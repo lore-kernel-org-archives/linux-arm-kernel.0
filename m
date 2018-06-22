@@ -1,85 +1,92 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 22 Jun 2018 12:01:45 +0100
-Subject: [PATCHv4 4/4] ARM: versatile: support configuring versatile
- machine for no-MMU
-In-Reply-To: <nycvar.YSQ.7.76.1806211212010.16670@knanqh.ubzr>
-References: <20180618141905.7789-1-gerg@linux-m68k.org>
- <20180618141905.7789-5-gerg@linux-m68k.org>
- <CAMuHMdUyCEq0U_CJindwcSEF+0dR-SJc1v8zGT-CcUqVkdOeVw@mail.gmail.com>
- <nycvar.YSQ.7.76.1806211212010.16670@knanqh.ubzr>
-Message-ID: <20180622110145.GU17671@n2100.armlinux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 22 Jun 2018 12:16:15 +0100
+Subject: KVM guest sometimes failed to boot because of kernel stack
+ overflow if KPTI is enabled on a hisilicon ARM64 platform.
+In-Reply-To: <5B2CD33B.9020702@hisilicon.com>
+References: <5B2A7832.4010502@hisilicon.com>
+ <ebfabb8f-dcd9-3fb4-3655-368a882d8f09@arm.com>
+ <5B2A7FE1.5040607@hisilicon.com>
+ <e701eaa8-dcb9-777c-2211-67ee27b43acb@arm.com>
+ <20180621091850.GA22505@arm.com> <5B2B7A84.8090309@hisilicon.com>
+ <20180621105404.GB22505@arm.com> <5B2CB440.8040705@hisilicon.com>
+ <20180622092330.GD7601@arm.com> <5B2CD33B.9020702@hisilicon.com>
+Message-ID: <20180622111614.GA1150@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 21, 2018 at 12:24:04PM -0400, Nicolas Pitre wrote:
-> [ adding linux-kbuild for their input ]
+Hi Wei,
+
+Thanks for giving that a spin.
+
+On Fri, Jun 22, 2018 at 06:45:15PM +0800, Wei Xu wrote:
+> On 2018/6/22 17:23, Will Deacon wrote:
+> >On Fri, Jun 22, 2018 at 09:33:04AM +0100, Wei Xu wrote:
+> >>On 2018/6/21 11:54, Will Deacon wrote:
+> >>>On Thu, Jun 21, 2018 at 11:14:28AM +0100, Wei Xu wrote:
+> >>>>On 2018/6/21 10:18, Will Deacon wrote:
+> >>>>>Wei -- does the diff below help at all? Make sure you disable CONFIG_KASAN,
+> >>>>>otherwise your kernel will take an age to boot.
+> >>>>Yes, amazing! This patch resolved the issue.
+> >>>Great...
+> >>>
+> >>>>I have tested 50 times and can not reproduce the issue any more.
+> >>>>Could you please tell more why this patch works?
+> >>>You might need to ask your CPU design team ;)
+> >>>
+> >>>Without this patch, the code in idmap_kpti_install_ng_mappings() sets
+> >>>bit 11 in table descriptors so that we can keep track of which parts of
+> >>>the page table we've visited. With this patch, we don't bother tracking
+> >>>and potentially rewalk parts of the page table (which takes a very long
+> >>>time if KASAN is enabled).
+> >>Got it. Thanks!
+> >>
+> >>>The architecture documents I've looked at are clear that bit 11 is IGNORED
+> >>>by the CPU, which:
+> >>>
+> >>>   "Indicates that the architecture guarantees that the bit or field is not
+> >>>    interpreted or modified by hardware."
+> >>>
+> >>>Please can you double-check that your CPU is indeed ignoring bit 11 in
+> >>>non-leaf (table) descriptors?
+> >>Do the non-leaf(table) descriptors mean the table descriptors
+> >>of the section D4.3.1 "VMSAv8-64 translation table level 0, level 1, and level 2 descriptor formats"
+> >>in the ARM Architecture Reference Manual ARMv8 for ARMv8-A(DDI0487C_a_armv8_arm.pdf)?
+> >>
+> >>If yes, our hardware does ignore it(not interpret or modify).
+> >Ok, thanks for checking.
+> >
+> >>Is there any other possible reason cause this?
+> >Perhaps just writing back the table entries is enough to cause the issue,
+> >although I really can't understand why that would be the case. Can you try
+> >the diff below (without my previous change), please?
 > 
-> On Thu, 21 Jun 2018, Geert Uytterhoeven wrote:
-> 
-> > I'm afraid adding (duplicating) machine entries for nommu support is not a
-> > sustainable solutions. Any machine can run a nommu kernel, in theory.
-> > 
-> > I'm aware of the objection "but you cannot build a nommu kernel that can
-> > boot on multiple systems".  That's true (unless RAM/FLASH addresses are the
-> > same). So don't do that.
-> > 
-> > All of the above is true for XIP, too, hence applies with s/nommu/XIP/.
-> > One more reason not to have this duplication.
-> > 
-> > The current "ARM multiplatform" has actually two meanings:
-> >   1. It groups platforms that follow the "ARM multiplatform" framework,
-> >   2. It allows to build a single kernel that can be booted on multiple
-> >      platforms.
-> > To avoid the duplication, I think 2 should be relaxed when specialized
-> > options like XIP or NOMMU are selected.
-> > 
-> > I've just sent a patch to do that.
-> 
-> Your patch isn't wrong per se.  But it is not enough. The issue here 
-> would be easily fixed with some kconfig extension so that:
-> 
-> - If XIP or NOMMU is selected then only one target in the multiplatform 
->   set can be selected, basically turning it into a choice menu.
+> Thanks!
+> But it does not resolve the issue(only apply this patch based on 4.17.0).
 
-I don't think that's how it should work.  Consider the V7M case, where
-we have better standardisation of the physical address layout than
-previous ARM devices.  We have three platforms which are V7M compliant:
+Thanks, that's a useful data point. It means that it still crashes even if
+we write back the same table entries, so it's the fact that we're writing
+them at all which causes the problem, not the value that we write.
 
-- AT91
-- iMX
-- STM32
+Whilst looking at the code, we noticed a missing DMB. On the off-chance
+that it helps, can you try this instead please?
 
-These have separate symbols:
+Will
 
-menuconfig ARCH_AT91
-	bool "AT91/Microchip SoCs"
-	depends on ARCH_MULTI_V4T || ARCH_MULTI_V5 || ARCH_MULTI_V7 || ARM_SINGLE_ARMV7M
+--->8
 
-menuconfig ARCH_MXC
-	bool "Freescale i.MX family"
-	depends on ARCH_MULTI_V4_V5 || ARCH_MULTI_V6_V7 || ARM_SINGLE_ARMV7M
-
-menuconfig ARCH_STM32
-	bool "STMicroelectronics STM32 family" if ARM_SINGLE_ARMV7M || ARCH_MULTI_V7
-
-With your suggestion, you would become only build a kernel for one of
-these, but that is not the case today: it's possible to build a single
-kernel which supports all these platforms.
-
-So, I don't think we want your suggestion.
-
-What we have today is flexible enough that we can have the best of
-multiplatform vs the restrictions caused by the variance in hardware.
-IOW, what we have is a compromise, which I believe is a reasonable,
-functional, and good compromise that fits the real world physical
-conditions with the least amount of overhead.
-
-Every other suggestion I've seen posted has drawbacks, from artificially
-restricting what can be selected (eg, as in your case) to allowing more
-platforms to be selected thereby creating non-bootable kernels (eg, as
-in Geert's case.)
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+index 5f9a73a4452c..03646e6a2ef4 100644
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -217,8 +217,9 @@ ENDPROC(idmap_cpu_replace_ttbr1)
+ 
+ 	.macro __idmap_kpti_put_pgtable_ent_ng, type
+ 	orr	\type, \type, #PTE_NG		// Same bit for blocks and pages
+-	str	\type, [cur_\()\type\()p]	// Update the entry and ensure it
+-	dc	civac, cur_\()\type\()p		// is visible to all CPUs.
++	str	\type, [cur_\()\type\()p]	// Update the entry and ensure
++	dmb	sy				// that it is visible to all
++	dc	civac, cur_\()\type\()p		// CPUs.
+ 	.endm
+ 
+ /*
