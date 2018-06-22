@@ -1,48 +1,98 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 22 Jun 2018 14:30:10 -0400
-Subject: [PATCH V2 2/2] efi/fb: Convert PCI bus address to resource if
- translated by the bridge
-In-Reply-To: <CAKv+Gu-WXLXqHSmiS2MmAMXHLKK_kg+3EK6L2rvO0SzN-c0UMg@mail.gmail.com>
-References: <1526653072-7153-1-git-send-email-okaya@codeaurora.org>
- <1526653072-7153-2-git-send-email-okaya@codeaurora.org>
- <20180619222921.GA90490@bhelgaas-glaptop.roam.corp.google.com>
- <CAKv+Gu_voOZ7YUL8pckww4mTt4PVcu7y69mf-z7ZZe1bJ81Shw@mail.gmail.com>
- <2a805337-c0b5-e134-7695-5a543ecaa26a@codeaurora.org>
- <CAKv+Gu9HAJRHwjYLNjf+gg=1vFoFu3BJphifKKE-aR4o_MW84A@mail.gmail.com>
- <CAKv+Gu-WXLXqHSmiS2MmAMXHLKK_kg+3EK6L2rvO0SzN-c0UMg@mail.gmail.com>
-Message-ID: <37289a27-eb99-6a73-4d32-4a75edd11dcd@codeaurora.org>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Fri, 22 Jun 2018 11:31:14 -0700
+Subject: [PATCH] input: mtk-pmic-keys: Fix probe when no DT node present
+In-Reply-To: <20180622114228.8619-1-matthias.bgg@gmail.com>
+References: <20180622114228.8619-1-matthias.bgg@gmail.com>
+Message-ID: <20180622183114.GA92912@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/22/2018 2:01 PM, Ard Biesheuvel wrote:
->> Yes, it is part of the PCI I/O protocol definition. FrameBufferBase is
->> described as
->>
->> """
->> Base address of graphics linear frame buffer. Info contains
->> information required to allow software to draw directly to the
->> frame buffer without using Blt().Offset zero in
->> FrameBufferBase represents the upper left pixel of the
->> display.
->> """
-> I just tried AMD Radeon and NVidia graphics cards on a system with
-> non-1:1 mapped MMIO windows, and in both cases, the GOP protocol
-> structure is populated correctly, i.e., using the CPU address not the
-> PCIe address.
+On Fri, Jun 22, 2018 at 01:42:28PM +0200, Matthias Brugger wrote:
+> The drivers gets probed from a mfd devices. So the driver runs
+> probe although no DT node exists. This leads to a NULL pointer
+> dereference in the probe function. Check if a node exists and
+> error out in case none is present.
+
+Hmm, if a cell specifies of_compatible and no such node is present in DT
+maybe we should bail out in mfd_add_device() instead of pushing the
+check into individual drivers? Something like:
+
+diff --git a/drivers/mfd/mfd-core.c b/drivers/mfd/mfd-core.c
+index 94e3f32ce935..36a5fd98000d 100644
+--- a/drivers/mfd/mfd-core.c
++++ b/drivers/mfd/mfd-core.c
+@@ -137,6 +137,18 @@ static inline void mfd_acpi_add_device(const struct mfd_cell *cell,
+ }
+ #endif
+ 
++static struct device_node *mfd_get_node_for_cell(struct device *parent,
++						 const struct mfd_cell *cell)
++{
++	struct device_node *np;
++
++	for_each_child_of_node(parent->of_node, np)
++		if (of_device_is_compatible(np, cell->of_compatible))
++			return np;
++
++	return NULL;
++}
++
+ static int mfd_add_device(struct device *parent, int id,
+ 			  const struct mfd_cell *cell, atomic_t *usage_count,
+ 			  struct resource *mem_base,
+@@ -144,7 +156,6 @@ static int mfd_add_device(struct device *parent, int id,
+ {
+ 	struct resource *res;
+ 	struct platform_device *pdev;
+-	struct device_node *np = NULL;
+ 	int ret = -ENOMEM;
+ 	int platform_id;
+ 	int r;
+@@ -176,11 +187,11 @@ static int mfd_add_device(struct device *parent, int id,
+ 		goto fail_res;
+ 
+ 	if (parent->of_node && cell->of_compatible) {
+-		for_each_child_of_node(parent->of_node, np) {
+-			if (of_device_is_compatible(np, cell->of_compatible)) {
+-				pdev->dev.of_node = np;
+-				break;
+-			}
++		pdev->dev.of_node = mfd_get_node_for_cell(parent, cell);
++		if (!pdev->dev.of_node) {
++			dev_err(parent, "unable to locate node for %s (%s)\n",
++				cell->name, cell->of_compatible);
++			goto fail_res;
+ 		}
+ 	}
+ 
+Lee?
+
 > 
-> EDK2 only recently gained support for MMIO translation in the host
-> bridge driver, so I so wonder if this is a platform issue rather than
-> a driver issue. It may be worth a try to dump the results of
-> GetBarAttributes() of all PCI I/O protocol instances (either in UEFI
-> or in the stub), to double check that the correct values are returned.
+> Fixes: 3e9f0b3e2b27 ("input: Add MediaTek PMIC keys support")
+> Signed-off-by: Matthias Brugger <mbrugger@suse.com>
+> ---
+>  drivers/input/keyboard/mtk-pmic-keys.c | 3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> diff --git a/drivers/input/keyboard/mtk-pmic-keys.c b/drivers/input/keyboard/mtk-pmic-keys.c
+> index 02c67a1749fc..388043e1939c 100644
+> --- a/drivers/input/keyboard/mtk-pmic-keys.c
+> +++ b/drivers/input/keyboard/mtk-pmic-keys.c
+> @@ -257,6 +257,9 @@ static int mtk_pmic_keys_probe(struct platform_device *pdev)
+>  	const struct of_device_id *of_id =
+>  		of_match_device(of_mtk_pmic_keys_match_tbl, &pdev->dev);
+>  
+> +	if (of_id == NULL)
+> +		return -ENODEV;
+> +
+>  	keys = devm_kzalloc(&pdev->dev, sizeof(*keys), GFP_KERNEL);
+>  	if (!keys)
+>  		return -ENOMEM;
+> -- 
+> 2.17.1
 > 
 
-Thanks for checking out other platforms. I'll mark the issue as a BIOS
-issue and bounce your feedback to the BIOS provider.
-
-Let's hold onto this patch for the moment.
+Thanks.
 
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Dmitry
