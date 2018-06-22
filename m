@@ -1,66 +1,40 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 22 Jun 2018 21:33:36 +0100
-Subject: [PATCHv4 4/4] ARM: versatile: support configuring versatile
- machine for no-MMU
-In-Reply-To: <TY1PR01MB1562F7C31AF6AFC4A1BBA1748A750@TY1PR01MB1562.jpnprd01.prod.outlook.com>
-References: <nycvar.YSQ.7.76.1806211212010.16670@knanqh.ubzr>
- <20180622110145.GU17671@n2100.armlinux.org.uk>
- <nycvar.YSQ.7.76.1806221110140.16670@knanqh.ubzr>
- <CAMuHMdWZPM3Q9fVXWiw1bMVWNRCYGoQa-XukJka-2xsP-=HmVQ@mail.gmail.com>
- <nycvar.YSQ.7.76.1806221146140.16670@knanqh.ubzr>
- <TY1PR01MB15624342267F973525BF45698A750@TY1PR01MB1562.jpnprd01.prod.outlook.com>
- <nycvar.YSQ.7.76.1806221244490.16670@knanqh.ubzr>
- <TY1PR01MB1562C54E8DD3942F40F8CBBD8A750@TY1PR01MB1562.jpnprd01.prod.outlook.com>
- <20180622183838.GZ17671@n2100.armlinux.org.uk>
- <TY1PR01MB1562F7C31AF6AFC4A1BBA1748A750@TY1PR01MB1562.jpnprd01.prod.outlook.com>
-Message-ID: <20180622203336.GA17671@n2100.armlinux.org.uk>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Fri, 22 Jun 2018 16:17:24 -0500
+Subject: [PATCH 1/2] hwrng: msm: add a spinlock and support for blocking
+ reads
+In-Reply-To: <4bc0afe1-0189-88c0-40aa-23a312325635@codeaurora.org>
+References: <1529594276-12210-1-git-send-email-timur@codeaurora.org>
+ <acc7e9d3-8a81-ff15-27c7-78ec7c17f6cc@linaro.org>
+ <6d655b97-418e-bacf-7e88-b9179cdc6fd1@codeaurora.org>
+ <152968991381.16708.522979730327886581@swboyd.mtv.corp.google.com>
+ <4bc0afe1-0189-88c0-40aa-23a312325635@codeaurora.org>
+Message-ID: <2ad6d37c-66eb-c173-95bc-f838d03e6741@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 22, 2018 at 08:25:06PM +0000, Chris Brandt wrote:
-> On Friday, June 22, 2018, Russell King - ARM Linux wrote:
-> > > There are configs options today that you can select, but unless some
-> > > external criteria is  met during build time, the build will fail (like
-> > > with a "missing .h file" message or something)
-> > 
-> > Such as?  I don't think that's found by the randconfig builders - I've
-> > never noticed any such failures on ARM.
+On 06/22/2018 01:03 PM, Timur Tabi wrote:
 > 
-> I got this set once by accident after a kernel update
+>> Perhaps it's because you implemented the 'wait' functionality in this
+>> driver? Before the patch there wasn't any sort of wait check so we would
+>> bail out if there wasn't any data even if the caller requested that we
+>> wait for randomness to be available.
 > 
->    CONFIG_SYSTEM_TRUSTED_KEYRING=y
-> 
-> which then let me to this error:
-> 
->   HOSTCC  scripts/extract-cert
-> ../scripts/extract-cert.c:21:25: fatal error: openssl/bio.h: No such file or directory
-> compilation terminated.
+> No, my tests showed the race condition (or at least something that looks 
+> like a race condition) even without the 'wait' feature.? I added support 
+> for 'wait' only recently, but I've been working with the crypto people 
+> for a month on everything else.
 
-Hmm.  Is that a problem if the documented minimum requirements to build
-the kernel are violated?  It seems the openssl 1.0.0 development package
-is required to build kernels v4.3 and beyond.
+Looks like I was wrong.
 
-Here's what Documentation/process/changes.rst has to say about it:
+I created some new tests to reproduce the problem, but I can't reproduce 
+it any more.  I can only assume that what I saw as a race condition back 
+then was something else entirely.
 
-Current Minimal Requirements
-****************************
-...
-====================== ===============  ========================================
-        Program        Minimal version       Command to check the version
-====================== ===============  ========================================
-openssl & libcrypto    1.0.0            openssl version
-...
-OpenSSL
--------
-
-Module signing and external certificate handling use the OpenSSL program and
-crypto library to do key creation and signature generation.
-
-You will need openssl to build kernels 3.7 and higher if module signing is
-enabled.  You will also need openssl development packages to build kernels 4.3
-and higher.
+So all of the spinlock code needs to go.  It looks like at this point, 
+if Vinod can add support for QCOM8160 to his patches, the only thing I 
+can contribute is support for 'wait'.
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
