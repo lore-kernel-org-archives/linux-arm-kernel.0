@@ -1,50 +1,51 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 22 Jun 2018 17:11:01 +0100
-Subject: [PATCHv4 4/4] ARM: versatile: support configuring versatile
- machine for no-MMU
-In-Reply-To: <nycvar.YSQ.7.76.1806221146140.16670@knanqh.ubzr>
-References: <20180618141905.7789-1-gerg@linux-m68k.org>
- <20180618141905.7789-5-gerg@linux-m68k.org>
- <CAMuHMdUyCEq0U_CJindwcSEF+0dR-SJc1v8zGT-CcUqVkdOeVw@mail.gmail.com>
- <nycvar.YSQ.7.76.1806211212010.16670@knanqh.ubzr>
- <20180622110145.GU17671@n2100.armlinux.org.uk>
- <nycvar.YSQ.7.76.1806221110140.16670@knanqh.ubzr>
- <CAMuHMdWZPM3Q9fVXWiw1bMVWNRCYGoQa-XukJka-2xsP-=HmVQ@mail.gmail.com>
- <nycvar.YSQ.7.76.1806221146140.16670@knanqh.ubzr>
-Message-ID: <20180622161101.GW17671@n2100.armlinux.org.uk>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Sat, 23 Jun 2018 00:06:31 +0800
+Subject: [PATCH 2/2] arm64: allwinner: a64: allow laptops to wake up from lid
+In-Reply-To: <20180622160631.8578-1-icenowy@aosc.io>
+References: <20180622160631.8578-1-icenowy@aosc.io>
+Message-ID: <20180622160631.8578-2-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 22, 2018 at 11:57:32AM -0400, Nicolas Pitre wrote:
-> That is no longer a kernel config/build issue if you the system 
-> integrator put an XIP kernel on a target with the wrong DT.
-> 
-> The XIP kernel does require that you provide the actual memory base 
-> address as a constant to the build system but that could be extracted 
-> directly from the DT data if having a kconfig prompt for that is too 
-> unwieldy. The new kconfig macro language in mainline could even be 
-> leveraged to do that at config time.
+Currently all ARM kernels will have s2idle enabled if CONFIG_SUSPEND is
+present. In this case if the lid is closed, systemd-logind will enter
+s2idle mode by default; however there's no possible wakeup source
+defined, so the system will enter a forever idle.
 
-That is actually incorrect - you're too used to the dynamic fixup of
-virt_to_phys() and friends now!
+Add the lid itself as a wakeup source, thus the system can wakeup when
+the lid is opened.
 
-Given that XIP is typically used in environments where the kernel text
-is very much unmodifyable, we disable CONFIG_ARM_PATCH_PHYS_VIRT.  When
-disabled, we use a constant translation, based upon the build-time
-CONFIG_PHYS_OFFSET and CONFIG_PAGE_OFFSET settings.
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+---
+This patch is not related with the first patch, and have no dependency.
 
-The early assembler relies upon these settings - which must be known
-before we enable the MMU.  As such, DT parsing is not available to us
-at that point (as we can't run any C code, because we won't be calling
-it at the address it was linked for.)
+ arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts | 1 +
+ arch/arm64/boot/dts/allwinner/sun50i-a64-teres-i.dts  | 1 +
+ 2 files changed, 2 insertions(+)
 
-I suppose someone who was sufficiently motivated could write assembly-
-based parsing of DT to extract the memory regions and work out what the
-right settings are.  Is there really the motivation to do that - there
-was a burst of XIP interest a few releases ago but it seems to have
-tailed off.
-
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
+index 58253d6f9be1..e6e5bf11b759 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
+@@ -49,6 +49,7 @@
+ 			linux,input-type = <EV_SW>;
+ 			linux,code = <SW_LID>;
+ 			linux,can-disable;
++			wakeup-source;
+ 		};
+ 	};
+ 
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-teres-i.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-teres-i.dts
+index 02fecc42440c..33f78e745815 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-teres-i.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-teres-i.dts
+@@ -38,6 +38,7 @@
+ 			gpios = <&r_pio 0 8 GPIO_ACTIVE_LOW>; /* PL8 */
+ 			linux,input-type = <EV_SW>;
+ 			linux,code = <SW_LID>;
++			wakeup-source;
+ 		};
+ 	};
+ 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+2.17.1
