@@ -1,50 +1,89 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Fri, 22 Jun 2018 15:08:25 +0200
-Subject: [Dev] [PATCH 0/5] RFC: Mezzanine handling for 96boards
-In-Reply-To: <CAMuUZTH8wXhoBSKwsCFBRBzAvvBBTUTnkmwKEpq=56=URo7kjQ@mail.gmail.com>
-References: <20180618074556.6944-1-linus.walleij@linaro.org>
- <CAK8P3a2KqoX-squhGc8TBuJ==8xxELsuy-H+c1+C7Fu7Z4OjDA@mail.gmail.com>
- <CAKv+Gu-gAkfRsEUOc=iyxi6Twvg9cbvWNqNHRS2HzUDZg8xUhg@mail.gmail.com>
- <CAMuUZTG0q4f2T=+HjEijUCLb7KNXok9RJHOXOKNs2iap5p7m5Q@mail.gmail.com>
- <CAKv+Gu_Dq1uY0wHRyREmCmQdSRSJbNheF1ZsrNhibKOZowvf+g@mail.gmail.com>
- <CAMuUZTHOuzQm3y-yF6cad9y1UgsK+6R2w7vSzz7MkkYCdYd3hA@mail.gmail.com>
- <CAKv+Gu80zzaahJhoMScvZ9dS31QobMa0+JFjaOo-GxD+4XsuWQ@mail.gmail.com>
- <CAMuUZTH8wXhoBSKwsCFBRBzAvvBBTUTnkmwKEpq=56=URo7kjQ@mail.gmail.com>
-Message-ID: <616e99d3-b43e-58ca-aa82-eaf41f618682@xilinx.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Fri, 22 Jun 2018 08:11:07 -0500
+Subject: [PATCH 1/2] hwrng: msm: add a spinlock and support for blocking
+ reads
+In-Reply-To: <152964579304.16708.2651020848216712299@swboyd.mtv.corp.google.com>
+References: <1529594276-12210-1-git-send-email-timur@codeaurora.org>
+ <152964579304.16708.2651020848216712299@swboyd.mtv.corp.google.com>
+Message-ID: <33df2915-ae2e-3cbd-fa84-b3d83bcc82b6@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19.6.2018 17:32, Yang Zhang wrote:
-> On 19 June 2018 at 16:30, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+On 6/22/18 12:36 AM, Stephen Boyd wrote:
+> Quoting Timur Tabi (2018-06-21 08:17:55)
+>> @@ -96,11 +110,39 @@ static int msm_rng_read(struct hwrng *hwrng, void *data, size_t max, bool wait)
+>>   
+>>          /* read random data from hardware */
+>>          do {
+>> -               val = readl_relaxed(rng->base + PRNG_STATUS);
+>> -               if (!(val & PRNG_STATUS_DATA_AVAIL))
+>> -                       break;
+>> +               spin_lock(&rng->lock);
+>> +
+>> +               /*
+>> +                * First check the status bit.  If 'wait' is true, then wait
+>> +                * up to TIMEOUT microseconds for data to be available.
+>> +                */
+>> +               if (wait) {
+>> +                       int ret;
+> Please don't do local variables like this. Put them at the top of the
+> function.
+
+Ok.
+
 > 
->> On 19 June 2018 at 17:26, Yang Zhang <yang.zhang@96boards.org> wrote:
->>> Yes.
->>>
->>> https://github.com/96boards/documentation/blob/master/
->> mezzanine/files/mezzanine-design-guidelines.pdf
->>>
->>> Under Configuration data section
->>>
->>
->> OK, fair enough. Do any such mezzanines exist yet? Should we offer
->> more guidance on how exactly this discovery should be implemented?
->>
->>
-> I can't be sure, could look into it - I know there were couple of from
-> Arrow and ST were supporting this.
+>> +
+>> +                       ret = readl_poll_timeout_atomic(rng->base + PRNG_STATUS,
+>> +                               val, val & PRNG_STATUS_DATA_AVAIL, 0, TIMEOUT);
+>> +                       if (ret) {
+>> +                               /* Timed out */
+>> +                               spin_unlock(&rng->lock);
+>> +                               break;
+>> +                       }
+>> +               } else {
+>> +                       val = readl_relaxed(rng->base + PRNG_STATUS);
+>> +                       if (!(val & PRNG_STATUS_DATA_AVAIL)) {
+>> +                               spin_unlock(&rng->lock);
+>> +                               break;
+>> +                       }
+>> +               }
+>>   
+>>                  val = readl_relaxed(rng->base + PRNG_DATA_OUT);
+>> +               spin_unlock(&rng->lock);
+> Maybe this should be written as:
 > 
-> Yes, more details guidance of "How to" is always welcome :-).
+> 		spin_lock()
+> 		if (wait) {
+> 			has_data = readl_poll_timeout_atomic(...) == 0;
+> 		} else {
+> 			val = readl_relaxed(rng->base + PRNG_STATUS);
+> 			has_data = val & PRNG_STATUS_DATA_AVAIL;
+> 		}
+> 
+> 		if (has_data)
+> 			val = readl_relaxed(rng->base + PRNG_DATA_OUT);
+> 		spin_unlock();
+> 
+> 		if (!has_data)
+> 			break;
 
-Unfortunately this is not saying i2c address and also how to handle
-stacked solution.
+That would work, but I don't really see this as better, just different.
 
-I have told to Linus what Xilinx is using for FMC connector present on
-the most of xilinx development boards.
-These on board FMC eeproms contain information in FRU format.
-Also there incomplete support fmc support in the kernel in drivers/fmc
-which was added by Alessandro Rubini in 2013.
+>> +               /*
+>> +                * Zero is technically a valid random number, but it's also
+>> +                * the value returned if the PRNG is not enabled properly.
+>> +                * To avoid accidentally returning all zeros, treat it as
+>> +                * invalid and just return what we've already read.
+>> +                */
+>>                  if (!val)
+>>                          break;
+> Is this a related change? Looks like a nice comment that isn't related
+> to locking.
 
-At least these eeprom could reuse FRU data format.
+It's slightly related in that the locking is needed to reduce the number 
+of times we read zero from the DATA_OUT register.
 
-Thanks,
-Michal
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
