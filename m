@@ -1,44 +1,42 @@
 From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Fri, 22 Jun 2018 14:33:06 +0800
-Subject: [PATCH 2/2] usb: core: phy: fix return value checking about
- devm_of_phy_get_by_index()
-In-Reply-To: <4c338a129ab14ab41949da5e3c21aed0d77dff8d.1529647619.git.chunfeng.yun@mediatek.com>
-References: <4c338a129ab14ab41949da5e3c21aed0d77dff8d.1529647619.git.chunfeng.yun@mediatek.com>
-Message-ID: <644d00edd2932c1a0d0a1bf368dd25427d1d9f64.1529647619.git.chunfeng.yun@mediatek.com>
+Date: Fri, 22 Jun 2018 14:33:05 +0800
+Subject: [PATCH 1/2] usb: gadget: composite: fix delayed_status race condition
+ when set_interface
+Message-ID: <4c338a129ab14ab41949da5e3c21aed0d77dff8d.1529647619.git.chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-1. use IS_ERR() but not IS_ERR_OR_NULL() because devm_of_phy_get_by_index()
-    never return NULL value;
-2. devm_of_phy_get_by_index() should not fail for a valid index
+It happens when enable debug log, if set_alt() returns
+USB_GADGET_DELAYED_STATUS and usb_composite_setup_continue()
+is called before increasing count of @delayed_status,
+so fix it by using spinlock of @cdev->lock.
 
 Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+Tested-by: Jay Hsu <shih-chieh.hsu@mediatek.com>
 ---
- drivers/usb/core/phy.c | 11 ++++-------
- 1 file changed, 4 insertions(+), 7 deletions(-)
+ drivers/usb/gadget/composite.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/drivers/usb/core/phy.c b/drivers/usb/core/phy.c
-index 9879767..0f972e1 100644
---- a/drivers/usb/core/phy.c
-+++ b/drivers/usb/core/phy.c
-@@ -23,14 +23,11 @@ static int usb_phy_roothub_add_phy(struct device *dev, int index,
- 				   struct list_head *list)
- {
- 	struct usb_phy_roothub *roothub_entry;
--	struct phy *phy = devm_of_phy_get_by_index(dev, dev->of_node, index);
-+	struct phy *phy;
- 
--	if (IS_ERR_OR_NULL(phy)) {
--		if (!phy || PTR_ERR(phy) == -ENODEV)
--			return 0;
--		else
--			return PTR_ERR(phy);
--	}
-+	phy = devm_of_phy_get_by_index(dev, dev->of_node, index);
-+	if (IS_ERR(phy))
-+		return PTR_ERR(phy);
- 
- 	roothub_entry = devm_kzalloc(dev, sizeof(*roothub_entry), GFP_KERNEL);
- 	if (!roothub_entry)
+diff --git a/drivers/usb/gadget/composite.c b/drivers/usb/gadget/composite.c
+index f242c2b..d2fa071 100644
+--- a/drivers/usb/gadget/composite.c
++++ b/drivers/usb/gadget/composite.c
+@@ -1719,6 +1719,8 @@ static int fill_ext_prop(struct usb_configuration *c, int interface, u8 *buf)
+ 		 */
+ 		if (w_value && !f->get_alt)
+ 			break;
++
++		spin_lock(&cdev->lock);
+ 		value = f->set_alt(f, w_index, w_value);
+ 		if (value == USB_GADGET_DELAYED_STATUS) {
+ 			DBG(cdev,
+@@ -1728,6 +1730,7 @@ static int fill_ext_prop(struct usb_configuration *c, int interface, u8 *buf)
+ 			DBG(cdev, "delayed_status count %d\n",
+ 					cdev->delayed_status);
+ 		}
++		spin_unlock(&cdev->lock);
+ 		break;
+ 	case USB_REQ_GET_INTERFACE:
+ 		if (ctrl->bRequestType != (USB_DIR_IN|USB_RECIP_INTERFACE))
 -- 
 1.9.1
