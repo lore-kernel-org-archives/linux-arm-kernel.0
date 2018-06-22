@@ -1,59 +1,79 @@
-From: david.wu@rock-chips.com (David Wu)
-Date: Fri, 22 Jun 2018 16:13:13 +0800
-Subject: [PATCH v2] net: ethernet: stmmac: dwmac-rk: Add GMAC support for
- PX30
-In-Reply-To: <18221590.FEDROxemCD@phil>
-References: <1528956927-32440-1-git-send-email-david.wu@rock-chips.com>
- <2582999.2hZx6CH9S6@diego>
- <157ecfc9-d0e6-7782-1cbc-d0fb76c81edb@rock-chips.com>
- <18221590.FEDROxemCD@phil>
-Message-ID: <7baeda9c-d7c4-e491-e18d-30afefa98c96@rock-chips.com>
+From: yaojun8558363@gmail.com (Jun Yao)
+Date: Fri, 22 Jun 2018 16:15:11 +0800
+Subject: [PATCH 1/1] arm64/mm: move
+ {idmap_pg_dir,tramp_pg_dir,swapper_pg_dir} to .rodata section
+In-Reply-To: <CAKv+Gu8=jxY0qfMk53L8p5+x8HoE1DRy7W_p42ji9omGBc6QSA@mail.gmail.com>
+References: <20180620085755.20045-1-yaojun8558363@gmail.com>
+ <20180620085755.20045-2-yaojun8558363@gmail.com>
+ <CAKv+Gu8_=uTJFDXr0GpGMc=9WZ9tbz305CE6i=qbnqRB=suRVA@mail.gmail.com>
+ <20180621025141.GB11276@toy>
+ <CAKv+Gu_3Cfuq-qQuRHkYCB2uTPOK=KVeVh4OKmtu2MDYwfOtTA@mail.gmail.com>
+ <70ebe6d7-0745-5606-ae89-8a7b2fb62008@arm.com>
+ <CAKv+Gu-t5ErL89J=sxeVRYzDNrB1Ejdj+XOggAMWk-gY7ewsOg@mail.gmail.com>
+ <67a238a8-e4db-6bf1-6da5-62ca9536191f@arm.com>
+ <CAKv+Gu8=jxY0qfMk53L8p5+x8HoE1DRy7W_p42ji9omGBc6QSA@mail.gmail.com>
+Message-ID: <20180622081511.GA11076@toy>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+Hi Ard,
 
-? 2018?06?22? 15:30, Heiko Stuebner ??:
-> Hi David,
+On Thu, Jun 21, 2018 at 07:27:01PM +0200, Ard Biesheuvel wrote:
+> On 21 June 2018 at 19:04, James Morse <james.morse@arm.com> wrote:
+> > On 21/06/18 10:29, Ard Biesheuvel wrote:
+> >> On 21 June 2018 at 10:59, James Morse <james.morse@arm.com> wrote:
+> >>> On 21/06/18 07:39, Ard Biesheuvel wrote:
+> >>>> On 21 June 2018 at 04:51, Jun Yao <yaojun8558363@gmail.com> wrote:
+> >>>>> On Wed, Jun 20, 2018 at 12:09:49PM +0200, Ard Biesheuvel wrote:
+> >>>>>> As for swapper_pg_dir, it would indeed be nice if we could keep those
+> >>>>>> mappings read-only most of the time, but I'm not sure how useful this
+> >>>>>> is if we apply it to the root level only.
+> >>>>>
+> >>>>> The purpose of it is to make 'KSMA' harder, where an single arbitrary
+> >>>>> write is used to add a block mapping to the page-tables, giving the
+> >>>>> attacker full access to kernel memory. That's why we just apply it to
+> >>>>> the root level only. If the attacker can arbitrary write multiple times,
+> >>>>> I think it's hard to defend.
+> >>>>
+> >>>> So the assumption is that the root level is more easy to find?
+> >>>> Otherwise, I'm not sure I understand why being able to write a level 0
+> >>>> entry is so harmful, given that we don't have block mappings at that
+> >>>> level.
+> >>>
+> >>> I think this thing assumes 3-level page tables with 39bit VA.
+> >
+> >> The attack, you mean? Because this code is unlikely to build with that
+> >> configuration, given that __pgd_populate() BUILD_BUG()s in that case.
+> >
+> > Yes, the attack. (I struggle to think of it as an 'attack' because you already
+> > have arbitrary write...)
+> >
 > 
-> Am Mittwoch, 20. Juni 2018, 04:40:35 CEST schrieb David Wu:
->> ? 2018?06?14? 16:30, Heiko St?bner ??:
->>> Am Donnerstag, 14. Juni 2018, 10:14:31 CEST schrieb David Wu:
->>>> Hi Heiko,
->>>>
->>>> ? 2018?06?14? 15:54, Heiko St?bner ??:
->>>>> I don't see that new clock documented in the dt-binding.
->>>>> Also, which clock from the clock-controller does this connect to?
->>>>
->>>> The clock is the "SCLK_GMAC_RMII" at the clock-controller, which could
->>>> be set rate by the link speed.
->>>
->>> Hmm, while these huge number of clocks are somewhat strange,
->>> shouldn't it be named something with _rmii instead of _speed then?
->>
->> Okay, it is better to be named _speed.
->>
->>>
->>> Also, I don't see any clk_enable action for that new clock, so you could
->>> end up with being off?
->>
->> The new speed is the parent of the clk_tx_rx, to enable/disable
->> clk_tx_rx, the new clock would be also enabled/disabled.
+> OK, so in that case, you can abuse your single arbitrary write to map
+> an entire 1 GB block of memory with arbitrary permissions, allowing
+> userland to take control of the contents, right? And if you know the
+> virtual and physical addresses of swapper_pg_dir, you can make sure
+> this block covers the entire kernel, allowing the attacker to
+> manipulate all core kernel code and statically allocated data
+> structures.
 > 
-> Still it is nicer to really enable it, so that the clock-framework can keep
-> track of usage counts.
-> 
-> Because also no-one hinders the chip-designer from putting a gate in
-> between in one of the next socs ;-)
+> What I don't understand about this patch is how it is sufficient to
+> only remap swapper_pg_dir r/w for updates on kernels that use 4 level
+> paging.
 > 
 
-Okay, i will add the enable/disable for clk_mac_speed.
-  ;-)
+Sorry, It's my mistake.
 
-> 
-> Heiko
-> 
-> 
-> 
-> 
-> 
+To my best knowledge, to defend 'KSMA', we need to handle these
+configurations:
+
+1. ARM64_4K_PAGES && ARM64_VA_BITS_39 (PGTABLE_LEVELS = 3, 1GB block)
+2. ARM64_16K_PAGES && ARM64_VA_BITS_36 (PGTABLE_LEVELS = 2, 32MB block)
+3. ARM64_64K_PAGES && ARM64_VA_BITS_42 (PGTABLE_LEVELS = 2, 512MB block)
+
+If these configurations are selected, we move {idmap_pg_dir,
+tramp_pg_dir, reserved_ttbr0, swapper_pg_dir} to .rodata section(avoid
+modifying tramp_(un)map_kernel), and remap swapper_pg_dir r/w for updates.
+If these configurations are not selected, we just keep them as they are.
+
+Do you think this is okay?
