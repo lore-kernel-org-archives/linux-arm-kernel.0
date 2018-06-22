@@ -1,8 +1,8 @@
-From: Chris.Brandt@renesas.com (Chris Brandt)
-Date: Fri, 22 Jun 2018 20:25:06 +0000
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 22 Jun 2018 22:28:45 +0200
 Subject: [PATCHv4 4/4] ARM: versatile: support configuring versatile
  machine for no-MMU
-In-Reply-To: <20180622183838.GZ17671@n2100.armlinux.org.uk>
+In-Reply-To: <TY1PR01MB1562F7C31AF6AFC4A1BBA1748A750@TY1PR01MB1562.jpnprd01.prod.outlook.com>
 References: <20180618141905.7789-5-gerg@linux-m68k.org>
  <CAMuHMdUyCEq0U_CJindwcSEF+0dR-SJc1v8zGT-CcUqVkdOeVw@mail.gmail.com>
  <nycvar.YSQ.7.76.1806211212010.16670@knanqh.ubzr>
@@ -14,31 +14,41 @@ References: <20180618141905.7789-5-gerg@linux-m68k.org>
  <nycvar.YSQ.7.76.1806221244490.16670@knanqh.ubzr>
  <TY1PR01MB1562C54E8DD3942F40F8CBBD8A750@TY1PR01MB1562.jpnprd01.prod.outlook.com>
  <20180622183838.GZ17671@n2100.armlinux.org.uk>
-Message-ID: <TY1PR01MB1562F7C31AF6AFC4A1BBA1748A750@TY1PR01MB1562.jpnprd01.prod.outlook.com>
+ <TY1PR01MB1562F7C31AF6AFC4A1BBA1748A750@TY1PR01MB1562.jpnprd01.prod.outlook.com>
+Message-ID: <CAMuHMdV51EvpFWqkRgwJfpU-hSxYiPJ0j2o4npRCTeZXQ-R74w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, June 22, 2018, Russell King - ARM Linux wrote:
-> > There are configs options today that you can select, but unless some
-> > external criteria is  met during build time, the build will fail (like
-> > with a "missing .h file" message or something)
-> 
-> Such as?  I don't think that's found by the randconfig builders - I've
-> never noticed any such failures on ARM.
+Hi Chris,
 
-I got this set once by accident after a kernel update
+On Fri, Jun 22, 2018 at 10:25 PM Chris Brandt <Chris.Brandt@renesas.com> wrote:
+> On Friday, June 22, 2018, Russell King - ARM Linux wrote:
+> > > There are configs options today that you can select, but unless some
+> > > external criteria is  met during build time, the build will fail (like
+> > > with a "missing .h file" message or something)
+> >
+> > Such as?  I don't think that's found by the randconfig builders - I've
+> > never noticed any such failures on ARM.
+>
+> I got this set once by accident after a kernel update
+>
+>    CONFIG_SYSTEM_TRUSTED_KEYRING=y
+>
+> which then let me to this error:
+>
+>   HOSTCC  scripts/extract-cert
+> ../scripts/extract-cert.c:21:25: fatal error: openssl/bio.h: No such file or directory
+> compilation terminated.
 
-   CONFIG_SYSTEM_TRUSTED_KEYRING=y
+Which just means libssl-dev became a build dependency.
 
-which then let me to this error:
+Gr{oetje,eeting}s,
 
-  HOSTCC  scripts/extract-cert
-../scripts/extract-cert.c:21:25: fatal error: openssl/bio.h: No such file or directory
-compilation terminated.
+                        Geert
 
+-- 
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-
-Regardless, I take your opinion as valid.
-
-
-Chris
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
