@@ -1,58 +1,116 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 22 Jun 2018 15:55:19 +0200
-Subject: [PATCH V2 2/2] efi/fb: Convert PCI bus address to resource if
- translated by the bridge
-In-Reply-To: <2a805337-c0b5-e134-7695-5a543ecaa26a@codeaurora.org>
-References: <1526653072-7153-1-git-send-email-okaya@codeaurora.org>
- <1526653072-7153-2-git-send-email-okaya@codeaurora.org>
- <20180619222921.GA90490@bhelgaas-glaptop.roam.corp.google.com>
- <CAKv+Gu_voOZ7YUL8pckww4mTt4PVcu7y69mf-z7ZZe1bJ81Shw@mail.gmail.com>
- <2a805337-c0b5-e134-7695-5a543ecaa26a@codeaurora.org>
-Message-ID: <CAKv+Gu9HAJRHwjYLNjf+gg=1vFoFu3BJphifKKE-aR4o_MW84A@mail.gmail.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Fri, 22 Jun 2018 09:01:25 -0500
+Subject: [PATCH 1/2] IB/hfi1: Try slot reset before secondary bus reset
+In-Reply-To: <2593baec-8a28-a3e7-7ebf-7c21addda0b8@codeaurora.org>
+References: <1524167784-5911-1-git-send-email-okaya@codeaurora.org>
+ <20180619214346.GD33049@bhelgaas-glaptop.roam.corp.google.com>
+ <2593baec-8a28-a3e7-7ebf-7c21addda0b8@codeaurora.org>
+Message-ID: <20180622140125.GD108993@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 June 2018 at 15:52, Sinan Kaya <okaya@codeaurora.org> wrote:
-> Hi Ard,
->
-> On 6/22/2018 7:21 AM, Ard Biesheuvel wrote:
->> Apologies for only bringing this up now, but I think this patch is
->> wrong after all.
->>
->> screen_info.lfb_base is supposed to be a CPU address, and so
->> translating it like this is wrong. If you end up with a PCI address
->> here, you have made a mistake in hacking support for PCI outbound
->> translations into UEFI. Other users such as UEFI itself or GRUB will
->> treat this as a CPU physical address as well, so the kernel should not
->> treat it any differently.
->
-> The behavior I'm seeing is from a UEFI BIOS vendor. I did not write the
-> code for it...
->
-> I was asked to debug it.
->
-> I'd like to dive into your statement about UEFI and GRUB using this address
-> as physical addresses.
->
-> AFAIK, all PCI outbound requests go through PCI IO protocol in UEFI and the
-> translation information is hidden inside the UEFI PCI Host Bridge driver.
-> Drivers are not allowed to access PCI resources directly especially as a
-> memory mapped address.
->
-> This particular vendor is programming the BAR address into the GOP protocol.
-> Since the host bridge driver is doing a translation, we are hitting this
-> issue.
->
-> Is there a UEFI spec reference about the definition of this field?
->
+[+cc Alex]
 
-Yes, it is part of the PCI I/O protocol definition. FrameBufferBase is
-described as
+On Tue, Jun 19, 2018 at 06:21:43PM -0400, Sinan Kaya wrote:
+> On 6/19/2018 5:43 PM, Bjorn Helgaas wrote:
+> >> Hotplug driver removes the device from system when a link down interrupt
+> >> is observed and performs re-enumeration when link up interrupt is observed.
+> >>
+> >> This conflicts with what this code is trying to do. Try secondary bus reset
+> >> only if pci_reset_slot() fails/unsupported.
+> > Hi Sinan,
+> > 
+> > We had a bunch of discussion here but not sure we ever reached a
+> > consensus.  It did seem like we'd like to avoid putting hotplug
+> > knowledge in drivers, though.  What do you think the path forward is?
+> > 
+> 
+> There are multiple issues. 
+> 
+> We discussed the need for a retrain API on this thread. However,
+> retrain API may not be enough for this particular usage as the
+> device might need a full link training sequence following firmware
+> load including a hot reset message. I don't think we can remove the
+> bus reset usage in this code.
+> 
+> I'd like to start with a small one to address your comment here.
+> 
+> "I think my concern is that knowledge about this reset/link
+> down/hotplug issue is leaking out and we'll end up with different
+> reset interfaces that may or may not result in hotplug events.  This
+> seems like a confusing API because it's hard to explain which
+> interface a driver should use."
+> 
+> I'm thinking of removing pci_reset_slot() and pci_try_reset_slot()
+> functions as an exported API and fold them into pci_reset_bus() and
+> pci_try_reset_bus() API respectively.
 
-"""
-Base address of graphics linear frame buffer. Info contains
-information required to allow software to draw directly to the
-frame buffer without using Blt().Offset zero in
-FrameBufferBase represents the upper left pixel of the
-display.
-"""
+pci_try_reset_slot() and pci_try_reset_bus() are both used by VFIO,
+but I don't see any callers of either pci_reset_slot() or
+pci_reset_bus().
+
+I suspect what happened was that we added pci_reset_slot(), used it
+in VFIO, found a deadlock, added pci_try_reset_slot(), and converted
+VFIO to use pci_try_reset_slot() to fix the deadlock, leaving no
+callers of pci_reset_slot() itself.
+
+  090a3c5322e9 ("PCI: Add pci_reset_slot() and pci_reset_bus()")
+  8b27ee60bfd6 ("vfio-pci: PCI hot reset interface")
+  61cf16d8bd38 ("PCI: Add pci_try_reset_function(), pci_try_reset_slot(), pci_try_reset_bus()")
+  890ed578df82 ("vfio-pci: Use pci "try" reset interface")
+
+I *think* pci_try_reset_slot() is already equivalent to pci_reset_slot()
+except that it returns -EAGAIN if it can't lock the slot.  But if you
+remove pci_reset_slot(), you could rename pci_try_reset_slot() to
+pci_reset_slot().  It doesn't seem like keeping "try" in the function
+name would be necessary.
+
+> This is what happens when you insert a fatal error to a hotplug
+> slot. See multiple link up/down messages.
+> 
+> /_#_[__333.699731]_pcieport_0001:00:00.0:_AER:_Uncorrected_(Fatal)_error_received:_id=0000
+> [  333.748116] pcieport 0001:00:00.0: PCIe Bus Error: severity=Uncorrected (Fatal), type=Transaction Layer, id
+> [  333.816044] pcieport 0001:00:00.0:   device [17cb:0404] error status/mask=00040000/00400000
+> [  333.871581] pcieport 0001:00:00.0:    [18] Malformed TLP          (First)
+> [  333.914675] pcieport 0001:00:00.0:   TLP Header: 40000001 000000ff 00000000 00000000
+> [  333.968397] pciehp 0001:00:00.0:pcie004: Slot(2): Link Down
+> [  334.043234] iommu: Removing device 0001:01:00.4 from group 0
+> [  334.095952] iommu: Removing device 0001:01:00.3 from group 0
+> [  334.144644] iommu: Removing device 0001:01:00.2 from group 0
+> [  334.194653] iommu: Removing device 0001:01:00.1 from group 0
+> [  334.243564] pciehp 0001:00:00.0:pcie004: Slot(2): Link Up
+> [  334.282556] iommu: Removing device 0001:01:00.0 from group 0
+> [  334.330994] pciehp 0001:00:00.0:pcie004: Slot(2): Link Up event queued; currently getting powered off
+> [  334.890587] pciehp 0001:00:00.0:pcie004: Timeout on hotplug command 0x13f1 (issued 282900 msec ago)
+> [  335.070190] pciehp 0001:00:00.0:pcie004: Slot(2): Link Down
+> [  335.106960] pciehp 0001:00:00.0:pcie004: Slot(2): Link Down event queued; currently getting powered on
+> [  335.191119] pcieport 0001:00:00.0: AER: Device recovery failed
+> [  346.590153] pciehp 0001:00:00.0:pcie004: Timeout on hotplug command 0x17f1 (issued 10250 msec ago)
+> 
+> As a suggestion:
+> 
+> 1. If the device belongs to a slot, do slot reset. 
+> 2. Otherwise, do bus reset.
+
+I assume this refers to pci_try_reset_slot() and pci_try_reset_bus(),
+which are only used by VFIO in vfio_pci_ioctl() and
+vfio_pci_try_bus_reset().
+
+Both of those callers use pci_probe_reset_slot() to decide whether to
+use pci_try_reset_slot() or pci_try_reset_bus().  If you're suggesting
+to pull that slot/bus distinction into the PCI core somehow, that
+would be fine with me, although VFIO does use the
+pci_probe_reset_slot() result for other purposes in those functions.
+
+> Since Oza's DPC/AER patch to refactor fatal error handling, both
+> hotplug driver and AER/DPC driver will try removing devices and
+> perform enumeration on link events/AER events.
+> 
+> Perfect environment for race condition without a change.
+
+Yeah, this looks like a bit of a mess.  I guess we're getting two
+interrupts (AER interrupt and hotplug interrupt) and we should
+coordinate their handling somehow.  I don't have a proposal.  This
+race could happen independent of the device reset paths, of course.
+
+Bjorn
