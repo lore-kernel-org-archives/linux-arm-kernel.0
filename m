@@ -1,137 +1,188 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Fri, 22 Jun 2018 17:14:21 +0200
-Subject: [PATCH v3 06/17] irqchip/irq-mvebu-icu: switch to regmap
+Date: Fri, 22 Jun 2018 17:14:24 +0200
+Subject: [PATCH v3 09/17] irqchip/irq-mvebu-icu: support ICU subnodes
 In-Reply-To: <20180622151432.1566-1-miquel.raynal@bootlin.com>
 References: <20180622151432.1566-1-miquel.raynal@bootlin.com>
-Message-ID: <20180622151432.1566-7-miquel.raynal@bootlin.com>
+Message-ID: <20180622151432.1566-10-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Before splitting the code to support multiple platform devices to
-be probed (one for the ICU, one per interrupt group), let's switch to
-regmap first by creating one in the ->probe().
+The ICU can handle several type of interrupt, each of them being handled
+differently on AP side. On CP side, the ICU should be able to make the
+distinction between each interrupt group by pointing to the right parent.
+
+This is done through the introduction of new bindings, presenting the ICU
+node as the parent of multiple ICU sub-nodes, each of them being an
+interrupt type with a different interrupt parent. ICU interrupt 'clients'
+now directly point to the right sub-node, avoiding the need for the extra
+ICU_GRP_* parameter.
+
+ICU subnodes are probed automatically with devm_platform_populate(). If
+the node as no child, the probe function for NSRs will still be called
+'manually' in order to preserve backward compatibility with DT using the
+old binding.
 
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 ---
- drivers/irqchip/irq-mvebu-icu.c | 45 +++++++++++++++++++++++++++--------------
- 1 file changed, 30 insertions(+), 15 deletions(-)
+ drivers/irqchip/irq-mvebu-icu.c | 88 ++++++++++++++++++++++++++++++++++-------
+ 1 file changed, 74 insertions(+), 14 deletions(-)
 
 diff --git a/drivers/irqchip/irq-mvebu-icu.c b/drivers/irqchip/irq-mvebu-icu.c
-index 0f2655d7f19e..3694c0d73c0d 100644
+index 24d45186eb6b..f7c2ede9c222 100644
 --- a/drivers/irqchip/irq-mvebu-icu.c
 +++ b/drivers/irqchip/irq-mvebu-icu.c
-@@ -18,6 +18,8 @@
- #include <linux/of_irq.h>
- #include <linux/of_platform.h>
- #include <linux/platform_device.h>
-+#include <linux/regmap.h>
-+#include <linux/mfd/syscon.h>
- 
- #include <dt-bindings/interrupt-controller/mvebu-icu.h>
- 
-@@ -38,7 +40,7 @@
- 
- struct mvebu_icu {
- 	struct irq_chip irq_chip;
--	void __iomem *base;
-+	struct regmap *regmap;
- 	struct irq_domain *domain;
+@@ -43,6 +43,7 @@ struct mvebu_icu {
+ 	struct regmap *regmap;
  	struct device *dev;
  	atomic_t initialized;
-@@ -56,10 +58,10 @@ static void mvebu_icu_init(struct mvebu_icu *icu, struct msi_msg *msg)
- 		return;
- 
- 	/* Set Clear/Set ICU SPI message address in AP */
--	writel_relaxed(msg[0].address_hi, icu->base + ICU_SETSPI_NSR_AH);
--	writel_relaxed(msg[0].address_lo, icu->base + ICU_SETSPI_NSR_AL);
--	writel_relaxed(msg[1].address_hi, icu->base + ICU_CLRSPI_NSR_AH);
--	writel_relaxed(msg[1].address_lo, icu->base + ICU_CLRSPI_NSR_AL);
-+	regmap_write(icu->regmap, ICU_SETSPI_NSR_AH, msg[0].address_hi);
-+	regmap_write(icu->regmap, ICU_SETSPI_NSR_AL, msg[0].address_lo);
-+	regmap_write(icu->regmap, ICU_CLRSPI_NSR_AH, msg[1].address_hi);
-+	regmap_write(icu->regmap, ICU_CLRSPI_NSR_AL, msg[1].address_lo);
- }
- 
- static void mvebu_icu_write_msg(struct msi_desc *desc, struct msi_msg *msg)
-@@ -82,7 +84,7 @@ static void mvebu_icu_write_msg(struct msi_desc *desc, struct msi_msg *msg)
- 		icu_int = 0;
- 	}
- 
--	writel_relaxed(icu_int, icu->base + ICU_INT_CFG(d->hwirq));
-+	regmap_write(icu->regmap, ICU_INT_CFG(d->hwirq), icu_int);
- 
- 	/*
- 	 * The SATA unit has 2 ports, and a dedicated ICU entry per
-@@ -94,10 +96,10 @@ static void mvebu_icu_write_msg(struct msi_desc *desc, struct msi_msg *msg)
- 	 * configured (regardless of which port is actually in use).
- 	 */
- 	if (d->hwirq == ICU_SATA0_ICU_ID || d->hwirq == ICU_SATA1_ICU_ID) {
--		writel_relaxed(icu_int,
--			       icu->base + ICU_INT_CFG(ICU_SATA0_ICU_ID));
--		writel_relaxed(icu_int,
--			       icu->base + ICU_INT_CFG(ICU_SATA1_ICU_ID));
-+		regmap_write(icu->regmap, ICU_INT_CFG(ICU_SATA0_ICU_ID),
-+			     icu_int);
-+		regmap_write(icu->regmap, ICU_INT_CFG(ICU_SATA1_ICU_ID),
-+			     icu_int);
- 	}
- }
- 
-@@ -204,12 +206,20 @@ static const struct irq_domain_ops mvebu_icu_domain_ops = {
- 	.free      = mvebu_icu_irq_domain_free,
++	bool legacy_bindings;
  };
  
-+static struct regmap_config mvebu_icu_regmap_config = {
-+	.reg_bits	= 32,
-+	.val_bits	= 32,
-+	.reg_stride	= 4,
-+	.name		= "mvebu_icu",
+ struct mvebu_icu_irq_data {
+@@ -51,6 +52,30 @@ struct mvebu_icu_irq_data {
+ 	unsigned int type;
+ };
+ 
++static struct mvebu_icu *mvebu_icu_dev_get_drvdata(struct platform_device *pdev)
++{
++	struct mvebu_icu *icu;
++
++	/*
++	 * Device data being populated means we should be using legacy bindings.
++	 * Using the _parent_ device data means we should be using new bindings.
++	 */
++	icu = dev_get_drvdata(&pdev->dev);
++	if (icu) {
++		if (!icu->legacy_bindings)
++			return ERR_PTR(-EINVAL);
++	} else {
++		icu = dev_get_drvdata(pdev->dev.parent);
++		if (!icu)
++			return ERR_PTR(-ENODEV);
++
++		if (icu->legacy_bindings)
++			return ERR_PTR(-EINVAL);
++	}
++
++	return icu;
++}
++
+ static void mvebu_icu_init(struct mvebu_icu *icu, struct msi_msg *msg)
+ {
+ 	if (atomic_cmpxchg(&icu->initialized, false, true))
+@@ -107,24 +132,28 @@ mvebu_icu_irq_domain_translate(struct irq_domain *d, struct irq_fwspec *fwspec,
+ 			       unsigned long *hwirq, unsigned int *type)
+ {
+ 	struct mvebu_icu *icu = platform_msi_get_host_data(d);
+-	unsigned int icu_group;
++	unsigned int param_count = icu->legacy_bindings ? 3 : 2;
+ 
+ 	/* Check the count of the parameters in dt */
+-	if (WARN_ON(fwspec->param_count < 3)) {
++	if (WARN_ON(fwspec->param_count != param_count)) {
+ 		dev_err(icu->dev, "wrong ICU parameter count %d\n",
+ 			fwspec->param_count);
+ 		return -EINVAL;
+ 	}
+ 
+-	/* Only ICU group type is handled */
+-	icu_group = fwspec->param[0];
+-	if (icu_group != ICU_GRP_NSR && icu_group != ICU_GRP_SR &&
+-	    icu_group != ICU_GRP_SEI && icu_group != ICU_GRP_REI) {
+-		dev_err(icu->dev, "wrong ICU group type %x\n", icu_group);
+-		return -EINVAL;
++	if (icu->legacy_bindings) {
++		*hwirq = fwspec->param[1];
++		*type = fwspec->param[2];
++		if (fwspec->param[0] != ICU_GRP_NSR) {
++			dev_err(icu->dev, "wrong ICU group type %x\n",
++				fwspec->param[0]);
++			return -EINVAL;
++		}
++	} else {
++		*hwirq = fwspec->param[0];
++		*type = fwspec->param[1];
+ 	}
+ 
+-	*hwirq = fwspec->param[1];
+ 	if (*hwirq >= ICU_MAX_IRQS) {
+ 		dev_err(icu->dev, "invalid interrupt number %ld\n", *hwirq);
+ 		return -EINVAL;
+@@ -157,7 +186,10 @@ mvebu_icu_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
+ 		goto free_irqd;
+ 	}
+ 
+-	icu_irqd->icu_group = fwspec->param[0];
++	if (icu->legacy_bindings)
++		icu_irqd->icu_group = fwspec->param[0];
++	else
++		icu_irqd->icu_group = ICU_GRP_NSR;
+ 	icu_irqd->icu = icu;
+ 
+ 	err = platform_msi_domain_alloc(domain, virq, nr_irqs);
+@@ -211,9 +243,9 @@ static int mvebu_icu_subset_probe(struct platform_device *pdev)
+ 	struct irq_domain *irq_domain;
+ 	struct mvebu_icu *icu;
+ 
+-	icu = dev_get_drvdata(&pdev->dev);
+-	if (!icu)
+-		return -ENODEV;
++	icu = mvebu_icu_dev_get_drvdata(pdev);
++	if (IS_ERR(icu))
++		return PTR_ERR(icu);
+ 
+ 	pdev->dev.msi_domain = of_msi_get_domain(&pdev->dev, pdev->dev.of_node,
+ 						 DOMAIN_BUS_PLATFORM_MSI);
+@@ -236,6 +268,22 @@ static int mvebu_icu_subset_probe(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++static const struct of_device_id mvebu_icu_subset_of_match[] = {
++	{
++		.compatible = "marvell,cp110-icu-nsr",
++	},
++	{},
 +};
 +
- static int mvebu_icu_probe(struct platform_device *pdev)
- {
- 	struct mvebu_icu *icu;
- 	struct device_node *node = pdev->dev.of_node;
- 	struct device_node *gicp_dn;
- 	struct resource *res;
-+	void __iomem *regs;
- 	int i;
- 
- 	icu = devm_kzalloc(&pdev->dev, sizeof(struct mvebu_icu),
-@@ -220,12 +230,17 @@ static int mvebu_icu_probe(struct platform_device *pdev)
- 	icu->dev = &pdev->dev;
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	icu->base = devm_ioremap_resource(&pdev->dev, res);
--	if (IS_ERR(icu->base)) {
-+	regs = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(regs)) {
- 		dev_err(&pdev->dev, "Failed to map icu base address.\n");
--		return PTR_ERR(icu->base);
-+		return PTR_ERR(regs);
- 	}
- 
-+	icu->regmap = devm_regmap_init_mmio(icu->dev, regs,
-+					    &mvebu_icu_regmap_config);
-+	if (IS_ERR(icu->regmap))
-+		return PTR_ERR(icu->regmap);
++static struct platform_driver mvebu_icu_subset_driver = {
++	.probe  = mvebu_icu_subset_probe,
++	.driver = {
++		.name = "mvebu-icu-subset",
++		.of_match_table = mvebu_icu_subset_of_match,
++	},
++};
++builtin_platform_driver(mvebu_icu_subset_driver);
 +
- 	icu->irq_chip.name = devm_kasprintf(&pdev->dev, GFP_KERNEL,
- 					    "ICU.%x",
- 					    (unsigned int)res->start);
-@@ -260,11 +275,11 @@ static int mvebu_icu_probe(struct platform_device *pdev)
- 	for (i = 0 ; i < ICU_MAX_IRQS ; i++) {
- 		u32 icu_int, icu_grp;
+ static struct regmap_config mvebu_icu_regmap_config = {
+ 	.reg_bits	= 32,
+ 	.val_bits	= 32,
+@@ -275,6 +323,15 @@ static int mvebu_icu_probe(struct platform_device *pdev)
+ 	if (!icu->irq_chip.name)
+ 		return -ENOMEM;
  
--		icu_int = readl_relaxed(icu->base + ICU_INT_CFG(i));
-+		regmap_read(icu->regmap, ICU_INT_CFG(i), &icu_int);
- 		icu_grp = icu_int >> ICU_GROUP_SHIFT;
++	/*
++	 * Legacy bindings: ICU is one node with one MSI parent: force manually
++	 *                  the probe of the NSR interrupts side.
++	 * New bindings: ICU node has children, one per interrupt controller
++	 *               having its own MSI parent: call platform_populate().
++	 */
++	if (!of_get_child_count(pdev->dev.of_node))
++		icu->legacy_bindings = true;
++
+ 	icu->irq_chip.irq_mask = irq_chip_mask_parent;
+ 	icu->irq_chip.irq_unmask = irq_chip_unmask_parent;
+ 	icu->irq_chip.irq_eoi = irq_chip_eoi_parent;
+@@ -299,7 +356,10 @@ static int mvebu_icu_probe(struct platform_device *pdev)
  
- 		if (icu_grp == ICU_GRP_NSR)
--			writel_relaxed(0x0, icu->base + ICU_INT_CFG(i));
-+			regmap_write(icu->regmap, ICU_INT_CFG(i), 0);
- 	}
+ 	platform_set_drvdata(pdev, icu);
  
- 	icu->domain =
+-	return mvebu_icu_subset_probe(pdev);
++	if (icu->legacy_bindings)
++		return mvebu_icu_subset_probe(pdev);
++	else
++		return devm_of_platform_populate(&pdev->dev);
+ }
+ 
+ static const struct of_device_id mvebu_icu_of_match[] = {
 -- 
 2.14.1
