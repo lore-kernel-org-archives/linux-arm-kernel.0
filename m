@@ -1,36 +1,68 @@
-From: chen.zhong@mediatek.com (Chen Zhong)
-Date: Fri, 22 Jun 2018 14:16:38 +0800
-Subject: [RESEND PATCH] dt-bindings: input: Add common keyboard document
- bindings
-Message-ID: <1529648198-14231-1-git-send-email-chen.zhong@mediatek.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 22 Jun 2018 08:27:46 +0200
+Subject: [PATCHv4 4/4] ARM: versatile: support configuring versatile
+ machine for no-MMU
+In-Reply-To: <TY1PR01MB1562B232625397CCACD5931A8A760@TY1PR01MB1562.jpnprd01.prod.outlook.com>
+References: <20180618141905.7789-1-gerg@linux-m68k.org>
+ <20180618141905.7789-5-gerg@linux-m68k.org>
+ <CAMuHMdUyCEq0U_CJindwcSEF+0dR-SJc1v8zGT-CcUqVkdOeVw@mail.gmail.com>
+ <nycvar.YSQ.7.76.1806211212010.16670@knanqh.ubzr>
+ <TY1PR01MB1562B232625397CCACD5931A8A760@TY1PR01MB1562.jpnprd01.prod.outlook.com>
+Message-ID: <CAMuHMdXPiDGg+S3VQutSYSBwBbjW_wV+nTSBHuu7a3VNTghm1A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the device tree binding documentation for common
-keyboard.
+Hi Chris,
 
-Acked-by: Rob Herring <robh@kernel.org>
-Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-Signed-off-by: Chen Zhong <chen.zhong@mediatek.com>
----
- Documentation/devicetree/bindings/input/keys.txt | 8 ++++++++
- 1 file changed, 8 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/input/keys.txt
+On Thu, Jun 21, 2018 at 6:45 PM Chris Brandt <Chris.Brandt@renesas.com> wrote:
+> On Thursday, June 21, 2018 1, Nicolas Pitre wrote:
+> > > I've just sent a patch to do that.
+> >
+> > Your patch isn't wrong per se.  But it is not enough. The issue here
+> > would be easily fixed with some kconfig extension so that:
+> >
+> > - If XIP or NOMMU is selected then only one target in the multiplatform
+> >   set can be selected, basically turning it into a choice menu.
+> >
+> > - If more than one multiplatform targets is selected then XIP and NOMMU
+> >   can no longere be selected.
+>
+> Over the years I tried to tackle this issue in multiple different ways,
+> while still staying in the limitations of kbuild.
+> Basically, everything was shot down for one reason or another (or the
+> only way to do it is really ugly...so I didn't even ask).
+>
+> kbuild doesn't really have a mutually exclusive property that can be
+> dynamically set/cleared.
+>
+> In the end, I saw only 2 paths for adding XIP to ARM MMU builds:
+>
+> 1) Modify kbuild to give the ability as stated above.
 
-diff --git a/Documentation/devicetree/bindings/input/keys.txt b/Documentation/devicetree/bindings/input/keys.txt
-new file mode 100644
-index 0000000..a0ea7eb
---- /dev/null
-+++ b/Documentation/devicetree/bindings/input/keys.txt
-@@ -0,0 +1,8 @@
-+General Keys Properties:
-+
-+Optional properties for Keys:
-+- power-off-time-sec: Duration in seconds which the key should be kept
-+ 	pressed for device to power off automatically. Device with key pressed
-+ 	shutdown feature can specify this property.
-+- linux,keycodes: Specifies the numeric keycode values to be used for
-+	reporting key presses.
-\ No newline at end of file
+Would that actually help, or would it only give you a false feeling of safety?
+Most "multiplatform" sub-architectures (like iMX or "shmobile") still have
+multiple families and SoCs, so you have to repeat the exercise at that level.
+
+Still, even when configuring a kernel for a single SoC, the final board
+selection is at the DTS level.
+
+Conclusion: If you want NOMMU and/or XIP, you have to know what you're doing,
+and hand-holding at whatever level may not save you from making mistakes.
+
+> 2) Make XIP builds somehow be able to run at multiple physical address
+> by modifying the binaries post-build (Arnd's suggestion).
+
+That's actually an interesting one: no manual configuration (iff parameters
+would be extracted from the DTB), so nothing can go wrong ;-)
+I guess it applies to NOMMU, too.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
 -- 
-1.8.1.1.dirty
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
