@@ -1,88 +1,249 @@
-From: mhocko@kernel.org (Michal Hocko)
-Date: Fri, 22 Jun 2018 11:11:53 +0200
-Subject: [PATCH 1/2] arm64: avoid alloc memory on offline node
-In-Reply-To: <5c083c9c-473f-f504-848b-48506d0fd380@huawei.com>
-References: <20180619120714.GE13685@dhcp22.suse.cz>
- <874lhz3pmn.fsf@e105922-lin.cambridge.arm.com>
- <20180619140818.GA16927@e107981-ln.cambridge.arm.com>
- <87wouu3jz1.fsf@e105922-lin.cambridge.arm.com>
- <20180619151425.GH13685@dhcp22.suse.cz>
- <87r2l23i2b.fsf@e105922-lin.cambridge.arm.com>
- <20180619163256.GA18952@e107981-ln.cambridge.arm.com>
- <814205eb-ae86-a519-bed0-f09b8e2d3a02@huawei.com>
- <87602d3ccl.fsf@e105922-lin.cambridge.arm.com>
- <5c083c9c-473f-f504-848b-48506d0fd380@huawei.com>
-Message-ID: <20180622091153.GU10465@dhcp22.suse.cz>
+From: ludovic.barre@st.com (Ludovic BARRE)
+Date: Fri, 22 Jun 2018 11:15:19 +0200
+Subject: [PATCH V4 2/4] watchdog: stm32: add pclk feature for stm32mp1
+In-Reply-To: <20180621165335.GA4563@roeck-us.net>
+References: <1529571737-3552-1-git-send-email-ludovic.Barre@st.com>
+ <1529571737-3552-3-git-send-email-ludovic.Barre@st.com>
+ <20180621165335.GA4563@roeck-us.net>
+Message-ID: <0bfe0082-2134-2d3b-322f-cd6c193a9974@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 22-06-18 16:58:05, Hanjun Guo wrote:
-> On 2018/6/20 19:51, Punit Agrawal wrote:
-> > Xie XiuQi <xiexiuqi@huawei.com> writes:
-> > 
-> >> Hi Lorenzo, Punit,
-> >>
-> >>
-> >> On 2018/6/20 0:32, Lorenzo Pieralisi wrote:
-> >>> On Tue, Jun 19, 2018 at 04:35:40PM +0100, Punit Agrawal wrote:
-> >>>> Michal Hocko <mhocko@kernel.org> writes:
-> >>>>
-> >>>>> On Tue 19-06-18 15:54:26, Punit Agrawal wrote:
-> >>>>> [...]
-> >>>>>> In terms of $SUBJECT, I wonder if it's worth taking the original patch
-> >>>>>> as a temporary fix (it'll also be easier to backport) while we work on
-> >>>>>> fixing these other issues and enabling memoryless nodes.
-> >>>>>
-> >>>>> Well, x86 already does that but copying this antipatern is not really
-> >>>>> nice. So it is good as a quick fix but it would be definitely much
-> >>>>> better to have a robust fix. Who knows how many other places might hit
-> >>>>> this. You certainly do not want to add a hack like this all over...
-> >>>>
-> >>>> Completely agree! I was only suggesting it as a temporary measure,
-> >>>> especially as it looked like a proper fix might be invasive.
-> >>>>
-> >>>> Another fix might be to change the node specific allocation to node
-> >>>> agnostic allocations. It isn't clear why the allocation is being
-> >>>> requested from a specific node. I think Lorenzo suggested this in one of
-> >>>> the threads.
-> >>>
-> >>> I think that code was just copypasted but it is better to fix the
-> >>> underlying issue.
-> >>>
-> >>>> I've started putting together a set fixing the issues identified in this
-> >>>> thread. It should give a better idea on the best course of action.
-> >>>
-> >>> On ACPI ARM64, this diff should do if I read the code correctly, it
-> >>> should be (famous last words) just a matter of mapping PXMs to nodes for
-> >>> every SRAT GICC entry, feel free to pick it up if it works.
-> >>>
-> >>> Yes, we can take the original patch just because it is safer for an -rc
-> >>> cycle even though if the patch below would do delaying the fix for a
-> >>> couple of -rc (to get it tested across ACPI ARM64 NUMA platforms) is
-> >>> not a disaster.
-> >>
-> >> I tested this patch on my arm board, it works.
-> > 
-> > I am assuming you tried the patch without enabling support for
-> > memory-less nodes.
-> > 
-> > The patch de-couples the onlining of numa nodes (as parsed from SRAT)
-> > from NR_CPUS restriction. When it comes to building zonelists, the node
-> > referenced by the PCI controller also has zonelists initialised.
-> > 
-> > So it looks like a fallback node is setup even if we don't have
-> > memory-less nodes enabled. I need to stare some more at the code to see
-> > why we need memory-less nodes at all then ...
-> 
-> Yes, please. From my limited MM knowledge, zonelists should not be
-> initialised if no CPU and no memory on this node, correct me if I'm
-> wrong.
 
-Well, as long as there is a code which can explicitly ask for a specific
-node than it is safer to have zonelists configured. Otherwise you just
-force callers to add hacks and figure out the proper placement there.
-Zonelists should be cheep to configure for all possible nodes. It's not
-like we are talking about huge amount of resources.
--- 
-Michal Hocko
-SUSE Labs
+
+On 06/21/2018 06:53 PM, Guenter Roeck wrote:
+> On Thu, Jun 21, 2018 at 11:02:15AM +0200, Ludovic Barre wrote:
+>> From: Ludovic Barre <ludovic.barre@st.com>
+>>
+>> This patch adds compatible data to manage pclk clock by
+>> compatible. Adds stm32mp1 support which requires pclk clock.
+>>
+>> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+>> ---
+>>   drivers/watchdog/stm32_iwdg.c | 116 +++++++++++++++++++++++++++---------------
+>>   1 file changed, 74 insertions(+), 42 deletions(-)
+>>
+>> diff --git a/drivers/watchdog/stm32_iwdg.c b/drivers/watchdog/stm32_iwdg.c
+>> index c97ad56..e00e3b3 100644
+>> --- a/drivers/watchdog/stm32_iwdg.c
+>> +++ b/drivers/watchdog/stm32_iwdg.c
+>> @@ -11,12 +11,13 @@
+>>   
+>>   #include <linux/clk.h>
+>>   #include <linux/delay.h>
+>> -#include <linux/kernel.h>
+>> -#include <linux/module.h>
+>>   #include <linux/interrupt.h>
+>>   #include <linux/io.h>
+>>   #include <linux/iopoll.h>
+>> +#include <linux/kernel.h>
+>> +#include <linux/module.h>
+>>   #include <linux/of.h>
+>> +#include <linux/of_device.h>
+>>   #include <linux/platform_device.h>
+>>   #include <linux/watchdog.h>
+>>   
+>> @@ -54,11 +55,15 @@
+>>   #define TIMEOUT_US	100000
+>>   #define SLEEP_US	1000
+>>   
+>> +#define HAS_PCLK	true
+>> +
+>>   struct stm32_iwdg {
+>>   	struct watchdog_device	wdd;
+>>   	void __iomem		*regs;
+>> -	struct clk		*clk;
+>> +	struct clk		*clk_lsi;
+>> +	struct clk		*clk_pclk;
+>>   	unsigned int		rate;
+>> +	bool			has_pclk;
+>>   };
+>>   
+>>   static inline u32 reg_read(void __iomem *base, u32 reg)
+>> @@ -133,6 +138,44 @@ static int stm32_iwdg_set_timeout(struct watchdog_device *wdd,
+>>   	return 0;
+>>   }
+>>   
+>> +static int stm32_iwdg_clk_init(struct platform_device *pdev,
+>> +			       struct stm32_iwdg *wdt)
+>> +{
+>> +	u32 ret;
+>> +
+>> +	wdt->clk_lsi = devm_clk_get(&pdev->dev, "lsi");
+> 
+> I just noticed a subtle difference: This used to be
+> 			devm_clk_get(&pdev->dev, NULL);
+> which would always get the first clock, no matter how it is named.
+> Can that cause problems with backward compatibility ?
+
+You are right Guenter.
+
+When there are multiple clocks, I prefer to use name interface.
+I find it easier to use, and avoid misunderstanding.
+
+Today, only one "dtsi" define the watchdog and it's disabled
+(stm32f429.dtsi). I think it's good moment to move to clock named
+(before it is used anymore).
+
+But you are right I forgot to change stm32f429.dtsi.
+If I add a commit for stm32f429.dtsi, it's Ok for you ?
+
+BR
+Ludo
+
+> 
+> Thanks,
+> Guenter
+> 
+>> +	if (IS_ERR(wdt->clk_lsi)) {
+>> +		dev_err(&pdev->dev, "Unable to get lsi clock\n");
+>> +		return PTR_ERR(wdt->clk_lsi);
+>> +	}
+>> +
+>> +	/* optional peripheral clock */
+>> +	if (wdt->has_pclk) {
+>> +		wdt->clk_pclk = devm_clk_get(&pdev->dev, "pclk");
+>> +		if (IS_ERR(wdt->clk_pclk)) {
+>> +			dev_err(&pdev->dev, "Unable to get pclk clock\n");
+>> +			return PTR_ERR(wdt->clk_pclk);
+>> +		}
+>> +
+>> +		ret = clk_prepare_enable(wdt->clk_pclk);
+>> +		if (ret) {
+>> +			dev_err(&pdev->dev, "Unable to prepare pclk clock\n");
+>> +			return ret;
+>> +		}
+>> +	}
+>> +
+>> +	ret = clk_prepare_enable(wdt->clk_lsi);
+>> +	if (ret) {
+>> +		dev_err(&pdev->dev, "Unable to prepare lsi clock\n");
+>> +		clk_disable_unprepare(wdt->clk_pclk);
+>> +		return ret;
+>> +	}
+>> +
+>> +	wdt->rate = clk_get_rate(wdt->clk_lsi);
+>> +
+>> +	return 0;
+>> +}
+>> +
+>>   static const struct watchdog_info stm32_iwdg_info = {
+>>   	.options	= WDIOF_SETTIMEOUT |
+>>   			  WDIOF_MAGICCLOSE |
+>> @@ -147,49 +190,42 @@ static const struct watchdog_ops stm32_iwdg_ops = {
+>>   	.set_timeout	= stm32_iwdg_set_timeout,
+>>   };
+>>   
+>> +static const struct of_device_id stm32_iwdg_of_match[] = {
+>> +	{ .compatible = "st,stm32-iwdg", .data = (void *)!HAS_PCLK },
+>> +	{ .compatible = "st,stm32mp1-iwdg", .data = (void *)HAS_PCLK },
+>> +	{ /* end node */ }
+>> +};
+>> +MODULE_DEVICE_TABLE(of, stm32_iwdg_of_match);
+>> +
+>>   static int stm32_iwdg_probe(struct platform_device *pdev)
+>>   {
+>>   	struct watchdog_device *wdd;
+>> +	const struct of_device_id *match;
+>>   	struct stm32_iwdg *wdt;
+>>   	struct resource *res;
+>> -	void __iomem *regs;
+>> -	struct clk *clk;
+>>   	int ret;
+>>   
+>> +	match = of_match_device(stm32_iwdg_of_match, &pdev->dev);
+>> +	if (!match)
+>> +		return -ENODEV;
+>> +
+>> +	wdt = devm_kzalloc(&pdev->dev, sizeof(*wdt), GFP_KERNEL);
+>> +	if (!wdt)
+>> +		return -ENOMEM;
+>> +
+>> +	wdt->has_pclk = match->data;
+>> +
+>>   	/* This is the timer base. */
+>>   	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> -	regs = devm_ioremap_resource(&pdev->dev, res);
+>> -	if (IS_ERR(regs)) {
+>> +	wdt->regs = devm_ioremap_resource(&pdev->dev, res);
+>> +	if (IS_ERR(wdt->regs)) {
+>>   		dev_err(&pdev->dev, "Could not get resource\n");
+>> -		return PTR_ERR(regs);
+>> +		return PTR_ERR(wdt->regs);
+>>   	}
+>>   
+>> -	clk = devm_clk_get(&pdev->dev, NULL);
+>> -	if (IS_ERR(clk)) {
+>> -		dev_err(&pdev->dev, "Unable to get clock\n");
+>> -		return PTR_ERR(clk);
+>> -	}
+>> -
+>> -	ret = clk_prepare_enable(clk);
+>> -	if (ret) {
+>> -		dev_err(&pdev->dev, "Unable to prepare clock %p\n", clk);
+>> +	ret = stm32_iwdg_clk_init(pdev, wdt);
+>> +	if (ret)
+>>   		return ret;
+>> -	}
+>> -
+>> -	/*
+>> -	 * Allocate our watchdog driver data, which has the
+>> -	 * struct watchdog_device nested within it.
+>> -	 */
+>> -	wdt = devm_kzalloc(&pdev->dev, sizeof(*wdt), GFP_KERNEL);
+>> -	if (!wdt) {
+>> -		ret = -ENOMEM;
+>> -		goto err;
+>> -	}
+>> -
+>> -	/* Initialize struct stm32_iwdg. */
+>> -	wdt->regs = regs;
+>> -	wdt->clk = clk;
+>> -	wdt->rate = clk_get_rate(clk);
+>>   
+>>   	/* Initialize struct watchdog_device. */
+>>   	wdd = &wdt->wdd;
+>> @@ -217,7 +253,8 @@ static int stm32_iwdg_probe(struct platform_device *pdev)
+>>   
+>>   	return 0;
+>>   err:
+>> -	clk_disable_unprepare(clk);
+>> +	clk_disable_unprepare(wdt->clk_lsi);
+>> +	clk_disable_unprepare(wdt->clk_pclk);
+>>   
+>>   	return ret;
+>>   }
+>> @@ -227,23 +264,18 @@ static int stm32_iwdg_remove(struct platform_device *pdev)
+>>   	struct stm32_iwdg *wdt = platform_get_drvdata(pdev);
+>>   
+>>   	watchdog_unregister_device(&wdt->wdd);
+>> -	clk_disable_unprepare(wdt->clk);
+>> +	clk_disable_unprepare(wdt->clk_lsi);
+>> +	clk_disable_unprepare(wdt->clk_pclk);
+>>   
+>>   	return 0;
+>>   }
+>>   
+>> -static const struct of_device_id stm32_iwdg_of_match[] = {
+>> -	{ .compatible = "st,stm32-iwdg" },
+>> -	{ /* end node */ }
+>> -};
+>> -MODULE_DEVICE_TABLE(of, stm32_iwdg_of_match);
+>> -
+>>   static struct platform_driver stm32_iwdg_driver = {
+>>   	.probe		= stm32_iwdg_probe,
+>>   	.remove		= stm32_iwdg_remove,
+>>   	.driver = {
+>>   		.name	= "iwdg",
+>> -		.of_match_table = stm32_iwdg_of_match,
+>> +		.of_match_table = of_match_ptr(stm32_iwdg_of_match),
+>>   	},
+>>   };
+>>   module_platform_driver(stm32_iwdg_driver);
+>> -- 
+>> 2.7.4
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-watchdog" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
