@@ -1,71 +1,28 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 22 Jun 2018 20:01:03 +0200
-Subject: [PATCH V2 2/2] efi/fb: Convert PCI bus address to resource if
- translated by the bridge
-In-Reply-To: <CAKv+Gu9HAJRHwjYLNjf+gg=1vFoFu3BJphifKKE-aR4o_MW84A@mail.gmail.com>
-References: <1526653072-7153-1-git-send-email-okaya@codeaurora.org>
- <1526653072-7153-2-git-send-email-okaya@codeaurora.org>
- <20180619222921.GA90490@bhelgaas-glaptop.roam.corp.google.com>
- <CAKv+Gu_voOZ7YUL8pckww4mTt4PVcu7y69mf-z7ZZe1bJ81Shw@mail.gmail.com>
- <2a805337-c0b5-e134-7695-5a543ecaa26a@codeaurora.org>
- <CAKv+Gu9HAJRHwjYLNjf+gg=1vFoFu3BJphifKKE-aR4o_MW84A@mail.gmail.com>
-Message-ID: <CAKv+Gu-WXLXqHSmiS2MmAMXHLKK_kg+3EK6L2rvO0SzN-c0UMg@mail.gmail.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Fri, 22 Jun 2018 13:03:32 -0500
+Subject: [PATCH 1/2] hwrng: msm: add a spinlock and support for blocking
+ reads
+In-Reply-To: <152968991381.16708.522979730327886581@swboyd.mtv.corp.google.com>
+References: <1529594276-12210-1-git-send-email-timur@codeaurora.org>
+ <acc7e9d3-8a81-ff15-27c7-78ec7c17f6cc@linaro.org>
+ <6d655b97-418e-bacf-7e88-b9179cdc6fd1@codeaurora.org>
+ <152968991381.16708.522979730327886581@swboyd.mtv.corp.google.com>
+Message-ID: <4bc0afe1-0189-88c0-40aa-23a312325635@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 June 2018 at 15:55, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> On 22 June 2018 at 15:52, Sinan Kaya <okaya@codeaurora.org> wrote:
->> Hi Ard,
->>
->> On 6/22/2018 7:21 AM, Ard Biesheuvel wrote:
->>> Apologies for only bringing this up now, but I think this patch is
->>> wrong after all.
->>>
->>> screen_info.lfb_base is supposed to be a CPU address, and so
->>> translating it like this is wrong. If you end up with a PCI address
->>> here, you have made a mistake in hacking support for PCI outbound
->>> translations into UEFI. Other users such as UEFI itself or GRUB will
->>> treat this as a CPU physical address as well, so the kernel should not
->>> treat it any differently.
->>
->> The behavior I'm seeing is from a UEFI BIOS vendor. I did not write the
->> code for it...
->>
->> I was asked to debug it.
->>
->> I'd like to dive into your statement about UEFI and GRUB using this address
->> as physical addresses.
->>
->> AFAIK, all PCI outbound requests go through PCI IO protocol in UEFI and the
->> translation information is hidden inside the UEFI PCI Host Bridge driver.
->> Drivers are not allowed to access PCI resources directly especially as a
->> memory mapped address.
->>
->> This particular vendor is programming the BAR address into the GOP protocol.
->> Since the host bridge driver is doing a translation, we are hitting this
->> issue.
->>
->> Is there a UEFI spec reference about the definition of this field?
->>
->
-> Yes, it is part of the PCI I/O protocol definition. FrameBufferBase is
-> described as
->
-> """
-> Base address of graphics linear frame buffer. Info contains
-> information required to allow software to draw directly to the
-> frame buffer without using Blt().Offset zero in
-> FrameBufferBase represents the upper left pixel of the
-> display.
-> """
+On 6/22/18 12:51 PM, Stephen Boyd wrote:
+> Perhaps it's because you implemented the 'wait' functionality in this
+> driver? Before the patch there wasn't any sort of wait check so we would
+> bail out if there wasn't any data even if the caller requested that we
+> wait for randomness to be available.
 
-I just tried AMD Radeon and NVidia graphics cards on a system with
-non-1:1 mapped MMIO windows, and in both cases, the GOP protocol
-structure is populated correctly, i.e., using the CPU address not the
-PCIe address.
+No, my tests showed the race condition (or at least something that looks 
+like a race condition) even without the 'wait' feature.  I added support 
+for 'wait' only recently, but I've been working with the crypto people 
+for a month on everything else.
 
-EDK2 only recently gained support for MMIO translation in the host
-bridge driver, so I so wonder if this is a platform issue rather than
-a driver issue. It may be worth a try to dump the results of
-GetBarAttributes() of all PCI I/O protocol instances (either in UEFI
-or in the stub), to double check that the correct values are returned.
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
