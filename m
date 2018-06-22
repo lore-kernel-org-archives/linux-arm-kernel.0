@@ -1,58 +1,48 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 22 Jun 2018 21:29:36 +0200
-Subject: [PATCH V2 2/2] efi/fb: Convert PCI bus address to resource if
- translated by the bridge
-In-Reply-To: <37289a27-eb99-6a73-4d32-4a75edd11dcd@codeaurora.org>
-References: <1526653072-7153-1-git-send-email-okaya@codeaurora.org>
- <1526653072-7153-2-git-send-email-okaya@codeaurora.org>
- <20180619222921.GA90490@bhelgaas-glaptop.roam.corp.google.com>
- <CAKv+Gu_voOZ7YUL8pckww4mTt4PVcu7y69mf-z7ZZe1bJ81Shw@mail.gmail.com>
- <2a805337-c0b5-e134-7695-5a543ecaa26a@codeaurora.org>
- <CAKv+Gu9HAJRHwjYLNjf+gg=1vFoFu3BJphifKKE-aR4o_MW84A@mail.gmail.com>
- <CAKv+Gu-WXLXqHSmiS2MmAMXHLKK_kg+3EK6L2rvO0SzN-c0UMg@mail.gmail.com>
- <37289a27-eb99-6a73-4d32-4a75edd11dcd@codeaurora.org>
-Message-ID: <CAKv+Gu-bwCFhCKiA7P1amMLeBaSxsjk0d6aPjAr9nCvOBPJA6w@mail.gmail.com>
+From: agustinv@codeaurora.org (Agustin Vega-Frias)
+Date: Fri, 22 Jun 2018 15:46:29 -0400
+Subject: [RFC V3 0/3] arm_pmu: acpi: variant support and QCOM Falkor extensions
+Message-ID: <1529696792-16903-1-git-send-email-agustinv@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 June 2018 at 20:30, Sinan Kaya <okaya@codeaurora.org> wrote:
-> On 6/22/2018 2:01 PM, Ard Biesheuvel wrote:
->>> Yes, it is part of the PCI I/O protocol definition. FrameBufferBase is
->>> described as
->>>
->>> """
->>> Base address of graphics linear frame buffer. Info contains
->>> information required to allow software to draw directly to the
->>> frame buffer without using Blt().Offset zero in
->>> FrameBufferBase represents the upper left pixel of the
->>> display.
->>> """
->> I just tried AMD Radeon and NVidia graphics cards on a system with
->> non-1:1 mapped MMIO windows, and in both cases, the GOP protocol
->> structure is populated correctly, i.e., using the CPU address not the
->> PCIe address.
->>
->> EDK2 only recently gained support for MMIO translation in the host
->> bridge driver, so I so wonder if this is a platform issue rather than
->> a driver issue. It may be worth a try to dump the results of
->> GetBarAttributes() of all PCI I/O protocol instances (either in UEFI
->> or in the stub), to double check that the correct values are returned.
->>
->
-> Thanks for checking out other platforms. I'll mark the issue as a BIOS
-> issue and bounce your feedback to the BIOS provider.
->
+This series is a complete re-design of V1 of the QCOM Falkor extensions [1],
+it introduces a probe table based on the HID of a device nested under the CPU
+device to allow variant detection and arm_pmu customization.
 
-I screwed up my testing, unfortunately. Both the public AMD GOP driver
-I tried, and the Nvidia GT218 under x86 emulation break when using
-MMIO translation. However, GraphicsOutputDxe in the EDK2 tree gets it
-right, and uses PciIo->GetBarAttributes() to get the address of the
-framebuffer region, which will return the CPU address not the PCI
-address.
+The first patch adds an additional section at the end of each ACPI probe table.
+This allows probe tables to be sentinel-delimited and better accommodate some
+APIs that require such tables.
 
-> Let's hold onto this patch for the moment.
->
+The second patch adds the PMUv3 ACPI probe table and plumbing to allow drivers
+to plug into the ACPI PMUv3 probe sequence.
 
-Yes. I'd like to get this resolved as well, but if the drivers are
-dereferencing BAR values as CPU addresses, this is unlikely to be the
-only thing that is broken under outbound translation.
+The third patch adds the QCOM Falkor extensions using the new probe table.
+
+If this found to be a reasonable extension approach other patches will be
+added to the series to build on the base QCOM extensions.
+
+[1] https://lkml.org/lkml/2017/3/1/540
+
+Changes since V2:
+- Address V2 comments, which resulted in removing all uses of the PMU lock.
+
+Changes since V1:
+- Redesign as a separate module by adding variant detection support.
+
+Agustin Vega-Frias (3):
+  ACPI: add support for sentinel-delimited probe tables
+  arm_pmu: acpi: add support for CPU PMU variant detection
+  perf: qcom: Add Falkor CPU PMU IMPLEMENTATION DEFINED event support
+
+ drivers/perf/Makefile             |   2 +-
+ drivers/perf/arm_pmu_acpi.c       |  27 ++++
+ drivers/perf/qcom_arm_pmu.c       | 310 ++++++++++++++++++++++++++++++++++++++
+ include/asm-generic/vmlinux.lds.h |   4 +-
+ include/linux/acpi.h              |  11 ++
+ include/linux/perf/arm_pmu.h      |   1 +
+ 6 files changed, 353 insertions(+), 2 deletions(-)
+ create mode 100644 drivers/perf/qcom_arm_pmu.c
+
+--
+Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
