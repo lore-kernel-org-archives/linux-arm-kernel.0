@@ -1,35 +1,44 @@
-From: Anson.Huang@nxp.com (Anson Huang)
-Date: Fri, 22 Jun 2018 14:28:52 +0800
-Subject: [PATCH] ARM: dts: imx6sll-evk: make pfuze100 sw4 always on
-Message-ID: <1529648932-4832-1-git-send-email-Anson.Huang@nxp.com>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Fri, 22 Jun 2018 14:33:06 +0800
+Subject: [PATCH 2/2] usb: core: phy: fix return value checking about
+ devm_of_phy_get_by_index()
+In-Reply-To: <4c338a129ab14ab41949da5e3c21aed0d77dff8d.1529647619.git.chunfeng.yun@mediatek.com>
+References: <4c338a129ab14ab41949da5e3c21aed0d77dff8d.1529647619.git.chunfeng.yun@mediatek.com>
+Message-ID: <644d00edd2932c1a0d0a1bf368dd25427d1d9f64.1529647619.git.chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On i.MX6SLL EVK board, PFuze100's SW4 is supplying
-LPDDR3, it needs to be always on. This patch fixes
-Linux kernel boot up hang caused by SW4 being turned
-off:
+1. use IS_ERR() but not IS_ERR_OR_NULL() because devm_of_phy_get_by_index()
+    never return NULL value;
+2. devm_of_phy_get_by_index() should not fail for a valid index
 
-[    1.693613] cfg80211: failed to load regulatory.db
-[    1.700063] SW4: disabling
-[    1.703973] SWBST: disabling
-
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
 ---
- arch/arm/boot/dts/imx6sll-evk.dts | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/usb/core/phy.c | 11 ++++-------
+ 1 file changed, 4 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6sll-evk.dts b/arch/arm/boot/dts/imx6sll-evk.dts
-index 4684ac4..2217c40 100644
---- a/arch/arm/boot/dts/imx6sll-evk.dts
-+++ b/arch/arm/boot/dts/imx6sll-evk.dts
-@@ -142,6 +142,7 @@
- 			sw4_reg: sw4 {
- 				regulator-min-microvolt = <800000>;
- 				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
- 			};
+diff --git a/drivers/usb/core/phy.c b/drivers/usb/core/phy.c
+index 9879767..0f972e1 100644
+--- a/drivers/usb/core/phy.c
++++ b/drivers/usb/core/phy.c
+@@ -23,14 +23,11 @@ static int usb_phy_roothub_add_phy(struct device *dev, int index,
+ 				   struct list_head *list)
+ {
+ 	struct usb_phy_roothub *roothub_entry;
+-	struct phy *phy = devm_of_phy_get_by_index(dev, dev->of_node, index);
++	struct phy *phy;
  
- 			swbst_reg: swbst {
+-	if (IS_ERR_OR_NULL(phy)) {
+-		if (!phy || PTR_ERR(phy) == -ENODEV)
+-			return 0;
+-		else
+-			return PTR_ERR(phy);
+-	}
++	phy = devm_of_phy_get_by_index(dev, dev->of_node, index);
++	if (IS_ERR(phy))
++		return PTR_ERR(phy);
+ 
+ 	roothub_entry = devm_kzalloc(dev, sizeof(*roothub_entry), GFP_KERNEL);
+ 	if (!roothub_entry)
 -- 
-2.7.4
+1.9.1
