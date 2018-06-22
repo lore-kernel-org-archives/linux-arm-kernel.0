@@ -1,59 +1,43 @@
-From: Chris.Brandt@renesas.com (Chris Brandt)
-Date: Fri, 22 Jun 2018 13:26:40 +0000
-Subject: [PATCHv4 4/4] ARM: versatile: support configuring versatile
- machine for no-MMU
-In-Reply-To: <CAMuHMdXPiDGg+S3VQutSYSBwBbjW_wV+nTSBHuu7a3VNTghm1A@mail.gmail.com>
-References: <20180618141905.7789-1-gerg@linux-m68k.org>
- <20180618141905.7789-5-gerg@linux-m68k.org>
- <CAMuHMdUyCEq0U_CJindwcSEF+0dR-SJc1v8zGT-CcUqVkdOeVw@mail.gmail.com>
- <nycvar.YSQ.7.76.1806211212010.16670@knanqh.ubzr>
- <TY1PR01MB1562B232625397CCACD5931A8A760@TY1PR01MB1562.jpnprd01.prod.outlook.com>
- <CAMuHMdXPiDGg+S3VQutSYSBwBbjW_wV+nTSBHuu7a3VNTghm1A@mail.gmail.com>
-Message-ID: <TY1PR01MB1562AFD0C247CA1A30957B1D8A750@TY1PR01MB1562.jpnprd01.prod.outlook.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 22 Jun 2018 14:31:34 +0100
+Subject: KVM guest sometimes failed to boot because of kernel stack
+ overflow if KPTI is enabled on a hisilicon ARM64 platform.
+In-Reply-To: <5B2CF723.7010600@hisilicon.com>
+References: <5B2A7FE1.5040607@hisilicon.com>
+ <e701eaa8-dcb9-777c-2211-67ee27b43acb@arm.com>
+ <20180621091850.GA22505@arm.com> <5B2B7A84.8090309@hisilicon.com>
+ <20180621105404.GB22505@arm.com> <5B2CB440.8040705@hisilicon.com>
+ <20180622092330.GD7601@arm.com> <5B2CD33B.9020702@hisilicon.com>
+ <20180622111614.GA1150@arm.com> <5B2CF723.7010600@hisilicon.com>
+Message-ID: <20180622133133.GA1802@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
+Hi again, Wei,
 
-On Friday, June 22, 2018, Geert Uytterhoeven wrote:
-> > 1) Modify kbuild to give the ability as stated above.
-> 
-> Would that actually help, or would it only give you a false feeling of
-> safety?
+On Fri, Jun 22, 2018 at 09:18:27PM +0800, Wei Xu wrote:
+> On 2018/6/22 19:16, Will Deacon wrote:
+> >On Fri, Jun 22, 2018 at 06:45:15PM +0800, Wei Xu wrote:
+> >>On 2018/6/22 17:23, Will Deacon wrote:
+> >>>Perhaps just writing back the table entries is enough to cause the issue,
+> >>>although I really can't understand why that would be the case. Can you try
+> >>>the diff below (without my previous change), please?
+> >>Thanks!
+> >>But it does not resolve the issue(only apply this patch based on 4.17.0).
+> >Thanks, that's a useful data point. It means that it still crashes even if
+> >we write back the same table entries, so it's the fact that we're writing
+> >them at all which causes the problem, not the value that we write.
+> >
+> >Whilst looking at the code, we noticed a missing DMB. On the off-chance
+> >that it helps, can you try this instead please?
+> Thanks!
+> Only apply below patch based on 4.17.0, we still got the crash.
 
-Yup!
-But I don't really care about safty. I just want to be able to build my images without having to hack Kconfig.
+Oh well, it was worth a shot (and that's still a fix worth having). Please
+can you provide the complete disassembly for kpti_install_ng_mappings()
+(I'm referring to the C function in cpufeature.c) along with a corresponding
+crash log so that we can correlate the instruction stream with the crash?
 
+Thanks,
 
-> Conclusion: If you want NOMMU and/or XIP, you have to know what you're
-> doing,
-> and hand-holding at whatever level may not save you from making mistakes.
-
-I agree.
-And, you'll require your own kernel config in order to cut out all the 
-extra stuff that your system doesn't need.
-
-
-> > 2) Make XIP builds somehow be able to run at multiple physical address
-> > by modifying the binaries post-build (Arnd's suggestion).
-> 
-> That's actually an interesting one: no manual configuration (iff
-> parameters
-> would be extracted from the DTB), so nothing can go wrong ;-)
-> I guess it applies to NOMMU, too.
-
-For the hard coded memory address, it's only need at the very beginning 
-of boot in order to set up a temporary stack, but soon the DTB is read 
-and life is good. So in theory, the memory address could be passed in 
-with a register.
-
-For the hard coded ROM address, that needs to be available at run time 
-in order to do the virt_to_phys translation. But, the idea is to change 
-that from a #define to a global variable.
-
-It sounded like it might work...although I never got around to hacking 
-the code to see if it would or not because at the end of the day, it 
-didn't provide any real value to ab XIP Linux system.
-
-
-Chris
+Will
