@@ -1,94 +1,69 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 22 Jun 2018 13:49:52 +0100
-Subject: [PATCH 7/8] KVM: Enforce error in ioctl for compat tasks when
- !KVM_COMPAT
+Date: Fri, 22 Jun 2018 13:49:51 +0100
+Subject: [PATCH 6/8] KVM: arm/arm64: add WARN_ON if size is not PAGE_SIZE
+ aligned in unmap_stage2_range
 In-Reply-To: <20180622124953.12355-1-marc.zyngier@arm.com>
 References: <20180622124953.12355-1-marc.zyngier@arm.com>
-Message-ID: <20180622124953.12355-8-marc.zyngier@arm.com>
+Message-ID: <20180622124953.12355-7-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current behaviour of the compat ioctls is a bit odd.
-We provide a compat_ioctl method when KVM_COMPAT is set, and NULL
-otherwise. But NULL means that the normal, non-compat ioctl should
-be used directly for compat tasks, and there is no way to actually
-prevent a compat task from issueing KVM ioctls.
+From: Jia He <hejianet@gmail.com>
 
-This patch changes this behaviour, by always registering a compat_ioctl
-method, even if KVM_COMPAT is not selected. In that case, the callback
-will always return -EINVAL.
+There is a panic in armv8a server(QDF2400) under memory pressure tests
+(start 20 guests and run memhog in the host).
 
-Fixes: de8e5d744051568c8aad ("KVM: Disable compat ioctl for s390")
-Reported-by: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Christian Borntraeger <borntraeger@de.ibm.com>
-Acked-by: Radim Kr?m?? <rkrcmar@redhat.com>
+---------------------------------begin--------------------------------
+[35380.800950] BUG: Bad page state in process qemu-kvm  pfn:dd0b6
+[35380.805825] page:ffff7fe003742d80 count:-4871 mapcount:-2126053375
+mapping:          (null) index:0x0
+[35380.815024] flags: 0x1fffc00000000000()
+[35380.818845] raw: 1fffc00000000000 0000000000000000 0000000000000000
+ffffecf981470000
+[35380.826569] raw: dead000000000100 dead000000000200 ffff8017c001c000
+0000000000000000
+[35380.805825] page:ffff7fe003742d80 count:-4871 mapcount:-2126053375
+mapping:          (null) index:0x0
+[35380.815024] flags: 0x1fffc00000000000()
+[35380.818845] raw: 1fffc00000000000 0000000000000000 0000000000000000
+ffffecf981470000
+[35380.826569] raw: dead000000000100 dead000000000200 ffff8017c001c000
+0000000000000000
+[35380.834294] page dumped because: nonzero _refcount
+[...]
+--------------------------------end--------------------------------------
+
+The root cause might be what was fixed at [1]. But from the KVM points of
+view, it would be better if the issue was caught earlier.
+
+If the size is not PAGE_SIZE aligned, unmap_stage2_range might unmap the
+wrong(more or less) page range. Hence it caused the "BUG: Bad page
+state"
+
+Let's WARN in that case, so that the issue is obvious.
+
+[1] https://lkml.org/lkml/2018/5/3/1042
+
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Signed-off-by: jia.he at hxt-semitech.com
+[maz: tidied up commit message]
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/kvm_main.c | 19 +++++++++----------
- 1 file changed, 9 insertions(+), 10 deletions(-)
+ virt/kvm/arm/mmu.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
-index ada21f47f22b..8b47507faab5 100644
---- a/virt/kvm/kvm_main.c
-+++ b/virt/kvm/kvm_main.c
-@@ -116,6 +116,11 @@ static long kvm_vcpu_ioctl(struct file *file, unsigned int ioctl,
- #ifdef CONFIG_KVM_COMPAT
- static long kvm_vcpu_compat_ioctl(struct file *file, unsigned int ioctl,
- 				  unsigned long arg);
-+#define KVM_COMPAT(c)	.compat_ioctl	= (c)
-+#else
-+static long kvm_no_compat_ioctl(struct file *file, unsigned int ioctl,
-+				unsigned long arg) { return -EINVAL; }
-+#define KVM_COMPAT(c)	.compat_ioctl	= kvm_no_compat_ioctl
- #endif
- static int hardware_enable_all(void);
- static void hardware_disable_all(void);
-@@ -2396,11 +2401,9 @@ static int kvm_vcpu_release(struct inode *inode, struct file *filp)
- static struct file_operations kvm_vcpu_fops = {
- 	.release        = kvm_vcpu_release,
- 	.unlocked_ioctl = kvm_vcpu_ioctl,
--#ifdef CONFIG_KVM_COMPAT
--	.compat_ioctl   = kvm_vcpu_compat_ioctl,
--#endif
- 	.mmap           = kvm_vcpu_mmap,
- 	.llseek		= noop_llseek,
-+	KVM_COMPAT(kvm_vcpu_compat_ioctl),
- };
+diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+index 8d90de213ce9..1d90d79706bd 100644
+--- a/virt/kvm/arm/mmu.c
++++ b/virt/kvm/arm/mmu.c
+@@ -297,6 +297,8 @@ static void unmap_stage2_range(struct kvm *kvm, phys_addr_t start, u64 size)
+ 	phys_addr_t next;
  
- /*
-@@ -2824,10 +2827,8 @@ static int kvm_device_release(struct inode *inode, struct file *filp)
- 
- static const struct file_operations kvm_device_fops = {
- 	.unlocked_ioctl = kvm_device_ioctl,
--#ifdef CONFIG_KVM_COMPAT
--	.compat_ioctl = kvm_device_ioctl,
--#endif
- 	.release = kvm_device_release,
-+	KVM_COMPAT(kvm_device_ioctl),
- };
- 
- struct kvm_device *kvm_device_from_filp(struct file *filp)
-@@ -3165,10 +3166,8 @@ static long kvm_vm_compat_ioctl(struct file *filp,
- static struct file_operations kvm_vm_fops = {
- 	.release        = kvm_vm_release,
- 	.unlocked_ioctl = kvm_vm_ioctl,
--#ifdef CONFIG_KVM_COMPAT
--	.compat_ioctl   = kvm_vm_compat_ioctl,
--#endif
- 	.llseek		= noop_llseek,
-+	KVM_COMPAT(kvm_vm_compat_ioctl),
- };
- 
- static int kvm_dev_ioctl_create_vm(unsigned long type)
-@@ -3259,8 +3258,8 @@ static long kvm_dev_ioctl(struct file *filp,
- 
- static struct file_operations kvm_chardev_ops = {
- 	.unlocked_ioctl = kvm_dev_ioctl,
--	.compat_ioctl   = kvm_dev_ioctl,
- 	.llseek		= noop_llseek,
-+	KVM_COMPAT(kvm_dev_ioctl),
- };
- 
- static struct miscdevice kvm_dev = {
+ 	assert_spin_locked(&kvm->mmu_lock);
++	WARN_ON(size & ~PAGE_MASK);
++
+ 	pgd = kvm->arch.pgd + stage2_pgd_index(addr);
+ 	do {
+ 		/*
 -- 
 2.17.1
