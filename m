@@ -1,30 +1,54 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 22 Jun 2018 12:48:50 -0300
-Subject: [PATCH] ARM: dts: imx51: add CodaHx4 VPU
-In-Reply-To: <1529660586.2431.6.camel@pengutronix.de>
-References: <20171213142406.5088-1-p.zabel@pengutronix.de>
- <20171226041517.GD4210@X250>
- <1529610890.4022.7.camel@pengutronix.de>
- <CAOMZO5Ahv2F-WeAPFgsBcpAeb2i==SAZ45QBLvnod7jYRG0fMQ@mail.gmail.com>
- <1529660586.2431.6.camel@pengutronix.de>
-Message-ID: <CAOMZO5AuB1gTG5jRsQjhunZdz+X4o3rGn8sz+axLVU+VyA0jdg@mail.gmail.com>
+From: FrankWu@gmx.de (Frank Wunderlich)
+Date: Fri, 22 Jun 2018 17:53:03 +0200
+Subject: [PATCH] [dts] fix green/blue pio-led on bananapi-r2
+References: <trinity-ae29ad25-a4fb-47f3-8d68-f6e58c875a0e-1529682447976@3c-app-gmx-bs42>
+Message-ID: <trinity-0d48bc23-f754-4da3-af01-c3a7abe1d34b-1529682783853@3c-app-gmx-bs42>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philipp,
-
-On Fri, Jun 22, 2018 at 6:43 AM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
-
-> I think i.MX51 doesn't have that clock gate:
->
->         clk[IMX5_CLK_OCRAM]             = imx_clk_gate2("ocram", "ahb", MXC_CCM_CCGR6, 2);
->
-> is added for i.MX53 only. CCGR6 CG1 (bits 3:2) is documented as
-> "no longer supported, should be cleared" in the i.MX51 reference
-> manual. I can't find any mention of a gate for the SCC RAM.
-
-That's true. This gate is only present on i.MX53, so:
-
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
-
-Thanks for the clarification
+From: Frank Wunderlich <frank-w@public-files.de>
+Date: Sun, 17 Jun 2018 19:11:58 +0200
+Subject: [PATCH] [dts] fix green/blue pio-led
+?green/blue pio-leds (near GPIO-Header) are swapped and LOW-active
+?this patch restore this expected behaviour
+?red cannot be switched afaik
+Signed-off-by: Frank Wunderlich <frank-w@public-files.de>
+---
+?arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts | 14 +++++++-------
+?1 file changed, 7 insertions(+), 7 deletions(-)
+diff --git a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
+index 531d905d924ff..3e8a0ffe8b13e 100644
+--- a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
++++ b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
+@@ -89,21 +89,21 @@
+??? ??? ?pinctrl-names = "default";
+??? ??? ?pinctrl-0 = <&led_pins_a>;
+?
+-?? ??? ?blue {
+-?? ??? ??? ?label = "bpi-r2:pio:blue";
+-?? ??? ??? ?gpios = <&pio 241 GPIO_ACTIVE_HIGH>;
++?? ??? ?green {
++?? ??? ??? ?label = "bpi-r2:pio:green";
++?? ??? ??? ?gpios = <&pio 241 GPIO_ACTIVE_LOW>;
+??? ??? ??? ?default-state = "off";
+??? ??? ?};
+?
+-?? ??? ?green {
+-?? ??? ??? ?label = "bpi-r2:pio:green";
+-?? ??? ??? ?gpios = <&pio 240 GPIO_ACTIVE_HIGH>;
++?? ??? ?blue {
++?? ??? ??? ?label = "bpi-r2:pio:blue";
++?? ??? ??? ?gpios = <&pio 240 GPIO_ACTIVE_LOW>;
+??? ??? ??? ?default-state = "off";
+??? ??? ?};
+?
+??? ??? ?red {
+??? ??? ??? ?label = "bpi-r2:pio:red";
+-?? ??? ??? ?gpios = <&pio 239 GPIO_ACTIVE_HIGH>;
++?? ??? ??? ?gpios = <&pio 239 GPIO_ACTIVE_LOW>;
+??? ??? ??? ?default-state = "off";
+??? ??? ?};
+??? ?};
+?
+?
+?
