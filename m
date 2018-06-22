@@ -1,24 +1,48 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Thu, 21 Jun 2018 17:31:48 -0700
-Subject: [PATCH V3 6/6] arm64: defconfig: Enable RPi voltage sensor
-In-Reply-To: <1527276279-23876-7-git-send-email-stefan.wahren@i2se.com>
-References: <1527276279-23876-1-git-send-email-stefan.wahren@i2se.com>
- <1527276279-23876-7-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <87zhznd5l7.fsf@anholt.net>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Thu, 21 Jun 2018 20:35:26 -0400
+Subject: [PATCH] locking/qspinlock: Fix build for anonymous union in older
+ gcc compilers
+Message-ID: <20180621203526.172ab5c4@vmware.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stefan Wahren <stefan.wahren@i2se.com> writes:
+From: Steven Rostedt (VMware) <rostedt@goodmis.org>
 
-> The patch enables the hwmon driver for the Raspberry Pi.
->
-> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+One of my tests compiles the kernel with gcc 4.5.3, and I hit the
+following build error:
 
-I've pulled this series to our -next branches now.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180621/fac36b3d/attachment.sig>
+/work/git/linux-trace.git/include/linux/semaphore.h: In function 'sema_init':
+/work/git/linux-trace.git/include/linux/semaphore.h:35:17: error: unknown field 'val' specified in initializer
+/work/git/linux-trace.git/include/linux/semaphore.h:35:17: warning: missing braces around initializer
+/work/git/linux-trace.git/include/linux/semaphore.h:35:17: warning: (near initialization for '(anonymous).raw_lock.<anonymous>.val')
+In file included from /work/git/linux-trace.git/include/linux/sched/user.h:7:0,
+                 from /work/git/linux-trace.git/include/linux/cred.h:22,
+                 from /work/git/linux-trace.git/include/linux/seq_file.h:12,
+                 from /work/git/linux-trace.git/include/linux/cgroup.h:18,
+                 from /work/git/linux-trace.git/include/linux/memcontrol.h:22,
+                 from /work/git/linux-trace.git/include/linux/swap.h:9,
+                 from /work/git/linux-trace.git/include/linux/suspend.h:5,
+                 from /work/git/linux-trace.git/arch/x86/kernel/asm-offsets.c:13:
+
+
+I bisected it down to the introduction of the commit that makes
+qspinlock have an anonymous union, which makes initializing it special
+for older compilers. By adding strategic brackets, it makes the build
+happy again.
+
+Fixes: 625e88be1f41 ("locking/qspinlock: Merge 'struct __qspinlock' into 'struct qspinlock'")
+Signed-off-by: Steven Rostedt (VMware) <rostedt@goodmis.org>
+---
+diff --git a/include/asm-generic/qspinlock_types.h b/include/asm-generic/qspinlock_types.h
+index 0763f065b975..d10f1e7d6ba8 100644
+--- a/include/asm-generic/qspinlock_types.h
++++ b/include/asm-generic/qspinlock_types.h
+@@ -63,7 +63,7 @@ typedef struct qspinlock {
+ /*
+  * Initializier
+  */
+-#define	__ARCH_SPIN_LOCK_UNLOCKED	{ .val = ATOMIC_INIT(0) }
++#define	__ARCH_SPIN_LOCK_UNLOCKED	{ { .val = ATOMIC_INIT(0) } }
+ 
+ /*
+  * Bitfields in the atomic value:
