@@ -1,79 +1,46 @@
-From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Fri, 22 Jun 2018 22:11:59 +0800
-Subject: [PATCH V3 4/5] dt-bindings: arm: fsl: add scu binding doc
-In-Reply-To: <1529676720-7533-1-git-send-email-aisheng.dong@nxp.com>
-References: <1529676720-7533-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1529676720-7533-5-git-send-email-aisheng.dong@nxp.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Fri, 22 Jun 2018 16:19:41 +0200
+Subject: [PATCH v4 05/19] dt-bindings: sram: sunxi: Add A33 binding for
+ the C1 SRAM region
+In-Reply-To: <20180618145843.14631-6-paul.kocialkowski@bootlin.com>
+References: <20180618145843.14631-1-paul.kocialkowski@bootlin.com>
+ <20180618145843.14631-6-paul.kocialkowski@bootlin.com>
+Message-ID: <20180622141941.ckap4ydxqbihai6m@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The System Controller Firmware (SCFW) is a low-level system function
-which runs on a dedicated Cortex-M core to provide power, clock, and
-resource management. It exists on some i.MX8 processors. e.g. i.MX8QM
-(QM, QP), and i.MX8QX (QXP, DX).
+On Mon, Jun 18, 2018 at 04:58:29PM +0200, Paul Kocialkowski wrote:
+> This introduces a dedicated binding for the C1 SRAM region for the A33
+> sunxi platform.
+> 
+> Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+> 
+> diff --git a/Documentation/devicetree/bindings/sram/sunxi-sram.txt b/Documentation/devicetree/bindings/sram/sunxi-sram.txt
+> index 221fa7b42c18..d8d1aac0840b 100644
+> --- a/Documentation/devicetree/bindings/sram/sunxi-sram.txt
+> +++ b/Documentation/devicetree/bindings/sram/sunxi-sram.txt
+> @@ -38,6 +38,9 @@ The valid sections compatible for A13 are:
+>  The valid sections compatible for A20 are:
+>      - allwinner,sun7i-a20-sram-c1
+>  
+> +The valid sections compatible for A33 are:
+> +    - allwinner,sun8i-a33-sram-c1
+> +
 
-Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: Fabio Estevam <fabio.estevam@nxp.com>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: devicetree at vger.kernel.org
-Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
----
-v2->v3:
- * update a bit to mailbox binding
-v1->v2:
- * remove status
- * changed to mu1
----
- .../devicetree/bindings/arm/freescale/fsl,scu.txt  | 39 ++++++++++++++++++++++
- 1 file changed, 39 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
+This is just a detail, but that got introduced with the A23, not the
+A33, so it should be the A23 in the compatible instead. It applies for
+the SRAM controller compatible too.
 
-diff --git a/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt b/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
-new file mode 100644
-index 0000000..b51f9d1
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
-@@ -0,0 +1,39 @@
-+NXP i.MX System Controller Firmware (SCFW)
-+--------------------------------------------------------------------
-+
-+The System Controller Firmware (SCFW) is a low-level system function
-+which runs on a dedicated Cortex-M core to provide power, clock, and
-+resource management. It exists on some i.MX8 processors. e.g. i.MX8QM
-+(QM, QP), and i.MX8QX (QXP, DX).
-+
-+The AP communicates with the SC using a multi-ported MU module found
-+in the LSIO subsystem. The current definition of this MU module provides
-+5 remote AP connections to the SC to support up to 5 execution environments
-+(TZ, HV, standard Linux, etc.). The SC side of this MU module interfaces
-+with the LSIO DSC IP bus. The SC firmware will communicate with this MU
-+using the MSI bus.
-+
-+System Controller Device Node:
-+=============================
-+
-+Required properties:
-+-------------------
-+- compatible: should be "fsl,imx8qxp-scu" or "fsl,imx8qm-scu"
-+- fsl,mu: a phandle to the Message Unit used by SCU. Should be
-+	  one of LSIO MU0~M4 for imx8qxp and imx8qm. Users need
-+	  to make sure not use the one which is conflict with
-+	  other execution environments. e.g. ATF.
-+
-+Examples:
-+--------
-+lsio_mu1: mailbox at 5d1c0000 {
-+	compatible = "fsl,imx8qxp-mu";
-+	reg = <0x0 0x5d1c0000 0x0 0x10000>;
-+	interrupts = <GIC_SPI 176 IRQ_TYPE_LEVEL_HIGH>;
-+	#mbox-cells = <0>;
-+};
-+
-+scu {
-+	compatible = "fsl,imx8qxp-scu";
-+	fsl,mu = <&lsio_mu1>;
-+};
+Maxime
+
 -- 
-2.7.4
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180622/c4220c1e/attachment.sig>
