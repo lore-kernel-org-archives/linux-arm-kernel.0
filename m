@@ -1,53 +1,45 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Fri, 22 Jun 2018 13:30:57 +0100
-Subject: [PATCH 3/4] drivers/bus: arm-cci: Use SPDX license information
-In-Reply-To: <20180622110628.GA23452@sesnaco> (Mawanda Henry's message of
- "Fri, 22 Jun 2018 14:06:29 +0300")
-References: <20180622110628.GA23452@sesnaco>
-Message-ID: <87r2kzypdq.fsf@e105922-lin.cambridge.arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Fri, 22 Jun 2018 13:47:17 +0100
+Subject: [PATCH v2] power: vexpress: fix corruption in notifier
+ registration
+In-Reply-To: <1529337272-11799-1-git-send-email-sudeep.holla@arm.com>
+References: <1529322007-4637-1-git-send-email-sudeep.holla@arm.com>
+ <1529337272-11799-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <044c6de2-fc9d-37a7-90f4-8d77dc4961c3@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[ + alkml, will ]
+Hi Sebastian,
 
-Please make sure to cc linux-arm-kernel and the appropriate maintainers
-(see scripts/get_maintainer.pl) for Arm related patches.
+On 18/06/18 16:54, Sudeep Holla wrote:
+> Vexpress platforms provide two different restart handlers: SYS_REBOOT
+> that restart the entire system, while DB_RESET only restarts the
+> daughter board containing the CPU. DB_RESET is overridden by SYS_REBOOT
+> if it exists.
+> 
+> notifier_chain_register used in register_restart_handler by design
+> relies on notifiers to be registered once only, however vexpress restart
+> notifier can get registered twice. When this happen it corrupts list
+> of notifiers, as result some notifiers can be not called on proper
+> event, traverse on list can be cycled forever, and second unregister
+> can access already freed memory.
+> 
+> So far, since this was the only restart handler in the system, no issue
+> was observed even if the same notifier was registered twice. However
+> commit 6c5c0d48b686 ("watchdog: sp805: add restart handler") added
+> support for SP805 restart handlers and since the system under test
+> contains two vexpress restart and two SP805 watchdog instances, it was
+> observed that during the boot traversing the restart handler list looped
+> forever as there's a cycle in that list resulting in boot hang.
+> 
+> This patch fixes the issues by ensuring that the notifier is installed
+> only once.
+> 
 
-Mawanda Henry <mawandahenrynaco@gmail.com> writes:
 
-> SPDX licence header helps developers and machines to know the right
-> license governing a particular file
+Can you pick this up ? Without this patch, my Vexpress TC2 hangs in the
+boot.
 
-It's good practice to update the commit log if you change the
-commit. Something like -
-
-"While we are at it, also update the MODULE_LICENSE() to reflect the
-license version - GPL v2"
-
-> Signed-off-by: Mawanda Henry <mawandahenrynaco@gmail.com>
-
-With that change,
-
-Acked-by: Punit Agrawal <punit.agrawal@arm.com>
-
-> ---
->  drivers/bus/arm-cci.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
-> index ab04201..4f92f39 100644
-> --- a/drivers/bus/arm-cci.c
-> +++ b/drivers/bus/arm-cci.c
-> @@ -1,4 +1,4 @@
-> -// SPDX-License-Identifier: GPL-2.0-or-later
-> +// SPDX-License-Identifier: GPL-2.0
->  /*
->   * CCI cache coherent interconnect driver
->   *
-> @@ -575,5 +575,5 @@ EXPORT_SYMBOL_GPL(cci_probed);
->  
->  early_initcall(cci_init);
->  core_initcall(cci_platform_init);
-> -MODULE_LICENSE("GPL");
-> +MODULE_LICENSE("GPL v2");
->  MODULE_DESCRIPTION("ARM CCI support");
+-- 
+Regards,
+Sudeep
