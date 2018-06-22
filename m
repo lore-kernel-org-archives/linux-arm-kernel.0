@@ -1,138 +1,65 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 22 Jun 2018 09:54:20 +0200
-Subject: [PATCH 4/7] ARM: s5pv210_defconfig: Enable drivers for Samsung
- Aries based phones
-In-Reply-To: <1529608199-5583-5-git-send-email-pawel.mikolaj.chmiel@gmail.com>
-References: <1529608199-5583-1-git-send-email-pawel.mikolaj.chmiel@gmail.com>
- <1529608199-5583-5-git-send-email-pawel.mikolaj.chmiel@gmail.com>
-Message-ID: <CAJKOXPe3D5Qp_idZY57UJi2c10D7wEfTZ=W=PkzanK4NPf-WWg@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 22 Jun 2018 09:54:22 +0200
+Subject: [PATCH V2 2/2] efi/fb: Convert PCI bus address to resource if
+ translated by the bridge
+In-Reply-To: <6376822.ENUjdQ58sn@amdc3058>
+References: <1526653072-7153-1-git-send-email-okaya@codeaurora.org>
+ <CGME20180613154552epcas5p4877f53310b66cf9d3e17196b0d028e41@epcas5p4.samsung.com>
+ <CAKv+Gu9+M8zOtACPQ4_UMgp-M1LfZnciYe1VTQNqn_zNWJea4g@mail.gmail.com>
+ <6376822.ENUjdQ58sn@amdc3058>
+Message-ID: <CAKv+Gu9dFGudOr1uTmOnM=X47gsOAgpdUJ6UMiDJJ_7phH1ZzA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 June 2018 at 21:09, Pawe? Chmiel <pawel.mikolaj.chmiel@gmail.com> wrote:
-> Enable config options required for Samsung Aries based phones..
-
-Two dots.
-
-> While we're here, also enable other useful options like:
-
-Please split it. One set of changes needed for Aries and second set of
-other useful changes with short explanation why they are needed. This
-explanation might be for example:
-1. because typical Linux distro or systemd requires them,
-2. they are useful for debugging.
-
-> - SYSVIPC
-> - CGROUPS
-> - DEVTMPFS
-> - networking support
-> - ext4 and autofs
+On 13 June 2018 at 18:08, Bartlomiej Zolnierkiewicz
+<b.zolnierkie@samsung.com> wrote:
+> On Wednesday, June 13, 2018 05:45:48 PM Ard Biesheuvel wrote:
+>> On 18 May 2018 at 16:17, Sinan Kaya <okaya@codeaurora.org> wrote:
+>> > A host bridge is allowed to remap BAR addresses using _TRA attribute in
+>> > _CRS windows.
+>> >
+>> > pci_bus 0000:00: root bus resource [mem 0x80100100000-0x8011fffffff window] (bus address [0x00100000-0x1fffffff])
+>> > pci 0000:02:00.0: reg 0x10: [mem 0x8011e000000-0x8011effffff]
+>> >
+>> > When a VGA device is behind such a host bridge and the resource is
+>> > translated efifb driver is trying to do ioremap against bus address
+>> > rather than the resource address and is failing to probe.
+>> >
+>> > efifb: probing for efifb
+>> > efifb: cannot reserve video memory at 0x1e000000
+>> > efifb: framebuffer at 0x1e000000, using 1920k, total 1875k
+>> > efifb: mode is 800x600x32, linelength=3200, pages=1
+>> > efifb: scrolling: redraw
+>> > efifb: Truecolor: size=8:8:8:8, shift=24:16:8:0
+>> >
+>> > Use the host bridge offset information to convert bus address to
+>> > resource address in the fixup.
+>> >
+>> > Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+>>
+>> Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>
+>> Bartlomiej, could you please take these via the fbdev tree for v4.19?
 >
-> Signed-off-by: Pawe? Chmiel <pawel.mikolaj.chmiel@gmail.com>
-> ---
->  arch/arm/configs/s5pv210_defconfig | 49 +++++++++++++++++++++++++++++++++++---
->  1 file changed, 46 insertions(+), 3 deletions(-)
+> Sure, I will queue it after the current merge window.
 >
-> diff --git a/arch/arm/configs/s5pv210_defconfig b/arch/arm/configs/s5pv210_defconfig
-> index 09b5a7386414..a077597369f1 100644
-> --- a/arch/arm/configs/s5pv210_defconfig
-> +++ b/arch/arm/configs/s5pv210_defconfig
-> @@ -1,5 +1,7 @@
-> +CONFIG_SYSVIPC=y
->  CONFIG_NO_HZ=y
->  CONFIG_HIGH_RES_TIMERS=y
-> +CONFIG_CGROUPS=y
->  CONFIG_SYSFS_DEPRECATED=y
->  CONFIG_SYSFS_DEPRECATED_V2=y
->  CONFIG_BLK_DEV_INITRD=y
-> @@ -13,28 +15,68 @@ CONFIG_SOLARIS_X86_PARTITION=y
->  CONFIG_ARCH_S5PV210=y
->  CONFIG_VMSPLIT_2G=y
->  CONFIG_PREEMPT=y
-> -CONFIG_AEABI=y
-
-I believe this comes from savedefconfig. In such case please make it a
-separate commit, before all others, because it should not bring any
-functional differences.
-
-Best regards,
-Krzysztof
-
-> +CONFIG_ARM_APPENDED_DTB=y
->  CONFIG_CMDLINE="root=/dev/ram0 rw ramdisk=8192 initrd=0x20800000,8M console=ttySAC1,115200 init=/linuxrc"
->  CONFIG_VFP=y
->  CONFIG_NEON=y
-> +CONFIG_NET=y
-> +CONFIG_PACKET=y
-> +CONFIG_UNIX=y
-> +CONFIG_INET=y
-> +CONFIG_IP_PNP=y
-> +CONFIG_IP_PNP_DHCP=y
-> +CONFIG_IP_PNP_BOOTP=y
-> +CONFIG_IP_PNP_RARP=y
-> +CONFIG_CFG80211=m
-> +CONFIG_MAC80211=m
->  CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-> +CONFIG_DEVTMPFS=y
-> +CONFIG_DEVTMPFS_MOUNT=y
->  CONFIG_BLK_DEV_LOOP=y
->  CONFIG_BLK_DEV_RAM=y
->  CONFIG_BLK_DEV_RAM_SIZE=8192
->  CONFIG_SCSI=y
->  CONFIG_BLK_DEV_SD=y
->  CONFIG_CHR_DEV_SG=y
-> +CONFIG_NETDEVICES=y
-> +CONFIG_BRCMFMAC=m
->  CONFIG_INPUT_EVDEV=y
-> -# CONFIG_INPUT_KEYBOARD is not set
-> +CONFIG_KEYBOARD_GPIO=y
->  # CONFIG_INPUT_MOUSE is not set
->  CONFIG_INPUT_TOUCHSCREEN=y
->  CONFIG_SERIAL_8250=y
->  CONFIG_SERIAL_SAMSUNG=y
->  CONFIG_SERIAL_SAMSUNG_CONSOLE=y
->  CONFIG_HW_RANDOM=y
-> +CONFIG_I2C_GPIO=y
-> +CONFIG_POWER_SUPPLY=y
-> +CONFIG_BATTERY_MAX17040=y
->  # CONFIG_HWMON is not set
-> -# CONFIG_USB_SUPPORT is not set
-> +CONFIG_MFD_MAX8998=y
-> +CONFIG_REGULATOR=y
-> +CONFIG_REGULATOR_MAX8998=y
-> +CONFIG_DRM=y
-> +CONFIG_DRM_EXYNOS=y
-> +CONFIG_DRM_EXYNOS_FIMD=y
-> +CONFIG_DRM_EXYNOS_DPI=y
-> +CONFIG_USB=y
-> +CONFIG_USB_OTG=y
-> +CONFIG_USB_EHCI_HCD=y
-> +CONFIG_USB_EHCI_EXYNOS=y
-> +CONFIG_USB_OHCI_HCD=y
-> +CONFIG_USB_OHCI_EXYNOS=y
-> +CONFIG_USB_DWC2=y
-> +CONFIG_MMC=y
-> +CONFIG_MMC_SDHCI=y
-> +CONFIG_MMC_SDHCI_S3C=y
-> +CONFIG_MMC_SDHCI_S3C_DMA=y
-> +CONFIG_RTC_CLASS=y
-> +CONFIG_RTC_DRV_MAX8998=m
-> +CONFIG_PHY_SAMSUNG_USB2=m
-> +CONFIG_PHY_S5PV210_USB2=y
->  CONFIG_EXT2_FS=y
-> +CONFIG_EXT4_FS=y
-> +CONFIG_AUTOFS4_FS=y
->  CONFIG_MSDOS_FS=y
->  CONFIG_VFAT_FS=y
->  CONFIG_TMPFS=y
-> @@ -44,6 +86,7 @@ CONFIG_ROMFS_FS=y
->  CONFIG_NLS_CODEPAGE_437=y
->  CONFIG_NLS_ASCII=y
->  CONFIG_NLS_ISO8859_1=y
-> +CONFIG_NLS_UTF8=y
->  CONFIG_DEBUG_INFO=y
->  CONFIG_MAGIC_SYSRQ=y
->  CONFIG_DEBUG_KERNEL=y
-> --
-> 2.7.4
+>> Peter already gave his ack but Sinan dropped it (presumably because of
+>> the split in v2)
 >
+> Peter, can I (re)add your ACK to V2 patches?
+>
+
+Actually, it would be better if we could take this through the EFI
+tree instead, with your ack. Would you mind?
+
+There are some other efifb changes coming up, some of which depend on
+core EFI changes, and taking these through different trees is going to
+be more trouble than it's worth.
+
+https://marc.info/?l=linux-efi&m=152929425329015&w=2 from Hans, and the series
+
+[PATCH v2 0/2] efi: add support for cacheable efifb mappings
+
+that I just cc'ed you on a minute ago.
+
+Thanks.
