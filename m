@@ -1,137 +1,138 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 22 Jun 2018 09:49:42 +0200
-Subject: [PATCH 3/7] ARM: dts: s5pv210: Add initial DTS for Samsung Galaxy
- S phone.
-In-Reply-To: <1529608199-5583-4-git-send-email-pawel.mikolaj.chmiel@gmail.com>
+Date: Fri, 22 Jun 2018 09:54:20 +0200
+Subject: [PATCH 4/7] ARM: s5pv210_defconfig: Enable drivers for Samsung
+ Aries based phones
+In-Reply-To: <1529608199-5583-5-git-send-email-pawel.mikolaj.chmiel@gmail.com>
 References: <1529608199-5583-1-git-send-email-pawel.mikolaj.chmiel@gmail.com>
- <1529608199-5583-4-git-send-email-pawel.mikolaj.chmiel@gmail.com>
-Message-ID: <CAJKOXPf8cpJ-pivG9j1sCM3aB_-i2n73MoeQKOd4oXxz976EVw@mail.gmail.com>
+ <1529608199-5583-5-git-send-email-pawel.mikolaj.chmiel@gmail.com>
+Message-ID: <CAJKOXPe3D5Qp_idZY57UJi2c10D7wEfTZ=W=PkzanK4NPf-WWg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 21 June 2018 at 21:09, Pawe? Chmiel <pawel.mikolaj.chmiel@gmail.com> wrote:
-> Signed-off-by: Pawe? Chmiel <pawel.mikolaj.chmiel@gmail.com>
+> Enable config options required for Samsung Aries based phones..
 
-Please add commit message. This can be something as simple as "Add
-Samsung Galaxy S DTS which is a commercial phone based on Aries
-family." or something more (e.g. describe what is working).
+Two dots.
 
-> ---
->  arch/arm/boot/dts/Makefile            |  1 +
->  arch/arm/boot/dts/s5pv210-galaxys.dts | 72 +++++++++++++++++++++++++++++++++++
->  2 files changed, 73 insertions(+)
->  create mode 100644 arch/arm/boot/dts/s5pv210-galaxys.dts
+> While we're here, also enable other useful options like:
+
+Please split it. One set of changes needed for Aries and second set of
+other useful changes with short explanation why they are needed. This
+explanation might be for example:
+1. because typical Linux distro or systemd requires them,
+2. they are useful for debugging.
+
+> - SYSVIPC
+> - CGROUPS
+> - DEVTMPFS
+> - networking support
+> - ext4 and autofs
 >
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 7e2424957809..522ebdca1d3d 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -846,6 +846,7 @@ dtb-$(CONFIG_ARCH_S3C64XX) += \
->         s3c6410-smdk6410.dtb
->  dtb-$(CONFIG_ARCH_S5PV210) += \
->         s5pv210-aquila.dtb \
-> +       s5pv210-galaxys.dtb \
->         s5pv210-goni.dtb \
->         s5pv210-smdkc110.dtb \
->         s5pv210-smdkv210.dtb \
-> diff --git a/arch/arm/boot/dts/s5pv210-galaxys.dts b/arch/arm/boot/dts/s5pv210-galaxys.dts
-> new file mode 100644
-> index 000000000000..d435032541a9
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/s5pv210-galaxys.dts
-> @@ -0,0 +1,72 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +
-> +/dts-v1/;
-> +#include <dt-bindings/gpio/gpio.h>
-> +#include <dt-bindings/interrupt-controller/irq.h>
-> +#include <dt-bindings/input/input.h>
-> +#include <dt-bindings/interrupt-controller/irq.h>
+> Signed-off-by: Pawe? Chmiel <pawel.mikolaj.chmiel@gmail.com>
+> ---
+>  arch/arm/configs/s5pv210_defconfig | 49 +++++++++++++++++++++++++++++++++++---
+>  1 file changed, 46 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm/configs/s5pv210_defconfig b/arch/arm/configs/s5pv210_defconfig
+> index 09b5a7386414..a077597369f1 100644
+> --- a/arch/arm/configs/s5pv210_defconfig
+> +++ b/arch/arm/configs/s5pv210_defconfig
+> @@ -1,5 +1,7 @@
+> +CONFIG_SYSVIPC=y
+>  CONFIG_NO_HZ=y
+>  CONFIG_HIGH_RES_TIMERS=y
+> +CONFIG_CGROUPS=y
+>  CONFIG_SYSFS_DEPRECATED=y
+>  CONFIG_SYSFS_DEPRECATED_V2=y
+>  CONFIG_BLK_DEV_INITRD=y
+> @@ -13,28 +15,68 @@ CONFIG_SOLARIS_X86_PARTITION=y
+>  CONFIG_ARCH_S5PV210=y
+>  CONFIG_VMSPLIT_2G=y
+>  CONFIG_PREEMPT=y
+> -CONFIG_AEABI=y
 
-Duplicated inclusion.
-
-> +#include "s5pv210-aries.dtsi"
-> +
-> +/ {
-> +       model = "Samsung Galaxy S1 (GT-I9000) based on S5PV210";
-> +       compatible = "samsung,galaxys", "samsung,aries", "samsung,s5pv210";
-> +
-> +       chosen {
-> +               bootargs = "console=ttySAC2,115200n8 root=/dev/mmcblk2p1 rw rootwait ignore_loglevel earlyprintk";
-
-stdout-path = "serial2:115200n8";
-
-Rest of bootargs should not be here (they are not HW dependent) unless
-you cannot configure them through bootloader?
-
-> +       };
-> +
-> +       nand_pwrseq: nand-pwrseq {
-> +               compatible = "mmc-pwrseq-simple";
-> +               reset-gpios = <&gpj2 7 GPIO_ACTIVE_LOW>;
-> +               pinctrl-names = "default";
-> +               pinctrl-0 = <&massmemory_en>;
-
-massmemory_en is used only here, so please move it from aries.dtsi.
-The same applies to all other possible properties if they are not used
-in other DTSes including aries.
-
-> +       };
-> +
-> +       gpio-keys {
-> +               compatible = "gpio-keys";
-> +
-> +               power {
-> +                       label = "power";
-> +                       gpios = <&gph2 6 GPIO_ACTIVE_LOW>;
-> +                       linux,code = <KEY_POWER>;
-> +                       wakeup-source;
-> +               };
-> +
-> +               vol-down {
-> +                       label = "volume_down";
-> +                       gpios = <&gph3 1 GPIO_ACTIVE_LOW>;
-> +                       linux,code = <KEY_VOLUMEDOWN>;
-> +               };
-> +
-> +               vol-up {
-> +                       label = "volume_up";
-> +                       gpios = <&gph3 2 GPIO_ACTIVE_LOW>;
-> +                       linux,code = <KEY_VOLUMEUP>;
-> +               };
-> +
-> +               home {
-> +                       label = "home";
-> +                       gpios = <&gph3 5 GPIO_ACTIVE_LOW>;
-> +                       linux,code = <KEY_HOME>;
-> +                       wakeup-source;
-> +               };
-> +       };
-> +};
-> +
-> +&pinctrl0 {
-> +       massmemory_en: massmemory-en {
-
-Oh wait, I see massmemory_en here... so there is no need of such in aries.dtsi.
+I believe this comes from savedefconfig. In such case please make it a
+separate commit, before all others, because it should not bring any
+functional differences.
 
 Best regards,
 Krzysztof
 
-> +               samsung,pins = "gpj2-7";
-> +               samsung,pin-function = <EXYNOS_PIN_FUNC_OUTPUT>;
-> +               samsung,pin-pud = <S3C64XX_PIN_PULL_NONE>;
-> +               samsung,pin-drv = <EXYNOS4_PIN_DRV_LV1>;
-> +       };
-> +};
-> +
-> +&sdhci0 {
-> +       bus-width = <4>;
-> +       non-removable;
-> +       mmc-pwrseq = <&nand_pwrseq>;
-> +       pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4>;
-> +       pinctrl-names = "default";
-> +       status = "okay";
-> +};
+> +CONFIG_ARM_APPENDED_DTB=y
+>  CONFIG_CMDLINE="root=/dev/ram0 rw ramdisk=8192 initrd=0x20800000,8M console=ttySAC1,115200 init=/linuxrc"
+>  CONFIG_VFP=y
+>  CONFIG_NEON=y
+> +CONFIG_NET=y
+> +CONFIG_PACKET=y
+> +CONFIG_UNIX=y
+> +CONFIG_INET=y
+> +CONFIG_IP_PNP=y
+> +CONFIG_IP_PNP_DHCP=y
+> +CONFIG_IP_PNP_BOOTP=y
+> +CONFIG_IP_PNP_RARP=y
+> +CONFIG_CFG80211=m
+> +CONFIG_MAC80211=m
+>  CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+> +CONFIG_DEVTMPFS=y
+> +CONFIG_DEVTMPFS_MOUNT=y
+>  CONFIG_BLK_DEV_LOOP=y
+>  CONFIG_BLK_DEV_RAM=y
+>  CONFIG_BLK_DEV_RAM_SIZE=8192
+>  CONFIG_SCSI=y
+>  CONFIG_BLK_DEV_SD=y
+>  CONFIG_CHR_DEV_SG=y
+> +CONFIG_NETDEVICES=y
+> +CONFIG_BRCMFMAC=m
+>  CONFIG_INPUT_EVDEV=y
+> -# CONFIG_INPUT_KEYBOARD is not set
+> +CONFIG_KEYBOARD_GPIO=y
+>  # CONFIG_INPUT_MOUSE is not set
+>  CONFIG_INPUT_TOUCHSCREEN=y
+>  CONFIG_SERIAL_8250=y
+>  CONFIG_SERIAL_SAMSUNG=y
+>  CONFIG_SERIAL_SAMSUNG_CONSOLE=y
+>  CONFIG_HW_RANDOM=y
+> +CONFIG_I2C_GPIO=y
+> +CONFIG_POWER_SUPPLY=y
+> +CONFIG_BATTERY_MAX17040=y
+>  # CONFIG_HWMON is not set
+> -# CONFIG_USB_SUPPORT is not set
+> +CONFIG_MFD_MAX8998=y
+> +CONFIG_REGULATOR=y
+> +CONFIG_REGULATOR_MAX8998=y
+> +CONFIG_DRM=y
+> +CONFIG_DRM_EXYNOS=y
+> +CONFIG_DRM_EXYNOS_FIMD=y
+> +CONFIG_DRM_EXYNOS_DPI=y
+> +CONFIG_USB=y
+> +CONFIG_USB_OTG=y
+> +CONFIG_USB_EHCI_HCD=y
+> +CONFIG_USB_EHCI_EXYNOS=y
+> +CONFIG_USB_OHCI_HCD=y
+> +CONFIG_USB_OHCI_EXYNOS=y
+> +CONFIG_USB_DWC2=y
+> +CONFIG_MMC=y
+> +CONFIG_MMC_SDHCI=y
+> +CONFIG_MMC_SDHCI_S3C=y
+> +CONFIG_MMC_SDHCI_S3C_DMA=y
+> +CONFIG_RTC_CLASS=y
+> +CONFIG_RTC_DRV_MAX8998=m
+> +CONFIG_PHY_SAMSUNG_USB2=m
+> +CONFIG_PHY_S5PV210_USB2=y
+>  CONFIG_EXT2_FS=y
+> +CONFIG_EXT4_FS=y
+> +CONFIG_AUTOFS4_FS=y
+>  CONFIG_MSDOS_FS=y
+>  CONFIG_VFAT_FS=y
+>  CONFIG_TMPFS=y
+> @@ -44,6 +86,7 @@ CONFIG_ROMFS_FS=y
+>  CONFIG_NLS_CODEPAGE_437=y
+>  CONFIG_NLS_ASCII=y
+>  CONFIG_NLS_ISO8859_1=y
+> +CONFIG_NLS_UTF8=y
+>  CONFIG_DEBUG_INFO=y
+>  CONFIG_MAGIC_SYSRQ=y
+>  CONFIG_DEBUG_KERNEL=y
 > --
 > 2.7.4
 >
