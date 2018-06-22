@@ -1,150 +1,77 @@
-From: gerg@linux-m68k.org (Greg Ungerer)
-Date: Fri, 22 Jun 2018 10:58:37 +1000
-Subject: [PATCHv4 4/4] ARM: versatile: support configuring versatile
- machine for no-MMU
-In-Reply-To: <CAMuHMdUyCEq0U_CJindwcSEF+0dR-SJc1v8zGT-CcUqVkdOeVw@mail.gmail.com>
-References: <20180618141905.7789-1-gerg@linux-m68k.org>
- <20180618141905.7789-5-gerg@linux-m68k.org>
- <CAMuHMdUyCEq0U_CJindwcSEF+0dR-SJc1v8zGT-CcUqVkdOeVw@mail.gmail.com>
-Message-ID: <0376105d-6a8e-ad8f-6516-a39244303e0b@linux-m68k.org>
+From: yibin.gong@nxp.com (Robin Gong)
+Date: Fri, 22 Jun 2018 01:12:48 +0000
+Subject: [PATCH v5 0/7] add virt-dma support for imx-sdma
+In-Reply-To: <1529427424-12321-1-git-send-email-yibin.gong@nxp.com>
+References: <1529427424-12321-1-git-send-email-yibin.gong@nxp.com>
+Message-ID: <DB6PR04MB32237203C350E5853C8870DB89750@DB6PR04MB3223.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
+Hello Lucas,
+	Would you like to try with the v5 for your Audio/UART case?
 
-On 22/06/18 01:59, Geert Uytterhoeven wrote:
-> CC Chris, Arnd, Nicolas
-> On Mon, Jun 18, 2018 at 4:21 PM Greg Ungerer <gerg@linux-m68k.org> wrote:
->> Allow the arm versatile machine to be configured for no-MMU operation.
->>
->> Older kernels had the ability to build the versatile machine with the MMU
->> disabled (!CONFIG_MMU). Recent changes to convert the versatile machine
->> to device tree lost this ability. (Although older kernels could be built
->> they did not run due to a bug in the IO_ADDRESS() mapping on this machine).
->>
->> The motivation for this is that the versatile machine is well supported
->> in qemu. And this provides an excellent platform for development and
->> testing no-MMU support on ARM in general.
->>
->> This patch adds a versatile platform selection in the upper level arm
->> system type menu - where it appeared in older kernel versions - when
->> configuring for the no-MMU case. There is no visible change to the way
->> versatile is selected for the MMU enabled case.
->>
->> Signed-off-by: Greg Ungerer <gerg@linux-m68k.org>
-> 
-> Thanks for your patch! I'm happy to see nommu spreading ;-)
+-----Original Message-----
+From: Robin Gong 
+Sent: 2018?6?20? 0:57
+To: vkoul at kernel.org; s.hauer at pengutronix.de; l.stach at pengutronix.de; dan.j.williams at intel.com; gregkh at linuxfoundation.org; jslaby at suse.com
+Cc: linux-serial at vger.kernel.org; dmaengine at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; dl-linux-imx <linux-imx@nxp.com>
+Subject: [PATCH v5 0/7] add virt-dma support for imx-sdma
 
-Not sure if it is a good thing or not :-)
+The legacy sdma driver has below limitations or drawbacks:
+  1. Hardcode the max BDs number as "PAGE_SIZE / sizeof(*)", and alloc
+     one page size for one channel regardless of only few BDs needed
+     most time. But in few cases, the max PAGE_SIZE maybe not enough.
+  2. One SDMA channel can't stop immediatley once channel disabled which
+     means SDMA interrupt may come in after this channel terminated.There
+     are some patches for this corner case such as commit "2746e2c389f9",
+     but not cover non-cyclic.
 
+The common virt-dma overcomes the above limitations. It can alloc bd dynamically and free bd once this tx transfer done. No memory wasted or maximum limititation here, only depends on how many memory can be requested from kernel. For No.2, such issue can be workaround by checking if there is available descript("sdmac->desc") now once the unwanted interrupt coming. At last the common virt-dma is easier for sdma driver maintain.
 
->> ---
->>   arch/arm/Kconfig                | 11 +++++++++++
->>   arch/arm/Kconfig.debug          |  3 ++-
->>   arch/arm/mach-versatile/Kconfig |  5 +++--
->>   3 files changed, 16 insertions(+), 3 deletions(-)
->>
->> v2: don't use a multiplatform setup, move versatile choice to top level menu
->> v3: rebase on top of linux-4.10
->> v3: rebase on top of linux-4.17
->>
->> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
->> index 54eeb8d00bc6..0608a6a32fac 100644
->> --- a/arch/arm/Kconfig
->> +++ b/arch/arm/Kconfig
->> @@ -356,6 +356,17 @@ config ARM_SINGLE_ARMV7M
->>          select SPARSE_IRQ
->>          select USE_OF
->>
->> +config ARM_SINGLE_ARCH_VERSATILE
->> +       bool "ARM Ltd. Versatile family"
->> +       depends on !MMU
->> +       select AUTO_ZRELADDR
->> +       select CLKSRC_OF
->> +       select COMMON_CLK
->> +       select GENERIC_CLOCKEVENTS
->> +       select GPIOLIB
->> +       select SPARSE_IRQ
->> +       select USE_OF
->> +
-> 
-> I'm afraid adding (duplicating) machine entries for nommu support is not a
-> sustainable solutions. Any machine can run a nommu kernel, in theory.
+Change from v4:
+  1. identify lockdep issue which caused by allocate memory with
+     'GFP_KERNEL', change to 'GFP_NOWAIT' instead so that lockdep
+     ignore check. That also make sense since Audio/uart driver may
+     call dma function after spin_lock_irqsave()...
+  2. use dma pool instead for bd description allocated,since audio
+     driver may call dma_terminate_all in irq. Please refer to 7/7.
+  3. remove 7/7 serial patch in v4, since lockdep issued fixed by No.1 
 
-I don't disagree with you, my first patch for this did not duplicate
-the machine type:
+Change from v3:
+  1. add two uart patches which impacted by this patchset.
+  2. unlock 'vc.lock' before cyclic dma callback and lock again after
+     it because some driver such as uart will call dmaengine_tx_status
+     which will acquire 'vc.lock' again and dead lock comes out.
+  3. remove 'Revert commit' stuff since that patch is not wrong and
+     combine two patch into one patch as Sascha's comment.
 
-   https://patchwork.kernel.org/patch/9350033/
+Change from v2:
+  1. include Sascha's patch to make the main patch easier to review.
+     Thanks Sacha.
+  2. remove useless 'desc'/'chan' in struct sdma_channe.
 
-Vladimir Murzin had an alternative that also didn't duplicate machines:
+Change from v1:
+  1. split v1 patch into 5 patches.
+  2. remove some unnecessary condition check.
+  3. remove unnecessary 'pending' list.
 
-   https://www.spinics.net/lists/arm-kernel/msg546837.html
+Robin Gong (6):
+  tty: serial: imx: correct dma cookie status
+  dmaengine: imx-sdma: add virt-dma support
+  dmaengine: imx-sdma: remove useless 'lock' and 'enabled' in 'struct
+    sdma_channel'
+  dmaengine: imx-sdma: remove the maximum limitation for bd numbers
+  dmaengine: imx-sdma: add sdma_transfer_init to decrease code overlap
+  dmaengine: imx-sdma: alloclate bd memory from dma pool
 
-But subsequent discussions didn't really get to a final solution:
+Sascha Hauer (1):
+  dmaengine: imx-sdma: factor out a struct sdma_desc from struct
+    sdma_channel
 
-   https://patchwork.kernel.org/patch/9464017/
+ drivers/dma/Kconfig      |   1 +
+ drivers/dma/imx-sdma.c   | 400 +++++++++++++++++++++++++++--------------------
+ drivers/tty/serial/imx.c |   2 +-
+ 3 files changed, 235 insertions(+), 168 deletions(-)
 
-Regards
-Greg
-
-
-> I'm aware of the objection "but you cannot build a nommu kernel that can
-> boot on multiple systems".  That's true (unless RAM/FLASH addresses are the
-> same). So don't do that.
-> 
-> All of the above is true for XIP, too, hence applies with s/nommu/XIP/.
-> One more reason not to have this duplication.
-> 
-> The current "ARM multiplatform" has actually two meanings:
->    1. It groups platforms that follow the "ARM multiplatform" framework,
->    2. It allows to build a single kernel that can be booted on multiple
->       platforms.
-> To avoid the duplication, I think 2 should be relaxed when specialized
-> options like XIP or NOMMU are selected.
-> 
-> I've just sent a patch to do that.
-> 
->>   config ARCH_EBSA110
->>          bool "EBSA-110"
->>          select ARCH_USES_GETTIMEOFFSET
->> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
->> index 693f84392f1b..242a0f744c8a 100644
->> --- a/arch/arm/Kconfig.debug
->> +++ b/arch/arm/Kconfig.debug
->> @@ -1836,7 +1836,8 @@ config DEBUG_UNCOMPRESS
->>   config UNCOMPRESS_INCLUDE
->>          string
->>          default "debug/uncompress.h" if ARCH_MULTIPLATFORM || ARCH_MSM || \
->> -                                       PLAT_SAMSUNG || ARM_SINGLE_ARMV7M
->> +                                       PLAT_SAMSUNG || ARM_SINGLE_ARMV7M || \
->> +                                       ARM_SINGLE_ARCH_VERSATILE
->>          default "mach/uncompress.h"
->>
->>   config EARLY_PRINTK
->> diff --git a/arch/arm/mach-versatile/Kconfig b/arch/arm/mach-versatile/Kconfig
->> index f5c275434d6c..06ad999d5978 100644
->> --- a/arch/arm/mach-versatile/Kconfig
->> +++ b/arch/arm/mach-versatile/Kconfig
->> @@ -1,7 +1,8 @@
->>   # SPDX-License-Identifier: GPL-2.0
->>   config ARCH_VERSATILE
->> -       bool "ARM Ltd. Versatile family"
->> -       depends on ARCH_MULTI_V5
->> +       bool "ARM Ltd. Versatile family" if ARCH_MULTI_V5
->> +       depends on ARCH_MULTI_V5 || ARM_SINGLE_ARCH_VERSATILE
->> +       default y if ARM_SINGLE_ARCH_VERSATILE
->>          select ARM_AMBA
->>          select ARM_TIMER_SP804
->>          select ARM_VIC
-> 
-> Gr{oetje,eeting}s,
-> 
->                          Geert
-> 
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-> 
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
->                                  -- Linus Torvalds
-> 
+--
+2.7.4
