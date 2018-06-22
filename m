@@ -1,49 +1,59 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 22 Jun 2018 09:57:16 +0200
-Subject: [PATCH 5/7] dt-bindings: samsung: Document bindings for Samsung
- aries boards
-In-Reply-To: <CAJKOXPdV+UKKnntcrXQ15aOB5eCehyxqVEJfvZp5faTw434rPw@mail.gmail.com>
-References: <1529608199-5583-1-git-send-email-pawel.mikolaj.chmiel@gmail.com>
- <1529608199-5583-6-git-send-email-pawel.mikolaj.chmiel@gmail.com>
- <CAJKOXPdV+UKKnntcrXQ15aOB5eCehyxqVEJfvZp5faTw434rPw@mail.gmail.com>
-Message-ID: <CAJKOXPe-Ty6OdHwGGMvrxmRkfBPzkicFZxWHTy=zzMiZZMFBeg@mail.gmail.com>
+From: david.wu@rock-chips.com (David Wu)
+Date: Fri, 22 Jun 2018 16:13:13 +0800
+Subject: [PATCH v2] net: ethernet: stmmac: dwmac-rk: Add GMAC support for
+ PX30
+In-Reply-To: <18221590.FEDROxemCD@phil>
+References: <1528956927-32440-1-git-send-email-david.wu@rock-chips.com>
+ <2582999.2hZx6CH9S6@diego>
+ <157ecfc9-d0e6-7782-1cbc-d0fb76c81edb@rock-chips.com>
+ <18221590.FEDROxemCD@phil>
+Message-ID: <7baeda9c-d7c4-e491-e18d-30afefa98c96@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 June 2018 at 09:56, Krzysztof Kozlowski <krzk@kernel.org> wrote:
-> On 21 June 2018 at 21:09, Pawe? Chmiel <pawel.mikolaj.chmiel@gmail.com> wrote:
->> Signed-off-by: Pawe? Chmiel <pawel.mikolaj.chmiel@gmail.com>
+Hi Heiko,
 
-... and commit msg please.
+? 2018?06?22? 15:30, Heiko Stuebner ??:
+> Hi David,
+> 
+> Am Mittwoch, 20. Juni 2018, 04:40:35 CEST schrieb David Wu:
+>> ? 2018?06?14? 16:30, Heiko St?bner ??:
+>>> Am Donnerstag, 14. Juni 2018, 10:14:31 CEST schrieb David Wu:
+>>>> Hi Heiko,
+>>>>
+>>>> ? 2018?06?14? 15:54, Heiko St?bner ??:
+>>>>> I don't see that new clock documented in the dt-binding.
+>>>>> Also, which clock from the clock-controller does this connect to?
+>>>>
+>>>> The clock is the "SCLK_GMAC_RMII" at the clock-controller, which could
+>>>> be set rate by the link speed.
+>>>
+>>> Hmm, while these huge number of clocks are somewhat strange,
+>>> shouldn't it be named something with _rmii instead of _speed then?
+>>
+>> Okay, it is better to be named _speed.
+>>
+>>>
+>>> Also, I don't see any clk_enable action for that new clock, so you could
+>>> end up with being off?
+>>
+>> The new speed is the parent of the clk_tx_rx, to enable/disable
+>> clk_tx_rx, the new clock would be also enabled/disabled.
+> 
+> Still it is nicer to really enable it, so that the clock-framework can keep
+> track of usage counts.
+> 
+> Because also no-one hinders the chip-designer from putting a gate in
+> between in one of the next socs ;-)
+> 
 
-BR,
-Krzysztof
+Okay, i will add the enable/disable for clk_mac_speed.
+  ;-)
 
->> ---
->>  Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt | 2 ++
->>  1 file changed, 2 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt b/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
->> index 14510b215480..edce6602de50 100644
->> --- a/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
->> +++ b/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
->> @@ -2,6 +2,8 @@
->>
->>  Required root node properties:
->>      - compatible = should be one or more of the following.
->> +       - "samsung,aries"       - for S5PV210-based Samsung Aries board.
->> +       - "samsung,galaxys"     - for S5PV210-based Samsung Galaxy S (i9000)  board.
->
-> It is not strictly speaking Exynos-based board (as mentioned in the
-> header at beginning of file) so maybe change it to "Samsung's Exynos
-> and S5P SoC based boards"?
->
-> Best regards,
-> Krzysztof
->
->>         - "samsung,artik5"      - for Exynos3250-based Samsung ARTIK5 module.
->>         - "samsung,artik5-eval" - for Exynos3250-based Samsung ARTIK5 eval board.
->>         - "samsung,monk"        - for Exynos3250-based Samsung Simband board.
->> --
->> 2.7.4
->>
+> 
+> Heiko
+> 
+> 
+> 
+> 
+> 
