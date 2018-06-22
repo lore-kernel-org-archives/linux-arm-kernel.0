@@ -1,30 +1,24 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Thu, 21 Jun 2018 17:15:14 -0700
-Subject: [PATCH v2] arm: bcm2835: Add the PMU to the devicetree.
-In-Reply-To: <1804311797.71726.1526929189594@email.1und1.de>
-References: <20180521183907.27563-1-eric@anholt.net>
- <1804311797.71726.1526929189594@email.1und1.de>
-Message-ID: <8736xfekx9.fsf@anholt.net>
+Date: Thu, 21 Jun 2018 17:31:48 -0700
+Subject: [PATCH V3 6/6] arm64: defconfig: Enable RPi voltage sensor
+In-Reply-To: <1527276279-23876-7-git-send-email-stefan.wahren@i2se.com>
+References: <1527276279-23876-1-git-send-email-stefan.wahren@i2se.com>
+ <1527276279-23876-7-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <87zhznd5l7.fsf@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Stefan Wahren <stefan.wahren@i2se.com> writes:
 
->> Eric Anholt <eric@anholt.net> hat am 21. Mai 2018 um 20:39 geschrieben:
->> 
->> 
->> This only probes on arm64 so far, but hopefully that driver will be
->> generalized soon.
->> 
->> Signed-off-by: Eric Anholt <eric@anholt.net>
+> The patch enables the hwmon driver for the Raspberry Pi.
 >
-> Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
+> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
 
-Merged to bcm2835-dt-next.  Thanks!
+I've pulled this series to our -next branches now.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 832 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180621/0ef5d553/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180621/fac36b3d/attachment.sig>
