@@ -1,72 +1,51 @@
-From: Anson.Huang@nxp.com (Anson Huang)
-Date: Fri, 22 Jun 2018 14:32:34 +0800
-Subject: [PATCH 2/2] ARM: dts: imx6sll: add gpio clocks
-In-Reply-To: <1529649154-5724-1-git-send-email-Anson.Huang@nxp.com>
-References: <1529649154-5724-1-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <1529649154-5724-2-git-send-email-Anson.Huang@nxp.com>
+From: chen.zhong@mediatek.com (Chen Zhong)
+Date: Fri, 22 Jun 2018 14:39:55 +0800
+Subject: [RESEND PATCH] dt-bindings: input: Add common keyboard document
+ bindings
+In-Reply-To: <1529648198-14231-1-git-send-email-chen.zhong@mediatek.com>
+References: <1529648198-14231-1-git-send-email-chen.zhong@mediatek.com>
+Message-ID: <1529649595.14396.18.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-i.MX6SLL has GPIO clock gates in CCM CCGR, add
-clock property for GPIO driver to make sure all
-GPIO banks work as expected.
+Hi Dmitry,
 
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
----
- arch/arm/boot/dts/imx6sll.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+The other patches in the series to add mediatek pmic keys support are
+now available in 4.18-rc1, but this patch seems not being merged.
 
-diff --git a/arch/arm/boot/dts/imx6sll.dtsi b/arch/arm/boot/dts/imx6sll.dtsi
-index c9b0ccc..116f561 100644
---- a/arch/arm/boot/dts/imx6sll.dtsi
-+++ b/arch/arm/boot/dts/imx6sll.dtsi
-@@ -375,6 +375,7 @@
- 				reg = <0x0209c000 0x4000>;
- 				interrupts = <GIC_SPI 66 IRQ_TYPE_LEVEL_HIGH>,
- 					     <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX6SLL_CLK_GPIO1>;
- 				gpio-controller;
- 				#gpio-cells = <2>;
- 				interrupt-controller;
-@@ -386,6 +387,7 @@
- 				reg = <0x020a0000 0x4000>;
- 				interrupts = <GIC_SPI 68 IRQ_TYPE_LEVEL_HIGH>,
- 					     <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX6SLL_CLK_GPIO2>;
- 				gpio-controller;
- 				#gpio-cells = <2>;
- 				interrupt-controller;
-@@ -397,6 +399,7 @@
- 				reg = <0x020a4000 0x4000>;
- 				interrupts = <GIC_SPI 70 IRQ_TYPE_LEVEL_HIGH>,
- 					     <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX6SLL_CLK_GPIO3>;
- 				gpio-controller;
- 				#gpio-cells = <2>;
- 				interrupt-controller;
-@@ -408,6 +411,7 @@
- 				reg = <0x020a8000 0x4000>;
- 				interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>,
- 					     <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX6SLL_CLK_GPIO4>;
- 				gpio-controller;
- 				#gpio-cells = <2>;
- 				interrupt-controller;
-@@ -419,6 +423,7 @@
- 				reg = <0x020ac000 0x4000>;
- 				interrupts = <GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>,
- 					     <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX6SLL_CLK_GPIO5>;
- 				gpio-controller;
- 				#gpio-cells = <2>;
- 				interrupt-controller;
-@@ -430,6 +435,7 @@
- 				reg = <0x020b0000 0x4000>;
- 				interrupts = <GIC_SPI 76 IRQ_TYPE_LEVEL_HIGH>,
- 					     <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX6SLL_CLK_GPIO6>;
- 				gpio-controller;
- 				#gpio-cells = <2>;
- 				interrupt-controller;
--- 
-2.7.4
+  git://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git
+ib-mfd-input-rtc-v4.18
+
+I have resend the patch, and rebase to 4.18-rc1.
+Could you help to see if it is good enough to be merged into your tree?
+
+Thank you.
+
+
+On Fri, 2018-06-22 at 14:16 +0800, Chen Zhong wrote:
+> This patch adds the device tree binding documentation for common
+> keyboard.
+> 
+> Acked-by: Rob Herring <robh@kernel.org>
+> Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> Signed-off-by: Chen Zhong <chen.zhong@mediatek.com>
+> ---
+>  Documentation/devicetree/bindings/input/keys.txt | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/input/keys.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/input/keys.txt b/Documentation/devicetree/bindings/input/keys.txt
+> new file mode 100644
+> index 0000000..a0ea7eb
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/input/keys.txt
+> @@ -0,0 +1,8 @@
+> +General Keys Properties:
+> +
+> +Optional properties for Keys:
+> +- power-off-time-sec: Duration in seconds which the key should be kept
+> + 	pressed for device to power off automatically. Device with key pressed
+> + 	shutdown feature can specify this property.
+> +- linux,keycodes: Specifies the numeric keycode values to be used for
+> +	reporting key presses.
+> \ No newline at end of file
