@@ -1,58 +1,58 @@
-From: dinguyen@kernel.org (Dinh Nguyen)
-Date: Fri, 22 Jun 2018 13:55:11 -0500
-Subject: [PATCH 1/2] arm64: dts: stratix10: Fix SPI nodes for Stratix10
-In-Reply-To: <2e12b65a-c0bf-0628-ef38-ed931935ee41@linux.intel.com>
-References: <1527617612-2205-1-git-send-email-thor.thayer@linux.intel.com>
- <2e12b65a-c0bf-0628-ef38-ed931935ee41@linux.intel.com>
-Message-ID: <4d02db71-c019-3517-8ba0-81b008cad2e2@kernel.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 22 Jun 2018 21:29:36 +0200
+Subject: [PATCH V2 2/2] efi/fb: Convert PCI bus address to resource if
+ translated by the bridge
+In-Reply-To: <37289a27-eb99-6a73-4d32-4a75edd11dcd@codeaurora.org>
+References: <1526653072-7153-1-git-send-email-okaya@codeaurora.org>
+ <1526653072-7153-2-git-send-email-okaya@codeaurora.org>
+ <20180619222921.GA90490@bhelgaas-glaptop.roam.corp.google.com>
+ <CAKv+Gu_voOZ7YUL8pckww4mTt4PVcu7y69mf-z7ZZe1bJ81Shw@mail.gmail.com>
+ <2a805337-c0b5-e134-7695-5a543ecaa26a@codeaurora.org>
+ <CAKv+Gu9HAJRHwjYLNjf+gg=1vFoFu3BJphifKKE-aR4o_MW84A@mail.gmail.com>
+ <CAKv+Gu-WXLXqHSmiS2MmAMXHLKK_kg+3EK6L2rvO0SzN-c0UMg@mail.gmail.com>
+ <37289a27-eb99-6a73-4d32-4a75edd11dcd@codeaurora.org>
+Message-ID: <CAKv+Gu-bwCFhCKiA7P1amMLeBaSxsjk0d6aPjAr9nCvOBPJA6w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 06/21/2018 01:25 PM, Thor Thayer wrote:
-> Hi Dinh,
-> 
-> On 05/29/2018 01:13 PM, thor.thayer at linux.intel.com wrote:
->> From: Thor Thayer <thor.thayer@linux.intel.com>
+On 22 June 2018 at 20:30, Sinan Kaya <okaya@codeaurora.org> wrote:
+> On 6/22/2018 2:01 PM, Ard Biesheuvel wrote:
+>>> Yes, it is part of the PCI I/O protocol definition. FrameBufferBase is
+>>> described as
+>>>
+>>> """
+>>> Base address of graphics linear frame buffer. Info contains
+>>> information required to allow software to draw directly to the
+>>> frame buffer without using Blt().Offset zero in
+>>> FrameBufferBase represents the upper left pixel of the
+>>> display.
+>>> """
+>> I just tried AMD Radeon and NVidia graphics cards on a system with
+>> non-1:1 mapped MMIO windows, and in both cases, the GOP protocol
+>> structure is populated correctly, i.e., using the CPU address not the
+>> PCIe address.
 >>
->> Remove the unused bus-num node and change num-chipselect
->> to num-cs to match SPI bindings.
+>> EDK2 only recently gained support for MMIO translation in the host
+>> bridge driver, so I so wonder if this is a platform issue rather than
+>> a driver issue. It may be worth a try to dump the results of
+>> GetBarAttributes() of all PCI I/O protocol instances (either in UEFI
+>> or in the stub), to double check that the correct values are returned.
 >>
->> Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
->> Fixes: 78cd6a9d8e154 ("arm64: dts: Add base stratix 10 dtsi")
->> Cc: stable at vger.kernel.org
->> ---
->> ? arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi | 6 ++----
->> ? 1 file changed, 2 insertions(+), 4 deletions(-)
->>
->> diff --git a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
->> b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
->> index d8c94d5ff4b4..47fa4b450324 100644
->> --- a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
->> +++ b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
->> @@ -315,8 +315,7 @@
->> ????????????? interrupts = <0 99 4>;
->> ????????????? resets = <&rst SPIM0_RESET>;
->> ????????????? reg-io-width = <4>;
->> -??????????? num-chipselect = <4>;
->> -??????????? bus-num = <0>;
->> +??????????? num-cs = <4>;
->> ????????????? status = "disabled";
->> ????????? };
->> ? @@ -328,8 +327,7 @@
->> ????????????? interrupts = <0 100 4>;
->> ????????????? resets = <&rst SPIM1_RESET>;
->> ????????????? reg-io-width = <4>;
->> -??????????? num-chipselect = <4>;
->> -??????????? bus-num = <0>;
->> +??????????? num-cs = <4>;
->> ????????????? status = "disabled";
->> ????????? };
->> ?
-> Any update on this patch?
+>
+> Thanks for checking out other platforms. I'll mark the issue as a BIOS
+> issue and bounce your feedback to the BIOS provider.
+>
 
-I've applied both patches.
+I screwed up my testing, unfortunately. Both the public AMD GOP driver
+I tried, and the Nvidia GT218 under x86 emulation break when using
+MMIO translation. However, GraphicsOutputDxe in the EDK2 tree gets it
+right, and uses PciIo->GetBarAttributes() to get the address of the
+framebuffer region, which will return the CPU address not the PCI
+address.
 
-Thanks,
-Dinh
+> Let's hold onto this patch for the moment.
+>
+
+Yes. I'd like to get this resolved as well, but if the drivers are
+dereferencing BAR values as CPU addresses, this is unlikely to be the
+only thing that is broken under outbound translation.
