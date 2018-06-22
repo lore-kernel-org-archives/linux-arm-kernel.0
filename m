@@ -1,54 +1,90 @@
-From: FrankWu@gmx.de (Frank Wunderlich)
-Date: Fri, 22 Jun 2018 17:53:03 +0200
-Subject: [PATCH] [dts] fix green/blue pio-led on bananapi-r2
-References: <trinity-ae29ad25-a4fb-47f3-8d68-f6e58c875a0e-1529682447976@3c-app-gmx-bs42>
-Message-ID: <trinity-0d48bc23-f754-4da3-af01-c3a7abe1d34b-1529682783853@3c-app-gmx-bs42>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 22 Jun 2018 11:57:32 -0400 (EDT)
+Subject: [PATCHv4 4/4] ARM: versatile: support configuring versatile
+ machine for no-MMU
+In-Reply-To: <CAMuHMdWZPM3Q9fVXWiw1bMVWNRCYGoQa-XukJka-2xsP-=HmVQ@mail.gmail.com>
+References: <20180618141905.7789-1-gerg@linux-m68k.org>
+ <20180618141905.7789-5-gerg@linux-m68k.org>
+ <CAMuHMdUyCEq0U_CJindwcSEF+0dR-SJc1v8zGT-CcUqVkdOeVw@mail.gmail.com>
+ <nycvar.YSQ.7.76.1806211212010.16670@knanqh.ubzr>
+ <20180622110145.GU17671@n2100.armlinux.org.uk>
+ <nycvar.YSQ.7.76.1806221110140.16670@knanqh.ubzr>
+ <CAMuHMdWZPM3Q9fVXWiw1bMVWNRCYGoQa-XukJka-2xsP-=HmVQ@mail.gmail.com>
+Message-ID: <nycvar.YSQ.7.76.1806221146140.16670@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Frank Wunderlich <frank-w@public-files.de>
-Date: Sun, 17 Jun 2018 19:11:58 +0200
-Subject: [PATCH] [dts] fix green/blue pio-led
-?green/blue pio-leds (near GPIO-Header) are swapped and LOW-active
-?this patch restore this expected behaviour
-?red cannot be switched afaik
-Signed-off-by: Frank Wunderlich <frank-w@public-files.de>
----
-?arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts | 14 +++++++-------
-?1 file changed, 7 insertions(+), 7 deletions(-)
-diff --git a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
-index 531d905d924ff..3e8a0ffe8b13e 100644
---- a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
-+++ b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
-@@ -89,21 +89,21 @@
-??? ??? ?pinctrl-names = "default";
-??? ??? ?pinctrl-0 = <&led_pins_a>;
-?
--?? ??? ?blue {
--?? ??? ??? ?label = "bpi-r2:pio:blue";
--?? ??? ??? ?gpios = <&pio 241 GPIO_ACTIVE_HIGH>;
-+?? ??? ?green {
-+?? ??? ??? ?label = "bpi-r2:pio:green";
-+?? ??? ??? ?gpios = <&pio 241 GPIO_ACTIVE_LOW>;
-??? ??? ??? ?default-state = "off";
-??? ??? ?};
-?
--?? ??? ?green {
--?? ??? ??? ?label = "bpi-r2:pio:green";
--?? ??? ??? ?gpios = <&pio 240 GPIO_ACTIVE_HIGH>;
-+?? ??? ?blue {
-+?? ??? ??? ?label = "bpi-r2:pio:blue";
-+?? ??? ??? ?gpios = <&pio 240 GPIO_ACTIVE_LOW>;
-??? ??? ??? ?default-state = "off";
-??? ??? ?};
-?
-??? ??? ?red {
-??? ??? ??? ?label = "bpi-r2:pio:red";
--?? ??? ??? ?gpios = <&pio 239 GPIO_ACTIVE_HIGH>;
-+?? ??? ??? ?gpios = <&pio 239 GPIO_ACTIVE_LOW>;
-??? ??? ??? ?default-state = "off";
-??? ??? ?};
-??? ?};
-?
-?
-?
+On Fri, 22 Jun 2018, Geert Uytterhoeven wrote:
+
+> Hi Nicolas,
+> 
+> On Fri, Jun 22, 2018 at 5:26 PM Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> > On Fri, 22 Jun 2018, Russell King - ARM Linux wrote:
+> > > On Thu, Jun 21, 2018 at 12:24:04PM -0400, Nicolas Pitre wrote:
+> > > > [ adding linux-kbuild for their input ]
+> > > >
+> > > > On Thu, 21 Jun 2018, Geert Uytterhoeven wrote:
+> > > > > I've just sent a patch to do that.
+> > > >
+> > > > Your patch isn't wrong per se.  But it is not enough. The issue here
+> > > > would be easily fixed with some kconfig extension so that:
+> > > >
+> > > > - If XIP or NOMMU is selected then only one target in the multiplatform
+> > > >   set can be selected, basically turning it into a choice menu.
+> > >
+> > > I don't think that's how it should work.  Consider the V7M case, where
+> > > we have better standardisation of the physical address layout than
+> > > previous ARM devices.  We have three platforms which are V7M compliant:
+> > >
+> > > - AT91
+> > > - iMX
+> > > - STM32
+> > >
+> > > These have separate symbols:
+> > >
+> > > menuconfig ARCH_AT91
+> > >       bool "AT91/Microchip SoCs"
+> > >       depends on ARCH_MULTI_V4T || ARCH_MULTI_V5 || ARCH_MULTI_V7 || ARM_SINGLE_ARMV7M
+> > >
+> > > menuconfig ARCH_MXC
+> > >       bool "Freescale i.MX family"
+> > >       depends on ARCH_MULTI_V4_V5 || ARCH_MULTI_V6_V7 || ARM_SINGLE_ARMV7M
+> > >
+> > > menuconfig ARCH_STM32
+> > >       bool "STMicroelectronics STM32 family" if ARM_SINGLE_ARMV7M || ARCH_MULTI_V7
+> > >
+> > > With your suggestion, you would become only build a kernel for one of
+> > > these, but that is not the case today: it's possible to build a single
+> > > kernel which supports all these platforms.
+> >
+> > That is still something that could be accommodated if the kconfig
+> > language was more accommodating. The problem comes from the fact that
+> > some options are mutually exclusive, like platforms with conflicting
+> > memory maps and XIP.
+> >
+> > Leaving your example above aside for the moment, let's just pick the
+> > ARCH_MULTIPLATFORM group which is always the problematic one in
+> > practice. We need a way to limit platform selection within that set to
+> > only one platform among them all if XIP_KERNEL is set. And that is
+> > impossible to express with the kconfig language today.
+> >
+> > So, my assertion is that, unless someone volunteers a solution to the
+> > kconfig language to express mutual exclusion between symbols, this issue
+> > just can't be fixed properly.
+> 
+> Even that would not be sufficient, as these days the final target platform
+> selection is not by a Kconfig symbol, but by a DT[SB] file.
+
+That is no longer a kernel config/build issue if you the system 
+integrator put an XIP kernel on a target with the wrong DT.
+
+The XIP kernel does require that you provide the actual memory base 
+address as a constant to the build system but that could be extracted 
+directly from the DT data if having a kconfig prompt for that is too 
+unwieldy. The new kconfig macro language in mainline could even be 
+leveraged to do that at config time.
+
+All that is possible already. But config symbol mutual exclusion is not.
+
+
+Nicolas
