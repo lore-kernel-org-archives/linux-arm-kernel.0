@@ -1,44 +1,160 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 22 Jun 2018 09:31:14 +0100
-Subject: [PATCH v2 0/4] I-side fixes
-Message-ID: <1529656278-878-1-git-send-email-will.deacon@arm.com>
+Date: Fri, 22 Jun 2018 09:31:15 +0100
+Subject: [PATCH v2 1/4] arm64: Avoid flush_icache_range() in alternatives
+ patching code
+In-Reply-To: <1529656278-878-1-git-send-email-will.deacon@arm.com>
+References: <1529656278-878-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1529656278-878-2-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+The implementation of flush_icache_range() includes instruction sequences
+which are themselves patched at runtime, so it is not safe to call from
+the patching framework.
 
-Here's version two of the patches I previously posted here:
+This patch reworks the alternatives cache-flushing code so that it rolls
+its own internal D-cache maintenance using DC CIVAC before invalidating
+the entire I-cache after all alternatives have been applied at boot.
+Modules don't cause any issues, since flush_icache_range() is safe to
+call by the time they are loaded.
 
-  http://lists.infradead.org/pipermail/linux-arm-kernel/2018-June/584857.html
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+Reported-by: Rohit Khanna <rokhanna@nvidia.com>
+Cc: Alexander Van Brunt <avanbrunt@nvidia.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/include/asm/alternative.h |  7 ++++-
+ arch/arm64/kernel/alternative.c      | 51 +++++++++++++++++++++++++++++++-----
+ arch/arm64/kernel/module.c           |  5 ++--
+ 3 files changed, 52 insertions(+), 11 deletions(-)
 
-Changes since v1 include:
-
-  * Removal of "hotpatch" mechanism for certain classes of instructions
-  * Avoid attempting IPI when secondaries are in stop_machine()
-  * Leave ISBs intact in the stop_machine() callbacks
-
-Cheers,
-
-Will
-
---->8
-
-Will Deacon (4):
-  arm64: Avoid flush_icache_range() in alternatives patching code
-  arm64: Remove unnecessary ISBs from set_{pte,pmd,pud}
-  arm64: IPI each CPU after invalidating the I-cache for kernel mappings
-  arm64: insn: Don't fallback on nosync path for general insn patching
-
- arch/arm64/include/asm/alternative.h |  7 +++-
- arch/arm64/include/asm/cacheflush.h  | 13 ++++++-
- arch/arm64/include/asm/insn.h        |  2 --
- arch/arm64/include/asm/pgtable.h     |  6 +---
- arch/arm64/kernel/alternative.c      | 51 ++++++++++++++++++++++----
- arch/arm64/kernel/cpu_errata.c       |  2 +-
- arch/arm64/kernel/insn.c             | 70 ++----------------------------------
- arch/arm64/kernel/module.c           |  5 ++-
- arch/arm64/mm/cache.S                |  4 +--
- 9 files changed, 71 insertions(+), 89 deletions(-)
-
+diff --git a/arch/arm64/include/asm/alternative.h b/arch/arm64/include/asm/alternative.h
+index a91933b1e2e6..4b650ec1d7dd 100644
+--- a/arch/arm64/include/asm/alternative.h
++++ b/arch/arm64/include/asm/alternative.h
+@@ -28,7 +28,12 @@ typedef void (*alternative_cb_t)(struct alt_instr *alt,
+ 				 __le32 *origptr, __le32 *updptr, int nr_inst);
+ 
+ void __init apply_alternatives_all(void);
+-void apply_alternatives(void *start, size_t length);
++
++#ifdef CONFIG_MODULES
++void apply_alternatives_module(void *start, size_t length);
++#else
++static inline void apply_alternatives_module(void *start, size_t length) { }
++#endif
+ 
+ #define ALTINSTR_ENTRY(feature,cb)					      \
+ 	" .word 661b - .\n"				/* label           */ \
+diff --git a/arch/arm64/kernel/alternative.c b/arch/arm64/kernel/alternative.c
+index 5c4bce4ac381..36fb069fd049 100644
+--- a/arch/arm64/kernel/alternative.c
++++ b/arch/arm64/kernel/alternative.c
+@@ -122,7 +122,30 @@ static void patch_alternative(struct alt_instr *alt,
+ 	}
+ }
+ 
+-static void __apply_alternatives(void *alt_region, bool use_linear_alias)
++/*
++ * We provide our own, private D-cache cleaning function so that we don't
++ * accidentally call into the cache.S code, which is patched by us at
++ * runtime.
++ */
++static void clean_dcache_range_nopatch(u64 start, u64 end)
++{
++	u64 cur, d_size, ctr_el0;
++
++	ctr_el0 = read_sanitised_ftr_reg(SYS_CTR_EL0);
++	d_size = 4 << cpuid_feature_extract_unsigned_field(ctr_el0,
++							   CTR_DMINLINE_SHIFT);
++	cur = start & ~(d_size - 1);
++	do {
++		/*
++		 * We must clean+invalidate to the PoC in order to avoid
++		 * Cortex-A53 errata 826319, 827319, 824069 and 819472
++		 * (this corresponds to ARM64_WORKAROUND_CLEAN_CACHE)
++		 */
++		asm volatile("dc civac, %0" : : "r" (cur) : "memory");
++	} while (cur += d_size, cur < end);
++}
++
++static void __apply_alternatives(void *alt_region, bool is_module)
+ {
+ 	struct alt_instr *alt;
+ 	struct alt_region *region = alt_region;
+@@ -145,7 +168,7 @@ static void __apply_alternatives(void *alt_region, bool use_linear_alias)
+ 		pr_info_once("patching kernel code\n");
+ 
+ 		origptr = ALT_ORIG_PTR(alt);
+-		updptr = use_linear_alias ? lm_alias(origptr) : origptr;
++		updptr = is_module ? origptr : lm_alias(origptr);
+ 		nr_inst = alt->orig_len / AARCH64_INSN_SIZE;
+ 
+ 		if (alt->cpufeature < ARM64_CB_PATCH)
+@@ -155,8 +178,20 @@ static void __apply_alternatives(void *alt_region, bool use_linear_alias)
+ 
+ 		alt_cb(alt, origptr, updptr, nr_inst);
+ 
+-		flush_icache_range((uintptr_t)origptr,
+-				   (uintptr_t)(origptr + nr_inst));
++		if (!is_module) {
++			clean_dcache_range_nopatch((u64)origptr,
++						   (u64)(origptr + nr_inst));
++		}
++	}
++
++	/*
++	 * The core module code takes care of cache maintenance in
++	 * flush_module_icache().
++	 */
++	if (!is_module) {
++		dsb(ish);
++		__flush_icache_all();
++		isb();
+ 	}
+ }
+ 
+@@ -178,7 +213,7 @@ static int __apply_alternatives_multi_stop(void *unused)
+ 		isb();
+ 	} else {
+ 		BUG_ON(alternatives_applied);
+-		__apply_alternatives(&region, true);
++		__apply_alternatives(&region, false);
+ 		/* Barriers provided by the cache flushing */
+ 		WRITE_ONCE(alternatives_applied, 1);
+ 	}
+@@ -192,12 +227,14 @@ void __init apply_alternatives_all(void)
+ 	stop_machine(__apply_alternatives_multi_stop, NULL, cpu_online_mask);
+ }
+ 
+-void apply_alternatives(void *start, size_t length)
++#ifdef CONFIG_MODULES
++void apply_alternatives_module(void *start, size_t length)
+ {
+ 	struct alt_region region = {
+ 		.begin	= start,
+ 		.end	= start + length,
+ 	};
+ 
+-	__apply_alternatives(&region, false);
++	__apply_alternatives(&region, true);
+ }
++#endif
+diff --git a/arch/arm64/kernel/module.c b/arch/arm64/kernel/module.c
+index 155fd91e78f4..f0f27aeefb73 100644
+--- a/arch/arm64/kernel/module.c
++++ b/arch/arm64/kernel/module.c
+@@ -448,9 +448,8 @@ int module_finalize(const Elf_Ehdr *hdr,
+ 	const char *secstrs = (void *)hdr + sechdrs[hdr->e_shstrndx].sh_offset;
+ 
+ 	for (s = sechdrs, se = sechdrs + hdr->e_shnum; s < se; s++) {
+-		if (strcmp(".altinstructions", secstrs + s->sh_name) == 0) {
+-			apply_alternatives((void *)s->sh_addr, s->sh_size);
+-		}
++		if (strcmp(".altinstructions", secstrs + s->sh_name) == 0)
++			apply_alternatives_module((void *)s->sh_addr, s->sh_size);
+ #ifdef CONFIG_ARM64_MODULE_PLTS
+ 		if (IS_ENABLED(CONFIG_DYNAMIC_FTRACE) &&
+ 		    !strcmp(".text.ftrace_trampoline", secstrs + s->sh_name))
 -- 
 2.1.4
