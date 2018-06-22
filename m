@@ -1,92 +1,66 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 22 Jun 2018 15:43:46 +0100
-Subject: KVM guest sometimes failed to boot because of kernel stack
- overflow if KPTI is enabled on a hisilicon ARM64 platform.
-In-Reply-To: <5B2CFDCD.6040207@hisilicon.com>
-References: <20180621091850.GA22505@arm.com> <5B2B7A84.8090309@hisilicon.com>
- <20180621105404.GB22505@arm.com> <5B2CB440.8040705@hisilicon.com>
- <20180622092330.GD7601@arm.com> <5B2CD33B.9020702@hisilicon.com>
- <20180622111614.GA1150@arm.com> <5B2CF723.7010600@hisilicon.com>
- <20180622133133.GA1802@arm.com> <5B2CFDCD.6040207@hisilicon.com>
-Message-ID: <20180622144346.GB1802@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 22 Jun 2018 15:50:25 +0100
+Subject: Applied "ASoC: add hp-det-gpio and mic-det-gpio to audio graph card
+ binding" to the asoc tree
+In-Reply-To: <20180620015959.10312-1-suzuki.katsuhiro@socionext.com>
+Message-ID: <E1fWNOL-0002cU-Oj@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 22, 2018 at 09:46:53PM +0800, Wei Xu wrote:
-> On 2018/6/22 21:31, Will Deacon wrote:
-> >On Fri, Jun 22, 2018 at 09:18:27PM +0800, Wei Xu wrote:
-> >>On 2018/6/22 19:16, Will Deacon wrote:
-> >>>On Fri, Jun 22, 2018 at 06:45:15PM +0800, Wei Xu wrote:
-> >>>>On 2018/6/22 17:23, Will Deacon wrote:
-> >>>>>Perhaps just writing back the table entries is enough to cause the issue,
-> >>>>>although I really can't understand why that would be the case. Can you try
-> >>>>>the diff below (without my previous change), please?
-> >>>>Thanks!
-> >>>>But it does not resolve the issue(only apply this patch based on 4.17.0).
-> >>>Thanks, that's a useful data point. It means that it still crashes even if
-> >>>we write back the same table entries, so it's the fact that we're writing
-> >>>them at all which causes the problem, not the value that we write.
-> >>>
-> >>>Whilst looking at the code, we noticed a missing DMB. On the off-chance
-> >>>that it helps, can you try this instead please?
-> >>Thanks!
-> >>Only apply below patch based on 4.17.0, we still got the crash.
-> >Oh well, it was worth a shot (and that's still a fix worth having). Please
-> >can you provide the complete disassembly for kpti_install_ng_mappings()
-> >(I'm referring to the C function in cpufeature.c) along with a corresponding
-> >crash log so that we can correlate the instruction stream with the crash?
-> Just let me know if you need more information.
+The patch
 
-Thanks; the disassembly and log are really helpful.
+   ASoC: add hp-det-gpio and mic-det-gpio to audio graph card binding
 
-I have another patch for you to try below. Please can you let me know how
-you get on, and sorry for the back-and-forth on this.
+has been applied to the asoc tree at
 
-Will
+   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
 
---->8
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
 
-diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index 5f9a73a4452c..26c5c3fabca8 100644
---- a/arch/arm64/mm/proc.S
-+++ b/arch/arm64/mm/proc.S
-@@ -216,9 +216,14 @@ ENDPROC(idmap_cpu_replace_ttbr1)
- 	.endm
- 
- 	.macro __idmap_kpti_put_pgtable_ent_ng, type
--	orr	\type, \type, #PTE_NG		// Same bit for blocks and pages
-+	eor	\type, \type, #PTE_NG		// Same bit for blocks and pages
- 	str	\type, [cur_\()\type\()p]	// Update the entry and ensure it
-+	tbz	\type, #11, 1234f
- 	dc	civac, cur_\()\type\()p		// is visible to all CPUs.
-+	b	1235f
-+	1234:
-+	dc	cvac, cur_\()\type\()p
-+	1235:
- 	.endm
- 
- /*
-@@ -298,6 +303,7 @@ skip_pgd:
- 	/* PUD */
- walk_puds:
- 	.if CONFIG_PGTABLE_LEVELS > 3
-+	eor	pgd, pgd, #PTE_NG
- 	pte_to_phys	cur_pudp, pgd
- 	add	end_pudp, cur_pudp, #(PTRS_PER_PUD * 8)
- do_pud:	__idmap_kpti_get_pgtable_ent	pud
-@@ -319,6 +325,7 @@ next_pud:
- 	/* PMD */
- walk_pmds:
- 	.if CONFIG_PGTABLE_LEVELS > 2
-+	eor	pud, pud, #PTE_NG
- 	pte_to_phys	cur_pmdp, pud
- 	add	end_pmdp, cur_pmdp, #(PTRS_PER_PMD * 8)
- do_pmd:	__idmap_kpti_get_pgtable_ent	pmd
-@@ -339,6 +346,7 @@ next_pmd:
- 
- 	/* PTE */
- walk_ptes:
-+	eor	pmd, pmd, #PTE_NG
- 	pte_to_phys	cur_ptep, pmd
- 	add	end_ptep, cur_ptep, #(PTRS_PER_PTE * 8)
- do_pte:	__idmap_kpti_get_pgtable_ent	pte
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
+
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
+
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
+
+Thanks,
+Mark
+
+>From a12f671b4241f53e7cd9dec8770d51549682453b Mon Sep 17 00:00:00 2001
+From: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
+Date: Wed, 20 Jun 2018 10:59:59 +0900
+Subject: [PATCH] ASoC: add hp-det-gpio and mic-det-gpio to audio graph card
+ binding
+
+Add headphone and microphone detection GPIO support to audio graph
+card same as supported in simple card.
+
+Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ Documentation/devicetree/bindings/sound/audio-graph-card.txt | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/sound/audio-graph-card.txt b/Documentation/devicetree/bindings/sound/audio-graph-card.txt
+index d04ea3b1a1dd..7e63e53a901c 100644
+--- a/Documentation/devicetree/bindings/sound/audio-graph-card.txt
++++ b/Documentation/devicetree/bindings/sound/audio-graph-card.txt
+@@ -18,6 +18,8 @@ Below are same as Simple-Card.
+ - bitclock-inversion
+ - frame-inversion
+ - mclk-fs
++- hp-det-gpio
++- mic-det-gpio
+ - dai-tdm-slot-num
+ - dai-tdm-slot-width
+ - clocks / system-clock-frequency
+-- 
+2.18.0.rc2
