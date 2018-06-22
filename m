@@ -1,33 +1,50 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Sat, 23 Jun 2018 00:06:30 +0800
-Subject: [PATCH 1/2] arm64: allwinner: a64: change TERES-I DLDO3's name to
- start with "vdd"
-Message-ID: <20180622160631.8578-1-icenowy@aosc.io>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 22 Jun 2018 17:11:01 +0100
+Subject: [PATCHv4 4/4] ARM: versatile: support configuring versatile
+ machine for no-MMU
+In-Reply-To: <nycvar.YSQ.7.76.1806221146140.16670@knanqh.ubzr>
+References: <20180618141905.7789-1-gerg@linux-m68k.org>
+ <20180618141905.7789-5-gerg@linux-m68k.org>
+ <CAMuHMdUyCEq0U_CJindwcSEF+0dR-SJc1v8zGT-CcUqVkdOeVw@mail.gmail.com>
+ <nycvar.YSQ.7.76.1806211212010.16670@knanqh.ubzr>
+ <20180622110145.GU17671@n2100.armlinux.org.uk>
+ <nycvar.YSQ.7.76.1806221110140.16670@knanqh.ubzr>
+ <CAMuHMdWZPM3Q9fVXWiw1bMVWNRCYGoQa-XukJka-2xsP-=HmVQ@mail.gmail.com>
+ <nycvar.YSQ.7.76.1806221146140.16670@knanqh.ubzr>
+Message-ID: <20180622161101.GW17671@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Originally the name of the DLDO3 regulator on TERES-I is "eDP12", which
-is not consistent with other regulator names.
+On Fri, Jun 22, 2018 at 11:57:32AM -0400, Nicolas Pitre wrote:
+> That is no longer a kernel config/build issue if you the system 
+> integrator put an XIP kernel on a target with the wrong DT.
+> 
+> The XIP kernel does require that you provide the actual memory base 
+> address as a constant to the build system but that could be extracted 
+> directly from the DT data if having a kconfig prompt for that is too 
+> unwieldy. The new kconfig macro language in mainline could even be 
+> leveraged to do that at config time.
 
-Change it to "vdd-edp", in order to make it more consistent.
+That is actually incorrect - you're too used to the dynamic fixup of
+virt_to_phys() and friends now!
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
----
- arch/arm64/boot/dts/allwinner/sun50i-a64-teres-i.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Given that XIP is typically used in environments where the kernel text
+is very much unmodifyable, we disable CONFIG_ARM_PATCH_PHYS_VIRT.  When
+disabled, we use a constant translation, based upon the build-time
+CONFIG_PHYS_OFFSET and CONFIG_PAGE_OFFSET settings.
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-teres-i.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-teres-i.dts
-index d9baab3dc96b..02fecc42440c 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-teres-i.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-teres-i.dts
-@@ -210,7 +210,7 @@
- &reg_dldo3 {
- 	regulator-min-microvolt = <1200000>;
- 	regulator-max-microvolt = <1200000>;
--	regulator-name = "eDP12";
-+	regulator-name = "vdd-edp";
- };
- 
- &reg_dldo4 {
+The early assembler relies upon these settings - which must be known
+before we enable the MMU.  As such, DT parsing is not available to us
+at that point (as we can't run any C code, because we won't be calling
+it at the address it was linked for.)
+
+I suppose someone who was sufficiently motivated could write assembly-
+based parsing of DT to extract the memory regions and work out what the
+right settings are.  Is there really the motivation to do that - there
+was a burst of XIP interest a few releases ago but it seems to have
+tailed off.
+
 -- 
-2.17.1
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
