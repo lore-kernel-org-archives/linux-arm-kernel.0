@@ -1,31 +1,30 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Fri, 22 Jun 2018 10:41:11 -0500
-Subject: [PATCH 1/2] hwrng: msm: add a spinlock and support for blocking
- reads
-In-Reply-To: <acc7e9d3-8a81-ff15-27c7-78ec7c17f6cc@linaro.org>
-References: <1529594276-12210-1-git-send-email-timur@codeaurora.org>
- <acc7e9d3-8a81-ff15-27c7-78ec7c17f6cc@linaro.org>
-Message-ID: <6d655b97-418e-bacf-7e88-b9179cdc6fd1@codeaurora.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 22 Jun 2018 12:48:50 -0300
+Subject: [PATCH] ARM: dts: imx51: add CodaHx4 VPU
+In-Reply-To: <1529660586.2431.6.camel@pengutronix.de>
+References: <20171213142406.5088-1-p.zabel@pengutronix.de>
+ <20171226041517.GD4210@X250>
+ <1529610890.4022.7.camel@pengutronix.de>
+ <CAOMZO5Ahv2F-WeAPFgsBcpAeb2i==SAZ45QBLvnod7jYRG0fMQ@mail.gmail.com>
+ <1529660586.2431.6.camel@pengutronix.de>
+Message-ID: <CAOMZO5AuB1gTG5jRsQjhunZdz+X4o3rGn8sz+axLVU+VyA0jdg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/22/18 10:38 AM, Stanimir Varbanov wrote:
-> Before entering into the read function we already hold a mutex which
-> serializes data reading so I cannot imagine how below sequence could
-> happen. Can you explain how to reproduce this race?
-> 
->> 1. Core 1 reads status register, shows data is available.
->> 2. Core 2 also reads status register, same result
->> 3. Core 2 reads data register, depleting all entropy
->> 4. Core 1 reads data register, which returns 0
+Hi Philipp,
 
-I have a test which spawns 100 copies of rngtest on a 48-core machine. 
-Without the spinlock, the driver returns no data much more often.
+On Fri, Jun 22, 2018 at 6:43 AM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
 
-If there really is a mutex that serializes data reads across all cores, 
-then I don't have an explanation.
+> I think i.MX51 doesn't have that clock gate:
+>
+>         clk[IMX5_CLK_OCRAM]             = imx_clk_gate2("ocram", "ahb", MXC_CCM_CCGR6, 2);
+>
+> is added for i.MX53 only. CCGR6 CG1 (bits 3:2) is documented as
+> "no longer supported, should be cleared" in the i.MX51 reference
+> manual. I can't find any mention of a gate for the SCC RAM.
 
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+That's true. This gate is only present on i.MX53, so:
+
+Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+
+Thanks for the clarification
