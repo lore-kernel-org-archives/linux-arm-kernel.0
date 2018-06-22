@@ -1,92 +1,192 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 22 Jun 2018 12:16:15 +0100
-Subject: KVM guest sometimes failed to boot because of kernel stack
- overflow if KPTI is enabled on a hisilicon ARM64 platform.
-In-Reply-To: <5B2CD33B.9020702@hisilicon.com>
-References: <5B2A7832.4010502@hisilicon.com>
- <ebfabb8f-dcd9-3fb4-3655-368a882d8f09@arm.com>
- <5B2A7FE1.5040607@hisilicon.com>
- <e701eaa8-dcb9-777c-2211-67ee27b43acb@arm.com>
- <20180621091850.GA22505@arm.com> <5B2B7A84.8090309@hisilicon.com>
- <20180621105404.GB22505@arm.com> <5B2CB440.8040705@hisilicon.com>
- <20180622092330.GD7601@arm.com> <5B2CD33B.9020702@hisilicon.com>
-Message-ID: <20180622111614.GA1150@arm.com>
+From: pbrobinson@gmail.com (Peter Robinson)
+Date: Fri, 22 Jun 2018 12:19:50 +0100
+Subject: Crash in netlink/sk_filter_trim_cap on ARMv7 on 4.18rc1
+Message-ID: <CALeDE9PP__kPHX_aW24kwzGf9BgA0gQOQJSY+Qw0yFMOLn4Pcw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wei,
+Hi All,
 
-Thanks for giving that a spin.
+I'm seeing this netlink/sk_filter_trim_cap crash on ARMv7 across quite
+a few ARMv7 platforms on Fedora with 4.18rc1. I've tested RPi2/RPi3
+(doesn't happen on aarch64), AllWinner H3, BeagleBone and a few
+others, both LPAE/normal kernels.
 
-On Fri, Jun 22, 2018 at 06:45:15PM +0800, Wei Xu wrote:
-> On 2018/6/22 17:23, Will Deacon wrote:
-> >On Fri, Jun 22, 2018 at 09:33:04AM +0100, Wei Xu wrote:
-> >>On 2018/6/21 11:54, Will Deacon wrote:
-> >>>On Thu, Jun 21, 2018 at 11:14:28AM +0100, Wei Xu wrote:
-> >>>>On 2018/6/21 10:18, Will Deacon wrote:
-> >>>>>Wei -- does the diff below help at all? Make sure you disable CONFIG_KASAN,
-> >>>>>otherwise your kernel will take an age to boot.
-> >>>>Yes, amazing! This patch resolved the issue.
-> >>>Great...
-> >>>
-> >>>>I have tested 50 times and can not reproduce the issue any more.
-> >>>>Could you please tell more why this patch works?
-> >>>You might need to ask your CPU design team ;)
-> >>>
-> >>>Without this patch, the code in idmap_kpti_install_ng_mappings() sets
-> >>>bit 11 in table descriptors so that we can keep track of which parts of
-> >>>the page table we've visited. With this patch, we don't bother tracking
-> >>>and potentially rewalk parts of the page table (which takes a very long
-> >>>time if KASAN is enabled).
-> >>Got it. Thanks!
-> >>
-> >>>The architecture documents I've looked at are clear that bit 11 is IGNORED
-> >>>by the CPU, which:
-> >>>
-> >>>   "Indicates that the architecture guarantees that the bit or field is not
-> >>>    interpreted or modified by hardware."
-> >>>
-> >>>Please can you double-check that your CPU is indeed ignoring bit 11 in
-> >>>non-leaf (table) descriptors?
-> >>Do the non-leaf(table) descriptors mean the table descriptors
-> >>of the section D4.3.1 "VMSAv8-64 translation table level 0, level 1, and level 2 descriptor formats"
-> >>in the ARM Architecture Reference Manual ARMv8 for ARMv8-A(DDI0487C_a_armv8_arm.pdf)?
-> >>
-> >>If yes, our hardware does ignore it(not interpret or modify).
-> >Ok, thanks for checking.
-> >
-> >>Is there any other possible reason cause this?
-> >Perhaps just writing back the table entries is enough to cause the issue,
-> >although I really can't understand why that would be the case. Can you try
-> >the diff below (without my previous change), please?
-> 
-> Thanks!
-> But it does not resolve the issue(only apply this patch based on 4.17.0).
+I'm a bit out of my depth in this part of the kernel but I'm wondering
+if it's known, I couldn't find anything that looked obvious on a few
+mailing lists.
 
-Thanks, that's a useful data point. It means that it still crashes even if
-we write back the same table entries, so it's the fact that we're writing
-them at all which causes the problem, not the value that we write.
+Peter
 
-Whilst looking at the code, we noticed a missing DMB. On the off-chance
-that it helps, can you try this instead please?
-
-Will
-
---->8
-
-diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index 5f9a73a4452c..03646e6a2ef4 100644
---- a/arch/arm64/mm/proc.S
-+++ b/arch/arm64/mm/proc.S
-@@ -217,8 +217,9 @@ ENDPROC(idmap_cpu_replace_ttbr1)
- 
- 	.macro __idmap_kpti_put_pgtable_ent_ng, type
- 	orr	\type, \type, #PTE_NG		// Same bit for blocks and pages
--	str	\type, [cur_\()\type\()p]	// Update the entry and ensure it
--	dc	civac, cur_\()\type\()p		// is visible to all CPUs.
-+	str	\type, [cur_\()\type\()p]	// Update the entry and ensure
-+	dmb	sy				// that it is visible to all
-+	dc	civac, cur_\()\type\()p		// CPUs.
- 	.endm
- 
- /*
+[    9.955543] Modules linked in:
+[    9.955562] CPU: 1 PID: 213 Comm: systemd-udevd Tainted: G      D
+        4.18.0-0.rc1.git0.1.fc29.armv7hl #1
+[    9.955566] Hardware name: BCM2835
+[    9.955584] PC is at sk_filter_trim_cap+0x15c/0x1b8
+[    9.955590] LR is at   (null)
+[    9.955597] pc : [<c09d4d58>]    lr : [<00000000>]    psr: 60000013
+[    9.955602] sp : c2cf9d58  ip : 00000000  fp : 00000000
+[    9.955608] r10: ef2c3c00  r9 : c13093c0  r8 : 00000000
+[    9.955615] r7 : 00000000  r6 : 00000001  r5 : f0f6a000  r4 : 00000000
+[    9.955621] r3 : 00000007  r2 : 00000000  r1 : 00000000  r0 : 00000000
+[    9.955629] Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment none
+[    9.955640] Control: 10c5387d  Table: 02e6406a  DAC: 00000051
+[    9.963334] Unable to handle kernel NULL pointer dereference at
+virtual address 0000000c
+[    9.964631] Process systemd-udevd (pid: 213, stack limit = 0x(ptrval))
+[    9.964640] Stack: (0xc2cf9d58 to 0xc2cfa000)
+[    9.964649] 9d40:
+    00000000 c2c90540
+[    9.964663] 9d60: 006000c0 00000000 00000000 c09a233c c2c90b40
+c2c90b40 c2c90540 00000000
+[    9.964678] 9d80: 00000000 00000000 c13093c0 c09fa2bc 006000c0
+00000001 ee7f1800 00000000
+[    9.964691] 9da0: 00000002 00000000 00000001 ef2c3c64 c2cf9f70
+00000002 c2c90540 00000000
+[    9.964706] 9dc0: c2cf9f68 00000083 ee7f1800 00000008 00000000
+c09fa3b8 006000c0 00000000
+[    9.964724] 9de0: 00000000 00000002 00000002 c09fc704 006000c0
+00000000 ee7c7c00 00000000
+[    9.976159] pgd = (ptrval)
+[    9.979536] 9e00: 000000d5 00000000 00000000 00000000 c126a314
+c2cf9f68 eec77880 c2cf9e50
+[    9.979550] 9e20: 00000040 00000000 eec77880 00000000 00000000
+c099a624 c2cf9f68 00000000
+[    9.979565] 9e40: c2cf9e50 c099ae48 00000100 00000000 00000080
+c04ab918 ee78e8c0 7fff0000
+[    9.979580] 9e60: c2cf9e90 c2cf9eec ffff0000 000000a0 bed817e4
+00000028 01a040a8 0000005b
+[    9.979594] 9e80: 00000000 00000000 00000000 01a0ef00 00000128
+40000028 b6cd9548 00000000
+[    9.979607] 9ea0: 0000000d 00000000 bed817b8 00000000 00000010
+00000000 00000002 00000000
+[    9.985866] [0000000c] *pgd=00000000
+[    9.988810] 9ec0: 00000000 00000000 01a0ef00 00000000 c2cf9fb0
+00000128 bed817b8 00000000
+[    9.988825] 9ee0: 00000000 c0407f18 00000000 00000000 c120bbec
+b6e2ba00 c2cf9fb0 10c5387d
+[    9.988841] 9f00: 01a0efb8 bed81720 bed81728 c03165fc 00005010
+00001000 3e600000 c04ced24
+[    9.988855] 9f20: ee4b5010 00000ff0 ee4b5000 00000000 ee4b6000
+eec77880 bed817b8 00000000
+[    9.988875] 9f40: 00000128 c0301204 c2cf8000 00000128 00000000
+c099bc5c 00000000 00000000
+[   10.000948] 9f60: 00000000 fffffff7 c2cf9eb0 0000000c 00000001
+00000000 00000000 c2cf9e80
+[   10.000961] 9f80: 00000000 c030ac08 00000000 00000000 00000040
+00000000 00000000 01a0ef00
+[   10.000976] 9fa0: bed817b8 c03011d4 00000000 01a0ef00 0000000d
+bed817b8 00000000 00000000
+[   10.000995] 9fc0: 00000000 01a0ef00 bed817b8 00000128 0000005b
+01a0af00 01a0f620 00000000
+[   10.228876] 9fe0: b6f9fad4 bed81780 b6de4780 b6cd9548 60000010
+0000000d 00000000 00000000
+[   10.237081] [<c09d4d58>] (sk_filter_trim_cap) from [<c09fa2bc>]
+(netlink_broadcast_filtered+0x304/0x3dc)
+[   10.246575] [<c09fa2bc>] (netlink_broadcast_filtered) from
+[<c09fa3b8>] (netlink_broadcast+0x24/0x2c)
+[   10.255806] [<c09fa3b8>] (netlink_broadcast) from [<c09fc704>]
+(netlink_sendmsg+0x30c/0x340)
+[   10.264258] [<c09fc704>] (netlink_sendmsg) from [<c099a624>]
+(sock_sendmsg+0x3c/0x4c)
+[   10.272100] [<c099a624>] (sock_sendmsg) from [<c099ae48>]
+(___sys_sendmsg+0x1d8/0x218)
+[   10.280030] [<c099ae48>] (___sys_sendmsg) from [<c099bc5c>]
+(__sys_sendmsg+0x48/0x6c)
+[   10.287872] [<c099bc5c>] (__sys_sendmsg) from [<c03011d4>]
+(__sys_trace_return+0x0/0x10)
+[   10.295962] Exception stack(0xc2cf9fa8 to 0xc2cf9ff0)
+[   10.301018] 9fa0:                   00000000 01a0ef00 0000000d
+bed817b8 00000000 00000000
+[   10.309202] 9fc0: 00000000 01a0ef00 bed817b8 00000128 0000005b
+01a0af00 01a0f620 00000000
+[   10.317381] 9fe0: b6f9fad4 bed81780 b6de4780 b6cd9548
+[   10.322442] Code: 1afffff7 e59c0000 e5830000 e3520000 (e584800c)
+[   10.328557] Internal error: Oops: 805 [#8] SMP ARM
+[   10.328768] ---[ end trace 2cb865e83300a747 ]---
+[   10.333357] Modules linked in:
+[   10.333374] CPU: 2 PID: 212 Comm: systemd-udevd Tainted: G      D
+        4.18.0-0.rc1.git0.1.fc29.armv7hl #1
+[   10.333378] Hardware name: BCM2835
+[   10.333396] PC is at sk_filter_trim_cap+0x15c/0x1b8
+[   10.333409] LR is at   (null)
+[   10.341840] Unable to handle kernel NULL pointer dereference at
+virtual address 0000000c
+[   10.351172] pc : [<c09d4d58>]    lr : [<00000000>]    psr: 60000013
+[   10.351179] sp : c2e5dd58  ip : 00000000  fp : 00000000
+[   10.351185] r10: ef2c3c00  r9 : c13093c0  r8 : 00000000
+[   10.351192] r7 : 00000000  r6 : 00000001  r5 : f0f6a000  r4 : 00000000
+[   10.351198] r3 : 00000007  r2 : 00000000  r1 : 00000000  r0 : 00000000
+[   10.351207] Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment none
+[   10.351215] Control: 10c5387d  Table: 02e6006a  DAC: 00000051
+[   10.351231] Process systemd-udevd (pid: 212, stack limit = 0x(ptrval))
+[   10.354654] pgd = (ptrval)
+[   10.359496] Stack: (0xc2e5dd58 to 0xc2e5e000)
+[   10.359505] dd40:
+    00000000 ef3c0540
+[   10.359520] dd60: 006000c0 00000000 00000000 c09a233c ef3c0b40
+ef3c0b40 ef3c0540 00000000
+[   10.359534] dd80: 00000000 00000000 c13093c0 c09fa2bc 006000c0
+00000001 ee7f2000 00000000
+[   10.359548] dda0: 00000002 00000000 00000001 ef2c3c64 c2e5df70
+00000002 ef3c0540 00000000
+[   10.359563] ddc0: c2e5df68 00000084 ee7f2000 00000008 00000000
+c09fa3b8 006000c0 00000000
+[   10.359585] dde0: 00000000 00000002 00000002 c09fc704 006000c0
+00000000 c2c68d00 00000000
+[   10.362574] [0000000c] *pgd=00000000
+[   10.382706] de00: 000000d4 00000000 00000000 00000000 c126a314
+c2e5df68 eec76c40 c2e5de50
+[   10.382721] de20: 00000040 00000000 eec76c40 00000000 00000000
+c099a624 c2e5df68 00000000
+[   10.382735] de40: c2e5de50 c099ae48 00000100 00000000 00000080
+c04ab918 ee78e8c0 7fff0000
+[   10.382750] de60: c2e5de90 c2e5deec ffff0000 000000a0 bed817e4
+00000028 01a040a8 0000005c
+[   10.382764] de80: 00000000 00000000 00000000 01a0e0f0 00000128
+40000028 b6cd9548 00000000
+[   10.382780] dea0: 0000000d 00000000 bed817b8 00000000 00000010
+00000000 00000002 00000000
+[   10.397129] dec0: 00000000 00000000 01a0e0f0 00000000 c2e5dfb0
+00000128 bed817b8 00000000
+[   10.397144] dee0: 00000000 c0407f18 00000000 00000000 c120bbec
+b6e2ba00 c2e5dfb0 10c5387d
+[   10.397159] df00: 01a0e1a8 bed81720 bed81728 c03165fc 00006010
+00001000 3e600000 c04ced24
+[   10.397174] df20: ef216010 00000ff0 ef216000 00000000 ef217000
+eec76c40 bed817b8 00000000
+[   10.397189] df40: 00000128 c0301204 c2e5c000 00000128 00000000
+c099bc5c 00000000 00000000
+[   10.589571] df60: 00000000 fffffff7 c2e5deb0 0000000c 00000001
+00000000 00000000 c2e5de80
+[   10.589596] df80: 00000000 c030ac08 00000000 00000000 00000040
+00000000 00000000 01a0e0f0
+[   10.605946] dfa0: bed817b8 c03011d4 00000000 01a0e0f0 0000000d
+bed817b8 00000000 00000000
+[   10.614131] dfc0: 00000000 01a0e0f0 bed817b8 00000128 0000005c
+01a0af00 01a0e920 00000000
+[   10.622316] dfe0: b6f9fad4 bed81780 b6de4780 b6cd9548 60000010
+0000000d 00000000 00000000
+[   10.630594] [<c09d4d58>] (sk_filter_trim_cap) from [<c09fa2bc>]
+(netlink_broadcast_filtered+0x304/0x3dc)
+[   10.640088] [<c09fa2bc>] (netlink_broadcast_filtered) from
+[<c09fa3b8>] (netlink_broadcast+0x24/0x2c)
+[   10.650447] [<c09fa3b8>] (netlink_broadcast) from [<c09fc704>]
+(netlink_sendmsg+0x30c/0x340)
+[   10.658899] [<c09fc704>] (netlink_sendmsg) from [<c099a624>]
+(sock_sendmsg+0x3c/0x4c)
+[   10.666742] [<c099a624>] (sock_sendmsg) from [<c099ae48>]
+(___sys_sendmsg+0x1d8/0x218)
+[   10.674673] [<c099ae48>] (___sys_sendmsg) from [<c099bc5c>]
+(__sys_sendmsg+0x48/0x6c)
+[   10.682515] [<c099bc5c>] (__sys_sendmsg) from [<c03011d4>]
+(__sys_trace_return+0x0/0x10)
+[   10.690604] Exception stack(0xc2e5dfa8 to 0xc2e5dff0)
+[   10.695660] dfa0:                   00000000 01a0e0f0 0000000d
+bed817b8 00000000 00000000
+[   10.703845] dfc0: 00000000 01a0e0f0 bed817b8 00000128 0000005c
+01a0af00 01a0e920 00000000
+[   10.712025] dfe0: b6f9fad4 bed81780 b6de4780 b6cd9548
+[   10.717086] Code: 1afffff7 e59c0000 e5830000 e3520000 (e584800c)
+[   10.723199] Internal error: Oops: 805 [#9] SMP ARM
+[   10.723343] ---[ end trace 2cb865e83300a748 ]---
