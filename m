@@ -1,229 +1,136 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Fri, 22 Jun 2018 03:31:11 +0000
-Subject: [PATCH V2 2/4] dt-bindings: arm: fsl: add mu binding doc
-In-Reply-To: <20180621180857.ozl7n7fcretg6rwi@pengutronix.de>
-References: <1529239789-26849-1-git-send-email-aisheng.dong@nxp.com>
- <1529239789-26849-3-git-send-email-aisheng.dong@nxp.com>
- <20180620194310.GA28983@rob-hp-laptop>
- <20180621074641.sqqvudxebt3hd43m@pengutronix.de>
- <AM0PR04MB4211B39D5AFAB95FC2A91F9980760@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <20180621180857.ozl7n7fcretg6rwi@pengutronix.de>
-Message-ID: <AM0PR04MB42118D2D4B426CF1000964BF80750@AM0PR04MB4211.eurprd04.prod.outlook.com>
+From: sean.wang@mediatek.com (sean.wang at mediatek.com)
+Date: Fri, 22 Jun 2018 11:49:08 +0800
+Subject: [PATCH 5/7] pinctrl: mt7622: fix a kernel panic when gpio-hog is
+ being applied
+In-Reply-To: <f222c9f488490bd86d35346e725491e1de306ace.1529639050.git.sean.wang@mediatek.com>
+References: <f222c9f488490bd86d35346e725491e1de306ace.1529639050.git.sean.wang@mediatek.com>
+Message-ID: <031d7dd666390aaf1b0566476c9661e6e674cae8.1529639050.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Oleksij Rempel [mailto:o.rempel at pengutronix.de]
-> Sent: Friday, June 22, 2018 2:09 AM
-> To: A.s. Dong <aisheng.dong@nxp.com>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>; Rob Herring
-> <robh@kernel.org>; Mark Rutland <mark.rutland@arm.com>;
-> devicetree at vger.kernel.org; dongas86 at gmail.com; dl-linux-imx <linux-
-> imx at nxp.com>; kernel at pengutronix.de; Fabio Estevam
-> <fabio.estevam@nxp.com>; shawnguo at kernel.org; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [PATCH V2 2/4] dt-bindings: arm: fsl: add mu binding doc
-> 
-> Hi,
-> 
-> On Thu, Jun 21, 2018 at 05:11:33PM +0000, A.s. Dong wrote:
-> > Hi Sascha,
-> > > On Wed, Jun 20, 2018 at 01:43:10PM -0600, Rob Herring wrote:
-> > > > On Sun, Jun 17, 2018 at 08:49:47PM +0800, Dong Aisheng wrote:
-> > > > > The Messaging Unit module enables two processors within the SoC
-> > > > > to communicate and coordinate by passing messages (e.g. data,
-> > > > > status and control) through the MU interface.
-> > > > >
-> > > > > ---
-> > > > > v1->v2:
-> > > > >  * typo fixes
-> > > > >  * remove status property
-> > > > >  * remove imx6&7 compatible string which may be added later for
-> > > > >    the generic mailbox binding
-> > > > >
-> > > > > Note: Because MU used by SCU is not implemented as a mailbox
-> > > > > driver, Instead, they're provided in library calls to gain higher
-> performance.
-> > > >
-> > > > Using a binding doesn't mean you have to use an OS's subsystem.
-> > > >
-> > > > What needs higher performance? What's the performance difference?
-> > > Why
-> > > > can't the mailbox framework be improved?
-> > >
-> > > From what I see the performance is improved by polling the interrupt
-> > > registers rather than using interrupts.
-> > > I see no reason though why this can't be implemented with the
-> > > mailbox framework as is.
-> > >
-> >
-> > I thought you've agreed to not write generic MU(mailbox) driver for SCU.
-> > https://www.spinics.net/lists/arm-kernel/msg650217.html
-> > But seems it's still not quite certain...
-> >
-> > I'd like to explain some more.
-> >
-> > 1) the interrupt mechanism is not quite suitable for SCU firmware
-> > protocol as the transfer size would be more than 4 words and the
-> > response data size is also undetermined (it's set by SCU firmware side
-> during a response).
-> > So polling mode may be the best way to handle this as MU message
-> > handling usually is quite fast in a few microseconds.
-> >
-> > 2) It's true that Mailbox framework is well designed and powerful.
-> > But it's not quite suitable for SCU MU as we don't need to use the
-> > most bits of it. Mailbox seems like to be more suitable for a generic
-> > MU mailbox driver used by various clients/servers.  But SCU MU are
-> > quite specific to SCU protocol and can't be used by other clients (MU
-> > 0~4 is fixed for SCU communication in MX8 HW design).
-> > Even we write a MU Mailbox driver for SCU MU, it's still not a general
-> > one and can't be used by others (e.g. communication with M4).
-> > So I'd believe the current library way is still the best approach for
-> > SCU MU Using. But I'm also okay for another generic MU drivers for
-> > other common communications between A core and M4 side.
-> >
-> > 3) We actually have tried the MU(Mailbox) internally, it increased a
-> > lot complexity comparing to the current library way and got a booting
-> > time regression issue due to extra delays introduced in handling SCU
-> > protocol in mailbox way.
-> >
-> > And finally a nature question to us is:
-> > What the benefit we can get for SCU MU using a mailbox way?
-> >
-> > If we can't find benefits but introduce more complexities then why we
-> > would do that way?
-> 
-> Looks like my response to same topic within my patch set is lost, so I repost it
-> here:
-> 
-> ok.. let's take some of IMX8 SCU driver code to see if there any difference:
-> 
-> ..this part of the code is blocking write procedure for one channeler (register
-> or what ever name you prefer) per write.. correct?
-> 
-> +void mu_send_msg(struct mu_priv *priv, uint32_t index, uint32_t msg) {
-> +	uint32_t mask = MU_SR_TE0_MASK >> index;
-> +
-> +	/* Wait TX register to be empty. */
-> +	while (!(readl_relaxed(priv->base + MU_ASR) & mask))
-> +		;
-> +	writel_relaxed(msg, priv->base + MU_ATR0  + (index * 4)); }
-> +EXPORT_SYMBOL_GPL(mu_send_msg);
-> 
-> According to documentation it is recommended to use only one status bit for
-> the last register to use MU as one big 4words sized pipe.
-> But, there is no way you can write to all 4 registers without checking status
-> for each of this register, because your protocol has dynamic message size. So
-> you are forced to use your one channel as 4 separate channels.
-> Write it part of the message separately and allow your firmware read 1 word
-> to understand how to behave on the rest of the message.
-> 
-> +static void sc_ipc_write(struct sc_ipc *sc_ipc, void *data) {
-> +	sc_rpc_msg_t *msg = (sc_rpc_msg_t *) data;
-> +	uint8_t count = 0;
-> +
-> +	/* Check size */
-> +	if (msg->size > SC_RPC_MAX_MSG)
-> +		return;
-> +
-> +	/* Write first word */
-> +	mu_send_msg(sc_ipc->mu_base, 0, *((uint32_t *) msg));
-> +	count++;
-> 
-> .. in this loop you are writing to one channel/register per loop. If the
-> communicate will stall for some reason, the linux system will just freeze here
-> without any timeout or error message.. no idea how about the opposite site.
-> 
-> +	/* Write remaining words */
-> +	while (count < msg->size) {
-> +		mu_send_msg(sc_ipc->mu_base, count % MU_TR_COUNT,
-> +			    msg->DATA.u32[count - 1]);
-> +		count++;
-> +	}
-> +}
-> 
-> 
-> ... and here is a proof that sc_ipc_write will do in some cases 5 rounds
-> (5 * 4 bytes = 20 bytes single message) with probable busy waiting for each
-> channel
-> 
-> +sc_err_t sc_misc_seco_image_load(sc_ipc_t ipc, uint32_t addr_src,
-> +				 uint32_t addr_dst, uint32_t len, bool fw) {
-> +	sc_rpc_msg_t msg;
-> +	uint8_t result;
-> +
-> +	RPC_VER(&msg) = SC_RPC_VERSION;
-> +	RPC_SVC(&msg) = (uint8_t)SC_RPC_SVC_MISC;
-> +	RPC_FUNC(&msg) = (uint8_t)MISC_FUNC_SECO_IMAGE_LOAD;
-> +	RPC_U32(&msg, 0) = addr_src;
-> +	RPC_U32(&msg, 4) = addr_dst;
-> +	RPC_U32(&msg, 8) = len;
-> +	RPC_U8(&msg, 12) = (uint8_t)fw;
-> +	RPC_SIZE(&msg) = 5;
-> +
-> +	sc_call_rpc(ipc, &msg, false);
-> +
-> +	result = RPC_R8(&msg);
-> +	return (sc_err_t)result;
-> +}
-> +
-> 
-> So, the same code with mailbox framework will be some thing like this:
-> 1. request all 4 channels in the probe. ignore completion callback and set
-> proper timeout.
-> 
+From: Sean Wang <sean.wang@mediatek.com>
 
-That looks a bit strange. As I said in another email, MU physical does not have multi
-Channels (here you mean are virtual channels).  And one whole MU instance is
-Exclusively used by SCU, why we need abstract them into 4 channels to use separately
-with extra unnecessary resource hold and code path executed.
+When we are explicitly using GPIO hogging mechanism in the pinctrl node,
+such as:
 
-> 2. keep your old code by replacing this part.
-> 	/* Write remaining words */
-> 	while (count < msg->size) {
-> 		mbox_send_message(sc_ipc->mbox_chan[count %
-> MU_TR_COUNT],
-> msg->DATA.u32[count - 1]);
-> 		count++;
-> 	}
-> 
-> The advantage of this variant. If SCU firmware will stall, the linux will be able
-> to notify about it without blocking complete system.
-> 
+	&pio {
+		line_input {
+			gpio-hog;
+			gpios = <95 0>, <96 0>, <97 0>;
+			input;
+		};
+	};
 
-This part of code has been used for a long time and we've never met the stall
-Issue which means SCU firmware guarantee it well. But I agree a timeout
-mechanism Is better. However,  if only for this reason, we can simply add a
-timeout mechanism in MU library function as well, but still is far from a strong
-enough reason to switch to a more complexed mailbox one.
+A kernel panic happens at dereferencing a NULL pointer: In this case, the
+drvdata is still not setup properly yet when it is being accessed.
 
-> Can you please provide (if possible) your old mailbox based implementation.
-> I'm curious to see why it is slow.
+A better solution for fixing up this issue should be we should obtain the
+private data from struct gpio_chip using a specific gpiochip_get_data
+instead of a generic dev_get_drvdata.
 
-In our implementation:
-1) One channel per MU
-2) Tx using the same way to send msg as sc_ipc_write() in polling mode
-3) Rx enables the first word interrupt and polling for the rest of them in
-a hrtimer.
+[    0.249424] Unable to handle kernel NULL pointer dereference at virtual
+	       address 000000c8
+[    0.257818] Mem abort info:
+[    0.260704]   ESR = 0x96000005
+[    0.263869]   Exception class = DABT (current EL), IL = 32 bits
+[    0.270011]   SET = 0, FnV = 0
+[    0.273167]   EA = 0, S1PTW = 0
+[    0.276421] Data abort info:
+[    0.279398]   ISV = 0, ISS = 0x00000005
+[    0.283372]   CM = 0, WnR = 0
+[    0.286440] [00000000000000c8] user address but active_mm is swapper
+[    0.293027] Internal error: Oops: 96000005 [#1] PREEMPT SMP
+[    0.298795] Modules linked in:
+[    0.301958] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.16.0-rc1+ #389
+[    0.308716] Hardware name: MediaTek MT7622 RFB1 board (DT)
+[    0.314396] pstate: 80000005 (Nzcv daif -PAN -UAO)
+[    0.319362] pc : mtk_hw_pin_field_get+0x28/0x118
+[    0.324140] lr : mtk_hw_set_value+0x30/0x104
+[    0.328557] sp : ffffff800801b6d0
+[    0.331983] x29: ffffff800801b6d0 x28: ffffff80086b7970
+[    0.337484] x27: 0000000000000000 x26: ffffff80087b8000
+[    0.342986] x25: 0000000000000000 x24: ffffffc00324c230
+[    0.348487] x23: 0000000000000003 x22: 0000000000000000
+[    0.353988] x21: ffffff80087b8000 x20: 0000000000000000
+[    0.359489] x19: 0000000000000054 x18: 00000000fffff7c0
+[    0.364990] x17: 0000000000006300 x16: 000000000000003f
+[    0.370492] x15: 000000000000000e x14: ffffffffffffffff
+[    0.375993] x13: 0000000000000000 x12: 0000000000000020
+[    0.381494] x11: 0000000000000006 x10: 0101010101010101
+[    0.386995] x9 : fffffffffffffffa x8 : 0000000000000007
+[    0.392496] x7 : ffffff80085d63f8 x6 : 0000000000000003
+[    0.397997] x5 : 0000000000000054 x4 : ffffffc0031eb800
+[    0.403499] x3 : ffffff800801b728 x2 : 0000000000000003
+[    0.409000] x1 : 0000000000000054 x0 : 0000000000000000
+[    0.414502] Process swapper/0 (pid: 1, stack limit = 0x000000002a913c1c)
+[    0.421441] Call trace:
+[    0.423968]  mtk_hw_pin_field_get+0x28/0x118
+[    0.428387]  mtk_hw_set_value+0x30/0x104
+[    0.432445]  mtk_gpio_set+0x20/0x28
+[    0.436052]  mtk_gpio_direction_output+0x18/0x30
+[    0.440833]  gpiod_direction_output_raw_commit+0x7c/0xa0
+[    0.446333]  gpiod_direction_output+0x104/0x114
+[    0.451022]  gpiod_configure_flags+0xbc/0xfc
+[    0.455441]  gpiod_hog+0x8c/0x140
+[    0.458869]  of_gpiochip_add+0x27c/0x2d4
+[    0.462928]  gpiochip_add_data_with_key+0x338/0x5f0
+[    0.467976]  mtk_pinctrl_probe+0x388/0x400
+[    0.472217]  platform_drv_probe+0x58/0xa4
+[    0.476365]  driver_probe_device+0x204/0x44c
+[    0.480783]  __device_attach_driver+0xac/0x108
+[    0.485384]  bus_for_each_drv+0x7c/0xac
+[    0.489352]  __device_attach+0xa0/0x144
+[    0.493320]  device_initial_probe+0x10/0x18
+[    0.497647]  bus_probe_device+0x2c/0x8c
+[    0.501616]  device_add+0x2f8/0x540
+[    0.505226]  of_device_add+0x3c/0x44
+[    0.508925]  of_platform_device_create_pdata+0x80/0xb8
+[    0.514245]  of_platform_bus_create+0x290/0x3e8
+[    0.518933]  of_platform_populate+0x78/0x100
+[    0.523352]  of_platform_default_populate+0x24/0x2c
+[    0.528403]  of_platform_default_populate_init+0x94/0xa4
+[    0.533903]  do_one_initcall+0x98/0x130
+[    0.537874]  kernel_init_freeable+0x13c/0x1d4
+[    0.542385]  kernel_init+0x10/0xf8
+[    0.545903]  ret_from_fork+0x10/0x18
+[    0.549603] Code: 900020a1 f9400800 911dcc21 1400001f (f9406401)
+[    0.555916] ---[ end trace de8c34787fdad3b3 ]---
+[    0.560722] Kernel panic - not syncing: Attempted to kill init!
+	       exitcode=0x0000000b
+[    0.560722]
+[    0.570188] SMP: stopping secondary CPUs
+[    0.574253] ---[ end Kernel panic - not syncing: Attempted to kill
+	       init! exitcode=0x0000000b
+[    0.574253]
 
-The possible extra cost comparing to simple polling way:
-1) Extra unnecessary code execution path of mailbox which is not used by SCU MU
-2) Interrupt latency
-3) Extra memory copy handling RX message separately.
-4) Extra schedule of hrtimer polling
+Cc: stable at vger.kernel.org
+Fixes: d6ed93551320 ("pinctrl: mediatek: add pinctrl driver for MT7622 SoC")
+Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+---
+ drivers/pinctrl/mediatek/pinctrl-mt7622.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Some of them probably could be optimized. However, besides the slow problem,
-the extra unnecessary complexity and can't be generic (specific to SCU) are also
-important ones. 
-
-And the MU general purpose interrupt feature and general purpose flags feature
-may also not supported by mailbox well.
-
-Regards
-Dong Aisheng
-> 
-> --
-> Pengutronix e.K.                           |                             |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+diff --git a/drivers/pinctrl/mediatek/pinctrl-mt7622.c b/drivers/pinctrl/mediatek/pinctrl-mt7622.c
+index 055074bb..4c4740f 100644
+--- a/drivers/pinctrl/mediatek/pinctrl-mt7622.c
++++ b/drivers/pinctrl/mediatek/pinctrl-mt7622.c
+@@ -1424,7 +1424,7 @@ static struct pinctrl_desc mtk_desc = {
+ 
+ static int mtk_gpio_get(struct gpio_chip *chip, unsigned int gpio)
+ {
+-	struct mtk_pinctrl *hw = dev_get_drvdata(chip->parent);
++	struct mtk_pinctrl *hw = gpiochip_get_data(chip);
+ 	int value, err;
+ 
+ 	err = mtk_hw_get_value(hw, gpio, PINCTRL_PIN_REG_DI, &value);
+@@ -1436,7 +1436,7 @@ static int mtk_gpio_get(struct gpio_chip *chip, unsigned int gpio)
+ 
+ static void mtk_gpio_set(struct gpio_chip *chip, unsigned int gpio, int value)
+ {
+-	struct mtk_pinctrl *hw = dev_get_drvdata(chip->parent);
++	struct mtk_pinctrl *hw = gpiochip_get_data(chip);
+ 
+ 	mtk_hw_set_value(hw, gpio, PINCTRL_PIN_REG_DO, !!value);
+ }
+-- 
+2.7.4
