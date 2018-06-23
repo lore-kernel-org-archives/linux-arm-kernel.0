@@ -1,43 +1,48 @@
 From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Sat, 23 Jun 2018 10:29:51 +0530
-Subject: [PATCH v2 0/3] Add gpio interrupt support for Actions Semi S900 SoC
-Message-ID: <20180623045954.6729-1-manivannan.sadhasivam@linaro.org>
+Date: Sat, 23 Jun 2018 10:29:52 +0530
+Subject: [PATCH v2 1/3] dt-bindings: pinctrl: Add gpio interrupt bindings for
+ Actions S900 SoC
+In-Reply-To: <20180623045954.6729-1-manivannan.sadhasivam@linaro.org>
+References: <20180623045954.6729-1-manivannan.sadhasivam@linaro.org>
+Message-ID: <20180623045954.6729-2-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds interrupt support for Actions Semi S900 GPIO's. Each
-port has individual register sets for configuring the below interrupt
-types:
+Add gpio interrupt bindings for Actions Semi S900 SoC.
 
-1. Rising Edge Interrupt
-2. Falling Edge Interrupt
-3. Software Emulation of both Edges
-4. High Level Interrupt
-5. Low Level Interrupt
+Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+Reviewed-by: Rob Herring <robh@kernel.org>
+---
+ .../bindings/pinctrl/actions,s900-pinctrl.txt          | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-Thanks,
-Mani
-
-Changes in v2:
-
-* Removed custom IRQ domain implementation and used GPIO_IRQCHIP with
-  multi parents based on gpio-tegra186.c
-* Added support for emulating interrupt on both edges
-* Added parentheses to the expression as spotted by Linus
-* Added Rob's Reviewed-by tag for bindings patch
-
-Manivannan Sadhasivam (3):
-  dt-bindings: pinctrl: Add gpio interrupt bindings for Actions S900 SoC
-  arm64: dts: actions: Add interrupt properties to pinctrl node for S900
-  pinctrl: actions: Add interrupt support for OWL S900 SoC
-
- .../bindings/pinctrl/actions,s900-pinctrl.txt |  10 +
- arch/arm64/boot/dts/actions/s900.dtsi         |   8 +
- drivers/pinctrl/actions/Kconfig               |   1 +
- drivers/pinctrl/actions/pinctrl-owl.c         | 271 +++++++++++++++++-
- drivers/pinctrl/actions/pinctrl-owl.h         |  22 +-
- drivers/pinctrl/actions/pinctrl-s900.c        |  31 +-
- 6 files changed, 325 insertions(+), 18 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/pinctrl/actions,s900-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/actions,s900-pinctrl.txt
+index 8fb5a53775e8..81b58dddd3ed 100644
+--- a/Documentation/devicetree/bindings/pinctrl/actions,s900-pinctrl.txt
++++ b/Documentation/devicetree/bindings/pinctrl/actions,s900-pinctrl.txt
+@@ -19,6 +19,10 @@ Required Properties:
+                     defines the interrupt number, the second encodes
+                     the trigger flags described in
+                     bindings/interrupt-controller/interrupts.txt
++- interrupts: The interrupt outputs from the controller. There is one GPIO
++              interrupt per GPIO bank. The number of interrupts listed depends
++              on the number of GPIO banks on the SoC. The interrupts must be
++              ordered by bank, starting with bank 0.
+ 
+ Please refer to pinctrl-bindings.txt in this directory for details of the
+ common pinctrl bindings used by client devices, including the meaning of the
+@@ -180,6 +184,12 @@ Example:
+                   #gpio-cells = <2>;
+                   interrupt-controller;
+                   #interrupt-cells = <2>;
++                  interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>,
++                               <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>,
++                               <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>,
++                               <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>,
++                               <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>,
++                               <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
+ 
+                   uart2-default: uart2-default {
+                           pinmux {
 -- 
 2.17.1
