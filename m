@@ -1,14 +1,15 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Sat, 23 Jun 2018 11:48:51 -0700
-Subject: [GIT PULL 1/3] Broadcom devicetree fixes for 4.18
-In-Reply-To: <CAOesGMjVK8tjndxdEWM1cCLb4ev7ur7Q-eDM8NM=S9pKAkRm4A@mail.gmail.com>
+Date: Sat, 23 Jun 2018 11:49:29 -0700
+Subject: [GIT PULL 2/3] Broadcom devicetree-arm64 fixes for 4.18
+In-Reply-To: <CAOesGMgvtqbKJpgj6_emT0MoPBFW5JRQOL2b57JknYMGV320Sw@mail.gmail.com>
 References: <20180619233104.32173-1-f.fainelli@gmail.com>
- <CAOesGMjVK8tjndxdEWM1cCLb4ev7ur7Q-eDM8NM=S9pKAkRm4A@mail.gmail.com>
-Message-ID: <80DE264C-E5B2-4C9D-AC3A-CD5BAF021E2A@gmail.com>
+ <20180619233104.32173-2-f.fainelli@gmail.com>
+ <CAOesGMgvtqbKJpgj6_emT0MoPBFW5JRQOL2b57JknYMGV320Sw@mail.gmail.com>
+Message-ID: <651633D4-95E3-4E7C-88DA-3B0B485C3F39@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On June 23, 2018 10:20:03 AM PDT, Olof Johansson <olof@lixom.net> wrote:
+On June 23, 2018 10:21:02 AM PDT, Olof Johansson <olof@lixom.net> wrote:
 >On Tue, Jun 19, 2018 at 4:31 PM, Florian Fainelli
 ><f.fainelli@gmail.com> wrote:
 >> The following changes since commit
@@ -19,28 +20,43 @@ On June 23, 2018 10:20:03 AM PDT, Olof Johansson <olof@lixom.net> wrote:
 >> are available in the git repository at:
 >>
 >>   https://github.com/Broadcom/stblinux.git
->tags/arm-soc/for-4.18/devicetree-fixes
+>tags/arm-soc/for-4.18/devicetree-arm64-fixes
 >>
 >> for you to fetch changes up to
->6cb1628ad3506b315cdddd7676db0ff2af378d28:
+>75af23c4736c5633894ea0baf9bca1cf6b248ca4:
 >>
->>   ARM: dts: Cygnus: Fix PCIe controller interrupt type (2018-06-18
->09:40:36 -0700)
+>>   arm64: dts: Stingray: Fix I2C controller interrupt type (2018-06-18
+>09:47:36 -0700)
 >>
 >> ----------------------------------------------------------------
->> This pull request contains Broadcom ARM-based SoCs Device Tree fixes
+>> This pull request contains Broadcom ARM64-based SoCs Device Tree
+>fixes
+>> for 4.18, please pull the following:
+>>
+>> - Scott fixes both the bcm958742k and bcm958742t reference boards to
+>>   have the correct eMMC voltage specified
+>>
+>> - Ray fixes the I2C and PCIe Device Tree nodes interrupt specifiers
 >for
->> 4.18, please pull the following:
+>>   Northstar 2 and Stingray SoCs.
 >>
->> - Ray fixes the I2C and PCIe interrupt types for the Cygnus SoC
+>> ----------------------------------------------------------------
+>> Ray Jui (3):
+>>       arm64: dts: ns2: Fix I2C controller interrupt type
+>>       arm64: dts: ns2: Fix PCIe controller interrupt type
+>>       arm64: dts: Stingray: Fix I2C controller interrupt type
 >>
->> - Florian fixes the I2C and PCIe interrupts for the Northstar
->>   (BCM5301x), Northstar Plus and Hurricane 2 SoCs
+>> Scott Branden (2):
+>>       arm64: dts: specify 1.8V EMMC capabilities for bcm958742k
+>>       arm64: dts: specify 1.8V EMMC capabilities for bcm958742t
 >
->Merged, thanks. What's the problem seen, btw? Just for correctness
->sake or did it cause actual problems?
+>Merged, thanks!
+>
+>Btw, for fixes you don't need to split up per topic, we're happy to
+>take single branches there since volume tends to be lower and we pile
+>it all into a fixes branch at our end anyway.
 
-This is not causing any functional problem yet, but Marc Z. introduced a loud check in the GIC driver that will help correct incorrectly specified interrupt specifiers.
+Good to know that will simplify things greatly on my side. Thanks!
 
 -- 
 Florian
