@@ -1,37 +1,36 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 23 Jun 2018 10:17:58 -0700
-Subject: i.MX fixes for 4.18
-In-Reply-To: <20180619081405.GF16091@dragon>
-References: <20180619081405.GF16091@dragon>
-Message-ID: <CAOesGMh=dihG2JpffcDwPWTJnB4DTOVDvv+nJ5tNNkcnkqpRCA@mail.gmail.com>
+Date: Sat, 23 Jun 2018 10:20:03 -0700
+Subject: [GIT PULL 1/3] Broadcom devicetree fixes for 4.18
+In-Reply-To: <20180619233104.32173-1-f.fainelli@gmail.com>
+References: <20180619233104.32173-1-f.fainelli@gmail.com>
+Message-ID: <CAOesGMjVK8tjndxdEWM1cCLb4ev7ur7Q-eDM8NM=S9pKAkRm4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 19, 2018 at 1:14 AM, Shawn Guo <shawnguo@kernel.org> wrote:
+On Tue, Jun 19, 2018 at 4:31 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
 > The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
 >
 >   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
 >
 > are available in the git repository at:
 >
->   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-fixes-4.18
+>   https://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.18/devicetree-fixes
 >
-> for you to fetch changes up to 1bcfe0564044be578841744faea1c2f46adc8178:
+> for you to fetch changes up to 6cb1628ad3506b315cdddd7676db0ff2af378d28:
 >
->   ARM: dts: imx6sx: fix irq for pcie bridge (2018-06-19 14:39:36 +0800)
+>   ARM: dts: Cygnus: Fix PCIe controller interrupt type (2018-06-18 09:40:36 -0700)
 >
 > ----------------------------------------------------------------
-> i.MX fixes for 4.18:
->  - Fix i.MX6SX PCIe MSI interrupt number, so that MSI IRQs can be
->    properly propagated to the upstream interrupt controller.
->  - Fix GPCv2 MIPI/PCIe/USB_HSIC's PGC offset.  The values in Reference
->    Manual are incorrect.
->  - Correct SDMA setting for i.MX6Q SPI5 device to fix the issue, that
->    the SPI controller RX FIFO was not empty after a DMA transfer, and
->    the driver gets stuck in the next PIO transfer when reading one word
->    more than expected.
+> This pull request contains Broadcom ARM-based SoCs Device Tree fixes for
+> 4.18, please pull the following:
+>
+> - Ray fixes the I2C and PCIe interrupt types for the Cygnus SoC
+>
+> - Florian fixes the I2C and PCIe interrupts for the Northstar
+>   (BCM5301x), Northstar Plus and Hurricane 2 SoCs
 
-Merged, thanks!
+Merged, thanks. What's the problem seen, btw? Just for correctness
+sake or did it cause actual problems?
 
 
 -Olof
