@@ -1,32 +1,26 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sat, 23 Jun 2018 10:23:04 -0700
-Subject: [GIT PULL] Qualcomm Fixes for v4.18-rc1
-In-Reply-To: <1529730636-32672-1-git-send-email-andy.gross@linaro.org>
-References: <1529730636-32672-1-git-send-email-andy.gross@linaro.org>
-Message-ID: <CAOesGMgDg4vaZfF+F97kdy9fkXYMyg7WXvGExx9ksqeFGX8ijg@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sat, 23 Jun 2018 14:27:10 -0300
+Subject: [PATCH] Fix for clk disable issue on imx6ul
+In-Reply-To: <CAOMZO5BSVKSEjk1inZb_yA6VNkZiW_gWK3LdzkAzwZzJb+hVfQ@mail.gmail.com>
+References: <1529636119-4076-1-git-send-email-chakra@openedev.com>
+ <CAOMZO5DJGCESqtSqbEw4O0Vxv3noUoCrTgbRCmwB2fJdVvu0RQ@mail.gmail.com>
+ <CAOMZO5BSVKSEjk1inZb_yA6VNkZiW_gWK3LdzkAzwZzJb+hVfQ@mail.gmail.com>
+Message-ID: <CAOMZO5B8tSTgBkZbAqRPdru=TaZ9=NZyKAOncgeCGCRqpQWwzg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 22, 2018 at 10:10 PM, Andy Gross <andy.gross@linaro.org> wrote:
-> The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
+On Sat, Jun 23, 2018 at 12:47 PM, Fabio Estevam <festevam@gmail.com> wrote:
+> On Sat, Jun 23, 2018 at 12:38 PM, Fabio Estevam <festevam@gmail.com> wrote:
 >
->   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+>> Looking at the CCM_CCGR0 register (address: 20C_4068) there is no
+>> aips_tz3 clock gate in bits 31-30.
+>>
+>> Bits 31-30 are gpio2_clocks and Anson has recently sent a patch adding
+>> support for it:
+>> https://patchwork.kernel.org/patch/10481351/
 >
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-fixes-for-4.18-rc1
->
-> for you to fetch changes up to 6b4154a655a258c67bcfabbd4c3a06637e74ebcd:
->
->   arm64: dts: msm8916: fix Coresight ETF graph connections (2018-06-23 00:00:05 -0500)
->
-> ----------------------------------------------------------------
-> Qualcomm Fixes for v4.18-rc1
->
-> * Fix coresight graph on msm8916
-> * Disable uart0 on db820c by default
+> Sorry, the correct link for the imx6ul patch is this one instead:
+> https://patchwork.kernel.org/patch/10445059/
 
-Merged, thanks.
-
-
--Olof
+And you will also need the dts part of the patch as well:
+https://patchwork.kernel.org/patch/10445053/
