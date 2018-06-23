@@ -1,26 +1,46 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 23 Jun 2018 14:27:10 -0300
-Subject: [PATCH] Fix for clk disable issue on imx6ul
-In-Reply-To: <CAOMZO5BSVKSEjk1inZb_yA6VNkZiW_gWK3LdzkAzwZzJb+hVfQ@mail.gmail.com>
-References: <1529636119-4076-1-git-send-email-chakra@openedev.com>
- <CAOMZO5DJGCESqtSqbEw4O0Vxv3noUoCrTgbRCmwB2fJdVvu0RQ@mail.gmail.com>
- <CAOMZO5BSVKSEjk1inZb_yA6VNkZiW_gWK3LdzkAzwZzJb+hVfQ@mail.gmail.com>
-Message-ID: <CAOMZO5B8tSTgBkZbAqRPdru=TaZ9=NZyKAOncgeCGCRqpQWwzg@mail.gmail.com>
+From: joe@perches.com (Joe Perches)
+Date: Sat, 23 Jun 2018 10:27:58 -0700
+Subject: [PATCH] staging: Convert random_ether_addr to eth_random_addr
+Message-ID: <d5ed83275b7e9ed8bacbcc8a45fcb5ac419c272f.1529774856.git.joe@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 23, 2018 at 12:47 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> On Sat, Jun 23, 2018 at 12:38 PM, Fabio Estevam <festevam@gmail.com> wrote:
->
->> Looking at the CCM_CCGR0 register (address: 20C_4068) there is no
->> aips_tz3 clock gate in bits 31-30.
->>
->> Bits 31-30 are gpio2_clocks and Anson has recently sent a patch adding
->> support for it:
->> https://patchwork.kernel.org/patch/10481351/
->
-> Sorry, the correct link for the imx6ul patch is this one instead:
-> https://patchwork.kernel.org/patch/10445059/
+random_ether_addr is a #define for eth_random_addr which is
+generally preferred in kernel code by ~3:1
 
-And you will also need the dts part of the patch as well:
-https://patchwork.kernel.org/patch/10445053/
+Convert the uses of random_ether_addr to enable removing the #define
+
+Signed-off-by: Joe Perches <joe@perches.com>
+---
+ drivers/staging/mt7621-eth/mtk_eth_soc.c               | 2 +-
+ drivers/staging/rtl8192u/ieee80211/ieee80211_softmac.c | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/staging/mt7621-eth/mtk_eth_soc.c b/drivers/staging/mt7621-eth/mtk_eth_soc.c
+index 2c7a2e666bfb..e1696b06870e 100644
+--- a/drivers/staging/mt7621-eth/mtk_eth_soc.c
++++ b/drivers/staging/mt7621-eth/mtk_eth_soc.c
+@@ -1822,7 +1822,7 @@ static int __init mtk_init(struct net_device *dev)
+ 
+ 	/* If the mac address is invalid, use random mac address  */
+ 	if (!is_valid_ether_addr(dev->dev_addr)) {
+-		random_ether_addr(dev->dev_addr);
++		eth_random_addr(dev->dev_addr);
+ 		dev_err(eth->dev, "generated random MAC address %pM\n",
+ 			dev->dev_addr);
+ 		dev->addr_assign_type = NET_ADDR_RANDOM;
+diff --git a/drivers/staging/rtl8192u/ieee80211/ieee80211_softmac.c b/drivers/staging/rtl8192u/ieee80211/ieee80211_softmac.c
+index 21874e78d8a1..9d9a9e102bb8 100644
+--- a/drivers/staging/rtl8192u/ieee80211/ieee80211_softmac.c
++++ b/drivers/staging/rtl8192u/ieee80211/ieee80211_softmac.c
+@@ -2382,7 +2382,7 @@ static void ieee80211_start_ibss_wq(struct work_struct *work)
+ 	if (ieee->state == IEEE80211_NOLINK) {
+ 		printk("creating new IBSS cell\n");
+ 		if(!ieee->wap_set)
+-			random_ether_addr(ieee->current_network.bssid);
++			eth_random_addr(ieee->current_network.bssid);
+ 
+ 		if(ieee->modulation & IEEE80211_CCK_MODULATION){
+ 
+-- 
+2.15.0
