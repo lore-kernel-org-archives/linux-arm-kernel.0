@@ -1,119 +1,125 @@
-From: dannf@dannf.org (dann frazier)
-Date: Fri, 22 Jun 2018 17:09:43 -0600
-Subject: arm64 regression bisected to "bpf: reject any prog that failed
- read-only lock"
-Message-ID: <20180622230943.GA27737@xps13.dannf>
+From: collinsd@codeaurora.org (David Collins)
+Date: Fri, 22 Jun 2018 17:46:12 -0700
+Subject: [PATCH v8 0/2] regulator: add QCOM RPMh regulator driver
+Message-ID: <cover.1529712888.git.collinsd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-fyi, I'm seeing a regression that I've bisected down to:
-  9facc336876f bpf: reject any prog that failed read-only lock
+This patch series adds a driver and device tree binding documentation for
+PMIC regulator control via Resource Power Manager-hardened (RPMh) on some
+Qualcomm Technologies, Inc. SoCs such as SDM845.  RPMh is a hardware block
+which contains several accelerators which are used to manage various
+hardware resources that are shared between the processors of the SoC.  The
+final hardware state of a regulator is determined within RPMh by performing
+max aggregation of the requests made by all of the processors.
 
-A snippet of the boot messages are below. I'll be out of pocket until
-Monday, so apologies in advance for delays in responding to follow-ups.
+The RPMh regulator driver depends upon the RPMh driver [1] and command DB
+driver [2] which are both still undergoing review.  It also depends upon
+three recent regulator patches: [3], [4], and [5] as well as an RPMh
+helper patch [6].
 
-[   28.544142] Internal error: SP/PC alignment exception: 8a000000 [#21] SMP
-[   28.550918] Modules linked in: btrfs zstd_compress hid_generic raid10 raid456 usbhid async_raid6_recov async_memcpy async_pq async_xor hid async_tx xor raid6_pq libcrc32c raid1 raid0 multipath linear marvell hibmc_drm aes_ce_blk ttm aes_ce_cipher drm_kms_helper crc32_ce crct10dif_ce syscopyarea ghash_ce qla2xxx sysfillrect sha2_ce sysimgblt fb_sys_fops sha256_arm64 sha1_ce hns3 mpt3sas nvme_fc hisi_sas_v3_hw nvme_fabrics drm ixgbe hisi_sas_main scsi_transport_fc hclge libsas ahci raid_class hnae3 libahci scsi_transport_sas mdio aes_neon_bs aes_neon_blk crypto_simd cryptd aes_arm64
-[   28.602352] CPU: 19 PID: 1423 Comm: systemd-udevd Tainted: G      D           4.18.0-rc1+ #19
-[   28.610861] Hardware name: Huawei D06/D06, BIOS Hisilicon D06 EC UEFI Nemo 2.0 RC0 - B308 (V0.38) 06/02/2018
-[   28.620674] pstate: 40400009 (nZcv daif +PAN -UAO)
-[   28.625451] pc : 0xffff00000327f857
-[   28.628928] lr : sk_filter_trim_cap+0x8c/0x1b8
-[   28.633358] sp : ffff00002b1bba80
-[   28.636659] x29: ffff00002b1bba80 x28: 0000000000000001 
-[   28.641958] x27: ffff803f71e25800 x26: ffff803f6b16d000 
-[   28.647257] x25: 0000000000000000 x24: 0000000000000000 
-[   28.652555] x23: 0000000000000001 x22: ffff00002ab06000 
-[   28.657854] x21: 0000000000000000 x20: ffff0000095c8000 
-[   28.663152] x19: ffff803f73c7a700 x18: 0000fffff53ce450 
-[   28.668451] x17: 0000ffffb96575f8 x16: ffff0000089c1c38 
-[   28.673750] x15: 0000000000000020 x14: 5953425553003331 
-[   28.679049] x13: 3a303a332d796870 x12: 2f7968705f736173 
-[   28.684347] x11: 2f33313a303a332d x10: 00000000000000db 
-[   28.689646] x9 : ffff00002b1bbd50 x8 : ffff803f73c7a700 
-[   28.694945] x7 : ffff803f73c7be00 x6 : 0000000000001900 
-[   28.700243] x5 : 0000000000000183 x4 : ffff803f80ccf9d0 
-[   28.705542] x3 : 0000000000000000 x2 : ffff00000327f857 
-[   28.710840] x1 : ffff00002ab06038 x0 : ffff803f73c7a700 
-[   28.716140] Process systemd-udevd (pid: 1423, stack limit = 0x(____ptrval____))
-[   28.723434] Call trace:
-[   28.725867]  0xffff00000327f857
-[   28.728995]  netlink_broadcast_filtered+0x234/0x418
-[   28.733860]  netlink_sendmsg+0x354/0x360
-[   28.737769]  sock_sendmsg+0x4c/0x68
-[   28.741244]  ___sys_sendmsg+0x2ac/0x2f0
-[   28.745067]  __sys_sendmsg+0x7c/0xd0
-[   28.748629]  sys_sendmsg+0x38/0x48
-[   28.752017]  el0_svc_naked+0x30/0x34
-[   28.755580] Code: 202000d4 202000d4 202000d4 202000d4 (a9bf7bfd) 
-[   28.761660] ---[ end trace 4451ed1a5b395c65 ]---
-[   28.766267] Internal error: SP/PC alignment exception: 8a000000 [#22] SMP
-[   28.773044] Modules linked in: btrfs zstd_compress hid_generic raid10 raid456 usbhid async_raid6_recov async_memcpy async_pq async_xor hid async_tx xor raid6_pq libcrc32c raid1 raid0 multipath linear marvell hibmc_drm aes_ce_blk ttm aes_ce_cipher drm_kms_helper crc32_ce crct10dif_ce syscopyarea ghash_ce qla2xxx sysfillrect sha2_ce sysimgblt fb_sys_fops sha256_arm64 sha1_ce hns3 mpt3sas nvme_fc hisi_sas_v3_hw nvme_fabrics drm ixgbe hisi_sas_main scsi_transport_fc hclge libsas ahci raid_class hnae3 libahci scsi_transport_sas mdio aes_neon_bs aes_neon_blk crypto_simd cryptd aes_arm64
-[   28.824485] CPU: 20 PID: 1424 Comm: systemd-udevd Tainted: G      D           4.18.0-rc1+ #19
-[   28.832994] Hardware name: Huawei D06/D06, BIOS Hisilicon D06 EC UEFI Nemo 2.0 RC0 - B308 (V0.38) 06/02/2018
-[   28.842805] pstate: 40400009 (nZcv daif +PAN -UAO)
-[   28.847583] pc : 0xffff00000327f857
-[   28.851060] lr : sk_filter_trim_cap+0x8c/0x1b8
-[   28.855490] sp : ffff00002b1c3a80
-[   28.858791] x29: ffff00002b1c3a80 x28: 0000000000000001 
-[   28.864090] x27: ffff803f71e25800 x26: ffff803f6b169000 
-[   28.869388] x25: 0000000000000000 x24: 0000000000000000 
-[   28.874687] x23: 0000000000000001 x22: ffff00002ab06000 
-[   28.879985] x21: 0000000000000000 x20: ffff0000095c8000 
-[   28.885284] x19: ffff803f742c0900 x18: 0000fffff53ce450 
-[   28.890583] x17: 0000ffffb96575f8 x16: ffff0000089c1c38 
-[   28.895881] x15: 0000000000000020 x14: 5953425553003431 
-[   28.901180] x13: 3a303a332d796870 x12: 2f7968705f736173 
-[   28.906478] x11: 2f34313a303a332d x10: 00000000000000db 
-[   28.911777] x9 : ffff00002b1c3d50 x8 : ffff803f742c0900 
-[   28.917075] x7 : ffff803f742c0c00 x6 : 0000000000000500 
-[   28.922374] x5 : 0000000000000045 x4 : ffff803f80ce89d0 
-[   28.927673] x3 : 0000000000000000 x2 : ffff00000327f857 
-[   28.932971] x1 : ffff00002ab06038 x0 : ffff803f742c0900 
-[   28.938271] Process systemd-udevd (pid: 1424, stack limit = 0x(____ptrval____))
-[   28.945565] Call trace:
-[   28.947998]  0xffff00000327f857
-[   28.951127]  netlink_broadcast_filtered+0x234/0x418
-[   28.955991]  netlink_sendmsg+0x354/0x360
-[   28.959901]  sock_sendmsg+0x4c/0x68
-[   28.963377]  ___sys_sendmsg+0x2ac/0x2f0
-[   28.967199]  __sys_sendmsg+0x7c/0xd0
-[   28.970761]  sys_sendmsg+0x38/0x48
-[   28.974150]  el0_svc_naked+0x30/0x34
-[   28.977713] Code: 202000d4 202000d4 202000d4 202000d4 (a9bf7bfd) 
-[   28.983793] ---[ end trace 4451ed1a5b395c66 ]---
-[   28.988399] Internal error: SP/PC alignment exception: 8a000000 [#23] SMP
-[   28.995175] Modules linked in: btrfs zstd_compress hid_generic raid10 raid456 usbhid async_raid6_recov async_memcpy async_pq async_xor hid async_tx xor raid6_pq libcrc32c raid1 raid0 multipath linear marvell hibmc_drm aes_ce_blk ttm aes_ce_cipher drm_kms_helper crc32_ce crct10dif_ce syscopyarea ghash_ce qla2xxx sysfillrect sha2_ce sysimgblt fb_sys_fops sha256_arm64 sha1_ce hns3 mpt3sas nvme_fc hisi_sas_v3_hw nvme_fabrics drm ixgbe hisi_sas_main scsi_transport_fc hclge libsas ahci raid_class hnae3 libahci scsi_transport_sas mdio aes_neon_bs aes_neon_blk crypto_simd cryptd aes_arm64
-[   29.046612] CPU: 22 PID: 1425 Comm: systemd-udevd Tainted: G      D           4.18.0-rc1+ #19
-[   29.055121] Hardware name: Huawei D06/D06, BIOS Hisilicon D06 EC UEFI Nemo 2.0 RC0 - B308 (V0.38) 06/02/2018
-[   29.064932] pstate: 40400009 (nZcv daif +PAN -UAO)
-[   29.069710] pc : 0xffff00000327f857
-[   29.073187] lr : sk_filter_trim_cap+0x8c/0x1b8
-[   29.077616] sp : ffff00002b1cba80
-[   29.080917] x29: ffff00002b1cba80 x28: 0000000000000001 
-[   29.086216] x27: ffff803f71e25800 x26: ffff803f6b16b000 
-[   29.091515] x25: 0000000000000000 x24: 0000000000000000 
-[   29.096813] x23: 0000000000000001 x22: ffff00002ab06000 
-[   29.102112] x21: 0000000000000000 x20: ffff0000095c8000 
-[   29.107411] x19: ffff803f74362c00 x18: 0000fffff53ce450 
-[   29.112709] x17: 0000ffffb96575f8 x16: ffff0000089c1c38 
-[   29.118008] x15: 0000000000000020 x14: 5953425553003531 
-[   29.123306] x13: 3a303a332d796870 x12: 2f7968705f736173 
-[   29.128605] x11: 2f35313a303a332d x10: 00000000000000db 
-[   29.133904] x9 : ffff00002b1cbd50 x8 : ffff803f74362c00 
-[   29.139202] x7 : ffff803f74363900 x6 : 0000000000001500 
-[   29.144501] x5 : 00000000000000c2 x4 : ffff803f80d1a9d0 
-[   29.149799] x3 : 0000000000000000 x2 : ffff00000327f857 
-[   29.155098] x1 : ffff00002ab06038 x0 : ffff803f74362c00 
-[   29.160397] Process systemd-udevd (pid: 1425, stack limit = 0x(____ptrval____))
-[   29.167691] Call trace:
-[   29.170125]  0xffff00000327f857
-[   29.173254]  netlink_broadcast_filtered+0x234/0x418
-[   29.178118]  netlink_sendmsg+0x354/0x360
-[   29.182027]  sock_sendmsg+0x4c/0x68
-[   29.185503]  ___sys_sendmsg+0x2ac/0x2f0
-[   29.189325]  __sys_sendmsg+0x7c/0xd0
-[   29.192888]  sys_sendmsg+0x38/0x48
-[   29.196276]  el0_svc_naked+0x30/0x34
-[   29.199839] Code: 202000d4 202000d4 202000d4 202000d4 (a9bf7bfd) 
-[   29.205919] ---[ end trace 4451ed1a5b395c67 ]---
+Changes since v7 [7]:
+ - Removed the cmd_db_ready() call from the driver probe function as it
+   is now handled by the RPMh driver itself [6]
+ - Added Reviewed-by tag for driver patch 2/2
+
+Changes since v6 [8]:
+ - Removed 'count' parameter from rpmh_regulator_send_request() since
+   it is always 1
+ - Fixed _rpmh_regulator_vrm_set_voltage_sel() return value
+ - Added a helper function to capture common code between
+   rpmh_regulator_enable() and rpmh_regulator_disable()
+ - Added an iterator for pmic_rpmh_data in rpmh_regulator_init_vreg()
+ - Added Reviewed-by tag for both patches
+
+Changes since v5 [9]:
+ - Removed unused constants
+ - Added Reviewed-by tag for DT patch 1/2
+
+Changes since v4 [10]:
+ - Removed support for DT properties qcom,regulator-drms-modes and
+   qcom,drms-mode-max-microamps
+ - Specified fixed DRMS high power mode minimum limits for LDO type
+   regulators
+ - Removed DRMS support for SMPS and BOB type regulators
+ - Simplified voltage caching logic
+
+Changes since v3 [11]:
+ - Removed support for DT properties qcom,regulator-initial-microvolt
+   and qcom,headroom-microvolt
+ - Renamed DT property qcom,allowed-drms-modes to be
+   qcom,regulator-drms-modes
+ - Updated DT binding documentation to mention which common regulator
+   bindings can be used for qcom-rpmh-regulator devices
+ - Added voltage caching so that voltage requests are only sent to RPMh
+   after the regulator has been enabled at least once
+ - Changed 'voltage_selector' default value to be -ENOTRECOVERABLE to
+   interact with [5]
+ - Initialized 'enabled' to -EINVAL so that unused regulators are
+   disabled by regulator_late_cleanup()
+ - Removed rpmh_regulator_load_default_parameters() as it is no longer
+   needed
+ - Updated the mode usage description in qcom,rpmh-regulator.h
+
+Changes since v2 [12]:
+ - Replaced '_' with '-' in device tree supply property names
+ - Renamed qcom_rpmh-regulator.c to be qcom-rpmh-regulator.c
+ - Updated various DT property names to use "microvolt" and "microamp"
+ - Moved allowed modes constraint specification out of the driver [4]
+ - Replaced rpmh_client with device pointer to match new RPMh API [1]
+ - Corrected drms mode threshold checking
+ - Initialized voltage_selector to -EINVAL when not specified in DT
+ - Added constants for PMIC regulator hardware modes
+ - Corrected type sign of mode mapping tables
+ - Made variable names for mode arrays plural
+ - Simplified Kconfig depends on
+ - Removed unnecessary constants and struct fields
+ - Added some descriptive comments
+
+Changes since v1 [13]:
+ - Addressed review feedback from Doug, Mark, and Stephen
+ - Replaced set_voltage()/get_voltage() callbacks with set_voltage_sel()/
+   get_voltage_sel()
+ - Added set_bypass()/get_bypass() callbacks for BOB pass-through mode
+   control
+ - Removed top-level PMIC data structures
+ - Removed initialization variables from structs and passed them as
+   function parameters
+ - Removed various comments and error messages
+ - Simplified mode handling
+ - Refactored per-PMIC rpmh-regulator data specification
+ - Simplified probe function
+ - Moved header into DT patch
+ - Removed redundant property listings from DT binding documentation
+
+[1]: https://lkml.org/lkml/2018/6/20/519
+[2]: https://lkml.org/lkml/2018/4/10/714
+[3]: https://lkml.org/lkml/2018/4/18/556
+[4]: https://lkml.org/lkml/2018/5/11/696
+[5]: https://lkml.org/lkml/2018/5/15/1005
+[6]: https://lkml.org/lkml/2018/6/18/1188
+[7]: https://lkml.org/lkml/2018/6/8/573
+[8]: https://lkml.org/lkml/2018/6/4/879
+[9]: https://lkml.org/lkml/2018/6/1/895
+[10]: https://lkml.org/lkml/2018/5/22/1168
+[11]: https://lkml.org/lkml/2018/5/11/701
+[12]: https://lkml.org/lkml/2018/4/13/687
+[13]: https://lkml.org/lkml/2018/3/16/1431
+
+David Collins (2):
+  regulator: dt-bindings: add QCOM RPMh regulator bindings
+  regulator: add QCOM RPMh regulator driver
+
+ .../bindings/regulator/qcom,rpmh-regulator.txt     | 160 +++++
+ drivers/regulator/Kconfig                          |   9 +
+ drivers/regulator/Makefile                         |   1 +
+ drivers/regulator/qcom-rpmh-regulator.c            | 746 +++++++++++++++++++++
+ .../dt-bindings/regulator/qcom,rpmh-regulator.h    |  36 +
+ 5 files changed, 952 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/regulator/qcom,rpmh-regulator.txt
+ create mode 100644 drivers/regulator/qcom-rpmh-regulator.c
+ create mode 100644 include/dt-bindings/regulator/qcom,rpmh-regulator.h
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
