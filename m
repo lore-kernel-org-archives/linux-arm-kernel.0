@@ -1,169 +1,81 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Sat, 23 Jun 2018 11:20:47 +0900
-Subject: [PATCH v10 03/14] powerpc,
- kexec_file: factor out memblock-based arch_kexec_walk_mem()
+Date: Sat, 23 Jun 2018 11:20:51 +0900
+Subject: [PATCH v10 07/14] arm64: enable KEXEC_FILE config
 In-Reply-To: <20180623022058.10935-1-takahiro.akashi@linaro.org>
 References: <20180623022058.10935-1-takahiro.akashi@linaro.org>
-Message-ID: <20180623022058.10935-4-takahiro.akashi@linaro.org>
+Message-ID: <20180623022058.10935-8-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Memblock list is another source for usable system memory layout.
-A merged new arch_kexec_walk_mem() will walk through either io resource
-list or memblock list depending on CONFIG_ARCH_DISCARD_MEMBLOCK so that
-arm64, in addition to powerpc, will be able to utilize this generic
-function for kexec_file.
+Modify arm64/Kconfig to enable kexec_file_load support.
 
 Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-Cc: "Eric W. Biederman" <ebiederm@xmission.com>
-Cc: Dave Young <dyoung@redhat.com>
-Cc: Vivek Goyal <vgoyal@redhat.com>
-Cc: Baoquan He <bhe@redhat.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/powerpc/kernel/machine_kexec_file_64.c | 53 ---------------------
- kernel/kexec_file.c                         | 52 ++++++++++++++++++++
- 2 files changed, 52 insertions(+), 53 deletions(-)
+ arch/arm64/Kconfig                     | 10 ++++++++++
+ arch/arm64/kernel/Makefile             |  3 ++-
+ arch/arm64/kernel/machine_kexec_file.c | 16 ++++++++++++++++
+ 3 files changed, 28 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm64/kernel/machine_kexec_file.c
 
-diff --git a/arch/powerpc/kernel/machine_kexec_file_64.c b/arch/powerpc/kernel/machine_kexec_file_64.c
-index 0bd23dc789a4..3d4be91786ce 100644
---- a/arch/powerpc/kernel/machine_kexec_file_64.c
-+++ b/arch/powerpc/kernel/machine_kexec_file_64.c
-@@ -46,59 +46,6 @@ int arch_kexec_kernel_image_probe(struct kimage *image, void *buf,
- 	return kexec_image_probe_default(image, buf, buf_len);
- }
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 42c090cf0292..f68318f61c85 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -835,6 +835,16 @@ config KEXEC
+ 	  but it is independent of the system firmware.   And like a reboot
+ 	  you can start any kernel with it, not just Linux.
  
--/**
-- * arch_kexec_walk_mem - call func(data) for each unreserved memory block
-- * @kbuf:	Context info for the search. Also passed to @func.
-- * @func:	Function to call for each memory block.
-- *
-- * This function is used by kexec_add_buffer and kexec_locate_mem_hole
-- * to find unreserved memory to load kexec segments into.
-- *
-- * Return: The memory walk will stop when func returns a non-zero value
-- * and that value will be returned. If all free regions are visited without
-- * func returning non-zero, then zero will be returned.
-- */
--int arch_kexec_walk_mem(struct kexec_buf *kbuf,
--			int (*func)(struct resource *, void *))
--{
--	int ret = 0;
--	u64 i;
--	phys_addr_t mstart, mend;
--	struct resource res = { };
--
--	if (kbuf->top_down) {
--		for_each_free_mem_range_reverse(i, NUMA_NO_NODE, 0,
--						&mstart, &mend, NULL) {
--			/*
--			 * In memblock, end points to the first byte after the
--			 * range while in kexec, end points to the last byte
--			 * in the range.
--			 */
--			res.start = mstart;
--			res.end = mend - 1;
--			ret = func(&res, kbuf);
--			if (ret)
--				break;
--		}
--	} else {
--		for_each_free_mem_range(i, NUMA_NO_NODE, 0, &mstart, &mend,
--					NULL) {
--			/*
--			 * In memblock, end points to the first byte after the
--			 * range while in kexec, end points to the last byte
--			 * in the range.
--			 */
--			res.start = mstart;
--			res.end = mend - 1;
--			ret = func(&res, kbuf);
--			if (ret)
--				break;
--		}
--	}
--
--	return ret;
--}
--
- /**
-  * setup_purgatory - initialize the purgatory's global variables
-  * @image:		kexec image.
-diff --git a/kernel/kexec_file.c b/kernel/kexec_file.c
-index 63c7ce1c0c3e..563acd1c9a61 100644
---- a/kernel/kexec_file.c
-+++ b/kernel/kexec_file.c
-@@ -16,6 +16,7 @@
- #include <linux/file.h>
- #include <linux/slab.h>
- #include <linux/kexec.h>
-+#include <linux/memblock.h>
- #include <linux/mutex.h>
- #include <linux/list.h>
- #include <linux/fs.h>
-@@ -501,6 +502,53 @@ static int locate_mem_hole_callback(struct resource *res, void *arg)
- 	return locate_mem_hole_bottom_up(start, end, kbuf);
- }
- 
-+#if defined(CONFIG_HAVE_MEMBLOCK) && !defined(CONFIG_ARCH_DISCARD_MEMBLOCK)
-+static int kexec_walk_memblock(struct kexec_buf *kbuf,
-+			       int (*func)(struct resource *, void *))
-+{
-+	u64 i;
-+	phys_addr_t mstart, mend;
-+	struct resource res = { };
-+	int ret = 0;
++config KEXEC_FILE
++	bool "kexec file based system call"
++	select KEXEC_CORE
++	select BUILD_BIN2C
++	help
++	  This is new version of kexec system call. This system call is
++	  file based and takes file descriptors as system call argument
++	  for kernel and initramfs as opposed to list of segments as
++	  accepted by previous system call.
 +
-+	if (kbuf->image->type == KEXEC_TYPE_CRASH)
-+		return func(&crashk_res, kbuf);
+ config CRASH_DUMP
+ 	bool "Build kdump crash kernel"
+ 	help
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index 0025f8691046..06281e1ad7ed 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -48,8 +48,9 @@ arm64-obj-$(CONFIG_ARM64_ACPI_PARKING_PROTOCOL)	+= acpi_parking_protocol.o
+ arm64-obj-$(CONFIG_PARAVIRT)		+= paravirt.o
+ arm64-obj-$(CONFIG_RANDOMIZE_BASE)	+= kaslr.o
+ arm64-obj-$(CONFIG_HIBERNATION)		+= hibernate.o hibernate-asm.o
+-arm64-obj-$(CONFIG_KEXEC)		+= machine_kexec.o relocate_kernel.o	\
++arm64-obj-$(CONFIG_KEXEC_CORE)		+= machine_kexec.o relocate_kernel.o	\
+ 					   cpu-reset.o
++arm64-obj-$(CONFIG_KEXEC_FILE)		+= machine_kexec_file.o
+ arm64-obj-$(CONFIG_ARM64_RELOC_TEST)	+= arm64-reloc-test.o
+ arm64-reloc-test-y := reloc_test_core.o reloc_test_syms.o
+ arm64-obj-$(CONFIG_CRASH_DUMP)		+= crash_dump.o
+diff --git a/arch/arm64/kernel/machine_kexec_file.c b/arch/arm64/kernel/machine_kexec_file.c
+new file mode 100644
+index 000000000000..c38a8048ed00
+--- /dev/null
++++ b/arch/arm64/kernel/machine_kexec_file.c
+@@ -0,0 +1,16 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * kexec_file for arm64
++ *
++ * Copyright (C) 2018 Linaro Limited
++ * Author: AKASHI Takahiro <takahiro.akashi@linaro.org>
++ *
++ */
 +
-+	/*
-+	 * In memblock, end points to the first byte after the
-+	 * range while in kexec, end points to the last byte
-+	 * in the range.
-+	 */
-+	if (kbuf->top_down) {
-+		for_each_free_mem_range_reverse(i, NUMA_NO_NODE, 0,
-+					&mstart, &mend, NULL) {
-+			res.start = mstart;
-+			res.end = mend - 1;
-+			ret = func(&res, kbuf);
-+			if (ret)
-+				break;
-+		}
-+	} else {
-+		for_each_free_mem_range(i, NUMA_NO_NODE, 0,
-+					&mstart, &mend, NULL) {
-+			res.start = mstart;
-+			res.end = mend - 1;
-+			ret = func(&res, kbuf);
-+			if (ret)
-+				break;
-+		}
-+	}
++#define pr_fmt(fmt) "kexec_file: " fmt
 +
-+	return ret;
-+}
-+#else
-+static int kexec_walk_memblock(struct kexec_buf *kbuf,
-+			       int (*func)(struct resource *, void *))
-+{
-+	return 0;
-+}
-+#endif
++#include <linux/kexec.h>
 +
- /**
-  * arch_kexec_walk_mem - call func(data) on free memory regions
-  * @kbuf:	Context info for the search. Also passed to @func.
-@@ -513,6 +561,10 @@ static int locate_mem_hole_callback(struct resource *res, void *arg)
- int __weak arch_kexec_walk_mem(struct kexec_buf *kbuf,
- 			       int (*func)(struct resource *, void *))
- {
-+	if (IS_ENABLED(CONFIG_HAVE_MEMBLOCK) &&
-+			!IS_ENABLED(CONFIG_ARCH_DISCARD_MEMBLOCK))
-+		return kexec_walk_memblock(kbuf, func);
-+
- 	if (kbuf->image->type == KEXEC_TYPE_CRASH)
- 		return walk_iomem_res_desc(crashk_res.desc,
- 					   IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY,
++const struct kexec_file_ops * const kexec_file_loaders[] = {
++	NULL
++};
 -- 
 2.17.0
