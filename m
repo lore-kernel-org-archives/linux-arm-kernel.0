@@ -1,60 +1,169 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Sat, 23 Jun 2018 11:20:49 +0900
-Subject: [PATCH v10 05/14] arm64: add image head flag definitions
+Date: Sat, 23 Jun 2018 11:20:47 +0900
+Subject: [PATCH v10 03/14] powerpc,
+ kexec_file: factor out memblock-based arch_kexec_walk_mem()
 In-Reply-To: <20180623022058.10935-1-takahiro.akashi@linaro.org>
 References: <20180623022058.10935-1-takahiro.akashi@linaro.org>
-Message-ID: <20180623022058.10935-6-takahiro.akashi@linaro.org>
+Message-ID: <20180623022058.10935-4-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Those image head's flags will be used later by kexec_file loader.
+Memblock list is another source for usable system memory layout.
+A merged new arch_kexec_walk_mem() will walk through either io resource
+list or memblock list depending on CONFIG_ARCH_DISCARD_MEMBLOCK so that
+arm64, in addition to powerpc, will be able to utilize this generic
+function for kexec_file.
 
 Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
+Cc: "Eric W. Biederman" <ebiederm@xmission.com>
+Cc: Dave Young <dyoung@redhat.com>
+Cc: Vivek Goyal <vgoyal@redhat.com>
+Cc: Baoquan He <bhe@redhat.com>
 ---
- arch/arm64/include/asm/boot.h | 15 +++++++++++++++
- arch/arm64/kernel/head.S      |  2 +-
- 2 files changed, 16 insertions(+), 1 deletion(-)
+ arch/powerpc/kernel/machine_kexec_file_64.c | 53 ---------------------
+ kernel/kexec_file.c                         | 52 ++++++++++++++++++++
+ 2 files changed, 52 insertions(+), 53 deletions(-)
 
-diff --git a/arch/arm64/include/asm/boot.h b/arch/arm64/include/asm/boot.h
-index 355e552a9175..0bab7eed3012 100644
---- a/arch/arm64/include/asm/boot.h
-+++ b/arch/arm64/include/asm/boot.h
-@@ -5,6 +5,21 @@
+diff --git a/arch/powerpc/kernel/machine_kexec_file_64.c b/arch/powerpc/kernel/machine_kexec_file_64.c
+index 0bd23dc789a4..3d4be91786ce 100644
+--- a/arch/powerpc/kernel/machine_kexec_file_64.c
++++ b/arch/powerpc/kernel/machine_kexec_file_64.c
+@@ -46,59 +46,6 @@ int arch_kexec_kernel_image_probe(struct kimage *image, void *buf,
+ 	return kexec_image_probe_default(image, buf, buf_len);
+ }
  
- #include <asm/sizes.h>
+-/**
+- * arch_kexec_walk_mem - call func(data) for each unreserved memory block
+- * @kbuf:	Context info for the search. Also passed to @func.
+- * @func:	Function to call for each memory block.
+- *
+- * This function is used by kexec_add_buffer and kexec_locate_mem_hole
+- * to find unreserved memory to load kexec segments into.
+- *
+- * Return: The memory walk will stop when func returns a non-zero value
+- * and that value will be returned. If all free regions are visited without
+- * func returning non-zero, then zero will be returned.
+- */
+-int arch_kexec_walk_mem(struct kexec_buf *kbuf,
+-			int (*func)(struct resource *, void *))
+-{
+-	int ret = 0;
+-	u64 i;
+-	phys_addr_t mstart, mend;
+-	struct resource res = { };
+-
+-	if (kbuf->top_down) {
+-		for_each_free_mem_range_reverse(i, NUMA_NO_NODE, 0,
+-						&mstart, &mend, NULL) {
+-			/*
+-			 * In memblock, end points to the first byte after the
+-			 * range while in kexec, end points to the last byte
+-			 * in the range.
+-			 */
+-			res.start = mstart;
+-			res.end = mend - 1;
+-			ret = func(&res, kbuf);
+-			if (ret)
+-				break;
+-		}
+-	} else {
+-		for_each_free_mem_range(i, NUMA_NO_NODE, 0, &mstart, &mend,
+-					NULL) {
+-			/*
+-			 * In memblock, end points to the first byte after the
+-			 * range while in kexec, end points to the last byte
+-			 * in the range.
+-			 */
+-			res.start = mstart;
+-			res.end = mend - 1;
+-			ret = func(&res, kbuf);
+-			if (ret)
+-				break;
+-		}
+-	}
+-
+-	return ret;
+-}
+-
+ /**
+  * setup_purgatory - initialize the purgatory's global variables
+  * @image:		kexec image.
+diff --git a/kernel/kexec_file.c b/kernel/kexec_file.c
+index 63c7ce1c0c3e..563acd1c9a61 100644
+--- a/kernel/kexec_file.c
++++ b/kernel/kexec_file.c
+@@ -16,6 +16,7 @@
+ #include <linux/file.h>
+ #include <linux/slab.h>
+ #include <linux/kexec.h>
++#include <linux/memblock.h>
+ #include <linux/mutex.h>
+ #include <linux/list.h>
+ #include <linux/fs.h>
+@@ -501,6 +502,53 @@ static int locate_mem_hole_callback(struct resource *res, void *arg)
+ 	return locate_mem_hole_bottom_up(start, end, kbuf);
+ }
  
-+#define ARM64_MAGIC		"ARM\x64"
++#if defined(CONFIG_HAVE_MEMBLOCK) && !defined(CONFIG_ARCH_DISCARD_MEMBLOCK)
++static int kexec_walk_memblock(struct kexec_buf *kbuf,
++			       int (*func)(struct resource *, void *))
++{
++	u64 i;
++	phys_addr_t mstart, mend;
++	struct resource res = { };
++	int ret = 0;
 +
-+#define HEAD_FLAG_BE_SHIFT		0
-+#define HEAD_FLAG_PAGE_SIZE_SHIFT	1
-+#define HEAD_FLAG_BE_MASK		0x1
-+#define HEAD_FLAG_PAGE_SIZE_MASK	0x3
++	if (kbuf->image->type == KEXEC_TYPE_CRASH)
++		return func(&crashk_res, kbuf);
 +
-+#define HEAD_FLAG_BE			1
-+#define HEAD_FLAG_PAGE_SIZE_4K		1
-+#define HEAD_FLAG_PAGE_SIZE_16K		2
-+#define HEAD_FLAG_PAGE_SIZE_64K		3
++	/*
++	 * In memblock, end points to the first byte after the
++	 * range while in kexec, end points to the last byte
++	 * in the range.
++	 */
++	if (kbuf->top_down) {
++		for_each_free_mem_range_reverse(i, NUMA_NO_NODE, 0,
++					&mstart, &mend, NULL) {
++			res.start = mstart;
++			res.end = mend - 1;
++			ret = func(&res, kbuf);
++			if (ret)
++				break;
++		}
++	} else {
++		for_each_free_mem_range(i, NUMA_NO_NODE, 0,
++					&mstart, &mend, NULL) {
++			res.start = mstart;
++			res.end = mend - 1;
++			ret = func(&res, kbuf);
++			if (ret)
++				break;
++		}
++	}
 +
-+#define head_flag_field(flags, field) \
-+		(((flags) >> field##_SHIFT) & field##_MASK)
++	return ret;
++}
++#else
++static int kexec_walk_memblock(struct kexec_buf *kbuf,
++			       int (*func)(struct resource *, void *))
++{
++	return 0;
++}
++#endif
 +
- /*
-  * arm64 requires the DTB to be 8 byte aligned and
-  * not exceed 2MB in size.
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index b0853069702f..8cbac6232ed1 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -91,7 +91,7 @@ _head:
- 	.quad	0				// reserved
- 	.quad	0				// reserved
- 	.quad	0				// reserved
--	.ascii	"ARM\x64"			// Magic number
-+	.ascii	ARM64_MAGIC			// Magic number
- #ifdef CONFIG_EFI
- 	.long	pe_header - _head		// Offset to the PE header.
- 
+ /**
+  * arch_kexec_walk_mem - call func(data) on free memory regions
+  * @kbuf:	Context info for the search. Also passed to @func.
+@@ -513,6 +561,10 @@ static int locate_mem_hole_callback(struct resource *res, void *arg)
+ int __weak arch_kexec_walk_mem(struct kexec_buf *kbuf,
+ 			       int (*func)(struct resource *, void *))
+ {
++	if (IS_ENABLED(CONFIG_HAVE_MEMBLOCK) &&
++			!IS_ENABLED(CONFIG_ARCH_DISCARD_MEMBLOCK))
++		return kexec_walk_memblock(kbuf, func);
++
+ 	if (kbuf->image->type == KEXEC_TYPE_CRASH)
+ 		return walk_iomem_res_desc(crashk_res.desc,
+ 					   IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY,
 -- 
 2.17.0
