@@ -1,82 +1,56 @@
-From: julian.calaby@gmail.com (Julian Calaby)
-Date: Sun, 24 Jun 2018 00:49:50 +1000
-Subject: [linux-sunxi] [PATCH v2 5/7] arm64: allwinner: a64: add necessary
- device tree nodes for DE2 CCU
-In-Reply-To: <3BDC9318-95A5-41BA-801E-6E0814249AFB@aosc.io>
-References: <20180622124540.56203-1-icenowy@aosc.io>
- <20180622124540.56203-4-icenowy@aosc.io>
- <CAGRGNgUuEjmEcvJ3OUcQ9_6bPs9fDvKzUFm_NfCsYyjxVOVw3A@mail.gmail.com>
- <3BDC9318-95A5-41BA-801E-6E0814249AFB@aosc.io>
-Message-ID: <CAGRGNgUkVjEmhQS4pTezfhmiOQkCERV-w=aA+i4oLN7C8k4Vnw@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sat, 23 Jun 2018 12:38:58 -0300
+Subject: [PATCH] Fix for clk disable issue on imx6ul
+In-Reply-To: <1529636119-4076-1-git-send-email-chakra@openedev.com>
+References: <1529636119-4076-1-git-send-email-chakra@openedev.com>
+Message-ID: <CAOMZO5DJGCESqtSqbEw4O0Vxv3noUoCrTgbRCmwB2fJdVvu0RQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Icenowy,
+Hi Chakra,
 
-On Sun, Jun 24, 2018 at 12:34 AM Icenowy Zheng <icenowy@aosc.io> wrote:
+On Thu, Jun 21, 2018 at 11:55 PM, Chakra Divi <2chakrass@gmail.com> wrote:
+> isiot engicam board is not booting after the
+> commit cf091ee994ec266e33c3a305d6fc8c5ccb1f8acd
+> done by <robin@protonic.nl>. Modified the
+> commit to support imx6ul based SOMs too along
+> with imx6ull processors
 >
+> Signed-off-by: Chakra Divi <chakra@openedev.com>
+> ---
+>  drivers/clk/imx/clk-imx6ul.c | 6 ++++--
+>  1 file changed, 4 insertions(+), 2 deletions(-)
 >
+> diff --git a/drivers/clk/imx/clk-imx6ul.c b/drivers/clk/imx/clk-imx6ul.c
+> index ba563ba..69ec9f0 100644
+> --- a/drivers/clk/imx/clk-imx6ul.c
+> +++ b/drivers/clk/imx/clk-imx6ul.c
+> @@ -80,7 +80,7 @@ static struct clk *clks[IMX6UL_CLK_END];
+>  static struct clk_onecell_data clk_data;
 >
-> ? 2018?6?23? GMT+08:00 ??10:06:27, Julian Calaby <julian.calaby@gmail.com> ??:
-> >Hi Icenowy,
-> >
-> >On Fri, Jun 22, 2018 at 10:49 PM Icenowy Zheng <icenowy@aosc.io> wrote:
-> >>
-> >> As we have all necessary parts to enable the DE2 CCU on the Allwinner
-> >> A64 SoC, add the needed device tree nodes, including the DE2 CCU
-> >itself
-> >> and the DE2 bus.
-> >>
-> >> The "mixer0-lcd0" simplefb device node is updated to use the DE2 CCU.
-> >>
-> >> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> >> ---
-> >> Changes in v2:
-> >> - Drop SRAM controller device tree node addition (as it's already
-> >added
-> >>   as part of syscon change.)
-> >> - Fix the clock reference in LCD SimpleFB.
-> >>
-> >>  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 30
-> >+++++++++++++++----
-> >>  1 file changed, 24 insertions(+), 6 deletions(-)
-> >>
-> >> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> >b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> >> index ff2ddde1e117..318c4ba8ae9f 100644
-> >> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> >> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> >> @@ -58,17 +60,12 @@
-> >>                 #size-cells = <1>;
-> >>                 ranges;
-> >>
-> >> -/*
-> >> - * The pipeline mixer0-lcd0 depends on clock CLK_MIXER0 from DE2
-> >CCU.
-> >> - * However there is no support for this clock on A64 yet, so we
-> >depend
-> >> - * on the upstream clocks here to keep them (and thus CLK_MIXER0)
-> >up.
-> >> - */
-> >>                 simplefb_lcd: framebuffer-lcd {
-> >>                         compatible = "allwinner,simple-framebuffer",
-> >>                                      "simple-framebuffer";
-> >>                         allwinner,pipeline = "mixer0-lcd0";
-> >>                         clocks = <&ccu CLK_TCON0>,
-> >> -                                <&ccu CLK_DE>, <&ccu CLK_BUS_DE>;
-> >> +                                <&display_clocks CLK_MIXER0>;
-> >
-> >Doesn't this technically break simplefb if this DT is used with a
-> >Linux that doesn't have the display clock driver?
->
-> 1. DT doesn't care forware compatibility.
+>  static int const clks_init_on[] __initconst = {
+> -       IMX6UL_CLK_AIPSTZ1, IMX6UL_CLK_AIPSTZ2,
+> +       IMX6UL_CLK_AIPSTZ1, IMX6UL_CLK_AIPSTZ2, IMX6UL_CLK_AIPSTZ3,
+>         IMX6UL_CLK_AXI, IMX6UL_CLK_ARM, IMX6UL_CLK_ROM,
+>         IMX6UL_CLK_MMDC_P0_FAST, IMX6UL_CLK_MMDC_P0_IPG,
+>  };
+> @@ -358,7 +358,9 @@ static void __init imx6ul_clocks_init(struct device_node *ccm_node)
+>         clks[IMX6UL_CLK_GPT2_SERIAL]    = imx_clk_gate2("gpt2_serial",  "perclk",       base + 0x68,    26);
+>         clks[IMX6UL_CLK_UART2_IPG]      = imx_clk_gate2("uart2_ipg",    "ipg",          base + 0x68,    28);
+>         clks[IMX6UL_CLK_UART2_SERIAL]   = imx_clk_gate2("uart2_serial", "uart_podf",    base + 0x68,    28);
+> -       if (clk_on_imx6ull())
+> +       if (clk_on_imx6ul())
+> +               clks[IMX6UL_CLK_AIPSTZ3]        = imx_clk_gate2("aips_tz3",     "ahb",          base + 0x68,    30);
 
-Ah, fair enough, that answers my question.
+Looking at the CCM_CCGR0 register (address: 20C_4068) there is no
+aips_tz3 clock gate in bits 31-30.
 
-Thanks,
+Bits 31-30 are gpio2_clocks and Anson has recently sent a patch adding
+support for it:
+https://patchwork.kernel.org/patch/10481351/
 
--- 
-Julian Calaby
+Please test Anson's patch as it should fix the problem you had.
 
-Email: julian.calaby at gmail.com
-Profile: http://www.google.com/profiles/julian.calaby/
+Regards,
+
+Fabio Estevam
