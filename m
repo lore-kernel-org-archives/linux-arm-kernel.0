@@ -1,70 +1,42 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 23 Jun 2018 10:14:43 -0700
-Subject: [GIT PULL] ARM: mvebu: fixes for v4.17 (#2)
-In-Reply-To: <87k1ra66o3.fsf@bootlin.com>
-References: <871sdvyfxj.fsf@bootlin.com>
- <20180602082431.lahocepns6vub6uq@localhost>
- <87k1ra66o3.fsf@bootlin.com>
-Message-ID: <CAOesGMgZS3rsQ0Vww6zgujxj3F5ohy5XgeuN5iWHmioVW0xzgw@mail.gmail.com>
+Date: Sat, 23 Jun 2018 10:17:16 -0700
+Subject: [GIT PULL] Renesas ARM Based SoC Fixes for v4.18
+In-Reply-To: <cover.1528889592.git.horms+renesas@verge.net.au>
+References: <cover.1528889592.git.horms+renesas@verge.net.au>
+Message-ID: <CAOesGMi5RDwv3jstPJ8ZMcKsbmYbhpq-2SyofBTt4mUWvZONJA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 7, 2018 at 6:57 AM, Gregory CLEMENT
-<gregory.clement@bootlin.com> wrote:
-> Hi Olof,
+On Wed, Jun 13, 2018 at 4:41 AM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
 >
->  On sam., juin 02 2018, Olof Johansson <olof@lixom.net> wrote:
+> Please consider these Renesas ARM based SoC fixes for v4.18.
 >
->> On Mon, May 28, 2018 at 05:10:16PM +0200, Gregory CLEMENT wrote:
->>> Hi,
->>>
->>> Here is the second pull request for fixes for mvebu for v4.17.
->>> Nothing really critical but it needs to be fixed.
->>>
->>> Gregory
->>>
->>> The following changes since commit f43194c1447c9536efb0859c2f3f46f6bf2b9154:
->>>
->>>   ARM64: dts: marvell: armada-cp110: Add mg_core_clk for ethernet node (2018-04-27 17:47:24 +0200)
->>>
->>> are available in the Git repository at:
->>>
->>>   git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-4.17-2
->>>
->>> for you to fetch changes up to ac62cc9d9cd6fa4c79e171c13dc8d58c3862b678:
->>>
->>>   arm: dts: armada: Fix "#cooling-cells" property's name (2018-05-28 16:54:44 +0200)
->>>
->>> ----------------------------------------------------------------
->>> mvebu fixes for 4.17 (part 2)
->>>
->>>  - Use correct size for ICU nodes (irq controller) on Armada 7K/8K
->>>  - Fix "#cooling-cells" property's name on Synology DS116 (Armada 385)
->>>
->>> ----------------------------------------------------------------
->>> Miquel Raynal (1):
->>>       arm64: dts: marvell: fix CP110 ICU node size
->>>
->>> Viresh Kumar (1):
->>>       arm: dts: armada: Fix "#cooling-cells" property's name
->>
->> Subject here should be 'ARM: dts: ...'
->>
->> The latter is definitely not 4.17 material by now. It's unclear on the ICU
->> patch whether it's causing a real problem in reality, i.e. if it's an urgent
->> regression fix or if it's just fixing up the register range to be correct per
->> documentation.  Let me know if it's a real issue and I can either cherry-pick
->> it or send a separate pull request with just that fix.
+> This pull request is based on renesas-soc-for-v4.18,
+> which you have already pulled.
 >
-> Even the first patch did not fix a regression. But it is more just than
-> just fixing the documentation as the extension of the size of the
-> register set is needed to support more feature provided by ICU (it is
-> part of series already submitted).
+> The following changes since commit 086b399965a7ee7e50c3b3c57f2dba30ff0334b0:
 >
-> It's not a problem for me that this PR was not merged in 4.17, but could
-> you add it for 4.18 in the current merge window?
+>   soc: renesas: r8a77990-sysc: Add workaround for 3DG-{A,B} (2018-05-16 10:57:44 +0200)
+>
+> are available in the git repository at:
+>
+>   https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-fixes-for-v4.18
+>
+> for you to fetch changes up to 977d5ba4507dfe5b1346597ee57750262d8d2b19:
+>
+>   soc: renesas: rcar-sysc: Make PM domain initialization more robust (2018-06-08 10:04:25 +0200)
+>
+> ----------------------------------------------------------------
+> Renesas ARM Based SoC Fixes for v4.18
+>
+> Make PM domain initialization more robust in Renesas R-Car SYSC driver.
+> This resolves a regression due to re-parenting of PM domains by
+> 086b399965a7ee7e ("soc: renesas: r8a77990-sysc: Add workaround for 3DG-{A,B}").
+>
 
-Merged into fixes now, apologies for the delay.
+Merged, thanks.
 
 
 -Olof
