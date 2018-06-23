@@ -1,50 +1,43 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Sat, 23 Jun 2018 11:20:58 +0900
-Subject: [PATCH v10 14/14] arm64: kexec_file: add kaslr support
+Date: Sat, 23 Jun 2018 11:20:56 +0900
+Subject: [PATCH v10 12/14] include: pe.h: remove message[] from mz header
+ definition
 In-Reply-To: <20180623022058.10935-1-takahiro.akashi@linaro.org>
 References: <20180623022058.10935-1-takahiro.akashi@linaro.org>
-Message-ID: <20180623022058.10935-15-takahiro.akashi@linaro.org>
+Message-ID: <20180623022058.10935-13-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding "kalsr-seed" to dtb enables triggering kaslr, or kernel virtual
-address randomization, at secondary kernel boot. We always do this as
-it wll have no harm on kaslr-incapable kernel.
+message[] field won't be part of the definition of mz header.
 
-We don't have any "switch" to turn off this feature directly, but still
-can suppress it by passing "nokaslr" as a kernel boot argument.
+This change is crucial for enabling kexec_file_load on arm64 because
+arm64's "Image" binary, as in PE format, doesn't have any data for it and
+accordingly the following check in pefile_parse_binary() will fail:
+
+	chkaddr(cursor, mz->peaddr, sizeof(*pe));
 
 Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
+Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: David Howells <dhowells@redhat.com>
+Cc: Vivek Goyal <vgoyal@redhat.com>
+Cc: Herbert Xu <herbert@gondor.apana.org.au>
+Cc: David S. Miller <davem@davemloft.net>
 ---
- arch/arm64/kernel/machine_kexec_file.c | 7 +++++++
- 1 file changed, 7 insertions(+)
+ include/linux/pe.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/kernel/machine_kexec_file.c b/arch/arm64/kernel/machine_kexec_file.c
-index 6aec996d015a..1283c1d912f2 100644
---- a/arch/arm64/kernel/machine_kexec_file.c
-+++ b/arch/arm64/kernel/machine_kexec_file.c
-@@ -16,6 +16,7 @@
- #include <linux/libfdt.h>
- #include <linux/memblock.h>
- #include <linux/of_fdt.h>
-+#include <linux/random.h>
- #include <linux/slab.h>
- #include <linux/types.h>
- #include <linux/vmalloc.h>
-@@ -132,6 +133,12 @@ static int setup_dtb(struct kimage *image,
- 			goto out_err;
- 	}
+diff --git a/include/linux/pe.h b/include/linux/pe.h
+index 143ce75be5f0..3482b18a48b5 100644
+--- a/include/linux/pe.h
++++ b/include/linux/pe.h
+@@ -166,7 +166,7 @@ struct mz_hdr {
+ 	uint16_t oem_info;	/* oem specific */
+ 	uint16_t reserved1[10];	/* reserved */
+ 	uint32_t peaddr;	/* address of pe header */
+-	char     message[64];	/* message to print */
++	char     message[];	/* message to print */
+ };
  
-+	/* add kaslr-seed */
-+	get_random_bytes(&value, sizeof(value));
-+	ret = fdt_setprop(buf, nodeoffset, "kaslr-seed", &value, sizeof(value));
-+	if (ret)
-+		goto out_err;
-+
- 	/* trim a buffer */
- 	fdt_pack(buf);
- 	*dtb_buf = buf;
+ struct mz_reloc {
 -- 
 2.17.0
