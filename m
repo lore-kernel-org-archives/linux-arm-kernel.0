@@ -1,31 +1,77 @@
 From: david@lechnology.com (David Lechner)
-Date: Sat, 23 Jun 2018 16:08:08 -0500
-Subject: [PATCH 6/8] ARM: davinci_all_defconfig: enable PRU remoteproc module
+Date: Sat, 23 Jun 2018 16:08:06 -0500
+Subject: [PATCH 4/8] dt-bindings: add bindings for TI PRU as remoteproc
 In-Reply-To: <20180623210810.21232-1-david@lechnology.com>
 References: <20180623210810.21232-1-david@lechnology.com>
-Message-ID: <20180623210810.21232-7-david@lechnology.com>
+Message-ID: <20180623210810.21232-5-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This enabled the remoteproc module for the PRU on DA8xx-type devices.
+This adds a new binding for the TI Programmable Runtime Unit (PRU)
+as a remoteproc device.
 
 Signed-off-by: David Lechner <david@lechnology.com>
 ---
- arch/arm/configs/davinci_all_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+ .../bindings/remoteproc/ti_pru_rproc.txt      | 51 +++++++++++++++++++
+ 1 file changed, 51 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/remoteproc/ti_pru_rproc.txt
 
-diff --git a/arch/arm/configs/davinci_all_defconfig b/arch/arm/configs/davinci_all_defconfig
-index a1b6e106b867..1bcc7c6a03ee 100644
---- a/arch/arm/configs/davinci_all_defconfig
-+++ b/arch/arm/configs/davinci_all_defconfig
-@@ -214,6 +214,8 @@ CONFIG_DMADEVICES=y
- CONFIG_TI_EDMA=y
- CONFIG_REMOTEPROC=m
- CONFIG_DA8XX_REMOTEPROC=m
-+CONFIG_TI_PRU_REMOTEPROC=m
-+CONFIG_RPMSG_VIRTIO=m
- CONFIG_MEMORY=y
- CONFIG_TI_AEMIF=m
- CONFIG_DA8XX_DDRCTL=y
+diff --git a/Documentation/devicetree/bindings/remoteproc/ti_pru_rproc.txt b/Documentation/devicetree/bindings/remoteproc/ti_pru_rproc.txt
+new file mode 100644
+index 000000000000..0e80a8db46d0
+--- /dev/null
++++ b/Documentation/devicetree/bindings/remoteproc/ti_pru_rproc.txt
+@@ -0,0 +1,51 @@
++TI Programmable Realtime Unit (PRU)
++===================================
++
++Some TI Sitara SoCs contain a Programmable Realtime Unit subsystem with two
++processor cores that can be used for hard-realtime tasks.
++
++
++Required properties:
++--------------------
++The following are the mandatory properties:
++
++- compatible:		Should be one of the following,
++			    "ti,da850-pru-rproc" for AM18xx/OMAPL138 SoCs
++			    "ti,am3352-pru-rproc" for AM355x SoCs
++
++- reg:			Should contain the memory region for the PRUSS
++
++- interrupts: 		Should contain the interrupt number used to receive the
++			virtualqueue kick interrupts from the PRU (i.e.
++			PRU_EVTOUT0 and PRU_EVTOUT1)
++
++- interrupt-names	Should contain "pru0-vq", "pru1-vq"
++
++Optional properties:
++--------------------
++
++- power-domains:	A phandle to the power domain that powers the PRUSS
++
++- ti,hwmods:		Name of the hwmod associated to the PRUSS, which is
++			typically "pruss"
++
++Example:
++--------
++
++	// AM18xx
++	pru_rproc: cpu at 30000 {
++		compatible = "ti,da850-pru-rproc";
++		reg = <0x30000 0x10000>;
++		interrupts = <3>, <4>;
++		interrupt-names = "pru0-vq", "pru1-vq";
++		power-domains = <&psc0 13>;
++	};
++
++	// AM335x
++	pru_rproc: cpu at 4a300000 {
++		compatible = "ti,am3352-pru-rproc";
++		reg = <0x4a300000 0x80000>;
++		interrupts = <20>, <21>;
++		interrupt-names = "pru0-vq", "pru1-vq";
++		ti,hwmods = "pruss";
++	};
 -- 
 2.17.1
