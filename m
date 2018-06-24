@@ -1,35 +1,34 @@
 From: tglx@linutronix.de (Thomas Gleixner)
-Date: Sun, 24 Jun 2018 15:15:25 +0200 (CEST)
-Subject: Finish the GENERIC_IRQ_MULTI_HANDLER conversion
-In-Reply-To: <20180621181756.12493-1-palmer@sifive.com>
-References: <20180621181756.12493-1-palmer@sifive.com>
-Message-ID: <alpine.DEB.2.21.1806241513260.8650@nanos.tec.linutronix.de>
+Date: Sun, 24 Jun 2018 15:19:18 +0200 (CEST)
+Subject: [PATCH v3 0/3] fix free pmd/pte page handlings on x86
+In-Reply-To: <20180516233207.1580-1-toshi.kani@hpe.com>
+References: <20180516233207.1580-1-toshi.kani@hpe.com>
+Message-ID: <alpine.DEB.2.21.1806241516410.8650@nanos.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 21 Jun 2018, Palmer Dabbelt wrote:
-> A while ago I sent a patch set that adds a GENERIC_IRQ_MULTI_HANDLER,
-> which is an exact copy of the existing IRQ_MULTI_HANDLER support in the
-> arm port, which is being used unconditionally by arm64 and openrisc.
-> GENERIC_IRQ_MULTI_HANDLER is currently being used by the RISC-V port.  I
-> managed to make a few mistakes in my original patch set and as a result
-> my conversion of the other architectures of GENERIC_IRQ_MULTI_HANDLER
-> was dropped.
-> 
-> This patch set finishes up my original patch set by converting arm,
-> arm64, and openrisc over to the new GENERIC_IRQ_MULTI_HANDLER support
-> and then removing MULTI_IRQ_HANDLER as it's obselete.
-> 
-> At the time I wrote this I gave it fairly extensive build testing, but
-> went I recently rebased it I just tested the full patch set on arm,
-> arm64, and openrisc defconfigs.
-> 
-> Various flavors of this patch set have bounced around a few times
-> before, but I'm calling this a whole new patch set as it builds on top
-> of what was merged.
+On Wed, 16 May 2018, Toshi Kani wrote:
 
-I'll take the whole pile through tip irq/core which probably makes the most
-sense unless there are any objections from architecture maintainers.
+> This series fixes two issues in the x86 ioremap free page handlings
+> for pud/pmd mappings.
+> 
+> Patch 01 fixes BUG_ON on x86-PAE reported by Joerg.  It disables
+> the free page handling on x86-PAE.
+> 
+> Patch 02-03 fixes a possible issue with speculation which can cause
+> stale page-directory cache.
+>  - Patch 02 is from Chintan's v9 01/04 patch [1], which adds a new arg
+>    'addr', with my merge change to patch 01.
+>  - Patch 03 adds a TLB purge (INVLPG) to purge page-structure caches
+>    that may be cached by speculation.  See the patch descriptions for
+>    more detal.
+
+Toshi, Joerg, Michal!
+
+I'm failing to find a conclusion of this discussion. Can we finally make
+some progress with that?
+
+Can someone give me a hint what to pick up urgently please?
 
 Thanks,
 
