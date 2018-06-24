@@ -1,36 +1,70 @@
-From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Sun, 24 Jun 2018 16:01:08 +0200
-Subject: [PATCH] soc: actions: Update SPS help text for S700
-In-Reply-To: <62ef1835-8db9-f1e8-53b9-4cd74b5d416d@suse.de>
-References: <62ef1835-8db9-f1e8-53b9-4cd74b5d416d@suse.de>
-Message-ID: <20180624140108.13505-1-afaerber@suse.de>
+From: harald@ccbib.org (Harald Geyer)
+Date: Sun, 24 Jun 2018 18:34:40 +0200
+Subject: [PATCHv2 5/5] arm64: allwinner: a64: Add support for TERES-I
+ laptop
+In-Reply-To: <a7011fe78d171658742406bf01d50b7e3d7eaf1d.camel@aosc.io>
+References: <20180315162510.11669-1-harald@ccbib.org>
+ <20180315162510.11669-6-harald@ccbib.org>
+ <a7011fe78d171658742406bf01d50b7e3d7eaf1d.camel@aosc.io>
+Message-ID: <E1fX7yK-0000OC-HA@stardust.g4.wien.funkfeuer.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 3ad85b08f7789d51e6aad0f535296d1c31e319b9 (soc: actions: sps: Add S700)
-added S700 support to the SPS driver but forget to update Kconfig help.
+Icenowy Zheng writes:
+> ? 2018-03-15?? 16:25 +0000?Harald Geyer???
+> > +&mmc1 {
+> > +	pinctrl-names = "default";
+> > +	pinctrl-0 = <&mmc1_pins>;
+> > +	vmmc-supply = <&reg_aldo2>;
+> > +	vqmmc-supply = <&reg_dldo4>;
+> > +	mmc-pwrseq = <&wifi_pwrseq>;
+> > +	bus-width = <4>;
+> > +	non-removable;
+> > +	status = "okay";
+> > +
+> > +	rtl8723bs: wifi at 1 {
+> > +		reg = <1>;
+> > +		interrupt-parent = <&r_pio>;
+> > +		interrupts = <0 3 IRQ_TYPE_LEVEL_LOW>; /* PL3 */
+> > +		interrupt-names = "host-wake";
+> > +	};
+> 
+> I think this node has some problem:
 
-Add missing S700 mention, in preparation for further SoCs.
+Thanks for the heads up! Admittedly, I simply copied this node from
+sun50i-a64-olinuxino.dts and since it worked, didn't look into it in
+too much detail.
 
-Fixes: 3ad85b08f778 ("soc: actions: sps: Add S700")
-Reported-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-Signed-off-by: Andreas F?rber <afaerber@suse.de>
----
- drivers/soc/actions/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> - This device node has no binding. The "host-wake" interrupt is part of
+>  Broadcom SDIO Wi-Fi binding, rather than a generic one.
 
-diff --git a/drivers/soc/actions/Kconfig b/drivers/soc/actions/Kconfig
-index 9d68b5a771c3..56064f8859a0 100644
---- a/drivers/soc/actions/Kconfig
-+++ b/drivers/soc/actions/Kconfig
-@@ -10,7 +10,7 @@ config OWL_PM_DOMAINS
- 	select PM_GENERIC_DOMAINS
- 	help
- 	  Say 'y' here to enable support for Smart Power System (SPS)
--	  power-gating on Actions Semiconductor S500 SoC.
-+	  power-gating on Actions Semiconductor S500 and S700 SoCs.
- 	  If unsure, say 'n'.
- 
- endif
--- 
-2.16.4
+I think the general mmc and interrupts bindings apply. And the mmc binding
+clearly states that for sub-nodes a compatible string is optional.
+
+However I just realized that the 'interrupt-names' property is not part
+of the general interrupts binding, so I guess at least this property should
+be removed.
+
+> - Without the interrupt this device node isn't needed, as RTL8723BS has
+> MAC eFUSE and doesn't need a MAC in device tree.
+
+Indeed. I wasn't aware of this, but I just tested and the device probes
+fine without the subnode present. I think the devicetree is mainly for
+information which cannot be probed, so maybe the subnode should just get
+removed.
+
+> In order to solve the problems. I suggest either drop this device node
+> or make a generic "sdio-wifi" device tree binding. Personally I prefer
+> the latter, as it's more accurate device representation.
+> 
+> If such a device tree binding is added, I think it should contain the
+> "host-wake" interrupt and a "local-mac-address" property. Both can be
+> ignored by the driver. (This interrupt can be needed if a more card-
+> ventor-neutral name is found.)
+
+I don't feel qualified to comment on this. If you want to propose such
+a patch and fix above node accordingly, I won't object. Otherwise I'll
+just send a patch to remove the subnode.
+
+Thanks,
+Harald
