@@ -1,34 +1,35 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Sun, 24 Jun 2018 02:21:04 +0200 (CEST)
-Subject: [PATCH 3/8] arm: time: Remove the persistent clock support for
- ARM architecture
-In-Reply-To: <ec57a4f5d7ba300540b99236e6eef1b551b152dc.1528878545.git.baolin.wang@linaro.org>
-References: <cover.1528878545.git.baolin.wang@linaro.org>
- <ec57a4f5d7ba300540b99236e6eef1b551b152dc.1528878545.git.baolin.wang@linaro.org>
-Message-ID: <alpine.DEB.2.21.1806240215310.8650@nanos.tec.linutronix.de>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 23 Jun 2018 18:26:38 -0700
+Subject: [PATCH v2] ARM: Always build secure_cntvoff.S on ARM V7 to fix
+ shmobile !SMP build
+In-Reply-To: <1528277116-14533-1-git-send-email-geert+renesas@glider.be>
+References: <1528277116-14533-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <20180624012638.dbqw5efzf6ubodgw@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 13 Jun 2018, Baolin Wang wrote:
+On Wed, Jun 06, 2018 at 11:25:16AM +0200, Geert Uytterhoeven wrote:
+> If CONFIG_SMP=n, building a kernel for R-Car Gen2 fails with:
+> 
+>     arch/arm/mach-shmobile/setup-rcar-gen2.o: In function `rcar_gen2_timer_init':
+>     setup-rcar-gen2.c:(.init.text+0x30): undefined reference to `secure_cntvoff_init'
+> 
+> Indeed, on R-Car Gen2 SoCs, secure_cntvoff_init() is not only needed for
+> secondary CPUs, but also for the boot CPU.  This is most visible on SoCs
+> with Cortex A7 cores (e.g. R-Car E2, cfr. commit 9ce3fa6816c2fb59 ("ARM:
+> shmobile: rcar-gen2: Add CA7 arch_timer initialization for r8a7794")),
+> but Cortex A15 is affected, too.
+> 
+> Fix this by always providing secure_cntvoff_init() when building for ARM
+> V7.
+> 
+> Reported-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 7c607944bc657616 ("ARM: smp: Add initialization of CNTVOFF")
+> Fixes: cad160ed0a94927e ("ARM: shmobile: Convert file to use cntvoff")
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Reviewed-by: Maxime Ripard <maxime.ripard@bootlin.com>
 
-> We have introduced the persistent clock framework to support the OS time
-> compensating from persistent clock, and we will convert all drivers to
-> use common persistent clock framework instead of the persistent clock
-> support used only for the ARM architecture. So we can remove these code
-> with converting the Omap 32k counter and tegra20 timer.
+Thanks, applied to fixes.
 
-Why did I look at that in the first place? But as I did, I just have to
-say, it's just consistent trainwreck engineering. Remove working code first
-and then add new one.
 
-Hell NO! This is not how it works. We add new infrastructure - if required
-with some extra temporary helpers - while keeping the existing
-functionality intact. Then we convert the users of the old infrastructure
-over and when the last user is gone, we remove that including all temporary
-helpers.
-
-That's not something fundamentally new. It's documented all over the place.
-
-Thanks,
-
-	tglx
+-Olof
