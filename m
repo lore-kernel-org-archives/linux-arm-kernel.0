@@ -1,29 +1,36 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Sun, 24 Jun 2018 15:07:42 +0200
-Subject: [PATCH 3/4] soc: actions: sps: Add S900 power domains
-In-Reply-To: <20180411164036.8046-4-manivannan.sadhasivam@linaro.org>
-References: <20180411164036.8046-1-manivannan.sadhasivam@linaro.org>
- <20180411164036.8046-4-manivannan.sadhasivam@linaro.org>
-Message-ID: <5e267c76-1c71-2381-ee66-50a5bef1cfc2@suse.de>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Sun, 24 Jun 2018 15:15:25 +0200 (CEST)
+Subject: Finish the GENERIC_IRQ_MULTI_HANDLER conversion
+In-Reply-To: <20180621181756.12493-1-palmer@sifive.com>
+References: <20180621181756.12493-1-palmer@sifive.com>
+Message-ID: <alpine.DEB.2.21.1806241513260.8650@nanos.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 11.04.2018 um 18:40 schrieb Manivannan Sadhasivam:
-> Add power domains for Actions Semi S900 SoC.
+On Thu, 21 Jun 2018, Palmer Dabbelt wrote:
+> A while ago I sent a patch set that adds a GENERIC_IRQ_MULTI_HANDLER,
+> which is an exact copy of the existing IRQ_MULTI_HANDLER support in the
+> arm port, which is being used unconditionally by arm64 and openrisc.
+> GENERIC_IRQ_MULTI_HANDLER is currently being used by the RISC-V port.  I
+> managed to make a few mistakes in my original patch set and as a result
+> my conversion of the other architectures of GENERIC_IRQ_MULTI_HANDLER
+> was dropped.
 > 
-> Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-> ---
->  drivers/soc/actions/owl-sps.c | 58 +++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 58 insertions(+)
+> This patch set finishes up my original patch set by converting arm,
+> arm64, and openrisc over to the new GENERIC_IRQ_MULTI_HANDLER support
+> and then removing MULTI_IRQ_HANDLER as it's obselete.
+> 
+> At the time I wrote this I gave it fairly extensive build testing, but
+> went I recently rebased it I just tested the full patch set on arm,
+> arm64, and openrisc defconfigs.
+> 
+> Various flavors of this patch set have bounced around a few times
+> before, but I'm calling this a whole new patch set as it builds on top
+> of what was merged.
 
-Reviewed-by: Andreas F?rber <afaerber@suse.de>
-
-(Depends on bindings patch.)
+I'll take the whole pile through tip irq/core which probably makes the most
+sense unless there are any objections from architecture maintainers.
 
 Thanks,
-Andreas
 
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+	tglx
