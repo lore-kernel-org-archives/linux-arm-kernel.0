@@ -1,50 +1,93 @@
 From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Sun, 24 Jun 2018 20:28:09 +0200
-Subject: [RfC v1 0/5] ARM64: amlogic: add support for the S905W and two boards
-Message-ID: <20180624182814.31691-1-martin.blumenstingl@googlemail.com>
+Date: Sun, 24 Jun 2018 20:28:13 +0200
+Subject: [RfC v1 4/5] ARM64: dts: meson-gxl: add support for the S905W SoC and
+ the P281 board - WiP
+In-Reply-To: <20180624182814.31691-1-martin.blumenstingl@googlemail.com>
+References: <20180624182814.31691-1-martin.blumenstingl@googlemail.com>
+Message-ID: <20180624182814.31691-5-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The goal of this series is to to add support for the Amlogic S905W SoC
-along with Amlogic's P281 development board and the Tanix TX3 Mini (which
-both use the S905W SoC).
+S905W is a new SoC from the GXL series. It is a cost-reduced version of
+the S905X.
+The P281 development board from Amlogic uses the same layout as the P231
+(S905D development board). Thus the new P281 board inherits
+meson-gx-p23x-q20x.dtsi to avoid code-duplication.
 
-I am sending this as request-for-comments because I would like to get
-feedback specifically on:
-- the naming of the new vendor "Oranth" and their brand "Tanix". more
-  information regarding their relation can be found in patch #1
-- I do not have access to the P281 development board (nor any
-  documentation apart from what is available in Amlogic's GPL kernel
-  sources). thus it would be great if someone from Amlogic could confirm
-  that my .dts is working
-- the S905W SoC is a cost-reduced version of the S905X SoC. I have
-  documented the differences that I am aware of in patch #2. none of
-  these changes require adjustments to any existing driver/binding
-  because these changes are either handled in the SCPI firmware (CPU
-  frequency and DDR interface) or there is no Linux support for them
-  yet (4k HDMI resolutions and the HW video decoder)
-
-
-Martin Blumenstingl (5):
-  dt-bindings: add vendor prefix for Shenzhen Oranth Technology Co.,
-    Ltd.
-  dt-bindings: arm: amlogic: Add support for GXL S905W and the P281
-    board
-  dt-bindings: arm: amlogic: Add support for the Oranth Tanix TX3 Mini
-  ARM64: dts: meson-gxl: add support for the S905W SoC and the P281
-    board - WiP
-  ARM64: dts: meson-gxl: add support for the Oranth Tanix TX3 Mini
-
- .../devicetree/bindings/arm/amlogic.txt       |  7 ++++++
- .../devicetree/bindings/vendor-prefixes.txt   |  1 +
- arch/arm64/boot/dts/amlogic/Makefile          |  2 ++
+Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+---
+ arch/arm64/boot/dts/amlogic/Makefile          |  1 +
  .../boot/dts/amlogic/meson-gxl-s905w-p281.dts | 22 +++++++++++++++++++
- .../dts/amlogic/meson-gxl-s905w-tx3-mini.dts  | 22 +++++++++++++++++++
  .../boot/dts/amlogic/meson-gxl-s905w.dtsi     | 20 +++++++++++++++++
- 6 files changed, 74 insertions(+)
+ 3 files changed, 43 insertions(+)
  create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl-s905w-p281.dts
- create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl-s905w-tx3-mini.dts
  create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl-s905w.dtsi
 
+diff --git a/arch/arm64/boot/dts/amlogic/Makefile b/arch/arm64/boot/dts/amlogic/Makefile
+index 34dd0e9b5cbb..6de2e7f5a9cc 100644
+--- a/arch/arm64/boot/dts/amlogic/Makefile
++++ b/arch/arm64/boot/dts/amlogic/Makefile
+@@ -17,6 +17,7 @@ dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905x-nexbox-a95x.dtb
+ dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905x-p212.dtb
+ dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905d-p230.dtb
+ dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905d-p231.dtb
++dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905w-p281.dtb
+ dtb-$(CONFIG_ARCH_MESON) += meson-gxm-khadas-vim2.dtb
+ dtb-$(CONFIG_ARCH_MESON) += meson-gxm-nexbox-a1.dtb
+ dtb-$(CONFIG_ARCH_MESON) += meson-gxm-q200.dtb
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905w-p281.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905w-p281.dts
+new file mode 100644
+index 000000000000..d4faed54c223
+--- /dev/null
++++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905w-p281.dts
+@@ -0,0 +1,22 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++/*
++ * Copyright (c) 2018 Martin Blumenstingl <martin.blumenstingl@googlemail.com>.
++ * Based on meson-gxl-s905d-p231.dts:
++ * - Copyright (c) 2016 Endless Computers, Inc.
++ *   Author: Carlo Caione <carlo@endlessm.com>
++ */
++
++/dts-v1/;
++
++#include "meson-gxl-s905w.dtsi"
++#include "meson-gx-p23x-q20x.dtsi"
++
++/ {
++	compatible = "amlogic,p281", "amlogic,s905w", "amlogic,meson-gxl";
++	model = "Amlogic Meson GXL (S905W) P281 Development Board";
++
++	memory at 0 {
++		device_type = "memory";
++		reg = <0x0 0x0 0x0 0x40000000>;
++	};
++};
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905w.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl-s905w.dtsi
+new file mode 100644
+index 000000000000..a4ed586d328b
+--- /dev/null
++++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905w.dtsi
+@@ -0,0 +1,20 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++/*
++ * Copyright (c) 2018 Martin Blumenstingl <martin.blumenstingl@googlemail.com>.
++ * Based on meson-gxl-s905x.dtsi:
++ * - Copyright (c) 2016 Endless Computers, Inc.
++ *   Author: Carlo Caione <carlo@endlessm.com>
++ */
++
++#include "meson-gxl.dtsi"
++#include "meson-gxl-mali.dtsi"
++
++/ {
++	compatible = "amlogic,s905w", "amlogic,meson-gxl";
++};
++
++/* S905W only has access to it's internal PHY */
++&ethmac {
++	phy-mode = "rmii";
++	phy-handle = <&internal_phy>;
++};
 -- 
 2.18.0
