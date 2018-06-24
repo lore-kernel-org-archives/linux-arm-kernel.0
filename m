@@ -1,64 +1,84 @@
 From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Sun, 24 Jun 2018 20:00:01 +0200
-Subject: [PATCH 2/2] usb: core: phy: fix return value checking about
- devm_of_phy_get_by_index()
-In-Reply-To: <644d00edd2932c1a0d0a1bf368dd25427d1d9f64.1529647619.git.chunfeng.yun@mediatek.com>
-References: <4c338a129ab14ab41949da5e3c21aed0d77dff8d.1529647619.git.chunfeng.yun@mediatek.com>
- <644d00edd2932c1a0d0a1bf368dd25427d1d9f64.1529647619.git.chunfeng.yun@mediatek.com>
-Message-ID: <CAFBinCBS+fpfx6jaaqD=kqFuMF6ko8GikbV1ZVwgbDh-Sn8T8w@mail.gmail.com>
+Date: Sun, 24 Jun 2018 20:28:14 +0200
+Subject: [RfC v1 5/5] ARM64: dts: meson-gxl: add support for the Oranth Tanix
+ TX3 Mini
+In-Reply-To: <20180624182814.31691-1-martin.blumenstingl@googlemail.com>
+References: <20180624182814.31691-1-martin.blumenstingl@googlemail.com>
+Message-ID: <20180624182814.31691-6-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Chunfeng,
+The Tanix TX3 Mini is a TV box based on the Amlogic S905W chipset.
+There are two variants:
+- 1 GiB or 2 GiB of DDR3 memory
+- 8 GB or 16 GB eMMC flash
 
-thank you for the patch!
+Both variants come with:
+- 802.11 b/g/n wifi (Silicon Valley Microelectronics SSV6051, does not
+  support Bluetooth)
+- an LED 7 segment display with an FD628 controller
+- HDMI and AV (CVBS) output
+- 2x USB (utilizing both USB ports provided by the SoC)
+- micro SD card slot
+- serial console (uart_AO) has to be soldered after opening the case
 
-On Fri, Jun 22, 2018 at 8:33 AM Chunfeng Yun <chunfeng.yun@mediatek.com> wrote:
->
-> 1. use IS_ERR() but not IS_ERR_OR_NULL() because devm_of_phy_get_by_index()
->     never return NULL value;
-ACK - good catch!
+The board seems to be very similar to the P23x and Q20x reference
+boards, which is why it includes meson-gx-p23x-q20x.dtsi:
+- eMMC reset routed to BOOT_9
+- the SDIO wifi chip's reset line is routed to GPIOX_6 and the reference
+  clock is 32.768KHz on PWM_E
+- SD card detection is routed to CARD_6
+- vqmmc of all MMC controllers is hard-wired to 1.8V (VDDIO_BOOT)
+- uart_AO can be accessed after opening the case and soldering RX, TX
+  and GND lines onto the exposed solder points (marked with RX, TX and
+  GND)
 
-> 2. devm_of_phy_get_by_index() should not fail for a valid index
-I have learned that the PHY framework can return -ENODEV if the PHY is:
-1. supposed to be handled by the legacy USB PHY framework
-2. the PHY node is disabled in devicetree
+Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+---
+ arch/arm64/boot/dts/amlogic/Makefile          |  1 +
+ .../dts/amlogic/meson-gxl-s905w-tx3-mini.dts  | 22 +++++++++++++++++++
+ 2 files changed, 23 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl-s905w-tx3-mini.dts
 
-see [0] for the code in the PHY framework and [1] for the discussion
-with Johan (who informed me of case #1, I added him on this mail)
-
-> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-> ---
->  drivers/usb/core/phy.c | 11 ++++-------
->  1 file changed, 4 insertions(+), 7 deletions(-)
->
-> diff --git a/drivers/usb/core/phy.c b/drivers/usb/core/phy.c
-> index 9879767..0f972e1 100644
-> --- a/drivers/usb/core/phy.c
-> +++ b/drivers/usb/core/phy.c
-> @@ -23,14 +23,11 @@ static int usb_phy_roothub_add_phy(struct device *dev, int index,
->                                    struct list_head *list)
->  {
->         struct usb_phy_roothub *roothub_entry;
-> -       struct phy *phy = devm_of_phy_get_by_index(dev, dev->of_node, index);
-> +       struct phy *phy;
->
-> -       if (IS_ERR_OR_NULL(phy)) {
-> -               if (!phy || PTR_ERR(phy) == -ENODEV)
-> -                       return 0;
-> -               else
-> -                       return PTR_ERR(phy);
-> -       }
-> +       phy = devm_of_phy_get_by_index(dev, dev->of_node, index);
-> +       if (IS_ERR(phy))
-> +               return PTR_ERR(phy);
-@Johan can you please review this as well? maybe we need to keep the
--ENODEV check
-
-
-Regards
-Martin
-
-
-[0] https://elixir.bootlin.com/linux/v4.18-rc2/source/drivers/phy/phy-core.c#L421
-[1] https://lkml.org/lkml/2018/4/19/88
+diff --git a/arch/arm64/boot/dts/amlogic/Makefile b/arch/arm64/boot/dts/amlogic/Makefile
+index 6de2e7f5a9cc..1b46affd376d 100644
+--- a/arch/arm64/boot/dts/amlogic/Makefile
++++ b/arch/arm64/boot/dts/amlogic/Makefile
+@@ -18,6 +18,7 @@ dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905x-p212.dtb
+ dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905d-p230.dtb
+ dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905d-p231.dtb
+ dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905w-p281.dtb
++dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905w-tx3-mini.dtb
+ dtb-$(CONFIG_ARCH_MESON) += meson-gxm-khadas-vim2.dtb
+ dtb-$(CONFIG_ARCH_MESON) += meson-gxm-nexbox-a1.dtb
+ dtb-$(CONFIG_ARCH_MESON) += meson-gxm-q200.dtb
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905w-tx3-mini.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905w-tx3-mini.dts
+new file mode 100644
+index 000000000000..08aca8346b72
+--- /dev/null
++++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905w-tx3-mini.dts
+@@ -0,0 +1,22 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++/*
++ * Copyright (c) 2018 Martin Blumenstingl <martin.blumenstingl@googlemail.com>.
++ * Based on meson-gxl-s905d-p231.dts:
++ * - Copyright (c) 2016 Endless Computers, Inc.
++ *   Author: Carlo Caione <carlo@endlessm.com>
++ */
++
++/dts-v1/;
++
++#include "meson-gxl-s905w.dtsi"
++#include "meson-gx-p23x-q20x.dtsi"
++
++/ {
++	compatible = "oranth,tx3-mini", "amlogic,s905w", "amlogic,meson-gxl";
++	model = "Oranth Tanix TX3 Mini";
++
++	memory at 0 {
++		device_type = "memory";
++		reg = <0x0 0x0 0x0 0x40000000>; /* 1 GiB or 2 GiB */
++	};
++};
+-- 
+2.18.0
