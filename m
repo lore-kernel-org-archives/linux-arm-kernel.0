@@ -1,42 +1,41 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Sun, 24 Jun 2018 23:09:20 +0200
-Subject: [PATCH v8 03/26] PM / Domains: Add generic data pointer to
- genpd_power_state struct
-In-Reply-To: <20180620172226.15012-4-ulf.hansson@linaro.org>
-References: <20180620172226.15012-1-ulf.hansson@linaro.org>
- <20180620172226.15012-4-ulf.hansson@linaro.org>
-Message-ID: <CAJZ5v0i52JTFbvBBaDyNHCnTz3UMW00NiodFpzS5m614D++9uA@mail.gmail.com>
+From: christoffer.dall@arm.com (Christoffer Dall)
+Date: Mon, 25 Jun 2018 00:11:00 +0200
+Subject: [PATCH 1/4] KVM: arm/arm64: GICv2 IGROUPR should read as zero
+In-Reply-To: <20180624221103.15055-1-christoffer.dall@arm.com>
+References: <20180624221103.15055-1-christoffer.dall@arm.com>
+Message-ID: <20180624221103.15055-2-christoffer.dall@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 20, 2018 at 7:22 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> From: Lina Iyer <lina.iyer@linaro.org>
->
-> Let's add a data pointer to the genpd_power_state struct, to allow
-> platforms to store per state specific data.
+We currently don't support grouping in the emulated VGIC, which is a
+known defect on KVM (not hurting any currently used guests as far as
+we're aware). This is currently handled by treating all interrupts as
+group 0 interrupts for an emulated GICv2 and always signaling interrupts
+as group 0 to the virtual CPU interface.
 
-Can you please fold it into a patch actually using this pointer?
+However, when reading which group interrupts belongs to in the guest
+from the emulated VGIC, the VGIC currently reports group 1 instead of
+group 0, which is misleading.  Fix this temporarily before introducing
+full group support by changing the hander to _raz instead of _rao.
 
-> Cc: Lina Iyer <ilina@codeaurora.org>
-> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
-> Co-developed-by: Ulf Hansson <ulf.hansson@linaro.org>
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> ---
->  include/linux/pm_domain.h | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
-> index 9206a4fef9ac..27fca748344a 100644
-> --- a/include/linux/pm_domain.h
-> +++ b/include/linux/pm_domain.h
-> @@ -44,6 +44,7 @@ struct genpd_power_state {
->         s64 residency_ns;
->         struct fwnode_handle *fwnode;
->         ktime_t idle_time;
-> +       void *data;
->  };
->
->  struct genpd_lock_ops;
-> --
-> 2.17.1
->
+Fixes: fb848db39661a "KVM: arm/arm64: vgic-new: Add GICv2 MMIO handling framework"
+Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
+---
+ virt/kvm/arm/vgic/vgic-mmio-v2.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+index ffc587bf4742..8d18f89397d3 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
++++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+@@ -362,7 +362,7 @@ static const struct vgic_register_region vgic_v2_dist_registers[] = {
+ 		vgic_mmio_read_v2_misc, vgic_mmio_write_v2_misc, 12,
+ 		VGIC_ACCESS_32bit),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_IGROUP,
+-		vgic_mmio_read_rao, vgic_mmio_write_wi, NULL, NULL, 1,
++		vgic_mmio_read_raz, vgic_mmio_write_wi, NULL, NULL, 1,
+ 		VGIC_ACCESS_32bit),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ENABLE_SET,
+ 		vgic_mmio_read_enable, vgic_mmio_write_senable, NULL, NULL, 1,
+-- 
+2.17.1
