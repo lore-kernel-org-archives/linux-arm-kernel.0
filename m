@@ -1,39 +1,67 @@
 From: akurz@blala.de (Alexander Kurz)
-Date: Sun, 24 Jun 2018 05:59:29 +0000
-Subject: [PATCH] ARM: dts: imx50: fix KPP pin definition typos
-Message-ID: <20180624055929.10011-1-akurz@blala.de>
+Date: Sun, 24 Jun 2018 06:15:38 +0000
+Subject: [PATCH] ARM: dts: imx50: remove non-existent USB instances
+Message-ID: <20180624061538.10156-1-akurz@blala.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-iMX50 pin mux options for pads KEY_COL2 and KEY_COL3 allow muxing the same
-KEY_COL instances as the pad name. Fix typos shifting KEY_COL instances.
+According to the i.MX50 Reference Manual, the SoC features one USB OTG
+and one host controller. Remove the non-existent instances from the
+DTS which probably got initially copied from the mx53 DTS.
 
 Signed-off-by: Alexander Kurz <akurz@blala.de>
 ---
- arch/arm/boot/dts/imx50-pinfunc.h | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/imx50-evk.dts |  8 --------
+ arch/arm/boot/dts/imx50.dtsi    | 18 ------------------
+ 2 files changed, 26 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx50-pinfunc.h b/arch/arm/boot/dts/imx50-pinfunc.h
-index 97e6e7f4ebdd..43863347362e 100644
---- a/arch/arm/boot/dts/imx50-pinfunc.h
-+++ b/arch/arm/boot/dts/imx50-pinfunc.h
-@@ -34,7 +34,7 @@
- #define MX50_PAD_KEY_ROW1__EIM_NANDF_CEN_1			0x02c 0x2d8 0x000 0x2 0x0
- #define MX50_PAD_KEY_ROW1__CTI_TRIGOUT_ACK7			0x02c 0x2d8 0x000 0x6 0x0
- #define MX50_PAD_KEY_ROW1__USBPHY1_RXERROR			0x02c 0x2d8 0x000 0x7 0x0
--#define MX50_PAD_KEY_COL2__KPP_COL_1				0x030 0x2dc 0x000 0x0 0x0
-+#define MX50_PAD_KEY_COL2__KPP_COL_2				0x030 0x2dc 0x000 0x0 0x0
- #define MX50_PAD_KEY_COL2__GPIO4_4				0x030 0x2dc 0x000 0x1 0x0
- #define MX50_PAD_KEY_COL2__EIM_NANDF_CEN_2			0x030 0x2dc 0x000 0x2 0x0
- #define MX50_PAD_KEY_COL2__CTI_TRIGOUT6				0x030 0x2dc 0x000 0x6 0x0
-@@ -44,7 +44,7 @@
- #define MX50_PAD_KEY_ROW2__EIM_NANDF_CEN_3			0x034 0x2e0 0x000 0x2 0x0
- #define MX50_PAD_KEY_ROW2__CTI_TRIGOUT7				0x034 0x2e0 0x000 0x6 0x0
- #define MX50_PAD_KEY_ROW2__USBPHY1_LINESTATE_0			0x034 0x2e0 0x000 0x7 0x0
--#define MX50_PAD_KEY_COL3__KPP_COL_2				0x038 0x2e4 0x000 0x0 0x0
-+#define MX50_PAD_KEY_COL3__KPP_COL_3				0x038 0x2e4 0x000 0x0 0x0
- #define MX50_PAD_KEY_COL3__GPIO4_6				0x038 0x2e4 0x000 0x1 0x0
- #define MX50_PAD_KEY_COL3__EIM_NANDF_READY0			0x038 0x2e4 0x7b4 0x2 0x0
- #define MX50_PAD_KEY_COL3__SDMA_EXT_EVENT_0			0x038 0x2e4 0x7b8 0x6 0x0
+diff --git a/arch/arm/boot/dts/imx50-evk.dts b/arch/arm/boot/dts/imx50-evk.dts
+index 98b5faa06e27..d952bd150764 100644
+--- a/arch/arm/boot/dts/imx50-evk.dts
++++ b/arch/arm/boot/dts/imx50-evk.dts
+@@ -105,14 +105,6 @@
+ 	status = "okay";
+ };
+ 
+-&usbh2 {
+-	status = "okay";
+-};
+-
+-&usbh3 {
+-	status = "okay";
+-};
+-
+ &usbotg {
+ 	status = "okay";
+ };
+diff --git a/arch/arm/boot/dts/imx50.dtsi b/arch/arm/boot/dts/imx50.dtsi
+index 3747d80104f4..42b3e53e07e9 100644
+--- a/arch/arm/boot/dts/imx50.dtsi
++++ b/arch/arm/boot/dts/imx50.dtsi
+@@ -212,24 +212,6 @@
+ 				status = "disabled";
+ 			};
+ 
+-			usbh2: usb at 53f80400 {
+-				compatible = "fsl,imx50-usb", "fsl,imx27-usb";
+-				reg = <0x53f80400 0x0200>;
+-				interrupts = <16>;
+-				clocks = <&clks IMX5_CLK_USBOH3_GATE>;
+-				dr_mode = "host";
+-				status = "disabled";
+-			};
+-
+-			usbh3: usb at 53f80600 {
+-				compatible = "fsl,imx50-usb", "fsl,imx27-usb";
+-				reg = <0x53f80600 0x0200>;
+-				interrupts = <17>;
+-				clocks = <&clks IMX5_CLK_USBOH3_GATE>;
+-				dr_mode = "host";
+-				status = "disabled";
+-			};
+-
+ 			gpio1: gpio at 53f84000 {
+ 				compatible = "fsl,imx50-gpio", "fsl,imx35-gpio";
+ 				reg = <0x53f84000 0x4000>;
 -- 
 2.11.0
