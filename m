@@ -1,70 +1,90 @@
-From: harald@ccbib.org (Harald Geyer)
-Date: Sun, 24 Jun 2018 18:34:40 +0200
-Subject: [PATCHv2 5/5] arm64: allwinner: a64: Add support for TERES-I
- laptop
-In-Reply-To: <a7011fe78d171658742406bf01d50b7e3d7eaf1d.camel@aosc.io>
-References: <20180315162510.11669-1-harald@ccbib.org>
- <20180315162510.11669-6-harald@ccbib.org>
- <a7011fe78d171658742406bf01d50b7e3d7eaf1d.camel@aosc.io>
-Message-ID: <E1fX7yK-0000OC-HA@stardust.g4.wien.funkfeuer.at>
+From: daniel@zonque.org (Daniel Mack)
+Date: Sun, 24 Jun 2018 19:41:34 +0200
+Subject: [PATCH] arm: dts: pxa3xx: Add ssp ports to pxa3xx device tree
+Message-ID: <20180624174134.20581-1-daniel@zonque.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Icenowy Zheng writes:
-> ? 2018-03-15?? 16:25 +0000?Harald Geyer???
-> > +&mmc1 {
-> > +	pinctrl-names = "default";
-> > +	pinctrl-0 = <&mmc1_pins>;
-> > +	vmmc-supply = <&reg_aldo2>;
-> > +	vqmmc-supply = <&reg_dldo4>;
-> > +	mmc-pwrseq = <&wifi_pwrseq>;
-> > +	bus-width = <4>;
-> > +	non-removable;
-> > +	status = "okay";
-> > +
-> > +	rtl8723bs: wifi at 1 {
-> > +		reg = <1>;
-> > +		interrupt-parent = <&r_pio>;
-> > +		interrupts = <0 3 IRQ_TYPE_LEVEL_LOW>; /* PL3 */
-> > +		interrupt-names = "host-wake";
-> > +	};
-> 
-> I think this node has some problem:
+Also fix the documentation for these bindings.
 
-Thanks for the heads up! Admittedly, I simply copied this node from
-sun50i-a64-olinuxino.dts and since it worked, didn't look into it in
-too much detail.
+The DMA properties have to be passed in the ssp users for now.
 
-> - This device node has no binding. The "host-wake" interrupt is part of
->  Broadcom SDIO Wi-Fi binding, rather than a generic one.
+Signed-off-by: Daniel Mack <daniel@zonque.org>
+---
+ .../bindings/sound/mrvl,pxa-ssp.txt           |  8 ++---
+ arch/arm/boot/dts/pxa3xx.dtsi                 | 32 +++++++++++++++++++
+ 2 files changed, 35 insertions(+), 5 deletions(-)
 
-I think the general mmc and interrupts bindings apply. And the mmc binding
-clearly states that for sub-nodes a compatible string is optional.
-
-However I just realized that the 'interrupt-names' property is not part
-of the general interrupts binding, so I guess at least this property should
-be removed.
-
-> - Without the interrupt this device node isn't needed, as RTL8723BS has
-> MAC eFUSE and doesn't need a MAC in device tree.
-
-Indeed. I wasn't aware of this, but I just tested and the device probes
-fine without the subnode present. I think the devicetree is mainly for
-information which cannot be probed, so maybe the subnode should just get
-removed.
-
-> In order to solve the problems. I suggest either drop this device node
-> or make a generic "sdio-wifi" device tree binding. Personally I prefer
-> the latter, as it's more accurate device representation.
-> 
-> If such a device tree binding is added, I think it should contain the
-> "host-wake" interrupt and a "local-mac-address" property. Both can be
-> ignored by the driver. (This interrupt can be needed if a more card-
-> ventor-neutral name is found.)
-
-I don't feel qualified to comment on this. If you want to propose such
-a patch and fix above node accordingly, I won't object. Otherwise I'll
-just send a patch to remove the subnode.
-
-Thanks,
-Harald
+diff --git a/Documentation/devicetree/bindings/sound/mrvl,pxa-ssp.txt b/Documentation/devicetree/bindings/sound/mrvl,pxa-ssp.txt
+index 74c9ba6c2823..efd3fb1f68d2 100644
+--- a/Documentation/devicetree/bindings/sound/mrvl,pxa-ssp.txt
++++ b/Documentation/devicetree/bindings/sound/mrvl,pxa-ssp.txt
+@@ -9,20 +9,18 @@ Example:
+ 
+ 	/* upstream device */
+ 
+-	ssp0: ssp at 41000000 {
++	ssp1: ssp at 41000000 {
+ 		compatible = "mrvl,pxa3xx-ssp";
+ 		reg = <0x41000000 0x40>;
+ 		interrupts = <24>;
+ 		clock-names = "pxa27x-ssp.0";
+-		dmas = <&dma 13
+-			&dma 14>;
+-		dma-names = "rx", "tx";
+ 	};
+ 
+ 	/* DAI as user */
+ 
+ 	ssp_dai0: ssp_dai at 0 {
+ 		compatible = "mrvl,pxa-ssp-dai";
+-		port = <&ssp0>;
++		port = <&ssp1>;
++		#sound-dai-cells = <0>;
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/pxa3xx.dtsi b/arch/arm/boot/dts/pxa3xx.dtsi
+index 132a3b8ab148..3851057bc77d 100644
+--- a/arch/arm/boot/dts/pxa3xx.dtsi
++++ b/arch/arm/boot/dts/pxa3xx.dtsi
+@@ -242,6 +242,38 @@
+ 			clocks = <&clks CLK_PWM1>;
+ 			status = "disabled";
+ 		};
++
++		ssp1: ssp at 41000000 {
++			compatible = "mrvl,pxa3xx-ssp";
++			reg = <0x41000000 0x40>;
++			interrupts = <24>;
++			clocks = <&clks CLK_SSP1>;
++			status = "disabled";
++		};
++
++		ssp2: ssp at 41700000 {
++			compatible = "mrvl,pxa3xx-ssp";
++			reg = <0x41700000 0x40>;
++			interrupts = <16>;
++			clocks = <&clks CLK_SSP2>;
++			status = "disabled";
++		};
++
++		ssp3: ssp at 41900000 {
++			compatible = "mrvl,pxa3xx-ssp";
++			reg = <0x41900000 0x40>;
++			interrupts = <0>;
++			clocks = <&clks CLK_SSP3>;
++			status = "disabled";
++		};
++
++		ssp4: ssp at 41a00000 {
++			compatible = "mrvl,pxa3xx-ssp";
++			reg = <0x41a00000 0x40>;
++			interrupts = <13>;
++			clocks = <&clks CLK_SSP4>;
++			status = "disabled";
++		};
+ 	};
+ 
+ 	clocks {
+-- 
+2.17.1
