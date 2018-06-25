@@ -1,148 +1,63 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 25 Jun 2018 16:03:11 +0200
-Subject: [PATCH 16/29] arm64: dts: renesas: r8a77980: add I2C support
+Date: Mon, 25 Jun 2018 16:03:13 +0200
+Subject: [PATCH 18/29] arm64: dts: renesas: r8a77990: ebisu: Enable watchdog
+ timer
 In-Reply-To: <cover.1529933747.git.horms+renesas@verge.net.au>
 References: <cover.1529933747.git.horms+renesas@verge.net.au>
-Message-ID: <bc620474c6e283c0e1e60796ed0ac9b04da9890c.1529933747.git.horms+renesas@verge.net.au>
+Message-ID: <eb614d94395293da7beecaa29555acb8966a2796.1529933747.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
 
-Define the generic R8A77980 parts of the I2C[0-5] device nodes.
+Add a device node for the Watchdog Timer (WDT) controller on the
+R8A77990 SoC, and enable the watchdog on the Ebisu board.
 
-Based on the original (and large) patch by Vladimir Barinov.
-
-Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+[geert: Squashed 2 commits]
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a77980.dtsi | 105 ++++++++++++++++++++++++++++++
- 1 file changed, 105 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts |  5 +++++
+ arch/arm64/boot/dts/renesas/r8a77990.dtsi      | 10 ++++++++++
+ 2 files changed, 15 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77980.dtsi b/arch/arm64/boot/dts/renesas/r8a77980.dtsi
-index c797db59ae18..424d5f12cdd3 100644
---- a/arch/arm64/boot/dts/renesas/r8a77980.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a77980.dtsi
-@@ -16,6 +16,15 @@
- 	#address-cells = <2>;
- 	#size-cells = <2>;
+diff --git a/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts b/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
+index 7a09d0524f9b..28945a8b9800 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
++++ b/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
+@@ -60,6 +60,11 @@
+ 	};
+ };
  
-+	aliases {
-+		i2c0 = &i2c0;
-+		i2c1 = &i2c1;
-+		i2c2 = &i2c2;
-+		i2c3 = &i2c3;
-+		i2c4 = &i2c4;
-+		i2c5 = &i2c5;
-+	};
++&rwdt {
++	timeout-sec = <60>;
++	status = "okay";
++};
 +
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-@@ -135,6 +144,102 @@
- 			#power-domain-cells = <1>;
- 		};
+ &scif2 {
+ 	status = "okay";
+ };
+diff --git a/arch/arm64/boot/dts/renesas/r8a77990.dtsi b/arch/arm64/boot/dts/renesas/r8a77990.dtsi
+index be4f519711a1..e644f49c9b58 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77990.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a77990.dtsi
+@@ -60,6 +60,16 @@
+ 		#size-cells = <2>;
+ 		ranges;
  
-+		i2c0: i2c at e6500000 {
-+			compatible = "renesas,i2c-r8a77980",
-+				     "renesas,rcar-gen3-i2c";
-+			reg = <0 0xe6500000 0 0x40>;
-+			interrupts = <GIC_SPI 287 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 931>;
-+			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
-+			resets = <&cpg 931>;
-+			dmas = <&dmac1 0x91>, <&dmac1 0x90>,
-+			       <&dmac2 0x91>, <&dmac2 0x90>;
-+			dma-names = "tx", "rx", "tx", "rx";
-+			i2c-scl-internal-delay-ns = <6>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
++		rwdt: watchdog at e6020000 {
++			compatible = "renesas,r8a77990-wdt",
++				     "renesas,rcar-gen3-wdt";
++			reg = <0 0xe6020000 0 0x0c>;
++			clocks = <&cpg CPG_MOD 402>;
++			power-domains = <&sysc 32>;
++			resets = <&cpg 402>;
 +			status = "disabled";
 +		};
 +
-+		i2c1: i2c at e6508000 {
-+			compatible = "renesas,i2c-r8a77980",
-+				     "renesas,rcar-gen3-i2c";
-+			reg = <0 0xe6508000 0 0x40>;
-+			interrupts = <GIC_SPI 288 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 930>;
-+			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
-+			resets = <&cpg 930>;
-+			dmas = <&dmac1 0x93>, <&dmac1 0x92>,
-+			       <&dmac2 0x93>, <&dmac2 0x92>;
-+			dma-names = "tx", "rx", "tx", "rx";
-+			i2c-scl-internal-delay-ns = <6>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
-+		i2c2: i2c at e6510000 {
-+			compatible = "renesas,i2c-r8a77980",
-+				     "renesas,rcar-gen3-i2c";
-+			reg = <0 0xe6510000 0 0x40>;
-+			interrupts = <GIC_SPI 286 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 929>;
-+			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
-+			resets = <&cpg 929>;
-+			dmas = <&dmac1 0x95>, <&dmac1 0x94>,
-+			       <&dmac2 0x95>, <&dmac2 0x94>;
-+			dma-names = "tx", "rx", "tx", "rx";
-+			i2c-scl-internal-delay-ns = <6>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
-+		i2c3: i2c at e66d0000 {
-+			compatible = "renesas,i2c-r8a77980",
-+				     "renesas,rcar-gen3-i2c";
-+			reg = <0 0xe66d0000 0 0x40>;
-+			interrupts = <GIC_SPI 290 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 928>;
-+			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
-+			resets = <&cpg 928>;
-+			i2c-scl-internal-delay-ns = <6>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
-+		i2c4: i2c at e66d8000 {
-+			compatible = "renesas,i2c-r8a77980",
-+				     "renesas,rcar-gen3-i2c";
-+			reg = <0 0xe66d8000 0 0x40>;
-+			interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 927>;
-+			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
-+			resets = <&cpg 927>;
-+			i2c-scl-internal-delay-ns = <6>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
-+		i2c5: i2c at e66e0000 {
-+			compatible = "renesas,i2c-r8a77980",
-+				     "renesas,rcar-gen3-i2c";
-+			reg = <0 0xe66e0000 0 0x40>;
-+			interrupts = <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 919>;
-+			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
-+			resets = <&cpg 919>;
-+			dmas = <&dmac1 0x9b>, <&dmac1 0x9a>,
-+			       <&dmac2 0x9b>, <&dmac2 0x9a>;
-+			dma-names = "tx", "rx", "tx", "rx";
-+			i2c-scl-internal-delay-ns = <6>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
- 		hscif0: serial at e6540000 {
- 			compatible = "renesas,hscif-r8a77980",
- 				     "renesas,rcar-gen3-hscif",
+ 		gpio0: gpio at e6050000 {
+ 			compatible = "renesas,gpio-r8a77990",
+ 				     "renesas,rcar-gen3-gpio";
 -- 
 2.11.0
