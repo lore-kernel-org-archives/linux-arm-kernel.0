@@ -1,111 +1,153 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 25 Jun 2018 16:05:26 +0200
-Subject: [GIT PULL] Renesas ARM Based SoC Arm SoC Updates for v4.19
-Message-ID: <cover.1529934908.git.horms+renesas@verge.net.au>
+Date: Mon, 25 Jun 2018 16:06:12 +0200
+Subject: [PATCH 01/15] ARM: shmobile: r8a7790: Remove legacy SMP fallback code
+In-Reply-To: <cover.1529934908.git.horms+renesas@verge.net.au>
+References: <cover.1529934908.git.horms+renesas@verge.net.au>
+Message-ID: <f13e47ee48e283e0b5aab8f899d438ae54b1d05d.1529934908.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Please consider these Renesas ARM based SoC arm SoC updates for v4.19.
+As of commit f5d70b9cee2282ec ("ARM: shmobile: r8a7790: Prioritize DT
+APMU support") in v4.8, non-DT enablement of SMP was left as a fallback
+for backwards compatibility with old DTBs.
 
+The time has come to drop backwards compatibility, hence remove the
+fallback code.
 
-The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
-
-  Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
-
-are available in the git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm-soc-for-v4.19
-
-for you to fetch changes up to c44e182e537492baaa37303fc0ee299222fce921:
-
-  ARM: shmobile: convert to SPDX identifier (2018-06-18 12:00:29 +0200)
-
-----------------------------------------------------------------
-Renesas ARM Based SoC Arm SoC Updates for v4.19
-
-* Convert to SPDX identifier
-
-* Remove legacy SMP fallback code
-
-  Geert Uytterhoeven says "R-Car H2 and M2-W have been supporting SMP
-  enablement from DT using the "renesas,apmu" enable-method since v4.8.
-  A legacy fallback was left in place for backwards compatibility with old
-  DTBs.
-
-  This patch series removes the legacy SMP fallbacks for R-Car H2 and
-  M2-W, and consolidates their support in the common R-Car Gen2 machine
-  definition.2
-
-* APMU cleanups after legacy SMP fallback removal
-  - Move cpu_leave_lowpower() from HOTPLUG_CPU || SUSPEND section to the
-    SUSPEND section as it is only used for suspend
-  - Remove shmobile_smp_apmu_prepare_cpus() as it is no longer used
-  - Remove platsmp-apmu.h
-
-* Drop legacy SYSC fallbacks
-
-  Geert Uytterhoeven says "When DT SYSC support was introduced in v4.7,
-  legacy fallbacks were kept to keep secondary CPUs working on R-Car H1,
-  H2, and M2-W using old DTBs.  However, the time has come to drop these
-  fallbacks, and clean up the resulting code"
-
-----------------------------------------------------------------
-Geert Uytterhoeven (14):
-      ARM: shmobile: r8a7790: Remove legacy SMP fallback code
-      ARM: shmobile: r8a7790: Use common R-Car Gen2 machine definition
-      ARM: shmobile: r8a7791: Remove legacy SMP fallback code
-      ARM: shmobile: r8a7791: Use common R-Car Gen2 machine definition
-      ARM: shmobile: Remove unused shmobile_smp_init_fallback_ops()
-      ARM: shmobile: apmu: Move cpu_leave_lowpower() to SUSPEND section
-      ARM: shmobile: apmu: Remove obsolete shmobile_smp_apmu_prepare_cpus()
-      ARM: shmobile: apmu: Remove platsmp-apmu.h
-      ARM: shmobile: rcar-gen2: Remove explicit SYSC config and init
-      ARM: shmobile: r8a7779: Stop powering down secondary CPUs during early boot
-      soc: renesas: rcar-sysc: Provide helpers to power up/down CPUs
-      ARM: shmobile: r8a7779: Use rcar_sysc_power_{down,up}_cpu()
-      ARM: shmobile: r8a7779: Remove explicit SYSC config and init
-      soc: renesas: rcar-sysc: Drop legacy handling
-
-Wolfram Sang (1):
-      ARM: shmobile: convert to SPDX identifier
-
- arch/arm/include/debug/renesas-scif.S              |   5 +-
- arch/arm/mach-shmobile/Makefile                    |   6 +-
- arch/arm/mach-shmobile/common.h                    |   1 -
- arch/arm/mach-shmobile/headsmp-apmu.S              |   5 +-
- arch/arm/mach-shmobile/platsmp-apmu.c              | 245 +++++++++------------
- arch/arm/mach-shmobile/platsmp-apmu.h              |  32 ---
- arch/arm/mach-shmobile/platsmp.c                   |   9 -
- arch/arm/mach-shmobile/pm-r8a7779.c                |  41 ----
- arch/arm/mach-shmobile/pm-rcar-gen2.c              |  25 ---
- arch/arm/mach-shmobile/r8a7779.h                   |   2 -
- arch/arm/mach-shmobile/r8a7790.h                   |   7 -
- arch/arm/mach-shmobile/r8a7791.h                   |   7 -
- arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c |  10 +-
- arch/arm/mach-shmobile/setup-emev2.c               |  10 +-
- arch/arm/mach-shmobile/setup-r7s72100.c            |  10 +-
- arch/arm/mach-shmobile/setup-r8a73a4.c             |  10 +-
- arch/arm/mach-shmobile/setup-r8a7740.c             |  10 +-
- arch/arm/mach-shmobile/setup-r8a7778.c             |  10 +-
- arch/arm/mach-shmobile/setup-r8a7779.c             |  10 +-
- arch/arm/mach-shmobile/setup-r8a7790.c             |  38 ----
- arch/arm/mach-shmobile/setup-r8a7791.c             |  39 ----
- arch/arm/mach-shmobile/setup-rcar-gen2.c           |  16 +-
- arch/arm/mach-shmobile/setup-sh73a0.c              |  10 +-
- arch/arm/mach-shmobile/smp-emev2.c                 |  10 +-
- arch/arm/mach-shmobile/smp-r8a7779.c               |  64 +-----
- arch/arm/mach-shmobile/smp-r8a7790.c               |  71 ------
- arch/arm/mach-shmobile/smp-r8a7791.c               |  53 -----
- drivers/soc/renesas/rcar-sysc.c                    |  64 ++++--
- include/linux/soc/renesas/rcar-sysc.h              |  13 +-
- 29 files changed, 166 insertions(+), 667 deletions(-)
- delete mode 100644 arch/arm/mach-shmobile/platsmp-apmu.h
- delete mode 100644 arch/arm/mach-shmobile/pm-r8a7779.c
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/Makefile        |  1 -
+ arch/arm/mach-shmobile/r8a7790.h       |  7 ----
+ arch/arm/mach-shmobile/setup-r8a7790.c |  2 -
+ arch/arm/mach-shmobile/smp-r8a7790.c   | 71 ----------------------------------
+ 4 files changed, 81 deletions(-)
  delete mode 100644 arch/arm/mach-shmobile/r8a7790.h
- delete mode 100644 arch/arm/mach-shmobile/r8a7791.h
- delete mode 100644 arch/arm/mach-shmobile/setup-r8a7790.c
- delete mode 100644 arch/arm/mach-shmobile/setup-r8a7791.c
  delete mode 100644 arch/arm/mach-shmobile/smp-r8a7790.c
- delete mode 100644 arch/arm/mach-shmobile/smp-r8a7791.c
+
+diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
+index 1939f521579c..9133949b5df2 100644
+--- a/arch/arm/mach-shmobile/Makefile
++++ b/arch/arm/mach-shmobile/Makefile
+@@ -32,7 +32,6 @@ obj-$(CONFIG_ARCH_R8A7793)	+= regulator-quirk-rcar-gen2.o
+ smp-y				:= $(cpu-y)
+ smp-$(CONFIG_ARCH_SH73A0)	+= smp-sh73a0.o headsmp-scu.o platsmp-scu.o
+ smp-$(CONFIG_ARCH_R8A7779)	+= smp-r8a7779.o headsmp-scu.o platsmp-scu.o
+-smp-$(CONFIG_ARCH_R8A7790)	+= smp-r8a7790.o
+ smp-$(CONFIG_ARCH_R8A7791)	+= smp-r8a7791.o
+ smp-$(CONFIG_ARCH_EMEV2)	+= smp-emev2.o headsmp-scu.o platsmp-scu.o
+ 
+diff --git a/arch/arm/mach-shmobile/r8a7790.h b/arch/arm/mach-shmobile/r8a7790.h
+deleted file mode 100644
+index 669c8cd09e07..000000000000
+--- a/arch/arm/mach-shmobile/r8a7790.h
++++ /dev/null
+@@ -1,7 +0,0 @@
+-/* SPDX-License-Identifier: GPL-2.0 */
+-#ifndef __ASM_R8A7790_H__
+-#define __ASM_R8A7790_H__
+-
+-extern const struct smp_operations r8a7790_smp_ops;
+-
+-#endif /* __ASM_R8A7790_H__ */
+diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c b/arch/arm/mach-shmobile/setup-r8a7790.c
+index 78d3e859bd64..fd2435b39529 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7790.c
++++ b/arch/arm/mach-shmobile/setup-r8a7790.c
+@@ -19,7 +19,6 @@
+ #include <asm/mach/arch.h>
+ 
+ #include "common.h"
+-#include "r8a7790.h"
+ #include "rcar-gen2.h"
+ 
+ static const char * const r8a7790_boards_compat_dt[] __initconst = {
+@@ -29,7 +28,6 @@ static const char * const r8a7790_boards_compat_dt[] __initconst = {
+ 
+ DT_MACHINE_START(R8A7790_DT, "Generic R8A7790 (Flattened Device Tree)")
+ 	.smp_init	= smp_init_ops(shmobile_smp_init_fallback_ops),
+-	.smp		= smp_ops(r8a7790_smp_ops),
+ 	.init_early	= shmobile_init_delay,
+ 	.init_time	= rcar_gen2_timer_init,
+ 	.init_late	= shmobile_init_late,
+diff --git a/arch/arm/mach-shmobile/smp-r8a7790.c b/arch/arm/mach-shmobile/smp-r8a7790.c
+deleted file mode 100644
+index 28f26d5362d8..000000000000
+--- a/arch/arm/mach-shmobile/smp-r8a7790.c
++++ /dev/null
+@@ -1,71 +0,0 @@
+-/*
+- * SMP support for r8a7790
+- *
+- * Copyright (C) 2012-2013 Renesas Solutions Corp.
+- * Copyright (C) 2012 Takashi Yoshii <takashi.yoshii.ze@renesas.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; version 2 of the License.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- */
+-#include <linux/kernel.h>
+-#include <linux/init.h>
+-#include <linux/smp.h>
+-#include <linux/io.h>
+-#include <linux/soc/renesas/rcar-sysc.h>
+-
+-#include <asm/smp_plat.h>
+-
+-#include "common.h"
+-#include "platsmp-apmu.h"
+-#include "rcar-gen2.h"
+-#include "r8a7790.h"
+-
+-static const struct rcar_sysc_ch r8a7790_ca15_scu = {
+-	.chan_offs = 0x180, /* PWRSR5 .. PWRER5 */
+-	.isr_bit = 12, /* CA15-SCU */
+-};
+-
+-static const struct rcar_sysc_ch r8a7790_ca7_scu = {
+-	.chan_offs = 0x100, /* PWRSR3 .. PWRER3 */
+-	.isr_bit = 21, /* CA7-SCU */
+-};
+-
+-static struct rcar_apmu_config r8a7790_apmu_config[] = {
+-	{
+-		.iomem = DEFINE_RES_MEM(0xe6152000, 0x188),
+-		.cpus = { 0, 1, 2, 3 },
+-	},
+-	{
+-		.iomem = DEFINE_RES_MEM(0xe6151000, 0x188),
+-		.cpus = { 0x100, 0x0101, 0x102, 0x103 },
+-	}
+-};
+-
+-static void __init r8a7790_smp_prepare_cpus(unsigned int max_cpus)
+-{
+-	/* let APMU code install data related to shmobile_boot_vector */
+-	shmobile_smp_apmu_prepare_cpus(max_cpus,
+-				       r8a7790_apmu_config,
+-				       ARRAY_SIZE(r8a7790_apmu_config));
+-
+-	/* turn on power to SCU */
+-	rcar_gen2_pm_init();
+-	rcar_sysc_power_up(&r8a7790_ca15_scu);
+-	rcar_sysc_power_up(&r8a7790_ca7_scu);
+-}
+-
+-const struct smp_operations r8a7790_smp_ops __initconst = {
+-	.smp_prepare_cpus	= r8a7790_smp_prepare_cpus,
+-	.smp_boot_secondary	= shmobile_smp_apmu_boot_secondary,
+-#ifdef CONFIG_HOTPLUG_CPU
+-	.cpu_can_disable	= shmobile_smp_cpu_can_disable,
+-	.cpu_die		= shmobile_smp_apmu_cpu_die,
+-	.cpu_kill		= shmobile_smp_apmu_cpu_kill,
+-#endif
+-};
+-- 
+2.11.0
