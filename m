@@ -1,37 +1,59 @@
-From: david@lechnology.com (David Lechner)
-Date: Mon, 25 Jun 2018 11:00:11 -0500
-Subject: [PATCH 3/9] ARM: davinci: da850-evm: use aemif platform driver in
- legacy mode
-In-Reply-To: <20180625152920.11549-4-brgl@bgdev.pl>
-References: <20180625152920.11549-1-brgl@bgdev.pl>
- <20180625152920.11549-4-brgl@bgdev.pl>
-Message-ID: <13418bf6-dbe7-5091-b5a7-07f779fb9f63@lechnology.com>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Mon, 25 Jun 2018 17:50:15 +0200
+Subject: [PATCH 04/14] ARM: davinci: dm646x-evm: use nvmem lookup for mac
+ address
+In-Reply-To: <20180625155025.12567-1-brgl@bgdev.pl>
+References: <20180625155025.12567-1-brgl@bgdev.pl>
+Message-ID: <20180625155025.12567-5-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/25/2018 10:29 AM, Bartosz Golaszewski wrote:
-> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> 
-> We now support board files in the aemif driver. Register a platform
-> device instead of using the handcrafted API in da850-evm.
-> 
-> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> ---
+From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-> -	iounmap(aemif_addr);
-> -}
-> +static struct platform_device da850_evm_aemif_device = {
-> +	.name		= "ti-aemif",
-> +	.dev = {
-> +		.platform_data	= &da850_evm_aemif_pdata,
-> +	},
-> +	.resource	= da850_evm_aemif_resource,
-> +	.num_resources	= ARRAY_SIZE(da850_evm_aemif_resource),
-> +	.id		= -1,
-> +};
-> 
+We now support nvmem lookups for machine code. Add a lookup for
+mac-address.
 
-Not essential, but it is nice to have the id right after name
-since they are closely related (as you did in several other
-instances in this same patch). For a second, I thought you
-forgot id = -1 here before I saw it.
+Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+---
+ arch/arm/mach-davinci/board-dm646x-evm.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/arch/arm/mach-davinci/board-dm646x-evm.c b/arch/arm/mach-davinci/board-dm646x-evm.c
+index 584064fdabf5..4c82d38033b6 100644
+--- a/arch/arm/mach-davinci/board-dm646x-evm.c
++++ b/arch/arm/mach-davinci/board-dm646x-evm.c
+@@ -37,6 +37,7 @@
+ #include <linux/platform_data/i2c-davinci.h>
+ #include <linux/platform_data/mtd-davinci.h>
+ #include <linux/platform_data/mtd-davinci-aemif.h>
++#include <linux/nvmem-provider.h>
+ 
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+@@ -310,6 +311,15 @@ static struct pcf857x_platform_data pcf_data = {
+  *  - ... newer boards may have more
+  */
+ 
++static struct nvmem_cell_lookup dm646x_evm_mac_address_cell = {
++	.info = {
++		.name = "mac-address",
++		.offset = 0x7f00,
++		.bytes = ETH_ALEN,
++	},
++	.nvmem_name = "1-00500",
++};
++
+ static struct at24_platform_data eeprom_info = {
+ 	.byte_len       = (256*1024) / 8,
+ 	.page_size      = 64,
+@@ -802,6 +812,8 @@ static __init void evm_init(void)
+ 		davinci_init_ide();
+ 
+ 	soc_info->emac_pdata->phy_id = DM646X_EVM_PHY_ID;
++
++	nvmem_register_lookup(&dm646x_evm_mac_address_cell, 1);
+ }
+ 
+ MACHINE_START(DAVINCI_DM6467_EVM, "DaVinci DM646x EVM")
+-- 
+2.17.1
