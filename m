@@ -1,27 +1,33 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 25 Jun 2018 01:04:16 -0700
-Subject: [PATCH] ARM: DRA7/OMAP5: Enable ACTLR[0] (Enable invalidates of
- BTB) for secondary cores
-In-Reply-To: <20180625080309.GH112168@atomide.com>
-References: <20180612213611.2484-1-nm@ti.com>
- <20180613101153.GD6920@n2100.armlinux.org.uk>
- <20180613132910.wr7ngq4nvxlgaoqi@kahuna>
- <20180625080309.GH112168@atomide.com>
-Message-ID: <20180625080416.GI112168@atomide.com>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Mon, 25 Jun 2018 10:06:04 +0200
+Subject: [PATCH v3 1/3] cpufreq: imx6q: check speed grades for i.MX6ULL
+In-Reply-To: <2d63a25f-7265-7aa7-a7dc-fd2379240804@armadeus.com>
+References: <20180522062853.24799-1-sebastien.szymanski@armadeus.com>
+ <20180611053826.GC16091@dragon>
+ <2d63a25f-7265-7aa7-a7dc-fd2379240804@armadeus.com>
+Message-ID: <CAJZ5v0j9P6dXM+8qBdgGwfd8diQ4F+hh+QZ8h09y769YYFtEkw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [180625 01:03]:
-> * Nishanth Menon <nm@ti.com> [180613 13:31]:
-> > 
-> > If the above explanation makes sense, I will add that to the commit log
-> > as well.
-> 
-> Probably good idea to also add a comment to the code that this
-> is for the secondary core.
+On Mon, Jun 25, 2018 at 10:01 AM, S?bastien Szymanski
+<sebastien.szymanski@armadeus.com> wrote:
+> Hi,
+>
+> On 06/11/2018 07:38 AM, Shawn Guo wrote:
+>> On Tue, May 22, 2018 at 08:28:51AM +0200, S?bastien Szymanski wrote:
+>>> Check the max speed supported from the fuses for i.MX6ULL and update the
+>>> operating points table accordingly.
+>>>
+>>> Signed-off-by: S?bastien Szymanski <sebastien.szymanski@armadeus.com>
+>>
+>> Acked-by: Shawn Guo <shawnguo@kernel.org>
+>>
+>
+> Thanks, but what about the two others patches ? Now that patch 1 is in
+> 4.18-rc1, should I resend the two others patches ?
 
-Or rename the function to make it specific to secondary core.
+Please do.
 
-Regards,
+> Should I merge them together ?
 
-Tony
+If they make related changes, you can do that.
