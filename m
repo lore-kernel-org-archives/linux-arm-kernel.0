@@ -1,81 +1,57 @@
-From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Mon, 25 Jun 2018 17:12:36 +0200
-Subject: [PATCH v2 20/23] arm64: dts: marvell: move AP806/CP110 thermal nodes
- into a new syscon
-In-Reply-To: <20180625151239.20976-1-miquel.raynal@bootlin.com>
-References: <20180625151239.20976-1-miquel.raynal@bootlin.com>
-Message-ID: <20180625151239.20976-21-miquel.raynal@bootlin.com>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Mon, 25 Jun 2018 12:05:46 -0500
+Subject: [PATCH 1/2] soc: qcom: cmd-db: Fix incorrect errno checks
+Message-ID: <1529946347-12740-1-git-send-email-andy.gross@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-New bindings impose to declare the thermal IP from within a new syscon.
+This patch fixes a couple of checks for errno that should have been
+checking for ret < 0.
 
-Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+Signed-off-by: Andy Gross <andy.gross@linaro.org>
 ---
- arch/arm64/boot/dts/marvell/armada-ap806.dtsi | 14 ++++++++++----
- arch/arm64/boot/dts/marvell/armada-cp110.dtsi | 18 ++++++++++++------
- 2 files changed, 22 insertions(+), 10 deletions(-)
+ drivers/soc/qcom/cmd-db.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-index 550f03b8c96f..3c6896fb96e6 100644
---- a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-@@ -258,10 +258,16 @@
- 				};
- 			};
+diff --git a/drivers/soc/qcom/cmd-db.c b/drivers/soc/qcom/cmd-db.c
+index a6f6462..deb2b90 100644
+--- a/drivers/soc/qcom/cmd-db.c
++++ b/drivers/soc/qcom/cmd-db.c
+@@ -121,7 +121,7 @@ rsc_offset(struct rsc_hdr *hdr, struct entry_header *ent)
+ /**
+  * cmd_db_ready - Indicates if command DB is available
+  *
+- * Return: 0 on success, errno otherwise
++ * Return: 0 on success, -errno otherwise
+  */
+ int cmd_db_ready(void)
+ {
+@@ -143,7 +143,7 @@ static int cmd_db_get_header(const char *id, struct entry_header *eh,
+ 	u8 query[8];
  
--			ap_thermal: thermal at 6f808c {
--				compatible = "marvell,armada-ap806-thermal";
--				reg = <0x6f808c 0x4>,
--				      <0x6f8084 0x8>;
-+			ap_syscon1: system-controller at 6f8000 {
-+				compatible = "syscon", "simple-mfd";
-+				reg = <0x6f8000 0x1000>;
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+
-+				ap_thermal: ap-thermal at 80 {
-+					compatible = "marvell,armada-ap806-thermal";
-+					reg = <0x80 0x10>;
-+				};
- 			};
- 		};
- 	};
-diff --git a/arch/arm64/boot/dts/marvell/armada-cp110.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
-index ab31ba20aa2a..65039292b398 100644
---- a/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
-@@ -177,12 +177,6 @@
- 			interrupts = <77 IRQ_TYPE_LEVEL_HIGH>;
- 		};
+ 	ret = cmd_db_ready();
+-	if (ret)
++	if (ret < 0)
+ 		return ret;
  
--		CP110_LABEL(thermal): thermal at 400078 {
--			compatible = "marvell,armada-cp110-thermal";
--			reg = <0x400078 0x4>,
--			<0x400070 0x8>;
--		};
--
- 		CP110_LABEL(syscon0): system-controller at 440000 {
- 			compatible = "syscon", "simple-mfd";
- 			reg = <0x440000 0x2000>;
-@@ -223,6 +217,18 @@
- 			};
- 		};
+ 	if (!eh || !rh)
+@@ -202,7 +202,7 @@ EXPORT_SYMBOL(cmd_db_read_addr);
+  *  @data: Data buffer to copy returned aux data to. Returns size on NULL
+  *  @len: Caller provides size of data buffer passed in.
+  *
+- *  Return: size of data on success, errno otherwise
++ *  Return: size of data on success, -errno otherwise
+  */
+ int cmd_db_read_aux_data(const char *id, u8 *data, size_t len)
+ {
+@@ -215,7 +215,7 @@ int cmd_db_read_aux_data(const char *id, u8 *data, size_t len)
+ 		return -EINVAL;
  
-+		CP110_LABEL(syscon1): system-controller at 400000 {
-+			compatible = "syscon", "simple-mfd";
-+			reg = <0x400000 0x1000>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+
-+			CP110_LABEL(thermal): thermal at 70 {
-+				compatible = "marvell,armada-cp110-thermal";
-+				reg = <0x70 0x10>;
-+			};
-+		};
-+
- 		CP110_LABEL(usb3_0): usb3 at 500000 {
- 			compatible = "marvell,armada-8k-xhci",
- 			"generic-xhci";
+ 	ret = cmd_db_get_header(id, &ent, &rsc_hdr);
+-	if (ret)
++	if (ret < 0)
+ 		return ret;
+ 
+ 	ent_len = le16_to_cpu(ent.len);
 -- 
-2.14.1
+2.7.4
