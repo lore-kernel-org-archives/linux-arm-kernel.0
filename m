@@ -1,25 +1,44 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 25 Jun 2018 11:33:17 -0600
-Subject: [PATCH v3 04/24] dt-bindings: display: sunxi-drm: Add TCON TOP
- description
-In-Reply-To: <20180625120304.7543-5-jernej.skrabec@siol.net>
-References: <20180625120304.7543-1-jernej.skrabec@siol.net>
- <20180625120304.7543-5-jernej.skrabec@siol.net>
-Message-ID: <20180625173317.GA3691@rob-hp-laptop>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Mon, 25 Jun 2018 13:31:29 -0400
+Subject: [PATCH V2 2/2] efi/fb: Convert PCI bus address to resource if
+ translated by the bridge
+In-Reply-To: <CAKv+Gu__a0yMcH6pyC0oxXZYgi=emuJA+6v1Zdmd4tbq_UR0Og@mail.gmail.com>
+References: <1526653072-7153-1-git-send-email-okaya@codeaurora.org>
+ <1526653072-7153-2-git-send-email-okaya@codeaurora.org>
+ <20180619222921.GA90490@bhelgaas-glaptop.roam.corp.google.com>
+ <CAKv+Gu_voOZ7YUL8pckww4mTt4PVcu7y69mf-z7ZZe1bJ81Shw@mail.gmail.com>
+ <2a805337-c0b5-e134-7695-5a543ecaa26a@codeaurora.org>
+ <CAKv+Gu9HAJRHwjYLNjf+gg=1vFoFu3BJphifKKE-aR4o_MW84A@mail.gmail.com>
+ <CAKv+Gu-WXLXqHSmiS2MmAMXHLKK_kg+3EK6L2rvO0SzN-c0UMg@mail.gmail.com>
+ <37289a27-eb99-6a73-4d32-4a75edd11dcd@codeaurora.org>
+ <CAKv+Gu-bwCFhCKiA7P1amMLeBaSxsjk0d6aPjAr9nCvOBPJA6w@mail.gmail.com>
+ <CAKv+Gu96HQf0oJ1RC+wVU34FqqcCWrnDGag48vjNP_z86HhLBQ@mail.gmail.com>
+ <7777f7bfead902f2f5175d48907fccec@codeaurora.org>
+ <eb16a77f-7950-7fa1-c436-0ce99a992d3b@codeaurora.org>
+ <CAKv+Gu__a0yMcH6pyC0oxXZYgi=emuJA+6v1Zdmd4tbq_UR0Og@mail.gmail.com>
+Message-ID: <d8f060ec-bc58-666d-7f2f-b3732ef2fa46@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 25, 2018 at 02:02:44PM +0200, Jernej Skrabec wrote:
-> TCON TOP main purpose is to configure whole display pipeline. It
-> determines relationships between mixers and TCONs, selects source TCON
-> for HDMI, muxes LCD and TV encoder GPIO output, selects TV encoder
-> clock source and contains additional TV TCON and DSI gates.
+On 6/25/2018 1:29 PM, Ard Biesheuvel wrote:
+>>> Platform has been doing mmio translation for quite a while. Because all accesses go through pci io protocol, the rest of the UEFI never needed to be aware of bar address or do direct access.
+>>>
+>>> This is the first time I hear of direct access. Maybe, GOP is a special case.
+>>>
+>>> I started copying your response to the bios vendor.
+>>>
+>>> They are probably missing that patch. I will pass it along.
+>> I was informed that they fixed the issue in BIOS by presenting CPU physical
+>> address instead of PCI bus address in FrameBufferBase of the AST GOP UEFI driver.
+>>
+>> We can drop this patch now.
+>>
+> Excellent! Thanks for following up with the vendor ...
 > 
-> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
-> ---
->  .../bindings/display/sunxi/sun4i-drm.txt      | 56 +++++++++++++++++++
->  include/dt-bindings/clock/sun8i-tcon-top.h    | 11 ++++
->  2 files changed, 67 insertions(+)
->  create mode 100644 include/dt-bindings/clock/sun8i-tcon-top.h
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+Sure, appreciate the help.
+
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
