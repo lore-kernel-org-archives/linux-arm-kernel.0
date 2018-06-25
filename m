@@ -1,59 +1,33 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Mon, 25 Jun 2018 17:50:16 +0200
-Subject: [PATCH 05/14] ARM: davinci: da830-evm: use nvmem lookup for mac
- address
-In-Reply-To: <20180625155025.12567-1-brgl@bgdev.pl>
-References: <20180625155025.12567-1-brgl@bgdev.pl>
-Message-ID: <20180625155025.12567-6-brgl@bgdev.pl>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 25 Jun 2018 11:17:34 -0600
+Subject: [PATCH V3 1/5] dt-bindings: mailbox: allow mbox-cells to be
+ equal to 0
+In-Reply-To: <1529676720-7533-2-git-send-email-aisheng.dong@nxp.com>
+References: <1529676720-7533-1-git-send-email-aisheng.dong@nxp.com>
+ <1529676720-7533-2-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <20180625171734.GA20153@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+On Fri, Jun 22, 2018 at 10:11:56PM +0800, Dong Aisheng wrote:
+> Mailbox devices may have only one channel which means the mbox-cells
+> at least 1 does not make sense for this type devices. Let's remove
+> that limitation to allow the mbox-cells to be equal to 0.
+> 
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Sudeep Holla <sudeep.holla@arm.com>
+> Cc: devicetree at vger.kernel.org
+> Cc: linux-kernel at vger.kernel.org
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> ---
+> ChangeLog:
+>  * New patch introduced in v3 series
+>  * Actually there're already users in kernel with mbox-cells set to 0.
+>    See:
+>    arch/arm/boot/dts/bcm283x.dtsi:145: #mbox-cells = <0>;
+> ---
+>  Documentation/devicetree/bindings/mailbox/mailbox.txt | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
 
-We now support nvmem lookups for machine code. Add a lookup for
-mac-address.
-
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
----
- arch/arm/mach-davinci/board-da830-evm.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
-
-diff --git a/arch/arm/mach-davinci/board-da830-evm.c b/arch/arm/mach-davinci/board-da830-evm.c
-index 14a6fc061744..3be3e93f2f18 100644
---- a/arch/arm/mach-davinci/board-da830-evm.c
-+++ b/arch/arm/mach-davinci/board-da830-evm.c
-@@ -29,6 +29,7 @@
- #include <linux/platform_data/spi-davinci.h>
- #include <linux/platform_data/usb-davinci.h>
- #include <linux/regulator/machine.h>
-+#include <linux/nvmem-provider.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -409,6 +410,15 @@ static inline void da830_evm_init_lcdc(int mux_mode)
- static inline void da830_evm_init_lcdc(int mux_mode) { }
- #endif
- 
-+static struct nvmem_cell_lookup da830_evm_mac_address_cell = {
-+	.info = {
-+		.name = "mac-address",
-+		.offset = 0x7f00,
-+		.bytes = ETH_ALEN,
-+	},
-+	.nvmem_name = "1-00500",
-+};
-+
- static struct at24_platform_data da830_evm_i2c_eeprom_info = {
- 	.byte_len	= SZ_256K / 8,
- 	.page_size	= 64,
-@@ -618,6 +628,8 @@ static __init void da830_evm_init(void)
- 		pr_warn("%s: spi 0 registration failed: %d\n", __func__, ret);
- 
- 	regulator_has_full_constraints();
-+
-+	nvmem_register_lookup(&da830_evm_mac_address_cell, 1);
- }
- 
- #ifdef CONFIG_SERIAL_8250_CONSOLE
--- 
-2.17.1
+Reviewed-by: Rob Herring <robh@kernel.org>
