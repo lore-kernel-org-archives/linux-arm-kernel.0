@@ -1,58 +1,48 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Mon, 25 Jun 2018 17:12:32 +0200
-Subject: [PATCH v2 16/23] dt-bindings: cp110: update documentation since DT
- de-duplication
+Date: Mon, 25 Jun 2018 17:12:35 +0200
+Subject: [PATCH v2 19/23] arm64: dts: marvell: rename ap806 syscon node
 In-Reply-To: <20180625151239.20976-1-miquel.raynal@bootlin.com>
 References: <20180625151239.20976-1-miquel.raynal@bootlin.com>
-Message-ID: <20180625151239.20976-17-miquel.raynal@bootlin.com>
+Message-ID: <20180625151239.20976-20-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CP110 master/slave DT files have been merged in a DT de-duplication work
-merged in v4.16. Update the syscon documentation accordingly to match
-the current state of the DT nodes.
+In CP files, the syscons are called CP110_LABEL(syscon<x>) in case of
+future additions. Use the same logic here to prepare the addition of a
+second syscon to access both the thermal IP, the DFX server registers
+and later probably other registers within this same memory area.
 
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
-Acked-by: Rob Herring <robh@kernel.org>
 ---
- .../bindings/arm/marvell/cp110-system-controller.txt           | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ .../devicetree/bindings/arm/marvell/ap806-system-controller.txt         | 2 +-
+ arch/arm64/boot/dts/marvell/armada-ap806.dtsi                           | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/marvell/cp110-system-controller.txt b/Documentation/devicetree/bindings/arm/marvell/cp110-system-controller.txt
-index 56e7fb1153e7..54b0d64ce819 100644
---- a/Documentation/devicetree/bindings/arm/marvell/cp110-system-controller.txt
-+++ b/Documentation/devicetree/bindings/arm/marvell/cp110-system-controller.txt
-@@ -163,26 +163,26 @@ Required properties:
+diff --git a/Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt b/Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt
+index a265f1628f36..108e8da600e4 100644
+--- a/Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt
++++ b/Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt
+@@ -79,7 +79,7 @@ Required properties:
+ - offset: offset address inside the syscon block
  
  Example:
- 
--cpm_syscon0: system-controller at 440000 {
-+CP110_LABEL(syscon0): system-controller at 440000 {
+-ap_syscon: system-controller at 6f4000 {
++ap_syscon0: system-controller at 6f4000 {
  	compatible = "syscon", "simple-mfd";
- 	reg = <0x440000 0x1000>;
+ 	reg = <0x6f4000 0x1000>;
  
--	cpm_clk: clock {
-+	CP110_LABEL(clk): clock {
- 		compatible = "marvell,cp110-clock";
- 		#clock-cells = <2>;
- 	};
+diff --git a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
+index 4f2a704615b0..550f03b8c96f 100644
+--- a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
+@@ -230,7 +230,7 @@
+ 				status = "disabled";
+ 			};
  
--	cpm_pinctrl: pinctrl {
-+	CP110_LABEL(pinctrl): pinctrl {
- 		compatible = "marvell,armada-8k-cpm-pinctrl";
- 	};
+-			ap_syscon: system-controller at 6f4000 {
++			ap_syscon0: system-controller at 6f4000 {
+ 				compatible = "syscon", "simple-mfd";
+ 				reg = <0x6f4000 0x2000>;
  
--	cpm_gpio1: gpio at 100 {
-+	CP110_LABEL(gpio1): gpio at 100 {
- 		compatible = "marvell,armada-8k-gpio";
- 		offset = <0x100>;
- 		ngpios = <32>;
- 		gpio-controller;
- 		#gpio-cells = <2>;
--		gpio-ranges = <&cpm_pinctrl 0 0 32>;
-+		gpio-ranges = <&CP110_LABEL(pinctrl) 0 0 32>;
- 	};
- 
- };
 -- 
 2.14.1
