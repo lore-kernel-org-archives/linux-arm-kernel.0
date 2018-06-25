@@ -1,34 +1,92 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 25 Jun 2018 11:42:50 +0200
-Subject: [PATCH v6 2/3] arm: shmobile: Add the R9A06G032 SMP enabler driver
-In-Reply-To: <CAMuHMdVarwq26Jr=YN+zBDrHjQf-Q+u3L6oRNiSKh-hxuwOsrA@mail.gmail.com>
-References: <1529915110-5867-1-git-send-email-michel.pollet@bp.renesas.com>
- <1529915110-5867-3-git-send-email-michel.pollet@bp.renesas.com>
- <CAMuHMdVarwq26Jr=YN+zBDrHjQf-Q+u3L6oRNiSKh-hxuwOsrA@mail.gmail.com>
-Message-ID: <20180625094249.b6dwnraqruicmo2u@verge.net.au>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 25 Jun 2018 10:44:17 +0100
+Subject: [PATCH 4/4] KVM: arm/arm64: vgic: Allow VMs to configure
+ interrupt groups
+In-Reply-To: <20180625093406.GC8004@C02W217FHV2R.local>
+References: <20180624221103.15055-1-christoffer.dall@arm.com>
+ <20180624221103.15055-5-christoffer.dall@arm.com>
+ <2f5feed6-c026-1871-25e4-943123c8b977@arm.com>
+ <20180625093406.GC8004@C02W217FHV2R.local>
+Message-ID: <4c2f318d-29be-fb1a-3bb2-56bb56be1420@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 25, 2018 at 11:24:48AM +0200, Geert Uytterhoeven wrote:
-> Hi Michel,
+On 25/06/18 10:34, Christoffer Dall wrote:
+> On Mon, Jun 25, 2018 at 09:19:07AM +0100, Marc Zyngier wrote:
+>> On 24/06/18 23:11, Christoffer Dall wrote:
+>>> Implement the required MMIO accessors for GICv2 and GICv3 for the
+>>> IGROUPR distributor and redistributor registers.
+>>>
+>>> This can allow guests to change behavior compared to running on previous
+>>> versions of KVM, but only to align with the architecture and hardware
+>>> implementations.
+>>>
+>>> Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
+>>> ---
+>>>  virt/kvm/arm/vgic/vgic-mmio-v2.c |  2 +-
+>>>  virt/kvm/arm/vgic/vgic-mmio-v3.c |  2 +-
+>>>  virt/kvm/arm/vgic/vgic-mmio.c    | 38 ++++++++++++++++++++++++++++++++
+>>>  virt/kvm/arm/vgic/vgic-mmio.h    |  6 +++++
+>>>  4 files changed, 46 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+>>> index 8d18f89397d3..ff3834d16ac9 100644
+>>> --- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
+>>> +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+>>> @@ -362,7 +362,7 @@ static const struct vgic_register_region vgic_v2_dist_registers[] = {
+>>>  		vgic_mmio_read_v2_misc, vgic_mmio_write_v2_misc, 12,
+>>>  		VGIC_ACCESS_32bit),
+>>>  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_IGROUP,
+>>> -		vgic_mmio_read_raz, vgic_mmio_write_wi, NULL, NULL, 1,
+>>> +		vgic_mmio_read_group, vgic_mmio_write_group, NULL, NULL, 1,
+>>>  		VGIC_ACCESS_32bit),
+>>>  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ENABLE_SET,
+>>>  		vgic_mmio_read_enable, vgic_mmio_write_senable, NULL, NULL, 1,
+>>> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+>>> index 287784095b5b..76e422859745 100644
+>>> --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
+>>> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+>>> @@ -451,7 +451,7 @@ static const struct vgic_register_region vgic_v3_dist_registers[] = {
+>>>  		vgic_mmio_read_rao, vgic_mmio_write_wi, 4,
+>>>  		VGIC_ACCESS_32bit),
+>>>  	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_IGROUPR,
+>>> -		vgic_mmio_read_rao, vgic_mmio_write_wi, NULL, NULL, 1,
+>>> +		vgic_mmio_read_group, vgic_mmio_write_group, NULL, NULL, 1,
+>>>  		VGIC_ACCESS_32bit),
+>>>  	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_ISENABLER,
+>>>  		vgic_mmio_read_enable, vgic_mmio_write_senable, NULL, NULL, 1,
+>>
+>> I think you're missing the GICR_IGROUPR accessor in the redistributor
+>> (despite mentioning it in the commit message).
+>>
 > 
-> On Mon, Jun 25, 2018 at 10:31 AM Michel Pollet
-> <michel.pollet@bp.renesas.com> wrote:
-> > The Renesas R9A06G032 second CA7 is parked in a ROM pen at boot time, it
-> > requires a special enable method to get it started.
-> >
-> > Signed-off-by: Michel Pollet <michel.pollet@bp.renesas.com>
-> > Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> > ---
-> >  arch/arm/mach-shmobile/Makefile        |  1 +
-> >  arch/arm/mach-shmobile/smp-r9a06g032.c | 96 ++++++++++++++++++++++++++++++++++
-> >  2 files changed, 97 insertions(+)
-> >  create mode 100644 arch/arm/mach-shmobile/smp-r9a06g032.c
+> Indeed.  I fixed this up on my kernel.org branch (vgic-group-fixes), and
+> the fix is pretty trivial:
 > 
-> Given this doesn't depend on anything under arch/arm/mach-shmobile/,
-> perhaps this should be moved to drivers/soc/renesas/ (and renamed to
-> r9a06g032-smp.c for consistency) instead?
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> index 76e422859745..d2acad07dd30 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> @@ -524,7 +524,7 @@ static const struct vgic_register_region vgic_v3_rdbase_registers[] = {
+>  
+>  static const struct vgic_register_region vgic_v3_sgibase_registers[] = {
+>  	REGISTER_DESC_WITH_LENGTH(GICR_IGROUPR0,
+> -		vgic_mmio_read_rao, vgic_mmio_write_wi, 4,
+> +		vgic_mmio_read_group, vgic_mmio_write_group, 4,
+>  		VGIC_ACCESS_32bit),
+>  	REGISTER_DESC_WITH_LENGTH(GICR_ISENABLER0,
+>  		vgic_mmio_read_enable, vgic_mmio_write_senable, 4,
 > 
-> Simon: what do you think?
+> I did a test on the model using both GICv3 and GICv2-on-GICv3, seems
+> happy still.
+> 
+> Do you want me to send a v2, or do you prefer to fix this up locally?
+I can fix that myself. But this raises another question: As this change
+is obviously observable by the guest, should we consider bumping up the
+IIDR revision field?
 
-Yes, I think that would be nice.
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
