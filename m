@@ -1,91 +1,77 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Mon, 25 Jun 2018 09:43:41 +0100
-Subject: [PATCH] efi/libstub/arm: add opt-in Kconfig option for the DTB
- loader
-In-Reply-To: <20180625063405.24387-1-ard.biesheuvel@linaro.org>
-References: <20180625063405.24387-1-ard.biesheuvel@linaro.org>
-Message-ID: <20180625084341.4sk2iduto67x3bkh@bivouac.eciton.net>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Mon, 25 Jun 2018 10:47:40 +0200
+Subject: [PATCH v7 00/29] Add support for mediatek SOC MT2712
+In-Reply-To: <1529482771-2153-1-git-send-email-stu.hsieh@mediatek.com>
+References: <1529482771-2153-1-git-send-email-stu.hsieh@mediatek.com>
+Message-ID: <20180625084740.GN2958@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 25, 2018 at 08:34:05AM +0200, Ard Biesheuvel wrote:
-> There are various ways a platform can provide a device tree binary
-> to the kernel, with different levels of sophistication:
-> - ideally, the UEFI firmware, which is tightly coupled with the
->   platform, provides a device tree image directly as a UEFI
->   configuration table, and typically permits the contents to be
->   manipulated either via menu options or via UEFI environment
->   variables that specify a replacement image,
-> - GRUB for ARM has a 'devicetree' directive which allows a device
->   tree image to be loaded from any location accessible to GRUB, and
->   supersede the one provided by the firmware,
-
-Just for comment - this too is considered an anomaly and will
-eventually be phased out. (Some part of the functionality may be
-retained in the form of overlay management.)
-
-> - the EFI stub implements a dtb= command line option that allows a
->   device tree image to be loaded from a file residing in the same
->   file system as the one the kernel image was loaded from.
+On Wed, Jun 20, 2018 at 04:19:02PM +0800, Stu Hsieh wrote:
+> This patch add support for the Mediatek MT2712 DISP subsystem.
+> MT2712 is base on MT8173, there are some difference as following:
+> MT2712 support three disp output(two ovl and one rdma)
 > 
-> The dtb= command line option was never intended to be more than a
-> development feature, to allow the other options to be implemented
-> in parallel. So let's make it an opt-in feature that is disabled
-> by default, but can be re-enabled at will.
-> 
-> Note that we already disable the dtb= command line option when we
-> detect that we are running with UEFI Secure Boot enabled.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Change in v6:
+> - Update commit message for the patch
+>   "drm/mediatek: Update the definition of connection from RDMA1 to DPI0"
 
-Acked-by: Leif Lindholm <leif.lindholm@linaro.org>
+Just a drive-by comment on the mediatek driver:
 
-> ---
->  drivers/firmware/efi/Kconfig            | 12 ++++++++++++
->  drivers/firmware/efi/libstub/arm-stub.c |  7 ++++---
->  2 files changed, 16 insertions(+), 3 deletions(-)
+As far as I can see mtk_drm_gem.c reimplements the cma helpers as a
+copypaste job. Any reasons why you're not using the normal cma helpers?
+
+Thanks, Daniel
 > 
-> diff --git a/drivers/firmware/efi/Kconfig b/drivers/firmware/efi/Kconfig
-> index 781a4a337557..fc1cb2961d5b 100644
-> --- a/drivers/firmware/efi/Kconfig
-> +++ b/drivers/firmware/efi/Kconfig
-> @@ -87,6 +87,18 @@ config EFI_RUNTIME_WRAPPERS
->  config EFI_ARMSTUB
->  	bool
->  
-> +config EFI_ARMSTUB_DTB_LOADER
-> +	bool "Enable the DTB loader"
-> +	depends on EFI_ARMSTUB
-> +	help
-> +	  Select this config option to add support for the dtb= command
-> +	  line parameter, allowing a device tree blob to be loaded into
-> +	  memory from the EFI System Partition by the stub.
-> +
-> +	  The device tree is typically provided by the platform or by
-> +	  the bootloader, and so this option is mostly for development
-> +	  purposes only.
-> +
->  config EFI_BOOTLOADER_CONTROL
->  	tristate "EFI Bootloader Control"
->  	depends on EFI_VARS
-> diff --git a/drivers/firmware/efi/libstub/arm-stub.c b/drivers/firmware/efi/libstub/arm-stub.c
-> index 01a9d78ee415..c98b1856fc3d 100644
-> --- a/drivers/firmware/efi/libstub/arm-stub.c
-> +++ b/drivers/firmware/efi/libstub/arm-stub.c
-> @@ -202,9 +202,10 @@ unsigned long efi_entry(void *handle, efi_system_table_t *sys_table,
->  	 * 'dtb=' unless UEFI Secure Boot is disabled.  We assume that secure
->  	 * boot is enabled if we can't determine its state.
->  	 */
-> -	if (secure_boot != efi_secureboot_mode_disabled &&
-> -	    strstr(cmdline_ptr, "dtb=")) {
-> -		pr_efi(sys_table, "Ignoring DTB from command line.\n");
-> +	if (!IS_ENABLED(CONFIG_EFI_ARMSTUB_DTB_LOADER) ||
-> +	     secure_boot != efi_secureboot_mode_disabled) {
-> +		if (strstr(cmdline_ptr, "dtb="))
-> +			pr_efi(sys_table, "Ignoring DTB from command line.\n");
->  	} else {
->  		status = handle_cmdline_files(sys_table, image, cmdline_ptr,
->  					      "dtb=",
+> Stu Hsieh (29):
+>   drm/mediatek: update dt-bindings for mt2712
+>   drm/mediatek: support maximum 64 mutex mod
+>   drm/mediatek: add ddp component AAL1
+>   drm/mediatek: add ddp component OD1
+>   drm/mediatek: add ddp component PWM1
+>   drm/mediatek: add ddp component PWM2
+>   drm/mediatek: add component DPI1
+>   drm/mediatek: add component DSI2
+>   drm/mediatek: add component DSI3
+>   drm/mediatek: add the DSI1 for component init condition
+>   drm/mediatek: add connection from OD1 to RDMA1
+>   drm/mediatek: Update the definition of connection from RDMA1 to DPI0
+>   drm/mediatek: add connection from RDMA0 to DPI0
+>   drm/mediatek: add connection from RDMA0 to DSI2
+>   drm/mediatek: add connection from RDMA0 to DSI3
+>   drm/mediatek: add connection from RDMA1 to DPI1
+>   drm/mediatek: add connection from RDMA1 to DSI1
+>   drm/mediatek: add connection from RDMA1 to DSI2
+>   drm/mediatek: add connection from RDMA1 to DSI3
+>   drm/mediatek: add connection from RDMA2 to DPI0
+>   drm/mediatek: add connection from RDMA2 to DPI1
+>   drm/mediatek: add connection from RDMA2 to DSI1
+>   drm/mediatek: add connection from RDMA2 to DSI2
+>   drm/mediatek: add connection from RDMA2 to DSI3
+>   drm/mediatek: add DPI1 support for mutex
+>   drm/mediatek: add DSI2 support for mutex
+>   drm/mediatek: add DSI3 support for mutex
+>   drm/mediatek: add third ddp path
+>   drm/mediatek: Add support for mediatek SOC MT2712
+> 
+>  .../bindings/display/mediatek/mediatek,disp.txt    |   2 +-
+>  drivers/gpu/drm/mediatek/mtk_drm_crtc.c            |   3 +
+>  drivers/gpu/drm/mediatek/mtk_drm_ddp.c             | 235 ++++++++++++++++++---
+>  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c        |  15 +-
+>  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h        |  10 +-
+>  drivers/gpu/drm/mediatek/mtk_drm_drv.c             |  47 ++++-
+>  drivers/gpu/drm/mediatek/mtk_drm_drv.h             |   5 +-
+>  7 files changed, 274 insertions(+), 43 deletions(-)
+> 
 > -- 
-> 2.11.0
+> 2.12.5
 > 
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+
+-- 
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
