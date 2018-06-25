@@ -1,61 +1,68 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Mon, 25 Jun 2018 14:02:56 +0200
-Subject: [PATCH v3 16/24] drm/sun4i: Enable DW HDMI PHY clock
+Date: Mon, 25 Jun 2018 14:02:51 +0200
+Subject: [PATCH v3 11/24] drm/sun4i: Don't check for LVDS and RGB when TCON
+ has only ch1
 In-Reply-To: <20180625120304.7543-1-jernej.skrabec@siol.net>
 References: <20180625120304.7543-1-jernej.skrabec@siol.net>
-Message-ID: <20180625120304.7543-17-jernej.skrabec@siol.net>
+Message-ID: <20180625120304.7543-12-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current DW HDMI PHY code never prepares and enables PHY clock after it is
-created. It's just used as it is. This may work in some cases, but it's
-clearly wrong. Fix it by adding proper calls to enable/disable PHY
-clock.
+LVDS and RGB interfaces are always connected to TCONs which have channel
+0. It doesn't make sense to try to init them on TV TCONs.
 
-Fixes: 4f86e81748fe ("drm/sun4i: Add support for H3 HDMI PHY variant")
+Add a check if TCON has channel 0 before trying to init LVDS or RGB
+interface.
 
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+ drivers/gpu/drm/sun4i/sun4i_tcon.c | 32 ++++++++++++++++--------------
+ 1 file changed, 17 insertions(+), 15 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
-index 5a52fc489a9d..966688f04741 100644
---- a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
-+++ b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
-@@ -477,13 +477,15 @@ int sun8i_hdmi_phy_probe(struct sun8i_dw_hdmi *hdmi, struct device_node *node)
- 			dev_err(dev, "Couldn't create the PHY clock\n");
- 			goto err_put_clk_pll0;
- 		}
-+
-+		clk_prepare_enable(phy->clk_phy);
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+index 264bcc43da11..761687ebacba 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+@@ -1106,23 +1106,25 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
+ 		goto err_free_dotclock;
  	}
  
- 	phy->rst_phy = of_reset_control_get_shared(node, "phy");
- 	if (IS_ERR(phy->rst_phy)) {
- 		dev_err(dev, "Could not get phy reset control\n");
- 		ret = PTR_ERR(phy->rst_phy);
--		goto err_put_clk_pll0;
-+		goto err_disable_clk_phy;
- 	}
+-	/*
+-	 * If we have an LVDS panel connected to the TCON, we should
+-	 * just probe the LVDS connector. Otherwise, just probe RGB as
+-	 * we used to.
+-	 */
+-	remote = of_graph_get_remote_node(dev->of_node, 1, 0);
+-	if (of_device_is_compatible(remote, "panel-lvds"))
+-		if (can_lvds)
+-			ret = sun4i_lvds_init(drm, tcon);
++	if (tcon->quirks->has_channel_0) {
++		/*
++		 * If we have an LVDS panel connected to the TCON, we should
++		 * just probe the LVDS connector. Otherwise, just probe RGB as
++		 * we used to.
++		 */
++		remote = of_graph_get_remote_node(dev->of_node, 1, 0);
++		if (of_device_is_compatible(remote, "panel-lvds"))
++			if (can_lvds)
++				ret = sun4i_lvds_init(drm, tcon);
++			else
++				ret = -EINVAL;
+ 		else
+-			ret = -EINVAL;
+-	else
+-		ret = sun4i_rgb_init(drm, tcon);
+-	of_node_put(remote);
++			ret = sun4i_rgb_init(drm, tcon);
++		of_node_put(remote);
  
- 	ret = reset_control_deassert(phy->rst_phy);
-@@ -514,6 +516,8 @@ int sun8i_hdmi_phy_probe(struct sun8i_dw_hdmi *hdmi, struct device_node *node)
- 	reset_control_assert(phy->rst_phy);
- err_put_rst_phy:
- 	reset_control_put(phy->rst_phy);
-+err_disable_clk_phy:
-+	clk_disable_unprepare(phy->clk_phy);
- err_put_clk_pll0:
- 	if (phy->variant->has_phy_clk)
- 		clk_put(phy->clk_pll0);
-@@ -531,6 +535,7 @@ void sun8i_hdmi_phy_remove(struct sun8i_dw_hdmi *hdmi)
+-	if (ret < 0)
+-		goto err_free_dotclock;
++		if (ret < 0)
++			goto err_free_dotclock;
++	}
  
- 	clk_disable_unprepare(phy->clk_mod);
- 	clk_disable_unprepare(phy->clk_bus);
-+	clk_disable_unprepare(phy->clk_phy);
- 
- 	reset_control_assert(phy->rst_phy);
- 
+ 	if (tcon->quirks->needs_de_be_mux) {
+ 		/*
 -- 
 2.18.0
