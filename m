@@ -1,254 +1,504 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 25 Jun 2018 12:52:44 +0200
-Subject: [PATCH v8 3/6] module: use relative references for __ksymtab
- entries
-In-Reply-To: <CAB0TPYHrx=tcOmzT2_4QpDG-reSJVX3BYEZcH0-X1m30WEADNw@mail.gmail.com>
-References: <20180311123815.17916-1-ard.biesheuvel@linaro.org>
- <20180311123815.17916-4-ard.biesheuvel@linaro.org>
- <CAB0TPYGd1jQzgc2q+fJZif4LVQTPnOrD4b6w0YSAzgAB0oL86g@mail.gmail.com>
- <CAKv+Gu-M4vJfppfQ8PYv3hFR6a1FuOAEKpvyisYSZBe-ubMvHQ@mail.gmail.com>
- <CAB0TPYHrx=tcOmzT2_4QpDG-reSJVX3BYEZcH0-X1m30WEADNw@mail.gmail.com>
-Message-ID: <CAKv+Gu-vmYxsEh-yRJqntWKqSimkCKzFYEqHhSoQLnbp=HuSaw@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 25 Jun 2018 12:58:07 +0200
+Subject: [PATCH V3 5/5] soc: imx: add SC firmware IPC and APIs
+In-Reply-To: <1529676720-7533-6-git-send-email-aisheng.dong@nxp.com>
+References: <1529676720-7533-1-git-send-email-aisheng.dong@nxp.com>
+ <1529676720-7533-6-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <20180625105807.in4oreq7s4zyjyci@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 June 2018 at 12:15, Martijn Coenen <maco@android.com> wrote:
-> On Mon, Jun 25, 2018 at 11:14 AM, Ard Biesheuvel
-> <ard.biesheuvel@linaro.org> wrote:
->> Because struct kernel_symbol is only 8 bytes in size after this
->> change, and aligning a 8 byte quantity to 16 bytes wastes 8 bytes.
->
-> I get that, but then that means the 16-byte alignment wasn't actually
-> necessary in the first place.
->
+On Fri, Jun 22, 2018 at 10:12:00PM +0800, Dong Aisheng wrote:
+> The System Controller Firmware (SCFW) is a low-level system function
+> which runs on a dedicated Cortex-M core to provide power, clock, and
+> resource management. It exists on some i.MX8 processors. e.g. i.MX8QM
+> (QM, QP), and i.MX8QX (QXP, DX).
+> 
+> This patch adds the SC firmware service APIs used by the system.
+> It mainly consists of two parts:
+> 1) Implementation of the IPC functions using MUs (client side).
+> 2) SCU firmware services APIs implemented based on RPC calls
+> 
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> ---
+> v2->v3:
+>  * add the ipc read/write error check
+> v1->v2:
+>  * change the type of sc_ipc_t from uint32_t to unsigned long.
+>    This can make it be capable of storing 64 bit pointer in ARMv8 system.
+>  * Update to use the new MU library implemenation (handle iomem privately)
+>  * remove unused delcarations e.g. sc_rpc_dispatch and sc_rpc_xlate.
+>  * remove unneeded pad ctl functions
+> ---
+> +static sc_ipc_t scu_ipc_handle;
+> +static DEFINE_SPINLOCK(ipc_list_lock);
+> +static struct list_head ipc_list = LIST_HEAD_INIT(ipc_list);
+> +
+> +/*
+> + * This function reads a message from an IPC channel.
+> + *
+> + * @param[in]     sc_ipc      IPC channel handle
+> + * @param[out]    data        pointer to message buffer to read
+> + *
+> + * This function will block if no message is available to be read.
+> + */
+> +static void sc_ipc_read(struct sc_ipc *sc_ipc, void *data)
+> +{
+> +	sc_rpc_msg_t *msg = (sc_rpc_msg_t *)data;
+> +	uint8_t count = 0;
+> +	int ret;
+> +
+> +	/* Read first word */
+> +	ret = mu_receive_msg(sc_ipc->mu, 0, (uint32_t *)msg);
+> +	if (ret)
+> +		pr_warn("%s: RPC(MU %pOF) read failed\n", __func__, mu_node(sc_ipc->mu));
 
-Not really, I suppose, although it is not unusual to align large
-arrays to the entry size if it is a power of 2, so they don't span
-cachelines.
+So mu_receive_msg() can now timeout. This of course does not help when
+all you do is to printk the error. You should forward it.
 
->> The x86 ABI may require it, but we don't actually adhere to it in the
->> kernel. Also, these structures never occur on the stack anyway.
->
-> Ok, makes sense.
->
-> Thanks,
-> Martijn
->
->>
->>
->>>> -#include <asm-generic/export.h>
->>>> diff --git a/include/asm-generic/export.h b/include/asm-generic/export.h
->>>> index 719db1968d81..97ce606459ae 100644
->>>> --- a/include/asm-generic/export.h
->>>> +++ b/include/asm-generic/export.h
->>>> @@ -5,12 +5,10 @@
->>>>  #define KSYM_FUNC(x) x
->>>>  #endif
->>>>  #ifdef CONFIG_64BIT
->>>> -#define __put .quad
->>>>  #ifndef KSYM_ALIGN
->>>>  #define KSYM_ALIGN 8
->>>>  #endif
->>>>  #else
->>>> -#define __put .long
->>>>  #ifndef KSYM_ALIGN
->>>>  #define KSYM_ALIGN 4
->>>>  #endif
->>>> @@ -25,6 +23,16 @@
->>>>  #define KSYM(name) name
->>>>  #endif
->>>>
->>>> +.macro __put, val, name
->>>> +#ifdef CONFIG_HAVE_ARCH_PREL32_RELOCATIONS
->>>> +       .long   \val - ., \name - .
->>>> +#elif defined(CONFIG_64BIT)
->>>> +       .quad   \val, \name
->>>> +#else
->>>> +       .long   \val, \name
->>>> +#endif
->>>> +.endm
->>>> +
->>>>  /*
->>>>   * note on .section use: @progbits vs %progbits nastiness doesn't matter,
->>>>   * since we immediately emit into those sections anyway.
->>>> diff --git a/include/linux/compiler.h b/include/linux/compiler.h
->>>> index ab4711c63601..0a9328ea9dbd 100644
->>>> --- a/include/linux/compiler.h
->>>> +++ b/include/linux/compiler.h
->>>> @@ -280,6 +280,25 @@ unsigned long read_word_at_a_time(const void *addr)
->>>>
->>>>  #endif /* __KERNEL__ */
->>>>
->>>> +/*
->>>> + * Force the compiler to emit 'sym' as a symbol, so that we can reference
->>>> + * it from inline assembler. Necessary in case 'sym' could be inlined
->>>> + * otherwise, or eliminated entirely due to lack of references that are
->>>> + * visible to the compiler.
->>>> + */
->>>> +#define __ADDRESSABLE(sym) \
->>>> +       static void * const __attribute__((section(".discard"), used))  \
->>>> +               __PASTE(__addressable_##sym, __LINE__) = (void *)&sym;
->>>> +
->>>> +/**
->>>> + * offset_to_ptr - convert a relative memory offset to an absolute pointer
->>>> + * @off:       the address of the 32-bit offset value
->>>> + */
->>>> +static inline void *offset_to_ptr(const int *off)
->>>> +{
->>>> +       return (void *)((unsigned long)off + *off);
->>>> +}
->>>> +
->>>>  #endif /* __ASSEMBLY__ */
->>>>
->>>>  #ifndef __optimize
->>>> diff --git a/include/linux/export.h b/include/linux/export.h
->>>> index 25005b55b079..04c78e6bfec9 100644
->>>> --- a/include/linux/export.h
->>>> +++ b/include/linux/export.h
->>>> @@ -24,12 +24,6 @@
->>>>  #define VMLINUX_SYMBOL_STR(x) __VMLINUX_SYMBOL_STR(x)
->>>>
->>>>  #ifndef __ASSEMBLY__
->>>> -struct kernel_symbol
->>>> -{
->>>> -       unsigned long value;
->>>> -       const char *name;
->>>> -};
->>>> -
->>>>  #ifdef MODULE
->>>>  extern struct module __this_module;
->>>>  #define THIS_MODULE (&__this_module)
->>>> @@ -60,17 +54,47 @@ extern struct module __this_module;
->>>>  #define __CRC_SYMBOL(sym, sec)
->>>>  #endif
->>>>
->>>> +#ifdef CONFIG_HAVE_ARCH_PREL32_RELOCATIONS
->>>> +#include <linux/compiler.h>
->>>> +/*
->>>> + * Emit the ksymtab entry as a pair of relative references: this reduces
->>>> + * the size by half on 64-bit architectures, and eliminates the need for
->>>> + * absolute relocations that require runtime processing on relocatable
->>>> + * kernels.
->>>> + */
->>>> +#define __KSYMTAB_ENTRY(sym, sec)                                      \
->>>> +       __ADDRESSABLE(sym)                                              \
->>>> +       asm("   .section \"___ksymtab" sec "+" #sym "\", \"a\"  \n"     \
->>>> +           "   .balign 8                                       \n"     \
->>>> +           VMLINUX_SYMBOL_STR(__ksymtab_##sym) ":              \n"     \
->>>> +           "   .long " VMLINUX_SYMBOL_STR(sym) "- .            \n"     \
->>>> +           "   .long " VMLINUX_SYMBOL_STR(__kstrtab_##sym) "- .\n"     \
->>>> +           "   .previous                                       \n")
->>>> +
->>>> +struct kernel_symbol {
->>>> +       int value_offset;
->>>> +       int name_offset;
->>>> +};
->>>> +#else
->>>> +#define __KSYMTAB_ENTRY(sym, sec)                                      \
->>>> +       static const struct kernel_symbol __ksymtab_##sym               \
->>>> +       __attribute__((section("___ksymtab" sec "+" #sym), used))       \
->>>> +       = { (unsigned long)&sym, __kstrtab_##sym }
->>>> +
->>>> +struct kernel_symbol {
->>>> +       unsigned long value;
->>>> +       const char *name;
->>>> +};
->>>> +#endif
->>>> +
->>>>  /* For every exported symbol, place a struct in the __ksymtab section */
->>>>  #define ___EXPORT_SYMBOL(sym, sec)                                     \
->>>>         extern typeof(sym) sym;                                         \
->>>>         __CRC_SYMBOL(sym, sec)                                          \
->>>>         static const char __kstrtab_##sym[]                             \
->>>> -       __attribute__((section("__ksymtab_strings"), aligned(1)))       \
->>>> +       __attribute__((section("__ksymtab_strings"), used, aligned(1))) \
->>>>         = VMLINUX_SYMBOL_STR(sym);                                      \
->>>> -       static const struct kernel_symbol __ksymtab_##sym               \
->>>> -       __used                                                          \
->>>> -       __attribute__((section("___ksymtab" sec "+" #sym), used))       \
->>>> -       = { (unsigned long)&sym, __kstrtab_##sym }
->>>> +       __KSYMTAB_ENTRY(sym, sec)
->>>>
->>>>  #if defined(__DISABLE_EXPORTS)
->>>>
->>>> diff --git a/kernel/module.c b/kernel/module.c
->>>> index ad2d420024f6..b4782cfbb79b 100644
->>>> --- a/kernel/module.c
->>>> +++ b/kernel/module.c
->>>> @@ -549,12 +549,30 @@ static bool check_symbol(const struct symsearch *syms,
->>>>         return true;
->>>>  }
->>>>
->>>> +static unsigned long kernel_symbol_value(const struct kernel_symbol *sym)
->>>> +{
->>>> +#ifdef CONFIG_HAVE_ARCH_PREL32_RELOCATIONS
->>>> +       return (unsigned long)offset_to_ptr(&sym->value_offset);
->>>> +#else
->>>> +       return sym->value;
->>>> +#endif
->>>> +}
->>>> +
->>>> +static const char *kernel_symbol_name(const struct kernel_symbol *sym)
->>>> +{
->>>> +#ifdef CONFIG_HAVE_ARCH_PREL32_RELOCATIONS
->>>> +       return offset_to_ptr(&sym->name_offset);
->>>> +#else
->>>> +       return sym->name;
->>>> +#endif
->>>> +}
->>>> +
->>>>  static int cmp_name(const void *va, const void *vb)
->>>>  {
->>>>         const char *a;
->>>>         const struct kernel_symbol *b;
->>>>         a = va; b = vb;
->>>> -       return strcmp(a, b->name);
->>>> +       return strcmp(a, kernel_symbol_name(b));
->>>>  }
->>>>
->>>>  static bool find_symbol_in_section(const struct symsearch *syms,
->>>> @@ -2198,7 +2216,7 @@ void *__symbol_get(const char *symbol)
->>>>                 sym = NULL;
->>>>         preempt_enable();
->>>>
->>>> -       return sym ? (void *)sym->value : NULL;
->>>> +       return sym ? (void *)kernel_symbol_value(sym) : NULL;
->>>>  }
->>>>  EXPORT_SYMBOL_GPL(__symbol_get);
->>>>
->>>> @@ -2228,10 +2246,12 @@ static int verify_export_symbols(struct module *mod)
->>>>
->>>>         for (i = 0; i < ARRAY_SIZE(arr); i++) {
->>>>                 for (s = arr[i].sym; s < arr[i].sym + arr[i].num; s++) {
->>>> -                       if (find_symbol(s->name, &owner, NULL, true, false)) {
->>>> +                       if (find_symbol(kernel_symbol_name(s), &owner, NULL,
->>>> +                                       true, false)) {
->>>>                                 pr_err("%s: exports duplicate symbol %s"
->>>>                                        " (owned by %s)\n",
->>>> -                                      mod->name, s->name, module_name(owner));
->>>> +                                      mod->name, kernel_symbol_name(s),
->>>> +                                      module_name(owner));
->>>>                                 return -ENOEXEC;
->>>>                         }
->>>>                 }
->>>> @@ -2280,7 +2300,7 @@ static int simplify_symbols(struct module *mod, const struct load_info *info)
->>>>                         ksym = resolve_symbol_wait(mod, info, name);
->>>>                         /* Ok if resolved.  */
->>>>                         if (ksym && !IS_ERR(ksym)) {
->>>> -                               sym[i].st_value = ksym->value;
->>>> +                               sym[i].st_value = kernel_symbol_value(ksym);
->>>>                                 break;
->>>>                         }
->>>>
->>>> @@ -2540,7 +2560,7 @@ static int is_exported(const char *name, unsigned long value,
->>>>                 ks = lookup_symbol(name, __start___ksymtab, __stop___ksymtab);
->>>>         else
->>>>                 ks = lookup_symbol(name, mod->syms, mod->syms + mod->num_syms);
->>>> -       return ks != NULL && ks->value == value;
->>>> +       return ks != NULL && kernel_symbol_value(ks) == value;
->>>>  }
->>>>
->>>>  /* As per nm */
->>>> --
->>>> 2.15.1
->>>>
+> +
+> +	count++;
+> +
+> +	/* Check size */
+> +	if (msg->size > SC_RPC_MAX_MSG) {
+> +		*((uint32_t *)msg) = 0;
+> +		return;
+> +	}
+
+That's an error. It shouldn't be silently ignored. By that I do not mean
+that you should print a message. Go and error out, let your callers know
+there an error.
+
+> +
+> +	/* Read remaining words */
+> +	while (count < msg->size) {
+> +		ret = mu_receive_msg(sc_ipc->mu, count % MU_RR_COUNT,
+> +				     &(msg->DATA.u32[count - 1]));
+> +		if (ret)
+> +			pr_warn("%s: RPC(MU %pOF) read failed\n", __func__,
+> +				mu_node(sc_ipc->mu));
+> +		count++;
+> +	}
+> +}
+> +
+> +/*
+> + * This function writes a message to an IPC channel.
+> + *
+> + * @param[in]     sc_ipc      IPC channel handle
+> + * @param[in]     data        pointer to message buffer to write
+> + *
+> + * This function will block if the outgoing buffer is full.
+> + */
+> +static void sc_ipc_write(struct sc_ipc *sc_ipc, void *data)
+> +{
+> +	sc_rpc_msg_t *msg = (sc_rpc_msg_t *)data;
+> +	uint8_t count = 0;
+> +	int ret;
+> +
+> +	/* Check size */
+> +	if (msg->size > SC_RPC_MAX_MSG)
+> +		return;
+> +
+> +	/* Write first word */
+> +	ret = mu_send_msg(sc_ipc->mu, 0, *((uint32_t *)msg));
+> +	if (ret)
+> +		pr_warn("%s: RPC(MU %pOF) write failed\n", __func__, mu_node(sc_ipc->mu));
+> +
+> +	count++;
+> +
+> +	/* Write remaining words */
+> +	while (count < msg->size) {
+> +		ret = mu_send_msg(sc_ipc->mu, count % MU_TR_COUNT,
+> +				  msg->DATA.u32[count - 1]);
+> +		if (ret)
+> +			pr_warn("%s: RPC(MU %pOF) write failed\n", __func__,
+> +				mu_node(sc_ipc->mu));
+> +		count++;
+> +	}
+> +}
+> +
+> +/*
+> + * RPC command/response
+> + */
+> +void sc_call_rpc(sc_ipc_t ipc, sc_rpc_msg_t *msg, bool no_resp)
+> +{
+> +	struct sc_ipc *sc_ipc = (struct sc_ipc *)ipc;
+
+This typedef is just unnecessary. In the include file for the consumer
+just do a:
+
+struct sc_ipc *sc_ipc;
+void sc_call_rpc(struct sc_ipc *sc_ipc, sc_rpc_msg_t *msg, bool no_resp);
+
+And here in the implementation you define struct sc_ipc.
+
+That's it. No need to cast back and forth any types.
+
+> +
+> +	WARN_ON(in_interrupt());
+> +
+> +	pr_debug("%s: RPC(MU %pOF) SVC %u FUNC %u\n", __func__,
+> +		 mu_node(sc_ipc->mu), RPC_SVC(msg), RPC_FUNC(msg));
+> +
+> +	if (WARN_ON(!sc_ipc || !msg))
+> +		return;
+> +
+> +	mutex_lock(&sc_ipc->lock);
+> +
+> +	sc_ipc_write(sc_ipc, msg);
+> +	if (!no_resp)
+> +		sc_ipc_read(sc_ipc, msg);
+> +
+> +	mutex_unlock(&sc_ipc->lock);
+> +
+> +	pr_debug("%s: RPC(MU %pOF) done\n", __func__, mu_node(sc_ipc->mu));
+> +}
+> +
+> +/*
+> + * Get the default handle used by SCU
+> + */
+> +int sc_ipc_get_handle(sc_ipc_t *ipc)
+> +{
+> +	if (!scu_ipc_handle)
+> +		return -EPROBE_DEFER;
+> +
+> +	*ipc = scu_ipc_handle;
+> +	return SC_ERR_NONE;
+> +}
+
+What is wrong when one function returns -EPROBE_DEFER *and* custom error
+codes?
+
+I had a look at the pinctrl consumer of this function and it does:
+
+int imx_pinctrl_sc_ipc_init(struct platform_device *pdev)
+{
+	sc_err_t sci_err;
+
+	sci_err = sc_ipc_get_handle(&pinctrl_ipc_handle);
+	if (sci_err != SC_ERR_NONE) {
+		dev_err(&pdev->dev, "can't get sc ipc handle\n");
+		return -ENODEV;
+	}
+
+	return 0;
+}
+
+So you give back -EPROBE_DEFER and then ignore the value.
+
+> +EXPORT_SYMBOL(sc_ipc_get_handle);
+> +
+> +static struct sc_ipc *sc_ipc_find(sc_ipc_id_t id)
+> +{
+> +	struct device_node *mu_np = (struct device_node *)id;
+> +	struct sc_ipc *sc_ipc;
+> +
+> +	spin_lock(&ipc_list_lock);
+> +	list_for_each_entry(sc_ipc, &ipc_list, node) {
+> +		if (mu_node(sc_ipc->mu) == mu_np) {
+> +			spin_unlock(&ipc_list_lock);
+> +			return sc_ipc;
+> +		}
+> +	}
+> +	spin_unlock(&ipc_list_lock);
+> +
+> +	return NULL;
+> +}
+> +
+> +/*
+> + * Open an IPC channel
+> + */
+> +sc_err_t sc_ipc_open(sc_ipc_t *ipc, sc_ipc_id_t id)
+> +{
+> +	struct device_node *mu_np = (struct device_node *)id;
+
+Why is the id argument of type sc_ipc_id_t? It is casted from a struct
+device_node * by the caller and casted back to a struct device_node *
+here. Doesn't this suggest the argument should be a struct device_node * ?
+
+> +	struct sc_ipc *sc_ipc;
+> +
+> +	sc_ipc = sc_ipc_find(id);
+> +	if (sc_ipc) {
+> +		sc_ipc->users++;
+> +		*ipc = (sc_ipc_t)sc_ipc;
+> +		return SC_ERR_NONE;
+> +	}
+
+Which sense does this pseudo resource management do? sc_ipc_open() is
+called exactly once during an initcall, and the resulting sc_ipc_t * is
+put into a global variable which is then passed to all consumers calling
+sc_ipc_get_handle().
+
+What's interesting about this is that in sc_ipc_get_handle() you pass
+the handle to your consumers and this place really could use resource
+manangement. So resource management is implemented and shortcircuited
+afterwards :(
+
+This is racy btw since sc_ipc could be freed below after the call to
+sc_ipc_find(). You would then act on an already freed sc_ipc.
+
+> +
+> +	sc_ipc = kzalloc(sizeof(*sc_ipc), GFP_KERNEL);
+> +	if (!sc_ipc)
+> +		return SC_ERR_UNAVAILABLE;
+> +
+> +	sc_ipc->mu = mu_init(mu_np);
+> +	if (IS_ERR_OR_NULL(sc_ipc->mu)) {
+> +		kfree(sc_ipc);
+> +		return SC_ERR_UNAVAILABLE;
+> +	}
+> +
+> +	mutex_init(&sc_ipc->lock);
+> +
+> +	spin_lock(&ipc_list_lock);
+> +	list_add_tail(&sc_ipc->node, &ipc_list);
+> +	spin_unlock(&ipc_list_lock);
+> +
+> +	sc_ipc->users++;
+> +	*ipc = (sc_ipc_t)sc_ipc;
+> +
+> +	return SC_ERR_NONE;
+> +}
+> +EXPORT_SYMBOL(sc_ipc_open);
+> +
+> +/*
+> + * Close an IPC channel
+> + */
+> +void sc_ipc_close(sc_ipc_t ipc)
+> +{
+> +	struct sc_ipc *sc_ipc = (struct sc_ipc *)ipc;
+> +
+> +	WARN_ON(!sc_ipc);
+> +
+> +	if (--sc_ipc->users)
+> +		return;
+> +
+> +	mu_exit(sc_ipc->mu);
+> +
+> +	spin_lock(&ipc_list_lock);
+> +	list_del(&sc_ipc->node);
+> +	spin_unlock(&ipc_list_lock);
+> +
+> +	kfree(sc_ipc);
+> +}
+> +EXPORT_SYMBOL(sc_ipc_close);
+> +
+> +/* Initialization of the MU code. */
+> +int __init imx8_scu_init(void)
+
+static
+
+> +{
+> +	struct device_node *np, *mu_np;
+> +	sc_err_t sciErr;
+> +
+> +	if (!of_machine_is_compatible("fsl,imx8qxp"))
+> +		return 0;
+> +
+> +	np = of_find_compatible_node(NULL, NULL, "nxp,imx8qxp-scu");
+> +	if (!np)
+> +		return -ENODEV;
+> +
+> +	mu_np = of_parse_phandle(np, "fsl,mu", 0);
+> +	if (WARN_ON(!mu_np))
+> +		return -EINVAL;
+> +
+> +	sciErr = sc_ipc_open(&scu_ipc_handle, (sc_ipc_id_t)mu_np);
+> +	if (sciErr != SC_ERR_NONE) {
+> +		pr_err("Cannot open MU (%pOF) to SCU\n", mu_np);
+> +		return -ENODEV;
+> +	};
+> +
+> +	pr_info("NXP i.MX SCU Initialized with MU: %pOF %s\n",
+> +		mu_np, mu_np->name);
+> +
+> +	of_node_put(mu_np);
+> +
+> +	return 0;
+> +}
+> +early_initcall(imx8_scu_init);
+> diff --git a/drivers/soc/imx/sc/main/rpc.h b/drivers/soc/imx/sc/main/rpc.h
+> new file mode 100644
+> index 0000000..e957eb5
+> --- /dev/null
+> +++ b/drivers/soc/imx/sc/main/rpc.h
+> @@ -0,0 +1,81 @@
+> +/* SPDX-License-Identifier: GPL-2.0+ */
+> +/*
+> + * Copyright (C) 2016 Freescale Semiconductor, Inc.
+> + * Copyright 2017~2018 NXP
+> + *
+> + * Header file for the RPC implementation.
+> + */
+> +
+> +#ifndef _SC_RPC_H
+> +#define _SC_RPC_H
+> +
+> +/* Includes */
+> +
+> +#include <soc/imx/sc/types.h>
+> +#include <soc/imx/sc/ipc.h>
+> +
+> +/* Defines */
+> +
+> +#define SC_RPC_VERSION		1
+> +
+> +#define SC_RPC_MAX_MSG		8
+> +
+> +#define SC_RPC_MAX_COUNT        5
+> +
+> +#define RPC_VER(MSG)            ((MSG)->version)
+> +#define RPC_SIZE(MSG)           ((MSG)->size)
+> +#define RPC_SVC(MSG)            ((MSG)->svc)
+> +#define RPC_FUNC(MSG)           ((MSG)->func)
+> +#define RPC_R8(MSG)             ((MSG)->func)
+> +#define RPC_I32(MSG, IDX)       ((MSG)->DATA.i32[(IDX) / 4])
+> +#define RPC_I16(MSG, IDX)       ((MSG)->DATA.i16[(IDX) / 2])
+> +#define RPC_I8(MSG, IDX)        ((MSG)->DATA.i8[(IDX)])
+> +#define RPC_U32(MSG, IDX)       ((MSG)->DATA.u32[(IDX) / 4])
+> +#define RPC_U16(MSG, IDX)       ((MSG)->DATA.u16[(IDX) / 2])
+> +#define RPC_U8(MSG, IDX)        ((MSG)->DATA.u8[(IDX)])
+
+I thought we agreed that you get rid of these.
+
+
+> +
+> +/* Types */
+> +
+> +typedef enum sc_rpc_svc_e {
+> +	SC_RPC_SVC_UNKNOWN = 0,
+> +	SC_RPC_SVC_RETURN = 1,
+> +	SC_RPC_SVC_PM = 2,
+> +	SC_RPC_SVC_RM = 3,
+> +	SC_RPC_SVC_TIMER = 5,
+> +	SC_RPC_SVC_PAD = 6,
+> +	SC_RPC_SVC_MISC = 7,
+> +	SC_RPC_SVC_IRQ = 8,
+> +	SC_RPC_SVC_ABORT = 9
+> +} sc_rpc_svc_t;
+> +
+> +typedef struct sc_rpc_msg_s {
+> +	uint8_t version;
+> +	uint8_t size;
+> +	uint8_t svc;
+> +	uint8_t func;
+> +	union {
+> +		int32_t i32[(SC_RPC_MAX_MSG - 1)];
+> +		int16_t i16[(SC_RPC_MAX_MSG - 1) * 2];
+> +		int8_t i8[(SC_RPC_MAX_MSG - 1) * 4];
+> +		uint32_t u32[(SC_RPC_MAX_MSG - 1)];
+> +		uint16_t u16[(SC_RPC_MAX_MSG - 1) * 2];
+> +		uint8_t u8[(SC_RPC_MAX_MSG - 1) * 4];
+> +	} DATA;
+> +} sc_rpc_msg_t;
+> +
+> +/* Functions */
+> +
+> +/*
+> + * This is an internal function to send an RPC message over an IPC
+> + * channel. It is called by client-side SCFW API function shims.
+> + *
+> + * @param[in]     ipc         IPC handle
+> + * @param[in,out] msg         handle to a message
+> + * @param[in]     no_resp     response flag
+> + *
+> + * If no_resp is false then this function waits for a response
+> + * and returns the result in msg.
+> + */
+> +void sc_call_rpc(sc_ipc_t ipc, sc_rpc_msg_t *msg, bool no_resp);
+
+Positive logic is usually easier to read. Instead of a 'no_resp' flag you should
+have a 'resp' flag.
+
+> +
+> +#endif /* _SC_RPC_H */
+> diff --git a/drivers/soc/imx/sc/svc/irq/rpc.h b/drivers/soc/imx/sc/svc/irq/rpc.h
+> new file mode 100644
+> index 0000000..3a6cccd
+> --- /dev/null
+> +++ b/drivers/soc/imx/sc/svc/irq/rpc.h
+> @@ -0,0 +1,23 @@
+> +/* SPDX-License-Identifier: GPL-2.0+ */
+> +/*
+> + * Copyright (C) 2016 Freescale Semiconductor, Inc.
+> + * Copyright 2017~2018 NXP
+> + *
+> + * Header file for the IRQ RPC implementation.
+> + */
+> +
+> +#ifndef _SC_IRQ_RPC_H
+> +#define _SC_IRQ_RPC_H
+> +
+> +/* Types */
+> +
+> +/*!
+> + * This type is used to indicate RPC IRQ function calls.
+> + */
+> +typedef enum irq_func_e {
+> +	IRQ_FUNC_UNKNOWN = 0,	/* Unknown function */
+> +	IRQ_FUNC_ENABLE = 1,	/* Index for irq_enable() RPC call */
+> +	IRQ_FUNC_STATUS = 2,	/* Index for irq_status() RPC call */
+> +} irq_func_t;
+> +
+> +#endif /* _SC_IRQ_RPC_H */
+> diff --git a/drivers/soc/imx/sc/svc/irq/rpc_clnt.c b/drivers/soc/imx/sc/svc/irq/rpc_clnt.c
+> new file mode 100644
+> index 0000000..37a9ab4
+> --- /dev/null
+> +++ b/drivers/soc/imx/sc/svc/irq/rpc_clnt.c
+> @@ -0,0 +1,58 @@
+> +// SPDX-License-Identifier: GPL-2.0+
+> +/*
+> + * Copyright (C) 2016 Freescale Semiconductor, Inc.
+> + * Copyright 2017~2018 NXP
+> + *
+> + * File containing client-side RPC functions for the IRQ service. These
+> + * function are ported to clients that communicate to the SC.
+> + *
+> + */
+> +
+> +#include <soc/imx/sc/types.h>
+> +#include <soc/imx/sc/svc/rm/api.h>
+> +#include <soc/imx/sc/svc/irq/api.h>
+> +#include "../../main/rpc.h"
+> +#include "rpc.h"
+> +
+> +sc_err_t sc_irq_enable(sc_ipc_t ipc, sc_rsrc_t resource,
+> +		       sc_irq_group_t group, uint32_t mask, bool enable)
+> +{
+> +	sc_rpc_msg_t msg;
+> +	uint8_t result;
+> +
+> +	RPC_VER(&msg) = SC_RPC_VERSION;
+> +	RPC_SVC(&msg) = (uint8_t)SC_RPC_SVC_IRQ;
+> +	RPC_FUNC(&msg) = (uint8_t)IRQ_FUNC_ENABLE;
+> +	RPC_U32(&msg, 0) = mask;
+> +	RPC_U16(&msg, 4) = resource;
+> +	RPC_U8(&msg, 6) = group;
+> +	RPC_U8(&msg, 7) = (uint8_t)enable;
+> +	RPC_SIZE(&msg) = 3;
+> +
+> +	sc_call_rpc(ipc, &msg, false);
+
+This call can fail...
+
+> +
+> +	result = RPC_R8(&msg);
+
+.. in which case RPC_R8(&msg) is still initialized with SC_RPC_VERSION.
+
+> +	return (sc_err_t)result;
+> +}
+> +
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
