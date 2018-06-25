@@ -1,26 +1,40 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 25 Jun 2018 15:01:20 -0600
-Subject: [RfC v1 1/5] dt-bindings: add vendor prefix for Shenzhen Oranth
- Technology Co., Ltd.
-In-Reply-To: <20180624182814.31691-2-martin.blumenstingl@googlemail.com>
+Date: Mon, 25 Jun 2018 15:03:24 -0600
+Subject: [RfC v1 2/5] dt-bindings: arm: amlogic: Add support for GXL
+ S905W and the P281 board
+In-Reply-To: <20180624182814.31691-3-martin.blumenstingl@googlemail.com>
 References: <20180624182814.31691-1-martin.blumenstingl@googlemail.com>
- <20180624182814.31691-2-martin.blumenstingl@googlemail.com>
-Message-ID: <20180625210120.GA3716@rob-hp-laptop>
+ <20180624182814.31691-3-martin.blumenstingl@googlemail.com>
+Message-ID: <20180625210324.GA4412@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 24, 2018 at 08:28:10PM +0200, Martin Blumenstingl wrote:
-> According to their website (http://www.oranth.com/about-oranth/)
-> Shenzhen Oranth Technology Co., Ltd. (or simply "Oranth") "is a
-> professional Design House & Manufacturer for Android TV Box established
-> in 2014". One of their brands is Tanix (sometimes also spelled "TANIX").
+On Sun, Jun 24, 2018 at 08:28:11PM +0200, Martin Blumenstingl wrote:
+> S905W SoC is another SoC from the GXL family. It is a cost-reduced
+> version of the S905X SoC. The following differences are known:
+> - S905W supports HDMI resolutions up to 4k at 30fps (while S905X support
+>   resolutions up to 4k at 60fps)
+> - the built-in video decoders of S905W decode up to 4k at 30fps (while
+>   S905X supports decoding up to 4k at 60fps)
+> - CPU speed on S905W is limited to 1.2GHz (compared to 1.5GHz on S905X,
+>   this is handled in the SCPI firmware)
+> - the DRAM interface on S905W is limited to 16-bit (GXL supports both,
+>   16-bit and 32-bit)
 > 
-> One of their most popular devices is the "Tanix TX3 Mini" TV box (which
-> uses the Amlogic S905W chipset).
+> Notes based on Amlogic's GPL kernel sources:
+> - the P281 is a development board from Amlogic which uses the S905W SoC.
+>   Amlogic's GPL kernel sources indicate that it uses the same PCB layout
+>   as the "P231" board (and simply replaces the S905D from the original
+>   P231 board with a S905W SoC).
+> - it is assumed that the S905W SoC is pin-compatible with the S905X SoC
+>   since Amlogic's GPL kernel sources use the same driver for both SoCs.
+> - gxl_p281_1g.dts contains a comment which mentions that "max gp pll for
+>   gpu is 650M, temporarily disabled". However, it seems to boot fine
+>   with 744MHz (as used on GXBB and the other GXL SoCs).
 > 
 > Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
 > ---
->  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
->  1 file changed, 1 insertion(+)
+>  Documentation/devicetree/bindings/arm/amlogic.txt | 6 ++++++
+>  1 file changed, 6 insertions(+)
 
 Reviewed-by: Rob Herring <robh@kernel.org>
