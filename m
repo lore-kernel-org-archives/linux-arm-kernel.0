@@ -1,43 +1,69 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 25 Jun 2018 16:06:21 +0200
-Subject: [PATCH 10/15] ARM: shmobile: r8a7779: Stop powering down secondary
- CPUs during early boot
-In-Reply-To: <cover.1529934908.git.horms+renesas@verge.net.au>
-References: <cover.1529934908.git.horms+renesas@verge.net.au>
-Message-ID: <62f55ce683e3675aa83cc3e912f070aef1baeff8.1529934908.git.horms+renesas@verge.net.au>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Mon, 25 Jun 2018 15:31:09 +0100
+Subject: [PATCH 05/11] ASoC: qdsp6: q6asm: use
+ of_platform_populate/depopulate()
+In-Reply-To: <20180625143115.8346-1-srinivas.kandagatla@linaro.org>
+References: <20180625143115.8346-1-srinivas.kandagatla@linaro.org>
+Message-ID: <20180625143115.8346-6-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+Now that the child nodes have there own compatible strings,
+Use of_platform_populate/depopulate() instead of less common
+of_platform_device_create()/destroy().
 
-At .smp_prepare_cpus() time, CPUs 1-3 are still powered down:
-  - The bootloader doesn't enable CPUs 1-3,
-  - Non-boot CPUs are disabled by kexec before starting the new kernel.
-
-Hence there is no need to try to power them down again, as it will fail
-silently with -EIO anyway.
-
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 ---
- arch/arm/mach-shmobile/smp-r8a7779.c | 5 -----
- 1 file changed, 5 deletions(-)
+ sound/soc/qcom/qdsp6/q6asm.c | 17 ++---------------
+ 1 file changed, 2 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/smp-r8a7779.c b/arch/arm/mach-shmobile/smp-r8a7779.c
-index c6951ee24588..ff1e6fc0b861 100644
---- a/arch/arm/mach-shmobile/smp-r8a7779.c
-+++ b/arch/arm/mach-shmobile/smp-r8a7779.c
-@@ -97,11 +97,6 @@ static void __init r8a7779_smp_prepare_cpus(unsigned int max_cpus)
- 	shmobile_smp_scu_prepare_cpus(R8A7779_SCU_BASE, max_cpus);
+diff --git a/sound/soc/qcom/qdsp6/q6asm.c b/sound/soc/qcom/qdsp6/q6asm.c
+index 530852385cad..2b2c7233bb5f 100644
+--- a/sound/soc/qcom/qdsp6/q6asm.c
++++ b/sound/soc/qcom/qdsp6/q6asm.c
+@@ -174,10 +174,8 @@ struct q6asm {
+ 	struct device *dev;
+ 	struct q6core_svc_api_info ainfo;
+ 	wait_queue_head_t mem_wait;
+-	struct platform_device *pcmdev;
+ 	spinlock_t slock;
+ 	struct audio_client *session[MAX_SESSIONS + 1];
+-	struct platform_device *pdev_dais;
+ };
  
- 	r8a7779_pm_init();
+ struct audio_client {
+@@ -1344,7 +1342,6 @@ EXPORT_SYMBOL_GPL(q6asm_cmd_nowait);
+ static int q6asm_probe(struct apr_device *adev)
+ {
+ 	struct device *dev = &adev->dev;
+-	struct device_node *dais_np;
+ 	struct q6asm *q6asm;
+ 
+ 	q6asm = devm_kzalloc(dev, sizeof(*q6asm), GFP_KERNEL);
+@@ -1359,22 +1356,12 @@ static int q6asm_probe(struct apr_device *adev)
+ 	spin_lock_init(&q6asm->slock);
+ 	dev_set_drvdata(dev, q6asm);
+ 
+-	dais_np = of_get_child_by_name(dev->of_node, "dais");
+-	if (dais_np) {
+-		q6asm->pdev_dais = of_platform_device_create(dais_np,
+-							   "q6asm-dai", dev);
+-		of_node_put(dais_np);
+-	}
 -
--	/* power off secondary CPUs */
--	r8a7779_platform_cpu_kill(1);
--	r8a7779_platform_cpu_kill(2);
--	r8a7779_platform_cpu_kill(3);
+-	return 0;
++	return of_platform_populate(dev->of_node, NULL, NULL, dev);
  }
  
- #ifdef CONFIG_HOTPLUG_CPU
+ static int q6asm_remove(struct apr_device *adev)
+ {
+-	struct q6asm *q6asm = dev_get_drvdata(&adev->dev);
+-
+-	if (q6asm->pdev_dais)
+-		of_platform_device_destroy(&q6asm->pdev_dais->dev, NULL);
++	of_platform_depopulate(&adev->dev);
+ 
+ 	return 0;
+ }
 -- 
-2.11.0
+2.16.2
