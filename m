@@ -1,35 +1,73 @@
-From: david@lechnology.com (David Lechner)
-Date: Mon, 25 Jun 2018 11:06:46 -0500
-Subject: [PATCH 1/9] clk: davinci: psc-dm365: use two lookup entries for
- the aemif clock
-In-Reply-To: <CAMRc=MdTdoL9qsrMAxhCTaQM7HGrAPpTVjDuHQ81Q5O-QMNcYQ@mail.gmail.com>
-References: <20180625152920.11549-1-brgl@bgdev.pl>
- <20180625152920.11549-2-brgl@bgdev.pl>
- <241fed6e-b414-feac-8e6c-39713c5e665e@lechnology.com>
- <CAMRc=MdTdoL9qsrMAxhCTaQM7HGrAPpTVjDuHQ81Q5O-QMNcYQ@mail.gmail.com>
-Message-ID: <c8d28664-e0fb-5a02-3c5b-b78684f87648@lechnology.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Mon, 25 Jun 2018 23:59:37 +0800
+Subject: [PATCH v2 3/7] bus: add bus driver for accessing Allwinner A64 DE2
+In-Reply-To: <20180625155805.kds7bl3cburblwv6@flea>
+References: <20180622124540.56203-1-icenowy@aosc.io>
+ <20180622124540.56203-2-icenowy@aosc.io>
+ <20180625155805.kds7bl3cburblwv6@flea>
+Message-ID: <4DFADAD6-3E17-425F-8B03-CAC4402BF14F@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/25/2018 11:01 AM, Bartosz Golaszewski wrote:
-> 2018-06-25 17:53 GMT+02:00 David Lechner <david@lechnology.com>:
->> On 06/25/2018 10:29 AM, Bartosz Golaszewski wrote:
->>>
->>> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->>>
->>> We want to be able to get the clock both from the board file by its
->>> con_id and from the aemif driver by dev_id.
->>
->>
->> What about the other SoCs? Don't they need this change as well?
->>
-> 
-> So I double checked and turns out I missed one other board that's
-> affected by this series and calls clk_get() from machine code:
-> dm644x-evm.
-> 
-> I'll fix it in v2.
 
-The ti-aemif platform driver also does clk_get(). Don't you need
-lookups to make that work as well? For example, DA830 doesn't have
-a clock lookup for aemif at all.
+
+? 2018?6?25? GMT+08:00 ??11:58:05, Maxime Ripard <maxime.ripard@bootlin.com> ??:
+>On Fri, Jun 22, 2018 at 08:45:36PM +0800, Icenowy Zheng wrote:
+>> The "Display Engine 2.0" (usually called DE2) on the Allwinner A64
+>SoC
+>> is different from the ones on other Allwinner SoCs. It requires a
+>SRAM
+>> region to be claimed, otherwise all DE2 subblocks won't be
+>accessible.
+>> 
+>> Add a bus driver for the Allwinner A64 DE2 part which claims the SRAM
+>> region when probing.
+>> 
+>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+>> ---
+>> No changes since v1.
+>> 
+>>  drivers/bus/Kconfig      | 10 ++++++++
+>>  drivers/bus/Makefile     |  1 +
+>>  drivers/bus/sun50i-de2.c | 49
+>++++++++++++++++++++++++++++++++++++++++
+>>  3 files changed, 60 insertions(+)
+>>  create mode 100644 drivers/bus/sun50i-de2.c
+>> 
+>> diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
+>> index d1c0b60e9326..1851112ccc29 100644
+>> --- a/drivers/bus/Kconfig
+>> +++ b/drivers/bus/Kconfig
+>> @@ -103,6 +103,16 @@ config SIMPLE_PM_BUS
+>>  	  Controller (BSC, sometimes called "LBSC within Bus Bridge", or
+>>  	  "External Bus Interface") as found on several Renesas ARM SoCs.
+>>  
+>> +config SUN50I_DE2_BUS
+>> +	bool "Allwinner A64 DE2 Bus Driver"
+>> +	  default ARM64
+>> +	  depends on ARCH_SUNXI
+>> +	  select SUNXI_SRAM
+>> +	  help
+>
+>The alignment here should be one tab.
+>
+>> +static int sun50i_de2_bus_probe(struct platform_device *pdev)
+>> +{
+>> +	struct device_node *np = pdev->dev.of_node;
+>> +	int ret;
+>> +
+>> +	ret = sunxi_sram_claim(&pdev->dev);
+>> +	if (ret) {
+>> +		dev_err(&pdev->dev, "Error couldn't map SRAM to device\n");
+>> +		return ret;
+>> +	}
+>> +
+>> +	if (np)
+>> +		of_platform_populate(np, NULL, NULL, &pdev->dev);
+>
+>Why do you need to test np here?
+
+Oh thanks. Currently it's only probeable via dt.
+
+>
+>Maxime
