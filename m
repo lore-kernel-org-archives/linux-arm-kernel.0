@@ -1,32 +1,64 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Mon, 25 Jun 2018 15:31:15 +0100
-Subject: [PATCH 11/11] ASoC: qdsp6: q6routing: add proper error check
-In-Reply-To: <20180625143115.8346-1-srinivas.kandagatla@linaro.org>
-References: <20180625143115.8346-1-srinivas.kandagatla@linaro.org>
-Message-ID: <20180625143115.8346-12-srinivas.kandagatla@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 25 Jun 2018 15:44:17 +0100
+Subject: [PATCH 3/7] arm64: compat: map SPSR_ELx<->PSR for signals
+In-Reply-To: <20180625144421.11511-1-mark.rutland@arm.com>
+References: <20180625144421.11511-1-mark.rutland@arm.com>
+Message-ID: <20180625144421.11511-4-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-q6adm_open can return error pointer or a null in error cases.
-Fix this check this.
+The SPSR_ELx format for exceptions taken from AArch32 differs from the
+AArch32 PSR format. Thus, we must translate between the two when setting
+up a compat sigframe, or restoring context from a compat sigframe.
 
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Fixes: 7206dc93a58fb764 ("arm64: Expose Arm v8.4 features")
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Suzuki Poulose <suzuki.poulose@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
 ---
- sound/soc/qcom/qdsp6/q6routing.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/kernel/signal32.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
-diff --git a/sound/soc/qcom/qdsp6/q6routing.c b/sound/soc/qcom/qdsp6/q6routing.c
-index caf2f847a886..c18f808c7730 100644
---- a/sound/soc/qcom/qdsp6/q6routing.c
-+++ b/sound/soc/qcom/qdsp6/q6routing.c
-@@ -310,7 +310,7 @@ int q6routing_stream_open(int fedai_id, int perf_mode,
- 			      session->channels, topology, perf_mode,
- 			      session->bits_per_sample, 0, 0);
+diff --git a/arch/arm64/kernel/signal32.c b/arch/arm64/kernel/signal32.c
+index 77b91f478995..fa9fb782f077 100644
+--- a/arch/arm64/kernel/signal32.c
++++ b/arch/arm64/kernel/signal32.c
+@@ -243,6 +243,7 @@ static int compat_restore_sigframe(struct pt_regs *regs,
+ 	int err;
+ 	sigset_t set;
+ 	struct compat_aux_sigframe __user *aux;
++	unsigned long psr;
  
--	if (!copp) {
-+	if (IS_ERR_OR_NULL(copp)) {
- 		mutex_unlock(&routing_data->lock);
- 		return -EINVAL;
- 	}
+ 	err = get_sigset_t(&set, &sf->uc.uc_sigmask);
+ 	if (err == 0) {
+@@ -266,7 +267,9 @@ static int compat_restore_sigframe(struct pt_regs *regs,
+ 	__get_user_error(regs->compat_sp, &sf->uc.uc_mcontext.arm_sp, err);
+ 	__get_user_error(regs->compat_lr, &sf->uc.uc_mcontext.arm_lr, err);
+ 	__get_user_error(regs->pc, &sf->uc.uc_mcontext.arm_pc, err);
+-	__get_user_error(regs->pstate, &sf->uc.uc_mcontext.arm_cpsr, err);
++	__get_user_error(psr, &sf->uc.uc_mcontext.arm_cpsr, err);
++
++	regs->pstate = compat_psr_to_pstate(regs->pstate);
+ 
+ 	/*
+ 	 * Avoid compat_sys_sigreturn() restarting.
+@@ -414,6 +417,7 @@ static int compat_setup_sigframe(struct compat_sigframe __user *sf,
+ 				 struct pt_regs *regs, sigset_t *set)
+ {
+ 	struct compat_aux_sigframe __user *aux;
++	unsigned long psr = pstate_to_compat_psr(regs->pstate);
+ 	int err = 0;
+ 
+ 	__put_user_error(regs->regs[0], &sf->uc.uc_mcontext.arm_r0, err);
+@@ -432,7 +436,7 @@ static int compat_setup_sigframe(struct compat_sigframe __user *sf,
+ 	__put_user_error(regs->compat_sp, &sf->uc.uc_mcontext.arm_sp, err);
+ 	__put_user_error(regs->compat_lr, &sf->uc.uc_mcontext.arm_lr, err);
+ 	__put_user_error(regs->pc, &sf->uc.uc_mcontext.arm_pc, err);
+-	__put_user_error(regs->pstate, &sf->uc.uc_mcontext.arm_cpsr, err);
++	__put_user_error(psr, &sf->uc.uc_mcontext.arm_cpsr, err);
+ 
+ 	__put_user_error((compat_ulong_t)0, &sf->uc.uc_mcontext.trap_no, err);
+ 	/* set the compat FSR WnR */
 -- 
-2.16.2
+2.11.0
