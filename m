@@ -1,64 +1,121 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 25 Jun 2018 15:44:17 +0100
-Subject: [PATCH 3/7] arm64: compat: map SPSR_ELx<->PSR for signals
+Date: Mon, 25 Jun 2018 15:44:15 +0100
+Subject: [PATCH 1/7] arm64: add PSR_AA32_* definitions
 In-Reply-To: <20180625144421.11511-1-mark.rutland@arm.com>
 References: <20180625144421.11511-1-mark.rutland@arm.com>
-Message-ID: <20180625144421.11511-4-mark.rutland@arm.com>
+Message-ID: <20180625144421.11511-2-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SPSR_ELx format for exceptions taken from AArch32 differs from the
-AArch32 PSR format. Thus, we must translate between the two when setting
-up a compat sigframe, or restoring context from a compat sigframe.
+The AArch32 CPSR/SPSR format is *almost* identical to the AArch64
+SPSR_ELx format for exceptions taken from AArch32, but the two have
+diverged with the addition of DIT, and we need to treat the two as
+logically distinct.
+
+This patch adds new definitions for the SPSR_ELx format for exceptions
+taken from AArch32, with a consistent PSR_AA32_ prefix. The existing
+COMPAT_PSR_ definitions will be used for the PSR format as seen from
+AArch32.
+
+Definitions of DIT are provided for both, and inline functions are
+provided to map between the two formats. Note that for SPSR_ELx, the
+(RES0) J bit has been re-allocated as the DIT bit.
+
+Once users of the COMPAT_PSR definitions have been migrated over to the
+PSR_AA32 definitions, the (majority of) the former will be removed, so
+no efforts is made to avoid duplication until then.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Fixes: 7206dc93a58fb764 ("arm64: Expose Arm v8.4 features")
 Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Christoffer Dall <christoffer.dall@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
 Cc: Suzuki Poulose <suzuki.poulose@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/kernel/signal32.c | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
+ arch/arm64/include/asm/ptrace.h | 57 ++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 56 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/kernel/signal32.c b/arch/arm64/kernel/signal32.c
-index 77b91f478995..fa9fb782f077 100644
---- a/arch/arm64/kernel/signal32.c
-+++ b/arch/arm64/kernel/signal32.c
-@@ -243,6 +243,7 @@ static int compat_restore_sigframe(struct pt_regs *regs,
- 	int err;
- 	sigset_t set;
- 	struct compat_aux_sigframe __user *aux;
-+	unsigned long psr;
+diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
+index 6069d66e0bc2..ee27468a1ba6 100644
+--- a/arch/arm64/include/asm/ptrace.h
++++ b/arch/arm64/include/asm/ptrace.h
+@@ -35,7 +35,37 @@
+ #define COMPAT_PTRACE_GETHBPREGS	29
+ #define COMPAT_PTRACE_SETHBPREGS	30
  
- 	err = get_sigset_t(&set, &sf->uc.uc_sigmask);
- 	if (err == 0) {
-@@ -266,7 +267,9 @@ static int compat_restore_sigframe(struct pt_regs *regs,
- 	__get_user_error(regs->compat_sp, &sf->uc.uc_mcontext.arm_sp, err);
- 	__get_user_error(regs->compat_lr, &sf->uc.uc_mcontext.arm_lr, err);
- 	__get_user_error(regs->pc, &sf->uc.uc_mcontext.arm_pc, err);
--	__get_user_error(regs->pstate, &sf->uc.uc_mcontext.arm_cpsr, err);
-+	__get_user_error(psr, &sf->uc.uc_mcontext.arm_cpsr, err);
+-/* AArch32 CPSR bits */
++/* SPSR_ELx bits for exceptions taken from AArch32 */
++#define PSR_AA32_MODE_MASK	0x0000001f
++#define PSR_AA32_MODE_USR	0x00000010
++#define PSR_AA32_MODE_FIQ	0x00000011
++#define PSR_AA32_MODE_IRQ	0x00000012
++#define PSR_AA32_MODE_SVC	0x00000013
++#define PSR_AA32_MODE_ABT	0x00000017
++#define PSR_AA32_MODE_HYP	0x0000001a
++#define PSR_AA32_MODE_UND	0x0000001b
++#define PSR_AA32_MODE_SYS	0x0000001f
++#define PSR_AA32_T_BIT		0x00000020
++#define PSR_AA32_F_BIT		0x00000040
++#define PSR_AA32_I_BIT		0x00000080
++#define PSR_AA32_A_BIT		0x00000100
++#define PSR_AA32_E_BIT		0x00000200
++#define PSR_AA32_DIT_BIT	0x01000000
++#define PSR_AA32_Q_BIT		0x08000000
++#define PSR_AA32_V_BIT		0x10000000
++#define PSR_AA32_C_BIT		0x20000000
++#define PSR_AA32_Z_BIT		0x40000000
++#define PSR_AA32_N_BIT		0x80000000
++#define PSR_AA32_IT_MASK	0x0600fc00	/* If-Then execution state mask */
++#define PSR_AA32_GE_MASK	0x000f0000
 +
-+	regs->pstate = compat_psr_to_pstate(regs->pstate);
++#ifdef CONFIG_CPU_BIG_ENDIAN
++#define PSR_AA32_ENDSTATE	PSR_AA32_E_BIT
++#else
++#define PSR_AA32_ENDSTATE	0
++#endif
++
++/* AArch32 CPSR bits, as seen in AArch32 */
+ #define COMPAT_PSR_MODE_MASK	0x0000001f
+ #define COMPAT_PSR_MODE_USR	0x00000010
+ #define COMPAT_PSR_MODE_FIQ	0x00000011
+@@ -50,6 +80,7 @@
+ #define COMPAT_PSR_I_BIT	0x00000080
+ #define COMPAT_PSR_A_BIT	0x00000100
+ #define COMPAT_PSR_E_BIT	0x00000200
++#define COMPAT_PSR_DIT_BIT	0x00200000
+ #define COMPAT_PSR_J_BIT	0x01000000
+ #define COMPAT_PSR_Q_BIT	0x08000000
+ #define COMPAT_PSR_V_BIT	0x10000000
+@@ -65,6 +96,30 @@
+ #define COMPAT_PSR_ENDSTATE	0
+ #endif
  
- 	/*
- 	 * Avoid compat_sys_sigreturn() restarting.
-@@ -414,6 +417,7 @@ static int compat_setup_sigframe(struct compat_sigframe __user *sf,
- 				 struct pt_regs *regs, sigset_t *set)
- {
- 	struct compat_aux_sigframe __user *aux;
-+	unsigned long psr = pstate_to_compat_psr(regs->pstate);
- 	int err = 0;
- 
- 	__put_user_error(regs->regs[0], &sf->uc.uc_mcontext.arm_r0, err);
-@@ -432,7 +436,7 @@ static int compat_setup_sigframe(struct compat_sigframe __user *sf,
- 	__put_user_error(regs->compat_sp, &sf->uc.uc_mcontext.arm_sp, err);
- 	__put_user_error(regs->compat_lr, &sf->uc.uc_mcontext.arm_lr, err);
- 	__put_user_error(regs->pc, &sf->uc.uc_mcontext.arm_pc, err);
--	__put_user_error(regs->pstate, &sf->uc.uc_mcontext.arm_cpsr, err);
-+	__put_user_error(psr, &sf->uc.uc_mcontext.arm_cpsr, err);
- 
- 	__put_user_error((compat_ulong_t)0, &sf->uc.uc_mcontext.trap_no, err);
- 	/* set the compat FSR WnR */
++static inline unsigned long compat_psr_to_pstate(const unsigned long psr)
++{
++	unsigned long pstate;
++
++	pstate = psr & ~COMPAT_PSR_DIT_BIT;
++
++	if (psr & COMPAT_PSR_DIT_BIT)
++		pstate |= PSR_AA32_DIT_BIT;
++
++	return pstate;
++}
++
++static inline unsigned long pstate_to_compat_psr(const unsigned long pstate)
++{
++	unsigned long psr;
++
++	psr = pstate & ~PSR_AA32_DIT_BIT;
++
++	if (pstate & PSR_AA32_DIT_BIT)
++		psr |= COMPAT_PSR_DIT_BIT;
++
++	return psr;
++}
++
+ /*
+  * These are 'magic' values for PTRACE_PEEKUSR that return info about where a
+  * process is located in memory.
 -- 
 2.11.0
