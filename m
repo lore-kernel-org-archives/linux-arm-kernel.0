@@ -1,39 +1,36 @@
-From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Mon, 25 Jun 2018 17:12:18 +0200
-Subject: [PATCH v2 02/23] thermal: armada: remove misleading comments
-In-Reply-To: <20180625151239.20976-1-miquel.raynal@bootlin.com>
-References: <20180625151239.20976-1-miquel.raynal@bootlin.com>
-Message-ID: <20180625151239.20976-3-miquel.raynal@bootlin.com>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Mon, 25 Jun 2018 17:29:12 +0200
+Subject: [PATCH 1/9] clk: davinci: psc-dm365: use two lookup entries for the
+ aemif clock
+In-Reply-To: <20180625152920.11549-1-brgl@bgdev.pl>
+References: <20180625152920.11549-1-brgl@bgdev.pl>
+Message-ID: <20180625152920.11549-2-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On older versions of this thermal IP, TSEN referred as the internal
-sensor in the thermal IP while EXT_TSEN referred as sensors outside of
-this IP, ie in the CPUs most of the time. The bit names in the
-specifications do not follow this rule anymore, so remove these comments
-that are misleading.
+From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+We want to be able to get the clock both from the board file by its
+con_id and from the aemif driver by dev_id.
+
+Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- drivers/thermal/armada_thermal.c | 2 --
- 1 file changed, 2 deletions(-)
+ drivers/clk/davinci/psc-dm365.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/thermal/armada_thermal.c b/drivers/thermal/armada_thermal.c
-index 6fdb90b3c001..18155e43e67f 100644
---- a/drivers/thermal/armada_thermal.c
-+++ b/drivers/thermal/armada_thermal.c
-@@ -51,12 +51,10 @@
- #define CONTROL0_TSEN_TC_TRIM_MASK	0x7
- #define CONTROL0_TSEN_TC_TRIM_VAL	0x3
- 
--/* TSEN refers to the temperature sensors within the AP */
- #define CONTROL0_TSEN_START		BIT(0)
- #define CONTROL0_TSEN_RESET		BIT(1)
- #define CONTROL0_TSEN_ENABLE		BIT(2)
- 
--/* EXT_TSEN refers to the external temperature sensors, out of the AP */
- #define CONTROL1_EXT_TSEN_SW_RESET	BIT(7)
- #define CONTROL1_EXT_TSEN_HW_RESETn	BIT(8)
- 
+diff --git a/drivers/clk/davinci/psc-dm365.c b/drivers/clk/davinci/psc-dm365.c
+index 8c73086cc676..c75424f4ea3b 100644
+--- a/drivers/clk/davinci/psc-dm365.c
++++ b/drivers/clk/davinci/psc-dm365.c
+@@ -21,7 +21,8 @@ LPSC_CLKDEV1(mmcsd1_clkdev,		NULL,		"da830-mmc.1");
+ LPSC_CLKDEV1(asp0_clkdev,		NULL,		"davinci-mcbsp");
+ LPSC_CLKDEV1(usb_clkdev,		"usb",		NULL);
+ LPSC_CLKDEV1(spi2_clkdev,		NULL,		"spi_davinci.2");
+-LPSC_CLKDEV1(aemif_clkdev,		"aemif",	NULL);
++LPSC_CLKDEV2(aemif_clkdev,		"aemif",	NULL,
++					NULL,		"ti-aemif");
+ LPSC_CLKDEV1(mmcsd0_clkdev,		NULL,		"da830-mmc.0");
+ LPSC_CLKDEV1(i2c_clkdev,		NULL,		"i2c_davinci.1");
+ LPSC_CLKDEV1(uart0_clkdev,		NULL,		"serial8250.0");
 -- 
-2.14.1
+2.17.1
