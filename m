@@ -1,54 +1,64 @@
-From: andy.gross@linaro.org (Andy Gross)
-Date: Mon, 25 Jun 2018 14:44:45 -0500
-Subject: [PATCH 2/2] soc: qcom: cmd-db: Fix compiler warnings
-In-Reply-To: <1529946347-12740-2-git-send-email-andy.gross@linaro.org>
-References: <1529946347-12740-1-git-send-email-andy.gross@linaro.org>
- <1529946347-12740-2-git-send-email-andy.gross@linaro.org>
-Message-ID: <20180625194445.GB4689@hector.attlocal.net>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Mon, 25 Jun 2018 22:06:56 +0200 (CEST)
+Subject: [PATCH 1/8] time: Add persistent clock support
+In-Reply-To: <CALAqxLWgfy8X75GOK5WttzRfgbwBxW0ibnQaFxcLrUTFmHMSUw@mail.gmail.com>
+References: <cover.1528878545.git.baolin.wang@linaro.org>
+ <d330f02c8ef2a348b179850e1745a52ab9c47e90.1528878545.git.baolin.wang@linaro.org>
+ <alpine.DEB.2.21.1806232224510.8650@nanos.tec.linutronix.de>
+ <CALAqxLWgfy8X75GOK5WttzRfgbwBxW0ibnQaFxcLrUTFmHMSUw@mail.gmail.com>
+Message-ID: <alpine.DEB.2.21.1806252142261.1587@nanos.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 25, 2018 at 12:05:47PM -0500, Andy Gross wrote:
-> This patch adds initialization of the entry_header structs to avoid
-> compiler warnings like the following:
+On Mon, 25 Jun 2018, John Stultz wrote:
+> On Sat, Jun 23, 2018 at 5:14 PM, Thomas Gleixner <tglx@linutronix.de> wrote:
 > 
->   CC      drivers/soc/qcom/cmd-db.o
-> drivers/soc/qcom/cmd-db.c: In function ?cmd_db_read_addr?:
-> drivers/soc/qcom/cmd-db.c:194:21: warning: ?ent.addr? may be used
-> uninitialized in this function [-Wmaybe-uninitialized]
->   return ret < 0 ? 0 : le32_to_cpu(ent.addr);
-> 
-> drivers/soc/qcom/cmd-db.c: In function ?cmd_db_read_aux_data_len?:
-> drivers/soc/qcom/cmd-db.c:247:38: warning: ?ent.len? may be used
-> uninitialized in this function [-Wmaybe-uninitialized]
->   return ret < 0 ? 0 : le16_to_cpu(ent.len);
->                                       ^
-> 
-> drivers/soc/qcom/cmd-db.c: In function ?cmd_db_read_slave_id?:
-> drivers/soc/qcom/cmd-db.c:269:7: warning: ?ent.addr? may be used
-> uninitialized in this function [-Wmaybe-uninitialized]
->   addr = le32_to_cpu(ent.addr);
-> 
-> drivers/soc/qcom/cmd-db.c: In function ?cmd_db_read_aux_data?:
-> drivers/soc/qcom/cmd-db.c:221:10: warning: ?ent.len? may be used
-> uninitialized in this function [-Wmaybe-uninitialized]
->   ent_len = le16_to_cpu(ent.len);
-> 
-> drivers/soc/qcom/cmd-db.c:226:15: warning: ?*((void *)&rsc_hdr+4)? may
-> be used uninitialized in this function [-Wmaybe-uninitialized]
->   memcpy(data, rsc_offset(&rsc_hdr, &ent), len);
->                ^~~~~~~~~~~~~~~~~~~~~~~~~~
-> drivers/soc/qcom/cmd-db.c:226:15: warning: ?*((void *)&ent+22)? may be
-> used uninitialized in this function [-Wmaybe-uninitialized]
-> 
-> Signed-off-by: Andy Gross <andy.gross@linaro.org>
+> Thomas, what is wrong with *you*?  This is completely unnecessary.
 
-I flubbed this one due to missing an already existing patch that fixes
-the warnings.  I'm going to package that one up with the errno check
-patch and send a fixes pull request.
+Nothing is wrong with me. I just hit a point where the amount of half baken
+crap tripped me over the edge and I let of steam. Sorry for that, it surely
+wasn't necessary. It was one of those days where grumpiness took
+control. My steam pressure is back to normal and I'm more than happy to put
+that back on the pure technical level.
 
-precursor patch:
-https://patchwork.kernel.org/patch/10384143/
+To be clear, that rant was not a shot at Baolin. It was definitely
+addressed to the people behind him who set him on this project and then
+failed to do any sanity checking.
 
+> Now, I've also been quite a poor maintainer of late, and haven't done
+> much to help with pre-review of Baloin's code.  So that's on me, not
+> him.
 
-Andy
+Fair enough.
+
+> I was really lucky to have your guidance and support when I was
+> starting in the community. Your helping bring me up as a co-maintainer
+> (only a a relatively small set of responsibility compared to your much
+> wider maintainership), does let me see that having the responsibility
+> of billions of devices running your code is immense and comes with no
+> small amount of stress. Juggling the infinite incoming stream of
+> review requests on naieve or otherwise lacking code with other
+> important development priorities is a major burden, so *I really get
+> how frustrating it is*.
+
+Yes, and I have to admit that I'm not a super human and despite trying to
+control my emotions, there are points where I fail in doing so. It makes me
+explode and that's it. I can assure Baolin, that this is nothing which
+sticks. I'll look at the next patchset from a pure technical level. There
+are surely precautions, but definitely no prejudice.
+
+> And its super annoying to have lots of short-term development requests
+> being thrown at you when you're the one who has to maintain it for the
+> long term.  But long-long-term, no one is going to be a maintainer
+> forever, and we are not going to develop more olympic swimmers if we
+> keep peeing in the pool.
+
+Right, that's why I early looked for co/sub-maintainers, but as you
+admitted yourself, that's not always working out and I surely would
+appreciate if there would be more help on all ends. I'm the last person who
+rejects help, quite the contrary I'm very happy when I can mark mails as
+'none of my business, somebody else takes care of that'.
+
+Thanks,
+
+	tglx
