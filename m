@@ -1,20 +1,56 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 25 Jun 2018 20:02:37 +0200
-Subject: [PATCH 00/14] ARM: davinci: step towards removing
- at24_platform_data
-In-Reply-To: <CAMRc=MdEn74G5SJAaGLAfNSS7Zy7wqH04aN5CMZ45UXqhu_58g@mail.gmail.com>
-References: <20180625155025.12567-1-brgl@bgdev.pl>
- <20180625174024.GB17417@lunn.ch>
- <CAMRc=MdEn74G5SJAaGLAfNSS7Zy7wqH04aN5CMZ45UXqhu_58g@mail.gmail.com>
-Message-ID: <20180625180237.GC17417@lunn.ch>
+From: niklas.cassel@linaro.org (Niklas Cassel)
+Date: Mon, 25 Jun 2018 20:03:08 +0200
+Subject: [PATCH 07/11] ASoC: qdsp6: q6afe-dai: support dt based module
+ loading
+In-Reply-To: <20180625143115.8346-8-srinivas.kandagatla@linaro.org>
+References: <20180625143115.8346-1-srinivas.kandagatla@linaro.org>
+ <20180625143115.8346-8-srinivas.kandagatla@linaro.org>
+Message-ID: <20180625180308.GF10876@centauri.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> With my patch 1/14 you'll get -EPROBE_DEFER from nvmem_cell_get() if
-> the nvmem provider is not yet registered. Will that help in your case?
+On Mon, Jun 25, 2018 at 03:31:11PM +0100, Srinivas Kandagatla wrote:
+> This patch uses new compatible string to make DT based module loading work.
+> 
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> ---
+>  sound/soc/qcom/qdsp6/q6afe-dai.c | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+> 
+> diff --git a/sound/soc/qcom/qdsp6/q6afe-dai.c b/sound/soc/qcom/qdsp6/q6afe-dai.c
+> index 5002dd05bf27..7fbf762a45ac 100644
+> --- a/sound/soc/qcom/qdsp6/q6afe-dai.c
+> +++ b/sound/soc/qcom/qdsp6/q6afe-dai.c
+> @@ -1290,9 +1290,17 @@ static int q6afe_dai_dev_remove(struct platform_device *pdev)
+>  	return 0;
+>  }
+>  
+> +static const struct of_device_id q6afe_dai_device_id[]  = {
 
-I don't think so. My driver instantiates the AT24 device. So if i get
--EPROBE_DEFER, i need to cleanup the probe, and return -EPROBDE_DEFER
-to the code. Which means i need to remove the AT24 device...
+Double space here.
 
-       Andrew
+> +	{ .compatible = "qcom,q6afe-dais" },
+> +	{},
+> +};
+> +
+
+Usually there is no empty line between the table and MODULE_DEVICE_TABLE.
+
+> +MODULE_DEVICE_TABLE(of, q6afe_dai_device_id);
+> +
+>  static struct platform_driver q6afe_dai_platform_driver = {
+>  	.driver = {
+>  		.name = "q6afe-dai",
+> +		.of_match_table = of_match_ptr(q6afe_dai_device_id),
+>  	},
+>  	.probe = q6afe_dai_dev_probe,
+>  	.remove = q6afe_dai_dev_remove,
+> -- 
+> 2.16.2
+> 
+
+I'm not sure if Rob agrees with me or not,
+but since this patch is less than 10 lines,
+I think that it would be simpler to review
+if it was squashed together with the patch
+adding the compatible to the DT binding.
