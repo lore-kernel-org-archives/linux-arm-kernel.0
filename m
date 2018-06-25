@@ -1,15 +1,14 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Mon, 25 Jun 2018 14:15:29 +0100
-Subject: Applied "mmc: pxamci: remove the dmaengine compat need" to the asoc
- tree
-In-Reply-To: <20180524070703.11901-4-robert.jarzmik@free.fr>
-Message-ID: <E1fXRL7-0008RT-0t@debutante>
+Date: Mon, 25 Jun 2018 14:15:20 +0100
+Subject: Applied "dmaengine: pxa: document pxad_param" to the asoc tree
+In-Reply-To: <20180524070703.11901-11-robert.jarzmik@free.fr>
+Message-ID: <E1fXRKy-0008Lb-A6@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   mmc: pxamci: remove the dmaengine compat need
+   dmaengine: pxa: document pxad_param
 
 has been applied to the asoc tree at
 
@@ -34,84 +33,39 @@ to this mail.
 Thanks,
 Mark
 
->From 6b3348f9e6eb35d2c2d49ffa274039ef9a901adc Mon Sep 17 00:00:00 2001
+>From b6d1a17f4729e4fda5740a855da91d202db2c118 Mon Sep 17 00:00:00 2001
 From: Robert Jarzmik <robert.jarzmik@free.fr>
-Date: Sun, 17 Jun 2018 19:02:07 +0200
-Subject: [PATCH] mmc: pxamci: remove the dmaengine compat need
+Date: Sun, 17 Jun 2018 19:02:14 +0200
+Subject: [PATCH] dmaengine: pxa: document pxad_param
 
-As the pxa architecture switched towards the dmaengine slave map, the
-old compatibility mechanism to acquire the dma requestor line number and
-priority are not needed anymore.
-
-This patch simplifies the dma resource acquisition, using the more
-generic function dma_request_slave_channel().
+Add some documentation for the pxad_param structure, and describe the
+contract behind the minimal required priority of a DMA channel.
 
 Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
-Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
+Acked-by: Vinod Koul <vkoul@kernel.org>
 ---
- drivers/mmc/host/pxamci.c | 29 +++--------------------------
- 1 file changed, 3 insertions(+), 26 deletions(-)
+ include/linux/dma/pxa-dma.h | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/drivers/mmc/host/pxamci.c b/drivers/mmc/host/pxamci.c
-index c763b404510f..6c94474e36f4 100644
---- a/drivers/mmc/host/pxamci.c
-+++ b/drivers/mmc/host/pxamci.c
-@@ -24,7 +24,6 @@
- #include <linux/interrupt.h>
- #include <linux/dmaengine.h>
- #include <linux/dma-mapping.h>
--#include <linux/dma/pxa-dma.h>
- #include <linux/clk.h>
- #include <linux/err.h>
- #include <linux/mmc/host.h>
-@@ -637,10 +636,8 @@ static int pxamci_probe(struct platform_device *pdev)
- {
- 	struct mmc_host *mmc;
- 	struct pxamci_host *host = NULL;
--	struct resource *r, *dmarx, *dmatx;
--	struct pxad_param param_rx, param_tx;
-+	struct resource *r;
- 	int ret, irq, gpio_cd = -1, gpio_ro = -1, gpio_power = -1;
--	dma_cap_mask_t mask;
+diff --git a/include/linux/dma/pxa-dma.h b/include/linux/dma/pxa-dma.h
+index e56ec7af4fd7..9fc594f69eff 100644
+--- a/include/linux/dma/pxa-dma.h
++++ b/include/linux/dma/pxa-dma.h
+@@ -9,6 +9,15 @@ enum pxad_chan_prio {
+ 	PXAD_PRIO_LOWEST,
+ };
  
- 	ret = pxamci_of_init(pdev);
- 	if (ret)
-@@ -739,34 +736,14 @@ static int pxamci_probe(struct platform_device *pdev)
- 
- 	platform_set_drvdata(pdev, mmc);
- 
--	if (!pdev->dev.of_node) {
--		dmarx = platform_get_resource(pdev, IORESOURCE_DMA, 0);
--		dmatx = platform_get_resource(pdev, IORESOURCE_DMA, 1);
--		if (!dmarx || !dmatx) {
--			ret = -ENXIO;
--			goto out;
--		}
--		param_rx.prio = PXAD_PRIO_LOWEST;
--		param_rx.drcmr = dmarx->start;
--		param_tx.prio = PXAD_PRIO_LOWEST;
--		param_tx.drcmr = dmatx->start;
--	}
--
--	dma_cap_zero(mask);
--	dma_cap_set(DMA_SLAVE, mask);
--
--	host->dma_chan_rx =
--		dma_request_slave_channel_compat(mask, pxad_filter_fn,
--						 &param_rx, &pdev->dev, "rx");
-+	host->dma_chan_rx = dma_request_slave_channel(&pdev->dev, "rx");
- 	if (host->dma_chan_rx == NULL) {
- 		dev_err(&pdev->dev, "unable to request rx dma channel\n");
- 		ret = -ENODEV;
- 		goto out;
- 	}
- 
--	host->dma_chan_tx =
--		dma_request_slave_channel_compat(mask, pxad_filter_fn,
--						 &param_tx,  &pdev->dev, "tx");
-+	host->dma_chan_tx = dma_request_slave_channel(&pdev->dev, "tx");
- 	if (host->dma_chan_tx == NULL) {
- 		dev_err(&pdev->dev, "unable to request tx dma channel\n");
- 		ret = -ENODEV;
++/**
++ * struct pxad_param - dma channel request parameters
++ * @drcmr: requestor line number
++ * @prio: minimal mandatory priority of the channel
++ *
++ * If a requested channel is granted, its priority will be at least @prio,
++ * ie. if PXAD_PRIO_LOW is required, the requested channel will be either
++ * PXAD_PRIO_LOW, PXAD_PRIO_NORMAL or PXAD_PRIO_HIGHEST.
++ */
+ struct pxad_param {
+ 	unsigned int drcmr;
+ 	enum pxad_chan_prio prio;
 -- 
 2.18.0.rc2
