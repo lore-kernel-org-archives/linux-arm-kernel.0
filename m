@@ -1,48 +1,155 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Mon, 25 Jun 2018 17:12:35 +0200
-Subject: [PATCH v2 19/23] arm64: dts: marvell: rename ap806 syscon node
+Date: Mon, 25 Jun 2018 17:12:19 +0200
+Subject: [PATCH v2 03/23] thermal: armada: rename the initialization routine
 In-Reply-To: <20180625151239.20976-1-miquel.raynal@bootlin.com>
 References: <20180625151239.20976-1-miquel.raynal@bootlin.com>
-Message-ID: <20180625151239.20976-20-miquel.raynal@bootlin.com>
+Message-ID: <20180625151239.20976-4-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In CP files, the syscons are called CP110_LABEL(syscon<x>) in case of
-future additions. Use the same logic here to prepare the addition of a
-second syscon to access both the thermal IP, the DFX server registers
-and later probably other registers within this same memory area.
+Calling a hook ->init_sensor() while what is initialized is the IP
+itself and not the sensors is misleading. Rename the hook ->init() to
+avoid any confusion in later work bringing multi-sensors support.
 
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 ---
- .../devicetree/bindings/arm/marvell/ap806-system-controller.txt         | 2 +-
- arch/arm64/boot/dts/marvell/armada-ap806.dtsi                           | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ drivers/thermal/armada_thermal.c | 40 ++++++++++++++++++++--------------------
+ 1 file changed, 20 insertions(+), 20 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt b/Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt
-index a265f1628f36..108e8da600e4 100644
---- a/Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt
-+++ b/Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt
-@@ -79,7 +79,7 @@ Required properties:
- - offset: offset address inside the syscon block
+diff --git a/drivers/thermal/armada_thermal.c b/drivers/thermal/armada_thermal.c
+index 18155e43e67f..3d22a6016b04 100644
+--- a/drivers/thermal/armada_thermal.c
++++ b/drivers/thermal/armada_thermal.c
+@@ -73,9 +73,9 @@ struct armada_thermal_priv {
+ };
  
- Example:
--ap_syscon: system-controller at 6f4000 {
-+ap_syscon0: system-controller at 6f4000 {
- 	compatible = "syscon", "simple-mfd";
- 	reg = <0x6f4000 0x1000>;
+ struct armada_thermal_data {
+-	/* Initialize the sensor */
+-	void (*init_sensor)(struct platform_device *pdev,
+-			    struct armada_thermal_priv *);
++	/* Initialize the thermal IC */
++	void (*init)(struct platform_device *pdev,
++		     struct armada_thermal_priv *priv);
  
-diff --git a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-index 4f2a704615b0..550f03b8c96f 100644
---- a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-@@ -230,7 +230,7 @@
- 				status = "disabled";
- 			};
+ 	/* Test for a valid sensor value (optional) */
+ 	bool (*is_valid)(struct armada_thermal_priv *);
+@@ -94,8 +94,8 @@ struct armada_thermal_data {
+ 	bool needs_control0;
+ };
  
--			ap_syscon: system-controller at 6f4000 {
-+			ap_syscon0: system-controller at 6f4000 {
- 				compatible = "syscon", "simple-mfd";
- 				reg = <0x6f4000 0x2000>;
+-static void armadaxp_init_sensor(struct platform_device *pdev,
+-				 struct armada_thermal_priv *priv)
++static void armadaxp_init(struct platform_device *pdev,
++			  struct armada_thermal_priv *priv)
+ {
+ 	u32 reg;
  
+@@ -117,8 +117,8 @@ static void armadaxp_init_sensor(struct platform_device *pdev,
+ 	writel(reg, priv->status);
+ }
+ 
+-static void armada370_init_sensor(struct platform_device *pdev,
+-				  struct armada_thermal_priv *priv)
++static void armada370_init(struct platform_device *pdev,
++			   struct armada_thermal_priv *priv)
+ {
+ 	u32 reg;
+ 
+@@ -136,8 +136,8 @@ static void armada370_init_sensor(struct platform_device *pdev,
+ 	msleep(10);
+ }
+ 
+-static void armada375_init_sensor(struct platform_device *pdev,
+-				  struct armada_thermal_priv *priv)
++static void armada375_init(struct platform_device *pdev,
++			   struct armada_thermal_priv *priv)
+ {
+ 	u32 reg;
+ 
+@@ -164,8 +164,8 @@ static void armada_wait_sensor_validity(struct armada_thermal_priv *priv)
+ 				   STATUS_POLL_TIMEOUT_US);
+ }
+ 
+-static void armada380_init_sensor(struct platform_device *pdev,
+-				  struct armada_thermal_priv *priv)
++static void armada380_init(struct platform_device *pdev,
++			   struct armada_thermal_priv *priv)
+ {
+ 	u32 reg = readl_relaxed(priv->control1);
+ 
+@@ -186,8 +186,8 @@ static void armada380_init_sensor(struct platform_device *pdev,
+ 	armada_wait_sensor_validity(priv);
+ }
+ 
+-static void armada_ap806_init_sensor(struct platform_device *pdev,
+-				     struct armada_thermal_priv *priv)
++static void armada_ap806_init(struct platform_device *pdev,
++			      struct armada_thermal_priv *priv)
+ {
+ 	u32 reg;
+ 
+@@ -247,7 +247,7 @@ static struct thermal_zone_device_ops ops = {
+ };
+ 
+ static const struct armada_thermal_data armadaxp_data = {
+-	.init_sensor = armadaxp_init_sensor,
++	.init = armadaxp_init,
+ 	.temp_shift = 10,
+ 	.temp_mask = 0x1ff,
+ 	.coef_b = 3153000000ULL,
+@@ -257,7 +257,7 @@ static const struct armada_thermal_data armadaxp_data = {
+ 
+ static const struct armada_thermal_data armada370_data = {
+ 	.is_valid = armada_is_valid,
+-	.init_sensor = armada370_init_sensor,
++	.init = armada370_init,
+ 	.is_valid_bit = BIT(9),
+ 	.temp_shift = 10,
+ 	.temp_mask = 0x1ff,
+@@ -268,7 +268,7 @@ static const struct armada_thermal_data armada370_data = {
+ 
+ static const struct armada_thermal_data armada375_data = {
+ 	.is_valid = armada_is_valid,
+-	.init_sensor = armada375_init_sensor,
++	.init = armada375_init,
+ 	.is_valid_bit = BIT(10),
+ 	.temp_shift = 0,
+ 	.temp_mask = 0x1ff,
+@@ -280,7 +280,7 @@ static const struct armada_thermal_data armada375_data = {
+ 
+ static const struct armada_thermal_data armada380_data = {
+ 	.is_valid = armada_is_valid,
+-	.init_sensor = armada380_init_sensor,
++	.init = armada380_init,
+ 	.is_valid_bit = BIT(10),
+ 	.temp_shift = 0,
+ 	.temp_mask = 0x3ff,
+@@ -292,7 +292,7 @@ static const struct armada_thermal_data armada380_data = {
+ 
+ static const struct armada_thermal_data armada_ap806_data = {
+ 	.is_valid = armada_is_valid,
+-	.init_sensor = armada_ap806_init_sensor,
++	.init = armada_ap806_init,
+ 	.is_valid_bit = BIT(16),
+ 	.temp_shift = 0,
+ 	.temp_mask = 0x3ff,
+@@ -306,7 +306,7 @@ static const struct armada_thermal_data armada_ap806_data = {
+ 
+ static const struct armada_thermal_data armada_cp110_data = {
+ 	.is_valid = armada_is_valid,
+-	.init_sensor = armada380_init_sensor,
++	.init = armada380_init,
+ 	.is_valid_bit = BIT(10),
+ 	.temp_shift = 0,
+ 	.temp_mask = 0x3ff,
+@@ -428,7 +428,7 @@ static int armada_thermal_probe(struct platform_device *pdev)
+ 		priv->control1 = control + CONTROL1_OFFSET;
+ 	}
+ 
+-	priv->data->init_sensor(pdev, priv);
++	priv->data->init(pdev, priv);
+ 
+ 	thermal = thermal_zone_device_register(priv->zone_name, 0, 0, priv,
+ 					       &ops, NULL, 0, 0);
 -- 
 2.14.1
