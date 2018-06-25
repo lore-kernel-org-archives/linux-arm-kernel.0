@@ -1,97 +1,195 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Mon, 25 Jun 2018 14:03:04 +0200
-Subject: [PATCH v3 24/24] ARM: dts: sun8i: r40: Enable HDMI output on BananaPi
- M2 Ultra
+Date: Mon, 25 Jun 2018 14:02:59 +0200
+Subject: [PATCH v3 19/24] drm/sun4i: Add support for second clock parent to DW
+ HDMI PHY clk driver
 In-Reply-To: <20180625120304.7543-1-jernej.skrabec@siol.net>
 References: <20180625120304.7543-1-jernej.skrabec@siol.net>
-Message-ID: <20180625120304.7543-25-jernej.skrabec@siol.net>
+Message-ID: <20180625120304.7543-20-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since HDMI can be considered as main output, most capable mixer is
-connected to it (mixer0).
+Expand HDMI PHY clock driver to support second clock parent.
 
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- .../boot/dts/sun8i-r40-bananapi-m2-ultra.dts  | 45 +++++++++++++++++++
- 1 file changed, 45 insertions(+)
+ drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h      |  4 +-
+ drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c     |  3 +-
+ drivers/gpu/drm/sun4i/sun8i_hdmi_phy_clk.c | 90 ++++++++++++++++------
+ 3 files changed, 73 insertions(+), 24 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts b/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
-index 27d9ccd0ef2f..0ebc2f9a980e 100644
---- a/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
-+++ b/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
-@@ -58,6 +58,17 @@
- 		stdout-path = "serial0:115200n8";
- 	};
+diff --git a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h
+index 46a3aa6a53a9..aadbe0a10b0c 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h
++++ b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h
+@@ -99,6 +99,7 @@
+ #define SUN8I_HDMI_PHY_PLL_CFG1_LDO1_EN		BIT(28)
+ #define SUN8I_HDMI_PHY_PLL_CFG1_HV_IS_33	BIT(27)
+ #define SUN8I_HDMI_PHY_PLL_CFG1_CKIN_SEL_MSK	BIT(26)
++#define SUN8I_HDMI_PHY_PLL_CFG1_CKIN_SEL_SHIFT	26
+ #define SUN8I_HDMI_PHY_PLL_CFG1_PLLEN		BIT(25)
+ #define SUN8I_HDMI_PHY_PLL_CFG1_LDO_VSET(x)	((x) << 22)
+ #define SUN8I_HDMI_PHY_PLL_CFG1_UNKNOWN(x)	((x) << 20)
+@@ -190,6 +191,7 @@ void sun8i_hdmi_phy_remove(struct sun8i_dw_hdmi *hdmi);
+ void sun8i_hdmi_phy_init(struct sun8i_hdmi_phy *phy);
+ const struct dw_hdmi_phy_ops *sun8i_hdmi_phy_get_ops(void);
  
-+	connector {
-+		compatible = "hdmi-connector";
-+		type = "a";
-+
-+		port {
-+			hdmi_con_in: endpoint {
-+				remote-endpoint = <&hdmi_out_con>;
-+			};
-+		};
-+	};
-+
- 	leds {
- 		compatible = "gpio-leds";
+-int sun8i_phy_clk_create(struct sun8i_hdmi_phy *phy, struct device *dev);
++int sun8i_phy_clk_create(struct sun8i_hdmi_phy *phy, struct device *dev,
++			 bool second_parent);
  
-@@ -93,6 +104,10 @@
- 	};
+ #endif /* _SUN8I_DW_HDMI_H_ */
+diff --git a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
+index f0877b3f67e7..aea46b08f127 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
++++ b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
+@@ -491,7 +491,8 @@ int sun8i_hdmi_phy_probe(struct sun8i_dw_hdmi *hdmi, struct device_node *node)
+ 			}
+ 		}
+ 
+-		ret = sun8i_phy_clk_create(phy, dev);
++		ret = sun8i_phy_clk_create(phy, dev,
++					   phy->variant->has_second_pll);
+ 		if (ret) {
+ 			dev_err(dev, "Couldn't create the PHY clock\n");
+ 			goto err_put_clk_pll1;
+diff --git a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy_clk.c b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy_clk.c
+index faea449812f8..a4d31fe3abff 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy_clk.c
++++ b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy_clk.c
+@@ -22,35 +22,45 @@ static int sun8i_phy_clk_determine_rate(struct clk_hw *hw,
+ {
+ 	unsigned long rate = req->rate;
+ 	unsigned long best_rate = 0;
++	struct clk_hw *best_parent = NULL;
+ 	struct clk_hw *parent;
+ 	int best_div = 1;
+-	int i;
++	int i, p;
+ 
+-	parent = clk_hw_get_parent(hw);
+-
+-	for (i = 1; i <= 16; i++) {
+-		unsigned long ideal = rate * i;
+-		unsigned long rounded;
+-
+-		rounded = clk_hw_round_rate(parent, ideal);
++	for (p = 0; p < clk_hw_get_num_parents(hw); p++) {
++		parent = clk_hw_get_parent_by_index(hw, p);
++		if (!parent)
++			continue;
+ 
+-		if (rounded == ideal) {
+-			best_rate = rounded;
+-			best_div = i;
+-			break;
++		for (i = 1; i <= 16; i++) {
++			unsigned long ideal = rate * i;
++			unsigned long rounded;
++
++			rounded = clk_hw_round_rate(parent, ideal);
++
++			if (rounded == ideal) {
++				best_rate = rounded;
++				best_div = i;
++				best_parent = parent;
++				break;
++			}
++
++			if (!best_rate ||
++			    abs(rate - rounded / i) <
++			    abs(rate - best_rate / best_div)) {
++				best_rate = rounded;
++				best_div = i;
++				best_parent = parent;
++			}
+ 		}
+ 
+-		if (!best_rate ||
+-		    abs(rate - rounded / i) <
+-		    abs(rate - best_rate / best_div)) {
+-			best_rate = rounded;
+-			best_div = i;
+-		}
++		if (best_rate / best_div == rate)
++			break;
+ 	}
+ 
+ 	req->rate = best_rate / best_div;
+ 	req->best_parent_rate = best_rate;
+-	req->best_parent_hw = parent;
++	req->best_parent_hw = best_parent;
+ 
+ 	return 0;
+ }
+@@ -95,22 +105,58 @@ static int sun8i_phy_clk_set_rate(struct clk_hw *hw, unsigned long rate,
+ 	return 0;
+ }
+ 
++static u8 sun8i_phy_clk_get_parent(struct clk_hw *hw)
++{
++	struct sun8i_phy_clk *priv = hw_to_phy_clk(hw);
++	u32 reg;
++
++	regmap_read(priv->phy->regs, SUN8I_HDMI_PHY_PLL_CFG1_REG, &reg);
++	reg = (reg & SUN8I_HDMI_PHY_PLL_CFG1_CKIN_SEL_MSK) >>
++	      SUN8I_HDMI_PHY_PLL_CFG1_CKIN_SEL_SHIFT;
++
++	return reg;
++}
++
++static int sun8i_phy_clk_set_parent(struct clk_hw *hw, u8 index)
++{
++	struct sun8i_phy_clk *priv = hw_to_phy_clk(hw);
++
++	if (index > 1)
++		return -EINVAL;
++
++	regmap_update_bits(priv->phy->regs, SUN8I_HDMI_PHY_PLL_CFG1_REG,
++			   SUN8I_HDMI_PHY_PLL_CFG1_CKIN_SEL_MSK,
++			   index << SUN8I_HDMI_PHY_PLL_CFG1_CKIN_SEL_SHIFT);
++
++	return 0;
++}
++
+ static const struct clk_ops sun8i_phy_clk_ops = {
+ 	.determine_rate	= sun8i_phy_clk_determine_rate,
+ 	.recalc_rate	= sun8i_phy_clk_recalc_rate,
+ 	.set_rate	= sun8i_phy_clk_set_rate,
++
++	.get_parent	= sun8i_phy_clk_get_parent,
++	.set_parent	= sun8i_phy_clk_set_parent,
  };
  
-+&de {
-+	status = "okay";
-+};
-+
- &ehci1 {
- 	status = "okay";
- };
-@@ -101,6 +116,16 @@
- 	status = "okay";
- };
+-int sun8i_phy_clk_create(struct sun8i_hdmi_phy *phy, struct device *dev)
++int sun8i_phy_clk_create(struct sun8i_hdmi_phy *phy, struct device *dev,
++			 bool second_parent)
+ {
+ 	struct clk_init_data init;
+ 	struct sun8i_phy_clk *priv;
+-	const char *parents[1];
++	const char *parents[2];
  
-+&hdmi {
-+	status = "okay";
-+};
-+
-+&hdmi_out {
-+	hdmi_out_con: endpoint {
-+		remote-endpoint = <&hdmi_con_in>;
-+	};
-+};
-+
- &i2c0 {
- 	status = "okay";
+ 	parents[0] = __clk_get_name(phy->clk_pll0);
+ 	if (!parents[0])
+ 		return -ENODEV;
  
-@@ -195,6 +220,26 @@
- 	status = "okay";
- };
++	if (second_parent) {
++		parents[1] = __clk_get_name(phy->clk_pll1);
++		if (!parents[1])
++			return -ENODEV;
++	}
++
+ 	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
+ 	if (!priv)
+ 		return -ENOMEM;
+@@ -118,7 +164,7 @@ int sun8i_phy_clk_create(struct sun8i_hdmi_phy *phy, struct device *dev)
+ 	init.name = "hdmi-phy-clk";
+ 	init.ops = &sun8i_phy_clk_ops;
+ 	init.parent_names = parents;
+-	init.num_parents = 1;
++	init.num_parents = second_parent ? 2 : 1;
+ 	init.flags = CLK_SET_RATE_PARENT;
  
-+&tcon_top_hdmi_in_tcon_tv0 {
-+	remote-endpoint = <&tcon_tv0_out_tcon_top>;
-+};
-+
-+&tcon_top_mixer0_out_tcon_tv0 {
-+	remote-endpoint = <&tcon_tv0_in_tcon_top>;
-+};
-+
-+&tcon_tv0_in {
-+	tcon_tv0_in_tcon_top: endpoint {
-+		remote-endpoint = <&tcon_top_mixer0_out_tcon_tv0>;
-+	};
-+};
-+
-+&tcon_tv0_out {
-+	tcon_tv0_out_tcon_top: endpoint {
-+		remote-endpoint = <&tcon_top_hdmi_in_tcon_tv0>;
-+	};
-+};
-+
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_pb_pins>;
+ 	priv->phy = phy;
 -- 
 2.18.0
