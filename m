@@ -1,96 +1,170 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 25 Jun 2018 16:03:15 +0200
-Subject: [PATCH 20/29] arm64: dts: renesas: r8a7796: Add PCIe device nodes
+Date: Mon, 25 Jun 2018 16:03:19 +0200
+Subject: [PATCH 24/29] arm64: dts: renesas: Fix VSPD registers range
 In-Reply-To: <cover.1529933747.git.horms+renesas@verge.net.au>
 References: <cover.1529933747.git.horms+renesas@verge.net.au>
-Message-ID: <51933b101567692b3a2a8e6d9e06883985c79724.1529933747.git.horms+renesas@verge.net.au>
+Message-ID: <e21adc781bb45e810f1c396c4bc2c1624a4c25b9.1529933747.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Harunobu Kurokawa <harunobu.kurokawa.dn@renesas.com>
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-This patch adds PCIe{0,1} device nodes for R8A7796 SoC.
+The VSPD and FCPVD nodes have overlapping register ranges, as the FCPVD
+devices are mapped in the memory range usually used by the VSP LUT and
+CLU, which are not present in the VSPD. Fix this by shortening the VSPD
+registers range to 0x5000.
 
-Signed-off-by: Harunobu Kurokawa <harunobu.kurokawa.dn@renesas.com>
-Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
+Fixes: 9f8573e38a0b ("arm64: dts: renesas: r8a7795: Add VSP instances")
+Fixes: 291e0c4994d0 ("arm64: dts: r8a7795: Add support for R-Car H3 ES2.0")
+Fixes: f06ffdfbdd90 ("arm64: dts: r8a7796: Add VSP instances")
+Fixes: b4f92030d5d3 ("arm64: dts: renesas: r8a77970: add VSPD support")
+Fixes: 295952a183d3 ("arm64: dts: renesas: r8a77995: add VSP instances")
+Fixes: 85cb3229218a ("arm64: dts: renesas: r8a77965: Add VSP instances")
+Reported-by: Simon Horman <horms+renesas@verge.net.au>
+Reported-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a7796.dtsi | 50 ++++++++++++++++++++++++++++++--
- 1 file changed, 47 insertions(+), 3 deletions(-)
+ arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi | 2 +-
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi     | 6 +++---
+ arch/arm64/boot/dts/renesas/r8a7796.dtsi     | 6 +++---
+ arch/arm64/boot/dts/renesas/r8a77965.dtsi    | 4 ++--
+ arch/arm64/boot/dts/renesas/r8a77970.dtsi    | 2 +-
+ arch/arm64/boot/dts/renesas/r8a77995.dtsi    | 4 ++--
+ 6 files changed, 12 insertions(+), 12 deletions(-)
 
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi b/arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi
+index fde3e84626d7..7b2fbaec9aef 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi
+@@ -77,7 +77,7 @@
+ 
+ 	vspd3: vsp at fea38000 {
+ 		compatible = "renesas,vsp2";
+-		reg = <0 0xfea38000 0 0x8000>;
++		reg = <0 0xfea38000 0 0x5000>;
+ 		interrupts = <GIC_SPI 469 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&cpg CPG_MOD 620>;
+ 		power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+index 018507d78132..e07546f91dff 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+@@ -2536,7 +2536,7 @@
+ 
+ 		vspd0: vsp at fea20000 {
+ 			compatible = "renesas,vsp2";
+-			reg = <0 0xfea20000 0 0x8000>;
++			reg = <0 0xfea20000 0 0x5000>;
+ 			interrupts = <GIC_SPI 466 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&cpg CPG_MOD 623>;
+ 			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
+@@ -2547,7 +2547,7 @@
+ 
+ 		vspd1: vsp at fea28000 {
+ 			compatible = "renesas,vsp2";
+-			reg = <0 0xfea28000 0 0x8000>;
++			reg = <0 0xfea28000 0 0x5000>;
+ 			interrupts = <GIC_SPI 467 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&cpg CPG_MOD 622>;
+ 			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
+@@ -2558,7 +2558,7 @@
+ 
+ 		vspd2: vsp at fea30000 {
+ 			compatible = "renesas,vsp2";
+-			reg = <0 0xfea30000 0 0x8000>;
++			reg = <0 0xfea30000 0 0x5000>;
+ 			interrupts = <GIC_SPI 468 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&cpg CPG_MOD 621>;
+ 			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
 diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-index 7c25be6b5af3..2a04635bc9ae 100644
+index 6436e814268a..af8196281b06 100644
 --- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
 +++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-@@ -1,7 +1,7 @@
- /*
-  * Device Tree Source for the r8a7796 SoC
-  *
-- * Copyright (C) 2016 Renesas Electronics Corp.
-+ * Copyright (C) 2016-2017 Renesas Electronics Corp.
-  *
-  * This file is licensed under the terms of the GNU General Public License
-  * version 2.  This program is licensed "as is" without any warranty of any
-@@ -2108,13 +2108,57 @@
- 		};
+@@ -2253,7 +2253,7 @@
  
- 		pciec0: pcie at fe000000 {
-+			compatible = "renesas,pcie-r8a7796",
-+				     "renesas,pcie-rcar-gen3";
- 			reg = <0 0xfe000000 0 0x80000>;
--			/* placeholder */
-+			#address-cells = <3>;
-+			#size-cells = <2>;
-+			bus-range = <0x00 0xff>;
-+			device_type = "pci";
-+			ranges = <0x01000000 0 0x00000000 0 0xfe100000 0 0x00100000
-+				0x02000000 0 0xfe200000 0 0xfe200000 0 0x00200000
-+				0x02000000 0 0x30000000 0 0x30000000 0 0x08000000
-+				0x42000000 0 0x38000000 0 0x38000000 0 0x08000000>;
-+			/* Map all possible DDR as inbound ranges */
-+			dma-ranges = <0x42000000 0 0x40000000 0 0x40000000 0 0x80000000>;
-+			interrupts = <GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>,
-+				<GIC_SPI 117 IRQ_TYPE_LEVEL_HIGH>,
-+				<GIC_SPI 118 IRQ_TYPE_LEVEL_HIGH>;
-+			#interrupt-cells = <1>;
-+			interrupt-map-mask = <0 0 0 0>;
-+			interrupt-map = <0 0 0 0 &gic GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 319>, <&pcie_bus_clk>;
-+			clock-names = "pcie", "pcie_bus";
-+			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
-+			resets = <&cpg 319>;
-+			status = "disabled";
- 		};
+ 		vspd0: vsp at fea20000 {
+ 			compatible = "renesas,vsp2";
+-			reg = <0 0xfea20000 0 0x8000>;
++			reg = <0 0xfea20000 0 0x5000>;
+ 			interrupts = <GIC_SPI 466 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&cpg CPG_MOD 623>;
+ 			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
+@@ -2264,7 +2264,7 @@
  
- 		pciec1: pcie at ee800000 {
-+			compatible = "renesas,pcie-r8a7796",
-+				     "renesas,pcie-rcar-gen3";
- 			reg = <0 0xee800000 0 0x80000>;
--			/* placeholder */
-+			#address-cells = <3>;
-+			#size-cells = <2>;
-+			bus-range = <0x00 0xff>;
-+			device_type = "pci";
-+			ranges = <0x01000000 0 0x00000000 0 0xee900000 0 0x00100000
-+				0x02000000 0 0xeea00000 0 0xeea00000 0 0x00200000
-+				0x02000000 0 0xc0000000 0 0xc0000000 0 0x08000000
-+				0x42000000 0 0xc8000000 0 0xc8000000 0 0x08000000>;
-+			/* Map all possible DDR as inbound ranges */
-+			dma-ranges = <0x42000000 0 0x40000000 0 0x40000000 0 0x80000000>;
-+			interrupts = <GIC_SPI 148 IRQ_TYPE_LEVEL_HIGH>,
-+				<GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH>,
-+				<GIC_SPI 150 IRQ_TYPE_LEVEL_HIGH>;
-+			#interrupt-cells = <1>;
-+			interrupt-map-mask = <0 0 0 0>;
-+			interrupt-map = <0 0 0 0 &gic GIC_SPI 148 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 318>, <&pcie_bus_clk>;
-+			clock-names = "pcie", "pcie_bus";
-+			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
-+			resets = <&cpg 318>;
-+			status = "disabled";
- 		};
+ 		vspd1: vsp at fea28000 {
+ 			compatible = "renesas,vsp2";
+-			reg = <0 0xfea28000 0 0x8000>;
++			reg = <0 0xfea28000 0 0x5000>;
+ 			interrupts = <GIC_SPI 467 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&cpg CPG_MOD 622>;
+ 			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
+@@ -2275,7 +2275,7 @@
  
- 		imr-lx4 at fe860000 {
+ 		vspd2: vsp at fea30000 {
+ 			compatible = "renesas,vsp2";
+-			reg = <0 0xfea30000 0 0x8000>;
++			reg = <0 0xfea30000 0 0x5000>;
+ 			interrupts = <GIC_SPI 468 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&cpg CPG_MOD 621>;
+ 			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
+diff --git a/arch/arm64/boot/dts/renesas/r8a77965.dtsi b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
+index d740c79752d5..a584dfc78339 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77965.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
+@@ -1490,7 +1490,7 @@
+ 
+ 		vspd0: vsp at fea20000 {
+ 			compatible = "renesas,vsp2";
+-			reg = <0 0xfea20000 0 0x8000>;
++			reg = <0 0xfea20000 0 0x5000>;
+ 			interrupts = <GIC_SPI 466 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&cpg CPG_MOD 623>;
+ 			power-domains = <&sysc R8A77965_PD_ALWAYS_ON>;
+@@ -1509,7 +1509,7 @@
+ 
+ 		vspd1: vsp at fea28000 {
+ 			compatible = "renesas,vsp2";
+-			reg = <0 0xfea28000 0 0x8000>;
++			reg = <0 0xfea28000 0 0x5000>;
+ 			interrupts = <GIC_SPI 467 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&cpg CPG_MOD 622>;
+ 			power-domains = <&sysc R8A77965_PD_ALWAYS_ON>;
+diff --git a/arch/arm64/boot/dts/renesas/r8a77970.dtsi b/arch/arm64/boot/dts/renesas/r8a77970.dtsi
+index 04953e1e205e..954168858fed 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77970.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a77970.dtsi
+@@ -773,7 +773,7 @@
+ 
+ 		vspd0: vsp at fea20000 {
+ 			compatible = "renesas,vsp2";
+-			reg = <0 0xfea20000 0 0x8000>;
++			reg = <0 0xfea20000 0 0x5000>;
+ 			interrupts = <GIC_SPI 169 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&cpg CPG_MOD 623>;
+ 			power-domains = <&sysc R8A77970_PD_ALWAYS_ON>;
+diff --git a/arch/arm64/boot/dts/renesas/r8a77995.dtsi b/arch/arm64/boot/dts/renesas/r8a77995.dtsi
+index b67d38cc4cf0..1de6ffca4772 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77995.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a77995.dtsi
+@@ -711,7 +711,7 @@
+ 
+ 		vspd0: vsp at fea20000 {
+ 			compatible = "renesas,vsp2";
+-			reg = <0 0xfea20000 0 0x8000>;
++			reg = <0 0xfea20000 0 0x5000>;
+ 			interrupts = <GIC_SPI 466 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&cpg CPG_MOD 623>;
+ 			power-domains = <&sysc R8A77995_PD_ALWAYS_ON>;
+@@ -721,7 +721,7 @@
+ 
+ 		vspd1: vsp at fea28000 {
+ 			compatible = "renesas,vsp2";
+-			reg = <0 0xfea28000 0 0x8000>;
++			reg = <0 0xfea28000 0 0x5000>;
+ 			interrupts = <GIC_SPI 467 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&cpg CPG_MOD 622>;
+ 			power-domains = <&sysc R8A77995_PD_ALWAYS_ON>;
 -- 
 2.11.0
