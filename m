@@ -1,103 +1,64 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 25 Jun 2018 16:06:22 +0200
-Subject: [PATCH 11/15] soc: renesas: rcar-sysc: Provide helpers to power
- up/down CPUs
-In-Reply-To: <cover.1529934908.git.horms+renesas@verge.net.au>
-References: <cover.1529934908.git.horms+renesas@verge.net.au>
-Message-ID: <f2b1d2f94af887c91bb8a0cfb495e546331bc5ed.1529934908.git.horms+renesas@verge.net.au>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Mon, 25 Jun 2018 17:02:28 +0200
+Subject: [PATCH v1 7/7] arm64: dts: mt7622: add EINT support to pinctrl
+In-Reply-To: <f896f79ebfa9a262c89fdeed89cf086220ca051d.1526835466.git.sean.wang@mediatek.com>
+References: <cover.1526835466.git.sean.wang@mediatek.com>
+ <f896f79ebfa9a262c89fdeed89cf086220ca051d.1526835466.git.sean.wang@mediatek.com>
+Message-ID: <e6747e99-78b6-ed8c-d6fa-cab2f7398fcf@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Provide helpers to control CPU power areas from platform code, taking
-just a CPU index.  This will avoid having to pass full CPU power area
-parameter blocks, and thus duplicating information already provided by
-SoC-specific SYSC drivers.
 
-This will be used on R-Car H1 only.
-Later R-Car generations rely on APMU/RST for CPU power area control.
+On 20/05/18 19:01, sean.wang at mediatek.com wrote:
+> From: Sean Wang <sean.wang@mediatek.com>
+> 
+> Add EINT support to pinctrl and set those GPIO keys as interrupt-driven
+> keys.
+> 
+> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> ---
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- drivers/soc/renesas/rcar-sysc.c       | 40 +++++++++++++++++++++++++++++++++++
- include/linux/soc/renesas/rcar-sysc.h |  2 ++
- 2 files changed, 42 insertions(+)
+Merged,
 
-diff --git a/drivers/soc/renesas/rcar-sysc.c b/drivers/soc/renesas/rcar-sysc.c
-index 95120acc4d80..4ad6dcd19420 100644
---- a/drivers/soc/renesas/rcar-sysc.c
-+++ b/drivers/soc/renesas/rcar-sysc.c
-@@ -310,6 +310,8 @@ struct rcar_pm_domains {
- 	struct generic_pm_domain *domains[RCAR_PD_ALWAYS_ON + 1];
- };
- 
-+static struct genpd_onecell_data *rcar_sysc_onecell_data;
-+
- static int __init rcar_sysc_pd_init(void)
- {
- 	const struct rcar_sysc_info *info;
-@@ -356,6 +358,7 @@ static int __init rcar_sysc_pd_init(void)
- 
- 	domains->onecell_data.domains = domains->domains;
- 	domains->onecell_data.num_domains = ARRAY_SIZE(domains->domains);
-+	rcar_sysc_onecell_data = &domains->onecell_data;
- 
- 	for (i = 0, syscier = 0; i < info->num_areas; i++)
- 		syscier |= BIT(info->areas[i].isr_bit);
-@@ -449,3 +452,40 @@ void __init rcar_sysc_init(phys_addr_t base, u32 syscier)
- 	pr_debug("%s: syscier = 0x%08x\n", __func__, syscier);
- 	iowrite32(syscier, rcar_sysc_base + SYSCIER);
- }
-+
-+#ifdef CONFIG_ARCH_R8A7779
-+static int rcar_sysc_power_cpu(unsigned int idx, bool on)
-+{
-+	struct generic_pm_domain *genpd;
-+	struct rcar_sysc_pd *pd;
-+	unsigned int i;
-+
-+	if (!rcar_sysc_onecell_data)
-+		return -ENODEV;
-+
-+	for (i = 0; i < rcar_sysc_onecell_data->num_domains; i++) {
-+		genpd = rcar_sysc_onecell_data->domains[i];
-+		if (!genpd)
-+			continue;
-+
-+		pd = to_rcar_pd(genpd);
-+		if (!(pd->flags & PD_CPU) || pd->ch.chan_bit != idx)
-+			continue;
-+
-+		return on ? rcar_sysc_power_up(&pd->ch)
-+			  : rcar_sysc_power_down(&pd->ch);
-+	}
-+
-+	return -ENOENT;
-+}
-+
-+int rcar_sysc_power_down_cpu(unsigned int cpu)
-+{
-+	return rcar_sysc_power_cpu(cpu, false);
-+}
-+
-+int rcar_sysc_power_up_cpu(unsigned int cpu)
-+{
-+	return rcar_sysc_power_cpu(cpu, true);
-+}
-+#endif /* CONFIG_ARCH_R8A7779 */
-diff --git a/include/linux/soc/renesas/rcar-sysc.h b/include/linux/soc/renesas/rcar-sysc.h
-index 8a6086d2e9c3..9020da2111fd 100644
---- a/include/linux/soc/renesas/rcar-sysc.h
-+++ b/include/linux/soc/renesas/rcar-sysc.h
-@@ -13,5 +13,7 @@ struct rcar_sysc_ch {
- int rcar_sysc_power_down(const struct rcar_sysc_ch *sysc_ch);
- int rcar_sysc_power_up(const struct rcar_sysc_ch *sysc_ch);
- void rcar_sysc_init(phys_addr_t base, u32 syscier);
-+int rcar_sysc_power_down_cpu(unsigned int cpu);
-+int rcar_sysc_power_up_cpu(unsigned int cpu);
- 
- #endif /* __LINUX_SOC_RENESAS_RCAR_SYSC_H__ */
--- 
-2.11.0
+Thanks!
+
+>  arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts | 2 +-
+>  arch/arm64/boot/dts/mediatek/mt7622.dtsi     | 8 +++++++-
+>  2 files changed, 8 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts b/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts
+> index b783764..1ff003e 100644
+> --- a/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts
+> +++ b/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts
+> @@ -34,7 +34,7 @@
+>  	};
+>  
+>  	gpio-keys {
+> -		compatible = "gpio-keys-polled";
+> +		compatible = "gpio-keys";
+>  		poll-interval = <100>;
+>  
+>  		factory {
+> diff --git a/arch/arm64/boot/dts/mediatek/mt7622.dtsi b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
+> index 9213c96..e2c5450 100644
+> --- a/arch/arm64/boot/dts/mediatek/mt7622.dtsi
+> +++ b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
+> @@ -286,9 +286,15 @@
+>  
+>  	pio: pinctrl at 10211000 {
+>  		compatible = "mediatek,mt7622-pinctrl";
+> -		reg = <0 0x10211000 0 0x1000>;
+> +		reg = <0 0x10211000 0 0x1000>,
+> +		      <0 0x10005000 0 0x1000>;
+> +		reg-names = "base", "eint";
+>  		gpio-controller;
+>  		#gpio-cells = <2>;
+> +		interrupt-controller;
+> +		interrupts = <GIC_SPI 153 IRQ_TYPE_LEVEL_HIGH>;
+> +		interrupt-parent = <&gic>;
+> +		#interrupt-cells = <2>;
+>  	};
+>  
+>  	watchdog: watchdog at 10212000 {
+> 
