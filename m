@@ -1,23 +1,609 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 25 Jun 2018 10:07:41 -0300
-Subject: [PATCH 2/2] ARM: imx_v6_v7_defconfig: Select ULPI support
-In-Reply-To: <1529931445.9910.15.camel@pengutronix.de>
-References: <1529930043-6387-1-git-send-email-festevam@gmail.com>
- <1529930043-6387-2-git-send-email-festevam@gmail.com>
- <1529931445.9910.15.camel@pengutronix.de>
-Message-ID: <CAOMZO5DiM5YP=qS6+qS37unS+o+BQbqpkF70g+hyqh=Mv2u+Wg@mail.gmail.com>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Mon, 25 Jun 2018 13:04:38 +0000
+Subject: [PATCH V3 5/5] soc: imx: add SC firmware IPC and APIs
+In-Reply-To: <20180625105807.in4oreq7s4zyjyci@pengutronix.de>
+References: <1529676720-7533-1-git-send-email-aisheng.dong@nxp.com>
+ <1529676720-7533-6-git-send-email-aisheng.dong@nxp.com>
+ <20180625105807.in4oreq7s4zyjyci@pengutronix.de>
+Message-ID: <AM0PR04MB42112587EC89573D5E428695804A0@AM0PR04MB4211.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lucas,
+> -----Original Message-----
+> From: Sascha Hauer [mailto:s.hauer at pengutronix.de]
+> Sent: Monday, June 25, 2018 6:58 PM
+> To: A.s. Dong <aisheng.dong@nxp.com>
+> Cc: linux-arm-kernel at lists.infradead.org; dongas86 at gmail.com; dl-linux-imx
+> <linux-imx@nxp.com>; kernel at pengutronix.de; Fabio Estevam
+> <fabio.estevam@nxp.com>; shawnguo at kernel.org
+> Subject: Re: [PATCH V3 5/5] soc: imx: add SC firmware IPC and APIs
+> 
+> On Fri, Jun 22, 2018 at 10:12:00PM +0800, Dong Aisheng wrote:
+> > The System Controller Firmware (SCFW) is a low-level system function
+> > which runs on a dedicated Cortex-M core to provide power, clock, and
+> > resource management. It exists on some i.MX8 processors. e.g. i.MX8QM
+> > (QM, QP), and i.MX8QX (QXP, DX).
+> >
+> > This patch adds the SC firmware service APIs used by the system.
+> > It mainly consists of two parts:
+> > 1) Implementation of the IPC functions using MUs (client side).
+> > 2) SCU firmware services APIs implemented based on RPC calls
+> >
+> > Cc: Shawn Guo <shawnguo@kernel.org>
+> > Cc: Sascha Hauer <kernel@pengutronix.de>
+> > Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> > ---
+> > v2->v3:
+> >  * add the ipc read/write error check
+> > v1->v2:
+> >  * change the type of sc_ipc_t from uint32_t to unsigned long.
+> >    This can make it be capable of storing 64 bit pointer in ARMv8 system.
+> >  * Update to use the new MU library implemenation (handle iomem
+> > privately)
+> >  * remove unused delcarations e.g. sc_rpc_dispatch and sc_rpc_xlate.
+> >  * remove unneeded pad ctl functions
+> > ---
+> > +static sc_ipc_t scu_ipc_handle;
+> > +static DEFINE_SPINLOCK(ipc_list_lock); static struct list_head
+> > +ipc_list = LIST_HEAD_INIT(ipc_list);
+> > +
+> > +/*
+> > + * This function reads a message from an IPC channel.
+> > + *
+> > + * @param[in]     sc_ipc      IPC channel handle
+> > + * @param[out]    data        pointer to message buffer to read
+> > + *
+> > + * This function will block if no message is available to be read.
+> > + */
+> > +static void sc_ipc_read(struct sc_ipc *sc_ipc, void *data) {
+> > +	sc_rpc_msg_t *msg = (sc_rpc_msg_t *)data;
+> > +	uint8_t count = 0;
+> > +	int ret;
+> > +
+> > +	/* Read first word */
+> > +	ret = mu_receive_msg(sc_ipc->mu, 0, (uint32_t *)msg);
+> > +	if (ret)
+> > +		pr_warn("%s: RPC(MU %pOF) read failed\n", __func__,
+> > +mu_node(sc_ipc->mu));
+> 
+> So mu_receive_msg() can now timeout. This of course does not help when
+> all you do is to printk the error. You should forward it.
+> 
 
-On Mon, Jun 25, 2018 at 9:57 AM, Lucas Stach <l.stach@pengutronix.de> wrote:
+The reason is this timeout case is very low possibility (we've never seen it up till now),
+so i just WARN it here to let user know something wrong happened in case it really happens.
+Just like many other code in kernel do like a WARN() without return error.
 
-> If the kernel hangs without those options, we might want to have a
-> check for them in the driver, so it aborts the initialization with a
-> big warning if the port is using ULPI mode and those options aren't
-> selected.
+You will see in current SC service API designs, it replies on SC firmware
+to return error code, timeout case is not considered.
+e.g.
+sc_err_t sc_irq_enable(sc_ipc_t ipc, sc_rsrc_t resource,
+                       sc_irq_group_t group, uint32_t mask, bool enable)
+{
+        sc_rpc_msg_t msg;
+        uint8_t result;
 
-That's a good idea. Will do as suggested.
+        RPC_VER(&msg) = SC_RPC_VERSION;
+        RPC_SVC(&msg) = (uint8_t)SC_RPC_SVC_IRQ;
+....................
 
-Thanks
+        sc_call_rpc(ipc, &msg, false);
+
+        result = RPC_R8(&msg);
+        return (sc_err_t)result;
+}
+
+If we want an extra check for timeout case, we need change the whole SC services
+APIs in all C code files. If you think it's still necessary to do that instead of a warn,
+please let me know. I can do it.
+
+> > +
+> > +	count++;
+> > +
+> > +	/* Check size */
+> > +	if (msg->size > SC_RPC_MAX_MSG) {
+> > +		*((uint32_t *)msg) = 0;
+> > +		return;
+> > +	}
+> 
+> That's an error. It shouldn't be silently ignored. By that I do not mean that
+> you should print a message. Go and error out, let your callers know there an
+> error.
+
+The msg->size are auto generated by SCU firmware script.
+But Okay to me if we decide to return an error for 
+
+> 
+> > +
+> > +	/* Read remaining words */
+> > +	while (count < msg->size) {
+> > +		ret = mu_receive_msg(sc_ipc->mu, count % MU_RR_COUNT,
+> > +				     &(msg->DATA.u32[count - 1]));
+> > +		if (ret)
+> > +			pr_warn("%s: RPC(MU %pOF) read failed\n",
+> __func__,
+> > +				mu_node(sc_ipc->mu));
+> > +		count++;
+> > +	}
+> > +}
+> > +
+> > +/*
+> > + * This function writes a message to an IPC channel.
+> > + *
+> > + * @param[in]     sc_ipc      IPC channel handle
+> > + * @param[in]     data        pointer to message buffer to write
+> > + *
+> > + * This function will block if the outgoing buffer is full.
+> > + */
+> > +static void sc_ipc_write(struct sc_ipc *sc_ipc, void *data) {
+> > +	sc_rpc_msg_t *msg = (sc_rpc_msg_t *)data;
+> > +	uint8_t count = 0;
+> > +	int ret;
+> > +
+> > +	/* Check size */
+> > +	if (msg->size > SC_RPC_MAX_MSG)
+> > +		return;
+> > +
+> > +	/* Write first word */
+> > +	ret = mu_send_msg(sc_ipc->mu, 0, *((uint32_t *)msg));
+> > +	if (ret)
+> > +		pr_warn("%s: RPC(MU %pOF) write failed\n", __func__,
+> > +mu_node(sc_ipc->mu));
+> > +
+> > +	count++;
+> > +
+> > +	/* Write remaining words */
+> > +	while (count < msg->size) {
+> > +		ret = mu_send_msg(sc_ipc->mu, count % MU_TR_COUNT,
+> > +				  msg->DATA.u32[count - 1]);
+> > +		if (ret)
+> > +			pr_warn("%s: RPC(MU %pOF) write failed\n",
+> __func__,
+> > +				mu_node(sc_ipc->mu));
+> > +		count++;
+> > +	}
+> > +}
+> > +
+> > +/*
+> > + * RPC command/response
+> > + */
+> > +void sc_call_rpc(sc_ipc_t ipc, sc_rpc_msg_t *msg, bool no_resp) {
+> > +	struct sc_ipc *sc_ipc = (struct sc_ipc *)ipc;
+> 
+> This typedef is just unnecessary. In the include file for the consumer just do a:
+> 
+> struct sc_ipc *sc_ipc;
+> void sc_call_rpc(struct sc_ipc *sc_ipc, sc_rpc_msg_t *msg, bool no_resp);
+> 
+> And here in the implementation you define struct sc_ipc.
+> 
+> That's it. No need to cast back and forth any types.
+> 
+> > +
+> > +	WARN_ON(in_interrupt());
+> > +
+> > +	pr_debug("%s: RPC(MU %pOF) SVC %u FUNC %u\n", __func__,
+> > +		 mu_node(sc_ipc->mu), RPC_SVC(msg), RPC_FUNC(msg));
+> > +
+> > +	if (WARN_ON(!sc_ipc || !msg))
+> > +		return;
+> > +
+> > +	mutex_lock(&sc_ipc->lock);
+> > +
+> > +	sc_ipc_write(sc_ipc, msg);
+> > +	if (!no_resp)
+> > +		sc_ipc_read(sc_ipc, msg);
+> > +
+> > +	mutex_unlock(&sc_ipc->lock);
+> > +
+> > +	pr_debug("%s: RPC(MU %pOF) done\n", __func__,
+> mu_node(sc_ipc->mu));
+> > +}
+> > +
+> > +/*
+> > + * Get the default handle used by SCU  */ int
+> > +sc_ipc_get_handle(sc_ipc_t *ipc) {
+> > +	if (!scu_ipc_handle)
+> > +		return -EPROBE_DEFER;
+> > +
+> > +	*ipc = scu_ipc_handle;
+> > +	return SC_ERR_NONE;
+> > +}
+> 
+> What is wrong when one function returns -EPROBE_DEFER *and* custom
+> error codes?
+> 
+> I had a look at the pinctrl consumer of this function and it does:
+> 
+> int imx_pinctrl_sc_ipc_init(struct platform_device *pdev) {
+> 	sc_err_t sci_err;
+> 
+> 	sci_err = sc_ipc_get_handle(&pinctrl_ipc_handle);
+> 	if (sci_err != SC_ERR_NONE) {
+> 		dev_err(&pdev->dev, "can't get sc ipc handle\n");
+> 		return -ENODEV;
+> 	}
+> 
+> 	return 0;
+> }
+> 
+> So you give back -EPROBE_DEFER and then ignore the value.
+
+Good catch.
+I probably should return sc_err_t for sc_ipc_get_handle as it's a
+SC function. And give a warn and return SC_ERR_UNAVAILABLE here.
+That means we drop the EPROBE_DEFER support as we already
+Guarantee the SC IPC is initialized before all clients devices.
+
+> 
+> > +EXPORT_SYMBOL(sc_ipc_get_handle);
+> > +
+> > +static struct sc_ipc *sc_ipc_find(sc_ipc_id_t id) {
+> > +	struct device_node *mu_np = (struct device_node *)id;
+> > +	struct sc_ipc *sc_ipc;
+> > +
+> > +	spin_lock(&ipc_list_lock);
+> > +	list_for_each_entry(sc_ipc, &ipc_list, node) {
+> > +		if (mu_node(sc_ipc->mu) == mu_np) {
+> > +			spin_unlock(&ipc_list_lock);
+> > +			return sc_ipc;
+> > +		}
+> > +	}
+> > +	spin_unlock(&ipc_list_lock);
+> > +
+> > +	return NULL;
+> > +}
+> > +
+> > +/*
+> > + * Open an IPC channel
+> > + */
+> > +sc_err_t sc_ipc_open(sc_ipc_t *ipc, sc_ipc_id_t id) {
+> > +	struct device_node *mu_np = (struct device_node *)id;
+> 
+> Why is the id argument of type sc_ipc_id_t? It is casted from a struct
+> device_node * by the caller and casted back to a struct device_node * here.
+> Doesn't this suggest the argument should be a struct device_node * ?
+> 
+
+That's more to align with original SC firmware API design to hide
+the real data type of sc_ipc_t and sc_ipc_id_t to users which can
+easy the future update in case a type change.
+
+But if you dislike it and thought the data should be determinted
+already for Linux and won't be changed anymore, I can change them
+into an explicit struct pointer.
+
+> > +	struct sc_ipc *sc_ipc;
+> > +
+> > +	sc_ipc = sc_ipc_find(id);
+> > +	if (sc_ipc) {
+> > +		sc_ipc->users++;
+> > +		*ipc = (sc_ipc_t)sc_ipc;
+> > +		return SC_ERR_NONE;
+> > +	}
+> 
+> Which sense does this pseudo resource management do? sc_ipc_open() is
+> called exactly once during an initcall, and the resulting sc_ipc_t * is put into a
+> global variable which is then passed to all consumers calling
+> sc_ipc_get_handle().
+> 
+
+This is designed to support multi channels simultaneously.
+For other users, they do similar thing like default SC IPC to open another IPC channel:
+e.g.
+        mu_np = of_parse_phandle(np, "fsl,mu", 0);
+       ....
+        sciErr = sc_ipc_open(&client_ipc_handle, (sc_ipc_id_t)mu_np);
+Then operate on client_ipc_handle.
+
+They can also free it after using by calling sc_ipc_close().
+
+> What's interesting about this is that in sc_ipc_get_handle() you pass the
+> handle to your consumers and this place really could use resource
+> manangement. So resource management is implemented and shortcircuited
+> afterwards :(
+
+The API sc_ipc_open design does not have device pointer. So we don't
+use the resource management.
+
+> 
+> This is racy btw since sc_ipc could be freed below after the call to
+> sc_ipc_find(). You would then act on an already freed sc_ipc.
+>
+
+Good catch. That would be improved.
+ 
+> > +
+> > +	sc_ipc = kzalloc(sizeof(*sc_ipc), GFP_KERNEL);
+> > +	if (!sc_ipc)
+> > +		return SC_ERR_UNAVAILABLE;
+> > +
+> > +	sc_ipc->mu = mu_init(mu_np);
+> > +	if (IS_ERR_OR_NULL(sc_ipc->mu)) {
+> > +		kfree(sc_ipc);
+> > +		return SC_ERR_UNAVAILABLE;
+> > +	}
+> > +
+> > +	mutex_init(&sc_ipc->lock);
+> > +
+> > +	spin_lock(&ipc_list_lock);
+> > +	list_add_tail(&sc_ipc->node, &ipc_list);
+> > +	spin_unlock(&ipc_list_lock);
+> > +
+> > +	sc_ipc->users++;
+> > +	*ipc = (sc_ipc_t)sc_ipc;
+> > +
+> > +	return SC_ERR_NONE;
+> > +}
+> > +EXPORT_SYMBOL(sc_ipc_open);
+> > +
+> > +/*
+> > + * Close an IPC channel
+> > + */
+> > +void sc_ipc_close(sc_ipc_t ipc)
+> > +{
+> > +	struct sc_ipc *sc_ipc = (struct sc_ipc *)ipc;
+> > +
+> > +	WARN_ON(!sc_ipc);
+> > +
+> > +	if (--sc_ipc->users)
+> > +		return;
+> > +
+> > +	mu_exit(sc_ipc->mu);
+> > +
+> > +	spin_lock(&ipc_list_lock);
+> > +	list_del(&sc_ipc->node);
+> > +	spin_unlock(&ipc_list_lock);
+> > +
+> > +	kfree(sc_ipc);
+> > +}
+> > +EXPORT_SYMBOL(sc_ipc_close);
+> > +
+> > +/* Initialization of the MU code. */
+> > +int __init imx8_scu_init(void)
+> 
+> static
+> 
+
+Got it.
+
+> > +{
+> > +	struct device_node *np, *mu_np;
+> > +	sc_err_t sciErr;
+> > +
+> > +	if (!of_machine_is_compatible("fsl,imx8qxp"))
+> > +		return 0;
+> > +
+> > +	np = of_find_compatible_node(NULL, NULL, "nxp,imx8qxp-scu");
+> > +	if (!np)
+> > +		return -ENODEV;
+> > +
+> > +	mu_np = of_parse_phandle(np, "fsl,mu", 0);
+> > +	if (WARN_ON(!mu_np))
+> > +		return -EINVAL;
+> > +
+> > +	sciErr = sc_ipc_open(&scu_ipc_handle, (sc_ipc_id_t)mu_np);
+> > +	if (sciErr != SC_ERR_NONE) {
+> > +		pr_err("Cannot open MU (%pOF) to SCU\n", mu_np);
+> > +		return -ENODEV;
+> > +	};
+> > +
+> > +	pr_info("NXP i.MX SCU Initialized with MU: %pOF %s\n",
+> > +		mu_np, mu_np->name);
+> > +
+> > +	of_node_put(mu_np);
+> > +
+> > +	return 0;
+> > +}
+> > +early_initcall(imx8_scu_init);
+> > diff --git a/drivers/soc/imx/sc/main/rpc.h
+> > b/drivers/soc/imx/sc/main/rpc.h new file mode 100644 index
+> > 0000000..e957eb5
+> > --- /dev/null
+> > +++ b/drivers/soc/imx/sc/main/rpc.h
+> > @@ -0,0 +1,81 @@
+> > +/* SPDX-License-Identifier: GPL-2.0+ */
+> > +/*
+> > + * Copyright (C) 2016 Freescale Semiconductor, Inc.
+> > + * Copyright 2017~2018 NXP
+> > + *
+> > + * Header file for the RPC implementation.
+> > + */
+> > +
+> > +#ifndef _SC_RPC_H
+> > +#define _SC_RPC_H
+> > +
+> > +/* Includes */
+> > +
+> > +#include <soc/imx/sc/types.h>
+> > +#include <soc/imx/sc/ipc.h>
+> > +
+> > +/* Defines */
+> > +
+> > +#define SC_RPC_VERSION		1
+> > +
+> > +#define SC_RPC_MAX_MSG		8
+> > +
+> > +#define SC_RPC_MAX_COUNT        5
+> > +
+> > +#define RPC_VER(MSG)            ((MSG)->version)
+> > +#define RPC_SIZE(MSG)           ((MSG)->size)
+> > +#define RPC_SVC(MSG)            ((MSG)->svc)
+> > +#define RPC_FUNC(MSG)           ((MSG)->func)
+> > +#define RPC_R8(MSG)             ((MSG)->func)
+> > +#define RPC_I32(MSG, IDX)       ((MSG)->DATA.i32[(IDX) / 4])
+> > +#define RPC_I16(MSG, IDX)       ((MSG)->DATA.i16[(IDX) / 2])
+> > +#define RPC_I8(MSG, IDX)        ((MSG)->DATA.i8[(IDX)])
+> > +#define RPC_U32(MSG, IDX)       ((MSG)->DATA.u32[(IDX) / 4])
+> > +#define RPC_U16(MSG, IDX)       ((MSG)->DATA.u16[(IDX) / 2])
+> > +#define RPC_U8(MSG, IDX)        ((MSG)->DATA.u8[(IDX)])
+> 
+> I thought we agreed that you get rid of these.
+> 
+
+Your earlier reply is only changing head files if needed.
+This requires change all over the code. 
+As I said before, that's part of code is auto generated by SCU firmware. 
+(Only drivers/soc/imx/sc/main/ipc.c and drivers/soc/imx/sc/main/rpc.h
+Is newly implemented for Linux). Changing it will result in maintain troubles
+(we then need to change them all the time in the future in case a update for
+new features and etc).
+So the original purpose is we'd like to preserve it unless it's a big issue.
+What's your opinion?
+
+> 
+> > +
+> > +/* Types */
+> > +
+> > +typedef enum sc_rpc_svc_e {
+> > +	SC_RPC_SVC_UNKNOWN = 0,
+> > +	SC_RPC_SVC_RETURN = 1,
+> > +	SC_RPC_SVC_PM = 2,
+> > +	SC_RPC_SVC_RM = 3,
+> > +	SC_RPC_SVC_TIMER = 5,
+> > +	SC_RPC_SVC_PAD = 6,
+> > +	SC_RPC_SVC_MISC = 7,
+> > +	SC_RPC_SVC_IRQ = 8,
+> > +	SC_RPC_SVC_ABORT = 9
+> > +} sc_rpc_svc_t;
+> > +
+> > +typedef struct sc_rpc_msg_s {
+> > +	uint8_t version;
+> > +	uint8_t size;
+> > +	uint8_t svc;
+> > +	uint8_t func;
+> > +	union {
+> > +		int32_t i32[(SC_RPC_MAX_MSG - 1)];
+> > +		int16_t i16[(SC_RPC_MAX_MSG - 1) * 2];
+> > +		int8_t i8[(SC_RPC_MAX_MSG - 1) * 4];
+> > +		uint32_t u32[(SC_RPC_MAX_MSG - 1)];
+> > +		uint16_t u16[(SC_RPC_MAX_MSG - 1) * 2];
+> > +		uint8_t u8[(SC_RPC_MAX_MSG - 1) * 4];
+> > +	} DATA;
+> > +} sc_rpc_msg_t;
+> > +
+> > +/* Functions */
+> > +
+> > +/*
+> > + * This is an internal function to send an RPC message over an IPC
+> > + * channel. It is called by client-side SCFW API function shims.
+> > + *
+> > + * @param[in]     ipc         IPC handle
+> > + * @param[in,out] msg         handle to a message
+> > + * @param[in]     no_resp     response flag
+> > + *
+> > + * If no_resp is false then this function waits for a response
+> > + * and returns the result in msg.
+> > + */
+> > +void sc_call_rpc(sc_ipc_t ipc, sc_rpc_msg_t *msg, bool no_resp);
+> 
+> Positive logic is usually easier to read. Instead of a 'no_resp' flag you should
+> have a 'resp' flag.
+
+Same explain as above one.
+
+> 
+> > +
+> > +#endif /* _SC_RPC_H */
+> > diff --git a/drivers/soc/imx/sc/svc/irq/rpc.h
+> > b/drivers/soc/imx/sc/svc/irq/rpc.h
+> > new file mode 100644
+> > index 0000000..3a6cccd
+> > --- /dev/null
+> > +++ b/drivers/soc/imx/sc/svc/irq/rpc.h
+> > @@ -0,0 +1,23 @@
+> > +/* SPDX-License-Identifier: GPL-2.0+ */
+> > +/*
+> > + * Copyright (C) 2016 Freescale Semiconductor, Inc.
+> > + * Copyright 2017~2018 NXP
+> > + *
+> > + * Header file for the IRQ RPC implementation.
+> > + */
+> > +
+> > +#ifndef _SC_IRQ_RPC_H
+> > +#define _SC_IRQ_RPC_H
+> > +
+> > +/* Types */
+> > +
+> > +/*!
+> > + * This type is used to indicate RPC IRQ function calls.
+> > + */
+> > +typedef enum irq_func_e {
+> > +	IRQ_FUNC_UNKNOWN = 0,	/* Unknown function */
+> > +	IRQ_FUNC_ENABLE = 1,	/* Index for irq_enable() RPC call */
+> > +	IRQ_FUNC_STATUS = 2,	/* Index for irq_status() RPC call */
+> > +} irq_func_t;
+> > +
+> > +#endif /* _SC_IRQ_RPC_H */
+> > diff --git a/drivers/soc/imx/sc/svc/irq/rpc_clnt.c
+> > b/drivers/soc/imx/sc/svc/irq/rpc_clnt.c
+> > new file mode 100644
+> > index 0000000..37a9ab4
+> > --- /dev/null
+> > +++ b/drivers/soc/imx/sc/svc/irq/rpc_clnt.c
+> > @@ -0,0 +1,58 @@
+> > +// SPDX-License-Identifier: GPL-2.0+
+> > +/*
+> > + * Copyright (C) 2016 Freescale Semiconductor, Inc.
+> > + * Copyright 2017~2018 NXP
+> > + *
+> > + * File containing client-side RPC functions for the IRQ service.
+> > +These
+> > + * function are ported to clients that communicate to the SC.
+> > + *
+> > + */
+> > +
+> > +#include <soc/imx/sc/types.h>
+> > +#include <soc/imx/sc/svc/rm/api.h>
+> > +#include <soc/imx/sc/svc/irq/api.h>
+> > +#include "../../main/rpc.h"
+> > +#include "rpc.h"
+> > +
+> > +sc_err_t sc_irq_enable(sc_ipc_t ipc, sc_rsrc_t resource,
+> > +		       sc_irq_group_t group, uint32_t mask, bool enable) {
+> > +	sc_rpc_msg_t msg;
+> > +	uint8_t result;
+> > +
+> > +	RPC_VER(&msg) = SC_RPC_VERSION;
+> > +	RPC_SVC(&msg) = (uint8_t)SC_RPC_SVC_IRQ;
+> > +	RPC_FUNC(&msg) = (uint8_t)IRQ_FUNC_ENABLE;
+> > +	RPC_U32(&msg, 0) = mask;
+> > +	RPC_U16(&msg, 4) = resource;
+> > +	RPC_U8(&msg, 6) = group;
+> > +	RPC_U8(&msg, 7) = (uint8_t)enable;
+> > +	RPC_SIZE(&msg) = 3;
+> > +
+> > +	sc_call_rpc(ipc, &msg, false);
+> 
+> This call can fail...
+> 
+
+See the similar reply above.
+
+Thanks for the kind and professional review.
+
+Regards
+Dong Aisheng
+
+> > +
+> > +	result = RPC_R8(&msg);
+> 
+> .. in which case RPC_R8(&msg) is still initialized with SC_RPC_VERSION.
+> 
+> > +	return (sc_err_t)result;
+> > +}
+> > +
+> 
+> Sascha
+> 
+> --
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 |
+> https://emea01.safelinks.protection.outlook.com/?url=http%3A%2F%2Fww
+> w.pengutronix.de%2F&data=02%7C01%7Caisheng.dong%40nxp.com%7Ca36
+> dc1e6a1d8406625be08d5da8a8a2c%7C686ea1d3bc2b4c6fa92cd99c5c301635%
+> 7C0%7C0%7C636655210928677179&sdata=mW2IA5PwSgTwcIkdf2Tx4yvBG8R
+> qCcWwfP0KG%2F99MIk%3D&reserved=0  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
