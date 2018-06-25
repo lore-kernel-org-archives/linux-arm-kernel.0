@@ -1,50 +1,108 @@
-From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Mon, 25 Jun 2018 14:02:52 +0200
-Subject: [PATCH v3 12/24] drm/sun4i: Don't check for panel or bridge on TV
- TCONs
+From: jernej.skrabec@gmail.com (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
+Date: Mon, 25 Jun 2018 14:07:22 +0200
+Subject: [linux-sunxi] [PATCH v3 00/24] Add support for R40 HDMI pipeline
 In-Reply-To: <20180625120304.7543-1-jernej.skrabec@siol.net>
 References: <20180625120304.7543-1-jernej.skrabec@siol.net>
-Message-ID: <20180625120304.7543-13-jernej.skrabec@siol.net>
+Message-ID: <2662242.Y24NoxnheK@jernej-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-TV TCONs are always connected to TV or HDMI encoder, so it doesn't make
-sense to check if panel or bridge is connected to them.
+Dne ponedeljek, 25. junij 2018 ob 14:02:40 CEST je Jernej Skrabec napisal(a):
+> This series adds support for R40 HDMI pipeline. It is a bit special
+> than other already supported pipelines because it has additional unit
+> called TCON TOP responsible for relationship configuration between
+> mixers, TCONs and HDMI. Additionally, it has additional gates for DSI
+> and TV TCONs, TV encoder clock settings and pin muxing between LCD
+> and TV encoders.
+> 
+> However, it seems that TCON TOP will become a norm, since newer
+> Allwinner SoCs like H6 also have this unit.
+> 
+> I tested different possible configurations:
+> - mixer0 <> TCON-TV0 <> HDMI
+> - mixer0 <> TCON-TV1 <> HDMI
+> - mixer1 <> TCON-TV0 <> HDMI
+> - mixer1 <> TCON-TV1 <> HDMI
+> 
+> Please review.
+> 
+> Best regards,
+> Jernej
+> 
+> Changes from v2:
+> - Collected tags
+> - Exported drm_crtc_port_mask() symbol
+> - Removed TCON TOP reset name
+> - TCON TOP gates have now right parents
+> - updated TCON TOP bindings
+> - dropped new TCON quirk due TCON TOP rework
 
-Check if TCON has channel 0 and only then check for connected panel or
-bridges.
+Forgot to add:
+- in "drm/sun4i: Don't change clock bits in DW HDMI PHY driver" patch, only 
+parent selection bit is reset to 0. Previously whole register was set to 0. 
+Previous version broke H3 HDMI.
 
-Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
----
- drivers/gpu/drm/sun4i/sun4i_tcon.c | 12 +++++++++---
- 1 file changed, 9 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-index 761687ebacba..a41c7bb0d557 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-@@ -1178,13 +1178,19 @@ static const struct component_ops sun4i_tcon_ops = {
- static int sun4i_tcon_probe(struct platform_device *pdev)
- {
- 	struct device_node *node = pdev->dev.of_node;
-+	const struct sun4i_tcon_quirks *quirks;
- 	struct drm_bridge *bridge;
- 	struct drm_panel *panel;
- 	int ret;
- 
--	ret = drm_of_find_panel_or_bridge(node, 1, 0, &panel, &bridge);
--	if (ret == -EPROBE_DEFER)
--		return ret;
-+	quirks = of_device_get_match_data(&pdev->dev);
-+
-+	/* panels and bridges are present only on TCONs with channel 0 */
-+	if (quirks->has_channel_0) {
-+		ret = drm_of_find_panel_or_bridge(node, 1, 0, &panel, &bridge);
-+		if (ret == -EPROBE_DEFER)
-+			return ret;
-+	}
- 
- 	return component_add(&pdev->dev, &sun4i_tcon_ops);
- }
--- 
-2.18.0
+> 
+> Changes from v1:
+> - Split DT bindings patch and updated description
+> - Split HDMI PHY patch
+> - Move header file from TCON TOP patch to dt bindings patch
+> - Added Rob reviewed-by tag
+> - Used clk_hw_register_gate() instead of custom gate registration code
+> - Reworked TCON TOP to be part of of-graph. Because of that, a lot of
+>   new patches were added.
+> - Droped mixer index quirk patch
+> - Reworked TCON support for TCON TOP
+> - Updated commit messages
+> 
+> Jernej Skrabec (24):
+>   clk: sunxi-ng: r40: Add minimal rate for video PLLs
+>   clk: sunxi-ng: r40: Allow setting parent rate to display related
+>     clocks
+>   clk: sunxi-ng: r40: Export video PLLs
+>   dt-bindings: display: sunxi-drm: Add TCON TOP description
+>   drm/sun4i: Add TCON TOP driver
+>   drm/sun4i: Fix releasing node when enumerating enpoints
+>   drm/sun4i: Split out code for enumerating endpoints in output port
+>   drm/sun4i: Add support for traversing graph with TCON TOP
+>   drm/sun4i: Don't skip TCONs if they don't have channel 0
+>   drm/sun4i: tcon: Generalize engine search algorithm
+>   drm/sun4i: Don't check for LVDS and RGB when TCON has only ch1
+>   drm/sun4i: Don't check for panel or bridge on TV TCONs
+>   dt-bindings: display: sun4i-drm: Add R40 mixer compatibles
+>   drm/sun4i: Add support for R40 mixers
+>   dt-bindings: display: sun4i-drm: Add description of A64 HDMI PHY
+>   drm/sun4i: Enable DW HDMI PHY clock
+>   drm/sun4i: Don't change clock bits in DW HDMI PHY driver
+>   drm/sun4i: DW HDMI PHY: Add support for second PLL
+>   drm/sun4i: Add support for second clock parent to DW HDMI PHY clk
+>     driver
+>   drm/sun4i: Add support for A64 HDMI PHY
+>   drm: of: Export drm_crtc_port_mask()
+>   drm/sun4i: DW HDMI: Expand algorithm for possible crtcs
+>   ARM: dts: sun8i: r40: Add HDMI pipeline
+>   ARM: dts: sun8i: r40: Enable HDMI output on BananaPi M2 Ultra
+> 
+>  .../bindings/display/sunxi/sun4i-drm.txt      |  62 +++-
+>  .../boot/dts/sun8i-r40-bananapi-m2-ultra.dts  |  45 +++
+>  arch/arm/boot/dts/sun8i-r40.dtsi              | 269 ++++++++++++++++
+>  drivers/clk/sunxi-ng/ccu-sun8i-r40.c          |  58 ++--
+>  drivers/clk/sunxi-ng/ccu-sun8i-r40.h          |   8 +-
+>  drivers/gpu/drm/drm_of.c                      |   5 +-
+>  drivers/gpu/drm/sun4i/Makefile                |   3 +-
+>  drivers/gpu/drm/sun4i/sun4i_drv.c             | 121 +++++--
+>  drivers/gpu/drm/sun4i/sun4i_tcon.c            |  66 ++--
+>  drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c         |  46 ++-
+>  drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h         |   8 +-
+>  drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c        |  54 +++-
+>  drivers/gpu/drm/sun4i/sun8i_hdmi_phy_clk.c    |  90 ++++--
+>  drivers/gpu/drm/sun4i/sun8i_mixer.c           |  24 ++
+>  drivers/gpu/drm/sun4i/sun8i_tcon_top.c        | 300 ++++++++++++++++++
+>  drivers/gpu/drm/sun4i/sun8i_tcon_top.h        |  40 +++
+>  include/drm/drm_of.h                          |   8 +
+>  include/dt-bindings/clock/sun8i-r40-ccu.h     |   4 +
+>  include/dt-bindings/clock/sun8i-tcon-top.h    |  11 +
+>  19 files changed, 1100 insertions(+), 122 deletions(-)
+>  create mode 100644 drivers/gpu/drm/sun4i/sun8i_tcon_top.c
+>  create mode 100644 drivers/gpu/drm/sun4i/sun8i_tcon_top.h
+>  create mode 100644 include/dt-bindings/clock/sun8i-tcon-top.h
