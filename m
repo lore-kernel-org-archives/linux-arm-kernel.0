@@ -1,84 +1,122 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 25 Jun 2018 11:50:52 -0700
-Subject: [PATCH v8 2/2] regulator: add QCOM RPMh regulator driver
-In-Reply-To: <35c4ea70cdf5caba560fb6f40e866ee8bc456d93.1529712888.git.collinsd@codeaurora.org>
-References: <cover.1529712888.git.collinsd@codeaurora.org>
- <35c4ea70cdf5caba560fb6f40e866ee8bc456d93.1529712888.git.collinsd@codeaurora.org>
-Message-ID: <CAD=FV=XVEEPgjBXxR+-46RgxLOq63Xvq-jtruoaCxccmMoKUuA@mail.gmail.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Mon, 25 Jun 2018 21:01:00 +0200
+Subject: [PATCH 7/9] media: cedrus: Move IRQ maintainance to cedrus_dec_ops
+In-Reply-To: <03f66b80b1a60c4fe62822b08eb5d97c0539aac0.camel@bootlin.com>
+References: <20180613140714.1686-1-maxime.ripard@bootlin.com>
+ <20180613140714.1686-8-maxime.ripard@bootlin.com>
+ <d8e471608643a014d0961c82256753e5fd0c5060.camel@bootlin.com>
+ <03f66b80b1a60c4fe62822b08eb5d97c0539aac0.camel@bootlin.com>
+Message-ID: <20180625190100.rlqbcafhktypotgj@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Jun 25, 2018 at 05:49:58PM +0200, Paul Kocialkowski wrote:
+> On Mon, 2018-06-25 at 17:38 +0200, Paul Kocialkowski wrote:
+> > Hi,
+> > 
+> > On Wed, 2018-06-13 at 16:07 +0200, Maxime Ripard wrote:
+> > > The IRQ handler up until now was hardcoding the use of the MPEG engine to
+> > > read the interrupt status, clear it and disable the interrupts.
+> > > 
+> > > Obviously, that won't work really well with the introduction of new codecs
+> > > that use a separate engine with a separate register set.
+> > > 
+> > > In order to make this more future proof, introduce new decodec operations
+> > > to deal with the interrupt management. The only one missing is the one to
+> > > enable the interrupts in the first place, but that's taken care of by the
+> > > trigger hook for now.
+> > 
+> > Here's another comment about an issue I just figured out.
+> > 
+> > > Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+> > > ---
+> > >  .../sunxi/cedrus/sunxi_cedrus_common.h        |  9 +++++
+> > >  .../platform/sunxi/cedrus/sunxi_cedrus_hw.c   | 21 ++++++------
+> > >  .../sunxi/cedrus/sunxi_cedrus_mpeg2.c         | 33 +++++++++++++++++++
+> > >  3 files changed, 53 insertions(+), 10 deletions(-)
+> > > 
+> > > diff --git a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h
+> > > index c2e2c92d103b..a2a507eb9fc9 100644
+> > > --- a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h
+> > > +++ b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h
+> > > @@ -108,7 +108,16 @@ struct sunxi_cedrus_buffer *vb2_to_cedrus_buffer(const struct vb2_buffer *p)
+> > >  	return vb2_v4l2_to_cedrus_buffer(to_vb2_v4l2_buffer(p));
+> > >  }
+> > >  
+> > > +enum sunxi_cedrus_irq_status {
+> > > +	SUNXI_CEDRUS_IRQ_NONE,
+> > > +	SUNXI_CEDRUS_IRQ_ERROR,
+> > > +	SUNXI_CEDRUS_IRQ_OK,
+> > > +};
+> > > +
+> > >  struct sunxi_cedrus_dec_ops {
+> > > +	void (*irq_clear)(struct sunxi_cedrus_ctx *ctx);
+> > > +	void (*irq_disable)(struct sunxi_cedrus_ctx *ctx);
+> > > +	enum sunxi_cedrus_irq_status (*irq_status)(struct sunxi_cedrus_ctx *ctx);
+> > >  	void (*setup)(struct sunxi_cedrus_ctx *ctx,
+> > >  		      struct sunxi_cedrus_run *run);
+> > >  	void (*trigger)(struct sunxi_cedrus_ctx *ctx);
+> > > diff --git a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_hw.c b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_hw.c
+> > > index bb46a01214e0..6b97cbd2834e 100644
+> > > --- a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_hw.c
+> > > +++ b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_hw.c
+> > > @@ -77,27 +77,28 @@ static irqreturn_t sunxi_cedrus_ve_irq(int irq, void *dev_id)
+> > >  	struct sunxi_cedrus_ctx *ctx;
+> > >  	struct sunxi_cedrus_buffer *src_buffer, *dst_buffer;
+> > >  	struct vb2_v4l2_buffer *src_vb, *dst_vb;
+> > > +	enum sunxi_cedrus_irq_status status;
+> > >  	unsigned long flags;
+> > > -	unsigned int value, status;
+> > >  
+> > >  	spin_lock_irqsave(&dev->irq_lock, flags);
+> > >  
+> > > -	/* Disable MPEG interrupts and stop the MPEG engine */
+> > > -	value = sunxi_cedrus_read(dev, VE_MPEG_CTRL);
+> > > -	sunxi_cedrus_write(dev, value & (~0xf), VE_MPEG_CTRL);
+> > > -
+> > > -	status = sunxi_cedrus_read(dev, VE_MPEG_STATUS);
+> > > -	sunxi_cedrus_write(dev, 0x0000c00f, VE_MPEG_STATUS);
+> > > -	sunxi_cedrus_engine_disable(dev);
+> > 
+> > This call was dropped from the code reorganization. What it intentional?
+> > 
+> > IMO, it should be brought back to the irq_disable ops for MPEG2 (and the
+> > same probably applies to H264).
+> 
+> Actually, this doesn't seem like the right place to put it.
+> 
+> Looking at the sunxi_engine_enable function, explicitly passing the
+> codec as an argument and calling that function from each codec's code
+> feels strange.
+> 
+> We should probably break down these functions
+> (sunxi_engine_enable/sunxi_engine_disable) into codec ops. The
+> start/stop couple seems like a good fit, but it brings up the following
+> question: do we want to disable the engine between each frame or not?
+> 
+> I really don't know how significant the power saving benefits are and
+> what downsides there might be.
+> 
+> What do you think?
 
-On Fri, Jun 22, 2018 at 5:46 PM, David Collins <collinsd@codeaurora.org> wrote:
-> Add the QCOM RPMh regulator driver to manage PMIC regulators
-> which are controlled via RPMh on some Qualcomm Technologies, Inc.
-> SoCs.  RPMh is a hardware block which contains several
-> accelerators which are used to manage various hardware resources
-> that are shared between the processors of the SoC.  The final
-> hardware state of a regulator is determined within RPMh by
-> performing max aggregation of the requests made by all of the
-> processors.
->
-> Add support for PMIC regulator control via the voltage regulator
-> manager (VRM) and oscillator buffer (XOB) RPMh accelerators.
-> VRM supports manipulation of enable state, voltage, and mode.
-> XOB supports manipulation of enable state.
->
-> Signed-off-by: David Collins <collinsd@codeaurora.org>
-> Reviewed-by: Douglas Anderson <dianders@chromium.org>
-> Reviewed-by: Matthias Kaehlcke <mka@chromium.org>
-> ---
->  drivers/regulator/Kconfig               |   9 +
->  drivers/regulator/Makefile              |   1 +
->  drivers/regulator/qcom-rpmh-regulator.c | 746 ++++++++++++++++++++++++++++++++
->  3 files changed, 756 insertions(+)
+If we don't need to disable it between each frames, then let's keep it
+enabled.
 
-I've been working with David's v7 patch series for a bit of time now
-and things have been working well.  v8 looks good.  Feel free to add:
+Without any number, and considering the current state of power
+management (which is inexistent on this driver, and close to for the
+whole platform), wasting a bit of power if we do isn't really a big
+deal.
 
-Tested-by: Douglas Anderson <dianders@chromium.org>
+Maxime
 
-...to this patch.  Speaking of which it might be getting very close to
-time for this series to land along with David's other series, AKA:
-
-* [1/2] regulator: of: add property for allowed modes specification
-  https://patchwork.kernel.org/patch/10395731/
-
-* [2/2] regulator: of: add support for allowed modes configuration
-  https://patchwork.kernel.org/patch/10395725/
-
-
-Specifically I think we are mostly waiting for RPMh to land.  This is
-on Andy's plate right now but I think it's happy and just waiting for
-the actual push from Andy.
-
-
-NOTE: I don't know if there anything special we need to do for landing
-this and RPMh across two git repositories.  Offline Stephen Boyd
-mentioned to me that maybe it was fine to land this in Mark's tree
-without the RPMh code since it depends on "QCOM_RPMH", but the "||
-COMPILE_TEST" worries me and makes me think auto-builders will start
-yelling.  Andy and Mark: what do you think?
-
-
-If it's helpful to have a link to the latest RPMh, here are patchwork
-IDs on linux-arm-msm:
-
-10477501 [v13,01/10] drivers: qcom: rpmh-rsc: add RPMH controller for QCOM SoCs
-10477559 [v13,02/10] dt-bindings: introduce RPMH RSC bindings for Qualcomm SoCs
-10477545 [v13,03/10] drivers: qcom: rpmh-rsc: log RPMH requests in FTRACE
-10477543 [v13,04/10] drivers: qcom: rpmh: add RPMH helper functions
-10477537 [v13,05/10] drivers: qcom: rpmh-rsc: write sleep/wake requests to TCS
-10477539 [v13,06/10] drivers: qcom: rpmh-rsc: allow invalidation of
-sleep/wake TCS
-10477533 [v13,07/10] drivers: qcom: rpmh: cache sleep/wake state requests
-10477529 [v13,08/10] drivers: qcom: rpmh: allow requests to be sent
-asynchronously
-10477525 [v13,09/10] drivers: qcom: rpmh: add support for batch RPMH request
-10477519 [v13,10/10] drivers: qcom: rpmh-rsc: allow active requests
-from wake TCS
-
-
-
--Doug
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180625/ede6afda/attachment.sig>
