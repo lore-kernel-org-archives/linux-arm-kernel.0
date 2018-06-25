@@ -1,44 +1,52 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 25 Jun 2018 19:29:21 +0200
-Subject: [PATCH V2 2/2] efi/fb: Convert PCI bus address to resource if
- translated by the bridge
-In-Reply-To: <eb16a77f-7950-7fa1-c436-0ce99a992d3b@codeaurora.org>
-References: <1526653072-7153-1-git-send-email-okaya@codeaurora.org>
- <1526653072-7153-2-git-send-email-okaya@codeaurora.org>
- <20180619222921.GA90490@bhelgaas-glaptop.roam.corp.google.com>
- <CAKv+Gu_voOZ7YUL8pckww4mTt4PVcu7y69mf-z7ZZe1bJ81Shw@mail.gmail.com>
- <2a805337-c0b5-e134-7695-5a543ecaa26a@codeaurora.org>
- <CAKv+Gu9HAJRHwjYLNjf+gg=1vFoFu3BJphifKKE-aR4o_MW84A@mail.gmail.com>
- <CAKv+Gu-WXLXqHSmiS2MmAMXHLKK_kg+3EK6L2rvO0SzN-c0UMg@mail.gmail.com>
- <37289a27-eb99-6a73-4d32-4a75edd11dcd@codeaurora.org>
- <CAKv+Gu-bwCFhCKiA7P1amMLeBaSxsjk0d6aPjAr9nCvOBPJA6w@mail.gmail.com>
- <CAKv+Gu96HQf0oJ1RC+wVU34FqqcCWrnDGag48vjNP_z86HhLBQ@mail.gmail.com>
- <7777f7bfead902f2f5175d48907fccec@codeaurora.org>
- <eb16a77f-7950-7fa1-c436-0ce99a992d3b@codeaurora.org>
-Message-ID: <CAKv+Gu__a0yMcH6pyC0oxXZYgi=emuJA+6v1Zdmd4tbq_UR0Og@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 25 Jun 2018 11:29:24 -0600
+Subject: [PATCH v3 2/5] dt-bindings: dmaengine: xilinx_dma: add optional
+ xlnx,sg-length-width property
+In-Reply-To: <20180625092724.22164-2-andrea.merello@gmail.com>
+References: <20180625092724.22164-1-andrea.merello@gmail.com>
+ <20180625092724.22164-2-andrea.merello@gmail.com>
+Message-ID: <20180625172924.GA398@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 June 2018 at 19:28, Sinan Kaya <okaya@codeaurora.org> wrote:
-> On 6/25/2018 11:52 AM, okaya at codeaurora.org wrote:
->>> Note that this is not the only MMIO translation related change made by
->>> Heyi Guo to the generic PCI host bridge and bus drivers, but given
->>> that those did not support MMIO translation at all, I take it your
->>> affected platforms will already have their own changes to accommodate
->>> this.
->>
->> Platform has been doing mmio translation for quite a while. Because all accesses go through pci io protocol, the rest of the UEFI never needed to be aware of bar address or do direct access.
->>
->> This is the first time I hear of direct access. Maybe, GOP is a special case.
->>
->> I started copying your response to the bios vendor.
->>
->> They are probably missing that patch. I will pass it along.
->
-> I was informed that they fixed the issue in BIOS by presenting CPU physical
-> address instead of PCI bus address in FrameBufferBase of the AST GOP UEFI driver.
->
-> We can drop this patch now.
->
+On Mon, Jun 25, 2018 at 11:27:21AM +0200, Andrea Merello wrote:
+> The width of the "length register" cannot be autodetected, and it is now
+> specified with a DT property. Add DOC for it.
+> 
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: devicetree at vger.kernel.org
+> Cc: Radhey Shyam Pandey <radhey.shyam.pandey@xilinx.com>
+> Signed-off-by: Andrea Merello <andrea.merello@gmail.com>
+> Reviewed-by: Radhey Shyam Pandey <radhey.shyam.pandey@xilinx.com>
+> ---
+> Changes in v2:
+> 	- change property name
+> 	- property is now optional
+> 	- cc DT maintainer
+> Changes in v3:
+> 	- reword
+> 	- cc DT maintainerS and ML
+> ---
+>  Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt b/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
+> index a2b8bfaec43c..c894abe28baa 100644
+> --- a/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
+> +++ b/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
+> @@ -41,6 +41,7 @@ Optional properties:
+>  - xlnx,include-sg: Tells configured for Scatter-mode in
+>  	the hardware.
+>  Optional properties for AXI DMA:
+> +- xlnx,sg-length-width: Should be the width of the length register as configured in h/w.
 
-Excellent! Thanks for following up with the vendor ...
+What are the units? What are valid values? What is the default if the 
+property is not present?
+
+>  - xlnx,mcdma: Tells whether configured for multi-channel mode in the hardware.
+>  Optional properties for VDMA:
+>  - xlnx,flush-fsync: Tells which channel to Flush on Frame sync.
+> -- 
+> 2.17.1
+> 
