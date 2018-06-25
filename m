@@ -1,63 +1,55 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Mon, 25 Jun 2018 19:46:51 +0200
-Subject: [PATCH 00/14] ARM: davinci: step towards removing
- at24_platform_data
-In-Reply-To: <20180625174024.GB17417@lunn.ch>
-References: <20180625155025.12567-1-brgl@bgdev.pl>
- <20180625174024.GB17417@lunn.ch>
-Message-ID: <CAMRc=MdEn74G5SJAaGLAfNSS7Zy7wqH04aN5CMZ45UXqhu_58g@mail.gmail.com>
+From: mhocko@kernel.org (Michal Hocko)
+Date: Mon, 25 Jun 2018 19:53:12 +0200
+Subject: [PATCH v3 0/3] fix free pmd/pte page handlings on x86
+In-Reply-To: <1529938470.14039.134.camel@hpe.com>
+References: <20180516233207.1580-1-toshi.kani@hpe.com>
+ <alpine.DEB.2.21.1806241516410.8650@nanos.tec.linutronix.de>
+ <1529938470.14039.134.camel@hpe.com>
+Message-ID: <20180625175225.GQ28965@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-06-25 19:40 GMT+02:00 Andrew Lunn <andrew@lunn.ch>:
-> On Mon, Jun 25, 2018 at 05:50:11PM +0200, Bartosz Golaszewski wrote:
->> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->>
->> Since I took over maintainership of the at24 driver I've been working
->> towards removing at24_platform_data in favor for device properties.
->>
->> DaVinci is the only platform that's still using it - all other users
->> have already been converted.
->>
->> One of the obstacles in case of DaVinci is removing the setup() callback
->> from the pdata struct, the only user of which are some davinci boards.
->
-> Hi Bartosz
->
-> Nice code.
->
-> I've got a platform i want to add sometime soon using the at24. I
-> noticed you doing the cleanup, so i avoided the setup() call. But
-> using it would of helped...
->
-> My platform is x86 based, so no device tree. I instantiate a number of
-> AT24 devices from a platform driver, and then add nvmem cells so i can
-> access data in these eeproms. This new code will make this simpler.
->
->> The only board that's still using this callback is now mityomapl138.
->> Unfortunately it stores more info in EEPROM than just the MAC address
->> and will require some more work. Unfortunately I don't have access
->> to this board so I can't test any actual solutions on a live hardware.
->
-> Depending on what i find in the EEPROM, i need to instantiate other
-> i2c devices. So i have the problem of knowing when the EEPROM has
-> actually probed and i can use the nvmem API to retrieve the contents.
->
-> What i have done so far, is registers a bus notifier on i2c_bus_type,
-> and look for BUS_NOTIFY_BOUND_DRIVER. I can then check if the i2c
-> client in the notifier is the at24 client. But when i then add more
-> i2c clients from inside the notifier i get lockdep splats. They are
-> false positives, but it does suggest it is not a good idea to do this.
->
-> So it would be good to have some sort of recommended alternative to
-> the setup() callback. Ideally it would be specific to a particular
-> at24, and safe to call other i2c functions from.
->
-> Do you have any ideas?
->
->    Andrew
+On Mon 25-06-18 14:56:26, Kani Toshimitsu wrote:
+> On Sun, 2018-06-24 at 15:19 +0200, Thomas Gleixner wrote:
+> > On Wed, 16 May 2018, Toshi Kani wrote:
+> > 
+> > > This series fixes two issues in the x86 ioremap free page handlings
+> > > for pud/pmd mappings.
+> > > 
+> > > Patch 01 fixes BUG_ON on x86-PAE reported by Joerg.  It disables
+> > > the free page handling on x86-PAE.
+> > > 
+> > > Patch 02-03 fixes a possible issue with speculation which can cause
+> > > stale page-directory cache.
+> > >  - Patch 02 is from Chintan's v9 01/04 patch [1], which adds a new arg
+> > >    'addr', with my merge change to patch 01.
+> > >  - Patch 03 adds a TLB purge (INVLPG) to purge page-structure caches
+> > >    that may be cached by speculation.  See the patch descriptions for
+> > >    more detal.
+> > 
+> > Toshi, Joerg, Michal!
+> 
+> Hi Thomas,
+> 
+> Thanks for checking. I was about to ping as well.
+> 
+> > I'm failing to find a conclusion of this discussion. Can we finally make
+> > some progress with that?
+> 
+> I have not heard from Joerg since I last replied to his comments to
+> Patch 3/3 -- I did my best to explain that there was no issue in the
+> single page allocation in pud_free_pmd_page().  From my perspective, the
+>  v3 series is good to go.
 
-With my patch 1/14 you'll get -EPROBE_DEFER from nvmem_cell_get() if
-the nvmem provider is not yet registered. Will that help in your case?
+Well, I admit that this not my area but I agree with Joerg that
+allocating memory inside afunction that is supposed to free page table
+is far from ideal. More so that the allocation is hardcoded GFP_KERNEL.
+We already have this antipattern in functions to allocate page tables
+and it has turned to be maintenance PITA longterm. So if there is a way
+around that then I would strongly suggest finding a different solution.
 
-Bart
+Whether that is sufficient to ditch the whole series is not my call
+though.
+-- 
+Michal Hocko
+SUSE Labs
