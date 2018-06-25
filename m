@@ -1,34 +1,46 @@
-From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Mon, 25 Jun 2018 14:31:21 +0200
-Subject: [PATCH] mtd: nand: raw: atmel: add module param to avoid using dma
-In-Reply-To: <20180618103908.17a04679@bbrezillon>
-References: <20180329131054.22506-1-peda@axentia.se>
- <20180618103908.17a04679@bbrezillon>
-Message-ID: <20180625143121.0104a671@xps13>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 25 Jun 2018 09:34:02 -0300
+Subject: [PATCH 1/2] ARM: imx_v6_v7_defconfig: Re-sync defconfig
+Message-ID: <1529930043-6387-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+From: Fabio Estevam <fabio.estevam@nxp.com>
 
-On Mon, 18 Jun 2018 10:39:08 +0200, Boris Brezillon
-<boris.brezillon@bootlin.com> wrote:
+Re-sync imx_v6_v7_defconfig by doing:
+ 
+make savedefconfig
+cp defconfig arch/arm/configs/imx_v6_v7_defconfig
 
-> On Thu, 29 Mar 2018 15:10:54 +0200
-> Peter Rosin <peda@axentia.se> wrote:
-> 
-> > On a sama5d31 with a Full-HD dual LVDS panel (132MHz pixel clock) NAND
-> > flash accesses have a tendency to cause display disturbances. Add a
-> > module param to disable DMA from the NAND controller, since that fixes
-> > the display problem for me.
-> > 
-> > Signed-off-by: Peter Rosin <peda@axentia.se>  
-> 
-> Reviewed-by: Boris Brezillon <boris.brezillon@bootlin.com>
-> 
-> Miquel, can you queue this one to nand/next.
-> 
+CONFIG_BT_HCIUART_H4 option is selected via Kconfig logic.
 
-Applied to nand/next with the prefix changed to "mtd: rawnand: atmel:".
+CONFIG_SND_SOC_IMX_WM8962 no longer exists as the imx-wm8962 audio
+machine layer has been removed.
 
-Thanks,
-Miqu?l
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+---
+ arch/arm/configs/imx_v6_v7_defconfig | 2 --
+ 1 file changed, 2 deletions(-)
+
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index f70507a..d14de86 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -81,7 +81,6 @@ CONFIG_CAN=y
+ CONFIG_CAN_FLEXCAN=y
+ CONFIG_BT=y
+ CONFIG_BT_HCIUART=y
+-CONFIG_BT_HCIUART_H4=y
+ CONFIG_BT_HCIUART_LL=y
+ CONFIG_CFG80211=y
+ CONFIG_CFG80211_WEXT=y
+@@ -282,7 +281,6 @@ CONFIG_SND_SOC_FSL_ASRC=y
+ CONFIG_SND_IMX_SOC=y
+ CONFIG_SND_SOC_PHYCORE_AC97=y
+ CONFIG_SND_SOC_EUKREA_TLV320=y
+-CONFIG_SND_SOC_IMX_WM8962=y
+ CONFIG_SND_SOC_IMX_ES8328=y
+ CONFIG_SND_SOC_IMX_SGTL5000=y
+ CONFIG_SND_SOC_IMX_SPDIF=y
+-- 
+2.7.4
