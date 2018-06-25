@@ -1,70 +1,89 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 25 Jun 2018 16:03:12 +0200
-Subject: [PATCH 17/29] arm64: dts: renesas: condor: add I2C0 support
+Date: Mon, 25 Jun 2018 16:03:20 +0200
+Subject: [PATCH 25/29] arm64: dts: renesas: r8a77965: Add PCIe device nodes
 In-Reply-To: <cover.1529933747.git.horms+renesas@verge.net.au>
 References: <cover.1529933747.git.horms+renesas@verge.net.au>
-Message-ID: <45fde0d498dc77e5fc221960843fa377e0c70822.1529933747.git.horms+renesas@verge.net.au>
+Message-ID: <406c5ad238d04135beaa9415d621e8b6157b7765.1529933747.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
 
-Define the Condor board dependent part of the I2C0 device node.
+This patch adds PCIe{0,1} device nodes to R8A77965 SoC.
 
-The I2C0 bus is populated by 2 ON Semiconductor PCA9654 I/O expanders
-and Analog Devices  ADV7511W HDMI transmitter (but we're only describing
-the former chips now).
+Based on a similar patches of the R8A7796 device tree
+by Harunobu Kurokawa <harunobu.kurokawa.dn@renesas.com>.
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a77980-condor.dts | 27 +++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a77965.dtsi | 48 +++++++++++++++++++++++++++++--
+ 1 file changed, 46 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77980-condor.dts b/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
-index 0b93a7d76585..cc3ee25f4e2d 100644
---- a/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
-@@ -80,6 +80,28 @@
- 	clock-frequency = <32768>;
- };
+diff --git a/arch/arm64/boot/dts/renesas/r8a77965.dtsi b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
+index a584dfc78339..be8631dff1b4 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77965.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
+@@ -1433,13 +1433,57 @@
+ 		};
  
-+&i2c0 {
-+	pinctrl-0 = <&i2c0_pins>;
-+	pinctrl-names = "default";
-+
-+	status = "okay";
-+	clock-frequency = <400000>;
-+
-+	io_expander0: gpio at 20 {
-+		compatible = "onnn,pca9654";
-+		reg = <0x20>;
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+	};
-+
-+	io_expander1: gpio at 21 {
-+		compatible = "onnn,pca9654";
-+		reg = <0x21>;
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+	};
-+};
-+
- &mmc0 {
- 	pinctrl-0 = <&mmc_pins>;
- 	pinctrl-1 = <&mmc_pins_uhs>;
-@@ -104,6 +126,11 @@
- 		function = "canfd0";
- 	};
+ 		pciec0: pcie at fe000000 {
++			compatible = "renesas,pcie-r8a77965",
++				     "renesas,pcie-rcar-gen3";
+ 			reg = <0 0xfe000000 0 0x80000>;
+-			/* placeholder */
++			#address-cells = <3>;
++			#size-cells = <2>;
++			bus-range = <0x00 0xff>;
++			device_type = "pci";
++			ranges = <0x01000000 0 0x00000000 0 0xfe100000 0 0x00100000
++				0x02000000 0 0xfe200000 0 0xfe200000 0 0x00200000
++				0x02000000 0 0x30000000 0 0x30000000 0 0x08000000
++				0x42000000 0 0x38000000 0 0x38000000 0 0x08000000>;
++			/* Map all possible DDR as inbound ranges */
++			dma-ranges = <0x42000000 0 0x40000000 0 0x40000000 0 0x80000000>;
++			interrupts = <GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>,
++				<GIC_SPI 117 IRQ_TYPE_LEVEL_HIGH>,
++				<GIC_SPI 118 IRQ_TYPE_LEVEL_HIGH>;
++			#interrupt-cells = <1>;
++			interrupt-map-mask = <0 0 0 0>;
++			interrupt-map = <0 0 0 0 &gic GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 319>, <&pcie_bus_clk>;
++			clock-names = "pcie", "pcie_bus";
++			power-domains = <&sysc R8A77965_PD_ALWAYS_ON>;
++			resets = <&cpg 319>;
++			status = "disabled";
+ 		};
  
-+	i2c0_pins: i2c0 {
-+		groups = "i2c0";
-+		function = "i2c0";
-+	};
-+
- 	mmc_pins: mmc {
- 		groups = "mmc_data8", "mmc_ctrl", "mmc_ds";
- 		function = "mmc";
+ 		pciec1: pcie at ee800000 {
++			compatible = "renesas,pcie-r8a77965",
++				     "renesas,pcie-rcar-gen3";
+ 			reg = <0 0xee800000 0 0x80000>;
+-			/* placeholder */
++			#address-cells = <3>;
++			#size-cells = <2>;
++			bus-range = <0x00 0xff>;
++			device_type = "pci";
++			ranges = <0x01000000 0 0x00000000 0 0xee900000 0 0x00100000
++				0x02000000 0 0xeea00000 0 0xeea00000 0 0x00200000
++				0x02000000 0 0xc0000000 0 0xc0000000 0 0x08000000
++				0x42000000 0 0xc8000000 0 0xc8000000 0 0x08000000>;
++			/* Map all possible DDR as inbound ranges */
++			dma-ranges = <0x42000000 0 0x40000000 0 0x40000000 0 0x80000000>;
++			interrupts = <GIC_SPI 148 IRQ_TYPE_LEVEL_HIGH>,
++				<GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH>,
++				<GIC_SPI 150 IRQ_TYPE_LEVEL_HIGH>;
++			#interrupt-cells = <1>;
++			interrupt-map-mask = <0 0 0 0>;
++			interrupt-map = <0 0 0 0 &gic GIC_SPI 148 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 318>, <&pcie_bus_clk>;
++			clock-names = "pcie", "pcie_bus";
++			power-domains = <&sysc R8A77965_PD_ALWAYS_ON>;
++			resets = <&cpg 318>;
++			status = "disabled";
+ 		};
+ 
+ 		fcpf0: fcp at fe950000 {
 -- 
 2.11.0
