@@ -1,58 +1,55 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Mon, 25 Jun 2018 17:04:55 +0200
-Subject: [PATCH V4 2/4] watchdog: stm32: add pclk feature for stm32mp1
-In-Reply-To: <d92ec883-09ae-271f-69dd-156df17c3e98@roeck-us.net>
-References: <1529571737-3552-1-git-send-email-ludovic.Barre@st.com>
- <1529571737-3552-3-git-send-email-ludovic.Barre@st.com>
- <20180621165335.GA4563@roeck-us.net>
- <0bfe0082-2134-2d3b-322f-cd6c193a9974@st.com>
- <3f65a889-f625-9521-ea09-bcf7b5b24927@roeck-us.net>
- <b5f62568-ff2f-4a04-212e-a952bf009c88@st.com>
- <d92ec883-09ae-271f-69dd-156df17c3e98@roeck-us.net>
-Message-ID: <630b72f7-d7f1-2975-8974-f6540f1b61dc@st.com>
+From: gregory.clement@bootlin.com (Gregory CLEMENT)
+Date: Mon, 25 Jun 2018 17:05:22 +0200
+Subject: [PATCH v3 03/17] arm64: dts: marvell: fix CP110 ICU node size
+In-Reply-To: <20180622151432.1566-4-miquel.raynal@bootlin.com> (Miquel
+ Raynal's message of "Fri, 22 Jun 2018 17:14:18 +0200")
+References: <20180622151432.1566-1-miquel.raynal@bootlin.com>
+ <20180622151432.1566-4-miquel.raynal@bootlin.com>
+Message-ID: <87a7ric3f1.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Miquel,
+ 
+ On ven., juin 22 2018, Miquel Raynal <miquel.raynal@bootlin.com> wrote:
 
+> ICU size in CP110 is not 0x10 but at least 0x440 bytes long (from the
+> specification).
+>
+> Fixes: 6ef84a827c37 ("arm64: dts: marvell: enable GICP and ICU on Armada 7K/8K")
+> Cc: stable at vger.kernel.org
+> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+> Reviewed-by: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
 
-On 06/25/2018 03:15 PM, Guenter Roeck wrote:
-> On 06/25/2018 05:52 AM, Alexandre Torgue wrote:
->> Hi Guenter,
->>
->>
->>>> But you are right I forgot to change stm32f429.dtsi.
->>>> If I add a commit for stm32f429.dtsi, it's Ok for you ?
->>>>
->>>
->>> Not really. You are imposing a personal preference on others,
->>> and you would make stm32f429.dtsi inconsistent since it doesn't
->>> use clock names for anything else.This in turn means that people
->>> will have an endless source of irritation since they will need
->>> a clock name for this node but not for others.
->>
->> Why? This kind of implementation depends on each driver. Isn't ?
->>
->> Or do you mean that if iwdg driver uses this implementation (clock 
->> name usage) all nodes inside stm32f429.dtsi should follow the same 
->> implementation ?
->>
->>>
->>> You will have to get the arm and DT maintainers to agree on this change.
->>
->> As this patch makes easier integration of new platform, I agree with 
->> Ludovic proposition.
->>
-> 
-> Please provide a formal Acked-by:.
-Sure
+This patch was part of the last PR from arm-soc for Linus and should be
+part of 4.18-rc3, so if there is new version you can drop it.
 
-Acked-by: Alexandre TORGUE <alexandre.torgue@st.com>
+Thanks,
 
-Ludovic, can you please resend a version by adding updates for 
-stm32f429.dtsi.
+Gregory
 
-Thanks
-Alex
+> ---
+>  arch/arm64/boot/dts/marvell/armada-cp110.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
+> index 7dabe25f6774..1c6ff8197a88 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
+> +++ b/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
+> @@ -149,7 +149,7 @@
+>  
+>  		CP110_LABEL(icu): interrupt-controller at 1e0000 {
+>  			compatible = "marvell,cp110-icu";
+> -			reg = <0x1e0000 0x10>;
+> +			reg = <0x1e0000 0x440>;
+>  			#interrupt-cells = <3>;
+>  			interrupt-controller;
+>  			msi-parent = <&gicp>;
+> -- 
+> 2.14.1
+>
 
-> 
-> Guenter
+-- 
+Gregory Clement, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+http://bootlin.com
