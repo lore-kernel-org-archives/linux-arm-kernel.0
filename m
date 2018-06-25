@@ -1,30 +1,31 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon, 25 Jun 2018 12:34:44 +0900
-Subject: [PATCH 1/2] ARM: uniphier: select RESET_CONTROLLER
-Message-ID: <1529897685-15029-1-git-send-email-yamada.masahiro@socionext.com>
+From: suzuki.katsuhiro@socionext.com (Katsuhiro Suzuki)
+Date: Mon, 25 Jun 2018 12:45:05 +0900
+Subject: [PATCH v2 2/2] arm64: dts: uniphier: add headphone detect gpio for
+ LD11 global board
+In-Reply-To: <20180625034505.1404-1-suzuki.katsuhiro@socionext.com>
+References: <20180625034505.1404-1-suzuki.katsuhiro@socionext.com>
+Message-ID: <20180625034505.1404-2-suzuki.katsuhiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The UniPhier platform highly relies on the reset controller.
-Select RESET_CONTROLLER to enable it forcibly.
+This patch adds GPIO for headphone detection on LD11 global board.
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
 ---
-
- arch/arm/mach-uniphier/Kconfig | 1 +
+ arch/arm64/boot/dts/socionext/uniphier-ld11-global.dts | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-uniphier/Kconfig b/arch/arm/mach-uniphier/Kconfig
-index 779235a..e661d26 100644
---- a/arch/arm/mach-uniphier/Kconfig
-+++ b/arch/arm/mach-uniphier/Kconfig
-@@ -9,6 +9,7 @@ config ARCH_UNIPHIER
- 	select HAVE_ARM_SCU
- 	select HAVE_ARM_TWD if SMP
- 	select PINCTRL
-+	select RESET_CONTROLLER
- 	help
- 	  Support for UniPhier SoC family developed by Socionext Inc.
- 	  (formerly, System LSI Business Division of Panasonic Corporation)
+diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld11-global.dts b/arch/arm64/boot/dts/socionext/uniphier-ld11-global.dts
+index 798882cccbd6..eb6a5b914fdb 100644
+--- a/arch/arm64/boot/dts/socionext/uniphier-ld11-global.dts
++++ b/arch/arm64/boot/dts/socionext/uniphier-ld11-global.dts
+@@ -60,6 +60,7 @@
+ 			&i2s_port4
+ 			&spdif_port0
+ 			&comp_spdif_port0>;
++		hp-det-gpio = <&gpio UNIPHIER_GPIO_IRQ(0) GPIO_ACTIVE_LOW>;
+ 	};
+ 
+ 	spdif-out {
 -- 
-2.7.4
+2.18.0
