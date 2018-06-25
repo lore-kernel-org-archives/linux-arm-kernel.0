@@ -1,92 +1,118 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 25 Jun 2018 16:03:14 +0200
-Subject: [PATCH 19/29] arm64: dts: renesas: r8a77990: Add secondary CA53 CPU
- core
+Date: Mon, 25 Jun 2018 16:03:16 +0200
+Subject: [PATCH 21/29] arm64: dts: renesas: r8a77990: Enable USB2.0 Host for
+ Ebisu board
 In-Reply-To: <cover.1529933747.git.horms+renesas@verge.net.au>
 References: <cover.1529933747.git.horms+renesas@verge.net.au>
-Message-ID: <7085f5d9e803688045e92ccb69e1f7fe0eee9621.1529933747.git.horms+renesas@verge.net.au>
+Message-ID: <6dd72b4d3da1f2be7fc57511677a0cb782d6acd9.1529933747.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+From: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
 
-Add a device node for the second Cortex-A53 CPU core on the Renesas
-R-Car E3 (r8a77990) SoC, and adjust the interrupt delivery masks for ARM
-Generic Interrupt Controller and Architectured Timer.
+This patch adds USB2.0 PHY and Host(EHCI/OHCI) nodes and
+enables them for R-Car E3 Ebisu board.
 
-Based on a patch in the BSP by Takeshi Kihara.
-
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a77990.dtsi | 27 ++++++++++++++++++---------
- 1 file changed, 18 insertions(+), 9 deletions(-)
+ arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts | 20 ++++++++++++++
+ arch/arm64/boot/dts/renesas/r8a77990.dtsi      | 37 ++++++++++++++++++++++++++
+ 2 files changed, 57 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77990.dtsi b/arch/arm64/boot/dts/renesas/r8a77990.dtsi
-index e644f49c9b58..735881d4e57a 100644
---- a/arch/arm64/boot/dts/renesas/r8a77990.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a77990.dtsi
-@@ -17,16 +17,24 @@
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 
--		/* 1 core only at this point */
- 		a53_0: cpu at 0 {
- 			compatible = "arm,cortex-a53", "arm,armv8";
--			reg = <0x0>;
-+			reg = <0>;
- 			device_type = "cpu";
- 			power-domains = <&sysc 5>;
- 			next-level-cache = <&L2_CA53>;
- 			enable-method = "psci";
- 		};
- 
-+		a53_1: cpu at 1 {
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			reg = <1>;
-+			device_type = "cpu";
-+			power-domains = <&sysc 6>;
-+			next-level-cache = <&L2_CA53>;
-+			enable-method = "psci";
-+		};
-+
- 		L2_CA53: cache-controller-0 {
- 			compatible = "cache";
- 			power-domains = <&sysc 21>;
-@@ -44,8 +52,9 @@
- 
- 	pmu_a53 {
- 		compatible = "arm,cortex-a53-pmu";
--		interrupts-extended = <&gic GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
--		interrupt-affinity = <&a53_0>;
-+		interrupts-extended = <&gic GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>,
-+				      <&gic GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-affinity = <&a53_0>, <&a53_1>;
- 	};
- 
- 	psci {
-@@ -268,7 +277,7 @@
- 			      <0x0 0xf1040000 0 0x20000>,
- 			      <0x0 0xf1060000 0 0x20000>;
- 			interrupts = <GIC_PPI 9
--					(GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_HIGH)>;
-+					(GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>;
- 			clocks = <&cpg CPG_MOD 408>;
- 			clock-names = "clk";
- 			power-domains = <&sysc 32>;
-@@ -283,9 +292,9 @@
- 
- 	timer {
- 		compatible = "arm,armv8-timer";
--		interrupts-extended = <&gic GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>,
--				      <&gic GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>,
--				      <&gic GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>,
--				      <&gic GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>;
-+		interrupts-extended = <&gic GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
-+				      <&gic GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
-+				      <&gic GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
-+				      <&gic GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>;
+diff --git a/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts b/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
+index 28945a8b9800..5e28c1b94b77 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
++++ b/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
+@@ -47,10 +47,18 @@
  	};
  };
+ 
++&ehci0 {
++	status = "okay";
++};
++
+ &extal_clk {
+ 	clock-frequency = <48000000>;
+ };
+ 
++&ohci0 {
++	status = "okay";
++};
++
+ &pfc {
+ 	avb_pins: avb {
+ 		mux {
+@@ -58,6 +66,11 @@
+ 			function = "avb";
+ 		};
+ 	};
++
++	usb0_pins: usb {
++		groups = "usb0_b";
++		function = "usb0";
++	};
+ };
+ 
+ &rwdt {
+@@ -68,3 +81,10 @@
+ &scif2 {
+ 	status = "okay";
+ };
++
++&usb2_phy0 {
++	pinctrl-0 = <&usb0_pins>;
++	pinctrl-names = "default";
++
++	status = "okay";
++};
+diff --git a/arch/arm64/boot/dts/renesas/r8a77990.dtsi b/arch/arm64/boot/dts/renesas/r8a77990.dtsi
+index 735881d4e57a..f8004608c595 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77990.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a77990.dtsi
+@@ -267,6 +267,43 @@
+ 			status = "disabled";
+ 		};
+ 
++		ohci0: usb at ee080000 {
++			compatible = "generic-ohci";
++			reg = <0 0xee080000 0 0x100>;
++			interrupts = <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 703>;
++			phys = <&usb2_phy0>;
++			phy-names = "usb";
++			power-domains = <&sysc 32>;
++			resets = <&cpg 703>;
++			status = "disabled";
++		};
++
++		ehci0: usb at ee080100 {
++			compatible = "generic-ehci";
++			reg = <0 0xee080100 0 0x100>;
++			interrupts = <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 703>;
++			phys = <&usb2_phy0>;
++			phy-names = "usb";
++			companion = <&ohci0>;
++			power-domains = <&sysc 32>;
++			resets = <&cpg 703>;
++			status = "disabled";
++		};
++
++		usb2_phy0: usb-phy at ee080200 {
++			compatible = "renesas,usb2-phy-r8a77990",
++				     "renesas,rcar-gen3-usb2-phy";
++			reg = <0 0xee080200 0 0x700>;
++			interrupts = <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 703>;
++			power-domains = <&sysc 32>;
++			resets = <&cpg 703>;
++			#phy-cells = <0>;
++			status = "disabled";
++		};
++
+ 		gic: interrupt-controller at f1010000 {
+ 			compatible = "arm,gic-400";
+ 			#interrupt-cells = <3>;
 -- 
 2.11.0
