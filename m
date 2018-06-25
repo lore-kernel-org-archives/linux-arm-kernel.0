@@ -1,58 +1,49 @@
-From: dinguyen@kernel.org (Dinh Nguyen)
-Date: Mon, 25 Jun 2018 08:53:56 -0500
-Subject: [GIT PULL] SoCFPGA DTS fixes for v4.18
-In-Reply-To: <1529934140-27012-1-git-send-email-dinguyen@kernel.org>
-References: <1529934140-27012-1-git-send-email-dinguyen@kernel.org>
-Message-ID: <19e9dc39-53cc-c580-918a-02ca90181e9c@kernel.org>
+From: lkp@intel.com (kbuild test robot)
+Date: Mon, 25 Jun 2018 21:55:59 +0800
+Subject: [PATCH v2 1/2] arm64/mm: Introduce init_pg_dir
+In-Reply-To: <20180625113921.21854-2-yaojun8558363@gmail.com>
+References: <20180625113921.21854-2-yaojun8558363@gmail.com>
+Message-ID: <201806252027.5rKkpJlm%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Apologies, I just saw the reply to the "NAND fixes for v4.17". Please
-just pull in the SPI fixes.
+Hi Jun,
 
-Thanks,
-Dinh
+Thank you for the patch! Yet something to improve:
 
-On 06/25/2018 08:42 AM, Dinh Nguyen wrote:
-> Hi Arnd, Kevin, and Olof:
-> 
-> Please pull in these SoCFPGA Stratix10 DTS fixes for v4.18.
-> 
-> Thanks,
-> Dinh
-> 
-> The following changes since commit 7daf201d7fe8334e2d2364d4e8ed3394ec9af819:
-> 
->   Linux 4.18-rc2 (2018-06-24 20:54:29 +0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git tags/socfpga_for_next_v4.18_fixes
-> 
-> for you to fetch changes up to ea38969d539d59e51e0b4bce4c5c6efcbffb0ade:
-> 
->   ARM: dts: Fix SPI node for Arria10 (2018-06-25 08:28:55 -0500)
-> 
-> ----------------------------------------------------------------
-> ARM: dts: socfpga: fix NAND support
-> - NAND should be using nand_x_clk, not nand_clk
-> - fix NAND node compatible for Cyclone5 and Arria10
-> - fix SPI node properties(unused bus-num, and use num-cs)
-> 
-> ----------------------------------------------------------------
-> Dinh Nguyen (1):
->       ARM: dts: socfpga: Fix NAND controller node compatible for Arria10
-> 
-> Marek Vasut (2):
->       ARM: dts: socfpga: Fix NAND controller clock supply
->       ARM: dts: socfpga: Fix NAND controller node compatible
-> 
-> Thor Thayer (2):
->       arm64: dts: stratix10: Fix SPI nodes for Stratix10
->       ARM: dts: Fix SPI node for Arria10
-> 
->  arch/arm/boot/dts/socfpga.dtsi                    | 4 ++--
->  arch/arm/boot/dts/socfpga_arria10.dtsi            | 5 ++---
->  arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi | 6 ++----
->  3 files changed, 6 insertions(+), 9 deletions(-)
-> 
+[auto build test ERROR on arm64/for-next/core]
+[also build test ERROR on v4.18-rc2 next-20180625]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+
+url:    https://github.com/0day-ci/linux/commits/Jun-Yao/arm64-mm-Introduce-init_pg_dir/20180625-194126
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git for-next/core
+config: x86_64-randconfig-x015-201825 (attached as .config)
+compiler: gcc-7 (Debian 7.3.0-16) 7.3.0
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=x86_64 
+
+All errors (new ones prefixed by >>):
+
+>> mm/init-mm.c:20:10: error: 'init_pg_dir' undeclared here (not in a function); did you mean 'init_pid_ns'?
+     .pgd  = init_pg_dir,
+             ^~~~~~~~~~~
+             init_pid_ns
+
+vim +20 mm/init-mm.c
+
+    17	
+    18	struct mm_struct init_mm = {
+    19		.mm_rb		= RB_ROOT,
+  > 20		.pgd		= init_pg_dir,
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 27204 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180625/828c6ea2/attachment-0001.gz>
