@@ -1,153 +1,72 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Mon, 25 Jun 2018 17:29:14 +0200
-Subject: [PATCH 3/9] ARM: davinci: da850-evm: use aemif platform driver in
- legacy mode
-In-Reply-To: <20180625152920.11549-1-brgl@bgdev.pl>
-References: <20180625152920.11549-1-brgl@bgdev.pl>
-Message-ID: <20180625152920.11549-4-brgl@bgdev.pl>
+From: miquel.raynal@bootlin.com (Miquel Raynal)
+Date: Mon, 25 Jun 2018 17:12:33 +0200
+Subject: [PATCH v2 17/23] dt-bindings: cp110: add the thermal node in the
+ syscon file
+In-Reply-To: <20180625151239.20976-1-miquel.raynal@bootlin.com>
+References: <20180625151239.20976-1-miquel.raynal@bootlin.com>
+Message-ID: <20180625151239.20976-18-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+Explain the thermal bindings now that the thermal IP is described being
+inside of a system controller. Add a reference to the thermal-zone node.
 
-We now support board files in the aemif driver. Register a platform
-device instead of using the handcrafted API in da850-evm.
-
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 ---
- arch/arm/mach-davinci/board-da850-evm.c | 93 ++++++++++++++-----------
- 1 file changed, 51 insertions(+), 42 deletions(-)
+ .../arm/marvell/cp110-system-controller.txt        | 37 ++++++++++++++++++++++
+ 1 file changed, 37 insertions(+)
 
-diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
-index 442c16773f09..0ae7c47ed2b0 100644
---- a/arch/arm/mach-davinci/board-da850-evm.c
-+++ b/arch/arm/mach-davinci/board-da850-evm.c
-@@ -33,6 +33,7 @@
- #include <linux/platform_data/gpio-davinci.h>
- #include <linux/platform_data/mtd-davinci.h>
- #include <linux/platform_data/mtd-davinci-aemif.h>
-+#include <linux/platform_data/ti-aemif.h>
- #include <linux/platform_data/spi-davinci.h>
- #include <linux/platform_data/uio_pruss.h>
- #include <linux/regulator/machine.h>
-@@ -185,16 +186,6 @@ static struct resource da850_evm_norflash_resource[] = {
- 	},
- };
+diff --git a/Documentation/devicetree/bindings/arm/marvell/cp110-system-controller.txt b/Documentation/devicetree/bindings/arm/marvell/cp110-system-controller.txt
+index 54b0d64ce819..cd4a7a57491e 100644
+--- a/Documentation/devicetree/bindings/arm/marvell/cp110-system-controller.txt
++++ b/Documentation/devicetree/bindings/arm/marvell/cp110-system-controller.txt
+@@ -11,6 +11,9 @@ For the top level node:
+  - compatible: must be: "syscon", "simple-mfd";
+  - reg: register area of the CP110 system controller
  
--static struct platform_device da850_evm_norflash_device = {
--	.name		= "physmap-flash",
--	.id		= 0,
--	.dev		= {
--		.platform_data  = &da850_evm_norflash_data,
--	},
--	.num_resources	= 1,
--	.resource	= da850_evm_norflash_resource,
--};
--
- /* DA850/OMAP-L138 EVM includes a 512 MByte large-page NAND flash
-  * (128K blocks). It may be used instead of the (default) SPI flash
-  * to boot, using TI's tools to install the secondary boot loader
-@@ -266,37 +257,58 @@ static struct resource da850_evm_nandflash_resource[] = {
- 	},
- };
++SYSTEM CONTROLLER 0
++===================
++
+ Clocks:
+ -------
  
--static struct platform_device da850_evm_nandflash_device = {
--	.name		= "davinci_nand",
--	.id		= 1,
--	.dev		= {
--		.platform_data	= &da850_evm_nandflash_data,
--	},
--	.num_resources	= ARRAY_SIZE(da850_evm_nandflash_resource),
--	.resource	= da850_evm_nandflash_resource,
-+static struct resource da850_evm_aemif_resource[] = {
-+	{
-+		.start	= DA8XX_AEMIF_CTL_BASE,
-+		.end	= DA8XX_AEMIF_CTL_BASE + SZ_32K,
-+		.flags	= IORESOURCE_MEM,
-+	}
- };
+@@ -186,3 +189,37 @@ CP110_LABEL(syscon0): system-controller at 440000 {
+ 	};
  
--static struct platform_device *da850_evm_devices[] = {
--	&da850_evm_nandflash_device,
--	&da850_evm_norflash_device,
-+static struct aemif_abus_data da850_evm_aemif_abus_data[] = {
-+	{
-+		.cs	= 3,
-+	}
  };
- 
--#define DA8XX_AEMIF_CE2CFG_OFFSET	0x10
--#define DA8XX_AEMIF_ASIZE_16BIT		0x1
--
--static void __init da850_evm_init_nor(void)
--{
--	void __iomem *aemif_addr;
--
--	aemif_addr = ioremap(DA8XX_AEMIF_CTL_BASE, SZ_32K);
-+static struct platform_device da850_evm_aemif_devices[] = {
-+	{
-+		.name		= "davinci_nand",
-+		.id		= 1,
-+		.dev		= {
-+			.platform_data	= &da850_evm_nandflash_data,
-+		},
-+		.num_resources	= ARRAY_SIZE(da850_evm_nandflash_resource),
-+		.resource	= da850_evm_nandflash_resource,
-+	},
-+	{
-+		.name		= "physmap-flash",
-+		.id		= 0,
-+		.dev		= {
-+			.platform_data  = &da850_evm_norflash_data,
-+		},
-+		.num_resources	= 1,
-+		.resource	= da850_evm_norflash_resource,
-+	}
++
++SYSTEM CONTROLLER 1
++===================
++
++Thermal:
++--------
++
++The thermal IP can probe the temperature all around the processor. It
++may feature several channels, each of them wired to one sensor.
++
++For common binding part and usage, refer to
++Documentation/devicetree/bindings/thermal/thermal.txt
++
++Required properties:
++- compatible: must be one of:
++  * marvell,armada-cp110-thermal
++- reg: register range associated with the thermal functions.
++
++Optional properties:
++- #thermal-sensor-cells: shall be <1> when thermal-zones subnodes refer
++  to this IP and represents the channel ID. There is one sensor per
++  channel. O refers to the thermal IP internal channel.
++
++Example:
++CP110_LABEL(syscon1): system-controller at 6f8000 {
++	compatible = "syscon", "simple-mfd";
++	reg = <0x6f8000 0x1000>;
++
++	CP110_LABEL(thermal): ap-thermal at 70 {
++		compatible = "marvell,armada-cp110-thermal";
++		reg = <0x70 0x10>;
++		#thermal-sensor-cells = <1>;
++	};
 +};
- 
--	/* Configure data bus width of CS2 to 16 bit */
--	writel(readl(aemif_addr + DA8XX_AEMIF_CE2CFG_OFFSET) |
--		DA8XX_AEMIF_ASIZE_16BIT,
--		aemif_addr + DA8XX_AEMIF_CE2CFG_OFFSET);
-+static struct aemif_platform_data da850_evm_aemif_pdata = {
-+	.cs_offset = 2,
-+	.abus_data = da850_evm_aemif_abus_data,
-+	.num_abus_data = ARRAY_SIZE(da850_evm_aemif_abus_data),
-+	.sub_devices = da850_evm_aemif_devices,
-+	.num_sub_devices = ARRAY_SIZE(da850_evm_aemif_devices),
-+};
- 
--	iounmap(aemif_addr);
--}
-+static struct platform_device da850_evm_aemif_device = {
-+	.name		= "ti-aemif",
-+	.dev = {
-+		.platform_data	= &da850_evm_aemif_pdata,
-+	},
-+	.resource	= da850_evm_aemif_resource,
-+	.num_resources	= ARRAY_SIZE(da850_evm_aemif_resource),
-+	.id		= -1,
-+};
- 
- static const short da850_evm_nand_pins[] = {
- 	DA850_EMA_D_0, DA850_EMA_D_1, DA850_EMA_D_2, DA850_EMA_D_3,
-@@ -339,13 +351,10 @@ static inline void da850_evm_setup_nor_nand(void)
- 			pr_warn("%s: NOR mux setup failed: %d\n",
- 				__func__, ret);
- 
--		da850_evm_init_nor();
--
--		platform_add_devices(da850_evm_devices,
--					ARRAY_SIZE(da850_evm_devices));
--
--		if (davinci_aemif_setup(&da850_evm_nandflash_device))
--			pr_warn("%s: Cannot configure AEMIF.\n", __func__);
-+		ret = platform_device_register(&da850_evm_aemif_device);
-+		if (ret)
-+			pr_warn("%s: registering aemif failed: %d\n",
-+				__func__, ret);
- 	}
- }
- 
 -- 
-2.17.1
+2.14.1
