@@ -1,68 +1,50 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Mon, 25 Jun 2018 14:02:51 +0200
-Subject: [PATCH v3 11/24] drm/sun4i: Don't check for LVDS and RGB when TCON
- has only ch1
+Date: Mon, 25 Jun 2018 14:02:52 +0200
+Subject: [PATCH v3 12/24] drm/sun4i: Don't check for panel or bridge on TV
+ TCONs
 In-Reply-To: <20180625120304.7543-1-jernej.skrabec@siol.net>
 References: <20180625120304.7543-1-jernej.skrabec@siol.net>
-Message-ID: <20180625120304.7543-12-jernej.skrabec@siol.net>
+Message-ID: <20180625120304.7543-13-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-LVDS and RGB interfaces are always connected to TCONs which have channel
-0. It doesn't make sense to try to init them on TV TCONs.
+TV TCONs are always connected to TV or HDMI encoder, so it doesn't make
+sense to check if panel or bridge is connected to them.
 
-Add a check if TCON has channel 0 before trying to init LVDS or RGB
-interface.
+Check if TCON has channel 0 and only then check for connected panel or
+bridges.
 
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/gpu/drm/sun4i/sun4i_tcon.c | 32 ++++++++++++++++--------------
- 1 file changed, 17 insertions(+), 15 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_tcon.c | 12 +++++++++---
+ 1 file changed, 9 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-index 264bcc43da11..761687ebacba 100644
+index 761687ebacba..a41c7bb0d557 100644
 --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
 +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-@@ -1106,23 +1106,25 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
- 		goto err_free_dotclock;
- 	}
+@@ -1178,13 +1178,19 @@ static const struct component_ops sun4i_tcon_ops = {
+ static int sun4i_tcon_probe(struct platform_device *pdev)
+ {
+ 	struct device_node *node = pdev->dev.of_node;
++	const struct sun4i_tcon_quirks *quirks;
+ 	struct drm_bridge *bridge;
+ 	struct drm_panel *panel;
+ 	int ret;
  
--	/*
--	 * If we have an LVDS panel connected to the TCON, we should
--	 * just probe the LVDS connector. Otherwise, just probe RGB as
--	 * we used to.
--	 */
--	remote = of_graph_get_remote_node(dev->of_node, 1, 0);
--	if (of_device_is_compatible(remote, "panel-lvds"))
--		if (can_lvds)
--			ret = sun4i_lvds_init(drm, tcon);
-+	if (tcon->quirks->has_channel_0) {
-+		/*
-+		 * If we have an LVDS panel connected to the TCON, we should
-+		 * just probe the LVDS connector. Otherwise, just probe RGB as
-+		 * we used to.
-+		 */
-+		remote = of_graph_get_remote_node(dev->of_node, 1, 0);
-+		if (of_device_is_compatible(remote, "panel-lvds"))
-+			if (can_lvds)
-+				ret = sun4i_lvds_init(drm, tcon);
-+			else
-+				ret = -EINVAL;
- 		else
--			ret = -EINVAL;
--	else
--		ret = sun4i_rgb_init(drm, tcon);
--	of_node_put(remote);
-+			ret = sun4i_rgb_init(drm, tcon);
-+		of_node_put(remote);
- 
--	if (ret < 0)
--		goto err_free_dotclock;
-+		if (ret < 0)
-+			goto err_free_dotclock;
+-	ret = drm_of_find_panel_or_bridge(node, 1, 0, &panel, &bridge);
+-	if (ret == -EPROBE_DEFER)
+-		return ret;
++	quirks = of_device_get_match_data(&pdev->dev);
++
++	/* panels and bridges are present only on TCONs with channel 0 */
++	if (quirks->has_channel_0) {
++		ret = drm_of_find_panel_or_bridge(node, 1, 0, &panel, &bridge);
++		if (ret == -EPROBE_DEFER)
++			return ret;
 +	}
  
- 	if (tcon->quirks->needs_de_be_mux) {
- 		/*
+ 	return component_add(&pdev->dev, &sun4i_tcon_ops);
+ }
 -- 
 2.18.0
