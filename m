@@ -1,28 +1,61 @@
-From: sebastien.szymanski@armadeus.com (=?UTF-8?Q?S=c3=a9bastien_Szymanski?=)
-Date: Mon, 25 Jun 2018 10:01:44 +0200
-Subject: [PATCH v3 1/3] cpufreq: imx6q: check speed grades for i.MX6ULL
-In-Reply-To: <20180611053826.GC16091@dragon>
-References: <20180522062853.24799-1-sebastien.szymanski@armadeus.com>
- <20180611053826.GC16091@dragon>
-Message-ID: <2d63a25f-7265-7aa7-a7dc-fd2379240804@armadeus.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Mon, 25 Jun 2018 15:47:18 +0800
+Subject: [PATCHv2 5/5] arm64: allwinner: a64: Add support for TERES-I
+ laptop
+In-Reply-To: <5B309D37.80207@broadcom.com>
+References: <20180315162510.11669-1-harald@ccbib.org>
+ <20180315162510.11669-6-harald@ccbib.org>
+ <a7011fe78d171658742406bf01d50b7e3d7eaf1d.camel@aosc.io>
+ <E1fX7yK-0000OC-HA@stardust.g4.wien.funkfeuer.at>
+ <5B309D37.80207@broadcom.com>
+Message-ID: <1CF519CD-D44E-4959-8951-27CE710E0984@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On 06/11/2018 07:38 AM, Shawn Guo wrote:
-> On Tue, May 22, 2018 at 08:28:51AM +0200, S?bastien Szymanski wrote:
->> Check the max speed supported from the fuses for i.MX6ULL and update the
->> operating points table accordingly.
+
+? 2018?6?25? GMT+08:00 ??3:43:51, Arend van Spriel <arend.vanspriel@broadcom.com> ??:
+>On 6/24/2018 6:34 PM, Harald Geyer wrote:
+>> Icenowy Zheng writes:
+>>> >? 2018-03-15?? 16:25 +0000?Harald Geyer???
+>>>> > >+&mmc1 {
+>>>> > >+	pinctrl-names = "default";
+>>>> > >+	pinctrl-0 = <&mmc1_pins>;
+>>>> > >+	vmmc-supply = <&reg_aldo2>;
+>>>> > >+	vqmmc-supply = <&reg_dldo4>;
+>>>> > >+	mmc-pwrseq = <&wifi_pwrseq>;
+>>>> > >+	bus-width = <4>;
+>>>> > >+	non-removable;
+>>>> > >+	status = "okay";
+>>>> > >+
+>>>> > >+	rtl8723bs: wifi at 1 {
+>>>> > >+		reg = <1>;
+>>>> > >+		interrupt-parent = <&r_pio>;
+>>>> > >+		interrupts = <0 3 IRQ_TYPE_LEVEL_LOW>; /* PL3 */
+>>>> > >+		interrupt-names = "host-wake";
+>>>> > >+	};
+>
+>[...]
+>
+>>> >- This device node has no binding. The "host-wake" interrupt is
+>part of
+>>> >  Broadcom SDIO Wi-Fi binding, rather than a generic one.
+>> I think the general mmc and interrupts bindings apply. And the mmc
+>binding
+>> clearly states that for sub-nodes a compatible string is optional.
 >>
->> Signed-off-by: S?bastien Szymanski <sebastien.szymanski@armadeus.com>
-> 
-> Acked-by: Shawn Guo <shawnguo@kernel.org>
-> 
+>> However I just realized that the 'interrupt-names' property is not
+>part
+>> of the general interrupts binding, so I guess at least this property
+>should
+>> be removed.
+>
+>Indeed. If the device just used the SDIO interrupt this is not needed. 
+>The Broadcom device can use either SDIO interrupt or a so-called 
+>out-of-band host-wake interrupt, which is what the above represents.
 
-Thanks, but what about the two others patches ? Now that patch 1 is in
-4.18-rc1, should I resend the two others patches ? Should I merge them
-together ?
+RTL8....S is also capable of use OOB interrupt.
 
--- 
-S?bastien Szymanski
+>
+>Regards,
+>Arend
