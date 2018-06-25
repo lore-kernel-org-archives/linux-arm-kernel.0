@@ -1,64 +1,105 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Mon, 25 Jun 2018 22:06:56 +0200 (CEST)
-Subject: [PATCH 1/8] time: Add persistent clock support
-In-Reply-To: <CALAqxLWgfy8X75GOK5WttzRfgbwBxW0ibnQaFxcLrUTFmHMSUw@mail.gmail.com>
-References: <cover.1528878545.git.baolin.wang@linaro.org>
- <d330f02c8ef2a348b179850e1745a52ab9c47e90.1528878545.git.baolin.wang@linaro.org>
- <alpine.DEB.2.21.1806232224510.8650@nanos.tec.linutronix.de>
- <CALAqxLWgfy8X75GOK5WttzRfgbwBxW0ibnQaFxcLrUTFmHMSUw@mail.gmail.com>
-Message-ID: <alpine.DEB.2.21.1806252142261.1587@nanos.tec.linutronix.de>
+From: leonard.crestez@nxp.com (Leonard Crestez)
+Date: Mon, 25 Jun 2018 23:09:32 +0300
+Subject: [PATCH] ARM: dts: imx: Add missing chosen/stdout-path
+Message-ID: <75f7fb96d53404152e742d405e2a14c5aa0f4438.1529957171.git.leonard.crestez@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 25 Jun 2018, John Stultz wrote:
-> On Sat, Jun 23, 2018 at 5:14 PM, Thomas Gleixner <tglx@linutronix.de> wrote:
-> 
-> Thomas, what is wrong with *you*?  This is completely unnecessary.
+This makes it possible to enable earlycon for debugging by just passing
+an empty "earlycon" argument on the kernel command-line.
 
-Nothing is wrong with me. I just hit a point where the amount of half baken
-crap tripped me over the edge and I let of steam. Sorry for that, it surely
-wasn't necessary. It was one of those days where grumpiness took
-control. My steam pressure is back to normal and I'm more than happy to put
-that back on the pure technical level.
+Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
 
-To be clear, that rant was not a shot at Baolin. It was definitely
-addressed to the people behind him who set him on this project and then
-failed to do any sanity checking.
+---
+ arch/arm/boot/dts/imx6qdl-sabreauto.dtsi | 4 ++++
+ arch/arm/boot/dts/imx6sl-evk.dts         | 4 ++++
+ arch/arm/boot/dts/imx6sll-evk.dts        | 4 ++++
+ arch/arm/boot/dts/imx7d-sdb.dts          | 4 ++++
+ 4 files changed, 16 insertions(+)
 
-> Now, I've also been quite a poor maintainer of late, and haven't done
-> much to help with pre-review of Baloin's code.  So that's on me, not
-> him.
+This patch adds stdout-path to some of the basic imx6 evaluation boards
+which were missing this property.
 
-Fair enough.
+Patch against shawnguo/imx/dt because it also touches the newly-added
+imx6sll-evk.
 
-> I was really lucky to have your guidance and support when I was
-> starting in the community. Your helping bring me up as a co-maintainer
-> (only a a relatively small set of responsibility compared to your much
-> wider maintainership), does let me see that having the responsibility
-> of billions of devices running your code is immense and comes with no
-> small amount of stress. Juggling the infinite incoming stream of
-> review requests on naieve or otherwise lacking code with other
-> important development priorities is a major burden, so *I really get
-> how frustrating it is*.
+Let me know if you want me to split this instead.
 
-Yes, and I have to admit that I'm not a super human and despite trying to
-control my emotions, there are points where I fail in doing so. It makes me
-explode and that's it. I can assure Baolin, that this is nothing which
-sticks. I'll look at the next patchset from a pure technical level. There
-are surely precautions, but definitely no prejudice.
-
-> And its super annoying to have lots of short-term development requests
-> being thrown at you when you're the one who has to maintain it for the
-> long term.  But long-long-term, no one is going to be a maintainer
-> forever, and we are not going to develop more olympic swimmers if we
-> keep peeing in the pool.
-
-Right, that's why I early looked for co/sub-maintainers, but as you
-admitted yourself, that's not always working out and I surely would
-appreciate if there would be more help on all ends. I'm the last person who
-rejects help, quite the contrary I'm very happy when I can mark mails as
-'none of my business, somebody else takes care of that'.
-
-Thanks,
-
-	tglx
+diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+index a59a0fd1eb02..9f11f1fcc3e6 100644
+--- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+@@ -4,10 +4,14 @@
+ // Copyright 2011 Linaro Ltd.
+ 
+ #include <dt-bindings/gpio/gpio.h>
+ 
+ / {
++	chosen {
++		stdout-path = &uart4;
++	};
++
+ 	memory at 10000000 {
+ 		reg = <0x10000000 0x80000000>;
+ 	};
+ 
+ 	leds {
+diff --git a/arch/arm/boot/dts/imx6sl-evk.dts b/arch/arm/boot/dts/imx6sl-evk.dts
+index 92ad01f676e3..50bdc65670a3 100644
+--- a/arch/arm/boot/dts/imx6sl-evk.dts
++++ b/arch/arm/boot/dts/imx6sl-evk.dts
+@@ -10,10 +10,14 @@
+ 
+ / {
+ 	model = "Freescale i.MX6 SoloLite EVK Board";
+ 	compatible = "fsl,imx6sl-evk", "fsl,imx6sl";
+ 
++	chosen {
++		stdout-path = &uart1;
++	};
++
+ 	memory at 80000000 {
+ 		reg = <0x80000000 0x40000000>;
+ 	};
+ 
+ 	backlight_display: backlight_display {
+diff --git a/arch/arm/boot/dts/imx6sll-evk.dts b/arch/arm/boot/dts/imx6sll-evk.dts
+index 4684ac4a816b..25438ea03092 100644
+--- a/arch/arm/boot/dts/imx6sll-evk.dts
++++ b/arch/arm/boot/dts/imx6sll-evk.dts
+@@ -13,10 +13,14 @@
+ 
+ / {
+ 	model = "Freescale i.MX6SLL EVK Board";
+ 	compatible = "fsl,imx6sll-evk", "fsl,imx6sll";
+ 
++	chosen {
++		stdout-path = &uart1;
++	};
++
+ 	memory at 80000000 {
+ 		reg = <0x80000000 0x80000000>;
+ 	};
+ 
+ 	backlight {
+diff --git a/arch/arm/boot/dts/imx7d-sdb.dts b/arch/arm/boot/dts/imx7d-sdb.dts
+index 9f9e6a1e3b72..fe61218eec6f 100644
+--- a/arch/arm/boot/dts/imx7d-sdb.dts
++++ b/arch/arm/boot/dts/imx7d-sdb.dts
+@@ -8,10 +8,14 @@
+ 
+ / {
+ 	model = "Freescale i.MX7 SabreSD Board";
+ 	compatible = "fsl,imx7d-sdb", "fsl,imx7d";
+ 
++	chosen {
++		stdout-path = &uart1;
++	};
++
+ 	memory at 80000000 {
+ 		reg = <0x80000000 0x80000000>;
+ 	};
+ 
+ 	gpio-keys {
+-- 
+2.17.1
