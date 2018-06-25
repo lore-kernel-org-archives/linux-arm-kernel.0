@@ -1,65 +1,49 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Mon, 25 Jun 2018 14:02:57 +0200
-Subject: [PATCH v3 17/24] drm/sun4i: Don't change clock bits in DW HDMI PHY
- driver
+Date: Mon, 25 Jun 2018 14:02:46 +0200
+Subject: [PATCH v3 06/24] drm/sun4i: Fix releasing node when enumerating
+ enpoints
 In-Reply-To: <20180625120304.7543-1-jernej.skrabec@siol.net>
 References: <20180625120304.7543-1-jernej.skrabec@siol.net>
-Message-ID: <20180625120304.7543-18-jernej.skrabec@siol.net>
+Message-ID: <20180625120304.7543-7-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DW HDMI PHY driver and PHY clock driver share same registers. Make sure
-that DW HDMI PHY setup code doesn't change any clock related bits.
-During initialization, set PHY PLL parent bit to 0.
+sun4i_drv_add_endpoints() has a memory leak since it uses of_node_put()
+when remote is equal to NULL and does nothing when remote has a valid
+pointer.
+
+Invert the logic to fix memory leak.
 
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h  |  2 +-
- drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c | 12 +++++++++++-
- 2 files changed, 12 insertions(+), 2 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_drv.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h
-index 79154f0f674a..3ba71aff92fc 100644
---- a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h
-+++ b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h
-@@ -98,7 +98,7 @@
- #define SUN8I_HDMI_PHY_PLL_CFG1_LDO2_EN		BIT(29)
- #define SUN8I_HDMI_PHY_PLL_CFG1_LDO1_EN		BIT(28)
- #define SUN8I_HDMI_PHY_PLL_CFG1_HV_IS_33	BIT(27)
--#define SUN8I_HDMI_PHY_PLL_CFG1_CKIN_SEL	BIT(26)
-+#define SUN8I_HDMI_PHY_PLL_CFG1_CKIN_SEL_MSK	BIT(26)
- #define SUN8I_HDMI_PHY_PLL_CFG1_PLLEN		BIT(25)
- #define SUN8I_HDMI_PHY_PLL_CFG1_LDO_VSET(x)	((x) << 22)
- #define SUN8I_HDMI_PHY_PLL_CFG1_UNKNOWN(x)	((x) << 20)
-diff --git a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
-index 966688f04741..e56b9e5b1c42 100644
---- a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
-+++ b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
-@@ -183,7 +183,13 @@ static int sun8i_hdmi_phy_config_h3(struct dw_hdmi *hdmi,
- 	regmap_update_bits(phy->regs, SUN8I_HDMI_PHY_ANA_CFG1_REG,
- 			   SUN8I_HDMI_PHY_ANA_CFG1_TXEN_MASK, 0);
+diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
+index 50d19605c38f..e15fa2389e3f 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_drv.c
++++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
+@@ -283,7 +283,6 @@ static int sun4i_drv_add_endpoints(struct device *dev,
+ 		remote = of_graph_get_remote_port_parent(ep);
+ 		if (!remote) {
+ 			DRM_DEBUG_DRIVER("Error retrieving the output node\n");
+-			of_node_put(remote);
+ 			continue;
+ 		}
  
--	regmap_write(phy->regs, SUN8I_HDMI_PHY_PLL_CFG1_REG, pll_cfg1_init);
-+	/*
-+	 * NOTE: We have to be careful not to overwrite PHY parent
-+	 * clock selection bit and clock divider.
-+	 */
-+	regmap_update_bits(phy->regs, SUN8I_HDMI_PHY_PLL_CFG1_REG,
-+			   (u32)~SUN8I_HDMI_PHY_PLL_CFG1_CKIN_SEL_MSK,
-+			   pll_cfg1_init);
- 	regmap_update_bits(phy->regs, SUN8I_HDMI_PHY_PLL_CFG2_REG,
- 			   (u32)~SUN8I_HDMI_PHY_PLL_CFG2_PREDIV_MSK,
- 			   pll_cfg2_init);
-@@ -352,6 +358,10 @@ static void sun8i_hdmi_phy_init_h3(struct sun8i_hdmi_phy *phy)
- 			   SUN8I_HDMI_PHY_ANA_CFG3_SCLEN |
- 			   SUN8I_HDMI_PHY_ANA_CFG3_SDAEN);
+@@ -297,11 +296,13 @@ static int sun4i_drv_add_endpoints(struct device *dev,
  
-+	/* reset PHY PLL clock parent */
-+	regmap_update_bits(phy->regs, SUN8I_HDMI_PHY_PLL_CFG1_REG,
-+			   SUN8I_HDMI_PHY_PLL_CFG1_CKIN_SEL_MSK, 0);
-+
- 	/* set HW control of CEC pins */
- 	regmap_write(phy->regs, SUN8I_HDMI_PHY_CEC_REG, 0);
+ 			if (of_graph_parse_endpoint(ep, &endpoint)) {
+ 				DRM_DEBUG_DRIVER("Couldn't parse endpoint\n");
++				of_node_put(remote);
+ 				continue;
+ 			}
  
+ 			if (!endpoint.id) {
+ 				DRM_DEBUG_DRIVER("Endpoint is our panel... skipping\n");
++				of_node_put(remote);
+ 				continue;
+ 			}
+ 		}
 -- 
 2.18.0
