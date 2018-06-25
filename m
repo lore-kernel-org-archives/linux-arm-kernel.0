@@ -1,90 +1,83 @@
-From: yangbo.lu@nxp.com (Yangbo Lu)
-Date: Mon, 25 Jun 2018 20:37:16 +0800
-Subject: [v4, 10/10] dpaa_eth: add the get_ts_info interface for ethtool
-In-Reply-To: <20180625123716.28993-1-yangbo.lu@nxp.com>
-References: <20180625123716.28993-1-yangbo.lu@nxp.com>
-Message-ID: <20180625123716.28993-11-yangbo.lu@nxp.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Mon, 25 Jun 2018 14:51:54 +0200
+Subject: [RfC v1 4/5] ARM64: dts: meson-gxl: add support for the S905W SoC
+ and the P281 board - WiP
+In-Reply-To: <20180624182814.31691-5-martin.blumenstingl@googlemail.com>
+References: <20180624182814.31691-1-martin.blumenstingl@googlemail.com>
+ <20180624182814.31691-5-martin.blumenstingl@googlemail.com>
+Message-ID: <fb3bfe0c-2cfc-5e92-5271-e2159f20b019@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Added the get_ts_info interface for ethtool to check
-the timestamping capability.
+On 24/06/2018 20:28, Martin Blumenstingl wrote:
+> S905W is a new SoC from the GXL series. It is a cost-reduced version of
+> the S905X.
+> The P281 development board from Amlogic uses the same layout as the P231
+> (S905D development board). Thus the new P281 board inherits
+> meson-gx-p23x-q20x.dtsi to avoid code-duplication.
+> 
+> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+> ---
+>  arch/arm64/boot/dts/amlogic/Makefile          |  1 +
+>  .../boot/dts/amlogic/meson-gxl-s905w-p281.dts | 22 +++++++++++++++++++
+>  .../boot/dts/amlogic/meson-gxl-s905w.dtsi     | 20 +++++++++++++++++
+>  3 files changed, 43 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl-s905w-p281.dts
+>  create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl-s905w.dtsi
+> 
+> diff --git a/arch/arm64/boot/dts/amlogic/Makefile b/arch/arm64/boot/dts/amlogic/Makefile
+> index 34dd0e9b5cbb..6de2e7f5a9cc 100644
+> --- a/arch/arm64/boot/dts/amlogic/Makefile
+> +++ b/arch/arm64/boot/dts/amlogic/Makefile
+> @@ -17,6 +17,7 @@ dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905x-nexbox-a95x.dtb
+>  dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905x-p212.dtb
+>  dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905d-p230.dtb
+>  dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905d-p231.dtb
+> +dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905w-p281.dtb
+>  dtb-$(CONFIG_ARCH_MESON) += meson-gxm-khadas-vim2.dtb
+>  dtb-$(CONFIG_ARCH_MESON) += meson-gxm-nexbox-a1.dtb
+>  dtb-$(CONFIG_ARCH_MESON) += meson-gxm-q200.dtb
 
-Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
-Acked-by: Richard Cochran <richardcochran@gmail.com>
-Acked-by: Madalin Bucur <madalin.bucur@nxp.com>
----
-Changes for v2:
-	- Removed ifdef for hw timestamp.
-Changes for v3:
-	- None.
-Changes for v4:
-	- Added ACKs.
----
- drivers/net/ethernet/freescale/dpaa/dpaa_ethtool.c |   39 ++++++++++++++++++++
- 1 files changed, 39 insertions(+), 0 deletions(-)
+[...]
 
-diff --git a/drivers/net/ethernet/freescale/dpaa/dpaa_ethtool.c b/drivers/net/ethernet/freescale/dpaa/dpaa_ethtool.c
-index 2f933b6..3184c8f 100644
---- a/drivers/net/ethernet/freescale/dpaa/dpaa_ethtool.c
-+++ b/drivers/net/ethernet/freescale/dpaa/dpaa_ethtool.c
-@@ -32,6 +32,9 @@
- #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
- 
- #include <linux/string.h>
-+#include <linux/of_platform.h>
-+#include <linux/net_tstamp.h>
-+#include <linux/fsl/ptp_qoriq.h>
- 
- #include "dpaa_eth.h"
- #include "mac.h"
-@@ -515,6 +518,41 @@ static int dpaa_set_rxnfc(struct net_device *dev, struct ethtool_rxnfc *cmd)
- 	return ret;
- }
- 
-+static int dpaa_get_ts_info(struct net_device *net_dev,
-+			    struct ethtool_ts_info *info)
-+{
-+	struct device *dev = net_dev->dev.parent;
-+	struct device_node *mac_node = dev->of_node;
-+	struct device_node *fman_node = NULL, *ptp_node = NULL;
-+	struct platform_device *ptp_dev = NULL;
-+	struct qoriq_ptp *ptp = NULL;
-+
-+	info->phc_index = -1;
-+
-+	fman_node = of_get_parent(mac_node);
-+	if (fman_node)
-+		ptp_node = of_parse_phandle(fman_node, "ptimer-handle", 0);
-+
-+	if (ptp_node)
-+		ptp_dev = of_find_device_by_node(ptp_node);
-+
-+	if (ptp_dev)
-+		ptp = platform_get_drvdata(ptp_dev);
-+
-+	if (ptp)
-+		info->phc_index = ptp->phc_index;
-+
-+	info->so_timestamping = SOF_TIMESTAMPING_TX_HARDWARE |
-+				SOF_TIMESTAMPING_RX_HARDWARE |
-+				SOF_TIMESTAMPING_RAW_HARDWARE;
-+	info->tx_types = (1 << HWTSTAMP_TX_OFF) |
-+			 (1 << HWTSTAMP_TX_ON);
-+	info->rx_filters = (1 << HWTSTAMP_FILTER_NONE) |
-+			   (1 << HWTSTAMP_FILTER_ALL);
-+
-+	return 0;
-+}
-+
- const struct ethtool_ops dpaa_ethtool_ops = {
- 	.get_drvinfo = dpaa_get_drvinfo,
- 	.get_msglevel = dpaa_get_msglevel,
-@@ -530,4 +568,5 @@ static int dpaa_set_rxnfc(struct net_device *dev, struct ethtool_rxnfc *cmd)
- 	.set_link_ksettings = dpaa_set_link_ksettings,
- 	.get_rxnfc = dpaa_get_rxnfc,
- 	.set_rxnfc = dpaa_set_rxnfc,
-+	.get_ts_info = dpaa_get_ts_info,
- };
--- 
-1.7.1
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905w.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl-s905w.dtsi
+> new file mode 100644
+> index 000000000000..a4ed586d328b
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905w.dtsi
+> @@ -0,0 +1,20 @@
+> +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+> +/*
+> + * Copyright (c) 2018 Martin Blumenstingl <martin.blumenstingl@googlemail.com>.
+> + * Based on meson-gxl-s905x.dtsi:
+> + * - Copyright (c) 2016 Endless Computers, Inc.
+> + *   Author: Carlo Caione <carlo@endlessm.com>
+> + */
+> +
+> +#include "meson-gxl.dtsi"
+> +#include "meson-gxl-mali.dtsi"
+> +
+> +/ {
+> +	compatible = "amlogic,s905w", "amlogic,meson-gxl";
+> +};
+> +
+> +/* S905W only has access to it's internal PHY */
+> +&ethmac {
+> +	phy-mode = "rmii";
+> +	phy-handle = <&internal_phy>;
+> +};
+> 
+
+Hi Martin, Kevin, Carlo, Jerome,
+
+I would like to discuss how we should handle all the GXl variants, since from linux PoV, S905x, S905W and S805X are the same (S905W and S805X only has ledd IO balls, less IO available but same pinctrl interface).
+
+At some point, meson-gxl-s905w.dtsi and meson-gxl-s805x.dtsi will be exactly the same as meson-gxl-s905x.dtsi, and maybe the same for S905Z in the Fire TV.
+
+The can be multiple solution :
+- duplicate the files
+- unify all the internal-PHY-only GXL variant into a meson-gxl-sx05x.dtsi
+- use meson-gxl-s905x.dtsi and override the compatible in board dts
+- move the meson-gxl-s905x.dtsi into a separate meson-gxl-internal-phy.dtsi and include it instead of meson-gxl-s905x.dtsi and drop the intermediate package specific dtsi
+
+Neil
