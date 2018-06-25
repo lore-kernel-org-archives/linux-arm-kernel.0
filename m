@@ -1,45 +1,33 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Mon, 25 Jun 2018 14:52:17 +0200
-Subject: [PATCH V4 2/4] watchdog: stm32: add pclk feature for stm32mp1
-In-Reply-To: <3f65a889-f625-9521-ea09-bcf7b5b24927@roeck-us.net>
-References: <1529571737-3552-1-git-send-email-ludovic.Barre@st.com>
- <1529571737-3552-3-git-send-email-ludovic.Barre@st.com>
- <20180621165335.GA4563@roeck-us.net>
- <0bfe0082-2134-2d3b-322f-cd6c193a9974@st.com>
- <3f65a889-f625-9521-ea09-bcf7b5b24927@roeck-us.net>
-Message-ID: <b5f62568-ff2f-4a04-212e-a952bf009c88@st.com>
+From: gengdongjiu@huawei.com (Dongjiu Geng)
+Date: Tue, 26 Jun 2018 04:58:27 +0800
+Subject: [PATCH v5 0/2] support exception state migration and set VSESR_EL2 by
+ user space
+Message-ID: <1529960309-2513-1-git-send-email-gengdongjiu@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guenter,
+This series patch is separated from https://www.spinics.net/lists/kvm/msg168917.html
 
+1. Detect whether KVM can set set guest SError syndrome
+2. Support to Set VSESR_EL2 and inject SError by user space.
+3. Support live migration to keep SError pending state and VSESR_EL2 value
 
->> But you are right I forgot to change stm32f429.dtsi.
->> If I add a commit for stm32f429.dtsi, it's Ok for you ?
->>
-> 
-> Not really. You are imposing a personal preference on others,
-> and you would make stm32f429.dtsi inconsistent since it doesn't
-> use clock names for anything else.This in turn means that people
-> will have an endless source of irritation since they will need
-> a clock name for this node but not for others.
+The user space patch is here: https://www.mail-archive.com/qemu-devel at nongnu.org/msg539534.html
 
-Why? This kind of implementation depends on each driver. Isn't ?
+Dongjiu Geng (2):
+  arm/arm64: KVM: Add KVM_GET/SET_VCPU_EVENTS
+  arm64: KVM: export the capability to set guest SError syndrome
 
-Or do you mean that if iwdg driver uses this implementation (clock name 
-usage) all nodes inside stm32f429.dtsi should follow the same 
-implementation ?
+ Documentation/virtual/kvm/api.txt    | 44 ++++++++++++++++++++++++++++++++----
+ arch/arm64/include/asm/kvm_emulate.h |  5 ++++
+ arch/arm64/include/asm/kvm_host.h    |  7 ++++++
+ arch/arm64/include/uapi/asm/kvm.h    | 13 +++++++++++
+ arch/arm64/kvm/guest.c               | 43 +++++++++++++++++++++++++++++++++++
+ arch/arm64/kvm/inject_fault.c        |  6 ++---
+ arch/arm64/kvm/reset.c               |  4 ++++
+ include/uapi/linux/kvm.h             |  1 +
+ virt/kvm/arm/arm.c                   | 21 +++++++++++++++++
+ 9 files changed, 137 insertions(+), 7 deletions(-)
 
-> 
-> You will have to get the arm and DT maintainers to agree on this change.
-
-As this patch makes easier integration of new platform, I agree with 
-Ludovic proposition.
-
-
-regards
-Alex
-
-> 
-> Thanks,
-> Guenter
+-- 
+2.7.4
