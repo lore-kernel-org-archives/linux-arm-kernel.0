@@ -1,68 +1,56 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 25 Jun 2018 16:03:09 +0200
-Subject: [PATCH 14/29] arm64: dts: renesas: Add sdhi2_ds pin group to SDHI2
- pinctrl groups
+Date: Mon, 25 Jun 2018 16:03:10 +0200
+Subject: [PATCH 15/29] arm64: dts: renesas: salvator-x(s): Update I2C ch4
+ clock to 400kHz
 In-Reply-To: <cover.1529933747.git.horms+renesas@verge.net.au>
 References: <cover.1529933747.git.horms+renesas@verge.net.au>
-Message-ID: <c5dd01aa790c436f2839ed9a7ab7feaf8924e7e4.1529933747.git.horms+renesas@verge.net.au>
+Message-ID: <56195dc5c3a156cad6afb7cbda411fd2cfd978ae.1529933747.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Masaharu Hayakawa <masaharu.hayakawa.ry@renesas.com>
+From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
 
-This patch adds definitions for configuration of the power-source,
-drive-strength, etc... for the SD2_DS pin for Salvator-X(S) and ULCB
-boards.
+Any of the following devices connected to I2C ch4 of the Salvator-X(S)
+boards will operate at 400 kHz:
 
-Signed-off-by: Masaharu Hayakawa <masaharu.hayakawa.ry@renesas.com>
+    PCA9654, 9FGV0841, ADV7482WBBCZ, MAX9611, 5P49V5923, 5P49V6901A
+
+This patch updates the clock frequency to 400 KHz.
+
 Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-[wsa: fixed for ULCB boards, too]
+[wsa: squashed commits into one]
 Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/salvator-common.dtsi | 4 ++--
- arch/arm64/boot/dts/renesas/ulcb.dtsi            | 4 ++--
- 2 files changed, 4 insertions(+), 4 deletions(-)
+ arch/arm64/boot/dts/renesas/salvator-x.dtsi  | 2 ++
+ arch/arm64/boot/dts/renesas/salvator-xs.dtsi | 2 ++
+ 2 files changed, 4 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/salvator-common.dtsi b/arch/arm64/boot/dts/renesas/salvator-common.dtsi
-index 9256fbaaab7f..b3c0b6912af4 100644
---- a/arch/arm64/boot/dts/renesas/salvator-common.dtsi
-+++ b/arch/arm64/boot/dts/renesas/salvator-common.dtsi
-@@ -589,13 +589,13 @@
- 	};
+diff --git a/arch/arm64/boot/dts/renesas/salvator-x.dtsi b/arch/arm64/boot/dts/renesas/salvator-x.dtsi
+index 468868c8ed9f..2828482eba1c 100644
+--- a/arch/arm64/boot/dts/renesas/salvator-x.dtsi
++++ b/arch/arm64/boot/dts/renesas/salvator-x.dtsi
+@@ -20,6 +20,8 @@
+ };
  
- 	sdhi2_pins: sd2 {
--		groups = "sdhi2_data8", "sdhi2_ctrl";
-+		groups = "sdhi2_data8", "sdhi2_ctrl", "sdhi2_ds";
- 		function = "sdhi2";
- 		power-source = <3300>;
- 	};
+ &i2c4 {
++	clock-frequency = <400000>;
++
+ 	versaclock5: clock-generator at 6a {
+ 		compatible = "idt,5p49v5923";
+ 		reg = <0x6a>;
+diff --git a/arch/arm64/boot/dts/renesas/salvator-xs.dtsi b/arch/arm64/boot/dts/renesas/salvator-xs.dtsi
+index bf4d200fb546..1ac03b7564aa 100644
+--- a/arch/arm64/boot/dts/renesas/salvator-xs.dtsi
++++ b/arch/arm64/boot/dts/renesas/salvator-xs.dtsi
+@@ -20,6 +20,8 @@
+ };
  
- 	sdhi2_pins_uhs: sd2_uhs {
--		groups = "sdhi2_data8", "sdhi2_ctrl";
-+		groups = "sdhi2_data8", "sdhi2_ctrl", "sdhi2_ds";
- 		function = "sdhi2";
- 		power-source = <1800>;
- 	};
-diff --git a/arch/arm64/boot/dts/renesas/ulcb.dtsi b/arch/arm64/boot/dts/renesas/ulcb.dtsi
-index 0edb16e6b372..702df9cbed52 100644
---- a/arch/arm64/boot/dts/renesas/ulcb.dtsi
-+++ b/arch/arm64/boot/dts/renesas/ulcb.dtsi
-@@ -330,13 +330,13 @@
- 	};
- 
- 	sdhi2_pins: sd2 {
--		groups = "sdhi2_data8", "sdhi2_ctrl";
-+		groups = "sdhi2_data8", "sdhi2_ctrl", "sdhi2_ds";
- 		function = "sdhi2";
- 		power-source = <3300>;
- 	};
- 
- 	sdhi2_pins_uhs: sd2_uhs {
--		groups = "sdhi2_data8", "sdhi2_ctrl";
-+		groups = "sdhi2_data8", "sdhi2_ctrl", "sdhi2_ds";
- 		function = "sdhi2";
- 		power-source = <1800>;
- 	};
+ &i2c4 {
++	clock-frequency = <400000>;
++
+ 	versaclock6: clock-generator at 6a {
+ 		compatible = "idt,5p49v6901";
+ 		reg = <0x6a>;
 -- 
 2.11.0
