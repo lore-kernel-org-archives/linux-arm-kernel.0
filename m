@@ -1,37 +1,61 @@
-From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Mon, 25 Jun 2018 17:12:34 +0200
-Subject: [PATCH v2 18/23] dt-bindings: thermal: armada: add reference to new
- bindings
-In-Reply-To: <20180625151239.20976-1-miquel.raynal@bootlin.com>
-References: <20180625151239.20976-1-miquel.raynal@bootlin.com>
-Message-ID: <20180625151239.20976-19-miquel.raynal@bootlin.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Mon, 25 Jun 2018 17:14:32 +0200
+Subject: [PATCH v2 1/6] dt-bindings: gpu: mali-utgard: add
+ mediatek,mt7623-mali compatible
+In-Reply-To: <7ab060c2e9ef2b220fc62913b8936b706dfaf202.1524816502.git.sean.wang@mediatek.com>
+References: <cover.1524816502.git.sean.wang@mediatek.com>
+ <7ab060c2e9ef2b220fc62913b8936b706dfaf202.1524816502.git.sean.wang@mediatek.com>
+Message-ID: <3bd6e509-f99a-1f2d-1b66-65c414bacdbd@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-New bindings (with the syscon and the overheat interrupt) are available
-for AP806 and CP110 compatibles. Add a reference to these files from the
-original documentation.
 
-Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
----
- Documentation/devicetree/bindings/thermal/armada-thermal.txt | 5 +++++
- 1 file changed, 5 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/thermal/armada-thermal.txt b/Documentation/devicetree/bindings/thermal/armada-thermal.txt
-index e0d013a2e66d..f3b441100890 100644
---- a/Documentation/devicetree/bindings/thermal/armada-thermal.txt
-+++ b/Documentation/devicetree/bindings/thermal/armada-thermal.txt
-@@ -10,6 +10,11 @@ Required properties:
-     * marvell,armada-ap806-thermal
-     * marvell,armada-cp110-thermal
- 
-+Note: these bindings are deprecated for AP806/CP110 and should instead
-+follow the rules described in:
-+Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt
-+Documentation/devicetree/bindings/arm/marvell/cp110-system-controller.txt
-+
- - reg: Device's register space.
-   Two entries are expected, see the examples below. The first one points
-   to the status register (4B). The second one points to the control
--- 
-2.14.1
+On 27/04/18 10:14, sean.wang at mediatek.com wrote:
+> From: Sean Wang <sean.wang@mediatek.com>
+> 
+> The MediaTek MT7623 SoC contains a Mali-450, so add a compatible for it
+> and define its own vendor-specific properties.
+> 
+> Reviewed-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> ---
+
+Hi Rob,
+
+Any comments regarding this patch?
+
+Regards,
+Matthias
+
+>  Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt | 9 +++++++++
+>  1 file changed, 9 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt b/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
+> index 99d1c0a..656068f 100644
+> --- a/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
+> +++ b/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
+> @@ -19,6 +19,7 @@ Required properties:
+>        + rockchip,rk3228-mali
+>        + rockchip,rk3328-mali
+>        + stericsson,db8500-mali
+> +      + mediatek,mt7623-mali
+>  
+>    - reg: Physical base address and length of the GPU registers
+>  
+> @@ -89,6 +90,14 @@ to specify one more vendor-specific compatible, among:
+>        * interrupt-names and interrupts:
+>          + combined: combined interrupt of all of the above lines
+>  
+> +  - mediatek,mt7623-mali
+> +     Required properties:
+> +      * resets: phandle to the reset line for the GPU
+> +      * mediatek,larb: phandle pointed to the local arbiter used to control the
+> +	access to external memory on the SoC.
+> +	see Documentation/devicetree/bindings/memory-controllers/mediatek,smi-larb.txt
+> +	for details
+> +
+>  Example:
+>  
+>  mali: gpu at 1c40000 {
+> 
