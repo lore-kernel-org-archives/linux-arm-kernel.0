@@ -1,48 +1,85 @@
-From: aford173@gmail.com (Adam Ford)
-Date: Sun, 24 Jun 2018 19:12:33 -0500
-Subject: [RFC 5/5] ARM: dts: am3517-evm: Enable MUSB on AM3517-evm
-In-Reply-To: <20180625001233.9785-1-aford173@gmail.com>
-References: <20180625001233.9785-1-aford173@gmail.com>
-Message-ID: <20180625001233.9785-6-aford173@gmail.com>
+From: inki.dae@samsung.com (Inki Dae)
+Date: Mon, 25 Jun 2018 11:37:56 +0900
+Subject: [PATCH v2 01/10] drm/exynos: rename "bridge_node" to
+ "mic_bridge_node"
+In-Reply-To: <1527682561-1386-2-git-send-email-m.purski@samsung.com>
+References: <1527682561-1386-1-git-send-email-m.purski@samsung.com>
+ <CGME20180530121623eucas1p27e08223bc5b04dbb0b0253c18a9f83d5@eucas1p2.samsung.com>
+ <1527682561-1386-2-git-send-email-m.purski@samsung.com>
+Message-ID: <20180625023757epcas1p215ceb8660829c6ce1bd60c572a4e61c0~7Rr1bz4G52864028640epcas1p24@epcas1p2.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With AM35x now supported in device tree and the pdata-quirks
-configuring the AM3517 clocks and some of the pin-mux,
-this patch enables the MUSB and configures the rest of the pin-
-mux options
+Hi,
 
-Signed-off-by: Adam Ford <aford173@gmail.com>
+I will start to review patch sets for -fixes first so I queued your four patches and you can check exynos-drm-next-todo branch for it.
 
-diff --git a/arch/arm/boot/dts/am3517-evm.dts b/arch/arm/boot/dts/am3517-evm.dts
-index 56fdec33afc1..4aeadaca915f 100644
---- a/arch/arm/boot/dts/am3517-evm.dts
-+++ b/arch/arm/boot/dts/am3517-evm.dts
-@@ -243,6 +243,12 @@
- 	phys = <&hsusb1_phy>;
- };
- 
-+&am35x_otg_hs {
-+        status = "okay";
-+        pinctrl-names = "default";
-+        pinctrl-0 = <&otg_drv_vbus>;
-+};
-+
- &omap3_pmx_core {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&hsusb1_rst_pins>;
-@@ -273,6 +279,12 @@
- 		>;
- 	};
- 
-+	otg_drv_vbus: pinmux_otg_drv_vbus {
-+		pinctrl-single,pins = <
-+			OMAP3_CORE1_IOPAD(0x2210, PIN_INPUT_PULLDOWN | MUX_MODE0) /* rmii_50MHz_clk.usb0_drvvbus */
-+		>;
-+	};
-+
- 	backlight_pins: pinmux_backlight_pins {
- 		pinctrl-single,pins = <
- 			OMAP3_CORE1_IOPAD(0x21de, PIN_OUTPUT | MUX_MODE4)       /* mcspi2_cs1.gpio_182 */
--- 
-2.17.1
+Thanks,
+Inki Dae
+
+2018? 05? 30? 21:15? Maciej Purski ?(?) ? ?:
+> When adding support for peripheral out bridges, the "bridge" name
+> becomes imprecise as it refers to a different device than the
+> "out_bridge".
+> 
+> Signed-off-by: Maciej Purski <m.purski@samsung.com>
+> ---
+>  drivers/gpu/drm/exynos/exynos_drm_dsi.c | 16 ++++++++--------
+>  1 file changed, 8 insertions(+), 8 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/exynos/exynos_drm_dsi.c b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+> index eae44fd..9599e6b 100644
+> --- a/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+> +++ b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+> @@ -279,7 +279,7 @@ struct exynos_dsi {
+>  	struct list_head transfer_list;
+>  
+>  	const struct exynos_dsi_driver_data *driver_data;
+> -	struct device_node *bridge_node;
+> +	struct device_node *mic_bridge_node;
+>  };
+>  
+>  #define host_to_dsi(host) container_of(host, struct exynos_dsi, dsi_host)
+> @@ -1631,7 +1631,7 @@ static int exynos_dsi_parse_dt(struct exynos_dsi *dsi)
+>  	if (ret < 0)
+>  		return ret;
+>  
+> -	dsi->bridge_node = of_graph_get_remote_node(node, DSI_PORT_IN, 0);
+> +	dsi->mic_bridge_node = of_graph_get_remote_node(node, DSI_PORT_IN, 0);
+>  
+>  	return 0;
+>  }
+> @@ -1642,7 +1642,7 @@ static int exynos_dsi_bind(struct device *dev, struct device *master,
+>  	struct drm_encoder *encoder = dev_get_drvdata(dev);
+>  	struct exynos_dsi *dsi = encoder_to_dsi(encoder);
+>  	struct drm_device *drm_dev = data;
+> -	struct drm_bridge *bridge;
+> +	struct drm_bridge *mic_bridge;
+>  	int ret;
+>  
+>  	drm_encoder_init(drm_dev, encoder, &exynos_dsi_encoder_funcs,
+> @@ -1661,10 +1661,10 @@ static int exynos_dsi_bind(struct device *dev, struct device *master,
+>  		return ret;
+>  	}
+>  
+> -	if (dsi->bridge_node) {
+> -		bridge = of_drm_find_bridge(dsi->bridge_node);
+> -		if (bridge)
+> -			drm_bridge_attach(encoder, bridge, NULL);
+> +	if (dsi->mic_bridge_node) {
+> +		mic_bridge = of_drm_find_bridge(dsi->mic_bridge_node);
+> +		if (mic_bridge)
+> +			drm_bridge_attach(encoder, mic_bridge, NULL);
+>  	}
+>  
+>  	return mipi_dsi_host_register(&dsi->dsi_host);
+> @@ -1783,7 +1783,7 @@ static int exynos_dsi_remove(struct platform_device *pdev)
+>  {
+>  	struct exynos_dsi *dsi = platform_get_drvdata(pdev);
+>  
+> -	of_node_put(dsi->bridge_node);
+> +	of_node_put(dsi->mic_bridge_node);
+>  
+>  	pm_runtime_disable(&pdev->dev);
+>  
+> 
