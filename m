@@ -1,70 +1,130 @@
-From: arend.vanspriel@broadcom.com (Arend van Spriel)
-Date: Mon, 25 Jun 2018 10:13:01 +0200
-Subject: [PATCHv2 5/5] arm64: allwinner: a64: Add support for TERES-I
- laptop
-In-Reply-To: <1CF519CD-D44E-4959-8951-27CE710E0984@aosc.io>
-References: <20180315162510.11669-1-harald@ccbib.org>
- <20180315162510.11669-6-harald@ccbib.org>
- <a7011fe78d171658742406bf01d50b7e3d7eaf1d.camel@aosc.io>
- <E1fX7yK-0000OC-HA@stardust.g4.wien.funkfeuer.at>
- <5B309D37.80207@broadcom.com> <1CF519CD-D44E-4959-8951-27CE710E0984@aosc.io>
-Message-ID: <5B30A40D.3070509@broadcom.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 25 Jun 2018 09:19:07 +0100
+Subject: [PATCH 4/4] KVM: arm/arm64: vgic: Allow VMs to configure
+ interrupt groups
+In-Reply-To: <20180624221103.15055-5-christoffer.dall@arm.com>
+References: <20180624221103.15055-1-christoffer.dall@arm.com>
+ <20180624221103.15055-5-christoffer.dall@arm.com>
+Message-ID: <2f5feed6-c026-1871-25e4-943123c8b977@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/25/2018 9:47 AM, Icenowy Zheng wrote:
->
->
-> ? 2018?6?25? GMT+08:00 ??3:43:51, Arend van Spriel <arend.vanspriel@broadcom.com> ??:
->> On 6/24/2018 6:34 PM, Harald Geyer wrote:
->>> Icenowy Zheng writes:
->>>>> ? 2018-03-15?? 16:25 +0000?Harald Geyer???
->>>>>>> +&mmc1 {
->>>>>>> +	pinctrl-names = "default";
->>>>>>> +	pinctrl-0 = <&mmc1_pins>;
->>>>>>> +	vmmc-supply = <&reg_aldo2>;
->>>>>>> +	vqmmc-supply = <&reg_dldo4>;
->>>>>>> +	mmc-pwrseq = <&wifi_pwrseq>;
->>>>>>> +	bus-width = <4>;
->>>>>>> +	non-removable;
->>>>>>> +	status = "okay";
->>>>>>> +
->>>>>>> +	rtl8723bs: wifi at 1 {
->>>>>>> +		reg = <1>;
->>>>>>> +		interrupt-parent = <&r_pio>;
->>>>>>> +		interrupts = <0 3 IRQ_TYPE_LEVEL_LOW>; /* PL3 */
->>>>>>> +		interrupt-names = "host-wake";
->>>>>>> +	};
->>
->> [...]
->>
->>>>> - This device node has no binding. The "host-wake" interrupt is
->> part of
->>>>>   Broadcom SDIO Wi-Fi binding, rather than a generic one.
->>> I think the general mmc and interrupts bindings apply. And the mmc
->> binding
->>> clearly states that for sub-nodes a compatible string is optional.
->>>
->>> However I just realized that the 'interrupt-names' property is not
->> part
->>> of the general interrupts binding, so I guess at least this property
->> should
->>> be removed.
->>
->> Indeed. If the device just used the SDIO interrupt this is not needed.
->> The Broadcom device can use either SDIO interrupt or a so-called
->> out-of-band host-wake interrupt, which is what the above represents.
->
-> RTL8....S is also capable of use OOB interrupt.
+On 24/06/18 23:11, Christoffer Dall wrote:
+> Implement the required MMIO accessors for GICv2 and GICv3 for the
+> IGROUPR distributor and redistributor registers.
+> 
+> This can allow guests to change behavior compared to running on previous
+> versions of KVM, but only to align with the architecture and hardware
+> implementations.
+> 
+> Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
+> ---
+>  virt/kvm/arm/vgic/vgic-mmio-v2.c |  2 +-
+>  virt/kvm/arm/vgic/vgic-mmio-v3.c |  2 +-
+>  virt/kvm/arm/vgic/vgic-mmio.c    | 38 ++++++++++++++++++++++++++++++++
+>  virt/kvm/arm/vgic/vgic-mmio.h    |  6 +++++
+>  4 files changed, 46 insertions(+), 2 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> index 8d18f89397d3..ff3834d16ac9 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> @@ -362,7 +362,7 @@ static const struct vgic_register_region vgic_v2_dist_registers[] = {
+>  		vgic_mmio_read_v2_misc, vgic_mmio_write_v2_misc, 12,
+>  		VGIC_ACCESS_32bit),
+>  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_IGROUP,
+> -		vgic_mmio_read_raz, vgic_mmio_write_wi, NULL, NULL, 1,
+> +		vgic_mmio_read_group, vgic_mmio_write_group, NULL, NULL, 1,
+>  		VGIC_ACCESS_32bit),
+>  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ENABLE_SET,
+>  		vgic_mmio_read_enable, vgic_mmio_write_senable, NULL, NULL, 1,
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> index 287784095b5b..76e422859745 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> @@ -451,7 +451,7 @@ static const struct vgic_register_region vgic_v3_dist_registers[] = {
+>  		vgic_mmio_read_rao, vgic_mmio_write_wi, 4,
+>  		VGIC_ACCESS_32bit),
+>  	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_IGROUPR,
+> -		vgic_mmio_read_rao, vgic_mmio_write_wi, NULL, NULL, 1,
+> +		vgic_mmio_read_group, vgic_mmio_write_group, NULL, NULL, 1,
+>  		VGIC_ACCESS_32bit),
+>  	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_ISENABLER,
+>  		vgic_mmio_read_enable, vgic_mmio_write_senable, NULL, NULL, 1,
 
-Ok. Is it also in-place in this TERES-I laptop? Anyway, if RTL8...S does 
-not have a binding specification there is not much to do about it. In my 
-opinion it does not make sense to add it to the generic mmc/sdio binding 
-as this interrupt does not involve the mmc/sdio hardware hence the term 
-OOB. There is generic wifi binding net/wireless/ieee80211.txt in which 
-this could be added. Obviously it would just be a binding and no 
-guarantee that the actual device driver supports it so the RTL driver 
-would need modification for that.
+I think you're missing the GICR_IGROUPR accessor in the redistributor
+(despite mentioning it in the commit message).
 
-Regards,
-Arend
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
+> index ff9655cfeb2f..ae31bd0dd365 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio.c
+> +++ b/virt/kvm/arm/vgic/vgic-mmio.c
+> @@ -40,6 +40,44 @@ void vgic_mmio_write_wi(struct kvm_vcpu *vcpu, gpa_t addr,
+>  	/* Ignore */
+>  }
+>  
+> +unsigned long vgic_mmio_read_group(struct kvm_vcpu *vcpu,
+> +				   gpa_t addr, unsigned int len)
+> +{
+> +	u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
+> +	u32 value = 0;
+> +	int i;
+> +
+> +	/* Loop over all IRQs affected by this read */
+> +	for (i = 0; i < len * 8; i++) {
+> +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
+> +
+> +		if (irq->group)
+> +			value |= BIT(i);
+> +
+> +		vgic_put_irq(vcpu->kvm, irq);
+> +	}
+> +
+> +	return value;
+> +}
+> +
+> +void vgic_mmio_write_group(struct kvm_vcpu *vcpu, gpa_t addr,
+> +			   unsigned int len, unsigned long val)
+> +{
+> +	u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
+> +	int i;
+> +	unsigned long flags;
+> +
+> +	for (i = 0; i < len * 8; i++) {
+> +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
+> +
+> +		spin_lock_irqsave(&irq->irq_lock, flags);
+> +		irq->group = !!(val & BIT(i));
+> +		vgic_queue_irq_unlock(vcpu->kvm, irq, flags);
+> +
+> +		vgic_put_irq(vcpu->kvm, irq);
+> +	}
+> +}
+> +
+>  /*
+>   * Read accesses to both GICD_ICENABLER and GICD_ISENABLER return the value
+>   * of the enabled bit, so there is only one function for both here.
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
+> index 5693f6df45ec..10798625f9ce 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio.h
+> +++ b/virt/kvm/arm/vgic/vgic-mmio.h
+> @@ -134,6 +134,12 @@ unsigned long vgic_mmio_read_rao(struct kvm_vcpu *vcpu,
+>  void vgic_mmio_write_wi(struct kvm_vcpu *vcpu, gpa_t addr,
+>  			unsigned int len, unsigned long val);
+>  
+> +unsigned long vgic_mmio_read_group(struct kvm_vcpu *vcpu, gpa_t addr,
+> +				   unsigned int len);
+> +
+> +void vgic_mmio_write_group(struct kvm_vcpu *vcpu, gpa_t addr,
+> +			   unsigned int len, unsigned long val);
+> +
+>  unsigned long vgic_mmio_read_enable(struct kvm_vcpu *vcpu,
+>  				    gpa_t addr, unsigned int len);
+>  
+> 
+
+Otherwise looks good.
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
