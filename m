@@ -1,36 +1,39 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 25 Jun 2018 18:54:44 +0100
-Subject: [PATCH 2/3] asm-generic: unistd.h: Wire up sys_rseq
-In-Reply-To: <1529949285-11013-1-git-send-email-will.deacon@arm.com>
-References: <1529949285-11013-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1529949285-11013-3-git-send-email-will.deacon@arm.com>
+Date: Mon, 25 Jun 2018 18:54:42 +0100
+Subject: [PATCH 0/3] Support rseq on arm64
+Message-ID: <1529949285-11013-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The new rseq call arrived in 4.18-rc1, so provide it in the asm-generic
-unistd.h for architectures such as arm64.
+Hi all,
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- include/uapi/asm-generic/unistd.h | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+This patch wires up rseq for native and compat tasks under arm64. Both
+have been tested with the selftests and they pass successfully on my Seattle
+box.
 
-diff --git a/include/uapi/asm-generic/unistd.h b/include/uapi/asm-generic/unistd.h
-index 42990676a55e..df4bedb9b01c 100644
---- a/include/uapi/asm-generic/unistd.h
-+++ b/include/uapi/asm-generic/unistd.h
-@@ -734,9 +734,11 @@ __SYSCALL(__NR_pkey_free,     sys_pkey_free)
- __SYSCALL(__NR_statx,     sys_statx)
- #define __NR_io_pgetevents 292
- __SC_COMP(__NR_io_pgetevents, sys_io_pgetevents, compat_sys_io_pgetevents)
-+#define __NR_rseq 293
-+__SYSCALL(__NR_rseq, sys_rseq)
- 
- #undef __NR_syscalls
--#define __NR_syscalls 293
-+#define __NR_syscalls 294
- 
- /*
-  * 32 bit systems traditionally used different
+Cheers,
+
+Will
+
+--->8
+
+Will Deacon (3):
+  arm64: rseq: Implement backend rseq calls and select HAVE_RSEQ
+  asm-generic: unistd.h: Wire up sys_rseq
+  rseq/selftests: Add support for arm64
+
+ arch/arm64/Kconfig                        |   1 +
+ arch/arm64/include/asm/unistd.h           |   2 +-
+ arch/arm64/include/asm/unistd32.h         |   2 +
+ arch/arm64/kernel/entry.S                 |   2 +
+ arch/arm64/kernel/ptrace.c                |   2 +
+ arch/arm64/kernel/signal.c                |   3 +
+ include/uapi/asm-generic/unistd.h         |   4 +-
+ tools/testing/selftests/rseq/param_test.c |  20 +
+ tools/testing/selftests/rseq/rseq-arm64.h | 594 ++++++++++++++++++++++++++++++
+ tools/testing/selftests/rseq/rseq.h       |   2 +
+ 10 files changed, 630 insertions(+), 2 deletions(-)
+ create mode 100644 tools/testing/selftests/rseq/rseq-arm64.h
+
 -- 
 2.1.4
