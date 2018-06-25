@@ -1,100 +1,103 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 25 Jun 2018 16:06:20 +0200
-Subject: [PATCH 09/15] ARM: shmobile: rcar-gen2: Remove explicit SYSC config
- and init
+Date: Mon, 25 Jun 2018 16:06:22 +0200
+Subject: [PATCH 11/15] soc: renesas: rcar-sysc: Provide helpers to power
+ up/down CPUs
 In-Reply-To: <cover.1529934908.git.horms+renesas@verge.net.au>
 References: <cover.1529934908.git.horms+renesas@verge.net.au>
-Message-ID: <319b15df66f931544dace69eb6465fc0a6e05797.1529934908.git.horms+renesas@verge.net.au>
+Message-ID: <f2b1d2f94af887c91bb8a0cfb495e546331bc5ed.1529934908.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-If the R-Car system controller is described in DT, the rcar-sysc driver
-configures SYSCIER and SYSCIMR based on the SoC-specific power area
-definitions in r8a779*-sysc.  The platform code still passed this
-information to the rcar-sysc driver, for compatibility with old R-Car H2
-and M2-W DTBs predating commit 8574de861978d518 ("ARM: dts: r8a7791: Add
-SYSC PM Domains") in v4.7.  The time has come to drop backwards
-compatibility, and delegate everything to the DT enabled rcar-sysc
-driver.
+Provide helpers to control CPU power areas from platform code, taking
+just a CPU index.  This will avoid having to pass full CPU power area
+parameter blocks, and thus duplicating information already provided by
+SoC-specific SYSC drivers.
 
-After the removal of the legacy SMP fallbacks, which powered up the SCUs
-explicitly, there is no longer a need to force an early initialization
-of the rcar-sysc driver.  It will be initialized in time for secondary
-CPU bringup by its early_initcall().
-
-Hence all explicit SYSC configuration and initialization can be removed
-from the R-Car Gen2 platform code.
+This will be used on R-Car H1 only.
+Later R-Car generations rely on APMU/RST for CPU power area control.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/pm-rcar-gen2.c | 25 -------------------------
- 1 file changed, 25 deletions(-)
+ drivers/soc/renesas/rcar-sysc.c       | 40 +++++++++++++++++++++++++++++++++++
+ include/linux/soc/renesas/rcar-sysc.h |  2 ++
+ 2 files changed, 42 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/pm-rcar-gen2.c b/arch/arm/mach-shmobile/pm-rcar-gen2.c
-index 5a798b406af0..345af3ebcc3a 100644
---- a/arch/arm/mach-shmobile/pm-rcar-gen2.c
-+++ b/arch/arm/mach-shmobile/pm-rcar-gen2.c
-@@ -15,7 +15,6 @@
- #include <linux/of.h>
- #include <linux/of_address.h>
- #include <linux/smp.h>
--#include <linux/soc/renesas/rcar-sysc.h>
- #include <asm/io.h>
- #include <asm/cputype.h>
- #include "common.h"
-@@ -46,23 +45,6 @@ static inline u32 phys_to_sbar(phys_addr_t addr)
- 	return (addr >> 8) & 0xfffffc00;
- }
+diff --git a/drivers/soc/renesas/rcar-sysc.c b/drivers/soc/renesas/rcar-sysc.c
+index 95120acc4d80..4ad6dcd19420 100644
+--- a/drivers/soc/renesas/rcar-sysc.c
++++ b/drivers/soc/renesas/rcar-sysc.c
+@@ -310,6 +310,8 @@ struct rcar_pm_domains {
+ 	struct generic_pm_domain *domains[RCAR_PD_ALWAYS_ON + 1];
+ };
  
--/* SYSC */
--#define SYSCIER 0x0c
--#define SYSCIMR 0x10
--
--#if defined(CONFIG_SMP)
--
--static void __init rcar_gen2_sysc_init(u32 syscier)
--{
--	rcar_sysc_init(0xe6180000, syscier);
--}
--
--#else /* CONFIG_SMP */
--
--static inline void rcar_gen2_sysc_init(u32 syscier) {}
--
--#endif /* CONFIG_SMP */
--
- void __init rcar_gen2_pm_init(void)
++static struct genpd_onecell_data *rcar_sysc_onecell_data;
++
+ static int __init rcar_sysc_pd_init(void)
  {
- 	void __iomem *p;
-@@ -72,7 +54,6 @@ void __init rcar_gen2_pm_init(void)
- 	bool has_a7 = false;
- 	bool has_a15 = false;
- 	struct resource res;
--	u32 syscier = 0;
- 	int error;
+ 	const struct rcar_sysc_info *info;
+@@ -356,6 +358,7 @@ static int __init rcar_sysc_pd_init(void)
  
- 	if (once++)
-@@ -89,11 +70,6 @@ void __init rcar_gen2_pm_init(void)
- 			has_a7 = true;
- 	}
+ 	domains->onecell_data.domains = domains->domains;
+ 	domains->onecell_data.num_domains = ARRAY_SIZE(domains->domains);
++	rcar_sysc_onecell_data = &domains->onecell_data;
  
--	if (of_machine_is_compatible("renesas,r8a7790"))
--		syscier = 0x013111ef;
--	else if (of_machine_is_compatible("renesas,r8a7791"))
--		syscier = 0x00111003;
--
- 	np = of_find_compatible_node(NULL, NULL, "renesas,smp-sram");
- 	if (!np) {
- 		/* No smp-sram in DT, fall back to hardcoded address */
-@@ -155,6 +131,5 @@ void __init rcar_gen2_pm_init(void)
- 	}
- 	iounmap(p);
- 
--	rcar_gen2_sysc_init(syscier);
- 	shmobile_smp_apmu_suspend_init();
+ 	for (i = 0, syscier = 0; i < info->num_areas; i++)
+ 		syscier |= BIT(info->areas[i].isr_bit);
+@@ -449,3 +452,40 @@ void __init rcar_sysc_init(phys_addr_t base, u32 syscier)
+ 	pr_debug("%s: syscier = 0x%08x\n", __func__, syscier);
+ 	iowrite32(syscier, rcar_sysc_base + SYSCIER);
  }
++
++#ifdef CONFIG_ARCH_R8A7779
++static int rcar_sysc_power_cpu(unsigned int idx, bool on)
++{
++	struct generic_pm_domain *genpd;
++	struct rcar_sysc_pd *pd;
++	unsigned int i;
++
++	if (!rcar_sysc_onecell_data)
++		return -ENODEV;
++
++	for (i = 0; i < rcar_sysc_onecell_data->num_domains; i++) {
++		genpd = rcar_sysc_onecell_data->domains[i];
++		if (!genpd)
++			continue;
++
++		pd = to_rcar_pd(genpd);
++		if (!(pd->flags & PD_CPU) || pd->ch.chan_bit != idx)
++			continue;
++
++		return on ? rcar_sysc_power_up(&pd->ch)
++			  : rcar_sysc_power_down(&pd->ch);
++	}
++
++	return -ENOENT;
++}
++
++int rcar_sysc_power_down_cpu(unsigned int cpu)
++{
++	return rcar_sysc_power_cpu(cpu, false);
++}
++
++int rcar_sysc_power_up_cpu(unsigned int cpu)
++{
++	return rcar_sysc_power_cpu(cpu, true);
++}
++#endif /* CONFIG_ARCH_R8A7779 */
+diff --git a/include/linux/soc/renesas/rcar-sysc.h b/include/linux/soc/renesas/rcar-sysc.h
+index 8a6086d2e9c3..9020da2111fd 100644
+--- a/include/linux/soc/renesas/rcar-sysc.h
++++ b/include/linux/soc/renesas/rcar-sysc.h
+@@ -13,5 +13,7 @@ struct rcar_sysc_ch {
+ int rcar_sysc_power_down(const struct rcar_sysc_ch *sysc_ch);
+ int rcar_sysc_power_up(const struct rcar_sysc_ch *sysc_ch);
+ void rcar_sysc_init(phys_addr_t base, u32 syscier);
++int rcar_sysc_power_down_cpu(unsigned int cpu);
++int rcar_sysc_power_up_cpu(unsigned int cpu);
+ 
+ #endif /* __LINUX_SOC_RENESAS_RCAR_SYSC_H__ */
 -- 
 2.11.0
