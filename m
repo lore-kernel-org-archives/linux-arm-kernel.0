@@ -1,41 +1,59 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 25 Jun 2018 15:03:57 -0600
-Subject: [RfC v1 3/5] dt-bindings: arm: amlogic: Add support for the
- Oranth Tanix TX3 Mini
-In-Reply-To: <20180624182814.31691-4-martin.blumenstingl@googlemail.com>
-References: <20180624182814.31691-1-martin.blumenstingl@googlemail.com>
- <20180624182814.31691-4-martin.blumenstingl@googlemail.com>
-Message-ID: <20180625210357.GA6694@rob-hp-laptop>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 25 Jun 2018 23:08:40 +0200
+Subject: [PATCH 2/2] soc: qcom: cmd-db: Fix compiler warnings
+In-Reply-To: <20180625205406.GC4689@hector.attlocal.net>
+References: <1529946347-12740-1-git-send-email-andy.gross@linaro.org>
+ <1529946347-12740-2-git-send-email-andy.gross@linaro.org>
+ <CAK8P3a0y9pUC2PQFv-GABnsr7cWWAKuLoDNeC1tC2A8iByzmaw@mail.gmail.com>
+ <20180625205406.GC4689@hector.attlocal.net>
+Message-ID: <CAK8P3a1+qs3f2cLPKPiMKR4L74dwpAkBcZPNVG4hk_nfx12Xqw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 24, 2018 at 08:28:12PM +0200, Martin Blumenstingl wrote:
-> The Tanix TX3 Mini is a TV box based on the Amlogic S905W chipset. It
-> comes with:
-> - 1 GiB or 2 GiB of DDR3 memory depending on the model
-> - 8 GB or 16 GB eMMC flash depending on the model
-> - 802.11 b/g/n wifi (Silicon Valley Microelectronics SSV6051, does not
->   support Bluetooth, not supported by any mailine driver)
-> - an LED 7 segment display with an FD628 controller (not supported by
->   any mainline driver)
-> - HDMI and AV (CVBS) output
-> - 2x USB (utilizing both USB ports provided by the SoC)
-> - micro SD card slot
-> 
-> The board seems to be very similar to the P23x and Q20x reference
-> boards:
-> - eMMC reset routed to BOOT_9
-> - the SDIO wifi chip's reset line is routed to GPIOX_6 and the reference
->   clock is 32.768KHz on PWM_E
-> - SD card detection is routed to CARD_6
-> - vqmmc of all MMC controllers is hard-wired to 1.8V (VDDIO_BOOT)
-> - uart_AO can be accessed after opening the case and soldering RX, TX
->   and GND lines onto the exposed solder points (marked with RX, TX and
->   GND)
-> 
-> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-> ---
->  Documentation/devicetree/bindings/arm/amlogic.txt | 1 +
->  1 file changed, 1 insertion(+)
+On Mon, Jun 25, 2018 at 10:54 PM, Andy Gross <andy.gross@linaro.org> wrote:
+> On Mon, Jun 25, 2018 at 10:30:17PM +0200, Arnd Bergmann wrote:
+>> On Mon, Jun 25, 2018 at 7:05 PM, Andy Gross <andy.gross@linaro.org> wrote:
+>>
+>> I generally don't like patches that add incorrect initializations to
+>> work around warnings like this.
+>
+> Correct me if I am wrong, but this just masks the warnings on toolchain/
+> platforms that exhibit these warnings.  I'm not entirely fond of doing
+> blanket init either to make the warnings go away either...
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+My patch disallows the case where the compiler can see that the variable
+is actually used without an initialization, and that code wouldn't
+work properly.
+
+The problem is that in this loop:
+
+        for (i = 0; i < MAX_SLV_ID; i++) {
+                rsc_hdr = &cmd_db_header->header[i];
+                if (!rsc_hdr->slv_id)
+                        break;
+
+                ent = rsc_to_entry_header(rsc_hdr);
+                for (j = 0; j < le16_to_cpu(rsc_hdr->cnt); j++, ent++) {
+                        if (memcmp(ent->id, query, sizeof(ent->id)) == 0)
+                                break;
+                }
+
+                if (j < le16_to_cpu(rsc_hdr->cnt)) {
+                        memcpy(eh, ent, sizeof(*ent));
+                        memcpy(rh, rsc_hdr, sizeof(*rh));
+                        return 0;
+                }
+        }
+
+I think gcc sees that cmd_db_header is initialized to NULL and never
+written to after of_reserved_mem_lookup() returns NULL during
+cmd_db_dev_probe().
+
+This means we are that cmd_db_get_header never intializes the
+resulting structure. It also never returns zero, but gcc doesn't
+see that here.
+
+A slightly more drastic workaround might be to initialize *eh
+at the start of cmd_db_get_header().
+
+     Arnd
