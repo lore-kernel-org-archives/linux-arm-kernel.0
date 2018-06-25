@@ -1,53 +1,74 @@
-From: anson.huang@nxp.com (Anson Huang)
-Date: Mon, 25 Jun 2018 05:53:59 +0000
-Subject: [PATCH v1] ARM: dts: imx6sl-evk: keep sw4 always on
-In-Reply-To: <1529930051-14122-1-git-send-email-yibin.gong@nxp.com>
-References: <1529930051-14122-1-git-send-email-yibin.gong@nxp.com>
-Message-ID: <AM3PR04MB13150F33BC062890B4E87477F54A0@AM3PR04MB1315.eurprd04.prod.outlook.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Mon, 25 Jun 2018 09:19:50 +0300
+Subject: [PATCH 04/24] 32-bit userspace ABI: introduce ARCH_32BIT_OFF_T
+ config option
+In-Reply-To: <20180611112736.GA19952@yury-thinkpad>
+References: <20180516081910.10067-1-ynorov@caviumnetworks.com>
+ <20180516081910.10067-5-ynorov@caviumnetworks.com>
+ <20180608173207.nwoi25jee52gpdwy@armageddon.cambridge.arm.com>
+ <20180609074227.GA6810@yury-thinkpad>
+ <CAK8P3a16ByPtCwKbdLQRDRni3qV9DXLNYZ9QJUH6uHaZYHr34g@mail.gmail.com>
+ <20180611112736.GA19952@yury-thinkpad>
+Message-ID: <20180625061950.GB23998@yury-thinkpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Acked-by: Anson Huang <anson.huang@nxp.com>
-
-I also saw such issue on i.MX6SLL evk board, and also sent out patch for i.MX6SLL.
-
-Anson Huang
-Best Regards!
-
-
-> -----Original Message-----
-> From: Robin Gong
-> Sent: Monday, June 25, 2018 8:34 PM
-> To: shawnguo at kernel.org; kernel at pengutronix.de; Fabio Estevam
-> <fabio.estevam@nxp.com>; robh+dt at kernel.org; mark.rutland at arm.com;
-> Anson Huang <anson.huang@nxp.com>
-> Cc: linux-arm-kernel at lists.infradead.org; devicetree at vger.kernel.org;
-> linux-kernel at vger.kernel.org; dl-linux-imx <linux-imx@nxp.com>
-> Subject: [PATCH v1] ARM: dts: imx6sl-evk: keep sw4 always on
+On Mon, Jun 11, 2018 at 02:27:36PM +0300, Yury Norov wrote:
+> On Mon, Jun 11, 2018 at 09:48:02AM +0200, Arnd Bergmann wrote:
+> > On Sat, Jun 9, 2018 at 9:42 AM, Yury Norov <ynorov@caviumnetworks.com> wrote:
+> > > On Fri, Jun 08, 2018 at 06:32:07PM +0100, Catalin Marinas wrote:
+> > >> On Wed, May 16, 2018 at 11:18:49AM +0300, Yury Norov wrote:
+> > >> > diff --git a/arch/Kconfig b/arch/Kconfig
+> > >> > index 76c0b54443b1..ee079244dc3c 100644
+> > >> > --- a/arch/Kconfig
+> > >> > +++ b/arch/Kconfig
+> > >> > @@ -264,6 +264,21 @@ config ARCH_THREAD_STACK_ALLOCATOR
+> > >> >  config ARCH_WANTS_DYNAMIC_TASK_STRUCT
+> > >> >     bool
+> > >> >
+> > >> > +config ARCH_32BIT_OFF_T
+> > >> > +   bool
+> > >> > +   depends on !64BIT
+> > >> > +   help
+> > >> > +     All new 32-bit architectures should have 64-bit off_t type on
+> > >> > +     userspace side which corresponds to the loff_t kernel type. This
+> > >> > +     is the requirement for modern ABIs. Some existing architectures
+> > >> > +     already have 32-bit off_t. This option is enabled for all such
+> > >> > +     architectures explicitly. Namely: arc, arm, blackfin, cris, frv,
+> > >> > +     h8300, hexagon, m32r, m68k, metag, microblaze, mips32, mn10300,
+> > >> > +     nios2, openrisc, parisc32, powerpc32, score, sh, sparc, tile32,
+> > >> > +     unicore32, x86_32 and xtensa. This is the complete list. Any
+> > >> > +     new 32-bit architecture should declare 64-bit off_t type on user
+> > >> > +     side and so should not enable this option.
+> > >>
+> > >> Do you know if this is the case for riscv and nds32, merged in the
+> > >> meantime? If not, I suggest you drop this patch altogether and just
+> > >> define force_o_largefile() for arm64/ilp32 as we don't seem to stick to
+> > >> "all new 32-bit architectures should have 64-bit off_t".
+> > >
+> > > I wrote this patch at request of Arnd Bergmann. This is actually his
+> > > words that all new 32-bit architectures should have 64-bit off_t. So
+> > > I was surprized when riscv was merged with 32-bit off_t (and I didn't
+> > > follow nds32).
+> > >
+> > > If this rule is still in force, we'd better add new exceptions to this
+> > > patch. Otherwise, we can drop it.
+> > >
+> > > Arnd, could you please comment it?
+> > 
+> > I completely forgot about it and had assumed that it was merged long
+> > ago, sorry about that.
 > 
-> SW4 is one power rail for LPDDR2 on i.mx6sl-evk, so it should be kept always on.
-> But it's disabled after switch disabled interface implemented in pfuze driver
-> 'commit 5fe156f1cab4
-> ("regulator: pfuze100: add enable/disable for switch")'.Thus, it breaks kernel
-> bootup. Add 'regulator-always-on' for SW4.
+> Hi Arnd,
 > 
-> Signed-off-by: Robin Gong <yibin.gong@nxp.com>
-> ---
->  arch/arm/boot/dts/imx6sl-evk.dts | 1 +
->  1 file changed, 1 insertion(+)
+> There are 3 patches like this in ILP32 series that change ABI for new
+> targets. I've submitted them in separated series:
+> https://lkml.org/lkml/2017/9/25/574
 > 
-> diff --git a/arch/arm/boot/dts/imx6sl-evk.dts
-> b/arch/arm/boot/dts/imx6sl-evk.dts
-> index 37e792f..798df66 100644
-> --- a/arch/arm/boot/dts/imx6sl-evk.dts
-> +++ b/arch/arm/boot/dts/imx6sl-evk.dts
-> @@ -199,6 +199,7 @@
->  			sw4_reg: sw4 {
->  				regulator-min-microvolt = <800000>;
->  				regulator-max-microvolt = <3300000>;
-> +				regulator-always-on;
->  			};
+> They all seems to be acked by you. If you ready to upstream the
+> series, I can rebase it and add riscv32 and nds32 exceptions.
 > 
->  			swbst_reg: swbst {
-> --
-> 2.7.4
+> If Palmer and riscv people will decide to follow new rules, we can
+> easily drop the exception.
+
+Ping?
