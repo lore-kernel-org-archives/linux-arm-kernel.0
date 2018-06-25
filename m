@@ -1,77 +1,35 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Mon, 25 Jun 2018 17:12:21 +0200
-Subject: [PATCH v2 05/23] thermal: armada: average over samples to avoid
- glitches
-In-Reply-To: <20180625151239.20976-1-miquel.raynal@bootlin.com>
-References: <20180625151239.20976-1-miquel.raynal@bootlin.com>
-Message-ID: <20180625151239.20976-6-miquel.raynal@bootlin.com>
+Date: Mon, 25 Jun 2018 17:09:34 +0200
+Subject: [PATCH v3 03/17] arm64: dts: marvell: fix CP110 ICU node size
+In-Reply-To: <87a7ric3f1.fsf@bootlin.com>
+References: <20180622151432.1566-1-miquel.raynal@bootlin.com>
+ <20180622151432.1566-4-miquel.raynal@bootlin.com>
+ <87a7ric3f1.fsf@bootlin.com>
+Message-ID: <20180625170934.4cd4319a@xps13>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Configure the sample frequency and number of averaged samples.
+Hi Gregory,
 
-This is needed for two reasons:
-1/ To be bootloader independent.
-2/ To prepare the introduction of multi-sensors support by preventing
-   inconsistencies when reading temperatures that could be a mean of
-   samples took from different sensors.
+On Mon, 25 Jun 2018 17:05:22 +0200, Gregory CLEMENT
+<gregory.clement@bootlin.com> wrote:
 
-Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
----
- drivers/thermal/armada_thermal.c | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+> Hi Miquel,
+>  
+>  On ven., juin 22 2018, Miquel Raynal <miquel.raynal@bootlin.com> wrote:
+> 
+> > ICU size in CP110 is not 0x10 but at least 0x440 bytes long (from the
+> > specification).
+> >
+> > Fixes: 6ef84a827c37 ("arm64: dts: marvell: enable GICP and ICU on Armada 7K/8K")
+> > Cc: stable at vger.kernel.org
+> > Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+> > Reviewed-by: Thomas Petazzoni <thomas.petazzoni@bootlin.com>  
+> 
+> This patch was part of the last PR from arm-soc for Linus and should be
+> part of 4.18-rc3, so if there is new version you can drop it.
+> 
 
-diff --git a/drivers/thermal/armada_thermal.c b/drivers/thermal/armada_thermal.c
-index 9291ea3ad2f7..1f9706d96a0d 100644
---- a/drivers/thermal/armada_thermal.c
-+++ b/drivers/thermal/armada_thermal.c
-@@ -54,7 +54,12 @@
- #define CONTROL0_TSEN_START		BIT(0)
- #define CONTROL0_TSEN_RESET		BIT(1)
- #define CONTROL0_TSEN_ENABLE		BIT(2)
-+#define CONTROL0_TSEN_AVG_BYPASS	BIT(6)
-+#define CONTROL0_TSEN_OSR_SHIFT		24
-+#define CONTROL0_TSEN_OSR_MAX		0x3
- 
-+#define CONTROL1_TSEN_AVG_SHIFT		0
-+#define CONTROL1_TSEN_AVG_MASK		0x7
- #define CONTROL1_EXT_TSEN_SW_RESET	BIT(7)
- #define CONTROL1_EXT_TSEN_HW_RESETn	BIT(8)
- 
-@@ -194,6 +199,13 @@ static void armada_ap806_init(struct platform_device *pdev,
- 	reg = readl_relaxed(priv->control0);
- 	reg &= ~CONTROL0_TSEN_RESET;
- 	reg |= CONTROL0_TSEN_START | CONTROL0_TSEN_ENABLE;
-+
-+	/* Sample every ~2ms */
-+	reg |= CONTROL0_TSEN_OSR_MAX << CONTROL0_TSEN_OSR_SHIFT;
-+
-+	/* Enable average (2 samples by default) */
-+	reg &= ~CONTROL0_TSEN_AVG_BYPASS;
-+
- 	writel(reg, priv->control0);
- 
- 	/* Wait the sensors to be valid or the core will warn the user */
-@@ -203,7 +215,20 @@ static void armada_ap806_init(struct platform_device *pdev,
- static void armada_cp110_init(struct platform_device *pdev,
- 			      struct armada_thermal_priv *priv)
- {
-+	u32 reg;
-+
- 	armada380_init(pdev, priv);
-+
-+	/* Sample every ~2ms */
-+	reg = readl_relaxed(priv->control0);
-+	reg |= CONTROL0_TSEN_OSR_MAX << CONTROL0_TSEN_OSR_SHIFT;
-+	writel(reg, priv->control0);
-+
-+	/* Average the output value over 2^1 = 2 samples */
-+	reg = readl_relaxed(priv->control1);
-+	reg &= ~CONTROL1_TSEN_AVG_MASK << CONTROL1_TSEN_AVG_SHIFT;
-+	reg |= 1 << CONTROL1_TSEN_AVG_SHIFT;
-+	writel(reg, priv->control1);
- }
- 
- static bool armada_is_valid(struct armada_thermal_priv *priv)
--- 
-2.14.1
+Sure, thanks for the reminder.
+
+Miqu?l
