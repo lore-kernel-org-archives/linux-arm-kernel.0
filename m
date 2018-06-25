@@ -1,37 +1,37 @@
-From: ludovic.Barre@st.com (Ludovic Barre)
-Date: Mon, 25 Jun 2018 17:43:02 +0200
-Subject: [PATCH V5 4/5] ARM: dts: stm32: add iwdg2 support for stm32mp157c-ed1
-In-Reply-To: <1529941383-8653-1-git-send-email-ludovic.Barre@st.com>
-References: <1529941383-8653-1-git-send-email-ludovic.Barre@st.com>
-Message-ID: <1529941383-8653-5-git-send-email-ludovic.Barre@st.com>
+From: miquel.raynal@bootlin.com (Miquel Raynal)
+Date: Mon, 25 Jun 2018 17:12:34 +0200
+Subject: [PATCH v2 18/23] dt-bindings: thermal: armada: add reference to new
+ bindings
+In-Reply-To: <20180625151239.20976-1-miquel.raynal@bootlin.com>
+References: <20180625151239.20976-1-miquel.raynal@bootlin.com>
+Message-ID: <20180625151239.20976-19-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ludovic Barre <ludovic.barre@st.com>
+New bindings (with the syscon and the overheat interrupt) are available
+for AP806 and CP110 compatibles. Add a reference to these files from the
+original documentation.
 
-This patch activates independent watchdog support for
-stm32mp157c board.
-
-Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 ---
- arch/arm/boot/dts/stm32mp157c-ed1.dts | 5 +++++
+ Documentation/devicetree/bindings/thermal/armada-thermal.txt | 5 +++++
  1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/boot/dts/stm32mp157c-ed1.dts b/arch/arm/boot/dts/stm32mp157c-ed1.dts
-index ae33653..8af263a 100644
---- a/arch/arm/boot/dts/stm32mp157c-ed1.dts
-+++ b/arch/arm/boot/dts/stm32mp157c-ed1.dts
-@@ -68,6 +68,11 @@
- 	status = "okay";
- };
+diff --git a/Documentation/devicetree/bindings/thermal/armada-thermal.txt b/Documentation/devicetree/bindings/thermal/armada-thermal.txt
+index e0d013a2e66d..f3b441100890 100644
+--- a/Documentation/devicetree/bindings/thermal/armada-thermal.txt
++++ b/Documentation/devicetree/bindings/thermal/armada-thermal.txt
+@@ -10,6 +10,11 @@ Required properties:
+     * marvell,armada-ap806-thermal
+     * marvell,armada-cp110-thermal
  
-+&iwdg2 {
-+	timeout-sec = <32>;
-+	status = "okay";
-+};
++Note: these bindings are deprecated for AP806/CP110 and should instead
++follow the rules described in:
++Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt
++Documentation/devicetree/bindings/arm/marvell/cp110-system-controller.txt
 +
- &uart4 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart4_pins_a>;
+ - reg: Device's register space.
+   Two entries are expected, see the examples below. The first one points
+   to the status register (4B). The second one points to the control
 -- 
-2.7.4
+2.14.1
