@@ -1,44 +1,56 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 25 Jun 2018 13:31:29 -0400
-Subject: [PATCH V2 2/2] efi/fb: Convert PCI bus address to resource if
- translated by the bridge
-In-Reply-To: <CAKv+Gu__a0yMcH6pyC0oxXZYgi=emuJA+6v1Zdmd4tbq_UR0Og@mail.gmail.com>
-References: <1526653072-7153-1-git-send-email-okaya@codeaurora.org>
- <1526653072-7153-2-git-send-email-okaya@codeaurora.org>
- <20180619222921.GA90490@bhelgaas-glaptop.roam.corp.google.com>
- <CAKv+Gu_voOZ7YUL8pckww4mTt4PVcu7y69mf-z7ZZe1bJ81Shw@mail.gmail.com>
- <2a805337-c0b5-e134-7695-5a543ecaa26a@codeaurora.org>
- <CAKv+Gu9HAJRHwjYLNjf+gg=1vFoFu3BJphifKKE-aR4o_MW84A@mail.gmail.com>
- <CAKv+Gu-WXLXqHSmiS2MmAMXHLKK_kg+3EK6L2rvO0SzN-c0UMg@mail.gmail.com>
- <37289a27-eb99-6a73-4d32-4a75edd11dcd@codeaurora.org>
- <CAKv+Gu-bwCFhCKiA7P1amMLeBaSxsjk0d6aPjAr9nCvOBPJA6w@mail.gmail.com>
- <CAKv+Gu96HQf0oJ1RC+wVU34FqqcCWrnDGag48vjNP_z86HhLBQ@mail.gmail.com>
- <7777f7bfead902f2f5175d48907fccec@codeaurora.org>
- <eb16a77f-7950-7fa1-c436-0ce99a992d3b@codeaurora.org>
- <CAKv+Gu__a0yMcH6pyC0oxXZYgi=emuJA+6v1Zdmd4tbq_UR0Og@mail.gmail.com>
-Message-ID: <d8f060ec-bc58-666d-7f2f-b3732ef2fa46@codeaurora.org>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 25 Jun 2018 19:40:24 +0200
+Subject: [PATCH 00/14] ARM: davinci: step towards removing
+ at24_platform_data
+In-Reply-To: <20180625155025.12567-1-brgl@bgdev.pl>
+References: <20180625155025.12567-1-brgl@bgdev.pl>
+Message-ID: <20180625174024.GB17417@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/25/2018 1:29 PM, Ard Biesheuvel wrote:
->>> Platform has been doing mmio translation for quite a while. Because all accesses go through pci io protocol, the rest of the UEFI never needed to be aware of bar address or do direct access.
->>>
->>> This is the first time I hear of direct access. Maybe, GOP is a special case.
->>>
->>> I started copying your response to the bios vendor.
->>>
->>> They are probably missing that patch. I will pass it along.
->> I was informed that they fixed the issue in BIOS by presenting CPU physical
->> address instead of PCI bus address in FrameBufferBase of the AST GOP UEFI driver.
->>
->> We can drop this patch now.
->>
-> Excellent! Thanks for following up with the vendor ...
+On Mon, Jun 25, 2018 at 05:50:11PM +0200, Bartosz Golaszewski wrote:
+> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 > 
+> Since I took over maintainership of the at24 driver I've been working
+> towards removing at24_platform_data in favor for device properties.
+> 
+> DaVinci is the only platform that's still using it - all other users
+> have already been converted.
+> 
+> One of the obstacles in case of DaVinci is removing the setup() callback
+> from the pdata struct, the only user of which are some davinci boards.
 
-Sure, appreciate the help.
+Hi Bartosz
 
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Nice code.
+
+I've got a platform i want to add sometime soon using the at24. I
+noticed you doing the cleanup, so i avoided the setup() call. But
+using it would of helped...
+
+My platform is x86 based, so no device tree. I instantiate a number of
+AT24 devices from a platform driver, and then add nvmem cells so i can
+access data in these eeproms. This new code will make this simpler.
+
+> The only board that's still using this callback is now mityomapl138.
+> Unfortunately it stores more info in EEPROM than just the MAC address
+> and will require some more work. Unfortunately I don't have access
+> to this board so I can't test any actual solutions on a live hardware.
+
+Depending on what i find in the EEPROM, i need to instantiate other
+i2c devices. So i have the problem of knowing when the EEPROM has
+actually probed and i can use the nvmem API to retrieve the contents.
+
+What i have done so far, is registers a bus notifier on i2c_bus_type,
+and look for BUS_NOTIFY_BOUND_DRIVER. I can then check if the i2c
+client in the notifier is the at24 client. But when i then add more
+i2c clients from inside the notifier i get lockdep splats. They are
+false positives, but it does suggest it is not a good idea to do this.
+
+So it would be good to have some sort of recommended alternative to
+the setup() callback. Ideally it would be specific to a particular
+at24, and safe to call other i2c functions from.
+
+Do you have any ideas?
+
+   Andrew
