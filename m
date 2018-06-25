@@ -1,25 +1,32 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 25 Jun 2018 14:18:34 -0600
-Subject: [PATCH v2 2/7] dt-bindings: add binding for the Allwinner A64
- DE2 bus
-In-Reply-To: <20180622124540.56203-1-icenowy@aosc.io>
-References: <20180622124540.56203-1-icenowy@aosc.io>
-Message-ID: <20180625201834.GA14276@rob-hp-laptop>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 25 Jun 2018 22:30:17 +0200
+Subject: [PATCH 2/2] soc: qcom: cmd-db: Fix compiler warnings
+In-Reply-To: <1529946347-12740-2-git-send-email-andy.gross@linaro.org>
+References: <1529946347-12740-1-git-send-email-andy.gross@linaro.org>
+ <1529946347-12740-2-git-send-email-andy.gross@linaro.org>
+Message-ID: <CAK8P3a0y9pUC2PQFv-GABnsr7cWWAKuLoDNeC1tC2A8iByzmaw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 22, 2018 at 08:45:35PM +0800, Icenowy Zheng wrote:
-> All the sub-blocks of Allwinner A64 DE2 needs the SRAM C on A64 SoC to
-> be claimed, otherwise the whole DE2 space is inaccessible.
-> 
-> Add a device tree binding of the DE2 part as a sub-bus.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> ---
-> No changes since v1.
-> 
->  .../bindings/bus/sun50i-de2-bus.txt           | 37 +++++++++++++++++++
->  1 file changed, 37 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/bus/sun50i-de2-bus.txt
+On Mon, Jun 25, 2018 at 7:05 PM, Andy Gross <andy.gross@linaro.org> wrote:
+> This patch adds initialization of the entry_header structs to avoid
+> compiler warnings like the following:
+>
+>   CC      drivers/soc/qcom/cmd-db.o
+> drivers/soc/qcom/cmd-db.c: In function ?cmd_db_read_addr?:
+> drivers/soc/qcom/cmd-db.c:194:21: warning: ?ent.addr? may be used
+> uninitialized in this function [-Wmaybe-uninitialized]
+>   return ret < 0 ? 0 : le32_to_cpu(ent.addr);
+>
+> drivers/soc/qcom/cmd-db.c: In function ?cmd_db_read_aux_data_len?:
+> drivers/soc/qcom/cmd-db.c:247:38: warning: ?ent.len? may be used
+> uninitialized in this function [-Wmaybe-uninitialized]
+>   return ret < 0 ? 0 : le16_to_cpu(ent.len);
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+Anything wrong with my fix that I posted a while ago?
+See https://lkml.org/lkml/2018/5/25/569
+
+I generally don't like patches that add incorrect initializations to
+work around warnings like this.
+
+       Arnd
