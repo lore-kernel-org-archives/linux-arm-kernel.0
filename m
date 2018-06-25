@@ -1,40 +1,43 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Mon, 25 Jun 2018 15:31:11 +0100
-Subject: [PATCH 07/11] ASoC: qdsp6: q6afe-dai: support dt based module loading
+Date: Mon, 25 Jun 2018 15:31:07 +0100
+Subject: [PATCH 03/11] ASoC: q6afe: dt-bindings: add compatible string to dais
 In-Reply-To: <20180625143115.8346-1-srinivas.kandagatla@linaro.org>
 References: <20180625143115.8346-1-srinivas.kandagatla@linaro.org>
-Message-ID: <20180625143115.8346-8-srinivas.kandagatla@linaro.org>
+Message-ID: <20180625143115.8346-4-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch uses new compatible string to make DT based module loading work.
+Add compatible string to dais so that it can support DT based module
+autoloading.
 
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 ---
- sound/soc/qcom/qdsp6/q6afe-dai.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ Documentation/devicetree/bindings/sound/qcom,q6afe.txt | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/sound/soc/qcom/qdsp6/q6afe-dai.c b/sound/soc/qcom/qdsp6/q6afe-dai.c
-index 5002dd05bf27..7fbf762a45ac 100644
---- a/sound/soc/qcom/qdsp6/q6afe-dai.c
-+++ b/sound/soc/qcom/qdsp6/q6afe-dai.c
-@@ -1290,9 +1290,17 @@ static int q6afe_dai_dev_remove(struct platform_device *pdev)
- 	return 0;
- }
+diff --git a/Documentation/devicetree/bindings/sound/qcom,q6afe.txt b/Documentation/devicetree/bindings/sound/qcom,q6afe.txt
+index bdbf87df8c0b..f7ea77ba7947 100644
+--- a/Documentation/devicetree/bindings/sound/qcom,q6afe.txt
++++ b/Documentation/devicetree/bindings/sound/qcom,q6afe.txt
+@@ -17,6 +17,11 @@ used by all apr services. Must contain the following properties.
+ subnode of "dais" representing board specific dai setup.
+ "dais" node should have following properties followed by dai children.
  
-+static const struct of_device_id q6afe_dai_device_id[]  = {
-+	{ .compatible = "qcom,q6afe-dais" },
-+	{},
-+};
++- compatible:
++	Usage: required
++	Value type: <stringlist>
++	Definition: must be "qcom,q6afe-dais"
 +
-+MODULE_DEVICE_TABLE(of, q6afe_dai_device_id);
-+
- static struct platform_driver q6afe_dai_platform_driver = {
- 	.driver = {
- 		.name = "q6afe-dai",
-+		.of_match_table = of_match_ptr(q6afe_dai_device_id),
- 	},
- 	.probe = q6afe_dai_dev_probe,
- 	.remove = q6afe_dai_dev_remove,
+ - #sound-dai-cells
+ 	Usage: required
+ 	Value type: <u32>
+@@ -103,6 +108,7 @@ q6afe at 4 {
+ 		#sound-dai-cells = <1>;
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
++		compatible = "qcom,q6afe-dais";
+ 
+ 		hdmi at 1 {
+ 			reg = <1>;
 -- 
 2.16.2
