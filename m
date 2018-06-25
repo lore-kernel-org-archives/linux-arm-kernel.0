@@ -1,84 +1,40 @@
-From: christoffer.dall@arm.com (Christoffer Dall)
-Date: Mon, 25 Jun 2018 11:34:06 +0200
-Subject: [PATCH 4/4] KVM: arm/arm64: vgic: Allow VMs to configure
- interrupt groups
-In-Reply-To: <2f5feed6-c026-1871-25e4-943123c8b977@arm.com>
-References: <20180624221103.15055-1-christoffer.dall@arm.com>
- <20180624221103.15055-5-christoffer.dall@arm.com>
- <2f5feed6-c026-1871-25e4-943123c8b977@arm.com>
-Message-ID: <20180625093406.GC8004@C02W217FHV2R.local>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 25 Jun 2018 11:35:04 +0200
+Subject: [PATCH V3 2/5] soc: imx: add mu library functions support
+In-Reply-To: <1529676720-7533-3-git-send-email-aisheng.dong@nxp.com>
+References: <1529676720-7533-1-git-send-email-aisheng.dong@nxp.com>
+ <1529676720-7533-3-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <20180625093504.hyjbixnnmipiqopg@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 25, 2018 at 09:19:07AM +0100, Marc Zyngier wrote:
-> On 24/06/18 23:11, Christoffer Dall wrote:
-> > Implement the required MMIO accessors for GICv2 and GICv3 for the
-> > IGROUPR distributor and redistributor registers.
-> > 
-> > This can allow guests to change behavior compared to running on previous
-> > versions of KVM, but only to align with the architecture and hardware
-> > implementations.
-> > 
-> > Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
-> > ---
-> >  virt/kvm/arm/vgic/vgic-mmio-v2.c |  2 +-
-> >  virt/kvm/arm/vgic/vgic-mmio-v3.c |  2 +-
-> >  virt/kvm/arm/vgic/vgic-mmio.c    | 38 ++++++++++++++++++++++++++++++++
-> >  virt/kvm/arm/vgic/vgic-mmio.h    |  6 +++++
-> >  4 files changed, 46 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-> > index 8d18f89397d3..ff3834d16ac9 100644
-> > --- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
-> > +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-> > @@ -362,7 +362,7 @@ static const struct vgic_register_region vgic_v2_dist_registers[] = {
-> >  		vgic_mmio_read_v2_misc, vgic_mmio_write_v2_misc, 12,
-> >  		VGIC_ACCESS_32bit),
-> >  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_IGROUP,
-> > -		vgic_mmio_read_raz, vgic_mmio_write_wi, NULL, NULL, 1,
-> > +		vgic_mmio_read_group, vgic_mmio_write_group, NULL, NULL, 1,
-> >  		VGIC_ACCESS_32bit),
-> >  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ENABLE_SET,
-> >  		vgic_mmio_read_enable, vgic_mmio_write_senable, NULL, NULL, 1,
-> > diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> > index 287784095b5b..76e422859745 100644
-> > --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> > +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> > @@ -451,7 +451,7 @@ static const struct vgic_register_region vgic_v3_dist_registers[] = {
-> >  		vgic_mmio_read_rao, vgic_mmio_write_wi, 4,
-> >  		VGIC_ACCESS_32bit),
-> >  	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_IGROUPR,
-> > -		vgic_mmio_read_rao, vgic_mmio_write_wi, NULL, NULL, 1,
-> > +		vgic_mmio_read_group, vgic_mmio_write_group, NULL, NULL, 1,
-> >  		VGIC_ACCESS_32bit),
-> >  	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_ISENABLER,
-> >  		vgic_mmio_read_enable, vgic_mmio_write_senable, NULL, NULL, 1,
-> 
-> I think you're missing the GICR_IGROUPR accessor in the redistributor
-> (despite mentioning it in the commit message).
-> 
+On Fri, Jun 22, 2018 at 10:11:57PM +0800, Dong Aisheng wrote:
+> This is used for i.MX multi core communication.
+> e.g. A core to SCU firmware(M core) on MX8.
 
-Indeed.  I fixed this up on my kernel.org branch (vgic-group-fixes), and
-the fix is pretty trivial:
+I still believe that a generic driver for the MU should be used here.
+Handling hardware resources under the hood of the driver framework is a
+hack. Preventing the generic driver from matching against the SCU MU by
+adding some #mbox-cells = <0>; to the MU device node is even more a
+hack.
 
-diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-index 76e422859745..d2acad07dd30 100644
---- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-@@ -524,7 +524,7 @@ static const struct vgic_register_region vgic_v3_rdbase_registers[] = {
- 
- static const struct vgic_register_region vgic_v3_sgibase_registers[] = {
- 	REGISTER_DESC_WITH_LENGTH(GICR_IGROUPR0,
--		vgic_mmio_read_rao, vgic_mmio_write_wi, 4,
-+		vgic_mmio_read_group, vgic_mmio_write_group, 4,
- 		VGIC_ACCESS_32bit),
- 	REGISTER_DESC_WITH_LENGTH(GICR_ISENABLER0,
- 		vgic_mmio_read_enable, vgic_mmio_write_senable, 4,
+We should really handle the MU in a driver and look for a way how the
+SCU case can coexist with other usages of the MUs.
 
-I did a test on the model using both GICv3 and GICv2-on-GICv3, seems
-happy still.
+Your main argument against using the mailbox framework is that it can't
+handle polling in the way you need it and that the mailbox framework
+provides things that you do not need. I don't buy this argument. In the
+end the mailbox framework is around 500 lines of code, it shouldn't be
+that hard to add the missing features. From the transmit side I don't
+see any showstoppers, the mailbox frameworks could be used as ist. What
+is missing is a synchronous wait-for-new-messages and receive-message
+call, the currently existing asynchronous rx callback is indeed not
+suitable for the SCU. But as said, it should be doable to add that.
 
-Do you want me to send a v2, or do you prefer to fix this up locally?
+Sascha
 
-Thanks,
--Christoffer
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
