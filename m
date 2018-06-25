@@ -1,39 +1,38 @@
 From: ludovic.Barre@st.com (Ludovic Barre)
-Date: Mon, 25 Jun 2018 17:43:01 +0200
-Subject: [PATCH V5 3/5] ARM: dts: stm32: add iwdg2 support for stm32mp157c
-In-Reply-To: <1529941383-8653-1-git-send-email-ludovic.Barre@st.com>
-References: <1529941383-8653-1-git-send-email-ludovic.Barre@st.com>
-Message-ID: <1529941383-8653-4-git-send-email-ludovic.Barre@st.com>
+Date: Mon, 25 Jun 2018 17:42:58 +0200
+Subject: [PATCH V5 0/5] add iwdg2 support for stm32mp157c
+Message-ID: <1529941383-8653-1-git-send-email-ludovic.Barre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ludovic Barre <ludovic.barre@st.com>
 
-This patch adds independent watchdog support for stm32mp157c.
+This patch series updates stm32_iwdg driver to manage pclk
+clock by compatible. stm32mp1 requires a pclk clock.
 
-Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
----
- arch/arm/boot/dts/stm32mp157c.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+v5:
+-update stm32f429.dtsi
 
-diff --git a/arch/arm/boot/dts/stm32mp157c.dtsi b/arch/arm/boot/dts/stm32mp157c.dtsi
-index 7d17538..95cc166 100644
---- a/arch/arm/boot/dts/stm32mp157c.dtsi
-+++ b/arch/arm/boot/dts/stm32mp157c.dtsi
-@@ -784,6 +784,14 @@
- 			status = "disabled";
- 		};
- 
-+		iwdg2: watchdog at 5a002000 {
-+			compatible = "st,stm32mp1-iwdg";
-+			reg = <0x5a002000 0x400>;
-+			clocks = <&rcc IWDG2>, <&rcc CK_LSI>;
-+			clock-names = "pclk", "lsi";
-+			status = "disabled";
-+		};
-+
- 		usbphyc: usbphyc at 5a006000 {
- 			#address-cells = <1>;
- 			#size-cells = <0>;
+v4:
+-dt-bindings: split and review
+
+v3:
+-remove stm32_iwdg_config structure, just assign the
+ boolean directly to .dat
+
+Ludovic Barre (5):
+  dt-bindings: watchdog: add stm32mp1 support
+  watchdog: stm32: add pclk feature for stm32mp1
+  ARM: dts: stm32: add iwdg2 support for stm32mp157c
+  ARM: dts: stm32: add iwdg2 support for stm32mp157c-ed1
+  ARM: dts: stm32: update iwdg with lsi clock name for stm32f429
+
+ .../devicetree/bindings/watchdog/st,stm32-iwdg.txt |  13 ++-
+ arch/arm/boot/dts/stm32f429.dtsi                   |   1 +
+ arch/arm/boot/dts/stm32mp157c-ed1.dts              |   5 +
+ arch/arm/boot/dts/stm32mp157c.dtsi                 |   8 ++
+ drivers/watchdog/stm32_iwdg.c                      | 116 +++++++++++++--------
+ 5 files changed, 98 insertions(+), 45 deletions(-)
+
 -- 
 2.7.4
