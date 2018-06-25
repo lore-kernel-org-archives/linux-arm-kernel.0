@@ -1,71 +1,113 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Mon, 25 Jun 2018 14:02:49 +0200
-Subject: [PATCH v3 09/24] drm/sun4i: Don't skip TCONs if they don't have
- channel 0
+Date: Mon, 25 Jun 2018 14:02:47 +0200
+Subject: [PATCH v3 07/24] drm/sun4i: Split out code for enumerating endpoints
+ in output port
 In-Reply-To: <20180625120304.7543-1-jernej.skrabec@siol.net>
 References: <20180625120304.7543-1-jernej.skrabec@siol.net>
-Message-ID: <20180625120304.7543-10-jernej.skrabec@siol.net>
+Message-ID: <20180625120304.7543-8-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-TV TCONs (channel 1 only) are always connected to TV or HDMI encoder.
-Because of that, all output endpoints on such TCON node will point to a
-encoder which is part of component framework.
+Until now, each node has one input port and one output port. However,
+with TCON TOP this is no longer true. It has 3 input and 3 output ports.
 
-Correct current graph traversing algorithm in such way that it doesn't
-skip output enpoints with id 0 on TV TCONs.
+In order to prepare to this situation, split out the code which checks
+all endpoints in input port and adds available components to fifo.
+
+This patch doesn't do any functional change.
 
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/gpu/drm/sun4i/sun4i_drv.c | 52 +++++++++++++++++++++----------
- 1 file changed, 35 insertions(+), 17 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_drv.c | 84 +++++++++++++++++--------------
+ 1 file changed, 46 insertions(+), 38 deletions(-)
 
 diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
-index e6c62c079146..6ddf4eaccb40 100644
+index e15fa2389e3f..20193d6f33ba 100644
 --- a/drivers/gpu/drm/sun4i/sun4i_drv.c
 +++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
-@@ -198,6 +198,22 @@ static bool sun4i_drv_node_is_tcon(struct device_node *node)
- 	return !!of_match_node(sun4i_tcon_of_table, node);
- }
+@@ -231,12 +231,55 @@ struct endpoint_list {
+ 	DECLARE_KFIFO(fifo, struct device_node *, 16);
+ };
  
-+static bool sun4i_drv_node_is_tcon_with_ch0(struct device_node *node)
++static void sun4i_drv_traverse_endpoints(struct endpoint_list *list,
++					 struct device_node *node,
++					 int port_id)
 +{
-+	const struct of_device_id *match;
++	struct device_node *ep, *remote, *port;
 +
-+	match = of_match_node(sun4i_tcon_of_table, node);
-+	if (match) {
-+		struct sun4i_tcon_quirks *quirks;
-+
-+		quirks = (struct sun4i_tcon_quirks *)match->data;
-+
-+		return quirks->has_channel_0;
++	port = of_graph_get_port_by_id(node, port_id);
++	if (!port) {
++		DRM_DEBUG_DRIVER("No output to bind on port %d\n", port_id);
++		return;
 +	}
 +
-+	return false;
++	for_each_available_child_of_node(port, ep) {
++		remote = of_graph_get_remote_port_parent(ep);
++		if (!remote) {
++			DRM_DEBUG_DRIVER("Error retrieving the output node\n");
++			continue;
++		}
++
++		/*
++		 * If the node is our TCON, the first port is used for
++		 * panel or bridges, and will not be part of the
++		 * component framework.
++		 */
++		if (sun4i_drv_node_is_tcon(node)) {
++			struct of_endpoint endpoint;
++
++			if (of_graph_parse_endpoint(ep, &endpoint)) {
++				DRM_DEBUG_DRIVER("Couldn't parse endpoint\n");
++				of_node_put(remote);
++				continue;
++			}
++
++			if (!endpoint.id) {
++				DRM_DEBUG_DRIVER("Endpoint is our panel... skipping\n");
++				of_node_put(remote);
++				continue;
++			}
++		}
++
++		kfifo_put(&list->fifo, remote);
++	}
 +}
 +
- static bool sun4i_drv_node_is_tcon_top(struct device_node *node)
+ static int sun4i_drv_add_endpoints(struct device *dev,
+ 				   struct endpoint_list *list,
+ 				   struct component_match **match,
+ 				   struct device_node *node)
  {
- 	return !!of_match_node(sun8i_tcon_top_of_table, node);
-@@ -256,14 +272,7 @@ static void sun4i_drv_traverse_endpoints(struct endpoint_list *list,
- 			continue;
- 		}
+-	struct device_node *port, *ep, *remote;
+ 	int count = 0;
  
+ 	/*
+@@ -272,43 +315,8 @@ static int sun4i_drv_add_endpoints(struct device *dev,
+ 		count++;
+ 	}
+ 
+-	/* Inputs are listed first, then outputs */
+-	port = of_graph_get_port_by_id(node, 1);
+-	if (!port) {
+-		DRM_DEBUG_DRIVER("No output to bind\n");
+-		return count;
+-	}
+-
+-	for_each_available_child_of_node(port, ep) {
+-		remote = of_graph_get_remote_port_parent(ep);
+-		if (!remote) {
+-			DRM_DEBUG_DRIVER("Error retrieving the output node\n");
+-			continue;
+-		}
+-
 -		/*
 -		 * If the node is our TCON, the first port is used for
 -		 * panel or bridges, and will not be part of the
 -		 * component framework.
 -		 */
- 		if (sun4i_drv_node_is_tcon(node)) {
+-		if (sun4i_drv_node_is_tcon(node)) {
 -			struct of_endpoint endpoint;
 -
- 			/*
- 			 * TCON TOP is always probed before TCON. However, TCON
- 			 * points back to TCON TOP when it is source for HDMI.
-@@ -276,16 +285,25 @@ static void sun4i_drv_traverse_endpoints(struct endpoint_list *list,
- 				continue;
- 			}
- 
 -			if (of_graph_parse_endpoint(ep, &endpoint)) {
 -				DRM_DEBUG_DRIVER("Couldn't parse endpoint\n");
 -				of_node_put(remote);
@@ -76,27 +118,15 @@ index e6c62c079146..6ddf4eaccb40 100644
 -				DRM_DEBUG_DRIVER("Endpoint is our panel... skipping\n");
 -				of_node_put(remote);
 -				continue;
-+			/*
-+			 * If the node is our TCON with channel 0, the first
-+			 * port is used for panel or bridges, and will not be
-+			 * part of the component framework.
-+			 */
-+			if (sun4i_drv_node_is_tcon_with_ch0(node)) {
-+				struct of_endpoint endpoint;
-+
-+				if (of_graph_parse_endpoint(ep, &endpoint)) {
-+					DRM_DEBUG_DRIVER("Couldn't parse endpoint\n");
-+					of_node_put(remote);
-+					continue;
-+				}
-+
-+				if (!endpoint.id) {
-+					DRM_DEBUG_DRIVER("Endpoint is our panel... skipping\n");
-+					of_node_put(remote);
-+					continue;
-+				}
- 			}
- 		}
+-			}
+-		}
+-
+-		kfifo_put(&list->fifo, remote);
+-	}
++	/* each node has at least one output */
++	sun4i_drv_traverse_endpoints(list, node, 1);
  
+ 	return count;
+ }
 -- 
 2.18.0
