@@ -1,48 +1,53 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Mon, 25 Jun 2018 18:09:45 +0200
-Subject: [PATCH 1/9] clk: davinci: psc-dm365: use two lookup entries for
- the aemif clock
-In-Reply-To: <c8d28664-e0fb-5a02-3c5b-b78684f87648@lechnology.com>
-References: <20180625152920.11549-1-brgl@bgdev.pl>
- <20180625152920.11549-2-brgl@bgdev.pl>
- <241fed6e-b414-feac-8e6c-39713c5e665e@lechnology.com>
- <CAMRc=MdTdoL9qsrMAxhCTaQM7HGrAPpTVjDuHQ81Q5O-QMNcYQ@mail.gmail.com>
- <c8d28664-e0fb-5a02-3c5b-b78684f87648@lechnology.com>
-Message-ID: <CAMRc=MdsTAz7rd6W0M8gcmY0-PfNY9RGW6hxrfhECecbkm2E1g@mail.gmail.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Mon, 25 Jun 2018 17:15:06 +0100
+Subject: [PATCH 3/7] arm64: compat: map SPSR_ELx<->PSR for signals
+In-Reply-To: <20180625144421.11511-4-mark.rutland@arm.com>
+References: <20180625144421.11511-1-mark.rutland@arm.com>
+ <20180625144421.11511-4-mark.rutland@arm.com>
+Message-ID: <334274ca-dd77-4c8a-7608-550534adae97@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-06-25 18:06 GMT+02:00 David Lechner <david@lechnology.com>:
-> On 06/25/2018 11:01 AM, Bartosz Golaszewski wrote:
->>
->> 2018-06-25 17:53 GMT+02:00 David Lechner <david@lechnology.com>:
->>>
->>> On 06/25/2018 10:29 AM, Bartosz Golaszewski wrote:
->>>>
->>>>
->>>> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->>>>
->>>> We want to be able to get the clock both from the board file by its
->>>> con_id and from the aemif driver by dev_id.
->>>
->>>
->>>
->>> What about the other SoCs? Don't they need this change as well?
->>>
->>
->> So I double checked and turns out I missed one other board that's
->> affected by this series and calls clk_get() from machine code:
->> dm644x-evm.
->>
->> I'll fix it in v2.
->
->
-> The ti-aemif platform driver also does clk_get(). Don't you need
-> lookups to make that work as well? For example, DA830 doesn't have
-> a clock lookup for aemif at all.
->
+On 25/06/18 15:44, Mark Rutland wrote:
+> The SPSR_ELx format for exceptions taken from AArch32 differs from the
+> AArch32 PSR format. Thus, we must translate between the two when setting
+> up a compat sigframe, or restoring context from a compat sigframe.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Fixes: 7206dc93a58fb764 ("arm64: Expose Arm v8.4 features")
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Suzuki Poulose <suzuki.poulose@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>   arch/arm64/kernel/signal32.c | 8 ++++++--
+>   1 file changed, 6 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/signal32.c b/arch/arm64/kernel/signal32.c
+> index 77b91f478995..fa9fb782f077 100644
+> --- a/arch/arm64/kernel/signal32.c
+> +++ b/arch/arm64/kernel/signal32.c
+> @@ -243,6 +243,7 @@ static int compat_restore_sigframe(struct pt_regs *regs,
+>   	int err;
+>   	sigset_t set;
+>   	struct compat_aux_sigframe __user *aux;
+> +	unsigned long psr;
+>   
+>   	err = get_sigset_t(&set, &sf->uc.uc_sigmask);
+>   	if (err == 0) {
+> @@ -266,7 +267,9 @@ static int compat_restore_sigframe(struct pt_regs *regs,
+>   	__get_user_error(regs->compat_sp, &sf->uc.uc_mcontext.arm_sp, err);
+>   	__get_user_error(regs->compat_lr, &sf->uc.uc_mcontext.arm_lr, err);
+>   	__get_user_error(regs->pc, &sf->uc.uc_mcontext.arm_pc, err);
+> -	__get_user_error(regs->pstate, &sf->uc.uc_mcontext.arm_cpsr, err);
+> +	__get_user_error(psr, &sf->uc.uc_mcontext.arm_cpsr, err);
+> +
+> +	regs->pstate = compat_psr_to_pstate(regs->pstate);
 
-Right, I'll check that too.
+Did you mean
+	regs->pstate = compat_psr_to_pstate(psr)
+above ?
 
-Thanks,
-Bart
+Otherwise, looks good to me.
+
+
+Suzuki
