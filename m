@@ -1,14 +1,14 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Mon, 25 Jun 2018 14:15:38 +0100
-Subject: Applied "dmaengine: pxa: use a dma slave map" to the asoc tree
-In-Reply-To: <20180524070703.11901-2-robert.jarzmik@free.fr>
-Message-ID: <E1fXRLG-00005A-3A@debutante>
+Date: Mon, 25 Jun 2018 14:15:18 +0100
+Subject: Applied "ARM: pxa: remove the DMA IO resources" to the asoc tree
+In-Reply-To: <20180524070703.11901-13-robert.jarzmik@free.fr>
+Message-ID: <E1fXRKw-0008K7-4P@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   dmaengine: pxa: use a dma slave map
+   ARM: pxa: remove the DMA IO resources
 
 has been applied to the asoc tree at
 
@@ -33,89 +33,243 @@ to this mail.
 Thanks,
 Mark
 
->From 420c0117db25db38b72b6230223f7a976d3070ea Mon Sep 17 00:00:00 2001
+>From b77ed2e6d61d40117272be1b2377c5dfd101e9cd Mon Sep 17 00:00:00 2001
 From: Robert Jarzmik <robert.jarzmik@free.fr>
-Date: Sun, 17 Jun 2018 19:02:04 +0200
-Subject: [PATCH] dmaengine: pxa: use a dma slave map
+Date: Sun, 17 Jun 2018 19:02:16 +0200
+Subject: [PATCH] ARM: pxa: remove the DMA IO resources
 
-In order to remove the specific knowledge of the dma mapping from PXA
-drivers, add a default slave map for pxa architectures.
-
-This won't impact MMP architecture, but is aimed only at all PXA boards.
-
-This is the first step, and once all drivers are converted,
-pxad_filter_fn() will be made static, and the DMA resources removed from
-device.c.
+As the last driver using the former mechanism to acquire the DMA
+requestor line has be converted to the dma_slave_map, remove all these
+resources from the PXA devices.
 
 Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
-Reported-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Vinod Koul <vkoul@kernel.org>
 ---
- drivers/dma/pxa_dma.c                 | 10 +++++++++-
- include/linux/platform_data/mmp_dma.h |  4 ++++
- 2 files changed, 13 insertions(+), 1 deletion(-)
+ arch/arm/mach-pxa/devices.c | 136 ------------------------------------
+ 1 file changed, 136 deletions(-)
 
-diff --git a/drivers/dma/pxa_dma.c b/drivers/dma/pxa_dma.c
-index b53fb618bbf6..9505334f9c6e 100644
---- a/drivers/dma/pxa_dma.c
-+++ b/drivers/dma/pxa_dma.c
-@@ -179,6 +179,8 @@ static unsigned int pxad_drcmr(unsigned int line)
- 	return 0x1000 + line * 4;
- }
- 
-+bool pxad_filter_fn(struct dma_chan *chan, void *param);
-+
- /*
-  * Debug fs
-  */
-@@ -1396,9 +1398,10 @@ static int pxad_probe(struct platform_device *op)
- {
- 	struct pxad_device *pdev;
- 	const struct of_device_id *of_id;
-+	const struct dma_slave_map *slave_map = NULL;
- 	struct mmp_dma_platdata *pdata = dev_get_platdata(&op->dev);
- 	struct resource *iores;
--	int ret, dma_channels = 0, nb_requestors = 0;
-+	int ret, dma_channels = 0, nb_requestors = 0, slave_map_cnt = 0;
- 	const enum dma_slave_buswidth widths =
- 		DMA_SLAVE_BUSWIDTH_1_BYTE   | DMA_SLAVE_BUSWIDTH_2_BYTES |
- 		DMA_SLAVE_BUSWIDTH_4_BYTES;
-@@ -1429,6 +1432,8 @@ static int pxad_probe(struct platform_device *op)
- 	} else if (pdata && pdata->dma_channels) {
- 		dma_channels = pdata->dma_channels;
- 		nb_requestors = pdata->nb_requestors;
-+		slave_map = pdata->slave_map;
-+		slave_map_cnt = pdata->slave_map_cnt;
- 	} else {
- 		dma_channels = 32;	/* default 32 channel */
- 	}
-@@ -1440,6 +1445,9 @@ static int pxad_probe(struct platform_device *op)
- 	pdev->slave.device_prep_dma_memcpy = pxad_prep_memcpy;
- 	pdev->slave.device_prep_slave_sg = pxad_prep_slave_sg;
- 	pdev->slave.device_prep_dma_cyclic = pxad_prep_dma_cyclic;
-+	pdev->slave.filter.map = slave_map;
-+	pdev->slave.filter.mapcnt = slave_map_cnt;
-+	pdev->slave.filter.fn = pxad_filter_fn;
- 
- 	pdev->slave.copy_align = PDMA_ALIGNMENT;
- 	pdev->slave.src_addr_widths = widths;
-diff --git a/include/linux/platform_data/mmp_dma.h b/include/linux/platform_data/mmp_dma.h
-index d1397c8ed94e..6397b9c8149a 100644
---- a/include/linux/platform_data/mmp_dma.h
-+++ b/include/linux/platform_data/mmp_dma.h
-@@ -12,9 +12,13 @@
- #ifndef MMP_DMA_H
- #define MMP_DMA_H
- 
-+struct dma_slave_map;
-+
- struct mmp_dma_platdata {
- 	int dma_channels;
- 	int nb_requestors;
-+	int slave_map_cnt;
-+	const struct dma_slave_map *slave_map;
+diff --git a/arch/arm/mach-pxa/devices.c b/arch/arm/mach-pxa/devices.c
+index 1e8915fc340d..5a16ea74e28a 100644
+--- a/arch/arm/mach-pxa/devices.c
++++ b/arch/arm/mach-pxa/devices.c
+@@ -60,16 +60,6 @@ static struct resource pxamci_resources[] = {
+ 		.end	= IRQ_MMC,
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+-	[2] = {
+-		.start	= 21,
+-		.end	= 21,
+-		.flags	= IORESOURCE_DMA,
+-	},
+-	[3] = {
+-		.start	= 22,
+-		.end	= 22,
+-		.flags	= IORESOURCE_DMA,
+-	},
  };
  
- #endif /* MMP_DMA_H */
+ static u64 pxamci_dmamask = 0xffffffffUL;
+@@ -407,16 +397,6 @@ static struct resource pxa_ir_resources[] = {
+ 		.end	= 0x40700023,
+ 		.flags  = IORESOURCE_MEM,
+ 	},
+-	[5] = {
+-		.start  = 17,
+-		.end	= 17,
+-		.flags  = IORESOURCE_DMA,
+-	},
+-	[6] = {
+-		.start  = 18,
+-		.end	= 18,
+-		.flags  = IORESOURCE_DMA,
+-	},
+ };
+ 
+ struct platform_device pxa_device_ficp = {
+@@ -545,18 +525,6 @@ static struct resource pxa25x_resource_ssp[] = {
+ 		.end	= IRQ_SSP,
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+-	[2] = {
+-		/* DRCMR for RX */
+-		.start	= 13,
+-		.end	= 13,
+-		.flags	= IORESOURCE_DMA,
+-	},
+-	[3] = {
+-		/* DRCMR for TX */
+-		.start	= 14,
+-		.end	= 14,
+-		.flags	= IORESOURCE_DMA,
+-	},
+ };
+ 
+ struct platform_device pxa25x_device_ssp = {
+@@ -583,18 +551,6 @@ static struct resource pxa25x_resource_nssp[] = {
+ 		.end	= IRQ_NSSP,
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+-	[2] = {
+-		/* DRCMR for RX */
+-		.start	= 15,
+-		.end	= 15,
+-		.flags	= IORESOURCE_DMA,
+-	},
+-	[3] = {
+-		/* DRCMR for TX */
+-		.start	= 16,
+-		.end	= 16,
+-		.flags	= IORESOURCE_DMA,
+-	},
+ };
+ 
+ struct platform_device pxa25x_device_nssp = {
+@@ -621,18 +577,6 @@ static struct resource pxa25x_resource_assp[] = {
+ 		.end	= IRQ_ASSP,
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+-	[2] = {
+-		/* DRCMR for RX */
+-		.start	= 23,
+-		.end	= 23,
+-		.flags	= IORESOURCE_DMA,
+-	},
+-	[3] = {
+-		/* DRCMR for TX */
+-		.start	= 24,
+-		.end	= 24,
+-		.flags	= IORESOURCE_DMA,
+-	},
+ };
+ 
+ struct platform_device pxa25x_device_assp = {
+@@ -751,18 +695,6 @@ static struct resource pxa27x_resource_ssp1[] = {
+ 		.end	= IRQ_SSP,
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+-	[2] = {
+-		/* DRCMR for RX */
+-		.start	= 13,
+-		.end	= 13,
+-		.flags	= IORESOURCE_DMA,
+-	},
+-	[3] = {
+-		/* DRCMR for TX */
+-		.start	= 14,
+-		.end	= 14,
+-		.flags	= IORESOURCE_DMA,
+-	},
+ };
+ 
+ struct platform_device pxa27x_device_ssp1 = {
+@@ -789,18 +721,6 @@ static struct resource pxa27x_resource_ssp2[] = {
+ 		.end	= IRQ_SSP2,
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+-	[2] = {
+-		/* DRCMR for RX */
+-		.start	= 15,
+-		.end	= 15,
+-		.flags	= IORESOURCE_DMA,
+-	},
+-	[3] = {
+-		/* DRCMR for TX */
+-		.start	= 16,
+-		.end	= 16,
+-		.flags	= IORESOURCE_DMA,
+-	},
+ };
+ 
+ struct platform_device pxa27x_device_ssp2 = {
+@@ -827,18 +747,6 @@ static struct resource pxa27x_resource_ssp3[] = {
+ 		.end	= IRQ_SSP3,
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+-	[2] = {
+-		/* DRCMR for RX */
+-		.start	= 66,
+-		.end	= 66,
+-		.flags	= IORESOURCE_DMA,
+-	},
+-	[3] = {
+-		/* DRCMR for TX */
+-		.start	= 67,
+-		.end	= 67,
+-		.flags	= IORESOURCE_DMA,
+-	},
+ };
+ 
+ struct platform_device pxa27x_device_ssp3 = {
+@@ -895,16 +803,6 @@ static struct resource pxa3xx_resources_mci2[] = {
+ 		.end	= IRQ_MMC2,
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+-	[2] = {
+-		.start	= 93,
+-		.end	= 93,
+-		.flags	= IORESOURCE_DMA,
+-	},
+-	[3] = {
+-		.start	= 94,
+-		.end	= 94,
+-		.flags	= IORESOURCE_DMA,
+-	},
+ };
+ 
+ struct platform_device pxa3xx_device_mci2 = {
+@@ -934,16 +832,6 @@ static struct resource pxa3xx_resources_mci3[] = {
+ 		.end	= IRQ_MMC3,
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+-	[2] = {
+-		.start	= 100,
+-		.end	= 100,
+-		.flags	= IORESOURCE_DMA,
+-	},
+-	[3] = {
+-		.start	= 101,
+-		.end	= 101,
+-		.flags	= IORESOURCE_DMA,
+-	},
+ };
+ 
+ struct platform_device pxa3xx_device_mci3 = {
+@@ -1021,18 +909,6 @@ static struct resource pxa3xx_resources_nand[] = {
+ 		.end	= IRQ_NAND,
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+-	[2] = {
+-		/* DRCMR for Data DMA */
+-		.start	= 97,
+-		.end	= 97,
+-		.flags	= IORESOURCE_DMA,
+-	},
+-	[3] = {
+-		/* DRCMR for Command DMA */
+-		.start	= 99,
+-		.end	= 99,
+-		.flags	= IORESOURCE_DMA,
+-	},
+ };
+ 
+ static u64 pxa3xx_nand_dma_mask = DMA_BIT_MASK(32);
+@@ -1066,18 +942,6 @@ static struct resource pxa3xx_resource_ssp4[] = {
+ 		.end	= IRQ_SSP4,
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+-	[2] = {
+-		/* DRCMR for RX */
+-		.start	= 2,
+-		.end	= 2,
+-		.flags	= IORESOURCE_DMA,
+-	},
+-	[3] = {
+-		/* DRCMR for TX */
+-		.start	= 3,
+-		.end	= 3,
+-		.flags	= IORESOURCE_DMA,
+-	},
+ };
+ 
+ /*
 -- 
 2.18.0.rc2
