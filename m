@@ -1,66 +1,36 @@
-From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Mon, 25 Jun 2018 14:02:54 +0200
-Subject: [PATCH v3 14/24] drm/sun4i: Add support for R40 mixers
-In-Reply-To: <20180625120304.7543-1-jernej.skrabec@siol.net>
-References: <20180625120304.7543-1-jernej.skrabec@siol.net>
-Message-ID: <20180625120304.7543-15-jernej.skrabec@siol.net>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 25 Jun 2018 09:26:16 -0300
+Subject: [PATCH] usb: chipidea: Fix ULPI on imx51
+In-Reply-To: <20180625121813.rzqgzdbk6ue73eq4@earth.universe>
+References: <20180530173414.6121-1-andrew.smirnov@gmail.com>
+ <CAOMZO5AyAegbvUtX42by99mU8yQfi91bmhJfd9iqu1Ak0dEHiw@mail.gmail.com>
+ <CAOMZO5DJj=oQfsB-vNP=81HCiy-69j-5U+Km9P6LxGpnLx9xzg@mail.gmail.com>
+ <CAHQ1cqHxq+RM1nNHECY75Cojd_kxu1ERLe6+MhMLUa5kb10r8w@mail.gmail.com>
+ <CAOMZO5B98O9XA8GhdWxJZ6DFgS=O+smHURm8v5jEirj31tuUhg@mail.gmail.com>
+ <CAHQ1cqELs4LaQkmPiPjXQuF17+7PBsEtbmSt8iveLqRv+4bgfQ@mail.gmail.com>
+ <CAOMZO5CumdNSP6iTfgXPdmpcZwh7YmBstUpAmb3A1QAf1UWJdw@mail.gmail.com>
+ <CAHQ1cqHpNvZGAfFKrp-OiZevsha5CBwJsw8GT+uhgNSfEUejkw@mail.gmail.com>
+ <CAOMZO5DAbooRgA+sHJa5EmEGy-CHW3FPydcOFtK5AqpdJzD7MQ@mail.gmail.com>
+ <20180625121813.rzqgzdbk6ue73eq4@earth.universe>
+Message-ID: <CAOMZO5B_tVj8niY10m2Q1vnr3Az74pwX+BgTo0DaN+PdM4xTYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Both mixers have similar capabilities as others SoCs with DE2.
+Hi Sebastian,
 
-First mixer has 1 VI and 3 UI planes and supports HW scaling on all
-planes.
+On Mon, Jun 25, 2018 at 9:18 AM, Sebastian Reichel
+<sebastian.reichel@collabora.co.uk> wrote:
 
-Second mixer has 1 VI and 1 UI planes and also supports HW scaling on
-all planes.
+> I still have access to the imx53 based PPD from General Electric.
+> But I don't understand what patch you want me to test. FWIW the
+> images I use(d) for testing already had CONFIG_USB_CHIPIDEA_ULPI
+> and CONFIG_USB_ULPI_BUS enabled.
 
-Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
----
- drivers/gpu/drm/sun4i/sun8i_mixer.c | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+I was referring to the patch that enables CONFIG_USB_CHIPIDEA_ULPI and
+CONFIG_USB_ULPI_BUS.
 
-diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.c b/drivers/gpu/drm/sun4i/sun8i_mixer.c
-index 126899d6f0d3..ee8febb25903 100644
---- a/drivers/gpu/drm/sun4i/sun8i_mixer.c
-+++ b/drivers/gpu/drm/sun4i/sun8i_mixer.c
-@@ -500,6 +500,22 @@ static const struct sun8i_mixer_cfg sun8i_h3_mixer0_cfg = {
- 	.vi_num		= 1,
- };
- 
-+static const struct sun8i_mixer_cfg sun8i_r40_mixer0_cfg = {
-+	.ccsc		= 0,
-+	.mod_rate	= 297000000,
-+	.scaler_mask	= 0xf,
-+	.ui_num		= 3,
-+	.vi_num		= 1,
-+};
-+
-+static const struct sun8i_mixer_cfg sun8i_r40_mixer1_cfg = {
-+	.ccsc		= 1,
-+	.mod_rate	= 297000000,
-+	.scaler_mask	= 0x3,
-+	.ui_num		= 1,
-+	.vi_num		= 1,
-+};
-+
- static const struct sun8i_mixer_cfg sun8i_v3s_mixer_cfg = {
- 	.vi_num = 2,
- 	.ui_num = 1,
-@@ -521,6 +537,14 @@ static const struct of_device_id sun8i_mixer_of_table[] = {
- 		.compatible = "allwinner,sun8i-h3-de2-mixer-0",
- 		.data = &sun8i_h3_mixer0_cfg,
- 	},
-+	{
-+		.compatible = "allwinner,sun8i-r40-de2-mixer-0",
-+		.data = &sun8i_r40_mixer0_cfg,
-+	},
-+	{
-+		.compatible = "allwinner,sun8i-r40-de2-mixer-1",
-+		.data = &sun8i_r40_mixer1_cfg,
-+	},
- 	{
- 		.compatible = "allwinner,sun8i-v3s-de2-mixer",
- 		.data = &sun8i_v3s_mixer_cfg,
--- 
-2.18.0
+Will submit this change as suggested by Andrey.
+
+Regards,
+
+Fabio Estevam
