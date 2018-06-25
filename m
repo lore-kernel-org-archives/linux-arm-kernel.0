@@ -1,72 +1,92 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 25 Jun 2018 16:03:23 +0200
-Subject: [PATCH 28/29] arm64: dts: renesas: salvator-common: Add HSCIF1 device
- support
+Date: Mon, 25 Jun 2018 16:03:14 +0200
+Subject: [PATCH 19/29] arm64: dts: renesas: r8a77990: Add secondary CA53 CPU
+ core
 In-Reply-To: <cover.1529933747.git.horms+renesas@verge.net.au>
 References: <cover.1529933747.git.horms+renesas@verge.net.au>
-Message-ID: <b6d3134ddcbe4d3c3986e4e7b649467a19045949.1529933747.git.horms+renesas@verge.net.au>
+Message-ID: <7085f5d9e803688045e92ccb69e1f7fe0eee9621.1529933747.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hiromitsu Yamasaki <hiromitsu.yamasaki.ym@renesas.com>
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-This patch adds pin control for HSCIF1, and supports connection with
-Debug Serial-1 (CN26) on Salvator boards.
+Add a device node for the second Cortex-A53 CPU core on the Renesas
+R-Car E3 (r8a77990) SoC, and adjust the interrupt delivery masks for ARM
+Generic Interrupt Controller and Architectured Timer.
 
-SCIF1 and HSCIF1 are sharing the pins connected to Debug Serial-1 (CN26)
-on Salvator boards, and it is necessary to ensure that either SCIF1 or
-HSCIF1 is enabled, not both.
+Based on a patch in the BSP by Takeshi Kihara.
 
-As for the default of this DeviceTree, SCIF1 is connected.
-
-Signed-off-by: Hiromitsu Yamasaki <hiromitsu.yamasaki.ym@renesas.com>
-Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-[geert: Add missing "uart-has-rtscts"]
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/salvator-common.dtsi | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a77990.dtsi | 27 ++++++++++++++++++---------
+ 1 file changed, 18 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/renesas/salvator-common.dtsi b/arch/arm64/boot/dts/renesas/salvator-common.dtsi
-index 320250d708c3..ce808d3f9f62 100644
---- a/arch/arm64/boot/dts/renesas/salvator-common.dtsi
-+++ b/arch/arm64/boot/dts/renesas/salvator-common.dtsi
-@@ -338,6 +338,15 @@
- 	clock-frequency = <32768>;
- };
+diff --git a/arch/arm64/boot/dts/renesas/r8a77990.dtsi b/arch/arm64/boot/dts/renesas/r8a77990.dtsi
+index e644f49c9b58..735881d4e57a 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77990.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a77990.dtsi
+@@ -17,16 +17,24 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
  
-+&hscif1 {
-+	pinctrl-0 = <&hscif1_pins>;
-+	pinctrl-names = "default";
+-		/* 1 core only at this point */
+ 		a53_0: cpu at 0 {
+ 			compatible = "arm,cortex-a53", "arm,armv8";
+-			reg = <0x0>;
++			reg = <0>;
+ 			device_type = "cpu";
+ 			power-domains = <&sysc 5>;
+ 			next-level-cache = <&L2_CA53>;
+ 			enable-method = "psci";
+ 		};
+ 
++		a53_1: cpu at 1 {
++			compatible = "arm,cortex-a53", "arm,armv8";
++			reg = <1>;
++			device_type = "cpu";
++			power-domains = <&sysc 6>;
++			next-level-cache = <&L2_CA53>;
++			enable-method = "psci";
++		};
 +
-+	uart-has-rtscts;
-+	/* Please only enable hscif1 or scif1 */
-+	/* status = "okay"; */
-+};
-+
- &hsusb {
- 	dr_mode = "otg";
- 	status = "okay";
-@@ -543,6 +552,11 @@
- 		function = "du";
+ 		L2_CA53: cache-controller-0 {
+ 			compatible = "cache";
+ 			power-domains = <&sysc 21>;
+@@ -44,8 +52,9 @@
+ 
+ 	pmu_a53 {
+ 		compatible = "arm,cortex-a53-pmu";
+-		interrupts-extended = <&gic GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
+-		interrupt-affinity = <&a53_0>;
++		interrupts-extended = <&gic GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>,
++				      <&gic GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-affinity = <&a53_0>, <&a53_1>;
  	};
  
-+	hscif1_pins: hscif1 {
-+		groups = "hscif1_data_a", "hscif1_ctrl_a";
-+		function = "hscif1";
-+	};
-+
- 	i2c2_pins: i2c2 {
- 		groups = "i2c2_a";
- 		function = "i2c2";
-@@ -708,6 +722,7 @@
- 	pinctrl-names = "default";
+ 	psci {
+@@ -268,7 +277,7 @@
+ 			      <0x0 0xf1040000 0 0x20000>,
+ 			      <0x0 0xf1060000 0 0x20000>;
+ 			interrupts = <GIC_PPI 9
+-					(GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_HIGH)>;
++					(GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>;
+ 			clocks = <&cpg CPG_MOD 408>;
+ 			clock-names = "clk";
+ 			power-domains = <&sysc 32>;
+@@ -283,9 +292,9 @@
  
- 	uart-has-rtscts;
-+	/* Please only enable hscif1 or scif1 */
- 	status = "okay";
+ 	timer {
+ 		compatible = "arm,armv8-timer";
+-		interrupts-extended = <&gic GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>,
+-				      <&gic GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>,
+-				      <&gic GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>,
+-				      <&gic GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>;
++		interrupts-extended = <&gic GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
++				      <&gic GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
++				      <&gic GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
++				      <&gic GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>;
+ 	};
  };
- 
 -- 
 2.11.0
