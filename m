@@ -1,59 +1,48 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Mon, 25 Jun 2018 17:50:13 +0200
-Subject: [PATCH 02/14] ARM: davinci: dm365-evm: use nvmem lookup for mac
- address
-In-Reply-To: <20180625155025.12567-1-brgl@bgdev.pl>
-References: <20180625155025.12567-1-brgl@bgdev.pl>
-Message-ID: <20180625155025.12567-3-brgl@bgdev.pl>
+Date: Mon, 25 Jun 2018 18:09:45 +0200
+Subject: [PATCH 1/9] clk: davinci: psc-dm365: use two lookup entries for
+ the aemif clock
+In-Reply-To: <c8d28664-e0fb-5a02-3c5b-b78684f87648@lechnology.com>
+References: <20180625152920.11549-1-brgl@bgdev.pl>
+ <20180625152920.11549-2-brgl@bgdev.pl>
+ <241fed6e-b414-feac-8e6c-39713c5e665e@lechnology.com>
+ <CAMRc=MdTdoL9qsrMAxhCTaQM7HGrAPpTVjDuHQ81Q5O-QMNcYQ@mail.gmail.com>
+ <c8d28664-e0fb-5a02-3c5b-b78684f87648@lechnology.com>
+Message-ID: <CAMRc=MdsTAz7rd6W0M8gcmY0-PfNY9RGW6hxrfhECecbkm2E1g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+2018-06-25 18:06 GMT+02:00 David Lechner <david@lechnology.com>:
+> On 06/25/2018 11:01 AM, Bartosz Golaszewski wrote:
+>>
+>> 2018-06-25 17:53 GMT+02:00 David Lechner <david@lechnology.com>:
+>>>
+>>> On 06/25/2018 10:29 AM, Bartosz Golaszewski wrote:
+>>>>
+>>>>
+>>>> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>>>>
+>>>> We want to be able to get the clock both from the board file by its
+>>>> con_id and from the aemif driver by dev_id.
+>>>
+>>>
+>>>
+>>> What about the other SoCs? Don't they need this change as well?
+>>>
+>>
+>> So I double checked and turns out I missed one other board that's
+>> affected by this series and calls clk_get() from machine code:
+>> dm644x-evm.
+>>
+>> I'll fix it in v2.
+>
+>
+> The ti-aemif platform driver also does clk_get(). Don't you need
+> lookups to make that work as well? For example, DA830 doesn't have
+> a clock lookup for aemif at all.
+>
 
-We now support nvmem lookups for machine code. Add a lookup for
-mac-address.
+Right, I'll check that too.
 
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
----
- arch/arm/mach-davinci/board-dm365-evm.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
-
-diff --git a/arch/arm/mach-davinci/board-dm365-evm.c b/arch/arm/mach-davinci/board-dm365-evm.c
-index 435f7ec7d9af..df640d977bfa 100644
---- a/arch/arm/mach-davinci/board-dm365-evm.c
-+++ b/arch/arm/mach-davinci/board-dm365-evm.c
-@@ -28,6 +28,7 @@
- #include <linux/spi/spi.h>
- #include <linux/spi/eeprom.h>
- #include <linux/v4l2-dv-timings.h>
-+#include <linux/nvmem-provider.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -169,6 +170,15 @@ static struct platform_device davinci_nand_device = {
- 	},
- };
- 
-+static struct nvmem_cell_lookup dm365evm_mac_address_cell = {
-+	.info = {
-+		.name = "mac-address",
-+		.offset = 0x7f00,
-+		.bytes = ETH_ALEN,
-+	},
-+	.nvmem_name = "1-00500",
-+};
-+
- static struct at24_platform_data eeprom_info = {
- 	.byte_len       = (256*1024) / 8,
- 	.page_size      = 64,
-@@ -769,6 +779,8 @@ static __init void dm365_evm_init(void)
- 
- 	dm365_init_spi0(BIT(0), dm365_evm_spi_info,
- 			ARRAY_SIZE(dm365_evm_spi_info));
-+
-+	nvmem_register_lookup(&dm365evm_mac_address_cell, 1);
- }
- 
- MACHINE_START(DAVINCI_DM365_EVM, "DaVinci DM365 EVM")
--- 
-2.17.1
+Thanks,
+Bart
