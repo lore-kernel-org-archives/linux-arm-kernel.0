@@ -1,62 +1,74 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Mon, 25 Jun 2018 17:50:25 +0200
-Subject: [PATCH 14/14] ARM: davinci: sffsdr: use device properties for at24
- eeprom
-In-Reply-To: <20180625155025.12567-1-brgl@bgdev.pl>
-References: <20180625155025.12567-1-brgl@bgdev.pl>
-Message-ID: <20180625155025.12567-15-brgl@bgdev.pl>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Mon, 25 Jun 2018 17:58:05 +0200
+Subject: [PATCH v2 3/7] bus: add bus driver for accessing Allwinner A64 DE2
+In-Reply-To: <20180622124540.56203-2-icenowy@aosc.io>
+References: <20180622124540.56203-1-icenowy@aosc.io>
+ <20180622124540.56203-2-icenowy@aosc.io>
+Message-ID: <20180625155805.kds7bl3cburblwv6@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+On Fri, Jun 22, 2018 at 08:45:36PM +0800, Icenowy Zheng wrote:
+> The "Display Engine 2.0" (usually called DE2) on the Allwinner A64 SoC
+> is different from the ones on other Allwinner SoCs. It requires a SRAM
+> region to be claimed, otherwise all DE2 subblocks won't be accessible.
+> 
+> Add a bus driver for the Allwinner A64 DE2 part which claims the SRAM
+> region when probing.
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> ---
+> No changes since v1.
+> 
+>  drivers/bus/Kconfig      | 10 ++++++++
+>  drivers/bus/Makefile     |  1 +
+>  drivers/bus/sun50i-de2.c | 49 ++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 60 insertions(+)
+>  create mode 100644 drivers/bus/sun50i-de2.c
+> 
+> diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
+> index d1c0b60e9326..1851112ccc29 100644
+> --- a/drivers/bus/Kconfig
+> +++ b/drivers/bus/Kconfig
+> @@ -103,6 +103,16 @@ config SIMPLE_PM_BUS
+>  	  Controller (BSC, sometimes called "LBSC within Bus Bridge", or
+>  	  "External Bus Interface") as found on several Renesas ARM SoCs.
+>  
+> +config SUN50I_DE2_BUS
+> +	bool "Allwinner A64 DE2 Bus Driver"
+> +	  default ARM64
+> +	  depends on ARCH_SUNXI
+> +	  select SUNXI_SRAM
+> +	  help
 
-We want to work towards phasing out the at24_platform_data structure.
-There are few users and its contents can be represented using generic
-device properties. Using device properties only will allow us to
-significantly simplify the at24 configuration code.
+The alignment here should be one tab.
 
-Remove the at24_platform_data structure and replace it with an array
-of property entries. Drop the byte_len/size property, as the model name
-already implies the EEPROM's size.
+> +static int sun50i_de2_bus_probe(struct platform_device *pdev)
+> +{
+> +	struct device_node *np = pdev->dev.of_node;
+> +	int ret;
+> +
+> +	ret = sunxi_sram_claim(&pdev->dev);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "Error couldn't map SRAM to device\n");
+> +		return ret;
+> +	}
+> +
+> +	if (np)
+> +		of_platform_populate(np, NULL, NULL, &pdev->dev);
 
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
----
- arch/arm/mach-davinci/board-sffsdr.c | 11 +++++------
- 1 file changed, 5 insertions(+), 6 deletions(-)
+Why do you need to test np here?
 
-diff --git a/arch/arm/mach-davinci/board-sffsdr.c b/arch/arm/mach-davinci/board-sffsdr.c
-index f6a4d094cbc3..680e5d7628a8 100644
---- a/arch/arm/mach-davinci/board-sffsdr.c
-+++ b/arch/arm/mach-davinci/board-sffsdr.c
-@@ -26,7 +26,7 @@
- #include <linux/init.h>
- #include <linux/platform_device.h>
- #include <linux/i2c.h>
--#include <linux/platform_data/at24.h>
-+#include <linux/property.h>
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/rawnand.h>
- #include <linux/mtd/partitions.h>
-@@ -92,16 +92,15 @@ static struct platform_device davinci_sffsdr_nandflash_device = {
- 	.resource	= davinci_sffsdr_nandflash_resource,
- };
- 
--static struct at24_platform_data eeprom_info = {
--	.byte_len	= (64*1024) / 8,
--	.page_size	= 32,
--	.flags		= AT24_FLAG_ADDR16,
-+static const struct property_entry eeprom_properties[] = {
-+	PROPERTY_ENTRY_U32("pagesize", 32),
-+	{ },
- };
- 
- static struct i2c_board_info __initdata i2c_info[] =  {
- 	{
- 		I2C_BOARD_INFO("24c64", 0x50),
--		.platform_data	= &eeprom_info,
-+		.properties = eeprom_properties,
- 	},
- 	/* Other I2C devices:
- 	 * MSP430,  addr 0x23 (not used)
+Maxime
+
 -- 
-2.17.1
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180625/e5be02c6/attachment.sig>
