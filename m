@@ -1,45 +1,42 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 25 Jun 2018 09:34:03 -0300
-Subject: [PATCH 2/2] ARM: imx_v6_v7_defconfig: Select ULPI support
-In-Reply-To: <1529930043-6387-1-git-send-email-festevam@gmail.com>
-References: <1529930043-6387-1-git-send-email-festevam@gmail.com>
-Message-ID: <1529930043-6387-2-git-send-email-festevam@gmail.com>
+From: yangbo.lu@nxp.com (Yangbo Lu)
+Date: Mon, 25 Jun 2018 20:37:07 +0800
+Subject: [v4, 01/10] fsl/fman: share the event interrupt
+In-Reply-To: <20180625123716.28993-1-yangbo.lu@nxp.com>
+References: <20180625123716.28993-1-yangbo.lu@nxp.com>
+Message-ID: <20180625123716.28993-2-yangbo.lu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@nxp.com>
+This patch is to share fman event interrupt because
+the 1588 timer driver will also use this interrupt.
 
-Select CONFIG_USB_CHIPIDEA_ULPI and CONFIG_USB_ULPI_BUS so that
-USB ULPI can be functional on some boards like imx51-babbge.
-
-This fixes a kernel hang in 4.18-rc1 on i.mx51-babbage when
-the bootloader does not initialize USB.
-
-Suggested-by: Andrey Smirnov <andrew.smirnov@gmail.com>
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
+Acked-by: Richard Cochran <richardcochran@gmail.com>
+Acked-by: Madalin Bucur <madalin.bucur@nxp.com>
 ---
- arch/arm/configs/imx_v6_v7_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+Changes for v2:
+	- None.
+Changes for v3:
+	- None.
+Changes for v4:
+	- Added ACKs.
+---
+ drivers/net/ethernet/freescale/fman/fman.c |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index d14de86..2da678c 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -300,6 +300,7 @@ CONFIG_USB_STORAGE=y
- CONFIG_USB_CHIPIDEA=y
- CONFIG_USB_CHIPIDEA_UDC=y
- CONFIG_USB_CHIPIDEA_HOST=y
-+CONFIG_USB_CHIPIDEA_ULPI=y
- CONFIG_USB_SERIAL=m
- CONFIG_USB_SERIAL_GENERIC=y
- CONFIG_USB_SERIAL_FTDI_SIO=m
-@@ -336,6 +337,7 @@ CONFIG_USB_GADGETFS=m
- CONFIG_USB_FUNCTIONFS=m
- CONFIG_USB_MASS_STORAGE=m
- CONFIG_USB_G_SERIAL=m
-+CONFIG_USB_ULPI_BUS=y
- CONFIG_MMC=y
- CONFIG_MMC_SDHCI=y
- CONFIG_MMC_SDHCI_PLTFM=y
+diff --git a/drivers/net/ethernet/freescale/fman/fman.c b/drivers/net/ethernet/freescale/fman/fman.c
+index 9530405..c415ac6 100644
+--- a/drivers/net/ethernet/freescale/fman/fman.c
++++ b/drivers/net/ethernet/freescale/fman/fman.c
+@@ -2801,7 +2801,8 @@ static irqreturn_t fman_irq(int irq, void *handle)
+ 	of_node_put(muram_node);
+ 	of_node_put(fm_node);
+ 
+-	err = devm_request_irq(&of_dev->dev, irq, fman_irq, 0, "fman", fman);
++	err = devm_request_irq(&of_dev->dev, irq, fman_irq, IRQF_SHARED,
++			       "fman", fman);
+ 	if (err < 0) {
+ 		dev_err(&of_dev->dev, "%s: irq %d allocation failed (error = %d)\n",
+ 			__func__, irq, err);
 -- 
-2.7.4
+1.7.1
