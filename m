@@ -1,48 +1,104 @@
-From: dinguyen@kernel.org (Dinh Nguyen)
-Date: Mon, 25 Jun 2018 08:42:20 -0500
-Subject: [GIT PULL] SoCFPGA DTS fixes for v4.18
-Message-ID: <1529934140-27012-1-git-send-email-dinguyen@kernel.org>
+From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
+Date: Mon, 25 Jun 2018 15:42:52 +0200
+Subject: [PATCH 8/9] media: cedrus: Add start and stop decoder operations
+In-Reply-To: <20180625133233.3b7qup3tcgydfo5t@flea>
+References: <20180613140714.1686-1-maxime.ripard@bootlin.com>
+ <20180613140714.1686-9-maxime.ripard@bootlin.com>
+ <f37f23580c92728bbcd5bfe3fff506b5bb2bdfd0.camel@bootlin.com>
+ <20180625133233.3b7qup3tcgydfo5t@flea>
+Message-ID: <bb4dea42891f1857a994b3b7f7c4f34f52acc41c.camel@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Kevin, and Olof:
+Hi,
 
-Please pull in these SoCFPGA Stratix10 DTS fixes for v4.18.
+On Mon, 2018-06-25 at 15:32 +0200, Maxime Ripard wrote:
+> On Thu, Jun 21, 2018 at 05:38:23PM +0200, Paul Kocialkowski wrote:
+> > Hi,
+> > 
+> > On Wed, 2018-06-13 at 16:07 +0200, Maxime Ripard wrote:
+> > > Some codec needs to perform some additional task when a decoding is started
+> > > and stopped, and not only at every frame.
+> > > 
+> > > For example, the H264 decoding support needs to allocate buffers that will
+> > > be used in the decoding process, but do not need to change over time, or at
+> > > each frame.
+> > > 
+> > > In order to allow that for codecs, introduce a start and stop hook that
+> > > will be called if present at start_streaming and stop_streaming time.
+> > > 
+> > > Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+> > > ---
+> > >  .../platform/sunxi/cedrus/sunxi_cedrus_common.h    |  2 ++
+> > >  .../platform/sunxi/cedrus/sunxi_cedrus_video.c     | 14 +++++++++++++-
+> > >  2 files changed, 15 insertions(+), 1 deletion(-)
+> > > 
+> > > diff --git a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h
+> > > index a2a507eb9fc9..20c78ec1f037 100644
+> > > --- a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h
+> > > +++ b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h
+> > > @@ -120,6 +120,8 @@ struct sunxi_cedrus_dec_ops {
+> > >  	enum sunxi_cedrus_irq_status (*irq_status)(struct sunxi_cedrus_ctx *ctx);
+> > >  	void (*setup)(struct sunxi_cedrus_ctx *ctx,
+> > >  		      struct sunxi_cedrus_run *run);
+> > > +	int (*start)(struct sunxi_cedrus_ctx *ctx);
+> > > +	void (*stop)(struct sunxi_cedrus_ctx *ctx);
+> > >  	void (*trigger)(struct sunxi_cedrus_ctx *ctx);
+> > >  };
+> > >  
+> > > diff --git a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_video.c b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_video.c
+> > > index fb7b081a5bb7..d93461178857 100644
+> > > --- a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_video.c
+> > > +++ b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_video.c
+> > > @@ -416,6 +416,8 @@ static int sunxi_cedrus_buf_prepare(struct vb2_buffer *vb)
+> > >  static int sunxi_cedrus_start_streaming(struct vb2_queue *q, unsigned int count)
+> > >  {
+> > >  	struct sunxi_cedrus_ctx *ctx = vb2_get_drv_priv(q);
+> > > +	struct sunxi_cedrus_dev *dev = ctx->dev;
+> > > +	int ret = 0;
+> > >  
+> > >  	switch (ctx->vpu_src_fmt->fourcc) {
+> > >  	case V4L2_PIX_FMT_MPEG2_FRAME:
+> > > @@ -425,16 +427,26 @@ static int sunxi_cedrus_start_streaming(struct vb2_queue *q, unsigned int count)
+> > >  		return -EINVAL;
+> > >  	}
+> > >  
+> > > -	return 0;
+> > > +	if (V4L2_TYPE_IS_OUTPUT(q->type) &&
+> > 
+> > I suppose this check was put in place to ensure that ->start is only
+> > called once, but what if start_streaming is called multiple times on
+> > output? Am I totally unsure about whether the API guarantees that we
+> > only get one start_streaming call per buffer queue, regardless of how
+> > many userspace issues.
+> > 
+> > If we don't have such a guarantee, we probably need an internal
+> > mechanism to avoid having ->start called more than once.
+> 
+> As far as I understand it, start_streaming can only be called once:
+> https://elixir.bootlin.com/linux/latest/source/include/media/videobuf2-core.h#L357
 
-Thanks,
-Dinh
+And there's definitely a check in vb2_core_streamon:
 
-The following changes since commit 7daf201d7fe8334e2d2364d4e8ed3394ec9af819:
+	if (q->streaming) {
+		dprintk(3, "already streaming\n");
+		return 0;
+	}
 
-  Linux 4.18-rc2 (2018-06-24 20:54:29 +0800)
+so it looks like we're safe :)
 
-are available in the git repository at:
+Cheers,
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git tags/socfpga_for_next_v4.18_fixes
+Paul
 
-for you to fetch changes up to ea38969d539d59e51e0b4bce4c5c6efcbffb0ade:
-
-  ARM: dts: Fix SPI node for Arria10 (2018-06-25 08:28:55 -0500)
-
-----------------------------------------------------------------
-ARM: dts: socfpga: fix NAND support
-- NAND should be using nand_x_clk, not nand_clk
-- fix NAND node compatible for Cyclone5 and Arria10
-- fix SPI node properties(unused bus-num, and use num-cs)
-
-----------------------------------------------------------------
-Dinh Nguyen (1):
-      ARM: dts: socfpga: Fix NAND controller node compatible for Arria10
-
-Marek Vasut (2):
-      ARM: dts: socfpga: Fix NAND controller clock supply
-      ARM: dts: socfpga: Fix NAND controller node compatible
-
-Thor Thayer (2):
-      arm64: dts: stratix10: Fix SPI nodes for Stratix10
-      ARM: dts: Fix SPI node for Arria10
-
- arch/arm/boot/dts/socfpga.dtsi                    | 4 ++--
- arch/arm/boot/dts/socfpga_arria10.dtsi            | 5 ++---
- arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi | 6 ++----
- 3 files changed, 6 insertions(+), 9 deletions(-)
+-- 
+Paul Kocialkowski, Bootlin (formerly Free Electrons)
+Embedded Linux and kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180625/76ab4b3a/attachment.sig>
