@@ -1,24 +1,25 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 25 Jun 2018 22:18:03 +0200
-Subject: [PATCH] arm: dts: pxa3xx: provide correct clk-names property for
- nand controller node
-In-Reply-To: <20180624174205.20648-1-daniel@zonque.org> (Daniel Mack's message
- of "Sun, 24 Jun 2018 19:42:05 +0200")
-References: <20180624174205.20648-1-daniel@zonque.org>
-Message-ID: <87po0emxhg.fsf@belgarion.home>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 25 Jun 2018 14:18:34 -0600
+Subject: [PATCH v2 2/7] dt-bindings: add binding for the Allwinner A64
+ DE2 bus
+In-Reply-To: <20180622124540.56203-1-icenowy@aosc.io>
+References: <20180622124540.56203-1-icenowy@aosc.io>
+Message-ID: <20180625201834.GA14276@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel Mack <daniel@zonque.org> writes:
+On Fri, Jun 22, 2018 at 08:45:35PM +0800, Icenowy Zheng wrote:
+> All the sub-blocks of Allwinner A64 DE2 needs the SRAM C on A64 SoC to
+> be claimed, otherwise the whole DE2 space is inaccessible.
+> 
+> Add a device tree binding of the DE2 part as a sub-bus.
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> ---
+> No changes since v1.
+> 
+>  .../bindings/bus/sun50i-de2-bus.txt           | 37 +++++++++++++++++++
+>  1 file changed, 37 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/bus/sun50i-de2-bus.txt
 
-> The NAND driver looks for a clock named "core" and falls back to a pdev
-> clock that has a wrong rate if not set.
->
-> Signed-off-by: Daniel Mack <daniel@zonque.org>
-Applied to pxa/dt with a small "line swap", ie. clock-names is one line below
-"clocks" line.
-
-Cheers.
-
--- 
-Robert
+Reviewed-by: Rob Herring <robh@kernel.org>
