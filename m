@@ -1,55 +1,117 @@
-From: mhocko@kernel.org (Michal Hocko)
-Date: Mon, 25 Jun 2018 19:53:12 +0200
-Subject: [PATCH v3 0/3] fix free pmd/pte page handlings on x86
-In-Reply-To: <1529938470.14039.134.camel@hpe.com>
-References: <20180516233207.1580-1-toshi.kani@hpe.com>
- <alpine.DEB.2.21.1806241516410.8650@nanos.tec.linutronix.de>
- <1529938470.14039.134.camel@hpe.com>
-Message-ID: <20180625175225.GQ28965@dhcp22.suse.cz>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 25 Jun 2018 18:54:43 +0100
+Subject: [PATCH 1/3] arm64: rseq: Implement backend rseq calls and select
+ HAVE_RSEQ
+In-Reply-To: <1529949285-11013-1-git-send-email-will.deacon@arm.com>
+References: <1529949285-11013-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1529949285-11013-2-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 25-06-18 14:56:26, Kani Toshimitsu wrote:
-> On Sun, 2018-06-24 at 15:19 +0200, Thomas Gleixner wrote:
-> > On Wed, 16 May 2018, Toshi Kani wrote:
-> > 
-> > > This series fixes two issues in the x86 ioremap free page handlings
-> > > for pud/pmd mappings.
-> > > 
-> > > Patch 01 fixes BUG_ON on x86-PAE reported by Joerg.  It disables
-> > > the free page handling on x86-PAE.
-> > > 
-> > > Patch 02-03 fixes a possible issue with speculation which can cause
-> > > stale page-directory cache.
-> > >  - Patch 02 is from Chintan's v9 01/04 patch [1], which adds a new arg
-> > >    'addr', with my merge change to patch 01.
-> > >  - Patch 03 adds a TLB purge (INVLPG) to purge page-structure caches
-> > >    that may be cached by speculation.  See the patch descriptions for
-> > >    more detal.
-> > 
-> > Toshi, Joerg, Michal!
-> 
-> Hi Thomas,
-> 
-> Thanks for checking. I was about to ping as well.
-> 
-> > I'm failing to find a conclusion of this discussion. Can we finally make
-> > some progress with that?
-> 
-> I have not heard from Joerg since I last replied to his comments to
-> Patch 3/3 -- I did my best to explain that there was no issue in the
-> single page allocation in pud_free_pmd_page().  From my perspective, the
->  v3 series is good to go.
+Implement calls to rseq_signal_deliver, rseq_handle_notify_resume
+and rseq_syscall so that we can select HAVE_RSEQ on arm64.
 
-Well, I admit that this not my area but I agree with Joerg that
-allocating memory inside afunction that is supposed to free page table
-is far from ideal. More so that the allocation is hardcoded GFP_KERNEL.
-We already have this antipattern in functions to allocate page tables
-and it has turned to be maintenance PITA longterm. So if there is a way
-around that then I would strongly suggest finding a different solution.
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/Kconfig                | 1 +
+ arch/arm64/include/asm/unistd.h   | 2 +-
+ arch/arm64/include/asm/unistd32.h | 2 ++
+ arch/arm64/kernel/entry.S         | 2 ++
+ arch/arm64/kernel/ptrace.c        | 2 ++
+ arch/arm64/kernel/signal.c        | 3 +++
+ 6 files changed, 11 insertions(+), 1 deletion(-)
 
-Whether that is sufficient to ditch the whole series is not my call
-though.
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 42c090cf0292..26cb550673b2 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -127,6 +127,7 @@ config ARM64
+ 	select HAVE_PERF_USER_STACK_DUMP
+ 	select HAVE_REGS_AND_STACK_ACCESS_API
+ 	select HAVE_RCU_TABLE_FREE
++	select HAVE_RSEQ
+ 	select HAVE_STACKPROTECTOR
+ 	select HAVE_SYSCALL_TRACEPOINTS
+ 	select HAVE_KPROBES
+diff --git a/arch/arm64/include/asm/unistd.h b/arch/arm64/include/asm/unistd.h
+index a0baa9af5487..e0d0f5b856e7 100644
+--- a/arch/arm64/include/asm/unistd.h
++++ b/arch/arm64/include/asm/unistd.h
+@@ -43,7 +43,7 @@
+ #define __ARM_NR_compat_cacheflush	(__ARM_NR_COMPAT_BASE+2)
+ #define __ARM_NR_compat_set_tls		(__ARM_NR_COMPAT_BASE+5)
+ 
+-#define __NR_compat_syscalls		398
++#define __NR_compat_syscalls		399
+ #endif
+ 
+ #define __ARCH_WANT_SYS_CLONE
+diff --git a/arch/arm64/include/asm/unistd32.h b/arch/arm64/include/asm/unistd32.h
+index ef292160748c..0fdc7ef8a776 100644
+--- a/arch/arm64/include/asm/unistd32.h
++++ b/arch/arm64/include/asm/unistd32.h
+@@ -817,6 +817,8 @@ __SYSCALL(__NR_pkey_alloc, sys_pkey_alloc)
+ __SYSCALL(__NR_pkey_free, sys_pkey_free)
+ #define __NR_statx 397
+ __SYSCALL(__NR_statx, sys_statx)
++#define __NR_rseq 398
++__SYSCALL(__NR_rseq, sys_rseq)
+ 
+ /*
+  * Please add new compat syscalls above this comment and update
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index 28ad8799406f..1eda9e1a1f4a 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -904,6 +904,7 @@ ENDPROC(el0_error)
+ ret_fast_syscall:
+ 	disable_daif
+ 	str	x0, [sp, #S_X0]			// returned x0
++#ifndef CONFIG_DEBUG_RSEQ
+ 	ldr	x1, [tsk, #TSK_TI_FLAGS]	// re-check for syscall tracing
+ 	and	x2, x1, #_TIF_SYSCALL_WORK
+ 	cbnz	x2, ret_fast_syscall_trace
+@@ -911,6 +912,7 @@ ret_fast_syscall:
+ 	cbnz	x2, work_pending
+ 	enable_step_tsk x1, x2
+ 	kernel_exit 0
++#endif
+ ret_fast_syscall_trace:
+ 	enable_daif
+ 	b	__sys_trace_return_skipped	// we already saved x0
+diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
+index 5c338ce5a7fa..9f479c111675 100644
+--- a/arch/arm64/kernel/ptrace.c
++++ b/arch/arm64/kernel/ptrace.c
+@@ -1656,6 +1656,8 @@ asmlinkage void syscall_trace_exit(struct pt_regs *regs)
+ 
+ 	if (test_thread_flag(TIF_SYSCALL_TRACE))
+ 		tracehook_report_syscall(regs, PTRACE_SYSCALL_EXIT);
++
++	rseq_syscall(regs);
+ }
+ 
+ /*
+diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+index 511af13e8d8f..e3b1d1b0aee8 100644
+--- a/arch/arm64/kernel/signal.c
++++ b/arch/arm64/kernel/signal.c
+@@ -802,6 +802,8 @@ static void handle_signal(struct ksignal *ksig, struct pt_regs *regs)
+ 	int usig = ksig->sig;
+ 	int ret;
+ 
++	rseq_signal_deliver(ksig, regs);
++
+ 	/*
+ 	 * Set up the stack frame
+ 	 */
+@@ -940,6 +942,7 @@ asmlinkage void do_notify_resume(struct pt_regs *regs,
+ 			if (thread_flags & _TIF_NOTIFY_RESUME) {
+ 				clear_thread_flag(TIF_NOTIFY_RESUME);
+ 				tracehook_notify_resume(regs);
++				rseq_handle_notify_resume(NULL, regs);
+ 			}
+ 
+ 			if (thread_flags & _TIF_FOREIGN_FPSTATE)
 -- 
-Michal Hocko
-SUSE Labs
+2.1.4
