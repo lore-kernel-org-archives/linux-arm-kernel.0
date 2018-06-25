@@ -1,98 +1,263 @@
-From: andrea.merello@gmail.com (Andrea Merello)
-Date: Mon, 25 Jun 2018 11:27:23 +0200
-Subject: [PATCH v3 4/5] dmaengine: xilinx_dma: autodetect whether the HW
- supports scatter-gather
-In-Reply-To: <20180625092724.22164-1-andrea.merello@gmail.com>
-References: <20180625092724.22164-1-andrea.merello@gmail.com>
-Message-ID: <20180625092724.22164-4-andrea.merello@gmail.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Mon, 25 Jun 2018 11:32:10 +0200
+Subject: [PATCH] clk: meson-axg: add clocks required by pcie driver
+In-Reply-To: <20180621122620.13195-1-yixun.lan@amlogic.com>
+References: <20180621122620.13195-1-yixun.lan@amlogic.com>
+Message-ID: <1529919130.2900.22.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AXIDMA and CDMA HW can be either direct-access or scatter-gather
-version. These are SW incompatible.
+On Thu, 2018-06-21 at 12:26 +0000, Yixun Lan wrote:
+> Adding clocks for pcie driver, due to the ASIC design,
+Adding clocks for the pcie driver. Due to the ASIC design,
 
-The driver can handle both version: a DT property was used to
-tell the driver whether to assume the HW is is scatter-gather mode.
+> the pcie controller re-use part of the mipi clock logic,
+> so the mipi clock is also required.
+> 
+> Tested-by: Jianxin Qin <jianxin.qin@amlogic.com>
+> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+> ---
+>  drivers/clk/meson/axg.c              | 145 +++++++++++++++++++++++++++
+>  drivers/clk/meson/axg.h              |   6 +-
+>  include/dt-bindings/clock/axg-clkc.h |   3 +
+>  3 files changed, 153 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/clk/meson/axg.c b/drivers/clk/meson/axg.c
+> index bd4dbc696b88..f1dc5433b69d 100644
+> --- a/drivers/clk/meson/axg.c
+> +++ b/drivers/clk/meson/axg.c
+> @@ -626,6 +626,137 @@ static struct clk_regmap axg_mpll3 = {
+>  	},
+>  };
+>  
+> +static const struct pll_rate_table axg_pcie_pll_rate_table[] = {
+> +	{
+> +		.rate	= 100000000,
+> +		.m	= 200,
+> +		.n	= 3,
+> +		.od	= 1,
+> +		.od2	= 3,
+> +	},
+> +	{ /* sentinel */ },
+> +};
+> +
+> +static const struct reg_sequence axg_pcie_init_regs[] = {
+> +	{ .reg = HHI_PCIE_PLL_CNTL,	.def = 0x400106c8 },
+> +	{ .reg = HHI_PCIE_PLL_CNTL1,	.def = 0x0084a2aa },
+> +	{ .reg = HHI_PCIE_PLL_CNTL2,	.def = 0xb75020be },
+> +	{ .reg = HHI_PCIE_PLL_CNTL3,	.def = 0x0a47488e },
+> +	{ .reg = HHI_PCIE_PLL_CNTL4,	.def = 0xc000004d },
+> +	{ .reg = HHI_PCIE_PLL_CNTL5,	.def = 0x00078000 },
+> +	{ .reg = HHI_PCIE_PLL_CNTL6,	.def = 0x002323c6 },
+> +};
+> +
+> +static struct clk_regmap axg_pcie_pll = {
+> +	.data = &(struct meson_clk_pll_data){
+> +		.m = {
+> +			.reg_off = HHI_PCIE_PLL_CNTL,
+> +			.shift   = 0,
+> +			.width   = 9,
+> +		},
+> +		.n = {
+> +			.reg_off = HHI_PCIE_PLL_CNTL,
+> +			.shift   = 9,
+> +			.width   = 5,
+> +		},
+> +		.od = {
+> +			.reg_off = HHI_PCIE_PLL_CNTL,
+> +			.shift   = 16,
+> +			.width   = 2,
+> +		},
+> +		.od2 = {
+> +			.reg_off = HHI_PCIE_PLL_CNTL6,
+> +			.shift   = 6,
+> +			.width   = 2,
+> +		},
+> +		.frac = {
+> +			.reg_off = HHI_PCIE_PLL_CNTL1,
+> +			.shift   = 0,
+> +			.width   = 12,
+> +		},
+> +		.l = {
+> +			.reg_off = HHI_PCIE_PLL_CNTL,
+> +			.shift   = 31,
+> +			.width   = 1,
+> +		},
+> +		.rst = {
+> +			.reg_off = HHI_PCIE_PLL_CNTL,
+> +			.shift   = 29,
+> +			.width   = 1,
+> +		},
+> +		.table = axg_pcie_pll_rate_table,
+> +		.init_regs = axg_pcie_init_regs,
+> +		.init_count = ARRAY_SIZE(axg_pcie_init_regs),
+> +	},
+> +	.hw.init = &(struct clk_init_data){
+> +		.name = "pcie_pll",
+> +		.ops = &meson_clk_pll_ops,
+> +		.parent_names = (const char *[]){ "xtal" },
+> +		.num_parents = 1,
+> +	},
+> +};
+> +
+> +static struct clk_regmap axg_pcie_mux = {
+> +	.data = &(struct clk_regmap_mux_data){
+> +		.offset = HHI_PCIE_PLL_CNTL6,
+> +		.mask = 0x1,
+> +		.shift = 2,
+> +	},
+> +	.hw.init = &(struct clk_init_data){
+> +		.name = "pcie_mux",
+> +		.ops = &clk_regmap_mux_ops,
+> +		.parent_names = (const char *[]){ "mpll3", "pcie_pll" },
+> +		.num_parents = 2,
+> +		.flags = CLK_SET_RATE_PARENT,
+> +	},
+> +};
+> +
+> +static struct clk_regmap axg_pcie_ref = {
+> +	.data = &(struct clk_regmap_mux_data){
+> +		.offset = HHI_PCIE_PLL_CNTL6,
+> +		.mask = 0x1,
+> +		.shift = 1,
+> +	},
+> +	.hw.init = &(struct clk_init_data){
+> +		.name = "pcie_ref",
+> +		.ops = &clk_regmap_mux_ops,
+> +		/* do not select the first partent, debug only */
+> +		.parent_names = (const char *[]){ "",
+> +			"pcie_mux" },
 
-This patch makes the driver to autodetect this information. The DT
-property is not required anymore.
+A) No declaring a clock name "" is not the way to do it.
 
-No changes for VDMA.
+Either declare a mux with just one parent and provide a table with the index of
+the said parent (have a look around, other clocks mux are using table), OR just
+declare what parent 0 is.
 
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: devicetree at vger.kernel.org
-Cc: Radhey Shyam Pandey <radhey.shyam.pandey@xilinx.com>
-Signed-off-by: Andrea Merello <andrea.merello@gmail.com>
-Reviewed-by: Radhey Shyam Pandey <radhey.shyam.pandey@xilinx.com>
----
-Changes in v2:
-	- autodetect only in !VDMA case
-Changes in v3:
-	- cc DT maintainers/ML
----
- drivers/dma/xilinx/xilinx_dma.c | 14 ++++++++++----
- 1 file changed, 10 insertions(+), 4 deletions(-)
+Looking at your clock, the pcie driver will have to call
+clk_set_rate(clk, 100000000) to make sure everything is setup properly,
+including this mux - otherwise you are relying on the setting provided by the
+bootloader, which should be avoided whenever possible.
 
-diff --git a/drivers/dma/xilinx/xilinx_dma.c b/drivers/dma/xilinx/xilinx_dma.c
-index 7f0ab904b749..43fcc71ff287 100644
---- a/drivers/dma/xilinx/xilinx_dma.c
-+++ b/drivers/dma/xilinx/xilinx_dma.c
-@@ -86,6 +86,7 @@
- #define XILINX_DMA_DMASR_DMA_DEC_ERR		BIT(6)
- #define XILINX_DMA_DMASR_DMA_SLAVE_ERR		BIT(5)
- #define XILINX_DMA_DMASR_DMA_INT_ERR		BIT(4)
-+#define XILINX_DMA_DMASR_SG_MASK		BIT(3)
- #define XILINX_DMA_DMASR_IDLE			BIT(1)
- #define XILINX_DMA_DMASR_HALTED		BIT(0)
- #define XILINX_DMA_DMASR_DELAY_MASK		GENMASK(31, 24)
-@@ -406,7 +407,6 @@ struct xilinx_dma_config {
-  * @dev: Device Structure
-  * @common: DMA device structure
-  * @chan: Driver specific DMA channel
-- * @has_sg: Specifies whether Scatter-Gather is present or not
-  * @mcdma: Specifies whether Multi-Channel is present or not
-  * @flush_on_fsync: Flush on frame sync
-  * @ext_addr: Indicates 64 bit addressing is supported by dma device
-@@ -426,7 +426,6 @@ struct xilinx_dma_device {
- 	struct device *dev;
- 	struct dma_device common;
- 	struct xilinx_dma_chan *chan[XILINX_DMA_MAX_CHANS_PER_DEVICE];
--	bool has_sg;
- 	bool mcdma;
- 	u32 flush_on_fsync;
- 	bool ext_addr;
-@@ -2393,7 +2392,6 @@ static int xilinx_dma_chan_probe(struct xilinx_dma_device *xdev,
- 
- 	chan->dev = xdev->dev;
- 	chan->xdev = xdev;
--	chan->has_sg = xdev->has_sg;
- 	chan->desc_pendingcount = 0x0;
- 	chan->ext_addr = xdev->ext_addr;
- 	/* This variable ensures that descriptors are not
-@@ -2486,6 +2484,15 @@ static int xilinx_dma_chan_probe(struct xilinx_dma_device *xdev,
- 		chan->stop_transfer = xilinx_dma_stop_transfer;
- 	}
- 
-+	/* check if SG is enabled (only for AXIDMA and CDMA) */
-+	if (xdev->dma_config->dmatype != XDMA_TYPE_VDMA) {
-+		if (dma_ctrl_read(chan, XILINX_DMA_REG_DMASR) &
-+		    XILINX_DMA_DMASR_SG_MASK)
-+			chan->has_sg = true;
-+		dev_dbg(chan->dev, "ch %d: SG %s\n", chan->id,
-+			chan->has_sg ? "enabled" : "disabled");
-+	}
-+
- 	/* Initialize the tasklet */
- 	tasklet_init(&chan->tasklet, xilinx_dma_do_tasklet,
- 			(unsigned long)chan);
-@@ -2624,7 +2631,6 @@ static int xilinx_dma_probe(struct platform_device *pdev)
- 		return PTR_ERR(xdev->regs);
- 
- 	/* Retrieve the DMA engine properties from the device tree */
--	xdev->has_sg = of_property_read_bool(node, "xlnx,include-sg");
- 	xdev->max_buffer_len = GENMASK(XILINX_DMA_MAX_TRANS_LEN_MAX - 1, 0);
- 
- 	if (xdev->dma_config->dmatype == XDMA_TYPE_AXIDMA) {
--- 
-2.17.1
+In this case, CCF should pick the right parent anyway, so there should be no
+harm describing what your clock tree is.
+
+B) Please fix the indentation.
+
+C) This mux deal with bit "CML_INPUT_SEL0". there is also a "CML_INPUT_SEL1"
+which seems to hint that there is a mux each CML_EN clock. Are you sure your
+description of the tree is accurate ?
+
+> +		.num_parents = 2,
+> +		.flags = CLK_SET_RATE_PARENT,
+> +	},
+> +};
+> +
+> +static struct clk_regmap axg_pcie_cml_en0 = {
+> +	.data = &(struct clk_regmap_gate_data){
+> +		.offset = HHI_PCIE_PLL_CNTL6,
+> +		.bit_idx = 4,
+> +	},
+> +	.hw.init = &(struct clk_init_data) {
+> +		.name = "pcie_cml_en0",
+> +		.ops = &clk_regmap_gate_ops,
+> +		.parent_names = (const char *[]){ "pcie_ref" },
+> +		.num_parents = 1,
+> +		.flags = CLK_SET_RATE_PARENT,
+> +
+> +	},
+> +};
+> +
+> +static struct clk_regmap axg_pcie_cml_en1 = {
+> +	.data = &(struct clk_regmap_gate_data){
+> +		.offset = HHI_PCIE_PLL_CNTL6,
+> +		.bit_idx = 3,
+> +	},
+> +	.hw.init = &(struct clk_init_data) {
+> +		.name = "pcie_cml_en1",
+> +		.ops = &clk_regmap_gate_ops,
+> +		.parent_names = (const char *[]){ "pcie_ref" },
+> +		.num_parents = 1,
+> +		.flags = CLK_SET_RATE_PARENT,
+> +	},
+> +};
+> +
+>  static u32 mux_table_clk81[]	= { 0, 2, 3, 4, 5, 6, 7 };
+>  static const char * const clk81_parent_names[] = {
+>  	"xtal", "fclk_div7", "mpll1", "mpll2", "fclk_div4",
+> @@ -821,6 +952,7 @@ static MESON_GATE(axg_mmc_pclk, HHI_GCLK_MPEG2, 11);
+>  static MESON_GATE(axg_vpu_intr, HHI_GCLK_MPEG2, 25);
+>  static MESON_GATE(axg_sec_ahb_ahb3_bridge, HHI_GCLK_MPEG2, 26);
+>  static MESON_GATE(axg_gic, HHI_GCLK_MPEG2, 30);
+> +static MESON_GATE(axg_mipi_enable, HHI_MIPI_CNTL0, 29);
+>  
+>  /* Always On (AO) domain gates */
+>  
+> @@ -910,6 +1042,13 @@ static struct clk_hw_onecell_data axg_hw_onecell_data = {
+>  		[CLKID_FCLK_DIV4_DIV]		= &axg_fclk_div4_div.hw,
+>  		[CLKID_FCLK_DIV5_DIV]		= &axg_fclk_div5_div.hw,
+>  		[CLKID_FCLK_DIV7_DIV]		= &axg_fclk_div7_div.hw,
+> +		[CLKID_PCIE_PLL]		= &axg_pcie_pll.hw,
+> +		[CLKID_PCIE_MUX]		= &axg_pcie_mux.hw,
+> +		[CLKID_PCIE_REF]		= &axg_pcie_ref.hw,
+> +		[CLKID_PCIE_CML_EN0]		= &axg_pcie_cml_en0.hw,
+> +		[CLKID_PCIE_CML_EN1]		= &axg_pcie_cml_en1.hw,
+> +		[CLKID_MIPI_ENABLE]		= &axg_mipi_enable.hw,
+> +
+>  		[NR_CLKS]			= NULL,
+>  	},
+>  	.num = NR_CLKS,
+> @@ -988,6 +1127,12 @@ static struct clk_regmap *const axg_clk_regmaps[] = {
+>  	&axg_fclk_div4,
+>  	&axg_fclk_div5,
+>  	&axg_fclk_div7,
+> +	&axg_pcie_pll,
+> +	&axg_pcie_mux,
+> +	&axg_pcie_ref,
+> +	&axg_pcie_cml_en0,
+> +	&axg_pcie_cml_en1,
+> +	&axg_mipi_enable,
+>  };
+>  
+>  static const struct of_device_id clkc_match_table[] = {
+> diff --git a/drivers/clk/meson/axg.h b/drivers/clk/meson/axg.h
+> index b421df6a7ea0..6e55ebd6c77d 100644
+> --- a/drivers/clk/meson/axg.h
+> +++ b/drivers/clk/meson/axg.h
+> @@ -16,6 +16,7 @@
+>   * Register offsets from the data sheet must be multiplied by 4 before
+>   * adding them to the base address to get the right value.
+>   */
+> +#define HHI_MIPI_CNTL0			0x00
+>  #define HHI_GP0_PLL_CNTL		0x40
+>  #define HHI_GP0_PLL_CNTL2		0x44
+>  #define HHI_GP0_PLL_CNTL3		0x48
+> @@ -127,8 +128,11 @@
+>  #define CLKID_FCLK_DIV4_DIV			73
+>  #define CLKID_FCLK_DIV5_DIV			74
+>  #define CLKID_FCLK_DIV7_DIV			75
+> +#define CLKID_PCIE_PLL				76
+> +#define CLKID_PCIE_MUX				77
+> +#define CLKID_PCIE_REF				78
+>  
+> -#define NR_CLKS					76
+> +#define NR_CLKS					82
+>  
+>  /* include the CLKIDs that have been made part of the DT binding */
+>  #include <dt-bindings/clock/axg-clkc.h>
+> diff --git a/include/dt-bindings/clock/axg-clkc.h b/include/dt-bindings/clock/axg-clkc.h
+> index 555937a25504..70371228b7e0 100644
+> --- a/include/dt-bindings/clock/axg-clkc.h
+> +++ b/include/dt-bindings/clock/axg-clkc.h
+
+As usual, please put dt bindings changes in a separate patch.
+
+> @@ -68,5 +68,8 @@
+>  #define CLKID_SD_EMMC_B_CLK0			59
+>  #define CLKID_SD_EMMC_C_CLK0			60
+>  #define CLKID_HIFI_PLL				69
+> +#define CLKID_PCIE_CML_EN0			79
+> +#define CLKID_PCIE_CML_EN1			80
+> +#define CLKID_MIPI_ENABLE			81
+>  
+>  #endif /* __AXG_CLKC_H */
