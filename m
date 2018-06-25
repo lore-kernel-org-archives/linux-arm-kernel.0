@@ -1,56 +1,59 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 25 Jun 2018 16:03:10 +0200
-Subject: [PATCH 15/29] arm64: dts: renesas: salvator-x(s): Update I2C ch4
- clock to 400kHz
-In-Reply-To: <cover.1529933747.git.horms+renesas@verge.net.au>
-References: <cover.1529933747.git.horms+renesas@verge.net.au>
-Message-ID: <56195dc5c3a156cad6afb7cbda411fd2cfd978ae.1529933747.git.horms+renesas@verge.net.au>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Mon, 25 Jun 2018 23:13:04 +0900
+Subject: [GIT PULL] ARM: uniphier: fixes for v4.18
+Message-ID: <CAK7LNARAMcUgV2K1_dDdkupaWdtLqGMz==+huurHJKyW=JVWxQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+Hi Arnd, Olof,
 
-Any of the following devices connected to I2C ch4 of the Salvator-X(S)
-boards will operate at 400 kHz:
+Please pull some fixes of ARM UniPhier platform.
 
-    PCA9654, 9FGV0841, ADV7482WBBCZ, MAX9611, 5P49V5923, 5P49V6901A
 
-This patch updates the clock frequency to 400 KHz.
 
-Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-[wsa: squashed commits into one]
-Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm64/boot/dts/renesas/salvator-x.dtsi  | 2 ++
- arch/arm64/boot/dts/renesas/salvator-xs.dtsi | 2 ++
- 2 files changed, 4 insertions(+)
+The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
 
-diff --git a/arch/arm64/boot/dts/renesas/salvator-x.dtsi b/arch/arm64/boot/dts/renesas/salvator-x.dtsi
-index 468868c8ed9f..2828482eba1c 100644
---- a/arch/arm64/boot/dts/renesas/salvator-x.dtsi
-+++ b/arch/arm64/boot/dts/renesas/salvator-x.dtsi
-@@ -20,6 +20,8 @@
- };
- 
- &i2c4 {
-+	clock-frequency = <400000>;
-+
- 	versaclock5: clock-generator at 6a {
- 		compatible = "idt,5p49v5923";
- 		reg = <0x6a>;
-diff --git a/arch/arm64/boot/dts/renesas/salvator-xs.dtsi b/arch/arm64/boot/dts/renesas/salvator-xs.dtsi
-index bf4d200fb546..1ac03b7564aa 100644
---- a/arch/arm64/boot/dts/renesas/salvator-xs.dtsi
-+++ b/arch/arm64/boot/dts/renesas/salvator-xs.dtsi
-@@ -20,6 +20,8 @@
- };
- 
- &i2c4 {
-+	clock-frequency = <400000>;
-+
- 	versaclock6: clock-generator at 6a {
- 		compatible = "idt,5p49v6901";
- 		reg = <0x6a>;
+  Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/masahiroy/linux-uniphier.git
+tags/uniphier-fixes-v4.18
+
+for you to fetch changes up to 4e62893c25bd3d5758058e15958364df3ca15fbc:
+
+  arm64: uniphier: select RESET_CONTROLLER (2018-06-25 23:00:31 +0900)
+
+----------------------------------------------------------------
+UniPhier ARM SoC fixes for v4.18
+
+ - add missing cooling device properties for CPUS
+
+ - fix widget name of headphone
+
+ - select RESET_CONTROLLER
+
+----------------------------------------------------------------
+Katsuhiro Suzuki (1):
+      arm64: dts: uniphier: fix widget name of headphone for LD11/LD20 boards
+
+Masahiro Yamada (2):
+      ARM: uniphier: select RESET_CONTROLLER
+      arm64: uniphier: select RESET_CONTROLLER
+
+Viresh Kumar (2):
+      ARM: dts: uniphier: Add missing cooling device properties for CPUs
+      arm64: dts: uniphier: Add missing cooling device properties for CPUs
+
+ arch/arm/boot/dts/uniphier-pxs2.dtsi                   | 3 +++
+ arch/arm/mach-uniphier/Kconfig                         | 1 +
+ arch/arm64/Kconfig.platforms                           | 1 +
+ arch/arm64/boot/dts/socionext/uniphier-ld11-global.dts | 2 +-
+ arch/arm64/boot/dts/socionext/uniphier-ld20-global.dts | 2 +-
+ arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi       | 2 ++
+ 6 files changed, 9 insertions(+), 2 deletions(-)
+
+
 -- 
-2.11.0
+Best Regards
+Masahiro Yamada
