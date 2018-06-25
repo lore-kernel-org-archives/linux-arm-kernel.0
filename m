@@ -1,37 +1,57 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Mon, 25 Jun 2018 17:12:38 +0200
-Subject: [PATCH v2 22/23] arm64: dts: marvell: add macro to make distinction
- between node names
+Date: Mon, 25 Jun 2018 17:12:25 +0200
+Subject: [PATCH v2 09/23] thermal: armada: remove sensors validity from the IP
+ initialization
 In-Reply-To: <20180625151239.20976-1-miquel.raynal@bootlin.com>
 References: <20180625151239.20976-1-miquel.raynal@bootlin.com>
-Message-ID: <20180625151239.20976-23-miquel.raynal@bootlin.com>
+Message-ID: <20180625151239.20976-10-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Because the label is different between CPs, the full path of a node is
-unique. However, when referring to the end of the path only (the node
-name), this name is not unique anymore.
+When using new bindings with multiple sensors, sensor validity is
+checked twice because sensor selection also checks for the validity.
 
-The *thermal_zone_of_sensor_register() functions of the thermal core
-present this limitation and prevent having a thermal-zone per CP.
-
-Add a macro to make the distinction between node names to solve this
-situation.
+Remove the redundant call from the IP initialization helper and move it
+to the legacy probe section where it is still needed.
 
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 ---
- arch/arm64/boot/dts/marvell/armada-common.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/thermal/armada_thermal.c | 9 +++------
+ 1 file changed, 3 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-common.dtsi b/arch/arm64/boot/dts/marvell/armada-common.dtsi
-index d5e8aedec188..b29c6405d214 100644
---- a/arch/arm64/boot/dts/marvell/armada-common.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-common.dtsi
-@@ -7,4 +7,5 @@
- #define PASTER(x, y) x ## y
- #define EVALUATOR(x, y) PASTER(x, y)
- #define CP110_LABEL(name) EVALUATOR(CP110_NAME, EVALUATOR(_, name))
-+#define CP110_NODE_NAME(name) EVALUATOR(CP110_NAME, EVALUATOR(-, name))
- #define ADDRESSIFY(addr) EVALUATOR(0x, addr)
+diff --git a/drivers/thermal/armada_thermal.c b/drivers/thermal/armada_thermal.c
+index 2b11bf929b64..3d5b29133d3a 100644
+--- a/drivers/thermal/armada_thermal.c
++++ b/drivers/thermal/armada_thermal.c
+@@ -221,9 +221,6 @@ static void armada380_init(struct platform_device *pdev,
+ 	reg &= ~CONTROL0_TSEN_TC_TRIM_MASK;
+ 	reg |= CONTROL0_TSEN_TC_TRIM_VAL;
+ 	regmap_write(priv->syscon, data->syscon_control0_off, reg);
+-
+-	/* Wait the sensors to be valid or the core will warn the user */
+-	armada_wait_sensor_validity(priv);
+ }
+ 
+ static void armada_ap806_init(struct platform_device *pdev,
+@@ -243,9 +240,6 @@ static void armada_ap806_init(struct platform_device *pdev,
+ 	reg &= ~CONTROL0_TSEN_AVG_BYPASS;
+ 
+ 	regmap_write(priv->syscon, data->syscon_control0_off, reg);
+-
+-	/* Wait the sensors to be valid or the core will warn the user */
+-	armada_wait_sensor_validity(priv);
+ }
+ 
+ static void armada_cp110_init(struct platform_device *pdev,
+@@ -657,6 +651,9 @@ static int armada_thermal_probe(struct platform_device *pdev)
+ 
+ 		priv->data->init(pdev, priv);
+ 
++		/* Wait the sensors to be valid */
++		armada_wait_sensor_validity(priv);
++
+ 		tz = thermal_zone_device_register(priv->zone_name, 0, 0, priv,
+ 						  &legacy_ops, NULL, 0, 0);
+ 		if (IS_ERR(tz)) {
 -- 
 2.14.1
