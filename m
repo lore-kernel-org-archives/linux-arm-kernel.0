@@ -1,36 +1,59 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon, 25 Jun 2018 19:09:13 +0200
-Subject: [PATCH 2/2] arm64: allwinner: a64: allow laptops to wake up from
- lid
-In-Reply-To: <20180622160631.8578-2-icenowy@aosc.io>
-References: <20180622160631.8578-1-icenowy@aosc.io>
- <20180622160631.8578-2-icenowy@aosc.io>
-Message-ID: <20180625170913.p335obgr3rfa4skt@flea>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Mon, 25 Jun 2018 17:50:14 +0200
+Subject: [PATCH 03/14] ARM: davinci: dm644-evm: use nvmem lookup for mac
+ address
+In-Reply-To: <20180625155025.12567-1-brgl@bgdev.pl>
+References: <20180625155025.12567-1-brgl@bgdev.pl>
+Message-ID: <20180625155025.12567-4-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 23, 2018 at 12:06:31AM +0800, Icenowy Zheng wrote:
-> Currently all ARM kernels will have s2idle enabled if CONFIG_SUSPEND is
-> present. In this case if the lid is closed, systemd-logind will enter
-> s2idle mode by default; however there's no possible wakeup source
-> defined, so the system will enter a forever idle.
-> 
-> Add the lid itself as a wakeup source, thus the system can wakeup when
-> the lid is opened.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-Applied both, thanks!
-Maxime
+We now support nvmem lookups for machine code. Add a lookup for
+mac-address.
 
+Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+---
+ arch/arm/mach-davinci/board-dm644x-evm.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c b/arch/arm/mach-davinci/board-dm644x-evm.c
+index 48436f74fd71..adbe8630ef19 100644
+--- a/arch/arm/mach-davinci/board-dm644x-evm.c
++++ b/arch/arm/mach-davinci/board-dm644x-evm.c
+@@ -28,6 +28,7 @@
+ #include <linux/v4l2-dv-timings.h>
+ #include <linux/export.h>
+ #include <linux/leds.h>
++#include <linux/nvmem-provider.h>
+ 
+ #include <media/i2c/tvp514x.h>
+ 
+@@ -476,6 +477,15 @@ static struct pcf857x_platform_data pcf_data_u35 = {
+  *  - ... newer boards may have more
+  */
+ 
++static struct nvmem_cell_lookup dm6446evm_mac_address_cell = {
++	.info = {
++		.name = "mac-address",
++		.offset = 0x7f00,
++		.bytes = ETH_ALEN,
++	},
++	.nvmem_name = "1-00500",
++};
++
+ static struct at24_platform_data eeprom_info = {
+ 	.byte_len	= (256*1024) / 8,
+ 	.page_size	= 64,
+@@ -828,6 +838,8 @@ static __init void davinci_evm_init(void)
+ 		phy_register_fixup_for_uid(LXT971_PHY_ID, LXT971_PHY_MASK,
+ 						davinci_phy_fixup);
+ 	}
++
++	nvmem_register_lookup(&dm6446evm_mac_address_cell, 1);
+ }
+ 
+ MACHINE_START(DAVINCI_EVM, "DaVinci DM644x EVM")
 -- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180625/312ba8b4/attachment-0001.sig>
+2.17.1
