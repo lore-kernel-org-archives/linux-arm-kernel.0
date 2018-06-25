@@ -1,77 +1,61 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Mon, 25 Jun 2018 14:02:50 +0200
-Subject: [PATCH v3 10/24] drm/sun4i: tcon: Generalize engine search algorithm
+Date: Mon, 25 Jun 2018 14:02:56 +0200
+Subject: [PATCH v3 16/24] drm/sun4i: Enable DW HDMI PHY clock
 In-Reply-To: <20180625120304.7543-1-jernej.skrabec@siol.net>
 References: <20180625120304.7543-1-jernej.skrabec@siol.net>
-Message-ID: <20180625120304.7543-11-jernej.skrabec@siol.net>
+Message-ID: <20180625120304.7543-17-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current "old" method to find engine worked pretty well for DE2. However,
-it doesn't work when TCON TOP is between  mixer (engine) and TCON. TCON
-TOP has multiple input ports, but current engine search algorithm
-expects only one.
+Current DW HDMI PHY code never prepares and enables PHY clock after it is
+created. It's just used as it is. This may work in some cases, but it's
+clearly wrong. Fix it by adding proper calls to enable/disable PHY
+clock.
 
-This can be fixed by first looking for output port id and selecting
-matching input by subtracting 1 for the next round. This work even if
-there is only one input and output.
+Fixes: 4f86e81748fe ("drm/sun4i: Add support for H3 HDMI PHY variant")
 
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/gpu/drm/sun4i/sun4i_tcon.c | 22 ++++++++++++++++++----
- 1 file changed, 18 insertions(+), 4 deletions(-)
+ drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-index 08747fc3ee71..264bcc43da11 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-@@ -791,12 +791,14 @@ static int sun4i_tcon_init_regmap(struct device *dev,
-  */
- static struct sunxi_engine *
- sun4i_tcon_find_engine_traverse(struct sun4i_drv *drv,
--				struct device_node *node)
-+				struct device_node *node,
-+				u32 port_id)
- {
- 	struct device_node *port, *ep, *remote;
- 	struct sunxi_engine *engine = ERR_PTR(-EINVAL);
-+	u32 reg = 0;
- 
--	port = of_graph_get_port_by_id(node, 0);
-+	port = of_graph_get_port_by_id(node, port_id);
- 	if (!port)
- 		return ERR_PTR(-EINVAL);
- 
-@@ -826,8 +828,20 @@ sun4i_tcon_find_engine_traverse(struct sun4i_drv *drv,
- 		if (remote == engine->node)
- 			goto out_put_remote;
- 
-+	/*
-+	 * According to device tree binding input ports have even id
-+	 * number and output ports have odd id. Since component with
-+	 * more than one input and one output (TCON TOP) exits, correct
-+	 * remote input id has to be calculated by subtracting 1 from
-+	 * remote output id. If this for some reason can't be done, 0
-+	 * is used as input port id.
-+	 */
-+	port = of_graph_get_remote_port(ep);
-+	if (!of_property_read_u32(port, "reg", &reg) && reg > 0)
-+		reg -= 1;
+diff --git a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
+index 5a52fc489a9d..966688f04741 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
++++ b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
+@@ -477,13 +477,15 @@ int sun8i_hdmi_phy_probe(struct sun8i_dw_hdmi *hdmi, struct device_node *node)
+ 			dev_err(dev, "Couldn't create the PHY clock\n");
+ 			goto err_put_clk_pll0;
+ 		}
 +
- 	/* keep looking through upstream ports */
--	engine = sun4i_tcon_find_engine_traverse(drv, remote);
-+	engine = sun4i_tcon_find_engine_traverse(drv, remote, reg);
++		clk_prepare_enable(phy->clk_phy);
+ 	}
  
- out_put_remote:
- 	of_node_put(remote);
-@@ -950,7 +964,7 @@ static struct sunxi_engine *sun4i_tcon_find_engine(struct sun4i_drv *drv,
+ 	phy->rst_phy = of_reset_control_get_shared(node, "phy");
+ 	if (IS_ERR(phy->rst_phy)) {
+ 		dev_err(dev, "Could not get phy reset control\n");
+ 		ret = PTR_ERR(phy->rst_phy);
+-		goto err_put_clk_pll0;
++		goto err_disable_clk_phy;
+ 	}
  
- 	/* Fallback to old method by traversing input endpoints */
- 	of_node_put(port);
--	return sun4i_tcon_find_engine_traverse(drv, node);
-+	return sun4i_tcon_find_engine_traverse(drv, node, 0);
- }
+ 	ret = reset_control_deassert(phy->rst_phy);
+@@ -514,6 +516,8 @@ int sun8i_hdmi_phy_probe(struct sun8i_dw_hdmi *hdmi, struct device_node *node)
+ 	reset_control_assert(phy->rst_phy);
+ err_put_rst_phy:
+ 	reset_control_put(phy->rst_phy);
++err_disable_clk_phy:
++	clk_disable_unprepare(phy->clk_phy);
+ err_put_clk_pll0:
+ 	if (phy->variant->has_phy_clk)
+ 		clk_put(phy->clk_pll0);
+@@ -531,6 +535,7 @@ void sun8i_hdmi_phy_remove(struct sun8i_dw_hdmi *hdmi)
  
- static int sun4i_tcon_bind(struct device *dev, struct device *master,
+ 	clk_disable_unprepare(phy->clk_mod);
+ 	clk_disable_unprepare(phy->clk_bus);
++	clk_disable_unprepare(phy->clk_phy);
+ 
+ 	reset_control_assert(phy->rst_phy);
+ 
 -- 
 2.18.0
