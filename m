@@ -1,78 +1,72 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 25 Jun 2018 08:34:05 +0200
-Subject: [PATCH] efi/libstub/arm: add opt-in Kconfig option for the DTB loader
-Message-ID: <20180625063405.24387-1-ard.biesheuvel@linaro.org>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Mon, 25 Jun 2018 14:37:01 +0800
+Subject: [PATCH 2/2] usb: core: phy: fix return value checking about
+ devm_of_phy_get_by_index()
+In-Reply-To: <CAFBinCBS+fpfx6jaaqD=kqFuMF6ko8GikbV1ZVwgbDh-Sn8T8w@mail.gmail.com>
+References: <4c338a129ab14ab41949da5e3c21aed0d77dff8d.1529647619.git.chunfeng.yun@mediatek.com>
+ <644d00edd2932c1a0d0a1bf368dd25427d1d9f64.1529647619.git.chunfeng.yun@mediatek.com>
+ <CAFBinCBS+fpfx6jaaqD=kqFuMF6ko8GikbV1ZVwgbDh-Sn8T8w@mail.gmail.com>
+Message-ID: <1529908621.32173.27.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are various ways a platform can provide a device tree binary
-to the kernel, with different levels of sophistication:
-- ideally, the UEFI firmware, which is tightly coupled with the
-  platform, provides a device tree image directly as a UEFI
-  configuration table, and typically permits the contents to be
-  manipulated either via menu options or via UEFI environment
-  variables that specify a replacement image,
-- GRUB for ARM has a 'devicetree' directive which allows a device
-  tree image to be loaded from any location accessible to GRUB, and
-  supersede the one provided by the firmware,
-- the EFI stub implements a dtb= command line option that allows a
-  device tree image to be loaded from a file residing in the same
-  file system as the one the kernel image was loaded from.
+On Sun, 2018-06-24 at 20:00 +0200, Martin Blumenstingl wrote:
+> Hello Chunfeng,
+> 
+> thank you for the patch!
+> 
+> On Fri, Jun 22, 2018 at 8:33 AM Chunfeng Yun <chunfeng.yun@mediatek.com> wrote:
+> >
+> > 1. use IS_ERR() but not IS_ERR_OR_NULL() because devm_of_phy_get_by_index()
+> >     never return NULL value;
+> ACK - good catch!
+> 
+> > 2. devm_of_phy_get_by_index() should not fail for a valid index
+> I have learned that the PHY framework can return -ENODEV if the PHY is:
+> 1. supposed to be handled by the legacy USB PHY framework
+> 2. the PHY node is disabled in devicetree
+A little confused, we can avoid this error by not using a disabled or
+"usb-nop-xceiv" phy in host node.
 
-The dtb= command line option was never intended to be more than a
-development feature, to allow the other options to be implemented
-in parallel. So let's make it an opt-in feature that is disabled
-by default, but can be re-enabled at will.
+If ignore error of -ENODEV, we will also skip an error case which we
+don't want it happen. 
 
-Note that we already disable the dtb= command line option when we
-detect that we are running with UEFI Secure Boot enabled.
-
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- drivers/firmware/efi/Kconfig            | 12 ++++++++++++
- drivers/firmware/efi/libstub/arm-stub.c |  7 ++++---
- 2 files changed, 16 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/firmware/efi/Kconfig b/drivers/firmware/efi/Kconfig
-index 781a4a337557..fc1cb2961d5b 100644
---- a/drivers/firmware/efi/Kconfig
-+++ b/drivers/firmware/efi/Kconfig
-@@ -87,6 +87,18 @@ config EFI_RUNTIME_WRAPPERS
- config EFI_ARMSTUB
- 	bool
- 
-+config EFI_ARMSTUB_DTB_LOADER
-+	bool "Enable the DTB loader"
-+	depends on EFI_ARMSTUB
-+	help
-+	  Select this config option to add support for the dtb= command
-+	  line parameter, allowing a device tree blob to be loaded into
-+	  memory from the EFI System Partition by the stub.
-+
-+	  The device tree is typically provided by the platform or by
-+	  the bootloader, and so this option is mostly for development
-+	  purposes only.
-+
- config EFI_BOOTLOADER_CONTROL
- 	tristate "EFI Bootloader Control"
- 	depends on EFI_VARS
-diff --git a/drivers/firmware/efi/libstub/arm-stub.c b/drivers/firmware/efi/libstub/arm-stub.c
-index 01a9d78ee415..c98b1856fc3d 100644
---- a/drivers/firmware/efi/libstub/arm-stub.c
-+++ b/drivers/firmware/efi/libstub/arm-stub.c
-@@ -202,9 +202,10 @@ unsigned long efi_entry(void *handle, efi_system_table_t *sys_table,
- 	 * 'dtb=' unless UEFI Secure Boot is disabled.  We assume that secure
- 	 * boot is enabled if we can't determine its state.
- 	 */
--	if (secure_boot != efi_secureboot_mode_disabled &&
--	    strstr(cmdline_ptr, "dtb=")) {
--		pr_efi(sys_table, "Ignoring DTB from command line.\n");
-+	if (!IS_ENABLED(CONFIG_EFI_ARMSTUB_DTB_LOADER) ||
-+	     secure_boot != efi_secureboot_mode_disabled) {
-+		if (strstr(cmdline_ptr, "dtb="))
-+			pr_efi(sys_table, "Ignoring DTB from command line.\n");
- 	} else {
- 		status = handle_cmdline_files(sys_table, image, cmdline_ptr,
- 					      "dtb=",
--- 
-2.11.0
+> 
+> see [0] for the code in the PHY framework and [1] for the discussion
+> with Johan (who informed me of case #1, I added him on this mail)
+> 
+> > Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> > ---
+> >  drivers/usb/core/phy.c | 11 ++++-------
+> >  1 file changed, 4 insertions(+), 7 deletions(-)
+> >
+> > diff --git a/drivers/usb/core/phy.c b/drivers/usb/core/phy.c
+> > index 9879767..0f972e1 100644
+> > --- a/drivers/usb/core/phy.c
+> > +++ b/drivers/usb/core/phy.c
+> > @@ -23,14 +23,11 @@ static int usb_phy_roothub_add_phy(struct device *dev, int index,
+> >                                    struct list_head *list)
+> >  {
+> >         struct usb_phy_roothub *roothub_entry;
+> > -       struct phy *phy = devm_of_phy_get_by_index(dev, dev->of_node, index);
+> > +       struct phy *phy;
+> >
+> > -       if (IS_ERR_OR_NULL(phy)) {
+> > -               if (!phy || PTR_ERR(phy) == -ENODEV)
+> > -                       return 0;
+> > -               else
+> > -                       return PTR_ERR(phy);
+> > -       }
+> > +       phy = devm_of_phy_get_by_index(dev, dev->of_node, index);
+> > +       if (IS_ERR(phy))
+> > +               return PTR_ERR(phy);
+> @Johan can you please review this as well? maybe we need to keep the
+> -ENODEV check
+> 
+> 
+> Regards
+> Martin
+> 
+> 
+> [0] https://elixir.bootlin.com/linux/v4.18-rc2/source/drivers/phy/phy-core.c#L421
+> [1] https://lkml.org/lkml/2018/4/19/88
