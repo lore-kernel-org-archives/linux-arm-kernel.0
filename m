@@ -1,58 +1,64 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 25 Jun 2018 15:44:16 +0100
-Subject: [PATCH 2/7] arm64: don't zero DIT on signal return
+Date: Mon, 25 Jun 2018 15:44:21 +0100
+Subject: [PATCH 7/7] arm64: remove unused COMPAT_PSR definitions
 In-Reply-To: <20180625144421.11511-1-mark.rutland@arm.com>
 References: <20180625144421.11511-1-mark.rutland@arm.com>
-Message-ID: <20180625144421.11511-3-mark.rutland@arm.com>
+Message-ID: <20180625144421.11511-8-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently valid_user_regs() treats SPSR_ELx.DIT as a RES0 bit, causing
-it to be zeroed upon exception return, rather than preserved. Thus, code
-relying on DIT will not function as expected, and may expose an
-unexpected timing sidechannel.
+Now that users have been migrated to PSR_AA32, kill the unused
+COMPAT_PSR definitions.
 
-Let's remove DIT from the set of RES0 bits, such that it is preserved.
-At the same time, the related comment is updated to better describe the
-situation, and to take into account the most recent documentation of
-SPSR_ELx, in ARM DDI 0487C.a.
+The only difference we need a definition for is COMPAT_PSR_DIT_BIT,
+which differs from PSR_AA32_DIT_BIT.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Fixes: 7206dc93a58fb764 ("arm64: Expose Arm v8.4 features")
 Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/kernel/ptrace.c | 12 ++++++++----
- 1 file changed, 8 insertions(+), 4 deletions(-)
+ arch/arm64/include/asm/ptrace.h | 28 ----------------------------
+ 1 file changed, 28 deletions(-)
 
-diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-index 5c338ce5a7fa..fff665988e21 100644
---- a/arch/arm64/kernel/ptrace.c
-+++ b/arch/arm64/kernel/ptrace.c
-@@ -1659,15 +1659,19 @@ asmlinkage void syscall_trace_exit(struct pt_regs *regs)
- }
+diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
+index ee27468a1ba6..550c64dd83cb 100644
+--- a/arch/arm64/include/asm/ptrace.h
++++ b/arch/arm64/include/asm/ptrace.h
+@@ -66,35 +66,7 @@
+ #endif
  
- /*
-- * Bits which are always architecturally RES0 per ARM DDI 0487A.h
-+ * SPSR_ELx bits which are always architecturally RES0 per ARM DDI 0487C.a 
-+ * We also take into account DIT (bit 24), which is not yet documented, and
-+ * treat PAN and UAO as RES0 bits, as they are meaningless at EL0, and may be
-+ * allocated an EL0 meaning in future.
-  * Userspace cannot use these until they have an architectural meaning.
-+ * Note that this follows the SPSR_ELx format, not the AArch32 PSR format.
-  * We also reserve IL for the kernel; SS is handled dynamically.
-  */
- #define SPSR_EL1_AARCH64_RES0_BITS \
--	(GENMASK_ULL(63,32) | GENMASK_ULL(27, 22) | GENMASK_ULL(20, 10) | \
--	 GENMASK_ULL(5, 5))
-+	(GENMASK_ULL(63,32) | GENMASK_ULL(27, 25) | GENMASK_ULL(23, 22) | \
-+	 GENMASK_ULL(20, 10) | GENMASK_ULL(5, 5))
- #define SPSR_EL1_AARCH32_RES0_BITS \
--	(GENMASK_ULL(63,32) | GENMASK_ULL(24, 22) | GENMASK_ULL(20,20))
-+	(GENMASK_ULL(63,32) | GENMASK_ULL(23, 22) | GENMASK_ULL(20,20))
+ /* AArch32 CPSR bits, as seen in AArch32 */
+-#define COMPAT_PSR_MODE_MASK	0x0000001f
+-#define COMPAT_PSR_MODE_USR	0x00000010
+-#define COMPAT_PSR_MODE_FIQ	0x00000011
+-#define COMPAT_PSR_MODE_IRQ	0x00000012
+-#define COMPAT_PSR_MODE_SVC	0x00000013
+-#define COMPAT_PSR_MODE_ABT	0x00000017
+-#define COMPAT_PSR_MODE_HYP	0x0000001a
+-#define COMPAT_PSR_MODE_UND	0x0000001b
+-#define COMPAT_PSR_MODE_SYS	0x0000001f
+-#define COMPAT_PSR_T_BIT	0x00000020
+-#define COMPAT_PSR_F_BIT	0x00000040
+-#define COMPAT_PSR_I_BIT	0x00000080
+-#define COMPAT_PSR_A_BIT	0x00000100
+-#define COMPAT_PSR_E_BIT	0x00000200
+ #define COMPAT_PSR_DIT_BIT	0x00200000
+-#define COMPAT_PSR_J_BIT	0x01000000
+-#define COMPAT_PSR_Q_BIT	0x08000000
+-#define COMPAT_PSR_V_BIT	0x10000000
+-#define COMPAT_PSR_C_BIT	0x20000000
+-#define COMPAT_PSR_Z_BIT	0x40000000
+-#define COMPAT_PSR_N_BIT	0x80000000
+-#define COMPAT_PSR_IT_MASK	0x0600fc00	/* If-Then execution state mask */
+-#define COMPAT_PSR_GE_MASK	0x000f0000
+-
+-#ifdef CONFIG_CPU_BIG_ENDIAN
+-#define COMPAT_PSR_ENDSTATE	COMPAT_PSR_E_BIT
+-#else
+-#define COMPAT_PSR_ENDSTATE	0
+-#endif
  
- static int valid_compat_regs(struct user_pt_regs *regs)
+ static inline unsigned long compat_psr_to_pstate(const unsigned long psr)
  {
 -- 
 2.11.0
