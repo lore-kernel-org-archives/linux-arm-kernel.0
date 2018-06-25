@@ -1,126 +1,125 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 25 Jun 2018 16:06:24 +0200
-Subject: [PATCH 13/15] ARM: shmobile: r8a7779: Remove explicit SYSC config and
- init
+Date: Mon, 25 Jun 2018 16:06:25 +0200
+Subject: [PATCH 14/15] soc: renesas: rcar-sysc: Drop legacy handling
 In-Reply-To: <cover.1529934908.git.horms+renesas@verge.net.au>
 References: <cover.1529934908.git.horms+renesas@verge.net.au>
-Message-ID: <16acd53b1547d3dbe3eabef5e3356674eb957ae4.1529934908.git.horms+renesas@verge.net.au>
+Message-ID: <7e8a50df26f4e7003d09f7e8d1e57fbbb7ebb750.1529934908.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-If the R-Car H1 system controller is described in DT, the rcar-sysc
-driver configures SYSCIER and SYSCIMR based on the SoC-specific power
-area definitions in r8a7779-sysc.  The platform code still passed this
-information to the rcar-sysc driver, for compatibility with old DTBs
-predating commit b2df3aa487395a1b ("ARM: dts: r8a7779: Add SYSC PM
-Domains") in v4.7.  The time has come to drop backwards compatibility,
-and delegate everything to the DT enabled rcar-sysc driver.
-
-After stopping powering down secondary CPUs during early boot, there is
-no longer a need to force an early initialization of the rcar-sysc
-driver.  It will be initialized in time for secondary CPU bringup by its
-early_initcall().
-
-Hence all explicit SYSC configuration and initialization can be removed
-from the R-Car H1 platform code.
+Now the R-Car platform code no longer supports DTBs lacking a SYSC
+device node in DT, all legacy handling can be dropped from the R-Car
+SYSC driver:
+  - Make rcar_sysc_ch private to the driver,
+  - Make rcar_sysc_power_{down,up}() static (they have been replaced by
+    rcar_sysc_power_{down,up}_cpu()),
+  - Remove the legacy wrapper rcar_sysc_init(), and the check for double
+    initialization (only the early_initcall is left).
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/Makefile      |  2 +-
- arch/arm/mach-shmobile/pm-r8a7779.c  | 41 ------------------------------------
- arch/arm/mach-shmobile/r8a7779.h     |  2 --
- arch/arm/mach-shmobile/smp-r8a7779.c |  2 --
- 4 files changed, 1 insertion(+), 46 deletions(-)
- delete mode 100644 arch/arm/mach-shmobile/pm-r8a7779.c
+ drivers/soc/renesas/rcar-sysc.c       | 38 ++++++++---------------------------
+ include/linux/soc/renesas/rcar-sysc.h | 11 ----------
+ 2 files changed, 8 insertions(+), 41 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
-index 2b8d3896e1eb..05ba728ed4f6 100644
---- a/arch/arm/mach-shmobile/Makefile
-+++ b/arch/arm/mach-shmobile/Makefile
-@@ -11,7 +11,7 @@ obj-$(CONFIG_ARCH_SH73A0)	+= setup-sh73a0.o
- obj-$(CONFIG_ARCH_R8A73A4)	+= setup-r8a73a4.o
- obj-$(CONFIG_ARCH_R8A7740)	+= setup-r8a7740.o
- obj-$(CONFIG_ARCH_R8A7778)	+= setup-r8a7778.o
--obj-$(CONFIG_ARCH_R8A7779)	+= setup-r8a7779.o pm-r8a7779.o
-+obj-$(CONFIG_ARCH_R8A7779)	+= setup-r8a7779.o
- obj-$(CONFIG_ARCH_EMEV2)	+= setup-emev2.o
- obj-$(CONFIG_ARCH_R7S72100)	+= setup-r7s72100.o
+diff --git a/drivers/soc/renesas/rcar-sysc.c b/drivers/soc/renesas/rcar-sysc.c
+index 4ad6dcd19420..41af9c7b912f 100644
+--- a/drivers/soc/renesas/rcar-sysc.c
++++ b/drivers/soc/renesas/rcar-sysc.c
+@@ -58,6 +58,12 @@
  
-diff --git a/arch/arm/mach-shmobile/pm-r8a7779.c b/arch/arm/mach-shmobile/pm-r8a7779.c
-deleted file mode 100644
-index 5c9a93f5e650..000000000000
---- a/arch/arm/mach-shmobile/pm-r8a7779.c
-+++ /dev/null
-@@ -1,41 +0,0 @@
--/*
-- * r8a7779 Power management support
-- *
-- * Copyright (C) 2011  Renesas Solutions Corp.
-- * Copyright (C) 2011  Magnus Damm
-- *
-- * This file is subject to the terms and conditions of the GNU General Public
-- * License.  See the file "COPYING" in the main directory of this archive
-- * for more details.
-- */
--
--#include <linux/soc/renesas/rcar-sysc.h>
--
--#include <asm/io.h>
--
--#include "r8a7779.h"
--
--/* SYSC */
--#define SYSCIER 0x0c
--#define SYSCIMR 0x10
--
--#if defined(CONFIG_PM) || defined(CONFIG_SMP)
--
--static void __init r8a7779_sysc_init(void)
--{
--	rcar_sysc_init(0xffd85000, 0x0131000e);
--}
--
--#else /* CONFIG_PM || CONFIG_SMP */
--
--static inline void r8a7779_sysc_init(void) {}
--
--#endif /* CONFIG_PM || CONFIG_SMP */
--
--void __init r8a7779_pm_init(void)
--{
--	static int once;
--
--	if (!once++)
--		r8a7779_sysc_init();
--}
-diff --git a/arch/arm/mach-shmobile/r8a7779.h b/arch/arm/mach-shmobile/r8a7779.h
-index 30668aa6acc3..ca9db8fde2f7 100644
---- a/arch/arm/mach-shmobile/r8a7779.h
-+++ b/arch/arm/mach-shmobile/r8a7779.h
-@@ -2,8 +2,6 @@
- #ifndef __ASM_R8A7779_H__
- #define __ASM_R8A7779_H__
+ #define RCAR_PD_ALWAYS_ON	32	/* Always-on power area */
  
--extern void r8a7779_pm_init(void);
--
- extern const struct smp_operations r8a7779_smp_ops;
++struct rcar_sysc_ch {
++	u16 chan_offs;
++	u8 chan_bit;
++	u8 isr_bit;
++};
++
+ static void __iomem *rcar_sysc_base;
+ static DEFINE_SPINLOCK(rcar_sysc_lock); /* SMP CPUs + I/O devices */
  
- #endif /* __ASM_R8A7779_H__ */
-diff --git a/arch/arm/mach-shmobile/smp-r8a7779.c b/arch/arm/mach-shmobile/smp-r8a7779.c
-index 3036f9100461..0d3ec5c2b8fc 100644
---- a/arch/arm/mach-shmobile/smp-r8a7779.c
-+++ b/arch/arm/mach-shmobile/smp-r8a7779.c
-@@ -60,8 +60,6 @@ static void __init r8a7779_smp_prepare_cpus(unsigned int max_cpus)
- 
- 	/* setup r8a7779 specific SCU bits */
- 	shmobile_smp_scu_prepare_cpus(R8A7779_SCU_BASE, max_cpus);
--
--	r8a7779_pm_init();
+@@ -143,12 +149,12 @@ static int rcar_sysc_power(const struct rcar_sysc_ch *sysc_ch, bool on)
+ 	return ret;
  }
  
- #ifdef CONFIG_HOTPLUG_CPU
+-int rcar_sysc_power_down(const struct rcar_sysc_ch *sysc_ch)
++static int rcar_sysc_power_down(const struct rcar_sysc_ch *sysc_ch)
+ {
+ 	return rcar_sysc_power(sysc_ch, false);
+ }
+ 
+-int rcar_sysc_power_up(const struct rcar_sysc_ch *sysc_ch)
++static int rcar_sysc_power_up(const struct rcar_sysc_ch *sysc_ch)
+ {
+ 	return rcar_sysc_power(sysc_ch, true);
+ }
+@@ -323,9 +329,6 @@ static int __init rcar_sysc_pd_init(void)
+ 	unsigned int i;
+ 	int error;
+ 
+-	if (rcar_sysc_base)
+-		return 0;
+-
+ 	np = of_find_matching_node_and_match(NULL, rcar_sysc_matches, &match);
+ 	if (!np)
+ 		return -ENODEV;
+@@ -428,31 +431,6 @@ void __init rcar_sysc_nullify(struct rcar_sysc_area *areas,
+ 		}
+ }
+ 
+-void __init rcar_sysc_init(phys_addr_t base, u32 syscier)
+-{
+-	u32 syscimr;
+-
+-	if (!rcar_sysc_pd_init())
+-		return;
+-
+-	rcar_sysc_base = ioremap_nocache(base, PAGE_SIZE);
+-
+-	/*
+-	 * Mask all interrupt sources to prevent the CPU from receiving them.
+-	 * Make sure not to clear reserved bits that were set before.
+-	 */
+-	syscimr = ioread32(rcar_sysc_base + SYSCIMR);
+-	syscimr |= syscier;
+-	pr_debug("%s: syscimr = 0x%08x\n", __func__, syscimr);
+-	iowrite32(syscimr, rcar_sysc_base + SYSCIMR);
+-
+-	/*
+-	 * SYSC needs all interrupt sources enabled to control power.
+-	 */
+-	pr_debug("%s: syscier = 0x%08x\n", __func__, syscier);
+-	iowrite32(syscier, rcar_sysc_base + SYSCIER);
+-}
+-
+ #ifdef CONFIG_ARCH_R8A7779
+ static int rcar_sysc_power_cpu(unsigned int idx, bool on)
+ {
+diff --git a/include/linux/soc/renesas/rcar-sysc.h b/include/linux/soc/renesas/rcar-sysc.h
+index 9020da2111fd..00fae6fd234d 100644
+--- a/include/linux/soc/renesas/rcar-sysc.h
++++ b/include/linux/soc/renesas/rcar-sysc.h
+@@ -2,17 +2,6 @@
+ #ifndef __LINUX_SOC_RENESAS_RCAR_SYSC_H__
+ #define __LINUX_SOC_RENESAS_RCAR_SYSC_H__
+ 
+-#include <linux/types.h>
+-
+-struct rcar_sysc_ch {
+-	u16 chan_offs;
+-	u8 chan_bit;
+-	u8 isr_bit;
+-};
+-
+-int rcar_sysc_power_down(const struct rcar_sysc_ch *sysc_ch);
+-int rcar_sysc_power_up(const struct rcar_sysc_ch *sysc_ch);
+-void rcar_sysc_init(phys_addr_t base, u32 syscier);
+ int rcar_sysc_power_down_cpu(unsigned int cpu);
+ int rcar_sysc_power_up_cpu(unsigned int cpu);
+ 
 -- 
 2.11.0
