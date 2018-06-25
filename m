@@ -1,31 +1,50 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 25 Jun 2018 11:30:13 -0600
-Subject: [PATCH v3 5/5] dt-bindings: dmaengine: xilinx_dma: drop has-sg
- property
-In-Reply-To: <20180625092724.22164-5-andrea.merello@gmail.com>
-References: <20180625092724.22164-1-andrea.merello@gmail.com>
- <20180625092724.22164-5-andrea.merello@gmail.com>
-Message-ID: <20180625173013.GA2268@rob-hp-laptop>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Mon, 25 Jun 2018 19:32:04 +0200
+Subject: [PATCH 2/2] usb: core: phy: fix return value checking about
+ devm_of_phy_get_by_index()
+In-Reply-To: <1529908621.32173.27.camel@mhfsdcap03>
+References: <4c338a129ab14ab41949da5e3c21aed0d77dff8d.1529647619.git.chunfeng.yun@mediatek.com>
+ <644d00edd2932c1a0d0a1bf368dd25427d1d9f64.1529647619.git.chunfeng.yun@mediatek.com>
+ <CAFBinCBS+fpfx6jaaqD=kqFuMF6ko8GikbV1ZVwgbDh-Sn8T8w@mail.gmail.com>
+ <1529908621.32173.27.camel@mhfsdcap03>
+Message-ID: <CAFBinCDuGd-R1OR6h1UTTsWm2XNJC_f8iREgdE8fQQv1ph9hpQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 25, 2018 at 11:27:24AM +0200, Andrea Merello wrote:
-> This property is not needed anymore, because the driver now autodetects it.
-> Delete references in documentation.
-> 
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: devicetree at vger.kernel.org
-> Cc: Radhey Shyam Pandey <radhey.shyam.pandey@xilinx.com>
-> Signed-off-by: Andrea Merello <andrea.merello@gmail.com>
-> Reviewed-by: Radhey Shyam Pandey <radhey.shyam.pandey@xilinx.com>
-> ---
-> Changes in v2:
-> 	- cc DT maintainer
-> Changes in v3:
-> 	- cc DT maintainerS/ML
-> ---
->  Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt | 3 ---
->  1 file changed, 3 deletions(-)
+Hi Chunfeng,
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+On Mon, Jun 25, 2018 at 8:37 AM Chunfeng Yun <chunfeng.yun@mediatek.com> wrote:
+>
+> On Sun, 2018-06-24 at 20:00 +0200, Martin Blumenstingl wrote:
+> > Hello Chunfeng,
+> >
+> > thank you for the patch!
+> >
+> > On Fri, Jun 22, 2018 at 8:33 AM Chunfeng Yun <chunfeng.yun@mediatek.com> wrote:
+> > >
+> > > 1. use IS_ERR() but not IS_ERR_OR_NULL() because devm_of_phy_get_by_index()
+> > >     never return NULL value;
+> > ACK - good catch!
+> >
+> > > 2. devm_of_phy_get_by_index() should not fail for a valid index
+> > I have learned that the PHY framework can return -ENODEV if the PHY is:
+> > 1. supposed to be handled by the legacy USB PHY framework
+> > 2. the PHY node is disabled in devicetree
+> A little confused, we can avoid this error by not using a disabled or
+> "usb-nop-xceiv" phy in host node.
+I think that would be the mid or long term goal
+
+> If ignore error of -ENODEV, we will also skip an error case which we
+> don't want it happen.
+as far as I understand the problem is that there are .dts files out
+there which specify "usb-nop-xceiv" in the "phys" property, see [0]
+(there might be even some more out-of-tree cases)
+so I think the -ENODEV check can only be removed once nothing uses
+"usb-nop-xceiv" anymore
+
+
+Regards
+Martin
+
+
+[0] https://patchwork.kernel.org/patch/10160181/
