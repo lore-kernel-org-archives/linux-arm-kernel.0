@@ -1,41 +1,117 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 25 Jun 2018 06:15:35 -0700
-Subject: [PATCH V4 2/4] watchdog: stm32: add pclk feature for stm32mp1
-In-Reply-To: <b5f62568-ff2f-4a04-212e-a952bf009c88@st.com>
-References: <1529571737-3552-1-git-send-email-ludovic.Barre@st.com>
- <1529571737-3552-3-git-send-email-ludovic.Barre@st.com>
- <20180621165335.GA4563@roeck-us.net>
- <0bfe0082-2134-2d3b-322f-cd6c193a9974@st.com>
- <3f65a889-f625-9521-ea09-bcf7b5b24927@roeck-us.net>
- <b5f62568-ff2f-4a04-212e-a952bf009c88@st.com>
-Message-ID: <d92ec883-09ae-271f-69dd-156df17c3e98@roeck-us.net>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Mon, 25 Jun 2018 13:22:19 +0000
+Subject: [PATCH V3 2/5] soc: imx: add mu library functions support
+In-Reply-To: <AM0PR04MB4211D74B6DD6BCA9A00C5E80804A0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+References: <1529676720-7533-1-git-send-email-aisheng.dong@nxp.com>
+ <1529676720-7533-3-git-send-email-aisheng.dong@nxp.com>
+ <20180625093504.hyjbixnnmipiqopg@pengutronix.de>
+ <AM0PR04MB4211D74B6DD6BCA9A00C5E80804A0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+Message-ID: <AM0PR04MB4211A1713C3868406B307BA8804A0@AM0PR04MB4211.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/25/2018 05:52 AM, Alexandre Torgue wrote:
-> Hi Guenter,
+> -----Original Message-----
+> From: A.s. Dong
+> Sent: Monday, June 25, 2018 7:59 PM
+> To: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: linux-arm-kernel at lists.infradead.org; dongas86 at gmail.com; dl-linux-imx
+> <linux-imx@nxp.com>; kernel at pengutronix.de; Fabio Estevam
+> <fabio.estevam@nxp.com>; shawnguo at kernel.org
+> Subject: RE: [PATCH V3 2/5] soc: imx: add mu library functions support
 > 
+> > -----Original Message-----
+> > From: Sascha Hauer [mailto:s.hauer at pengutronix.de]
+> > Sent: Monday, June 25, 2018 5:35 PM
+> > To: A.s. Dong <aisheng.dong@nxp.com>
+> > Cc: linux-arm-kernel at lists.infradead.org; dongas86 at gmail.com;
+> > dl-linux-imx <linux-imx@nxp.com>; kernel at pengutronix.de; Fabio
+> Estevam
+> > <fabio.estevam@nxp.com>; shawnguo at kernel.org
+> > Subject: Re: [PATCH V3 2/5] soc: imx: add mu library functions support
+> >
+> > On Fri, Jun 22, 2018 at 10:11:57PM +0800, Dong Aisheng wrote:
+> > > This is used for i.MX multi core communication.
+> > > e.g. A core to SCU firmware(M core) on MX8.
+> >
+> > I still believe that a generic driver for the MU should be used here.
+> > Handling hardware resources under the hood of the driver framework is
+> > a hack. Preventing the generic driver from matching against the SCU MU
+> > by adding some #mbox-cells = <0>; to the MU device node is even more a
+> hack.
+> >
 > 
->>> But you are right I forgot to change stm32f429.dtsi.
->>> If I add a commit for stm32f429.dtsi, it's Ok for you ?
->>>
->>
->> Not really. You are imposing a personal preference on others,
->> and you would make stm32f429.dtsi inconsistent since it doesn't
->> use clock names for anything else.This in turn means that people
->> will have an endless source of irritation since they will need
->> a clock name for this node but not for others.
+> That is not a hack from a HW point of view. The MU HW does not have multi
+> channels according to Reference Manual. Even we switch to mailbox, we
+> probably may still prefer mbox-cell = <0> as the virtual channels do not fit for
+> SCU MU.
 > 
-> Why? This kind of implementation depends on each driver. Isn't ?
+> > We should really handle the MU in a driver and look for a way how the
+> > SCU case can coexist with other usages of the MUs.
+> >
+> > Your main argument against using the mailbox framework is that it
+> > can't handle polling in the way you need it and that the mailbox
+> > framework provides things that you do not need. I don't buy this
+> > argument. In the end the mailbox framework is around 500 lines of
+> > code, it shouldn't be that hard to add the missing features. From the
+> > transmit side I don't see any showstoppers, the mailbox frameworks
+> > could be used as ist. What is missing is a synchronous
+> > wait-for-new-messages and receive-message call, the currently existing
+> asynchronous rx callback is indeed not suitable for the SCU.
+> > But as said, it should be doable to add that.
+> >
 > 
-> Or do you mean that if iwdg driver uses this implementation (clock name usage) all nodes inside stm32f429.dtsi should follow the same implementation ?
+> Besides the mailbox framework may not suitable for SCU, another important
+> Reason is that even we force to switch to mailbox, it's still can't be generic
+> driver and it can only be used by SCU MU.
 > 
->>
->> You will have to get the arm and DT maintainers to agree on this change.
+> Let's see the mailbox doc where it also highlights it may somehow depend on
+> mailbox communication protocol.
 > 
-> As this patch makes easier integration of new platform, I agree with Ludovic proposition.
+> Documentation/mailbox.txt
+> ----------------------------------------------------------------------------------------
+> This document aims to help developers write client and controller drivers for
+> the API. But before we start, let us note that the client (especially) and
+> controller drivers are likely going to be very platform specific because the
+> remote firmware is likely to be proprietary and implement non-standard
+> protocol.
+> .....
+> ----------------------------------------------------------------------------------------
+> 
+> So the question to us is: If it can't be generic driver which can be used by
+> others as well and it introduces much unnecessary complexities, why do we
+> need do that? What's real benefits we can have?
 > 
 
-Please provide a formal Acked-by:.
+Another option is we can try to improve mailbox framework to fit
+for SCU MU user case, but that may be a long time which will block all
+QXP bits upstreaming as most QXP parts are based on SCU API call.
+How about do that as an improvement investigation later? As the underlying
+IPC communication mechanism is somehow separate and independent of
+the high layer service and client users and current implementation is quite
+light one, won't cause much extra code.
+That won't block QXP upstream and can also have an in-tree comparison
+to the old ways.
 
-Guenter
+How do you think of it?
+
+Regards
+Dong Aisheng
+
+> Regards
+> Dong Aisheng
+> 
+> > Sascha
+> >
+> > --
+> > Pengutronix e.K.                           |                             |
+> > Industrial Linux Solutions                 |
+> >
+> https://emea01.safelinks.protection.outlook.com/?url=http%3A%2F%2Fww
+> >
+> w.pengutronix.de%2F&data=02%7C01%7Caisheng.dong%40nxp.com%7Cfe5
+> > 2cb3aecd3461fab3d08d5da7eefc6%7C686ea1d3bc2b4c6fa92cd99c5c301635%
+> >
+> 7C0%7C0%7C636655161075403401&sdata=bRnnlrq82OAlxoli5IHAtXuwieLGJM
+> > 4raDRvaV8y5gs%3D&reserved=0  |
+> > Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> > Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
