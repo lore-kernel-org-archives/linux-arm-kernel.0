@@ -1,108 +1,79 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Mon, 25 Jun 2018 14:02:44 +0200
-Subject: [PATCH v3 04/24] dt-bindings: display: sunxi-drm: Add TCON TOP
- description
+Date: Mon, 25 Jun 2018 14:02:48 +0200
+Subject: [PATCH v3 08/24] drm/sun4i: Add support for traversing graph with
+ TCON TOP
 In-Reply-To: <20180625120304.7543-1-jernej.skrabec@siol.net>
 References: <20180625120304.7543-1-jernej.skrabec@siol.net>
-Message-ID: <20180625120304.7543-5-jernej.skrabec@siol.net>
+Message-ID: <20180625120304.7543-9-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-TCON TOP main purpose is to configure whole display pipeline. It
-determines relationships between mixers and TCONs, selects source TCON
-for HDMI, muxes LCD and TV encoder GPIO output, selects TV encoder
-clock source and contains additional TV TCON and DSI gates.
+TCON TOP is different from other nodes in graph by having 3 input and 3
+output ports. Additionally, connection to TV TCON might lead back to
+HDMI mux input port, creating loops.
+
+Add support for traversing such graph.
 
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- .../bindings/display/sunxi/sun4i-drm.txt      | 56 +++++++++++++++++++
- include/dt-bindings/clock/sun8i-tcon-top.h    | 11 ++++
- 2 files changed, 67 insertions(+)
- create mode 100644 include/dt-bindings/clock/sun8i-tcon-top.h
+ drivers/gpu/drm/sun4i/sun4i_drv.c | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-index 3346c1e2a7a0..fe31b1510717 100644
---- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-+++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-@@ -187,6 +187,62 @@ And on the A23, A31, A31s and A33, you need one more clock line:
-    - 'lvds-alt': An alternative clock source, separate from the TCON channel 0
-                  clock, that can be used to drive the LVDS clock
+diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
+index 20193d6f33ba..e6c62c079146 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_drv.c
++++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
+@@ -26,6 +26,7 @@
+ #include "sun4i_frontend.h"
+ #include "sun4i_framebuffer.h"
+ #include "sun4i_tcon.h"
++#include "sun8i_tcon_top.h"
  
-+TCON TOP
-+--------
-+
-+TCON TOPs main purpose is to configure whole display pipeline. It determines
-+relationships between mixers and TCONs, selects source TCON for HDMI, muxes
-+LCD and TV encoder GPIO output, selects TV encoder clock source and contains
-+additional TV TCON and DSI gates.
-+
-+It allows display pipeline to be configured in very different ways:
-+
-+                                / LCD0/LVDS0
-+                 / [0] TCON-LCD0
-+                 |              \ MIPI DSI
-+ mixer0          |
-+        \        / [1] TCON-LCD1 - LCD1/LVDS1
-+         TCON-TOP
-+        /        \ [2] TCON-TV0 [0] - TVE0/RGB
-+ mixer1          |                  \
-+                 |                   TCON-TOP - HDMI
-+                 |                  /
-+                 \ [3] TCON-TV1 [1] - TVE1/RGB
-+
-+Note that both TCON TOP references same physical unit. Both mixers can be
-+connected to any TCON.
-+
-+Required properties:
-+  - compatible: value must be one of:
-+    * allwinner,sun8i-r40-tcon-top
-+  - reg: base address and size of the memory-mapped region.
-+  - clocks: phandle to the clocks feeding the TCON TOP
-+    * bus: TCON TOP interface clock
-+    * tcon-tv0: TCON TV0 clock
-+    * tve0: TVE0 clock
-+    * tcon-tv1: TCON TV1 clock
-+    * tve1: TVE0 clock
-+    * dsi: MIPI DSI clock
-+  - clock-names: clock name mentioned above
-+  - resets: phandle to the reset line driving the TCON TOP
-+  - #clock-cells : must contain 1
-+  - clock-output-names: Names of clocks created for TCON TV0 channel clock,
-+    TCON TV1 channel clock and DSI channel clock, in that order.
-+
-+- ports: A ports node with endpoint definitions as defined in
-+    Documentation/devicetree/bindings/media/video-interfaces.txt. 6 ports should
-+    be defined:
-+    * port 0 is input for mixer0 mux
-+    * port 1 is output for mixer0 mux
-+    * port 2 is input for mixer1 mux
-+    * port 3 is output for mixer1 mux
-+    * port 4 is input for HDMI mux
-+    * port 5 is output for HDMI mux
-+    All output endpoints for mixer muxes and input endpoints for HDMI mux should
-+    have reg property with the id of the target TCON, as shown in above graph
-+    (0-3 for mixer muxes and 0-1 for HDMI mux). All ports should have only one
-+    endpoint connected to remote endpoint.
-+
- DRC
- ---
+ DEFINE_DRM_GEM_CMA_FOPS(sun4i_drv_fops);
  
-diff --git a/include/dt-bindings/clock/sun8i-tcon-top.h b/include/dt-bindings/clock/sun8i-tcon-top.h
-new file mode 100644
-index 000000000000..25164d767835
---- /dev/null
-+++ b/include/dt-bindings/clock/sun8i-tcon-top.h
-@@ -0,0 +1,11 @@
-+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
-+/* Copyright (C) 2018 Jernej Skrabec <jernej.skrabec@siol.net> */
+@@ -197,6 +198,11 @@ static bool sun4i_drv_node_is_tcon(struct device_node *node)
+ 	return !!of_match_node(sun4i_tcon_of_table, node);
+ }
+ 
++static bool sun4i_drv_node_is_tcon_top(struct device_node *node)
++{
++	return !!of_match_node(sun8i_tcon_top_of_table, node);
++}
 +
-+#ifndef _DT_BINDINGS_CLOCK_SUN8I_TCON_TOP_H_
-+#define _DT_BINDINGS_CLOCK_SUN8I_TCON_TOP_H_
+ static int compare_of(struct device *dev, void *data)
+ {
+ 	DRM_DEBUG_DRIVER("Comparing of node %pOF with %pOF\n",
+@@ -258,6 +264,18 @@ static void sun4i_drv_traverse_endpoints(struct endpoint_list *list,
+ 		if (sun4i_drv_node_is_tcon(node)) {
+ 			struct of_endpoint endpoint;
+ 
++			/*
++			 * TCON TOP is always probed before TCON. However, TCON
++			 * points back to TCON TOP when it is source for HDMI.
++			 * We have to skip it here to prevent infinite looping
++			 * between TCON TOP and TCON.
++			 */
++			if (sun4i_drv_node_is_tcon_top(remote)) {
++				DRM_DEBUG_DRIVER("TCON output endpoint is TCON TOP... skipping\n");
++				of_node_put(remote);
++				continue;
++			}
 +
-+#define CLK_TCON_TOP_TV0	0
-+#define CLK_TCON_TOP_TV1	1
-+#define CLK_TCON_TOP_DSI	2
+ 			if (of_graph_parse_endpoint(ep, &endpoint)) {
+ 				DRM_DEBUG_DRIVER("Couldn't parse endpoint\n");
+ 				of_node_put(remote);
+@@ -318,6 +336,12 @@ static int sun4i_drv_add_endpoints(struct device *dev,
+ 	/* each node has at least one output */
+ 	sun4i_drv_traverse_endpoints(list, node, 1);
+ 
++	/* TCON TOP has second and third output */
++	if (sun4i_drv_node_is_tcon_top(node)) {
++		sun4i_drv_traverse_endpoints(list, node, 3);
++		sun4i_drv_traverse_endpoints(list, node, 5);
++	}
 +
-+#endif /* _DT_BINDINGS_CLOCK_SUN8I_TCON_TOP_H_ */
+ 	return count;
+ }
+ 
 -- 
 2.18.0
