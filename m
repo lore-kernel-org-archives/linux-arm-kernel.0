@@ -1,36 +1,77 @@
 From: radu.pirea@microchip.com (Radu Pirea)
-Date: Mon, 25 Jun 2018 13:21:03 +0300
-Subject: [PATCH v9 4/6] MAINTAINERS: add at91 usart spi driver
-In-Reply-To: <20180625102105.28383-1-radu.pirea@microchip.com>
-References: <20180625102105.28383-1-radu.pirea@microchip.com>
-Message-ID: <20180625102105.28383-5-radu.pirea@microchip.com>
+Date: Mon, 25 Jun 2018 13:20:59 +0300
+Subject: [PATCH v9 0/6] Driver for at91 usart in spi mode
+Message-ID: <20180625102105.28383-1-radu.pirea@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Added entry for at91 usart mfd driver.
+Hello,
 
-Signed-off-by: Radu Pirea <radu.pirea@microchip.com>
----
- MAINTAINERS | 7 +++++++
- 1 file changed, 7 insertions(+)
+This is the second version of driver. I added a mfd driver which by
+default probes atmel_serial driver and if in dt is specified to probe
+the spi driver, then the spi-at91-usart driver will be probed. The
+compatible for atmel_serial is now the compatible for at91-usart mfd
+driver and compatilbe for atmel_serial driver was changed in order to
+keep the bindings for serial as they are.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 7ac6e6af5292..f849cc4acbf6 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -9362,6 +9362,13 @@ F:	drivers/mfd/at91-usart.c
- F:	include/dt-bindings/mfd/at91-usart.h
- F:	Documentation/devicetree/bindings/mfd/atmel-usart.txt
- 
-+MICROCHIP AT91 USART SPI DRIVER
-+M:	Radu Pirea <radu.pirea@microchip.com>
-+L:	linux-spi at vger.kernel.org
-+S:	Supported
-+F:	drivers/spi/spi-at91-usart.c
-+F:	Documentation/devicetree/bindings/mfd/atmel-usart.txt
-+
- MICROCHIP KSZ SERIES ETHERNET SWITCH DRIVER
- M:	Woojung Huh <Woojung.Huh@microchip.com>
- M:	Microchip Linux Driver Support <UNGLinuxDriver@microchip.com>
+Changes in v9:
+- minor changes
+- rebased on top of broonie/for-4.19
+
+Changes in v8:
+- fixed passing an empty mfd cell if "atmel,usart-mode" value is invalid
+
+Changes in v7:
+- synced up  SPDIX license with module license
+- numbering of usart modes starts from 0 insteand of 1
+
+Changes in v6:
+- removed unused compatible strings from serial and spi drivers
+
+Changes in v5:
+- fixed usage of stdout-path property with atmel_serial driver
+
+Changes in v4:
+- modified the spi driver to use cs gpio support form spi subsystem
+- fixed dma transfers for serial driver
+- squashed binding for spi and serial and moved them to mfd/atmel-usart.txt
+
+Changes in v3:
+- fixed spi slaves probing
+
+Changes in v2:
+- added at91-usart mfd driver
+- modified spi-at91-usart driver to work as mfd driver child
+- modified atmel_serial driver to work as mfd driver child
+
+Changes in v1:
+- added spi-at91-usart driver
+
+
+Radu Pirea (6):
+  MAINTAINERS: add at91 usart mfd driver
+  dt-bindings: add binding for atmel-usart in SPI mode
+  mfd: at91-usart: added mfd driver for usart
+  MAINTAINERS: add at91 usart spi driver
+  spi: at91-usart: add driver for at91-usart as spi
+  tty/serial: atmel: change the driver to work under at91-usart mfd
+
+ .../bindings/{serial => mfd}/atmel-usart.txt  |  25 +-
+ MAINTAINERS                                   |  16 +
+ drivers/mfd/Kconfig                           |   9 +
+ drivers/mfd/Makefile                          |   1 +
+ drivers/mfd/at91-usart.c                      |  71 +++
+ drivers/spi/Kconfig                           |   9 +
+ drivers/spi/Makefile                          |   1 +
+ drivers/spi/spi-at91-usart.c                  | 432 ++++++++++++++++++
+ drivers/tty/serial/Kconfig                    |   1 +
+ drivers/tty/serial/atmel_serial.c             |  42 +-
+ include/dt-bindings/mfd/at91-usart.h          |  17 +
+ 11 files changed, 607 insertions(+), 17 deletions(-)
+ rename Documentation/devicetree/bindings/{serial => mfd}/atmel-usart.txt (76%)
+ create mode 100644 drivers/mfd/at91-usart.c
+ create mode 100644 drivers/spi/spi-at91-usart.c
+ create mode 100644 include/dt-bindings/mfd/at91-usart.h
+
 -- 
 2.17.1
