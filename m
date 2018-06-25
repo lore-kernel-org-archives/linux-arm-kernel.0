@@ -1,33 +1,33 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Mon, 25 Jun 2018 14:56:02 -0700
-Subject: [PATCH] arm64: dts: hikey: Define wl1835 power capabilities
-In-Reply-To: <CANcMJZASEDRxaXwdG96nNeEDPrDm_ap5MjhXonEcg=yHZ8F=qg@mail.gmail.com>
-References: <20180613151305.17240-1-ryan@edited.us>
- <CANcMJZASEDRxaXwdG96nNeEDPrDm_ap5MjhXonEcg=yHZ8F=qg@mail.gmail.com>
-Message-ID: <CALAqxLWjJKsU+XJmANzx-aO2ruszwbBnPV2yV5WoyVStO+5K0A@mail.gmail.com>
+From: david@lechnology.com (David Lechner)
+Date: Mon, 25 Jun 2018 18:02:24 -0500
+Subject: [RESEND (again) PATCH] clkdev: don't call __of_clk_get_by_name()
+ unnecessarily from clk_get()
+In-Reply-To: <20180625160440.10537-1-brgl@bgdev.pl>
+References: <20180625160440.10537-1-brgl@bgdev.pl>
+Message-ID: <5824a382-00fc-0af3-097f-519a36c2d555@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 13, 2018 at 11:30 AM, John Stultz <john.stultz@linaro.org> wrote:
-> On Wed, Jun 13, 2018 at 8:13 AM, Ryan Grachek <ryan@edited.us> wrote:
->> These properties are required for compatibility with runtime PM.
->> Without these properties, MMC host controller will not be aware
->> of power capabilities. When the wlcore driver attempts to power
->> on the device, it will erroneously fail with -EACCES.
->>
->> Signed-off-by: Ryan Grachek <ryan@edited.us>
->
-> Fixes: 60f36637bbbd ("wlcore: sdio: allow pm to handle sdio power")
-> Tested-by: John Stultz <john.stultz@linaro.org>
-> Acked-by: John Stultz <john.stultz@linaro.org>
->
-> Wei Xu: This fixes a functional regression with wifi on the HiKey
-> board that was introduced in 4.18-rc with commit 60f36637bbbd
-> ("wlcore: sdio: allow pm to handle sdio power").
+On 06/25/2018 11:04 AM, Bartosz Golaszewski wrote:
+> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> 
+> The way this function is implemented caused some confusion when
+> converting the TI DaVinci platform to using the common clock framework.
+> 
+> Current kernel supports booting DaVinci boards both in device tree as
+> well as legacy, board-file mode. In the latter, we always end up
+> calling clk_get_sys() as of_node is NULL and __of_clk_get_by_name()
+> returns -ENOENT.
+> 
+> It was not obvious at first glance how clk_get(dev, NULL) will work in
+> board-file mode since we always call __of_clk_get_by_name(). Let's make
+> it clearer by checking if of_node is NULL and skipping right to
+> clk_get_sys().
+> 
+> Cc: Sekhar Nori <nsekhar@ti.com>
+> Cc: Kevin Hilman <khilman@baylibre.com>
+> Cc: David Lechner <david@lechnology.com>
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> ---
 
-Wei Xu: Just wanted to follow up to make sure this wasn't missed for
-4.18-rc, as I haven't seen it upstream or in -next, and it fixes a
-recently introduced regression.
-
-thanks
--john
+Reviewed-by: David Lechner <david@lechnology.com>
