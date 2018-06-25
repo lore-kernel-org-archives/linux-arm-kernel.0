@@ -1,33 +1,59 @@
-From: yibin.gong@nxp.com (Robin Gong)
-Date: Mon, 25 Jun 2018 20:34:11 +0800
-Subject: [PATCH v1] ARM: dts: imx6sl-evk: keep sw4 always on
-Message-ID: <1529930051-14122-1-git-send-email-yibin.gong@nxp.com>
+From: johan@kernel.org (Johan Hovold)
+Date: Mon, 25 Jun 2018 07:29:30 +0200
+Subject: [PATCH 2/2] usb: core: phy: fix return value checking about
+ devm_of_phy_get_by_index()
+In-Reply-To: <CAFBinCBS+fpfx6jaaqD=kqFuMF6ko8GikbV1ZVwgbDh-Sn8T8w@mail.gmail.com>
+References: <4c338a129ab14ab41949da5e3c21aed0d77dff8d.1529647619.git.chunfeng.yun@mediatek.com>
+ <644d00edd2932c1a0d0a1bf368dd25427d1d9f64.1529647619.git.chunfeng.yun@mediatek.com>
+ <CAFBinCBS+fpfx6jaaqD=kqFuMF6ko8GikbV1ZVwgbDh-Sn8T8w@mail.gmail.com>
+Message-ID: <20180625052930.GA26803@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SW4 is one power rail for LPDDR2 on i.mx6sl-evk, so it should
-be kept always on. But it's disabled after switch disabled
-interface implemented in pfuze driver
-'commit 5fe156f1cab4
-("regulator: pfuze100: add enable/disable for switch")'.Thus,
-it breaks kernel bootup. Add 'regulator-always-on' for SW4.
+On Sun, Jun 24, 2018 at 08:00:01PM +0200, Martin Blumenstingl wrote:
+> Hello Chunfeng,
+> 
+> thank you for the patch!
+> 
+> On Fri, Jun 22, 2018 at 8:33 AM Chunfeng Yun <chunfeng.yun@mediatek.com> wrote:
 
-Signed-off-by: Robin Gong <yibin.gong@nxp.com>
----
- arch/arm/boot/dts/imx6sl-evk.dts | 1 +
- 1 file changed, 1 insertion(+)
+> > 2. devm_of_phy_get_by_index() should not fail for a valid index
+> I have learned that the PHY framework can return -ENODEV if the PHY is:
+> 1. supposed to be handled by the legacy USB PHY framework
+> 2. the PHY node is disabled in devicetree
+> 
+> see [0] for the code in the PHY framework and [1] for the discussion
+> with Johan (who informed me of case #1, I added him on this mail)
+> 
+> > Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> > ---
+> >  drivers/usb/core/phy.c | 11 ++++-------
+> >  1 file changed, 4 insertions(+), 7 deletions(-)
+> >
+> > diff --git a/drivers/usb/core/phy.c b/drivers/usb/core/phy.c
+> > index 9879767..0f972e1 100644
+> > --- a/drivers/usb/core/phy.c
+> > +++ b/drivers/usb/core/phy.c
+> > @@ -23,14 +23,11 @@ static int usb_phy_roothub_add_phy(struct device *dev, int index,
+> >                                    struct list_head *list)
+> >  {
+> >         struct usb_phy_roothub *roothub_entry;
+> > -       struct phy *phy = devm_of_phy_get_by_index(dev, dev->of_node, index);
+> > +       struct phy *phy;
+> >
+> > -       if (IS_ERR_OR_NULL(phy)) {
+> > -               if (!phy || PTR_ERR(phy) == -ENODEV)
+> > -                       return 0;
+> > -               else
+> > -                       return PTR_ERR(phy);
+> > -       }
+> > +       phy = devm_of_phy_get_by_index(dev, dev->of_node, index);
+> > +       if (IS_ERR(phy))
+> > +               return PTR_ERR(phy);
+> @Johan can you please review this as well? maybe we need to keep the
+> -ENODEV check
 
-diff --git a/arch/arm/boot/dts/imx6sl-evk.dts b/arch/arm/boot/dts/imx6sl-evk.dts
-index 37e792f..798df66 100644
---- a/arch/arm/boot/dts/imx6sl-evk.dts
-+++ b/arch/arm/boot/dts/imx6sl-evk.dts
-@@ -199,6 +199,7 @@
- 			sw4_reg: sw4 {
- 				regulator-min-microvolt = <800000>;
- 				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
- 			};
- 
- 			swbst_reg: swbst {
--- 
-2.7.4
+Indeed, the -ENODEV check is still needed for the reasons you point out
+above.
+
+Johan
