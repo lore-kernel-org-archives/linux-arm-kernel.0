@@ -1,92 +1,254 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Mon, 25 Jun 2018 18:42:30 +0800
-Subject: [PATCHv2 5/5] arm64: allwinner: a64: Add support for TERES-I
- laptop
-In-Reply-To: <5B30A40D.3070509@broadcom.com>
-References: <20180315162510.11669-1-harald@ccbib.org>
- <20180315162510.11669-6-harald@ccbib.org>
- <a7011fe78d171658742406bf01d50b7e3d7eaf1d.camel@aosc.io>
- <E1fX7yK-0000OC-HA@stardust.g4.wien.funkfeuer.at>
- <5B309D37.80207@broadcom.com> <1CF519CD-D44E-4959-8951-27CE710E0984@aosc.io>
- <5B30A40D.3070509@broadcom.com>
-Message-ID: <C9EE9283-66CB-4B0F-853E-3D6DC746C20E@aosc.io>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 25 Jun 2018 12:52:44 +0200
+Subject: [PATCH v8 3/6] module: use relative references for __ksymtab
+ entries
+In-Reply-To: <CAB0TPYHrx=tcOmzT2_4QpDG-reSJVX3BYEZcH0-X1m30WEADNw@mail.gmail.com>
+References: <20180311123815.17916-1-ard.biesheuvel@linaro.org>
+ <20180311123815.17916-4-ard.biesheuvel@linaro.org>
+ <CAB0TPYGd1jQzgc2q+fJZif4LVQTPnOrD4b6w0YSAzgAB0oL86g@mail.gmail.com>
+ <CAKv+Gu-M4vJfppfQ8PYv3hFR6a1FuOAEKpvyisYSZBe-ubMvHQ@mail.gmail.com>
+ <CAB0TPYHrx=tcOmzT2_4QpDG-reSJVX3BYEZcH0-X1m30WEADNw@mail.gmail.com>
+Message-ID: <CAKv+Gu-vmYxsEh-yRJqntWKqSimkCKzFYEqHhSoQLnbp=HuSaw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 25 June 2018 at 12:15, Martijn Coenen <maco@android.com> wrote:
+> On Mon, Jun 25, 2018 at 11:14 AM, Ard Biesheuvel
+> <ard.biesheuvel@linaro.org> wrote:
+>> Because struct kernel_symbol is only 8 bytes in size after this
+>> change, and aligning a 8 byte quantity to 16 bytes wastes 8 bytes.
+>
+> I get that, but then that means the 16-byte alignment wasn't actually
+> necessary in the first place.
+>
 
+Not really, I suppose, although it is not unusual to align large
+arrays to the entry size if it is a power of 2, so they don't span
+cachelines.
 
-? 2018?6?25? GMT+08:00 ??4:13:01, Arend van Spriel <arend.vanspriel@broadcom.com> ??:
->On 6/25/2018 9:47 AM, Icenowy Zheng wrote:
+>> The x86 ABI may require it, but we don't actually adhere to it in the
+>> kernel. Also, these structures never occur on the stack anyway.
+>
+> Ok, makes sense.
+>
+> Thanks,
+> Martijn
+>
 >>
 >>
->> ? 2018?6?25? GMT+08:00 ??3:43:51, Arend van Spriel
-><arend.vanspriel@broadcom.com> ??:
->>> On 6/24/2018 6:34 PM, Harald Geyer wrote:
->>>> Icenowy Zheng writes:
->>>>>> ? 2018-03-15?? 16:25 +0000?Harald Geyer???
->>>>>>>> +&mmc1 {
->>>>>>>> +	pinctrl-names = "default";
->>>>>>>> +	pinctrl-0 = <&mmc1_pins>;
->>>>>>>> +	vmmc-supply = <&reg_aldo2>;
->>>>>>>> +	vqmmc-supply = <&reg_dldo4>;
->>>>>>>> +	mmc-pwrseq = <&wifi_pwrseq>;
->>>>>>>> +	bus-width = <4>;
->>>>>>>> +	non-removable;
->>>>>>>> +	status = "okay";
->>>>>>>> +
->>>>>>>> +	rtl8723bs: wifi at 1 {
->>>>>>>> +		reg = <1>;
->>>>>>>> +		interrupt-parent = <&r_pio>;
->>>>>>>> +		interrupts = <0 3 IRQ_TYPE_LEVEL_LOW>; /* PL3 */
->>>>>>>> +		interrupt-names = "host-wake";
->>>>>>>> +	};
->>>
->>> [...]
->>>
->>>>>> - This device node has no binding. The "host-wake" interrupt is
->>> part of
->>>>>>   Broadcom SDIO Wi-Fi binding, rather than a generic one.
->>>> I think the general mmc and interrupts bindings apply. And the mmc
->>> binding
->>>> clearly states that for sub-nodes a compatible string is optional.
+>>>> -#include <asm-generic/export.h>
+>>>> diff --git a/include/asm-generic/export.h b/include/asm-generic/export.h
+>>>> index 719db1968d81..97ce606459ae 100644
+>>>> --- a/include/asm-generic/export.h
+>>>> +++ b/include/asm-generic/export.h
+>>>> @@ -5,12 +5,10 @@
+>>>>  #define KSYM_FUNC(x) x
+>>>>  #endif
+>>>>  #ifdef CONFIG_64BIT
+>>>> -#define __put .quad
+>>>>  #ifndef KSYM_ALIGN
+>>>>  #define KSYM_ALIGN 8
+>>>>  #endif
+>>>>  #else
+>>>> -#define __put .long
+>>>>  #ifndef KSYM_ALIGN
+>>>>  #define KSYM_ALIGN 4
+>>>>  #endif
+>>>> @@ -25,6 +23,16 @@
+>>>>  #define KSYM(name) name
+>>>>  #endif
 >>>>
->>>> However I just realized that the 'interrupt-names' property is not
->>> part
->>>> of the general interrupts binding, so I guess at least this
->property
->>> should
->>>> be removed.
->>>
->>> Indeed. If the device just used the SDIO interrupt this is not
->needed.
->>> The Broadcom device can use either SDIO interrupt or a so-called
->>> out-of-band host-wake interrupt, which is what the above represents.
->>
->> RTL8....S is also capable of use OOB interrupt.
->
->Ok. Is it also in-place in this TERES-I laptop? Anyway, if RTL8...S
-
-In fact it's a regexp here, mean Realtek SDIO WLAN NICs.
-
->does 
->not have a binding specification there is not much to do about it. In
->my 
->opinion it does not make sense to add it to the generic mmc/sdio
->binding 
->as this interrupt does not involve the mmc/sdio hardware hence the term
->
->OOB. There is generic wifi binding net/wireless/ieee80211.txt in which 
-
-It seems ok. Maybe it can be used for all interfaces, not
-SDIO, although I don't think there's any other interfaces
-that can use OOB IRQ except SPI and SDIO, maybe UART? :-)
-
->this could be added. Obviously it would just be a binding and no 
->guarantee that the actual device driver supports it so the RTL driver 
->would need modification for that.
-
-Yes. Currently OOB interrupt is not used at all.
-
->
->Regards,
->Arend
+>>>> +.macro __put, val, name
+>>>> +#ifdef CONFIG_HAVE_ARCH_PREL32_RELOCATIONS
+>>>> +       .long   \val - ., \name - .
+>>>> +#elif defined(CONFIG_64BIT)
+>>>> +       .quad   \val, \name
+>>>> +#else
+>>>> +       .long   \val, \name
+>>>> +#endif
+>>>> +.endm
+>>>> +
+>>>>  /*
+>>>>   * note on .section use: @progbits vs %progbits nastiness doesn't matter,
+>>>>   * since we immediately emit into those sections anyway.
+>>>> diff --git a/include/linux/compiler.h b/include/linux/compiler.h
+>>>> index ab4711c63601..0a9328ea9dbd 100644
+>>>> --- a/include/linux/compiler.h
+>>>> +++ b/include/linux/compiler.h
+>>>> @@ -280,6 +280,25 @@ unsigned long read_word_at_a_time(const void *addr)
+>>>>
+>>>>  #endif /* __KERNEL__ */
+>>>>
+>>>> +/*
+>>>> + * Force the compiler to emit 'sym' as a symbol, so that we can reference
+>>>> + * it from inline assembler. Necessary in case 'sym' could be inlined
+>>>> + * otherwise, or eliminated entirely due to lack of references that are
+>>>> + * visible to the compiler.
+>>>> + */
+>>>> +#define __ADDRESSABLE(sym) \
+>>>> +       static void * const __attribute__((section(".discard"), used))  \
+>>>> +               __PASTE(__addressable_##sym, __LINE__) = (void *)&sym;
+>>>> +
+>>>> +/**
+>>>> + * offset_to_ptr - convert a relative memory offset to an absolute pointer
+>>>> + * @off:       the address of the 32-bit offset value
+>>>> + */
+>>>> +static inline void *offset_to_ptr(const int *off)
+>>>> +{
+>>>> +       return (void *)((unsigned long)off + *off);
+>>>> +}
+>>>> +
+>>>>  #endif /* __ASSEMBLY__ */
+>>>>
+>>>>  #ifndef __optimize
+>>>> diff --git a/include/linux/export.h b/include/linux/export.h
+>>>> index 25005b55b079..04c78e6bfec9 100644
+>>>> --- a/include/linux/export.h
+>>>> +++ b/include/linux/export.h
+>>>> @@ -24,12 +24,6 @@
+>>>>  #define VMLINUX_SYMBOL_STR(x) __VMLINUX_SYMBOL_STR(x)
+>>>>
+>>>>  #ifndef __ASSEMBLY__
+>>>> -struct kernel_symbol
+>>>> -{
+>>>> -       unsigned long value;
+>>>> -       const char *name;
+>>>> -};
+>>>> -
+>>>>  #ifdef MODULE
+>>>>  extern struct module __this_module;
+>>>>  #define THIS_MODULE (&__this_module)
+>>>> @@ -60,17 +54,47 @@ extern struct module __this_module;
+>>>>  #define __CRC_SYMBOL(sym, sec)
+>>>>  #endif
+>>>>
+>>>> +#ifdef CONFIG_HAVE_ARCH_PREL32_RELOCATIONS
+>>>> +#include <linux/compiler.h>
+>>>> +/*
+>>>> + * Emit the ksymtab entry as a pair of relative references: this reduces
+>>>> + * the size by half on 64-bit architectures, and eliminates the need for
+>>>> + * absolute relocations that require runtime processing on relocatable
+>>>> + * kernels.
+>>>> + */
+>>>> +#define __KSYMTAB_ENTRY(sym, sec)                                      \
+>>>> +       __ADDRESSABLE(sym)                                              \
+>>>> +       asm("   .section \"___ksymtab" sec "+" #sym "\", \"a\"  \n"     \
+>>>> +           "   .balign 8                                       \n"     \
+>>>> +           VMLINUX_SYMBOL_STR(__ksymtab_##sym) ":              \n"     \
+>>>> +           "   .long " VMLINUX_SYMBOL_STR(sym) "- .            \n"     \
+>>>> +           "   .long " VMLINUX_SYMBOL_STR(__kstrtab_##sym) "- .\n"     \
+>>>> +           "   .previous                                       \n")
+>>>> +
+>>>> +struct kernel_symbol {
+>>>> +       int value_offset;
+>>>> +       int name_offset;
+>>>> +};
+>>>> +#else
+>>>> +#define __KSYMTAB_ENTRY(sym, sec)                                      \
+>>>> +       static const struct kernel_symbol __ksymtab_##sym               \
+>>>> +       __attribute__((section("___ksymtab" sec "+" #sym), used))       \
+>>>> +       = { (unsigned long)&sym, __kstrtab_##sym }
+>>>> +
+>>>> +struct kernel_symbol {
+>>>> +       unsigned long value;
+>>>> +       const char *name;
+>>>> +};
+>>>> +#endif
+>>>> +
+>>>>  /* For every exported symbol, place a struct in the __ksymtab section */
+>>>>  #define ___EXPORT_SYMBOL(sym, sec)                                     \
+>>>>         extern typeof(sym) sym;                                         \
+>>>>         __CRC_SYMBOL(sym, sec)                                          \
+>>>>         static const char __kstrtab_##sym[]                             \
+>>>> -       __attribute__((section("__ksymtab_strings"), aligned(1)))       \
+>>>> +       __attribute__((section("__ksymtab_strings"), used, aligned(1))) \
+>>>>         = VMLINUX_SYMBOL_STR(sym);                                      \
+>>>> -       static const struct kernel_symbol __ksymtab_##sym               \
+>>>> -       __used                                                          \
+>>>> -       __attribute__((section("___ksymtab" sec "+" #sym), used))       \
+>>>> -       = { (unsigned long)&sym, __kstrtab_##sym }
+>>>> +       __KSYMTAB_ENTRY(sym, sec)
+>>>>
+>>>>  #if defined(__DISABLE_EXPORTS)
+>>>>
+>>>> diff --git a/kernel/module.c b/kernel/module.c
+>>>> index ad2d420024f6..b4782cfbb79b 100644
+>>>> --- a/kernel/module.c
+>>>> +++ b/kernel/module.c
+>>>> @@ -549,12 +549,30 @@ static bool check_symbol(const struct symsearch *syms,
+>>>>         return true;
+>>>>  }
+>>>>
+>>>> +static unsigned long kernel_symbol_value(const struct kernel_symbol *sym)
+>>>> +{
+>>>> +#ifdef CONFIG_HAVE_ARCH_PREL32_RELOCATIONS
+>>>> +       return (unsigned long)offset_to_ptr(&sym->value_offset);
+>>>> +#else
+>>>> +       return sym->value;
+>>>> +#endif
+>>>> +}
+>>>> +
+>>>> +static const char *kernel_symbol_name(const struct kernel_symbol *sym)
+>>>> +{
+>>>> +#ifdef CONFIG_HAVE_ARCH_PREL32_RELOCATIONS
+>>>> +       return offset_to_ptr(&sym->name_offset);
+>>>> +#else
+>>>> +       return sym->name;
+>>>> +#endif
+>>>> +}
+>>>> +
+>>>>  static int cmp_name(const void *va, const void *vb)
+>>>>  {
+>>>>         const char *a;
+>>>>         const struct kernel_symbol *b;
+>>>>         a = va; b = vb;
+>>>> -       return strcmp(a, b->name);
+>>>> +       return strcmp(a, kernel_symbol_name(b));
+>>>>  }
+>>>>
+>>>>  static bool find_symbol_in_section(const struct symsearch *syms,
+>>>> @@ -2198,7 +2216,7 @@ void *__symbol_get(const char *symbol)
+>>>>                 sym = NULL;
+>>>>         preempt_enable();
+>>>>
+>>>> -       return sym ? (void *)sym->value : NULL;
+>>>> +       return sym ? (void *)kernel_symbol_value(sym) : NULL;
+>>>>  }
+>>>>  EXPORT_SYMBOL_GPL(__symbol_get);
+>>>>
+>>>> @@ -2228,10 +2246,12 @@ static int verify_export_symbols(struct module *mod)
+>>>>
+>>>>         for (i = 0; i < ARRAY_SIZE(arr); i++) {
+>>>>                 for (s = arr[i].sym; s < arr[i].sym + arr[i].num; s++) {
+>>>> -                       if (find_symbol(s->name, &owner, NULL, true, false)) {
+>>>> +                       if (find_symbol(kernel_symbol_name(s), &owner, NULL,
+>>>> +                                       true, false)) {
+>>>>                                 pr_err("%s: exports duplicate symbol %s"
+>>>>                                        " (owned by %s)\n",
+>>>> -                                      mod->name, s->name, module_name(owner));
+>>>> +                                      mod->name, kernel_symbol_name(s),
+>>>> +                                      module_name(owner));
+>>>>                                 return -ENOEXEC;
+>>>>                         }
+>>>>                 }
+>>>> @@ -2280,7 +2300,7 @@ static int simplify_symbols(struct module *mod, const struct load_info *info)
+>>>>                         ksym = resolve_symbol_wait(mod, info, name);
+>>>>                         /* Ok if resolved.  */
+>>>>                         if (ksym && !IS_ERR(ksym)) {
+>>>> -                               sym[i].st_value = ksym->value;
+>>>> +                               sym[i].st_value = kernel_symbol_value(ksym);
+>>>>                                 break;
+>>>>                         }
+>>>>
+>>>> @@ -2540,7 +2560,7 @@ static int is_exported(const char *name, unsigned long value,
+>>>>                 ks = lookup_symbol(name, __start___ksymtab, __stop___ksymtab);
+>>>>         else
+>>>>                 ks = lookup_symbol(name, mod->syms, mod->syms + mod->num_syms);
+>>>> -       return ks != NULL && ks->value == value;
+>>>> +       return ks != NULL && kernel_symbol_value(ks) == value;
+>>>>  }
+>>>>
+>>>>  /* As per nm */
+>>>> --
+>>>> 2.15.1
+>>>>
