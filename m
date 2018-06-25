@@ -1,31 +1,58 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Mon, 25 Jun 2018 15:31:14 +0100
-Subject: [PATCH 10/11] ASoC: qcom: apq8096: remove redundant owner assignment
+Date: Mon, 25 Jun 2018 15:31:08 +0100
+Subject: [PATCH 04/11] ASoC: qdsp6: q6adm: use
+ of_platform_populate/depopulate()
 In-Reply-To: <20180625143115.8346-1-srinivas.kandagatla@linaro.org>
 References: <20180625143115.8346-1-srinivas.kandagatla@linaro.org>
-Message-ID: <20180625143115.8346-11-srinivas.kandagatla@linaro.org>
+Message-ID: <20180625143115.8346-5-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-module owner is already set in platform_driver_register(), so remove this
-redundant assignment.
+Now that the child nodes have there own compatible strings,
+Use of_platform_populate/depopulate() instead of less common
+of_platform_device_create()/destroy().
 
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 ---
- sound/soc/qcom/apq8096.c | 1 -
- 1 file changed, 1 deletion(-)
+ sound/soc/qcom/qdsp6/q6adm.c | 15 ++-------------
+ 1 file changed, 2 insertions(+), 13 deletions(-)
 
-diff --git a/sound/soc/qcom/apq8096.c b/sound/soc/qcom/apq8096.c
-index 561cd429e6f2..6e79fec7e789 100644
---- a/sound/soc/qcom/apq8096.c
-+++ b/sound/soc/qcom/apq8096.c
-@@ -245,7 +245,6 @@ static struct platform_driver msm_snd_apq8096_driver = {
- 	.remove = apq8096_platform_remove,
- 	.driver = {
- 		.name = "msm-snd-apq8096",
--		.owner = THIS_MODULE,
- 		.of_match_table = msm_snd_apq8096_dt_match,
- 	},
- };
+diff --git a/sound/soc/qcom/qdsp6/q6adm.c b/sound/soc/qcom/qdsp6/q6adm.c
+index 9983c665a941..dfd5bc3ddd52 100644
+--- a/sound/soc/qcom/qdsp6/q6adm.c
++++ b/sound/soc/qcom/qdsp6/q6adm.c
+@@ -588,7 +588,6 @@ EXPORT_SYMBOL_GPL(q6adm_close);
+ static int q6adm_probe(struct apr_device *adev)
+ {
+ 	struct device *dev = &adev->dev;
+-	struct device_node *dais_np;
+ 	struct q6adm *adm;
+ 
+ 	adm = devm_kzalloc(&adev->dev, sizeof(*adm), GFP_KERNEL);
+@@ -605,22 +604,12 @@ static int q6adm_probe(struct apr_device *adev)
+ 	INIT_LIST_HEAD(&adm->copps_list);
+ 	spin_lock_init(&adm->copps_list_lock);
+ 
+-	dais_np = of_get_child_by_name(dev->of_node, "routing");
+-	if (dais_np) {
+-		adm->pdev_routing = of_platform_device_create(dais_np,
+-							   "q6routing", dev);
+-		of_node_put(dais_np);
+-	}
+-
+-	return 0;
++	return of_platform_populate(dev->of_node, NULL, NULL, dev);
+ }
+ 
+ static int q6adm_remove(struct apr_device *adev)
+ {
+-	struct q6adm *adm = dev_get_drvdata(&adev->dev);
+-
+-	if (adm->pdev_routing)
+-		of_platform_device_destroy(&adm->pdev_routing->dev, NULL);
++	of_platform_depopulate(&adev->dev);
+ 
+ 	return 0;
+ }
 -- 
 2.16.2
