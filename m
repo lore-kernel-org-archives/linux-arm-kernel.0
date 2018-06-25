@@ -1,196 +1,60 @@
-From: yaojun8558363@gmail.com (Jun Yao)
-Date: Mon, 25 Jun 2018 19:39:21 +0800
-Subject: [PATCH v2 2/2] arm64/mm: Move {tramp_pg_dir,
- swapper_pg_dir} to .rodata section
-In-Reply-To: <20180625113921.21854-1-yaojun8558363@gmail.com>
-References: <20180625113921.21854-1-yaojun8558363@gmail.com>
-Message-ID: <20180625113921.21854-3-yaojun8558363@gmail.com>
+From: christoffer.dall@arm.com (Christoffer Dall)
+Date: Mon, 25 Jun 2018 13:56:03 +0200
+Subject: [PATCH 0/4] KVM: arm/arm64: vgic: Virtual interrupt grouping
+ support
+In-Reply-To: <20180625101347.GF8004@C02W217FHV2R.local>
+References: <20180624221103.15055-1-christoffer.dall@arm.com>
+ <CAFEAcA_C6Voh_6Ljj9--cbo14X_uWTOekM30dU=Rp9CtZK-6ow@mail.gmail.com>
+ <20180625101347.GF8004@C02W217FHV2R.local>
+Message-ID: <20180625115603.GG8004@C02W217FHV2R.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When CONFIG_ARM64_VA_BITS_36/CONFIG_ARM64_VA_BITS_39/
-CONFIG_ARM64_VA_BITS_42 are selected, a block-mapping can be
-written to swapper_pg_dir. To defend 'KSMA', we move swapper_pg_dir
-to .rodata section when these configurations are selected. At the
-same time, we update swapper_pg_dir by fixmap.
+On Mon, Jun 25, 2018 at 12:13:47PM +0200, Christoffer Dall wrote:
+> On Mon, Jun 25, 2018 at 10:52:41AM +0100, Peter Maydell wrote:
+> > On 24 June 2018 at 23:10, Christoffer Dall <christoffer.dall@arm.com> wrote:
+> > > This small series addresses a peculiarity of the current VGIC
+> > > implementation, namely that we don't support interrupt grouping.
+> > >
+> > > KVM either implements a GICv2 without support for the security
+> > > extensions, or a GICv3 with DS=1.  For GICv2, on systems without the
+> > > security extensions, group 0 interrupts can be configured to be either
+> > > signalled as FIQs or as IRQs by the VM, whereas group 1 interrupts are
+> > > always IRQs.  For GICv3, with DS=1, group 1 interrupts are always IRQs
+> > > and group 0 interrupts are always FIQs, and there is no concept of
+> > > secure vs. non-secure group 1 interrupts when DS=1.
+> > >
+> > > We were treating all interrupts on GICv2 as group 0, but yet telling the
+> > > geust that they were group 1.  The first patch changes this behavior,
+> > > which seems to have no effect on no known guests, but still.
+> > >
+> > > The remaining patches introduce proper interrupt grouping support, along
+> > > with MMIO accessors for the VM and userspace to retrieve and set the
+> > > which group SGIs, PPIs, and SPIs belong to.  LPIs are always group 1
+> > > interrupts as per the architecture, and there is no way to modify this
+> > > configuration (no IGROUPR registers for LPIs or equivalent ITS
+> > > commands).
+> > 
+> > How do we handle migration compatibility here? For instance if
+> > we have a guest running on an old kernel with GICv2, presumably
+> > it reports the GICD_IGROUPRn to userspace as being all-1 (but
+> > they behave as group 0); then when we load on the new kernel
+> > the new kernel will honour the IGROUPRn values and the interrupts
+> > will start behaving like group 1 ? Maybe this works because the
+> > guest is expecting them to be signalled as IRQ either way...
+> > 
+> 
+> Interesting.  For GICv2, I think this will actually break, and the
+> migrated Linux guest won't see any interrupts anymore (Linux only sets
+> bit 0 in GICD_CTLR).  For GICv3, everything stays group 1 unless the
+> guest is specifically trying to configure group 0 for something.
+> 
+> I suppose this means we need to let userspace request
+> ARCH_COMPLIANT_GICV2 and otherwise ignore userspace writes to IGROUPR?
+> 
+Alternatively, we could deny (fail) migration where the
+GICD_IIDR.Revision does not match the source, and just let userspace fix
+things up.  Thoughts?
 
-Signed-off-by: Jun Yao <yaojun8558363@gmail.com>
----
- arch/arm64/include/asm/fixmap.h  |  1 +
- arch/arm64/include/asm/pgalloc.h | 33 ++++++++++++++++++++++++++++++++
- arch/arm64/include/asm/pgtable.h |  5 +++++
- arch/arm64/kernel/head.S         |  6 +++---
- arch/arm64/kernel/vmlinux.lds.S  | 23 ++++++++++++++++++++++
- arch/arm64/mm/mmu.c              |  6 ++++++
- 6 files changed, 71 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm64/include/asm/fixmap.h b/arch/arm64/include/asm/fixmap.h
-index 62908eeedcdc..881784b43965 100644
---- a/arch/arm64/include/asm/fixmap.h
-+++ b/arch/arm64/include/asm/fixmap.h
-@@ -83,6 +83,7 @@ enum fixed_addresses {
- 	FIX_PTE,
- 	FIX_PMD,
- 	FIX_PUD,
-+	FIX_SWAPPER,
- 
- 	__end_of_fixed_addresses
- };
-diff --git a/arch/arm64/include/asm/pgalloc.h b/arch/arm64/include/asm/pgalloc.h
-index 2e05bcd944c8..62512ad9c310 100644
---- a/arch/arm64/include/asm/pgalloc.h
-+++ b/arch/arm64/include/asm/pgalloc.h
-@@ -49,6 +49,22 @@ static inline void __pud_populate(pud_t *pudp, phys_addr_t pmdp, pudval_t prot)
- 
- static inline void pud_populate(struct mm_struct *mm, pud_t *pudp, pmd_t *pmdp)
- {
-+#ifdef CONFIG_ARM64_VA_BITS_39
-+	if (mm == &init_mm) {
-+		pud_t *pud;
-+		unsigned long offset;
-+		extern spinlock_t pgdir_lock;
-+
-+		spin_lock(&pgdir_lock);
-+		pud = (pud_t *)swapper_set_fixmap();
-+		offset = (unsigned long)pudp - (unsigned long)swapper_pg_dir;
-+		pud = (pud_t *)((unsigned long)pud + offset);
-+		__pud_populate(pud, __pa(pmdp), PMD_TYPE_TABLE);
-+		swapper_clear_fixmap();
-+		spin_unlock(&pgdir_lock);
-+		return;
-+	}
-+#endif
- 	__pud_populate(pudp, __pa(pmdp), PMD_TYPE_TABLE);
- }
- #else
-@@ -142,6 +158,23 @@ pmd_populate_kernel(struct mm_struct *mm, pmd_t *pmdp, pte_t *ptep)
- 	/*
- 	 * The pmd must be loaded with the physical address of the PTE table
- 	 */
-+#if defined(CONFIG_ARM64_VA_BITS_42) || \
-+	defined(CONFIG_ARM64_VA_BITS_36)
-+	if (mm == &init_mm) {
-+		pmd_t *pmd;
-+		unsigned long offset;
-+		extern spinlock_t pgdir_lock;
-+
-+		spin_lock(&pgdir_lock);
-+		pmd = (pmd_t *)swapper_set_fixmap();
-+		offset = (unsigned long)pmdp - (unsigned long)swapper_pg_dir;
-+		pmd = (pmd_t *)((unsigned long)pmd + offset);
-+		__pmd_populate(pmd, __pa(ptep), PMD_TYPE_TABLE);
-+		swapper_clear_fixmap();
-+		spin_unlock(&pgdir_lock);
-+		return;
-+	}
-+#endif
- 	__pmd_populate(pmdp, __pa(ptep), PMD_TYPE_TABLE);
- }
- 
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index b2435e8b975b..85743ea0709b 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -592,6 +592,11 @@ static inline phys_addr_t pgd_page_paddr(pgd_t pgd)
- /* to find an entry in a kernel page-table-directory */
- #define pgd_offset_k(addr)	pgd_offset(&init_mm, addr)
- 
-+#define swapper_set_fixmap() \
-+	set_fixmap_offset(FIX_SWAPPER, __pa_symbol(swapper_pg_dir))
-+
-+#define swapper_clear_fixmap()	clear_fixmap(FIX_SWAPPER)
-+
- static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
- {
- 	const pteval_t mask = PTE_USER | PTE_PXN | PTE_UXN | PTE_RDONLY |
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 9677deb7b6c7..9db187024b44 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -300,7 +300,7 @@ __create_page_tables:
- 	 * dirty cache lines being evicted.
- 	 */
- 	adrp	x0, idmap_pg_dir
--	adrp	x1, swapper_pg_end
-+	adrp	x1, idmap_pg_end
- 	sub	x1, x1, x0
- 	bl	__inval_dcache_area
- 
-@@ -313,7 +313,7 @@ __create_page_tables:
- 	 * Clear the idmap and init page tables.
- 	 */
- 	adrp	x0, idmap_pg_dir
--	adrp	x1, swapper_pg_end
-+	adrp	x1, idmap_pg_end
- 	sub	x1, x1, x0
- 	clear_pages x0, x1
- 
-@@ -404,7 +404,7 @@ __create_page_tables:
- 	 * tables again to remove any speculatively loaded cache lines.
- 	 */
- 	adrp	x0, idmap_pg_dir
--	adrp	x1, swapper_pg_end
-+	adrp	x1, idmap_pg_end
- 	sub	x1, x1, x0
- 	dmb	sy
- 	bl	__inval_dcache_area
-diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-index b0e4255fcba4..db72c4680f1d 100644
---- a/arch/arm64/kernel/vmlinux.lds.S
-+++ b/arch/arm64/kernel/vmlinux.lds.S
-@@ -219,6 +219,28 @@ SECTIONS
- 	. = ALIGN(PAGE_SIZE);
- 	idmap_pg_dir = .;
- 	. += IDMAP_DIR_SIZE;
-+	idmap_pg_end = .;
-+
-+#if defined(CONFIG_ARM64_VA_BITS_39) || \
-+	defined(CONFIG_ARM64_VA_BITS_36) || \
-+	defined(CONFIG_ARM64_VA_BITS_42)
-+	.rodata : {
-+#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
-+		. = ALIGN(PAGE_SIZE);
-+		tramp_pg_dir = .;
-+		. += PAGE_SIZE;
-+#endif
-+
-+#ifdef CONFIG_ARM64_SW_TTBR0_PAN
-+		reserved_ttbr0 = .;
-+		. += RESERVED_TTBR0_SIZE;
-+#endif
-+		swapper_pg_dir = .;
-+		. += PAGE_SIZE;
-+		swapper_pg_end = .;
-+	}
-+
-+#else
- 
- #ifdef CONFIG_UNMAP_KERNEL_AT_EL0
- 	tramp_pg_dir = .;
-@@ -232,6 +254,7 @@ SECTIONS
- 	swapper_pg_dir = .;
- 	. += PAGE_SIZE;
- 	swapper_pg_end = .;
-+#endif
- 
- 	__pecoff_data_size = ABSOLUTE(. - __initdata_begin);
- 	_end = .;
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index a3b5f1dffb84..fbaf3e9b4a43 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -66,6 +66,12 @@ static pte_t bm_pte[PTRS_PER_PTE] __page_aligned_bss;
- static pmd_t bm_pmd[PTRS_PER_PMD] __page_aligned_bss __maybe_unused;
- static pud_t bm_pud[PTRS_PER_PUD] __page_aligned_bss __maybe_unused;
- 
-+#if defined(CONFIG_ARM64_VA_BITS_39) || \
-+	defined(CONFIG_ARM64_VA_BITS_36) || \
-+	defined(CONFIG_ARM64_VA_BITS_42)
-+DEFINE_SPINLOCK(pgdir_lock);
-+#endif
-+
- pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
- 			      unsigned long size, pgprot_t vma_prot)
- {
--- 
-2.17.1
+Thanks,
+-Christoffer
