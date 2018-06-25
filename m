@@ -1,46 +1,61 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 26 Jun 2018 00:46:55 +0900
-Subject: [PATCH v2 1/2] arm64: dts: uniphier: add headphone detect gpio
- for LD20 global board
-In-Reply-To: <20180625034505.1404-1-suzuki.katsuhiro@socionext.com>
-References: <20180625034505.1404-1-suzuki.katsuhiro@socionext.com>
-Message-ID: <CAK7LNARnMkTj3i=P80uiikhuD8xnX1wD85S9RRyFZzQ1BafpEA@mail.gmail.com>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Mon, 25 Jun 2018 17:50:11 +0200
+Subject: [PATCH 00/14] ARM: davinci: step towards removing at24_platform_data
+Message-ID: <20180625155025.12567-1-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-06-25 12:45 GMT+09:00 Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>:
-> This patch adds GPIO for headphone detection on LD20 global board.
->
-> Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
+From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-Applied.  Thanks!
+Since I took over maintainership of the at24 driver I've been working
+towards removing at24_platform_data in favor for device properties.
 
-> ---
->  arch/arm64/boot/dts/socionext/uniphier-ld20-global.dts | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld20-global.dts b/arch/arm64/boot/dts/socionext/uniphier-ld20-global.dts
-> index 6a074a20c924..8aeb59486ff2 100644
-> --- a/arch/arm64/boot/dts/socionext/uniphier-ld20-global.dts
-> +++ b/arch/arm64/boot/dts/socionext/uniphier-ld20-global.dts
-> @@ -60,6 +60,7 @@
->                         &i2s_port4
->                         &spdif_port0
->                         &comp_spdif_port0>;
-> +               hp-det-gpio = <&gpio UNIPHIER_GPIO_IRQ(0) GPIO_ACTIVE_LOW>;
->         };
->
->         spdif-out {
-> --
-> 2.18.0
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+DaVinci is the only platform that's still using it - all other users
+have already been converted.
 
+One of the obstacles in case of DaVinci is removing the setup() callback
+from the pdata struct, the only user of which are some davinci boards.
 
+Most boards use the EEPROM to store the MAC address. This series adds
+support for cell lookups to the nvmem framework, registers relevant
+cells for all users, converts the davinci_emac driver to using them
+and replaces at24_platform_data with device properties.
+
+The only board that's still using this callback is now mityomapl138.
+Unfortunately it stores more info in EEPROM than just the MAC address
+and will require some more work. Unfortunately I don't have access
+to this board so I can't test any actual solutions on a live hardware.
+
+Tested on a dm365-evm board.
+
+Bartosz Golaszewski (14):
+  nvmem: add support for cell lookups
+  ARM: davinci: dm365-evm: use nvmem lookup for mac address
+  ARM: davinci: dm644-evm: use nvmem lookup for mac address
+  ARM: davinci: dm646x-evm: use nvmem lookup for mac address
+  ARM: davinci: da830-evm: use nvmem lookup for mac address
+  ARM: davinci: mityomapl138: add nvmem cells lookup entries
+  net: davinci_emac: use nvmem to retrieve the mac address
+  ARM: davinci: mityomapl138: don't read the MAC address from machine
+    code
+  ARM: davinci: dm365-evm: use device properties for at24 eeprom
+  ARM: davinci: da830-evm: use device properties for at24 eeprom
+  ARM: davinci: dm644x-evm: use device properties for at24 eeprom
+  ARM: davinci: dm646x-evm: use device properties for at24 eeprom
+  ARM: davinci: sffsdr: fix the at24 eeprom device name
+  ARM: davinci: sffsdr: use device properties for at24 eeprom
+
+ arch/arm/mach-davinci/board-da830-evm.c    | 25 +++++++---
+ arch/arm/mach-davinci/board-dm365-evm.c    | 25 +++++++---
+ arch/arm/mach-davinci/board-dm644x-evm.c   | 24 ++++++---
+ arch/arm/mach-davinci/board-dm646x-evm.c   | 25 +++++++---
+ arch/arm/mach-davinci/board-mityomapl138.c | 30 +++++++++---
+ arch/arm/mach-davinci/board-sffsdr.c       | 13 +++--
+ drivers/net/ethernet/ti/davinci_emac.c     | 29 +++++++----
+ drivers/nvmem/core.c                       | 57 +++++++++++++++++++++-
+ include/linux/nvmem-consumer.h             |  6 +++
+ include/linux/nvmem-provider.h             |  6 +++
+ 10 files changed, 182 insertions(+), 58 deletions(-)
 
 -- 
-Best Regards
-Masahiro Yamada
+2.17.1
