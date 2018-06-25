@@ -1,111 +1,74 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Mon, 25 Jun 2018 18:09:07 -0500
-Subject: [PATCH 07/14] net: davinci_emac: use nvmem to retrieve the mac
- address
-In-Reply-To: <20180625155025.12567-8-brgl@bgdev.pl>
-References: <20180625155025.12567-1-brgl@bgdev.pl>
- <20180625155025.12567-8-brgl@bgdev.pl>
-Message-ID: <590fd122-1c13-8958-7e84-dbc5c5ea65f3@ti.com>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Mon, 25 Jun 2018 16:26:18 -0700
+Subject: [PATCH 2/2] soc: qcom: cmd-db: Fix compiler warnings
+In-Reply-To: <CAK8P3a1+qs3f2cLPKPiMKR4L74dwpAkBcZPNVG4hk_nfx12Xqw@mail.gmail.com>
+References: <1529946347-12740-1-git-send-email-andy.gross@linaro.org>
+ <1529946347-12740-2-git-send-email-andy.gross@linaro.org>
+ <CAK8P3a0y9pUC2PQFv-GABnsr7cWWAKuLoDNeC1tC2A8iByzmaw@mail.gmail.com>
+ <20180625205406.GC4689@hector.attlocal.net>
+ <CAK8P3a1+qs3f2cLPKPiMKR4L74dwpAkBcZPNVG4hk_nfx12Xqw@mail.gmail.com>
+Message-ID: <20180625232618.GD1860@tuxbook-pro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon 25 Jun 14:08 PDT 2018, Arnd Bergmann wrote:
 
-
-On 06/25/2018 10:50 AM, Bartosz Golaszewski wrote:
-> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> On Mon, Jun 25, 2018 at 10:54 PM, Andy Gross <andy.gross@linaro.org> wrote:
+> > On Mon, Jun 25, 2018 at 10:30:17PM +0200, Arnd Bergmann wrote:
+> >> On Mon, Jun 25, 2018 at 7:05 PM, Andy Gross <andy.gross@linaro.org> wrote:
+> >>
+> >> I generally don't like patches that add incorrect initializations to
+> >> work around warnings like this.
+> >
+> > Correct me if I am wrong, but this just masks the warnings on toolchain/
+> > platforms that exhibit these warnings.  I'm not entirely fond of doing
+> > blanket init either to make the warnings go away either...
 > 
-> All users which store the MAC address in EEPROM now register relevant
-> nvmem cells. Switch to retrieving the MAC address over the nvmem
-> framework.
+> My patch disallows the case where the compiler can see that the variable
+> is actually used without an initialization, and that code wouldn't
+> work properly.
 > 
-> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> ---
->   drivers/net/ethernet/ti/davinci_emac.c | 29 +++++++++++++++++---------
->   1 file changed, 19 insertions(+), 10 deletions(-)
+> The problem is that in this loop:
 > 
-> diff --git a/drivers/net/ethernet/ti/davinci_emac.c b/drivers/net/ethernet/ti/davinci_emac.c
-> index a1a6445b5a7e..22c2322e46be 100644
-> --- a/drivers/net/ethernet/ti/davinci_emac.c
-> +++ b/drivers/net/ethernet/ti/davinci_emac.c
-> @@ -67,7 +67,7 @@
->   #include <linux/of_irq.h>
->   #include <linux/of_net.h>
->   #include <linux/mfd/syscon.h>
-> -
-> +#include <linux/nvmem-consumer.h>
->   #include <asm/irq.h>
->   #include <asm/page.h>
->   
-> @@ -1696,7 +1696,6 @@ davinci_emac_of_get_pdata(struct platform_device *pdev, struct emac_priv *priv)
->   	const struct of_device_id *match;
->   	const struct emac_platform_data *auxdata;
->   	struct emac_platform_data *pdata = NULL;
-> -	const u8 *mac_addr;
->   
->   	if (!IS_ENABLED(CONFIG_OF) || !pdev->dev.of_node)
->   		return dev_get_platdata(&pdev->dev);
-> @@ -1708,12 +1707,6 @@ davinci_emac_of_get_pdata(struct platform_device *pdev, struct emac_priv *priv)
->   	np = pdev->dev.of_node;
->   	pdata->version = EMAC_VERSION_2;
->   
-> -	if (!is_valid_ether_addr(pdata->mac_addr)) {
-> -		mac_addr = of_get_mac_address(np);
-> -		if (mac_addr)
-> -			ether_addr_copy(pdata->mac_addr, mac_addr);
-> -	}
-> -
-
-Not sure it is correct. of_get_mac_address() is called when board data doesn't
-provide MAC address with expectation that MAC address is defined in DT (usually by u-boot).
-Standard DT properties for MAC address "local-mac-address" and "mac-address".
-
-So, you can't just drop it and replace with nvmem.
-
-Two options are here:
-1) try to read MAC-address from nvmem then try DT (as it's now)
-2) try to read DT then try nvmem [then random MAC | fail]
-
-
->   	of_property_read_u32(np, "ti,davinci-ctrl-reg-offset",
->   			     &pdata->ctrl_reg_offset);
->   
-> @@ -1783,7 +1776,9 @@ static int davinci_emac_probe(struct platform_device *pdev)
->   	struct cpdma_params dma_params;
->   	struct clk *emac_clk;
->   	unsigned long emac_bus_frequency;
-> -
-> +	struct nvmem_cell *cell;
-> +	void *mac_addr;
-> +	size_t mac_addr_len;
->   
->   	/* obtain emac clock from kernel */
->   	emac_clk = devm_clk_get(&pdev->dev, NULL);
-> @@ -1815,8 +1810,22 @@ static int davinci_emac_probe(struct platform_device *pdev)
->   		goto err_free_netdev;
->   	}
->   
-> +	cell = nvmem_cell_get(&pdev->dev, "mac-address");
-> +	if (!IS_ERR(cell)) {
-> +		mac_addr = nvmem_cell_read(cell, &mac_addr_len);
-> +		if (!IS_ERR(mac_addr)) {
-> +			if (is_valid_ether_addr(mac_addr)) {
-> +				dev_info(&pdev->dev,
-> +					 "Read MAC addr from EEPROM: %pM\n",
-> +					 mac_addr);
-> +				memcpy(priv->mac_addr, mac_addr, ETH_ALEN);
-> +			}
-> +			kfree(mac_addr);
-> +		}
-> +		nvmem_cell_put(cell);
-> +	}
-> +
->   	/* MAC addr and PHY mask , RMII enable info from platform_data */
-> -	memcpy(priv->mac_addr, pdata->mac_addr, ETH_ALEN);
->   	priv->phy_id = pdata->phy_id;
->   	priv->rmii_en = pdata->rmii_en;
->   	priv->version = pdata->version;
+>         for (i = 0; i < MAX_SLV_ID; i++) {
+>                 rsc_hdr = &cmd_db_header->header[i];
+>                 if (!rsc_hdr->slv_id)
+>                         break;
+> 
+>                 ent = rsc_to_entry_header(rsc_hdr);
+>                 for (j = 0; j < le16_to_cpu(rsc_hdr->cnt); j++, ent++) {
+>                         if (memcmp(ent->id, query, sizeof(ent->id)) == 0)
+>                                 break;
+>                 }
+> 
+>                 if (j < le16_to_cpu(rsc_hdr->cnt)) {
+>                         memcpy(eh, ent, sizeof(*ent));
+>                         memcpy(rh, rsc_hdr, sizeof(*rh));
+>                         return 0;
+>                 }
+>         }
+> 
+> I think gcc sees that cmd_db_header is initialized to NULL and never
+> written to after of_reserved_mem_lookup() returns NULL during
+> cmd_db_dev_probe().
+> 
+> This means we are that cmd_db_get_header never intializes the
+> resulting structure. It also never returns zero, but gcc doesn't
+> see that here.
 > 
 
--- 
-regards,
--grygorii
+The optimization that I can see would lead to a difference here is if
+the conditional in cmd_db_read() is just removed as the compiler see it
+always being true, but then doesn't propagate this to the error handling
+in cmd_db_get_header(); but that wouldn't make much sense...
+
+Otherwise I think cmd_db_header would be equally uninitialized in the
+case where CONFIG_OF_RESERVED_MEM is set, but we haven't seen any issues
+related to this on arm64.
+
+
+Unless there's something I'm missing I would prefer that we just take
+Anders' proposed fix, it does mask the problem in a more direct way.
+
+Regards,
+Bjorn
