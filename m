@@ -1,117 +1,117 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Mon, 25 Jun 2018 13:22:19 +0000
-Subject: [PATCH V3 2/5] soc: imx: add mu library functions support
-In-Reply-To: <AM0PR04MB4211D74B6DD6BCA9A00C5E80804A0@AM0PR04MB4211.eurprd04.prod.outlook.com>
-References: <1529676720-7533-1-git-send-email-aisheng.dong@nxp.com>
- <1529676720-7533-3-git-send-email-aisheng.dong@nxp.com>
- <20180625093504.hyjbixnnmipiqopg@pengutronix.de>
- <AM0PR04MB4211D74B6DD6BCA9A00C5E80804A0@AM0PR04MB4211.eurprd04.prod.outlook.com>
-Message-ID: <AM0PR04MB4211A1713C3868406B307BA8804A0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Mon, 25 Jun 2018 15:29:33 +0200
+Subject: [PATCH 6/9] media: cedrus: Add ops structure
+In-Reply-To: <939381a854760b1d54984ae0f534ec03312ec8e0.camel@bootlin.com>
+References: <20180613140714.1686-1-maxime.ripard@bootlin.com>
+ <20180613140714.1686-7-maxime.ripard@bootlin.com>
+ <939381a854760b1d54984ae0f534ec03312ec8e0.camel@bootlin.com>
+Message-ID: <20180625132933.tzr36vsucqsq3mmb@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: A.s. Dong
-> Sent: Monday, June 25, 2018 7:59 PM
-> To: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: linux-arm-kernel at lists.infradead.org; dongas86 at gmail.com; dl-linux-imx
-> <linux-imx@nxp.com>; kernel at pengutronix.de; Fabio Estevam
-> <fabio.estevam@nxp.com>; shawnguo at kernel.org
-> Subject: RE: [PATCH V3 2/5] soc: imx: add mu library functions support
-> 
-> > -----Original Message-----
-> > From: Sascha Hauer [mailto:s.hauer at pengutronix.de]
-> > Sent: Monday, June 25, 2018 5:35 PM
-> > To: A.s. Dong <aisheng.dong@nxp.com>
-> > Cc: linux-arm-kernel at lists.infradead.org; dongas86 at gmail.com;
-> > dl-linux-imx <linux-imx@nxp.com>; kernel at pengutronix.de; Fabio
-> Estevam
-> > <fabio.estevam@nxp.com>; shawnguo at kernel.org
-> > Subject: Re: [PATCH V3 2/5] soc: imx: add mu library functions support
-> >
-> > On Fri, Jun 22, 2018 at 10:11:57PM +0800, Dong Aisheng wrote:
-> > > This is used for i.MX multi core communication.
-> > > e.g. A core to SCU firmware(M core) on MX8.
-> >
-> > I still believe that a generic driver for the MU should be used here.
-> > Handling hardware resources under the hood of the driver framework is
-> > a hack. Preventing the generic driver from matching against the SCU MU
-> > by adding some #mbox-cells = <0>; to the MU device node is even more a
-> hack.
-> >
-> 
-> That is not a hack from a HW point of view. The MU HW does not have multi
-> channels according to Reference Manual. Even we switch to mailbox, we
-> probably may still prefer mbox-cell = <0> as the virtual channels do not fit for
-> SCU MU.
-> 
-> > We should really handle the MU in a driver and look for a way how the
-> > SCU case can coexist with other usages of the MUs.
-> >
-> > Your main argument against using the mailbox framework is that it
-> > can't handle polling in the way you need it and that the mailbox
-> > framework provides things that you do not need. I don't buy this
-> > argument. In the end the mailbox framework is around 500 lines of
-> > code, it shouldn't be that hard to add the missing features. From the
-> > transmit side I don't see any showstoppers, the mailbox frameworks
-> > could be used as ist. What is missing is a synchronous
-> > wait-for-new-messages and receive-message call, the currently existing
-> asynchronous rx callback is indeed not suitable for the SCU.
-> > But as said, it should be doable to add that.
-> >
-> 
-> Besides the mailbox framework may not suitable for SCU, another important
-> Reason is that even we force to switch to mailbox, it's still can't be generic
-> driver and it can only be used by SCU MU.
-> 
-> Let's see the mailbox doc where it also highlights it may somehow depend on
-> mailbox communication protocol.
-> 
-> Documentation/mailbox.txt
-> ----------------------------------------------------------------------------------------
-> This document aims to help developers write client and controller drivers for
-> the API. But before we start, let us note that the client (especially) and
-> controller drivers are likely going to be very platform specific because the
-> remote firmware is likely to be proprietary and implement non-standard
-> protocol.
-> .....
-> ----------------------------------------------------------------------------------------
-> 
-> So the question to us is: If it can't be generic driver which can be used by
-> others as well and it introduces much unnecessary complexities, why do we
-> need do that? What's real benefits we can have?
-> 
+Hi!
 
-Another option is we can try to improve mailbox framework to fit
-for SCU MU user case, but that may be a long time which will block all
-QXP bits upstreaming as most QXP parts are based on SCU API call.
-How about do that as an improvement investigation later? As the underlying
-IPC communication mechanism is somehow separate and independent of
-the high layer service and client users and current implementation is quite
-light one, won't cause much extra code.
-That won't block QXP upstream and can also have an in-tree comparison
-to the old ways.
-
-How do you think of it?
-
-Regards
-Dong Aisheng
-
-> Regards
-> Dong Aisheng
+On Thu, Jun 21, 2018 at 11:49:54AM +0200, Paul Kocialkowski wrote:
+> Hi,
 > 
-> > Sascha
-> >
-> > --
-> > Pengutronix e.K.                           |                             |
-> > Industrial Linux Solutions                 |
-> >
-> https://emea01.safelinks.protection.outlook.com/?url=http%3A%2F%2Fww
-> >
-> w.pengutronix.de%2F&data=02%7C01%7Caisheng.dong%40nxp.com%7Cfe5
-> > 2cb3aecd3461fab3d08d5da7eefc6%7C686ea1d3bc2b4c6fa92cd99c5c301635%
-> >
-> 7C0%7C0%7C636655161075403401&sdata=bRnnlrq82OAlxoli5IHAtXuwieLGJM
-> > 4raDRvaV8y5gs%3D&reserved=0  |
-> > Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-> > Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> On Wed, 2018-06-13 at 16:07 +0200, Maxime Ripard wrote:
+> > In order to increase the number of codecs supported, we need to decouple
+> > the MPEG2 only code that was there up until now and turn it into something
+> > a bit more generic.
+> > 
+> > Do that by introducing an intermediate ops structure that would need to be
+> > filled by each supported codec. Start by implementing in that structure the
+> > setup and trigger hooks that are currently the only functions being
+> > implemented by codecs support.
+> > 
+> > To do so, we need to store the current codec in use, which we do at
+> > start_streaming time.
+> 
+> With the comments below taken in account, this is:
+> 
+> Acked-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+
+Thanks!
+
+> > Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+> > ---
+> >  .../platform/sunxi/cedrus/sunxi_cedrus.c      |  2 ++
+> >  .../sunxi/cedrus/sunxi_cedrus_common.h        | 11 +++++++
+> >  .../platform/sunxi/cedrus/sunxi_cedrus_dec.c  | 10 +++---
+> >  .../sunxi/cedrus/sunxi_cedrus_mpeg2.c         | 11 +++++--
+> >  .../sunxi/cedrus/sunxi_cedrus_mpeg2.h         | 33 -------------------
+> >  .../sunxi/cedrus/sunxi_cedrus_video.c         | 17 +++++++++-
+> >  6 files changed, 42 insertions(+), 42 deletions(-)
+> >  delete mode 100644 drivers/media/platform/sunxi/cedrus/sunxi_cedrus_mpeg2.h
+> > 
+> > diff --git a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus.c b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus.c
+> > index ccd41d9a3e41..bc80480f5dfd 100644
+> > --- a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus.c
+> > +++ b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus.c
+> > @@ -244,6 +244,8 @@ static int sunxi_cedrus_probe(struct platform_device *pdev)
+> >  	if (ret)
+> >  		return ret;
+> >  
+> > +	dev->dec_ops[SUNXI_CEDRUS_CODEC_MPEG2] = &sunxi_cedrus_dec_ops_mpeg2;
+> > +
+> >  	ret = v4l2_device_register(&pdev->dev, &dev->v4l2_dev);
+> >  	if (ret)
+> >  		goto unreg_media;
+> > diff --git a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h
+> > index a5f83c452006..c2e2c92d103b 100644
+> > --- a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h
+> > +++ b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h
+> > @@ -75,6 +75,7 @@ struct sunxi_cedrus_ctx {
+> >  	struct v4l2_pix_format_mplane src_fmt;
+> >  	struct sunxi_cedrus_fmt *vpu_dst_fmt;
+> >  	struct v4l2_pix_format_mplane dst_fmt;
+> > +	enum sunxi_cedrus_codec current_codec;
+> 
+> Nit: for consistency with the way things are named, "codec_current"
+> probably makes more sense.
+
+I'm not quite sure what you mean by consitency here. This structure
+has 5 other variables with two words: vpu_src_fmt, src_fmt,
+vpu_dst_fmt, dst_fmt and dst_bufs. codec_current would be going
+against the consistency of that structure.
+
+> IMO using the natural English order is fine for temporary variables, but
+>  less so for variables used in common parts like structures. This allows
+> seeing "_" as a logical hierarchical delimiter that automatically makes
+> us end up with consistent prefixes that can easily be grepped for and
+> derived.
+> 
+> But that's just my 2 cents, it's really not a big deal, especially in
+> this case!
+> 
+> >  	struct v4l2_ctrl_handler hdl;
+> >  	struct v4l2_ctrl *ctrls[SUNXI_CEDRUS_CTRL_MAX];
+> > @@ -107,6 +108,14 @@ struct sunxi_cedrus_buffer *vb2_to_cedrus_buffer(const struct vb2_buffer *p)
+> >  	return vb2_v4l2_to_cedrus_buffer(to_vb2_v4l2_buffer(p));
+> >  }
+> >  
+> > +struct sunxi_cedrus_dec_ops {
+> > +	void (*setup)(struct sunxi_cedrus_ctx *ctx,
+> > +		      struct sunxi_cedrus_run *run);
+> > +	void (*trigger)(struct sunxi_cedrus_ctx *ctx);
+> 
+> By the way, are we sure that these functions won't ever fail?
+> I think this is the case for MPEG2 (there is virtually nothing to check
+> for errors) but perhaps it's different for H264.
+
+It won't fail either, and if we need to change it somewhere down the
+line, it's quite easy to do.
+
+Maxime
+
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180625/e35865d9/attachment.sig>
