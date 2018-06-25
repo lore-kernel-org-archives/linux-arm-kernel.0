@@ -1,66 +1,53 @@
 From: yangbo.lu@nxp.com (Yangbo Lu)
-Date: Mon, 25 Jun 2018 20:37:11 +0800
-Subject: [v4, 05/10] arm64: dts: fsl: move ptp timer out of fman
-In-Reply-To: <20180625123716.28993-1-yangbo.lu@nxp.com>
-References: <20180625123716.28993-1-yangbo.lu@nxp.com>
-Message-ID: <20180625123716.28993-6-yangbo.lu@nxp.com>
+Date: Mon, 25 Jun 2018 20:37:06 +0800
+Subject: [v4, 00/10] Support DPAA PTP clock and timestamping
+Message-ID: <20180625123716.28993-1-yangbo.lu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is to move ptp timer node out of fman.
-Because ptp timer will be probed by ptp_qoriq driver,
-it should be an independent device in case of conflict
-memory mapping.
+This patchset is to support DPAA FMAN PTP clock and HW timestamping.
+It had been verified on both ARM platform and PPC platform.
+- The patch #1 to patch #5 are to support DPAA FMAN 1588 timer in
+  ptp_qoriq driver.
+- The patch #6 to patch #10 are to add HW timestamping support in
+  DPAA ethernet driver.
 
-Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
-Acked-by: Richard Cochran <richardcochran@gmail.com>
-Acked-by: Madalin Bucur <madalin.bucur@nxp.com>
----
-Changes for v2:
-	- Fixed address-cells for ptp-timer.
-Changes for v3:
-	- None.
-Changes for v4:
-	- Added ACKs.
----
- arch/arm64/boot/dts/freescale/qoriq-fman3-0.dtsi |   14 ++++++++------
- 1 files changed, 8 insertions(+), 6 deletions(-)
+Yangbo Lu (10):
+  fsl/fman: share the event interrupt
+  ptp: support DPAA FMan 1588 timer in ptp_qoriq
+  dt-binding: ptp_qoriq: add DPAA FMan support
+  powerpc/mpc85xx: move ptp timer out of fman in dts
+  arm64: dts: fsl: move ptp timer out of fman
+  fsl/fman: add set_tstamp interface
+  fsl/fman_port: support getting timestamp
+  fsl/fman: define frame description command UPD
+  dpaa_eth: add support for hardware timestamping
+  dpaa_eth: add the get_ts_info interface for ethtool
 
-diff --git a/arch/arm64/boot/dts/freescale/qoriq-fman3-0.dtsi b/arch/arm64/boot/dts/freescale/qoriq-fman3-0.dtsi
-index 4dd0676..a56a408 100644
---- a/arch/arm64/boot/dts/freescale/qoriq-fman3-0.dtsi
-+++ b/arch/arm64/boot/dts/freescale/qoriq-fman3-0.dtsi
-@@ -11,13 +11,14 @@ fman0: fman at 1a00000 {
- 	#size-cells = <1>;
- 	cell-index = <0>;
- 	compatible = "fsl,fman";
--	ranges = <0x0 0x0 0x1a00000 0x100000>;
--	reg = <0x0 0x1a00000 0x0 0x100000>;
-+	ranges = <0x0 0x0 0x1a00000 0xfe000>;
-+	reg = <0x0 0x1a00000 0x0 0xfe000>;
- 	interrupts = <GIC_SPI 44 IRQ_TYPE_LEVEL_HIGH>,
- 		     <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>;
- 	clocks = <&clockgen 3 0>;
- 	clock-names = "fmanclk";
- 	fsl,qman-channel-range = <0x800 0x10>;
-+	ptimer-handle = <&ptp_timer0>;
- 
- 	muram at 0 {
- 		compatible = "fsl,fman-muram";
-@@ -73,9 +74,10 @@ fman0: fman at 1a00000 {
- 		compatible = "fsl,fman-memac-mdio", "fsl,fman-xmdio";
- 		reg = <0xfd000 0x1000>;
- 	};
-+};
- 
--	ptp_timer0: ptp-timer at fe000 {
--		compatible = "fsl,fman-ptp-timer";
--		reg = <0xfe000 0x1000>;
--	};
-+ptp_timer0: ptp-timer at 1afe000 {
-+	compatible = "fsl,fman-ptp-timer";
-+	reg = <0x0 0x1afe000 0x0 0x1000>;
-+	interrupts = <GIC_SPI 44 IRQ_TYPE_LEVEL_HIGH>;
- };
--- 
-1.7.1
+ Documentation/devicetree/bindings/net/fsl-fman.txt |   25 +-----
+ .../devicetree/bindings/ptp/ptp-qoriq.txt          |   15 +++-
+ arch/arm64/boot/dts/freescale/qoriq-fman3-0.dtsi   |   14 ++-
+ arch/powerpc/boot/dts/fsl/qoriq-fman-0.dtsi        |   14 ++-
+ arch/powerpc/boot/dts/fsl/qoriq-fman-1.dtsi        |   14 ++-
+ arch/powerpc/boot/dts/fsl/qoriq-fman3-0.dtsi       |   14 ++-
+ arch/powerpc/boot/dts/fsl/qoriq-fman3-1.dtsi       |   14 ++-
+ arch/powerpc/boot/dts/fsl/qoriq-fman3l-0.dtsi      |   14 ++-
+ drivers/net/ethernet/freescale/dpaa/dpaa_eth.c     |   88 ++++++++++++++++-
+ drivers/net/ethernet/freescale/dpaa/dpaa_eth.h     |    3 +
+ drivers/net/ethernet/freescale/dpaa/dpaa_ethtool.c |   39 ++++++++
+ drivers/net/ethernet/freescale/fman/fman.c         |    3 +-
+ drivers/net/ethernet/freescale/fman/fman.h         |    1 +
+ drivers/net/ethernet/freescale/fman/fman_dtsec.c   |   27 +++++
+ drivers/net/ethernet/freescale/fman/fman_dtsec.h   |    1 +
+ drivers/net/ethernet/freescale/fman/fman_memac.c   |    5 +
+ drivers/net/ethernet/freescale/fman/fman_memac.h   |    1 +
+ drivers/net/ethernet/freescale/fman/fman_port.c    |   12 +++
+ drivers/net/ethernet/freescale/fman/fman_port.h    |    2 +
+ drivers/net/ethernet/freescale/fman/fman_tgec.c    |   21 ++++
+ drivers/net/ethernet/freescale/fman/fman_tgec.h    |    1 +
+ drivers/net/ethernet/freescale/fman/mac.c          |    3 +
+ drivers/net/ethernet/freescale/fman/mac.h          |    1 +
+ drivers/ptp/Kconfig                                |    2 +-
+ drivers/ptp/ptp_qoriq.c                            |  104 ++++++++++++-------
+ include/linux/fsl/ptp_qoriq.h                      |   38 ++++++--
+ 26 files changed, 361 insertions(+), 115 deletions(-)
