@@ -1,33 +1,45 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 25 Jun 2018 11:17:34 -0600
-Subject: [PATCH V3 1/5] dt-bindings: mailbox: allow mbox-cells to be
- equal to 0
-In-Reply-To: <1529676720-7533-2-git-send-email-aisheng.dong@nxp.com>
-References: <1529676720-7533-1-git-send-email-aisheng.dong@nxp.com>
- <1529676720-7533-2-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <20180625171734.GA20153@rob-hp-laptop>
+From: radu.pirea@microchip.com (Radu Pirea)
+Date: Mon, 25 Jun 2018 20:22:25 +0300
+Subject: [PATCH v10 1/6] MAINTAINERS: add at91 usart mfd driver
+In-Reply-To: <20180625172230.29686-1-radu.pirea@microchip.com>
+References: <20180625172230.29686-1-radu.pirea@microchip.com>
+Message-ID: <20180625172230.29686-2-radu.pirea@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 22, 2018 at 10:11:56PM +0800, Dong Aisheng wrote:
-> Mailbox devices may have only one channel which means the mbox-cells
-> at least 1 does not make sense for this type devices. Let's remove
-> that limitation to allow the mbox-cells to be equal to 0.
-> 
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Sudeep Holla <sudeep.holla@arm.com>
-> Cc: devicetree at vger.kernel.org
-> Cc: linux-kernel at vger.kernel.org
-> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> ---
-> ChangeLog:
->  * New patch introduced in v3 series
->  * Actually there're already users in kernel with mbox-cells set to 0.
->    See:
->    arch/arm/boot/dts/bcm283x.dtsi:145: #mbox-cells = <0>;
-> ---
->  Documentation/devicetree/bindings/mailbox/mailbox.txt | 3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
+Added entry for at91 usart mfd driver.
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Radu Pirea <radu.pirea@microchip.com>
+---
+ MAINTAINERS | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 9d5eeff51b5f..7ac6e6af5292 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -9321,6 +9321,7 @@ M:	Richard Genoud <richard.genoud@gmail.com>
+ S:	Maintained
+ F:	drivers/tty/serial/atmel_serial.c
+ F:	drivers/tty/serial/atmel_serial.h
++F:	Documentation/devicetree/bindings/mfd/atmel-usart.txt
+ 
+ MICROCHIP / ATMEL DMA DRIVER
+ M:	Ludovic Desroches <ludovic.desroches@microchip.com>
+@@ -9353,6 +9354,14 @@ S:	Supported
+ F:	drivers/mtd/nand/raw/atmel/*
+ F:	Documentation/devicetree/bindings/mtd/atmel-nand.txt
+ 
++MICROCHIP AT91 USART MFD DRIVER
++M:	Radu Pirea <radu.pirea@microchip.com>
++L:	linux-kernel at vger.kernel.org
++S:	Supported
++F:	drivers/mfd/at91-usart.c
++F:	include/dt-bindings/mfd/at91-usart.h
++F:	Documentation/devicetree/bindings/mfd/atmel-usart.txt
++
+ MICROCHIP KSZ SERIES ETHERNET SWITCH DRIVER
+ M:	Woojung Huh <Woojung.Huh@microchip.com>
+ M:	Microchip Linux Driver Support <UNGLinuxDriver@microchip.com>
+-- 
+2.18.0
