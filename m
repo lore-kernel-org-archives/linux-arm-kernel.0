@@ -1,60 +1,84 @@
-From: christoffer.dall@arm.com (Christoffer Dall)
-Date: Mon, 25 Jun 2018 13:56:03 +0200
-Subject: [PATCH 0/4] KVM: arm/arm64: vgic: Virtual interrupt grouping
- support
-In-Reply-To: <20180625101347.GF8004@C02W217FHV2R.local>
-References: <20180624221103.15055-1-christoffer.dall@arm.com>
- <CAFEAcA_C6Voh_6Ljj9--cbo14X_uWTOekM30dU=Rp9CtZK-6ow@mail.gmail.com>
- <20180625101347.GF8004@C02W217FHV2R.local>
-Message-ID: <20180625115603.GG8004@C02W217FHV2R.local>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Mon, 25 Jun 2018 11:59:04 +0000
+Subject: [PATCH V3 2/5] soc: imx: add mu library functions support
+In-Reply-To: <20180625093504.hyjbixnnmipiqopg@pengutronix.de>
+References: <1529676720-7533-1-git-send-email-aisheng.dong@nxp.com>
+ <1529676720-7533-3-git-send-email-aisheng.dong@nxp.com>
+ <20180625093504.hyjbixnnmipiqopg@pengutronix.de>
+Message-ID: <AM0PR04MB4211D74B6DD6BCA9A00C5E80804A0@AM0PR04MB4211.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 25, 2018 at 12:13:47PM +0200, Christoffer Dall wrote:
-> On Mon, Jun 25, 2018 at 10:52:41AM +0100, Peter Maydell wrote:
-> > On 24 June 2018 at 23:10, Christoffer Dall <christoffer.dall@arm.com> wrote:
-> > > This small series addresses a peculiarity of the current VGIC
-> > > implementation, namely that we don't support interrupt grouping.
-> > >
-> > > KVM either implements a GICv2 without support for the security
-> > > extensions, or a GICv3 with DS=1.  For GICv2, on systems without the
-> > > security extensions, group 0 interrupts can be configured to be either
-> > > signalled as FIQs or as IRQs by the VM, whereas group 1 interrupts are
-> > > always IRQs.  For GICv3, with DS=1, group 1 interrupts are always IRQs
-> > > and group 0 interrupts are always FIQs, and there is no concept of
-> > > secure vs. non-secure group 1 interrupts when DS=1.
-> > >
-> > > We were treating all interrupts on GICv2 as group 0, but yet telling the
-> > > geust that they were group 1.  The first patch changes this behavior,
-> > > which seems to have no effect on no known guests, but still.
-> > >
-> > > The remaining patches introduce proper interrupt grouping support, along
-> > > with MMIO accessors for the VM and userspace to retrieve and set the
-> > > which group SGIs, PPIs, and SPIs belong to.  LPIs are always group 1
-> > > interrupts as per the architecture, and there is no way to modify this
-> > > configuration (no IGROUPR registers for LPIs or equivalent ITS
-> > > commands).
-> > 
-> > How do we handle migration compatibility here? For instance if
-> > we have a guest running on an old kernel with GICv2, presumably
-> > it reports the GICD_IGROUPRn to userspace as being all-1 (but
-> > they behave as group 0); then when we load on the new kernel
-> > the new kernel will honour the IGROUPRn values and the interrupts
-> > will start behaving like group 1 ? Maybe this works because the
-> > guest is expecting them to be signalled as IRQ either way...
-> > 
+> -----Original Message-----
+> From: Sascha Hauer [mailto:s.hauer at pengutronix.de]
+> Sent: Monday, June 25, 2018 5:35 PM
+> To: A.s. Dong <aisheng.dong@nxp.com>
+> Cc: linux-arm-kernel at lists.infradead.org; dongas86 at gmail.com; dl-linux-imx
+> <linux-imx@nxp.com>; kernel at pengutronix.de; Fabio Estevam
+> <fabio.estevam@nxp.com>; shawnguo at kernel.org
+> Subject: Re: [PATCH V3 2/5] soc: imx: add mu library functions support
 > 
-> Interesting.  For GICv2, I think this will actually break, and the
-> migrated Linux guest won't see any interrupts anymore (Linux only sets
-> bit 0 in GICD_CTLR).  For GICv3, everything stays group 1 unless the
-> guest is specifically trying to configure group 0 for something.
+> On Fri, Jun 22, 2018 at 10:11:57PM +0800, Dong Aisheng wrote:
+> > This is used for i.MX multi core communication.
+> > e.g. A core to SCU firmware(M core) on MX8.
 > 
-> I suppose this means we need to let userspace request
-> ARCH_COMPLIANT_GICV2 and otherwise ignore userspace writes to IGROUPR?
+> I still believe that a generic driver for the MU should be used here.
+> Handling hardware resources under the hood of the driver framework is a
+> hack. Preventing the generic driver from matching against the SCU MU by
+> adding some #mbox-cells = <0>; to the MU device node is even more a hack.
 > 
-Alternatively, we could deny (fail) migration where the
-GICD_IIDR.Revision does not match the source, and just let userspace fix
-things up.  Thoughts?
 
-Thanks,
--Christoffer
+That is not a hack from a HW point of view. The MU HW does not have multi
+channels according to Reference Manual. Even we switch to mailbox, we probably
+may still prefer mbox-cell = <0> as the virtual channels do not fit for SCU MU.
+
+> We should really handle the MU in a driver and look for a way how the SCU
+> case can coexist with other usages of the MUs.
+> 
+> Your main argument against using the mailbox framework is that it can't
+> handle polling in the way you need it and that the mailbox framework
+> provides things that you do not need. I don't buy this argument. In the end
+> the mailbox framework is around 500 lines of code, it shouldn't be that hard
+> to add the missing features. From the transmit side I don't see any
+> showstoppers, the mailbox frameworks could be used as ist. What is missing
+> is a synchronous wait-for-new-messages and receive-message call, the
+> currently existing asynchronous rx callback is indeed not suitable for the SCU.
+> But as said, it should be doable to add that.
+> 
+
+Besides the mailbox framework may not suitable for SCU, another important
+Reason is that even we force to switch to mailbox, it's still can't be generic driver
+and it can only be used by SCU MU. 
+
+Let's see the mailbox doc where it also highlights it may somehow depend on mailbox
+communication protocol.
+
+Documentation/mailbox.txt
+----------------------------------------------------------------------------------------
+This document aims to help developers write client and controller
+drivers for the API. But before we start, let us note that the
+client (especially) and controller drivers are likely going to be
+very platform specific because the remote firmware is likely to be
+proprietary and implement non-standard protocol.
+.....
+----------------------------------------------------------------------------------------
+
+So the question to us is: If it can't be generic driver which can be
+used by others as well and it introduces much unnecessary complexities,
+why do we need do that? What's real benefits we can have?
+
+Regards
+Dong Aisheng
+
+> Sascha
+> 
+> --
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 |
+> https://emea01.safelinks.protection.outlook.com/?url=http%3A%2F%2Fww
+> w.pengutronix.de%2F&data=02%7C01%7Caisheng.dong%40nxp.com%7Cfe5
+> 2cb3aecd3461fab3d08d5da7eefc6%7C686ea1d3bc2b4c6fa92cd99c5c301635%
+> 7C0%7C0%7C636655161075403401&sdata=bRnnlrq82OAlxoli5IHAtXuwieLGJM
+> 4raDRvaV8y5gs%3D&reserved=0  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
