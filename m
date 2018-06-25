@@ -1,254 +1,71 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 25 Jun 2018 11:14:51 +0200
-Subject: [PATCH v8 3/6] module: use relative references for __ksymtab
- entries
-In-Reply-To: <CAB0TPYGd1jQzgc2q+fJZif4LVQTPnOrD4b6w0YSAzgAB0oL86g@mail.gmail.com>
-References: <20180311123815.17916-1-ard.biesheuvel@linaro.org>
- <20180311123815.17916-4-ard.biesheuvel@linaro.org>
- <CAB0TPYGd1jQzgc2q+fJZif4LVQTPnOrD4b6w0YSAzgAB0oL86g@mail.gmail.com>
-Message-ID: <CAKv+Gu-M4vJfppfQ8PYv3hFR6a1FuOAEKpvyisYSZBe-ubMvHQ@mail.gmail.com>
+From: sean.wang@mediatek.com (Sean Wang)
+Date: Mon, 25 Jun 2018 17:17:43 +0800
+Subject: [PATCH] [dts] fix green/blue pio-led on bananapi-r2
+In-Reply-To: <trinity-0d48bc23-f754-4da3-af01-c3a7abe1d34b-1529682783853@3c-app-gmx-bs42>
+References: <trinity-ae29ad25-a4fb-47f3-8d68-f6e58c875a0e-1529682447976@3c-app-gmx-bs42>
+ <trinity-0d48bc23-f754-4da3-af01-c3a7abe1d34b-1529682783853@3c-app-gmx-bs42>
+Message-ID: <1529918263.29697.31.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 June 2018 at 10:56, Martijn Coenen <maco@android.com> wrote:
-> Hi Ard,
->
->> --- a/arch/x86/include/asm/export.h
->> +++ /dev/null
->> @@ -1,5 +0,0 @@
->> -/* SPDX-License-Identifier: GPL-2.0 */
->> -#ifdef CONFIG_64BIT
->> -#define KSYM_ALIGN 16
->> -#endif
->
-> Why remove the 16-byte alignment here?
+On Fri, 2018-06-22 at 17:53 +0200, Frank Wunderlich wrote:
+> From: Frank Wunderlich <frank-w@public-files.de>
+> Date: Sun, 17 Jun 2018 19:11:58 +0200
+> Subject: [PATCH] [dts] fix green/blue pio-led
+>  green/blue pio-leds (near GPIO-Header) are swapped and LOW-active
+>  this patch restore this expected behaviour
+>  red cannot be switched afaik
+> Signed-off-by: Frank Wunderlich <frank-w@public-files.de>
+> ---
+>  arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts | 14 +++++++-------
+>  1 file changed, 7 insertions(+), 7 deletions(-)
+> diff --git a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
+> index 531d905d924ff..3e8a0ffe8b13e 100644
+> --- a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
+> +++ b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
+> @@ -89,21 +89,21 @@
+>          pinctrl-names = "default";
+>          pinctrl-0 = <&led_pins_a>;
+>  
+> -        blue {
+> -            label = "bpi-r2:pio:blue";
+> -            gpios = <&pio 241 GPIO_ACTIVE_HIGH>;
+> +        green {
+> +            label = "bpi-r2:pio:green";
+> +            gpios = <&pio 241 GPIO_ACTIVE_LOW>;
+>              default-state = "off";
+>          };
+>  
+> -        green {
+> -            label = "bpi-r2:pio:green";
+> -            gpios = <&pio 240 GPIO_ACTIVE_HIGH>;
+> +        blue {
+> +            label = "bpi-r2:pio:blue";
+> +            gpios = <&pio 240 GPIO_ACTIVE_LOW>;
+>              default-state = "off";
+>          };
+>  
+>          red {
+>              label = "bpi-r2:pio:red";
+> -            gpios = <&pio 239 GPIO_ACTIVE_HIGH>;
+> +            gpios = <&pio 239 GPIO_ACTIVE_LOW>;
+>              default-state = "off";
+>          };
+>      };
+>  
 
-Because struct kernel_symbol is only 8 bytes in size after this
-change, and aligning a 8 byte quantity to 16 bytes wastes 8 bytes.
+Hi, Frank
 
-> I was working on some other
-> code and ran into this 16-byte alignment, but I'm not sure why it's
-> needed on x86_64 in the first place. Possibly because the ABI requires
-> the stack to be 16-byte aligned when using sse instructions?
->
+Node name should be listed in alphabetic order that means you should
+keep the order and only have the fixes for its content.
 
-The x86 ABI may require it, but we don't actually adhere to it in the
-kernel. Also, these structures never occur on the stack anyway.
-
-
->> -#include <asm-generic/export.h>
->> diff --git a/include/asm-generic/export.h b/include/asm-generic/export.h
->> index 719db1968d81..97ce606459ae 100644
->> --- a/include/asm-generic/export.h
->> +++ b/include/asm-generic/export.h
->> @@ -5,12 +5,10 @@
->>  #define KSYM_FUNC(x) x
->>  #endif
->>  #ifdef CONFIG_64BIT
->> -#define __put .quad
->>  #ifndef KSYM_ALIGN
->>  #define KSYM_ALIGN 8
->>  #endif
->>  #else
->> -#define __put .long
->>  #ifndef KSYM_ALIGN
->>  #define KSYM_ALIGN 4
->>  #endif
->> @@ -25,6 +23,16 @@
->>  #define KSYM(name) name
->>  #endif
->>
->> +.macro __put, val, name
->> +#ifdef CONFIG_HAVE_ARCH_PREL32_RELOCATIONS
->> +       .long   \val - ., \name - .
->> +#elif defined(CONFIG_64BIT)
->> +       .quad   \val, \name
->> +#else
->> +       .long   \val, \name
->> +#endif
->> +.endm
->> +
->>  /*
->>   * note on .section use: @progbits vs %progbits nastiness doesn't matter,
->>   * since we immediately emit into those sections anyway.
->> diff --git a/include/linux/compiler.h b/include/linux/compiler.h
->> index ab4711c63601..0a9328ea9dbd 100644
->> --- a/include/linux/compiler.h
->> +++ b/include/linux/compiler.h
->> @@ -280,6 +280,25 @@ unsigned long read_word_at_a_time(const void *addr)
->>
->>  #endif /* __KERNEL__ */
->>
->> +/*
->> + * Force the compiler to emit 'sym' as a symbol, so that we can reference
->> + * it from inline assembler. Necessary in case 'sym' could be inlined
->> + * otherwise, or eliminated entirely due to lack of references that are
->> + * visible to the compiler.
->> + */
->> +#define __ADDRESSABLE(sym) \
->> +       static void * const __attribute__((section(".discard"), used))  \
->> +               __PASTE(__addressable_##sym, __LINE__) = (void *)&sym;
->> +
->> +/**
->> + * offset_to_ptr - convert a relative memory offset to an absolute pointer
->> + * @off:       the address of the 32-bit offset value
->> + */
->> +static inline void *offset_to_ptr(const int *off)
->> +{
->> +       return (void *)((unsigned long)off + *off);
->> +}
->> +
->>  #endif /* __ASSEMBLY__ */
->>
->>  #ifndef __optimize
->> diff --git a/include/linux/export.h b/include/linux/export.h
->> index 25005b55b079..04c78e6bfec9 100644
->> --- a/include/linux/export.h
->> +++ b/include/linux/export.h
->> @@ -24,12 +24,6 @@
->>  #define VMLINUX_SYMBOL_STR(x) __VMLINUX_SYMBOL_STR(x)
->>
->>  #ifndef __ASSEMBLY__
->> -struct kernel_symbol
->> -{
->> -       unsigned long value;
->> -       const char *name;
->> -};
->> -
->>  #ifdef MODULE
->>  extern struct module __this_module;
->>  #define THIS_MODULE (&__this_module)
->> @@ -60,17 +54,47 @@ extern struct module __this_module;
->>  #define __CRC_SYMBOL(sym, sec)
->>  #endif
->>
->> +#ifdef CONFIG_HAVE_ARCH_PREL32_RELOCATIONS
->> +#include <linux/compiler.h>
->> +/*
->> + * Emit the ksymtab entry as a pair of relative references: this reduces
->> + * the size by half on 64-bit architectures, and eliminates the need for
->> + * absolute relocations that require runtime processing on relocatable
->> + * kernels.
->> + */
->> +#define __KSYMTAB_ENTRY(sym, sec)                                      \
->> +       __ADDRESSABLE(sym)                                              \
->> +       asm("   .section \"___ksymtab" sec "+" #sym "\", \"a\"  \n"     \
->> +           "   .balign 8                                       \n"     \
->> +           VMLINUX_SYMBOL_STR(__ksymtab_##sym) ":              \n"     \
->> +           "   .long " VMLINUX_SYMBOL_STR(sym) "- .            \n"     \
->> +           "   .long " VMLINUX_SYMBOL_STR(__kstrtab_##sym) "- .\n"     \
->> +           "   .previous                                       \n")
->> +
->> +struct kernel_symbol {
->> +       int value_offset;
->> +       int name_offset;
->> +};
->> +#else
->> +#define __KSYMTAB_ENTRY(sym, sec)                                      \
->> +       static const struct kernel_symbol __ksymtab_##sym               \
->> +       __attribute__((section("___ksymtab" sec "+" #sym), used))       \
->> +       = { (unsigned long)&sym, __kstrtab_##sym }
->> +
->> +struct kernel_symbol {
->> +       unsigned long value;
->> +       const char *name;
->> +};
->> +#endif
->> +
->>  /* For every exported symbol, place a struct in the __ksymtab section */
->>  #define ___EXPORT_SYMBOL(sym, sec)                                     \
->>         extern typeof(sym) sym;                                         \
->>         __CRC_SYMBOL(sym, sec)                                          \
->>         static const char __kstrtab_##sym[]                             \
->> -       __attribute__((section("__ksymtab_strings"), aligned(1)))       \
->> +       __attribute__((section("__ksymtab_strings"), used, aligned(1))) \
->>         = VMLINUX_SYMBOL_STR(sym);                                      \
->> -       static const struct kernel_symbol __ksymtab_##sym               \
->> -       __used                                                          \
->> -       __attribute__((section("___ksymtab" sec "+" #sym), used))       \
->> -       = { (unsigned long)&sym, __kstrtab_##sym }
->> +       __KSYMTAB_ENTRY(sym, sec)
->>
->>  #if defined(__DISABLE_EXPORTS)
->>
->> diff --git a/kernel/module.c b/kernel/module.c
->> index ad2d420024f6..b4782cfbb79b 100644
->> --- a/kernel/module.c
->> +++ b/kernel/module.c
->> @@ -549,12 +549,30 @@ static bool check_symbol(const struct symsearch *syms,
->>         return true;
->>  }
->>
->> +static unsigned long kernel_symbol_value(const struct kernel_symbol *sym)
->> +{
->> +#ifdef CONFIG_HAVE_ARCH_PREL32_RELOCATIONS
->> +       return (unsigned long)offset_to_ptr(&sym->value_offset);
->> +#else
->> +       return sym->value;
->> +#endif
->> +}
->> +
->> +static const char *kernel_symbol_name(const struct kernel_symbol *sym)
->> +{
->> +#ifdef CONFIG_HAVE_ARCH_PREL32_RELOCATIONS
->> +       return offset_to_ptr(&sym->name_offset);
->> +#else
->> +       return sym->name;
->> +#endif
->> +}
->> +
->>  static int cmp_name(const void *va, const void *vb)
->>  {
->>         const char *a;
->>         const struct kernel_symbol *b;
->>         a = va; b = vb;
->> -       return strcmp(a, b->name);
->> +       return strcmp(a, kernel_symbol_name(b));
->>  }
->>
->>  static bool find_symbol_in_section(const struct symsearch *syms,
->> @@ -2198,7 +2216,7 @@ void *__symbol_get(const char *symbol)
->>                 sym = NULL;
->>         preempt_enable();
->>
->> -       return sym ? (void *)sym->value : NULL;
->> +       return sym ? (void *)kernel_symbol_value(sym) : NULL;
->>  }
->>  EXPORT_SYMBOL_GPL(__symbol_get);
->>
->> @@ -2228,10 +2246,12 @@ static int verify_export_symbols(struct module *mod)
->>
->>         for (i = 0; i < ARRAY_SIZE(arr); i++) {
->>                 for (s = arr[i].sym; s < arr[i].sym + arr[i].num; s++) {
->> -                       if (find_symbol(s->name, &owner, NULL, true, false)) {
->> +                       if (find_symbol(kernel_symbol_name(s), &owner, NULL,
->> +                                       true, false)) {
->>                                 pr_err("%s: exports duplicate symbol %s"
->>                                        " (owned by %s)\n",
->> -                                      mod->name, s->name, module_name(owner));
->> +                                      mod->name, kernel_symbol_name(s),
->> +                                      module_name(owner));
->>                                 return -ENOEXEC;
->>                         }
->>                 }
->> @@ -2280,7 +2300,7 @@ static int simplify_symbols(struct module *mod, const struct load_info *info)
->>                         ksym = resolve_symbol_wait(mod, info, name);
->>                         /* Ok if resolved.  */
->>                         if (ksym && !IS_ERR(ksym)) {
->> -                               sym[i].st_value = ksym->value;
->> +                               sym[i].st_value = kernel_symbol_value(ksym);
->>                                 break;
->>                         }
->>
->> @@ -2540,7 +2560,7 @@ static int is_exported(const char *name, unsigned long value,
->>                 ks = lookup_symbol(name, __start___ksymtab, __stop___ksymtab);
->>         else
->>                 ks = lookup_symbol(name, mod->syms, mod->syms + mod->num_syms);
->> -       return ks != NULL && ks->value == value;
->> +       return ks != NULL && kernel_symbol_value(ks) == value;
->>  }
->>
->>  /* As per nm */
->> --
->> 2.15.1
->>
+Apart from that
+	Reviewed-by: Sean Wang <sean.wang@mediatek.com>
+	
+>  
+>  
+> 
+> _______________________________________________
+> Linux-mediatek mailing list
+> Linux-mediatek at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-mediatek
