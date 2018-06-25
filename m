@@ -1,41 +1,71 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Mon, 25 Jun 2018 13:12:29 +0200
-Subject: [PATCH] efi/libstub/arm: add opt-in Kconfig option for the DTB
- loader
-In-Reply-To: <20180625063405.24387-1-ard.biesheuvel@linaro.org>
-References: <20180625063405.24387-1-ard.biesheuvel@linaro.org>
-Message-ID: <4825d1cd-c490-0442-5d43-9991250d5c1f@suse.de>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Mon, 25 Jun 2018 12:22:07 +0100
+Subject: [PATCH v2 0/6] coresight: Coresight Address Translation Unit support
+Message-ID: <20180625112213.23492-1-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/25/2018 08:34 AM, Ard Biesheuvel wrote:
-> There are various ways a platform can provide a device tree binary
-> to the kernel, with different levels of sophistication:
-> - ideally, the UEFI firmware, which is tightly coupled with the
->    platform, provides a device tree image directly as a UEFI
->    configuration table, and typically permits the contents to be
->    manipulated either via menu options or via UEFI environment
->    variables that specify a replacement image,
-> - GRUB for ARM has a 'devicetree' directive which allows a device
->    tree image to be loaded from any location accessible to GRUB, and
->    supersede the one provided by the firmware,
-> - the EFI stub implements a dtb= command line option that allows a
->    device tree image to be loaded from a file residing in the same
->    file system as the one the kernel image was loaded from.
->
-> The dtb= command line option was never intended to be more than a
-> development feature, to allow the other options to be implemented
-> in parallel. So let's make it an opt-in feature that is disabled
-> by default, but can be re-enabled at will.
->
-> Note that we already disable the dtb= command line option when we
-> detect that we are running with UEFI Secure Boot enabled.
->
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Add support for the Coresight Address Translation Unit (CATU), which
+provides improved scatter-gather functionality for TMC-ETR. The CATU
+performs address translation for ETR based on a page table, which
+contains address of 4KB sized data pages, but uses a different
+format from that of the TMC-ETR SG table. The page table format is
+described in the code. See patch
 
-Sounds reasonable to me.
+ "coresight: catu: Add support for scatter gather tables"
 
-Reviewed-by: Alexander Graf <agraf@suse.de>
+The CATU devices do not appear on the "software" path for given
+trace session, to leave the management of the device to the driving
+TMC-ETR, depending on the mode of the buffer. Towards this we
+introduce a new class of coresight device_type, helper devices.
+These helper devices are managed by the master devices. The
+build-path operation takes care of making sure that any helper
+device associated with a device is turned on.
 
+Applies on Mathieu's coresight/next tree.
 
-Alex
+This series is, part 2 of the split of the series [0].
+
+Changes since v1:
+ - Rename the variables in CATU page table populate for better
+   readability.
+ - Fix broken commit description.
+ - Fix the order of "wait for ready" & "disable hw" in catu_disable_hw.
+
+Changes since [0] :
+ - Remove "restore" buf support and trim down the page table
+   populate code to get rid of "range" updates.
+ - Do not create a circular table by default.
+ - Fix style issues
+ - Set DMA mask for CATU based on the address width.
+ - Rename :
+	coresight_prepare_device => coresight_grab_device
+	coresight_release_device => coresight_drop_device
+   to avoid confusing with coresight_device_release().
+
+[0] - TMC ETR perf support
+ - http://lists.infradead.org/pipermail/linux-arm-kernel/2018-May/574875.html
+
+Suzuki K Poulose (6):
+  coresight: Cleanup device subtype struct
+  coresight: Add helper device type
+  coresight: Introduce support for Coresight Address Translation Unit
+  dts: bindings: Document device tree binding for CATU
+  coresight: catu: Add support for scatter gather tables
+  coresight: catu: Plug in CATU as a backend for ETR buffer
+
+ .../devicetree/bindings/arm/coresight.txt          |  53 ++
+ drivers/hwtracing/coresight/Kconfig                |  11 +
+ drivers/hwtracing/coresight/Makefile               |   1 +
+ drivers/hwtracing/coresight/coresight-catu.c       | 577 +++++++++++++++++++++
+ drivers/hwtracing/coresight/coresight-catu.h       | 120 +++++
+ drivers/hwtracing/coresight/coresight-tmc-etr.c    |  71 ++-
+ drivers/hwtracing/coresight/coresight-tmc.h        |   3 +
+ drivers/hwtracing/coresight/coresight.c            |  43 +-
+ include/linux/coresight.h                          |  46 +-
+ 9 files changed, 911 insertions(+), 14 deletions(-)
+ create mode 100644 drivers/hwtracing/coresight/coresight-catu.c
+ create mode 100644 drivers/hwtracing/coresight/coresight-catu.h
+
+-- 
+2.9.5
