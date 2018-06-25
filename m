@@ -1,15 +1,15 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Mon, 25 Jun 2018 14:15:15 +0100
-Subject: Applied "ARM: pxa: change SSP DMA channels allocation" to the asoc
- tree
-In-Reply-To: <20180524070703.11901-14-robert.jarzmik@free.fr>
-Message-ID: <E1fXRKt-0008Il-HJ@debutante>
+Date: Mon, 25 Jun 2018 14:15:26 +0100
+Subject: Applied "media: pxa_camera: remove the dmaengine compat need" to the
+ asoc tree
+In-Reply-To: <20180524070703.11901-5-robert.jarzmik@free.fr>
+Message-ID: <E1fXRL4-0008Q6-RV@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   ARM: pxa: change SSP DMA channels allocation
+   media: pxa_camera: remove the dmaengine compat need
 
 has been applied to the asoc tree at
 
@@ -34,116 +34,75 @@ to this mail.
 Thanks,
 Mark
 
->From cd31b80736852d34bc1072f3e579a6fd73a244e7 Mon Sep 17 00:00:00 2001
+>From f727b6cda449184188d8a64987f194687bf01782 Mon Sep 17 00:00:00 2001
 From: Robert Jarzmik <robert.jarzmik@free.fr>
-Date: Sun, 17 Jun 2018 19:02:17 +0200
-Subject: [PATCH] ARM: pxa: change SSP DMA channels allocation
+Date: Sun, 17 Jun 2018 19:02:08 +0200
+Subject: [PATCH] media: pxa_camera: remove the dmaengine compat need
 
-Now the dma_slave_map is available for PXA architecture, switch the SSP
-device to it.
+As the pxa architecture switched towards the dmaengine slave map, the
+old compatibility mechanism to acquire the dma requestor line number and
+priority are not needed anymore.
 
-This specifically means that :
-- for platform data based machines, the DMA requestor channels are
-  extracted from the slave map, where pxa-ssp-dai.<N> is a 1-1 match to
-  ssp.<N>, and the channels are either "rx" or "tx".
-
-- for device tree platforms, the dma node should be hooked into the
-  pxa2xx-ac97 or pxa-ssp-dai node.
+This patch simplifies the dma resource acquisition, using the more
+generic function dma_request_slave_channel().
 
 Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
-Acked-by: Daniel Mack <daniel@zonque.org>
+Acked-by: Hans Verkuil <hans.verkuil@cisco.com>
+Acked-by: Mauro Carvalho Chehab <mchehab+samsung@kernel.org>
 ---
- arch/arm/plat-pxa/ssp.c    | 47 --------------------------------------
- include/linux/pxa2xx_ssp.h |  2 --
- sound/soc/pxa/pxa-ssp.c    |  5 ++--
- 3 files changed, 2 insertions(+), 52 deletions(-)
+ drivers/media/platform/pxa_camera.c | 22 +++-------------------
+ 1 file changed, 3 insertions(+), 19 deletions(-)
 
-diff --git a/arch/arm/plat-pxa/ssp.c b/arch/arm/plat-pxa/ssp.c
-index ba13f793fbce..ed36dcab80f1 100644
---- a/arch/arm/plat-pxa/ssp.c
-+++ b/arch/arm/plat-pxa/ssp.c
-@@ -127,53 +127,6 @@ static int pxa_ssp_probe(struct platform_device *pdev)
- 	if (IS_ERR(ssp->clk))
- 		return PTR_ERR(ssp->clk);
+diff --git a/drivers/media/platform/pxa_camera.c b/drivers/media/platform/pxa_camera.c
+index d85ffbfb7c1f..b6e9e93bde7a 100644
+--- a/drivers/media/platform/pxa_camera.c
++++ b/drivers/media/platform/pxa_camera.c
+@@ -2375,8 +2375,6 @@ static int pxa_camera_probe(struct platform_device *pdev)
+ 		.src_maxburst = 8,
+ 		.direction = DMA_DEV_TO_MEM,
+ 	};
+-	dma_cap_mask_t mask;
+-	struct pxad_param params;
+ 	char clk_name[V4L2_CLK_NAME_SIZE];
+ 	int irq;
+ 	int err = 0, i;
+@@ -2450,34 +2448,20 @@ static int pxa_camera_probe(struct platform_device *pdev)
+ 	pcdev->base = base;
  
--	if (dev->of_node) {
--		struct of_phandle_args dma_spec;
--		struct device_node *np = dev->of_node;
--		int ret;
+ 	/* request dma */
+-	dma_cap_zero(mask);
+-	dma_cap_set(DMA_SLAVE, mask);
+-	dma_cap_set(DMA_PRIVATE, mask);
 -
--		/*
--		 * FIXME: we should allocate the DMA channel from this
--		 * context and pass the channel down to the ssp users.
--		 * For now, we lookup the rx and tx indices manually
--		 */
--
--		/* rx */
--		ret = of_parse_phandle_with_args(np, "dmas", "#dma-cells",
--						 0, &dma_spec);
--
--		if (ret) {
--			dev_err(dev, "Can't parse dmas property\n");
--			return -ENODEV;
--		}
--		ssp->drcmr_rx = dma_spec.args[0];
--		of_node_put(dma_spec.np);
--
--		/* tx */
--		ret = of_parse_phandle_with_args(np, "dmas", "#dma-cells",
--						 1, &dma_spec);
--		if (ret) {
--			dev_err(dev, "Can't parse dmas property\n");
--			return -ENODEV;
--		}
--		ssp->drcmr_tx = dma_spec.args[0];
--		of_node_put(dma_spec.np);
--	} else {
--		res = platform_get_resource(pdev, IORESOURCE_DMA, 0);
--		if (res == NULL) {
--			dev_err(dev, "no SSP RX DRCMR defined\n");
--			return -ENODEV;
--		}
--		ssp->drcmr_rx = res->start;
--
--		res = platform_get_resource(pdev, IORESOURCE_DMA, 1);
--		if (res == NULL) {
--			dev_err(dev, "no SSP TX DRCMR defined\n");
--			return -ENODEV;
--		}
--		ssp->drcmr_tx = res->start;
--	}
--
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	if (res == NULL) {
- 		dev_err(dev, "no memory resource defined\n");
-diff --git a/include/linux/pxa2xx_ssp.h b/include/linux/pxa2xx_ssp.h
-index 8461b18e4608..03a7ca46735b 100644
---- a/include/linux/pxa2xx_ssp.h
-+++ b/include/linux/pxa2xx_ssp.h
-@@ -212,8 +212,6 @@ struct ssp_device {
- 	int		type;
- 	int		use_count;
- 	int		irq;
--	int		drcmr_rx;
--	int		drcmr_tx;
+-	params.prio = 0;
+-	params.drcmr = 68;
+-	pcdev->dma_chans[0] =
+-		dma_request_slave_channel_compat(mask, pxad_filter_fn,
+-						 &params, &pdev->dev, "CI_Y");
++	pcdev->dma_chans[0] = dma_request_slave_channel(&pdev->dev, "CI_Y");
+ 	if (!pcdev->dma_chans[0]) {
+ 		dev_err(&pdev->dev, "Can't request DMA for Y\n");
+ 		return -ENODEV;
+ 	}
  
- 	struct device_node	*of_node;
- };
-diff --git a/sound/soc/pxa/pxa-ssp.c b/sound/soc/pxa/pxa-ssp.c
-index 6fc986080130..0b441338bdd4 100644
---- a/sound/soc/pxa/pxa-ssp.c
-+++ b/sound/soc/pxa/pxa-ssp.c
-@@ -105,9 +105,8 @@ static int pxa_ssp_startup(struct snd_pcm_substream *substream,
- 	dma = kzalloc(sizeof(struct snd_dmaengine_dai_dma_data), GFP_KERNEL);
- 	if (!dma)
- 		return -ENOMEM;
--
--	dma->filter_data = substream->stream == SNDRV_PCM_STREAM_PLAYBACK ?
--				&ssp->drcmr_tx : &ssp->drcmr_rx;
-+	dma->chan_name = substream->stream == SNDRV_PCM_STREAM_PLAYBACK ?
-+		"tx" : "rx";
+-	params.drcmr = 69;
+-	pcdev->dma_chans[1] =
+-		dma_request_slave_channel_compat(mask, pxad_filter_fn,
+-						 &params, &pdev->dev, "CI_U");
++	pcdev->dma_chans[1] = dma_request_slave_channel(&pdev->dev, "CI_U");
+ 	if (!pcdev->dma_chans[1]) {
+ 		dev_err(&pdev->dev, "Can't request DMA for Y\n");
+ 		err = -ENODEV;
+ 		goto exit_free_dma_y;
+ 	}
  
- 	snd_soc_dai_set_dma_data(cpu_dai, substream, dma);
- 
+-	params.drcmr = 70;
+-	pcdev->dma_chans[2] =
+-		dma_request_slave_channel_compat(mask, pxad_filter_fn,
+-						 &params, &pdev->dev, "CI_V");
++	pcdev->dma_chans[2] = dma_request_slave_channel(&pdev->dev, "CI_V");
+ 	if (!pcdev->dma_chans[2]) {
+ 		dev_err(&pdev->dev, "Can't request DMA for V\n");
+ 		err = -ENODEV;
 -- 
 2.18.0.rc2
