@@ -1,27 +1,43 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 25 Jun 2018 14:46:12 -0600
-Subject: [PATCH v2 4/6] dts: bindings: Document device tree binding for
- CATU
-In-Reply-To: <20180625112213.23492-5-suzuki.poulose@arm.com>
-References: <20180625112213.23492-1-suzuki.poulose@arm.com>
- <20180625112213.23492-5-suzuki.poulose@arm.com>
-Message-ID: <20180625204612.GA15054@rob-hp-laptop>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Mon, 25 Jun 2018 15:54:06 -0500
+Subject: [PATCH 2/2] soc: qcom: cmd-db: Fix compiler warnings
+In-Reply-To: <CAK8P3a0y9pUC2PQFv-GABnsr7cWWAKuLoDNeC1tC2A8iByzmaw@mail.gmail.com>
+References: <1529946347-12740-1-git-send-email-andy.gross@linaro.org>
+ <1529946347-12740-2-git-send-email-andy.gross@linaro.org>
+ <CAK8P3a0y9pUC2PQFv-GABnsr7cWWAKuLoDNeC1tC2A8iByzmaw@mail.gmail.com>
+Message-ID: <20180625205406.GC4689@hector.attlocal.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 25, 2018 at 12:22:11PM +0100, Suzuki K Poulose wrote:
-> Document CATU device-tree bindings. CATU augments the TMC-ETR
-> by providing an improved Scatter Gather mechanism for streaming
-> trace data to non-contiguous system RAM pages.
+On Mon, Jun 25, 2018 at 10:30:17PM +0200, Arnd Bergmann wrote:
+> On Mon, Jun 25, 2018 at 7:05 PM, Andy Gross <andy.gross@linaro.org> wrote:
+> > This patch adds initialization of the entry_header structs to avoid
+> > compiler warnings like the following:
+> >
+> >   CC      drivers/soc/qcom/cmd-db.o
+> > drivers/soc/qcom/cmd-db.c: In function ?cmd_db_read_addr?:
+> > drivers/soc/qcom/cmd-db.c:194:21: warning: ?ent.addr? may be used
+> > uninitialized in this function [-Wmaybe-uninitialized]
+> >   return ret < 0 ? 0 : le32_to_cpu(ent.addr);
+> >
+> > drivers/soc/qcom/cmd-db.c: In function ?cmd_db_read_aux_data_len?:
+> > drivers/soc/qcom/cmd-db.c:247:38: warning: ?ent.len? may be used
+> > uninitialized in this function [-Wmaybe-uninitialized]
+> >   return ret < 0 ? 0 : le16_to_cpu(ent.len);
 > 
-> Cc: devicetree at vger.kernel.org
-> Cc: frowand.list at gmail.com
-> Cc: Rob Herring <robh@kernel.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->  .../devicetree/bindings/arm/coresight.txt          | 53 ++++++++++++++++++++++
->  1 file changed, 53 insertions(+)
+> Anything wrong with my fix that I posted a while ago?
+> See https://lkml.org/lkml/2018/5/25/569
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+Not entirely, see the comment below.  I missed this one and the other fix
+somehow.
+
+> 
+> I generally don't like patches that add incorrect initializations to
+> work around warnings like this.
+
+Correct me if I am wrong, but this just masks the warnings on toolchain/
+platforms that exhibit these warnings.  I'm not entirely fond of doing
+blanket init either to make the warnings go away either...
+
+
+Andy
