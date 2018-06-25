@@ -1,63 +1,98 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 25 Jun 2018 16:58:04 +0200
-Subject: [PATCH 03/15] arm: dts: mediatek: Add missing cooling device
- properties for CPUs
-In-Reply-To: <b687bb6035fbb010383f4511a206abb4006679fa.1527244201.git.viresh.kumar@linaro.org>
-References: <cover.1527244200.git.viresh.kumar@linaro.org>
- <b687bb6035fbb010383f4511a206abb4006679fa.1527244201.git.viresh.kumar@linaro.org>
-Message-ID: <186ed0b1-e365-4b3d-5c50-613d8353708b@gmail.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Mon, 25 Jun 2018 16:06:23 +0200
+Subject: [PATCH 12/15] ARM: shmobile: r8a7779: Use rcar_sysc_power_{down,
+ up}_cpu()
+In-Reply-To: <cover.1529934908.git.horms+renesas@verge.net.au>
+References: <cover.1529934908.git.horms+renesas@verge.net.au>
+Message-ID: <9d65c891587ea9d0936551e432f34485c16bb71c.1529934908.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
+The r8a7779 SMP code calls rcar_sysc_power_{down,up}() to control power
+to the SYSC power areas containing CPUs. This requires passing full CPU
+power area parameter blocks.
 
-On 25/05/18 12:31, Viresh Kumar wrote:
-> The cooling device properties, like "#cooling-cells" and
-> "dynamic-power-coefficient", should either be present for all the CPUs
-> of a cluster or none. If these are present only for a subset of CPUs of
-> a cluster then things will start falling apart as soon as the CPUs are
-> brought online in a different order. For example, this will happen
-> because the operating system looks for such properties in the CPU node
-> it is trying to bring up, so that it can register a cooling device.
-> 
-> Add such missing properties.
-> 
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+Migrate the code to call the new rcar_sysc_power_{down,up}_cpu()
+helpers, which just take a CPU index, and use the SYSC power area
+definitions from the r8a7779-sysc driver.
 
-pushed to v4.18-next/dts32
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/smp-r8a7779.c | 47 +++++-------------------------------
+ 1 file changed, 6 insertions(+), 41 deletions(-)
 
-Thanks
-
-> ---
->  arch/arm/boot/dts/mt7623.dtsi | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/mt7623.dtsi b/arch/arm/boot/dts/mt7623.dtsi
-> index d1eb123bc73b..1cdc346a05e8 100644
-> --- a/arch/arm/boot/dts/mt7623.dtsi
-> +++ b/arch/arm/boot/dts/mt7623.dtsi
-> @@ -92,6 +92,7 @@
->  				 <&apmixedsys CLK_APMIXED_MAINPLL>;
->  			clock-names = "cpu", "intermediate";
->  			operating-points-v2 = <&cpu_opp_table>;
-> +			#cooling-cells = <2>;
->  			clock-frequency = <1300000000>;
->  		};
->  
-> @@ -103,6 +104,7 @@
->  				 <&apmixedsys CLK_APMIXED_MAINPLL>;
->  			clock-names = "cpu", "intermediate";
->  			operating-points-v2 = <&cpu_opp_table>;
-> +			#cooling-cells = <2>;
->  			clock-frequency = <1300000000>;
->  		};
->  
-> @@ -114,6 +116,7 @@
->  				 <&apmixedsys CLK_APMIXED_MAINPLL>;
->  			clock-names = "cpu", "intermediate";
->  			operating-points-v2 = <&cpu_opp_table>;
-> +			#cooling-cells = <2>;
->  			clock-frequency = <1300000000>;
->  		};
->  	};
-> 
+diff --git a/arch/arm/mach-shmobile/smp-r8a7779.c b/arch/arm/mach-shmobile/smp-r8a7779.c
+index ff1e6fc0b861..3036f9100461 100644
+--- a/arch/arm/mach-shmobile/smp-r8a7779.c
++++ b/arch/arm/mach-shmobile/smp-r8a7779.c
+@@ -31,59 +31,24 @@
+ #define AVECR IOMEM(0xfe700040)
+ #define R8A7779_SCU_BASE 0xf0000000
+ 
+-static const struct rcar_sysc_ch r8a7779_ch_cpu1 = {
+-	.chan_offs = 0x40, /* PWRSR0 .. PWRER0 */
+-	.chan_bit = 1, /* ARM1 */
+-	.isr_bit = 1, /* ARM1 */
+-};
+-
+-static const struct rcar_sysc_ch r8a7779_ch_cpu2 = {
+-	.chan_offs = 0x40, /* PWRSR0 .. PWRER0 */
+-	.chan_bit = 2, /* ARM2 */
+-	.isr_bit = 2, /* ARM2 */
+-};
+-
+-static const struct rcar_sysc_ch r8a7779_ch_cpu3 = {
+-	.chan_offs = 0x40, /* PWRSR0 .. PWRER0 */
+-	.chan_bit = 3, /* ARM3 */
+-	.isr_bit = 3, /* ARM3 */
+-};
+-
+-static const struct rcar_sysc_ch * const r8a7779_ch_cpu[4] = {
+-	[1] = &r8a7779_ch_cpu1,
+-	[2] = &r8a7779_ch_cpu2,
+-	[3] = &r8a7779_ch_cpu3,
+-};
+-
+ static int r8a7779_platform_cpu_kill(unsigned int cpu)
+ {
+-	const struct rcar_sysc_ch *ch = NULL;
+ 	int ret = -EIO;
+ 
+ 	cpu = cpu_logical_map(cpu);
+-
+-	if (cpu < ARRAY_SIZE(r8a7779_ch_cpu))
+-		ch = r8a7779_ch_cpu[cpu];
+-
+-	if (ch)
+-		ret = rcar_sysc_power_down(ch);
++	if (cpu)
++		ret = rcar_sysc_power_down_cpu(cpu);
+ 
+ 	return ret ? ret : 1;
+ }
+ 
+ static int r8a7779_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ {
+-	const struct rcar_sysc_ch *ch = NULL;
+-	unsigned int lcpu = cpu_logical_map(cpu);
+-	int ret;
+-
+-	if (lcpu < ARRAY_SIZE(r8a7779_ch_cpu))
+-		ch = r8a7779_ch_cpu[lcpu];
++	int ret = -EIO;
+ 
+-	if (ch)
+-		ret = rcar_sysc_power_up(ch);
+-	else
+-		ret = -EIO;
++	cpu = cpu_logical_map(cpu);
++	if (cpu)
++		ret = rcar_sysc_power_up_cpu(cpu);
+ 
+ 	return ret;
+ }
+-- 
+2.11.0
