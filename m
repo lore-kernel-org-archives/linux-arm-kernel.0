@@ -1,33 +1,70 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Mon, 25 Jun 2018 10:06:04 +0200
-Subject: [PATCH v3 1/3] cpufreq: imx6q: check speed grades for i.MX6ULL
-In-Reply-To: <2d63a25f-7265-7aa7-a7dc-fd2379240804@armadeus.com>
-References: <20180522062853.24799-1-sebastien.szymanski@armadeus.com>
- <20180611053826.GC16091@dragon>
- <2d63a25f-7265-7aa7-a7dc-fd2379240804@armadeus.com>
-Message-ID: <CAJZ5v0j9P6dXM+8qBdgGwfd8diQ4F+hh+QZ8h09y769YYFtEkw@mail.gmail.com>
+From: arend.vanspriel@broadcom.com (Arend van Spriel)
+Date: Mon, 25 Jun 2018 10:13:01 +0200
+Subject: [PATCHv2 5/5] arm64: allwinner: a64: Add support for TERES-I
+ laptop
+In-Reply-To: <1CF519CD-D44E-4959-8951-27CE710E0984@aosc.io>
+References: <20180315162510.11669-1-harald@ccbib.org>
+ <20180315162510.11669-6-harald@ccbib.org>
+ <a7011fe78d171658742406bf01d50b7e3d7eaf1d.camel@aosc.io>
+ <E1fX7yK-0000OC-HA@stardust.g4.wien.funkfeuer.at>
+ <5B309D37.80207@broadcom.com> <1CF519CD-D44E-4959-8951-27CE710E0984@aosc.io>
+Message-ID: <5B30A40D.3070509@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 25, 2018 at 10:01 AM, S?bastien Szymanski
-<sebastien.szymanski@armadeus.com> wrote:
-> Hi,
+On 6/25/2018 9:47 AM, Icenowy Zheng wrote:
 >
-> On 06/11/2018 07:38 AM, Shawn Guo wrote:
->> On Tue, May 22, 2018 at 08:28:51AM +0200, S?bastien Szymanski wrote:
->>> Check the max speed supported from the fuses for i.MX6ULL and update the
->>> operating points table accordingly.
+>
+> ? 2018?6?25? GMT+08:00 ??3:43:51, Arend van Spriel <arend.vanspriel@broadcom.com> ??:
+>> On 6/24/2018 6:34 PM, Harald Geyer wrote:
+>>> Icenowy Zheng writes:
+>>>>> ? 2018-03-15?? 16:25 +0000?Harald Geyer???
+>>>>>>> +&mmc1 {
+>>>>>>> +	pinctrl-names = "default";
+>>>>>>> +	pinctrl-0 = <&mmc1_pins>;
+>>>>>>> +	vmmc-supply = <&reg_aldo2>;
+>>>>>>> +	vqmmc-supply = <&reg_dldo4>;
+>>>>>>> +	mmc-pwrseq = <&wifi_pwrseq>;
+>>>>>>> +	bus-width = <4>;
+>>>>>>> +	non-removable;
+>>>>>>> +	status = "okay";
+>>>>>>> +
+>>>>>>> +	rtl8723bs: wifi at 1 {
+>>>>>>> +		reg = <1>;
+>>>>>>> +		interrupt-parent = <&r_pio>;
+>>>>>>> +		interrupts = <0 3 IRQ_TYPE_LEVEL_LOW>; /* PL3 */
+>>>>>>> +		interrupt-names = "host-wake";
+>>>>>>> +	};
+>>
+>> [...]
+>>
+>>>>> - This device node has no binding. The "host-wake" interrupt is
+>> part of
+>>>>>   Broadcom SDIO Wi-Fi binding, rather than a generic one.
+>>> I think the general mmc and interrupts bindings apply. And the mmc
+>> binding
+>>> clearly states that for sub-nodes a compatible string is optional.
 >>>
->>> Signed-off-by: S?bastien Szymanski <sebastien.szymanski@armadeus.com>
+>>> However I just realized that the 'interrupt-names' property is not
+>> part
+>>> of the general interrupts binding, so I guess at least this property
+>> should
+>>> be removed.
 >>
->> Acked-by: Shawn Guo <shawnguo@kernel.org>
->>
+>> Indeed. If the device just used the SDIO interrupt this is not needed.
+>> The Broadcom device can use either SDIO interrupt or a so-called
+>> out-of-band host-wake interrupt, which is what the above represents.
 >
-> Thanks, but what about the two others patches ? Now that patch 1 is in
-> 4.18-rc1, should I resend the two others patches ?
+> RTL8....S is also capable of use OOB interrupt.
 
-Please do.
+Ok. Is it also in-place in this TERES-I laptop? Anyway, if RTL8...S does 
+not have a binding specification there is not much to do about it. In my 
+opinion it does not make sense to add it to the generic mmc/sdio binding 
+as this interrupt does not involve the mmc/sdio hardware hence the term 
+OOB. There is generic wifi binding net/wireless/ieee80211.txt in which 
+this could be added. Obviously it would just be a binding and no 
+guarantee that the actual device driver supports it so the RTL driver 
+would need modification for that.
 
-> Should I merge them together ?
-
-If they make related changes, you can do that.
+Regards,
+Arend
