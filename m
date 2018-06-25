@@ -1,103 +1,94 @@
-From: sebastian.reichel@collabora.co.uk (Sebastian Reichel)
-Date: Mon, 25 Jun 2018 14:18:13 +0200
-Subject: [PATCH] usb: chipidea: Fix ULPI on imx51
-In-Reply-To: <CAOMZO5DAbooRgA+sHJa5EmEGy-CHW3FPydcOFtK5AqpdJzD7MQ@mail.gmail.com>
-References: <20180530173414.6121-1-andrew.smirnov@gmail.com>
- <CAOMZO5AyAegbvUtX42by99mU8yQfi91bmhJfd9iqu1Ak0dEHiw@mail.gmail.com>
- <CAOMZO5DJj=oQfsB-vNP=81HCiy-69j-5U+Km9P6LxGpnLx9xzg@mail.gmail.com>
- <CAHQ1cqHxq+RM1nNHECY75Cojd_kxu1ERLe6+MhMLUa5kb10r8w@mail.gmail.com>
- <CAOMZO5B98O9XA8GhdWxJZ6DFgS=O+smHURm8v5jEirj31tuUhg@mail.gmail.com>
- <CAHQ1cqELs4LaQkmPiPjXQuF17+7PBsEtbmSt8iveLqRv+4bgfQ@mail.gmail.com>
- <CAOMZO5CumdNSP6iTfgXPdmpcZwh7YmBstUpAmb3A1QAf1UWJdw@mail.gmail.com>
- <CAHQ1cqHpNvZGAfFKrp-OiZevsha5CBwJsw8GT+uhgNSfEUejkw@mail.gmail.com>
- <CAOMZO5DAbooRgA+sHJa5EmEGy-CHW3FPydcOFtK5AqpdJzD7MQ@mail.gmail.com>
-Message-ID: <20180625121813.rzqgzdbk6ue73eq4@earth.universe>
+From: jernej.skrabec@siol.net (Jernej Skrabec)
+Date: Mon, 25 Jun 2018 14:03:02 +0200
+Subject: [PATCH v3 22/24] drm/sun4i: DW HDMI: Expand algorithm for possible
+ crtcs
+In-Reply-To: <20180625120304.7543-1-jernej.skrabec@siol.net>
+References: <20180625120304.7543-1-jernej.skrabec@siol.net>
+Message-ID: <20180625120304.7543-23-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+drm_of_find_possible_crtcs() doesn't work when DW HDMI encoder is
+connected to TCON (crtc) through mux in TCON TOP.
 
-On Sun, Jun 24, 2018 at 08:51:20PM -0300, Fabio Estevam wrote:
-> Hi Andrey,
-> 
-> On Sun, Jun 24, 2018 at 7:40 PM, Andrey Smirnov
-> <andrew.smirnov@gmail.com> wrote:
-> 
-> > It's definitely the bootloader, or more specifically whether or not it
-> > initialized/used USB before booting the kernel. Some interesting
-> > highlights:
-> >
-> >  - On your "good" 4.17.2 based image, if you interrupt U-Boot, do "usb
-> > start" (optionally "usb stop") and then "boot", you'll get the hang
-> > that I was trying to fix with my patch.
-> >
-> >  - Things are exact opposite with 4.18-rc1 and doing the above would
-> > _prevent_ the hang and the image would boot fine.
-> >
-> >  - Disabling USB in Barebox based boot "stack" gets it to behave the
-> > same way as U-boot from your image (hanging when booting 4.18-rc1)
-> >
-> > Digging more into code it seems that the reason for 4.18-rc1's
-> > behavior is the fact that it's missing a call hw_phymode_configure()
-> > after usb_phy_init() and, AFAICT, the only reason it is not happening
-> > is because default image is being built without
-> > CONFIG_USB_CHIPIDEA_ULPI and CONFIG_USB_ULPI_BUS. Enabling those two
-> > options on 4.18-rc1, seem to fix the problem on both your U-Boot based
-> > image and my "special" Barebox setup.
-> >
-> > So AFAICT, this patch still fixes a valid issue (my use-case was net
-> > booting via USB-Ethernet dongle), but an additional patch enabling
-> > those two configuration options might be needed. Thoughts?
-> 
-> Yes, I can confirm that your suggested change avoids the kernel hang:
-> 
-> diff --git a/arch/arm/configs/imx_v6_v7_defconfig
-> b/arch/arm/configs/imx_v6_v7_defconfig
-> index d14de86..2da678c 100644
-> --- a/arch/arm/configs/imx_v6_v7_defconfig
-> +++ b/arch/arm/configs/imx_v6_v7_defconfig
-> @@ -300,6 +300,7 @@ CONFIG_USB_STORAGE=y
->  CONFIG_USB_CHIPIDEA=y
->  CONFIG_USB_CHIPIDEA_UDC=y
->  CONFIG_USB_CHIPIDEA_HOST=y
-> +CONFIG_USB_CHIPIDEA_ULPI=y
->  CONFIG_USB_SERIAL=m
->  CONFIG_USB_SERIAL_GENERIC=y
->  CONFIG_USB_SERIAL_FTDI_SIO=m
-> @@ -336,6 +337,7 @@ CONFIG_USB_GADGETFS=m
->  CONFIG_USB_FUNCTIONFS=m
->  CONFIG_USB_MASS_STORAGE=m
->  CONFIG_USB_G_SERIAL=m
-> +CONFIG_USB_ULPI_BUS=y
->  CONFIG_MMC=y
->  CONFIG_MMC_SDHCI=y
->  CONFIG_MMC_SDHCI_PLTFM=y
-> 
-> > Also, I don't have any i.MX53 HW, so I wasn't able to test the effects
-> > of enabling those two options there.
-> 
-> The imx53 board I have access to does not use ULPI.
-> 
-> Maybe Sebastian on Cc may help testing this on his imx53 board as he
-> is the author of:
-> be9cae2479f48 ("usb: chipidea: imx: Fix ULPI on imx53")
+In that case TCON TOP HDMI mux input port has to be manually traversed
+and checked if it matches any known crtc.
 
-I still have access to the imx53 based PPD from General Electric.
-But I don't understand what patch you want me to test. FWIW the
-images I use(d) for testing already had CONFIG_USB_CHIPIDEA_ULPI
-and CONFIG_USB_ULPI_BUS enabled.
+Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+---
+ drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c | 46 ++++++++++++++++++++++++++-
+ 1 file changed, 45 insertions(+), 1 deletion(-)
 
-> I am wondering if we need to force some kind of USB reset to put the
-> USB controller into a known state independently of what the bootloader
-> has done previously.
-
-Makes sense to me.
-
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180625/bcdea32f/attachment.sig>
+diff --git a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
+index 9f40a44b456b..d443886e055b 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
++++ b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
+@@ -12,6 +12,7 @@
+ #include <drm/drm_crtc_helper.h>
+ 
+ #include "sun8i_dw_hdmi.h"
++#include "sun8i_tcon_top.h"
+ 
+ static void sun8i_dw_hdmi_encoder_mode_set(struct drm_encoder *encoder,
+ 					   struct drm_display_mode *mode,
+@@ -41,6 +42,48 @@ sun8i_dw_hdmi_mode_valid(struct drm_connector *connector,
+ 	return MODE_OK;
+ }
+ 
++static bool sun8i_dw_hdmi_node_is_tcon_top(struct device_node *node)
++{
++	return !!of_match_node(sun8i_tcon_top_of_table, node);
++}
++
++static u32 sun8i_dw_hdmi_find_possible_crtcs(struct drm_device *drm,
++					     struct device_node *node)
++{
++	struct device_node *port, *ep, *remote, *remote_port;
++	u32 crtcs = 0;
++
++	port = of_graph_get_port_by_id(node, 0);
++	if (!port)
++		return 0;
++
++	ep = of_get_next_available_child(port, NULL);
++	if (!ep)
++		return 0;
++
++	remote = of_graph_get_remote_port_parent(ep);
++	if (!remote)
++		return 0;
++
++	if (sun8i_dw_hdmi_node_is_tcon_top(remote)) {
++		port = of_graph_get_port_by_id(remote, 4);
++		if (!port)
++			return 0;
++
++		for_each_child_of_node(port, ep) {
++			remote_port = of_graph_get_remote_port(ep);
++			if (remote_port) {
++				crtcs |= drm_crtc_port_mask(drm, remote_port);
++				of_node_put(remote_port);
++			}
++		}
++	} else {
++		crtcs = drm_of_find_possible_crtcs(drm, node);
++	}
++
++	return crtcs;
++}
++
+ static int sun8i_dw_hdmi_bind(struct device *dev, struct device *master,
+ 			      void *data)
+ {
+@@ -63,7 +106,8 @@ static int sun8i_dw_hdmi_bind(struct device *dev, struct device *master,
+ 	hdmi->dev = &pdev->dev;
+ 	encoder = &hdmi->encoder;
+ 
+-	encoder->possible_crtcs = drm_of_find_possible_crtcs(drm, dev->of_node);
++	encoder->possible_crtcs =
++		sun8i_dw_hdmi_find_possible_crtcs(drm, dev->of_node);
+ 	/*
+ 	 * If we failed to find the CRTC(s) which this encoder is
+ 	 * supposed to be connected to, it's because the CRTC has
+-- 
+2.18.0
