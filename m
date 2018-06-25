@@ -1,242 +1,268 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 25 Jun 2018 16:06:26 +0200
-Subject: [PATCH 15/15] ARM: shmobile: convert to SPDX identifier
+Date: Mon, 25 Jun 2018 16:06:19 +0200
+Subject: [PATCH 08/15] ARM: shmobile: apmu: Remove platsmp-apmu.h
 In-Reply-To: <cover.1529934908.git.horms+renesas@verge.net.au>
 References: <cover.1529934908.git.horms+renesas@verge.net.au>
-Message-ID: <c44e182e537492baaa37303fc0ee299222fce921.1529934908.git.horms+renesas@verge.net.au>
+Message-ID: <3bf6d77388273c2d99756040b820dd71959e4587.1529934908.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wolfram Sang <wsa+renesas@sang-engineering.com>
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
-Acked-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
-Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+After the removal of the legacy SMP fallbacks, platsmp-apmu.h is no
+longer needed outside platsmp-apmu.c.
+
+Hence remove platsmp-apmu.h, and make the functions exported previously
+static.  As the header file also provided forward declarations, the code
+in platsmp-apmu.c must be reshuffled.
+
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/include/debug/renesas-scif.S              |  5 +----
- arch/arm/mach-shmobile/headsmp-apmu.S              |  5 +----
- arch/arm/mach-shmobile/platsmp-apmu.c              |  5 +----
- arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c | 10 +---------
- arch/arm/mach-shmobile/setup-emev2.c               | 10 +---------
- arch/arm/mach-shmobile/setup-r7s72100.c            | 10 +---------
- arch/arm/mach-shmobile/setup-r8a73a4.c             | 10 +---------
- arch/arm/mach-shmobile/setup-r8a7740.c             | 10 +---------
- arch/arm/mach-shmobile/setup-r8a7778.c             | 10 +---------
- arch/arm/mach-shmobile/setup-r8a7779.c             | 10 +---------
- arch/arm/mach-shmobile/setup-rcar-gen2.c           | 10 +---------
- arch/arm/mach-shmobile/setup-sh73a0.c              | 10 +---------
- arch/arm/mach-shmobile/smp-emev2.c                 | 10 +---------
- arch/arm/mach-shmobile/smp-r8a7779.c               | 10 +---------
- 14 files changed, 14 insertions(+), 111 deletions(-)
+ arch/arm/mach-shmobile/platsmp-apmu.c | 200 +++++++++++++++++-----------------
+ arch/arm/mach-shmobile/platsmp-apmu.h |  24 ----
+ 2 files changed, 100 insertions(+), 124 deletions(-)
+ delete mode 100644 arch/arm/mach-shmobile/platsmp-apmu.h
 
-diff --git a/arch/arm/include/debug/renesas-scif.S b/arch/arm/include/debug/renesas-scif.S
-index 97820a8df51a..1c5f795587fc 100644
---- a/arch/arm/include/debug/renesas-scif.S
-+++ b/arch/arm/include/debug/renesas-scif.S
-@@ -1,3 +1,4 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
- /*
-  * Renesas SCIF(A) debugging macro include header
-  *
-@@ -5,10 +6,6 @@
-  *
-  * Copyright (C) 2012-2013 Renesas Electronics Corporation
-  * Copyright (C) 1994-1999 Russell King
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-  */
- 
- #define SCIF_PHYS	CONFIG_DEBUG_UART_PHYS
-diff --git a/arch/arm/mach-shmobile/headsmp-apmu.S b/arch/arm/mach-shmobile/headsmp-apmu.S
-index d49ab194766a..a7b4bc7a087b 100644
---- a/arch/arm/mach-shmobile/headsmp-apmu.S
-+++ b/arch/arm/mach-shmobile/headsmp-apmu.S
-@@ -1,11 +1,8 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
- /*
-  * SMP support for APMU based systems with Cortex A7/A15
-  *
-  * Copyright (C) 2014  Renesas Electronics Corporation
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-  */
- 
- #include <linux/linkage.h>
 diff --git a/arch/arm/mach-shmobile/platsmp-apmu.c b/arch/arm/mach-shmobile/platsmp-apmu.c
-index 9e1e85cf1899..96330ef25641 100644
+index 42c9405e556b..9e1e85cf1899 100644
 --- a/arch/arm/mach-shmobile/platsmp-apmu.c
 +++ b/arch/arm/mach-shmobile/platsmp-apmu.c
-@@ -1,12 +1,9 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * SMP support for SoCs with APMU
-  *
-  * Copyright (C) 2014  Renesas Electronics Corporation
-  * Copyright (C) 2013  Magnus Damm
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-  */
- #include <linux/cpu_pm.h>
- #include <linux/delay.h>
-diff --git a/arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c b/arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c
-index 93f628acfd94..21ebc7678ffd 100644
---- a/arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c
-+++ b/arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c
-@@ -1,3 +1,4 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * R-Car Generation 2 da9063/da9210 regulator quirk
-  *
-@@ -16,15 +17,6 @@
-  * been initialized, but before the i2c slave drivers are initialized.
-  *
-  * Copyright (C) 2015 Glider bvba
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; version 2 of the License.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-  */
+@@ -23,7 +23,6 @@
+ #include <asm/smp_plat.h>
+ #include <asm/suspend.h>
+ #include "common.h"
+-#include "platsmp-apmu.h"
+ #include "rcar-gen2.h"
  
- #include <linux/device.h>
-diff --git a/arch/arm/mach-shmobile/setup-emev2.c b/arch/arm/mach-shmobile/setup-emev2.c
-index 3c99aaf65325..a328d2f52678 100644
---- a/arch/arm/mach-shmobile/setup-emev2.c
-+++ b/arch/arm/mach-shmobile/setup-emev2.c
-@@ -1,16 +1,8 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * Emma Mobile EV2 processor support
-  *
-  * Copyright (C) 2012  Magnus Damm
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; version 2 of the License.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-  */
- #include <linux/kernel.h>
- #include <linux/init.h>
-diff --git a/arch/arm/mach-shmobile/setup-r7s72100.c b/arch/arm/mach-shmobile/setup-r7s72100.c
-index 319ca9508ec6..14867226f8f4 100644
---- a/arch/arm/mach-shmobile/setup-r7s72100.c
-+++ b/arch/arm/mach-shmobile/setup-r7s72100.c
-@@ -1,17 +1,9 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * r7s72100 processor support
-  *
-  * Copyright (C) 2013  Renesas Solutions Corp.
-  * Copyright (C) 2013  Magnus Damm
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; version 2 of the License.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-  */
+ static struct {
+@@ -87,6 +86,104 @@ static int __maybe_unused apmu_wrap(int cpu, int (*fn)(void __iomem *p, int cpu)
+ 	return p ? fn(p, apmu_cpus[cpu].bit) : -EINVAL;
+ }
  
- #include <linux/kernel.h>
-diff --git a/arch/arm/mach-shmobile/setup-r8a73a4.c b/arch/arm/mach-shmobile/setup-r8a73a4.c
-index 20173c4f415d..ef391fa368e9 100644
---- a/arch/arm/mach-shmobile/setup-r8a73a4.c
-+++ b/arch/arm/mach-shmobile/setup-r8a73a4.c
-@@ -1,17 +1,9 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * r8a73a4 processor support
-  *
-  * Copyright (C) 2013  Renesas Solutions Corp.
-  * Copyright (C) 2013  Magnus Damm
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; version 2 of the License.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-  */
++#if defined(CONFIG_HOTPLUG_CPU) || defined(CONFIG_SUSPEND)
++/* nicked from arch/arm/mach-exynos/hotplug.c */
++static inline void cpu_enter_lowpower_a15(void)
++{
++	unsigned int v;
++
++	asm volatile(
++	"       mrc     p15, 0, %0, c1, c0, 0\n"
++	"       bic     %0, %0, %1\n"
++	"       mcr     p15, 0, %0, c1, c0, 0\n"
++		: "=&r" (v)
++		: "Ir" (CR_C)
++		: "cc");
++
++	flush_cache_louis();
++
++	asm volatile(
++	/*
++	 * Turn off coherency
++	 */
++	"       mrc     p15, 0, %0, c1, c0, 1\n"
++	"       bic     %0, %0, %1\n"
++	"       mcr     p15, 0, %0, c1, c0, 1\n"
++		: "=&r" (v)
++		: "Ir" (0x40)
++		: "cc");
++
++	isb();
++	dsb();
++}
++
++static void shmobile_smp_apmu_cpu_shutdown(unsigned int cpu)
++{
++
++	/* Select next sleep mode using the APMU */
++	apmu_wrap(cpu, apmu_power_off);
++
++	/* Do ARM specific CPU shutdown */
++	cpu_enter_lowpower_a15();
++}
++#endif
++
++#if defined(CONFIG_HOTPLUG_CPU)
++static void shmobile_smp_apmu_cpu_die(unsigned int cpu)
++{
++	/* For this particular CPU deregister boot vector */
++	shmobile_smp_hook(cpu, 0, 0);
++
++	/* Shutdown CPU core */
++	shmobile_smp_apmu_cpu_shutdown(cpu);
++
++	/* jump to shared mach-shmobile sleep / reset code */
++	shmobile_smp_sleep();
++}
++
++static int shmobile_smp_apmu_cpu_kill(unsigned int cpu)
++{
++	return apmu_wrap(cpu, apmu_power_off_poll);
++}
++#endif
++
++#if defined(CONFIG_SUSPEND)
++static int shmobile_smp_apmu_do_suspend(unsigned long cpu)
++{
++	shmobile_smp_hook(cpu, __pa_symbol(cpu_resume), 0);
++	shmobile_smp_apmu_cpu_shutdown(cpu);
++	cpu_do_idle(); /* WFI selects Core Standby */
++	return 1;
++}
++
++static inline void cpu_leave_lowpower(void)
++{
++	unsigned int v;
++
++	asm volatile("mrc    p15, 0, %0, c1, c0, 0\n"
++		     "       orr     %0, %0, %1\n"
++		     "       mcr     p15, 0, %0, c1, c0, 0\n"
++		     "       mrc     p15, 0, %0, c1, c0, 1\n"
++		     "       orr     %0, %0, %2\n"
++		     "       mcr     p15, 0, %0, c1, c0, 1\n"
++		     : "=&r" (v)
++		     : "Ir" (CR_C), "Ir" (0x40)
++		     : "cc");
++}
++
++static int shmobile_smp_apmu_enter_suspend(suspend_state_t state)
++{
++	cpu_suspend(smp_processor_id(), shmobile_smp_apmu_do_suspend);
++	cpu_leave_lowpower();
++	return 0;
++}
++
++void __init shmobile_smp_apmu_suspend_init(void)
++{
++	shmobile_suspend_ops.enter = shmobile_smp_apmu_enter_suspend;
++}
++#endif
++
+ #ifdef CONFIG_SMP
+ static void apmu_init_cpu(struct resource *res, int cpu, int bit)
+ {
+@@ -162,7 +259,8 @@ static void __init shmobile_smp_apmu_setup_boot(void)
+ 	shmobile_boot_fn_gen2 = shmobile_boot_fn;
+ }
  
- #include <linux/init.h>
-diff --git a/arch/arm/mach-shmobile/setup-r8a7740.c b/arch/arm/mach-shmobile/setup-r8a7740.c
-index 3849eef0d3a7..787d039b5a07 100644
---- a/arch/arm/mach-shmobile/setup-r8a7740.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7740.c
-@@ -1,17 +1,9 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * R8A7740 processor support
-  *
-  * Copyright (C) 2011  Renesas Solutions Corp.
-  * Copyright (C) 2011  Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; version 2 of the License.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-  */
- #include <linux/kernel.h>
- #include <linux/init.h>
-diff --git a/arch/arm/mach-shmobile/setup-r8a7778.c b/arch/arm/mach-shmobile/setup-r8a7778.c
-index 7fa4a0b5f654..ce51794f64c7 100644
---- a/arch/arm/mach-shmobile/setup-r8a7778.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7778.c
-@@ -1,18 +1,10 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * r8a7778 processor support
-  *
-  * Copyright (C) 2013  Renesas Solutions Corp.
-  * Copyright (C) 2013  Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-  * Copyright (C) 2013  Cogent Embedded, Inc.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; version 2 of the License.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-  */
+-int shmobile_smp_apmu_boot_secondary(unsigned int cpu, struct task_struct *idle)
++static int shmobile_smp_apmu_boot_secondary(unsigned int cpu,
++					    struct task_struct *idle)
+ {
+ 	/* For this particular CPU register boot vector */
+ 	shmobile_smp_hook(cpu, __pa_symbol(shmobile_boot_apmu), 0);
+@@ -189,101 +287,3 @@ static struct smp_operations apmu_smp_ops __initdata = {
  
- #include <linux/io.h>
-diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
-index 0686112f2435..d589326099e0 100644
---- a/arch/arm/mach-shmobile/setup-r8a7779.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7779.c
-@@ -1,18 +1,10 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * r8a7779 processor support
-  *
-  * Copyright (C) 2011, 2013  Renesas Solutions Corp.
-  * Copyright (C) 2011  Magnus Damm
-  * Copyright (C) 2013  Cogent Embedded, Inc.
+ CPU_METHOD_OF_DECLARE(shmobile_smp_apmu, "renesas,apmu", &apmu_smp_ops);
+ #endif /* CONFIG_SMP */
+-
+-#if defined(CONFIG_HOTPLUG_CPU) || defined(CONFIG_SUSPEND)
+-/* nicked from arch/arm/mach-exynos/hotplug.c */
+-static inline void cpu_enter_lowpower_a15(void)
+-{
+-	unsigned int v;
+-
+-	asm volatile(
+-	"       mrc     p15, 0, %0, c1, c0, 0\n"
+-	"       bic     %0, %0, %1\n"
+-	"       mcr     p15, 0, %0, c1, c0, 0\n"
+-		: "=&r" (v)
+-		: "Ir" (CR_C)
+-		: "cc");
+-
+-	flush_cache_louis();
+-
+-	asm volatile(
+-	/*
+-	 * Turn off coherency
+-	 */
+-	"       mrc     p15, 0, %0, c1, c0, 1\n"
+-	"       bic     %0, %0, %1\n"
+-	"       mcr     p15, 0, %0, c1, c0, 1\n"
+-		: "=&r" (v)
+-		: "Ir" (0x40)
+-		: "cc");
+-
+-	isb();
+-	dsb();
+-}
+-
+-static void shmobile_smp_apmu_cpu_shutdown(unsigned int cpu)
+-{
+-
+-	/* Select next sleep mode using the APMU */
+-	apmu_wrap(cpu, apmu_power_off);
+-
+-	/* Do ARM specific CPU shutdown */
+-	cpu_enter_lowpower_a15();
+-}
+-#endif
+-
+-#if defined(CONFIG_HOTPLUG_CPU)
+-void shmobile_smp_apmu_cpu_die(unsigned int cpu)
+-{
+-	/* For this particular CPU deregister boot vector */
+-	shmobile_smp_hook(cpu, 0, 0);
+-
+-	/* Shutdown CPU core */
+-	shmobile_smp_apmu_cpu_shutdown(cpu);
+-
+-	/* jump to shared mach-shmobile sleep / reset code */
+-	shmobile_smp_sleep();
+-}
+-
+-int shmobile_smp_apmu_cpu_kill(unsigned int cpu)
+-{
+-	return apmu_wrap(cpu, apmu_power_off_poll);
+-}
+-#endif
+-
+-#if defined(CONFIG_SUSPEND)
+-static int shmobile_smp_apmu_do_suspend(unsigned long cpu)
+-{
+-	shmobile_smp_hook(cpu, __pa_symbol(cpu_resume), 0);
+-	shmobile_smp_apmu_cpu_shutdown(cpu);
+-	cpu_do_idle(); /* WFI selects Core Standby */
+-	return 1;
+-}
+-
+-static inline void cpu_leave_lowpower(void)
+-{
+-	unsigned int v;
+-
+-	asm volatile("mrc    p15, 0, %0, c1, c0, 0\n"
+-		     "       orr     %0, %0, %1\n"
+-		     "       mcr     p15, 0, %0, c1, c0, 0\n"
+-		     "       mrc     p15, 0, %0, c1, c0, 1\n"
+-		     "       orr     %0, %0, %2\n"
+-		     "       mcr     p15, 0, %0, c1, c0, 1\n"
+-		     : "=&r" (v)
+-		     : "Ir" (CR_C), "Ir" (0x40)
+-		     : "cc");
+-}
+-
+-static int shmobile_smp_apmu_enter_suspend(suspend_state_t state)
+-{
+-	cpu_suspend(smp_processor_id(), shmobile_smp_apmu_do_suspend);
+-	cpu_leave_lowpower();
+-	return 0;
+-}
+-
+-void __init shmobile_smp_apmu_suspend_init(void)
+-{
+-	shmobile_suspend_ops.enter = shmobile_smp_apmu_enter_suspend;
+-}
+-#endif
+diff --git a/arch/arm/mach-shmobile/platsmp-apmu.h b/arch/arm/mach-shmobile/platsmp-apmu.h
+deleted file mode 100644
+index 70424572b9da..000000000000
+--- a/arch/arm/mach-shmobile/platsmp-apmu.h
++++ /dev/null
+@@ -1,24 +0,0 @@
+-/*
+- * rmobile apmu definition
+- *
+- * Copyright (C) 2014  Renesas Electronics Corporation
 - *
 - * This program is free software; you can redistribute it and/or modify
 - * it under the terms of the GNU General Public License as published by
@@ -246,102 +272,16 @@ index 0686112f2435..d589326099e0 100644
 - * but WITHOUT ANY WARRANTY; without even the implied warranty of
 - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 - * GNU General Public License for more details.
-  */
- #include <linux/init.h>
- #include <linux/irq.h>
-diff --git a/arch/arm/mach-shmobile/setup-rcar-gen2.c b/arch/arm/mach-shmobile/setup-rcar-gen2.c
-index 4c605129cd37..117531367f17 100644
---- a/arch/arm/mach-shmobile/setup-rcar-gen2.c
-+++ b/arch/arm/mach-shmobile/setup-rcar-gen2.c
-@@ -1,18 +1,10 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * R-Car Generation 2 support
-  *
-  * Copyright (C) 2013  Renesas Solutions Corp.
-  * Copyright (C) 2013  Magnus Damm
-  * Copyright (C) 2014  Ulrich Hecht
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; version 2 of the License.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-  */
- 
- #include <linux/clk-provider.h>
-diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
-index a25ff188e403..cc08aa752244 100644
---- a/arch/arm/mach-shmobile/setup-sh73a0.c
-+++ b/arch/arm/mach-shmobile/setup-sh73a0.c
-@@ -1,18 +1,10 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * sh73a0 processor support
-  *
-  * Copyright (C) 2010  Takashi Yoshii
-  * Copyright (C) 2010  Magnus Damm
-  * Copyright (C) 2008  Yoshihiro Shimoda
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; version 2 of the License.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-  */
- #include <linux/kernel.h>
- #include <linux/init.h>
-diff --git a/arch/arm/mach-shmobile/smp-emev2.c b/arch/arm/mach-shmobile/smp-emev2.c
-index 3a732199cf5e..3853ecea44ca 100644
---- a/arch/arm/mach-shmobile/smp-emev2.c
-+++ b/arch/arm/mach-shmobile/smp-emev2.c
-@@ -1,17 +1,9 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * SMP support for Emma Mobile EV2
-  *
-  * Copyright (C) 2012  Renesas Solutions Corp.
-  * Copyright (C) 2012  Magnus Damm
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; version 2 of the License.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-  */
- #include <linux/kernel.h>
- #include <linux/init.h>
-diff --git a/arch/arm/mach-shmobile/smp-r8a7779.c b/arch/arm/mach-shmobile/smp-r8a7779.c
-index 0d3ec5c2b8fc..b7fe1f489b08 100644
---- a/arch/arm/mach-shmobile/smp-r8a7779.c
-+++ b/arch/arm/mach-shmobile/smp-r8a7779.c
-@@ -1,17 +1,9 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * SMP support for R-Mobile / SH-Mobile - r8a7779 portion
-  *
-  * Copyright (C) 2011  Renesas Solutions Corp.
-  * Copyright (C) 2011  Magnus Damm
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; version 2 of the License.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-  */
- #include <linux/kernel.h>
- #include <linux/init.h>
+- */
+-
+-#ifndef PLATSMP_APMU_H
+-#define PLATSMP_APMU_H
+-
+-extern int shmobile_smp_apmu_boot_secondary(unsigned int cpu,
+-					    struct task_struct *idle);
+-extern void shmobile_smp_apmu_cpu_die(unsigned int cpu);
+-extern int shmobile_smp_apmu_cpu_kill(unsigned int cpu);
+-
+-#endif /* PLATSMP_APMU_H */
 -- 
 2.11.0
