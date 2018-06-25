@@ -1,43 +1,50 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Mon, 25 Jun 2018 10:33:19 +0300
-Subject: [PATCH] dt-bindings: serial: imx: clarify rs485 support usage
-Message-ID: <01fc1e3d89037adce38177c3922d277584214fdd.1529911999.git.baruch@tkos.co.il>
+From: arend.vanspriel@broadcom.com (Arend van Spriel)
+Date: Mon, 25 Jun 2018 09:43:51 +0200
+Subject: [PATCHv2 5/5] arm64: allwinner: a64: Add support for TERES-I
+ laptop
+In-Reply-To: <E1fX7yK-0000OC-HA@stardust.g4.wien.funkfeuer.at>
+References: <20180315162510.11669-1-harald@ccbib.org>
+ <20180315162510.11669-6-harald@ccbib.org>
+ <a7011fe78d171658742406bf01d50b7e3d7eaf1d.camel@aosc.io>
+ <E1fX7yK-0000OC-HA@stardust.g4.wien.funkfeuer.at>
+Message-ID: <5B309D37.80207@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The i.MX UART peripheral uses the RST_B signal as input, and CTS_B as
-output. This is just like the CDE role in RS-232. This is true
-regardless of the "DTE mode" setting of this peripheral.
+On 6/24/2018 6:34 PM, Harald Geyer wrote:
+> Icenowy Zheng writes:
+>> >? 2018-03-15?? 16:25 +0000?Harald Geyer???
+>>> > >+&mmc1 {
+>>> > >+	pinctrl-names = "default";
+>>> > >+	pinctrl-0 = <&mmc1_pins>;
+>>> > >+	vmmc-supply = <&reg_aldo2>;
+>>> > >+	vqmmc-supply = <&reg_dldo4>;
+>>> > >+	mmc-pwrseq = <&wifi_pwrseq>;
+>>> > >+	bus-width = <4>;
+>>> > >+	non-removable;
+>>> > >+	status = "okay";
+>>> > >+
+>>> > >+	rtl8723bs: wifi at 1 {
+>>> > >+		reg = <1>;
+>>> > >+		interrupt-parent = <&r_pio>;
+>>> > >+		interrupts = <0 3 IRQ_TYPE_LEVEL_LOW>; /* PL3 */
+>>> > >+		interrupt-names = "host-wake";
+>>> > >+	};
 
-As a result, rs485 support hardware must use the CTS_B signal to control
-the RS-485 transceiver. This is in contrast to generic rs485 kernel
-code, documentation, and DT property names that consistently refer to
-the RST as transceiver control signal.
+[...]
 
-Add a note in the DT binding document about that, to reduce the
-confusion somewhat.
+>> >- This device node has no binding. The "host-wake" interrupt is part of
+>> >  Broadcom SDIO Wi-Fi binding, rather than a generic one.
+> I think the general mmc and interrupts bindings apply. And the mmc binding
+> clearly states that for sub-nodes a compatible string is optional.
+>
+> However I just realized that the 'interrupt-names' property is not part
+> of the general interrupts binding, so I guess at least this property should
+> be removed.
 
-Signed-off-by: Baruch Siach <baruch@tkos.co.il>
----
- Documentation/devicetree/bindings/serial/fsl-imx-uart.txt | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+Indeed. If the device just used the SDIO interrupt this is not needed. 
+The Broadcom device can use either SDIO interrupt or a so-called 
+out-of-band host-wake interrupt, which is what the above represents.
 
-diff --git a/Documentation/devicetree/bindings/serial/fsl-imx-uart.txt b/Documentation/devicetree/bindings/serial/fsl-imx-uart.txt
-index afcfbc34e243..35957cbf1571 100644
---- a/Documentation/devicetree/bindings/serial/fsl-imx-uart.txt
-+++ b/Documentation/devicetree/bindings/serial/fsl-imx-uart.txt
-@@ -9,7 +9,11 @@ Optional properties:
- - fsl,dte-mode : Indicate the uart works in DTE mode. The uart works
-                   in DCE mode by default.
- - rs485-rts-delay, rs485-rts-active-low, rs485-rx-during-tx,
--  linux,rs485-enabled-at-boot-time: see rs485.txt
-+  linux,rs485-enabled-at-boot-time: see rs485.txt. Note that for RS485
-+  you must enable either the "uart-has-rtscts" or the "rts-gpios"
-+  properties. In case you use "uart-has-rtscts" the signal that controls
-+  the transceiver is actually CTS_B, not RTS_B. CTS_B is always output,
-+  and RTS_B is input, regardless of dte-mode.
- 
- Please check Documentation/devicetree/bindings/serial/serial.txt
- for the complete list of generic properties.
--- 
-2.18.0
+Regards,
+Arend
