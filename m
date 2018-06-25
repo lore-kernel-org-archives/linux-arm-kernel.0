@@ -1,49 +1,60 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Mon, 25 Jun 2018 14:02:46 +0200
-Subject: [PATCH v3 06/24] drm/sun4i: Fix releasing node when enumerating
- enpoints
+Date: Mon, 25 Jun 2018 14:02:42 +0200
+Subject: [PATCH v3 02/24] clk: sunxi-ng: r40: Allow setting parent rate to
+ display related clocks
 In-Reply-To: <20180625120304.7543-1-jernej.skrabec@siol.net>
 References: <20180625120304.7543-1-jernej.skrabec@siol.net>
-Message-ID: <20180625120304.7543-7-jernej.skrabec@siol.net>
+Message-ID: <20180625120304.7543-3-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-sun4i_drv_add_endpoints() has a memory leak since it uses of_node_put()
-when remote is equal to NULL and does nothing when remote has a valid
-pointer.
+Display related peripherals need precise clocks to operate correctly.
 
-Invert the logic to fix memory leak.
+Allow DE2, TCONs and HDMI to set parent clock.
 
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/gpu/drm/sun4i/sun4i_drv.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/clk/sunxi-ng/ccu-sun8i-r40.c | 12 ++++++++----
+ 1 file changed, 8 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
-index 50d19605c38f..e15fa2389e3f 100644
---- a/drivers/gpu/drm/sun4i/sun4i_drv.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
-@@ -283,7 +283,6 @@ static int sun4i_drv_add_endpoints(struct device *dev,
- 		remote = of_graph_get_remote_port_parent(ep);
- 		if (!remote) {
- 			DRM_DEBUG_DRIVER("Error retrieving the output node\n");
--			of_node_put(remote);
- 			continue;
- 		}
+diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-r40.c b/drivers/clk/sunxi-ng/ccu-sun8i-r40.c
+index c16a62a7bdbd..fa5317719684 100644
+--- a/drivers/clk/sunxi-ng/ccu-sun8i-r40.c
++++ b/drivers/clk/sunxi-ng/ccu-sun8i-r40.c
+@@ -655,7 +655,8 @@ static SUNXI_CCU_GATE(dram_deinterlace_clk,	"dram-deinterlace",	"dram",
  
-@@ -297,11 +296,13 @@ static int sun4i_drv_add_endpoints(struct device *dev,
+ static const char * const de_parents[] = { "pll-periph0-2x", "pll-de" };
+ static SUNXI_CCU_M_WITH_MUX_GATE(de_clk, "de", de_parents,
+-				 0x104, 0, 4, 24, 3, BIT(31), 0);
++				 0x104, 0, 4, 24, 3, BIT(31),
++				 CLK_SET_RATE_PARENT);
+ static SUNXI_CCU_M_WITH_MUX_GATE(mp_clk, "mp", de_parents,
+ 				 0x108, 0, 4, 24, 3, BIT(31), 0);
  
- 			if (of_graph_parse_endpoint(ep, &endpoint)) {
- 				DRM_DEBUG_DRIVER("Couldn't parse endpoint\n");
-+				of_node_put(remote);
- 				continue;
- 			}
+@@ -667,9 +668,11 @@ static SUNXI_CCU_MUX_WITH_GATE(tcon_lcd0_clk, "tcon-lcd0", tcon_parents,
+ static SUNXI_CCU_MUX_WITH_GATE(tcon_lcd1_clk, "tcon-lcd1", tcon_parents,
+ 			       0x114, 24, 3, BIT(31), CLK_SET_RATE_PARENT);
+ static SUNXI_CCU_M_WITH_MUX_GATE(tcon_tv0_clk, "tcon-tv0", tcon_parents,
+-				 0x118, 0, 4, 24, 3, BIT(31), 0);
++				 0x118, 0, 4, 24, 3, BIT(31),
++				 CLK_SET_RATE_PARENT);
+ static SUNXI_CCU_M_WITH_MUX_GATE(tcon_tv1_clk, "tcon-tv1", tcon_parents,
+-				 0x11c, 0, 4, 24, 3, BIT(31), 0);
++				 0x11c, 0, 4, 24, 3, BIT(31),
++				 CLK_SET_RATE_PARENT);
  
- 			if (!endpoint.id) {
- 				DRM_DEBUG_DRIVER("Endpoint is our panel... skipping\n");
-+				of_node_put(remote);
- 				continue;
- 			}
- 		}
+ static const char * const deinterlace_parents[] = { "pll-periph0",
+ 						    "pll-periph1" };
+@@ -699,7 +702,8 @@ static SUNXI_CCU_GATE(avs_clk,		"avs",		"osc24M",
+ 
+ static const char * const hdmi_parents[] = { "pll-video0", "pll-video1" };
+ static SUNXI_CCU_M_WITH_MUX_GATE(hdmi_clk, "hdmi", hdmi_parents,
+-				 0x150, 0, 4, 24, 2, BIT(31), 0);
++				 0x150, 0, 4, 24, 2, BIT(31),
++				 CLK_SET_RATE_PARENT);
+ 
+ static SUNXI_CCU_GATE(hdmi_slow_clk,	"hdmi-slow",	"osc24M",
+ 		      0x154, BIT(31), 0);
 -- 
 2.18.0
