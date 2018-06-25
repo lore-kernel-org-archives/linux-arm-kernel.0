@@ -1,132 +1,77 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Mon, 25 Jun 2018 14:02:47 +0200
-Subject: [PATCH v3 07/24] drm/sun4i: Split out code for enumerating endpoints
- in output port
+Date: Mon, 25 Jun 2018 14:02:50 +0200
+Subject: [PATCH v3 10/24] drm/sun4i: tcon: Generalize engine search algorithm
 In-Reply-To: <20180625120304.7543-1-jernej.skrabec@siol.net>
 References: <20180625120304.7543-1-jernej.skrabec@siol.net>
-Message-ID: <20180625120304.7543-8-jernej.skrabec@siol.net>
+Message-ID: <20180625120304.7543-11-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Until now, each node has one input port and one output port. However,
-with TCON TOP this is no longer true. It has 3 input and 3 output ports.
+Current "old" method to find engine worked pretty well for DE2. However,
+it doesn't work when TCON TOP is between  mixer (engine) and TCON. TCON
+TOP has multiple input ports, but current engine search algorithm
+expects only one.
 
-In order to prepare to this situation, split out the code which checks
-all endpoints in input port and adds available components to fifo.
-
-This patch doesn't do any functional change.
+This can be fixed by first looking for output port id and selecting
+matching input by subtracting 1 for the next round. This work even if
+there is only one input and output.
 
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/gpu/drm/sun4i/sun4i_drv.c | 84 +++++++++++++++++--------------
- 1 file changed, 46 insertions(+), 38 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_tcon.c | 22 ++++++++++++++++++----
+ 1 file changed, 18 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
-index e15fa2389e3f..20193d6f33ba 100644
---- a/drivers/gpu/drm/sun4i/sun4i_drv.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
-@@ -231,12 +231,55 @@ struct endpoint_list {
- 	DECLARE_KFIFO(fifo, struct device_node *, 16);
- };
- 
-+static void sun4i_drv_traverse_endpoints(struct endpoint_list *list,
-+					 struct device_node *node,
-+					 int port_id)
-+{
-+	struct device_node *ep, *remote, *port;
-+
-+	port = of_graph_get_port_by_id(node, port_id);
-+	if (!port) {
-+		DRM_DEBUG_DRIVER("No output to bind on port %d\n", port_id);
-+		return;
-+	}
-+
-+	for_each_available_child_of_node(port, ep) {
-+		remote = of_graph_get_remote_port_parent(ep);
-+		if (!remote) {
-+			DRM_DEBUG_DRIVER("Error retrieving the output node\n");
-+			continue;
-+		}
-+
-+		/*
-+		 * If the node is our TCON, the first port is used for
-+		 * panel or bridges, and will not be part of the
-+		 * component framework.
-+		 */
-+		if (sun4i_drv_node_is_tcon(node)) {
-+			struct of_endpoint endpoint;
-+
-+			if (of_graph_parse_endpoint(ep, &endpoint)) {
-+				DRM_DEBUG_DRIVER("Couldn't parse endpoint\n");
-+				of_node_put(remote);
-+				continue;
-+			}
-+
-+			if (!endpoint.id) {
-+				DRM_DEBUG_DRIVER("Endpoint is our panel... skipping\n");
-+				of_node_put(remote);
-+				continue;
-+			}
-+		}
-+
-+		kfifo_put(&list->fifo, remote);
-+	}
-+}
-+
- static int sun4i_drv_add_endpoints(struct device *dev,
- 				   struct endpoint_list *list,
- 				   struct component_match **match,
- 				   struct device_node *node)
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+index 08747fc3ee71..264bcc43da11 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+@@ -791,12 +791,14 @@ static int sun4i_tcon_init_regmap(struct device *dev,
+  */
+ static struct sunxi_engine *
+ sun4i_tcon_find_engine_traverse(struct sun4i_drv *drv,
+-				struct device_node *node)
++				struct device_node *node,
++				u32 port_id)
  {
--	struct device_node *port, *ep, *remote;
- 	int count = 0;
+ 	struct device_node *port, *ep, *remote;
+ 	struct sunxi_engine *engine = ERR_PTR(-EINVAL);
++	u32 reg = 0;
  
- 	/*
-@@ -272,43 +315,8 @@ static int sun4i_drv_add_endpoints(struct device *dev,
- 		count++;
- 	}
+-	port = of_graph_get_port_by_id(node, 0);
++	port = of_graph_get_port_by_id(node, port_id);
+ 	if (!port)
+ 		return ERR_PTR(-EINVAL);
  
--	/* Inputs are listed first, then outputs */
--	port = of_graph_get_port_by_id(node, 1);
--	if (!port) {
--		DRM_DEBUG_DRIVER("No output to bind\n");
--		return count;
--	}
--
--	for_each_available_child_of_node(port, ep) {
--		remote = of_graph_get_remote_port_parent(ep);
--		if (!remote) {
--			DRM_DEBUG_DRIVER("Error retrieving the output node\n");
--			continue;
--		}
--
--		/*
--		 * If the node is our TCON, the first port is used for
--		 * panel or bridges, and will not be part of the
--		 * component framework.
--		 */
--		if (sun4i_drv_node_is_tcon(node)) {
--			struct of_endpoint endpoint;
--
--			if (of_graph_parse_endpoint(ep, &endpoint)) {
--				DRM_DEBUG_DRIVER("Couldn't parse endpoint\n");
--				of_node_put(remote);
--				continue;
--			}
--
--			if (!endpoint.id) {
--				DRM_DEBUG_DRIVER("Endpoint is our panel... skipping\n");
--				of_node_put(remote);
--				continue;
--			}
--		}
--
--		kfifo_put(&list->fifo, remote);
--	}
-+	/* each node has at least one output */
-+	sun4i_drv_traverse_endpoints(list, node, 1);
+@@ -826,8 +828,20 @@ sun4i_tcon_find_engine_traverse(struct sun4i_drv *drv,
+ 		if (remote == engine->node)
+ 			goto out_put_remote;
  
- 	return count;
++	/*
++	 * According to device tree binding input ports have even id
++	 * number and output ports have odd id. Since component with
++	 * more than one input and one output (TCON TOP) exits, correct
++	 * remote input id has to be calculated by subtracting 1 from
++	 * remote output id. If this for some reason can't be done, 0
++	 * is used as input port id.
++	 */
++	port = of_graph_get_remote_port(ep);
++	if (!of_property_read_u32(port, "reg", &reg) && reg > 0)
++		reg -= 1;
++
+ 	/* keep looking through upstream ports */
+-	engine = sun4i_tcon_find_engine_traverse(drv, remote);
++	engine = sun4i_tcon_find_engine_traverse(drv, remote, reg);
+ 
+ out_put_remote:
+ 	of_node_put(remote);
+@@ -950,7 +964,7 @@ static struct sunxi_engine *sun4i_tcon_find_engine(struct sun4i_drv *drv,
+ 
+ 	/* Fallback to old method by traversing input endpoints */
+ 	of_node_put(port);
+-	return sun4i_tcon_find_engine_traverse(drv, node);
++	return sun4i_tcon_find_engine_traverse(drv, node, 0);
  }
+ 
+ static int sun4i_tcon_bind(struct device *dev, struct device *master,
 -- 
 2.18.0
