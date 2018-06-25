@@ -1,178 +1,120 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Mon, 25 Jun 2018 17:29:13 +0200
-Subject: [PATCH 2/9] ARM: davinci: omapl138-hawk: add aemif & nand support
+Date: Mon, 25 Jun 2018 17:29:15 +0200
+Subject: [PATCH 4/9] ARM: davinci: dm365-evm: use the ti-aemif soc driver
 In-Reply-To: <20180625152920.11549-1-brgl@bgdev.pl>
 References: <20180625152920.11549-1-brgl@bgdev.pl>
-Message-ID: <20180625152920.11549-3-brgl@bgdev.pl>
+Message-ID: <20180625152920.11549-5-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-We now have support for aemif & nand from board files. As an example
-add support for nand to da850-hawk.
+We now support board files in the aemif driver. Register a platform
+device instead of using the handcrafted API in dm365-evm.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- arch/arm/mach-davinci/board-omapl138-hawk.c | 132 ++++++++++++++++++++
- 1 file changed, 132 insertions(+)
+ arch/arm/mach-davinci/board-dm365-evm.c | 59 +++++++++++++++++++------
+ 1 file changed, 46 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/board-omapl138-hawk.c b/arch/arm/mach-davinci/board-omapl138-hawk.c
-index 466e87b24e9a..02c0f36633e9 100644
---- a/arch/arm/mach-davinci/board-omapl138-hawk.c
-+++ b/arch/arm/mach-davinci/board-omapl138-hawk.c
-@@ -16,6 +16,11 @@
- #include <linux/gpio.h>
- #include <linux/gpio/machine.h>
- #include <linux/platform_data/gpio-davinci.h>
+diff --git a/arch/arm/mach-davinci/board-dm365-evm.c b/arch/arm/mach-davinci/board-dm365-evm.c
+index 307e88d99dd3..12b8d7b8c6b8 100644
+--- a/arch/arm/mach-davinci/board-dm365-evm.c
++++ b/arch/arm/mach-davinci/board-dm365-evm.c
+@@ -28,6 +28,7 @@
+ #include <linux/spi/spi.h>
+ #include <linux/spi/eeprom.h>
+ #include <linux/v4l2-dv-timings.h>
 +#include <linux/platform_data/ti-aemif.h>
-+#include <linux/mtd/rawnand.h>
-+#include <linux/mtd/partitions.h>
-+#include <linux/platform_data/mtd-davinci.h>
-+#include <linux/platform_data/mtd-davinci-aemif.h>
- #include <linux/regulator/machine.h>
  
  #include <asm/mach-types.h>
-@@ -166,6 +171,129 @@ static __init void omapl138_hawk_mmc_init(void)
- 	gpiod_remove_lookup_table(&mmc_gpios_table);
- }
+ #include <asm/mach/arch.h>
+@@ -159,14 +160,47 @@ static struct resource davinci_nand_resources[] = {
+ 	},
+ };
  
-+static struct mtd_partition omapl138_hawk_nandflash_partition[] = {
-+	{
-+		.name		= "u-boot env",
-+		.offset		= 0,
-+		.size		= SZ_128K,
-+		.mask_flags	= MTD_WRITEABLE,
-+	 },
-+	{
-+		.name		= "u-boot",
-+		.offset		= MTDPART_OFS_APPEND,
-+		.size		= SZ_512K,
-+		.mask_flags	= MTD_WRITEABLE,
-+	},
-+	{
-+		.name		= "free space",
-+		.offset		= MTDPART_OFS_APPEND,
-+		.size		= MTDPART_SIZ_FULL,
-+		.mask_flags	= 0,
-+	},
-+};
-+
-+static struct davinci_aemif_timing omapl138_hawk_nandflash_timing = {
-+	.wsetup		= 24,
-+	.wstrobe	= 21,
-+	.whold		= 14,
-+	.rsetup		= 19,
-+	.rstrobe	= 50,
-+	.rhold		= 0,
-+	.ta		= 20,
-+};
-+
-+static struct davinci_nand_pdata omapl138_hawk_nandflash_data = {
-+	.core_chipsel	= 1,
-+	.parts		= omapl138_hawk_nandflash_partition,
-+	.nr_parts	= ARRAY_SIZE(omapl138_hawk_nandflash_partition),
-+	.ecc_mode	= NAND_ECC_HW,
-+	.ecc_bits	= 4,
-+	.bbt_options	= NAND_BBT_USE_FLASH,
-+	.options	= NAND_BUSWIDTH_16,
-+	.timing		= &omapl138_hawk_nandflash_timing,
-+	.mask_chipsel	= 0,
-+	.mask_ale	= 0,
-+	.mask_cle	= 0,
-+};
-+
-+static struct resource omapl138_hawk_nandflash_resource[] = {
-+	{
-+		.start	= DA8XX_AEMIF_CS3_BASE,
-+		.end	= DA8XX_AEMIF_CS3_BASE + SZ_32M,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	{
-+		.start	= DA8XX_AEMIF_CTL_BASE,
-+		.end	= DA8XX_AEMIF_CTL_BASE + SZ_32K,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+};
-+
-+static struct resource omapl138_hawk_aemif_resource[] = {
-+	{
-+		.start	= DA8XX_AEMIF_CTL_BASE,
-+		.end	= DA8XX_AEMIF_CTL_BASE + SZ_32K,
-+		.flags	= IORESOURCE_MEM,
-+	}
-+};
-+
-+static struct aemif_abus_data omapl138_hawk_aemif_abus_data[] = {
-+	{
-+		.cs	= 3,
-+	}
-+};
-+
-+static struct platform_device omapl138_hawk_aemif_devices[] = {
+-static struct platform_device davinci_nand_device = {
+-	.name			= "davinci_nand",
+-	.id			= 0,
+-	.num_resources		= ARRAY_SIZE(davinci_nand_resources),
+-	.resource		= davinci_nand_resources,
+-	.dev			= {
+-		.platform_data	= &davinci_nand_data,
++static struct platform_device davinci_aemif_devices[] = {
 +	{
 +		.name		= "davinci_nand",
-+		.id		= 1,
++		.id		= 0,
++		.num_resources	= ARRAY_SIZE(davinci_nand_resources),
++		.resource	= davinci_nand_resources,
 +		.dev		= {
-+			.platform_data	= &omapl138_hawk_nandflash_data,
++			.platform_data	= &davinci_nand_data,
 +		},
-+		.resource	= omapl138_hawk_nandflash_resource,
-+		.num_resources	= ARRAY_SIZE(omapl138_hawk_nandflash_resource),
 +	}
 +};
 +
-+static struct aemif_platform_data omapl138_hawk_aemif_pdata = {
-+	.cs_offset = 2,
-+	.abus_data = omapl138_hawk_aemif_abus_data,
-+	.num_abus_data = ARRAY_SIZE(omapl138_hawk_aemif_abus_data),
-+	.sub_devices = omapl138_hawk_aemif_devices,
-+	.num_sub_devices = ARRAY_SIZE(omapl138_hawk_aemif_devices),
-+};
-+
-+static struct platform_device omapl138_hawk_aemif_device = {
-+	.name		= "ti-aemif",
-+	.dev = {
-+		.platform_data	= &omapl138_hawk_aemif_pdata,
++static struct resource davinci_aemif_resources[] = {
++	{
++		.start		= DM365_ASYNC_EMIF_CONTROL_BASE,
++		.end		= DM365_ASYNC_EMIF_CONTROL_BASE + SZ_4K - 1,
++		.flags		= IORESOURCE_MEM,
 +	},
-+	.resource	= omapl138_hawk_aemif_resource,
-+	.num_resources	= ARRAY_SIZE(omapl138_hawk_aemif_resource),
-+	.id		= -1,
 +};
 +
-+static const short omapl138_hawk_nand_pins[] = {
-+	DA850_EMA_WAIT_1, DA850_NEMA_OE, DA850_NEMA_WE, DA850_NEMA_CS_3,
-+	DA850_EMA_D_0, DA850_EMA_D_1, DA850_EMA_D_2, DA850_EMA_D_3,
-+	DA850_EMA_D_4, DA850_EMA_D_5, DA850_EMA_D_6, DA850_EMA_D_7,
-+	DA850_EMA_D_8, DA850_EMA_D_9, DA850_EMA_D_10, DA850_EMA_D_11,
-+	DA850_EMA_D_12, DA850_EMA_D_13, DA850_EMA_D_14, DA850_EMA_D_15,
-+	DA850_EMA_A_1, DA850_EMA_A_2,
-+	-1
++static struct aemif_abus_data da850_evm_aemif_abus_data[] = {
++	{
++		.cs		= 1,
++	},
 +};
 +
-+static int omapl138_hawk_register_aemif(void)
-+{
-+	int ret;
++static struct aemif_platform_data davinci_aemif_pdata = {
++	.abus_data		= da850_evm_aemif_abus_data,
++	.num_abus_data		= ARRAY_SIZE(da850_evm_aemif_abus_data),
++	.sub_devices		= davinci_aemif_devices,
++	.num_sub_devices	= ARRAY_SIZE(davinci_aemif_devices),
++};
 +
-+	ret = davinci_cfg_reg_list(omapl138_hawk_nand_pins);
-+	if (ret)
-+		pr_warn("%s: NAND mux setup failed: %d\n", __func__, ret);
-+
-+	return platform_device_register(&omapl138_hawk_aemif_device);
-+}
-+
- static irqreturn_t omapl138_hawk_usb_ocic_irq(int irq, void *dev_id);
- static da8xx_ocic_handler_t hawk_usb_ocic_handler;
++static struct platform_device davinci_aemif_device = {
++	.name			= "ti-aemif",
++	.dev = {
++		.platform_data	= &davinci_aemif_pdata,
+ 	},
++	.resource		= davinci_aemif_resources,
++	.num_resources		= ARRAY_SIZE(davinci_aemif_resources),
++	.id			= -1,
+ };
  
-@@ -298,6 +426,10 @@ static __init void omapl138_hawk_init(void)
+ static struct at24_platform_data eeprom_info = {
+@@ -537,10 +571,6 @@ static void __init evm_init_i2c(void)
+ 	i2c_register_board_info(1, i2c_info, ARRAY_SIZE(i2c_info));
+ }
  
- 	omapl138_hawk_usb_init();
+-static struct platform_device *dm365_evm_nand_devices[] __initdata = {
+-	&davinci_nand_device,
+-};
+-
+ static inline int have_leds(void)
+ {
+ #ifdef CONFIG_LEDS_CLASS
+@@ -628,6 +658,7 @@ static void __init evm_init_cpld(void)
+ 	u8 mux, resets;
+ 	const char *label;
+ 	struct clk *aemif_clk;
++	int rc;
  
-+	ret = omapl138_hawk_register_aemif();
-+	if (ret)
-+		pr_warn("%s: aemif registration failed: %d\n", __func__, ret);
-+
- 	ret = da8xx_register_watchdog();
- 	if (ret)
- 		pr_warn("%s: watchdog registration failed: %d\n",
+ 	/* Make sure we can configure the CPLD through CS1.  Then
+ 	 * leave it on for later access to MMC and LED registers.
+@@ -660,8 +691,10 @@ static void __init evm_init_cpld(void)
+ 		/* external keypad mux */
+ 		mux |= BIT(7);
+ 
+-		platform_add_devices(dm365_evm_nand_devices,
+-				ARRAY_SIZE(dm365_evm_nand_devices));
++		rc = platform_device_register(&davinci_aemif_device);
++		if (rc)
++			pr_warn("%s(): error registering the aemif device: %d\n",
++				__func__, rc);
+ 	} else {
+ 		/* no OneNAND support yet */
+ 	}
 -- 
 2.17.1
