@@ -1,96 +1,125 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 25 Jun 2018 16:02:58 +0200
-Subject: [PATCH 03/29] arm64: dts: renesas: r8a77995: don't use deprecated
- renesas, gpio-rcar compat string
+Date: Mon, 25 Jun 2018 16:02:59 +0200
+Subject: [PATCH 04/29] arm64: dts: renesas: draak: Describe CVBS input
 In-Reply-To: <cover.1529933747.git.horms+renesas@verge.net.au>
 References: <cover.1529933747.git.horms+renesas@verge.net.au>
-Message-ID: <341238b57dfb1adf40d26557da4399de8823532a.1529933747.git.horms+renesas@verge.net.au>
+Message-ID: <6a0942c20f5ca9bf203a20ab4a91c7b7dcd6a0c5.1529933747.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The compat string renesas,gpio-rcar has been deprecated since v4.14,
-the same release that r8a77990 SoC support was added. Thus
-renesas,gpio-rcar can safely be removed without any risk of behaviour
-changes between old and new mainline kernels and DTBs.
+From: Jacopo Mondi <jacopo+renesas@jmondi.org>
 
+Describe CVBS video input through analog video decoder ADV7180
+connected to video input interface VIN4.
+
+The video input signal path is shared with HDMI video input, and
+selected by on-board switches SW-53 and SW-54 with CVBS input selected
+by the default switches configuration.
+
+Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+Reviewed-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a77995.dtsi | 21 +++++++--------------
- 1 file changed, 7 insertions(+), 14 deletions(-)
+ arch/arm64/boot/dts/renesas/r8a77995-draak.dts | 68 ++++++++++++++++++++++++++
+ 1 file changed, 68 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77995.dtsi b/arch/arm64/boot/dts/renesas/r8a77995.dtsi
-index 44268671c487..8f162ac369b1 100644
---- a/arch/arm64/boot/dts/renesas/r8a77995.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a77995.dtsi
-@@ -88,8 +88,7 @@
+diff --git a/arch/arm64/boot/dts/renesas/r8a77995-draak.dts b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
+index 9d1c33927064..a1b71c7d01b6 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
++++ b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
+@@ -59,6 +59,16 @@
+ 		};
+ 	};
  
- 		gpio0: gpio at e6050000 {
- 			compatible = "renesas,gpio-r8a77995",
--				     "renesas,rcar-gen3-gpio",
--				     "renesas,gpio-rcar";
-+				     "renesas,rcar-gen3-gpio";
- 			reg = <0 0xe6050000 0 0x50>;
- 			interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
- 			#gpio-cells = <2>;
-@@ -104,8 +103,7 @@
++	composite-in {
++		compatible = "composite-video-connector";
++
++		port {
++			composite_con_in: endpoint {
++				remote-endpoint = <&adv7180_in>;
++			};
++		};
++	};
++
+ 	memory at 48000000 {
+ 		device_type = "memory";
+ 		/* first 128MB is reserved for secure area. */
+@@ -148,6 +158,11 @@
+ 		groups = "usb0";
+ 		function = "usb0";
+ 	};
++
++	vin4_pins_cvbs: vin4 {
++		groups = "vin4_data8", "vin4_sync", "vin4_clk";
++		function = "vin4";
++	};
+ };
  
- 		gpio1: gpio at e6051000 {
- 			compatible = "renesas,gpio-r8a77995",
--				     "renesas,rcar-gen3-gpio",
--				     "renesas,gpio-rcar";
-+				     "renesas,rcar-gen3-gpio";
- 			reg = <0 0xe6051000 0 0x50>;
- 			interrupts = <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>;
- 			#gpio-cells = <2>;
-@@ -120,8 +118,7 @@
+ &i2c0 {
+@@ -160,6 +175,39 @@
+ 		reg = <0x50>;
+ 		pagesize = <8>;
+ 	};
++
++	composite-in at 20 {
++		compatible = "adi,adv7180cp";
++		reg = <0x20>;
++
++		port {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port at 0 {
++				reg = <0>;
++				adv7180_in: endpoint {
++					remote-endpoint = <&composite_con_in>;
++				};
++			};
++
++			port at 3 {
++				reg = <3>;
++
++				/*
++				 * The VIN4 video input path is shared between
++				 * CVBS and HDMI inputs through SW[49-53]
++				 * switches.
++				 *
++				 * CVBS is the default selection, link it to
++				 * VIN4 here.
++				 */
++				adv7180_out: endpoint {
++					remote-endpoint = <&vin4_in>;
++				};
++			};
++		};
++	};
+ };
  
- 		gpio2: gpio at e6052000 {
- 			compatible = "renesas,gpio-r8a77995",
--				     "renesas,rcar-gen3-gpio",
--				     "renesas,gpio-rcar";
-+				     "renesas,rcar-gen3-gpio";
- 			reg = <0 0xe6052000 0 0x50>;
- 			interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
- 			#gpio-cells = <2>;
-@@ -136,8 +133,7 @@
- 
- 		gpio3: gpio at e6053000 {
- 			compatible = "renesas,gpio-r8a77995",
--				     "renesas,rcar-gen3-gpio",
--				     "renesas,gpio-rcar";
-+				     "renesas,rcar-gen3-gpio";
- 			reg = <0 0xe6053000 0 0x50>;
- 			interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
- 			#gpio-cells = <2>;
-@@ -152,8 +148,7 @@
- 
- 		gpio4: gpio at e6054000 {
- 			compatible = "renesas,gpio-r8a77995",
--				     "renesas,rcar-gen3-gpio",
--				     "renesas,gpio-rcar";
-+				     "renesas,rcar-gen3-gpio";
- 			reg = <0 0xe6054000 0 0x50>;
- 			interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
- 			#gpio-cells = <2>;
-@@ -168,8 +163,7 @@
- 
- 		gpio5: gpio at e6055000 {
- 			compatible = "renesas,gpio-r8a77995",
--				     "renesas,rcar-gen3-gpio",
--				     "renesas,gpio-rcar";
-+				     "renesas,rcar-gen3-gpio";
- 			reg = <0 0xe6055000 0 0x50>;
- 			interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>;
- 			#gpio-cells = <2>;
-@@ -184,8 +178,7 @@
- 
- 		gpio6: gpio at e6055400 {
- 			compatible = "renesas,gpio-r8a77995",
--				     "renesas,rcar-gen3-gpio",
--				     "renesas,gpio-rcar";
-+				     "renesas,rcar-gen3-gpio";
- 			reg = <0 0xe6055400 0 0x50>;
- 			interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
- 			#gpio-cells = <2>;
+ &i2c1 {
+@@ -257,3 +305,23 @@
+ 	timeout-sec = <60>;
+ 	status = "okay";
+ };
++
++&vin4 {
++	pinctrl-0 = <&vin4_pins_cvbs>;
++	pinctrl-names = "default";
++
++	status = "okay";
++
++	ports {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		port at 0 {
++			reg = <0>;
++
++			vin4_in: endpoint {
++				remote-endpoint = <&adv7180_out>;
++			};
++		};
++	};
++};
 -- 
 2.11.0
