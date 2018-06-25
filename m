@@ -1,73 +1,45 @@
 From: andrea.merello@gmail.com (Andrea Merello)
-Date: Mon, 25 Jun 2018 11:27:20 +0200
-Subject: [PATCH v3 1/5] dmaengine: xilinx_dma: in axidma slave_sg and
- dma_cylic mode align split descriptors
-Message-ID: <20180625092724.22164-1-andrea.merello@gmail.com>
+Date: Mon, 25 Jun 2018 11:27:21 +0200
+Subject: [PATCH v3 2/5] dt-bindings: dmaengine: xilinx_dma: add optional xlnx,
+ sg-length-width property
+In-Reply-To: <20180625092724.22164-1-andrea.merello@gmail.com>
+References: <20180625092724.22164-1-andrea.merello@gmail.com>
+Message-ID: <20180625092724.22164-2-andrea.merello@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Whenever a single or cyclic transaction is prepared, the driver
-could eventually split it over several SG descriptors in order
-to deal with the HW maximum transfer length.
+The width of the "length register" cannot be autodetected, and it is now
+specified with a DT property. Add DOC for it.
 
-This could end up in DMA operations starting from a misaligned
-address. This seems fatal for the HW if DRE is not enabled.
-
-This patch eventually adjusts the transfer size in order to make sure
-all operations start from an aligned address.
-
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: devicetree at vger.kernel.org
 Cc: Radhey Shyam Pandey <radhey.shyam.pandey@xilinx.com>
 Signed-off-by: Andrea Merello <andrea.merello@gmail.com>
 Reviewed-by: Radhey Shyam Pandey <radhey.shyam.pandey@xilinx.com>
 ---
 Changes in v2:
-        - don't introduce copy_mask field, rather rely on already-esistent
-          copy_align field. Suggested by Radhey Shyam Pandey
-        - reword title
+	- change property name
+	- property is now optional
+	- cc DT maintainer
 Changes in v3:
-	- fix bug introduced in v2: wrong copy size when DRE is enabled
-	  use implementation suggested by Radhey Shyam Pandey
+	- reword
+	- cc DT maintainerS and ML
 ---
- drivers/dma/xilinx/xilinx_dma.c | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+ Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/dma/xilinx/xilinx_dma.c b/drivers/dma/xilinx/xilinx_dma.c
-index 27b523530c4a..113d9bf1b6a1 100644
---- a/drivers/dma/xilinx/xilinx_dma.c
-+++ b/drivers/dma/xilinx/xilinx_dma.c
-@@ -1793,6 +1793,16 @@ static struct dma_async_tx_descriptor *xilinx_dma_prep_slave_sg(
- 			 */
- 			copy = min_t(size_t, sg_dma_len(sg) - sg_used,
- 				     XILINX_DMA_MAX_TRANS_LEN);
-+
-+			if ((copy + sg_used < sg_dma_len(sg)) &&
-+			    chan->xdev->common.copy_align) {
-+				/*
-+				 * If this is not the last descriptor, make sure
-+				 * the next one will be properly aligned
-+				 */
-+				copy = rounddown(copy,
-+					(1 << chan->xdev->common.copy_align));
-+			}
- 			hw = &segment->hw;
- 
- 			/* Fill in the descriptor */
-@@ -1898,6 +1908,16 @@ static struct dma_async_tx_descriptor *xilinx_dma_prep_dma_cyclic(
- 			 */
- 			copy = min_t(size_t, period_len - sg_used,
- 				     XILINX_DMA_MAX_TRANS_LEN);
-+
-+			if ((copy + sg_used < period_len) &&
-+			    chan->xdev->common.copy_align) {
-+				/*
-+				 * If this is not the last descriptor, make sure
-+				 * the next one will be properly aligned
-+				 */
-+				copy = rounddown(copy,
-+					(1 << chan->xdev->common.copy_align));
-+			}
- 			hw = &segment->hw;
- 			xilinx_axidma_buf(chan, hw, buf_addr, sg_used,
- 					  period_len * i);
+diff --git a/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt b/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
+index a2b8bfaec43c..c894abe28baa 100644
+--- a/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
++++ b/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
+@@ -41,6 +41,7 @@ Optional properties:
+ - xlnx,include-sg: Tells configured for Scatter-mode in
+ 	the hardware.
+ Optional properties for AXI DMA:
++- xlnx,sg-length-width: Should be the width of the length register as configured in h/w.
+ - xlnx,mcdma: Tells whether configured for multi-channel mode in the hardware.
+ Optional properties for VDMA:
+ - xlnx,flush-fsync: Tells which channel to Flush on Frame sync.
 -- 
 2.17.1
