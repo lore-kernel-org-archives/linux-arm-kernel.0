@@ -1,58 +1,40 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Mon, 25 Jun 2018 15:31:08 +0100
-Subject: [PATCH 04/11] ASoC: qdsp6: q6adm: use
- of_platform_populate/depopulate()
+Date: Mon, 25 Jun 2018 15:31:13 +0100
+Subject: [PATCH 09/11] ASoC: qdsp6: q6routing: support dt based module loading
 In-Reply-To: <20180625143115.8346-1-srinivas.kandagatla@linaro.org>
 References: <20180625143115.8346-1-srinivas.kandagatla@linaro.org>
-Message-ID: <20180625143115.8346-5-srinivas.kandagatla@linaro.org>
+Message-ID: <20180625143115.8346-10-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the child nodes have there own compatible strings,
-Use of_platform_populate/depopulate() instead of less common
-of_platform_device_create()/destroy().
+This patch uses new compatible string to make DT based module loading work.
 
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 ---
- sound/soc/qcom/qdsp6/q6adm.c | 15 ++-------------
- 1 file changed, 2 insertions(+), 13 deletions(-)
+ sound/soc/qcom/qdsp6/q6routing.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/sound/soc/qcom/qdsp6/q6adm.c b/sound/soc/qcom/qdsp6/q6adm.c
-index 9983c665a941..dfd5bc3ddd52 100644
---- a/sound/soc/qcom/qdsp6/q6adm.c
-+++ b/sound/soc/qcom/qdsp6/q6adm.c
-@@ -588,7 +588,6 @@ EXPORT_SYMBOL_GPL(q6adm_close);
- static int q6adm_probe(struct apr_device *adev)
- {
- 	struct device *dev = &adev->dev;
--	struct device_node *dais_np;
- 	struct q6adm *adm;
- 
- 	adm = devm_kzalloc(&adev->dev, sizeof(*adm), GFP_KERNEL);
-@@ -605,22 +604,12 @@ static int q6adm_probe(struct apr_device *adev)
- 	INIT_LIST_HEAD(&adm->copps_list);
- 	spin_lock_init(&adm->copps_list_lock);
- 
--	dais_np = of_get_child_by_name(dev->of_node, "routing");
--	if (dais_np) {
--		adm->pdev_routing = of_platform_device_create(dais_np,
--							   "q6routing", dev);
--		of_node_put(dais_np);
--	}
--
--	return 0;
-+	return of_platform_populate(dev->of_node, NULL, NULL, dev);
- }
- 
- static int q6adm_remove(struct apr_device *adev)
- {
--	struct q6adm *adm = dev_get_drvdata(&adev->dev);
--
--	if (adm->pdev_routing)
--		of_platform_device_destroy(&adm->pdev_routing->dev, NULL);
-+	of_platform_depopulate(&adev->dev);
- 
+diff --git a/sound/soc/qcom/qdsp6/q6routing.c b/sound/soc/qcom/qdsp6/q6routing.c
+index 593f66b8622f..caf2f847a886 100644
+--- a/sound/soc/qcom/qdsp6/q6routing.c
++++ b/sound/soc/qcom/qdsp6/q6routing.c
+@@ -993,9 +993,17 @@ static int q6pcm_routing_remove(struct platform_device *pdev)
  	return 0;
  }
+ 
++static const struct of_device_id q6pcm_routing_device_id[]  = {
++	{ .compatible = "qcom,q6adm-routing" },
++	{},
++};
++
++MODULE_DEVICE_TABLE(of, q6pcm_routing_device_id);
++
+ static struct platform_driver q6pcm_routing_platform_driver = {
+ 	.driver = {
+ 		.name = "q6routing",
++		.of_match_table = of_match_ptr(q6pcm_routing_device_id),
+ 	},
+ 	.probe = q6pcm_routing_probe,
+ 	.remove = q6pcm_routing_remove,
 -- 
 2.16.2
