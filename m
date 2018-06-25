@@ -1,126 +1,96 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 25 Jun 2018 16:03:17 +0200
-Subject: [PATCH 22/29] arm64: dts: renesas: r8a77980: add GPIO support
+Date: Mon, 25 Jun 2018 16:03:15 +0200
+Subject: [PATCH 20/29] arm64: dts: renesas: r8a7796: Add PCIe device nodes
 In-Reply-To: <cover.1529933747.git.horms+renesas@verge.net.au>
 References: <cover.1529933747.git.horms+renesas@verge.net.au>
-Message-ID: <efcb52e35d162dc9104be56492b65049a17dc6a4.1529933747.git.horms+renesas@verge.net.au>
+Message-ID: <51933b101567692b3a2a8e6d9e06883985c79724.1529933747.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+From: Harunobu Kurokawa <harunobu.kurokawa.dn@renesas.com>
 
-Describe all 6 GPIO controllers in the R8A77980 device tree.
+This patch adds PCIe{0,1} device nodes for R8A7796 SoC.
 
-Based on the original (and large) patch by Vladimir Barinov.
-
-Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Harunobu Kurokawa <harunobu.kurokawa.dn@renesas.com>
+Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a77980.dtsi | 90 +++++++++++++++++++++++++++++++
- 1 file changed, 90 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a7796.dtsi | 50 ++++++++++++++++++++++++++++++--
+ 1 file changed, 47 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77980.dtsi b/arch/arm64/boot/dts/renesas/r8a77980.dtsi
-index 424d5f12cdd3..68cede26b01a 100644
---- a/arch/arm64/boot/dts/renesas/r8a77980.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a77980.dtsi
-@@ -118,6 +118,96 @@
- 		#size-cells = <2>;
- 		ranges;
+diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+index 7c25be6b5af3..2a04635bc9ae 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+@@ -1,7 +1,7 @@
+ /*
+  * Device Tree Source for the r8a7796 SoC
+  *
+- * Copyright (C) 2016 Renesas Electronics Corp.
++ * Copyright (C) 2016-2017 Renesas Electronics Corp.
+  *
+  * This file is licensed under the terms of the GNU General Public License
+  * version 2.  This program is licensed "as is" without any warranty of any
+@@ -2108,13 +2108,57 @@
+ 		};
  
-+		gpio0: gpio at e6050000 {
-+			compatible = "renesas,gpio-r8a77980",
-+				     "renesas,rcar-gen3-gpio";
-+			reg = <0 0xe6050000 0 0x50>;
-+			interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			gpio-ranges = <&pfc 0 0 22>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			clocks = <&cpg CPG_MOD 912>;
-+			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
-+			resets = <&cpg 912>;
-+		};
-+
-+		gpio1: gpio at e6051000 {
-+			compatible = "renesas,gpio-r8a77980",
-+				     "renesas,rcar-gen3-gpio";
-+			reg = <0 0xe6051000 0 0x50>;
-+			interrupts = <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			gpio-ranges = <&pfc 0 32 28>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			clocks = <&cpg CPG_MOD 911>;
-+			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
-+			resets = <&cpg 911>;
-+		};
-+
-+		gpio2: gpio at e6052000 {
-+			compatible = "renesas,gpio-r8a77980",
-+				     "renesas,rcar-gen3-gpio";
-+			reg = <0 0xe6052000 0 0x50>;
-+			interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			gpio-ranges = <&pfc 0 64 30>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			clocks = <&cpg CPG_MOD 910>;
-+			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
-+			resets = <&cpg 910>;
-+		};
-+
-+		gpio3: gpio at e6053000 {
-+			compatible = "renesas,gpio-r8a77980",
-+				     "renesas,rcar-gen3-gpio";
-+			reg = <0 0xe6053000 0 0x50>;
-+			interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			gpio-ranges = <&pfc 0 96 17>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			clocks = <&cpg CPG_MOD 909>;
-+			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
-+			resets = <&cpg 909>;
-+		};
-+
-+		gpio4: gpio at e6054000 {
-+			compatible = "renesas,gpio-r8a77980",
-+				     "renesas,rcar-gen3-gpio";
-+			reg = <0 0xe6054000 0 0x50>;
-+			interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			gpio-ranges = <&pfc 0 128 25>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			clocks = <&cpg CPG_MOD 908>;
-+			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
-+			resets = <&cpg 908>;
-+		};
-+
-+		gpio5: gpio at e6055000 {
-+			compatible = "renesas,gpio-r8a77980",
-+				     "renesas,rcar-gen3-gpio";
-+			reg = <0 0xe6055000 0 0x50>;
-+			interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			gpio-ranges = <&pfc 0 160 15>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			clocks = <&cpg CPG_MOD 907>;
-+			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
-+			resets = <&cpg 907>;
-+		};
-+
- 		pfc: pin-controller at e6060000 {
- 			compatible = "renesas,pfc-r8a77980";
- 			reg = <0 0xe6060000 0 0x50c>;
+ 		pciec0: pcie at fe000000 {
++			compatible = "renesas,pcie-r8a7796",
++				     "renesas,pcie-rcar-gen3";
+ 			reg = <0 0xfe000000 0 0x80000>;
+-			/* placeholder */
++			#address-cells = <3>;
++			#size-cells = <2>;
++			bus-range = <0x00 0xff>;
++			device_type = "pci";
++			ranges = <0x01000000 0 0x00000000 0 0xfe100000 0 0x00100000
++				0x02000000 0 0xfe200000 0 0xfe200000 0 0x00200000
++				0x02000000 0 0x30000000 0 0x30000000 0 0x08000000
++				0x42000000 0 0x38000000 0 0x38000000 0 0x08000000>;
++			/* Map all possible DDR as inbound ranges */
++			dma-ranges = <0x42000000 0 0x40000000 0 0x40000000 0 0x80000000>;
++			interrupts = <GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>,
++				<GIC_SPI 117 IRQ_TYPE_LEVEL_HIGH>,
++				<GIC_SPI 118 IRQ_TYPE_LEVEL_HIGH>;
++			#interrupt-cells = <1>;
++			interrupt-map-mask = <0 0 0 0>;
++			interrupt-map = <0 0 0 0 &gic GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 319>, <&pcie_bus_clk>;
++			clock-names = "pcie", "pcie_bus";
++			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
++			resets = <&cpg 319>;
++			status = "disabled";
+ 		};
+ 
+ 		pciec1: pcie at ee800000 {
++			compatible = "renesas,pcie-r8a7796",
++				     "renesas,pcie-rcar-gen3";
+ 			reg = <0 0xee800000 0 0x80000>;
+-			/* placeholder */
++			#address-cells = <3>;
++			#size-cells = <2>;
++			bus-range = <0x00 0xff>;
++			device_type = "pci";
++			ranges = <0x01000000 0 0x00000000 0 0xee900000 0 0x00100000
++				0x02000000 0 0xeea00000 0 0xeea00000 0 0x00200000
++				0x02000000 0 0xc0000000 0 0xc0000000 0 0x08000000
++				0x42000000 0 0xc8000000 0 0xc8000000 0 0x08000000>;
++			/* Map all possible DDR as inbound ranges */
++			dma-ranges = <0x42000000 0 0x40000000 0 0x40000000 0 0x80000000>;
++			interrupts = <GIC_SPI 148 IRQ_TYPE_LEVEL_HIGH>,
++				<GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH>,
++				<GIC_SPI 150 IRQ_TYPE_LEVEL_HIGH>;
++			#interrupt-cells = <1>;
++			interrupt-map-mask = <0 0 0 0>;
++			interrupt-map = <0 0 0 0 &gic GIC_SPI 148 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 318>, <&pcie_bus_clk>;
++			clock-names = "pcie", "pcie_bus";
++			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
++			resets = <&cpg 318>;
++			status = "disabled";
+ 		};
+ 
+ 		imr-lx4 at fe860000 {
 -- 
 2.11.0
