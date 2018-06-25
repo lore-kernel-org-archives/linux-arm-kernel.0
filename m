@@ -1,67 +1,43 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 25 Jun 2018 11:49:49 +0200
-Subject: v4.18-rc1 on droid 4: very bad CPU performance
-In-Reply-To: <20180622074936.GG112168@atomide.com>
-References: <20180621121542.GA4836@amd> <20180622072005.GF112168@atomide.com>
- <20180622074936.GG112168@atomide.com>
-Message-ID: <20180625094949.GA17001@amd>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Mon, 25 Jun 2018 10:52:41 +0100
+Subject: [PATCH 0/4] KVM: arm/arm64: vgic: Virtual interrupt grouping
+ support
+In-Reply-To: <20180624221103.15055-1-christoffer.dall@arm.com>
+References: <20180624221103.15055-1-christoffer.dall@arm.com>
+Message-ID: <CAFEAcA_C6Voh_6Ljj9--cbo14X_uWTOekM30dU=Rp9CtZK-6ow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On 24 June 2018 at 23:10, Christoffer Dall <christoffer.dall@arm.com> wrote:
+> This small series addresses a peculiarity of the current VGIC
+> implementation, namely that we don't support interrupt grouping.
+>
+> KVM either implements a GICv2 without support for the security
+> extensions, or a GICv3 with DS=1.  For GICv2, on systems without the
+> security extensions, group 0 interrupts can be configured to be either
+> signalled as FIQs or as IRQs by the VM, whereas group 1 interrupts are
+> always IRQs.  For GICv3, with DS=1, group 1 interrupts are always IRQs
+> and group 0 interrupts are always FIQs, and there is no concept of
+> secure vs. non-secure group 1 interrupts when DS=1.
+>
+> We were treating all interrupts on GICv2 as group 0, but yet telling the
+> geust that they were group 1.  The first patch changes this behavior,
+> which seems to have no effect on no known guests, but still.
+>
+> The remaining patches introduce proper interrupt grouping support, along
+> with MMIO accessors for the VM and userspace to retrieve and set the
+> which group SGIs, PPIs, and SPIs belong to.  LPIs are always group 1
+> interrupts as per the architecture, and there is no way to modify this
+> configuration (no IGROUPR registers for LPIs or equivalent ITS
+> commands).
 
-> > > V4.18 is slower than it should be.
-> > > 
-> > > user at devuan:~$ time cat /dev/urandom | head -c 10000000 |  bzip2 -9 -
-> > > | wc -c
-> > > 10044291
-> > > 52.73user 2.40system 61.53 (1m1.534s) elapsed 89.60%CPU
-> > > user at devuan:~$ uname -a
-> > > Linux devuan 4.18.0-rc1-87964-gfa19934-dirty #743 SMP Sun Jun 17
-> > > 19:26:37 CEST 2018 armv7l GNU/Linux
-> > > 
-> > > That bzip should take 12 seconds, not minute.
-> > > 
-> > > Any ideas? Do you see it, too?
-> > 
-> > I've noticed firefox is super slow.. Git bisect time?
-> 
-> Hmm not happening for me at least on duovero and droid4,
-> I'm getting about 20s for v4.17 and v4.18-rc1.
+How do we handle migration compatibility here? For instance if
+we have a guest running on an old kernel with GICv2, presumably
+it reports the GICD_IGROUPRn to userspace as being all-1 (but
+they behave as group 0); then when we load on the new kernel
+the new kernel will honour the IGROUPRn values and the interrupts
+will start behaving like group 1 ? Maybe this works because the
+guest is expecting them to be signalled as IRQ either way...
 
-Something weird is going on here. My notes say it should be 12
-seconds.
-
-It is indeed 20 seconds for v4.17, but it is 12 seconds in v4.14.
-
-v4.14 is:
-# CONFIG_CPU_FREQ is not set
-CONFIG_CPU_IDLE=y
-# CONFIG_CPU_IDLE_GOV_LADDER is not set
-CONFIG_CPU_IDLE_GOV_MENU=y
-# CONFIG_ARM_CPUIDLE is not set
-
-In v4.18, I have:
-
-CONFIG_CPU_FREQ=y
-CONFIG_CPU_FREQ_GOV_ATTR_SET=y
-CONFIG_CPU_FREQ_GOV_COMMON=y
-CONFIG_CPU_FREQ_STAT=y
-CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
-
-CONFIG_CPU_IDLE=y
-CONFIG_CPU_IDLE_GOV_MENU=y
-CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED=y
-
-
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180625/32dadc81/attachment.sig>
+thanks
+-- PMM
