@@ -1,240 +1,61 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 25 Jun 2018 15:44:19 +0100
-Subject: [PATCH 5/7] arm64: use PSR_AA32 definitions
-In-Reply-To: <20180625144421.11511-1-mark.rutland@arm.com>
-References: <20180625144421.11511-1-mark.rutland@arm.com>
-Message-ID: <20180625144421.11511-6-mark.rutland@arm.com>
+From: toshi.kani@hpe.com (Kani, Toshi)
+Date: Mon, 25 Jun 2018 14:56:26 +0000
+Subject: [PATCH v3 0/3] fix free pmd/pte page handlings on x86
+In-Reply-To: <alpine.DEB.2.21.1806241516410.8650@nanos.tec.linutronix.de>
+References: <20180516233207.1580-1-toshi.kani@hpe.com>
+ <alpine.DEB.2.21.1806241516410.8650@nanos.tec.linutronix.de>
+Message-ID: <1529938470.14039.134.camel@hpe.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some code cares about the SPSR_ELx format for exceptions taken from
-AArch32 to inspect or manipulate the SPSR_ELx value, which is already in
-the SPSR_ELx format, and not in the AArch32 PSR format.
+On Sun, 2018-06-24 at 15:19 +0200, Thomas Gleixner wrote:
+> On Wed, 16 May 2018, Toshi Kani wrote:
+> 
+> > This series fixes two issues in the x86 ioremap free page handlings
+> > for pud/pmd mappings.
+> > 
+> > Patch 01 fixes BUG_ON on x86-PAE reported by Joerg.  It disables
+> > the free page handling on x86-PAE.
+> > 
+> > Patch 02-03 fixes a possible issue with speculation which can cause
+> > stale page-directory cache.
+> >  - Patch 02 is from Chintan's v9 01/04 patch [1], which adds a new arg
+> >    'addr', with my merge change to patch 01.
+> >  - Patch 03 adds a TLB purge (INVLPG) to purge page-structure caches
+> >    that may be cached by speculation.  See the patch descriptions for
+> >    more detal.
+> 
+> Toshi, Joerg, Michal!
 
-To separate these from cases where we care about the AArch32 PSR format,
-migrate these cases to use the PSR_AA32_* definitions rather than
-COMPAT_PSR_*.
+Hi Thomas,
 
-There should be no functional change as a result of this patch.
+Thanks for checking. I was about to ping as well.
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/include/asm/processor.h   |  6 +++---
- arch/arm64/kernel/armv8_deprecated.c | 24 ++++++++++++------------
- arch/arm64/kernel/cpufeature.c       |  2 +-
- arch/arm64/kernel/process.c          | 20 ++++++++++----------
- arch/arm64/kernel/ptrace.c           | 20 ++++++++++----------
- arch/arm64/kernel/signal32.c         | 10 +++++-----
- 6 files changed, 41 insertions(+), 41 deletions(-)
+> I'm failing to find a conclusion of this discussion. Can we finally make
+> some progress with that?
 
-diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-index a73ae1e49200..e02612105d78 100644
---- a/arch/arm64/include/asm/processor.h
-+++ b/arch/arm64/include/asm/processor.h
-@@ -182,12 +182,12 @@ static inline void compat_start_thread(struct pt_regs *regs, unsigned long pc,
- 				       unsigned long sp)
- {
- 	start_thread_common(regs, pc);
--	regs->pstate = COMPAT_PSR_MODE_USR;
-+	regs->pstate = PSR_AA32_MODE_USR;
- 	if (pc & 1)
--		regs->pstate |= COMPAT_PSR_T_BIT;
-+		regs->pstate |= PSR_AA32_T_BIT;
- 
- #ifdef __AARCH64EB__
--	regs->pstate |= COMPAT_PSR_E_BIT;
-+	regs->pstate |= PSR_AA32_E_BIT;
- #endif
- 
- 	regs->compat_sp = sp;
-diff --git a/arch/arm64/kernel/armv8_deprecated.c b/arch/arm64/kernel/armv8_deprecated.c
-index d4707abb2f16..d2c0938ccaec 100644
---- a/arch/arm64/kernel/armv8_deprecated.c
-+++ b/arch/arm64/kernel/armv8_deprecated.c
-@@ -441,8 +441,8 @@ static struct undef_hook swp_hooks[] = {
- 	{
- 		.instr_mask	= 0x0fb00ff0,
- 		.instr_val	= 0x01000090,
--		.pstate_mask	= COMPAT_PSR_MODE_MASK,
--		.pstate_val	= COMPAT_PSR_MODE_USR,
-+		.pstate_mask	= PSR_AA32_MODE_MASK,
-+		.pstate_val	= PSR_AA32_MODE_USR,
- 		.fn		= swp_handler
- 	},
- 	{ }
-@@ -521,15 +521,15 @@ static struct undef_hook cp15_barrier_hooks[] = {
- 	{
- 		.instr_mask	= 0x0fff0fdf,
- 		.instr_val	= 0x0e070f9a,
--		.pstate_mask	= COMPAT_PSR_MODE_MASK,
--		.pstate_val	= COMPAT_PSR_MODE_USR,
-+		.pstate_mask	= PSR_AA32_MODE_MASK,
-+		.pstate_val	= PSR_AA32_MODE_USR,
- 		.fn		= cp15barrier_handler,
- 	},
- 	{
- 		.instr_mask	= 0x0fff0fff,
- 		.instr_val	= 0x0e070f95,
--		.pstate_mask	= COMPAT_PSR_MODE_MASK,
--		.pstate_val	= COMPAT_PSR_MODE_USR,
-+		.pstate_mask	= PSR_AA32_MODE_MASK,
-+		.pstate_val	= PSR_AA32_MODE_USR,
- 		.fn		= cp15barrier_handler,
- 	},
- 	{ }
-@@ -562,10 +562,10 @@ static int compat_setend_handler(struct pt_regs *regs, u32 big_endian)
- 
- 	if (big_endian) {
- 		insn = "setend be";
--		regs->pstate |= COMPAT_PSR_E_BIT;
-+		regs->pstate |= PSR_AA32_E_BIT;
- 	} else {
- 		insn = "setend le";
--		regs->pstate &= ~COMPAT_PSR_E_BIT;
-+		regs->pstate &= ~PSR_AA32_E_BIT;
- 	}
- 
- 	trace_instruction_emulation(insn, regs->pc);
-@@ -593,16 +593,16 @@ static struct undef_hook setend_hooks[] = {
- 	{
- 		.instr_mask	= 0xfffffdff,
- 		.instr_val	= 0xf1010000,
--		.pstate_mask	= COMPAT_PSR_MODE_MASK,
--		.pstate_val	= COMPAT_PSR_MODE_USR,
-+		.pstate_mask	= PSR_AA32_MODE_MASK,
-+		.pstate_val	= PSR_AA32_MODE_USR,
- 		.fn		= a32_setend_handler,
- 	},
- 	{
- 		/* Thumb mode */
- 		.instr_mask	= 0x0000fff7,
- 		.instr_val	= 0x0000b650,
--		.pstate_mask	= (COMPAT_PSR_T_BIT | COMPAT_PSR_MODE_MASK),
--		.pstate_val	= (COMPAT_PSR_T_BIT | COMPAT_PSR_MODE_USR),
-+		.pstate_mask	= (PSR_AA32_T_BIT | PSR_AA32_MODE_MASK),
-+		.pstate_val	= (PSR_AA32_T_BIT | PSR_AA32_MODE_USR),
- 		.fn		= t16_setend_handler,
- 	},
- 	{}
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index f24892a40d2c..48d813defe5e 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -1723,7 +1723,7 @@ static int emulate_mrs(struct pt_regs *regs, u32 insn)
- static struct undef_hook mrs_hook = {
- 	.instr_mask = 0xfff00000,
- 	.instr_val  = 0xd5300000,
--	.pstate_mask = COMPAT_PSR_MODE_MASK,
-+	.pstate_mask = PSR_AA32_MODE_MASK,
- 	.pstate_val = PSR_MODE_EL0t,
- 	.fn = emulate_mrs,
- };
-diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-index e10bc363f533..740b31f77ade 100644
---- a/arch/arm64/kernel/process.c
-+++ b/arch/arm64/kernel/process.c
-@@ -177,16 +177,16 @@ static void print_pstate(struct pt_regs *regs)
- 	if (compat_user_mode(regs)) {
- 		printk("pstate: %08llx (%c%c%c%c %c %s %s %c%c%c)\n",
- 			pstate,
--			pstate & COMPAT_PSR_N_BIT ? 'N' : 'n',
--			pstate & COMPAT_PSR_Z_BIT ? 'Z' : 'z',
--			pstate & COMPAT_PSR_C_BIT ? 'C' : 'c',
--			pstate & COMPAT_PSR_V_BIT ? 'V' : 'v',
--			pstate & COMPAT_PSR_Q_BIT ? 'Q' : 'q',
--			pstate & COMPAT_PSR_T_BIT ? "T32" : "A32",
--			pstate & COMPAT_PSR_E_BIT ? "BE" : "LE",
--			pstate & COMPAT_PSR_A_BIT ? 'A' : 'a',
--			pstate & COMPAT_PSR_I_BIT ? 'I' : 'i',
--			pstate & COMPAT_PSR_F_BIT ? 'F' : 'f');
-+			pstate & PSR_AA32_N_BIT ? 'N' : 'n',
-+			pstate & PSR_AA32_Z_BIT ? 'Z' : 'z',
-+			pstate & PSR_AA32_C_BIT ? 'C' : 'c',
-+			pstate & PSR_AA32_V_BIT ? 'V' : 'v',
-+			pstate & PSR_AA32_Q_BIT ? 'Q' : 'q',
-+			pstate & PSR_AA32_T_BIT ? "T32" : "A32",
-+			pstate & PSR_AA32_E_BIT ? "BE" : "LE",
-+			pstate & PSR_AA32_A_BIT ? 'A' : 'a',
-+			pstate & PSR_AA32_I_BIT ? 'I' : 'i',
-+			pstate & PSR_AA32_F_BIT ? 'F' : 'f');
- 	} else {
- 		printk("pstate: %08llx (%c%c%c%c %c%c%c%c %cPAN %cUAO)\n",
- 			pstate,
-diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-index bc07e8ec062b..ee2677bdc41e 100644
---- a/arch/arm64/kernel/ptrace.c
-+++ b/arch/arm64/kernel/ptrace.c
-@@ -1681,15 +1681,15 @@ static int valid_compat_regs(struct user_pt_regs *regs)
- 
- 	if (!system_supports_mixed_endian_el0()) {
- 		if (IS_ENABLED(CONFIG_CPU_BIG_ENDIAN))
--			regs->pstate |= COMPAT_PSR_E_BIT;
-+			regs->pstate |= PSR_AA32_E_BIT;
- 		else
--			regs->pstate &= ~COMPAT_PSR_E_BIT;
-+			regs->pstate &= ~PSR_AA32_E_BIT;
- 	}
- 
- 	if (user_mode(regs) && (regs->pstate & PSR_MODE32_BIT) &&
--	    (regs->pstate & COMPAT_PSR_A_BIT) == 0 &&
--	    (regs->pstate & COMPAT_PSR_I_BIT) == 0 &&
--	    (regs->pstate & COMPAT_PSR_F_BIT) == 0) {
-+	    (regs->pstate & PSR_AA32_A_BIT) == 0 &&
-+	    (regs->pstate & PSR_AA32_I_BIT) == 0 &&
-+	    (regs->pstate & PSR_AA32_F_BIT) == 0) {
- 		return 1;
- 	}
- 
-@@ -1697,11 +1697,11 @@ static int valid_compat_regs(struct user_pt_regs *regs)
- 	 * Force PSR to a valid 32-bit EL0t, preserving the same bits as
- 	 * arch/arm.
- 	 */
--	regs->pstate &= COMPAT_PSR_N_BIT | COMPAT_PSR_Z_BIT |
--			COMPAT_PSR_C_BIT | COMPAT_PSR_V_BIT |
--			COMPAT_PSR_Q_BIT | COMPAT_PSR_IT_MASK |
--			COMPAT_PSR_GE_MASK | COMPAT_PSR_E_BIT |
--			COMPAT_PSR_T_BIT;
-+	regs->pstate &= PSR_AA32_N_BIT | PSR_AA32_Z_BIT |
-+			PSR_AA32_C_BIT | PSR_AA32_V_BIT |
-+			PSR_AA32_Q_BIT | PSR_AA32_IT_MASK |
-+			PSR_AA32_GE_MASK | PSR_AA32_E_BIT |
-+			PSR_AA32_T_BIT;
- 	regs->pstate |= PSR_MODE32_BIT;
- 
- 	return 0;
-diff --git a/arch/arm64/kernel/signal32.c b/arch/arm64/kernel/signal32.c
-index fa9fb782f077..9ff4f958c679 100644
---- a/arch/arm64/kernel/signal32.c
-+++ b/arch/arm64/kernel/signal32.c
-@@ -375,22 +375,22 @@ static void compat_setup_return(struct pt_regs *regs, struct k_sigaction *ka,
- {
- 	compat_ulong_t handler = ptr_to_compat(ka->sa.sa_handler);
- 	compat_ulong_t retcode;
--	compat_ulong_t spsr = regs->pstate & ~(PSR_f | COMPAT_PSR_E_BIT);
-+	compat_ulong_t spsr = regs->pstate & ~(PSR_f | PSR_AA32_E_BIT);
- 	int thumb;
- 
- 	/* Check if the handler is written for ARM or Thumb */
- 	thumb = handler & 1;
- 
- 	if (thumb)
--		spsr |= COMPAT_PSR_T_BIT;
-+		spsr |= PSR_AA32_T_BIT;
- 	else
--		spsr &= ~COMPAT_PSR_T_BIT;
-+		spsr &= ~PSR_AA32_T_BIT;
- 
- 	/* The IT state must be cleared for both ARM and Thumb-2 */
--	spsr &= ~COMPAT_PSR_IT_MASK;
-+	spsr &= ~PSR_AA32_IT_MASK;
- 
- 	/* Restore the original endianness */
--	spsr |= COMPAT_PSR_ENDSTATE;
-+	spsr |= PSR_AA32_ENDSTATE;
- 
- 	if (ka->sa.sa_flags & SA_RESTORER) {
- 		retcode = ptr_to_compat(ka->sa.sa_restorer);
--- 
-2.11.0
+I have not heard from Joerg since I last replied to his comments to
+Patch 3/3 -- I did my best to explain that there was no issue in the
+single page allocation in pud_free_pmd_page().  From my perspective, the
+ v3 series is good to go.
+
+> Can someone give me a hint what to pick up urgently please?
+
+I've confirmed that the v3 series still applies clearly to 4.18-r2
+linus.git.
+
+Patch 1/3, v3 
+https://patchwork.kernel.org/patch/10405071/
+
+Patch 2/3, v3-UPDATE
+https://patchwork.kernel.org/patch/10407065/
+
+nit: sorry, please fix my email address below.
+- [toshi at hpe.com: merge changes, rewrite patch description]
++ [toshi.kani at hpe.com: merge changes, rewrite patch description]
+
+Patch 3/3, v3
+https://patchwork.kernel.org/patch/10405073/
+
+Thanks,
+-Toshi
