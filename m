@@ -1,85 +1,116 @@
-From: inki.dae@samsung.com (Inki Dae)
-Date: Mon, 25 Jun 2018 11:37:56 +0900
-Subject: [PATCH v2 01/10] drm/exynos: rename "bridge_node" to
- "mic_bridge_node"
-In-Reply-To: <1527682561-1386-2-git-send-email-m.purski@samsung.com>
-References: <1527682561-1386-1-git-send-email-m.purski@samsung.com>
- <CGME20180530121623eucas1p27e08223bc5b04dbb0b0253c18a9f83d5@eucas1p2.samsung.com>
- <1527682561-1386-2-git-send-email-m.purski@samsung.com>
-Message-ID: <20180625023757epcas1p215ceb8660829c6ce1bd60c572a4e61c0~7Rr1bz4G52864028640epcas1p24@epcas1p2.samsung.com>
+From: fugang.duan@nxp.com (Andy Duan)
+Date: Mon, 25 Jun 2018 02:50:01 +0000
+Subject: [RFC] Configure i.MX6 RGMII pad group control registers from
+ device tree
+In-Reply-To: <AM0PR04MB42111E25172F6068F937ECCB804B0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+References: <f5a01de5-fc81-52c1-c2ea-edb77ecff076@ysoft.com>
+ <5ab5c58a-dc44-d1bc-2132-8704d05bf1de@ysoft.com>
+ <AM0PR04MB42111E25172F6068F937ECCB804B0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+Message-ID: <AM4PR0401MB2260FB90A3B243A60D027F46FF4A0@AM4PR0401MB2260.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-I will start to review patch sets for -fixes first so I queued your four patches and you can check exynos-drm-next-todo branch for it.
-
-Thanks,
-Inki Dae
-
-2018? 05? 30? 21:15? Maciej Purski ?(?) ? ?:
-> When adding support for peripheral out bridges, the "bridge" name
-> becomes imprecise as it refers to a different device than the
-> "out_bridge".
+From: A.s. Dong Sent: 2018?6?24? 12:24
+> Copy Andy & Frank,
 > 
-> Signed-off-by: Maciej Purski <m.purski@samsung.com>
-> ---
->  drivers/gpu/drm/exynos/exynos_drm_dsi.c | 16 ++++++++--------
->  1 file changed, 8 insertions(+), 8 deletions(-)
+> > -----Original Message-----
+> > From: Michal Vok?? [mailto:michal.vokac at ysoft.com]
+> > Sent: Tuesday, June 12, 2018 11:10 PM
+> > To: linux-gpio at vger.kernel.org
+> > Cc: linux-arm-kernel at lists.infradead.org; Shawn Guo
+> > <shawnguo@kernel.org>; Sascha Hauer <kernel@pengutronix.de>;
+> Fabio
+> > Estevam <fabio.estevam@nxp.com>; Rob Herring
+> <robh+dt@kernel.org>;
+> > devicetree at vger.kernel.org; A.s. Dong <aisheng.dong@nxp.com>;
+> Fabio
+> > Estevam <festevam@gmail.com>; Shawn Guo <shawnguo@kernel.org>;
+> Stefan
+> > Agner <stefan@agner.ch>; Pengutronix Kernel Team
+> > <kernel@pengutronix.de>; Linus Walleij <linus.walleij@linaro.org>;
+> > linux- kernel at vger.kernel.org
+> > Subject: Re: [RFC] Configure i.MX6 RGMII pad group control registers
+> > from device tree
+> >
+> > On 11.6.2018 14:36, Michal Vok?? wrote:
+> > > Ahoj,
+> > >
+> > > To configure individual pad's characteristics on i.MX6 SoC a
+> > > fsl,pins = <PIN_FUNC_ID CONFIG> property can be used. Is there any
+> > > convenient way to configure the pad group control registers?
+> > >
+> > > The issue is that some bits (DDR_SEL and ODT) in the individual
+> > > RGMII pad control registers are read-only. To tweak those parameters
+> > > (signal voltage and termination resistors) one need to write to the
+> > > pad group control registers for the whole RGMII pad group. Namely
+> > > IOMUXC_SW_PAD_CTL_GRP_DDR_TYPE_RGMII and
+> > > IOMUXC_SW_PAD_CTL_GRP_RGMII_TERM. The group registers in
+> general
+> > are not accessible from the list in arch/arm/boot/dts/imx6dl-pinfunc.h.
+> > >
+> > > I could not find any other way to change the group registers than
+> > > hacking-in some lines into the imx6q_init_machine(void) function in
+> > > arch/arm/mach-imx/mach-imx6q.c source. As I work towards
+> upstreaming
+> > > my board this should be done from my device tree or solved in some
+> > universal way.
+> > >
+> > > Any hints will be much appreciated.
+> > > Michal
+> >
+> > I figured out this is more "pinctrl-imx.c" than "device-tree" related
+> > so I am kindly adding maintainers of that file in hope somebody will
+> > shed some light to it.
+> >
+> > I am diving deeper into the code and it seems there really is no
+> > generic option to set the i.MX6 pad group control registers from device
+> tree.
+> > Or am I looking at the problem from a wrong angle?
+> >
 > 
-> diff --git a/drivers/gpu/drm/exynos/exynos_drm_dsi.c b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-> index eae44fd..9599e6b 100644
-> --- a/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-> +++ b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-> @@ -279,7 +279,7 @@ struct exynos_dsi {
->  	struct list_head transfer_list;
->  
->  	const struct exynos_dsi_driver_data *driver_data;
-> -	struct device_node *bridge_node;
-> +	struct device_node *mic_bridge_node;
->  };
->  
->  #define host_to_dsi(host) container_of(host, struct exynos_dsi, dsi_host)
-> @@ -1631,7 +1631,7 @@ static int exynos_dsi_parse_dt(struct exynos_dsi *dsi)
->  	if (ret < 0)
->  		return ret;
->  
-> -	dsi->bridge_node = of_graph_get_remote_node(node, DSI_PORT_IN, 0);
-> +	dsi->mic_bridge_node = of_graph_get_remote_node(node, DSI_PORT_IN, 0);
->  
->  	return 0;
->  }
-> @@ -1642,7 +1642,7 @@ static int exynos_dsi_bind(struct device *dev, struct device *master,
->  	struct drm_encoder *encoder = dev_get_drvdata(dev);
->  	struct exynos_dsi *dsi = encoder_to_dsi(encoder);
->  	struct drm_device *drm_dev = data;
-> -	struct drm_bridge *bridge;
-> +	struct drm_bridge *mic_bridge;
->  	int ret;
->  
->  	drm_encoder_init(drm_dev, encoder, &exynos_dsi_encoder_funcs,
-> @@ -1661,10 +1661,10 @@ static int exynos_dsi_bind(struct device *dev, struct device *master,
->  		return ret;
->  	}
->  
-> -	if (dsi->bridge_node) {
-> -		bridge = of_drm_find_bridge(dsi->bridge_node);
-> -		if (bridge)
-> -			drm_bridge_attach(encoder, bridge, NULL);
-> +	if (dsi->mic_bridge_node) {
-> +		mic_bridge = of_drm_find_bridge(dsi->mic_bridge_node);
-> +		if (mic_bridge)
-> +			drm_bridge_attach(encoder, mic_bridge, NULL);
->  	}
->  
->  	return mipi_dsi_host_register(&dsi->dsi_host);
-> @@ -1783,7 +1783,7 @@ static int exynos_dsi_remove(struct platform_device *pdev)
->  {
->  	struct exynos_dsi *dsi = platform_get_drvdata(pdev);
->  
-> -	of_node_put(dsi->bridge_node);
-> +	of_node_put(dsi->mic_bridge_node);
->  
->  	pm_runtime_disable(&pdev->dev);
->  
+> Yes, there's a few special pad group ctrl registers (e.g. DRAM and RGMII
+> for mx6q) which are not added In the pinctrl driver support.
 > 
+> > How should we deal with boards that need to configure some pad
+> > characteristics available only through the pad group control registers?
+> >
+> 
+> Andy,
+> How do we handle it internally?
+No, we don't handle the pin.
+I remembered IC owner said It seems only RGMII 2.5v need to handle the pin.
+
+> 
+> > I also raised this question at the NXP community forum [1] and get
+> > quite unsatisfying answer so far. I would love to find/implement a
+> > proper and universal solution.
+> >
+> 
+> There're probably two ways to do it:
+> 1) handle it in fec driver by parsing a specific property
+> 2) Add a new pad group into pinctrl driver support e.g.
+> MX6Q_PAD_CTL_GRP_RGMII_TERM
+> MX6Q_PAD_CTL_GRP_DDR_TYPE_RGMII
+> 
+> I may prefer to 2).
+> 
+> Regards
+> Dong Aisheng
+> 
+> > Thanks in advance for your time,
+> > Michal
+> >
+> > [1]
+> >
+> https://emea01.safelinks.protection.outlook.com/?url=https%3A%2F%2Fc
+> o
+> >
+> mmunity.nxp.com%2Fthread%2F477464&data=02%7C01%7Caisheng.dong
+> %4
+> >
+> 0nxp.com%7Ca3e5463eb06a47f1121008d5d0768a04%7C686ea1d3bc2b
+> 4c6fa9
+> >
+> 2cd99c5c301635%7C0%7C1%7C636644129914162495&sdata=xqtBS8uX
+> %2BSzq
+> > 5m6tbNaLzCkB7ezgHSnyu9GQ3K13cW8%3D&reserved=0
