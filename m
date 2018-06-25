@@ -1,53 +1,131 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 25 Jun 2018 17:15:06 +0100
-Subject: [PATCH 3/7] arm64: compat: map SPSR_ELx<->PSR for signals
-In-Reply-To: <20180625144421.11511-4-mark.rutland@arm.com>
-References: <20180625144421.11511-1-mark.rutland@arm.com>
- <20180625144421.11511-4-mark.rutland@arm.com>
-Message-ID: <334274ca-dd77-4c8a-7608-550534adae97@arm.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Mon, 25 Jun 2018 18:15:22 +0200
+Subject: [PATCH 7/9] media: cedrus: Move IRQ maintainance to cedrus_dec_ops
+In-Reply-To: <b222fae80b1b212fdc5171a39b9a761527931eb0.camel@bootlin.com>
+References: <20180613140714.1686-1-maxime.ripard@bootlin.com>
+ <20180613140714.1686-8-maxime.ripard@bootlin.com>
+ <a2e1e0a85e0cd650d27eb02dc58d438d6a750929.camel@bootlin.com>
+ <b222fae80b1b212fdc5171a39b9a761527931eb0.camel@bootlin.com>
+Message-ID: <20180625161522.mwl3bhiuly4bkdsh@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/06/18 15:44, Mark Rutland wrote:
-> The SPSR_ELx format for exceptions taken from AArch32 differs from the
-> AArch32 PSR format. Thus, we must translate between the two when setting
-> up a compat sigframe, or restoring context from a compat sigframe.
+On Mon, Jun 25, 2018 at 04:18:51PM +0200, Paul Kocialkowski wrote:
+> Hi,
 > 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Fixes: 7206dc93a58fb764 ("arm64: Expose Arm v8.4 features")
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Suzuki Poulose <suzuki.poulose@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
->   arch/arm64/kernel/signal32.c | 8 ++++++--
->   1 file changed, 6 insertions(+), 2 deletions(-)
+> On Thu, 2018-06-21 at 17:35 +0200, Paul Kocialkowski wrote:
+> > Hi,
+> > 
+> > On Wed, 2018-06-13 at 16:07 +0200, Maxime Ripard wrote:
+> > > The IRQ handler up until now was hardcoding the use of the MPEG engine to
+> > > read the interrupt status, clear it and disable the interrupts.
+> > > 
+> > > Obviously, that won't work really well with the introduction of new codecs
+> > > that use a separate engine with a separate register set.
+> > > 
+> > > In order to make this more future proof, introduce new decodec operations
+> > > to deal with the interrupt management. The only one missing is the one to
+> > > enable the interrupts in the first place, but that's taken care of by the
+> > > trigger hook for now.
+> > 
+> > Acked-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 > 
-> diff --git a/arch/arm64/kernel/signal32.c b/arch/arm64/kernel/signal32.c
-> index 77b91f478995..fa9fb782f077 100644
-> --- a/arch/arm64/kernel/signal32.c
-> +++ b/arch/arm64/kernel/signal32.c
-> @@ -243,6 +243,7 @@ static int compat_restore_sigframe(struct pt_regs *regs,
->   	int err;
->   	sigset_t set;
->   	struct compat_aux_sigframe __user *aux;
-> +	unsigned long psr;
->   
->   	err = get_sigset_t(&set, &sf->uc.uc_sigmask);
->   	if (err == 0) {
-> @@ -266,7 +267,9 @@ static int compat_restore_sigframe(struct pt_regs *regs,
->   	__get_user_error(regs->compat_sp, &sf->uc.uc_mcontext.arm_sp, err);
->   	__get_user_error(regs->compat_lr, &sf->uc.uc_mcontext.arm_lr, err);
->   	__get_user_error(regs->pc, &sf->uc.uc_mcontext.arm_pc, err);
-> -	__get_user_error(regs->pstate, &sf->uc.uc_mcontext.arm_cpsr, err);
-> +	__get_user_error(psr, &sf->uc.uc_mcontext.arm_cpsr, err);
-> +
-> +	regs->pstate = compat_psr_to_pstate(regs->pstate);
+> Scratch that for now, I just thought of something here (see below).
+> 
+> > > Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+> > > ---
+> > >  .../sunxi/cedrus/sunxi_cedrus_common.h        |  9 +++++
+> > >  .../platform/sunxi/cedrus/sunxi_cedrus_hw.c   | 21 ++++++------
+> > >  .../sunxi/cedrus/sunxi_cedrus_mpeg2.c         | 33 +++++++++++++++++++
+> > >  3 files changed, 53 insertions(+), 10 deletions(-)
+> > > 
+> > > diff --git a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h
+> > > index c2e2c92d103b..a2a507eb9fc9 100644
+> > > --- a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h
+> > > +++ b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h
+> > > @@ -108,7 +108,16 @@ struct sunxi_cedrus_buffer *vb2_to_cedrus_buffer(const struct vb2_buffer *p)
+> > >  	return vb2_v4l2_to_cedrus_buffer(to_vb2_v4l2_buffer(p));
+> > >  }
+> > >  
+> > > +enum sunxi_cedrus_irq_status {
+> > > +	SUNXI_CEDRUS_IRQ_NONE,
+> > > +	SUNXI_CEDRUS_IRQ_ERROR,
+> > > +	SUNXI_CEDRUS_IRQ_OK,
+> > > +};
+> > > +
+> > >  struct sunxi_cedrus_dec_ops {
+> > > +	void (*irq_clear)(struct sunxi_cedrus_ctx *ctx);
+> > > +	void (*irq_disable)(struct sunxi_cedrus_ctx *ctx);
+> > > +	enum sunxi_cedrus_irq_status (*irq_status)(struct sunxi_cedrus_ctx *ctx);
+> > >  	void (*setup)(struct sunxi_cedrus_ctx *ctx,
+> > >  		      struct sunxi_cedrus_run *run);
+> > >  	void (*trigger)(struct sunxi_cedrus_ctx *ctx);
+> > > diff --git a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_hw.c b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_hw.c
+> > > index bb46a01214e0..6b97cbd2834e 100644
+> > > --- a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_hw.c
+> > > +++ b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_hw.c
+> > > @@ -77,27 +77,28 @@ static irqreturn_t sunxi_cedrus_ve_irq(int irq, void *dev_id)
+> > >  	struct sunxi_cedrus_ctx *ctx;
+> > >  	struct sunxi_cedrus_buffer *src_buffer, *dst_buffer;
+> > >  	struct vb2_v4l2_buffer *src_vb, *dst_vb;
+> > > +	enum sunxi_cedrus_irq_status status;
+> > >  	unsigned long flags;
+> > > -	unsigned int value, status;
+> > >  
+> > >  	spin_lock_irqsave(&dev->irq_lock, flags);
+> > >  
+> > > -	/* Disable MPEG interrupts and stop the MPEG engine */
+> > > -	value = sunxi_cedrus_read(dev, VE_MPEG_CTRL);
+> > > -	sunxi_cedrus_write(dev, value & (~0xf), VE_MPEG_CTRL);
+> > > -
+> > > -	status = sunxi_cedrus_read(dev, VE_MPEG_STATUS);
+> > > -	sunxi_cedrus_write(dev, 0x0000c00f, VE_MPEG_STATUS);
+> > > -	sunxi_cedrus_engine_disable(dev);
+> > > -
+> > >  	ctx = v4l2_m2m_get_curr_priv(dev->m2m_dev);
+> > >  	if (!ctx) {
+> > >  		pr_err("Instance released before the end of transaction\n");
+> > >  		spin_unlock_irqrestore(&dev->irq_lock, flags);
+> > >  
+> > > -		return IRQ_HANDLED;
+> > > +		return IRQ_NONE;
+> > >  	}
+> > >  
+> > > +	status = dev->dec_ops[ctx->current_codec]->irq_status(ctx);
+> > > +	if (status == SUNXI_CEDRUS_IRQ_NONE) {
+> > > +		spin_unlock_irqrestore(&dev->irq_lock, flags);
+> > > +		return IRQ_NONE;
+> > > +	}
+> > > +
+> > > +	dev->dec_ops[ctx->current_codec]->irq_disable(ctx);
+> > > +	dev->dec_ops[ctx->current_codec]->irq_clear(ctx);
+> > > +
+> > >  	src_vb = v4l2_m2m_src_buf_remove(ctx->fh.m2m_ctx);
+> > >  	dst_vb = v4l2_m2m_dst_buf_remove(ctx->fh.m2m_ctx);
+> 
+> Later in that file, there is still some checking that the first bit of
+> status is set:
+> 
+> 	/* First bit of MPEG_STATUS indicates success. */
+> 	if (ctx->job_abort || !(status & 0x01))
+> 
+> So !(status & 0x01) must be replaced with status != CEDRUS_IRQ_OK.
+> 
+> It seems that was working "by accident", with CEDRUS_IRQ_OK probably
+> being set by the compiler to 0x03.
 
-Did you mean
-	regs->pstate = compat_psr_to_pstate(psr)
-above ?
+Yeah, I noticed this already and this was fixed for the v2 :)
 
-Otherwise, looks good to me.
+Maxime
 
-
-Suzuki
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180625/f59de79d/attachment.sig>
