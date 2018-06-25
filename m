@@ -1,94 +1,91 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Mon, 25 Jun 2018 14:03:02 +0200
-Subject: [PATCH v3 22/24] drm/sun4i: DW HDMI: Expand algorithm for possible
- crtcs
+Date: Mon, 25 Jun 2018 14:02:58 +0200
+Subject: [PATCH v3 18/24] drm/sun4i: DW HDMI PHY: Add support for second PLL
 In-Reply-To: <20180625120304.7543-1-jernej.skrabec@siol.net>
 References: <20180625120304.7543-1-jernej.skrabec@siol.net>
-Message-ID: <20180625120304.7543-23-jernej.skrabec@siol.net>
+Message-ID: <20180625120304.7543-19-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-drm_of_find_possible_crtcs() doesn't work when DW HDMI encoder is
-connected to TCON (crtc) through mux in TCON TOP.
+Some DW HDMI PHYs, like those found in A64 and R40 SoCs, can select
+between two clock parents.
 
-In that case TCON TOP HDMI mux input port has to be manually traversed
-and checked if it matches any known crtc.
+Add code which reads second PLL from DT.
 
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c | 46 ++++++++++++++++++++++++++-
- 1 file changed, 45 insertions(+), 1 deletion(-)
+ drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h  |  2 ++
+ drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c | 20 +++++++++++++++-----
+ 2 files changed, 17 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
-index 9f40a44b456b..d443886e055b 100644
---- a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
-+++ b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
-@@ -12,6 +12,7 @@
- #include <drm/drm_crtc_helper.h>
+diff --git a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h
+index 3ba71aff92fc..46a3aa6a53a9 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h
++++ b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h
+@@ -147,6 +147,7 @@ struct sun8i_hdmi_phy;
  
- #include "sun8i_dw_hdmi.h"
-+#include "sun8i_tcon_top.h"
+ struct sun8i_hdmi_phy_variant {
+ 	bool has_phy_clk;
++	bool has_second_pll;
+ 	void (*phy_init)(struct sun8i_hdmi_phy *phy);
+ 	void (*phy_disable)(struct dw_hdmi *hdmi,
+ 			    struct sun8i_hdmi_phy *phy);
+@@ -160,6 +161,7 @@ struct sun8i_hdmi_phy {
+ 	struct clk			*clk_mod;
+ 	struct clk			*clk_phy;
+ 	struct clk			*clk_pll0;
++	struct clk			*clk_pll1;
+ 	unsigned int			rcal;
+ 	struct regmap			*regs;
+ 	struct reset_control		*rst_phy;
+diff --git a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
+index e56b9e5b1c42..f0877b3f67e7 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
++++ b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
+@@ -482,10 +482,19 @@ int sun8i_hdmi_phy_probe(struct sun8i_dw_hdmi *hdmi, struct device_node *node)
+ 			goto err_put_clk_mod;
+ 		}
  
- static void sun8i_dw_hdmi_encoder_mode_set(struct drm_encoder *encoder,
- 					   struct drm_display_mode *mode,
-@@ -41,6 +42,48 @@ sun8i_dw_hdmi_mode_valid(struct drm_connector *connector,
- 	return MODE_OK;
- }
- 
-+static bool sun8i_dw_hdmi_node_is_tcon_top(struct device_node *node)
-+{
-+	return !!of_match_node(sun8i_tcon_top_of_table, node);
-+}
-+
-+static u32 sun8i_dw_hdmi_find_possible_crtcs(struct drm_device *drm,
-+					     struct device_node *node)
-+{
-+	struct device_node *port, *ep, *remote, *remote_port;
-+	u32 crtcs = 0;
-+
-+	port = of_graph_get_port_by_id(node, 0);
-+	if (!port)
-+		return 0;
-+
-+	ep = of_get_next_available_child(port, NULL);
-+	if (!ep)
-+		return 0;
-+
-+	remote = of_graph_get_remote_port_parent(ep);
-+	if (!remote)
-+		return 0;
-+
-+	if (sun8i_dw_hdmi_node_is_tcon_top(remote)) {
-+		port = of_graph_get_port_by_id(remote, 4);
-+		if (!port)
-+			return 0;
-+
-+		for_each_child_of_node(port, ep) {
-+			remote_port = of_graph_get_remote_port(ep);
-+			if (remote_port) {
-+				crtcs |= drm_crtc_port_mask(drm, remote_port);
-+				of_node_put(remote_port);
++		if (phy->variant->has_second_pll) {
++			phy->clk_pll1 = of_clk_get_by_name(node, "pll-1");
++			if (IS_ERR(phy->clk_pll1)) {
++				dev_err(dev, "Could not get pll-1 clock\n");
++				ret = PTR_ERR(phy->clk_pll1);
++				goto err_put_clk_pll0;
 +			}
 +		}
-+	} else {
-+		crtcs = drm_of_find_possible_crtcs(drm, node);
-+	}
 +
-+	return crtcs;
-+}
-+
- static int sun8i_dw_hdmi_bind(struct device *dev, struct device *master,
- 			      void *data)
- {
-@@ -63,7 +106,8 @@ static int sun8i_dw_hdmi_bind(struct device *dev, struct device *master,
- 	hdmi->dev = &pdev->dev;
- 	encoder = &hdmi->encoder;
+ 		ret = sun8i_phy_clk_create(phy, dev);
+ 		if (ret) {
+ 			dev_err(dev, "Couldn't create the PHY clock\n");
+-			goto err_put_clk_pll0;
++			goto err_put_clk_pll1;
+ 		}
  
--	encoder->possible_crtcs = drm_of_find_possible_crtcs(drm, dev->of_node);
-+	encoder->possible_crtcs =
-+		sun8i_dw_hdmi_find_possible_crtcs(drm, dev->of_node);
- 	/*
- 	 * If we failed to find the CRTC(s) which this encoder is
- 	 * supposed to be connected to, it's because the CRTC has
+ 		clk_prepare_enable(phy->clk_phy);
+@@ -528,9 +537,10 @@ int sun8i_hdmi_phy_probe(struct sun8i_dw_hdmi *hdmi, struct device_node *node)
+ 	reset_control_put(phy->rst_phy);
+ err_disable_clk_phy:
+ 	clk_disable_unprepare(phy->clk_phy);
++err_put_clk_pll1:
++	clk_put(phy->clk_pll1);
+ err_put_clk_pll0:
+-	if (phy->variant->has_phy_clk)
+-		clk_put(phy->clk_pll0);
++	clk_put(phy->clk_pll0);
+ err_put_clk_mod:
+ 	clk_put(phy->clk_mod);
+ err_put_clk_bus:
+@@ -551,8 +561,8 @@ void sun8i_hdmi_phy_remove(struct sun8i_dw_hdmi *hdmi)
+ 
+ 	reset_control_put(phy->rst_phy);
+ 
+-	if (phy->variant->has_phy_clk)
+-		clk_put(phy->clk_pll0);
++	clk_put(phy->clk_pll0);
++	clk_put(phy->clk_pll1);
+ 	clk_put(phy->clk_mod);
+ 	clk_put(phy->clk_bus);
+ }
 -- 
 2.18.0
