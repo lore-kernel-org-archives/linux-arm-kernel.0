@@ -1,316 +1,160 @@
-From: yixun.lan@amlogic.com (Yixun Lan)
-Date: Mon, 25 Jun 2018 21:59:13 +0800
-Subject: [PATCH] clk: meson-axg: add clocks required by pcie driver
-In-Reply-To: <1529919130.2900.22.camel@baylibre.com>
-References: <20180621122620.13195-1-yixun.lan@amlogic.com>
- <1529919130.2900.22.camel@baylibre.com>
-Message-ID: <19816376-c4c8-8373-1d32-152447b743d9@amlogic.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Mon, 25 Jun 2018 16:03:16 +0200
+Subject: [GIT PULL] Renesas ARM64 Based SoC DT Updates for v4.19
+Message-ID: <cover.1529933747.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jerome
+Hi Olof, Hi Kevin, Hi Arnd,
 
-see my comments below
-
-On 06/25/2018 05:32 PM, Jerome Brunet wrote:
-> On Thu, 2018-06-21 at 12:26 +0000, Yixun Lan wrote:
->> Adding clocks for pcie driver, due to the ASIC design,
-> Adding clocks for the pcie driver. Due to the ASIC design,
-> 
-Ok, I will adjust these in v2
-
->> the pcie controller re-use part of the mipi clock logic,
->> so the mipi clock is also required.
->>
->> Tested-by: Jianxin Qin <jianxin.qin@amlogic.com>
->> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
->> ---
->>  drivers/clk/meson/axg.c              | 145 +++++++++++++++++++++++++++
->>  drivers/clk/meson/axg.h              |   6 +-
->>  include/dt-bindings/clock/axg-clkc.h |   3 +
->>  3 files changed, 153 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/clk/meson/axg.c b/drivers/clk/meson/axg.c
->> index bd4dbc696b88..f1dc5433b69d 100644
->> --- a/drivers/clk/meson/axg.c
->> +++ b/drivers/clk/meson/axg.c
->> @@ -626,6 +626,137 @@ static struct clk_regmap axg_mpll3 = {
->>  	},
->>  };
->>  
->> +static const struct pll_rate_table axg_pcie_pll_rate_table[] = {
->> +	{
->> +		.rate	= 100000000,
->> +		.m	= 200,
->> +		.n	= 3,
->> +		.od	= 1,
->> +		.od2	= 3,
->> +	},
->> +	{ /* sentinel */ },
->> +};
->> +
->> +static const struct reg_sequence axg_pcie_init_regs[] = {
->> +	{ .reg = HHI_PCIE_PLL_CNTL,	.def = 0x400106c8 },
->> +	{ .reg = HHI_PCIE_PLL_CNTL1,	.def = 0x0084a2aa },
->> +	{ .reg = HHI_PCIE_PLL_CNTL2,	.def = 0xb75020be },
->> +	{ .reg = HHI_PCIE_PLL_CNTL3,	.def = 0x0a47488e },
->> +	{ .reg = HHI_PCIE_PLL_CNTL4,	.def = 0xc000004d },
->> +	{ .reg = HHI_PCIE_PLL_CNTL5,	.def = 0x00078000 },
->> +	{ .reg = HHI_PCIE_PLL_CNTL6,	.def = 0x002323c6 },
->> +};
->> +
->> +static struct clk_regmap axg_pcie_pll = {
->> +	.data = &(struct meson_clk_pll_data){
->> +		.m = {
->> +			.reg_off = HHI_PCIE_PLL_CNTL,
->> +			.shift   = 0,
->> +			.width   = 9,
->> +		},
->> +		.n = {
->> +			.reg_off = HHI_PCIE_PLL_CNTL,
->> +			.shift   = 9,
->> +			.width   = 5,
->> +		},
->> +		.od = {
->> +			.reg_off = HHI_PCIE_PLL_CNTL,
->> +			.shift   = 16,
->> +			.width   = 2,
->> +		},
->> +		.od2 = {
->> +			.reg_off = HHI_PCIE_PLL_CNTL6,
->> +			.shift   = 6,
->> +			.width   = 2,
->> +		},
->> +		.frac = {
->> +			.reg_off = HHI_PCIE_PLL_CNTL1,
->> +			.shift   = 0,
->> +			.width   = 12,
->> +		},
->> +		.l = {
->> +			.reg_off = HHI_PCIE_PLL_CNTL,
->> +			.shift   = 31,
->> +			.width   = 1,
->> +		},
->> +		.rst = {
->> +			.reg_off = HHI_PCIE_PLL_CNTL,
->> +			.shift   = 29,
->> +			.width   = 1,
->> +		},
->> +		.table = axg_pcie_pll_rate_table,
->> +		.init_regs = axg_pcie_init_regs,
->> +		.init_count = ARRAY_SIZE(axg_pcie_init_regs),
->> +	},
->> +	.hw.init = &(struct clk_init_data){
->> +		.name = "pcie_pll",
->> +		.ops = &meson_clk_pll_ops,
->> +		.parent_names = (const char *[]){ "xtal" },
->> +		.num_parents = 1,
->> +	},
->> +};
->> +
->> +static struct clk_regmap axg_pcie_mux = {
->> +	.data = &(struct clk_regmap_mux_data){
->> +		.offset = HHI_PCIE_PLL_CNTL6,
->> +		.mask = 0x1,
->> +		.shift = 2,
->> +	},
->> +	.hw.init = &(struct clk_init_data){
->> +		.name = "pcie_mux",
->> +		.ops = &clk_regmap_mux_ops,
->> +		.parent_names = (const char *[]){ "mpll3", "pcie_pll" },
->> +		.num_parents = 2,
->> +		.flags = CLK_SET_RATE_PARENT,
->> +	},
->> +};
->> +
->> +static struct clk_regmap axg_pcie_ref = {
->> +	.data = &(struct clk_regmap_mux_data){
->> +		.offset = HHI_PCIE_PLL_CNTL6,
->> +		.mask = 0x1,
->> +		.shift = 1,
->> +	},
->> +	.hw.init = &(struct clk_init_data){
->> +		.name = "pcie_ref",
->> +		.ops = &clk_regmap_mux_ops,
->> +		/* do not select the first partent, debug only */
->> +		.parent_names = (const char *[]){ "",
->> +			"pcie_mux" },
-> 
-> A) No declaring a clock name "" is not the way to do it.
-> 
-> Either declare a mux with just one parent and provide a table with the index of
-> the said parent (have a look around, other clocks mux are using table), OR just
-> declare what parent 0 is.
-> 
-Ok, in this case, I will go as the first way - using table with only one
-parent
-
-the parent 0 is a debug clock which should been feed directly from
-outside (via crystal or somthing), and in the normal cases we don't do this.
-
-> Looking at your clock, the pcie driver will have to call
-> clk_set_rate(clk, 100000000) to make sure everything is setup properly,
-> including this mux - otherwise you are relying on the setting provided by the
-> bootloader, which should be avoided whenever possible.
-> 
-yes, we will call clk_set_rate(clk, 100000000), and let CCF propagate
-upside.. we definitely want to avoid relying on bootloader to setup this
-clock.
-
-> In this case, CCF should pick the right parent anyway, so there should be no
-> harm describing what your clock tree is.
-if we want to describe debug clock (the parent 0), which I think the
-debug clock should be also 100MHz, then it will be equal to parent 1,
-then no difference between these two clocks, the pcie driver may wrongly
-choose the parent 0 which doesn't exist in the real case if let CCF
-choose freely.
-
-to fix this, one solution come to my mind that is to manually select
-parent of the mux clock -  but it's kind of tedious/un-necessary ..
-
-> 
-> B) Please fix the indentation.
-> 
-> C) This mux deal with bit "CML_INPUT_SEL0". there is also a "CML_INPUT_SEL1"
-> which seems to hint that there is a mux each CML_EN clock. Are you sure your
-> description of the tree is accurate ?
-> 
-we already describe these two mux, see
-
-"CML_INPUT_SEL1" -> bit[2]
-static struct clk_regmap axg_pcie_mux
-
-"CML_INPUT_SEL0" -> bit[1]
-static struct clk_regmap axg_pcie_ref
+Please consider these Renesas ARM64 based SoC DT updates for v4.19.
 
 
+The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
 
-the clock map is something like this:
+  Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
 
+are available in the git repository at:
 
-                        "debug" ->|            | -> pcie_cml_en0
-xtal -> pcie_pll ->|              | pcie_ref ->|
-                   | pcie_mux   ->|            | -> pcie_cml_en1
-                   |
-        mpll3    ->|
-		
+  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm64-dt-for-v4.19
 
+for you to fetch changes up to 6b284a81307848b4331453b02cf7a33c09719d4b:
 
->> +		.num_parents = 2,
->> +		.flags = CLK_SET_RATE_PARENT,
->> +	},
->> +};
->> +
->> +static struct clk_regmap axg_pcie_cml_en0 = {
->> +	.data = &(struct clk_regmap_gate_data){
->> +		.offset = HHI_PCIE_PLL_CNTL6,
->> +		.bit_idx = 4,
->> +	},
->> +	.hw.init = &(struct clk_init_data) {
->> +		.name = "pcie_cml_en0",
->> +		.ops = &clk_regmap_gate_ops,
->> +		.parent_names = (const char *[]){ "pcie_ref" },
->> +		.num_parents = 1,
->> +		.flags = CLK_SET_RATE_PARENT,
->> +
->> +	},
->> +};
->> +
->> +static struct clk_regmap axg_pcie_cml_en1 = {
->> +	.data = &(struct clk_regmap_gate_data){
->> +		.offset = HHI_PCIE_PLL_CNTL6,
->> +		.bit_idx = 3,
->> +	},
->> +	.hw.init = &(struct clk_init_data) {
->> +		.name = "pcie_cml_en1",
->> +		.ops = &clk_regmap_gate_ops,
->> +		.parent_names = (const char *[]){ "pcie_ref" },
->> +		.num_parents = 1,
->> +		.flags = CLK_SET_RATE_PARENT,
->> +	},
->> +};
->> +
->>  static u32 mux_table_clk81[]	= { 0, 2, 3, 4, 5, 6, 7 };
->>  static const char * const clk81_parent_names[] = {
->>  	"xtal", "fclk_div7", "mpll1", "mpll2", "fclk_div4",
->> @@ -821,6 +952,7 @@ static MESON_GATE(axg_mmc_pclk, HHI_GCLK_MPEG2, 11);
->>  static MESON_GATE(axg_vpu_intr, HHI_GCLK_MPEG2, 25);
->>  static MESON_GATE(axg_sec_ahb_ahb3_bridge, HHI_GCLK_MPEG2, 26);
->>  static MESON_GATE(axg_gic, HHI_GCLK_MPEG2, 30);
->> +static MESON_GATE(axg_mipi_enable, HHI_MIPI_CNTL0, 29);
->>  
->>  /* Always On (AO) domain gates */
->>  
->> @@ -910,6 +1042,13 @@ static struct clk_hw_onecell_data axg_hw_onecell_data = {
->>  		[CLKID_FCLK_DIV4_DIV]		= &axg_fclk_div4_div.hw,
->>  		[CLKID_FCLK_DIV5_DIV]		= &axg_fclk_div5_div.hw,
->>  		[CLKID_FCLK_DIV7_DIV]		= &axg_fclk_div7_div.hw,
->> +		[CLKID_PCIE_PLL]		= &axg_pcie_pll.hw,
->> +		[CLKID_PCIE_MUX]		= &axg_pcie_mux.hw,
->> +		[CLKID_PCIE_REF]		= &axg_pcie_ref.hw,
->> +		[CLKID_PCIE_CML_EN0]		= &axg_pcie_cml_en0.hw,
->> +		[CLKID_PCIE_CML_EN1]		= &axg_pcie_cml_en1.hw,
->> +		[CLKID_MIPI_ENABLE]		= &axg_mipi_enable.hw,
->> +
->>  		[NR_CLKS]			= NULL,
->>  	},
->>  	.num = NR_CLKS,
->> @@ -988,6 +1127,12 @@ static struct clk_regmap *const axg_clk_regmaps[] = {
->>  	&axg_fclk_div4,
->>  	&axg_fclk_div5,
->>  	&axg_fclk_div7,
->> +	&axg_pcie_pll,
->> +	&axg_pcie_mux,
->> +	&axg_pcie_ref,
->> +	&axg_pcie_cml_en0,
->> +	&axg_pcie_cml_en1,
->> +	&axg_mipi_enable,
->>  };
->>  
->>  static const struct of_device_id clkc_match_table[] = {
->> diff --git a/drivers/clk/meson/axg.h b/drivers/clk/meson/axg.h
->> index b421df6a7ea0..6e55ebd6c77d 100644
->> --- a/drivers/clk/meson/axg.h
->> +++ b/drivers/clk/meson/axg.h
->> @@ -16,6 +16,7 @@
->>   * Register offsets from the data sheet must be multiplied by 4 before
->>   * adding them to the base address to get the right value.
->>   */
->> +#define HHI_MIPI_CNTL0			0x00
->>  #define HHI_GP0_PLL_CNTL		0x40
->>  #define HHI_GP0_PLL_CNTL2		0x44
->>  #define HHI_GP0_PLL_CNTL3		0x48
->> @@ -127,8 +128,11 @@
->>  #define CLKID_FCLK_DIV4_DIV			73
->>  #define CLKID_FCLK_DIV5_DIV			74
->>  #define CLKID_FCLK_DIV7_DIV			75
->> +#define CLKID_PCIE_PLL				76
->> +#define CLKID_PCIE_MUX				77
->> +#define CLKID_PCIE_REF				78
->>  
->> -#define NR_CLKS					76
->> +#define NR_CLKS					82
->>  
->>  /* include the CLKIDs that have been made part of the DT binding */
->>  #include <dt-bindings/clock/axg-clkc.h>
->> diff --git a/include/dt-bindings/clock/axg-clkc.h b/include/dt-bindings/clock/axg-clkc.h
->> index 555937a25504..70371228b7e0 100644
->> --- a/include/dt-bindings/clock/axg-clkc.h
->> +++ b/include/dt-bindings/clock/axg-clkc.h
-> 
-> As usual, please put dt bindings changes in a separate patch.
-> 
-ok, will do
+  arm64: dts: renesas: r8a77995: Add MSIOF device nodes (2018-06-25 15:30:39 +0200)
 
->> @@ -68,5 +68,8 @@
->>  #define CLKID_SD_EMMC_B_CLK0			59
->>  #define CLKID_SD_EMMC_C_CLK0			60
->>  #define CLKID_HIFI_PLL				69
->> +#define CLKID_PCIE_CML_EN0			79
->> +#define CLKID_PCIE_CML_EN1			80
->> +#define CLKID_MIPI_ENABLE			81
->>  
->>  #endif /* __AXG_CLKC_H */
-> 
-> .
-> 
+----------------------------------------------------------------
+Renesas ARM64 Based SoC DT Updates for v4.19
+
+* All applicable R-Car Gen 3 SoCs
+  - Correct VSPD registers range
+  - Convert R-Car Gen3 SoC and board DT files to SPDX identifiers
+
+* R-Car H3 (r8a7795), M3-W (r8a7796) and M3-N (r8a77965) SoCs
+  - Salvator-X and Salvator-XS boards
+    + Describe HSCIF1 device
+    + Correct I2C ch4 clock to 400kHz
+  - Salvator-X, Salvator-XS and ULCB boards
+    + Add sdhi2_ds pin group to SDHI2 pinctrl groups
+
+* R-Car H3 (r8a7795) SoC
+  - Describe CryptoCAL (CCREE) device
+
+* R-Car M3-W (r8a7796) SoC
+  - Describe PCIe devices
+  - Describe HSCIF nodes
+
+* R-Car M3-N (r8a77965) SoC
+  - Describe PCIe devices
+  - Use CPG MSSR symbols instead of numeric indicies
+
+* R-Car D3 (r8a77995) SoC
+  - Describe Thermal device
+  - Describe MSIOF devices
+  - Add power domains to description of IPMMU devices
+  - Do not use deprecated renesas,gpio-rcar compat string
+  - Describe HDMI and CVBS input in DT of R-Car Gen3 D3 Draak board
+
+* R-Car V3H (r8a77980) SoC
+  - Describe secondary CA53 CPU cores, and GPIO and
+    interconected FCPVD0, VSPD0, DU, and LVDS0 devices
+  - Enable ethernet on V3HSK board
+  - Specify Ethernet PHY IRQs in the DT of the Condor and V3HSK boards.
+    This is possible now that GPIO support is present.
+    Previously phylib had to resort to polling.
+  - Enable I2C0 on Condor board
+
+* R-Car E3 (r8a77990)
+  - Enable Watchdog timer and USB2.0 host on Ebisu board
+  - Enable secondary CA53 CPU core
+
+----------------------------------------------------------------
+Geert Uytterhoeven (2):
+      arm64: dts: renesas: r8a77965: Use r8a77965-cpg-mssr binding definitions
+      arm64: dts: renesas: r8a77990: Add secondary CA53 CPU core
+
+Gilad Ben-Yossef (1):
+      arm64: dts: renesas: r8a7795: add ccree to device tree
+
+Harunobu Kurokawa (1):
+      arm64: dts: renesas: r8a7796: Add PCIe device nodes
+
+Hiromitsu Yamasaki (2):
+      arm64: dts: renesas: salvator-common: Add HSCIF1 device support
+      arm64: dts: renesas: r8a77995: Add MSIOF device nodes
+
+Jacopo Mondi (2):
+      arm64: dts: renesas: draak: Describe CVBS input
+      arm64: dts: renesas: draak: Describe HDMI input
+
+Laurent Pinchart (1):
+      arm64: dts: renesas: Fix VSPD registers range
+
+Magnus Damm (1):
+      arm64: dts: renesas: r8a77995: Add IPMMU power domains
+
+Masaharu Hayakawa (1):
+      arm64: dts: renesas: Add sdhi2_ds pin group to SDHI2 pinctrl groups
+
+Sergei Shtylyov (8):
+      arm64: dts: renesas: r8a77980: add SMP support
+      arm64: dts: renesas: r8a77980: add GEther support
+      arm64: dts: renesas: v3hsk: add GEther support
+      arm64: dts: renesas: r8a77980: add I2C support
+      arm64: dts: renesas: condor: add I2C0 support
+      arm64: dts: renesas: r8a77980: add GPIO support
+      arm64: dts: renesas: condor/v3hsk: specify Ethernet PHY IRQs
+      arm64: dts: renesas: r8a77980: add FCPVD/VSPD/DU/LVDS support
+
+Simon Horman (1):
+      arm64: dts: renesas: r8a77995: don't use deprecated renesas,gpio-rcar compat string
+
+Takeshi Kihara (5):
+      arm64: dts: renesas: r8a77965: Add Watchdog Timer controller node using RCLK Watchdog Timer
+      arm64: dts: renesas: r8a77965: Add all HSCIF nodes
+      arm64: dts: renesas: salvator-x(s): Update I2C ch4 clock to 400kHz
+      arm64: dts: renesas: r8a77990: ebisu: Enable watchdog timer
+      arm64: dts: renesas: r8a77965: Add PCIe device nodes
+
+Ulrich Hecht (1):
+      arm64: dts: renesas: draak: add X12 input dot clock
+
+Wolfram Sang (1):
+      arm64: dts: renesas: convert to SPDX identifiers
+
+Yoshihiro Kaneko (1):
+      arm64: dts: renesas: r8a77995: add thermal device support
+
+Yoshihiro Shimoda (1):
+      arm64: dts: renesas: r8a77990: Enable USB2.0 Host for Ebisu board
+
+ .../boot/dts/renesas/r8a7795-es1-h3ulcb-kf.dts     |   5 +-
+ arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb.dts |   5 +-
+ .../boot/dts/renesas/r8a7795-es1-salvator-x.dts    |   5 +-
+ arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi       |   7 +-
+ arch/arm64/boot/dts/renesas/r8a7795-h3ulcb-kf.dts  |   5 +-
+ arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts     |   5 +-
+ arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts |   5 +-
+ .../arm64/boot/dts/renesas/r8a7795-salvator-xs.dts |   5 +-
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi           |  20 +-
+ arch/arm64/boot/dts/renesas/r8a7796-m3ulcb-kf.dts  |   5 +-
+ arch/arm64/boot/dts/renesas/r8a7796-m3ulcb.dts     |   5 +-
+ arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts |   5 +-
+ .../arm64/boot/dts/renesas/r8a7796-salvator-xs.dts |   5 +-
+ arch/arm64/boot/dts/renesas/r8a7796.dtsi           |  61 +++-
+ arch/arm64/boot/dts/renesas/r8a77965.dtsi          | 159 +++++++++-
+ arch/arm64/boot/dts/renesas/r8a77970-eagle.dts     |   5 +-
+ arch/arm64/boot/dts/renesas/r8a77970-v3msk.dts     |   5 +-
+ arch/arm64/boot/dts/renesas/r8a77970.dtsi          |   7 +-
+ arch/arm64/boot/dts/renesas/r8a77980-condor.dts    |  29 ++
+ arch/arm64/boot/dts/renesas/r8a77980-v3hsk.dts     |  23 ++
+ arch/arm64/boot/dts/renesas/r8a77980.dtsi          | 324 ++++++++++++++++++++-
+ arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts     |  25 ++
+ arch/arm64/boot/dts/renesas/r8a77990.dtsi          |  74 ++++-
+ arch/arm64/boot/dts/renesas/r8a77995-draak.dts     | 133 ++++++++-
+ arch/arm64/boot/dts/renesas/r8a77995.dtsi          | 133 +++++++--
+ arch/arm64/boot/dts/renesas/salvator-common.dtsi   |  24 +-
+ arch/arm64/boot/dts/renesas/salvator-x.dtsi        |   7 +-
+ arch/arm64/boot/dts/renesas/salvator-xs.dtsi       |   7 +-
+ arch/arm64/boot/dts/renesas/ulcb-kf.dtsi           |   5 +-
+ arch/arm64/boot/dts/renesas/ulcb.dtsi              |   9 +-
+ 30 files changed, 960 insertions(+), 152 deletions(-)
