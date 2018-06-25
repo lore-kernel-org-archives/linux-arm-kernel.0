@@ -1,73 +1,38 @@
-From: mathieu.desnoyers@efficios.com (Mathieu Desnoyers)
-Date: Mon, 25 Jun 2018 14:10:10 -0400 (EDT)
-Subject: [PATCH 3/3] rseq/selftests: Add support for arm64
-In-Reply-To: <1529949285-11013-4-git-send-email-will.deacon@arm.com>
-References: <1529949285-11013-1-git-send-email-will.deacon@arm.com>
- <1529949285-11013-4-git-send-email-will.deacon@arm.com>
-Message-ID: <501929863.3051.1529950210436.JavaMail.zimbra@efficios.com>
+From: niklas.cassel@linaro.org (Niklas Cassel)
+Date: Mon, 25 Jun 2018 20:04:54 +0200
+Subject: [PATCH 11/11] ASoC: qdsp6: q6routing: add proper error check
+In-Reply-To: <20180625143115.8346-12-srinivas.kandagatla@linaro.org>
+References: <20180625143115.8346-1-srinivas.kandagatla@linaro.org>
+ <20180625143115.8346-12-srinivas.kandagatla@linaro.org>
+Message-ID: <20180625180454.GI10876@centauri.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------ On Jun 25, 2018, at 1:54 PM, Will Deacon will.deacon at arm.com wrote:
+On Mon, Jun 25, 2018 at 03:31:15PM +0100, Srinivas Kandagatla wrote:
+> q6adm_open can return error pointer or a null in error cases.
+> Fix this check this.
 
-[...]
+Instead of "Fix this check this.", how about "Fix the return handling."
 
-> +#define __RSEQ_ASM_DEFINE_TABLE(label, version, flags, start_ip,		\
-> +				post_commit_offset, abort_ip)			\
-> +	"	.pushsection	__rseq_table, \"aw\"\n"				\
-> +	"	.balign	32\n"							\
-> +	__rseq_str(label) ":\n"							\
-> +	"	.long	" __rseq_str(version) ", " __rseq_str(flags) "\n"	\
-> +	"	.quad	" __rseq_str(start_ip) ", "				\
-> +			  __rseq_str(post_commit_offset) ", "			\
-> +			  __rseq_str(abort_ip) "\n"				\
-> +	"	.popsection\n"
-> +
-> +#define RSEQ_ASM_DEFINE_TABLE(label, start_ip, post_commit_ip, abort_ip)	\
-> +	__RSEQ_ASM_DEFINE_TABLE(label, 0x0, 0x0, start_ip,			\
-> +				(post_commit_ip - start_ip), abort_ip)
-> +
-> +#define RSEQ_ASM_STORE_RSEQ_CS(label, cs_label, rseq_cs)			\
-> +	RSEQ_INJECT_ASM(1)							\
-> +	"	adrp	" RSEQ_ASM_TMP_REG ", " __rseq_str(cs_label) "\n"	\
-> +	"	add	" RSEQ_ASM_TMP_REG ", " RSEQ_ASM_TMP_REG		\
-> +			", :lo12:" __rseq_str(cs_label) "\n"			\
-> +	"	str	" RSEQ_ASM_TMP_REG ", %[" __rseq_str(rseq_cs) "]\n"	\
-> +	__rseq_str(label) ":\n"
-> +
-> +#define RSEQ_ASM_DEFINE_ABORT(label, abort_label)				\
-> +	"	.pushsection	__rseq_failure, \"ax\"\n"			\
-> +	"	.long 	"	__rseq_str(RSEQ_SIG) "\n"			\
-> +	__rseq_str(label) ":\n"							\
-> +	"	b	%l[" __rseq_str(abort_label) "]\n"			\
-> +	"	.popsection\n"
-
-Thanks Will for porting rseq to arm64 !
-
-I notice you are using the instructions
-
-  adrp
-  add
-  str
-
-to implement RSEQ_ASM_STORE_RSEQ_CS(). Did you compare
-performance-wise with an approach using a literal pool
-near the instruction pointer like I did on arm32 ?
-
-With that approach, this ends up being simply
-
-  adr
-  str
-
-which provides significantly better performance on my test
-platform over loading a pointer targeting a separate data
-section.
-
-Thanks,
-
-Mathieu
-
--- 
-Mathieu Desnoyers
-EfficiOS Inc.
-http://www.efficios.com
+> 
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> ---
+>  sound/soc/qcom/qdsp6/q6routing.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/sound/soc/qcom/qdsp6/q6routing.c b/sound/soc/qcom/qdsp6/q6routing.c
+> index caf2f847a886..c18f808c7730 100644
+> --- a/sound/soc/qcom/qdsp6/q6routing.c
+> +++ b/sound/soc/qcom/qdsp6/q6routing.c
+> @@ -310,7 +310,7 @@ int q6routing_stream_open(int fedai_id, int perf_mode,
+>  			      session->channels, topology, perf_mode,
+>  			      session->bits_per_sample, 0, 0);
+>  
+> -	if (!copp) {
+> +	if (IS_ERR_OR_NULL(copp)) {
+>  		mutex_unlock(&routing_data->lock);
+>  		return -EINVAL;
+>  	}
+> -- 
+> 2.16.2
+> 
