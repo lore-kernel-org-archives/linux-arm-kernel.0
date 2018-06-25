@@ -1,118 +1,70 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 25 Jun 2018 16:03:16 +0200
-Subject: [PATCH 21/29] arm64: dts: renesas: r8a77990: Enable USB2.0 Host for
- Ebisu board
+Date: Mon, 25 Jun 2018 16:03:12 +0200
+Subject: [PATCH 17/29] arm64: dts: renesas: condor: add I2C0 support
 In-Reply-To: <cover.1529933747.git.horms+renesas@verge.net.au>
 References: <cover.1529933747.git.horms+renesas@verge.net.au>
-Message-ID: <6dd72b4d3da1f2be7fc57511677a0cb782d6acd9.1529933747.git.horms+renesas@verge.net.au>
+Message-ID: <45fde0d498dc77e5fc221960843fa377e0c70822.1529933747.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-This patch adds USB2.0 PHY and Host(EHCI/OHCI) nodes and
-enables them for R-Car E3 Ebisu board.
+Define the Condor board dependent part of the I2C0 device node.
 
-Signed-off-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+The I2C0 bus is populated by 2 ON Semiconductor PCA9654 I/O expanders
+and Analog Devices  ADV7511W HDMI transmitter (but we're only describing
+the former chips now).
+
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts | 20 ++++++++++++++
- arch/arm64/boot/dts/renesas/r8a77990.dtsi      | 37 ++++++++++++++++++++++++++
- 2 files changed, 57 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a77980-condor.dts | 27 +++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts b/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
-index 28945a8b9800..5e28c1b94b77 100644
---- a/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
-@@ -47,10 +47,18 @@
- 	};
+diff --git a/arch/arm64/boot/dts/renesas/r8a77980-condor.dts b/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
+index 0b93a7d76585..cc3ee25f4e2d 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
++++ b/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
+@@ -80,6 +80,28 @@
+ 	clock-frequency = <32768>;
  };
  
-+&ehci0 {
-+	status = "okay";
-+};
-+
- &extal_clk {
- 	clock-frequency = <48000000>;
- };
- 
-+&ohci0 {
-+	status = "okay";
-+};
-+
- &pfc {
- 	avb_pins: avb {
- 		mux {
-@@ -58,6 +66,11 @@
- 			function = "avb";
- 		};
- 	};
-+
-+	usb0_pins: usb {
-+		groups = "usb0_b";
-+		function = "usb0";
-+	};
- };
- 
- &rwdt {
-@@ -68,3 +81,10 @@
- &scif2 {
- 	status = "okay";
- };
-+
-+&usb2_phy0 {
-+	pinctrl-0 = <&usb0_pins>;
++&i2c0 {
++	pinctrl-0 = <&i2c0_pins>;
 +	pinctrl-names = "default";
 +
 +	status = "okay";
++	clock-frequency = <400000>;
++
++	io_expander0: gpio at 20 {
++		compatible = "onnn,pca9654";
++		reg = <0x20>;
++		gpio-controller;
++		#gpio-cells = <2>;
++	};
++
++	io_expander1: gpio at 21 {
++		compatible = "onnn,pca9654";
++		reg = <0x21>;
++		gpio-controller;
++		#gpio-cells = <2>;
++	};
 +};
-diff --git a/arch/arm64/boot/dts/renesas/r8a77990.dtsi b/arch/arm64/boot/dts/renesas/r8a77990.dtsi
-index 735881d4e57a..f8004608c595 100644
---- a/arch/arm64/boot/dts/renesas/r8a77990.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a77990.dtsi
-@@ -267,6 +267,43 @@
- 			status = "disabled";
- 		};
++
+ &mmc0 {
+ 	pinctrl-0 = <&mmc_pins>;
+ 	pinctrl-1 = <&mmc_pins_uhs>;
+@@ -104,6 +126,11 @@
+ 		function = "canfd0";
+ 	};
  
-+		ohci0: usb at ee080000 {
-+			compatible = "generic-ohci";
-+			reg = <0 0xee080000 0 0x100>;
-+			interrupts = <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 703>;
-+			phys = <&usb2_phy0>;
-+			phy-names = "usb";
-+			power-domains = <&sysc 32>;
-+			resets = <&cpg 703>;
-+			status = "disabled";
-+		};
++	i2c0_pins: i2c0 {
++		groups = "i2c0";
++		function = "i2c0";
++	};
 +
-+		ehci0: usb at ee080100 {
-+			compatible = "generic-ehci";
-+			reg = <0 0xee080100 0 0x100>;
-+			interrupts = <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 703>;
-+			phys = <&usb2_phy0>;
-+			phy-names = "usb";
-+			companion = <&ohci0>;
-+			power-domains = <&sysc 32>;
-+			resets = <&cpg 703>;
-+			status = "disabled";
-+		};
-+
-+		usb2_phy0: usb-phy at ee080200 {
-+			compatible = "renesas,usb2-phy-r8a77990",
-+				     "renesas,rcar-gen3-usb2-phy";
-+			reg = <0 0xee080200 0 0x700>;
-+			interrupts = <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 703>;
-+			power-domains = <&sysc 32>;
-+			resets = <&cpg 703>;
-+			#phy-cells = <0>;
-+			status = "disabled";
-+		};
-+
- 		gic: interrupt-controller at f1010000 {
- 			compatible = "arm,gic-400";
- 			#interrupt-cells = <3>;
+ 	mmc_pins: mmc {
+ 		groups = "mmc_data8", "mmc_ctrl", "mmc_ds";
+ 		function = "mmc";
 -- 
 2.11.0
