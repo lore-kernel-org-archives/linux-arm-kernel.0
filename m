@@ -1,52 +1,71 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 25 Jun 2018 16:03:21 +0200
-Subject: [PATCH 26/29] arm64: dts: renesas: condor/v3hsk: specify Ethernet PHY
- IRQs
+Date: Mon, 25 Jun 2018 16:03:23 +0200
+Subject: [PATCH 28/29] arm64: dts: renesas: salvator-common: Add HSCIF1 device
+ support
 In-Reply-To: <cover.1529933747.git.horms+renesas@verge.net.au>
 References: <cover.1529933747.git.horms+renesas@verge.net.au>
-Message-ID: <ffbd52352208534a30d5bbe2e15ee9e5cbb98c6d.1529933747.git.horms+renesas@verge.net.au>
+Message-ID: <b6d3134ddcbe4d3c3986e4e7b649467a19045949.1529933747.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+From: Hiromitsu Yamasaki <hiromitsu.yamasaki.ym@renesas.com>
 
-Specify Ethernet PHY IRQs in the Condor/V3HSK board device trees, now that
-we have the GPIO support (previously phylib had  to resort to polling).
+This patch adds pin control for HSCIF1, and supports connection with
+Debug Serial-1 (CN26) on Salvator boards.
 
-Based on the original (and large) patch by Vladimir Barinov.
+SCIF1 and HSCIF1 are sharing the pins connected to Debug Serial-1 (CN26)
+on Salvator boards, and it is necessary to ensure that either SCIF1 or
+HSCIF1 is enabled, not both.
 
-Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+As for the default of this DeviceTree, SCIF1 is connected.
+
+Signed-off-by: Hiromitsu Yamasaki <hiromitsu.yamasaki.ym@renesas.com>
+Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+[geert: Add missing "uart-has-rtscts"]
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a77980-condor.dts | 2 ++
- arch/arm64/boot/dts/renesas/r8a77980-v3hsk.dts  | 2 ++
- 2 files changed, 4 insertions(+)
+ arch/arm64/boot/dts/renesas/salvator-common.dtsi | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77980-condor.dts b/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
-index cc3ee25f4e2d..9f25c407dfd7 100644
---- a/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
-@@ -59,6 +59,8 @@
- 	phy0: ethernet-phy at 0 {
- 		rxc-skew-ps = <1500>;
- 		reg = <0>;
-+		interrupt-parent = <&gpio1>;
-+		interrupts = <17 IRQ_TYPE_LEVEL_LOW>;
- 	};
+diff --git a/arch/arm64/boot/dts/renesas/salvator-common.dtsi b/arch/arm64/boot/dts/renesas/salvator-common.dtsi
+index 320250d708c3..ce808d3f9f62 100644
+--- a/arch/arm64/boot/dts/renesas/salvator-common.dtsi
++++ b/arch/arm64/boot/dts/renesas/salvator-common.dtsi
+@@ -338,6 +338,15 @@
+ 	clock-frequency = <32768>;
  };
  
-diff --git a/arch/arm64/boot/dts/renesas/r8a77980-v3hsk.dts b/arch/arm64/boot/dts/renesas/r8a77980-v3hsk.dts
-index bb7e0e5cd57b..9dac42f8f804 100644
---- a/arch/arm64/boot/dts/renesas/r8a77980-v3hsk.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a77980-v3hsk.dts
-@@ -48,6 +48,8 @@
- 
- 	phy0: ethernet-phy at 0 {
- 		reg = <0>;
-+		interrupt-parent = <&gpio4>;
-+		interrupts = <23 IRQ_TYPE_LEVEL_LOW>;
++&hscif1 {
++	pinctrl-0 = <&hscif1_pins>;
++	pinctrl-names = "default";
++
++	uart-has-rtscts;
++	/* Please only enable hscif1 or scif1 */
++	/* status = "okay"; */
++};
++
+ &hsusb {
+ 	dr_mode = "otg";
+ 	status = "okay";
+@@ -543,6 +552,11 @@
+ 		function = "du";
  	};
+ 
++	hscif1_pins: hscif1 {
++		groups = "hscif1_data_a", "hscif1_ctrl_a";
++		function = "hscif1";
++	};
++
+ 	i2c2_pins: i2c2 {
+ 		groups = "i2c2_a";
+ 		function = "i2c2";
+@@ -708,6 +722,7 @@
+ 	pinctrl-names = "default";
+ 
+ 	uart-has-rtscts;
++	/* Please only enable hscif1 or scif1 */
+ 	status = "okay";
  };
  
 -- 
