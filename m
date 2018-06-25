@@ -1,45 +1,102 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Mon, 25 Jun 2018 14:02:55 +0200
-Subject: [PATCH v3 15/24] dt-bindings: display: sun4i-drm: Add description of
- A64 HDMI PHY
+Date: Mon, 25 Jun 2018 14:02:49 +0200
+Subject: [PATCH v3 09/24] drm/sun4i: Don't skip TCONs if they don't have
+ channel 0
 In-Reply-To: <20180625120304.7543-1-jernej.skrabec@siol.net>
 References: <20180625120304.7543-1-jernej.skrabec@siol.net>
-Message-ID: <20180625120304.7543-16-jernej.skrabec@siol.net>
+Message-ID: <20180625120304.7543-10-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A64 HDMI PHY is similar to H3 HDMI PHY except it has two possible PLL
-clock parents. It is compatible to other HDMI PHYs, like that found in
-R40.
+TV TCONs (channel 1 only) are always connected to TV or HDMI encoder.
+Because of that, all output endpoints on such TCON node will point to a
+encoder which is part of component framework.
 
-Acked-by: Rob Herring <robh@kernel.org>
+Correct current graph traversing algorithm in such way that it doesn't
+skip output enpoints with id 0 on TV TCONs.
+
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ drivers/gpu/drm/sun4i/sun4i_drv.c | 52 +++++++++++++++++++++----------
+ 1 file changed, 35 insertions(+), 17 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-index 84fe38dbb900..dc83f21ef188 100644
---- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-+++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-@@ -101,6 +101,7 @@ DWC HDMI PHY
+diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
+index e6c62c079146..6ddf4eaccb40 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_drv.c
++++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
+@@ -198,6 +198,22 @@ static bool sun4i_drv_node_is_tcon(struct device_node *node)
+ 	return !!of_match_node(sun4i_tcon_of_table, node);
+ }
  
- Required properties:
-   - compatible: value must be one of:
-+    * allwinner,sun50i-a64-hdmi-phy
-     * allwinner,sun8i-a83t-hdmi-phy
-     * allwinner,sun8i-h3-hdmi-phy
-   - reg: base address and size of memory-mapped region
-@@ -111,8 +112,9 @@ Required properties:
-   - resets: phandle to the reset controller driving the PHY
-   - reset-names: must be "phy"
++static bool sun4i_drv_node_is_tcon_with_ch0(struct device_node *node)
++{
++	const struct of_device_id *match;
++
++	match = of_match_node(sun4i_tcon_of_table, node);
++	if (match) {
++		struct sun4i_tcon_quirks *quirks;
++
++		quirks = (struct sun4i_tcon_quirks *)match->data;
++
++		return quirks->has_channel_0;
++	}
++
++	return false;
++}
++
+ static bool sun4i_drv_node_is_tcon_top(struct device_node *node)
+ {
+ 	return !!of_match_node(sun8i_tcon_top_of_table, node);
+@@ -256,14 +272,7 @@ static void sun4i_drv_traverse_endpoints(struct endpoint_list *list,
+ 			continue;
+ 		}
  
--H3 HDMI PHY requires additional clock:
-+H3 and A64 HDMI PHY require additional clocks:
-   - pll-0: parent of phy clock
-+  - pll-1: second possible phy clock parent (A64 only)
+-		/*
+-		 * If the node is our TCON, the first port is used for
+-		 * panel or bridges, and will not be part of the
+-		 * component framework.
+-		 */
+ 		if (sun4i_drv_node_is_tcon(node)) {
+-			struct of_endpoint endpoint;
+-
+ 			/*
+ 			 * TCON TOP is always probed before TCON. However, TCON
+ 			 * points back to TCON TOP when it is source for HDMI.
+@@ -276,16 +285,25 @@ static void sun4i_drv_traverse_endpoints(struct endpoint_list *list,
+ 				continue;
+ 			}
  
- TV Encoder
- ----------
+-			if (of_graph_parse_endpoint(ep, &endpoint)) {
+-				DRM_DEBUG_DRIVER("Couldn't parse endpoint\n");
+-				of_node_put(remote);
+-				continue;
+-			}
+-
+-			if (!endpoint.id) {
+-				DRM_DEBUG_DRIVER("Endpoint is our panel... skipping\n");
+-				of_node_put(remote);
+-				continue;
++			/*
++			 * If the node is our TCON with channel 0, the first
++			 * port is used for panel or bridges, and will not be
++			 * part of the component framework.
++			 */
++			if (sun4i_drv_node_is_tcon_with_ch0(node)) {
++				struct of_endpoint endpoint;
++
++				if (of_graph_parse_endpoint(ep, &endpoint)) {
++					DRM_DEBUG_DRIVER("Couldn't parse endpoint\n");
++					of_node_put(remote);
++					continue;
++				}
++
++				if (!endpoint.id) {
++					DRM_DEBUG_DRIVER("Endpoint is our panel... skipping\n");
++					of_node_put(remote);
++					continue;
++				}
+ 			}
+ 		}
+ 
 -- 
 2.18.0
