@@ -1,70 +1,109 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 25 Jun 2018 12:22:08 +0100
-Subject: [PATCH v2 1/6] coresight: Cleanup device subtype struct
+Date: Mon, 25 Jun 2018 12:22:11 +0100
+Subject: [PATCH v2 4/6] dts: bindings: Document device tree binding for CATU
 In-Reply-To: <20180625112213.23492-1-suzuki.poulose@arm.com>
 References: <20180625112213.23492-1-suzuki.poulose@arm.com>
-Message-ID: <20180625112213.23492-2-suzuki.poulose@arm.com>
+Message-ID: <20180625112213.23492-5-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Clean up our struct a little bit by using a union instead of
-a struct for tracking the subtype of a device.
+Document CATU device-tree bindings. CATU augments the TMC-ETR
+by providing an improved Scatter Gather mechanism for streaming
+trace data to non-contiguous system RAM pages.
 
+Cc: devicetree at vger.kernel.org
+Cc: frowand.list at gmail.com
+Cc: Rob Herring <robh@kernel.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- include/linux/coresight.h | 21 ++++++++++++---------
- 1 file changed, 12 insertions(+), 9 deletions(-)
+ .../devicetree/bindings/arm/coresight.txt          | 53 ++++++++++++++++++++++
+ 1 file changed, 53 insertions(+)
 
-diff --git a/include/linux/coresight.h b/include/linux/coresight.h
-index 69a5c9f..7c188c2 100644
---- a/include/linux/coresight.h
-+++ b/include/linux/coresight.h
-@@ -63,17 +63,20 @@ enum coresight_dev_subtype_source {
- };
+diff --git a/Documentation/devicetree/bindings/arm/coresight.txt b/Documentation/devicetree/bindings/arm/coresight.txt
+index 9aa30a1..5d1ad09 100644
+--- a/Documentation/devicetree/bindings/arm/coresight.txt
++++ b/Documentation/devicetree/bindings/arm/coresight.txt
+@@ -39,6 +39,8 @@ its hardware characteristcs.
  
- /**
-- * struct coresight_dev_subtype - further characterisation of a type
-+ * union coresight_dev_subtype - further characterisation of a type
-  * @sink_subtype:	type of sink this component is, as defined
--			by @coresight_dev_subtype_sink.
-+ *			by @coresight_dev_subtype_sink.
-  * @link_subtype:	type of link this component is, as defined
--			by @coresight_dev_subtype_link.
-+ *			by @coresight_dev_subtype_link.
-  * @source_subtype:	type of source this component is, as defined
--			by @coresight_dev_subtype_source.
-+ *			by @coresight_dev_subtype_source.
-  */
--struct coresight_dev_subtype {
--	enum coresight_dev_subtype_sink sink_subtype;
--	enum coresight_dev_subtype_link link_subtype;
-+union coresight_dev_subtype {
-+	/* We have some devices which acts as LINK and SINK */
-+	struct {
-+		enum coresight_dev_subtype_sink sink_subtype;
-+		enum coresight_dev_subtype_link link_subtype;
+ 		- System Trace Macrocell:
+ 			"arm,coresight-stm", "arm,primecell"; [1]
++		- Coresight Address Translation Unit (CATU)
++			"arm,coresight-catu", "arm,primecell";
+ 
+ 	* reg: physical base address and length of the register
+ 	  set(s) of the component.
+@@ -90,6 +92,10 @@ its hardware characteristcs.
+ 	* arm,scatter-gather: boolean. Indicates that the TMC-ETR can safely
+ 	  use the SG mode on this system.
+ 
++* Optional property for CATU :
++	* interrupts : Exactly one SPI may be listed for reporting the address
++	  error
++
+ Example:
+ 
+ 1. Sinks
+@@ -121,6 +127,35 @@ Example:
+ 		};
+ 	};
+ 
++	etr at 20070000 {
++		compatible = "arm,coresight-tmc", "arm,primecell";
++		reg = <0 0x20070000 0 0x1000>;
++
++		clocks = <&oscclk6a>;
++		clock-names = "apb_pclk";
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			/* input port */
++			port at 0 {
++				reg =  <0>;
++				etr_in_port: endpoint {
++					slave-mode;
++					remote-endpoint = <&replicator2_out_port0>;
++				};
++			};
++
++			/* CATU link represented by output port */
++			port at 1 {
++				reg = <1>;
++				etr_out_port: endpoint {
++					remote-endpoint = <&catu_in_port>;
++				};
++			};
++		};
 +	};
- 	enum coresight_dev_subtype_source source_subtype;
- };
++
+ 2. Links
+ 	replicator {
+ 		/* non-configurable replicators don't show up on the
+@@ -250,5 +285,23 @@ Example:
+ 		};
+ 	};
  
-@@ -111,7 +114,7 @@ struct coresight_platform_data {
-  */
- struct coresight_desc {
- 	enum coresight_dev_type type;
--	struct coresight_dev_subtype subtype;
-+	union coresight_dev_subtype subtype;
- 	const struct coresight_ops *ops;
- 	struct coresight_platform_data *pdata;
- 	struct device *dev;
-@@ -155,7 +158,7 @@ struct coresight_device {
- 	int nr_inport;
- 	int nr_outport;
- 	enum coresight_dev_type type;
--	struct coresight_dev_subtype subtype;
-+	union coresight_dev_subtype subtype;
- 	const struct coresight_ops *ops;
- 	struct device dev;
- 	atomic_t *refcnt;
++5. CATU
++
++	catu at 207e0000 {
++		compatible = "arm,coresight-catu", "arm,primecell";
++		reg = <0 0x207e0000 0 0x1000>;
++
++		clocks = <&oscclk6a>;
++		clock-names = "apb_pclk";
++
++		interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
++		port {
++			catu_in_port: endpoint {
++				slave-mode;
++				remote-endpoint = <&etr_out_port>;
++			};
++		};
++	};
++
+ [1]. There is currently two version of STM: STM32 and STM500.  Both
+ have the same HW interface and as such don't need an explicit binding name.
 -- 
 2.9.5
