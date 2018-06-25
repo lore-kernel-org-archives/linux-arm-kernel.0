@@ -1,72 +1,43 @@
-From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Mon, 25 Jun 2018 14:37:01 +0800
-Subject: [PATCH 2/2] usb: core: phy: fix return value checking about
- devm_of_phy_get_by_index()
-In-Reply-To: <CAFBinCBS+fpfx6jaaqD=kqFuMF6ko8GikbV1ZVwgbDh-Sn8T8w@mail.gmail.com>
-References: <4c338a129ab14ab41949da5e3c21aed0d77dff8d.1529647619.git.chunfeng.yun@mediatek.com>
- <644d00edd2932c1a0d0a1bf368dd25427d1d9f64.1529647619.git.chunfeng.yun@mediatek.com>
- <CAFBinCBS+fpfx6jaaqD=kqFuMF6ko8GikbV1ZVwgbDh-Sn8T8w@mail.gmail.com>
-Message-ID: <1529908621.32173.27.camel@mhfsdcap03>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Mon, 25 Jun 2018 10:33:19 +0300
+Subject: [PATCH] dt-bindings: serial: imx: clarify rs485 support usage
+Message-ID: <01fc1e3d89037adce38177c3922d277584214fdd.1529911999.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2018-06-24 at 20:00 +0200, Martin Blumenstingl wrote:
-> Hello Chunfeng,
-> 
-> thank you for the patch!
-> 
-> On Fri, Jun 22, 2018 at 8:33 AM Chunfeng Yun <chunfeng.yun@mediatek.com> wrote:
-> >
-> > 1. use IS_ERR() but not IS_ERR_OR_NULL() because devm_of_phy_get_by_index()
-> >     never return NULL value;
-> ACK - good catch!
-> 
-> > 2. devm_of_phy_get_by_index() should not fail for a valid index
-> I have learned that the PHY framework can return -ENODEV if the PHY is:
-> 1. supposed to be handled by the legacy USB PHY framework
-> 2. the PHY node is disabled in devicetree
-A little confused, we can avoid this error by not using a disabled or
-"usb-nop-xceiv" phy in host node.
+The i.MX UART peripheral uses the RST_B signal as input, and CTS_B as
+output. This is just like the CDE role in RS-232. This is true
+regardless of the "DTE mode" setting of this peripheral.
 
-If ignore error of -ENODEV, we will also skip an error case which we
-don't want it happen. 
+As a result, rs485 support hardware must use the CTS_B signal to control
+the RS-485 transceiver. This is in contrast to generic rs485 kernel
+code, documentation, and DT property names that consistently refer to
+the RST as transceiver control signal.
 
-> 
-> see [0] for the code in the PHY framework and [1] for the discussion
-> with Johan (who informed me of case #1, I added him on this mail)
-> 
-> > Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-> > ---
-> >  drivers/usb/core/phy.c | 11 ++++-------
-> >  1 file changed, 4 insertions(+), 7 deletions(-)
-> >
-> > diff --git a/drivers/usb/core/phy.c b/drivers/usb/core/phy.c
-> > index 9879767..0f972e1 100644
-> > --- a/drivers/usb/core/phy.c
-> > +++ b/drivers/usb/core/phy.c
-> > @@ -23,14 +23,11 @@ static int usb_phy_roothub_add_phy(struct device *dev, int index,
-> >                                    struct list_head *list)
-> >  {
-> >         struct usb_phy_roothub *roothub_entry;
-> > -       struct phy *phy = devm_of_phy_get_by_index(dev, dev->of_node, index);
-> > +       struct phy *phy;
-> >
-> > -       if (IS_ERR_OR_NULL(phy)) {
-> > -               if (!phy || PTR_ERR(phy) == -ENODEV)
-> > -                       return 0;
-> > -               else
-> > -                       return PTR_ERR(phy);
-> > -       }
-> > +       phy = devm_of_phy_get_by_index(dev, dev->of_node, index);
-> > +       if (IS_ERR(phy))
-> > +               return PTR_ERR(phy);
-> @Johan can you please review this as well? maybe we need to keep the
-> -ENODEV check
-> 
-> 
-> Regards
-> Martin
-> 
-> 
-> [0] https://elixir.bootlin.com/linux/v4.18-rc2/source/drivers/phy/phy-core.c#L421
-> [1] https://lkml.org/lkml/2018/4/19/88
+Add a note in the DT binding document about that, to reduce the
+confusion somewhat.
+
+Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+---
+ Documentation/devicetree/bindings/serial/fsl-imx-uart.txt | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/Documentation/devicetree/bindings/serial/fsl-imx-uart.txt b/Documentation/devicetree/bindings/serial/fsl-imx-uart.txt
+index afcfbc34e243..35957cbf1571 100644
+--- a/Documentation/devicetree/bindings/serial/fsl-imx-uart.txt
++++ b/Documentation/devicetree/bindings/serial/fsl-imx-uart.txt
+@@ -9,7 +9,11 @@ Optional properties:
+ - fsl,dte-mode : Indicate the uart works in DTE mode. The uart works
+                   in DCE mode by default.
+ - rs485-rts-delay, rs485-rts-active-low, rs485-rx-during-tx,
+-  linux,rs485-enabled-at-boot-time: see rs485.txt
++  linux,rs485-enabled-at-boot-time: see rs485.txt. Note that for RS485
++  you must enable either the "uart-has-rtscts" or the "rts-gpios"
++  properties. In case you use "uart-has-rtscts" the signal that controls
++  the transceiver is actually CTS_B, not RTS_B. CTS_B is always output,
++  and RTS_B is input, regardless of dte-mode.
+ 
+ Please check Documentation/devicetree/bindings/serial/serial.txt
+ for the complete list of generic properties.
+-- 
+2.18.0
