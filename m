@@ -1,118 +1,51 @@
-From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Mon, 25 Jun 2018 17:49:58 +0200
-Subject: [PATCH 7/9] media: cedrus: Move IRQ maintainance to cedrus_dec_ops
-In-Reply-To: <d8e471608643a014d0961c82256753e5fd0c5060.camel@bootlin.com>
-References: <20180613140714.1686-1-maxime.ripard@bootlin.com>
- <20180613140714.1686-8-maxime.ripard@bootlin.com>
- <d8e471608643a014d0961c82256753e5fd0c5060.camel@bootlin.com>
-Message-ID: <03f66b80b1a60c4fe62822b08eb5d97c0539aac0.camel@bootlin.com>
+From: ludovic.Barre@st.com (Ludovic Barre)
+Date: Mon, 25 Jun 2018 17:42:59 +0200
+Subject: [PATCH V5 1/5] dt-bindings: watchdog: add stm32mp1 support
+In-Reply-To: <1529941383-8653-1-git-send-email-ludovic.Barre@st.com>
+References: <1529941383-8653-1-git-send-email-ludovic.Barre@st.com>
+Message-ID: <1529941383-8653-2-git-send-email-ludovic.Barre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2018-06-25 at 17:38 +0200, Paul Kocialkowski wrote:
-> Hi,
-> 
-> On Wed, 2018-06-13 at 16:07 +0200, Maxime Ripard wrote:
-> > The IRQ handler up until now was hardcoding the use of the MPEG engine to
-> > read the interrupt status, clear it and disable the interrupts.
-> > 
-> > Obviously, that won't work really well with the introduction of new codecs
-> > that use a separate engine with a separate register set.
-> > 
-> > In order to make this more future proof, introduce new decodec operations
-> > to deal with the interrupt management. The only one missing is the one to
-> > enable the interrupts in the first place, but that's taken care of by the
-> > trigger hook for now.
-> 
-> Here's another comment about an issue I just figured out.
-> 
-> > Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
-> > ---
-> >  .../sunxi/cedrus/sunxi_cedrus_common.h        |  9 +++++
-> >  .../platform/sunxi/cedrus/sunxi_cedrus_hw.c   | 21 ++++++------
-> >  .../sunxi/cedrus/sunxi_cedrus_mpeg2.c         | 33 +++++++++++++++++++
-> >  3 files changed, 53 insertions(+), 10 deletions(-)
-> > 
-> > diff --git a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h
-> > index c2e2c92d103b..a2a507eb9fc9 100644
-> > --- a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h
-> > +++ b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h
-> > @@ -108,7 +108,16 @@ struct sunxi_cedrus_buffer *vb2_to_cedrus_buffer(const struct vb2_buffer *p)
-> >  	return vb2_v4l2_to_cedrus_buffer(to_vb2_v4l2_buffer(p));
-> >  }
-> >  
-> > +enum sunxi_cedrus_irq_status {
-> > +	SUNXI_CEDRUS_IRQ_NONE,
-> > +	SUNXI_CEDRUS_IRQ_ERROR,
-> > +	SUNXI_CEDRUS_IRQ_OK,
-> > +};
-> > +
-> >  struct sunxi_cedrus_dec_ops {
-> > +	void (*irq_clear)(struct sunxi_cedrus_ctx *ctx);
-> > +	void (*irq_disable)(struct sunxi_cedrus_ctx *ctx);
-> > +	enum sunxi_cedrus_irq_status (*irq_status)(struct sunxi_cedrus_ctx *ctx);
-> >  	void (*setup)(struct sunxi_cedrus_ctx *ctx,
-> >  		      struct sunxi_cedrus_run *run);
-> >  	void (*trigger)(struct sunxi_cedrus_ctx *ctx);
-> > diff --git a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_hw.c b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_hw.c
-> > index bb46a01214e0..6b97cbd2834e 100644
-> > --- a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_hw.c
-> > +++ b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_hw.c
-> > @@ -77,27 +77,28 @@ static irqreturn_t sunxi_cedrus_ve_irq(int irq, void *dev_id)
-> >  	struct sunxi_cedrus_ctx *ctx;
-> >  	struct sunxi_cedrus_buffer *src_buffer, *dst_buffer;
-> >  	struct vb2_v4l2_buffer *src_vb, *dst_vb;
-> > +	enum sunxi_cedrus_irq_status status;
-> >  	unsigned long flags;
-> > -	unsigned int value, status;
-> >  
-> >  	spin_lock_irqsave(&dev->irq_lock, flags);
-> >  
-> > -	/* Disable MPEG interrupts and stop the MPEG engine */
-> > -	value = sunxi_cedrus_read(dev, VE_MPEG_CTRL);
-> > -	sunxi_cedrus_write(dev, value & (~0xf), VE_MPEG_CTRL);
-> > -
-> > -	status = sunxi_cedrus_read(dev, VE_MPEG_STATUS);
-> > -	sunxi_cedrus_write(dev, 0x0000c00f, VE_MPEG_STATUS);
-> > -	sunxi_cedrus_engine_disable(dev);
-> 
-> This call was dropped from the code reorganization. What it intentional?
-> 
-> IMO, it should be brought back to the irq_disable ops for MPEG2 (and the
-> same probably applies to H264).
+From: Ludovic Barre <ludovic.barre@st.com>
 
-Actually, this doesn't seem like the right place to put it.
+This patch adds support of stm32mp1.
+stm32mp1 requires 2 clocks lsi and pclk.
 
-Looking at the sunxi_engine_enable function, explicitly passing the
-codec as an argument and calling that function from each codec's code
-feels strange.
+Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+---
+ .../devicetree/bindings/watchdog/st,stm32-iwdg.txt          | 13 ++++++++++---
+ 1 file changed, 10 insertions(+), 3 deletions(-)
 
-We should probably break down these functions
-(sunxi_engine_enable/sunxi_engine_disable) into codec ops. The
-start/stop couple seems like a good fit, but it brings up the following
-question: do we want to disable the engine between each frame or not?
-
-I really don't know how significant the power saving benefits are and
-what downsides there might be.
-
-What do you think?
-
->  Things still seem to work without it,
-> though, but there might be a difference in terms of standby VPU power
-> consumption.
-> 
-> Cheers,
-> 
-> Paul
-> 
+diff --git a/Documentation/devicetree/bindings/watchdog/st,stm32-iwdg.txt b/Documentation/devicetree/bindings/watchdog/st,stm32-iwdg.txt
+index cc13b10a..d8f4430 100644
+--- a/Documentation/devicetree/bindings/watchdog/st,stm32-iwdg.txt
++++ b/Documentation/devicetree/bindings/watchdog/st,stm32-iwdg.txt
+@@ -2,9 +2,15 @@ STM32 Independent WatchDoG (IWDG)
+ ---------------------------------
+ 
+ Required properties:
+-- compatible: "st,stm32-iwdg"
+-- reg: physical base address and length of the registers set for the device
+-- clocks: must contain a single entry describing the clock input
++- compatible: Should be either:
++  - "st,stm32-iwdg"
++  - "st,stm32mp1-iwdg"
++- reg: Physical base address and length of the registers set for the device
++- clocks: Reference to the clock entry lsi. Additional pclk clock entry
++  is required only for st,stm32mp1-iwdg.
++- clock-names: Name of the clocks used.
++  "lsi" for st,stm32-iwdg
++  "lsi", "pclk" for st,stm32mp1-iwdg
+ 
+ Optional Properties:
+ - timeout-sec: Watchdog timeout value in seconds.
+@@ -15,5 +21,6 @@ iwdg: watchdog at 40003000 {
+ 	compatible = "st,stm32-iwdg";
+ 	reg = <0x40003000 0x400>;
+ 	clocks = <&clk_lsi>;
++	clock-names = "lsi";
+ 	timeout-sec = <32>;
+ };
 -- 
-Paul Kocialkowski, Bootlin (formerly Free Electrons)
-Embedded Linux and kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180625/c279bd89/attachment-0001.sig>
+2.7.4
