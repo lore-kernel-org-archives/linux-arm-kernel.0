@@ -1,36 +1,92 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Tue, 26 Jun 2018 09:50:08 +0200
-Subject: [PATCH 0/2] ARM: dts: Correct SCU unit address
-Message-ID: <20180626075010.15611-1-geert+renesas@glider.be>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 26 Jun 2018 08:53:20 +0100
+Subject: [PATCH v2 2/2] arm64: dts: mediatek: add mt6765 support
+In-Reply-To: <1529978646-28976-3-git-send-email-mars.cheng@mediatek.com>
+References: <1529978646-28976-1-git-send-email-mars.cheng@mediatek.com>
+ <1529978646-28976-3-git-send-email-mars.cheng@mediatek.com>
+Message-ID: <86h8lq6l1r.wl-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-	Hi All,
+On Tue, 26 Jun 2018 03:04:06 +0100,
+Mars Cheng <mars.cheng@mediatek.com> wrote:
+> 
+> This adds basic chip support for MT6765 SoC.
+> 
+> Signed-off-by: Mars Cheng <mars.cheng@mediatek.com>
+> ---
+>  arch/arm64/boot/dts/mediatek/Makefile       |    1 +
+>  arch/arm64/boot/dts/mediatek/mt6765-evb.dts |   33 ++++++
+>  arch/arm64/boot/dts/mediatek/mt6765.dtsi    |  158 +++++++++++++++++++++++++++
+>  3 files changed, 192 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/mediatek/mt6765-evb.dts
+>  create mode 100644 arch/arm64/boot/dts/mediatek/mt6765.dtsi
+> 
+> diff --git a/arch/arm64/boot/dts/mediatek/mt6765.dtsi b/arch/arm64/boot/dts/mediatek/mt6765.dtsi
+> new file mode 100644
+> index 0000000..ab34c0f
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/mediatek/mt6765.dtsi
 
-This patch series fixes the unit address for the SCU node in the ux500
-DT source, which has spread to the UX500 and generic ARM DT bindings.
+[...]
 
-Thanks!
+> +	timer {
+> +		compatible = "arm,armv8-timer";
+> +		interrupt-parent = <&gic>;
+> +		interrupts = <GIC_PPI 13
+> +			     (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
+> +			     <GIC_PPI 14
+> +			     (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
+> +			     <GIC_PPI 11
+> +			     (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
+> +			     <GIC_PPI 10
+> +			     (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>;
 
-Geert Uytterhoeven (2):
-  ARM: dts: ux500: Correct SCU unit address
-  dt-bindings: arm: scu: Correct example SCU unit addresses
+GICv3 doesn't encode the PPI affinity in its interrupt specifiers (or
+at least not this way). Please drop it.
 
- Documentation/devicetree/bindings/arm/scu.txt          | 2 +-
- Documentation/devicetree/bindings/arm/ux500/boards.txt | 2 +-
- arch/arm/boot/dts/ste-dbx5x0.dtsi                      | 2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+> +	};
+> +
+> +	soc {
+> +		#address-cells = <2>;
+> +		#size-cells = <2>;
+> +		compatible = "simple-bus";
+> +		ranges;
+> +
+> +		sysirq: intpol-controller at 10200a80 {
+> +			compatible = "mediatek,mt6765-sysirq",
+> +				     "mediatek,mt6577-sysirq";
+> +			interrupt-controller;
+> +			#interrupt-cells = <3>;
+> +			interrupt-parent = <&gic>;
+> +			reg = <0 0x10200a80 0 0x50>;
+> +		};
+> +
+> +		gic: interrupt-controller at 0c000000 {
+> +			compatible = "arm,gic-v3";
+> +			#interrupt-cells = <3>;
+> +			#address-cells = <2>;
+> +			#size-cells = <2>;
+> +			#redistributor-regions = <1>;
+
+A single redistributor is the default, and you don't need to specify
+it in the DT.
+
+> +			interrupt-parent = <&gic>;
+> +			interrupt-controller;
+> +			reg = <0 0x0c000000 0 0x40000>, // distributor
+> +			      <0 0x0c100000 0 0x200000>; // redistributor
+
+How about the GICv2 compatibility regions, which are provided by the
+CPUs at a fixed offset from PERIPHBASE? See the Cortex-A53 TRM for
+detail, and please add the missing regions.
+
+> +			interrupts = <GIC_PPI 9 IRQ_TYPE_LEVEL_HIGH>;
+> +		};
+
+Thanks,
+
+	M.
 
 -- 
-2.17.1
-
-Gr{oetje,eeting}s,
-
-						Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-							    -- Linus Torvalds
+Jazz is not dead, it just smell funny.
