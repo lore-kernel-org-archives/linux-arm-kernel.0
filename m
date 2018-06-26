@@ -1,5 +1,5 @@
 From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Tue, 26 Jun 2018 18:27:01 +0100
+Date: Tue, 26 Jun 2018 18:27:13 +0100
 Subject: [PATCH 1/2] arm64: avoid alloc memory on offline node
 In-Reply-To: <20180622184223.00007bc3@huawei.com> (Jonathan Cameron's message
  of "Fri, 22 Jun 2018 18:42:23 +0100")
@@ -16,7 +16,7 @@ References: <20180619120714.GE13685@dhcp22.suse.cz>
  <20180622091153.GU10465@dhcp22.suse.cz>
  <87y3f7yv89.fsf@e105922-lin.cambridge.arm.com>
  <20180622184223.00007bc3@huawei.com>
-Message-ID: <87muvhwja2.fsf@e105922-lin.cambridge.arm.com>
+Message-ID: <87lgb1wj9q.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
