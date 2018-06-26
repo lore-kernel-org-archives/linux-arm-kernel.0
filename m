@@ -1,97 +1,59 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Tue, 26 Jun 2018 12:22:37 +0200
-Subject: [PATCH v2 07/15] net: davinci_emac: use nvmem to retrieve the mac
+Date: Tue, 26 Jun 2018 12:22:34 +0200
+Subject: [PATCH v2 04/15] ARM: davinci: dm646x-evm: use nvmem lookup for mac
  address
 In-Reply-To: <20180626102245.30711-1-brgl@bgdev.pl>
 References: <20180626102245.30711-1-brgl@bgdev.pl>
-Message-ID: <20180626102245.30711-8-brgl@bgdev.pl>
+Message-ID: <20180626102245.30711-5-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-All users which store the MAC address in EEPROM now register relevant
-nvmem cells. Switch to retrieving the MAC address over the nvmem
-framework. If we can't get the nvmem cell then fall back to using
-the device tree.
+We now support nvmem lookups for machine code. Add a lookup for
+mac-address.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- drivers/net/ethernet/ti/davinci_emac.c | 33 ++++++++++++++++++--------
- 1 file changed, 23 insertions(+), 10 deletions(-)
+ arch/arm/mach-davinci/board-dm646x-evm.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/drivers/net/ethernet/ti/davinci_emac.c b/drivers/net/ethernet/ti/davinci_emac.c
-index a1a6445b5a7e..48b70bc7b9cf 100644
---- a/drivers/net/ethernet/ti/davinci_emac.c
-+++ b/drivers/net/ethernet/ti/davinci_emac.c
-@@ -67,7 +67,7 @@
- #include <linux/of_irq.h>
- #include <linux/of_net.h>
- #include <linux/mfd/syscon.h>
--
-+#include <linux/nvmem-consumer.h>
- #include <asm/irq.h>
- #include <asm/page.h>
+diff --git a/arch/arm/mach-davinci/board-dm646x-evm.c b/arch/arm/mach-davinci/board-dm646x-evm.c
+index 584064fdabf5..4c82d38033b6 100644
+--- a/arch/arm/mach-davinci/board-dm646x-evm.c
++++ b/arch/arm/mach-davinci/board-dm646x-evm.c
+@@ -37,6 +37,7 @@
+ #include <linux/platform_data/i2c-davinci.h>
+ #include <linux/platform_data/mtd-davinci.h>
+ #include <linux/platform_data/mtd-davinci-aemif.h>
++#include <linux/nvmem-provider.h>
  
-@@ -1696,7 +1696,6 @@ davinci_emac_of_get_pdata(struct platform_device *pdev, struct emac_priv *priv)
- 	const struct of_device_id *match;
- 	const struct emac_platform_data *auxdata;
- 	struct emac_platform_data *pdata = NULL;
--	const u8 *mac_addr;
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+@@ -310,6 +311,15 @@ static struct pcf857x_platform_data pcf_data = {
+  *  - ... newer boards may have more
+  */
  
- 	if (!IS_ENABLED(CONFIG_OF) || !pdev->dev.of_node)
- 		return dev_get_platdata(&pdev->dev);
-@@ -1708,12 +1707,6 @@ davinci_emac_of_get_pdata(struct platform_device *pdev, struct emac_priv *priv)
- 	np = pdev->dev.of_node;
- 	pdata->version = EMAC_VERSION_2;
- 
--	if (!is_valid_ether_addr(pdata->mac_addr)) {
--		mac_addr = of_get_mac_address(np);
--		if (mac_addr)
--			ether_addr_copy(pdata->mac_addr, mac_addr);
--	}
--
- 	of_property_read_u32(np, "ti,davinci-ctrl-reg-offset",
- 			     &pdata->ctrl_reg_offset);
- 
-@@ -1783,7 +1776,9 @@ static int davinci_emac_probe(struct platform_device *pdev)
- 	struct cpdma_params dma_params;
- 	struct clk *emac_clk;
- 	unsigned long emac_bus_frequency;
--
-+	struct nvmem_cell *cell;
-+	const void *mac_addr;
-+	size_t mac_addr_len;
- 
- 	/* obtain emac clock from kernel */
- 	emac_clk = devm_clk_get(&pdev->dev, NULL);
-@@ -1815,8 +1810,26 @@ static int davinci_emac_probe(struct platform_device *pdev)
- 		goto err_free_netdev;
- 	}
- 
-+	cell = nvmem_cell_get(&pdev->dev, "mac-address");
-+	if (!IS_ERR(cell)) {
-+		mac_addr = nvmem_cell_read(cell, &mac_addr_len);
-+		if (!IS_ERR(mac_addr)) {
-+			if (is_valid_ether_addr(mac_addr)) {
-+				dev_info(&pdev->dev,
-+					 "Read MAC addr from EEPROM: %pM\n",
-+					 mac_addr);
-+				ether_addr_copy(priv->mac_addr, mac_addr);
-+			}
-+			kfree(mac_addr);
-+		}
-+		nvmem_cell_put(cell);
-+	} else {
-+		mac_addr = of_get_mac_address(np);
-+		if (mac_addr)
-+			ether_addr_copy(priv->mac_addr, mac_addr);
-+	}
++static struct nvmem_cell_lookup dm646x_evm_mac_address_cell = {
++	.info = {
++		.name = "mac-address",
++		.offset = 0x7f00,
++		.bytes = ETH_ALEN,
++	},
++	.nvmem_name = "1-00500",
++};
 +
- 	/* MAC addr and PHY mask , RMII enable info from platform_data */
--	memcpy(priv->mac_addr, pdata->mac_addr, ETH_ALEN);
- 	priv->phy_id = pdata->phy_id;
- 	priv->rmii_en = pdata->rmii_en;
- 	priv->version = pdata->version;
+ static struct at24_platform_data eeprom_info = {
+ 	.byte_len       = (256*1024) / 8,
+ 	.page_size      = 64,
+@@ -802,6 +812,8 @@ static __init void evm_init(void)
+ 		davinci_init_ide();
+ 
+ 	soc_info->emac_pdata->phy_id = DM646X_EVM_PHY_ID;
++
++	nvmem_register_lookup(&dm646x_evm_mac_address_cell, 1);
+ }
+ 
+ MACHINE_START(DAVINCI_DM6467_EVM, "DaVinci DM646x EVM")
 -- 
 2.17.1
