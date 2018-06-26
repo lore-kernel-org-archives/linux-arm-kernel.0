@@ -1,23 +1,54 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Tue, 26 Jun 2018 10:22:55 +0200
-Subject: [PATCH] drm/rockchip: vop: fixup linebuffer mode calc error
-In-Reply-To: <1530001004-25036-1-git-send-email-hjc@rock-chips.com>
-References: <1530001004-25036-1-git-send-email-hjc@rock-chips.com>
-Message-ID: <61227765.LN80DIZAeb@diego>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Tue, 26 Jun 2018 10:23:30 +0200
+Subject: [PATCH 0/4] media: sun6i: Add support for the H3 CSI controller
+In-Reply-To: <CAMty3ZBQXyvOnzy_9RLDW-QO9qnAC4SR5UJnWYmhiPrP23z_vg@mail.gmail.com>
+References: <20180305100432.15009-1-maxime.ripard@bootlin.com>
+ <CAMty3ZBQXyvOnzy_9RLDW-QO9qnAC4SR5UJnWYmhiPrP23z_vg@mail.gmail.com>
+Message-ID: <20180626082330.pvq3gi6mmokky5vl@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 26. Juni 2018, 10:16:44 CEST schrieb Sandy Huang:
-> linebuffer mode should be LB_YUV_3840X5 when width is bigger
-> than 1280 in yuv mode.
-> seperate yuv and rgb case make the scl_vop_cal_lb_mode() logic
-> is clearer.
+Hi,
+
+On Tue, Jun 26, 2018 at 11:41:56AM +0530, Jagan Teki wrote:
+> On Mon, Mar 5, 2018 at 3:34 PM, Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+> > The H3 and H5 have a CSI controller based on the one previously found
+> > in the A31, that is currently supported by the sun6i-csi driver.
+> >
+> > Add the compatibles to the device tree bindings and to the driver to
+> > make it work properly.
+> >
+> > This obviously depends on the serie "Initial Allwinner V3s CSI
+> > Support" by Yong Deng.
+> >
+> > Let me know what you think,
+> > Maxime
+> >
+> > Maxime Ripard (2):
+> >   dt-bindings: media: sun6i: Add A31 and H3 compatibles
+> >   media: sun6i: Add A31 compatible
+> >
+> > Myl?ne Josserand (2):
+> >   ARM: dts: sun8i: Add the H3/H5 CSI controller
+> >   [DO NOT MERGE] ARM: dts: sun8i: Add CAM500B camera module to the Nano
+> >     Pi M1+
 > 
-> Signed-off-by: Sandy Huang <hjc@rock-chips.com>
-> Link:
-> https://patchwork.freedesktop.org/patch/msgid/1523960108-190541-1-git-send-> email-hjc at rock-chips.com
+> Just trying to understand what interface has been tested with npi-m1+,
+> is it DVP (parallel) interface?
 
-Missing the "v2" in the subject, but I remembered and found the v1 from april. 
-And it looks great now.
+Yes
 
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+> I've Bananapi 5MP[1] and trying to test on top, and look like its
+> MIPI CSI2. I guess Yong patch[2] doesn't support CSI2 yet, am I
+> correct?
+
+This is what Yong's cover letter is saying yes :)
+
+The name Allwinner chose for this IP is very unfortunate...
+
+Maxime
+
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
