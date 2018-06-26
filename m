@@ -1,63 +1,78 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 26 Jun 2018 10:42:10 +0100
-Subject: [PATCH v2] arm: Hook up SYNC_CORE functionality for sys_membarrier()
-Message-ID: <1530006130-18048-1-git-send-email-will.deacon@arm.com>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Tue, 26 Jun 2018 11:51:15 +0200
+Subject: [PATCH v3] ARM: dts: stm32: Add ADC support to stm32mp157c
+In-Reply-To: <1527003937-15999-1-git-send-email-fabrice.gasnier@st.com>
+References: <1527003937-15999-1-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <3b44dd54-087c-e10f-4bf5-3728e735ee0c@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Exception return implies context synchronization, so we can hook up the
-SYNC_CORE option to sys_membarrier() simply by selecting the Kconfig option,
-just like we've done for arm64 already.
+Hi Fabrice
 
-Cc: Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
-Cc: Orion Hodson <oth@google.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
+On 05/22/2018 05:45 PM, Fabrice Gasnier wrote:
+> stm32mp157c has an ADC block with two physical ADCs.
+> 
+> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+> ---
+> Changes in v3:
+> - Add dmas since dmamux1 has been added on top of stm32-next
+> ---
+>   arch/arm/boot/dts/stm32mp157c.dtsi | 36 ++++++++++++++++++++++++++++++++++++
+>   1 file changed, 36 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/stm32mp157c.dtsi b/arch/arm/boot/dts/stm32mp157c.dtsi
+> index b66f673..66d7496 100644
+> --- a/arch/arm/boot/dts/stm32mp157c.dtsi
+> +++ b/arch/arm/boot/dts/stm32mp157c.dtsi
 
-v1 -> v2: Update arch-support.txt
 
- .../features/sched/membarrier-sync-core/arch-support.txt          | 8 ++++----
- arch/arm/Kconfig                                                  | 1 +
- 2 files changed, 5 insertions(+), 4 deletions(-)
+Applied on stm32-next.
 
-diff --git a/Documentation/features/sched/membarrier-sync-core/arch-support.txt b/Documentation/features/sched/membarrier-sync-core/arch-support.txt
-index dbdf62907703..c7858dd1ea8f 100644
---- a/Documentation/features/sched/membarrier-sync-core/arch-support.txt
-+++ b/Documentation/features/sched/membarrier-sync-core/arch-support.txt
-@@ -5,10 +5,10 @@
- #
- # Architecture requirements
- #
--# * arm64
-+# * arm/arm64
- #
--# Rely on eret context synchronization when returning from IPI handler, and
--# when returning to user-space.
-+# Rely on implicit context synchronization as a result of exception return
-+# when returning from IPI handler, and when returning to user-space.
- #
- # * x86
- #
-@@ -31,7 +31,7 @@
-     -----------------------
-     |       alpha: | TODO |
-     |         arc: | TODO |
--    |         arm: | TODO |
-+    |         arm: |  ok  |
-     |       arm64: |  ok  |
-     |         c6x: | TODO |
-     |       h8300: | TODO |
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 54eeb8d00bc6..b0ac18547370 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -9,6 +9,7 @@ config ARM
- 	select ARCH_HAS_ELF_RANDOMIZE
- 	select ARCH_HAS_FORTIFY_SOURCE
- 	select ARCH_HAS_KCOV
-+	select ARCH_HAS_MEMBARRIER_SYNC_CORE
- 	select ARCH_HAS_PTE_SPECIAL if ARM_LPAE
- 	select ARCH_HAS_PHYS_TO_DMA
- 	select ARCH_HAS_SET_MEMORY
--- 
-2.1.4
+Thanks.
+Alex
+
+
+> @@ -600,6 +600,42 @@
+>   			clocks = <&rcc DMAMUX>;
+>   		};
+>   
+> +		adc: adc at 48003000 {
+> +			compatible = "st,stm32mp1-adc-core";
+> +			reg = <0x48003000 0x400>;
+> +			interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>,
+> +				     <GIC_SPI 90 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&rcc ADC12>, <&rcc ADC12_K>;
+> +			clock-names = "bus", "adc";
+> +			interrupt-controller;
+> +			#interrupt-cells = <1>;
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			status = "disabled";
+> +
+> +			adc1: adc at 0 {
+> +				compatible = "st,stm32mp1-adc";
+> +				#io-channel-cells = <1>;
+> +				reg = <0x0>;
+> +				interrupt-parent = <&adc>;
+> +				interrupts = <0>;
+> +				dmas = <&dmamux1 9 0x400 0x01>;
+> +				dma-names = "rx";
+> +				status = "disabled";
+> +			};
+> +
+> +			adc2: adc at 100 {
+> +				compatible = "st,stm32mp1-adc";
+> +				#io-channel-cells = <1>;
+> +				reg = <0x100>;
+> +				interrupt-parent = <&adc>;
+> +				interrupts = <1>;
+> +				dmas = <&dmamux1 10 0x400 0x01>;
+> +				dma-names = "rx";
+> +				status = "disabled";
+> +			};
+> +		};
+> +
+>   		rcc: rcc at 50000000 {
+>   			compatible = "st,stm32mp1-rcc", "syscon";
+>   			reg = <0x50000000 0x1000>;
+> 
