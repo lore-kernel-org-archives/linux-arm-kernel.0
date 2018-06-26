@@ -1,54 +1,110 @@
 From: james.morse@arm.com (James Morse)
-Date: Tue, 26 Jun 2018 18:00:59 +0100
-Subject: [PATCH v5 03/20] ACPI / APEI: don't wait to serialise with oops
- messages when panic()ing
+Date: Tue, 26 Jun 2018 18:01:01 +0100
+Subject: [PATCH v5 05/20] ACPI / APEI: Make estatus queue a Kconfig symbol
 In-Reply-To: <20180626170116.25825-1-james.morse@arm.com>
 References: <20180626170116.25825-1-james.morse@arm.com>
-Message-ID: <20180626170116.25825-4-james.morse@arm.com>
+Message-ID: <20180626170116.25825-6-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-oops_begin() exists to group printk() messages with the oops message
-printed by die(). To reach this caller we know that platform firmware
-took this error first, then notified the OS via NMI with a 'panic'
-severity.
+Now that there are two users of the estatus queue, and likely to be more,
+make it a Kconfig symbol selected by the appropriate notification. We
+can move the ARCH_HAVE_NMI_SAFE_CMPXCHG checks in here too.
 
-Don't wait for another CPU to release the die-lock before we can
-panic(), our only goal is to print this fatal error and panic().
-
-This code is always called in_nmi(), and since 42a0bb3f7138 ("printk/nmi:
-generic solution for safe printk in NMI"), it has been safe to call
-printk() from this context. Messages are batched in a per-cpu buffer
-and printed via irq-work, or a call back from panic().
-
-Link: https://patchwork.kernel.org/patch/10313555/
-Acked-by: Borislav Petkov <bp@suse.de>
 Signed-off-by: James Morse <james.morse@arm.com>
 ---
- drivers/acpi/apei/ghes.c | 4 ----
- 1 file changed, 4 deletions(-)
+ drivers/acpi/apei/Kconfig |  6 ++++++
+ drivers/acpi/apei/ghes.c  | 12 +++---------
+ 2 files changed, 9 insertions(+), 9 deletions(-)
 
+diff --git a/drivers/acpi/apei/Kconfig b/drivers/acpi/apei/Kconfig
+index 52ae5438edeb..2b191e09b647 100644
+--- a/drivers/acpi/apei/Kconfig
++++ b/drivers/acpi/apei/Kconfig
+@@ -4,6 +4,7 @@ config HAVE_ACPI_APEI
+ 
+ config HAVE_ACPI_APEI_NMI
+ 	bool
++	select ACPI_APEI_GHES_ESTATUS_QUEUE
+ 
+ config ACPI_APEI
+ 	bool "ACPI Platform Error Interface (APEI)"
+@@ -33,6 +34,10 @@ config ACPI_APEI_GHES
+ 	  by firmware to produce more valuable hardware error
+ 	  information for Linux.
+ 
++config ACPI_APEI_GHES_ESTATUS_QUEUE
++	bool
++	depends on ACPI_APEI_GHES && ARCH_HAVE_NMI_SAFE_CMPXCHG
++
+ config ACPI_APEI_PCIEAER
+ 	bool "APEI PCIe AER logging/recovering support"
+ 	depends on ACPI_APEI && PCIEAER
+@@ -43,6 +48,7 @@ config ACPI_APEI_PCIEAER
+ config ACPI_APEI_SEA
+ 	bool "APEI Synchronous External Abort logging/recovering support"
+ 	depends on ARM64 && ACPI_APEI_GHES
++	select ACPI_APEI_GHES_ESTATUS_QUEUE
+ 	default y
+ 	help
+ 	  This option should be enabled if the system supports
 diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-index 29d863ff2f87..d7c46236b353 100644
+index 150fb184c7cb..2880547e13b8 100644
 --- a/drivers/acpi/apei/ghes.c
 +++ b/drivers/acpi/apei/ghes.c
-@@ -33,7 +33,6 @@
- #include <linux/interrupt.h>
- #include <linux/timer.h>
- #include <linux/cper.h>
--#include <linux/kdebug.h>
- #include <linux/platform_device.h>
- #include <linux/mutex.h>
- #include <linux/ratelimit.h>
-@@ -758,9 +757,6 @@ static int _in_nmi_notify_one(struct ghes *ghes)
+@@ -58,10 +58,6 @@
  
- 	sev = ghes_severity(ghes->estatus->error_severity);
- 	if (sev >= GHES_SEV_PANIC) {
--#ifdef CONFIG_X86
--		oops_begin();
+ #define GHES_PFX	"GHES: "
+ 
+-#if defined(CONFIG_HAVE_ACPI_APEI_NMI) || defined(CONFIG_ACPI_APEI_SEA)
+-#define WANT_NMI_ESTATUS_QUEUE	1
 -#endif
- 		ghes_print_queued_estatus();
- 		__ghes_panic(ghes);
+-
+ #define GHES_ESTATUS_MAX_SIZE		65536
+ #define GHES_ESOURCE_PREALLOC_MAX_SIZE	65536
+ 
+@@ -685,7 +681,7 @@ static void ghes_estatus_cache_add(
+ 	rcu_read_unlock();
+ }
+ 
+-#ifdef WANT_NMI_ESTATUS_QUEUE
++#ifdef CONFIG_ACPI_APEI_GHES_ESTATUS_QUEUE
+ /*
+  * Handlers for CPER records may not be NMI safe. For example,
+  * memory_failure_queue() takes spinlocks and calls schedule_work_on().
+@@ -727,7 +723,6 @@ static void ghes_print_queued_estatus(void)
+ /* Save estatus for further processing in IRQ context */
+ static void __process_error(struct ghes *ghes)
+ {
+-#ifdef CONFIG_ARCH_HAVE_NMI_SAFE_CMPXCHG
+ 	u32 len, node_len;
+ 	struct ghes_estatus_node *estatus_node;
+ 	struct acpi_hest_generic_status *estatus;
+@@ -747,7 +742,6 @@ static void __process_error(struct ghes *ghes)
+ 	estatus = GHES_ESTATUS_FROM_NODE(estatus_node);
+ 	memcpy(estatus, ghes->estatus, len);
+ 	llist_add(&estatus_node->llnode, &ghes_estatus_llist);
+-#endif
+ }
+ 
+ static int _in_nmi_notify_one(struct ghes *ghes)
+@@ -786,7 +780,7 @@ static int ghes_estatus_queue_notified(struct list_head *rcu_list)
  	}
+ 	rcu_read_unlock();
+ 
+-	if (IS_ENABLED(CONFIG_ARCH_HAVE_NMI_SAFE_CMPXCHG) && !ret)
++	if (!ret)
+ 		irq_work_queue(&ghes_proc_irq_work);
+ 
+ 	return ret;
+@@ -865,7 +859,7 @@ static void ghes_nmi_init_cxt(void)
+ 
+ #else
+ static inline void ghes_nmi_init_cxt(void) { }
+-#endif /* WANT_NMI_ESTATUS_QUEUE */
++#endif /* CONFIG_ACPI_APEI_GHES_ESTATUS_QUEUE */
+ 
+ static int ghes_ack_error(struct acpi_hest_generic_v2 *gv2)
+ {
 -- 
 2.17.1
