@@ -1,53 +1,43 @@
-From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Tue, 26 Jun 2018 14:42:11 +0530
-Subject: [PATCH 0/4] media: sun6i: Add support for the H3 CSI controller
-In-Reply-To: <20180626082330.pvq3gi6mmokky5vl@flea>
-References: <20180305100432.15009-1-maxime.ripard@bootlin.com>
- <CAMty3ZBQXyvOnzy_9RLDW-QO9qnAC4SR5UJnWYmhiPrP23z_vg@mail.gmail.com>
- <20180626082330.pvq3gi6mmokky5vl@flea>
-Message-ID: <CAMty3ZBRYtTBiYjQNZj07Ni_bi6qH+L1xga_kcHVrW0tZ0-hLQ@mail.gmail.com>
+From: mhocko@kernel.org (Michal Hocko)
+Date: Tue, 26 Jun 2018 10:54:49 +0200
+Subject: [PATCH v3 0/3] fix free pmd/pte page handlings on x86
+In-Reply-To: <alpine.DEB.2.21.1806261043080.2204@nanos.tec.linutronix.de>
+References: <20180516233207.1580-1-toshi.kani@hpe.com>
+ <alpine.DEB.2.21.1806241516410.8650@nanos.tec.linutronix.de>
+ <1529938470.14039.134.camel@hpe.com>
+ <20180625175225.GQ28965@dhcp22.suse.cz>
+ <1529961187.14039.206.camel@hpe.com>
+ <20180626063521.GT28965@dhcp22.suse.cz>
+ <alpine.DEB.2.21.1806261043080.2204@nanos.tec.linutronix.de>
+Message-ID: <20180626085449.GU28965@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 26, 2018 at 1:53 PM, Maxime Ripard
-<maxime.ripard@bootlin.com> wrote:
-> Hi,
->
-> On Tue, Jun 26, 2018 at 11:41:56AM +0530, Jagan Teki wrote:
->> On Mon, Mar 5, 2018 at 3:34 PM, Maxime Ripard <maxime.ripard@bootlin.com> wrote:
->> > The H3 and H5 have a CSI controller based on the one previously found
->> > in the A31, that is currently supported by the sun6i-csi driver.
->> >
->> > Add the compatibles to the device tree bindings and to the driver to
->> > make it work properly.
->> >
->> > This obviously depends on the serie "Initial Allwinner V3s CSI
->> > Support" by Yong Deng.
->> >
->> > Let me know what you think,
->> > Maxime
->> >
->> > Maxime Ripard (2):
->> >   dt-bindings: media: sun6i: Add A31 and H3 compatibles
->> >   media: sun6i: Add A31 compatible
->> >
->> > Myl?ne Josserand (2):
->> >   ARM: dts: sun8i: Add the H3/H5 CSI controller
->> >   [DO NOT MERGE] ARM: dts: sun8i: Add CAM500B camera module to the Nano
->> >     Pi M1+
->>
->> Just trying to understand what interface has been tested with npi-m1+,
->> is it DVP (parallel) interface?
->
-> Yes
->
->> I've Bananapi 5MP[1] and trying to test on top, and look like its
->> MIPI CSI2. I guess Yong patch[2] doesn't support CSI2 yet, am I
->> correct?
->
-> This is what Yong's cover letter is saying yes :)
+On Tue 26-06-18 10:45:11, Thomas Gleixner wrote:
+> On Tue, 26 Jun 2018, Michal Hocko wrote:
+> > On Mon 25-06-18 21:15:03, Kani Toshimitsu wrote:
+> > > Lastly, for the code maintenance, I believe this memory allocation keeps
+> > > the code much simpler than it would otherwise need to manage a special
+> > > page list.
+> > 
+> > Yes, I can see a simplicity as a reasonable argument for a quick fix,
+> > which these pile is supposed to be AFAIU. So this might be good to go
+> > from that perspective, but I believe that this should be changed in
+> > future at least.
+> 
+> So the conclusion is, that we ship this set of patches now to cure the
+> existing wreckage, right?
 
-Thanks, and this ov5640 tested on -next or any specific code? please
-provide if you have different code base.
+Joerg was suggesting some alternative but I got lost in the discussion
+to be honest so I might mis{interpret,remember}.
 
-Jagan.
+> Fine with that, but who will take care of reworking it proper? I'm
+> concerned that this will just go stale the moment the fixes hit the tree.
+
+Yeah, this is why I usually try to push back hard because "will be fixed
+later" is similar to say "documentation will come later" etc...
+
+A big fat TODO would be appropriate so it won't get forgotten at least.
+-- 
+Michal Hocko
+SUSE Labs
