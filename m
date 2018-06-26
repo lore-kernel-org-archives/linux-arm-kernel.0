@@ -1,167 +1,70 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Tue, 26 Jun 2018 12:22:31 +0200
-Subject: [PATCH v2 01/15] nvmem: add support for cell lookups
-In-Reply-To: <20180626102245.30711-1-brgl@bgdev.pl>
-References: <20180626102245.30711-1-brgl@bgdev.pl>
-Message-ID: <20180626102245.30711-2-brgl@bgdev.pl>
+Date: Tue, 26 Jun 2018 12:22:30 +0200
+Subject: [PATCH v2 00/15] ARM: davinci: step towards removing
+ at24_platform_data
+Message-ID: <20180626102245.30711-1-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-We can currently only register nvmem cells from device tree or by
-manually calling nvmem_add_cells(). The latter options however forces
-users to make sure that the nvmem provider with which the cells are
-associated is registered before the call.
+Since I took over maintainership of the at24 driver I've been working
+towards removing at24_platform_data in favor for device properties.
 
-This patch proposes a new solution inspired by other frameworks that
-offer resource lookups (GPIO, PWM etc.). It adds a function that allows
-machine code to register nvmem lookup which are later lazily used to
-add corresponding nvmem cells.
+DaVinci is the only platform that's still using it - all other users
+have already been converted.
 
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
----
- drivers/nvmem/core.c           | 57 +++++++++++++++++++++++++++++++++-
- include/linux/nvmem-consumer.h |  6 ++++
- include/linux/nvmem-provider.h |  6 ++++
- 3 files changed, 68 insertions(+), 1 deletion(-)
+One of the obstacles in case of DaVinci is removing the setup() callback
+from the pdata struct, the only user of which are some davinci boards.
 
-diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
-index b5b0cdc21d01..a2e87b464319 100644
---- a/drivers/nvmem/core.c
-+++ b/drivers/nvmem/core.c
-@@ -62,6 +62,9 @@ static DEFINE_IDA(nvmem_ida);
- static LIST_HEAD(nvmem_cells);
- static DEFINE_MUTEX(nvmem_cells_mutex);
- 
-+static LIST_HEAD(nvmem_cell_lookups);
-+static DEFINE_MUTEX(nvmem_lookup_mutex);
-+
- #ifdef CONFIG_DEBUG_LOCK_ALLOC
- static struct lock_class_key eeprom_lock_key;
- #endif
-@@ -247,6 +250,23 @@ static const struct attribute_group *nvmem_ro_root_dev_groups[] = {
- 	NULL,
- };
- 
-+/**
-+ * nvmem_register_lookup() - register a number of nvmem cell lookup entries
-+ *
-+ * @lookup: array of nvmem cell lookup entries
-+ * @nentries: number of lookup entries in the array
-+ */
-+void nvmem_register_lookup(struct nvmem_cell_lookup *lookup, size_t nentries)
-+{
-+	int i;
-+
-+	mutex_lock(&nvmem_lookup_mutex);
-+	for (i = 0; i < nentries; i++)
-+		list_add_tail(&lookup[i].list, &nvmem_cell_lookups);
-+	mutex_unlock(&nvmem_lookup_mutex);
-+}
-+EXPORT_SYMBOL_GPL(nvmem_register_lookup);
-+
- static void nvmem_release(struct device *dev)
- {
- 	struct nvmem_device *nvmem = to_nvmem_device(dev);
-@@ -916,6 +936,37 @@ struct nvmem_cell *of_nvmem_cell_get(struct device_node *np,
- EXPORT_SYMBOL_GPL(of_nvmem_cell_get);
- #endif
- 
-+static struct nvmem_cell *nvmem_cell_from_lookup(const char *cell_id)
-+{
-+	struct nvmem_cell *cell = ERR_PTR(-EPROBE_DEFER);
-+	struct nvmem_cell_lookup *lookup;
-+	struct nvmem_device *nvmem;
-+	int rc;
-+
-+	mutex_lock(&nvmem_lookup_mutex);
-+
-+	list_for_each_entry(lookup, &nvmem_cell_lookups, list) {
-+		if (strcmp(cell_id, lookup->info.name) == 0) {
-+			nvmem = nvmem_find(lookup->nvmem_name);
-+			if (!nvmem)
-+				goto out;
-+
-+			rc = nvmem_add_cells(nvmem, &lookup->info, 1);
-+			if (rc) {
-+				cell = ERR_PTR(rc);
-+				goto out;
-+			}
-+
-+			cell = nvmem_cell_get_from_list(cell_id);
-+			break;
-+		}
-+	}
-+
-+out:
-+	mutex_unlock(&nvmem_lookup_mutex);
-+	return cell;
-+}
-+
- /**
-  * nvmem_cell_get() - Get nvmem cell of device form a given cell name
-  *
-@@ -936,7 +987,11 @@ struct nvmem_cell *nvmem_cell_get(struct device *dev, const char *cell_id)
- 			return cell;
- 	}
- 
--	return nvmem_cell_get_from_list(cell_id);
-+	cell = nvmem_cell_get_from_list(cell_id);
-+	if (!IS_ERR(cell) || PTR_ERR(cell) == -EPROBE_DEFER)
-+		return cell;
-+
-+	return nvmem_cell_from_lookup(cell_id);
- }
- EXPORT_SYMBOL_GPL(nvmem_cell_get);
- 
-diff --git a/include/linux/nvmem-consumer.h b/include/linux/nvmem-consumer.h
-index 4e85447f7860..f4b5d3186e94 100644
---- a/include/linux/nvmem-consumer.h
-+++ b/include/linux/nvmem-consumer.h
-@@ -29,6 +29,12 @@ struct nvmem_cell_info {
- 	unsigned int		nbits;
- };
- 
-+struct nvmem_cell_lookup {
-+	struct nvmem_cell_info	info;
-+	struct list_head	list;
-+	const char		*nvmem_name;
-+};
-+
- #if IS_ENABLED(CONFIG_NVMEM)
- 
- /* Cell based interface */
-diff --git a/include/linux/nvmem-provider.h b/include/linux/nvmem-provider.h
-index 24def6ad09bb..766c0a96c113 100644
---- a/include/linux/nvmem-provider.h
-+++ b/include/linux/nvmem-provider.h
-@@ -17,6 +17,7 @@
- 
- struct nvmem_device;
- struct nvmem_cell_info;
-+struct nvmem_cell_lookup;
- typedef int (*nvmem_reg_read_t)(void *priv, unsigned int offset,
- 				void *val, size_t bytes);
- typedef int (*nvmem_reg_write_t)(void *priv, unsigned int offset,
-@@ -72,6 +73,8 @@ struct nvmem_config {
- struct nvmem_device *nvmem_register(const struct nvmem_config *cfg);
- int nvmem_unregister(struct nvmem_device *nvmem);
- 
-+void nvmem_register_lookup(struct nvmem_cell_lookup *lookup, size_t nentries);
-+
- struct nvmem_device *devm_nvmem_register(struct device *dev,
- 					 const struct nvmem_config *cfg);
- 
-@@ -92,6 +95,9 @@ static inline int nvmem_unregister(struct nvmem_device *nvmem)
- 	return -ENOSYS;
- }
- 
-+static inline void
-+nvmem_register_lookup(struct nvmem_cell_lookup *lookup, size_t nentries) {}
-+
- static inline struct nvmem_device *
- devm_nvmem_register(struct device *dev, const struct nvmem_config *c)
- {
+Most boards use the EEPROM to store the MAC address. This series adds
+support for cell lookups to the nvmem framework, registers relevant
+cells for all users, converts the davinci_emac driver to using them
+and replaces at24_platform_data with device properties.
+
+The only board that's still using this callback is now mityomapl138.
+Unfortunately it stores more info in EEPROM than just the MAC address
+and will require some more work. Unfortunately I don't have access
+to this board so I can't test any actual solutions on a live hardware.
+
+Tested on a dm365-evm board.
+
+v1 -> v2:
+- for backward compatiblity: fall back to using of_get_mac_address() if
+  we can't get an nvmem cell in patch 7
+- add patch 15 which removes dead code
+
+Bartosz Golaszewski (15):
+  nvmem: add support for cell lookups
+  ARM: davinci: dm365-evm: use nvmem lookup for mac address
+  ARM: davinci: dm644-evm: use nvmem lookup for mac address
+  ARM: davinci: dm646x-evm: use nvmem lookup for mac address
+  ARM: davinci: da830-evm: use nvmem lookup for mac address
+  ARM: davinci: mityomapl138: add nvmem cells lookup entries
+  net: davinci_emac: use nvmem to retrieve the mac address
+  ARM: davinci: mityomapl138: don't read the MAC address from machine
+    code
+  ARM: davinci: dm365-evm: use device properties for at24 eeprom
+  ARM: davinci: da830-evm: use device properties for at24 eeprom
+  ARM: davinci: dm644x-evm: use device properties for at24 eeprom
+  ARM: davinci: dm646x-evm: use device properties for at24 eeprom
+  ARM: davinci: sffsdr: fix the at24 eeprom device name
+  ARM: davinci: sffsdr: use device properties for at24 eeprom
+  ARM: davinci: remove dead code
+
+ arch/arm/mach-davinci/board-da830-evm.c    | 25 +++++++---
+ arch/arm/mach-davinci/board-dm365-evm.c    | 25 +++++++---
+ arch/arm/mach-davinci/board-dm644x-evm.c   | 24 ++++++---
+ arch/arm/mach-davinci/board-dm646x-evm.c   | 25 +++++++---
+ arch/arm/mach-davinci/board-mityomapl138.c | 30 +++++++++---
+ arch/arm/mach-davinci/board-sffsdr.c       | 13 +++--
+ arch/arm/mach-davinci/common.c             | 15 ------
+ drivers/net/ethernet/ti/davinci_emac.c     | 33 +++++++++----
+ drivers/nvmem/core.c                       | 57 +++++++++++++++++++++-
+ include/linux/davinci_emac.h               |  2 -
+ include/linux/nvmem-consumer.h             |  6 +++
+ include/linux/nvmem-provider.h             |  6 +++
+ 12 files changed, 186 insertions(+), 75 deletions(-)
+
 -- 
 2.17.1
