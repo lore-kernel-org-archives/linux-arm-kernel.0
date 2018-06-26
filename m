@@ -1,44 +1,40 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 26 Jun 2018 11:15:14 -0700
-Subject: [PATCH v8 2/2] regulator: add QCOM RPMh regulator driver
-In-Reply-To: <20180626150203.GG1779@sirena.org.uk>
-References: <cover.1529712888.git.collinsd@codeaurora.org>
- <35c4ea70cdf5caba560fb6f40e866ee8bc456d93.1529712888.git.collinsd@codeaurora.org>
- <CAD=FV=XVEEPgjBXxR+-46RgxLOq63Xvq-jtruoaCxccmMoKUuA@mail.gmail.com>
- <20180626120733.GD1779@sirena.org.uk>
- <CAD=FV=X1E8Cz=L93G-zJwhM0R=N3YuBBhkvCnLvWuxMU9KJkTw@mail.gmail.com>
- <20180626150203.GG1779@sirena.org.uk>
-Message-ID: <CAD=FV=WC_XWRk-6OELOFFWGnhRq1VeoiiveqXLSy+xqsVb22pA@mail.gmail.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Tue, 26 Jun 2018 12:22:54 -0600
+Subject: [PATCH] ARM: dts: pxa: fix the rtc controller
+In-Reply-To: <20180626164701.1034-1-robert.jarzmik@free.fr>
+References: <20180626164701.1034-1-robert.jarzmik@free.fr>
+Message-ID: <CAL_JsqLo5ntGLLZzssCJo7g--WWvgZLkX0vTV0VOT7a5H0QLFg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, Jun 26, 2018 at 8:02 AM, Mark Brown <broonie@kernel.org> wrote:
-> On Tue, Jun 26, 2018 at 08:00:29AM -0700, Doug Anderson wrote:
->> On Tue, Jun 26, 2018 at 5:07 AM, Mark Brown <broonie@kernel.org> wrote:
+On Tue, Jun 26, 2018 at 10:47 AM Robert Jarzmik <robert.jarzmik@free.fr> wrote:
 >
->> > Please do not submit new versions of already applied patches, please
->> > submit incremental updates to the existing code.  Modifying existing
->> > commits creates problems for other users building on top of those
->> > commits so it's best practice to only change pubished git commits if
->> > absolutely essential.
+> The RTC controller is fed by an external fixed 32kHz clock. Yet the
+> driver wants to acquire this clock, even though it doesn't make any use
+> of it, ie. doesn't get the rate to make calculation.
 >
->> Sorry, wasn't suggesting making any changes to those two patches, just
->> was noting the dependency.  ...but, as you said, the two dependent
->> patches have already landed and I just didn't notice.  :(  Sorry for
->> the noise.
+> Therefore, add the dummy clock in the PXA clock tree to make the driver
+> happy and working.
 >
-> Ah, so there's no revisions that need merging?  That's great.
+> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+> ---
+>  arch/arm/boot/dts/pxa25x.dtsi | 4 ++++
+>  arch/arm/boot/dts/pxa27x.dtsi | 4 ++++
+>  2 files changed, 8 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/pxa25x.dtsi b/arch/arm/boot/dts/pxa25x.dtsi
+> index 95d59be97213..c6ca07e4626b 100644
+> --- a/arch/arm/boot/dts/pxa25x.dtsi
+> +++ b/arch/arm/boot/dts/pxa25x.dtsi
+> @@ -80,6 +80,10 @@
+>                         #pwm-cells = <1>;
+>                         clocks = <&clks CLK_PWM1>;
+>                 };
+> +
+> +               rtc at 40900000 {
+> +                       clocks = <&clks CLK_NONE>;
 
-Right.  So all that's left to do is decide if ${SUBJECT} patch is
-ready to land and how to land it.  Andy has landed RPMh into his
-for-next tree.  You can see it at
-<https://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git/log/?h=for-next>.
-I think he's still planning on re-shuffling his tree a bit.  When he
-does this, do you need him to put the RPMh patches somewhere you can
-merge into your tree?
+Don't add fake clocks. Either add a real clock or fix the driver to
+not require a clock.
 
-Thanks!
-
--Doug
+Rob
