@@ -1,11 +1,11 @@
 From: david@lechnology.com (David Lechner)
-Date: Tue, 26 Jun 2018 11:16:18 -0500
-Subject: [PATCH v2 02/13] clk: davinci: psc-dm365: use two lookup entries
+Date: Tue, 26 Jun 2018 11:17:04 -0500
+Subject: [PATCH v2 03/13] clk: davinci: psc-dm644x: use two lookup entries
  for the aemif clock
-In-Reply-To: <20180626092537.6737-3-brgl@bgdev.pl>
+In-Reply-To: <20180626092537.6737-4-brgl@bgdev.pl>
 References: <20180626092537.6737-1-brgl@bgdev.pl>
- <20180626092537.6737-3-brgl@bgdev.pl>
-Message-ID: <1704809d-07d1-973b-ae92-092eca0426f8@lechnology.com>
+ <20180626092537.6737-4-brgl@bgdev.pl>
+Message-ID: <ab355923-89bf-c574-9f0a-2f7abd984762@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
