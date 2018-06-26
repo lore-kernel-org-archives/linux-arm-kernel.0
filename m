@@ -1,38 +1,51 @@
-From: Anson.Huang@nxp.com (Anson Huang)
-Date: Tue, 26 Jun 2018 09:01:40 +0800
-Subject: [PATCH V2] ARM: dts: imx6sll-evk: make pfuze100 sw4 always on
-Message-ID: <1529974900-28865-1-git-send-email-Anson.Huang@nxp.com>
+From: anson.huang@nxp.com (Anson Huang)
+Date: Tue, 26 Jun 2018 01:06:40 +0000
+Subject: [PATCH] ARM: dts: imx6sll-evk: make pfuze100 sw4 always on
+In-Reply-To: <CAOMZO5Coi-LRXG8vepnm-eSSx75LLEtsZ90WrtK6rEy76u+OBQ@mail.gmail.com>
+References: <1529648932-4832-1-git-send-email-Anson.Huang@nxp.com>
+ <CAOMZO5Coi-LRXG8vepnm-eSSx75LLEtsZ90WrtK6rEy76u+OBQ@mail.gmail.com>
+Message-ID: <AM3PR04MB13157D44DC7357CFB2F35948F5490@AM3PR04MB1315.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On i.MX6SLL EVK board, PFuze100's SW4 is supplying
-LPDDR3, it needs to be always on. This patch fixes
-Linux kernel boot up hang caused by commit
-(5fe156f regulator: pfuze100: add enable/disable for switch),
-because SW4 is turned off unexpectedly:
+Hi, Fabio
 
-[    1.693613] cfg80211: failed to load regulatory.db
-[    1.700063] SW4: disabling
-[    1.703973] SWBST: disabling
+Anson Huang
+Best Regards!
 
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
----
-changes since V1:
-	improve commit message by adding info of which commit introduces this issue.
- arch/arm/boot/dts/imx6sll-evk.dts | 1 +
- 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/imx6sll-evk.dts b/arch/arm/boot/dts/imx6sll-evk.dts
-index 4684ac4..2217c40 100644
---- a/arch/arm/boot/dts/imx6sll-evk.dts
-+++ b/arch/arm/boot/dts/imx6sll-evk.dts
-@@ -142,6 +142,7 @@
- 			sw4_reg: sw4 {
- 				regulator-min-microvolt = <800000>;
- 				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
- 			};
+> -----Original Message-----
+> From: Fabio Estevam [mailto:festevam at gmail.com]
+> Sent: Monday, June 25, 2018 8:23 PM
+> To: Anson Huang <anson.huang@nxp.com>
+> Cc: Shawn Guo <shawnguo@kernel.org>; Sascha Hauer
+> <s.hauer@pengutronix.de>; Sascha Hauer <kernel@pengutronix.de>; Fabio
+> Estevam <fabio.estevam@nxp.com>; Rob Herring <robh+dt@kernel.org>;
+> Mark Rutland <mark.rutland@arm.com>; open list:OPEN FIRMWARE AND
+> FLATTENED DEVICE TREE BINDINGS <devicetree@vger.kernel.org>;
+> dl-linux-imx <linux-imx@nxp.com>; moderated list:ARM/FREESCALE IMX / MXC
+> ARM ARCHITECTURE <linux-arm-kernel@lists.infradead.org>; linux-kernel
+> <linux-kernel@vger.kernel.org>
+> Subject: Re: [PATCH] ARM: dts: imx6sll-evk: make pfuze100 sw4 always on
+> 
+> Hi Anson,
+> 
+> On Fri, Jun 22, 2018 at 3:28 AM, Anson Huang <Anson.Huang@nxp.com>
+> wrote:
+> > On i.MX6SLL EVK board, PFuze100's SW4 is supplying LPDDR3, it needs to
+> > be always on. This patch fixes Linux kernel boot up hang caused by SW4
+> > being turned
+> > off:
+> >
+> > [    1.693613] cfg80211: failed to load regulatory.db
+> > [    1.700063] SW4: disabling
+> > [    1.703973] SWBST: disabling
+> 
+> It would be nice to mention in the commit log what was the patch that caused
+> the breakage, just like Robin did for imx6sl-evk.
+> 
+> Thanks,
  
- 			swbst_reg: swbst {
--- 
-2.7.4
+Done, already sent out V2 patch, please review it, thanks.
+
+Anson.
