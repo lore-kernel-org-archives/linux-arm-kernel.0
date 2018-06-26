@@ -1,47 +1,57 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Tue, 26 Jun 2018 09:25:44 +0100
-Subject: [PATCH] arm64: dts: hikey: Define wl1835 power capabilities
-In-Reply-To: <CALAqxLWjJKsU+XJmANzx-aO2ruszwbBnPV2yV5WoyVStO+5K0A@mail.gmail.com>
-References: <20180613151305.17240-1-ryan@edited.us>
- <CANcMJZASEDRxaXwdG96nNeEDPrDm_ap5MjhXonEcg=yHZ8F=qg@mail.gmail.com>
- <CALAqxLWjJKsU+XJmANzx-aO2ruszwbBnPV2yV5WoyVStO+5K0A@mail.gmail.com>
-Message-ID: <5B31F888.7010403@hisilicon.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Tue, 26 Jun 2018 10:26:19 +0200
+Subject: [PATCH] drm/meson: Fix an un-handled error path in
+ 'meson_drv_bind_master()'
+In-Reply-To: <20180611165335.24542-1-christophe.jaillet@wanadoo.fr>
+References: <20180611165335.24542-1-christophe.jaillet@wanadoo.fr>
+Message-ID: <e24fbd8f-e280-8376-7f05-43390df7340c@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi John,
-
-On 2018/6/25 22:56, John Stultz wrote:
-> On Wed, Jun 13, 2018 at 11:30 AM, John Stultz <john.stultz@linaro.org> wrote:
->> On Wed, Jun 13, 2018 at 8:13 AM, Ryan Grachek <ryan@edited.us> wrote:
->>> These properties are required for compatibility with runtime PM.
->>> Without these properties, MMC host controller will not be aware
->>> of power capabilities. When the wlcore driver attempts to power
->>> on the device, it will erroneously fail with -EACCES.
->>>
->>> Signed-off-by: Ryan Grachek <ryan@edited.us>
->>
->> Fixes: 60f36637bbbd ("wlcore: sdio: allow pm to handle sdio power")
->> Tested-by: John Stultz <john.stultz@linaro.org>
->> Acked-by: John Stultz <john.stultz@linaro.org>
->>
->> Wei Xu: This fixes a functional regression with wifi on the HiKey
->> board that was introduced in 4.18-rc with commit 60f36637bbbd
->> ("wlcore: sdio: allow pm to handle sdio power").
+On 11/06/2018 18:53, Christophe JAILLET wrote:
+> If 'platform_get_resource_byname()' fails, we should release some resources
+> before leaving, as already done in the other error handling path of the
+> function.
 > 
-> Wei Xu: Just wanted to follow up to make sure this wasn't missed for
-> 4.18-rc, as I haven't seen it upstream or in -next, and it fixes a
-> recently introduced regression.
-
-Thanks!
-I will send out the fix pull request in these two days if no problem.
-
-Best Regards,
-Wei
-
+> Fixes: acaa3f13b8dd ("drm/meson: Fix potential NULL dereference in meson_drv_bind_master()")
+> Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
+> ---
+>  drivers/gpu/drm/meson/meson_drv.c | 12 ++++++++----
+>  1 file changed, 8 insertions(+), 4 deletions(-)
 > 
-> thanks
-> -john
+> diff --git a/drivers/gpu/drm/meson/meson_drv.c b/drivers/gpu/drm/meson/meson_drv.c
+> index 32b1a6cdecfc..d3443125e661 100644
+> --- a/drivers/gpu/drm/meson/meson_drv.c
+> +++ b/drivers/gpu/drm/meson/meson_drv.c
+> @@ -197,8 +197,10 @@ static int meson_drv_bind_master(struct device *dev, bool has_components)
+>  	priv->io_base = regs;
+>  
+>  	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "hhi");
+> -	if (!res)
+> -		return -EINVAL;
+> +	if (!res) {
+> +		ret = -EINVAL;
+> +		goto free_drm;
+> +	}
+>  	/* Simply ioremap since it may be a shared register zone */
+>  	regs = devm_ioremap(dev, res->start, resource_size(res));
+>  	if (!regs) {
+> @@ -215,8 +217,10 @@ static int meson_drv_bind_master(struct device *dev, bool has_components)
+>  	}
+>  
+>  	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "dmc");
+> -	if (!res)
+> -		return -EINVAL;
+> +	if (!res) {
+> +		ret = -EINVAL;
+> +		goto free_drm;
+> +	}
+>  	/* Simply ioremap since it may be a shared register zone */
+>  	regs = devm_ioremap(dev, res->start, resource_size(res));
+>  	if (!regs) {
 > 
-> .
-> 
+
+Applied to drm-misc-fixes
+
+Thanks,
+Neil
