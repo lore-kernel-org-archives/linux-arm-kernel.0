@@ -1,213 +1,238 @@
 From: james.morse@arm.com (James Morse)
-Date: Tue, 26 Jun 2018 18:01:06 +0100
-Subject: [PATCH v5 10/20] ACPI / APEI: preparatory split of ghes->estatus
+Date: Tue, 26 Jun 2018 18:01:03 +0100
+Subject: [PATCH v5 07/20] arm64: KVM/mm: Move SEA handling behind a single
+ 'claim' interface
 In-Reply-To: <20180626170116.25825-1-james.morse@arm.com>
 References: <20180626170116.25825-1-james.morse@arm.com>
-Message-ID: <20180626170116.25825-11-james.morse@arm.com>
+Message-ID: <20180626170116.25825-8-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The NMI-like notifications scribble over ghes->estatus, before
-copying it somewhere else. If this interrupts the ghes_probe() code
-calling ghes_proc() on each struct ghes, the data is corrupted.
+To split up APEIs in_nmi() path, we need the nmi-like callers to always
+be in_nmi(). Add a helper to do the work and claim the notification.
 
-We want the NMI-like notifications to use a queued estatus entry
-from the beginning. To that end, break up any use of "ghes->estatus"
-so that all functions take the estatus as an argument.
+When KVM or the arch code takes an exception that might be a RAS
+notification, it asks the APEI firmware-first code whether it wants
+to claim the exception. We can then go on to see if (a future)
+kernel-first mechanism wants to claim the notification, before
+falling through to the existing default behaviour.
 
-This patch is just moving types around, no change in behaviour.
+The NOTIFY_SEA code was merged before we had multiple, possibly
+interacting, NMI-like notifications and the need to consider kernel
+first in the future. Make the 'claiming' behaviour explicit.
+
+As we're restructuring the APEI code to allow multiple NMI-like
+notifications, any notification that might interrupt interrupts-masked
+code must always be wrapped in nmi_enter()/nmi_exit(). This allows APEI
+to use in_nmi() to use the right fixmap entries.
+
+We mask SError over this window to prevent an asynchronous RAS error
+arriving and tripping 'nmi_enter()'s BUG_ON(in_nmi()).
 
 Signed-off-by: James Morse <james.morse@arm.com>
----
- drivers/acpi/apei/ghes.c | 82 ++++++++++++++++++++++------------------
- 1 file changed, 45 insertions(+), 37 deletions(-)
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Tested-by: Tyler Baicar <tbaicar@codeaurora.org>
 
-diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-index 77505cfa930e..9bb00a06ba6e 100644
---- a/drivers/acpi/apei/ghes.c
-+++ b/drivers/acpi/apei/ghes.c
-@@ -289,7 +289,9 @@ static void ghes_copy_tofrom_phys(void *buffer, u64 paddr, u32 len,
- 	}
+---
+Why does apei_claim_sea() take a pt_regs? This gets used later to take
+APEI by the hand through NMI->IRQ context, depending on what we
+interrupted.
+
+Changes since v4:
+ * Made irqs-unmasked comment a lockdep assert.
+
+Changes since v3:
+ * Removed spurious whitespace change
+ * Updated comment in acpi.c to cover SError masking
+
+Changes since v2:
+ * Added dummy definition for !ACPI and culled IS_ENABLED() checks.
+
+squash: make 'call with irqs unmaksed' a lockdep assert, much better
+---
+ arch/arm64/include/asm/acpi.h      |  4 ++++
+ arch/arm64/include/asm/daifflags.h |  1 +
+ arch/arm64/include/asm/kvm_ras.h   | 16 +++++++++++++++-
+ arch/arm64/kernel/acpi.c           | 30 ++++++++++++++++++++++++++++++
+ arch/arm64/mm/fault.c              | 29 +++++------------------------
+ 5 files changed, 55 insertions(+), 25 deletions(-)
+
+diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+index 0db62a4cbce2..bfd23f0f0060 100644
+--- a/arch/arm64/include/asm/acpi.h
++++ b/arch/arm64/include/asm/acpi.h
+@@ -16,6 +16,7 @@
+ #include <linux/psci.h>
+ 
+ #include <asm/cputype.h>
++#include <asm/ptrace.h>
+ #include <asm/smp_plat.h>
+ #include <asm/tlbflush.h>
+ 
+@@ -130,6 +131,9 @@ static inline const char *acpi_get_enable_method(int cpu)
+  */
+ #define acpi_disable_cmcff 1
+ pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr);
++int apei_claim_sea(struct pt_regs *regs);
++#else
++static inline int apei_claim_sea(struct pt_regs *regs) { return -ENOENT; }
+ #endif /* CONFIG_ACPI_APEI */
+ 
+ #ifdef CONFIG_ACPI_NUMA
+diff --git a/arch/arm64/include/asm/daifflags.h b/arch/arm64/include/asm/daifflags.h
+index 22e4c83de5a5..cbd753855bf3 100644
+--- a/arch/arm64/include/asm/daifflags.h
++++ b/arch/arm64/include/asm/daifflags.h
+@@ -20,6 +20,7 @@
+ 
+ #define DAIF_PROCCTX		0
+ #define DAIF_PROCCTX_NOIRQ	PSR_I_BIT
++#define DAIF_ERRCTX		(PSR_I_BIT | PSR_A_BIT)
+ 
+ /* mask/save/unmask/restore all exceptions, including interrupts. */
+ static inline void local_daif_mask(void)
+diff --git a/arch/arm64/include/asm/kvm_ras.h b/arch/arm64/include/asm/kvm_ras.h
+index 5f72b07b7912..5b56e7e297b1 100644
+--- a/arch/arm64/include/asm/kvm_ras.h
++++ b/arch/arm64/include/asm/kvm_ras.h
+@@ -4,8 +4,22 @@
+ #ifndef __ARM64_KVM_RAS_H__
+ #define __ARM64_KVM_RAS_H__
+ 
++#include <linux/acpi.h>
++#include <linux/errno.h>
+ #include <linux/types.h>
+ 
+-int kvm_handle_guest_sea(phys_addr_t addr, unsigned int esr);
++#include <asm/acpi.h>
++
++/*
++ * Was this synchronous external abort a RAS notification?
++ * Returns '0' for errors handled by some RAS subsystem, or -ENOENT.
++ */
++static inline int kvm_handle_guest_sea(phys_addr_t addr, unsigned int esr)
++{
++	/* apei_claim_sea(NULL) expects to mask interrupts itself */
++	lockdep_assert_irqs_enabled();
++
++	return apei_claim_sea(NULL);
++}
+ 
+ #endif /* __ARM64_KVM_RAS_H__ */
+diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+index 7b09487ff8fb..df2c6bff8c58 100644
+--- a/arch/arm64/kernel/acpi.c
++++ b/arch/arm64/kernel/acpi.c
+@@ -33,6 +33,8 @@
+ 
+ #ifdef CONFIG_ACPI_APEI
+ # include <linux/efi.h>
++# include <acpi/ghes.h>
++# include <asm/daifflags.h>
+ # include <asm/pgtable.h>
+ #endif
+ 
+@@ -261,4 +263,32 @@ pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr)
+ 		return __pgprot(PROT_NORMAL_NC);
+ 	return __pgprot(PROT_DEVICE_nGnRnE);
  }
++
++
++/*
++ * Claim Synchronous External Aborts as a firmware first notification.
++ *
++ * Used by KVM and the arch do_sea handler.
++ * @regs may be NULL when called from process context.
++ */
++int apei_claim_sea(struct pt_regs *regs)
++{
++	int err = -ENOENT;
++	unsigned long current_flags = arch_local_save_flags();
++
++	if (!IS_ENABLED(CONFIG_ACPI_APEI_SEA))
++		return err;
++
++	/*
++	 * SEA can interrupt SError, mask it and describe this as an NMI so
++	 * that APEI defers the handling.
++	 */
++	local_daif_restore(DAIF_ERRCTX);
++	nmi_enter();
++	err = ghes_notify_sea();
++	nmi_exit();
++	local_daif_restore(current_flags);
++
++	return err;
++}
+ #endif
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+index 167772fe4360..fb2761172cd4 100644
+--- a/arch/arm64/mm/fault.c
++++ b/arch/arm64/mm/fault.c
+@@ -18,6 +18,7 @@
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
  
--static int ghes_read_estatus(struct ghes *ghes, int silent, int fixmap_idx)
-+static int ghes_read_estatus(struct ghes *ghes,
-+			     struct acpi_hest_generic_status *estatus,
-+			     int silent, int fixmap_idx)
- {
- 	struct acpi_hest_generic *g = ghes->generic;
- 	u64 buf_paddr;
-@@ -307,26 +309,26 @@ static int ghes_read_estatus(struct ghes *ghes, int silent, int fixmap_idx)
- 	if (!buf_paddr)
- 		return -ENOENT;
++#include <linux/acpi.h>
+ #include <linux/extable.h>
+ #include <linux/signal.h>
+ #include <linux/mm.h>
+@@ -33,6 +34,7 @@
+ #include <linux/preempt.h>
+ #include <linux/hugetlb.h>
  
--	ghes_copy_tofrom_phys(ghes->estatus, buf_paddr,
--			      sizeof(*ghes->estatus), 1, fixmap_idx);
--	if (!ghes->estatus->block_status)
-+	ghes_copy_tofrom_phys(estatus, buf_paddr,
-+			      sizeof(*estatus), 1, fixmap_idx);
-+	if (!estatus->block_status)
- 		return -ENOENT;
++#include <asm/acpi.h>
+ #include <asm/bug.h>
+ #include <asm/cmpxchg.h>
+ #include <asm/cpufeature.h>
+@@ -45,8 +47,6 @@
+ #include <asm/tlbflush.h>
+ #include <asm/traps.h>
  
- 	ghes->buffer_paddr = buf_paddr;
- 	ghes->flags |= GHES_TO_CLEAR;
+-#include <acpi/ghes.h>
+-
+ struct fault_info {
+ 	int	(*fn)(unsigned long addr, unsigned int esr,
+ 		      struct pt_regs *regs);
+@@ -631,19 +631,10 @@ static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
+ 	inf = esr_to_fault_info(esr);
  
- 	rc = -EIO;
--	len = cper_estatus_len(ghes->estatus);
--	if (len < sizeof(*ghes->estatus))
-+	len = cper_estatus_len(estatus);
-+	if (len < sizeof(*estatus))
- 		goto err_read_block;
- 	if (len > ghes->generic->error_block_length)
- 		goto err_read_block;
--	if (cper_estatus_check_header(ghes->estatus))
-+	if (cper_estatus_check_header(estatus))
- 		goto err_read_block;
--	ghes_copy_tofrom_phys(ghes->estatus + 1,
--			      buf_paddr + sizeof(*ghes->estatus),
--			      len - sizeof(*ghes->estatus), 1, fixmap_idx);
--	if (cper_estatus_check(ghes->estatus))
-+	ghes_copy_tofrom_phys(estatus + 1,
-+			      buf_paddr + sizeof(*estatus),
-+			      len - sizeof(*estatus), 1, fixmap_idx);
-+	if (cper_estatus_check(estatus))
- 		goto err_read_block;
- 	rc = 0;
- 
-@@ -337,13 +339,15 @@ static int ghes_read_estatus(struct ghes *ghes, int silent, int fixmap_idx)
- 	return rc;
- }
- 
--static void ghes_clear_estatus(struct ghes *ghes, int fixmap_idx)
-+static void ghes_clear_estatus(struct ghes *ghes,
-+			       struct acpi_hest_generic_status *estatus,
-+			       int fixmap_idx)
- {
--	ghes->estatus->block_status = 0;
-+	estatus->block_status = 0;
- 	if (!(ghes->flags & GHES_TO_CLEAR))
- 		return;
--	ghes_copy_tofrom_phys(ghes->estatus, ghes->buffer_paddr,
--			      sizeof(ghes->estatus->block_status), 0, fixmap_idx);
-+	ghes_copy_tofrom_phys(estatus, ghes->buffer_paddr,
-+			      sizeof(estatus->block_status), 0, fixmap_idx);
- 	ghes->flags &= ~GHES_TO_CLEAR;
- }
- 
-@@ -509,9 +513,10 @@ static int ghes_print_estatus(const char *pfx,
- 	return 0;
- }
- 
--static void __ghes_panic(struct ghes *ghes)
-+static void __ghes_panic(struct ghes *ghes,
-+			 struct acpi_hest_generic_status *estatus)
- {
--	__ghes_print_estatus(KERN_EMERG, ghes->generic, ghes->estatus);
-+	__ghes_print_estatus(KERN_EMERG, ghes->generic, estatus);
- 
- 	/* reboot to log the error! */
- 	if (!panic_timeout)
-@@ -686,16 +691,17 @@ static void ghes_print_queued_estatus(void)
- }
- 
- /* Save estatus for further processing in IRQ context */
--static void __process_error(struct ghes *ghes)
-+static void __process_error(struct ghes *ghes,
-+			    struct acpi_hest_generic_status *ghes_estatus)
- {
- 	u32 len, node_len;
- 	struct ghes_estatus_node *estatus_node;
- 	struct acpi_hest_generic_status *estatus;
- 
--	if (ghes_estatus_cached(ghes->estatus))
-+	if (ghes_estatus_cached(ghes_estatus))
- 		return;
- 
--	len = cper_estatus_len(ghes->estatus);
-+	len = cper_estatus_len(ghes_estatus);
- 	node_len = GHES_ESTATUS_NODE_LEN(len);
- 
- 	estatus_node = (void *)gen_pool_alloc(ghes_estatus_pool, node_len);
-@@ -705,35 +711,37 @@ static void __process_error(struct ghes *ghes)
- 	estatus_node->ghes = ghes;
- 	estatus_node->generic = ghes->generic;
- 	estatus = GHES_ESTATUS_FROM_NODE(estatus_node);
--	memcpy(estatus, ghes->estatus, len);
-+	memcpy(estatus, ghes_estatus, len);
- 	llist_add(&estatus_node->llnode, &ghes_estatus_llist);
- }
- 
- static int _in_nmi_notify_one(struct ghes *ghes, int fixmap_idx)
- {
- 	int sev;
-+	struct acpi_hest_generic_status *estatus = ghes->estatus;
- 
--	if (ghes_read_estatus(ghes, 1, fixmap_idx)) {
--		ghes_clear_estatus(ghes, fixmap_idx);
-+	if (ghes_read_estatus(ghes, estatus, 1, fixmap_idx)) {
-+		ghes_clear_estatus(ghes, estatus, fixmap_idx);
- 		return -ENOENT;
- 	}
- 
--	sev = ghes_severity(ghes->estatus->error_severity);
-+	sev = ghes_severity(estatus->error_severity);
- 	if (sev >= GHES_SEV_PANIC) {
- 		ghes_print_queued_estatus();
--		__ghes_panic(ghes);
-+		__ghes_panic(ghes, estatus);
- 	}
- 
- 	if (!(ghes->flags & GHES_TO_CLEAR))
- 		return 0;
- 
--	__process_error(ghes);
--	ghes_clear_estatus(ghes, fixmap_idx);
-+	__process_error(ghes, estatus);
-+	ghes_clear_estatus(ghes, estatus, fixmap_idx);
- 
- 	return 0;
- }
- 
--static int ghes_estatus_queue_notified(struct list_head *rcu_list, int fixmap_idx)
-+static int ghes_estatus_queue_notified(struct list_head *rcu_list,
-+				       int fixmap_idx)
- {
- 	int ret = -ENOENT;
- 	struct ghes *ghes;
-@@ -845,25 +853,25 @@ static int ghes_proc(struct ghes *ghes)
- {
- 	int rc;
- 	unsigned long flags;
-+	struct acpi_hest_generic_status *estatus = ghes->estatus;
- 
- 	spin_lock_irqsave(&ghes_notify_lock_irq, flags);
- 
--	rc = ghes_read_estatus(ghes, 0, FIX_APEI_GHES_IRQ);
-+	rc = ghes_read_estatus(ghes, estatus, 0, FIX_APEI_GHES_IRQ);
- 	if (rc)
- 		goto out;
- 
--	if (ghes_severity(ghes->estatus->error_severity) >= GHES_SEV_PANIC) {
--		__ghes_panic(ghes);
+ 	/*
+-	 * Synchronous aborts may interrupt code which had interrupts masked.
+-	 * Before calling out into the wider kernel tell the interested
+-	 * subsystems.
++	 * Return value ignored as we rely on signal merging.
++	 * Future patches will make this more robust.
+ 	 */
+-	if (IS_ENABLED(CONFIG_ACPI_APEI_SEA)) {
+-		if (interrupts_enabled(regs))
+-			nmi_enter();
+-
+-		ghes_notify_sea();
+-
+-		if (interrupts_enabled(regs))
+-			nmi_exit();
 -	}
-+	if (ghes_severity(estatus->error_severity) >= GHES_SEV_PANIC)
-+		__ghes_panic(ghes, estatus);
++	apei_claim_sea(regs);
  
--	if (!ghes_estatus_cached(ghes->estatus)) {
--		if (ghes_print_estatus(NULL, ghes->generic, ghes->estatus))
--			ghes_estatus_cache_add(ghes->generic, ghes->estatus);
-+	if (!ghes_estatus_cached(estatus)) {
-+		if (ghes_print_estatus(NULL, ghes->generic, estatus))
-+			ghes_estatus_cache_add(ghes->generic, estatus);
- 	}
--	ghes_do_proc(ghes, ghes->estatus);
-+	ghes_do_proc(ghes, estatus);
+ 	clear_siginfo(&info);
+ 	info.si_signo = inf->sig;
+@@ -725,16 +716,6 @@ static const struct fault_info fault_info[] = {
+ 	{ do_bad,		SIGKILL, SI_KERNEL,	"unknown 63"			},
+ };
  
- out:
--	ghes_clear_estatus(ghes, FIX_APEI_GHES_IRQ);
-+	ghes_clear_estatus(ghes, estatus, FIX_APEI_GHES_IRQ);
- 
- 	if (rc == -ENOENT)
- 		goto unlock;
+-int kvm_handle_guest_sea(phys_addr_t addr, unsigned int esr)
+-{
+-	int ret = -ENOENT;
+-
+-	if (IS_ENABLED(CONFIG_ACPI_APEI_SEA))
+-		ret = ghes_notify_sea();
+-
+-	return ret;
+-}
+-
+ asmlinkage void __exception do_mem_abort(unsigned long addr, unsigned int esr,
+ 					 struct pt_regs *regs)
+ {
 -- 
 2.17.1
