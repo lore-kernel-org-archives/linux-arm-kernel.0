@@ -1,74 +1,171 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Mon, 25 Jun 2018 16:26:18 -0700
-Subject: [PATCH 2/2] soc: qcom: cmd-db: Fix compiler warnings
-In-Reply-To: <CAK8P3a1+qs3f2cLPKPiMKR4L74dwpAkBcZPNVG4hk_nfx12Xqw@mail.gmail.com>
-References: <1529946347-12740-1-git-send-email-andy.gross@linaro.org>
- <1529946347-12740-2-git-send-email-andy.gross@linaro.org>
- <CAK8P3a0y9pUC2PQFv-GABnsr7cWWAKuLoDNeC1tC2A8iByzmaw@mail.gmail.com>
- <20180625205406.GC4689@hector.attlocal.net>
- <CAK8P3a1+qs3f2cLPKPiMKR4L74dwpAkBcZPNVG4hk_nfx12Xqw@mail.gmail.com>
-Message-ID: <20180625232618.GD1860@tuxbook-pro>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Tue, 26 Jun 2018 08:28:18 +0800
+Subject: [linux-sunxi] [PATCH 2/3] arm64: allwinner: h6: add device tree
+ nodes for MMC controllers
+In-Reply-To: <8259b2d9-be02-68fb-90bb-bd0ebdee0b05@arm.com>
+References: <20180426140728.43155-1-icenowy@aosc.io>
+ <20180426140728.43155-3-icenowy@aosc.io>
+ <9571735d-929f-a2ef-ed97-dc9193420b73@arm.com>
+ <77DF7884-8DA8-4ED5-BB51-941CFDE4A123@aosc.io>
+ <0ae1b6ce-c1cf-61e8-e09b-abec47b089b2@arm.com>
+ <6EBD7D16-E985-4345-B2C2-D0CE7B32F8C5@aosc.io>
+ <8259b2d9-be02-68fb-90bb-bd0ebdee0b05@arm.com>
+Message-ID: <0b80e778a7c03b5aeeb0e4142895e0e820df3a95.camel@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 25 Jun 14:08 PDT 2018, Arnd Bergmann wrote:
+? 2018-04-27?? 22:25 +0100?Andr? Przywara???
+> On 27/04/18 10:23, Icenowy Zheng wrote:
+> > 
+> > 
+> > ? 2018?4?27? GMT+08:00 ??5:18:23, Andre Przywara <andre.przywara@ar
+> > m.com> ??:
+> > > Hi,
+> > > 
+> > > On 27/04/18 09:36, Icenowy Zheng wrote:
+> > > > 
+> > > > 
+> > > > ? 2018?4?27? GMT+08:00 ??12:45:38, Andre Przywara
+> > > 
+> > > <andre.przywara@arm.com> ??:
+> > > > > Hi,
+> > > > > 
+> > > > > On 26/04/18 15:07, Icenowy Zheng wrote:
+> > > > > > The Allwinner H6 SoC have 3 MMC controllers.
+> > > > > > 
+> > > > > > Add device tree nodes for them.
+> > > > > > 
+> > > > > > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> > > > > > ---
+> > > > > >  arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi | 56
+> > > > > 
+> > > > > ++++++++++++++++++++++++++++
+> > > > > >  1 file changed, 56 insertions(+)
+> > > > > > 
+> > > > > > diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
+> > > > > 
+> > > > > b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
+> > > > > > index 4debc3962830..3cbfc035c979 100644
+> > > > > > --- a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
+> > > > > > +++ b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
+> > > > > > @@ -124,12 +124,68 @@
+> > > > > >  			interrupt-controller;
+> > > > > >  			#interrupt-cells = <3>;
+> > > > > >  
+> > > > > > +			mmc0_pins: mmc0-pins {
+> > > > > > +				pins = "PF0", "PF1",
+> > > > > > "PF2", "PF3",
+> > > > > > +				       "PF4", "PF5";
+> > > > > > +				function = "mmc0";
+> > > > > > +				drive-strength = <30>;
+> > > > > > +				bias-pull-up;
+> > > > > > +			};
+> > > > > > +
+> > > > > > +			mmc2_pins: mmc2-pins {
+> > > > > > +				pins = "PC1", "PC4",
+> > > > > > "PC5", "PC6",
+> > > > > > +				       "PC7", "PC8",
+> > > > > > "PC9", "PC10",
+> > > > > > +				       "PC11", "PC12",
+> > > > > > "PC13", "PC14";
+> > > > > > +				function = "mmc2";
+> > > > > > +				drive-strength = <30>;
+> > > > > > +				bias-pull-up;
+> > > > > > +			};
+> > > > > > +
+> > > > > >  			uart0_ph_pins: uart0-ph {
+> > > > > >  				pins = "PH0", "PH1";
+> > > > > >  				function = "uart0";
+> > > > > >  			};
+> > > > > >  		};
+> > > > > >  
+> > > > > > +		mmc0: mmc at 4020000 {
+> > > > > > +			compatible = "allwinner,sun50i-h6-
+> > > > > > mmc";
+> > > > > 
+> > > > > This should be:
+> > > > > 			compatible = "allwinner,sun50i-h6-mmc",
+> > > > > 				     "allwinner,sun50i-a64-
+> > > > > mmc";
+> > > > 
+> > > > I'm intended to not add A64 compatible, as
+> > > > H6 is a quite new design
+> > > > (new process) and there might be different behavior, even on
+> > > > mmc0/1.
+> > > 
+> > > But as your patch proves, it is fully backwards compatible: An
+> > > A64
+> > > driver works with this device.
+> > 
+> > No, my patch only proves "the current A64 driver works
+> > with this device", not "Any A64 driver works with device", as
+> > the current driver doesn't fully use the capability provided
+> > by A64 MMC cobtrollers.
+> 
+> Good point, but I still believe every A64 driver would be capable of
+> driving an H6 MMC controller, ....
+> 
+> > > And this is what this compatible string list says: If your system
+> > > does
+> > > not have a specific H6 driver, you can use an A64 driver.
+> > > You might not get all the (potentially) new features, but it
+> > > covers
+> > > everything the A64 has.
+> > > 
+> > > And a new silicon process doesn't matter here, since the software
+> > > interface is unchanged. *If* we find bugs, we can add quirks
+> > > matching
+> > 
+> > I think there's timing parameters for higher speed bins which
+> > are different among chips. As we have currently no support
+> > for speed bins higher than DDR50, they're not added yet.
+> 
+> True, but what are those differences? I compared the A64 and H6
+> manuals
+> side by side, the differences I found are:
+> SMHC_FIFOTH[+0x40]:
+> 	BSIZE_OF_TRANS[30:28]:
+> 	- H6 supports 16 transfers for SMHC0 also.
+> 	other parameters:
+> 	- H6 recommends better values for SMHC0 also
+> SMHC_CSDC[+0x54]:
+> 	- H6 doesn't mention restriction to SMHC2
+> 	(though this might be a mistake)
+> SMHC_NTSR_REG[+0x5C]:
+> 	- H6 defines fields for bits[24:8]
+> SMHC_EMCE[+0x64] and SMHC_EMCE_DBG[+0x68]:
+> 	- H6 adds, for EMCE support
+> EMMC_DDR_SBIT_DET_REG[0x10c]:
+> 	- A64 doesn't mention restriction to SMHC2,
+> 	  but I believe this is a mistake
+> SMHC_EMCE_BMn[0x150 + 0x4 * 0..31]
+> 	- H6 adds, for EMCE support
+> 
+> All those pieces are only *additions* to the H6 over the A64, so
+> don't
+> affect backwards compatibility.
+> 
+> > > on
+> > > the H6 compatible string - that's why we put it here already,
+> > > despite
+> > > having a matching string in the kernel at the moment.
+> > 
+> > Device tree is not driver data but hardware description, so
+> > it should follow "how the device is formed" rather than
+> > "how the device works".
+> 
+> True, but as shown above, the compatibility is really at the device
+> level.
+> Unless you have any other information ...
 
-> On Mon, Jun 25, 2018 at 10:54 PM, Andy Gross <andy.gross@linaro.org> wrote:
-> > On Mon, Jun 25, 2018 at 10:30:17PM +0200, Arnd Bergmann wrote:
-> >> On Mon, Jun 25, 2018 at 7:05 PM, Andy Gross <andy.gross@linaro.org> wrote:
-> >>
-> >> I generally don't like patches that add incorrect initializations to
-> >> work around warnings like this.
-> >
-> > Correct me if I am wrong, but this just masks the warnings on toolchain/
-> > platforms that exhibit these warnings.  I'm not entirely fond of doing
-> > blanket init either to make the warnings go away either...
-> 
-> My patch disallows the case where the compiler can see that the variable
-> is actually used without an initialization, and that code wouldn't
-> work properly.
-> 
-> The problem is that in this loop:
-> 
->         for (i = 0; i < MAX_SLV_ID; i++) {
->                 rsc_hdr = &cmd_db_header->header[i];
->                 if (!rsc_hdr->slv_id)
->                         break;
-> 
->                 ent = rsc_to_entry_header(rsc_hdr);
->                 for (j = 0; j < le16_to_cpu(rsc_hdr->cnt); j++, ent++) {
->                         if (memcmp(ent->id, query, sizeof(ent->id)) == 0)
->                                 break;
->                 }
-> 
->                 if (j < le16_to_cpu(rsc_hdr->cnt)) {
->                         memcpy(eh, ent, sizeof(*ent));
->                         memcpy(rh, rsc_hdr, sizeof(*rh));
->                         return 0;
->                 }
->         }
-> 
-> I think gcc sees that cmd_db_header is initialized to NULL and never
-> written to after of_reserved_mem_lookup() returns NULL during
-> cmd_db_dev_probe().
-> 
-> This means we are that cmd_db_get_header never intializes the
-> resulting structure. It also never returns zero, but gcc doesn't
-> see that here.
-> 
+Rob, could you answer whether we should add the A64 compatible or not?
 
-The optimization that I can see would lead to a difference here is if
-the conditional in cmd_db_read() is just removed as the compiler see it
-always being true, but then doesn't propagate this to the error handling
-in cmd_db_get_header(); but that wouldn't make much sense...
-
-Otherwise I think cmd_db_header would be equally uninitialized in the
-case where CONFIG_OF_RESERVED_MEM is set, but we haven't seen any issues
-related to this on arm64.
-
-
-Unless there's something I'm missing I would prefer that we just take
-Anders' proposed fix, it does mask the problem in a more direct way.
-
-Regards,
-Bjorn
+> 
+> Cheers,
+> Andre.
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
