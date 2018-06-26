@@ -1,41 +1,93 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Tue, 26 Jun 2018 15:38:14 +0200
-Subject: [PATCH 00/14] ARM: davinci: step towards removing
- at24_platform_data
-In-Reply-To: <20180626132154.GA5064@lunn.ch>
-References: <20180625155025.12567-1-brgl@bgdev.pl>
- <20180625174024.GB17417@lunn.ch>
- <CAMRc=MdEn74G5SJAaGLAfNSS7Zy7wqH04aN5CMZ45UXqhu_58g@mail.gmail.com>
- <20180625180237.GC17417@lunn.ch>
- <CAMRc=MejDn=t6EPbKOfhMfRAb_O-5hxtWRyjAWH1mb5BUySrDA@mail.gmail.com>
- <20180626083823.GA28068@lunn.ch>
- <CAMRc=Mdvh+1enpD3qDoamhPfaBPin2v3amneQELApgoC0bS2FQ@mail.gmail.com>
- <20180626132154.GA5064@lunn.ch>
-Message-ID: <CAMRc=McCk6fz5x5vJmjYkYx-i6XfGPAZPm9ctg2fuCCfkvKpLQ@mail.gmail.com>
+From: oth@google.com (Orion Hodson)
+Date: Tue, 26 Jun 2018 14:47:41 +0100
+Subject: [PATCH v2] arm: Hook up SYNC_CORE functionality for
+ sys_membarrier()
+In-Reply-To: <299958542.3269.1530019599660.JavaMail.zimbra@efficios.com>
+References: <1530006130-18048-1-git-send-email-will.deacon@arm.com>
+ <299958542.3269.1530019599660.JavaMail.zimbra@efficios.com>
+Message-ID: <CAAttue3ZaPgr6QZZ8wJF=1HD+fr0CKZ4oRm9npPfejWgHAmQsg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-06-26 15:21 GMT+02:00 Andrew Lunn <andrew@lunn.ch>:
->> I see. I see it this way: the setup callback comes from the time when
->> we didn't have nvmem and should go away. I will protest loud whenever
->> someone will try to use it again and will work towards removing it as
->> soon as possible.
->
-> The setup() callback could be moved into the nvmem framework, rather
-> than in the at24 driver. Make the call when the cells have been
-> connected to the backing store.
->
+Great, thank you!
 
-This would at least make it more generic. And maybe I could also get
-rid of the setup callback from the mityomapl138 board file.
-
-Bart
-
->> I will give your problem a thought and will try to get back with some
->> proposals - maybe we should, as you suggested, extend nvmem even
->> further to allow to remove nvmem info entries etc.
+On Tue, Jun 26, 2018 at 2:26 PM Mathieu Desnoyers
+<mathieu.desnoyers@efficios.com> wrote:
 >
-> That does not help me too much. I have the same problem with i2c and
-> MDIO. So i actually prefer to keep this the same as all others.
+> ----- On Jun 26, 2018, at 5:42 AM, Will Deacon will.deacon at arm.com wrote:
 >
->         Andrew
+> > Exception return implies context synchronization, so we can hook up the
+> > SYNC_CORE option to sys_membarrier() simply by selecting the Kconfig option,
+> > just like we've done for arm64 already.
+> >
+> > Cc: Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+> > Cc: Orion Hodson <oth@google.com>
+> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+>
+> Acked-by: Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+>
+> Thanks!
+>
+> Mathieu
+>
+> > ---
+> >
+> > v1 -> v2: Update arch-support.txt
+> >
+> > .../features/sched/membarrier-sync-core/arch-support.txt          | 8 ++++----
+> > arch/arm/Kconfig                                                  | 1 +
+> > 2 files changed, 5 insertions(+), 4 deletions(-)
+> >
+> > diff --git a/Documentation/features/sched/membarrier-sync-core/arch-support.txt
+> > b/Documentation/features/sched/membarrier-sync-core/arch-support.txt
+> > index dbdf62907703..c7858dd1ea8f 100644
+> > --- a/Documentation/features/sched/membarrier-sync-core/arch-support.txt
+> > +++ b/Documentation/features/sched/membarrier-sync-core/arch-support.txt
+> > @@ -5,10 +5,10 @@
+> > #
+> > # Architecture requirements
+> > #
+> > -# * arm64
+> > +# * arm/arm64
+> > #
+> > -# Rely on eret context synchronization when returning from IPI handler, and
+> > -# when returning to user-space.
+> > +# Rely on implicit context synchronization as a result of exception return
+> > +# when returning from IPI handler, and when returning to user-space.
+> > #
+> > # * x86
+> > #
+> > @@ -31,7 +31,7 @@
+> >     -----------------------
+> >     |       alpha: | TODO |
+> >     |         arc: | TODO |
+> > -    |         arm: | TODO |
+> > +    |         arm: |  ok  |
+> >     |       arm64: |  ok  |
+> >     |         c6x: | TODO |
+> >     |       h8300: | TODO |
+> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> > index 54eeb8d00bc6..b0ac18547370 100644
+> > --- a/arch/arm/Kconfig
+> > +++ b/arch/arm/Kconfig
+> > @@ -9,6 +9,7 @@ config ARM
+> >       select ARCH_HAS_ELF_RANDOMIZE
+> >       select ARCH_HAS_FORTIFY_SOURCE
+> >       select ARCH_HAS_KCOV
+> > +     select ARCH_HAS_MEMBARRIER_SYNC_CORE
+> >       select ARCH_HAS_PTE_SPECIAL if ARM_LPAE
+> >       select ARCH_HAS_PHYS_TO_DMA
+> >       select ARCH_HAS_SET_MEMORY
+> > --
+> > 2.1.4
+>
+> --
+> Mathieu Desnoyers
+> EfficiOS Inc.
+> http://www.efficios.com
+
+
+
+-- 
+
+Orion Hodson | Software Engineer | oth at google.com | +44 7505 730469
