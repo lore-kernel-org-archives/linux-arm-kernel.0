@@ -1,56 +1,24 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Tue, 26 Jun 2018 22:03:08 +0200
-Subject: [PATCH v2 2/2] ARM: dts: pxa: fix the rtc controller
-In-Reply-To: <20180626200308.16192-1-robert.jarzmik@free.fr>
-References: <20180626200308.16192-1-robert.jarzmik@free.fr>
-Message-ID: <20180626200308.16192-2-robert.jarzmik@free.fr>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 26 Jun 2018 13:14:28 -0700
+Subject: [GIT PULL] Qualcomm Fixes for v4.18-rc2
+In-Reply-To: <20180626174242.tksnyhhvqwglnz3o@localhost>
+References: <1529996893-6390-1-git-send-email-andy.gross@linaro.org>
+ <20180626174242.tksnyhhvqwglnz3o@localhost>
+Message-ID: <CAOesGMjm-bO6C3wT1QpysYciAU+XuRcpEZFRMxrSnQnTFE04pw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The RTC controller is fed by an external fixed 32kHz clock. Yet the
-driver wants to acquire this clock, even though it doesn't make any use
-of it, ie. doesn't get the rate to make calculation.
+On Tue, Jun 26, 2018 at 10:42 AM, Olof Johansson <olof@lixom.net> wrote:
+> On Tue, Jun 26, 2018 at 02:08:13AM -0500, Andy Gross wrote:
+>> The following changes since commit 9573ce74d3bc797758cbd55194aae1b7248f2503:
+>>
+>>   Merge tag 'qcom-fixes-for-4.18-rc1' into linus (2018-06-25 23:53:28 -0500)
 
-Therefore, use the exported 32.768kHz clock in the PXA clock tree to
-make the driver happy and working.
+Hmm, I just noticed this. It is the kind of thing Linus sometimes gets
+upset about when it gets excessive (merge-backs).
 
-Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
----
-Since v1: change the dummy clock by the actual 32.768kHz
----
- arch/arm/boot/dts/pxa25x.dtsi | 4 ++++
- arch/arm/boot/dts/pxa27x.dtsi | 4 ++++
- 2 files changed, 8 insertions(+)
+You should just have based this second branch on top of the first one
+without that merge. Or was it needed due to some conflict?
 
-diff --git a/arch/arm/boot/dts/pxa25x.dtsi b/arch/arm/boot/dts/pxa25x.dtsi
-index 95d59be97213..78a413ea0e88 100644
---- a/arch/arm/boot/dts/pxa25x.dtsi
-+++ b/arch/arm/boot/dts/pxa25x.dtsi
-@@ -80,6 +80,10 @@
- 			#pwm-cells = <1>;
- 			clocks = <&clks CLK_PWM1>;
- 		};
-+
-+		rtc at 40900000 {
-+			clocks = <&clks CLK_OSC32k768>>;
-+		};
- 	};
- 
- 	timer at 40a00000 {
-diff --git a/arch/arm/boot/dts/pxa27x.dtsi b/arch/arm/boot/dts/pxa27x.dtsi
-index 747f750f675d..2ab6986433c8 100644
---- a/arch/arm/boot/dts/pxa27x.dtsi
-+++ b/arch/arm/boot/dts/pxa27x.dtsi
-@@ -113,6 +113,10 @@
- 
- 			status = "disabled";
- 		};
-+
-+		rtc at 40900000 {
-+			clocks = <&clks CLK_OSC32k768>;
-+		};
- 	};
- 
- 	clocks {
--- 
-2.11.0
+
+-Olof
