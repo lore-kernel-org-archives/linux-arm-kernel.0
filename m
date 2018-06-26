@@ -1,40 +1,59 @@
 From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Tue, 26 Jun 2018 18:19:00 +0200
-Subject: [PATCH 1/2] ARM: dts: stm32: remove gpio aliases for stm32mp157c
+Date: Tue, 26 Jun 2018 18:19:01 +0200
+Subject: [PATCH 2/2] ARM: dts: stm32: Reorder nodes in stm32mp157c-ed1
 In-Reply-To: <1530029941-26089-1-git-send-email-alexandre.torgue@st.com>
 References: <1530029941-26089-1-git-send-email-alexandre.torgue@st.com>
-Message-ID: <1530029941-26089-2-git-send-email-alexandre.torgue@st.com>
+Message-ID: <1530029941-26089-3-git-send-email-alexandre.torgue@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-GPIO aliases are not used by stm32 pinctrl driver.
+Nodes should be ordered in alphabetic order.
 
 Signed-off-by: Alexandre Torgue <alexandre.torgue@st.com>
 
-diff --git a/arch/arm/boot/dts/stm32mp157c.dtsi b/arch/arm/boot/dts/stm32mp157c.dtsi
-index 5183830..9dc4ff0 100644
---- a/arch/arm/boot/dts/stm32mp157c.dtsi
-+++ b/arch/arm/boot/dts/stm32mp157c.dtsi
-@@ -35,20 +35,6 @@
- 		cpu_on = <0x84000003>;
+diff --git a/arch/arm/boot/dts/stm32mp157c-ed1.dts b/arch/arm/boot/dts/stm32mp157c-ed1.dts
+index 050c30d..de8b8a1 100644
+--- a/arch/arm/boot/dts/stm32mp157c-ed1.dts
++++ b/arch/arm/boot/dts/stm32mp157c-ed1.dts
+@@ -49,17 +49,6 @@
  	};
+ };
  
--	aliases {
--		gpio0 = &gpioa;
--		gpio1 = &gpiob;
--		gpio2 = &gpioc;
--		gpio3 = &gpiod;
--		gpio4 = &gpioe;
--		gpio5 = &gpiof;
--		gpio6 = &gpiog;
--		gpio7 = &gpioh;
--		gpio8 = &gpioi;
--		gpio9 = &gpioj;
--		gpio10 = &gpiok;
--	};
+-&rng1 {
+-	status = "okay";
+-};
 -
- 	intc: interrupt-controller at a0021000 {
- 		compatible = "arm,cortex-a7-gic";
- 		#interrupt-cells = <3>;
+-&timers6 {
+-	status = "okay";
+-	timer at 5 {
+-		status = "okay";
+-	};
+-};
+-
+ &i2c4 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&i2c4_pins_a>;
+@@ -68,10 +57,21 @@
+ 	status = "okay";
+ };
+ 
++&rng1 {
++	status = "okay";
++};
++
+ &rtc {
+ 	status = "okay";
+ };
+ 
++&timers6 {
++	status = "okay";
++	timer at 5 {
++		status = "okay";
++	};
++};
++
+ &uart4 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart4_pins_a>;
 -- 
 2.7.4
