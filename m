@@ -1,31 +1,71 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 26 Jun 2018 10:31:41 +0100
-Subject: [PATCH 19/20] dts: ste-dbx5x0: Update coresight bindings for
- hardware port
-In-Reply-To: <CACRpkda17Txr4X=En8HUeE6z6a5WQOVXy8HObbKy7sOJ1V-DUg@mail.gmail.com>
-References: <1528235011-30691-1-git-send-email-suzuki.poulose@arm.com>
- <1528235011-30691-20-git-send-email-suzuki.poulose@arm.com>
- <CACRpkda17Txr4X=En8HUeE6z6a5WQOVXy8HObbKy7sOJ1V-DUg@mail.gmail.com>
-Message-ID: <6f501794-1620-0190-c38b-10c53bb029f5@arm.com>
+From: niklas.cassel@linaro.org (Niklas Cassel)
+Date: Tue, 26 Jun 2018 11:30:03 +0200
+Subject: [PATCH v2 04/12] ASoC: qdsp6: q6adm: use
+ of_platform_populate/depopulate()
+In-Reply-To: <20180626092016.9296-5-srinivas.kandagatla@linaro.org>
+References: <20180626092016.9296-1-srinivas.kandagatla@linaro.org>
+ <20180626092016.9296-5-srinivas.kandagatla@linaro.org>
+Message-ID: <20180626093003.GB25217@centauri.ideon.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/06/18 10:30, Linus Walleij wrote:
-> On Tue, Jun 5, 2018 at 11:45 PM Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
-> 
->> Switch to the new coresight bindings
->>
->> Cc: Linus Walleij <linus.walleij@linaro.org>
->> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
->> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> 
-> I think I was requested in another mail to hold back applying this
-> patch until it's been discussed.
-> 
-> I will apply once Mathieu (etc) ACKs the series.
+Acked-by: Niklas Cassel <niklas.cassel@linaro.org>
 
-Linus,
-
-Yes, thats right. Please ignore this for now.
-
-Suzuki
+On Tue, Jun 26, 2018 at 10:20:08AM +0100, Srinivas Kandagatla wrote:
+> Now that the child nodes have there own compatible strings,
+> Use of_platform_populate/depopulate() instead of less common
+> of_platform_device_create()/destroy().
+> 
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> ---
+>  sound/soc/qcom/qdsp6/q6adm.c | 16 ++--------------
+>  1 file changed, 2 insertions(+), 14 deletions(-)
+> 
+> diff --git a/sound/soc/qcom/qdsp6/q6adm.c b/sound/soc/qcom/qdsp6/q6adm.c
+> index 9983c665a941..932c3ebfd252 100644
+> --- a/sound/soc/qcom/qdsp6/q6adm.c
+> +++ b/sound/soc/qcom/qdsp6/q6adm.c
+> @@ -64,7 +64,6 @@ struct q6adm {
+>  	struct aprv2_ibasic_rsp_result_t result;
+>  	struct mutex lock;
+>  	wait_queue_head_t matrix_map_wait;
+> -	struct platform_device *pdev_routing;
+>  };
+>  
+>  struct q6adm_cmd_device_open_v5 {
+> @@ -588,7 +587,6 @@ EXPORT_SYMBOL_GPL(q6adm_close);
+>  static int q6adm_probe(struct apr_device *adev)
+>  {
+>  	struct device *dev = &adev->dev;
+> -	struct device_node *dais_np;
+>  	struct q6adm *adm;
+>  
+>  	adm = devm_kzalloc(&adev->dev, sizeof(*adm), GFP_KERNEL);
+> @@ -605,22 +603,12 @@ static int q6adm_probe(struct apr_device *adev)
+>  	INIT_LIST_HEAD(&adm->copps_list);
+>  	spin_lock_init(&adm->copps_list_lock);
+>  
+> -	dais_np = of_get_child_by_name(dev->of_node, "routing");
+> -	if (dais_np) {
+> -		adm->pdev_routing = of_platform_device_create(dais_np,
+> -							   "q6routing", dev);
+> -		of_node_put(dais_np);
+> -	}
+> -
+> -	return 0;
+> +	return of_platform_populate(dev->of_node, NULL, NULL, dev);
+>  }
+>  
+>  static int q6adm_remove(struct apr_device *adev)
+>  {
+> -	struct q6adm *adm = dev_get_drvdata(&adev->dev);
+> -
+> -	if (adm->pdev_routing)
+> -		of_platform_device_destroy(&adm->pdev_routing->dev, NULL);
+> +	of_platform_depopulate(&adev->dev);
+>  
+>  	return 0;
+>  }
+> -- 
+> 2.16.2
+> 
