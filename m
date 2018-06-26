@@ -1,59 +1,64 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Tue, 26 Jun 2018 12:22:32 +0200
-Subject: [PATCH v2 02/15] ARM: davinci: dm365-evm: use nvmem lookup for mac
- address
+Date: Tue, 26 Jun 2018 12:22:39 +0200
+Subject: [PATCH v2 09/15] ARM: davinci: dm365-evm: use device properties for
+ at24 eeprom
 In-Reply-To: <20180626102245.30711-1-brgl@bgdev.pl>
 References: <20180626102245.30711-1-brgl@bgdev.pl>
-Message-ID: <20180626102245.30711-3-brgl@bgdev.pl>
+Message-ID: <20180626102245.30711-10-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-We now support nvmem lookups for machine code. Add a lookup for
-mac-address.
+We want to work towards phasing out the at24_platform_data structure.
+There are few users and its contents can be represented using generic
+device properties. Using device properties only will allow us to
+significantly simplify the at24 configuration code.
+
+Remove the at24_platform_data structure and replace it with an array
+of property entries. Drop the byte_len/size property, as the model name
+already implies the EEPROM's size.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- arch/arm/mach-davinci/board-dm365-evm.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ arch/arm/mach-davinci/board-dm365-evm.c | 13 +++++--------
+ 1 file changed, 5 insertions(+), 8 deletions(-)
 
 diff --git a/arch/arm/mach-davinci/board-dm365-evm.c b/arch/arm/mach-davinci/board-dm365-evm.c
-index 435f7ec7d9af..df640d977bfa 100644
+index df640d977bfa..ffe93265f565 100644
 --- a/arch/arm/mach-davinci/board-dm365-evm.c
 +++ b/arch/arm/mach-davinci/board-dm365-evm.c
-@@ -28,6 +28,7 @@
- #include <linux/spi/spi.h>
- #include <linux/spi/eeprom.h>
- #include <linux/v4l2-dv-timings.h>
-+#include <linux/nvmem-provider.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -169,6 +170,15 @@ static struct platform_device davinci_nand_device = {
- 	},
+@@ -18,7 +18,7 @@
+ #include <linux/i2c.h>
+ #include <linux/io.h>
+ #include <linux/clk.h>
+-#include <linux/platform_data/at24.h>
++#include <linux/property.h>
+ #include <linux/leds.h>
+ #include <linux/mtd/mtd.h>
+ #include <linux/mtd/partitions.h>
+@@ -179,18 +179,15 @@ static struct nvmem_cell_lookup dm365evm_mac_address_cell = {
+ 	.nvmem_name = "1-00500",
  };
  
-+static struct nvmem_cell_lookup dm365evm_mac_address_cell = {
-+	.info = {
-+		.name = "mac-address",
-+		.offset = 0x7f00,
-+		.bytes = ETH_ALEN,
-+	},
-+	.nvmem_name = "1-00500",
-+};
-+
- static struct at24_platform_data eeprom_info = {
- 	.byte_len       = (256*1024) / 8,
- 	.page_size      = 64,
-@@ -769,6 +779,8 @@ static __init void dm365_evm_init(void)
+-static struct at24_platform_data eeprom_info = {
+-	.byte_len       = (256*1024) / 8,
+-	.page_size      = 64,
+-	.flags          = AT24_FLAG_ADDR16,
+-	.setup          = davinci_get_mac_addr,
+-	.context	= (void *)0x7f00,
++static const struct property_entry eeprom_properties[] = {
++	PROPERTY_ENTRY_U32("pagesize", 64),
++	{ }
+ };
  
- 	dm365_init_spi0(BIT(0), dm365_evm_spi_info,
- 			ARRAY_SIZE(dm365_evm_spi_info));
-+
-+	nvmem_register_lookup(&dm365evm_mac_address_cell, 1);
- }
- 
- MACHINE_START(DAVINCI_DM365_EVM, "DaVinci DM365 EVM")
+ static struct i2c_board_info i2c_info[] = {
+ 	{
+ 		I2C_BOARD_INFO("24c256", 0x50),
+-		.platform_data	= &eeprom_info,
++		.properties = eeprom_properties,
+ 	},
+ 	{
+ 		I2C_BOARD_INFO("tlv320aic3x", 0x18),
 -- 
 2.17.1
