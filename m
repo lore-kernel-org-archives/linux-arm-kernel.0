@@ -1,62 +1,59 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Tue, 26 Jun 2018 12:22:44 +0200
-Subject: [PATCH v2 14/15] ARM: davinci: sffsdr: use device properties for at24
- eeprom
+Date: Tue, 26 Jun 2018 12:22:35 +0200
+Subject: [PATCH v2 05/15] ARM: davinci: da830-evm: use nvmem lookup for mac
+ address
 In-Reply-To: <20180626102245.30711-1-brgl@bgdev.pl>
 References: <20180626102245.30711-1-brgl@bgdev.pl>
-Message-ID: <20180626102245.30711-15-brgl@bgdev.pl>
+Message-ID: <20180626102245.30711-6-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-We want to work towards phasing out the at24_platform_data structure.
-There are few users and its contents can be represented using generic
-device properties. Using device properties only will allow us to
-significantly simplify the at24 configuration code.
-
-Remove the at24_platform_data structure and replace it with an array
-of property entries. Drop the byte_len/size property, as the model name
-already implies the EEPROM's size.
+We now support nvmem lookups for machine code. Add a lookup for
+mac-address.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- arch/arm/mach-davinci/board-sffsdr.c | 11 +++++------
- 1 file changed, 5 insertions(+), 6 deletions(-)
+ arch/arm/mach-davinci/board-da830-evm.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/arch/arm/mach-davinci/board-sffsdr.c b/arch/arm/mach-davinci/board-sffsdr.c
-index f6a4d094cbc3..680e5d7628a8 100644
---- a/arch/arm/mach-davinci/board-sffsdr.c
-+++ b/arch/arm/mach-davinci/board-sffsdr.c
-@@ -26,7 +26,7 @@
- #include <linux/init.h>
- #include <linux/platform_device.h>
- #include <linux/i2c.h>
--#include <linux/platform_data/at24.h>
-+#include <linux/property.h>
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/rawnand.h>
- #include <linux/mtd/partitions.h>
-@@ -92,16 +92,15 @@ static struct platform_device davinci_sffsdr_nandflash_device = {
- 	.resource	= davinci_sffsdr_nandflash_resource,
- };
+diff --git a/arch/arm/mach-davinci/board-da830-evm.c b/arch/arm/mach-davinci/board-da830-evm.c
+index 14a6fc061744..3be3e93f2f18 100644
+--- a/arch/arm/mach-davinci/board-da830-evm.c
++++ b/arch/arm/mach-davinci/board-da830-evm.c
+@@ -29,6 +29,7 @@
+ #include <linux/platform_data/spi-davinci.h>
+ #include <linux/platform_data/usb-davinci.h>
+ #include <linux/regulator/machine.h>
++#include <linux/nvmem-provider.h>
  
--static struct at24_platform_data eeprom_info = {
--	.byte_len	= (64*1024) / 8,
--	.page_size	= 32,
--	.flags		= AT24_FLAG_ADDR16,
-+static const struct property_entry eeprom_properties[] = {
-+	PROPERTY_ENTRY_U32("pagesize", 32),
-+	{ },
- };
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+@@ -409,6 +410,15 @@ static inline void da830_evm_init_lcdc(int mux_mode)
+ static inline void da830_evm_init_lcdc(int mux_mode) { }
+ #endif
  
- static struct i2c_board_info __initdata i2c_info[] =  {
- 	{
- 		I2C_BOARD_INFO("24c64", 0x50),
--		.platform_data	= &eeprom_info,
-+		.properties = eeprom_properties,
- 	},
- 	/* Other I2C devices:
- 	 * MSP430,  addr 0x23 (not used)
++static struct nvmem_cell_lookup da830_evm_mac_address_cell = {
++	.info = {
++		.name = "mac-address",
++		.offset = 0x7f00,
++		.bytes = ETH_ALEN,
++	},
++	.nvmem_name = "1-00500",
++};
++
+ static struct at24_platform_data da830_evm_i2c_eeprom_info = {
+ 	.byte_len	= SZ_256K / 8,
+ 	.page_size	= 64,
+@@ -618,6 +628,8 @@ static __init void da830_evm_init(void)
+ 		pr_warn("%s: spi 0 registration failed: %d\n", __func__, ret);
+ 
+ 	regulator_has_full_constraints();
++
++	nvmem_register_lookup(&da830_evm_mac_address_cell, 1);
+ }
+ 
+ #ifdef CONFIG_SERIAL_8250_CONSOLE
 -- 
 2.17.1
