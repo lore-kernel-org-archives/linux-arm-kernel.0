@@ -1,71 +1,61 @@
-From: niklas.cassel@linaro.org (Niklas Cassel)
-Date: Tue, 26 Jun 2018 11:30:03 +0200
-Subject: [PATCH v2 04/12] ASoC: qdsp6: q6adm: use
- of_platform_populate/depopulate()
-In-Reply-To: <20180626092016.9296-5-srinivas.kandagatla@linaro.org>
-References: <20180626092016.9296-1-srinivas.kandagatla@linaro.org>
- <20180626092016.9296-5-srinivas.kandagatla@linaro.org>
-Message-ID: <20180626093003.GB25217@centauri.ideon.se>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 26 Jun 2018 10:24:54 +0100
+Subject: [RFC v2 1/4] arm: Store address of thread_info in sp^
+In-Reply-To: <20180618153053.186224-2-zsm@chromium.org>
+References: <20180618153053.186224-1-zsm@chromium.org>
+ <20180618153053.186224-2-zsm@chromium.org>
+Message-ID: <20180626092454.GF17671@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Acked-by: Niklas Cassel <niklas.cassel@linaro.org>
-
-On Tue, Jun 26, 2018 at 10:20:08AM +0100, Srinivas Kandagatla wrote:
-> Now that the child nodes have there own compatible strings,
-> Use of_platform_populate/depopulate() instead of less common
-> of_platform_device_create()/destroy().
+On Mon, Jun 18, 2018 at 08:30:50AM -0700, Zubin Mithra wrote:
+> There is a need to store thread_info in a register so that subsequent
+> patches can move thread_info into task_struct. This would also
+> facilitate having separate IRQ stacks.
 > 
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> Banked register sp is an unused scratch register in EL1 context. We can
+> utilize this register for stashing the current thread_info.
+> 
+> The macro save_ti_sp_usr is used to stash the address of thread_info
+> into sp^. The macro get_thread_info is modified to retrieve thread_info
+> from sp^. Additionally, upon context switch, sp^ is set to current's
+> thread_info by using set_sp_usr.
+> 
+> Signed-off-by: Zubin Mithra <zsm@chromium.org>
 > ---
->  sound/soc/qcom/qdsp6/q6adm.c | 16 ++--------------
->  1 file changed, 2 insertions(+), 14 deletions(-)
+>  arch/arm/include/asm/assembler.h   | 27 ++++++++++++++++++++++-----
+>  arch/arm/include/asm/switch_to.h   | 11 +++++++++++
+>  arch/arm/include/asm/thread_info.h | 14 ++++++++++++--
+>  arch/arm/kernel/entry-armv.S       |  5 ++++-
+>  arch/arm/kernel/entry-common.S     |  2 ++
+>  arch/arm/kernel/head-common.S      |  2 ++
+>  arch/arm/kernel/head.S             |  1 +
+>  7 files changed, 54 insertions(+), 8 deletions(-)
 > 
-> diff --git a/sound/soc/qcom/qdsp6/q6adm.c b/sound/soc/qcom/qdsp6/q6adm.c
-> index 9983c665a941..932c3ebfd252 100644
-> --- a/sound/soc/qcom/qdsp6/q6adm.c
-> +++ b/sound/soc/qcom/qdsp6/q6adm.c
-> @@ -64,7 +64,6 @@ struct q6adm {
->  	struct aprv2_ibasic_rsp_result_t result;
->  	struct mutex lock;
->  	wait_queue_head_t matrix_map_wait;
-> -	struct platform_device *pdev_routing;
->  };
->  
->  struct q6adm_cmd_device_open_v5 {
-> @@ -588,7 +587,6 @@ EXPORT_SYMBOL_GPL(q6adm_close);
->  static int q6adm_probe(struct apr_device *adev)
->  {
->  	struct device *dev = &adev->dev;
-> -	struct device_node *dais_np;
->  	struct q6adm *adm;
->  
->  	adm = devm_kzalloc(&adev->dev, sizeof(*adm), GFP_KERNEL);
-> @@ -605,22 +603,12 @@ static int q6adm_probe(struct apr_device *adev)
->  	INIT_LIST_HEAD(&adm->copps_list);
->  	spin_lock_init(&adm->copps_list_lock);
->  
-> -	dais_np = of_get_child_by_name(dev->of_node, "routing");
-> -	if (dais_np) {
-> -		adm->pdev_routing = of_platform_device_create(dais_np,
-> -							   "q6routing", dev);
-> -		of_node_put(dais_np);
-> -	}
-> -
-> -	return 0;
-> +	return of_platform_populate(dev->of_node, NULL, NULL, dev);
->  }
->  
->  static int q6adm_remove(struct apr_device *adev)
->  {
-> -	struct q6adm *adm = dev_get_drvdata(&adev->dev);
-> -
-> -	if (adm->pdev_routing)
-> -		of_platform_device_destroy(&adm->pdev_routing->dev, NULL);
-> +	of_platform_depopulate(&adev->dev);
->  
->  	return 0;
->  }
-> -- 
-> 2.16.2
-> 
+> diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
+> index 0cd4dccbae78..be18a364f590 100644
+> --- a/arch/arm/include/asm/assembler.h
+> +++ b/arch/arm/include/asm/assembler.h
+> @@ -205,11 +205,28 @@
+>  /*
+>   * Get current thread_info.
+>   */
+> -	.macro	get_thread_info, rd
+> - ARM(	mov	\rd, sp, lsr #THREAD_SIZE_ORDER + PAGE_SHIFT	)
+> - THUMB(	mov	\rd, sp			)
+> - THUMB(	lsr	\rd, \rd, #THREAD_SIZE_ORDER + PAGE_SHIFT	)
+> -	mov	\rd, \rd, lsl #THREAD_SIZE_ORDER + PAGE_SHIFT
+> +	.macro get_thread_info, rd
+> +	sub sp, #4
+> +	stm sp, {sp}^
+
+What isn't mentioned in the ARM ARM is that you need at least one
+instruction here that does not access any of the banked registers.
+Ditto for ldm rn, {...}^ form.
+
+Have you done performance analysis of this patch?
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
