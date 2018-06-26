@@ -1,59 +1,35 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Tue, 26 Jun 2018 12:22:34 +0200
-Subject: [PATCH v2 04/15] ARM: davinci: dm646x-evm: use nvmem lookup for mac
- address
+Date: Tue, 26 Jun 2018 12:22:43 +0200
+Subject: [PATCH v2 13/15] ARM: davinci: sffsdr: fix the at24 eeprom device name
 In-Reply-To: <20180626102245.30711-1-brgl@bgdev.pl>
 References: <20180626102245.30711-1-brgl@bgdev.pl>
-Message-ID: <20180626102245.30711-5-brgl@bgdev.pl>
+Message-ID: <20180626102245.30711-14-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-We now support nvmem lookups for machine code. Add a lookup for
-mac-address.
+The currently used 24lc64 i2c device name doesn't match against any
+of the devices supported by the at24 driver. Change it to the closest
+compatible chip.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- arch/arm/mach-davinci/board-dm646x-evm.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ arch/arm/mach-davinci/board-sffsdr.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-davinci/board-dm646x-evm.c b/arch/arm/mach-davinci/board-dm646x-evm.c
-index 584064fdabf5..4c82d38033b6 100644
---- a/arch/arm/mach-davinci/board-dm646x-evm.c
-+++ b/arch/arm/mach-davinci/board-dm646x-evm.c
-@@ -37,6 +37,7 @@
- #include <linux/platform_data/i2c-davinci.h>
- #include <linux/platform_data/mtd-davinci.h>
- #include <linux/platform_data/mtd-davinci-aemif.h>
-+#include <linux/nvmem-provider.h>
+diff --git a/arch/arm/mach-davinci/board-sffsdr.c b/arch/arm/mach-davinci/board-sffsdr.c
+index e7c1728b0833..f6a4d094cbc3 100644
+--- a/arch/arm/mach-davinci/board-sffsdr.c
++++ b/arch/arm/mach-davinci/board-sffsdr.c
+@@ -100,7 +100,7 @@ static struct at24_platform_data eeprom_info = {
  
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -310,6 +311,15 @@ static struct pcf857x_platform_data pcf_data = {
-  *  - ... newer boards may have more
-  */
- 
-+static struct nvmem_cell_lookup dm646x_evm_mac_address_cell = {
-+	.info = {
-+		.name = "mac-address",
-+		.offset = 0x7f00,
-+		.bytes = ETH_ALEN,
-+	},
-+	.nvmem_name = "1-00500",
-+};
-+
- static struct at24_platform_data eeprom_info = {
- 	.byte_len       = (256*1024) / 8,
- 	.page_size      = 64,
-@@ -802,6 +812,8 @@ static __init void evm_init(void)
- 		davinci_init_ide();
- 
- 	soc_info->emac_pdata->phy_id = DM646X_EVM_PHY_ID;
-+
-+	nvmem_register_lookup(&dm646x_evm_mac_address_cell, 1);
- }
- 
- MACHINE_START(DAVINCI_DM6467_EVM, "DaVinci DM646x EVM")
+ static struct i2c_board_info __initdata i2c_info[] =  {
+ 	{
+-		I2C_BOARD_INFO("24lc64", 0x50),
++		I2C_BOARD_INFO("24c64", 0x50),
+ 		.platform_data	= &eeprom_info,
+ 	},
+ 	/* Other I2C devices:
 -- 
 2.17.1
