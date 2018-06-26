@@ -1,92 +1,54 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 26 Jun 2018 08:53:20 +0100
-Subject: [PATCH v2 2/2] arm64: dts: mediatek: add mt6765 support
-In-Reply-To: <1529978646-28976-3-git-send-email-mars.cheng@mediatek.com>
-References: <1529978646-28976-1-git-send-email-mars.cheng@mediatek.com>
- <1529978646-28976-3-git-send-email-mars.cheng@mediatek.com>
-Message-ID: <86h8lq6l1r.wl-marc.zyngier@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 26 Jun 2018 10:02:20 +0200
+Subject: [PATCH 0/5] RFC: Mezzanine handling for 96boards
+In-Reply-To: <CAK8P3a2KqoX-squhGc8TBuJ==8xxELsuy-H+c1+C7Fu7Z4OjDA@mail.gmail.com>
+References: <20180618074556.6944-1-linus.walleij@linaro.org>
+ <CAK8P3a2KqoX-squhGc8TBuJ==8xxELsuy-H+c1+C7Fu7Z4OjDA@mail.gmail.com>
+Message-ID: <CACRpkdZY0+q=VKrNhk8w-NSn0zbjCqdgdyApBTs+tVRBWm8ReA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 26 Jun 2018 03:04:06 +0100,
-Mars Cheng <mars.cheng@mediatek.com> wrote:
-> 
-> This adds basic chip support for MT6765 SoC.
-> 
-> Signed-off-by: Mars Cheng <mars.cheng@mediatek.com>
-> ---
->  arch/arm64/boot/dts/mediatek/Makefile       |    1 +
->  arch/arm64/boot/dts/mediatek/mt6765-evb.dts |   33 ++++++
->  arch/arm64/boot/dts/mediatek/mt6765.dtsi    |  158 +++++++++++++++++++++++++++
->  3 files changed, 192 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/mediatek/mt6765-evb.dts
->  create mode 100644 arch/arm64/boot/dts/mediatek/mt6765.dtsi
-> 
-> diff --git a/arch/arm64/boot/dts/mediatek/mt6765.dtsi b/arch/arm64/boot/dts/mediatek/mt6765.dtsi
-> new file mode 100644
-> index 0000000..ab34c0f
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/mediatek/mt6765.dtsi
+On Mon, Jun 18, 2018 at 2:21 PM Arnd Bergmann <arnd@arndb.de> wrote:
 
-[...]
+> - I really like the idea of having C code deal with the mezzanine
+>   connector itself, acting as an intermediate to tie a number of
+>   boards to a number of add-on cards, this seems much simpler than
+>   trying to do everything with overlays or one of the other more
+>   generic mechanisms.
 
-> +	timer {
-> +		compatible = "arm,armv8-timer";
-> +		interrupt-parent = <&gic>;
-> +		interrupts = <GIC_PPI 13
-> +			     (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
-> +			     <GIC_PPI 14
-> +			     (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
-> +			     <GIC_PPI 11
-> +			     (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
-> +			     <GIC_PPI 10
-> +			     (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>;
+This is my point of view as well.
 
-GICv3 doesn't encode the PPI affinity in its interrupt specifiers (or
-at least not this way). Please drop it.
+> - I don't like the idea of having the bus driver contain a list of possible
+>   add-ons, this seems to go against our usual driver model. What
+>   I think we want instead is to make the connector itself a proper
+>   bus_type, to allow drivers to register against it as loadable modules,
+>   and devices (maybe limited to one device) being created as probed
+>   from DT or some other method as you describe.
 
-> +	};
-> +
-> +	soc {
-> +		#address-cells = <2>;
-> +		#size-cells = <2>;
-> +		compatible = "simple-bus";
-> +		ranges;
-> +
-> +		sysirq: intpol-controller at 10200a80 {
-> +			compatible = "mediatek,mt6765-sysirq",
-> +				     "mediatek,mt6577-sysirq";
-> +			interrupt-controller;
-> +			#interrupt-cells = <3>;
-> +			interrupt-parent = <&gic>;
-> +			reg = <0 0x10200a80 0 0x50>;
-> +		};
-> +
-> +		gic: interrupt-controller at 0c000000 {
-> +			compatible = "arm,gic-v3";
-> +			#interrupt-cells = <3>;
-> +			#address-cells = <2>;
-> +			#size-cells = <2>;
-> +			#redistributor-regions = <1>;
+OK I think I can do that. It will take some thinking and I would
+guess I should also move it to drivers/platform/*
 
-A single redistributor is the default, and you don't need to specify
-it in the DT.
+My idea here would be to have a connector bus that some random
+add-on (such as a 96board mezzanine) would probe to, so we
+make it generic for any connector plug.
 
-> +			interrupt-parent = <&gic>;
-> +			interrupt-controller;
-> +			reg = <0 0x0c000000 0 0x40000>, // distributor
-> +			      <0 0x0c100000 0 0x200000>; // redistributor
+> - You export symbols in the mezzanine_* namespace, which I think
+>    is a bit too generic and should perhaps contain something related
+>    to  96boards in its name to make it less ambiguous. I suspect we
+>    would add a number of further connectors for hats, capes, lures etc,
+>    which could all be described as mezzanines.
 
-How about the GICv2 compatibility regions, which are provided by the
-CPUs at a fixed offset from PERIPHBASE? See the Cortex-A53 TRM for
-detail, and please add the missing regions.
+Michal also brings up the (discoverable!) FMC connectors Xilinx are
+using. So the idea would be to create something generic to help
+probe and populate them all whether partly discoverable or not.
 
-> +			interrupts = <GIC_PPI 9 IRQ_TYPE_LEVEL_HIGH>;
-> +		};
+>    One open question
+>    is how we structure the commonality between the various
+>    connectors, but we can defer that until we have more than one
+>    or two of them.
 
-Thanks,
+I can clean up the namespace at least so it gets clear where to
+add them. I will try to be more generic in the next iteration.
 
-	M.
-
--- 
-Jazz is not dead, it just smell funny.
+Yours,
+Linus Walleij
