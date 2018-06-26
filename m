@@ -1,257 +1,74 @@
 From: james.morse@arm.com (James Morse)
-Date: Tue, 26 Jun 2018 18:01:14 +0100
-Subject: [PATCH v5 18/20] ACPI / APEI: Add support for the SDEI GHES
- Notification type
+Date: Tue, 26 Jun 2018 18:01:12 +0100
+Subject: [PATCH v5 16/20] ACPI / APEI: Split fixmap pages for arm64 NMI-like
+ notifications
 In-Reply-To: <20180626170116.25825-1-james.morse@arm.com>
 References: <20180626170116.25825-1-james.morse@arm.com>
-Message-ID: <20180626170116.25825-19-james.morse@arm.com>
+Message-ID: <20180626170116.25825-17-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the GHES notification type is SDEI, register the provided event
-using the SDEI-GHES helper.
+Now that ghes notification helpers provide the fixmap slots and
+take the lock themselves we can support multiple NMI-like
+notifications on arm64.
 
-SDEI may be one of two types of event, normal and critical. Critical
-events can interrupt normal events, so these must have separate
-fixmap slots and locks in case both event types are in use.
+These should be named after their notification method. x86's
+NOTIFY_NMI already is, move it to live with the ghes_nmi list.
+Change the SEA fixmap entry to be called FIX_APEI_GHES_SEA.
+
+Future patches can add support for FIX_APEI_GHES_SEI and
+FIX_APEI_GHES_SDEI_{NORMAL,CRITICAL}.
 
 Signed-off-by: James Morse <james.morse@arm.com>
----
-Changes since v4:
- * We now have two callbacks and separate locks and fixmap entries for
-   normal/critical calls.
- * Use the new Kconfig selector for ESTATUS_QUEUE
 
- arch/arm64/include/asm/fixmap.h |  2 +-
- drivers/acpi/apei/Kconfig       |  5 ++
- drivers/acpi/apei/ghes.c        | 92 ++++++++++++++++++++++++++++++++-
- drivers/firmware/Kconfig        |  1 +
- drivers/firmware/arm_sdei.c     |  4 +-
- include/linux/arm_sdei.h        |  3 ++
- 6 files changed, 102 insertions(+), 5 deletions(-)
+---
+Changes since v3:
+ * idx/lock are now in a separate struct.
+ * Add to the comment above ghes_fixmap_lock_irq so that it makes more
+   sense in isolation.
+---
+ arch/arm64/include/asm/fixmap.h | 4 +++-
+ drivers/acpi/apei/ghes.c        | 6 +++---
+ 2 files changed, 6 insertions(+), 4 deletions(-)
 
 diff --git a/arch/arm64/include/asm/fixmap.h b/arch/arm64/include/asm/fixmap.h
-index e2b423a5feaf..e875b97032ce 100644
+index ec1e6d6fa14c..c3974517c2cb 100644
 --- a/arch/arm64/include/asm/fixmap.h
 +++ b/arch/arm64/include/asm/fixmap.h
-@@ -58,7 +58,7 @@ enum fixed_addresses {
- #ifdef CONFIG_ACPI_APEI_SEA
- 	FIX_APEI_GHES_SEA,
- #endif
--#ifdef CONFIG_ARM_SDE_INTERFACE
-+#ifdef CONFIG_ACPI_APEI_SDEI
- 	FIX_APEI_GHES_SDEI_NORMAL,
- 	FIX_APEI_GHES_SDEI_CRITICAL,
- #endif
-diff --git a/drivers/acpi/apei/Kconfig b/drivers/acpi/apei/Kconfig
-index 2b191e09b647..a8d09065e6a9 100644
---- a/drivers/acpi/apei/Kconfig
-+++ b/drivers/acpi/apei/Kconfig
-@@ -61,6 +61,11 @@ config ACPI_APEI_SEA
- 	  option allows the OS to look for such hardware error record, and
- 	  take appropriate action.
+@@ -55,7 +55,9 @@ enum fixed_addresses {
+ #ifdef CONFIG_ACPI_APEI_GHES
+ 	/* Used for GHES mapping from assorted contexts */
+ 	FIX_APEI_GHES_IRQ,
+-	FIX_APEI_GHES_NMI,
++#ifdef CONFIG_ACPI_APEI_SEA
++	FIX_APEI_GHES_SEA,
++#endif
+ #endif /* CONFIG_ACPI_APEI_GHES */
  
-+config ACPI_APEI_SDEI
-+	bool
-+	depends on ACPI_APEI_GHES && ARM_SDE_INTERFACE
-+	select ACPI_APEI_GHES_ESTATUS_QUEUE
-+
- config ACPI_APEI_MEMORY_FAILURE
- 	bool "APEI memory error recovering support"
- 	depends on ACPI_APEI && MEMORY_FAILURE
+ #ifdef CONFIG_UNMAP_KERNEL_AT_EL0
 diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-index 15d472048aa8..b7b335450a6b 100644
+index f196f8797fc1..15d472048aa8 100644
 --- a/drivers/acpi/apei/ghes.c
 +++ b/drivers/acpi/apei/ghes.c
-@@ -25,6 +25,7 @@
-  * GNU General Public License for more details.
+@@ -982,7 +982,7 @@ int ghes_notify_sea(void)
+ 	int rv;
+ 
+ 	raw_spin_lock(&ghes_notify_lock_sea);
+-	rv = ghes_estatus_queue_notified(&ghes_sea, FIX_APEI_GHES_NMI);
++	rv = ghes_estatus_queue_notified(&ghes_sea, FIX_APEI_GHES_SEA);
+ 	raw_spin_unlock(&ghes_notify_lock_sea);
+ 
+ 	return rv;
+@@ -1013,8 +1013,8 @@ static inline void ghes_sea_remove(struct ghes *ghes) { }
+ 
+ #ifdef CONFIG_HAVE_ACPI_APEI_NMI
+ /*
+- * NMI may be triggered on any CPU, so ghes_in_nmi is used for
+- * having only one concurrent reader.
++ * NOTIFY_NMI may be triggered on any CPU, so ghes_in_nmi is
++ * used for having only one concurrent reader.
   */
+ static atomic_t ghes_in_nmi = ATOMIC_INIT(0);
  
-+#include <linux/arm_sdei.h>
- #include <linux/kernel.h>
- #include <linux/moduleparam.h>
- #include <linux/init.h>
-@@ -763,8 +764,8 @@ static int _in_nmi_notify_one(struct ghes *ghes, int fixmap_idx)
- 	return rc;
- }
- 
--static int ghes_estatus_queue_notified(struct list_head *rcu_list,
--				       int fixmap_idx)
-+static int __maybe_unused
-+ghes_estatus_queue_notified(struct list_head *rcu_list, int fixmap_idx)
- {
- 	int ret = -ENOENT;
- 	struct ghes *ghes;
-@@ -1069,6 +1070,75 @@ static inline void ghes_nmi_add(struct ghes *ghes) { }
- static inline void ghes_nmi_remove(struct ghes *ghes) { }
- #endif /* CONFIG_HAVE_ACPI_APEI_NMI */
- 
-+#ifdef CONFIG_ACPI_APEI_SDEI
-+static int __ghes_sdei_callback(struct ghes *ghes, int fixmap_idx)
-+{
-+	if (!_in_nmi_notify_one(ghes, fixmap_idx)) {
-+		irq_work_queue(&ghes_proc_irq_work);
-+
-+		return 0;
-+	}
-+
-+	return -ENOENT;
-+}
-+
-+static DEFINE_RAW_SPINLOCK(ghes_notify_lock_sdei_normal);
-+static DEFINE_RAW_SPINLOCK(ghes_notify_lock_sdei_critical);
-+
-+static int ghes_sdei_normal_callback(u32 event_num, struct pt_regs *regs,
-+				      void *arg)
-+{
-+	int err = -ENOENT;
-+	struct ghes *ghes = arg;
-+
-+	raw_spin_lock(&ghes_notify_lock_sdei_normal);
-+	err = __ghes_sdei_callback(ghes, FIX_APEI_GHES_SDEI_NORMAL);
-+	raw_spin_unlock(&ghes_notify_lock_sdei_normal);
-+
-+	return err;
-+}
-+
-+static int ghes_sdei_critical_callback(u32 event_num, struct pt_regs *regs,
-+				       void *arg)
-+{
-+	int err = -ENOENT;
-+	struct ghes *ghes = arg;
-+
-+	raw_spin_lock(&ghes_notify_lock_sdei_critical);
-+	err = __ghes_sdei_callback(ghes, FIX_APEI_GHES_SDEI_CRITICAL);
-+	raw_spin_unlock(&ghes_notify_lock_sdei_critical);
-+
-+	return err;
-+}
-+
-+static int apei_sdei_register_ghes(struct ghes *ghes)
-+{
-+	int err;
-+
-+	ghes_estatus_queue_grow_pool(ghes);
-+
-+	err = sdei_register_ghes(ghes, ghes_sdei_normal_callback,
-+				 ghes_sdei_critical_callback);
-+	if (err)
-+		ghes_estatus_queue_shrink_pool(ghes);
-+
-+	return err;
-+}
-+
-+static int apei_sdei_unregister_ghes(struct ghes *ghes)
-+{
-+	int err = sdei_unregister_ghes(ghes);
-+
-+	if (!err)
-+		ghes_estatus_queue_shrink_pool(ghes);
-+
-+	return err;
-+}
-+#else
-+static int apei_sdei_register_ghes(struct ghes *ghes) { return -EINVAL; }
-+static int apei_sdei_unregister_ghes(struct ghes *ghes) { return -EINVAL; }
-+#endif /* CONFIG_ACPI_APEI_SDEI */
-+
- static int ghes_probe(struct platform_device *ghes_dev)
- {
- 	struct acpi_hest_generic *generic;
-@@ -1103,6 +1173,13 @@ static int ghes_probe(struct platform_device *ghes_dev)
- 			goto err;
- 		}
- 		break;
-+	case ACPI_HEST_NOTIFY_SOFTWARE_DELEGATED:
-+		if (!IS_ENABLED(CONFIG_ACPI_APEI_SDEI)) {
-+			pr_warn(GHES_PFX "Generic hardware error source: %d notified via SDE Interface is not supported!\n",
-+				generic->header.source_id);
-+			goto err;
-+		}
-+		break;
- 	case ACPI_HEST_NOTIFY_LOCAL:
- 		pr_warning(GHES_PFX "Generic hardware error source: %d notified via local interrupt is not supported!\n",
- 			   generic->header.source_id);
-@@ -1166,6 +1243,11 @@ static int ghes_probe(struct platform_device *ghes_dev)
- 	case ACPI_HEST_NOTIFY_NMI:
- 		ghes_nmi_add(ghes);
- 		break;
-+	case ACPI_HEST_NOTIFY_SOFTWARE_DELEGATED:
-+		rc = apei_sdei_register_ghes(ghes);
-+		if (rc)
-+			goto err;
-+		break;
- 	default:
- 		BUG();
- 	}
-@@ -1189,6 +1271,7 @@ static int ghes_probe(struct platform_device *ghes_dev)
- 
- static int ghes_remove(struct platform_device *ghes_dev)
- {
-+	int rc;
- 	struct ghes *ghes;
- 	struct acpi_hest_generic *generic;
- 
-@@ -1221,6 +1304,11 @@ static int ghes_remove(struct platform_device *ghes_dev)
- 	case ACPI_HEST_NOTIFY_NMI:
- 		ghes_nmi_remove(ghes);
- 		break;
-+	case ACPI_HEST_NOTIFY_SOFTWARE_DELEGATED:
-+		rc = apei_sdei_unregister_ghes(ghes);
-+		if (rc)
-+			return rc;
-+		break;
- 	default:
- 		BUG();
- 		break;
-diff --git a/drivers/firmware/Kconfig b/drivers/firmware/Kconfig
-index 6e83880046d7..69c52c0591da 100644
---- a/drivers/firmware/Kconfig
-+++ b/drivers/firmware/Kconfig
-@@ -85,6 +85,7 @@ config ARM_SCPI_POWER_DOMAIN
- config ARM_SDE_INTERFACE
- 	bool "ARM Software Delegated Exception Interface (SDEI)"
- 	depends on ARM64
-+	select ACPI_APEI_SDEI if ACPI_APEI_GHES
- 	help
- 	  The Software Delegated Exception Interface (SDEI) is an ARM
- 	  standard for registering callbacks from the platform firmware
-diff --git a/drivers/firmware/arm_sdei.c b/drivers/firmware/arm_sdei.c
-index c1b6591f2183..97fd8d22bf15 100644
---- a/drivers/firmware/arm_sdei.c
-+++ b/drivers/firmware/arm_sdei.c
-@@ -890,7 +890,7 @@ static void sdei_smccc_hvc(unsigned long function_id,
- 	arm_smccc_hvc(function_id, arg0, arg1, arg2, arg3, arg4, 0, 0, res);
- }
- 
--#ifdef CONFIG_ACPI_APEI_GHES
-+#ifdef CONFIG_ACPI_APEI_SDEI
- int sdei_register_ghes(struct ghes *ghes, sdei_event_callback *normal_cb,
- 		       sdei_event_callback *critical_cb)
- {
-@@ -951,7 +951,7 @@ int sdei_unregister_ghes(struct ghes *ghes)
- 
- 	return err;
- }
--#endif /* CONFIG_ACPI_APEI_GHES */
-+#endif /* CONFIG_ACPI_APEI_SDEI */
- 
- static int sdei_get_conduit(struct platform_device *pdev)
- {
-diff --git a/include/linux/arm_sdei.h b/include/linux/arm_sdei.h
-index 393899192906..3305ea7f9dc7 100644
---- a/include/linux/arm_sdei.h
-+++ b/include/linux/arm_sdei.h
-@@ -12,7 +12,10 @@ enum sdei_conduit_types {
- };
- 
- #include <acpi/ghes.h>
-+
-+#ifdef CONFIG_ARM_SDE_INTERFACE
- #include <asm/sdei.h>
-+#endif
- 
- /* Arch code should override this to set the entry point from firmware... */
- #ifndef sdei_arch_get_entry_point
 -- 
 2.17.1
