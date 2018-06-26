@@ -1,126 +1,212 @@
-From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
-Date: Tue, 26 Jun 2018 15:16:35 +0100
-Subject: [RFC PATCH] ARM: Debug kernel copy by printing
-Message-ID: <1530022595-6806-1-git-send-email-fabrizio.castro@bp.renesas.com>
+From: gregory.clement@bootlin.com (Gregory CLEMENT)
+Date: Tue, 26 Jun 2018 16:26:20 +0200
+Subject: [PATCH v2] pinctrl: armada-37xx: add suspend/resume support
+In-Reply-To: <20180626140613.13908-1-miquel.raynal@bootlin.com> (Miquel
+ Raynal's message of "Tue, 26 Jun 2018 16:06:13 +0200")
+References: <20180626140613.13908-1-miquel.raynal@bootlin.com>
+Message-ID: <87k1qlaak3.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It may happen that when we relocate the kernel we corrupt other
-sensible memory (e.g. the memory needed by U-Boot for dealing
-with bootm command) while copying the kernel. If we overwrite
-the content of the memory area used by U-Boot's command bootm
-(described by U-Boot's parameters bootm_low and bootm_size),
-the kernel won't be able to boot. Troubleshooting the problem
-then is not straightforward.
-
-This commit allows the user to easily print information on
-where the kernel gets copied from/to in order to help with the
-design of the system memory map (e.g. bootm_low and bootm_size)
-at boot up.
-
-Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-Reviewed-by: Chris Paterson <Chris.Paterson2@renesas.com>
-Acked-by: Biju Das <biju.das@bp.renesas.com>
----
-Dear All,
-
-shmobile_defconfig doesn't use kernel modules, everything gets
-built-in. iwg20d and iwg22d platforms from iWave use uImage
-to boot, DRAM starts at address 0x40000000, the kernel gets
-loaded up in memory at address 0x40007fc0, bootm_low is
-0x40e00000, and bootm_size is 0x100000.
-
-The kernel is getting larger and larger, so much so that during
-the relocation the kernel is copying itself right where the
-bootm memory area lives, preventing Linux from booting.
-Here is what this patch prints when applied on top of tag
-next-20180625 and running on the iwg22d:
-
-C:0x400080C0-0x404922A0->0x40E90800-0x4131A9E0
-
-The designer then has to pick up a suitable memory range for
-bootm memory area to fix this, but the only way to successfully
-achieve this is by knowing where the kernel is going to copy
-itself in memory, so that he can stay clear of it.
-
-Other platforms that use the same defconfig suffer from the same
-issue (e.g. Koelsch et al.) as they have been designed some time
-ago or the original BSP was based on an LTS kernel.
-
-Debugging this basically requires a JTAG debugger at this stage.
-
-Do you think this patch could be considered acceptable? If not,
-what would be the best way to get useful/sensible/debug
-information out of the kernel when the problem occours?
-
-Comments welcome!
-
-Thanks,
-Fab
-
- arch/arm/boot/compressed/head.S | 43 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 43 insertions(+)
-
-diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-index 517e0e1..6c7ccb4 100644
---- a/arch/arm/boot/compressed/head.S
-+++ b/arch/arm/boot/compressed/head.S
-@@ -114,6 +114,35 @@
- #endif
- 		.endm
+Hi Miquel,
  
-+		/*
-+		 * Debug kernel copy by printing the memory addresses involved
-+		 */
-+		.macro dbgkc, begin, end, cbegin, cend
-+#ifdef DEBUG
-+		kputc   #'\n'
-+		kputc   #'C'
-+		kputc   #':'
-+		kputc   #'0'
-+		kputc   #'x'
-+		kphex   \begin, 8	/* Start of compressed kernel */
-+		kputc	#'-'
-+		kputc	#'0'
-+		kputc	#'x'
-+		kphex	\end, 8		/* End of compressed kernel */
-+		kputc	#'-'
-+		kputc	#'>'
-+		kputc   #'0'
-+		kputc   #'x'
-+		kphex   \cbegin, 8	/* Start of kernel copy */
-+		kputc	#'-'
-+		kputc	#'0'
-+		kputc	#'x'
-+		kphex	\cend, 8	/* End of kernel copy */
-+		kputc	#'\n'
-+		kputc	#'\r'
-+#endif
-+		.endm
-+
- 		.section ".start", #alloc, #execinstr
- /*
-  * sort out different calling conventions
-@@ -450,6 +479,20 @@ dtb_check_done:
- 		add	r6, r9, r5
- 		add	r9, r9, r10
- 
-+#ifdef DEBUG
-+		sub     r10, r6, r5
-+		sub     r10, r9, r10
-+		/*
-+		 * We are about to copy the kernel to a new memory area.
-+		 * The boundaries of the new memory area can be found in
-+		 * r10 and r9, whilst r5 and r6 contain the boundaries
-+		 * of the memory we are going to copy.
-+		 * Calling dbgkc will help with the printing of this
-+		 * information.
-+		 */
-+		dbgkc	r5, r6, r10, r9
-+#endif
-+
- 1:		ldmdb	r6!, {r0 - r3, r10 - r12, lr}
- 		cmp	r6, r5
- 		stmdb	r9!, {r0 - r3, r10 - r12, lr}
+ On mar., juin 26 2018, Miquel Raynal <miquel.raynal@bootlin.com> wrote:
+
+> Add suspend/resume hooks in pinctrl driver to handle S2RAM operations.
+>
+> Beyond the traditional register save/restore operations, these hooks
+> also keep the GPIOs used for both-edge IRQ synchronized between their
+> level (low/high) and expected IRQ polarity (falling/rising edge).
+>
+> Since pinctrl is an infrastructure module, its resume should be issued
+> prior to other IO drivers. The pinctrl PM operations are requested at
+> early/late stages for this reason.
+>
+> Suggested-by: Ken Ma <make@marvell.com>
+> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+
+Thanks for your change,
+
+Reviewed-by: Gregory CLEMENT <gregory.clement@bootlin.com>
+
+Gregory
+
+> ---
+>
+> Changes since v1:
+> =================
+> * Removed the syscore-level operations and used
+>   .suspend_late/.resume_early() to give this driver more priority.
+> * Created an ARMADA_37XX_DEV_PM_OPS definition to avoid a couple of
+>   #if defined/#endif macros in the platform driver structure around the
+>   .pm entry.
+> * Removed the global node list (previously used by the syscore
+>   operations, not needed anymore).
+>
+>
+>  drivers/pinctrl/mvebu/pinctrl-armada-37xx.c | 118 ++++++++++++++++++++++++++++
+>  1 file changed, 118 insertions(+)
+>
+> diff --git a/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c b/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
+> index 53cf800688e9..aa48b3f23c7f 100644
+> --- a/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
+> +++ b/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
+> @@ -80,6 +80,18 @@ struct armada_37xx_pmx_func {
+>  	unsigned int		ngroups;
+>  };
+>  
+> +struct armada_37xx_pm_state {
+> +	u32 out_en_l;
+> +	u32 out_en_h;
+> +	u32 out_val_l;
+> +	u32 out_val_h;
+> +	u32 irq_en_l;
+> +	u32 irq_en_h;
+> +	u32 irq_pol_l;
+> +	u32 irq_pol_h;
+> +	u32 selection;
+> +};
+> +
+>  struct armada_37xx_pinctrl {
+>  	struct regmap			*regmap;
+>  	void __iomem			*base;
+> @@ -94,6 +106,7 @@ struct armada_37xx_pinctrl {
+>  	unsigned int			ngroups;
+>  	struct armada_37xx_pmx_func	*funcs;
+>  	unsigned int			nfuncs;
+> +	struct armada_37xx_pm_state	pm;
+>  };
+>  
+>  #define PIN_GRP(_name, _start, _nr, _mask, _func1, _func2)	\
+> @@ -996,6 +1009,110 @@ static int armada_37xx_pinctrl_register(struct platform_device *pdev,
+>  	return 0;
+>  }
+>  
+> +#if defined(CONFIG_PM)
+> +static int armada_3700_pinctrl_suspend(struct device *dev)
+> +{
+> +	struct armada_37xx_pinctrl *info = dev_get_drvdata(dev);
+> +
+> +	/* Save GPIO state */
+> +	regmap_read(info->regmap, OUTPUT_EN, &info->pm.out_en_l);
+> +	regmap_read(info->regmap, OUTPUT_EN + sizeof(u32), &info->pm.out_en_h);
+> +	regmap_read(info->regmap, OUTPUT_VAL, &info->pm.out_val_l);
+> +	regmap_read(info->regmap, OUTPUT_VAL + sizeof(u32),
+> +		    &info->pm.out_val_h);
+> +
+> +	info->pm.irq_en_l = readl(info->base + IRQ_EN);
+> +	info->pm.irq_en_h = readl(info->base + IRQ_EN + sizeof(u32));
+> +	info->pm.irq_pol_l = readl(info->base + IRQ_POL);
+> +	info->pm.irq_pol_h = readl(info->base + IRQ_POL + sizeof(u32));
+> +
+> +	/* Save pinctrl state */
+> +	regmap_read(info->regmap, SELECTION, &info->pm.selection);
+> +
+> +	return 0;
+> +}
+> +
+> +static int armada_3700_pinctrl_resume(struct device *dev)
+> +{
+> +	struct armada_37xx_pinctrl *info = dev_get_drvdata(dev);
+> +	struct gpio_chip *gc;
+> +	struct irq_domain *d;
+> +	int i;
+> +
+> +	/* Restore GPIO state */
+> +	regmap_write(info->regmap, OUTPUT_EN, info->pm.out_en_l);
+> +	regmap_write(info->regmap, OUTPUT_EN + sizeof(u32),
+> +		     info->pm.out_en_h);
+> +	regmap_write(info->regmap, OUTPUT_VAL, info->pm.out_val_l);
+> +	regmap_write(info->regmap, OUTPUT_VAL + sizeof(u32),
+> +		     info->pm.out_val_h);
+> +
+> +	/*
+> +	 * Input levels may change during suspend, which is not monitored at
+> +	 * that time. GPIOs used for both-edge IRQs may not be synchronized
+> +	 * anymore with their polarities (rising/falling edge) and must be
+> +	 * re-configured manually.
+> +	 */
+> +	gc = &info->gpio_chip;
+> +	d = gc->irq.domain;
+> +	for (i = 0; i < gc->ngpio; i++) {
+> +		u32 irq_bit = BIT(i % GPIO_PER_REG);
+> +		u32 mask, *irq_pol, input_reg, virq, type, level;
+> +
+> +		if (i < GPIO_PER_REG) {
+> +			mask = info->pm.irq_en_l;
+> +			irq_pol = &info->pm.irq_pol_l;
+> +			input_reg = INPUT_VAL;
+> +		} else {
+> +			mask = info->pm.irq_en_h;
+> +			irq_pol = &info->pm.irq_pol_h;
+> +			input_reg = INPUT_VAL + sizeof(u32);
+> +		}
+> +
+> +		if (!(mask & irq_bit))
+> +			continue;
+> +
+> +		virq = irq_find_mapping(d, i);
+> +		type = irq_get_trigger_type(virq);
+> +
+> +		/*
+> +		 * Synchronize level and polarity for both-edge irqs:
+> +		 *     - a high input level expects a falling edge,
+> +		 *     - a low input level exepects a rising edge.
+> +		 */
+> +		if ((type & IRQ_TYPE_SENSE_MASK) ==
+> +		    IRQ_TYPE_EDGE_BOTH) {
+> +			regmap_read(info->regmap, input_reg, &level);
+> +			if ((*irq_pol ^ level) & irq_bit)
+> +				*irq_pol ^= irq_bit;
+> +		}
+> +	}
+> +
+> +	writel(info->pm.irq_en_l, info->base + IRQ_EN);
+> +	writel(info->pm.irq_en_h, info->base + IRQ_EN + sizeof(u32));
+> +	writel(info->pm.irq_pol_l, info->base + IRQ_POL);
+> +	writel(info->pm.irq_pol_h, info->base + IRQ_POL + sizeof(u32));
+> +
+> +	/* Restore pinctrl state */
+> +	regmap_write(info->regmap, SELECTION, info->pm.selection);
+> +
+> +	return 0;
+> +}
+> +
+> +/*
+> + * Since pinctrl is an infrastructure module, its resume should be issued prior
+> + * to other IO drivers.
+> + */
+> +static const struct dev_pm_ops armada_3700_pinctrl_pm_ops = {
+> +	.suspend_late = armada_3700_pinctrl_suspend,
+> +	.resume_early = armada_3700_pinctrl_resume,
+> +};
+> +
+> +#define PINCTRL_ARMADA_37XX_DEV_PM_OPS (&armada_3700_pinctrl_pm_ops)
+> +#else
+> +#define PINCTRL_ARMADA_37XX_DEV_PM_OPS NULL
+> +#endif /* CONFIG_PM */
+> +
+>  static const struct of_device_id armada_37xx_pinctrl_of_match[] = {
+>  	{
+>  		.compatible = "marvell,armada3710-sb-pinctrl",
+> @@ -1049,6 +1166,7 @@ static struct platform_driver armada_37xx_pinctrl_driver = {
+>  	.driver = {
+>  		.name = "armada-37xx-pinctrl",
+>  		.of_match_table = armada_37xx_pinctrl_of_match,
+> +		.pm = PINCTRL_ARMADA_37XX_DEV_PM_OPS,
+>  	},
+>  };
+>  
+> -- 
+> 2.14.1
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
 -- 
-2.7.4
+Gregory Clement, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+http://bootlin.com
