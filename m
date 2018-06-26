@@ -1,171 +1,152 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Tue, 26 Jun 2018 08:28:18 +0800
-Subject: [linux-sunxi] [PATCH 2/3] arm64: allwinner: h6: add device tree
- nodes for MMC controllers
-In-Reply-To: <8259b2d9-be02-68fb-90bb-bd0ebdee0b05@arm.com>
-References: <20180426140728.43155-1-icenowy@aosc.io>
- <20180426140728.43155-3-icenowy@aosc.io>
- <9571735d-929f-a2ef-ed97-dc9193420b73@arm.com>
- <77DF7884-8DA8-4ED5-BB51-941CFDE4A123@aosc.io>
- <0ae1b6ce-c1cf-61e8-e09b-abec47b089b2@arm.com>
- <6EBD7D16-E985-4345-B2C2-D0CE7B32F8C5@aosc.io>
- <8259b2d9-be02-68fb-90bb-bd0ebdee0b05@arm.com>
-Message-ID: <0b80e778a7c03b5aeeb0e4142895e0e820df3a95.camel@aosc.io>
+Date: Tue, 26 Jun 2018 08:49:41 +0800
+Subject: [PATCH 5/5] arm64: dts: allwinner: h6: enable AXP805 PMIC on
+ Pine H64
+In-Reply-To: <20180620051540.25617-6-wens@csie.org>
+References: <20180620051540.25617-1-wens@csie.org>
+ <20180620051540.25617-6-wens@csie.org>
+Message-ID: <f93b1524657048279f54004fdbcd6ab5af9ec1c1.camel@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2018-04-27?? 22:25 +0100?Andr? Przywara???
-> On 27/04/18 10:23, Icenowy Zheng wrote:
-> > 
-> > 
-> > ? 2018?4?27? GMT+08:00 ??5:18:23, Andre Przywara <andre.przywara@ar
-> > m.com> ??:
-> > > Hi,
-> > > 
-> > > On 27/04/18 09:36, Icenowy Zheng wrote:
-> > > > 
-> > > > 
-> > > > ? 2018?4?27? GMT+08:00 ??12:45:38, Andre Przywara
-> > > 
-> > > <andre.przywara@arm.com> ??:
-> > > > > Hi,
-> > > > > 
-> > > > > On 26/04/18 15:07, Icenowy Zheng wrote:
-> > > > > > The Allwinner H6 SoC have 3 MMC controllers.
-> > > > > > 
-> > > > > > Add device tree nodes for them.
-> > > > > > 
-> > > > > > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> > > > > > ---
-> > > > > >  arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi | 56
-> > > > > 
-> > > > > ++++++++++++++++++++++++++++
-> > > > > >  1 file changed, 56 insertions(+)
-> > > > > > 
-> > > > > > diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
-> > > > > 
-> > > > > b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
-> > > > > > index 4debc3962830..3cbfc035c979 100644
-> > > > > > --- a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
-> > > > > > +++ b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
-> > > > > > @@ -124,12 +124,68 @@
-> > > > > >  			interrupt-controller;
-> > > > > >  			#interrupt-cells = <3>;
-> > > > > >  
-> > > > > > +			mmc0_pins: mmc0-pins {
-> > > > > > +				pins = "PF0", "PF1",
-> > > > > > "PF2", "PF3",
-> > > > > > +				       "PF4", "PF5";
-> > > > > > +				function = "mmc0";
-> > > > > > +				drive-strength = <30>;
-> > > > > > +				bias-pull-up;
-> > > > > > +			};
-> > > > > > +
-> > > > > > +			mmc2_pins: mmc2-pins {
-> > > > > > +				pins = "PC1", "PC4",
-> > > > > > "PC5", "PC6",
-> > > > > > +				       "PC7", "PC8",
-> > > > > > "PC9", "PC10",
-> > > > > > +				       "PC11", "PC12",
-> > > > > > "PC13", "PC14";
-> > > > > > +				function = "mmc2";
-> > > > > > +				drive-strength = <30>;
-> > > > > > +				bias-pull-up;
-> > > > > > +			};
-> > > > > > +
-> > > > > >  			uart0_ph_pins: uart0-ph {
-> > > > > >  				pins = "PH0", "PH1";
-> > > > > >  				function = "uart0";
-> > > > > >  			};
-> > > > > >  		};
-> > > > > >  
-> > > > > > +		mmc0: mmc at 4020000 {
-> > > > > > +			compatible = "allwinner,sun50i-h6-
-> > > > > > mmc";
-> > > > > 
-> > > > > This should be:
-> > > > > 			compatible = "allwinner,sun50i-h6-mmc",
-> > > > > 				     "allwinner,sun50i-a64-
-> > > > > mmc";
-> > > > 
-> > > > I'm intended to not add A64 compatible, as
-> > > > H6 is a quite new design
-> > > > (new process) and there might be different behavior, even on
-> > > > mmc0/1.
-> > > 
-> > > But as your patch proves, it is fully backwards compatible: An
-> > > A64
-> > > driver works with this device.
-> > 
-> > No, my patch only proves "the current A64 driver works
-> > with this device", not "Any A64 driver works with device", as
-> > the current driver doesn't fully use the capability provided
-> > by A64 MMC cobtrollers.
+? 2018-06-20?? 13:15 +0800?Chen-Yu Tsai???
+> From: Icenowy Zheng <icenowy@aosc.io>
 > 
-> Good point, but I still believe every A64 driver would be capable of
-> driving an H6 MMC controller, ....
+> Pine H64 board has an AXP805 PMIC on it.
 > 
-> > > And this is what this compatible string list says: If your system
-> > > does
-> > > not have a specific H6 driver, you can use an A64 driver.
-> > > You might not get all the (potentially) new features, but it
-> > > covers
-> > > everything the A64 has.
-> > > 
-> > > And a new silicon process doesn't matter here, since the software
-> > > interface is unchanged. *If* we find bugs, we can add quirks
-> > > matching
-> > 
-> > I think there's timing parameters for higher speed bins which
-> > are different among chips. As we have currently no support
-> > for speed bins higher than DDR50, they're not added yet.
+> Enable it in the device tree.
 > 
-> True, but what are those differences? I compared the A64 and H6
-> manuals
-> side by side, the differences I found are:
-> SMHC_FIFOTH[+0x40]:
-> 	BSIZE_OF_TRANS[30:28]:
-> 	- H6 supports 16 transfers for SMHC0 also.
-> 	other parameters:
-> 	- H6 recommends better values for SMHC0 also
-> SMHC_CSDC[+0x54]:
-> 	- H6 doesn't mention restriction to SMHC2
-> 	(though this might be a mistake)
-> SMHC_NTSR_REG[+0x5C]:
-> 	- H6 defines fields for bits[24:8]
-> SMHC_EMCE[+0x64] and SMHC_EMCE_DBG[+0x68]:
-> 	- H6 adds, for EMCE support
-> EMMC_DDR_SBIT_DET_REG[0x10c]:
-> 	- A64 doesn't mention restriction to SMHC2,
-> 	  but I believe this is a mistake
-> SMHC_EMCE_BMn[0x150 + 0x4 * 0..31]
-> 	- H6 adds, for EMCE support
-> 
-> All those pieces are only *additions* to the H6 over the A64, so
-> don't
-> affect backwards compatibility.
-> 
-> > > on
-> > > the H6 compatible string - that's why we put it here already,
-> > > despite
-> > > having a matching string in the kernel at the moment.
-> > 
-> > Device tree is not driver data but hardware description, so
-> > it should follow "how the device is formed" rather than
-> > "how the device works".
-> 
-> True, but as shown above, the compatibility is really at the device
-> level.
-> Unless you have any other information ...
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 
-Rob, could you answer whether we should add the A64 compatible or not?
+I suggest to mention the working mode change here.
 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>  .../boot/dts/allwinner/sun50i-h6-pine-h64.dts | 109
+> ++++++++++++++++++
+>  1 file changed, 109 insertions(+)
 > 
-> Cheers,
-> Andre.
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
+> b/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
+> index 2e97173c9204..1673636358ef 100644
+> --- a/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
+> +++ b/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
+> @@ -44,6 +44,115 @@
+>  &r_i2c {
+>  	status = "okay";
+>  
+> +	axp805: pmic at 36 {
+> +		compatible = "x-powers,axp805", "x-powers,axp806";
+> +		reg = <0x36>;
+> +		interrupt-parent = <&r_intc>;
+> +		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
+> +		interrupt-controller;
+> +		#interrupt-cells = <1>;
+> +		x-powers,self-working-mode;
+> +
+> +		regulators {
+> +			reg_aldo1: aldo1 {
+> +				regulator-always-on;
+> +				regulator-min-microvolt = <3300000>;
+> +				regulator-max-microvolt = <3300000>;
+> +				regulator-name = "vcc-pl";
+> +			};
+> +
+> +			reg_aldo2: aldo2 {
+> +				regulator-min-microvolt = <3300000>;
+> +				regulator-max-microvolt = <3300000>;
+> +				regulator-name = "vcc-ac200";
+> +			};
+> +
+> +			reg_aldo3: aldo3 {
+> +				/* This regulator is connected with
+> CLDO1 */
+> +				regulator-always-on;
+> +				regulator-min-microvolt = <3300000>;
+> +				regulator-max-microvolt = <3300000>;
+> +				regulator-name = "vcc-3v3-1";
+> +			};
+> +
+> +			reg_bldo1: bldo1 {
+> +				regulator-always-on;
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt = <1800000>;
+> +				regulator-name = "vcc-bias-pll";
+> +			};
+> +
+> +			reg_bldo2: bldo2 {
+> +				regulator-always-on;
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt = <1800000>;
+> +				regulator-name = "vcc-efuse-pcie-
+> hdmi-io";
+> +			};
+> +
+> +			reg_bldo3: bldo3 {
+> +				regulator-always-on;
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt = <1800000>;
+> +				regulator-name = "vcc-dcxoio";
+> +			};
+> +
+> +			bldo4 {
+> +				/* unused */
+> +			};
+> +
+> +			reg_cldo1: cldo1 {
+> +				/* This regulator is connected with
+> ALDO3 */
+> +				regulator-always-on;
+> +				regulator-min-microvolt = <3300000>;
+> +				regulator-max-microvolt = <3300000>;
+> +				regulator-name = "vcc-3v3-2";
+> +			};
+> +
+> +			reg_cldo2: cldo2 {
+> +				regulator-min-microvolt = <3300000>;
+> +				regulator-max-microvolt = <3300000>;
+> +				regulator-name = "vcc-wifi-1";
+> +			};
+> +
+> +			reg_cldo3: cldo3 {
+> +				regulator-min-microvolt = <3300000>;
+> +				regulator-max-microvolt = <3300000>;
+> +				regulator-name = "vcc-wifi-2";
+> +			};
+> +
+> +			reg_dcdca: dcdca {
+> +				regulator-always-on;
+> +				regulator-min-microvolt = <810000>;
+> +				regulator-max-microvolt = <1080000>;
+> +				regulator-name = "vdd-cpu";
+> +			};
+> +
+> +			reg_dcdcc: dcdcc {
+> +				regulator-min-microvolt = <810000>;
+> +				regulator-max-microvolt = <1080000>;
+> +				regulator-name = "vdd-gpu";
+> +			};
+> +
+> +			reg_dcdcd: dcdcd {
+> +				regulator-always-on;
+> +				regulator-min-microvolt = <960000>;
+> +				regulator-max-microvolt = <960000>;
+> +				regulator-name = "vdd-sys";
+> +			};
+> +
+> +			reg_dcdce: dcdce {
+> +				regulator-always-on;
+> +				regulator-min-microvolt = <1200000>;
+> +				regulator-max-microvolt = <1200000>;
+> +				regulator-name = "vcc-dram";
+> +			};
+> +
+> +			sw {
+> +				/* unused */
+> +			};
+> +		};
+> +	};
+> +
+>  	pcf8563: rtc at 51 {
+>  		compatible = "nxp,pcf8563";
+>  		reg = <0x51>;
