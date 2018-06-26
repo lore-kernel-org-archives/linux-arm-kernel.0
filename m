@@ -1,84 +1,62 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Tue, 26 Jun 2018 12:06:19 +0100
-Subject: [PATCH v2 01/15] nvmem: add support for cell lookups
-In-Reply-To: <20180626102245.30711-2-brgl@bgdev.pl>
-References: <20180626102245.30711-1-brgl@bgdev.pl>
- <20180626102245.30711-2-brgl@bgdev.pl>
-Message-ID: <25ebceca-8cdd-edae-6393-dd29eb323c53@linaro.org>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Tue, 26 Jun 2018 13:08:06 +0200
+Subject: [PATCH 0/4] media: sun6i: Add support for the H3 CSI controller
+In-Reply-To: <CAMty3ZBRYtTBiYjQNZj07Ni_bi6qH+L1xga_kcHVrW0tZ0-hLQ@mail.gmail.com>
+References: <20180305100432.15009-1-maxime.ripard@bootlin.com>
+ <CAMty3ZBQXyvOnzy_9RLDW-QO9qnAC4SR5UJnWYmhiPrP23z_vg@mail.gmail.com>
+ <20180626082330.pvq3gi6mmokky5vl@flea>
+ <CAMty3ZBRYtTBiYjQNZj07Ni_bi6qH+L1xga_kcHVrW0tZ0-hLQ@mail.gmail.com>
+Message-ID: <20180626110806.mqygmu6odhcfy67h@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for the patch,
-
-On 26/06/18 11:22, Bartosz Golaszewski wrote:
-> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+On Tue, Jun 26, 2018 at 02:42:11PM +0530, Jagan Teki wrote:
+> On Tue, Jun 26, 2018 at 1:53 PM, Maxime Ripard
+> <maxime.ripard@bootlin.com> wrote:
+> > Hi,
+> >
+> > On Tue, Jun 26, 2018 at 11:41:56AM +0530, Jagan Teki wrote:
+> >> On Mon, Mar 5, 2018 at 3:34 PM, Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+> >> > The H3 and H5 have a CSI controller based on the one previously found
+> >> > in the A31, that is currently supported by the sun6i-csi driver.
+> >> >
+> >> > Add the compatibles to the device tree bindings and to the driver to
+> >> > make it work properly.
+> >> >
+> >> > This obviously depends on the serie "Initial Allwinner V3s CSI
+> >> > Support" by Yong Deng.
+> >> >
+> >> > Let me know what you think,
+> >> > Maxime
+> >> >
+> >> > Maxime Ripard (2):
+> >> >   dt-bindings: media: sun6i: Add A31 and H3 compatibles
+> >> >   media: sun6i: Add A31 compatible
+> >> >
+> >> > Myl?ne Josserand (2):
+> >> >   ARM: dts: sun8i: Add the H3/H5 CSI controller
+> >> >   [DO NOT MERGE] ARM: dts: sun8i: Add CAM500B camera module to the Nano
+> >> >     Pi M1+
+> >>
+> >> Just trying to understand what interface has been tested with npi-m1+,
+> >> is it DVP (parallel) interface?
+> >
+> > Yes
+> >
+> >> I've Bananapi 5MP[1] and trying to test on top, and look like its
+> >> MIPI CSI2. I guess Yong patch[2] doesn't support CSI2 yet, am I
+> >> correct?
+> >
+> > This is what Yong's cover letter is saying yes :)
 > 
-> We can currently only register nvmem cells from device tree or by
-> manually calling nvmem_add_cells(). The latter options however forces
-> users to make sure that the nvmem provider with which the cells are
-> associated is registered before the call.
-> 
-> This patch proposes a new solution inspired by other frameworks that
-> offer resource lookups (GPIO, PWM etc.). It adds a function that allows
-> machine code to register nvmem lookup which are later lazily used to
-> add corresponding nvmem cells.
-> 
-Overall the idea look fine to me.
+> Thanks, and this ov5640 tested on -next or any specific code? please
+> provide if you have different code base.
 
-This needs to be documented in ./Documentation/nvmem/nvmem.txt
+It should work with the current ov5640 driver.
 
-> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> ---
->   drivers/nvmem/core.c           | 57 +++++++++++++++++++++++++++++++++-
->   include/linux/nvmem-consumer.h |  6 ++++
->   include/linux/nvmem-provider.h |  6 ++++
->   3 files changed, 68 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
-> index b5b0cdc21d01..a2e87b464319 100644
-> --- a/drivers/nvmem/core.c
-> +++ b/drivers/nvmem/core.c
-> @@ -62,6 +62,9 @@ static DEFINE_IDA(nvmem_ida);
->   static LIST_HEAD(nvmem_cells);
->   static DEFINE_MUTEX(nvmem_cells_mutex);
->   
-> +static LIST_HEAD(nvmem_cell_lookups);
-> +static DEFINE_MUTEX(nvmem_lookup_mutex);
-> +
->   #ifdef CONFIG_DEBUG_LOCK_ALLOC
->   static struct lock_class_key eeprom_lock_key;
->   #endif
-> @@ -247,6 +250,23 @@ static const struct attribute_group *nvmem_ro_root_dev_groups[] = {
->   	NULL,
->   };
->   
-> +/**
-> + * nvmem_register_lookup() - register a number of nvmem cell lookup entries
-> + *
+Maxime
 
-Can we rename this to nvmem_add_lookup_table()?
-register sound bit heavy here.
-
-We should also have something like nvmem_remove_lookup_table() for 
-consistency, and it should ensure that it clears the cells entry too.
-
-> + * @lookup: array of nvmem cell lookup entries
-> + * @nentries: number of lookup entries in the array
-> + */
-> +void nvmem_register_lookup(struct nvmem_cell_lookup *lookup, size_t nentries)
-> +{
-> +	int i;
-> + > +	mutex_lock(&nvmem_lookup_mutex);
-> +	for (i = 0; i < nentries; i++)
-> +		list_add_tail(&lookup[i].list, &nvmem_cell_lookups);
-> +	mutex_unlock(&nvmem_lookup_mutex);
-> +}
-> +EXPORT_SYMBOL_GPL(nvmem_register_lookup);
-> +
->   static void nvmem_release(struct device *dev)
->   {
->   	struct nvmem_device *nvmem = to_nvmem_device(dev);
-> @@ -916,6 +936,37 @@ struct nvmem_cell *of_nvmem_cell_get(struct device_node *np,
->   EXPORT_SYMBOL_GPL(of_nvmem_cell_get);
->   #endif
->   
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
