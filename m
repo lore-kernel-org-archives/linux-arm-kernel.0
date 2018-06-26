@@ -1,151 +1,154 @@
 From: james.morse@arm.com (James Morse)
-Date: Tue, 26 Jun 2018 18:01:02 +0100
-Subject: [PATCH v5 06/20] KVM: arm/arm64: Add kvm_ras.h to collect kvm
- specific RAS plumbing
+Date: Tue, 26 Jun 2018 18:01:04 +0100
+Subject: [PATCH v5 08/20] ACPI / APEI: Move locking to the notification helper
 In-Reply-To: <20180626170116.25825-1-james.morse@arm.com>
 References: <20180626170116.25825-1-james.morse@arm.com>
-Message-ID: <20180626170116.25825-7-james.morse@arm.com>
+Message-ID: <20180626170116.25825-9-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To split up APEIs in_nmi() path, we need any nmi-like callers to always
-be in_nmi(). KVM shouldn't have to know about this, pull the RAS plumbing
-out into a header file.
+ghes_copy_tofrom_phys() takes different locks depending on in_nmi().
+This doesn't work when we have multiple NMI-like notifications, that
+can interrupt each other.
 
-Currently guest synchronous external aborts are claimed as RAS
-notifications by handle_guest_sea(), which is hidden in the arch codes
-mm/fault.c. 32bit gets a dummy declaration in system_misc.h.
+Now that NOTIFY_SEA is always called as an NMI, move the lock-taking
+to the notification helper. The helper will always know which lock
+to take. This avoids ghes_copy_tofrom_phys() taking a guess based
+on in_nmi().
 
-There is going to be more of this in the future if/when we support
-the SError-based firmware-first notification mechanism and/or
-kernel-first notifications for both synchronous external abort and
-SError. Each of these will come with some Kconfig symbols and a
-handful of header files.
-
-Create a header file for all this.
-
-This patch gives handle_guest_sea() a 'kvm_' prefix, and moves the
-declarations to kvm_ras.h as preparation for a future patch that moves
-the ACPI-specific RAS code out of mm/fault.c.
+This splits NOTIFY_NMI and NOTIFY_SEA to use different locks. All
+the other notifications use ghes_proc(), and are called in process
+or IRQ context. Move the spin_lock_irqsave() into ghes_proc().
 
 Signed-off-by: James Morse <james.morse@arm.com>
-Reviewed-by: Punit Agrawal <punit.agrawal@arm.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Tested-by: Tyler Baicar <tbaicar@codeaurora.org>
 ---
- arch/arm/include/asm/kvm_ras.h       | 14 ++++++++++++++
- arch/arm/include/asm/system_misc.h   |  5 -----
- arch/arm64/include/asm/kvm_ras.h     | 11 +++++++++++
- arch/arm64/include/asm/system_misc.h |  2 --
- arch/arm64/mm/fault.c                |  2 +-
- virt/kvm/arm/mmu.c                   |  4 ++--
- 6 files changed, 28 insertions(+), 10 deletions(-)
- create mode 100644 arch/arm/include/asm/kvm_ras.h
- create mode 100644 arch/arm64/include/asm/kvm_ras.h
+ drivers/acpi/apei/ghes.c | 38 +++++++++++++++++++++++++-------------
+ 1 file changed, 25 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_ras.h b/arch/arm/include/asm/kvm_ras.h
-new file mode 100644
-index 000000000000..aaff56bf338f
---- /dev/null
-+++ b/arch/arm/include/asm/kvm_ras.h
-@@ -0,0 +1,14 @@
-+// SPDX-License-Identifier: GPL-2.0
-+// Copyright (C) 2018 - Arm Ltd
+diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
+index 2880547e13b8..f30e6fae57c0 100644
+--- a/drivers/acpi/apei/ghes.c
++++ b/drivers/acpi/apei/ghes.c
+@@ -113,12 +113,13 @@ static DEFINE_MUTEX(ghes_list_mutex);
+  * from BIOS to Linux can be determined only in NMI, IRQ or timer
+  * handler, but general ioremap can not be used in atomic context, so
+  * the fixmap is used instead.
+- *
+- * These 2 spinlocks are used to prevent the fixmap entries from being used
+- * simultaneously.
+  */
+-static DEFINE_RAW_SPINLOCK(ghes_ioremap_lock_nmi);
+-static DEFINE_SPINLOCK(ghes_ioremap_lock_irq);
 +
-+#ifndef __ARM_KVM_RAS_H__
-+#define __ARM_KVM_RAS_H__
-+
-+#include <linux/types.h>
-+
-+static inline int kvm_handle_guest_sea(phys_addr_t addr, unsigned int esr)
-+{
-+	return -1;
-+}
-+
-+#endif /* __ARM_KVM_RAS_H__ */
-diff --git a/arch/arm/include/asm/system_misc.h b/arch/arm/include/asm/system_misc.h
-index 8e76db83c498..66f6a3ae68d2 100644
---- a/arch/arm/include/asm/system_misc.h
-+++ b/arch/arm/include/asm/system_misc.h
-@@ -38,11 +38,6 @@ static inline void harden_branch_predictor(void)
++/*
++ * Used by ghes_proc() to prevent non-NMI notifications from interacting.
++ * This also protects the FIX_APEI_GHES_IRQ fixmap slot.
++ */
++static DEFINE_SPINLOCK(ghes_notify_lock_irq);
  
- extern unsigned int user_debug;
- 
--static inline int handle_guest_sea(phys_addr_t addr, unsigned int esr)
--{
--	return -1;
--}
--
- #endif /* !__ASSEMBLY__ */
- 
- #endif /* __ASM_ARM_SYSTEM_MISC_H */
-diff --git a/arch/arm64/include/asm/kvm_ras.h b/arch/arm64/include/asm/kvm_ras.h
-new file mode 100644
-index 000000000000..5f72b07b7912
---- /dev/null
-+++ b/arch/arm64/include/asm/kvm_ras.h
-@@ -0,0 +1,11 @@
-+// SPDX-License-Identifier: GPL-2.0
-+// Copyright (C) 2018 - Arm Ltd
-+
-+#ifndef __ARM64_KVM_RAS_H__
-+#define __ARM64_KVM_RAS_H__
-+
-+#include <linux/types.h>
-+
-+int kvm_handle_guest_sea(phys_addr_t addr, unsigned int esr);
-+
-+#endif /* __ARM64_KVM_RAS_H__ */
-diff --git a/arch/arm64/include/asm/system_misc.h b/arch/arm64/include/asm/system_misc.h
-index 28893a0b141d..48ded3628a89 100644
---- a/arch/arm64/include/asm/system_misc.h
-+++ b/arch/arm64/include/asm/system_misc.h
-@@ -45,8 +45,6 @@ extern void __show_regs(struct pt_regs *);
- 
- extern void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
- 
--int handle_guest_sea(phys_addr_t addr, unsigned int esr);
--
- #endif	/* __ASSEMBLY__ */
- 
- #endif	/* __ASM_SYSTEM_MISC_H */
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index b8eecc7b9531..167772fe4360 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -725,7 +725,7 @@ static const struct fault_info fault_info[] = {
- 	{ do_bad,		SIGKILL, SI_KERNEL,	"unknown 63"			},
- };
- 
--int handle_guest_sea(phys_addr_t addr, unsigned int esr)
-+int kvm_handle_guest_sea(phys_addr_t addr, unsigned int esr)
+ static struct gen_pool *ghes_estatus_pool;
+ static unsigned long ghes_estatus_pool_size_request;
+@@ -291,7 +292,6 @@ static void ghes_copy_tofrom_phys(void *buffer, u64 paddr, u32 len,
+ 				  int from_phys)
  {
- 	int ret = -ENOENT;
+ 	void __iomem *vaddr;
+-	unsigned long flags = 0;
+ 	int in_nmi = in_nmi();
+ 	u64 offset;
+ 	u32 trunk;
+@@ -299,10 +299,8 @@ static void ghes_copy_tofrom_phys(void *buffer, u64 paddr, u32 len,
+ 	while (len > 0) {
+ 		offset = paddr - (paddr & PAGE_MASK);
+ 		if (in_nmi) {
+-			raw_spin_lock(&ghes_ioremap_lock_nmi);
+ 			vaddr = ghes_ioremap_pfn_nmi(paddr >> PAGE_SHIFT);
+ 		} else {
+-			spin_lock_irqsave(&ghes_ioremap_lock_irq, flags);
+ 			vaddr = ghes_ioremap_pfn_irq(paddr >> PAGE_SHIFT);
+ 		}
+ 		trunk = PAGE_SIZE - offset;
+@@ -316,10 +314,8 @@ static void ghes_copy_tofrom_phys(void *buffer, u64 paddr, u32 len,
+ 		buffer += trunk;
+ 		if (in_nmi) {
+ 			ghes_iounmap_nmi();
+-			raw_spin_unlock(&ghes_ioremap_lock_nmi);
+ 		} else {
+ 			ghes_iounmap_irq();
+-			spin_unlock_irqrestore(&ghes_ioremap_lock_irq, flags);
+ 		}
+ 	}
+ }
+@@ -879,6 +875,9 @@ static int ghes_ack_error(struct acpi_hest_generic_v2 *gv2)
+ static int ghes_proc(struct ghes *ghes)
+ {
+ 	int rc;
++	unsigned long flags;
++
++	spin_lock_irqsave(&ghes_notify_lock_irq, flags);
  
-diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-index 1d90d79706bd..15b85c10f6db 100644
---- a/virt/kvm/arm/mmu.c
-+++ b/virt/kvm/arm/mmu.c
-@@ -27,10 +27,10 @@
- #include <asm/kvm_arm.h>
- #include <asm/kvm_mmu.h>
- #include <asm/kvm_mmio.h>
-+#include <asm/kvm_ras.h>
- #include <asm/kvm_asm.h>
- #include <asm/kvm_emulate.h>
- #include <asm/virt.h>
--#include <asm/system_misc.h>
+ 	rc = ghes_read_estatus(ghes, 0);
+ 	if (rc)
+@@ -898,14 +897,17 @@ static int ghes_proc(struct ghes *ghes)
+ 	ghes_clear_estatus(ghes);
  
- #include "trace.h"
+ 	if (rc == -ENOENT)
+-		return rc;
++		goto unlock;
  
-@@ -1650,7 +1650,7 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 		 * For RAS the host kernel may handle this abort.
- 		 * There is no need to pass the error into the guest.
- 		 */
--		if (!handle_guest_sea(fault_ipa, kvm_vcpu_get_hsr(vcpu)))
-+		if (!kvm_handle_guest_sea(fault_ipa, kvm_vcpu_get_hsr(vcpu)))
- 			return 1;
+ 	/*
+ 	 * GHESv2 type HEST entries introduce support for error acknowledgment,
+ 	 * so only acknowledge the error if this support is present.
+ 	 */
+ 	if (is_hest_type_generic_v2(ghes))
+-		return ghes_ack_error(ghes->generic_v2);
++		rc = ghes_ack_error(ghes->generic_v2);
++
++unlock:
++	spin_unlock_irqrestore(&ghes_notify_lock_irq, flags);
  
- 		if (unlikely(!is_iabt)) {
+ 	return rc;
+ }
+@@ -968,6 +970,7 @@ static struct notifier_block ghes_notifier_hed = {
+ 
+ #ifdef CONFIG_ACPI_APEI_SEA
+ static LIST_HEAD(ghes_sea);
++static DEFINE_RAW_SPINLOCK(ghes_notify_lock_sea);
+ 
+ /*
+  * Return 0 only if one of the SEA error sources successfully reported an error
+@@ -975,7 +978,13 @@ static LIST_HEAD(ghes_sea);
+  */
+ int ghes_notify_sea(void)
+ {
+-	return ghes_estatus_queue_notified(&ghes_sea);
++	int rv;
++
++	raw_spin_lock(&ghes_notify_lock_sea);
++	rv = ghes_estatus_queue_notified(&ghes_sea);
++	raw_spin_unlock(&ghes_notify_lock_sea);
++
++	return rv;
+ }
+ 
+ static void ghes_sea_add(struct ghes *ghes)
+@@ -1009,6 +1018,7 @@ static inline void ghes_sea_remove(struct ghes *ghes) { }
+ static atomic_t ghes_in_nmi = ATOMIC_INIT(0);
+ 
+ static LIST_HEAD(ghes_nmi);
++static DEFINE_RAW_SPINLOCK(ghes_notify_lock_nmi);
+ 
+ static int ghes_notify_nmi(unsigned int cmd, struct pt_regs *regs)
+ {
+@@ -1017,8 +1027,10 @@ static int ghes_notify_nmi(unsigned int cmd, struct pt_regs *regs)
+ 	if (!atomic_add_unless(&ghes_in_nmi, 1, 1))
+ 		return ret;
+ 
++	raw_spin_lock(&ghes_notify_lock_nmi);
+ 	if (!ghes_estatus_queue_notified(&ghes_nmi))
+ 		ret = NMI_HANDLED;
++	raw_spin_unlock(&ghes_notify_lock_nmi);
+ 
+ 	atomic_dec(&ghes_in_nmi);
+ 	return ret;
 -- 
 2.17.1
