@@ -1,36 +1,34 @@
-From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Tue, 26 Jun 2018 09:29:31 +0200
-Subject: [PATCH v2 06/23] thermal: armada: convert driver to syscon
- register accesses
-In-Reply-To: <20180626033724.q7radxgjeqtsl7ae@tarshish>
-References: <20180625151239.20976-1-miquel.raynal@bootlin.com>
- <20180625151239.20976-7-miquel.raynal@bootlin.com>
- <20180626033724.q7radxgjeqtsl7ae@tarshish>
-Message-ID: <20180626092931.7f0f0ad4@xps13>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Tue, 26 Jun 2018 09:30:26 +0200
+Subject: [PATCH v2 0/3] Add STM32 RTC to stm32mp157c
+In-Reply-To: <1526558828-24456-1-git-send-email-amelie.delaunay@st.com>
+References: <1526558828-24456-1-git-send-email-amelie.delaunay@st.com>
+Message-ID: <1ea8b34d-340a-20b2-6377-3c1c370d36fc@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Baruch,
+Hi Am?lie,
 
-On Tue, 26 Jun 2018 06:37:24 +0300, Baruch Siach <baruch@tkos.co.il>
-wrote:
-
-> Hi Miquel,
+On 05/17/2018 02:07 PM, Amelie Delaunay wrote:
+> This series adds support for STM32 RTC to stm32mp157c SoC and enables it
+> on stm32mp157c-ed1 board.
 > 
-> On Mon, Jun 25, 2018 at 05:12:22PM +0200, Miquel Raynal wrote:
-> > Until recently, only one register was referenced in MVEBU thermal IP
-> > node. Recent changes added a second entry pointing to another
-> > register right next to it. We cannot know for sure that we will not
-> > have to access other registers. That will be actually the case when
-> > overheat interrupt feature will come, where it will be needed to access
-> > DFX registers in the same area.
-> > 
-> > This approach is not scalable so intead of adding consinuously memory
-> > areas in the DT (and change de DT bindings, while keeping backward  
+> ---
+> Changes in v2:
+> * Enable STM32 RTC in multi_v7_defconfig
 > 
-> s/de/the/
+> Amelie Delaunay (3):
+>    ARM: dts: stm32: add RTC support to stm32mp157c
+>    ARM: dts: stm32: enable RTC on stm32mp157c-ed1
+>    ARM: multi_v7_defconfig: enable STM32 RTC
+> 
+>   arch/arm/boot/dts/stm32mp157c-ed1.dts | 4 ++++
+>   arch/arm/boot/dts/stm32mp157c.dtsi    | 9 +++++++++
+>   arch/arm/configs/multi_v7_defconfig   | 1 +
+>   3 files changed, 14 insertions(+)
+> 
 
-Oh and s/intead/instead/ too.
+Series applied on stm32-next.
 
-Thanks for pointing it,
-Miqu?l
+Regards
+Alex
