@@ -1,24 +1,34 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 26 Jun 2018 13:14:28 -0700
-Subject: [GIT PULL] Qualcomm Fixes for v4.18-rc2
-In-Reply-To: <20180626174242.tksnyhhvqwglnz3o@localhost>
-References: <1529996893-6390-1-git-send-email-andy.gross@linaro.org>
- <20180626174242.tksnyhhvqwglnz3o@localhost>
-Message-ID: <CAOesGMjm-bO6C3wT1QpysYciAU+XuRcpEZFRMxrSnQnTFE04pw@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 26 Jun 2018 14:19:44 -0600
+Subject: [PATCH] dt-bindings: Fix unbalanced quotation marks
+In-Reply-To: <20180617143127.11421-1-j.neuschaefer@gmx.net>
+References: <20180617143127.11421-1-j.neuschaefer@gmx.net>
+Message-ID: <20180626201944.GA24678@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 26, 2018 at 10:42 AM, Olof Johansson <olof@lixom.net> wrote:
-> On Tue, Jun 26, 2018 at 02:08:13AM -0500, Andy Gross wrote:
->> The following changes since commit 9573ce74d3bc797758cbd55194aae1b7248f2503:
->>
->>   Merge tag 'qcom-fixes-for-4.18-rc1' into linus (2018-06-25 23:53:28 -0500)
+On Sun, Jun 17, 2018 at 04:31:18PM +0200, Jonathan Neusch?fer wrote:
+> Multiple binding documents have various forms of unbalanced quotation
+> marks. Fix them.
+> 
+> Signed-off-by: Jonathan Neusch?fer <j.neuschaefer@gmx.net>
+> ---
+> 
+> Should I split this patch so that different parts can go through different trees?
 
-Hmm, I just noticed this. It is the kind of thing Linus sometimes gets
-upset about when it gets excessive (merge-backs).
+No, I applied it. Thanks.
 
-You should just have based this second branch on top of the first one
-without that merge. Or was it needed due to some conflict?
-
-
--Olof
+> ---
+>  .../devicetree/bindings/arm/samsung/samsung-boards.txt          | 2 +-
+>  .../devicetree/bindings/gpio/nintendo,hollywood-gpio.txt        | 2 +-
+>  Documentation/devicetree/bindings/input/touchscreen/hideep.txt  | 2 +-
+>  .../bindings/interrupt-controller/nvidia,tegra20-ictlr.txt      | 2 +-
+>  .../devicetree/bindings/interrupt-controller/st,stm32-exti.txt  | 2 +-
+>  Documentation/devicetree/bindings/mips/brcm/soc.txt             | 2 +-
+>  Documentation/devicetree/bindings/net/fsl-fman.txt              | 2 +-
+>  Documentation/devicetree/bindings/power/power_domain.txt        | 2 +-
+>  Documentation/devicetree/bindings/regulator/tps65090.txt        | 2 +-
+>  Documentation/devicetree/bindings/reset/st,sti-softreset.txt    | 2 +-
+>  Documentation/devicetree/bindings/sound/qcom,apq8016-sbc.txt    | 2 +-
+>  Documentation/devicetree/bindings/sound/qcom,apq8096.txt        | 2 +-
+>  12 files changed, 12 insertions(+), 12 deletions(-)
