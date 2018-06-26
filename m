@@ -1,27 +1,22 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Tue, 26 Jun 2018 09:53:59 +0100
-Subject: [PATCH 03/11] ASoC: q6afe: dt-bindings: add compatible string to
- dais
-In-Reply-To: <20180625180130.GC10876@centauri.lan>
+Date: Tue, 26 Jun 2018 09:56:54 +0100
+Subject: [PATCH 04/11] ASoC: qdsp6: q6adm: use
+ of_platform_populate/depopulate()
+In-Reply-To: <20180625180329.GG10876@centauri.lan>
 References: <20180625143115.8346-1-srinivas.kandagatla@linaro.org>
- <20180625143115.8346-4-srinivas.kandagatla@linaro.org>
- <20180625180130.GC10876@centauri.lan>
-Message-ID: <70ad3f74-3fb3-af04-3515-5a593077b82a@linaro.org>
+ <20180625143115.8346-5-srinivas.kandagatla@linaro.org>
+ <20180625180329.GG10876@centauri.lan>
+Message-ID: <7912fa0c-b677-3206-51ac-e870c00ff4f8@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 25/06/18 19:01, Niklas Cassel wrote:
->> @ -103,6 +108,7 @@ q6afe at 4 {
->>   		#sound-dai-cells = <1>;
->>   		#address-cells = <1>;
->>   		#size-cells = <0>;
->> +		compatible = "qcom,q6afe-dais";
-> Perhaps have the compatible before #sound-dai-cells
-> (and #size-cells, #address-cells) like in two previous
-> patches.
-> 
-Sure, Will fix this in next version!
+On 25/06/18 19:03, Niklas Cassel wrote:
+> You can remove pdev_routing from struct q6adm,
+> since it is no longer in use.
+yep, I thought I removed this, but it looks like its still there.
+Will fix this in next version.
+
 thanks,
 srini
