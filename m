@@ -1,52 +1,29 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Tue, 26 Jun 2018 18:47:01 +0200
-Subject: [PATCH] ARM: dts: pxa: fix the rtc controller
-Message-ID: <20180626164701.1034-1-robert.jarzmik@free.fr>
+From: david@lechnology.com (David Lechner)
+Date: Tue, 26 Jun 2018 11:51:00 -0500
+Subject: [PATCH 0/2] ARM: LEGO MINDSTORMS EV3 Bluetooth support
+In-Reply-To: <20180531202549.11255-1-david@lechnology.com>
+References: <20180531202549.11255-1-david@lechnology.com>
+Message-ID: <a448b752-e32c-d5a8-7f11-57a14b63ba8a@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The RTC controller is fed by an external fixed 32kHz clock. Yet the
-driver wants to acquire this clock, even though it doesn't make any use
-of it, ie. doesn't get the rate to make calculation.
+Hi Sekhar,
 
-Therefore, add the dummy clock in the PXA clock tree to make the driver
-happy and working.
+On 05/31/2018 03:25 PM, David Lechner wrote:
+> This series adds Bluetooth support to LEGO MINDSTORMS EV3.
+> 
+> The pwm-clock depends on the common clock framework, so this requires the
+> recent davinci common clock series to switch to the common clock framework
+> before it will actually work.
+> 
+> David Lechner (2):
+>    ARM: dts: da850-lego-ev3: Add Bluetooth nodes
+>    ARM: davinci_all_defconfig: Enable Bluetooth
+> 
+>   arch/arm/boot/dts/da850-lego-ev3.dts   | 82 ++++++++++++++++++++++++++
+>   arch/arm/configs/davinci_all_defconfig |  9 +++
+>   2 files changed, 91 insertions(+)
+> 
 
-Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
----
- arch/arm/boot/dts/pxa25x.dtsi | 4 ++++
- arch/arm/boot/dts/pxa27x.dtsi | 4 ++++
- 2 files changed, 8 insertions(+)
-
-diff --git a/arch/arm/boot/dts/pxa25x.dtsi b/arch/arm/boot/dts/pxa25x.dtsi
-index 95d59be97213..c6ca07e4626b 100644
---- a/arch/arm/boot/dts/pxa25x.dtsi
-+++ b/arch/arm/boot/dts/pxa25x.dtsi
-@@ -80,6 +80,10 @@
- 			#pwm-cells = <1>;
- 			clocks = <&clks CLK_PWM1>;
- 		};
-+
-+		rtc at 40900000 {
-+			clocks = <&clks CLK_NONE>;
-+		};
- 	};
- 
- 	timer at 40a00000 {
-diff --git a/arch/arm/boot/dts/pxa27x.dtsi b/arch/arm/boot/dts/pxa27x.dtsi
-index 747f750f675d..e9cf4192e2e0 100644
---- a/arch/arm/boot/dts/pxa27x.dtsi
-+++ b/arch/arm/boot/dts/pxa27x.dtsi
-@@ -113,6 +113,10 @@
- 
- 			status = "disabled";
- 		};
-+
-+		rtc at 40900000 {
-+			clocks = <&clks CLK_NONE>;
-+		};
- 	};
- 
- 	clocks {
--- 
-2.11.0
+After "ARM: dts: da850: Add power-domains to PWM nodes", this is ready to
+apply.
