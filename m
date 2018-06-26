@@ -1,15 +1,15 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Tue, 26 Jun 2018 16:10:54 +0100 (BST)
-Subject: Applied "ASoC: qdsp6: q6routing: add proper error check" to the asoc
- tree
-In-Reply-To: <20180625143115.8346-12-srinivas.kandagatla@linaro.org>
-Message-ID: <20180626151054.6E282440070@finisterre.ee.mobilebroadband>
+Date: Tue, 26 Jun 2018 16:11:04 +0100 (BST)
+Subject: Applied "ASoC: qdsp6: q6afe-dai: support dt based module loading" to
+ the asoc tree
+In-Reply-To: <20180626092016.9296-8-srinivas.kandagatla@linaro.org>
+Message-ID: <20180626151104.CB715440070@finisterre.ee.mobilebroadband>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   ASoC: qdsp6: q6routing: add proper error check
+   ASoC: qdsp6: q6afe-dai: support dt based module loading
 
 has been applied to the asoc tree at
 
@@ -34,33 +34,40 @@ to this mail.
 Thanks,
 Mark
 
->From 972562f7aaaa261ec6e1ac14fed0c5bdd0dfb1cb Mon Sep 17 00:00:00 2001
+>From eb7cc9be6e9ce17e69252a6fc00e75a5b08201ab Mon Sep 17 00:00:00 2001
 From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-Date: Tue, 26 Jun 2018 10:20:15 +0100
-Subject: [PATCH] ASoC: qdsp6: q6routing: add proper error check
+Date: Tue, 26 Jun 2018 10:20:11 +0100
+Subject: [PATCH] ASoC: qdsp6: q6afe-dai: support dt based module loading
 
-q6adm_open can return error pointer or a null in error cases.
-Fix the return handling.
+This patch uses new compatible string to make DT based module loading work.
 
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 Acked-by: Niklas Cassel <niklas.cassel@linaro.org>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- sound/soc/qcom/qdsp6/q6routing.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ sound/soc/qcom/qdsp6/q6afe-dai.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/sound/soc/qcom/qdsp6/q6routing.c b/sound/soc/qcom/qdsp6/q6routing.c
-index ab696bf8d1d3..c80fdbc2442e 100644
---- a/sound/soc/qcom/qdsp6/q6routing.c
-+++ b/sound/soc/qcom/qdsp6/q6routing.c
-@@ -310,7 +310,7 @@ int q6routing_stream_open(int fedai_id, int perf_mode,
- 			      session->channels, topology, perf_mode,
- 			      session->bits_per_sample, 0, 0);
+diff --git a/sound/soc/qcom/qdsp6/q6afe-dai.c b/sound/soc/qcom/qdsp6/q6afe-dai.c
+index 5002dd05bf27..1d2e5013c121 100644
+--- a/sound/soc/qcom/qdsp6/q6afe-dai.c
++++ b/sound/soc/qcom/qdsp6/q6afe-dai.c
+@@ -1290,9 +1290,16 @@ static int q6afe_dai_dev_remove(struct platform_device *pdev)
+ 	return 0;
+ }
  
--	if (!copp) {
-+	if (IS_ERR_OR_NULL(copp)) {
- 		mutex_unlock(&routing_data->lock);
- 		return -EINVAL;
- 	}
++static const struct of_device_id q6afe_dai_device_id[] = {
++	{ .compatible = "qcom,q6afe-dais" },
++	{},
++};
++MODULE_DEVICE_TABLE(of, q6afe_dai_device_id);
++
+ static struct platform_driver q6afe_dai_platform_driver = {
+ 	.driver = {
+ 		.name = "q6afe-dai",
++		.of_match_table = of_match_ptr(q6afe_dai_device_id),
+ 	},
+ 	.probe = q6afe_dai_dev_probe,
+ 	.remove = q6afe_dai_dev_remove,
 -- 
 2.17.1
