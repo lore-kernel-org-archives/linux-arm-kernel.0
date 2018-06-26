@@ -1,58 +1,31 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Tue, 26 Jun 2018 11:25:24 +0200
-Subject: [PATCH v2 00/13] ARM: davinci: remove duplicate aemif support
-Message-ID: <20180626092537.6737-1-brgl@bgdev.pl>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 26 Jun 2018 10:27:51 +0100
+Subject: [RFC v2 4/4] arm: add refcounting for task stacks
+In-Reply-To: <20180618153053.186224-5-zsm@chromium.org>
+References: <20180618153053.186224-1-zsm@chromium.org>
+ <20180618153053.186224-5-zsm@chromium.org>
+Message-ID: <20180626092751.GG17671@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+On Mon, Jun 18, 2018 at 08:30:53AM -0700, Zubin Mithra wrote:
+> @@ -285,8 +290,12 @@ static int __die(const char *str, int err, struct pt_regs *regs)
+>  		 TASK_COMM_LEN, tsk->comm, task_pid_nr(tsk), end_of_stack(tsk));
+>  
+>  	if (!user_mode(regs) || in_interrupt()) {
+> -		dump_mem(KERN_EMERG, "Stack: ", regs->ARM_sp,
+> -			 THREAD_SIZE + (unsigned long)task_stack_page(tsk));
+> +		unsigned long stack_page = try_get_task_stack(tsk);
+> +		if (stack_page) {
+> +			dump_mem(KERN_EMERG, "Stack: ", regs->ARM_sp,
+> +				 THREAD_SIZE + stack_page);
+> +			put_task_stack(tsk);
+> +		}
 
-This series moves all aemif/nand users to using the ti-aemif platform
-driver located in drivers/memory instead of the older API located in
-mach-davinci.
-
-First five patches add necessary changes to the clock driver. Next
-seven convert the board files to using the ti-aemif driver. Last patch
-removes now dead code.
-
-v1 -> v2:
-- added missing clock lookups for ti-aemif where needed
-- removed an unnecessary davinci_nand clock lookup from psc-da850
-- moved the .id field initialization of aemif platform devices next to .name
-- tweaked the commit message for the last patch
-
-Bartosz Golaszewski (13):
-  clk: davinci: psc-da850: remove the 'davinci_nand.0" lookup
-  clk: davinci: psc-dm365: use two lookup entries for the aemif clock
-  clk: davinci: psc-dm644x: use two lookup entries for the aemif clock
-  clk: davinci: psc-dm646x: use two lookup entries for the aemif clock
-  clk: davinci: psc-da830: add a lookup entry for aemif clock
-  ARM: davinci: omapl138-hawk: add aemif & nand support
-  ARM: davinci: da850-evm: use aemif platform driver in legacy mode
-  ARM: davinci: dm365-evm: use the ti-aemif soc driver
-  ARM: davinci: dm644x-evm: use aemif platform driver
-  ARM: davinci: da830-evm: use aemif platform driver
-  ARM: davinci: dm646x-evm: use aemif platform driver
-  ARM: davinci: mityomapl138: use aemif platform driver
-  ARM: davinci: unduplicate aemif support
-
- arch/arm/mach-davinci/Makefile                |   2 +-
- arch/arm/mach-davinci/aemif.c                 | 218 ------------------
- arch/arm/mach-davinci/board-da830-evm.c       |  56 ++++-
- arch/arm/mach-davinci/board-da850-evm.c       |  93 ++++----
- arch/arm/mach-davinci/board-dm365-evm.c       |  59 +++--
- arch/arm/mach-davinci/board-dm644x-evm.c      |  55 +++--
- arch/arm/mach-davinci/board-dm646x-evm.c      |  52 ++++-
- arch/arm/mach-davinci/board-mityomapl138.c    |  55 +++--
- arch/arm/mach-davinci/board-omapl138-hawk.c   | 132 +++++++++++
- drivers/clk/davinci/psc-da830.c               |   3 +-
- drivers/clk/davinci/psc-da850.c               |   3 +-
- drivers/clk/davinci/psc-dm365.c               |   3 +-
- drivers/clk/davinci/psc-dm644x.c              |   3 +-
- drivers/clk/davinci/psc-dm646x.c              |   3 +-
- .../linux/platform_data/mtd-davinci-aemif.h   |   1 -
- 15 files changed, 407 insertions(+), 331 deletions(-)
- delete mode 100644 arch/arm/mach-davinci/aemif.c
+This one can't - we're running in the context of the task, and so the
+stack pages are in use by the CPU in this very function.
 
 -- 
-2.17.1
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
