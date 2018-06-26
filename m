@@ -1,33 +1,39 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 26 Jun 2018 10:45:11 +0200 (CEST)
-Subject: [PATCH v3 0/3] fix free pmd/pte page handlings on x86
-In-Reply-To: <20180626063521.GT28965@dhcp22.suse.cz>
-References: <20180516233207.1580-1-toshi.kani@hpe.com>
- <alpine.DEB.2.21.1806241516410.8650@nanos.tec.linutronix.de>
- <1529938470.14039.134.camel@hpe.com> <20180625175225.GQ28965@dhcp22.suse.cz>
- <1529961187.14039.206.camel@hpe.com>
- <20180626063521.GT28965@dhcp22.suse.cz>
-Message-ID: <alpine.DEB.2.21.1806261043080.2204@nanos.tec.linutronix.de>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Tue, 26 Jun 2018 09:52:23 +0100
+Subject: [PATCH 05/11] ASoC: qdsp6: q6asm: use
+ of_platform_populate/depopulate()
+In-Reply-To: <20180625180159.GD10876@centauri.lan>
+References: <20180625143115.8346-1-srinivas.kandagatla@linaro.org>
+ <20180625143115.8346-6-srinivas.kandagatla@linaro.org>
+ <20180625180159.GD10876@centauri.lan>
+Message-ID: <b5a41a84-162b-62dd-271c-066e42370a3e@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 26 Jun 2018, Michal Hocko wrote:
-> On Mon 25-06-18 21:15:03, Kani Toshimitsu wrote:
-> > Lastly, for the code maintenance, I believe this memory allocation keeps
-> > the code much simpler than it would otherwise need to manage a special
-> > page list.
+
+
+On 25/06/18 19:01, Niklas Cassel wrote:
+> On Mon, Jun 25, 2018 at 03:31:09PM +0100, Srinivas Kandagatla wrote:
+>> Now that the child nodes have there own compatible strings,
+>> Use of_platform_populate/depopulate() instead of less common
+>> of_platform_device_create()/destroy().
+>>
+>> Signed-off-by: Srinivas Kandagatla<srinivas.kandagatla@linaro.org>
+>> ---
+>>   sound/soc/qcom/qdsp6/q6asm.c | 17 ++---------------
+>>   1 file changed, 2 insertions(+), 15 deletions(-)
+>>
+>> diff --git a/sound/soc/qcom/qdsp6/q6asm.c b/sound/soc/qcom/qdsp6/q6asm.c
+>> index 530852385cad..2b2c7233bb5f 100644
+>> --- a/sound/soc/qcom/qdsp6/q6asm.c
+>> +++ b/sound/soc/qcom/qdsp6/q6asm.c
+>> @@ -174,10 +174,8 @@ struct q6asm {
+>>   	struct device *dev;
+>>   	struct q6core_svc_api_info ainfo;
+>>   	wait_queue_head_t mem_wait;
+>> -	struct platform_device *pcmdev;
+> Why is this removed?
+> If it's a cleanup, perhaps it should be in a separate patch.
+Thanks, I will move this to a separate patch.
+--srini
 > 
-> Yes, I can see a simplicity as a reasonable argument for a quick fix,
-> which these pile is supposed to be AFAIU. So this might be good to go
-> from that perspective, but I believe that this should be changed in
-> future at least.
-
-So the conclusion is, that we ship this set of patches now to cure the
-existing wreckage, right?
-
-Fine with that, but who will take care of reworking it proper? I'm
-concerned that this will just go stale the moment the fixes hit the tree.
-
-Thanks,
-
-	tglx
