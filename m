@@ -1,34 +1,38 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Tue, 26 Jun 2018 09:30:26 +0200
-Subject: [PATCH v2 0/3] Add STM32 RTC to stm32mp157c
-In-Reply-To: <1526558828-24456-1-git-send-email-amelie.delaunay@st.com>
-References: <1526558828-24456-1-git-send-email-amelie.delaunay@st.com>
-Message-ID: <1ea8b34d-340a-20b2-6377-3c1c370d36fc@st.com>
+From: miquel.raynal@bootlin.com (Miquel Raynal)
+Date: Tue, 26 Jun 2018 09:34:10 +0200
+Subject: [PATCH v2 14/23] dt-bindings: cp110: prepare the syscon file to
+ list other syscons nodes
+In-Reply-To: <20180626033556.bsub25ykdseflsta@tarshish>
+References: <20180625151239.20976-1-miquel.raynal@bootlin.com>
+ <20180625151239.20976-15-miquel.raynal@bootlin.com>
+ <20180626033556.bsub25ykdseflsta@tarshish>
+Message-ID: <20180626093410.2d9f815c@xps13>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Am?lie,
+Hi Baruch,
 
-On 05/17/2018 02:07 PM, Amelie Delaunay wrote:
-> This series adds support for STM32 RTC to stm32mp157c SoC and enables it
-> on stm32mp157c-ed1 board.
-> 
-> ---
-> Changes in v2:
-> * Enable STM32 RTC in multi_v7_defconfig
-> 
-> Amelie Delaunay (3):
->    ARM: dts: stm32: add RTC support to stm32mp157c
->    ARM: dts: stm32: enable RTC on stm32mp157c-ed1
->    ARM: multi_v7_defconfig: enable STM32 RTC
-> 
->   arch/arm/boot/dts/stm32mp157c-ed1.dts | 4 ++++
->   arch/arm/boot/dts/stm32mp157c.dtsi    | 9 +++++++++
->   arch/arm/configs/multi_v7_defconfig   | 1 +
->   3 files changed, 14 insertions(+)
-> 
+On Tue, 26 Jun 2018 06:35:56 +0300, Baruch Siach <baruch@tkos.co.il>
+wrote:
 
-Series applied on stm32-next.
+> Hi Miquel,
+> 
+> On Mon, Jun 25, 2018 at 05:12:30PM +0200, Miquel Raynal wrote:
+> > There are multiple system controllers in CP110. Because all syscon nodes
+> > use the same compatible, it is pertinent to use this same file to list
+> > IPs inside it. Thus, change the header to be more generic, and align
+> > with AP806 file.
+> > 
+> > Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>  
+> 
+> This patch and the file rename in patch #12 should be squashed together, I 
+> think.
 
-Regards
-Alex
+I was asked multiple times to clearly separate any kind of file
+renaming with internal changes because otherwise the reviewing process
+is way more complicated. I do agree the changes could be squashed but
+now I prefer to let them as is unless I'm explicitly told to do so
+after the reviewing process.
+
+Regards,
+Miqu?l
