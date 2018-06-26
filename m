@@ -1,113 +1,62 @@
-From: Anson.Huang@nxp.com (Anson Huang)
-Date: Tue, 26 Jun 2018 14:08:03 +0800
-Subject: [PATCH] ARM: dts: make pfuze switch always-on for imx platforms
-Message-ID: <1529993283-32396-1-git-send-email-Anson.Huang@nxp.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 25 Jun 2018 23:16:04 -0700
+Subject: v4.18-rc1 on droid 4: very bad CPU performance
+In-Reply-To: <20180625094949.GA17001@amd>
+References: <20180621121542.GA4836@amd> <20180622072005.GF112168@atomide.com>
+ <20180622074936.GG112168@atomide.com> <20180625094949.GA17001@amd>
+Message-ID: <20180626061604.GK112168@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit (5fe156f regulator: pfuze100: add enable/disable
-for switch) will cause those unreferenced switches being
-turned off if "regulator-always-on" is NOT present, as
-pfuze switches are normally used by critical modules which
-must be always ON or shared by many peripherals which
-do NOT implement power domain control, so just make sure
-all switches always ON to avoid any system issue caused
-by unexpectedly turning off switches.
+* Pavel Machek <pavel@ucw.cz> [180625 09:52]:
+> Hi!
+> 
+> > > > V4.18 is slower than it should be.
+> > > > 
+> > > > user at devuan:~$ time cat /dev/urandom | head -c 10000000 |  bzip2 -9 -
+> > > > | wc -c
+> > > > 10044291
+> > > > 52.73user 2.40system 61.53 (1m1.534s) elapsed 89.60%CPU
+> > > > user at devuan:~$ uname -a
+> > > > Linux devuan 4.18.0-rc1-87964-gfa19934-dirty #743 SMP Sun Jun 17
+> > > > 19:26:37 CEST 2018 armv7l GNU/Linux
+> > > > 
+> > > > That bzip should take 12 seconds, not minute.
+> > > > 
+> > > > Any ideas? Do you see it, too?
+> > > 
+> > > I've noticed firefox is super slow.. Git bisect time?
+> > 
+> > Hmm not happening for me at least on duovero and droid4,
+> > I'm getting about 20s for v4.17 and v4.18-rc1.
+> 
+> Something weird is going on here. My notes say it should be 12
+> seconds.
+> 
+> It is indeed 20 seconds for v4.17, but it is 12 seconds in v4.14.
+> 
+> v4.14 is:
+> # CONFIG_CPU_FREQ is not set
+> CONFIG_CPU_IDLE=y
+> # CONFIG_CPU_IDLE_GOV_LADDER is not set
+> CONFIG_CPU_IDLE_GOV_MENU=y
+> # CONFIG_ARM_CPUIDLE is not set
+> 
+> In v4.18, I have:
+> 
+> CONFIG_CPU_FREQ=y
+> CONFIG_CPU_FREQ_GOV_ATTR_SET=y
+> CONFIG_CPU_FREQ_GOV_COMMON=y
+> CONFIG_CPU_FREQ_STAT=y
+> CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
+> 
+> CONFIG_CPU_IDLE=y
+> CONFIG_CPU_IDLE_GOV_MENU=y
+> CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED=y
 
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
----
- arch/arm/boot/dts/imx6q-display5.dtsi  | 1 +
- arch/arm/boot/dts/imx6q-mccmon6.dts    | 1 +
- arch/arm/boot/dts/imx6q-novena.dts     | 1 +
- arch/arm/boot/dts/imx6q-pistachio.dts  | 1 +
- arch/arm/boot/dts/imx6qdl-gw54xx.dtsi  | 1 +
- arch/arm/boot/dts/imx6qdl-sabresd.dtsi | 1 +
- arch/arm/boot/dts/imx6sx-sdb-reva.dts  | 1 +
- 7 files changed, 7 insertions(+)
+I gave it a quick try here with v4.14 and it was 21 seconds
+on 4430 duovero. But this was with omap2plus_defconfig.
 
-diff --git a/arch/arm/boot/dts/imx6q-display5.dtsi b/arch/arm/boot/dts/imx6q-display5.dtsi
-index 85232c7..33d266f 100644
---- a/arch/arm/boot/dts/imx6q-display5.dtsi
-+++ b/arch/arm/boot/dts/imx6q-display5.dtsi
-@@ -326,6 +326,7 @@
- 			sw4_reg: sw4 {
- 				regulator-min-microvolt = <800000>;
- 				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
- 			};
- 
- 			swbst_reg: swbst {
-diff --git a/arch/arm/boot/dts/imx6q-mccmon6.dts b/arch/arm/boot/dts/imx6q-mccmon6.dts
-index b7e9f38..e6429c5 100644
---- a/arch/arm/boot/dts/imx6q-mccmon6.dts
-+++ b/arch/arm/boot/dts/imx6q-mccmon6.dts
-@@ -166,6 +166,7 @@
- 			sw4_reg: sw4 {
- 				regulator-min-microvolt = <800000>;
- 				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
- 			};
- 
- 			swbst_reg: swbst {
-diff --git a/arch/arm/boot/dts/imx6q-novena.dts b/arch/arm/boot/dts/imx6q-novena.dts
-index fcd824d..0b3c651 100644
---- a/arch/arm/boot/dts/imx6q-novena.dts
-+++ b/arch/arm/boot/dts/imx6q-novena.dts
-@@ -341,6 +341,7 @@
- 			reg_sw4: sw4 {
- 				regulator-min-microvolt = <800000>;
- 				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
- 			};
- 
- 			reg_swbst: swbst {
-diff --git a/arch/arm/boot/dts/imx6q-pistachio.dts b/arch/arm/boot/dts/imx6q-pistachio.dts
-index a31e83c..6ea09f9 100644
---- a/arch/arm/boot/dts/imx6q-pistachio.dts
-+++ b/arch/arm/boot/dts/imx6q-pistachio.dts
-@@ -253,6 +253,7 @@
- 			sw4_reg: sw4 {
- 				regulator-min-microvolt = <800000>;
- 				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
- 			};
- 
- 			swbst_reg: swbst {
-diff --git a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
-index a1a6fb5..281cae5 100644
---- a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
-@@ -268,6 +268,7 @@
- 			sw4_reg: sw4 {
- 				regulator-min-microvolt = <800000>;
- 				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
- 			};
- 
- 			swbst_reg: swbst {
-diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-index 15744ad..6e46a19 100644
---- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-@@ -341,6 +341,7 @@
- 			sw4_reg: sw4 {
- 				regulator-min-microvolt = <800000>;
- 				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
- 			};
- 
- 			swbst_reg: swbst {
-diff --git a/arch/arm/boot/dts/imx6sx-sdb-reva.dts b/arch/arm/boot/dts/imx6sx-sdb-reva.dts
-index e3533e7..9cc6ff2 100644
---- a/arch/arm/boot/dts/imx6sx-sdb-reva.dts
-+++ b/arch/arm/boot/dts/imx6sx-sdb-reva.dts
-@@ -63,6 +63,7 @@
- 			sw4_reg: sw4 {
- 				regulator-min-microvolt = <800000>;
- 				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
- 			};
- 
- 			swbst_reg: swbst {
--- 
-2.7.4
+Regards,
+
+Tony
