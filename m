@@ -1,160 +1,75 @@
 From: james.morse@arm.com (James Morse)
-Date: Tue, 26 Jun 2018 18:01:08 +0100
-Subject: [PATCH v5 12/20] ACPI / APEI: Don't store CPER records physical
- address in struct ghes
+Date: Tue, 26 Jun 2018 18:01:07 +0100
+Subject: [PATCH v5 11/20] ACPI / APEI: Remove silent flag from
+ ghes_read_estatus()
 In-Reply-To: <20180626170116.25825-1-james.morse@arm.com>
 References: <20180626170116.25825-1-james.morse@arm.com>
-Message-ID: <20180626170116.25825-13-james.morse@arm.com>
+Message-ID: <20180626170116.25825-12-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When CPER records are found the address of the records is stashed
-in the struct ghes. Once the records have been processed, this
-address is overwritten with zero so that it won't be processed
-again without being re-populated by firmware.
+Subsequent patches will split up ghes_read_estatus(), at which
+point passing around the 'silent' flag gets annoying. This is to
+suppress prink() messages, which prior to 42a0bb3f7138 ("printk/nmi:
+generic solution for safe printk in NMI"), were unsafe in NMI context.
 
-This goes wrong if a struct ghes can be processed concurrently,
-as can happen at probe time when an NMI occurs.
-
-Avoid this stashing by letting the caller hold the address. A
-later patch will do away with the use of ghes->flags in the
-read/clear code too.
+We don't need to do this anymore, remove the flag. printk() messages
+are batched in a per-cpu buffer and printed via irq-work, or a call
+back from panic().
 
 Signed-off-by: James Morse <james.morse@arm.com>
 ---
- drivers/acpi/apei/ghes.c | 30 +++++++++++++++---------------
- include/acpi/ghes.h      |  1 -
- 2 files changed, 15 insertions(+), 16 deletions(-)
+ drivers/acpi/apei/ghes.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-index 7b412508b3ea..b0054dfad9cc 100644
+index 9bb00a06ba6e..7b412508b3ea 100644
 --- a/drivers/acpi/apei/ghes.c
 +++ b/drivers/acpi/apei/ghes.c
-@@ -266,7 +266,7 @@ static inline int ghes_severity(int severity)
- 	}
- }
- 
--static void ghes_copy_tofrom_phys(void *buffer, u64 paddr, u32 len,
-+static void ghes_copy_tofrom_phys(void *buffer, phys_addr_t paddr, u32 len,
- 				  int from_phys, int fixmap_idx)
- {
- 	void __iomem *vaddr;
-@@ -291,14 +291,13 @@ static void ghes_copy_tofrom_phys(void *buffer, u64 paddr, u32 len,
+@@ -291,7 +291,7 @@ static void ghes_copy_tofrom_phys(void *buffer, u64 paddr, u32 len,
  
  static int ghes_read_estatus(struct ghes *ghes,
  			     struct acpi_hest_generic_status *estatus,
--			     int fixmap_idx)
-+			     phys_addr_t *buf_paddr, int fixmap_idx)
+-			     int silent, int fixmap_idx)
++			     int fixmap_idx)
  {
  	struct acpi_hest_generic *g = ghes->generic;
--	u64 buf_paddr;
- 	u32 len;
- 	int rc;
+ 	u64 buf_paddr;
+@@ -300,7 +300,7 @@ static int ghes_read_estatus(struct ghes *ghes,
  
--	rc = apei_read(&buf_paddr, &g->error_status_address);
-+	rc = apei_read(buf_paddr, &g->error_status_address);
+ 	rc = apei_read(&buf_paddr, &g->error_status_address);
  	if (rc) {
- 		if (printk_ratelimit())
+-		if (!silent && printk_ratelimit())
++		if (printk_ratelimit())
  			pr_warning(FW_WARN GHES_PFX
-@@ -306,15 +305,14 @@ static int ghes_read_estatus(struct ghes *ghes,
+ "Failed to read error status block address for hardware error source: %d.\n",
  				   g->header.source_id);
- 		return -EIO;
- 	}
--	if (!buf_paddr)
-+	if (!*buf_paddr)
- 		return -ENOENT;
+@@ -333,7 +333,7 @@ static int ghes_read_estatus(struct ghes *ghes,
+ 	rc = 0;
  
--	ghes_copy_tofrom_phys(estatus, buf_paddr,
-+	ghes_copy_tofrom_phys(estatus, *buf_paddr,
- 			      sizeof(*estatus), 1, fixmap_idx);
- 	if (!estatus->block_status)
- 		return -ENOENT;
- 
--	ghes->buffer_paddr = buf_paddr;
- 	ghes->flags |= GHES_TO_CLEAR;
- 
- 	rc = -EIO;
-@@ -326,7 +324,7 @@ static int ghes_read_estatus(struct ghes *ghes,
- 	if (cper_estatus_check_header(estatus))
- 		goto err_read_block;
- 	ghes_copy_tofrom_phys(estatus + 1,
--			      buf_paddr + sizeof(*estatus),
-+			      *buf_paddr + sizeof(*estatus),
- 			      len - sizeof(*estatus), 1, fixmap_idx);
- 	if (cper_estatus_check(estatus))
- 		goto err_read_block;
-@@ -341,12 +339,12 @@ static int ghes_read_estatus(struct ghes *ghes,
- 
- static void ghes_clear_estatus(struct ghes *ghes,
- 			       struct acpi_hest_generic_status *estatus,
--			       int fixmap_idx)
-+			       phys_addr_t buf_paddr, int fixmap_idx)
- {
- 	estatus->block_status = 0;
- 	if (!(ghes->flags & GHES_TO_CLEAR))
- 		return;
--	ghes_copy_tofrom_phys(estatus, ghes->buffer_paddr,
-+	ghes_copy_tofrom_phys(estatus, buf_paddr,
- 			      sizeof(estatus->block_status), 0, fixmap_idx);
- 	ghes->flags &= ~GHES_TO_CLEAR;
- }
-@@ -718,10 +716,11 @@ static void __process_error(struct ghes *ghes,
- static int _in_nmi_notify_one(struct ghes *ghes, int fixmap_idx)
- {
+ err_read_block:
+-	if (rc && !silent && printk_ratelimit())
++	if (rc && printk_ratelimit())
+ 		pr_warning(FW_WARN GHES_PFX
+ 			   "Failed to read error status block!\n");
+ 	return rc;
+@@ -720,7 +720,7 @@ static int _in_nmi_notify_one(struct ghes *ghes, int fixmap_idx)
  	int sev;
-+	phys_addr_t buf_paddr;
  	struct acpi_hest_generic_status *estatus = ghes->estatus;
  
--	if (ghes_read_estatus(ghes, estatus, fixmap_idx)) {
--		ghes_clear_estatus(ghes, estatus, fixmap_idx);
-+	if (ghes_read_estatus(ghes, estatus, &buf_paddr, fixmap_idx)) {
-+		ghes_clear_estatus(ghes, estatus, buf_paddr, fixmap_idx);
+-	if (ghes_read_estatus(ghes, estatus, 1, fixmap_idx)) {
++	if (ghes_read_estatus(ghes, estatus, fixmap_idx)) {
+ 		ghes_clear_estatus(ghes, estatus, fixmap_idx);
  		return -ENOENT;
  	}
- 
-@@ -735,7 +734,7 @@ static int _in_nmi_notify_one(struct ghes *ghes, int fixmap_idx)
- 		return 0;
- 
- 	__process_error(ghes, estatus);
--	ghes_clear_estatus(ghes, estatus, fixmap_idx);
-+	ghes_clear_estatus(ghes, estatus, buf_paddr, fixmap_idx);
- 
- 	return 0;
- }
-@@ -853,11 +852,12 @@ static int ghes_proc(struct ghes *ghes)
- {
- 	int rc;
- 	unsigned long flags;
-+	phys_addr_t buf_paddr;
- 	struct acpi_hest_generic_status *estatus = ghes->estatus;
+@@ -857,7 +857,7 @@ static int ghes_proc(struct ghes *ghes)
  
  	spin_lock_irqsave(&ghes_notify_lock_irq, flags);
  
--	rc = ghes_read_estatus(ghes, estatus, FIX_APEI_GHES_IRQ);
-+	rc = ghes_read_estatus(ghes, estatus, &buf_paddr, FIX_APEI_GHES_IRQ);
+-	rc = ghes_read_estatus(ghes, estatus, 0, FIX_APEI_GHES_IRQ);
++	rc = ghes_read_estatus(ghes, estatus, FIX_APEI_GHES_IRQ);
  	if (rc)
  		goto out;
  
-@@ -871,7 +871,7 @@ static int ghes_proc(struct ghes *ghes)
- 	ghes_do_proc(ghes, estatus);
- 
- out:
--	ghes_clear_estatus(ghes, estatus, FIX_APEI_GHES_IRQ);
-+	ghes_clear_estatus(ghes, estatus, buf_paddr, FIX_APEI_GHES_IRQ);
- 
- 	if (rc == -ENOENT)
- 		goto unlock;
-diff --git a/include/acpi/ghes.h b/include/acpi/ghes.h
-index 1624e2be485c..3d77452e3a1d 100644
---- a/include/acpi/ghes.h
-+++ b/include/acpi/ghes.h
-@@ -22,7 +22,6 @@ struct ghes {
- 		struct acpi_hest_generic_v2 *generic_v2;
- 	};
- 	struct acpi_hest_generic_status *estatus;
--	u64 buffer_paddr;
- 	unsigned long flags;
- 	union {
- 		struct list_head list;
 -- 
 2.17.1
