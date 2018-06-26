@@ -1,38 +1,23 @@
 From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
-Date: Tue, 26 Jun 2018 14:17:13 -0700
-Subject: [linux-next PATCH 0/4] Enable network driver on K2G ICE and GP
- EVMs
-In-Reply-To: <8e1aa492-ae7a-de2b-f5d2-8756b10ece79@oracle.com>
-References: <1526066952-5230-1-git-send-email-m-karicheri2@ti.com>
- <8e1aa492-ae7a-de2b-f5d2-8756b10ece79@oracle.com>
-Message-ID: <3fd86a06-6702-8e1c-54e6-01b23f9fd4cd@oracle.com>
+Date: Tue, 26 Jun 2018 14:17:41 -0700
+Subject: [PATCH 0/3] Dts nodes for Keystone2 hw_rng driver
+In-Reply-To: <45e0a1c8-739e-0a38-bd86-047c37551f62@oracle.com>
+References: <1527167538-29837-1-git-send-email-vitalya@ti.com>
+ <45e0a1c8-739e-0a38-bd86-047c37551f62@oracle.com>
+Message-ID: <1b60d0ff-f445-1f95-bb4c-366b09249b6d@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 5/20/2018 8:17 PM, santosh.shilimkar at oracle.com wrote:
-> On 5/11/18 12:29 PM, Murali Karicheri wrote:
->> Now that NetCP driver patches for K2G SoC is merged to linux-next master
->> this series add patches to enable network driver on K2G ICE and GP EVMs.
+On 5/25/2018 9:43 PM, santosh.shilimkar at oracle.com wrote:
+> On 5/24/18 6:12 AM, Vitaly Andrianov wrote:
+>> This series adds dts nodes for Keystone2 hw_rng driver
 >>
->> Thanks
+>> Vitaly Andrianov (3):
+>> ?? ARM: dts: k2hk: add dts node for k2hk hw_rng driver
+>> ?? ARM: dts: k2l: add dts node for k2l hw_rng driver
+>> ?? ARM: dts: k2e: add dts node for k2e hw_rng driver
 >>
->> Applied the patches on top of latest linux-next master, built kernel and
->> booted up on both EVMs. The logs are below
->>
->> K2G GP EVM: https://pastebin.ubuntu.com/p/ycZDnZXYPx/
->> K2G ICE EVM: https://pastebin.ubuntu.com/p/bdCpzgdrXr/
->>
->> Murali Karicheri (4):
->> ?? ARM: dts: k2g: add dt bindings to support network driver
->> ?? ARM: dts: keystone-k2g-evm: Enable netcp network driver
->> ?? ARM: dts: keystone-k2g-ice: Enable netcp network driver
->> ?? ARM: keystone: k2g: enable micrel and dp83867 phys
->>
-[...]
-
->>
-> Looks good. Will add this to the queue for 4.19. Thanks !!
+> Looks good. Will queue this up for 4.19. Thanks !!
 > 
 Applied. You should see it in linux-next as well.
 
