@@ -1,64 +1,80 @@
-From: tudor.ambarus@microchip.com (Tudor Ambarus)
-Date: Tue, 26 Jun 2018 17:44:26 +0300
-Subject: [RFC PATCH 1/2] spi: Add QuadSPI driver for Atmel SAMA5D2
-In-Reply-To: <20180622093905.62a3b936@bbrezillon>
-References: <20180618162124.21749-1-bugalski.piotr@gmail.com>
- <20180618162124.21749-2-bugalski.piotr@gmail.com>
- <20180621233321.0f25f572@bbrezillon>
- <alpine.DEB.2.20.1806220719190.21824@carbonite>
- <20180622093905.62a3b936@bbrezillon>
-Message-ID: <455adb76-530a-1fd5-303c-cfa158ad7870@microchip.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Tue, 26 Jun 2018 16:45:37 +0200
+Subject: Self-detected stall on CPU when using SD card
+In-Reply-To: <037cbd3560a68bad0cea92f453c1b819@agner.ch>
+References: <037cbd3560a68bad0cea92f453c1b819@agner.ch>
+Message-ID: <0f262b04fab61ec75b7e368a8f4968aa@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Piotr,
-
-General things to consider for the limitation in performance:
-- is the serial flash memory operating in Quad SPI?
-- QSCLK should be as high as possible
-- transfer delays - I checked them, they have default values, we should be good.
-- use DMA, as you suggested
-
-On 06/22/2018 10:39 AM, Boris Brezillon wrote:
-> [...]
+On 26.06.2018 12:53, Stefan Agner wrote:
+> Hi,
 > 
->>>> +/*
->>>> + * Atmel SAMA5D2 QuadSPI driver.
->>>> + *
->>>> + * Copyright (C) 2018 Cryptera A/S  
->>>
->>> A non-negligible portion of this code has been copied from the existing
->>> driver. Please keep the existing copyright (you can still add Cryptera's
->>> one).
->>>  
->>
->> Technically this driver were written from scratch, with spi-fsl-qspi
->> as example of new interface. Hence the name and code structure.
->> But it's the same peripheral as Atmel's driver uses so code looks
->> similar. I can unify the code to make comparsion even simpler and
->> then update copyright.
+> On our Colibri iMX6 (arch/arm/boot/dts/imx6qdl-colibri.dtsi) we
+> experience the following stack trace when a SD card is plugged in:
 > 
-> Hm, ok. Some constructs really looked like they were copied
-> from the old driver, hence my comment. I'll let Nicolas give his
-> opinion on this aspect.
-
-This driver will be a conversion of the legacy one to the spi-mem interface. I
-would keep the legacy copyright and add Cryptera's below, as Boris suggested.
 
 [...]
 
->>>> +#define QSPI_SR_CMD_COMPLETED           (QSPI_SR_INSTRE | QSPI_SR_CSR)  
->>>
->>> Do you really to wait for both INSTRE and CSR to consider the command
->>> as complete?
->>>  
->>
->> This part were really copied from Atmel driver. I wasn't sure so I
->> used tested solution.
+> [<c08396f4>] (esdhc_pltfm_set_clock) from [<c083622c>]
+> (sdhci_set_ios+0xd8/0x584)
+>  r10:ffffe000 r9:c1105900 r8:00004097 r7:d818f2e8 r6:d818f480
+> r5:d818f2e8
+>  r4:d818f000
+> [<c0836154>] (sdhci_set_ios) from [<c0836070>]
+> (sdhci_runtime_resume_host+0xa0/0x184)
+>  r9:c1105900 r8:00004097 r7:d818f2e8 r6:d818f648 r5:d818f000 r4:d818f480
+
+[...]
+
 > 
-> Okay. I guess that's a question for Cyrille and/or Tudor then.
+> It used to work in v4.9, so I started a git bisect. It pointed me to
+> this commit:
+> 
+> Commit d1e4f74f911d ("mmc: sdhci: Do not use spin lock in set_ios
+> paths").
+> 
+> Reverting the commit on-top of v4.18-rc1 seems to fix the issue too.
+> 
+> Any idea?
 
-We have to wait for both INSTRE and CSR.
+I figured out that the same platform had a GPIO Key which triggered all
+the time. This seems to exacerbate the MMC issue such that it triggers
+on very boot, about rootfs mount time.
 
-Best,
-ta
+This change seems to fix the issue as well, not sure though whether this
+is a proper fix:
+
+--- a/drivers/mmc/host/sdhci-esdhc-imx.c
++++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+@@ -697,6 +697,7 @@ static inline void esdhc_pltfm_set_clock(struct
+sdhci_host *host,
+        int ddr_pre_div = imx_data->is_ddr ? 2 : 1;
+        int pre_div = 1;
+        int div = 1;
++       unsigned long flags;
+        u32 temp, val;
+ 
+        if (clock == 0) {
+@@ -724,6 +725,7 @@ static inline void esdhc_pltfm_set_clock(struct
+sdhci_host *host,
+                        pre_div = 2;
+        }
+ 
++       spin_lock_irqsave(&host->lock, flags);
+        temp = sdhci_readl(host, ESDHC_SYSTEM_CONTROL);
+        temp &= ~(ESDHC_CLOCK_IPGEN | ESDHC_CLOCK_HCKEN |
+ESDHC_CLOCK_PEREN
+                | ESDHC_CLOCK_MASK);
+@@ -754,6 +756,7 @@ static inline void esdhc_pltfm_set_clock(struct
+sdhci_host *host,
+                writel(val | ESDHC_VENDOR_SPEC_FRC_SDCLK_ON,
+                host->ioaddr + ESDHC_VENDOR_SPEC);
+        }
++       spin_unlock_irqrestore(&host->lock, flags);
+ 
+        mdelay(1);
+ }
+
+--
+Stefan
