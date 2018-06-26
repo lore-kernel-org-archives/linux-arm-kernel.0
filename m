@@ -1,124 +1,175 @@
 From: james.morse@arm.com (James Morse)
-Date: Tue, 26 Jun 2018 18:01:10 +0100
-Subject: [PATCH v5 14/20] ACPI / APEI: Split ghes_read_estatus() to read CPER
- length
+Date: Tue, 26 Jun 2018 18:01:13 +0100
+Subject: [PATCH v5 17/20] firmware: arm_sdei: Add ACPI GHES registration helper
 In-Reply-To: <20180626170116.25825-1-james.morse@arm.com>
 References: <20180626170116.25825-1-james.morse@arm.com>
-Message-ID: <20180626170116.25825-15-james.morse@arm.com>
+Message-ID: <20180626170116.25825-18-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ghes_read_estatus() reads the record address, then the record's
-header, then performs some sanity checks before reading the
-records into the provided estatus buffer.
+APEI's Generic Hardware Error Source structures do not describe
+whether the SDEI event is shared or private, as this information is
+discoverable via the API.
 
-We either need to know the size of the records before we call
-ghes_read_estatus(), or always provide a worst-case sized buffer,
-as happens today.
+GHES needs to know whether an event is normal or critical to avoid
+sharing locks or fixmap entries, but we don't want GHES to have to
+know much about the SDEI API.
 
-Add a function to peek at the record's header to find the size. This
-will let the NMI path allocate the right amount of memory before reading
-the records, instead of using the worst-case size, and having to copy
-the records.
-
-Split ghes_read_estatus() to create ghes_peek_estatus() which
-returns the address and size of the CPER records.
+Add a helper to register the GHES using the appropriate normal or
+critical callback.
 
 Signed-off-by: James Morse <james.morse@arm.com>
----
- drivers/acpi/apei/ghes.c | 55 ++++++++++++++++++++++++++++++----------
- 1 file changed, 41 insertions(+), 14 deletions(-)
 
-diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-index 75360525935d..1d59d85b38d2 100644
---- a/drivers/acpi/apei/ghes.c
-+++ b/drivers/acpi/apei/ghes.c
-@@ -289,11 +289,12 @@ static void ghes_copy_tofrom_phys(void *buffer, phys_addr_t paddr, u32 len,
- 	}
- }
+---
+Changes since v4:
+ * Moved normal/critical callbacks into the helper, as APEI needs to know.
+ * Dropped Punit's Reviewed-by.
+
+Changes since v3:
+ * Removed acpi_disabled() checks that aren't necessary after v2s #ifdef
+   change.
+
+Changes since v2:
+ * Added header file, thanks kbuild-robot!
+ * changed ifdef to the GHES version to match the fixmap definition
+
+Changes since v1:
+ * ghes->fixmap_idx variable rename
+---
+ arch/arm64/include/asm/fixmap.h |  4 ++
+ drivers/firmware/arm_sdei.c     | 66 +++++++++++++++++++++++++++++++++
+ include/linux/arm_sdei.h        |  6 +++
+ 3 files changed, 76 insertions(+)
+
+diff --git a/arch/arm64/include/asm/fixmap.h b/arch/arm64/include/asm/fixmap.h
+index c3974517c2cb..e2b423a5feaf 100644
+--- a/arch/arm64/include/asm/fixmap.h
++++ b/arch/arm64/include/asm/fixmap.h
+@@ -58,6 +58,10 @@ enum fixed_addresses {
+ #ifdef CONFIG_ACPI_APEI_SEA
+ 	FIX_APEI_GHES_SEA,
+ #endif
++#ifdef CONFIG_ARM_SDE_INTERFACE
++	FIX_APEI_GHES_SDEI_NORMAL,
++	FIX_APEI_GHES_SDEI_CRITICAL,
++#endif
+ #endif /* CONFIG_ACPI_APEI_GHES */
  
--static int ghes_read_estatus(struct ghes *ghes,
--			     struct acpi_hest_generic_status *estatus,
--			     phys_addr_t *buf_paddr, int fixmap_idx)
-+/* read the CPER block returning its address and size */
-+static int ghes_peek_estatus(struct ghes *ghes, int fixmap_idx,
-+			     phys_addr_t *buf_paddr, u32 *buf_len)
- {
- 	struct acpi_hest_generic *g = ghes->generic;
-+	struct acpi_hest_generic_status estatus;
- 	u32 len;
- 	int rc;
+ #ifdef CONFIG_UNMAP_KERNEL_AT_EL0
+diff --git a/drivers/firmware/arm_sdei.c b/drivers/firmware/arm_sdei.c
+index 1ea71640fdc2..c1b6591f2183 100644
+--- a/drivers/firmware/arm_sdei.c
++++ b/drivers/firmware/arm_sdei.c
+@@ -2,6 +2,7 @@
+ // Copyright (C) 2017 Arm Ltd.
+ #define pr_fmt(fmt) "sdei: " fmt
  
-@@ -308,26 +309,23 @@ static int ghes_read_estatus(struct ghes *ghes,
- 	if (!*buf_paddr)
- 		return -ENOENT;
++#include <acpi/ghes.h>
+ #include <linux/acpi.h>
+ #include <linux/arm_sdei.h>
+ #include <linux/arm-smccc.h>
+@@ -32,6 +33,8 @@
+ #include <linux/spinlock.h>
+ #include <linux/uaccess.h>
  
--	ghes_copy_tofrom_phys(estatus, *buf_paddr,
--			      sizeof(*estatus), 1, fixmap_idx);
--	if (!estatus->block_status) {
-+	ghes_copy_tofrom_phys(&estatus, *buf_paddr,
-+			      sizeof(estatus), 1, fixmap_idx);
-+	if (!estatus.block_status) {
- 		*buf_paddr = 0;
- 		return -ENOENT;
- 	}
- 
- 	rc = -EIO;
--	len = cper_estatus_len(estatus);
--	if (len < sizeof(*estatus))
-+	len = cper_estatus_len(&estatus);
-+	if (len < sizeof(estatus))
- 		goto err_read_block;
- 	if (len > ghes->generic->error_block_length)
- 		goto err_read_block;
--	if (cper_estatus_check_header(estatus))
--		goto err_read_block;
--	ghes_copy_tofrom_phys(estatus + 1,
--			      *buf_paddr + sizeof(*estatus),
--			      len - sizeof(*estatus), 1, fixmap_idx);
--	if (cper_estatus_check(estatus))
-+	if (cper_estatus_check_header(&estatus))
- 		goto err_read_block;
-+	*buf_len = len;
++#include <asm/fixmap.h>
 +
- 	rc = 0;
- 
- err_read_block:
-@@ -337,6 +335,35 @@ static int ghes_read_estatus(struct ghes *ghes,
- 	return rc;
+ /*
+  * The call to use to reach the firmware.
+  */
+@@ -887,6 +890,69 @@ static void sdei_smccc_hvc(unsigned long function_id,
+ 	arm_smccc_hvc(function_id, arg0, arg1, arg2, arg3, arg4, 0, 0, res);
  }
  
-+static int __ghes_read_estatus(struct acpi_hest_generic_status *estatus,
-+			       phys_addr_t buf_paddr, size_t buf_len,
-+			       int fixmap_idx)
++#ifdef CONFIG_ACPI_APEI_GHES
++int sdei_register_ghes(struct ghes *ghes, sdei_event_callback *normal_cb,
++		       sdei_event_callback *critical_cb)
 +{
-+	ghes_copy_tofrom_phys(estatus, buf_paddr, buf_len, 1, fixmap_idx);
-+	if (cper_estatus_check(estatus)) {
-+		if (printk_ratelimit())
-+			pr_warning(FW_WARN GHES_PFX
-+				   "Failed to read error status block!\n");
-+		return -EIO;
++	int err;
++	u64 result;
++	u32 event_num;
++	sdei_event_callback *cb;
++
++	event_num = ghes->generic->notify.vector;
++	if (event_num == 0) {
++		/*
++		 * Event 0 is reserved by the specification for
++		 * SDEI_EVENT_SIGNAL.
++		 */
++		return -EINVAL;
 +	}
 +
-+	return 0;
++	err = sdei_api_event_get_info(event_num, SDEI_EVENT_INFO_EV_PRIORITY,
++				      &result);
++	if (err)
++		return err;
++
++	if (result == SDEI_EVENT_PRIORITY_CRITICAL)
++		cb = critical_cb;
++	else
++		cb = normal_cb;
++
++	err = sdei_event_register(event_num, cb, ghes);
++	if (!err)
++		err = sdei_event_enable(event_num);
++
++	return err;
 +}
 +
-+static int ghes_read_estatus(struct ghes *ghes,
-+			     struct acpi_hest_generic_status *estatus,
-+			     phys_addr_t *buf_paddr, int fixmap_idx)
++int sdei_unregister_ghes(struct ghes *ghes)
 +{
-+	int rc;
-+	u32 buf_len;
++	int i;
++	int err;
++	u32 event_num = ghes->generic->notify.vector;
 +
-+	rc = ghes_peek_estatus(ghes, fixmap_idx, buf_paddr, &buf_len);
-+	if (rc)
-+		return rc;
++	might_sleep();
 +
-+	return __ghes_read_estatus(estatus, *buf_paddr, buf_len, fixmap_idx);
++	/*
++	 * The event may be running on another CPU. Disable it
++	 * to stop new events, then try to unregister a few times.
++	 */
++	err = sdei_event_disable(event_num);
++	if (err)
++		return err;
++
++	for (i = 0; i < 3; i++) {
++		err = sdei_event_unregister(event_num);
++		if (err != -EINPROGRESS)
++			break;
++
++		schedule();
++	}
++
++	return err;
 +}
++#endif /* CONFIG_ACPI_APEI_GHES */
 +
- static void ghes_clear_estatus(struct acpi_hest_generic_status *estatus,
- 			       phys_addr_t buf_paddr, int fixmap_idx)
+ static int sdei_get_conduit(struct platform_device *pdev)
  {
+ 	const char *method;
+diff --git a/include/linux/arm_sdei.h b/include/linux/arm_sdei.h
+index 942afbd544b7..393899192906 100644
+--- a/include/linux/arm_sdei.h
++++ b/include/linux/arm_sdei.h
+@@ -11,6 +11,7 @@ enum sdei_conduit_types {
+ 	CONDUIT_HVC,
+ };
+ 
++#include <acpi/ghes.h>
+ #include <asm/sdei.h>
+ 
+ /* Arch code should override this to set the entry point from firmware... */
+@@ -39,6 +40,11 @@ int sdei_event_unregister(u32 event_num);
+ int sdei_event_enable(u32 event_num);
+ int sdei_event_disable(u32 event_num);
+ 
++/* GHES register/unregister helpers */
++int sdei_register_ghes(struct ghes *ghes, sdei_event_callback *normal_cb,
++		       sdei_event_callback *critical_cb);
++int sdei_unregister_ghes(struct ghes *ghes);
++
+ #ifdef CONFIG_ARM_SDE_INTERFACE
+ /* For use by arch code when CPU hotplug notifiers are not appropriate. */
+ int sdei_mask_local_cpu(void);
 -- 
 2.17.1
