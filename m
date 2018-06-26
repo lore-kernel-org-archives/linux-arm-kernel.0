@@ -1,31 +1,102 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 26 Jun 2018 10:27:51 +0100
-Subject: [RFC v2 4/4] arm: add refcounting for task stacks
-In-Reply-To: <20180618153053.186224-5-zsm@chromium.org>
-References: <20180618153053.186224-1-zsm@chromium.org>
- <20180618153053.186224-5-zsm@chromium.org>
-Message-ID: <20180626092751.GG17671@n2100.armlinux.org.uk>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Tue, 26 Jun 2018 11:25:33 +0200
+Subject: [PATCH v2 09/13] ARM: davinci: dm644x-evm: use aemif platform driver
+In-Reply-To: <20180626092537.6737-1-brgl@bgdev.pl>
+References: <20180626092537.6737-1-brgl@bgdev.pl>
+Message-ID: <20180626092537.6737-10-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 18, 2018 at 08:30:53AM -0700, Zubin Mithra wrote:
-> @@ -285,8 +290,12 @@ static int __die(const char *str, int err, struct pt_regs *regs)
->  		 TASK_COMM_LEN, tsk->comm, task_pid_nr(tsk), end_of_stack(tsk));
->  
->  	if (!user_mode(regs) || in_interrupt()) {
-> -		dump_mem(KERN_EMERG, "Stack: ", regs->ARM_sp,
-> -			 THREAD_SIZE + (unsigned long)task_stack_page(tsk));
-> +		unsigned long stack_page = try_get_task_stack(tsk);
-> +		if (stack_page) {
-> +			dump_mem(KERN_EMERG, "Stack: ", regs->ARM_sp,
-> +				 THREAD_SIZE + stack_page);
-> +			put_task_stack(tsk);
-> +		}
+From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-This one can't - we're running in the context of the task, and so the
-stack pages are in use by the CPU in this very function.
+We now support board files in the aemif driver. Register a platform
+device instead of using the handcrafted API in dm644x-evm.
 
+Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+---
+ arch/arm/mach-davinci/board-dm644x-evm.c | 55 ++++++++++++++++++------
+ 1 file changed, 42 insertions(+), 13 deletions(-)
+
+diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c b/arch/arm/mach-davinci/board-dm644x-evm.c
+index 738e443ab15f..e4a8f9225d16 100644
+--- a/arch/arm/mach-davinci/board-dm644x-evm.c
++++ b/arch/arm/mach-davinci/board-dm644x-evm.c
+@@ -42,6 +42,7 @@
+ #include <linux/platform_data/mmc-davinci.h>
+ #include <linux/platform_data/usb-davinci.h>
+ #include <linux/platform_data/mtd-davinci-aemif.h>
++#include <linux/platform_data/ti-aemif.h>
+ 
+ #include "davinci.h"
+ 
+@@ -174,14 +175,47 @@ static struct resource davinci_evm_nandflash_resource[] = {
+ 	},
+ };
+ 
+-static struct platform_device davinci_evm_nandflash_device = {
+-	.name		= "davinci_nand",
+-	.id		= 0,
+-	.dev		= {
+-		.platform_data	= &davinci_evm_nandflash_data,
++static struct resource davinci_evm_aemif_resource[] = {
++	{
++		.start		= DM644X_ASYNC_EMIF_CONTROL_BASE,
++		.end		= DM644X_ASYNC_EMIF_CONTROL_BASE + SZ_4K - 1,
++		.flags		= IORESOURCE_MEM,
+ 	},
+-	.num_resources	= ARRAY_SIZE(davinci_evm_nandflash_resource),
+-	.resource	= davinci_evm_nandflash_resource,
++};
++
++static struct aemif_abus_data davinci_evm_aemif_abus_data[] = {
++	{
++		.cs		= 1,
++	},
++};
++
++static struct platform_device davinci_evm_nandflash_devices[] = {
++	{
++		.name		= "davinci_nand",
++		.id		= 0,
++		.dev		= {
++			.platform_data	= &davinci_evm_nandflash_data,
++		},
++		.num_resources	= ARRAY_SIZE(davinci_evm_nandflash_resource),
++		.resource	= davinci_evm_nandflash_resource,
++	},
++};
++
++static struct aemif_platform_data davinci_evm_aemif_pdata = {
++	.abus_data = davinci_evm_aemif_abus_data,
++	.num_abus_data = ARRAY_SIZE(davinci_evm_aemif_abus_data),
++	.sub_devices = davinci_evm_nandflash_devices,
++	.num_sub_devices = ARRAY_SIZE(davinci_evm_nandflash_devices),
++};
++
++static struct platform_device davinci_evm_aemif_device = {
++	.name			= "ti-aemif",
++	.id			= -1,
++	.dev = {
++		.platform_data	= &davinci_evm_aemif_pdata,
++	},
++	.resource		= davinci_evm_aemif_resource,
++	.num_resources		= ARRAY_SIZE(davinci_evm_aemif_resource),
+ };
+ 
+ static u64 davinci_fb_dma_mask = DMA_BIT_MASK(32);
+@@ -795,12 +829,7 @@ static __init void davinci_evm_init(void)
+ 
+ 		/* only one device will be jumpered and detected */
+ 		if (HAS_NAND) {
+-			platform_device_register(&davinci_evm_nandflash_device);
+-
+-			if (davinci_aemif_setup(&davinci_evm_nandflash_device))
+-				pr_warn("%s: Cannot configure AEMIF\n",
+-					__func__);
+-
++			platform_device_register(&davinci_evm_aemif_device);
+ #ifdef CONFIG_I2C
+ 			evm_leds[7].default_trigger = "nand-disk";
+ #endif
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+2.17.1
