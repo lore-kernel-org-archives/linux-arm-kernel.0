@@ -1,77 +1,75 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Tue, 26 Jun 2018 20:18:44 +0300
-Subject: [PATCH 5/5] i2c: Add Actions Semi OWL family S900 I2C driver
-In-Reply-To: <20180626170125.GB5241@Mani-XPS-13-9360>
-References: <20180623161147.15672-1-manivannan.sadhasivam@linaro.org>
- <20180623161147.15672-6-manivannan.sadhasivam@linaro.org>
- <CAHp75Vf_JR6scrwnomiu62_x2idgCGH63UdMf2bhfy8VNaijXQ@mail.gmail.com>
- <20180626170125.GB5241@Mani-XPS-13-9360>
-Message-ID: <CAHp75VdR5UbGvM3AOu21+Hp1xqPgtSnjRSKyhnCeB8ebAmF7eQ@mail.gmail.com>
+From: james.morse@arm.com (James Morse)
+Date: Tue, 26 Jun 2018 18:01:15 +0100
+Subject: [PATCH v5 19/20] mm/memory-failure: increase queued recovery work's
+ priority
+In-Reply-To: <20180626170116.25825-1-james.morse@arm.com>
+References: <20180626170116.25825-1-james.morse@arm.com>
+Message-ID: <20180626170116.25825-20-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 26, 2018 at 8:01 PM, Manivannan Sadhasivam
-<manivannan.sadhasivam@linaro.org> wrote:
-> On Mon, Jun 25, 2018 at 12:38:50PM +0300, Andy Shevchenko wrote:
->> On Sat, Jun 23, 2018 at 7:11 PM, Manivannan Sadhasivam
->> <manivannan.sadhasivam@linaro.org> wrote:
+arm64 can take an NMI-like error notification when user-space steps in
+some corrupt memory. APEI's GHES code will call memory_failure_queue()
+to schedule the recovery work. We then return to user-space, possibly
+taking the fault again.
 
->> > +#define OWL_I2C_REG_CTL                (0x0000)
->> > +#define OWL_I2C_REG_CLKDIV     (0x0004)
->> > +#define OWL_I2C_REG_STAT       (0x0008)
->> > +#define OWL_I2C_REG_ADDR       (0x000C)
->> > +#define OWL_I2C_REG_TXDAT      (0x0010)
->> > +#define OWL_I2C_REG_RXDAT      (0x0014)
->> > +#define OWL_I2C_REG_CMD                (0x0018)
->> > +#define OWL_I2C_REG_FIFOCTL    (0x001C)
->> > +#define OWL_I2C_REG_FIFOSTAT   (0x0020)
->> > +#define OWL_I2C_REG_DATCNT     (0x0024)
->> > +#define OWL_I2C_REG_RCNT       (0x0028)
->>
->> I don't understand why these have parents?
->>
->
-> I'm not sure what you mean here! Can you please elaborate?
+Currently the arch code unconditionally signals user-space from this
+path, so we don't get stuck in this loop, but the affected process
+never benefits from memory_failure()s recovery work. To fix this we
+need to know the recovery work will run before we get back to user-space.
 
-One has to read 'parens'. Sorry for confusion.
+Increase the priority of the recovery work by scheduling it on the
+system_highpri_wq, then try to bump the current task off this CPU
+so that the recovery work starts immediately.
 
->> > +#define OWL_I2C_TIMEOUT                (msecs_to_jiffies(4 * 1000))
->>
->> Ditto.
+Reported-by: Xie XiuQi <xiexiuqi@huawei.com>
+Signed-off-by: James Morse <james.morse@arm.com>
+Reviewed-by: Punit Agrawal <punit.agrawal@arm.com>
+Tested-by: Tyler Baicar <tbaicar@codeaurora.org>
+Tested-by: gengdongjiu <gengdongjiu@huawei.com>
+CC: Xie XiuQi <xiexiuqi@huawei.com>
+CC: gengdongjiu <gengdongjiu@huawei.com>
+---
+ mm/memory-failure.c | 11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
 
-> Same as above
-
-Ditto.
-
->> > +       /* Wait until FIFO reset complete */
->> > +       do {
->> > +               val = readl(i2c_dev->base + OWL_I2C_REG_FIFOCTL);
->> > +               if (!(val & (OWL_I2C_FIFOCTL_RFR | OWL_I2C_FIFOCTL_TFR)))
->> > +                       break;
->> > +       } while (1);
->>
->> No way. Get rid of infinite loop.
-
-> Okay. Can I change it to max of 50 retries with 1ms delay?
-
-Whatever suitable for HW. Rely on datasheet or other source of
-information about this timeouts.
-
->> > +static irqreturn_t owl_i2c_interrupt(int irq, void *_dev)
-
->> > +               dev_warn(&i2c_dev->adap.dev, "received NACK from device");
->>
->> And if it happens hundreds times in a row?
-
-> Should I change it to dev_dbg?
-
->> > +               dev_warn(&i2c_dev->adap.dev, "bus error");
-
-> Same as above?
-
-ratelimit, another level, tracepoints, getting rid of them completely
-? your call.
-
+diff --git a/mm/memory-failure.c b/mm/memory-failure.c
+index 9d142b9b86dc..f0e69d7ac406 100644
+--- a/mm/memory-failure.c
++++ b/mm/memory-failure.c
+@@ -55,6 +55,7 @@
+ #include <linux/hugetlb.h>
+ #include <linux/memory_hotplug.h>
+ #include <linux/mm_inline.h>
++#include <linux/preempt.h>
+ #include <linux/kfifo.h>
+ #include <linux/ratelimit.h>
+ #include "internal.h"
+@@ -1333,6 +1334,7 @@ static DEFINE_PER_CPU(struct memory_failure_cpu, memory_failure_cpu);
+  */
+ void memory_failure_queue(unsigned long pfn, int flags)
+ {
++	int cpu = smp_processor_id();
+ 	struct memory_failure_cpu *mf_cpu;
+ 	unsigned long proc_flags;
+ 	struct memory_failure_entry entry = {
+@@ -1342,11 +1344,14 @@ void memory_failure_queue(unsigned long pfn, int flags)
+ 
+ 	mf_cpu = &get_cpu_var(memory_failure_cpu);
+ 	spin_lock_irqsave(&mf_cpu->lock, proc_flags);
+-	if (kfifo_put(&mf_cpu->fifo, entry))
+-		schedule_work_on(smp_processor_id(), &mf_cpu->work);
+-	else
++	if (kfifo_put(&mf_cpu->fifo, entry)) {
++		queue_work_on(cpu, system_highpri_wq, &mf_cpu->work);
++		set_tsk_need_resched(current);
++		preempt_set_need_resched();
++	} else {
+ 		pr_err("Memory failure: buffer overflow when queuing memory failure at %#lx\n",
+ 		       pfn);
++	}
+ 	spin_unlock_irqrestore(&mf_cpu->lock, proc_flags);
+ 	put_cpu_var(memory_failure_cpu);
+ }
 -- 
-With Best Regards,
-Andy Shevchenko
+2.17.1
