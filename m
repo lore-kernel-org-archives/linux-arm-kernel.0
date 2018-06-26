@@ -1,10 +1,10 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Tue, 26 Jun 2018 10:20:10 +0100
-Subject: [PATCH v2 06/12] ASoC: qdsp6: q6afe: use
+Date: Tue, 26 Jun 2018 10:20:08 +0100
+Subject: [PATCH v2 04/12] ASoC: qdsp6: q6adm: use
  of_platform_populate/depopulate()
 In-Reply-To: <20180626092016.9296-1-srinivas.kandagatla@linaro.org>
 References: <20180626092016.9296-1-srinivas.kandagatla@linaro.org>
-Message-ID: <20180626092016.9296-7-srinivas.kandagatla@linaro.org>
+Message-ID: <20180626092016.9296-5-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,39 +13,38 @@ Use of_platform_populate/depopulate() instead of less common
 of_platform_device_create()/destroy().
 
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-Acked-by: Niklas Cassel <niklas.cassel@linaro.org>
 ---
- sound/soc/qcom/qdsp6/q6afe.c | 16 ++--------------
+ sound/soc/qcom/qdsp6/q6adm.c | 16 ++--------------
  1 file changed, 2 insertions(+), 14 deletions(-)
 
-diff --git a/sound/soc/qcom/qdsp6/q6afe.c b/sound/soc/qcom/qdsp6/q6afe.c
-index 01f43218984b..621b67b34db9 100644
---- a/sound/soc/qcom/qdsp6/q6afe.c
-+++ b/sound/soc/qcom/qdsp6/q6afe.c
-@@ -316,7 +316,6 @@ struct q6afe {
+diff --git a/sound/soc/qcom/qdsp6/q6adm.c b/sound/soc/qcom/qdsp6/q6adm.c
+index 9983c665a941..932c3ebfd252 100644
+--- a/sound/soc/qcom/qdsp6/q6adm.c
++++ b/sound/soc/qcom/qdsp6/q6adm.c
+@@ -64,7 +64,6 @@ struct q6adm {
+ 	struct aprv2_ibasic_rsp_result_t result;
  	struct mutex lock;
- 	struct list_head port_list;
- 	spinlock_t port_list_lock;
--	struct platform_device *pdev_dais;
+ 	wait_queue_head_t matrix_map_wait;
+-	struct platform_device *pdev_routing;
  };
  
- struct afe_port_cmd_device_start {
-@@ -1438,7 +1437,6 @@ static int q6afe_probe(struct apr_device *adev)
+ struct q6adm_cmd_device_open_v5 {
+@@ -588,7 +587,6 @@ EXPORT_SYMBOL_GPL(q6adm_close);
+ static int q6adm_probe(struct apr_device *adev)
  {
- 	struct q6afe *afe;
  	struct device *dev = &adev->dev;
 -	struct device_node *dais_np;
+ 	struct q6adm *adm;
  
- 	afe = devm_kzalloc(dev, sizeof(*afe), GFP_KERNEL);
- 	if (!afe)
-@@ -1453,22 +1451,12 @@ static int q6afe_probe(struct apr_device *adev)
+ 	adm = devm_kzalloc(&adev->dev, sizeof(*adm), GFP_KERNEL);
+@@ -605,22 +603,12 @@ static int q6adm_probe(struct apr_device *adev)
+ 	INIT_LIST_HEAD(&adm->copps_list);
+ 	spin_lock_init(&adm->copps_list_lock);
  
- 	dev_set_drvdata(dev, afe);
- 
--	dais_np = of_get_child_by_name(dev->of_node, "dais");
+-	dais_np = of_get_child_by_name(dev->of_node, "routing");
 -	if (dais_np) {
--		afe->pdev_dais = of_platform_device_create(dais_np,
--							   "q6afe-dai", dev);
+-		adm->pdev_routing = of_platform_device_create(dais_np,
+-							   "q6routing", dev);
 -		of_node_put(dais_np);
 -	}
 -
@@ -53,12 +52,12 @@ index 01f43218984b..621b67b34db9 100644
 +	return of_platform_populate(dev->of_node, NULL, NULL, dev);
  }
  
- static int q6afe_remove(struct apr_device *adev)
+ static int q6adm_remove(struct apr_device *adev)
  {
--	struct q6afe *afe = dev_get_drvdata(&adev->dev);
+-	struct q6adm *adm = dev_get_drvdata(&adev->dev);
 -
--	if (afe->pdev_dais)
--		of_platform_device_destroy(&afe->pdev_dais->dev, NULL);
+-	if (adm->pdev_routing)
+-		of_platform_device_destroy(&adm->pdev_routing->dev, NULL);
 +	of_platform_depopulate(&adev->dev);
  
  	return 0;
