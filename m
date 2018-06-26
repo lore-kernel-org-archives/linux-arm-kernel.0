@@ -1,77 +1,174 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 26 Jun 2018 16:11:33 +0100 (BST)
-Subject: Applied "ASoC: q6afe: dt-bindings: add compatible string to dais" to
- the asoc tree
-In-Reply-To: <20180626092016.9296-4-srinivas.kandagatla@linaro.org>
-Message-ID: <20180626151133.5E097440070@finisterre.ee.mobilebroadband>
+From: mathieu.desnoyers@efficios.com (Mathieu Desnoyers)
+Date: Tue, 26 Jun 2018 12:11:52 -0400 (EDT)
+Subject: [PATCH 3/3] rseq/selftests: Add support for arm64
+In-Reply-To: <20180626151427.GF23375@arm.com>
+References: <1529949285-11013-1-git-send-email-will.deacon@arm.com>
+ <1529949285-11013-4-git-send-email-will.deacon@arm.com>
+ <501929863.3051.1529950210436.JavaMail.zimbra@efficios.com>
+ <20180626151427.GF23375@arm.com>
+Message-ID: <1763491947.3520.1530029512923.JavaMail.zimbra@efficios.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
 
-   ASoC: q6afe: dt-bindings: add compatible string to dais
 
-has been applied to the asoc tree at
+----- On Jun 26, 2018, at 11:14 AM, Will Deacon will.deacon at arm.com wrote:
 
-   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+> Hi Mathieu,
+> 
+> On Mon, Jun 25, 2018 at 02:10:10PM -0400, Mathieu Desnoyers wrote:
+>> ----- On Jun 25, 2018, at 1:54 PM, Will Deacon will.deacon at arm.com wrote:
+>> > +#define __RSEQ_ASM_DEFINE_TABLE(label, version, flags, start_ip,		\
+>> > +				post_commit_offset, abort_ip)			\
+>> > +	"	.pushsection	__rseq_table, \"aw\"\n"				\
+>> > +	"	.balign	32\n"							\
+>> > +	__rseq_str(label) ":\n"							\
+>> > +	"	.long	" __rseq_str(version) ", " __rseq_str(flags) "\n"	\
+>> > +	"	.quad	" __rseq_str(start_ip) ", "				\
+>> > +			  __rseq_str(post_commit_offset) ", "			\
+>> > +			  __rseq_str(abort_ip) "\n"				\
+>> > +	"	.popsection\n"
+>> > +
+>> > +#define RSEQ_ASM_DEFINE_TABLE(label, start_ip, post_commit_ip, abort_ip)	\
+>> > +	__RSEQ_ASM_DEFINE_TABLE(label, 0x0, 0x0, start_ip,			\
+>> > +				(post_commit_ip - start_ip), abort_ip)
+>> > +
+>> > +#define RSEQ_ASM_STORE_RSEQ_CS(label, cs_label, rseq_cs)			\
+>> > +	RSEQ_INJECT_ASM(1)							\
+>> > +	"	adrp	" RSEQ_ASM_TMP_REG ", " __rseq_str(cs_label) "\n"	\
+>> > +	"	add	" RSEQ_ASM_TMP_REG ", " RSEQ_ASM_TMP_REG		\
+>> > +			", :lo12:" __rseq_str(cs_label) "\n"			\
+>> > +	"	str	" RSEQ_ASM_TMP_REG ", %[" __rseq_str(rseq_cs) "]\n"	\
+>> > +	__rseq_str(label) ":\n"
+>> > +
+>> > +#define RSEQ_ASM_DEFINE_ABORT(label, abort_label)				\
+>> > +	"	.pushsection	__rseq_failure, \"ax\"\n"			\
+>> > +	"	.long 	"	__rseq_str(RSEQ_SIG) "\n"			\
+>> > +	__rseq_str(label) ":\n"							\
+>> > +	"	b	%l[" __rseq_str(abort_label) "]\n"			\
+>> > +	"	.popsection\n"
+>> 
+>> Thanks Will for porting rseq to arm64 !
+> 
+> That's ok, it was good fun :)
+> 
+> I'm going to chat with our compiler guys to see if there's any room for
+> improving the flexibility in the critical section, since having a temporary
+> in the clobber list is pretty grotty.
 
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
+Let me know how it goes!
 
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
+> 
+>> I notice you are using the instructions
+>> 
+>>   adrp
+>>   add
+>>   str
+>> 
+>> to implement RSEQ_ASM_STORE_RSEQ_CS(). Did you compare
+>> performance-wise with an approach using a literal pool
+>> near the instruction pointer like I did on arm32 ?
+> 
+> I didn't, no. Do you have a benchmark to hand so I can give this a go?
 
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
+see tools/testing/selftests/rseq/param_test_benchmark --help
 
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
+It's a stripped-down version of param_test, without all the code for
+delay loops and testing checks.
+
+Example use for counter increment with 4 threads, doing 5G counter
+increments per thread:
+
+time ./param_test_benchmark -T i -t 4 -r 5000000000
+
+> The two reasons I didn't go down this route are:
+> 
+> 1. It introduces data which is mapped as executable. I don't have a
+>   specific security concern here, but the way things have gone so far
+>   this year, I've realised that I'm not bright enough to anticipate
+>   these things.
+
+So far I've been able to dig up that "pure code" or "execute only" code
+is explicitly requested by compiler flags (-mno-pc-relative-literal-loads
+on aarch64, -mpure-code on arm32 when the moon cycle is aligned). It's a
+shame that it's not more standard, or that there does not appear to be any
+preprocessor define available to test this within code.
+
+I'm all for allowing end users to chose whether they want to use literal
+pools in code or not, but I think it should be configurable at compile
+time, and we should make it similar on arm32 and arm64. Given that compilers
+don't emit preprocessor define, perhaps we need to introduce our own
+RSEQ_NO_PC_RELATIVE_LITERAL_LOADS (or perhaps a shorter name ?) define to
+select behavior at compile-time.
+
+> 2. It introduces a branch over the table on the fast path, which is likely
+>   to have a relatively higher branch misprediction cost on more advanced
+>   CPUs.
+
+Hrm, wait a second... I see that your comparison of the cpu number requires:
+
++#define RSEQ_ASM_OP_CMPEQ32(var, expect, label)                                        \
++        "        ldr        " RSEQ_ASM_TMP_REG32 ", %[" __rseq_str(var) "]\n"        \
++        "        sub        " RSEQ_ASM_TMP_REG32 ", " RSEQ_ASM_TMP_REG32                \
++                        ", %w[" __rseq_str(expect) "]\n"                        \
++        "        cbnz        " RSEQ_ASM_TMP_REG32 ", " __rseq_str(label) "\n"
+
+because the abort code is emitted in a separate section:
+
++#define RSEQ_ASM_DEFINE_ABORT(label, abort_label)                                \
++        "        .pushsection        __rseq_failure, \"ax\"\n"                        \
++        "        .long         "        __rseq_str(RSEQ_SIG) "\n"                        \
++        __rseq_str(label) ":\n"                                                        \
++        "        b        %l[" __rseq_str(abort_label) "]\n"                        \
++        "        .popsection\n"
+
+Like I did on x86. But the cbnz instruction requires the branch target to be
+within +/- 1MB from the instruction (http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0024a/ch06s04.html),
+which clearly is not guaranteed when you place the abort label in a separate
+section.
+
+Also, using cbnz to jump to a label that is outside of the assembly
+(e.g. %l[error1]) does not ensure that the branch target is within
+1MB of the code.
+
+I've had assembler issues on arm32 due to those kind of constraints
+when integrating rseq headers into larger code-bases.
+
+So, one way to fix the fast-path so cpu number comparison can branch
+to a close location is to put the abort code near the fast-path, and
+you end up having to unconditionally jump over the abort code from
+the fast-path on success. So once you bite the bullet and jump over
+abort, you just have to ensure you place the struct rseq_cs data
+near the abort code, so you end up jumping over both at the same time.
+
+> 
+> I also find it grotty that we emit two tables so that debuggers can cope,
+> but that's just a cosmetic nit.
+> 
+>> With that approach, this ends up being simply
+>> 
+>>   adr
+>>   str
+>> 
+>> which provides significantly better performance on my test
+>> platform over loading a pointer targeting a separate data
+>> section.
+> 
+> My understanding is that your test platform is based on Cortex-A7, so I'd
+> be wary about concluding too much about general performance from that CPU
+> since its a pretty straightforward in-order design.
+
+I did benchmarks on our Wandboard (Cortex A9) as well as the Cubietruck. I
+could only use perf to do detailed breakdown of the fast-path overhead on
+the Cubie because I could not get it to work on our Wandboard, but overall
+speed was better on Wandboard as well (as I recall) with the literal pool.
 
 Thanks,
-Mark
 
->From e43792c6e5027ad3f0280f5a2e6952b0d436b19b Mon Sep 17 00:00:00 2001
-From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-Date: Tue, 26 Jun 2018 10:20:07 +0100
-Subject: [PATCH] ASoC: q6afe: dt-bindings: add compatible string to dais
+Mathieu
 
-Add compatible string to dais so that it can support DT based module
-autoloading.
 
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-Acked-by: Niklas Cassel <niklas.cassel@linaro.org>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- Documentation/devicetree/bindings/sound/qcom,q6afe.txt | 6 ++++++
- 1 file changed, 6 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/sound/qcom,q6afe.txt b/Documentation/devicetree/bindings/sound/qcom,q6afe.txt
-index bdbf87df8c0b..a8179409c194 100644
---- a/Documentation/devicetree/bindings/sound/qcom,q6afe.txt
-+++ b/Documentation/devicetree/bindings/sound/qcom,q6afe.txt
-@@ -17,6 +17,11 @@ used by all apr services. Must contain the following properties.
- subnode of "dais" representing board specific dai setup.
- "dais" node should have following properties followed by dai children.
- 
-+- compatible:
-+	Usage: required
-+	Value type: <stringlist>
-+	Definition: must be "qcom,q6afe-dais"
-+
- - #sound-dai-cells
- 	Usage: required
- 	Value type: <u32>
-@@ -100,6 +105,7 @@ q6afe at 4 {
- 	reg = <APR_SVC_AFE>;
- 
- 	dais {
-+		compatible = "qcom,q6afe-dais";
- 		#sound-dai-cells = <1>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
 -- 
-2.17.1
+Mathieu Desnoyers
+EfficiOS Inc.
+http://www.efficios.com
