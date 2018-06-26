@@ -1,90 +1,153 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Tue, 26 Jun 2018 11:31:46 +0200
-Subject: [PATCH 00/14] ARM: davinci: step towards removing
- at24_platform_data
-In-Reply-To: <20180626083823.GA28068@lunn.ch>
-References: <20180625155025.12567-1-brgl@bgdev.pl>
- <20180625174024.GB17417@lunn.ch>
- <CAMRc=MdEn74G5SJAaGLAfNSS7Zy7wqH04aN5CMZ45UXqhu_58g@mail.gmail.com>
- <20180625180237.GC17417@lunn.ch>
- <CAMRc=MejDn=t6EPbKOfhMfRAb_O-5hxtWRyjAWH1mb5BUySrDA@mail.gmail.com>
- <20180626083823.GA28068@lunn.ch>
-Message-ID: <CAMRc=Mdvh+1enpD3qDoamhPfaBPin2v3amneQELApgoC0bS2FQ@mail.gmail.com>
+Date: Tue, 26 Jun 2018 11:25:31 +0200
+Subject: [PATCH v2 07/13] ARM: davinci: da850-evm: use aemif platform driver
+ in legacy mode
+In-Reply-To: <20180626092537.6737-1-brgl@bgdev.pl>
+References: <20180626092537.6737-1-brgl@bgdev.pl>
+Message-ID: <20180626092537.6737-8-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-06-26 10:38 GMT+02:00 Andrew Lunn <andrew@lunn.ch>:
-> On Tue, Jun 26, 2018 at 09:44:19AM +0200, Bartosz Golaszewski wrote:
->> 2018-06-25 20:02 GMT+02:00 Andrew Lunn <andrew@lunn.ch>:
->> >> With my patch 1/14 you'll get -EPROBE_DEFER from nvmem_cell_get() if
->> >> the nvmem provider is not yet registered. Will that help in your case?
->> >
->> > I don't think so. My driver instantiates the AT24 device. So if i get
->> > -EPROBE_DEFER, i need to cleanup the probe, and return -EPROBDE_DEFER
->> > to the code. Which means i need to remove the AT24 device...
->> >
->> >        Andrew
->>
->> Are you sure this is the correct approach? I understand that you want
->> to use something like board files for your machine? Wouldn't it be
->> better to register a platform device for at24, register a cell lookup
->> and then depend on that cell from your driver?
->
-> Hi Bartosz
->
-> The machine is based around a Kontron Com Express module, with an
-> intel Ivy Bridge CPU. This is then placed into a custom carrier board,
-> which has a number of i2c devices.
->
-> I have a platform driver which matches on the DMI system ID for the
-> Kontron module.
->
-> The Com Express module has a PLD which implements i2c, gpio,
-> etc. There is an MFD for this, which instantiates the i2c-kempld i2c
-> bus driver.
->
-> My platform driver finds this i2c-kempld bus driver. If it does not
-> exist yet, it return -EPROBE_DEFER. If it is found it instantiates an
-> at24 device on it. I need to look at the content of the EEPROM to
-> determine the hardware revision, plus do a checksum.  From that, i
-> need to instantiates 1 or 2 additional AT24, up to 4 GPIO expanders,
-> and i2c to spi converter, add some gpio-leds on the gpio expanders,
-> create a bit-banging MDIO bus, instantiate an Ethernet switch on the
-> MDIO bus, maybe add an Ethernet switch to the SPI bus, etc.
->
-> As you can see, i have a chain of events. I cannot move onto the next
-> part of the chain until i know the probe for the previous part has
-> finished. e.g. i cannot add gpio-leds until i know the gpio expander
-> has probed. But the gpio expander provides a call back, similar to the
-> at24 setup(). The MDIO bus and the SPI bus has a mechanism to register
-> an info structure, just like you have done for NVMEM cells. So that
-> works out.
->
-> The weak link in this chain is that first at24 probe, and knowing when
-> i can access the nvmem cells for the revision and checksum
-> information. -EPROBE_DEFER does not help me here. I need either some
-> sort of blocking wait for the cells to become available, or a callback
-> in a context which allows me to instantiate more devices.
->
-> I also have some steps which cannot be undone. You don't provide a
-> mechanism to unregister the nvmem info structure. The I2C and MDIO
-> equivalent also does not provide an unregister for bus info. So once i
-> register the first info structure, i'm past the point of no return. I
-> cannot return -EPROBE_DEFER because i cannot unregister the info
-> structures, so that i can register them again the next time the
-> platform driver gets probed.
->
->          Andrew
->
+From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-I see. I see it this way: the setup callback comes from the time when
-we didn't have nvmem and should go away. I will protest loud whenever
-someone will try to use it again and will work towards removing it as
-soon as possible.
+We now support board files in the aemif driver. Register a platform
+device instead of using the handcrafted API in da850-evm.
 
-I will give your problem a thought and will try to get back with some
-proposals - maybe we should, as you suggested, extend nvmem even
-further to allow to remove nvmem info entries etc.
+Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+---
+ arch/arm/mach-davinci/board-da850-evm.c | 93 ++++++++++++++-----------
+ 1 file changed, 51 insertions(+), 42 deletions(-)
 
-Best regards,
-Bartosz Golaszewski
+diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
+index 442c16773f09..ace66f368f8d 100644
+--- a/arch/arm/mach-davinci/board-da850-evm.c
++++ b/arch/arm/mach-davinci/board-da850-evm.c
+@@ -33,6 +33,7 @@
+ #include <linux/platform_data/gpio-davinci.h>
+ #include <linux/platform_data/mtd-davinci.h>
+ #include <linux/platform_data/mtd-davinci-aemif.h>
++#include <linux/platform_data/ti-aemif.h>
+ #include <linux/platform_data/spi-davinci.h>
+ #include <linux/platform_data/uio_pruss.h>
+ #include <linux/regulator/machine.h>
+@@ -185,16 +186,6 @@ static struct resource da850_evm_norflash_resource[] = {
+ 	},
+ };
+ 
+-static struct platform_device da850_evm_norflash_device = {
+-	.name		= "physmap-flash",
+-	.id		= 0,
+-	.dev		= {
+-		.platform_data  = &da850_evm_norflash_data,
+-	},
+-	.num_resources	= 1,
+-	.resource	= da850_evm_norflash_resource,
+-};
+-
+ /* DA850/OMAP-L138 EVM includes a 512 MByte large-page NAND flash
+  * (128K blocks). It may be used instead of the (default) SPI flash
+  * to boot, using TI's tools to install the secondary boot loader
+@@ -266,37 +257,58 @@ static struct resource da850_evm_nandflash_resource[] = {
+ 	},
+ };
+ 
+-static struct platform_device da850_evm_nandflash_device = {
+-	.name		= "davinci_nand",
+-	.id		= 1,
+-	.dev		= {
+-		.platform_data	= &da850_evm_nandflash_data,
+-	},
+-	.num_resources	= ARRAY_SIZE(da850_evm_nandflash_resource),
+-	.resource	= da850_evm_nandflash_resource,
++static struct resource da850_evm_aemif_resource[] = {
++	{
++		.start	= DA8XX_AEMIF_CTL_BASE,
++		.end	= DA8XX_AEMIF_CTL_BASE + SZ_32K,
++		.flags	= IORESOURCE_MEM,
++	}
+ };
+ 
+-static struct platform_device *da850_evm_devices[] = {
+-	&da850_evm_nandflash_device,
+-	&da850_evm_norflash_device,
++static struct aemif_abus_data da850_evm_aemif_abus_data[] = {
++	{
++		.cs	= 3,
++	}
+ };
+ 
+-#define DA8XX_AEMIF_CE2CFG_OFFSET	0x10
+-#define DA8XX_AEMIF_ASIZE_16BIT		0x1
+-
+-static void __init da850_evm_init_nor(void)
+-{
+-	void __iomem *aemif_addr;
+-
+-	aemif_addr = ioremap(DA8XX_AEMIF_CTL_BASE, SZ_32K);
++static struct platform_device da850_evm_aemif_devices[] = {
++	{
++		.name		= "davinci_nand",
++		.id		= 1,
++		.dev		= {
++			.platform_data	= &da850_evm_nandflash_data,
++		},
++		.num_resources	= ARRAY_SIZE(da850_evm_nandflash_resource),
++		.resource	= da850_evm_nandflash_resource,
++	},
++	{
++		.name		= "physmap-flash",
++		.id		= 0,
++		.dev		= {
++			.platform_data  = &da850_evm_norflash_data,
++		},
++		.num_resources	= 1,
++		.resource	= da850_evm_norflash_resource,
++	}
++};
+ 
+-	/* Configure data bus width of CS2 to 16 bit */
+-	writel(readl(aemif_addr + DA8XX_AEMIF_CE2CFG_OFFSET) |
+-		DA8XX_AEMIF_ASIZE_16BIT,
+-		aemif_addr + DA8XX_AEMIF_CE2CFG_OFFSET);
++static struct aemif_platform_data da850_evm_aemif_pdata = {
++	.cs_offset = 2,
++	.abus_data = da850_evm_aemif_abus_data,
++	.num_abus_data = ARRAY_SIZE(da850_evm_aemif_abus_data),
++	.sub_devices = da850_evm_aemif_devices,
++	.num_sub_devices = ARRAY_SIZE(da850_evm_aemif_devices),
++};
+ 
+-	iounmap(aemif_addr);
+-}
++static struct platform_device da850_evm_aemif_device = {
++	.name		= "ti-aemif",
++	.id		= -1,
++	.dev = {
++		.platform_data	= &da850_evm_aemif_pdata,
++	},
++	.resource	= da850_evm_aemif_resource,
++	.num_resources	= ARRAY_SIZE(da850_evm_aemif_resource),
++};
+ 
+ static const short da850_evm_nand_pins[] = {
+ 	DA850_EMA_D_0, DA850_EMA_D_1, DA850_EMA_D_2, DA850_EMA_D_3,
+@@ -339,13 +351,10 @@ static inline void da850_evm_setup_nor_nand(void)
+ 			pr_warn("%s: NOR mux setup failed: %d\n",
+ 				__func__, ret);
+ 
+-		da850_evm_init_nor();
+-
+-		platform_add_devices(da850_evm_devices,
+-					ARRAY_SIZE(da850_evm_devices));
+-
+-		if (davinci_aemif_setup(&da850_evm_nandflash_device))
+-			pr_warn("%s: Cannot configure AEMIF.\n", __func__);
++		ret = platform_device_register(&da850_evm_aemif_device);
++		if (ret)
++			pr_warn("%s: registering aemif failed: %d\n",
++				__func__, ret);
+ 	}
+ }
+ 
+-- 
+2.17.1
