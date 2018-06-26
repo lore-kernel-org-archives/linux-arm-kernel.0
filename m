@@ -1,82 +1,58 @@
-From: joe@perches.com (Joe Perches)
-Date: Tue, 26 Jun 2018 10:19:41 -0700
-Subject: [PATCH v2 3/6] coresight: Introduce support for Coresight
- Address Translation Unit
-In-Reply-To: <20180626155954.GA27118@xps15>
-References: <20180625112213.23492-1-suzuki.poulose@arm.com>
- <20180625112213.23492-4-suzuki.poulose@arm.com>
- <1dab29ef47d77c2456ee2500a4636f8793b53354.camel@perches.com>
- <20180626155954.GA27118@xps15>
-Message-ID: <cdc280594f84fda5a880bf3ce3b0931d50809e58.camel@perches.com>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Tue, 26 Jun 2018 18:27:01 +0100
+Subject: [PATCH 1/2] arm64: avoid alloc memory on offline node
+In-Reply-To: <20180622184223.00007bc3@huawei.com> (Jonathan Cameron's message
+ of "Fri, 22 Jun 2018 18:42:23 +0100")
+References: <20180619120714.GE13685@dhcp22.suse.cz>
+ <874lhz3pmn.fsf@e105922-lin.cambridge.arm.com>
+ <20180619140818.GA16927@e107981-ln.cambridge.arm.com>
+ <87wouu3jz1.fsf@e105922-lin.cambridge.arm.com>
+ <20180619151425.GH13685@dhcp22.suse.cz>
+ <87r2l23i2b.fsf@e105922-lin.cambridge.arm.com>
+ <20180619163256.GA18952@e107981-ln.cambridge.arm.com>
+ <814205eb-ae86-a519-bed0-f09b8e2d3a02@huawei.com>
+ <87602d3ccl.fsf@e105922-lin.cambridge.arm.com>
+ <5c083c9c-473f-f504-848b-48506d0fd380@huawei.com>
+ <20180622091153.GU10465@dhcp22.suse.cz>
+ <87y3f7yv89.fsf@e105922-lin.cambridge.arm.com>
+ <20180622184223.00007bc3@huawei.com>
+Message-ID: <87muvhwja2.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2018-06-26 at 09:59 -0600, Mathieu Poirier wrote:
-> On Mon, Jun 25, 2018 at 09:23:51AM -0700, Joe Perches wrote:
-> > On Mon, 2018-06-25 at 12:22 +0100, Suzuki K Poulose wrote:
-> > > Add the initial support for Coresight Address Translation Unit, which
-> > > augments the TMC in Coresight SoC-600 by providing an improved Scatter
-> > > Gather mechanism. CATU is always connected to a single TMC-ETR and
-> > > converts the AXI address with a translated address (from a given SG
-> > > table with specific format). The CATU should be programmed in pass
-> > > through mode and enabled even if the ETR doesn't use the translation
-> > > by CATU.
-> > 
-> > []
-> > > diff --git a/drivers/hwtracing/coresight/coresight-catu.h b/drivers/hwtracing/coresight/coresight-catu.h
-> > 
-> > []
-> > > +static inline bool coresight_is_catu_device(struct coresight_device *csdev)
-> > > +{
-> > > +	enum coresight_dev_subtype_helper subtype;
-> > > +
-> > > +	/* Make the checkpatch happy */
-> > > +	subtype = csdev->subtype.helper_subtype;
-> > > +
-> > > +	return IS_ENABLED(CONFIG_CORESIGHT_CATU) &&
-> > > +	       csdev->type == CORESIGHT_DEV_TYPE_HELPER &&
-> > > +	       subtype == CORESIGHT_DEV_SUBTYPE_HELPER_CATU;
-> > > +}
-> > 
-> > I believe you should not make checkpatch happy here
-> > by using a temporary but use the most readable form.
-> > 
-> > Probably the most readable form is:
-> > 
-> > 	return IS_ENABLED(CONFIG_CORESIGHT_CATU) &&
-> > 	       csdev->type == CORESIGHT_DEV_TYPE_HELPER &&
-> > 	       csdev->subtype.helper_subtype == CORESIGHT_DEV_SUBTYPE_HELPER_CATU;
-> > 
-> > where restricting line length to 80 columns is not useful
-> > because the identifiers are very long.  The identifiers
-> > are possibly longer than necessary.
-> 
-> I would prefer to avoid adding code that will trigger checkpatch warnings.  I
-> suggest the following:
-> 
-> static inline bool coresight_is_catu_device(struct coresight_device *csdev)
-> {
->         if (!IS_ENABLED(CONFIG_CORESIGHT_CATU))
->                 return false;
-> 
->         if (csdev->type != CORESIGHT_DEV_TYPE_HELPER)
->                 return false;
-> 
->         if (csdev->subtype.helper_subtype != CORESIGHT_DEV_SUBTYPE_HELPER_CATU)
->                 return false;
-> 
->         return true;
-> }
-> 
-> No temporary variable and all shorther than 80 columns.
+Jonathan Cameron <jonathan.cameron@huawei.com> writes:
 
-Perhaps the most readable uses the positive
-form instead of the negative, but your choice.
-The compiler should emit equivalent or identical
-code anyway.
+[...]
 
-Do remember that checkpatch is brainless and
-everyone should always use theirs over fixing
-any message that checkpatch emits.
+>
+> I'll test it when back in the office, but I had a similar issue with
+> memory only nodes when I moved the SRAT listing for cpus from the 4
+> 4th mode to the 3rd node to fake some memory I could hot unplug.
+> This gave a memory only node for the last node on the system.
+>
+> When I instead moved cpus from the 3rd node to the 4th (so the node
+> with only memory was now in the middle, everything worked).
+>
+> Was odd, and I'd been meaning to chase it down but hadn't gotten to it
+> yet.  If I get time I'll put together some test firmwares as see if there
+> are any other nasty corner cases we aren't handling.
 
-cheers, Joe
+If you get a chance, it'd be really helpful to test reversing the
+ordering of entries in the SRAT and booting with a restricted
+NR_CPUS.
+
+This issue was found through code inspection.
+
+Please make sure to use the updated patch from Lorenzo for your
+tests[0].
+
+[0] https://marc.info/?l=linux-acpi&m=152998665713983&w=2
+
+>
+> Jonathan
+>
+>> 
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
