@@ -1,59 +1,51 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Tue, 26 Jun 2018 12:22:35 +0200
-Subject: [PATCH v2 05/15] ARM: davinci: da830-evm: use nvmem lookup for mac
- address
-In-Reply-To: <20180626102245.30711-1-brgl@bgdev.pl>
-References: <20180626102245.30711-1-brgl@bgdev.pl>
-Message-ID: <20180626102245.30711-6-brgl@bgdev.pl>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 26 Jun 2018 11:31:14 +0100
+Subject: [PATCH 1/3] arm64: rseq: Implement backend rseq calls and select
+ HAVE_RSEQ
+In-Reply-To: <1529949285-11013-2-git-send-email-will.deacon@arm.com>
+References: <1529949285-11013-1-git-send-email-will.deacon@arm.com>
+ <1529949285-11013-2-git-send-email-will.deacon@arm.com>
+Message-ID: <20180626103114.ddu62cccupjdo2ia@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+On Mon, Jun 25, 2018 at 06:54:43PM +0100, Will Deacon wrote:
+>  /*
+>   * Please add new compat syscalls above this comment and update
+> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> index 28ad8799406f..1eda9e1a1f4a 100644
+> --- a/arch/arm64/kernel/entry.S
+> +++ b/arch/arm64/kernel/entry.S
+> @@ -904,6 +904,7 @@ ENDPROC(el0_error)
+>  ret_fast_syscall:
+>  	disable_daif
+>  	str	x0, [sp, #S_X0]			// returned x0
+> +#ifndef CONFIG_DEBUG_RSEQ
+>  	ldr	x1, [tsk, #TSK_TI_FLAGS]	// re-check for syscall tracing
+>  	and	x2, x1, #_TIF_SYSCALL_WORK
+>  	cbnz	x2, ret_fast_syscall_trace
+> @@ -911,6 +912,7 @@ ret_fast_syscall:
+>  	cbnz	x2, work_pending
+>  	enable_step_tsk x1, x2
+>  	kernel_exit 0
+> +#endif
+>  ret_fast_syscall_trace:
+>  	enable_daif
+>  	b	__sys_trace_return_skipped	// we already saved x0
 
-We now support nvmem lookups for machine code. Add a lookup for
-mac-address.
+I *think* this is ok, since we re-check the TIF bits in
+syscall_trace_exit().
 
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
----
- arch/arm/mach-davinci/board-da830-evm.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+This does mean that we'd now always call audit_syscall_exit(),
+regardless of TIF_AUDIT, but there are already cases when we call that
+with TIF_AUDIT clear, so I think if that's a problem it's a latent bug.
+Likewise for audit_syscall_entry().
 
-diff --git a/arch/arm/mach-davinci/board-da830-evm.c b/arch/arm/mach-davinci/board-da830-evm.c
-index 14a6fc061744..3be3e93f2f18 100644
---- a/arch/arm/mach-davinci/board-da830-evm.c
-+++ b/arch/arm/mach-davinci/board-da830-evm.c
-@@ -29,6 +29,7 @@
- #include <linux/platform_data/spi-davinci.h>
- #include <linux/platform_data/usb-davinci.h>
- #include <linux/regulator/machine.h>
-+#include <linux/nvmem-provider.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -409,6 +410,15 @@ static inline void da830_evm_init_lcdc(int mux_mode)
- static inline void da830_evm_init_lcdc(int mux_mode) { }
- #endif
- 
-+static struct nvmem_cell_lookup da830_evm_mac_address_cell = {
-+	.info = {
-+		.name = "mac-address",
-+		.offset = 0x7f00,
-+		.bytes = ETH_ALEN,
-+	},
-+	.nvmem_name = "1-00500",
-+};
-+
- static struct at24_platform_data da830_evm_i2c_eeprom_info = {
- 	.byte_len	= SZ_256K / 8,
- 	.page_size	= 64,
-@@ -618,6 +628,8 @@ static __init void da830_evm_init(void)
- 		pr_warn("%s: spi 0 registration failed: %d\n", __func__, ret);
- 
- 	regulator_has_full_constraints();
-+
-+	nvmem_register_lookup(&da830_evm_mac_address_cell, 1);
- }
- 
- #ifdef CONFIG_SERIAL_8250_CONSOLE
--- 
-2.17.1
+It seems we're in the same boat as other architectures there,
+regardless.
+
+FWIW, for the entry bits:
+
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+Mark.
