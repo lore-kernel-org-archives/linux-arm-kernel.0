@@ -1,33 +1,64 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 26 Jun 2018 20:09:54 +0530
-Subject: [PATCH] ARM: davinci: board-da850-evm: fix WP pin polarity for
- MMC/SD
-In-Reply-To: <20180518012052.31345-1-aford173@gmail.com>
-References: <20180518012052.31345-1-aford173@gmail.com>
-Message-ID: <29c2c428-4334-bca4-0600-680878782ce4@ti.com>
+From: tudor.ambarus@microchip.com (Tudor Ambarus)
+Date: Tue, 26 Jun 2018 17:44:26 +0300
+Subject: [RFC PATCH 1/2] spi: Add QuadSPI driver for Atmel SAMA5D2
+In-Reply-To: <20180622093905.62a3b936@bbrezillon>
+References: <20180618162124.21749-1-bugalski.piotr@gmail.com>
+ <20180618162124.21749-2-bugalski.piotr@gmail.com>
+ <20180621233321.0f25f572@bbrezillon>
+ <alpine.DEB.2.20.1806220719190.21824@carbonite>
+ <20180622093905.62a3b936@bbrezillon>
+Message-ID: <455adb76-530a-1fd5-303c-cfa158ad7870@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 18 May 2018 06:50 AM, Adam Ford wrote:
-> When booting from MMC/SD in rw mode, the system crashes because
+Hi, Piotr,
 
-... in rw mode on DA850 EVM, .. 
+General things to consider for the limitation in performance:
+- is the serial flash memory operating in Quad SPI?
+- QSCLK should be as high as possible
+- transfer delays - I checked them, they have default values, we should be good.
+- use DMA, as you suggested
 
-> the write protect pin should be active high and not active low.
-> This patch fixes the polarity of the WP pin.
+On 06/22/2018 10:39 AM, Boris Brezillon wrote:
+> [...]
 > 
-> Fixes: 67c6b6ff221f ("ARM: davinci: board-da850-evm: fix GPIO
-> lookup for MMC/SD")
-
-Fixes: bdf0e8364fd3 ("ARM: davinci: da850-evm: use gpio descriptor for mmc pins")
-
-is more appropriate since thats where the bug was actually introduced 
-and thats how far back you want the patch backported.
-
+>>>> +/*
+>>>> + * Atmel SAMA5D2 QuadSPI driver.
+>>>> + *
+>>>> + * Copyright (C) 2018 Cryptera A/S  
+>>>
+>>> A non-negligible portion of this code has been copied from the existing
+>>> driver. Please keep the existing copyright (you can still add Cryptera's
+>>> one).
+>>>  
+>>
+>> Technically this driver were written from scratch, with spi-fsl-qspi
+>> as example of new interface. Hence the name and code structure.
+>> But it's the same peripheral as Atmel's driver uses so code looks
+>> similar. I can unify the code to make comparsion even simpler and
+>> then update copyright.
 > 
-> Signed-off-by: Adam Ford <aford173@gmail.com>
+> Hm, ok. Some constructs really looked like they were copied
+> from the old driver, hence my comment. I'll let Nicolas give his
+> opinion on this aspect.
 
-With these changes, applied to fixes for v4.18.
+This driver will be a conversion of the legacy one to the spi-mem interface. I
+would keep the legacy copyright and add Cryptera's below, as Boris suggested.
 
-Thanks,
-Sekhar
+[...]
+
+>>>> +#define QSPI_SR_CMD_COMPLETED           (QSPI_SR_INSTRE | QSPI_SR_CSR)  
+>>>
+>>> Do you really to wait for both INSTRE and CSR to consider the command
+>>> as complete?
+>>>  
+>>
+>> This part were really copied from Atmel driver. I wasn't sure so I
+>> used tested solution.
+> 
+> Okay. I guess that's a question for Cyrille and/or Tudor then.
+
+We have to wait for both INSTRE and CSR.
+
+Best,
+ta
