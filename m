@@ -1,59 +1,34 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Tue, 26 Jun 2018 14:13:20 +0200
-Subject: [PATCH 3/3] ARM: multi_v7_defconfig: enable STM32 SPI
-In-Reply-To: <120d8997-3184-bfed-26b7-e0ac7d995b74@st.com>
-References: <1526566904-24514-1-git-send-email-amelie.delaunay@st.com>
- <1526566904-24514-4-git-send-email-amelie.delaunay@st.com>
- <e3bd3097-fbde-b790-e2b3-d78fb34b849d@st.com>
- <120d8997-3184-bfed-26b7-e0ac7d995b74@st.com>
-Message-ID: <f61c7908-8046-1709-94cf-a4066a330299@st.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 26 Jun 2018 13:07:33 +0100
+Subject: [PATCH v8 2/2] regulator: add QCOM RPMh regulator driver
+In-Reply-To: <CAD=FV=XVEEPgjBXxR+-46RgxLOq63Xvq-jtruoaCxccmMoKUuA@mail.gmail.com>
+References: <cover.1529712888.git.collinsd@codeaurora.org>
+ <35c4ea70cdf5caba560fb6f40e866ee8bc456d93.1529712888.git.collinsd@codeaurora.org>
+ <CAD=FV=XVEEPgjBXxR+-46RgxLOq63Xvq-jtruoaCxccmMoKUuA@mail.gmail.com>
+Message-ID: <20180626120733.GD1779@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Jun 25, 2018 at 11:50:52AM -0700, Doug Anderson wrote:
 
+> ...to this patch.  Speaking of which it might be getting very close to
+> time for this series to land along with David's other series, AKA:
 
-On 06/26/2018 01:47 PM, Amelie DELAUNAY wrote:
-> Hi Alex
-> 
-> On 06/26/2018 10:44 AM, Alexandre Torgue wrote:
->> Hi Am?lie
->> 
->> On 05/17/2018 04:21 PM, Amelie Delaunay wrote:
->>> Enable the STM32 SPI driver, implemented on STM32MP1 SoC.
->>>
->>> Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
->>> ---
->>> ? arch/arm/configs/multi_v7_defconfig | 1 +
->>> ? 1 file changed, 1 insertion(+)
->>>
->>> diff --git a/arch/arm/configs/multi_v7_defconfig 
->>> b/arch/arm/configs/multi_v7_defconfig
->>> index 89167cd..f990335 100644
->>> --- a/arch/arm/configs/multi_v7_defconfig
->>> +++ b/arch/arm/configs/multi_v7_defconfig
->>> @@ -411,6 +411,7 @@ CONFIG_SPI_S3C64XX=m
->>> ? CONFIG_SPI_SH_MSIOF=m
->>> ? CONFIG_SPI_SH_HSPI=y
->>> ? CONFIG_SPI_SIRF=y
->>> +CONFIG_SPI_STM32=y
->>> ? CONFIG_SPI_SUN4I=y
->>> ? CONFIG_SPI_SUN6I=y
->>> ? CONFIG_SPI_TEGRA114=y
->>>
->> 
->> Driver which are are not "vital" to boot STM32 platform should be 
->> defined as module. It's the case for this one. Isn't ?
->> 
-> 
-> You're right. I'll send v2 with CONFIG_SPI_STM32=m ASAP. Should I resend
-> the whole patchset (with DT), or just this patch and you take the DT
-> patches as they are ?
-> 
+> * [1/2] regulator: of: add property for allowed modes specification
+>   https://patchwork.kernel.org/patch/10395731/
 
-No, you can just resend this one. I will take DT part from this version.
+> * [2/2] regulator: of: add support for allowed modes configuration
+>   https://patchwork.kernel.org/patch/10395725/
 
-Regards
-Alex
-
-> Regards,
-> Amelie
+Please do not submit new versions of already applied patches, please
+submit incremental updates to the existing code.  Modifying existing
+commits creates problems for other users building on top of those
+commits so it's best practice to only change pubished git commits if
+absolutely essential.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180626/756ecee7/attachment-0001.sig>
