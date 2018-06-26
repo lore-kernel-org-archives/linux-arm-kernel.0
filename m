@@ -1,57 +1,75 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 26 Jun 2018 10:36:52 +0200
-Subject: [PATCH 0/5] RFC: Mezzanine handling for 96boards
-In-Reply-To: <CAKv+Gu8cXxQWbnB++adGx=xwAzuM9jqxkCOznk1qP5r=P4vxrQ@mail.gmail.com>
-References: <20180618074556.6944-1-linus.walleij@linaro.org>
- <CAK8P3a2KqoX-squhGc8TBuJ==8xxELsuy-H+c1+C7Fu7Z4OjDA@mail.gmail.com>
- <CAKv+Gu-gAkfRsEUOc=iyxi6Twvg9cbvWNqNHRS2HzUDZg8xUhg@mail.gmail.com>
- <CACRpkdb1GksbePt6XgePCD6g-z4fxY-LF-gpyRfQVxCrq226fg@mail.gmail.com>
- <CAKv+Gu8cXxQWbnB++adGx=xwAzuM9jqxkCOznk1qP5r=P4vxrQ@mail.gmail.com>
-Message-ID: <CACRpkdYZmoP-yf6wT0=3Npr4u9zB8qtEraihSYyrjXHeEHp0ow@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 26 Jun 2018 10:38:23 +0200
+Subject: [PATCH 00/14] ARM: davinci: step towards removing
+ at24_platform_data
+In-Reply-To: <CAMRc=MejDn=t6EPbKOfhMfRAb_O-5hxtWRyjAWH1mb5BUySrDA@mail.gmail.com>
+References: <20180625155025.12567-1-brgl@bgdev.pl>
+ <20180625174024.GB17417@lunn.ch>
+ <CAMRc=MdEn74G5SJAaGLAfNSS7Zy7wqH04aN5CMZ45UXqhu_58g@mail.gmail.com>
+ <20180625180237.GC17417@lunn.ch>
+ <CAMRc=MejDn=t6EPbKOfhMfRAb_O-5hxtWRyjAWH1mb5BUySrDA@mail.gmail.com>
+Message-ID: <20180626083823.GA28068@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 26, 2018 at 10:19 AM Ard Biesheuvel
-<ard.biesheuvel@linaro.org> wrote:
-> On 26 June 2018 at 10:09, Linus Walleij <linus.walleij@linaro.org> wrote:
-> > On Mon, Jun 18, 2018 at 3:22 PM Ard Biesheuvel
-> > <ard.biesheuvel@linaro.org> wrote:
+On Tue, Jun 26, 2018 at 09:44:19AM +0200, Bartosz Golaszewski wrote:
+> 2018-06-25 20:02 GMT+02:00 Andrew Lunn <andrew@lunn.ch>:
+> >> With my patch 1/14 you'll get -EPROBE_DEFER from nvmem_cell_get() if
+> >> the nvmem provider is not yet registered. Will that help in your case?
 > >
-> >> We should also consider firmware use of the mezzanines. For instance,
-> >> the Secure96 has a RNG which UEFI may want to use so the early boot
-> >> code can access is for KASLR. It also has a TPM, which should not be
-> >> reset/reinitialized/etc by the OS if we want to make meaningful use of
-> >> it.
+> > I don't think so. My driver instantiates the AT24 device. So if i get
+> > -EPROBE_DEFER, i need to cleanup the probe, and return -EPROBDE_DEFER
+> > to the code. Which means i need to remove the AT24 device...
 > >
-> > This problem: sharing or dedicating a piece of hardware to UEFI or
-> > the TrustZone secure world is a generic problem not related to
-> > mezzanines or plug-in boards specifically.
-(...)
-> I agree that this is *also* a problem. But it is not what I was talking about.
->
-> My example is about peripherals that firmware and OS should both drive
-> natively, and in the TPM case, the OS should be mindful of the fact
-> that the measured state should be preserved.
+> >        Andrew
+> 
+> Are you sure this is the correct approach? I understand that you want
+> to use something like board files for your machine? Wouldn't it be
+> better to register a platform device for at24, register a cell lookup
+> and then depend on that cell from your driver?
 
-Ah I see.
+Hi Bartosz
 
-In that case this is something the TPM driver should be doing
-I guess? I mean it is a "firmware plus OS TPM driver"-specific
-problem.
+The machine is based around a Kontron Com Express module, with an
+intel Ivy Bridge CPU. This is then placed into a custom carrier board,
+which has a number of i2c devices.
 
-I guess that would be hard to duct-tape on if the peripheral
-is context-unaware and easy to do if the designer of the
-peripheral HW took multiple call-context into account.
-Whether TPM does this I don't know...
+I have a platform driver which matches on the DMI system ID for the
+Kontron module.
 
-> Also, it means that we
-> may be duplicating functionality between the OS and firmware [as
-> usual] so it might make sense to come up with something that takes
-> both use cases into account.
+The Com Express module has a PLD which implements i2c, gpio,
+etc. There is an MFD for this, which instantiates the i2c-kempld i2c
+bus driver.
 
-What we are doing now with Atmel's ECC chip is even worse:
-duplicating functionality between OS and userspace. So I'm
-trying to solve that first.
+My platform driver finds this i2c-kempld bus driver. If it does not
+exist yet, it return -EPROBE_DEFER. If it is found it instantiates an
+at24 device on it. I need to look at the content of the EEPROM to
+determine the hardware revision, plus do a checksum.  From that, i
+need to instantiates 1 or 2 additional AT24, up to 4 GPIO expanders,
+and i2c to spi converter, add some gpio-leds on the gpio expanders,
+create a bit-banging MDIO bus, instantiate an Ethernet switch on the
+MDIO bus, maybe add an Ethernet switch to the SPI bus, etc.
 
-Yours,
-Linus Walleij
+As you can see, i have a chain of events. I cannot move onto the next
+part of the chain until i know the probe for the previous part has
+finished. e.g. i cannot add gpio-leds until i know the gpio expander
+has probed. But the gpio expander provides a call back, similar to the
+at24 setup(). The MDIO bus and the SPI bus has a mechanism to register
+an info structure, just like you have done for NVMEM cells. So that
+works out.
+
+The weak link in this chain is that first at24 probe, and knowing when
+i can access the nvmem cells for the revision and checksum
+information. -EPROBE_DEFER does not help me here. I need either some
+sort of blocking wait for the cells to become available, or a callback
+in a context which allows me to instantiate more devices.
+
+I also have some steps which cannot be undone. You don't provide a
+mechanism to unregister the nvmem info structure. The I2C and MDIO
+equivalent also does not provide an unregister for bus info. So once i
+register the first info structure, i'm past the point of no return. I
+cannot return -EPROBE_DEFER because i cannot unregister the info
+structures, so that i can register them again the next time the
+platform driver gets probed.
+
+	 Andrew
