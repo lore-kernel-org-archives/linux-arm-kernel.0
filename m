@@ -1,65 +1,54 @@
-From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Tue, 26 Jun 2018 10:17:01 +0200
-Subject: [PATCH v2] arm64: dts: marvell: armada-37xx: reserve memory for ATF
-Message-ID: <20180626081701.27176-1-miquel.raynal@bootlin.com>
+From: hjc@rock-chips.com (Sandy Huang)
+Date: Tue, 26 Jun 2018 16:16:44 +0800
+Subject: [PATCH] drm/rockchip: vop: fixup linebuffer mode calc error
+Message-ID: <1530001004-25036-1-git-send-email-hjc@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Victor Gu <xigu@marvell.com>
+linebuffer mode should be LB_YUV_3840X5 when width is bigger
+than 1280 in yuv mode.
+seperate yuv and rgb case make the scl_vop_cal_lb_mode() logic
+is clearer.
 
-The PSCI area should be reserved in Linux for PSCI operations such as
-suspend/resume.
-
-Reserve 2MiB of memory which matches the area used by ATF (BL1, BL2,
-BL3x, see [1] in ATF source code). This covers all PSCI code and data
-area and is 2MiB aligned, which is required by Linux for huge pages
-handling.
-
-Please note that this is a default setup allowing to perform PSCI
-operations with legacy bootloaders. Recent bootloaders should update the
-region size/position accordingly.
-
-[1] plat/marvell/a3700/common/include/platform_def.h
-
-Signed-off-by: Victor Gu <xigu@marvell.com>
-[miquel.raynal at bootlin.com: reword of commit message, comment in the DTSI]
-Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+Signed-off-by: Sandy Huang <hjc@rock-chips.com>
+Link: https://patchwork.freedesktop.org/patch/msgid/1523960108-190541-1-git-send-email-hjc at rock-chips.com
 ---
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.h | 23 +++++++++++++----------
+ 1 file changed, 13 insertions(+), 10 deletions(-)
 
-Changes since v1:
-=================
-* Updated commit log to explain that this memory region should be
-  updated by recent bootloaders.
-* Added a comment to tell the same thing above the psci-area subnode.
-
- arch/arm64/boot/dts/marvell/armada-37xx.dtsi | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-index 3353252d78a0..d18a4a098d79 100644
---- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-@@ -22,6 +22,21 @@
- 		serial1 = &uart1;
- 	};
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.h b/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
+index 084acdd..fcb9104 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
+@@ -331,16 +331,19 @@ static inline int scl_vop_cal_lb_mode(int width, bool is_yuv)
+ {
+ 	int lb_mode;
  
-+	reserved-memory {
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		ranges;
-+
-+		/*
-+		 * The PSCI firmware region depicted below is the default one
-+		 * and should be updated by the bootloader.
-+		 */
-+		psci-area at 4000000 {
-+			reg = <0 0x4000000 0 0x200000>;
-+			no-map;
-+		};
-+	};
-+
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
+-	if (width > 2560)
+-		lb_mode = LB_RGB_3840X2;
+-	else if (width > 1920)
+-		lb_mode = LB_RGB_2560X4;
+-	else if (!is_yuv)
+-		lb_mode = LB_RGB_1920X5;
+-	else if (width > 1280)
+-		lb_mode = LB_YUV_3840X5;
+-	else
+-		lb_mode = LB_YUV_2560X8;
++	if (is_yuv) {
++		if (width > 1280)
++			lb_mode = LB_YUV_3840X5;
++		else
++			lb_mode = LB_YUV_2560X8;
++	} else {
++		if (width > 2560)
++			lb_mode = LB_RGB_3840X2;
++		else if (width > 1920)
++			lb_mode = LB_RGB_2560X4;
++		else
++			lb_mode = LB_RGB_1920X5;
++	}
+ 
+ 	return lb_mode;
+ }
 -- 
-2.14.1
+2.7.4
