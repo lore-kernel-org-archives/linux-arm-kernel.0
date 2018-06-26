@@ -1,77 +1,92 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 26 Jun 2018 16:11:52 +0100 (BST)
-Subject: Applied "ASoC: q6asm: dt-bindings: add compatible string to dais" to
- the asoc tree
-In-Reply-To: <20180625143115.8346-3-srinivas.kandagatla@linaro.org>
-Message-ID: <20180626151152.E2B77440070@finisterre.ee.mobilebroadband>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 26 Jun 2018 16:14:27 +0100
+Subject: [PATCH 3/3] rseq/selftests: Add support for arm64
+In-Reply-To: <501929863.3051.1529950210436.JavaMail.zimbra@efficios.com>
+References: <1529949285-11013-1-git-send-email-will.deacon@arm.com>
+ <1529949285-11013-4-git-send-email-will.deacon@arm.com>
+ <501929863.3051.1529950210436.JavaMail.zimbra@efficios.com>
+Message-ID: <20180626151427.GF23375@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+Hi Mathieu,
 
-   ASoC: q6asm: dt-bindings: add compatible string to dais
+On Mon, Jun 25, 2018 at 02:10:10PM -0400, Mathieu Desnoyers wrote:
+> ----- On Jun 25, 2018, at 1:54 PM, Will Deacon will.deacon at arm.com wrote:
+> > +#define __RSEQ_ASM_DEFINE_TABLE(label, version, flags, start_ip,		\
+> > +				post_commit_offset, abort_ip)			\
+> > +	"	.pushsection	__rseq_table, \"aw\"\n"				\
+> > +	"	.balign	32\n"							\
+> > +	__rseq_str(label) ":\n"							\
+> > +	"	.long	" __rseq_str(version) ", " __rseq_str(flags) "\n"	\
+> > +	"	.quad	" __rseq_str(start_ip) ", "				\
+> > +			  __rseq_str(post_commit_offset) ", "			\
+> > +			  __rseq_str(abort_ip) "\n"				\
+> > +	"	.popsection\n"
+> > +
+> > +#define RSEQ_ASM_DEFINE_TABLE(label, start_ip, post_commit_ip, abort_ip)	\
+> > +	__RSEQ_ASM_DEFINE_TABLE(label, 0x0, 0x0, start_ip,			\
+> > +				(post_commit_ip - start_ip), abort_ip)
+> > +
+> > +#define RSEQ_ASM_STORE_RSEQ_CS(label, cs_label, rseq_cs)			\
+> > +	RSEQ_INJECT_ASM(1)							\
+> > +	"	adrp	" RSEQ_ASM_TMP_REG ", " __rseq_str(cs_label) "\n"	\
+> > +	"	add	" RSEQ_ASM_TMP_REG ", " RSEQ_ASM_TMP_REG		\
+> > +			", :lo12:" __rseq_str(cs_label) "\n"			\
+> > +	"	str	" RSEQ_ASM_TMP_REG ", %[" __rseq_str(rseq_cs) "]\n"	\
+> > +	__rseq_str(label) ":\n"
+> > +
+> > +#define RSEQ_ASM_DEFINE_ABORT(label, abort_label)				\
+> > +	"	.pushsection	__rseq_failure, \"ax\"\n"			\
+> > +	"	.long 	"	__rseq_str(RSEQ_SIG) "\n"			\
+> > +	__rseq_str(label) ":\n"							\
+> > +	"	b	%l[" __rseq_str(abort_label) "]\n"			\
+> > +	"	.popsection\n"
+> 
+> Thanks Will for porting rseq to arm64 !
 
-has been applied to the asoc tree at
+That's ok, it was good fun :)
 
-   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+I'm going to chat with our compiler guys to see if there's any room for
+improving the flexibility in the critical section, since having a temporary
+in the clobber list is pretty grotty.
 
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
+> I notice you are using the instructions
+> 
+>   adrp
+>   add
+>   str
+> 
+> to implement RSEQ_ASM_STORE_RSEQ_CS(). Did you compare
+> performance-wise with an approach using a literal pool
+> near the instruction pointer like I did on arm32 ?
 
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
+I didn't, no. Do you have a benchmark to hand so I can give this a go?
+The two reasons I didn't go down this route are:
 
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
+1. It introduces data which is mapped as executable. I don't have a
+   specific security concern here, but the way things have gone so far
+   this year, I've realised that I'm not bright enough to anticipate
+   these things.
 
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
+2. It introduces a branch over the table on the fast path, which is likely
+   to have a relatively higher branch misprediction cost on more advanced
+   CPUs.
 
-Thanks,
-Mark
+I also find it grotty that we emit two tables so that debuggers can cope,
+but that's just a cosmetic nit.
 
->From 9618b706672db1b595c7076389a833078335417c Mon Sep 17 00:00:00 2001
-From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-Date: Tue, 26 Jun 2018 10:20:06 +0100
-Subject: [PATCH] ASoC: q6asm: dt-bindings: add compatible string to dais
+> With that approach, this ends up being simply
+> 
+>   adr
+>   str
+> 
+> which provides significantly better performance on my test
+> platform over loading a pointer targeting a separate data
+> section.
 
-Add compatible string to dais so that it can support DT based module
-autoloading.
+My understanding is that your test platform is based on Cortex-A7, so I'd
+be wary about concluding too much about general performance from that CPU
+since its a pretty straightforward in-order design.
 
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-Acked-by: Niklas Cassel <niklas.cassel@linaro.org>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- Documentation/devicetree/bindings/sound/qcom,q6asm.txt | 6 ++++++
- 1 file changed, 6 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/sound/qcom,q6asm.txt b/Documentation/devicetree/bindings/sound/qcom,q6asm.txt
-index 2178eb91146f..f9c7bd8c1bc0 100644
---- a/Documentation/devicetree/bindings/sound/qcom,q6asm.txt
-+++ b/Documentation/devicetree/bindings/sound/qcom,q6asm.txt
-@@ -17,6 +17,11 @@ used by the apr service device.
- = ASM DAIs (Digial Audio Interface)
- "dais" subnode of the ASM node represents dai specific configuration
- 
-+- compatible:
-+	Usage: required
-+	Value type: <stringlist>
-+	Definition: must be "qcom,q6asm-dais".
-+
- - #sound-dai-cells
- 	Usage: required
- 	Value type: <u32>
-@@ -28,6 +33,7 @@ q6asm at 7 {
- 	compatible = "qcom,q6asm";
- 	reg = <APR_SVC_ASM>;
- 	q6asmdai: dais {
-+		compatible = "qcom,q6asm-dais";
- 		#sound-dai-cells = <1>;
- 	};
- };
--- 
-2.17.1
+Will
