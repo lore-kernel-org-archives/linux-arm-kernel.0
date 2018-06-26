@@ -1,48 +1,113 @@
-From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Tue, 26 Jun 2018 11:41:56 +0530
-Subject: [PATCH 0/4] media: sun6i: Add support for the H3 CSI controller
-In-Reply-To: <20180305100432.15009-1-maxime.ripard@bootlin.com>
-References: <20180305100432.15009-1-maxime.ripard@bootlin.com>
-Message-ID: <CAMty3ZBQXyvOnzy_9RLDW-QO9qnAC4SR5UJnWYmhiPrP23z_vg@mail.gmail.com>
+From: Anson.Huang@nxp.com (Anson Huang)
+Date: Tue, 26 Jun 2018 14:08:03 +0800
+Subject: [PATCH] ARM: dts: make pfuze switch always-on for imx platforms
+Message-ID: <1529993283-32396-1-git-send-email-Anson.Huang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 5, 2018 at 3:34 PM, Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> Hi,
->
-> The H3 and H5 have a CSI controller based on the one previously found
-> in the A31, that is currently supported by the sun6i-csi driver.
->
-> Add the compatibles to the device tree bindings and to the driver to
-> make it work properly.
->
-> This obviously depends on the serie "Initial Allwinner V3s CSI
-> Support" by Yong Deng.
->
-> Let me know what you think,
-> Maxime
->
-> Maxime Ripard (2):
->   dt-bindings: media: sun6i: Add A31 and H3 compatibles
->   media: sun6i: Add A31 compatible
->
-> Myl?ne Josserand (2):
->   ARM: dts: sun8i: Add the H3/H5 CSI controller
->   [DO NOT MERGE] ARM: dts: sun8i: Add CAM500B camera module to the Nano
->     Pi M1+
+commit (5fe156f regulator: pfuze100: add enable/disable
+for switch) will cause those unreferenced switches being
+turned off if "regulator-always-on" is NOT present, as
+pfuze switches are normally used by critical modules which
+must be always ON or shared by many peripherals which
+do NOT implement power domain control, so just make sure
+all switches always ON to avoid any system issue caused
+by unexpectedly turning off switches.
 
-Just trying to understand what interface has been tested with npi-m1+,
-is it DVP (parallel) interface? I've Bananapi 5MP[1] and trying to
-test on top, and look like its MIPI CSI2. I guess Yong patch[2]
-doesn't support CSI2 yet, am I correct?
+Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+---
+ arch/arm/boot/dts/imx6q-display5.dtsi  | 1 +
+ arch/arm/boot/dts/imx6q-mccmon6.dts    | 1 +
+ arch/arm/boot/dts/imx6q-novena.dts     | 1 +
+ arch/arm/boot/dts/imx6q-pistachio.dts  | 1 +
+ arch/arm/boot/dts/imx6qdl-gw54xx.dtsi  | 1 +
+ arch/arm/boot/dts/imx6qdl-sabresd.dtsi | 1 +
+ arch/arm/boot/dts/imx6sx-sdb-reva.dts  | 1 +
+ 7 files changed, 7 insertions(+)
 
-[1] https://www.amazon.in/Generic-V3-0-BPI-M3-camera-chipset/dp/B0727N5CD1
-[2] https://patchwork.kernel.org/patch/10380067/
-
-Jagan.
-
+diff --git a/arch/arm/boot/dts/imx6q-display5.dtsi b/arch/arm/boot/dts/imx6q-display5.dtsi
+index 85232c7..33d266f 100644
+--- a/arch/arm/boot/dts/imx6q-display5.dtsi
++++ b/arch/arm/boot/dts/imx6q-display5.dtsi
+@@ -326,6 +326,7 @@
+ 			sw4_reg: sw4 {
+ 				regulator-min-microvolt = <800000>;
+ 				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
+ 			};
+ 
+ 			swbst_reg: swbst {
+diff --git a/arch/arm/boot/dts/imx6q-mccmon6.dts b/arch/arm/boot/dts/imx6q-mccmon6.dts
+index b7e9f38..e6429c5 100644
+--- a/arch/arm/boot/dts/imx6q-mccmon6.dts
++++ b/arch/arm/boot/dts/imx6q-mccmon6.dts
+@@ -166,6 +166,7 @@
+ 			sw4_reg: sw4 {
+ 				regulator-min-microvolt = <800000>;
+ 				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
+ 			};
+ 
+ 			swbst_reg: swbst {
+diff --git a/arch/arm/boot/dts/imx6q-novena.dts b/arch/arm/boot/dts/imx6q-novena.dts
+index fcd824d..0b3c651 100644
+--- a/arch/arm/boot/dts/imx6q-novena.dts
++++ b/arch/arm/boot/dts/imx6q-novena.dts
+@@ -341,6 +341,7 @@
+ 			reg_sw4: sw4 {
+ 				regulator-min-microvolt = <800000>;
+ 				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
+ 			};
+ 
+ 			reg_swbst: swbst {
+diff --git a/arch/arm/boot/dts/imx6q-pistachio.dts b/arch/arm/boot/dts/imx6q-pistachio.dts
+index a31e83c..6ea09f9 100644
+--- a/arch/arm/boot/dts/imx6q-pistachio.dts
++++ b/arch/arm/boot/dts/imx6q-pistachio.dts
+@@ -253,6 +253,7 @@
+ 			sw4_reg: sw4 {
+ 				regulator-min-microvolt = <800000>;
+ 				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
+ 			};
+ 
+ 			swbst_reg: swbst {
+diff --git a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
+index a1a6fb5..281cae5 100644
+--- a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
+@@ -268,6 +268,7 @@
+ 			sw4_reg: sw4 {
+ 				regulator-min-microvolt = <800000>;
+ 				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
+ 			};
+ 
+ 			swbst_reg: swbst {
+diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+index 15744ad..6e46a19 100644
+--- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+@@ -341,6 +341,7 @@
+ 			sw4_reg: sw4 {
+ 				regulator-min-microvolt = <800000>;
+ 				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
+ 			};
+ 
+ 			swbst_reg: swbst {
+diff --git a/arch/arm/boot/dts/imx6sx-sdb-reva.dts b/arch/arm/boot/dts/imx6sx-sdb-reva.dts
+index e3533e7..9cc6ff2 100644
+--- a/arch/arm/boot/dts/imx6sx-sdb-reva.dts
++++ b/arch/arm/boot/dts/imx6sx-sdb-reva.dts
+@@ -63,6 +63,7 @@
+ 			sw4_reg: sw4 {
+ 				regulator-min-microvolt = <800000>;
+ 				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
+ 			};
+ 
+ 			swbst_reg: swbst {
 -- 
-Jagan Teki
-Senior Linux Kernel Engineer | Amarula Solutions
-U-Boot, Linux | Upstream Maintainer
-Hyderabad, India.
+2.7.4
