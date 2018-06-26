@@ -1,56 +1,33 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue, 26 Jun 2018 11:37:36 +0900
-Subject: [PATCH v2 00/10] Split i2c_lock_adapter into i2c_lock_root and
- i2c_lock_segment
-In-Reply-To: <20180620051803.12206-1-peda@axentia.se>
-References: <20180620051803.12206-1-peda@axentia.se>
-Message-ID: <20180626023735.xj7aqhvw7ta2lq6s@ninjato>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 26 Jun 2018 11:17:30 +0800
+Subject: [PATCH 2/2] arm64: allwinner: a64: allow laptops to wake up from
+ lid
+In-Reply-To: <20180625170913.p335obgr3rfa4skt@flea>
+References: <20180622160631.8578-1-icenowy@aosc.io>
+ <20180622160631.8578-2-icenowy@aosc.io>
+ <20180625170913.p335obgr3rfa4skt@flea>
+Message-ID: <CAGb2v65HJKm3UhA1bPZxg7+KL_FAHO+LDx4ijzXasS-K0UGUXQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 20, 2018 at 07:17:53AM +0200, Peter Rosin wrote:
-> Hi!
-> 
-> With the introduction of mux-locked I2C muxes, the concept of
-> locking only a segment of the I2C adapter tree was added. At the
-> time, I did not want to cause a lot of extra churn, so left most
-> users of i2c_lock_adapter alone and apparently didn't think enough
-> about it; they simply continued to lock the whole adapter tree.
-> However, i2c_lock_adapter is in fact wrong for almost every caller
-> (there is naturally an exception) that is itself not a driver for
-> a root adapter. What normal drivers generally want is to only
-> lock the segment of the adapter tree that their device sits on.
-> 
-> In fact, if a device sits behind a mux-locked I2C mux, and its
-> driver calls i2c_lock_adapter followed by an unlocked I2C transfer,
-> things will deadlock (since even a mux-locked I2C adapter will lock
-> its parent at some point). If the device is not sitting behind a
-> mux-locked I2C mux (i.e. either directly on the root adapter or
-> behind a (chain of) parent-locked I2C muxes) the root/segment
-> distinction is of no consequence; the root adapter is locked either
-> way.
-> 
-> Mux-locked I2C muxes are probably not that common, and putting any
-> of the affected devices behind one is probably even rarer, which
-> is why we have not seen any deadlocks. At least not that I know
-> of...
-> 
-> Since silently changing the semantics of i2c_lock_adapter might
-> be quite a surprise, especially for out-of-tree users, this series
-> instead removes the function and forces all users to explicitly
-> name I2C_LOCK_SEGMENT or I2C_LOCK_ROOT_ADAPTER in a call to
-> i2c_lock_bus, as suggested by Wolfram. Yes, users will be a teensy
-> bit more wordy, but open-coding I2C locking from random drivers
-> should be avoided, so it's perhaps a good thing if it doesn't look
-> too neat?
-> 
-> I suggest that Wolfram takes this series through the I2C tree and
-> creates an immutable branch for the other subsystems. The series
-> is based on v4.18-r1.
+On Tue, Jun 26, 2018 at 1:09 AM, Maxime Ripard
+<maxime.ripard@bootlin.com> wrote:
+> On Sat, Jun 23, 2018 at 12:06:31AM +0800, Icenowy Zheng wrote:
+>> Currently all ARM kernels will have s2idle enabled if CONFIG_SUSPEND is
+>> present. In this case if the lid is closed, systemd-logind will enter
+>> s2idle mode by default; however there's no possible wakeup source
+>> defined, so the system will enter a forever idle.
+>>
+>> Add the lid itself as a wakeup source, thus the system can wakeup when
+>> the lid is opened.
+>>
+>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+>
+> Applied both, thanks!
+> Maxime
 
-Applied to a seperate branch named "i2c/precise-locking-names" which I
-will merge into for-next, so it will get proper testing already. Once we
-get the missing acks from media, MFD, and IIO maintainers, I will merge
-it into for-4.19.
+Icenowy, could you also look into having the power button as a wakeup source?
+It has no device node, so you might have to look at how to implement it in
+the driver.
 
-Thank you, Peter!
+ChenYu
