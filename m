@@ -1,75 +1,124 @@
 From: james.morse@arm.com (James Morse)
-Date: Tue, 26 Jun 2018 18:01:15 +0100
-Subject: [PATCH v5 19/20] mm/memory-failure: increase queued recovery work's
- priority
+Date: Tue, 26 Jun 2018 18:01:10 +0100
+Subject: [PATCH v5 14/20] ACPI / APEI: Split ghes_read_estatus() to read CPER
+ length
 In-Reply-To: <20180626170116.25825-1-james.morse@arm.com>
 References: <20180626170116.25825-1-james.morse@arm.com>
-Message-ID: <20180626170116.25825-20-james.morse@arm.com>
+Message-ID: <20180626170116.25825-15-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arm64 can take an NMI-like error notification when user-space steps in
-some corrupt memory. APEI's GHES code will call memory_failure_queue()
-to schedule the recovery work. We then return to user-space, possibly
-taking the fault again.
+ghes_read_estatus() reads the record address, then the record's
+header, then performs some sanity checks before reading the
+records into the provided estatus buffer.
 
-Currently the arch code unconditionally signals user-space from this
-path, so we don't get stuck in this loop, but the affected process
-never benefits from memory_failure()s recovery work. To fix this we
-need to know the recovery work will run before we get back to user-space.
+We either need to know the size of the records before we call
+ghes_read_estatus(), or always provide a worst-case sized buffer,
+as happens today.
 
-Increase the priority of the recovery work by scheduling it on the
-system_highpri_wq, then try to bump the current task off this CPU
-so that the recovery work starts immediately.
+Add a function to peek at the record's header to find the size. This
+will let the NMI path allocate the right amount of memory before reading
+the records, instead of using the worst-case size, and having to copy
+the records.
 
-Reported-by: Xie XiuQi <xiexiuqi@huawei.com>
+Split ghes_read_estatus() to create ghes_peek_estatus() which
+returns the address and size of the CPER records.
+
 Signed-off-by: James Morse <james.morse@arm.com>
-Reviewed-by: Punit Agrawal <punit.agrawal@arm.com>
-Tested-by: Tyler Baicar <tbaicar@codeaurora.org>
-Tested-by: gengdongjiu <gengdongjiu@huawei.com>
-CC: Xie XiuQi <xiexiuqi@huawei.com>
-CC: gengdongjiu <gengdongjiu@huawei.com>
 ---
- mm/memory-failure.c | 11 ++++++++---
- 1 file changed, 8 insertions(+), 3 deletions(-)
+ drivers/acpi/apei/ghes.c | 55 ++++++++++++++++++++++++++++++----------
+ 1 file changed, 41 insertions(+), 14 deletions(-)
 
-diff --git a/mm/memory-failure.c b/mm/memory-failure.c
-index 9d142b9b86dc..f0e69d7ac406 100644
---- a/mm/memory-failure.c
-+++ b/mm/memory-failure.c
-@@ -55,6 +55,7 @@
- #include <linux/hugetlb.h>
- #include <linux/memory_hotplug.h>
- #include <linux/mm_inline.h>
-+#include <linux/preempt.h>
- #include <linux/kfifo.h>
- #include <linux/ratelimit.h>
- #include "internal.h"
-@@ -1333,6 +1334,7 @@ static DEFINE_PER_CPU(struct memory_failure_cpu, memory_failure_cpu);
-  */
- void memory_failure_queue(unsigned long pfn, int flags)
- {
-+	int cpu = smp_processor_id();
- 	struct memory_failure_cpu *mf_cpu;
- 	unsigned long proc_flags;
- 	struct memory_failure_entry entry = {
-@@ -1342,11 +1344,14 @@ void memory_failure_queue(unsigned long pfn, int flags)
- 
- 	mf_cpu = &get_cpu_var(memory_failure_cpu);
- 	spin_lock_irqsave(&mf_cpu->lock, proc_flags);
--	if (kfifo_put(&mf_cpu->fifo, entry))
--		schedule_work_on(smp_processor_id(), &mf_cpu->work);
--	else
-+	if (kfifo_put(&mf_cpu->fifo, entry)) {
-+		queue_work_on(cpu, system_highpri_wq, &mf_cpu->work);
-+		set_tsk_need_resched(current);
-+		preempt_set_need_resched();
-+	} else {
- 		pr_err("Memory failure: buffer overflow when queuing memory failure at %#lx\n",
- 		       pfn);
-+	}
- 	spin_unlock_irqrestore(&mf_cpu->lock, proc_flags);
- 	put_cpu_var(memory_failure_cpu);
+diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
+index 75360525935d..1d59d85b38d2 100644
+--- a/drivers/acpi/apei/ghes.c
++++ b/drivers/acpi/apei/ghes.c
+@@ -289,11 +289,12 @@ static void ghes_copy_tofrom_phys(void *buffer, phys_addr_t paddr, u32 len,
+ 	}
  }
+ 
+-static int ghes_read_estatus(struct ghes *ghes,
+-			     struct acpi_hest_generic_status *estatus,
+-			     phys_addr_t *buf_paddr, int fixmap_idx)
++/* read the CPER block returning its address and size */
++static int ghes_peek_estatus(struct ghes *ghes, int fixmap_idx,
++			     phys_addr_t *buf_paddr, u32 *buf_len)
+ {
+ 	struct acpi_hest_generic *g = ghes->generic;
++	struct acpi_hest_generic_status estatus;
+ 	u32 len;
+ 	int rc;
+ 
+@@ -308,26 +309,23 @@ static int ghes_read_estatus(struct ghes *ghes,
+ 	if (!*buf_paddr)
+ 		return -ENOENT;
+ 
+-	ghes_copy_tofrom_phys(estatus, *buf_paddr,
+-			      sizeof(*estatus), 1, fixmap_idx);
+-	if (!estatus->block_status) {
++	ghes_copy_tofrom_phys(&estatus, *buf_paddr,
++			      sizeof(estatus), 1, fixmap_idx);
++	if (!estatus.block_status) {
+ 		*buf_paddr = 0;
+ 		return -ENOENT;
+ 	}
+ 
+ 	rc = -EIO;
+-	len = cper_estatus_len(estatus);
+-	if (len < sizeof(*estatus))
++	len = cper_estatus_len(&estatus);
++	if (len < sizeof(estatus))
+ 		goto err_read_block;
+ 	if (len > ghes->generic->error_block_length)
+ 		goto err_read_block;
+-	if (cper_estatus_check_header(estatus))
+-		goto err_read_block;
+-	ghes_copy_tofrom_phys(estatus + 1,
+-			      *buf_paddr + sizeof(*estatus),
+-			      len - sizeof(*estatus), 1, fixmap_idx);
+-	if (cper_estatus_check(estatus))
++	if (cper_estatus_check_header(&estatus))
+ 		goto err_read_block;
++	*buf_len = len;
++
+ 	rc = 0;
+ 
+ err_read_block:
+@@ -337,6 +335,35 @@ static int ghes_read_estatus(struct ghes *ghes,
+ 	return rc;
+ }
+ 
++static int __ghes_read_estatus(struct acpi_hest_generic_status *estatus,
++			       phys_addr_t buf_paddr, size_t buf_len,
++			       int fixmap_idx)
++{
++	ghes_copy_tofrom_phys(estatus, buf_paddr, buf_len, 1, fixmap_idx);
++	if (cper_estatus_check(estatus)) {
++		if (printk_ratelimit())
++			pr_warning(FW_WARN GHES_PFX
++				   "Failed to read error status block!\n");
++		return -EIO;
++	}
++
++	return 0;
++}
++
++static int ghes_read_estatus(struct ghes *ghes,
++			     struct acpi_hest_generic_status *estatus,
++			     phys_addr_t *buf_paddr, int fixmap_idx)
++{
++	int rc;
++	u32 buf_len;
++
++	rc = ghes_peek_estatus(ghes, fixmap_idx, buf_paddr, &buf_len);
++	if (rc)
++		return rc;
++
++	return __ghes_read_estatus(estatus, *buf_paddr, buf_len, fixmap_idx);
++}
++
+ static void ghes_clear_estatus(struct acpi_hest_generic_status *estatus,
+ 			       phys_addr_t buf_paddr, int fixmap_idx)
+ {
 -- 
 2.17.1
