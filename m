@@ -1,39 +1,33 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Tue, 26 Jun 2018 10:44:32 +0200
-Subject: [PATCH 3/3] ARM: multi_v7_defconfig: enable STM32 SPI
-In-Reply-To: <1526566904-24514-4-git-send-email-amelie.delaunay@st.com>
-References: <1526566904-24514-1-git-send-email-amelie.delaunay@st.com>
- <1526566904-24514-4-git-send-email-amelie.delaunay@st.com>
-Message-ID: <e3bd3097-fbde-b790-e2b3-d78fb34b849d@st.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 26 Jun 2018 10:45:11 +0200 (CEST)
+Subject: [PATCH v3 0/3] fix free pmd/pte page handlings on x86
+In-Reply-To: <20180626063521.GT28965@dhcp22.suse.cz>
+References: <20180516233207.1580-1-toshi.kani@hpe.com>
+ <alpine.DEB.2.21.1806241516410.8650@nanos.tec.linutronix.de>
+ <1529938470.14039.134.camel@hpe.com> <20180625175225.GQ28965@dhcp22.suse.cz>
+ <1529961187.14039.206.camel@hpe.com>
+ <20180626063521.GT28965@dhcp22.suse.cz>
+Message-ID: <alpine.DEB.2.21.1806261043080.2204@nanos.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Am?lie
-
-On 05/17/2018 04:21 PM, Amelie Delaunay wrote:
-> Enable the STM32 SPI driver, implemented on STM32MP1 SoC.
+On Tue, 26 Jun 2018, Michal Hocko wrote:
+> On Mon 25-06-18 21:15:03, Kani Toshimitsu wrote:
+> > Lastly, for the code maintenance, I believe this memory allocation keeps
+> > the code much simpler than it would otherwise need to manage a special
+> > page list.
 > 
-> Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
-> ---
->   arch/arm/configs/multi_v7_defconfig | 1 +
->   1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-> index 89167cd..f990335 100644
-> --- a/arch/arm/configs/multi_v7_defconfig
-> +++ b/arch/arm/configs/multi_v7_defconfig
-> @@ -411,6 +411,7 @@ CONFIG_SPI_S3C64XX=m
->   CONFIG_SPI_SH_MSIOF=m
->   CONFIG_SPI_SH_HSPI=y
->   CONFIG_SPI_SIRF=y
-> +CONFIG_SPI_STM32=y
->   CONFIG_SPI_SUN4I=y
->   CONFIG_SPI_SUN6I=y
->   CONFIG_SPI_TEGRA114=y
-> 
+> Yes, I can see a simplicity as a reasonable argument for a quick fix,
+> which these pile is supposed to be AFAIU. So this might be good to go
+> from that perspective, but I believe that this should be changed in
+> future at least.
 
-Driver which are are not "vital" to boot STM32 platform should be 
-defined as module. It's the case for this one. Isn't ?
+So the conclusion is, that we ship this set of patches now to cure the
+existing wreckage, right?
 
-Regards
-Alex
+Fine with that, but who will take care of reworking it proper? I'm
+concerned that this will just go stale the moment the fixes hit the tree.
+
+Thanks,
+
+	tglx
