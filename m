@@ -1,75 +1,39 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 26 Jun 2018 10:38:23 +0200
-Subject: [PATCH 00/14] ARM: davinci: step towards removing
- at24_platform_data
-In-Reply-To: <CAMRc=MejDn=t6EPbKOfhMfRAb_O-5hxtWRyjAWH1mb5BUySrDA@mail.gmail.com>
-References: <20180625155025.12567-1-brgl@bgdev.pl>
- <20180625174024.GB17417@lunn.ch>
- <CAMRc=MdEn74G5SJAaGLAfNSS7Zy7wqH04aN5CMZ45UXqhu_58g@mail.gmail.com>
- <20180625180237.GC17417@lunn.ch>
- <CAMRc=MejDn=t6EPbKOfhMfRAb_O-5hxtWRyjAWH1mb5BUySrDA@mail.gmail.com>
-Message-ID: <20180626083823.GA28068@lunn.ch>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Tue, 26 Jun 2018 10:44:32 +0200
+Subject: [PATCH 3/3] ARM: multi_v7_defconfig: enable STM32 SPI
+In-Reply-To: <1526566904-24514-4-git-send-email-amelie.delaunay@st.com>
+References: <1526566904-24514-1-git-send-email-amelie.delaunay@st.com>
+ <1526566904-24514-4-git-send-email-amelie.delaunay@st.com>
+Message-ID: <e3bd3097-fbde-b790-e2b3-d78fb34b849d@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 26, 2018 at 09:44:19AM +0200, Bartosz Golaszewski wrote:
-> 2018-06-25 20:02 GMT+02:00 Andrew Lunn <andrew@lunn.ch>:
-> >> With my patch 1/14 you'll get -EPROBE_DEFER from nvmem_cell_get() if
-> >> the nvmem provider is not yet registered. Will that help in your case?
-> >
-> > I don't think so. My driver instantiates the AT24 device. So if i get
-> > -EPROBE_DEFER, i need to cleanup the probe, and return -EPROBDE_DEFER
-> > to the code. Which means i need to remove the AT24 device...
-> >
-> >        Andrew
+Hi Am?lie
+
+On 05/17/2018 04:21 PM, Amelie Delaunay wrote:
+> Enable the STM32 SPI driver, implemented on STM32MP1 SoC.
 > 
-> Are you sure this is the correct approach? I understand that you want
-> to use something like board files for your machine? Wouldn't it be
-> better to register a platform device for at24, register a cell lookup
-> and then depend on that cell from your driver?
+> Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
+> ---
+>   arch/arm/configs/multi_v7_defconfig | 1 +
+>   1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+> index 89167cd..f990335 100644
+> --- a/arch/arm/configs/multi_v7_defconfig
+> +++ b/arch/arm/configs/multi_v7_defconfig
+> @@ -411,6 +411,7 @@ CONFIG_SPI_S3C64XX=m
+>   CONFIG_SPI_SH_MSIOF=m
+>   CONFIG_SPI_SH_HSPI=y
+>   CONFIG_SPI_SIRF=y
+> +CONFIG_SPI_STM32=y
+>   CONFIG_SPI_SUN4I=y
+>   CONFIG_SPI_SUN6I=y
+>   CONFIG_SPI_TEGRA114=y
+> 
 
-Hi Bartosz
+Driver which are are not "vital" to boot STM32 platform should be 
+defined as module. It's the case for this one. Isn't ?
 
-The machine is based around a Kontron Com Express module, with an
-intel Ivy Bridge CPU. This is then placed into a custom carrier board,
-which has a number of i2c devices.
-
-I have a platform driver which matches on the DMI system ID for the
-Kontron module.
-
-The Com Express module has a PLD which implements i2c, gpio,
-etc. There is an MFD for this, which instantiates the i2c-kempld i2c
-bus driver.
-
-My platform driver finds this i2c-kempld bus driver. If it does not
-exist yet, it return -EPROBE_DEFER. If it is found it instantiates an
-at24 device on it. I need to look at the content of the EEPROM to
-determine the hardware revision, plus do a checksum.  From that, i
-need to instantiates 1 or 2 additional AT24, up to 4 GPIO expanders,
-and i2c to spi converter, add some gpio-leds on the gpio expanders,
-create a bit-banging MDIO bus, instantiate an Ethernet switch on the
-MDIO bus, maybe add an Ethernet switch to the SPI bus, etc.
-
-As you can see, i have a chain of events. I cannot move onto the next
-part of the chain until i know the probe for the previous part has
-finished. e.g. i cannot add gpio-leds until i know the gpio expander
-has probed. But the gpio expander provides a call back, similar to the
-at24 setup(). The MDIO bus and the SPI bus has a mechanism to register
-an info structure, just like you have done for NVMEM cells. So that
-works out.
-
-The weak link in this chain is that first at24 probe, and knowing when
-i can access the nvmem cells for the revision and checksum
-information. -EPROBE_DEFER does not help me here. I need either some
-sort of blocking wait for the cells to become available, or a callback
-in a context which allows me to instantiate more devices.
-
-I also have some steps which cannot be undone. You don't provide a
-mechanism to unregister the nvmem info structure. The I2C and MDIO
-equivalent also does not provide an unregister for bus info. So once i
-register the first info structure, i'm past the point of no return. I
-cannot return -EPROBE_DEFER because i cannot unregister the info
-structures, so that i can register them again the next time the
-platform driver gets probed.
-
-	 Andrew
+Regards
+Alex
