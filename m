@@ -1,37 +1,55 @@
-From: jmorris@namei.org (James Morris)
-Date: Wed, 27 Jun 2018 05:13:31 +1000 (AEST)
-Subject: [PATCH v9 4/6] init: allow initcall tables to be emitted using
- relative references
-In-Reply-To: <20180626182802.19932-5-ard.biesheuvel@linaro.org>
-References: <20180626182802.19932-1-ard.biesheuvel@linaro.org>
- <20180626182802.19932-5-ard.biesheuvel@linaro.org>
-Message-ID: <alpine.LRH.2.21.1806270513020.18107@namei.org>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 26 Jun 2018 21:22:52 +0200
+Subject: [PATCH v5 1/7] tty: serial: imx: correct dma cookie status
+In-Reply-To: <1529427424-12321-2-git-send-email-yibin.gong@nxp.com>
+References: <1529427424-12321-1-git-send-email-yibin.gong@nxp.com>
+ <1529427424-12321-2-git-send-email-yibin.gong@nxp.com>
+Message-ID: <20180626192252.6qdpwzpbpn6s5sd3@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 26 Jun 2018, Ard Biesheuvel wrote:
-
-> Allow the initcall tables to be emitted using relative references that
-> are only half the size on 64-bit architectures and don't require fixups
-> at runtime on relocatable kernels.
+On Wed, Jun 20, 2018 at 12:56:58AM +0800, Robin Gong wrote:
+> Correct to check the right rx dma cookie status in spit of it
+> works because only one cookie is running in the current sdma.
+> But it will not once sdma driver support multi cookies
+> running based on virt-dma.
 > 
-> Cc: Petr Mladek <pmladek@suse.com>
-> Cc: Sergey Senozhatsky <sergey.senozhatsky@gmail.com>
-> Cc: Steven Rostedt <rostedt@goodmis.org>
-> Cc: James Morris <jmorris@namei.org>
-> Cc: "Serge E. Hallyn" <serge@hallyn.com>
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Signed-off-by: Robin Gong <yibin.gong@nxp.com>
+Looks wrong (because of tx_status vs rx_cookie), but is right
+nevertheless I think:
+
+Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+
+Thanks
+Uwe
+
 > ---
->  include/linux/init.h   | 44 +++++++++++++++-----
->  init/main.c            | 32 +++++++-------
->  kernel/printk/printk.c | 16 +++----
->  security/security.c    | 17 ++++----
->  4 files changed, 68 insertions(+), 41 deletions(-)
-
-
-Acked-by: James Morris <james.morris@microsoft.com>
-
+>  drivers/tty/serial/imx.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+> index 4e85357..2879407 100644
+> --- a/drivers/tty/serial/imx.c
+> +++ b/drivers/tty/serial/imx.c
+> @@ -1051,7 +1051,7 @@ static void imx_uart_dma_rx_callback(void *data)
+>  	unsigned int r_bytes;
+>  	unsigned int bd_size;
+>  
+> -	status = dmaengine_tx_status(chan, (dma_cookie_t)0, &state);
+> +	status = dmaengine_tx_status(chan, sport->rx_cookie, &state);
+>  
+>  	if (status == DMA_ERROR) {
+>  		imx_uart_clear_rx_errors(sport);
+> -- 
+> 2.7.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
 
 -- 
-James Morris
-<jmorris@namei.org>
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
