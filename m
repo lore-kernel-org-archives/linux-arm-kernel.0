@@ -1,102 +1,101 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Tue, 26 Jun 2018 11:25:33 +0200
-Subject: [PATCH v2 09/13] ARM: davinci: dm644x-evm: use aemif platform driver
+Date: Tue, 26 Jun 2018 11:25:36 +0200
+Subject: [PATCH v2 12/13] ARM: davinci: mityomapl138: use aemif platform driver
 In-Reply-To: <20180626092537.6737-1-brgl@bgdev.pl>
 References: <20180626092537.6737-1-brgl@bgdev.pl>
-Message-ID: <20180626092537.6737-10-brgl@bgdev.pl>
+Message-ID: <20180626092537.6737-13-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
 We now support board files in the aemif driver. Register a platform
-device instead of using the handcrafted API in dm644x-evm.
+device instead of using the handcrafted API in mityomapl138.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- arch/arm/mach-davinci/board-dm644x-evm.c | 55 ++++++++++++++++++------
- 1 file changed, 42 insertions(+), 13 deletions(-)
+ arch/arm/mach-davinci/board-mityomapl138.c | 55 ++++++++++++++++------
+ 1 file changed, 41 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c b/arch/arm/mach-davinci/board-dm644x-evm.c
-index 738e443ab15f..e4a8f9225d16 100644
---- a/arch/arm/mach-davinci/board-dm644x-evm.c
-+++ b/arch/arm/mach-davinci/board-dm644x-evm.c
-@@ -42,6 +42,7 @@
- #include <linux/platform_data/mmc-davinci.h>
- #include <linux/platform_data/usb-davinci.h>
+diff --git a/arch/arm/mach-davinci/board-mityomapl138.c b/arch/arm/mach-davinci/board-mityomapl138.c
+index 2cce0d7d2f2a..2933e0c87cfa 100644
+--- a/arch/arm/mach-davinci/board-mityomapl138.c
++++ b/arch/arm/mach-davinci/board-mityomapl138.c
+@@ -30,6 +30,7 @@
+ #include <mach/da8xx.h>
+ #include <linux/platform_data/mtd-davinci.h>
  #include <linux/platform_data/mtd-davinci-aemif.h>
 +#include <linux/platform_data/ti-aemif.h>
+ #include <mach/mux.h>
+ #include <linux/platform_data/spi-davinci.h>
  
- #include "davinci.h"
- 
-@@ -174,14 +175,47 @@ static struct resource davinci_evm_nandflash_resource[] = {
+@@ -422,27 +423,53 @@ static struct resource mityomapl138_nandflash_resource[] = {
  	},
  };
  
--static struct platform_device davinci_evm_nandflash_device = {
+-static struct platform_device mityomapl138_nandflash_device = {
 -	.name		= "davinci_nand",
--	.id		= 0,
+-	.id		= 1,
 -	.dev		= {
--		.platform_data	= &davinci_evm_nandflash_data,
-+static struct resource davinci_evm_aemif_resource[] = {
-+	{
-+		.start		= DM644X_ASYNC_EMIF_CONTROL_BASE,
-+		.end		= DM644X_ASYNC_EMIF_CONTROL_BASE + SZ_4K - 1,
-+		.flags		= IORESOURCE_MEM,
- 	},
--	.num_resources	= ARRAY_SIZE(davinci_evm_nandflash_resource),
--	.resource	= davinci_evm_nandflash_resource,
-+};
-+
-+static struct aemif_abus_data davinci_evm_aemif_abus_data[] = {
-+	{
-+		.cs		= 1,
-+	},
-+};
-+
-+static struct platform_device davinci_evm_nandflash_devices[] = {
+-		.platform_data	= &mityomapl138_nandflash_data,
++static struct platform_device mityomapl138_aemif_devices[] = {
 +	{
 +		.name		= "davinci_nand",
-+		.id		= 0,
++		.id		= 1,
 +		.dev		= {
-+			.platform_data	= &davinci_evm_nandflash_data,
++			.platform_data	= &mityomapl138_nandflash_data,
 +		},
-+		.num_resources	= ARRAY_SIZE(davinci_evm_nandflash_resource),
-+		.resource	= davinci_evm_nandflash_resource,
-+	},
-+};
-+
-+static struct aemif_platform_data davinci_evm_aemif_pdata = {
-+	.abus_data = davinci_evm_aemif_abus_data,
-+	.num_abus_data = ARRAY_SIZE(davinci_evm_aemif_abus_data),
-+	.sub_devices = davinci_evm_nandflash_devices,
-+	.num_sub_devices = ARRAY_SIZE(davinci_evm_nandflash_devices),
-+};
-+
-+static struct platform_device davinci_evm_aemif_device = {
-+	.name			= "ti-aemif",
-+	.id			= -1,
-+	.dev = {
-+		.platform_data	= &davinci_evm_aemif_pdata,
-+	},
-+	.resource		= davinci_evm_aemif_resource,
-+	.num_resources		= ARRAY_SIZE(davinci_evm_aemif_resource),
++		.num_resources	= ARRAY_SIZE(mityomapl138_nandflash_resource),
++		.resource	= mityomapl138_nandflash_resource,
+ 	},
+-	.num_resources	= ARRAY_SIZE(mityomapl138_nandflash_resource),
+-	.resource	= mityomapl138_nandflash_resource,
  };
  
- static u64 davinci_fb_dma_mask = DMA_BIT_MASK(32);
-@@ -795,12 +829,7 @@ static __init void davinci_evm_init(void)
+-static struct platform_device *mityomapl138_devices[] __initdata = {
+-	&mityomapl138_nandflash_device,
++static struct resource mityomapl138_aemif_resources[] = {
++	{
++		.start	= DA8XX_AEMIF_CTL_BASE,
++		.end	= DA8XX_AEMIF_CTL_BASE + SZ_32K - 1,
++		.flags	= IORESOURCE_MEM,
++	},
++};
++
++static struct aemif_abus_data mityomapl138_aemif_abus_data[] = {
++	{
++		.cs	= 1,
++	},
++};
++
++static struct aemif_platform_data mityomapl138_aemif_pdata = {
++	.abus_data		= mityomapl138_aemif_abus_data,
++	.num_abus_data		= ARRAY_SIZE(mityomapl138_aemif_abus_data),
++	.sub_devices		= mityomapl138_aemif_devices,
++	.num_sub_devices	= ARRAY_SIZE(mityomapl138_aemif_devices),
++};
++
++static struct platform_device mityomapl138_aemif_device = {
++	.name		= "ti-aemif",
++	.id		= -1,
++	.dev = {
++		.platform_data	= &mityomapl138_aemif_pdata,
++	},
++	.resource	= mityomapl138_aemif_resources,
++	.num_resources	= ARRAY_SIZE(mityomapl138_aemif_resources),
+ };
  
- 		/* only one device will be jumpered and detected */
- 		if (HAS_NAND) {
--			platform_device_register(&davinci_evm_nandflash_device);
+ static void __init mityomapl138_setup_nand(void)
+ {
+-	platform_add_devices(mityomapl138_devices,
+-				 ARRAY_SIZE(mityomapl138_devices));
 -
--			if (davinci_aemif_setup(&davinci_evm_nandflash_device))
--				pr_warn("%s: Cannot configure AEMIF\n",
--					__func__);
--
-+			platform_device_register(&davinci_evm_aemif_device);
- #ifdef CONFIG_I2C
- 			evm_leds[7].default_trigger = "nand-disk";
- #endif
+-	if (davinci_aemif_setup(&mityomapl138_nandflash_device))
+-		pr_warn("%s: Cannot configure AEMIF\n", __func__);
++	if (platform_device_register(&mityomapl138_aemif_device))
++		pr_warn("%s: Cannot register AEMIF device\n", __func__);
+ }
+ 
+ static const short mityomap_mii_pins[] = {
 -- 
 2.17.1
