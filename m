@@ -1,152 +1,38 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Tue, 26 Jun 2018 08:49:41 +0800
-Subject: [PATCH 5/5] arm64: dts: allwinner: h6: enable AXP805 PMIC on
- Pine H64
-In-Reply-To: <20180620051540.25617-6-wens@csie.org>
-References: <20180620051540.25617-1-wens@csie.org>
- <20180620051540.25617-6-wens@csie.org>
-Message-ID: <f93b1524657048279f54004fdbcd6ab5af9ec1c1.camel@aosc.io>
+From: Anson.Huang@nxp.com (Anson Huang)
+Date: Tue, 26 Jun 2018 09:01:40 +0800
+Subject: [PATCH V2] ARM: dts: imx6sll-evk: make pfuze100 sw4 always on
+Message-ID: <1529974900-28865-1-git-send-email-Anson.Huang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2018-06-20?? 13:15 +0800?Chen-Yu Tsai???
-> From: Icenowy Zheng <icenowy@aosc.io>
-> 
-> Pine H64 board has an AXP805 PMIC on it.
-> 
-> Enable it in the device tree.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+On i.MX6SLL EVK board, PFuze100's SW4 is supplying
+LPDDR3, it needs to be always on. This patch fixes
+Linux kernel boot up hang caused by commit
+(5fe156f regulator: pfuze100: add enable/disable for switch),
+because SW4 is turned off unexpectedly:
 
-I suggest to mention the working mode change here.
+[    1.693613] cfg80211: failed to load regulatory.db
+[    1.700063] SW4: disabling
+[    1.703973] SWBST: disabling
 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->  .../boot/dts/allwinner/sun50i-h6-pine-h64.dts | 109
-> ++++++++++++++++++
->  1 file changed, 109 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
-> b/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
-> index 2e97173c9204..1673636358ef 100644
-> --- a/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
-> +++ b/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
-> @@ -44,6 +44,115 @@
->  &r_i2c {
->  	status = "okay";
->  
-> +	axp805: pmic at 36 {
-> +		compatible = "x-powers,axp805", "x-powers,axp806";
-> +		reg = <0x36>;
-> +		interrupt-parent = <&r_intc>;
-> +		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-> +		interrupt-controller;
-> +		#interrupt-cells = <1>;
-> +		x-powers,self-working-mode;
-> +
-> +		regulators {
-> +			reg_aldo1: aldo1 {
-> +				regulator-always-on;
-> +				regulator-min-microvolt = <3300000>;
-> +				regulator-max-microvolt = <3300000>;
-> +				regulator-name = "vcc-pl";
-> +			};
-> +
-> +			reg_aldo2: aldo2 {
-> +				regulator-min-microvolt = <3300000>;
-> +				regulator-max-microvolt = <3300000>;
-> +				regulator-name = "vcc-ac200";
-> +			};
-> +
-> +			reg_aldo3: aldo3 {
-> +				/* This regulator is connected with
-> CLDO1 */
-> +				regulator-always-on;
-> +				regulator-min-microvolt = <3300000>;
-> +				regulator-max-microvolt = <3300000>;
-> +				regulator-name = "vcc-3v3-1";
-> +			};
-> +
-> +			reg_bldo1: bldo1 {
-> +				regulator-always-on;
-> +				regulator-min-microvolt = <1800000>;
-> +				regulator-max-microvolt = <1800000>;
-> +				regulator-name = "vcc-bias-pll";
-> +			};
-> +
-> +			reg_bldo2: bldo2 {
-> +				regulator-always-on;
-> +				regulator-min-microvolt = <1800000>;
-> +				regulator-max-microvolt = <1800000>;
-> +				regulator-name = "vcc-efuse-pcie-
-> hdmi-io";
-> +			};
-> +
-> +			reg_bldo3: bldo3 {
-> +				regulator-always-on;
-> +				regulator-min-microvolt = <1800000>;
-> +				regulator-max-microvolt = <1800000>;
-> +				regulator-name = "vcc-dcxoio";
-> +			};
-> +
-> +			bldo4 {
-> +				/* unused */
-> +			};
-> +
-> +			reg_cldo1: cldo1 {
-> +				/* This regulator is connected with
-> ALDO3 */
-> +				regulator-always-on;
-> +				regulator-min-microvolt = <3300000>;
-> +				regulator-max-microvolt = <3300000>;
-> +				regulator-name = "vcc-3v3-2";
-> +			};
-> +
-> +			reg_cldo2: cldo2 {
-> +				regulator-min-microvolt = <3300000>;
-> +				regulator-max-microvolt = <3300000>;
-> +				regulator-name = "vcc-wifi-1";
-> +			};
-> +
-> +			reg_cldo3: cldo3 {
-> +				regulator-min-microvolt = <3300000>;
-> +				regulator-max-microvolt = <3300000>;
-> +				regulator-name = "vcc-wifi-2";
-> +			};
-> +
-> +			reg_dcdca: dcdca {
-> +				regulator-always-on;
-> +				regulator-min-microvolt = <810000>;
-> +				regulator-max-microvolt = <1080000>;
-> +				regulator-name = "vdd-cpu";
-> +			};
-> +
-> +			reg_dcdcc: dcdcc {
-> +				regulator-min-microvolt = <810000>;
-> +				regulator-max-microvolt = <1080000>;
-> +				regulator-name = "vdd-gpu";
-> +			};
-> +
-> +			reg_dcdcd: dcdcd {
-> +				regulator-always-on;
-> +				regulator-min-microvolt = <960000>;
-> +				regulator-max-microvolt = <960000>;
-> +				regulator-name = "vdd-sys";
-> +			};
-> +
-> +			reg_dcdce: dcdce {
-> +				regulator-always-on;
-> +				regulator-min-microvolt = <1200000>;
-> +				regulator-max-microvolt = <1200000>;
-> +				regulator-name = "vcc-dram";
-> +			};
-> +
-> +			sw {
-> +				/* unused */
-> +			};
-> +		};
-> +	};
-> +
->  	pcf8563: rtc at 51 {
->  		compatible = "nxp,pcf8563";
->  		reg = <0x51>;
+Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+---
+changes since V1:
+	improve commit message by adding info of which commit introduces this issue.
+ arch/arm/boot/dts/imx6sll-evk.dts | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/boot/dts/imx6sll-evk.dts b/arch/arm/boot/dts/imx6sll-evk.dts
+index 4684ac4..2217c40 100644
+--- a/arch/arm/boot/dts/imx6sll-evk.dts
++++ b/arch/arm/boot/dts/imx6sll-evk.dts
+@@ -142,6 +142,7 @@
+ 			sw4_reg: sw4 {
+ 				regulator-min-microvolt = <800000>;
+ 				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
+ 			};
+ 
+ 			swbst_reg: swbst {
+-- 
+2.7.4
