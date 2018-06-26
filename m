@@ -1,32 +1,32 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Tue, 26 Jun 2018 09:44:19 +0200
-Subject: [PATCH 00/14] ARM: davinci: step towards removing
- at24_platform_data
-In-Reply-To: <20180625180237.GC17417@lunn.ch>
-References: <20180625155025.12567-1-brgl@bgdev.pl>
- <20180625174024.GB17417@lunn.ch>
- <CAMRc=MdEn74G5SJAaGLAfNSS7Zy7wqH04aN5CMZ45UXqhu_58g@mail.gmail.com>
- <20180625180237.GC17417@lunn.ch>
-Message-ID: <CAMRc=MejDn=t6EPbKOfhMfRAb_O-5hxtWRyjAWH1mb5BUySrDA@mail.gmail.com>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Tue, 26 Jun 2018 09:50:09 +0200
+Subject: [PATCH 1/2] ARM: dts: ux500: Correct SCU unit address
+In-Reply-To: <20180626075010.15611-1-geert+renesas@glider.be>
+References: <20180626075010.15611-1-geert+renesas@glider.be>
+Message-ID: <20180626075010.15611-2-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-06-25 20:02 GMT+02:00 Andrew Lunn <andrew@lunn.ch>:
->> With my patch 1/14 you'll get -EPROBE_DEFER from nvmem_cell_get() if
->> the nvmem provider is not yet registered. Will that help in your case?
->
-> I don't think so. My driver instantiates the AT24 device. So if i get
-> -EPROBE_DEFER, i need to cleanup the probe, and return -EPROBDE_DEFER
-> to the code. Which means i need to remove the AT24 device...
->
->        Andrew
+The unit address of the Cortex-A9 SCU device node contains one zero too
+many.  Remove it.
 
-Are you sure this is the correct approach? I understand that you want
-to use something like board files for your machine? Wouldn't it be
-better to register a platform device for at24, register a cell lookup
-and then depend on that cell from your driver?
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+ arch/arm/boot/dts/ste-dbx5x0.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Would you mind describing your platform in detail a bit more?
-
-Best regards,
-Bartosz
+diff --git a/arch/arm/boot/dts/ste-dbx5x0.dtsi b/arch/arm/boot/dts/ste-dbx5x0.dtsi
+index 2310a4e97768c222..3dc0028e108b3d49 100644
+--- a/arch/arm/boot/dts/ste-dbx5x0.dtsi
++++ b/arch/arm/boot/dts/ste-dbx5x0.dtsi
+@@ -197,7 +197,7 @@
+ 			      <0xa0410100 0x100>;
+ 		};
+ 
+-		scu at a04100000 {
++		scu at a0410000 {
+ 			compatible = "arm,cortex-a9-scu";
+ 			reg = <0xa0410000 0x100>;
+ 		};
+-- 
+2.17.1
