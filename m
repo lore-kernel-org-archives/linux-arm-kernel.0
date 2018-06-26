@@ -1,273 +1,57 @@
-From: jonathan.cameron@huawei.com (Jonathan Cameron)
-Date: Tue, 26 Jun 2018 09:28:41 +0100
-Subject: [PATCH v2 10/10] i2c: remove i2c_lock_adapter and use
- i2c_lock_bus directly
-In-Reply-To: <20180620051803.12206-11-peda@axentia.se>
-References: <20180620051803.12206-1-peda@axentia.se>
- <20180620051803.12206-11-peda@axentia.se>
-Message-ID: <20180626092841.00003277@huawei.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 26 Jun 2018 10:36:52 +0200
+Subject: [PATCH 0/5] RFC: Mezzanine handling for 96boards
+In-Reply-To: <CAKv+Gu8cXxQWbnB++adGx=xwAzuM9jqxkCOznk1qP5r=P4vxrQ@mail.gmail.com>
+References: <20180618074556.6944-1-linus.walleij@linaro.org>
+ <CAK8P3a2KqoX-squhGc8TBuJ==8xxELsuy-H+c1+C7Fu7Z4OjDA@mail.gmail.com>
+ <CAKv+Gu-gAkfRsEUOc=iyxi6Twvg9cbvWNqNHRS2HzUDZg8xUhg@mail.gmail.com>
+ <CACRpkdb1GksbePt6XgePCD6g-z4fxY-LF-gpyRfQVxCrq226fg@mail.gmail.com>
+ <CAKv+Gu8cXxQWbnB++adGx=xwAzuM9jqxkCOznk1qP5r=P4vxrQ@mail.gmail.com>
+Message-ID: <CACRpkdYZmoP-yf6wT0=3Npr4u9zB8qtEraihSYyrjXHeEHp0ow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 20 Jun 2018 07:18:03 +0200
-Peter Rosin <peda@axentia.se> wrote:
+On Tue, Jun 26, 2018 at 10:19 AM Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+> On 26 June 2018 at 10:09, Linus Walleij <linus.walleij@linaro.org> wrote:
+> > On Mon, Jun 18, 2018 at 3:22 PM Ard Biesheuvel
+> > <ard.biesheuvel@linaro.org> wrote:
+> >
+> >> We should also consider firmware use of the mezzanines. For instance,
+> >> the Secure96 has a RNG which UEFI may want to use so the early boot
+> >> code can access is for KASLR. It also has a TPM, which should not be
+> >> reset/reinitialized/etc by the OS if we want to make meaningful use of
+> >> it.
+> >
+> > This problem: sharing or dedicating a piece of hardware to UEFI or
+> > the TrustZone secure world is a generic problem not related to
+> > mezzanines or plug-in boards specifically.
+(...)
+> I agree that this is *also* a problem. But it is not what I was talking about.
+>
+> My example is about peripherals that firmware and OS should both drive
+> natively, and in the TPM case, the OS should be mindful of the fact
+> that the measured state should be preserved.
 
-> The i2c_lock_adapter name is ambiguous since it is unclear if it
-> refers to the root adapter or the adapter you name in the argument.
-> The natural interpretation is the adapter you name in the argument,
-> but there are historical reasons for that not being the case; it
-> in fact locks the root adapter. Just remove the function and force
-> users to spell out the I2C_LOCK_ROOT_ADAPTER name to indicate what
-> is really going on. Also remove i2c_unlock_adapter, of course.
-> 
-> This patch was generated with
-> 
-> git grep -l 'i2c_\(un\)\?lock_adapter' \
-> | xargs sed -i 's/i2c_\(un\)\?lock_adapter(\([^)]*\))/'\
-> 'i2c_\1lock_bus(\2, I2C_LOCK_ROOT_ADAPTER)/g'
-> 
-> followed by white-space touch-up.
-> 
-> Signed-off-by: Peter Rosin <peda@axentia.se>
+Ah I see.
 
-For IIO: Acked-by: Jonathan Cameron <jonathan.cameron@huawei.com>
+In that case this is something the TPM driver should be doing
+I guess? I mean it is a "firmware plus OS TPM driver"-specific
+problem.
 
-> ---
->  drivers/i2c/busses/i2c-brcmstb.c   |  8 ++++----
->  drivers/i2c/busses/i2c-davinci.c   |  4 ++--
->  drivers/i2c/busses/i2c-gpio.c      | 40 +++++++++++++++++++-------------------
->  drivers/i2c/busses/i2c-s3c2410.c   |  4 ++--
->  drivers/i2c/busses/i2c-sprd.c      |  8 ++++----
->  drivers/i2c/i2c-core-slave.c       |  8 ++++----
->  drivers/iio/temperature/mlx90614.c |  4 ++--
->  include/linux/i2c.h                | 12 ------------
->  8 files changed, 38 insertions(+), 50 deletions(-)
-> 
-> diff --git a/drivers/i2c/busses/i2c-brcmstb.c b/drivers/i2c/busses/i2c-brcmstb.c
-> index 78792b4d6437..826d32049996 100644
-> --- a/drivers/i2c/busses/i2c-brcmstb.c
-> +++ b/drivers/i2c/busses/i2c-brcmstb.c
-> @@ -689,9 +689,9 @@ static int brcmstb_i2c_suspend(struct device *dev)
->  {
->  	struct brcmstb_i2c_dev *i2c_dev = dev_get_drvdata(dev);
->  
-> -	i2c_lock_adapter(&i2c_dev->adapter);
-> +	i2c_lock_bus(&i2c_dev->adapter, I2C_LOCK_ROOT_ADAPTER);
->  	i2c_dev->is_suspended = true;
-> -	i2c_unlock_adapter(&i2c_dev->adapter);
-> +	i2c_unlock_bus(&i2c_dev->adapter, I2C_LOCK_ROOT_ADAPTER);
->  
->  	return 0;
->  }
-> @@ -700,10 +700,10 @@ static int brcmstb_i2c_resume(struct device *dev)
->  {
->  	struct brcmstb_i2c_dev *i2c_dev = dev_get_drvdata(dev);
->  
-> -	i2c_lock_adapter(&i2c_dev->adapter);
-> +	i2c_lock_bus(&i2c_dev->adapter, I2C_LOCK_ROOT_ADAPTER);
->  	brcmstb_i2c_set_bsc_reg_defaults(i2c_dev);
->  	i2c_dev->is_suspended = false;
-> -	i2c_unlock_adapter(&i2c_dev->adapter);
-> +	i2c_unlock_bus(&i2c_dev->adapter, I2C_LOCK_ROOT_ADAPTER);
->  
->  	return 0;
->  }
-> diff --git a/drivers/i2c/busses/i2c-davinci.c b/drivers/i2c/busses/i2c-davinci.c
-> index 75d6ab177055..d945a2654c2f 100644
-> --- a/drivers/i2c/busses/i2c-davinci.c
-> +++ b/drivers/i2c/busses/i2c-davinci.c
-> @@ -714,14 +714,14 @@ static int i2c_davinci_cpufreq_transition(struct notifier_block *nb,
->  
->  	dev = container_of(nb, struct davinci_i2c_dev, freq_transition);
->  
-> -	i2c_lock_adapter(&dev->adapter);
-> +	i2c_lock_bus(&dev->adapter, I2C_LOCK_ROOT_ADAPTER);
->  	if (val == CPUFREQ_PRECHANGE) {
->  		davinci_i2c_reset_ctrl(dev, 0);
->  	} else if (val == CPUFREQ_POSTCHANGE) {
->  		i2c_davinci_calc_clk_dividers(dev);
->  		davinci_i2c_reset_ctrl(dev, 1);
->  	}
-> -	i2c_unlock_adapter(&dev->adapter);
-> +	i2c_unlock_bus(&dev->adapter, I2C_LOCK_ROOT_ADAPTER);
->  
->  	return 0;
->  }
-> diff --git a/drivers/i2c/busses/i2c-gpio.c b/drivers/i2c/busses/i2c-gpio.c
-> index 005e6e0330c2..9d63337efa82 100644
-> --- a/drivers/i2c/busses/i2c-gpio.c
-> +++ b/drivers/i2c/busses/i2c-gpio.c
-> @@ -78,24 +78,24 @@ static struct dentry *i2c_gpio_debug_dir;
->  #define getscl(bd)	((bd)->getscl((bd)->data))
->  
->  #define WIRE_ATTRIBUTE(wire) \
-> -static int fops_##wire##_get(void *data, u64 *val)	\
-> -{							\
-> -	struct i2c_gpio_private_data *priv = data;	\
-> -							\
-> -	i2c_lock_adapter(&priv->adap);			\
-> -	*val = get##wire(&priv->bit_data);		\
-> -	i2c_unlock_adapter(&priv->adap);		\
-> -	return 0;					\
-> -}							\
-> -static int fops_##wire##_set(void *data, u64 val)	\
-> -{							\
-> -	struct i2c_gpio_private_data *priv = data;	\
-> -							\
-> -	i2c_lock_adapter(&priv->adap);			\
-> -	set##wire(&priv->bit_data, val);		\
-> -	i2c_unlock_adapter(&priv->adap);		\
-> -	return 0;					\
-> -}							\
-> +static int fops_##wire##_get(void *data, u64 *val)		\
-> +{								\
-> +	struct i2c_gpio_private_data *priv = data;		\
-> +								\
-> +	i2c_lock_bus(&priv->adap, I2C_LOCK_ROOT_ADAPTER);	\
-> +	*val = get##wire(&priv->bit_data);			\
-> +	i2c_unlock_bus(&priv->adap, I2C_LOCK_ROOT_ADAPTER);	\
-> +	return 0;						\
-> +}								\
-> +static int fops_##wire##_set(void *data, u64 val)		\
-> +{								\
-> +	struct i2c_gpio_private_data *priv = data;		\
-> +								\
-> +	i2c_lock_bus(&priv->adap, I2C_LOCK_ROOT_ADAPTER);	\
-> +	set##wire(&priv->bit_data, val);			\
-> +	i2c_unlock_bus(&priv->adap, I2C_LOCK_ROOT_ADAPTER);	\
-> +	return 0;						\
-> +}								\
->  DEFINE_DEBUGFS_ATTRIBUTE(fops_##wire, fops_##wire##_get, fops_##wire##_set, "%llu\n")
->  
->  WIRE_ATTRIBUTE(scl);
-> @@ -113,7 +113,7 @@ static int fops_incomplete_transfer_set(void *data, u64 addr)
->  	/* ADDR (7 bit) + RD (1 bit) + SDA hi (1 bit) */
->  	pattern = (addr << 2) | 3;
->  
-> -	i2c_lock_adapter(&priv->adap);
-> +	i2c_lock_bus(&priv->adap, I2C_LOCK_ROOT_ADAPTER);
->  
->  	/* START condition */
->  	setsda(bit_data, 0);
-> @@ -129,7 +129,7 @@ static int fops_incomplete_transfer_set(void *data, u64 addr)
->  		udelay(bit_data->udelay);
->  	}
->  
-> -	i2c_unlock_adapter(&priv->adap);
-> +	i2c_unlock_bus(&priv->adap, I2C_LOCK_ROOT_ADAPTER);
->  
->  	return 0;
->  }
-> diff --git a/drivers/i2c/busses/i2c-s3c2410.c b/drivers/i2c/busses/i2c-s3c2410.c
-> index 9fe2b6951895..2f2e28d60ef5 100644
-> --- a/drivers/i2c/busses/i2c-s3c2410.c
-> +++ b/drivers/i2c/busses/i2c-s3c2410.c
-> @@ -919,9 +919,9 @@ static int s3c24xx_i2c_cpufreq_transition(struct notifier_block *nb,
->  
->  	if ((val == CPUFREQ_POSTCHANGE && delta_f < 0) ||
->  	    (val == CPUFREQ_PRECHANGE && delta_f > 0)) {
-> -		i2c_lock_adapter(&i2c->adap);
-> +		i2c_lock_bus(&i2c->adap, I2C_LOCK_ROOT_ADAPTER);
->  		ret = s3c24xx_i2c_clockrate(i2c, &got);
-> -		i2c_unlock_adapter(&i2c->adap);
-> +		i2c_unlock_bus(&i2c->adap, I2C_LOCK_ROOT_ADAPTER);
->  
->  		if (ret < 0)
->  			dev_err(i2c->dev, "cannot find frequency (%d)\n", ret);
-> diff --git a/drivers/i2c/busses/i2c-sprd.c b/drivers/i2c/busses/i2c-sprd.c
-> index 4053259bccb8..a94e724f51dc 100644
-> --- a/drivers/i2c/busses/i2c-sprd.c
-> +++ b/drivers/i2c/busses/i2c-sprd.c
-> @@ -590,9 +590,9 @@ static int __maybe_unused sprd_i2c_suspend_noirq(struct device *pdev)
->  {
->  	struct sprd_i2c *i2c_dev = dev_get_drvdata(pdev);
->  
-> -	i2c_lock_adapter(&i2c_dev->adap);
-> +	i2c_lock_bus(&i2c_dev->adap, I2C_LOCK_ROOT_ADAPTER);
->  	i2c_dev->is_suspended = true;
-> -	i2c_unlock_adapter(&i2c_dev->adap);
-> +	i2c_unlock_bus(&i2c_dev->adap, I2C_LOCK_ROOT_ADAPTER);
->  
->  	return pm_runtime_force_suspend(pdev);
->  }
-> @@ -601,9 +601,9 @@ static int __maybe_unused sprd_i2c_resume_noirq(struct device *pdev)
->  {
->  	struct sprd_i2c *i2c_dev = dev_get_drvdata(pdev);
->  
-> -	i2c_lock_adapter(&i2c_dev->adap);
-> +	i2c_lock_bus(&i2c_dev->adap, I2C_LOCK_ROOT_ADAPTER);
->  	i2c_dev->is_suspended = false;
-> -	i2c_unlock_adapter(&i2c_dev->adap);
-> +	i2c_unlock_bus(&i2c_dev->adap, I2C_LOCK_ROOT_ADAPTER);
->  
->  	return pm_runtime_force_resume(pdev);
->  }
-> diff --git a/drivers/i2c/i2c-core-slave.c b/drivers/i2c/i2c-core-slave.c
-> index 4a78c65e9971..47a9f70a24a9 100644
-> --- a/drivers/i2c/i2c-core-slave.c
-> +++ b/drivers/i2c/i2c-core-slave.c
-> @@ -47,9 +47,9 @@ int i2c_slave_register(struct i2c_client *client, i2c_slave_cb_t slave_cb)
->  
->  	client->slave_cb = slave_cb;
->  
-> -	i2c_lock_adapter(client->adapter);
-> +	i2c_lock_bus(client->adapter, I2C_LOCK_ROOT_ADAPTER);
->  	ret = client->adapter->algo->reg_slave(client);
-> -	i2c_unlock_adapter(client->adapter);
-> +	i2c_unlock_bus(client->adapter, I2C_LOCK_ROOT_ADAPTER);
->  
->  	if (ret) {
->  		client->slave_cb = NULL;
-> @@ -69,9 +69,9 @@ int i2c_slave_unregister(struct i2c_client *client)
->  		return -EOPNOTSUPP;
->  	}
->  
-> -	i2c_lock_adapter(client->adapter);
-> +	i2c_lock_bus(client->adapter, I2C_LOCK_ROOT_ADAPTER);
->  	ret = client->adapter->algo->unreg_slave(client);
-> -	i2c_unlock_adapter(client->adapter);
-> +	i2c_unlock_bus(client->adapter, I2C_LOCK_ROOT_ADAPTER);
->  
->  	if (ret == 0)
->  		client->slave_cb = NULL;
-> diff --git a/drivers/iio/temperature/mlx90614.c b/drivers/iio/temperature/mlx90614.c
-> index d619e8634a00..13a4cec64ea8 100644
-> --- a/drivers/iio/temperature/mlx90614.c
-> +++ b/drivers/iio/temperature/mlx90614.c
-> @@ -433,11 +433,11 @@ static int mlx90614_wakeup(struct mlx90614_data *data)
->  
->  	dev_dbg(&data->client->dev, "Requesting wake-up");
->  
-> -	i2c_lock_adapter(data->client->adapter);
-> +	i2c_lock_bus(data->client->adapter, I2C_LOCK_ROOT_ADAPTER);
->  	gpiod_direction_output(data->wakeup_gpio, 0);
->  	msleep(MLX90614_TIMING_WAKEUP);
->  	gpiod_direction_input(data->wakeup_gpio);
-> -	i2c_unlock_adapter(data->client->adapter);
-> +	i2c_unlock_bus(data->client->adapter, I2C_LOCK_ROOT_ADAPTER);
->  
->  	data->ready_timestamp = jiffies +
->  			msecs_to_jiffies(MLX90614_TIMING_STARTUP);
-> diff --git a/include/linux/i2c.h b/include/linux/i2c.h
-> index 254cd34eeae2..795e3a860afe 100644
-> --- a/include/linux/i2c.h
-> +++ b/include/linux/i2c.h
-> @@ -754,18 +754,6 @@ i2c_unlock_bus(struct i2c_adapter *adapter, unsigned int flags)
->  	adapter->lock_ops->unlock_bus(adapter, flags);
->  }
->  
-> -static inline void
-> -i2c_lock_adapter(struct i2c_adapter *adapter)
-> -{
-> -	i2c_lock_bus(adapter, I2C_LOCK_ROOT_ADAPTER);
-> -}
-> -
-> -static inline void
-> -i2c_unlock_adapter(struct i2c_adapter *adapter)
-> -{
-> -	i2c_unlock_bus(adapter, I2C_LOCK_ROOT_ADAPTER);
-> -}
-> -
->  /*flags for the client struct: */
->  #define I2C_CLIENT_PEC		0x04	/* Use Packet Error Checking */
->  #define I2C_CLIENT_TEN		0x10	/* we have a ten bit chip address */
+I guess that would be hard to duct-tape on if the peripheral
+is context-unaware and easy to do if the designer of the
+peripheral HW took multiple call-context into account.
+Whether TPM does this I don't know...
+
+> Also, it means that we
+> may be duplicating functionality between the OS and firmware [as
+> usual] so it might make sense to come up with something that takes
+> both use cases into account.
+
+What we are doing now with Atmel's ECC chip is even worse:
+duplicating functionality between OS and userspace. So I'm
+trying to solve that first.
+
+Yours,
+Linus Walleij
