@@ -1,72 +1,77 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 26 Jun 2018 09:59:54 -0600
-Subject: [PATCH v2 3/6] coresight: Introduce support for Coresight
- Address Translation Unit
-In-Reply-To: <1dab29ef47d77c2456ee2500a4636f8793b53354.camel@perches.com>
-References: <20180625112213.23492-1-suzuki.poulose@arm.com>
- <20180625112213.23492-4-suzuki.poulose@arm.com>
- <1dab29ef47d77c2456ee2500a4636f8793b53354.camel@perches.com>
-Message-ID: <20180626155954.GA27118@xps15>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 26 Jun 2018 16:11:52 +0100 (BST)
+Subject: Applied "ASoC: q6asm: dt-bindings: add compatible string to dais" to
+ the asoc tree
+In-Reply-To: <20180625143115.8346-3-srinivas.kandagatla@linaro.org>
+Message-ID: <20180626151152.E2B77440070@finisterre.ee.mobilebroadband>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 25, 2018 at 09:23:51AM -0700, Joe Perches wrote:
-> On Mon, 2018-06-25 at 12:22 +0100, Suzuki K Poulose wrote:
-> > Add the initial support for Coresight Address Translation Unit, which
-> > augments the TMC in Coresight SoC-600 by providing an improved Scatter
-> > Gather mechanism. CATU is always connected to a single TMC-ETR and
-> > converts the AXI address with a translated address (from a given SG
-> > table with specific format). The CATU should be programmed in pass
-> > through mode and enabled even if the ETR doesn't use the translation
-> > by CATU.
-> []
-> > diff --git a/drivers/hwtracing/coresight/coresight-catu.h b/drivers/hwtracing/coresight/coresight-catu.h
-> []
-> > +static inline bool coresight_is_catu_device(struct coresight_device *csdev)
-> > +{
-> > +	enum coresight_dev_subtype_helper subtype;
-> > +
-> > +	/* Make the checkpatch happy */
-> > +	subtype = csdev->subtype.helper_subtype;
-> > +
-> > +	return IS_ENABLED(CONFIG_CORESIGHT_CATU) &&
-> > +	       csdev->type == CORESIGHT_DEV_TYPE_HELPER &&
-> > +	       subtype == CORESIGHT_DEV_SUBTYPE_HELPER_CATU;
-> > +}
-> 
-> I believe you should not make checkpatch happy here
-> by using a temporary but use the most readable form.
-> 
-> Probably the most readable form is:
-> 
-> 	return IS_ENABLED(CONFIG_CORESIGHT_CATU) &&
-> 	       csdev->type == CORESIGHT_DEV_TYPE_HELPER &&
-> 	       csdev->subtype.helper_subtype == CORESIGHT_DEV_SUBTYPE_HELPER_CATU;
-> 
-> where restricting line length to 80 columns is not useful
-> because the identifiers are very long.  The identifiers
-> are possibly longer than necessary.
+The patch
 
-I would prefer to avoid adding code that will trigger checkpatch warnings.  I
-suggest the following:
+   ASoC: q6asm: dt-bindings: add compatible string to dais
 
-static inline bool coresight_is_catu_device(struct coresight_device *csdev)
-{
-        if (!IS_ENABLED(CONFIG_CORESIGHT_CATU))
-                return false;
+has been applied to the asoc tree at
 
-        if (csdev->type != CORESIGHT_DEV_TYPE_HELPER)
-                return false;
+   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
 
-        if (csdev->subtype.helper_subtype != CORESIGHT_DEV_SUBTYPE_HELPER_CATU)
-                return false;
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
 
-        return true;
-}
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
 
-No temporary variable and all shorther than 80 columns.
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
+
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
 
 Thanks,
-Mathieu
+Mark
 
-> 
+>From 9618b706672db1b595c7076389a833078335417c Mon Sep 17 00:00:00 2001
+From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+Date: Tue, 26 Jun 2018 10:20:06 +0100
+Subject: [PATCH] ASoC: q6asm: dt-bindings: add compatible string to dais
+
+Add compatible string to dais so that it can support DT based module
+autoloading.
+
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+Acked-by: Niklas Cassel <niklas.cassel@linaro.org>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ Documentation/devicetree/bindings/sound/qcom,q6asm.txt | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/sound/qcom,q6asm.txt b/Documentation/devicetree/bindings/sound/qcom,q6asm.txt
+index 2178eb91146f..f9c7bd8c1bc0 100644
+--- a/Documentation/devicetree/bindings/sound/qcom,q6asm.txt
++++ b/Documentation/devicetree/bindings/sound/qcom,q6asm.txt
+@@ -17,6 +17,11 @@ used by the apr service device.
+ = ASM DAIs (Digial Audio Interface)
+ "dais" subnode of the ASM node represents dai specific configuration
+ 
++- compatible:
++	Usage: required
++	Value type: <stringlist>
++	Definition: must be "qcom,q6asm-dais".
++
+ - #sound-dai-cells
+ 	Usage: required
+ 	Value type: <u32>
+@@ -28,6 +33,7 @@ q6asm at 7 {
+ 	compatible = "qcom,q6asm";
+ 	reg = <APR_SVC_ASM>;
+ 	q6asmdai: dais {
++		compatible = "qcom,q6asm-dais";
+ 		#sound-dai-cells = <1>;
+ 	};
+ };
+-- 
+2.17.1
