@@ -1,180 +1,218 @@
-From: doudahwezomiechahtah@xff.cz (=?utf-8?Q?Ond=C5=99ej?= Jirman)
-Date: Tue, 26 Jun 2018 13:53:35 +0200
-Subject: [PATCH v9 00/12] Sunxi: Add SMP support on A83T
-In-Reply-To: <20180504190545.5114-1-mylene.josserand@bootlin.com>
-References: <20180504190545.5114-1-mylene.josserand@bootlin.com>
-Message-ID: <20180626115335.cou6o22lks2stign@core>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 26 Jun 2018 14:01:25 +0200
+Subject: [PATCH V3 2/5] soc: imx: add mu library functions support
+In-Reply-To: <AM0PR04MB4211672C8EF978B578B87EEA80490@AM0PR04MB4211.eurprd04.prod.outlook.com>
+References: <1529676720-7533-1-git-send-email-aisheng.dong@nxp.com>
+ <1529676720-7533-3-git-send-email-aisheng.dong@nxp.com>
+ <20180625093504.hyjbixnnmipiqopg@pengutronix.de>
+ <AM0PR04MB4211D74B6DD6BCA9A00C5E80804A0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <20180625134647.jewrmqzujpi7rfx6@pengutronix.de>
+ <AM0PR04MB4211672C8EF978B578B87EEA80490@AM0PR04MB4211.eurprd04.prod.outlook.com>
+Message-ID: <20180626120125.bgw5tiy65uimjk6s@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Myl?ne,
+On Tue, Jun 26, 2018 at 08:53:55AM +0000, A.s. Dong wrote:
+> > -----Original Message-----
+> > From: Sascha Hauer [mailto:s.hauer at pengutronix.de]
+> > Sent: Monday, June 25, 2018 9:47 PM
+> > To: A.s. Dong <aisheng.dong@nxp.com>
+> > Cc: linux-arm-kernel at lists.infradead.org; dongas86 at gmail.com; dl-linux-imx
+> > <linux-imx@nxp.com>; kernel at pengutronix.de; Fabio Estevam
+> > <fabio.estevam@nxp.com>; shawnguo at kernel.org
+> > Subject: Re: [PATCH V3 2/5] soc: imx: add mu library functions support
+> > 
+> > On Mon, Jun 25, 2018 at 11:59:04AM +0000, A.s. Dong wrote:
+> > > > -----Original Message-----
+> > > > From: Sascha Hauer [mailto:s.hauer at pengutronix.de]
+> > > > Sent: Monday, June 25, 2018 5:35 PM
+> > > > To: A.s. Dong <aisheng.dong@nxp.com>
+> > > > Cc: linux-arm-kernel at lists.infradead.org; dongas86 at gmail.com;
+> > > > dl-linux-imx <linux-imx@nxp.com>; kernel at pengutronix.de; Fabio
+> > > > Estevam <fabio.estevam@nxp.com>; shawnguo at kernel.org
+> > > > Subject: Re: [PATCH V3 2/5] soc: imx: add mu library functions
+> > > > support
+> > > >
+> > > > On Fri, Jun 22, 2018 at 10:11:57PM +0800, Dong Aisheng wrote:
+> > > > > This is used for i.MX multi core communication.
+> > > > > e.g. A core to SCU firmware(M core) on MX8.
+> > > >
+> > > > I still believe that a generic driver for the MU should be used here.
+> > > > Handling hardware resources under the hood of the driver framework
+> > > > is a hack. Preventing the generic driver from matching against the
+> > > > SCU MU by adding some #mbox-cells = <0>; to the MU device node is
+> > even more a hack.
+> > > >
+> > >
+> > > That is not a hack from a HW point of view. The MU HW does not have
+> > > multi channels according to Reference Manual. Even we switch to
+> > > mailbox, we probably may still prefer mbox-cell = <0> as the virtual
+> > channels do not fit for SCU MU.
+> > 
+> > If you switch to mailbox then you'll need something for the driver to
+> > distinguish between the different transfer modes. One possibility would be
+> > to introduce channels like I suggested earlier, so one channel could simply
+> > mean "transfer in SCU mode".
+> > 
+> 
+> I feel that may be a little strange as device tree is used to description HW.
+> Mbox-cells = <0> is more reflecting the real HW, right?
 
-On Fri, May 04, 2018 at 09:05:33PM +0200, Myl?ne Josserand wrote:
-> Hello everyone,
-> 
-> This is a V9 of my series that adds SMP support for Allwinner sun8i-a83t.
-> Based on sunxi's tree, sunxi/for-next branch.
-> Depends on a patch from Doug Berger that allows to include the "cpu-type"
-> header on assembly files that I included in my series (patch 01).
+The SCU code is Software, so once we try to bind a driver to the SCU we
+are leaving hardware description anyway. The number of channels we have
+is defined by software. Consider the case when SCU would expect pinmux
+calls in MU tx register 0, clock control in register 1 and other calls
+in registers 2 and 3. You actually *can* see the MU as a unit with
+multiple channels, so why shouldn't we describe this in the device tree?
 
-I've tested your patches and the kernel always locks up when disabling the first
-CPU in the second cluster. I can enable/disable other CPUs in the second cluster
-though.
+> 
+> > >
+> > > > We should really handle the MU in a driver and look for a way how
+> > > > the SCU case can coexist with other usages of the MUs.
+> > > >
+> > > > Your main argument against using the mailbox framework is that it
+> > > > can't handle polling in the way you need it and that the mailbox
+> > > > framework provides things that you do not need. I don't buy this
+> > > > argument. In the end the mailbox framework is around 500 lines of
+> > > > code, it shouldn't be that hard to add the missing features. From
+> > > > the transmit side I don't see any showstoppers, the mailbox
+> > > > frameworks could be used as ist. What is missing is a synchronous
+> > > > wait-for-new-messages and receive-message call, the currently existing
+> > asynchronous rx callback is indeed not suitable for the SCU.
+> > > > But as said, it should be doable to add that.
+> > > >
+> > >
+> > > Besides the mailbox framework may not suitable for SCU, another
+> > > important Reason is that even we force to switch to mailbox, it's
+> > > still can't be generic driver and it can only be used by SCU MU.
+> > 
+> > You claim that the driver can't be generic. I claim the opposite though.
+> > 
+> 
+> The 'generic' I  mean here is a generic driver without any sense of protocol.
+> It only transfer a number of data. That means we need develop a generic
+> data transfer protocol to send only data without knowing any protocol
+> specific things.
+> 
+> AFAIK SCU MU used data transfer protocol is different from M4 in Oleksij
+> Rempel's patch series. That means we need some specific hacks to support
+> both protocols. Then it's not a generic to me.
 
-Other thing I observed was, that when disabling cores no power is saved (not
-even a tiny bit), which is slightly surprising.
+Yes, indeed. You'll need to be SCU mode aware in the driver. No doubt
+about this.
 
->From the standpoint of the DT, A83T CPU config seems to lack some cpu
-properties, which makes it not claim a cluster clock when I enable any other
-CPU than the first CPU in the cluster.
+> 
+> But it might be acceptable if the hack is quite small. However, I can't see
+> that up till now as M4 protocol based on virtual channel is quite different
+> from SCU MU, that means the hack will be big which may lose the 'generic'
+> meaning.
+> 
+> > >
+> > > Let's see the mailbox doc where it also highlights it may somehow
+> > > depend on mailbox communication protocol.
+> > >
+> > > Documentation/mailbox.txt
+> > > ----------------------------------------------------------------------
+> > > ------------------ This document aims to help developers write client
+> > > and controller drivers for the API. But before we start, let us note
+> > > that the client (especially) and controller drivers are likely going
+> > > to be very platform specific because the remote firmware is likely to
+> > > be proprietary and implement non-standard protocol.
+> > > .....
+> > 
+> > Read on:
+> > 
+> > | So even if two platforms employ, say, PL320 controller, the client
+> > | drivers can't be shared across them. Even the PL320 driver might need
+> > | to accommodate some platform specific quirks.
+> > 
+> > Here the MU would be the PL320 and the SCU mode would be the platform
+> > specific quirks.
+> > 
+> 
+> SCU can be platform specific, but how to make MU generic to be unware of SCU
+> transfer protocol?
+> 
+> The current MU transfer protocol is already specific to SCU.
+> See:
+> typedef struct sc_rpc_msg_s {
+>         uint8_t version;
+>         uint8_t size; 
+>         uint8_t svc;
+>         uint8_t func;
+>         union {
+>                 int32_t i32[(SC_RPC_MAX_MSG - 1)];
+>                 int16_t i16[(SC_RPC_MAX_MSG - 1) * 2];
+>                 int8_t i8[(SC_RPC_MAX_MSG - 1) * 4];
+>                 uint32_t u32[(SC_RPC_MAX_MSG - 1)];
+>                 uint16_t u16[(SC_RPC_MAX_MSG - 1) * 2];
+>                 uint8_t u8[(SC_RPC_MAX_MSG - 1) * 4];
+>         } DATA;
+> } sc_rpc_msg_t;
+> 
+> Where MU knows the size to transfer.
 
-The same goes for cpu-supply regulator. When I dump the state of regulators
-after booting with maxcpus=1 and enabling cpu5, the regulator on the second
-cluster is not claimed, but when I add cpu-supply property on all cpu# nodes,
-I get (when enabling CPU5):
+The mailbox send hook takes a void *. You can interpret this pointer how
+you like, that's part of the design decision with the mailbox framework.
+There's no need to interpret this void * always in the same manner in
+your driver, nothing prevent us from casting it to some SCU message for
+the SCU case and to something different in !SCU case.
 
-[  200.072895] CPU5: update cpu_capacity 1024
-[  200.072914] CPU5: thread -1, cpu 1, socket 1, mpidr 80000101
-[  200.151403] cpu cpu5: opp_list_debug_create_link: Failed to create link
-[  200.151411] cpu cpu5: _add_opp_dev: Failed to register opp debugfs (-12)
+> 
+> > > ----------------------------------------------------------------------
+> > > ------------------
+> > >
+> > > So the question to us is: If it can't be generic driver which can be
+> > > used by others as well and it introduces much unnecessary
+> > > complexities, why do we need do that? What's real benefits we can have?
+> > 
+> > The driver can be used by others, the additional complexity is not that much
+> > and your code may be in a more upstreamable shape.
+> > 
+> 
+> Okay, then let's try to see the complexity if trying to support two type protocols
+> in a 'generic' driver:
+> 
+> As I said earlier, we internally have tried mailbox already, and the implementation is:
+> 1) One channel per MU
+> 2) Tx using the same way to send msg as sc_ipc_write() in polling mode
+> 3) Rx enables the first word interrupt and polling for the rest of them in a hrtimer.
 
-I'm not having much luck with this. Do you have some suggestions, please?
-I'll probably figure out the last issue with the regulators, but I'm at the
-loss about the lockup on CPU4 disable.
+And that's where the current mailbox framework lacks real polling mode.
 
-thaks and regards,
-  Ondrej Jirman
+> 
+> M4 is quite different in Oleksij Rempel's patch.
+> The questions to us is:
+> 1) what's generic data transfer protocol should we use?
 
-> The difference with the v8 is just that the machine is renamed in sun8i-a83t
-> (see patch 07), according to Maxime's review.
+None. As mentioned above, in SCU case cast it to whatever you need.
+
 > 
-> Thank you in advance,
-> Best regards,
-> Myl?ne
+> This patch is not aim to support M4 as current kernel still does not support M4.
+> We don't have to figure out everything in one patch, right?
+> That will make us hard to do even a simple thing.
+
+No, and I don't expect you to implement M4 support, and in fact it is
+not clear if Oleksijs patch implements the M4 support in a way we
+actually need it later.
+
 > 
-> Changes from v8:
->     - Rename machine into "sun8i-a83t"
-> 
-> Changes from v7:
->     - Add the patch of Doug Berger in my series.
->     - Rename the machine name to start secure_cntvoff into "sun8i-a83t",
->     according to Maxime's review.
->     - Change the type of is_a83t field from integer into boolean.
-> 
-> Changes from v6:
->     - Correct the commit log on patch 07 according to Sergei Shtylyov's
->     review.
->     - Rename the field "is_sun8i" into "is_a83t".
->     - Add all Tested-by and Reviewed-by from previous version.
-> 
-> Changes from v5:
->     - Remove my patch 01 and use the patch of Doug Berger to be able to
->     include the cpu-type header on assembly files.
->     - Rename smp_init_cntvoff function into secure_cntvoff_init according
->     to Marc Zyngier's review.
->     - According to Chen-Yu and Maxime's reviews, remove the patch that was
->     moving structures. Instead of using an index to retrieve which
->     architecture we are having, use a global variable.
->     - Merge the 2 patches that move assembly code from C to assembly file.
->     - Use a sun8i field instead of sun9i to know on which architecture we
->     are using because many modifications/additions of the code are for
->     sun8i-a83t.
->     - Rework the patch "add is_sun8i field" to add only this field in this
->     patch. The part of the patch that was starting to handle the differences
->     between sun8i-a83t and sun9i-a80 is merged in the patch that adds the
->     support of sun8i-a83t.
->     - Add a new patch that refactor the shmobile code to use the new function
->     secure_cntvoff_init introduced in this series.
-> 
-> Changes from v4:
->     - Rebased my series according to new Chen-Yu series:
->        "ARM: sunxi: Clean and improvements for multi-cluster SMP"
->        https://lkml.org/lkml/2018/3/8/886
->     - Updated my series according to Marc Zyngier's reviews to add CNTVOFF
->     initialization's function into ARM's common part. Thanks to that, other
->     platforms such as Renesa can use this function.
->     - For boot CPU, create a new machine to handle the CNTVOFF initialization
->     using "init_early" callback.
-> 
-> Changes from v3:
->     - Take into account Maxime's reviews:
-> 	- split the first patch into 4 new patches: add sun9i device tree
-> 	parsing, rename some variables, add a83t support and finally,
-> 	add hotplug support.
-> 	- Move the code of previous patch 07 (to disable CPU0 disabling)
-> 	into hotplug support patch (see patch 04)
-> 	- Remove the patch that added PRCM register because it is already
-> 	available. Because of that, update the device tree parsing to use
-> 	"sun8i-a83t-r-ccu".
-> 	- Use a variable to know which SoC we currently have
->     - Take into account Chen-Yu's reviews: create two iounmap functions
->     to release the resources of the device tree parsing.
->     - Take into account Marc's review: Update the code to initialize CNTVOFF
->     register. As there is already assembly code in the driver, I decided
->     to create an assembly file not to mix assembly and C code.
->     For that, I create 3 new patches: move the current assembly code that
->     handles the cluster cache enabling into a file, move the cpu_resume entry
->     in this file and finally, add a new assembly entry to initialize the timer
->     offset for boot CPU and secondary CPUs.
-> 
-> Changes from v2:
->     - Rebased my modifications according to new Chen Yu's patch series
->     that adds SMP support for sun9i-a80 (without MCPM).
->     - Split the device-tree patches into 3 patches for CPUCFG, R_CPUCFG
->     and PRCM registers for more visibility.
->     - The hotplug of CPU0 is currently not working (even after trying what
->     Allwinner's code is doing) so remove the possibility of disabling
->     this CPU. Created a new patch for it.
-> 
-> Changes from v1:
->     - Add Chen Yu's patch in my series (see path 01)
->     - Add new compatibles for prcm and cpucfg registers for sun8i-a83t.
->     Create two functions to separate the DT parsing of sun9i-a80 and
->     sun8i-a83t.
->     - Thanks to Maxime's review: order device tree's nodes according
->     to physical addresses, remove unused label and fix registers' sizes.
->     Update the commit log and commit title of my last patch (see
->     patch 05).
-> 
-> Doug Berger (1):
->   ARM: Allow this header to be included by assembly files
-> 
-> Myl?ne Josserand (11):
->   ARM: sunxi: smp: Move assembly code into a file
->   ARM: dts: sun8i: Add CPUCFG device node for A83T dtsi
->   ARM: dts: sun8i: Add R_CPUCFG device node for the A83T dtsi
->   ARM: dts: sun8i: a83t: Add CCI-400 node
->   ARM: smp: Add initialization of CNTVOFF
->   ARM: sunxi: Add initialization of CNTVOFF
->   ARM: sun9i: smp: Rename clusters's power-off
->   ARM: sun9i: smp: Add is_a83t field
->   ARM: sun8i: smp: Add support for A83T
->   ARM: dts: sun8i: Add enable-method for SMP support for the A83T SoC
->   ARM: shmobile: Convert file to use cntvoff
-> 
->  arch/arm/boot/dts/sun8i-a83t.dtsi        |  59 ++++++++
->  arch/arm/common/Makefile                 |   1 +
->  arch/arm/common/secure_cntvoff.S         |  31 ++++
->  arch/arm/include/asm/cputype.h           |  10 +-
->  arch/arm/include/asm/secure_cntvoff.h    |   8 ++
->  arch/arm/mach-shmobile/common.h          |   1 -
->  arch/arm/mach-shmobile/headsmp-apmu.S    |  22 +--
->  arch/arm/mach-shmobile/setup-rcar-gen2.c |   3 +-
->  arch/arm/mach-sunxi/Kconfig              |   2 +-
->  arch/arm/mach-sunxi/Makefile             |   2 +-
->  arch/arm/mach-sunxi/headsmp.S            |  81 +++++++++++
->  arch/arm/mach-sunxi/mc_smp.c             | 239 +++++++++++++++++++------------
->  arch/arm/mach-sunxi/sunxi.c              |  20 ++-
->  13 files changed, 356 insertions(+), 123 deletions(-)
->  create mode 100644 arch/arm/common/secure_cntvoff.S
->  create mode 100644 arch/arm/include/asm/secure_cntvoff.h
->  create mode 100644 arch/arm/mach-sunxi/headsmp.S
-> 
-> -- 
-> 2.11.0
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Mailbox support obviously is another thing which is independent of this patch
+> series. They're not conflict thing. You obviously could extend your MU driver
+> to support SCU as well. If it's proved to better than current way, we definitely
+> could switch to it later. It's not clean up old code, it's just simply switch to a
+> new way.
+
+Provided you don't use a mailbox driver then we'll have to prevent a
+mailbox driver from binding to the device that is used for the SCU. And
+yes, that's what I consider having to cleanup after you.
+
+Sascha
+
+
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
