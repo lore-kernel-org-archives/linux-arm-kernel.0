@@ -1,33 +1,66 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 26 Jun 2018 15:21:54 +0200
-Subject: [PATCH 00/14] ARM: davinci: step towards removing
- at24_platform_data
-In-Reply-To: <CAMRc=Mdvh+1enpD3qDoamhPfaBPin2v3amneQELApgoC0bS2FQ@mail.gmail.com>
-References: <20180625155025.12567-1-brgl@bgdev.pl>
- <20180625174024.GB17417@lunn.ch>
- <CAMRc=MdEn74G5SJAaGLAfNSS7Zy7wqH04aN5CMZ45UXqhu_58g@mail.gmail.com>
- <20180625180237.GC17417@lunn.ch>
- <CAMRc=MejDn=t6EPbKOfhMfRAb_O-5hxtWRyjAWH1mb5BUySrDA@mail.gmail.com>
- <20180626083823.GA28068@lunn.ch>
- <CAMRc=Mdvh+1enpD3qDoamhPfaBPin2v3amneQELApgoC0bS2FQ@mail.gmail.com>
-Message-ID: <20180626132154.GA5064@lunn.ch>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Tue, 26 Jun 2018 15:21:57 +0200
+Subject: [PATCH V4 5/8] ARM: dts: stm32: Add ethernet dwmac on stm32mp1
+In-Reply-To: <1527090479-5263-6-git-send-email-christophe.roullier@st.com>
+References: <1527090479-5263-1-git-send-email-christophe.roullier@st.com>
+ <1527090479-5263-6-git-send-email-christophe.roullier@st.com>
+Message-ID: <c88813df-a5a8-3c24-fbc4-bc4d2cebcab1@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> I see. I see it this way: the setup callback comes from the time when
-> we didn't have nvmem and should go away. I will protest loud whenever
-> someone will try to use it again and will work towards removing it as
-> soon as possible.
+Hi christophe
 
-The setup() callback could be moved into the nvmem framework, rather
-than in the at24 driver. Make the call when the cells have been
-connected to the backing store.
+On 05/23/2018 05:47 PM, Christophe Roullier wrote:
+> Add Ethernet support (Synopsys MAC IP 4.20a) on stm32mp1 SOC.
+> Enable feature supported by the stmmac driver, such as TSO.
+> 
+> Signed-off-by: Christophe Roullier <christophe.roullier@st.com>
+> ---
+>   arch/arm/boot/dts/stm32mp157c.dtsi | 30 ++++++++++++++++++++++++++++++
+>   1 file changed, 30 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/stm32mp157c.dtsi b/arch/arm/boot/dts/stm32mp157c.dtsi
+> index 3db03a2..ea7b6cb 100644
+> --- a/arch/arm/boot/dts/stm32mp157c.dtsi
+> +++ b/arch/arm/boot/dts/stm32mp157c.dtsi
+> @@ -179,5 +179,35 @@
+>   			clocks = <&rcc USART1_K>;
+>   			status = "disabled";
+>   		};
+> +
+> +		stmmac_axi_config_0: stmmac-axi-config {
+> +			snps,wr_osr_lmt = <0x7>;
+> +			snps,rd_osr_lmt = <0x7>;
+> +			snps,blen = <0 0 0 0 16 8 4>;
+> +		};
+> +
+> +		ethernet0: ethernet at 5800a000 {
+> +			compatible = "st,stm32mp1-dwmac", "snps,dwmac-4.20a";
+> +			reg = <0x5800a000 0x2000>;
+> +			reg-names = "stmmaceth";
+> +			interrupts-extended = <&intc GIC_SPI 61 IRQ_TYPE_NONE>;
 
-> I will give your problem a thought and will try to get back with some
-> proposals - maybe we should, as you suggested, extend nvmem even
-> further to allow to remove nvmem info entries etc.
+IRQ_TYPE_NONE souldn't be used. Please provide edge sensitiv or level 
+sensitic type.
 
-That does not help me too much. I have the same problem with i2c and
-MDIO. So i actually prefer to keep this the same as all others.
-
-	Andrew
+> +			interrupt-names = "macirq";
+> +			clock-names = "stmmaceth",
+> +				      "mac-clk-tx",
+> +				      "mac-clk-rx",
+> +				      "ethstp",
+> +				      "syscfg-clk";
+> +			clocks = <&rcc ETHMAC>,
+> +				 <&rcc ETHTX>,
+> +				 <&rcc ETHRX>,
+> +				 <&rcc ETHSTP>,
+> +				 <&rcc SYSCFG>;
+> +			st,syscon = <&syscfg 0x4>;
+> +			snps,mixed-burst;
+> +			snps,pbl = <2>;
+> +			snps,axi-config = <&stmmac_axi_config_0>;
+> +			snps,tso;
+> +			status = "disabled";
+> +		};
+>   	};
+>   };
+> 
