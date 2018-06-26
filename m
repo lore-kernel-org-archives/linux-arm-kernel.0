@@ -1,38 +1,34 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Tue, 26 Jun 2018 11:25:25 +0200
-Subject: [PATCH v2 01/13] clk: davinci: psc-da850: remove the 'davinci_nand.0"
- lookup
-In-Reply-To: <20180626092537.6737-1-brgl@bgdev.pl>
-References: <20180626092537.6737-1-brgl@bgdev.pl>
-Message-ID: <20180626092537.6737-2-brgl@bgdev.pl>
+From: Alexander.Steffen@infineon.com (Alexander Steffen)
+Date: Tue, 26 Jun 2018 12:07:21 +0200
+Subject: [PATCH v2 01/10] tpm/tpm_i2c_infineon: switch to
+ i2c_lock_bus(..., I2C_LOCK_SEGMENT)
+In-Reply-To: <20180625102454.GA3845@linux.intel.com>
+References: <20180620051803.12206-1-peda@axentia.se>
+ <20180620051803.12206-2-peda@axentia.se>
+ <20180625102454.GA3845@linux.intel.com>
+Message-ID: <7703d6a2-b22c-104c-7390-b5143a504725@infineon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+On 25.06.2018 12:24, Jarkko Sakkinen wrote:
+> On Wed, Jun 20, 2018 at 07:17:54AM +0200, Peter Rosin wrote:
+>> Locking the root adapter for __i2c_transfer will deadlock if the
+>> device sits behind a mux-locked I2C mux. Switch to the finer-grained
+>> i2c_lock_bus with the I2C_LOCK_SEGMENT flag. If the device does not
+>> sit behind a mux-locked mux, the two locking variants are equivalent.
+>>
+>> Signed-off-by: Peter Rosin <peda@axentia.se>
+> 
+> Studied enough so that I can give
+> 
+> Reviewed-by: Jarkko Sakkinen <jarkko.sakkinen@linux.intel.com>
+> 
+> Do not have hardware to test this, however.
 
-Since commit a8e3923ab571 ("mtd: rawnand: davinci: don't acquire and
-enable clock") we no longer acquire the aemif clock from the davinci
-nand driver - we only do it from the ti-aemif driver. Remove the nand
-entry from the psc lookup table.
+I don't have a mux-locked I2C mux either, but at least I can confirm 
+that this change did not break my existing test setup (SLB9635/SLB9645 
+on Raspberry Pi 2B).
 
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
----
- drivers/clk/davinci/psc-da850.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+Tested-by: Alexander Steffen <Alexander.Steffen@infineon.com>
 
-diff --git a/drivers/clk/davinci/psc-da850.c b/drivers/clk/davinci/psc-da850.c
-index d196dcbed560..5a18bca464cd 100644
---- a/drivers/clk/davinci/psc-da850.c
-+++ b/drivers/clk/davinci/psc-da850.c
-@@ -16,8 +16,7 @@
- 
- #include "psc.h"
- 
--LPSC_CLKDEV2(emifa_clkdev,	NULL,		"ti-aemif",
--				"aemif",	"davinci_nand.0");
-+LPSC_CLKDEV1(emifa_clkdev,	NULL,		"ti-aemif");
- LPSC_CLKDEV1(spi0_clkdev,	NULL,		"spi_davinci.0");
- LPSC_CLKDEV1(mmcsd0_clkdev,	NULL,		"da830-mmc.0");
- LPSC_CLKDEV1(uart0_clkdev,	NULL,		"serial8250.0");
--- 
-2.17.1
+Alexander
