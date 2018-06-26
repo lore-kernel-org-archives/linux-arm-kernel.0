@@ -1,82 +1,73 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 26 Jun 2018 17:04:02 +0200
-Subject: [PATCH v5 0/7] add virt-dma support for imx-sdma
-In-Reply-To: <1529427424-12321-1-git-send-email-yibin.gong@nxp.com>
-References: <1529427424-12321-1-git-send-email-yibin.gong@nxp.com>
-Message-ID: <1530025442.9910.44.camel@pengutronix.de>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 26 Jun 2018 16:11:02 +0100 (BST)
+Subject: Applied "ASoC: qdsp6: q6asm-dai: support dt based module loading" to
+ the asoc tree
+In-Reply-To: <20180626092016.9296-9-srinivas.kandagatla@linaro.org>
+Message-ID: <20180626151102.612F1440070@finisterre.ee.mobilebroadband>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+The patch
 
-I've tested this whole series with the SDMA being used for SPI, UART
-and SSI with no regressions spotted. As this should cover most common
-use-cases, I think this series is good to go in.
+   ASoC: qdsp6: q6asm-dai: support dt based module loading
 
-Tested-by: Lucas Stach <l.stach@pengutronix.de>
+has been applied to the asoc tree at
 
-Regards,
-Lucas
+   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
 
-Am Mittwoch, den 20.06.2018, 00:56 +0800 schrieb Robin Gong:
-> The legacy sdma driver has below limitations or drawbacks:
-> ? 1. Hardcode the max BDs number as "PAGE_SIZE / sizeof(*)", and alloc
-> ?????one page size for one channel regardless of only few BDs needed
-> ?????most time. But in few cases, the max PAGE_SIZE maybe not enough.
-> ? 2. One SDMA channel can't stop immediatley once channel disabled which
-> ?????means SDMA interrupt may come in after this channel terminated.There
-> ?????are some patches for this corner case such as commit "2746e2c389f9",
-> ?????but not cover non-cyclic.
-> 
-> The common virt-dma overcomes the above limitations. It can alloc bd
-> dynamically and free bd once this tx transfer done. No memory wasted or
-> maximum limititation here, only depends on how many memory can be requested
-> from kernel. For No.2, such issue can be workaround by checking if there
-> is available descript("sdmac->desc") now once the unwanted interrupt
-> coming. At last the common virt-dma is easier for sdma driver maintain.
-> 
-> Change from v4:
-> ? 1. identify lockdep issue which caused by allocate memory with
-> ?????'GFP_KERNEL', change to 'GFP_NOWAIT' instead so that lockdep
-> ?????ignore check. That also make sense since Audio/uart driver may
-> ?????call dma function after spin_lock_irqsave()...
-> ? 2. use dma pool instead for bd description allocated,since audio
-> ?????driver may call dma_terminate_all in irq. Please refer to 7/7.
-> ? 3. remove 7/7 serial patch in v4, since lockdep issued fixed by No.1?
-> 
-> Change from v3:
-> ? 1. add two uart patches which impacted by this patchset.
-> ? 2. unlock 'vc.lock' before cyclic dma callback and lock again after
-> ?????it because some driver such as uart will call dmaengine_tx_status
-> ?????which will acquire 'vc.lock' again and dead lock comes out.
-> ? 3. remove 'Revert commit' stuff since that patch is not wrong and
-> ?????combine two patch into one patch as Sascha's comment.
-> 
-> Change from v2:
-> ? 1. include Sascha's patch to make the main patch easier to review.
-> ?????Thanks Sacha.
-> ? 2. remove useless 'desc'/'chan' in struct sdma_channe.
-> 
-> Change from v1:
-> ? 1. split v1 patch into 5 patches.
-> ? 2. remove some unnecessary condition check.
-> ? 3. remove unnecessary 'pending' list.
-> 
-> Robin Gong (6):
-> ? tty: serial: imx: correct dma cookie status
-> ? dmaengine: imx-sdma: add virt-dma support
-> ? dmaengine: imx-sdma: remove useless 'lock' and 'enabled' in 'struct
-> ????sdma_channel'
-> ? dmaengine: imx-sdma: remove the maximum limitation for bd numbers
-> ? dmaengine: imx-sdma: add sdma_transfer_init to decrease code overlap
-> ? dmaengine: imx-sdma: alloclate bd memory from dma pool
-> 
-> Sascha Hauer (1):
-> ? dmaengine: imx-sdma: factor out a struct sdma_desc from struct
-> ????sdma_channel
-> 
-> ?drivers/dma/Kconfig??????|???1 +
-> ?drivers/dma/imx-sdma.c???| 400 +++++++++++++++++++++++++++--------------------
-> ?drivers/tty/serial/imx.c |???2 +-
-> ?3 files changed, 235 insertions(+), 168 deletions(-)
-> 
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
+
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
+
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
+
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
+
+Thanks,
+Mark
+
+>From 1ce09ef36fb190fa207fdb3e31fc1c8caa292125 Mon Sep 17 00:00:00 2001
+From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+Date: Tue, 26 Jun 2018 10:20:12 +0100
+Subject: [PATCH] ASoC: qdsp6: q6asm-dai: support dt based module loading
+
+This patch uses new compatible string to make DT based module loading work.
+
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+Acked-by: Niklas Cassel <niklas.cassel@linaro.org>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ sound/soc/qcom/qdsp6/q6asm-dai.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/sound/soc/qcom/qdsp6/q6asm-dai.c b/sound/soc/qcom/qdsp6/q6asm-dai.c
+index 349c6a883c63..1196dc7483d2 100644
+--- a/sound/soc/qcom/qdsp6/q6asm-dai.c
++++ b/sound/soc/qcom/qdsp6/q6asm-dai.c
+@@ -611,9 +611,16 @@ static int q6asm_dai_dev_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++static const struct of_device_id q6asm_dai_device_id[] = {
++	{ .compatible = "qcom,q6asm-dais" },
++	{},
++};
++MODULE_DEVICE_TABLE(of, q6asm_dai_device_id);
++
+ static struct platform_driver q6asm_dai_platform_driver = {
+ 	.driver = {
+ 		.name = "q6asm-dai",
++		.of_match_table = of_match_ptr(q6asm_dai_device_id),
+ 	},
+ 	.probe = q6asm_dai_probe,
+ 	.remove = q6asm_dai_dev_remove,
+-- 
+2.17.1
