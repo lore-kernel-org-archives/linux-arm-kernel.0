@@ -1,69 +1,66 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Tue, 26 Jun 2018 12:22:36 +0200
-Subject: [PATCH v2 06/15] ARM: davinci: mityomapl138: add nvmem cells lookup
- entries
+Date: Tue, 26 Jun 2018 12:22:45 +0200
+Subject: [PATCH v2 15/15] ARM: davinci: remove dead code
 In-Reply-To: <20180626102245.30711-1-brgl@bgdev.pl>
 References: <20180626102245.30711-1-brgl@bgdev.pl>
-Message-ID: <20180626102245.30711-7-brgl@bgdev.pl>
+Message-ID: <20180626102245.30711-16-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-We now support nvmem lookups for machine code. Add a lookup for
-mac-address.
+There are no more users of davinci_get_mac_addr(). Remove it. Also
+remove the mac_addr field from the emac platform data struct.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- arch/arm/mach-davinci/board-mityomapl138.c | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+ arch/arm/mach-davinci/common.c | 15 ---------------
+ include/linux/davinci_emac.h   |  2 --
+ 2 files changed, 17 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/board-mityomapl138.c b/arch/arm/mach-davinci/board-mityomapl138.c
-index 37b3e48a21d1..2ec31ff61dbd 100644
---- a/arch/arm/mach-davinci/board-mityomapl138.c
-+++ b/arch/arm/mach-davinci/board-mityomapl138.c
-@@ -21,6 +21,7 @@
- #include <linux/etherdevice.h>
- #include <linux/spi/spi.h>
- #include <linux/spi/flash.h>
-+#include <linux/nvmem-provider.h>
+diff --git a/arch/arm/mach-davinci/common.c b/arch/arm/mach-davinci/common.c
+index bcb6a7ba84e9..0c6cc354a4aa 100644
+--- a/arch/arm/mach-davinci/common.c
++++ b/arch/arm/mach-davinci/common.c
+@@ -28,21 +28,6 @@ EXPORT_SYMBOL(davinci_soc_info);
+ void __iomem *davinci_intc_base;
+ int davinci_intc_type;
  
- #include <asm/io.h>
- #include <asm/mach-types.h>
-@@ -160,6 +161,25 @@ static void read_factory_config(struct nvmem_device *nvmem, void *context)
- 	mityomapl138_cpufreq_init(partnum);
- }
+-void davinci_get_mac_addr(struct nvmem_device *nvmem, void *context)
+-{
+-	char *mac_addr = davinci_soc_info.emac_pdata->mac_addr;
+-	off_t offset = (off_t)context;
+-
+-	if (!IS_BUILTIN(CONFIG_NVMEM)) {
+-		pr_warn("Cannot read MAC addr from EEPROM without CONFIG_NVMEM\n");
+-		return;
+-	}
+-
+-	/* Read MAC addr from EEPROM */
+-	if (nvmem_device_read(nvmem, offset, ETH_ALEN, mac_addr) == ETH_ALEN)
+-		pr_info("Read MAC addr from EEPROM: %pM\n", mac_addr);
+-}
+-
+ static int __init davinci_init_id(struct davinci_soc_info *soc_info)
+ {
+ 	int			i;
+diff --git a/include/linux/davinci_emac.h b/include/linux/davinci_emac.h
+index 05b97144d342..19888b27706d 100644
+--- a/include/linux/davinci_emac.h
++++ b/include/linux/davinci_emac.h
+@@ -19,7 +19,6 @@ struct mdio_platform_data {
+ };
  
-+static struct nvmem_cell_lookup mityomapl138_nvmem_cells[] = {
-+	{
-+		.info = {
-+			.name = "factory-config",
-+			.offset = 0x0,
-+			.bytes = sizeof(struct factory_config),
-+		},
-+		.nvmem_name = "1-00500",
-+	},
-+	{
-+		.info = {
-+			.name = "mac-address",
-+			.offset = 0x64,
-+			.bytes = ETH_ALEN,
-+		},
-+		.nvmem_name = "1-00500",
-+	}
-+};
-+
- static struct at24_platform_data mityomapl138_fd_chip = {
- 	.byte_len	= 256,
- 	.page_size	= 8,
-@@ -534,6 +554,8 @@ static void __init mityomapl138_init(void)
- 	if (ret)
- 		pr_warn("spi 1 registration failed: %d\n", ret);
+ struct emac_platform_data {
+-	char mac_addr[ETH_ALEN];
+ 	u32 ctrl_reg_offset;
+ 	u32 ctrl_mod_reg_offset;
+ 	u32 ctrl_ram_offset;
+@@ -46,5 +45,4 @@ enum {
+ 	EMAC_VERSION_2,	/* DM646x */
+ };
  
-+	nvmem_register_lookup(mityomapl138_nvmem_cells,
-+			      ARRAY_SIZE(mityomapl138_nvmem_cells));
- 	mityomapl138_config_emac();
- 
- 	ret = da8xx_register_rtc();
+-void davinci_get_mac_addr(struct nvmem_device *nvmem, void *context);
+ #endif
 -- 
 2.17.1
