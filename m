@@ -1,271 +1,90 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Tue, 26 Jun 2018 11:25:37 +0200
-Subject: [PATCH v2 13/13] ARM: davinci: unduplicate aemif support
-In-Reply-To: <20180626092537.6737-1-brgl@bgdev.pl>
-References: <20180626092537.6737-1-brgl@bgdev.pl>
-Message-ID: <20180626092537.6737-14-brgl@bgdev.pl>
+Date: Tue, 26 Jun 2018 11:31:46 +0200
+Subject: [PATCH 00/14] ARM: davinci: step towards removing
+ at24_platform_data
+In-Reply-To: <20180626083823.GA28068@lunn.ch>
+References: <20180625155025.12567-1-brgl@bgdev.pl>
+ <20180625174024.GB17417@lunn.ch>
+ <CAMRc=MdEn74G5SJAaGLAfNSS7Zy7wqH04aN5CMZ45UXqhu_58g@mail.gmail.com>
+ <20180625180237.GC17417@lunn.ch>
+ <CAMRc=MejDn=t6EPbKOfhMfRAb_O-5hxtWRyjAWH1mb5BUySrDA@mail.gmail.com>
+ <20180626083823.GA28068@lunn.ch>
+Message-ID: <CAMRc=Mdvh+1enpD3qDoamhPfaBPin2v3amneQELApgoC0bS2FQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+2018-06-26 10:38 GMT+02:00 Andrew Lunn <andrew@lunn.ch>:
+> On Tue, Jun 26, 2018 at 09:44:19AM +0200, Bartosz Golaszewski wrote:
+>> 2018-06-25 20:02 GMT+02:00 Andrew Lunn <andrew@lunn.ch>:
+>> >> With my patch 1/14 you'll get -EPROBE_DEFER from nvmem_cell_get() if
+>> >> the nvmem provider is not yet registered. Will that help in your case?
+>> >
+>> > I don't think so. My driver instantiates the AT24 device. So if i get
+>> > -EPROBE_DEFER, i need to cleanup the probe, and return -EPROBDE_DEFER
+>> > to the code. Which means i need to remove the AT24 device...
+>> >
+>> >        Andrew
+>>
+>> Are you sure this is the correct approach? I understand that you want
+>> to use something like board files for your machine? Wouldn't it be
+>> better to register a platform device for at24, register a cell lookup
+>> and then depend on that cell from your driver?
+>
+> Hi Bartosz
+>
+> The machine is based around a Kontron Com Express module, with an
+> intel Ivy Bridge CPU. This is then placed into a custom carrier board,
+> which has a number of i2c devices.
+>
+> I have a platform driver which matches on the DMI system ID for the
+> Kontron module.
+>
+> The Com Express module has a PLD which implements i2c, gpio,
+> etc. There is an MFD for this, which instantiates the i2c-kempld i2c
+> bus driver.
+>
+> My platform driver finds this i2c-kempld bus driver. If it does not
+> exist yet, it return -EPROBE_DEFER. If it is found it instantiates an
+> at24 device on it. I need to look at the content of the EEPROM to
+> determine the hardware revision, plus do a checksum.  From that, i
+> need to instantiates 1 or 2 additional AT24, up to 4 GPIO expanders,
+> and i2c to spi converter, add some gpio-leds on the gpio expanders,
+> create a bit-banging MDIO bus, instantiate an Ethernet switch on the
+> MDIO bus, maybe add an Ethernet switch to the SPI bus, etc.
+>
+> As you can see, i have a chain of events. I cannot move onto the next
+> part of the chain until i know the probe for the previous part has
+> finished. e.g. i cannot add gpio-leds until i know the gpio expander
+> has probed. But the gpio expander provides a call back, similar to the
+> at24 setup(). The MDIO bus and the SPI bus has a mechanism to register
+> an info structure, just like you have done for NVMEM cells. So that
+> works out.
+>
+> The weak link in this chain is that first at24 probe, and knowing when
+> i can access the nvmem cells for the revision and checksum
+> information. -EPROBE_DEFER does not help me here. I need either some
+> sort of blocking wait for the cells to become available, or a callback
+> in a context which allows me to instantiate more devices.
+>
+> I also have some steps which cannot be undone. You don't provide a
+> mechanism to unregister the nvmem info structure. The I2C and MDIO
+> equivalent also does not provide an unregister for bus info. So once i
+> register the first info structure, i'm past the point of no return. I
+> cannot return -EPROBE_DEFER because i cannot unregister the info
+> structures, so that i can register them again the next time the
+> platform driver gets probed.
+>
+>          Andrew
+>
 
-All users now register platform devices using the ti-aemif driver.
-Remove the handcrafted aemif API.
+I see. I see it this way: the setup callback comes from the time when
+we didn't have nvmem and should go away. I will protest loud whenever
+someone will try to use it again and will work towards removing it as
+soon as possible.
 
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
----
- arch/arm/mach-davinci/Makefile                |   2 +-
- arch/arm/mach-davinci/aemif.c                 | 218 ------------------
- .../linux/platform_data/mtd-davinci-aemif.h   |   1 -
- 3 files changed, 1 insertion(+), 220 deletions(-)
- delete mode 100644 arch/arm/mach-davinci/aemif.c
+I will give your problem a thought and will try to get back with some
+proposals - maybe we should, as you suggested, extend nvmem even
+further to allow to remove nvmem info entries etc.
 
-diff --git a/arch/arm/mach-davinci/Makefile b/arch/arm/mach-davinci/Makefile
-index 8725d8bea567..93d271b4d84b 100644
---- a/arch/arm/mach-davinci/Makefile
-+++ b/arch/arm/mach-davinci/Makefile
-@@ -6,7 +6,7 @@
- 
- # Common objects
- obj-y 					:= time.o serial.o usb.o \
--					   common.o sram.o aemif.o
-+					   common.o sram.o
- 
- obj-$(CONFIG_DAVINCI_MUX)		+= mux.o
- 
-diff --git a/arch/arm/mach-davinci/aemif.c b/arch/arm/mach-davinci/aemif.c
-deleted file mode 100644
-index e4ab3f3a2a1f..000000000000
---- a/arch/arm/mach-davinci/aemif.c
-+++ /dev/null
-@@ -1,218 +0,0 @@
--/*
-- * AEMIF support for DaVinci SoCs
-- *
-- * Copyright (C) 2010 Texas Instruments Incorporated. http://www.ti.com/
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--
--#include <linux/kernel.h>
--#include <linux/io.h>
--#include <linux/err.h>
--#include <linux/clk.h>
--#include <linux/module.h>
--#include <linux/time.h>
--
--#include <linux/platform_data/mtd-davinci-aemif.h>
--#include <linux/platform_data/mtd-davinci.h>
--
--/* Timing value configuration */
--
--#define TA(x)		((x) << 2)
--#define RHOLD(x)	((x) << 4)
--#define RSTROBE(x)	((x) << 7)
--#define RSETUP(x)	((x) << 13)
--#define WHOLD(x)	((x) << 17)
--#define WSTROBE(x)	((x) << 20)
--#define WSETUP(x)	((x) << 26)
--
--#define TA_MAX		0x3
--#define RHOLD_MAX	0x7
--#define RSTROBE_MAX	0x3f
--#define RSETUP_MAX	0xf
--#define WHOLD_MAX	0x7
--#define WSTROBE_MAX	0x3f
--#define WSETUP_MAX	0xf
--
--#define TIMING_MASK	(TA(TA_MAX) | \
--				RHOLD(RHOLD_MAX) | \
--				RSTROBE(RSTROBE_MAX) |	\
--				RSETUP(RSETUP_MAX) | \
--				WHOLD(WHOLD_MAX) | \
--				WSTROBE(WSTROBE_MAX) | \
--				WSETUP(WSETUP_MAX))
--
--static inline unsigned int davinci_aemif_readl(void __iomem *base, int offset)
--{
--	return readl_relaxed(base + offset);
--}
--
--static inline void davinci_aemif_writel(void __iomem *base,
--					int offset, unsigned long value)
--{
--	writel_relaxed(value, base + offset);
--}
--
--/*
-- * aemif_calc_rate - calculate timing data.
-- * @wanted: The cycle time needed in nanoseconds.
-- * @clk: The input clock rate in kHz.
-- * @max: The maximum divider value that can be programmed.
-- *
-- * On success, returns the calculated timing value minus 1 for easy
-- * programming into AEMIF timing registers, else negative errno.
-- */
--static int aemif_calc_rate(int wanted, unsigned long clk, int max)
--{
--	int result;
--
--	result = DIV_ROUND_UP((wanted * clk), NSEC_PER_MSEC) - 1;
--
--	pr_debug("%s: result %d from %ld, %d\n", __func__, result, clk, wanted);
--
--	/* It is generally OK to have a more relaxed timing than requested... */
--	if (result < 0)
--		result = 0;
--
--	/* ... But configuring tighter timings is not an option. */
--	else if (result > max)
--		result = -EINVAL;
--
--	return result;
--}
--
--/**
-- * davinci_aemif_setup_timing - setup timing values for a given AEMIF interface
-- * @t: timing values to be progammed
-- * @base: The virtual base address of the AEMIF interface
-- * @cs: chip-select to program the timing values for
-- * @clkrate: the AEMIF clkrate
-- *
-- * This function programs the given timing values (in real clock) into the
-- * AEMIF registers taking the AEMIF clock into account.
-- *
-- * This function does not use any locking while programming the AEMIF
-- * because it is expected that there is only one user of a given
-- * chip-select.
-- *
-- * Returns 0 on success, else negative errno.
-- */
--static int davinci_aemif_setup_timing(struct davinci_aemif_timing *t,
--					void __iomem *base, unsigned cs,
--					unsigned long clkrate)
--{
--	unsigned set, val;
--	int ta, rhold, rstrobe, rsetup, whold, wstrobe, wsetup;
--	unsigned offset = A1CR_OFFSET + cs * 4;
--
--	if (!t)
--		return 0;	/* Nothing to do */
--
--	clkrate /= 1000;	/* turn clock into kHz for ease of use */
--
--	ta	= aemif_calc_rate(t->ta, clkrate, TA_MAX);
--	rhold	= aemif_calc_rate(t->rhold, clkrate, RHOLD_MAX);
--	rstrobe	= aemif_calc_rate(t->rstrobe, clkrate, RSTROBE_MAX);
--	rsetup	= aemif_calc_rate(t->rsetup, clkrate, RSETUP_MAX);
--	whold	= aemif_calc_rate(t->whold, clkrate, WHOLD_MAX);
--	wstrobe	= aemif_calc_rate(t->wstrobe, clkrate, WSTROBE_MAX);
--	wsetup	= aemif_calc_rate(t->wsetup, clkrate, WSETUP_MAX);
--
--	if (ta < 0 || rhold < 0 || rstrobe < 0 || rsetup < 0 ||
--			whold < 0 || wstrobe < 0 || wsetup < 0) {
--		pr_err("%s: cannot get suitable timings\n", __func__);
--		return -EINVAL;
--	}
--
--	set = TA(ta) | RHOLD(rhold) | RSTROBE(rstrobe) | RSETUP(rsetup) |
--		WHOLD(whold) | WSTROBE(wstrobe) | WSETUP(wsetup);
--
--	val = __raw_readl(base + offset);
--	val &= ~TIMING_MASK;
--	val |= set;
--	__raw_writel(val, base + offset);
--
--	return 0;
--}
--
--/**
-- * davinci_aemif_setup - setup AEMIF interface by davinci_nand_pdata
-- * @pdev - link to platform device to setup settings for
-- *
-- * This function does not use any locking while programming the AEMIF
-- * because it is expected that there is only one user of a given
-- * chip-select.
-- *
-- * Returns 0 on success, else negative errno.
-- */
--int davinci_aemif_setup(struct platform_device *pdev)
--{
--	struct davinci_nand_pdata *pdata = dev_get_platdata(&pdev->dev);
--	uint32_t val;
--	unsigned long clkrate;
--	struct resource	*res;
--	void __iomem *base;
--	struct clk *clk;
--	int ret = 0;
--
--	clk = clk_get(&pdev->dev, "aemif");
--	if (IS_ERR(clk)) {
--		ret = PTR_ERR(clk);
--		dev_dbg(&pdev->dev, "unable to get AEMIF clock, err %d\n", ret);
--		return ret;
--	}
--
--	ret = clk_prepare_enable(clk);
--	if (ret < 0) {
--		dev_dbg(&pdev->dev, "unable to enable AEMIF clock, err %d\n",
--			ret);
--		goto err_put;
--	}
--
--	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
--	if (!res) {
--		dev_err(&pdev->dev, "cannot get IORESOURCE_MEM\n");
--		ret = -ENOMEM;
--		goto err;
--	}
--
--	base = ioremap(res->start, resource_size(res));
--	if (!base) {
--		dev_err(&pdev->dev, "ioremap failed for resource %pR\n", res);
--		ret = -ENOMEM;
--		goto err;
--	}
--
--	/*
--	 * Setup Async configuration register in case we did not boot
--	 * from NAND and so bootloader did not bother to set it up.
--	 */
--	val = davinci_aemif_readl(base, A1CR_OFFSET + pdata->core_chipsel * 4);
--	/*
--	 * Extended Wait is not valid and Select Strobe mode is not
--	 * used
--	 */
--	val &= ~(ACR_ASIZE_MASK | ACR_EW_MASK | ACR_SS_MASK);
--	if (pdata->options & NAND_BUSWIDTH_16)
--		val |= 0x1;
--
--	davinci_aemif_writel(base, A1CR_OFFSET + pdata->core_chipsel * 4, val);
--
--	clkrate = clk_get_rate(clk);
--
--	if (pdata->timing)
--		ret = davinci_aemif_setup_timing(pdata->timing, base,
--						 pdata->core_chipsel, clkrate);
--
--	if (ret < 0)
--		dev_dbg(&pdev->dev, "NAND timing values setup fail\n");
--
--	iounmap(base);
--err:
--	clk_disable_unprepare(clk);
--err_put:
--	clk_put(clk);
--	return ret;
--}
-diff --git a/include/linux/platform_data/mtd-davinci-aemif.h b/include/linux/platform_data/mtd-davinci-aemif.h
-index 97948ac2bb9b..a403dd51dacc 100644
---- a/include/linux/platform_data/mtd-davinci-aemif.h
-+++ b/include/linux/platform_data/mtd-davinci-aemif.h
-@@ -33,5 +33,4 @@ struct davinci_aemif_timing {
- 	u8	ta;
- };
- 
--int davinci_aemif_setup(struct platform_device *pdev);
- #endif
--- 
-2.17.1
+Best regards,
+Bartosz Golaszewski
