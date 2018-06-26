@@ -1,39 +1,40 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 26 Jun 2018 15:12:03 -0600
-Subject: [PATCH 1/2] Documentation: dt: keystone: ti-sci: Add optional
- host-id parameter
-In-Reply-To: <20180619194421.3432-2-nm@ti.com>
-References: <20180619194421.3432-1-nm@ti.com> <20180619194421.3432-2-nm@ti.com>
-Message-ID: <20180626211203.GA19874@rob-hp-laptop>
+From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
+Date: Tue, 26 Jun 2018 14:17:13 -0700
+Subject: [linux-next PATCH 0/4] Enable network driver on K2G ICE and GP
+ EVMs
+In-Reply-To: <8e1aa492-ae7a-de2b-f5d2-8756b10ece79@oracle.com>
+References: <1526066952-5230-1-git-send-email-m-karicheri2@ti.com>
+ <8e1aa492-ae7a-de2b-f5d2-8756b10ece79@oracle.com>
+Message-ID: <3fd86a06-6702-8e1c-54e6-01b23f9fd4cd@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 19, 2018 at 02:44:20PM -0500, Nishanth Menon wrote:
-> Texas Instrument's System Control Interface (TISCI) permits
-> the ability for OSs running in virtual machines to be able to
-> independently communicate with the firmware without the need going
-> through an hypervisor.
-> 
-> The "host-id" in effect is the hardware representation of the
-> host (example: VMs locked to a core) as identified to the System
-> Controller. Hypervisors can either fill in appropriate host-ids in dt
-> used for each VM instance OR may use prebuilt blobs where the host-ids
-> are pre-populated, as appropriate for the OS running in the VMs.
-> 
-> This is introduced as an optional parameter to maintain consistency
-> with legacy device tree blobs.
-> 
-> We call this with a vendor prefix to prevent any possible confusion
-> with SCSI ID (m68k) kernel option.
-> 
-> Signed-off-by: Nishanth Menon <nm@ti.com>
-> ---
-> Changes since RFC:
-> * Commit message update to elaborate usage in VM
-> 
-> RFC: https://patchwork.kernel.org/patch/10447753/
-> 
->  Documentation/devicetree/bindings/arm/keystone/ti,sci.txt | 4 ++++
->  1 file changed, 4 insertions(+)
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+On 5/20/2018 8:17 PM, santosh.shilimkar at oracle.com wrote:
+> On 5/11/18 12:29 PM, Murali Karicheri wrote:
+>> Now that NetCP driver patches for K2G SoC is merged to linux-next master
+>> this series add patches to enable network driver on K2G ICE and GP EVMs.
+>>
+>> Thanks
+>>
+>> Applied the patches on top of latest linux-next master, built kernel and
+>> booted up on both EVMs. The logs are below
+>>
+>> K2G GP EVM: https://pastebin.ubuntu.com/p/ycZDnZXYPx/
+>> K2G ICE EVM: https://pastebin.ubuntu.com/p/bdCpzgdrXr/
+>>
+>> Murali Karicheri (4):
+>> ?? ARM: dts: k2g: add dt bindings to support network driver
+>> ?? ARM: dts: keystone-k2g-evm: Enable netcp network driver
+>> ?? ARM: dts: keystone-k2g-ice: Enable netcp network driver
+>> ?? ARM: keystone: k2g: enable micrel and dp83867 phys
+>>
+[...]
+
+>>
+> Looks good. Will add this to the queue for 4.19. Thanks !!
+> 
+Applied. You should see it in linux-next as well.
+
+Regards,
+Santosh
