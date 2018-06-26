@@ -1,21 +1,19 @@
 From: david@lechnology.com (David Lechner)
-Date: Tue, 26 Jun 2018 11:15:55 -0500
-Subject: [PATCH v2 01/13] clk: davinci: psc-da850: remove the
- 'davinci_nand.0" lookup
-In-Reply-To: <20180626092537.6737-2-brgl@bgdev.pl>
+Date: Tue, 26 Jun 2018 11:16:18 -0500
+Subject: [PATCH v2 02/13] clk: davinci: psc-dm365: use two lookup entries
+ for the aemif clock
+In-Reply-To: <20180626092537.6737-3-brgl@bgdev.pl>
 References: <20180626092537.6737-1-brgl@bgdev.pl>
- <20180626092537.6737-2-brgl@bgdev.pl>
-Message-ID: <543c4ebf-4212-1933-9672-f8e29ba4d303@lechnology.com>
+ <20180626092537.6737-3-brgl@bgdev.pl>
+Message-ID: <1704809d-07d1-973b-ae92-092eca0426f8@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 06/26/2018 04:25 AM, Bartosz Golaszewski wrote:
 > From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 > 
-> Since commit a8e3923ab571 ("mtd: rawnand: davinci: don't acquire and
-> enable clock") we no longer acquire the aemif clock from the davinci
-> nand driver - we only do it from the ti-aemif driver. Remove the nand
-> entry from the psc lookup table.
+> We want to be able to get the clock both from the board file by its
+> con_id and from the aemif driver by dev_id.
 > 
 > Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 > ---
