@@ -1,61 +1,25 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 26 Jun 2018 11:32:34 +0800
-Subject: [linux-sunxi] [PATCH v2 6/7] arm64: allwinner: a64: add device
- tree node for HDMI simplefb
-In-Reply-To: <20180622124540.56203-5-icenowy@aosc.io>
-References: <20180622124540.56203-1-icenowy@aosc.io>
- <20180622124540.56203-5-icenowy@aosc.io>
-Message-ID: <CAGb2v65W5zVGygcYx2CJDOm__Txp-Fjf=38axo=0K4A0g8hb_w@mail.gmail.com>
+Date: Tue, 26 Jun 2018 11:46:21 +0800
+Subject: [PATCH 5/5] arm64: dts: allwinner: h6: enable AXP805 PMIC on Pine
+ H64
+In-Reply-To: <f93b1524657048279f54004fdbcd6ab5af9ec1c1.camel@aosc.io>
+References: <20180620051540.25617-1-wens@csie.org>
+ <20180620051540.25617-6-wens@csie.org>
+ <f93b1524657048279f54004fdbcd6ab5af9ec1c1.camel@aosc.io>
+Message-ID: <CAGb2v65A+ry5sTZCkqr_wXfe8uXJV0wnXPAGg29NWJrgtOPCxA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 22, 2018 at 8:45 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
-> As the U-Boot bootloader now is also capable of initialize the HDMI on
-> A64 boards, add a simplefb device tree node for accessing the HDMI
-> framebuffer initialized by the bootloader.
+On Tue, Jun 26, 2018 at 8:49 AM, Icenowy Zheng <icenowy@aosc.io> wrote:
+> ? 2018-06-20?? 13:15 +0800?Chen-Yu Tsai???
+>> From: Icenowy Zheng <icenowy@aosc.io>
+>>
+>> Pine H64 board has an AXP805 PMIC on it.
+>>
+>> Enable it in the device tree.
+>>
+>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 >
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> I suggest to mention the working mode change here.
 
-The subject should have "dts" in it, like:
-
-    arm64: dts: allwinner: a64: ....
-
-Seems we've been missing them for half the patches this coming cycle.
-
-ChenYu
-
-> ---
-> Changes in v2:
-> - Dropped LCD SimpleFB as it's already added. LCD SimpleFB needs some
->   fix but the fix is present when adding DE2 CCU.
->
->  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 9 +++++++++
->  1 file changed, 9 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> index 318c4ba8ae9f..840753432ea5 100644
-> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> @@ -68,6 +68,15 @@
->                                  <&display_clocks CLK_MIXER0>;
->                         status = "disabled";
->                 };
-> +
-> +               simplefb_hdmi: framebuffer-hdmi {
-> +                       compatible = "allwinner,simple-framebuffer",
-> +                                    "simple-framebuffer";
-> +                       allwinner,pipeline = "mixer1-lcd1-hdmi";
-> +                       clocks = <&display_clocks CLK_MIXER1>,
-> +                                <&ccu CLK_TCON1>, <&ccu CLK_HDMI>;
-> +                       status = "disabled";
-> +               };
->         };
->
->         cpus {
-> --
-> 2.17.1
->
-> --
-> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
+Done. Thanks.
