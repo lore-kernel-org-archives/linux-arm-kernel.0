@@ -1,15 +1,15 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Tue, 26 Jun 2018 16:11:07 +0100 (BST)
-Subject: Applied "ASoC: qdsp6: q6afe: use of_platform_populate/depopulate()"
+Date: Tue, 26 Jun 2018 16:11:09 +0100 (BST)
+Subject: Applied "ASoC: qdsp6: q6asm: use of_platform_populate/depopulate()"
  to the asoc tree
-In-Reply-To: <20180625143115.8346-7-srinivas.kandagatla@linaro.org>
-Message-ID: <20180626151107.2C0CB440070@finisterre.ee.mobilebroadband>
+In-Reply-To: <20180626092016.9296-6-srinivas.kandagatla@linaro.org>
+Message-ID: <20180626151109.43C44440070@finisterre.ee.mobilebroadband>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   ASoC: qdsp6: q6afe: use of_platform_populate/depopulate()
+   ASoC: qdsp6: q6asm: use of_platform_populate/depopulate()
 
 has been applied to the asoc tree at
 
@@ -34,10 +34,10 @@ to this mail.
 Thanks,
 Mark
 
->From 01afbd45f78cb0557db18c3ba768eea3e9576cfd Mon Sep 17 00:00:00 2001
+>From 4aac7e2773030d667491fbb6d97c9f467fdcbc05 Mon Sep 17 00:00:00 2001
 From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-Date: Tue, 26 Jun 2018 10:20:10 +0100
-Subject: [PATCH] ASoC: qdsp6: q6afe: use of_platform_populate/depopulate()
+Date: Tue, 26 Jun 2018 10:20:09 +0100
+Subject: [PATCH] ASoC: qdsp6: q6asm: use of_platform_populate/depopulate()
 
 Now that the child nodes have there own compatible strings,
 Use of_platform_populate/depopulate() instead of less common
@@ -47,37 +47,37 @@ Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 Acked-by: Niklas Cassel <niklas.cassel@linaro.org>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- sound/soc/qcom/qdsp6/q6afe.c | 16 ++--------------
+ sound/soc/qcom/qdsp6/q6asm.c | 16 ++--------------
  1 file changed, 2 insertions(+), 14 deletions(-)
 
-diff --git a/sound/soc/qcom/qdsp6/q6afe.c b/sound/soc/qcom/qdsp6/q6afe.c
-index 01f43218984b..621b67b34db9 100644
---- a/sound/soc/qcom/qdsp6/q6afe.c
-+++ b/sound/soc/qcom/qdsp6/q6afe.c
-@@ -316,7 +316,6 @@ struct q6afe {
- 	struct mutex lock;
- 	struct list_head port_list;
- 	spinlock_t port_list_lock;
+diff --git a/sound/soc/qcom/qdsp6/q6asm.c b/sound/soc/qcom/qdsp6/q6asm.c
+index 530852385cad..c4fd28f168d5 100644
+--- a/sound/soc/qcom/qdsp6/q6asm.c
++++ b/sound/soc/qcom/qdsp6/q6asm.c
+@@ -177,7 +177,6 @@ struct q6asm {
+ 	struct platform_device *pcmdev;
+ 	spinlock_t slock;
+ 	struct audio_client *session[MAX_SESSIONS + 1];
 -	struct platform_device *pdev_dais;
  };
  
- struct afe_port_cmd_device_start {
-@@ -1438,7 +1437,6 @@ static int q6afe_probe(struct apr_device *adev)
+ struct audio_client {
+@@ -1344,7 +1343,6 @@ EXPORT_SYMBOL_GPL(q6asm_cmd_nowait);
+ static int q6asm_probe(struct apr_device *adev)
  {
- 	struct q6afe *afe;
  	struct device *dev = &adev->dev;
 -	struct device_node *dais_np;
+ 	struct q6asm *q6asm;
  
- 	afe = devm_kzalloc(dev, sizeof(*afe), GFP_KERNEL);
- 	if (!afe)
-@@ -1453,22 +1451,12 @@ static int q6afe_probe(struct apr_device *adev)
- 
- 	dev_set_drvdata(dev, afe);
+ 	q6asm = devm_kzalloc(dev, sizeof(*q6asm), GFP_KERNEL);
+@@ -1359,22 +1357,12 @@ static int q6asm_probe(struct apr_device *adev)
+ 	spin_lock_init(&q6asm->slock);
+ 	dev_set_drvdata(dev, q6asm);
  
 -	dais_np = of_get_child_by_name(dev->of_node, "dais");
 -	if (dais_np) {
--		afe->pdev_dais = of_platform_device_create(dais_np,
--							   "q6afe-dai", dev);
+-		q6asm->pdev_dais = of_platform_device_create(dais_np,
+-							   "q6asm-dai", dev);
 -		of_node_put(dais_np);
 -	}
 -
@@ -85,12 +85,12 @@ index 01f43218984b..621b67b34db9 100644
 +	return of_platform_populate(dev->of_node, NULL, NULL, dev);
  }
  
- static int q6afe_remove(struct apr_device *adev)
+ static int q6asm_remove(struct apr_device *adev)
  {
--	struct q6afe *afe = dev_get_drvdata(&adev->dev);
+-	struct q6asm *q6asm = dev_get_drvdata(&adev->dev);
 -
--	if (afe->pdev_dais)
--		of_platform_device_destroy(&afe->pdev_dais->dev, NULL);
+-	if (q6asm->pdev_dais)
+-		of_platform_device_destroy(&q6asm->pdev_dais->dev, NULL);
 +	of_platform_depopulate(&adev->dev);
  
  	return 0;
