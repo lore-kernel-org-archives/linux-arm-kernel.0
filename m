@@ -1,15 +1,15 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Tue, 26 Jun 2018 16:11:09 +0100 (BST)
-Subject: Applied "ASoC: qdsp6: q6asm: use of_platform_populate/depopulate()"
+Date: Tue, 26 Jun 2018 16:11:31 +0100 (BST)
+Subject: Applied "ASoC: qdsp6: q6adm: use of_platform_populate/depopulate()"
  to the asoc tree
-In-Reply-To: <20180626092016.9296-6-srinivas.kandagatla@linaro.org>
-Message-ID: <20180626151109.43C44440070@finisterre.ee.mobilebroadband>
+In-Reply-To: <20180626092016.9296-5-srinivas.kandagatla@linaro.org>
+Message-ID: <20180626151131.337B6440070@finisterre.ee.mobilebroadband>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   ASoC: qdsp6: q6asm: use of_platform_populate/depopulate()
+   ASoC: qdsp6: q6adm: use of_platform_populate/depopulate()
 
 has been applied to the asoc tree at
 
@@ -34,10 +34,10 @@ to this mail.
 Thanks,
 Mark
 
->From 4aac7e2773030d667491fbb6d97c9f467fdcbc05 Mon Sep 17 00:00:00 2001
+>From f614c9b070ed149bbaac4edefb2b5fcb7755c4b0 Mon Sep 17 00:00:00 2001
 From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-Date: Tue, 26 Jun 2018 10:20:09 +0100
-Subject: [PATCH] ASoC: qdsp6: q6asm: use of_platform_populate/depopulate()
+Date: Tue, 26 Jun 2018 10:20:08 +0100
+Subject: [PATCH] ASoC: qdsp6: q6adm: use of_platform_populate/depopulate()
 
 Now that the child nodes have there own compatible strings,
 Use of_platform_populate/depopulate() instead of less common
@@ -47,37 +47,37 @@ Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 Acked-by: Niklas Cassel <niklas.cassel@linaro.org>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- sound/soc/qcom/qdsp6/q6asm.c | 16 ++--------------
+ sound/soc/qcom/qdsp6/q6adm.c | 16 ++--------------
  1 file changed, 2 insertions(+), 14 deletions(-)
 
-diff --git a/sound/soc/qcom/qdsp6/q6asm.c b/sound/soc/qcom/qdsp6/q6asm.c
-index 530852385cad..c4fd28f168d5 100644
---- a/sound/soc/qcom/qdsp6/q6asm.c
-+++ b/sound/soc/qcom/qdsp6/q6asm.c
-@@ -177,7 +177,6 @@ struct q6asm {
- 	struct platform_device *pcmdev;
- 	spinlock_t slock;
- 	struct audio_client *session[MAX_SESSIONS + 1];
--	struct platform_device *pdev_dais;
+diff --git a/sound/soc/qcom/qdsp6/q6adm.c b/sound/soc/qcom/qdsp6/q6adm.c
+index 9983c665a941..932c3ebfd252 100644
+--- a/sound/soc/qcom/qdsp6/q6adm.c
++++ b/sound/soc/qcom/qdsp6/q6adm.c
+@@ -64,7 +64,6 @@ struct q6adm {
+ 	struct aprv2_ibasic_rsp_result_t result;
+ 	struct mutex lock;
+ 	wait_queue_head_t matrix_map_wait;
+-	struct platform_device *pdev_routing;
  };
  
- struct audio_client {
-@@ -1344,7 +1343,6 @@ EXPORT_SYMBOL_GPL(q6asm_cmd_nowait);
- static int q6asm_probe(struct apr_device *adev)
+ struct q6adm_cmd_device_open_v5 {
+@@ -588,7 +587,6 @@ EXPORT_SYMBOL_GPL(q6adm_close);
+ static int q6adm_probe(struct apr_device *adev)
  {
  	struct device *dev = &adev->dev;
 -	struct device_node *dais_np;
- 	struct q6asm *q6asm;
+ 	struct q6adm *adm;
  
- 	q6asm = devm_kzalloc(dev, sizeof(*q6asm), GFP_KERNEL);
-@@ -1359,22 +1357,12 @@ static int q6asm_probe(struct apr_device *adev)
- 	spin_lock_init(&q6asm->slock);
- 	dev_set_drvdata(dev, q6asm);
+ 	adm = devm_kzalloc(&adev->dev, sizeof(*adm), GFP_KERNEL);
+@@ -605,22 +603,12 @@ static int q6adm_probe(struct apr_device *adev)
+ 	INIT_LIST_HEAD(&adm->copps_list);
+ 	spin_lock_init(&adm->copps_list_lock);
  
--	dais_np = of_get_child_by_name(dev->of_node, "dais");
+-	dais_np = of_get_child_by_name(dev->of_node, "routing");
 -	if (dais_np) {
--		q6asm->pdev_dais = of_platform_device_create(dais_np,
--							   "q6asm-dai", dev);
+-		adm->pdev_routing = of_platform_device_create(dais_np,
+-							   "q6routing", dev);
 -		of_node_put(dais_np);
 -	}
 -
@@ -85,12 +85,12 @@ index 530852385cad..c4fd28f168d5 100644
 +	return of_platform_populate(dev->of_node, NULL, NULL, dev);
  }
  
- static int q6asm_remove(struct apr_device *adev)
+ static int q6adm_remove(struct apr_device *adev)
  {
--	struct q6asm *q6asm = dev_get_drvdata(&adev->dev);
+-	struct q6adm *adm = dev_get_drvdata(&adev->dev);
 -
--	if (q6asm->pdev_dais)
--		of_platform_device_destroy(&q6asm->pdev_dais->dev, NULL);
+-	if (adm->pdev_routing)
+-		of_platform_device_destroy(&adm->pdev_routing->dev, NULL);
 +	of_platform_depopulate(&adev->dev);
  
  	return 0;
