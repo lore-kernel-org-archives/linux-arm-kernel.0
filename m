@@ -1,68 +1,32 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 26 Jun 2018 18:26:31 +0530
-Subject: =?UTF-8?Q?Re:_[PATCH_v11_00/27]_ARM:_davinci:_convert_to_common_clo?=
- =?UTF-8?B?Y2sgZnJhbWV3b3Jr4oCL?=
-In-Reply-To: <9ca9d240-f556-cb4f-1a58-4a55c379a02f@lechnology.com>
-References: <20180518164829.27052-1-david@lechnology.com>
- <850a0ec9-53aa-02a5-ecbd-e068b13b2764@ti.com>
- <9ca9d240-f556-cb4f-1a58-4a55c379a02f@lechnology.com>
-Message-ID: <a45f20fe-61f1-6c10-c44d-655f9960d824@ti.com>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Tue, 26 Jun 2018 15:01:18 +0200
+Subject: [PATCH 0/3] Add STM32 SPI support on stm32mp157c
+In-Reply-To: <1526566904-24514-1-git-send-email-amelie.delaunay@st.com>
+References: <1526566904-24514-1-git-send-email-amelie.delaunay@st.com>
+Message-ID: <3cad9448-3e19-b686-8f90-d9c2c9928450@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 25 May 2018 11:51 PM, David Lechner wrote:
-> On 05/22/2018 04:38 AM, Sekhar Nori wrote:
->> Hi David,
->>
->> On Friday 18 May 2018 10:18 PM, David Lechner wrote:
->>> This series converts mach-davinci to use the common clock framework.
->>>
->>> The series works like this, the first 3 patches fix some issues with
->>> the clock
->>> drivers that have already been accepted into the mainline kernel.
->>>
->>> Then, starting with "ARM: davinci: pass clock as parameter to
->>> davinci_timer_init()", we get the mach code ready for the switch by
->>> adding the
->>> code needed for the new clock drivers and adding #ifndef
->>> CONFIG_COMMON_CLK
->>> around the legacy clocks so that we can switch easily between the old
->>> and the
->>> new.
->>>
->>> "ARM: davinci: switch to common clock framework" actually flips the
->>> switch
->>> to start using the new clock drivers. Then the next 8 patches remove all
->>> of the old clock code.
->>>
->>> The final four patches add device tree clock support to the one SoC that
->>> supports it.
->>>
->>> This series has been tested on TI OMAP-L138 LCDK (both device tree
->>> and legacy
->>> board file).
->>
->> If you do end up sending a v12, you can leave out the mach-davinci
->> portions unless there are any changes you need to make. I will pick them
->> up from this series once the driver dependencies are merged.
->>
->> I do hope the drivers/clk/* changes can be merged from v4.18.
->>
-> 
-> I have resent all of the clk patches (including all of the ones I listed as
-> dependencies in addition to the three remaining in this series) under the
-> cover "clk: davinci: outstanding fixes?".
-> 
-> I also found that we need to add power-domains properties to the PWM nodes
-> in "ARM: dts: da850: Add clocks". I probably should just take your advice
-> and just globally added them even if they are not documented for some types
-> ofnodes.
+Hi Am?lie,
 
-I think doing it en masse will be controversial. Just add it to PWM
-nodes for now (I am assuming the binding documentation agrees).
+On 05/17/2018 04:21 PM, Amelie Delaunay wrote:
+> This patch adds STM32 SPI support on stm32mp157c SoC.
+> SPI1, available on GPIO expansion connector, is kept disabled, so these
+> pins can be used as GPIOs by default.
+> 
+> Amelie Delaunay (3):
+>    ARM: dts: stm32: add STM32 SPI support on stm32mp157c
+>    ARM: dts: stm32: add SPI1 support on stm32mp157c-ev1
+>    ARM: multi_v7_defconfig: enable STM32 SPI
+> 
+>   arch/arm/boot/dts/stm32mp157-pinctrl.dtsi | 16 +++++-
+>   arch/arm/boot/dts/stm32mp157c-ev1.dts     |  6 +++
+>   arch/arm/boot/dts/stm32mp157c.dtsi        | 84 +++++++++++++++++++++++++++++++
+>   arch/arm/configs/multi_v7_defconfig       |  1 +
+>   4 files changed, 106 insertions(+), 1 deletion(-)
+> 
 
-I have applied this series so please send any more changes as follow-on
-patches.
+DT patches applied on stm32-next.
 
 Thanks
-Sekhar
+Alex
