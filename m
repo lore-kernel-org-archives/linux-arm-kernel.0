@@ -1,202 +1,100 @@
-From: evgreen@chromium.org (Evan Green)
-Date: Tue, 26 Jun 2018 13:47:52 -0700
-Subject: [PATCH v5 4/8] interconnect: qcom: Add RPM communication
-In-Reply-To: <20180620121141.15403-5-georgi.djakov@linaro.org>
-References: <20180620121141.15403-1-georgi.djakov@linaro.org>
- <20180620121141.15403-5-georgi.djakov@linaro.org>
-Message-ID: <CAE=gft7+S7MJHB2jw8SNewNcr2OvK+1a-PdJdcaonTphJX7c8A@mail.gmail.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 27 Jun 2018 04:55:36 +0800
+Subject: [PATCH v5 12/20] ACPI / APEI: Don't store CPER records physical
+ address in struct ghes
+In-Reply-To: <20180626170116.25825-13-james.morse@arm.com>
+References: <20180626170116.25825-13-james.morse@arm.com>
+Message-ID: <201806270332.vrWmASbO%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Georgi,
+Hi James,
 
-On Wed, Jun 20, 2018 at 5:11 AM Georgi Djakov <georgi.djakov@linaro.org> wrote:
->
-> On some Qualcomm SoCs, there is a remote processor, which controls some of
-> the Network-On-Chip interconnect resources. Other CPUs express their needs
-> by communicating with this processor. Add a driver to handle comminication
-> with this remote processor.
->
-> Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
-> ---
->  .../bindings/interconnect/qcom-smd.txt        | 32 +++++++
->  drivers/interconnect/qcom/Makefile            |  2 +
->  drivers/interconnect/qcom/smd-rpm.c           | 90 +++++++++++++++++++
->  drivers/interconnect/qcom/smd-rpm.h           | 15 ++++
->  4 files changed, 139 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/interconnect/qcom-smd.txt
->  create mode 100644 drivers/interconnect/qcom/Makefile
->  create mode 100644 drivers/interconnect/qcom/smd-rpm.c
->  create mode 100644 drivers/interconnect/qcom/smd-rpm.h
->
-> diff --git a/Documentation/devicetree/bindings/interconnect/qcom-smd.txt b/Documentation/devicetree/bindings/interconnect/qcom-smd.txt
-> new file mode 100644
-> index 000000000000..88a5aeb50935
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/interconnect/qcom-smd.txt
-> @@ -0,0 +1,32 @@
-> +Qualcomm SMD-RPM interconnect driver binding
-> +------------------------------------------------
-> +The RPM (Resource Power Manager) is a dedicated hardware engine
-> +for managing the shared SoC resources in order to keep the lowest
-> +power profile. It communicates with other hardware subsystems via
-> +the shared memory driver (SMD) back-end and accepts requests for
-> +various resources.
-> +
-> +Required properties :
-> +- compatible : shall contain only one of the following:
-> +                       "qcom,interconnect-smd-rpm"
-> +
-> +Example:
-> +       smd {
-> +               compatible = "qcom,smd";
-> +
-> +               rpm {
-> +                       interrupts = <0 168 1>;
-> +                       qcom,ipc = <&apcs 8 0>;
-> +                       qcom,smd-edge = <15>;
-> +
-> +                       rpm_requests {
-> +                               compatible = "qcom,rpm-msm8916";
-> +                               qcom,smd-channels = "rpm_requests";
-> +
-> +                               interconnect-smd-rpm {
-> +                                       compatible = "qcom,interconnect-smd-rpm";
-> +                               };
-> +
-> +                       };
-> +               };
-> +       };
-> diff --git a/drivers/interconnect/qcom/Makefile b/drivers/interconnect/qcom/Makefile
-> new file mode 100644
-> index 000000000000..2a0c41db91c4
-> --- /dev/null
-> +++ b/drivers/interconnect/qcom/Makefile
-> @@ -0,0 +1,2 @@
-> +# SPDX-License-Identifier: GPL-2.0
-> +obj-y += smd-rpm.o
+I love your patch! Yet something to improve:
 
-This new file has an unexpressed dependency on CONFIG_QCOM_SMD_RPM due
-to qcom_rpm_smd_write. RPMh-based systems won't need this file, right?
-Maybe this file should live behind some config?
+[auto build test ERROR on pm/linux-next]
+[also build test ERROR on v4.18-rc2 next-20180626]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-> diff --git a/drivers/interconnect/qcom/smd-rpm.c b/drivers/interconnect/qcom/smd-rpm.c
-> new file mode 100644
-> index 000000000000..0cf772f51642
-> --- /dev/null
-> +++ b/drivers/interconnect/qcom/smd-rpm.c
-> @@ -0,0 +1,90 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +/*
-> + * RPM over SMD communication wrapper for interconects
-> + *
-> + * Copyright (C) 2018 Linaro Ltd
-> + * Author: Georgi Djakov <georgi.djakov@linaro.org>
-> + */
-> +
-> +#include <linux/interconnect-provider.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/of_platform.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/soc/qcom/smd-rpm.h>
-> +#include "smd-rpm.h"
-> +
-> +#define        RPM_KEY_BW      0x00007762
-> +
-> +static struct qcom_icc_rpm {
-> +       struct qcom_smd_rpm *rpm;
-> +} icc_rpm_smd;
-> +
-> +struct icc_rpm_smd_req {
-> +       __le32 key;
-> +       __le32 nbytes;
-> +       __le32 value;
-> +};
-> +
-> +bool qcom_icc_rpm_smd_available(void)
-> +{
-> +       if (!icc_rpm_smd.rpm)
-> +               return false;
-> +
-> +       return true;
-> +}
-> +
-> +int qcom_icc_rpm_smd_send(int ctx, int rsc_type, int id, u32 val)
-> +{
-> +       struct icc_rpm_smd_req req = {
-> +               .key = cpu_to_le32(RPM_KEY_BW),
-> +               .nbytes = cpu_to_le32(sizeof(u32)),
-> +               .value = cpu_to_le32(val),
-> +       };
-> +
-> +       return qcom_rpm_smd_write(icc_rpm_smd.rpm, ctx, rsc_type, id, &req,
-> +                                 sizeof(req));
-> +}
-> +EXPORT_SYMBOL(qcom_icc_rpm_smd_send);
-> +
-> +static int qcom_icc_rpm_smd_probe(struct platform_device *pdev)
-> +{
-> +       icc_rpm_smd.rpm = dev_get_drvdata(pdev->dev.parent);
-> +       if (!icc_rpm_smd.rpm) {
-> +               dev_err(&pdev->dev, "unable to retrieve handle to RPM\n");
-> +               return -ENODEV;
-> +       }
-> +
-> +       return 0;
-> +}
-> +
-> +static const struct of_device_id qcom_icc_rpm_smd_dt_match[] = {
-> +       { .compatible = "qcom,interconnect-smd-rpm", },
-> +       { },
-> +};
-> +
-> +MODULE_DEVICE_TABLE(of, qcom_interconnect_rpm_smd_dt_match);
-> +
-> +static struct platform_driver qcom_interconnect_rpm_smd_driver = {
-> +       .driver = {
-> +               .name           = "qcom-interconnect-smd-rpm",
-> +               .of_match_table = qcom_icc_rpm_smd_dt_match,
-> +       },
-> +       .probe = qcom_icc_rpm_smd_probe,
-> +};
-> +
-> +static int __init rpm_smd_interconnect_init(void)
-> +{
-> +       return platform_driver_register(&qcom_interconnect_rpm_smd_driver);
-> +}
-> +subsys_initcall(rpm_smd_interconnect_init);
-> +
-> +static void __exit rpm_smd_interconnect_exit(void)
-> +{
-> +       platform_driver_unregister(&qcom_interconnect_rpm_smd_driver);
-> +}
-> +module_exit(rpm_smd_interconnect_exit)
-> +
-> +MODULE_AUTHOR("Georgi Djakov <georgi.djakov@linaro.org>");
-> +MODULE_DESCRIPTION("Qualcomm SMD RPM interconnect driver");
-> +MODULE_LICENSE("GPL v2");
-> diff --git a/drivers/interconnect/qcom/smd-rpm.h b/drivers/interconnect/qcom/smd-rpm.h
-> new file mode 100644
-> index 000000000000..0f4a3da31cf6
-> --- /dev/null
-> +++ b/drivers/interconnect/qcom/smd-rpm.h
-> @@ -0,0 +1,15 @@
-> +/* SPDX-License-Identifier: GPL-2.0 */
-> +/*
-> + * Copyright (c) 2018, Linaro Ltd.
-> + * Author: Georgi Djakov <georgi.djakov@linaro.org>
-> + */
-> +
-> +#ifndef __LINUX_INTERCONNECT_QCOM_RPM_H
-> +#define __LINUX_INTERCONNECT_QCOM_RPM_H
+url:    https://github.com/0day-ci/linux/commits/James-Morse/APEI-in_nmi-rework-and-arm64-SDEI-wire-up/20180627-024229
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/rafael/linux-pm.git linux-next
+config: i386-randconfig-i1-201825 (attached as .config)
+compiler: gcc-7 (Debian 7.3.0-16) 7.3.0
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=i386 
 
-This doesn't really reflect the path, should this be something different?
+All errors (new ones prefixed by >>):
 
-> +
-> +#include <linux/soc/qcom/smd-rpm.h>
-> +
-> +bool qcom_icc_rpm_smd_available(void);
-> +int qcom_icc_rpm_smd_send(int ctx, int rsc_type, int id, u32 val);
-> +
-> +#endif
+   drivers/acpi/apei/ghes.c: In function 'ghes_read_estatus':
+>> drivers/acpi/apei/ghes.c:300:17: error: passing argument 1 of 'apei_read' from incompatible pointer type [-Werror=incompatible-pointer-types]
+     rc = apei_read(buf_paddr, &g->error_status_address);
+                    ^~~~~~~~~
+   In file included from drivers/acpi/apei/ghes.c:57:0:
+   drivers/acpi/apei/apei-internal.h:80:5: note: expected 'u64 * {aka long long unsigned int *}' but argument is of type 'phys_addr_t * {aka unsigned int *}'
+    int apei_read(u64 *val, struct acpi_generic_address *reg);
+        ^~~~~~~~~
+   cc1: some warnings being treated as errors
+
+vim +/apei_read +300 drivers/acpi/apei/ghes.c
+
+   291	
+   292	static int ghes_read_estatus(struct ghes *ghes,
+   293				     struct acpi_hest_generic_status *estatus,
+   294				     phys_addr_t *buf_paddr, int fixmap_idx)
+   295	{
+   296		struct acpi_hest_generic *g = ghes->generic;
+   297		u32 len;
+   298		int rc;
+   299	
+ > 300		rc = apei_read(buf_paddr, &g->error_status_address);
+   301		if (rc) {
+   302			if (printk_ratelimit())
+   303				pr_warning(FW_WARN GHES_PFX
+   304	"Failed to read error status block address for hardware error source: %d.\n",
+   305					   g->header.source_id);
+   306			return -EIO;
+   307		}
+   308		if (!*buf_paddr)
+   309			return -ENOENT;
+   310	
+   311		ghes_copy_tofrom_phys(estatus, *buf_paddr,
+   312				      sizeof(*estatus), 1, fixmap_idx);
+   313		if (!estatus->block_status)
+   314			return -ENOENT;
+   315	
+   316		ghes->flags |= GHES_TO_CLEAR;
+   317	
+   318		rc = -EIO;
+   319		len = cper_estatus_len(estatus);
+   320		if (len < sizeof(*estatus))
+   321			goto err_read_block;
+   322		if (len > ghes->generic->error_block_length)
+   323			goto err_read_block;
+   324		if (cper_estatus_check_header(estatus))
+   325			goto err_read_block;
+   326		ghes_copy_tofrom_phys(estatus + 1,
+   327				      *buf_paddr + sizeof(*estatus),
+   328				      len - sizeof(*estatus), 1, fixmap_idx);
+   329		if (cper_estatus_check(estatus))
+   330			goto err_read_block;
+   331		rc = 0;
+   332	
+   333	err_read_block:
+   334		if (rc && printk_ratelimit())
+   335			pr_warning(FW_WARN GHES_PFX
+   336				   "Failed to read error status block!\n");
+   337		return rc;
+   338	}
+   339	
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 26080 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180627/9fc15286/attachment-0001.gz>
