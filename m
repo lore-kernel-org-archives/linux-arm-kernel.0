@@ -1,26 +1,47 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Tue, 26 Jun 2018 10:23:44 +0200
-Subject: [PATCH] arm: dts: pxa3xx: Add ssp ports to pxa3xx device tree
-In-Reply-To: <20180624174134.20581-1-daniel@zonque.org> (Daniel Mack's message
- of "Sun, 24 Jun 2018 19:41:34 +0200")
-References: <20180624174134.20581-1-daniel@zonque.org>
-Message-ID: <87d0welzvz.fsf@belgarion.home>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Tue, 26 Jun 2018 09:25:44 +0100
+Subject: [PATCH] arm64: dts: hikey: Define wl1835 power capabilities
+In-Reply-To: <CALAqxLWjJKsU+XJmANzx-aO2ruszwbBnPV2yV5WoyVStO+5K0A@mail.gmail.com>
+References: <20180613151305.17240-1-ryan@edited.us>
+ <CANcMJZASEDRxaXwdG96nNeEDPrDm_ap5MjhXonEcg=yHZ8F=qg@mail.gmail.com>
+ <CALAqxLWjJKsU+XJmANzx-aO2ruszwbBnPV2yV5WoyVStO+5K0A@mail.gmail.com>
+Message-ID: <5B31F888.7010403@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel Mack <daniel@zonque.org> writes:
+Hi John,
 
-> Also fix the documentation for these bindings.
->
-> The DMA properties have to be passed in the ssp users for now.
->
-> Signed-off-by: Daniel Mack <daniel@zonque.org>
-Applied to pxa/dt.
+On 2018/6/25 22:56, John Stultz wrote:
+> On Wed, Jun 13, 2018 at 11:30 AM, John Stultz <john.stultz@linaro.org> wrote:
+>> On Wed, Jun 13, 2018 at 8:13 AM, Ryan Grachek <ryan@edited.us> wrote:
+>>> These properties are required for compatibility with runtime PM.
+>>> Without these properties, MMC host controller will not be aware
+>>> of power capabilities. When the wlcore driver attempts to power
+>>> on the device, it will erroneously fail with -EACCES.
+>>>
+>>> Signed-off-by: Ryan Grachek <ryan@edited.us>
+>>
+>> Fixes: 60f36637bbbd ("wlcore: sdio: allow pm to handle sdio power")
+>> Tested-by: John Stultz <john.stultz@linaro.org>
+>> Acked-by: John Stultz <john.stultz@linaro.org>
+>>
+>> Wei Xu: This fixes a functional regression with wifi on the HiKey
+>> board that was introduced in 4.18-rc with commit 60f36637bbbd
+>> ("wlcore: sdio: allow pm to handle sdio power").
+> 
+> Wei Xu: Just wanted to follow up to make sure this wasn't missed for
+> 4.18-rc, as I haven't seen it upstream or in -next, and it fixes a
+> recently introduced regression.
 
-For completeness, you could always add another patch for pxa27x.dtsi to ssp
-ports :)
+Thanks!
+I will send out the fix pull request in these two days if no problem.
 
-Cheers.
+Best Regards,
+Wei
 
---
-Robert
+> 
+> thanks
+> -john
+> 
+> .
+> 
