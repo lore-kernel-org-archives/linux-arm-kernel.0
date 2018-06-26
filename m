@@ -1,117 +1,119 @@
-From: mhocko@kernel.org (Michal Hocko)
-Date: Tue, 26 Jun 2018 08:35:21 +0200
-Subject: [PATCH v3 0/3] fix free pmd/pte page handlings on x86
-In-Reply-To: <1529961187.14039.206.camel@hpe.com>
-References: <20180516233207.1580-1-toshi.kani@hpe.com>
- <alpine.DEB.2.21.1806241516410.8650@nanos.tec.linutronix.de>
- <1529938470.14039.134.camel@hpe.com>
- <20180625175225.GQ28965@dhcp22.suse.cz>
- <1529961187.14039.206.camel@hpe.com>
-Message-ID: <20180626063521.GT28965@dhcp22.suse.cz>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Tue, 26 Jun 2018 14:50:56 +0800
+Subject: [PATCH v2 0/7] arm64: numa/topology/smp: update the cpumasks for
+ CPU hotplug
+In-Reply-To: <1529327923-17911-1-git-send-email-sudeep.holla@arm.com>
+References: <1529327923-17911-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <d6812552-f27c-83d8-900d-5849e5c6d141@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 25-06-18 21:15:03, Kani Toshimitsu wrote:
-> On Mon, 2018-06-25 at 19:53 +0200, Michal Hocko wrote:
-> > On Mon 25-06-18 14:56:26, Kani Toshimitsu wrote:
-> > > On Sun, 2018-06-24 at 15:19 +0200, Thomas Gleixner wrote:
-> > > > On Wed, 16 May 2018, Toshi Kani wrote:
-> > > > 
-> > > > > This series fixes two issues in the x86 ioremap free page handlings
-> > > > > for pud/pmd mappings.
-> > > > > 
-> > > > > Patch 01 fixes BUG_ON on x86-PAE reported by Joerg.  It disables
-> > > > > the free page handling on x86-PAE.
-> > > > > 
-> > > > > Patch 02-03 fixes a possible issue with speculation which can cause
-> > > > > stale page-directory cache.
-> > > > >  - Patch 02 is from Chintan's v9 01/04 patch [1], which adds a new arg
-> > > > >    'addr', with my merge change to patch 01.
-> > > > >  - Patch 03 adds a TLB purge (INVLPG) to purge page-structure caches
-> > > > >    that may be cached by speculation.  See the patch descriptions for
-> > > > >    more detal.
-> > > > 
-> > > > Toshi, Joerg, Michal!
-> > > 
-> > > Hi Thomas,
-> > > 
-> > > Thanks for checking. I was about to ping as well.
-> > > 
-> > > > I'm failing to find a conclusion of this discussion. Can we finally make
-> > > > some progress with that?
-> > > 
-> > > I have not heard from Joerg since I last replied to his comments to
-> > > Patch 3/3 -- I did my best to explain that there was no issue in the
-> > > single page allocation in pud_free_pmd_page().  From my perspective, the
-> > >  v3 series is good to go.
-> > 
-> > Well, I admit that this not my area but I agree with Joerg that
-> > allocating memory inside afunction that is supposed to free page table
-> > is far from ideal. More so that the allocation is hardcoded GFP_KERNEL.
-> > We already have this antipattern in functions to allocate page tables
-> > and it has turned to be maintenance PITA longterm. So if there is a way
-> > around that then I would strongly suggest finding a different solution.
-> > 
-> > Whether that is sufficient to ditch the whole series is not my call
-> > though.
-> 
-> I'd agree if this code is in a memory free path.  However, this code is
-> in the ioremap() path, which is expected to allocate new page(s).
+Hi Sudeep,
 
-This might be the case right now but my experience tells me that
-something named this generic and placed in a generic pte handling header
-file will end up being called in many other places you even do not
-expect right now sooner or later.
+On 2018/6/18 21:18, Sudeep Holla wrote:
+> Hi,
+> 
+> Commit 37c3ec2d810f ("arm64: topology: divorce MC scheduling domain from core_siblings")
+> was reported to cause some hotplug and system suspend regressions when
+> it was merged. On investigation, it was found that unlike x86/PPC,
+> arm64 doesn't update the cpu and numa masks on CPU hotplug. That's
+> somewhat expected from the scheduler.
+> 
+> Since these changes were bit invasive as a solution to the above
+> mentioned regression, as small change was temporarily applied as a fix.
+> This series updates the cpu and numa masks on CPU hotplug and reverts
+> that temporary fix.
+> 
+> It would be good to get this tested(CPU hotplug - few and all CPUs in
+> a socket) on multi-socket/NUMA systems from Cavium and Huawei/Hisilicon.
 
-> For example, setting a fresh PUD map allocates a new page to setup page
-> tables as follows:
-> 
->   ioremap_pud_range()
->     pud_alloc()
->       __pud_alloc()
->         pud_alloc_one()
->           get_zeroed_page() with GFP_KERNEL
->             __get_free_pages() with GFP_KERNEL | __GFP_ZERO
-> 
-> In a rare case, a PUD map is set to a previously-used-for-PMD range,
-> which leads to call pud_free_pmd_page() to free up the page consisting
-> of cleared PMD entries.  To manage this procedure, pud_free_pmd_page()
-> temporary allocates a page to save the cleared PMD entries as follows:
-> 
->   ioremap_pud_range()
->     pud_free_pmd_page()
->       __get_free_page() with GFP_KERNEL
-> 
-> These details are all internal to the ioremap() callers, who should
-> always expect that ioremap() allocates pages for setting page tables.
-> 
-> As for possible performance implications associated with this page
-> allocation, pmd_free_pte_page() and pud_free_pmd_page() are very
-> different in terms of how likely they can be called.
-> 
-> pmd_free_pte_page(), which does not allocate a page, gets called
-> multiple times during normal boot on my test systems.  My ioremap tests
-> cause this function be called quite frequently.  This is because 4KB and
-> 2MB vaddr allocation comes from similar vmalloc ranges. 
-> 
-> pud_free_pmd_page(), which allocates a page, seems to be never called
-> under normal circumstances, at least I was not able to with my ioremap
-> tests.  I found that 1GB vaddr allocation does not share with 4KB/2MB
-> ranges.  I had to hack the allocation code to force them shared to test
-> this function.  Hence, this memory allocation does not have any
-> implications in performance.
+Sorry for the late response, tons of other work just distracted me.
 
-Again, this is all too much focused on your particular testing and the
-current code base. Neither is a great foundation for design decisions.
+I tested this patch set on top of 4.18-rc2, CPU hotplug (online/offline)
+works, but the "Core(s) per socket:" of lscpu is not right, for example,
+the system with 4 NUMA nodes and 4 sockets, each socket has 16 CPU cores,
+from the beginning, everything looks correct:
 
-> Lastly, for the code maintenance, I believe this memory allocation keeps
-> the code much simpler than it would otherwise need to manage a special
-> page list.
+localhost:~ # lscpu
+Architecture:          aarch64
+Byte Order:            Little Endian
+CPU(s):                64
+On-line CPU(s) list:   0-63
+Thread(s) per core:    1
+Core(s) per socket:    16    // 16 is the right value, and should be unchanged when CPU hotpluging
+Socket(s):             4
+NUMA node(s):          4
+L1d cache:             32K
+L1i cache:             48K
+L2 cache:              1024K
+L3 cache:              16384K
+NUMA node0 CPU(s):     0-15
+NUMA node1 CPU(s):     16-31
+NUMA node2 CPU(s):     32-47
+NUMA node3 CPU(s):     48-63
 
-Yes, I can see a simplicity as a reasonable argument for a quick fix,
-which these pile is supposed to be AFAIU. So this might be good to go
-from that perspective, but I believe that this should be changed in
-future at least.
--- 
-Michal Hocko
-SUSE Labs
+But when I offlined one CPU:
+localhost:/sys/devices/system/cpu # echo 0 > cpu22/online
+localhost:/sys/devices/system/cpu # lscpu
+Architecture:          aarch64
+Byte Order:            Little Endian
+CPU(s):                64
+On-line CPU(s) list:   0-21,23-63
+Off-line CPU(s) list:  22
+Thread(s) per core:    1
+Core(s) per socket:    15      //it's 15 now...
+Socket(s):             4
+NUMA node(s):          4
+L1d cache:             32K
+L1i cache:             48K
+L2 cache:              1024K
+L3 cache:              16384K
+NUMA node0 CPU(s):     0-15
+NUMA node1 CPU(s):     16-21,23-31
+NUMA node2 CPU(s):     32-47
+NUMA node3 CPU(s):     48-63
+
+Offlined 16 cores on NUMA node 0, everything backs to normal:
+Architecture:          aarch64
+Byte Order:            Little Endian
+CPU(s):                64
+On-line CPU(s) list:   16-63
+Off-line CPU(s) list:  0-15
+Thread(s) per core:    1
+Core(s) per socket:    16
+Socket(s):             3
+NUMA node(s):          4
+L1d cache:             32K
+L1i cache:             48K
+L2 cache:              1024K
+L3 cache:              16384K
+NUMA node0 CPU(s):
+NUMA node1 CPU(s):     16-31
+NUMA node2 CPU(s):     32-47
+NUMA node3 CPU(s):     48-63
+
+but when onlined CPU15 after,
+Architecture:          aarch64
+Byte Order:            Little Endian
+CPU(s):                64
+On-line CPU(s) list:   15-63
+Off-line CPU(s) list:  0-14
+Thread(s) per core:    1
+Core(s) per socket:    12     // it's 12, hmm...
+Socket(s):             4
+NUMA node(s):          4
+L1d cache:             32K
+L1i cache:             48K
+L2 cache:              1024K
+L3 cache:              16384K
+NUMA node0 CPU(s):     15
+NUMA node1 CPU(s):     16-31
+NUMA node2 CPU(s):     32-47
+NUMA node3 CPU(s):     48-63
+
+I think maybe the cpumask for the socket is changed in a
+wrong way when online/offline CPUs, didn't take a deep look into
+that, hope the test helps.
+
+Thanks
+Hanjun
