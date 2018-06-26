@@ -1,70 +1,48 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Tue, 26 Jun 2018 13:14:35 +0800
-Subject: [PATCH 0/5] arm64: allwinner: h6: Enable AXP805 PMIC on Pine H64
-In-Reply-To: <20180620051540.25617-1-wens@csie.org>
-References: <20180620051540.25617-1-wens@csie.org>
-Message-ID: <7397ce33b3b5f1a6743ce8d527807efdb7f73caa.camel@aosc.io>
+From: jagan@amarulasolutions.com (Jagan Teki)
+Date: Tue, 26 Jun 2018 11:41:56 +0530
+Subject: [PATCH 0/4] media: sun6i: Add support for the H3 CSI controller
+In-Reply-To: <20180305100432.15009-1-maxime.ripard@bootlin.com>
+References: <20180305100432.15009-1-maxime.ripard@bootlin.com>
+Message-ID: <CAMty3ZBQXyvOnzy_9RLDW-QO9qnAC4SR5UJnWYmhiPrP23z_vg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2018-06-20?? 13:15 +0800?Chen-Yu Tsai???
-> Hi everyone,
-> 
-> This series enables the AXP805 PMIC found on the Pine64 Pine H64
-> board.
-> The AXP805 seems to be identical to the AXP806 when comparing
-> datasheets.
-> The Pine H64 uses the PMIC in stand-alone or "self-working" mode,
-> using
-> the I2C interface. Neither features are currently supported. This
-> series
-> adds support for them, and then adds the PMIC to the device tree.
-> 
-> Patch 1 adds a new device tree property to describe the self-working
-> mode
-> for the AXP806.
-> 
-> Patch 2 adds support for the newly added property to the driver.
-> 
-> Patch 3 adds support for the using AXP806 with I2C.
-> 
-> Patch 4 converts raw clock/reset indices for the H6 R_CCU currently
-> found
-> in the device tree to macros defined as part of the device tree
-> bindings.
-> 
-> Patch 5 adds the PMIC and its regulators to the Pine H64 device tree.
-> 
-> Please have a look.
-> 
-> Regards
-> ChenYu
+On Mon, Mar 5, 2018 at 3:34 PM, Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+> Hi,
+>
+> The H3 and H5 have a CSI controller based on the one previously found
+> in the A31, that is currently supported by the sun6i-csi driver.
+>
+> Add the compatibles to the device tree bindings and to the driver to
+> make it work properly.
+>
+> This obviously depends on the serie "Initial Allwinner V3s CSI
+> Support" by Yong Deng.
+>
+> Let me know what you think,
+> Maxime
+>
+> Maxime Ripard (2):
+>   dt-bindings: media: sun6i: Add A31 and H3 compatibles
+>   media: sun6i: Add A31 compatible
+>
+> Myl?ne Josserand (2):
+>   ARM: dts: sun8i: Add the H3/H5 CSI controller
+>   [DO NOT MERGE] ARM: dts: sun8i: Add CAM500B camera module to the Nano
+>     Pi M1+
 
-For the whole series:
+Just trying to understand what interface has been tested with npi-m1+,
+is it DVP (parallel) interface? I've Bananapi 5MP[1] and trying to
+test on top, and look like its MIPI CSI2. I guess Yong patch[2]
+doesn't support CSI2 yet, am I correct?
 
-Tested-by: Icenowy Zheng <icenowy@aosc.io>
+[1] https://www.amazon.in/Generic-V3-0-BPI-M3-camera-chipset/dp/B0727N5CD1
+[2] https://patchwork.kernel.org/patch/10380067/
 
-And, except two small inline comments,
+Jagan.
 
-Reviewed-by: Icenowy Zheng <icenowy@aosc.io>
-
-> 
-> 
-> Chen-Yu Tsai (4):
->   dt-bindings: mfd: axp20x: Add "self-working" mode for AXP806
->   mfd: axp20x: Add self-working mode support for AXP806
->   mfd: axp20x: Support AXP806 in I2C mode
->   arm64: dts: allwinner: h6: Use macros for R_CCU clock and reset
->     indices
-> 
-> Icenowy Zheng (1):
->   arm64: dts: allwinner: h6: enable AXP805 PMIC on Pine H64
-> 
->  .../devicetree/bindings/mfd/axp20x.txt        |   7 +-
->  .../boot/dts/allwinner/sun50i-h6-pine-h64.dts | 109
-> ++++++++++++++++++
->  arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi  |   9 +-
->  drivers/mfd/axp20x-i2c.c                      |   2 +
->  drivers/mfd/axp20x.c                          |  30 ++++-
->  5 files changed, 149 insertions(+), 8 deletions(-)
-> 
+-- 
+Jagan Teki
+Senior Linux Kernel Engineer | Amarula Solutions
+U-Boot, Linux | Upstream Maintainer
+Hyderabad, India.
