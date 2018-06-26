@@ -1,103 +1,36 @@
-From: mars.cheng@mediatek.com (Mars Cheng)
-Date: Tue, 26 Jun 2018 19:23:43 +0800
-Subject: [PATCH v2 2/2] arm64: dts: mediatek: add mt6765 support
-In-Reply-To: <86h8lq6l1r.wl-marc.zyngier@arm.com>
-References: <1529978646-28976-1-git-send-email-mars.cheng@mediatek.com>
- <1529978646-28976-3-git-send-email-mars.cheng@mediatek.com>
- <86h8lq6l1r.wl-marc.zyngier@arm.com>
-Message-ID: <1530012223.17380.2.camel@mtkswgap22>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 26 Jun 2018 08:37:09 -0300
+Subject: [PATCH] ARM: imx_v4_v5_defconfig: Select ULPI support
+Message-ID: <1530013029-15809-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc
+From: Fabio Estevam <fabio.estevam@nxp.com>
 
-On Tue, 2018-06-26 at 08:53 +0100, Marc Zyngier wrote:
-> On Tue, 26 Jun 2018 03:04:06 +0100,
-> Mars Cheng <mars.cheng@mediatek.com> wrote:
-> > 
-> > This adds basic chip support for MT6765 SoC.
-> > 
-> > Signed-off-by: Mars Cheng <mars.cheng@mediatek.com>
-> > ---
-> >  arch/arm64/boot/dts/mediatek/Makefile       |    1 +
-> >  arch/arm64/boot/dts/mediatek/mt6765-evb.dts |   33 ++++++
-> >  arch/arm64/boot/dts/mediatek/mt6765.dtsi    |  158 +++++++++++++++++++++++++++
-> >  3 files changed, 192 insertions(+)
-> >  create mode 100644 arch/arm64/boot/dts/mediatek/mt6765-evb.dts
-> >  create mode 100644 arch/arm64/boot/dts/mediatek/mt6765.dtsi
-> > 
-> > diff --git a/arch/arm64/boot/dts/mediatek/mt6765.dtsi b/arch/arm64/boot/dts/mediatek/mt6765.dtsi
-> > new file mode 100644
-> > index 0000000..ab34c0f
-> > --- /dev/null
-> > +++ b/arch/arm64/boot/dts/mediatek/mt6765.dtsi
-> 
-> [...]
-> 
-> > +	timer {
-> > +		compatible = "arm,armv8-timer";
-> > +		interrupt-parent = <&gic>;
-> > +		interrupts = <GIC_PPI 13
-> > +			     (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
-> > +			     <GIC_PPI 14
-> > +			     (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
-> > +			     <GIC_PPI 11
-> > +			     (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
-> > +			     <GIC_PPI 10
-> > +			     (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>;
-> 
-> GICv3 doesn't encode the PPI affinity in its interrupt specifiers (or
-> at least not this way). Please drop it.
+Select CONFIG_USB_CHIPIDEA_ULPI and CONFIG_USB_ULPI_BUS so that
+USB ULPI can be functional on some boards like that use ULPI
+interface.
 
-Got it, will fix it.
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+---
+ arch/arm/configs/imx_v4_v5_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-> 
-> > +	};
-> > +
-> > +	soc {
-> > +		#address-cells = <2>;
-> > +		#size-cells = <2>;
-> > +		compatible = "simple-bus";
-> > +		ranges;
-> > +
-> > +		sysirq: intpol-controller at 10200a80 {
-> > +			compatible = "mediatek,mt6765-sysirq",
-> > +				     "mediatek,mt6577-sysirq";
-> > +			interrupt-controller;
-> > +			#interrupt-cells = <3>;
-> > +			interrupt-parent = <&gic>;
-> > +			reg = <0 0x10200a80 0 0x50>;
-> > +		};
-> > +
-> > +		gic: interrupt-controller at 0c000000 {
-> > +			compatible = "arm,gic-v3";
-> > +			#interrupt-cells = <3>;
-> > +			#address-cells = <2>;
-> > +			#size-cells = <2>;
-> > +			#redistributor-regions = <1>;
-> 
-> A single redistributor is the default, and you don't need to specify
-> it in the DT.
-> 
-
-sure, it's really unnecessary. will remove it.
-
-> > +			interrupt-parent = <&gic>;
-> > +			interrupt-controller;
-> > +			reg = <0 0x0c000000 0 0x40000>, // distributor
-> > +			      <0 0x0c100000 0 0x200000>; // redistributor
-> 
-> How about the GICv2 compatibility regions, which are provided by the
-> CPUs at a fixed offset from PERIPHBASE? See the Cortex-A53 TRM for
-> detail, and please add the missing regions.
-> 
-
-Thanks. will add it soon.
-
-> > +			interrupts = <GIC_PPI 9 IRQ_TYPE_LEVEL_HIGH>;
-> > +		};
-> 
-> Thanks,
-> 
-> 	M.
-> 
+diff --git a/arch/arm/configs/imx_v4_v5_defconfig b/arch/arm/configs/imx_v4_v5_defconfig
+index 054591d..4cd2f4a 100644
+--- a/arch/arm/configs/imx_v4_v5_defconfig
++++ b/arch/arm/configs/imx_v4_v5_defconfig
+@@ -141,9 +141,11 @@ CONFIG_USB_STORAGE=y
+ CONFIG_USB_CHIPIDEA=y
+ CONFIG_USB_CHIPIDEA_UDC=y
+ CONFIG_USB_CHIPIDEA_HOST=y
++CONFIG_USB_CHIPIDEA_ULPI=y
+ CONFIG_NOP_USB_XCEIV=y
+ CONFIG_USB_GADGET=y
+ CONFIG_USB_ETH=m
++CONFIG_USB_ULPI_BUS=y
+ CONFIG_MMC=y
+ CONFIG_MMC_SDHCI=y
+ CONFIG_MMC_SDHCI_PLTFM=y
+-- 
+2.7.4
