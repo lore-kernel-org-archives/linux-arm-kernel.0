@@ -1,53 +1,31 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Tue, 26 Jun 2018 16:52:42 +0200
-Subject: [PATCH 2/3] ARM: dts: imx6qdl-colibri: move card detect to module
- device tree
-In-Reply-To: <20180626145243.24880-1-stefan@agner.ch>
-References: <20180626145243.24880-1-stefan@agner.ch>
-Message-ID: <20180626145243.24880-2-stefan@agner.ch>
+Date: Tue, 26 Jun 2018 16:52:41 +0200
+Subject: [PATCH 1/3] ARM: dts: imx6qdl-colibri: mux SD/MMC card detect
+ explicitly
+Message-ID: <20180626145243.24880-1-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Muxing the card detect only in the carrier board device tree
-overwrites the USDHC muxing in the module level device tree.
-Move card detect to the module level device tree since this
-is also a default pinout of the Colibri standard. If a carrier
-board requires a different setting it still can overwrite the
-nodes in the carrier board specific device tree.
+Do not rely on reset/boot defaults and use a default GPIO setting
+with pull-up enabled.
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- arch/arm/boot/dts/imx6dl-colibri-eval-v3.dts | 3 ---
- arch/arm/boot/dts/imx6qdl-colibri.dtsi       | 3 ++-
- 2 files changed, 2 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/imx6qdl-colibri.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/imx6dl-colibri-eval-v3.dts b/arch/arm/boot/dts/imx6dl-colibri-eval-v3.dts
-index 3dee3af1a4c1..9de45a717356 100644
---- a/arch/arm/boot/dts/imx6dl-colibri-eval-v3.dts
-+++ b/arch/arm/boot/dts/imx6dl-colibri-eval-v3.dts
-@@ -221,9 +221,6 @@
- 
- /* Colibri MMC */
- &usdhc1 {
--	pinctrl-names = "default";
--	pinctrl-0 = <&pinctrl_mmc_cd>;
--	cd-gpios = <&gpio2 5 GPIO_ACTIVE_LOW>; /* MMCD */
- 	status = "okay";
- };
- 
 diff --git a/arch/arm/boot/dts/imx6qdl-colibri.dtsi b/arch/arm/boot/dts/imx6qdl-colibri.dtsi
-index 83d7c7d48c3f..55c90c2fbf69 100644
+index 76035db96f67..83d7c7d48c3f 100644
 --- a/arch/arm/boot/dts/imx6qdl-colibri.dtsi
 +++ b/arch/arm/boot/dts/imx6qdl-colibri.dtsi
-@@ -385,7 +385,8 @@
- /* Colibri MMC */
- &usdhc1 {
- 	pinctrl-names = "default";
--	pinctrl-0 = <&pinctrl_usdhc1>;
-+	pinctrl-0 = <&pinctrl_usdhc1 &pinctrl_mmc_cd>;
-+	cd-gpios = <&gpio2 5 GPIO_ACTIVE_LOW>; /* MMCD */
- 	vqmmc-supply = <&reg_3p3v>;
- 	bus-width = <4>;
- 	voltage-ranges = <3300 3300>;
+@@ -567,7 +567,7 @@
+ 
+ 	pinctrl_mmc_cd: gpiommccd {
+ 		fsl,pins = <
+-			MX6QDL_PAD_NANDF_D5__GPIO2_IO05	0x80000000
++			MX6QDL_PAD_NANDF_D5__GPIO2_IO05	0x1b0b1
+ 		>;
+ 	};
+ 
 -- 
 2.18.0
