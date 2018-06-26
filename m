@@ -1,62 +1,76 @@
 From: david@lechnology.com (David Lechner)
-Date: Tue, 26 Jun 2018 10:28:17 -0500
-Subject: [PATCH] ARM: dts: da850: Add power-domains to PWM nodes
-Message-ID: <20180626152817.16803-1-david@lechnology.com>
+Date: Tue, 26 Jun 2018 10:34:32 -0500
+Subject: =?UTF-8?Q?Re:_[PATCH_v11_00/27]_ARM:_davinci:_convert_to_common_clo?=
+ =?UTF-8?B?Y2sgZnJhbWV3b3Jr4oCL?=
+In-Reply-To: <a45f20fe-61f1-6c10-c44d-655f9960d824@ti.com>
+References: <20180518164829.27052-1-david@lechnology.com>
+ <850a0ec9-53aa-02a5-ecbd-e068b13b2764@ti.com>
+ <9ca9d240-f556-cb4f-1a58-4a55c379a02f@lechnology.com>
+ <a45f20fe-61f1-6c10-c44d-655f9960d824@ti.com>
+Message-ID: <33875d5b-6e99-fa38-20aa-9701e2c851d6@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the power-domains property to both the ECAP and EHRPWM PWM
-nodes. Both have drivers that use pm_runtime to enable the clocks, so
-they need this property in order to find and enable the clock properly.
+On 06/26/2018 07:56 AM, Sekhar Nori wrote:
+> On Friday 25 May 2018 11:51 PM, David Lechner wrote:
+>> On 05/22/2018 04:38 AM, Sekhar Nori wrote:
+>>> Hi David,
+>>>
+>>> On Friday 18 May 2018 10:18 PM, David Lechner wrote:
+>>>> This series converts mach-davinci to use the common clock framework.
+>>>>
+>>>> The series works like this, the first 3 patches fix some issues with
+>>>> the clock
+>>>> drivers that have already been accepted into the mainline kernel.
+>>>>
+>>>> Then, starting with "ARM: davinci: pass clock as parameter to
+>>>> davinci_timer_init()", we get the mach code ready for the switch by
+>>>> adding the
+>>>> code needed for the new clock drivers and adding #ifndef
+>>>> CONFIG_COMMON_CLK
+>>>> around the legacy clocks so that we can switch easily between the old
+>>>> and the
+>>>> new.
+>>>>
+>>>> "ARM: davinci: switch to common clock framework" actually flips the
+>>>> switch
+>>>> to start using the new clock drivers. Then the next 8 patches remove all
+>>>> of the old clock code.
+>>>>
+>>>> The final four patches add device tree clock support to the one SoC that
+>>>> supports it.
+>>>>
+>>>> This series has been tested on TI OMAP-L138 LCDK (both device tree
+>>>> and legacy
+>>>> board file).
+>>>
+>>> If you do end up sending a v12, you can leave out the mach-davinci
+>>> portions unless there are any changes you need to make. I will pick them
+>>> up from this series once the driver dependencies are merged.
+>>>
+>>> I do hope the drivers/clk/* changes can be merged from v4.18.
+>>>
+>>
+>> I have resent all of the clk patches (including all of the ones I listed as
+>> dependencies in addition to the three remaining in this series) under the
+>> cover "clk: davinci: outstanding fixes?".
+>>
+>> I also found that we need to add power-domains properties to the PWM nodes
+>> in "ARM: dts: da850: Add clocks". I probably should just take your advice
+>> and just globally added them even if they are not documented for some types
+>> ofnodes.
+> 
+> I think doing it en masse will be controversial. Just add it to PWM
+> nodes for now (I am assuming the binding documentation agrees).
+> 
+> I have applied this series so please send any more changes as follow-on
+> patches.
+> 
+> Thanks
+> Sekhar
+> 
 
-Signed-off-by: David Lechner <david@lechnology.com>
----
- arch/arm/boot/dts/da850.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
-
-diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-index de9a8bea100e..d60198e2ae4e 100644
---- a/arch/arm/boot/dts/da850.dtsi
-+++ b/arch/arm/boot/dts/da850.dtsi
-@@ -532,6 +532,7 @@
- 			reg = <0x300000 0x2000>;
- 			clocks = <&psc1 17>, <&ehrpwm_tbclk>;
- 			clock-names = "fck", "tbclk";
-+			power-domains = <&psc1 17>;
- 			status = "disabled";
- 		};
- 		ehrpwm1: pwm at 302000 {
-@@ -541,6 +542,7 @@
- 			reg = <0x302000 0x2000>;
- 			clocks = <&psc1 17>, <&ehrpwm_tbclk>;
- 			clock-names = "fck", "tbclk";
-+			power-domains = <&psc1 17>;
- 			status = "disabled";
- 		};
- 		ecap0: ecap at 306000 {
-@@ -550,6 +552,7 @@
- 			reg = <0x306000 0x80>;
- 			clocks = <&psc1 20>;
- 			clock-names = "fck";
-+			power-domains = <&psc1 20>;
- 			status = "disabled";
- 		};
- 		ecap1: ecap at 307000 {
-@@ -559,6 +562,7 @@
- 			reg = <0x307000 0x80>;
- 			clocks = <&psc1 20>;
- 			clock-names = "fck";
-+			power-domains = <&psc1 20>;
- 			status = "disabled";
- 		};
- 		ecap2: ecap at 308000 {
-@@ -568,6 +572,7 @@
- 			reg = <0x308000 0x80>;
- 			clocks = <&psc1 20>;
- 			clock-names = "fck";
-+			power-domains = <&psc1 20>;
- 			status = "disabled";
- 		};
- 		spi0: spi at 41000 {
--- 
-2.17.1
+FYI, there are some CPU frequency scaling patches that I was playing around
+with, but I don't plan on submitting them since they aren't much use to me
+at the moment. If anyone would like to pick them up, you can find them at
+https://github.com/dlech/linux/tree/da850-dt-cpufreq.
