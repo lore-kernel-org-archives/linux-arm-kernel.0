@@ -1,230 +1,78 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 26 Jun 2018 20:27:59 +0200
-Subject: [PATCH v9 4/6] init: allow initcall tables to be emitted using
- relative references
+Date: Tue, 26 Jun 2018 20:27:57 +0200
+Subject: [PATCH v9 2/6] module: allow symbol exports to be disabled
 In-Reply-To: <20180626182802.19932-1-ard.biesheuvel@linaro.org>
 References: <20180626182802.19932-1-ard.biesheuvel@linaro.org>
-Message-ID: <20180626182802.19932-5-ard.biesheuvel@linaro.org>
+Message-ID: <20180626182802.19932-3-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow the initcall tables to be emitted using relative references that
-are only half the size on 64-bit architectures and don't require fixups
-at runtime on relocatable kernels.
+To allow existing C code to be incorporated into the decompressor or
+the UEFI stub, introduce a CPP macro that turns all EXPORT_SYMBOL_xxx
+declarations into nops, and #define it in places where such exports
+are undesirable. Note that this gets rid of a rather dodgy redefine
+of linux/export.h's header guard.
 
-Cc: Petr Mladek <pmladek@suse.com>
-Cc: Sergey Senozhatsky <sergey.senozhatsky@gmail.com>
-Cc: Steven Rostedt <rostedt@goodmis.org>
-Cc: James Morris <jmorris@namei.org>
-Cc: "Serge E. Hallyn" <serge@hallyn.com>
+Acked-by: Nicolas Pitre <nico@linaro.org>
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- include/linux/init.h   | 44 +++++++++++++++-----
- init/main.c            | 32 +++++++-------
- kernel/printk/printk.c | 16 +++----
- security/security.c    | 17 ++++----
- 4 files changed, 68 insertions(+), 41 deletions(-)
+ arch/x86/boot/compressed/kaslr.c      |  5 +----
+ drivers/firmware/efi/libstub/Makefile |  3 ++-
+ include/linux/export.h                | 11 ++++++++++-
+ 3 files changed, 13 insertions(+), 6 deletions(-)
 
-diff --git a/include/linux/init.h b/include/linux/init.h
-index bc27cf03c41e..2538d176dd1f 100644
---- a/include/linux/init.h
-+++ b/include/linux/init.h
-@@ -116,8 +116,24 @@
- typedef int (*initcall_t)(void);
- typedef void (*exitcall_t)(void);
- 
--extern initcall_t __con_initcall_start[], __con_initcall_end[];
--extern initcall_t __security_initcall_start[], __security_initcall_end[];
-+#ifdef CONFIG_HAVE_ARCH_PREL32_RELOCATIONS
-+typedef int initcall_entry_t;
-+
-+static inline initcall_t initcall_from_entry(initcall_entry_t *entry)
-+{
-+	return offset_to_ptr(entry);
-+}
-+#else
-+typedef initcall_t initcall_entry_t;
-+
-+static inline initcall_t initcall_from_entry(initcall_entry_t *entry)
-+{
-+	return *entry;
-+}
-+#endif
-+
-+extern initcall_entry_t __con_initcall_start[], __con_initcall_end[];
-+extern initcall_entry_t __security_initcall_start[], __security_initcall_end[];
- 
- /* Used for contructor calls. */
- typedef void (*ctor_fn_t)(void);
-@@ -167,9 +183,20 @@ extern bool initcall_debug;
-  * as KEEP() in the linker script.
+diff --git a/arch/x86/boot/compressed/kaslr.c b/arch/x86/boot/compressed/kaslr.c
+index b87a7582853d..ed7a123bba42 100644
+--- a/arch/x86/boot/compressed/kaslr.c
++++ b/arch/x86/boot/compressed/kaslr.c
+@@ -23,11 +23,8 @@
+  * _ctype[] in lib/ctype.c is needed by isspace() of linux/ctype.h.
+  * While both lib/ctype.c and lib/cmdline.c will bring EXPORT_SYMBOL
+  * which is meaningless and will cause compiling error in some cases.
+- * So do not include linux/export.h and define EXPORT_SYMBOL(sym)
+- * as empty.
   */
+-#define _LINUX_EXPORT_H
+-#define EXPORT_SYMBOL(sym)
++#define __DISABLE_EXPORTS
  
--#define __define_initcall(fn, id) \
-+#ifdef CONFIG_HAVE_ARCH_PREL32_RELOCATIONS
-+#define ___define_initcall(fn, id, __sec)			\
-+	__ADDRESSABLE(fn)					\
-+	asm(".section	\"" #__sec ".init\", \"a\"	\n"	\
-+	"__initcall_" #fn #id ":			\n"	\
-+	    ".long	" #fn " - .			\n"	\
-+	    ".previous					\n");
-+#else
-+#define ___define_initcall(fn, id, __sec) \
- 	static initcall_t __initcall_##fn##id __used \
--	__attribute__((__section__(".initcall" #id ".init"))) = fn;
-+		__attribute__((__section__(#__sec ".init"))) = fn;
-+#endif
+ #include "misc.h"
+ #include "error.h"
+diff --git a/drivers/firmware/efi/libstub/Makefile b/drivers/firmware/efi/libstub/Makefile
+index a34e9290a699..0d0d3483241c 100644
+--- a/drivers/firmware/efi/libstub/Makefile
++++ b/drivers/firmware/efi/libstub/Makefile
+@@ -20,7 +20,8 @@ cflags-$(CONFIG_EFI_ARMSTUB)	+= -I$(srctree)/scripts/dtc/libfdt
+ KBUILD_CFLAGS			:= $(cflags-y) -DDISABLE_BRANCH_PROFILING \
+ 				   -D__NO_FORTIFY \
+ 				   $(call cc-option,-ffreestanding) \
+-				   $(call cc-option,-fno-stack-protector)
++				   $(call cc-option,-fno-stack-protector) \
++				   -D__DISABLE_EXPORTS
+ 
+ GCOV_PROFILE			:= n
+ KASAN_SANITIZE			:= n
+diff --git a/include/linux/export.h b/include/linux/export.h
+index b768d6dd3c90..ea7df303d68d 100644
+--- a/include/linux/export.h
++++ b/include/linux/export.h
+@@ -66,7 +66,16 @@ extern struct module __this_module;
+ 	__attribute__((section("___ksymtab" sec "+" #sym), used))	\
+ 	= { (unsigned long)&sym, __kstrtab_##sym }
+ 
+-#if defined(__KSYM_DEPS__)
++#if defined(__DISABLE_EXPORTS)
 +
-+#define __define_initcall(fn, id) ___define_initcall(fn, id, .initcall##id)
++/*
++ * Allow symbol exports to be disabled completely so that C code may
++ * be reused in other execution contexts such as the UEFI stub or the
++ * decompressor.
++ */
++#define __EXPORT_SYMBOL(sym, sec)
++
++#elif defined(__KSYM_DEPS__)
  
  /*
-  * Early initcalls run before initializing SMP.
-@@ -208,13 +235,8 @@ extern bool initcall_debug;
- #define __exitcall(fn)						\
- 	static exitcall_t __exitcall_##fn __exit_call = fn
- 
--#define console_initcall(fn)					\
--	static initcall_t __initcall_##fn			\
--	__used __section(.con_initcall.init) = fn
--
--#define security_initcall(fn)					\
--	static initcall_t __initcall_##fn			\
--	__used __section(.security_initcall.init) = fn
-+#define console_initcall(fn)	___define_initcall(fn,, .con_initcall)
-+#define security_initcall(fn)	___define_initcall(fn,, .security_initcall)
- 
- struct obs_kernel_param {
- 	const char *str;
-diff --git a/init/main.c b/init/main.c
-index 3b4ada11ed52..e59a01f163d6 100644
---- a/init/main.c
-+++ b/init/main.c
-@@ -901,18 +901,18 @@ int __init_or_module do_one_initcall(initcall_t fn)
- }
- 
- 
--extern initcall_t __initcall_start[];
--extern initcall_t __initcall0_start[];
--extern initcall_t __initcall1_start[];
--extern initcall_t __initcall2_start[];
--extern initcall_t __initcall3_start[];
--extern initcall_t __initcall4_start[];
--extern initcall_t __initcall5_start[];
--extern initcall_t __initcall6_start[];
--extern initcall_t __initcall7_start[];
--extern initcall_t __initcall_end[];
--
--static initcall_t *initcall_levels[] __initdata = {
-+extern initcall_entry_t __initcall_start[];
-+extern initcall_entry_t __initcall0_start[];
-+extern initcall_entry_t __initcall1_start[];
-+extern initcall_entry_t __initcall2_start[];
-+extern initcall_entry_t __initcall3_start[];
-+extern initcall_entry_t __initcall4_start[];
-+extern initcall_entry_t __initcall5_start[];
-+extern initcall_entry_t __initcall6_start[];
-+extern initcall_entry_t __initcall7_start[];
-+extern initcall_entry_t __initcall_end[];
-+
-+static initcall_entry_t *initcall_levels[] __initdata = {
- 	__initcall0_start,
- 	__initcall1_start,
- 	__initcall2_start,
-@@ -938,7 +938,7 @@ static char *initcall_level_names[] __initdata = {
- 
- static void __init do_initcall_level(int level)
- {
--	initcall_t *fn;
-+	initcall_entry_t *fn;
- 
- 	strcpy(initcall_command_line, saved_command_line);
- 	parse_args(initcall_level_names[level],
-@@ -949,7 +949,7 @@ static void __init do_initcall_level(int level)
- 
- 	trace_initcall_level(initcall_level_names[level]);
- 	for (fn = initcall_levels[level]; fn < initcall_levels[level+1]; fn++)
--		do_one_initcall(*fn);
-+		do_one_initcall(initcall_from_entry(fn));
- }
- 
- static void __init do_initcalls(void)
-@@ -980,11 +980,11 @@ static void __init do_basic_setup(void)
- 
- static void __init do_pre_smp_initcalls(void)
- {
--	initcall_t *fn;
-+	initcall_entry_t *fn;
- 
- 	trace_initcall_level("early");
- 	for (fn = __initcall_start; fn < __initcall0_start; fn++)
--		do_one_initcall(*fn);
-+		do_one_initcall(initcall_from_entry(fn));
- }
- 
- /*
-diff --git a/kernel/printk/printk.c b/kernel/printk/printk.c
-index 247808333ba4..688a27b0888c 100644
---- a/kernel/printk/printk.c
-+++ b/kernel/printk/printk.c
-@@ -2772,7 +2772,8 @@ EXPORT_SYMBOL(unregister_console);
- void __init console_init(void)
- {
- 	int ret;
--	initcall_t *call;
-+	initcall_t call;
-+	initcall_entry_t *ce;
- 
- 	/* Setup the default TTY line discipline. */
- 	n_tty_init();
-@@ -2781,13 +2782,14 @@ void __init console_init(void)
- 	 * set up the console device so that later boot sequences can
- 	 * inform about problems etc..
- 	 */
--	call = __con_initcall_start;
-+	ce = __con_initcall_start;
- 	trace_initcall_level("console");
--	while (call < __con_initcall_end) {
--		trace_initcall_start((*call));
--		ret = (*call)();
--		trace_initcall_finish((*call), ret);
--		call++;
-+	while (ce < __con_initcall_end) {
-+		call = initcall_from_entry(ce);
-+		trace_initcall_start(call);
-+		ret = call();
-+		trace_initcall_finish(call, ret);
-+		ce++;
- 	}
- }
- 
-diff --git a/security/security.c b/security/security.c
-index 68f46d849abe..1e7b1486d82a 100644
---- a/security/security.c
-+++ b/security/security.c
-@@ -48,14 +48,17 @@ static __initdata char chosen_lsm[SECURITY_NAME_MAX + 1] =
- static void __init do_security_initcalls(void)
- {
- 	int ret;
--	initcall_t *call;
--	call = __security_initcall_start;
-+	initcall_t call;
-+	initcall_entry_t *ce;
-+
-+	ce = __security_initcall_start;
- 	trace_initcall_level("security");
--	while (call < __security_initcall_end) {
--		trace_initcall_start((*call));
--		ret = (*call) ();
--		trace_initcall_finish((*call), ret);
--		call++;
-+	while (ce < __security_initcall_end) {
-+		call = initcall_from_entry(ce);
-+		trace_initcall_start(call);
-+		ret = call();
-+		trace_initcall_finish(call, ret);
-+		ce++;
- 	}
- }
- 
+  * For fine grained build dependencies, we want to tell the build system
 -- 
 2.11.0
