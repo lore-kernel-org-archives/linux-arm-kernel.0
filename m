@@ -1,57 +1,51 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue, 26 Jun 2018 10:26:19 +0200
-Subject: [PATCH] drm/meson: Fix an un-handled error path in
- 'meson_drv_bind_master()'
-In-Reply-To: <20180611165335.24542-1-christophe.jaillet@wanadoo.fr>
-References: <20180611165335.24542-1-christophe.jaillet@wanadoo.fr>
-Message-ID: <e24fbd8f-e280-8376-7f05-43390df7340c@baylibre.com>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Tue, 26 Jun 2018 10:27:21 +0200
+Subject: [PATCH 1/9] clk: davinci: psc-dm365: use two lookup entries for
+ the aemif clock
+In-Reply-To: <c8d28664-e0fb-5a02-3c5b-b78684f87648@lechnology.com>
+References: <20180625152920.11549-1-brgl@bgdev.pl>
+ <20180625152920.11549-2-brgl@bgdev.pl>
+ <241fed6e-b414-feac-8e6c-39713c5e665e@lechnology.com>
+ <CAMRc=MdTdoL9qsrMAxhCTaQM7HGrAPpTVjDuHQ81Q5O-QMNcYQ@mail.gmail.com>
+ <c8d28664-e0fb-5a02-3c5b-b78684f87648@lechnology.com>
+Message-ID: <CAMRc=MfDmQxiy+jX4kW1A8vvP4xVXjKDo8VpgRZ-2AsTNik-0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/06/2018 18:53, Christophe JAILLET wrote:
-> If 'platform_get_resource_byname()' fails, we should release some resources
-> before leaving, as already done in the other error handling path of the
-> function.
-> 
-> Fixes: acaa3f13b8dd ("drm/meson: Fix potential NULL dereference in meson_drv_bind_master()")
-> Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
-> ---
->  drivers/gpu/drm/meson/meson_drv.c | 12 ++++++++----
->  1 file changed, 8 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/meson/meson_drv.c b/drivers/gpu/drm/meson/meson_drv.c
-> index 32b1a6cdecfc..d3443125e661 100644
-> --- a/drivers/gpu/drm/meson/meson_drv.c
-> +++ b/drivers/gpu/drm/meson/meson_drv.c
-> @@ -197,8 +197,10 @@ static int meson_drv_bind_master(struct device *dev, bool has_components)
->  	priv->io_base = regs;
->  
->  	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "hhi");
-> -	if (!res)
-> -		return -EINVAL;
-> +	if (!res) {
-> +		ret = -EINVAL;
-> +		goto free_drm;
-> +	}
->  	/* Simply ioremap since it may be a shared register zone */
->  	regs = devm_ioremap(dev, res->start, resource_size(res));
->  	if (!regs) {
-> @@ -215,8 +217,10 @@ static int meson_drv_bind_master(struct device *dev, bool has_components)
->  	}
->  
->  	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "dmc");
-> -	if (!res)
-> -		return -EINVAL;
-> +	if (!res) {
-> +		ret = -EINVAL;
-> +		goto free_drm;
-> +	}
->  	/* Simply ioremap since it may be a shared register zone */
->  	regs = devm_ioremap(dev, res->start, resource_size(res));
->  	if (!regs) {
-> 
+2018-06-25 18:06 GMT+02:00 David Lechner <david@lechnology.com>:
+> On 06/25/2018 11:01 AM, Bartosz Golaszewski wrote:
+>>
+>> 2018-06-25 17:53 GMT+02:00 David Lechner <david@lechnology.com>:
+>>>
+>>> On 06/25/2018 10:29 AM, Bartosz Golaszewski wrote:
+>>>>
+>>>>
+>>>> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>>>>
+>>>> We want to be able to get the clock both from the board file by its
+>>>> con_id and from the aemif driver by dev_id.
+>>>
+>>>
+>>>
+>>> What about the other SoCs? Don't they need this change as well?
+>>>
+>>
+>> So I double checked and turns out I missed one other board that's
+>> affected by this series and calls clk_get() from machine code:
+>> dm644x-evm.
+>>
+>> I'll fix it in v2.
+>
+>
+> The ti-aemif platform driver also does clk_get(). Don't you need
+> lookups to make that work as well? For example, DA830 doesn't have
+> a clock lookup for aemif at all.
+>
 
-Applied to drm-misc-fixes
+This seems like a bug: in arch/arm/mach-davinci/aemif.c in current
+mainline we do call clk_get() for 'aemif' and it's called indirectly
+from board-da830-evm.c via davinci_aemif_setup().
 
-Thanks,
-Neil
+I'll address this too in v2.
+
+Bart
