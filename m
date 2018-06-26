@@ -1,15 +1,15 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Tue, 26 Jun 2018 16:10:57 +0100 (BST)
-Subject: Applied "ASoC: qcom: apq8096: remove redundant owner assignment" to
+Date: Tue, 26 Jun 2018 16:10:52 +0100 (BST)
+Subject: Applied "ASoC: qdsp6: q6asm: remove unused struct q6asm member" to
  the asoc tree
-In-Reply-To: <20180625143115.8346-11-srinivas.kandagatla@linaro.org>
-Message-ID: <20180626151057.A5751440070@finisterre.ee.mobilebroadband>
+In-Reply-To: <20180626092016.9296-13-srinivas.kandagatla@linaro.org>
+Message-ID: <20180626151052.2DE53440070@finisterre.ee.mobilebroadband>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   ASoC: qcom: apq8096: remove redundant owner assignment
+   ASoC: qdsp6: q6asm: remove unused struct q6asm member
 
 has been applied to the asoc tree at
 
@@ -34,32 +34,31 @@ to this mail.
 Thanks,
 Mark
 
->From 2d12c20b98ad610892151da37367f2d018181455 Mon Sep 17 00:00:00 2001
+>From f339155a4063cf3177bb38f6e83760951148e86b Mon Sep 17 00:00:00 2001
 From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-Date: Tue, 26 Jun 2018 10:20:14 +0100
-Subject: [PATCH] ASoC: qcom: apq8096: remove redundant owner assignment
+Date: Tue, 26 Jun 2018 10:20:16 +0100
+Subject: [PATCH] ASoC: qdsp6: q6asm: remove unused struct q6asm member
 
-module owner is already set in platform_driver_register(), so remove this
-redundant assignment.
+pcmdev in struct q6asm seems be left over and unused, so just remove it.
 
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 Acked-by: Niklas Cassel <niklas.cassel@linaro.org>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- sound/soc/qcom/apq8096.c | 1 -
+ sound/soc/qcom/qdsp6/q6asm.c | 1 -
  1 file changed, 1 deletion(-)
 
-diff --git a/sound/soc/qcom/apq8096.c b/sound/soc/qcom/apq8096.c
-index 239b8cb77bdb..cab8c4ff7c00 100644
---- a/sound/soc/qcom/apq8096.c
-+++ b/sound/soc/qcom/apq8096.c
-@@ -246,7 +246,6 @@ static struct platform_driver msm_snd_apq8096_driver = {
- 	.remove = apq8096_platform_remove,
- 	.driver = {
- 		.name = "msm-snd-apq8096",
--		.owner = THIS_MODULE,
- 		.of_match_table = msm_snd_apq8096_dt_match,
- 	},
+diff --git a/sound/soc/qcom/qdsp6/q6asm.c b/sound/soc/qcom/qdsp6/q6asm.c
+index c4fd28f168d5..2b2c7233bb5f 100644
+--- a/sound/soc/qcom/qdsp6/q6asm.c
++++ b/sound/soc/qcom/qdsp6/q6asm.c
+@@ -174,7 +174,6 @@ struct q6asm {
+ 	struct device *dev;
+ 	struct q6core_svc_api_info ainfo;
+ 	wait_queue_head_t mem_wait;
+-	struct platform_device *pcmdev;
+ 	spinlock_t slock;
+ 	struct audio_client *session[MAX_SESSIONS + 1];
  };
 -- 
 2.17.1
