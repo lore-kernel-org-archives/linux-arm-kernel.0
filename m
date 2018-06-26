@@ -1,55 +1,33 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 26 Jun 2018 21:22:52 +0200
-Subject: [PATCH v5 1/7] tty: serial: imx: correct dma cookie status
-In-Reply-To: <1529427424-12321-2-git-send-email-yibin.gong@nxp.com>
-References: <1529427424-12321-1-git-send-email-yibin.gong@nxp.com>
- <1529427424-12321-2-git-send-email-yibin.gong@nxp.com>
-Message-ID: <20180626192252.6qdpwzpbpn6s5sd3@pengutronix.de>
+From: sravanhome@gmail.com (Saravanan Sekar)
+Date: Tue, 26 Jun 2018 21:28:18 +0200
+Subject: [PATCH 0/2] Add clock driver for Actions S700 SoC 
+Message-ID: <20180626192820.28237-1-sravanhome@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 20, 2018 at 12:56:58AM +0800, Robin Gong wrote:
-> Correct to check the right rx dma cookie status in spit of it
-> works because only one cookie is running in the current sdma.
-> But it will not once sdma driver support multi cookies
-> running based on virt-dma.
-> 
-> Signed-off-by: Robin Gong <yibin.gong@nxp.com>
-Looks wrong (because of tx_status vs rx_cookie), but is right
-nevertheless I think:
+This patchset adds clock support for Actions Semi OWL series
+S700 SoC with relevant clock bindings and device tree info.
 
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Changed the UART clock using CMU instance and changes are
+tested in cubieboard7 
 
-Thanks
-Uwe
+Thanks and regards,
+Saravanan,
+Parthiban
 
-> ---
->  drivers/tty/serial/imx.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-> index 4e85357..2879407 100644
-> --- a/drivers/tty/serial/imx.c
-> +++ b/drivers/tty/serial/imx.c
-> @@ -1051,7 +1051,7 @@ static void imx_uart_dma_rx_callback(void *data)
->  	unsigned int r_bytes;
->  	unsigned int bd_size;
->  
-> -	status = dmaengine_tx_status(chan, (dma_cookie_t)0, &state);
-> +	status = dmaengine_tx_status(chan, sport->rx_cookie, &state);
->  
->  	if (status == DMA_ERROR) {
->  		imx_uart_clear_rx_errors(sport);
-> -- 
-> 2.7.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Saravanan Sekar (2):
+  arm64: dts: actions: Enable clock controller for S700
+  clk: actions: Add S700 SoC clock support
+
+ .../boot/dts/actions/s700-cubieboard7.dts     |   7 -
+ arch/arm64/boot/dts/actions/s700.dtsi         |   8 +
+ drivers/clk/actions/Kconfig                   |   7 +
+ drivers/clk/actions/Makefile                  |   1 +
+ drivers/clk/actions/owl-s700.c                | 614 ++++++++++++++++++
+ include/dt-bindings/clock/actions,s700-cmu.h  | 128 ++++
+ 6 files changed, 758 insertions(+), 7 deletions(-)
+ create mode 100644 drivers/clk/actions/owl-s700.c
+ create mode 100644 include/dt-bindings/clock/actions,s700-cmu.h
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+2.18.0
