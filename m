@@ -1,196 +1,94 @@
-From: vivek.gautam@codeaurora.org (Vivek Gautam)
-Date: Wed, 27 Jun 2018 18:20:55 +0530
-Subject: [PATCH 1/2] device core: Rename flag AUTOREMOVE to AUTOREMOVE_CONSUMER
-Message-ID: <20180627125056.12851-1-vivek.gautam@codeaurora.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 27 Jun 2018 14:09:17 +0100
+Subject: [PATCH] arm64: entry: add END/ENDPROC markers to *.S files
+In-Reply-To: <1530035261-17786-1-git-send-email-eugene.loh@oracle.com>
+References: <1530035261-17786-1-git-send-email-eugene.loh@oracle.com>
+Message-ID: <20180627130917.g45eigeevavqsi3u@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we want to add another flag to autoremove the device link
-on supplier unbind, it's fair to rename the existing flag from
-DL_FLAG_AUTOREMOVE to DL_FLAG_AUTOREMOVE_CONSUMER so that we can
-add similar flag for supplier later.
-And, while we are touching device.h, fix a doc build warning.
+Hi,
 
-Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
-Cc: Lukas Wunner <lukas@wunner.de>
-Cc: Jonathan Corbet <corbet@lwn.net>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Thierry Reding <thierry.reding@gmail.com>
-Cc: David Airlie <airlied@linux.ie>
-Cc: Jonathan Hunter <jonathanh@nvidia.com>
-Cc: Philipp Zabel <p.zabel@pengutronix.de>
-Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: Robin Murphy <robin.murphy@arm.com>
-Cc: linux-doc at vger.kernel.org
-Cc: dri-devel at lists.freedesktop.org
-Cc: linux-tegra at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-pm at vger.kernel.org
-Cc: linux-arm-msm at vger.kernel.org
----
- Documentation/driver-api/device_link.rst |  8 ++++----
- drivers/base/core.c                      | 15 ++++++++-------
- drivers/gpu/drm/tegra/dc.c               |  2 +-
- drivers/gpu/ipu-v3/ipu-pre.c             |  3 ++-
- drivers/gpu/ipu-v3/ipu-prg.c             |  3 ++-
- drivers/soc/imx/gpc.c                    |  2 +-
- include/linux/device.h                   | 12 ++++++------
- 7 files changed, 24 insertions(+), 21 deletions(-)
+On Tue, Jun 26, 2018 at 10:47:41AM -0700, eugene.loh at oracle.com wrote:
+> From: Eugene Loh <eugene.loh@oracle.com>
+> 
+> Add END/ENDPROC markers to *.S files so that assembly instructions
+> can be mapped to symbols.
 
-diff --git a/Documentation/driver-api/device_link.rst b/Documentation/driver-api/device_link.rst
-index 70e328e16aad..a005b904a264 100644
---- a/Documentation/driver-api/device_link.rst
-+++ b/Documentation/driver-api/device_link.rst
-@@ -81,10 +81,10 @@ integration is desired.
- Two other flags are specifically targeted at use cases where the device
- link is added from the consumer's ``->probe`` callback:  ``DL_FLAG_RPM_ACTIVE``
- can be specified to runtime resume the supplier upon addition of the
--device link.  ``DL_FLAG_AUTOREMOVE`` causes the device link to be automatically
--purged when the consumer fails to probe or later unbinds.  This obviates
--the need to explicitly delete the link in the ``->remove`` callback or in
--the error path of the ``->probe`` callback.
-+device link.  ``DL_FLAG_AUTOREMOVE_CONSUMER`` causes the device link to be
-+automatically purged when the consumer fails to probe or later unbinds.
-+This obviates the need to explicitly delete the link in the ``->remove``
-+callback or in the error path of the ``->probe`` callback.
- 
- Limitations
- ===========
-diff --git a/drivers/base/core.c b/drivers/base/core.c
-index df3e1a44707a..14c1e3151e08 100644
---- a/drivers/base/core.c
-+++ b/drivers/base/core.c
-@@ -178,10 +178,10 @@ void device_pm_move_to_tail(struct device *dev)
-  * of the link.  If DL_FLAG_PM_RUNTIME is not set, DL_FLAG_RPM_ACTIVE will be
-  * ignored.
-  *
-- * If the DL_FLAG_AUTOREMOVE is set, the link will be removed automatically
-- * when the consumer device driver unbinds from it.  The combination of both
-- * DL_FLAG_AUTOREMOVE and DL_FLAG_STATELESS set is invalid and will cause NULL
-- * to be returned.
-+ * If the DL_FLAG_AUTOREMOVE_CONSUMER is set, the link will be removed
-+ * automatically when the consumer device driver unbinds from it.
-+ * The combination of both DL_FLAG_AUTOREMOVE_CONSUMER and DL_FLAG_STATELESS
-+ * set is invalid and will cause NULL to be returned.
-  *
-  * A side effect of the link creation is re-ordering of dpm_list and the
-  * devices_kset list by moving the consumer device and all devices depending
-@@ -198,7 +198,8 @@ struct device_link *device_link_add(struct device *consumer,
- 	struct device_link *link;
- 
- 	if (!consumer || !supplier ||
--	    ((flags & DL_FLAG_STATELESS) && (flags & DL_FLAG_AUTOREMOVE)))
-+	    ((flags & DL_FLAG_STATELESS) &&
-+	     (flags & DL_FLAG_AUTOREMOVE_CONSUMER)))
- 		return NULL;
- 
- 	device_links_write_lock();
-@@ -479,7 +480,7 @@ static void __device_links_no_driver(struct device *dev)
- 		if (link->flags & DL_FLAG_STATELESS)
- 			continue;
- 
--		if (link->flags & DL_FLAG_AUTOREMOVE)
-+		if (link->flags & DL_FLAG_AUTOREMOVE_CONSUMER)
- 			kref_put(&link->kref, __device_link_del);
- 		else if (link->status != DL_STATE_SUPPLIER_UNBIND)
- 			WRITE_ONCE(link->status, DL_STATE_AVAILABLE);
-@@ -515,7 +516,7 @@ void device_links_driver_cleanup(struct device *dev)
- 		if (link->flags & DL_FLAG_STATELESS)
- 			continue;
- 
--		WARN_ON(link->flags & DL_FLAG_AUTOREMOVE);
-+		WARN_ON(link->flags & DL_FLAG_AUTOREMOVE_CONSUMER);
- 		WARN_ON(link->status != DL_STATE_SUPPLIER_UNBIND);
- 		WRITE_ONCE(link->status, DL_STATE_DORMANT);
- 	}
-diff --git a/drivers/gpu/drm/tegra/dc.c b/drivers/gpu/drm/tegra/dc.c
-index c3afe7b2237e..965088afcfad 100644
---- a/drivers/gpu/drm/tegra/dc.c
-+++ b/drivers/gpu/drm/tegra/dc.c
-@@ -2312,7 +2312,7 @@ static int tegra_dc_couple(struct tegra_dc *dc)
- 	 * POWER_CONTROL registers during CRTC enabling.
- 	 */
- 	if (dc->soc->coupled_pm && dc->pipe == 1) {
--		u32 flags = DL_FLAG_PM_RUNTIME | DL_FLAG_AUTOREMOVE;
-+		u32 flags = DL_FLAG_PM_RUNTIME | DL_FLAG_AUTOREMOVE_CONSUMER;
- 		struct device_link *link;
- 		struct device *partner;
- 
-diff --git a/drivers/gpu/ipu-v3/ipu-pre.c b/drivers/gpu/ipu-v3/ipu-pre.c
-index 0f70e8847540..2f8db9d62551 100644
---- a/drivers/gpu/ipu-v3/ipu-pre.c
-+++ b/drivers/gpu/ipu-v3/ipu-pre.c
-@@ -128,7 +128,8 @@ ipu_pre_lookup_by_phandle(struct device *dev, const char *name, int index)
- 	list_for_each_entry(pre, &ipu_pre_list, list) {
- 		if (pre_node == pre->dev->of_node) {
- 			mutex_unlock(&ipu_pre_list_mutex);
--			device_link_add(dev, pre->dev, DL_FLAG_AUTOREMOVE);
-+			device_link_add(dev, pre->dev,
-+					DL_FLAG_AUTOREMOVE_CONSUMER);
- 			of_node_put(pre_node);
- 			return pre;
- 		}
-diff --git a/drivers/gpu/ipu-v3/ipu-prg.c b/drivers/gpu/ipu-v3/ipu-prg.c
-index 83f9dd934a5d..38a3a9764e49 100644
---- a/drivers/gpu/ipu-v3/ipu-prg.c
-+++ b/drivers/gpu/ipu-v3/ipu-prg.c
-@@ -100,7 +100,8 @@ ipu_prg_lookup_by_phandle(struct device *dev, const char *name, int ipu_id)
- 	list_for_each_entry(prg, &ipu_prg_list, list) {
- 		if (prg_node == prg->dev->of_node) {
- 			mutex_unlock(&ipu_prg_list_mutex);
--			device_link_add(dev, prg->dev, DL_FLAG_AUTOREMOVE);
-+			device_link_add(dev, prg->dev,
-+					DL_FLAG_AUTOREMOVE_CONSUMER);
- 			prg->id = ipu_id;
- 			of_node_put(prg_node);
- 			return prg;
-diff --git a/drivers/soc/imx/gpc.c b/drivers/soc/imx/gpc.c
-index 32f0748fd067..aa9e65bc965e 100644
---- a/drivers/soc/imx/gpc.c
-+++ b/drivers/soc/imx/gpc.c
-@@ -202,7 +202,7 @@ static int imx_pgc_power_domain_probe(struct platform_device *pdev)
- 			goto genpd_err;
- 	}
- 
--	device_link_add(dev, dev->parent, DL_FLAG_AUTOREMOVE);
-+	device_link_add(dev, dev->parent, DL_FLAG_AUTOREMOVE_CONSUMER);
- 
- 	return 0;
- 
-diff --git a/include/linux/device.h b/include/linux/device.h
-index 055a69dbcd18..3929805cdd59 100644
---- a/include/linux/device.h
-+++ b/include/linux/device.h
-@@ -90,7 +90,7 @@ extern void bus_remove_file(struct bus_type *, struct bus_attribute *);
-  * @num_vf:	Called to find out how many virtual functions a device on this
-  *		bus supports.
-  * @dma_configure:	Called to setup DMA configuration on a device on
--			this bus.
-+ *			this bus.
-  * @pm:		Power management operations of this bus, callback the specific
-  *		device driver's pm-ops.
-  * @iommu_ops:  IOMMU specific operations for this bus, used to attach IOMMU
-@@ -784,14 +784,14 @@ enum device_link_state {
-  * Device link flags.
-  *
-  * STATELESS: The core won't track the presence of supplier/consumer drivers.
-- * AUTOREMOVE: Remove this link automatically on consumer driver unbind.
-+ * AUTOREMOVE_CONSUMER: Remove the link automatically on consumer driver unbind.
-  * PM_RUNTIME: If set, the runtime PM framework will use this link.
-  * RPM_ACTIVE: Run pm_runtime_get_sync() on the supplier during link creation.
-  */
--#define DL_FLAG_STATELESS	BIT(0)
--#define DL_FLAG_AUTOREMOVE	BIT(1)
--#define DL_FLAG_PM_RUNTIME	BIT(2)
--#define DL_FLAG_RPM_ACTIVE	BIT(3)
-+#define DL_FLAG_STATELESS		BIT(0)
-+#define DL_FLAG_AUTOREMOVE_CONSUMER	BIT(1)
-+#define DL_FLAG_PM_RUNTIME		BIT(2)
-+#define DL_FLAG_RPM_ACTIVE		BIT(3)
- 
- /**
-  * struct device_link - Device link representation.
--- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
-of Code Aurora Forum, hosted by The Linux Foundation
+Is this just for external debug, or does anything in-kernel rely on
+this?
+
+> Signed-off-by: Eugene Loh <eugene.loh@oracle.com>
+> Reviewed-by: Rob Gardner <rob.gardner@oracle.com>
+> 
+> Orabug: 28143715
+> ---
+>  arch/arm64/kernel/entry.S      | 6 +++++-
+>  arch/arm64/kvm/hyp/hyp-entry.S | 6 ++++++
+>  2 files changed, 11 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> index 5f4e54a..3ad0e1a 100644
+> --- a/arch/arm64/kernel/entry.S
+> +++ b/arch/arm64/kernel/entry.S
+> @@ -456,6 +456,7 @@ __bad_stack:
+>  	/* Time to die */
+>  	bl	handle_bad_stack
+>  	ASM_BUG()
+> +END(__bad_stack)
+>  #endif /* CONFIG_VMAP_STACK */
+>  
+>  /*
+> @@ -622,6 +623,7 @@ el1_preempt:
+>  	ldr	x0, [tsk, #TSK_TI_FLAGS]	// get new tasks TI_FLAGS
+>  	tbnz	x0, #TIF_NEED_RESCHED, 1b	// needs rescheduling?
+>  	ret	x24
+> +END(el1_preempt)
+
+We treat el1_preempt like a subroutine (it gets called and returns), so
+END_PROC() would seem more sensible.
+
+>  #endif
+>  
+>  /*
+> @@ -886,6 +888,7 @@ ret_fast_syscall:
+>  ret_fast_syscall_trace:
+>  	enable_irq				// enable interrupts
+>  	b	__sys_trace_return_skipped	// we already saved x0
+> +END(ret_fast_syscall)
+>  
+>  /*
+>   * Ok, we need to do extra processing, enter the slow path.
+> @@ -898,6 +901,7 @@ work_pending:
+>  #endif
+>  	ldr	x1, [tsk, #TSK_TI_FLAGS]	// re-check for single-step
+>  	b	finish_ret_to_user
+> +END(work_pending)
+>  /*
+>   * "slow" syscall return path.
+>   */
+> @@ -958,7 +962,6 @@ ni_sys:
+>  	mov	x0, sp
+>  	bl	do_ni_syscall
+>  	b	ret_fast_syscall
+> -ENDPROC(el0_svc)
+>  
+>  	/*
+>  	 * This is the really slow path.  We're going to be doing context
+> @@ -995,6 +998,7 @@ __ni_sys_trace:
+>  	mov	x0, sp
+>  	bl	do_ni_syscall
+>  	b	__sys_trace_return
+> +ENDPROC(el0_svc)
+
+I'm converting the syscall paths to C [1], which should address all of
+the above, except for work_pending.
+
+I do hope to convert that in future along with the rest of the entry
+triage logic [2].
+
+Thanks,
+Mark.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2018-June/582238.html
+[2] https://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git/log/?h=arm64/entry-deasm
