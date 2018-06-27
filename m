@@ -1,103 +1,83 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 27 Jun 2018 17:36:46 +0100
-Subject: [PATCH v3 1/6] arm64: KVM: Add support for Stage-2 control of
- memory types and cacheability
-In-Reply-To: <94512c9e-b625-ba7c-097b-cb7b18cb592d@arm.com>
-References: <20180627122058.8210-1-marc.zyngier@arm.com>
- <20180627122058.8210-2-marc.zyngier@arm.com>
- <94512c9e-b625-ba7c-097b-cb7b18cb592d@arm.com>
-Message-ID: <d65a43bd-7b6b-8768-fb3c-878ee8ab70d2@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 27 Jun 2018 17:37:50 +0100
+Subject: [PATCH 1/1] iommu/arm-smmu: Add support to use Last level cache
+In-Reply-To: <CAFp+6iFm29ufb2Pr7Gb-2O_aN3GQLH4rcyWhbQGZ3QiwCC8vPg@mail.gmail.com>
+References: <20180615105329.26800-1-vivek.gautam@codeaurora.org>
+ <20180615165232.GE2202@arm.com>
+ <CAFp+6iFm29ufb2Pr7Gb-2O_aN3GQLH4rcyWhbQGZ3QiwCC8vPg@mail.gmail.com>
+Message-ID: <20180627163749.GA8729@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/06/18 17:20, Suzuki K Poulose wrote:
-> Marc,
+Hi Vivek,
+
+On Tue, Jun 19, 2018 at 02:04:44PM +0530, Vivek Gautam wrote:
+> On Fri, Jun 15, 2018 at 10:22 PM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Fri, Jun 15, 2018 at 04:23:29PM +0530, Vivek Gautam wrote:
+> >> Qualcomm SoCs have an additional level of cache called as
+> >> System cache or Last level cache[1]. This cache sits right
+> >> before the DDR, and is tightly coupled with the memory
+> >> controller.
+> >> The cache is available to all the clients present in the
+> >> SoC system. The clients request their slices from this system
+> >> cache, make it active, and can then start using it. For these
+> >> clients with smmu, to start using the system cache for
+> >> dma buffers and related page tables [2], few of the memory
+> >> attributes need to be set accordingly.
+> >> This change makes the related memory Outer-Shareable, and
+> >> updates the MAIR with necessary protection.
+> >>
+> >> The MAIR attribute requirements are:
+> >>     Inner Cacheablity = 0
+> >>     Outer Cacheablity = 1, Write-Back Write Allocate
+> >>     Outer Shareablity = 1
+> >
+> > Hmm, so is this cache coherent with the CPU or not?
 > 
-> On 27/06/18 13:20, Marc Zyngier wrote:
->> Up to ARMv8.3, the combinaison of Stage-1 and Stage-2 attributes
->> results in the strongest attribute of the two stages.  This means
->> that the hypervisor has to perform quite a lot of cache maintenance
->> just in case the guest has some non-cacheable mappings around.
->>
->> ARMv8.4 solves this problem by offering a different mode (FWB) where
->> Stage-2 has total control over the memory attribute (this is limited
->> to systems where both I/O and instruction fetches are coherent with
->> the dcache). This is achieved by having a different set of memory
->> attributes in the page tables, and a new bit set in HCR_EL2.
->>
->> On such a system, we can then safely sidestep any form of dcache
->> management.
->>
->> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>   arch/arm64/include/asm/cpucaps.h      |  3 ++-
->>   arch/arm64/include/asm/kvm_arm.h      |  1 +
->>   arch/arm64/include/asm/kvm_emulate.h  |  2 ++
->>   arch/arm64/include/asm/kvm_mmu.h      | 26 ++++++++++++++++++++------
->>   arch/arm64/include/asm/memory.h       |  7 +++++++
->>   arch/arm64/include/asm/pgtable-prot.h | 14 ++++++++++++--
->>   arch/arm64/include/asm/sysreg.h       |  1 +
->>   arch/arm64/kernel/cpufeature.c        | 20 ++++++++++++++++++++
->>   virt/kvm/arm/mmu.c                    |  4 ++++
->>   9 files changed, 69 insertions(+), 9 deletions(-)
->>
->> diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
->> index 8a699c708fc9..ed84d6536830 100644
->> --- a/arch/arm64/include/asm/cpucaps.h
->> +++ b/arch/arm64/include/asm/cpucaps.h
->> @@ -49,7 +49,8 @@
->>   #define ARM64_HAS_CACHE_DIC			28
->>   #define ARM64_HW_DBM				29
->>   #define ARM64_SSBD				30
->> +#define ARM64_HAS_STAGE2_FWB			31
->>   
->> -#define ARM64_NCAPS				31
->> +#define ARM64_NCAPS				32
->>   
->>   #endif /* __ASM_CPUCAPS_H */
->> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
->> index 6dd285e979c9..aa45df752a16 100644
->> --- a/arch/arm64/include/asm/kvm_arm.h
->> +++ b/arch/arm64/include/asm/kvm_arm.h
->> @@ -23,6 +23,7 @@
->>   #include <asm/types.h>
->>   
->>   /* Hyp Configuration Register (HCR) bits */
->> +#define HCR_FWB		(UL(1) << 46)
->>   #define HCR_TEA		(UL(1) << 37)
->>   #define HCR_TERR	(UL(1) << 36)
->>   #define HCR_TLOR	(UL(1) << 35)
->> diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
->> index 1dab3a984608..dd98fdf33d99 100644
->> --- a/arch/arm64/include/asm/kvm_emulate.h
->> +++ b/arch/arm64/include/asm/kvm_emulate.h
->> @@ -63,6 +63,8 @@ static inline void vcpu_reset_hcr(struct kvm_vcpu *vcpu)
->>   		/* trap error record accesses */
->>   		vcpu->arch.hcr_el2 |= HCR_TERR;
->>   	}
->> +	if (cpus_have_const_cap(ARM64_HAS_STAGE2_FWB))
->> +		vcpu->arch.hcr_el2 |= HCR_FWB;
->>   
->>   	if (test_bit(KVM_ARM_VCPU_EL1_32BIT, vcpu->arch.features))
->>   		vcpu->arch.hcr_el2 &= ~HCR_RW;
->> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
->> index fb9a7127bb75..620eb9e06bd8 100644
->> --- a/arch/arm64/include/asm/kvm_mmu.h
->> +++ b/arch/arm64/include/asm/kvm_mmu.h
->> @@ -257,6 +257,7 @@ static inline bool kvm_page_empty(void *ptr)
->>   struct kvm;
->>   
->>   #define kvm_flush_dcache_to_poc(a,l)	__flush_dcache_area((a), (l))
->> +#define kvm_flush_dcache_to_pou(a,l)	__clean_dcache_area_pou((a), (l))
+> Thanks for reviewing.
+> Yes, this LLC is cache coherent with CPU, so we mark for Outer-cacheable.
+> The different masters such as GPU as able to allocated and activate a slice
+> in this Last Level Cache.
+
+What I mean is, for example, if the CPU writes some data using Normal, Inner
+Shareable, Inner/Outer Cacheable, Inner/Outer Write-back, Non-transient
+Read/Write-allocate and a device reads that data using your MAIR encoding
+above, is the device guaranteed to see the CPU writes after the CPU has
+executed a DSB instruction?
+
+I don't think so, because the ARM ARM would say that there's a mismatch on
+the Inner Cacheability attribute.
+
+> > Why don't normal
+> > non-cacheable mappings allocated in the LLC by default?
 > 
-> We don't seem to use this new helper anywhere. Otherwise looks good to me.
+> Sorry, I couldn't fully understand your question here.
+> Few of the masters on qcom socs are not io-coherent, so for them
+> the IC has to be marked as 0.
 
-Good point, I forgot to remove it when I dropped the flush to PoU...
-I'll sort it.
+By IC you mean Inner Cacheability? In your MAIR encoding above, it is zero
+so I don't understand the problem. What goes wrong if non-coherent devices
+use your MAIR encoding for their DMA buffers?
 
-Thanks,
+> But they are able to use the LLC with OC marked as 1.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+The issue here is that whatever attributes we put in the SMMU need to align
+with the attributes used by the CPU in order to avoid introducing mismatched
+aliases. Currently, we support three types of mapping in the SMMU:
+
+1. DMA non-coherent (e.g. "dma-coherent" is not set on the device)
+	Normal, Inner Shareable, Inner/Outer Non-Cacheable
+
+2. DMA coherent (e.g. "dma-coherent" is set on the device) [IOMMU_CACHE]
+	Normal, Inner Shareable, Inner/Outer Cacheable, Inner/Outer
+	Write-back, Non-transient Read/Write-allocate
+
+3. MMIO (e.g. MSI doorbell) [IOMMU_MMIO]
+	Device-nGnRE (Outer Shareable)
+
+So either you override one of these types (I was suggesting (1)) or you need
+to create a new memory type, along with the infrastructure for it to be
+recognised on a per-device basis and used by the DMA API so that we don't
+get mismatched aliases on the CPU.
+
+Will
