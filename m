@@ -1,39 +1,89 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 27 Jun 2018 09:28:03 -0700
-Subject: [PATCH v8 2/2] regulator: add QCOM RPMh regulator driver
-In-Reply-To: <20180627150126.GC5263@sirena.org.uk>
-References: <cover.1529712888.git.collinsd@codeaurora.org>
- <35c4ea70cdf5caba560fb6f40e866ee8bc456d93.1529712888.git.collinsd@codeaurora.org>
- <CAD=FV=XVEEPgjBXxR+-46RgxLOq63Xvq-jtruoaCxccmMoKUuA@mail.gmail.com>
- <20180626120733.GD1779@sirena.org.uk>
- <CAD=FV=X1E8Cz=L93G-zJwhM0R=N3YuBBhkvCnLvWuxMU9KJkTw@mail.gmail.com>
- <20180626150203.GG1779@sirena.org.uk>
- <CAD=FV=WC_XWRk-6OELOFFWGnhRq1VeoiiveqXLSy+xqsVb22pA@mail.gmail.com>
- <20180627150126.GC5263@sirena.org.uk>
-Message-ID: <CAD=FV=WYcCVjAiMpzf4zyAByw5y-oDMnuabip1HXqa-mQFRt2w@mail.gmail.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Wed, 27 Jun 2018 19:35:03 +0300
+Subject: [PATCH 1/4] PCI: mediatek: fixup mtk_pcie_find_port logical
+In-Reply-To: <1530091298-28120-2-git-send-email-honghui.zhang@mediatek.com>
+References: <1530091298-28120-1-git-send-email-honghui.zhang@mediatek.com>
+ <1530091298-28120-2-git-send-email-honghui.zhang@mediatek.com>
+Message-ID: <CAHp75Ve2N_Bt8FvX8xCx3JtQ+ozZE=isfsKp9swY+86Cg-78XQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, Jun 27, 2018 at 8:01 AM, Mark Brown <broonie@kernel.org> wrote:
-> On Tue, Jun 26, 2018 at 11:15:14AM -0700, Doug Anderson wrote:
+On Wed, Jun 27, 2018 at 12:21 PM,  <honghui.zhang@mediatek.com> wrote:
+> From: Honghui Zhang <honghui.zhang@mediatek.com>
 >
->> I think he's still planning on re-shuffling his tree a bit.  When he
->> does this, do you need him to put the RPMh patches somewhere you can
->> merge into your tree?
+> Mediatek's host controller have two slots, each have it's own control
+> registers. The host driver need to identify which slot was connected
+> in order to access the device's configuration space. There's problem
+> for current host driver to find out which slot was connected to for
+> a given EP device.
 >
-> Well, I *think* there's no actual dependency here since it's a new
-> driver with a Kconfig dependency.  It really just needs me to get round
-> to trawling through what's a fairly large patch with a troubled history
-> now you've reviewed it.
+> Assuming each slot have connect with one EP device as below:
+>
+>                 host bridge
+>   bus 0 --> __________|_______
+>            |                  |
+>            |                  |
+>          slot 0             slot 1
+>   bus 1 -->|        bus 2 --> |
+>            |                  |
+>          EP 0               EP 1
+>
+> While PCI emulation, system software will scan all the PCI device
+> starting from devfn 0. So it will get the proper port for slot0 and
+> slot1 device when using PCI_SLOT(devfn) for match. But it will get
+> the wrong slot for EP1: The devfn will be start from 0 when scanning
+> EP1 behind slot1, it will get port0 since the PCI_SLOT(EP1) is match
+> for port0's slot value. So the host driver should not using EP's devfn
+> but the slot's devfn(the slot which EP was connected to) for match.
+>
+> This patch fix the mtk_pcie_find_port's logical by using the slot's
+> devfn for match.
 
-OK, great.  I guess I'm confused about the "|| COMPILE_TEST" causing
-problems then?  I was worried that anyone trying to do "COMPILE_TEST"
-on your tree (or linuxnext if RPMh isn't there) would get failures due
-to the lack of header files.  I guess if it's a problem you could just
-gut the "|| COMPILE_TEST" and it could be added back in later?
 
-Hoping my reviews saved you time overall.
+> +       list_for_each_entry(port, &pcie->ports, list) {
+> +               if (bus->number == 0 && port->slot == PCI_SLOT(devfn)) {
+>                         return port;
+> +               } else if (bus->number != 0) {
 
--Doug
+You can do it like (no need 'else')
+
+if (...)
+ return ...;
+if (bus->number) {
+ ...
+}
+
+> +                       pbus = bus;
+> +                       do {
+> +                               dev = pbus->self;
+> +                               if (port->slot == PCI_SLOT(dev->devfn))
+> +                                       return port;
+> +
+> +                               pbus = dev->bus;
+> +                       } while (dev->bus->number != 0);
+
+This can be rewritten like
+
+pbus = bus;
+while (pbus->number) {
+ dev = ...;
+ ...
+ pbus = dev->bus;
+}
+
+and no need for if (bus->number) anymore.
+
+> +               }
+> +       }
+>
+>         return NULL;
+>  }
+> --
+> 2.6.4
+>
+
+
+
+-- 
+With Best Regards,
+Andy Shevchenko
