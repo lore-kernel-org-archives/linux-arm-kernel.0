@@ -1,24 +1,24 @@
 From: houlong.wei@mediatek.com (houlong wei)
-Date: Wed, 27 Jun 2018 19:32:40 +0800
+Date: Wed, 27 Jun 2018 19:43:53 +0800
 Subject: [PATCH v21 4/4] soc: mediatek: Add Mediatek CMDQ helper
-In-Reply-To: <1517885553.24456.19.camel@mtksdaap41>
+In-Reply-To: <1519200345.8716.68.camel@mtksdaap41>
 References: <1517383693-25591-1-git-send-email-houlong.wei@mediatek.com>
  <1517383693-25591-5-git-send-email-houlong.wei@mediatek.com>
- <1517885553.24456.19.camel@mtksdaap41>
-Message-ID: <1530099160.31725.1.camel@mhfsdcap03>
+ <1519200345.8716.68.camel@mtksdaap41>
+Message-ID: <1530099833.31725.7.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2018-02-06 at 10:52 +0800, CK Hu wrote:
+On Wed, 2018-02-21 at 16:05 +0800, CK Hu wrote:
 > Hi, Houlong:
 > 
-> I've some inline comment.
+> I've one more inline comment.
 > 
 > On Wed, 2018-01-31 at 15:28 +0800, houlong.wei at mediatek.com wrote:
 > > From: "hs.liao at mediatek.com" <hs.liao@mediatek.com>
-> >
+> > 
 > > Add Mediatek CMDQ helper to create CMDQ packet and assemble GCE op code.
-> >
+> > 
 > > Signed-off-by: Houlong Wei <houlong.wei@mediatek.com>
 > > Signed-off-by: HS Liao <hs.liao@mediatek.com>
 > > ---
@@ -29,30 +29,30 @@ On Tue, 2018-02-06 at 10:52 +0800, CK Hu wrote:
 > >  4 files changed, 509 insertions(+)
 > >  create mode 100644 drivers/soc/mediatek/mtk-cmdq-helper.c
 > >  create mode 100644 include/linux/soc/mediatek/mtk-cmdq.h
-> >
+> > 
 > > diff --git a/drivers/soc/mediatek/Kconfig b/drivers/soc/mediatek/Kconfig
 > > index a7d0667..e66582e 100644
 > > --- a/drivers/soc/mediatek/Kconfig
 > > +++ b/drivers/soc/mediatek/Kconfig
 > > @@ -4,6 +4,18 @@
 > >  menu "MediaTek SoC drivers"
-> >  depends on ARCH_MEDIATEK || COMPILE_TEST
-> >
+> >  	depends on ARCH_MEDIATEK || COMPILE_TEST
+> >  
 > > +config MTK_CMDQ
-> > +bool "MediaTek CMDQ Support"
-> > +depends on ARM64 && ( ARCH_MEDIATEK || COMPILE_TEST )
-> > +select MAILBOX
-> > +select MTK_CMDQ_MBOX
-> > +select MTK_INFRACFG
-> > +help
-> > +  Say yes here to add support for the MediaTek Command Queue (CMDQ)
-> > +  driver. The CMDQ is used to help read/write registers with critical
-> > +  time limitation, such as updating display configuration during the
-> > +  vblank.
+> > +	bool "MediaTek CMDQ Support"
+> > +	depends on ARM64 && ( ARCH_MEDIATEK || COMPILE_TEST )
+> > +	select MAILBOX
+> > +	select MTK_CMDQ_MBOX
+> > +	select MTK_INFRACFG
+> > +	help
+> > +	  Say yes here to add support for the MediaTek Command Queue (CMDQ)
+> > +	  driver. The CMDQ is used to help read/write registers with critical
+> > +	  time limitation, such as updating display configuration during the
+> > +	  vblank.
 > > +
 > >  config MTK_INFRACFG
-> >  bool "MediaTek INFRACFG Support"
-> >  select REGMAP
+> >  	bool "MediaTek INFRACFG Support"
+> >  	select REGMAP
 > > diff --git a/drivers/soc/mediatek/Makefile b/drivers/soc/mediatek/Makefile
 > > index 12998b0..64ce5ee 100644
 > > --- a/drivers/soc/mediatek/Makefile
@@ -88,351 +88,355 @@ On Tue, 2018-02-06 at 10:52 +0800, CK Hu wrote:
 > > +#include <linux/mailbox_controller.h>
 > > +#include <linux/soc/mediatek/mtk-cmdq.h>
 > > +
-> > +#define CMDQ_ARG_A_WRITE_MASK0xffff
-> > +#define CMDQ_WRITE_ENABLE_MASKBIT(0)
-> > +#define CMDQ_EOC_IRQ_ENBIT(0)
-> > +#define CMDQ_EOC_CMD((u64)((CMDQ_CODE_EOC << CMDQ_OP_CODE_SHIFT)) \
-> > +<< 32 | CMDQ_EOC_IRQ_EN)
+> > +#define CMDQ_ARG_A_WRITE_MASK	0xffff
+> > +#define CMDQ_WRITE_ENABLE_MASK	BIT(0)
+> > +#define CMDQ_EOC_IRQ_EN		BIT(0)
+> > +#define CMDQ_EOC_CMD		((u64)((CMDQ_CODE_EOC << CMDQ_OP_CODE_SHIFT)) \
+> > +				<< 32 | CMDQ_EOC_IRQ_EN)
 > > +
 > > +struct cmdq_subsys {
-> > +u32base;
-> > +intid;
+> > +	u32	base;
+> > +	int	id;
 > > +};
 > > +
 > > +static const struct cmdq_subsys gce_subsys[] = {
-> > +{0x1400, 1},
-> > +{0x1401, 2},
-> > +{0x1402, 3},
+> > +	{0x1400, 1},
+> > +	{0x1401, 2},
+> > +	{0x1402, 3},
 > > +};
-> 
-> I think subsys definition varies by different SoC, so it's better to
-> pass these definition from device tree to driver (client driver), and
-> client driver pass this subsys in the related interface. For example,
-> 
-> in include/dt-bindings/gce/mt8173-gce.h, you define
-> 
-> #define GCE_SUBSYS_1400XXXX1
-> #define GCE_SUBSYS_1401XXXX2
-> #define GCE_SUBSYS_1402XXXX3
-> 
-> in device tree, place the subsys definition in client device node,
-> 
-> #include "dt-bindings/gce/mt8173-gce.h"
-> 
-> ovl0: ovl at 1400c000 {
-> compatible = "mediatek,mt8173-disp-ovl";
-> gce-subsys = <GCE_SUBSYS_1400XXXX>;
-> ...
-> };
-> 
-> And client driver pass subsys in the related interface,
-> 
-> int cmdq_pkt_write(struct cmdq_pkt *pkt, u8 subsys, u16 offset, u32
-> value);
-> 
-> So, for another SoC, you just need to modify device tree and you do not
-> need to modify driver.
-
-Hi CK, thanks for your suggestion. I do it in v22.
-
 > > +
 > > +static int cmdq_subsys_base_to_id(u32 base)
 > > +{
-> > +int i;
+> > +	int i;
 > > +
-> > +for (i = 0; i < ARRAY_SIZE(gce_subsys); i++)
-> > +if (gce_subsys[i].base == base)
-> > +return gce_subsys[i].id;
-> > +return -EFAULT;
+> > +	for (i = 0; i < ARRAY_SIZE(gce_subsys); i++)
+> > +		if (gce_subsys[i].base == base)
+> > +			return gce_subsys[i].id;
+> > +	return -EFAULT;
 > > +}
 > > +
 > > +static int cmdq_pkt_realloc_cmd_buffer(struct cmdq_pkt *pkt, size_t size)
 > > +{
-> > +void *new_buf;
+> > +	void *new_buf;
 > > +
-> > +new_buf = krealloc(pkt->va_base, size, GFP_KERNEL | __GFP_ZERO);
-> > +if (!new_buf)
-> > +return -ENOMEM;
-> > +pkt->va_base = new_buf;
-> > +pkt->buf_size = size;
-> > +return 0;
+> > +	new_buf = krealloc(pkt->va_base, size, GFP_KERNEL | __GFP_ZERO);
+> > +	if (!new_buf)
+> > +		return -ENOMEM;
+> > +	pkt->va_base = new_buf;
+> > +	pkt->buf_size = size;
+> > +	return 0;
 > > +}
 > > +
 > > +struct cmdq_base *cmdq_register_device(struct device *dev)
 > > +{
-> > +struct cmdq_base *cmdq_base;
-> > +struct resource res;
-> > +int subsys;
-> > +u32 base;
+> > +	struct cmdq_base *cmdq_base;
+> > +	struct resource res;
+> > +	int subsys;
+> > +	u32 base;
 > > +
-> > +if (of_address_to_resource(dev->of_node, 0, &res))
-> > +return NULL;
-> > +base = (u32)res.start;
+> > +	if (of_address_to_resource(dev->of_node, 0, &res))
+> > +		return NULL;
+> > +	base = (u32)res.start;
 > > +
-> > +subsys = cmdq_subsys_base_to_id(base >> 16);
-> > +if (subsys < 0)
-> > +return NULL;
+> > +	subsys = cmdq_subsys_base_to_id(base >> 16);
+> > +	if (subsys < 0)
+> > +		return NULL;
 > > +
-> > +cmdq_base = devm_kmalloc(dev, sizeof(*cmdq_base), GFP_KERNEL);
-> > +if (!cmdq_base)
-> > +return NULL;
-> > +cmdq_base->subsys = subsys;
-> > +cmdq_base->base = base;
+> > +	cmdq_base = devm_kmalloc(dev, sizeof(*cmdq_base), GFP_KERNEL);
+> > +	if (!cmdq_base)
+> > +		return NULL;
+> > +	cmdq_base->subsys = subsys;
+> > +	cmdq_base->base = base;
 > > +
-> > +return cmdq_base;
+> > +	return cmdq_base;
 > > +}
 > > +EXPORT_SYMBOL(cmdq_register_device);
 > > +
 > > +struct cmdq_client *cmdq_mbox_create(struct device *dev, int index)
 > > +{
-> > +struct cmdq_client *client;
+> > +	struct cmdq_client *client;
 > > +
-> > +client = kzalloc(sizeof(*client), GFP_KERNEL);
-> > +client->client.dev = dev;
-> > +client->client.tx_block = false;
-> > +client->chan = mbox_request_channel(&client->client, index);
-> > +return client;
+> > +	client = kzalloc(sizeof(*client), GFP_KERNEL);
+> > +	client->client.dev = dev;
+> > +	client->client.tx_block = false;
+> > +	client->chan = mbox_request_channel(&client->client, index);
+> > +	return client;
 > > +}
 > > +EXPORT_SYMBOL(cmdq_mbox_create);
 > > +
 > > +void cmdq_mbox_destroy(struct cmdq_client *client)
 > > +{
-> > +mbox_free_channel(client->chan);
-> > +kfree(client);
+> > +	mbox_free_channel(client->chan);
+> > +	kfree(client);
 > > +}
 > > +EXPORT_SYMBOL(cmdq_mbox_destroy);
 > > +
 > > +int cmdq_pkt_create(struct cmdq_pkt **pkt_ptr)
 > > +{
-> > +struct cmdq_pkt *pkt;
-> > +int err;
+> > +	struct cmdq_pkt *pkt;
+> > +	int err;
 > > +
-> > +pkt = kzalloc(sizeof(*pkt), GFP_KERNEL);
-> > +if (!pkt)
-> > +return -ENOMEM;
-> > +err = cmdq_pkt_realloc_cmd_buffer(pkt, PAGE_SIZE);
-> > +if (err < 0) {
-> > +kfree(pkt);
-> > +return err;
-> > +}
-> > +*pkt_ptr = pkt;
-> > +return 0;
+> > +	pkt = kzalloc(sizeof(*pkt), GFP_KERNEL);
+> > +	if (!pkt)
+> > +		return -ENOMEM;
+> > +	err = cmdq_pkt_realloc_cmd_buffer(pkt, PAGE_SIZE);
+> > +	if (err < 0) {
+> > +		kfree(pkt);
+> > +		return err;
+> > +	}
+> > +	*pkt_ptr = pkt;
+> > +	return 0;
 > > +}
 > > +EXPORT_SYMBOL(cmdq_pkt_create);
 > > +
 > > +void cmdq_pkt_destroy(struct cmdq_pkt *pkt)
 > > +{
-> > +kfree(pkt->va_base);
-> > +kfree(pkt);
+> > +	kfree(pkt->va_base);
+> > +	kfree(pkt);
 > > +}
 > > +EXPORT_SYMBOL(cmdq_pkt_destroy);
 > > +
 > > +static bool cmdq_pkt_is_finalized(struct cmdq_pkt *pkt)
 > > +{
-> > +u64 *expect_eoc;
+> > +	u64 *expect_eoc;
 > > +
-> > +if (pkt->cmd_buf_size < CMDQ_INST_SIZE << 1)
-> > +return false;
+> > +	if (pkt->cmd_buf_size < CMDQ_INST_SIZE << 1)
+> > +		return false;
 > > +
-> > +expect_eoc = pkt->va_base + pkt->cmd_buf_size - (CMDQ_INST_SIZE << 1);
-> > +if (*expect_eoc == CMDQ_EOC_CMD)
-> > +return true;
+> > +	expect_eoc = pkt->va_base + pkt->cmd_buf_size - (CMDQ_INST_SIZE << 1);
+> > +	if (*expect_eoc == CMDQ_EOC_CMD)
+> > +		return true;
 > > +
-> > +return false;
+> > +	return false;
 > > +}
 > > +
 > > +static int cmdq_pkt_append_command(struct cmdq_pkt *pkt, enum cmdq_code code,
-> > +   u32 arg_a, u32 arg_b)
+> > +				   u32 arg_a, u32 arg_b)
 > > +{
-> > +u64 *cmd_ptr;
-> > +int err;
+> > +	u64 *cmd_ptr;
+> > +	int err;
 > > +
-> > +if (WARN_ON(cmdq_pkt_is_finalized(pkt)))
-> > +return -EBUSY;
-> > +if (unlikely(pkt->cmd_buf_size + CMDQ_INST_SIZE > pkt->buf_size)) {
-> > +err = cmdq_pkt_realloc_cmd_buffer(pkt, pkt->buf_size << 1);
-> > +if (err < 0)
-> > +return err;
-> > +}
-> > +cmd_ptr = pkt->va_base + pkt->cmd_buf_size;
-> > +(*cmd_ptr) = (u64)((code << CMDQ_OP_CODE_SHIFT) | arg_a) << 32 | arg_b;
-> > +pkt->cmd_buf_size += CMDQ_INST_SIZE;
-> > +return 0;
+> > +	if (WARN_ON(cmdq_pkt_is_finalized(pkt)))
+> > +		return -EBUSY;
+> > +	if (unlikely(pkt->cmd_buf_size + CMDQ_INST_SIZE > pkt->buf_size)) {
+> > +		err = cmdq_pkt_realloc_cmd_buffer(pkt, pkt->buf_size << 1);
+> 
+> In your design, the command buffer is frequently allocated and freed.
+> But client may not want this mechanism because it have penalty on CPU
+> loading and may have risk of allocation failure. The client may
+> pre-allocate the command buffer and reuse it. So it's better to let
+> client decide which buffer management it want. That means cmdq helper do
+> not allocate command buffer and do not reallocate it. The working flow
+> would be:
+> 
+> For client that want to pre-allocate buffer:
+> (1) Client pre-allocate a command buffer with a pre-calculated size.
+> (Programmer should make sure that all command would not exceed this
+> size)
+> (2) Client use cmdq helper function to generate command in command
+> buffer. If command buffer is full, helper still increase
+> pkt->cmd_buf_size but do not write command into command buffer.
+> (3) When client flush packet, cmdq helper could check whether
+> pkt->cmd_buf_size is greater than pkt->buf_size, if so, return error and
+> programmer should modify the pre-calculated size in step (1).
+> (4) Wait for command done.
+> (5) Set pkt->cmd_buf_size to zero and directly goto step (2) to reuse
+> this command buffer.
+> 
+> For client that want to dynamically allocate buffer:
+> (1) Client dynamically allocate a command buffer with a initial size,
+> for example, 1024 bytes.
+> (2) Client use cmdq helper function to generate command in command
+> buffer. If command buffer is full, helper still increase
+> pkt->cmd_buf_size but do not write command into command buffer.
+> (3) When client flush packet, cmdq helper could check whether
+> pkt->cmd_buf_size is greater than pkt->buf_size, if so, return error and
+> client goto step (1) and reallocate a command buffer with pkt->buf_size.
+> (4) Wait for command done.
+> (5) Free the command buffer.
+> 
+> Because the reallocation is so complicated, for client that want to
+> dynamically allocate buffer, the initial buffer size could also be
+> pre-calculated that you need not to reallocate it. Once the buffer is
+> full, programmer should also fix the accurate buffer size.
+> 
+> Regards,
+> CK
+> 
+
+Hi CK, thanks for your explanation and suggestion. Currently, the cmdq
+buffer is allocated in cmdq_pkt_create and its initial size is
+PAGE_SIZE. In most case of display scenario, PAGE_SIZE(4096) bytes are
+enough.
+
+> > +		if (err < 0)
+> > +			return err;
+> > +	}
+> > +	cmd_ptr = pkt->va_base + pkt->cmd_buf_size;
+> > +	(*cmd_ptr) = (u64)((code << CMDQ_OP_CODE_SHIFT) | arg_a) << 32 | arg_b;
+> > +	pkt->cmd_buf_size += CMDQ_INST_SIZE;
+> > +	return 0;
 > > +}
 > > +
 > > +int cmdq_pkt_write(struct cmdq_pkt *pkt, u32 value, struct cmdq_base *base,
-> > +   u32 offset)
+> > +		   u32 offset)
 > > +{
-> > +u32 arg_a = ((base->base + offset) & CMDQ_ARG_A_WRITE_MASK) |
-> > +    (base->subsys << CMDQ_SUBSYS_SHIFT);
-> > +return cmdq_pkt_append_command(pkt, CMDQ_CODE_WRITE, arg_a, value);
+> > +	u32 arg_a = ((base->base + offset) & CMDQ_ARG_A_WRITE_MASK) |
+> > +		    (base->subsys << CMDQ_SUBSYS_SHIFT);
+> > +	return cmdq_pkt_append_command(pkt, CMDQ_CODE_WRITE, arg_a, value);
 > > +}
 > > +EXPORT_SYMBOL(cmdq_pkt_write);
 > > +
 > > +int cmdq_pkt_write_mask(struct cmdq_pkt *pkt, u32 value,
-> > +struct cmdq_base *base, u32 offset, u32 mask)
+> > +			struct cmdq_base *base, u32 offset, u32 mask)
 > > +{
-> > +u32 offset_mask = offset;
-> > +int err;
+> > +	u32 offset_mask = offset;
+> > +	int err;
 > > +
-> > +if (mask != 0xffffffff) {
-> > +err = cmdq_pkt_append_command(pkt, CMDQ_CODE_MASK, 0, ~mask);
-> > +if (err < 0)
-> > +return err;
-> > +offset_mask |= CMDQ_WRITE_ENABLE_MASK;
-> > +}
-> > +return cmdq_pkt_write(pkt, value, base, offset_mask);
+> > +	if (mask != 0xffffffff) {
+> > +		err = cmdq_pkt_append_command(pkt, CMDQ_CODE_MASK, 0, ~mask);
+> > +		if (err < 0)
+> > +			return err;
+> > +		offset_mask |= CMDQ_WRITE_ENABLE_MASK;
+> > +	}
+> > +	return cmdq_pkt_write(pkt, value, base, offset_mask);
 > > +}
 > > +EXPORT_SYMBOL(cmdq_pkt_write_mask);
 > > +
 > > +static const u32 cmdq_event_value[CMDQ_MAX_EVENT] = {
-> > +/* Display start of frame(SOF) events */
-> > +[CMDQ_EVENT_DISP_OVL0_SOF] = 11,
-> > +[CMDQ_EVENT_DISP_OVL1_SOF] = 12,
-> > +[CMDQ_EVENT_DISP_RDMA0_SOF] = 13,
-> > +[CMDQ_EVENT_DISP_RDMA1_SOF] = 14,
-> > +[CMDQ_EVENT_DISP_RDMA2_SOF] = 15,
-> > +[CMDQ_EVENT_DISP_WDMA0_SOF] = 16,
-> > +[CMDQ_EVENT_DISP_WDMA1_SOF] = 17,
-> > +/* Display end of frame(EOF) events */
-> > +[CMDQ_EVENT_DISP_OVL0_EOF] = 39,
-> > +[CMDQ_EVENT_DISP_OVL1_EOF] = 40,
-> > +[CMDQ_EVENT_DISP_RDMA0_EOF] = 41,
-> > +[CMDQ_EVENT_DISP_RDMA1_EOF] = 42,
-> > +[CMDQ_EVENT_DISP_RDMA2_EOF] = 43,
-> > +[CMDQ_EVENT_DISP_WDMA0_EOF] = 44,
-> > +[CMDQ_EVENT_DISP_WDMA1_EOF] = 45,
-> > +/* Mutex end of frame(EOF) events */
-> > +[CMDQ_EVENT_MUTEX0_STREAM_EOF] = 53,
-> > +[CMDQ_EVENT_MUTEX1_STREAM_EOF] = 54,
-> > +[CMDQ_EVENT_MUTEX2_STREAM_EOF] = 55,
-> > +[CMDQ_EVENT_MUTEX3_STREAM_EOF] = 56,
-> > +[CMDQ_EVENT_MUTEX4_STREAM_EOF] = 57,
-> > +/* Display underrun events */
-> > +[CMDQ_EVENT_DISP_RDMA0_UNDERRUN] = 63,
-> > +[CMDQ_EVENT_DISP_RDMA1_UNDERRUN] = 64,
-> > +[CMDQ_EVENT_DISP_RDMA2_UNDERRUN] = 65,
+> > +	/* Display start of frame(SOF) events */
+> > +	[CMDQ_EVENT_DISP_OVL0_SOF] = 11,
+> > +	[CMDQ_EVENT_DISP_OVL1_SOF] = 12,
+> > +	[CMDQ_EVENT_DISP_RDMA0_SOF] = 13,
+> > +	[CMDQ_EVENT_DISP_RDMA1_SOF] = 14,
+> > +	[CMDQ_EVENT_DISP_RDMA2_SOF] = 15,
+> > +	[CMDQ_EVENT_DISP_WDMA0_SOF] = 16,
+> > +	[CMDQ_EVENT_DISP_WDMA1_SOF] = 17,
+> > +	/* Display end of frame(EOF) events */
+> > +	[CMDQ_EVENT_DISP_OVL0_EOF] = 39,
+> > +	[CMDQ_EVENT_DISP_OVL1_EOF] = 40,
+> > +	[CMDQ_EVENT_DISP_RDMA0_EOF] = 41,
+> > +	[CMDQ_EVENT_DISP_RDMA1_EOF] = 42,
+> > +	[CMDQ_EVENT_DISP_RDMA2_EOF] = 43,
+> > +	[CMDQ_EVENT_DISP_WDMA0_EOF] = 44,
+> > +	[CMDQ_EVENT_DISP_WDMA1_EOF] = 45,
+> > +	/* Mutex end of frame(EOF) events */
+> > +	[CMDQ_EVENT_MUTEX0_STREAM_EOF] = 53,
+> > +	[CMDQ_EVENT_MUTEX1_STREAM_EOF] = 54,
+> > +	[CMDQ_EVENT_MUTEX2_STREAM_EOF] = 55,
+> > +	[CMDQ_EVENT_MUTEX3_STREAM_EOF] = 56,
+> > +	[CMDQ_EVENT_MUTEX4_STREAM_EOF] = 57,
+> > +	/* Display underrun events */
+> > +	[CMDQ_EVENT_DISP_RDMA0_UNDERRUN] = 63,
+> > +	[CMDQ_EVENT_DISP_RDMA1_UNDERRUN] = 64,
+> > +	[CMDQ_EVENT_DISP_RDMA2_UNDERRUN] = 65,
 > > +};
-> 
-> The event is like subsys that it varies by different SoC, so it's better
-> to pass this information from device tree to client driver. And the wait
-> for event interface would become
-> 
-> int cmdq_pkt_wfe(struct cmdq_pkt *pkt, u16 event)
-> 
-> And cmdq driver need not to translate the event value.
-> 
-> Regards,
-> CK
-
-Hi CK, thanks for your suggestion. I do it in v22.
-
 > > +
 > > +int cmdq_pkt_wfe(struct cmdq_pkt *pkt, enum cmdq_event event)
 > > +{
-> > +u32 arg_b;
+> > +	u32 arg_b;
 > > +
-> > +if (event >= CMDQ_MAX_EVENT || event < 0)
-> > +return -EINVAL;
+> > +	if (event >= CMDQ_MAX_EVENT || event < 0)
+> > +		return -EINVAL;
 > > +
-> > +/*
-> > + * WFE arg_b
-> > + * bit 0-11: wait value
-> > + * bit 15: 1 - wait, 0 - no wait
-> > + * bit 16-27: update value
-> > + * bit 31: 1 - update, 0 - no update
-> > + */
-> > +arg_b = CMDQ_WFE_UPDATE | CMDQ_WFE_WAIT | CMDQ_WFE_WAIT_VALUE;
-> > +return cmdq_pkt_append_command(pkt, CMDQ_CODE_WFE,
-> > +cmdq_event_value[event], arg_b);
+> > +	/*
+> > +	 * WFE arg_b
+> > +	 * bit 0-11: wait value
+> > +	 * bit 15: 1 - wait, 0 - no wait
+> > +	 * bit 16-27: update value
+> > +	 * bit 31: 1 - update, 0 - no update
+> > +	 */
+> > +	arg_b = CMDQ_WFE_UPDATE | CMDQ_WFE_WAIT | CMDQ_WFE_WAIT_VALUE;
+> > +	return cmdq_pkt_append_command(pkt, CMDQ_CODE_WFE,
+> > +			cmdq_event_value[event], arg_b);
 > > +}
 > > +EXPORT_SYMBOL(cmdq_pkt_wfe);
 > > +
 > > +int cmdq_pkt_clear_event(struct cmdq_pkt *pkt, enum cmdq_event event)
 > > +{
-> > +if (event >= CMDQ_MAX_EVENT || event < 0)
-> > +return -EINVAL;
+> > +	if (event >= CMDQ_MAX_EVENT || event < 0)
+> > +		return -EINVAL;
 > > +
-> > +return cmdq_pkt_append_command(pkt, CMDQ_CODE_WFE,
-> > +cmdq_event_value[event], CMDQ_WFE_UPDATE);
+> > +	return cmdq_pkt_append_command(pkt, CMDQ_CODE_WFE,
+> > +			cmdq_event_value[event], CMDQ_WFE_UPDATE);
 > > +}
 > > +EXPORT_SYMBOL(cmdq_pkt_clear_event);
 > > +
 > > +static int cmdq_pkt_finalize(struct cmdq_pkt *pkt)
 > > +{
-> > +int err;
+> > +	int err;
 > > +
-> > +if (cmdq_pkt_is_finalized(pkt))
-> > +return 0;
+> > +	if (cmdq_pkt_is_finalized(pkt))
+> > +		return 0;
 > > +
-> > +/* insert EOC and generate IRQ for each command iteration */
-> > +err = cmdq_pkt_append_command(pkt, CMDQ_CODE_EOC, 0, CMDQ_EOC_IRQ_EN);
-> > +if (err < 0)
-> > +return err;
+> > +	/* insert EOC and generate IRQ for each command iteration */
+> > +	err = cmdq_pkt_append_command(pkt, CMDQ_CODE_EOC, 0, CMDQ_EOC_IRQ_EN);
+> > +	if (err < 0)
+> > +		return err;
 > > +
-> > +/* JUMP to end */
-> > +err = cmdq_pkt_append_command(pkt, CMDQ_CODE_JUMP, 0, CMDQ_JUMP_PASS);
-> > +if (err < 0)
-> > +return err;
+> > +	/* JUMP to end */
+> > +	err = cmdq_pkt_append_command(pkt, CMDQ_CODE_JUMP, 0, CMDQ_JUMP_PASS);
+> > +	if (err < 0)
+> > +		return err;
 > > +
-> > +return 0;
+> > +	return 0;
 > > +}
 > > +
 > > +int cmdq_pkt_flush_async(struct cmdq_client *client, struct cmdq_pkt *pkt,
-> > + cmdq_async_flush_cb cb, void *data)
+> > +			 cmdq_async_flush_cb cb, void *data)
 > > +{
-> > +int err;
-> > +struct device *dev;
-> > +dma_addr_t dma_addr;
+> > +	int err;
+> > +	struct device *dev;
+> > +	dma_addr_t dma_addr;
 > > +
-> > +err = cmdq_pkt_finalize(pkt);
-> > +if (err < 0)
-> > +return err;
+> > +	err = cmdq_pkt_finalize(pkt);
+> > +	if (err < 0)
+> > +		return err;
 > > +
-> > +dev = client->chan->mbox->dev;
-> > +dma_addr = dma_map_single(dev, pkt->va_base, pkt->cmd_buf_size,
-> > +DMA_TO_DEVICE);
-> > +if (dma_mapping_error(dev, dma_addr)) {
-> > +dev_err(client->chan->mbox->dev, "dma map failed\n");
-> > +return -ENOMEM;
-> > +}
+> > +	dev = client->chan->mbox->dev;
+> > +	dma_addr = dma_map_single(dev, pkt->va_base, pkt->cmd_buf_size,
+> > +		DMA_TO_DEVICE);
+> > +	if (dma_mapping_error(dev, dma_addr)) {
+> > +		dev_err(client->chan->mbox->dev, "dma map failed\n");
+> > +		return -ENOMEM;
+> > +	}
 > > +
-> > +pkt->pa_base = dma_addr;
-> > +pkt->cb.cb = cb;
-> > +pkt->cb.data = data;
+> > +	pkt->pa_base = dma_addr;
+> > +	pkt->cb.cb = cb;
+> > +	pkt->cb.data = data;
 > > +
-> > +mbox_send_message(client->chan, pkt);
-> > +/* We can send next packet immediately, so just call txdone. */
-> > +mbox_client_txdone(client->chan, 0);
+> > +	mbox_send_message(client->chan, pkt);
+> > +	/* We can send next packet immediately, so just call txdone. */
+> > +	mbox_client_txdone(client->chan, 0);
 > > +
-> > +return 0;
+> > +	return 0;
 > > +}
 > > +EXPORT_SYMBOL(cmdq_pkt_flush_async);
 > > +
 > > +struct cmdq_flush_completion {
-> > +struct completion cmplt;
-> > +bool err;
+> > +	struct completion cmplt;
+> > +	bool err;
 > > +};
 > > +
 > > +static void cmdq_pkt_flush_cb(struct cmdq_cb_data data)
 > > +{
-> > +struct cmdq_flush_completion *cmplt = data.data;
+> > +	struct cmdq_flush_completion *cmplt = data.data;
 > > +
-> > +cmplt->err = data.err;
-> > +complete(&cmplt->cmplt);
+> > +	cmplt->err = data.err;
+> > +	complete(&cmplt->cmplt);
 > > +}
 > > +
 > > +int cmdq_pkt_flush(struct cmdq_client *client, struct cmdq_pkt *pkt)
 > > +{
-> > +struct cmdq_flush_completion cmplt;
-> > +int err;
+> > +	struct cmdq_flush_completion cmplt;
+> > +	int err;
 > > +
-> > +init_completion(&cmplt.cmplt);
-> > +err = cmdq_pkt_flush_async(client, pkt, cmdq_pkt_flush_cb, &cmplt);
-> > +if (err < 0)
-> > +return err;
-> > +wait_for_completion(&cmplt.cmplt);
-> > +return cmplt.err ? -EFAULT : 0;
+> > +	init_completion(&cmplt.cmplt);
+> > +	err = cmdq_pkt_flush_async(client, pkt, cmdq_pkt_flush_cb, &cmplt);
+> > +	if (err < 0)
+> > +		return err;
+> > +	wait_for_completion(&cmplt.cmplt);
+> > +	return cmplt.err ? -EFAULT : 0;
 > > +}
 > > +EXPORT_SYMBOL(cmdq_pkt_flush);
 > > diff --git a/include/linux/soc/mediatek/mtk-cmdq.h b/include/linux/soc/mediatek/mtk-cmdq.h
@@ -462,51 +466,51 @@ Hi CK, thanks for your suggestion. I do it in v22.
 > > +
 > > +/* display events in command queue(CMDQ) */
 > > +enum cmdq_event {
-> > +/* Display start of frame(SOF) events */
-> > +CMDQ_EVENT_DISP_OVL0_SOF,
-> > +CMDQ_EVENT_DISP_OVL1_SOF,
-> > +CMDQ_EVENT_DISP_RDMA0_SOF,
-> > +CMDQ_EVENT_DISP_RDMA1_SOF,
-> > +CMDQ_EVENT_DISP_RDMA2_SOF,
-> > +CMDQ_EVENT_DISP_WDMA0_SOF,
-> > +CMDQ_EVENT_DISP_WDMA1_SOF,
-> > +/* Display end of frame(EOF) events */
-> > +CMDQ_EVENT_DISP_OVL0_EOF,
-> > +CMDQ_EVENT_DISP_OVL1_EOF,
-> > +CMDQ_EVENT_DISP_RDMA0_EOF,
-> > +CMDQ_EVENT_DISP_RDMA1_EOF,
-> > +CMDQ_EVENT_DISP_RDMA2_EOF,
-> > +CMDQ_EVENT_DISP_WDMA0_EOF,
-> > +CMDQ_EVENT_DISP_WDMA1_EOF,
-> > +/* Mutex end of frame(EOF) events */
-> > +CMDQ_EVENT_MUTEX0_STREAM_EOF,
-> > +CMDQ_EVENT_MUTEX1_STREAM_EOF,
-> > +CMDQ_EVENT_MUTEX2_STREAM_EOF,
-> > +CMDQ_EVENT_MUTEX3_STREAM_EOF,
-> > +CMDQ_EVENT_MUTEX4_STREAM_EOF,
-> > +/* Display underrun events */
-> > +CMDQ_EVENT_DISP_RDMA0_UNDERRUN,
-> > +CMDQ_EVENT_DISP_RDMA1_UNDERRUN,
-> > +CMDQ_EVENT_DISP_RDMA2_UNDERRUN,
-> > +/* Keep this at the end */
-> > +CMDQ_MAX_EVENT,
+> > +	/* Display start of frame(SOF) events */
+> > +	CMDQ_EVENT_DISP_OVL0_SOF,
+> > +	CMDQ_EVENT_DISP_OVL1_SOF,
+> > +	CMDQ_EVENT_DISP_RDMA0_SOF,
+> > +	CMDQ_EVENT_DISP_RDMA1_SOF,
+> > +	CMDQ_EVENT_DISP_RDMA2_SOF,
+> > +	CMDQ_EVENT_DISP_WDMA0_SOF,
+> > +	CMDQ_EVENT_DISP_WDMA1_SOF,
+> > +	/* Display end of frame(EOF) events */
+> > +	CMDQ_EVENT_DISP_OVL0_EOF,
+> > +	CMDQ_EVENT_DISP_OVL1_EOF,
+> > +	CMDQ_EVENT_DISP_RDMA0_EOF,
+> > +	CMDQ_EVENT_DISP_RDMA1_EOF,
+> > +	CMDQ_EVENT_DISP_RDMA2_EOF,
+> > +	CMDQ_EVENT_DISP_WDMA0_EOF,
+> > +	CMDQ_EVENT_DISP_WDMA1_EOF,
+> > +	/* Mutex end of frame(EOF) events */
+> > +	CMDQ_EVENT_MUTEX0_STREAM_EOF,
+> > +	CMDQ_EVENT_MUTEX1_STREAM_EOF,
+> > +	CMDQ_EVENT_MUTEX2_STREAM_EOF,
+> > +	CMDQ_EVENT_MUTEX3_STREAM_EOF,
+> > +	CMDQ_EVENT_MUTEX4_STREAM_EOF,
+> > +	/* Display underrun events */
+> > +	CMDQ_EVENT_DISP_RDMA0_UNDERRUN,
+> > +	CMDQ_EVENT_DISP_RDMA1_UNDERRUN,
+> > +	CMDQ_EVENT_DISP_RDMA2_UNDERRUN,
+> > +	/* Keep this at the end */
+> > +	CMDQ_MAX_EVENT,
 > > +};
 > > +
 > > +struct cmdq_pkt;
 > > +
 > > +struct cmdq_base {
-> > +intsubsys;
-> > +u32base;
+> > +	int	subsys;
+> > +	u32	base;
 > > +};
 > > +
 > > +struct cmdq_client {
-> > +struct mbox_client client;
-> > +struct mbox_chan *chan;
+> > +	struct mbox_client client;
+> > +	struct mbox_chan *chan;
 > > +};
 > > +
 > > +/**
 > > + * cmdq_register_device() - register device which needs CMDQ
-> > + * @dev:device for CMDQ to access its registers
+> > + * @dev:	device for CMDQ to access its registers
 > > + *
 > > + * Return: cmdq_base pointer or NULL for failed
 > > + */
@@ -514,8 +518,8 @@ Hi CK, thanks for your suggestion. I do it in v22.
 > > +
 > > +/**
 > > + * cmdq_mbox_create() - create CMDQ mailbox client and channel
-> > + * @dev:device of CMDQ mailbox client
-> > + * @index:index of CMDQ mailbox channel
+> > + * @dev:	device of CMDQ mailbox client
+> > + * @index:	index of CMDQ mailbox channel
 > > + *
 > > + * Return: CMDQ mailbox client pointer
 > > + */
@@ -523,13 +527,13 @@ Hi CK, thanks for your suggestion. I do it in v22.
 > > +
 > > +/**
 > > + * cmdq_mbox_destroy() - destroy CMDQ mailbox client and channel
-> > + * @client:the CMDQ mailbox client
+> > + * @client:	the CMDQ mailbox client
 > > + */
 > > +void cmdq_mbox_destroy(struct cmdq_client *client);
 > > +
 > > +/**
 > > + * cmdq_pkt_create() - create a CMDQ packet
-> > + * @pkt_ptr:CMDQ packet pointer to retrieve cmdq_pkt
+> > + * @pkt_ptr:	CMDQ packet pointer to retrieve cmdq_pkt
 > > + *
 > > + * Return: 0 for success; else the error code is returned
 > > + */
@@ -537,39 +541,39 @@ Hi CK, thanks for your suggestion. I do it in v22.
 > > +
 > > +/**
 > > + * cmdq_pkt_destroy() - destroy the CMDQ packet
-> > + * @pkt:the CMDQ packet
+> > + * @pkt:	the CMDQ packet
 > > + */
 > > +void cmdq_pkt_destroy(struct cmdq_pkt *pkt);
 > > +
 > > +/**
 > > + * cmdq_pkt_write() - append write command to the CMDQ packet
-> > + * @pkt:the CMDQ packet
-> > + * @value:the specified target register value
-> > + * @base:the CMDQ base
-> > + * @offset:register offset from module base
+> > + * @pkt:	the CMDQ packet
+> > + * @value:	the specified target register value
+> > + * @base:	the CMDQ base
+> > + * @offset:	register offset from module base
 > > + *
 > > + * Return: 0 for success; else the error code is returned
 > > + */
 > > +int cmdq_pkt_write(struct cmdq_pkt *pkt, u32 value,
-> > +   struct cmdq_base *base, u32 offset);
+> > +		   struct cmdq_base *base, u32 offset);
 > > +
 > > +/**
 > > + * cmdq_pkt_write_mask() - append write command with mask to the CMDQ packet
-> > + * @pkt:the CMDQ packet
-> > + * @value:the specified target register value
-> > + * @base:the CMDQ base
-> > + * @offset:register offset from module base
-> > + * @mask:the specified target register mask
+> > + * @pkt:	the CMDQ packet
+> > + * @value:	the specified target register value
+> > + * @base:	the CMDQ base
+> > + * @offset:	register offset from module base
+> > + * @mask:	the specified target register mask
 > > + *
 > > + * Return: 0 for success; else the error code is returned
 > > + */
 > > +int cmdq_pkt_write_mask(struct cmdq_pkt *pkt, u32 value,
-> > +struct cmdq_base *base, u32 offset, u32 mask);
+> > +			struct cmdq_base *base, u32 offset, u32 mask);
 > > +
 > > +/**
 > > + * cmdq_pkt_wfe() - append wait for event command to the CMDQ packet
-> > + * @pkt:the CMDQ packet
-> > + * @event:the desired event type to "wait and CLEAR"
+> > + * @pkt:	the CMDQ packet
+> > + * @event:	the desired event type to "wait and CLEAR"
 > > + *
 > > + * Return: 0 for success; else the error code is returned
 > > + */
@@ -577,8 +581,8 @@ Hi CK, thanks for your suggestion. I do it in v22.
 > > +
 > > +/**
 > > + * cmdq_pkt_clear_event() - append clear event command to the CMDQ packet
-> > + * @pkt:the CMDQ packet
-> > + * @event:the desired event to be cleared
+> > + * @pkt:	the CMDQ packet
+> > + * @event:	the desired event to be cleared
 > > + *
 > > + * Return: 0 for success; else the error code is returned
 > > + */
@@ -586,8 +590,8 @@ Hi CK, thanks for your suggestion. I do it in v22.
 > > +
 > > +/**
 > > + * cmdq_pkt_flush() - trigger CMDQ to execute the CMDQ packet
-> > + * @client:the CMDQ mailbox client
-> > + * @pkt:the CMDQ packet
+> > + * @client:	the CMDQ mailbox client
+> > + * @pkt:	the CMDQ packet
 > > + *
 > > + * Return: 0 for success; else the error code is returned
 > > + *
@@ -600,10 +604,10 @@ Hi CK, thanks for your suggestion. I do it in v22.
 > > +/**
 > > + * cmdq_pkt_flush_async() - trigger CMDQ to asynchronously execute the CMDQ
 > > + *                          packet and call back at the end of done packet
-> > + * @client:the CMDQ mailbox client
-> > + * @pkt:the CMDQ packet
-> > + * @cb:called at the end of done packet
-> > + * @data:this data will pass back to cb
+> > + * @client:	the CMDQ mailbox client
+> > + * @pkt:	the CMDQ packet
+> > + * @cb:		called at the end of done packet
+> > + * @data:	this data will pass back to cb
 > > + *
 > > + * Return: 0 for success; else the error code is returned
 > > + *
@@ -612,8 +616,8 @@ Hi CK, thanks for your suggestion. I do it in v22.
 > > + * function returned, it may or may not be finished.
 > > + */
 > > +int cmdq_pkt_flush_async(struct cmdq_client *client, struct cmdq_pkt *pkt,
-> > + cmdq_async_flush_cb cb, void *data);
+> > +			 cmdq_async_flush_cb cb, void *data);
 > > +
-> > +#endif/* __MTK_CMDQ_H__ */
+> > +#endif	/* __MTK_CMDQ_H__ */
 > 
 > 
