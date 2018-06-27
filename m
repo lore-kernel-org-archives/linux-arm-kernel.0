@@ -1,67 +1,45 @@
-From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
-Date: Wed, 27 Jun 2018 11:01:53 -0700
-Subject: [PATCH] i2c: aspeed: Improve driver to support multi-master use
- cases stably
-In-Reply-To: <60d0dad1-b735-0650-47b4-40c57b1a5209@linux.intel.com>
-References: <20180626165812.4141-1-jae.hyun.yoo@linux.intel.com>
- <60d0dad1-b735-0650-47b4-40c57b1a5209@linux.intel.com>
-Message-ID: <c1c361de-32a7-83b6-4d48-ad0750c6218b@linux.intel.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Wed, 27 Jun 2018 20:02:15 +0200
+Subject: [PATCH v3 00/24] Add support for R40 HDMI pipeline
+In-Reply-To: <20180625120304.7543-1-jernej.skrabec@siol.net>
+References: <20180625120304.7543-1-jernej.skrabec@siol.net>
+Message-ID: <20180627180215.y5kvvdqeriadxwte@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jarkko,
-
-Thanks for the review. Please see my answer below.
-
-On 6/27/2018 12:48 AM, Jarkko Nikula wrote:
-> Hi
+On Mon, Jun 25, 2018 at 02:02:40PM +0200, Jernej Skrabec wrote:
+> This series adds support for R40 HDMI pipeline. It is a bit special
+> than other already supported pipelines because it has additional unit
+> called TCON TOP responsible for relationship configuration between
+> mixers, TCONs and HDMI. Additionally, it has additional gates for DSI
+> and TV TCONs, TV encoder clock settings and pin muxing between LCD
+> and TV encoders.
 > 
-> On 06/26/2018 07:58 PM, Jae Hyun Yoo wrote:
->> BMC firmware should support some multi-master use cases such as 
->> multi-node,
->> IPMB, BMC-ME link and so on but the current ASPEED I2C driver is a bit
->> unstable for the multi-master use case. So this patch improves ASPEED I2C
->> driver to support the multi-master use case stably.
->>
->> Changes:
->> * Added XFER_MODE status register checking logic into
->> ?? aspeed_i2c_master_xfer to improve the current bus busy checking logic.
->> * Changed the order of enum aspeed_i2c_master_state and
->> ?? enum aspeed_i2c_slave_state defines to make their initial values 
->> set to
->> ?? ASPEED_I2C_MASTER_INACTIVE and ASPEED_I2C_SLAVE_STOP respectively.
->> ?? In case of multi-master use with previous code, if a slave data comes
->> ?? ahead of the first master xfer, master_state starts from an invalid
->> ?? state. This change fixed the issue.
->> * Adjusted spin_lock scope to make it wrap the whole irq handler using
->> ?? a single lock and unlock pair covers both master and slave handlers.
->> * Added irq_status variable as a member of the struct aspeed_i2c_bus to
->> ?? collect handled interrupt bits throughout the master and the slave irq
->> ?? handlers.
->> * Added control logic to put an order on calling the master and the slave
->> ?? irq handlers based on their current states.
->>
-> This does many unrelated looking changes in one patch making it more 
-> vulnerable for potential multiple regressions. For instance busy 
-> checking goes from single read to loop with 250 ms timeout in this patch 
-> while changing also spin lock logic and interrupt handling.
+> However, it seems that TCON TOP will become a norm, since newer
+> Allwinner SoCs like H6 also have this unit.
 > 
-> Now if there is some regression it might be difficult to find what 
-> change in this patch is causing it and more over things goes more 
-> complicated if some other kind of regressions are found pointing into 
-> the same commit.
+> I tested different possible configurations:
+> - mixer0 <> TCON-TV0 <> HDMI
+> - mixer0 <> TCON-TV1 <> HDMI
+> - mixer1 <> TCON-TV0 <> HDMI
+> - mixer1 <> TCON-TV1 <> HDMI
 > 
-> I suggest splitting this into multiple smaller patches. For instance 
-> having first simple conversions patches that are unlikely to cause a 
-> regression like one patch adding '\n' to error print, another moving 
-> irq_status variable into struct aspeed_i2c_bus and so on followed by 
-> patches that change logic like busy checking, spin lock change and then 
-> patch or more for multi-master support.
-> 
+> Please review.
 
-Yes, that makes sense and I agree with you. I'll split out this patch
-into multiple smaller patches as you suggested.
+I just applied it. It didn't apply cleanly, so please make sure it
+does next time, or at least state what the dependencies are.
 
-Thanks,
+Thanks!
+Maxime
 
-Jae
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180627/a32d1905/attachment.sig>
