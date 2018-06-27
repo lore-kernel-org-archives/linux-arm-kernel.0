@@ -1,50 +1,47 @@
-From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Wed, 27 Jun 2018 08:10:24 +0200
-Subject: [PATCH] arm64: dts: marvell: mcbin: fix eth3 connector name
-In-Reply-To: <e4bdd3c11db195ffccb1da7b62e489ed85a2bb1d.1529818097.git.baruch@tkos.co.il>
- (Baruch Siach's message of "Sun, 24 Jun 2018 08:28:17 +0300")
-References: <e4bdd3c11db195ffccb1da7b62e489ed85a2bb1d.1529818097.git.baruch@tkos.co.il>
-Message-ID: <871scsahf3.fsf@bootlin.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Wed, 27 Jun 2018 08:19:20 +0200
+Subject: [PATCH v5 1/8] interconnect: Add generic on-chip interconnect API
+In-Reply-To: <20180620121141.15403-2-georgi.djakov@linaro.org>
+References: <20180620121141.15403-1-georgi.djakov@linaro.org>
+ <20180620121141.15403-2-georgi.djakov@linaro.org>
+Message-ID: <CAKfTPtBApjf9rhJm3paeXdgbVG50ALeun=zMUddc-f+RnrvkqQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Baruch,
- 
- On dim., juin 24 2018, Baruch Siach <baruch@tkos.co.il> wrote:
+Hi Georgi
 
-> The right most SFP connector on the Macchiatobin board and schematics is
-> marked as CON13/CON14.
->
-> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+On Wed, 20 Jun 2018 at 14:11, Georgi Djakov <georgi.djakov@linaro.org> wrote:
 
-Applied on mvebu/dt64
+[snip]
 
-Thanks,
+> +
+> +static struct icc_path *path_allocate(struct icc_node *dst, ssize_t num_nodes)
+> +{
+> +       struct icc_node *node = dst;
+> +       struct icc_path *path;
+> +       size_t i;
+> +
+> +       path = kzalloc(sizeof(*path) + num_nodes * sizeof(*path->reqs),
 
-Gregory
+Should be (num_nodes -1) * sizeof(*path->reqs) as there is already 1
+icc_req in icc_path struct
 
-> ---
->  arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
-> index a66958ff4de6..56fa44860909 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
-> +++ b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
-> @@ -91,7 +91,7 @@
->  	};
->  
->  	sfp_eth3: sfp-eth3 {
-> -		/* CON3,4 - CPS lane 5 */
-> +		/* CON13,14 - CPS lane 5 */
->  		compatible = "sff,sfp";
->  		i2c-bus = <&sfp_1g_i2c>;
->  		los-gpio = <&cp0_gpio2 22 GPIO_ACTIVE_HIGH>;
-> -- 
-> 2.17.1
->
+> +                      GFP_KERNEL);
+> +       if (!path)
+> +               return ERR_PTR(-ENOMEM);
+> +
+> +       path->num_nodes = num_nodes;
+> +
+> +       for (i = 0; i < num_nodes; i++) {
+> +               hlist_add_head(&path->reqs[i].req_node, &node->req_list);
+> +
+> +               path->reqs[i].node = node;
+> +               /* reference to previous node was saved during path traversal */
+> +               node = node->reverse;
+> +       }
+> +
+> +       return path;
+> +}
+> +
 
--- 
-Gregory Clement, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-http://bootlin.com
+[snip]
