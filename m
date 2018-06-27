@@ -1,138 +1,109 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 27 Jun 2018 07:38:14 -0700
-Subject: [GIT PULL] ARM: SoC fixes
-Message-ID: <20180627143814.fg7v6sjupytb3eyb@localhost>
+From: ethan@ethantuttle.com (Ethan Tuttle)
+Date: Wed, 27 Jun 2018 07:39:29 -0700
+Subject: [PATCH] ARM: mvebu: declare asm symbols as character arrays in
+ pmsu.c
+In-Reply-To: <87wouk92dm.fsf@bootlin.com>
+References: <20180620043109.1190-1-ethan@ethantuttle.com>
+ <87wouk92dm.fsf@bootlin.com>
+Message-ID: <CACzLR4s7v8sxkvVvv1H2KKJHazfgCBmhAeb2Upa5JRoxTqm5nw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Hi Gregory.
 
+On Tue, Jun 26, 2018 at 11:20 PM, Gregory CLEMENT
+<gregory.clement@bootlin.com> wrote:
+> Hi Ethan,
+>
+>  On mar., juin 19 2018, Ethan Tuttle <ethan@ethantuttle.com> wrote:
+>
+>> With CONFIG_FORTIFY_SOURCE, memcpy uses the declared size of operands to
+>> detect buffer overflows.  If src or dest is declared as a char, attempts to
+>> copy more than byte will result in a fortify_panic().
+>>
+>> Address this problem in mvebu_setup_boot_addr_wa() by declaring
+>> mvebu_boot_wa_start and mvebu_boot_wa_end as character arrays.  Also remove
+>> a couple addressof operators to avoid "arithmetic on pointer to an
+>> incomplete type" compiler error.
+>>
+>> See commit 54a7d50b9205 ("x86: mark kprobe templates as character arrays,
+>> not single characters") for a similar fix.
+>>
+>> Fixes "detected buffer overflow in memcpy" error during init on some mvebu
+>> systems (armada-370-xp, armada-375):
+>>
+>> (fortify_panic) from (mvebu_setup_boot_addr_wa+0xb0/0xb4)
+>> (mvebu_setup_boot_addr_wa) from (mvebu_v7_cpu_pm_init+0x154/0x204)
+>> (mvebu_v7_cpu_pm_init) from (do_one_initcall+0x7c/0x1a8)
+>> (do_one_initcall) from (kernel_init_freeable+0x1bc/0x254)
+>> (kernel_init_freeable) from (kernel_init+0x8/0x114)
+>> (kernel_init) from (ret_from_fork+0x14/0x2c)
+>>
+>> Signed-off-by: Ethan Tuttle <ethan@ethantuttle.com>
+>> Tested-by: Ethan Tuttle <ethan@ethantuttle.com>
+>
+> Out of curiosity on which platform did you test it?
 
-The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
+I found the problem on my Mirabox after a kernel upgrade, and verified the fix
+on the Mirabox as well.
 
-  Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+I just observed in the code that the panic should also happen on armada-375,
+didn't do any testing there.
 
-are available in the git repository at:
+BTW, just realizing I did not test with CONFIG_FORTIFY_SOURCE off.  But
+I imagine it will work.  Let me know if you think that requires testing.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-fixes
+> Applied on mvebu/arm
 
-for you to fetch changes up to 86676c4685f774d818f7a6c401c925bbf2a92903:
+Excellent!  Thank you.
 
-  arm64: dts: uniphier: fix widget name of headphone for LD11/LD20 boards (2018-06-27 07:14:47 -0700)
+Ethan
 
-----------------------------------------------------------------
-ARM: SoC fixes for 4.18-rc
-
-A handful of fixes, nothing really concerning and most touching devicetree
-files for various platforms.
-
-I also regenerated the shared multiplatform defconfigs; they have drifted
-quite a bit due to Kconfig changes and reordering, and several platform
-maintainers tried doing the same which resulted in a lot of conflict pain
--- this way we get everybody onto the same base for next merge window.
-
-----------------------------------------------------------------
-Andy Gross (1):
-      Merge tag 'qcom-fixes-for-4.18-rc1' into linus
-
-Anson Huang (1):
-      soc: imx: gpcv2: correct PGC offset
-
-Arnd Bergmann (1):
-      qcom: cmd-db: enforce CONFIG_OF_RESERVED_MEM dependency
-
-Dinh Nguyen (1):
-      ARM: dts: socfpga: Fix NAND controller node compatible for Arria10
-
-Florian Fainelli (6):
-      MAINAINTERS: Corrected Broadcom Northstar2 entry
-      MAINTAINERS: Update Broadcom iProc entry with Stingray
-      ARM: dts: NSP: Fix i2c controller interrupt type
-      ARM: dts: NSP: Fix PCIe controllers interrupt types
-      ARM: dts: HR2: Fix interrupt types for i2c and PCIe
-      ARM: dts: BCM5301x: Fix i2c controller interrupt type
-
-Geert Uytterhoeven (2):
-      soc: renesas: rcar-sysc: Make PM domain initialization more robust
-      ARM: Always build secure_cntvoff.S on ARM V7 to fix shmobile !SMP build
-
-Katsuhiro Suzuki (1):
-      arm64: dts: uniphier: fix widget name of headphone for LD11/LD20 boards
-
-Marek Vasut (2):
-      ARM: dts: socfpga: Fix NAND controller clock supply
-      ARM: dts: socfpga: Fix NAND controller node compatible
-
-Miquel Raynal (1):
-      arm64: dts: marvell: fix CP110 ICU node size
-
-Oleksij Rempel (1):
-      ARM: dts: imx6sx: fix irq for pcie bridge
-
-Olof Johansson (11):
-      Merge tag 'mvebu-fixes-4.17-2' of git://git.infradead.org/linux-mvebu into fixes
-      Merge tag 'renesas-fixes-for-v4.18' of https://git.kernel.org/.../horms/renesas into fixes
-      Merge tag 'imx-fixes-4.18' of git://git.kernel.org/.../shawnguo/linux into fixes
-      Merge tag 'arm-soc/for-4.18/devicetree-fixes' of https://github.com/Broadcom/stblinux into fixes
-      Merge tag 'arm-soc/for-4.18/devicetree-arm64-fixes' of https://github.com/Broadcom/stblinux into fixes
-      Merge tag 'arm-soc/for-4.18/maintainers-arm64-fixes' of https://github.com/Broadcom/stblinux into fixes
-      Merge tag 'qcom-fixes-for-4.18-rc1' of git://git.kernel.org/.../agross/linux into fixes
-      arm64: defconfig: renormalize based on recent additions
-      ARM: multi_v7_defconfig: renormalize based on recent additions
-      Merge tag 'socfpga_nand_fix_v4.17' of git://git.kernel.org/.../dinguyen/linux into fixes
-      Merge tag 'qcom-fixes-for-4.18-rc2' of git://git.kernel.org/.../agross/linux into fixes
-
-Ray Jui (5):
-      ARM: dts: Cygnus: Fix I2C controller interrupt type
-      ARM: dts: Cygnus: Fix PCIe controller interrupt type
-      arm64: dts: ns2: Fix I2C controller interrupt type
-      arm64: dts: ns2: Fix PCIe controller interrupt type
-      arm64: dts: Stingray: Fix I2C controller interrupt type
-
-Rob Herring (1):
-      arm64: dts: msm8916: fix Coresight ETF graph connections
-
-Scott Branden (2):
-      arm64: dts: specify 1.8V EMMC capabilities for bcm958742k
-      arm64: dts: specify 1.8V EMMC capabilities for bcm958742t
-
-Sean Nyekjaer (1):
-      ARM: dts: imx6q: Use correct SDMA script for SPI5 core
-
-Srinivas Kandagatla (1):
-      arm64: dts: apq8096-db820c: disable uart0 by default
-
-Thor Thayer (2):
-      arm64: dts: stratix10: Fix SPI nodes for Stratix10
-      ARM: dts: Fix SPI node for Arria10
-
-Viresh Kumar (1):
-      arm: dts: armada: Fix "#cooling-cells" property's name
-
- MAINTAINERS                                        |   6 +-
- arch/arm/boot/dts/armada-385-synology-ds116.dts    |   2 +-
- arch/arm/boot/dts/bcm-cygnus.dtsi                  |  24 +-
- arch/arm/boot/dts/bcm-hr2.dtsi                     |  24 +-
- arch/arm/boot/dts/bcm-nsp.dtsi                     |  32 +-
- arch/arm/boot/dts/bcm5301x.dtsi                    |   2 +-
- arch/arm/boot/dts/imx6q.dtsi                       |   2 +-
- arch/arm/boot/dts/imx6sx.dtsi                      |   2 +-
- arch/arm/boot/dts/socfpga.dtsi                     |   4 +-
- arch/arm/boot/dts/socfpga_arria10.dtsi             |   5 +-
- arch/arm/common/Makefile                           |   2 +-
- arch/arm/configs/multi_v7_defconfig                | 378 +++++++++------------
- arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi  |   6 +-
- arch/arm64/boot/dts/broadcom/northstar2/ns2.dtsi   |   8 +-
- .../boot/dts/broadcom/stingray/bcm958742k.dts      |   4 +
- .../boot/dts/broadcom/stingray/bcm958742t.dts      |   4 +
- .../arm64/boot/dts/broadcom/stingray/stingray.dtsi |   4 +-
- arch/arm64/boot/dts/marvell/armada-cp110.dtsi      |   2 +-
- arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi       |   2 +-
- arch/arm64/boot/dts/qcom/msm8916.dtsi              |   4 +-
- .../boot/dts/socionext/uniphier-ld11-global.dts    |   2 +-
- .../boot/dts/socionext/uniphier-ld20-global.dts    |   2 +-
- arch/arm64/configs/defconfig                       | 102 +++---
- drivers/soc/imx/gpcv2.c                            |  13 +-
- drivers/soc/qcom/Kconfig                           |   3 +-
- drivers/soc/renesas/rcar-sysc.c                    |  35 +-
- 26 files changed, 310 insertions(+), 364 deletions(-)
+>
+> Thanks,
+>
+> Gregory
+>
+>
+>
+>> ---
+>>  arch/arm/mach-mvebu/pmsu.c | 6 +++---
+>>  1 file changed, 3 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
+>> index 27a78c80e5b1..73d5d72dfc3e 100644
+>> --- a/arch/arm/mach-mvebu/pmsu.c
+>> +++ b/arch/arm/mach-mvebu/pmsu.c
+>> @@ -116,8 +116,8 @@ void mvebu_pmsu_set_cpu_boot_addr(int hw_cpu, void *boot_addr)
+>>               PMSU_BOOT_ADDR_REDIRECT_OFFSET(hw_cpu));
+>>  }
+>>
+>> -extern unsigned char mvebu_boot_wa_start;
+>> -extern unsigned char mvebu_boot_wa_end;
+>> +extern unsigned char mvebu_boot_wa_start[];
+>> +extern unsigned char mvebu_boot_wa_end[];
+>>
+>>  /*
+>>   * This function sets up the boot address workaround needed for SMP
+>> @@ -130,7 +130,7 @@ int mvebu_setup_boot_addr_wa(unsigned int crypto_eng_target,
+>>                            phys_addr_t resume_addr_reg)
+>>  {
+>>       void __iomem *sram_virt_base;
+>> -     u32 code_len = &mvebu_boot_wa_end - &mvebu_boot_wa_start;
+>> +     u32 code_len = mvebu_boot_wa_end - mvebu_boot_wa_start;
+>>
+>>       mvebu_mbus_del_window(BOOTROM_BASE, BOOTROM_SIZE);
+>>       mvebu_mbus_add_window_by_id(crypto_eng_target, crypto_eng_attribute,
+>> --
+>> 2.17.1
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+> --
+> Gregory Clement, Bootlin (formerly Free Electrons)
+> Embedded Linux and Kernel engineering
+> http://bootlin.com
