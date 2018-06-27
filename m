@@ -1,83 +1,74 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 27 Jun 2018 18:06:02 +0200
-Subject: [PATCH 3/5] arm64/kernel: jump_label: switch to relative references
+Date: Wed, 27 Jun 2018 18:06:04 +0200
+Subject: [PATCH 5/5] x86/kernel: jump_table: use relative references
 In-Reply-To: <20180627160604.8154-1-ard.biesheuvel@linaro.org>
 References: <20180627160604.8154-1-ard.biesheuvel@linaro.org>
-Message-ID: <20180627160604.8154-4-ard.biesheuvel@linaro.org>
+Message-ID: <20180627160604.8154-6-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On a randomly chosen distro kernel build for arm64, vmlinux.o shows the
-following sections, containing jump label entries, and the associated
-RELA relocation records, respectively:
-
-  ...
-  [38088] __jump_table      PROGBITS         0000000000000000  00e19f30
-       000000000002ea10  0000000000000000  WA       0     0     8
-  [38089] .rela__jump_table RELA             0000000000000000  01fd8bb0
-       000000000008be30  0000000000000018   I      38178   38088     8
-  ...
-
-In other words, we have 190 KB worth of 'struct jump_entry' instances,
-and 573 KB worth of RELA entries to relocate each entry's code, target
-and key members. This means the RELA section occupies 10% of the .init
-segment, and the two sections combined represent 5% of vmlinux's entire
-memory footprint.
-
-So let's switch from 64-bit absolute references to 32-bit relative
-references: this reduces the size of the __jump_table by 50%, and gets
-rid of the RELA section entirely.
+Similar to the arm64 case, 64-bit x86 can benefit from using 32-bit
+relative references rather than 64-bit absolute ones when emitting
+struct jump_entry instances. Not only does this reduce the memory
+footprint of the entries themselves by 50%, it also removes the need
+for carrying relocation metadata on relocatable builds (i.e., for KASLR)
+which saves a fair chunk of .init space as well (although the savings
+are not as dramatic as on arm64)
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/Kconfig                  |  1 +
- arch/arm64/include/asm/jump_label.h | 16 ++++------------
- arch/arm64/kernel/jump_label.c      |  6 +++---
- 3 files changed, 8 insertions(+), 15 deletions(-)
+ arch/x86/Kconfig                  |  1 +
+ arch/x86/include/asm/jump_label.h | 28 ++++++--------------
+ tools/objtool/special.c           |  4 +--
+ 3 files changed, 11 insertions(+), 22 deletions(-)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 1940c6405d04..d17aa9614e69 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -91,6 +91,7 @@ config ARM64
- 	select HAVE_ARCH_BITREVERSE
- 	select HAVE_ARCH_HUGE_VMAP
+diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
+index e10a3542db7e..dd71258ec1cc 100644
+--- a/arch/x86/Kconfig
++++ b/arch/x86/Kconfig
+@@ -118,6 +118,7 @@ config X86
+ 	select HAVE_ARCH_AUDITSYSCALL
+ 	select HAVE_ARCH_HUGE_VMAP		if X86_64 || X86_PAE
  	select HAVE_ARCH_JUMP_LABEL
 +	select HAVE_ARCH_JUMP_LABEL_RELATIVE
- 	select HAVE_ARCH_KASAN if !(ARM64_16K_PAGES && ARM64_VA_BITS_48)
+ 	select HAVE_ARCH_KASAN			if X86_64
  	select HAVE_ARCH_KGDB
- 	select HAVE_ARCH_MMAP_RND_BITS
-diff --git a/arch/arm64/include/asm/jump_label.h b/arch/arm64/include/asm/jump_label.h
-index 1b5e0e843c3a..5e3e31df3805 100644
---- a/arch/arm64/include/asm/jump_label.h
-+++ b/arch/arm64/include/asm/jump_label.h
-@@ -30,8 +30,8 @@ static __always_inline bool arch_static_branch(struct static_key *key, bool bran
- {
- 	asm goto("1: nop\n\t"
- 		 ".pushsection __jump_table,  \"aw\"\n\t"
--		 ".align 3\n\t"
--		 ".quad 1b, %l[l_yes], %c0\n\t"
-+		 ".align 2\n\t"
-+		 ".long 1b - ., %l[l_yes] - ., %c0 - .\n\t"
- 		 ".popsection\n\t"
- 		 :  :  "i"(&((char *)key)[branch]) :  : l_yes);
+ 	select HAVE_ARCH_MMAP_RND_BITS		if MMU
+diff --git a/arch/x86/include/asm/jump_label.h b/arch/x86/include/asm/jump_label.h
+index 8c0de4282659..d0f1f25b41d5 100644
+--- a/arch/x86/include/asm/jump_label.h
++++ b/arch/x86/include/asm/jump_label.h
+@@ -36,8 +36,8 @@ static __always_inline bool arch_static_branch(struct static_key *key, bool bran
+ 	asm_volatile_goto("1:"
+ 		".byte " __stringify(STATIC_KEY_INIT_NOP) "\n\t"
+ 		".pushsection __jump_table,  \"aw\" \n\t"
+-		_ASM_ALIGN "\n\t"
+-		_ASM_PTR "1b, %l[l_yes], %c0 + %c1 \n\t"
++		".balign 4\n\t"
++		".long 1b - ., %l[l_yes] - ., %c0 + %c1 - .\n\t"
+ 		".popsection \n\t"
+ 		: :  "i" (key), "i" (branch) : : l_yes);
  
-@@ -44,8 +44,8 @@ static __always_inline bool arch_static_branch_jump(struct static_key *key, bool
- {
- 	asm goto("1: b %l[l_yes]\n\t"
- 		 ".pushsection __jump_table,  \"aw\"\n\t"
--		 ".align 3\n\t"
--		 ".quad 1b, %l[l_yes], %c0\n\t"
-+		 ".align 2\n\t"
-+		 ".long 1b - ., %l[l_yes] - ., %c0 - .\n\t"
- 		 ".popsection\n\t"
- 		 :  :  "i"(&((char *)key)[branch]) :  : l_yes);
+@@ -52,8 +52,8 @@ static __always_inline bool arch_static_branch_jump(struct static_key *key, bool
+ 		".byte 0xe9\n\t .long %l[l_yes] - 2f\n\t"
+ 		"2:\n\t"
+ 		".pushsection __jump_table,  \"aw\" \n\t"
+-		_ASM_ALIGN "\n\t"
+-		_ASM_PTR "1b, %l[l_yes], %c0 + %c1 \n\t"
++		".balign 4\n\t"
++		".long 1b - ., %l[l_yes] - ., %c0 + %c1 - .\n\t"
+ 		".popsection \n\t"
+ 		: :  "i" (key), "i" (branch) : : l_yes);
  
-@@ -54,13 +54,5 @@ static __always_inline bool arch_static_branch_jump(struct static_key *key, bool
+@@ -62,18 +62,6 @@ static __always_inline bool arch_static_branch_jump(struct static_key *key, bool
  	return true;
  }
  
+-#ifdef CONFIG_X86_64
 -typedef u64 jump_label_t;
+-#else
+-typedef u32 jump_label_t;
+-#endif
 -
 -struct jump_entry {
 -	jump_label_t code;
@@ -85,27 +76,46 @@ index 1b5e0e843c3a..5e3e31df3805 100644
 -	jump_label_t key;
 -};
 -
- #endif  /* __ASSEMBLY__ */
- #endif	/* __ASM_JUMP_LABEL_H */
-diff --git a/arch/arm64/kernel/jump_label.c b/arch/arm64/kernel/jump_label.c
-index c2dd1ad3e648..903d17023d77 100644
---- a/arch/arm64/kernel/jump_label.c
-+++ b/arch/arm64/kernel/jump_label.c
-@@ -25,12 +25,12 @@
- void arch_jump_label_transform(struct jump_entry *entry,
- 			       enum jump_label_type type)
- {
--	void *addr = (void *)entry->code;
-+	void *addr = (void *)jump_entry_code(entry);
- 	u32 insn;
+ #else	/* __ASSEMBLY__ */
  
- 	if (type == JUMP_LABEL_JMP) {
--		insn = aarch64_insn_gen_branch_imm(entry->code,
--						   entry->target,
-+		insn = aarch64_insn_gen_branch_imm(jump_entry_code(entry),
-+						   jump_entry_target(entry),
- 						   AARCH64_INSN_BRANCH_NOLINK);
- 	} else {
- 		insn = aarch64_insn_gen_nop();
+ .macro STATIC_JUMP_IF_TRUE target, key, def
+@@ -87,8 +75,8 @@ struct jump_entry {
+ 	.byte		STATIC_KEY_INIT_NOP
+ 	.endif
+ 	.pushsection __jump_table, "aw"
+-	_ASM_ALIGN
+-	_ASM_PTR	.Lstatic_jump_\@, \target, \key
++	.balign		4
++	.long		.Lstatic_jump_\@ - ., \target - ., \key - .
+ 	.popsection
+ .endm
+ 
+@@ -103,8 +91,8 @@ struct jump_entry {
+ .Lstatic_jump_after_\@:
+ 	.endif
+ 	.pushsection __jump_table, "aw"
+-	_ASM_ALIGN
+-	_ASM_PTR	.Lstatic_jump_\@, \target, \key + 1
++	.balign		4
++	.long		.Lstatic_jump_\@ - ., \target - ., \key + 1 - .
+ 	.popsection
+ .endm
+ 
+diff --git a/tools/objtool/special.c b/tools/objtool/special.c
+index 84f001d52322..98ae55b39037 100644
+--- a/tools/objtool/special.c
++++ b/tools/objtool/special.c
+@@ -30,9 +30,9 @@
+ #define EX_ORIG_OFFSET		0
+ #define EX_NEW_OFFSET		4
+ 
+-#define JUMP_ENTRY_SIZE		24
++#define JUMP_ENTRY_SIZE		12
+ #define JUMP_ORIG_OFFSET	0
+-#define JUMP_NEW_OFFSET		8
++#define JUMP_NEW_OFFSET		4
+ 
+ #define ALT_ENTRY_SIZE		13
+ #define ALT_ORIG_OFFSET		0
 -- 
 2.11.0
