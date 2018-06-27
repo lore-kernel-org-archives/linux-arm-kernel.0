@@ -1,28 +1,31 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 27 Jun 2018 11:31:22 -0300
-Subject: [PATCH] ARM: dts: imx6sll-evk: enable usdhc3 slot
-In-Reply-To: <1530088605-9264-1-git-send-email-Anson.Huang@nxp.com>
-References: <1530088605-9264-1-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <CAOMZO5DoRUSOfV_oh242w6s_1Zs8yAy9Kf4D+WdYym5c+6nucg@mail.gmail.com>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Wed, 27 Jun 2018 09:33:45 -0500
+Subject: [GIT PULL] Qualcomm Fixes for v4.18-rc2
+In-Reply-To: <CAOesGMjm-bO6C3wT1QpysYciAU+XuRcpEZFRMxrSnQnTFE04pw@mail.gmail.com>
+References: <1529996893-6390-1-git-send-email-andy.gross@linaro.org>
+ <20180626174242.tksnyhhvqwglnz3o@localhost>
+ <CAOesGMjm-bO6C3wT1QpysYciAU+XuRcpEZFRMxrSnQnTFE04pw@mail.gmail.com>
+Message-ID: <20180627143345.GA1141@hector.attlocal.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Anson,
+On Tue, Jun 26, 2018 at 01:14:28PM -0700, Olof Johansson wrote:
+> On Tue, Jun 26, 2018 at 10:42 AM, Olof Johansson <olof@lixom.net> wrote:
+> > On Tue, Jun 26, 2018 at 02:08:13AM -0500, Andy Gross wrote:
+> >> The following changes since commit 9573ce74d3bc797758cbd55194aae1b7248f2503:
+> >>
+> >>   Merge tag 'qcom-fixes-for-4.18-rc1' into linus (2018-06-25 23:53:28 -0500)
+> 
+> Hmm, I just noticed this. It is the kind of thing Linus sometimes gets
+> upset about when it gets excessive (merge-backs).
+> 
+> You should just have based this second branch on top of the first one
+> without that merge. Or was it needed due to some conflict?
 
-On Wed, Jun 27, 2018 at 5:36 AM, Anson Huang <Anson.Huang@nxp.com> wrote:
+No this was an honest mistake on my part.  There wasn't any need to merge in the
+-rc1 as a base.  My apologies.
 
-> +&usdhc3 {
-> +       pinctrl-names = "default", "state_100mhz", "state_200mhz";
-> +       pinctrl-0 = <&pinctrl_usdhc3>;
-> +       pinctrl-1 = <&pinctrl_usdhc3_100mhz>;
-> +       pinctrl-2 = <&pinctrl_usdhc3_200mhz>;
-> +       cd-gpios = <&gpio3 22 GPIO_ACTIVE_LOW>;
-> +       keep-power-in-suspend;
-> +       enable-sdio-wakeup;
-> +       vmmc-supply = <&reg_sd3_vmmc>;
-> +       status = "okay";
-> +};
-> +
->  &usbotg1 {
 
-Please keep the nodes sorted in alphabetical order.
+Regards,
+
+Andy
