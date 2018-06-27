@@ -1,67 +1,141 @@
-From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
-Date: Wed, 27 Jun 2018 22:58:28 +0200
-Subject: [PATCH] drm/sun4i: Implement zpos for DE2
-In-Reply-To: <20180627182500.eanqagmcfmsgzos2@flea>
-References: <20180627164514.4777-1-jernej.skrabec@siol.net>
- <20180627182500.eanqagmcfmsgzos2@flea>
-Message-ID: <8012754.crdjCMeE0H@jernej-laptop>
+From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
+Date: Wed, 27 Jun 2018 23:14:47 +0200
+Subject: [RFC RESEND PATCH] drm/rockchip: update cursors asynchronously
+ through atomic.
+Message-ID: <20180627211447.20927-1-enric.balletbo@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne sreda, 27. junij 2018 ob 20:25:00 CEST je Maxime Ripard napisal(a):
-> Hi!
-> 
-> On Wed, Jun 27, 2018 at 06:45:14PM +0200, Jernej Skrabec wrote:
-> > Initial implementation of DE2 planes only supported fixed zpos.
-> > 
-> > Expand implementation with configurable zpos property.
-> > 
-> > Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
-> 
-> Thanks for that work. I guess you should expand a bit on the exact
-> setup you're doing here.
+Add support to async updates of cursors by using the new atomic
+interface for that.
 
-OK.
+Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+---
+I am sending this as RFC because I still don't have a deep knowledge of
+the hw and I am not sure if the vop_plane_update function can be reused
+in both cases, atomic_updates and atomic_async_updates. I think that
+someone with more knowledge should take a look. The patch was tested on
+a Samsung Chromebook Plus in two ways.
 
-> 
-> Are the pipes working the same way on the DE2 than on DE1, ie does the
-> pipe blending applies before the alpha blending, and therefore you
-> need to make sure that there's not two planes with alpha going to the
-> same pipe?
+1. Running all igt kms_cursor_legacy and kms_atomic at plane_cursor_legacy
+tests and see that there is no regression after the patch.
 
-I'm not familiar with DE1 and I'm not sure what the problem is.
-
-However, there is an issue in DE2 when alpha blending multiple planes if 
-bottom-most plane doesn't cover all screen. In this case alpha blending 
-produce weird result on screen. Fortunately, there is elegant solution. Black 
-opaque fill color is enabled for pipe 0 (always at the bottom), which covers 
-any "undefined region" and that makes alpha blending happy again.
-
-Alternatively, blending modes between planes could be tweaked or disabled, but 
-I found aforementioned solution is much simpler and you set it only once.
-
-> 
-> Also, you seem to use the pipe and channels indifferently now, why is
-> that?
-
-Why do you think so?
-
-Channel always represents HW unit, for example, on H3, mixer0, channel 0 
-always represents VI plane, channel 1, represents first UI, plane, channel 2, 
-second UI plane, etc.
-
-Pipe 0 always represent channel at the bottom, pipe 1 channel on top pipe 0, 
-etc. Initial, fixed zpos implementation really had 1:1 mapping, but now it can 
-be different.
-
-Register SUN8I_MIXER_BLEND_ROUTE holds pipe <-> channel mappings.
-Bits 3:0 represents pipe 0 and holds channel number. Bits 7:4 represents pipe 
-1, etc.
-
-Additionaly,  there can be holes, for example, pipe 3 and pipe 0 are enabled 
-and pipe 1 and 2 are disabled.
-
-I hope I answered your questions.
+2. Running weston using the atomic API.
 
 Best regards,
-Jernej
+  Enric
+
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 80 ++++++++++++++++-----
+ 1 file changed, 64 insertions(+), 16 deletions(-)
+
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+index 53d4afe15278..1eb6bda924af 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+@@ -688,8 +688,7 @@ static void vop_plane_atomic_disable(struct drm_plane *plane,
+ 	spin_unlock(&vop->reg_lock);
+ }
+ 
+-static void vop_plane_atomic_update(struct drm_plane *plane,
+-		struct drm_plane_state *old_state)
++static void vop_plane_update(struct drm_plane *plane)
+ {
+ 	struct drm_plane_state *state = plane->state;
+ 	struct drm_crtc *crtc = state->crtc;
+@@ -710,20 +709,6 @@ static void vop_plane_atomic_update(struct drm_plane *plane,
+ 	bool rb_swap;
+ 	int format;
+ 
+-	/*
+-	 * can't update plane when vop is disabled.
+-	 */
+-	if (WARN_ON(!crtc))
+-		return;
+-
+-	if (WARN_ON(!vop->is_enabled))
+-		return;
+-
+-	if (!state->visible) {
+-		vop_plane_atomic_disable(plane, old_state);
+-		return;
+-	}
+-
+ 	obj = rockchip_fb_get_gem_obj(fb, 0);
+ 	rk_obj = to_rockchip_obj(obj);
+ 
+@@ -794,10 +779,73 @@ static void vop_plane_atomic_update(struct drm_plane *plane,
+ 	spin_unlock(&vop->reg_lock);
+ }
+ 
++static void vop_plane_atomic_update(struct drm_plane *plane,
++				    struct drm_plane_state *old_state)
++{
++	struct drm_plane_state *state = plane->state;
++	struct vop *vop = to_vop(state->crtc);
++
++	/*
++	 * can't update plane when vop is disabled.
++	 */
++	if (WARN_ON(!state->crtc))
++		return;
++
++	if (WARN_ON(!vop->is_enabled))
++		return;
++
++	if (!state->visible) {
++		vop_plane_atomic_disable(plane, old_state);
++		return;
++	}
++
++	vop_plane_update(plane);
++}
++
++static int vop_plane_atomic_async_check(struct drm_plane *plane,
++					struct drm_plane_state *state)
++{
++	struct drm_crtc_state *crtc_state;
++
++	crtc_state = drm_atomic_get_existing_crtc_state(state->state,
++							state->crtc);
++	if (WARN_ON(!crtc_state))
++		return -EINVAL;
++
++	if (!crtc_state->active)
++		return -EINVAL;
++
++	if (plane->state->crtc != state->crtc ||
++	    plane->state->src_w != state->src_w ||
++	    plane->state->src_h != state->src_h ||
++	    plane->state->crtc_w != state->crtc_w ||
++	    plane->state->crtc_h != state->crtc_h ||
++	    !plane->state->fb ||
++	    plane->state->fb != state->fb)
++		return -EINVAL;
++
++	return 0;
++}
++
++static void vop_plane_atomic_async_update(struct drm_plane *plane,
++					  struct drm_plane_state *new_state)
++{
++	plane->state->src_x = new_state->src_x;
++	plane->state->src_y = new_state->src_y;
++	plane->state->crtc_x = new_state->crtc_x;
++	plane->state->crtc_y = new_state->crtc_y;
++	plane->state->fb = new_state->fb;
++	*plane->state = *new_state;
++
++	vop_plane_update(plane);
++}
++
+ static const struct drm_plane_helper_funcs plane_helper_funcs = {
+ 	.atomic_check = vop_plane_atomic_check,
+ 	.atomic_update = vop_plane_atomic_update,
+ 	.atomic_disable = vop_plane_atomic_disable,
++	.atomic_async_check = vop_plane_atomic_async_check,
++	.atomic_async_update = vop_plane_atomic_async_update,
+ };
+ 
+ static const struct drm_plane_funcs vop_plane_funcs = {
+-- 
+2.18.0
