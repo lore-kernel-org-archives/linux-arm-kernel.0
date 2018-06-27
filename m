@@ -1,37 +1,31 @@
 From: pawel.mikolaj.chmiel@gmail.com (=?UTF-8?q?Pawe=C5=82=20Chmiel?=)
-Date: Wed, 27 Jun 2018 19:12:15 +0200
-Subject: [PATCH v2 01/10] ARM: dts: s5pv210: Add missing interrupt-controller
- property to gph2
+Date: Wed, 27 Jun 2018 19:12:19 +0200
+Subject: [PATCH v2 05/10] dt-bindings: samsung: Add S5PV210 as possible soc in
+ Samsung boards
 In-Reply-To: <1530119544-30023-1-git-send-email-pawel.mikolaj.chmiel@gmail.com>
 References: <1530119544-30023-1-git-send-email-pawel.mikolaj.chmiel@gmail.com>
-Message-ID: <1530119544-30023-2-git-send-email-pawel.mikolaj.chmiel@gmail.com>
+Message-ID: <1530119544-30023-6-git-send-email-pawel.mikolaj.chmiel@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds missing interrupt-controller property to gph2 block,
-to silence following warnings during build
-  /soc/pinctrl at e0200000/gph2: Missing interrupt-controller or interrupt-map property
-
-It's reguired by Samsung aries boards, an S5PV210 based
-Samsung Galaxy S (i9000) and Galaxy S 4G phones, which are added in next patches.
+There are Samsung devices, which are not Exynos-based boards,
+like it's in case of S5PV210. Document this information at beginning
+of file.
 
 Signed-off-by: Pawe? Chmiel <pawel.mikolaj.chmiel@gmail.com>
 ---
- arch/arm/boot/dts/s5pv210-pinctrl.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
+ Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/s5pv210-pinctrl.dtsi b/arch/arm/boot/dts/s5pv210-pinctrl.dtsi
-index 3a79feab11c3..7f0c9d447871 100644
---- a/arch/arm/boot/dts/s5pv210-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/s5pv210-pinctrl.dtsi
-@@ -258,6 +258,8 @@
- 	gph2: gph2 {
- 		gpio-controller;
- 		#gpio-cells = <2>;
-+
-+		interrupt-controller;
- 		#interrupt-cells = <2>;
- 	};
+diff --git a/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt b/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
+index 14510b215480..175f669d9bb6 100644
+--- a/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
++++ b/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
+@@ -1,4 +1,4 @@
+-* Samsung's Exynos SoC based boards
++* Samsung's Exynos and S5P SoC based boards
  
+ Required root node properties:
+     - compatible = should be one or more of the following.
 -- 
 2.7.4
