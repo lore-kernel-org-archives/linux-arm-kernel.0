@@ -1,66 +1,57 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 26 Jun 2018 21:34:22 -0300
-Subject: [PATCH v2] ARM: dts: imx53-qsb: Let the codec control MCLK pinctrl
-Message-ID: <1530059662-20589-1-git-send-email-festevam@gmail.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 26 Jun 2018 17:41:20 -0700
+Subject: [PATCH V5 1/5] dt-bindings: watchdog: add stm32mp1 support
+In-Reply-To: <1529941383-8653-2-git-send-email-ludovic.Barre@st.com>
+References: <1529941383-8653-1-git-send-email-ludovic.Barre@st.com>
+ <1529941383-8653-2-git-send-email-ludovic.Barre@st.com>
+Message-ID: <a3e9d3a1-eb7a-5752-6c87-fa1906889543@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@nxp.com>
+On 06/25/2018 08:42 AM, Ludovic Barre wrote:
+> From: Ludovic Barre <ludovic.barre@st.com>
+> 
+> This patch adds support of stm32mp1.
+> stm32mp1 requires 2 clocks lsi and pclk.
+> 
+> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
 
-The hog pinctrl hog is meant for pins that do not have an
-associated driver.
+Following Rob's lead here.
 
-The MX53_PAD_GPIO_0__CCM_SSI_EXT1_CLK pin is the one that
-provides the MCLK signal to the SGTL5000 codec, so a
-better represenation is to move it under the codec node.
+Reviewed-by: Guenter Roeck Linux at roeck-us.net>
 
-While at it, change the pinctrl value from 0x80000000 to the
-POR reset value of register IOMUXC_SW_PAD_CTL_PAD_GPIO_0.
-
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
----
-Change since v1:
-- Since the root cause of the pinctrl failure has been
-fixed by commit bc3322bc166a ("pinctrl: devicetree: Fix pctldev pointer
-overwrite") in 4.18-rc2 changed the commit log to inform that this is
-a cleanup rather than a bug fix.
-
- arch/arm/boot/dts/imx53-qsb-common.dtsi | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/imx53-qsb-common.dtsi b/arch/arm/boot/dts/imx53-qsb-common.dtsi
-index ef7658a..7423d46 100644
---- a/arch/arm/boot/dts/imx53-qsb-common.dtsi
-+++ b/arch/arm/boot/dts/imx53-qsb-common.dtsi
-@@ -153,7 +153,6 @@
- 	imx53-qsb {
- 		pinctrl_hog: hoggrp {
- 			fsl,pins = <
--				MX53_PAD_GPIO_0__CCM_SSI_EXT1_CLK 0x80000000
- 				MX53_PAD_GPIO_8__GPIO1_8          0x80000000
- 				MX53_PAD_PATA_DATA14__GPIO2_14    0x80000000
- 				MX53_PAD_PATA_DATA15__GPIO2_15    0x80000000
-@@ -180,6 +179,12 @@
- 			>;
- 		};
- 
-+		pinctrl_codec: codecgrp {
-+			fsl,pins = <
-+				MX53_PAD_GPIO_0__CCM_SSI_EXT1_CLK	0x1c4
-+			>;
-+		};
-+
- 		pinctrl_esdhc1: esdhc1grp {
- 			fsl,pins = <
- 				MX53_PAD_SD1_DATA0__ESDHC1_DAT0		0x1d5
-@@ -310,6 +315,8 @@
- 	sgtl5000: codec@a {
- 		compatible = "fsl,sgtl5000";
- 		reg = <0x0a>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_codec>;
- 		#sound-dai-cells = <0>;
- 		VDDA-supply = <&reg_3p2v>;
- 		VDDIO-supply = <&reg_3p2v>;
--- 
-2.7.4
+> ---
+>   .../devicetree/bindings/watchdog/st,stm32-iwdg.txt          | 13 ++++++++++---
+>   1 file changed, 10 insertions(+), 3 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/watchdog/st,stm32-iwdg.txt b/Documentation/devicetree/bindings/watchdog/st,stm32-iwdg.txt
+> index cc13b10a..d8f4430 100644
+> --- a/Documentation/devicetree/bindings/watchdog/st,stm32-iwdg.txt
+> +++ b/Documentation/devicetree/bindings/watchdog/st,stm32-iwdg.txt
+> @@ -2,9 +2,15 @@ STM32 Independent WatchDoG (IWDG)
+>   ---------------------------------
+>   
+>   Required properties:
+> -- compatible: "st,stm32-iwdg"
+> -- reg: physical base address and length of the registers set for the device
+> -- clocks: must contain a single entry describing the clock input
+> +- compatible: Should be either:
+> +  - "st,stm32-iwdg"
+> +  - "st,stm32mp1-iwdg"
+> +- reg: Physical base address and length of the registers set for the device
+> +- clocks: Reference to the clock entry lsi. Additional pclk clock entry
+> +  is required only for st,stm32mp1-iwdg.
+> +- clock-names: Name of the clocks used.
+> +  "lsi" for st,stm32-iwdg
+> +  "lsi", "pclk" for st,stm32mp1-iwdg
+>   
+>   Optional Properties:
+>   - timeout-sec: Watchdog timeout value in seconds.
+> @@ -15,5 +21,6 @@ iwdg: watchdog at 40003000 {
+>   	compatible = "st,stm32-iwdg";
+>   	reg = <0x40003000 0x400>;
+>   	clocks = <&clk_lsi>;
+> +	clock-names = "lsi";
+>   	timeout-sec = <32>;
+>   };
+> 
