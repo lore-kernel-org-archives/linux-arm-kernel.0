@@ -1,81 +1,53 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 27 Jun 2018 10:00:08 +0200
-Subject: [PATCH v4 2/7] serdev: add dev_pm_domain_attach|detach()
-In-Reply-To: <ed497b2a9751df3b2f84cc9db6d6834816a6027f.1530004712.git.sean.wang@mediatek.com>
-References: <cover.1530004712.git.sean.wang@mediatek.com>
- <ed497b2a9751df3b2f84cc9db6d6834816a6027f.1530004712.git.sean.wang@mediatek.com>
-Message-ID: <CAPDyKFp4kESPH4hcqgATYWBt3Kz3FhAOCpnrCc5PRSkMkBikEg@mail.gmail.com>
+From: james.morse@arm.com (James Morse)
+Date: Wed, 27 Jun 2018 09:39:36 +0100
+Subject: KVM guest sometimes failed to boot because of kernel stack
+ overflow if KPTI is enabled on a hisilicon ARM64 platform.
+In-Reply-To: <20180626174746.GO23375@arm.com>
+References: <5B2A6218.3030201@hisilicon.com> <20180620144257.GB27776@arm.com>
+ <5B2A7832.4010502@hisilicon.com>
+ <ebfabb8f-dcd9-3fb4-3655-368a882d8f09@arm.com>
+ <5B2A7FE1.5040607@hisilicon.com>
+ <e701eaa8-dcb9-777c-2211-67ee27b43acb@arm.com>
+ <5B2B6DEA.2090100@hisilicon.com> <5B3274FC.7000206@hisilicon.com>
+ <20180626174746.GO23375@arm.com>
+Message-ID: <942e76b6-a46a-6c5e-5ec3-67daca636d43@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 June 2018 at 07:43,  <sean.wang@mediatek.com> wrote:
-> From: Sean Wang <sean.wang@mediatek.com>
->
-> In order to open up the required power gate before any operation can be
-> effectively performed over the serial bus between CPU and serdev, it's
-> clearly essential to add common attach functions for PM domains to serdev
-> at the probe phase.
->
-> Similarly, the relevant dettach function for the PM domains should be
-> properly and reversely added at the remove phase.
->
-> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> Cc: Rob Herring <robh@kernel.org>
-> Cc: Ulf Hansson <ulf.hansson@linaro.org>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: Jiri Slaby <jslaby@suse.com>
-> Cc: linux-serial at vger.kernel.org
+Hi Wei,
 
-Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+On 26/06/18 18:47, Will Deacon wrote:
+> On Wed, Jun 27, 2018 at 01:16:44AM +0800, Wei Xu wrote:
+>>     [    0.000000] Booting Linux on physical CPU 0x0000000000 [0x480fd010]
+>>     [    0.000000] Linux version 4.18.0-rc2-58583-g7daf201-dirty
+> 
+> I'm still suspicious that this is 4.18-rc2 with "no change on top" ^^^ !
 
-Kind regards
-Uffe
+Some examples:
 
-> ---
->  drivers/tty/serdev/core.c | 15 ++++++++++++++-
->  1 file changed, 14 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/tty/serdev/core.c b/drivers/tty/serdev/core.c
-> index df93b72..8096138 100644
-> --- a/drivers/tty/serdev/core.c
-> +++ b/drivers/tty/serdev/core.c
-> @@ -13,6 +13,7 @@
->  #include <linux/module.h>
->  #include <linux/of.h>
->  #include <linux/of_device.h>
-> +#include <linux/pm_domain.h>
->  #include <linux/serdev.h>
->  #include <linux/slab.h>
->
-> @@ -330,8 +331,17 @@ EXPORT_SYMBOL_GPL(serdev_device_set_tiocm);
->  static int serdev_drv_probe(struct device *dev)
->  {
->         const struct serdev_device_driver *sdrv = to_serdev_device_driver(dev->driver);
-> +       int ret;
->
-> -       return sdrv->probe(to_serdev_device(dev));
-> +       ret = dev_pm_domain_attach(dev, true);
-> +       if (ret)
-> +               return ret;
-> +
-> +       ret = sdrv->probe(to_serdev_device(dev));
-> +       if (ret)
-> +               dev_pm_domain_detach(dev, true);
-> +
-> +       return ret;
->  }
->
->  static int serdev_drv_remove(struct device *dev)
-> @@ -339,6 +349,9 @@ static int serdev_drv_remove(struct device *dev)
->         const struct serdev_device_driver *sdrv = to_serdev_device_driver(dev->driver);
->         if (sdrv->remove)
->                 sdrv->remove(to_serdev_device(dev));
-> +
-> +       dev_pm_domain_detach(dev, true);
-> +
->         return 0;
->  }
->
-> --
-> 2.7.4
->
+For comparison, when I boot v4.17 it looks like this:
+| Linux version 4.17.0 (morse at melchizedek) (gcc version 4.9.3 20141031
+| (prerelease) (Linaro GCC 2014.11)) #9886 SMP PREEMPT Thu Jun 21 10:30:55 BST
+| 2018
+
+
+If I apply some extra patches and make some uncommitted changes, it looks like this:
+| Linux version 4.17.0-00025-ga22ca2234824-dirty (morse at melchizedek) (gcc
+| version 4.9.3 20141031 (prerelease) (Linaro GCC 2014.11)) #9887 SMP PREEMPT
+| Thu Jun 21 10:46:22 BST 2018
+
+
+Hence we read your '4.17.0-45864-g29dcea8-dirty' line as v4.17 with extra
+patches and uncommited changes, and similar with this v4.18-rc2.
+
+I agree 7daf201 is the head commit for v4.18-rc2, but something has gone wrong
+here. Could you try building from a fresh clone of Linus' tree?
+
+(I suspect at some point you've applied a patch, and have then been merging
+upstream, instead of 'fast forwarding')
+
+
+
+Thanks,
+
+James
