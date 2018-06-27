@@ -1,21 +1,65 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 27 Jun 2018 17:41:26 +0530
-Subject: [PATCH v2] ARM: dts: da850: Fix interrups property for gpio
-In-Reply-To: <1528193271-10726-1-git-send-email-j-keerthy@ti.com>
-References: <1528193271-10726-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <8572a60f-982c-9981-ff73-15d1532d5965@ti.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 27 Jun 2018 13:20:52 +0100
+Subject: [PATCH v3 0/6] KVM/arm64: Cache maintenance relaxations
+Message-ID: <20180627122058.8210-1-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 05 June 2018 03:37 PM, Keerthy wrote:
-> The intc #interrupt-cells is equal to 1. Currently gpio
-> node has 2 cells per IRQ which is wrong. Remove the additional
-> cell for each of the interrupts.
-> 
-> Signed-off-by: Keerthy <j-keerthy@ti.com>
-> Fixes: 2e38b946dc54 ("ARM: davinci: da850: add GPIO DT node")
+This small series makes use of features recently introduced in the
+ARMv8 architecture to relax the cache maintenance operations on CPUs
+that implement these features.
 
-Applied to fixes for v4.18
+FWB is the most important one. It allows stage-2 to enforce the
+cacheability of memory, no matter what the guest says. It also
+mandates that the whole machine is cache coherent (no non-coherent
+I/O), meaning we can drop a whole class of cache maintenance
+operations.
 
-Thanks,
-Sekhar
+FWB also has the same effect as CTR_EL0.IDC being set, and when
+combined with CTR_EL0.DIC allows the removal of all cache maintenance
+and tracking of pages being executed.
+
+We also take the opportunity to drop a few useless CMOs that were
+applied to the HYP page tables, but that were never necessary. This
+ended up requiring quite a few changes in out page table accessors so
+that they get consistent barriers. These barriers are a bit on the
+heavy side, and could be further optimized, although that's probably
+for a different patch series
+
+* From v1:
+  - Reordered the series in a slightly more consistent order
+  - Added patches refactoring the PT accessors before dropping
+    the CMOs
+  - Removed final dsb(ishst) from the last patch, as all PT accessors
+    now have their own barriers
+  - Collected Acks from Catalin
+
+* From v2:
+  - Dropped the clean to PoU when FWB, as it always implies IDC
+  - Added comments about the pertinence of Set/Way CMOs in guests
+  - Collected Acks and RBs
+
+Marc Zyngier (6):
+  arm64: KVM: Add support for Stage-2 control of memory types and
+    cacheability
+  arm64: KVM: Handle Set/Way CMOs as NOPs if FWB is present
+  arm64: KVM: Avoid marking pages as XN in Stage-2 if CTR_EL0.DIC is set
+  KVM: arm/arm64: Consolidate page-table accessors
+  KVM: arm/arm64: Stop using {pmd,pud,pgd}_populate
+  KVM: arm/arm64: Remove unnecessary CMOs when creating HYP page tables
+
+ arch/arm/include/asm/kvm_mmu.h        | 14 ++-------
+ arch/arm64/include/asm/cpucaps.h      |  3 +-
+ arch/arm64/include/asm/kvm_arm.h      |  1 +
+ arch/arm64/include/asm/kvm_emulate.h  |  2 ++
+ arch/arm64/include/asm/kvm_mmu.h      | 34 +++++++++++++++-----
+ arch/arm64/include/asm/memory.h       |  7 +++++
+ arch/arm64/include/asm/pgtable-prot.h | 24 ++++++++++++--
+ arch/arm64/include/asm/sysreg.h       |  1 +
+ arch/arm64/kernel/cpufeature.c        | 20 ++++++++++++
+ arch/arm64/kvm/sys_regs.c             | 11 ++++++-
+ virt/kvm/arm/mmu.c                    | 45 ++++++++++++++++++++++-----
+ 11 files changed, 131 insertions(+), 31 deletions(-)
+
+-- 
+2.17.1
