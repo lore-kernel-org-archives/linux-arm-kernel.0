@@ -1,64 +1,35 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 27 Jun 2018 17:21:33 +0200
-Subject: [PATCH v9 3/6] module: use relative references for __ksymtab
- entries
-In-Reply-To: <20180627151339.GD30631@arm.com>
+From: pmladek@suse.com (Petr Mladek)
+Date: Wed, 27 Jun 2018 17:22:32 +0200
+Subject: [PATCH v9 4/6] init: allow initcall tables to be emitted using
+ relative references
+In-Reply-To: <20180626182802.19932-5-ard.biesheuvel@linaro.org>
 References: <20180626182802.19932-1-ard.biesheuvel@linaro.org>
- <20180626182802.19932-4-ard.biesheuvel@linaro.org>
- <20180627151339.GD30631@arm.com>
-Message-ID: <CAKv+Gu8v4VGzKSQ1F6r6B_U2xhffM1EJQWCJYuf+4-xsf_hjuw@mail.gmail.com>
+ <20180626182802.19932-5-ard.biesheuvel@linaro.org>
+Message-ID: <20180627152232.7kelnwelhfhgwf2v@pathway.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 June 2018 at 17:13, Will Deacon <will.deacon@arm.com> wrote:
-> Hi Ard,
->
-> On Tue, Jun 26, 2018 at 08:27:58PM +0200, Ard Biesheuvel wrote:
->> An ordinary arm64 defconfig build has ~64 KB worth of __ksymtab
->> entries, each consisting of two 64-bit fields containing absolute
->> references, to the symbol itself and to a char array containing
->> its name, respectively.
->
-> [...]
->
->> diff --git a/include/linux/export.h b/include/linux/export.h
->> index ea7df303d68d..ae072bc5aacf 100644
->> --- a/include/linux/export.h
->> +++ b/include/linux/export.h
->> @@ -18,12 +18,6 @@
->>  #define VMLINUX_SYMBOL_STR(x) __VMLINUX_SYMBOL_STR(x)
->>
->>  #ifndef __ASSEMBLY__
->> -struct kernel_symbol
->> -{
->> -     unsigned long value;
->> -     const char *name;
->> -};
->> -
->>  #ifdef MODULE
->>  extern struct module __this_module;
->>  #define THIS_MODULE (&__this_module)
->> @@ -54,17 +48,47 @@ extern struct module __this_module;
->>  #define __CRC_SYMBOL(sym, sec)
->>  #endif
->>
->> +#ifdef CONFIG_HAVE_ARCH_PREL32_RELOCATIONS
->> +#include <linux/compiler.h>
->> +/*
->> + * Emit the ksymtab entry as a pair of relative references: this reduces
->> + * the size by half on 64-bit architectures, and eliminates the need for
->> + * absolute relocations that require runtime processing on relocatable
->> + * kernels.
->> + */
->> +#define __KSYMTAB_ENTRY(sym, sec)                                    \
->> +     __ADDRESSABLE(sym)                                              \
->> +     asm("   .section \"___ksymtab" sec "+" #sym "\", \"a\"  \n"     \
->> +         "   .balign 8                                       \n"     \
->
-> Can we use KSYM_ALIGN here instead of 8, or do we need the 8-byte alignment
-> even on 32-bit architectures?
->
+On Tue 2018-06-26 20:27:59, Ard Biesheuvel wrote:
+> Allow the initcall tables to be emitted using relative references that
+> are only half the size on 64-bit architectures and don't require fixups
+> at runtime on relocatable kernels.
+> 
+> Cc: Petr Mladek <pmladek@suse.com>
+> Cc: Sergey Senozhatsky <sergey.senozhatsky@gmail.com>
+> Cc: Steven Rostedt <rostedt@goodmis.org>
+> Cc: James Morris <jmorris@namei.org>
+> Cc: "Serge E. Hallyn" <serge@hallyn.com>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  include/linux/init.h   | 44 +++++++++++++++-----
+>  init/main.c            | 32 +++++++-------
+>  kernel/printk/printk.c | 16 +++----
+>  security/security.c    | 17 ++++----
+>  4 files changed, 68 insertions(+), 41 deletions(-)
 
-We don't *need* 8 byte alignment on any architecture, but since the
-structure itself is 8 bytes in size and we have a sizable array of
-them, it makes sense to align them to 8 bytes.
+For the printk stuff:
+
+Acked-by: Petr Mladek <pmladek@suse.com>
+
+Best Regards,
+Petr
