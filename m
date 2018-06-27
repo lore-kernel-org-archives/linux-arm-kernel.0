@@ -1,207 +1,94 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Tue, 26 Jun 2018 18:15:22 -0700
-Subject: [RFC PATCH] arm64/mm: unmap the linear alias of module allocations
-In-Reply-To: <CAKv+Gu9uiqerCd54upWHxPBKcX1ga1oTwpYctEqbhhQGZOq6XA@mail.gmail.com>
-References: <20180626165455.22636-1-ard.biesheuvel@linaro.org>
- <06b7ea07-53e2-690a-b670-d1fc41d133c3@redhat.com>
- <CAKv+Gu9uiqerCd54upWHxPBKcX1ga1oTwpYctEqbhhQGZOq6XA@mail.gmail.com>
-Message-ID: <76b00e4f-e6fd-f0e9-379c-e31e85d5258d@redhat.com>
+From: yibin.gong@nxp.com (Robin Gong)
+Date: Wed, 27 Jun 2018 01:18:05 +0000
+Subject: [PATCH v5 0/7] add virt-dma support for imx-sdma
+In-Reply-To: <1530025442.9910.44.camel@pengutronix.de>
+References: <1529427424-12321-1-git-send-email-yibin.gong@nxp.com>
+ <1530025442.9910.44.camel@pengutronix.de>
+Message-ID: <DB6PR04MB3223F2B6364A63A00A251DF689480@DB6PR04MB3223.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/26/2018 03:11 PM, Ard Biesheuvel wrote:
-> Hi Laura,
-> 
-> Thanks for taking a look.
-> 
-> On 26 June 2018 at 23:28, Laura Abbott <labbott@redhat.com> wrote:
->> On 06/26/2018 09:54 AM, Ard Biesheuvel wrote:
->>>
->>> When CONFIG_STRICT_KERNEL_RXW=y [which is the default on arm64], we
->>> take great care to ensure that the mappings of modules in the vmalloc
->>> space are locked down as much as possible, i.e., executable code is
->>> mapped read-only, read-only data is mapped read-only and non-executable,
->>> and read-write data is mapped non-executable as well.
->>>
->>> However, due to the way we map the linear region [aka the kernel direct
->>> mapping], those module regions are aliased by read-write mappings, and
->>> it is possible for an attacker to modify code or data that was assumed
->>> to be immutable in this configuration.
->>>
->>> So let's ensure that the linear alias of module memory is unmapped upon
->>> allocation and remapped when it is freed. The latter requires some
->>> special handling involving a workqueue due to the fact that it may be
->>> called in softirq context at which time calling find_vm_area() is unsafe.
->>>
->>> Note that this requires the entire linear region to be mapped down to
->>> pages, which may result in a performance regression in some
->>> configurations.
->>>
->>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>> ---
->>> For this RFC, I simply reused set_memory_valid() to do the unmap/remap,
->>> but I am aware that this likely breaks hibernation, and perhaps some
->>> other things as well, so we should probably remap r/o instead.
->>>
->>
->> This fixes modules but doesn't fix the set_memory_*
->> uses like in bpf. Is it worth trying to fix it for those
->> cases as well?
->>
-> 
-> AIUI bpf uses set_memory_* on the vmalloc region only, and is
-> oblivious to the fact that there exists a linear alias in the first
-> place. But due to the fact that it actually uses module_alloc() to
-> allocate the regions, this patch affects the linear aliases of those
-> regions as well.
-> 
-> Does that answer your question at all?
-> 
+Thanks Lucas. Let's wait for comments from Vinod.
 
-Ah! I didn't realize bpf used module_alloc. That makes sense for
-that case, yes.
+-----Original Message-----
+From: Lucas Stach [mailto:l.stach at pengutronix.de] 
+Sent: 2018?6?26? 23:04
+To: Robin Gong <yibin.gong@nxp.com>; vkoul at kernel.org; s.hauer at pengutronix.de; dan.j.williams at intel.com; gregkh at linuxfoundation.org; jslaby at suse.com
+Cc: linux-serial at vger.kernel.org; dmaengine at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; dl-linux-imx <linux-imx@nxp.com>
+Subject: Re: [PATCH v5 0/7] add virt-dma support for imx-sdma
 
->>
->>>    arch/arm64/kernel/module.c | 57 ++++++++++++++++++++
->>>    arch/arm64/mm/mmu.c        |  2 +-
->>>    2 files changed, 58 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/arch/arm64/kernel/module.c b/arch/arm64/kernel/module.c
->>> index 155fd91e78f4..4a1d3c7486f5 100644
->>> --- a/arch/arm64/kernel/module.c
->>> +++ b/arch/arm64/kernel/module.c
->>> @@ -26,10 +26,66 @@
->>>    #include <linux/mm.h>
->>>    #include <linux/moduleloader.h>
->>>    #include <linux/vmalloc.h>
->>> +#include <linux/workqueue.h>
->>>    #include <asm/alternative.h>
->>> +#include <asm/cacheflush.h>
->>>    #include <asm/insn.h>
->>>    #include <asm/sections.h>
->>>    +#ifdef CONFIG_STRICT_KERNEL_RWX
->>> +
->>> +static struct workqueue_struct *module_free_wq;
->>> +
->>> +static int init_workqueue(void)
->>> +{
->>> +       module_free_wq = alloc_ordered_workqueue("module_free_wq", 0);
->>> +       WARN_ON(!module_free_wq);
->>> +
->>> +       return 0;
->>> +}
->>> +pure_initcall(init_workqueue);
->>> +
->>> +static void remap_linear_module_alias(void *module_region, int enable)
->>> +{
->>> +       struct vm_struct *vm = find_vm_area(module_region);
->>> +       struct page **p;
->>> +       unsigned long size;
->>> +
->>> +       WARN_ON(!vm || !vm->pages);
->>> +
->>> +       for (p = vm->pages, size = vm->size; size > 0; size -= PAGE_SIZE)
->>> +               set_memory_valid((u64)page_address(*p++), 1, enable);
->>> +}
->>> +
->>> +static void module_free_wq_worker(struct work_struct *work)
->>> +{
->>> +       remap_linear_module_alias(work, true);
->>> +       vfree(work);
->>> +}
->>> +
->>> +void module_memfree(void *module_region)
->>> +{
->>> +       struct work_struct *work;
->>> +
->>> +       if (!module_region)
->>> +               return;
->>> +
->>> +       /*
->>> +        * At this point, module_region is a pointer to an allocation of
->>> at
->>> +        * least PAGE_SIZE bytes that is mapped read-write. So instead of
->>> +        * allocating memory for a data structure containing a work_struct
->>> +        * instance and a copy of the value of module_region, just reuse
->>> the
->>> +        * allocation directly.
->>> +        */
->>> +       work = module_region;
->>> +       INIT_WORK(work, module_free_wq_worker);
->>> +       queue_work(module_free_wq, work);
->>> +}
->>> +
->>> +#else
->>> +static void remap_linear_module_alias(void *module_region, int enable) {}
->>> +#endif
->>> +
->>>    void *module_alloc(unsigned long size)
->>>    {
->>>          gfp_t gfp_mask = GFP_KERNEL;
->>> @@ -65,6 +121,7 @@ void *module_alloc(unsigned long size)
->>>                  return NULL;
->>>          }
->>>    +     remap_linear_module_alias(p, false);
->>>          return p;
->>>    }
->>>    diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
->>> index 493ff75670ff..e1057ebb672d 100644
->>> --- a/arch/arm64/mm/mmu.c
->>> +++ b/arch/arm64/mm/mmu.c
->>> @@ -432,7 +432,7 @@ static void __init map_mem(pgd_t *pgdp)
->>>          struct memblock_region *reg;
->>>          int flags = 0;
->>>    -     if (debug_pagealloc_enabled())
->>> +       if (IS_ENABLED(CONFIG_STRICT_KERNEL_RWX) ||
->>> debug_pagealloc_enabled())
->>>                  flags = NO_BLOCK_MAPPINGS | NO_CONT_MAPPINGS;
->>>          /*
->>>
->>
->> I think this should be based on rodata_enabled instead of the kernel
->> configuration option.
->>
-> 
-> Agreed.
-> 
->> This looks reasonable from the pagetable debugfs but I'm seeing
->> some intermittent weird output:
->>
->> ---[ Linear Mapping ]---
->> 0xffff800000000000-0xffff800000001000           4K PTE       RW x
->> BLK DEVICE/nGnRnE
->> 0xffff800000200000-0xffff800000280000         512K PTE       RW NX SHD AF NG
->> UXN MEM/NORMAL
->> 0xffff800000280000-0xffff800000400000        1536K PTE       ro NX SHD AF NG
->> UXN MEM/NORMAL
->> 0xffff800000400000-0xffff800001400000          16M PMD       ro NX SHD AF NG
->> BLK UXN MEM/NORMAL
->> 0xffff800001400000-0xffff800001440000         256K PTE       ro NX SHD AF NG
->> UXN MEM/NORMAL
->> 0xffff800001440000-0xffff800010000000      241408K PTE       RW NX SHD AF NG
->> UXN MEM/NORMAL
->>
->>
->> I can't tell if this is some artifact of how we do the
->> debugfs dumping or an actual bug. It doesn't seem to
->> happen on every boot either. I'll play around with this
->> to see if I find anything.
->>
-> 
-> This is indeed weird, but I think the ptdump code makes it look
-> weirder than it actually is: the BLK attribute means bit 1 is cleared,
-> and the nGnRnE device attribute means bits [4:2] are cleared, so this
-> is essentially a reserved entry, although I wouldn't be able to
-> explain how we ended up with one.
-> 
+Hi Robin,
 
-Yes, that does make sense.
+I've tested this whole series with the SDMA being used for SPI, UART and SSI with no regressions spotted. As this should cover most common use-cases, I think this series is good to go in.
 
-> Are the first 2 MB of DRAM made available to the kernel by the firmware?
+Tested-by: Lucas Stach <l.stach@pengutronix.de>
+
+Regards,
+Lucas
+
+Am Mittwoch, den 20.06.2018, 00:56 +0800 schrieb Robin Gong:
+> The legacy sdma driver has below limitations or drawbacks:
+> ? 1. Hardcode the max BDs number as "PAGE_SIZE / sizeof(*)", and alloc
+> ?????one page size for one channel regardless of only few BDs needed
+> ?????most time. But in few cases, the max PAGE_SIZE maybe not enough.
+> ? 2. One SDMA channel can't stop immediatley once channel disabled 
+> which
+> ?????means SDMA interrupt may come in after this channel 
+> terminated.There
+> ?????are some patches for this corner case such as commit 
+> "2746e2c389f9",
+> ?????but not cover non-cyclic.
 > 
-
-Based on what I can see, I think so? It doesn't look to be marked
-as reserved in memblock and shows up in the memory regions.
-
-Thanks,
-Laura
+> The common virt-dma overcomes the above limitations. It can alloc bd 
+> dynamically and free bd once this tx transfer done. No memory wasted 
+> or maximum limititation here, only depends on how many memory can be 
+> requested from kernel. For No.2, such issue can be workaround by 
+> checking if there is available descript("sdmac->desc") now once the 
+> unwanted interrupt coming. At last the common virt-dma is easier for sdma driver maintain.
+> 
+> Change from v4:
+> ? 1. identify lockdep issue which caused by allocate memory with
+> ?????'GFP_KERNEL', change to 'GFP_NOWAIT' instead so that lockdep
+> ?????ignore check. That also make sense since Audio/uart driver may
+> ?????call dma function after spin_lock_irqsave()...
+> ? 2. use dma pool instead for bd description allocated,since audio
+> ?????driver may call dma_terminate_all in irq. Please refer to 7/7.
+> ? 3. remove 7/7 serial patch in v4, since lockdep issued fixed by No.1
+> 
+> Change from v3:
+> ? 1. add two uart patches which impacted by this patchset.
+> ? 2. unlock 'vc.lock' before cyclic dma callback and lock again after
+> ?????it because some driver such as uart will call dmaengine_tx_status
+> ?????which will acquire 'vc.lock' again and dead lock comes out.
+> ? 3. remove 'Revert commit' stuff since that patch is not wrong and
+> ?????combine two patch into one patch as Sascha's comment.
+> 
+> Change from v2:
+> ? 1. include Sascha's patch to make the main patch easier to review.
+> ?????Thanks Sacha.
+> ? 2. remove useless 'desc'/'chan' in struct sdma_channe.
+> 
+> Change from v1:
+> ? 1. split v1 patch into 5 patches.
+> ? 2. remove some unnecessary condition check.
+> ? 3. remove unnecessary 'pending' list.
+> 
+> Robin Gong (6):
+> ? tty: serial: imx: correct dma cookie status
+> ? dmaengine: imx-sdma: add virt-dma support
+> ? dmaengine: imx-sdma: remove useless 'lock' and 'enabled' in 'struct
+> ????sdma_channel'
+> ? dmaengine: imx-sdma: remove the maximum limitation for bd numbers
+> ? dmaengine: imx-sdma: add sdma_transfer_init to decrease code overlap
+> ? dmaengine: imx-sdma: alloclate bd memory from dma pool
+> 
+> Sascha Hauer (1):
+> ? dmaengine: imx-sdma: factor out a struct sdma_desc from struct
+> ????sdma_channel
+> 
+> ?drivers/dma/Kconfig??????|???1 +
+> ?drivers/dma/imx-sdma.c???| 400 
+> +++++++++++++++++++++++++++--------------------
+> ?drivers/tty/serial/imx.c |???2 +-
+> ?3 files changed, 235 insertions(+), 168 deletions(-)
+> 
