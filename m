@@ -1,39 +1,20 @@
 From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 27 Jun 2018 15:56:11 +0530
-Subject: [PATCH v2 04/13] clk: davinci: psc-dm646x: use two lookup entries
- for the aemif clock
-In-Reply-To: <CAMpxmJXpAECkA7FTLx-nR_w0ZEBUw_A7qpu2P6e_mS6k=pTsUQ@mail.gmail.com>
-References: <20180626092537.6737-1-brgl@bgdev.pl>
- <20180626092537.6737-5-brgl@bgdev.pl>
- <1da88059-2d5b-f035-1d4c-9e21ae141017@ti.com>
- <CAMpxmJXpAECkA7FTLx-nR_w0ZEBUw_A7qpu2P6e_mS6k=pTsUQ@mail.gmail.com>
-Message-ID: <28c47ca0-60ca-beb2-cd78-63ef6595fcd5@ti.com>
+Date: Wed, 27 Jun 2018 16:23:09 +0530
+Subject: [PATCH] ARM: dts: da850: Add power-domains to PWM nodes
+In-Reply-To: <20180626152817.16803-1-david@lechnology.com>
+References: <20180626152817.16803-1-david@lechnology.com>
+Message-ID: <52fe7982-9bee-1b45-a939-59ec5cff756d@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 27 June 2018 03:33 PM, Bartosz Golaszewski wrote:
-> 2018-06-27 12:01 GMT+02:00 Sekhar Nori <nsekhar@ti.com>:
->> On Tuesday 26 June 2018 02:55 PM, Bartosz Golaszewski wrote:
->>> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->>>
->>> We want to be able to get the clock both from the board file by its
->>> con_id and from the aemif driver by dev_id.
->>>
->>> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->>
->> I see the DM365 and DM644x EVM board files getting reference to aemif
->> clock using just the con_id, but don't see that for DM646x. Am I
->> overlooking something?
->>
->> Thanks,
->> Sekhar
+On Tuesday 26 June 2018 08:58 PM, David Lechner wrote:
+> This adds the power-domains property to both the ECAP and EHRPWM PWM
+> nodes. Both have drivers that use pm_runtime to enable the clocks, so
+> they need this property in order to find and enable the clock properly.
 > 
-> It's being done indirectly from mach-davinci/aemif.c. I guess we can
-> remove it again after last patch.
+> Signed-off-by: David Lechner <david@lechnology.com>
 
-I see. One way to avoid that would be to merge this into 11/13. I prefer
-that, but it prevents clean separation of clock and machine patches. So
-okay with current way too.
+Applied for v4.19
 
 Thanks,
 Sekhar
