@@ -1,72 +1,67 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Wed, 27 Jun 2018 22:58:34 +0200
-Subject: v4.18-rc1 on droid 4: very bad CPU performance
-In-Reply-To: <20180622074936.GG112168@atomide.com>
-References: <20180621121542.GA4836@amd> <20180622072005.GF112168@atomide.com>
- <20180622074936.GG112168@atomide.com>
-Message-ID: <20180627205834.GB29478@amd>
+From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
+Date: Wed, 27 Jun 2018 22:58:28 +0200
+Subject: [PATCH] drm/sun4i: Implement zpos for DE2
+In-Reply-To: <20180627182500.eanqagmcfmsgzos2@flea>
+References: <20180627164514.4777-1-jernej.skrabec@siol.net>
+ <20180627182500.eanqagmcfmsgzos2@flea>
+Message-ID: <8012754.crdjCMeE0H@jernej-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 2018-06-22 00:49:36, Tony Lindgren wrote:
-> * Tony Lindgren <tony@atomide.com> [180622 07:22]:
-> > * Pavel Machek <pavel@ucw.cz> [180621 12:18]:
-> > > Hi!
-> > > 
-> > > V4.18 is slower than it should be.
-> > > 
-> > > user at devuan:~$ time cat /dev/urandom | head -c 10000000 |  bzip2 -9 -
-> > > | wc -c
-> > > 10044291
-> > > 52.73user 2.40system 61.53 (1m1.534s) elapsed 89.60%CPU
-> > > user at devuan:~$ uname -a
-> > > Linux devuan 4.18.0-rc1-87964-gfa19934-dirty #743 SMP Sun Jun 17
-> > > 19:26:37 CEST 2018 armv7l GNU/Linux
-> > > 
-> > > That bzip should take 12 seconds, not minute.
-> > > 
-> > > Any ideas? Do you see it, too?
-> > 
-> > I've noticed firefox is super slow.. Git bisect time?
+Dne sreda, 27. junij 2018 ob 20:25:00 CEST je Maxime Ripard napisal(a):
+> Hi!
 > 
-> Hmm not happening for me at least on duovero and droid4,
-> I'm getting about 20s for v4.17 and v4.18-rc1.
+> On Wed, Jun 27, 2018 at 06:45:14PM +0200, Jernej Skrabec wrote:
+> > Initial implementation of DE2 planes only supported fixed zpos.
+> > 
+> > Expand implementation with configurable zpos property.
+> > 
+> > Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+> 
+> Thanks for that work. I guess you should expand a bit on the exact
+> setup you're doing here.
 
-Okay, so I know what was wrong with my config. I had l2cache disabled
--- and this solved it:
+OK.
 
-+CONFIG_OUTER_CACHE=y
-+CONFIG_OUTER_CACHE_SYNC=y
-+CONFIG_CACHE_L2X0=y
-+CONFIG_PL310_ERRATA_588369=y
-+CONFIG_PL310_ERRATA_727915=y
-+CONFIG_PL310_ERRATA_753970=y
-+CONFIG_PL310_ERRATA_769419=y
+> 
+> Are the pipes working the same way on the DE2 than on DE1, ie does the
+> pipe blending applies before the alpha blending, and therefore you
+> need to make sure that there's not two planes with alpha going to the
+> same pipe?
 
-Now I'm at 12 seconds.
+I'm not familiar with DE1 and I'm not sure what the problem is.
 
-user at devuan:~$ time cat /dev/urandom | head -c 10000000 |  bzip2 -9 - | wc -c
-10043993
-11.41user 0.44system 11.63 (0m11.637s) elapsed 101.97%CPU
-user at devuan:~$ uname -a
-Linux devuan 4.18.0-rc2-88315-g3452793-dirty #756 SMP Wed Jun 27 22:16:59 CEST 2018 armv7l GNU/Linux
-user at devuan:~$
+However, there is an issue in DE2 when alpha blending multiple planes if 
+bottom-most plane doesn't cover all screen. In this case alpha blending 
+produce weird result on screen. Fortunately, there is elegant solution. Black 
+opaque fill color is enabled for pipe 0 (always at the bottom), which covers 
+any "undefined region" and that makes alpha blending happy again.
 
-I was about to add "facepalm" emoji here, as disabling l2 cache is
-major mistake. OTOH if you also see 20 seconds, then either there is
-another problem, or you need to enable l2 cache, too (and I don't have
-to feel too bad for misconfiguring it).
+Alternatively, blending modes between planes could be tweaked or disabled, but 
+I found aforementioned solution is much simpler and you set it only once.
 
-Best regards, 
-									
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180627/8a34fb90/attachment.sig>
+> 
+> Also, you seem to use the pipe and channels indifferently now, why is
+> that?
+
+Why do you think so?
+
+Channel always represents HW unit, for example, on H3, mixer0, channel 0 
+always represents VI plane, channel 1, represents first UI, plane, channel 2, 
+second UI plane, etc.
+
+Pipe 0 always represent channel at the bottom, pipe 1 channel on top pipe 0, 
+etc. Initial, fixed zpos implementation really had 1:1 mapping, but now it can 
+be different.
+
+Register SUN8I_MIXER_BLEND_ROUTE holds pipe <-> channel mappings.
+Bits 3:0 represents pipe 0 and holds channel number. Bits 7:4 represents pipe 
+1, etc.
+
+Additionaly,  there can be holes, for example, pipe 3 and pipe 0 are enabled 
+and pipe 1 and 2 are disabled.
+
+I hope I answered your questions.
+
+Best regards,
+Jernej
