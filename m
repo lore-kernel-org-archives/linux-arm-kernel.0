@@ -1,63 +1,36 @@
-From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Wed, 27 Jun 2018 11:31:12 +0200
-Subject: [PATCH v2] ARM: multi_v7_defconfig: Add Marvell NAND controller
- support
-In-Reply-To: <20180528151357.29203-1-gregory.clement@bootlin.com> (Gregory
- CLEMENT's message of "Mon, 28 May 2018 17:13:57 +0200")
-References: <20180528151357.29203-1-gregory.clement@bootlin.com>
-Message-ID: <87h8lo8tjz.fsf@bootlin.com>
+From: thierry.escande@linaro.org (Thierry Escande)
+Date: Wed, 27 Jun 2018 11:31:46 +0200
+Subject: [PATCH v10 00/14] Krait clocks + Krait CPUfreq
+In-Reply-To: <1529415925-28915-1-git-send-email-sricharan@codeaurora.org>
+References: <1529415925-28915-1-git-send-email-sricharan@codeaurora.org>
+Message-ID: <a58c2d2c-64d1-7223-dc98-8f749397375d@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
- 
- On lun., mai 28 2018, Gregory CLEMENT <gregory.clement@bootlin.com> wrote:
+Hi Sricharan,
 
-> Add Marvell NAND controller support used by some Marvell Armada based
-> boards.
->
-> Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
+On 19/06/2018 15:45, Sricharan R wrote:
+> Sricharan R (2):
+>    clk: qcom: Add safe switch hook for krait mux clocks
+>    dt-bindings: cpufreq: Document operating-points-v2-krait-cpu
+> 
+> Stephen Boyd (12):
+>    ARM: Add Krait L2 register accessor functions
+>    clk: qcom: Add support for High-Frequency PLLs (HFPLLs)
+>    clk: qcom: Add HFPLL driver
+>    dt-bindings: clock: Document qcom,hfpll
+>    clk: qcom: Add MSM8960/APQ8064's HFPLLs
+>    clk: qcom: Add IPQ806X's HFPLLs
+>    clk: qcom: Add support for Krait clocks
+>    clk: qcom: Add KPSS ACC/GCC driver
+>    dt-bindings: arm: Document qcom,kpss-gcc
+>    clk: qcom: Add Krait clock controller driver
+>    dt-bindings: clock: Document qcom,krait-cc
+>    cpufreq: Add module to register cpufreq on Krait CPUs
 
-I didn't see this patch in v4.18-rc1 and I also didn't see any update
-done on multi_v7_defconfig with the current configuration.
+Tested on apq8064 (db600c).
 
-Would it possible doing it?
+Tested-By: Thierry Escande <thierry.escande@linaro.org>
 
-And I guess I will have to put this patch in my PR for 4.19, won't I?
-
-Gregory
-
-> ---
-> Changelog v1 -> v2:
->
->  - Rebased on v4.17-rc1 (Dropped "ARM: multi_v7_defconfig: Update with
->    current configuration")
->
->  arch/arm/configs/multi_v7_defconfig | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-> index e6b3c96d4c09..3fcb17b38f50 100644
-> --- a/arch/arm/configs/multi_v7_defconfig
-> +++ b/arch/arm/configs/multi_v7_defconfig
-> @@ -210,6 +210,7 @@ CONFIG_MTD_NAND_DENALI_DT=y
->  CONFIG_MTD_NAND_OMAP2=y
->  CONFIG_MTD_NAND_OMAP_BCH=y
->  CONFIG_MTD_NAND_ATMEL=y
-> +CONFIG_MTD_NAND_MARVELL=y
->  CONFIG_MTD_NAND_GPMI_NAND=y
->  CONFIG_MTD_NAND_BRCMNAND=y
->  CONFIG_MTD_NAND_VF610_NFC=y
-> -- 
-> 2.17.0
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
--- 
-Gregory Clement, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-http://bootlin.com
+Best regards,
+Thierry
