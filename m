@@ -1,96 +1,78 @@
 From: bugalski.piotr@gmail.com (Piotr Bugalski)
-Date: Wed, 27 Jun 2018 15:16:08 +0200
-Subject: [RFC PATCH v2 5/6] spi: Add QuadSPI driver for Atmel SAMA5D2
-In-Reply-To: <20180627131609.13681-1-bugalski.piotr@gmail.com>
-References: <20180627131609.13681-1-bugalski.piotr@gmail.com>
-Message-ID: <20180627131609.13681-6-bugalski.piotr@gmail.com>
+Date: Wed, 27 Jun 2018 15:16:03 +0200
+Subject: [RFC PATCH v2 0/6] New QuadSPI driver for Atmel SAMA5D2
+Message-ID: <20180627131609.13681-1-bugalski.piotr@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kernel contains QSPI driver strongly tied to MTD and nor-flash memory.
-New spi-mem interface allows usage also other memory types, especially
-much larger NAND with SPI interface. This driver works as SPI controller
-and is not related to MTD, however can work with NAND-flash or other
-peripherals using spi-mem interface.
+Hello,
 
-Suggested-by: Boris Brezillon <boris.brezillon@bootlin.com>
-Signed-off-by: Piotr Bugalski <pbu@cryptera.com>
----
- drivers/mtd/spi-nor/Kconfig                  | 9 ---------
- drivers/mtd/spi-nor/Makefile                 | 1 -
- drivers/spi/Kconfig                          | 9 +++++++++
- drivers/spi/Makefile                         | 1 +
- drivers/{mtd/spi-nor => spi}/atmel-quadspi.c | 0
- 5 files changed, 10 insertions(+), 10 deletions(-)
- rename drivers/{mtd/spi-nor => spi}/atmel-quadspi.c (100%)
+Atmel SAMA5D2 is equipped with two QSPI interfaces. These interfaces can
+work as in SPI-compatible mode or use two / four lines to improve
+communication speed. At the moment there is QSPI driver strongly tied to
+NOR-flash memory and MTD subsystem.
+Intention of this change is to provide new driver which will not be tied
+to MTD and allows using QSPI with NAND-flash memory or other peripherals
+New spi-mem API provides abstraction layer which can disconnect QSPI
+from MTD. This driver doesn't support regular SPI interface, it should
+be used with spi-mem interface only.
+Unfortunately SAMA5D2 hardware by default supports only NOR-flash
+memory. It allows 24- and 32-bit addressing while NAND-flash requires
+16-bit long. To workaround hardware limitation driver is a bit more
+complicated.
 
-diff --git a/drivers/mtd/spi-nor/Kconfig b/drivers/mtd/spi-nor/Kconfig
-index 6cc9c929ff57..44fe8018733c 100644
---- a/drivers/mtd/spi-nor/Kconfig
-+++ b/drivers/mtd/spi-nor/Kconfig
-@@ -39,15 +39,6 @@ config SPI_ASPEED_SMC
- 	  and support for the SPI flash memory controller (SPI) for
- 	  the host firmware. The implementation only supports SPI NOR.
- 
--config SPI_ATMEL_QUADSPI
--	tristate "Atmel Quad SPI Controller"
--	depends on ARCH_AT91 || (ARM && COMPILE_TEST)
--	depends on OF && HAS_IOMEM
--	help
--	  This enables support for the Quad SPI controller in master mode.
--	  This driver does not support generic SPI. The implementation only
--	  supports SPI NOR.
--
- config SPI_CADENCE_QUADSPI
- 	tristate "Cadence Quad SPI controller"
- 	depends on OF && (ARM || ARM64 || COMPILE_TEST)
-diff --git a/drivers/mtd/spi-nor/Makefile b/drivers/mtd/spi-nor/Makefile
-index f4c61d282abd..a552efd22958 100644
---- a/drivers/mtd/spi-nor/Makefile
-+++ b/drivers/mtd/spi-nor/Makefile
-@@ -1,7 +1,6 @@
- # SPDX-License-Identifier: GPL-2.0
- obj-$(CONFIG_MTD_SPI_NOR)	+= spi-nor.o
- obj-$(CONFIG_SPI_ASPEED_SMC)	+= aspeed-smc.o
--obj-$(CONFIG_SPI_ATMEL_QUADSPI)	+= atmel-quadspi.o
- obj-$(CONFIG_SPI_CADENCE_QUADSPI)	+= cadence-quadspi.o
- obj-$(CONFIG_SPI_FSL_QUADSPI)	+= fsl-quadspi.o
- obj-$(CONFIG_SPI_HISI_SFC)	+= hisi-sfc.o
-diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
-index ad5d68e1dab7..88f9c007d825 100644
---- a/drivers/spi/Kconfig
-+++ b/drivers/spi/Kconfig
-@@ -83,6 +83,15 @@ config SPI_ATMEL
- 	  This selects a driver for the Atmel SPI Controller, present on
- 	  many AT91 ARM chips.
- 
-+config SPI_ATMEL_QUADSPI
-+	tristate "Atmel Quad SPI Controller"
-+	depends on ARCH_AT91 || (ARM && COMPILE_TEST)
-+	depends on OF && HAS_IOMEM
-+	help
-+	  This enables support for the Quad SPI controller in master mode.
-+	  This driver does not support generic SPI. The implementation only
-+	  supports spi-mem interface.
-+
- config SPI_AU1550
- 	tristate "Au1550/Au1200/Au1300 SPI Controller"
- 	depends on MIPS_ALCHEMY
-diff --git a/drivers/spi/Makefile b/drivers/spi/Makefile
-index cb1f4378b87c..1a08e5bfcee9 100644
---- a/drivers/spi/Makefile
-+++ b/drivers/spi/Makefile
-@@ -16,6 +16,7 @@ obj-$(CONFIG_SPI_LOOPBACK_TEST)		+= spi-loopback-test.o
- obj-$(CONFIG_SPI_ALTERA)		+= spi-altera.o
- obj-$(CONFIG_SPI_ARMADA_3700)		+= spi-armada-3700.o
- obj-$(CONFIG_SPI_ATMEL)			+= spi-atmel.o
-+obj-$(CONFIG_SPI_ATMEL_QUADSPI)		+= atmel-quadspi.o
- obj-$(CONFIG_SPI_ATH79)			+= spi-ath79.o
- obj-$(CONFIG_SPI_AU1550)		+= spi-au1550.o
- obj-$(CONFIG_SPI_AXI_SPI_ENGINE)	+= spi-axi-spi-engine.o
-diff --git a/drivers/mtd/spi-nor/atmel-quadspi.c b/drivers/spi/atmel-quadspi.c
-similarity index 100%
-rename from drivers/mtd/spi-nor/atmel-quadspi.c
-rename to drivers/spi/atmel-quadspi.c
+Request to spi-mem contains three fiels: opcode (command), address,
+dummy bytes. SAMA5D2 QSPI hardware supports opcode, address, dummy and
+option byte where address field can only be 24- or 32- bytes long.
+Handling 8-bits long addresses is done using option field. For 16-bits
+address behaviour depends of number of requested dummy bits. If there
+are 8 or more dummy cycles, address is shifted and sent with first dummy
+byte. Otherwise opcode is disabled and first byte of address contains
+command opcode (works only if opcode and address use the same buswidth).
+The limitation is when 16-bit address is used without enough dummy
+cycles and opcode is using different buswidth than address. Other modes
+are supported with described workaround.
+
+It looks like hardware has some limitation in performance. The same issue
+exists in current QSPI driver (MTD/nor-flash) and soft-pack (bare-metal
+library from Atmel). Without using DMA read speed is much worse than
+maximum bandwidth (efficiency 30-40%). Any help with performance
+improvement is highly welcome, especially for NAND-flash memories which
+offers higher capacity than NOR-flash used with previous driver.
+
+Best Regards,
+Piotr
+
+v2 changes:
+ - driver is now replacement of existing atmel-quadspi
+ - code was re-written to follow original code structure
+ - deinitialization order fixed
+ - empty atmel_qspi_adjust_op_size function removed
+ - code formatting fixes
+ - use spi_device->max_speed_hz to get spi speed
+ - spi freqency set in spi_controller->setup() hook
+ - address range checkng for 4-bytes addressing
+ - use timeout to avoid infinite waiting
+
+Piotr Bugalski (6):
+  mtd: spi-nor: atmel-quaspi: Typo fix
+  mtd: spi-nor: atmel-quadspi: Add spi-mem support to atmel-quadspi
+  mtd: spi-nor: atmel-quadspi: Use spi-mem interface for atmel-quadspi
+    driver
+  mtd: spi-nor: atmel-quadspi: Remove unused code from atmel-quadspi
+    driver
+  spi: Add QuadSPI driver for Atmel SAMA5D2
+  dt-bindings: spi: QuadSPI driver for Atmel SAMA5D2
+
+ .../bindings/{mtd => spi}/atmel-quadspi.txt        |   0
+ drivers/mtd/spi-nor/Kconfig                        |   9 -
+ drivers/mtd/spi-nor/Makefile                       |   1 -
+ drivers/spi/Kconfig                                |   9 +
+ drivers/spi/Makefile                               |   1 +
+ drivers/{mtd/spi-nor => spi}/atmel-quadspi.c       | 529 ++++++---------------
+ 6 files changed, 155 insertions(+), 394 deletions(-)
+ rename Documentation/devicetree/bindings/{mtd => spi}/atmel-quadspi.txt (100%)
+ rename drivers/{mtd/spi-nor => spi}/atmel-quadspi.c (52%)
+
 -- 
 2.11.0
