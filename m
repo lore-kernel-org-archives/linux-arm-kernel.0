@@ -1,45 +1,49 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 27 Jun 2018 16:15:11 +0100
-Subject: [PATCH v9 0/6] add support for relative references in special
- sections
-In-Reply-To: <20180626182802.19932-1-ard.biesheuvel@linaro.org>
-References: <20180626182802.19932-1-ard.biesheuvel@linaro.org>
-Message-ID: <20180627151510.GE30631@arm.com>
+From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
+Date: Wed, 27 Jun 2018 17:16:27 +0200
+Subject: [PATCH v3 2/2] ARM: dts: pxa: fix the rtc controller
+In-Reply-To: <20180627150150.23951-2-robert.jarzmik@free.fr>
+References: <20180627150150.23951-1-robert.jarzmik@free.fr>
+ <20180627150150.23951-2-robert.jarzmik@free.fr>
+Message-ID: <20180627171627.592849b5@windsurf.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+Hello,
 
-On Tue, Jun 26, 2018 at 08:27:55PM +0200, Ard Biesheuvel wrote:
-> This adds support for emitting special sections such as initcall arrays,
-> PCI fixups and tracepoints as relative references rather than absolute
-> references. This reduces the size by 50% on 64-bit architectures, but
-> more importantly, it removes the need for carrying relocation metadata
-> for these sections in relocatable kernels (e.g., for KASLR) that needs
-> to be fixed up at boot time. On arm64, this reduces the vmlinux footprint
-> of such a reference by 8x (8 byte absolute reference + 24 byte RELA entry
-> vs 4 byte relative reference)
+On Wed, 27 Jun 2018 17:01:50 +0200, Robert Jarzmik wrote:
+> The RTC controller is fed by an external fixed 32kHz clock. Yet the
+> driver wants to acquire this clock, even though it doesn't make any use
+> of it, ie. doesn't get the rate to make calculation.
 > 
-> Patch #3 was sent out before as a single patch. This series supersedes
-> the previous submission. This version makes relative ksymtab entries
-> dependent on the new Kconfig symbol HAVE_ARCH_PREL32_RELOCATIONS rather
-> than trying to infer from kbuild test robot replies for which architectures
-> it should be blacklisted.
+> Therefore, use the exported 32.768kHz clock in the PXA clock tree to
+> make the driver happy and working.
 > 
-> Patch #1 introduces the new Kconfig symbol HAVE_ARCH_PREL32_RELOCATIONS,
-> and sets it for the main architectures that are expected to benefit the
-> most from this feature, i.e., 64-bit architectures or ones that use
-> runtime relocations.
+> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+> ---
+> Since v1: change the dummy clock by the actual 32.768kHz
+> ---
+>  arch/arm/boot/dts/pxa25x.dtsi | 4 ++++
+>  arch/arm/boot/dts/pxa27x.dtsi | 4 ++++
+>  2 files changed, 8 insertions(+)
 > 
-> Patch #2 add support for #define'ing __DISABLE_EXPORTS to get rid of
-> ksymtab/kcrctab sections in decompressor and EFI stub objects when
-> rebuilding existing C files to run in a different context.
+> diff --git a/arch/arm/boot/dts/pxa25x.dtsi b/arch/arm/boot/dts/pxa25x.dtsi
+> index 95d59be97213..78a413ea0e88 100644
+> --- a/arch/arm/boot/dts/pxa25x.dtsi
+> +++ b/arch/arm/boot/dts/pxa25x.dtsi
+> @@ -80,6 +80,10 @@
+>  			#pwm-cells = <1>;
+>  			clocks = <&clks CLK_PWM1>;
+>  		};
+> +
+> +		rtc at 40900000 {
+> +			clocks = <&clks CLK_OSC32k768>>;
 
-I had a small question on patch 3, but it's really for my understanding.
-So, for patches 1-3:
+Double closing bracket, doesn't look good.
 
-Reviewed-by: Will Deacon <will.deacon@arm.com>
+Best regards,
 
-Thanks,
-
-Will
+Thomas
+-- 
+Thomas Petazzoni, CTO, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
