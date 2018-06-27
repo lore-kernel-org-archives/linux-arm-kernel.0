@@ -1,47 +1,91 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Wed, 27 Jun 2018 08:19:20 +0200
-Subject: [PATCH v5 1/8] interconnect: Add generic on-chip interconnect API
-In-Reply-To: <20180620121141.15403-2-georgi.djakov@linaro.org>
-References: <20180620121141.15403-1-georgi.djakov@linaro.org>
- <20180620121141.15403-2-georgi.djakov@linaro.org>
-Message-ID: <CAKfTPtBApjf9rhJm3paeXdgbVG50ALeun=zMUddc-f+RnrvkqQ@mail.gmail.com>
+From: gregory.clement@bootlin.com (Gregory CLEMENT)
+Date: Wed, 27 Jun 2018 08:20:37 +0200
+Subject: [PATCH] ARM: mvebu: declare asm symbols as character arrays in
+ pmsu.c
+In-Reply-To: <20180620043109.1190-1-ethan@ethantuttle.com> (Ethan Tuttle's
+ message of "Tue, 19 Jun 2018 21:31:08 -0700")
+References: <20180620043109.1190-1-ethan@ethantuttle.com>
+Message-ID: <87wouk92dm.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Georgi
+Hi Ethan,
+ 
+ On mar., juin 19 2018, Ethan Tuttle <ethan@ethantuttle.com> wrote:
 
-On Wed, 20 Jun 2018 at 14:11, Georgi Djakov <georgi.djakov@linaro.org> wrote:
+> With CONFIG_FORTIFY_SOURCE, memcpy uses the declared size of operands to
+> detect buffer overflows.  If src or dest is declared as a char, attempts to
+> copy more than byte will result in a fortify_panic().
+>
+> Address this problem in mvebu_setup_boot_addr_wa() by declaring
+> mvebu_boot_wa_start and mvebu_boot_wa_end as character arrays.  Also remove
+> a couple addressof operators to avoid "arithmetic on pointer to an
+> incomplete type" compiler error.
+>
+> See commit 54a7d50b9205 ("x86: mark kprobe templates as character arrays,
+> not single characters") for a similar fix.
+>
+> Fixes "detected buffer overflow in memcpy" error during init on some mvebu
+> systems (armada-370-xp, armada-375):
+>
+> (fortify_panic) from (mvebu_setup_boot_addr_wa+0xb0/0xb4)
+> (mvebu_setup_boot_addr_wa) from (mvebu_v7_cpu_pm_init+0x154/0x204)
+> (mvebu_v7_cpu_pm_init) from (do_one_initcall+0x7c/0x1a8)
+> (do_one_initcall) from (kernel_init_freeable+0x1bc/0x254)
+> (kernel_init_freeable) from (kernel_init+0x8/0x114)
+> (kernel_init) from (ret_from_fork+0x14/0x2c)
+>
+> Signed-off-by: Ethan Tuttle <ethan@ethantuttle.com>
+> Tested-by: Ethan Tuttle <ethan@ethantuttle.com>
 
-[snip]
+Out of curiosity on which platform did you test it?
 
-> +
-> +static struct icc_path *path_allocate(struct icc_node *dst, ssize_t num_nodes)
-> +{
-> +       struct icc_node *node = dst;
-> +       struct icc_path *path;
-> +       size_t i;
-> +
-> +       path = kzalloc(sizeof(*path) + num_nodes * sizeof(*path->reqs),
+Applied on mvebu/arm
 
-Should be (num_nodes -1) * sizeof(*path->reqs) as there is already 1
-icc_req in icc_path struct
+Thanks,
 
-> +                      GFP_KERNEL);
-> +       if (!path)
-> +               return ERR_PTR(-ENOMEM);
-> +
-> +       path->num_nodes = num_nodes;
-> +
-> +       for (i = 0; i < num_nodes; i++) {
-> +               hlist_add_head(&path->reqs[i].req_node, &node->req_list);
-> +
-> +               path->reqs[i].node = node;
-> +               /* reference to previous node was saved during path traversal */
-> +               node = node->reverse;
-> +       }
-> +
-> +       return path;
-> +}
-> +
+Gregory
 
-[snip]
+
+
+> ---
+>  arch/arm/mach-mvebu/pmsu.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
+> index 27a78c80e5b1..73d5d72dfc3e 100644
+> --- a/arch/arm/mach-mvebu/pmsu.c
+> +++ b/arch/arm/mach-mvebu/pmsu.c
+> @@ -116,8 +116,8 @@ void mvebu_pmsu_set_cpu_boot_addr(int hw_cpu, void *boot_addr)
+>  		PMSU_BOOT_ADDR_REDIRECT_OFFSET(hw_cpu));
+>  }
+>  
+> -extern unsigned char mvebu_boot_wa_start;
+> -extern unsigned char mvebu_boot_wa_end;
+> +extern unsigned char mvebu_boot_wa_start[];
+> +extern unsigned char mvebu_boot_wa_end[];
+>  
+>  /*
+>   * This function sets up the boot address workaround needed for SMP
+> @@ -130,7 +130,7 @@ int mvebu_setup_boot_addr_wa(unsigned int crypto_eng_target,
+>  			     phys_addr_t resume_addr_reg)
+>  {
+>  	void __iomem *sram_virt_base;
+> -	u32 code_len = &mvebu_boot_wa_end - &mvebu_boot_wa_start;
+> +	u32 code_len = mvebu_boot_wa_end - mvebu_boot_wa_start;
+>  
+>  	mvebu_mbus_del_window(BOOTROM_BASE, BOOTROM_SIZE);
+>  	mvebu_mbus_add_window_by_id(crypto_eng_target, crypto_eng_attribute,
+> -- 
+> 2.17.1
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+-- 
+Gregory Clement, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+http://bootlin.com
