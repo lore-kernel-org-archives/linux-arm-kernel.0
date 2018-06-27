@@ -1,53 +1,25 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Wed, 27 Jun 2018 11:40:42 +0200
-Subject: [PATCH 00/14] ARM: davinci: step towards removing
- at24_platform_data
-In-Reply-To: <CAMRc=McCk6fz5x5vJmjYkYx-i6XfGPAZPm9ctg2fuCCfkvKpLQ@mail.gmail.com>
-References: <20180625155025.12567-1-brgl@bgdev.pl>
- <20180625174024.GB17417@lunn.ch>
- <CAMRc=MdEn74G5SJAaGLAfNSS7Zy7wqH04aN5CMZ45UXqhu_58g@mail.gmail.com>
- <20180625180237.GC17417@lunn.ch>
- <CAMRc=MejDn=t6EPbKOfhMfRAb_O-5hxtWRyjAWH1mb5BUySrDA@mail.gmail.com>
- <20180626083823.GA28068@lunn.ch>
- <CAMRc=Mdvh+1enpD3qDoamhPfaBPin2v3amneQELApgoC0bS2FQ@mail.gmail.com>
- <20180626132154.GA5064@lunn.ch>
- <CAMRc=McCk6fz5x5vJmjYkYx-i6XfGPAZPm9ctg2fuCCfkvKpLQ@mail.gmail.com>
-Message-ID: <CAMRc=MfWDiUsqpA0RcjYQ0QyfyfYBzSBUD45-rXbxebO-SV6GQ@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 27 Jun 2018 15:31:14 +0530
+Subject: [PATCH v2 04/13] clk: davinci: psc-dm646x: use two lookup entries
+ for the aemif clock
+In-Reply-To: <20180626092537.6737-5-brgl@bgdev.pl>
+References: <20180626092537.6737-1-brgl@bgdev.pl>
+ <20180626092537.6737-5-brgl@bgdev.pl>
+Message-ID: <1da88059-2d5b-f035-1d4c-9e21ae141017@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-06-26 15:38 GMT+02:00 Bartosz Golaszewski <brgl@bgdev.pl>:
-> 2018-06-26 15:21 GMT+02:00 Andrew Lunn <andrew@lunn.ch>:
->>> I see. I see it this way: the setup callback comes from the time when
->>> we didn't have nvmem and should go away. I will protest loud whenever
->>> someone will try to use it again and will work towards removing it as
->>> soon as possible.
->>
->> The setup() callback could be moved into the nvmem framework, rather
->> than in the at24 driver. Make the call when the cells have been
->> connected to the backing store.
->>
->
-> This would at least make it more generic. And maybe I could also get
-> rid of the setup callback from the mityomapl138 board file.
->
-> Bart
->
->>> I will give your problem a thought and will try to get back with some
->>> proposals - maybe we should, as you suggested, extend nvmem even
->>> further to allow to remove nvmem info entries etc.
->>
->> That does not help me too much. I have the same problem with i2c and
->> MDIO. So i actually prefer to keep this the same as all others.
->>
->>         Andrew
+On Tuesday 26 June 2018 02:55 PM, Bartosz Golaszewski wrote:
+> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> 
+> We want to be able to get the clock both from the board file by its
+> con_id and from the aemif driver by dev_id.
+> 
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-Hi Andrew,
+I see the DM365 and DM644x EVM board files getting reference to aemif
+clock using just the con_id, but don't see that for DM646x. Am I
+overlooking something?
 
-MTD subsystem has the struct mtd_notifier and register_mtd_user(). I'm
-wondering if we could implement something like this as a generic nvmem
-functionality.
-
-What do you think?
-
-Bart
+Thanks,
+Sekhar
