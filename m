@@ -1,25 +1,80 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 27 Jun 2018 14:00:11 -0300
-Subject: [1/3] ARM: dts: imx51-zii-common: create common include dtsi
-In-Reply-To: <CAHQ1cqH0o2rsVJWccR6dBXQCnp2-mmLNTNOi0uAOO2SSdz0+xA@mail.gmail.com>
-References: <1529603100-31958-2-git-send-email-andrey.gusakov@cogentembedded.com>
- <5a3490a5-ee5c-a4da-8b54-b5234b7e50d0@yandex.ru>
- <CAHQ1cqH0o2rsVJWccR6dBXQCnp2-mmLNTNOi0uAOO2SSdz0+xA@mail.gmail.com>
-Message-ID: <CAOMZO5B5PS7a6SFfzX915AkRoDpeFVV7P0hrG9A51yWRFy5X_w@mail.gmail.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Wed, 27 Jun 2018 20:04:19 +0300
+Subject: [PATCH v4 6/7] Bluetooth: mediatek: Add protocol support for
+ MediaTek serial devices
+In-Reply-To: <CAHp75VehTeyyzR4bPKK3hFDTVqZnhdNy5vcBFJCSH_Zrx+QrKA@mail.gmail.com>
+References: <cover.1530004712.git.sean.wang@mediatek.com>
+ <48215a1276c36af7ad581c3d83759fe9f55e3c4b.1530004712.git.sean.wang@mediatek.com>
+ <CAHp75VehTeyyzR4bPKK3hFDTVqZnhdNy5vcBFJCSH_Zrx+QrKA@mail.gmail.com>
+Message-ID: <CAHp75VedHLw52J_ymh3iYf2w=r8d+Kqg=fJZmBGnaCrEbNEPdQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 27, 2018 at 1:46 PM, Andrey Smirnov
-<andrew.smirnov@gmail.com> wrote:
+On Wed, Jun 27, 2018 at 7:59 PM, Andy Shevchenko
+<andy.shevchenko@gmail.com> wrote:
+> On Wed, Jun 27, 2018 at 8:43 AM,  <sean.wang@mediatek.com> wrote:
+>> From: Sean Wang <sean.wang@mediatek.com>
+>>
+>
+>> +config BT_HCIBTUART_MTK
+>> +       tristate "MediaTek HCI UART driver"
+>> +       depends on BT_HCIBTUART
+>
+>> +       default y
+>
+> Perhaps it's an overkill for users which would like to have less
+> amount on stuff in kernel.
+>
+>
+>> +#include <asm/unaligned.h>
+>> +#include <linux/atomic.h>
+>> +#include <linux/clk.h>
+>> +#include <linux/firmware.h>
+>> +#include <linux/module.h>
+>> +#include <linux/pm_runtime.h>
+>> +#include <linux/serdev.h>
 
-> We are now starting to give Andrey Gusakov conflicting
-> recommendations. For the sake of moving forward, can we agree that
-> this and similar comments are relatively minor and defer to the
-> maintainers to make a call which way to go?
-> This way Andrey has a clear way on how to move forward with this set.
+Perhaps alphabetically ordered?
 
-The approach in this patched looked fine to me as well.
++ blank line.
 
-Maybe we can have some feedback from Shawn?
+>
+>> +#include <net/bluetooth/bluetooth.h>
+>> +#include <net/bluetooth/hci_core.h>
 
-Thanks
+>> +       /* Enable the power domain and clock the device requires. */
+>> +       pm_runtime_enable(dev);
+>> +       err = pm_runtime_get_sync(dev);
+>> +       if (err < 0)
+>> +               goto err_pm2;
+
+Should be err_pm1 here.
+Yes, that's correct.
+
+>> +err_pm1:
+>> +       pm_runtime_put_sync(dev);
+>> +err_pm2:
+>> +       pm_runtime_disable(dev);
+
+>> +#define MTK_WMT_CMD_SIZE       (MTK_WMT_HDR_SIZE + MTK_STP_HDR_SIZE + \
+>> +                                MTK_STP_TLR_SIZE + HCI_ACL_HDR_SIZE)
+
+It would look slightly better if you start on new line like
+#define FOO \
+ (BAR + BAZ)
+
+>> +struct mtk_stp_hdr {
+>> +       __u8 prefix;
+>> +       __u8 dlen1:4;
+>> +       __u8 type:4;
+
+>> +       __u8 dlen2:8;
+
+u8 already 8 bit.
+
+>> +       __u8 cs;
+>> +} __packed;
+
+-- 
+With Best Regards,
+Andy Shevchenko
