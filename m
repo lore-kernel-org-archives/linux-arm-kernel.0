@@ -1,96 +1,75 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Wed, 27 Jun 2018 11:51:45 +0800
-Subject: [PATCH v2 0/7] arm64: numa/topology/smp: update the cpumasks for
- CPU hotplug
-In-Reply-To: <b40f9a03-e416-f4e6-707b-257f4d29d893@arm.com>
-References: <1529327923-17911-1-git-send-email-sudeep.holla@arm.com>
- <d6812552-f27c-83d8-900d-5849e5c6d141@huawei.com>
- <b40f9a03-e416-f4e6-707b-257f4d29d893@arm.com>
-Message-ID: <1fff22a2-0421-c102-172a-508d1ca8f2b0@huawei.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Wed, 27 Jun 2018 12:51:43 +0900
+Subject: [GIT PULL] ARM: uniphier: fixes for v4.18
+In-Reply-To: <20180626174215.spnsyfqh5wk4tzep@localhost>
+References: <CAK7LNARAMcUgV2K1_dDdkupaWdtLqGMz==+huurHJKyW=JVWxQ@mail.gmail.com>
+ <20180626174215.spnsyfqh5wk4tzep@localhost>
+Message-ID: <CAK7LNATHQMSNV0HoHNm-Lnha3oz7z5fd=iUPcufC0L-AuK9BZg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018/6/26 17:23, Sudeep Holla wrote:
-[...]
->> Core(s) per socket:    15      //it's 15 now...
-> 
-> I know exactly what's the problem. And I think that's exactly the
-> behavior on my x86 box too. Further you might see another issue
-> as most of these applications like lstopo and lscpu parse only CPU0
-> sysfs, things fall apart if CPU0 is hotplugged out which is not allowed
-> on most of x86 boxes I have tried.
-> 
-> So, for me, that's issue with the application TBH.
-> 
-> [..]
-> 
->> Offlined 16 cores on NUMA node 0, everything backs to normal:
-> 
-> Expected :)
-> 
->> but when onlined CPU15 after,
->> Architecture:          aarch64
->> Byte Order:            Little Endian
->> CPU(s):                64
->> On-line CPU(s) list:   15-63
->> Off-line CPU(s) list:  0-14
->> Thread(s) per core:    1
->> Core(s) per socket:    12     // it's 12, hmm...
-> 
-> I had to looks at the lscpu code and I think that explains why you can
-> get 12 here. We have
-> 	add_summary_n(tb, _("Core(s) per socket:"),
-> 		cores_per_socket ?: desc->ncores / desc->nsockets);
-> 
-> Now cores_per_socket because we don't have procfs entry, so ncores=49
-> and nsockets=4, which means you get 12. TBH lscpu should be used only
-> when all CPUs are online. Lots of inaccurate assumptions in it.
-> 
+Hi Olof,
+
+2018-06-27 2:42 GMT+09:00 Olof Johansson <olof@lixom.net>:
+> Hi,
+>
+> On Mon, Jun 25, 2018 at 11:13:04PM +0900, Masahiro Yamada wrote:
+>> Hi Arnd, Olof,
 >>
->> I think maybe the cpumask for the socket is changed in a
->> wrong way when online/offline CPUs, didn't take a deep look into
->> that, hope the test helps.
+>> Please pull some fixes of ARM UniPhier platform.
 >>
-> 
-> I am not convinced if there's any issue unless you see discrepancy in
-> sysfs entries themselves and not though applications interpreting the
-> values for you based on some wrong assumptions.
+>>
+>>
+>> The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
+>>
+>>   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+>>
+>> are available in the git repository at:
+>>
+>>   git://git.kernel.org/pub/scm/linux/kernel/git/masahiroy/linux-uniphier.git
+>> tags/uniphier-fixes-v4.18
+>>
+>> for you to fetch changes up to 4e62893c25bd3d5758058e15958364df3ca15fbc:
+>>
+>>   arm64: uniphier: select RESET_CONTROLLER (2018-06-25 23:00:31 +0900)
+>>
+>> ----------------------------------------------------------------
+>> UniPhier ARM SoC fixes for v4.18
+>>
+>>  - add missing cooling device properties for CPUS
+>>  - fix widget name of headphone
+>>  - select RESET_CONTROLLER
+>
+> It's unclear to me what the severity of these fixes are. and I think the
+> headphone widget name is the only bug that's causing problems for someone using
+> this kernel, is that correct?
 
-Thanks for the clarify and let me know the detail, I tested 4.17 on
-a x86 machine which CPU0 can be offlined, also with the same lscpu version,
-I got the same on x86:
+Right.
+The others are on the boundary.
+The criteria on those is different by maintainers
+because some pull and some do not.
 
-lscpu
-Architecture:          x86_64
-CPU op-mode(s):        32-bit, 64-bit
-Byte Order:            Little Endian
-CPU(s):                72
-On-line CPU(s) list:   1-9,11-23,25-45,47-65,67-71
-Off-line CPU(s) list:  0,10,24,46,66                  // offline CPUs to make no continuous 18 logical CPUs on a socket
-Thread(s) per core:    1                              // it's 2 before CPU offlined
-Core(s) per socket:    17                             // and not 18 which is the value before CPU offlined
-Socket(s):             2
-NUMA node(s):          2
-Vendor ID:             GenuineIntel
-CPU family:            6
-Model:                 85
-Model name:            Intel(R) Xeon(R) Gold 6140 CPU @ 2.30GHz
-Stepping:              4
-CPU MHz:               2999.755
-CPU max MHz:           3700.0000
-CPU min MHz:           1000.0000
-BogoMIPS:              4600.00
-Virtualization:        VT-x
-L1d cache:             32K
-L1i cache:             32K
-L2 cache:              1024K
-L3 cache:              25344K
-NUMA node0 CPU(s):     1-9,11-17,36-45,47-53
-NUMA node1 CPU(s):     18-23,25-35,54-65,67-71
 
-So with this patch set:
+> If so, it would also be useful to get a "Fixes:" tag for it, seems like it
+> should be:
+>
+> Fixes: fb21a0acaa2b7 ("arm64: dts: uniphier: add sound node")
+> Care to resubmit with just the bugfix? Or, if it's easier, I can cherry-pick
+> just that fix at this end and add the Fixes line. You should queue the other
+> patches up for 4.19 and include in those pull requests.
 
-Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
+If you care to cherry-pick with Fixes: tag,
+that would be good.
 
-Thanks
-Hanjun
+Thanks.
+
+>
+> Thanks,
+>
+> -Olof
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
