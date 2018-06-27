@@ -1,91 +1,136 @@
-From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Wed, 27 Jun 2018 08:20:37 +0200
-Subject: [PATCH] ARM: mvebu: declare asm symbols as character arrays in
- pmsu.c
-In-Reply-To: <20180620043109.1190-1-ethan@ethantuttle.com> (Ethan Tuttle's
- message of "Tue, 19 Jun 2018 21:31:08 -0700")
-References: <20180620043109.1190-1-ethan@ethantuttle.com>
-Message-ID: <87wouk92dm.fsf@bootlin.com>
+From: gkulkarni@caviumnetworks.com (Ganapatrao Kulkarni)
+Date: Wed, 27 Jun 2018 12:24:08 +0530
+Subject: [PATCH v2 2/7] arm64: numa: separate out updates to percpu nodeid
+ and NUMA node cpumap
+In-Reply-To: <1529327923-17911-3-git-send-email-sudeep.holla@arm.com>
+References: <1529327923-17911-1-git-send-email-sudeep.holla@arm.com>
+ <1529327923-17911-3-git-send-email-sudeep.holla@arm.com>
+Message-ID: <5B333490.7050203@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ethan,
- 
- On mar., juin 19 2018, Ethan Tuttle <ethan@ethantuttle.com> wrote:
 
-> With CONFIG_FORTIFY_SOURCE, memcpy uses the declared size of operands to
-> detect buffer overflows.  If src or dest is declared as a char, attempts to
-> copy more than byte will result in a fortify_panic().
+
+On 06/18/2018 06:48 PM, Sudeep Holla wrote:
 >
-> Address this problem in mvebu_setup_boot_addr_wa() by declaring
-> mvebu_boot_wa_start and mvebu_boot_wa_end as character arrays.  Also remove
-> a couple addressof operators to avoid "arithmetic on pointer to an
-> incomplete type" compiler error.
+> Currently numa_clear_node removes both cpu information from the NUMA
+> node cpumap as well as the NUMA node id from the cpu. Similarly
+> numa_store_cpu_info updates both percpu nodeid and NUMA cpumap.
 >
-> See commit 54a7d50b9205 ("x86: mark kprobe templates as character arrays,
-> not single characters") for a similar fix.
+> However we need to retain the numa node id for the cpu and only remove
+> the cpu information from the numa node cpumap during CPU hotplug out.
+> The same can be extended for hotplugging in the CPU.
 >
-> Fixes "detected buffer overflow in memcpy" error during init on some mvebu
-> systems (armada-370-xp, armada-375):
+> This patch separates out numa_{add,remove}_cpu from numa_clear_node and
+> numa_store_cpu_info.
 >
-> (fortify_panic) from (mvebu_setup_boot_addr_wa+0xb0/0xb4)
-> (mvebu_setup_boot_addr_wa) from (mvebu_v7_cpu_pm_init+0x154/0x204)
-> (mvebu_v7_cpu_pm_init) from (do_one_initcall+0x7c/0x1a8)
-> (do_one_initcall) from (kernel_init_freeable+0x1bc/0x254)
-> (kernel_init_freeable) from (kernel_init+0x8/0x114)
-> (kernel_init) from (ret_from_fork+0x14/0x2c)
->
-> Signed-off-by: Ethan Tuttle <ethan@ethantuttle.com>
-> Tested-by: Ethan Tuttle <ethan@ethantuttle.com>
-
-Out of curiosity on which platform did you test it?
-
-Applied on mvebu/arm
-
-Thanks,
-
-Gregory
-
-
-
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 > ---
->  arch/arm/mach-mvebu/pmsu.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
+>   arch/arm64/include/asm/numa.h |  4 ++++
+>   arch/arm64/kernel/smp.c       |  2 ++
+>   arch/arm64/mm/numa.c          | 29 +++++++++++++++++++++--------
+>   3 files changed, 27 insertions(+), 8 deletions(-)
 >
-> diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
-> index 27a78c80e5b1..73d5d72dfc3e 100644
-> --- a/arch/arm/mach-mvebu/pmsu.c
-> +++ b/arch/arm/mach-mvebu/pmsu.c
-> @@ -116,8 +116,8 @@ void mvebu_pmsu_set_cpu_boot_addr(int hw_cpu, void *boot_addr)
->  		PMSU_BOOT_ADDR_REDIRECT_OFFSET(hw_cpu));
->  }
->  
-> -extern unsigned char mvebu_boot_wa_start;
-> -extern unsigned char mvebu_boot_wa_end;
-> +extern unsigned char mvebu_boot_wa_start[];
-> +extern unsigned char mvebu_boot_wa_end[];
->  
->  /*
->   * This function sets up the boot address workaround needed for SMP
-> @@ -130,7 +130,7 @@ int mvebu_setup_boot_addr_wa(unsigned int crypto_eng_target,
->  			     phys_addr_t resume_addr_reg)
->  {
->  	void __iomem *sram_virt_base;
-> -	u32 code_len = &mvebu_boot_wa_end - &mvebu_boot_wa_start;
-> +	u32 code_len = mvebu_boot_wa_end - mvebu_boot_wa_start;
->  
->  	mvebu_mbus_del_window(BOOTROM_BASE, BOOTROM_SIZE);
->  	mvebu_mbus_add_window_by_id(crypto_eng_target, crypto_eng_attribute,
-> -- 
-> 2.17.1
+> diff --git a/arch/arm64/include/asm/numa.h b/arch/arm64/include/asm/numa.h
+> index 01bc46d5b43a..626ad01e83bf 100644
+> --- a/arch/arm64/include/asm/numa.h
+> +++ b/arch/arm64/include/asm/numa.h
+> @@ -35,10 +35,14 @@ void __init numa_set_distance(int from, int to, int distance);
+>   void __init numa_free_distance(void);
+>   void __init early_map_cpu_to_node(unsigned int cpu, int nid);
+>   void numa_store_cpu_info(unsigned int cpu);
+> +void numa_add_cpu(unsigned int cpu);
+> +void numa_remove_cpu(unsigned int cpu);
 >
+>   #else  /* CONFIG_NUMA */
 >
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>   static inline void numa_store_cpu_info(unsigned int cpu) { }
+> +static inline void numa_add_cpu(unsigned int cpu) { }
+> +static inline void numa_remove_cpu(unsigned int cpu) { }
+>   static inline void arm64_numa_init(void) { }
+>   static inline void early_map_cpu_to_node(unsigned int cpu, int nid) { }
+>
+> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+> index f3e2e3aec0b0..49a021e30dfb 100644
+> --- a/arch/arm64/kernel/smp.c
+> +++ b/arch/arm64/kernel/smp.c
+> @@ -225,6 +225,7 @@ asmlinkage void secondary_start_kernel(void)
+>          notify_cpu_starting(cpu);
+>
+>          store_cpu_topology(cpu);
+> +       numa_add_cpu(cpu);
+>
+>          /*
+>           * OK, now it's safe to let the boot CPU continue.  Wait for
+> @@ -679,6 +680,7 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
+>          this_cpu = smp_processor_id();
+>          store_cpu_topology(this_cpu);
+>          numa_store_cpu_info(this_cpu);
+> +       numa_add_cpu(this_cpu);
+>
+>          /*
+>           * If UP is mandated by "nosmp" (which implies "maxcpus=0"), don't set
+> diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
+> index dad128ba98bf..43cc669bc7bc 100644
+> --- a/arch/arm64/mm/numa.c
+> +++ b/arch/arm64/mm/numa.c
+> @@ -70,19 +70,32 @@ EXPORT_SYMBOL(cpumask_of_node);
+>
+>   #endif
+>
+> -static void map_cpu_to_node(unsigned int cpu, int nid)
+> +static void numa_update_cpu(unsigned int cpu, bool remove)
+>   {
+> -       set_cpu_numa_node(cpu, nid);
+> -       if (nid >= 0)
+> +       int nid = cpu_to_node(cpu);
+> +
+> +       if (nid < 0)
+> +               return;
+> +
+> +       if (remove)
+> +               cpumask_clear_cpu(cpu, node_to_cpumask_map[nid]);
+> +       else
+>                  cpumask_set_cpu(cpu, node_to_cpumask_map[nid]);
+>   }
+>
+> -void numa_clear_node(unsigned int cpu)
+> +void numa_add_cpu(unsigned int cpu)
+>   {
+> -       int nid = cpu_to_node(cpu);
+> +       numa_update_cpu(cpu, false);
+> +}
+>
+> -       if (nid >= 0)
+> -               cpumask_clear_cpu(cpu, node_to_cpumask_map[nid]);
+> +void numa_remove_cpu(unsigned int cpu)
+> +{
+> +       numa_update_cpu(cpu, true);
+> +}
+> +
+> +void numa_clear_node(unsigned int cpu)
+> +{
+> +       numa_remove_cpu(cpu);
+>          set_cpu_numa_node(cpu, NUMA_NO_NODE);
+>   }
+>
+> @@ -116,7 +129,7 @@ static void __init setup_node_to_cpumask_map(void)
+>    */
+>   void numa_store_cpu_info(unsigned int cpu)
+>   {
+> -       map_cpu_to_node(cpu, cpu_to_node_map[cpu]);
+> +       set_cpu_numa_node(cpu, cpu_to_node_map[cpu]);
+>   }
+>
+>   void __init early_map_cpu_to_node(unsigned int cpu, int nid)
+> --
+> 2.7.4
+>
 
--- 
-Gregory Clement, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-http://bootlin.com
+changes looks ok to me.
+Reviewed-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+
+thanks
+Ganapat
