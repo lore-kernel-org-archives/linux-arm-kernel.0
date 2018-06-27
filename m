@@ -1,109 +1,78 @@
-From: ethan@ethantuttle.com (Ethan Tuttle)
-Date: Wed, 27 Jun 2018 07:39:29 -0700
-Subject: [PATCH] ARM: mvebu: declare asm symbols as character arrays in
- pmsu.c
-In-Reply-To: <87wouk92dm.fsf@bootlin.com>
-References: <20180620043109.1190-1-ethan@ethantuttle.com>
- <87wouk92dm.fsf@bootlin.com>
-Message-ID: <CACzLR4s7v8sxkvVvv1H2KKJHazfgCBmhAeb2Upa5JRoxTqm5nw@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 27 Jun 2018 15:45:01 +0100
+Subject: [PATCH v3 5/6] KVM: arm/arm64: Stop using {pmd,pud,pgd}_populate
+In-Reply-To: <fdc34d4f-73b6-4b5f-685b-d3775ee3122d@arm.com>
+References: <20180627122058.8210-1-marc.zyngier@arm.com>
+ <20180627122058.8210-6-marc.zyngier@arm.com>
+ <fdc34d4f-73b6-4b5f-685b-d3775ee3122d@arm.com>
+Message-ID: <f421cfbb-46c7-e183-ab0c-46c73ef5c623@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gregory.
-
-On Tue, Jun 26, 2018 at 11:20 PM, Gregory CLEMENT
-<gregory.clement@bootlin.com> wrote:
-> Hi Ethan,
->
->  On mar., juin 19 2018, Ethan Tuttle <ethan@ethantuttle.com> wrote:
->
->> With CONFIG_FORTIFY_SOURCE, memcpy uses the declared size of operands to
->> detect buffer overflows.  If src or dest is declared as a char, attempts to
->> copy more than byte will result in a fortify_panic().
+On 27/06/18 14:47, Suzuki K Poulose wrote:
+> Hi Marc,
+> 
+> On 27/06/18 13:20, Marc Zyngier wrote:
+>> The {pmd,pud,pgd}_populate accessors usage in the kernel have always
+>> been a bit weird in KVM. We don't have a struct mm to pass (and
+>> neither does the kernel most of the time, but still...), and
+>> the 32bit code has all kind of cache maintenance that doesn't make
+>> sense on ARMv7+ when MP extensions are mandatory (which is the
+>> case when the VEs are present).
 >>
->> Address this problem in mvebu_setup_boot_addr_wa() by declaring
->> mvebu_boot_wa_start and mvebu_boot_wa_end as character arrays.  Also remove
->> a couple addressof operators to avoid "arithmetic on pointer to an
->> incomplete type" compiler error.
+>> Let's bite the bullet and provide our own implementations. The
+>> only bit of architectural code left has to do with building the table
+>> entry itself (arm64 having up to 52bit PA, arm lacking PUD level).
 >>
->> See commit 54a7d50b9205 ("x86: mark kprobe templates as character arrays,
->> not single characters") for a similar fix.
->>
->> Fixes "detected buffer overflow in memcpy" error during init on some mvebu
->> systems (armada-370-xp, armada-375):
->>
->> (fortify_panic) from (mvebu_setup_boot_addr_wa+0xb0/0xb4)
->> (mvebu_setup_boot_addr_wa) from (mvebu_v7_cpu_pm_init+0x154/0x204)
->> (mvebu_v7_cpu_pm_init) from (do_one_initcall+0x7c/0x1a8)
->> (do_one_initcall) from (kernel_init_freeable+0x1bc/0x254)
->> (kernel_init_freeable) from (kernel_init+0x8/0x114)
->> (kernel_init) from (ret_from_fork+0x14/0x2c)
->>
->> Signed-off-by: Ethan Tuttle <ethan@ethantuttle.com>
->> Tested-by: Ethan Tuttle <ethan@ethantuttle.com>
->
-> Out of curiosity on which platform did you test it?
-
-I found the problem on my Mirabox after a kernel upgrade, and verified the fix
-on the Mirabox as well.
-
-I just observed in the code that the panic should also happen on armada-375,
-didn't do any testing there.
-
-BTW, just realizing I did not test with CONFIG_FORTIFY_SOURCE off.  But
-I imagine it will work.  Let me know if you think that requires testing.
-
-> Applied on mvebu/arm
-
-Excellent!  Thank you.
-
-Ethan
-
->
-> Thanks,
->
-> Gregory
->
->
->
+>> Acked-by: Mark Rutland <mark.rutland@arm.com>
+>> Acked-by: Christoffer Dall <christoffer.dall@arm.com>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 >> ---
->>  arch/arm/mach-mvebu/pmsu.c | 6 +++---
->>  1 file changed, 3 insertions(+), 3 deletions(-)
+>>   arch/arm/include/asm/kvm_mmu.h   | 4 ++++
+>>   arch/arm64/include/asm/kvm_mmu.h | 7 +++++++
+>>   virt/kvm/arm/mmu.c               | 8 +++++---
+>>   3 files changed, 16 insertions(+), 3 deletions(-)
 >>
->> diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
->> index 27a78c80e5b1..73d5d72dfc3e 100644
->> --- a/arch/arm/mach-mvebu/pmsu.c
->> +++ b/arch/arm/mach-mvebu/pmsu.c
->> @@ -116,8 +116,8 @@ void mvebu_pmsu_set_cpu_boot_addr(int hw_cpu, void *boot_addr)
->>               PMSU_BOOT_ADDR_REDIRECT_OFFSET(hw_cpu));
->>  }
->>
->> -extern unsigned char mvebu_boot_wa_start;
->> -extern unsigned char mvebu_boot_wa_end;
->> +extern unsigned char mvebu_boot_wa_start[];
->> +extern unsigned char mvebu_boot_wa_end[];
->>
->>  /*
->>   * This function sets up the boot address workaround needed for SMP
->> @@ -130,7 +130,7 @@ int mvebu_setup_boot_addr_wa(unsigned int crypto_eng_target,
->>                            phys_addr_t resume_addr_reg)
->>  {
->>       void __iomem *sram_virt_base;
->> -     u32 code_len = &mvebu_boot_wa_end - &mvebu_boot_wa_start;
->> +     u32 code_len = mvebu_boot_wa_end - mvebu_boot_wa_start;
->>
->>       mvebu_mbus_del_window(BOOTROM_BASE, BOOTROM_SIZE);
->>       mvebu_mbus_add_window_by_id(crypto_eng_target, crypto_eng_attribute,
->> --
->> 2.17.1
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
-> --
-> Gregory Clement, Bootlin (formerly Free Electrons)
-> Embedded Linux and Kernel engineering
-> http://bootlin.com
+>> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+>> index b2feaea1434c..265ea9cf7df7 100644
+>> --- a/arch/arm/include/asm/kvm_mmu.h
+>> +++ b/arch/arm/include/asm/kvm_mmu.h
+>> @@ -75,6 +75,10 @@ phys_addr_t kvm_get_idmap_vector(void);
+>>   int kvm_mmu_init(void);
+>>   void kvm_clear_hyp_idmap(void);
+>>   
+>> +#define kvm_mk_pmd(ptep)	__pmd(__pa(ptep) | PMD_TYPE_TABLE)
+>> +#define kvm_mk_pud(pmdp)	__pud(__pa(pmdp) | PMD_TYPE_TABLE)
+>> +#define kvm_mk_pgd(pudp)	({ BUILD_BUG(); 0; })
+>> +
+>>   static inline pte_t kvm_s2pte_mkwrite(pte_t pte)
+>>   {
+>>   	pte_val(pte) |= L_PTE_S2_RDWR;
+>> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+>> index 25c9a91f6a87..2f05be2bed63 100644
+>> --- a/arch/arm64/include/asm/kvm_mmu.h
+>> +++ b/arch/arm64/include/asm/kvm_mmu.h
+>> @@ -169,6 +169,13 @@ phys_addr_t kvm_get_idmap_vector(void);
+>>   int kvm_mmu_init(void);
+>>   void kvm_clear_hyp_idmap(void);
+>>   
+>> +#define kvm_mk_pmd(ptep)					\
+>> +	__pmd(__phys_to_pmd_val(__pa(ptep) | PMD_TYPE_TABLE))
+>> +#define kvm_mk_pud(pmdp)					\
+>> +	__pud(__phys_to_pud_val(__pa(pmdp) | PMD_TYPE_TABLE))
+>> +#define kvm_mk_pgd(pudp)					\
+>> +	__pgd(__phys_to_pgd_val(__pa(pudp) | PUD_TYPE_TABLE))
+>> +
+> 
+> I believe this is wrong, as the __phys_to_p.d_val could strip of the
+> TABLE bit. The correct usage is :
+> 
+> __pXd(__phys_to_pXd_val(__pa(ptr)) | PxD_TYPE_TABLE)
+
+Ah, you're absolutely correct! Fixed now.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
