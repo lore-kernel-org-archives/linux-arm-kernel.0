@@ -1,88 +1,44 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Wed, 27 Jun 2018 21:41:23 +0200
-Subject: [PATCH v4 1/2] clk: pxa: export 32kHz PLL
-Message-ID: <20180627194124.26366-1-robert.jarzmik@free.fr>
+From: ghackmann@android.com (Greg Hackmann)
+Date: Wed, 27 Jun 2018 12:46:14 -0700
+Subject: [PATCH] arm64: remove no-op -p linker flag
+Message-ID: <20180627194614.188210-1-ghackmann@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This clock is especially used by the RTC driver, so export it so that
-devicetree users can use it.
+Linking the ARM64 defconfig kernel with LLVM lld fails with the error:
 
-Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
----
-Since v2: fix missing parenthesis in clk-pxa25x.c and clk-pxa3xx.c
----
- drivers/clk/pxa/clk-pxa25x.c          | 6 ++++--
- drivers/clk/pxa/clk-pxa27x.c          | 7 ++++---
- drivers/clk/pxa/clk-pxa3xx.c          | 7 ++++---
- include/dt-bindings/clock/pxa-clock.h | 3 ++-
- 4 files changed, 14 insertions(+), 9 deletions(-)
+  ld.lld: error: unknown argument: -p
+  Makefile:1015: recipe for target 'vmlinux' failed
 
-diff --git a/drivers/clk/pxa/clk-pxa25x.c b/drivers/clk/pxa/clk-pxa25x.c
-index 6416c1f8e632..e88f8e01fe3a 100644
---- a/drivers/clk/pxa/clk-pxa25x.c
-+++ b/drivers/clk/pxa/clk-pxa25x.c
-@@ -292,8 +292,10 @@ static void __init pxa25x_register_plls(void)
- {
- 	clk_register_fixed_rate(NULL, "osc_3_6864mhz", NULL,
- 				CLK_GET_RATE_NOCACHE, 3686400);
--	clk_register_fixed_rate(NULL, "osc_32_768khz", NULL,
--				CLK_GET_RATE_NOCACHE, 32768);
-+	clkdev_pxa_register(CLK_OSC32k768, "osc_32_768khz", NULL,
-+			    clk_register_fixed_rate(NULL, "osc_32_768khz", NULL,
-+						    CLK_GET_RATE_NOCACHE,
-+						    32768));
- 	clk_register_fixed_rate(NULL, "clk_dummy", NULL, 0, 0);
- 	clk_register_fixed_factor(NULL, "ppll_95_85mhz", "osc_3_6864mhz",
- 				  0, 26, 1);
-diff --git a/drivers/clk/pxa/clk-pxa27x.c b/drivers/clk/pxa/clk-pxa27x.c
-index 25a30194d27a..d40b63e7bbce 100644
---- a/drivers/clk/pxa/clk-pxa27x.c
-+++ b/drivers/clk/pxa/clk-pxa27x.c
-@@ -314,9 +314,10 @@ static void __init pxa27x_register_plls(void)
- 	clk_register_fixed_rate(NULL, "osc_13mhz", NULL,
- 				CLK_GET_RATE_NOCACHE,
- 				13 * MHz);
--	clk_register_fixed_rate(NULL, "osc_32_768khz", NULL,
--				CLK_GET_RATE_NOCACHE,
--				32768 * KHz);
-+	clkdev_pxa_register(CLK_OSC32k768, "osc_32_768khz", NULL,
-+			    clk_register_fixed_rate(NULL, "osc_32_768khz", NULL,
-+						    CLK_GET_RATE_NOCACHE,
-+						    32768 * KHz));
- 	clk_register_fixed_rate(NULL, "clk_dummy", NULL, 0, 0);
- 	clk_register_fixed_factor(NULL, "ppll_312mhz", "osc_13mhz", 0, 24, 1);
- }
-diff --git a/drivers/clk/pxa/clk-pxa3xx.c b/drivers/clk/pxa/clk-pxa3xx.c
-index 2d126df2bccd..7aa120c3bd08 100644
---- a/drivers/clk/pxa/clk-pxa3xx.c
-+++ b/drivers/clk/pxa/clk-pxa3xx.c
-@@ -286,9 +286,10 @@ static void __init pxa3xx_register_plls(void)
- 	clk_register_fixed_rate(NULL, "osc_13mhz", NULL,
- 				CLK_GET_RATE_NOCACHE,
- 				13 * MHz);
--	clk_register_fixed_rate(NULL, "osc_32_768khz", NULL,
--				CLK_GET_RATE_NOCACHE,
--				32768);
-+	clkdev_pxa_register(CLK_OSC32k768, "osc_32_768khz", NULL,
-+			    clk_register_fixed_rate(NULL, "osc_32_768khz", NULL,
-+						    CLK_GET_RATE_NOCACHE,
-+						    32768));
- 	clk_register_fixed_rate(NULL, "ring_osc_120mhz", NULL,
- 				CLK_GET_RATE_NOCACHE,
- 				120 * MHz);
-diff --git a/include/dt-bindings/clock/pxa-clock.h b/include/dt-bindings/clock/pxa-clock.h
-index e65803b1dc7e..0b0fd2b01538 100644
---- a/include/dt-bindings/clock/pxa-clock.h
-+++ b/include/dt-bindings/clock/pxa-clock.h
-@@ -72,6 +72,7 @@
- #define CLK_USIM 58
- #define CLK_USIM1 59
- #define CLK_USMI0 60
--#define CLK_MAX 61
-+#define CLK_OSC32k768 61
-+#define CLK_MAX 62
+Without this flag, the ARM64 defconfig kernel successfully links with
+lld and boots on Dragonboard 410c.
+
+After digging through binutils source and changelogs, it turns out that
+-p is only relevant to ancient binutils installations targeting 32-bit
+ARM.  binutils accepts -p for AArch64 too, but it's always been
+undocumented and silently ignored.  A comment in
+ld/emultempl/aarch64elf.em explains that it's "Only here for backwards
+compatibility".
+
+Since this flag is a no-op on ARM64, we can safely drop it.
+
+Signed-off-by: Greg Hackmann <ghackmann@google.com>
+---
+ arch/arm64/Makefile | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+index 45272266dafb..79bd701071de 100644
+--- a/arch/arm64/Makefile
++++ b/arch/arm64/Makefile
+@@ -10,7 +10,7 @@
+ #
+ # Copyright (C) 1995-2001 by Russell King
  
- #endif
+-LDFLAGS_vmlinux	:=-p --no-undefined -X
++LDFLAGS_vmlinux	:=--no-undefined -X
+ CPPFLAGS_vmlinux.lds = -DTEXT_OFFSET=$(TEXT_OFFSET)
+ GZFLAGS		:=-9
+ 
 -- 
-2.11.0
+2.18.0.rc2.346.g013aa6912e-goog
