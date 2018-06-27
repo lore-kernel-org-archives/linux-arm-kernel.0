@@ -1,77 +1,63 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Wed, 27 Jun 2018 19:39:06 +0300
-Subject: [PATCH 4/4] PCI: mediatek: Add loadable kernel module support
-In-Reply-To: <1530091298-28120-5-git-send-email-honghui.zhang@mediatek.com>
-References: <1530091298-28120-1-git-send-email-honghui.zhang@mediatek.com>
- <1530091298-28120-5-git-send-email-honghui.zhang@mediatek.com>
-Message-ID: <CAHp75VdsSZifb5xZ2Q8cmJV=PgAaoN=iOhMfyVX4uE4vNpo=Mg@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 27 Jun 2018 17:41:51 +0100
+Subject: [PATCH] arm64: fix infinite stacktrace
+In-Reply-To: <20180615115823.2oq5d7amzwlliczg@lakrids.cambridge.arm.com>
+References: <alpine.LRH.2.02.1806141457200.4243@file01.intranet.prod.int.rdu2.redhat.com>
+ <20180615115823.2oq5d7amzwlliczg@lakrids.cambridge.arm.com>
+Message-ID: <20180627164150.GB8729@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 27, 2018 at 12:21 PM,  <honghui.zhang@mediatek.com> wrote:
-> From: Honghui Zhang <honghui.zhang@mediatek.com>
->
-> Implement remove callback function for Mediatek PCIe driver to add
-> loadable kernel module support.
+Hi all,
 
-> +static void mtk_pcie_irq_teardown(struct mtk_pcie *pcie)
-> +{
-> +       struct mtk_pcie_port *port, *tmp;
-> +
+On Fri, Jun 15, 2018 at 12:58:23PM +0100, Mark Rutland wrote:
+> On Thu, Jun 14, 2018 at 02:58:21PM -0400, Mikulas Patocka wrote:
+> > I've got this infinite stacktrace when debugging another problem:
+> > [  908.795225] INFO: rcu_preempt detected stalls on CPUs/tasks:
+> > [  908.796176]  1-...!: (1 GPs behind) idle=952/1/4611686018427387904 softirq=1462/1462 fqs=355
+> > [  908.797692]  2-...!: (1 GPs behind) idle=f42/1/4611686018427387904 softirq=1550/1551 fqs=355
+> > [  908.799189]  (detected by 0, t=2109 jiffies, g=130, c=129, q=235)
+> > [  908.800284] Task dump for CPU 1:
+> > [  908.800871] kworker/1:1     R  running task        0    32      2 0x00000022
+> > [  908.802127] Workqueue: writecache-writeabck writecache_writeback [dm_writecache]
+> > [  908.820285] Call trace:
+> > [  908.824785]  __switch_to+0x68/0x90
+> > [  908.837661]  0xfffffe00603afd90
+> > [  908.844119]  0xfffffe00603afd90
+> > [  908.850091]  0xfffffe00603afd90
+> > [  908.854285]  0xfffffe00603afd90
+> > [  908.863538]  0xfffffe00603afd90
+> > [  908.865523]  0xfffffe00603afd90
+> > 
+> > The machine just locked up and kept on printing the same line over and
+> > over again. This patch fixes it.
+> > 
+> > Signed-off-by: Mikulas Patocka <mpatocka@redhat.com>
+> > Cc: stable at vger.kernel.org
+> 
+> Given this can only occur when there's a corrupted stack (where a frame
+> record points to itself), I'm not sure this requires a cc stable.
+> 
+> > Index: linux-2.6/arch/arm64/kernel/stacktrace.c
+> > ===================================================================
+> > --- linux-2.6.orig/arch/arm64/kernel/stacktrace.c
+> > +++ linux-2.6/arch/arm64/kernel/stacktrace.c
+> > @@ -56,6 +56,9 @@ int notrace unwind_frame(struct task_str
+> >  	frame->fp = READ_ONCE_NOCHECK(*(unsigned long *)(fp));
+> >  	frame->pc = READ_ONCE_NOCHECK(*(unsigned long *)(fp + 8));
+> >  
+> > +	if (frame->fp <= fp)
+> > +		return -EINVAL;
+> > +
+> 
+> Dave Martin had a series [1] which addressed this along with a number of
+> other cases where stack traces might not terminate.
+> 
+> Dave, do you plan to respin that?
 
-> +       if (list_empty(&pcie->ports))
-> +               return;
+I'd be interested in an update on that; we clearly should be fixing this in
+one way or another.
 
-This is redundant.
+Mikulus -- would you be able to test and/or review it, please?
 
-> +
-> +       list_for_each_entry_safe(port, tmp, &pcie->ports, list) {
-> +               irq_set_chained_handler_and_data(port->irq, NULL, NULL);
-> +
-> +               if (port->irq_domain)
-> +                       irq_domain_remove(port->irq_domain);
-> +
-> +               if (IS_ENABLED(CONFIG_PCI_MSI)) {
-> +                       if (port->msi_domain)
-> +                               irq_domain_remove(port->msi_domain);
-> +                       if (port->inner_domain)
-> +                               irq_domain_remove(port->inner_domain);
-> +               }
-> +
-> +               irq_dispose_mapping(port->irq);
-> +       }
-> +}
-
-> +static void mtk_pcie_free_resources(struct mtk_pcie *pcie)
-> +{
-> +       struct pci_host_bridge *host = pci_host_bridge_from_priv(pcie);
-> +       struct list_head *windows = &host->windows;
-> +
-> +       pci_unmap_iospace(&pcie->pio);
-> +       pci_free_resource_list(windows);
-> +}
-> +
-> +static int mtk_pcie_remove(struct platform_device *pdev)
-> +{
-> +       struct mtk_pcie *pcie = platform_get_drvdata(pdev);
-> +       struct pci_host_bridge *host = pci_host_bridge_from_priv(pcie);
-> +
-> +       pci_stop_root_bus(host->bus);
-> +       pci_remove_root_bus(host->bus);
-> +       mtk_pcie_free_resources(pcie);
-> +
-> +       mtk_pcie_irq_teardown(pcie);
-> +
-
-> +       if (!list_empty(&pcie->ports))
-
-I think this is also not needed. Do you put runtime PM by the way?
-
-> +               mtk_pcie_put_resources(pcie);
-> +
-> +       return 0;
-> +}
-
--- 
-With Best Regards,
-Andy Shevchenko
+Will
