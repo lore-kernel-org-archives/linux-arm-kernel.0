@@ -1,55 +1,47 @@
-From: rnayak@codeaurora.org (Rajendra Nayak)
-Date: Wed, 27 Jun 2018 14:59:55 +0530
-Subject: [PATCH v2 9/9] PM / Domains: Add dev_pm_domain_attach_by_id() to
- manage multi PM domains
-In-Reply-To: <CAPDyKFqZVLfKXK7H+VLaiTh96xRwqBWHxaFfs5PDo7o+5hzRsQ@mail.gmail.com>
-References: <20180529100421.31022-1-ulf.hansson@linaro.org>
- <20180529100421.31022-10-ulf.hansson@linaro.org>
- <cc6f36ce-32b7-4b69-f9a9-98cf0b12a9d1@nvidia.com>
- <CAPDyKFoiEctBuyw1nVS6ruQ92-jOsMMSAUsWKew42dkmk64_8A@mail.gmail.com>
- <f214cf2b-49ee-2f7c-babd-1cee7dcae927@nvidia.com>
- <ebec2f66-d28d-7b94-3cef-be980617cd6f@codeaurora.org>
- <CAPDyKFqZVLfKXK7H+VLaiTh96xRwqBWHxaFfs5PDo7o+5hzRsQ@mail.gmail.com>
-Message-ID: <c692fec8-29a1-0107-e7b7-971b209d3972@codeaurora.org>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 27 Jun 2018 10:31:12 +0100
+Subject: [PATCH v2 0/7] arm64: numa/topology/smp: update the cpumasks for
+ CPU hotplug
+In-Reply-To: <5B332228.40204@caviumnetworks.com>
+References: <1529327923-17911-1-git-send-email-sudeep.holla@arm.com>
+ <5B332228.40204@caviumnetworks.com>
+Message-ID: <62111bfd-87a7-061b-9934-5c3bf2be9dbe@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 06/27/2018 02:35 PM, Ulf Hansson wrote:
-> On 27 June 2018 at 10:55, Rajendra Nayak <rnayak@codeaurora.org> wrote:
->>
->>
->> On 05/30/2018 08:00 PM, Jon Hunter wrote:
->>>>> My only other comments on this series are ...
->>>>>
->>>>> 1. I think it would be nice to have an dev_pm_domain_attach_by_name() and
->>>>>    that the DT binding has a 'power-domain-names' property.
->>>> I think it makes sense, but my plan was to do that as second step on
->>>> top. Are you okay with that as well?
->>> Yes that is fine with me.
->>
->> Ulf, do you have a patch for this? I am working on moving some of qcom
->> remoteproc drivers to use this series and it will help to have a
->> dev_pm_domain_attach_by_name() api.
+On 27/06/18 06:35, Ganapatrao Kulkarni wrote:
 > 
-> Right. Besides this I have been working on a little improvement,
-> avoiding to power the PM domain while attaching.
+> Hi Sudeep,
 > 
-> I post a series in a day or two.
+> On 06/18/2018 06:48 PM, Sudeep Holla wrote:
+>>
+>> Hi,
+>>
+>> Commit 37c3ec2d810f ("arm64: topology: divorce MC scheduling domain
+>> from core_siblings")
+>> was reported to cause some hotplug and system suspend regressions when
+>> it was merged. On investigation, it was found that unlike x86/PPC,
+>> arm64 doesn't update the cpu and numa masks on CPU hotplug. That's
+>> somewhat expected from the scheduler.
+>>
+>> Since these changes were bit invasive as a solution to the above
+>> mentioned regression, as small change was temporarily applied as a fix.
+>> This series updates the cpu and numa masks on CPU hotplug and reverts
+>> that temporary fix.
+>>
+>> It would be good to get this tested(CPU hotplug - few and all CPUs in
+>> a socket) on multi-socket/NUMA systems from Cavium and Huawei/Hisilicon.
+> 
+> testing looks ok on Cavium's ThunderX2 system.
+> please feel free to add,
+> 
+> Tested-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+> 
 
-great, thank you.
-
-> 
-> Kind regards
-> Uffe
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Thanks Ganapat.
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Regards,
+Sudeep
