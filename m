@@ -1,136 +1,47 @@
-From: gkulkarni@caviumnetworks.com (Ganapatrao Kulkarni)
-Date: Wed, 27 Jun 2018 12:24:08 +0530
-Subject: [PATCH v2 2/7] arm64: numa: separate out updates to percpu nodeid
- and NUMA node cpumap
-In-Reply-To: <1529327923-17911-3-git-send-email-sudeep.holla@arm.com>
-References: <1529327923-17911-1-git-send-email-sudeep.holla@arm.com>
- <1529327923-17911-3-git-send-email-sudeep.holla@arm.com>
-Message-ID: <5B333490.7050203@caviumnetworks.com>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Wed, 27 Jun 2018 09:03:31 +0200
+Subject: [PATCH V5 0/5] add iwdg2 support for stm32mp157c
+In-Reply-To: <1529941383-8653-1-git-send-email-ludovic.Barre@st.com>
+References: <1529941383-8653-1-git-send-email-ludovic.Barre@st.com>
+Message-ID: <c6996e7f-2b30-6eaf-afa3-5a98b6dcaa78@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Guenter
 
+On 06/25/2018 05:42 PM, Ludovic Barre wrote:
+> From: Ludovic Barre <ludovic.barre@st.com>
+> 
+> This patch series updates stm32_iwdg driver to manage pclk
+> clock by compatible. stm32mp1 requires a pclk clock.
+> 
+> v5:
+> -update stm32f429.dtsi
+> 
+> v4:
+> -dt-bindings: split and review
+> 
+> v3:
+> -remove stm32_iwdg_config structure, just assign the
+>   boolean directly to .dat
+> 
+> Ludovic Barre (5):
+>    dt-bindings: watchdog: add stm32mp1 support
+>    watchdog: stm32: add pclk feature for stm32mp1
+>    ARM: dts: stm32: add iwdg2 support for stm32mp157c
+>    ARM: dts: stm32: add iwdg2 support for stm32mp157c-ed1
+>    ARM: dts: stm32: update iwdg with lsi clock name for stm32f429
 
-On 06/18/2018 06:48 PM, Sudeep Holla wrote:
->
-> Currently numa_clear_node removes both cpu information from the NUMA
-> node cpumap as well as the NUMA node id from the cpu. Similarly
-> numa_store_cpu_info updates both percpu nodeid and NUMA cpumap.
->
-> However we need to retain the numa node id for the cpu and only remove
-> the cpu information from the numa node cpumap during CPU hotplug out.
-> The same can be extended for hotplugging in the CPU.
->
-> This patch separates out numa_{add,remove}_cpu from numa_clear_node and
-> numa_store_cpu_info.
->
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> ---
->   arch/arm64/include/asm/numa.h |  4 ++++
->   arch/arm64/kernel/smp.c       |  2 ++
->   arch/arm64/mm/numa.c          | 29 +++++++++++++++++++++--------
->   3 files changed, 27 insertions(+), 8 deletions(-)
->
-> diff --git a/arch/arm64/include/asm/numa.h b/arch/arm64/include/asm/numa.h
-> index 01bc46d5b43a..626ad01e83bf 100644
-> --- a/arch/arm64/include/asm/numa.h
-> +++ b/arch/arm64/include/asm/numa.h
-> @@ -35,10 +35,14 @@ void __init numa_set_distance(int from, int to, int distance);
->   void __init numa_free_distance(void);
->   void __init early_map_cpu_to_node(unsigned int cpu, int nid);
->   void numa_store_cpu_info(unsigned int cpu);
-> +void numa_add_cpu(unsigned int cpu);
-> +void numa_remove_cpu(unsigned int cpu);
->
->   #else  /* CONFIG_NUMA */
->
->   static inline void numa_store_cpu_info(unsigned int cpu) { }
-> +static inline void numa_add_cpu(unsigned int cpu) { }
-> +static inline void numa_remove_cpu(unsigned int cpu) { }
->   static inline void arm64_numa_init(void) { }
->   static inline void early_map_cpu_to_node(unsigned int cpu, int nid) { }
->
-> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-> index f3e2e3aec0b0..49a021e30dfb 100644
-> --- a/arch/arm64/kernel/smp.c
-> +++ b/arch/arm64/kernel/smp.c
-> @@ -225,6 +225,7 @@ asmlinkage void secondary_start_kernel(void)
->          notify_cpu_starting(cpu);
->
->          store_cpu_topology(cpu);
-> +       numa_add_cpu(cpu);
->
->          /*
->           * OK, now it's safe to let the boot CPU continue.  Wait for
-> @@ -679,6 +680,7 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
->          this_cpu = smp_processor_id();
->          store_cpu_topology(this_cpu);
->          numa_store_cpu_info(this_cpu);
-> +       numa_add_cpu(this_cpu);
->
->          /*
->           * If UP is mandated by "nosmp" (which implies "maxcpus=0"), don't set
-> diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
-> index dad128ba98bf..43cc669bc7bc 100644
-> --- a/arch/arm64/mm/numa.c
-> +++ b/arch/arm64/mm/numa.c
-> @@ -70,19 +70,32 @@ EXPORT_SYMBOL(cpumask_of_node);
->
->   #endif
->
-> -static void map_cpu_to_node(unsigned int cpu, int nid)
-> +static void numa_update_cpu(unsigned int cpu, bool remove)
->   {
-> -       set_cpu_numa_node(cpu, nid);
-> -       if (nid >= 0)
-> +       int nid = cpu_to_node(cpu);
-> +
-> +       if (nid < 0)
-> +               return;
-> +
-> +       if (remove)
-> +               cpumask_clear_cpu(cpu, node_to_cpumask_map[nid]);
-> +       else
->                  cpumask_set_cpu(cpu, node_to_cpumask_map[nid]);
->   }
->
-> -void numa_clear_node(unsigned int cpu)
-> +void numa_add_cpu(unsigned int cpu)
->   {
-> -       int nid = cpu_to_node(cpu);
-> +       numa_update_cpu(cpu, false);
-> +}
->
-> -       if (nid >= 0)
-> -               cpumask_clear_cpu(cpu, node_to_cpumask_map[nid]);
-> +void numa_remove_cpu(unsigned int cpu)
-> +{
-> +       numa_update_cpu(cpu, true);
-> +}
-> +
-> +void numa_clear_node(unsigned int cpu)
-> +{
-> +       numa_remove_cpu(cpu);
->          set_cpu_numa_node(cpu, NUMA_NO_NODE);
->   }
->
-> @@ -116,7 +129,7 @@ static void __init setup_node_to_cpumask_map(void)
->    */
->   void numa_store_cpu_info(unsigned int cpu)
->   {
-> -       map_cpu_to_node(cpu, cpu_to_node_map[cpu]);
-> +       set_cpu_numa_node(cpu, cpu_to_node_map[cpu]);
->   }
->
->   void __init early_map_cpu_to_node(unsigned int cpu, int nid)
-> --
-> 2.7.4
->
+I will take DT patches in my tree.
 
-changes looks ok to me.
-Reviewed-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+Thanks
+alex
 
-thanks
-Ganapat
+> 
+>   .../devicetree/bindings/watchdog/st,stm32-iwdg.txt |  13 ++-
+>   arch/arm/boot/dts/stm32f429.dtsi                   |   1 +
+>   arch/arm/boot/dts/stm32mp157c-ed1.dts              |   5 +
+>   arch/arm/boot/dts/stm32mp157c.dtsi                 |   8 ++
+>   drivers/watchdog/stm32_iwdg.c                      | 116 +++++++++++++--------
+>   5 files changed, 98 insertions(+), 45 deletions(-)
+> 
