@@ -1,56 +1,37 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Wed, 27 Jun 2018 16:08:00 -0700
-Subject: [PATCH v4 00/17] khwasan: kernel hardware assisted address
- sanitizer
-In-Reply-To: <cover.1530018818.git.andreyknvl@google.com>
-References: <cover.1530018818.git.andreyknvl@google.com>
-Message-ID: <20180627160800.3dc7f9ee41c0badbf7342520@linux-foundation.org>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Wed, 27 Jun 2018 16:10:24 -0700
+Subject: [PATCH] ARM64: dts: meson-axg: fix ethernet stability issue
+In-Reply-To: <d59a60d1-d5fc-6d89-f89b-148c8e3f3521@baylibre.com> (Neil
+ Armstrong's message of "Tue, 26 Jun 2018 10:07:26 +0200")
+References: <20180625125653.3404-1-jbrunet@baylibre.com>
+ <d59a60d1-d5fc-6d89-f89b-148c8e3f3521@baylibre.com>
+Message-ID: <7h6023keqn.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 26 Jun 2018 15:15:10 +0200 Andrey Konovalov <andreyknvl@google.com> wrote:
+Neil Armstrong <narmstrong@baylibre.com> writes:
 
-> This patchset adds a new mode to KASAN [1], which is called KHWASAN
-> (Kernel HardWare assisted Address SANitizer).
-> 
-> The plan is to implement HWASan [2] for the kernel with the incentive,
-> that it's going to have comparable to KASAN performance, but in the same
-> time consume much less memory, trading that off for somewhat imprecise
-> bug detection and being supported only for arm64.
+> On 25/06/2018 14:56, Jerome Brunet wrote:
+>> Like the odroid-c2 and wetek, the s400 uses the RTL8211F and seems to
+>> suffer from the kind of stability issue.
+>> 
+>> Doing an iperf3 download test, we can see a significant number of LPI
+>> interrupts on the tx path. After a short while (5 to 15 seconds), the
+>> network connection dies. If using rootfs over NFS, the connection may
+>> also break during the boot sequence.
+>> 
+>> We still don't have a real explanation for this problem so let's disable
+>> EEE once again.
+>> 
+>> Fixes: f6f6ac914b82 ("ARM64: dts: meson-axg: enable ethernet for A113D S400 board")
+>> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+>> ---
+>>  arch/arm64/boot/dts/amlogic/meson-axg-s400.dts | 15 ++++++++++++++-
+>>  1 file changed, 14 insertions(+), 1 deletion(-)
+>> 
+> [...]
+> Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
 
-Why do we consider this to be a worthwhile change?
+Applied to v4.18/fixes (which I'll be sending upstream today.)
 
-Is KASAN's memory consumption actually a significant problem?  Some
-data regarding that would be very useful.
-
-If it is a large problem then we still have that problem on x86, so the
-problem remains largely unsolved?
-
-> ====== Benchmarks
-> 
-> The following numbers were collected on Odroid C2 board. Both KASAN and
-> KHWASAN were used in inline instrumentation mode.
-> 
-> Boot time [1]:
-> * ~1.7 sec for clean kernel
-> * ~5.0 sec for KASAN
-> * ~5.0 sec for KHWASAN
-> 
-> Slab memory usage after boot [2]:
-> * ~40 kb for clean kernel
-> * ~105 kb + 1/8th shadow ~= 118 kb for KASAN
-> * ~47 kb + 1/16th shadow ~= 50 kb for KHWASAN
-> 
-> Network performance [3]:
-> * 8.33 Gbits/sec for clean kernel
-> * 3.17 Gbits/sec for KASAN
-> * 2.85 Gbits/sec for KHWASAN
-> 
-> Note, that KHWASAN (compared to KASAN) doesn't require quarantine.
-> 
-> [1] Time before the ext4 driver is initialized.
-> [2] Measured as `cat /proc/meminfo | grep Slab`.
-> [3] Measured as `iperf -s & iperf -c 127.0.0.1 -t 30`.
-
-The above doesn't actually demonstrate the whole point of the
-patchset: to reduce KASAN's very high memory consumption?
+Kevin
