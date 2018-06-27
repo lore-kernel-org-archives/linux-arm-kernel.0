@@ -1,60 +1,59 @@
-From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Wed, 27 Jun 2018 20:40:52 +0530
-Subject: [PATCH 1/4] dt-bindings: power: Add Actions Semi S900 SPS
-In-Reply-To: <20180627145713.uao2gr5kknk2cypk@holly.lan>
-References: <20180411164036.8046-1-manivannan.sadhasivam@linaro.org>
- <20180411164036.8046-2-manivannan.sadhasivam@linaro.org>
- <a261bae6-d2fa-a550-7232-7647ce0ac0e2@suse.de>
- <20180626164117.GA5241@Mani-XPS-13-9360>
- <20180627145713.uao2gr5kknk2cypk@holly.lan>
-Message-ID: <20180627151052.GA24330@mani>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 27 Jun 2018 16:13:39 +0100
+Subject: [PATCH v9 3/6] module: use relative references for __ksymtab
+ entries
+In-Reply-To: <20180626182802.19932-4-ard.biesheuvel@linaro.org>
+References: <20180626182802.19932-1-ard.biesheuvel@linaro.org>
+ <20180626182802.19932-4-ard.biesheuvel@linaro.org>
+Message-ID: <20180627151339.GD30631@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 27, 2018 at 03:57:13PM +0100, Daniel Thompson wrote:
-> On Tue, Jun 26, 2018 at 10:11:17PM +0530, Manivannan Sadhasivam wrote:
-> > > > diff --git a/include/dt-bindings/power/owl-s900-powergate.h b/include/dt-bindings/power/owl-s900-powergate.h
-> > > > new file mode 100644
-> > > > index 000000000000..f1aaf761112b
-> > > > --- /dev/null
-> > > > +++ b/include/dt-bindings/power/owl-s900-powergate.h
-> > > > @@ -0,0 +1,23 @@
-> > > > +// SPDX-License-Identifier: GPL-2.0+
-> > > 
-> > > checkpatch.pl warns about this line due to not using /* ... */ syntax
-> > > for headers. I could fix that up on my own, but it made me realize that
-> > > you are licensing this file under GPL-2.0+ only, whereas the .dts[i] is
-> > > supposed to be dual-licensed.
-> > > 
-> > > Can you please give your consent to make this
-> > > 
-> > > /* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
-> > > 
-> > 
-> > You can change the license to GPL-2.0+ OR MIT.
-> > 
-> > > like my S500 and S700 bindings?
-> > > 
-> > > Question: Should it still be GPL-2.0+ or the new GPL-2.0-or-later?
-> > >
-> > 
-> > I think GPL-2.0+ is fine.
-> 
-> So... when I saw this I did wonder why one would knowly choose to use a
-> deprecated license identifier (https://spdx.org/licenses/ ).
-> 
-> However running `git diff v4.17..v4.18-rc1` through some filters does
-> indicate that GPL-2.0+ is the more popular choice by 256 to 0! Doesn't
-> mean you couldn't break the mould though ;-).
->
+Hi Ard,
 
-I did grep through the source and hit with same numbers ;-) But I was not
-sure whether to break the mould or not, so chose the safest path :)
+On Tue, Jun 26, 2018 at 08:27:58PM +0200, Ard Biesheuvel wrote:
+> An ordinary arm64 defconfig build has ~64 KB worth of __ksymtab
+> entries, each consisting of two 64-bit fields containing absolute
+> references, to the symbol itself and to a char array containing
+> its name, respectively.
 
-Since you already gave the green signal, I think we can move to new style
-identifier.
+[...]
 
-Thanks,
-Mani 
-> 
-> Daniel.
+> diff --git a/include/linux/export.h b/include/linux/export.h
+> index ea7df303d68d..ae072bc5aacf 100644
+> --- a/include/linux/export.h
+> +++ b/include/linux/export.h
+> @@ -18,12 +18,6 @@
+>  #define VMLINUX_SYMBOL_STR(x) __VMLINUX_SYMBOL_STR(x)
+>  
+>  #ifndef __ASSEMBLY__
+> -struct kernel_symbol
+> -{
+> -	unsigned long value;
+> -	const char *name;
+> -};
+> -
+>  #ifdef MODULE
+>  extern struct module __this_module;
+>  #define THIS_MODULE (&__this_module)
+> @@ -54,17 +48,47 @@ extern struct module __this_module;
+>  #define __CRC_SYMBOL(sym, sec)
+>  #endif
+>  
+> +#ifdef CONFIG_HAVE_ARCH_PREL32_RELOCATIONS
+> +#include <linux/compiler.h>
+> +/*
+> + * Emit the ksymtab entry as a pair of relative references: this reduces
+> + * the size by half on 64-bit architectures, and eliminates the need for
+> + * absolute relocations that require runtime processing on relocatable
+> + * kernels.
+> + */
+> +#define __KSYMTAB_ENTRY(sym, sec)					\
+> +	__ADDRESSABLE(sym)						\
+> +	asm("	.section \"___ksymtab" sec "+" #sym "\", \"a\"	\n"	\
+> +	    "	.balign	8					\n"	\
+
+Can we use KSYM_ALIGN here instead of 8, or do we need the 8-byte alignment
+even on 32-bit architectures?
+
+Will
