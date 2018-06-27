@@ -1,65 +1,36 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 27 Jun 2018 13:20:52 +0100
-Subject: [PATCH v3 0/6] KVM/arm64: Cache maintenance relaxations
-Message-ID: <20180627122058.8210-1-marc.zyngier@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 27 Jun 2018 13:21:30 +0100
+Subject: [PATCH 3/4] drivers/bus: arm-cci: Use SPDX license information
+In-Reply-To: <87r2kzypdq.fsf@e105922-lin.cambridge.arm.com>
+References: <20180622110628.GA23452@sesnaco>
+ <87r2kzypdq.fsf@e105922-lin.cambridge.arm.com>
+Message-ID: <20180627122130.GA30147@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This small series makes use of features recently introduced in the
-ARMv8 architecture to relax the cache maintenance operations on CPUs
-that implement these features.
+On Fri, Jun 22, 2018 at 01:30:57PM +0100, Punit Agrawal wrote:
+> [ + alkml, will ]
+> 
+> Please make sure to cc linux-arm-kernel and the appropriate maintainers
+> (see scripts/get_maintainer.pl) for Arm related patches.
+> 
+> Mawanda Henry <mawandahenrynaco@gmail.com> writes:
+> 
+> > SPDX licence header helps developers and machines to know the right
+> > license governing a particular file
+> 
+> It's good practice to update the commit log if you change the
+> commit. Something like -
+> 
+> "While we are at it, also update the MODULE_LICENSE() to reflect the
+> license version - GPL v2"
+> 
+> > Signed-off-by: Mawanda Henry <mawandahenrynaco@gmail.com>
+> 
+> With that change,
+> 
+> Acked-by: Punit Agrawal <punit.agrawal@arm.com>
 
-FWB is the most important one. It allows stage-2 to enforce the
-cacheability of memory, no matter what the guest says. It also
-mandates that the whole machine is cache coherent (no non-coherent
-I/O), meaning we can drop a whole class of cache maintenance
-operations.
+Is there a v2 of this patch that I can pick up?
 
-FWB also has the same effect as CTR_EL0.IDC being set, and when
-combined with CTR_EL0.DIC allows the removal of all cache maintenance
-and tracking of pages being executed.
-
-We also take the opportunity to drop a few useless CMOs that were
-applied to the HYP page tables, but that were never necessary. This
-ended up requiring quite a few changes in out page table accessors so
-that they get consistent barriers. These barriers are a bit on the
-heavy side, and could be further optimized, although that's probably
-for a different patch series
-
-* From v1:
-  - Reordered the series in a slightly more consistent order
-  - Added patches refactoring the PT accessors before dropping
-    the CMOs
-  - Removed final dsb(ishst) from the last patch, as all PT accessors
-    now have their own barriers
-  - Collected Acks from Catalin
-
-* From v2:
-  - Dropped the clean to PoU when FWB, as it always implies IDC
-  - Added comments about the pertinence of Set/Way CMOs in guests
-  - Collected Acks and RBs
-
-Marc Zyngier (6):
-  arm64: KVM: Add support for Stage-2 control of memory types and
-    cacheability
-  arm64: KVM: Handle Set/Way CMOs as NOPs if FWB is present
-  arm64: KVM: Avoid marking pages as XN in Stage-2 if CTR_EL0.DIC is set
-  KVM: arm/arm64: Consolidate page-table accessors
-  KVM: arm/arm64: Stop using {pmd,pud,pgd}_populate
-  KVM: arm/arm64: Remove unnecessary CMOs when creating HYP page tables
-
- arch/arm/include/asm/kvm_mmu.h        | 14 ++-------
- arch/arm64/include/asm/cpucaps.h      |  3 +-
- arch/arm64/include/asm/kvm_arm.h      |  1 +
- arch/arm64/include/asm/kvm_emulate.h  |  2 ++
- arch/arm64/include/asm/kvm_mmu.h      | 34 +++++++++++++++-----
- arch/arm64/include/asm/memory.h       |  7 +++++
- arch/arm64/include/asm/pgtable-prot.h | 24 ++++++++++++--
- arch/arm64/include/asm/sysreg.h       |  1 +
- arch/arm64/kernel/cpufeature.c        | 20 ++++++++++++
- arch/arm64/kvm/sys_regs.c             | 11 ++++++-
- virt/kvm/arm/mmu.c                    | 45 ++++++++++++++++++++++-----
- 11 files changed, 131 insertions(+), 31 deletions(-)
-
--- 
-2.17.1
+Will
