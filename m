@@ -1,80 +1,37 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Wed, 27 Jun 2018 20:04:19 +0300
-Subject: [PATCH v4 6/7] Bluetooth: mediatek: Add protocol support for
- MediaTek serial devices
-In-Reply-To: <CAHp75VehTeyyzR4bPKK3hFDTVqZnhdNy5vcBFJCSH_Zrx+QrKA@mail.gmail.com>
-References: <cover.1530004712.git.sean.wang@mediatek.com>
- <48215a1276c36af7ad581c3d83759fe9f55e3c4b.1530004712.git.sean.wang@mediatek.com>
- <CAHp75VehTeyyzR4bPKK3hFDTVqZnhdNy5vcBFJCSH_Zrx+QrKA@mail.gmail.com>
-Message-ID: <CAHp75VedHLw52J_ymh3iYf2w=r8d+Kqg=fJZmBGnaCrEbNEPdQ@mail.gmail.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Wed, 27 Jun 2018 19:04:03 +0200
+Subject: [PATCH] ARM: dts: sun8i: a83t: Add CPU regulator supplies for
+ A83T boards
+In-Reply-To: <20180627022709.27434-1-wens@csie.org>
+References: <20180627022709.27434-1-wens@csie.org>
+Message-ID: <20180627170403.y7ptuiyrhklh7foj@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 27, 2018 at 7:59 PM, Andy Shevchenko
-<andy.shevchenko@gmail.com> wrote:
-> On Wed, Jun 27, 2018 at 8:43 AM,  <sean.wang@mediatek.com> wrote:
->> From: Sean Wang <sean.wang@mediatek.com>
->>
->
->> +config BT_HCIBTUART_MTK
->> +       tristate "MediaTek HCI UART driver"
->> +       depends on BT_HCIBTUART
->
->> +       default y
->
-> Perhaps it's an overkill for users which would like to have less
-> amount on stuff in kernel.
->
->
->> +#include <asm/unaligned.h>
->> +#include <linux/atomic.h>
->> +#include <linux/clk.h>
->> +#include <linux/firmware.h>
->> +#include <linux/module.h>
->> +#include <linux/pm_runtime.h>
->> +#include <linux/serdev.h>
+On Wed, Jun 27, 2018 at 10:27:09AM +0800, Chen-Yu Tsai wrote:
+> The OPPs for the A83T CPU cores were added in v4.17 in commit 2db639d8c166
+> ("ARM: dts: sun8i: a83t: add stable OPP tables and CPUfreq"), but board
+> level regulator supplies for the CPU clusters were only added for the
+> TBS-A711 tablet. This means the other A83T boards do not benefit from
+> voltage scaling, or worse, if the implementation does not scale the
+> frequency when the voltage is fixed, no benefit at all.
+> 
+> Add board level CPU cluster power supplies to all the A83T development
+> boards, so they can have proper dynamic CPU voltage and frequency scaling.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-Perhaps alphabetically ordered?
-
-+ blank line.
-
->
->> +#include <net/bluetooth/bluetooth.h>
->> +#include <net/bluetooth/hci_core.h>
-
->> +       /* Enable the power domain and clock the device requires. */
->> +       pm_runtime_enable(dev);
->> +       err = pm_runtime_get_sync(dev);
->> +       if (err < 0)
->> +               goto err_pm2;
-
-Should be err_pm1 here.
-Yes, that's correct.
-
->> +err_pm1:
->> +       pm_runtime_put_sync(dev);
->> +err_pm2:
->> +       pm_runtime_disable(dev);
-
->> +#define MTK_WMT_CMD_SIZE       (MTK_WMT_HDR_SIZE + MTK_STP_HDR_SIZE + \
->> +                                MTK_STP_TLR_SIZE + HCI_ACL_HDR_SIZE)
-
-It would look slightly better if you start on new line like
-#define FOO \
- (BAR + BAZ)
-
->> +struct mtk_stp_hdr {
->> +       __u8 prefix;
->> +       __u8 dlen1:4;
->> +       __u8 type:4;
-
->> +       __u8 dlen2:8;
-
-u8 already 8 bit.
-
->> +       __u8 cs;
->> +} __packed;
+Applied, thanks!
+Maxime
 
 -- 
-With Best Regards,
-Andy Shevchenko
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180627/4a028bea/attachment.sig>
