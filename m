@@ -1,51 +1,91 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 27 Jun 2018 13:20:54 +0100
-Subject: [PATCH v3 2/6] arm64: KVM: Handle Set/Way CMOs as NOPs if FWB is
- present
+Date: Wed, 27 Jun 2018 13:20:57 +0100
+Subject: [PATCH v3 5/6] KVM: arm/arm64: Stop using {pmd,pud,pgd}_populate
 In-Reply-To: <20180627122058.8210-1-marc.zyngier@arm.com>
 References: <20180627122058.8210-1-marc.zyngier@arm.com>
-Message-ID: <20180627122058.8210-3-marc.zyngier@arm.com>
+Message-ID: <20180627122058.8210-6-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Set/Way handling is one of the ugliest corners of KVM. We shouldn't
-have to handle that, but better safe than sorry.
+The {pmd,pud,pgd}_populate accessors usage in the kernel have always
+been a bit weird in KVM. We don't have a struct mm to pass (and
+neither does the kernel most of the time, but still...), and
+the 32bit code has all kind of cache maintenance that doesn't make
+sense on ARMv7+ when MP extensions are mandatory (which is the
+case when the VEs are present).
 
-Thankfully, FWB fixes this for us by not requiering any maintenance
-(the guest is forced to use cacheable memory, no matter what it says,
-and the whole system is garanteed to be cache coherent), which means
-we don't have to emulate S/W CMOs, and don't have to track VM ops either.
+Let's bite the bullet and provide our own implementations. The
+only bit of architectural code left has to do with building the table
+entry itself (arm64 having up to 52bit PA, arm lacking PUD level).
 
-We still have to trap S/W though, if only to prevent the guest from
-doing something bad.
-
-Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Christoffer Dall <christoffer.dall@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kvm/sys_regs.c | 11 ++++++++++-
- 1 file changed, 10 insertions(+), 1 deletion(-)
+ arch/arm/include/asm/kvm_mmu.h   | 4 ++++
+ arch/arm64/include/asm/kvm_mmu.h | 7 +++++++
+ virt/kvm/arm/mmu.c               | 8 +++++---
+ 3 files changed, 16 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index a4363735d3f8..774d72155904 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -194,7 +194,16 @@ static bool access_dcsw(struct kvm_vcpu *vcpu,
- 	if (!p->is_write)
- 		return read_from_write_only(vcpu, p, r);
+diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+index b2feaea1434c..265ea9cf7df7 100644
+--- a/arch/arm/include/asm/kvm_mmu.h
++++ b/arch/arm/include/asm/kvm_mmu.h
+@@ -75,6 +75,10 @@ phys_addr_t kvm_get_idmap_vector(void);
+ int kvm_mmu_init(void);
+ void kvm_clear_hyp_idmap(void);
  
--	kvm_set_way_flush(vcpu);
-+	/*
-+	 * Only track S/W ops if we don't have FWB. It still indicates
-+	 * that the guest is a bit broken (S/W operations should only
-+	 * be done by firmware, knowing that there is only a single
-+	 * CPU left in the system, and certainly not from non-secure
-+	 * software).
-+	 */
-+	if (!cpus_have_const_cap(ARM64_HAS_STAGE2_FWB))
-+		kvm_set_way_flush(vcpu);
++#define kvm_mk_pmd(ptep)	__pmd(__pa(ptep) | PMD_TYPE_TABLE)
++#define kvm_mk_pud(pmdp)	__pud(__pa(pmdp) | PMD_TYPE_TABLE)
++#define kvm_mk_pgd(pudp)	({ BUILD_BUG(); 0; })
 +
- 	return true;
+ static inline pte_t kvm_s2pte_mkwrite(pte_t pte)
+ {
+ 	pte_val(pte) |= L_PTE_S2_RDWR;
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index 25c9a91f6a87..2f05be2bed63 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -169,6 +169,13 @@ phys_addr_t kvm_get_idmap_vector(void);
+ int kvm_mmu_init(void);
+ void kvm_clear_hyp_idmap(void);
+ 
++#define kvm_mk_pmd(ptep)					\
++	__pmd(__phys_to_pmd_val(__pa(ptep) | PMD_TYPE_TABLE))
++#define kvm_mk_pud(pmdp)					\
++	__pud(__phys_to_pud_val(__pa(pmdp) | PMD_TYPE_TABLE))
++#define kvm_mk_pgd(pudp)					\
++	__pgd(__phys_to_pgd_val(__pa(pudp) | PUD_TYPE_TABLE))
++
+ static inline pte_t kvm_s2pte_mkwrite(pte_t pte)
+ {
+ 	pte_val(pte) |= PTE_S2_RDWR;
+diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+index 87d5c91b9b6a..eade30caaa3c 100644
+--- a/virt/kvm/arm/mmu.c
++++ b/virt/kvm/arm/mmu.c
+@@ -191,17 +191,19 @@ static inline void kvm_set_pmd(pmd_t *pmdp, pmd_t new_pmd)
+ 
+ static inline void kvm_pmd_populate(pmd_t *pmdp, pte_t *ptep)
+ {
+-	pmd_populate_kernel(NULL, pmdp, ptep);
++	kvm_set_pmd(pmdp, kvm_mk_pmd(ptep));
  }
  
+ static inline void kvm_pud_populate(pud_t *pudp, pmd_t *pmdp)
+ {
+-	pud_populate(NULL, pudp, pmdp);
++	WRITE_ONCE(*pudp, kvm_mk_pud(pmdp));
++	dsb(ishst);
+ }
+ 
+ static inline void kvm_pgd_populate(pgd_t *pgdp, pud_t *pudp)
+ {
+-	pgd_populate(NULL, pgdp, pudp);
++	WRITE_ONCE(*pgdp, kvm_mk_pgd(pudp));
++	dsb(ishst);
+ }
+ 
+ /*
 -- 
 2.17.1
