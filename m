@@ -1,45 +1,48 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Thu, 28 Jun 2018 04:21:30 +0800
-Subject: [PATCH v2 0/7] Allwinner A64 DE2 CCU support with dedicated DE2
- bus driver
-In-Reply-To: <20180627183721.jmmsmp3u3mq4drvb@flea>
-References: <20180622122615.55836-1-icenowy@aosc.io>
- <20180627183721.jmmsmp3u3mq4drvb@flea>
-Message-ID: <EB513C5E-4BBD-46B2-9B61-18ED0B14C0E4@aosc.io>
+From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
+Date: Wed, 27 Jun 2018 22:25:37 +0200
+Subject: [PATCH v3 00/24] Add support for R40 HDMI pipeline
+In-Reply-To: <20180627195043.hfasvppfm2cbudx7@flea>
+References: <20180625120304.7543-1-jernej.skrabec@siol.net>
+ <20180627180215.y5kvvdqeriadxwte@flea> <20180627195043.hfasvppfm2cbudx7@flea>
+Message-ID: <4275695.oLYl8XEDF6@jernej-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Dne sreda, 27. junij 2018 ob 21:50:43 CEST je Maxime Ripard napisal(a):
+> 1;5202;0c
+> 
+> On Wed, Jun 27, 2018 at 08:02:15PM +0200, Maxime Ripard wrote:
+> > On Mon, Jun 25, 2018 at 02:02:40PM +0200, Jernej Skrabec wrote:
+> > > This series adds support for R40 HDMI pipeline. It is a bit special
+> > > than other already supported pipelines because it has additional unit
+> > > called TCON TOP responsible for relationship configuration between
+> > > mixers, TCONs and HDMI. Additionally, it has additional gates for DSI
+> > > and TV TCONs, TV encoder clock settings and pin muxing between LCD
+> > > and TV encoders.
+> > > 
+> > > However, it seems that TCON TOP will become a norm, since newer
+> > > Allwinner SoCs like H6 also have this unit.
+> > > 
+> > > I tested different possible configurations:
+> > > - mixer0 <> TCON-TV0 <> HDMI
+> > > - mixer0 <> TCON-TV1 <> HDMI
+> > > - mixer1 <> TCON-TV0 <> HDMI
+> > > - mixer1 <> TCON-TV1 <> HDMI
+> > > 
+> > > Please review.
+> > 
+> > I just applied it. It didn't apply cleanly, so please make sure it
+> > does next time, or at least state what the dependencies are.
+> 
+> And it didn't compile either, because of the compile error that was
+> reported to the previous version by kbuild... Those shouldn't be
+> ignored and simply fixed.
 
+Sorry about that. I forgot to rebase and had same linux-next base for all 3 
+versions.
 
-? 2018?6?28? GMT+08:00 ??2:37:21, Maxime Ripard <maxime.ripard@bootlin.com> ??:
->On Fri, Jun 22, 2018 at 08:26:08PM +0800, Icenowy Zheng wrote:
->> This patchset tries to implement the Allwinner A64 DE2 as a bus
->driver,
->> in order to model the fact that the SRAM claim controls the access to
->> the whole DE2 memory space.
->> 
->> PATCH 1 and PATCH 4 are for the CCU part.
->> 
->> PATCH 2 is the device tree binding for the A64 DE2 bus, and PATCH 3
->> implements the bus driver.
->> 
->> PATCH 5 adds the DE2 CCU device tree node, with the DE2 bus node.
->> 
->> PATCH 6 and 7 are HDMI simplefb patches for A64. They're present as a
->> test to this patchset.
->
->Applied all the patches with the minor modifications Chen-Yu and I
->suggested.
->
->The threading was broken on your serie though, so you probably want to
->check your git configuration.
+I actually take a look at that kbuild message, but it just didn't make much 
+sense and it worked for me without issues. Merge conflicts would explain that.
 
-In fact I think I should check my ISP configuration.
-
-The breakage is introduced due to too long delay between aosc.io
-mail server and my computer, so I must start to send the
-remaining patches again.
-
->
->Thanks!
->Maxime
+Best regards,
+Jernej
