@@ -1,69 +1,46 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Thu, 28 Jun 2018 07:48:36 +0800
-Subject: [RFC PATCH v2 1/6] serial: uartps: Do not initialize field to
- zero again
-In-Reply-To: <05e553c2-202b-0b4b-8b88-60e330c80fa3@xilinx.com>
-References: <cover.1528288895.git.michal.simek@xilinx.com>
- <e8b0169887855a5ef2c1a0456842f650601b451c.1528288895.git.michal.simek@xilinx.com>
- <e7b01bd9-5763-75c0-1384-2536313f5854@monstr.eu>
- <20180627100917.GA20940@kroah.com>
- <05e553c2-202b-0b4b-8b88-60e330c80fa3@xilinx.com>
-Message-ID: <20180627234836.GA1691@kroah.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Wed, 27 Jun 2018 16:55:30 -0700
+Subject: [GIT PULL] Amlogic fixes for v4.18-rc
+Message-ID: <7hk1qjhjil.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 27, 2018 at 04:19:46PM +0200, Michal Simek wrote:
-> On 27.6.2018 12:09, Greg Kroah-Hartman wrote:
-> > On Tue, Jun 19, 2018 at 10:09:05AM +0200, Michal Simek wrote:
-> >> On 6.6.2018 14:41, Michal Simek wrote:
-> >>> Writing zero and NULLs to already initialized fields is not needed.
-> >>> Remove this additional writes.
-> >>>
-> >>> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
-> >>> ---
-> >>>
-> >>> Changes in v2:
-> >>> - new patch - it can be sent separately too
-> >>>
-> >>>  drivers/tty/serial/xilinx_uartps.c | 3 ---
-> >>>  1 file changed, 3 deletions(-)
-> >>>
-> >>> diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
-> >>> index 8a3e34234e98..5f116f3ecd4a 100644
-> >>> --- a/drivers/tty/serial/xilinx_uartps.c
-> >>> +++ b/drivers/tty/serial/xilinx_uartps.c
-> >>> @@ -1510,15 +1510,12 @@ static int cdns_uart_probe(struct platform_device *pdev)
-> >>>  
-> >>>  	/* At this point, we've got an empty uart_port struct, initialize it */
-> >>>  	spin_lock_init(&port->lock);
-> >>> -	port->membase	= NULL;
-> >>> -	port->irq	= 0;
-> >>>  	port->type	= PORT_UNKNOWN;
-> >>>  	port->iotype	= UPIO_MEM32;
-> >>>  	port->flags	= UPF_BOOT_AUTOCONF;
-> >>>  	port->ops	= &cdns_uart_ops;
-> >>>  	port->fifosize	= CDNS_UART_FIFO_SIZE;
-> >>>  	port->line	= id;
-> >>> -	port->dev	= NULL;
-> >>>  
-> >>>  	/*
-> >>>  	 * Register the port.
-> >>>
-> >>
-> >> Alan, Rob, Greg: Any comment about this RFC?
-> > 
-> > I rarely review RFC patchesets as obviously you don't think it is good
-> > enough to be submitted "for real" :)
-> 
-> There is one missing minor part but I want to review concept first
-> because I didn't find any driver which is using this style.
-> 
-> > If you think this is all good, great, please resend it without the RFC
-> > and it will end up in my queue.
-> 
-> I will definitely do it but please look at the concept itself because I
-> would like to use this with at least 3 other drivers.
+The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
 
-I don't have the time right now to review "concepts", sorry.
+  Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
 
-greg k-h
+are available in the git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-fixes
+
+for you to fetch changes up to 1c38f4afd5d40234b67635b3c608a4093be04b96:
+
+  ARM64: dts: meson-gxl: fix Mali GPU compatible string (2018-06-27 16:48:25 -0700)
+
+----------------------------------------------------------------
+Amlogic fixes for v4.18-rc
+- minor 64-bit DT fixes
+
+----------------------------------------------------------------
+Jerome Brunet (2):
+      ARM64: dts: meson: disable sd-uhs modes on the libretech-cc
+      ARM64: dts: meson-axg: fix ethernet stability issue
+
+Kevin Hilman (2):
+      ARM64: dts: meson: fix register ranges for SD/eMMC
+      ARM64: dts: meson-gx: fix ATF reserved memory region
+
+Martin Blumenstingl (1):
+      ARM64: dts: meson-gxl: fix Mali GPU compatible string
+
+Neil Armstrong (1):
+      ARM64: dts: meson-gxl-s905x-p212: Add phy-supply for usb0
+
+ arch/arm64/boot/dts/amlogic/meson-axg-s400.dts               | 15 ++++++++++++++-
+ arch/arm64/boot/dts/amlogic/meson-axg.dtsi                   |  4 ++--
+ arch/arm64/boot/dts/amlogic/meson-gx.dtsi                    | 12 +++++++++---
+ arch/arm64/boot/dts/amlogic/meson-gxl-mali.dtsi              |  2 +-
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts |  3 ---
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dtsi        |  7 +++++++
+ arch/arm64/boot/dts/amlogic/meson-gxl.dtsi                   |  8 --------
+ 7 files changed, 33 insertions(+), 18 deletions(-)
