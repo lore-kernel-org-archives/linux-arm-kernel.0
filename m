@@ -1,33 +1,49 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 27 Jun 2018 15:53:45 +0100
-Subject: [PATCH v3 4/6] KVM: arm/arm64: Consolidate page-table accessors
-In-Reply-To: <0afbb729-d801-1563-a319-4d3e3d6ac6a9@arm.com>
-References: <20180627122058.8210-1-marc.zyngier@arm.com>
- <20180627122058.8210-5-marc.zyngier@arm.com>
- <0afbb729-d801-1563-a319-4d3e3d6ac6a9@arm.com>
-Message-ID: <38b5b90d-131f-ebd2-7a0f-491b92cf9f38@arm.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Wed, 27 Jun 2018 15:57:13 +0100
+Subject: [PATCH 1/4] dt-bindings: power: Add Actions Semi S900 SPS
+In-Reply-To: <20180626164117.GA5241@Mani-XPS-13-9360>
+References: <20180411164036.8046-1-manivannan.sadhasivam@linaro.org>
+ <20180411164036.8046-2-manivannan.sadhasivam@linaro.org>
+ <a261bae6-d2fa-a550-7232-7647ce0ac0e2@suse.de>
+ <20180626164117.GA5241@Mani-XPS-13-9360>
+Message-ID: <20180627145713.uao2gr5kknk2cypk@holly.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/06/18 14:59, Suzuki K Poulose wrote:
-> Marc,
+On Tue, Jun 26, 2018 at 10:11:17PM +0530, Manivannan Sadhasivam wrote:
+> > > diff --git a/include/dt-bindings/power/owl-s900-powergate.h b/include/dt-bindings/power/owl-s900-powergate.h
+> > > new file mode 100644
+> > > index 000000000000..f1aaf761112b
+> > > --- /dev/null
+> > > +++ b/include/dt-bindings/power/owl-s900-powergate.h
+> > > @@ -0,0 +1,23 @@
+> > > +// SPDX-License-Identifier: GPL-2.0+
+> > 
+> > checkpatch.pl warns about this line due to not using /* ... */ syntax
+> > for headers. I could fix that up on my own, but it made me realize that
+> > you are licensing this file under GPL-2.0+ only, whereas the .dts[i] is
+> > supposed to be dual-licensed.
+> > 
+> > Can you please give your consent to make this
+> > 
+> > /* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
+> > 
 > 
-> On 27/06/18 13:20, Marc Zyngier wrote:
->> The arm and arm64 KVM page tables accessors are pointlessly different
->> between the two architectures, and likely both wrong one way or another:
->> arm64 lacks a dsb(), and arm doesn't use WRITE_ONCE.
->>
->> Let's unify them.
+> You can change the license to GPL-2.0+ OR MIT.
 > 
-> nit: Feel free to ignore. The changes introducing kvm_p.d_populate
-> is not mentioned in the commit description and they do look a bit
-> disconnected from the change described above.
+> > like my S500 and S700 bindings?
+> > 
+> > Question: Should it still be GPL-2.0+ or the new GPL-2.0-or-later?
+> >
+> 
+> I think GPL-2.0+ is fine.
 
-That's a good point. I've moved those into patch #5, where they make
-much more sense.
+So... when I saw this I did wonder why one would knowly choose to use a
+deprecated license identifier (https://spdx.org/licenses/ ).
 
-Thanks,
+However running `git diff v4.17..v4.18-rc1` through some filters does
+indicate that GPL-2.0+ is the more popular choice by 256 to 0! Doesn't
+mean you couldn't break the mould though ;-).
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+
+Daniel.
