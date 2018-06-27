@@ -1,66 +1,66 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 27 Jun 2018 08:16:16 +0800
-Subject: [PATCH v2 1/2] clk: pxa: export 32kHz PLL
-In-Reply-To: <20180626200308.16192-1-robert.jarzmik@free.fr>
-References: <20180626200308.16192-1-robert.jarzmik@free.fr>
-Message-ID: <201806270855.xvEN3vnK%fengguang.wu@intel.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 26 Jun 2018 21:34:22 -0300
+Subject: [PATCH v2] ARM: dts: imx53-qsb: Let the codec control MCLK pinctrl
+Message-ID: <1530059662-20589-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robert,
+From: Fabio Estevam <fabio.estevam@nxp.com>
 
-I love your patch! Yet something to improve:
+The hog pinctrl hog is meant for pins that do not have an
+associated driver.
 
-[auto build test ERROR on clk/clk-next]
-[also build test ERROR on v4.18-rc2 next-20180626]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+The MX53_PAD_GPIO_0__CCM_SSI_EXT1_CLK pin is the one that
+provides the MCLK signal to the SGTL5000 codec, so a
+better represenation is to move it under the codec node.
 
-url:    https://github.com/0day-ci/linux/commits/Robert-Jarzmik/clk-pxa-export-32kHz-PLL/20180627-040726
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-next
-config: arm-xcep_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        GCC_VERSION=7.2.0 make.cross ARCH=arm 
+While at it, change the pinctrl value from 0x80000000 to the
+POR reset value of register IOMUXC_SW_PAD_CTL_PAD_GPIO_0.
 
-All errors (new ones prefixed by >>):
-
-   drivers/clk/pxa/clk-pxa25x.c: In function 'pxa25x_register_plls':
->> drivers/clk/pxa/clk-pxa25x.c:298:17: error: expected ')' before ';' token
-              32768);
-                    ^
->> drivers/clk/pxa/clk-pxa25x.c:304:1: error: expected ';' before '}' token
-    }
-    ^
-
-vim +298 drivers/clk/pxa/clk-pxa25x.c
-
-   290	
-   291	static void __init pxa25x_register_plls(void)
-   292	{
-   293		clk_register_fixed_rate(NULL, "osc_3_6864mhz", NULL,
-   294					CLK_GET_RATE_NOCACHE, 3686400);
-   295		clkdev_pxa_register(CLK_OSC32k768, "osc_32_768khz", NULL,
-   296				    clk_register_fixed_rate(NULL, "osc_32_768khz", NULL,
-   297							    CLK_GET_RATE_NOCACHE,
- > 298							    32768);
-   299		clk_register_fixed_rate(NULL, "clk_dummy", NULL, 0, 0);
-   300		clk_register_fixed_factor(NULL, "ppll_95_85mhz", "osc_3_6864mhz",
-   301					  0, 26, 1);
-   302		clk_register_fixed_factor(NULL, "ppll_147_46mhz", "osc_3_6864mhz",
-   303					  0, 40, 1);
- > 304	}
-   305	
-
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 12833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180627/e0d4c48a/attachment-0001.gz>
+Change since v1:
+- Since the root cause of the pinctrl failure has been
+fixed by commit bc3322bc166a ("pinctrl: devicetree: Fix pctldev pointer
+overwrite") in 4.18-rc2 changed the commit log to inform that this is
+a cleanup rather than a bug fix.
+
+ arch/arm/boot/dts/imx53-qsb-common.dtsi | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/imx53-qsb-common.dtsi b/arch/arm/boot/dts/imx53-qsb-common.dtsi
+index ef7658a..7423d46 100644
+--- a/arch/arm/boot/dts/imx53-qsb-common.dtsi
++++ b/arch/arm/boot/dts/imx53-qsb-common.dtsi
+@@ -153,7 +153,6 @@
+ 	imx53-qsb {
+ 		pinctrl_hog: hoggrp {
+ 			fsl,pins = <
+-				MX53_PAD_GPIO_0__CCM_SSI_EXT1_CLK 0x80000000
+ 				MX53_PAD_GPIO_8__GPIO1_8          0x80000000
+ 				MX53_PAD_PATA_DATA14__GPIO2_14    0x80000000
+ 				MX53_PAD_PATA_DATA15__GPIO2_15    0x80000000
+@@ -180,6 +179,12 @@
+ 			>;
+ 		};
+ 
++		pinctrl_codec: codecgrp {
++			fsl,pins = <
++				MX53_PAD_GPIO_0__CCM_SSI_EXT1_CLK	0x1c4
++			>;
++		};
++
+ 		pinctrl_esdhc1: esdhc1grp {
+ 			fsl,pins = <
+ 				MX53_PAD_SD1_DATA0__ESDHC1_DAT0		0x1d5
+@@ -310,6 +315,8 @@
+ 	sgtl5000: codec@a {
+ 		compatible = "fsl,sgtl5000";
+ 		reg = <0x0a>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_codec>;
+ 		#sound-dai-cells = <0>;
+ 		VDDA-supply = <&reg_3p2v>;
+ 		VDDIO-supply = <&reg_3p2v>;
+-- 
+2.7.4
