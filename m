@@ -1,20 +1,15 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 26 Jun 2018 22:19:56 -0300
-Subject: [PATCH V2] ARM: dts: imx6sll-evk: make pfuze100 sw4 always on
-In-Reply-To: <1529974900-28865-1-git-send-email-Anson.Huang@nxp.com>
-References: <1529974900-28865-1-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <CAOMZO5CfmYvE0hLfeni6wQfE6j7C2qa9teQbo3zOWCnq33zhBw@mail.gmail.com>
+Date: Tue, 26 Jun 2018 22:20:48 -0300
+Subject: [PATCH] ARM: dts: make pfuze switch always-on for imx platforms
+In-Reply-To: <1529993283-32396-1-git-send-email-Anson.Huang@nxp.com>
+References: <1529993283-32396-1-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <CAOMZO5C--fpkRLfwmySFJeO2hwPdz3paxW1WMiqcqraqmbL9Mg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Anson,
-
-On Mon, Jun 25, 2018 at 10:01 PM, Anson Huang <Anson.Huang@nxp.com> wrote:
-> On i.MX6SLL EVK board, PFuze100's SW4 is supplying
-> LPDDR3, it needs to be always on. This patch fixes
-> Linux kernel boot up hang caused by commit
-> (5fe156f regulator: pfuze100: add enable/disable for switch),
-> because SW4 is turned off unexpectedly:
+On Tue, Jun 26, 2018 at 3:08 AM, Anson Huang <Anson.Huang@nxp.com> wrote:
+> commit (5fe156f regulator: pfuze100: add enable/disable
+> for switch) will cause those unreferenced switches being
 
 Nit: The proper way to reference a commit is:
 
@@ -22,15 +17,13 @@ commit 5fe156f1cab4 ("regulator: pfuze100: add enable/disable for switch")
 
 12 char for the commit ID and the commit name inside (" ").
 
-> [    1.693613] cfg80211: failed to load regulatory.db
-> [    1.700063] SW4: disabling
-> [    1.703973] SWBST: disabling
-
-Probably worth adding the Fixes tag so that it can fix the boot
-regression in 4.18-rc:
-
-Fixes: 5fe156f1cab4 ("regulator: pfuze100: add enable/disable for switch")
-
+> turned off if "regulator-always-on" is NOT present, as
+> pfuze switches are normally used by critical modules which
+> must be always ON or shared by many peripherals which
+> do NOT implement power domain control, so just make sure
+> all switches always ON to avoid any system issue caused
+> by unexpectedly turning off switches.
+>
 > Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
 
 Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
