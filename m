@@ -1,107 +1,53 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 27 Jun 2018 10:33:05 +0100
-Subject: [PATCH v2 0/7] arm64: numa/topology/smp: update the cpumasks for
- CPU hotplug
-In-Reply-To: <1fff22a2-0421-c102-172a-508d1ca8f2b0@huawei.com>
-References: <1529327923-17911-1-git-send-email-sudeep.holla@arm.com>
- <d6812552-f27c-83d8-900d-5849e5c6d141@huawei.com>
- <b40f9a03-e416-f4e6-707b-257f4d29d893@arm.com>
- <1fff22a2-0421-c102-172a-508d1ca8f2b0@huawei.com>
-Message-ID: <0fa16210-ef31-07d9-897a-fb91276164b6@arm.com>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Wed, 27 Jun 2018 11:40:42 +0200
+Subject: [PATCH 00/14] ARM: davinci: step towards removing
+ at24_platform_data
+In-Reply-To: <CAMRc=McCk6fz5x5vJmjYkYx-i6XfGPAZPm9ctg2fuCCfkvKpLQ@mail.gmail.com>
+References: <20180625155025.12567-1-brgl@bgdev.pl>
+ <20180625174024.GB17417@lunn.ch>
+ <CAMRc=MdEn74G5SJAaGLAfNSS7Zy7wqH04aN5CMZ45UXqhu_58g@mail.gmail.com>
+ <20180625180237.GC17417@lunn.ch>
+ <CAMRc=MejDn=t6EPbKOfhMfRAb_O-5hxtWRyjAWH1mb5BUySrDA@mail.gmail.com>
+ <20180626083823.GA28068@lunn.ch>
+ <CAMRc=Mdvh+1enpD3qDoamhPfaBPin2v3amneQELApgoC0bS2FQ@mail.gmail.com>
+ <20180626132154.GA5064@lunn.ch>
+ <CAMRc=McCk6fz5x5vJmjYkYx-i6XfGPAZPm9ctg2fuCCfkvKpLQ@mail.gmail.com>
+Message-ID: <CAMRc=MfWDiUsqpA0RcjYQ0QyfyfYBzSBUD45-rXbxebO-SV6GQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hanjun,
+2018-06-26 15:38 GMT+02:00 Bartosz Golaszewski <brgl@bgdev.pl>:
+> 2018-06-26 15:21 GMT+02:00 Andrew Lunn <andrew@lunn.ch>:
+>>> I see. I see it this way: the setup callback comes from the time when
+>>> we didn't have nvmem and should go away. I will protest loud whenever
+>>> someone will try to use it again and will work towards removing it as
+>>> soon as possible.
+>>
+>> The setup() callback could be moved into the nvmem framework, rather
+>> than in the at24 driver. Make the call when the cells have been
+>> connected to the backing store.
+>>
+>
+> This would at least make it more generic. And maybe I could also get
+> rid of the setup callback from the mityomapl138 board file.
+>
+> Bart
+>
+>>> I will give your problem a thought and will try to get back with some
+>>> proposals - maybe we should, as you suggested, extend nvmem even
+>>> further to allow to remove nvmem info entries etc.
+>>
+>> That does not help me too much. I have the same problem with i2c and
+>> MDIO. So i actually prefer to keep this the same as all others.
+>>
+>>         Andrew
 
-On 27/06/18 04:51, Hanjun Guo wrote:
-> On 2018/6/26 17:23, Sudeep Holla wrote:
-> [...]
->>> Core(s) per socket:    15      //it's 15 now...
->>
->> I know exactly what's the problem. And I think that's exactly the
->> behavior on my x86 box too. Further you might see another issue
->> as most of these applications like lstopo and lscpu parse only CPU0
->> sysfs, things fall apart if CPU0 is hotplugged out which is not allowed
->> on most of x86 boxes I have tried.
->>
->> So, for me, that's issue with the application TBH.
->>
->> [..]
->>
->>> Offlined 16 cores on NUMA node 0, everything backs to normal:
->>
->> Expected :)
->>
->>> but when onlined CPU15 after,
->>> Architecture:          aarch64
->>> Byte Order:            Little Endian
->>> CPU(s):                64
->>> On-line CPU(s) list:   15-63
->>> Off-line CPU(s) list:  0-14
->>> Thread(s) per core:    1
->>> Core(s) per socket:    12     // it's 12, hmm...
->>
->> I had to looks at the lscpu code and I think that explains why you can
->> get 12 here. We have
->> 	add_summary_n(tb, _("Core(s) per socket:"),
->> 		cores_per_socket ?: desc->ncores / desc->nsockets);
->>
->> Now cores_per_socket because we don't have procfs entry, so ncores=49
->> and nsockets=4, which means you get 12. TBH lscpu should be used only
->> when all CPUs are online. Lots of inaccurate assumptions in it.
->>
->>>
->>> I think maybe the cpumask for the socket is changed in a
->>> wrong way when online/offline CPUs, didn't take a deep look into
->>> that, hope the test helps.
->>>
->>
->> I am not convinced if there's any issue unless you see discrepancy in
->> sysfs entries themselves and not though applications interpreting the
->> values for you based on some wrong assumptions.
-> 
-> Thanks for the clarify and let me know the detail, I tested 4.17 on
-> a x86 machine which CPU0 can be offlined, also with the same lscpu version,
-> I got the same on x86:
-> 
+Hi Andrew,
 
-Thanks for taking trouble and confirming this.
+MTD subsystem has the struct mtd_notifier and register_mtd_user(). I'm
+wondering if we could implement something like this as a generic nvmem
+functionality.
 
-> lscpu
-> Architecture:          x86_64
-> CPU op-mode(s):        32-bit, 64-bit
-> Byte Order:            Little Endian
-> CPU(s):                72
-> On-line CPU(s) list:   1-9,11-23,25-45,47-65,67-71
-> Off-line CPU(s) list:  0,10,24,46,66                  // offline CPUs to make no continuous 18 logical CPUs on a socket
-> Thread(s) per core:    1                              // it's 2 before CPU offlined
-> Core(s) per socket:    17                             // and not 18 which is the value before CPU offlined
-> Socket(s):             2
-> NUMA node(s):          2
-> Vendor ID:             GenuineIntel
-> CPU family:            6
-> Model:                 85
-> Model name:            Intel(R) Xeon(R) Gold 6140 CPU @ 2.30GHz
-> Stepping:              4
-> CPU MHz:               2999.755
-> CPU max MHz:           3700.0000
-> CPU min MHz:           1000.0000
-> BogoMIPS:              4600.00
-> Virtualization:        VT-x
-> L1d cache:             32K
-> L1i cache:             32K
-> L2 cache:              1024K
-> L3 cache:              25344K
-> NUMA node0 CPU(s):     1-9,11-17,36-45,47-53
-> NUMA node1 CPU(s):     18-23,25-35,54-65,67-71
-> 
-> So with this patch set:
-> 
-> Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
-> 
+What do you think?
 
-Thanks for testing.
-
--- 
-Regards,
-Sudeep
+Bart
