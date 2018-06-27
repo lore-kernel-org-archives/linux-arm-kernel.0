@@ -1,111 +1,67 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Wed, 27 Jun 2018 19:58:28 +0200
-Subject: [PATCH 7/9] media: cedrus: Move IRQ maintainance to cedrus_dec_ops
-In-Reply-To: <03f66b80b1a60c4fe62822b08eb5d97c0539aac0.camel@bootlin.com>
-References: <20180613140714.1686-1-maxime.ripard@bootlin.com>
- <20180613140714.1686-8-maxime.ripard@bootlin.com>
- <d8e471608643a014d0961c82256753e5fd0c5060.camel@bootlin.com>
- <03f66b80b1a60c4fe62822b08eb5d97c0539aac0.camel@bootlin.com>
-Message-ID: <20180627175828.hvos5hxdk2cyvare@flea>
+From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
+Date: Wed, 27 Jun 2018 11:01:53 -0700
+Subject: [PATCH] i2c: aspeed: Improve driver to support multi-master use
+ cases stably
+In-Reply-To: <60d0dad1-b735-0650-47b4-40c57b1a5209@linux.intel.com>
+References: <20180626165812.4141-1-jae.hyun.yoo@linux.intel.com>
+ <60d0dad1-b735-0650-47b4-40c57b1a5209@linux.intel.com>
+Message-ID: <c1c361de-32a7-83b6-4d48-ad0750c6218b@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 25, 2018 at 05:49:58PM +0200, Paul Kocialkowski wrote:
-> On Mon, 2018-06-25 at 17:38 +0200, Paul Kocialkowski wrote:
-> > Hi,
-> > 
-> > On Wed, 2018-06-13 at 16:07 +0200, Maxime Ripard wrote:
-> > > The IRQ handler up until now was hardcoding the use of the MPEG engine to
-> > > read the interrupt status, clear it and disable the interrupts.
-> > > 
-> > > Obviously, that won't work really well with the introduction of new codecs
-> > > that use a separate engine with a separate register set.
-> > > 
-> > > In order to make this more future proof, introduce new decodec operations
-> > > to deal with the interrupt management. The only one missing is the one to
-> > > enable the interrupts in the first place, but that's taken care of by the
-> > > trigger hook for now.
-> > 
-> > Here's another comment about an issue I just figured out.
-> > 
-> > > Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
-> > > ---
-> > >  .../sunxi/cedrus/sunxi_cedrus_common.h        |  9 +++++
-> > >  .../platform/sunxi/cedrus/sunxi_cedrus_hw.c   | 21 ++++++------
-> > >  .../sunxi/cedrus/sunxi_cedrus_mpeg2.c         | 33 +++++++++++++++++++
-> > >  3 files changed, 53 insertions(+), 10 deletions(-)
-> > > 
-> > > diff --git a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h
-> > > index c2e2c92d103b..a2a507eb9fc9 100644
-> > > --- a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h
-> > > +++ b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h
-> > > @@ -108,7 +108,16 @@ struct sunxi_cedrus_buffer *vb2_to_cedrus_buffer(const struct vb2_buffer *p)
-> > >  	return vb2_v4l2_to_cedrus_buffer(to_vb2_v4l2_buffer(p));
-> > >  }
-> > >  
-> > > +enum sunxi_cedrus_irq_status {
-> > > +	SUNXI_CEDRUS_IRQ_NONE,
-> > > +	SUNXI_CEDRUS_IRQ_ERROR,
-> > > +	SUNXI_CEDRUS_IRQ_OK,
-> > > +};
-> > > +
-> > >  struct sunxi_cedrus_dec_ops {
-> > > +	void (*irq_clear)(struct sunxi_cedrus_ctx *ctx);
-> > > +	void (*irq_disable)(struct sunxi_cedrus_ctx *ctx);
-> > > +	enum sunxi_cedrus_irq_status (*irq_status)(struct sunxi_cedrus_ctx *ctx);
-> > >  	void (*setup)(struct sunxi_cedrus_ctx *ctx,
-> > >  		      struct sunxi_cedrus_run *run);
-> > >  	void (*trigger)(struct sunxi_cedrus_ctx *ctx);
-> > > diff --git a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_hw.c b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_hw.c
-> > > index bb46a01214e0..6b97cbd2834e 100644
-> > > --- a/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_hw.c
-> > > +++ b/drivers/media/platform/sunxi/cedrus/sunxi_cedrus_hw.c
-> > > @@ -77,27 +77,28 @@ static irqreturn_t sunxi_cedrus_ve_irq(int irq, void *dev_id)
-> > >  	struct sunxi_cedrus_ctx *ctx;
-> > >  	struct sunxi_cedrus_buffer *src_buffer, *dst_buffer;
-> > >  	struct vb2_v4l2_buffer *src_vb, *dst_vb;
-> > > +	enum sunxi_cedrus_irq_status status;
-> > >  	unsigned long flags;
-> > > -	unsigned int value, status;
-> > >  
-> > >  	spin_lock_irqsave(&dev->irq_lock, flags);
-> > >  
-> > > -	/* Disable MPEG interrupts and stop the MPEG engine */
-> > > -	value = sunxi_cedrus_read(dev, VE_MPEG_CTRL);
-> > > -	sunxi_cedrus_write(dev, value & (~0xf), VE_MPEG_CTRL);
-> > > -
-> > > -	status = sunxi_cedrus_read(dev, VE_MPEG_STATUS);
-> > > -	sunxi_cedrus_write(dev, 0x0000c00f, VE_MPEG_STATUS);
-> > > -	sunxi_cedrus_engine_disable(dev);
-> > 
-> > This call was dropped from the code reorganization. What it intentional?
-> > 
-> > IMO, it should be brought back to the irq_disable ops for MPEG2 (and the
-> > same probably applies to H264).
+Hi Jarkko,
+
+Thanks for the review. Please see my answer below.
+
+On 6/27/2018 12:48 AM, Jarkko Nikula wrote:
+> Hi
 > 
-> Actually, this doesn't seem like the right place to put it.
+> On 06/26/2018 07:58 PM, Jae Hyun Yoo wrote:
+>> BMC firmware should support some multi-master use cases such as 
+>> multi-node,
+>> IPMB, BMC-ME link and so on but the current ASPEED I2C driver is a bit
+>> unstable for the multi-master use case. So this patch improves ASPEED I2C
+>> driver to support the multi-master use case stably.
+>>
+>> Changes:
+>> * Added XFER_MODE status register checking logic into
+>> ?? aspeed_i2c_master_xfer to improve the current bus busy checking logic.
+>> * Changed the order of enum aspeed_i2c_master_state and
+>> ?? enum aspeed_i2c_slave_state defines to make their initial values 
+>> set to
+>> ?? ASPEED_I2C_MASTER_INACTIVE and ASPEED_I2C_SLAVE_STOP respectively.
+>> ?? In case of multi-master use with previous code, if a slave data comes
+>> ?? ahead of the first master xfer, master_state starts from an invalid
+>> ?? state. This change fixed the issue.
+>> * Adjusted spin_lock scope to make it wrap the whole irq handler using
+>> ?? a single lock and unlock pair covers both master and slave handlers.
+>> * Added irq_status variable as a member of the struct aspeed_i2c_bus to
+>> ?? collect handled interrupt bits throughout the master and the slave irq
+>> ?? handlers.
+>> * Added control logic to put an order on calling the master and the slave
+>> ?? irq handlers based on their current states.
+>>
+> This does many unrelated looking changes in one patch making it more 
+> vulnerable for potential multiple regressions. For instance busy 
+> checking goes from single read to loop with 250 ms timeout in this patch 
+> while changing also spin lock logic and interrupt handling.
 > 
-> Looking at the sunxi_engine_enable function, explicitly passing the
-> codec as an argument and calling that function from each codec's code
-> feels strange.
+> Now if there is some regression it might be difficult to find what 
+> change in this patch is causing it and more over things goes more 
+> complicated if some other kind of regressions are found pointing into 
+> the same commit.
+> 
+> I suggest splitting this into multiple smaller patches. For instance 
+> having first simple conversions patches that are unlikely to cause a 
+> regression like one patch adding '\n' to error print, another moving 
+> irq_status variable into struct aspeed_i2c_bus and so on followed by 
+> patches that change logic like busy checking, spin lock change and then 
+> patch or more for multi-master support.
+> 
 
-This isn't what this code is doing. You have three engines, each of
-them implementing a different set of codec. The JPEG engine implements
-MPEG1, MPEG2 and MPEG4, the H264 engine H264 and VP8, and the H265
-H265 and VP9.
+Yes, that makes sense and I agree with you. I'll split out this patch
+into multiple smaller patches as you suggested.
 
-So there is no direct match between a codec and an engine.
+Thanks,
 
-Maxime
-
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180627/d175bf3b/attachment.sig>
+Jae
