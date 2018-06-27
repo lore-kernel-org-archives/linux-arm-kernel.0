@@ -1,56 +1,37 @@
 From: pawel.mikolaj.chmiel@gmail.com (=?UTF-8?q?Pawe=C5=82=20Chmiel?=)
-Date: Wed, 27 Jun 2018 19:12:14 +0200
-Subject: [PATCH v2 00/10] Initial support for Samsung Galaxy S and Galaxy S 4G
-Message-ID: <1530119544-30023-1-git-send-email-pawel.mikolaj.chmiel@gmail.com>
+Date: Wed, 27 Jun 2018 19:12:15 +0200
+Subject: [PATCH v2 01/10] ARM: dts: s5pv210: Add missing interrupt-controller
+ property to gph2
+In-Reply-To: <1530119544-30023-1-git-send-email-pawel.mikolaj.chmiel@gmail.com>
+References: <1530119544-30023-1-git-send-email-pawel.mikolaj.chmiel@gmail.com>
+Message-ID: <1530119544-30023-2-git-send-email-pawel.mikolaj.chmiel@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series adds support for Samsung Galaxy S and Galaxy S 4G.
-Both are commercial phone based on Aries family.
+Adds missing interrupt-controller property to gph2 block,
+to silence following warnings during build
+  /soc/pinctrl at e0200000/gph2: Missing interrupt-controller or interrupt-map property
 
-Changes from v1:
-  - Removed duplicated and unneeded headers
-  - Corrected node names
-  - Formatting fixes
-  - Removed unneeded pinctrl and sorted entries
-  - Set correct interrupt type for max8998 pmic
-  - Add missing regulators
-  - Added missing commit msg
-  - Added stdout-path
-  - Added information why we hardcode bootargs
-  - Added new patch which adds information, that there are samsung boards,
-    not using exynos bases soc.
-  - Split patch updating s5pv210_defconfig into three parts.
-    First is result of make savedefconfig, second adds drivers required
-    by both devices and last adds some options, which are usefull in booting
-    typical Linux distribution.
+It's reguired by Samsung aries boards, an S5PV210 based
+Samsung Galaxy S (i9000) and Galaxy S 4G phones, which are added in next patches.
 
-Jonathan Bakker (2):
-  ARM: dts: s5pv210: Add initial DTS for SGH-T959P phone
-  dt-bindings: samsung: Document bindings for SGH-T959P board
+Signed-off-by: Pawe? Chmiel <pawel.mikolaj.chmiel@gmail.com>
+---
+ arch/arm/boot/dts/s5pv210-pinctrl.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Pawe? Chmiel (8):
-  ARM: dts: s5pv210: Add missing interrupt-controller property to gph2
-  ARM: dts: s5pv210: Add initial DTS for Samsung Aries based phones
-  ARM: dts: s5pv210: Add initial DTS for Samsung Galaxy S phone
-  dt-bindings: samsung: Add S5PV210 as possible soc in Samsung boards
-  dt-bindings: samsung: Document bindings for Samsung aries boards
-  ARM: s5pv210_defconfig: Run make savedefconfig
-  ARM: s5pv210_defconfig: Enable drivers for Samsung Aries based phones
-  ARM: s5pv210_defconfig: Enable options needed to boot typical Linux
-    distro
-
- .../bindings/arm/samsung/samsung-boards.txt        |   5 +-
- arch/arm/boot/dts/Makefile                         |   2 +
- arch/arm/boot/dts/s5pv210-aries.dtsi               | 413 +++++++++++++++++++++
- arch/arm/boot/dts/s5pv210-fascinate4g.dts          |  45 +++
- arch/arm/boot/dts/s5pv210-galaxys.dts              |  77 ++++
- arch/arm/boot/dts/s5pv210-pinctrl.dtsi             |   2 +
- arch/arm/configs/s5pv210_defconfig                 |  49 ++-
- 7 files changed, 589 insertions(+), 4 deletions(-)
- create mode 100644 arch/arm/boot/dts/s5pv210-aries.dtsi
- create mode 100644 arch/arm/boot/dts/s5pv210-fascinate4g.dts
- create mode 100644 arch/arm/boot/dts/s5pv210-galaxys.dts
-
+diff --git a/arch/arm/boot/dts/s5pv210-pinctrl.dtsi b/arch/arm/boot/dts/s5pv210-pinctrl.dtsi
+index 3a79feab11c3..7f0c9d447871 100644
+--- a/arch/arm/boot/dts/s5pv210-pinctrl.dtsi
++++ b/arch/arm/boot/dts/s5pv210-pinctrl.dtsi
+@@ -258,6 +258,8 @@
+ 	gph2: gph2 {
+ 		gpio-controller;
+ 		#gpio-cells = <2>;
++
++		interrupt-controller;
+ 		#interrupt-cells = <2>;
+ 	};
+ 
 -- 
 2.7.4
