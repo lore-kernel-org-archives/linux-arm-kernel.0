@@ -1,83 +1,77 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 27 Jun 2018 17:37:50 +0100
-Subject: [PATCH 1/1] iommu/arm-smmu: Add support to use Last level cache
-In-Reply-To: <CAFp+6iFm29ufb2Pr7Gb-2O_aN3GQLH4rcyWhbQGZ3QiwCC8vPg@mail.gmail.com>
-References: <20180615105329.26800-1-vivek.gautam@codeaurora.org>
- <20180615165232.GE2202@arm.com>
- <CAFp+6iFm29ufb2Pr7Gb-2O_aN3GQLH4rcyWhbQGZ3QiwCC8vPg@mail.gmail.com>
-Message-ID: <20180627163749.GA8729@arm.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Wed, 27 Jun 2018 19:39:06 +0300
+Subject: [PATCH 4/4] PCI: mediatek: Add loadable kernel module support
+In-Reply-To: <1530091298-28120-5-git-send-email-honghui.zhang@mediatek.com>
+References: <1530091298-28120-1-git-send-email-honghui.zhang@mediatek.com>
+ <1530091298-28120-5-git-send-email-honghui.zhang@mediatek.com>
+Message-ID: <CAHp75VdsSZifb5xZ2Q8cmJV=PgAaoN=iOhMfyVX4uE4vNpo=Mg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vivek,
+On Wed, Jun 27, 2018 at 12:21 PM,  <honghui.zhang@mediatek.com> wrote:
+> From: Honghui Zhang <honghui.zhang@mediatek.com>
+>
+> Implement remove callback function for Mediatek PCIe driver to add
+> loadable kernel module support.
 
-On Tue, Jun 19, 2018 at 02:04:44PM +0530, Vivek Gautam wrote:
-> On Fri, Jun 15, 2018 at 10:22 PM, Will Deacon <will.deacon@arm.com> wrote:
-> > On Fri, Jun 15, 2018 at 04:23:29PM +0530, Vivek Gautam wrote:
-> >> Qualcomm SoCs have an additional level of cache called as
-> >> System cache or Last level cache[1]. This cache sits right
-> >> before the DDR, and is tightly coupled with the memory
-> >> controller.
-> >> The cache is available to all the clients present in the
-> >> SoC system. The clients request their slices from this system
-> >> cache, make it active, and can then start using it. For these
-> >> clients with smmu, to start using the system cache for
-> >> dma buffers and related page tables [2], few of the memory
-> >> attributes need to be set accordingly.
-> >> This change makes the related memory Outer-Shareable, and
-> >> updates the MAIR with necessary protection.
-> >>
-> >> The MAIR attribute requirements are:
-> >>     Inner Cacheablity = 0
-> >>     Outer Cacheablity = 1, Write-Back Write Allocate
-> >>     Outer Shareablity = 1
-> >
-> > Hmm, so is this cache coherent with the CPU or not?
-> 
-> Thanks for reviewing.
-> Yes, this LLC is cache coherent with CPU, so we mark for Outer-cacheable.
-> The different masters such as GPU as able to allocated and activate a slice
-> in this Last Level Cache.
+> +static void mtk_pcie_irq_teardown(struct mtk_pcie *pcie)
+> +{
+> +       struct mtk_pcie_port *port, *tmp;
+> +
 
-What I mean is, for example, if the CPU writes some data using Normal, Inner
-Shareable, Inner/Outer Cacheable, Inner/Outer Write-back, Non-transient
-Read/Write-allocate and a device reads that data using your MAIR encoding
-above, is the device guaranteed to see the CPU writes after the CPU has
-executed a DSB instruction?
+> +       if (list_empty(&pcie->ports))
+> +               return;
 
-I don't think so, because the ARM ARM would say that there's a mismatch on
-the Inner Cacheability attribute.
+This is redundant.
 
-> > Why don't normal
-> > non-cacheable mappings allocated in the LLC by default?
-> 
-> Sorry, I couldn't fully understand your question here.
-> Few of the masters on qcom socs are not io-coherent, so for them
-> the IC has to be marked as 0.
+> +
+> +       list_for_each_entry_safe(port, tmp, &pcie->ports, list) {
+> +               irq_set_chained_handler_and_data(port->irq, NULL, NULL);
+> +
+> +               if (port->irq_domain)
+> +                       irq_domain_remove(port->irq_domain);
+> +
+> +               if (IS_ENABLED(CONFIG_PCI_MSI)) {
+> +                       if (port->msi_domain)
+> +                               irq_domain_remove(port->msi_domain);
+> +                       if (port->inner_domain)
+> +                               irq_domain_remove(port->inner_domain);
+> +               }
+> +
+> +               irq_dispose_mapping(port->irq);
+> +       }
+> +}
 
-By IC you mean Inner Cacheability? In your MAIR encoding above, it is zero
-so I don't understand the problem. What goes wrong if non-coherent devices
-use your MAIR encoding for their DMA buffers?
+> +static void mtk_pcie_free_resources(struct mtk_pcie *pcie)
+> +{
+> +       struct pci_host_bridge *host = pci_host_bridge_from_priv(pcie);
+> +       struct list_head *windows = &host->windows;
+> +
+> +       pci_unmap_iospace(&pcie->pio);
+> +       pci_free_resource_list(windows);
+> +}
+> +
+> +static int mtk_pcie_remove(struct platform_device *pdev)
+> +{
+> +       struct mtk_pcie *pcie = platform_get_drvdata(pdev);
+> +       struct pci_host_bridge *host = pci_host_bridge_from_priv(pcie);
+> +
+> +       pci_stop_root_bus(host->bus);
+> +       pci_remove_root_bus(host->bus);
+> +       mtk_pcie_free_resources(pcie);
+> +
+> +       mtk_pcie_irq_teardown(pcie);
+> +
 
-> But they are able to use the LLC with OC marked as 1.
+> +       if (!list_empty(&pcie->ports))
 
-The issue here is that whatever attributes we put in the SMMU need to align
-with the attributes used by the CPU in order to avoid introducing mismatched
-aliases. Currently, we support three types of mapping in the SMMU:
+I think this is also not needed. Do you put runtime PM by the way?
 
-1. DMA non-coherent (e.g. "dma-coherent" is not set on the device)
-	Normal, Inner Shareable, Inner/Outer Non-Cacheable
+> +               mtk_pcie_put_resources(pcie);
+> +
+> +       return 0;
+> +}
 
-2. DMA coherent (e.g. "dma-coherent" is set on the device) [IOMMU_CACHE]
-	Normal, Inner Shareable, Inner/Outer Cacheable, Inner/Outer
-	Write-back, Non-transient Read/Write-allocate
-
-3. MMIO (e.g. MSI doorbell) [IOMMU_MMIO]
-	Device-nGnRE (Outer Shareable)
-
-So either you override one of these types (I was suggesting (1)) or you need
-to create a new memory type, along with the infrastructure for it to be
-recognised on a per-device basis and used by the DMA API so that we don't
-get mismatched aliases on the CPU.
-
-Will
+-- 
+With Best Regards,
+Andy Shevchenko
