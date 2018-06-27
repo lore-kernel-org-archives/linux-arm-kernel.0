@@ -1,70 +1,29 @@
-From: ramana.radhakrishnan@arm.com (Ramana Radhakrishnan)
-Date: Wed, 27 Jun 2018 16:08:09 +0100
-Subject: [PATCH v4 0/7] arm64: untag user pointers passed to the kernel
-In-Reply-To: <CAAeHK+yqWKTdTG+ymZ2-5XKiDANV+fmUjnQkRy-5tpgphuLJRA@mail.gmail.com>
-References: <cover.1529507994.git.andreyknvl@google.com>
- <CAAeHK+zqtyGzd_CZ7qKZKU-uZjZ1Pkmod5h8zzbN0xCV26nSfg@mail.gmail.com>
- <20180626172900.ufclp2pfrhwkxjco@armageddon.cambridge.arm.com>
- <CAAeHK+yqWKTdTG+ymZ2-5XKiDANV+fmUjnQkRy-5tpgphuLJRA@mail.gmail.com>
-Message-ID: <0cef1643-a523-98e7-95e2-9ec595137642@arm.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 27 Jun 2018 17:09:37 +0200
+Subject: [PATCH] ARM: shmobile: rcar-gen2: Stop compiling headsmp-apmu on
+ !SMP
+In-Reply-To: <20180620085618.dy5vnlhxiajppryy@verge.net.au>
+References: <20180619172049.20089-1-geert+renesas@glider.be>
+ <20180620085618.dy5vnlhxiajppryy@verge.net.au>
+Message-ID: <20180627150936.xwbsppxcewg5qsow@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/06/2018 16:05, Andrey Konovalov wrote:
-> On Tue, Jun 26, 2018 at 7:29 PM, Catalin Marinas
-> <catalin.marinas@arm.com> wrote:
->> Hi Andrey,
->>
->> On Tue, Jun 26, 2018 at 02:47:50PM +0200, Andrey Konovalov wrote:
->>> On Wed, Jun 20, 2018 at 5:24 PM, Andrey Konovalov <andreyknvl@google.com> wrote:
->>>> arm64 has a feature called Top Byte Ignore, which allows to embed pointer
->>>> tags into the top byte of each pointer. Userspace programs (such as
->>>> HWASan, a memory debugging tool [1]) might use this feature and pass
->>>> tagged user pointers to the kernel through syscalls or other interfaces.
->>>>
->>>> This patch makes a few of the kernel interfaces accept tagged user
->>>> pointers. The kernel is already able to handle user faults with tagged
->>>> pointers and has the untagged_addr macro, which this patchset reuses.
->>>>
->>>> We're not trying to cover all possible ways the kernel accepts user
->>>> pointers in one patchset, so this one should be considered as a start.
->>>>
->>>> Thanks!
->>>>
->>>> [1] http://clang.llvm.org/docs/HardwareAssistedAddressSanitizerDesign.html
->>>
->>> Is there anything I should do to move forward with this?
->>>
->>> I've received zero replies to this patch set (v3 and v4) over the last
->>> month.
->>
->> The patches in this series look fine but my concern is that they are not
->> sufficient and we don't have (yet?) a way to identify where such
->> annotations are required. You even say in patch 6 that this is "some
->> initial work for supporting non-zero address tags passed to the kernel".
->> Unfortunately, merging (or relaxing) an ABI without a clear picture is
->> not really feasible.
->>
->> While I support this work, as a maintainer I'd like to understand
->> whether we'd be in a continuous chase of ABI breaks with every kernel
->> release or we have a better way to identify potential issues. Is there
->> any way to statically analyse conversions from __user ptr to long for
->> example? Or, could we get the compiler to do this for us?
+On Wed, Jun 20, 2018 at 10:56:19AM +0200, Simon Horman wrote:
+> On Tue, Jun 19, 2018 at 07:20:49PM +0200, Geert Uytterhoeven wrote:
+> > As of commit cad160ed0a94927e ("ARM: shmobile: Convert file to use
+> > cntvoff"), there's no non-SMP code left in headsmp-apmu.S.
+> > 
+> > Hence build the file for SMP only, and drop the no longer needed check
+> > for CONFIG_SMP inside the file.
+> > 
+> > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 > 
+> Thanks Geert,
 > 
-> OK, got it, I'll try to figure out a way to find these conversions.
-
-
-This sounds like the kind of thing we should be able to get sparse to do
-already, no ? It's been many years since I last looked at it but I
-thought sparse was the tool of choice in the kernel to do this kind of
-checking.
-
-regards
-Ramana
-
-
-
+> This looks fine to me but I will wait to see if there are other reviews
+> before applying.
 > 
-> Thanks!
-> 
+> Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
+
+Thanks, applied.
