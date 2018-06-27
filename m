@@ -1,70 +1,66 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 26 Jun 2018 21:05:01 -0300
-Subject: [PATCH] ARM: dts: imx6ull: Switch to SPDX identifier
-Message-ID: <1530057901-18383-1-git-send-email-festevam@gmail.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 27 Jun 2018 08:16:16 +0800
+Subject: [PATCH v2 1/2] clk: pxa: export 32kHz PLL
+In-Reply-To: <20180626200308.16192-1-robert.jarzmik@free.fr>
+References: <20180626200308.16192-1-robert.jarzmik@free.fr>
+Message-ID: <201806270855.xvEN3vnK%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@nxp.com>
+Hi Robert,
 
-Adopt the SPDX license identifier headers to ease license compliance
-management.
+I love your patch! Yet something to improve:
 
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+[auto build test ERROR on clk/clk-next]
+[also build test ERROR on v4.18-rc2 next-20180626]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+
+url:    https://github.com/0day-ci/linux/commits/Robert-Jarzmik/clk-pxa-export-32kHz-PLL/20180627-040726
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-next
+config: arm-xcep_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        GCC_VERSION=7.2.0 make.cross ARCH=arm 
+
+All errors (new ones prefixed by >>):
+
+   drivers/clk/pxa/clk-pxa25x.c: In function 'pxa25x_register_plls':
+>> drivers/clk/pxa/clk-pxa25x.c:298:17: error: expected ')' before ';' token
+              32768);
+                    ^
+>> drivers/clk/pxa/clk-pxa25x.c:304:1: error: expected ';' before '}' token
+    }
+    ^
+
+vim +298 drivers/clk/pxa/clk-pxa25x.c
+
+   290	
+   291	static void __init pxa25x_register_plls(void)
+   292	{
+   293		clk_register_fixed_rate(NULL, "osc_3_6864mhz", NULL,
+   294					CLK_GET_RATE_NOCACHE, 3686400);
+   295		clkdev_pxa_register(CLK_OSC32k768, "osc_32_768khz", NULL,
+   296				    clk_register_fixed_rate(NULL, "osc_32_768khz", NULL,
+   297							    CLK_GET_RATE_NOCACHE,
+ > 298							    32768);
+   299		clk_register_fixed_rate(NULL, "clk_dummy", NULL, 0, 0);
+   300		clk_register_fixed_factor(NULL, "ppll_95_85mhz", "osc_3_6864mhz",
+   301					  0, 26, 1);
+   302		clk_register_fixed_factor(NULL, "ppll_147_46mhz", "osc_3_6864mhz",
+   303					  0, 40, 1);
+ > 304	}
+   305	
+
 ---
- arch/arm/boot/dts/imx6ull.dtsi | 43 +++---------------------------------------
- 1 file changed, 3 insertions(+), 40 deletions(-)
-
-diff --git a/arch/arm/boot/dts/imx6ull.dtsi b/arch/arm/boot/dts/imx6ull.dtsi
-index ebc25c9..70a2862 100644
---- a/arch/arm/boot/dts/imx6ull.dtsi
-+++ b/arch/arm/boot/dts/imx6ull.dtsi
-@@ -1,43 +1,6 @@
--/*
-- * Copyright 2016 Freescale Semiconductor, Inc.
-- *
-- * This file is dual-licensed: you can use it either under the terms
-- * of the GPL or the X11 license, at your option. Note that this dual
-- * licensing only applies to this file, and not this project as a
-- * whole.
-- *
-- *  a) This file is free software; you can redistribute it and/or
-- *     modify it under the terms of the GNU General Public License
-- *     version 2 as published by the Free Software Foundation.
-- *
-- *     This file is distributed in the hope that it will be useful,
-- *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-- *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- *     GNU General Public License for more details.
-- *
-- * Or, alternatively,
-- *
-- *  b) Permission is hereby granted, free of charge, to any person
-- *     obtaining a copy of this software and associated documentation
-- *     files (the "Software"), to deal in the Software without
-- *     restriction, including without limitation the rights to use,
-- *     copy, modify, merge, publish, distribute, sublicense, and/or
-- *     sell copies of the Software, and to permit persons to whom the
-- *     Software is furnished to do so, subject to the following
-- *     conditions:
-- *
-- *     The above copyright notice and this permission notice shall be
-- *     included in all copies or substantial portions of the Software.
-- *
-- *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-- *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-- *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-- *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-- *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-- *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-- *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-- *     OTHER DEALINGS IN THE SOFTWARE.
-- */
-+// SPDX-License-Identifier: (GPL-2.0 OR MIT)
-+//
-+// Copyright 2016 Freescale Semiconductor, Inc.
- 
- #include "imx6ul.dtsi"
- #include "imx6ull-pinfunc.h"
--- 
-2.7.4
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 12833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180627/e0d4c48a/attachment-0001.gz>
