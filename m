@@ -1,74 +1,130 @@
-From: jernej.skrabec@gmail.com (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
-Date: Thu, 28 Jun 2018 00:05:07 +0200
-Subject: [linux-sunxi] Re: [PATCH] drm/sun4i: Implement zpos for DE2
-In-Reply-To: <8012754.crdjCMeE0H@jernej-laptop>
-References: <20180627164514.4777-1-jernej.skrabec@siol.net>
- <20180627182500.eanqagmcfmsgzos2@flea> <8012754.crdjCMeE0H@jernej-laptop>
-Message-ID: <5955444.QSmitHbQH2@jernej-laptop>
+From: javierm@redhat.com (Javier Martinez Canillas)
+Date: Thu, 28 Jun 2018 00:06:56 +0200
+Subject: [PATCH v2] driver core: add a debugfs entry to show deferred devices
+Message-ID: <20180627220656.19298-1-javierm@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne sreda, 27. junij 2018 ob 22:58:28 CEST je Jernej ?krabec napisal(a):
-> Dne sreda, 27. junij 2018 ob 20:25:00 CEST je Maxime Ripard napisal(a):
-> > Hi!
-> > 
-> > On Wed, Jun 27, 2018 at 06:45:14PM +0200, Jernej Skrabec wrote:
-> > > Initial implementation of DE2 planes only supported fixed zpos.
-> > > 
-> > > Expand implementation with configurable zpos property.
-> > > 
-> > > Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
-> > 
-> > Thanks for that work. I guess you should expand a bit on the exact
-> > setup you're doing here.
-> 
-> OK.
-> 
-> > Are the pipes working the same way on the DE2 than on DE1, ie does the
-> > pipe blending applies before the alpha blending, and therefore you
-> > need to make sure that there's not two planes with alpha going to the
-> > same pipe?
-> 
-> I'm not familiar with DE1 and I'm not sure what the problem is.
-> 
-> However, there is an issue in DE2 when alpha blending multiple planes if
-> bottom-most plane doesn't cover all screen. In this case alpha blending
-> produce weird result on screen. Fortunately, there is elegant solution.
-> Black opaque fill color is enabled for pipe 0 (always at the bottom), which
-> covers any "undefined region" and that makes alpha blending happy again.
-> 
-> Alternatively, blending modes between planes could be tweaked or disabled,
-> but I found aforementioned solution is much simpler and you set it only
-> once.
+With Device Trees (DT), the dependencies of the devices are defined in the
+DT, then the drivers parse that information to lookup the needed resources
+that have as dependencies.
 
-I forgot to test one corner case - what happens if pipe 0 has alpha channel 
-enabled. I think it still has to work, since there is background color which 
-IMO is meant for such cases.
+Since drivers and devices are registered in a non-deterministic way, it is
+possible that a device that is a dependency has not been registered yet by
+the time that is looked up.
 
-> > Also, you seem to use the pipe and channels indifferently now, why is
-> > that?
-> 
-> Why do you think so?
-> 
-> Channel always represents HW unit, for example, on H3, mixer0, channel 0
-> always represents VI plane, channel 1, represents first UI, plane, channel
-> 2, second UI plane, etc.
-> 
-> Pipe 0 always represent channel at the bottom, pipe 1 channel on top pipe 0,
-> etc. Initial, fixed zpos implementation really had 1:1 mapping, but now it
-> can be different.
-> 
-> Register SUN8I_MIXER_BLEND_ROUTE holds pipe <-> channel mappings.
-> Bits 3:0 represents pipe 0 and holds channel number. Bits 7:4 represents
-> pipe 1, etc.
-> 
-> Additionaly,  there can be holes, for example, pipe 3 and pipe 0 are enabled
-> and pipe 1 and 2 are disabled.
-> 
-> I hope I answered your questions.
+In this case the driver that requires this dependency cannot probe and has
+to defer it. So the driver core adds it to a list of deferred devices that
+is iterated again every time that a new driver is probed successfully.
 
-Looking at DE2.0 documentation, chapter 5.10.2 (pp. 87) might give you some 
-answers. Block diagram seems much simpler than that of DE1.
+For debugging purposes it may be useful to know what are the devices whose
+probe function was deferred. Add a debugfs entry showing that information.
 
-Best regards,
-Jernej
+  $ cat /sys/kernel/debug/devices_deferred
+  48070000.i2c:twl at 48:bci
+  musb-hdrc.0.auto
+  omapdrm.0
+
+This information could be obtained partially by enabling debugging, but it
+means that the kernel log has to be parsed and the probe deferral balanced
+with the successes. This can be error probe and has to be done in a ad-hoc
+manner by everyone who needs to debug these kind of issues.
+
+Since the information is already known by the kernel, just show it to make
+it easier to debug.
+
+Signed-off-by: Javier Martinez Canillas <javierm@redhat.com>
+
+---
+
+Andy, I didn't carry your Reviewed-by tag because it wasn't clear to me
+if you had agreed with the patch or not from your last email.
+
+Changes since RFC v1:
+- Remove unneeded ret variable from deferred_devs_show()
+
+Changes since RFC v2:
+- Use DEFINE_SHOW_ATTRIBUTE() macro.
+- Don't propagate debugfs_create_file() error.
+- Remove IS_ENABLED(CONFIG_DEBUG_FS) guards.
+- Drop RFC prefix.
+
+Changes since v1:
+- Better explain in the commit message why this patch is useful.
+- Rename deferred_devices entry to devices_deferred.
+- Add an exit function and remove the debugfs entry.
+
+
+ drivers/base/dd.c | 29 +++++++++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
+
+diff --git a/drivers/base/dd.c b/drivers/base/dd.c
+index 1435d7281c6..489c484301b 100644
+--- a/drivers/base/dd.c
++++ b/drivers/base/dd.c
+@@ -16,6 +16,7 @@
+  * Copyright (c) 2007-2009 Novell Inc.
+  */
+ 
++#include <linux/debugfs.h>
+ #include <linux/device.h>
+ #include <linux/delay.h>
+ #include <linux/dma-mapping.h>
+@@ -53,6 +54,7 @@ static DEFINE_MUTEX(deferred_probe_mutex);
+ static LIST_HEAD(deferred_probe_pending_list);
+ static LIST_HEAD(deferred_probe_active_list);
+ static atomic_t deferred_trigger_count = ATOMIC_INIT(0);
++static struct dentry *deferred_devices;
+ static bool initcalls_done;
+ 
+ /*
+@@ -224,6 +226,24 @@ void device_unblock_probing(void)
+ 	driver_deferred_probe_trigger();
+ }
+ 
++/*
++ * deferred_devs_show() - Show the devices in the deferred probe pending list.
++ */
++static int deferred_devs_show(struct seq_file *s, void *data)
++{
++	struct device_private *curr;
++
++	mutex_lock(&deferred_probe_mutex);
++
++	list_for_each_entry(curr, &deferred_probe_pending_list, deferred_probe)
++		seq_printf(s, "%s\n", dev_name(curr->device));
++
++	mutex_unlock(&deferred_probe_mutex);
++
++	return 0;
++}
++DEFINE_SHOW_ATTRIBUTE(deferred_devs);
++
+ /**
+  * deferred_probe_initcall() - Enable probing of deferred devices
+  *
+@@ -233,6 +253,9 @@ void device_unblock_probing(void)
+  */
+ static int deferred_probe_initcall(void)
+ {
++	deferred_devices = debugfs_create_file("devices_deferred", 0444, NULL,
++					       NULL, &deferred_devs_fops);
++
+ 	driver_deferred_probe_enable = true;
+ 	driver_deferred_probe_trigger();
+ 	/* Sort as many dependencies as possible before exiting initcalls */
+@@ -242,6 +265,12 @@ static int deferred_probe_initcall(void)
+ }
+ late_initcall(deferred_probe_initcall);
+ 
++static void __exit deferred_probe_exit(void)
++{
++	debugfs_remove_recursive(deferred_devices);
++}
++__exitcall(deferred_probe_exit);
++
+ /**
+  * device_is_bound() - Check if device is bound to a driver
+  * @dev: device to check
+-- 
+2.17.1
