@@ -1,29 +1,57 @@
-From: eugene.loh@oracle.com (Eugene Loh)
-Date: Wed, 27 Jun 2018 12:02:23 -0700
-Subject: [PATCH] arm64: entry: add END/ENDPROC markers to *.S files
-In-Reply-To: <20180627130917.g45eigeevavqsi3u@lakrids.cambridge.arm.com>
-References: <1530035261-17786-1-git-send-email-eugene.loh@oracle.com>
- <20180627130917.g45eigeevavqsi3u@lakrids.cambridge.arm.com>
-Message-ID: <053d2679-2036-09b5-b9c0-68a1a13794d3@oracle.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Wed, 27 Jun 2018 21:41:24 +0200
+Subject: [PATCH v4 2/2] ARM: dts: pxa: fix the rtc controller
+In-Reply-To: <20180627194124.26366-1-robert.jarzmik@free.fr>
+References: <20180627194124.26366-1-robert.jarzmik@free.fr>
+Message-ID: <20180627194124.26366-2-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks to Mark and Will for pointing me to Mark's work, which makes this 
-patch unneeded.
+The RTC controller is fed by an external fixed 32kHz clock. Yet the
+driver wants to acquire this clock, even though it doesn't make any use
+of it, ie. doesn't get the rate to make calculation.
 
-A few more comments below in case anyone is interested.
+Therefore, use the exported 32.768kHz clock in the PXA clock tree to
+make the driver happy and working.
 
-On 06/27/2018 06:09 AM, Mark Rutland wrote:
+Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+---
+Since v1: change the dummy clock by the actual 32.768kHz
+Since v3: remove spurious bracket
+---
+ arch/arm/boot/dts/pxa25x.dtsi | 4 ++++
+ arch/arm/boot/dts/pxa27x.dtsi | 4 ++++
+ 2 files changed, 8 insertions(+)
 
-> On Tue, Jun 26, 2018 at 10:47:41AM -0700, eugene.loh at oracle.com wrote:
->> Add END/ENDPROC markers to *.S files so that assembly instructions
->> can be mapped to symbols.
-> Is this just for external debug, or does anything in-kernel rely on this?
-
-It was motivated by DTrace, which got symbolic information from "nm -S 
-vmlinux".
-
-> I'm converting the syscall paths to C [1], which should address all of the above...
-> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2018-June/582238.html
-
-Bingo.  Thanks.
+diff --git a/arch/arm/boot/dts/pxa25x.dtsi b/arch/arm/boot/dts/pxa25x.dtsi
+index 95d59be97213..8494b5787170 100644
+--- a/arch/arm/boot/dts/pxa25x.dtsi
++++ b/arch/arm/boot/dts/pxa25x.dtsi
+@@ -80,6 +80,10 @@
+ 			#pwm-cells = <1>;
+ 			clocks = <&clks CLK_PWM1>;
+ 		};
++
++		rtc at 40900000 {
++			clocks = <&clks CLK_OSC32k768>;
++		};
+ 	};
+ 
+ 	timer at 40a00000 {
+diff --git a/arch/arm/boot/dts/pxa27x.dtsi b/arch/arm/boot/dts/pxa27x.dtsi
+index 747f750f675d..2ab6986433c8 100644
+--- a/arch/arm/boot/dts/pxa27x.dtsi
++++ b/arch/arm/boot/dts/pxa27x.dtsi
+@@ -113,6 +113,10 @@
+ 
+ 			status = "disabled";
+ 		};
++
++		rtc at 40900000 {
++			clocks = <&clks CLK_OSC32k768>;
++		};
+ 	};
+ 
+ 	clocks {
+-- 
+2.11.0
