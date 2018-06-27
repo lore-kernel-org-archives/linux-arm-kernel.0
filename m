@@ -1,71 +1,34 @@
-From: sean.wang@mediatek.com (Sean Wang)
-Date: Wed, 27 Jun 2018 16:52:45 +0800
-Subject: [PATCH v2 1/6] dt-bindings: gpu: mali-utgard: add
- mediatek,mt7623-mali compatible
-In-Reply-To: <3bd6e509-f99a-1f2d-1b66-65c414bacdbd@gmail.com>
-References: <cover.1524816502.git.sean.wang@mediatek.com>
- <7ab060c2e9ef2b220fc62913b8936b706dfaf202.1524816502.git.sean.wang@mediatek.com>
- <3bd6e509-f99a-1f2d-1b66-65c414bacdbd@gmail.com>
-Message-ID: <1530089565.29697.35.camel@mtkswgap22>
+From: rnayak@codeaurora.org (Rajendra Nayak)
+Date: Wed, 27 Jun 2018 14:25:07 +0530
+Subject: [PATCH v2 9/9] PM / Domains: Add dev_pm_domain_attach_by_id() to
+ manage multi PM domains
+In-Reply-To: <f214cf2b-49ee-2f7c-babd-1cee7dcae927@nvidia.com>
+References: <20180529100421.31022-1-ulf.hansson@linaro.org>
+ <20180529100421.31022-10-ulf.hansson@linaro.org>
+ <cc6f36ce-32b7-4b69-f9a9-98cf0b12a9d1@nvidia.com>
+ <CAPDyKFoiEctBuyw1nVS6ruQ92-jOsMMSAUsWKew42dkmk64_8A@mail.gmail.com>
+ <f214cf2b-49ee-2f7c-babd-1cee7dcae927@nvidia.com>
+Message-ID: <ebec2f66-d28d-7b94-3cef-be980617cd6f@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2018-06-25 at 17:14 +0200, Matthias Brugger wrote:
-> 
-> On 27/04/18 10:14, sean.wang at mediatek.com wrote:
-> > From: Sean Wang <sean.wang@mediatek.com>
-> > 
-> > The MediaTek MT7623 SoC contains a Mali-450, so add a compatible for it
-> > and define its own vendor-specific properties.
-> > 
-> > Reviewed-by: Rob Herring <robh@kernel.org>
-> > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> > ---
-> 
-> Hi Rob,
-> 
-> Any comments regarding this patch?
-> 
-> Regards,
-> Matthias
-> 
 
-Hi, Matthias
 
-I've already got a Reviewed-by tag from Rob.
+On 05/30/2018 08:00 PM, Jon Hunter wrote:
+>>> My only other comments on this series are ...
+>>>
+>>> 1. I think it would be nice to have an dev_pm_domain_attach_by_name() and
+>>>    that the DT binding has a 'power-domain-names' property.
+>> I think it makes sense, but my plan was to do that as second step on
+>> top. Are you okay with that as well?
+> Yes that is fine with me.
 
-Is it possible that this patch go through your tree ?
+Ulf, do you have a patch for this? I am working on moving some of qcom
+remoteproc drivers to use this series and it will help to have a
+dev_pm_domain_attach_by_name() api.
 
-	Sean
-
-> >  Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt | 9 +++++++++
-> >  1 file changed, 9 insertions(+)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt b/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
-> > index 99d1c0a..656068f 100644
-> > --- a/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
-> > +++ b/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
-> > @@ -19,6 +19,7 @@ Required properties:
-> >        + rockchip,rk3228-mali
-> >        + rockchip,rk3328-mali
-> >        + stericsson,db8500-mali
-> > +      + mediatek,mt7623-mali
-> >  
-> >    - reg: Physical base address and length of the GPU registers
-> >  
-> > @@ -89,6 +90,14 @@ to specify one more vendor-specific compatible, among:
-> >        * interrupt-names and interrupts:
-> >          + combined: combined interrupt of all of the above lines
-> >  
-> > +  - mediatek,mt7623-mali
-> > +     Required properties:
-> > +      * resets: phandle to the reset line for the GPU
-> > +      * mediatek,larb: phandle pointed to the local arbiter used to control the
-> > +	access to external memory on the SoC.
-> > +	see Documentation/devicetree/bindings/memory-controllers/mediatek,smi-larb.txt
-> > +	for details
-> > +
-> >  Example:
-> >  
-> >  mali: gpu at 1c40000 {
-> > 
+Thanks,
+Rajendra
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
