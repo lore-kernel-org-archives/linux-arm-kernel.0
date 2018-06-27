@@ -1,63 +1,152 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 27 Jun 2018 17:41:51 +0100
-Subject: [PATCH] arm64: fix infinite stacktrace
-In-Reply-To: <20180615115823.2oq5d7amzwlliczg@lakrids.cambridge.arm.com>
-References: <alpine.LRH.2.02.1806141457200.4243@file01.intranet.prod.int.rdu2.redhat.com>
- <20180615115823.2oq5d7amzwlliczg@lakrids.cambridge.arm.com>
-Message-ID: <20180627164150.GB8729@arm.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Wed, 27 Jun 2018 19:45:36 +0300
+Subject: [PATCH 3/4] PCI: mediatek: Add system pm support for MT2712 and
+ MT7622
+In-Reply-To: <1530091298-28120-4-git-send-email-honghui.zhang@mediatek.com>
+References: <1530091298-28120-1-git-send-email-honghui.zhang@mediatek.com>
+ <1530091298-28120-4-git-send-email-honghui.zhang@mediatek.com>
+Message-ID: <CAHp75VcHgJrujzqstSc4RWpUbjip1vtJu87HN3uTosoLdOiT3A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Wed, Jun 27, 2018 at 12:21 PM,  <honghui.zhang@mediatek.com> wrote:
+> From: Honghui Zhang <honghui.zhang@mediatek.com>
+>
+> The MTCMOS of PCIe Host for MT2712 and MT7622 will be off when system
+> suspend, and all the internal control register will be reset after system
+> resume. The PCIe link should be re-established and the related control
+> register values should be re-set after system resume.
 
-On Fri, Jun 15, 2018 at 12:58:23PM +0100, Mark Rutland wrote:
-> On Thu, Jun 14, 2018 at 02:58:21PM -0400, Mikulas Patocka wrote:
-> > I've got this infinite stacktrace when debugging another problem:
-> > [  908.795225] INFO: rcu_preempt detected stalls on CPUs/tasks:
-> > [  908.796176]  1-...!: (1 GPs behind) idle=952/1/4611686018427387904 softirq=1462/1462 fqs=355
-> > [  908.797692]  2-...!: (1 GPs behind) idle=f42/1/4611686018427387904 softirq=1550/1551 fqs=355
-> > [  908.799189]  (detected by 0, t=2109 jiffies, g=130, c=129, q=235)
-> > [  908.800284] Task dump for CPU 1:
-> > [  908.800871] kworker/1:1     R  running task        0    32      2 0x00000022
-> > [  908.802127] Workqueue: writecache-writeabck writecache_writeback [dm_writecache]
-> > [  908.820285] Call trace:
-> > [  908.824785]  __switch_to+0x68/0x90
-> > [  908.837661]  0xfffffe00603afd90
-> > [  908.844119]  0xfffffe00603afd90
-> > [  908.850091]  0xfffffe00603afd90
-> > [  908.854285]  0xfffffe00603afd90
-> > [  908.863538]  0xfffffe00603afd90
-> > [  908.865523]  0xfffffe00603afd90
-> > 
-> > The machine just locked up and kept on printing the same line over and
-> > over again. This patch fixes it.
-> > 
-> > Signed-off-by: Mikulas Patocka <mpatocka@redhat.com>
-> > Cc: stable at vger.kernel.org
-> 
-> Given this can only occur when there's a corrupted stack (where a frame
-> record points to itself), I'm not sure this requires a cc stable.
-> 
-> > Index: linux-2.6/arch/arm64/kernel/stacktrace.c
-> > ===================================================================
-> > --- linux-2.6.orig/arch/arm64/kernel/stacktrace.c
-> > +++ linux-2.6/arch/arm64/kernel/stacktrace.c
-> > @@ -56,6 +56,9 @@ int notrace unwind_frame(struct task_str
-> >  	frame->fp = READ_ONCE_NOCHECK(*(unsigned long *)(fp));
-> >  	frame->pc = READ_ONCE_NOCHECK(*(unsigned long *)(fp + 8));
-> >  
-> > +	if (frame->fp <= fp)
-> > +		return -EINVAL;
-> > +
-> 
-> Dave Martin had a series [1] which addressed this along with a number of
-> other cases where stack traces might not terminate.
-> 
-> Dave, do you plan to respin that?
+>  struct mtk_pcie_soc {
+>         bool need_fix_class_id;
 
-I'd be interested in an update on that; we clearly should be fixing this in
-one way or another.
+> +       bool pm_support;
 
-Mikulus -- would you be able to test and/or review it, please?
+Hmm... Do you really need this flag? Can't runtime PM API tell you this?
 
-Will
+>         struct pci_ops *ops;
+>         int (*startup)(struct mtk_pcie_port *port);
+>         int (*setup_irq)(struct mtk_pcie_port *port, struct device_node *node);
+> @@ -1195,12 +1197,76 @@ static int mtk_pcie_probe(struct platform_device *pdev)
+>         return err;
+>  }
+>
+> +#ifdef CONFIG_PM_SLEEP
+> +static int mtk_pcie_suspend_noirq(struct device *dev)
+
+Perhaps __maybe_unused?
+
+> +{
+> +       struct mtk_pcie *pcie = dev_get_drvdata(dev);
+> +       const struct mtk_pcie_soc *soc = pcie->soc;
+> +       struct mtk_pcie_port *port;
+> +
+> +       if (!soc->pm_support)
+> +               return 0;
+> +
+
+> +       if (list_empty(&pcie->ports))
+> +               return 0;
+
+So, if the list is empty you are not suspending for the host?
+
+
+> +
+> +       list_for_each_entry(port, &pcie->ports, list) {
+> +               clk_disable_unprepare(port->pipe_ck);
+> +               clk_disable_unprepare(port->obff_ck);
+> +               clk_disable_unprepare(port->axi_ck);
+> +               clk_disable_unprepare(port->aux_ck);
+> +               clk_disable_unprepare(port->ahb_ck);
+> +               clk_disable_unprepare(port->sys_ck);
+> +               phy_power_off(port->phy);
+> +               phy_exit(port->phy);
+> +       }
+> +
+> +       mtk_pcie_subsys_powerdown(pcie);
+> +
+> +       return 0;
+> +}
+> +
+> +static int mtk_pcie_resume_noirq(struct device *dev)
+> +{
+> +       struct mtk_pcie *pcie = dev_get_drvdata(dev);
+> +       const struct mtk_pcie_soc *soc = pcie->soc;
+> +       struct mtk_pcie_port *port;
+> +
+> +       if (!soc->pm_support)
+> +               return 0;
+> +
+
+> +       if (list_empty(&pcie->ports))
+> +               return 0;
+
+No runtime PM for this case?
+(It seems now I understand why in previous patch you have a similar check)
+
+> +
+> +       if (dev->pm_domain) {
+> +               pm_runtime_enable(dev);
+> +               pm_runtime_get_sync(dev);
+> +       }
+> +
+> +       clk_prepare_enable(pcie->free_ck);
+> +
+> +       list_for_each_entry(port, &pcie->ports, list)
+> +               mtk_pcie_enable_port(port);
+> +
+
+> +       if (list_empty(&pcie->ports))
+
+Hmm... How it would be true if you already bailed out above on the
+same condition?
+
+> +               mtk_pcie_subsys_powerdown(pcie);
+> +
+> +       return 0;
+> +}
+> +#endif
+> +
+> +static const struct dev_pm_ops mtk_pcie_pm_ops = {
+> +       SET_NOIRQ_SYSTEM_SLEEP_PM_OPS(mtk_pcie_suspend_noirq,
+> +                                     mtk_pcie_resume_noirq)
+> +};
+> +
+>  static const struct mtk_pcie_soc mtk_pcie_soc_v1 = {
+>         .ops = &mtk_pcie_ops,
+>         .startup = mtk_pcie_startup_port,
+>  };
+>
+>  static const struct mtk_pcie_soc mtk_pcie_soc_mt2712 = {
+> +       .pm_support = true,
+>         .ops = &mtk_pcie_ops_v2,
+>         .startup = mtk_pcie_startup_port_v2,
+>         .setup_irq = mtk_pcie_setup_irq,
+
+No update for .pm ?
+
+> @@ -1208,6 +1274,7 @@ static const struct mtk_pcie_soc mtk_pcie_soc_mt2712 = {
+>
+>  static const struct mtk_pcie_soc mtk_pcie_soc_mt7622 = {
+>         .need_fix_class_id = true,
+> +       .pm_support = true,
+>         .ops = &mtk_pcie_ops_v2,
+>         .startup = mtk_pcie_startup_port_v2,
+>         .setup_irq = mtk_pcie_setup_irq,
+> @@ -1227,6 +1294,7 @@ static struct platform_driver mtk_pcie_driver = {
+>                 .name = "mtk-pcie",
+>                 .of_match_table = mtk_pcie_ids,
+>                 .suppress_bind_attrs = true,
+> +               .pm = &mtk_pcie_pm_ops,
+>         },
+>  };
+>  builtin_platform_driver(mtk_pcie_driver);
+> --
+> 2.6.4
+>
+
+
+
+-- 
+With Best Regards,
+Andy Shevchenko
