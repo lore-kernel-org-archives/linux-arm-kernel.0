@@ -1,34 +1,38 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Wed, 27 Jun 2018 16:28:04 -0700
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 28 Jun 2018 01:29:42 +0200
 Subject: [RFC PATCH] arm64/mm: unmap the linear alias of module allocations
-In-Reply-To: <76b00e4f-e6fd-f0e9-379c-e31e85d5258d@redhat.com>
+In-Reply-To: <ab0541ca-a036-34ca-ed1b-937c470cc9da@redhat.com>
 References: <20180626165455.22636-1-ard.biesheuvel@linaro.org>
  <06b7ea07-53e2-690a-b670-d1fc41d133c3@redhat.com>
  <CAKv+Gu9uiqerCd54upWHxPBKcX1ga1oTwpYctEqbhhQGZOq6XA@mail.gmail.com>
  <76b00e4f-e6fd-f0e9-379c-e31e85d5258d@redhat.com>
-Message-ID: <ab0541ca-a036-34ca-ed1b-937c470cc9da@redhat.com>
+ <ab0541ca-a036-34ca-ed1b-937c470cc9da@redhat.com>
+Message-ID: <CAKv+Gu8TnraRGj_b=pcb6xTKMLX7GLZeJGmJ4R3vU6ygnr2kTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/26/2018 06:15 PM, Laura Abbott wrote:
-> +static?void?remap_linear_module_alias(void?*module_region,?int?enable)
-> +{
-> +???????struct?vm_struct?*vm?=?find_vm_area(module_region);
-> +???????struct?page?**p;
-> +???????unsigned?long?size;
-> +
-> +???????WARN_ON(!vm?||?!vm->pages);
-> +
-> +???????for?(p?=?vm->pages,?size?=?vm->size;?size?>?0;?size?-=?PAGE_SIZE)
-> +???????????????set_memory_valid((u64)page_address(*p++),?1,?enable);
-> +}
+On 28 June 2018 at 01:28, Laura Abbott <labbott@redhat.com> wrote:
+> On 06/26/2018 06:15 PM, Laura Abbott wrote:
+>>
+>> +static void remap_linear_module_alias(void *module_region, int enable)
+>> +{
+>> +       struct vm_struct *vm = find_vm_area(module_region);
+>> +       struct page **p;
+>> +       unsigned long size;
+>> +
+>> +       WARN_ON(!vm || !vm->pages);
+>> +
+>> +       for (p = vm->pages, size = vm->size; size > 0; size -= PAGE_SIZE)
+>> +               set_memory_valid((u64)page_address(*p++), 1, enable);
+>> +}
+>
+>
+> So I think the weirdness is caused by using vm->size here. The size of
+> the array is actually tracked by vm->nr_pages since vm->size may vary
+> depending on the guard page. I think this ended being an off by one
+> error with setting a non-existent page valid, hence the oddness in
+> the entry. If I switch to using vm->nr_pages, I don't see the entry
+> anymore.
+>
 
-So I think the weirdness is caused by using vm->size here. The size of
-the array is actually tracked by vm->nr_pages since vm->size may vary
-depending on the guard page. I think this ended being an off by one
-error with setting a non-existent page valid, hence the oddness in
-the entry. If I switch to using vm->nr_pages, I don't see the entry
-anymore.
-
-Thanks,
-Laura
+OK, thanks for tracking that down!
