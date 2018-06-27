@@ -1,66 +1,54 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Wed, 27 Jun 2018 16:19:46 +0200
-Subject: [RFC PATCH v2 1/6] serial: uartps: Do not initialize field to
- zero again
-In-Reply-To: <20180627100917.GA20940@kroah.com>
-References: <cover.1528288895.git.michal.simek@xilinx.com>
- <e8b0169887855a5ef2c1a0456842f650601b451c.1528288895.git.michal.simek@xilinx.com>
- <e7b01bd9-5763-75c0-1384-2536313f5854@monstr.eu>
- <20180627100917.GA20940@kroah.com>
-Message-ID: <05e553c2-202b-0b4b-8b88-60e330c80fa3@xilinx.com>
+From: sergey.senozhatsky@gmail.com (Sergey Senozhatsky)
+Date: Wed, 27 Jun 2018 23:20:53 +0900
+Subject: [PATCH v9 4/6] init: allow initcall tables to be emitted using
+ relative references
+In-Reply-To: <20180626182802.19932-5-ard.biesheuvel@linaro.org>
+References: <20180626182802.19932-1-ard.biesheuvel@linaro.org>
+ <20180626182802.19932-5-ard.biesheuvel@linaro.org>
+Message-ID: <20180627142053.GB477@tigerII.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27.6.2018 12:09, Greg Kroah-Hartman wrote:
-> On Tue, Jun 19, 2018 at 10:09:05AM +0200, Michal Simek wrote:
->> On 6.6.2018 14:41, Michal Simek wrote:
->>> Writing zero and NULLs to already initialized fields is not needed.
->>> Remove this additional writes.
->>>
->>> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
->>> ---
->>>
->>> Changes in v2:
->>> - new patch - it can be sent separately too
->>>
->>>  drivers/tty/serial/xilinx_uartps.c | 3 ---
->>>  1 file changed, 3 deletions(-)
->>>
->>> diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
->>> index 8a3e34234e98..5f116f3ecd4a 100644
->>> --- a/drivers/tty/serial/xilinx_uartps.c
->>> +++ b/drivers/tty/serial/xilinx_uartps.c
->>> @@ -1510,15 +1510,12 @@ static int cdns_uart_probe(struct platform_device *pdev)
->>>  
->>>  	/* At this point, we've got an empty uart_port struct, initialize it */
->>>  	spin_lock_init(&port->lock);
->>> -	port->membase	= NULL;
->>> -	port->irq	= 0;
->>>  	port->type	= PORT_UNKNOWN;
->>>  	port->iotype	= UPIO_MEM32;
->>>  	port->flags	= UPF_BOOT_AUTOCONF;
->>>  	port->ops	= &cdns_uart_ops;
->>>  	port->fifosize	= CDNS_UART_FIFO_SIZE;
->>>  	port->line	= id;
->>> -	port->dev	= NULL;
->>>  
->>>  	/*
->>>  	 * Register the port.
->>>
->>
->> Alan, Rob, Greg: Any comment about this RFC?
-> 
-> I rarely review RFC patchesets as obviously you don't think it is good
-> enough to be submitted "for real" :)
+On (06/26/18 20:27), Ard Biesheuvel wrote:
+>  /*
+> diff --git a/kernel/printk/printk.c b/kernel/printk/printk.c
+> index 247808333ba4..688a27b0888c 100644
+> --- a/kernel/printk/printk.c
+> +++ b/kernel/printk/printk.c
+> @@ -2772,7 +2772,8 @@ EXPORT_SYMBOL(unregister_console);
+>  void __init console_init(void)
+>  {
+>  	int ret;
+> -	initcall_t *call;
+> +	initcall_t call;
+> +	initcall_entry_t *ce;
+>  
+>  	/* Setup the default TTY line discipline. */
+>  	n_tty_init();
+> @@ -2781,13 +2782,14 @@ void __init console_init(void)
+>  	 * set up the console device so that later boot sequences can
+>  	 * inform about problems etc..
+>  	 */
+> -	call = __con_initcall_start;
+> +	ce = __con_initcall_start;
+>  	trace_initcall_level("console");
+> -	while (call < __con_initcall_end) {
+> -		trace_initcall_start((*call));
+> -		ret = (*call)();
+> -		trace_initcall_finish((*call), ret);
+> -		call++;
+> +	while (ce < __con_initcall_end) {
+> +		call = initcall_from_entry(ce);
+> +		trace_initcall_start(call);
+> +		ret = call();
+> +		trace_initcall_finish(call, ret);
+> +		ce++;
+>  	}
+>  }
 
-There is one missing minor part but I want to review concept first
-because I didn't find any driver which is using this style.
+printk bits look OK to me.
+The patch set works fine on my x86_64 and does reduce the size of vmlinux.
 
-> If you think this is all good, great, please resend it without the RFC
-> and it will end up in my queue.
+Acked-by: Sergey Senozhatsky <sergey.senozhatsky@gmail.com>
 
-I will definitely do it but please look at the concept itself because I
-would like to use this with at least 3 other drivers.
-
-Thanks,
-Michal
+	-ss
