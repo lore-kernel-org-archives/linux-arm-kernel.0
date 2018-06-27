@@ -1,84 +1,26 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 27 Jun 2018 10:27:09 +0800
-Subject: [PATCH] ARM: dts: sun8i: a83t: Add CPU regulator supplies for A83T
- boards
-Message-ID: <20180627022709.27434-1-wens@csie.org>
+From: wangzhou1@hisilicon.com (Zhou Wang)
+Date: Wed, 27 Jun 2018 10:49:46 +0800
+Subject: [PATCH] arm64: defconfig: enable HiSilicon PMU driver
+Message-ID: <1530067786-195470-1-git-send-email-wangzhou1@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The OPPs for the A83T CPU cores were added in v4.17 in commit 2db639d8c166
-("ARM: dts: sun8i: a83t: add stable OPP tables and CPUfreq"), but board
-level regulator supplies for the CPU clusters were only added for the
-TBS-A711 tablet. This means the other A83T boards do not benefit from
-voltage scaling, or worse, if the implementation does not scale the
-frequency when the voltage is fixed, no benefit at all.
-
-Add board level CPU cluster power supplies to all the A83T development
-boards, so they can have proper dynamic CPU voltage and frequency scaling.
-
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
 ---
- arch/arm/boot/dts/sun8i-a83t-allwinner-h8homlet-v2.dts | 8 ++++++++
- arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts           | 8 ++++++++
- arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts       | 8 ++++++++
- 3 files changed, 24 insertions(+)
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-a83t-allwinner-h8homlet-v2.dts b/arch/arm/boot/dts/sun8i-a83t-allwinner-h8homlet-v2.dts
-index 36ecebaff3c0..1c012a4def16 100644
---- a/arch/arm/boot/dts/sun8i-a83t-allwinner-h8homlet-v2.dts
-+++ b/arch/arm/boot/dts/sun8i-a83t-allwinner-h8homlet-v2.dts
-@@ -79,6 +79,14 @@
- 	};
- };
- 
-+&cpu0 {
-+	cpu-supply = <&reg_dcdc2>;
-+};
-+
-+&cpu100 {
-+	cpu-supply = <&reg_dcdc3>;
-+};
-+
- &ehci0 {
- 	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts b/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
-index 3b579d7567c8..c7ce4158d6c8 100644
---- a/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
-+++ b/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
-@@ -107,6 +107,14 @@
- 	};
- };
- 
-+&cpu0 {
-+	cpu-supply = <&reg_dcdc2>;
-+};
-+
-+&cpu100 {
-+	cpu-supply = <&reg_dcdc3>;
-+};
-+
- &de {
- 	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts b/arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts
-index 88decb0747ac..e5f0645e53a7 100644
---- a/arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts
-+++ b/arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts
-@@ -145,6 +145,14 @@
- 	};
- };
- 
-+&cpu0 {
-+	cpu-supply = <&reg_dcdc2>;
-+};
-+
-+&cpu100 {
-+	cpu-supply = <&reg_dcdc3>;
-+};
-+
- &ehci0 {
- 	/* GL830 USB-to-SATA bridge here */
- 	status = "okay";
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index 3cfa8ca..be36e61 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -633,6 +633,7 @@ CONFIG_PHY_ROCKCHIP_PCIE=m
+ CONFIG_PHY_ROCKCHIP_TYPEC=y
+ CONFIG_PHY_XGENE=y
+ CONFIG_PHY_TEGRA_XUSB=y
++CONFIG_HISI_PMU=y
+ CONFIG_QCOM_L2_PMU=y
+ CONFIG_QCOM_L3_PMU=y
+ CONFIG_MESON_EFUSE=m
 -- 
-2.18.0
+1.9.1
