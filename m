@@ -1,47 +1,78 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Wed, 27 Jun 2018 09:03:31 +0200
-Subject: [PATCH V5 0/5] add iwdg2 support for stm32mp157c
-In-Reply-To: <1529941383-8653-1-git-send-email-ludovic.Barre@st.com>
-References: <1529941383-8653-1-git-send-email-ludovic.Barre@st.com>
-Message-ID: <c6996e7f-2b30-6eaf-afa3-5a98b6dcaa78@st.com>
+From: nikita.yoush@yandex.ru (Nikita Yushchenko)
+Date: Wed, 27 Jun 2018 10:11:40 +0300
+Subject: [1/3] ARM: dts: imx51-zii-common: create common include dtsi
+In-Reply-To: <1529603100-31958-2-git-send-email-andrey.gusakov@cogentembedded.com>
+References: <1529603100-31958-2-git-send-email-andrey.gusakov@cogentembedded.com>
+Message-ID: <5a3490a5-ee5c-a4da-8b54-b5234b7e50d0@yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guenter
+> +	i2c_gpio: i2c-gpio {
+> +		compatible = "i2c-gpio";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pinctrl_swi2c>;
+> +		i2c-gpio,delay-us = <50>;
+> +		status = "okay";
+> +
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +	};
 
-On 06/25/2018 05:42 PM, Ludovic Barre wrote:
-> From: Ludovic Barre <ludovic.barre@st.com>
-> 
-> This patch series updates stm32_iwdg driver to manage pclk
-> clock by compatible. stm32mp1 requires a pclk clock.
-> 
-> v5:
-> -update stm32f429.dtsi
-> 
-> v4:
-> -dt-bindings: split and review
-> 
-> v3:
-> -remove stm32_iwdg_config structure, just assign the
->   boolean directly to .dat
-> 
-> Ludovic Barre (5):
->    dt-bindings: watchdog: add stm32mp1 support
->    watchdog: stm32: add pclk feature for stm32mp1
->    ARM: dts: stm32: add iwdg2 support for stm32mp157c
->    ARM: dts: stm32: add iwdg2 support for stm32mp157c-ed1
->    ARM: dts: stm32: update iwdg with lsi clock name for stm32f429
+You add i2c-gpio node to dtsi file without defining gpios, with reference
+to pinctrl not defined inside your dtsi file or it's includes, and without
+any usage inside dtsi file.
 
-I will take DT patches in my tree.
+Saving several text lines that way is a bad idea. Please move it to where
+it is fully defined and used.
 
-Thanks
-alex
+> +&usb_vbus {
+> +	regulator-always-on;
 
-> 
->   .../devicetree/bindings/watchdog/st,stm32-iwdg.txt |  13 ++-
->   arch/arm/boot/dts/stm32f429.dtsi                   |   1 +
->   arch/arm/boot/dts/stm32mp157c-ed1.dts              |   5 +
->   arch/arm/boot/dts/stm32mp157c.dtsi                 |   8 ++
->   drivers/watchdog/stm32_iwdg.c                      | 116 +++++++++++++--------
->   5 files changed, 98 insertions(+), 45 deletions(-)
-> 
+usb_vbus is regilator-fixed, what for is this?
+
+> +&uart2 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_uart2>;
+> +	status = "okay";
+> +};
+
+In your further patches you include this and then revert by marking &uart2 as
+disabled. Better to enable it in dts for boards that have it.
+
+Same with ecspi2, ipu and maybe more.
+
+> -	flash at 1 {
+> -		#address-cells = <1>;
+> -		#size-cells = <1>;
+> -		compatible = "atmel,at45db642d", "atmel,at45", "atmel,dataflash";
+> -		spi-max-frequency = <25000000>;
+> -		reg = <1>;
+> -	};
+
+> +	flash at 1 {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		compatible = "atmel,at45", "atmel,dataflash";
+> +		spi-max-frequency = <25000000>;
+> +		reg = <1>;
+> +	};
+
+Lost a compatible key?
+
+> -			sysled0 at 3 {
+> -				reg = <3>;
+> -				label = "system:green:status";
+> -				linux,default-trigger = "default-on";
+> -			};
+
+> +			sysled3: led3 at 3 {
+> +				reg = <3>;
+> +				label = "system:red:power";
+> +				linux,default-trigger = "default-on";
+> +			};
+
+> +&sysled3 {
+> +	label = "system:green:status";
+ 
+What for this label games?
+Maybe just define things for boards that use it?
