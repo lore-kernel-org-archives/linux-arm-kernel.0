@@ -1,50 +1,102 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 27 Jun 2018 11:42:34 -0700
-Subject: [PATCH v4 1/6] Documentation: DT: Consolidate SP805 binding docs
-In-Reply-To: <a18733e2-be06-4ea9-dbfb-1d4f756a97e7@broadcom.com>
-References: <1527530497-10392-1-git-send-email-ray.jui@broadcom.com>
- <1527530497-10392-2-git-send-email-ray.jui@broadcom.com>
- <20180605194124.GA26885@rob-hp-laptop>
- <e91c75f3-f7a4-6f51-9911-7e22d5d05084@roeck-us.net>
- <CABGGisxEvWDy16SKE2RG-vhUHBZHSCCHyfwJsPY16B1fQS-=cA@mail.gmail.com>
- <09c870cd-0a44-6634-58d8-f57f9fcd0cb5@broadcom.com>
- <46ca340f-4347-94ca-6463-d38bece820e2@broadcom.com>
- <20180627183327.GD16753@roeck-us.net>
- <a18733e2-be06-4ea9-dbfb-1d4f756a97e7@broadcom.com>
-Message-ID: <20180627184234.GA19538@roeck-us.net>
+From: doudahwezomiechahtah@xff.cz (=?utf-8?Q?Ond=C5=99ej?= Jirman)
+Date: Wed, 27 Jun 2018 20:45:39 +0200
+Subject: [linux-sunxi] [PATCH] ARM: dts: sun8i: a83t: Add CPU regulator
+ supplies for A83T boards
+In-Reply-To: <20180627022709.27434-1-wens@csie.org>
+References: <20180627022709.27434-1-wens@csie.org>
+Message-ID: <20180627184539.3er4226lkbtudhwe@core>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 27, 2018 at 11:38:48AM -0700, Ray Jui wrote:
-> 
-> 
-> On 6/27/2018 11:33 AM, Guenter Roeck wrote:
-> >On Wed, Jun 20, 2018 at 10:39:16AM -0700, Ray Jui wrote:
-> >>Hi Guenter/Rob,
-> >>
-> >>Kindly let me know how you want to proceed with this?
-> >>
-> >
-> >If I recall correctly, the patch series does not add a new problem
-> >but merely exposes one. Is my recollection correct ? If so, maybe
-> >we should just add a note somewhere indicating what might be wrong
-> >and otherwise apply the series.
-> >
-> >Does this make sense ?
-> 
-> Yes this makes a lot of sense to me. This patch series exposes potential
-> problems in some SoCs that they might not be feeding the correct clock into
-> WDT, at least based on clock names from their DT entries.
-> 
-> This patch series does not change/affect how SP805 works on those systems.
-> 
-> Where should the note be added?
-> 
+Hi,
 
-I would suggest to add a note into the driver where the clock is used,
-with the details discussed here.
+On Wed, Jun 27, 2018 at 10:27:09AM +0800, Chen-Yu Tsai wrote:
+> The OPPs for the A83T CPU cores were added in v4.17 in commit 2db639d8c166
+> ("ARM: dts: sun8i: a83t: add stable OPP tables and CPUfreq"), but board
+> level regulator supplies for the CPU clusters were only added for the
+> TBS-A711 tablet. This means the other A83T boards do not benefit from
+> voltage scaling, or worse, if the implementation does not scale the
+> frequency when the voltage is fixed, no benefit at all.
+> 
+> Add board level CPU cluster power supplies to all the A83T development
+> boards, so they can have proper dynamic CPU voltage and frequency scaling.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>  arch/arm/boot/dts/sun8i-a83t-allwinner-h8homlet-v2.dts | 8 ++++++++
+>  arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts           | 8 ++++++++
+>  arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts       | 8 ++++++++
+>  3 files changed, 24 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/sun8i-a83t-allwinner-h8homlet-v2.dts b/arch/arm/boot/dts/sun8i-a83t-allwinner-h8homlet-v2.dts
+> index 36ecebaff3c0..1c012a4def16 100644
+> --- a/arch/arm/boot/dts/sun8i-a83t-allwinner-h8homlet-v2.dts
+> +++ b/arch/arm/boot/dts/sun8i-a83t-allwinner-h8homlet-v2.dts
+> @@ -79,6 +79,14 @@
+>  	};
+>  };
+>  
+> +&cpu0 {
+> +	cpu-supply = <&reg_dcdc2>;
+> +};
+> +
+> +&cpu100 {
+> +	cpu-supply = <&reg_dcdc3>;
+> +};
+> +
 
-Does this make sense ?
+Shouldn't this be done for all CPU cores? Say you start the kernel with
+maxcpus=1 and then enable CPU5 later on, will the regulator get enabled,
+if it is not enabled by always-on setting?
 
-Thanks,
-Guenter
+regards,
+  o.
+
+>  &ehci0 {
+>  	status = "okay";
+>  };
+> diff --git a/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts b/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
+> index 3b579d7567c8..c7ce4158d6c8 100644
+> --- a/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
+> +++ b/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
+> @@ -107,6 +107,14 @@
+>  	};
+>  };
+>  
+> +&cpu0 {
+> +	cpu-supply = <&reg_dcdc2>;
+> +};
+> +
+> +&cpu100 {
+> +	cpu-supply = <&reg_dcdc3>;
+> +};
+> +
+>  &de {
+>  	status = "okay";
+>  };
+> diff --git a/arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts b/arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts
+> index 88decb0747ac..e5f0645e53a7 100644
+> --- a/arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts
+> +++ b/arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts
+> @@ -145,6 +145,14 @@
+>  	};
+>  };
+>  
+> +&cpu0 {
+> +	cpu-supply = <&reg_dcdc2>;
+> +};
+> +
+> +&cpu100 {
+> +	cpu-supply = <&reg_dcdc3>;
+> +};
+> +
+>  &ehci0 {
+>  	/* GL830 USB-to-SATA bridge here */
+>  	status = "okay";
+> -- 
+> 2.18.0
+> 
+> -- 
+> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
