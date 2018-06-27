@@ -1,103 +1,81 @@
-From: bugalski.piotr@gmail.com (Piotr Bugalski)
-Date: Wed, 27 Jun 2018 09:52:00 +0200 (CEST)
-Subject: [RFC PATCH 1/2] spi: Add QuadSPI driver for Atmel SAMA5D2
-In-Reply-To: <455adb76-530a-1fd5-303c-cfa158ad7870@microchip.com>
-References: <20180618162124.21749-1-bugalski.piotr@gmail.com>
- <20180618162124.21749-2-bugalski.piotr@gmail.com>
- <20180621233321.0f25f572@bbrezillon>
- <alpine.DEB.2.20.1806220719190.21824@carbonite>
- <20180622093905.62a3b936@bbrezillon>
- <455adb76-530a-1fd5-303c-cfa158ad7870@microchip.com>
-Message-ID: <alpine.DEB.2.20.1806270940500.32198@carbonite>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 27 Jun 2018 10:00:08 +0200
+Subject: [PATCH v4 2/7] serdev: add dev_pm_domain_attach|detach()
+In-Reply-To: <ed497b2a9751df3b2f84cc9db6d6834816a6027f.1530004712.git.sean.wang@mediatek.com>
+References: <cover.1530004712.git.sean.wang@mediatek.com>
+ <ed497b2a9751df3b2f84cc9db6d6834816a6027f.1530004712.git.sean.wang@mediatek.com>
+Message-ID: <CAPDyKFp4kESPH4hcqgATYWBt3Kz3FhAOCpnrCc5PRSkMkBikEg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi Tudor,
-
-Thank you very much for comments.
-
-On Tue, 26 Jun 2018, Tudor Ambarus wrote:
-
-> Hi, Piotr,
+On 27 June 2018 at 07:43,  <sean.wang@mediatek.com> wrote:
+> From: Sean Wang <sean.wang@mediatek.com>
 >
-> General things to consider for the limitation in performance:
-> - is the serial flash memory operating in Quad SPI?
-
-Yes, I've checked signal using logic analyzer, data is transferred using
-all four lines.
-
-> - QSCLK should be as high as possible
-
-Sure, but when we are using lower frequency CPU impact should be
-negligible while efficiency is crap on every speed.
-
-> - transfer delays - I checked them, they have default values, we should be good.
-> - use DMA, as you suggested
+> In order to open up the required power gate before any operation can be
+> effectively performed over the serial bus between CPU and serdev, it's
+> clearly essential to add common attach functions for PM domains to serdev
+> at the probe phase.
 >
-
-I don't understand one thing. While CPU is not busy and during my tests
-100% of CPU can be used for communication, efficiency is still very low.
-Why DMA has such impact?
-
-It is very interesting to observe signals using logic analyzer.
-When CPU is used for communication, there are long delays after
-every byte transferred. These delays are  much longer than it 
-should be only because of writing next value by CPU.
-I tried to change SPI frequency. If delay were CPU related,
-delay time should stay the same. Unfortunately results were different -
-lowering SPI freqency extends delay time.
-Using DMA makes these delays to disappear, but how to acheive CPU
-communication without delays?
-
-> On 06/22/2018 10:39 AM, Boris Brezillon wrote:
->> [...]
->>
->>>>> +/*
->>>>> + * Atmel SAMA5D2 QuadSPI driver.
->>>>> + *
->>>>> + * Copyright (C) 2018 Cryptera A/S
->>>>
->>>> A non-negligible portion of this code has been copied from the existing
->>>> driver. Please keep the existing copyright (you can still add Cryptera's
->>>> one).
->>>>
->>>
->>> Technically this driver were written from scratch, with spi-fsl-qspi
->>> as example of new interface. Hence the name and code structure.
->>> But it's the same peripheral as Atmel's driver uses so code looks
->>> similar. I can unify the code to make comparsion even simpler and
->>> then update copyright.
->>
->> Hm, ok. Some constructs really looked like they were copied
->> from the old driver, hence my comment. I'll let Nicolas give his
->> opinion on this aspect.
+> Similarly, the relevant dettach function for the PM domains should be
+> properly and reversely added at the remove phase.
 >
-> This driver will be a conversion of the legacy one to the spi-mem interface. I
-> would keep the legacy copyright and add Cryptera's below, as Boris suggested.
->
-> [...]
->
->>>>> +#define QSPI_SR_CMD_COMPLETED           (QSPI_SR_INSTRE | QSPI_SR_CSR)
->>>>
->>>> Do you really to wait for both INSTRE and CSR to consider the command
->>>> as complete?
->>>>
->>>
->>> This part were really copied from Atmel driver. I wasn't sure so I
->>> used tested solution.
->>
->> Okay. I guess that's a question for Cyrille and/or Tudor then.
->
-> We have to wait for both INSTRE and CSR.
->
+> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> Cc: Rob Herring <robh@kernel.org>
+> Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Jiri Slaby <jslaby@suse.com>
+> Cc: linux-serial at vger.kernel.org
 
-I've also found that information in datasheet, good we have this
-solution then.
+Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
 
-> Best,
-> ta
+Kind regards
+Uffe
+
+> ---
+>  drivers/tty/serdev/core.c | 15 ++++++++++++++-
+>  1 file changed, 14 insertions(+), 1 deletion(-)
 >
-
-Best Regards,
-Piotr
+> diff --git a/drivers/tty/serdev/core.c b/drivers/tty/serdev/core.c
+> index df93b72..8096138 100644
+> --- a/drivers/tty/serdev/core.c
+> +++ b/drivers/tty/serdev/core.c
+> @@ -13,6 +13,7 @@
+>  #include <linux/module.h>
+>  #include <linux/of.h>
+>  #include <linux/of_device.h>
+> +#include <linux/pm_domain.h>
+>  #include <linux/serdev.h>
+>  #include <linux/slab.h>
+>
+> @@ -330,8 +331,17 @@ EXPORT_SYMBOL_GPL(serdev_device_set_tiocm);
+>  static int serdev_drv_probe(struct device *dev)
+>  {
+>         const struct serdev_device_driver *sdrv = to_serdev_device_driver(dev->driver);
+> +       int ret;
+>
+> -       return sdrv->probe(to_serdev_device(dev));
+> +       ret = dev_pm_domain_attach(dev, true);
+> +       if (ret)
+> +               return ret;
+> +
+> +       ret = sdrv->probe(to_serdev_device(dev));
+> +       if (ret)
+> +               dev_pm_domain_detach(dev, true);
+> +
+> +       return ret;
+>  }
+>
+>  static int serdev_drv_remove(struct device *dev)
+> @@ -339,6 +349,9 @@ static int serdev_drv_remove(struct device *dev)
+>         const struct serdev_device_driver *sdrv = to_serdev_device_driver(dev->driver);
+>         if (sdrv->remove)
+>                 sdrv->remove(to_serdev_device(dev));
+> +
+> +       dev_pm_domain_detach(dev, true);
+> +
+>         return 0;
+>  }
+>
+> --
+> 2.7.4
+>
