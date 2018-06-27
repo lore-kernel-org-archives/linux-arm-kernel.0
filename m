@@ -1,49 +1,32 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Wed, 27 Jun 2018 15:57:13 +0100
-Subject: [PATCH 1/4] dt-bindings: power: Add Actions Semi S900 SPS
-In-Reply-To: <20180626164117.GA5241@Mani-XPS-13-9360>
-References: <20180411164036.8046-1-manivannan.sadhasivam@linaro.org>
- <20180411164036.8046-2-manivannan.sadhasivam@linaro.org>
- <a261bae6-d2fa-a550-7232-7647ce0ac0e2@suse.de>
- <20180626164117.GA5241@Mani-XPS-13-9360>
-Message-ID: <20180627145713.uao2gr5kknk2cypk@holly.lan>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 27 Jun 2018 16:01:26 +0100
+Subject: [PATCH v8 2/2] regulator: add QCOM RPMh regulator driver
+In-Reply-To: <CAD=FV=WC_XWRk-6OELOFFWGnhRq1VeoiiveqXLSy+xqsVb22pA@mail.gmail.com>
+References: <cover.1529712888.git.collinsd@codeaurora.org>
+ <35c4ea70cdf5caba560fb6f40e866ee8bc456d93.1529712888.git.collinsd@codeaurora.org>
+ <CAD=FV=XVEEPgjBXxR+-46RgxLOq63Xvq-jtruoaCxccmMoKUuA@mail.gmail.com>
+ <20180626120733.GD1779@sirena.org.uk>
+ <CAD=FV=X1E8Cz=L93G-zJwhM0R=N3YuBBhkvCnLvWuxMU9KJkTw@mail.gmail.com>
+ <20180626150203.GG1779@sirena.org.uk>
+ <CAD=FV=WC_XWRk-6OELOFFWGnhRq1VeoiiveqXLSy+xqsVb22pA@mail.gmail.com>
+Message-ID: <20180627150126.GC5263@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 26, 2018 at 10:11:17PM +0530, Manivannan Sadhasivam wrote:
-> > > diff --git a/include/dt-bindings/power/owl-s900-powergate.h b/include/dt-bindings/power/owl-s900-powergate.h
-> > > new file mode 100644
-> > > index 000000000000..f1aaf761112b
-> > > --- /dev/null
-> > > +++ b/include/dt-bindings/power/owl-s900-powergate.h
-> > > @@ -0,0 +1,23 @@
-> > > +// SPDX-License-Identifier: GPL-2.0+
-> > 
-> > checkpatch.pl warns about this line due to not using /* ... */ syntax
-> > for headers. I could fix that up on my own, but it made me realize that
-> > you are licensing this file under GPL-2.0+ only, whereas the .dts[i] is
-> > supposed to be dual-licensed.
-> > 
-> > Can you please give your consent to make this
-> > 
-> > /* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
-> > 
-> 
-> You can change the license to GPL-2.0+ OR MIT.
-> 
-> > like my S500 and S700 bindings?
-> > 
-> > Question: Should it still be GPL-2.0+ or the new GPL-2.0-or-later?
-> >
-> 
-> I think GPL-2.0+ is fine.
+On Tue, Jun 26, 2018 at 11:15:14AM -0700, Doug Anderson wrote:
 
-So... when I saw this I did wonder why one would knowly choose to use a
-deprecated license identifier (https://spdx.org/licenses/ ).
+> I think he's still planning on re-shuffling his tree a bit.  When he
+> does this, do you need him to put the RPMh patches somewhere you can
+> merge into your tree?
 
-However running `git diff v4.17..v4.18-rc1` through some filters does
-indicate that GPL-2.0+ is the more popular choice by 256 to 0! Doesn't
-mean you couldn't break the mould though ;-).
-
-
-Daniel.
+Well, I *think* there's no actual dependency here since it's a new
+driver with a Kconfig dependency.  It really just needs me to get round
+to trawling through what's a fairly large patch with a troubled history
+now you've reviewed it.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180627/813bc040/attachment.sig>
