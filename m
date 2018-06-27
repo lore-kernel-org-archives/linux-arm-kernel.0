@@ -1,37 +1,34 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed, 27 Jun 2018 16:10:24 -0700
-Subject: [PATCH] ARM64: dts: meson-axg: fix ethernet stability issue
-In-Reply-To: <d59a60d1-d5fc-6d89-f89b-148c8e3f3521@baylibre.com> (Neil
- Armstrong's message of "Tue, 26 Jun 2018 10:07:26 +0200")
-References: <20180625125653.3404-1-jbrunet@baylibre.com>
- <d59a60d1-d5fc-6d89-f89b-148c8e3f3521@baylibre.com>
-Message-ID: <7h6023keqn.fsf@baylibre.com>
+From: labbott@redhat.com (Laura Abbott)
+Date: Wed, 27 Jun 2018 16:28:04 -0700
+Subject: [RFC PATCH] arm64/mm: unmap the linear alias of module allocations
+In-Reply-To: <76b00e4f-e6fd-f0e9-379c-e31e85d5258d@redhat.com>
+References: <20180626165455.22636-1-ard.biesheuvel@linaro.org>
+ <06b7ea07-53e2-690a-b670-d1fc41d133c3@redhat.com>
+ <CAKv+Gu9uiqerCd54upWHxPBKcX1ga1oTwpYctEqbhhQGZOq6XA@mail.gmail.com>
+ <76b00e4f-e6fd-f0e9-379c-e31e85d5258d@redhat.com>
+Message-ID: <ab0541ca-a036-34ca-ed1b-937c470cc9da@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Neil Armstrong <narmstrong@baylibre.com> writes:
+On 06/26/2018 06:15 PM, Laura Abbott wrote:
+> +static?void?remap_linear_module_alias(void?*module_region,?int?enable)
+> +{
+> +???????struct?vm_struct?*vm?=?find_vm_area(module_region);
+> +???????struct?page?**p;
+> +???????unsigned?long?size;
+> +
+> +???????WARN_ON(!vm?||?!vm->pages);
+> +
+> +???????for?(p?=?vm->pages,?size?=?vm->size;?size?>?0;?size?-=?PAGE_SIZE)
+> +???????????????set_memory_valid((u64)page_address(*p++),?1,?enable);
+> +}
 
-> On 25/06/2018 14:56, Jerome Brunet wrote:
->> Like the odroid-c2 and wetek, the s400 uses the RTL8211F and seems to
->> suffer from the kind of stability issue.
->> 
->> Doing an iperf3 download test, we can see a significant number of LPI
->> interrupts on the tx path. After a short while (5 to 15 seconds), the
->> network connection dies. If using rootfs over NFS, the connection may
->> also break during the boot sequence.
->> 
->> We still don't have a real explanation for this problem so let's disable
->> EEE once again.
->> 
->> Fixes: f6f6ac914b82 ("ARM64: dts: meson-axg: enable ethernet for A113D S400 board")
->> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
->> ---
->>  arch/arm64/boot/dts/amlogic/meson-axg-s400.dts | 15 ++++++++++++++-
->>  1 file changed, 14 insertions(+), 1 deletion(-)
->> 
-> [...]
-> Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
+So I think the weirdness is caused by using vm->size here. The size of
+the array is actually tracked by vm->nr_pages since vm->size may vary
+depending on the guard page. I think this ended being an off by one
+error with setting a non-existent page valid, hence the oddness in
+the entry. If I switch to using vm->nr_pages, I don't see the entry
+anymore.
 
-Applied to v4.18/fixes (which I'll be sending upstream today.)
-
-Kevin
+Thanks,
+Laura
