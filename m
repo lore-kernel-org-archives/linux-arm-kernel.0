@@ -1,60 +1,73 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Wed, 27 Jun 2018 14:32:58 +0100
-Subject: KVM guest sometimes failed to boot because of kernel stack
- overflow if KPTI is enabled on a hisilicon ARM64 platform.
-In-Reply-To: <20180627132826.GB30631@arm.com>
-References: <5B2A6218.3030201@hisilicon.com> <20180620144257.GB27776@arm.com>
- <5B2A7832.4010502@hisilicon.com>
- <ebfabb8f-dcd9-3fb4-3655-368a882d8f09@arm.com>
- <5B2A7FE1.5040607@hisilicon.com>
- <e701eaa8-dcb9-777c-2211-67ee27b43acb@arm.com>
- <5B2B6DEA.2090100@hisilicon.com> <5B3274FC.7000206@hisilicon.com>
- <20180626174746.GO23375@arm.com> <5B338F7B.9070500@hisilicon.com>
- <20180627132826.GB30631@arm.com>
-Message-ID: <5B33920A.9070700@hisilicon.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Wed, 27 Jun 2018 14:47:30 +0100
+Subject: [PATCH v3 5/6] KVM: arm/arm64: Stop using {pmd,pud,pgd}_populate
+In-Reply-To: <20180627122058.8210-6-marc.zyngier@arm.com>
+References: <20180627122058.8210-1-marc.zyngier@arm.com>
+ <20180627122058.8210-6-marc.zyngier@arm.com>
+Message-ID: <fdc34d4f-73b6-4b5f-685b-d3775ee3122d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+Hi Marc,
 
-On 2018/6/27 14:28, Will Deacon wrote:
-> On Wed, Jun 27, 2018 at 02:22:03PM +0100, Wei Xu wrote:
->> On 2018/6/26 18:47, Will Deacon wrote:
->>> If you look at the __idmap_kpti_put_pgtable_ent_ng asm macro, can you try
->>> replacing:
->>>
->>> 	dc      civac, cur_\()\type\()p
->>>
->>> with:
->>>
->>> 	dc      ivac, cur_\()\type\()p
->>>
->>> please? Only do this for the guest kernel, not the host. KVM will upgrade
->>> the clean to a clean+invalidate, so it's interesting to see if this has
->>> an effect on the behaviour.
->>
->> Only changed the guest kernel, the guest still failed to boot and the log
->> is same with the last mail.
->>
->> But if I changed to cvac as below for the guest, it is kind of stable.
->> 	dc      cvac, cur_\()\type\()p
->>
->> I have synced with our SoC guys about this and hope we can find the reason.
->> Do you have any more suggestion?
+On 27/06/18 13:20, Marc Zyngier wrote:
+> The {pmd,pud,pgd}_populate accessors usage in the kernel have always
+> been a bit weird in KVM. We don't have a struct mm to pass (and
+> neither does the kernel most of the time, but still...), and
+> the 32bit code has all kind of cache maintenance that doesn't make
+> sense on ARMv7+ when MP extensions are mandatory (which is the
+> case when the VEs are present).
 > 
-> Unfortunately, not. It looks like somehow clean+invalidate is behaving
-> just as an invalidate, and we're corrupting the page table as a result.
+> Let's bite the bullet and provide our own implementations. The
+> only bit of architectural code left has to do with building the table
+> entry itself (arm64 having up to 52bit PA, arm lacking PUD level).
 > 
-> Hopefully the SoC guys will figure it out.
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
+> Acked-by: Christoffer Dall <christoffer.dall@arm.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>   arch/arm/include/asm/kvm_mmu.h   | 4 ++++
+>   arch/arm64/include/asm/kvm_mmu.h | 7 +++++++
+>   virt/kvm/arm/mmu.c               | 8 +++++---
+>   3 files changed, 16 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+> index b2feaea1434c..265ea9cf7df7 100644
+> --- a/arch/arm/include/asm/kvm_mmu.h
+> +++ b/arch/arm/include/asm/kvm_mmu.h
+> @@ -75,6 +75,10 @@ phys_addr_t kvm_get_idmap_vector(void);
+>   int kvm_mmu_init(void);
+>   void kvm_clear_hyp_idmap(void);
+>   
+> +#define kvm_mk_pmd(ptep)	__pmd(__pa(ptep) | PMD_TYPE_TABLE)
+> +#define kvm_mk_pud(pmdp)	__pud(__pa(pmdp) | PMD_TYPE_TABLE)
+> +#define kvm_mk_pgd(pudp)	({ BUILD_BUG(); 0; })
+> +
+>   static inline pte_t kvm_s2pte_mkwrite(pte_t pte)
+>   {
+>   	pte_val(pte) |= L_PTE_S2_RDWR;
+> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+> index 25c9a91f6a87..2f05be2bed63 100644
+> --- a/arch/arm64/include/asm/kvm_mmu.h
+> +++ b/arch/arm64/include/asm/kvm_mmu.h
+> @@ -169,6 +169,13 @@ phys_addr_t kvm_get_idmap_vector(void);
+>   int kvm_mmu_init(void);
+>   void kvm_clear_hyp_idmap(void);
+>   
+> +#define kvm_mk_pmd(ptep)					\
+> +	__pmd(__phys_to_pmd_val(__pa(ptep) | PMD_TYPE_TABLE))
+> +#define kvm_mk_pud(pmdp)					\
+> +	__pud(__phys_to_pud_val(__pa(pmdp) | PMD_TYPE_TABLE))
+> +#define kvm_mk_pgd(pudp)					\
+> +	__pgd(__phys_to_pgd_val(__pa(pudp) | PUD_TYPE_TABLE))
+> +
 
-Thanks anyway!
-I will update here if any news.
+I believe this is wrong, as the __phys_to_p.d_val could strip of the
+TABLE bit. The correct usage is :
 
-Best Regards,
-Wei
+__pXd(__phys_to_pXd_val(__pa(ptr)) | PxD_TYPE_TABLE)
 
-> 
-> Will
-> 
-> .
-> 
+
+
+Thanks
+Suzuki
