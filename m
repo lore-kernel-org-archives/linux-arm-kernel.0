@@ -1,152 +1,111 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Wed, 27 Jun 2018 19:45:36 +0300
-Subject: [PATCH 3/4] PCI: mediatek: Add system pm support for MT2712 and
- MT7622
-In-Reply-To: <1530091298-28120-4-git-send-email-honghui.zhang@mediatek.com>
-References: <1530091298-28120-1-git-send-email-honghui.zhang@mediatek.com>
- <1530091298-28120-4-git-send-email-honghui.zhang@mediatek.com>
-Message-ID: <CAHp75VcHgJrujzqstSc4RWpUbjip1vtJu87HN3uTosoLdOiT3A@mail.gmail.com>
+From: andrew.smirnov@gmail.com (Andrey Smirnov)
+Date: Wed, 27 Jun 2018 09:46:34 -0700
+Subject: [1/3] ARM: dts: imx51-zii-common: create common include dtsi
+In-Reply-To: <5a3490a5-ee5c-a4da-8b54-b5234b7e50d0@yandex.ru>
+References: <1529603100-31958-2-git-send-email-andrey.gusakov@cogentembedded.com>
+ <5a3490a5-ee5c-a4da-8b54-b5234b7e50d0@yandex.ru>
+Message-ID: <CAHQ1cqH0o2rsVJWccR6dBXQCnp2-mmLNTNOi0uAOO2SSdz0+xA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 27, 2018 at 12:21 PM,  <honghui.zhang@mediatek.com> wrote:
-> From: Honghui Zhang <honghui.zhang@mediatek.com>
+Nikita:
+
+Since you are mostly arguing against the suggestions I made to Andrey
+Gusakov in off-list review, I'll respond.
+
+On Wed, Jun 27, 2018 at 12:11 AM Nikita Yushchenko
+<nikita.yoush@yandex.ru> wrote:
 >
-> The MTCMOS of PCIe Host for MT2712 and MT7622 will be off when system
-> suspend, and all the internal control register will be reset after system
-> resume. The PCIe link should be re-established and the related control
-> register values should be re-set after system resume.
-
->  struct mtk_pcie_soc {
->         bool need_fix_class_id;
-
-> +       bool pm_support;
-
-Hmm... Do you really need this flag? Can't runtime PM API tell you this?
-
->         struct pci_ops *ops;
->         int (*startup)(struct mtk_pcie_port *port);
->         int (*setup_irq)(struct mtk_pcie_port *port, struct device_node *node);
-> @@ -1195,12 +1197,76 @@ static int mtk_pcie_probe(struct platform_device *pdev)
->         return err;
->  }
+> > +     i2c_gpio: i2c-gpio {
+> > +             compatible = "i2c-gpio";
+> > +             pinctrl-names = "default";
+> > +             pinctrl-0 = <&pinctrl_swi2c>;
+> > +             i2c-gpio,delay-us = <50>;
+> > +             status = "okay";
+> > +
+> > +             #address-cells = <1>;
+> > +             #size-cells = <0>;
+> > +     };
 >
-> +#ifdef CONFIG_PM_SLEEP
-> +static int mtk_pcie_suspend_noirq(struct device *dev)
-
-Perhaps __maybe_unused?
-
-> +{
-> +       struct mtk_pcie *pcie = dev_get_drvdata(dev);
-> +       const struct mtk_pcie_soc *soc = pcie->soc;
-> +       struct mtk_pcie_port *port;
-> +
-> +       if (!soc->pm_support)
-> +               return 0;
-> +
-
-> +       if (list_empty(&pcie->ports))
-> +               return 0;
-
-So, if the list is empty you are not suspending for the host?
-
-
-> +
-> +       list_for_each_entry(port, &pcie->ports, list) {
-> +               clk_disable_unprepare(port->pipe_ck);
-> +               clk_disable_unprepare(port->obff_ck);
-> +               clk_disable_unprepare(port->axi_ck);
-> +               clk_disable_unprepare(port->aux_ck);
-> +               clk_disable_unprepare(port->ahb_ck);
-> +               clk_disable_unprepare(port->sys_ck);
-> +               phy_power_off(port->phy);
-> +               phy_exit(port->phy);
-> +       }
-> +
-> +       mtk_pcie_subsys_powerdown(pcie);
-> +
-> +       return 0;
-> +}
-> +
-> +static int mtk_pcie_resume_noirq(struct device *dev)
-> +{
-> +       struct mtk_pcie *pcie = dev_get_drvdata(dev);
-> +       const struct mtk_pcie_soc *soc = pcie->soc;
-> +       struct mtk_pcie_port *port;
-> +
-> +       if (!soc->pm_support)
-> +               return 0;
-> +
-
-> +       if (list_empty(&pcie->ports))
-> +               return 0;
-
-No runtime PM for this case?
-(It seems now I understand why in previous patch you have a similar check)
-
-> +
-> +       if (dev->pm_domain) {
-> +               pm_runtime_enable(dev);
-> +               pm_runtime_get_sync(dev);
-> +       }
-> +
-> +       clk_prepare_enable(pcie->free_ck);
-> +
-> +       list_for_each_entry(port, &pcie->ports, list)
-> +               mtk_pcie_enable_port(port);
-> +
-
-> +       if (list_empty(&pcie->ports))
-
-Hmm... How it would be true if you already bailed out above on the
-same condition?
-
-> +               mtk_pcie_subsys_powerdown(pcie);
-> +
-> +       return 0;
-> +}
-> +#endif
-> +
-> +static const struct dev_pm_ops mtk_pcie_pm_ops = {
-> +       SET_NOIRQ_SYSTEM_SLEEP_PM_OPS(mtk_pcie_suspend_noirq,
-> +                                     mtk_pcie_resume_noirq)
-> +};
-> +
->  static const struct mtk_pcie_soc mtk_pcie_soc_v1 = {
->         .ops = &mtk_pcie_ops,
->         .startup = mtk_pcie_startup_port,
->  };
+> You add i2c-gpio node to dtsi file without defining gpios, with reference
+> to pinctrl not defined inside your dtsi file or it's includes, and without
+> any usage inside dtsi file.
 >
->  static const struct mtk_pcie_soc mtk_pcie_soc_mt2712 = {
-> +       .pm_support = true,
->         .ops = &mtk_pcie_ops_v2,
->         .startup = mtk_pcie_startup_port_v2,
->         .setup_irq = mtk_pcie_setup_irq,
+> Saving several text lines that way is a bad idea.
 
-No update for .pm ?
+There are three boards that share that configuration almost to a T,
+with the only difference is the particular GPIOs used. Putting it into
+a common file avoids repeating the boilerplate and makes it explicit
+to the reader that those settings are shared.
 
-> @@ -1208,6 +1274,7 @@ static const struct mtk_pcie_soc mtk_pcie_soc_mt2712 = {
->
->  static const struct mtk_pcie_soc mtk_pcie_soc_mt7622 = {
->         .need_fix_class_id = true,
-> +       .pm_support = true,
->         .ops = &mtk_pcie_ops_v2,
->         .startup = mtk_pcie_startup_port_v2,
->         .setup_irq = mtk_pcie_setup_irq,
-> @@ -1227,6 +1294,7 @@ static struct platform_driver mtk_pcie_driver = {
->                 .name = "mtk-pcie",
->                 .of_match_table = mtk_pcie_ids,
->                 .suppress_bind_attrs = true,
-> +               .pm = &mtk_pcie_pm_ops,
->         },
->  };
->  builtin_platform_driver(mtk_pcie_driver);
-> --
-> 2.6.4
+> Please move it to where it is fully defined and used.
 >
 
+We are now starting to give Andrey Gusakov conflicting
+recommendations. For the sake of moving forward, can we agree that
+this and similar comments are relatively minor and defer to the
+maintainers to make a call which way to go?
+This way Andrey has a clear way on how to move forward with this set.
 
+> > +&usb_vbus {
+> > +     regulator-always-on;
+>
+> usb_vbus is regilator-fixed, what for is this?
+>
+> > +&uart2 {
+> > +     pinctrl-names = "default";
+> > +     pinctrl-0 = <&pinctrl_uart2>;
+> > +     status = "okay";
+> > +};
+>
+> In your further patches you include this and then revert by marking &uart2 as
+> disabled. Better to enable it in dts for boards that have it.
+>
 
--- 
-With Best Regards,
-Andy Shevchenko
+There are at least two boards that use that UART2 as is. Same as above
+this was done to reduce boilerplate.
+
+> Same with ecspi2, ipu and maybe more.
+>
+
+Ditto.
+
+> > -     flash at 1 {
+> > -             #address-cells = <1>;
+> > -             #size-cells = <1>;
+> > -             compatible = "atmel,at45db642d", "atmel,at45", "atmel,dataflash";
+> > -             spi-max-frequency = <25000000>;
+> > -             reg = <1>;
+> > -     };
+>
+> > +     flash at 1 {
+> > +             #address-cells = <1>;
+> > +             #size-cells = <1>;
+> > +             compatible = "atmel,at45", "atmel,dataflash";
+> > +             spi-max-frequency = <25000000>;
+> > +             reg = <1>;
+> > +     };
+>
+> Lost a compatible key?
+>
+> > -                     sysled0 at 3 {
+> > -                             reg = <3>;
+> > -                             label = "system:green:status";
+> > -                             linux,default-trigger = "default-on";
+> > -                     };
+>
+> > +                     sysled3: led3 at 3 {
+> > +                             reg = <3>;
+> > +                             label = "system:red:power";
+> > +                             linux,default-trigger = "default-on";
+> > +                     };
+>
+> > +&sysled3 {
+> > +     label = "system:green:status";
+>
+> What for this label games?
+
+Same as above. Avoiding unnecessary repetitions.
+
+Thanks,
+Andrey Smirnov
