@@ -1,52 +1,45 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Wed, 27 Jun 2018 22:08:12 +0200
-Subject: [PATCH] ARM: dts: sun8i-h3: Increase the GPU clock to 576 MHz
-In-Reply-To: <20180627072635.3592-1-paul.kocialkowski@bootlin.com>
-References: <20180627072635.3592-1-paul.kocialkowski@bootlin.com>
-Message-ID: <20180627200812.usm5ndoyrnmuhjrv@flea>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Thu, 28 Jun 2018 04:21:30 +0800
+Subject: [PATCH v2 0/7] Allwinner A64 DE2 CCU support with dedicated DE2
+ bus driver
+In-Reply-To: <20180627183721.jmmsmp3u3mq4drvb@flea>
+References: <20180622122615.55836-1-icenowy@aosc.io>
+ <20180627183721.jmmsmp3u3mq4drvb@flea>
+Message-ID: <EB513C5E-4BBD-46B2-9B61-18ED0B14C0E4@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 27, 2018 at 09:26:35AM +0200, Paul Kocialkowski wrote:
-> It was reported (based on declarations from the Allwiner BSP) that the
-> Mali 400 found on the H3 can be clocked up to 576 MHz.
-> 
-> The frequency was tested using the r6p2 out-of-tree driver and a Kodi
-> userspace with associated r6p2 blobs, leading to a working result.
-> 
-> This increases the clock to 576 MHz, which directly increases the pixel
-> throughput of the GPU (given the 1 pixel-per-cycle rate).
-> 
-> Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-> ---
->  arch/arm/boot/dts/sun8i-h3.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
-> index 41d57c76f290..a14a63092dc6 100644
-> --- a/arch/arm/boot/dts/sun8i-h3.dtsi
-> +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
-> @@ -133,7 +133,7 @@
->  			resets = <&ccu RST_BUS_GPU>;
->  
->  			assigned-clocks = <&ccu CLK_GPU>;
-> -			assigned-clock-rates = <384000000>;
-> +			assigned-clock-rates = <576000000>;
 
-This should really be fixed through the driver or through OPPs,
-instead of just coding it here and hoping that it will remain set to
-that rate.
 
-Maxime
+? 2018?6?28? GMT+08:00 ??2:37:21, Maxime Ripard <maxime.ripard@bootlin.com> ??:
+>On Fri, Jun 22, 2018 at 08:26:08PM +0800, Icenowy Zheng wrote:
+>> This patchset tries to implement the Allwinner A64 DE2 as a bus
+>driver,
+>> in order to model the fact that the SRAM claim controls the access to
+>> the whole DE2 memory space.
+>> 
+>> PATCH 1 and PATCH 4 are for the CCU part.
+>> 
+>> PATCH 2 is the device tree binding for the A64 DE2 bus, and PATCH 3
+>> implements the bus driver.
+>> 
+>> PATCH 5 adds the DE2 CCU device tree node, with the DE2 bus node.
+>> 
+>> PATCH 6 and 7 are HDMI simplefb patches for A64. They're present as a
+>> test to this patchset.
+>
+>Applied all the patches with the minor modifications Chen-Yu and I
+>suggested.
+>
+>The threading was broken on your serie though, so you probably want to
+>check your git configuration.
 
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180627/e712ed43/attachment.sig>
+In fact I think I should check my ISP configuration.
+
+The breakage is introduced due to too long delay between aosc.io
+mail server and my computer, so I must start to send the
+remaining patches again.
+
+>
+>Thanks!
+>Maxime
