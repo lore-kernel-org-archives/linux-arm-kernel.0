@@ -1,114 +1,69 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed, 27 Jun 2018 16:40:45 -0700
-Subject: [PATCH 1/2] dt-bindings: nand: meson: add Amlogic NAND controller
- driver
-In-Reply-To: <20180626183003.GA3019@rob-hp-laptop> (Rob Herring's message of
- "Tue, 26 Jun 2018 12:30:03 -0600")
-References: <20180613161314.14894-1-yixun.lan@amlogic.com>
- <20180613161314.14894-2-yixun.lan@amlogic.com>
- <CAFBinCBeyXf6LNaZzAw6WnsxzDAv8E=Yp2eem0xCPWMEUi6pnQ@mail.gmail.com>
- <20180626183003.GA3019@rob-hp-laptop>
-Message-ID: <7hvaa3hk76.fsf@baylibre.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Thu, 28 Jun 2018 07:48:36 +0800
+Subject: [RFC PATCH v2 1/6] serial: uartps: Do not initialize field to
+ zero again
+In-Reply-To: <05e553c2-202b-0b4b-8b88-60e330c80fa3@xilinx.com>
+References: <cover.1528288895.git.michal.simek@xilinx.com>
+ <e8b0169887855a5ef2c1a0456842f650601b451c.1528288895.git.michal.simek@xilinx.com>
+ <e7b01bd9-5763-75c0-1384-2536313f5854@monstr.eu>
+ <20180627100917.GA20940@kroah.com>
+ <05e553c2-202b-0b4b-8b88-60e330c80fa3@xilinx.com>
+Message-ID: <20180627234836.GA1691@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rob Herring <robh@kernel.org> writes:
+On Wed, Jun 27, 2018 at 04:19:46PM +0200, Michal Simek wrote:
+> On 27.6.2018 12:09, Greg Kroah-Hartman wrote:
+> > On Tue, Jun 19, 2018 at 10:09:05AM +0200, Michal Simek wrote:
+> >> On 6.6.2018 14:41, Michal Simek wrote:
+> >>> Writing zero and NULLs to already initialized fields is not needed.
+> >>> Remove this additional writes.
+> >>>
+> >>> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> >>> ---
+> >>>
+> >>> Changes in v2:
+> >>> - new patch - it can be sent separately too
+> >>>
+> >>>  drivers/tty/serial/xilinx_uartps.c | 3 ---
+> >>>  1 file changed, 3 deletions(-)
+> >>>
+> >>> diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
+> >>> index 8a3e34234e98..5f116f3ecd4a 100644
+> >>> --- a/drivers/tty/serial/xilinx_uartps.c
+> >>> +++ b/drivers/tty/serial/xilinx_uartps.c
+> >>> @@ -1510,15 +1510,12 @@ static int cdns_uart_probe(struct platform_device *pdev)
+> >>>  
+> >>>  	/* At this point, we've got an empty uart_port struct, initialize it */
+> >>>  	spin_lock_init(&port->lock);
+> >>> -	port->membase	= NULL;
+> >>> -	port->irq	= 0;
+> >>>  	port->type	= PORT_UNKNOWN;
+> >>>  	port->iotype	= UPIO_MEM32;
+> >>>  	port->flags	= UPF_BOOT_AUTOCONF;
+> >>>  	port->ops	= &cdns_uart_ops;
+> >>>  	port->fifosize	= CDNS_UART_FIFO_SIZE;
+> >>>  	port->line	= id;
+> >>> -	port->dev	= NULL;
+> >>>  
+> >>>  	/*
+> >>>  	 * Register the port.
+> >>>
+> >>
+> >> Alan, Rob, Greg: Any comment about this RFC?
+> > 
+> > I rarely review RFC patchesets as obviously you don't think it is good
+> > enough to be submitted "for real" :)
+> 
+> There is one missing minor part but I want to review concept first
+> because I didn't find any driver which is using this style.
+> 
+> > If you think this is all good, great, please resend it without the RFC
+> > and it will end up in my queue.
+> 
+> I will definitely do it but please look at the concept itself because I
+> would like to use this with at least 3 other drivers.
 
-> On Sun, Jun 24, 2018 at 12:46:59AM +0200, Martin Blumenstingl wrote:
->> Hello Yixun, Hello Liang,
->> 
->> I have a few small comments inline below
->> additionally I tried to explain the reason behind
->> "amlogic,mmc-syscon", clkin0 and clkin1 so Rob (or the devicetree
->> maintainers in general) can give feedback. feel free to correct me
->> wherever I'm wrong or provide additional notes in case I missed
->> something!
->> 
->> On Wed, Jun 13, 2018 at 10:17 AM Yixun Lan <yixun.lan@amlogic.com> wrote:
->> >
->> > From: Liang Yang <liang.yang@amlogic.com>
->> >
->> > Add Amlogic NAND controller dt-bindings for Meson SoC,
->> > Current this driver support GXBB/GXL/AXG platform.
->> >
->> > Signed-off-by: Liang Yang <liang.yang@amlogic.com>
->> > Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
->> > ---
->> >  .../bindings/mtd/amlogic,meson-nand.txt       | 118 ++++++++++++++++++
->> >  1 file changed, 118 insertions(+)
->> >  create mode 100644 Documentation/devicetree/bindings/mtd/amlogic,meson-nand.txt
->> >
->> > diff --git a/Documentation/devicetree/bindings/mtd/amlogic,meson-nand.txt b/Documentation/devicetree/bindings/mtd/amlogic,meson-nand.txt
->> > new file mode 100644
->> > index 000000000000..eac9f9433d5d
->> > --- /dev/null
->> > +++ b/Documentation/devicetree/bindings/mtd/amlogic,meson-nand.txt
->> > @@ -0,0 +1,118 @@
->> > +Amlogic NAND Flash Controller (NFC) for GXBB/GXL/AXG family SoCs
->> > +
->> > +This file documents the properties in addition to those available in
->> > +the MTD NAND bindings.
->> > +
->> > +Required properties:
->> > +- compatible : contains one of:
->> > +  - "amlogic,meson-gxl-nfc"
->> > +  - "amlogic,meson-axg-nfc"
->> the patch description states that GXBB/GXL/AXG are supported
->> shouldn't you add a compatible string for GXBB as well?
->> 
->> > +- clocks     :
->> > +       A list of phandle + clock-specifier pairs for the clocks listed
->> > +       in clock-names.
->> > +
->> > +- clock-names: Should contain the following:
->> > +       "core" - NFC module gate clock
->> > +       "clkin0" - Parent clock of internal mux
->> > +       "clkin1" - Other parent clock of internal mux
->> to give the devicetree maintainers some context on clkin0 and clkin1:
->> 
->> older SoCs (Meson8, Meson8b - not supported by this binding/driver
->> yet) had a dedicated NAND clock. there neither clkin0 or clkin1 would
->> be used, instead we just had a "nand" or "interface" clock (I'm not
->> aware of the actual naming in Amlogic's internal datasheets)
->> 
->> newer SoCs do NOT have a dedicated NAND "interface" clock anymore.
->> instead they are sharing the clock with the "sd_emmc_c" controller (I
->> *believe* the reason for this is because sd_emmc_c and the NAND
->> controller use the same pads on the SoC, pinctrl muxing controls where
->> these pads are routed -> NAND and sd_emmc_c cannot be used at the same
->> time, so SoC designers probably decided to re-use the clock)
->> 
->> unfortunately the sd_emmc_c clock is not provided by the "main" clock
->> controller on these newer SoCs
->> instead the clock is part of the MMC controller's register space (see
->> the SD_EMMC_CLOCK register in drivers/mmc/host/meson-gx-mmc.c)
->> even worse: the SD_EMMC_CLOCK contains more than just clock settings
->> (bit 25 enables the SDIO interrupt, which is currently not supported
->> by the meson-gx-mmc driver though)
->> 
->> the SD_EMMC_CLOCK register has a mux (CLK_SRC_MASK) to choose from
->> clkin0 and clkin1 which are passed here
->> the "amlogic,mmc-syscon" property is used to get a phandle to the
->> sd_emmc_c syscon register space
->> thus there is a bit of code duplication in the MMC and NAND drivers
->> with this binding (because both need to configure the SD_EMMC_CLOCK
->> register)
->
-> Well, that's ugly. Really, the SD controller should be modeled as a 
-> clock provider. But then you would have to always have a driver 
-> instantiated for it. Maybe you need that anyway if accessing this 
-> register is dependent on some other clock or reset to the module being 
-> enabled (which you may not hit if you only access the reg during boot)?
+I don't have the time right now to review "concepts", sorry.
 
-On some earlier rounds of off-lis review, we did consider making the
-SD/MMC controller a clock provider.  But forcing it to be instantiated
-was kinda ugly too, especailly because there are several instances of
-the MMC IP, and only one of them shares the clock with the NAND, so only
-one of them needs to be a clock provider. :(
-
-> But if you really want to do it this way, I guess that is fine.
-
-Thanks.  We did consider a few options, and found this one to be the
-least worst of a few options.
-
-Kevin
+greg k-h
