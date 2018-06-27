@@ -1,137 +1,128 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 27 Jun 2018 13:20:56 +0100
-Subject: [PATCH v3 4/6] KVM: arm/arm64: Consolidate page-table accessors
-In-Reply-To: <20180627122058.8210-1-marc.zyngier@arm.com>
-References: <20180627122058.8210-1-marc.zyngier@arm.com>
-Message-ID: <20180627122058.8210-5-marc.zyngier@arm.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Wed, 27 Jun 2018 08:25:31 -0400
+Subject: [PATCH] arm64/acpi: Add fixup for HPE m400 quirks
+In-Reply-To: <CAKv+Gu9VfK8itWr5EoOGAdSA-OkrXystw-sbooOq2ZOpFwi9vw@mail.gmail.com>
+References: <51d3d738-cdf5-2992-bba5-c3e1f34096c2@infradead.org>
+ <098e6d53-8dc7-439f-7165-adbe0e7c4941@arm.com>
+ <8a3034b9-6cf3-5182-717f-dd1dc8a087aa@infradead.org>
+ <5b03f754-3a98-c01d-3e2a-615a8b1ea537@arm.com>
+ <0cbc68d5-9a8f-1734-4eea-d1f037927137@infradead.org>
+ <cb5aa4ee12422ecc5f6530f3a74bcfa553b42c80.camel@redhat.com>
+ <a59fa0f8-4123-bcd9-670a-8885d34f37ed@arm.com>
+ <0be5ce017286a4ec494e0f0969bb10126b8501ce.camel@redhat.com>
+ <bd5fc825573c3394b80365ad2dc47bde7b22044a.camel@gmail.com>
+ <950b3034-08a8-38b9-b8f9-514d3e2519fa@arm.com>
+ <257bbf8d90669921cede5b2e7555b9523311b795.camel@redhat.com>
+ <CAKv+Gu9VfK8itWr5EoOGAdSA-OkrXystw-sbooOq2ZOpFwi9vw@mail.gmail.com>
+Message-ID: <45b96b937687b199bdbd6966491ab23f50bb20e7.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The arm and arm64 KVM page tables accessors are pointlessly different
-between the two architectures, and likely both wrong one way or another:
-arm64 lacks a dsb(), and arm doesn't use WRITE_ONCE.
+On Wed, 2018-06-27 at 10:48 +0200, Ard Biesheuvel wrote:
+> On 26 June 2018 at 22:20, Mark Salter <msalter@redhat.com> wrote:
+> > On Tue, 2018-06-26 at 15:51 +0100, James Morse wrote:
+> > > Hi Mark,
+> > > 
+> > > Thanks for shed-ing some light on what is going on here!
+> > > 
+> > > On 25/06/18 16:34, Mark Salter wrote:
+> > > > On Fri, 2018-06-22 at 11:19 -0400, Mark Salter wrote:
+> > > > > I'm going to hack something to get to the ghes info earlier in boot and
+> > > > > check the things you mention above wrt Error Status Block and GHES.0.
+> > > > 
+> > > > So I had to end up instrumenting the EFI stub to see where the error came
+> > > > from. At the start of the stub, there is no GHES.2 error. The error first
+> > > > shows up after the stub's call to ExitBootServices returns.
+> > > 
+> > > What's the notification type of GHES.2? I'm guessing POLLed or some kind of IRQ.
+> > 
+> > SCI
+> > 
+> > Here's the HEST entry:
+> > 
+> > [028h 0040   2]                Subtable Type : 0009 [Generic Hardware Error Source]
+> > [02Ah 0042   2]                    Source Id : 0002
+> > [02Ch 0044   2]            Related Source Id : FFFF
+> > [02Eh 0046   1]                     Reserved : 00
+> > [02Fh 0047   1]                      Enabled : 01
+> > [030h 0048   4]       Records To Preallocate : 00000001
+> > [034h 0052   4]      Max Sections Per Record : 00000001
+> > [038h 0056   4]          Max Raw Data Length : 00000AEC
+> > 
+> > [03Ch 0060  12]         Error Status Address : [Generic Address Structure]
+> > [03Ch 0060   1]                     Space ID : 00 [SystemMemory]
+> > [03Dh 0061   1]                    Bit Width : 40
+> > [03Eh 0062   1]                   Bit Offset : 00
+> > [03Fh 0063   1]         Encoded Access Width : 04 [QWord Access:64]
+> > [040h 0064   8]                      Address : 0000004FF7E9F0E0
+> > 
+> 
+> This is a reserved region in the memory map. Does that apply to the
+> other occurrences as well?
 
-Let's unify them.
+Yes, they are all in the same reserved region.
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Christoffer Dall <christoffer.dall@arm.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/include/asm/kvm_mmu.h   | 12 -----------
- arch/arm64/include/asm/kvm_mmu.h |  3 ---
- virt/kvm/arm/mmu.c               | 35 ++++++++++++++++++++++++++++----
- 3 files changed, 31 insertions(+), 19 deletions(-)
-
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index 8553d68b7c8a..b2feaea1434c 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -75,18 +75,6 @@ phys_addr_t kvm_get_idmap_vector(void);
- int kvm_mmu_init(void);
- void kvm_clear_hyp_idmap(void);
- 
--static inline void kvm_set_pmd(pmd_t *pmd, pmd_t new_pmd)
--{
--	*pmd = new_pmd;
--	dsb(ishst);
--}
--
--static inline void kvm_set_pte(pte_t *pte, pte_t new_pte)
--{
--	*pte = new_pte;
--	dsb(ishst);
--}
--
- static inline pte_t kvm_s2pte_mkwrite(pte_t pte)
- {
- 	pte_val(pte) |= L_PTE_S2_RDWR;
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index 620eb9e06bd8..25c9a91f6a87 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -169,9 +169,6 @@ phys_addr_t kvm_get_idmap_vector(void);
- int kvm_mmu_init(void);
- void kvm_clear_hyp_idmap(void);
- 
--#define	kvm_set_pte(ptep, pte)		set_pte(ptep, pte)
--#define	kvm_set_pmd(pmdp, pmd)		set_pmd(pmdp, pmd)
--
- static inline pte_t kvm_s2pte_mkwrite(pte_t pte)
- {
- 	pte_val(pte) |= PTE_S2_RDWR;
-diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-index ea7314296ad1..87d5c91b9b6a 100644
---- a/virt/kvm/arm/mmu.c
-+++ b/virt/kvm/arm/mmu.c
-@@ -177,6 +177,33 @@ static void clear_stage2_pmd_entry(struct kvm *kvm, pmd_t *pmd, phys_addr_t addr
- 	put_page(virt_to_page(pmd));
- }
- 
-+static inline void kvm_set_pte(pte_t *ptep, pte_t new_pte)
-+{
-+	WRITE_ONCE(*ptep, new_pte);
-+	dsb(ishst);
-+}
-+
-+static inline void kvm_set_pmd(pmd_t *pmdp, pmd_t new_pmd)
-+{
-+	WRITE_ONCE(*pmdp, new_pmd);
-+	dsb(ishst);
-+}
-+
-+static inline void kvm_pmd_populate(pmd_t *pmdp, pte_t *ptep)
-+{
-+	pmd_populate_kernel(NULL, pmdp, ptep);
-+}
-+
-+static inline void kvm_pud_populate(pud_t *pudp, pmd_t *pmdp)
-+{
-+	pud_populate(NULL, pudp, pmdp);
-+}
-+
-+static inline void kvm_pgd_populate(pgd_t *pgdp, pud_t *pudp)
-+{
-+	pgd_populate(NULL, pgdp, pudp);
-+}
-+
- /*
-  * Unmapping vs dcache management:
-  *
-@@ -605,7 +632,7 @@ static int create_hyp_pmd_mappings(pud_t *pud, unsigned long start,
- 				kvm_err("Cannot allocate Hyp pte\n");
- 				return -ENOMEM;
- 			}
--			pmd_populate_kernel(NULL, pmd, pte);
-+			kvm_pmd_populate(pmd, pte);
- 			get_page(virt_to_page(pmd));
- 			kvm_flush_dcache_to_poc(pmd, sizeof(*pmd));
- 		}
-@@ -638,7 +665,7 @@ static int create_hyp_pud_mappings(pgd_t *pgd, unsigned long start,
- 				kvm_err("Cannot allocate Hyp pmd\n");
- 				return -ENOMEM;
- 			}
--			pud_populate(NULL, pud, pmd);
-+			kvm_pud_populate(pud, pmd);
- 			get_page(virt_to_page(pud));
- 			kvm_flush_dcache_to_poc(pud, sizeof(*pud));
- 		}
-@@ -675,7 +702,7 @@ static int __create_hyp_mappings(pgd_t *pgdp, unsigned long ptrs_per_pgd,
- 				err = -ENOMEM;
- 				goto out;
- 			}
--			pgd_populate(NULL, pgd, pud);
-+			kvm_pgd_populate(pgd, pud);
- 			get_page(virt_to_page(pgd));
- 			kvm_flush_dcache_to_poc(pgd, sizeof(*pgd));
- 		}
-@@ -1094,7 +1121,7 @@ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
- 		if (!cache)
- 			return 0; /* ignore calls from kvm_set_spte_hva */
- 		pte = mmu_memory_cache_alloc(cache);
--		pmd_populate_kernel(NULL, pmd, pte);
-+		kvm_pmd_populate(pmd, pte);
- 		get_page(virt_to_page(pmd));
- 	}
- 
--- 
-2.17.1
+> 
+> > There are 9 others all identical except for Source ID and address.
+> > 
+> > > These systems don't have EL3, so the CPU must continue running while something
+> > > external generates the CPER records. The records being visible is the last point
+> > > the faulty-access could have been made, with the window of time depending on how
+> > > fast this external-thing receives and processes the error.
+> > 
+> > There's a System Control Processor (slimpro) on the SoC which can interact with
+> > the CPU in various ways and which has access to memory and other hw.
+> > 
+> > > 
+> > > 
+> > > > So it looks
+> > > > like the firmware itself is causing the error. There's still a chance that
+> > > > the stub is doing something wrong with the memory map passed to the
+> > > > firmware, so I'll try to eliminate that as well.
+> > > 
+> > > adding delay loops will help prove the EFIStub is innocent.
+> > 
+> > Didn't change anything.
+> > 
+> > > 
+> > > Are there any optional drivers being loaded by UEFI? (can you remove any USB
+> > > mass storage drives for instance).
+> > 
+> > The only storage is pci based. There is a USB port but doesn't look like
+> > anything is attached to it. I don't have physical access to it. It is one on
+> > many moonshot cartridges in a chassis several hundred miles away.
+> > 
+> > > 
+> > > Are redhat able to rebuild UEFI on these systems? (Can it be fixed?)
+> > 
+> > No.
+> > 
+> > > 
+> > > https://bugzilla.redhat.com/show_bug.cgi?id=1285107 is about the m400
+> > > description of the GIC, comments 15 and 16 show a UEFI patch to something other
+> > > than the upstream platforms tree[0], and new firmware being tested.
+> > > (although this may be wishful thinking)
+> > 
+> > HPe would respond to bug reports until m400 reached EOL. They have been pretty
+> > clear that no more firmware updates will be done.
+> > 
+> > > 
+> > > It looks like quirking this based on the DMI platform name and UEFI version will
+> > > be what we need. We could discard anything in the error status block areas at
+> > > ghes_probe() time based on this quirk, but we may have missed other problems
+> > > during boot, giving a false sense of security.
+> > > 
+> > > 
+> > > Thanks,
+> > > 
+> > > James
+> > > 
+> > > 
+> > > [0] Might be wrong, but this is where I look:
+> > > https://github.com/tianocore/edk2-platforms.git
+> > 
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
