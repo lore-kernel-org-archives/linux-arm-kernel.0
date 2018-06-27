@@ -1,85 +1,43 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 27 Jun 2018 18:18:11 +0100
-Subject: [PATCH v4 5/6] PCI: aardvark: Introduce an
- advk_pcie_valid_device() helper
-In-Reply-To: <20180627165124.GA8243@red-moon>
-References: <20180406145536.19637-1-thomas.petazzoni@bootlin.com>
- <20180406145536.19637-6-thomas.petazzoni@bootlin.com>
- <20180627165124.GA8243@red-moon>
-Message-ID: <20180627171811.GB8243@red-moon>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Wed, 27 Jun 2018 20:25:00 +0200
+Subject: [PATCH] drm/sun4i: Implement zpos for DE2
+In-Reply-To: <20180627164514.4777-1-jernej.skrabec@siol.net>
+References: <20180627164514.4777-1-jernej.skrabec@siol.net>
+Message-ID: <20180627182500.eanqagmcfmsgzos2@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 27, 2018 at 05:51:24PM +0100, Lorenzo Pieralisi wrote:
-> On Fri, Apr 06, 2018 at 04:55:35PM +0200, Thomas Petazzoni wrote:
-> > In other to mimic other PCIe host controller drivers, introduce an
-> > advk_pcie_valid_device() helper, used in the configuration read/write
-> > functions.
-> > 
-> > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
-> > ---
-> > Changes since v4:
-> >  - Move later into the series, so that it doesn't need to be pushed as
-> >    a fix for stable.
-> > Changes since v3:
-> >  - Make the new helper return a bool instead of int
-> > Changes since v2:
-> >  - New patch
-> > ---
-> >  drivers/pci/host/pci-aardvark.c | 13 +++++++++++--
-> >  1 file changed, 11 insertions(+), 2 deletions(-)
-> 
-> Hi Thomas,
-> 
-> please rebase patch 5 (this patch) and 6 and resend, I will apply them
-> straight away, sorry for the delay.
+Hi!
 
-Never mind, I handled the host->controller dir move myself, applied both
-to pci/aardvark for v4.19, thanks.
-
-Lorenzo
-
-> Thanks,
-> Lorenzo
+On Wed, Jun 27, 2018 at 06:45:14PM +0200, Jernej Skrabec wrote:
+> Initial implementation of DE2 planes only supported fixed zpos.
 > 
-> > diff --git a/drivers/pci/host/pci-aardvark.c b/drivers/pci/host/pci-aardvark.c
-> > index 9abf549631b4..69c4fd50947e 100644
-> > --- a/drivers/pci/host/pci-aardvark.c
-> > +++ b/drivers/pci/host/pci-aardvark.c
-> > @@ -431,6 +431,15 @@ static int advk_pcie_wait_pio(struct advk_pcie *pcie)
-> >  	return -ETIMEDOUT;
-> >  }
-> >  
-> > +static bool advk_pcie_valid_device(struct advk_pcie *pcie, struct pci_bus *bus,
-> > +				  int devfn)
-> > +{
-> > +	if ((bus->number == pcie->root_bus_nr) && PCI_SLOT(devfn) != 0)
-> > +		return false;
-> > +
-> > +	return true;
-> > +}
-> > +
-> >  static int advk_pcie_rd_conf(struct pci_bus *bus, u32 devfn,
-> >  			     int where, int size, u32 *val)
-> >  {
-> > @@ -438,7 +447,7 @@ static int advk_pcie_rd_conf(struct pci_bus *bus, u32 devfn,
-> >  	u32 reg;
-> >  	int ret;
-> >  
-> > -	if ((bus->number == pcie->root_bus_nr) && PCI_SLOT(devfn) != 0) {
-> > +	if (!advk_pcie_valid_device(pcie, bus, devfn)) {
-> >  		*val = 0xffffffff;
-> >  		return PCIBIOS_DEVICE_NOT_FOUND;
-> >  	}
-> > @@ -492,7 +501,7 @@ static int advk_pcie_wr_conf(struct pci_bus *bus, u32 devfn,
-> >  	int offset;
-> >  	int ret;
-> >  
-> > -	if ((bus->number == pcie->root_bus_nr) && PCI_SLOT(devfn) != 0)
-> > +	if (!advk_pcie_valid_device(pcie, bus, devfn))
-> >  		return PCIBIOS_DEVICE_NOT_FOUND;
-> >  
-> >  	if (where % size)
-> > -- 
-> > 2.14.3
-> > 
+> Expand implementation with configurable zpos property.
+> 
+> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+
+Thanks for that work. I guess you should expand a bit on the exact
+setup you're doing here.
+
+Are the pipes working the same way on the DE2 than on DE1, ie does the
+pipe blending applies before the alpha blending, and therefore you
+need to make sure that there's not two planes with alpha going to the
+same pipe?
+
+Also, you seem to use the pipe and channels indifferently now, why is
+that?
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180627/22a7ac37/attachment.sig>
