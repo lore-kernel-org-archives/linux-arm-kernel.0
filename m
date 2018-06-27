@@ -1,114 +1,46 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Wed, 27 Jun 2018 15:26:18 +0200
-Subject: v4.18-rc1 on droid 4: very bad CPU performance
-In-Reply-To: <20180626061604.GK112168@atomide.com>
-References: <20180621121542.GA4836@amd> <20180622072005.GF112168@atomide.com>
- <20180622074936.GG112168@atomide.com> <20180625094949.GA17001@amd>
- <20180626061604.GK112168@atomide.com>
-Message-ID: <20180627132618.GA32007@amd>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 27 Jun 2018 14:28:27 +0100
+Subject: KVM guest sometimes failed to boot because of kernel stack
+ overflow if KPTI is enabled on a hisilicon ARM64 platform.
+In-Reply-To: <5B338F7B.9070500@hisilicon.com>
+References: <5B2A6218.3030201@hisilicon.com> <20180620144257.GB27776@arm.com>
+ <5B2A7832.4010502@hisilicon.com>
+ <ebfabb8f-dcd9-3fb4-3655-368a882d8f09@arm.com>
+ <5B2A7FE1.5040607@hisilicon.com>
+ <e701eaa8-dcb9-777c-2211-67ee27b43acb@arm.com>
+ <5B2B6DEA.2090100@hisilicon.com> <5B3274FC.7000206@hisilicon.com>
+ <20180626174746.GO23375@arm.com> <5B338F7B.9070500@hisilicon.com>
+Message-ID: <20180627132826.GB30631@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 2018-06-25 23:16:04, Tony Lindgren wrote:
-> * Pavel Machek <pavel@ucw.cz> [180625 09:52]:
-> > Hi!
+On Wed, Jun 27, 2018 at 02:22:03PM +0100, Wei Xu wrote:
+> On 2018/6/26 18:47, Will Deacon wrote:
+> > If you look at the __idmap_kpti_put_pgtable_ent_ng asm macro, can you try
+> > replacing:
 > > 
-> > > > > V4.18 is slower than it should be.
-> > > > > 
-> > > > > user at devuan:~$ time cat /dev/urandom | head -c 10000000 |  bzip2 -9 -
-> > > > > | wc -c
-> > > > > 10044291
-> > > > > 52.73user 2.40system 61.53 (1m1.534s) elapsed 89.60%CPU
-> > > > > user at devuan:~$ uname -a
-> > > > > Linux devuan 4.18.0-rc1-87964-gfa19934-dirty #743 SMP Sun Jun 17
-> > > > > 19:26:37 CEST 2018 armv7l GNU/Linux
-> > > > > 
-> > > > > That bzip should take 12 seconds, not minute.
-> > > > > 
-> > > > > Any ideas? Do you see it, too?
-> > > > 
-> > > > I've noticed firefox is super slow.. Git bisect time?
-> > > 
-> > > Hmm not happening for me at least on duovero and droid4,
-> > > I'm getting about 20s for v4.17 and v4.18-rc1.
+> > 	dc      civac, cur_\()\type\()p
 > > 
-> > Something weird is going on here. My notes say it should be 12
-> > seconds.
+> > with:
 > > 
-> > It is indeed 20 seconds for v4.17, but it is 12 seconds in v4.14.
+> > 	dc      ivac, cur_\()\type\()p
 > > 
-> > v4.14 is:
-> > # CONFIG_CPU_FREQ is not set
-> > CONFIG_CPU_IDLE=y
-> > # CONFIG_CPU_IDLE_GOV_LADDER is not set
-> > CONFIG_CPU_IDLE_GOV_MENU=y
-> > # CONFIG_ARM_CPUIDLE is not set
-> > 
-> > In v4.18, I have:
-> > 
-> > CONFIG_CPU_FREQ=y
-> > CONFIG_CPU_FREQ_GOV_ATTR_SET=y
-> > CONFIG_CPU_FREQ_GOV_COMMON=y
-> > CONFIG_CPU_FREQ_STAT=y
-> > CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
-> > 
-> > CONFIG_CPU_IDLE=y
-> > CONFIG_CPU_IDLE_GOV_MENU=y
-> > CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED=y
+> > please? Only do this for the guest kernel, not the host. KVM will upgrade
+> > the clean to a clean+invalidate, so it's interesting to see if this has
+> > an effect on the behaviour.
 > 
-> I gave it a quick try here with v4.14 and it was 21 seconds
-> on 4430 duovero. But this was with omap2plus_defconfig.
+> Only changed the guest kernel, the guest still failed to boot and the log
+> is same with the last mail.
+> 
+> But if I changed to cvac as below for the guest, it is kind of stable.
+> 	dc      cvac, cur_\()\type\()p
+> 
+> I have synced with our SoC guys about this and hope we can find the reason.
+> Do you have any more suggestion?
 
-Weird. In v4.18 I seen times from 57 seconds to 27 seconds to 20
-seconds. It seems to be consistent after boot.
+Unfortunately, not. It looks like somehow clean+invalidate is behaving
+just as an invalidate, and we're corrupting the page table as a result.
 
-v4.14 is fast... 12 second. v4.15 (all-v4.15 branch) -- no
-boot. all-v4.16 -- 15.7 seconds. all-v4.18 with "all" config: time
-varies (20, 24, 27, 57 seconds). all-v4.18 with "droid4" config: 20
-seconds.
+Hopefully the SoC guys will figure it out.
 
-What needs to be done to get cpufreq to work? One of my hypothesis is
-that cpu is running at wrong rate. I have it enabled in config, but no
-luck:
-
-user at devuan:~$ zcat /proc/config.gz | grep CPU_FREQ
-CONFIG_CPU_FREQ=y
-CONFIG_CPU_FREQ_GOV_ATTR_SET=y
-CONFIG_CPU_FREQ_GOV_COMMON=y
-CONFIG_CPU_FREQ_STAT=y
-# CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE is not set
-# CONFIG_CPU_FREQ_DEFAULT_GOV_POWERSAVE is not set
-# CONFIG_CPU_FREQ_DEFAULT_GOV_USERSPACE is not set
-CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
-# CONFIG_CPU_FREQ_DEFAULT_GOV_CONSERVATIVE is not set
-# CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL is not set
-CONFIG_CPU_FREQ_GOV_PERFORMANCE=y
-CONFIG_CPU_FREQ_GOV_POWERSAVE=y
-CONFIG_CPU_FREQ_GOV_USERSPACE=y
-CONFIG_CPU_FREQ_GOV_ONDEMAND=y
-CONFIG_CPU_FREQ_GOV_CONSERVATIVE=y
-# CONFIG_CPU_FREQ_GOV_SCHEDUTIL is not set
-user at devuan:~$ sudo cpufreq-info
-cpufrequtils 008: cpufreq-info (C) Dominik Brodowski 2004-2009
-Report errors and bugs to cpufreq at vger.kernel.org, please.
-analyzing CPU 0:
-  no or unknown cpufreq driver is active on this CPU
-    maximum transition latency: 0.00 ms.
-    analyzing CPU 1:
- no or unknown cpufreq driver is active on this CPU
- maximum transition latency: 0.00 ms.
-user at devuan:~$
-
-Best regards,
-
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180627/387e589d/attachment.sig>
+Will
