@@ -1,37 +1,56 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Wed, 27 Jun 2018 19:04:03 +0200
-Subject: [PATCH] ARM: dts: sun8i: a83t: Add CPU regulator supplies for
- A83T boards
-In-Reply-To: <20180627022709.27434-1-wens@csie.org>
-References: <20180627022709.27434-1-wens@csie.org>
-Message-ID: <20180627170403.y7ptuiyrhklh7foj@flea>
+From: pawel.mikolaj.chmiel@gmail.com (=?UTF-8?q?Pawe=C5=82=20Chmiel?=)
+Date: Wed, 27 Jun 2018 19:12:14 +0200
+Subject: [PATCH v2 00/10] Initial support for Samsung Galaxy S and Galaxy S 4G
+Message-ID: <1530119544-30023-1-git-send-email-pawel.mikolaj.chmiel@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 27, 2018 at 10:27:09AM +0800, Chen-Yu Tsai wrote:
-> The OPPs for the A83T CPU cores were added in v4.17 in commit 2db639d8c166
-> ("ARM: dts: sun8i: a83t: add stable OPP tables and CPUfreq"), but board
-> level regulator supplies for the CPU clusters were only added for the
-> TBS-A711 tablet. This means the other A83T boards do not benefit from
-> voltage scaling, or worse, if the implementation does not scale the
-> frequency when the voltage is fixed, no benefit at all.
-> 
-> Add board level CPU cluster power supplies to all the A83T development
-> boards, so they can have proper dynamic CPU voltage and frequency scaling.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+This patch series adds support for Samsung Galaxy S and Galaxy S 4G.
+Both are commercial phone based on Aries family.
 
-Applied, thanks!
-Maxime
+Changes from v1:
+  - Removed duplicated and unneeded headers
+  - Corrected node names
+  - Formatting fixes
+  - Removed unneeded pinctrl and sorted entries
+  - Set correct interrupt type for max8998 pmic
+  - Add missing regulators
+  - Added missing commit msg
+  - Added stdout-path
+  - Added information why we hardcode bootargs
+  - Added new patch which adds information, that there are samsung boards,
+    not using exynos bases soc.
+  - Split patch updating s5pv210_defconfig into three parts.
+    First is result of make savedefconfig, second adds drivers required
+    by both devices and last adds some options, which are usefull in booting
+    typical Linux distribution.
+
+Jonathan Bakker (2):
+  ARM: dts: s5pv210: Add initial DTS for SGH-T959P phone
+  dt-bindings: samsung: Document bindings for SGH-T959P board
+
+Pawe? Chmiel (8):
+  ARM: dts: s5pv210: Add missing interrupt-controller property to gph2
+  ARM: dts: s5pv210: Add initial DTS for Samsung Aries based phones
+  ARM: dts: s5pv210: Add initial DTS for Samsung Galaxy S phone
+  dt-bindings: samsung: Add S5PV210 as possible soc in Samsung boards
+  dt-bindings: samsung: Document bindings for Samsung aries boards
+  ARM: s5pv210_defconfig: Run make savedefconfig
+  ARM: s5pv210_defconfig: Enable drivers for Samsung Aries based phones
+  ARM: s5pv210_defconfig: Enable options needed to boot typical Linux
+    distro
+
+ .../bindings/arm/samsung/samsung-boards.txt        |   5 +-
+ arch/arm/boot/dts/Makefile                         |   2 +
+ arch/arm/boot/dts/s5pv210-aries.dtsi               | 413 +++++++++++++++++++++
+ arch/arm/boot/dts/s5pv210-fascinate4g.dts          |  45 +++
+ arch/arm/boot/dts/s5pv210-galaxys.dts              |  77 ++++
+ arch/arm/boot/dts/s5pv210-pinctrl.dtsi             |   2 +
+ arch/arm/configs/s5pv210_defconfig                 |  49 ++-
+ 7 files changed, 589 insertions(+), 4 deletions(-)
+ create mode 100644 arch/arm/boot/dts/s5pv210-aries.dtsi
+ create mode 100644 arch/arm/boot/dts/s5pv210-fascinate4g.dts
+ create mode 100644 arch/arm/boot/dts/s5pv210-galaxys.dts
 
 -- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180627/4a028bea/attachment.sig>
+2.7.4
