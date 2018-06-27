@@ -1,88 +1,50 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 27 Jun 2018 14:59:02 +0100
-Subject: [PATCH v3 4/6] KVM: arm/arm64: Consolidate page-table accessors
-In-Reply-To: <20180627122058.8210-5-marc.zyngier@arm.com>
-References: <20180627122058.8210-1-marc.zyngier@arm.com>
- <20180627122058.8210-5-marc.zyngier@arm.com>
-Message-ID: <0afbb729-d801-1563-a319-4d3e3d6ac6a9@arm.com>
+From: toshi.kani@hpe.com (Toshi Kani)
+Date: Wed, 27 Jun 2018 08:13:45 -0600
+Subject: [PATCH v4 0/3] fix free pmd/pte page handlings on x86
+Message-ID: <20180627141348.21777-1-toshi.kani@hpe.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc,
+This series fixes two issues in the x86 ioremap free page handlings
+for pud/pmd mappings.
 
-On 27/06/18 13:20, Marc Zyngier wrote:
-> The arm and arm64 KVM page tables accessors are pointlessly different
-> between the two architectures, and likely both wrong one way or another:
-> arm64 lacks a dsb(), and arm doesn't use WRITE_ONCE.
-> 
-> Let's unify them.
+Patch 01 fixes BUG_ON on x86-PAE reported by Joerg.  It disables
+the free page handling on x86-PAE.
 
-nit: Feel free to ignore. The changes introducing kvm_p.d_populate
-is not mentioned in the commit description and they do look a bit
-disconnected from the change described above.
+Patch 02-03 fixes a possible issue with speculation which can cause
+stale page-directory cache.
+ - Patch 02 is from Chintan's v9 01/04 patch [1], which adds a new arg
+   'addr', with my merge change to patch 01.
+ - Patch 03 adds a TLB purge (INVLPG) to purge page-structure caches
+   that may be cached by speculation.  See the patch descriptions for
+   more detal.
 
-> 
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
-> Acked-by: Christoffer Dall <christoffer.dall@arm.com>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+The patches are based off from the tip tree.
 
+[1] https://patchwork.kernel.org/patch/10371015/
 
-> +static inline void kvm_pmd_populate(pmd_t *pmdp, pte_t *ptep)
-> +{
-> +	pmd_populate_kernel(NULL, pmdp, ptep);
-> +}
-> +
-> +static inline void kvm_pud_populate(pud_t *pudp, pmd_t *pmdp)
-> +{
-> +	pud_populate(NULL, pudp, pmdp);
-> +}
-> +
-> +static inline void kvm_pgd_populate(pgd_t *pgdp, pud_t *pudp)
-> +{
-> +	pgd_populate(NULL, pgdp, pudp);
-> +}
-> +
+v4:
+ - Re-wrote patch 2/3 description. (v3-UPDATE)
+ - Added NOTE to pud_free_pmd_page().
 
->   /*
->    * Unmapping vs dcache management:
->    *
-> @@ -605,7 +632,7 @@ static int create_hyp_pmd_mappings(pud_t *pud, unsigned long start,
->   				kvm_err("Cannot allocate Hyp pte\n");
->   				return -ENOMEM;
->   			}
-> -			pmd_populate_kernel(NULL, pmd, pte);
-> +			kvm_pmd_populate(pmd, pte);
->   			get_page(virt_to_page(pmd));
->   			kvm_flush_dcache_to_poc(pmd, sizeof(*pmd));
->   		}
-> @@ -638,7 +665,7 @@ static int create_hyp_pud_mappings(pgd_t *pgd, unsigned long start,
->   				kvm_err("Cannot allocate Hyp pmd\n");
->   				return -ENOMEM;
->   			}
-> -			pud_populate(NULL, pud, pmd);
-> +			kvm_pud_populate(pud, pmd);
->   			get_page(virt_to_page(pud));
->   			kvm_flush_dcache_to_poc(pud, sizeof(*pud));
->   		}
-> @@ -675,7 +702,7 @@ static int __create_hyp_mappings(pgd_t *pgdp, unsigned long ptrs_per_pgd,
->   				err = -ENOMEM;
->   				goto out;
->   			}
-> -			pgd_populate(NULL, pgd, pud);
-> +			kvm_pgd_populate(pgd, pud);
->   			get_page(virt_to_page(pgd));
->   			kvm_flush_dcache_to_poc(pgd, sizeof(*pgd));
->   		}
-> @@ -1094,7 +1121,7 @@ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
->   		if (!cache)
->   			return 0; /* ignore calls from kvm_set_spte_hva */
->   		pte = mmu_memory_cache_alloc(cache);
-> -		pmd_populate_kernel(NULL, pmd, pte);
-> +		kvm_pmd_populate(pmd, pte);
->   		get_page(virt_to_page(pmd));
->   	}
->   
-> 
+v3:
+ - Fixed a build error in v2.
 
+v2:
+ - Reordered patch-set, so that patch 01 can be applied independently.
+ - Added a NULL pointer check for the page alloc in patch 03. 
 
-Suzuki
+---
+Toshi Kani (2):
+  1/3 x86/mm: disable ioremap free page handling on x86-PAE
+  3/3 x86/mm: add TLB purge to free pmd/pte page interfaces
+
+Chintan Pandya (1):
+  2/3 ioremap: Update pgtable free interfaces with addr
+
+---
+ arch/arm64/mm/mmu.c           |  4 +--
+ arch/x86/mm/pgtable.c         | 61 +++++++++++++++++++++++++++++++++++++------
+ include/asm-generic/pgtable.h |  8 +++---
+ lib/ioremap.c                 |  4 +--
+ 4 files changed, 61 insertions(+), 16 deletions(-)
