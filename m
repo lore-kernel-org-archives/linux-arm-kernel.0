@@ -1,39 +1,31 @@
 From: pawel.mikolaj.chmiel@gmail.com (=?UTF-8?q?Pawe=C5=82=20Chmiel?=)
-Date: Wed, 27 Jun 2018 19:12:21 +0200
-Subject: [PATCH v2 07/10] dt-bindings: samsung: Document bindings for
- SGH-T959P board
+Date: Wed, 27 Jun 2018 19:12:22 +0200
+Subject: [PATCH v2 08/10] ARM: s5pv210_defconfig: Run make savedefconfig
 In-Reply-To: <1530119544-30023-1-git-send-email-pawel.mikolaj.chmiel@gmail.com>
 References: <1530119544-30023-1-git-send-email-pawel.mikolaj.chmiel@gmail.com>
-Message-ID: <1530119544-30023-8-git-send-email-pawel.mikolaj.chmiel@gmail.com>
+Message-ID: <1530119544-30023-9-git-send-email-pawel.mikolaj.chmiel@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jonathan Bakker <xc-racer2@live.ca>
+This is result of running savedefconfig.
+It's preparation for adding support for Samsung Aries devices.
 
-Document the binding for Samsung Galaxy S Fascinate 4G (SGH-T959P).
-
-Signed-off-by: Jonathan Bakker <xc-racer2@live.ca>
 Signed-off-by: Pawe? Chmiel <pawel.mikolaj.chmiel@gmail.com>
---
-
-Changes from v1:
-  - Added missing commit msg.
---
 ---
- Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/configs/s5pv210_defconfig | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt b/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
-index 3fa287a86300..37e96e48c48c 100644
---- a/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
-+++ b/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
-@@ -3,6 +3,7 @@
- Required root node properties:
-     - compatible = should be one or more of the following.
- 	- "samsung,aries"	- for S5PV210-based Samsung Aries board.
-+	- "samsung,fascinate4g"	- for S5PV210-based Samsung Galaxy S Fascinate 4G (SGH-T959P) board.
- 	- "samsung,galaxys"	- for S5PV210-based Samsung Galaxy S (i9000)  board.
- 	- "samsung,artik5"	- for Exynos3250-based Samsung ARTIK5 module.
- 	- "samsung,artik5-eval" - for Exynos3250-based Samsung ARTIK5 eval board.
+diff --git a/arch/arm/configs/s5pv210_defconfig b/arch/arm/configs/s5pv210_defconfig
+index 09b5a7386414..9c862d366fb3 100644
+--- a/arch/arm/configs/s5pv210_defconfig
++++ b/arch/arm/configs/s5pv210_defconfig
+@@ -13,7 +13,6 @@ CONFIG_SOLARIS_X86_PARTITION=y
+ CONFIG_ARCH_S5PV210=y
+ CONFIG_VMSPLIT_2G=y
+ CONFIG_PREEMPT=y
+-CONFIG_AEABI=y
+ CONFIG_CMDLINE="root=/dev/ram0 rw ramdisk=8192 initrd=0x20800000,8M console=ttySAC1,115200 init=/linuxrc"
+ CONFIG_VFP=y
+ CONFIG_NEON=y
 -- 
 2.7.4
