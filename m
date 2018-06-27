@@ -1,59 +1,21 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Wed, 27 Jun 2018 18:09:17 +0800
-Subject: [RFC PATCH v2 1/6] serial: uartps: Do not initialize field to
- zero again
-In-Reply-To: <e7b01bd9-5763-75c0-1384-2536313f5854@monstr.eu>
-References: <cover.1528288895.git.michal.simek@xilinx.com>
- <e8b0169887855a5ef2c1a0456842f650601b451c.1528288895.git.michal.simek@xilinx.com>
- <e7b01bd9-5763-75c0-1384-2536313f5854@monstr.eu>
-Message-ID: <20180627100917.GA20940@kroah.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 27 Jun 2018 17:41:26 +0530
+Subject: [PATCH v2] ARM: dts: da850: Fix interrups property for gpio
+In-Reply-To: <1528193271-10726-1-git-send-email-j-keerthy@ti.com>
+References: <1528193271-10726-1-git-send-email-j-keerthy@ti.com>
+Message-ID: <8572a60f-982c-9981-ff73-15d1532d5965@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 19, 2018 at 10:09:05AM +0200, Michal Simek wrote:
-> On 6.6.2018 14:41, Michal Simek wrote:
-> > Writing zero and NULLs to already initialized fields is not needed.
-> > Remove this additional writes.
-> > 
-> > Signed-off-by: Michal Simek <michal.simek@xilinx.com>
-> > ---
-> > 
-> > Changes in v2:
-> > - new patch - it can be sent separately too
-> > 
-> >  drivers/tty/serial/xilinx_uartps.c | 3 ---
-> >  1 file changed, 3 deletions(-)
-> > 
-> > diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
-> > index 8a3e34234e98..5f116f3ecd4a 100644
-> > --- a/drivers/tty/serial/xilinx_uartps.c
-> > +++ b/drivers/tty/serial/xilinx_uartps.c
-> > @@ -1510,15 +1510,12 @@ static int cdns_uart_probe(struct platform_device *pdev)
-> >  
-> >  	/* At this point, we've got an empty uart_port struct, initialize it */
-> >  	spin_lock_init(&port->lock);
-> > -	port->membase	= NULL;
-> > -	port->irq	= 0;
-> >  	port->type	= PORT_UNKNOWN;
-> >  	port->iotype	= UPIO_MEM32;
-> >  	port->flags	= UPF_BOOT_AUTOCONF;
-> >  	port->ops	= &cdns_uart_ops;
-> >  	port->fifosize	= CDNS_UART_FIFO_SIZE;
-> >  	port->line	= id;
-> > -	port->dev	= NULL;
-> >  
-> >  	/*
-> >  	 * Register the port.
-> > 
+On Tuesday 05 June 2018 03:37 PM, Keerthy wrote:
+> The intc #interrupt-cells is equal to 1. Currently gpio
+> node has 2 cells per IRQ which is wrong. Remove the additional
+> cell for each of the interrupts.
 > 
-> Alan, Rob, Greg: Any comment about this RFC?
+> Signed-off-by: Keerthy <j-keerthy@ti.com>
+> Fixes: 2e38b946dc54 ("ARM: davinci: da850: add GPIO DT node")
 
-I rarely review RFC patchesets as obviously you don't think it is good
-enough to be submitted "for real" :)
+Applied to fixes for v4.18
 
-If you think this is all good, great, please resend it without the RFC
-and it will end up in my queue.
-
-thanks,
-
-greg k-h
+Thanks,
+Sekhar
