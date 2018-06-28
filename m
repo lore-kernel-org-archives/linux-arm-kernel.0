@@ -1,32 +1,30 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Thu, 28 Jun 2018 11:53:15 +0200
-Subject: [PATCH 0/4] RDU1/2 latest supported RAVE SP nodes
-In-Reply-To: <20180628042424.12664-1-andrew.smirnov@gmail.com>
-References: <20180628042424.12664-1-andrew.smirnov@gmail.com>
-Message-ID: <1530179595.22468.50.camel@pengutronix.de>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 28 Jun 2018 10:52:01 +0100
+Subject: [PATCH 1/2] ARM: dts: armada388-clearfog: enable spi flash
+In-Reply-To: <874lhn8dg1.fsf@bootlin.com>
+References: <2bc87e3e365c460943730ded86c8fcb1ff55a533.1530170016.git.baruch@tkos.co.il>
+ <874lhn8dg1.fsf@bootlin.com>
+Message-ID: <20180628095201.GD17271@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, den 27.06.2018, 21:24 -0700 schrieb Andrey Smirnov:
-> Shawn:
+On Thu, Jun 28, 2018 at 11:31:26AM +0200, Gregory CLEMENT wrote:
+> Hi Baruch,
+>  
+>  On jeu., juin 28 2018, Baruch Siach <baruch@tkos.co.il> wrote:
 > 
-> These are patches adding the rest of RAVE SP child nodes covering all
-> the rest of currently supported MFD cells. There's more to be added,
-> once more drivers get accepted upstream.
+> > The SolidRun Armada 388 SOM has the SPI flash populated by default
+> > unless the customer explicitly asks otherwise. Enable support by
+> > default.
+> >
+> > Signed-off-by: Baruch Siach <baruch@tkos.co.il>
 > 
-> The bindings three drivers mentioned are availible in:
-> 
-> ????Documentation/devicetree/bindings/nvmem/zii,rave-sp-eeprom.txt
-> ????Documentation/devicetree/bindings/input/zii,rave-sp-pwrbutton.txt
-> ????Documentation/devicetree/bindings/leds/backlight/zii,rave-sp-backlight.txt
-> 
-> Feedback is welcome!
+> Applied on mvebu/dt
 
-Apart from the RDU 1/2 mixup you noticed yourself this looks good to
-me. Maybe Shawn can just fix this up while applying.
+It would be nice if you waited for acks or review before picking up
+patches.  Only patch 2 has been acked and reviewed.
 
-For the series:
-Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
-
-Regards,
-Lucas
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
