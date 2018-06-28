@@ -1,50 +1,73 @@
-From: luc.vanoostenryck@gmail.com (Luc Van Oostenryck)
-Date: Thu, 28 Jun 2018 12:46:11 +0200
-Subject: [PATCH v4 0/7] arm64: untag user pointers passed to the kernel
-In-Reply-To: <20180628102741.vk6vphfinlj3lvhv@armageddon.cambridge.arm.com>
-References: <cover.1529507994.git.andreyknvl@google.com>
- <CAAeHK+zqtyGzd_CZ7qKZKU-uZjZ1Pkmod5h8zzbN0xCV26nSfg@mail.gmail.com>
- <20180626172900.ufclp2pfrhwkxjco@armageddon.cambridge.arm.com>
- <CAAeHK+yqWKTdTG+ymZ2-5XKiDANV+fmUjnQkRy-5tpgphuLJRA@mail.gmail.com>
- <0cef1643-a523-98e7-95e2-9ec595137642@arm.com>
- <20180627171757.amucnh5znld45cpc@armageddon.cambridge.arm.com>
- <20180628061758.j6bytsaj5jk4aocg@ltop.local>
- <20180628102741.vk6vphfinlj3lvhv@armageddon.cambridge.arm.com>
-Message-ID: <20180628104610.czsnq4w3lfhxrn53@ltop.local>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Thu, 28 Jun 2018 13:47:30 +0300
+Subject: [PATCH 1/2] ARM: dts: armada388-clearfog: enable spi flash
+In-Reply-To: <20180628103320.GE17271@n2100.armlinux.org.uk>
+References: <2bc87e3e365c460943730ded86c8fcb1ff55a533.1530170016.git.baruch@tkos.co.il>
+ <20180628095113.GC17271@n2100.armlinux.org.uk>
+ <20180628100759.45clx3diuv6tk3e3@tarshish>
+ <20180628103320.GE17271@n2100.armlinux.org.uk>
+Message-ID: <20180628104730.te6ckfhncftvakjk@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 28, 2018 at 11:27:42AM +0100, Catalin Marinas wrote:
-> On Thu, Jun 28, 2018 at 08:17:59AM +0200, Luc Van Oostenryck wrote:
-> > On Wed, Jun 27, 2018 at 06:17:58PM +0100, Catalin Marinas wrote:
-> > > sparse is indeed an option. The current implementation doesn't warn on
-> > > an explicit cast from (void __user *) to (unsigned long) since that's a
-> > > valid thing in the kernel. I couldn't figure out if there's any other
-> > > __attribute__ that could be used to warn of such conversion.
+Hi Russell,
+
+On Thu, Jun 28, 2018 at 11:33:20AM +0100, Russell King - ARM Linux wrote:
+> On Thu, Jun 28, 2018 at 01:07:59PM +0300, Baruch Siach wrote:
+> > Thanks for reviewing.
 > > 
-> > sparse doesn't have such attribute but would an new option that would warn
-> > on such cast be a solution for your case?
+> > On Thu, Jun 28, 2018 at 10:51:14AM +0100, Russell King - ARM Linux wrote:
+> > > On Thu, Jun 28, 2018 at 10:13:35AM +0300, Baruch Siach wrote:
+> > > > The SolidRun Armada 388 SOM has the SPI flash populated by default
+> > > > unless the customer explicitly asks otherwise. Enable support by
+> > > > default.
+> > > 
+> > > Are you sure about that - at least some of my boards do not have the
+> > > SPI flash populated.
+> > > 
+> > > &spi1 {
+> > >         /* The microsom has an optional W25Q32 on board, connected to CS0 */
+> > > ...
+> > > &spi1 {
+> > >         /*
+> > >          * Add SPI CS pins for clearfog:
+> > >          * CS0: W25Q32 (not populated on uSOM)
+> > 
+> > I should update this line as well, I guess.
+> > 
+> > >          * CS1: PIC microcontroller (Pro models)
+> > >          * CS2: mikrobus
+> > >          */
+> > > 
+> > > I wouldn't have written "not populated on uSOM" without having first
+> > > taken the uSOM off and physically checked.
+> > 
+> > Are these production SOMs or development/engineering samples?
 > 
-> I can't tell for sure whether such sparse option would be the full
-> solution but detecting explicit __user pointer casts to long is a good
-> starting point. So far this patchset pretty much relies on detecting
-> a syscall failure and trying to figure out why, patching the kernel. It
-> doesn't really scale.
+> I don't remember.
+> 
+> > Ilya Viten from the SolidRun commercial department told me that all production 
+> > SOMs that were shipped to customers have the SPI flash populated.
+> 
+> Yes, Jon confirms that.
+> 
+> > This is just the default value for the common case.
+> 
+> Has it been tested with boards that don't have the SPI flash populated?
+> That needs to happen to make sure that this doesn't cause a regression.
 
-OK, I'll add such an option this evening.
- 
-> As a side note, we have cases in the user-kernel ABI where the user
-> address type is "unsigned long": mmap() and friends. My feedback on an
-> early version of this patchset was to always require untagged pointers
-> coming from user space on such syscalls, so no need for explicit
-> untagging.
+I don't have such a SOM handy. I can try to "produce" one next week.
 
-Mmmm yes.
-I tend to favor a sort of opposite approach. When we have an address
-that must not be dereferenced as-such (and sometimes when the address
-can be from both __user & __kernel space) I prefer to use a ulong
-which will force the use of the required operation before being
-able to do any sort of dereferencing and this won't need horrible
-casts with __force (it, of course, all depends on the full context).
+I tested a modified DT with the 'reg' property set to 1 to simulate an 
+unpopulated SPI flash. The driver probe seems to fail gracefully:
 
--- Luc
+  m25p80 spi1.1: unrecognized JEDEC id bytes: ff, ff, ff
+
+Is this test sufficient to ensure the safety of this patch?
+
+baruch
+
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
