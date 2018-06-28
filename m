@@ -1,131 +1,146 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu, 28 Jun 2018 14:28:23 -0400
-Subject: [PATCH V3 3/6] PCI: Unify try slot and bus reset API
-In-Reply-To: <1530210507-9287-1-git-send-email-okaya@codeaurora.org>
-References: <1530210507-9287-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1530210507-9287-3-git-send-email-okaya@codeaurora.org>
+From: alexandre.belloni@bootlin.com (Alexandre Belloni)
+Date: Thu, 28 Jun 2018 20:34:09 +0200
+Subject: [PATCH v5 1/6] ARM: at91: add TCB registers definitions
+In-Reply-To: <1bc64ccb-1e22-364c-e08c-fa86692783ff@linaro.org>
+References: <20180619211929.22908-1-alexandre.belloni@bootlin.com>
+ <20180619211929.22908-2-alexandre.belloni@bootlin.com>
+ <1bc64ccb-1e22-364c-e08c-fa86692783ff@linaro.org>
+Message-ID: <20180628183409.GS4207@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Drivers are expected to call pci_try_reset_slot() or pci_try_reset_bus() by
-querying if a system supports hotplug or not. A survey showed that most
-drivers don't do this and we are leaking hotplug capability to the user.
+On 28/06/2018 17:15:39+0200, Daniel Lezcano wrote:
+> On 19/06/2018 23:19, Alexandre Belloni wrote:
+> > Add registers and bits definitions for the timer counter blocks found on
+> > Atmel ARM SoCs.
+> > 
+> > Tested-by: Alexander Dahl <ada@thorsis.com>
+> > Tested-by: Andras Szemzo <szemzo.andras@gmail.com>
+> > Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
+> > ---
+> >  include/soc/at91/atmel_tcb.h | 216 +++++++++++++++++++++++++++++++++++
+> 
+> Is the header necessary ? Can it be moved in the .c ?
+> 
 
-Hide pci_try_slot_reset() from drivers and embed into pci_try_bus_reset().
-Change pci_try_reset_bus() parameter from struct pci_bus to struct pci_dev.
+Ultimately, the clocksource driver will not be the only one to use it.
+There is the pwm driver that will be converted (it was converted in the
+first version of the series). and then there is a counter driver that
+will be submitted once the subsystem is upstreamed.
 
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- drivers/pci/pci.c           | 26 +++++++++++++++++++++-----
- drivers/vfio/pci/vfio_pci.c |  6 ++----
- include/linux/pci.h         |  3 +--
- 3 files changed, 24 insertions(+), 11 deletions(-)
+> >  1 file changed, 216 insertions(+)
+> >  create mode 100644 include/soc/at91/atmel_tcb.h
+> > 
+> > diff --git a/include/soc/at91/atmel_tcb.h b/include/soc/at91/atmel_tcb.h
+> > new file mode 100644
+> > index 000000000000..3ed66031fc76
+> > --- /dev/null
+> 
+> [ ... ]
+> 
+> > +static inline struct clk *tcb_clk_get(struct device_node *node, int channel)
+> > +{
+> > +	struct clk *clk;
+> > +	char clk_name[] = "t0_clk";
+> > +
+> > +	clk_name[1] += channel;
+> 
+> clever :)
+> 
+> > +	clk = of_clk_get_by_name(node->parent, clk_name);
+> > +	if (!IS_ERR(clk))
+> > +		return clk;
+> > +
+> > +	return of_clk_get_by_name(node->parent, "t0_clk");
+> 
+> Why do you want to return clk from t0_clk if another channel is
+> requested ? This is prone to error.
 
-diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-index 236220c..79a1566 100644
---- a/drivers/pci/pci.c
-+++ b/drivers/pci/pci.c
-@@ -4817,12 +4817,12 @@ int pci_reset_slot(struct pci_slot *slot)
- EXPORT_SYMBOL_GPL(pci_reset_slot);
- 
- /**
-- * pci_try_reset_slot - Try to reset a PCI slot
-+ * __pci_try_reset_slot - Try to reset a PCI slot
-  * @slot: PCI slot to reset
-  *
-  * Same as above except return -EAGAIN if the slot cannot be locked
-  */
--int pci_try_reset_slot(struct pci_slot *slot)
-+static int __pci_try_reset_slot(struct pci_slot *slot)
- {
- 	int rc;
- 
-@@ -4843,7 +4843,6 @@ int pci_try_reset_slot(struct pci_slot *slot)
- 
- 	return rc;
- }
--EXPORT_SYMBOL_GPL(pci_try_reset_slot);
- 
- static int pci_bus_reset(struct pci_bus *bus, int probe)
- {
-@@ -4906,12 +4905,12 @@ int pci_reset_bus(struct pci_bus *bus)
- EXPORT_SYMBOL_GPL(pci_reset_bus);
- 
- /**
-- * pci_try_reset_bus - Try to reset a PCI bus
-+ * __pci_try_reset_bus - Try to reset a PCI bus
-  * @bus: top level PCI bus to reset
-  *
-  * Same as above except return -EAGAIN if the bus cannot be locked
-  */
--int pci_try_reset_bus(struct pci_bus *bus)
-+static int __pci_try_reset_bus(struct pci_bus *bus)
- {
- 	int rc;
- 
-@@ -4932,6 +4931,23 @@ int pci_try_reset_bus(struct pci_bus *bus)
- 
- 	return rc;
- }
-+
-+/**
-+ * pci_try_reset_bus - Try to reset a PCI bus
-+ * @pdev: top level PCI device to reset via slot/bus
-+ *
-+ * Same as above except return -EAGAIN if the bus cannot be locked
-+ */
-+int pci_try_reset_bus(struct pci_dev *pdev)
-+{
-+	bool slot = false;
-+
-+	if (!pci_probe_reset_slot(pdev->slot))
-+		slot = true;
-+
-+	return slot ? __pci_try_reset_slot(pdev->slot) :
-+			__pci_try_reset_bus(pdev->bus);
-+}
- EXPORT_SYMBOL_GPL(pci_try_reset_bus);
- 
- /**
-diff --git a/drivers/vfio/pci/vfio_pci.c b/drivers/vfio/pci/vfio_pci.c
-index b423a30..71018ec 100644
---- a/drivers/vfio/pci/vfio_pci.c
-+++ b/drivers/vfio/pci/vfio_pci.c
-@@ -1010,8 +1010,7 @@ static long vfio_pci_ioctl(void *device_data,
- 						    &info, slot);
- 		if (!ret)
- 			/* User has access, do the reset */
--			ret = slot ? pci_try_reset_slot(vdev->pdev->slot) :
--				     pci_try_reset_bus(vdev->pdev->bus);
-+			ret = pci_try_reset_bus(vdev->pdev);
- 
- hot_reset_release:
- 		for (i--; i >= 0; i--)
-@@ -1373,8 +1372,7 @@ static void vfio_pci_try_bus_reset(struct vfio_pci_device *vdev)
- 	}
- 
- 	if (needs_reset)
--		ret = slot ? pci_try_reset_slot(vdev->pdev->slot) :
--			     pci_try_reset_bus(vdev->pdev->bus);
-+		ret = pci_try_reset_bus(vdev->pdev);
- 
- put_devs:
- 	for (i = 0; i < devs.cur_index; i++) {
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index 6b12ce2..f5c85b6 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -1096,10 +1096,9 @@ int pci_reset_function_locked(struct pci_dev *dev);
- int pci_try_reset_function(struct pci_dev *dev);
- int pci_probe_reset_slot(struct pci_slot *slot);
- int pci_reset_slot(struct pci_slot *slot);
--int pci_try_reset_slot(struct pci_slot *slot);
- int pci_probe_reset_bus(struct pci_bus *bus);
- int pci_reset_bus(struct pci_bus *bus);
--int pci_try_reset_bus(struct pci_bus *bus);
-+int pci_try_reset_bus(struct pci_dev *dev);
- void pci_reset_secondary_bus(struct pci_dev *dev);
- void pcibios_reset_secondary_bus(struct pci_dev *dev);
- void pci_update_resource(struct pci_dev *dev, int resno);
+The newer TCBs only have one peripheral clocks. The current DT binding only
+have t0_clk in that case so whatever the channel, t0_clk is the correct
+one.
+
+> 
+> I would clarify that at the caller level, if tcb_clk_get fails then try
+> with channel zero.
+
+This was hidden from the individual drivers by tclib but this can be
+open coded in the drivers.
+
+> 
+> > +}
+> > +
+> > +static inline int tcb_irq_get(struct device_node *node, int channel)
+> 
+> no inline
+> 
+
+IIRC, removing the inline will make linking the kernel fail when there
+is more than 2 drivers using the TCBs but I'll try again. Or I can
+remove both those functions and open code as you suggest.
+
+> > +{
+> > +	int irq;
+> > +
+> > +	irq = of_irq_get(node->parent, channel);
+> > +	if (irq > 0)
+> > +		return irq;
+> > +
+> > +	return of_irq_get(node->parent, 0);
+> 
+> Same comment than above.
+> 
+> > +}
+> > +
+> > +static const u8 atmel_tc_divisors[5] = { 2, 8, 32, 128, 0, };
+> > +
+> > +struct atmel_tcb_info {
+> > +	int bits;
+> > +};
+> > +
+> > +static const struct atmel_tcb_info atmel_tcb_infos[] = {
+> > +	{ .bits = 16 },
+> > +	{ .bits = 32 },
+> > +};
+> 
+> Structuring the code with structure is a good practice. However, this is
+> too much :)
+> 
+
+I was going to add the divisor there but as AVR32 is gone, this is
+indeed unnecessary.
+
+> > +static const struct of_device_id atmel_tcb_dt_ids[] = {
+> > +	{
+> > +		.compatible = "atmel,at91rm9200-tcb",
+> > +		.data = &atmel_tcb_infos[0],
+> 
+> 		.data = (void *)16;
+> 
+> > +	}, {
+> > +		.compatible = "atmel,at91sam9x5-tcb",
+> > +		.data = &atmel_tcb_infos[1],
+> > +	}, {
+> > +		/* sentinel */
+> > +	}
+> > +};
+> > +
+> 
+> 
+> 
+> > +#endif /* __SOC_ATMEL_TCB_H */
+> > 
+> 
+> 
+> -- 
+>  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+> 
+> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+> <http://twitter.com/#!/linaroorg> Twitter |
+> <http://www.linaro.org/linaro-blog/> Blog
+> 
+
 -- 
-2.7.4
+Alexandre Belloni, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
