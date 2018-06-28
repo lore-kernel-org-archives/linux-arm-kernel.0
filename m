@@ -1,97 +1,35 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Thu, 28 Jun 2018 20:25:43 +0200
-Subject: [PATCH v3 10/24] drm/sun4i: tcon: Generalize engine search
- algorithm
-In-Reply-To: <1812731.FQOhD8MfmX@jernej-laptop>
-References: <20180625120304.7543-1-jernej.skrabec@siol.net>
- <20180625120304.7543-11-jernej.skrabec@siol.net>
- <CAGb2v66ndyhVFKsOt=g45MJ-cBun8WvRrDsb9XO2hteSX2oe5A@mail.gmail.com>
- <1812731.FQOhD8MfmX@jernej-laptop>
-Message-ID: <20180628182543.yyja6hiry7rx7fu2@flea>
+From: andreyknvl@google.com (Andrey Konovalov)
+Date: Thu, 28 Jun 2018 20:26:39 +0200
+Subject: [PATCH v4 00/17] khwasan: kernel hardware assisted address
+ sanitizer
+In-Reply-To: <20180627181138.14c9b66e13b8778506205f89@linux-foundation.org>
+References: <cover.1530018818.git.andreyknvl@google.com>
+ <20180627160800.3dc7f9ee41c0badbf7342520@linux-foundation.org>
+ <CAN=P9pivApAo76Kjc0TUDE0kvJn0pET=47xU6e=ioZV2VqO0Rg@mail.gmail.com>
+ <CAEZpscCcP6=O_OCqSwW8Y6u9Ee99SzWN+hRcgpP2tK=OEBFnNw@mail.gmail.com>
+ <20180627181138.14c9b66e13b8778506205f89@linux-foundation.org>
+Message-ID: <CAAeHK+wg35W6D3Cat7w8kqV+9fB6dKmnCUuUrZP_tz5=vKk+0Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 28, 2018 at 06:48:50AM +0200, Jernej ?krabec wrote:
-> Dne ?etrtek, 28. junij 2018 ob 04:06:52 CEST je Chen-Yu Tsai napisal(a):
-> > On Mon, Jun 25, 2018 at 8:02 PM, Jernej Skrabec <jernej.skrabec@siol.net> 
-> wrote:
-> > > Current "old" method to find engine worked pretty well for DE2. However,
-> > > it doesn't work when TCON TOP is between  mixer (engine) and TCON. TCON
-> > > TOP has multiple input ports, but current engine search algorithm
-> > > expects only one.
-> > > 
-> > > This can be fixed by first looking for output port id and selecting
-> > > matching input by subtracting 1 for the next round. This work even if
-> > > there is only one input and output.
-> > > 
-> > > Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
-> > > ---
-> > > 
-> > >  drivers/gpu/drm/sun4i/sun4i_tcon.c | 22 ++++++++++++++++++----
-> > >  1 file changed, 18 insertions(+), 4 deletions(-)
-> > > 
-> > > diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> > > b/drivers/gpu/drm/sun4i/sun4i_tcon.c index 08747fc3ee71..264bcc43da11
-> > > 100644
-> > > --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> > > +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> > > @@ -791,12 +791,14 @@ static int sun4i_tcon_init_regmap(struct device
-> > > *dev,
-> > > 
-> > >   */
-> > >  
-> > >  static struct sunxi_engine *
-> > >  sun4i_tcon_find_engine_traverse(struct sun4i_drv *drv,
-> > > 
-> > > -                               struct device_node *node)
-> > > +                               struct device_node *node,
-> > > +                               u32 port_id)
-> > > 
-> > >  {
-> > >  
-> > >         struct device_node *port, *ep, *remote;
-> > >         struct sunxi_engine *engine = ERR_PTR(-EINVAL);
-> > > 
-> > > +       u32 reg = 0;
-> > > 
-> > > -       port = of_graph_get_port_by_id(node, 0);
-> > > +       port = of_graph_get_port_by_id(node, port_id);
-> > > 
-> > >         if (!port)
-> > >         
-> > >                 return ERR_PTR(-EINVAL);
-> > > 
-> > > @@ -826,8 +828,20 @@ sun4i_tcon_find_engine_traverse(struct sun4i_drv
-> > > *drv,
-> > > 
-> > >                 if (remote == engine->node)
-> > >                 
-> > >                         goto out_put_remote;
-> > > 
-> > > +       /*
-> > > +        * According to device tree binding input ports have even id
-> > > +        * number and output ports have odd id. Since component with
-> > > +        * more than one input and one output (TCON TOP) exits, correct
-> > > +        * remote input id has to be calculated by subtracting 1 from
-> > > +        * remote output id. If this for some reason can't be done, 0
-> > > +        * is used as input port id.
-> > > +        */
-> > 
-> > You need to call
-> > 
-> >     of_node_put(port);
-> > 
-> > to drop the reference to the original port.
-> 
-> Thanks for noticing it. I guess I should send fix patch, since patches from 
-> drm-misc-next can't be dropped.
+On Thu, Jun 28, 2018 at 3:11 AM, Andrew Morton
+<akpm@linux-foundation.org> wrote:
+> On Wed, 27 Jun 2018 17:59:00 -0700 Vishwath Mohan <vishwath@google.com> wrote:
+>> Yeah, I can confirm that it's an issue. Like Kostya mentioned, I don't have
+>> data on-hand, but anecdotally both ASAN and KASAN have proven problematic
+>> to enable for environments that don't tolerate the increased memory
+>> pressure well. This includes,
+>> (a) Low-memory form factors - Wear, TV, Things, lower-tier phones like Go
+>> (c) Connected components like Pixel's visual core
+>> <https://www.blog.google/products/pixel/pixel-visual-core-image-processing-and-machine-learning-pixel-2/>
+>>
+>>
+>> These are both places I'd love to have a low(er) memory footprint option at
+>> my disposal.
+>
+> Thanks.
+>
+> It really is important that such information be captured in the
+> changelogs.  In as much detail as can be mustered.
 
-Yeah, please send additional patches for all the issues pointed out by
-Chen-Yu.
-
-Maxime
-
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+I'll add it to the changelog in v5. Thanks!
