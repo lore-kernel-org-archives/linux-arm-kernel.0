@@ -1,53 +1,106 @@
-From: cyndis@kapsi.fi (Mikko Perttunen)
-Date: Thu, 28 Jun 2018 08:57:23 +0300
-Subject: [PATCH 2/2] arm64: tegra: Add CPU nodes to Tegra194 device tree
-In-Reply-To: <20180627165730.GA15867@rob-hp-laptop>
-References: <20180620122827.14165-1-mperttunen@nvidia.com>
- <20180620122827.14165-2-mperttunen@nvidia.com>
- <20180627165730.GA15867@rob-hp-laptop>
-Message-ID: <4eacd53a-b128-241f-8284-14e315451c8e@kapsi.fi>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Thu, 28 Jun 2018 08:02:28 +0200
+Subject: [PATCH v7 00/29] Add support for mediatek SOC MT2712
+In-Reply-To: <1530157537.11190.53.camel@mtksdccf07>
+References: <1529482771-2153-1-git-send-email-stu.hsieh@mediatek.com>
+ <20180625084740.GN2958@phenom.ffwll.local>
+ <1530157537.11190.53.camel@mtksdccf07>
+Message-ID: <20180628060228.GJ13978@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27.06.2018 19:57, Rob Herring wrote:
-> On Wed, Jun 20, 2018 at 03:28:27PM +0300, Mikko Perttunen wrote:
->> Add CPU and PSCI nodes to device tree. The Tegra194 SoC contains
->> eight NVIDIA Carmel CPUs.
->>
->> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
->> ---
->>   arch/arm64/boot/dts/nvidia/tegra194-p2888.dtsi | 40 +++++++++++++++++++
->>   arch/arm64/boot/dts/nvidia/tegra194.dtsi       | 53 ++++++++++++++++++++++++++
->>   2 files changed, 93 insertions(+)
->>
->> diff --git a/arch/arm64/boot/dts/nvidia/tegra194-p2888.dtsi b/arch/arm64/boot/dts/nvidia/tegra194-p2888.dtsi
->> index ecb034177fc2..859ab5af17c1 100644
->> --- a/arch/arm64/boot/dts/nvidia/tegra194-p2888.dtsi
->> +++ b/arch/arm64/boot/dts/nvidia/tegra194-p2888.dtsi
->> @@ -229,6 +229,46 @@
->>   		};
->>   	};
->>   
->> +	cpus {
->> +		cpu at 0 {
->> +			enable-method = "psci";
->> +		};
+On Thu, Jun 28, 2018 at 11:45:37AM +0800, Stu Hsieh wrote:
+> Hi, Daniel Vetter:
 > 
-> Kind of strange to have this separated out. I guess you have non-PSCI
-> firmware too? In any case, unless things have changed, upstream is only
-> supporting spin-table or PSCI for arm64. So please combine this with the
-> rest of the cpu nodes.
+> On Mon, 2018-06-25 at 10:47 +0200, Daniel Vetter wrote:
+> > On Wed, Jun 20, 2018 at 04:19:02PM +0800, Stu Hsieh wrote:
+> > > This patch add support for the Mediatek MT2712 DISP subsystem.
+> > > MT2712 is base on MT8173, there are some difference as following:
+> > > MT2712 support three disp output(two ovl and one rdma)
+> > > 
+> > > Change in v6:
+> > > - Update commit message for the patch
+> > >   "drm/mediatek: Update the definition of connection from RDMA1 to DPI0"
+> > 
+> > Just a drive-by comment on the mediatek driver:
+> > 
+> > As far as I can see mtk_drm_gem.c reimplements the cma helpers as a
+> > copypaste job. Any reasons why you're not using the normal cma helpers?
+> > 
+> > Thanks, Daniel
+> > > 
+> 
+> In the beginning, we develop mtk_drm_gem.c by referring other platform.
+> We will try to use the normal cma helpers according to your idea.
 
-This was copied from older Tegras - we might have had some systems in 
-the past with non-PSCI firmware, but certainly don't have that anymore. 
-I'll combine the nodes.
+Sounds great if you can do this as a longer-term refactoring task!
 
-Mikko
+I discussed this also a bit with Philipp on irc, and he said there's
+possible a need to support non-contig buffers in mtk. If that can't be
+done using cma helpers (usually you have an iommu in such a case, which
+again gives you a contig buffer in device-address space, and that can be
+used by cma I think), then I think it would still be useful if you use the
+cma helpers for the contig buffers. But then wrap them in some mtk code to
+switch between the two.
+
+Cheers, Daniel
 
 > 
-> Rob
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Thanks,
+> Stu
 > 
+> > > Stu Hsieh (29):
+> > >   drm/mediatek: update dt-bindings for mt2712
+> > >   drm/mediatek: support maximum 64 mutex mod
+> > >   drm/mediatek: add ddp component AAL1
+> > >   drm/mediatek: add ddp component OD1
+> > >   drm/mediatek: add ddp component PWM1
+> > >   drm/mediatek: add ddp component PWM2
+> > >   drm/mediatek: add component DPI1
+> > >   drm/mediatek: add component DSI2
+> > >   drm/mediatek: add component DSI3
+> > >   drm/mediatek: add the DSI1 for component init condition
+> > >   drm/mediatek: add connection from OD1 to RDMA1
+> > >   drm/mediatek: Update the definition of connection from RDMA1 to DPI0
+> > >   drm/mediatek: add connection from RDMA0 to DPI0
+> > >   drm/mediatek: add connection from RDMA0 to DSI2
+> > >   drm/mediatek: add connection from RDMA0 to DSI3
+> > >   drm/mediatek: add connection from RDMA1 to DPI1
+> > >   drm/mediatek: add connection from RDMA1 to DSI1
+> > >   drm/mediatek: add connection from RDMA1 to DSI2
+> > >   drm/mediatek: add connection from RDMA1 to DSI3
+> > >   drm/mediatek: add connection from RDMA2 to DPI0
+> > >   drm/mediatek: add connection from RDMA2 to DPI1
+> > >   drm/mediatek: add connection from RDMA2 to DSI1
+> > >   drm/mediatek: add connection from RDMA2 to DSI2
+> > >   drm/mediatek: add connection from RDMA2 to DSI3
+> > >   drm/mediatek: add DPI1 support for mutex
+> > >   drm/mediatek: add DSI2 support for mutex
+> > >   drm/mediatek: add DSI3 support for mutex
+> > >   drm/mediatek: add third ddp path
+> > >   drm/mediatek: Add support for mediatek SOC MT2712
+> > > 
+> > >  .../bindings/display/mediatek/mediatek,disp.txt    |   2 +-
+> > >  drivers/gpu/drm/mediatek/mtk_drm_crtc.c            |   3 +
+> > >  drivers/gpu/drm/mediatek/mtk_drm_ddp.c             | 235 ++++++++++++++++++---
+> > >  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c        |  15 +-
+> > >  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h        |  10 +-
+> > >  drivers/gpu/drm/mediatek/mtk_drm_drv.c             |  47 ++++-
+> > >  drivers/gpu/drm/mediatek/mtk_drm_drv.h             |   5 +-
+> > >  7 files changed, 274 insertions(+), 43 deletions(-)
+> > > 
+> > > -- 
+> > > 2.12.5
+> > > 
+> > > _______________________________________________
+> > > dri-devel mailing list
+> > > dri-devel at lists.freedesktop.org
+> > > https://lists.freedesktop.org/mailman/listinfo/dri-devel
+> > 
+> 
+> 
+
+-- 
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
