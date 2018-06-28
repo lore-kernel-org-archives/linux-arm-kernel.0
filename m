@@ -1,41 +1,57 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Thu, 28 Jun 2018 11:28:15 +0200
-Subject: [PATCH 5/5] x86/kernel: jump_table: use relative references
-In-Reply-To: <CAKv+Gu9oxJCvpxRKpkndci1RGuewBsAPQW9W1=uXU1boGTSRrQ@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 28 Jun 2018 11:29:40 +0200
+Subject: [PATCH 2/5] kernel/jump_label: implement generic support for
+ relative references
+In-Reply-To: <20180628092504.GC2494@hirez.programming.kicks-ass.net>
 References: <20180627160604.8154-1-ard.biesheuvel@linaro.org>
- <20180627160604.8154-6-ard.biesheuvel@linaro.org>
- <20180628083107.GY2494@hirez.programming.kicks-ass.net>
- <CAKv+Gu9oxJCvpxRKpkndci1RGuewBsAPQW9W1=uXU1boGTSRrQ@mail.gmail.com>
-Message-ID: <20180628092815.GD2494@hirez.programming.kicks-ass.net>
+ <20180627160604.8154-3-ard.biesheuvel@linaro.org>
+ <20180628085003.GA2494@hirez.programming.kicks-ass.net>
+ <CAKv+Gu87DmGLG7N8X8+V7LppXm72SJUmCcEpaehCE5Rt0Z4FNw@mail.gmail.com>
+ <CAKv+Gu-xPR6UEiP0NT0zYXKRYXqwFCXP=nf0cC87PZdDYBZB4A@mail.gmail.com>
+ <20180628092504.GC2494@hirez.programming.kicks-ass.net>
+Message-ID: <CAKv+Gu-bL0neh61=1B=Dja7+tsH_ong731t2Xp17h4E1fjavjA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 28, 2018 at 10:34:54AM +0200, Ard Biesheuvel wrote:
-> On 28 June 2018 at 10:31, Peter Zijlstra <peterz@infradead.org> wrote:
-> > On Wed, Jun 27, 2018 at 06:06:04PM +0200, Ard Biesheuvel wrote:
-> >> Similar to the arm64 case, 64-bit x86 can benefit from using 32-bit
-> >> relative references rather than 64-bit absolute ones when emitting
-> >> struct jump_entry instances. Not only does this reduce the memory
-> >> footprint of the entries themselves by 50%, it also removes the need
-> >> for carrying relocation metadata on relocatable builds (i.e., for KASLR)
-> >> which saves a fair chunk of .init space as well (although the savings
-> >> are not as dramatic as on arm64)
-> >
-> > This will conflict with:
-> >
-> >   https://lkml.kernel.org/r/20180622172212.199633-10-namit at vmware.com
-> 
-> Thanks for the head's up. Fortunately, it does not conflict
-> fundamentally, so it should be a straight-forward rebase after that
-> code is merged.
+On 28 June 2018 at 11:25, Peter Zijlstra <peterz@infradead.org> wrote:
+> On Thu, Jun 28, 2018 at 11:04:45AM +0200, Ard Biesheuvel wrote:
+>> On 28 June 2018 at 11:02, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>> >>> @@ -56,7 +72,9 @@ jump_label_sort_entries(struct jump_entry *start, struct jump_entry *stop)
+>> >>>
+>> >>>       size = (((unsigned long)stop - (unsigned long)start)
+>> >>>                                       / sizeof(struct jump_entry));
+>> >>> -     sort(start, size, sizeof(struct jump_entry), jump_label_cmp, NULL);
+>> >>> +     sort(start, size, sizeof(struct jump_entry), jump_label_cmp,
+>> >>> +          IS_ENABLED(CONFIG_HAVE_ARCH_JUMP_LABEL_RELATIVE) ? jump_label_swap
+>> >>> +                                                           : NULL);
+>> >>>  }
+>> >>
+>> >> That will result in jump_label_swap being an unused symbol for some
+>> >> compile options.
+>> >
+>> > No, and isn't that the point of IS_ENABLED()? The compiler sees a
+>> > reference to jump_label_swap(), so it won't complain about it being
+>> > unused.
+>
+> Ah, ok. I hadn't figured it was quite that smart about it.
+>
 
-Yeah, shouldn't be hard to cure.
+Yeah. I could use a temp variable to make the indentation less
+obnoxious, but since this is an opt-in feature, I'd like to preserve
+the NULL (*swap)() argument for the existing users.
 
-There's another patch set that might have a little conflict, but that's
-not near ready I think, so that'll have to just cope with things
-shifting underneath (and there too, the fixup shouldn't be hard).
+>> > Meh. I thought IS_ENABLED() was preferred over #ifdef, no?
+>
+> Dunno, I just reacted to the proposed code's uglyness :-)
+>
 
-> Do you think this is likely to get merged for v4.19?
+I will try to come up with something that rhymes, ok? :-)
 
-I'm thinking it is near ready so it might, but I'm not in charge of
-those bits :-)
+>> ... and it means the sort() routine will unconditionally perform an
+>> indirect function call even if the arch does not require it.
+>
+> Yeah, not sure I care about that here, this is a one time affair, very
+> far away from any fast paths.
+>
+
+Fair enough.
