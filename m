@@ -1,96 +1,58 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Thu, 28 Jun 2018 09:56:18 +0200
-Subject: [PATCH v2 01/15] nvmem: add support for cell lookups
-In-Reply-To: <25ebceca-8cdd-edae-6393-dd29eb323c53@linaro.org>
-References: <20180626102245.30711-1-brgl@bgdev.pl>
- <20180626102245.30711-2-brgl@bgdev.pl>
- <25ebceca-8cdd-edae-6393-dd29eb323c53@linaro.org>
-Message-ID: <CAMRc=Md8TM+zLn=T=BQeVHG-PGAvx-PHrs9y1t5zhdYo+m0ovg@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 28 Jun 2018 10:14:24 +0200
+Subject: [PATCH v2] dt-bindings: serial: imx: clarify rs485 support usage
+In-Reply-To: <e9beff38e9035c2f33d691f362e37d8e62aaa660.1530170732.git.baruch@tkos.co.il>
+References: <e9beff38e9035c2f33d691f362e37d8e62aaa660.1530170732.git.baruch@tkos.co.il>
+Message-ID: <20180628081424.hsndzkyhzxjvuzyp@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-06-26 13:06 GMT+02:00 Srinivas Kandagatla <srinivas.kandagatla@linaro.org>:
-> Thanks for the patch,
->
-> On 26/06/18 11:22, Bartosz Golaszewski wrote:
->>
->> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->>
->> We can currently only register nvmem cells from device tree or by
->> manually calling nvmem_add_cells(). The latter options however forces
->> users to make sure that the nvmem provider with which the cells are
->> associated is registered before the call.
->>
->> This patch proposes a new solution inspired by other frameworks that
->> offer resource lookups (GPIO, PWM etc.). It adds a function that allows
->> machine code to register nvmem lookup which are later lazily used to
->> add corresponding nvmem cells.
->>
-> Overall the idea look fine to me.
->
-> This needs to be documented in ./Documentation/nvmem/nvmem.txt
->
->> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->> ---
->>   drivers/nvmem/core.c           | 57 +++++++++++++++++++++++++++++++++-
->>   include/linux/nvmem-consumer.h |  6 ++++
->>   include/linux/nvmem-provider.h |  6 ++++
->>   3 files changed, 68 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
->> index b5b0cdc21d01..a2e87b464319 100644
->> --- a/drivers/nvmem/core.c
->> +++ b/drivers/nvmem/core.c
->> @@ -62,6 +62,9 @@ static DEFINE_IDA(nvmem_ida);
->>   static LIST_HEAD(nvmem_cells);
->>   static DEFINE_MUTEX(nvmem_cells_mutex);
->>   +static LIST_HEAD(nvmem_cell_lookups);
->> +static DEFINE_MUTEX(nvmem_lookup_mutex);
->> +
->>   #ifdef CONFIG_DEBUG_LOCK_ALLOC
->>   static struct lock_class_key eeprom_lock_key;
->>   #endif
->> @@ -247,6 +250,23 @@ static const struct attribute_group
->> *nvmem_ro_root_dev_groups[] = {
->>         NULL,
->>   };
->>   +/**
->> + * nvmem_register_lookup() - register a number of nvmem cell lookup
->> entries
->> + *
->
->
-> Can we rename this to nvmem_add_lookup_table()?
-> register sound bit heavy here.
->
-> We should also have something like nvmem_remove_lookup_table() for
-> consistency, and it should ensure that it clears the cells entry too.
->
+On Thu, Jun 28, 2018 at 10:25:32AM +0300, Baruch Siach wrote:
+> The i.MX UART peripheral uses the RST_B signal as input, and CTS_B as
+> output. This is just like the DCE role in RS-232. This is true
+> regardless of the "DTE mode" setting of this peripheral.
+> 
+> As a result, rs485 support hardware must use the CTS_B signal to control
+> the RS-485 transceiver. This is in contrast to generic rs485 kernel
+> code, documentation, and DT property names that consistently refer to
+> the RTS as transceiver control signal.
 
-What do you mean by clearing the cells entry exactly?
+Well, the reason is that the pin function is called CTS because
+Freescale chose to name it from the DCE's POV which is unusual.
+So this isn't exactly specific to rs485 but also affect rs232 operation.
 
-Bart
+> Add a note in the DT binding document about that, to reduce the
+> confusion somewhat.
+> 
+> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+> ---
+> v2: Fix commit log typos (Lothar Wa?mann)
+> ---
+>  Documentation/devicetree/bindings/serial/fsl-imx-uart.txt | 6 +++++-
+>  1 file changed, 5 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/serial/fsl-imx-uart.txt b/Documentation/devicetree/bindings/serial/fsl-imx-uart.txt
+> index afcfbc34e243..35957cbf1571 100644
+> --- a/Documentation/devicetree/bindings/serial/fsl-imx-uart.txt
+> +++ b/Documentation/devicetree/bindings/serial/fsl-imx-uart.txt
+> @@ -9,7 +9,11 @@ Optional properties:
+>  - fsl,dte-mode : Indicate the uart works in DTE mode. The uart works
+>                    in DCE mode by default.
+>  - rs485-rts-delay, rs485-rts-active-low, rs485-rx-during-tx,
+> -  linux,rs485-enabled-at-boot-time: see rs485.txt
+> +  linux,rs485-enabled-at-boot-time: see rs485.txt. Note that for RS485
+> +  you must enable either the "uart-has-rtscts" or the "rts-gpios"
+> +  properties. In case you use "uart-has-rtscts" the signal that controls
+> +  the transceiver is actually CTS_B, not RTS_B. CTS_B is always output,
+> +  and RTS_B is input, regardless of dte-mode.
 
->
->> + * @lookup: array of nvmem cell lookup entries
->> + * @nentries: number of lookup entries in the array
->> + */
->> +void nvmem_register_lookup(struct nvmem_cell_lookup *lookup, size_t
->> nentries)
->> +{
->> +       int i;
->> + > +   mutex_lock(&nvmem_lookup_mutex);
->> +       for (i = 0; i < nentries; i++)
->> +               list_add_tail(&lookup[i].list, &nvmem_cell_lookups);
->> +       mutex_unlock(&nvmem_lookup_mutex);
->> +}
->> +EXPORT_SYMBOL_GPL(nvmem_register_lookup);
->> +
->>   static void nvmem_release(struct device *dev)
->>   {
->>         struct nvmem_device *nvmem = to_nvmem_device(dev);
->> @@ -916,6 +936,37 @@ struct nvmem_cell *of_nvmem_cell_get(struct
->> device_node *np,
->>   EXPORT_SYMBOL_GPL(of_nvmem_cell_get);
->>   #endif
->>
+Still this section is correct and better than what we had (not) before.
+So:
+Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
