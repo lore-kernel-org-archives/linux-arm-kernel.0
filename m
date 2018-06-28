@@ -1,26 +1,30 @@
-From: jon@solid-run.com (Jon Nettleton)
-Date: Thu, 28 Jun 2018 11:33:48 +0300
-Subject: [PATCH 2/2] ARM: dts: armada388-clearfog: drop future changes
- disclaimer
-In-Reply-To: <20180628082258.GD16727@lunn.ch>
-References: <2bc87e3e365c460943730ded86c8fcb1ff55a533.1530170016.git.baruch@tkos.co.il>
- <2c2eb16ffa18023d8d1be759ad8dc7e6c5affc5d.1530170016.git.baruch@tkos.co.il>
- <20180628082258.GD16727@lunn.ch>
-Message-ID: <CABdtJHt6o-suFnJmPwenWqpqD2BpkeRzAHjuNWM0waXL8FMd4Q@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 28 Jun 2018 10:34:54 +0200
+Subject: [PATCH 5/5] x86/kernel: jump_table: use relative references
+In-Reply-To: <20180628083107.GY2494@hirez.programming.kicks-ass.net>
+References: <20180627160604.8154-1-ard.biesheuvel@linaro.org>
+ <20180627160604.8154-6-ard.biesheuvel@linaro.org>
+ <20180628083107.GY2494@hirez.programming.kicks-ass.net>
+Message-ID: <CAKv+Gu9oxJCvpxRKpkndci1RGuewBsAPQW9W1=uXU1boGTSRrQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 28, 2018 at 11:23 AM Andrew Lunn <andrew@lunn.ch> wrote:
+On 28 June 2018 at 10:31, Peter Zijlstra <peterz@infradead.org> wrote:
+> On Wed, Jun 27, 2018 at 06:06:04PM +0200, Ard Biesheuvel wrote:
+>> Similar to the arm64 case, 64-bit x86 can benefit from using 32-bit
+>> relative references rather than 64-bit absolute ones when emitting
+>> struct jump_entry instances. Not only does this reduce the memory
+>> footprint of the entries themselves by 50%, it also removes the need
+>> for carrying relocation metadata on relocatable builds (i.e., for KASLR)
+>> which saves a fair chunk of .init space as well (although the savings
+>> are not as dramatic as on arm64)
 >
-> On Thu, Jun 28, 2018 at 10:13:36AM +0300, Baruch Siach wrote:
-> > The current device-tree description of the SolidRun Armada 38x platforms
-> > has been successfully tested with production systems.
+> This will conflict with:
 >
-> Hi Baruch
->
-> For a change link this, we should have an acknowledgement from
-> SolidRun, or maybe Russell King.
->
->           Andrew
+>   https://lkml.kernel.org/r/20180622172212.199633-10-namit at vmware.com
 
-Acked-by: Jon Nettleton <jon@solid-run.com>
+Thanks for the head's up. Fortunately, it does not conflict
+fundamentally, so it should be a straight-forward rebase after that
+code is merged.
+
+Do you think this is likely to get merged for v4.19?
