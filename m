@@ -1,44 +1,52 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Thu, 28 Jun 2018 21:26:41 +0100
-Subject: [PATCH] arm64: dts: hikey960: Define wl1837 power capabilities
-In-Reply-To: <20180613180321.16745-1-ryan@edited.us>
-References: <20180613180321.16745-1-ryan@edited.us>
-Message-ID: <5B354481.5080207@hisilicon.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 28 Jun 2018 14:43:38 -0600
+Subject: [PATCH v3 0/6] Make deferring probe forever optional
+Message-ID: <20180628204344.13973-1-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ryan,
+This series came out of a discussion on the ARM boot-architecture
+list[1] about DT forwards and backwards compatibility issues. There are
+issues with newer DTs breaking on older, stable kernels. Some of these
+are difficult to solve, but cases of optional devices not having
+kernel support should be solvable.
 
-On 2018/6/13 19:03, Ryan Grachek wrote:
-> These properties are required for compatibility with runtime PM.
-> Without these properties, MMC host controller will not be aware
-> of power capabilities. When the wlcore driver attempts to power
-> on the device, it will erroneously fail with -EACCES. This fixes
-> a regression found here: https://lkml.org/lkml/2018/6/12/930
-> 
-> Signed-off-by: Ryan Grachek <ryan@edited.us>
-> ---
+I tested this on a RPi3 B with the pinctrl driver forced off. With this
+change, the MMC/SD and UART drivers can function without the pinctrl
+driver. I left the dts change out this time.
 
-Applied to hisilicon fix tree.
-Thanks!
+v2 of this series can be found here[2].
 
-Best Regards,
-Wei
+Rob
 
->  arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
-> index c6999624ed8a..68c5a6c819ae 100644
-> --- a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
-> +++ b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
-> @@ -585,6 +585,8 @@
->  	vmmc-supply = <&wlan_en>;
->  	ti,non-removable;
->  	non-removable;
-> +	cap-power-off-card;
-> +	keep-power-in-suspend;
->  	#address-cells = <0x1>;
->  	#size-cells = <0x0>;
->  	status = "ok";
-> 
+[1] https://lists.linaro.org/pipermail/boot-architecture/2018-April/000466.html
+[2] https://lore.kernel.org/patchwork/project/lkml/list/?series=347413
+
+Rob Herring (6):
+  driver core: allow stopping deferred probe after init
+  dt-bindings: pinctrl: add a 'pinctrl-use-default' property
+  pinctrl: Support stopping deferred probe after initcalls
+  iommu: Stop deferring probe at end of initcalls
+  iommu: Remove IOMMU_OF_DECLARE
+  PM / Domains: Stop deferring probe at the end of initcall
+
+ .../admin-guide/kernel-parameters.txt         |  9 +++
+ .../bindings/pinctrl/pinctrl-bindings.txt     |  6 ++
+ drivers/base/dd.c                             | 57 +++++++++++++++++++
+ drivers/base/power/domain.c                   |  2 +-
+ drivers/iommu/arm-smmu-v3.c                   |  2 -
+ drivers/iommu/arm-smmu.c                      |  7 ---
+ drivers/iommu/exynos-iommu.c                  |  2 -
+ drivers/iommu/ipmmu-vmsa.c                    |  3 -
+ drivers/iommu/msm_iommu.c                     |  2 -
+ drivers/iommu/of_iommu.c                      | 21 +------
+ drivers/iommu/qcom_iommu.c                    |  2 -
+ drivers/iommu/rockchip-iommu.c                |  2 -
+ drivers/pinctrl/devicetree.c                  | 15 +++--
+ include/asm-generic/vmlinux.lds.h             |  2 -
+ include/linux/device.h                        |  2 +
+ include/linux/of_iommu.h                      |  4 --
+ 16 files changed, 88 insertions(+), 50 deletions(-)
+
+--
+2.17.1
