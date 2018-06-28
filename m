@@ -1,32 +1,25 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 28 Jun 2018 10:39:29 +0100
-Subject: [PATCH] arm64: remove no-op -p linker flag
-In-Reply-To: <20180627194614.188210-1-ghackmann@google.com>
-References: <20180627194614.188210-1-ghackmann@google.com>
-Message-ID: <20180628093928.GB10751@arm.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Thu, 28 Jun 2018 11:50:51 +0200
+Subject: [PATCH 0/3] ARM64: dts: meson-axg: first round of daughter card
+ updates
+Message-ID: <20180628095054.13433-1-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 27, 2018 at 12:46:14PM -0700, Greg Hackmann wrote:
-> Linking the ARM64 defconfig kernel with LLVM lld fails with the error:
-> 
->   ld.lld: error: unknown argument: -p
->   Makefile:1015: recipe for target 'vmlinux' failed
-> 
-> Without this flag, the ARM64 defconfig kernel successfully links with
-> lld and boots on Dragonboard 410c.
-> 
-> After digging through binutils source and changelogs, it turns out that
-> -p is only relevant to ancient binutils installations targeting 32-bit
-> ARM.  binutils accepts -p for AArch64 too, but it's always been
-> undocumented and silently ignored.  A comment in
-> ld/emultempl/aarch64elf.em explains that it's "Only here for backwards
-> compatibility".
-> 
-> Since this flag is a no-op on ARM64, we can safely drop it.
+This patchset adds a speaker amplifier and some leds present on daughter
+cards which are connected to the s400 board.
 
-Makes sense:
+Kevin, please note that the bindings documentation update for the tas5707
+has been queued for next in Mark Brown's ASoC tree. Not having it won't
+break anything but you may get checkpatch warning.
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+Jerome Brunet (3):
+  ARM64: dts: meson-axg: add s400 microphone card leds
+  ARM64: dts: meson-axg: add s400 main 12v supply
+  ARM64: dts: meson-axg: add s400 speaker amplifier
 
-Will
+ arch/arm64/boot/dts/amlogic/meson-axg-s400.dts | 62 ++++++++++++++++++++++++++
+ 1 file changed, 62 insertions(+)
+
+-- 
+2.14.4
