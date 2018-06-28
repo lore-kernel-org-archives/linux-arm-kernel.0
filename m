@@ -1,45 +1,133 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 28 Jun 2018 10:17:57 +0100
-Subject: [PATCH 3/5] arm64/kernel: jump_label: switch to relative
- references
-In-Reply-To: <20180627160604.8154-4-ard.biesheuvel@linaro.org>
-References: <20180627160604.8154-1-ard.biesheuvel@linaro.org>
- <20180627160604.8154-4-ard.biesheuvel@linaro.org>
-Message-ID: <20180628091757.GA10751@arm.com>
+From: shunyong.yang@hxt-semitech.com (Shunyong Yang)
+Date: Thu, 28 Jun 2018 17:18:28 +0800
+Subject: [RFC PATCH] arm64: topology: Map PPTT node offset to logic physical
+ package id
+Message-ID: <1530177508-15298-1-git-send-email-shunyong.yang@hxt-semitech.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 27, 2018 at 06:06:02PM +0200, Ard Biesheuvel wrote:
-> On a randomly chosen distro kernel build for arm64, vmlinux.o shows the
-> following sections, containing jump label entries, and the associated
-> RELA relocation records, respectively:
-> 
->   ...
->   [38088] __jump_table      PROGBITS         0000000000000000  00e19f30
->        000000000002ea10  0000000000000000  WA       0     0     8
->   [38089] .rela__jump_table RELA             0000000000000000  01fd8bb0
->        000000000008be30  0000000000000018   I      38178   38088     8
->   ...
-> 
-> In other words, we have 190 KB worth of 'struct jump_entry' instances,
-> and 573 KB worth of RELA entries to relocate each entry's code, target
-> and key members. This means the RELA section occupies 10% of the .init
-> segment, and the two sections combined represent 5% of vmlinux's entire
-> memory footprint.
-> 
-> So let's switch from 64-bit absolute references to 32-bit relative
-> references: this reduces the size of the __jump_table by 50%, and gets
-> rid of the RELA section entirely.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/Kconfig                  |  1 +
->  arch/arm64/include/asm/jump_label.h | 16 ++++------------
->  arch/arm64/kernel/jump_label.c      |  6 +++---
->  3 files changed, 8 insertions(+), 15 deletions(-)
+As PPTT spec doesn't define the physical package id,
+find_acpi_cpu_topology_package() will return offset of the node with
+Physical package field set when querying physical package id. So, it
+returns 162(0xA2) in following example.
 
-Looks good, cheers:
+[0A2h 0162   1]                Subtable Type : 00 [Processor Hierarchy
+Node]
+[0A3h 0163   1]                       Length : 1C
+[0A4h 0164   2]                     Reserved : 0000
+[0A6h 0166   4]        Flags (decoded below) : 00000003
+                            Physical package : 1
+                     ACPI Processor ID valid : 1
+[0AAh 0170   4]                       Parent : 00000000
+[0AEh 0174   4]            ACPI Processor ID : 00001000
+[0B2h 0178   4]      Private Resource Number : 00000002
+[0B6h 0182   4]             Private Resource : 0000006C
+[0BAh 0186   4]             Private Resource : 00000084
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+So, when "cat physical_package" in /sys/devices/system/cpu/cpu0/topology/,
+it will output 162(0xA2). And if some items are added before the node
+above, the output will change to other value.
 
-Will
+This patch maps the node offset to a logic package id. It maps the first
+node offset to 0, the second to 1, and so on.
+
+Then, it will not output a big value, such as 162 above. And it will
+not change when some nodes(Physical package not set) are added.
+
+And as long as the nodes with Physical package field set in PPTT keeps
+the real hardware order, the logic id can map to hardware package id to
+some extent.
+
+Hope to get feedback from you.
+
+Cc: Joey Zheng <yu.zheng@hxt-semitech.com>
+Signed-off-by: Shunyong Yang <shunyong.yang@hxt-semitech.com>
+---
+ arch/arm64/kernel/topology.c | 53 +++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 52 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+index f845a8617812..c219224b36e8 100644
+--- a/arch/arm64/kernel/topology.c
++++ b/arch/arm64/kernel/topology.c
+@@ -320,11 +320,59 @@ static void __init reset_cpu_topology(void)
+  * Propagate the topology information of the processor_topology_node tree to the
+  * cpu_topology array.
+  */
++
++struct package_id_map {
++	int topology_id;
++	int package_id;
++	struct list_head list;
++};
++
++static int map_package_id(int topology_id, int *max_package_id,
++			  struct list_head *head)
++{
++	struct list_head *pos;
++	struct package_id_map *entry;
++
++	list_for_each(pos, head) {
++		entry = container_of(pos, struct package_id_map, list);
++		if (entry->topology_id == topology_id)
++			goto done;
++	}
++
++	/* topology_id not found in the list */
++	entry = kzalloc(sizeof(*entry), GFP_KERNEL);
++	if (!entry)
++		return topology_id;
++
++	entry->topology_id = topology_id;
++	entry->package_id = *max_package_id;
++	list_add(&entry->list, head);
++	*max_package_id = *max_package_id + 1;
++
++done:
++	return entry->package_id;
++}
++
++static void destroy_map(struct list_head *head)
++{
++	struct package_id_map *entry;
++	struct list_head *pos, *q;
++
++	list_for_each_safe(pos, q, head) {
++		entry = container_of(pos, struct package_id_map, list);
++		list_del(pos);
++		kfree(entry);
++	}
++}
++
+ static int __init parse_acpi_topology(void)
+ {
+ 	bool is_threaded;
+ 	int cpu, topology_id;
++	struct list_head package_id_list;
++	int max_package_id = 0;
+ 
++	INIT_LIST_HEAD(&package_id_list);
+ 	is_threaded = read_cpuid_mpidr() & MPIDR_MT_BITMASK;
+ 
+ 	for_each_possible_cpu(cpu) {
+@@ -343,7 +391,9 @@ static int __init parse_acpi_topology(void)
+ 			cpu_topology[cpu].core_id    = topology_id;
+ 		}
+ 		topology_id = find_acpi_cpu_topology_package(cpu);
+-		cpu_topology[cpu].package_id = topology_id;
++		cpu_topology[cpu].package_id = map_package_id(topology_id,
++							&max_package_id,
++							&package_id_list);
+ 
+ 		i = acpi_find_last_cache_level(cpu);
+ 
+@@ -358,6 +408,7 @@ static int __init parse_acpi_topology(void)
+ 		}
+ 	}
+ 
++	destroy_map(&package_id_list);
+ 	return 0;
+ }
+ 
+-- 
+1.8.3.1
