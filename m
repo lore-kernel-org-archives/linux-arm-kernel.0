@@ -1,34 +1,69 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Thu, 28 Jun 2018 17:44:33 +0300
-Subject: [PATCH 2/2] ARM: mvebu_v7_defconfig: enable SFP support
-In-Reply-To: <20180628151407.53231885@windsurf>
-References: <ee69693c87cd0146f259042fc5dcd29338fcdf25.1530169575.git.baruch@tkos.co.il>
- <b130ccb8a9812530d33a71afb1563545fa8808cf.1530169575.git.baruch@tkos.co.il>
- <20180628151407.53231885@windsurf>
-Message-ID: <20180628144433.ezel6xyi3ulppsog@tarshish>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 28 Jun 2018 15:48:59 +0100
+Subject: [PATCH v4 0/7] arm64: untag user pointers passed to the kernel
+In-Reply-To: <20180628104610.czsnq4w3lfhxrn53@ltop.local>
+References: <cover.1529507994.git.andreyknvl@google.com>
+ <CAAeHK+zqtyGzd_CZ7qKZKU-uZjZ1Pkmod5h8zzbN0xCV26nSfg@mail.gmail.com>
+ <20180626172900.ufclp2pfrhwkxjco@armageddon.cambridge.arm.com>
+ <CAAeHK+yqWKTdTG+ymZ2-5XKiDANV+fmUjnQkRy-5tpgphuLJRA@mail.gmail.com>
+ <0cef1643-a523-98e7-95e2-9ec595137642@arm.com>
+ <20180627171757.amucnh5znld45cpc@armageddon.cambridge.arm.com>
+ <20180628061758.j6bytsaj5jk4aocg@ltop.local>
+ <20180628102741.vk6vphfinlj3lvhv@armageddon.cambridge.arm.com>
+ <20180628104610.czsnq4w3lfhxrn53@ltop.local>
+Message-ID: <20180628144858.2fu7kq56cxhp2kpg@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
-
-On Thu, Jun 28, 2018 at 03:14:07PM +0200, Thomas Petazzoni wrote:
-> On Thu, 28 Jun 2018 10:06:15 +0300, Baruch Siach wrote:
-> > This enables support for SFP cages on SolidRun Armada 38x and 8k
+On Thu, Jun 28, 2018 at 12:46:11PM +0200, Luc Van Oostenryck wrote:
+> On Thu, Jun 28, 2018 at 11:27:42AM +0100, Catalin Marinas wrote:
+> > On Thu, Jun 28, 2018 at 08:17:59AM +0200, Luc Van Oostenryck wrote:
+> > > On Wed, Jun 27, 2018 at 06:17:58PM +0100, Catalin Marinas wrote:
+> > > > sparse is indeed an option. The current implementation doesn't warn on
+> > > > an explicit cast from (void __user *) to (unsigned long) since that's a
+> > > > valid thing in the kernel. I couldn't figure out if there's any other
+> > > > __attribute__ that could be used to warn of such conversion.
+> > > 
+> > > sparse doesn't have such attribute but would an new option that would warn
+> > > on such cast be a solution for your case?
+> > 
+> > I can't tell for sure whether such sparse option would be the full
+> > solution but detecting explicit __user pointer casts to long is a good
+> > starting point. So far this patchset pretty much relies on detecting
+> > a syscall failure and trying to figure out why, patching the kernel. It
+> > doesn't really scale.
 > 
-> You're running a 32-bit kernel on 8K platforms ?
+> OK, I'll add such an option this evening.
 
-No, though that is probably possible.
+That's great, thanks. I think this should cover casting pointers to any
+integer types, not just "unsigned long" (e.g. long long).
 
-But you are right. In practice this patch only affects 32-bit mvebu platforms. 
-Support for 8k platforms would require a separate patch.
+The only downside is that with this patchset the untagging can be done
+after the conversion to ulong (get_user_pages()) as that's where the
+problem was noticed. With a new sparse feature, we'd have to annotate
+the conversion sites (not sure how many until we run the tool though).
 
-Gregory, you mentioned earlier that mvebu branches are not immutable yet. Can 
-you drop reference to 8k platforms from the commit log?
+> > As a side note, we have cases in the user-kernel ABI where the user
+> > address type is "unsigned long": mmap() and friends. My feedback on an
+> > early version of this patchset was to always require untagged pointers
+> > coming from user space on such syscalls, so no need for explicit
+> > untagging.
+> 
+> Mmmm yes.
+> I tend to favor a sort of opposite approach. When we have an address
+> that must not be dereferenced as-such (and sometimes when the address
+> can be from both __user & __kernel space) I prefer to use a ulong
+> which will force the use of the required operation before being
+> able to do any sort of dereferencing and this won't need horrible
+> casts with __force (it, of course, all depends on the full context).
 
-Thanks,
-baruch
+I agree. That's what the kernel uses in functions like get_user_pages()
+which take ulong as an argument. Similarly mmap() and friends don't
+expect the pointer to be dereferenced, hence the ulong argument. The
+interesting part that the man page (and the C library header
+declaration) shows such address argument as void *. We could add a
+syscall wrapper in the arch code, only that it doesn't feel consistent
+with the "rule" that ulong addresses are not actually tagged pointers.
 
 -- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
+Catalin
