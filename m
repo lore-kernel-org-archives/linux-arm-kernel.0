@@ -1,98 +1,142 @@
 From: ravi.bangoria@linux.ibm.com (Ravi Bangoria)
-Date: Thu, 28 Jun 2018 10:52:00 +0530
-Subject: [PATCH v5 01/10] Uprobes: Move uprobe structure to uprobe.h
+Date: Thu, 28 Jun 2018 10:52:01 +0530
+Subject: [PATCH v5 02/10] Uprobes: Simplify uprobe_register() body
 In-Reply-To: <20180628052209.13056-1-ravi.bangoria@linux.ibm.com>
 References: <20180628052209.13056-1-ravi.bangoria@linux.ibm.com>
-Message-ID: <20180628052209.13056-2-ravi.bangoria@linux.ibm.com>
+Message-ID: <20180628052209.13056-3-ravi.bangoria@linux.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need struct uprobe in some arch specific files. Move it to
-uprobe.h from uprobe.c
+Simplify uprobe_register() function body and let __uprobe_register()
+handle everything. Also move dependency functions around to fix build
+failures.
 
 Signed-off-by: Ravi Bangoria <ravi.bangoria@linux.ibm.com>
 ---
- include/linux/uprobes.h | 25 +++++++++++++++++++++++++
- kernel/events/uprobes.c | 24 ------------------------
- 2 files changed, 25 insertions(+), 24 deletions(-)
+ kernel/events/uprobes.c | 69 ++++++++++++++++++++++++++-----------------------
+ 1 file changed, 36 insertions(+), 33 deletions(-)
 
-diff --git a/include/linux/uprobes.h b/include/linux/uprobes.h
-index 0a294e950df8..044359083a57 100644
---- a/include/linux/uprobes.h
-+++ b/include/linux/uprobes.h
-@@ -28,6 +28,7 @@
- #include <linux/rbtree.h>
- #include <linux/types.h>
- #include <linux/wait.h>
-+#include <linux/rwsem.h>
- 
- struct vm_area_struct;
- struct mm_struct;
-@@ -61,6 +62,30 @@ struct uprobe_consumer {
- #ifdef CONFIG_UPROBES
- #include <asm/uprobes.h>
- 
-+struct uprobe {
-+	struct rb_node		rb_node;	/* node in the rb tree */
-+	atomic_t		ref;
-+	struct rw_semaphore	register_rwsem;
-+	struct rw_semaphore	consumer_rwsem;
-+	struct list_head	pending_list;
-+	struct uprobe_consumer	*consumers;
-+	struct inode		*inode;		/* Also hold a ref to inode */
-+	loff_t			offset;
-+	unsigned long		flags;
-+
-+	/*
-+	 * The generic code assumes that it has two members of unknown type
-+	 * owned by the arch-specific code:
-+	 *
-+	 *	insn -	copy_insn() saves the original instruction here for
-+	 *		arch_uprobe_analyze_insn().
-+	 *
-+	 *	ixol -	potentially modified instruction to execute out of
-+	 *		line, copied to xol_area by xol_get_insn_slot().
-+	 */
-+	struct arch_uprobe	arch;
-+};
-+
- enum uprobe_task_state {
- 	UTASK_RUNNING,
- 	UTASK_SSTEP,
 diff --git a/kernel/events/uprobes.c b/kernel/events/uprobes.c
-index ccc579a7d32e..e6e812304b22 100644
+index e6e812304b22..26c2d95c55fa 100644
 --- a/kernel/events/uprobes.c
 +++ b/kernel/events/uprobes.c
-@@ -64,30 +64,6 @@ static struct percpu_rw_semaphore dup_mmap_sem;
- /* Have a copy of original instruction */
- #define UPROBE_COPY_INSN	0
+@@ -816,13 +816,8 @@ register_for_each_vma(struct uprobe *uprobe, struct uprobe_consumer *new)
+ 	return err;
+ }
  
--struct uprobe {
--	struct rb_node		rb_node;	/* node in the rb tree */
--	atomic_t		ref;
--	struct rw_semaphore	register_rwsem;
--	struct rw_semaphore	consumer_rwsem;
--	struct list_head	pending_list;
--	struct uprobe_consumer	*consumers;
--	struct inode		*inode;		/* Also hold a ref to inode */
--	loff_t			offset;
--	unsigned long		flags;
+-static int __uprobe_register(struct uprobe *uprobe, struct uprobe_consumer *uc)
+-{
+-	consumer_add(uprobe, uc);
+-	return register_for_each_vma(uprobe, uc);
+-}
 -
--	/*
--	 * The generic code assumes that it has two members of unknown type
--	 * owned by the arch-specific code:
--	 *
--	 * 	insn -	copy_insn() saves the original instruction here for
--	 *		arch_uprobe_analyze_insn().
--	 *
--	 *	ixol -	potentially modified instruction to execute out of
--	 *		line, copied to xol_area by xol_get_insn_slot().
--	 */
--	struct arch_uprobe	arch;
--};
--
+-static void __uprobe_unregister(struct uprobe *uprobe, struct uprobe_consumer *uc)
++static void
++__uprobe_unregister(struct uprobe *uprobe, struct uprobe_consumer *uc)
+ {
+ 	int err;
+ 
+@@ -836,24 +831,46 @@ static void __uprobe_unregister(struct uprobe *uprobe, struct uprobe_consumer *u
+ }
+ 
  /*
-  * Execute out of line area: anonymous executable mapping installed
-  * by the probed task to execute the copy of the original instruction
+- * uprobe_register - register a probe
++ * uprobe_unregister - unregister a already registered probe.
++ * @inode: the file in which the probe has to be removed.
++ * @offset: offset from the start of the file.
++ * @uc: identify which probe if multiple probes are colocated.
++ */
++void uprobe_unregister(struct inode *inode, loff_t offset, struct uprobe_consumer *uc)
++{
++	struct uprobe *uprobe;
++
++	uprobe = find_uprobe(inode, offset);
++	if (WARN_ON(!uprobe))
++		return;
++
++	down_write(&uprobe->register_rwsem);
++	__uprobe_unregister(uprobe, uc);
++	up_write(&uprobe->register_rwsem);
++	put_uprobe(uprobe);
++}
++EXPORT_SYMBOL_GPL(uprobe_unregister);
++
++/*
++ * __uprobe_register - register a probe
+  * @inode: the file in which the probe has to be placed.
+  * @offset: offset from the start of the file.
+  * @uc: information on howto handle the probe..
+  *
+- * Apart from the access refcount, uprobe_register() takes a creation
++ * Apart from the access refcount, __uprobe_register() takes a creation
+  * refcount (thro alloc_uprobe) if and only if this @uprobe is getting
+  * inserted into the rbtree (i.e first consumer for a @inode:@offset
+  * tuple).  Creation refcount stops uprobe_unregister from freeing the
+  * @uprobe even before the register operation is complete. Creation
+  * refcount is released when the last @uc for the @uprobe
+- * unregisters. Caller of uprobe_register() is required to keep @inode
++ * unregisters. Caller of __uprobe_register() is required to keep @inode
+  * (and the containing mount) referenced.
+  *
+  * Return errno if it cannot successully install probes
+  * else return 0 (success)
+  */
+-int uprobe_register(struct inode *inode, loff_t offset, struct uprobe_consumer *uc)
++static int __uprobe_register(struct inode *inode, loff_t offset,
++			     struct uprobe_consumer *uc)
+ {
+ 	struct uprobe *uprobe;
+ 	int ret;
+@@ -880,7 +897,8 @@ int uprobe_register(struct inode *inode, loff_t offset, struct uprobe_consumer *
+ 	down_write(&uprobe->register_rwsem);
+ 	ret = -EAGAIN;
+ 	if (likely(uprobe_is_active(uprobe))) {
+-		ret = __uprobe_register(uprobe, uc);
++		consumer_add(uprobe, uc);
++		ret = register_for_each_vma(uprobe, uc);
+ 		if (ret)
+ 			__uprobe_unregister(uprobe, uc);
+ 	}
+@@ -891,6 +909,12 @@ int uprobe_register(struct inode *inode, loff_t offset, struct uprobe_consumer *
+ 		goto retry;
+ 	return ret;
+ }
++
++int uprobe_register(struct inode *inode, loff_t offset,
++		    struct uprobe_consumer *uc)
++{
++	return __uprobe_register(inode, offset, uc);
++}
+ EXPORT_SYMBOL_GPL(uprobe_register);
+ 
+ /*
+@@ -922,27 +946,6 @@ int uprobe_apply(struct inode *inode, loff_t offset,
+ 	return ret;
+ }
+ 
+-/*
+- * uprobe_unregister - unregister a already registered probe.
+- * @inode: the file in which the probe has to be removed.
+- * @offset: offset from the start of the file.
+- * @uc: identify which probe if multiple probes are colocated.
+- */
+-void uprobe_unregister(struct inode *inode, loff_t offset, struct uprobe_consumer *uc)
+-{
+-	struct uprobe *uprobe;
+-
+-	uprobe = find_uprobe(inode, offset);
+-	if (WARN_ON(!uprobe))
+-		return;
+-
+-	down_write(&uprobe->register_rwsem);
+-	__uprobe_unregister(uprobe, uc);
+-	up_write(&uprobe->register_rwsem);
+-	put_uprobe(uprobe);
+-}
+-EXPORT_SYMBOL_GPL(uprobe_unregister);
+-
+ static int unapply_uprobe(struct uprobe *uprobe, struct mm_struct *mm)
+ {
+ 	struct vm_area_struct *vma;
 -- 
 2.14.4
