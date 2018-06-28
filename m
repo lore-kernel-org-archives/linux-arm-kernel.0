@@ -1,49 +1,97 @@
-From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Thu, 28 Jun 2018 23:40:40 +0530
-Subject: [PATCH v2 4/6] arm64: dts: actions: Enable I2C1 and I2C2 in
- Bubblegum-96 board
-In-Reply-To: <20180628181042.2239-1-manivannan.sadhasivam@linaro.org>
-References: <20180628181042.2239-1-manivannan.sadhasivam@linaro.org>
-Message-ID: <20180628181042.2239-5-manivannan.sadhasivam@linaro.org>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Thu, 28 Jun 2018 20:25:43 +0200
+Subject: [PATCH v3 10/24] drm/sun4i: tcon: Generalize engine search
+ algorithm
+In-Reply-To: <1812731.FQOhD8MfmX@jernej-laptop>
+References: <20180625120304.7543-1-jernej.skrabec@siol.net>
+ <20180625120304.7543-11-jernej.skrabec@siol.net>
+ <CAGb2v66ndyhVFKsOt=g45MJ-cBun8WvRrDsb9XO2hteSX2oe5A@mail.gmail.com>
+ <1812731.FQOhD8MfmX@jernej-laptop>
+Message-ID: <20180628182543.yyja6hiry7rx7fu2@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable I2C1 and I2C2 exposed on the low speed expansion connector in
-Bubblegum-96 board.
+On Thu, Jun 28, 2018 at 06:48:50AM +0200, Jernej ?krabec wrote:
+> Dne ?etrtek, 28. junij 2018 ob 04:06:52 CEST je Chen-Yu Tsai napisal(a):
+> > On Mon, Jun 25, 2018 at 8:02 PM, Jernej Skrabec <jernej.skrabec@siol.net> 
+> wrote:
+> > > Current "old" method to find engine worked pretty well for DE2. However,
+> > > it doesn't work when TCON TOP is between  mixer (engine) and TCON. TCON
+> > > TOP has multiple input ports, but current engine search algorithm
+> > > expects only one.
+> > > 
+> > > This can be fixed by first looking for output port id and selecting
+> > > matching input by subtracting 1 for the next round. This work even if
+> > > there is only one input and output.
+> > > 
+> > > Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+> > > ---
+> > > 
+> > >  drivers/gpu/drm/sun4i/sun4i_tcon.c | 22 ++++++++++++++++++----
+> > >  1 file changed, 18 insertions(+), 4 deletions(-)
+> > > 
+> > > diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> > > b/drivers/gpu/drm/sun4i/sun4i_tcon.c index 08747fc3ee71..264bcc43da11
+> > > 100644
+> > > --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> > > +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> > > @@ -791,12 +791,14 @@ static int sun4i_tcon_init_regmap(struct device
+> > > *dev,
+> > > 
+> > >   */
+> > >  
+> > >  static struct sunxi_engine *
+> > >  sun4i_tcon_find_engine_traverse(struct sun4i_drv *drv,
+> > > 
+> > > -                               struct device_node *node)
+> > > +                               struct device_node *node,
+> > > +                               u32 port_id)
+> > > 
+> > >  {
+> > >  
+> > >         struct device_node *port, *ep, *remote;
+> > >         struct sunxi_engine *engine = ERR_PTR(-EINVAL);
+> > > 
+> > > +       u32 reg = 0;
+> > > 
+> > > -       port = of_graph_get_port_by_id(node, 0);
+> > > +       port = of_graph_get_port_by_id(node, port_id);
+> > > 
+> > >         if (!port)
+> > >         
+> > >                 return ERR_PTR(-EINVAL);
+> > > 
+> > > @@ -826,8 +828,20 @@ sun4i_tcon_find_engine_traverse(struct sun4i_drv
+> > > *drv,
+> > > 
+> > >                 if (remote == engine->node)
+> > >                 
+> > >                         goto out_put_remote;
+> > > 
+> > > +       /*
+> > > +        * According to device tree binding input ports have even id
+> > > +        * number and output ports have odd id. Since component with
+> > > +        * more than one input and one output (TCON TOP) exits, correct
+> > > +        * remote input id has to be calculated by subtracting 1 from
+> > > +        * remote output id. If this for some reason can't be done, 0
+> > > +        * is used as input port id.
+> > > +        */
+> > 
+> > You need to call
+> > 
+> >     of_node_put(port);
+> > 
+> > to drop the reference to the original port.
+> 
+> Thanks for noticing it. I guess I should send fix patch, since patches from 
+> drm-misc-next can't be dropped.
 
-Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
----
- arch/arm64/boot/dts/actions/s900-bubblegum-96.dts | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+Yeah, please send additional patches for all the issues pointed out by
+Chen-Yu.
 
-diff --git a/arch/arm64/boot/dts/actions/s900-bubblegum-96.dts b/arch/arm64/boot/dts/actions/s900-bubblegum-96.dts
-index d0ba35df9015..57ae374cfb5a 100644
---- a/arch/arm64/boot/dts/actions/s900-bubblegum-96.dts
-+++ b/arch/arm64/boot/dts/actions/s900-bubblegum-96.dts
-@@ -7,6 +7,7 @@
- /dts-v1/;
- 
- #include "s900.dtsi"
-+#include "s900-bubblegum-96-pins.dtsi"
- 
- / {
- 	compatible = "ucrobotics,bubblegum-96", "actions,s900";
-@@ -35,6 +36,16 @@
- 	clocks = <&cmu CLK_UART5>;
- };
- 
-+&i2c1 {
-+	status = "okay";
-+	clocks = <&cmu CLK_I2C1>;
-+};
-+
-+&i2c2 {
-+	status = "okay";
-+	clocks = <&cmu CLK_I2C2>;
-+};
-+
- /*
-  * GPIO name legend: proper name = the GPIO line is used as GPIO
-  *         NC = not connected (pin out but not routed from the chip to
+Maxime
+
 -- 
-2.17.1
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
