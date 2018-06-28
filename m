@@ -1,19 +1,43 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 28 Jun 2018 17:01:35 +0100
-Subject: [PATCH v2 0/4] I-side fixes
-In-Reply-To: <1529656278-878-1-git-send-email-will.deacon@arm.com>
-References: <1529656278-878-1-git-send-email-will.deacon@arm.com>
-Message-ID: <20180628160135.cjjtwpq5jesl3ucn@armageddon.cambridge.arm.com>
+From: james.morse@arm.com (James Morse)
+Date: Thu, 28 Jun 2018 17:13:42 +0100
+Subject: question about arm64 exception handling
+In-Reply-To: <5B34CD7D.5090002@broadcom.com>
+References: <5B34CD7D.5090002@broadcom.com>
+Message-ID: <e54b3d4c-dbd0-b39d-28a2-063f34068dfd@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 22, 2018 at 09:31:14AM +0100, Will Deacon wrote:
-> Will Deacon (4):
->   arm64: Avoid flush_icache_range() in alternatives patching code
->   arm64: Remove unnecessary ISBs from set_{pte,pmd,pud}
+Hi Arend,
 
-I'm merging these two patches for -rc3. I'll leave the other two to you
-for 4.19.
+On 28/06/18 12:58, Arend van Spriel wrote:
+> I am looking at some issues we are seeing on a custom arm platform and I had
+> some questions regarding exception handling and hope you can help me with that.
+> 
+> The platform has 4 cortex a53 cores running 4.1.51 kernel.
 
--- 
-Catalin
+v4.1 is circa 2015, and chance you could try v4.17?
+
+
+> On the platform upon
+> accessing our wifi devices over PCIe, we observe two issue intermittently.
+> 
+> 1) synchronous external abort
+> 2) NMI watchdog
+> 
+> With the latter I notice el1_irq in the exception stack trace. Is that due to
+> the NMI watchdog or is this caused by another issue like our crappy hardware ;-) ?
+
+
+> Regarding the SEA I noticed stuff has been added for that in 4.13. Is is worth
+> backporting that to obtain more info about that?
+
+Unlikely. Those changes are related to firmware-first RAS. You would see this on
+server platforms booting with ACPI and have a 'HEST' table.
+
+Can you share the backtrace for the Synchronous External Abort? It should point
+at the instruction in the (probably) driver that causes the abort.
+
+
+Thanks,
+
+James
