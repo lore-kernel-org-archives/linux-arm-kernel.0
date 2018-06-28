@@ -1,186 +1,415 @@
-From: honghui.zhang@mediatek.com (Honghui Zhang)
-Date: Thu, 28 Jun 2018 09:44:25 +0800
-Subject: [PATCH 3/4] PCI: mediatek: Add system pm support for MT2712 and
- MT7622
-In-Reply-To: <CAHp75VcHgJrujzqstSc4RWpUbjip1vtJu87HN3uTosoLdOiT3A@mail.gmail.com>
-References: <1530091298-28120-1-git-send-email-honghui.zhang@mediatek.com>
- <1530091298-28120-4-git-send-email-honghui.zhang@mediatek.com>
- <CAHp75VcHgJrujzqstSc4RWpUbjip1vtJu87HN3uTosoLdOiT3A@mail.gmail.com>
-Message-ID: <1530150265.28284.25.camel@mhfsdcap03>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 28 Jun 2018 09:47:20 +0800
+Subject: [PATCH v3 05/24] drm/sun4i: Add TCON TOP driver
+In-Reply-To: <20180625120304.7543-6-jernej.skrabec@siol.net>
+References: <20180625120304.7543-1-jernej.skrabec@siol.net>
+ <20180625120304.7543-6-jernej.skrabec@siol.net>
+Message-ID: <CAGb2v6465Upen-aFiLXDrSPLDGLh+2REjaZ_91W39=E1DffHeA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2018-06-27 at 19:45 +0300, Andy Shevchenko wrote:
-> On Wed, Jun 27, 2018 at 12:21 PM,  <honghui.zhang@mediatek.com> wrote:
-> > From: Honghui Zhang <honghui.zhang@mediatek.com>
-> >
-> > The MTCMOS of PCIe Host for MT2712 and MT7622 will be off when system
-> > suspend, and all the internal control register will be reset after system
-> > resume. The PCIe link should be re-established and the related control
-> > register values should be re-set after system resume.
-> 
-> >  struct mtk_pcie_soc {
-> >         bool need_fix_class_id;
-> 
-> > +       bool pm_support;
-> 
-> Hmm... Do you really need this flag? Can't runtime PM API tell you this?
+Hi,
 
-This host driver is both for MT2712, MT7622 and MT7623, but MT7623 do
-not this this patch.
-I only add this flag to identify whether we need to do the PM operation
-for this SoC since I do not want to touch anything for MT7623.
- 
-> 
-> >         struct pci_ops *ops;
-> >         int (*startup)(struct mtk_pcie_port *port);
-> >         int (*setup_irq)(struct mtk_pcie_port *port, struct device_node *node);
-> > @@ -1195,12 +1197,76 @@ static int mtk_pcie_probe(struct platform_device *pdev)
-> >         return err;
-> >  }
-> >
-> > +#ifdef CONFIG_PM_SLEEP
-> > +static int mtk_pcie_suspend_noirq(struct device *dev)
-> 
-> Perhaps __maybe_unused?
+So I'm late to the party, but...
 
-Ok, I'm a bit confused about this, if there's some discussion about
-this, do you have the link of those discussion and kindly point put it
-in this thread? Or I guess I can change this back to __maybe_unused if
-there's no other comments about this.
+On Mon, Jun 25, 2018 at 8:02 PM, Jernej Skrabec <jernej.skrabec@siol.net> wrote:
+> As already described in DT binding, TCON TOP is responsible for
+> configuring display pipeline. In this initial driver focus is on HDMI
+> pipeline, so TVE and LCD configuration is not implemented.
+>
+> Implemented features:
+> - HDMI source selection
+> - clock driver (TCON and DSI gating)
+> - connecting mixers and TCONS
+>
+> Something similar also existed in previous SoCs, except that it was part
+> of first TCON.
+>
+> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+> ---
+>  drivers/gpu/drm/sun4i/Makefile         |   3 +-
+>  drivers/gpu/drm/sun4i/sun8i_tcon_top.c | 300 +++++++++++++++++++++++++
+>  drivers/gpu/drm/sun4i/sun8i_tcon_top.h |  40 ++++
+>  3 files changed, 342 insertions(+), 1 deletion(-)
+>  create mode 100644 drivers/gpu/drm/sun4i/sun8i_tcon_top.c
+>  create mode 100644 drivers/gpu/drm/sun4i/sun8i_tcon_top.h
+>
+> diff --git a/drivers/gpu/drm/sun4i/Makefile b/drivers/gpu/drm/sun4i/Makefile
+> index 2589f4acd5ae..09fbfd6304ba 100644
+> --- a/drivers/gpu/drm/sun4i/Makefile
+> +++ b/drivers/gpu/drm/sun4i/Makefile
+> @@ -16,7 +16,8 @@ sun8i-drm-hdmi-y              += sun8i_hdmi_phy_clk.o
+>
+>  sun8i-mixer-y                  += sun8i_mixer.o sun8i_ui_layer.o \
+>                                    sun8i_vi_layer.o sun8i_ui_scaler.o \
+> -                                  sun8i_vi_scaler.o sun8i_csc.o
+> +                                  sun8i_vi_scaler.o sun8i_csc.o \
+> +                                  sun8i_tcon_top.o
+>
+>  sun4i-tcon-y                   += sun4i_crtc.o
+>  sun4i-tcon-y                   += sun4i_dotclock.o
+> diff --git a/drivers/gpu/drm/sun4i/sun8i_tcon_top.c b/drivers/gpu/drm/sun4i/sun8i_tcon_top.c
+> new file mode 100644
+> index 000000000000..8da0460e0028
+> --- /dev/null
+> +++ b/drivers/gpu/drm/sun4i/sun8i_tcon_top.c
+> @@ -0,0 +1,300 @@
+> +// SPDX-License-Identifier: GPL-2.0+
+> +/* Copyright (c) 2018 Jernej Skrabec <jernej.skrabec@siol.net> */
+> +
+> +#include <drm/drmP.h>
+> +
+> +#include <dt-bindings/clock/sun8i-tcon-top.h>
+> +
+> +#include <linux/bitfield.h>
+> +#include <linux/component.h>
+> +#include <linux/device.h>
+> +#include <linux/module.h>
+> +#include <linux/of_graph.h>
+> +#include <linux/platform_device.h>
+> +
+> +#include "sun8i_tcon_top.h"
+> +
+> +static int sun8i_tcon_top_get_connected_ep_id(struct device_node *node,
+> +                                             int port_id)
+> +{
+> +       struct device_node *ep, *remote, *port;
+> +       struct of_endpoint endpoint;
+> +
+> +       port = of_graph_get_port_by_id(node, port_id);
+> +       if (!port)
+> +               return -ENOENT;
+> +
+> +       for_each_available_child_of_node(port, ep) {
+> +               remote = of_graph_get_remote_port_parent(ep);
+> +               if (!remote)
+> +                       continue;
+> +
+> +               if (of_device_is_available(remote)) {
+> +                       of_graph_parse_endpoint(ep, &endpoint);
+> +
+> +                       of_node_put(remote);
+> +
+> +                       return endpoint.id;
+> +               }
+> +
+> +               of_node_put(remote);
+> +       }
+> +
+> +       return -ENOENT;
+> +}
+> +
+> +static struct clk_hw *sun8i_tcon_top_register_gate(struct device *dev,
+> +                                                  struct clk *parent,
+> +                                                  void __iomem *regs,
+> +                                                  spinlock_t *lock,
+> +                                                  u8 bit, int name_index)
+> +{
+> +       const char *clk_name, *parent_name;
+> +       int ret;
+> +
+> +       parent_name = __clk_get_name(parent);
 
-> 
-> > +{
-> > +       struct mtk_pcie *pcie = dev_get_drvdata(dev);
-> > +       const struct mtk_pcie_soc *soc = pcie->soc;
-> > +       struct mtk_pcie_port *port;
-> > +
-> > +       if (!soc->pm_support)
-> > +               return 0;
-> > +
-> 
-> > +       if (list_empty(&pcie->ports))
-> > +               return 0;
-> 
-> So, if the list is empty you are not suspending for the host?
-> 
+You can simply pass in the binding clock name, and have
 
-if the list was empty then it indicate that all the PCIe slot was not
-connected with any EP device, and all the resource have been release in
-probe time. So the host driver does not need to save or restore
-anything.
+    index = of_property_match_string(np, "clock-names", name);
+    parent_name = of_clk_get_parent_name(dev->of_node, index);
 
-> 
-> > +
-> > +       list_for_each_entry(port, &pcie->ports, list) {
-> > +               clk_disable_unprepare(port->pipe_ck);
-> > +               clk_disable_unprepare(port->obff_ck);
-> > +               clk_disable_unprepare(port->axi_ck);
-> > +               clk_disable_unprepare(port->aux_ck);
-> > +               clk_disable_unprepare(port->ahb_ck);
-> > +               clk_disable_unprepare(port->sys_ck);
-> > +               phy_power_off(port->phy);
-> > +               phy_exit(port->phy);
-> > +       }
-> > +
-> > +       mtk_pcie_subsys_powerdown(pcie);
-> > +
-> > +       return 0;
-> > +}
-> > +
-> > +static int mtk_pcie_resume_noirq(struct device *dev)
-> > +{
-> > +       struct mtk_pcie *pcie = dev_get_drvdata(dev);
-> > +       const struct mtk_pcie_soc *soc = pcie->soc;
-> > +       struct mtk_pcie_port *port;
-> > +
-> > +       if (!soc->pm_support)
-> > +               return 0;
-> > +
-> 
-> > +       if (list_empty(&pcie->ports))
-> > +               return 0;
-> 
-> No runtime PM for this case?
-> (It seems now I understand why in previous patch you have a similar check)
-> 
-I guess host driver does not need to resume anything if there's no EP
-device was connected.
+> +       ret = of_property_read_string_index(dev->of_node,
+> +                                           "clock-output-names", name_index,
+> +                                           &clk_name);
+> +       if (ret)
+> +               return ERR_PTR(ret);
+> +
+> +       return clk_hw_register_gate(dev, clk_name, parent_name,
+> +                                   CLK_SET_RATE_PARENT,
+> +                                   regs + TCON_TOP_GATE_SRC_REG,
+> +                                   bit, 0, lock);
+> +};
+> +
+> +static int sun8i_tcon_top_bind(struct device *dev, struct device *master,
+> +                              void *data)
+> +{
+> +       struct platform_device *pdev = to_platform_device(dev);
+> +       struct clk *dsi, *tcon_tv0, *tcon_tv1, *tve0, *tve1;
+> +       struct clk_hw_onecell_data *clk_data;
+> +       struct sun8i_tcon_top *tcon_top;
+> +       bool mixer0_unused = false;
+> +       struct resource *res;
+> +       void __iomem *regs;
+> +       int ret, i, id;
+> +       u32 val;
+> +
+> +       tcon_top = devm_kzalloc(dev, sizeof(*tcon_top), GFP_KERNEL);
+> +       if (!tcon_top)
+> +               return -ENOMEM;
+> +
+> +       clk_data = devm_kzalloc(dev, sizeof(*clk_data) +
+> +                               sizeof(*clk_data->hws) * CLK_NUM,
+> +                               GFP_KERNEL);
+> +       if (!clk_data)
+> +               return -ENOMEM;
+> +       tcon_top->clk_data = clk_data;
+> +
+> +       spin_lock_init(&tcon_top->reg_lock);
+> +
+> +       tcon_top->rst = devm_reset_control_get(dev, NULL);
+> +       if (IS_ERR(tcon_top->rst)) {
+> +               dev_err(dev, "Couldn't get our reset line\n");
+> +               return PTR_ERR(tcon_top->rst);
+> +       }
+> +
+> +       tcon_top->bus = devm_clk_get(dev, "bus");
+> +       if (IS_ERR(tcon_top->bus)) {
+> +               dev_err(dev, "Couldn't get the bus clock\n");
+> +               return PTR_ERR(tcon_top->bus);
+> +       }
+> +
+> +       dsi = devm_clk_get(dev, "dsi");
+> +       if (IS_ERR(dsi)) {
+> +               dev_err(dev, "Couldn't get the dsi clock\n");
+> +               return PTR_ERR(dsi);
+> +       }
+> +
+> +       tcon_tv0 = devm_clk_get(dev, "tcon-tv0");
+> +       if (IS_ERR(tcon_tv0)) {
+> +               dev_err(dev, "Couldn't get the tcon-tv0 clock\n");
+> +               return PTR_ERR(tcon_tv0);
+> +       }
+> +
+> +       tcon_tv1 = devm_clk_get(dev, "tcon-tv1");
+> +       if (IS_ERR(tcon_tv1)) {
+> +               dev_err(dev, "Couldn't get the tcon-tv1 clock\n");
+> +               return PTR_ERR(tcon_tv1);
+> +       }
+> +
+> +       tve0 = devm_clk_get(dev, "tve0");
+> +       if (IS_ERR(tve0)) {
+> +               dev_err(dev, "Couldn't get the tve0 clock\n");
+> +               return PTR_ERR(tve0);
+> +       }
+> +
+> +       tve1 = devm_clk_get(dev, "tve1");
+> +       if (IS_ERR(tve1)) {
+> +               dev_err(dev, "Couldn't get the tve1 clock\n");
+> +               return PTR_ERR(tve1);
+> +       }
 
-> > +
-> > +       if (dev->pm_domain) {
-> > +               pm_runtime_enable(dev);
-> > +               pm_runtime_get_sync(dev);
-> > +       }
-> > +
-> > +       clk_prepare_enable(pcie->free_ck);
-> > +
-> > +       list_for_each_entry(port, &pcie->ports, list)
-> > +               mtk_pcie_enable_port(port);
-> > +
-> 
-> > +       if (list_empty(&pcie->ports))
-> 
-> Hmm... How it would be true if you already bailed out above on the
-> same condition?
+So you don't actually have to hold references to the parent clocks.
 
-Assuming that there's EP device connected before suspend, and the EP was
-removed from the link while system suspend. It means that when enter
-this function the list is not empty, but after the function of
-mtk_pcie_enable_port was called, host driver found there's no EP device
-was connected anymore, it will free this list and some other resources
-in mtk_pcie_enable_port,(after mtk_pcie_enable_port was called, the list
-is empty in this scenario) but leave the subsys power along, I guess we
-need to take care of this scenario.
-> 
-> > +               mtk_pcie_subsys_powerdown(pcie);
-> > +
-> > +       return 0;
-> > +}
-> > +#endif
-> > +
-> > +static const struct dev_pm_ops mtk_pcie_pm_ops = {
-> > +       SET_NOIRQ_SYSTEM_SLEEP_PM_OPS(mtk_pcie_suspend_noirq,
-> > +                                     mtk_pcie_resume_noirq)
-> > +};
-> > +
-> >  static const struct mtk_pcie_soc mtk_pcie_soc_v1 = {
-> >         .ops = &mtk_pcie_ops,
-> >         .startup = mtk_pcie_startup_port,
-> >  };
-> >
-> >  static const struct mtk_pcie_soc mtk_pcie_soc_mt2712 = {
-> > +       .pm_support = true,
-> >         .ops = &mtk_pcie_ops_v2,
-> >         .startup = mtk_pcie_startup_port_v2,
-> >         .setup_irq = mtk_pcie_setup_irq,
-> 
-> No update for .pm ?
+ChenYu
 
-I'm not get your point, I update the .pm callbacks in the
-platform_driver struct, this SoC data just store the different
-information for SoCs. Did I missed something?
-
-> 
-> > @@ -1208,6 +1274,7 @@ static const struct mtk_pcie_soc mtk_pcie_soc_mt2712 = {
-> >
-> >  static const struct mtk_pcie_soc mtk_pcie_soc_mt7622 = {
-> >         .need_fix_class_id = true,
-> > +       .pm_support = true,
-> >         .ops = &mtk_pcie_ops_v2,
-> >         .startup = mtk_pcie_startup_port_v2,
-> >         .setup_irq = mtk_pcie_setup_irq,
-> > @@ -1227,6 +1294,7 @@ static struct platform_driver mtk_pcie_driver = {
-> >                 .name = "mtk-pcie",
-> >                 .of_match_table = mtk_pcie_ids,
-> >                 .suppress_bind_attrs = true,
-> > +               .pm = &mtk_pcie_pm_ops,
-> >         },
-> >  };
-> >  builtin_platform_driver(mtk_pcie_driver);
-> > --
-> > 2.6.4
-> >
-> 
-> 
-> 
+> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +       regs = devm_ioremap_resource(dev, res);
+> +       if (IS_ERR(regs))
+> +               return PTR_ERR(regs);
+> +
+> +       ret = reset_control_deassert(tcon_top->rst);
+> +       if (ret) {
+> +               dev_err(dev, "Could not deassert ctrl reset control\n");
+> +               return ret;
+> +       }
+> +
+> +       ret = clk_prepare_enable(tcon_top->bus);
+> +       if (ret) {
+> +               dev_err(dev, "Could not enable bus clock\n");
+> +               goto err_assert_reset;
+> +       }
+> +
+> +       val = 0;
+> +
+> +       /* check if HDMI mux output is connected */
+> +       if (sun8i_tcon_top_get_connected_ep_id(dev->of_node, 5) >= 0) {
+> +               /* find HDMI input endpoint id, if it is connected at all*/
+> +               id = sun8i_tcon_top_get_connected_ep_id(dev->of_node, 4);
+> +               if (id >= 0)
+> +                       val = FIELD_PREP(TCON_TOP_HDMI_SRC_MSK, id + 1);
+> +               else
+> +                       DRM_DEBUG_DRIVER("TCON TOP HDMI input is not connected\n");
+> +       } else {
+> +               DRM_DEBUG_DRIVER("TCON TOP HDMI output is not connected\n");
+> +       }
+> +
+> +       writel(val, regs + TCON_TOP_GATE_SRC_REG);
+> +
+> +       val = 0;
+> +
+> +       /* process mixer0 mux output */
+> +       id = sun8i_tcon_top_get_connected_ep_id(dev->of_node, 1);
+> +       if (id >= 0) {
+> +               val = FIELD_PREP(TCON_TOP_PORT_DE0_MSK, id);
+> +       } else {
+> +               DRM_DEBUG_DRIVER("TCON TOP mixer0 output is not connected\n");
+> +               mixer0_unused = true;
+> +       }
+> +
+> +       /* process mixer1 mux output */
+> +       id = sun8i_tcon_top_get_connected_ep_id(dev->of_node, 3);
+> +       if (id >= 0) {
+> +               val |= FIELD_PREP(TCON_TOP_PORT_DE1_MSK, id);
+> +
+> +               /*
+> +                * mixer0 mux has priority over mixer1 mux. We have to
+> +                * make sure mixer0 doesn't overtake TCON from mixer1.
+> +                */
+> +               if (mixer0_unused && id == 0)
+> +                       val |= FIELD_PREP(TCON_TOP_PORT_DE0_MSK, 1);
+> +       } else {
+> +               DRM_DEBUG_DRIVER("TCON TOP mixer1 output is not connected\n");
+> +       }
+> +
+> +       writel(val, regs + TCON_TOP_PORT_SEL_REG);
+> +
+> +       /*
+> +        * TCON TOP has two muxes, which select parent clock for each TCON TV
+> +        * channel clock. Parent could be either TCON TV or TVE clock. For now
+> +        * we leave this fixed to TCON TV, since TVE driver for R40 is not yet
+> +        * implemented. Once it is, graph needs to be traversed to determine
+> +        * if TVE is active on each TCON TV. If it is, mux should be switched
+> +        * to TVE clock parent.
+> +        */
+> +       clk_data->hws[CLK_TCON_TOP_TV0] =
+> +               sun8i_tcon_top_register_gate(dev, tcon_tv0, regs,
+> +                                            &tcon_top->reg_lock,
+> +                                            TCON_TOP_TCON_TV0_GATE, 0);
+> +
+> +       clk_data->hws[CLK_TCON_TOP_TV1] =
+> +               sun8i_tcon_top_register_gate(dev, tcon_tv1, regs,
+> +                                            &tcon_top->reg_lock,
+> +                                            TCON_TOP_TCON_TV1_GATE, 1);
+> +
+> +       clk_data->hws[CLK_TCON_TOP_DSI] =
+> +               sun8i_tcon_top_register_gate(dev, dsi, regs,
+> +                                            &tcon_top->reg_lock,
+> +                                            TCON_TOP_TCON_DSI_GATE, 2);
+> +
+> +       for (i = 0; i < CLK_NUM; i++)
+> +               if (IS_ERR(clk_data->hws[i])) {
+> +                       ret = PTR_ERR(clk_data->hws[i]);
+> +                       goto err_unregister_gates;
+> +               }
+> +
+> +       clk_data->num = CLK_NUM;
+> +
+> +       ret = of_clk_add_hw_provider(dev->of_node, of_clk_hw_onecell_get,
+> +                                    clk_data);
+> +       if (ret)
+> +               goto err_unregister_gates;
+> +
+> +       dev_set_drvdata(dev, tcon_top);
+> +
+> +       return 0;
+> +
+> +err_unregister_gates:
+> +       for (i = 0; i < CLK_NUM; i++)
+> +               if (clk_data->hws[i])
+> +                       clk_hw_unregister_gate(clk_data->hws[i]);
+> +       clk_disable_unprepare(tcon_top->bus);
+> +err_assert_reset:
+> +       reset_control_assert(tcon_top->rst);
+> +
+> +       return ret;
+> +}
+> +
+> +static void sun8i_tcon_top_unbind(struct device *dev, struct device *master,
+> +                                 void *data)
+> +{
+> +       struct sun8i_tcon_top *tcon_top = dev_get_drvdata(dev);
+> +       struct clk_hw_onecell_data *clk_data = tcon_top->clk_data;
+> +       int i;
+> +
+> +       of_clk_del_provider(dev->of_node);
+> +       for (i = 0; i < CLK_NUM; i++)
+> +               clk_hw_unregister_gate(clk_data->hws[i]);
+> +
+> +       clk_disable_unprepare(tcon_top->bus);
+> +       reset_control_assert(tcon_top->rst);
+> +}
+> +
+> +static const struct component_ops sun8i_tcon_top_ops = {
+> +       .bind   = sun8i_tcon_top_bind,
+> +       .unbind = sun8i_tcon_top_unbind,
+> +};
+> +
+> +static int sun8i_tcon_top_probe(struct platform_device *pdev)
+> +{
+> +       return component_add(&pdev->dev, &sun8i_tcon_top_ops);
+> +}
+> +
+> +static int sun8i_tcon_top_remove(struct platform_device *pdev)
+> +{
+> +       component_del(&pdev->dev, &sun8i_tcon_top_ops);
+> +
+> +       return 0;
+> +}
+> +
+> +/* sun4i_drv uses this list to check if a device node is a TCON TOP */
+> +const struct of_device_id sun8i_tcon_top_of_table[] = {
+> +       { .compatible = "allwinner,sun8i-r40-tcon-top" },
+> +       { /* sentinel */ }
+> +};
+> +MODULE_DEVICE_TABLE(of, sun8i_tcon_top_of_table);
+> +EXPORT_SYMBOL(sun8i_tcon_top_of_table);
+> +
+> +static struct platform_driver sun8i_tcon_top_platform_driver = {
+> +       .probe          = sun8i_tcon_top_probe,
+> +       .remove         = sun8i_tcon_top_remove,
+> +       .driver         = {
+> +               .name           = "sun8i-tcon-top",
+> +               .of_match_table = sun8i_tcon_top_of_table,
+> +       },
+> +};
+> +module_platform_driver(sun8i_tcon_top_platform_driver);
+> +
+> +MODULE_AUTHOR("Jernej Skrabec <jernej.skrabec@siol.net>");
+> +MODULE_DESCRIPTION("Allwinner R40 TCON TOP driver");
+> +MODULE_LICENSE("GPL");
+> diff --git a/drivers/gpu/drm/sun4i/sun8i_tcon_top.h b/drivers/gpu/drm/sun4i/sun8i_tcon_top.h
+> new file mode 100644
+> index 000000000000..39838bbfeaee
+> --- /dev/null
+> +++ b/drivers/gpu/drm/sun4i/sun8i_tcon_top.h
+> @@ -0,0 +1,40 @@
+> +/* SPDX-License-Identifier: GPL-2.0+ */
+> +/* Copyright (c) 2018 Jernej Skrabec <jernej.skrabec@siol.net> */
+> +
+> +#ifndef _SUN8I_TCON_TOP_H_
+> +#define _SUN8I_TCON_TOP_H_
+> +
+> +#include <linux/clk.h>
+> +#include <linux/clk-provider.h>
+> +#include <linux/reset.h>
+> +#include <linux/spinlock.h>
+> +
+> +#define TCON_TOP_TCON_TV_SETUP_REG     0x00
+> +
+> +#define TCON_TOP_PORT_SEL_REG          0x1C
+> +#define TCON_TOP_PORT_DE0_MSK                  GENMASK(1, 0)
+> +#define TCON_TOP_PORT_DE1_MSK                  GENMASK(5, 4)
+> +
+> +#define TCON_TOP_GATE_SRC_REG          0x20
+> +#define TCON_TOP_HDMI_SRC_MSK                  GENMASK(29, 28)
+> +#define TCON_TOP_TCON_TV1_GATE                 24
+> +#define TCON_TOP_TCON_TV0_GATE                 20
+> +#define TCON_TOP_TCON_DSI_GATE                 16
+> +
+> +#define CLK_NUM                                        3
+> +
+> +struct sun8i_tcon_top {
+> +       struct clk                      *bus;
+> +       struct clk_hw_onecell_data      *clk_data;
+> +       struct reset_control            *rst;
+> +
+> +       /*
+> +        * spinlock is used to synchronize access to same
+> +        * register where multiple clock gates can be set.
+> +        */
+> +       spinlock_t                      reg_lock;
+> +};
+> +
+> +extern const struct of_device_id sun8i_tcon_top_of_table[];
+> +
+> +#endif /* _SUN8I_TCON_TOP_H_ */
+> --
+> 2.18.0
+>
