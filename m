@@ -1,133 +1,44 @@
-From: shunyong.yang@hxt-semitech.com (Shunyong Yang)
-Date: Thu, 28 Jun 2018 17:18:28 +0800
-Subject: [RFC PATCH] arm64: topology: Map PPTT node offset to logic physical
- package id
-Message-ID: <1530177508-15298-1-git-send-email-shunyong.yang@hxt-semitech.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Thu, 28 Jun 2018 11:25:04 +0200
+Subject: [PATCH 2/5] kernel/jump_label: implement generic support for
+ relative references
+In-Reply-To: <CAKv+Gu-xPR6UEiP0NT0zYXKRYXqwFCXP=nf0cC87PZdDYBZB4A@mail.gmail.com>
+References: <20180627160604.8154-1-ard.biesheuvel@linaro.org>
+ <20180627160604.8154-3-ard.biesheuvel@linaro.org>
+ <20180628085003.GA2494@hirez.programming.kicks-ass.net>
+ <CAKv+Gu87DmGLG7N8X8+V7LppXm72SJUmCcEpaehCE5Rt0Z4FNw@mail.gmail.com>
+ <CAKv+Gu-xPR6UEiP0NT0zYXKRYXqwFCXP=nf0cC87PZdDYBZB4A@mail.gmail.com>
+Message-ID: <20180628092504.GC2494@hirez.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As PPTT spec doesn't define the physical package id,
-find_acpi_cpu_topology_package() will return offset of the node with
-Physical package field set when querying physical package id. So, it
-returns 162(0xA2) in following example.
+On Thu, Jun 28, 2018 at 11:04:45AM +0200, Ard Biesheuvel wrote:
+> On 28 June 2018 at 11:02, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> >>> @@ -56,7 +72,9 @@ jump_label_sort_entries(struct jump_entry *start, struct jump_entry *stop)
+> >>>
+> >>>       size = (((unsigned long)stop - (unsigned long)start)
+> >>>                                       / sizeof(struct jump_entry));
+> >>> -     sort(start, size, sizeof(struct jump_entry), jump_label_cmp, NULL);
+> >>> +     sort(start, size, sizeof(struct jump_entry), jump_label_cmp,
+> >>> +          IS_ENABLED(CONFIG_HAVE_ARCH_JUMP_LABEL_RELATIVE) ? jump_label_swap
+> >>> +                                                           : NULL);
+> >>>  }
+> >>
+> >> That will result in jump_label_swap being an unused symbol for some
+> >> compile options.
+> >
+> > No, and isn't that the point of IS_ENABLED()? The compiler sees a
+> > reference to jump_label_swap(), so it won't complain about it being
+> > unused.
 
-[0A2h 0162   1]                Subtable Type : 00 [Processor Hierarchy
-Node]
-[0A3h 0163   1]                       Length : 1C
-[0A4h 0164   2]                     Reserved : 0000
-[0A6h 0166   4]        Flags (decoded below) : 00000003
-                            Physical package : 1
-                     ACPI Processor ID valid : 1
-[0AAh 0170   4]                       Parent : 00000000
-[0AEh 0174   4]            ACPI Processor ID : 00001000
-[0B2h 0178   4]      Private Resource Number : 00000002
-[0B6h 0182   4]             Private Resource : 0000006C
-[0BAh 0186   4]             Private Resource : 00000084
+Ah, ok. I hadn't figured it was quite that smart about it.
 
-So, when "cat physical_package" in /sys/devices/system/cpu/cpu0/topology/,
-it will output 162(0xA2). And if some items are added before the node
-above, the output will change to other value.
+> > Meh. I thought IS_ENABLED() was preferred over #ifdef, no?
 
-This patch maps the node offset to a logic package id. It maps the first
-node offset to 0, the second to 1, and so on.
+Dunno, I just reacted to the proposed code's uglyness :-)
 
-Then, it will not output a big value, such as 162 above. And it will
-not change when some nodes(Physical package not set) are added.
+> ... and it means the sort() routine will unconditionally perform an
+> indirect function call even if the arch does not require it.
 
-And as long as the nodes with Physical package field set in PPTT keeps
-the real hardware order, the logic id can map to hardware package id to
-some extent.
-
-Hope to get feedback from you.
-
-Cc: Joey Zheng <yu.zheng@hxt-semitech.com>
-Signed-off-by: Shunyong Yang <shunyong.yang@hxt-semitech.com>
----
- arch/arm64/kernel/topology.c | 53 +++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 52 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
-index f845a8617812..c219224b36e8 100644
---- a/arch/arm64/kernel/topology.c
-+++ b/arch/arm64/kernel/topology.c
-@@ -320,11 +320,59 @@ static void __init reset_cpu_topology(void)
-  * Propagate the topology information of the processor_topology_node tree to the
-  * cpu_topology array.
-  */
-+
-+struct package_id_map {
-+	int topology_id;
-+	int package_id;
-+	struct list_head list;
-+};
-+
-+static int map_package_id(int topology_id, int *max_package_id,
-+			  struct list_head *head)
-+{
-+	struct list_head *pos;
-+	struct package_id_map *entry;
-+
-+	list_for_each(pos, head) {
-+		entry = container_of(pos, struct package_id_map, list);
-+		if (entry->topology_id == topology_id)
-+			goto done;
-+	}
-+
-+	/* topology_id not found in the list */
-+	entry = kzalloc(sizeof(*entry), GFP_KERNEL);
-+	if (!entry)
-+		return topology_id;
-+
-+	entry->topology_id = topology_id;
-+	entry->package_id = *max_package_id;
-+	list_add(&entry->list, head);
-+	*max_package_id = *max_package_id + 1;
-+
-+done:
-+	return entry->package_id;
-+}
-+
-+static void destroy_map(struct list_head *head)
-+{
-+	struct package_id_map *entry;
-+	struct list_head *pos, *q;
-+
-+	list_for_each_safe(pos, q, head) {
-+		entry = container_of(pos, struct package_id_map, list);
-+		list_del(pos);
-+		kfree(entry);
-+	}
-+}
-+
- static int __init parse_acpi_topology(void)
- {
- 	bool is_threaded;
- 	int cpu, topology_id;
-+	struct list_head package_id_list;
-+	int max_package_id = 0;
- 
-+	INIT_LIST_HEAD(&package_id_list);
- 	is_threaded = read_cpuid_mpidr() & MPIDR_MT_BITMASK;
- 
- 	for_each_possible_cpu(cpu) {
-@@ -343,7 +391,9 @@ static int __init parse_acpi_topology(void)
- 			cpu_topology[cpu].core_id    = topology_id;
- 		}
- 		topology_id = find_acpi_cpu_topology_package(cpu);
--		cpu_topology[cpu].package_id = topology_id;
-+		cpu_topology[cpu].package_id = map_package_id(topology_id,
-+							&max_package_id,
-+							&package_id_list);
- 
- 		i = acpi_find_last_cache_level(cpu);
- 
-@@ -358,6 +408,7 @@ static int __init parse_acpi_topology(void)
- 		}
- 	}
- 
-+	destroy_map(&package_id_list);
- 	return 0;
- }
- 
--- 
-1.8.3.1
+Yeah, not sure I care about that here, this is a one time affair, very
+far away from any fast paths.
