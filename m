@@ -1,117 +1,145 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu, 28 Jun 2018 15:31:03 -0400
-Subject: [PATCH V4 5/7] PCI: Deprecate pci_reset_bus() and pci_reset_slot()
- functions
+Date: Thu, 28 Jun 2018 15:31:02 -0400
+Subject: [PATCH V4 4/7] PCI: Unify try slot and bus reset API
 In-Reply-To: <1530214274-21139-1-git-send-email-okaya@codeaurora.org>
 References: <1530214274-21139-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1530214274-21139-5-git-send-email-okaya@codeaurora.org>
+Message-ID: <1530214274-21139-4-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pci_reset_bus() and pci_reset_slot() functions are not being used by
-any code. Remove them from the kernel in favor of pci_try_reset_bus()
-and pci_try_reset_slot() functions.
+Drivers are expected to call pci_try_reset_slot() or pci_try_reset_bus() by
+querying if a system supports hotplug or not. A survey showed that most
+drivers don't do this and we are leaking hotplug capability to the user.
+
+Hide pci_try_slot_reset() from drivers and embed into pci_try_bus_reset().
+Change pci_try_reset_bus() parameter from struct pci_bus to struct pci_dev.
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/pci/pci.c   | 55 ++---------------------------------------------------
- include/linux/pci.h |  2 --
- 2 files changed, 2 insertions(+), 55 deletions(-)
+ drivers/infiniband/hw/hfi1/pcie.c |  2 +-
+ drivers/pci/pci.c                 | 26 +++++++++++++++++++++-----
+ drivers/vfio/pci/vfio_pci.c       |  6 ++----
+ include/linux/pci.h               |  3 +--
+ 4 files changed, 25 insertions(+), 12 deletions(-)
 
+diff --git a/drivers/infiniband/hw/hfi1/pcie.c b/drivers/infiniband/hw/hfi1/pcie.c
+index 4570c4d..df4f2d3 100644
+--- a/drivers/infiniband/hw/hfi1/pcie.c
++++ b/drivers/infiniband/hw/hfi1/pcie.c
+@@ -905,7 +905,7 @@ static int trigger_sbr(struct hfi1_devdata *dd)
+ 	 * delay after a reset is required.  Per spec requirements,
+ 	 * the link is either working or not after that point.
+ 	 */
+-	return pci_try_reset_bus(dev->bus);
++	return pci_try_reset_bus(dev);
+ }
+ 
+ /*
 diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-index 79a1566..6cec722 100644
+index 236220c..79a1566 100644
 --- a/drivers/pci/pci.c
 +++ b/drivers/pci/pci.c
-@@ -4784,9 +4784,9 @@ int pci_probe_reset_slot(struct pci_slot *slot)
- EXPORT_SYMBOL_GPL(pci_probe_reset_slot);
+@@ -4817,12 +4817,12 @@ int pci_reset_slot(struct pci_slot *slot)
+ EXPORT_SYMBOL_GPL(pci_reset_slot);
  
  /**
-- * pci_reset_slot - reset a PCI slot
+- * pci_try_reset_slot - Try to reset a PCI slot
 + * __pci_try_reset_slot - Try to reset a PCI slot
   * @slot: PCI slot to reset
-- *
-+ *`
-  * A PCI bus may host multiple slots, each slot may support a reset mechanism
-  * independent of other slots.  For instance, some slots may support slot power
-  * control.  In the case of a 1:1 bus to slot architecture, this function may
-@@ -4796,30 +4796,6 @@ EXPORT_SYMBOL_GPL(pci_probe_reset_slot);
-  * through this function.  PCI config space of all devices in the slot and
-  * behind the slot is saved before and restored after reset.
   *
-- * Return 0 on success, non-zero on error.
-- */
--int pci_reset_slot(struct pci_slot *slot)
--{
--	int rc;
--
--	rc = pci_slot_reset(slot, 1);
--	if (rc)
--		return rc;
--
--	pci_slot_save_and_disable(slot);
--
--	rc = pci_slot_reset(slot, 0);
--
--	pci_slot_restore(slot);
--
--	return rc;
--}
--EXPORT_SYMBOL_GPL(pci_reset_slot);
--
--/**
-- * __pci_try_reset_slot - Try to reset a PCI slot
-- * @slot: PCI slot to reset
-- *
   * Same as above except return -EAGAIN if the slot cannot be locked
   */
- static int __pci_try_reset_slot(struct pci_slot *slot)
-@@ -4878,33 +4854,6 @@ int pci_probe_reset_bus(struct pci_bus *bus)
- EXPORT_SYMBOL_GPL(pci_probe_reset_bus);
+-int pci_try_reset_slot(struct pci_slot *slot)
++static int __pci_try_reset_slot(struct pci_slot *slot)
+ {
+ 	int rc;
+ 
+@@ -4843,7 +4843,6 @@ int pci_try_reset_slot(struct pci_slot *slot)
+ 
+ 	return rc;
+ }
+-EXPORT_SYMBOL_GPL(pci_try_reset_slot);
+ 
+ static int pci_bus_reset(struct pci_bus *bus, int probe)
+ {
+@@ -4906,12 +4905,12 @@ int pci_reset_bus(struct pci_bus *bus)
+ EXPORT_SYMBOL_GPL(pci_reset_bus);
  
  /**
-- * pci_reset_bus - reset a PCI bus
-- * @bus: top level PCI bus to reset
-- *
-- * Do a bus reset on the given bus and any subordinate buses, saving
-- * and restoring state of all devices.
-- *
-- * Return 0 on success, non-zero on error.
-- */
--int pci_reset_bus(struct pci_bus *bus)
--{
--	int rc;
--
--	rc = pci_bus_reset(bus, 1);
--	if (rc)
--		return rc;
--
--	pci_bus_save_and_disable(bus);
--
--	rc = pci_bus_reset(bus, 0);
--
--	pci_bus_restore(bus);
--
--	return rc;
--}
--EXPORT_SYMBOL_GPL(pci_reset_bus);
--
--/**
-  * __pci_try_reset_bus - Try to reset a PCI bus
+- * pci_try_reset_bus - Try to reset a PCI bus
++ * __pci_try_reset_bus - Try to reset a PCI bus
   * @bus: top level PCI bus to reset
   *
+  * Same as above except return -EAGAIN if the bus cannot be locked
+  */
+-int pci_try_reset_bus(struct pci_bus *bus)
++static int __pci_try_reset_bus(struct pci_bus *bus)
+ {
+ 	int rc;
+ 
+@@ -4932,6 +4931,23 @@ int pci_try_reset_bus(struct pci_bus *bus)
+ 
+ 	return rc;
+ }
++
++/**
++ * pci_try_reset_bus - Try to reset a PCI bus
++ * @pdev: top level PCI device to reset via slot/bus
++ *
++ * Same as above except return -EAGAIN if the bus cannot be locked
++ */
++int pci_try_reset_bus(struct pci_dev *pdev)
++{
++	bool slot = false;
++
++	if (!pci_probe_reset_slot(pdev->slot))
++		slot = true;
++
++	return slot ? __pci_try_reset_slot(pdev->slot) :
++			__pci_try_reset_bus(pdev->bus);
++}
+ EXPORT_SYMBOL_GPL(pci_try_reset_bus);
+ 
+ /**
+diff --git a/drivers/vfio/pci/vfio_pci.c b/drivers/vfio/pci/vfio_pci.c
+index b423a30..71018ec 100644
+--- a/drivers/vfio/pci/vfio_pci.c
++++ b/drivers/vfio/pci/vfio_pci.c
+@@ -1010,8 +1010,7 @@ static long vfio_pci_ioctl(void *device_data,
+ 						    &info, slot);
+ 		if (!ret)
+ 			/* User has access, do the reset */
+-			ret = slot ? pci_try_reset_slot(vdev->pdev->slot) :
+-				     pci_try_reset_bus(vdev->pdev->bus);
++			ret = pci_try_reset_bus(vdev->pdev);
+ 
+ hot_reset_release:
+ 		for (i--; i >= 0; i--)
+@@ -1373,8 +1372,7 @@ static void vfio_pci_try_bus_reset(struct vfio_pci_device *vdev)
+ 	}
+ 
+ 	if (needs_reset)
+-		ret = slot ? pci_try_reset_slot(vdev->pdev->slot) :
+-			     pci_try_reset_bus(vdev->pdev->bus);
++		ret = pci_try_reset_bus(vdev->pdev);
+ 
+ put_devs:
+ 	for (i = 0; i < devs.cur_index; i++) {
 diff --git a/include/linux/pci.h b/include/linux/pci.h
-index f5c85b6..ad0c89a 100644
+index 6b12ce2..f5c85b6 100644
 --- a/include/linux/pci.h
 +++ b/include/linux/pci.h
-@@ -1095,9 +1095,7 @@ int pci_reset_function(struct pci_dev *dev);
- int pci_reset_function_locked(struct pci_dev *dev);
+@@ -1096,10 +1096,9 @@ int pci_reset_function_locked(struct pci_dev *dev);
  int pci_try_reset_function(struct pci_dev *dev);
  int pci_probe_reset_slot(struct pci_slot *slot);
--int pci_reset_slot(struct pci_slot *slot);
+ int pci_reset_slot(struct pci_slot *slot);
+-int pci_try_reset_slot(struct pci_slot *slot);
  int pci_probe_reset_bus(struct pci_bus *bus);
--int pci_reset_bus(struct pci_bus *bus);
- int pci_try_reset_bus(struct pci_dev *dev);
+ int pci_reset_bus(struct pci_bus *bus);
+-int pci_try_reset_bus(struct pci_bus *bus);
++int pci_try_reset_bus(struct pci_dev *dev);
  void pci_reset_secondary_bus(struct pci_dev *dev);
  void pcibios_reset_secondary_bus(struct pci_dev *dev);
+ void pci_update_resource(struct pci_dev *dev, int resno);
 -- 
 2.7.4
