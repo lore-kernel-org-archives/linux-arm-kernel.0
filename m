@@ -1,60 +1,168 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 28 Jun 2018 11:33:20 +0100
-Subject: [PATCH 1/2] ARM: dts: armada388-clearfog: enable spi flash
-In-Reply-To: <20180628100759.45clx3diuv6tk3e3@tarshish>
-References: <2bc87e3e365c460943730ded86c8fcb1ff55a533.1530170016.git.baruch@tkos.co.il>
- <20180628095113.GC17271@n2100.armlinux.org.uk>
- <20180628100759.45clx3diuv6tk3e3@tarshish>
-Message-ID: <20180628103320.GE17271@n2100.armlinux.org.uk>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Thu, 28 Jun 2018 18:41:56 +0800
+Subject: [PATCH v22 4/4] soc: mediatek: Add Mediatek CMDQ helper
+In-Reply-To: <1530098172-31385-5-git-send-email-houlong.wei@mediatek.com>
+References: <1530098172-31385-1-git-send-email-houlong.wei@mediatek.com>
+ <1530098172-31385-5-git-send-email-houlong.wei@mediatek.com>
+Message-ID: <1530182516.8518.11.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 28, 2018 at 01:07:59PM +0300, Baruch Siach wrote:
-> Hi Russell,
+Hi, Houlong:
+
+Some inline comment.
+
+On Wed, 2018-06-27 at 19:16 +0800, Houlong Wei wrote:
+> Add Mediatek CMDQ helper to create CMDQ packet and assemble GCE op code.
 > 
-> Thanks for reviewing.
+> Signed-off-by: Houlong Wei <houlong.wei@mediatek.com>
+> Signed-off-by: HS Liao <hs.liao@mediatek.com>
+> ---
+>  drivers/soc/mediatek/Kconfig           |   12 ++
+>  drivers/soc/mediatek/Makefile          |    1 +
+>  drivers/soc/mediatek/mtk-cmdq-helper.c |  258 ++++++++++++++++++++++++++++++++
+>  include/linux/soc/mediatek/mtk-cmdq.h  |  132 ++++++++++++++++
+>  4 files changed, 403 insertions(+)
+>  create mode 100644 drivers/soc/mediatek/mtk-cmdq-helper.c
+>  create mode 100644 include/linux/soc/mediatek/mtk-cmdq.h
 > 
-> On Thu, Jun 28, 2018 at 10:51:14AM +0100, Russell King - ARM Linux wrote:
-> > On Thu, Jun 28, 2018 at 10:13:35AM +0300, Baruch Siach wrote:
-> > > The SolidRun Armada 388 SOM has the SPI flash populated by default
-> > > unless the customer explicitly asks otherwise. Enable support by
-> > > default.
-> > 
-> > Are you sure about that - at least some of my boards do not have the
-> > SPI flash populated.
-> > 
-> > &spi1 {
-> >         /* The microsom has an optional W25Q32 on board, connected to CS0 */
-> > ...
-> > &spi1 {
-> >         /*
-> >          * Add SPI CS pins for clearfog:
-> >          * CS0: W25Q32 (not populated on uSOM)
-> 
-> I should update this line as well, I guess.
-> 
-> >          * CS1: PIC microcontroller (Pro models)
-> >          * CS2: mikrobus
-> >          */
-> > 
-> > I wouldn't have written "not populated on uSOM" without having first
-> > taken the uSOM off and physically checked.
-> 
-> Are these production SOMs or development/engineering samples?
+> diff --git a/drivers/soc/mediatek/Kconfig b/drivers/soc/mediatek/Kconfig
+> index a7d0667..17bd759 100644
+> --- a/drivers/soc/mediatek/Kconfig
+> +++ b/drivers/soc/mediatek/Kconfig
+> @@ -4,6 +4,18 @@
+>  menu "MediaTek SoC drivers"
+>  	depends on ARCH_MEDIATEK || COMPILE_TEST
+>  
 
-I don't remember.
+[...]
 
-> Ilya Viten from the SolidRun commercial department told me that all production 
-> SOMs that were shipped to customers have the SPI flash populated.
+> +
+> +int cmdq_pkt_wfe(struct cmdq_pkt *pkt, u32 event)
+> +{
+> +	u32 arg_b;
+> +
+> +	if (event >= CMDQ_MAX_EVENT || event < 0)
 
-Yes, Jon confirms that.
+The type of event is 'u32', so checking 'event < 0' is redundant.
 
-> This is just the default value for the common case.
+> +		return -EINVAL;
+> +
+> +	/*
+> +	 * WFE arg_b
+> +	 * bit 0-11: wait value
+> +	 * bit 15: 1 - wait, 0 - no wait
+> +	 * bit 16-27: update value
+> +	 * bit 31: 1 - update, 0 - no update
+> +	 */
+> +	arg_b = CMDQ_WFE_UPDATE | CMDQ_WFE_WAIT | CMDQ_WFE_WAIT_VALUE;
+> +
+> +	return cmdq_pkt_append_command(pkt, CMDQ_CODE_WFE, event, arg_b);
+> +}
+> +EXPORT_SYMBOL(cmdq_pkt_wfe);
+> +
+> +int cmdq_pkt_clear_event(struct cmdq_pkt *pkt, u32 event)
+> +{
+> +	if (event >= CMDQ_MAX_EVENT || event < 0)
 
-Has it been tested with boards that don't have the SPI flash populated?
-That needs to happen to make sure that this doesn't cause a regression.
+The type of event is 'u32', so checking 'event < 0' is redundant.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+> +		return -EINVAL;
+> +
+> +	return cmdq_pkt_append_command(pkt, CMDQ_CODE_WFE, event,
+> +				       CMDQ_WFE_UPDATE);
+> +}
+> +EXPORT_SYMBOL(cmdq_pkt_clear_event);
+> +
+> +static int cmdq_pkt_finalize(struct cmdq_pkt *pkt)
+> +{
+> +	int err;
+> +
+> +	if (cmdq_pkt_is_finalized(pkt))
+> +		return 0;
+> +
+> +	/* insert EOC and generate IRQ for each command iteration */
+> +	err = cmdq_pkt_append_command(pkt, CMDQ_CODE_EOC, 0, CMDQ_EOC_IRQ_EN);
+> +	if (err < 0)
+> +		return err;
+> +
+> +	/* JUMP to end */
+> +	err = cmdq_pkt_append_command(pkt, CMDQ_CODE_JUMP, 0, CMDQ_JUMP_PASS);
+> +	if (err < 0)
+> +		return err;
+> +
+> +	return 0;
+> +}
+> +
+> +int cmdq_pkt_flush_async(struct cmdq_client *client, struct cmdq_pkt *pkt,
+> +			 cmdq_async_flush_cb cb, void *data)
+> +{
+> +	int err;
+> +	struct device *dev;
+> +	dma_addr_t dma_addr;
+> +
+> +	err = cmdq_pkt_finalize(pkt);
+> +	if (err < 0)
+> +		return err;
+> +
+> +	dev = client->chan->mbox->dev;
+> +	dma_addr = dma_map_single(dev, pkt->va_base, pkt->cmd_buf_size,
+> +		DMA_TO_DEVICE);
+
+You map here, but I could not find unmap, so the unmap should be done in
+client driver. I would prefer a symmetric map/unmap which means that
+both map and unmap are done in client driver. I think you put map here
+because you should map after finalize. Therefore, export
+cmdq_pkt_finalize() to client driver and let client do finalize, so
+there is no finalize in flush function. This method have a benefit that
+if client reuse command buffer, it need not to map/unmap frequently.
+
+Regards,
+CK
+
+> +	if (dma_mapping_error(dev, dma_addr)) {
+> +		dev_err(client->chan->mbox->dev, "dma map failed\n");
+> +		return -ENOMEM;
+> +	}
+> +
+> +	pkt->pa_base = dma_addr;
+> +	pkt->cb.cb = cb;
+> +	pkt->cb.data = data;
+> +
+> +	mbox_send_message(client->chan, pkt);
+> +	/* We can send next packet immediately, so just call txdone. */
+> +	mbox_client_txdone(client->chan, 0);
+> +
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL(cmdq_pkt_flush_async);
+> +
+> +struct cmdq_flush_completion {
+> +	struct completion cmplt;
+> +	bool err;
+> +};
+> +
+> +static void cmdq_pkt_flush_cb(struct cmdq_cb_data data)
+> +{
+> +	struct cmdq_flush_completion *cmplt = data.data;
+> +
+> +	cmplt->err = data.err;
+> +	complete(&cmplt->cmplt);
+> +}
+> +
+> +int cmdq_pkt_flush(struct cmdq_client *client, struct cmdq_pkt *pkt)
+> +{
+> +	struct cmdq_flush_completion cmplt;
+> +	int err;
+> +
+> +	init_completion(&cmplt.cmplt);
+> +	err = cmdq_pkt_flush_async(client, pkt, cmdq_pkt_flush_cb, &cmplt);
+> +	if (err < 0)
+> +		return err;
+> +	wait_for_completion(&cmplt.cmplt);
+> +
+> +	return cmplt.err ? -EFAULT : 0;
+> +}
+> +EXPORT_SYMBOL(cmdq_pkt_flush);
+
+[...]
