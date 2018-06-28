@@ -1,142 +1,147 @@
 From: ravi.bangoria@linux.ibm.com (Ravi Bangoria)
-Date: Thu, 28 Jun 2018 10:52:01 +0530
-Subject: [PATCH v5 02/10] Uprobes: Simplify uprobe_register() body
-In-Reply-To: <20180628052209.13056-1-ravi.bangoria@linux.ibm.com>
-References: <20180628052209.13056-1-ravi.bangoria@linux.ibm.com>
-Message-ID: <20180628052209.13056-3-ravi.bangoria@linux.ibm.com>
+Date: Thu, 28 Jun 2018 10:51:59 +0530
+Subject: [PATCH v5 00/10] Uprobes: Support SDT markers having reference count
+ (semaphore)
+Message-ID: <20180628052209.13056-1-ravi.bangoria@linux.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Simplify uprobe_register() function body and let __uprobe_register()
-handle everything. Also move dependency functions around to fix build
-failures.
+Userspace Statically Defined Tracepoints[1] are dtrace style markers
+inside userspace applications. Applications like PostgreSQL, MySQL,
+Pthread, Perl, Python, Java, Ruby, Node.js, libvirt, QEMU, glib etc
+have these markers embedded in them. These markers are added by developer
+at important places in the code. Each marker source expands to a single
+nop instruction in the compiled code but there may be additional
+overhead for computing the marker arguments which expands to couple of
+instructions. In case the overhead is more, execution of it can be
+omitted by runtime if() condition when no one is tracing on the marker:
 
-Signed-off-by: Ravi Bangoria <ravi.bangoria@linux.ibm.com>
----
- kernel/events/uprobes.c | 69 ++++++++++++++++++++++++++-----------------------
- 1 file changed, 36 insertions(+), 33 deletions(-)
+    if (reference_counter > 0) {
+        Execute marker instructions;
+    }
 
-diff --git a/kernel/events/uprobes.c b/kernel/events/uprobes.c
-index e6e812304b22..26c2d95c55fa 100644
---- a/kernel/events/uprobes.c
-+++ b/kernel/events/uprobes.c
-@@ -816,13 +816,8 @@ register_for_each_vma(struct uprobe *uprobe, struct uprobe_consumer *new)
- 	return err;
- }
- 
--static int __uprobe_register(struct uprobe *uprobe, struct uprobe_consumer *uc)
--{
--	consumer_add(uprobe, uc);
--	return register_for_each_vma(uprobe, uc);
--}
--
--static void __uprobe_unregister(struct uprobe *uprobe, struct uprobe_consumer *uc)
-+static void
-+__uprobe_unregister(struct uprobe *uprobe, struct uprobe_consumer *uc)
- {
- 	int err;
- 
-@@ -836,24 +831,46 @@ static void __uprobe_unregister(struct uprobe *uprobe, struct uprobe_consumer *u
- }
- 
- /*
-- * uprobe_register - register a probe
-+ * uprobe_unregister - unregister a already registered probe.
-+ * @inode: the file in which the probe has to be removed.
-+ * @offset: offset from the start of the file.
-+ * @uc: identify which probe if multiple probes are colocated.
-+ */
-+void uprobe_unregister(struct inode *inode, loff_t offset, struct uprobe_consumer *uc)
-+{
-+	struct uprobe *uprobe;
-+
-+	uprobe = find_uprobe(inode, offset);
-+	if (WARN_ON(!uprobe))
-+		return;
-+
-+	down_write(&uprobe->register_rwsem);
-+	__uprobe_unregister(uprobe, uc);
-+	up_write(&uprobe->register_rwsem);
-+	put_uprobe(uprobe);
-+}
-+EXPORT_SYMBOL_GPL(uprobe_unregister);
-+
-+/*
-+ * __uprobe_register - register a probe
-  * @inode: the file in which the probe has to be placed.
-  * @offset: offset from the start of the file.
-  * @uc: information on howto handle the probe..
-  *
-- * Apart from the access refcount, uprobe_register() takes a creation
-+ * Apart from the access refcount, __uprobe_register() takes a creation
-  * refcount (thro alloc_uprobe) if and only if this @uprobe is getting
-  * inserted into the rbtree (i.e first consumer for a @inode:@offset
-  * tuple).  Creation refcount stops uprobe_unregister from freeing the
-  * @uprobe even before the register operation is complete. Creation
-  * refcount is released when the last @uc for the @uprobe
-- * unregisters. Caller of uprobe_register() is required to keep @inode
-+ * unregisters. Caller of __uprobe_register() is required to keep @inode
-  * (and the containing mount) referenced.
-  *
-  * Return errno if it cannot successully install probes
-  * else return 0 (success)
-  */
--int uprobe_register(struct inode *inode, loff_t offset, struct uprobe_consumer *uc)
-+static int __uprobe_register(struct inode *inode, loff_t offset,
-+			     struct uprobe_consumer *uc)
- {
- 	struct uprobe *uprobe;
- 	int ret;
-@@ -880,7 +897,8 @@ int uprobe_register(struct inode *inode, loff_t offset, struct uprobe_consumer *
- 	down_write(&uprobe->register_rwsem);
- 	ret = -EAGAIN;
- 	if (likely(uprobe_is_active(uprobe))) {
--		ret = __uprobe_register(uprobe, uc);
-+		consumer_add(uprobe, uc);
-+		ret = register_for_each_vma(uprobe, uc);
- 		if (ret)
- 			__uprobe_unregister(uprobe, uc);
- 	}
-@@ -891,6 +909,12 @@ int uprobe_register(struct inode *inode, loff_t offset, struct uprobe_consumer *
- 		goto retry;
- 	return ret;
- }
-+
-+int uprobe_register(struct inode *inode, loff_t offset,
-+		    struct uprobe_consumer *uc)
-+{
-+	return __uprobe_register(inode, offset, uc);
-+}
- EXPORT_SYMBOL_GPL(uprobe_register);
- 
- /*
-@@ -922,27 +946,6 @@ int uprobe_apply(struct inode *inode, loff_t offset,
- 	return ret;
- }
- 
--/*
-- * uprobe_unregister - unregister a already registered probe.
-- * @inode: the file in which the probe has to be removed.
-- * @offset: offset from the start of the file.
-- * @uc: identify which probe if multiple probes are colocated.
-- */
--void uprobe_unregister(struct inode *inode, loff_t offset, struct uprobe_consumer *uc)
--{
--	struct uprobe *uprobe;
--
--	uprobe = find_uprobe(inode, offset);
--	if (WARN_ON(!uprobe))
--		return;
--
--	down_write(&uprobe->register_rwsem);
--	__uprobe_unregister(uprobe, uc);
--	up_write(&uprobe->register_rwsem);
--	put_uprobe(uprobe);
--}
--EXPORT_SYMBOL_GPL(uprobe_unregister);
--
- static int unapply_uprobe(struct uprobe *uprobe, struct mm_struct *mm)
- {
- 	struct vm_area_struct *vma;
+Default value of reference counter is 0. Tracer has to increment the 
+reference counter before tracing on a marker and decrement it when
+done with the tracing.
+
+Currently, perf tool has limited supports for SDT markers. I.e. it
+can not trace markers surrounded by reference counter. Also, it's
+not easy to add reference counter logic in userspace tool like perf,
+so basic idea for this patchset is to add reference counter logic in
+the a uprobe infrastructure. Ex,[2]
+
+  # cat tick.c
+    ... 
+    for (i = 0; i < 100; i++) {
+	DTRACE_PROBE1(tick, loop1, i);
+        if (TICK_LOOP2_ENABLED()) {
+            DTRACE_PROBE1(tick, loop2, i); 
+        }
+        printf("hi: %d\n", i); 
+        sleep(1);
+    }   
+    ... 
+
+Here tick:loop1 is marker without reference counter where as tick:loop2
+is surrounded by reference counter condition.
+
+  # perf buildid-cache --add /tmp/tick
+  # perf probe sdt_tick:loop1
+  # perf probe sdt_tick:loop2
+
+  # perf stat -e sdt_tick:loop1,sdt_tick:loop2 -- /tmp/tick
+  hi: 0
+  hi: 1
+  hi: 2
+  ^C
+  Performance counter stats for '/tmp/tick':
+             3      sdt_tick:loop1
+             0      sdt_tick:loop2
+     2.747086086 seconds time elapsed
+
+Perf failed to record data for tick:loop2. Same experiment with this
+patch series:
+
+  # ./perf buildid-cache --add /tmp/tick
+  # ./perf probe sdt_tick:loop2
+  # ./perf stat -e sdt_tick:loop2 /tmp/tick
+    hi: 0
+    hi: 1
+    hi: 2
+    ^C  
+     Performance counter stats for '/tmp/tick':
+                 3      sdt_tick:loop2
+       2.561851452 seconds time elapsed
+
+
+v5 changes:
+ - Fix build failure. 'struct uprobe' was local to uprobe.c file and I
+   was using it in some arch specific code which caused a build failure.
+   Added new patch [PATCH v5 1/10] to fix it.
+
+v4 changes:
+ - Previous version moved the implementation from trace_uprobe to core
+   uprobe. But it had some issues. I've fixed them in this version. To
+   cut a long story short, reference counter increment/decrement is
+   tied to instruction patching. Whenever instruction gets patched, we
+   update the reference counter. Now, what if vma holding reference
+   counter is not present while patching an instruction? To overcome
+   this issue, we will add such uprobe to delayed_uprobe list. Whenever
+   process maps the region holding the reference counter, we increment
+   it and remove the uprobe from delayed_uprobe list.
+ - Until last version, we were incrementing reference counter for each
+   uprobe_consumer. That isn't true now. With this implementation, we
+   increment and decrement the counter only once. This is fine because
+   we increment the counter when we find first valid consumer and we
+   decrement it when last consumer is going away. (For a tiny binary,
+   multiple vmas maps to the same file portion. In such case, we are
+   patching the instruction multiple time and thus we will increment /
+   decrement the reference counter multiple time as well.)
+ - Fortunately, there is no need to maintain sdt_mm_list now, because
+   we are sure that the increment and decrement will always happen in
+   sync. This make the implementation lot more simpler compared to
+   earlier versions.
+
+v4 can be foud at: https://lkml.org/lkml/2018/6/19/1324 
+
+Note:
+ - 'reference counter' is called as 'semaphore' in original Dtrace
+   (or Systemtap, bcc and even in ELF) documentation and code. But the 
+   term 'semaphore' is misleading in this context. This is just a counter
+   used to hold number of tracers tracing on a marker. This is not really
+   used for any synchronization. So we are referring it as 'reference
+   counter' in kernel / perf code.
+
+[1] https://sourceware.org/systemtap/wiki/UserSpaceProbeImplementation
+[2] https://github.com/iovisor/bcc/issues/327#issuecomment-200576506
+
+
+Ravi Bangoria (10):
+  Uprobes: Move uprobe structure to uprobe.h
+  Uprobes: Simplify uprobe_register() body
+  Uprobe: Change set_swbp definition
+  Uprobe: Change set_orig_insn definition
+  Uprobe: Change uprobe_write_opcode definition
+  Uprobes: Support SDT markers having reference count (semaphore)
+  trace_uprobe/sdt: Prevent multiple reference counter for same uprobe
+  Uprobes/sdt: Prevent multiple reference counter for same uprobe
+  Uprobes/sdt: Document about reference counter
+  perf probe: Support SDT markers having reference counter (semaphore)
+
+ Documentation/trace/uprobetracer.rst |  16 +-
+ arch/arm/probes/uprobes/core.c       |   6 +-
+ arch/mips/kernel/uprobes.c           |   6 +-
+ include/linux/uprobes.h              |  37 +++-
+ kernel/events/uprobes.c              | 390 ++++++++++++++++++++++++++++-------
+ kernel/trace/trace.c                 |   2 +-
+ kernel/trace/trace_uprobe.c          |  74 ++++++-
+ tools/perf/util/probe-event.c        |  39 +++-
+ tools/perf/util/probe-event.h        |   1 +
+ tools/perf/util/probe-file.c         |  34 ++-
+ tools/perf/util/probe-file.h         |   1 +
+ tools/perf/util/symbol-elf.c         |  46 +++--
+ tools/perf/util/symbol.h             |   7 +
+ 13 files changed, 542 insertions(+), 117 deletions(-)
+
 -- 
 2.14.4
