@@ -1,62 +1,34 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Thu, 28 Jun 2018 16:32:43 +0200
-Subject: [PATCH v3 17/18] ARM: davinci: sffsdr: use device properties for at24
- eeprom
-In-Reply-To: <20180628143244.4561-1-brgl@bgdev.pl>
-References: <20180628143244.4561-1-brgl@bgdev.pl>
-Message-ID: <20180628143244.4561-18-brgl@bgdev.pl>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Thu, 28 Jun 2018 17:44:33 +0300
+Subject: [PATCH 2/2] ARM: mvebu_v7_defconfig: enable SFP support
+In-Reply-To: <20180628151407.53231885@windsurf>
+References: <ee69693c87cd0146f259042fc5dcd29338fcdf25.1530169575.git.baruch@tkos.co.il>
+ <b130ccb8a9812530d33a71afb1563545fa8808cf.1530169575.git.baruch@tkos.co.il>
+ <20180628151407.53231885@windsurf>
+Message-ID: <20180628144433.ezel6xyi3ulppsog@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+Hi Thomas,
 
-We want to work towards phasing out the at24_platform_data structure.
-There are few users and its contents can be represented using generic
-device properties. Using device properties only will allow us to
-significantly simplify the at24 configuration code.
+On Thu, Jun 28, 2018 at 03:14:07PM +0200, Thomas Petazzoni wrote:
+> On Thu, 28 Jun 2018 10:06:15 +0300, Baruch Siach wrote:
+> > This enables support for SFP cages on SolidRun Armada 38x and 8k
+> 
+> You're running a 32-bit kernel on 8K platforms ?
 
-Remove the at24_platform_data structure and replace it with an array
-of property entries. Drop the byte_len/size property, as the model name
-already implies the EEPROM's size.
+No, though that is probably possible.
 
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
----
- arch/arm/mach-davinci/board-sffsdr.c | 11 +++++------
- 1 file changed, 5 insertions(+), 6 deletions(-)
+But you are right. In practice this patch only affects 32-bit mvebu platforms. 
+Support for 8k platforms would require a separate patch.
 
-diff --git a/arch/arm/mach-davinci/board-sffsdr.c b/arch/arm/mach-davinci/board-sffsdr.c
-index f6a4d094cbc3..680e5d7628a8 100644
---- a/arch/arm/mach-davinci/board-sffsdr.c
-+++ b/arch/arm/mach-davinci/board-sffsdr.c
-@@ -26,7 +26,7 @@
- #include <linux/init.h>
- #include <linux/platform_device.h>
- #include <linux/i2c.h>
--#include <linux/platform_data/at24.h>
-+#include <linux/property.h>
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/rawnand.h>
- #include <linux/mtd/partitions.h>
-@@ -92,16 +92,15 @@ static struct platform_device davinci_sffsdr_nandflash_device = {
- 	.resource	= davinci_sffsdr_nandflash_resource,
- };
- 
--static struct at24_platform_data eeprom_info = {
--	.byte_len	= (64*1024) / 8,
--	.page_size	= 32,
--	.flags		= AT24_FLAG_ADDR16,
-+static const struct property_entry eeprom_properties[] = {
-+	PROPERTY_ENTRY_U32("pagesize", 32),
-+	{ },
- };
- 
- static struct i2c_board_info __initdata i2c_info[] =  {
- 	{
- 		I2C_BOARD_INFO("24c64", 0x50),
--		.platform_data	= &eeprom_info,
-+		.properties = eeprom_properties,
- 	},
- 	/* Other I2C devices:
- 	 * MSP430,  addr 0x23 (not used)
+Gregory, you mentioned earlier that mvebu branches are not immutable yet. Can 
+you drop reference to 8k platforms from the commit log?
+
+Thanks,
+baruch
+
 -- 
-2.17.1
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
