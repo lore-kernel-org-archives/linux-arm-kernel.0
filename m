@@ -1,32 +1,61 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu, 28 Jun 2018 15:17:45 -0400
-Subject: [PATCH V3 5/6] PCI: Rename pci_try_reset_bus() to pci_reset_bus()
-In-Reply-To: <1530210507-9287-5-git-send-email-okaya@codeaurora.org>
-References: <1530210507-9287-1-git-send-email-okaya@codeaurora.org>
- <1530210507-9287-5-git-send-email-okaya@codeaurora.org>
-Message-ID: <006d7041-6d5c-af10-6252-005978bdc203@codeaurora.org>
+From: sravanhome@gmail.com (Saravanan Sekar)
+Date: Thu, 28 Jun 2018 21:18:05 +0200
+Subject: [PATCH v2 3/3] dt-bindings: clock: Modify Actions Soc clock bindings
+In-Reply-To: <20180628191805.3722-1-sravanhome@gmail.com>
+References: <20180626192820.28237-3-sravanhome@gmail.com>
+ <20180628191805.3722-1-sravanhome@gmail.com>
+Message-ID: <20180628191805.3722-4-sravanhome@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/28/2018 2:28 PM, Sinan Kaya wrote:
-> --- a/drivers/infiniband/hw/hfi1/pcie.c
-> +++ b/drivers/infiniband/hw/hfi1/pcie.c
-> @@ -905,7 +905,7 @@ static int trigger_sbr(struct hfi1_devdata *dd)
->  	 * delay after a reset is required.  Per spec requirements,
->  	 * the link is either working or not after that point.
->  	 */
-> -	return pci_try_reset_bus(dev->bus);
-> +	return pci_reset_bus(dev->bus);
->  }
->  
+Modify clock bindings common Actions Semi Soc family S700/S900.
 
-This should have been 
+Signed-off-by: Parthiban Nallathambi <pn@denx.de>
+Signed-off-by: Saravanan Sekar <sravanhome@gmail.com>
+---
+ ...tions,s900-cmu.txt => actions,sx00-cmu.txt} | 18 ++++++++++--------
+ 1 file changed, 10 insertions(+), 8 deletions(-)
+ rename Documentation/devicetree/bindings/clock/{actions,s900-cmu.txt => actions,sx00-cmu.txt} (71%)
 
-return pci_reset_bus(dev);
-
-I'll wait until I hear more feedback.
-
+diff --git a/Documentation/devicetree/bindings/clock/actions,s900-cmu.txt b/Documentation/devicetree/bindings/clock/actions,sx00-cmu.txt
+similarity index 71%
+rename from Documentation/devicetree/bindings/clock/actions,s900-cmu.txt
+rename to Documentation/devicetree/bindings/clock/actions,sx00-cmu.txt
+index 93e4fb827cd6..8dc7edb4d198 100644
+--- a/Documentation/devicetree/bindings/clock/actions,s900-cmu.txt
++++ b/Documentation/devicetree/bindings/clock/actions,sx00-cmu.txt
+@@ -1,12 +1,14 @@
+-* Actions S900 Clock Management Unit (CMU)
++* Actions S900/S700 Clock Management Unit (CMU)
+ 
+-The Actions S900 clock management unit generates and supplies clock to various
+-controllers within the SoC. The clock binding described here is applicable to
+-S900 SoC.
++The Actions S900/S700 clock management unit generates and supplies clock to
++various controllers within the SoC. The clock binding described here is
++applicable to S900/S700 SoC.
+ 
+ Required Properties:
+ 
+-- compatible: should be "actions,s900-cmu"
++- compatible: should be one of this
++	"actions,s900-cmu"
++	"actions,s700-cmu"
+ - reg: physical base address of the controller and length of memory mapped
+   region.
+ - clocks: Reference to the parent clocks ("hosc", "losc")
+@@ -15,9 +17,9 @@ Required Properties:
+ Each clock is assigned an identifier, and client nodes can use this identifier
+ to specify the clock which they consume.
+ 
+-All available clocks are defined as preprocessor macros in
+-dt-bindings/clock/actions,s900-cmu.h header and can be used in device
+-tree sources.
++All available clocks are defined as preprocessor macros in corresponding
++dt-bindings/clock/actions,s900-cmu.h or s700-cmu.h header and can be used in
++device tree sources.
+ 
+ External clocks:
+ 
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+2.18.0
