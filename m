@@ -1,37 +1,35 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Thu, 28 Jun 2018 11:50:53 +0200
-Subject: [PATCH 2/3] ARM64: dts: meson-axg: add s400 main 12v supply
-In-Reply-To: <20180628095054.13433-1-jbrunet@baylibre.com>
-References: <20180628095054.13433-1-jbrunet@baylibre.com>
-Message-ID: <20180628095054.13433-3-jbrunet@baylibre.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 28 Jun 2018 10:51:14 +0100
+Subject: [PATCH 1/2] ARM: dts: armada388-clearfog: enable spi flash
+In-Reply-To: <2bc87e3e365c460943730ded86c8fcb1ff55a533.1530170016.git.baruch@tkos.co.il>
+References: <2bc87e3e365c460943730ded86c8fcb1ff55a533.1530170016.git.baruch@tkos.co.il>
+Message-ID: <20180628095113.GC17271@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a fixed regulator for the main 12v which is the main power supply
-of the board.
+On Thu, Jun 28, 2018 at 10:13:35AM +0300, Baruch Siach wrote:
+> The SolidRun Armada 388 SOM has the SPI flash populated by default
+> unless the customer explicitly asks otherwise. Enable support by
+> default.
 
-Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
----
- arch/arm64/boot/dts/amlogic/meson-axg-s400.dts | 7 +++++++
- 1 file changed, 7 insertions(+)
+Are you sure about that - at least some of my boards do not have the
+SPI flash populated.
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
-index d926f8956db8..0b655570b7c2 100644
---- a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
-@@ -16,6 +16,13 @@
- 		serial1 = &uart_A;
- 	};
- 
-+	main_12v: regulator-main_12v {
-+		compatible = "regulator-fixed";
-+		regulator-name = "12V";
-+		regulator-min-microvolt = <12000000>;
-+		regulator-max-microvolt = <12000000>;
-+	};
-+
- 	vddio_boot: regulator-vddio_boot {
- 		compatible = "regulator-fixed";
- 		regulator-name = "VDDIO_BOOT";
+&spi1 {
+        /* The microsom has an optional W25Q32 on board, connected to CS0 */
+...
+&spi1 {
+        /*
+         * Add SPI CS pins for clearfog:
+         * CS0: W25Q32 (not populated on uSOM)
+         * CS1: PIC microcontroller (Pro models)
+         * CS2: mikrobus
+         */
+
+I wouldn't have written "not populated on uSOM" without having first
+taken the uSOM off and physically checked.
+
 -- 
-2.14.4
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
