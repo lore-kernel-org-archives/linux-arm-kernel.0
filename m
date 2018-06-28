@@ -1,114 +1,59 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 28 Jun 2018 17:15:39 +0200
-Subject: [PATCH v5 1/6] ARM: at91: add TCB registers definitions
-In-Reply-To: <20180619211929.22908-2-alexandre.belloni@bootlin.com>
-References: <20180619211929.22908-1-alexandre.belloni@bootlin.com>
- <20180619211929.22908-2-alexandre.belloni@bootlin.com>
-Message-ID: <1bc64ccb-1e22-364c-e08c-fa86692783ff@linaro.org>
+From: luc.vanoostenryck@gmail.com (Luc Van Oostenryck)
+Date: Thu, 28 Jun 2018 17:28:43 +0200
+Subject: [PATCH v4 0/7] arm64: untag user pointers passed to the kernel
+In-Reply-To: <20180628144858.2fu7kq56cxhp2kpg@armageddon.cambridge.arm.com>
+References: <cover.1529507994.git.andreyknvl@google.com>
+ <CAAeHK+zqtyGzd_CZ7qKZKU-uZjZ1Pkmod5h8zzbN0xCV26nSfg@mail.gmail.com>
+ <20180626172900.ufclp2pfrhwkxjco@armageddon.cambridge.arm.com>
+ <CAAeHK+yqWKTdTG+ymZ2-5XKiDANV+fmUjnQkRy-5tpgphuLJRA@mail.gmail.com>
+ <0cef1643-a523-98e7-95e2-9ec595137642@arm.com>
+ <20180627171757.amucnh5znld45cpc@armageddon.cambridge.arm.com>
+ <20180628061758.j6bytsaj5jk4aocg@ltop.local>
+ <20180628102741.vk6vphfinlj3lvhv@armageddon.cambridge.arm.com>
+ <20180628104610.czsnq4w3lfhxrn53@ltop.local>
+ <20180628144858.2fu7kq56cxhp2kpg@armageddon.cambridge.arm.com>
+Message-ID: <20180628152841.rgc62aqqckcuecaf@ltop.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/06/2018 23:19, Alexandre Belloni wrote:
-> Add registers and bits definitions for the timer counter blocks found on
-> Atmel ARM SoCs.
+On Thu, Jun 28, 2018 at 03:48:59PM +0100, Catalin Marinas wrote:
+> On Thu, Jun 28, 2018 at 12:46:11PM +0200, Luc Van Oostenryck wrote:
+> > On Thu, Jun 28, 2018 at 11:27:42AM +0100, Catalin Marinas wrote:
+> > > On Thu, Jun 28, 2018 at 08:17:59AM +0200, Luc Van Oostenryck wrote:
+> > > > On Wed, Jun 27, 2018 at 06:17:58PM +0100, Catalin Marinas wrote:
+> > > > > sparse is indeed an option. The current implementation doesn't warn on
+> > > > > an explicit cast from (void __user *) to (unsigned long) since that's a
+> > > > > valid thing in the kernel. I couldn't figure out if there's any other
+> > > > > __attribute__ that could be used to warn of such conversion.
+> > > > 
+> > > > sparse doesn't have such attribute but would an new option that would warn
+> > > > on such cast be a solution for your case?
+> > > 
+> > > I can't tell for sure whether such sparse option would be the full
+> > > solution but detecting explicit __user pointer casts to long is a good
+> > > starting point. So far this patchset pretty much relies on detecting
+> > > a syscall failure and trying to figure out why, patching the kernel. It
+> > > doesn't really scale.
+> > 
+> > OK, I'll add such an option this evening.
 > 
-> Tested-by: Alexander Dahl <ada@thorsis.com>
-> Tested-by: Andras Szemzo <szemzo.andras@gmail.com>
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
-> ---
->  include/soc/at91/atmel_tcb.h | 216 +++++++++++++++++++++++++++++++++++
+> That's great, thanks. I think this should cover casting pointers to any
+> integer types, not just "unsigned long" (e.g. long long).
 
-Is the header necessary ? Can it be moved in the .c ?
+Yes, of course.
+ 
+> The only downside is that with this patchset the untagging can be done
+> after the conversion to ulong (get_user_pages()) as that's where the
+> problem was noticed. With a new sparse feature, we'd have to annotate
+> the conversion sites (not sure how many until we run the tool though).
 
->  1 file changed, 216 insertions(+)
->  create mode 100644 include/soc/at91/atmel_tcb.h
-> 
-> diff --git a/include/soc/at91/atmel_tcb.h b/include/soc/at91/atmel_tcb.h
-> new file mode 100644
-> index 000000000000..3ed66031fc76
-> --- /dev/null
+I've done a lot of hacking on sparse and as such I run a lot of tests.
+What I see with these tests is that a lot of annotations are wrong or
+missing so I'm very reluctant to add another attribute. Even more so
+one that would be only slightly different than an existing one. OTOH,
+if it's something localized or a one-shot and there is a need, ...
+why not?
 
-[ ... ]
+What would you ideally need?
 
-> +static inline struct clk *tcb_clk_get(struct device_node *node, int channel)
-> +{
-> +	struct clk *clk;
-> +	char clk_name[] = "t0_clk";
-> +
-> +	clk_name[1] += channel;
-
-clever :)
-
-> +	clk = of_clk_get_by_name(node->parent, clk_name);
-> +	if (!IS_ERR(clk))
-> +		return clk;
-> +
-> +	return of_clk_get_by_name(node->parent, "t0_clk");
-
-Why do you want to return clk from t0_clk if another channel is
-requested ? This is prone to error.
-
-I would clarify that at the caller level, if tcb_clk_get fails then try
-with channel zero.
-
-> +}
-> +
-> +static inline int tcb_irq_get(struct device_node *node, int channel)
-
-no inline
-
-> +{
-> +	int irq;
-> +
-> +	irq = of_irq_get(node->parent, channel);
-> +	if (irq > 0)
-> +		return irq;
-> +
-> +	return of_irq_get(node->parent, 0);
-
-Same comment than above.
-
-> +}
-> +
-> +static const u8 atmel_tc_divisors[5] = { 2, 8, 32, 128, 0, };
-> +
-> +struct atmel_tcb_info {
-> +	int bits;
-> +};
-> +
-> +static const struct atmel_tcb_info atmel_tcb_infos[] = {
-> +	{ .bits = 16 },
-> +	{ .bits = 32 },
-> +};
-
-Structuring the code with structure is a good practice. However, this is
-too much :)
-
-> +static const struct of_device_id atmel_tcb_dt_ids[] = {
-> +	{
-> +		.compatible = "atmel,at91rm9200-tcb",
-> +		.data = &atmel_tcb_infos[0],
-
-		.data = (void *)16;
-
-> +	}, {
-> +		.compatible = "atmel,at91sam9x5-tcb",
-> +		.data = &atmel_tcb_infos[1],
-> +	}, {
-> +		/* sentinel */
-> +	}
-> +};
-> +
-
-
-
-> +#endif /* __SOC_ATMEL_TCB_H */
-> 
-
-
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+-- Luc
