@@ -1,49 +1,56 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 28 Jun 2018 14:24:34 +0800
-Subject: [linux-sunxi] Re: [PATCH v3 09/24] drm/sun4i: Don't skip TCONs if
- they don't have channel 0
-In-Reply-To: <2676604.ZYCNkuCdbT@jernej-laptop>
-References: <20180625120304.7543-1-jernej.skrabec@siol.net>
- <20180625120304.7543-10-jernej.skrabec@siol.net>
- <CAGb2v64EkVK+AEngEuadBzAZagyU7eyOhHhBh0iFrxS+-BbCYQ@mail.gmail.com>
- <2676604.ZYCNkuCdbT@jernej-laptop>
-Message-ID: <CAGb2v67kBRWkJpJogFR4GXgA66dsxVaMVWN8MDiP_wFTqxW-=g@mail.gmail.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Thu, 28 Jun 2018 08:36:52 +0200
+Subject: [RFC PATCH 1/5] arm: dts: zynq: Set correct manufacturer for
+ ZedBoard and MicroZed boards
+In-Reply-To: <20180628054205.17737-2-luaraneda@gmail.com>
+References: <20180628054205.17737-1-luaraneda@gmail.com>
+ <20180628054205.17737-2-luaraneda@gmail.com>
+Message-ID: <d43b1758-cc0c-3a19-0d7d-f4773fe5caac@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 28, 2018 at 12:45 PM, Jernej ?krabec
-<jernej.skrabec@siol.net> wrote:
-> Dne ?etrtek, 28. junij 2018 ob 03:51:31 CEST je Chen-Yu Tsai napisal(a):
->> On Mon, Jun 25, 2018 at 8:02 PM, Jernej Skrabec <jernej.skrabec@siol.net>
-> wrote:
->> > TV TCONs (channel 1 only) are always connected to TV or HDMI encoder.
->> > Because of that, all output endpoints on such TCON node will point to a
->> > encoder which is part of component framework.
->> >
->> > Correct current graph traversing algorithm in such way that it doesn't
->> > skip output enpoints with id 0 on TV TCONs.
->>
->> No. Our bindings say that endpoint 0 _is_ channel 0. For TCONs that don't
->> have channel 0, it must be skipped.
->
-> I'm not sure where this is stated. I read TCON binding again. Can you please
-> point me to it?
+On 28.6.2018 07:42, Luis Araneda wrote:
+> Both boards are made by Avnet, Inc.
+> 
+> Signed-off-by: Luis Araneda <luaraneda@gmail.com>
+> ---
+>  arch/arm/boot/dts/zynq-microzed.dts | 2 +-
+>  arch/arm/boot/dts/zynq-zed.dts      | 2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/zynq-microzed.dts b/arch/arm/boot/dts/zynq-microzed.dts
+> index aa4a0b6de..e40f40a7f 100644
+> --- a/arch/arm/boot/dts/zynq-microzed.dts
+> +++ b/arch/arm/boot/dts/zynq-microzed.dts
+> @@ -8,7 +8,7 @@
+>  
+>  / {
+>  	model = "Zynq MicroZED Development Board";
+> -	compatible = "xlnx,zynq-microzed", "xlnx,zynq-7000";
+> +	compatible = "avnet,zynq-microzed", "xlnx,zynq-7000";
+>  
+>  	aliases {
+>  		ethernet0 = &gem0;
+> diff --git a/arch/arm/boot/dts/zynq-zed.dts b/arch/arm/boot/dts/zynq-zed.dts
+> index 53c6883ce..98381cc85 100644
+> --- a/arch/arm/boot/dts/zynq-zed.dts
+> +++ b/arch/arm/boot/dts/zynq-zed.dts
+> @@ -8,7 +8,7 @@
+>  
+>  / {
+>  	model = "Zynq Zed Development Board";
+> -	compatible = "xlnx,zynq-zed", "xlnx,zynq-7000";
+> +	compatible = "avnet,zynq-zed", "xlnx,zynq-7000";
+>  
+>  	aliases {
+>  		ethernet0 = &gem0;
+> 
 
-https://elixir.bootlin.com/linux/latest/source/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt#L169
+Unfortunately we don't know who is parsing this string. It means please
+keep that origin compatible string there.
 
-Our TCON driver still expects RGB or LVDS panel / bridges on endpoint 0.
-So I guess this was sort of implied historically. It's no longer true.
-This is something we should probably fix.
+I have no problem with this.
+compatible = "avnet,zynq-zed", "xlnx,zynq-zed", "xlnx,zynq-7000";
 
-In practice our drivers don't look at it (yet), but rely on the downstream
-encoder type to determine which channel to use.
-
-But please add the "allwinner,tcon-channel" property as specified in
-the binding.
-
-> So on TV TCONs on R40 (without channel 0) TVE would be endpoint 1 and HDMI
-> endpoint 2 (or the other way around)?
-
-Which one goes first doesn't quite matter. IIRC there's also a mux for TVE?
-
-ChenYu
+Thanks,
+Michal
