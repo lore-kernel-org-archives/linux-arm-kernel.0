@@ -1,43 +1,27 @@
-From: james.morse@arm.com (James Morse)
-Date: Thu, 28 Jun 2018 17:13:42 +0100
-Subject: question about arm64 exception handling
-In-Reply-To: <5B34CD7D.5090002@broadcom.com>
-References: <5B34CD7D.5090002@broadcom.com>
-Message-ID: <e54b3d4c-dbd0-b39d-28a2-063f34068dfd@arm.com>
+From: geoff@infradead.org (Geoff Levand)
+Date: Thu, 28 Jun 2018 09:15:28 -0700
+Subject: [RFC/RFT PATCH 0/2] disable_hest quirk on HP m400 with bad UEFI
+ firmwware
+In-Reply-To: <CAKv+Gu9ZHAGzcfgHShM1qvZ3qf4gb1pD_XfoceJu9Qy+5_pEsg@mail.gmail.com>
+References: <20180628100656.10692-1-james.morse@arm.com>
+ <CAKv+Gu9ZHAGzcfgHShM1qvZ3qf4gb1pD_XfoceJu9Qy+5_pEsg@mail.gmail.com>
+Message-ID: <ef039f0c-dea2-80d7-e6fa-481f3452a600@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arend,
+Hi Ard,
 
-On 28/06/18 12:58, Arend van Spriel wrote:
-> I am looking at some issues we are seeing on a custom arm platform and I had
-> some questions regarding exception handling and hope you can help me with that.
-> 
-> The platform has 4 cortex a53 cores running 4.1.51 kernel.
+On 06/28/2018 03:25 AM, Ard Biesheuvel wrote:
 
-v4.1 is circa 2015, and chance you could try v4.17?
+> Given how the upstream kernel is aimed at future development, I don't
+> think we should fix this in the upstream kernel at all. Distros are
+> free to do what they like, of course, and I'm sure RedHat already have
+> a fix for this in their downstream kernel. 
 
+Debian expects the kernel to work correctly, and so won't add a fix.
+That means CONFIG_ACPI_APEI can't be enabled, and so users must either
+go without APEI or use a custom built kernel. See:
 
-> On the platform upon
-> accessing our wifi devices over PCIe, we observe two issue intermittently.
-> 
-> 1) synchronous external abort
-> 2) NMI watchdog
-> 
-> With the latter I notice el1_irq in the exception stack trace. Is that due to
-> the NMI watchdog or is this caused by another issue like our crappy hardware ;-) ?
+  https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=900581
 
-
-> Regarding the SEA I noticed stuff has been added for that in 4.13. Is is worth
-> backporting that to obtain more info about that?
-
-Unlikely. Those changes are related to firmware-first RAS. You would see this on
-server platforms booting with ACPI and have a 'HEST' table.
-
-Can you share the backtrace for the Synchronous External Abort? It should point
-at the instruction in the (probably) driver that causes the abort.
-
-
-Thanks,
-
-James
+-Geoff
