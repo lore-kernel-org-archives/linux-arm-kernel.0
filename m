@@ -1,32 +1,99 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 28 Jun 2018 00:02:10 -0300
-Subject: [PATCH 1/3] ARM: dts: imx53: Add 'ARM platform' node
-In-Reply-To: <20180628013530.GE22683@dragon>
-References: <1529329939-14117-1-git-send-email-festevam@gmail.com>
- <20180628013530.GE22683@dragon>
-Message-ID: <CAOMZO5CQCTdJC5NOzFGXeHwqkeJmrw9ui0oJ_h=7vFnP5ThUcg@mail.gmail.com>
+From: sean.wang@mediatek.com (Sean Wang)
+Date: Thu, 28 Jun 2018 11:06:13 +0800
+Subject: [PATCH v4 6/7] Bluetooth: mediatek: Add protocol support for
+ MediaTek serial devices
+In-Reply-To: <CAHp75VedHLw52J_ymh3iYf2w=r8d+Kqg=fJZmBGnaCrEbNEPdQ@mail.gmail.com>
+References: <cover.1530004712.git.sean.wang@mediatek.com>
+ <48215a1276c36af7ad581c3d83759fe9f55e3c4b.1530004712.git.sean.wang@mediatek.com>
+ <CAHp75VehTeyyzR4bPKK3hFDTVqZnhdNy5vcBFJCSH_Zrx+QrKA@mail.gmail.com>
+ <CAHp75VedHLw52J_ymh3iYf2w=r8d+Kqg=fJZmBGnaCrEbNEPdQ@mail.gmail.com>
+Message-ID: <1530155173.29697.48.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 27, 2018 at 10:35 PM, Shawn Guo <shawnguo@kernel.org> wrote:
+On Wed, 2018-06-27 at 20:04 +0300, Andy Shevchenko wrote:
+> On Wed, Jun 27, 2018 at 7:59 PM, Andy Shevchenko
+> <andy.shevchenko@gmail.com> wrote:
+> > On Wed, Jun 27, 2018 at 8:43 AM,  <sean.wang@mediatek.com> wrote:
+> >> From: Sean Wang <sean.wang@mediatek.com>
+> >>
+> >
+> >> +config BT_HCIBTUART_MTK
+> >> +       tristate "MediaTek HCI UART driver"
+> >> +       depends on BT_HCIBTUART
+> >
+> >> +       default y
+> >
+> > Perhaps it's an overkill for users which would like to have less
+> > amount on stuff in kernel.
+> >
 
->> diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
->> index 1a7a7bb..a70fbf4 100644
->> --- a/arch/arm/boot/dts/imx53.dtsi
->> +++ b/arch/arm/boot/dts/imx53.dtsi
->> @@ -672,6 +672,11 @@
->>                               status = "disabled";
->>                       };
->>
->> +                     arm_platform: arm-platform at 63fa0000 {
->> +                             compatible = "fsl,imx53-arm-plat", "fsl,imx51-arm-plat";
->
-> Don't we need a bindings for that?
+Sure, the default y will be removed
 
-I thought this is the same case as "fsl,imx51-src" where we only use
-it inside arch/arm/mach-imx/ and there is also no bindings doc for it.
+> >
+> >> +#include <asm/unaligned.h>
+> >> +#include <linux/atomic.h>
+> >> +#include <linux/clk.h>
+> >> +#include <linux/firmware.h>
+> >> +#include <linux/module.h>
+> >> +#include <linux/pm_runtime.h>
+> >> +#include <linux/serdev.h>
+> 
+> Perhaps alphabetically ordered?
+> 
 
-That's why I did not add an entry for the bindings doc.
+They seem already in alphabetically ordered
 
-If you think that a binding doc is needed, in which directory should
-it be placed?
+> + blank line.
+> 
+
+A blank line will be added here
+
+> >
+> >> +#include <net/bluetooth/bluetooth.h>
+> >> +#include <net/bluetooth/hci_core.h>
+> 
+> >> +       /* Enable the power domain and clock the device requires. */
+> >> +       pm_runtime_enable(dev);
+> >> +       err = pm_runtime_get_sync(dev);
+> >> +       if (err < 0)
+> >> +               goto err_pm2;
+> 
+> Should be err_pm1 here.
+
+Label err_pm1 and err_pm2 can be swapped for the readability and this
+doesn't have any effect on the logic.
+
+> Yes, that's correct.
+> 
+> >> +err_pm1:
+> >> +       pm_runtime_put_sync(dev);
+> >> +err_pm2:
+> >> +       pm_runtime_disable(dev);
+> 
+> >> +#define MTK_WMT_CMD_SIZE       (MTK_WMT_HDR_SIZE + MTK_STP_HDR_SIZE + \
+> >> +                                MTK_STP_TLR_SIZE + HCI_ACL_HDR_SIZE)
+> 
+> It would look slightly better if you start on new line like
+> #define FOO \
+>  (BAR + BAZ)
+> 
+
+Thanks for your pointing out. I also found that the macro is not being
+used by anyone, it can be removed freely.
+
+> >> +struct mtk_stp_hdr {
+> >> +       __u8 prefix;
+> >> +       __u8 dlen1:4;
+> >> +       __u8 type:4;
+> 
+> >> +       __u8 dlen2:8;
+> 
+> u8 already 8 bit.
+> 
+
+the superfluous :8 for dlen2 will be removed
+
+> >> +       __u8 cs;
+> >> +} __packed;
+> 
