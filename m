@@ -1,47 +1,32 @@
-From: sean.wang@mediatek.com (Sean Wang)
-Date: Thu, 28 Jun 2018 10:54:58 +0800
-Subject: [PATCH v4 6/7] Bluetooth: mediatek: Add protocol support for
- MediaTek serial devices
-In-Reply-To: <CAHp75VehTeyyzR4bPKK3hFDTVqZnhdNy5vcBFJCSH_Zrx+QrKA@mail.gmail.com>
-References: <cover.1530004712.git.sean.wang@mediatek.com>
- <48215a1276c36af7ad581c3d83759fe9f55e3c4b.1530004712.git.sean.wang@mediatek.com>
- <CAHp75VehTeyyzR4bPKK3hFDTVqZnhdNy5vcBFJCSH_Zrx+QrKA@mail.gmail.com>
-Message-ID: <1530154498.29697.37.camel@mtkswgap22>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 28 Jun 2018 00:02:10 -0300
+Subject: [PATCH 1/3] ARM: dts: imx53: Add 'ARM platform' node
+In-Reply-To: <20180628013530.GE22683@dragon>
+References: <1529329939-14117-1-git-send-email-festevam@gmail.com>
+ <20180628013530.GE22683@dragon>
+Message-ID: <CAOMZO5CQCTdJC5NOzFGXeHwqkeJmrw9ui0oJ_h=7vFnP5ThUcg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2018-06-27 at 19:59 +0300, Andy Shevchenko wrote:
-> On Wed, Jun 27, 2018 at 8:43 AM,  <sean.wang@mediatek.com> wrote:
-> > From: Sean Wang <sean.wang@mediatek.com>
-> >
-> 
-> > +config BT_HCIBTUART_MTK
-> > +       tristate "MediaTek HCI UART driver"
-> > +       depends on BT_HCIBTUART
-> 
-> > +       default y
-> 
-> Perhaps it's an overkill for users which would like to have less
-> amount on stuff in kernel.
+On Wed, Jun 27, 2018 at 10:35 PM, Shawn Guo <shawnguo@kernel.org> wrote:
 
-sure, the default y will be removed
+>> diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+>> index 1a7a7bb..a70fbf4 100644
+>> --- a/arch/arm/boot/dts/imx53.dtsi
+>> +++ b/arch/arm/boot/dts/imx53.dtsi
+>> @@ -672,6 +672,11 @@
+>>                               status = "disabled";
+>>                       };
+>>
+>> +                     arm_platform: arm-platform at 63fa0000 {
+>> +                             compatible = "fsl,imx53-arm-plat", "fsl,imx51-arm-plat";
+>
+> Don't we need a bindings for that?
 
-> 
-> > +#include <asm/unaligned.h>
-> > +#include <linux/atomic.h>
-> > +#include <linux/clk.h>
-> > +#include <linux/firmware.h>
-> > +#include <linux/module.h>
-> > +#include <linux/pm_runtime.h>
-> > +#include <linux/serdev.h>
-> 
+I thought this is the same case as "fsl,imx51-src" where we only use
+it inside arch/arm/mach-imx/ and there is also no bindings doc for it.
 
-[ ... ]
+That's why I did not add an entry for the bindings doc.
 
-> >  MODULE_DEVICE_TABLE(of, btuart_of_match_table);
-> > --
-> > 2.7.4
-> >
-> 
-> 
-> 
+If you think that a binding doc is needed, in which directory should
+it be placed?
