@@ -1,51 +1,35 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 28 Jun 2018 15:52:57 -0700
-Subject: [PATCH 1/3] arm64: dts: qcom: sdm845: Add thermal-zones node
-In-Reply-To: <20180628210915.160893-1-mka@chromium.org>
-References: <20180628210915.160893-1-mka@chromium.org>
-Message-ID: <CAD=FV=UPCgEvN1F5jFhLxq=KrH2_BwEG=ZRX3npy_EPLZ_V0hA@mail.gmail.com>
+From: nick@shmanahar.org (Nick Dyer)
+Date: Thu, 28 Jun 2018 23:56:26 +0100
+Subject: [PATCH v1] ARM: dts: imx51-zii-rdu1: correct touchscreen axis
+ inversion
+Message-ID: <20180628225626.26203-1-nick@shmanahar.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The RMI4 touchscreen driver applied inversion and axis swap in the
+wrong order, violating the DT binding for those properties. This was fixed in
+645a397, so correct the RDU1 DT to apply the inversion to the
+correct axis.
 
-On Thu, Jun 28, 2018 at 2:09 PM, Matthias Kaehlcke <mka@chromium.org> wrote:
-> The node is empty for now. It is needed to allow other DT snippets
-> to add thermal zone entries.
->
-> Signed-off-by: Matthias Kaehlcke <mka@chromium.org>
-> ---
-> Sorry if you received this twice, lists were missing in cc in the first attempt ...
->
->  arch/arm64/boot/dts/qcom/sdm845.dtsi | 4 ++++
->  1 file changed, 4 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-> index 00722b533a92..968390fb0933 100644
-> --- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
-> +++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-> @@ -9,6 +9,7 @@
->  #include <dt-bindings/clock/qcom,rpmh.h>
->  #include <dt-bindings/interrupt-controller/arm-gic.h>
->  #include <dt-bindings/soc/qcom,rpmh-rsc.h>
-> +#include <dt-bindings/thermal/thermal.h>
->
->  / {
->         interrupt-parent = <&intc>;
-> @@ -1087,4 +1088,7 @@
->                         };
->                 };
->         };
-> +
-> +       thermal_zones: thermal-zones {
-> +       };
+Tested on Zii RDU1 00-5105-30 rev B
 
-Others can feel free to disagree, but IMO ${SUBJECT} patch is not
-needed.  Instead patch #3 in your series should just define a
-"thermal-zones" node at the root level.  The "thermal-zones" node is a
-well-defined node with a well-defined node name and location (see the
-"thermal.txt" binding).  If the SoC has a "thermal-zones" node and so
-does the PMIC then they'll just be merged.
+Signed-off-by: Nick Dyer <nick@shmanahar.org>
+---
+ arch/arm/boot/dts/imx51-zii-rdu1.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-
--Doug
+diff --git a/arch/arm/boot/dts/imx51-zii-rdu1.dts b/arch/arm/boot/dts/imx51-zii-rdu1.dts
+index 68f5c1d5ecd0..b1d83fb08150 100644
+--- a/arch/arm/boot/dts/imx51-zii-rdu1.dts
++++ b/arch/arm/boot/dts/imx51-zii-rdu1.dts
+@@ -553,7 +553,7 @@
+ 
+ 		rmi4-f11 at 11 {
+ 			reg = <0x11>;
+-			touchscreen-inverted-y;
++			touchscreen-inverted-x;
+ 			touchscreen-swapped-x-y;
+ 			syna,sensor-type = <1>;
+ 		};
+-- 
+2.17.1
