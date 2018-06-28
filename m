@@ -1,14 +1,15 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Wed, 27 Jun 2018 21:24:22 -0700
-Subject: [PATCH 2/4] ARM: dts: imx6qdl-zii-rdu2: Populate RAVE SP EEPROM nodes
+Date: Wed, 27 Jun 2018 21:24:23 -0700
+Subject: [PATCH 3/4] ARM: dts: imx6qdl-zii-rdu2: Populate RAVE SP backlight
+ node
 In-Reply-To: <20180628042424.12664-1-andrew.smirnov@gmail.com>
 References: <20180628042424.12664-1-andrew.smirnov@gmail.com>
-Message-ID: <20180628042424.12664-3-andrew.smirnov@gmail.com>
+Message-ID: <20180628042424.12664-4-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ZII's RDU1s come with two EEPROMs attached to RAVE SP. Add
-corresponding nodes to make them availible.
+RAVE SP found on RDU2 implements backlight control compatible with the
+rave-sp-backlight driver. Add a node to make it availible.
 
 Cc: Fabio Estevam <fabio.estevam@nxp.com>
 Cc: Nikita Yushchenko <nikita.yoush@cogentembedded.com>
@@ -22,41 +23,23 @@ Cc: devicetree at vger.kernel.org
 Cc: linux-kernel at vger.kernel.org
 Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 ---
- arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+ arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
 
 diff --git a/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi b/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
-index 19a075aee19e..e4630481d951 100644
+index e4630481d951..48da4b15da09 100644
 --- a/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
 +++ b/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
-@@ -320,10 +320,28 @@
- 	rave-sp {
- 		compatible = "zii,rave-sp-rdu2";
- 		current-speed = <1000000>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
- 
- 		watchdog {
+@@ -327,6 +327,10 @@
  			compatible = "zii,rave-sp-watchdog";
  		};
-+
-+		eeprom at a3 {
-+			compatible = "zii,rave-sp-eeprom";
-+			reg = <0xa3 0x4000>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			zii,eeprom-name = "dds-eeprom";
-+		};
-+
-+		eeprom at a4 {
-+			compatible = "zii,rave-sp-eeprom";
-+			reg = <0xa4 0x4000>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			zii,eeprom-name = "main-eeprom";
-+		};
- 	};
- };
  
++		backlight {
++			compatible = "zii,rave-sp-backlight";
++		};
++
+ 		eeprom at a3 {
+ 			compatible = "zii,rave-sp-eeprom";
+ 			reg = <0xa3 0x4000>;
 -- 
 2.17.1
