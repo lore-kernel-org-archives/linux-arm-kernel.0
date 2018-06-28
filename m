@@ -1,47 +1,138 @@
-From: andreyknvl@google.com (Andrey Konovalov)
-Date: Thu, 28 Jun 2018 20:56:41 +0200
-Subject: [PATCH v4 00/17] khwasan: kernel hardware assisted address
- sanitizer
-In-Reply-To: <20180628105057.GA26019@e103592.cambridge.arm.com>
-References: <cover.1530018818.git.andreyknvl@google.com>
- <20180628105057.GA26019@e103592.cambridge.arm.com>
-Message-ID: <CAAeHK+w0T43+h3xqU4a-qutxd-qiEhsvk0eaZpmAn-T0hpaLZQ@mail.gmail.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Thu, 28 Jun 2018 14:28:25 -0400
+Subject: [PATCH V3 5/6] PCI: Rename pci_try_reset_bus() to pci_reset_bus()
+In-Reply-To: <1530210507-9287-1-git-send-email-okaya@codeaurora.org>
+References: <1530210507-9287-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <1530210507-9287-5-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 28, 2018 at 12:51 PM, Dave Martin <Dave.Martin@arm.com> wrote:
-> On Tue, Jun 26, 2018 at 03:15:10PM +0200, Andrey Konovalov wrote:
->> 1. By using the Top Byte Ignore arm64 CPU feature, we can store pointer
->>    tags in the top byte of each kernel pointer.
->
-> [...]
->
-> This is a change from the current situation, so the kernel may be
-> making implicit assumptions about the top byte of kernel addresses.
->
-> Randomising the top bits may cause things like address conversions and
-> pointer arithmetic to break.
->
-> For example, (q - p) will not produce the expected result if q and p
-> have different tags.
+Now that the old implementation of pci_reset_bus() is gone, replace
+pci_try_reset_bus() with pci_reset_bus().
 
-If q and p have different tags, that means they come from different
-allocations. I don't think it would make sense to calculate pointer
-difference in this case.
+Compared to the old implementation, new code will fail immmediately with
+-EAGAIN if object lock cannot be obtained.
 
->
-> Conversions, such as between pointer and pfn, may also go wrong if not
-> appropriately masked.
->
-> There are also potential pointer comparison and aliasing issues if
-> the tag bits are ever stripped or modified.
->
->
-> What was your approach to tracking down all the points in the code
-> where we have a potential issue?
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+---
+ drivers/infiniband/hw/hfi1/pcie.c |  2 +-
+ drivers/pci/pci.c                 | 18 +++++++++---------
+ drivers/vfio/pci/vfio_pci.c       |  4 ++--
+ include/linux/pci.h               |  2 +-
+ 4 files changed, 13 insertions(+), 13 deletions(-)
 
-I've been fuzzing the kernel built with KWHASAN with syzkaller. This
-gives a decent coverage and I was able to find some places where
-fixups were required this way. Right now the fuzzer is running without
-issues. It doesn't prove that all such places are fixed, but I don't
-know a better way to test this.
+diff --git a/drivers/infiniband/hw/hfi1/pcie.c b/drivers/infiniband/hw/hfi1/pcie.c
+index 4570c4d..a6d695a 100644
+--- a/drivers/infiniband/hw/hfi1/pcie.c
++++ b/drivers/infiniband/hw/hfi1/pcie.c
+@@ -905,7 +905,7 @@ static int trigger_sbr(struct hfi1_devdata *dd)
+ 	 * delay after a reset is required.  Per spec requirements,
+ 	 * the link is either working or not after that point.
+ 	 */
+-	return pci_try_reset_bus(dev->bus);
++	return pci_reset_bus(dev->bus);
+ }
+ 
+ /*
+diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+index 6cec722..28a071d 100644
+--- a/drivers/pci/pci.c
++++ b/drivers/pci/pci.c
+@@ -4784,7 +4784,7 @@ int pci_probe_reset_slot(struct pci_slot *slot)
+ EXPORT_SYMBOL_GPL(pci_probe_reset_slot);
+ 
+ /**
+- * __pci_try_reset_slot - Try to reset a PCI slot
++ * __pci_reset_slot - Try to reset a PCI slot
+  * @slot: PCI slot to reset
+  *`
+  * A PCI bus may host multiple slots, each slot may support a reset mechanism
+@@ -4798,7 +4798,7 @@ EXPORT_SYMBOL_GPL(pci_probe_reset_slot);
+  *
+  * Same as above except return -EAGAIN if the slot cannot be locked
+  */
+-static int __pci_try_reset_slot(struct pci_slot *slot)
++static int __pci_reset_slot(struct pci_slot *slot)
+ {
+ 	int rc;
+ 
+@@ -4854,12 +4854,12 @@ int pci_probe_reset_bus(struct pci_bus *bus)
+ EXPORT_SYMBOL_GPL(pci_probe_reset_bus);
+ 
+ /**
+- * __pci_try_reset_bus - Try to reset a PCI bus
++ * __pci_reset_bus - Try to reset a PCI bus
+  * @bus: top level PCI bus to reset
+  *
+  * Same as above except return -EAGAIN if the bus cannot be locked
+  */
+-static int __pci_try_reset_bus(struct pci_bus *bus)
++static int __pci_reset_bus(struct pci_bus *bus)
+ {
+ 	int rc;
+ 
+@@ -4882,22 +4882,22 @@ static int __pci_try_reset_bus(struct pci_bus *bus)
+ }
+ 
+ /**
+- * pci_try_reset_bus - Try to reset a PCI bus
++ * pci_reset_bus - Try to reset a PCI bus
+  * @pdev: top level PCI device to reset via slot/bus
+  *
+  * Same as above except return -EAGAIN if the bus cannot be locked
+  */
+-int pci_try_reset_bus(struct pci_dev *pdev)
++int pci_reset_bus(struct pci_dev *pdev)
+ {
+ 	bool slot = false;
+ 
+ 	if (!pci_probe_reset_slot(pdev->slot))
+ 		slot = true;
+ 
+-	return slot ? __pci_try_reset_slot(pdev->slot) :
+-			__pci_try_reset_bus(pdev->bus);
++	return slot ? __pci_reset_slot(pdev->slot) :
++			__pci_reset_bus(pdev->bus);
+ }
+-EXPORT_SYMBOL_GPL(pci_try_reset_bus);
++EXPORT_SYMBOL_GPL(pci_reset_bus);
+ 
+ /**
+  * pcix_get_max_mmrbc - get PCI-X maximum designed memory read byte count
+diff --git a/drivers/vfio/pci/vfio_pci.c b/drivers/vfio/pci/vfio_pci.c
+index 71018ec..345c0dc 100644
+--- a/drivers/vfio/pci/vfio_pci.c
++++ b/drivers/vfio/pci/vfio_pci.c
+@@ -1010,7 +1010,7 @@ static long vfio_pci_ioctl(void *device_data,
+ 						    &info, slot);
+ 		if (!ret)
+ 			/* User has access, do the reset */
+-			ret = pci_try_reset_bus(vdev->pdev);
++			ret = pci_reset_bus(vdev->pdev);
+ 
+ hot_reset_release:
+ 		for (i--; i >= 0; i--)
+@@ -1372,7 +1372,7 @@ static void vfio_pci_try_bus_reset(struct vfio_pci_device *vdev)
+ 	}
+ 
+ 	if (needs_reset)
+-		ret = pci_try_reset_bus(vdev->pdev);
++		ret = pci_reset_bus(vdev->pdev);
+ 
+ put_devs:
+ 	for (i = 0; i < devs.cur_index; i++) {
+diff --git a/include/linux/pci.h b/include/linux/pci.h
+index ad0c89a..79a2c27 100644
+--- a/include/linux/pci.h
++++ b/include/linux/pci.h
+@@ -1096,7 +1096,7 @@ int pci_reset_function_locked(struct pci_dev *dev);
+ int pci_try_reset_function(struct pci_dev *dev);
+ int pci_probe_reset_slot(struct pci_slot *slot);
+ int pci_probe_reset_bus(struct pci_bus *bus);
+-int pci_try_reset_bus(struct pci_dev *dev);
++int pci_reset_bus(struct pci_dev *dev);
+ void pci_reset_secondary_bus(struct pci_dev *dev);
+ void pcibios_reset_secondary_bus(struct pci_dev *dev);
+ void pci_update_resource(struct pci_dev *dev, int resno);
+-- 
+2.7.4
