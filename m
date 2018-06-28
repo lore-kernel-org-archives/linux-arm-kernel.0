@@ -1,55 +1,74 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 28 Jun 2018 17:47:01 +0100
-Subject: [PATCH 3/3] rseq/selftests: Add support for arm64
-In-Reply-To: <1763491947.3520.1530029512923.JavaMail.zimbra@efficios.com>
-References: <1529949285-11013-1-git-send-email-will.deacon@arm.com>
- <1529949285-11013-4-git-send-email-will.deacon@arm.com>
- <501929863.3051.1529950210436.JavaMail.zimbra@efficios.com>
- <20180626151427.GF23375@arm.com>
- <1763491947.3520.1530029512923.JavaMail.zimbra@efficios.com>
-Message-ID: <20180628164700.GD10751@arm.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 28 Jun 2018 17:49:01 +0100
+Subject: [PATCH] arm64: fix infinite stacktrace
+In-Reply-To: <20180627164150.GB8729@arm.com>
+References: <alpine.LRH.2.02.1806141457200.4243@file01.intranet.prod.int.rdu2.redhat.com>
+ <20180615115823.2oq5d7amzwlliczg@lakrids.cambridge.arm.com>
+ <20180627164150.GB8729@arm.com>
+Message-ID: <20180628164900.GB26019@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mathieu,
-
-On Tue, Jun 26, 2018 at 12:11:52PM -0400, Mathieu Desnoyers wrote:
-> ----- On Jun 26, 2018, at 11:14 AM, Will Deacon will.deacon at arm.com wrote:
-> > On Mon, Jun 25, 2018 at 02:10:10PM -0400, Mathieu Desnoyers wrote:
-> >> I notice you are using the instructions
-> >> 
-> >>   adrp
-> >>   add
-> >>   str
-> >> 
-> >> to implement RSEQ_ASM_STORE_RSEQ_CS(). Did you compare
-> >> performance-wise with an approach using a literal pool
-> >> near the instruction pointer like I did on arm32 ?
+On Wed, Jun 27, 2018 at 05:41:51PM +0100, Will Deacon wrote:
+> Hi all,
+> 
+> On Fri, Jun 15, 2018 at 12:58:23PM +0100, Mark Rutland wrote:
+> > On Thu, Jun 14, 2018 at 02:58:21PM -0400, Mikulas Patocka wrote:
+> > > I've got this infinite stacktrace when debugging another problem:
+> > > [  908.795225] INFO: rcu_preempt detected stalls on CPUs/tasks:
+> > > [  908.796176]  1-...!: (1 GPs behind) idle=952/1/4611686018427387904 softirq=1462/1462 fqs=355
+> > > [  908.797692]  2-...!: (1 GPs behind) idle=f42/1/4611686018427387904 softirq=1550/1551 fqs=355
+> > > [  908.799189]  (detected by 0, t=2109 jiffies, g=130, c=129, q=235)
+> > > [  908.800284] Task dump for CPU 1:
+> > > [  908.800871] kworker/1:1     R  running task        0    32      2 0x00000022
+> > > [  908.802127] Workqueue: writecache-writeabck writecache_writeback [dm_writecache]
+> > > [  908.820285] Call trace:
+> > > [  908.824785]  __switch_to+0x68/0x90
+> > > [  908.837661]  0xfffffe00603afd90
+> > > [  908.844119]  0xfffffe00603afd90
+> > > [  908.850091]  0xfffffe00603afd90
+> > > [  908.854285]  0xfffffe00603afd90
+> > > [  908.863538]  0xfffffe00603afd90
+> > > [  908.865523]  0xfffffe00603afd90
+> > > 
+> > > The machine just locked up and kept on printing the same line over and
+> > > over again. This patch fixes it.
+> > > 
+> > > Signed-off-by: Mikulas Patocka <mpatocka@redhat.com>
+> > > Cc: stable at vger.kernel.org
 > > 
-> > I didn't, no. Do you have a benchmark to hand so I can give this a go?
+> > Given this can only occur when there's a corrupted stack (where a frame
+> > record points to itself), I'm not sure this requires a cc stable.
+> > 
+> > > Index: linux-2.6/arch/arm64/kernel/stacktrace.c
+> > > ===================================================================
+> > > --- linux-2.6.orig/arch/arm64/kernel/stacktrace.c
+> > > +++ linux-2.6/arch/arm64/kernel/stacktrace.c
+> > > @@ -56,6 +56,9 @@ int notrace unwind_frame(struct task_str
+> > >  	frame->fp = READ_ONCE_NOCHECK(*(unsigned long *)(fp));
+> > >  	frame->pc = READ_ONCE_NOCHECK(*(unsigned long *)(fp + 8));
+> > >  
+> > > +	if (frame->fp <= fp)
+> > > +		return -EINVAL;
+> > > +
+> > 
+> > Dave Martin had a series [1] which addressed this along with a number of
+> > other cases where stack traces might not terminate.
+> > 
+> > Dave, do you plan to respin that?
 > 
-> see tools/testing/selftests/rseq/param_test_benchmark --help
+> I'd be interested in an update on that; we clearly should be fixing this in
+> one way or another.
 > 
-> It's a stripped-down version of param_test, without all the code for
-> delay loops and testing checks.
-> 
-> Example use for counter increment with 4 threads, doing 5G counter
-> increments per thread:
-> 
-> time ./param_test_benchmark -T i -t 4 -r 5000000000
+> Mikulus -- would you be able to test and/or review it, please?
 
-Thanks. I ran that on a few arm64 systems I have access to, with three
-configurations of the selftest:
+My patch was arguably over-engineered, and broken in some way connected
+with SDEI.  Unfortunately I've had too much other stuff to do...
 
-1. As I posted
-2. With the abort signature and branch in-lined, so as to avoid the CBNZ
-   address limitations in large codebases
-3. With both the abort handler and the table inlined (i.e. the same thing
-   as 32-bit).
+I could take another look, but it may take time to get to it.
 
-There isn't a reliably measurable difference between (1) and (2), but I take
-between 12% and 27% hit between (2) and (3).
+Alternatively, if someone wants to pick up my patch and take it forward,
+I'm happy to comment.
 
-So I'll post a v2 based on (2).
-
-Will
+Cheers
+---Dave
