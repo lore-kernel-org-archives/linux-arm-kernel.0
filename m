@@ -1,81 +1,80 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 28 Jun 2018 16:34:25 +0100
-Subject: KVM guest sometimes failed to boot because of kernel stack
- overflow if KPTI is enabled on a hisilicon ARM64 platform.
-In-Reply-To: <5B34F5C0.9090001@hisilicon.com>
-References: <5B2A7832.4010502@hisilicon.com>
- <ebfabb8f-dcd9-3fb4-3655-368a882d8f09@arm.com>
- <5B2A7FE1.5040607@hisilicon.com>
- <e701eaa8-dcb9-777c-2211-67ee27b43acb@arm.com>
- <5B2B6DEA.2090100@hisilicon.com> <5B3274FC.7000206@hisilicon.com>
- <20180626174746.GO23375@arm.com> <5B338F7B.9070500@hisilicon.com>
- <20180627132826.GB30631@arm.com> <5B34F5C0.9090001@hisilicon.com>
-Message-ID: <20180628153425.rm5fd6dxb53n226z@lakrids.cambridge.arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 28 Jun 2018 17:00:05 +0100
+Subject: [PATCH v2 3/4] arm64: IPI each CPU after invalidating the
+ I-cache for kernel mappings
+In-Reply-To: <1529656278-878-4-git-send-email-will.deacon@arm.com>
+References: <1529656278-878-1-git-send-email-will.deacon@arm.com>
+ <1529656278-878-4-git-send-email-will.deacon@arm.com>
+Message-ID: <20180628160005.cywb6vn7jl4v7kmb@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 28, 2018 at 03:50:40PM +0100, Wei Xu wrote:
-> Hi Will,
+Hi Will,
+
+On Fri, Jun 22, 2018 at 09:31:17AM +0100, Will Deacon wrote:
+> When invalidating the instruction cache for a kernel mapping via
+> flush_icache_range(), it is also necessary to flush the pipeline for
+> other CPUs so that instructions fetched into the pipeline before the
+> I-cache invalidation are discarded. For example, if module 'foo' is
+> unloaded and then module 'bar' is loaded into the same area of memory,
+> a CPU could end up executing instructions from 'foo' when branching into
+> 'bar' if these instructions were fetched into the pipeline before 'foo'
+> was unloaded.
 > 
-> On 2018/6/27 14:28, Will Deacon wrote:
-> > On Wed, Jun 27, 2018 at 02:22:03PM +0100, Wei Xu wrote:
-> >> On 2018/6/26 18:47, Will Deacon wrote:
-> >>> If you look at the __idmap_kpti_put_pgtable_ent_ng asm macro, can you try
-> >>> replacing:
-> >>>
-> >>> 	dc      civac, cur_\()\type\()p
-> >>>
-> >>> with:
-> >>>
-> >>> 	dc      ivac, cur_\()\type\()p
-> >>>
-> >>> please? Only do this for the guest kernel, not the host. KVM will upgrade
-> >>> the clean to a clean+invalidate, so it's interesting to see if this has
-> >>> an effect on the behaviour.
-> >>
-> >> Only changed the guest kernel, the guest still failed to boot and the log
-> >> is same with the last mail.
-> >>
-> >> But if I changed to cvac as below for the guest, it is kind of stable.
-> >> 	dc      cvac, cur_\()\type\()p
-> >>
-> >> I have synced with our SoC guys about this and hope we can find the reason.
-> >> Do you have any more suggestion?
-> > 
-> > Unfortunately, not. It looks like somehow clean+invalidate is behaving
-> > just as an invalidate, and we're corrupting the page table as a result.
-> > 
-> > Hopefully the SoC guys will figure it out.
+> Whilst this is highly unlikely to occur in practice, particularly as
+> any exception acts as a context-synchronizing operation, following the
+> letter of the architecture requires us to execute an ISB on each CPU
+> in order for the new instruction stream to be visible.
 > 
-> After replaced the dmb with dsb in both __idmap_kpti_get_pgtable_ent and
-> __idmap_kpti_put_pgtable_ent_ng, we tested 20 times and we can not reproduce
-> the issue.
-> Today we will continue to do the stress testing and will update the result tomorrow.
-> 
-> The dsb in __idmap_kpti_get_pgtable_ent is to make sure the dc has been done and
-> the following ldr can get the latest data.
-> 
-> The dsb in __idmap_kpti_put_pgtable_ent_ng is to make sure the str will be done
-> before dc. Although dmb can guarantee the order of the str and dc on the L2 cache,
-> dmb can not guarantee the order on the bus.
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-The architecture mandates that a DMB must provide this ordering, so that
-would be an erratum.
+I hit a warning via kgdb_flush_swbreak_addr() because if IRQs disabled
+(and it actually deadlocks for me; running as a guest under KVM on TX1):
 
-Per ARM DDI 0487C.a, page D3-2069, "Ordering and completion of data and instruction
-cache instructions":
+WARNING: CPU: 3 PID: 1 at /home/cmarinas/work/Linux/linux-2.6-aarch64/kernel/smp.c:416 smp_call_function_many+0xd4/0x350
+Modules linked in:
+CPU: 3 PID: 1 Comm: swapper/0 Not tainted 4.18.0-rc2-00006-ga5cfc8429d36 #97
+Hardware name: QEMU KVM Virtual Machine, BIOS 0.0.0 02/06/2015
+pstate: 200003c5 (nzCv DAIF -PAN -UAO)
+pc : smp_call_function_many+0xd4/0x350
+lr : smp_call_function+0x38/0x68
+sp : ffff0000080737f0
+x29: ffff0000080737f0 x28: ffff000009169000 
+x27: 0000000000000003 x26: 0000000000000000 
+x25: ffff00000815a3d0 x24: 0000000000000001 
+x23: 0000000000000000 x22: ffff000008eba730 
+x21: ffff000009169940 x20: 0000000000000000 
+x19: 0000000000000003 x18: ffffffffffffffff 
+x17: 0000000000000001 x16: 0000000000000019 
+x15: ffff0000091696c8 x14: ffff00008930ef07 
+x13: ffff00000930ef1d x12: 0000000000000010 
+x11: 0101010101010101 x10: 7f7f7f7f7f7f7f7f 
+x9 : 656565652aff6223 x8 : ffffffffffffffff 
+x7 : fefefefefefefefe x6 : ffff7dfffe7fe014 
+x5 : ffff000009169940 x4 : ffff000009147018 
+x3 : 0000000000000001 x2 : 0000000000000000 
+x1 : ffff00000815a3d0 x0 : 0000000000000000 
+Call trace:
+ smp_call_function_many+0xd4/0x350
+ smp_call_function+0x38/0x68
+ kick_all_cpus_sync+0x20/0x28
+ kgdb_flush_swbreak_addr+0x14/0x20
+ dbg_activate_sw_breakpoints+0x74/0xb0
+ gdb_serial_stub+0x6ec/0xc80
+ kgdb_cpu_enter+0x36c/0x578
+ kgdb_handle_exception+0x130/0x238
+ kgdb_compiled_brk_fn+0x28/0x38
+ brk_handler+0x80/0xd8
+ do_debug_exception+0x94/0x170
+ el1_dbg+0x18/0x78
+ kgdb_breakpoint+0x20/0x40
+ run_breakpoint_test+0x58/0xb0
+ configure_kgdbts+0x1b8/0x538
+ init_kgdbts+0x1c/0x2c
+ do_one_initcall+0x58/0x170
+ kernel_init_freeable+0x184/0x22c
+ kernel_init+0x10/0x108
+ ret_from_fork+0x10/0x18
 
-  All data cache instructions, other than DC ZVA, that specify an
-  address:
-
-  * Can execute in any order relative to loads or stores that access any
-    address with the Device memory attribute,or with Normal memory with
-    Inner Non-cacheable attribute unless a DMB or DSB is executed
-    between the instructions.
-
-Note that we rely on this ordering in head.S when creating the page
-tables and setting up the boot mode. We also rely on this for the pmem
-API.
-
-Thanks,
-Mark.
+-- 
+Catalin
