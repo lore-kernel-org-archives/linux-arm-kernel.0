@@ -1,104 +1,74 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Thu, 28 Jun 2018 10:13:36 +0300
-Subject: [PATCH 2/2] ARM: dts: armada388-clearfog: drop future changes
- disclaimer
-In-Reply-To: <2bc87e3e365c460943730ded86c8fcb1ff55a533.1530170016.git.baruch@tkos.co.il>
-References: <2bc87e3e365c460943730ded86c8fcb1ff55a533.1530170016.git.baruch@tkos.co.il>
-Message-ID: <2c2eb16ffa18023d8d1be759ad8dc7e6c5affc5d.1530170016.git.baruch@tkos.co.il>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Thu, 28 Jun 2018 09:18:08 +0200
+Subject: [RFC PATCH v2 1/6] serial: uartps: Do not initialize field to
+ zero again
+In-Reply-To: <20180627234836.GA1691@kroah.com>
+References: <cover.1528288895.git.michal.simek@xilinx.com>
+ <e8b0169887855a5ef2c1a0456842f650601b451c.1528288895.git.michal.simek@xilinx.com>
+ <e7b01bd9-5763-75c0-1384-2536313f5854@monstr.eu>
+ <20180627100917.GA20940@kroah.com>
+ <05e553c2-202b-0b4b-8b88-60e330c80fa3@xilinx.com>
+ <20180627234836.GA1691@kroah.com>
+Message-ID: <a12639be-dd7b-d706-9c2e-35a99b816383@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current device-tree description of the SolidRun Armada 38x platforms
-has been successfully tested with production systems.
+On 28.6.2018 01:48, Greg Kroah-Hartman wrote:
+> On Wed, Jun 27, 2018 at 04:19:46PM +0200, Michal Simek wrote:
+>> On 27.6.2018 12:09, Greg Kroah-Hartman wrote:
+>>> On Tue, Jun 19, 2018 at 10:09:05AM +0200, Michal Simek wrote:
+>>>> On 6.6.2018 14:41, Michal Simek wrote:
+>>>>> Writing zero and NULLs to already initialized fields is not needed.
+>>>>> Remove this additional writes.
+>>>>>
+>>>>> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+>>>>> ---
+>>>>>
+>>>>> Changes in v2:
+>>>>> - new patch - it can be sent separately too
+>>>>>
+>>>>>  drivers/tty/serial/xilinx_uartps.c | 3 ---
+>>>>>  1 file changed, 3 deletions(-)
+>>>>>
+>>>>> diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
+>>>>> index 8a3e34234e98..5f116f3ecd4a 100644
+>>>>> --- a/drivers/tty/serial/xilinx_uartps.c
+>>>>> +++ b/drivers/tty/serial/xilinx_uartps.c
+>>>>> @@ -1510,15 +1510,12 @@ static int cdns_uart_probe(struct platform_device *pdev)
+>>>>>  
+>>>>>  	/* At this point, we've got an empty uart_port struct, initialize it */
+>>>>>  	spin_lock_init(&port->lock);
+>>>>> -	port->membase	= NULL;
+>>>>> -	port->irq	= 0;
+>>>>>  	port->type	= PORT_UNKNOWN;
+>>>>>  	port->iotype	= UPIO_MEM32;
+>>>>>  	port->flags	= UPF_BOOT_AUTOCONF;
+>>>>>  	port->ops	= &cdns_uart_ops;
+>>>>>  	port->fifosize	= CDNS_UART_FIFO_SIZE;
+>>>>>  	port->line	= id;
+>>>>> -	port->dev	= NULL;
+>>>>>  
+>>>>>  	/*
+>>>>>  	 * Register the port.
+>>>>>
+>>>>
+>>>> Alan, Rob, Greg: Any comment about this RFC?
+>>>
+>>> I rarely review RFC patchesets as obviously you don't think it is good
+>>> enough to be submitted "for real" :)
+>>
+>> There is one missing minor part but I want to review concept first
+>> because I didn't find any driver which is using this style.
+>>
+>>> If you think this is all good, great, please resend it without the RFC
+>>> and it will end up in my queue.
+>>
+>> I will definitely do it but please look at the concept itself because I
+>> would like to use this with at least 3 other drivers.
+> 
+> I don't have the time right now to review "concepts", sorry.
 
-Signed-off-by: Baruch Siach <baruch@tkos.co.il>
----
- arch/arm/boot/dts/armada-388-clearfog-base.dts      | 5 -----
- arch/arm/boot/dts/armada-388-clearfog-pro.dts       | 5 -----
- arch/arm/boot/dts/armada-388-clearfog.dts           | 5 -----
- arch/arm/boot/dts/armada-388-clearfog.dtsi          | 5 -----
- arch/arm/boot/dts/armada-38x-solidrun-microsom.dtsi | 5 -----
- 5 files changed, 25 deletions(-)
+Ok. I will revup that missing part to get it review to be able to use it.
 
-diff --git a/arch/arm/boot/dts/armada-388-clearfog-base.dts b/arch/arm/boot/dts/armada-388-clearfog-base.dts
-index 50ed4ae5c621..53b4bd35522a 100644
---- a/arch/arm/boot/dts/armada-388-clearfog-base.dts
-+++ b/arch/arm/boot/dts/armada-388-clearfog-base.dts
-@@ -3,11 +3,6 @@
-  * Device Tree file for SolidRun Clearfog Base revision A1 rev 2.0 (88F6828)
-  *
-  *  Copyright (C) 2015 Russell King
-- *
-- * This board is in development; the contents of this file work with
-- * the A1 rev 2.0 of the board, which does not represent final
-- * production board.  Things will change, don't expect this file to
-- * remain compatible info the future.
-  */
- 
- /dts-v1/;
-diff --git a/arch/arm/boot/dts/armada-388-clearfog-pro.dts b/arch/arm/boot/dts/armada-388-clearfog-pro.dts
-index 24e4b5a509be..ff890c09c3ed 100644
---- a/arch/arm/boot/dts/armada-388-clearfog-pro.dts
-+++ b/arch/arm/boot/dts/armada-388-clearfog-pro.dts
-@@ -3,11 +3,6 @@
-  * Device Tree file for SolidRun Clearfog Pro revision A1 rev 2.0 (88F6828)
-  *
-  *  Copyright (C) 2015 Russell King
-- *
-- * This board is in development; the contents of this file work with
-- * the A1 rev 2.0 of the board, which does not represent final
-- * production board.  Things will change, don't expect this file to
-- * remain compatible info the future.
-  */
- #include "armada-388-clearfog.dts"
- 
-diff --git a/arch/arm/boot/dts/armada-388-clearfog.dts b/arch/arm/boot/dts/armada-388-clearfog.dts
-index 5fd0f6f61e77..32b1e09b8293 100644
---- a/arch/arm/boot/dts/armada-388-clearfog.dts
-+++ b/arch/arm/boot/dts/armada-388-clearfog.dts
-@@ -3,11 +3,6 @@
-  * Device Tree file for SolidRun Clearfog Pro revision A1 rev 2.0 (88F6828)
-  *
-  *  Copyright (C) 2015 Russell King
-- *
-- * This board is in development; the contents of this file work with
-- * the A1 rev 2.0 of the board, which does not represent final
-- * production board.  Things will change, don't expect this file to
-- * remain compatible info the future.
-  */
- 
- /dts-v1/;
-diff --git a/arch/arm/boot/dts/armada-388-clearfog.dtsi b/arch/arm/boot/dts/armada-388-clearfog.dtsi
-index 0d9dfdfe977e..1da40bdfcef1 100644
---- a/arch/arm/boot/dts/armada-388-clearfog.dtsi
-+++ b/arch/arm/boot/dts/armada-388-clearfog.dtsi
-@@ -3,11 +3,6 @@
-  * Device Tree include file for SolidRun Clearfog 88F6828 based boards
-  *
-  *  Copyright (C) 2015 Russell King
-- *
-- * This board is in development; the contents of this file work with
-- * the A1 rev 2.0 of the board, which does not represent final
-- * production board.  Things will change, don't expect this file to
-- * remain compatible info the future.
-  */
- 
- #include "armada-388.dtsi"
-diff --git a/arch/arm/boot/dts/armada-38x-solidrun-microsom.dtsi b/arch/arm/boot/dts/armada-38x-solidrun-microsom.dtsi
-index c990d502d9a4..3a7f9c1ac346 100644
---- a/arch/arm/boot/dts/armada-38x-solidrun-microsom.dtsi
-+++ b/arch/arm/boot/dts/armada-38x-solidrun-microsom.dtsi
-@@ -3,11 +3,6 @@
-  * Device Tree file for SolidRun Armada 38x Microsom
-  *
-  *  Copyright (C) 2015 Russell King
-- *
-- * This board is in development; the contents of this file work with
-- * the A1 rev 2.0 of the board, which does not represent final
-- * production board.  Things will change, don't expect this file to
-- * remain compatible info the future.
-  */
- #include <dt-bindings/input/input.h>
- #include <dt-bindings/gpio/gpio.h>
--- 
-2.18.0
+Thanks,
+Michal
