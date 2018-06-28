@@ -1,64 +1,59 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Thu, 28 Jun 2018 16:32:38 +0200
-Subject: [PATCH v3 12/18] ARM: davinci: dm365-evm: use device properties for
- at24 eeprom
+Date: Thu, 28 Jun 2018 16:32:28 +0200
+Subject: [PATCH v3 02/18] Documentation: nvmem: document lookup entries
 In-Reply-To: <20180628143244.4561-1-brgl@bgdev.pl>
 References: <20180628143244.4561-1-brgl@bgdev.pl>
-Message-ID: <20180628143244.4561-13-brgl@bgdev.pl>
+Message-ID: <20180628143244.4561-3-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-We want to work towards phasing out the at24_platform_data structure.
-There are few users and its contents can be represented using generic
-device properties. Using device properties only will allow us to
-significantly simplify the at24 configuration code.
-
-Remove the at24_platform_data structure and replace it with an array
-of property entries. Drop the byte_len/size property, as the model name
-already implies the EEPROM's size.
+Describe the usage of nvmem cell lookup tables.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- arch/arm/mach-davinci/board-dm365-evm.c | 13 +++++--------
- 1 file changed, 5 insertions(+), 8 deletions(-)
+ Documentation/nvmem/nvmem.txt | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
-diff --git a/arch/arm/mach-davinci/board-dm365-evm.c b/arch/arm/mach-davinci/board-dm365-evm.c
-index cb0ac92a278e..b360d26e6caa 100644
---- a/arch/arm/mach-davinci/board-dm365-evm.c
-+++ b/arch/arm/mach-davinci/board-dm365-evm.c
-@@ -18,7 +18,7 @@
- #include <linux/i2c.h>
- #include <linux/io.h>
- #include <linux/clk.h>
--#include <linux/platform_data/at24.h>
-+#include <linux/property.h>
- #include <linux/leds.h>
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/partitions.h>
-@@ -179,18 +179,15 @@ static struct nvmem_cell_lookup dm365evm_mac_address_cell = {
- 	.nvmem_name = "1-00500",
- };
+diff --git a/Documentation/nvmem/nvmem.txt b/Documentation/nvmem/nvmem.txt
+index 8d8d8f58f96f..9d5e3ca2b4f3 100644
+--- a/Documentation/nvmem/nvmem.txt
++++ b/Documentation/nvmem/nvmem.txt
+@@ -58,6 +58,34 @@ static int qfprom_probe(struct platform_device *pdev)
+ It is mandatory that the NVMEM provider has a regmap associated with its
+ struct device. Failure to do would return error code from nvmem_register().
  
--static struct at24_platform_data eeprom_info = {
--	.byte_len       = (256*1024) / 8,
--	.page_size      = 64,
--	.flags          = AT24_FLAG_ADDR16,
--	.setup          = davinci_get_mac_addr,
--	.context	= (void *)0x7f00,
-+static const struct property_entry eeprom_properties[] = {
-+	PROPERTY_ENTRY_U32("pagesize", 64),
-+	{ }
- };
++Additionally it is possible to create nvmem cell lookup entries and register
++them with the nvmem framework from machine code as shown in the example below:
++
++static struct nvmem_cell_lookup foobar_lookup = {
++	.info = {
++		.name = "mac-address",
++		.offset = 0xd000,
++		.bytes = ERH_ALEN,
++	},
++	.nvmem_name = "foobar",
++};
++
++static void foobar_register(void)
++{
++	...
++	nvmem_add_lookup_table(&foobar_lookup, 1);
++	...
++}
++
++A lookup entry table can be later removed if needed:
++
++static void foobar_fini(void)
++{
++	...
++	nvmem_del_lookup_table(&foobar_lookup, 1);
++	...
++}
++
+ NVMEM Consumers
+ +++++++++++++++
  
- static struct i2c_board_info i2c_info[] = {
- 	{
- 		I2C_BOARD_INFO("24c256", 0x50),
--		.platform_data	= &eeprom_info,
-+		.properties = eeprom_properties,
- 	},
- 	{
- 		I2C_BOARD_INFO("tlv320aic3x", 0x18),
 -- 
 2.17.1
