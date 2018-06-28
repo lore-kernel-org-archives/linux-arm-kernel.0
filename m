@@ -1,20 +1,118 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 28 Jun 2018 11:11:35 +0200
-Subject: [PATCH 2/2] ARM: dts: armada388-clearfog: drop future changes
- disclaimer
-In-Reply-To: <2c2eb16ffa18023d8d1be759ad8dc7e6c5affc5d.1530170016.git.baruch@tkos.co.il>
-References: <2bc87e3e365c460943730ded86c8fcb1ff55a533.1530170016.git.baruch@tkos.co.il>
- <2c2eb16ffa18023d8d1be759ad8dc7e6c5affc5d.1530170016.git.baruch@tkos.co.il>
-Message-ID: <20180628091135.GH16727@lunn.ch>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 28 Jun 2018 11:14:34 +0200
+Subject: [PATCH 4/5] x86: jump_label: switch to jump_entry accessors
+In-Reply-To: <20180628091135.GB2494@hirez.programming.kicks-ass.net>
+References: <20180627160604.8154-1-ard.biesheuvel@linaro.org>
+ <20180627160604.8154-5-ard.biesheuvel@linaro.org>
+ <20180628091135.GB2494@hirez.programming.kicks-ass.net>
+Message-ID: <CAKv+Gu8OuxSWEWA0o+b+DaPLW8tSx-R6K4_KfomZSBKxqSuukA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 28, 2018 at 10:13:36AM +0300, Baruch Siach wrote:
-> The current device-tree description of the SolidRun Armada 38x platforms
-> has been successfully tested with production systems.
-> 
-> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+On 28 June 2018 at 11:11, Peter Zijlstra <peterz@infradead.org> wrote:
+> On Wed, Jun 27, 2018 at 06:06:03PM +0200, Ard Biesheuvel wrote:
+>> In preparation of switching x86 to use place-relative references for
+>> the code, target and key members of struct jump_entry, replace direct
+>> references to the struct members with invocations of the new accessors.
+>> This will allow us to make the switch by modifying the accessors only.
+>>
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>
+> That just makes horrible code worse.. can't we do something like so
+> instead?
+>
 
-Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+Sure, I will incorporate that for v2.
 
-    Andrew
+>
+> --- a/arch/x86/kernel/jump_label.c
+> +++ b/arch/x86/kernel/jump_label.c
+> @@ -42,52 +42,37 @@ static void __jump_label_transform(struc
+>                                    void *(*poker)(void *, const void *, size_t),
+>                                    int init)
+>  {
+> -       union jump_code_union code;
+> +       union jump_code_union jmp = {
+> +               { .jump = 0xe9,
+> +                 .offset = jump_entry_target(entry) -
+> +                           (jump_entry_code(entry) + JUMP_LABEL_NOP_SIZE), }
+> +       };
+>         const unsigned char default_nop[] = { STATIC_KEY_INIT_NOP };
+>         const unsigned char *ideal_nop = ideal_nops[NOP_ATOMIC5];
+> +       const unsigned char *expect, *code;
+> +       int line;
+>
+>         if (type == JUMP_LABEL_JMP) {
+>                 if (init) {
+> -                       /*
+> -                        * Jump label is enabled for the first time.
+> -                        * So we expect a default_nop...
+> -                        */
+> -                       if (unlikely(memcmp((void *)entry->code, default_nop, 5)
+> -                                    != 0))
+> -                               bug_at((void *)entry->code, __LINE__);
+> +                       expect = default_nop; line = __LINE__;
+>                 } else {
+> -                       /*
+> -                        * ...otherwise expect an ideal_nop. Otherwise
+> -                        * something went horribly wrong.
+> -                        */
+> -                       if (unlikely(memcmp((void *)entry->code, ideal_nop, 5)
+> -                                    != 0))
+> -                               bug_at((void *)entry->code, __LINE__);
+> +                       expect = ideal_nop; line = __LINE__;
+>                 }
+>
+> -               code.jump = 0xe9;
+> -               code.offset = entry->target -
+> -                               (entry->code + JUMP_LABEL_NOP_SIZE);
+> +               code = &jmp.code;
+>         } else {
+> -               /*
+> -                * We are disabling this jump label. If it is not what
+> -                * we think it is, then something must have gone wrong.
+> -                * If this is the first initialization call, then we
+> -                * are converting the default nop to the ideal nop.
+> -                */
+>                 if (init) {
+> -                       if (unlikely(memcmp((void *)entry->code, default_nop, 5) != 0))
+> -                               bug_at((void *)entry->code, __LINE__);
+> +                       expect = default_nop; line = __LINE__;
+>                 } else {
+> -                       code.jump = 0xe9;
+> -                       code.offset = entry->target -
+> -                               (entry->code + JUMP_LABEL_NOP_SIZE);
+> -                       if (unlikely(memcmp((void *)entry->code, &code, 5) != 0))
+> -                               bug_at((void *)entry->code, __LINE__);
+> +                       expect = &jmp.code; line = __LINE__;
+>                 }
+> -               memcpy(&code, ideal_nops[NOP_ATOMIC5], JUMP_LABEL_NOP_SIZE);
+> +
+> +               code = ideal_nop;
+>         }
+>
+> +       if (memcmp((void *)jump_entry_code(entry), expect, JUMP_LABEL_NOP_SIZE))
+> +               bug_at((void *)jump_entry_code(entry), line);
+> +
+>         /*
+>          * Make text_poke_bp() a default fallback poker.
+>          *
+> @@ -96,11 +81,13 @@ static void __jump_label_transform(struc
+>          * always nop being the 'currently valid' instruction
+>          *
+>          */
+> -       if (poker)
+> -               (*poker)((void *)entry->code, &code, JUMP_LABEL_NOP_SIZE);
+> -       else
+> -               text_poke_bp((void *)entry->code, &code, JUMP_LABEL_NOP_SIZE,
+> -                            (void *)entry->code + JUMP_LABEL_NOP_SIZE);
+> +       if (poker) {
+> +               (*poker)((void *)jump_entry_code(entry), &code, JUMP_LABEL_NOP_SIZE);
+> +               return;
+> +       }
+> +
+> +       text_poke_bp((void *)jump_entry_code(entry), &code, JUMP_LABEL_NOP_SIZE,
+> +                    (void *)jump_entry_code(entry) + JUMP_LABEL_NOP_SIZE);
+>  }
+>
+>  void arch_jump_label_transform(struct jump_entry *entry,
