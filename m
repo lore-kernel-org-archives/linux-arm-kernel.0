@@ -1,34 +1,36 @@
-From: james.morse@arm.com (James Morse)
-Date: Thu, 28 Jun 2018 18:29:17 +0100
-Subject: [PATCH v2 2/4] efi/arm: map UEFI memory map even w/o runtime
- services enabled
-In-Reply-To: <20180619064424.6642-3-takahiro.akashi@linaro.org>
-References: <20180619064424.6642-1-takahiro.akashi@linaro.org>
- <20180619064424.6642-3-takahiro.akashi@linaro.org>
-Message-ID: <d910258e-b332-36f3-4024-ed9ab48af278@arm.com>
+From: drjones@redhat.com (Andrew Jones)
+Date: Thu, 28 Jun 2018 19:32:43 +0200
+Subject: [PATCH] arm64: acpi: reenumerate topology ids
+In-Reply-To: <a38fb684-c023-1a96-464e-dd268f3132ea@arm.com>
+References: <20180628145128.10057-1-drjones@redhat.com>
+ <a38fb684-c023-1a96-464e-dd268f3132ea@arm.com>
+Message-ID: <20180628173243.obydzakh2stfs26w@kamzik.brq.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Akashi,
+On Thu, Jun 28, 2018 at 05:30:51PM +0100, Sudeep Holla wrote:
+> I am not sure if we can ever guarantee that DT and ACPI will get the
+> same ids whatever counter we use as it depends on the order presented in
+> the firmware(DT or ACPI). So I am not for generating ids for core and
+> threads in that way.
 
-On 19/06/18 07:44, AKASHI Takahiro wrote:
-> Under the current implementation, UEFI memory map will be mapped and made
-> available in virtual mappings only if runtime services are enabled.
+I don't believe we have to guarantee that the exact (package,core,thread)
+triplet describing a PE with DT matches ACPI. We just need to guarantee
+that each triplet we select properly puts a PE in the same group as its
+peers. So, as long as we keep the grouping described by DT or ACPI, then
+the (package,core,thread) IDs assigned are pretty arbitrary.
 
-> But in a later patch, we want to use UEFI memory map in acpi_os_ioremap()
-> to create mappings of ACPI tables using memory attributes described in
-> UEFI memory map.
+I could change the commit message to state we can generate IDs *like*
+DT does (i.e. with counters), even if they may not result in identical
+triplet to PE mappings.
+
 > 
-> So, as a first step, arm_enter_runtime_services() will be modified
-> so that UEFI memory map will be always accessible.
+> So I would like to keep it simple and just have this counters for
+> package ids as demonstrated in Shunyong's patch.
 > 
-> See a relevant commit:
->     arm64: acpi: fix alignment fault in accessing ACPI tables
 
-For what its worth:
-Acked-by: James Morse <james.morse@arm.com>
-
+If we don't also handle cores when there are threads, then the cores
+will also end up having weird IDs.
 
 Thanks,
-
-James
+drew
