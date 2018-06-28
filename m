@@ -1,105 +1,102 @@
 From: ravi.bangoria@linux.ibm.com (Ravi Bangoria)
-Date: Thu, 28 Jun 2018 10:52:02 +0530
-Subject: [PATCH v5 03/10] Uprobe: Change set_swbp definition
+Date: Thu, 28 Jun 2018 10:52:04 +0530
+Subject: [PATCH v5 05/10] Uprobe: Change uprobe_write_opcode definition
 In-Reply-To: <20180628052209.13056-1-ravi.bangoria@linux.ibm.com>
 References: <20180628052209.13056-1-ravi.bangoria@linux.ibm.com>
-Message-ID: <20180628052209.13056-4-ravi.bangoria@linux.ibm.com>
+Message-ID: <20180628052209.13056-6-ravi.bangoria@linux.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of arch_uprobe, pass uprobe object to set_swbp(). We need
+Add addition argument 'uprobe' to uprobe_write_opcode(). We need
 this in later set of patches.
 
 Signed-off-by: Ravi Bangoria <ravi.bangoria@linux.ibm.com>
 ---
- arch/arm/probes/uprobes/core.c | 4 ++--
- arch/mips/kernel/uprobes.c     | 4 ++--
+ arch/arm/probes/uprobes/core.c | 2 +-
+ arch/mips/kernel/uprobes.c     | 2 +-
  include/linux/uprobes.h        | 2 +-
- kernel/events/uprobes.c        | 6 +++---
- 4 files changed, 8 insertions(+), 8 deletions(-)
+ kernel/events/uprobes.c        | 9 +++++----
+ 4 files changed, 8 insertions(+), 7 deletions(-)
 
 diff --git a/arch/arm/probes/uprobes/core.c b/arch/arm/probes/uprobes/core.c
-index d1329f1ba4e4..c678a5c4a284 100644
+index c678a5c4a284..a4856a904a0a 100644
 --- a/arch/arm/probes/uprobes/core.c
 +++ b/arch/arm/probes/uprobes/core.c
-@@ -29,11 +29,11 @@ bool is_swbp_insn(uprobe_opcode_t *insn)
- 		(UPROBE_SWBP_ARM_INSN & 0x0fffffff);
- }
- 
--int set_swbp(struct arch_uprobe *auprobe, struct mm_struct *mm,
-+int set_swbp(struct uprobe *uprobe, struct mm_struct *mm,
+@@ -32,7 +32,7 @@ bool is_swbp_insn(uprobe_opcode_t *insn)
+ int set_swbp(struct uprobe *uprobe, struct mm_struct *mm,
  	     unsigned long vaddr)
  {
- 	return uprobe_write_opcode(mm, vaddr,
--		   __opcode_to_mem_arm(auprobe->bpinsn));
-+		   __opcode_to_mem_arm(uprobe->arch.bpinsn));
+-	return uprobe_write_opcode(mm, vaddr,
++	return uprobe_write_opcode(uprobe, mm, vaddr,
+ 		   __opcode_to_mem_arm(uprobe->arch.bpinsn));
  }
  
- bool arch_uprobe_ignore(struct arch_uprobe *auprobe, struct pt_regs *regs)
 diff --git a/arch/mips/kernel/uprobes.c b/arch/mips/kernel/uprobes.c
-index f7a0645ccb82..2aaa378a46e6 100644
+index 2aaa378a46e6..8bdf4b54c4a7 100644
 --- a/arch/mips/kernel/uprobes.c
 +++ b/arch/mips/kernel/uprobes.c
-@@ -211,7 +211,7 @@ unsigned long arch_uretprobe_hijack_return_addr(
- 
- /**
-  * set_swbp - store breakpoint at a given address.
-- * @auprobe: arch specific probepoint information.
-+ * @uprobe: uprobe object.
-  * @mm: the probed process address space.
-  * @vaddr: the virtual address to insert the opcode.
-  *
-@@ -221,7 +221,7 @@ unsigned long arch_uretprobe_hijack_return_addr(
-  * This version overrides the weak version in kernel/events/uprobes.c.
-  * It is required to handle MIPS16 and microMIPS.
-  */
--int __weak set_swbp(struct arch_uprobe *auprobe, struct mm_struct *mm,
-+int __weak set_swbp(struct uprobe *uprobe, struct mm_struct *mm,
+@@ -224,7 +224,7 @@ unsigned long arch_uretprobe_hijack_return_addr(
+ int __weak set_swbp(struct uprobe *uprobe, struct mm_struct *mm,
  	unsigned long vaddr)
  {
- 	return uprobe_write_opcode(mm, vaddr, UPROBE_SWBP_INSN);
+-	return uprobe_write_opcode(mm, vaddr, UPROBE_SWBP_INSN);
++	return uprobe_write_opcode(uprobe, mm, vaddr, UPROBE_SWBP_INSN);
+ }
+ 
+ void arch_uprobe_copy_ixol(struct page *page, unsigned long vaddr,
 diff --git a/include/linux/uprobes.h b/include/linux/uprobes.h
-index 044359083a57..7a77bd57c9e7 100644
+index 85db5918f675..88942b1f0a3e 100644
 --- a/include/linux/uprobes.h
 +++ b/include/linux/uprobes.h
-@@ -140,7 +140,7 @@ struct uprobes_state {
- 	struct xol_area		*xol_area;
- };
- 
--extern int set_swbp(struct arch_uprobe *aup, struct mm_struct *mm, unsigned long vaddr);
-+extern int set_swbp(struct uprobe *uprobe, struct mm_struct *mm, unsigned long vaddr);
- extern int set_orig_insn(struct arch_uprobe *aup, struct mm_struct *mm, unsigned long vaddr);
- extern bool is_swbp_insn(uprobe_opcode_t *insn);
+@@ -146,7 +146,7 @@ extern bool is_swbp_insn(uprobe_opcode_t *insn);
  extern bool is_trap_insn(uprobe_opcode_t *insn);
+ extern unsigned long uprobe_get_swbp_addr(struct pt_regs *regs);
+ extern unsigned long uprobe_get_trap_addr(struct pt_regs *regs);
+-extern int uprobe_write_opcode(struct mm_struct *mm, unsigned long vaddr, uprobe_opcode_t);
++extern int uprobe_write_opcode(struct uprobe *uprobe, struct mm_struct *mm, unsigned long vaddr, uprobe_opcode_t opcode);
+ extern int uprobe_register(struct inode *inode, loff_t offset, struct uprobe_consumer *uc);
+ extern int uprobe_apply(struct inode *inode, loff_t offset, struct uprobe_consumer *uc, bool);
+ extern void uprobe_unregister(struct inode *inode, loff_t offset, struct uprobe_consumer *uc);
 diff --git a/kernel/events/uprobes.c b/kernel/events/uprobes.c
-index 26c2d95c55fa..8de52bcd1a18 100644
+index 04fe80057331..3e0426c76376 100644
 --- a/kernel/events/uprobes.c
 +++ b/kernel/events/uprobes.c
-@@ -318,14 +318,14 @@ int uprobe_write_opcode(struct mm_struct *mm, unsigned long vaddr,
- 
- /**
-  * set_swbp - store breakpoint at a given address.
-- * @auprobe: arch specific probepoint information.
+@@ -268,6 +268,7 @@ static int verify_opcode(struct page *page, unsigned long vaddr, uprobe_opcode_t
+  * that have fixed length instructions.
+  *
+  * uprobe_write_opcode - write the opcode at a given virtual address.
 + * @uprobe: uprobe object.
   * @mm: the probed process address space.
-  * @vaddr: the virtual address to insert the opcode.
-  *
-  * For mm @mm, store the breakpoint instruction at @vaddr.
+  * @vaddr: the virtual address to store the opcode.
+  * @opcode: opcode to be written at @vaddr.
+@@ -275,8 +276,8 @@ static int verify_opcode(struct page *page, unsigned long vaddr, uprobe_opcode_t
+  * Called with mm->mmap_sem held for write.
   * Return 0 (success) or a negative errno.
   */
--int __weak set_swbp(struct arch_uprobe *auprobe, struct mm_struct *mm, unsigned long vaddr)
-+int __weak set_swbp(struct uprobe *uprobe, struct mm_struct *mm, unsigned long vaddr)
+-int uprobe_write_opcode(struct mm_struct *mm, unsigned long vaddr,
+-			uprobe_opcode_t opcode)
++int uprobe_write_opcode(struct uprobe *uprobe, struct mm_struct *mm,
++			unsigned long vaddr, uprobe_opcode_t opcode)
  {
- 	return uprobe_write_opcode(mm, vaddr, UPROBE_SWBP_INSN);
+ 	struct page *old_page, *new_page;
+ 	struct vm_area_struct *vma;
+@@ -327,7 +328,7 @@ int uprobe_write_opcode(struct mm_struct *mm, unsigned long vaddr,
+  */
+ int __weak set_swbp(struct uprobe *uprobe, struct mm_struct *mm, unsigned long vaddr)
+ {
+-	return uprobe_write_opcode(mm, vaddr, UPROBE_SWBP_INSN);
++	return uprobe_write_opcode(uprobe, mm, vaddr, UPROBE_SWBP_INSN);
  }
-@@ -642,7 +642,7 @@ install_breakpoint(struct uprobe *uprobe, struct mm_struct *mm,
- 	if (first_uprobe)
- 		set_bit(MMF_HAS_UPROBES, &mm->flags);
  
--	ret = set_swbp(&uprobe->arch, mm, vaddr);
-+	ret = set_swbp(uprobe, mm, vaddr);
- 	if (!ret)
- 		clear_bit(MMF_RECALC_UPROBES, &mm->flags);
- 	else if (first_uprobe)
+ /**
+@@ -342,7 +343,7 @@ int __weak set_swbp(struct uprobe *uprobe, struct mm_struct *mm, unsigned long v
+ int __weak
+ set_orig_insn(struct uprobe *uprobe, struct mm_struct *mm, unsigned long vaddr)
+ {
+-	return uprobe_write_opcode(mm, vaddr,
++	return uprobe_write_opcode(uprobe, mm, vaddr,
+ 			*(uprobe_opcode_t *)&(uprobe->arch.insn));
+ }
+ 
 -- 
 2.14.4
