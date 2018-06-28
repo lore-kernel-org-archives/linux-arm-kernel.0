@@ -1,47 +1,119 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Thu, 28 Jun 2018 15:14:13 +0300
-Subject: [PATCH] ARM: dts: armada388-clearfog: update spi flash comment
-Message-ID: <54d6bdd0a348926cabb4083cf2e98e8124de95f7.1530188053.git.baruch@tkos.co.il>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 28 Jun 2018 13:24:05 +0100
+Subject: [PATCH v3 08/17] irqchip/irq-mvebu-icu: disociate ICU and NSR
+In-Reply-To: <20180622151432.1566-9-miquel.raynal@bootlin.com>
+References: <20180622151432.1566-1-miquel.raynal@bootlin.com>
+ <20180622151432.1566-9-miquel.raynal@bootlin.com>
+Message-ID: <0d666052-b1f5-a27a-1bc8-fa3ede9e388a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the comment stating that the spi is not populated. The spi flash
-is populated on production SOMs.
+On 22/06/18 16:14, Miquel Raynal wrote:
+> NSR (non-secure interrupts) are handled in the ICU driver like if there
+> was only this type of interrupt in the ICU. Change this behavior to
+> prepare the introduction of SEI (System Error Interrupts) support by
+> moving the NSR code in a separate function. This is done under the form
+> of a 'probe' function to ease future migration to NSR/SEI being platform
+> devices part of the ICU.
+> 
+> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+> Reviewed-by: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
+> ---
+>  drivers/irqchip/irq-mvebu-icu.c | 58 +++++++++++++++++++++++------------------
+>  1 file changed, 33 insertions(+), 25 deletions(-)
+> 
+> diff --git a/drivers/irqchip/irq-mvebu-icu.c b/drivers/irqchip/irq-mvebu-icu.c
+> index 607948870a14..24d45186eb6b 100644
+> --- a/drivers/irqchip/irq-mvebu-icu.c
+> +++ b/drivers/irqchip/irq-mvebu-icu.c
+> @@ -205,6 +205,37 @@ static const struct irq_domain_ops mvebu_icu_domain_ops = {
+>  	.free      = mvebu_icu_irq_domain_free,
+>  };
+>  
+> +static int mvebu_icu_subset_probe(struct platform_device *pdev)
+> +{
+> +	struct device_node *msi_parent_dn;
+> +	struct irq_domain *irq_domain;
+> +	struct mvebu_icu *icu;
+> +
+> +	icu = dev_get_drvdata(&pdev->dev);
+> +	if (!icu)
+> +		return -ENODEV;
+> +
+> +	pdev->dev.msi_domain = of_msi_get_domain(&pdev->dev, pdev->dev.of_node,
+> +						 DOMAIN_BUS_PLATFORM_MSI);
+> +	if (!pdev->dev.msi_domain)
+> +		return -EPROBE_DEFER;
+> +
+> +	msi_parent_dn = irq_domain_get_of_node(pdev->dev.msi_domain);
+> +	if (!msi_parent_dn)
+> +		return -ENODEV;
+> +
+> +	irq_domain = platform_msi_create_device_domain(&pdev->dev, ICU_MAX_IRQS,
+> +						       mvebu_icu_write_msg,
+> +						       &mvebu_icu_domain_ops,
+> +						       icu);
+> +	if (!irq_domain) {
+> +		dev_err(&pdev->dev, "Failed to create ICU MSI domain\n");
+> +		return -ENOMEM;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+>  static struct regmap_config mvebu_icu_regmap_config = {
+>  	.reg_bits	= 32,
+>  	.val_bits	= 32,
+> @@ -215,9 +246,6 @@ static struct regmap_config mvebu_icu_regmap_config = {
+>  static int mvebu_icu_probe(struct platform_device *pdev)
+>  {
+>  	struct mvebu_icu *icu;
+> -	struct device_node *node = pdev->dev.of_node;
+> -	struct device_node *gicp_dn;
+> -	struct irq_domain *irq_domain;
+>  	struct resource *res;
+>  	void __iomem *regs;
+>  	int i;
+> @@ -255,19 +283,6 @@ static int mvebu_icu_probe(struct platform_device *pdev)
+>  	icu->irq_chip.irq_set_affinity = irq_chip_set_affinity_parent;
+>  #endif
+>  
+> -	/*
+> -	 * We're probed after MSI domains have been resolved, so force
+> -	 * resolution here.
+> -	 */
+> -	pdev->dev.msi_domain = of_msi_get_domain(&pdev->dev, node,
+> -						 DOMAIN_BUS_PLATFORM_MSI);
+> -	if (!pdev->dev.msi_domain)
+> -		return -EPROBE_DEFER;
+> -
+> -	gicp_dn = irq_domain_get_of_node(pdev->dev.msi_domain);
+> -	if (!gicp_dn)
+> -		return -ENODEV;
+> -
+>  	/*
+>  	 * Clean all ICU interrupts with type SPI_NSR, required to
+>  	 * avoid unpredictable SPI assignments done by firmware.
+> @@ -282,16 +297,9 @@ static int mvebu_icu_probe(struct platform_device *pdev)
+>  			regmap_write(icu->regmap, ICU_INT_CFG(i), 0);
+>  	}
+>  
+> -	irq_domain =
+> -		platform_msi_create_device_domain(&pdev->dev, ICU_MAX_IRQS,
+> -						  mvebu_icu_write_msg,
+> -						  &mvebu_icu_domain_ops, icu);
+> -	if (!irq_domain) {
+> -		dev_err(&pdev->dev, "Failed to create ICU domain\n");
+> -		return -ENOMEM;
+> -	}
+> +	platform_set_drvdata(pdev, icu);
 
-This is a follow up to commit 12b427331ae5 (ARM: dts:
-armada388-clearfog: enable spi flash).
+What is the upshot of passing this icu pointer as part of the platform
+device structure instead of simply passing it as a parameter? Is
+anything else using it?
 
-Signed-off-by: Baruch Siach <baruch@tkos.co.il>
----
- arch/arm/boot/dts/armada-388-clearfog.dts  | 2 +-
- arch/arm/boot/dts/armada-388-clearfog.dtsi | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+Thanks,
 
-diff --git a/arch/arm/boot/dts/armada-388-clearfog.dts b/arch/arm/boot/dts/armada-388-clearfog.dts
-index 32b1e09b8293..89a354b43978 100644
---- a/arch/arm/boot/dts/armada-388-clearfog.dts
-+++ b/arch/arm/boot/dts/armada-388-clearfog.dts
-@@ -230,7 +230,7 @@
- &spi1 {
- 	/*
- 	 * Add SPI CS pins for clearfog:
--	 * CS0: W25Q32 (not populated on uSOM)
-+	 * CS0: W25Q32
- 	 * CS1:
- 	 * CS2: mikrobus
- 	 */
-diff --git a/arch/arm/boot/dts/armada-388-clearfog.dtsi b/arch/arm/boot/dts/armada-388-clearfog.dtsi
-index 1da40bdfcef1..7c6ad2afb094 100644
---- a/arch/arm/boot/dts/armada-388-clearfog.dtsi
-+++ b/arch/arm/boot/dts/armada-388-clearfog.dtsi
-@@ -225,7 +225,7 @@
- &spi1 {
- 	/*
- 	 * Add SPI CS pins for clearfog:
--	 * CS0: W25Q32 (not populated on uSOM)
-+	 * CS0: W25Q32
- 	 * CS1: PIC microcontroller (Pro models)
- 	 * CS2: mikrobus
- 	 */
+	M.
 -- 
-2.18.0
+Jazz is not dead. It just smells funny...
