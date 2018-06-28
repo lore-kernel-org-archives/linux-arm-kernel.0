@@ -1,29 +1,78 @@
-From: arend.vanspriel@broadcom.com (Arend van Spriel)
-Date: Thu, 28 Jun 2018 13:58:53 +0200
-Subject: question about arm64 exception handling
-Message-ID: <5B34CD7D.5090002@broadcom.com>
+From: bugalski.piotr@gmail.com (Piotr Bugalski)
+Date: Thu, 28 Jun 2018 14:02:19 +0200 (CEST)
+Subject: [RFC PATCH 1/2] spi: Add QuadSPI driver for Atmel SAMA5D2
+In-Reply-To: <1d736934-b3e7-7b23-0f34-1d22d36b2b18@microchip.com>
+References: <20180618162124.21749-1-bugalski.piotr@gmail.com>
+ <20180618162124.21749-2-bugalski.piotr@gmail.com>
+ <20180621233321.0f25f572@bbrezillon>
+ <alpine.DEB.2.20.1806220719190.21824@carbonite>
+ <20180622093905.62a3b936@bbrezillon>
+ <455adb76-530a-1fd5-303c-cfa158ad7870@microchip.com>
+ <alpine.DEB.2.20.1806270940500.32198@carbonite>
+ <1d736934-b3e7-7b23-0f34-1d22d36b2b18@microchip.com>
+Message-ID: <alpine.DEB.2.20.1806281352590.22837@carbonite>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
 
-I am looking at some issues we are seeing on a custom arm platform and I 
-had some questions regarding exception handling and hope you can help me 
-with that.
+Hi Tudor,
 
-The platform has 4 cortex a53 cores running 4.1.51 kernel. On the 
-platform upon accessing our wifi devices over PCIe, we observe two issue 
-intermittently.
+On Thu, 28 Jun 2018, Tudor Ambarus wrote:
 
-1) synchronous external abort
-2) NMI watchdog
+> Hi, Piotr,
+>
+> On 06/27/2018 10:52 AM, Piotr Bugalski wrote:
+>>
+>>> General things to consider for the limitation in performance:
+>>> - is the serial flash memory operating in Quad SPI?
+>>
+>> Yes, I've checked signal using logic analyzer, data is transferred using
+>> all four lines.
+>>
+>>> - QSCLK should be as high as possible
+>>
+>> Sure, but when we are using lower frequency CPU impact should be
+>> negligible while efficiency is crap on every speed.
+>>
+>>> - transfer delays - I checked them, they have default values, we should be good.
+>>> - use DMA, as you suggested
+>>>
+>>
+>> I don't understand one thing. While CPU is not busy and during my tests
+>> 100% of CPU can be used for communication, efficiency is still very low.
+>> Why DMA has such impact?
+>>
+>> It is very interesting to observe signals using logic analyzer.
+>> When CPU is used for communication, there are long delays after
+>> every byte transferred. These delays are  much longer than it should be only because of writing next value by CPU.
+>
+> Are those consecutive transfers (same peripheral without removing chip select)?
+> The delays between consecutive transfers can be set just in SPI mode. It would
+> be strange to see this kind of delays in serial memory mode.
+>
 
-With the latter I notice el1_irq in the exception stack trace. Is that 
-due to the NMI watchdog or is this caused by another issue like our 
-crappy hardware ;-) ?
+Yes, it's just single block transfer so no CS changes occurs.
+I find this delays strange also, but I have no idea how to avoid them.
+The same behaviour exists even when DMA is used in APB mode (write
+to registers). Only using SMM with DMA helps.
 
-Regarding the SEA I noticed stuff has been added for that in 4.13. Is is 
-worth backporting that to obtain more info about that?
+>> I tried to change SPI frequency. If delay were CPU related,
+>> delay time should stay the same. Unfortunately results were different -
+>> lowering SPI freqency extends delay time.
+>
+> If QSCK is less than f-perif-clock/2, then setting DLYBS to 1 will shorten the
+> DLYBS delay, but this is peanuts.
+>
 
-Regards,
-Arend
+I have DLYBS, DLYCS and DLYBCT set to zeros. I can try DLYBS=1 if
+you wish.
+
+> Thanks,
+> ta
+>
+>> Using DMA makes these delays to disappear, but how to acheive CPU
+>> communication without delays?
+>
+
+Thank you for comments,
+Piotr
