@@ -1,188 +1,233 @@
-From: houlong.wei@mediatek.com (houlong wei)
-Date: Fri, 29 Jun 2018 07:32:19 +0800
-Subject: [PATCH v22 4/4] soc: mediatek: Add Mediatek CMDQ helper
-In-Reply-To: <1530182516.8518.11.camel@mtksdaap41>
-References: <1530098172-31385-1-git-send-email-houlong.wei@mediatek.com>
- <1530098172-31385-5-git-send-email-houlong.wei@mediatek.com>
- <1530182516.8518.11.camel@mtksdaap41>
-Message-ID: <1530228739.21991.14.camel@mhfsdcap03>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Thu, 28 Jun 2018 16:45:53 -0700
+Subject: [PATCH 2/2] mtd: rawnand: meson: add support for Amlogic NAND
+ flash controller
+In-Reply-To: <20180628090034.0637a062@xps13> (Miquel Raynal's message of "Thu,
+ 28 Jun 2018 09:00:34 +0200")
+References: <20180613161314.14894-1-yixun.lan@amlogic.com>
+ <20180613161314.14894-3-yixun.lan@amlogic.com>
+ <20180624213844.2207ca6f@bbrezillon> <7ha7rfiz3c.fsf@baylibre.com>
+ <20180628090034.0637a062@xps13>
+Message-ID: <7hr2kqfpam.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2018-06-28 at 18:41 +0800, CK Hu wrote:
-> Hi, Houlong:
-> 
-> Some inline comment.
-> 
-> On Wed, 2018-06-27 at 19:16 +0800, Houlong Wei wrote:
-> > Add Mediatek CMDQ helper to create CMDQ packet and assemble GCE op code.
-> > 
-> > Signed-off-by: Houlong Wei <houlong.wei@mediatek.com>
-> > Signed-off-by: HS Liao <hs.liao@mediatek.com>
-> > ---
-> >  drivers/soc/mediatek/Kconfig           |   12 ++
-> >  drivers/soc/mediatek/Makefile          |    1 +
-> >  drivers/soc/mediatek/mtk-cmdq-helper.c |  258 ++++++++++++++++++++++++++++++++
-> >  include/linux/soc/mediatek/mtk-cmdq.h  |  132 ++++++++++++++++
-> >  4 files changed, 403 insertions(+)
-> >  create mode 100644 drivers/soc/mediatek/mtk-cmdq-helper.c
-> >  create mode 100644 include/linux/soc/mediatek/mtk-cmdq.h
-> > 
-> > diff --git a/drivers/soc/mediatek/Kconfig b/drivers/soc/mediatek/Kconfig
-> > index a7d0667..17bd759 100644
-> > --- a/drivers/soc/mediatek/Kconfig
-> > +++ b/drivers/soc/mediatek/Kconfig
-> > @@ -4,6 +4,18 @@
-> >  menu "MediaTek SoC drivers"
-> >  	depends on ARCH_MEDIATEK || COMPILE_TEST
-> >  
-> 
-> [...]
-> 
-> > +
-> > +int cmdq_pkt_wfe(struct cmdq_pkt *pkt, u32 event)
-> > +{
-> > +	u32 arg_b;
-> > +
-> > +	if (event >= CMDQ_MAX_EVENT || event < 0)
-> 
-> The type of event is 'u32', so checking 'event < 0' is redundant.
+Hi Miquel,
 
-will fix.
+Miquel Raynal <miquel.raynal@bootlin.com> writes:
 
-> 
-> > +		return -EINVAL;
-> > +
-> > +	/*
-> > +	 * WFE arg_b
-> > +	 * bit 0-11: wait value
-> > +	 * bit 15: 1 - wait, 0 - no wait
-> > +	 * bit 16-27: update value
-> > +	 * bit 31: 1 - update, 0 - no update
-> > +	 */
-> > +	arg_b = CMDQ_WFE_UPDATE | CMDQ_WFE_WAIT | CMDQ_WFE_WAIT_VALUE;
-> > +
-> > +	return cmdq_pkt_append_command(pkt, CMDQ_CODE_WFE, event, arg_b);
-> > +}
-> > +EXPORT_SYMBOL(cmdq_pkt_wfe);
-> > +
-> > +int cmdq_pkt_clear_event(struct cmdq_pkt *pkt, u32 event)
-> > +{
-> > +	if (event >= CMDQ_MAX_EVENT || event < 0)
-> 
-> The type of event is 'u32', so checking 'event < 0' is redundant.
+> On Wed, 27 Jun 2018 16:33:43 -0700, Kevin Hilman <khilman@baylibre.com>
+> wrote:
+>
+>> Hi Boris,
+>> 
+>> Boris Brezillon <boris.brezillon@bootlin.com> writes:
+>> 
+>> > Hi Yixun,
+>> >
+>> > On Wed, 13 Jun 2018 16:13:14 +0000
+>> > Yixun Lan <yixun.lan@amlogic.com> wrote:
+>> >  
+>> >> From: Liang Yang <liang.yang@amlogic.com>
+>> >> 
+>> >> Add initial support for the Amlogic NAND flash controller which found
+>> >> in the Meson-GXBB/GXL/AXG SoCs.
+>> >> 
+>> >> Singed-off-by: Liang Yang <liang.yang@amlogic.com>
+>> >> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+>> >> ---
+>> >>  drivers/mtd/nand/raw/Kconfig      |    8 +
+>> >>  drivers/mtd/nand/raw/Makefile     |    3 +
+>> >>  drivers/mtd/nand/raw/meson_nand.c | 1422 +++++++++++++++++++++++++++++
+>> >>  3 files changed, 1433 insertions(+)
+>> >>  create mode 100644 drivers/mtd/nand/raw/meson_nand.c  
+>> >
+>> > Can you run checkpatch.pl --strict and fix the coding style issues?
+>> >  
+>> >> 
+>> >> diff --git a/drivers/mtd/nand/raw/Kconfig b/drivers/mtd/nand/raw/Kconfig
+>> >> index 19a2b283fbbe..b3c17a3ca8f4 100644
+>> >> --- a/drivers/mtd/nand/raw/Kconfig
+>> >> +++ b/drivers/mtd/nand/raw/Kconfig
+>> >> @@ -534,4 +534,12 @@ config MTD_NAND_MTK
+>> >>  	  Enables support for NAND controller on MTK SoCs.
+>> >>  	  This controller is found on mt27xx, mt81xx, mt65xx SoCs.
+>> >>  
+>> >> +config MTD_NAND_MESON
+>> >> +	tristate "Support for NAND flash controller on Amlogic's Meson SoCs"
+>> >> +	depends on ARCH_MESON || COMPILE_TEST
+>> >> +	select COMMON_CLK_REGMAP_MESON
+>> >> +	select MFD_SYSCON
+>> >> +	help
+>> >> +	  Enables support for NAND controller on Amlogic's Meson SoCs.
+>> >> +
+>> >>  endif # MTD_NAND
+>> >> diff --git a/drivers/mtd/nand/raw/Makefile b/drivers/mtd/nand/raw/Makefile
+>> >> index 165b7ef9e9a1..cdf6162f38c3 100644
+>> >> --- a/drivers/mtd/nand/raw/Makefile
+>> >> +++ b/drivers/mtd/nand/raw/Makefile
+>> >> @@ -1,5 +1,7 @@
+>> >>  # SPDX-License-Identifier: GPL-2.0
+>> >>  
+>> >> +ccflags-$(CONFIG_MTD_NAND_MESON) += -I$(srctree)/drivers/clk/meson  
+>> >
+>> > Please don't do that. If you need to expose common regs, put them
+>> > in include/linux/soc/meson/. I'm also not sure why you need to access
+>> > the clk regs directly. Why can't you expose the MMC/NAND clk as a clk
+>> > provider whose driver would be placed in drivers/clk and which would use
+>> > the mmc syscon. This way the same clk driver could be used for both
+>> > MMC and NAND clk indifferently, and the NAND driver would be much
+>> > simpler.  
+>> 
+>> [...]
+>> 
+>> >> +
+>> >> +	return 0;
+>> >> +}
+>> >> +
+>> >> +static const char * sd_emmc_ext_clk0_parent_names[MUX_CLK_NUM_PARENTS];
+>> >> +
+>> >> +static struct clk_regmap sd_emmc_c_ext_clk0_sel = {
+>> >> +	.data = &(struct clk_regmap_mux_data){
+>> >> +		.offset = SD_EMMC_CLOCK,
+>> >> +		.mask = 0x3,
+>> >> +		.shift = 6,
+>> >> +	},
+>> >> +	.hw.init = &(struct clk_init_data) {
+>> >> +		.name = "sd_emmc_c_nand_clk_mux",
+>> >> +		.ops = &clk_regmap_mux_ops,
+>> >> +		.parent_names = sd_emmc_ext_clk0_parent_names,
+>> >> +		.num_parents = ARRAY_SIZE(sd_emmc_ext_clk0_parent_names),
+>> >> +		.flags = CLK_SET_RATE_PARENT,
+>> >> +	},
+>> >> +};
+>> >> +
+>> >> +static struct clk_regmap sd_emmc_c_ext_clk0_div = {
+>> >> +	.data = &(struct clk_regmap_div_data){
+>> >> +		.offset = SD_EMMC_CLOCK,
+>> >> +		.shift = 0,
+>> >> +		.width = 6,
+>> >> +		.flags = CLK_DIVIDER_ROUND_CLOSEST | CLK_DIVIDER_ONE_BASED,
+>> >> +	},
+>> >> +	.hw.init = &(struct clk_init_data) {
+>> >> +		.name = "sd_emmc_c_nand_clk_div",
+>> >> +		.ops = &clk_regmap_divider_ops,
+>> >> +		.parent_names = (const char *[]){ "sd_emmc_c_nand_clk_mux" },
+>> >> +		.num_parents = 1,
+>> >> +		.flags = CLK_SET_RATE_PARENT,
+>> >> +	},
+>> >> +};
+>> >> +
+>> >> +static int meson_nfc_clk_init(struct meson_nfc *nfc)
+>> >> +{
+>> >> +	struct clk_regmap *mux = &sd_emmc_c_ext_clk0_sel;
+>> >> +	struct clk_regmap *div = &sd_emmc_c_ext_clk0_div;
+>> >> +	struct clk *clk;
+>> >> +	int i, ret;
+>> >> +
+>> >> +	/* request core clock */
+>> >> +	nfc->core_clk = devm_clk_get(nfc->dev, "core");
+>> >> +	if (IS_ERR(nfc->core_clk)) {
+>> >> +		dev_err(nfc->dev, "failed to get core clk\n");
+>> >> +		return PTR_ERR(nfc->core_clk);
+>> >> +	}
+>> >> +
+>> >> +	/* init SD_EMMC_CLOCK to sane defaults w/min clock rate */
+>> >> +	regmap_update_bits(nfc->reg_clk, 0,
+>> >> +			CLK_SELECT_NAND | CLK_ALWAYS_ON | CLK_DIV_MASK,
+>> >> +			CLK_SELECT_NAND | CLK_ALWAYS_ON | CLK_DIV_MASK);
+>> >> +
+>> >> +	/* get the mux parents */
+>> >> +	for (i = 0; i < MUX_CLK_NUM_PARENTS; i++) {
+>> >> +		char name[16];
+>> >> +
+>> >> +		snprintf(name, sizeof(name), "clkin%d", i);
+>> >> +		clk = devm_clk_get(nfc->dev, name);
+>> >> +		if (IS_ERR(clk)) {
+>> >> +			if (clk != ERR_PTR(-EPROBE_DEFER))
+>> >> +				dev_err(nfc->dev, "Missing clock %s\n", name);
+>> >> +			return PTR_ERR(clk);
+>> >> +		}
+>> >> +
+>> >> +		sd_emmc_ext_clk0_parent_names[i] = __clk_get_name(clk);
+>> >> +	}
+>> >> +
+>> >> +	mux->map = nfc->reg_clk;
+>> >> +	clk = devm_clk_register(nfc->dev, &mux->hw);
+>> >> +	if (WARN_ON(IS_ERR(clk)))
+>> >> +		return PTR_ERR(clk);
+>> >> +
+>> >> +	div->map = nfc->reg_clk;
+>> >> +	nfc->device_clk = devm_clk_register(nfc->dev, &div->hw);
+>> >> +	if (WARN_ON(IS_ERR(nfc->device_clk)))
+>> >> +		return PTR_ERR(nfc->device_clk);
+>> >> +
+>> >> +	ret = clk_prepare_enable(nfc->core_clk);
+>> >> +	if (ret) {
+>> >> +		dev_err(nfc->dev, "failed to enable core clk\n");
+>> >> +		return ret;
+>> >> +	}
+>> >> +
+>> >> +	ret = clk_prepare_enable(nfc->device_clk);
+>> >> +	if (ret) {
+>> >> +		dev_err(nfc->dev, "failed to enable device clk\n");
+>> >> +		clk_disable_unprepare(nfc->core_clk);
+>> >> +		return ret;
+>> >> +	}
+>> >> +
+>> >> +	return 0;
+>> >> +}  
+>> >
+>> >
+>> > As said above, I don't like having a clk driver here, especially since
+>> > the registers you're accessing are not part of the NAND controller
+>> > registers. Please try to create a driver in drivers/clk/ for that.  
+>> 
+>> We went back and forth on this one on some off-list reviews.
+>> 
+>> Had we known that the NAND controller was (re)using the clock registers
+>> internal to the MMC IP block from the beginning, we would have written a
+>> clock provider in drivers/clk for this, and shared it.
+>> 
+>> However, when I wrote the MMC driver[1] (already upstream) along with
+>> the bindings[2], we did not fathom that the internal mux and divider
+>> would be "borrowed" by another device. :(
+>> 
+>> We only recently found out that the NAND controller "borrows" one of the
+>> MMC clocks, whose registers are inside the MMC range.  Taking the clock
+>> out of the MMC driver and into its own clock-provider implies redoing
+>> the MMC driver, as well as its bindings, which we wanted to avoid
+>> (especially the binding changes.)
+>> 
+>> We (I can take the blame) decided that since the MMC and NAND are
+>> mutually exclusive (they also share pins), that allowing NAND to reuse
+>> the MMC range would be a good compromise.  The DT still accurately
+>> describes the hardware, but we don't have to throw a large wrench into
+>> the DT bindings just for a newly discovered shared clock.
+>> 
+>> I agree, it's not the prettiest thing, but when we cannot know the full
+>> details of the hardware when we start, sometimes we end up in a bit of a
+>> mess that requires some compromise.
+>
+> I totally understand your situation but as MMC and NAND are mutually
+> exclusive, how is this a problem to have a dedicated clock driver used
+> only by the NAND controller (as maybe a first step)? I mean, if you
+> don't change the MMC bindings, then the MMC driver will still use its
+> own 'local' clock driver, right?
 
-Will fix.
+Yeah, I think you're right.  That would work too.
 
-> 
-> > +		return -EINVAL;
-> > +
-> > +	return cmdq_pkt_append_command(pkt, CMDQ_CODE_WFE, event,
-> > +				       CMDQ_WFE_UPDATE);
-> > +}
-> > +EXPORT_SYMBOL(cmdq_pkt_clear_event);
-> > +
-> > +static int cmdq_pkt_finalize(struct cmdq_pkt *pkt)
-> > +{
-> > +	int err;
-> > +
-> > +	if (cmdq_pkt_is_finalized(pkt))
-> > +		return 0;
-> > +
-> > +	/* insert EOC and generate IRQ for each command iteration */
-> > +	err = cmdq_pkt_append_command(pkt, CMDQ_CODE_EOC, 0, CMDQ_EOC_IRQ_EN);
-> > +	if (err < 0)
-> > +		return err;
-> > +
-> > +	/* JUMP to end */
-> > +	err = cmdq_pkt_append_command(pkt, CMDQ_CODE_JUMP, 0, CMDQ_JUMP_PASS);
-> > +	if (err < 0)
-> > +		return err;
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +int cmdq_pkt_flush_async(struct cmdq_client *client, struct cmdq_pkt *pkt,
-> > +			 cmdq_async_flush_cb cb, void *data)
-> > +{
-> > +	int err;
-> > +	struct device *dev;
-> > +	dma_addr_t dma_addr;
-> > +
-> > +	err = cmdq_pkt_finalize(pkt);
-> > +	if (err < 0)
-> > +		return err;
-> > +
-> > +	dev = client->chan->mbox->dev;
-> > +	dma_addr = dma_map_single(dev, pkt->va_base, pkt->cmd_buf_size,
-> > +		DMA_TO_DEVICE);
-> 
-> You map here, but I could not find unmap, so the unmap should be done in
-> client driver. I would prefer a symmetric map/unmap which means that
-> both map and unmap are done in client driver. I think you put map here
-> because you should map after finalize. 
+> I don't know if you can have two nodes reserving the same address
+> range though.
 
-The unmap is done before callback to client, in function
-cmdq_task_exec_done, mtk-cmdq-mailbox.c.
+You can, but it's a race who gets to claim the region.
 
-> Therefore, export
-> cmdq_pkt_finalize() to client driver and let client do finalize, so
-> there is no finalize in flush function. This method have a benefit that
-> if client reuse command buffer, it need not to map/unmap frequently.
+You'd have to have the new clock-controler disabled by default, and have
+any boards that use the NAND disable the MMC and enable the clock
+controller node.
 
-If client reuse command buffer or cmdq_pkt(command queue packet), client
-will add new commands to the cmdq_pkt, so map/unmap are necessary for
-each cmdq_pkt flush.
+But I think that should work.
 
-> 
-> Regards,
-> CK
-> 
-> > +	if (dma_mapping_error(dev, dma_addr)) {
-> > +		dev_err(client->chan->mbox->dev, "dma map failed\n");
-> > +		return -ENOMEM;
-> > +	}
-> > +
-> > +	pkt->pa_base = dma_addr;
-> > +	pkt->cb.cb = cb;
-> > +	pkt->cb.data = data;
-> > +
-> > +	mbox_send_message(client->chan, pkt);
-> > +	/* We can send next packet immediately, so just call txdone. */
-> > +	mbox_client_txdone(client->chan, 0);
-> > +
-> > +	return 0;
-> > +}
-> > +EXPORT_SYMBOL(cmdq_pkt_flush_async);
-> > +
-> > +struct cmdq_flush_completion {
-> > +	struct completion cmplt;
-> > +	bool err;
-> > +};
-> > +
-> > +static void cmdq_pkt_flush_cb(struct cmdq_cb_data data)
-> > +{
-> > +	struct cmdq_flush_completion *cmplt = data.data;
-> > +
-> > +	cmplt->err = data.err;
-> > +	complete(&cmplt->cmplt);
-> > +}
-> > +
-> > +int cmdq_pkt_flush(struct cmdq_client *client, struct cmdq_pkt *pkt)
-> > +{
-> > +	struct cmdq_flush_completion cmplt;
-> > +	int err;
-> > +
-> > +	init_completion(&cmplt.cmplt);
-> > +	err = cmdq_pkt_flush_async(client, pkt, cmdq_pkt_flush_cb, &cmplt);
-> > +	if (err < 0)
-> > +		return err;
-> > +	wait_for_completion(&cmplt.cmplt);
-> > +
-> > +	return cmplt.err ? -EFAULT : 0;
-> > +}
-> > +EXPORT_SYMBOL(cmdq_pkt_flush);
-> 
-> [...]
-> 
-> 
+Yixun, can you give this approach a try?
+
+Kevin
