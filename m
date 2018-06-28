@@ -1,66 +1,91 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 28 Jun 2018 09:01:42 +0200
-Subject: [PATCH v4 00/17] khwasan: kernel hardware assisted address
- sanitizer
-In-Reply-To: <CAN=P9pivApAo76Kjc0TUDE0kvJn0pET=47xU6e=ioZV2VqO0Rg@mail.gmail.com>
-References: <cover.1530018818.git.andreyknvl@google.com>
- <20180627160800.3dc7f9ee41c0badbf7342520@linux-foundation.org>
- <CAN=P9pivApAo76Kjc0TUDE0kvJn0pET=47xU6e=ioZV2VqO0Rg@mail.gmail.com>
-Message-ID: <CAMuHMdVVutxU3paxcjsuLVjCuooHqs61o0DEySkOK1zUeMj2tw@mail.gmail.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Thu, 28 Jun 2018 10:06:14 +0300
+Subject: [PATCH 1/2] ARM: mvebu_v7_defconfig: sync defconfig
+Message-ID: <ee69693c87cd0146f259042fc5dcd29338fcdf25.1530169575.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kostya,
+Use savedefconfig to sync defconfig for current kernel. No change in
+generated configuration.
 
-On Thu, Jun 28, 2018 at 2:04 AM Kostya Serebryany <kcc@google.com> wrote:
-> On Wed, Jun 27, 2018 at 4:08 PM Andrew Morton <akpm@linux-foundation.org> wrote:
-> > On Tue, 26 Jun 2018 15:15:10 +0200 Andrey Konovalov <andreyknvl@google.com> wrote:
-> > > This patchset adds a new mode to KASAN [1], which is called KHWASAN
-> > > (Kernel HardWare assisted Address SANitizer).
-> > >
-> > > The plan is to implement HWASan [2] for the kernel with the incentive,
-> > > that it's going to have comparable to KASAN performance, but in the same
-> > > time consume much less memory, trading that off for somewhat imprecise
-> > > bug detection and being supported only for arm64.
-> >
-> > Why do we consider this to be a worthwhile change?
-> >
-> > Is KASAN's memory consumption actually a significant problem?  Some
-> > data regarding that would be very useful.
->
-> On mobile, ASAN's and KASAN's memory usage is a significant problem.
-> Not sure if I can find scientific evidence of that.
-> CC-ing Vishwath Mohan who deals with KASAN on Android to provide
-> anecdotal evidence.
->
-> There are several other benefits too:
-> * HWASAN more reliably detects non-linear-buffer-overflows compared to
-> ASAN (same for kernel-HWASAN vs kernel-ASAN)
-> * Same for detecting use-after-free (since HWASAN doesn't rely on quarantine).
-> * Much easier to implement stack-use-after-return detection (which
-> IIRC KASAN doesn't have yet, because in KASAN it's too hard)
->
-> > If it is a large problem then we still have that problem on x86, so the
-> > problem remains largely unsolved?
->
-> The problem is more significant on mobile devices than on desktop/server.
-> I'd love to have [K]HWASAN on x86_64 as well, but it's less trivial since x86_64
-> doesn't have an analog of aarch64's top-byte-ignore hardware feature.
+Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+---
+ arch/arm/configs/mvebu_v7_defconfig | 12 ++----------
+ 1 file changed, 2 insertions(+), 10 deletions(-)
 
-This depends on your mobile devices and desktops and servers.
-There exist mobile devices with more memory than some desktops or servers.
-
-So actual numbers (O(KiB)? O(MiB)? O(GiB)?) would be nice to have.
-
-Thanks!
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
+diff --git a/arch/arm/configs/mvebu_v7_defconfig b/arch/arm/configs/mvebu_v7_defconfig
+index ddaeda4f2e82..1ff371ae688d 100644
+--- a/arch/arm/configs/mvebu_v7_defconfig
++++ b/arch/arm/configs/mvebu_v7_defconfig
+@@ -1,5 +1,4 @@
+ CONFIG_SYSVIPC=y
+-CONFIG_FHANDLE=y
+ CONFIG_HIGH_RES_TIMERS=y
+ CONFIG_LOG_BUF_SHIFT=14
+ CONFIG_BLK_DEV_INITRD=y
+@@ -16,10 +15,8 @@ CONFIG_MACH_ARMADA_39X=y
+ CONFIG_MACH_ARMADA_XP=y
+ CONFIG_MACH_DOVE=y
+ CONFIG_PCI=y
+-CONFIG_PCI_MSI=y
+ CONFIG_PCI_MVEBU=y
+ CONFIG_SMP=y
+-CONFIG_AEABI=y
+ CONFIG_HIGHMEM=y
+ # CONFIG_COMPACTION is not set
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+@@ -58,7 +55,6 @@ CONFIG_MTD_M25P80=y
+ CONFIG_MTD_NAND=y
+ CONFIG_MTD_NAND_MARVELL=y
+ CONFIG_MTD_SPI_NOR=y
+-CONFIG_SRAM=y
+ CONFIG_MTD_UBI=y
+ CONFIG_EEPROM_AT24=y
+ CONFIG_BLK_DEV_SD=y
+@@ -67,12 +63,10 @@ CONFIG_SATA_AHCI=y
+ CONFIG_AHCI_MVEBU=y
+ CONFIG_SATA_MV=y
+ CONFIG_NETDEVICES=y
+-CONFIG_NET_DSA_MV88E6XXX=y
+ CONFIG_MV643XX_ETH=y
+ CONFIG_MVNETA=y
+ CONFIG_MVPP2=y
+ CONFIG_MARVELL_PHY=y
+-CONFIG_FIXED_PHY=y
+ CONFIG_MWIFIEX=y
+ CONFIG_MWIFIEX_SDIO=y
+ CONFIG_INPUT_EVDEV=y
+@@ -88,10 +82,11 @@ CONFIG_SPI=y
+ CONFIG_SPI_ORION=y
+ CONFIG_GPIO_SYSFS=y
+ CONFIG_GPIO_PCA953X=y
+-CONFIG_POWER_SUPPLY=y
+ CONFIG_POWER_RESET=y
+ CONFIG_POWER_RESET_GPIO=y
++CONFIG_POWER_SUPPLY=y
+ CONFIG_SENSORS_GPIO_FAN=y
++CONFIG_SENSORS_PWM_FAN=y
+ CONFIG_THERMAL=y
+ CONFIG_ARMADA_THERMAL=y
+ CONFIG_WATCHDOG=y
+@@ -135,7 +130,6 @@ CONFIG_MV_XOR=y
+ # CONFIG_IOMMU_SUPPORT is not set
+ CONFIG_MEMORY=y
+ CONFIG_PWM=y
+-CONFIG_SENSORS_PWM_FAN=y
+ CONFIG_EXT4_FS=y
+ CONFIG_ISO9660_FS=y
+ CONFIG_JOLIET=y
+@@ -153,10 +147,8 @@ CONFIG_NLS_ISO8859_2=y
+ CONFIG_NLS_UTF8=y
+ CONFIG_PRINTK_TIME=y
+ CONFIG_DEBUG_INFO=y
+-CONFIG_DEBUG_FS=y
+ CONFIG_MAGIC_SYSRQ=y
+ # CONFIG_SCHED_DEBUG is not set
+-CONFIG_TIMER_STATS=y
+ # CONFIG_DEBUG_BUGVERBOSE is not set
+ CONFIG_DEBUG_USER=y
+ CONFIG_CRYPTO_DEV_MARVELL_CESA=y
 -- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+2.18.0
