@@ -1,40 +1,51 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 28 Jun 2018 14:43:40 -0600
-Subject: [PATCH v3 2/6] dt-bindings: pinctrl: add a 'pinctrl-use-default'
- property
+Date: Thu, 28 Jun 2018 14:43:44 -0600
+Subject: [PATCH v3 6/6] PM / Domains: Stop deferring probe at the end of
+ initcall
 In-Reply-To: <20180628204344.13973-1-robh@kernel.org>
 References: <20180628204344.13973-1-robh@kernel.org>
-Message-ID: <20180628204344.13973-3-robh@kernel.org>
+Message-ID: <20180628204344.13973-7-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pin setup may be optional in some cases such as the reset default works
-or the pin setup is done by the bootloader. In these cases, it is optional
-for the OS to support managing the pin controller and pin setup. In order
-to support this scenario, add a property 'pinctrl-use-default' to indicate
-that the pin configuration is optional.
+All PM domain drivers must be built-in (at least those using DT), so
+there is no point deferring probe after initcalls are done. Continuing
+to defer probe may prevent booting successfully even if managing PM
+domains is not required. This can happen if the user failed to enable
+the driver or if power-domains are added to a platform's DT, but there
+is not yet a driver (e.g. a new DTB with an old kernel).
 
+Call the driver core function driver_deferred_probe_check_init_done()
+instead of just returning -EPROBE_DEFER to stop deferring probe when
+initcalls are done.
+
+Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+Cc: Kevin Hilman <khilman@kernel.org>
+Cc: Ulf Hansson <ulf.hansson@linaro.org>
+Cc: Pavel Machek <pavel@ucw.cz>
+Cc: Len Brown <len.brown@intel.com>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: linux-pm at vger.kernel.org
 Signed-off-by: Rob Herring <robh@kernel.org>
 ---
- .../devicetree/bindings/pinctrl/pinctrl-bindings.txt        | 6 ++++++
- 1 file changed, 6 insertions(+)
+v3:
+  - Update to new function name
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
-index ad9bbbba36e9..cef2b5855d60 100644
---- a/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
-@@ -103,6 +103,12 @@ Optional properties:
- #pinctrl-cells:	Number of pin control cells in addition to the index within the
- 		pin controller device instance
- 
-+pinctrl-use-default: Boolean. Indicates that the OS can use the boot default
-+		pin configuration. This allows using an OS that does not have a
-+		driver for the pin controller. This property can be set either
-+		globally for the pin controller or in child nodes for individual
-+		pin group control.
-+
- Pin controller devices should contain the pin configuration nodes that client
- devices reference.
- 
--- 
+ drivers/base/power/domain.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+index 4925af5c4cf0..8c12213875c6 100644
+--- a/drivers/base/power/domain.c
++++ b/drivers/base/power/domain.c
+@@ -2253,7 +2253,7 @@ static int __genpd_dev_pm_attach(struct device *dev, struct device_node *np,
+ 		mutex_unlock(&gpd_list_lock);
+ 		dev_dbg(dev, "%s() failed to find PM domain: %ld\n",
+ 			__func__, PTR_ERR(pd));
+-		return -EPROBE_DEFER;
++		return driver_deferred_probe_check_state(dev);
+ 	}
+
+ 	dev_dbg(dev, "adding to PM domain %s\n", pd->name);
+--
 2.17.1
