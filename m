@@ -1,46 +1,53 @@
-From: james.morse@arm.com (James Morse)
-Date: Thu, 28 Jun 2018 11:06:55 +0100
-Subject: [RFC/RFT PATCH 1/2] efi: Add helper to retrieve runtime version number
-In-Reply-To: <20180628100656.10692-1-james.morse@arm.com>
-References: <20180628100656.10692-1-james.morse@arm.com>
-Message-ID: <20180628100656.10692-2-james.morse@arm.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Thu, 28 Jun 2018 13:07:59 +0300
+Subject: [PATCH 1/2] ARM: dts: armada388-clearfog: enable spi flash
+In-Reply-To: <20180628095113.GC17271@n2100.armlinux.org.uk>
+References: <2bc87e3e365c460943730ded86c8fcb1ff55a533.1530170016.git.baruch@tkos.co.il>
+ <20180628095113.GC17271@n2100.armlinux.org.uk>
+Message-ID: <20180628100759.45clx3diuv6tk3e3@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some RAS errors are related to an invalid hardware access that was
-made by software. Sometimes this happens before the kernel runs.
+Hi Russell,
 
-For example, HPE's ProLiant m400 Server (aka moonshot) trips the
-platforms RAS mechanism during ExitBootServices. Once the kernel
-probes the RAS error descriptor regions, it finds a stale 'fatal
-error', and hits the deck.
+Thanks for reviewing.
 
-Quirking this platform based on the DMI data doesn't capture that
-the bug lies in the platforms UEFI firmware. Expose the runtime
-version, originally retrieved from the EFI system table's header
-revision field, so that any future or unaffected platform firmware
-isn't swept up too.
+On Thu, Jun 28, 2018 at 10:51:14AM +0100, Russell King - ARM Linux wrote:
+> On Thu, Jun 28, 2018 at 10:13:35AM +0300, Baruch Siach wrote:
+> > The SolidRun Armada 388 SOM has the SPI flash populated by default
+> > unless the customer explicitly asks otherwise. Enable support by
+> > default.
+> 
+> Are you sure about that - at least some of my boards do not have the
+> SPI flash populated.
+> 
+> &spi1 {
+>         /* The microsom has an optional W25Q32 on board, connected to CS0 */
+> ...
+> &spi1 {
+>         /*
+>          * Add SPI CS pins for clearfog:
+>          * CS0: W25Q32 (not populated on uSOM)
 
-Signed-off-by: James Morse <james.morse@arm.com>
----
- include/linux/efi.h | 5 +++++
- 1 file changed, 5 insertions(+)
+I should update this line as well, I guess.
 
-diff --git a/include/linux/efi.h b/include/linux/efi.h
-index 56add823f190..42ddf8399814 100644
---- a/include/linux/efi.h
-+++ b/include/linux/efi.h
-@@ -966,6 +966,11 @@ extern struct efi {
- 	unsigned long flags;
- } efi;
- 
-+static inline unsigned int efi_get_runtime_version(void)
-+{
-+	return efi.runtime_version;
-+}
-+
- extern struct mm_struct efi_mm;
- 
- static inline int
+>          * CS1: PIC microcontroller (Pro models)
+>          * CS2: mikrobus
+>          */
+> 
+> I wouldn't have written "not populated on uSOM" without having first
+> taken the uSOM off and physically checked.
+
+Are these production SOMs or development/engineering samples?
+
+Ilya Viten from the SolidRun commercial department told me that all production 
+SOMs that were shipped to customers have the SPI flash populated.
+
+This is just the default value for the common case.
+
+baruch
+
 -- 
-2.17.1
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
