@@ -1,73 +1,187 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Thu, 28 Jun 2018 20:55:30 +0800
-Subject: [PATCH] arm64: numa: rework ACPI NUMA initialization
-In-Reply-To: <20180625130552.5636-1-lorenzo.pieralisi@arm.com>
-References: <20180625130552.5636-1-lorenzo.pieralisi@arm.com>
-Message-ID: <aeb3d665-4135-f6ea-7f65-13b08983673e@huawei.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Thu, 28 Jun 2018 13:57:53 +0100
+Subject: [PATCH v3 2/6] coresight: Add helper device type
+In-Reply-To: <1530190677-19933-1-git-send-email-suzuki.poulose@arm.com>
+References: <1530190677-19933-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1530190677-19933-3-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018/6/25 21:05, Lorenzo Pieralisi wrote:
-> Current ACPI ARM64 NUMA initialization code in
-> 
-> acpi_numa_gicc_affinity_init()
-> 
-> carries out NUMA nodes creation and cpu<->node mappings at the same time
-> in the arch backend so that a single SRAT walk is needed to parse both
-> pieces of information.  This implies that the cpu<->node mappings must
-> be stashed in an array (sized NR_CPUS) so that SMP code can later use
-> the stashed values to avoid another SRAT table walk to set-up the early
-> cpu<->node mappings.
-> 
-> If the kernel is configured with a NR_CPUS value less than the actual
-> processor entries in the SRAT (and MADT), the logic in
-> acpi_numa_gicc_affinity_init() is broken in that the cpu<->node mapping
-> is only carried out (and stashed for future use) only for a number of
-> SRAT entries up to NR_CPUS, which do not necessarily correspond to the
-> possible cpus detected at SMP initialization in
-> acpi_map_gic_cpu_interface() (ie MADT and SRAT processor entries order
-> is not enforced), which leaves the kernel with broken cpu<->node
-> mappings.
-> 
-> Furthermore, given the current ACPI NUMA code parsing logic in
-> acpi_numa_gicc_affinity_init(), PXM domains for CPUs that are not parsed
-> because they exceed NR_CPUS entries are not mapped to NUMA nodes (ie the
-> PXM corresponding node is not created in the kernel) leaving the system
-> with a broken NUMA topology.
-> 
-> Rework the ACPI ARM64 NUMA initialization process so that the NUMA
-> nodes creation and cpu<->node mappings are decoupled. cpu<->node
-> mappings are moved to SMP initialization code (where they are needed),
-> at the cost of an extra SRAT walk so that ACPI NUMA mappings can be
-> batched before being applied, fixing current parsing pitfalls.
-> 
-> Fixes: d8b47fca8c23 ("arm64, ACPI, NUMA: NUMA support based on SRAT and
-> SLIT")
-> Link: http://lkml.kernel.org/r/1527768879-88161-2-git-send-email-xiexiuqi at huawei.com
-> Reported-by: Xie XiuQi <xiexiuqi@huawei.com>
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Punit Agrawal <punit.agrawal@arm.com>
-> Cc: Jonathan Cameron <jonathan.cameron@huawei.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Hanjun Guo <guohanjun@huawei.com>
-> Cc: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
-> Cc: Jeremy Linton <jeremy.linton@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Xie XiuQi <xiexiuqi@huawei.com>
-> ---
->  arch/arm64/include/asm/acpi.h |  6 ++-
->  arch/arm64/kernel/acpi_numa.c | 88 ++++++++++++++++++++++++++-----------------
->  arch/arm64/kernel/smp.c       | 39 +++++++++++++------
->  3 files changed, 85 insertions(+), 48 deletions(-)
+Add a new coresight device type, which do not belong to any
+of the existing types, i.e, source, sink, link etc. A helper
+device could be connected to a coresight device, which could
+augment the functionality of the coresight device.
 
-Looks good to me,
+This is intended to cover Coresight Address Translation Unit (CATU)
+devices, which provide improved Scatter Gather mechanism for TMC
+ETR. The idea is that the helper device could be controlled by
+the driver of the device it is attached to (in this case ETR),
+transparent to the generic coresight driver (and paths).
 
-Acked-by: Hanjun Guo <hanjun.guo@linaro.org>
+The operations include enable(), disable(), both of which could
+accept a device specific "data" which the driving device and
+the helper device could share. Since they don't appear in the
+coresight "path" tracked by software, we have to ensure that
+they are powered up/down whenever the master device is turned
+on.
 
-Tested on D05 with NR_CPUS=48 (with last NUMA node boot
-without CPUs), the system works fine. If Xiuqi can test
-this patch on D06 with memory-less node, that would be
-more helpful.
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+---
+ drivers/hwtracing/coresight/coresight.c | 43 +++++++++++++++++++++++++++++++--
+ include/linux/coresight.h               | 24 ++++++++++++++++++
+ 2 files changed, 65 insertions(+), 2 deletions(-)
 
-Thanks
-Hanjun
+diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
+index 7f2b478..3e07fd3 100644
+--- a/drivers/hwtracing/coresight/coresight.c
++++ b/drivers/hwtracing/coresight/coresight.c
+@@ -425,6 +425,42 @@ struct coresight_device *coresight_get_enabled_sink(bool deactivate)
+ 	return dev ? to_coresight_device(dev) : NULL;
+ }
+ 
++/*
++ * coresight_grab_device - Power up this device and any of the helper
++ * devices connected to it for trace operation. Since the helper devices
++ * don't appear on the trace path, they should be handled along with the
++ * the master device.
++ */
++static void coresight_grab_device(struct coresight_device *csdev)
++{
++	int i;
++
++	for (i = 0; i < csdev->nr_outport; i++) {
++		struct coresight_device *child = csdev->conns[i].child_dev;
++
++		if (child && child->type == CORESIGHT_DEV_TYPE_HELPER)
++			pm_runtime_get_sync(child->dev.parent);
++	}
++	pm_runtime_get_sync(csdev->dev.parent);
++}
++
++/*
++ * coresight_drop_device - Release this device and any of the helper
++ * devices connected to it.
++ */
++static void coresight_drop_device(struct coresight_device *csdev)
++{
++	int i;
++
++	pm_runtime_put(csdev->dev.parent);
++	for (i = 0; i < csdev->nr_outport; i++) {
++		struct coresight_device *child = csdev->conns[i].child_dev;
++
++		if (child && child->type == CORESIGHT_DEV_TYPE_HELPER)
++			pm_runtime_put(child->dev.parent);
++	}
++}
++
+ /**
+  * _coresight_build_path - recursively build a path from a @csdev to a sink.
+  * @csdev:	The device to start from.
+@@ -473,9 +509,9 @@ static int _coresight_build_path(struct coresight_device *csdev,
+ 	if (!node)
+ 		return -ENOMEM;
+ 
++	coresight_grab_device(csdev);
+ 	node->csdev = csdev;
+ 	list_add(&node->link, path);
+-	pm_runtime_get_sync(csdev->dev.parent);
+ 
+ 	return 0;
+ }
+@@ -519,7 +555,7 @@ void coresight_release_path(struct list_head *path)
+ 	list_for_each_entry_safe(nd, next, path, link) {
+ 		csdev = nd->csdev;
+ 
+-		pm_runtime_put_sync(csdev->dev.parent);
++		coresight_drop_device(csdev);
+ 		list_del(&nd->link);
+ 		kfree(nd);
+ 	}
+@@ -770,6 +806,9 @@ static struct device_type coresight_dev_type[] = {
+ 		.name = "source",
+ 		.groups = coresight_source_groups,
+ 	},
++	{
++		.name = "helper",
++	},
+ };
+ 
+ static void coresight_device_release(struct device *dev)
+diff --git a/include/linux/coresight.h b/include/linux/coresight.h
+index 7c188c2..3d40a2b 100644
+--- a/include/linux/coresight.h
++++ b/include/linux/coresight.h
+@@ -40,6 +40,7 @@ enum coresight_dev_type {
+ 	CORESIGHT_DEV_TYPE_LINK,
+ 	CORESIGHT_DEV_TYPE_LINKSINK,
+ 	CORESIGHT_DEV_TYPE_SOURCE,
++	CORESIGHT_DEV_TYPE_HELPER,
+ };
+ 
+ enum coresight_dev_subtype_sink {
+@@ -62,6 +63,10 @@ enum coresight_dev_subtype_source {
+ 	CORESIGHT_DEV_SUBTYPE_SOURCE_SOFTWARE,
+ };
+ 
++enum coresight_dev_subtype_helper {
++	CORESIGHT_DEV_SUBTYPE_HELPER_NONE,
++};
++
+ /**
+  * union coresight_dev_subtype - further characterisation of a type
+  * @sink_subtype:	type of sink this component is, as defined
+@@ -70,6 +75,8 @@ enum coresight_dev_subtype_source {
+  *			by @coresight_dev_subtype_link.
+  * @source_subtype:	type of source this component is, as defined
+  *			by @coresight_dev_subtype_source.
++ * @helper_subtype:	type of helper this component is, as defined
++ *			by @coresight_dev_subtype_helper.
+  */
+ union coresight_dev_subtype {
+ 	/* We have some devices which acts as LINK and SINK */
+@@ -78,6 +85,7 @@ union coresight_dev_subtype {
+ 		enum coresight_dev_subtype_link link_subtype;
+ 	};
+ 	enum coresight_dev_subtype_source source_subtype;
++	enum coresight_dev_subtype_helper helper_subtype;
+ };
+ 
+ /**
+@@ -172,6 +180,7 @@ struct coresight_device {
+ #define source_ops(csdev)	csdev->ops->source_ops
+ #define sink_ops(csdev)		csdev->ops->sink_ops
+ #define link_ops(csdev)		csdev->ops->link_ops
++#define helper_ops(csdev)	csdev->ops->helper_ops
+ 
+ /**
+  * struct coresight_ops_sink - basic operations for a sink
+@@ -231,10 +240,25 @@ struct coresight_ops_source {
+ 			struct perf_event *event);
+ };
+ 
++/**
++ * struct coresight_ops_helper - Operations for a helper device.
++ *
++ * All operations could pass in a device specific data, which could
++ * help the helper device to determine what to do.
++ *
++ * @enable	: Enable the device
++ * @disable	: Disable the device
++ */
++struct coresight_ops_helper {
++	int (*enable)(struct coresight_device *csdev, void *data);
++	int (*disable)(struct coresight_device *csdev, void *data);
++};
++
+ struct coresight_ops {
+ 	const struct coresight_ops_sink *sink_ops;
+ 	const struct coresight_ops_link *link_ops;
+ 	const struct coresight_ops_source *source_ops;
++	const struct coresight_ops_helper *helper_ops;
+ };
+ 
+ #ifdef CONFIG_CORESIGHT
+-- 
+2.7.4
