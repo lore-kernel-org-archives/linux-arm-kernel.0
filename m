@@ -1,37 +1,56 @@
-From: joe@perches.com (Joe Perches)
-Date: Thu, 28 Jun 2018 04:04:24 -0700
-Subject: [PATCH v2 2/5] net: emaclite: Simplify if-else statements
-In-Reply-To: <1530171584-20673-3-git-send-email-radhey.shyam.pandey@xilinx.com>
-References: <1530171584-20673-1-git-send-email-radhey.shyam.pandey@xilinx.com>
- <1530171584-20673-3-git-send-email-radhey.shyam.pandey@xilinx.com>
-Message-ID: <fc15913c3800923ef35e9db9508cbb9f67d0525f.camel@perches.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 28 Jun 2018 12:12:04 +0100
+Subject: [PATCH v3 01/17] platform-msi: allow creation of MSI domain
+ without interrupt number
+In-Reply-To: <20180622151432.1566-2-miquel.raynal@bootlin.com>
+References: <20180622151432.1566-1-miquel.raynal@bootlin.com>
+ <20180622151432.1566-2-miquel.raynal@bootlin.com>
+Message-ID: <c5b38c34-5ba0-6545-3635-45be1858fa3b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2018-06-28 at 13:09 +0530, Radhey Shyam Pandey wrote:
-> Remove else as it is not required with if doing a return.
-> Fixes below checkpatch warning.
-[]
-> diff --git a/drivers/net/ethernet/xilinx/xilinx_emaclite.c b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
-[]
-> @@ -1052,13 +1051,13 @@ static bool get_bool(struct platform_device *ofdev, const char *s)
->  {
->  	u32 *p = (u32 *)of_get_property(ofdev->dev.of_node, s, NULL);
+On 22/06/18 16:14, Miquel Raynal wrote:
+> platform_msi_alloc_priv_data() checks that a number of interrupts is
+> always given. This extra-check has no real impact and just prevents
+> uselessly the user to create an MSI tree domain: remove it.
+> 
+> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+> ---
+>  drivers/base/platform-msi.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/base/platform-msi.c b/drivers/base/platform-msi.c
+> index 60d6cc618f1c..9f001f4ccc0f 100644
+> --- a/drivers/base/platform-msi.c
+> +++ b/drivers/base/platform-msi.c
+> @@ -203,7 +203,7 @@ platform_msi_alloc_priv_data(struct device *dev, unsigned int nvec,
+>  	 * accordingly (which would impact the max number of MSI
+>  	 * capable devices).
+>  	 */
+> -	if (!dev->msi_domain || !write_msi_msg || !nvec || nvec > MAX_DEV_MSIS)
+> +	if (!dev->msi_domain || !write_msi_msg || nvec > MAX_DEV_MSIS)
+>  		return ERR_PTR(-EINVAL);
 >  
-> -	if (p) {
-> -		return (bool)*p;
-> -	} else {
-> +	if (!p) {
->  		dev_warn(&ofdev->dev, "Parameter %s not found,"
->  			"defaulting to false\n", s);
+>  	if (dev->msi_domain->bus_token != DOMAIN_BUS_PLATFORM_MSI) {
+> 
 
-Please coalesce the format onto a single line
-and add the missing space after the comma.
+Huh... It's not that simple.
 
->  		return false;
->  	}
-> +
-> +	return (bool)*p;
->  }
->  
->  static const struct net_device_ops xemaclite_netdev_ops;
+Yes, it allows you to get a tree via platform_msi_create_device_domain
+(assuming that's why you're changing it -- your commit message doesn't
+say much) but it also has some impact on the way msi_domain_prepare_irqs
+works (see how it is called from platform_msi_create_device_domain).
+
+Importantly, the msi_prepare callback takes nvec as a parameter, and
+that ends up trickling down to the irqchip, or whatever will setup the
+MSI domain. Things like the GICv3 ITS do rely on that to carve out the
+LPI space that subsequently gets used to populate the domain.
+
+So no, you can't do it like that. If you really want a tree, add a
+helper that does so.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
