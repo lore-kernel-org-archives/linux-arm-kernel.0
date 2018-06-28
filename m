@@ -1,87 +1,66 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 28 Jun 2018 15:00:32 +0800
-Subject: [linux-sunxi] Re: [PATCH v3 15/24] dt-bindings: display:
- sun4i-drm: Add description of A64 HDMI PHY
-In-Reply-To: <1669385.k4L9lni8DF@jernej-laptop>
-References: <20180625120304.7543-1-jernej.skrabec@siol.net>
- <20180625120304.7543-16-jernej.skrabec@siol.net>
- <CAGb2v66ytOrjMOK067URknens34jvYxJ1XoYmGMi4Ji0LYt9sQ@mail.gmail.com>
- <1669385.k4L9lni8DF@jernej-laptop>
-Message-ID: <CAGb2v67iRZZTQuTH8inwmPC6S0BRecFgPEpKrxgThQbsYaZgmQ@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 28 Jun 2018 09:01:42 +0200
+Subject: [PATCH v4 00/17] khwasan: kernel hardware assisted address
+ sanitizer
+In-Reply-To: <CAN=P9pivApAo76Kjc0TUDE0kvJn0pET=47xU6e=ioZV2VqO0Rg@mail.gmail.com>
+References: <cover.1530018818.git.andreyknvl@google.com>
+ <20180627160800.3dc7f9ee41c0badbf7342520@linux-foundation.org>
+ <CAN=P9pivApAo76Kjc0TUDE0kvJn0pET=47xU6e=ioZV2VqO0Rg@mail.gmail.com>
+Message-ID: <CAMuHMdVVutxU3paxcjsuLVjCuooHqs61o0DEySkOK1zUeMj2tw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 28, 2018 at 12:51 PM, Jernej ?krabec
-<jernej.skrabec@siol.net> wrote:
-> Dne ?etrtek, 28. junij 2018 ob 04:19:55 CEST je Chen-Yu Tsai napisal(a):
->> On Mon, Jun 25, 2018 at 8:02 PM, Jernej Skrabec <jernej.skrabec@siol.net>
-> wrote:
->> > A64 HDMI PHY is similar to H3 HDMI PHY except it has two possible PLL
->> > clock parents. It is compatible to other HDMI PHYs, like that found in
->> > R40.
->> >
->> > Acked-by: Rob Herring <robh@kernel.org>
->> > Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
->> > ---
->> >
->> >  Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 4 +++-
->> >  1 file changed, 3 insertions(+), 1 deletion(-)
->> >
->> > diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
->> > b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt index
->> > 84fe38dbb900..dc83f21ef188 100644
->> > --- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
->> > +++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
->> > @@ -101,6 +101,7 @@ DWC HDMI PHY
->> >
->> >  Required properties:
->> >    - compatible: value must be one of:
->> > +    * allwinner,sun50i-a64-hdmi-phy
->> >
->> >      * allwinner,sun8i-a83t-hdmi-phy
->> >      * allwinner,sun8i-h3-hdmi-phy
->>
->> Nit: the list is sorted by family first, then SoC name, so it should
->> be the last on the list.
->
-> I went alphabetically, since "5" is before "8"...
+Hi Kostya,
 
-I see. I think version sort applies here, given that sun50i is newer
-than sun8i.
+On Thu, Jun 28, 2018 at 2:04 AM Kostya Serebryany <kcc@google.com> wrote:
+> On Wed, Jun 27, 2018 at 4:08 PM Andrew Morton <akpm@linux-foundation.org> wrote:
+> > On Tue, 26 Jun 2018 15:15:10 +0200 Andrey Konovalov <andreyknvl@google.com> wrote:
+> > > This patchset adds a new mode to KASAN [1], which is called KHWASAN
+> > > (Kernel HardWare assisted Address SANitizer).
+> > >
+> > > The plan is to implement HWASan [2] for the kernel with the incentive,
+> > > that it's going to have comparable to KASAN performance, but in the same
+> > > time consume much less memory, trading that off for somewhat imprecise
+> > > bug detection and being supported only for arm64.
+> >
+> > Why do we consider this to be a worthwhile change?
+> >
+> > Is KASAN's memory consumption actually a significant problem?  Some
+> > data regarding that would be very useful.
+>
+> On mobile, ASAN's and KASAN's memory usage is a significant problem.
+> Not sure if I can find scientific evidence of that.
+> CC-ing Vishwath Mohan who deals with KASAN on Android to provide
+> anecdotal evidence.
+>
+> There are several other benefits too:
+> * HWASAN more reliably detects non-linear-buffer-overflows compared to
+> ASAN (same for kernel-HWASAN vs kernel-ASAN)
+> * Same for detecting use-after-free (since HWASAN doesn't rely on quarantine).
+> * Much easier to implement stack-use-after-return detection (which
+> IIRC KASAN doesn't have yet, because in KASAN it's too hard)
+>
+> > If it is a large problem then we still have that problem on x86, so the
+> > problem remains largely unsolved?
+>
+> The problem is more significant on mobile devices than on desktop/server.
+> I'd love to have [K]HWASAN on x86_64 as well, but it's less trivial since x86_64
+> doesn't have an analog of aarch64's top-byte-ignore hardware feature.
 
-ChenYu
+This depends on your mobile devices and desktops and servers.
+There exist mobile devices with more memory than some desktops or servers.
 
-> Best regards,
-> Jernej
->
->>
->> Otherwise,
->>
->> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
->>
->> >    - reg: base address and size of memory-mapped region
->> >
->> > @@ -111,8 +112,9 @@ Required properties:
->> >    - resets: phandle to the reset controller driving the PHY
->> >    - reset-names: must be "phy"
->> >
->> > -H3 HDMI PHY requires additional clock:
->> >
->> > +H3 and A64 HDMI PHY require additional clocks:
->> >    - pll-0: parent of phy clock
->> >
->> > +  - pll-1: second possible phy clock parent (A64 only)
->> >
->> >  TV Encoder
->> >  ----------
->> >
->> > --
->> > 2.18.0
->
->
->
->
-> --
-> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
+So actual numbers (O(KiB)? O(MiB)? O(GiB)?) would be nice to have.
+
+Thanks!
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+-- 
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
