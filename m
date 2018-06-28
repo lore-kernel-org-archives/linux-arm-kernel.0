@@ -1,170 +1,40 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 28 Jun 2018 14:43:39 -0600
-Subject: [PATCH v3 1/6] driver core: allow stopping deferred probe after init
+Date: Thu, 28 Jun 2018 14:43:40 -0600
+Subject: [PATCH v3 2/6] dt-bindings: pinctrl: add a 'pinctrl-use-default'
+ property
 In-Reply-To: <20180628204344.13973-1-robh@kernel.org>
 References: <20180628204344.13973-1-robh@kernel.org>
-Message-ID: <20180628204344.13973-2-robh@kernel.org>
+Message-ID: <20180628204344.13973-3-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Deferred probe will currently wait forever on dependent devices to probe,
-but sometimes a driver will never exist. It's also not always critical for
-a driver to exist. Platforms can rely on default configuration from the
-bootloader or reset defaults for things such as pinctrl and power domains.
-This is often the case with initial platform support until various drivers
-get enabled. There's at least 2 scenarios where deferred probe can render
-a platform broken. Both involve using a DT which has more devices and
-dependencies than the kernel supports. The 1st case is a driver may be
-disabled in the kernel config. The 2nd case is the kernel version may
-simply not have the dependent driver. This can happen if using a newer DT
-(provided by firmware perhaps) with a stable kernel version. Deferred
-probe issues can be difficult to debug especially if the console has
-dependencies or userspace fails to boot to a shell.
+Pin setup may be optional in some cases such as the reset default works
+or the pin setup is done by the bootloader. In these cases, it is optional
+for the OS to support managing the pin controller and pin setup. In order
+to support this scenario, add a property 'pinctrl-use-default' to indicate
+that the pin configuration is optional.
 
-There are also cases like IOMMUs where only built-in drivers are
-supported, so deferring probe after initcalls is not needed. The IOMMU
-subsystem implemented its own mechanism to handle this using OF_DECLARE
-linker sections.
-
-This commit adds makes ending deferred probe conditional on initcalls
-being completed or a debug timeout. Subsystems or drivers may opt-in by
-calling driver_deferred_probe_check_init_done() instead of
-unconditionally returning -EPROBE_DEFER. They may use additional
-information from DT or kernel's config to decide whether to continue to
-defer probe or not.
-
-The timeout mechanism is intended for debug purposes and WARNs loudly.
-The remaining deferred probe pending list will also be dumped after the
-timeout. Not that this timeout won't work for the console which needs
-to be enabled before userspace starts. However, if the console's
-dependencies are resolved, then the kernel log will be printed (as
-opposed to no output).
-
-Cc: Alexander Graf <agraf@suse.de>
 Signed-off-by: Rob Herring <robh@kernel.org>
 ---
-v3:
-- Merged with timeout patch.
-- Clarify that deferred_probe_timeout is a debug option.
-- Drop the 'optional' param. The only user was pinctrl, so it has to handle
-  that functionality.
-- Rename function to driver_deferred_probe_check_state
-- Added kerneldoc for driver_deferred_probe_check_state
-- Print a 1 line warning if stopping deferred probe after initcalls and a
-  WARN on timeout.
+ .../devicetree/bindings/pinctrl/pinctrl-bindings.txt        | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
- .../admin-guide/kernel-parameters.txt         |  9 +++
- drivers/base/dd.c                             | 57 +++++++++++++++++++
- include/linux/device.h                        |  2 +
- 3 files changed, 68 insertions(+)
-
-diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
-index efc7aa7a0670..e83ef4648ea4 100644
---- a/Documentation/admin-guide/kernel-parameters.txt
-+++ b/Documentation/admin-guide/kernel-parameters.txt
-@@ -804,6 +804,15 @@
- 			Defaults to the default architecture's huge page size
- 			if not specified.
-
-+	deferred_probe_timeout=
-+			[KNL] Debugging option to set a timeout in seconds for
-+			deferred probe to give up waiting on dependencies to
-+			probe. Only specific dependencies (subsystems or
-+			drivers) that have opted in will be ignored. A timeout of 0
-+			will timeout at the end of initcalls. This option will also
-+			dump out devices still on the deferred probe list after
-+			retrying.
+diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
+index ad9bbbba36e9..cef2b5855d60 100644
+--- a/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
++++ b/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
+@@ -103,6 +103,12 @@ Optional properties:
+ #pinctrl-cells:	Number of pin control cells in addition to the index within the
+ 		pin controller device instance
+ 
++pinctrl-use-default: Boolean. Indicates that the OS can use the boot default
++		pin configuration. This allows using an OS that does not have a
++		driver for the pin controller. This property can be set either
++		globally for the pin controller or in child nodes for individual
++		pin group control.
 +
- 	dhash_entries=	[KNL]
- 			Set number of hash buckets for dentry cache.
-
-diff --git a/drivers/base/dd.c b/drivers/base/dd.c
-index 1435d7281c66..f0bc73a71a25 100644
---- a/drivers/base/dd.c
-+++ b/drivers/base/dd.c
-@@ -224,6 +224,51 @@ void device_unblock_probing(void)
- 	driver_deferred_probe_trigger();
- }
-
-+static int deferred_probe_timeout = -1;
-+static int __init deferred_probe_timeout_setup(char *str)
-+{
-+	deferred_probe_timeout = simple_strtol(str, NULL, 0);
-+	return 1;
-+}
-+__setup("deferred_probe_timeout=", deferred_probe_timeout_setup);
-+
-+/**
-+ * driver_deferred_probe_check_state() - Check deferred probe state
-+ * @dev: device to check
-+ *
-+ * Returns -ENODEV if init is done and all built-in drivers have had a chance
-+ * to probe (i.e. initcalls are done), -ETIMEDOUT if deferred probe debug
-+ * timeout has expired, or -EPROBE_DEFER if none of those conditions are met.
-+ *
-+ * Drivers or subsystems can opt-in to calling this function instead of directly
-+ * returning -EPROBE_DEFER.
-+ */
-+int driver_deferred_probe_check_state(struct device *dev)
-+{
-+	if (initcalls_done) {
-+		if (!deferred_probe_timeout) {
-+			dev_WARN(dev, "deferred probe timeout, ignoring dependency");
-+			return -ETIMEDOUT;
-+		}
-+		dev_warn(dev, "ignoring dependency for device, assuming no driver");
-+		return -ENODEV;
-+	}
-+	return -EPROBE_DEFER;
-+}
-+
-+static void deferred_probe_timeout_work_func(struct work_struct *work)
-+{
-+	struct device_private *private, *p;
-+
-+	deferred_probe_timeout = 0;
-+	driver_deferred_probe_trigger();
-+	flush_work(&deferred_probe_work);
-+
-+	list_for_each_entry_safe(private, p, &deferred_probe_pending_list, deferred_probe)
-+		dev_info(private->device, "deferred probe pending");
-+}
-+static DECLARE_DELAYED_WORK(deferred_probe_timeout_work, deferred_probe_timeout_work_func);
-+
- /**
-  * deferred_probe_initcall() - Enable probing of deferred devices
-  *
-@@ -238,6 +283,18 @@ static int deferred_probe_initcall(void)
- 	/* Sort as many dependencies as possible before exiting initcalls */
- 	flush_work(&deferred_probe_work);
- 	initcalls_done = true;
-+
-+	/*
-+	 * Trigger deferred probe again, this time we won't defer anything
-+	 * that is optional
-+	 */
-+	driver_deferred_probe_trigger();
-+	flush_work(&deferred_probe_work);
-+
-+	if (deferred_probe_timeout > 0) {
-+		schedule_delayed_work(&deferred_probe_timeout_work,
-+			deferred_probe_timeout * HZ);
-+	}
- 	return 0;
- }
- late_initcall(deferred_probe_initcall);
-diff --git a/include/linux/device.h b/include/linux/device.h
-index 055a69dbcd18..b6d8e0a09ad9 100644
---- a/include/linux/device.h
-+++ b/include/linux/device.h
-@@ -339,6 +339,8 @@ struct device *driver_find_device(struct device_driver *drv,
- 				  struct device *start, void *data,
- 				  int (*match)(struct device *dev, void *data));
-
-+int driver_deferred_probe_check_state(struct device *dev);
-+
- /**
-  * struct subsys_interface - interfaces to device functions
-  * @name:       name of the device function
---
+ Pin controller devices should contain the pin configuration nodes that client
+ devices reference.
+ 
+-- 
 2.17.1
