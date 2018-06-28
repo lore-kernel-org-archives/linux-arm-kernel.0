@@ -1,84 +1,113 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 28 Jun 2018 02:06:55 -0700
-Subject: v4.18-rc1 on droid 4: very bad CPU performance
-In-Reply-To: <20180627205834.GB29478@amd>
-References: <20180621121542.GA4836@amd> <20180622072005.GF112168@atomide.com>
- <20180622074936.GG112168@atomide.com> <20180627205834.GB29478@amd>
-Message-ID: <20180628090655.GL112168@atomide.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Thu, 28 Jun 2018 11:11:35 +0200
+Subject: [PATCH 4/5] x86: jump_label: switch to jump_entry accessors
+In-Reply-To: <20180627160604.8154-5-ard.biesheuvel@linaro.org>
+References: <20180627160604.8154-1-ard.biesheuvel@linaro.org>
+ <20180627160604.8154-5-ard.biesheuvel@linaro.org>
+Message-ID: <20180628091135.GB2494@hirez.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Pavel Machek <pavel@ucw.cz> [180627 21:01]:
-> On Fri 2018-06-22 00:49:36, Tony Lindgren wrote:
-> > * Tony Lindgren <tony@atomide.com> [180622 07:22]:
-> > > * Pavel Machek <pavel@ucw.cz> [180621 12:18]:
-> > > > Hi!
-> > > > 
-> > > > V4.18 is slower than it should be.
-> > > > 
-> > > > user at devuan:~$ time cat /dev/urandom | head -c 10000000 |  bzip2 -9 -
-> > > > | wc -c
-> > > > 10044291
-> > > > 52.73user 2.40system 61.53 (1m1.534s) elapsed 89.60%CPU
-> > > > user at devuan:~$ uname -a
-> > > > Linux devuan 4.18.0-rc1-87964-gfa19934-dirty #743 SMP Sun Jun 17
-> > > > 19:26:37 CEST 2018 armv7l GNU/Linux
-> > > > 
-> > > > That bzip should take 12 seconds, not minute.
-> > > > 
-> > > > Any ideas? Do you see it, too?
-> > > 
-> > > I've noticed firefox is super slow.. Git bisect time?
-> > 
-> > Hmm not happening for me at least on duovero and droid4,
-> > I'm getting about 20s for v4.17 and v4.18-rc1.
+On Wed, Jun 27, 2018 at 06:06:03PM +0200, Ard Biesheuvel wrote:
+> In preparation of switching x86 to use place-relative references for
+> the code, target and key members of struct jump_entry, replace direct
+> references to the struct members with invocations of the new accessors.
+> This will allow us to make the switch by modifying the accessors only.
 > 
-> Okay, so I know what was wrong with my config. I had l2cache disabled
-> -- and this solved it:
-> 
-> +CONFIG_OUTER_CACHE=y
-> +CONFIG_OUTER_CACHE_SYNC=y
-> +CONFIG_CACHE_L2X0=y
-> +CONFIG_PL310_ERRATA_588369=y
-> +CONFIG_PL310_ERRATA_727915=y
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-We have these in omap2plus_defconfig.
+That just makes horrible code worse.. can't we do something like so
+instead?
 
-> +CONFIG_PL310_ERRATA_753970=y
-> +CONFIG_PL310_ERRATA_769419=y
 
-These two should not be needed from what I recall. Have not
-checked against processor revisions or errata though. But
-I verified that my duovero time stays at 21 seconds also
-with these enabled. It seems to run at 600MHz so it's slower
-compared to droid4.
-
-> Now I'm at 12 seconds.
-> 
-> user at devuan:~$ time cat /dev/urandom | head -c 10000000 |  bzip2 -9 - | wc -c
-> 10043993
-> 11.41user 0.44system 11.63 (0m11.637s) elapsed 101.97%CPU
-> user at devuan:~$ uname -a
-> Linux devuan 4.18.0-rc2-88315-g3452793-dirty #756 SMP Wed Jun 27 22:16:59 CEST 2018 armv7l GNU/Linux
-> user at devuan:~$
-> 
-> I was about to add "facepalm" emoji here, as disabling l2 cache is
-> major mistake. OTOH if you also see 20 seconds, then either there is
-> another problem, or you need to enable l2 cache, too (and I don't have
-> to feel too bad for misconfiguring it).
-
-OK. I checked and duovero runs only at 600MHz. I can only
-get down to 19 seconds with omap2plus_defconfig if I disable
-CONFIG_CPU_FREQ so the max speed is maintained from bootloader.
-Otherwise it runs at most at 1GHz, I think any higher speeds
-need smartreflex and voltage scaling working which we don't
-have in the mainline kernel. Not sure what happens with higher
-speeds with mainline kernel or if they are unsafe in the long
-run.
-
-Anyways, care to post your .config somewhere so I can see what
-the numbers are for me with it?
-
-Regards,
-
-Tony
+--- a/arch/x86/kernel/jump_label.c
++++ b/arch/x86/kernel/jump_label.c
+@@ -42,52 +42,37 @@ static void __jump_label_transform(struc
+ 				   void *(*poker)(void *, const void *, size_t),
+ 				   int init)
+ {
+-	union jump_code_union code;
++	union jump_code_union jmp = {
++		{ .jump = 0xe9,
++		  .offset = jump_entry_target(entry) -
++			    (jump_entry_code(entry) + JUMP_LABEL_NOP_SIZE), }
++	};
+ 	const unsigned char default_nop[] = { STATIC_KEY_INIT_NOP };
+ 	const unsigned char *ideal_nop = ideal_nops[NOP_ATOMIC5];
++	const unsigned char *expect, *code;
++	int line;
+ 
+ 	if (type == JUMP_LABEL_JMP) {
+ 		if (init) {
+-			/*
+-			 * Jump label is enabled for the first time.
+-			 * So we expect a default_nop...
+-			 */
+-			if (unlikely(memcmp((void *)entry->code, default_nop, 5)
+-				     != 0))
+-				bug_at((void *)entry->code, __LINE__);
++			expect = default_nop; line = __LINE__;
+ 		} else {
+-			/*
+-			 * ...otherwise expect an ideal_nop. Otherwise
+-			 * something went horribly wrong.
+-			 */
+-			if (unlikely(memcmp((void *)entry->code, ideal_nop, 5)
+-				     != 0))
+-				bug_at((void *)entry->code, __LINE__);
++			expect = ideal_nop; line = __LINE__;
+ 		}
+ 
+-		code.jump = 0xe9;
+-		code.offset = entry->target -
+-				(entry->code + JUMP_LABEL_NOP_SIZE);
++		code = &jmp.code;
+ 	} else {
+-		/*
+-		 * We are disabling this jump label. If it is not what
+-		 * we think it is, then something must have gone wrong.
+-		 * If this is the first initialization call, then we
+-		 * are converting the default nop to the ideal nop.
+-		 */
+ 		if (init) {
+-			if (unlikely(memcmp((void *)entry->code, default_nop, 5) != 0))
+-				bug_at((void *)entry->code, __LINE__);
++			expect = default_nop; line = __LINE__;
+ 		} else {
+-			code.jump = 0xe9;
+-			code.offset = entry->target -
+-				(entry->code + JUMP_LABEL_NOP_SIZE);
+-			if (unlikely(memcmp((void *)entry->code, &code, 5) != 0))
+-				bug_at((void *)entry->code, __LINE__);
++			expect = &jmp.code; line = __LINE__;
+ 		}
+-		memcpy(&code, ideal_nops[NOP_ATOMIC5], JUMP_LABEL_NOP_SIZE);
++
++		code = ideal_nop;
+ 	}
+ 
++	if (memcmp((void *)jump_entry_code(entry), expect, JUMP_LABEL_NOP_SIZE))
++		bug_at((void *)jump_entry_code(entry), line);
++
+ 	/*
+ 	 * Make text_poke_bp() a default fallback poker.
+ 	 *
+@@ -96,11 +81,13 @@ static void __jump_label_transform(struc
+ 	 * always nop being the 'currently valid' instruction
+ 	 *
+ 	 */
+-	if (poker)
+-		(*poker)((void *)entry->code, &code, JUMP_LABEL_NOP_SIZE);
+-	else
+-		text_poke_bp((void *)entry->code, &code, JUMP_LABEL_NOP_SIZE,
+-			     (void *)entry->code + JUMP_LABEL_NOP_SIZE);
++	if (poker) {
++		(*poker)((void *)jump_entry_code(entry), &code, JUMP_LABEL_NOP_SIZE);
++		return;
++	}
++
++	text_poke_bp((void *)jump_entry_code(entry), &code, JUMP_LABEL_NOP_SIZE,
++		     (void *)jump_entry_code(entry) + JUMP_LABEL_NOP_SIZE);
+ }
+ 
+ void arch_jump_label_transform(struct jump_entry *entry,
