@@ -1,76 +1,32 @@
 From: james.morse@arm.com (James Morse)
-Date: Thu, 28 Jun 2018 18:28:32 +0100
-Subject: [PATCH v2 4/4] arm64: acpi: fix alignment fault in accessing ACPI
-In-Reply-To: <20180619064424.6642-5-takahiro.akashi@linaro.org>
+Date: Thu, 28 Jun 2018 18:29:17 +0100
+Subject: [PATCH v2 2/4] efi/arm: map UEFI memory map even w/o runtime
+ services enabled
+In-Reply-To: <20180619064424.6642-3-takahiro.akashi@linaro.org>
 References: <20180619064424.6642-1-takahiro.akashi@linaro.org>
- <20180619064424.6642-5-takahiro.akashi@linaro.org>
-Message-ID: <a8d309e0-4918-9e02-670e-4a67245274d7@arm.com>
+ <20180619064424.6642-3-takahiro.akashi@linaro.org>
+Message-ID: <d910258e-b332-36f3-4024-ed9ab48af278@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Akashi,
 
 On 19/06/18 07:44, AKASHI Takahiro wrote:
-> This is a fix against the issue that crash dump kernel may hang up
-> during booting, which can happen on any ACPI-based system with "ACPI
-> Reclaim Memory."
-> 
-> (kernel messages after panic kicked off kdump)
-> 	   (snip...)
-> 	Bye!
-> 	   (snip...)
-> 	ACPI: Core revision 20170728
-> 	pud=000000002e7d0003, *pmd=000000002e7c0003, *pte=00e8000039710707
-> 	Internal error: Oops: 96000021 [#1] SMP
-> 	Modules linked in:
-> 	CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.14.0-rc6 #1
-> 	task: ffff000008d05180 task.stack: ffff000008cc0000
-> 	PC is at acpi_ns_lookup+0x25c/0x3c0
-> 	LR is at acpi_ds_load1_begin_op+0xa4/0x294
-> 	   (snip...)
-> 	Process swapper/0 (pid: 0, stack limit = 0xffff000008cc0000)
-> 	Call trace:
-> 	   (snip...)
-> 	[<ffff0000084a6764>] acpi_ns_lookup+0x25c/0x3c0
-> 	[<ffff00000849b4f8>] acpi_ds_load1_begin_op+0xa4/0x294
-> 	[<ffff0000084ad4ac>] acpi_ps_build_named_op+0xc4/0x198
-> 	[<ffff0000084ad6cc>] acpi_ps_create_op+0x14c/0x270
-> 	[<ffff0000084acfa8>] acpi_ps_parse_loop+0x188/0x5c8
-> 	[<ffff0000084ae048>] acpi_ps_parse_aml+0xb0/0x2b8
-> 	[<ffff0000084a8e10>] acpi_ns_one_complete_parse+0x144/0x184
-> 	[<ffff0000084a8e98>] acpi_ns_parse_table+0x48/0x68
-> 	[<ffff0000084a82cc>] acpi_ns_load_table+0x4c/0xdc
-> 	[<ffff0000084b32f8>] acpi_tb_load_namespace+0xe4/0x264
-> 	[<ffff000008baf9b4>] acpi_load_tables+0x48/0xc0
-> 	[<ffff000008badc20>] acpi_early_init+0x9c/0xd0
-> 	[<ffff000008b70d50>] start_kernel+0x3b4/0x43c
-> 	Code: b9008fb9 2a000318 36380054 32190318 (b94002c0)
-> 	---[ end trace c46ed37f9651c58e ]---
-> 	Kernel panic - not syncing: Fatal exception
-> 	Rebooting in 10 seconds..
-> 
-> (diagnosis)
-> * This fault is a data abort, alignment fault (ESR=0x96000021)
->   during reading out ACPI table.
-> * Initial ACPI tables are normally stored in system ram and marked as
->   "ACPI Reclaim memory" by the firmware.
-> * After the commit f56ab9a5b73c ("efi/arm: Don't mark ACPI reclaim
->   memory as MEMBLOCK_NOMAP"), those regions are differently handled
->   as they are "memblock-reserved", without NOMAP bit.
-> * So they are now excluded from device tree's "usable-memory-range"
->   which kexec-tools determines based on a current view of /proc/iomem.
-> * When crash dump kernel boots up, it tries to accesses ACPI tables by
->   mapping them with ioremap(), not ioremap_cache(), in acpi_os_ioremap()
->   since they are no longer part of mapped system ram.
-> * Given that ACPI accessor/helper functions are compiled in without
->   unaligned access support (ACPI_MISALIGNMENT_NOT_SUPPORTED),
->   any unaligned access to ACPI tables can cause a fatal panic.
-> 
-> With this patch, acpi_os_ioremap() always honors memory attribute
-> information provided by the firmware (EFI) and retaining cacheability
-> allows the kernel safe access to ACPI tables.
+> Under the current implementation, UEFI memory map will be mapped and made
+> available in virtual mappings only if runtime services are enabled.
 
-Reviewed-by: James Morse <james.morse@arm.com>
+> But in a later patch, we want to use UEFI memory map in acpi_os_ioremap()
+> to create mappings of ACPI tables using memory attributes described in
+> UEFI memory map.
+> 
+> So, as a first step, arm_enter_runtime_services() will be modified
+> so that UEFI memory map will be always accessible.
+> 
+> See a relevant commit:
+>     arm64: acpi: fix alignment fault in accessing ACPI tables
+
+For what its worth:
+Acked-by: James Morse <james.morse@arm.com>
 
 
 Thanks,
