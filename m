@@ -1,71 +1,97 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 28 Jun 2018 15:58:41 -0700
-Subject: [PATCH 3/3] arm64: dts: qcom: pm8998: Add thermal zone
-In-Reply-To: <20180628210915.160893-3-mka@chromium.org>
-References: <20180628210915.160893-1-mka@chromium.org>
- <20180628210915.160893-3-mka@chromium.org>
-Message-ID: <CAD=FV=Wo4wc_QZYr0a2_Ge=B6T4RNJDnOyxAd8r6sT4iZJjCKg@mail.gmail.com>
+From: joel@jms.id.au (Joel Stanley)
+Date: Fri, 29 Jun 2018 08:45:40 +0930
+Subject: [PATCH] clk: aspeed: Support HPLL strapping on ast2400
+Message-ID: <20180628231540.26633-1-joel@jms.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The HPLL can be configured through a register (SCU24), however some
+platforms chose to configure it through the strapping settings and do
+not use the register. This was not noticed as the logic for bit 18 in
+SCU24 was confused: set means programmed, but the driver read it as set
+means strapped.
 
-On Thu, Jun 28, 2018 at 2:09 PM, Matthias Kaehlcke <mka@chromium.org> wrote:
-> Add pm8998 thermal zone based on the examples in the spmi-temp-alarm
-> bindings.
->
-> Note: devices with the pm8998 need to have a 'thermal-zones' node (which
-> may be empty) with a label 'thermal_zones'.
->
-> Signed-off-by: Matthias Kaehlcke <mka@chromium.org>
-> ---
->  arch/arm64/boot/dts/qcom/pm8998.dtsi | 28 ++++++++++++++++++++++++++++
->  1 file changed, 28 insertions(+)
+This gives us the correct HPLL value on Palmetto systems, from which
+most of the peripheral clocks are generated.
 
-Do you know if this patch actually does anything since you didn't
-define a cooling-maps?  Hopefully at least the critical shuts things
-down?
+Fixes: 5eda5d79e4be ("clk: Add clock driver for ASPEED BMC SoCs")
+Cc: stable at vger.kernel.org # v4.15
+Reviewed-by: C?dric Le Goater <clg@kaod.org>
+Signed-off-by: Joel Stanley <joel@jms.id.au>
+---
+ drivers/clk/clk-aspeed.c | 42 +++++++++++++++++++++++++++-------------
+ 1 file changed, 29 insertions(+), 13 deletions(-)
 
-Do you have any idea how we'll eventually want to specify a
-cooling-maps?  Are we just going to assume we're included by an sdm845
-device and refer to the big/little CPU phandles?
-
-
-> diff --git a/arch/arm64/boot/dts/qcom/pm8998.dtsi b/arch/arm64/boot/dts/qcom/pm8998.dtsi
-> index f2d39074ed74..d85ceb4f976b 100644
-> --- a/arch/arm64/boot/dts/qcom/pm8998.dtsi
-> +++ b/arch/arm64/boot/dts/qcom/pm8998.dtsi
-> @@ -3,6 +3,7 @@
->
->  #include <dt-bindings/spmi/spmi.h>
->  #include <dt-bindings/interrupt-controller/irq.h>
-> +#include <dt-bindings/thermal/thermal.h>
->
->  &spmi_bus {
->         pm8998_lsid0: pmic at 0 {
-> @@ -59,3 +60,30 @@
->                 #size-cells = <0>;
->         };
->  };
-> +
-> +&thermal_zones {
-
-As per comments in patch #1, don't rely on a label.  Just put your
-stuff in a top-level "thermal-zones" node.
-
-> +       pm8998 {
-> +               polling-delay-passive = <250>;
-> +               polling-delay = <1000>;
-> +
-> +               thermal-sensors = <&pm8998_temp>;
-> +
-> +               trips {
-> +                       passive {
-
-IMO you should proactively put a label on these trips even if there's
-no cooling device yet.  It's expected that at some point someone will
-add a cooling device and refer to them, right?
-
-
-
--Doug
+diff --git a/drivers/clk/clk-aspeed.c b/drivers/clk/clk-aspeed.c
+index 38b366b00c57..2ef4ad7bdbdc 100644
+--- a/drivers/clk/clk-aspeed.c
++++ b/drivers/clk/clk-aspeed.c
+@@ -24,7 +24,7 @@
+ #define ASPEED_MPLL_PARAM	0x20
+ #define ASPEED_HPLL_PARAM	0x24
+ #define  AST2500_HPLL_BYPASS_EN	BIT(20)
+-#define  AST2400_HPLL_STRAPPED	BIT(18)
++#define  AST2400_HPLL_PROGRAMMED BIT(18)
+ #define  AST2400_HPLL_BYPASS_EN	BIT(17)
+ #define ASPEED_MISC_CTRL	0x2c
+ #define  UART_DIV13_EN		BIT(12)
+@@ -565,29 +565,45 @@ builtin_platform_driver(aspeed_clk_driver);
+ static void __init aspeed_ast2400_cc(struct regmap *map)
+ {
+ 	struct clk_hw *hw;
+-	u32 val, freq, div;
++	u32 val, div, clkin, hpll;
++	const u16 hpll_rates[][4] = {
++		{384, 360, 336, 408},
++		{400, 375, 350, 425},
++	};
++	int rate;
+ 
+ 	/*
+ 	 * CLKIN is the crystal oscillator, 24, 48 or 25MHz selected by
+ 	 * strapping
+ 	 */
+ 	regmap_read(map, ASPEED_STRAP, &val);
+-	if (val & CLKIN_25MHZ_EN)
+-		freq = 25000000;
+-	else if (val & AST2400_CLK_SOURCE_SEL)
+-		freq = 48000000;
+-	else
+-		freq = 24000000;
+-	hw = clk_hw_register_fixed_rate(NULL, "clkin", NULL, 0, freq);
+-	pr_debug("clkin @%u MHz\n", freq / 1000000);
++	rate = (val >> 8) & 3;
++	if (val & CLKIN_25MHZ_EN) {
++		clkin = 25000000;
++		hpll = hpll_rates[1][rate];
++	} else if (val & AST2400_CLK_SOURCE_SEL) {
++		clkin = 48000000;
++		hpll = hpll_rates[0][rate];
++	} else {
++		clkin = 24000000;
++		hpll = hpll_rates[0][rate];
++	}
++	hw = clk_hw_register_fixed_rate(NULL, "clkin", NULL, 0, clkin);
++	pr_debug("clkin @%u MHz\n", clkin / 1000000);
+ 
+ 	/*
+ 	 * High-speed PLL clock derived from the crystal. This the CPU clock,
+-	 * and we assume that it is enabled
++	 * and we assume that it is enabled. It can be configured through the
++	 * HPLL_PARAM register, or set to a specified frequency by strapping.
+ 	 */
+ 	regmap_read(map, ASPEED_HPLL_PARAM, &val);
+-	WARN(val & AST2400_HPLL_STRAPPED, "hpll is strapped not configured");
+-	aspeed_clk_data->hws[ASPEED_CLK_HPLL] = aspeed_ast2400_calc_pll("hpll", val);
++	if (val & AST2400_HPLL_PROGRAMMED)
++		hw = aspeed_ast2400_calc_pll("hpll", val);
++	else
++		hw = clk_hw_register_fixed_rate(NULL, "hpll", "clkin", 0,
++				hpll * 1000000);
++
++	aspeed_clk_data->hws[ASPEED_CLK_HPLL] = hw;
+ 
+ 	/*
+ 	 * Strap bits 11:10 define the CPU/AHB clock frequency ratio (aka HCLK)
+-- 
+2.17.1
