@@ -1,80 +1,141 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 28 Jun 2018 15:43:52 -0300
-Subject: [RFC] ARM: dts: imx7s: Fix the port reg properties
-In-Reply-To: <1526306996-25045-1-git-send-email-festevam@gmail.com>
-References: <1526306996-25045-1-git-send-email-festevam@gmail.com>
-Message-ID: <CAOMZO5DPdzQVtSHfp3RtgLPsUi_aTJG7J-OrJpUz0Kk3U86zzQ@mail.gmail.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Thu, 28 Jun 2018 14:28:22 -0400
+Subject: [PATCH V3 2/6] PCI: Hide pci_reset_bridge_secondary_bus() from drivers
+In-Reply-To: <1530210507-9287-1-git-send-email-okaya@codeaurora.org>
+References: <1530210507-9287-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <1530210507-9287-2-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Rename pci_reset_bridge_secondary_bus() to pci_bridge_secondary_bus_reset()
+and move the declartation from linux/pci.h to drivers/pci.h to be used
+internally in PCI directory only.
 
-On Mon, May 14, 2018 at 11:09 AM, Fabio Estevam <festevam@gmail.com> wrote:
-> From: Fabio Estevam <fabio.estevam@nxp.com>
->
-> The 'reg' property must match the unit address, so fix them
-> to avoid the following DTC warnings with W=1:
->
-> arch/arm/boot/dts/imx7d-cl-som-imx7.dtb: Warning (graph_port): /replicator/ports/port at 2: graph node unit address error, expected "0"
-> arch/arm/boot/dts/imx7d-cl-som-imx7.dtb: Warning (graph_port): /soc/funnel at 30041000/ports/port at 2: graph node unit address error, expected "0"
-> arch/arm/boot/dts/imx7d-cl-som-imx7.dtb: Warning (graph_port): /soc/funnel at 30083000/ports/port at 2: graph node unit address error, expected "0"
-> arch/arm/boot/dts/imx7d-cl-som-imx7.dtb: Warning (graph_port): /soc/etf at 30084000/ports/port at 1: graph node unit address error, expected "0"
->
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
-> ---
-> Hi Rob,
->
-> Is this the correct way to fix these warnings?
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+---
+ drivers/pci/hotplug/pciehp_hpc.c |  2 +-
+ drivers/pci/pci.c                | 11 +++++------
+ drivers/pci/pci.h                |  1 +
+ drivers/pci/pcie/aer.c           |  2 +-
+ drivers/pci/pcie/err.c           |  2 +-
+ include/linux/pci.h              |  1 -
+ 6 files changed, 9 insertions(+), 10 deletions(-)
 
-Any suggestions, please? I would like to clean up these dtc warnings.
-
-Thanks
-
-
->
->  arch/arm/boot/dts/imx7s.dtsi | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
-> index 7d33993..55b6241 100644
-> --- a/arch/arm/boot/dts/imx7s.dtsi
-> +++ b/arch/arm/boot/dts/imx7s.dtsi
-> @@ -126,7 +126,7 @@
->
->                         /* replicator input port */
->                         port at 2 {
-> -                               reg = <0>;
-> +                               reg = <2>;
->                                 replicator_in_port0: endpoint {
->                                         slave-mode;
->                                         remote-endpoint = <&etf_out_port>;
-> @@ -183,7 +183,7 @@
->
->                                 /* funnel output port */
->                                 port at 2 {
-> -                                       reg = <0>;
-> +                                       reg = <2>;
->                                         ca_funnel_out_port0: endpoint {
->                                                 remote-endpoint = <&hugo_funnel_in_port0>;
->                                         };
-> @@ -234,7 +234,7 @@
->                                 };
->
->                                 port at 2 {
-> -                                       reg = <0>;
-> +                                       reg = <2>;
->                                         hugo_funnel_out_port0: endpoint {
->                                                 remote-endpoint = <&etf_in_port>;
->                                         };
-> @@ -263,7 +263,7 @@
->                                 };
->
->                                 port at 1 {
-> -                                       reg = <0>;
-> +                                       reg = <1>;
->                                         etf_out_port: endpoint {
->                                                 remote-endpoint = <&replicator_in_port0>;
->                                         };
-> --
-> 2.7.4
->
+diff --git a/drivers/pci/hotplug/pciehp_hpc.c b/drivers/pci/hotplug/pciehp_hpc.c
+index bbaa211..8dae232 100644
+--- a/drivers/pci/hotplug/pciehp_hpc.c
++++ b/drivers/pci/hotplug/pciehp_hpc.c
+@@ -746,7 +746,7 @@ int pciehp_reset_slot(struct slot *slot, int probe)
+ 	if (pciehp_poll_mode)
+ 		del_timer_sync(&ctrl->poll_timer);
+ 
+-	rc = pci_reset_bridge_secondary_bus(ctrl->pcie->port);
++	rc = pci_bridge_secondary_bus_reset(ctrl->pcie->port);
+ 
+ 	pcie_capability_write_word(pdev, PCI_EXP_SLTSTA, stat_mask);
+ 	pcie_write_cmd_nowait(ctrl, ctrl_mask, ctrl_mask);
+diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+index 98d1490..236220c 100644
+--- a/drivers/pci/pci.c
++++ b/drivers/pci/pci.c
+@@ -4224,19 +4224,18 @@ void __weak pcibios_reset_secondary_bus(struct pci_dev *dev)
+ }
+ 
+ /**
+- * pci_reset_bridge_secondary_bus - Reset the secondary bus on a PCI bridge.
++ * pci_bridge_secondary_bus_reset - Reset the secondary bus on a PCI bridge.
+  * @dev: Bridge device
+  *
+  * Use the bridge control register to assert reset on the secondary bus.
+  * Devices on the secondary bus are left in power-on state.
+  */
+-int pci_reset_bridge_secondary_bus(struct pci_dev *dev)
++int pci_bridge_secondary_bus_reset(struct pci_dev *dev)
+ {
+ 	pcibios_reset_secondary_bus(dev);
+ 
+ 	return pci_dev_wait(dev, "bus reset", PCIE_RESET_READY_POLL_MS);
+ }
+-EXPORT_SYMBOL_GPL(pci_reset_bridge_secondary_bus);
+ 
+ static int pci_parent_bus_reset(struct pci_dev *dev, int probe)
+ {
+@@ -4253,7 +4252,7 @@ static int pci_parent_bus_reset(struct pci_dev *dev, int probe)
+ 	if (probe)
+ 		return 0;
+ 
+-	return pci_reset_bridge_secondary_bus(dev->bus->self);
++	return pci_bridge_secondary_bus_reset(dev->bus->self);
+ }
+ 
+ static int pci_reset_hotplug_slot(struct hotplug_slot *hotplug, int probe)
+@@ -4860,7 +4859,7 @@ static int pci_bus_reset(struct pci_bus *bus, int probe)
+ 
+ 	might_sleep();
+ 
+-	ret = pci_reset_bridge_secondary_bus(bus->self);
++	ret = pci_bridge_secondary_bus_reset(bus->self);
+ 
+ 	pci_bus_unlock(bus);
+ 
+@@ -4924,7 +4923,7 @@ int pci_try_reset_bus(struct pci_bus *bus)
+ 
+ 	if (pci_bus_trylock(bus)) {
+ 		might_sleep();
+-		rc = pci_reset_bridge_secondary_bus(bus->self);
++		rc = pci_bridge_secondary_bus_reset(bus->self);
+ 		pci_bus_unlock(bus);
+ 	} else
+ 		rc = -EAGAIN;
+diff --git a/drivers/pci/pci.h b/drivers/pci/pci.h
+index c358e7a0..f784263 100644
+--- a/drivers/pci/pci.h
++++ b/drivers/pci/pci.h
+@@ -33,6 +33,7 @@ int pci_mmap_fits(struct pci_dev *pdev, int resno, struct vm_area_struct *vmai,
+ 		  enum pci_mmap_api mmap_api);
+ 
+ int pci_probe_reset_function(struct pci_dev *dev);
++int pci_bridge_secondary_bus_reset(struct pci_dev *dev);
+ 
+ /**
+  * struct pci_platform_pm_ops - Firmware PM callbacks
+diff --git a/drivers/pci/pcie/aer.c b/drivers/pci/pcie/aer.c
+index f1d0f3e..74ea6ec 100644
+--- a/drivers/pci/pcie/aer.c
++++ b/drivers/pci/pcie/aer.c
+@@ -1314,7 +1314,7 @@ static pci_ers_result_t aer_root_reset(struct pci_dev *dev)
+ 	reg32 &= ~ROOT_PORT_INTR_ON_MESG_MASK;
+ 	pci_write_config_dword(dev, pos + PCI_ERR_ROOT_COMMAND, reg32);
+ 
+-	rc = pci_reset_bridge_secondary_bus(dev);
++	rc = pci_bridge_secondary_bus_reset(dev);
+ 	pci_printk(KERN_DEBUG, dev, "Root Port link has been reset\n");
+ 
+ 	/* Clear Root Error Status */
+diff --git a/drivers/pci/pcie/err.c b/drivers/pci/pcie/err.c
+index 3a62a2e..a3a26f1 100644
+--- a/drivers/pci/pcie/err.c
++++ b/drivers/pci/pcie/err.c
+@@ -177,7 +177,7 @@ static pci_ers_result_t default_reset_link(struct pci_dev *dev)
+ {
+ 	int rc;
+ 
+-	rc = pci_reset_bridge_secondary_bus(dev);
++	rc = pci_bridge_secondary_bus_reset(dev);
+ 	pci_printk(KERN_DEBUG, dev, "downstream link has been reset\n");
+ 	return !rc ? PCI_ERS_RESULT_RECOVERED : PCI_ERS_RESULT_DISCONNECT;
+ }
+diff --git a/include/linux/pci.h b/include/linux/pci.h
+index 340029b..6b12ce2 100644
+--- a/include/linux/pci.h
++++ b/include/linux/pci.h
+@@ -1102,7 +1102,6 @@ int pci_reset_bus(struct pci_bus *bus);
+ int pci_try_reset_bus(struct pci_bus *bus);
+ void pci_reset_secondary_bus(struct pci_dev *dev);
+ void pcibios_reset_secondary_bus(struct pci_dev *dev);
+-int pci_reset_bridge_secondary_bus(struct pci_dev *dev);
+ void pci_update_resource(struct pci_dev *dev, int resno);
+ int __must_check pci_assign_resource(struct pci_dev *dev, int i);
+ int __must_check pci_reassign_resource(struct pci_dev *dev, int i, resource_size_t add_size, resource_size_t align);
+-- 
+2.7.4
