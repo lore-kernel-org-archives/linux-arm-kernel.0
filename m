@@ -1,271 +1,86 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Thu, 28 Jun 2018 11:57:48 +0200
-Subject: [PATCH v3 13/13] ARM: davinci: unduplicate aemif support
-In-Reply-To: <20180628095748.4462-1-brgl@bgdev.pl>
-References: <20180628095748.4462-1-brgl@bgdev.pl>
-Message-ID: <20180628095748.4462-14-brgl@bgdev.pl>
+From: james.morse@arm.com (James Morse)
+Date: Thu, 28 Jun 2018 11:06:00 +0100
+Subject: [PATCH] arm64/acpi: Add fixup for HPE m400 quirks
+In-Reply-To: <257bbf8d90669921cede5b2e7555b9523311b795.camel@redhat.com>
+References: <51d3d738-cdf5-2992-bba5-c3e1f34096c2@infradead.org>
+ <098e6d53-8dc7-439f-7165-adbe0e7c4941@arm.com>
+ <8a3034b9-6cf3-5182-717f-dd1dc8a087aa@infradead.org>
+ <5b03f754-3a98-c01d-3e2a-615a8b1ea537@arm.com>
+ <0cbc68d5-9a8f-1734-4eea-d1f037927137@infradead.org>
+ <cb5aa4ee12422ecc5f6530f3a74bcfa553b42c80.camel@redhat.com>
+ <a59fa0f8-4123-bcd9-670a-8885d34f37ed@arm.com>
+ <0be5ce017286a4ec494e0f0969bb10126b8501ce.camel@redhat.com>
+ <bd5fc825573c3394b80365ad2dc47bde7b22044a.camel@gmail.com>
+ <950b3034-08a8-38b9-b8f9-514d3e2519fa@arm.com>
+ <257bbf8d90669921cede5b2e7555b9523311b795.camel@redhat.com>
+Message-ID: <d1ed8486-077b-6360-9c98-03aff5051762@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+Hi Mark,
 
-All users now register platform devices using the ti-aemif driver.
-Remove the handcrafted aemif API.
+On 26/06/18 21:20, Mark Salter wrote:
+> On Tue, 2018-06-26 at 15:51 +0100, James Morse wrote:
+>> On 25/06/18 16:34, Mark Salter wrote:
+>>> On Fri, 2018-06-22 at 11:19 -0400, Mark Salter wrote:
+>>>> I'm going to hack something to get to the ghes info earlier in boot and
+>>>> check the things you mention above wrt Error Status Block and GHES.0.
+>>>
+>>> So I had to end up instrumenting the EFI stub to see where the error came
+>>> from. At the start of the stub, there is no GHES.2 error. The error first
+>>> shows up after the stub's call to ExitBootServices returns.
+>>
+>> What's the notification type of GHES.2? I'm guessing POLLed or some kind of IRQ.
 
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
----
- arch/arm/mach-davinci/Makefile                |   2 +-
- arch/arm/mach-davinci/aemif.c                 | 218 ------------------
- .../linux/platform_data/mtd-davinci-aemif.h   |   1 -
- 3 files changed, 1 insertion(+), 220 deletions(-)
- delete mode 100644 arch/arm/mach-davinci/aemif.c
+>> These systems don't have EL3, so the CPU must continue running while something
+>> external generates the CPER records. The records being visible is the last point
+>> the faulty-access could have been made, with the window of time depending on how
+>> fast this external-thing receives and processes the error.
+> 
+> There's a System Control Processor (slimpro) on the SoC which can interact with
+> the CPU in various ways and which has access to memory and other hw.
 
-diff --git a/arch/arm/mach-davinci/Makefile b/arch/arm/mach-davinci/Makefile
-index 8725d8bea567..93d271b4d84b 100644
---- a/arch/arm/mach-davinci/Makefile
-+++ b/arch/arm/mach-davinci/Makefile
-@@ -6,7 +6,7 @@
- 
- # Common objects
- obj-y 					:= time.o serial.o usb.o \
--					   common.o sram.o aemif.o
-+					   common.o sram.o
- 
- obj-$(CONFIG_DAVINCI_MUX)		+= mux.o
- 
-diff --git a/arch/arm/mach-davinci/aemif.c b/arch/arm/mach-davinci/aemif.c
-deleted file mode 100644
-index e4ab3f3a2a1f..000000000000
---- a/arch/arm/mach-davinci/aemif.c
-+++ /dev/null
-@@ -1,218 +0,0 @@
--/*
-- * AEMIF support for DaVinci SoCs
-- *
-- * Copyright (C) 2010 Texas Instruments Incorporated. http://www.ti.com/
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--
--#include <linux/kernel.h>
--#include <linux/io.h>
--#include <linux/err.h>
--#include <linux/clk.h>
--#include <linux/module.h>
--#include <linux/time.h>
--
--#include <linux/platform_data/mtd-davinci-aemif.h>
--#include <linux/platform_data/mtd-davinci.h>
--
--/* Timing value configuration */
--
--#define TA(x)		((x) << 2)
--#define RHOLD(x)	((x) << 4)
--#define RSTROBE(x)	((x) << 7)
--#define RSETUP(x)	((x) << 13)
--#define WHOLD(x)	((x) << 17)
--#define WSTROBE(x)	((x) << 20)
--#define WSETUP(x)	((x) << 26)
--
--#define TA_MAX		0x3
--#define RHOLD_MAX	0x7
--#define RSTROBE_MAX	0x3f
--#define RSETUP_MAX	0xf
--#define WHOLD_MAX	0x7
--#define WSTROBE_MAX	0x3f
--#define WSETUP_MAX	0xf
--
--#define TIMING_MASK	(TA(TA_MAX) | \
--				RHOLD(RHOLD_MAX) | \
--				RSTROBE(RSTROBE_MAX) |	\
--				RSETUP(RSETUP_MAX) | \
--				WHOLD(WHOLD_MAX) | \
--				WSTROBE(WSTROBE_MAX) | \
--				WSETUP(WSETUP_MAX))
--
--static inline unsigned int davinci_aemif_readl(void __iomem *base, int offset)
--{
--	return readl_relaxed(base + offset);
--}
--
--static inline void davinci_aemif_writel(void __iomem *base,
--					int offset, unsigned long value)
--{
--	writel_relaxed(value, base + offset);
--}
--
--/*
-- * aemif_calc_rate - calculate timing data.
-- * @wanted: The cycle time needed in nanoseconds.
-- * @clk: The input clock rate in kHz.
-- * @max: The maximum divider value that can be programmed.
-- *
-- * On success, returns the calculated timing value minus 1 for easy
-- * programming into AEMIF timing registers, else negative errno.
-- */
--static int aemif_calc_rate(int wanted, unsigned long clk, int max)
--{
--	int result;
--
--	result = DIV_ROUND_UP((wanted * clk), NSEC_PER_MSEC) - 1;
--
--	pr_debug("%s: result %d from %ld, %d\n", __func__, result, clk, wanted);
--
--	/* It is generally OK to have a more relaxed timing than requested... */
--	if (result < 0)
--		result = 0;
--
--	/* ... But configuring tighter timings is not an option. */
--	else if (result > max)
--		result = -EINVAL;
--
--	return result;
--}
--
--/**
-- * davinci_aemif_setup_timing - setup timing values for a given AEMIF interface
-- * @t: timing values to be progammed
-- * @base: The virtual base address of the AEMIF interface
-- * @cs: chip-select to program the timing values for
-- * @clkrate: the AEMIF clkrate
-- *
-- * This function programs the given timing values (in real clock) into the
-- * AEMIF registers taking the AEMIF clock into account.
-- *
-- * This function does not use any locking while programming the AEMIF
-- * because it is expected that there is only one user of a given
-- * chip-select.
-- *
-- * Returns 0 on success, else negative errno.
-- */
--static int davinci_aemif_setup_timing(struct davinci_aemif_timing *t,
--					void __iomem *base, unsigned cs,
--					unsigned long clkrate)
--{
--	unsigned set, val;
--	int ta, rhold, rstrobe, rsetup, whold, wstrobe, wsetup;
--	unsigned offset = A1CR_OFFSET + cs * 4;
--
--	if (!t)
--		return 0;	/* Nothing to do */
--
--	clkrate /= 1000;	/* turn clock into kHz for ease of use */
--
--	ta	= aemif_calc_rate(t->ta, clkrate, TA_MAX);
--	rhold	= aemif_calc_rate(t->rhold, clkrate, RHOLD_MAX);
--	rstrobe	= aemif_calc_rate(t->rstrobe, clkrate, RSTROBE_MAX);
--	rsetup	= aemif_calc_rate(t->rsetup, clkrate, RSETUP_MAX);
--	whold	= aemif_calc_rate(t->whold, clkrate, WHOLD_MAX);
--	wstrobe	= aemif_calc_rate(t->wstrobe, clkrate, WSTROBE_MAX);
--	wsetup	= aemif_calc_rate(t->wsetup, clkrate, WSETUP_MAX);
--
--	if (ta < 0 || rhold < 0 || rstrobe < 0 || rsetup < 0 ||
--			whold < 0 || wstrobe < 0 || wsetup < 0) {
--		pr_err("%s: cannot get suitable timings\n", __func__);
--		return -EINVAL;
--	}
--
--	set = TA(ta) | RHOLD(rhold) | RSTROBE(rstrobe) | RSETUP(rsetup) |
--		WHOLD(whold) | WSTROBE(wstrobe) | WSETUP(wsetup);
--
--	val = __raw_readl(base + offset);
--	val &= ~TIMING_MASK;
--	val |= set;
--	__raw_writel(val, base + offset);
--
--	return 0;
--}
--
--/**
-- * davinci_aemif_setup - setup AEMIF interface by davinci_nand_pdata
-- * @pdev - link to platform device to setup settings for
-- *
-- * This function does not use any locking while programming the AEMIF
-- * because it is expected that there is only one user of a given
-- * chip-select.
-- *
-- * Returns 0 on success, else negative errno.
-- */
--int davinci_aemif_setup(struct platform_device *pdev)
--{
--	struct davinci_nand_pdata *pdata = dev_get_platdata(&pdev->dev);
--	uint32_t val;
--	unsigned long clkrate;
--	struct resource	*res;
--	void __iomem *base;
--	struct clk *clk;
--	int ret = 0;
--
--	clk = clk_get(&pdev->dev, "aemif");
--	if (IS_ERR(clk)) {
--		ret = PTR_ERR(clk);
--		dev_dbg(&pdev->dev, "unable to get AEMIF clock, err %d\n", ret);
--		return ret;
--	}
--
--	ret = clk_prepare_enable(clk);
--	if (ret < 0) {
--		dev_dbg(&pdev->dev, "unable to enable AEMIF clock, err %d\n",
--			ret);
--		goto err_put;
--	}
--
--	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
--	if (!res) {
--		dev_err(&pdev->dev, "cannot get IORESOURCE_MEM\n");
--		ret = -ENOMEM;
--		goto err;
--	}
--
--	base = ioremap(res->start, resource_size(res));
--	if (!base) {
--		dev_err(&pdev->dev, "ioremap failed for resource %pR\n", res);
--		ret = -ENOMEM;
--		goto err;
--	}
--
--	/*
--	 * Setup Async configuration register in case we did not boot
--	 * from NAND and so bootloader did not bother to set it up.
--	 */
--	val = davinci_aemif_readl(base, A1CR_OFFSET + pdata->core_chipsel * 4);
--	/*
--	 * Extended Wait is not valid and Select Strobe mode is not
--	 * used
--	 */
--	val &= ~(ACR_ASIZE_MASK | ACR_EW_MASK | ACR_SS_MASK);
--	if (pdata->options & NAND_BUSWIDTH_16)
--		val |= 0x1;
--
--	davinci_aemif_writel(base, A1CR_OFFSET + pdata->core_chipsel * 4, val);
--
--	clkrate = clk_get_rate(clk);
--
--	if (pdata->timing)
--		ret = davinci_aemif_setup_timing(pdata->timing, base,
--						 pdata->core_chipsel, clkrate);
--
--	if (ret < 0)
--		dev_dbg(&pdev->dev, "NAND timing values setup fail\n");
--
--	iounmap(base);
--err:
--	clk_disable_unprepare(clk);
--err_put:
--	clk_put(clk);
--	return ret;
--}
-diff --git a/include/linux/platform_data/mtd-davinci-aemif.h b/include/linux/platform_data/mtd-davinci-aemif.h
-index 97948ac2bb9b..a403dd51dacc 100644
---- a/include/linux/platform_data/mtd-davinci-aemif.h
-+++ b/include/linux/platform_data/mtd-davinci-aemif.h
-@@ -33,5 +33,4 @@ struct davinci_aemif_timing {
- 	u8	ta;
- };
- 
--int davinci_aemif_setup(struct platform_device *pdev);
- #endif
--- 
-2.17.1
+Thanks, saves me guessing!
+
+
+>>> So it looks
+>>> like the firmware itself is causing the error. There's still a chance that
+>>> the stub is doing something wrong with the memory map passed to the
+>>> firmware, so I'll try to eliminate that as well.
+>>
+>> adding delay loops will help prove the EFIStub is innocent.
+> 
+> Didn't change anything.
+
+Okay, so just to clarify, a delay before ExitBootServices doesn't cause the
+error to show up before ExitBootServices, so the error hasn't occurred prior to
+this point.
+And a delay after ExitBootServices allows us to see the error before we exit
+into head.S. (this rules out a bug in head.S)
+The delays should be long enough to tell us this slimpro isn't generating the
+error records N seconds after reset.
+
+Given this I agree we should disable_hest based on the DMI platform name and the
+UEFI version number. (it may be earlier firmware didn't have this bug).
+
+
+I don't have anything to test this on, so I've picked the DMI strings out the
+demsg output on that bugzilla entry. Any chance you could give it a test?
+
+
+>> Are redhat able to rebuild UEFI on these systems? (Can it be fixed?)
+
+>> https://bugzilla.redhat.com/show_bug.cgi?id=1285107 is about the m400
+>> description of the GIC, comments 15 and 16 show a UEFI patch to something other
+>> than the upstream platforms tree[0], and new firmware being tested.
+>> (although this may be wishful thinking)
+> 
+> HPe would respond to bug reports until m400 reached EOL. They have been pretty
+> clear that no more firmware updates will be done.
+
+Thanks, it was a bit murky from that ticket...
+
+
+Thanks for doing this!
+
+James
