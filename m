@@ -1,104 +1,84 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 28 Jun 2018 11:04:45 +0200
-Subject: [PATCH 2/5] kernel/jump_label: implement generic support for
- relative references
-In-Reply-To: <CAKv+Gu87DmGLG7N8X8+V7LppXm72SJUmCcEpaehCE5Rt0Z4FNw@mail.gmail.com>
-References: <20180627160604.8154-1-ard.biesheuvel@linaro.org>
- <20180627160604.8154-3-ard.biesheuvel@linaro.org>
- <20180628085003.GA2494@hirez.programming.kicks-ass.net>
- <CAKv+Gu87DmGLG7N8X8+V7LppXm72SJUmCcEpaehCE5Rt0Z4FNw@mail.gmail.com>
-Message-ID: <CAKv+Gu-xPR6UEiP0NT0zYXKRYXqwFCXP=nf0cC87PZdDYBZB4A@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 28 Jun 2018 02:06:55 -0700
+Subject: v4.18-rc1 on droid 4: very bad CPU performance
+In-Reply-To: <20180627205834.GB29478@amd>
+References: <20180621121542.GA4836@amd> <20180622072005.GF112168@atomide.com>
+ <20180622074936.GG112168@atomide.com> <20180627205834.GB29478@amd>
+Message-ID: <20180628090655.GL112168@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 June 2018 at 11:02, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> On 28 June 2018 at 10:50, Peter Zijlstra <peterz@infradead.org> wrote:
->> On Wed, Jun 27, 2018 at 06:06:01PM +0200, Ard Biesheuvel wrote:
->>> diff --git a/include/linux/jump_label.h b/include/linux/jump_label.h
->>> index 86ec0652d3b1..aa203dffe72c 100644
->>> --- a/include/linux/jump_label.h
->>> +++ b/include/linux/jump_label.h
->>> @@ -121,6 +121,32 @@ struct static_key {
->>>  #include <asm/jump_label.h>
->>>
->>>  #ifndef __ASSEMBLY__
->>> +#ifdef CONFIG_HAVE_ARCH_JUMP_LABEL_RELATIVE
->>> +
->>> +struct jump_entry {
->>> +     int code;
->>> +     int target;
->>> +     int key;
->>> +};
->>
->> I much prefer you use 'u32' there.
->>
->
-> Actually, they are signed so that would be s32. But yeah, I can change that.
->
->>
->>> +static void jump_label_swap(void *a, void *b, int size)
->>> +{
->>> +     long delta = (unsigned long)a - (unsigned long)b;
->>> +     struct jump_entry *jea = a;
->>> +     struct jump_entry *jeb = b;
->>> +     struct jump_entry tmp = *jea;
->>> +
->>> +     jea->code       = jeb->code - delta;
->>> +     jea->target     = jeb->target - delta;
->>> +     jea->key        = jeb->key - delta;
->>> +
->>> +     jeb->code       = tmp.code + delta;
->>> +     jeb->target     = tmp.target + delta;
->>> +     jeb->key        = tmp.key + delta;
->>> +}
->>> +
->>>  static void
->>>  jump_label_sort_entries(struct jump_entry *start, struct jump_entry *stop)
->>>  {
->>> @@ -56,7 +72,9 @@ jump_label_sort_entries(struct jump_entry *start, struct jump_entry *stop)
->>>
->>>       size = (((unsigned long)stop - (unsigned long)start)
->>>                                       / sizeof(struct jump_entry));
->>> -     sort(start, size, sizeof(struct jump_entry), jump_label_cmp, NULL);
->>> +     sort(start, size, sizeof(struct jump_entry), jump_label_cmp,
->>> +          IS_ENABLED(CONFIG_HAVE_ARCH_JUMP_LABEL_RELATIVE) ? jump_label_swap
->>> +                                                           : NULL);
->>>  }
->>
->> That will result in jump_label_swap being an unused symbol for some
->> compile options.
->>
->
-> No, and isn't that the point of IS_ENABLED()? The compiler sees a
-> reference to jump_label_swap(), so it won't complain about it being
-> unused.
->
->> Would it not be much nicer to write that like:
->>
->> static void jump_label_swap(void *a, void *b, int size)
->> {
->>         struct jump_entry *jea = a, *jeb = b;
->>
->> #ifdef CONFIG_HAVE_ARCH_JUMP_LABEL_RELATIVE
->>         long delta = a - b;
->>
->>         jea->code += delta;
->>         jea->target += delta;
->>         jea->key += delta;
->>
->>         jeb->code -= delta;
->>         jeb->target -= delta;
->>         jeb->key -= delta;
->> #else
->>
->>         swap(*jea, *jeb);
->> }
->>
->> And then unconditionally use jump_label_swap().
->
-> Meh. I thought IS_ENABLED() was preferred over #ifdef, no? That way,
-> the compiler always sees the code, and simply discards it without
-> complaining if it ends up left unused.
+* Pavel Machek <pavel@ucw.cz> [180627 21:01]:
+> On Fri 2018-06-22 00:49:36, Tony Lindgren wrote:
+> > * Tony Lindgren <tony@atomide.com> [180622 07:22]:
+> > > * Pavel Machek <pavel@ucw.cz> [180621 12:18]:
+> > > > Hi!
+> > > > 
+> > > > V4.18 is slower than it should be.
+> > > > 
+> > > > user at devuan:~$ time cat /dev/urandom | head -c 10000000 |  bzip2 -9 -
+> > > > | wc -c
+> > > > 10044291
+> > > > 52.73user 2.40system 61.53 (1m1.534s) elapsed 89.60%CPU
+> > > > user at devuan:~$ uname -a
+> > > > Linux devuan 4.18.0-rc1-87964-gfa19934-dirty #743 SMP Sun Jun 17
+> > > > 19:26:37 CEST 2018 armv7l GNU/Linux
+> > > > 
+> > > > That bzip should take 12 seconds, not minute.
+> > > > 
+> > > > Any ideas? Do you see it, too?
+> > > 
+> > > I've noticed firefox is super slow.. Git bisect time?
+> > 
+> > Hmm not happening for me at least on duovero and droid4,
+> > I'm getting about 20s for v4.17 and v4.18-rc1.
+> 
+> Okay, so I know what was wrong with my config. I had l2cache disabled
+> -- and this solved it:
+> 
+> +CONFIG_OUTER_CACHE=y
+> +CONFIG_OUTER_CACHE_SYNC=y
+> +CONFIG_CACHE_L2X0=y
+> +CONFIG_PL310_ERRATA_588369=y
+> +CONFIG_PL310_ERRATA_727915=y
 
-... and it means the sort() routine will unconditionally perform an
-indirect function call even if the arch does not require it.
+We have these in omap2plus_defconfig.
+
+> +CONFIG_PL310_ERRATA_753970=y
+> +CONFIG_PL310_ERRATA_769419=y
+
+These two should not be needed from what I recall. Have not
+checked against processor revisions or errata though. But
+I verified that my duovero time stays at 21 seconds also
+with these enabled. It seems to run at 600MHz so it's slower
+compared to droid4.
+
+> Now I'm at 12 seconds.
+> 
+> user at devuan:~$ time cat /dev/urandom | head -c 10000000 |  bzip2 -9 - | wc -c
+> 10043993
+> 11.41user 0.44system 11.63 (0m11.637s) elapsed 101.97%CPU
+> user at devuan:~$ uname -a
+> Linux devuan 4.18.0-rc2-88315-g3452793-dirty #756 SMP Wed Jun 27 22:16:59 CEST 2018 armv7l GNU/Linux
+> user at devuan:~$
+> 
+> I was about to add "facepalm" emoji here, as disabling l2 cache is
+> major mistake. OTOH if you also see 20 seconds, then either there is
+> another problem, or you need to enable l2 cache, too (and I don't have
+> to feel too bad for misconfiguring it).
+
+OK. I checked and duovero runs only at 600MHz. I can only
+get down to 19 seconds with omap2plus_defconfig if I disable
+CONFIG_CPU_FREQ so the max speed is maintained from bootloader.
+Otherwise it runs at most at 1GHz, I think any higher speeds
+need smartreflex and voltage scaling working which we don't
+have in the mainline kernel. Not sure what happens with higher
+speeds with mainline kernel or if they are unsafe in the long
+run.
+
+Anyways, care to post your .config somewhere so I can see what
+the numbers are for me with it?
+
+Regards,
+
+Tony
