@@ -1,71 +1,46 @@
-From: mathieu.desnoyers@efficios.com (Mathieu Desnoyers)
-Date: Thu, 28 Jun 2018 16:50:40 -0400 (EDT)
-Subject: [PATCH 3/3] rseq/selftests: Add support for arm64
-In-Reply-To: <20180628164700.GD10751@arm.com>
-References: <1529949285-11013-1-git-send-email-will.deacon@arm.com>
- <1529949285-11013-4-git-send-email-will.deacon@arm.com>
- <501929863.3051.1529950210436.JavaMail.zimbra@efficios.com>
- <20180626151427.GF23375@arm.com>
- <1763491947.3520.1530029512923.JavaMail.zimbra@efficios.com>
- <20180628164700.GD10751@arm.com>
-Message-ID: <176714835.9396.1530219040151.JavaMail.zimbra@efficios.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 28 Jun 2018 22:56:29 +0200
+Subject: [RFC/RFT PATCH 0/2] disable_hest quirk on HP m400 with bad UEFI
+ firmwware
+In-Reply-To: <ef039f0c-dea2-80d7-e6fa-481f3452a600@infradead.org>
+References: <20180628100656.10692-1-james.morse@arm.com>
+ <CAKv+Gu9ZHAGzcfgHShM1qvZ3qf4gb1pD_XfoceJu9Qy+5_pEsg@mail.gmail.com>
+ <ef039f0c-dea2-80d7-e6fa-481f3452a600@infradead.org>
+Message-ID: <CAKv+Gu8OkHZJL8FXhsfQP8JodWLTFg5kz4wVcDPVWTs-29buug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------ On Jun 28, 2018, at 12:47 PM, Will Deacon will.deacon at arm.com wrote:
+On 28 June 2018 at 18:15, Geoff Levand <geoff@infradead.org> wrote:
+> Hi Ard,
+>
+> On 06/28/2018 03:25 AM, Ard Biesheuvel wrote:
+>
+>> Given how the upstream kernel is aimed at future development, I don't
+>> think we should fix this in the upstream kernel at all. Distros are
+>> free to do what they like, of course, and I'm sure RedHat already have
+>> a fix for this in their downstream kernel.
+>
+> Debian expects the kernel to work correctly, and so won't add a fix.
+> That means CONFIG_ACPI_APEI can't be enabled, and so users must either
+> go without APEI or use a custom built kernel. See:
+>
+>   https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=900581
+>
 
-> Hi Mathieu,
-> 
-> On Tue, Jun 26, 2018 at 12:11:52PM -0400, Mathieu Desnoyers wrote:
->> ----- On Jun 26, 2018, at 11:14 AM, Will Deacon will.deacon at arm.com wrote:
->> > On Mon, Jun 25, 2018 at 02:10:10PM -0400, Mathieu Desnoyers wrote:
->> >> I notice you are using the instructions
->> >> 
->> >>   adrp
->> >>   add
->> >>   str
->> >> 
->> >> to implement RSEQ_ASM_STORE_RSEQ_CS(). Did you compare
->> >> performance-wise with an approach using a literal pool
->> >> near the instruction pointer like I did on arm32 ?
->> > 
->> > I didn't, no. Do you have a benchmark to hand so I can give this a go?
->> 
->> see tools/testing/selftests/rseq/param_test_benchmark --help
->> 
->> It's a stripped-down version of param_test, without all the code for
->> delay loops and testing checks.
->> 
->> Example use for counter increment with 4 threads, doing 5G counter
->> increments per thread:
->> 
->> time ./param_test_benchmark -T i -t 4 -r 5000000000
-> 
-> Thanks. I ran that on a few arm64 systems I have access to, with three
-> configurations of the selftest:
-> 
-> 1. As I posted
-> 2. With the abort signature and branch in-lined, so as to avoid the CBNZ
->   address limitations in large codebases
-> 3. With both the abort handler and the table inlined (i.e. the same thing
->   as 32-bit).
-> 
-> There isn't a reliably measurable difference between (1) and (2), but I take
-> between 12% and 27% hit between (2) and (3).
+Hi Geoff,
 
-Those results puzzle me. Do you have the actual code snippets of each
-implementation nearby ?
+I am aware of the context of this discussion, and I feel your pain,
+given that you don't care about m400 in the first place.
 
-Thanks,
+So I guess we should take this up with the Debian folks directly. They
+apparently do care about m400, and are reluctant to have to add
+'hest_disable=1' to the kernel command line.
 
-Mathieu
+But that does not make it an upstream problem. The fact that this is
+an EOL platform of which only a couple of hundred are in circulation,
+combined with the fact that there is a trivial workaround available
+(the command line option) makes it a non-issue in my opinion,
+especially given the fact that not a single distro ships pristine
+mainline kernels, and so they can carry the quirk themselves.
 
-> 
-> So I'll post a v2 based on (2).
-> 
-> Will
-
--- 
-Mathieu Desnoyers
-EfficiOS Inc.
-http://www.efficios.com
+I
