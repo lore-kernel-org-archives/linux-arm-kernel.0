@@ -1,153 +1,102 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Thu, 28 Jun 2018 11:57:42 +0200
-Subject: [PATCH v3 07/13] ARM: davinci: da850-evm: use aemif platform driver
- in legacy mode
+Date: Thu, 28 Jun 2018 11:57:44 +0200
+Subject: [PATCH v3 09/13] ARM: davinci: dm644x-evm: use aemif platform driver
 In-Reply-To: <20180628095748.4462-1-brgl@bgdev.pl>
 References: <20180628095748.4462-1-brgl@bgdev.pl>
-Message-ID: <20180628095748.4462-8-brgl@bgdev.pl>
+Message-ID: <20180628095748.4462-10-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
 We now support board files in the aemif driver. Register a platform
-device instead of using the handcrafted API in da850-evm.
+device instead of using the handcrafted API in dm644x-evm.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- arch/arm/mach-davinci/board-da850-evm.c | 93 ++++++++++++++-----------
- 1 file changed, 51 insertions(+), 42 deletions(-)
+ arch/arm/mach-davinci/board-dm644x-evm.c | 55 ++++++++++++++++++------
+ 1 file changed, 42 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
-index 442c16773f09..ace66f368f8d 100644
---- a/arch/arm/mach-davinci/board-da850-evm.c
-+++ b/arch/arm/mach-davinci/board-da850-evm.c
-@@ -33,6 +33,7 @@
- #include <linux/platform_data/gpio-davinci.h>
- #include <linux/platform_data/mtd-davinci.h>
+diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c b/arch/arm/mach-davinci/board-dm644x-evm.c
+index 738e443ab15f..e4a8f9225d16 100644
+--- a/arch/arm/mach-davinci/board-dm644x-evm.c
++++ b/arch/arm/mach-davinci/board-dm644x-evm.c
+@@ -42,6 +42,7 @@
+ #include <linux/platform_data/mmc-davinci.h>
+ #include <linux/platform_data/usb-davinci.h>
  #include <linux/platform_data/mtd-davinci-aemif.h>
 +#include <linux/platform_data/ti-aemif.h>
- #include <linux/platform_data/spi-davinci.h>
- #include <linux/platform_data/uio_pruss.h>
- #include <linux/regulator/machine.h>
-@@ -185,16 +186,6 @@ static struct resource da850_evm_norflash_resource[] = {
+ 
+ #include "davinci.h"
+ 
+@@ -174,14 +175,47 @@ static struct resource davinci_evm_nandflash_resource[] = {
  	},
  };
  
--static struct platform_device da850_evm_norflash_device = {
--	.name		= "physmap-flash",
+-static struct platform_device davinci_evm_nandflash_device = {
+-	.name		= "davinci_nand",
 -	.id		= 0,
 -	.dev		= {
--		.platform_data  = &da850_evm_norflash_data,
--	},
--	.num_resources	= 1,
--	.resource	= da850_evm_norflash_resource,
--};
--
- /* DA850/OMAP-L138 EVM includes a 512 MByte large-page NAND flash
-  * (128K blocks). It may be used instead of the (default) SPI flash
-  * to boot, using TI's tools to install the secondary boot loader
-@@ -266,37 +257,58 @@ static struct resource da850_evm_nandflash_resource[] = {
+-		.platform_data	= &davinci_evm_nandflash_data,
++static struct resource davinci_evm_aemif_resource[] = {
++	{
++		.start		= DM644X_ASYNC_EMIF_CONTROL_BASE,
++		.end		= DM644X_ASYNC_EMIF_CONTROL_BASE + SZ_4K - 1,
++		.flags		= IORESOURCE_MEM,
  	},
- };
- 
--static struct platform_device da850_evm_nandflash_device = {
--	.name		= "davinci_nand",
--	.id		= 1,
--	.dev		= {
--		.platform_data	= &da850_evm_nandflash_data,
--	},
--	.num_resources	= ARRAY_SIZE(da850_evm_nandflash_resource),
--	.resource	= da850_evm_nandflash_resource,
-+static struct resource da850_evm_aemif_resource[] = {
+-	.num_resources	= ARRAY_SIZE(davinci_evm_nandflash_resource),
+-	.resource	= davinci_evm_nandflash_resource,
++};
++
++static struct aemif_abus_data davinci_evm_aemif_abus_data[] = {
 +	{
-+		.start	= DA8XX_AEMIF_CTL_BASE,
-+		.end	= DA8XX_AEMIF_CTL_BASE + SZ_32K,
-+		.flags	= IORESOURCE_MEM,
-+	}
- };
- 
--static struct platform_device *da850_evm_devices[] = {
--	&da850_evm_nandflash_device,
--	&da850_evm_norflash_device,
-+static struct aemif_abus_data da850_evm_aemif_abus_data[] = {
-+	{
-+		.cs	= 3,
-+	}
- };
- 
--#define DA8XX_AEMIF_CE2CFG_OFFSET	0x10
--#define DA8XX_AEMIF_ASIZE_16BIT		0x1
--
--static void __init da850_evm_init_nor(void)
--{
--	void __iomem *aemif_addr;
--
--	aemif_addr = ioremap(DA8XX_AEMIF_CTL_BASE, SZ_32K);
-+static struct platform_device da850_evm_aemif_devices[] = {
++		.cs		= 1,
++	},
++};
++
++static struct platform_device davinci_evm_nandflash_devices[] = {
 +	{
 +		.name		= "davinci_nand",
-+		.id		= 1,
-+		.dev		= {
-+			.platform_data	= &da850_evm_nandflash_data,
-+		},
-+		.num_resources	= ARRAY_SIZE(da850_evm_nandflash_resource),
-+		.resource	= da850_evm_nandflash_resource,
-+	},
-+	{
-+		.name		= "physmap-flash",
 +		.id		= 0,
 +		.dev		= {
-+			.platform_data  = &da850_evm_norflash_data,
++			.platform_data	= &davinci_evm_nandflash_data,
 +		},
-+		.num_resources	= 1,
-+		.resource	= da850_evm_norflash_resource,
-+	}
-+};
- 
--	/* Configure data bus width of CS2 to 16 bit */
--	writel(readl(aemif_addr + DA8XX_AEMIF_CE2CFG_OFFSET) |
--		DA8XX_AEMIF_ASIZE_16BIT,
--		aemif_addr + DA8XX_AEMIF_CE2CFG_OFFSET);
-+static struct aemif_platform_data da850_evm_aemif_pdata = {
-+	.cs_offset = 2,
-+	.abus_data = da850_evm_aemif_abus_data,
-+	.num_abus_data = ARRAY_SIZE(da850_evm_aemif_abus_data),
-+	.sub_devices = da850_evm_aemif_devices,
-+	.num_sub_devices = ARRAY_SIZE(da850_evm_aemif_devices),
-+};
- 
--	iounmap(aemif_addr);
--}
-+static struct platform_device da850_evm_aemif_device = {
-+	.name		= "ti-aemif",
-+	.id		= -1,
-+	.dev = {
-+		.platform_data	= &da850_evm_aemif_pdata,
++		.num_resources	= ARRAY_SIZE(davinci_evm_nandflash_resource),
++		.resource	= davinci_evm_nandflash_resource,
 +	},
-+	.resource	= da850_evm_aemif_resource,
-+	.num_resources	= ARRAY_SIZE(da850_evm_aemif_resource),
 +};
++
++static struct aemif_platform_data davinci_evm_aemif_pdata = {
++	.abus_data = davinci_evm_aemif_abus_data,
++	.num_abus_data = ARRAY_SIZE(davinci_evm_aemif_abus_data),
++	.sub_devices = davinci_evm_nandflash_devices,
++	.num_sub_devices = ARRAY_SIZE(davinci_evm_nandflash_devices),
++};
++
++static struct platform_device davinci_evm_aemif_device = {
++	.name			= "ti-aemif",
++	.id			= -1,
++	.dev = {
++		.platform_data	= &davinci_evm_aemif_pdata,
++	},
++	.resource		= davinci_evm_aemif_resource,
++	.num_resources		= ARRAY_SIZE(davinci_evm_aemif_resource),
+ };
  
- static const short da850_evm_nand_pins[] = {
- 	DA850_EMA_D_0, DA850_EMA_D_1, DA850_EMA_D_2, DA850_EMA_D_3,
-@@ -339,13 +351,10 @@ static inline void da850_evm_setup_nor_nand(void)
- 			pr_warn("%s: NOR mux setup failed: %d\n",
- 				__func__, ret);
+ static u64 davinci_fb_dma_mask = DMA_BIT_MASK(32);
+@@ -795,12 +829,7 @@ static __init void davinci_evm_init(void)
  
--		da850_evm_init_nor();
+ 		/* only one device will be jumpered and detected */
+ 		if (HAS_NAND) {
+-			platform_device_register(&davinci_evm_nandflash_device);
 -
--		platform_add_devices(da850_evm_devices,
--					ARRAY_SIZE(da850_evm_devices));
+-			if (davinci_aemif_setup(&davinci_evm_nandflash_device))
+-				pr_warn("%s: Cannot configure AEMIF\n",
+-					__func__);
 -
--		if (davinci_aemif_setup(&da850_evm_nandflash_device))
--			pr_warn("%s: Cannot configure AEMIF.\n", __func__);
-+		ret = platform_device_register(&da850_evm_aemif_device);
-+		if (ret)
-+			pr_warn("%s: registering aemif failed: %d\n",
-+				__func__, ret);
- 	}
- }
- 
++			platform_device_register(&davinci_evm_aemif_device);
+ #ifdef CONFIG_I2C
+ 			evm_leds[7].default_trigger = "nand-disk";
+ #endif
 -- 
 2.17.1
