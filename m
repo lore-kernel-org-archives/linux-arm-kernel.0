@@ -1,49 +1,56 @@
-From: james.morse@arm.com (James Morse)
-Date: Thu, 28 Jun 2018 09:45:56 +0100
-Subject: KVM guest sometimes failed to boot because of kernel stack
- overflow if KPTI is enabled on a hisilicon ARM64 platform.
-In-Reply-To: <5B339068.5020304@hisilicon.com>
-References: <5B2A6218.3030201@hisilicon.com> <20180620144257.GB27776@arm.com>
- <5B2A7832.4010502@hisilicon.com>
- <ebfabb8f-dcd9-3fb4-3655-368a882d8f09@arm.com>
- <5B2A7FE1.5040607@hisilicon.com>
- <e701eaa8-dcb9-777c-2211-67ee27b43acb@arm.com>
- <5B2B6DEA.2090100@hisilicon.com> <5B3274FC.7000206@hisilicon.com>
- <20180626174746.GO23375@arm.com>
- <942e76b6-a46a-6c5e-5ec3-67daca636d43@arm.com>
- <5B339068.5020304@hisilicon.com>
-Message-ID: <9549e15d-4ec6-8dd3-2237-b6c9b52fc816@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 28 Jun 2018 10:47:12 +0200
+Subject: [PATCH 2/9] crypto: atmel-ecc: Silently ignore missing clock
+ frequency
+In-Reply-To: <e33b8860-2ff4-da8f-8500-ad24ab6c1e4e@microchip.com>
+References: <20180605134950.6605-1-linus.walleij@linaro.org>
+ <20180605134950.6605-2-linus.walleij@linaro.org>
+ <e33b8860-2ff4-da8f-8500-ad24ab6c1e4e@microchip.com>
+Message-ID: <CACRpkdYDABDgYe=FOsQK9=p-mB3Qr8wVb=hbbEgzo_qUCbutPQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wei,
+On Mon, Jun 11, 2018 at 11:46 AM Tudor Ambarus
+<tudor.ambarus@microchip.com> wrote:
+> On 06/05/2018 04:49 PM, Linus Walleij wrote:
+> > The Atmel ECC driver contains a check for the I2C bus clock
+> > frequency, so as to check that the I2C adapter in use
+> > satisfies the device specs.
+> >
+> > If the device is connected to a device tree node that does not
+> > contain a clock frequency setting, such as an I2C mux or gate,
+> > this blocks the probe. Make the probe continue silently if
+> > no clock frequency can be found, assuming all is safe.
+>
+> I don't think it's safe. We use bus_clk_rate to compute the ecc508's
+> wake token. If you can't wake the device, it will ignore all your
+> commands.
 
-On 27/06/18 14:26, Wei Xu wrote:
-> Sorry, I should highlight that I have only updated the default value
-> of CONFIG_NR_CPUS by menuconfig in the previous mail.
-> That is why it showed dirty.
+I see. I wonder why it works so well for me then?
+Could we just print a warning and continue?
+The general advice for the kernel is not to bail out if
+hardware is not optimally configured, but continue with
+a warning that maybe not everything is all right.
 
-(menuconfig changes don't show up like this)
+> My proposal was to introduce a bus_freq_hz member in the i2c_adapter
+> structure (https://patchwork.kernel.org/patch/10307637/), but I haven't
+> received feedback yet, Wolfram?
+>
+> I would say first to check the bus_freq_hz from adapter (if it will be
+> accepted) else to look into dt and, in the last case, if nowhere
+> provided, to block the probe.
 
+So blocking the probe because we are not 100% sure the hardware
+will work is against established practice: the established practice
+is to be liberal with letting probe() continue, but emit a warning.
 
-More than 64 CPUs ... Is this system running more VMs than it has VMIDs? Too-few
-VMIDs does work with KVM, its just going to trigger rollover frequently.
+In my case that is good because it makes the hardware probe
+and work without any visible problems.
 
-Just to check, what kernel version is the host running? Does it have commit
-f0cf47d939d0 ("KVM: arm/arm64: Close VMID generation race")
-(looks like that went in as a fix for v4.17-rc3)
+I *can* try to traverse the device tree upwards from the mux node
+to find the parent I2C controller and its "clock-frequency"
+property. I felt that was hackish, but if you prefer the hack I
+can try to use that.
 
-Are you running (lots) of other VMs whenever this happens? Do they have multiple
-vcpus? (I'm thinking of the scenario in that patch's description)
-
-Is the host system otherwise idle when this happens?
-(If not, can you reproduce the issue without exhausting the VMIDs?)
-
-
-It may be that writing back the page-table entries with the MMU off, and
-changing the cache maintenance are just changing the timing of something else.
-
-
-Thanks,
-
-James
+Yours,
+Linus Walleij
