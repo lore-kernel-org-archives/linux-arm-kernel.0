@@ -1,69 +1,47 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 28 Jun 2018 13:10:05 +0100
-Subject: [PATCH v3 07/17] irqchip/irq-mvebu-icu: make irq_domain local
-In-Reply-To: <20180622151432.1566-8-miquel.raynal@bootlin.com>
-References: <20180622151432.1566-1-miquel.raynal@bootlin.com>
- <20180622151432.1566-8-miquel.raynal@bootlin.com>
-Message-ID: <2f751e0a-857e-22ab-1748-5fd1cb127766@arm.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Thu, 28 Jun 2018 15:14:13 +0300
+Subject: [PATCH] ARM: dts: armada388-clearfog: update spi flash comment
+Message-ID: <54d6bdd0a348926cabb4083cf2e98e8124de95f7.1530188053.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/06/18 16:14, Miquel Raynal wrote:
-> Make the current MSI irq_domain local to ease the split between ICU
-> platform device code and NSR platform device code.
-> 
-> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
-> Reviewed-by: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
-> ---
->  drivers/irqchip/irq-mvebu-icu.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/irqchip/irq-mvebu-icu.c b/drivers/irqchip/irq-mvebu-icu.c
-> index 3694c0d73c0d..607948870a14 100644
-> --- a/drivers/irqchip/irq-mvebu-icu.c
-> +++ b/drivers/irqchip/irq-mvebu-icu.c
-> @@ -41,7 +41,6 @@
->  struct mvebu_icu {
->  	struct irq_chip irq_chip;
->  	struct regmap *regmap;
-> -	struct irq_domain *domain;
->  	struct device *dev;
->  	atomic_t initialized;
->  };
-> @@ -218,6 +217,7 @@ static int mvebu_icu_probe(struct platform_device *pdev)
->  	struct mvebu_icu *icu;
->  	struct device_node *node = pdev->dev.of_node;
->  	struct device_node *gicp_dn;
-> +	struct irq_domain *irq_domain;
->  	struct resource *res;
->  	void __iomem *regs;
->  	int i;
-> @@ -282,11 +282,11 @@ static int mvebu_icu_probe(struct platform_device *pdev)
->  			regmap_write(icu->regmap, ICU_INT_CFG(i), 0);
->  	}
->  
-> -	icu->domain =
-> +	irq_domain =
->  		platform_msi_create_device_domain(&pdev->dev, ICU_MAX_IRQS,
->  						  mvebu_icu_write_msg,
->  						  &mvebu_icu_domain_ops, icu);
+Remove the comment stating that the spi is not populated. The spi flash
+is populated on production SOMs.
 
-nit: this really hurts my eyes. Please put the = sign and the function
-call on a single line. I really don't care if it checkpatch is having a
-fit because of that.
+This is a follow up to commit 12b427331ae5 (ARM: dts:
+armada388-clearfog: enable spi flash).
 
-> -	if (!icu->domain) {
-> +	if (!irq_domain) {
->  		dev_err(&pdev->dev, "Failed to create ICU domain\n");
->  		return -ENOMEM;
->  	}
-> 
+Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+---
+ arch/arm/boot/dts/armada-388-clearfog.dts  | 2 +-
+ arch/arm/boot/dts/armada-388-clearfog.dtsi | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-But looking at the next patch, you might as well fold the two. On its
-own, this patches is pretty pointless.
-
-Thanks,
-
-	M.
+diff --git a/arch/arm/boot/dts/armada-388-clearfog.dts b/arch/arm/boot/dts/armada-388-clearfog.dts
+index 32b1e09b8293..89a354b43978 100644
+--- a/arch/arm/boot/dts/armada-388-clearfog.dts
++++ b/arch/arm/boot/dts/armada-388-clearfog.dts
+@@ -230,7 +230,7 @@
+ &spi1 {
+ 	/*
+ 	 * Add SPI CS pins for clearfog:
+-	 * CS0: W25Q32 (not populated on uSOM)
++	 * CS0: W25Q32
+ 	 * CS1:
+ 	 * CS2: mikrobus
+ 	 */
+diff --git a/arch/arm/boot/dts/armada-388-clearfog.dtsi b/arch/arm/boot/dts/armada-388-clearfog.dtsi
+index 1da40bdfcef1..7c6ad2afb094 100644
+--- a/arch/arm/boot/dts/armada-388-clearfog.dtsi
++++ b/arch/arm/boot/dts/armada-388-clearfog.dtsi
+@@ -225,7 +225,7 @@
+ &spi1 {
+ 	/*
+ 	 * Add SPI CS pins for clearfog:
+-	 * CS0: W25Q32 (not populated on uSOM)
++	 * CS0: W25Q32
+ 	 * CS1: PIC microcontroller (Pro models)
+ 	 * CS2: mikrobus
+ 	 */
 -- 
-Jazz is not dead. It just smells funny...
+2.18.0
