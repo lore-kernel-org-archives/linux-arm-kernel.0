@@ -1,79 +1,132 @@
 From: radhey.shyam.pandey@xilinx.com (Radhey Shyam Pandey)
-Date: Thu, 28 Jun 2018 13:09:41 +0530
-Subject: [PATCH v2 2/5] net: emaclite: Simplify if-else statements
+Date: Thu, 28 Jun 2018 13:09:44 +0530
+Subject: [PATCH v2 5/5] net: emaclite: Remove unnecessary spaces
 In-Reply-To: <1530171584-20673-1-git-send-email-radhey.shyam.pandey@xilinx.com>
 References: <1530171584-20673-1-git-send-email-radhey.shyam.pandey@xilinx.com>
-Message-ID: <1530171584-20673-3-git-send-email-radhey.shyam.pandey@xilinx.com>
+Message-ID: <1530171584-20673-6-git-send-email-radhey.shyam.pandey@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove else as it is not required with if doing a return.
-Fixes below checkpatch warning.
+This patch fixes below checkpatch checks-
 
-WARNING: else is not generally useful after a break or return
+CHECK: spaces preferred around that '*' (ctx:VxV)
+CHECK: No space is necessary after a cast
 
 Signed-off-by: Radhey Shyam Pandey <radhey.shyam.pandey@xilinx.com>
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 ---
 Changes from v1:
-	- Refactor to make failure path return early as suggested
-	  by Joe Perches <joe@perches.com>
+	- None
 ---
- drivers/net/ethernet/xilinx/xilinx_emaclite.c |   31 ++++++++++++-------------
- 1 files changed, 15 insertions(+), 16 deletions(-)
+ drivers/net/ethernet/xilinx/xilinx_emaclite.c |   27 +++++++++++++------------
+ 1 files changed, 14 insertions(+), 13 deletions(-)
 
 diff --git a/drivers/net/ethernet/xilinx/xilinx_emaclite.c b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
-index 0544134..51f84f0 100644
+index 59f4ab8..8b93940 100644
 --- a/drivers/net/ethernet/xilinx/xilinx_emaclite.c
 +++ b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
-@@ -564,19 +564,18 @@ static void xemaclite_tx_handler(struct net_device *dev)
+@@ -95,11 +95,11 @@
+ 
+ 
+ 
+-#define TX_TIMEOUT		(60*HZ)		/* Tx timeout is 60 seconds. */
++#define TX_TIMEOUT		(60 * HZ)	/* Tx timeout is 60 seconds. */
+ #define ALIGNMENT		4
+ 
+ /* BUFFER_ALIGN(adr) calculates the number of bytes to the next alignment. */
+-#define BUFFER_ALIGN(adr) ((ALIGNMENT - ((u32) adr)) % ALIGNMENT)
++#define BUFFER_ALIGN(adr) ((ALIGNMENT - ((u32)adr)) % ALIGNMENT)
+ 
+ #ifdef __BIG_ENDIAN
+ #define xemaclite_readl		ioread32be
+@@ -239,8 +239,8 @@ static void xemaclite_aligned_write(void *src_ptr, u32 *dest_ptr,
+ 
+ 		/* Set up to output the remaining data */
+ 		align_buffer = 0;
+-		to_u8_ptr = (u8 *) &align_buffer;
+-		from_u8_ptr = (u8 *) from_u16_ptr;
++		to_u8_ptr = (u8 *)&align_buffer;
++		from_u8_ptr = (u8 *)from_u16_ptr;
+ 
+ 		/* Output the remaining data */
+ 		for (; length > 0; length--)
+@@ -273,7 +273,7 @@ static void xemaclite_aligned_read(u32 *src_ptr, u8 *dest_ptr,
+ 	u32 align_buffer;
+ 
+ 	from_u32_ptr = src_ptr;
+-	to_u16_ptr = (u16 *) dest_ptr;
++	to_u16_ptr = (u16 *)dest_ptr;
+ 
+ 	for (; length > 3; length -= 4) {
+ 		/* Copy each word into the temporary buffer */
+@@ -289,9 +289,9 @@ static void xemaclite_aligned_read(u32 *src_ptr, u8 *dest_ptr,
+ 		u8 *to_u8_ptr, *from_u8_ptr;
+ 
+ 		/* Set up to read the remaining data */
+-		to_u8_ptr = (u8 *) to_u16_ptr;
++		to_u8_ptr = (u8 *)to_u16_ptr;
+ 		align_buffer = *from_u32_ptr++;
+-		from_u8_ptr = (u8 *) &align_buffer;
++		from_u8_ptr = (u8 *)&align_buffer;
+ 
+ 		/* Read the remaining data */
+ 		for (; length > 0; length--)
+@@ -351,7 +351,7 @@ static int xemaclite_send_data(struct net_local *drvdata, u8 *data,
+ 		return -1; /* Buffer was full, return failure */
+ 
+ 	/* Write the frame to the buffer */
+-	xemaclite_aligned_write(data, (u32 __force *) addr, byte_count);
++	xemaclite_aligned_write(data, (u32 __force *)addr, byte_count);
+ 
+ 	xemaclite_writel((byte_count & XEL_TPLR_LENGTH_MASK),
+ 			 addr + XEL_TPLR_OFFSET);
+@@ -448,7 +448,7 @@ static u16 xemaclite_recv_data(struct net_local *drvdata, u8 *data, int maxlen)
+ 		length = maxlen;
+ 
+ 	/* Read from the EmacLite device */
+-	xemaclite_aligned_read((u32 __force *) (addr + XEL_RXBUFF_OFFSET),
++	xemaclite_aligned_read((u32 __force *)(addr + XEL_RXBUFF_OFFSET),
+ 				data, length);
+ 
+ 	/* Acknowledge the frame */
+@@ -479,7 +479,7 @@ static void xemaclite_update_address(struct net_local *drvdata,
+ 	/* Determine the expected Tx buffer address */
+ 	addr = drvdata->base_addr + drvdata->next_tx_buf_to_use;
+ 
+-	xemaclite_aligned_write(address_ptr, (u32 __force *) addr, ETH_ALEN);
++	xemaclite_aligned_write(address_ptr, (u32 __force *)addr, ETH_ALEN);
+ 
+ 	xemaclite_writel(ETH_ALEN, addr + XEL_TPLR_OFFSET);
+ 
+@@ -572,10 +572,11 @@ static void xemaclite_tx_handler(struct net_device *dev)
  	struct net_local *lp = netdev_priv(dev);
  
  	dev->stats.tx_packets++;
--	if (lp->deferred_skb) {
--		if (xemaclite_send_data(lp,
--					(u8 *) lp->deferred_skb->data,
--					lp->deferred_skb->len) != 0)
--			return;
--		else {
--			dev->stats.tx_bytes += lp->deferred_skb->len;
--			dev_kfree_skb_irq(lp->deferred_skb);
--			lp->deferred_skb = NULL;
--			netif_trans_update(dev); /* prevent tx timeout */
--			netif_wake_queue(dev);
--		}
--	}
-+	if (!lp->deferred_skb)
-+		return;
 +
-+	if (xemaclite_send_data(lp, (u8 *) lp->deferred_skb->data,
-+				lp->deferred_skb->len))
-+		return;
-+
-+	dev->stats.tx_bytes += lp->deferred_skb->len;
-+	dev_kfree_skb_irq(lp->deferred_skb);
-+	lp->deferred_skb = NULL;
-+	netif_trans_update(dev); /* prevent tx timeout */
-+	netif_wake_queue(dev);
- }
+ 	if (!lp->deferred_skb)
+ 		return;
  
- /**
-@@ -1052,13 +1051,13 @@ static bool get_bool(struct platform_device *ofdev, const char *s)
- {
- 	u32 *p = (u32 *)of_get_property(ofdev->dev.of_node, s, NULL);
+-	if (xemaclite_send_data(lp, (u8 *) lp->deferred_skb->data,
++	if (xemaclite_send_data(lp, (u8 *)lp->deferred_skb->data,
+ 				lp->deferred_skb->len))
+ 		return;
  
--	if (p) {
--		return (bool)*p;
--	} else {
-+	if (!p) {
- 		dev_warn(&ofdev->dev, "Parameter %s not found,"
- 			"defaulting to false\n", s);
- 		return false;
- 	}
-+
-+	return (bool)*p;
- }
+@@ -620,7 +621,7 @@ static void xemaclite_rx_handler(struct net_device *dev)
  
- static const struct net_device_ops xemaclite_netdev_ops;
+ 	skb_reserve(skb, 2);
+ 
+-	len = xemaclite_recv_data(lp, (u8 *) skb->data, len);
++	len = xemaclite_recv_data(lp, (u8 *)skb->data, len);
+ 
+ 	if (!len) {
+ 		dev->stats.rx_errors++;
+@@ -1033,7 +1034,7 @@ static int xemaclite_send(struct sk_buff *orig_skb, struct net_device *dev)
+ 	new_skb = orig_skb;
+ 
+ 	spin_lock_irqsave(&lp->reset_lock, flags);
+-	if (xemaclite_send_data(lp, (u8 *) new_skb->data, len) != 0) {
++	if (xemaclite_send_data(lp, (u8 *)new_skb->data, len) != 0) {
+ 		/* If the Emaclite Tx buffer is busy, stop the Tx queue and
+ 		 * defer the skb for transmission during the ISR, after the
+ 		 * current transmission is complete
 -- 
 1.7.1
