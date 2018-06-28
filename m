@@ -1,30 +1,29 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 28 Jun 2018 17:24:17 +0100
-Subject: =?utf-8?B?562U5aSNOiBLVk0gZ3Vlc3Qgc29t?=
- =?utf-8?Q?etimes_failed_to_boot_because_of_kernel_stac?= =?utf-8?Q?k?=
- overflow if KPTI is enabled on a hisilicon ARM64 platform.
-In-Reply-To: <etPan.5b3507f7.914aa16.1d6b@localhost>
-References: <5B2A7FE1.5040607@hisilicon.com>
- <e701eaa8-dcb9-777c-2211-67ee27b43acb@arm.com>
- <5B2B6DEA.2090100@hisilicon.com> <5B3274FC.7000206@hisilicon.com>
- <20180626174746.GO23375@arm.com> <5B338F7B.9070500@hisilicon.com>
- <20180627132826.GB30631@arm.com> <5B34F5C0.9090001@hisilicon.com>
- <20180628153425.rm5fd6dxb53n226z@lakrids.cambridge.arm.com>
- <etPan.5b3507f7.914aa16.1d6b@localhost>
-Message-ID: <20180628162417.s4mcoaow3dgpodew@lakrids.cambridge.arm.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 28 Jun 2018 13:30:40 -0300
+Subject: [PATCH v2] dt-bindings: serial: imx: clarify rs485 support usage
+In-Reply-To: <e9beff38e9035c2f33d691f362e37d8e62aaa660.1530170732.git.baruch@tkos.co.il>
+References: <e9beff38e9035c2f33d691f362e37d8e62aaa660.1530170732.git.baruch@tkos.co.il>
+Message-ID: <CAOMZO5DfJZUayL_JCH1UKSXYQTraoBTK7w3YHif6aLz0nFdh3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 28, 2018 at 04:08:24PM +0000, Wangxuefeng (E) wrote:
-> Hi, mark
->      Your means is that DMB must  make sure the completion of prior load/store
-> or CMO  and make sure the data is visible to all obsevers (no matter device or
-> cacheable).   DMB not only keep order?
+Hi Baruch,
 
-Not quite -- DMB does not guarantee completion.
+On Thu, Jun 28, 2018 at 4:25 AM, Baruch Siach <baruch@tkos.co.il> wrote:
+> The i.MX UART peripheral uses the RST_B signal as input, and CTS_B as
+> output. This is just like the DCE role in RS-232. This is true
+> regardless of the "DTE mode" setting of this peripheral.
+>
+> As a result, rs485 support hardware must use the CTS_B signal to control
+> the RS-485 transceiver. This is in contrast to generic rs485 kernel
+> code, documentation, and DT property names that consistently refer to
+> the RTS as transceiver control signal.
+>
+> Add a note in the DT binding document about that, to reduce the
+> confusion somewhat.
+>
+> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
 
-However, DMB must guarantee that loads/stores and CMOs are ordered on
-the bus, all the way to the PoC.
+Yes, this is helpful:
 
-Thanks,
-Mark.
+Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
