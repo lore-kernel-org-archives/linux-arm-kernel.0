@@ -1,33 +1,32 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Thu, 28 Jun 2018 10:33:27 +0100
-Subject: [PATCH v2 01/15] nvmem: add support for cell lookups
-In-Reply-To: <CAMRc=Md8TM+zLn=T=BQeVHG-PGAvx-PHrs9y1t5zhdYo+m0ovg@mail.gmail.com>
-References: <20180626102245.30711-1-brgl@bgdev.pl>
- <20180626102245.30711-2-brgl@bgdev.pl>
- <25ebceca-8cdd-edae-6393-dd29eb323c53@linaro.org>
- <CAMRc=Md8TM+zLn=T=BQeVHG-PGAvx-PHrs9y1t5zhdYo+m0ovg@mail.gmail.com>
-Message-ID: <1b3736c0-246e-4725-b64f-da916b9a0383@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 28 Jun 2018 10:39:29 +0100
+Subject: [PATCH] arm64: remove no-op -p linker flag
+In-Reply-To: <20180627194614.188210-1-ghackmann@google.com>
+References: <20180627194614.188210-1-ghackmann@google.com>
+Message-ID: <20180628093928.GB10751@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 28/06/18 08:56, Bartosz Golaszewski wrote:
->> We should also have something like nvmem_remove_lookup_table() for
->> consistency, and it should ensure that it clears the cells entry too.
->>
-> What do you mean by clearing the cells entry exactly?
-I meant, Removing entry from the nvmem_cells list.
-
-Initially I though we should remove the entry form nvmem_cells list, 
-but It would complicate this path if some consumer has reference to it.
-
-So, just removing the lookup list should be good! Lets not worry about 
-removing from nvmem_cells list.
-
-
---srini
-
+On Wed, Jun 27, 2018 at 12:46:14PM -0700, Greg Hackmann wrote:
+> Linking the ARM64 defconfig kernel with LLVM lld fails with the error:
 > 
-> Bart
+>   ld.lld: error: unknown argument: -p
+>   Makefile:1015: recipe for target 'vmlinux' failed
 > 
+> Without this flag, the ARM64 defconfig kernel successfully links with
+> lld and boots on Dragonboard 410c.
+> 
+> After digging through binutils source and changelogs, it turns out that
+> -p is only relevant to ancient binutils installations targeting 32-bit
+> ARM.  binutils accepts -p for AArch64 too, but it's always been
+> undocumented and silently ignored.  A comment in
+> ld/emultempl/aarch64elf.em explains that it's "Only here for backwards
+> compatibility".
+> 
+> Since this flag is a no-op on ARM64, we can safely drop it.
+
+Makes sense:
+
+Acked-by: Will Deacon <will.deacon@arm.com>
+
+Will
