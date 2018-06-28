@@ -1,99 +1,111 @@
-From: sean.wang@mediatek.com (Sean Wang)
-Date: Thu, 28 Jun 2018 11:06:13 +0800
-Subject: [PATCH v4 6/7] Bluetooth: mediatek: Add protocol support for
- MediaTek serial devices
-In-Reply-To: <CAHp75VedHLw52J_ymh3iYf2w=r8d+Kqg=fJZmBGnaCrEbNEPdQ@mail.gmail.com>
-References: <cover.1530004712.git.sean.wang@mediatek.com>
- <48215a1276c36af7ad581c3d83759fe9f55e3c4b.1530004712.git.sean.wang@mediatek.com>
- <CAHp75VehTeyyzR4bPKK3hFDTVqZnhdNy5vcBFJCSH_Zrx+QrKA@mail.gmail.com>
- <CAHp75VedHLw52J_ymh3iYf2w=r8d+Kqg=fJZmBGnaCrEbNEPdQ@mail.gmail.com>
-Message-ID: <1530155173.29697.48.camel@mtkswgap22>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 28 Jun 2018 11:10:17 +0800
+Subject: [linux-sunxi] [PATCH] ARM: dts: sun8i: a83t: Add CPU regulator
+ supplies for A83T boards
+In-Reply-To: <20180627184539.3er4226lkbtudhwe@core>
+References: <20180627022709.27434-1-wens@csie.org>
+ <20180627184539.3er4226lkbtudhwe@core>
+Message-ID: <CAGb2v64FtpYbSK7gqbQmuRwUz1UrTRDY0KvT3VZGc9tv6sDecw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2018-06-27 at 20:04 +0300, Andy Shevchenko wrote:
-> On Wed, Jun 27, 2018 at 7:59 PM, Andy Shevchenko
-> <andy.shevchenko@gmail.com> wrote:
-> > On Wed, Jun 27, 2018 at 8:43 AM,  <sean.wang@mediatek.com> wrote:
-> >> From: Sean Wang <sean.wang@mediatek.com>
-> >>
-> >
-> >> +config BT_HCIBTUART_MTK
-> >> +       tristate "MediaTek HCI UART driver"
-> >> +       depends on BT_HCIBTUART
-> >
-> >> +       default y
-> >
-> > Perhaps it's an overkill for users which would like to have less
-> > amount on stuff in kernel.
-> >
+On Thu, Jun 28, 2018 at 2:45 AM, Ond?ej Jirman
+<doudahwezomiechahtah@xff.cz> wrote:
+> Hi,
+>
+> On Wed, Jun 27, 2018 at 10:27:09AM +0800, Chen-Yu Tsai wrote:
+>> The OPPs for the A83T CPU cores were added in v4.17 in commit 2db639d8c166
+>> ("ARM: dts: sun8i: a83t: add stable OPP tables and CPUfreq"), but board
+>> level regulator supplies for the CPU clusters were only added for the
+>> TBS-A711 tablet. This means the other A83T boards do not benefit from
+>> voltage scaling, or worse, if the implementation does not scale the
+>> frequency when the voltage is fixed, no benefit at all.
+>>
+>> Add board level CPU cluster power supplies to all the A83T development
+>> boards, so they can have proper dynamic CPU voltage and frequency scaling.
+>>
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> ---
+>>  arch/arm/boot/dts/sun8i-a83t-allwinner-h8homlet-v2.dts | 8 ++++++++
+>>  arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts           | 8 ++++++++
+>>  arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts       | 8 ++++++++
+>>  3 files changed, 24 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/sun8i-a83t-allwinner-h8homlet-v2.dts b/arch/arm/boot/dts/sun8i-a83t-allwinner-h8homlet-v2.dts
+>> index 36ecebaff3c0..1c012a4def16 100644
+>> --- a/arch/arm/boot/dts/sun8i-a83t-allwinner-h8homlet-v2.dts
+>> +++ b/arch/arm/boot/dts/sun8i-a83t-allwinner-h8homlet-v2.dts
+>> @@ -79,6 +79,14 @@
+>>       };
+>>  };
+>>
+>> +&cpu0 {
+>> +     cpu-supply = <&reg_dcdc2>;
+>> +};
+>> +
+>> +&cpu100 {
+>> +     cpu-supply = <&reg_dcdc3>;
+>> +};
+>> +
+>
+> Shouldn't this be done for all CPU cores? Say you start the kernel with
+> maxcpus=1 and then enable CPU5 later on, will the regulator get enabled,
+> if it is not enabled by always-on setting?
 
-Sure, the default y will be removed
+As it stands, the cpufreq framework doesn't enable the regulator anyway.
+There's nothing in the bindings that say how this should be set either.
 
-> >
-> >> +#include <asm/unaligned.h>
-> >> +#include <linux/atomic.h>
-> >> +#include <linux/clk.h>
-> >> +#include <linux/firmware.h>
-> >> +#include <linux/module.h>
-> >> +#include <linux/pm_runtime.h>
-> >> +#include <linux/serdev.h>
-> 
-> Perhaps alphabetically ordered?
-> 
+ChenYu
 
-They seem already in alphabetically ordered
-
-> + blank line.
-> 
-
-A blank line will be added here
-
-> >
-> >> +#include <net/bluetooth/bluetooth.h>
-> >> +#include <net/bluetooth/hci_core.h>
-> 
-> >> +       /* Enable the power domain and clock the device requires. */
-> >> +       pm_runtime_enable(dev);
-> >> +       err = pm_runtime_get_sync(dev);
-> >> +       if (err < 0)
-> >> +               goto err_pm2;
-> 
-> Should be err_pm1 here.
-
-Label err_pm1 and err_pm2 can be swapped for the readability and this
-doesn't have any effect on the logic.
-
-> Yes, that's correct.
-> 
-> >> +err_pm1:
-> >> +       pm_runtime_put_sync(dev);
-> >> +err_pm2:
-> >> +       pm_runtime_disable(dev);
-> 
-> >> +#define MTK_WMT_CMD_SIZE       (MTK_WMT_HDR_SIZE + MTK_STP_HDR_SIZE + \
-> >> +                                MTK_STP_TLR_SIZE + HCI_ACL_HDR_SIZE)
-> 
-> It would look slightly better if you start on new line like
-> #define FOO \
->  (BAR + BAZ)
-> 
-
-Thanks for your pointing out. I also found that the macro is not being
-used by anyone, it can be removed freely.
-
-> >> +struct mtk_stp_hdr {
-> >> +       __u8 prefix;
-> >> +       __u8 dlen1:4;
-> >> +       __u8 type:4;
-> 
-> >> +       __u8 dlen2:8;
-> 
-> u8 already 8 bit.
-> 
-
-the superfluous :8 for dlen2 will be removed
-
-> >> +       __u8 cs;
-> >> +} __packed;
-> 
+>
+> regards,
+>   o.
+>
+>>  &ehci0 {
+>>       status = "okay";
+>>  };
+>> diff --git a/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts b/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
+>> index 3b579d7567c8..c7ce4158d6c8 100644
+>> --- a/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
+>> +++ b/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
+>> @@ -107,6 +107,14 @@
+>>       };
+>>  };
+>>
+>> +&cpu0 {
+>> +     cpu-supply = <&reg_dcdc2>;
+>> +};
+>> +
+>> +&cpu100 {
+>> +     cpu-supply = <&reg_dcdc3>;
+>> +};
+>> +
+>>  &de {
+>>       status = "okay";
+>>  };
+>> diff --git a/arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts b/arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts
+>> index 88decb0747ac..e5f0645e53a7 100644
+>> --- a/arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts
+>> +++ b/arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts
+>> @@ -145,6 +145,14 @@
+>>       };
+>>  };
+>>
+>> +&cpu0 {
+>> +     cpu-supply = <&reg_dcdc2>;
+>> +};
+>> +
+>> +&cpu100 {
+>> +     cpu-supply = <&reg_dcdc3>;
+>> +};
+>> +
+>>  &ehci0 {
+>>       /* GL830 USB-to-SATA bridge here */
+>>       status = "okay";
+>> --
+>> 2.18.0
+>>
+>> --
+>> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+>> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+>> For more options, visit https://groups.google.com/d/optout.
