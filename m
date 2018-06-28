@@ -1,50 +1,69 @@
-From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Thu, 28 Jun 2018 14:07:47 +0200
-Subject: [PATCH 2/2] ARM: mvebu_v7_defconfig: enable SFP support
-In-Reply-To: <b130ccb8a9812530d33a71afb1563545fa8808cf.1530169575.git.baruch@tkos.co.il>
- (Baruch Siach's message of "Thu, 28 Jun 2018 10:06:15 +0300")
-References: <ee69693c87cd0146f259042fc5dcd29338fcdf25.1530169575.git.baruch@tkos.co.il>
- <b130ccb8a9812530d33a71afb1563545fa8808cf.1530169575.git.baruch@tkos.co.il>
-Message-ID: <87fu176rn0.fsf@bootlin.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 28 Jun 2018 13:10:05 +0100
+Subject: [PATCH v3 07/17] irqchip/irq-mvebu-icu: make irq_domain local
+In-Reply-To: <20180622151432.1566-8-miquel.raynal@bootlin.com>
+References: <20180622151432.1566-1-miquel.raynal@bootlin.com>
+ <20180622151432.1566-8-miquel.raynal@bootlin.com>
+Message-ID: <2f751e0a-857e-22ab-1748-5fd1cb127766@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Baruch,
- 
- On jeu., juin 28 2018, Baruch Siach <baruch@tkos.co.il> wrote:
+On 22/06/18 16:14, Miquel Raynal wrote:
+> Make the current MSI irq_domain local to ease the split between ICU
+> platform device code and NSR platform device code.
+> 
+> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+> Reviewed-by: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
+> ---
+>  drivers/irqchip/irq-mvebu-icu.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/irqchip/irq-mvebu-icu.c b/drivers/irqchip/irq-mvebu-icu.c
+> index 3694c0d73c0d..607948870a14 100644
+> --- a/drivers/irqchip/irq-mvebu-icu.c
+> +++ b/drivers/irqchip/irq-mvebu-icu.c
+> @@ -41,7 +41,6 @@
+>  struct mvebu_icu {
+>  	struct irq_chip irq_chip;
+>  	struct regmap *regmap;
+> -	struct irq_domain *domain;
+>  	struct device *dev;
+>  	atomic_t initialized;
+>  };
+> @@ -218,6 +217,7 @@ static int mvebu_icu_probe(struct platform_device *pdev)
+>  	struct mvebu_icu *icu;
+>  	struct device_node *node = pdev->dev.of_node;
+>  	struct device_node *gicp_dn;
+> +	struct irq_domain *irq_domain;
+>  	struct resource *res;
+>  	void __iomem *regs;
+>  	int i;
+> @@ -282,11 +282,11 @@ static int mvebu_icu_probe(struct platform_device *pdev)
+>  			regmap_write(icu->regmap, ICU_INT_CFG(i), 0);
+>  	}
+>  
+> -	icu->domain =
+> +	irq_domain =
+>  		platform_msi_create_device_domain(&pdev->dev, ICU_MAX_IRQS,
+>  						  mvebu_icu_write_msg,
+>  						  &mvebu_icu_domain_ops, icu);
 
-> This enables support for SFP cages on SolidRun Armada 38x and 8k
-> platforms.
->
-> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+nit: this really hurts my eyes. Please put the = sign and the function
+call on a single line. I really don't care if it checkpatch is having a
+fit because of that.
 
-Applied on mvebu/arm
+> -	if (!icu->domain) {
+> +	if (!irq_domain) {
+>  		dev_err(&pdev->dev, "Failed to create ICU domain\n");
+>  		return -ENOMEM;
+>  	}
+> 
+
+But looking at the next patch, you might as well fold the two. On its
+own, this patches is pretty pointless.
 
 Thanks,
 
-Gregory
-
-> ---
->  arch/arm/configs/mvebu_v7_defconfig | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm/configs/mvebu_v7_defconfig b/arch/arm/configs/mvebu_v7_defconfig
-> index 1ff371ae688d..55140219ab11 100644
-> --- a/arch/arm/configs/mvebu_v7_defconfig
-> +++ b/arch/arm/configs/mvebu_v7_defconfig
-> @@ -66,6 +66,7 @@ CONFIG_NETDEVICES=y
->  CONFIG_MV643XX_ETH=y
->  CONFIG_MVNETA=y
->  CONFIG_MVPP2=y
-> +CONFIG_SFP=y
->  CONFIG_MARVELL_PHY=y
->  CONFIG_MWIFIEX=y
->  CONFIG_MWIFIEX_SDIO=y
-> -- 
-> 2.18.0
->
-
+	M.
 -- 
-Gregory Clement, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-http://bootlin.com
+Jazz is not dead. It just smells funny...
