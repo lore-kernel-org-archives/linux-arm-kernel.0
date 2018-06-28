@@ -1,189 +1,47 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Thu, 28 Jun 2018 16:32:27 +0200
-Subject: [PATCH v3 01/18] nvmem: add support for cell lookups
+Date: Thu, 28 Jun 2018 16:32:37 +0200
+Subject: [PATCH v3 11/18] ARM: davinci: mityomapl138: don't read the MAC
+ address from machine code
 In-Reply-To: <20180628143244.4561-1-brgl@bgdev.pl>
 References: <20180628143244.4561-1-brgl@bgdev.pl>
-Message-ID: <20180628143244.4561-2-brgl@bgdev.pl>
+Message-ID: <20180628143244.4561-12-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-We can currently only register nvmem cells from device tree or by
-manually calling nvmem_add_cells(). The latter options however forces
-users to make sure that the nvmem provider with which the cells are
-associated is registered before the call.
-
-This patch proposes a new solution inspired by other frameworks that
-offer resource lookups (GPIO, PWM etc.). It adds functions that allow
-machine code to register nvmem lookup which are later lazily used to
-add corresponding nvmem cells and remove them if no longer needed.
+This is now done by the emac driver using a registered nvmem cell.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- drivers/nvmem/core.c           | 75 +++++++++++++++++++++++++++++++++-
- include/linux/nvmem-consumer.h |  6 +++
- include/linux/nvmem-provider.h | 10 +++++
- 3 files changed, 90 insertions(+), 1 deletion(-)
+ arch/arm/mach-davinci/board-mityomapl138.c | 8 --------
+ 1 file changed, 8 deletions(-)
 
-diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
-index b5b0cdc21d01..c4889a4b26cf 100644
---- a/drivers/nvmem/core.c
-+++ b/drivers/nvmem/core.c
-@@ -62,6 +62,9 @@ static DEFINE_IDA(nvmem_ida);
- static LIST_HEAD(nvmem_cells);
- static DEFINE_MUTEX(nvmem_cells_mutex);
- 
-+static LIST_HEAD(nvmem_cell_lookups);
-+static DEFINE_MUTEX(nvmem_lookup_mutex);
-+
- #ifdef CONFIG_DEBUG_LOCK_ALLOC
- static struct lock_class_key eeprom_lock_key;
- #endif
-@@ -247,6 +250,41 @@ static const struct attribute_group *nvmem_ro_root_dev_groups[] = {
- 	NULL,
- };
- 
-+/**
-+ * nvmem_add_lookup_table() - register a number of nvmem cell lookup entries
-+ *
-+ * @lookup: array of nvmem cell lookup entries
-+ * @nentries: number of lookup entries in the array
-+ */
-+void nvmem_add_lookup_table(struct nvmem_cell_lookup *lookup, size_t nentries)
-+{
-+	int i;
-+
-+	mutex_lock(&nvmem_lookup_mutex);
-+	for (i = 0; i < nentries; i++)
-+		list_add_tail(&lookup[i].list, &nvmem_cell_lookups);
-+	mutex_unlock(&nvmem_lookup_mutex);
-+}
-+EXPORT_SYMBOL_GPL(nvmem_add_lookup_table);
-+
-+/**
-+ * nvmem_del_lookup_table() - unregister a set of previously added nvmem cell
-+ *                            lookup entries
-+ *
-+ * @lookup: array of nvmem cell lookup entries
-+ * @nentries: number of lookup entries in the array
-+ */
-+void nvmem_del_lookup_table(struct nvmem_cell_lookup *lookup, size_t nentries)
-+{
-+	int i;
-+
-+	mutex_lock(&nvmem_lookup_mutex);
-+	for (i = 0; i < nentries; i++)
-+		list_del(&lookup[i].list);
-+	mutex_unlock(&nvmem_lookup_mutex);
-+}
-+EXPORT_SYMBOL_GPL(nvmem_del_lookup_table);
-+
- static void nvmem_release(struct device *dev)
+diff --git a/arch/arm/mach-davinci/board-mityomapl138.c b/arch/arm/mach-davinci/board-mityomapl138.c
+index b5be51c0451e..5c0a0557a361 100644
+--- a/arch/arm/mach-davinci/board-mityomapl138.c
++++ b/arch/arm/mach-davinci/board-mityomapl138.c
+@@ -120,7 +120,6 @@ static void read_factory_config(struct nvmem_device *nvmem, void *context)
  {
- 	struct nvmem_device *nvmem = to_nvmem_device(dev);
-@@ -916,6 +954,37 @@ struct nvmem_cell *of_nvmem_cell_get(struct device_node *np,
- EXPORT_SYMBOL_GPL(of_nvmem_cell_get);
- #endif
+ 	int ret;
+ 	const char *partnum = NULL;
+-	struct davinci_soc_info *soc_info = &davinci_soc_info;
  
-+static struct nvmem_cell *nvmem_cell_from_lookup(const char *cell_id)
-+{
-+	struct nvmem_cell *cell = ERR_PTR(-EPROBE_DEFER);
-+	struct nvmem_cell_lookup *lookup;
-+	struct nvmem_device *nvmem;
-+	int rc;
-+
-+	mutex_lock(&nvmem_lookup_mutex);
-+
-+	list_for_each_entry(lookup, &nvmem_cell_lookups, list) {
-+		if (strcmp(cell_id, lookup->info.name) == 0) {
-+			nvmem = nvmem_find(lookup->nvmem_name);
-+			if (!nvmem)
-+				goto out;
-+
-+			rc = nvmem_add_cells(nvmem, &lookup->info, 1);
-+			if (rc) {
-+				cell = ERR_PTR(rc);
-+				goto out;
-+			}
-+
-+			cell = nvmem_cell_get_from_list(cell_id);
-+			break;
-+		}
-+	}
-+
-+out:
-+	mutex_unlock(&nvmem_lookup_mutex);
-+	return cell;
-+}
-+
- /**
-  * nvmem_cell_get() - Get nvmem cell of device form a given cell name
-  *
-@@ -936,7 +1005,11 @@ struct nvmem_cell *nvmem_cell_get(struct device *dev, const char *cell_id)
- 			return cell;
+ 	if (!IS_BUILTIN(CONFIG_NVMEM)) {
+ 		pr_warn("Factory Config not available without CONFIG_NVMEM\n");
+@@ -146,13 +145,6 @@ static void read_factory_config(struct nvmem_device *nvmem, void *context)
+ 		goto bad_config;
  	}
  
--	return nvmem_cell_get_from_list(cell_id);
-+	cell = nvmem_cell_get_from_list(cell_id);
-+	if (!IS_ERR(cell) || PTR_ERR(cell) == -EPROBE_DEFER)
-+		return cell;
-+
-+	return nvmem_cell_from_lookup(cell_id);
- }
- EXPORT_SYMBOL_GPL(nvmem_cell_get);
+-	pr_info("Found MAC = %pM\n", factory_config.mac);
+-	if (is_valid_ether_addr(factory_config.mac))
+-		memcpy(soc_info->emac_pdata->mac_addr,
+-			factory_config.mac, ETH_ALEN);
+-	else
+-		pr_warn("Invalid MAC found in factory config block\n");
+-
+ 	partnum = factory_config.partnum;
+ 	pr_info("Part Number = %s\n", partnum);
  
-diff --git a/include/linux/nvmem-consumer.h b/include/linux/nvmem-consumer.h
-index 4e85447f7860..f4b5d3186e94 100644
---- a/include/linux/nvmem-consumer.h
-+++ b/include/linux/nvmem-consumer.h
-@@ -29,6 +29,12 @@ struct nvmem_cell_info {
- 	unsigned int		nbits;
- };
- 
-+struct nvmem_cell_lookup {
-+	struct nvmem_cell_info	info;
-+	struct list_head	list;
-+	const char		*nvmem_name;
-+};
-+
- #if IS_ENABLED(CONFIG_NVMEM)
- 
- /* Cell based interface */
-diff --git a/include/linux/nvmem-provider.h b/include/linux/nvmem-provider.h
-index 24def6ad09bb..6a17d722062b 100644
---- a/include/linux/nvmem-provider.h
-+++ b/include/linux/nvmem-provider.h
-@@ -17,6 +17,7 @@
- 
- struct nvmem_device;
- struct nvmem_cell_info;
-+struct nvmem_cell_lookup;
- typedef int (*nvmem_reg_read_t)(void *priv, unsigned int offset,
- 				void *val, size_t bytes);
- typedef int (*nvmem_reg_write_t)(void *priv, unsigned int offset,
-@@ -72,6 +73,9 @@ struct nvmem_config {
- struct nvmem_device *nvmem_register(const struct nvmem_config *cfg);
- int nvmem_unregister(struct nvmem_device *nvmem);
- 
-+void nvmem_add_lookup_table(struct nvmem_cell_lookup *lookup, size_t nentries);
-+void nvmem_del_lookup_table(struct nvmem_cell_lookup *lookup, size_t nentries);
-+
- struct nvmem_device *devm_nvmem_register(struct device *dev,
- 					 const struct nvmem_config *cfg);
- 
-@@ -92,6 +96,12 @@ static inline int nvmem_unregister(struct nvmem_device *nvmem)
- 	return -ENOSYS;
- }
- 
-+static inline void
-+nvmem_add_lookup_table(struct nvmem_cell_lookup *lookup, size_t nentries) {}
-+
-+static inline void
-+nvmem_del_lookup_table(struct nvmem_cell_lookup *lookup, size_t nentries) {}
-+
- static inline struct nvmem_device *
- devm_nvmem_register(struct device *dev, const struct nvmem_config *c)
- {
 -- 
 2.17.1
