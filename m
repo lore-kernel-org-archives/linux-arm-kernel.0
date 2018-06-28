@@ -1,51 +1,59 @@
 From: luaraneda@gmail.com (Luis Araneda)
-Date: Thu, 28 Jun 2018 01:42:00 -0400
-Subject: [RFC PATCH 0/5] arm: dts: zynq: improvements and cleanup
-Message-ID: <20180628054205.17737-1-luaraneda@gmail.com>
+Date: Thu, 28 Jun 2018 01:42:02 -0400
+Subject: [RFC PATCH 2/5] dt-bindings: xilinx: Add missing zynq boards
+In-Reply-To: <20180628054205.17737-1-luaraneda@gmail.com>
+References: <20180628054205.17737-1-luaraneda@gmail.com>
+Message-ID: <20180628054205.17737-3-luaraneda@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series attempts to standardize device naming and improve
-its information for better identification
+The bindings were missing when adding the device-tree files
+Also, improve description of existing boards
 
-The values of the "compatible" and "model" device-tree properties
-are corrected for some devices, adding complementary information
-when necessary
+Signed-off-by: Luis Araneda <luaraneda@gmail.com>
+---
+ .../devicetree/bindings/arm/xilinx.txt        | 22 +++++++++++++++++--
+ 1 file changed, 20 insertions(+), 2 deletions(-)
 
-Additionally, a device-tree file is renamed to reflect the real model
-of the device
-
-I'm sending the series as an RFC because I don't know if
-device-tree files can be renamed and properties be changed
-(the last patch in particular)
-
-The patches are sorted (descending) by what I think is
-the probability of being accepted
-
-Luis Araneda (5):
-  arm: dts: zynq: Set correct manufacturer for ZedBoard and MicroZed
-    boards
-  dt-bindings: xilinx: Add missing zynq boards
-  arm: dts: zynq: correct and improve the model property of dt files
-  arm: dts: zynq: rename board zed to zedboard
-  arm: dts: zynq: remove "zynq" prefix from compatible property
-
- .../devicetree/bindings/arm/xilinx.txt        | 34 ++++++++++++++-----
- arch/arm/boot/dts/Makefile                    |  2 +-
- arch/arm/boot/dts/zynq-cc108.dts              |  4 +--
- arch/arm/boot/dts/zynq-microzed.dts           |  4 +--
- arch/arm/boot/dts/zynq-parallella.dts         |  2 +-
- arch/arm/boot/dts/zynq-zc702.dts              |  4 +--
- arch/arm/boot/dts/zynq-zc706.dts              |  4 +--
- arch/arm/boot/dts/zynq-zc770-xm010.dts        |  4 +--
- arch/arm/boot/dts/zynq-zc770-xm011.dts        |  4 +--
- arch/arm/boot/dts/zynq-zc770-xm012.dts        |  4 +--
- arch/arm/boot/dts/zynq-zc770-xm013.dts        |  4 +--
- .../dts/{zynq-zed.dts => zynq-zedboard.dts}   |  4 +--
- arch/arm/boot/dts/zynq-zybo-z7.dts            |  4 +--
- arch/arm/boot/dts/zynq-zybo.dts               |  4 +--
- 14 files changed, 50 insertions(+), 32 deletions(-)
- rename arch/arm/boot/dts/{zynq-zed.dts => zynq-zedboard.dts} (89%)
-
+diff --git a/Documentation/devicetree/bindings/arm/xilinx.txt b/Documentation/devicetree/bindings/arm/xilinx.txt
+index b9043bc35..f1e911058 100644
+--- a/Documentation/devicetree/bindings/arm/xilinx.txt
++++ b/Documentation/devicetree/bindings/arm/xilinx.txt
+@@ -8,15 +8,33 @@ Required root node properties:
+ 
+ Additional compatible strings:
+ 
+-- Xilinx internal board cc108
++- Xilinx CC108 board
+   "xlnx,zynq-cc108"
+ 
+-- Xilinx internal board zc770 with different FMC cards
++- Avnet MicroZed board
++  "avnet,zynq-microzed"
++
++- Adapteva Parallella board
++  "adapteva,parallella"
++
++- Xilinx ZC702 board
++  "xlnx,zynq-zc702"
++
++- Xilinx ZC706 board
++  "xlnx,zynq-zc706"
++
++- Xilinx ZC770 board, with different FMC cards
+   "xlnx,zynq-zc770-xm010"
+   "xlnx,zynq-zc770-xm011"
+   "xlnx,zynq-zc770-xm012"
+   "xlnx,zynq-zc770-xm013"
+ 
++- Avnet ZedBoard board
++  "avnet,zynq-zed"
++
++- Digilent Zybo board
++  "digilent,zynq-zybo"
++
+ - Digilent Zybo Z7 board
+   "digilent,zynq-zybo-z7"
+ 
 -- 
 2.18.0
