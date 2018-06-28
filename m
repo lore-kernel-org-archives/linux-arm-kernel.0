@@ -1,55 +1,86 @@
-From: anson.huang@nxp.com (Anson Huang)
-Date: Thu, 28 Jun 2018 01:14:44 +0000
-Subject: [PATCH] ARM: dts: imx6sll-evk: enable usdhc3 slot
-In-Reply-To: <CAOMZO5DoRUSOfV_oh242w6s_1Zs8yAy9Kf4D+WdYym5c+6nucg@mail.gmail.com>
-References: <1530088605-9264-1-git-send-email-Anson.Huang@nxp.com>
- <CAOMZO5DoRUSOfV_oh242w6s_1Zs8yAy9Kf4D+WdYym5c+6nucg@mail.gmail.com>
-Message-ID: <AM3PR04MB1315128EA1000FD6D0903CEAF54F0@AM3PR04MB1315.eurprd04.prod.outlook.com>
+From: honghui.zhang@mediatek.com (Honghui Zhang)
+Date: Thu, 28 Jun 2018 09:17:32 +0800
+Subject: [PATCH 4/4] PCI: mediatek: Add loadable kernel module support
+In-Reply-To: <CAHp75VdsSZifb5xZ2Q8cmJV=PgAaoN=iOhMfyVX4uE4vNpo=Mg@mail.gmail.com>
+References: <1530091298-28120-1-git-send-email-honghui.zhang@mediatek.com>
+ <1530091298-28120-5-git-send-email-honghui.zhang@mediatek.com>
+ <CAHp75VdsSZifb5xZ2Q8cmJV=PgAaoN=iOhMfyVX4uE4vNpo=Mg@mail.gmail.com>
+Message-ID: <1530148652.28284.4.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Fabio
-
-Anson Huang
-Best Regards!
-
-
-> -----Original Message-----
-> From: Fabio Estevam [mailto:festevam at gmail.com]
-> Sent: Wednesday, June 27, 2018 10:31 PM
-> To: Anson Huang <anson.huang@nxp.com>
-> Cc: Shawn Guo <shawnguo@kernel.org>; Sascha Hauer
-> <s.hauer@pengutronix.de>; Sascha Hauer <kernel@pengutronix.de>; Fabio
-> Estevam <fabio.estevam@nxp.com>; Rob Herring <robh+dt@kernel.org>;
-> Mark Rutland <mark.rutland@arm.com>; open list:OPEN FIRMWARE AND
-> FLATTENED DEVICE TREE BINDINGS <devicetree@vger.kernel.org>;
-> dl-linux-imx <linux-imx@nxp.com>; moderated list:ARM/FREESCALE IMX / MXC
-> ARM ARCHITECTURE <linux-arm-kernel@lists.infradead.org>; linux-kernel
-> <linux-kernel@vger.kernel.org>
-> Subject: Re: [PATCH] ARM: dts: imx6sll-evk: enable usdhc3 slot
+On Wed, 2018-06-27 at 19:39 +0300, Andy Shevchenko wrote:
+> On Wed, Jun 27, 2018 at 12:21 PM,  <honghui.zhang@mediatek.com> wrote:
+> > From: Honghui Zhang <honghui.zhang@mediatek.com>
+> >
+> > Implement remove callback function for Mediatek PCIe driver to add
+> > loadable kernel module support.
 > 
-> Hi Anson,
-> 
-> On Wed, Jun 27, 2018 at 5:36 AM, Anson Huang <Anson.Huang@nxp.com>
-> wrote:
-> 
-> > +&usdhc3 {
-> > +       pinctrl-names = "default", "state_100mhz", "state_200mhz";
-> > +       pinctrl-0 = <&pinctrl_usdhc3>;
-> > +       pinctrl-1 = <&pinctrl_usdhc3_100mhz>;
-> > +       pinctrl-2 = <&pinctrl_usdhc3_200mhz>;
-> > +       cd-gpios = <&gpio3 22 GPIO_ACTIVE_LOW>;
-> > +       keep-power-in-suspend;
-> > +       enable-sdio-wakeup;
-> > +       vmmc-supply = <&reg_sd3_vmmc>;
-> > +       status = "okay";
-> > +};
+> > +static void mtk_pcie_irq_teardown(struct mtk_pcie *pcie)
+> > +{
+> > +       struct mtk_pcie_port *port, *tmp;
 > > +
-> >  &usbotg1 {
 > 
-> Please keep the nodes sorted in alphabetical order.
+> > +       if (list_empty(&pcie->ports))
+> > +               return;
+> 
+> This is redundant.
 
-Thanks, it is because original code does NOT do it in alphabetical order, so I just added
-usdhc3 at the end of usdhc1, but I sent V2 patch to re-sort it anyway, please review it.  
+Yeah, you are right, I will remove it.
 
-Anson.
+> 
+> > +
+> > +       list_for_each_entry_safe(port, tmp, &pcie->ports, list) {
+> > +               irq_set_chained_handler_and_data(port->irq, NULL, NULL);
+> > +
+> > +               if (port->irq_domain)
+> > +                       irq_domain_remove(port->irq_domain);
+> > +
+> > +               if (IS_ENABLED(CONFIG_PCI_MSI)) {
+> > +                       if (port->msi_domain)
+> > +                               irq_domain_remove(port->msi_domain);
+> > +                       if (port->inner_domain)
+> > +                               irq_domain_remove(port->inner_domain);
+> > +               }
+> > +
+> > +               irq_dispose_mapping(port->irq);
+> > +       }
+> > +}
+> 
+> > +static void mtk_pcie_free_resources(struct mtk_pcie *pcie)
+> > +{
+> > +       struct pci_host_bridge *host = pci_host_bridge_from_priv(pcie);
+> > +       struct list_head *windows = &host->windows;
+> > +
+> > +       pci_unmap_iospace(&pcie->pio);
+> > +       pci_free_resource_list(windows);
+> > +}
+> > +
+> > +static int mtk_pcie_remove(struct platform_device *pdev)
+> > +{
+> > +       struct mtk_pcie *pcie = platform_get_drvdata(pdev);
+> > +       struct pci_host_bridge *host = pci_host_bridge_from_priv(pcie);
+> > +
+> > +       pci_stop_root_bus(host->bus);
+> > +       pci_remove_root_bus(host->bus);
+> > +       mtk_pcie_free_resources(pcie);
+> > +
+> > +       mtk_pcie_irq_teardown(pcie);
+> > +
+> 
+> > +       if (!list_empty(&pcie->ports))
+> 
+> I think this is also not needed. Do you put runtime PM by the way?
+
+Yes, it's could be removed.
+the pm was putted in mtk_pcie_put_resources which will call
+mtk_pcie_subsys_powerdown, and the pm was putted in that function.
+
+thanks.
+
+> 
+> > +               mtk_pcie_put_resources(pcie);
+> > +
+> > +       return 0;
+> > +}
+> 
