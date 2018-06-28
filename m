@@ -1,198 +1,71 @@
 From: michal.simek@xilinx.com (Michal Simek)
-Date: Thu, 28 Jun 2018 08:39:09 +0200
-Subject: [RFC PATCH 3/5] arm: dts: zynq: correct and improve the model
- property of dt files
-In-Reply-To: <20180628054205.17737-4-luaraneda@gmail.com>
+Date: Thu, 28 Jun 2018 08:40:18 +0200
+Subject: [RFC PATCH 4/5] arm: dts: zynq: rename board zed to zedboard
+In-Reply-To: <20180628054205.17737-5-luaraneda@gmail.com>
 References: <20180628054205.17737-1-luaraneda@gmail.com>
- <20180628054205.17737-4-luaraneda@gmail.com>
-Message-ID: <05232c62-0b3f-d2b1-3e28-98f0154942ef@xilinx.com>
+ <20180628054205.17737-5-luaraneda@gmail.com>
+Message-ID: <9d00dae5-835f-43b4-0a78-2aa43bbcff54@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 28.6.2018 07:42, Luis Araneda wrote:
-> Replace the current value of the model property by a more accurate
-> description of each board (which includes the manufacturer), as some
-> of the boards had the same value ("Xilinx Zynq")
+> The real name of the board is ZedBoard, from Avnet
 > 
 > Signed-off-by: Luis Araneda <luaraneda@gmail.com>
 > ---
->  arch/arm/boot/dts/zynq-cc108.dts       | 2 +-
->  arch/arm/boot/dts/zynq-microzed.dts    | 2 +-
->  arch/arm/boot/dts/zynq-parallella.dts  | 2 +-
->  arch/arm/boot/dts/zynq-zc702.dts       | 2 +-
->  arch/arm/boot/dts/zynq-zc706.dts       | 2 +-
->  arch/arm/boot/dts/zynq-zc770-xm010.dts | 2 +-
->  arch/arm/boot/dts/zynq-zc770-xm011.dts | 2 +-
->  arch/arm/boot/dts/zynq-zc770-xm012.dts | 2 +-
->  arch/arm/boot/dts/zynq-zc770-xm013.dts | 2 +-
->  arch/arm/boot/dts/zynq-zed.dts         | 2 +-
->  arch/arm/boot/dts/zynq-zybo-z7.dts     | 2 +-
->  arch/arm/boot/dts/zynq-zybo.dts        | 2 +-
->  12 files changed, 12 insertions(+), 12 deletions(-)
+>  Documentation/devicetree/bindings/arm/xilinx.txt      | 2 +-
+>  arch/arm/boot/dts/Makefile                            | 2 +-
+>  arch/arm/boot/dts/{zynq-zed.dts => zynq-zedboard.dts} | 2 +-
+>  3 files changed, 3 insertions(+), 3 deletions(-)
+>  rename arch/arm/boot/dts/{zynq-zed.dts => zynq-zedboard.dts} (93%)
 > 
-> diff --git a/arch/arm/boot/dts/zynq-cc108.dts b/arch/arm/boot/dts/zynq-cc108.dts
-> index 1a0f631c1..8b9ab9bba 100644
-> --- a/arch/arm/boot/dts/zynq-cc108.dts
-> +++ b/arch/arm/boot/dts/zynq-cc108.dts
-> @@ -12,8 +12,8 @@
->  /include/ "zynq-7000.dtsi"
+> diff --git a/Documentation/devicetree/bindings/arm/xilinx.txt b/Documentation/devicetree/bindings/arm/xilinx.txt
+> index f1e911058..d10adc4d0 100644
+> --- a/Documentation/devicetree/bindings/arm/xilinx.txt
+> +++ b/Documentation/devicetree/bindings/arm/xilinx.txt
+> @@ -30,7 +30,7 @@ Additional compatible strings:
+>    "xlnx,zynq-zc770-xm013"
 >  
->  / {
-> +	model = "Xilinx CC108 board";
->  	compatible = "xlnx,zynq-cc108", "xlnx,zynq-7000";
-> -	model = "Xilinx Zynq";
+>  - Avnet ZedBoard board
+> -  "avnet,zynq-zed"
+> +  "avnet,zynq-zedboard"
 >  
->  	aliases {
->  		ethernet0 = &gem0;
-> diff --git a/arch/arm/boot/dts/zynq-microzed.dts b/arch/arm/boot/dts/zynq-microzed.dts
-> index e40f40a7f..3cc957428 100644
-> --- a/arch/arm/boot/dts/zynq-microzed.dts
-> +++ b/arch/arm/boot/dts/zynq-microzed.dts
-> @@ -7,7 +7,7 @@
->  /include/ "zynq-7000.dtsi"
->  
->  / {
-> -	model = "Zynq MicroZED Development Board";
-> +	model = "Avnet MicroZed board";
->  	compatible = "avnet,zynq-microzed", "xlnx,zynq-7000";
->  
->  	aliases {
-> diff --git a/arch/arm/boot/dts/zynq-parallella.dts b/arch/arm/boot/dts/zynq-parallella.dts
-> index c05f4b67d..54592aeb9 100644
-> --- a/arch/arm/boot/dts/zynq-parallella.dts
-> +++ b/arch/arm/boot/dts/zynq-parallella.dts
-> @@ -12,7 +12,7 @@
->  /include/ "zynq-7000.dtsi"
->  
->  / {
-> -	model = "Adapteva Parallella Board";
-> +	model = "Adapteva Parallella board";
->  	compatible = "adapteva,parallella", "xlnx,zynq-7000";
->  
->  	aliases {
-> diff --git a/arch/arm/boot/dts/zynq-zc702.dts b/arch/arm/boot/dts/zynq-zc702.dts
-> index f2330b0cb..3f84b94db 100644
-> --- a/arch/arm/boot/dts/zynq-zc702.dts
-> +++ b/arch/arm/boot/dts/zynq-zc702.dts
-> @@ -7,7 +7,7 @@
->  #include "zynq-7000.dtsi"
->  
->  / {
-> -	model = "Zynq ZC702 Development Board";
-> +	model = "Xilinx ZC702 board";
->  	compatible = "xlnx,zynq-zc702", "xlnx,zynq-7000";
->  
->  	aliases {
-> diff --git a/arch/arm/boot/dts/zynq-zc706.dts b/arch/arm/boot/dts/zynq-zc706.dts
-> index 3ad1260ff..a15908cac 100644
-> --- a/arch/arm/boot/dts/zynq-zc706.dts
-> +++ b/arch/arm/boot/dts/zynq-zc706.dts
-> @@ -7,7 +7,7 @@
->  #include "zynq-7000.dtsi"
->  
->  / {
-> -	model = "Zynq ZC706 Development Board";
-> +	model = "Xilinx ZC706 board";
->  	compatible = "xlnx,zynq-zc706", "xlnx,zynq-7000";
->  
->  	aliases {
-> diff --git a/arch/arm/boot/dts/zynq-zc770-xm010.dts b/arch/arm/boot/dts/zynq-zc770-xm010.dts
-> index 6884f1ad6..0e1bfdd34 100644
-> --- a/arch/arm/boot/dts/zynq-zc770-xm010.dts
-> +++ b/arch/arm/boot/dts/zynq-zc770-xm010.dts
-> @@ -8,8 +8,8 @@
->  #include "zynq-7000.dtsi"
->  
->  / {
-> +	model = "Xilinx ZC770 XM010 board";
->  	compatible = "xlnx,zynq-zc770-xm010", "xlnx,zynq-7000";
-> -	model = "Xilinx Zynq";
->  
->  	aliases {
->  		ethernet0 = &gem0;
-> diff --git a/arch/arm/boot/dts/zynq-zc770-xm011.dts b/arch/arm/boot/dts/zynq-zc770-xm011.dts
-> index b78883cee..b7f65862c 100644
-> --- a/arch/arm/boot/dts/zynq-zc770-xm011.dts
-> +++ b/arch/arm/boot/dts/zynq-zc770-xm011.dts
-> @@ -8,8 +8,8 @@
->  #include "zynq-7000.dtsi"
->  
->  / {
-> +	model = "Xilinx ZC770 XM011 board";
->  	compatible = "xlnx,zynq-zc770-xm011", "xlnx,zynq-7000";
-> -	model = "Xilinx Zynq";
->  
->  	aliases {
->  		i2c0 = &i2c1;
-> diff --git a/arch/arm/boot/dts/zynq-zc770-xm012.dts b/arch/arm/boot/dts/zynq-zc770-xm012.dts
-> index c3169d636..d2359b789 100644
-> --- a/arch/arm/boot/dts/zynq-zc770-xm012.dts
-> +++ b/arch/arm/boot/dts/zynq-zc770-xm012.dts
-> @@ -8,8 +8,8 @@
->  #include "zynq-7000.dtsi"
->  
->  / {
-> +	model = "Xilinx ZC770 XM012 board";
->  	compatible = "xlnx,zynq-zc770-xm012", "xlnx,zynq-7000";
-> -	model = "Xilinx Zynq";
->  
->  	aliases {
->  		i2c0 = &i2c0;
-> diff --git a/arch/arm/boot/dts/zynq-zc770-xm013.dts b/arch/arm/boot/dts/zynq-zc770-xm013.dts
-> index 8bb66859d..651913f1a 100644
-> --- a/arch/arm/boot/dts/zynq-zc770-xm013.dts
-> +++ b/arch/arm/boot/dts/zynq-zc770-xm013.dts
-> @@ -8,8 +8,8 @@
->  #include "zynq-7000.dtsi"
->  
->  / {
-> +	model = "Xilinx ZC770 XM013 board";
->  	compatible = "xlnx,zynq-zc770-xm013", "xlnx,zynq-7000";
-> -	model = "Xilinx Zynq";
->  
->  	aliases {
->  		ethernet0 = &gem1;
-> diff --git a/arch/arm/boot/dts/zynq-zed.dts b/arch/arm/boot/dts/zynq-zed.dts
-> index 98381cc85..bf3e26dbf 100644
+>  - Digilent Zybo board
+>    "digilent,zynq-zybo"
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 37a3de760..e4c39e26f 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -1108,7 +1108,7 @@ dtb-$(CONFIG_ARCH_ZYNQ) += \
+>  	zynq-zc770-xm011.dtb \
+>  	zynq-zc770-xm012.dtb \
+>  	zynq-zc770-xm013.dtb \
+> -	zynq-zed.dtb \
+> +	zynq-zedboard.dtb \
+>  	zynq-zybo.dtb \
+>  	zynq-zybo-z7.dtb
+>  dtb-$(CONFIG_MACH_ARMADA_370) += \
+> diff --git a/arch/arm/boot/dts/zynq-zed.dts b/arch/arm/boot/dts/zynq-zedboard.dts
+> similarity index 93%
+> rename from arch/arm/boot/dts/zynq-zed.dts
+> rename to arch/arm/boot/dts/zynq-zedboard.dts
+> index bf3e26dbf..540581c56 100644
 > --- a/arch/arm/boot/dts/zynq-zed.dts
-> +++ b/arch/arm/boot/dts/zynq-zed.dts
-> @@ -7,7 +7,7 @@
->  #include "zynq-7000.dtsi"
+> +++ b/arch/arm/boot/dts/zynq-zedboard.dts
+> @@ -8,7 +8,7 @@
 >  
 >  / {
-> -	model = "Zynq Zed Development Board";
-> +	model = "Avnet ZedBoard board";
->  	compatible = "avnet,zynq-zed", "xlnx,zynq-7000";
+>  	model = "Avnet ZedBoard board";
+> -	compatible = "avnet,zynq-zed", "xlnx,zynq-7000";
+> +	compatible = "avnet,zynq-zedboard", "xlnx,zynq-7000";
 >  
 >  	aliases {
-> diff --git a/arch/arm/boot/dts/zynq-zybo-z7.dts b/arch/arm/boot/dts/zynq-zybo-z7.dts
-> index 1e713dc98..be40be9b7 100644
-> --- a/arch/arm/boot/dts/zynq-zybo-z7.dts
-> +++ b/arch/arm/boot/dts/zynq-zybo-z7.dts
-> @@ -3,7 +3,7 @@
->  #include "zynq-7000.dtsi"
->  
->  / {
-> -	model = "Zynq ZYBO Z7 Development Board";
-> +	model = "Digilent Zybo Z7 board";
->  	compatible = "digilent,zynq-zybo-z7", "xlnx,zynq-7000";
->  
->  	aliases {
-> diff --git a/arch/arm/boot/dts/zynq-zybo.dts b/arch/arm/boot/dts/zynq-zybo.dts
-> index a6c00e7fa..0439e9f1e 100644
-> --- a/arch/arm/boot/dts/zynq-zybo.dts
-> +++ b/arch/arm/boot/dts/zynq-zybo.dts
-> @@ -7,7 +7,7 @@
->  #include "zynq-7000.dtsi"
->  
->  / {
-> -	model = "Zynq ZYBO Development Board";
-> +	model = "Digilent Zybo board";
->  	compatible = "digilent,zynq-zybo", "xlnx,zynq-7000";
->  
->  	aliases {
+>  		ethernet0 = &gem0;
 > 
 
-Not a problem with this patch.
+It will just cause confusion and I can't see any benefit to rename this
+file. If you want to state different compatible string with full board
+name I am fine with that but that's it.
 
-M
+Thanks,
+Michal
