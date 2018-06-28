@@ -1,43 +1,66 @@
-From: collinsd@codeaurora.org (David Collins)
-Date: Thu, 28 Jun 2018 11:04:17 -0700
-Subject: [PATCH v8 2/2] regulator: add QCOM RPMh regulator driver
-In-Reply-To: <20180628101813.GD14040@sirena.org.uk>
-References: <cover.1529712888.git.collinsd@codeaurora.org>
- <35c4ea70cdf5caba560fb6f40e866ee8bc456d93.1529712888.git.collinsd@codeaurora.org>
- <CAD=FV=XVEEPgjBXxR+-46RgxLOq63Xvq-jtruoaCxccmMoKUuA@mail.gmail.com>
- <20180626120733.GD1779@sirena.org.uk>
- <CAD=FV=X1E8Cz=L93G-zJwhM0R=N3YuBBhkvCnLvWuxMU9KJkTw@mail.gmail.com>
- <20180626150203.GG1779@sirena.org.uk>
- <CAD=FV=WC_XWRk-6OELOFFWGnhRq1VeoiiveqXLSy+xqsVb22pA@mail.gmail.com>
- <20180627150126.GC5263@sirena.org.uk>
- <CAD=FV=WYcCVjAiMpzf4zyAByw5y-oDMnuabip1HXqa-mQFRt2w@mail.gmail.com>
- <20180628101813.GD14040@sirena.org.uk>
-Message-ID: <87cc8c77-7b39-1746-4680-cb26d602e62e@codeaurora.org>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Thu, 28 Jun 2018 23:40:36 +0530
+Subject: [PATCH v2 0/6] Add Actions Semi S900 I2C support
+Message-ID: <20180628181042.2239-1-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Mark,
+This patchset adds I2C controller support for Actions Semi S900 SoC.
+This driver has been structured in a way such that there will be only
+one controller driver for the whole OWL family series (S500, S700 and
+S900 SoCs).
 
-On 06/28/2018 03:18 AM, Mark Brown wrote:
-> On Wed, Jun 27, 2018 at 09:28:03AM -0700, Doug Anderson wrote:
-> 
->> OK, great.  I guess I'm confused about the "|| COMPILE_TEST" causing
->> problems then?  I was worried that anyone trying to do "COMPILE_TEST"
->> on your tree (or linuxnext if RPMh isn't there) would get failures due
->> to the lack of header files.  I guess if it's a problem you could just
->> gut the "|| COMPILE_TEST" and it could be added back in later?
-> 
-> Ugh, yes - that'll break things.  In that case I can't apply this
-> without a signed tag from Andy's tree with the dependency stuff in.
-> 
+There are 6 I2C controllers with separate memory mapped register space.
+The I2C controller can handle atmost two messages concatenated by a
+repeated start via its internal address feature. Hence the driver
+uses this feature for messages of length greater than 1. In those cases,
+the first message of the combined message should be a `write` with maximum
+message length 6 and the second message's maximum length should be 240 bytes.
 
-Do you have any remaining concerns with the qcom-rpmh-regulator binding
-and driver patches that would keep you from applying them (other than the
-dependency patches being applied first)?
+As far as the bus speed is concerned, this driver only supports
+Standard (100KHz) and High speed (400KHz) for now.
+
+The pinctrl definitions are only available for I2C0, I2C1 and I2C2.
+With the mux option available only for I2C0.
+
+For Bubblegum-96 board utilizing the S900 SoC, only I2C1 and I2C2 which
+are exposed on the Low speed expansion connector are enabled.
 
 Thanks,
-David
+Mani
+
+Changes in v2:
+
+As per Andy's review:
+* Modified infinite loops to fixed number of retries
+* Used i2c_8bit_addr_from_msg for constructing the slave address
+* Removed unnecessary parenthesis around defines
+* Modified certain dev_warn to dev_dbg
+* Modified the error handling to more generic pattern
+
+* Fixed the return value in owl_i2c_master_xfer
+* Added MAINTAINERS patch for I2C driver and its binding
+
+Manivannan Sadhasivam (6):
+  dt-bindings: i2c: Add binding for Actions Semi OWL I2C controller
+  arm64: dts: actions: Add Actions Semi S900 I2C controller nodes
+  arm64: dts: actions: Add pinctrl definition for S900 I2C controller
+  arm64: dts: actions: Enable I2C1 and I2C2 in Bubblegum-96 board
+  i2c: Add Actions Semi OWL family S900 I2C driver
+  MAINTAINERS: Add entry for Actions Semi OWL I2C driver
+
+ .../devicetree/bindings/i2c/i2c-owl.txt       |  27 +
+ MAINTAINERS                                   |   2 +
+ .../dts/actions/s900-bubblegum-96-pins.dtsi   |  29 ++
+ .../boot/dts/actions/s900-bubblegum-96.dts    |  11 +
+ arch/arm64/boot/dts/actions/s900.dtsi         |  60 +++
+ drivers/i2c/busses/Kconfig                    |   7 +
+ drivers/i2c/busses/Makefile                   |   1 +
+ drivers/i2c/busses/i2c-owl.c                  | 471 ++++++++++++++++++
+ 8 files changed, 608 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/i2c/i2c-owl.txt
+ create mode 100644 arch/arm64/boot/dts/actions/s900-bubblegum-96-pins.dtsi
+ create mode 100644 drivers/i2c/busses/i2c-owl.c
 
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.17.1
