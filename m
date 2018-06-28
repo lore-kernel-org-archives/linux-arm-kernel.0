@@ -1,45 +1,47 @@
-From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Wed, 27 Jun 2018 21:24:24 -0700
-Subject: [PATCH 4/4] ARM: dts: imx6qdl-zii-rdu2: Populate RAVE SP power button
- node
-In-Reply-To: <20180628042424.12664-1-andrew.smirnov@gmail.com>
-References: <20180628042424.12664-1-andrew.smirnov@gmail.com>
-Message-ID: <20180628042424.12664-5-andrew.smirnov@gmail.com>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Thu, 28 Jun 2018 09:59:13 +0530
+Subject: [PATCH v10 00/14] Krait clocks + Krait CPUfreq
+In-Reply-To: <a58c2d2c-64d1-7223-dc98-8f749397375d@linaro.org>
+References: <1529415925-28915-1-git-send-email-sricharan@codeaurora.org>
+ <a58c2d2c-64d1-7223-dc98-8f749397375d@linaro.org>
+Message-ID: <410263b4-9434-ed49-626d-2a14efe350f0@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-RAVE SP found on RDU2 implements power button control compatible with
-the rave-sp-pwrbutton driver. Add a node to make it availible.
+Hi Thierry,
 
-Cc: Fabio Estevam <fabio.estevam@nxp.com>
-Cc: Nikita Yushchenko <nikita.yoush@cogentembedded.com>
-Cc: Lucas Stach <l.stach@pengutronix.de>
-Cc: cphealy at gmail.com
-Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: devicetree at vger.kernel.org
-Cc: linux-kernel at vger.kernel.org
-Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
----
- arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi | 4 ++++
- 1 file changed, 4 insertions(+)
+On 6/27/2018 3:01 PM, Thierry Escande wrote:
+> Hi Sricharan,
+> 
+> On 19/06/2018 15:45, Sricharan R wrote:
+>> Sricharan R (2):
+>> ?? clk: qcom: Add safe switch hook for krait mux clocks
+>> ?? dt-bindings: cpufreq: Document operating-points-v2-krait-cpu
+>>
+>> Stephen Boyd (12):
+>> ?? ARM: Add Krait L2 register accessor functions
+>> ?? clk: qcom: Add support for High-Frequency PLLs (HFPLLs)
+>> ?? clk: qcom: Add HFPLL driver
+>> ?? dt-bindings: clock: Document qcom,hfpll
+>> ?? clk: qcom: Add MSM8960/APQ8064's HFPLLs
+>> ?? clk: qcom: Add IPQ806X's HFPLLs
+>> ?? clk: qcom: Add support for Krait clocks
+>> ?? clk: qcom: Add KPSS ACC/GCC driver
+>> ?? dt-bindings: arm: Document qcom,kpss-gcc
+>> ?? clk: qcom: Add Krait clock controller driver
+>> ?? dt-bindings: clock: Document qcom,krait-cc
+>> ?? cpufreq: Add module to register cpufreq on Krait CPUs
+> 
+> Tested on apq8064 (db600c).
+> 
+> Tested-By: Thierry Escande <thierry.escande@linaro.org>
+> 
 
-diff --git a/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi b/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
-index 48da4b15da09..869dfd8431a1 100644
---- a/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
-@@ -331,6 +331,10 @@
- 			compatible = "zii,rave-sp-backlight";
- 		};
- 
-+		pwrbutton {
-+			compatible = "zii,rave-sp-pwrbutton";
-+		};
-+
- 		eeprom at a3 {
- 			compatible = "zii,rave-sp-eeprom";
- 			reg = <0xa3 0x4000>;
+  Thanks for testing this !!
+  I Will try to merge the kryo cpu-freq and this one if that looks neat.
+
+Regards,
+ Sricharan
+
 -- 
-2.17.1
+"QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
