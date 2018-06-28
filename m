@@ -1,119 +1,72 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 28 Jun 2018 13:24:05 +0100
-Subject: [PATCH v3 08/17] irqchip/irq-mvebu-icu: disociate ICU and NSR
-In-Reply-To: <20180622151432.1566-9-miquel.raynal@bootlin.com>
-References: <20180622151432.1566-1-miquel.raynal@bootlin.com>
- <20180622151432.1566-9-miquel.raynal@bootlin.com>
-Message-ID: <0d666052-b1f5-a27a-1bc8-fa3ede9e388a@arm.com>
+From: ndesaulniers@google.com (Nick Desaulniers)
+Date: Thu, 28 Jun 2018 08:40:14 -0400
+Subject: [PATCH] arm64: remove no-op -p linker flag
+In-Reply-To: <20180628093928.GB10751@arm.com>
+References: <20180627194614.188210-1-ghackmann@google.com>
+ <20180628093928.GB10751@arm.com>
+Message-ID: <CAKwvOdnhPhXc+V2aTzpyCDCeCmFtzPe+-7+YrRrPeWDF1f5s1A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/06/18 16:14, Miquel Raynal wrote:
-> NSR (non-secure interrupts) are handled in the ICU driver like if there
-> was only this type of interrupt in the ICU. Change this behavior to
-> prepare the introduction of SEI (System Error Interrupts) support by
-> moving the NSR code in a separate function. This is done under the form
-> of a 'probe' function to ease future migration to NSR/SEI being platform
-> devices part of the ICU.
-> 
-> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
-> Reviewed-by: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
-> ---
->  drivers/irqchip/irq-mvebu-icu.c | 58 +++++++++++++++++++++++------------------
->  1 file changed, 33 insertions(+), 25 deletions(-)
-> 
-> diff --git a/drivers/irqchip/irq-mvebu-icu.c b/drivers/irqchip/irq-mvebu-icu.c
-> index 607948870a14..24d45186eb6b 100644
-> --- a/drivers/irqchip/irq-mvebu-icu.c
-> +++ b/drivers/irqchip/irq-mvebu-icu.c
-> @@ -205,6 +205,37 @@ static const struct irq_domain_ops mvebu_icu_domain_ops = {
->  	.free      = mvebu_icu_irq_domain_free,
->  };
->  
-> +static int mvebu_icu_subset_probe(struct platform_device *pdev)
-> +{
-> +	struct device_node *msi_parent_dn;
-> +	struct irq_domain *irq_domain;
-> +	struct mvebu_icu *icu;
-> +
-> +	icu = dev_get_drvdata(&pdev->dev);
-> +	if (!icu)
-> +		return -ENODEV;
-> +
-> +	pdev->dev.msi_domain = of_msi_get_domain(&pdev->dev, pdev->dev.of_node,
-> +						 DOMAIN_BUS_PLATFORM_MSI);
-> +	if (!pdev->dev.msi_domain)
-> +		return -EPROBE_DEFER;
-> +
-> +	msi_parent_dn = irq_domain_get_of_node(pdev->dev.msi_domain);
-> +	if (!msi_parent_dn)
-> +		return -ENODEV;
-> +
-> +	irq_domain = platform_msi_create_device_domain(&pdev->dev, ICU_MAX_IRQS,
-> +						       mvebu_icu_write_msg,
-> +						       &mvebu_icu_domain_ops,
-> +						       icu);
-> +	if (!irq_domain) {
-> +		dev_err(&pdev->dev, "Failed to create ICU MSI domain\n");
-> +		return -ENOMEM;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
->  static struct regmap_config mvebu_icu_regmap_config = {
->  	.reg_bits	= 32,
->  	.val_bits	= 32,
-> @@ -215,9 +246,6 @@ static struct regmap_config mvebu_icu_regmap_config = {
->  static int mvebu_icu_probe(struct platform_device *pdev)
->  {
->  	struct mvebu_icu *icu;
-> -	struct device_node *node = pdev->dev.of_node;
-> -	struct device_node *gicp_dn;
-> -	struct irq_domain *irq_domain;
->  	struct resource *res;
->  	void __iomem *regs;
->  	int i;
-> @@ -255,19 +283,6 @@ static int mvebu_icu_probe(struct platform_device *pdev)
->  	icu->irq_chip.irq_set_affinity = irq_chip_set_affinity_parent;
->  #endif
->  
-> -	/*
-> -	 * We're probed after MSI domains have been resolved, so force
-> -	 * resolution here.
-> -	 */
-> -	pdev->dev.msi_domain = of_msi_get_domain(&pdev->dev, node,
-> -						 DOMAIN_BUS_PLATFORM_MSI);
-> -	if (!pdev->dev.msi_domain)
-> -		return -EPROBE_DEFER;
-> -
-> -	gicp_dn = irq_domain_get_of_node(pdev->dev.msi_domain);
-> -	if (!gicp_dn)
-> -		return -ENODEV;
-> -
->  	/*
->  	 * Clean all ICU interrupts with type SPI_NSR, required to
->  	 * avoid unpredictable SPI assignments done by firmware.
-> @@ -282,16 +297,9 @@ static int mvebu_icu_probe(struct platform_device *pdev)
->  			regmap_write(icu->regmap, ICU_INT_CFG(i), 0);
->  	}
->  
-> -	irq_domain =
-> -		platform_msi_create_device_domain(&pdev->dev, ICU_MAX_IRQS,
-> -						  mvebu_icu_write_msg,
-> -						  &mvebu_icu_domain_ops, icu);
-> -	if (!irq_domain) {
-> -		dev_err(&pdev->dev, "Failed to create ICU domain\n");
-> -		return -ENOMEM;
-> -	}
-> +	platform_set_drvdata(pdev, icu);
+On Thu, Jun 28, 2018 at 5:38 AM Will Deacon <will.deacon@arm.com> wrote:
+>
+> On Wed, Jun 27, 2018 at 12:46:14PM -0700, Greg Hackmann wrote:
+> > Linking the ARM64 defconfig kernel with LLVM lld fails with the error:
+> >
+> >   ld.lld: error: unknown argument: -p
+> >   Makefile:1015: recipe for target 'vmlinux' failed
+> >
+> > Without this flag, the ARM64 defconfig kernel successfully links with
+> > lld and boots on Dragonboard 410c.
 
-What is the upshot of passing this icu pointer as part of the platform
-device structure instead of simply passing it as a parameter? Is
-anything else using it?
+Ha! Just one single unknown linker flag, to link and boot? That's not too bad.
 
-Thanks,
+> > After digging through binutils source and changelogs, it turns out that
+> > -p is only relevant to ancient binutils installations targeting 32-bit
+> > ARM.  binutils accepts -p for AArch64 too, but it's always been
+> > undocumented and silently ignored.
 
-	M.
+Nothing in the man pages for ld in regards to -p.  Seems like it was
+shortform for "--no-pipeline-knowledge: Stop the linker knowing about
+the pipeline length".
+
+Looks like it was added to binutils via this commit in 1999:
+https://sourceware.org/git/gitweb.cgi?p=binutils-gdb.git;a=commit;h=7ca69e9e10ef290eb3dd62a1e6bebbe4c87fa202
+
+And removed in 2004:
+https://sourceware.org/git/gitweb.cgi?p=binutils-gdb.git;a=commit;h=dea514f51da1051f9f3cd7a746e3b68085aa1a72
+
+arch/arm/Makefile has -p as a LD_FLAGS.  Is it actually needed there
+too, or can it be removed from there?  I assume we'll want to use lld
+for arm32 at some point.
+
+> > A comment in
+> > ld/emultempl/aarch64elf.em explains that it's "Only here for backwards
+> > compatibility".
+
+Yep: https://sourceware.org/git/gitweb.cgi?p=binutils-gdb.git;a=blob;f=ld/emultempl/aarch64elf.em;h=edc548f65298e563481bdd9d547fcb9c6b13da04;hb=HEAD#l405
+
+armelf.em also has that comment.
+
+Looks like -p has been in arch/arm64/Makefile since the initial commit
+that added that file. So likely copy+pasted from arch/arm/Makefile.
+
+commit 8c2c3df31e3b ("arm64: Build infrastructure"):
+https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/arch/arm64/Makefile?id=8c2c3df31e3b87cb5348e48776c366ebd1dc5a7a
+
+And it looks like arch/arm/Makefile has has -p since the move to git
+for Linux 2.6:
+
+commit 1da177e4c3f4 ("Linux-2.6.12-rc2")
+https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/arch/arm/Makefile?id=1da177e4c3f41524e886b7f1b8a0c1fc7321cac2
+
+So nothing in the kernel commit history to hint at what it was ever used for.
+
+As long as you have a version of binutils that not 14 years old, you
+should be good.
+
+Reviewed-by: Nick Desaulniers <ndesaulniers@google.com>
+
 -- 
-Jazz is not dead. It just smells funny...
+Thanks,
+~Nick Desaulniers
