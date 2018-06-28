@@ -1,168 +1,50 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Thu, 28 Jun 2018 18:41:56 +0800
-Subject: [PATCH v22 4/4] soc: mediatek: Add Mediatek CMDQ helper
-In-Reply-To: <1530098172-31385-5-git-send-email-houlong.wei@mediatek.com>
-References: <1530098172-31385-1-git-send-email-houlong.wei@mediatek.com>
- <1530098172-31385-5-git-send-email-houlong.wei@mediatek.com>
-Message-ID: <1530182516.8518.11.camel@mtksdaap41>
+From: luc.vanoostenryck@gmail.com (Luc Van Oostenryck)
+Date: Thu, 28 Jun 2018 12:46:11 +0200
+Subject: [PATCH v4 0/7] arm64: untag user pointers passed to the kernel
+In-Reply-To: <20180628102741.vk6vphfinlj3lvhv@armageddon.cambridge.arm.com>
+References: <cover.1529507994.git.andreyknvl@google.com>
+ <CAAeHK+zqtyGzd_CZ7qKZKU-uZjZ1Pkmod5h8zzbN0xCV26nSfg@mail.gmail.com>
+ <20180626172900.ufclp2pfrhwkxjco@armageddon.cambridge.arm.com>
+ <CAAeHK+yqWKTdTG+ymZ2-5XKiDANV+fmUjnQkRy-5tpgphuLJRA@mail.gmail.com>
+ <0cef1643-a523-98e7-95e2-9ec595137642@arm.com>
+ <20180627171757.amucnh5znld45cpc@armageddon.cambridge.arm.com>
+ <20180628061758.j6bytsaj5jk4aocg@ltop.local>
+ <20180628102741.vk6vphfinlj3lvhv@armageddon.cambridge.arm.com>
+Message-ID: <20180628104610.czsnq4w3lfhxrn53@ltop.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Houlong:
-
-Some inline comment.
-
-On Wed, 2018-06-27 at 19:16 +0800, Houlong Wei wrote:
-> Add Mediatek CMDQ helper to create CMDQ packet and assemble GCE op code.
+On Thu, Jun 28, 2018 at 11:27:42AM +0100, Catalin Marinas wrote:
+> On Thu, Jun 28, 2018 at 08:17:59AM +0200, Luc Van Oostenryck wrote:
+> > On Wed, Jun 27, 2018 at 06:17:58PM +0100, Catalin Marinas wrote:
+> > > sparse is indeed an option. The current implementation doesn't warn on
+> > > an explicit cast from (void __user *) to (unsigned long) since that's a
+> > > valid thing in the kernel. I couldn't figure out if there's any other
+> > > __attribute__ that could be used to warn of such conversion.
+> > 
+> > sparse doesn't have such attribute but would an new option that would warn
+> > on such cast be a solution for your case?
 > 
-> Signed-off-by: Houlong Wei <houlong.wei@mediatek.com>
-> Signed-off-by: HS Liao <hs.liao@mediatek.com>
-> ---
->  drivers/soc/mediatek/Kconfig           |   12 ++
->  drivers/soc/mediatek/Makefile          |    1 +
->  drivers/soc/mediatek/mtk-cmdq-helper.c |  258 ++++++++++++++++++++++++++++++++
->  include/linux/soc/mediatek/mtk-cmdq.h  |  132 ++++++++++++++++
->  4 files changed, 403 insertions(+)
->  create mode 100644 drivers/soc/mediatek/mtk-cmdq-helper.c
->  create mode 100644 include/linux/soc/mediatek/mtk-cmdq.h
-> 
-> diff --git a/drivers/soc/mediatek/Kconfig b/drivers/soc/mediatek/Kconfig
-> index a7d0667..17bd759 100644
-> --- a/drivers/soc/mediatek/Kconfig
-> +++ b/drivers/soc/mediatek/Kconfig
-> @@ -4,6 +4,18 @@
->  menu "MediaTek SoC drivers"
->  	depends on ARCH_MEDIATEK || COMPILE_TEST
->  
+> I can't tell for sure whether such sparse option would be the full
+> solution but detecting explicit __user pointer casts to long is a good
+> starting point. So far this patchset pretty much relies on detecting
+> a syscall failure and trying to figure out why, patching the kernel. It
+> doesn't really scale.
 
-[...]
+OK, I'll add such an option this evening.
+ 
+> As a side note, we have cases in the user-kernel ABI where the user
+> address type is "unsigned long": mmap() and friends. My feedback on an
+> early version of this patchset was to always require untagged pointers
+> coming from user space on such syscalls, so no need for explicit
+> untagging.
 
-> +
-> +int cmdq_pkt_wfe(struct cmdq_pkt *pkt, u32 event)
-> +{
-> +	u32 arg_b;
-> +
-> +	if (event >= CMDQ_MAX_EVENT || event < 0)
+Mmmm yes.
+I tend to favor a sort of opposite approach. When we have an address
+that must not be dereferenced as-such (and sometimes when the address
+can be from both __user & __kernel space) I prefer to use a ulong
+which will force the use of the required operation before being
+able to do any sort of dereferencing and this won't need horrible
+casts with __force (it, of course, all depends on the full context).
 
-The type of event is 'u32', so checking 'event < 0' is redundant.
-
-> +		return -EINVAL;
-> +
-> +	/*
-> +	 * WFE arg_b
-> +	 * bit 0-11: wait value
-> +	 * bit 15: 1 - wait, 0 - no wait
-> +	 * bit 16-27: update value
-> +	 * bit 31: 1 - update, 0 - no update
-> +	 */
-> +	arg_b = CMDQ_WFE_UPDATE | CMDQ_WFE_WAIT | CMDQ_WFE_WAIT_VALUE;
-> +
-> +	return cmdq_pkt_append_command(pkt, CMDQ_CODE_WFE, event, arg_b);
-> +}
-> +EXPORT_SYMBOL(cmdq_pkt_wfe);
-> +
-> +int cmdq_pkt_clear_event(struct cmdq_pkt *pkt, u32 event)
-> +{
-> +	if (event >= CMDQ_MAX_EVENT || event < 0)
-
-The type of event is 'u32', so checking 'event < 0' is redundant.
-
-> +		return -EINVAL;
-> +
-> +	return cmdq_pkt_append_command(pkt, CMDQ_CODE_WFE, event,
-> +				       CMDQ_WFE_UPDATE);
-> +}
-> +EXPORT_SYMBOL(cmdq_pkt_clear_event);
-> +
-> +static int cmdq_pkt_finalize(struct cmdq_pkt *pkt)
-> +{
-> +	int err;
-> +
-> +	if (cmdq_pkt_is_finalized(pkt))
-> +		return 0;
-> +
-> +	/* insert EOC and generate IRQ for each command iteration */
-> +	err = cmdq_pkt_append_command(pkt, CMDQ_CODE_EOC, 0, CMDQ_EOC_IRQ_EN);
-> +	if (err < 0)
-> +		return err;
-> +
-> +	/* JUMP to end */
-> +	err = cmdq_pkt_append_command(pkt, CMDQ_CODE_JUMP, 0, CMDQ_JUMP_PASS);
-> +	if (err < 0)
-> +		return err;
-> +
-> +	return 0;
-> +}
-> +
-> +int cmdq_pkt_flush_async(struct cmdq_client *client, struct cmdq_pkt *pkt,
-> +			 cmdq_async_flush_cb cb, void *data)
-> +{
-> +	int err;
-> +	struct device *dev;
-> +	dma_addr_t dma_addr;
-> +
-> +	err = cmdq_pkt_finalize(pkt);
-> +	if (err < 0)
-> +		return err;
-> +
-> +	dev = client->chan->mbox->dev;
-> +	dma_addr = dma_map_single(dev, pkt->va_base, pkt->cmd_buf_size,
-> +		DMA_TO_DEVICE);
-
-You map here, but I could not find unmap, so the unmap should be done in
-client driver. I would prefer a symmetric map/unmap which means that
-both map and unmap are done in client driver. I think you put map here
-because you should map after finalize. Therefore, export
-cmdq_pkt_finalize() to client driver and let client do finalize, so
-there is no finalize in flush function. This method have a benefit that
-if client reuse command buffer, it need not to map/unmap frequently.
-
-Regards,
-CK
-
-> +	if (dma_mapping_error(dev, dma_addr)) {
-> +		dev_err(client->chan->mbox->dev, "dma map failed\n");
-> +		return -ENOMEM;
-> +	}
-> +
-> +	pkt->pa_base = dma_addr;
-> +	pkt->cb.cb = cb;
-> +	pkt->cb.data = data;
-> +
-> +	mbox_send_message(client->chan, pkt);
-> +	/* We can send next packet immediately, so just call txdone. */
-> +	mbox_client_txdone(client->chan, 0);
-> +
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL(cmdq_pkt_flush_async);
-> +
-> +struct cmdq_flush_completion {
-> +	struct completion cmplt;
-> +	bool err;
-> +};
-> +
-> +static void cmdq_pkt_flush_cb(struct cmdq_cb_data data)
-> +{
-> +	struct cmdq_flush_completion *cmplt = data.data;
-> +
-> +	cmplt->err = data.err;
-> +	complete(&cmplt->cmplt);
-> +}
-> +
-> +int cmdq_pkt_flush(struct cmdq_client *client, struct cmdq_pkt *pkt)
-> +{
-> +	struct cmdq_flush_completion cmplt;
-> +	int err;
-> +
-> +	init_completion(&cmplt.cmplt);
-> +	err = cmdq_pkt_flush_async(client, pkt, cmdq_pkt_flush_cb, &cmplt);
-> +	if (err < 0)
-> +		return err;
-> +	wait_for_completion(&cmplt.cmplt);
-> +
-> +	return cmplt.err ? -EFAULT : 0;
-> +}
-> +EXPORT_SYMBOL(cmdq_pkt_flush);
-
-[...]
+-- Luc
