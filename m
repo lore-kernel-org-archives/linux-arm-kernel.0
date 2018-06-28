@@ -1,36 +1,65 @@
 From: mka@chromium.org (Matthias Kaehlcke)
-Date: Thu, 28 Jun 2018 14:09:14 -0700
-Subject: [PATCH 2/3] arm64: dts: qcom: pm8998: Add spmi-temp-alarm node
+Date: Thu, 28 Jun 2018 14:09:15 -0700
+Subject: [PATCH 3/3] arm64: dts: qcom: pm8998: Add thermal zone
 In-Reply-To: <20180628210915.160893-1-mka@chromium.org>
 References: <20180628210915.160893-1-mka@chromium.org>
-Message-ID: <20180628210915.160893-2-mka@chromium.org>
+Message-ID: <20180628210915.160893-3-mka@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the spmi-temp-alarm node to pm8998 based on the examples in the
+Add pm8998 thermal zone based on the examples in the spmi-temp-alarm
 bindings.
+
+Note: devices with the pm8998 need to have a 'thermal-zones' node (which
+may be empty) with a label 'thermal_zones'.
 
 Signed-off-by: Matthias Kaehlcke <mka@chromium.org>
 ---
- arch/arm64/boot/dts/qcom/pm8998.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm64/boot/dts/qcom/pm8998.dtsi | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/qcom/pm8998.dtsi b/arch/arm64/boot/dts/qcom/pm8998.dtsi
-index 92bed1e7d4bb..f2d39074ed74 100644
+index f2d39074ed74..d85ceb4f976b 100644
 --- a/arch/arm64/boot/dts/qcom/pm8998.dtsi
 +++ b/arch/arm64/boot/dts/qcom/pm8998.dtsi
-@@ -44,6 +44,12 @@
- 				     <0 0xd9 0 IRQ_TYPE_NONE>;
- 		};
+@@ -3,6 +3,7 @@
  
-+		pm8998_temp: qcom,temp-alarm at 2400 {
-+			compatible = "qcom,spmi-temp-alarm";
-+			reg = <0x2400 0x100>;
-+			interrupts = <0x0 0x24 0x0 IRQ_TYPE_EDGE_RISING>;
-+			#thermal-sensor-cells = <0>;
-+		};
+ #include <dt-bindings/spmi/spmi.h>
+ #include <dt-bindings/interrupt-controller/irq.h>
++#include <dt-bindings/thermal/thermal.h>
+ 
+ &spmi_bus {
+ 	pm8998_lsid0: pmic at 0 {
+@@ -59,3 +60,30 @@
+ 		#size-cells = <0>;
  	};
- 
- 	pm8998_lsid1: pmic at 1 {
+ };
++
++&thermal_zones {
++	pm8998 {
++		polling-delay-passive = <250>;
++		polling-delay = <1000>;
++
++		thermal-sensors = <&pm8998_temp>;
++
++		trips {
++			passive {
++				temperature = <1050000>;
++				hysteresis = <2000>;
++				type = "passive";
++			};
++			alert {
++				temperature = <125000>;
++				hysteresis = <2000>;
++				type = "hot";
++			};
++			crit {
++				temperature = <145000>;
++				hysteresis = <2000>;
++				type = "critical";
++			};
++		};
++	};
++};
 -- 
 2.18.0.rc2.346.g013aa6912e-goog
