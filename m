@@ -1,51 +1,69 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 28 Jun 2018 14:43:44 -0600
-Subject: [PATCH v3 6/6] PM / Domains: Stop deferring probe at the end of
- initcall
+Date: Thu, 28 Jun 2018 14:43:41 -0600
+Subject: [PATCH v3 3/6] pinctrl: Support stopping deferred probe after
+ initcalls
 In-Reply-To: <20180628204344.13973-1-robh@kernel.org>
 References: <20180628204344.13973-1-robh@kernel.org>
-Message-ID: <20180628204344.13973-7-robh@kernel.org>
+Message-ID: <20180628204344.13973-4-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All PM domain drivers must be built-in (at least those using DT), so
-there is no point deferring probe after initcalls are done. Continuing
-to defer probe may prevent booting successfully even if managing PM
-domains is not required. This can happen if the user failed to enable
-the driver or if power-domains are added to a platform's DT, but there
-is not yet a driver (e.g. a new DTB with an old kernel).
+Pinctrl drivers are a common dependency which can prevent a system
+booting even if the default or bootloader configured settings can work.
+If a pinctrl node in DT indicates that the default pin setup can be used
+with the 'pinctrl-use-default' property, then only defer probe until
+initcalls are done. If the deferred probe timeout is enabled or loadable
+modules are disabled, then we'll stop deferring probe regardless of the
+DT property. This gives platforms the option to work without their
+pinctrl driver being enabled.
 
-Call the driver core function driver_deferred_probe_check_init_done()
-instead of just returning -EPROBE_DEFER to stop deferring probe when
-initcalls are done.
+Dropped the pinctrl specific deferring probe message as the driver core
+can print deferred probe related messages if needed.
 
-Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-Cc: Kevin Hilman <khilman@kernel.org>
-Cc: Ulf Hansson <ulf.hansson@linaro.org>
-Cc: Pavel Machek <pavel@ucw.cz>
-Cc: Len Brown <len.brown@intel.com>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: linux-pm at vger.kernel.org
 Signed-off-by: Rob Herring <robh@kernel.org>
 ---
 v3:
-  - Update to new function name
+- Drop pinctrl deferred probe msg in favor of driver core messages
+- Move the handling of "pinctrl-use-default" option out of driver core
+- Stop deferring probe if modules are not enabled.
 
- drivers/base/power/domain.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Linus, I reworked this a bit, so didn't add your ack.
 
-diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-index 4925af5c4cf0..8c12213875c6 100644
---- a/drivers/base/power/domain.c
-+++ b/drivers/base/power/domain.c
-@@ -2253,7 +2253,7 @@ static int __genpd_dev_pm_attach(struct device *dev, struct device_node *np,
- 		mutex_unlock(&gpd_list_lock);
- 		dev_dbg(dev, "%s() failed to find PM domain: %ld\n",
- 			__func__, PTR_ERR(pd));
--		return -EPROBE_DEFER;
-+		return driver_deferred_probe_check_state(dev);
- 	}
+ drivers/pinctrl/devicetree.c | 15 +++++++++++----
+ 1 file changed, 11 insertions(+), 4 deletions(-)
 
- 	dev_dbg(dev, "adding to PM domain %s\n", pd->name);
+diff --git a/drivers/pinctrl/devicetree.c b/drivers/pinctrl/devicetree.c
+index c4aa411f5935..2969ff3162c3 100644
+--- a/drivers/pinctrl/devicetree.c
++++ b/drivers/pinctrl/devicetree.c
+@@ -111,17 +111,24 @@ static int dt_to_map_one_config(struct pinctrl *p,
+ 	int ret;
+ 	struct pinctrl_map *map;
+ 	unsigned num_maps;
++	bool allow_default = false;
+
+ 	/* Find the pin controller containing np_config */
+ 	np_pctldev = of_node_get(np_config);
+ 	for (;;) {
++		if (!allow_default)
++			allow_default = of_property_read_bool(np_pctldev,
++							      "pinctrl-use-default");
++
+ 		np_pctldev = of_get_next_parent(np_pctldev);
+ 		if (!np_pctldev || of_node_is_root(np_pctldev)) {
+-			dev_info(p->dev, "could not find pctldev for node %pOF, deferring probe\n",
+-				np_config);
+ 			of_node_put(np_pctldev);
+-			/* OK let's just assume this will appear later then */
+-			return -EPROBE_DEFER;
++			ret = driver_deferred_probe_check_state(p->dev);
++			/* keep deferring if modules are enabled unless we've timed out */
++			if (IS_ENABLED(CONFIG_MODULES) && !allow_default && ret == -ENODEV)
++				ret = -EPROBE_DEFER;
++
++			return ret;
+ 		}
+ 		/* If we're creating a hog we can use the passed pctldev */
+ 		if (hog_pctldev && (np_pctldev == p->dev->of_node)) {
 --
 2.17.1
