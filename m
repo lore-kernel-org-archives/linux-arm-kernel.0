@@ -1,91 +1,31 @@
 From: baruch@tkos.co.il (Baruch Siach)
-Date: Thu, 28 Jun 2018 10:06:14 +0300
-Subject: [PATCH 1/2] ARM: mvebu_v7_defconfig: sync defconfig
-Message-ID: <ee69693c87cd0146f259042fc5dcd29338fcdf25.1530169575.git.baruch@tkos.co.il>
+Date: Thu, 28 Jun 2018 10:06:15 +0300
+Subject: [PATCH 2/2] ARM: mvebu_v7_defconfig: enable SFP support
+In-Reply-To: <ee69693c87cd0146f259042fc5dcd29338fcdf25.1530169575.git.baruch@tkos.co.il>
+References: <ee69693c87cd0146f259042fc5dcd29338fcdf25.1530169575.git.baruch@tkos.co.il>
+Message-ID: <b130ccb8a9812530d33a71afb1563545fa8808cf.1530169575.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use savedefconfig to sync defconfig for current kernel. No change in
-generated configuration.
+This enables support for SFP cages on SolidRun Armada 38x and 8k
+platforms.
 
 Signed-off-by: Baruch Siach <baruch@tkos.co.il>
 ---
- arch/arm/configs/mvebu_v7_defconfig | 12 ++----------
- 1 file changed, 2 insertions(+), 10 deletions(-)
+ arch/arm/configs/mvebu_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/arch/arm/configs/mvebu_v7_defconfig b/arch/arm/configs/mvebu_v7_defconfig
-index ddaeda4f2e82..1ff371ae688d 100644
+index 1ff371ae688d..55140219ab11 100644
 --- a/arch/arm/configs/mvebu_v7_defconfig
 +++ b/arch/arm/configs/mvebu_v7_defconfig
-@@ -1,5 +1,4 @@
- CONFIG_SYSVIPC=y
--CONFIG_FHANDLE=y
- CONFIG_HIGH_RES_TIMERS=y
- CONFIG_LOG_BUF_SHIFT=14
- CONFIG_BLK_DEV_INITRD=y
-@@ -16,10 +15,8 @@ CONFIG_MACH_ARMADA_39X=y
- CONFIG_MACH_ARMADA_XP=y
- CONFIG_MACH_DOVE=y
- CONFIG_PCI=y
--CONFIG_PCI_MSI=y
- CONFIG_PCI_MVEBU=y
- CONFIG_SMP=y
--CONFIG_AEABI=y
- CONFIG_HIGHMEM=y
- # CONFIG_COMPACTION is not set
- CONFIG_ZBOOT_ROM_TEXT=0x0
-@@ -58,7 +55,6 @@ CONFIG_MTD_M25P80=y
- CONFIG_MTD_NAND=y
- CONFIG_MTD_NAND_MARVELL=y
- CONFIG_MTD_SPI_NOR=y
--CONFIG_SRAM=y
- CONFIG_MTD_UBI=y
- CONFIG_EEPROM_AT24=y
- CONFIG_BLK_DEV_SD=y
-@@ -67,12 +63,10 @@ CONFIG_SATA_AHCI=y
- CONFIG_AHCI_MVEBU=y
- CONFIG_SATA_MV=y
- CONFIG_NETDEVICES=y
--CONFIG_NET_DSA_MV88E6XXX=y
+@@ -66,6 +66,7 @@ CONFIG_NETDEVICES=y
  CONFIG_MV643XX_ETH=y
  CONFIG_MVNETA=y
  CONFIG_MVPP2=y
++CONFIG_SFP=y
  CONFIG_MARVELL_PHY=y
--CONFIG_FIXED_PHY=y
  CONFIG_MWIFIEX=y
  CONFIG_MWIFIEX_SDIO=y
- CONFIG_INPUT_EVDEV=y
-@@ -88,10 +82,11 @@ CONFIG_SPI=y
- CONFIG_SPI_ORION=y
- CONFIG_GPIO_SYSFS=y
- CONFIG_GPIO_PCA953X=y
--CONFIG_POWER_SUPPLY=y
- CONFIG_POWER_RESET=y
- CONFIG_POWER_RESET_GPIO=y
-+CONFIG_POWER_SUPPLY=y
- CONFIG_SENSORS_GPIO_FAN=y
-+CONFIG_SENSORS_PWM_FAN=y
- CONFIG_THERMAL=y
- CONFIG_ARMADA_THERMAL=y
- CONFIG_WATCHDOG=y
-@@ -135,7 +130,6 @@ CONFIG_MV_XOR=y
- # CONFIG_IOMMU_SUPPORT is not set
- CONFIG_MEMORY=y
- CONFIG_PWM=y
--CONFIG_SENSORS_PWM_FAN=y
- CONFIG_EXT4_FS=y
- CONFIG_ISO9660_FS=y
- CONFIG_JOLIET=y
-@@ -153,10 +147,8 @@ CONFIG_NLS_ISO8859_2=y
- CONFIG_NLS_UTF8=y
- CONFIG_PRINTK_TIME=y
- CONFIG_DEBUG_INFO=y
--CONFIG_DEBUG_FS=y
- CONFIG_MAGIC_SYSRQ=y
- # CONFIG_SCHED_DEBUG is not set
--CONFIG_TIMER_STATS=y
- # CONFIG_DEBUG_BUGVERBOSE is not set
- CONFIG_DEBUG_USER=y
- CONFIG_CRYPTO_DEV_MARVELL_CESA=y
 -- 
 2.18.0
