@@ -1,131 +1,108 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Thu, 28 Jun 2018 09:07:08 +0800
-Subject: [PATCH v21 4/4] soc: mediatek: Add Mediatek CMDQ helper
-In-Reply-To: <1530099833.31725.7.camel@mhfsdcap03>
-References: <1517383693-25591-1-git-send-email-houlong.wei@mediatek.com>
- <1517383693-25591-5-git-send-email-houlong.wei@mediatek.com>
- <1519200345.8716.68.camel@mtksdaap41> <1530099833.31725.7.camel@mhfsdcap03>
-Message-ID: <1530148028.6193.9.camel@mtksdaap41>
+From: Anson.Huang@nxp.com (Anson Huang)
+Date: Thu, 28 Jun 2018 09:04:27 +0800
+Subject: [PATCH V2] ARM: dts: imx6sll-evk: enable usdhc3 slot
+Message-ID: <1530147867-24159-1-git-send-email-Anson.Huang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Houlong:
+On i.MX6SLL EVK board, SD3 slot can be used for
+WiFi and other SD accessories, enable it.
 
-On Wed, 2018-06-27 at 19:43 +0800, houlong wei wrote:
-> On Wed, 2018-02-21 at 16:05 +0800, CK Hu wrote:
-> > Hi, Houlong:
-> > 
-> > I've one more inline comment.
-> > 
-> > On Wed, 2018-01-31 at 15:28 +0800, houlong.wei at mediatek.com wrote:
-> > > From: "hs.liao at mediatek.com" <hs.liao@mediatek.com>
-> > > 
-> > > Add Mediatek CMDQ helper to create CMDQ packet and assemble GCE op code.
-> > > 
-> > > Signed-off-by: Houlong Wei <houlong.wei@mediatek.com>
-> > > Signed-off-by: HS Liao <hs.liao@mediatek.com>
-> > > ---
-> > >  drivers/soc/mediatek/Kconfig           |   12 ++
-> > >  drivers/soc/mediatek/Makefile          |    1 +
-> > >  drivers/soc/mediatek/mtk-cmdq-helper.c |  322 ++++++++++++++++++++++++++++++++
-> > >  include/linux/soc/mediatek/mtk-cmdq.h  |  174 +++++++++++++++++
-> > >  4 files changed, 509 insertions(+)
-> > >  create mode 100644 drivers/soc/mediatek/mtk-cmdq-helper.c
-> > >  create mode 100644 include/linux/soc/mediatek/mtk-cmdq.h
-> > > 
-> > > diff --git a/drivers/soc/mediatek/Kconfig b/drivers/soc/mediatek/Kconfig
-> > > index a7d0667..e66582e 100644
-> > > --- a/drivers/soc/mediatek/Kconfig
-> > > +++ b/drivers/soc/mediatek/Kconfig
-> > > @@ -4,6 +4,18 @@
-> > >  menu "MediaTek SoC drivers"
-> > >  	depends on ARCH_MEDIATEK || COMPILE_TEST
-> > >  
+Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+---
+ arch/arm/boot/dts/imx6sll-evk.dts | 65 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 65 insertions(+)
 
-[...]
-
-> > > +
-> > > +static int cmdq_pkt_append_command(struct cmdq_pkt *pkt, enum cmdq_code code,
-> > > +				   u32 arg_a, u32 arg_b)
-> > > +{
-> > > +	u64 *cmd_ptr;
-> > > +	int err;
-> > > +
-> > > +	if (WARN_ON(cmdq_pkt_is_finalized(pkt)))
-> > > +		return -EBUSY;
-> > > +	if (unlikely(pkt->cmd_buf_size + CMDQ_INST_SIZE > pkt->buf_size)) {
-> > > +		err = cmdq_pkt_realloc_cmd_buffer(pkt, pkt->buf_size << 1);
-> > 
-> > In your design, the command buffer is frequently allocated and freed.
-> > But client may not want this mechanism because it have penalty on CPU
-> > loading and may have risk of allocation failure. The client may
-> > pre-allocate the command buffer and reuse it. So it's better to let
-> > client decide which buffer management it want. That means cmdq helper do
-> > not allocate command buffer and do not reallocate it. The working flow
-> > would be:
-> > 
-> > For client that want to pre-allocate buffer:
-> > (1) Client pre-allocate a command buffer with a pre-calculated size.
-> > (Programmer should make sure that all command would not exceed this
-> > size)
-> > (2) Client use cmdq helper function to generate command in command
-> > buffer. If command buffer is full, helper still increase
-> > pkt->cmd_buf_size but do not write command into command buffer.
-> > (3) When client flush packet, cmdq helper could check whether
-> > pkt->cmd_buf_size is greater than pkt->buf_size, if so, return error and
-> > programmer should modify the pre-calculated size in step (1).
-> > (4) Wait for command done.
-> > (5) Set pkt->cmd_buf_size to zero and directly goto step (2) to reuse
-> > this command buffer.
-> > 
-> > For client that want to dynamically allocate buffer:
-> > (1) Client dynamically allocate a command buffer with a initial size,
-> > for example, 1024 bytes.
-> > (2) Client use cmdq helper function to generate command in command
-> > buffer. If command buffer is full, helper still increase
-> > pkt->cmd_buf_size but do not write command into command buffer.
-> > (3) When client flush packet, cmdq helper could check whether
-> > pkt->cmd_buf_size is greater than pkt->buf_size, if so, return error and
-> > client goto step (1) and reallocate a command buffer with pkt->buf_size.
-> > (4) Wait for command done.
-> > (5) Free the command buffer.
-> > 
-> > Because the reallocation is so complicated, for client that want to
-> > dynamically allocate buffer, the initial buffer size could also be
-> > pre-calculated that you need not to reallocate it. Once the buffer is
-> > full, programmer should also fix the accurate buffer size.
-> > 
-> > Regards,
-> > CK
-> > 
-> 
-> Hi CK, thanks for your explanation and suggestion. Currently, the cmdq
-> buffer is allocated in cmdq_pkt_create and its initial size is
-> PAGE_SIZE. In most case of display scenario, PAGE_SIZE(4096) bytes are
-> enough.
-> 
-
-You use the tern 'most' means you still need to consider the size over
-PAGE_SIZE. If in current application, PAGE_SIZE is enough for display, I
-think you still should remove this reallocation in the first patch
-because you need not to reallocation. Once the display need more than
-PAGE_SIZE, you send the another patch that support client to set the
-initial size. I think we should make the first patch as simple as
-possible, and you could add another patch to improve it.
-
-Regards,
-CK
-
-> > > +		if (err < 0)
-> > > +			return err;
-> > > +	}
-> > > +	cmd_ptr = pkt->va_base + pkt->cmd_buf_size;
-> > > +	(*cmd_ptr) = (u64)((code << CMDQ_OP_CODE_SHIFT) | arg_a) << 32 | arg_b;
-> > > +	pkt->cmd_buf_size += CMDQ_INST_SIZE;
-> > > +	return 0;
-> > > +}
-> > > +
-
-[...]
-> 
-> 
+diff --git a/arch/arm/boot/dts/imx6sll-evk.dts b/arch/arm/boot/dts/imx6sll-evk.dts
+index 2217c40..1a60c8d 100644
+--- a/arch/arm/boot/dts/imx6sll-evk.dts
++++ b/arch/arm/boot/dts/imx6sll-evk.dts
+@@ -84,6 +84,17 @@
+ 		gpio = <&gpio3 30 GPIO_ACTIVE_HIGH>;
+ 		enable-active-high;
+ 	};
++
++	reg_sd3_vmmc: regulator-sd3-vmmc {
++		compatible = "regulator-fixed";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_reg_sd3_vmmc>;
++		regulator-name = "SD3_WIFI";
++		regulator-min-microvolt = <3000000>;
++		regulator-max-microvolt = <3000000>;
++		gpio = <&gpio4 4 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
+ };
+ 
+ &cpu0 {
+@@ -236,7 +247,25 @@
+ 	status = "okay";
+ };
+ 
++&usdhc3 {
++	pinctrl-names = "default", "state_100mhz", "state_200mhz";
++	pinctrl-0 = <&pinctrl_usdhc3>;
++	pinctrl-1 = <&pinctrl_usdhc3_100mhz>;
++	pinctrl-2 = <&pinctrl_usdhc3_200mhz>;
++	cd-gpios = <&gpio3 22 GPIO_ACTIVE_LOW>;
++	keep-power-in-suspend;
++	enable-sdio-wakeup;
++	vmmc-supply = <&reg_sd3_vmmc>;
++	status = "okay";
++};
++
+ &iomuxc {
++	pinctrl_reg_sd3_vmmc: sd3vmmcgrp {
++		fsl,pins = <
++			MX6SLL_PAD_KEY_COL6__GPIO4_IO04 0x17059
++		>;
++	};
++
+ 	pinctrl_usb_otg1_vbus: vbus1grp {
+ 		fsl,pins = <
+ 			MX6SLL_PAD_KEY_COL4__GPIO4_IO00 0x17059
+@@ -307,6 +336,42 @@
+ 		>;
+ 	};
+ 
++	pinctrl_usdhc3: usdhc3grp {
++		fsl,pins = <
++			MX6SLL_PAD_SD3_CMD__SD3_CMD		0x17061
++			MX6SLL_PAD_SD3_CLK__SD3_CLK		0x13061
++			MX6SLL_PAD_SD3_DATA0__SD3_DATA0		0x17061
++			MX6SLL_PAD_SD3_DATA1__SD3_DATA1		0x17061
++			MX6SLL_PAD_SD3_DATA2__SD3_DATA2		0x17061
++			MX6SLL_PAD_SD3_DATA3__SD3_DATA3		0x17061
++			MX6SLL_PAD_REF_CLK_32K__GPIO3_IO22	0x17059
++		>;
++	};
++
++	pinctrl_usdhc3_100mhz: usdhc3grp_100mhz {
++		fsl,pins = <
++			MX6SLL_PAD_SD3_CMD__SD3_CMD		0x170a1
++			MX6SLL_PAD_SD3_CLK__SD3_CLK		0x130a1
++			MX6SLL_PAD_SD3_DATA0__SD3_DATA0		0x170a1
++			MX6SLL_PAD_SD3_DATA1__SD3_DATA1		0x170a1
++			MX6SLL_PAD_SD3_DATA2__SD3_DATA2		0x170a1
++			MX6SLL_PAD_SD3_DATA3__SD3_DATA3		0x170a1
++			MX6SLL_PAD_REF_CLK_32K__GPIO3_IO22	0x17059
++		>;
++	};
++
++	pinctrl_usdhc3_200mhz: usdhc3grp_200mhz {
++		fsl,pins = <
++			MX6SLL_PAD_SD3_CMD__SD3_CMD		0x170e9
++			MX6SLL_PAD_SD3_CLK__SD3_CLK		0x130f9
++			MX6SLL_PAD_SD3_DATA0__SD3_DATA0		0x170e9
++			MX6SLL_PAD_SD3_DATA1__SD3_DATA1		0x170e9
++			MX6SLL_PAD_SD3_DATA2__SD3_DATA2		0x170e9
++			MX6SLL_PAD_SD3_DATA3__SD3_DATA3		0x170e9
++			MX6SLL_PAD_REF_CLK_32K__GPIO3_IO22	0x17059
++		>;
++	};
++
+ 	pinctrl_i2c1: i2c1grp {
+ 		fsl,pins = <
+ 			MX6SLL_PAD_I2C1_SCL__I2C1_SCL	 0x4001b8b1
+-- 
+2.7.4
