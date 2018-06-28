@@ -1,31 +1,38 @@
-From: andreyknvl@google.com (Andrey Konovalov)
-Date: Thu, 28 Jun 2018 21:30:16 +0200
-Subject: [PATCH v4 0/7] arm64: untag user pointers passed to the kernel
-In-Reply-To: <CAAeHK+yqWKTdTG+ymZ2-5XKiDANV+fmUjnQkRy-5tpgphuLJRA@mail.gmail.com>
-References: <cover.1529507994.git.andreyknvl@google.com>
- <CAAeHK+zqtyGzd_CZ7qKZKU-uZjZ1Pkmod5h8zzbN0xCV26nSfg@mail.gmail.com>
- <20180626172900.ufclp2pfrhwkxjco@armageddon.cambridge.arm.com>
- <CAAeHK+yqWKTdTG+ymZ2-5XKiDANV+fmUjnQkRy-5tpgphuLJRA@mail.gmail.com>
-Message-ID: <CAAeHK+wJbbCZd+-X=9oeJgsqQJiq8h+Aagz3SQMPaAzCD+pvFw@mail.gmail.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Thu, 28 Jun 2018 15:31:00 -0400
+Subject: [PATCH V4 2/7] IB/hfi1: Use pci_try_reset_bus() for initiating pci
+ secondary bus reset
+In-Reply-To: <1530214274-21139-1-git-send-email-okaya@codeaurora.org>
+References: <1530214274-21139-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <1530214274-21139-2-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 27, 2018 at 5:05 PM, Andrey Konovalov <andreyknvl@google.com> wrote:
-> On Tue, Jun 26, 2018 at 7:29 PM, Catalin Marinas
-> <catalin.marinas@arm.com> wrote:
->> While I support this work, as a maintainer I'd like to understand
->> whether we'd be in a continuous chase of ABI breaks with every kernel
->> release or we have a better way to identify potential issues. Is there
->> any way to statically analyse conversions from __user ptr to long for
->> example? Or, could we get the compiler to do this for us?
->
->
-> OK, got it, I'll try to figure out a way to find these conversions.
+Getting ready to hide pci_reset_bridge_secondary_bus() from the drivers.
+pci_reset_bridge_secondary_bus() should only be used internally by the
+PCI code itself.
 
-I've prototyped a checker on top of clang static analyzer (initially
-looked at sparse, but couldn't find any documentation or examples).
-The results are here [1], search for "warning: user pointer cast".
-Sharing in case anybody wants to take a look, will look at them myself
-tomorrow.
+Other drivers should rely on higher level pci_try_reset_bus() API.
 
-[1] https://gist.github.com/xairy/433edd5c86456a64026247cb2fef2115
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+---
+ drivers/infiniband/hw/hfi1/pcie.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
+
+diff --git a/drivers/infiniband/hw/hfi1/pcie.c b/drivers/infiniband/hw/hfi1/pcie.c
+index 4d4371b..4570c4d 100644
+--- a/drivers/infiniband/hw/hfi1/pcie.c
++++ b/drivers/infiniband/hw/hfi1/pcie.c
+@@ -905,9 +905,7 @@ static int trigger_sbr(struct hfi1_devdata *dd)
+ 	 * delay after a reset is required.  Per spec requirements,
+ 	 * the link is either working or not after that point.
+ 	 */
+-	pci_reset_bridge_secondary_bus(dev->bus->self);
+-
+-	return 0;
++	return pci_try_reset_bus(dev->bus);
+ }
+ 
+ /*
+-- 
+2.7.4
