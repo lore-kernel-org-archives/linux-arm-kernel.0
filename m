@@ -1,36 +1,43 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Thu, 28 Jun 2018 19:32:43 +0200
-Subject: [PATCH] arm64: acpi: reenumerate topology ids
-In-Reply-To: <a38fb684-c023-1a96-464e-dd268f3132ea@arm.com>
-References: <20180628145128.10057-1-drjones@redhat.com>
- <a38fb684-c023-1a96-464e-dd268f3132ea@arm.com>
-Message-ID: <20180628173243.obydzakh2stfs26w@kamzik.brq.redhat.com>
+From: collinsd@codeaurora.org (David Collins)
+Date: Thu, 28 Jun 2018 11:04:17 -0700
+Subject: [PATCH v8 2/2] regulator: add QCOM RPMh regulator driver
+In-Reply-To: <20180628101813.GD14040@sirena.org.uk>
+References: <cover.1529712888.git.collinsd@codeaurora.org>
+ <35c4ea70cdf5caba560fb6f40e866ee8bc456d93.1529712888.git.collinsd@codeaurora.org>
+ <CAD=FV=XVEEPgjBXxR+-46RgxLOq63Xvq-jtruoaCxccmMoKUuA@mail.gmail.com>
+ <20180626120733.GD1779@sirena.org.uk>
+ <CAD=FV=X1E8Cz=L93G-zJwhM0R=N3YuBBhkvCnLvWuxMU9KJkTw@mail.gmail.com>
+ <20180626150203.GG1779@sirena.org.uk>
+ <CAD=FV=WC_XWRk-6OELOFFWGnhRq1VeoiiveqXLSy+xqsVb22pA@mail.gmail.com>
+ <20180627150126.GC5263@sirena.org.uk>
+ <CAD=FV=WYcCVjAiMpzf4zyAByw5y-oDMnuabip1HXqa-mQFRt2w@mail.gmail.com>
+ <20180628101813.GD14040@sirena.org.uk>
+Message-ID: <87cc8c77-7b39-1746-4680-cb26d602e62e@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 28, 2018 at 05:30:51PM +0100, Sudeep Holla wrote:
-> I am not sure if we can ever guarantee that DT and ACPI will get the
-> same ids whatever counter we use as it depends on the order presented in
-> the firmware(DT or ACPI). So I am not for generating ids for core and
-> threads in that way.
+Hello Mark,
 
-I don't believe we have to guarantee that the exact (package,core,thread)
-triplet describing a PE with DT matches ACPI. We just need to guarantee
-that each triplet we select properly puts a PE in the same group as its
-peers. So, as long as we keep the grouping described by DT or ACPI, then
-the (package,core,thread) IDs assigned are pretty arbitrary.
-
-I could change the commit message to state we can generate IDs *like*
-DT does (i.e. with counters), even if they may not result in identical
-triplet to PE mappings.
-
+On 06/28/2018 03:18 AM, Mark Brown wrote:
+> On Wed, Jun 27, 2018 at 09:28:03AM -0700, Doug Anderson wrote:
 > 
-> So I would like to keep it simple and just have this counters for
-> package ids as demonstrated in Shunyong's patch.
+>> OK, great.  I guess I'm confused about the "|| COMPILE_TEST" causing
+>> problems then?  I was worried that anyone trying to do "COMPILE_TEST"
+>> on your tree (or linuxnext if RPMh isn't there) would get failures due
+>> to the lack of header files.  I guess if it's a problem you could just
+>> gut the "|| COMPILE_TEST" and it could be added back in later?
+> 
+> Ugh, yes - that'll break things.  In that case I can't apply this
+> without a signed tag from Andy's tree with the dependency stuff in.
 > 
 
-If we don't also handle cores when there are threads, then the cores
-will also end up having weird IDs.
+Do you have any remaining concerns with the qcom-rpmh-regulator binding
+and driver patches that would keep you from applying them (other than the
+dependency patches being applied first)?
 
 Thanks,
-drew
+David
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
