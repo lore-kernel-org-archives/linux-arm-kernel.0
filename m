@@ -1,76 +1,73 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 28 Jun 2018 13:51:30 +0100
-Subject: [RFC/RFT PATCH 0/2] disable_hest quirk on HP m400 with bad UEFI
- firmwware
-In-Reply-To: <CAKv+Gu9ZHAGzcfgHShM1qvZ3qf4gb1pD_XfoceJu9Qy+5_pEsg@mail.gmail.com>
-References: <20180628100656.10692-1-james.morse@arm.com>
- <CAKv+Gu9ZHAGzcfgHShM1qvZ3qf4gb1pD_XfoceJu9Qy+5_pEsg@mail.gmail.com>
-Message-ID: <20180628125130.GA9025@red-moon>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Thu, 28 Jun 2018 20:55:30 +0800
+Subject: [PATCH] arm64: numa: rework ACPI NUMA initialization
+In-Reply-To: <20180625130552.5636-1-lorenzo.pieralisi@arm.com>
+References: <20180625130552.5636-1-lorenzo.pieralisi@arm.com>
+Message-ID: <aeb3d665-4135-f6ea-7f65-13b08983673e@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 28, 2018 at 12:25:06PM +0200, Ard Biesheuvel wrote:
-> Hi James,
+On 2018/6/25 21:05, Lorenzo Pieralisi wrote:
+> Current ACPI ARM64 NUMA initialization code in
 > 
-> On 28 June 2018 at 12:06, James Morse <james.morse@arm.com> wrote:
-> > There are reports[0] that HPE's 'ProLiant m400 Server' (aka moonshot) has
-> > broken RAS support, and adding disable_hest to the kernel cmdline is the
-> > only way to make the board boot if APEI support is built into the kernel.
-> >
-> > After Mark Salter's investigation[1] we know that UEFI's ExitBootServices
-> > is doing something that causes a fatal error to be written to GHES.2.
-> > Once the kernel finds this, it falsely assume it was due to something that
-> > happened during boot, and panic()s.
-> >
-> > This series adds a DMI quirks table to hest.c, and adds a helper that lets
-> > us query the UEFI system table version, to set hest_disabled on this
-> > platform.
-> >
-> > Testing the HEST table vendor and revision is a problem as this would
-> > match all 'HPE ProLiant', some of which may be a totally different CPU
-> > architecture.
-> >
-> >
-> > I don't have access to an m400, these DMI and UEFI values were taken from
-> > the crashlog report at [0], then tested with the equivalent fields on
-> > Seattle.
-> >
+> acpi_numa_gicc_affinity_init()
 > 
-> I understand the desire to keep running these M400s as long as they
-> have some life left in them, but the reality is that they are end of
-> life already, and not many were manufactured to begin with.
+> carries out NUMA nodes creation and cpu<->node mappings at the same time
+> in the arch backend so that a single SRAT walk is needed to parse both
+> pieces of information.  This implies that the cpu<->node mappings must
+> be stashed in an array (sized NR_CPUS) so that SMP code can later use
+> the stashed values to avoid another SRAT table walk to set-up the early
+> cpu<->node mappings.
 > 
-> Given how the upstream kernel is aimed at future development, I don't
-> think we should fix this in the upstream kernel at all. Distros are
-> free to do what they like, of course, and I'm sure RedHat already have
-> a fix for this in their downstream kernel. But putting this upstream
-> means we will never be able to remove it again, which would be
-> especially unfortunate given that it is the first ever DMI quirk for
-> arm64, which we tried *very* hard to avoid, also because we don't
-> initialize the DMI framework as early as x86 does, and so once we open
-> the floodgates, we will run into issues where we will need to reorder
-> the init sequence to make DMI data available early enough.
+> If the kernel is configured with a NR_CPUS value less than the actual
+> processor entries in the SRAT (and MADT), the logic in
+> acpi_numa_gicc_affinity_init() is broken in that the cpu<->node mapping
+> is only carried out (and stashed for future use) only for a number of
+> SRAT entries up to NR_CPUS, which do not necessarily correspond to the
+> possible cpus detected at SMP initialization in
+> acpi_map_gic_cpu_interface() (ie MADT and SRAT processor entries order
+> is not enforced), which leaves the kernel with broken cpu<->node
+> mappings.
 > 
-> As for the efi.h patch: I don't object to adding code that makes the
-> spec revision available, but note that this is *not* a firmware build
-> number, and so it should not be used as such. Also, given that m400 is
-> EOL and unmaintained, no firmware updates are expected, and so
-> assuming that there will be a UEFI 2.7 based update in the future
-> seems rather optimistic.
+> Furthermore, given the current ACPI NUMA code parsing logic in
+> acpi_numa_gicc_affinity_init(), PXM domains for CPUs that are not parsed
+> because they exceed NR_CPUS entries are not mapped to NUMA nodes (ie the
+> PXM corresponding node is not created in the kernel) leaving the system
+> with a broken NUMA topology.
 > 
-> Ultimately, it is not up to me to decide whether
+> Rework the ACPI ARM64 NUMA initialization process so that the NUMA
+> nodes creation and cpu<->node mappings are decoupled. cpu<->node
+> mappings are moved to SMP initialization code (where they are needed),
+> at the cost of an extra SRAT walk so that ACPI NUMA mappings can be
+> batched before being applied, fixing current parsing pitfalls.
 > 
-> a) DMI quirks will be permitted on arm64
-> b) we care about m400 enough to put this quirk in the upstream kernel
-> 
-> but I'd prefer it if we steered clear of this.
+> Fixes: d8b47fca8c23 ("arm64, ACPI, NUMA: NUMA support based on SRAT and
+> SLIT")
+> Link: http://lkml.kernel.org/r/1527768879-88161-2-git-send-email-xiexiuqi at huawei.com
+> Reported-by: Xie XiuQi <xiexiuqi@huawei.com>
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Punit Agrawal <punit.agrawal@arm.com>
+> Cc: Jonathan Cameron <jonathan.cameron@huawei.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Hanjun Guo <guohanjun@huawei.com>
+> Cc: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
+> Cc: Jeremy Linton <jeremy.linton@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Xie XiuQi <xiexiuqi@huawei.com>
+> ---
+>  arch/arm64/include/asm/acpi.h |  6 ++-
+>  arch/arm64/kernel/acpi_numa.c | 88 ++++++++++++++++++++++++++-----------------
+>  arch/arm64/kernel/smp.c       | 39 +++++++++++++------
+>  3 files changed, 85 insertions(+), 48 deletions(-)
 
-I apologise to James (and Mark) who went all the way to debug this FW
-bug and worked around it with a series that is upstreamable, I was in
-two minds about this but eventually I would agree with you, your
-reasoning is linear and it is an acceptable reason not to merge this
-series, if HPe do not care I do not think we should either, for the time
-being let's keep the floodgates watertight, with my apologies.
+Looks good to me,
 
-Thanks,
-Lorenzo
+Acked-by: Hanjun Guo <hanjun.guo@linaro.org>
+
+Tested on D05 with NR_CPUS=48 (with last NUMA node boot
+without CPUs), the system works fine. If Xiuqi can test
+this patch on D06 with memory-less node, that would be
+more helpful.
+
+Thanks
+Hanjun
