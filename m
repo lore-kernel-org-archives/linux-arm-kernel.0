@@ -1,43 +1,71 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Thu, 28 Jun 2018 21:46:58 +0100
-Subject: [GIT PULL] arm64: hisilicon fixes for 4.18
-Message-ID: <5B354942.1060306@hisilicon.com>
+From: mathieu.desnoyers@efficios.com (Mathieu Desnoyers)
+Date: Thu, 28 Jun 2018 16:50:40 -0400 (EDT)
+Subject: [PATCH 3/3] rseq/selftests: Add support for arm64
+In-Reply-To: <20180628164700.GD10751@arm.com>
+References: <1529949285-11013-1-git-send-email-will.deacon@arm.com>
+ <1529949285-11013-4-git-send-email-will.deacon@arm.com>
+ <501929863.3051.1529950210436.JavaMail.zimbra@efficios.com>
+ <20180626151427.GF23375@arm.com>
+ <1763491947.3520.1530029512923.JavaMail.zimbra@efficios.com>
+ <20180628164700.GD10751@arm.com>
+Message-ID: <176714835.9396.1530219040151.JavaMail.zimbra@efficios.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Arnd,
+----- On Jun 28, 2018, at 12:47 PM, Will Deacon will.deacon at arm.com wrote:
 
-Please help to pull the following fix.
-Thanks!
+> Hi Mathieu,
+> 
+> On Tue, Jun 26, 2018 at 12:11:52PM -0400, Mathieu Desnoyers wrote:
+>> ----- On Jun 26, 2018, at 11:14 AM, Will Deacon will.deacon at arm.com wrote:
+>> > On Mon, Jun 25, 2018 at 02:10:10PM -0400, Mathieu Desnoyers wrote:
+>> >> I notice you are using the instructions
+>> >> 
+>> >>   adrp
+>> >>   add
+>> >>   str
+>> >> 
+>> >> to implement RSEQ_ASM_STORE_RSEQ_CS(). Did you compare
+>> >> performance-wise with an approach using a literal pool
+>> >> near the instruction pointer like I did on arm32 ?
+>> > 
+>> > I didn't, no. Do you have a benchmark to hand so I can give this a go?
+>> 
+>> see tools/testing/selftests/rseq/param_test_benchmark --help
+>> 
+>> It's a stripped-down version of param_test, without all the code for
+>> delay loops and testing checks.
+>> 
+>> Example use for counter increment with 4 threads, doing 5G counter
+>> increments per thread:
+>> 
+>> time ./param_test_benchmark -T i -t 4 -r 5000000000
+> 
+> Thanks. I ran that on a few arm64 systems I have access to, with three
+> configurations of the selftest:
+> 
+> 1. As I posted
+> 2. With the abort signature and branch in-lined, so as to avoid the CBNZ
+>   address limitations in large codebases
+> 3. With both the abort handler and the table inlined (i.e. the same thing
+>   as 32-bit).
+> 
+> There isn't a reliably measurable difference between (1) and (2), but I take
+> between 12% and 27% hit between (2) and (3).
 
-Best Regards,
-Wei
+Those results puzzle me. Do you have the actual code snippets of each
+implementation nearby ?
 
----
+Thanks,
 
-The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
+Mathieu
 
-  Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+> 
+> So I'll post a v2 based on (2).
+> 
+> Will
 
-are available in the git repository at:
-
-  git://github.com/hisilicon/linux-hisi.git tags/hisi-fixes-for-4.18
-
-for you to fetch changes up to a30449eb3ac908f26b4bc963a58039a5f2725ffa:
-
-  arm64: dts: hikey960: Define wl1837 power capabilities (2018-06-28 17:07:44 +0100)
-
-----------------------------------------------------------------
-ARM64: hisi fixes for 4.18
-
-- Added power capabilities for the mmc host controller on the
-  hikey and hikey960 boards to avoid broken wifi.
-
-----------------------------------------------------------------
-oscardagrach (2):
-      arm64: dts: hikey: Define wl1835 power capabilities
-      arm64: dts: hikey960: Define wl1837 power capabilities
-
- arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts | 2 ++
- arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts    | 2 ++
- 2 files changed, 4 insertions(+)
+-- 
+Mathieu Desnoyers
+EfficiOS Inc.
+http://www.efficios.com
