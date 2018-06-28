@@ -1,48 +1,62 @@
-From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Thu, 28 Jun 2018 11:56:48 +0200
-Subject: [PATCH 1/2] ARM: dts: armada388-clearfog: enable spi flash
-In-Reply-To: <20180628095201.GD17271@n2100.armlinux.org.uk> (Russell King's
- message of "Thu, 28 Jun 2018 10:52:01 +0100")
-References: <2bc87e3e365c460943730ded86c8fcb1ff55a533.1530170016.git.baruch@tkos.co.il>
- <874lhn8dg1.fsf@bootlin.com>
- <20180628095201.GD17271@n2100.armlinux.org.uk>
-Message-ID: <87sh576xpb.fsf@bootlin.com>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Thu, 28 Jun 2018 11:57:35 +0200
+Subject: [PATCH v3 00/13] ARM: davinci: remove duplicate aemif support
+Message-ID: <20180628095748.4462-1-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell King,
- 
- On jeu., juin 28 2018, Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
+From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-> On Thu, Jun 28, 2018 at 11:31:26AM +0200, Gregory CLEMENT wrote:
->> Hi Baruch,
->>  
->>  On jeu., juin 28 2018, Baruch Siach <baruch@tkos.co.il> wrote:
->> 
->> > The SolidRun Armada 388 SOM has the SPI flash populated by default
->> > unless the customer explicitly asks otherwise. Enable support by
->> > default.
->> >
->> > Signed-off-by: Baruch Siach <baruch@tkos.co.il>
->> 
->> Applied on mvebu/dt
->
-> It would be nice if you waited for acks or review before picking up
-> patches.  Only patch 2 has been acked and reviewed.
+This series moves all aemif/nand users to using the ti-aemif platform
+driver located in drivers/memory instead of the older API located in
+mach-davinci.
 
-The mvebu branches can still be modified, they become immutably only
-when we do PR, and usually it is around rc5 or rc6. So it's not too late
-to make some remarks on them.
+First five patches add necessary changes to the clock driver. Next
+seven convert the board files to using the ti-aemif driver. Last patch
+removes now dead code.
 
-Gregory
+v1 -> v2:
+- added missing clock lookups for ti-aemif where needed
+- removed an unnecessary davinci_nand clock lookup from psc-da850
+- moved the .id field initialization of aemif platform devices next to .name
+- tweaked the commit message for the last patch
 
->
-> -- 
-> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-> According to speedtest.net: 8.21Mbps down 510kbps up
+v2 -> v3:
+- in patch 6: change the davinci_nand device's id to -1 and keep the
+  includes sorted
+
+Bartosz Golaszewski (13):
+  clk: davinci: psc-da850: remove the 'davinci_nand.0" lookup
+  clk: davinci: psc-dm365: use two lookup entries for the aemif clock
+  clk: davinci: psc-dm644x: use two lookup entries for the aemif clock
+  clk: davinci: psc-dm646x: use two lookup entries for the aemif clock
+  clk: davinci: psc-da830: add a lookup entry for aemif clock
+  ARM: davinci: omapl138-hawk: add aemif & nand support
+  ARM: davinci: da850-evm: use aemif platform driver in legacy mode
+  ARM: davinci: dm365-evm: use the ti-aemif soc driver
+  ARM: davinci: dm644x-evm: use aemif platform driver
+  ARM: davinci: da830-evm: use aemif platform driver
+  ARM: davinci: dm646x-evm: use aemif platform driver
+  ARM: davinci: mityomapl138: use aemif platform driver
+  ARM: davinci: unduplicate aemif support
+
+ arch/arm/mach-davinci/Makefile                |   2 +-
+ arch/arm/mach-davinci/aemif.c                 | 218 ------------------
+ arch/arm/mach-davinci/board-da830-evm.c       |  56 ++++-
+ arch/arm/mach-davinci/board-da850-evm.c       |  93 ++++----
+ arch/arm/mach-davinci/board-dm365-evm.c       |  59 +++--
+ arch/arm/mach-davinci/board-dm644x-evm.c      |  55 +++--
+ arch/arm/mach-davinci/board-dm646x-evm.c      |  52 ++++-
+ arch/arm/mach-davinci/board-mityomapl138.c    |  55 +++--
+ arch/arm/mach-davinci/board-omapl138-hawk.c   | 132 +++++++++++
+ drivers/clk/davinci/psc-da830.c               |   3 +-
+ drivers/clk/davinci/psc-da850.c               |   3 +-
+ drivers/clk/davinci/psc-dm365.c               |   3 +-
+ drivers/clk/davinci/psc-dm644x.c              |   3 +-
+ drivers/clk/davinci/psc-dm646x.c              |   3 +-
+ .../linux/platform_data/mtd-davinci-aemif.h   |   1 -
+ 15 files changed, 407 insertions(+), 331 deletions(-)
+ delete mode 100644 arch/arm/mach-davinci/aemif.c
 
 -- 
-Gregory Clement, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-http://bootlin.com
+2.17.1
