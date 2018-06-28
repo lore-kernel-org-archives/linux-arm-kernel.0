@@ -1,181 +1,188 @@
-From: luc.vanoostenryck@gmail.com (Luc Van Oostenryck)
-Date: Fri, 29 Jun 2018 01:21:20 +0200
-Subject: [PATCH] sparse: stricter warning for explicit cast to ulong
-In-Reply-To: <20180628102741.vk6vphfinlj3lvhv@armageddon.cambridge.arm.com>
-References: <cover.1529507994.git.andreyknvl@google.com>
- <CAAeHK+zqtyGzd_CZ7qKZKU-uZjZ1Pkmod5h8zzbN0xCV26nSfg@mail.gmail.com>
- <20180626172900.ufclp2pfrhwkxjco@armageddon.cambridge.arm.com>
- <CAAeHK+yqWKTdTG+ymZ2-5XKiDANV+fmUjnQkRy-5tpgphuLJRA@mail.gmail.com>
- <0cef1643-a523-98e7-95e2-9ec595137642@arm.com>
- <20180627171757.amucnh5znld45cpc@armageddon.cambridge.arm.com>
- <20180628061758.j6bytsaj5jk4aocg@ltop.local>
- <20180628102741.vk6vphfinlj3lvhv@armageddon.cambridge.arm.com>
-Message-ID: <20180628232119.5jaavhewv5nb6ufb@ltop.local>
+From: houlong.wei@mediatek.com (houlong wei)
+Date: Fri, 29 Jun 2018 07:32:19 +0800
+Subject: [PATCH v22 4/4] soc: mediatek: Add Mediatek CMDQ helper
+In-Reply-To: <1530182516.8518.11.camel@mtksdaap41>
+References: <1530098172-31385-1-git-send-email-houlong.wei@mediatek.com>
+ <1530098172-31385-5-git-send-email-houlong.wei@mediatek.com>
+ <1530182516.8518.11.camel@mtksdaap41>
+Message-ID: <1530228739.21991.14.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-sparse issues a warning when user pointers are casted to integer
-types except to unsigned longs which are explicitly allowed.
-However it may happen that we would like to also be warned
-on casts to unsigned long.
+On Thu, 2018-06-28 at 18:41 +0800, CK Hu wrote:
+> Hi, Houlong:
+> 
+> Some inline comment.
+> 
+> On Wed, 2018-06-27 at 19:16 +0800, Houlong Wei wrote:
+> > Add Mediatek CMDQ helper to create CMDQ packet and assemble GCE op code.
+> > 
+> > Signed-off-by: Houlong Wei <houlong.wei@mediatek.com>
+> > Signed-off-by: HS Liao <hs.liao@mediatek.com>
+> > ---
+> >  drivers/soc/mediatek/Kconfig           |   12 ++
+> >  drivers/soc/mediatek/Makefile          |    1 +
+> >  drivers/soc/mediatek/mtk-cmdq-helper.c |  258 ++++++++++++++++++++++++++++++++
+> >  include/linux/soc/mediatek/mtk-cmdq.h  |  132 ++++++++++++++++
+> >  4 files changed, 403 insertions(+)
+> >  create mode 100644 drivers/soc/mediatek/mtk-cmdq-helper.c
+> >  create mode 100644 include/linux/soc/mediatek/mtk-cmdq.h
+> > 
+> > diff --git a/drivers/soc/mediatek/Kconfig b/drivers/soc/mediatek/Kconfig
+> > index a7d0667..17bd759 100644
+> > --- a/drivers/soc/mediatek/Kconfig
+> > +++ b/drivers/soc/mediatek/Kconfig
+> > @@ -4,6 +4,18 @@
+> >  menu "MediaTek SoC drivers"
+> >  	depends on ARCH_MEDIATEK || COMPILE_TEST
+> >  
+> 
+> [...]
+> 
+> > +
+> > +int cmdq_pkt_wfe(struct cmdq_pkt *pkt, u32 event)
+> > +{
+> > +	u32 arg_b;
+> > +
+> > +	if (event >= CMDQ_MAX_EVENT || event < 0)
+> 
+> The type of event is 'u32', so checking 'event < 0' is redundant.
 
-Fix this by adding a new warning flag: -Wcast-from-as (to mirrors
--Wcast-to-as) which extends -Waddress-space to all casts that
-remove an address space attribute (without using __force).
+will fix.
 
-References: https://lore.kernel.org/lkml/20180628102741.vk6vphfinlj3lvhv at armageddon.cambridge.arm.com/
-Signed-off-by: Luc Van Oostenryck <luc.vanoostenryck@gmail.com>
----
+> 
+> > +		return -EINVAL;
+> > +
+> > +	/*
+> > +	 * WFE arg_b
+> > +	 * bit 0-11: wait value
+> > +	 * bit 15: 1 - wait, 0 - no wait
+> > +	 * bit 16-27: update value
+> > +	 * bit 31: 1 - update, 0 - no update
+> > +	 */
+> > +	arg_b = CMDQ_WFE_UPDATE | CMDQ_WFE_WAIT | CMDQ_WFE_WAIT_VALUE;
+> > +
+> > +	return cmdq_pkt_append_command(pkt, CMDQ_CODE_WFE, event, arg_b);
+> > +}
+> > +EXPORT_SYMBOL(cmdq_pkt_wfe);
+> > +
+> > +int cmdq_pkt_clear_event(struct cmdq_pkt *pkt, u32 event)
+> > +{
+> > +	if (event >= CMDQ_MAX_EVENT || event < 0)
+> 
+> The type of event is 'u32', so checking 'event < 0' is redundant.
 
-This patch is available in the Git repository at:
-  git://github.com/lucvoo/sparse-dev.git warn-cast-from-as
+Will fix.
 
-----------------------------------------------------------------
-Luc Van Oostenryck (1):
-      stricter warning for explicit cast to ulong
+> 
+> > +		return -EINVAL;
+> > +
+> > +	return cmdq_pkt_append_command(pkt, CMDQ_CODE_WFE, event,
+> > +				       CMDQ_WFE_UPDATE);
+> > +}
+> > +EXPORT_SYMBOL(cmdq_pkt_clear_event);
+> > +
+> > +static int cmdq_pkt_finalize(struct cmdq_pkt *pkt)
+> > +{
+> > +	int err;
+> > +
+> > +	if (cmdq_pkt_is_finalized(pkt))
+> > +		return 0;
+> > +
+> > +	/* insert EOC and generate IRQ for each command iteration */
+> > +	err = cmdq_pkt_append_command(pkt, CMDQ_CODE_EOC, 0, CMDQ_EOC_IRQ_EN);
+> > +	if (err < 0)
+> > +		return err;
+> > +
+> > +	/* JUMP to end */
+> > +	err = cmdq_pkt_append_command(pkt, CMDQ_CODE_JUMP, 0, CMDQ_JUMP_PASS);
+> > +	if (err < 0)
+> > +		return err;
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +int cmdq_pkt_flush_async(struct cmdq_client *client, struct cmdq_pkt *pkt,
+> > +			 cmdq_async_flush_cb cb, void *data)
+> > +{
+> > +	int err;
+> > +	struct device *dev;
+> > +	dma_addr_t dma_addr;
+> > +
+> > +	err = cmdq_pkt_finalize(pkt);
+> > +	if (err < 0)
+> > +		return err;
+> > +
+> > +	dev = client->chan->mbox->dev;
+> > +	dma_addr = dma_map_single(dev, pkt->va_base, pkt->cmd_buf_size,
+> > +		DMA_TO_DEVICE);
+> 
+> You map here, but I could not find unmap, so the unmap should be done in
+> client driver. I would prefer a symmetric map/unmap which means that
+> both map and unmap are done in client driver. I think you put map here
+> because you should map after finalize. 
 
- evaluate.c                         |  4 +--
- lib.c                              |  2 ++
- lib.h                              |  1 +
- sparse.1                           |  9 ++++++
- validation/Waddress-space-strict.c | 56 ++++++++++++++++++++++++++++++++++++++
- 5 files changed, 70 insertions(+), 2 deletions(-)
- create mode 100644 validation/Waddress-space-strict.c
+The unmap is done before callback to client, in function
+cmdq_task_exec_done, mtk-cmdq-mailbox.c.
 
-diff --git a/evaluate.c b/evaluate.c
-index 194b97218..64e1067ce 100644
---- a/evaluate.c
-+++ b/evaluate.c
-@@ -2998,14 +2998,14 @@ static struct symbol *evaluate_cast(struct expression *expr)
- 		}
- 	}
- 
--	if (ttype == &ulong_ctype)
-+	if (ttype == &ulong_ctype && !Wcast_from_as)
- 		tas = -1;
- 	else if (tclass == TYPE_PTR) {
- 		examine_pointer_target(ttype);
- 		tas = ttype->ctype.as;
- 	}
- 
--	if (stype == &ulong_ctype)
-+	if (stype == &ulong_ctype && !Wcast_from_as)
- 		sas = -1;
- 	else if (sclass == TYPE_PTR) {
- 		examine_pointer_target(stype);
-diff --git a/lib.c b/lib.c
-index 308f8f699..0bb5232ab 100644
---- a/lib.c
-+++ b/lib.c
-@@ -248,6 +248,7 @@ static struct token *pre_buffer_end = NULL;
- int Waddress = 0;
- int Waddress_space = 1;
- int Wbitwise = 1;
-+int Wcast_from_as = 0;
- int Wcast_to_as = 0;
- int Wcast_truncate = 1;
- int Wconstexpr_not_const = 0;
-@@ -678,6 +679,7 @@ static const struct flag warnings[] = {
- 	{ "address", &Waddress },
- 	{ "address-space", &Waddress_space },
- 	{ "bitwise", &Wbitwise },
-+	{ "cast-from-as", &Wcast_from_as },
- 	{ "cast-to-as", &Wcast_to_as },
- 	{ "cast-truncate", &Wcast_truncate },
- 	{ "constexpr-not-const", &Wconstexpr_not_const},
-diff --git a/lib.h b/lib.h
-index b0453bb6e..46e685421 100644
---- a/lib.h
-+++ b/lib.h
-@@ -137,6 +137,7 @@ extern int preprocess_only;
- extern int Waddress;
- extern int Waddress_space;
- extern int Wbitwise;
-+extern int Wcast_from_as;
- extern int Wcast_to_as;
- extern int Wcast_truncate;
- extern int Wconstexpr_not_const;
-diff --git a/sparse.1 b/sparse.1
-index 806fb0cf0..62956f18b 100644
---- a/sparse.1
-+++ b/sparse.1
-@@ -77,6 +77,15 @@ Sparse issues these warnings by default.  To turn them off, use
- \fB\-Wno\-bitwise\fR.
- .
- .TP
-+.B \-Wcast\-from\-as
-+Warn about which remove an address space to a pointer type.
-+
-+This is similar to \fB\-Waddress\-space\fR but will also warn
-+on casts to \fBunsigned long\fR.
-+
-+Sparse does not issues these warnings by default.
-+.
-+.TP
- .B \-Wcast\-to\-as
- Warn about casts which add an address space to a pointer type.
- 
-diff --git a/validation/Waddress-space-strict.c b/validation/Waddress-space-strict.c
-new file mode 100644
-index 000000000..ad23f74ae
---- /dev/null
-+++ b/validation/Waddress-space-strict.c
-@@ -0,0 +1,56 @@
-+#define __user __attribute__((address_space(1)))
-+
-+typedef unsigned long ulong;
-+typedef long long llong;
-+typedef struct s obj_t;
-+
-+static void expl(int i, ulong u, llong l, void *v, obj_t *o, obj_t __user *p)
-+{
-+	(obj_t*)(i);
-+	(obj_t __user*)(i);
-+
-+	(obj_t*)(u);
-+	(obj_t __user*)(u);
-+
-+	(obj_t*)(l);
-+	(obj_t __user*)(l);
-+
-+	(obj_t*)(v);
-+	(obj_t __user*)(v);
-+
-+	(int)(o);
-+	(ulong)(o);
-+	(llong)(o);
-+	(void *)(o);
-+	(obj_t*)(o);
-+	(obj_t __user*)(o);
-+
-+	(int)(p);		// w
-+	(ulong)(p);		// w!
-+	(llong)(p);		// w
-+	(void *)(p);		// w
-+	(obj_t*)(p);		// w
-+	(obj_t __user*)(p);	// ok
-+}
-+
-+/*
-+ * check-name: Waddress-space-strict
-+ * check-command: sparse -Wcast-from-as -Wcast-to-as $file
-+ *
-+ * check-error-start
-+Waddress-space-strict.c:10:10: warning: cast adds address space to expression (<asn:1>)
-+Waddress-space-strict.c:13:10: warning: cast adds address space to expression (<asn:1>)
-+Waddress-space-strict.c:16:10: warning: cast adds address space to expression (<asn:1>)
-+Waddress-space-strict.c:19:10: warning: cast adds address space to expression (<asn:1>)
-+Waddress-space-strict.c:26:10: warning: cast adds address space to expression (<asn:1>)
-+Waddress-space-strict.c:28:10: warning: cast removes address space of expression
-+Waddress-space-strict.c:29:10: warning: cast removes address space of expression
-+Waddress-space-strict.c:30:10: warning: cast removes address space of expression
-+Waddress-space-strict.c:31:10: warning: cast removes address space of expression
-+Waddress-space-strict.c:32:10: warning: cast removes address space of expression
-+Waddress-space-strict.c:9:10: warning: non size-preserving integer to pointer cast
-+Waddress-space-strict.c:10:10: warning: non size-preserving integer to pointer cast
-+Waddress-space-strict.c:21:10: warning: non size-preserving pointer to integer cast
-+Waddress-space-strict.c:28:10: warning: non size-preserving pointer to integer cast
-+ * check-error-end
-+ */
--- 
-2.18.0
+> Therefore, export
+> cmdq_pkt_finalize() to client driver and let client do finalize, so
+> there is no finalize in flush function. This method have a benefit that
+> if client reuse command buffer, it need not to map/unmap frequently.
+
+If client reuse command buffer or cmdq_pkt(command queue packet), client
+will add new commands to the cmdq_pkt, so map/unmap are necessary for
+each cmdq_pkt flush.
+
+> 
+> Regards,
+> CK
+> 
+> > +	if (dma_mapping_error(dev, dma_addr)) {
+> > +		dev_err(client->chan->mbox->dev, "dma map failed\n");
+> > +		return -ENOMEM;
+> > +	}
+> > +
+> > +	pkt->pa_base = dma_addr;
+> > +	pkt->cb.cb = cb;
+> > +	pkt->cb.data = data;
+> > +
+> > +	mbox_send_message(client->chan, pkt);
+> > +	/* We can send next packet immediately, so just call txdone. */
+> > +	mbox_client_txdone(client->chan, 0);
+> > +
+> > +	return 0;
+> > +}
+> > +EXPORT_SYMBOL(cmdq_pkt_flush_async);
+> > +
+> > +struct cmdq_flush_completion {
+> > +	struct completion cmplt;
+> > +	bool err;
+> > +};
+> > +
+> > +static void cmdq_pkt_flush_cb(struct cmdq_cb_data data)
+> > +{
+> > +	struct cmdq_flush_completion *cmplt = data.data;
+> > +
+> > +	cmplt->err = data.err;
+> > +	complete(&cmplt->cmplt);
+> > +}
+> > +
+> > +int cmdq_pkt_flush(struct cmdq_client *client, struct cmdq_pkt *pkt)
+> > +{
+> > +	struct cmdq_flush_completion cmplt;
+> > +	int err;
+> > +
+> > +	init_completion(&cmplt.cmplt);
+> > +	err = cmdq_pkt_flush_async(client, pkt, cmdq_pkt_flush_cb, &cmplt);
+> > +	if (err < 0)
+> > +		return err;
+> > +	wait_for_completion(&cmplt.cmplt);
+> > +
+> > +	return cmplt.err ? -EFAULT : 0;
+> > +}
+> > +EXPORT_SYMBOL(cmdq_pkt_flush);
+> 
+> [...]
+> 
+> 
