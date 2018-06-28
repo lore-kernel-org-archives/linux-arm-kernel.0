@@ -1,77 +1,64 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Thu, 28 Jun 2018 11:20:35 +0100
-Subject: KVM guest sometimes failed to boot because of kernel stack
- overflow if KPTI is enabled on a hisilicon ARM64 platform.
-In-Reply-To: <9549e15d-4ec6-8dd3-2237-b6c9b52fc816@arm.com>
-References: <5B2A6218.3030201@hisilicon.com> <20180620144257.GB27776@arm.com>
- <5B2A7832.4010502@hisilicon.com>
- <ebfabb8f-dcd9-3fb4-3655-368a882d8f09@arm.com>
- <5B2A7FE1.5040607@hisilicon.com>
- <e701eaa8-dcb9-777c-2211-67ee27b43acb@arm.com>
- <5B2B6DEA.2090100@hisilicon.com> <5B3274FC.7000206@hisilicon.com>
- <20180626174746.GO23375@arm.com>
- <942e76b6-a46a-6c5e-5ec3-67daca636d43@arm.com>
- <5B339068.5020304@hisilicon.com>
- <9549e15d-4ec6-8dd3-2237-b6c9b52fc816@arm.com>
-Message-ID: <5B34B673.20803@hisilicon.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 28 Jun 2018 12:25:06 +0200
+Subject: [RFC/RFT PATCH 0/2] disable_hest quirk on HP m400 with bad UEFI
+ firmwware
+In-Reply-To: <20180628100656.10692-1-james.morse@arm.com>
+References: <20180628100656.10692-1-james.morse@arm.com>
+Message-ID: <CAKv+Gu9ZHAGzcfgHShM1qvZ3qf4gb1pD_XfoceJu9Qy+5_pEsg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi James,
 
-On 2018/6/28 9:45, James Morse wrote:
-> Hi Wei,
-> 
-> On 27/06/18 14:26, Wei Xu wrote:
->> Sorry, I should highlight that I have only updated the default value
->> of CONFIG_NR_CPUS by menuconfig in the previous mail.
->> That is why it showed dirty.
-> 
-> (menuconfig changes don't show up like this)
-
-Thanks!
-Sorry, yes, you are right.
-I did not see dirty after I reset the proc.S.
-
-> 
-> 
-> More than 64 CPUs ... Is this system running more VMs than it has VMIDs? Too-few
-> VMIDs does work with KVM, its just going to trigger rollover frequently.
+On 28 June 2018 at 12:06, James Morse <james.morse@arm.com> wrote:
+> There are reports[0] that HPE's 'ProLiant m400 Server' (aka moonshot) has
+> broken RAS support, and adding disable_hest to the kernel cmdline is the
+> only way to make the board boot if APEI support is built into the kernel.
+>
+> After Mark Salter's investigation[1] we know that UEFI's ExitBootServices
+> is doing something that causes a fatal error to be written to GHES.2.
+> Once the kernel finds this, it falsely assume it was due to something that
+> happened during boot, and panic()s.
+>
+> This series adds a DMI quirks table to hest.c, and adds a helper that lets
+> us query the UEFI system table version, to set hest_disabled on this
+> platform.
+>
+> Testing the HEST table vendor and revision is a problem as this would
+> match all 'HPE ProLiant', some of which may be a totally different CPU
+> architecture.
+>
+>
+> I don't have access to an m400, these DMI and UEFI values were taken from
+> the crashlog report at [0], then tested with the equivalent fields on
+> Seattle.
 >
 
-No, we just ran one VM.
+I understand the desire to keep running these M400s as long as they
+have some life left in them, but the reality is that they are end of
+life already, and not many were manufactured to begin with.
 
-> Just to check, what kernel version is the host running? Does it have commit
-> f0cf47d939d0 ("KVM: arm/arm64: Close VMID generation race")
-> (looks like that went in as a fix for v4.17-rc3)
+Given how the upstream kernel is aimed at future development, I don't
+think we should fix this in the upstream kernel at all. Distros are
+free to do what they like, of course, and I'm sure RedHat already have
+a fix for this in their downstream kernel. But putting this upstream
+means we will never be able to remove it again, which would be
+especially unfortunate given that it is the first ever DMI quirk for
+arm64, which we tried *very* hard to avoid, also because we don't
+initialize the DMI framework as early as x86 does, and so once we open
+the floodgates, we will run into issues where we will need to reorder
+the init sequence to make DMI data available early enough.
 
-Yes, the host is runing 4.18-rc2 as the guest including above commit.
+As for the efi.h patch: I don't object to adding code that makes the
+spec revision available, but note that this is *not* a firmware build
+number, and so it should not be used as such. Also, given that m400 is
+EOL and unmaintained, no firmware updates are expected, and so
+assuming that there will be a UEFI 2.7 based update in the future
+seems rather optimistic.
 
-> 
-> Are you running (lots) of other VMs whenever this happens? Do they have multiple
-> vcpus? (I'm thinking of the scenario in that patch's description)
+Ultimately, it is not up to me to decide whether
 
-No, we just ran one VM with 1 cpu.
+a) DMI quirks will be permitted on arm64
+b) we care about m400 enough to put this quirk in the upstream kernel
 
-> 
-> Is the host system otherwise idle when this happens?
-> (If not, can you reproduce the issue without exhausting the VMIDs?)
-> 
-> 
-> It may be that writing back the page-table entries with the MMU off, and
-> changing the cache maintenance are just changing the timing of something else.
-> 
-
-Yes, maybe. Now we are debugging with the SoC guys together.
-Thanks!
-
-Best Regards,
-Wei
-
-> 
-> Thanks,
-> 
-> James
-> 
-> .
-> 
+but I'd prefer it if we steered clear of this.
