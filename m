@@ -1,68 +1,67 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Thu, 28 Jun 2018 16:32:34 +0200
-Subject: [PATCH v3 08/18] net: davinci_emac: potentially get the MAC address
- from MTD
+Date: Thu, 28 Jun 2018 16:32:35 +0200
+Subject: [PATCH v3 09/18] ARM: davinci: da850-evm: remove dead MTD code
 In-Reply-To: <20180628143244.4561-1-brgl@bgdev.pl>
 References: <20180628143244.4561-1-brgl@bgdev.pl>
-Message-ID: <20180628143244.4561-9-brgl@bgdev.pl>
+Message-ID: <20180628143244.4561-10-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-On da850-evm board we can read the MAC address from MTD. It's currently
-done in the relevant board file, but we want to get rid of all the MAC
-reading callbacks from the board file (SPI and NAND). Move the reading
-of the MAC address from SPI to the emac driver's probe function.
+We no longer need to register the MTD notifier to read the MAC address
+as it's now being done in the emac address.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- drivers/net/ethernet/ti/davinci_emac.c | 19 +++++++++++++++++--
- 1 file changed, 17 insertions(+), 2 deletions(-)
+ arch/arm/mach-davinci/board-da850-evm.c | 28 -------------------------
+ 1 file changed, 28 deletions(-)
 
-diff --git a/drivers/net/ethernet/ti/davinci_emac.c b/drivers/net/ethernet/ti/davinci_emac.c
-index a1a6445b5a7e..17cfe093b8cf 100644
---- a/drivers/net/ethernet/ti/davinci_emac.c
-+++ b/drivers/net/ethernet/ti/davinci_emac.c
-@@ -67,7 +67,7 @@
- #include <linux/of_irq.h>
- #include <linux/of_net.h>
- #include <linux/mfd/syscon.h>
+diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
+index e22fb40e34bc..4de075458d83 100644
+--- a/arch/arm/mach-davinci/board-da850-evm.c
++++ b/arch/arm/mach-davinci/board-da850-evm.c
+@@ -124,32 +124,6 @@ static struct spi_board_info da850evm_spi_info[] = {
+ 	},
+ };
+ 
+-#ifdef CONFIG_MTD
+-static void da850_evm_m25p80_notify_add(struct mtd_info *mtd)
+-{
+-	char *mac_addr = davinci_soc_info.emac_pdata->mac_addr;
+-	size_t retlen;
 -
-+#include <linux/mtd/mtd.h>
- #include <asm/irq.h>
- #include <asm/page.h>
- 
-@@ -1783,7 +1783,10 @@ static int davinci_emac_probe(struct platform_device *pdev)
- 	struct cpdma_params dma_params;
- 	struct clk *emac_clk;
- 	unsigned long emac_bus_frequency;
+-	if (!strcmp(mtd->name, "MAC-Address")) {
+-		mtd_read(mtd, 0, ETH_ALEN, &retlen, mac_addr);
+-		if (retlen == ETH_ALEN)
+-			pr_info("Read MAC addr from SPI Flash: %pM\n",
+-				mac_addr);
+-	}
+-}
 -
-+#ifdef CONFIG_MTD
-+	size_t mac_addr_len;
-+	struct mtd_info *mtd;
-+#endif /* CONFIG_MTD */
+-static struct mtd_notifier da850evm_spi_notifier = {
+-	.add	= da850_evm_m25p80_notify_add,
+-};
+-
+-static void da850_evm_setup_mac_addr(void)
+-{
+-	register_mtd_user(&da850evm_spi_notifier);
+-}
+-#else
+-static void da850_evm_setup_mac_addr(void) { }
+-#endif
+-
+ static struct mtd_partition da850_evm_norflash_partition[] = {
+ 	{
+ 		.name           = "bootloaders + env",
+@@ -1455,8 +1429,6 @@ static __init void da850_evm_init(void)
+ 	if (ret)
+ 		pr_warn("%s: SATA registration failed: %d\n", __func__, ret);
  
- 	/* obtain emac clock from kernel */
- 	emac_clk = devm_clk_get(&pdev->dev, NULL);
-@@ -1815,6 +1818,18 @@ static int davinci_emac_probe(struct platform_device *pdev)
- 		goto err_free_netdev;
- 	}
- 
-+#ifdef CONFIG_MTD
-+	mtd = get_mtd_device_nm("MAC-Address");
-+	if (!IS_ERR(mtd)) {
-+		rc = mtd_read(mtd, 0, ETH_ALEN,
-+			      &mac_addr_len, priv->mac_addr);
-+		if (rc == 0)
-+			dev_info(&pdev->dev,
-+				 "Read MAC addr from SPI Flash: %pM\n",
-+				 priv->mac_addr);
-+	}
-+#endif /* CONFIG_MTD */
-+
- 	/* MAC addr and PHY mask , RMII enable info from platform_data */
- 	memcpy(priv->mac_addr, pdata->mac_addr, ETH_ALEN);
- 	priv->phy_id = pdata->phy_id;
+-	da850_evm_setup_mac_addr();
+-
+ 	ret = da8xx_register_rproc();
+ 	if (ret)
+ 		pr_warn("%s: dsp/rproc registration failed: %d\n",
 -- 
 2.17.1
