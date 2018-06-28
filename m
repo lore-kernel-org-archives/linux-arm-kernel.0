@@ -1,39 +1,37 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Thu, 28 Jun 2018 11:57:36 +0200
-Subject: [PATCH v3 01/13] clk: davinci: psc-da850: remove the 'davinci_nand.0"
- lookup
+Date: Thu, 28 Jun 2018 11:57:38 +0200
+Subject: [PATCH v3 03/13] clk: davinci: psc-dm644x: use two lookup entries for
+ the aemif clock
 In-Reply-To: <20180628095748.4462-1-brgl@bgdev.pl>
 References: <20180628095748.4462-1-brgl@bgdev.pl>
-Message-ID: <20180628095748.4462-2-brgl@bgdev.pl>
+Message-ID: <20180628095748.4462-4-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-Since commit a8e3923ab571 ("mtd: rawnand: davinci: don't acquire and
-enable clock") we no longer acquire the aemif clock from the davinci
-nand driver - we only do it from the ti-aemif driver. Remove the nand
-entry from the psc lookup table.
+We want to be able to get the clock both from the board file by its
+con_id and from the aemif driver by dev_id.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 Reviewed-by: David Lechner <david@lechnology.com>
 ---
- drivers/clk/davinci/psc-da850.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ drivers/clk/davinci/psc-dm644x.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/clk/davinci/psc-da850.c b/drivers/clk/davinci/psc-da850.c
-index d196dcbed560..5a18bca464cd 100644
---- a/drivers/clk/davinci/psc-da850.c
-+++ b/drivers/clk/davinci/psc-da850.c
-@@ -16,8 +16,7 @@
- 
- #include "psc.h"
- 
--LPSC_CLKDEV2(emifa_clkdev,	NULL,		"ti-aemif",
--				"aemif",	"davinci_nand.0");
-+LPSC_CLKDEV1(emifa_clkdev,	NULL,		"ti-aemif");
- LPSC_CLKDEV1(spi0_clkdev,	NULL,		"spi_davinci.0");
- LPSC_CLKDEV1(mmcsd0_clkdev,	NULL,		"da830-mmc.0");
- LPSC_CLKDEV1(uart0_clkdev,	NULL,		"serial8250.0");
+diff --git a/drivers/clk/davinci/psc-dm644x.c b/drivers/clk/davinci/psc-dm644x.c
+index fc0230e3a3d6..0cea6e0bd5f0 100644
+--- a/drivers/clk/davinci/psc-dm644x.c
++++ b/drivers/clk/davinci/psc-dm644x.c
+@@ -21,7 +21,8 @@ LPSC_CLKDEV2(emac_clkdev,		NULL,		"davinci_emac.1",
+ 					"fck",		"davinci_mdio.0");
+ LPSC_CLKDEV1(usb_clkdev,		"usb",		NULL);
+ LPSC_CLKDEV1(ide_clkdev,		NULL,		"palm_bk3710");
+-LPSC_CLKDEV1(aemif_clkdev,		"aemif",	NULL);
++LPSC_CLKDEV2(aemif_clkdev,		"aemif",	NULL,
++					NULL,		"ti-aemif");
+ LPSC_CLKDEV1(mmcsd_clkdev,		NULL,		"dm6441-mmc.0");
+ LPSC_CLKDEV1(asp0_clkdev,		NULL,		"davinci-mcbsp");
+ LPSC_CLKDEV1(i2c_clkdev,		NULL,		"i2c_davinci.1");
 -- 
 2.17.1
