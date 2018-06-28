@@ -1,119 +1,126 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 28 Jun 2018 08:07:37 -0500
-Subject: [PATCH 1/4] PCI: mediatek: fixup mtk_pcie_find_port logical
-In-Reply-To: <1530091298-28120-2-git-send-email-honghui.zhang@mediatek.com>
-References: <1530091298-28120-1-git-send-email-honghui.zhang@mediatek.com>
- <1530091298-28120-2-git-send-email-honghui.zhang@mediatek.com>
-Message-ID: <20180628130737.GA90450@bhelgaas-glaptop.roam.corp.google.com>
+From: gregory.clement@bootlin.com (Gregory CLEMENT)
+Date: Thu, 28 Jun 2018 15:07:45 +0200
+Subject: [PATCH] ARM: mvebu: declare asm symbols as character arrays in
+ pmsu.c
+In-Reply-To: <CACzLR4s7v8sxkvVvv1H2KKJHazfgCBmhAeb2Upa5JRoxTqm5nw@mail.gmail.com>
+ (Ethan Tuttle's message of "Wed, 27 Jun 2018 07:39:29 -0700")
+References: <20180620043109.1190-1-ethan@ethantuttle.com>
+ <87wouk92dm.fsf@bootlin.com>
+ <CACzLR4s7v8sxkvVvv1H2KKJHazfgCBmhAeb2Upa5JRoxTqm5nw@mail.gmail.com>
+Message-ID: <8736x76ov2.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 27, 2018 at 05:21:35PM +0800, honghui.zhang at mediatek.com wrote:
-> From: Honghui Zhang <honghui.zhang@mediatek.com>
-> 
-> Mediatek's host controller have two slots, each have it's own control
-> registers. The host driver need to identify which slot was connected
-> in order to access the device's configuration space. There's problem
-> for current host driver to find out which slot was connected to for
-> a given EP device.
+Hi Ethan,
+ 
+ On mer., juin 27 2018, Ethan Tuttle <ethan@ethantuttle.com> wrote:
 
-  The Mediatek host controller has two slots, each with its own control
-  registers.
+> Hi Gregory.
+>
+> On Tue, Jun 26, 2018 at 11:20 PM, Gregory CLEMENT
+> <gregory.clement@bootlin.com> wrote:
+>> Hi Ethan,
+>>
+>>  On mar., juin 19 2018, Ethan Tuttle <ethan@ethantuttle.com> wrote:
+>>
+>>> With CONFIG_FORTIFY_SOURCE, memcpy uses the declared size of operands to
+>>> detect buffer overflows.  If src or dest is declared as a char, attempts to
+>>> copy more than byte will result in a fortify_panic().
+>>>
+>>> Address this problem in mvebu_setup_boot_addr_wa() by declaring
+>>> mvebu_boot_wa_start and mvebu_boot_wa_end as character arrays.  Also remove
+>>> a couple addressof operators to avoid "arithmetic on pointer to an
+>>> incomplete type" compiler error.
+>>>
+>>> See commit 54a7d50b9205 ("x86: mark kprobe templates as character arrays,
+>>> not single characters") for a similar fix.
+>>>
+>>> Fixes "detected buffer overflow in memcpy" error during init on some mvebu
+>>> systems (armada-370-xp, armada-375):
+>>>
+>>> (fortify_panic) from (mvebu_setup_boot_addr_wa+0xb0/0xb4)
+>>> (mvebu_setup_boot_addr_wa) from (mvebu_v7_cpu_pm_init+0x154/0x204)
+>>> (mvebu_v7_cpu_pm_init) from (do_one_initcall+0x7c/0x1a8)
+>>> (do_one_initcall) from (kernel_init_freeable+0x1bc/0x254)
+>>> (kernel_init_freeable) from (kernel_init+0x8/0x114)
+>>> (kernel_init) from (ret_from_fork+0x14/0x2c)
+>>>
+>>> Signed-off-by: Ethan Tuttle <ethan@ethantuttle.com>
+>>> Tested-by: Ethan Tuttle <ethan@ethantuttle.com>
+>>
+>> Out of curiosity on which platform did you test it?
+>
+> I found the problem on my Mirabox after a kernel upgrade, and verified the fix
+> on the Mirabox as well.
+>
+> I just observed in the code that the panic should also happen on armada-375,
+> didn't do any testing there.
+>
+> BTW, just realizing I did not test with CONFIG_FORTIFY_SOURCE off.  But
+> I imagine it will work.  Let me know if you think that requires
+> testing.
 
-> Assuming each slot have connect with one EP device as below:
-> 
->                 host bridge
->   bus 0 --> __________|_______
->            |                  |
->            |                  |
->          slot 0             slot 1
->   bus 1 -->|        bus 2 --> |
->            |                  |
->          EP 0               EP 1
-> 
-> While PCI emulation, system software will scan all the PCI device
+No it's OK, thanks for extra information.
 
-s/While PCI emulation/During PCI enumeration/
+Gregory
 
-> starting from devfn 0. So it will get the proper port for slot0 and
-> slot1 device when using PCI_SLOT(devfn) for match. But it will get
-> the wrong slot for EP1: The devfn will be start from 0 when scanning
-> EP1 behind slot1, it will get port0 since the PCI_SLOT(EP1) is match
-> for port0's slot value. So the host driver should not using EP's devfn
-> but the slot's devfn(the slot which EP was connected to) for match.
-> 
-> This patch fix the mtk_pcie_find_port's logical by using the slot's
-> devfn for match.
-> 
-> Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
-> Reviewed-by: Ryder Lee <ryder.lee@mediatek.com>
-> ---
->  drivers/pci/controller/pcie-mediatek.c | 17 +++++++++++++++--
->  1 file changed, 15 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/pci/controller/pcie-mediatek.c b/drivers/pci/controller/pcie-mediatek.c
-> index 0baabe3..9cf7ecf 100644
-> --- a/drivers/pci/controller/pcie-mediatek.c
-> +++ b/drivers/pci/controller/pcie-mediatek.c
-> @@ -337,10 +337,23 @@ static struct mtk_pcie_port *mtk_pcie_find_port(struct pci_bus *bus,
->  {
->  	struct mtk_pcie *pcie = bus->sysdata;
->  	struct mtk_pcie_port *port;
-> +	struct pci_dev *dev;
-> +	struct pci_bus *pbus;
->  
-> -	list_for_each_entry(port, &pcie->ports, list)
-> -		if (port->slot == PCI_SLOT(devfn))
-> +	list_for_each_entry(port, &pcie->ports, list) {
+>
+>> Applied on mvebu/arm
+>
+> Excellent!  Thank you.
+>
+> Ethan
+>
+>>
+>> Thanks,
+>>
+>> Gregory
+>>
+>>
+>>
+>>> ---
+>>>  arch/arm/mach-mvebu/pmsu.c | 6 +++---
+>>>  1 file changed, 3 insertions(+), 3 deletions(-)
+>>>
+>>> diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
+>>> index 27a78c80e5b1..73d5d72dfc3e 100644
+>>> --- a/arch/arm/mach-mvebu/pmsu.c
+>>> +++ b/arch/arm/mach-mvebu/pmsu.c
+>>> @@ -116,8 +116,8 @@ void mvebu_pmsu_set_cpu_boot_addr(int hw_cpu, void *boot_addr)
+>>>               PMSU_BOOT_ADDR_REDIRECT_OFFSET(hw_cpu));
+>>>  }
+>>>
+>>> -extern unsigned char mvebu_boot_wa_start;
+>>> -extern unsigned char mvebu_boot_wa_end;
+>>> +extern unsigned char mvebu_boot_wa_start[];
+>>> +extern unsigned char mvebu_boot_wa_end[];
+>>>
+>>>  /*
+>>>   * This function sets up the boot address workaround needed for SMP
+>>> @@ -130,7 +130,7 @@ int mvebu_setup_boot_addr_wa(unsigned int crypto_eng_target,
+>>>                            phys_addr_t resume_addr_reg)
+>>>  {
+>>>       void __iomem *sram_virt_base;
+>>> -     u32 code_len = &mvebu_boot_wa_end - &mvebu_boot_wa_start;
+>>> +     u32 code_len = mvebu_boot_wa_end - mvebu_boot_wa_start;
+>>>
+>>>       mvebu_mbus_del_window(BOOTROM_BASE, BOOTROM_SIZE);
+>>>       mvebu_mbus_add_window_by_id(crypto_eng_target, crypto_eng_attribute,
+>>> --
+>>> 2.17.1
+>>>
+>>>
+>>> _______________________________________________
+>>> linux-arm-kernel mailing list
+>>> linux-arm-kernel at lists.infradead.org
+>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+>> --
+>> Gregory Clement, Bootlin (formerly Free Electrons)
+>> Embedded Linux and Kernel engineering
+>> http://bootlin.com
 
-mvebu has the identical hardware structure but uses an array instead
-of a list:
-
-  num = of_get_available_child_count(np);
-  pcie->ports = devm_kcalloc(dev, num, sizeof(*pcie->ports), GFP_KERNEL);
-  for_each_available_child_of_node(np, child) {
-    struct mvebu_pcie_port *port = &pcie->ports[i];
-    mvebu_pcie_parse_port(pcie, port, child);
-  }
-
-It would be nice if mvebu and mtk used the same strategy so the code
-looks the same.
-
-> +		if (bus->number == 0 && port->slot == PCI_SLOT(devfn)) {
-
-Is the root bus number fixed at 0 or is it programmable?  Many drivers
-do something like this:
-
-  if (bus->number == pcie->root_bus_nr)
-
-to handle the case of the root bus number being programmable.
-
->  			return port;
-> +		} else if (bus->number != 0) {
-> +			pbus = bus;
-> +			do {
-> +				dev = pbus->self;
-> +				if (port->slot == PCI_SLOT(dev->devfn))
-> +					return port;
-> +
-> +				pbus = dev->bus;
-> +			} while (dev->bus->number != 0);
-
-You should not need to search up the tree of dev->bus->self.
-
-mvebu_pcie_find_port() checks the root port secondary and subordinate
-bus numbers, which should work here, too.
-
-> +		}
-> +	}
->  
->  	return NULL;
->  }
-> -- 
-> 2.6.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+Gregory Clement, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+http://bootlin.com
