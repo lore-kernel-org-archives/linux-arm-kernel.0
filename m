@@ -1,47 +1,131 @@
-From: andreyknvl@google.com (Andrey Konovalov)
-Date: Thu, 28 Jun 2018 20:29:07 +0200
-Subject: [PATCH v4 00/17] khwasan: kernel hardware assisted address
- sanitizer
-In-Reply-To: <20180627160800.3dc7f9ee41c0badbf7342520@linux-foundation.org>
-References: <cover.1530018818.git.andreyknvl@google.com>
- <20180627160800.3dc7f9ee41c0badbf7342520@linux-foundation.org>
-Message-ID: <CAAeHK+xz552VNpZxgWwU-hbTqF5_F6YVDw3fSv=4OT8mNrqPzg@mail.gmail.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Thu, 28 Jun 2018 14:28:23 -0400
+Subject: [PATCH V3 3/6] PCI: Unify try slot and bus reset API
+In-Reply-To: <1530210507-9287-1-git-send-email-okaya@codeaurora.org>
+References: <1530210507-9287-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <1530210507-9287-3-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 28, 2018 at 1:08 AM, Andrew Morton
-<akpm@linux-foundation.org> wrote:
-> On Tue, 26 Jun 2018 15:15:10 +0200 Andrey Konovalov <andreyknvl@google.com> wrote:
->> ====== Benchmarks
->>
->> The following numbers were collected on Odroid C2 board. Both KASAN and
->> KHWASAN were used in inline instrumentation mode.
->>
->> Boot time [1]:
->> * ~1.7 sec for clean kernel
->> * ~5.0 sec for KASAN
->> * ~5.0 sec for KHWASAN
->>
->> Slab memory usage after boot [2]:
->> * ~40 kb for clean kernel
->> * ~105 kb + 1/8th shadow ~= 118 kb for KASAN
->> * ~47 kb + 1/16th shadow ~= 50 kb for KHWASAN
->>
->> Network performance [3]:
->> * 8.33 Gbits/sec for clean kernel
->> * 3.17 Gbits/sec for KASAN
->> * 2.85 Gbits/sec for KHWASAN
->>
->> Note, that KHWASAN (compared to KASAN) doesn't require quarantine.
->>
->> [1] Time before the ext4 driver is initialized.
->> [2] Measured as `cat /proc/meminfo | grep Slab`.
->> [3] Measured as `iperf -s & iperf -c 127.0.0.1 -t 30`.
->
-> The above doesn't actually demonstrate the whole point of the
-> patchset: to reduce KASAN's very high memory consumption?
+Drivers are expected to call pci_try_reset_slot() or pci_try_reset_bus() by
+querying if a system supports hotplug or not. A survey showed that most
+drivers don't do this and we are leaking hotplug capability to the user.
 
-You mean that memory usage numbers collected after boot don't give a
-representative picture of actual memory consumption on real workloads?
+Hide pci_try_slot_reset() from drivers and embed into pci_try_bus_reset().
+Change pci_try_reset_bus() parameter from struct pci_bus to struct pci_dev.
 
-What kind of memory consumption testing would you like to see?
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+---
+ drivers/pci/pci.c           | 26 +++++++++++++++++++++-----
+ drivers/vfio/pci/vfio_pci.c |  6 ++----
+ include/linux/pci.h         |  3 +--
+ 3 files changed, 24 insertions(+), 11 deletions(-)
+
+diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+index 236220c..79a1566 100644
+--- a/drivers/pci/pci.c
++++ b/drivers/pci/pci.c
+@@ -4817,12 +4817,12 @@ int pci_reset_slot(struct pci_slot *slot)
+ EXPORT_SYMBOL_GPL(pci_reset_slot);
+ 
+ /**
+- * pci_try_reset_slot - Try to reset a PCI slot
++ * __pci_try_reset_slot - Try to reset a PCI slot
+  * @slot: PCI slot to reset
+  *
+  * Same as above except return -EAGAIN if the slot cannot be locked
+  */
+-int pci_try_reset_slot(struct pci_slot *slot)
++static int __pci_try_reset_slot(struct pci_slot *slot)
+ {
+ 	int rc;
+ 
+@@ -4843,7 +4843,6 @@ int pci_try_reset_slot(struct pci_slot *slot)
+ 
+ 	return rc;
+ }
+-EXPORT_SYMBOL_GPL(pci_try_reset_slot);
+ 
+ static int pci_bus_reset(struct pci_bus *bus, int probe)
+ {
+@@ -4906,12 +4905,12 @@ int pci_reset_bus(struct pci_bus *bus)
+ EXPORT_SYMBOL_GPL(pci_reset_bus);
+ 
+ /**
+- * pci_try_reset_bus - Try to reset a PCI bus
++ * __pci_try_reset_bus - Try to reset a PCI bus
+  * @bus: top level PCI bus to reset
+  *
+  * Same as above except return -EAGAIN if the bus cannot be locked
+  */
+-int pci_try_reset_bus(struct pci_bus *bus)
++static int __pci_try_reset_bus(struct pci_bus *bus)
+ {
+ 	int rc;
+ 
+@@ -4932,6 +4931,23 @@ int pci_try_reset_bus(struct pci_bus *bus)
+ 
+ 	return rc;
+ }
++
++/**
++ * pci_try_reset_bus - Try to reset a PCI bus
++ * @pdev: top level PCI device to reset via slot/bus
++ *
++ * Same as above except return -EAGAIN if the bus cannot be locked
++ */
++int pci_try_reset_bus(struct pci_dev *pdev)
++{
++	bool slot = false;
++
++	if (!pci_probe_reset_slot(pdev->slot))
++		slot = true;
++
++	return slot ? __pci_try_reset_slot(pdev->slot) :
++			__pci_try_reset_bus(pdev->bus);
++}
+ EXPORT_SYMBOL_GPL(pci_try_reset_bus);
+ 
+ /**
+diff --git a/drivers/vfio/pci/vfio_pci.c b/drivers/vfio/pci/vfio_pci.c
+index b423a30..71018ec 100644
+--- a/drivers/vfio/pci/vfio_pci.c
++++ b/drivers/vfio/pci/vfio_pci.c
+@@ -1010,8 +1010,7 @@ static long vfio_pci_ioctl(void *device_data,
+ 						    &info, slot);
+ 		if (!ret)
+ 			/* User has access, do the reset */
+-			ret = slot ? pci_try_reset_slot(vdev->pdev->slot) :
+-				     pci_try_reset_bus(vdev->pdev->bus);
++			ret = pci_try_reset_bus(vdev->pdev);
+ 
+ hot_reset_release:
+ 		for (i--; i >= 0; i--)
+@@ -1373,8 +1372,7 @@ static void vfio_pci_try_bus_reset(struct vfio_pci_device *vdev)
+ 	}
+ 
+ 	if (needs_reset)
+-		ret = slot ? pci_try_reset_slot(vdev->pdev->slot) :
+-			     pci_try_reset_bus(vdev->pdev->bus);
++		ret = pci_try_reset_bus(vdev->pdev);
+ 
+ put_devs:
+ 	for (i = 0; i < devs.cur_index; i++) {
+diff --git a/include/linux/pci.h b/include/linux/pci.h
+index 6b12ce2..f5c85b6 100644
+--- a/include/linux/pci.h
++++ b/include/linux/pci.h
+@@ -1096,10 +1096,9 @@ int pci_reset_function_locked(struct pci_dev *dev);
+ int pci_try_reset_function(struct pci_dev *dev);
+ int pci_probe_reset_slot(struct pci_slot *slot);
+ int pci_reset_slot(struct pci_slot *slot);
+-int pci_try_reset_slot(struct pci_slot *slot);
+ int pci_probe_reset_bus(struct pci_bus *bus);
+ int pci_reset_bus(struct pci_bus *bus);
+-int pci_try_reset_bus(struct pci_bus *bus);
++int pci_try_reset_bus(struct pci_dev *dev);
+ void pci_reset_secondary_bus(struct pci_dev *dev);
+ void pcibios_reset_secondary_bus(struct pci_dev *dev);
+ void pci_update_resource(struct pci_dev *dev, int resno);
+-- 
+2.7.4
