@@ -1,118 +1,45 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 28 Jun 2018 11:14:34 +0200
-Subject: [PATCH 4/5] x86: jump_label: switch to jump_entry accessors
-In-Reply-To: <20180628091135.GB2494@hirez.programming.kicks-ass.net>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 28 Jun 2018 10:17:57 +0100
+Subject: [PATCH 3/5] arm64/kernel: jump_label: switch to relative
+ references
+In-Reply-To: <20180627160604.8154-4-ard.biesheuvel@linaro.org>
 References: <20180627160604.8154-1-ard.biesheuvel@linaro.org>
- <20180627160604.8154-5-ard.biesheuvel@linaro.org>
- <20180628091135.GB2494@hirez.programming.kicks-ass.net>
-Message-ID: <CAKv+Gu8OuxSWEWA0o+b+DaPLW8tSx-R6K4_KfomZSBKxqSuukA@mail.gmail.com>
+ <20180627160604.8154-4-ard.biesheuvel@linaro.org>
+Message-ID: <20180628091757.GA10751@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 June 2018 at 11:11, Peter Zijlstra <peterz@infradead.org> wrote:
-> On Wed, Jun 27, 2018 at 06:06:03PM +0200, Ard Biesheuvel wrote:
->> In preparation of switching x86 to use place-relative references for
->> the code, target and key members of struct jump_entry, replace direct
->> references to the struct members with invocations of the new accessors.
->> This will allow us to make the switch by modifying the accessors only.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->
-> That just makes horrible code worse.. can't we do something like so
-> instead?
->
+On Wed, Jun 27, 2018 at 06:06:02PM +0200, Ard Biesheuvel wrote:
+> On a randomly chosen distro kernel build for arm64, vmlinux.o shows the
+> following sections, containing jump label entries, and the associated
+> RELA relocation records, respectively:
+> 
+>   ...
+>   [38088] __jump_table      PROGBITS         0000000000000000  00e19f30
+>        000000000002ea10  0000000000000000  WA       0     0     8
+>   [38089] .rela__jump_table RELA             0000000000000000  01fd8bb0
+>        000000000008be30  0000000000000018   I      38178   38088     8
+>   ...
+> 
+> In other words, we have 190 KB worth of 'struct jump_entry' instances,
+> and 573 KB worth of RELA entries to relocate each entry's code, target
+> and key members. This means the RELA section occupies 10% of the .init
+> segment, and the two sections combined represent 5% of vmlinux's entire
+> memory footprint.
+> 
+> So let's switch from 64-bit absolute references to 32-bit relative
+> references: this reduces the size of the __jump_table by 50%, and gets
+> rid of the RELA section entirely.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/Kconfig                  |  1 +
+>  arch/arm64/include/asm/jump_label.h | 16 ++++------------
+>  arch/arm64/kernel/jump_label.c      |  6 +++---
+>  3 files changed, 8 insertions(+), 15 deletions(-)
 
-Sure, I will incorporate that for v2.
+Looks good, cheers:
 
->
-> --- a/arch/x86/kernel/jump_label.c
-> +++ b/arch/x86/kernel/jump_label.c
-> @@ -42,52 +42,37 @@ static void __jump_label_transform(struc
->                                    void *(*poker)(void *, const void *, size_t),
->                                    int init)
->  {
-> -       union jump_code_union code;
-> +       union jump_code_union jmp = {
-> +               { .jump = 0xe9,
-> +                 .offset = jump_entry_target(entry) -
-> +                           (jump_entry_code(entry) + JUMP_LABEL_NOP_SIZE), }
-> +       };
->         const unsigned char default_nop[] = { STATIC_KEY_INIT_NOP };
->         const unsigned char *ideal_nop = ideal_nops[NOP_ATOMIC5];
-> +       const unsigned char *expect, *code;
-> +       int line;
->
->         if (type == JUMP_LABEL_JMP) {
->                 if (init) {
-> -                       /*
-> -                        * Jump label is enabled for the first time.
-> -                        * So we expect a default_nop...
-> -                        */
-> -                       if (unlikely(memcmp((void *)entry->code, default_nop, 5)
-> -                                    != 0))
-> -                               bug_at((void *)entry->code, __LINE__);
-> +                       expect = default_nop; line = __LINE__;
->                 } else {
-> -                       /*
-> -                        * ...otherwise expect an ideal_nop. Otherwise
-> -                        * something went horribly wrong.
-> -                        */
-> -                       if (unlikely(memcmp((void *)entry->code, ideal_nop, 5)
-> -                                    != 0))
-> -                               bug_at((void *)entry->code, __LINE__);
-> +                       expect = ideal_nop; line = __LINE__;
->                 }
->
-> -               code.jump = 0xe9;
-> -               code.offset = entry->target -
-> -                               (entry->code + JUMP_LABEL_NOP_SIZE);
-> +               code = &jmp.code;
->         } else {
-> -               /*
-> -                * We are disabling this jump label. If it is not what
-> -                * we think it is, then something must have gone wrong.
-> -                * If this is the first initialization call, then we
-> -                * are converting the default nop to the ideal nop.
-> -                */
->                 if (init) {
-> -                       if (unlikely(memcmp((void *)entry->code, default_nop, 5) != 0))
-> -                               bug_at((void *)entry->code, __LINE__);
-> +                       expect = default_nop; line = __LINE__;
->                 } else {
-> -                       code.jump = 0xe9;
-> -                       code.offset = entry->target -
-> -                               (entry->code + JUMP_LABEL_NOP_SIZE);
-> -                       if (unlikely(memcmp((void *)entry->code, &code, 5) != 0))
-> -                               bug_at((void *)entry->code, __LINE__);
-> +                       expect = &jmp.code; line = __LINE__;
->                 }
-> -               memcpy(&code, ideal_nops[NOP_ATOMIC5], JUMP_LABEL_NOP_SIZE);
-> +
-> +               code = ideal_nop;
->         }
->
-> +       if (memcmp((void *)jump_entry_code(entry), expect, JUMP_LABEL_NOP_SIZE))
-> +               bug_at((void *)jump_entry_code(entry), line);
-> +
->         /*
->          * Make text_poke_bp() a default fallback poker.
->          *
-> @@ -96,11 +81,13 @@ static void __jump_label_transform(struc
->          * always nop being the 'currently valid' instruction
->          *
->          */
-> -       if (poker)
-> -               (*poker)((void *)entry->code, &code, JUMP_LABEL_NOP_SIZE);
-> -       else
-> -               text_poke_bp((void *)entry->code, &code, JUMP_LABEL_NOP_SIZE,
-> -                            (void *)entry->code + JUMP_LABEL_NOP_SIZE);
-> +       if (poker) {
-> +               (*poker)((void *)jump_entry_code(entry), &code, JUMP_LABEL_NOP_SIZE);
-> +               return;
-> +       }
-> +
-> +       text_poke_bp((void *)jump_entry_code(entry), &code, JUMP_LABEL_NOP_SIZE,
-> +                    (void *)jump_entry_code(entry) + JUMP_LABEL_NOP_SIZE);
->  }
->
->  void arch_jump_label_transform(struct jump_entry *entry,
+Acked-by: Will Deacon <will.deacon@arm.com>
+
+Will
