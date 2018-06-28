@@ -1,120 +1,80 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 28 Jun 2018 15:41:36 -0300
-Subject: [PATCH v2] ARM: dts: imx51: Fix USB PHY duplicate unit-address
-Message-ID: <1530211296-24591-1-git-send-email-festevam@gmail.com>
+Date: Thu, 28 Jun 2018 15:43:52 -0300
+Subject: [RFC] ARM: dts: imx7s: Fix the port reg properties
+In-Reply-To: <1526306996-25045-1-git-send-email-festevam@gmail.com>
+References: <1526306996-25045-1-git-send-email-festevam@gmail.com>
+Message-ID: <CAOMZO5DPdzQVtSHfp3RtgLPsUi_aTJG7J-OrJpUz0Kk3U86zzQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@nxp.com>
+Hi Rob,
 
-Currently the following DTC warnings are seen with W=1:
+On Mon, May 14, 2018 at 11:09 AM, Fabio Estevam <festevam@gmail.com> wrote:
+> From: Fabio Estevam <fabio.estevam@nxp.com>
+>
+> The 'reg' property must match the unit address, so fix them
+> to avoid the following DTC warnings with W=1:
+>
+> arch/arm/boot/dts/imx7d-cl-som-imx7.dtb: Warning (graph_port): /replicator/ports/port at 2: graph node unit address error, expected "0"
+> arch/arm/boot/dts/imx7d-cl-som-imx7.dtb: Warning (graph_port): /soc/funnel at 30041000/ports/port at 2: graph node unit address error, expected "0"
+> arch/arm/boot/dts/imx7d-cl-som-imx7.dtb: Warning (graph_port): /soc/funnel at 30083000/ports/port at 2: graph node unit address error, expected "0"
+> arch/arm/boot/dts/imx7d-cl-som-imx7.dtb: Warning (graph_port): /soc/etf at 30084000/ports/port at 1: graph node unit address error, expected "0"
+>
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+> ---
+> Hi Rob,
+>
+> Is this the correct way to fix these warnings?
 
-arch/arm/boot/dts/imx51-babbage.dtb: Warning (unique_unit_address): /usbphy/usbphy at 0: duplicate unit-address (also used in node /usbphy/usbh1phy at 0)
-arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dtb: Warning (unique_unit_address): /usbphy/usbphy at 0: duplicate unit-address (also used in node /usbphy/usbh1phy at 0)
+Any suggestions, please? I would like to clean up these dtc warnings.
 
-Fix it by moving the USB PHY nodes outside of simple-bus and drop the
-unneeded unit-address, which matches the bindings documentation
-at Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt
+Thanks
 
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
----
-Changes since v1:
-- Make it a single patch including the imx51.dtsi change (Shawn)
 
- arch/arm/boot/dts/imx51-babbage.dts                 | 21 +++++++--------------
- .../boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts   | 19 ++++++-------------
- arch/arm/boot/dts/imx51.dtsi                        | 17 +++++------------
- 3 files changed, 18 insertions(+), 39 deletions(-)
-
-diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
-index b8ca73d..de46906 100644
---- a/arch/arm/boot/dts/imx51-babbage.dts
-+++ b/arch/arm/boot/dts/imx51-babbage.dts
-@@ -170,20 +170,13 @@
- 		mux-ext-port = <3>;
- 	};
- 
--	usbphy {
--		#address-cells = <1>;
--		#size-cells = <0>;
--		compatible = "simple-bus";
--
--		usbh1phy: usbh1phy at 0 {
--			compatible = "usb-nop-xceiv";
--			reg = <0>;
--			clocks = <&clk_usb>;
--			clock-names = "main_clk";
--			reset-gpios = <&gpio2 5 GPIO_ACTIVE_LOW>;
--			vcc-supply = <&vusb_reg>;
--			#phy-cells = <0>;
--		};
-+	usbh1phy: usbh1phy1 {
-+		compatible = "usb-nop-xceiv";
-+		clocks = <&clk_usb>;
-+		clock-names = "main_clk";
-+		reset-gpios = <&gpio2 5 GPIO_ACTIVE_LOW>;
-+		vcc-supply = <&vusb_reg>;
-+		#phy-cells = <0>;
- 	};
- };
- 
-diff --git a/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts
-index b3d952f..2320464 100644
---- a/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts
-+++ b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts
-@@ -83,19 +83,12 @@
- 		fsl,mux-ext-port = <3>;
- 	};
- 
--	usbphy {
--		#address-cells = <1>;
--		#size-cells = <0>;
--		compatible = "simple-bus";
--
--		usbh1phy: usbh1phy at 0 {
--			compatible = "usb-nop-xceiv";
--			reg = <0>;
--			clocks = <&clks IMX5_CLK_USB_PHY_GATE>;
--			clock-names = "main_clk";
--			clock-frequency = <19200000>;
--			#phy-cells = <0>;
--		};
-+	usbh1phy: usbh1phy {
-+		compatible = "usb-nop-xceiv";
-+		clocks = <&clks IMX5_CLK_USB_PHY_GATE>;
-+		clock-names = "main_clk";
-+		clock-frequency = <19200000>;
-+		#phy-cells = <0>;
- 	};
- };
- 
-diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
-index fe01b89..89520c1 100644
---- a/arch/arm/boot/dts/imx51.dtsi
-+++ b/arch/arm/boot/dts/imx51.dtsi
-@@ -93,18 +93,11 @@
- 		};
- 	};
- 
--	usbphy {
--		#address-cells = <1>;
--		#size-cells = <0>;
--		compatible = "simple-bus";
--
--		usbphy0: usbphy at 0 {
--			compatible = "usb-nop-xceiv";
--			reg = <0>;
--			clocks = <&clks IMX5_CLK_USB_PHY_GATE>;
--			clock-names = "main_clk";
--			#phy-cells = <0>;
--		};
-+	usbphy0: usbphy0 {
-+		compatible = "usb-nop-xceiv";
-+		clocks = <&clks IMX5_CLK_USB_PHY_GATE>;
-+		clock-names = "main_clk";
-+		#phy-cells = <0>;
- 	};
- 
- 	display-subsystem {
--- 
-2.7.4
+>
+>  arch/arm/boot/dts/imx7s.dtsi | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
+> index 7d33993..55b6241 100644
+> --- a/arch/arm/boot/dts/imx7s.dtsi
+> +++ b/arch/arm/boot/dts/imx7s.dtsi
+> @@ -126,7 +126,7 @@
+>
+>                         /* replicator input port */
+>                         port at 2 {
+> -                               reg = <0>;
+> +                               reg = <2>;
+>                                 replicator_in_port0: endpoint {
+>                                         slave-mode;
+>                                         remote-endpoint = <&etf_out_port>;
+> @@ -183,7 +183,7 @@
+>
+>                                 /* funnel output port */
+>                                 port at 2 {
+> -                                       reg = <0>;
+> +                                       reg = <2>;
+>                                         ca_funnel_out_port0: endpoint {
+>                                                 remote-endpoint = <&hugo_funnel_in_port0>;
+>                                         };
+> @@ -234,7 +234,7 @@
+>                                 };
+>
+>                                 port at 2 {
+> -                                       reg = <0>;
+> +                                       reg = <2>;
+>                                         hugo_funnel_out_port0: endpoint {
+>                                                 remote-endpoint = <&etf_in_port>;
+>                                         };
+> @@ -263,7 +263,7 @@
+>                                 };
+>
+>                                 port at 1 {
+> -                                       reg = <0>;
+> +                                       reg = <1>;
+>                                         etf_out_port: endpoint {
+>                                                 remote-endpoint = <&replicator_in_port0>;
+>                                         };
+> --
+> 2.7.4
+>
