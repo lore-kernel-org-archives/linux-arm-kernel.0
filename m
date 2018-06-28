@@ -1,93 +1,55 @@
-From: honghui.zhang@mediatek.com (Honghui Zhang)
-Date: Thu, 28 Jun 2018 09:12:07 +0800
-Subject: [PATCH 1/4] PCI: mediatek: fixup mtk_pcie_find_port logical
-In-Reply-To: <CAHp75Ve2N_Bt8FvX8xCx3JtQ+ozZE=isfsKp9swY+86Cg-78XQ@mail.gmail.com>
-References: <1530091298-28120-1-git-send-email-honghui.zhang@mediatek.com>
- <1530091298-28120-2-git-send-email-honghui.zhang@mediatek.com>
- <CAHp75Ve2N_Bt8FvX8xCx3JtQ+ozZE=isfsKp9swY+86Cg-78XQ@mail.gmail.com>
-Message-ID: <1530148327.28284.1.camel@mhfsdcap03>
+From: anson.huang@nxp.com (Anson Huang)
+Date: Thu, 28 Jun 2018 01:14:44 +0000
+Subject: [PATCH] ARM: dts: imx6sll-evk: enable usdhc3 slot
+In-Reply-To: <CAOMZO5DoRUSOfV_oh242w6s_1Zs8yAy9Kf4D+WdYym5c+6nucg@mail.gmail.com>
+References: <1530088605-9264-1-git-send-email-Anson.Huang@nxp.com>
+ <CAOMZO5DoRUSOfV_oh242w6s_1Zs8yAy9Kf4D+WdYym5c+6nucg@mail.gmail.com>
+Message-ID: <AM3PR04MB1315128EA1000FD6D0903CEAF54F0@AM3PR04MB1315.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2018-06-27 at 19:35 +0300, Andy Shevchenko wrote:
-> On Wed, Jun 27, 2018 at 12:21 PM,  <honghui.zhang@mediatek.com> wrote:
-> > From: Honghui Zhang <honghui.zhang@mediatek.com>
-> >
-> > Mediatek's host controller have two slots, each have it's own control
-> > registers. The host driver need to identify which slot was connected
-> > in order to access the device's configuration space. There's problem
-> > for current host driver to find out which slot was connected to for
-> > a given EP device.
-> >
-> > Assuming each slot have connect with one EP device as below:
-> >
-> >                 host bridge
-> >   bus 0 --> __________|_______
-> >            |                  |
-> >            |                  |
-> >          slot 0             slot 1
-> >   bus 1 -->|        bus 2 --> |
-> >            |                  |
-> >          EP 0               EP 1
-> >
-> > While PCI emulation, system software will scan all the PCI device
-> > starting from devfn 0. So it will get the proper port for slot0 and
-> > slot1 device when using PCI_SLOT(devfn) for match. But it will get
-> > the wrong slot for EP1: The devfn will be start from 0 when scanning
-> > EP1 behind slot1, it will get port0 since the PCI_SLOT(EP1) is match
-> > for port0's slot value. So the host driver should not using EP's devfn
-> > but the slot's devfn(the slot which EP was connected to) for match.
-> >
-> > This patch fix the mtk_pcie_find_port's logical by using the slot's
-> > devfn for match.
+Hi, Fabio
+
+Anson Huang
+Best Regards!
+
+
+> -----Original Message-----
+> From: Fabio Estevam [mailto:festevam at gmail.com]
+> Sent: Wednesday, June 27, 2018 10:31 PM
+> To: Anson Huang <anson.huang@nxp.com>
+> Cc: Shawn Guo <shawnguo@kernel.org>; Sascha Hauer
+> <s.hauer@pengutronix.de>; Sascha Hauer <kernel@pengutronix.de>; Fabio
+> Estevam <fabio.estevam@nxp.com>; Rob Herring <robh+dt@kernel.org>;
+> Mark Rutland <mark.rutland@arm.com>; open list:OPEN FIRMWARE AND
+> FLATTENED DEVICE TREE BINDINGS <devicetree@vger.kernel.org>;
+> dl-linux-imx <linux-imx@nxp.com>; moderated list:ARM/FREESCALE IMX / MXC
+> ARM ARCHITECTURE <linux-arm-kernel@lists.infradead.org>; linux-kernel
+> <linux-kernel@vger.kernel.org>
+> Subject: Re: [PATCH] ARM: dts: imx6sll-evk: enable usdhc3 slot
 > 
+> Hi Anson,
 > 
-> > +       list_for_each_entry(port, &pcie->ports, list) {
-> > +               if (bus->number == 0 && port->slot == PCI_SLOT(devfn)) {
-> >                         return port;
-> > +               } else if (bus->number != 0) {
+> On Wed, Jun 27, 2018 at 5:36 AM, Anson Huang <Anson.Huang@nxp.com>
+> wrote:
 > 
-> You can do it like (no need 'else')
-> 
-> if (...)
->  return ...;
-> if (bus->number) {
->  ...
-> }
-> 
-> > +                       pbus = bus;
-> > +                       do {
-> > +                               dev = pbus->self;
-> > +                               if (port->slot == PCI_SLOT(dev->devfn))
-> > +                                       return port;
+> > +&usdhc3 {
+> > +       pinctrl-names = "default", "state_100mhz", "state_200mhz";
+> > +       pinctrl-0 = <&pinctrl_usdhc3>;
+> > +       pinctrl-1 = <&pinctrl_usdhc3_100mhz>;
+> > +       pinctrl-2 = <&pinctrl_usdhc3_200mhz>;
+> > +       cd-gpios = <&gpio3 22 GPIO_ACTIVE_LOW>;
+> > +       keep-power-in-suspend;
+> > +       enable-sdio-wakeup;
+> > +       vmmc-supply = <&reg_sd3_vmmc>;
+> > +       status = "okay";
+> > +};
 > > +
-> > +                               pbus = dev->bus;
-> > +                       } while (dev->bus->number != 0);
+> >  &usbotg1 {
 > 
-> This can be rewritten like
-> 
-> pbus = bus;
-> while (pbus->number) {
->  dev = ...;
->  ...
->  pbus = dev->bus;
-> }
-> 
-> and no need for if (bus->number) anymore.
-> 
+> Please keep the nodes sorted in alphabetical order.
 
-Hi, Andy, thanks very much for your advise, I will change it in the next
-version.
+Thanks, it is because original code does NOT do it in alphabetical order, so I just added
+usdhc3 at the end of usdhc1, but I sent V2 patch to re-sort it anyway, please review it.  
 
-thanks.
-> > +               }
-> > +       }
-> >
-> >         return NULL;
-> >  }
-> > --
-> > 2.6.4
-> >
-> 
-> 
-> 
+Anson.
