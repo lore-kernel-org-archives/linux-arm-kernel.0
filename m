@@ -1,44 +1,104 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Thu, 28 Jun 2018 11:57:40 +0200
-Subject: [PATCH v3 05/13] clk: davinci: psc-da830: add a lookup entry for
- aemif clock
+Date: Thu, 28 Jun 2018 11:57:45 +0200
+Subject: [PATCH v3 10/13] ARM: davinci: da830-evm: use aemif platform driver
 In-Reply-To: <20180628095748.4462-1-brgl@bgdev.pl>
 References: <20180628095748.4462-1-brgl@bgdev.pl>
-Message-ID: <20180628095748.4462-6-brgl@bgdev.pl>
+Message-ID: <20180628095748.4462-11-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-We want to use the ti-aemif platform driver for da830-evm. To make it
-work we need a lookup entry for the aemif clock.
+We now support board files in the aemif driver. Register a platform
+device instead of using the handcrafted API in da830-evm.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-Reviewed-by: David Lechner <david@lechnology.com>
 ---
- drivers/clk/davinci/psc-da830.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/mach-davinci/board-da830-evm.c | 56 +++++++++++++++++++------
+ 1 file changed, 44 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/clk/davinci/psc-da830.c b/drivers/clk/davinci/psc-da830.c
-index 081b039fcb02..6481337382a6 100644
---- a/drivers/clk/davinci/psc-da830.c
-+++ b/drivers/clk/davinci/psc-da830.c
-@@ -14,6 +14,7 @@
+diff --git a/arch/arm/mach-davinci/board-da830-evm.c b/arch/arm/mach-davinci/board-da830-evm.c
+index b2470141dba3..7d8ab36ff83d 100644
+--- a/arch/arm/mach-davinci/board-da830-evm.c
++++ b/arch/arm/mach-davinci/board-da830-evm.c
+@@ -28,6 +28,7 @@
+ #include <linux/platform_data/mtd-davinci-aemif.h>
+ #include <linux/platform_data/spi-davinci.h>
+ #include <linux/platform_data/usb-davinci.h>
++#include <linux/platform_data/ti-aemif.h>
+ #include <linux/regulator/machine.h>
  
- #include "psc.h"
+ #include <asm/mach-types.h>
+@@ -333,14 +334,48 @@ static struct resource da830_evm_nand_resources[] = {
+ 	},
+ };
  
-+LPSC_CLKDEV1(aemif_clkdev,	NULL,	"ti-aemif");
- LPSC_CLKDEV1(spi0_clkdev,	NULL,	"spi_davinci.0");
- LPSC_CLKDEV1(mmcsd_clkdev,	NULL,	"da830-mmc.0");
- LPSC_CLKDEV1(uart0_clkdev,	NULL,	"serial8250.0");
-@@ -22,7 +23,7 @@ static const struct davinci_lpsc_clk_info da830_psc0_info[] = {
- 	LPSC(0,  0, tpcc,     pll0_sysclk2, NULL,         LPSC_ALWAYS_ENABLED),
- 	LPSC(1,  0, tptc0,    pll0_sysclk2, NULL,         LPSC_ALWAYS_ENABLED),
- 	LPSC(2,  0, tptc1,    pll0_sysclk2, NULL,         LPSC_ALWAYS_ENABLED),
--	LPSC(3,  0, aemif,    pll0_sysclk3, NULL,         LPSC_ALWAYS_ENABLED),
-+	LPSC(3,  0, aemif,    pll0_sysclk3, aemif_clkdev, LPSC_ALWAYS_ENABLED),
- 	LPSC(4,  0, spi0,     pll0_sysclk2, spi0_clkdev,  0),
- 	LPSC(5,  0, mmcsd,    pll0_sysclk2, mmcsd_clkdev, 0),
- 	LPSC(6,  0, aintc,    pll0_sysclk4, NULL,         LPSC_ALWAYS_ENABLED),
+-static struct platform_device da830_evm_nand_device = {
+-	.name		= "davinci_nand",
+-	.id		= 1,
+-	.dev		= {
+-		.platform_data	= &da830_evm_nand_pdata,
++static struct platform_device da830_evm_aemif_devices[] = {
++	{
++		.name		= "davinci_nand",
++		.id		= 1,
++		.dev		= {
++			.platform_data	= &da830_evm_nand_pdata,
++		},
++		.num_resources	= ARRAY_SIZE(da830_evm_nand_resources),
++		.resource	= da830_evm_nand_resources,
++	},
++};
++
++static struct resource da830_evm_aemif_resource[] = {
++	{
++		.start	= DA8XX_AEMIF_CTL_BASE,
++		.end	= DA8XX_AEMIF_CTL_BASE + SZ_32K - 1,
++		.flags	= IORESOURCE_MEM,
++	},
++};
++
++static struct aemif_abus_data da830_evm_aemif_abus_data[] = {
++	{
++		.cs	= 3,
+ 	},
+-	.num_resources	= ARRAY_SIZE(da830_evm_nand_resources),
+-	.resource	= da830_evm_nand_resources,
++};
++
++static struct aemif_platform_data da830_evm_aemif_pdata = {
++	.abus_data		= da830_evm_aemif_abus_data,
++	.num_abus_data		= ARRAY_SIZE(da830_evm_aemif_abus_data),
++	.sub_devices		= da830_evm_aemif_devices,
++	.num_sub_devices	= ARRAY_SIZE(da830_evm_aemif_devices),
++	.cs_offset		= 2,
++};
++
++static struct platform_device da830_evm_aemif_device = {
++	.name		= "ti-aemif",
++	.id		= -1,
++	.dev = {
++		.platform_data = &da830_evm_aemif_pdata,
++	},
++	.resource	= da830_evm_aemif_resource,
++	.num_resources	= ARRAY_SIZE(da830_evm_aemif_resource),
+ };
+ 
+ /*
+@@ -371,12 +406,9 @@ static inline void da830_evm_init_nand(int mux_mode)
+ 	if (ret)
+ 		pr_warn("%s: emif25 mux setup failed: %d\n", __func__, ret);
+ 
+-	ret = platform_device_register(&da830_evm_nand_device);
++	ret = platform_device_register(&da830_evm_aemif_device);
+ 	if (ret)
+-		pr_warn("%s: NAND device not registered\n", __func__);
+-
+-	if (davinci_aemif_setup(&da830_evm_nand_device))
+-		pr_warn("%s: Cannot configure AEMIF\n", __func__);
++		pr_warn("%s: AEMIF device not registered\n", __func__);
+ 
+ 	gpio_direction_output(mux_mode, 1);
+ }
 -- 
 2.17.1
