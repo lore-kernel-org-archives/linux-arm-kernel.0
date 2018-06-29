@@ -1,115 +1,239 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 29 Jun 2018 15:25:39 +0100
-Subject: Clarifying dma_wmb behavior in presence of non-coherent masters
- and outer caches
-In-Reply-To: <1530275290.22468.69.camel@pengutronix.de>
-References: <1530275290.22468.69.camel@pengutronix.de>
-Message-ID: <20180629142539.GH17271@n2100.armlinux.org.uk>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Fri, 29 Jun 2018 15:29:12 +0100
+Subject: [PATCH v3 7/7] arm64: perf: Add support for chaining event
+ counters
+In-Reply-To: <20180629140129.i4oh4oov3jaecnt5@lakrids.cambridge.arm.com>
+References: <1529403342-17899-1-git-send-email-suzuki.poulose@arm.com>
+ <1529403342-17899-8-git-send-email-suzuki.poulose@arm.com>
+ <20180629140129.i4oh4oov3jaecnt5@lakrids.cambridge.arm.com>
+Message-ID: <f3c293f6-226f-2d16-8e45-6a4ab08c595f@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 29, 2018 at 02:28:10PM +0200, Lucas Stach wrote:
-> Oleksij was hunting a memory corruption issue on SocFPGA for the last
-> few days. While we still don't have a clear picture about what's going
-> wrong, I was reading some driver code and stumbled across the use of
-> dma_wmb, which left me with some questions about the intended use
-> and/or implementation. I'll try to describe by train of thought below.
-
-I don't have a full understanding of this (partly because of
-implementation details, and I don't know the SocFPGA implementation.)
-
-The dma_*() barriers were proposed by Alexander Duyck in 2014, and the
-commit explicitly states that dma_wmb() will be outer-shareable only.
-
-I think what constitutes "outer-shareable" in terms of DMB is also
-something of a debate - the ARM ARM is vague on that subject, basically
-saying its implementation dependent:
-
-  In a VMSA implementation, for Shareable Normal memory, whether
-  there is a distinction between Inner Shareable and Outer Shareable
-  is IMPLEMENTATION DEFINED.
-
-In the case of the three levels of shareability being implemented, a
-"dmb ish" only reaches as far as the inner domain, "dmb osh" reaches
-both the inner and outer domains, and "dmb sy" reaches outside the
-outer domain.  Where there's no distinction between inner and outer,
-it seems that both "dmb ish*" and "dmb osh*" will both have the same
-reach.
-
-That would mean that "dmb osh*" would not be visible outside of the
-shareability domain, which surely is where most non-coherent DMA
-masters in our SoCs lie, so on the face of it, it seems that it is
-the wrong reach for this barrier.
-
-However, it obviously works for most systems out there, which suggests
-that "dmb osh*" reaches beyond "dmb ish*", but that seems to go against
-the ARM ARM.
-
-All our memory in Linux is mapped with NOS=1, which basically means
-all shareable memory in the system is only inner shareable, and
-nothing is shareable outside of the inner domain.  Does it make
-sense to use "dmb osh*" if we have no outer-shareable memory?
-
-Final bit of the puzzle is about which domain the PL310 ends up in.
-It will come as no surprise that's also "implementation defined":
-
-  "The relationship between these conceptual levels of cache and the
-   implemented physical levels of cache is IMPLEMENTATION DEFINED,
-   and can differ from the boundaries between the Inner and Outer
-   Shareability domains."
-
-were "conceptual levels" is talking about the inner/outer cacheability
-level.
-
-The only thing we can be sure about is that the L1 caches are in the
-inner cacheability and inner shareability domains.  Everything else
-is... implementation defined.
-
-So, it seems to be possible that a L2 cache, such as the PL310, could
-be in the inner cacheability domain and the outer shareability domain,
-or vice versa!
-
-"Implementation defined" is a nightmare when it comes to generic OSes
-that have to work across multiple different implementations.
-
-Maybe Will can shed some light on this topic.
-
-> Some drivers like the DWMAC driver
-> (drivers/net/ethernet/stmicro/stmmac/) are using dma_wmb to order
-> accesses to DMA descriptors, to make sure the own bit is only visible
-> to the DMA engine once the descriptor has been fully set up. This seems
-> to be correct and the intended use of this barrier as described in
-> Documentation/memory-barriers.txt.
+On 29/06/18 15:01, Mark Rutland wrote:
+> On Tue, Jun 19, 2018 at 11:15:42AM +0100, Suzuki K Poulose wrote:
+>> Add support for 64bit event by using chained event counters
+>> and 64bit cycle counters.
+>>
+>> PMUv3 allows chaining a pair of adjacent 32-bit counters, effectively
+>> forming a 64-bit counter. The low/even counter is programmed to count
+>> the event of interest, and the high/odd counter is programmed to count
+>> the CHAIN event, taken when the low/even counter overflows.
+>>
+>> For CPU cycles, when 64bit mode is requested, the cycle counter
+>> is used in 64bit mode. If the cycle counter is not available,
+>> falls back to chaining.
+>>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>> ---
+>> Changes sinec v2:
+>>   - Drop special allocation algorithm for chain indices
+>>   - Since we access the counters when the PMU is stopped,
+>>     get rid of the unncessary barriers.
+>>   - Ensure a counter is allocated when checking for chained event
+>> ---
+>>   arch/arm64/kernel/perf_event.c | 184 ++++++++++++++++++++++++++++++++++++-----
+>>   drivers/perf/arm_pmu.c         |  13 ++-
+>>   2 files changed, 169 insertions(+), 28 deletions(-)
+>>
+>> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+>> index eebc635..a03def7 100644
+>> --- a/arch/arm64/kernel/perf_event.c
+>> +++ b/arch/arm64/kernel/perf_event.c
+>> @@ -446,9 +446,16 @@ static struct attribute_group armv8_pmuv3_events_attr_group = {
+>>   };
+>>   
+>>   PMU_FORMAT_ATTR(event, "config:0-15");
+>> +PMU_FORMAT_ATTR(bits64, "config1:0");
 > 
-> The barrier documentation describes the dma barrier as "for use with
-> consistent memory", wich Documentation/DMA-API.txt says is memory returned by dma_alloc_coherent. As the DMA descriptors are located in memory allocated this way, it seems the driver side implementation is fine (or at least matches the documentation).
-> 
-> The SocFPGA platform, where this driver is used, is a Cortex A9 with a
-> PL310 outer cache. The peripherals being non coherent masters, as on
-> most ARMv7 systems.
-> 
-> Now the current implementation of dma_wmb maps to a dmb(oshst), which
-> to me seems like it is too weak to guarantee store visibility ordering
-> to the non-coherent DMA engine master. I would have expected that at
-> least a dmb(st) is necessary to provide the ordering, as specified in
-> the?dma_wmb Documentation on such a system.
-> 
-> Also with a outer cache present I'm unsure if a dmb(st) has the desired
-> effect. Do we need to have a full cache synchronization operation in
-> between the writes, as is done for the raw wmb()?
-> 
-> Can you confirm my understanding of the situation, or did I miss
-> something there?
-> 
-> Thanks,
-> Lucas
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> I'm not too keen on the "bits64" name here -- it's a little unusual.
+> Perhaps "long"?
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+I wasn't either. The other option was _64bit, but it is easier to misspell.
+The only reason for not sticking to "long" is, that gives a perception that
+the user always get "double" the normal counter width, which may break
+if we ever get 64bit PMU counters by default without chaining.
+
+> 
+>> +
+>> +static inline bool armv8pmu_event_is_64bit(struct perf_event *event)
+>> +{
+>> +	return event->attr.config1 & 0x1;
+>> +}
+>>   
+>>   static struct attribute *armv8_pmuv3_format_attrs[] = {
+>>   	&format_attr_event.attr,
+>> +	&format_attr_bits64.attr,
+>>   	NULL,
+>>   };
+>>   
+>> @@ -466,6 +473,20 @@ static struct attribute_group armv8_pmuv3_format_attr_group = {
+>>   	(ARMV8_IDX_CYCLE_COUNTER + cpu_pmu->num_events - 1)
+>>   
+>>   /*
+>> + * Use chained counter for a 64bit event, if we could not allocate
+>> + * the 64bit cycle counter. This must be called after a counter
+>> + * was allocated.
+>> + */
+>> +static inline bool armv8pmu_event_is_chained(struct perf_event *event)
+>> +{
+>> +	int idx = event->hw.idx;
+>> +
+>> +	return !WARN_ON(idx < 0) &&
+>> +	       armv8pmu_event_is_64bit(event) &&
+>> +	       (event->hw.idx != ARMV8_IDX_CYCLE_COUNTER);
+>> +}
+> 
+> It took me a moment to parse this. Perhaps:
+
+Yes, it does look a bit weird.
+
+> 
+> 	/*
+> 	 * The dedicated cycle counter doesn't requrie chaining, but
+> 	 * when this is already in use, we must chain two programmable
+> 	 * counters to form a 64-bit cycle counter.
+> 	 */
+
+That sounds like, we check only for cycle events, which is not true, how
+about :
+
+	/*
+	 * We must chain two programmable counters for 64 bit events,
+	 * except when we have allocated the 64bit cycle counter (for CPU
+	 *cycles event).
+	 */
+
+
+> 
+>> +
+>> +/*
+>>    * ARMv8 low level PMU access
+>>    */
+>>   
+>> @@ -516,12 +537,28 @@ static inline u32 armv8pmu_read_evcntr(int idx)
+>>   	return read_sysreg(pmxevcntr_el0);
+>>   }
+>>   
+>> +static inline u64 armv8pmu_read_hw_counter(struct perf_event *event)
+>> +{
+>> +	int idx = event->hw.idx;
+>> +	u64 val = 0;
+>> +
+>> +	val = armv8pmu_read_evcntr(idx);
+>> +	/*
+>> +	 * We always read the counter with the PMU turned off.
+>> +	 * So we don't need special care for reading chained
+>> +	 * counters.
+>> +	 */
+> 
+> I think this comment can go.
+
+OK
+
+>> +	if (armv8pmu_event_is_chained(event))
+>> +		val = (val << 32) | armv8pmu_read_evcntr(idx - 1);
+>> +	return val;
+>> +}
+>> +
+>>   static inline u64 armv8pmu_read_counter(struct perf_event *event)
+>>   {
+>>   	struct arm_pmu *cpu_pmu = to_arm_pmu(event->pmu);
+>>   	struct hw_perf_event *hwc = &event->hw;
+>>   	int idx = hwc->idx;
+>> -	u32 value = 0;
+>> +	u64 value = 0;
+>>   
+>>   	if (!armv8pmu_counter_valid(cpu_pmu, idx))
+>>   		pr_err("CPU%u reading wrong counter %d\n",
+>> @@ -529,7 +566,7 @@ static inline u64 armv8pmu_read_counter(struct perf_event *event)
+>>   	else if (idx == ARMV8_IDX_CYCLE_COUNTER)
+>>   		value = read_sysreg(pmccntr_el0);
+>>   	else
+>> -		value = armv8pmu_read_evcntr(idx);
+>> +		value = armv8pmu_read_hw_counter(event);
+>>   
+>>   	return value;
+>>   }
+>> @@ -540,6 +577,19 @@ static inline void armv8pmu_write_evcntr(int idx, u32 value)
+>>   	write_sysreg(value, pmxevcntr_el0);
+>>   }
+>>   
+>> +static inline void armv8pmu_write_hw_counter(struct perf_event *event,
+>> +					     u64 value)
+>> +{
+>> +	int idx = event->hw.idx;
+>> +
+>> +	if (armv8pmu_event_is_chained(event)) {
+>> +		armv8pmu_write_evcntr(idx, upper_32_bits(value));
+>> +		armv8pmu_write_evcntr(idx - 1, lower_32_bits(value));
+>> +	} else {
+>> +		armv8pmu_write_evcntr(idx, value);
+>> +	}
+>> +}
+>> +
+>>   static inline void armv8pmu_write_counter(struct perf_event *event, u64 value)
+>>   {
+>>   	struct arm_pmu *cpu_pmu = to_arm_pmu(event->pmu);
+>> @@ -551,14 +601,15 @@ static inline void armv8pmu_write_counter(struct perf_event *event, u64 value)
+>>   			smp_processor_id(), idx);
+>>   	else if (idx == ARMV8_IDX_CYCLE_COUNTER) {
+>>   		/*
+>> -		 * Set the upper 32bits as this is a 64bit counter but we only
+>> +		 * Set the upper 32bits as this is a 64bit counter, if we only
+>>   		 * count using the lower 32bits and we want an interrupt when
+>>   		 * it overflows.
+>>   		 */
+> 
+> Let's reword this as:
+> 
+> 		/*
+> 		 * The cycles counter is really a 64-bit counter.
+> 		 * When treating it as a 32-bit counter, we only count
+> 		 * the lower 32 bits, and set the upper 32-bits so that
+> 		 * we get an interrupt upon 32-bit overflow.
+> 		 */
+> 
+
+OK
+
+...
+
+>> diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
+>> index 6e10e8c..a4675e4 100644
+>> --- a/drivers/perf/arm_pmu.c
+>> +++ b/drivers/perf/arm_pmu.c
+>> @@ -674,14 +674,13 @@ static void cpu_pm_pmu_setup(struct arm_pmu *armpmu, unsigned long cmd)
+>>   	int idx;
+>>   
+>>   	for (idx = 0; idx < armpmu->num_events; idx++) {
+>> -		/*
+>> -		 * If the counter is not used skip it, there is no
+>> -		 * need of stopping/restarting it.
+>> -		 */
+>> -		if (!test_bit(idx, hw_events->used_mask))
+>> -			continue;
+>> -
+>>   		event = hw_events->events[idx];
+>> +		/*
+>> +		 * If there is no event at this idx (e.g, an idx used
+>> +		 * by a chained event in Arm v8 PMUv3), skip it.
+>> +		 */
+>> +		if (!event)
+>> +			continue;
+>>   
+>>   		switch (cmd) {
+>>   		case CPU_PM_ENTER:
+> 
+> Please make this change an individual patch earlier in the series. It's
+
+I can do that. But I don't think the krait needs this, as explained in the
+other patch.
+
+> a bug fix needed for krait, too.
+
+Thanks for the review.
+
+Suzuki
