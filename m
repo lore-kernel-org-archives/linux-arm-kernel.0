@@ -1,34 +1,32 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 29 Jun 2018 14:09:51 -0700
-Subject: [GIT PULL] DaVinci fixes for v4.18
-In-Reply-To: <341001c8-3881-5d02-2971-77c7e1adf61a@ti.com>
-References: <341001c8-3881-5d02-2971-77c7e1adf61a@ti.com>
-Message-ID: <20180629210951.yca4ke2gn27kktpp@localhost>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 29 Jun 2018 23:22:22 +0200
+Subject: [PATCH] dma: ste_dma40: Remove VLA usage
+In-Reply-To: <20180629185107.GA37488@beast>
+References: <20180629185107.GA37488@beast>
+Message-ID: <CAK8P3a30Q1ezvCWfudUY=z1q3NHdrkbwRsmSDso4s7TifQAmNQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 29, 2018 at 07:23:37PM +0530, Sekhar Nori wrote:
-> The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
-> 
->   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
-> 
-> are available in the Git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-fixes-for-v4.18
-> 
-> for you to fetch changes up to 3eb1b955cd7ed1e621ace856710006c2a8a7f231:
-> 
->   ARM: dts: da850: Fix interrups property for gpio (2018-06-27 17:38:44 +0530)
-> 
-> ----------------------------------------------------------------
-> This fixes polarity of SD card write-protect pin on DA850 EVM
-> and fixes interrupt property for DA850 SoC GPIO as defined in
-> device-tree.
-> 
-> Both of these are not introduced with v4.18 merge but have
-> existed prior.
+On Fri, Jun 29, 2018 at 8:51 PM, Kees Cook <keescook@chromium.org> wrote:
+> In the quest to remove all stack VLA usage from the kernel[1], this
+> switches to using a pre-allocated scratch register space, set up with
+> all other other allocations.
+>
+> [1] https://lkml.kernel.org/r/CA+55aFzCG-zNmZwX4A2FQpadafLfEzK6CC=qPXydAacU1RqZWA at mail.gmail.com
+>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Dan Williams <dan.j.williams@intel.com>
+> Cc: Vinod Koul <vkoul@kernel.org>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: dmaengine at vger.kernel.org
+> Signed-off-by: Kees Cook <keescook@chromium.org>
 
-Merged, thanks.
+I looked too long at this one, in short:
 
+- Your change looks correct to me
+- It could be done better in many ways, all of which would
+  involve cleaning up some of the existing code in the process
+- Nobody uses this driver in practice, as the hardware platform
+  was a dead end
 
--Olof
+Reviewed-by: Arnd Bergmann <arnd@arndb.de>
