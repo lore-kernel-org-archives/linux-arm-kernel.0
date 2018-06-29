@@ -1,95 +1,94 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 29 Jun 2018 14:29:34 +0100
+Date: Fri, 29 Jun 2018 14:38:49 +0100
 Subject: [PATCH] arm64: acpi: reenumerate topology ids
-In-Reply-To: <20180629112354.hefdl2pe72frl6x3@kamzik.brq.redhat.com>
+In-Reply-To: <20180629114227.4noje2kx3lcjbcpd@kamzik.brq.redhat.com>
 References: <20180628145128.10057-1-drjones@redhat.com>
  <a38fb684-c023-1a96-464e-dd268f3132ea@arm.com>
- <20180628173243.obydzakh2stfs26w@kamzik.brq.redhat.com>
- <20180629102927.GA18043@e107155-lin>
- <20180629112354.hefdl2pe72frl6x3@kamzik.brq.redhat.com>
-Message-ID: <20180629132934.GA16282@e107155-lin>
+ <d797ebc5-bd7b-4f72-d4fc-840ba7345a15@arm.com>
+ <20180629105334.GB18043@e107155-lin>
+ <20180629114227.4noje2kx3lcjbcpd@kamzik.brq.redhat.com>
+Message-ID: <20180629133849.GB16282@e107155-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 29, 2018 at 01:23:54PM +0200, Andrew Jones wrote:
-> On Fri, Jun 29, 2018 at 11:29:27AM +0100, Sudeep Holla wrote:
-> > On Thu, Jun 28, 2018 at 07:32:43PM +0200, Andrew Jones wrote:
-> > > On Thu, Jun 28, 2018 at 05:30:51PM +0100, Sudeep Holla wrote:
-> > > > I am not sure if we can ever guarantee that DT and ACPI will get the
-> > > > same ids whatever counter we use as it depends on the order presented in
-> > > > the firmware(DT or ACPI). So I am not for generating ids for core and
-> > > > threads in that way.
+On Fri, Jun 29, 2018 at 01:42:27PM +0200, Andrew Jones wrote:
+> On Fri, Jun 29, 2018 at 11:53:34AM +0100, Sudeep Holla wrote:
+> > On Thu, Jun 28, 2018 at 12:12:00PM -0500, Jeremy Linton wrote:
+> > > Hi,
+> > > 
+> > > On 06/28/2018 11:30 AM, Sudeep Holla wrote:
+> > 
+> > [...]
+> > 
+> > > >I am not sure if we can ever guarantee that DT and ACPI will get the
+> > > >same ids whatever counter we use as it depends on the order presented in
+> > > >the firmware(DT or ACPI). So I am not for generating ids for core and
+> > > >threads in that way.
+> > > >
+> > > >So I would like to keep it simple and just have this counters for
+> > > >package ids as demonstrated in Shunyong's patch.
 > > >
-> > > I don't believe we have to guarantee that the exact (package,core,thread)
-> > > triplet describing a PE with DT matches ACPI. We just need to guarantee
-> > > that each triplet we select properly puts a PE in the same group as its
-> > > peers. So, as long as we keep the grouping described by DT or ACPI, then
-> > > the (package,core,thread) IDs assigned are pretty arbitrary.
+> > > So, currently on a non threaded system, the core id's look nice because they
+> > > are just the ACPI ids. Its the package id's that look strange, we could just
+> > > fix the package ids, but on threaded machines the threads have the nice acpi
+> > > ids, and the core ids are then funny numbers. So, I suspect that is driving
+> > > this as much as the strange package ids.
 > > >
 > > 
-> > If that's the requirement, we already do that. The IDs are just too
-> > arbitrary :)
+> > Yes, I know that and that's what made be look at topology_get_acpi_cpu_tag
+> > For me, if the PPTT has valid ID, we should use that. Just becuase DT lacks
+> > it and uses counter doesn't mean ACPI also needs to follow that.
 > 
-> Right. The patch doesn't fix anything, it just makes the IDs less weird
-> looking to humans, and brings some consistency to IDs across systems
-> and hardware descriptions.
+> AFAIK, a valid ACPI UID doesn't need to be something derivable directly
+> from the hardware, so it's just as arbitrary as the CPU phandle that is
+> in the DT cpu-map, i.e. DT *does* have an analogous leaf node integer.
 >
 
-I agree, but don't think counter like this will be harmless. It can create
-some other inconsistency in some other way.
+Its platform specific, left to vendors to identify that. Are you referring
+to reg property in DT for leaf nodes ? If so, that's MPIDR and is present
+in ACPI MADT.
 
-> > 
-> > > I could change the commit message to state we can generate IDs *like*
-> > > DT does (i.e. with counters), even if they may not result in identical
-> > > triplet to PE mappings.
-> > >
-> > 
-> > Why we need to make it *like DT* ?
-> 
-> Because the DT parser considers human readers, which, IMHO, is nicer.
-> 
-> The consistency remapping to counters brings shouldn't be overlooked. If
-> both ACPI and DT present the CPUs in the same order (i.e.  cpu0 is mpidr0,
-> cpu1 is mpidr1, ...) using their respective descriptions, then this patch
-> will ensure topology IDs are the same. 
-
-Yes, it's all fine in theory. But firmware is the one presenting it and
-ACPI PPTT has UID for a reason and I want that to be the single source
-for these IDs.
-
-> Also, when going from machine to
-> machine, it's nice to expect package/core/thread-id to be within
-> the same range and to vary by a set difference (1), rather than have
-> IDs that increment by 20 on one system and by 160 on another,
-> depending on how the ACPI table nodes are laid out.
+> >
+> > I am sure some vendor will put valid UID and expect that to be in the
+> > sysfs.
+>
+> I can't think of any reason that would be useful, especially when the
+> UID is for a thread, which isn't even displayed by sysfs.
 >
 
-If it matters a lot, vendors must use UID for consistency. Since OS doesn't
-use those IDs for any particular reason, OS must not care.
+You are mixing MPIDR and UID here.
 
 > > 
-> > > >
-> > > > So I would like to keep it simple and just have this counters for
-> > > > package ids as demonstrated in Shunyong's patch.
-> > > >
-> > >
-> > > If we don't also handle cores when there are threads, then the cores
-> > > will also end up having weird IDs.
-> > >
-> > 
-> > Yes, but if PPTT says it has valid ID, I would prefer that over DT like
-> > generated.
+> > > (and as a side, I actually like the PE has a acpi id behavior, but for
+> > > threads its being lost with this patch...)
+> > > 
+> > > Given i've seen odd package/core ids on x86s a few years ago, it never
 > 
-> Valid *ACPI* ID, which just means it's a guaranteed unique ACPI UID,
-> which isn't likely going to be anything useful to a user.
+> So this inspired me to grep some x86 topology code. I found
+> arch/x86/kernel/smpboot.c:topology_update_package_map(), which uses
+> a counter to set the logical package id and Documentation/x86/topology.txt
+> states
+> 
+> """
+>   - cpuinfo_x86.logical_id:
+> 
+>     The logical ID of the package. As we do not trust BIOSes to enumerate the
+>     packages in a consistent way, we introduced the concept of logical package
+>     ID so we can sanely calculate the number of maximum possible packages in
+>     the system and have the packages enumerated linearly.
+> """
+> 
+> Which I see as x86 precedent for the consistency argument I made in my
+> other reply.
 > 
 
-How is that different from OS generated one from user's perspective ?
-Vendors might assign sockets UID and he may help them to replace one.
-Having some generated counter based id is not helpful.
+There are lots of things arm64 doesn't replicate x86. So I don't take that
+as valid argument. It's a new feature, we can use APCI PPTT UID feature to
+be consistent. I don't see counter being in anyway consistent.
 
-So if someone needs to have valid IDs there, better to pass it via PPTT.
-OS will otherwise put any value(current offset is good choice)
+Even PPTT could be generated in the firmware and the order is not consistent.
+In which case the counter values in Linux might get things wrong while using
+UID from the firmware can keep it consistent(e.g. sockets removed,..etc)
 
 --
 Regards,
