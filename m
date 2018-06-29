@@ -1,15 +1,19 @@
 From: sboyd@kernel.org (Stephen Boyd)
-Date: Fri, 29 Jun 2018 11:42:51 -0700
-Subject: [PATCH V2 1/2] clk: imx6ul: add GPIO clock gates
-In-Reply-To: <1527990245-13619-1-git-send-email-Anson.Huang@nxp.com>
-References: <1527990245-13619-1-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <153029777187.143105.15648614335130166075@swboyd.mtv.corp.google.com>
+Date: Fri, 29 Jun 2018 11:43:19 -0700
+Subject: [PATCH V2 1/4] clk: imx6q: remove clks_init_on array
+In-Reply-To: <1528074406-11735-1-git-send-email-Anson.Huang@nxp.com>
+References: <1528074406-11735-1-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <153029779960.143105.8299429804541348750@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Anson Huang (2018-06-02 18:44:04)
-> i.MX6UL has GPIO clock gates in CCM CCGR,
-> add them into clock tree for clock management.
+Quoting Anson Huang (2018-06-03 18:06:43)
+> Clock framework will enable those clocks registered
+> with CLK_IS_CRITICAL flag, so no need to have
+> clks_init_on array during clock initialization now.
+> 
+> ARM clock is busy divider type which has the
+> CLK_IS_CRITICAL flag set by default when registered.
 > 
 > Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
 > ---
