@@ -1,149 +1,189 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 29 Jun 2018 12:15:35 +0100
-Subject: [PATCH v3 15/20] kvm: arm/arm64: Allow tuning the physical address
- size for VM
-In-Reply-To: <1530270944-11351-1-git-send-email-suzuki.poulose@arm.com>
-References: <1530270944-11351-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1530270944-11351-16-git-send-email-suzuki.poulose@arm.com>
+Date: Fri, 29 Jun 2018 12:15:20 +0100
+Subject: [PATCH v3 00/20] arm64: Dynamic & 52bit IPA support
+Message-ID: <1530270944-11351-1-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow specifying the physical address size for a new VM via
-the kvm_type argument for KVM_CREATE_VM ioctl. This allows
-us to finalise the stage2 page table format as early as possible
-and hence perform the right checks on the memory slots without
-complication. The size is encoded as Log2(PA_Size) in the bits[7:0]
-of the type field and can encode more information in the future if
-required. The IPA size is still capped at 40bits.
 
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Christoffer Dall <cdall@kernel.org>
-Cc: Peter Maydel <peter.maydell@linaro.org>
-Cc: Paolo Bonzini <pbonzini@redhat.com>
-Cc: Radim Kr?m?? <rkrcmar@redhat.com>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
- arch/arm/include/asm/kvm_mmu.h   |  2 ++
- arch/arm64/include/asm/kvm_arm.h | 10 +++-------
- arch/arm64/include/asm/kvm_mmu.h |  2 ++
- include/uapi/linux/kvm.h         | 10 ++++++++++
- virt/kvm/arm/arm.c               | 24 ++++++++++++++++++++++--
- 5 files changed, 39 insertions(+), 9 deletions(-)
+The physical address space size for a VM (IPA size) on arm/arm64 is
+limited to a static limit of 40bits. This series adds support for
+using an IPA size specific to a VM, allowing to use a limit supported
+by the host (based on the host kernel configuration and CPU support).
+The default and the minimum size is fixed to 40bits. We also add
+support for handling 52bit IPA addresses added by Arm v8.2 extensions.
 
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index d86f8dd..bcc3dd9 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -385,6 +385,8 @@ static inline u32 kvm_get_ipa_limit(void)
- 	return KVM_PHYS_SHIFT;
- }
- 
-+static inline void kvm_config_stage2(struct kvm *kvm, u32 ipa_shift) {}
-+
- #endif	/* !__ASSEMBLY__ */
- 
- #endif /* __ARM_KVM_MMU_H__ */
-diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-index b02c316..2e90942 100644
---- a/arch/arm64/include/asm/kvm_arm.h
-+++ b/arch/arm64/include/asm/kvm_arm.h
-@@ -128,19 +128,15 @@
- #define VTCR_EL2_T0SZ(x)	TCR_T0SZ(x)
- 
- /*
-- * We configure the Stage-2 page tables to always restrict the IPA space to be
-- * 40 bits wide (T0SZ = 24).  Systems with a PARange smaller than 40 bits are
-- * not known to exist and will break with this configuration.
-+ * We configure the Stage-2 page tables based on the requested size of
-+ * IPA for each VM. The default size is set to 40bits and is not allowed
-+ * go below that limit (for backward compatibility).
-  *
-  * VTCR_EL2.PS is extracted from ID_AA64MMFR0_EL1.PARange at boot time
-  * (see hyp-init.S).
-  *
-  * VTCR_EL2.SL0 and T0SZ are configured per VM at runtime before switching to
-  * the VM.
-- *
-- * Note that when using 4K pages, we concatenate two first level page tables
-- * together. With 16K pages, we concatenate 16 first level page tables.
-- *
-  */
- 
- #define VTCR_EL2_COMMON_BITS	(VTCR_EL2_SH0_INNER | VTCR_EL2_ORGN0_WBWA | \
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index b4564d8..f3fb05a3 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -537,5 +537,7 @@ static inline u32 kvm_get_ipa_limit(void)
- 	return KVM_PHYS_SHIFT;
- }
- 
-+static inline void kvm_config_stage2(struct kvm *kvm, u32 ipa_shift) {}
-+
- #endif /* __ASSEMBLY__ */
- #endif /* __ARM64_KVM_MMU_H__ */
-diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
-index 4df9bb6..fa4cab0 100644
---- a/include/uapi/linux/kvm.h
-+++ b/include/uapi/linux/kvm.h
-@@ -751,6 +751,16 @@ struct kvm_ppc_resize_hpt {
- #define KVM_S390_SIE_PAGE_OFFSET 1
- 
- /*
-+ * On arm/arm64, machine type can be used to request the physical
-+ * address size for the VM. Bits [7-0] have been reserved for the
-+ * PA size shift (i.e, log2(PA_Size)). For backward compatibility,
-+ * value 0 implies the default IPA size, which is 40bits.
-+ */
-+#define KVM_VM_TYPE_ARM_PHYS_SHIFT_MASK	0xff
-+#define KVM_VM_TYPE_ARM_PHYS_SHIFT(x)		\
-+	((x) & KVM_VM_TYPE_ARM_PHYS_SHIFT_MASK)
-+
-+/*
-  * ioctls for /dev/kvm fds:
-  */
- #define KVM_GET_API_VERSION       _IO(KVMIO,   0x00)
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index 0d99e67..1085761 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -112,6 +112,25 @@ void kvm_arch_check_processor_compat(void *rtn)
- }
- 
- 
-+static int kvm_arch_config_vm(struct kvm *kvm, unsigned long type)
-+{
-+	u32 ipa_shift = KVM_VM_TYPE_ARM_PHYS_SHIFT(type);
-+
-+	/*
-+	 * Make sure the size, if specified, is within the range of
-+	 * default size and supported maximum limit.
-+	 */
-+	if (ipa_shift) {
-+		if (ipa_shift < KVM_PHYS_SHIFT || ipa_shift > kvm_ipa_limit)
-+			return -EINVAL;
-+	} else {
-+		ipa_shift = KVM_PHYS_SHIFT;
-+	}
-+
-+	kvm_config_stage2(kvm, ipa_shift);
-+	return 0;
-+}
-+
- /**
-  * kvm_arch_init_vm - initializes a VM data structure
-  * @kvm:	pointer to the KVM struct
-@@ -120,8 +139,9 @@ int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
- {
- 	int ret, cpu;
- 
--	if (type)
--		return -EINVAL;
-+	ret = kvm_arch_config_vm(kvm, type);
-+	if (ret)
-+		return ret;
- 
- 	kvm->arch.last_vcpu_ran = alloc_percpu(typeof(*kvm->arch.last_vcpu_ran));
- 	if (!kvm->arch.last_vcpu_ran)
+As mentioned above, the supported IPA size on a host could be different
+from the system's PARange indicated by the CPUs (e.g, kernel limit
+on the PA size). So we expose the limit via a new system ioctl request
+ - KVM_ARM_GET_MAX_VM_PHYS_SHIFT - on arm/arm64. This can then be
+passed on to the KVM_CREATE_VM ioctl, encoded in the "type" field.
+Bits [7-0] of the type are reserved for the IPA size. This approach
+allows simpler management of the stage2 page table and guest memory
+slots.
+
+The arm64 page table level helpers are defined based on the page
+table levels used by the host VA. So, the accessors may not work
+if the guest uses more number of levels in stage2 than the stage1
+of the host.  The previous versions (v1 & v2) of this series refactored
+the stage1 page table accessors to reuse the low-level accessors for an
+independent stage2 table. However, due to the level folding in the
+generic code, the types are redefined as well. i.e, if the PUD is
+folded, the pud_t could be defined as :
+
+ typedef struct { pgd_t pgd; } pud_t;
+
+similarly for pmd_t.  So, without stage1 independent page table entry
+types for stage2, we could be dealing with a different type for level
+ 0-2 entries. This is practically fine on arm/arm64 as the entries
+have similar format and size and we always use the appropriate
+accessors to get the raw value (i.e, pud_val/pmd_val etc). But not
+ideal for a solution upstream. So, this version caps the stage2 page
+table levels to that of the stage1. This has the following impact on
+the IPA support for various pagesize/host-va combinations :
+
+
+x-----------------------------------------------------x
+| host\ipa    | 40bit | 42bit | 44bit | 48bit | 52bit |
+-------------------------------------------------------
+| 39bit-4K    |  y    |   y   |  n    |   n   |  n/a  |
+-------------------------------------------------------
+| 48bit-4K    |  y    |   y   |  y    |   y   |  n/a  |
+-------------------------------------------------------
+| 36bit-16K   |  y    |   n   |  n    |   n   |  n/a  |
+-------------------------------------------------------
+| 47bit-16K   |  y    |   y   |  y    |   y   |  n/a  |
+-------------------------------------------------------
+| 48bit-4K    |  y    |   y   |  y    |   y   |  n/a  |
+-------------------------------------------------------
+| 42bit-64K   |  y    |   y   |  y    |   n   |  n    |
+-------------------------------------------------------
+| 48bit-64K   |  y    |   y   |  y    |   y   |  y    |
+x-----------------------------------------------------x
+
+Or the following list shows what cannot be supported :
+
+ 39bit-4K host supporting IPA > 43bit (upto 48bit)
+ 36bit-16K host for IPA > 40bit (upto 48bit)
+ 42bit-64K host for IPA > 46bit (upto 52bit)
+
+which is not really bad. We can pursue the independent stage2
+page table support and lift the restriction once we get there.
+Given there is a proposal for new generic page table walker [0],
+it would make sense to make our efforts in sync with it to avoid
+diverting from a common API.
+
+52bit support is added for VGIC (including ITS emulation) and handling
+of PAR, HPFAR registers.
+
+The series applies on 4.18-rc2. A tree is available here:
+
+	 git://linux-arm.org/linux-skp.git ipa52/v3
+
+Tested with
+  - Modified kvmtool, which can only be used for (patches included in
+    the series for reference / testing):
+    * with virtio-pci upto 44bit PA (Due to 4K page size for virtio-pci
+      legacy implemented by kvmtool)
+    * Upto 48bit PA with virtio-mmio, due to 32bit PFN limitation.
+  - Hacked Qemu (boot loader support for highmem, phys-shift support)
+    * with virtio-pci GIC-v3 ITS & MSI upto 52bit on Foundation model.
+    Also see [1] for Qemu support.
+
+[0] https://lkml.org/lkml/2018/4/24/777
+[1] https://lists.gnu.org/archive/html/qemu-devel/2018-06/msg05759.html
+
+Changes since V2:
+ - Drop "refactoring of host page table helpers" and restrict the IPA size
+   to make sure stage2 doesn't use more page table levels than that of the host.
+ - Load VTCR for TLB operations on behalf of the VM (Pointed-by: James Morse)
+ - Split a couple of patches to make them easier to review.
+ - Fall back to normal (non-concatenated) entry level page table support if
+   possible.
+ - Bump the IOCTL number
+
+Changes since V1:
+ - Change the userspace API for configuring VM to encode the IPA
+   size in the VM type.  (suggested by Christoffer)
+ - Expose the IPA limit on the host via ioctl on /dev/kvm
+ - Handle 52bit addresses in PAR & HPFAR
+ - Drop patch changing the life time of stage2 PGD
+ - Rename macros for 48-to-52 bit conversion for GIC ITS BASER.
+   (suggested by Christoffer)
+ - Split virtio PFN check patches and address comments.
+
+Kristina Martsenko (1):
+  vgic: Add support for 52bit guest physical address
+
+Suzuki K Poulose (19):
+  virtio: mmio-v1: Validate queue PFN
+  virtio: pci-legacy: Validate queue pfn
+  arm64: Add a helper for PARange to physical shift conversion
+  kvm: arm64: Clean up VTCR_EL2 initialisation
+  kvm: arm/arm64: Fix stage2_flush_memslot for 4 level page table
+  kvm: arm/arm64: Remove spurious WARN_ON
+  kvm: arm/arm64: Prepare for VM specific stage2 translations
+  kvm: arm/arm64: Abstract stage2 pgd table allocation
+  kvm: arm64: Make stage2 page table layout dynamic
+  kvm: arm64: Dynamic configuration of VTTBR mask
+  kvm: arm64: Helper for computing VTCR_EL2.SL0
+  kvm: arm64: Add helper for loading the stage2 setting for a VM
+  kvm: arm64: Configure VTCR per VM
+  kvm: arm/arm64: Expose supported physical address limit for VM
+  kvm: arm/arm64: Allow tuning the physical address size for VM
+  kvm: arm64: Switch to per VM IPA limit
+  kvm: arm64: Add support for handling 52bit IPA
+  kvm: arm64: Allow IPA size supported by the system
+  kvm: arm64: Fall back to normal stage2 entry level
+
+ Documentation/virtual/kvm/api.txt             |  15 ++
+ arch/arm/include/asm/kvm_arm.h                |   3 +-
+ arch/arm/include/asm/kvm_mmu.h                |  28 +++-
+ arch/arm/include/asm/stage2_pgtable.h         |  42 ++---
+ arch/arm64/include/asm/cpufeature.h           |  13 ++
+ arch/arm64/include/asm/kvm_arm.h              | 137 ++++++++++++++---
+ arch/arm64/include/asm/kvm_asm.h              |   2 +-
+ arch/arm64/include/asm/kvm_host.h             |  19 ++-
+ arch/arm64/include/asm/kvm_hyp.h              |  16 ++
+ arch/arm64/include/asm/kvm_mmu.h              |  92 ++++++++++-
+ arch/arm64/include/asm/stage2_pgtable-nopmd.h |  42 -----
+ arch/arm64/include/asm/stage2_pgtable-nopud.h |  39 -----
+ arch/arm64/include/asm/stage2_pgtable.h       | 213 +++++++++++++++++++-------
+ arch/arm64/kvm/guest.c                        |  42 +++++
+ arch/arm64/kvm/hyp/s2-setup.c                 |  37 +----
+ arch/arm64/kvm/hyp/switch.c                   |   4 +-
+ arch/arm64/kvm/hyp/tlb.c                      |   4 +-
+ drivers/virtio/virtio_mmio.c                  |  18 ++-
+ drivers/virtio/virtio_pci_legacy.c            |  12 +-
+ include/linux/irqchip/arm-gic-v3.h            |   5 +
+ include/uapi/linux/kvm.h                      |  16 ++
+ virt/kvm/arm/arm.c                            |  32 +++-
+ virt/kvm/arm/mmu.c                            | 124 ++++++++-------
+ virt/kvm/arm/vgic/vgic-its.c                  |  36 ++---
+ virt/kvm/arm/vgic/vgic-kvm-device.c           |   2 +-
+ virt/kvm/arm/vgic/vgic-mmio-v3.c              |   2 -
+ 26 files changed, 663 insertions(+), 332 deletions(-)
+ delete mode 100644 arch/arm64/include/asm/stage2_pgtable-nopmd.h
+ delete mode 100644 arch/arm64/include/asm/stage2_pgtable-nopud.h
+
+
+kvmtool patches :
+
+Suzuki K Poulose (4):
+  kvmtool: Allow backends to run checks on the KVM device fd
+  kvmtool: arm64: Add support for guest physical address size
+  kvmtool: arm64: Switch memory layout
+  kvmtool: arm: Add support for creating VM with PA size
+
+ arm/aarch32/include/kvm/kvm-arch.h        |  6 ++++--
+ arm/aarch64/include/kvm/kvm-arch.h        | 15 ++++++++++++---
+ arm/aarch64/include/kvm/kvm-config-arch.h |  5 ++++-
+ arm/include/arm-common/kvm-arch.h         | 17 +++++++++++------
+ arm/include/arm-common/kvm-config-arch.h  |  1 +
+ arm/kvm.c                                 | 24 +++++++++++++++++++++++-
+ include/kvm/kvm.h                         |  4 ++++
+ kvm.c                                     |  2 ++
+ 8 files changed, 61 insertions(+), 13 deletions(-)
+
 -- 
 2.7.4
