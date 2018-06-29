@@ -1,37 +1,49 @@
 From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 29 Jun 2018 19:23:37 +0530
-Subject: [GIT PULL] DaVinci fixes for v4.18
-Message-ID: <341001c8-3881-5d02-2971-77c7e1adf61a@ti.com>
+Date: Fri, 29 Jun 2018 19:30:11 +0530
+Subject: [PATCH 2/2] ARM: davinci_all_defconfig: Enable Bluetooth
+In-Reply-To: <0525829c-3070-6aee-39cf-1154dcbb1e75@lechnology.com>
+References: <20180531202549.11255-1-david@lechnology.com>
+ <20180531202549.11255-3-david@lechnology.com>
+ <5d45fabc-cc25-fbdf-859c-c29111b42eb2@ti.com>
+ <0525829c-3070-6aee-39cf-1154dcbb1e75@lechnology.com>
+Message-ID: <b4c41d75-d253-c92e-8d3e-d9b83f0337f9@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
+On Wednesday 27 June 2018 10:43 PM, David Lechner wrote:
+> On 06/27/2018 06:11 AM, Sekhar Nori wrote:
+>> On Friday 01 June 2018 01:55 AM, David Lechner wrote:
+>>> This enables Bluetooth modules in davinic_all_defconfig needed for LEGO
+>>
+>> davinci_all_defconfig
+>>
+>>> MINDSTORMS EV3.
+>>>
+>>> Signed-off-by: David Lechner <david@lechnology.com>
+>>> ---
+>>> ? arch/arm/configs/davinci_all_defconfig | 9 +++++++++
+>>> ? 1 file changed, 9 insertions(+)
+>>
+>>> +CONFIG_SERIAL_DEV_BUS=y
+>>
+>> Any reason to build this into the kernel?
+>>
+> 
+> Yes:
+> 
+> 
+> config SERIAL_DEV_CTRL_TTYPORT
+> ????bool "Serial device TTY port controller"
+> ????help
+> ????? Say Y here if you want to use the Serial device bus with common TTY
+> ????? drivers (e.g. serial drivers).
+> 
+> ????? If unsure, say Y.
+> ????depends on TTY
+> ????depends on SERIAL_DEV_BUS != m
 
-  Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+Patch applied to v4.19/defconfig. I added a note about this to commit
+text in case I wonder again at a later time.
 
-are available in the Git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-fixes-for-v4.18
-
-for you to fetch changes up to 3eb1b955cd7ed1e621ace856710006c2a8a7f231:
-
-  ARM: dts: da850: Fix interrups property for gpio (2018-06-27 17:38:44 +0530)
-
-----------------------------------------------------------------
-This fixes polarity of SD card write-protect pin on DA850 EVM
-and fixes interrupt property for DA850 SoC GPIO as defined in
-device-tree.
-
-Both of these are not introduced with v4.18 merge but have
-existed prior.
-
-----------------------------------------------------------------
-Adam Ford (1):
-      ARM: davinci: board-da850-evm: fix WP pin polarity for MMC/SD
-
-Keerthy (1):
-      ARM: dts: da850: Fix interrups property for gpio
-
- arch/arm/boot/dts/da850.dtsi            | 6 +-----
- arch/arm/mach-davinci/board-da850-evm.c | 2 +-
- 2 files changed, 2 insertions(+), 6 deletions(-)
+Thanks,
+Sekhar
