@@ -1,71 +1,67 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Sat, 30 Jun 2018 01:25:36 +0300
-Subject: [PATCH v3 1/6] driver core: allow stopping deferred probe after
- init
-In-Reply-To: <20180628204344.13973-2-robh@kernel.org>
-References: <20180628204344.13973-1-robh@kernel.org>
- <20180628204344.13973-2-robh@kernel.org>
-Message-ID: <CAHp75Vf+o7aA8M6T+zM5r8i_YCzWkP=rO8sTHY0qtz-YjVRibA@mail.gmail.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Fri, 29 Jun 2018 18:30:34 -0500
+Subject: [PATCH] PCI: Clean up resource allocation in
+ devm_of_pci_get_host_bridge_resources()
+In-Reply-To: <f35b2972-aa40-5397-facb-765cafe7c315@siemens.com>
+References: <cover.1526375226.git.jan.kiszka@siemens.com>
+ <3aeb2ed038cbce8fe744b614dc19d414555a7e8f.1526375226.git.jan.kiszka@siemens.com>
+ <CAHp75VeUbjobse6uLeM4h_xXRUw+YUQUN+EOye67AJy77a5euQ@mail.gmail.com>
+ <CAHp75VeM7_8+9QJjOypXaiBhpWP4B5KACdUQ-p3frbS3jPh=OQ@mail.gmail.com>
+ <f35b2972-aa40-5397-facb-765cafe7c315@siemens.com>
+Message-ID: <20180629233034.GH40928@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 28, 2018 at 11:43 PM, Rob Herring <robh@kernel.org> wrote:
-> Deferred probe will currently wait forever on dependent devices to probe,
-> but sometimes a driver will never exist. It's also not always critical for
-> a driver to exist. Platforms can rely on default configuration from the
-> bootloader or reset defaults for things such as pinctrl and power domains.
-> This is often the case with initial platform support until various drivers
-> get enabled. There's at least 2 scenarios where deferred probe can render
-> a platform broken. Both involve using a DT which has more devices and
-> dependencies than the kernel supports. The 1st case is a driver may be
-> disabled in the kernel config. The 2nd case is the kernel version may
-> simply not have the dependent driver. This can happen if using a newer DT
-> (provided by firmware perhaps) with a stable kernel version. Deferred
-> probe issues can be difficult to debug especially if the console has
-> dependencies or userspace fails to boot to a shell.
->
-> There are also cases like IOMMUs where only built-in drivers are
-> supported, so deferring probe after initcalls is not needed. The IOMMU
-> subsystem implemented its own mechanism to handle this using OF_DECLARE
-> linker sections.
->
-> This commit adds makes ending deferred probe conditional on initcalls
-> being completed or a debug timeout. Subsystems or drivers may opt-in by
-> calling driver_deferred_probe_check_init_done() instead of
-> unconditionally returning -EPROBE_DEFER. They may use additional
-> information from DT or kernel's config to decide whether to continue to
-> defer probe or not.
->
-> The timeout mechanism is intended for debug purposes and WARNs loudly.
+On Wed, May 16, 2018 at 02:31:44PM +0200, Jan Kiszka wrote:
+> Instead of first allocating and then freeing memory for struct resource
+> in case we cannot parse a PCI resource from the device tree, work
+> against a local struct and kmemdup it when we decide to go with it.
+> 
+> Suggested-by: Andy Shevchenko <andy.shevchenko@gmail.com>
+> Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
 
-> The remaining deferred probe pending list will also be dumped after the
-> timeout. Not that this timeout won't work for the console which needs
-> to be enabled before userspace starts. However, if the console's
-> dependencies are resolved, then the kernel log will be printed (as
-> opposed to no output).
+Applied with Vladimir's reviewed-by to pci/resource for v4.19, thanks!
 
-There is another patch flying around with debugfs node to dump a list
-of deferred probe queue.
-I dunno if it makes sense to dump it here and there and if yes, some
-unification in output, perhaps?
-
-> +       deferred_probe_timeout = simple_strtol(str, NULL, 0);
-
-Hmm... I don't think 16-base or 8-base values are useful to support.
-One subtle difference that people usually consider timeout values as
-10-base and if at some point someone makes it as 0100 (no matter why),
-it would be much less than expected.
-08 wouldn't parsed at all.
-
-> +       if (deferred_probe_timeout > 0) {
-
-Would it be harmful / useful if we skip this check and run the work immediately?
-
-> +               schedule_delayed_work(&deferred_probe_timeout_work,
-> +                       deferred_probe_timeout * HZ);
-> +       }
-
-
--- 
-With Best Regards,
-Andy Shevchenko
+> ---
+>  drivers/pci/of.c | 14 ++++++--------
+>  1 file changed, 6 insertions(+), 8 deletions(-)
+> 
+> diff --git a/drivers/pci/of.c b/drivers/pci/of.c
+> index b06585a1da75..fc0f906c5c25 100644
+> --- a/drivers/pci/of.c
+> +++ b/drivers/pci/of.c
+> @@ -266,7 +266,7 @@ int devm_of_pci_get_host_bridge_resources(struct device *dev,
+>  			struct list_head *resources, resource_size_t *io_base)
+>  {
+>  	struct device_node *dev_node = dev->of_node;
+> -	struct resource *res;
+> +	struct resource *res, tmp_res;
+>  	struct resource *bus_range;
+>  	struct of_pci_range range;
+>  	struct of_pci_range_parser parser;
+> @@ -320,18 +320,16 @@ int devm_of_pci_get_host_bridge_resources(struct device *dev,
+>  		if (range.cpu_addr == OF_BAD_ADDR || range.size == 0)
+>  			continue;
+>  
+> -		res = devm_kzalloc(dev, sizeof(struct resource), GFP_KERNEL);
+> +		err = of_pci_range_to_resource(&range, dev_node, &tmp_res);
+> +		if (err)
+> +			continue;
+> +
+> +		res = devm_kmemdup(dev, &tmp_res, sizeof(tmp_res), GFP_KERNEL);
+>  		if (!res) {
+>  			err = -ENOMEM;
+>  			goto failed;
+>  		}
+>  
+> -		err = of_pci_range_to_resource(&range, dev_node, res);
+> -		if (err) {
+> -			devm_kfree(dev, res);
+> -			continue;
+> -		}
+> -
+>  		if (resource_type(res) == IORESOURCE_IO) {
+>  			if (!io_base) {
+>  				dev_err(dev,
+> -- 
+> 2.13.6
