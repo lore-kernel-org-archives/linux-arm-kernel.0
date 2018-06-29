@@ -1,59 +1,47 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Fri, 29 Jun 2018 11:40:24 +0200
-Subject: [PATCH v4 03/18] ARM: davinci: dm365-evm: use nvmem lookup for mac
- address
+Date: Fri, 29 Jun 2018 11:40:32 +0200
+Subject: [PATCH v4 11/18] ARM: davinci: mityomapl138: don't read the MAC
+ address from machine code
 In-Reply-To: <20180629094039.7543-1-brgl@bgdev.pl>
 References: <20180629094039.7543-1-brgl@bgdev.pl>
-Message-ID: <20180629094039.7543-4-brgl@bgdev.pl>
+Message-ID: <20180629094039.7543-12-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-We now support nvmem lookups for machine code. Add a lookup for
-mac-address.
+This is now done by the emac driver using a registered nvmem cell.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- arch/arm/mach-davinci/board-dm365-evm.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ arch/arm/mach-davinci/board-mityomapl138.c | 8 --------
+ 1 file changed, 8 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/board-dm365-evm.c b/arch/arm/mach-davinci/board-dm365-evm.c
-index 435f7ec7d9af..cb0ac92a278e 100644
---- a/arch/arm/mach-davinci/board-dm365-evm.c
-+++ b/arch/arm/mach-davinci/board-dm365-evm.c
-@@ -28,6 +28,7 @@
- #include <linux/spi/spi.h>
- #include <linux/spi/eeprom.h>
- #include <linux/v4l2-dv-timings.h>
-+#include <linux/nvmem-provider.h>
+diff --git a/arch/arm/mach-davinci/board-mityomapl138.c b/arch/arm/mach-davinci/board-mityomapl138.c
+index b5be51c0451e..5c0a0557a361 100644
+--- a/arch/arm/mach-davinci/board-mityomapl138.c
++++ b/arch/arm/mach-davinci/board-mityomapl138.c
+@@ -120,7 +120,6 @@ static void read_factory_config(struct nvmem_device *nvmem, void *context)
+ {
+ 	int ret;
+ 	const char *partnum = NULL;
+-	struct davinci_soc_info *soc_info = &davinci_soc_info;
  
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -169,6 +170,15 @@ static struct platform_device davinci_nand_device = {
- 	},
- };
+ 	if (!IS_BUILTIN(CONFIG_NVMEM)) {
+ 		pr_warn("Factory Config not available without CONFIG_NVMEM\n");
+@@ -146,13 +145,6 @@ static void read_factory_config(struct nvmem_device *nvmem, void *context)
+ 		goto bad_config;
+ 	}
  
-+static struct nvmem_cell_lookup dm365evm_mac_address_cell = {
-+	.info = {
-+		.name = "mac-address",
-+		.offset = 0x7f00,
-+		.bytes = ETH_ALEN,
-+	},
-+	.nvmem_name = "1-00500",
-+};
-+
- static struct at24_platform_data eeprom_info = {
- 	.byte_len       = (256*1024) / 8,
- 	.page_size      = 64,
-@@ -769,6 +779,8 @@ static __init void dm365_evm_init(void)
+-	pr_info("Found MAC = %pM\n", factory_config.mac);
+-	if (is_valid_ether_addr(factory_config.mac))
+-		memcpy(soc_info->emac_pdata->mac_addr,
+-			factory_config.mac, ETH_ALEN);
+-	else
+-		pr_warn("Invalid MAC found in factory config block\n");
+-
+ 	partnum = factory_config.partnum;
+ 	pr_info("Part Number = %s\n", partnum);
  
- 	dm365_init_spi0(BIT(0), dm365_evm_spi_info,
- 			ARRAY_SIZE(dm365_evm_spi_info));
-+
-+	nvmem_add_lookup_table(&dm365evm_mac_address_cell, 1);
- }
- 
- MACHINE_START(DAVINCI_DM365_EVM, "DaVinci DM365 EVM")
 -- 
 2.17.1
