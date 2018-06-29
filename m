@@ -1,64 +1,52 @@
-From: vkoul@kernel.org (Vinod)
-Date: Fri, 29 Jun 2018 16:33:46 +0530
-Subject: [PATCH v5 1/7] tty: serial: imx: correct dma cookie status
-In-Reply-To: <20180626192252.6qdpwzpbpn6s5sd3@pengutronix.de>
-References: <1529427424-12321-1-git-send-email-yibin.gong@nxp.com>
- <1529427424-12321-2-git-send-email-yibin.gong@nxp.com>
- <20180626192252.6qdpwzpbpn6s5sd3@pengutronix.de>
-Message-ID: <20180629110346.GD22377@vkoul-mobl>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 29 Jun 2018 12:03:41 +0100
+Subject: [PATCH 2/2] regulator: uniphier: add regulator driver for
+ UniPhier SoC
+In-Reply-To: <1530260533-19415-3-git-send-email-hayashi.kunihiko@socionext.com>
+References: <1530260533-19415-1-git-send-email-hayashi.kunihiko@socionext.com>
+ <1530260533-19415-3-git-send-email-hayashi.kunihiko@socionext.com>
+Message-ID: <20180629110341.GA6556@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26-06-18, 21:22, Uwe Kleine-K?nig wrote:
-> On Wed, Jun 20, 2018 at 12:56:58AM +0800, Robin Gong wrote:
-> > Correct to check the right rx dma cookie status in spit of it
-> > works because only one cookie is running in the current sdma.
-> > But it will not once sdma driver support multi cookies
-> > running based on virt-dma.
-> > 
-> > Signed-off-by: Robin Gong <yibin.gong@nxp.com>
-> Looks wrong (because of tx_status vs rx_cookie), but is right
-> nevertheless I think:
+On Fri, Jun 29, 2018 at 05:22:13PM +0900, Kunihiko Hayashi wrote:
 
-hehe, tx refers to transfer status for rx (receive) cookie and not
-transmit .. yeah notations can be better!
+> +++ b/drivers/regulator/uniphier-regulator.c
+> @@ -0,0 +1,251 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * Regulator controller driver for UniPhier SoC
+> + * Copyright 2018 Socionext Inc.
+> + * Author: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+> + */
 
-> 
-> Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> 
-> Thanks
-> Uwe
-> 
-> > ---
-> >  drivers/tty/serial/imx.c | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-> > index 4e85357..2879407 100644
-> > --- a/drivers/tty/serial/imx.c
-> > +++ b/drivers/tty/serial/imx.c
-> > @@ -1051,7 +1051,7 @@ static void imx_uart_dma_rx_callback(void *data)
-> >  	unsigned int r_bytes;
-> >  	unsigned int bd_size;
-> >  
-> > -	status = dmaengine_tx_status(chan, (dma_cookie_t)0, &state);
-> > +	status = dmaengine_tx_status(chan, sport->rx_cookie, &state);
-> >  
-> >  	if (status == DMA_ERROR) {
-> >  		imx_uart_clear_rx_errors(sport);
-> > -- 
-> > 2.7.4
-> > 
-> > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> > 
-> 
-> -- 
-> Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Please make the entire header a C++ comment so that it looks intentional
+rather than mixing C and C++ like this.
 
--- 
-~Vinod
+> +static int uniphier_regulator_enable(struct regulator_dev *rdev)
+> +{
+> +	struct uniphier_regulator_priv *priv = rdev_get_drvdata(rdev);
+> +	u32 val;
+> +
+> +	val = readl_relaxed(priv->base + rdev->desc->enable_reg);
+> +	val &= ~rdev->desc->enable_mask;
+> +	val |= rdev->desc->enable_val;
+> +	writel_relaxed(val, priv->base + rdev->desc->enable_reg);
+> +
+> +	return 0;
+> +}
+
+Could you use a MMIO regmap for this driver?  All the operations look
+like they're just straight up operations of the sort the standard
+helpers support them and it means the driver will be able to take
+advantage of any improvements the core makes for free.
+
+Otherwise this looks great, and the above two issues can be fixed as
+followup patches so I'll apply.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180629/a76a53c6/attachment.sig>
