@@ -1,152 +1,144 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 29 Jun 2018 12:15:40 +0100
-Subject: [PATCH v3 20/20] kvm: arm64: Fall back to normal stage2 entry level
+Date: Fri, 29 Jun 2018 12:15:34 +0100
+Subject: [PATCH v3 14/20] kvm: arm/arm64: Expose supported physical address
+ limit for VM
 In-Reply-To: <1530270944-11351-1-git-send-email-suzuki.poulose@arm.com>
 References: <1530270944-11351-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1530270944-11351-21-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1530270944-11351-15-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We use concatenated entry level page tables (upto 16tables) for
-stage2. If we don't have sufficient contiguous pages (e.g, 16 * 64K),
-fallback to the normal page table format, by going one level
-deeper if permitted.
+Expose the maximum physical address size supported by the host
+for a VM. This could be later used by the userspace to choose the
+appropriate size for a given VM. The limit is determined as the
+minimum of actual CPU limit, the kernel limit (i.e, either 48 or 52)
+and the stage2 page table support limit (which is 40bits at the moment).
+For backward compatibility, we support a minimum of 40bits. The limit
+will be lifted as we add support for the stage2 to support the host
+kernel PA limit.
 
-Cc: Marc Zyngier <marc.zyngier@arm.com>
+This value may be different from what is exposed to the VM via
+CPU ID registers. The limit only applies to the stage2 page table.
+
 Cc: Christoffer Dall <cdall@kernel.org>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Peter Maydel <peter.maydell@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
-New in v3
+Changes since V2:
+ - Bump the ioctl number
 ---
- arch/arm64/include/asm/kvm_arm.h |  7 +++++++
- arch/arm64/include/asm/kvm_mmu.h | 18 +----------------
- arch/arm64/kvm/guest.c           | 42 ++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 50 insertions(+), 17 deletions(-)
+ Documentation/virtual/kvm/api.txt | 15 +++++++++++++++
+ arch/arm/include/asm/kvm_mmu.h    |  5 +++++
+ arch/arm64/include/asm/kvm_mmu.h  |  5 +++++
+ include/uapi/linux/kvm.h          |  6 ++++++
+ virt/kvm/arm/arm.c                |  6 ++++++
+ 5 files changed, 37 insertions(+)
 
-diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-index cb6a2ee..42eb528 100644
---- a/arch/arm64/include/asm/kvm_arm.h
-+++ b/arch/arm64/include/asm/kvm_arm.h
-@@ -137,6 +137,8 @@
-  *
-  * VTCR_EL2.SL0 and T0SZ are configured per VM at runtime before switching to
-  * the VM.
-+ *
-+ * With 16k/64k, the maximum number of levels supported at Stage2 is 3.
-  */
+diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+index d10944e..662374b 100644
+--- a/Documentation/virtual/kvm/api.txt
++++ b/Documentation/virtual/kvm/api.txt
+@@ -3561,6 +3561,21 @@ Returns: 0 on success,
+ 	-ENOENT on deassign if the conn_id isn't registered
+ 	-EEXIST on assign if the conn_id is already registered
  
- #define VTCR_EL2_COMMON_BITS	(VTCR_EL2_SH0_INNER | VTCR_EL2_ORGN0_WBWA | \
-@@ -150,6 +152,7 @@
-  */
- #define VTCR_EL2_TGRAN			VTCR_EL2_TG0_64K
- #define VTCR_EL2_TGRAN_SL0_BASE		3UL
-+#define ARM64_TGRAN_STAGE2_MAX_LEVELS	3
- 
- #elif defined(CONFIG_ARM64_16K_PAGES)
- /*
-@@ -158,6 +161,8 @@
-  */
- #define VTCR_EL2_TGRAN			VTCR_EL2_TG0_16K
- #define VTCR_EL2_TGRAN_SL0_BASE		3UL
-+#define ARM64_TGRAN_STAGE2_MAX_LEVELS	3
++4.113 KVM_ARM_GET_MAX_VM_PHYS_SHIFT
++Capability: basic
++Architectures: arm, arm64
++Type: system ioctl
++Parameters: none
++Returns: log2(Maximum Guest physical address space size) supported by the
++hypervisor.
 +
- #else	/* 4K */
- /*
-  * Stage2 translation configuration:
-@@ -165,6 +170,8 @@
-  */
- #define VTCR_EL2_TGRAN			VTCR_EL2_TG0_4K
- #define VTCR_EL2_TGRAN_SL0_BASE		2UL
-+#define ARM64_TGRAN_STAGE2_MAX_LEVELS	4
-+
- #endif
++This ioctl can be used to identify the maximum guest physical address
++space size supported by the hypervisor. The returned value indicates the
++maximum size of the address that can be resolved by the stage2
++translation table on arm/arm64. On arm64, the value is decided based
++on the host kernel configuration and the system wide safe value of
++ID_AA64MMFR0_EL1:PARange. This may not match the value exposed to the
++VM in CPU ID registers.
  
- #define VTCR_EL2_FLAGS		(VTCR_EL2_COMMON_BITS | VTCR_EL2_TGRAN)
+ 5. The kvm_run structure
+ ------------------------
+diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+index b2da5a4..d86f8dd 100644
+--- a/arch/arm/include/asm/kvm_mmu.h
++++ b/arch/arm/include/asm/kvm_mmu.h
+@@ -380,6 +380,11 @@ static inline void *stage2_alloc_pgd(struct kvm *kvm)
+ 
+ #define kvm_phys_to_vttbr(addr)		(addr)
+ 
++static inline u32 kvm_get_ipa_limit(void)
++{
++	return KVM_PHYS_SHIFT;
++}
++
+ #endif	/* !__ASSEMBLY__ */
+ 
+ #endif /* __ARM_KVM_MMU_H__ */
 diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index d38f395..50f632e 100644
+index 813a72a..b4564d8 100644
 --- a/arch/arm64/include/asm/kvm_mmu.h
 +++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -527,23 +527,7 @@ static inline u64 kvm_vttbr_baddr_mask(struct kvm *kvm)
- 	return vttbr_baddr_mask(kvm_phys_shift(kvm), kvm_stage2_levels(kvm));
+@@ -532,5 +532,10 @@ static inline void *stage2_alloc_pgd(struct kvm *kvm)
+ 				 GFP_KERNEL | __GFP_ZERO);
  }
  
--static inline void *stage2_alloc_pgd(struct kvm *kvm)
--{
--	u32 ipa, lvls;
--
--	/*
--	 * Stage2 page table can support concatenation of (upto 16) tables
--	 * at the entry level, thereby reducing the number of levels.
--	 */
--	ipa = kvm_phys_shift(kvm);
--	lvls = stage2_pt_levels(ipa);
--
--	kvm->arch.s2_levels = lvls;
--	kvm->arch.vtcr_private = VTCR_EL2_SL0(lvls) | TCR_T0SZ(ipa);
--
--	return alloc_pages_exact(stage2_pgd_size(kvm),
--				 GFP_KERNEL | __GFP_ZERO);
--}
-+extern void *stage2_alloc_pgd(struct kvm *kvm);
- 
- static inline u32 kvm_get_ipa_limit(void)
- {
-diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
-index 56a0260..5a3a687 100644
---- a/arch/arm64/kvm/guest.c
-+++ b/arch/arm64/kvm/guest.c
-@@ -31,6 +31,8 @@
- #include <asm/kvm.h>
- #include <asm/kvm_emulate.h>
- #include <asm/kvm_coproc.h>
-+#include <asm/kvm_mmu.h>
-+#include <asm/pgtable-hwdef.h>
- 
- #include "trace.h"
- 
-@@ -458,3 +460,43 @@ int kvm_arm_vcpu_arch_has_attr(struct kvm_vcpu *vcpu,
- 
- 	return ret;
- }
-+
-+void *stage2_alloc_pgd(struct kvm *kvm)
++static inline u32 kvm_get_ipa_limit(void)
 +{
-+	u32 ipa, s2_lvls, lvls;
-+	u64 pgd_size;
-+	void *pgd;
-+
-+	/*
-+	 * Stage2 page table can support concatenation of (upto 16) tables
-+	 * at the entry level, thereby reducing the number of levels. We try
-+	 * to use concatenation wherever possible. If we fail, fallback to
-+	 * normal levels if possible.
-+	 */
-+	ipa = kvm_phys_shift(kvm);
-+	lvls = s2_lvls = stage2_pt_levels(ipa);
-+
-+retry:
-+	pgd_size = __s2_pgd_size(ipa, lvls);
-+	pgd = alloc_pages_exact(pgd_size, GFP_KERNEL | __GFP_ZERO);
-+
-+	/* Check if the PGD meets the alignment requirements */
-+	if (pgd && (virt_to_phys(pgd) & ~vttbr_baddr_mask(ipa, lvls))) {
-+		free_pages_exact(pgd, pgd_size);
-+		pgd = NULL;
-+	}
-+
-+	if (pgd) {
-+		kvm->arch.s2_levels = lvls;
-+		kvm->arch.vtcr_private = VTCR_EL2_SL0(lvls) | TCR_T0SZ(ipa);
-+	} else {
-+		/* Check if we can use an entry level without concatenation */
-+		lvls = ARM64_HW_PGTABLE_LEVELS(ipa);
-+		if ((lvls > s2_lvls) &&
-+		    (lvls <= CONFIG_PGTABLE_LEVELS) &&
-+		    (lvls <= ARM64_TGRAN_STAGE2_MAX_LEVELS))
-+			goto retry;
-+	}
-+
-+	return pgd;
++	return KVM_PHYS_SHIFT;
 +}
++
+ #endif /* __ASSEMBLY__ */
+ #endif /* __ARM64_KVM_MMU_H__ */
+diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+index b6270a3..4df9bb6 100644
+--- a/include/uapi/linux/kvm.h
++++ b/include/uapi/linux/kvm.h
+@@ -775,6 +775,12 @@ struct kvm_ppc_resize_hpt {
+ #define KVM_GET_MSR_FEATURE_INDEX_LIST    _IOWR(KVMIO, 0x0a, struct kvm_msr_list)
+ 
+ /*
++ * Get the maximum physical address size supported by the host.
++ * Returns log2(Max-Physical-Address-Size)
++ */
++#define KVM_ARM_GET_MAX_VM_PHYS_SHIFT	_IO(KVMIO, 0x0b)
++
++/*
+  * Extension capability list.
+  */
+ #define KVM_CAP_IRQCHIP	  0
+diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+index d2637bb..0d99e67 100644
+--- a/virt/kvm/arm/arm.c
++++ b/virt/kvm/arm/arm.c
+@@ -66,6 +66,7 @@ static atomic64_t kvm_vmid_gen = ATOMIC64_INIT(1);
+ static u32 kvm_next_vmid;
+ static unsigned int kvm_vmid_bits __read_mostly;
+ static DEFINE_RWLOCK(kvm_vmid_lock);
++static u32 kvm_ipa_limit;
+ 
+ static bool vgic_present;
+ 
+@@ -248,6 +249,9 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
+ long kvm_arch_dev_ioctl(struct file *filp,
+ 			unsigned int ioctl, unsigned long arg)
+ {
++	if (ioctl == KVM_ARM_GET_MAX_VM_PHYS_SHIFT)
++		return kvm_ipa_limit;
++
+ 	return -EINVAL;
+ }
+ 
+@@ -1361,6 +1365,8 @@ static int init_common_resources(void)
+ 	kvm_vmid_bits = kvm_get_vmid_bits();
+ 	kvm_info("%d-bit VMID\n", kvm_vmid_bits);
+ 
++	kvm_ipa_limit = kvm_get_ipa_limit();
++
+ 	return 0;
+ }
+ 
 -- 
 2.7.4
