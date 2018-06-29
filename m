@@ -1,26 +1,24 @@
 From: trini@konsulko.com (Tom Rini)
-Date: Fri, 29 Jun 2018 16:53:16 -0400
-Subject: [U-Boot, 3/4] ARM: mach-omap2: omap5/dra7: Enable ACTLR[0]
- (Enable invalidates of BTB) to facilitate CVE_2017-5715 WA in OS
-In-Reply-To: <20180612202411.29798-4-nm@ti.com>
-References: <20180612202411.29798-4-nm@ti.com>
-Message-ID: <20180629205316.GK18596@bill-the-cat>
+Date: Fri, 29 Jun 2018 16:53:26 -0400
+Subject: [U-Boot, 4/4] ARM: mach-omap2: omap3/am335x: Enable ACR::IBE on
+ Cortex-A8 SoCs for CVE-2017-5715
+In-Reply-To: <20180612202411.29798-5-nm@ti.com>
+References: <20180612202411.29798-5-nm@ti.com>
+Message-ID: <20180629205326.GL18596@bill-the-cat>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 12, 2018 at 03:24:10PM -0500, Nishanth Menon wrote:
+On Tue, Jun 12, 2018 at 03:24:11PM -0500, Nishanth Menon wrote:
 
-> Enable CVE_2017_5715 and since we have our own v7_arch_cp15_set_acr
-> function to setup the bits, we are able to override the settings.
+> Enable CVE-2017-5715 option to set the IBE bit. This enables kernel
+> workarounds necessary for the said CVE.
 > 
-> Without this enabled, Linux kernel reports:
-> CPU0: Spectre v2: firmware did not set auxiliary control register IBE bit, system vulnerable
+> With this enabled, Linux reports:
+> CPU0: Spectre v2: using BPIALL workaround
 > 
-> With this enabled, Linux kernel reports:
-> CPU0: Spectre v2: using ICIALLU workaround
-> 
-> NOTE: This by itself does not enable the workaround for CPU1 (on
-> OMAP5 and DRA72/AM572 SoCs) and may require additional kernel patches.
+> This workaround may need to be re-applied in OS environment around low
+> power transition resume states where context of ACR would be lost (off-mode
+> etc).
 > 
 > Signed-off-by: Nishanth Menon <nm@ti.com>
 
@@ -34,4 +32,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180629/413e1c95/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180629/9b9c813c/attachment.sig>
