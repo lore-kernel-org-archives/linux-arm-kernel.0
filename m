@@ -1,46 +1,56 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 29 Jun 2018 16:55:56 +0100
-Subject: [PATCH] arm64: acpi: reenumerate topology ids
-In-Reply-To: <20180629154608.nqudibf54ti6dpjc@kamzik.brq.redhat.com>
-References: <20180628145128.10057-1-drjones@redhat.com>
- <a38fb684-c023-1a96-464e-dd268f3132ea@arm.com>
- <20180628173243.obydzakh2stfs26w@kamzik.brq.redhat.com>
- <20180629102927.GA18043@e107155-lin>
- <20180629112354.hefdl2pe72frl6x3@kamzik.brq.redhat.com>
- <20180629132934.GA16282@e107155-lin>
- <20180629154608.nqudibf54ti6dpjc@kamzik.brq.redhat.com>
-Message-ID: <20180629155556.GD16282@e107155-lin>
+From: james.morse@arm.com (James Morse)
+Date: Fri, 29 Jun 2018 16:58:44 +0100
+Subject: [PATCH v5 2/2] arm64: KVM: export the capability to set guest
+ SError syndrome
+In-Reply-To: <1529960309-2513-3-git-send-email-gengdongjiu@huawei.com>
+References: <1529960309-2513-1-git-send-email-gengdongjiu@huawei.com>
+ <1529960309-2513-3-git-send-email-gengdongjiu@huawei.com>
+Message-ID: <bca12032-c465-1d10-f7d4-71fc044ac695@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 29, 2018 at 05:46:08PM +0200, Andrew Jones wrote:
-> On Fri, Jun 29, 2018 at 02:29:34PM +0100, Sudeep Holla wrote:
+Hi Dongjiu Geng,
 
-[..]
+This patch doesn't apply on v4.18-rc2.
 
-> > 
-> > How is that different from OS generated one from user's perspective ?
-> > Vendors might assign sockets UID and he may help them to replace one.
-> > Having some generated counter based id is not helpful.
+Documentation/virtual/kvm/api.txt already has a 8.18 section. I guess you based
+this on v4.17.
+
+For posting patches, please use the latest 'rc' from Linus' tree, (or the
+maintainer's tree listed in MAINTAINERS for the tree you are targeting if the
+maintainer has started to pick up patches).
+
+
+Thanks,
+
+James
+
+
+On 25/06/18 21:58, Dongjiu Geng wrote:
+> For the arm64 RAS Extension, user space can inject a virtual-SError
+> with specified ESR. So user space needs to know whether KVM support
+> to inject such SError, this interface adds this query for this capability.
 > 
-> I agree with this. It's a good argument for maintaining a mapping of
-> package-id to id-physically-printed-on-a-package somewhere. To avoid
-> maintaining a mapping it could just be stored directly in
-> cpu_topology[cpu].package_id, but then how can we tell the difference
-> between a valid printed-on-package-id and an ACPI offset? We'd still
-> have to maintain additional state to determine if it's valid or not,
-> so we could just maintain a mapping instead.
-> 
+> KVM will check whether system support RAS Extension, if supported, KVM
+> returns true to user space, otherwise returns false.
 
-x86 may have a architectural way to obtain it and hence they don't need
-to rely on PPTT. But for ARM, we need to rely on PPTT for it and if
-vendors/users need accurate information, it has to come from PPTT and
-any other place is never going to be consistent and hence unusable.
-So, even though specification doesn't mandate, I think OS should as it's
-the only robust way. We can get the firmware fixed/updated if random
-unique number hurts. Firmware is not upgradeable is no longer a valid
-argument.
 
--- 
-Regards,
-Sudeep
+> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+> index 3732097..86b3808 100644
+> --- a/Documentation/virtual/kvm/api.txt
+> +++ b/Documentation/virtual/kvm/api.txt
+> @@ -4628,3 +4628,14 @@ Architectures: s390
+>  This capability indicates that kvm will implement the interfaces to handle
+>  reset, migration and nested KVM for branch prediction blocking. The stfle
+>  facility 82 should not be provided to the guest without this capability.
+> +
+> +8.14 KVM_CAP_ARM_SET_SERROR_ESR
+> +
+> +Architectures: arm, arm64
+> +
+> +This capability indicates that userspace can specify the syndrome value reported
+> +to the guest OS when guest takes a virtual SError interrupt exception.
+> +If KVM has this capability, userspace can only specify the ISS field for the ESR
+> +syndrome, it can not specify the EC field which is not under control by KVM.
+> +If this virtual SError is taken to EL1 using AArch64, this value will be reported
+> +in ISS filed of ESR_EL1.
