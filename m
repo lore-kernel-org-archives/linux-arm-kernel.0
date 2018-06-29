@@ -1,10 +1,10 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Fri, 29 Jun 2018 11:40:33 +0200
-Subject: [PATCH v4 12/18] ARM: davinci: dm365-evm: use device properties for
+Date: Fri, 29 Jun 2018 11:40:36 +0200
+Subject: [PATCH v4 15/18] ARM: davinci: dm646x-evm: use device properties for
  at24 eeprom
 In-Reply-To: <20180629094039.7543-1-brgl@bgdev.pl>
 References: <20180629094039.7543-1-brgl@bgdev.pl>
-Message-ID: <20180629094039.7543-13-brgl@bgdev.pl>
+Message-ID: <20180629094039.7543-16-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -21,23 +21,23 @@ already implies the EEPROM's size.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- arch/arm/mach-davinci/board-dm365-evm.c | 13 +++++--------
+ arch/arm/mach-davinci/board-dm646x-evm.c | 13 +++++--------
  1 file changed, 5 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/board-dm365-evm.c b/arch/arm/mach-davinci/board-dm365-evm.c
-index cb0ac92a278e..b360d26e6caa 100644
---- a/arch/arm/mach-davinci/board-dm365-evm.c
-+++ b/arch/arm/mach-davinci/board-dm365-evm.c
-@@ -18,7 +18,7 @@
+diff --git a/arch/arm/mach-davinci/board-dm646x-evm.c b/arch/arm/mach-davinci/board-dm646x-evm.c
+index 5a9de47bc8a2..5049f0c6cd1a 100644
+--- a/arch/arm/mach-davinci/board-dm646x-evm.c
++++ b/arch/arm/mach-davinci/board-dm646x-evm.c
+@@ -22,7 +22,7 @@
+ #include <linux/gpio.h>
+ #include <linux/platform_device.h>
  #include <linux/i2c.h>
- #include <linux/io.h>
- #include <linux/clk.h>
 -#include <linux/platform_data/at24.h>
 +#include <linux/property.h>
- #include <linux/leds.h>
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/partitions.h>
-@@ -179,18 +179,15 @@ static struct nvmem_cell_lookup dm365evm_mac_address_cell = {
+ #include <linux/platform_data/pcf857x.h>
+ 
+ #include <media/i2c/tvp514x.h>
+@@ -320,12 +320,9 @@ static struct nvmem_cell_lookup dm646x_evm_mac_address_cell = {
  	.nvmem_name = "1-00500",
  };
  
@@ -51,14 +51,16 @@ index cb0ac92a278e..b360d26e6caa 100644
 +	PROPERTY_ENTRY_U32("pagesize", 64),
 +	{ }
  };
+ #endif
  
- static struct i2c_board_info i2c_info[] = {
+@@ -396,7 +393,7 @@ static void evm_init_cpld(void)
+ static struct i2c_board_info __initdata i2c_info[] =  {
  	{
  		I2C_BOARD_INFO("24c256", 0x50),
--		.platform_data	= &eeprom_info,
-+		.properties = eeprom_properties,
+-		.platform_data  = &eeprom_info,
++		.properties  = eeprom_properties,
  	},
  	{
- 		I2C_BOARD_INFO("tlv320aic3x", 0x18),
+ 		I2C_BOARD_INFO("pcf8574a", 0x38),
 -- 
 2.17.1
