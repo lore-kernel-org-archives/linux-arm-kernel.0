@@ -1,40 +1,78 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Fri, 29 Jun 2018 19:38:50 +0200
-Subject: [PATCH v2 1/3] arm64: dts: actions: Enable clock controller for
- S700
-In-Reply-To: <153029379879.143105.2037926027438984922@swboyd.mtv.corp.google.com>
-References: <20180626192820.28237-3-sravanhome@gmail.com>
- <20180628191805.3722-1-sravanhome@gmail.com>
- <20180628191805.3722-2-sravanhome@gmail.com>
- <153029379879.143105.2037926027438984922@swboyd.mtv.corp.google.com>
-Message-ID: <c3a62fea-a769-d2fc-2fef-c43ac9c95de6@suse.de>
+From: mst@redhat.com (Michael S. Tsirkin)
+Date: Fri, 29 Jun 2018 20:42:02 +0300
+Subject: [PATCH v3 01/20] virtio: mmio-v1: Validate queue PFN
+In-Reply-To: <1530270944-11351-2-git-send-email-suzuki.poulose@arm.com>
+References: <1530270944-11351-1-git-send-email-suzuki.poulose@arm.com>
+ <1530270944-11351-2-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20180629200816-mutt-send-email-mst@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 29.06.2018 um 19:36 schrieb Stephen Boyd:
-> Quoting Saravanan Sekar (2018-06-28 12:18:03)
->> diff --git a/arch/arm64/boot/dts/actions/s700-cubieboard7.dts b/arch/arm64/boot/dts/actions/s700-cubieboard7.dts
->> index ef79d7905f44..28f3f4a0f7f0 100644
->> --- a/arch/arm64/boot/dts/actions/s700-cubieboard7.dts
->> +++ b/arch/arm64/boot/dts/actions/s700-cubieboard7.dts
->> diff --git a/arch/arm64/boot/dts/actions/s700.dtsi b/arch/arm64/boot/dts/actions/s700.dtsi
->> index 66dd5309f0a2..3530b705df90 100644
->> --- a/arch/arm64/boot/dts/actions/s700.dtsi
->> +++ b/arch/arm64/boot/dts/actions/s700.dtsi
+On Fri, Jun 29, 2018 at 12:15:21PM +0100, Suzuki K Poulose wrote:
+> virtio-mmio with virtio-v1 uses a 32bit PFN for the queue.
+> If the queue pfn is too large to fit in 32bits, which
+> we could hit on arm64 systems with 52bit physical addresses
+> (even with 64K page size), we simply miss out a proper link
+> to the other side of the queue.
 > 
-> Can the above part be split from the below part? I don't want to merge
-> dts bits into clk tree, when those should normally go through arm-soc.
+> Add a check to validate the PFN, rather than silently breaking
+> the devices.
 > 
->> diff --git a/include/dt-bindings/clock/actions,s700-cmu.h b/include/dt-bindings/clock/actions,s700-cmu.h
->> new file mode 100644
+> Cc: "Michael S. Tsirkin" <mst@redhat.com>
+> Cc: Jason Wang <jasowang@redhat.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Christoffer Dall <cdall@kernel.org>
+> Cc: Peter Maydel <peter.maydell@linaro.org>
+> Cc: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
+> Changes since v2:
+>  - Change errno to -E2BIG
+> ---
+>  drivers/virtio/virtio_mmio.c | 18 ++++++++++++++++--
+>  1 file changed, 16 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/virtio/virtio_mmio.c b/drivers/virtio/virtio_mmio.c
+> index 67763d3..82cedc8 100644
+> --- a/drivers/virtio/virtio_mmio.c
+> +++ b/drivers/virtio/virtio_mmio.c
+> @@ -397,9 +397,21 @@ static struct virtqueue *vm_setup_vq(struct virtio_device *vdev, unsigned index,
+>  	/* Activate the queue */
+>  	writel(virtqueue_get_vring_size(vq), vm_dev->base + VIRTIO_MMIO_QUEUE_NUM);
+>  	if (vm_dev->version == 1) {
+> +		u64 q_pfn = virtqueue_get_desc_addr(vq) >> PAGE_SHIFT;
+> +
+> +		/*
+> +		 * virtio-mmio v1 uses a 32bit QUEUE PFN. If we have something
+> +		 * that doesn't fit in 32bit, fail the setup rather than
+> +		 * pretending to be successful.
+> +		 */
+> +		if (q_pfn >> 32) {
+> +			dev_err(&vdev->dev, "virtio-mmio: queue address too large\n");
 
-This part needs to go into the bindings patch, which should be 1/3, not
-3/3 please.
+How about:
+	"hypervisor bug: legacy virtio-mmio must not be used with more than 0x%llx Gigabytes of memory",
+	0x1ULL << (32 - 30) << PAGE_SHIFT
 
-Thanks,
-Andreas
-
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+> +			err = -E2BIG;
+> +			goto error_bad_pfn;
+> +		}
+> +
+>  		writel(PAGE_SIZE, vm_dev->base + VIRTIO_MMIO_QUEUE_ALIGN);
+> -		writel(virtqueue_get_desc_addr(vq) >> PAGE_SHIFT,
+> -				vm_dev->base + VIRTIO_MMIO_QUEUE_PFN);
+> +		writel(q_pfn, vm_dev->base + VIRTIO_MMIO_QUEUE_PFN);
+>  	} else {
+>  		u64 addr;
+>  
+> @@ -430,6 +442,8 @@ static struct virtqueue *vm_setup_vq(struct virtio_device *vdev, unsigned index,
+>  
+>  	return vq;
+>  
+> +error_bad_pfn:
+> +	vring_del_virtqueue(vq);
+>  error_new_virtqueue:
+>  	if (vm_dev->version == 1) {
+>  		writel(0, vm_dev->base + VIRTIO_MMIO_QUEUE_PFN);
+> -- 
+> 2.7.4
