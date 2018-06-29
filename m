@@ -1,78 +1,86 @@
-From: sebastien.szymanski@armadeus.com (=?UTF-8?q?S=C3=A9bastien=20Szymanski?=)
-Date: Fri, 29 Jun 2018 16:52:21 +0200
-Subject: [PATCH 1/1] ARM: dts: imx6ull: add operating points
-Message-ID: <20180629145221.10393-1-sebastien.szymanski@armadeus.com>
+From: miquel.raynal@bootlin.com (Miquel Raynal)
+Date: Fri, 29 Jun 2018 16:43:23 +0200
+Subject: [PATCH v3 01/17] platform-msi: allow creation of MSI domain
+ without interrupt number
+In-Reply-To: <86bmbtzmhk.wl-marc.zyngier@arm.com>
+References: <20180622151432.1566-1-miquel.raynal@bootlin.com>
+ <20180622151432.1566-2-miquel.raynal@bootlin.com>
+ <c5b38c34-5ba0-6545-3635-45be1858fa3b@arm.com>
+ <20180629094035.5199fe89@xps13>
+ <86bmbtzmhk.wl-marc.zyngier@arm.com>
+Message-ID: <20180629164323.7fb2a0c3@xps13>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-i.MX6ULL has different operating ranges than i.MX6UL so add the
-operating points for the i.MX6ULL and removed them form board device
-trees. A 25mV offset is added to the minimum allowed values like for the
-i.MX6UL.
-The valid frequencies are now selected by the cpufreq driver according
-to ratings stored in fuses since commit 0aa9abd4c212 ("cpufreq: imx6q:
-check speed grades for i.MX6ULL")
+Hi Marc,
 
-Signed-off-by: S?bastien Szymanski <sebastien.szymanski@armadeus.com>
----
- arch/arm/boot/dts/imx6ull-colibri-wifi.dtsi | 14 --------------
- arch/arm/boot/dts/imx6ull.dtsi              | 19 +++++++++++++++++++
- 2 files changed, 19 insertions(+), 14 deletions(-)
+Marc Zyngier <marc.zyngier@arm.com> wrote on Fri, 29 Jun 2018 15:38:31
++0100:
 
-diff --git a/arch/arm/boot/dts/imx6ull-colibri-wifi.dtsi b/arch/arm/boot/dts/imx6ull-colibri-wifi.dtsi
-index 3dffbcd50bf6..183193e8580d 100644
---- a/arch/arm/boot/dts/imx6ull-colibri-wifi.dtsi
-+++ b/arch/arm/boot/dts/imx6ull-colibri-wifi.dtsi
-@@ -20,20 +20,6 @@
- 
- &cpu0 {
- 	clock-frequency = <792000000>;
--	operating-points = <
--		/* kHz	uV */
--		792000  1225000
--		528000	1175000
--		396000	1025000
--		198000	950000
--	>;
--	fsl,soc-operating-points = <
--		/* KHz	uV */
--		792000  1175000
--		528000	1175000
--		396000	1175000
--		198000	1175000
--	>;
- };
- 
- &iomuxc {
-diff --git a/arch/arm/boot/dts/imx6ull.dtsi b/arch/arm/boot/dts/imx6ull.dtsi
-index ebc25c98e5e1..ade64bd46fab 100644
---- a/arch/arm/boot/dts/imx6ull.dtsi
-+++ b/arch/arm/boot/dts/imx6ull.dtsi
-@@ -48,6 +48,25 @@
- /* Delete CAAM node in AIPS-2 (i.MX6UL specific) */
- /delete-node/ &crypto;
- 
-+&cpu0 {
-+	operating-points = <
-+		/* kHz	uV */
-+		900000	1275000
-+		792000	1225000
-+		528000	1175000
-+		396000	1025000
-+		198000	950000
-+	>;
-+	fsl,soc-operating-points = <
-+		/* KHz	uV */
-+		900000	1175000
-+		792000	1175000
-+		528000	1175000
-+		396000	1175000
-+		198000	1175000
-+	>;
-+};
-+
- / {
- 	soc {
- 		aips3: aips-bus at 2200000 {
--- 
-2.16.4
+> On Fri, 29 Jun 2018 08:40:35 +0100,
+> Miquel Raynal <miquel.raynal@bootlin.com> wrote:
+> > 
+> > Hi Marc,
+> > 
+> > Marc Zyngier <marc.zyngier@arm.com> wrote on Thu, 28 Jun 2018 12:12:04
+> > +0100:
+> >   
+> > > On 22/06/18 16:14, Miquel Raynal wrote:  
+> > > > platform_msi_alloc_priv_data() checks that a number of interrupts is
+> > > > always given. This extra-check has no real impact and just prevents
+> > > > uselessly the user to create an MSI tree domain: remove it.
+> > > > 
+> > > > Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+> > > > ---
+> > > >  drivers/base/platform-msi.c | 2 +-
+> > > >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > > > 
+> > > > diff --git a/drivers/base/platform-msi.c b/drivers/base/platform-msi.c
+> > > > index 60d6cc618f1c..9f001f4ccc0f 100644
+> > > > --- a/drivers/base/platform-msi.c
+> > > > +++ b/drivers/base/platform-msi.c
+> > > > @@ -203,7 +203,7 @@ platform_msi_alloc_priv_data(struct device *dev, unsigned int nvec,
+> > > >  	 * accordingly (which would impact the max number of MSI
+> > > >  	 * capable devices).
+> > > >  	 */
+> > > > -	if (!dev->msi_domain || !write_msi_msg || !nvec || nvec > MAX_DEV_MSIS)
+> > > > +	if (!dev->msi_domain || !write_msi_msg || nvec > MAX_DEV_MSIS)
+> > > >  		return ERR_PTR(-EINVAL);
+> > > >  
+> > > >  	if (dev->msi_domain->bus_token != DOMAIN_BUS_PLATFORM_MSI) {
+> > > >     
+> > > 
+> > > Huh... It's not that simple.
+> > > 
+> > > Yes, it allows you to get a tree via platform_msi_create_device_domain
+> > > (assuming that's why you're changing it -- your commit message doesn't
+> > > say much)  
+> > 
+> > Indeed. That was exactly my intention.
+> >   
+> > > but it also has some impact on the way msi_domain_prepare_irqs
+> > > works (see how it is called from platform_msi_create_device_domain).
+> > > 
+> > > Importantly, the msi_prepare callback takes nvec as a parameter, and
+> > > that ends up trickling down to the irqchip, or whatever will setup the
+> > > MSI domain. Things like the GICv3 ITS do rely on that to carve out the
+> > > LPI space that subsequently gets used to populate the domain.
+> > > 
+> > > So no, you can't do it like that. If you really want a tree, add a
+> > > helper that does so.  
+> > 
+> > So if I understand correctly, what should be done is writting a new
+> > helper that would do something similar to
+> > platform_msi_create_device_domain(), but creating instead a tree domain
+> > and still giving msi_domain_prepare_irqs() a meaningful number (as
+> > nvec) that would be the maximum number of MSIs that could be allocated.
+> > Am I right here?  
+> 
+> What I have in mind is the following (untested) patch. Let me know if
+> that works for you.
+
+Ok, that's really close to what I wrote this morning, cool. I was not
+sure that was the only thing to modify.
+
+Thanks,
+Miqu?l
