@@ -1,152 +1,91 @@
-From: christoffer.dall@arm.com (Christoffer Dall)
-Date: Fri, 29 Jun 2018 11:28:31 +0200
-Subject: [PATCH v3 1/6] arm64: KVM: Add support for Stage-2 control of
- memory types and cacheability
-In-Reply-To: <86efgqymlk.wl-marc.zyngier@arm.com>
-References: <20180627122058.8210-1-marc.zyngier@arm.com>
- <20180627122058.8210-2-marc.zyngier@arm.com>
- <20180628205638.GC8441@e113682-lin.lund.arm.com>
- <86po0aypx0.wl-marc.zyngier@arm.com>
- <20180629090750.GD8441@e113682-lin.lund.arm.com>
- <86efgqymlk.wl-marc.zyngier@arm.com>
-Message-ID: <20180629092831.GF8441@e113682-lin.lund.arm.com>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Fri, 29 Jun 2018 11:40:21 +0200
+Subject: [PATCH v4 00/18] ARM: davinci: step towards removing
+ at24_platform_data
+Message-ID: <20180629094039.7543-1-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 29, 2018 at 10:21:27AM +0100, Marc Zyngier wrote:
-> On Fri, 29 Jun 2018 10:07:50 +0100,
-> Christoffer Dall <christoffer.dall@arm.com> wrote:
-> >
-> > On Fri, Jun 29, 2018 at 09:09:47AM +0100, Marc Zyngier wrote:
-> > > On Thu, 28 Jun 2018 21:56:38 +0100,
-> > > Christoffer Dall <christoffer.dall@arm.com> wrote:
-> > > >
-> > > > On Wed, Jun 27, 2018 at 01:20:53PM +0100, Marc Zyngier wrote:
-> > > > > Up to ARMv8.3, the combinaison of Stage-1 and Stage-2 attributes
-> > > > > results in the strongest attribute of the two stages.  This means
-> > > > > that the hypervisor has to perform quite a lot of cache maintenance
-> > > > > just in case the guest has some non-cacheable mappings around.
-> > > > >
-> > > > > ARMv8.4 solves this problem by offering a different mode (FWB) where
-> > > > > Stage-2 has total control over the memory attribute (this is limited
-> > > > > to systems where both I/O and instruction fetches are coherent with
-> > > > > the dcache). This is achieved by having a different set of memory
-> > > > > attributes in the page tables, and a new bit set in HCR_EL2.
-> > > > >
-> > > > > On such a system, we can then safely sidestep any form of dcache
-> > > > > management.
-> > > > >
-> > > > > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> > > > > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> > > > > ---
-> > > > >  arch/arm64/include/asm/cpucaps.h      |  3 ++-
-> > > > >  arch/arm64/include/asm/kvm_arm.h      |  1 +
-> > > > >  arch/arm64/include/asm/kvm_emulate.h  |  2 ++
-> > > > >  arch/arm64/include/asm/kvm_mmu.h      | 26 ++++++++++++++++++++------
-> > > > >  arch/arm64/include/asm/memory.h       |  7 +++++++
-> > > > >  arch/arm64/include/asm/pgtable-prot.h | 14 ++++++++++++--
-> > > > >  arch/arm64/include/asm/sysreg.h       |  1 +
-> > > > >  arch/arm64/kernel/cpufeature.c        | 20 ++++++++++++++++++++
-> > > > >  virt/kvm/arm/mmu.c                    |  4 ++++
-> > > > >  9 files changed, 69 insertions(+), 9 deletions(-)
-> > > > >
-> > > > > diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
-> > > > > index 8a699c708fc9..ed84d6536830 100644
-> > > > > --- a/arch/arm64/include/asm/cpucaps.h
-> > > > > +++ b/arch/arm64/include/asm/cpucaps.h
-> > > > > @@ -49,7 +49,8 @@
-> > > > >  #define ARM64_HAS_CACHE_DIC                  28
-> > > > >  #define ARM64_HW_DBM                         29
-> > > > >  #define ARM64_SSBD                           30
-> > > > > +#define ARM64_HAS_STAGE2_FWB                 31
-> > > > >
-> > > > > -#define ARM64_NCAPS                          31
-> > > > > +#define ARM64_NCAPS                          32
-> > > > >
-> > > > >  #endif /* __ASM_CPUCAPS_H */
-> > > > > diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-> > > > > index 6dd285e979c9..aa45df752a16 100644
-> > > > > --- a/arch/arm64/include/asm/kvm_arm.h
-> > > > > +++ b/arch/arm64/include/asm/kvm_arm.h
-> > > > > @@ -23,6 +23,7 @@
-> > > > >  #include <asm/types.h>
-> > > > >
-> > > > >  /* Hyp Configuration Register (HCR) bits */
-> > > > > +#define HCR_FWB              (UL(1) << 46)
-> > > > >  #define HCR_TEA              (UL(1) << 37)
-> > > > >  #define HCR_TERR     (UL(1) << 36)
-> > > > >  #define HCR_TLOR     (UL(1) << 35)
-> > > > > diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
-> > > > > index 1dab3a984608..dd98fdf33d99 100644
-> > > > > --- a/arch/arm64/include/asm/kvm_emulate.h
-> > > > > +++ b/arch/arm64/include/asm/kvm_emulate.h
-> > > > > @@ -63,6 +63,8 @@ static inline void vcpu_reset_hcr(struct kvm_vcpu *vcpu)
-> > > > >               /* trap error record accesses */
-> > > > >               vcpu->arch.hcr_el2 |= HCR_TERR;
-> > > > >       }
-> > > > > +     if (cpus_have_const_cap(ARM64_HAS_STAGE2_FWB))
-> > > > > +             vcpu->arch.hcr_el2 |= HCR_FWB;
-> > > > >
-> > > > >       if (test_bit(KVM_ARM_VCPU_EL1_32BIT, vcpu->arch.features))
-> > > > >               vcpu->arch.hcr_el2 &= ~HCR_RW;
-> > > > > diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-> > > > > index fb9a7127bb75..620eb9e06bd8 100644
-> > > > > --- a/arch/arm64/include/asm/kvm_mmu.h
-> > > > > +++ b/arch/arm64/include/asm/kvm_mmu.h
-> > > > > @@ -257,6 +257,7 @@ static inline bool kvm_page_empty(void *ptr)
-> > > > >  struct kvm;
-> > > > >
-> > > > >  #define kvm_flush_dcache_to_poc(a,l) __flush_dcache_area((a), (l))
-> > > > > +#define kvm_flush_dcache_to_pou(a,l) __clean_dcache_area_pou((a), (l))
-> > > > >
-> > > > >  static inline bool vcpu_has_cache_enabled(struct kvm_vcpu *vcpu)
-> > > > >  {
-> > > > > @@ -267,6 +268,13 @@ static inline void __clean_dcache_guest_page(kvm_pfn_t pfn, unsigned long size)
-> > > > >  {
-> > > > >       void *va = page_address(pfn_to_page(pfn));
-> > > > >
-> > > > > +     /*
-> > > > > +      * FWB implies IDC, so cache clean to PoC is not required in
-> > > > > +      * this case.
-> > > > > +      */
-> > > >
-> > > > I don't understand this comment.  __clean_dcache_guest_page is called
-> > > > when faulting in pages for translation faults (fault_status != FSC_PERM)
-> > > > and PoC is about coherency between ram and caches, not instruction and
-> > > > data caches, so how is this related to IDC?
-> > >
-> > > There's a shortcut in this comment, so let me develop a tiny bit:
-> > >
-> > > - FWB makes memory the memory cacheable from the PoV of the guest, so
-> > >   we don't need to clean to the PoC for the guest to access it even
-> > >   when running with the stage-1 MMU off or non-cacheable mappings.
-> > >
-> > > - FWB implies IDC so there is no need to clean to the PoU for
-> > >   instruction fetches to get the right thing either.
-> > >
-> > > The combination of these two statements implies that we don't need to
-> > > clean anything at all.
-> > >
-> > > Does it make more sense?
-> >
-> > Yes, this makes sense, but the comment is weird, because it's not
-> > because FWB implies IDC that you don't have to clean to PoC, so I would
-> > suggest either removing the comment, or rewording it to something like:
-> >
-> > /*
-> >  * With FWB we ensure that the guest always accesses memory cacheable
-> >  * and we don't have to clean to PoC when faulting in pages.
-> >  * Furthermore, FWB implies IDC, so cleaning to PoU is also not required
-> >  * in this case.
-> >  */
-> >
-> > I think the comment as it stands now, only makes sense in the context of
-> > the conversation we've had on this patch on the list.
->
-> Fair enough. I'll update the comment to reflect the above.
->
+From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-Thanks, with that:
+Since I took over maintainership of the at24 driver I've been working
+towards removing at24_platform_data in favor for device properties.
 
-Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
-IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+DaVinci is the only platform that's still using it - all other users
+have already been converted.
+
+One of the obstacles in case of DaVinci is removing the setup() callback
+from the pdata struct, the only user of which are some davinci boards.
+
+Most boards use the EEPROM to store the MAC address. This series adds
+support for cell lookups to the nvmem framework, registers relevant
+cells for all users, converts the davinci_emac driver to using them
+and replaces at24_platform_data with device properties.
+
+The only board that's still using this callback is now mityomapl138.
+Unfortunately it stores more info in EEPROM than just the MAC address
+and will require some more work. Unfortunately I don't have access
+to this board so I can't test any actual solutions on a live hardware.
+
+Tested on a dm365-evm board.
+
+v1 -> v2:
+- for backward compatiblity: fall back to using of_get_mac_address() if
+  we can't get an nvmem cell in patch 7
+- add patch 15 which removes dead code
+
+v2 -> v3:
+- documented new nvmem cell lookup API
+- renamed the nvmem cell lookup routines
+- added a function for removing the lookup tables
+- in order to completly remove the mac_addr from davinci's soc_info
+  added a patch that moves reading the MAC address from SPI to the emac
+  driver
+- removed more dead code
+
+v3 -> v4:
+- only return -EPROBE_DEFER from nvmem_cell_from_lookup() if we have
+  a matching lookup entry but no corresponding nvmem device yet, return
+  -ENOENT if we can't match the lookup
+- check for -EPROBE_DEFER in the emac driver
+- put the mtd device after reading the MAC address
+
+Bartosz Golaszewski (18):
+  nvmem: add support for cell lookups
+  Documentation: nvmem: document lookup entries
+  ARM: davinci: dm365-evm: use nvmem lookup for mac address
+  ARM: davinci: dm644-evm: use nvmem lookup for mac address
+  ARM: davinci: dm646x-evm: use nvmem lookup for mac address
+  ARM: davinci: da830-evm: use nvmem lookup for mac address
+  ARM: davinci: mityomapl138: add nvmem cells lookup entries
+  net: davinci_emac: potentially get the MAC address from MTD
+  ARM: davinci: da850-evm: remove dead MTD code
+  net: davinci_emac: use nvmem to retrieve the mac address
+  ARM: davinci: mityomapl138: don't read the MAC address from machine
+    code
+  ARM: davinci: dm365-evm: use device properties for at24 eeprom
+  ARM: davinci: da830-evm: use device properties for at24 eeprom
+  ARM: davinci: dm644x-evm: use device properties for at24 eeprom
+  ARM: davinci: dm646x-evm: use device properties for at24 eeprom
+  ARM: davinci: sffsdr: fix the at24 eeprom device name
+  ARM: davinci: sffsdr: use device properties for at24 eeprom
+  ARM: davinci: remove dead code related to MAC address reading
+
+ Documentation/nvmem/nvmem.txt              | 28 ++++++++
+ arch/arm/mach-davinci/board-da830-evm.c    | 25 ++++---
+ arch/arm/mach-davinci/board-da850-evm.c    | 28 --------
+ arch/arm/mach-davinci/board-dm365-evm.c    | 25 ++++---
+ arch/arm/mach-davinci/board-dm644x-evm.c   | 24 ++++---
+ arch/arm/mach-davinci/board-dm646x-evm.c   | 25 ++++---
+ arch/arm/mach-davinci/board-mityomapl138.c | 30 ++++++---
+ arch/arm/mach-davinci/board-sffsdr.c       | 13 ++--
+ arch/arm/mach-davinci/common.c             | 15 -----
+ drivers/net/ethernet/ti/davinci_emac.c     | 53 ++++++++++++---
+ drivers/nvmem/core.c                       | 77 +++++++++++++++++++++-
+ include/linux/davinci_emac.h               |  2 -
+ include/linux/nvmem-consumer.h             |  6 ++
+ include/linux/nvmem-provider.h             | 10 +++
+ 14 files changed, 258 insertions(+), 103 deletions(-)
+
+-- 
+2.17.1
