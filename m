@@ -1,121 +1,91 @@
-From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Fri, 29 Jun 2018 16:44:02 +0200
-Subject: [PATCH 1/2] clk: mvebu: armada-37xx-periph: Fix switching CPU
- rate from 300Mhz to 1.2GHz
-In-Reply-To: <20180619123446.694-2-gregory.clement@bootlin.com> (Gregory
- CLEMENT's message of "Tue, 19 Jun 2018 14:34:45 +0200")
-References: <20180619123446.694-1-gregory.clement@bootlin.com>
- <20180619123446.694-2-gregory.clement@bootlin.com>
-Message-ID: <87tvpl4pql.fsf@bootlin.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 29 Jun 2018 15:29:52 +0100
+Subject: [PATCH v3 4/7] arm_pmu: Tidy up clear_event_idx call backs
+In-Reply-To: <109b2082-f4ae-9095-7d6f-9daf78b38144@arm.com>
+References: <1529403342-17899-1-git-send-email-suzuki.poulose@arm.com>
+ <1529403342-17899-5-git-send-email-suzuki.poulose@arm.com>
+ <20180629134049.b6sppasr7j32h37g@lakrids.cambridge.arm.com>
+ <109b2082-f4ae-9095-7d6f-9daf78b38144@arm.com>
+Message-ID: <20180629142951.lzuzvw6oisrnjjgn@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
- 
- On mar., juin 19 2018, Gregory CLEMENT <gregory.clement@bootlin.com> wrote:
+On Fri, Jun 29, 2018 at 03:18:23PM +0100, Suzuki K Poulose wrote:
+> 
+> Hi Mark,
+> 
+> On 29/06/18 14:40, Mark Rutland wrote:
+> > On Tue, Jun 19, 2018 at 11:15:39AM +0100, Suzuki K Poulose wrote:
+> > > The armpmu uses get_event_idx callback to allocate an event
+> > > counter for a given event, which marks the selected counter
+> > > as "used". Now, when we delete the counter, the arm_pmu goes
+> > > ahead and clears the "used" bit and then invokes the "clear_event_idx"
+> > > call back, which kind of splits the job between the core code
+> > > and the backend. Tidy this up by relying on the clear_event_idx
+> > > to do the book keeping, if available. Otherwise, let the core
+> > > driver do the default "clear" bit operation. This will be useful
+> > > for adding the chained event support, where we leave the event
+> > > idx maintenance to the backend.
+> > > 
+> > > Also, when an event is removed from the PMU, reset the hw.idx
+> > > to indicate that a counter is not allocated for this event,
+> > > to help the backends do better checks. This will be also used
+> > > for the chain counter support.
+> > > 
+> > > Cc: Mark Rutland <mark.rutland@arm.com>
+> > > Cc: Will Deacon <will.deacon@arm.com>
+> > > Reviewed-by: Julien Thierry <julien.thierry@arm.com>
+> > > Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> > > ---
+> > > Changes since v2:
+> > >   - Reset the event counter after an event is removed.
+> > > ---
+> > >   arch/arm/kernel/perf_event_v7.c |  2 ++
+> > >   drivers/perf/arm_pmu.c          | 17 +++++++++++++----
+> > >   2 files changed, 15 insertions(+), 4 deletions(-)
+> > > 
+> > > diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
+> > > index fd7ce01..765d265 100644
+> > > --- a/arch/arm/kernel/perf_event_v7.c
+> > > +++ b/arch/arm/kernel/perf_event_v7.c
+> > > @@ -1637,6 +1637,7 @@ static void krait_pmu_clear_event_idx(struct pmu_hw_events *cpuc,
+> > >   	bool venum_event = EVENT_VENUM(hwc->config_base);
+> > >   	bool krait_event = EVENT_CPU(hwc->config_base);
+> > > +	clear_bit(hwc->idx, cpuc->used_mask);
+> > >   	if (venum_event || krait_event) {
+> > >   		bit = krait_event_to_bit(event, region, group);
+> > >   		clear_bit(bit, cpuc->used_mask);
+> > > @@ -1966,6 +1967,7 @@ static void scorpion_pmu_clear_event_idx(struct pmu_hw_events *cpuc,
+> > >   	bool venum_event = EVENT_VENUM(hwc->config_base);
+> > >   	bool scorpion_event = EVENT_CPU(hwc->config_base);
+> > > +	clear_bit(hwc->idx, cpuc->used_mask);
+> > >   	if (venum_event || scorpion_event) {
+> > >   		bit = scorpion_event_to_bit(event, region, group);
+> > >   		clear_bit(bit, cpuc->used_mask);
+> > 
+> > As an aside, I think there's an existing problem with krait and
+> > cpu_pm_pmu_setup(), and we'll end up with the same issue when chained
+> > counters use multiple counters for one event.
+> > 
+> > The krait code sets multiple bits in the PMU's pmu_hw_events::used_mask,
+> > but only one of these will have a corresponding (non-NULL) entry in
+> > pmu_hw_events::events[].
+> 
+> The Krait pmu allocates the "krait" specific event bit beyond the armpmu->num_events.
+> See krait_event_to_bit(). And we don't go beyond armpmu->num_events for the "events"
+> check. So we should be safe. And it passes on the idx within the num_events back
+> to armpmu. So whatever krait pmu does is invisible to the generic driver.
 
-> Switching the CPU from the L2 or L3 frequencies (300 and 200 Mhz
-> respectively) to L0 frequency (1.2 Ghz) requires a significant amount
-> of time to let VDD stabilize to the appropriate voltage. This amount of
-> time is large enough that it cannot be covered by the hardware
-> countdown register. Due to this, the CPU might start operating at L0
-> before the voltage is stabilized, leading to CPU stalls.
->
-> To work around this problem, we prevent switching directly from the
-> L2/L3 frequencies to the L0 frequency, and instead switch to the L1
-> frequency in-between. The sequence therefore becomes:
->
-> 1. First switch from L2/L3(200/300MHz) to L1(600MHZ)
-> 2. Sleep 20ms for stabling VDD voltage
-> 3. Then switch from L1(600MHZ) to L0(1200Mhz).
+Ah; I had missed that, sorry for the noise.
 
-Do you have any comment on this fix?
+> > I guess the best thing to do would be to avoid the test_bit(), and just
+> > skip an idx if hw_events->events[idx] is NULL.
+> > 
+> > Would you mind spinning a patch to that effect?
+> 
+> Eitherway, I could split that change to a new one.
 
-Gregory
+No need -- sorry for the noise.
 
->
-> It is based on the work done by Ken Ma <make@marvell.com>
->
-> Cc: stable at vger.kernel.org
-> Fixes: 2089dc33ea0e ("clk: mvebu: armada-37xx-periph: add DVFS support for cpu clocks")
-> Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
-> ---
->  drivers/clk/mvebu/armada-37xx-periph.c | 38 ++++++++++++++++++++++++++
->  1 file changed, 38 insertions(+)
->
-> diff --git a/drivers/clk/mvebu/armada-37xx-periph.c b/drivers/clk/mvebu/armada-37xx-periph.c
-> index 6860bd5a37c5..44e4e27eddad 100644
-> --- a/drivers/clk/mvebu/armada-37xx-periph.c
-> +++ b/drivers/clk/mvebu/armada-37xx-periph.c
-> @@ -35,6 +35,7 @@
->  #define CLK_SEL		0x10
->  #define CLK_DIS		0x14
->  
-> +#define  ARMADA_37XX_DVFS_LOAD_1 1
->  #define LOAD_LEVEL_NR	4
->  
->  #define ARMADA_37XX_NB_L0L1	0x18
-> @@ -507,6 +508,40 @@ static long clk_pm_cpu_round_rate(struct clk_hw *hw, unsigned long rate,
->  	return -EINVAL;
->  }
->  
-> +/*
-> + * Switching the CPU from the L2 or L3 frequencies (300 and 200 Mhz
-> + * respectively) to L0 frequency (1.2 Ghz) requires a significant
-> + * amount of time to let VDD stabilize to the appropriate
-> + * voltage. This amount of time is large enough that it cannot be
-> + * covered by the hardware countdown register. Due to this, the CPU
-> + * might start operating at L0 before the voltage is stabilized,
-> + * leading to CPU stalls.
-> + *
-> + * To work around this problem, we prevent switching directly from the
-> + * L2/L3 frequencies to the L0 frequency, and instead switch to the L1
-> + * frequency in-between. The sequence therefore becomes:
-> + * 1. First switch from L2/L3(200/300MHz) to L1(600MHZ)
-> + * 2. Sleep 20ms for stabling VDD voltage
-> + * 3. Then switch from L1(600MHZ) to L0(1200Mhz).
-> + */
-> +static void clk_pm_cpu_set_rate_wa(unsigned long rate, struct regmap *base)
-> +{
-> +	unsigned int cur_level;
-> +
-> +	if (rate != 1200 * 1000 * 1000)
-> +		return;
-> +
-> +	regmap_read(base, ARMADA_37XX_NB_CPU_LOAD, &cur_level);
-> +	cur_level &= ARMADA_37XX_NB_CPU_LOAD_MASK;
-> +	if (cur_level <= ARMADA_37XX_DVFS_LOAD_1)
-> +		return;
-> +
-> +	regmap_update_bits(base, ARMADA_37XX_NB_CPU_LOAD,
-> +			   ARMADA_37XX_NB_CPU_LOAD_MASK,
-> +			   ARMADA_37XX_DVFS_LOAD_1);
-> +	msleep(20);
-> +}
-> +
->  static int clk_pm_cpu_set_rate(struct clk_hw *hw, unsigned long rate,
->  			       unsigned long parent_rate)
->  {
-> @@ -537,6 +572,9 @@ static int clk_pm_cpu_set_rate(struct clk_hw *hw, unsigned long rate,
->  			 */
->  			reg = ARMADA_37XX_NB_CPU_LOAD;
->  			mask = ARMADA_37XX_NB_CPU_LOAD_MASK;
-> +
-> +			clk_pm_cpu_set_rate_wa(rate, base);
-> +
->  			regmap_update_bits(base, reg, mask, load_level);
->  
->  			return rate;
-> -- 
-> 2.17.1
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
--- 
-Gregory Clement, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-http://bootlin.com
+Thanks,
+Mark.
