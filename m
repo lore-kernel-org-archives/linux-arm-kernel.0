@@ -1,248 +1,73 @@
-From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
-Date: Fri, 29 Jun 2018 11:10:06 +0200
-Subject: [PATCH 2/3] PCI: mvebu: Convert to use pci_host_bridge directly
-In-Reply-To: <20180629091007.31069-1-thomas.petazzoni@bootlin.com>
-References: <20180629091007.31069-1-thomas.petazzoni@bootlin.com>
-Message-ID: <20180629091007.31069-3-thomas.petazzoni@bootlin.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 29 Jun 2018 10:11:27 +0100
+Subject: [PATCH 0/4] KVM: arm/arm64: vgic: Virtual interrupt grouping
+ support
+In-Reply-To: <20180625115603.GG8004@C02W217FHV2R.local>
+References: <20180624221103.15055-1-christoffer.dall@arm.com>
+ <CAFEAcA_C6Voh_6Ljj9--cbo14X_uWTOekM30dU=Rp9CtZK-6ow@mail.gmail.com>
+ <20180625101347.GF8004@C02W217FHV2R.local>
+ <20180625115603.GG8004@C02W217FHV2R.local>
+Message-ID: <86h8lmyn28.wl-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rather than using the ARM-specific pci_common_init_dev() API, use the
-pci_host_bridge logic directly.
+On Mon, 25 Jun 2018 12:56:03 +0100,
+Christoffer Dall <christoffer.dall@arm.com> wrote:
+> 
+> On Mon, Jun 25, 2018 at 12:13:47PM +0200, Christoffer Dall wrote:
+> > On Mon, Jun 25, 2018 at 10:52:41AM +0100, Peter Maydell wrote:
+> > > On 24 June 2018 at 23:10, Christoffer Dall <christoffer.dall@arm.com> wrote:
+> > > > This small series addresses a peculiarity of the current VGIC
+> > > > implementation, namely that we don't support interrupt grouping.
+> > > >
+> > > > KVM either implements a GICv2 without support for the security
+> > > > extensions, or a GICv3 with DS=1.  For GICv2, on systems without the
+> > > > security extensions, group 0 interrupts can be configured to be either
+> > > > signalled as FIQs or as IRQs by the VM, whereas group 1 interrupts are
+> > > > always IRQs.  For GICv3, with DS=1, group 1 interrupts are always IRQs
+> > > > and group 0 interrupts are always FIQs, and there is no concept of
+> > > > secure vs. non-secure group 1 interrupts when DS=1.
+> > > >
+> > > > We were treating all interrupts on GICv2 as group 0, but yet telling the
+> > > > geust that they were group 1.  The first patch changes this behavior,
+> > > > which seems to have no effect on no known guests, but still.
+> > > >
+> > > > The remaining patches introduce proper interrupt grouping support, along
+> > > > with MMIO accessors for the VM and userspace to retrieve and set the
+> > > > which group SGIs, PPIs, and SPIs belong to.  LPIs are always group 1
+> > > > interrupts as per the architecture, and there is no way to modify this
+> > > > configuration (no IGROUPR registers for LPIs or equivalent ITS
+> > > > commands).
+> > > 
+> > > How do we handle migration compatibility here? For instance if
+> > > we have a guest running on an old kernel with GICv2, presumably
+> > > it reports the GICD_IGROUPRn to userspace as being all-1 (but
+> > > they behave as group 0); then when we load on the new kernel
+> > > the new kernel will honour the IGROUPRn values and the interrupts
+> > > will start behaving like group 1 ? Maybe this works because the
+> > > guest is expecting them to be signalled as IRQ either way...
+> > > 
+> > 
+> > Interesting.  For GICv2, I think this will actually break, and the
+> > migrated Linux guest won't see any interrupts anymore (Linux only sets
+> > bit 0 in GICD_CTLR).  For GICv3, everything stays group 1 unless the
+> > guest is specifically trying to configure group 0 for something.
+> > 
+> > I suppose this means we need to let userspace request
+> > ARCH_COMPLIANT_GICV2 and otherwise ignore userspace writes to IGROUPR?
+> > 
+> Alternatively, we could deny (fail) migration where the
+> GICD_IIDR.Revision does not match the source, and just let userspace fix
+> things up.  Thoughts?
 
-Unfortunately, we can't use devm_of_pci_get_host_bridge_resources(),
-because the DT binding for describing PCIe apertures for this PCI
-controller is a bit special, and we cannot retrieve them from the
-'ranges' property. Therefore, we still have some special code to
-handle this.
+That's exactly the kind of thing I had in mind when I suggested to
+bump up the IIDR. It allows us to push the knowledge of the quirks to
+both the guest and userspace, instead of adding more esoteric API
+features.
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
----
- drivers/pci/controller/pci-mvebu.c | 145 ++++++++++++++++++-------------------
- 1 file changed, 71 insertions(+), 74 deletions(-)
+Thanks,
 
-diff --git a/drivers/pci/controller/pci-mvebu.c b/drivers/pci/controller/pci-mvebu.c
-index 0e729bab14c0..6e801cef2c5f 100644
---- a/drivers/pci/controller/pci-mvebu.c
-+++ b/drivers/pci/controller/pci-mvebu.c
-@@ -71,6 +71,7 @@ struct mvebu_pcie {
- 	struct platform_device *pdev;
- 	struct mvebu_pcie_port *ports;
- 	struct msi_controller *msi;
-+	struct list_head resources;
- 	struct resource io;
- 	struct resource realio;
- 	struct resource mem;
-@@ -632,7 +633,7 @@ static struct mvebu_pcie_port *mvebu_pcie_find_port(struct mvebu_pcie *pcie,
- static int mvebu_pcie_wr_conf(struct pci_bus *bus, u32 devfn,
- 			      int where, int size, u32 val)
- {
--	struct mvebu_pcie *pcie = sys_to_pcie(bus->sysdata);
-+	struct mvebu_pcie *pcie = bus->sysdata;
- 	struct mvebu_pcie_port *port;
- 	int ret;
- 
-@@ -658,7 +659,7 @@ static int mvebu_pcie_wr_conf(struct pci_bus *bus, u32 devfn,
- static int mvebu_pcie_rd_conf(struct pci_bus *bus, u32 devfn, int where,
- 			      int size, u32 *val)
- {
--	struct mvebu_pcie *pcie = sys_to_pcie(bus->sysdata);
-+	struct mvebu_pcie *pcie = bus->sysdata;
- 	struct mvebu_pcie_port *port;
- 	int ret;
- 
-@@ -689,36 +690,6 @@ static struct pci_ops mvebu_pcie_ops = {
- 	.write = mvebu_pcie_wr_conf,
- };
- 
--static int mvebu_pcie_setup(int nr, struct pci_sys_data *sys)
--{
--	struct mvebu_pcie *pcie = sys_to_pcie(sys);
--	int err, i;
--
--	pcie->mem.name = "PCI MEM";
--	pcie->realio.name = "PCI I/O";
--
--	if (resource_size(&pcie->realio) != 0)
--		pci_add_resource_offset(&sys->resources, &pcie->realio,
--					sys->io_offset);
--
--	pci_add_resource_offset(&sys->resources, &pcie->mem, sys->mem_offset);
--	pci_add_resource(&sys->resources, &pcie->busn);
--
--	err = devm_request_pci_bus_resources(&pcie->pdev->dev, &sys->resources);
--	if (err)
--		return 0;
--
--	for (i = 0; i < pcie->nports; i++) {
--		struct mvebu_pcie_port *port = &pcie->ports[i];
--
--		if (!port->base)
--			continue;
--		mvebu_pcie_setup_hw(port);
--	}
--
--	return 1;
--}
--
- static resource_size_t mvebu_pcie_align_resource(struct pci_dev *dev,
- 						 const struct resource *res,
- 						 resource_size_t start,
-@@ -749,26 +720,6 @@ static resource_size_t mvebu_pcie_align_resource(struct pci_dev *dev,
- 		return start;
- }
- 
--static void mvebu_pcie_enable(struct mvebu_pcie *pcie)
--{
--	struct hw_pci hw;
--
--	memset(&hw, 0, sizeof(hw));
--
--#ifdef CONFIG_PCI_MSI
--	hw.msi_ctrl = pcie->msi;
--#endif
--
--	hw.nr_controllers = 1;
--	hw.private_data   = (void **)&pcie;
--	hw.setup          = mvebu_pcie_setup;
--	hw.map_irq        = of_irq_parse_and_map_pci;
--	hw.ops            = &mvebu_pcie_ops;
--	hw.align_resource = mvebu_pcie_align_resource;
--
--	pci_common_init_dev(&pcie->pdev->dev, &hw);
--}
--
- /*
-  * Looks up the list of register addresses encoded into the reg =
-  * <...> property for one that matches the given port/lane. Once
-@@ -1022,28 +973,38 @@ static void mvebu_pcie_powerdown(struct mvebu_pcie_port *port)
- 	clk_disable_unprepare(port->clk);
- }
- 
--static int mvebu_pcie_probe(struct platform_device *pdev)
-+/*
-+ * We can't use devm_of_pci_get_host_bridge_resources() because we
-+ * need to parse our special DT properties encoding the MEM and IO
-+ * apertures.
-+ */
-+static int mvebu_pcie_parse_request_resources(struct mvebu_pcie *pcie)
- {
--	struct device *dev = &pdev->dev;
--	struct mvebu_pcie *pcie;
-+	struct device *dev = &pcie->pdev->dev;
- 	struct device_node *np = dev->of_node;
--	struct device_node *child;
--	int num, i, ret;
-+	int ret;
- 
--	pcie = devm_kzalloc(dev, sizeof(*pcie), GFP_KERNEL);
--	if (!pcie)
--		return -ENOMEM;
-+	INIT_LIST_HEAD(&pcie->resources);
- 
--	pcie->pdev = pdev;
--	platform_set_drvdata(pdev, pcie);
-+	/* Get the bus range */
-+	ret = of_pci_parse_bus_range(np, &pcie->busn);
-+	if (ret) {
-+		dev_err(dev, "failed to parse bus-range property: %d\n", ret);
-+		return ret;
-+	}
-+	pci_add_resource(&pcie->resources, &pcie->busn);
- 
--	/* Get the PCIe memory and I/O aperture */
-+	/* Get the PCIe memory aperture */
- 	mvebu_mbus_get_pcie_mem_aperture(&pcie->mem);
- 	if (resource_size(&pcie->mem) == 0) {
- 		dev_err(dev, "invalid memory aperture size\n");
- 		return -EINVAL;
- 	}
- 
-+	pcie->mem.name = "PCI MEM";
-+	pci_add_resource_offset(&pcie->resources, &pcie->mem, 0);
-+
-+	/* Get the PCIe IO aperture */
- 	mvebu_mbus_get_pcie_io_aperture(&pcie->io);
- 
- 	if (resource_size(&pcie->io) != 0) {
-@@ -1055,12 +1016,42 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
- 	} else
- 		pcie->realio = pcie->io;
- 
--	/* Get the bus range */
--	ret = of_pci_parse_bus_range(np, &pcie->busn);
--	if (ret) {
--		dev_err(dev, "failed to parse bus-range property: %d\n", ret);
-+	pcie->realio.name = "PCI I/O";
-+
-+	if (resource_size(&pcie->realio) != 0)
-+		pci_add_resource_offset(&pcie->resources, &pcie->realio, 0);
-+
-+	ret = devm_request_pci_bus_resources(dev, &pcie->resources);
-+	if (ret)
-+		return 0;
-+
-+	ret = pci_remap_iospace(&pcie->realio, pcie->realio.start);
-+	if (ret)
-+		return ret;
-+
-+	return 0;
-+}
-+
-+static int mvebu_pcie_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct mvebu_pcie *pcie;
-+	struct pci_host_bridge *bridge;
-+	struct device_node *np = dev->of_node;
-+	struct device_node *child;
-+	int num, i, ret;
-+
-+	bridge = devm_pci_alloc_host_bridge(dev, sizeof(struct mvebu_pcie));
-+	if (!bridge)
-+		return -ENOMEM;
-+
-+	pcie = pci_host_bridge_priv(bridge);
-+	pcie->pdev = pdev;
-+	platform_set_drvdata(pdev, pcie);
-+
-+	ret = mvebu_pcie_parse_request_resources(pcie);
-+	if (ret)
- 		return ret;
--	}
- 
- 	num = of_get_available_child_count(np);
- 
-@@ -1104,18 +1095,24 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
- 			continue;
- 		}
- 
-+		mvebu_pcie_setup_hw(port);
- 		mvebu_pcie_set_local_dev_nr(port, 1);
- 		mvebu_pci_sw_bridge_init(port);
- 	}
- 
- 	pcie->nports = i;
- 
--	for (i = 0; i < (IO_SPACE_LIMIT - SZ_64K); i += SZ_64K)
--		pci_ioremap_io(i, pcie->io.start + i);
--
--	mvebu_pcie_enable(pcie);
--
--	return 0;
-+	list_splice_init(&pcie->resources, &bridge->windows);
-+	bridge->dev.parent = dev;
-+	bridge->sysdata = pcie;
-+	bridge->busnr = 0;
-+	bridge->ops = &mvebu_pcie_ops;
-+	bridge->map_irq = of_irq_parse_and_map_pci;
-+	bridge->swizzle_irq = pci_common_swizzle;
-+	bridge->align_resource = mvebu_pcie_align_resource;
-+	bridge->msi = pcie->msi;
-+
-+	return pci_host_probe(bridge);
- }
- 
- static const struct of_device_id mvebu_pcie_of_match_table[] = {
+	M.
+
 -- 
-2.14.4
+Jazz is not dead, it just smell funny.
