@@ -1,99 +1,71 @@
-From: vkoul@kernel.org (Vinod)
-Date: Fri, 29 Jun 2018 13:07:07 +0530
-Subject: [PATCH v3 4/5] dmaengine: xilinx_dma: autodetect whether the HW
- supports scatter-gather
-In-Reply-To: <20180625092724.22164-4-andrea.merello@gmail.com>
-References: <20180625092724.22164-1-andrea.merello@gmail.com>
- <20180625092724.22164-4-andrea.merello@gmail.com>
-Message-ID: <20180629073707.GZ22377@vkoul-mobl>
+From: miquel.raynal@bootlin.com (Miquel Raynal)
+Date: Fri, 29 Jun 2018 09:40:35 +0200
+Subject: [PATCH v3 01/17] platform-msi: allow creation of MSI domain
+ without interrupt number
+In-Reply-To: <c5b38c34-5ba0-6545-3635-45be1858fa3b@arm.com>
+References: <20180622151432.1566-1-miquel.raynal@bootlin.com>
+ <20180622151432.1566-2-miquel.raynal@bootlin.com>
+ <c5b38c34-5ba0-6545-3635-45be1858fa3b@arm.com>
+Message-ID: <20180629094035.5199fe89@xps13>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25-06-18, 11:27, Andrea Merello wrote:
-> The AXIDMA and CDMA HW can be either direct-access or scatter-gather
-> version. These are SW incompatible.
+Hi Marc,
+
+Marc Zyngier <marc.zyngier@arm.com> wrote on Thu, 28 Jun 2018 12:12:04
++0100:
+
+> On 22/06/18 16:14, Miquel Raynal wrote:
+> > platform_msi_alloc_priv_data() checks that a number of interrupts is
+> > always given. This extra-check has no real impact and just prevents
+> > uselessly the user to create an MSI tree domain: remove it.
+> > 
+> > Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+> > ---
+> >  drivers/base/platform-msi.c | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/base/platform-msi.c b/drivers/base/platform-msi.c
+> > index 60d6cc618f1c..9f001f4ccc0f 100644
+> > --- a/drivers/base/platform-msi.c
+> > +++ b/drivers/base/platform-msi.c
+> > @@ -203,7 +203,7 @@ platform_msi_alloc_priv_data(struct device *dev, unsigned int nvec,
+> >  	 * accordingly (which would impact the max number of MSI
+> >  	 * capable devices).
+> >  	 */
+> > -	if (!dev->msi_domain || !write_msi_msg || !nvec || nvec > MAX_DEV_MSIS)
+> > +	if (!dev->msi_domain || !write_msi_msg || nvec > MAX_DEV_MSIS)
+> >  		return ERR_PTR(-EINVAL);
+> >  
+> >  	if (dev->msi_domain->bus_token != DOMAIN_BUS_PLATFORM_MSI) {
+> >   
 > 
-> The driver can handle both version: a DT property was used to
-                                ^^^^
-versions
-
-> tell the driver whether to assume the HW is is scatter-gather mode.
-                                           ^^^^^
-is in?
-
+> Huh... It's not that simple.
 > 
-> This patch makes the driver to autodetect this information. The DT
-> property is not required anymore.
+> Yes, it allows you to get a tree via platform_msi_create_device_domain
+> (assuming that's why you're changing it -- your commit message doesn't
+> say much)
+
+Indeed. That was exactly my intention.
+
+> but it also has some impact on the way msi_domain_prepare_irqs
+> works (see how it is called from platform_msi_create_device_domain).
 > 
-> No changes for VDMA.
+> Importantly, the msi_prepare callback takes nvec as a parameter, and
+> that ends up trickling down to the irqchip, or whatever will setup the
+> MSI domain. Things like the GICv3 ITS do rely on that to carve out the
+> LPI space that subsequently gets used to populate the domain.
 > 
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: devicetree at vger.kernel.org
-> Cc: Radhey Shyam Pandey <radhey.shyam.pandey@xilinx.com>
-> Signed-off-by: Andrea Merello <andrea.merello@gmail.com>
-> Reviewed-by: Radhey Shyam Pandey <radhey.shyam.pandey@xilinx.com>
-> ---
-> Changes in v2:
-> 	- autodetect only in !VDMA case
-> Changes in v3:
-> 	- cc DT maintainers/ML
-> ---
->  drivers/dma/xilinx/xilinx_dma.c | 14 ++++++++++----
->  1 file changed, 10 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/dma/xilinx/xilinx_dma.c b/drivers/dma/xilinx/xilinx_dma.c
-> index 7f0ab904b749..43fcc71ff287 100644
-> --- a/drivers/dma/xilinx/xilinx_dma.c
-> +++ b/drivers/dma/xilinx/xilinx_dma.c
-> @@ -86,6 +86,7 @@
->  #define XILINX_DMA_DMASR_DMA_DEC_ERR		BIT(6)
->  #define XILINX_DMA_DMASR_DMA_SLAVE_ERR		BIT(5)
->  #define XILINX_DMA_DMASR_DMA_INT_ERR		BIT(4)
-> +#define XILINX_DMA_DMASR_SG_MASK		BIT(3)
->  #define XILINX_DMA_DMASR_IDLE			BIT(1)
->  #define XILINX_DMA_DMASR_HALTED		BIT(0)
->  #define XILINX_DMA_DMASR_DELAY_MASK		GENMASK(31, 24)
-> @@ -406,7 +407,6 @@ struct xilinx_dma_config {
->   * @dev: Device Structure
->   * @common: DMA device structure
->   * @chan: Driver specific DMA channel
-> - * @has_sg: Specifies whether Scatter-Gather is present or not
->   * @mcdma: Specifies whether Multi-Channel is present or not
->   * @flush_on_fsync: Flush on frame sync
->   * @ext_addr: Indicates 64 bit addressing is supported by dma device
-> @@ -426,7 +426,6 @@ struct xilinx_dma_device {
->  	struct device *dev;
->  	struct dma_device common;
->  	struct xilinx_dma_chan *chan[XILINX_DMA_MAX_CHANS_PER_DEVICE];
-> -	bool has_sg;
->  	bool mcdma;
->  	u32 flush_on_fsync;
->  	bool ext_addr;
-> @@ -2393,7 +2392,6 @@ static int xilinx_dma_chan_probe(struct xilinx_dma_device *xdev,
->  
->  	chan->dev = xdev->dev;
->  	chan->xdev = xdev;
-> -	chan->has_sg = xdev->has_sg;
->  	chan->desc_pendingcount = 0x0;
->  	chan->ext_addr = xdev->ext_addr;
->  	/* This variable ensures that descriptors are not
-> @@ -2486,6 +2484,15 @@ static int xilinx_dma_chan_probe(struct xilinx_dma_device *xdev,
->  		chan->stop_transfer = xilinx_dma_stop_transfer;
->  	}
->  
-> +	/* check if SG is enabled (only for AXIDMA and CDMA) */
-> +	if (xdev->dma_config->dmatype != XDMA_TYPE_VDMA) {
-> +		if (dma_ctrl_read(chan, XILINX_DMA_REG_DMASR) &
-> +		    XILINX_DMA_DMASR_SG_MASK)
+> So no, you can't do it like that. If you really want a tree, add a
+> helper that does so.
 
-why not read this for VDMA too, will it return false?
+So if I understand correctly, what should be done is writting a new
+helper that would do something similar to
+platform_msi_create_device_domain(), but creating instead a tree domain
+and still giving msi_domain_prepare_irqs() a meaningful number (as
+nvec) that would be the maximum number of MSIs that could be allocated.
+Am I right here?
 
-> +			chan->has_sg = true;
-> +		dev_dbg(chan->dev, "ch %d: SG %s\n", chan->id,
-> +			chan->has_sg ? "enabled" : "disabled");
 
-this debug print can be removed
-
--- 
-~Vinod
+Thanks,
+Miqu?l
