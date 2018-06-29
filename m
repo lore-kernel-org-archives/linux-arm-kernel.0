@@ -1,67 +1,59 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Fri, 29 Jun 2018 11:40:30 +0200
-Subject: [PATCH v4 09/18] ARM: davinci: da850-evm: remove dead MTD code
+Date: Fri, 29 Jun 2018 11:40:26 +0200
+Subject: [PATCH v4 05/18] ARM: davinci: dm646x-evm: use nvmem lookup for mac
+ address
 In-Reply-To: <20180629094039.7543-1-brgl@bgdev.pl>
 References: <20180629094039.7543-1-brgl@bgdev.pl>
-Message-ID: <20180629094039.7543-10-brgl@bgdev.pl>
+Message-ID: <20180629094039.7543-6-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-We no longer need to register the MTD notifier to read the MAC address
-as it's now being done in the emac address.
+We now support nvmem lookups for machine code. Add a lookup for
+mac-address.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- arch/arm/mach-davinci/board-da850-evm.c | 28 -------------------------
- 1 file changed, 28 deletions(-)
+ arch/arm/mach-davinci/board-dm646x-evm.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
-index e22fb40e34bc..4de075458d83 100644
---- a/arch/arm/mach-davinci/board-da850-evm.c
-+++ b/arch/arm/mach-davinci/board-da850-evm.c
-@@ -124,32 +124,6 @@ static struct spi_board_info da850evm_spi_info[] = {
- 	},
- };
+diff --git a/arch/arm/mach-davinci/board-dm646x-evm.c b/arch/arm/mach-davinci/board-dm646x-evm.c
+index 584064fdabf5..5a9de47bc8a2 100644
+--- a/arch/arm/mach-davinci/board-dm646x-evm.c
++++ b/arch/arm/mach-davinci/board-dm646x-evm.c
+@@ -37,6 +37,7 @@
+ #include <linux/platform_data/i2c-davinci.h>
+ #include <linux/platform_data/mtd-davinci.h>
+ #include <linux/platform_data/mtd-davinci-aemif.h>
++#include <linux/nvmem-provider.h>
  
--#ifdef CONFIG_MTD
--static void da850_evm_m25p80_notify_add(struct mtd_info *mtd)
--{
--	char *mac_addr = davinci_soc_info.emac_pdata->mac_addr;
--	size_t retlen;
--
--	if (!strcmp(mtd->name, "MAC-Address")) {
--		mtd_read(mtd, 0, ETH_ALEN, &retlen, mac_addr);
--		if (retlen == ETH_ALEN)
--			pr_info("Read MAC addr from SPI Flash: %pM\n",
--				mac_addr);
--	}
--}
--
--static struct mtd_notifier da850evm_spi_notifier = {
--	.add	= da850_evm_m25p80_notify_add,
--};
--
--static void da850_evm_setup_mac_addr(void)
--{
--	register_mtd_user(&da850evm_spi_notifier);
--}
--#else
--static void da850_evm_setup_mac_addr(void) { }
--#endif
--
- static struct mtd_partition da850_evm_norflash_partition[] = {
- 	{
- 		.name           = "bootloaders + env",
-@@ -1455,8 +1429,6 @@ static __init void da850_evm_init(void)
- 	if (ret)
- 		pr_warn("%s: SATA registration failed: %d\n", __func__, ret);
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+@@ -310,6 +311,15 @@ static struct pcf857x_platform_data pcf_data = {
+  *  - ... newer boards may have more
+  */
  
--	da850_evm_setup_mac_addr();
--
- 	ret = da8xx_register_rproc();
- 	if (ret)
- 		pr_warn("%s: dsp/rproc registration failed: %d\n",
++static struct nvmem_cell_lookup dm646x_evm_mac_address_cell = {
++	.info = {
++		.name = "mac-address",
++		.offset = 0x7f00,
++		.bytes = ETH_ALEN,
++	},
++	.nvmem_name = "1-00500",
++};
++
+ static struct at24_platform_data eeprom_info = {
+ 	.byte_len       = (256*1024) / 8,
+ 	.page_size      = 64,
+@@ -802,6 +812,8 @@ static __init void evm_init(void)
+ 		davinci_init_ide();
+ 
+ 	soc_info->emac_pdata->phy_id = DM646X_EVM_PHY_ID;
++
++	nvmem_add_lookup_table(&dm646x_evm_mac_address_cell, 1);
+ }
+ 
+ MACHINE_START(DAVINCI_DM6467_EVM, "DaVinci DM646x EVM")
 -- 
 2.17.1
