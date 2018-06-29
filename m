@@ -1,82 +1,27 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 29 Jun 2018 11:15:37 +0200
-Subject: [PATCH] PM / Domains: Don't power on at attach for the multi PM
- domain case
-Message-ID: <20180629091537.26864-1-ulf.hansson@linaro.org>
+From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
+Date: Fri, 29 Jun 2018 11:16:18 +0200
+Subject: [PATCH 0/2] PCI: aardvark: misc improvements
+Message-ID: <20180629091620.31503-1-thomas.petazzoni@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are no legacy behavior in drivers to consider while attaching a
-device to genpd - for the multiple PM domain case.
+Hello,
 
-For that reason, let's instead require the driver to runtime resume the
-device, via calling pm_runtime_get_sync() for example, when it needs to
-power on the corresponding PM domain.
+This small set of two patches make sure the pci-aardvark driver calls
+pci_bus_size_bridges() and then converts it to use pci_host_probe().
 
-This allows us to improve the situation during attach. Instead of always
-power on the PM domain, which may be unnecessary, let's leave it in its
-current state. Additionally, to avoid the PM domain to stay powered on,
-let's schedule a power off work.
+Thanks,
 
-Fixes: 3c095f32a92b ("PM / Domains: Add support for multi PM domains...")
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
- drivers/base/power/domain.c | 16 +++++++++-------
- 1 file changed, 9 insertions(+), 7 deletions(-)
+Thomas
 
-diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-index c298de8a8308..9e8484189034 100644
---- a/drivers/base/power/domain.c
-+++ b/drivers/base/power/domain.c
-@@ -2235,7 +2235,7 @@ static void genpd_dev_pm_sync(struct device *dev)
- }
- 
- static int __genpd_dev_pm_attach(struct device *dev, struct device_node *np,
--				 unsigned int index)
-+				 unsigned int index, bool power_on)
- {
- 	struct of_phandle_args pd_args;
- 	struct generic_pm_domain *pd;
-@@ -2271,9 +2271,11 @@ static int __genpd_dev_pm_attach(struct device *dev, struct device_node *np,
- 	dev->pm_domain->detach = genpd_dev_pm_detach;
- 	dev->pm_domain->sync = genpd_dev_pm_sync;
- 
--	genpd_lock(pd);
--	ret = genpd_power_on(pd, 0);
--	genpd_unlock(pd);
-+	if (power_on) {
-+		genpd_lock(pd);
-+		ret = genpd_power_on(pd, 0);
-+		genpd_unlock(pd);
-+	}
- 
- 	if (ret)
- 		genpd_remove_device(pd, dev);
-@@ -2307,7 +2309,7 @@ int genpd_dev_pm_attach(struct device *dev)
- 				       "#power-domain-cells") != 1)
- 		return 0;
- 
--	return __genpd_dev_pm_attach(dev, dev->of_node, 0);
-+	return __genpd_dev_pm_attach(dev, dev->of_node, 0, true);
- }
- EXPORT_SYMBOL_GPL(genpd_dev_pm_attach);
- 
-@@ -2359,14 +2361,14 @@ struct device *genpd_dev_pm_attach_by_id(struct device *dev,
- 	}
- 
- 	/* Try to attach the device to the PM domain at the specified index. */
--	ret = __genpd_dev_pm_attach(genpd_dev, dev->of_node, index);
-+	ret = __genpd_dev_pm_attach(genpd_dev, dev->of_node, index, false);
- 	if (ret < 1) {
- 		device_unregister(genpd_dev);
- 		return ret ? ERR_PTR(ret) : NULL;
- 	}
- 
--	pm_runtime_set_active(genpd_dev);
- 	pm_runtime_enable(genpd_dev);
-+	genpd_queue_power_off_work(dev_to_genpd(genpd_dev));
- 
- 	return genpd_dev;
- }
+Thomas Petazzoni (1):
+  PCI: aardvark: Convert to use pci_host_probe()
+
+Zachary Zhang (1):
+  PCI: aardvark: Size bridges before resources allocation
+
+ drivers/pci/controller/pci-aardvark.c | 11 +----------
+ 1 file changed, 1 insertion(+), 10 deletions(-)
+
 -- 
-2.17.1
+2.14.4
