@@ -1,102 +1,69 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Fri, 29 Jun 2018 11:40:31 +0200
-Subject: [PATCH v4 10/18] net: davinci_emac: use nvmem to retrieve the mac
- address
+Date: Fri, 29 Jun 2018 11:40:28 +0200
+Subject: [PATCH v4 07/18] ARM: davinci: mityomapl138: add nvmem cells lookup
+ entries
 In-Reply-To: <20180629094039.7543-1-brgl@bgdev.pl>
 References: <20180629094039.7543-1-brgl@bgdev.pl>
-Message-ID: <20180629094039.7543-11-brgl@bgdev.pl>
+Message-ID: <20180629094039.7543-8-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-All users which store the MAC address in EEPROM now register relevant
-nvmem cells. Switch to retrieving the MAC address over the nvmem
-framework. If we can't get the nvmem cell then fall back to using
-the device tree.
+We now support nvmem lookups for machine code. Add a lookup for
+mac-address.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- drivers/net/ethernet/ti/davinci_emac.c | 35 +++++++++++++++++++-------
- 1 file changed, 26 insertions(+), 9 deletions(-)
+ arch/arm/mach-davinci/board-mityomapl138.c | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
 
-diff --git a/drivers/net/ethernet/ti/davinci_emac.c b/drivers/net/ethernet/ti/davinci_emac.c
-index 48e6a7755811..ea303e1f7916 100644
---- a/drivers/net/ethernet/ti/davinci_emac.c
-+++ b/drivers/net/ethernet/ti/davinci_emac.c
-@@ -68,6 +68,8 @@
- #include <linux/of_net.h>
- #include <linux/mfd/syscon.h>
- #include <linux/mtd/mtd.h>
-+#include <linux/nvmem-consumer.h>
-+#include <linux/nvmem-consumer.h>
- #include <asm/irq.h>
- #include <asm/page.h>
+diff --git a/arch/arm/mach-davinci/board-mityomapl138.c b/arch/arm/mach-davinci/board-mityomapl138.c
+index 37b3e48a21d1..b5be51c0451e 100644
+--- a/arch/arm/mach-davinci/board-mityomapl138.c
++++ b/arch/arm/mach-davinci/board-mityomapl138.c
+@@ -21,6 +21,7 @@
+ #include <linux/etherdevice.h>
+ #include <linux/spi/spi.h>
+ #include <linux/spi/flash.h>
++#include <linux/nvmem-provider.h>
  
-@@ -1696,7 +1698,6 @@ davinci_emac_of_get_pdata(struct platform_device *pdev, struct emac_priv *priv)
- 	const struct of_device_id *match;
- 	const struct emac_platform_data *auxdata;
- 	struct emac_platform_data *pdata = NULL;
--	const u8 *mac_addr;
+ #include <asm/io.h>
+ #include <asm/mach-types.h>
+@@ -160,6 +161,25 @@ static void read_factory_config(struct nvmem_device *nvmem, void *context)
+ 	mityomapl138_cpufreq_init(partnum);
+ }
  
- 	if (!IS_ENABLED(CONFIG_OF) || !pdev->dev.of_node)
- 		return dev_get_platdata(&pdev->dev);
-@@ -1708,12 +1709,6 @@ davinci_emac_of_get_pdata(struct platform_device *pdev, struct emac_priv *priv)
- 	np = pdev->dev.of_node;
- 	pdata->version = EMAC_VERSION_2;
- 
--	if (!is_valid_ether_addr(pdata->mac_addr)) {
--		mac_addr = of_get_mac_address(np);
--		if (mac_addr)
--			ether_addr_copy(pdata->mac_addr, mac_addr);
--	}
--
- 	of_property_read_u32(np, "ti,davinci-ctrl-reg-offset",
- 			     &pdata->ctrl_reg_offset);
- 
-@@ -1783,10 +1778,12 @@ static int davinci_emac_probe(struct platform_device *pdev)
- 	struct cpdma_params dma_params;
- 	struct clk *emac_clk;
- 	unsigned long emac_bus_frequency;
--#ifdef CONFIG_MTD
-+	const void *mac_addr;
- 	size_t mac_addr_len;
-+#ifdef CONFIG_MTD
- 	struct mtd_info *mtd;
- #endif /* CONFIG_MTD */
-+	struct nvmem_cell *cell;
- 
- 	/* obtain emac clock from kernel */
- 	emac_clk = devm_clk_get(&pdev->dev, NULL);
-@@ -1831,8 +1828,28 @@ static int davinci_emac_probe(struct platform_device *pdev)
- 	}
- #endif /* CONFIG_MTD */
- 
-+	cell = nvmem_cell_get(&pdev->dev, "mac-address");
-+	if (IS_ERR(cell) && PTR_ERR(cell) == -EPROBE_DEFER) {
-+		return -EPROBE_DEFER;
-+	} else if (!IS_ERR(cell)) {
-+		mac_addr = nvmem_cell_read(cell, &mac_addr_len);
-+		if (!IS_ERR(mac_addr)) {
-+			if (is_valid_ether_addr(mac_addr)) {
-+				dev_info(&pdev->dev,
-+					 "Read MAC addr from EEPROM: %pM\n",
-+					 mac_addr);
-+				ether_addr_copy(priv->mac_addr, mac_addr);
-+			}
-+			kfree(mac_addr);
-+		}
-+		nvmem_cell_put(cell);
-+	} else {
-+		mac_addr = of_get_mac_address(np);
-+		if (mac_addr)
-+			ether_addr_copy(priv->mac_addr, mac_addr);
++static struct nvmem_cell_lookup mityomapl138_nvmem_cells[] = {
++	{
++		.info = {
++			.name = "factory-config",
++			.offset = 0x0,
++			.bytes = sizeof(struct factory_config),
++		},
++		.nvmem_name = "1-00500",
++	},
++	{
++		.info = {
++			.name = "mac-address",
++			.offset = 0x64,
++			.bytes = ETH_ALEN,
++		},
++		.nvmem_name = "1-00500",
 +	}
++};
 +
- 	/* MAC addr and PHY mask , RMII enable info from platform_data */
--	memcpy(priv->mac_addr, pdata->mac_addr, ETH_ALEN);
- 	priv->phy_id = pdata->phy_id;
- 	priv->rmii_en = pdata->rmii_en;
- 	priv->version = pdata->version;
+ static struct at24_platform_data mityomapl138_fd_chip = {
+ 	.byte_len	= 256,
+ 	.page_size	= 8,
+@@ -534,6 +554,8 @@ static void __init mityomapl138_init(void)
+ 	if (ret)
+ 		pr_warn("spi 1 registration failed: %d\n", ret);
+ 
++	nvmem_add_lookup_table(mityomapl138_nvmem_cells,
++			       ARRAY_SIZE(mityomapl138_nvmem_cells));
+ 	mityomapl138_config_emac();
+ 
+ 	ret = da8xx_register_rtc();
 -- 
 2.17.1
