@@ -1,120 +1,44 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 29 Jun 2018 17:48:01 +0100
-Subject: Clarifying dma_wmb behavior in presence of non-coherent masters
- and outer caches
-In-Reply-To: <20180629162248.GB20010@arm.com>
-References: <1530275290.22468.69.camel@pengutronix.de>
- <20180629142539.GH17271@n2100.armlinux.org.uk>
- <20180629162248.GB20010@arm.com>
-Message-ID: <20180629164801.GJ17271@n2100.armlinux.org.uk>
+From: drjones@redhat.com (Andrew Jones)
+Date: Fri, 29 Jun 2018 19:03:34 +0200
+Subject: [PATCH] arm64: acpi: reenumerate topology ids
+In-Reply-To: <30d56d70-6043-0ad7-4530-208fab18c8d4@arm.com>
+References: <20180628145128.10057-1-drjones@redhat.com>
+ <a38fb684-c023-1a96-464e-dd268f3132ea@arm.com>
+ <20180628173243.obydzakh2stfs26w@kamzik.brq.redhat.com>
+ <20180629102927.GA18043@e107155-lin>
+ <20180629112354.hefdl2pe72frl6x3@kamzik.brq.redhat.com>
+ <20180629132934.GA16282@e107155-lin>
+ <20180629154608.nqudibf54ti6dpjc@kamzik.brq.redhat.com>
+ <30d56d70-6043-0ad7-4530-208fab18c8d4@arm.com>
+Message-ID: <20180629170334.3ab7ngru3abxcobf@kamzik.brq.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 29, 2018 at 05:22:48PM +0100, Will Deacon wrote:
-> Hi all,
-> 
-> On Fri, Jun 29, 2018 at 03:25:39PM +0100, Russell King - ARM Linux wrote:
-> > On Fri, Jun 29, 2018 at 02:28:10PM +0200, Lucas Stach wrote:
-> > > Oleksij was hunting a memory corruption issue on SocFPGA for the last
-> > > few days. While we still don't have a clear picture about what's going
-> > > wrong, I was reading some driver code and stumbled across the use of
-> > > dma_wmb, which left me with some questions about the intended use
-> > > and/or implementation. I'll try to describe by train of thought below.
-> > 
-> > I don't have a full understanding of this (partly because of
-> > implementation details, and I don't know the SocFPGA implementation.)
-> > 
-> > The dma_*() barriers were proposed by Alexander Duyck in 2014, and the
-> > commit explicitly states that dma_wmb() will be outer-shareable only.
-> > 
-> > I think what constitutes "outer-shareable" in terms of DMB is also
-> > something of a debate - the ARM ARM is vague on that subject, basically
-> > saying its implementation dependent:
-> > 
-> >   In a VMSA implementation, for Shareable Normal memory, whether
-> >   there is a distinction between Inner Shareable and Outer Shareable
-> >   is IMPLEMENTATION DEFINED.
-> > 
-> > In the case of the three levels of shareability being implemented, a
-> > "dmb ish" only reaches as far as the inner domain, "dmb osh" reaches
-> > both the inner and outer domains, and "dmb sy" reaches outside the
-> > outer domain.  Where there's no distinction between inner and outer,
-> > it seems that both "dmb ish*" and "dmb osh*" will both have the same
-> > reach.
-> > 
-> > That would mean that "dmb osh*" would not be visible outside of the
-> > shareability domain, which surely is where most non-coherent DMA
-> > masters in our SoCs lie, so on the face of it, it seems that it is
-> > the wrong reach for this barrier.
-> > 
-> > However, it obviously works for most systems out there, which suggests
-> > that "dmb osh*" reaches beyond "dmb ish*", but that seems to go against
-> > the ARM ARM.
-> > 
-> > All our memory in Linux is mapped with NOS=1, which basically means
-> > all shareable memory in the system is only inner shareable, and
-> > nothing is shareable outside of the inner domain.  Does it make
-> > sense to use "dmb osh*" if we have no outer-shareable memory?
-> > 
-> > Final bit of the puzzle is about which domain the PL310 ends up in.
-> > It will come as no surprise that's also "implementation defined":
-> > 
-> >   "The relationship between these conceptual levels of cache and the
-> >    implemented physical levels of cache is IMPLEMENTATION DEFINED,
-> >    and can differ from the boundaries between the Inner and Outer
-> >    Shareability domains."
-> > 
-> > were "conceptual levels" is talking about the inner/outer cacheability
-> > level.
-> > 
-> > The only thing we can be sure about is that the L1 caches are in the
-> > inner cacheability and inner shareability domains.  Everything else
-> > is... implementation defined.
-> > 
-> > So, it seems to be possible that a L2 cache, such as the PL310, could
-> > be in the inner cacheability domain and the outer shareability domain,
-> > or vice versa!
-> > 
-> > "Implementation defined" is a nightmare when it comes to generic OSes
-> > that have to work across multiple different implementations.
-> > 
-> > Maybe Will can shed some light on this topic.
-> 
-> You're right that cacheability and shareability are different things. For
-> the purposes of ordering and coherence, we care about shareability. Normal
-> non-cacheable is outer-shareable (which is a superset of inner-shareable),
+On Fri, Jun 29, 2018 at 11:48:15AM -0500, Jeremy Linton wrote:
+> Just to be clear, there isn't anything (AFAIK) in the ACPI specification
+> which dictates what values should comprise the various ACPI id's. They are
+> assumed only to be machine readable, which is why it seems some
+> implementations are just using a sanitized version of mpidr for the
+> core/MADT acpi id. That is why simply using the id flagged as valid in a
+> PPTT node doesn't necessarily give you a more human readable value.
 
-What does it mean when the "implementation" doesn't define two shareable
-domains - does it mean that inner and outer shareable are combined into
-just one "shareable" domain, or is outer shareable always treated as
-"everything but inner shareable"?
+I didn't expect them to be sequential integers, but I was starting to see
+value in them anyway if they were expected to be some something stamped on
+the socket.
 
->From the paragraph I quoted from the ARM ARM, it seems that the former
-applies, which should also mean that "dmb ish*" and "dmb osh*" are
-functionally equivalent, and only touch the inner shareable domain.
-
-You also seem to be saying that PRRR.NOSn is ignored for any mapping
-that indicates non-cacheable normal memory - I've not found that stated
-in the ARM ARM.  It does say that NOSn doesn't apply if the region is
-mapped as strongly-ordered, but that isn't the case for our DMA
-coherent mappings.
-
-> so DMB OSH is sufficient to order accesses to that buffer from the
-> perspective of all observers. Since we use Normal non-cacheable mappings
-> for non-coherent DMA buffers (and there is no such thing as a
-> system-shareable memory type), then these barriers are sufficient to provide
-> ordering in this case too.
 > 
-> Ideally, we'd limit the DMA barriers to the inner-shareable domain when
-> dealing with coherent devices, but there's no way to determine that from
-> the barrier macros.
+> If you want a human readable socket identifier that matches something
+> stamped above the socket, that is what SMBIOS is for. Queue discussion about
+> that tables reliability for functional ids. Either way, as the spec is
+> written today (or any ECRs I've seen), your definitely not going to get both
+> nice socket1, socket2, and cpu1, cpu2 out of the same PPTT/ACPIid name-space
+> since the numerical id's conflict.
 > 
-> Lucas -- did changing the shareability of the DMA barriers actually solve
-> your problem?
-> 
-> Will
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+If we don't expect the ACPI processor ID to be something useful to users,
+then I'll revert back to lobbying for counters, as those arbitrary numbers
+can't be less useful than arbitrary offsets and ACPI IDs, and, IMO, are
+more likely to make users/user apps happy.
+
+Thanks,
+drew
