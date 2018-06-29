@@ -1,36 +1,96 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 29 Jun 2018 12:15:25 +0100
-Subject: [PATCH v3 05/20] kvm: arm/arm64: Fix stage2_flush_memslot for 4 level
- page table
+Date: Fri, 29 Jun 2018 12:15:31 +0100
+Subject: [PATCH v3 11/20] kvm: arm64: Helper for computing VTCR_EL2.SL0
 In-Reply-To: <1530270944-11351-1-git-send-email-suzuki.poulose@arm.com>
 References: <1530270944-11351-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1530270944-11351-6-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1530270944-11351-12-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So far we have only supported 3 level page table with fixed IPA of 40bits.
-Fix stage2_flush_memslot() to accommodate for 4 level tables.
+VTCR_EL2 holds the following key stage2 translation table
+parameters:
+  SL0  - Entry level in the page table lookup.
+  T0SZ - Denotes the size of the memory addressed by the table.
+
+We have been using fixed values for the SL0 depending on the
+page size as we have a fixed IPA size. But since we are about
+to make it dynamic, we need to calculate the SL0 at runtime
+per VM. This patch adds a helper to comput the value of SL0 for
+a given IPA.
 
 Cc: Marc Zyngier <marc.zyngier@arm.com>
-Acked-by: Christoffer Dall <cdall@kernel.org>
+Cc: Christoffer Dall <cdall@arm.com>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- virt/kvm/arm/mmu.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+Changes since v2:
+ - Part 2 of split from VTCR & VTTBR dynamic configuration
+---
+ arch/arm64/include/asm/kvm_arm.h | 35 ++++++++++++++++++++++++++++++++---
+ 1 file changed, 32 insertions(+), 3 deletions(-)
 
-diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-index 1d90d79..061e6b3 100644
---- a/virt/kvm/arm/mmu.c
-+++ b/virt/kvm/arm/mmu.c
-@@ -379,7 +379,8 @@ static void stage2_flush_memslot(struct kvm *kvm,
- 	pgd = kvm->arch.pgd + stage2_pgd_index(addr);
- 	do {
- 		next = stage2_pgd_addr_end(addr, end);
--		stage2_flush_puds(kvm, pgd, addr, next);
-+		if (!stage2_pgd_none(*pgd))
-+			stage2_flush_puds(kvm, pgd, addr, next);
- 	} while (pgd++, addr = next, addr != end);
- }
+diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+index c557f45..11a7db0 100644
+--- a/arch/arm64/include/asm/kvm_arm.h
++++ b/arch/arm64/include/asm/kvm_arm.h
+@@ -153,7 +153,8 @@
+  * 2 level page tables (SL = 1)
+  */
+ #define VTCR_EL2_TGRAN_FLAGS		(VTCR_EL2_TG0_64K | VTCR_EL2_SL0_LVL1)
+-#define VTTBR_X_TGRAN_MAGIC		38
++#define VTCR_EL2_TGRAN_SL0_BASE		3UL
++
+ #elif defined(CONFIG_ARM64_16K_PAGES)
+ /*
+  * Stage2 translation configuration:
+@@ -161,7 +162,7 @@
+  * 2 level page tables (SL = 1)
+  */
+ #define VTCR_EL2_TGRAN_FLAGS		(VTCR_EL2_TG0_16K | VTCR_EL2_SL0_LVL1)
+-#define VTTBR_X_TGRAN_MAGIC		42
++#define VTCR_EL2_TGRAN_SL0_BASE		3UL
+ #else	/* 4K */
+ /*
+  * Stage2 translation configuration:
+@@ -169,11 +170,39 @@
+  * 3 level page tables (SL = 1)
+  */
+ #define VTCR_EL2_TGRAN_FLAGS		(VTCR_EL2_TG0_4K | VTCR_EL2_SL0_LVL1)
+-#define VTTBR_X_TGRAN_MAGIC		37
++#define VTCR_EL2_TGRAN_SL0_BASE		2UL
+ #endif
  
+ #define VTCR_EL2_FLAGS			(VTCR_EL2_COMMON_BITS | VTCR_EL2_TGRAN_FLAGS)
+ /*
++ * VTCR_EL2:SL0 indicates the entry level for Stage2 translation.
++ * Interestingly, it depends on the page size.
++ * See D.10.2.110, VTCR_EL2, in ARM DDI 0487B.b
++ *
++ *	-----------------------------------------
++ *	| Entry level		|  4K  | 16K/64K |
++ *	------------------------------------------
++ *	| Level: 0		|  2   |   -     |
++ *	------------------------------------------
++ *	| Level: 1		|  1   |   2     |
++ *	------------------------------------------
++ *	| Level: 2		|  0   |   1     |
++ *	------------------------------------------
++ *	| Level: 3		|  -   |   0     |
++ *	------------------------------------------
++ *
++ * That table roughly translates to :
++ *
++ *	SL0(PAGE_SIZE, Entry_level) = SL0_BASE(PAGE_SIZE) - Entry_Level
++ *
++ * Where SL0_BASE(4K) = 2 and SL0_BASE(16K) = 3, SL0_BASE(64K) = 3, provided
++ * we take care of ruling out the unsupported cases and
++ * Entry_Level = 4 - Number_of_levels.
++ *
++ */
++#define VTCR_EL2_SL0(levels) \
++	((VTCR_EL2_TGRAN_SL0_BASE - (4 - (levels))) << VTCR_EL2_SL0_SHIFT)
++/*
+  * ARM VMSAv8-64 defines an algorithm for finding the translation table
+  * descriptors in section D4.2.8 in ARM DDI 0487B.b.
+  *
 -- 
 2.7.4
