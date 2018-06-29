@@ -1,78 +1,61 @@
-From: mst@redhat.com (Michael S. Tsirkin)
-Date: Fri, 29 Jun 2018 20:42:02 +0300
-Subject: [PATCH v3 01/20] virtio: mmio-v1: Validate queue PFN
-In-Reply-To: <1530270944-11351-2-git-send-email-suzuki.poulose@arm.com>
-References: <1530270944-11351-1-git-send-email-suzuki.poulose@arm.com>
- <1530270944-11351-2-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20180629200816-mutt-send-email-mst@kernel.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 29 Jun 2018 18:43:22 +0100
+Subject: Clarifying dma_wmb behavior in presence of non-coherent masters
+ and outer caches
+In-Reply-To: <20180629164801.GJ17271@n2100.armlinux.org.uk>
+References: <1530275290.22468.69.camel@pengutronix.de>
+ <20180629142539.GH17271@n2100.armlinux.org.uk>
+ <20180629162248.GB20010@arm.com>
+ <20180629164801.GJ17271@n2100.armlinux.org.uk>
+Message-ID: <20180629174321.GA20909@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 29, 2018 at 12:15:21PM +0100, Suzuki K Poulose wrote:
-> virtio-mmio with virtio-v1 uses a 32bit PFN for the queue.
-> If the queue pfn is too large to fit in 32bits, which
-> we could hit on arm64 systems with 52bit physical addresses
-> (even with 64K page size), we simply miss out a proper link
-> to the other side of the queue.
-> 
-> Add a check to validate the PFN, rather than silently breaking
-> the devices.
-> 
-> Cc: "Michael S. Tsirkin" <mst@redhat.com>
-> Cc: Jason Wang <jasowang@redhat.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Christoffer Dall <cdall@kernel.org>
-> Cc: Peter Maydel <peter.maydell@linaro.org>
-> Cc: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
-> Changes since v2:
->  - Change errno to -E2BIG
-> ---
->  drivers/virtio/virtio_mmio.c | 18 ++++++++++++++++--
->  1 file changed, 16 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/virtio/virtio_mmio.c b/drivers/virtio/virtio_mmio.c
-> index 67763d3..82cedc8 100644
-> --- a/drivers/virtio/virtio_mmio.c
-> +++ b/drivers/virtio/virtio_mmio.c
-> @@ -397,9 +397,21 @@ static struct virtqueue *vm_setup_vq(struct virtio_device *vdev, unsigned index,
->  	/* Activate the queue */
->  	writel(virtqueue_get_vring_size(vq), vm_dev->base + VIRTIO_MMIO_QUEUE_NUM);
->  	if (vm_dev->version == 1) {
-> +		u64 q_pfn = virtqueue_get_desc_addr(vq) >> PAGE_SHIFT;
-> +
-> +		/*
-> +		 * virtio-mmio v1 uses a 32bit QUEUE PFN. If we have something
-> +		 * that doesn't fit in 32bit, fail the setup rather than
-> +		 * pretending to be successful.
-> +		 */
-> +		if (q_pfn >> 32) {
-> +			dev_err(&vdev->dev, "virtio-mmio: queue address too large\n");
+Hi Russell,
 
-How about:
-	"hypervisor bug: legacy virtio-mmio must not be used with more than 0x%llx Gigabytes of memory",
-	0x1ULL << (32 - 30) << PAGE_SHIFT
+On Fri, Jun 29, 2018 at 05:48:01PM +0100, Russell King - ARM Linux wrote:
+> On Fri, Jun 29, 2018 at 05:22:48PM +0100, Will Deacon wrote:
+> > On Fri, Jun 29, 2018 at 03:25:39PM +0100, Russell King - ARM Linux wrote:
+> > > Maybe Will can shed some light on this topic.
+> > 
+> > You're right that cacheability and shareability are different things. For
+> > the purposes of ordering and coherence, we care about shareability. Normal
+> > non-cacheable is outer-shareable (which is a superset of inner-shareable),
+> 
+> What does it mean when the "implementation" doesn't define two shareable
+> domains - does it mean that inner and outer shareable are combined into
+> just one "shareable" domain, or is outer shareable always treated as
+> "everything but inner shareable"?
 
-> +			err = -E2BIG;
-> +			goto error_bad_pfn;
-> +		}
-> +
->  		writel(PAGE_SIZE, vm_dev->base + VIRTIO_MMIO_QUEUE_ALIGN);
-> -		writel(virtqueue_get_desc_addr(vq) >> PAGE_SHIFT,
-> -				vm_dev->base + VIRTIO_MMIO_QUEUE_PFN);
-> +		writel(q_pfn, vm_dev->base + VIRTIO_MMIO_QUEUE_PFN);
->  	} else {
->  		u64 addr;
->  
-> @@ -430,6 +442,8 @@ static struct virtqueue *vm_setup_vq(struct virtio_device *vdev, unsigned index,
->  
->  	return vq;
->  
-> +error_bad_pfn:
-> +	vring_del_virtqueue(vq);
->  error_new_virtqueue:
->  	if (vm_dev->version == 1) {
->  		writel(0, vm_dev->base + VIRTIO_MMIO_QUEUE_PFN);
-> -- 
-> 2.7.4
+If there is only one shareability domain, then the inner and outer shareable
+domains refer to that domain (i.e. they're the same).
+
+> From the paragraph I quoted from the ARM ARM, it seems that the former
+> applies, which should also mean that "dmb ish*" and "dmb osh*" are
+> functionally equivalent, and only touch the inner shareable domain.
+
+In this case, yes. In practice, there is usually one inner-shareable domain
+which contains the CPUs and coherent DMA devices, and there is one
+outer-shareable domain containing that inner-shareable domain, where
+non-coherent DMA lives only in the outer-shareable domain. I don't know
+of any systems where that isn't the case, and I'm not sure that our
+interconnects even permit building anything else (I'd need to check).
+
+> You also seem to be saying that PRRR.NOSn is ignored for any mapping
+> that indicates non-cacheable normal memory - I've not found that stated
+> in the ARM ARM.  It does say that NOSn doesn't apply if the region is
+> mapped as strongly-ordered, but that isn't the case for our DMA
+> coherent mappings.
+
+Ah, it looks like it's not the case for short-descriptor without TEX remap,
+where the S bit determines the shareability (i.e. shared or non-shared).
+However, in Armv8 or short-descriptor using TEX remapping then non-cacheable
+mappings are outer-shareable:
+
+G4.7.3	Short-descriptor format memory region attributes, with TEX remap
+
+If the TEX[0], C and B bits determine that the region is a Device memory
+type, or is Normal Inner Non-cacheable, Outer Non-cacheable, then the
+region is Outer Shareable.
+
+Will
