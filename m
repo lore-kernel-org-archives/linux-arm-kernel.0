@@ -1,53 +1,33 @@
-From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Thu, 28 Jun 2018 17:53:02 -0700
-Subject: [PATCH 1/2] ARM: dts: imx51-babbage: Fix reg for usbh1phy
-In-Reply-To: <CAOMZO5DqkfotddSRbibD0UE2R=QZMef2-4Gr3LaeGT=Fq9qMyw@mail.gmail.com>
-References: <20180628043713.14425-1-andrew.smirnov@gmail.com>
- <CAOMZO5DqkfotddSRbibD0UE2R=QZMef2-4Gr3LaeGT=Fq9qMyw@mail.gmail.com>
-Message-ID: <CAHQ1cqHysWKNnHJNym4-FXS-kXnUhrbDwaZ+Pc5=79oVM+M71A@mail.gmail.com>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Fri, 29 Jun 2018 10:20:31 +0800
+Subject: [PATCH 5/5] MAINTAINERS: update files of MediaTek USB3 PHYs
+In-Reply-To: <54260d59ae39c2335e97892fe85db16cac30b33b.1530238400.git.chunfeng.yun@mediatek.com>
+References: <54260d59ae39c2335e97892fe85db16cac30b33b.1530238400.git.chunfeng.yun@mediatek.com>
+Message-ID: <d5e0fb3a6ed54f974c303ed307cdfed7b7263c04.1530238400.git.chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 28, 2018 at 6:35 AM Fabio Estevam <festevam@gmail.com> wrote:
->
-> Hi Andrey,
->
-> On Thu, Jun 28, 2018 at 1:37 AM, Andrey Smirnov
-> <andrew.smirnov@gmail.com> wrote:
-> > There's already a USB PHY with reg of zero on that bus - usbphy0, used
-> > by usbotg (included from imx51.dtsi). Move usbh1phy to @1 avoid
-> > address collision.
-> >
-> > Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> > Cc: Shawn Guo <shawnguo@kernel.org>
-> > Cc: linux-arm-kernel at lists.infradead.org
-> > Cc: linux-kernel at vger.kernel.org
-> > Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
-> > ---
-> >  arch/arm/boot/dts/imx51-babbage.dts | 4 ++--
-> >  1 file changed, 2 insertions(+), 2 deletions(-)
-> >
-> > diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
-> > index b8ca73d3d379..541c6e67ad1a 100644
-> > --- a/arch/arm/boot/dts/imx51-babbage.dts
-> > +++ b/arch/arm/boot/dts/imx51-babbage.dts
-> > @@ -175,9 +175,9 @@
-> >                 #size-cells = <0>;
-> >                 compatible = "simple-bus";
-> >
-> > -               usbh1phy: usbh1phy at 0 {
-> > +               usbh1phy: usbh1phy at 1 {
-> >                         compatible = "usb-nop-xceiv";
-> > -                       reg = <0>;
-> > +                       reg = <1>;
->
-> We don't really need the 'reg' property here.
->
-> I have sent a previous fix for this on an attempt to fix dtc warnings
-> with W=1,  so let me send a v2 based on the feedback I got previously:
-> https://patchwork.kernel.org/patch/10399085/
+Update maintained files include MediaTek USB3 PHYs drivers and
+their bindings
 
-OK, cool, good to hear. Please disregard this patch in that case.
+Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+---
+ MAINTAINERS | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-Thanks,
-Andrey Smirnov
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 9d5eeff..2b782f1 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1647,7 +1647,8 @@ M:	Chunfeng Yun <chunfeng.yun@mediatek.com>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ L:	linux-mediatek at lists.infradead.org (moderated for non-subscribers)
+ S:	Maintained
+-F:	drivers/phy/mediatek/phy-mtk-tphy.c
++F:	drivers/phy/mediatek/
++F:	Documentation/devicetree/bindings/phy/phy-mtk-*
+ 
+ ARM/MICREL KS8695 ARCHITECTURE
+ M:	Greg Ungerer <gerg@uclinux.org>
+-- 
+1.9.1
