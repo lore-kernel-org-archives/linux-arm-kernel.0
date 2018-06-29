@@ -1,33 +1,21 @@
-From: andreyknvl@google.com (Andrey Konovalov)
-Date: Fri, 29 Jun 2018 15:18:31 +0200
-Subject: [PATCH v4 00/17] khwasan: kernel hardware assisted address
- sanitizer
-In-Reply-To: <20180629112613.7i4xesjyxolc63gu@ltop.local>
-References: <cover.1530018818.git.andreyknvl@google.com>
- <20180628105057.GA26019@e103592.cambridge.arm.com>
- <CAAeHK+w0T43+h3xqU4a-qutxd-qiEhsvk0eaZpmAn-T0hpaLZQ@mail.gmail.com>
- <20180629110419.GC26019@e103592.cambridge.arm.com>
- <20180629112613.7i4xesjyxolc63gu@ltop.local>
-Message-ID: <CAAeHK+zXzTEo_DJ5a7KaVDQa06Gx98Oj2O3jMFJo_tNgkq822g@mail.gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 29 Jun 2018 22:19:25 +0900 (KST)
+Subject: [PATCH v4] net: ethernet: stmmac: dwmac-rk: Add GMAC support
+ for px30
+In-Reply-To: <1530149601-23337-1-git-send-email-david.wu@rock-chips.com>
+References: <1530149601-23337-1-git-send-email-david.wu@rock-chips.com>
+Message-ID: <20180629.221925.1974171391493646561.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 29, 2018 at 1:26 PM, Luc Van Oostenryck
-<luc.vanoostenryck@gmail.com> wrote:
-> On Fri, Jun 29, 2018 at 12:04:22PM +0100, Dave Martin wrote:
->>
->> Can sparse be hacked to identify pointer subtractions where the pointers
->> are cannot be statically proved to point into the same allocation?
+From: David Wu <david.wu@rock-chips.com>
+Date: Thu, 28 Jun 2018 09:33:21 +0800
 
-Re all the comments about finding all the places where we do pointer
-subtraction/comparison:
+> Add constants and callback functions for the dwmac on px30 Soc.
+> The base structure is the same, but registers and the bits in
+> them are moved slightly, and add the clk_mac_speed for selecting
+> mac speed.
+> 
+> Signed-off-by: David Wu <david.wu@rock-chips.com>
 
-I might be wrong, but I doubt you can easily do that with static analysis.
-
-What we could do is to try to detect all such subtractions/comparisons
-dynamically. The idea is to instrument all pointer/ulong
-subtraction/comparison instructions and try to detect tags mismatch.
-And then run some workload (e.g. syzkaller) to trigger more kernel
-code. The question is how much false positives we would get, since I
-imagine there would be a number of cases when we compare some random
-ulongs.
+Applied.
