@@ -1,30 +1,28 @@
-From: lsun@mellanox.com (Liming Sun)
-Date: Fri, 29 Jun 2018 10:45:26 -0400
-Subject: [PATCH v1 1/1] arm64: defconfig: Enable dw_mmc-bluefield driver
-Message-ID: <0a5fbadb025116d22e8ee939c4b2f1dcbf118fa2.1530281777.git.lsun@mellanox.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 29 Jun 2018 16:47:36 +0200
+Subject: [PATCH] arm64: dts: renesas: r8a77965: Add second port to
+ rcar_sound placeholder
+In-Reply-To: <CAMuHMdVBbQ-rHHcdkw=3_+Dng-sOdnV4uyQ7bGXT_FNWte67Fw@mail.gmail.com>
+References: <20180628124259.12760-1-horms+renesas@verge.net.au>
+ <CAMuHMdVBbQ-rHHcdkw=3_+Dng-sOdnV4uyQ7bGXT_FNWte67Fw@mail.gmail.com>
+Message-ID: <20180629144734.23zhak4uhxr4sgdk@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates arm64 defconfig to enable dw_mmc-bluefield,
-which is a driver extension of Synopsys Designware MMC for the
-Mellanox BlueField Soc.
+On Thu, Jun 28, 2018 at 03:33:59PM +0200, Geert Uytterhoeven wrote:
+> On Thu, Jun 28, 2018 at 2:43 PM Simon Horman <horms+renesas@verge.net.au> wrote:
+> > This node is just a placeholder but fills that function better if it does
+> > not trigger build warnings. This update satisfies the requirement that
+> > nodes with #address-cells/#size-cells properties have more than one child
+> > node.
+> >
+> > This is flagged by dtc as follows:
+> >  # make dtbs W=1
+> >  arch/arm64/boot/dts/renesas/r8a77965-salvator-x.dtb: Warning (graph_child_address): /soc/sound at ec500000/ports: graph node has single child node 'port at 0', #address-cells/#size-cells are not necessary
+> >  arch/arm64/boot/dts/renesas/r8a77965-salvator-xs.dtb: Warning (graph_child_address): /soc/sound at ec500000/ports: graph node has single child node 'port at 0', #address-cells/#size-cells are not necessary
+> >
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> 
+> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Signed-off-by: Liming Sun <lsun@mellanox.com>
----
- arch/arm64/configs/defconfig | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index f9a186f..83de504 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -497,6 +497,7 @@ CONFIG_MMC_SDHCI_MSM=y
- CONFIG_MMC_SPI=y
- CONFIG_MMC_SDHI=y
- CONFIG_MMC_DW=y
-+CONFIG_MMC_DW_BLUEFIELD=y
- CONFIG_MMC_DW_EXYNOS=y
- CONFIG_MMC_DW_HI3798CV200=y
- CONFIG_MMC_DW_K3=y
--- 
-1.8.3.1
+Thanks, applied.
