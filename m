@@ -1,25 +1,54 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 29 Jun 2018 14:22:44 +0200
-Subject: [PATCH 6/7] arm64: dts: mt7622: use gpio-ranges to pinctrl device
-In-Reply-To: <e0483accc1e82280492a2f68a90959232ba868f6.1529639050.git.sean.wang@mediatek.com>
-References: <f222c9f488490bd86d35346e725491e1de306ace.1529639050.git.sean.wang@mediatek.com>
- <e0483accc1e82280492a2f68a90959232ba868f6.1529639050.git.sean.wang@mediatek.com>
-Message-ID: <CACRpkdZta2f1OKB3E1crLH1mymq26_6vU4hF=fseRt_70EDEuA@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 29 Jun 2018 13:23:59 +0100
+Subject: [PATCH v4 2/3] ioremap: Update pgtable free interfaces with addr
+In-Reply-To: <1530115885.14039.295.camel@hpe.com>
+References: <20180627141348.21777-1-toshi.kani@hpe.com>
+ <20180627141348.21777-3-toshi.kani@hpe.com>
+ <20180627155632.GH30631@arm.com>
+ <1530115885.14039.295.camel@hpe.com>
+Message-ID: <20180629122358.GC17859@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 22, 2018 at 5:49 AM <sean.wang@mediatek.com> wrote:
+Hi Toshi, Thomas,
 
-> From: Sean Wang <sean.wang@mediatek.com>
->
-> Using gpio-ranges property represent which GPIOs correspond to which pins
-> on MT7622 pin controllers. For details, we can see section 2.1 of
-> Documentation/devicetree/bindings/gpio/gpio.txt to know how to bind pinctrl
-> and gpio drivers via the "gpio-ranges" property.
->
-> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+On Wed, Jun 27, 2018 at 04:13:22PM +0000, Kani, Toshi wrote:
+> On Wed, 2018-06-27 at 16:56 +0100, Will Deacon wrote:
+> > On Wed, Jun 27, 2018 at 08:13:47AM -0600, Toshi Kani wrote:
+> > > From: Chintan Pandya <cpandya@codeaurora.org>
+> > > 
+> > > The following kernel panic was observed on ARM64 platform due to a stale
+> > > TLB entry.
+> > > 
+> > >  1. ioremap with 4K size, a valid pte page table is set.
+> > >  2. iounmap it, its pte entry is set to 0.
+> > >  3. ioremap the same address with 2M size, update its pmd entry with
+> > >     a new value.
+> > >  4. CPU may hit an exception because the old pmd entry is still in TLB,
+> > >     which leads to a kernel panic.
+> > > 
+> > > Commit b6bdb7517c3d ("mm/vmalloc: add interfaces to free unmapped page
+> > > table") has addressed this panic by falling to pte mappings in the above
+> > > case on ARM64.
+> > > 
+> > > To support pmd mappings in all cases, TLB purge needs to be performed
+> > > in this case on ARM64.
+> > > 
+> > > Add a new arg, 'addr', to pud_free_pmd_page() and pmd_free_pte_page()
+> > > so that TLB purge can be added later in seprate patches.
+> > 
+> > So I acked v13 of Chintan's series posted here:
+> > 
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2018-June/582953.html
+> > 
+> > any chance this lot could all be merged together, please?
+> 
+> Chintan's patch 2/3 and 3/3 apply cleanly on top of my series. Can you
+> please coordinate with Thomas on the logistics?
 
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+Sure. I guess having this series on a common branch that I can pull into
+arm64 and apply Chintan's other patches on top would work.
 
-Yours,
-Linus Walleij
+How does that sound?
+
+Will
