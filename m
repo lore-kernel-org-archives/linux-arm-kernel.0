@@ -1,149 +1,171 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 29 Jun 2018 10:21:27 +0100
-Subject: [PATCH v3 1/6] arm64: KVM: Add support for Stage-2 control of
- memory types and cacheability
-In-Reply-To: <20180629090750.GD8441@e113682-lin.lund.arm.com>
-References: <20180627122058.8210-1-marc.zyngier@arm.com>
- <20180627122058.8210-2-marc.zyngier@arm.com>
- <20180628205638.GC8441@e113682-lin.lund.arm.com>
- <86po0aypx0.wl-marc.zyngier@arm.com>
- <20180629090750.GD8441@e113682-lin.lund.arm.com>
-Message-ID: <86efgqymlk.wl-marc.zyngier@arm.com>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Fri, 29 Jun 2018 17:22:03 +0800
+Subject: [PATCH v22 4/4] soc: mediatek: Add Mediatek CMDQ helper
+In-Reply-To: <1530228739.21991.14.camel@mhfsdcap03>
+References: <1530098172-31385-1-git-send-email-houlong.wei@mediatek.com>
+ <1530098172-31385-5-git-send-email-houlong.wei@mediatek.com>
+ <1530182516.8518.11.camel@mtksdaap41>
+ <1530228739.21991.14.camel@mhfsdcap03>
+Message-ID: <1530264123.22098.12.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 29 Jun 2018 10:07:50 +0100,
-Christoffer Dall <christoffer.dall@arm.com> wrote:
-> 
-> On Fri, Jun 29, 2018 at 09:09:47AM +0100, Marc Zyngier wrote:
-> > On Thu, 28 Jun 2018 21:56:38 +0100,
-> > Christoffer Dall <christoffer.dall@arm.com> wrote:
+Hi, Houlong:
+
+On Fri, 2018-06-29 at 07:32 +0800, houlong wei wrote:
+> On Thu, 2018-06-28 at 18:41 +0800, CK Hu wrote:
+> > Hi, Houlong:
+> > 
+> > Some inline comment.
+> > 
+> > On Wed, 2018-06-27 at 19:16 +0800, Houlong Wei wrote:
+> > > Add Mediatek CMDQ helper to create CMDQ packet and assemble GCE op code.
 > > > 
-> > > On Wed, Jun 27, 2018 at 01:20:53PM +0100, Marc Zyngier wrote:
-> > > > Up to ARMv8.3, the combinaison of Stage-1 and Stage-2 attributes
-> > > > results in the strongest attribute of the two stages.  This means
-> > > > that the hypervisor has to perform quite a lot of cache maintenance
-> > > > just in case the guest has some non-cacheable mappings around.
-> > > > 
-> > > > ARMv8.4 solves this problem by offering a different mode (FWB) where
-> > > > Stage-2 has total control over the memory attribute (this is limited
-> > > > to systems where both I/O and instruction fetches are coherent with
-> > > > the dcache). This is achieved by having a different set of memory
-> > > > attributes in the page tables, and a new bit set in HCR_EL2.
-> > > > 
-> > > > On such a system, we can then safely sidestep any form of dcache
-> > > > management.
-> > > > 
-> > > > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> > > > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> > > > ---
-> > > >  arch/arm64/include/asm/cpucaps.h      |  3 ++-
-> > > >  arch/arm64/include/asm/kvm_arm.h      |  1 +
-> > > >  arch/arm64/include/asm/kvm_emulate.h  |  2 ++
-> > > >  arch/arm64/include/asm/kvm_mmu.h      | 26 ++++++++++++++++++++------
-> > > >  arch/arm64/include/asm/memory.h       |  7 +++++++
-> > > >  arch/arm64/include/asm/pgtable-prot.h | 14 ++++++++++++--
-> > > >  arch/arm64/include/asm/sysreg.h       |  1 +
-> > > >  arch/arm64/kernel/cpufeature.c        | 20 ++++++++++++++++++++
-> > > >  virt/kvm/arm/mmu.c                    |  4 ++++
-> > > >  9 files changed, 69 insertions(+), 9 deletions(-)
-> > > > 
-> > > > diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
-> > > > index 8a699c708fc9..ed84d6536830 100644
-> > > > --- a/arch/arm64/include/asm/cpucaps.h
-> > > > +++ b/arch/arm64/include/asm/cpucaps.h
-> > > > @@ -49,7 +49,8 @@
-> > > >  #define ARM64_HAS_CACHE_DIC			28
-> > > >  #define ARM64_HW_DBM				29
-> > > >  #define ARM64_SSBD				30
-> > > > +#define ARM64_HAS_STAGE2_FWB			31
-> > > >  
-> > > > -#define ARM64_NCAPS				31
-> > > > +#define ARM64_NCAPS				32
-> > > >  
-> > > >  #endif /* __ASM_CPUCAPS_H */
-> > > > diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-> > > > index 6dd285e979c9..aa45df752a16 100644
-> > > > --- a/arch/arm64/include/asm/kvm_arm.h
-> > > > +++ b/arch/arm64/include/asm/kvm_arm.h
-> > > > @@ -23,6 +23,7 @@
-> > > >  #include <asm/types.h>
-> > > >  
-> > > >  /* Hyp Configuration Register (HCR) bits */
-> > > > +#define HCR_FWB		(UL(1) << 46)
-> > > >  #define HCR_TEA		(UL(1) << 37)
-> > > >  #define HCR_TERR	(UL(1) << 36)
-> > > >  #define HCR_TLOR	(UL(1) << 35)
-> > > > diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
-> > > > index 1dab3a984608..dd98fdf33d99 100644
-> > > > --- a/arch/arm64/include/asm/kvm_emulate.h
-> > > > +++ b/arch/arm64/include/asm/kvm_emulate.h
-> > > > @@ -63,6 +63,8 @@ static inline void vcpu_reset_hcr(struct kvm_vcpu *vcpu)
-> > > >  		/* trap error record accesses */
-> > > >  		vcpu->arch.hcr_el2 |= HCR_TERR;
-> > > >  	}
-> > > > +	if (cpus_have_const_cap(ARM64_HAS_STAGE2_FWB))
-> > > > +		vcpu->arch.hcr_el2 |= HCR_FWB;
-> > > >  
-> > > >  	if (test_bit(KVM_ARM_VCPU_EL1_32BIT, vcpu->arch.features))
-> > > >  		vcpu->arch.hcr_el2 &= ~HCR_RW;
-> > > > diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-> > > > index fb9a7127bb75..620eb9e06bd8 100644
-> > > > --- a/arch/arm64/include/asm/kvm_mmu.h
-> > > > +++ b/arch/arm64/include/asm/kvm_mmu.h
-> > > > @@ -257,6 +257,7 @@ static inline bool kvm_page_empty(void *ptr)
-> > > >  struct kvm;
-> > > >  
-> > > >  #define kvm_flush_dcache_to_poc(a,l)	__flush_dcache_area((a), (l))
-> > > > +#define kvm_flush_dcache_to_pou(a,l)	__clean_dcache_area_pou((a), (l))
-> > > >  
-> > > >  static inline bool vcpu_has_cache_enabled(struct kvm_vcpu *vcpu)
-> > > >  {
-> > > > @@ -267,6 +268,13 @@ static inline void __clean_dcache_guest_page(kvm_pfn_t pfn, unsigned long size)
-> > > >  {
-> > > >  	void *va = page_address(pfn_to_page(pfn));
-> > > >  
-> > > > +	/*
-> > > > +	 * FWB implies IDC, so cache clean to PoC is not required in
-> > > > +	 * this case.
-> > > > +	 */
+> > > Signed-off-by: Houlong Wei <houlong.wei@mediatek.com>
+> > > Signed-off-by: HS Liao <hs.liao@mediatek.com>
+> > > ---
+> > >  drivers/soc/mediatek/Kconfig           |   12 ++
+> > >  drivers/soc/mediatek/Makefile          |    1 +
+> > >  drivers/soc/mediatek/mtk-cmdq-helper.c |  258 ++++++++++++++++++++++++++++++++
+> > >  include/linux/soc/mediatek/mtk-cmdq.h  |  132 ++++++++++++++++
+> > >  4 files changed, 403 insertions(+)
+> > >  create mode 100644 drivers/soc/mediatek/mtk-cmdq-helper.c
+> > >  create mode 100644 include/linux/soc/mediatek/mtk-cmdq.h
 > > > 
-> > > I don't understand this comment.  __clean_dcache_guest_page is called
-> > > when faulting in pages for translation faults (fault_status != FSC_PERM)
-> > > and PoC is about coherency between ram and caches, not instruction and
-> > > data caches, so how is this related to IDC?
+> > > diff --git a/drivers/soc/mediatek/Kconfig b/drivers/soc/mediatek/Kconfig
+> > > index a7d0667..17bd759 100644
+> > > --- a/drivers/soc/mediatek/Kconfig
+> > > +++ b/drivers/soc/mediatek/Kconfig
+> > > @@ -4,6 +4,18 @@
+> > >  menu "MediaTek SoC drivers"
+> > >  	depends on ARCH_MEDIATEK || COMPILE_TEST
+> > >  
 > > 
-> > There's a shortcut in this comment, so let me develop a tiny bit:
-> > 
-> > - FWB makes memory the memory cacheable from the PoV of the guest, so
-> >   we don't need to clean to the PoC for the guest to access it even
-> >   when running with the stage-1 MMU off or non-cacheable mappings.
-> > 
-> > - FWB implies IDC so there is no need to clean to the PoU for
-> >   instruction fetches to get the right thing either.
-> > 
-> > The combination of these two statements implies that we don't need to
-> > clean anything at all.
-> > 
-> > Does it make more sense?
-> 
-> Yes, this makes sense, but the comment is weird, because it's not
-> because FWB implies IDC that you don't have to clean to PoC, so I would
-> suggest either removing the comment, or rewording it to something like:
-> 
-> /*
->  * With FWB we ensure that the guest always accesses memory cacheable
->  * and we don't have to clean to PoC when faulting in pages.
->  * Furthermore, FWB implies IDC, so cleaning to PoU is also not required
->  * in this case.
->  */
-> 
-> I think the comment as it stands now, only makes sense in the context of
-> the conversation we've had on this patch on the list.
 
-Fair enough. I'll update the comment to reflect the above.
+[...]
 
-	M.
+> > > +
+> > > +static int cmdq_pkt_finalize(struct cmdq_pkt *pkt)
+> > > +{
+> > > +	int err;
+> > > +
+> > > +	if (cmdq_pkt_is_finalized(pkt))
+> > > +		return 0;
+> > > +
+> > > +	/* insert EOC and generate IRQ for each command iteration */
+> > > +	err = cmdq_pkt_append_command(pkt, CMDQ_CODE_EOC, 0, CMDQ_EOC_IRQ_EN);
+> > > +	if (err < 0)
+> > > +		return err;
+> > > +
+> > > +	/* JUMP to end */
+> > > +	err = cmdq_pkt_append_command(pkt, CMDQ_CODE_JUMP, 0, CMDQ_JUMP_PASS);
+> > > +	if (err < 0)
+> > > +		return err;
+> > > +
+> > > +	return 0;
+> > > +}
+> > > +
+> > > +int cmdq_pkt_flush_async(struct cmdq_client *client, struct cmdq_pkt *pkt,
+> > > +			 cmdq_async_flush_cb cb, void *data)
+> > > +{
+> > > +	int err;
+> > > +	struct device *dev;
+> > > +	dma_addr_t dma_addr;
+> > > +
+> > > +	err = cmdq_pkt_finalize(pkt);
+> > > +	if (err < 0)
+> > > +		return err;
+> > > +
+> > > +	dev = client->chan->mbox->dev;
+> > > +	dma_addr = dma_map_single(dev, pkt->va_base, pkt->cmd_buf_size,
+> > > +		DMA_TO_DEVICE);
+> > 
+> > You map here, but I could not find unmap, so the unmap should be done in
+> > client driver. I would prefer a symmetric map/unmap which means that
+> > both map and unmap are done in client driver. I think you put map here
+> > because you should map after finalize. 
+> 
+> The unmap is done before callback to client, in function
+> cmdq_task_exec_done, mtk-cmdq-mailbox.c.
 
--- 
-Jazz is not dead, it just smell funny.
+You put unmap in mailbox controller, and map here (here would be mailbox
+client), so this is not symmetric. If the code is asymmetric, it's easy
+to cause bug and not easy to maintain. So I would like move both
+map/unmap to client driver.
+
+> 
+> > Therefore, export
+> > cmdq_pkt_finalize() to client driver and let client do finalize, so
+> > there is no finalize in flush function. This method have a benefit that
+> > if client reuse command buffer, it need not to map/unmap frequently.
+> 
+> If client reuse command buffer or cmdq_pkt(command queue packet), client
+> will add new commands to the cmdq_pkt, so map/unmap are necessary for
+> each cmdq_pkt flush.
+
+If the buffer size is 4K bytes, client driver could map the whole 4K at
+initialization. Before it write new command, it call
+dma_sync_single_for_cpu(), after it write new command, it call
+dma_sync_single_for_device(). And then it could flush this buffer to
+mailbox controller. So client driver just call dma sync function when it
+reuse the command buffer. dma sync function is much lightweight then dma
+map because map would search the memory area which could be mapped.
+
+Regards,
+CK
+
+> 
+> > 
+> > Regards,
+> > CK
+> > 
+> > > +	if (dma_mapping_error(dev, dma_addr)) {
+> > > +		dev_err(client->chan->mbox->dev, "dma map failed\n");
+> > > +		return -ENOMEM;
+> > > +	}
+> > > +
+> > > +	pkt->pa_base = dma_addr;
+> > > +	pkt->cb.cb = cb;
+> > > +	pkt->cb.data = data;
+> > > +
+> > > +	mbox_send_message(client->chan, pkt);
+> > > +	/* We can send next packet immediately, so just call txdone. */
+> > > +	mbox_client_txdone(client->chan, 0);
+> > > +
+> > > +	return 0;
+> > > +}
+> > > +EXPORT_SYMBOL(cmdq_pkt_flush_async);
+> > > +
+> > > +struct cmdq_flush_completion {
+> > > +	struct completion cmplt;
+> > > +	bool err;
+> > > +};
+> > > +
+> > > +static void cmdq_pkt_flush_cb(struct cmdq_cb_data data)
+> > > +{
+> > > +	struct cmdq_flush_completion *cmplt = data.data;
+> > > +
+> > > +	cmplt->err = data.err;
+> > > +	complete(&cmplt->cmplt);
+> > > +}
+> > > +
+> > > +int cmdq_pkt_flush(struct cmdq_client *client, struct cmdq_pkt *pkt)
+> > > +{
+> > > +	struct cmdq_flush_completion cmplt;
+> > > +	int err;
+> > > +
+> > > +	init_completion(&cmplt.cmplt);
+> > > +	err = cmdq_pkt_flush_async(client, pkt, cmdq_pkt_flush_cb, &cmplt);
+> > > +	if (err < 0)
+> > > +		return err;
+> > > +	wait_for_completion(&cmplt.cmplt);
+> > > +
+> > > +	return cmplt.err ? -EFAULT : 0;
+> > > +}
+> > > +EXPORT_SYMBOL(cmdq_pkt_flush);
+> > 
+> > [...]
+> > 
+> > 
+> 
+> 
