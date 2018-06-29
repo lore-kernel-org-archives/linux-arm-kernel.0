@@ -1,65 +1,47 @@
 From: eric.auger@redhat.com (Auger Eric)
-Date: Fri, 29 Jun 2018 16:50:35 +0200
-Subject: [PATCH v3 03/20] arm64: Add a helper for PARange to physical
- shift conversion
-In-Reply-To: <1530270944-11351-4-git-send-email-suzuki.poulose@arm.com>
+Date: Fri, 29 Jun 2018 16:50:57 +0200
+Subject: [PATCH v3 05/20] kvm: arm/arm64: Fix stage2_flush_memslot for 4
+ level page table
+In-Reply-To: <1530270944-11351-6-git-send-email-suzuki.poulose@arm.com>
 References: <1530270944-11351-1-git-send-email-suzuki.poulose@arm.com>
- <1530270944-11351-4-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <163cca54-3e0d-750d-a203-c97b2e3f2f29@redhat.com>
+ <1530270944-11351-6-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <0820efa5-1524-9039-2340-421aad88b3c5@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Suzuki,
 
 On 06/29/2018 01:15 PM, Suzuki K Poulose wrote:
-> On arm64, ID_AA64MMFR0_EL1.PARange encodes the maximum Physical
-> Address range supported by the CPU. Add a helper to decode this
-> to actual physical shift. If we hit an unallocated value, return
-> the maximum range supported by the kernel.
-> This is will be used by the KVM to set the VTCR_EL2.T0SZ, as it
-s/is// and s/the KVM/KVM
-> is about to move its place. Having this helper keeps the code
-> movement cleaner.
+> So far we have only supported 3 level page table with fixed IPA of 40bits.
+> Fix stage2_flush_memslot() to accommodate for 4 level tables.
+in 06/30 you add the justification for this change I think. worth to put
+in here as well?
+
 > 
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
 > Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: James Morse <james.morse@arm.com>
-> Cc: Christoffer Dall <cdall@kernel.org>
+> Acked-by: Christoffer Dall <cdall@kernel.org>
 > Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 > ---
-> Changes since V2:
->  - Split the patch
->  - Limit the physical shift only for values unrecognized.
-> ---
->  arch/arm64/include/asm/cpufeature.h | 13 +++++++++++++
->  1 file changed, 13 insertions(+)
+>  virt/kvm/arm/mmu.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-> index 1717ba1..855cf0e 100644
-> --- a/arch/arm64/include/asm/cpufeature.h
-> +++ b/arch/arm64/include/asm/cpufeature.h
-> @@ -530,6 +530,19 @@ void arm64_set_ssbd_mitigation(bool state);
->  static inline void arm64_set_ssbd_mitigation(bool state) {}
->  #endif
+> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+> index 1d90d79..061e6b3 100644
+> --- a/virt/kvm/arm/mmu.c
+> +++ b/virt/kvm/arm/mmu.c
+> @@ -379,7 +379,8 @@ static void stage2_flush_memslot(struct kvm *kvm,
+>  	pgd = kvm->arch.pgd + stage2_pgd_index(addr);
+>  	do {
+>  		next = stage2_pgd_addr_end(addr, end);
+> -		stage2_flush_puds(kvm, pgd, addr, next);
+> +		if (!stage2_pgd_none(*pgd))
+> +			stage2_flush_puds(kvm, pgd, addr, next);
+>  	} while (pgd++, addr = next, addr != end);
+>  }
 >  
-> +static inline u32 id_aa64mmfr0_parange_to_phys_shift(int parange)
-> +{
-> +	switch (parange) {
-> +	case 0: return 32;
-> +	case 1: return 36;
-> +	case 2: return 40;
-> +	case 3: return 42;
-> +	case 4: return 44;
-> +	case 5: return 48;
-> +	case 6: return 52;
-> +	default: return CONFIG_ARM64_PA_BITS;
-> +	}
-> +}
->  #endif /* __ASSEMBLY__ */
->  
->  #endif
->
+> 
 
+Besides
 Reviewed-by: Eric Auger <eric.auger@redhat.com>
 
 Thanks
