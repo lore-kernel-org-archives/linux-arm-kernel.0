@@ -1,32 +1,29 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 29 Jun 2018 23:22:22 +0200
-Subject: [PATCH] dma: ste_dma40: Remove VLA usage
-In-Reply-To: <20180629185107.GA37488@beast>
-References: <20180629185107.GA37488@beast>
-Message-ID: <CAK8P3a30Q1ezvCWfudUY=z1q3NHdrkbwRsmSDso4s7TifQAmNQ@mail.gmail.com>
+Date: Fri, 29 Jun 2018 23:25:05 +0200
+Subject: [PATCH] KVM: arm64: vgic-its: Remove VLA usage
+In-Reply-To: <20180629184618.GA37364@beast>
+References: <20180629184618.GA37364@beast>
+Message-ID: <CAK8P3a18SfxL5RfyrUuDGK9wr34kHEa2MxMxK1tHgRBBb7N3jQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 29, 2018 at 8:51 PM, Kees Cook <keescook@chromium.org> wrote:
+On Fri, Jun 29, 2018 at 8:46 PM, Kees Cook <keescook@chromium.org> wrote:
 > In the quest to remove all stack VLA usage from the kernel[1], this
-> switches to using a pre-allocated scratch register space, set up with
-> all other other allocations.
+> switches to using a maximum size and adds sanity checks. Additionally
+> cleans up some of the int-vs-u32 usage and adds additional bounds checking.
+> As it currently stands, this will always be 8 bytes until the ABI changes.
 >
 > [1] https://lkml.kernel.org/r/CA+55aFzCG-zNmZwX4A2FQpadafLfEzK6CC=qPXydAacU1RqZWA at mail.gmail.com
 >
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Dan Williams <dan.j.williams@intel.com>
-> Cc: Vinod Koul <vkoul@kernel.org>
+> Cc: Christoffer Dall <christoffer.dall@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Eric Auger <eric.auger@redhat.com>
+> Cc: Andre Przywara <andre.przywara@arm.com>
 > Cc: linux-arm-kernel at lists.infradead.org
-> Cc: dmaengine at vger.kernel.org
+> Cc: kvmarm at lists.cs.columbia.edu
 > Signed-off-by: Kees Cook <keescook@chromium.org>
 
-I looked too long at this one, in short:
 
-- Your change looks correct to me
-- It could be done better in many ways, all of which would
-  involve cleaning up some of the existing code in the process
-- Nobody uses this driver in practice, as the hardware platform
-  was a dead end
+Looks good to me.
 
-Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+    Arnd
