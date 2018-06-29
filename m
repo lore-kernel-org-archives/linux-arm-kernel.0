@@ -1,86 +1,57 @@
-From: david@lechnology.com (David Lechner)
-Date: Fri, 29 Jun 2018 15:35:27 -0500
-Subject: [PATCH v4 08/18] net: davinci_emac: potentially get the MAC
- address from MTD
-In-Reply-To: <e2579b81-7c66-8be6-fcad-ab7a3a5b0765@lechnology.com>
-References: <20180629094039.7543-1-brgl@bgdev.pl>
- <20180629094039.7543-9-brgl@bgdev.pl>
- <e2579b81-7c66-8be6-fcad-ab7a3a5b0765@lechnology.com>
-Message-ID: <ee49a8de-0812-a619-25be-4c6d8a35cc81@lechnology.com>
+From: trini@konsulko.com (Tom Rini)
+Date: Fri, 29 Jun 2018 16:53:06 -0400
+Subject: [U-Boot, 1/4] ARM: Introduce ability to enable ACR::IBE on
+ Cortex-A8 for CVE-2017-5715
+In-Reply-To: <20180612202411.29798-2-nm@ti.com>
+References: <20180612202411.29798-2-nm@ti.com>
+Message-ID: <20180629205306.GI18596@bill-the-cat>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/29/2018 03:09 PM, David Lechner wrote:
-> On 06/29/2018 04:40 AM, Bartosz Golaszewski wrote:
->> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->>
->> On da850-evm board we can read the MAC address from MTD. It's currently
->> done in the relevant board file, but we want to get rid of all the MAC
->> reading callbacks from the board file (SPI and NAND). Move the reading
->> of the MAC address from SPI to the emac driver's probe function.
->>
->> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->> ---
->> ? drivers/net/ethernet/ti/davinci_emac.c | 20 ++++++++++++++++++--
->> ? 1 file changed, 18 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/net/ethernet/ti/davinci_emac.c b/drivers/net/ethernet/ti/davinci_emac.c
->> index a1a6445b5a7e..48e6a7755811 100644
->> --- a/drivers/net/ethernet/ti/davinci_emac.c
->> +++ b/drivers/net/ethernet/ti/davinci_emac.c
->> @@ -67,7 +67,7 @@
->> ? #include <linux/of_irq.h>
->> ? #include <linux/of_net.h>
->> ? #include <linux/mfd/syscon.h>
->> -
->> +#include <linux/mtd/mtd.h>
->> ? #include <asm/irq.h>
->> ? #include <asm/page.h>
->> @@ -1783,7 +1783,10 @@ static int davinci_emac_probe(struct platform_device *pdev)
->> ????? struct cpdma_params dma_params;
->> ????? struct clk *emac_clk;
->> ????? unsigned long emac_bus_frequency;
->> -
->> +#ifdef CONFIG_MTD
->> +??? size_t mac_addr_len;
->> +??? struct mtd_info *mtd;
->> +#endif /* CONFIG_MTD */
->> ????? /* obtain emac clock from kernel */
->> ????? emac_clk = devm_clk_get(&pdev->dev, NULL);
->> @@ -1815,6 +1818,19 @@ static int davinci_emac_probe(struct platform_device *pdev)
->> ????????? goto err_free_netdev;
->> ????? }
->> +#ifdef CONFIG_MTD
-> 
-> What about the case when MTD is compiled as a module?
-> 
->> +??? mtd = get_mtd_device_nm("MAC-Address");
-> 
-> What about the case when PTR_ERR(mtd) == -EPROBE_DEFER?
+On Tue, Jun 12, 2018 at 03:24:08PM -0500, Nishanth Menon wrote:
 
-To answer my own question: because get_mtd_device_nm() doesn't
-ever return -EPROBE_DEFER.
-
-I'm trying to make this work on LCDK, but the emac driver probes
-before any mtd device is registered, so, I just get -ENODEV even
-though I've added a partition to the device tree labeled
-"MAC-Address". You can see in the kernel messages that MTD is
-not probed until later.
-
+> As recommended by Arm in [1], IBE[2] has to be enabled unconditionally
+> for BPIALL to be functional on Cortex-A8 processors. Provide a config
+> option for platforms to enable this option based on impact analysis
+> for products.
 > 
->> +??? if (!IS_ERR(mtd)) {
->> +??????? rc = mtd_read(mtd, 0, ETH_ALEN,
->> +????????????????? &mac_addr_len, priv->mac_addr);
->> +??????? if (rc == 0)
->> +??????????? dev_info(&pdev->dev,
->> +???????????????? "Read MAC addr from SPI Flash: %pM\n",
->> +???????????????? priv->mac_addr);
->> +??????? put_mtd_device(mtd);
->> +??? }
->> +#endif /* CONFIG_MTD */
->> +
->> ????? /* MAC addr and PHY mask , RMII enable info from platform_data */
->> ????? memcpy(priv->mac_addr, pdata->mac_addr, ETH_ALEN);
->> ????? priv->phy_id = pdata->phy_id;
->>
+> NOTE: This patch in itself is NOT the final solution, this requires:
+> a) Implementation of v7_arch_cp15_set_acr on SoCs which may not
+>    provide direct access to ACR register.
+> b) Operating Systems such as Linux to provide adequate workaround in the right
+>    locations.
+> c) This workaround applies to only the boot processor. It is important
+>    to apply workaround as necessary (context-save-restore) around low
+>    power context loss OR additional processors as necessary in either
+>    firmware support OR elsewhere in OS.
 > 
+> [1] https://developer.arm.com/support/security-update
+> [2] http://infocenter.arm.com/help/topic/com.arm.doc.ddi0344k/Bgbffjhh.html
+> 
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Robin Murphy <robin.murphy@arm.com>
+> Cc: Florian Fainelli <f.fainelli@gmail.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> Cc: Andre Przywara <Andre.Przywara@arm.com>
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Cc: Tom Rini <trini@konsulko.com>
+> Cc: Michael Nazzareno Trimarchi <michael@amarulasolutions.com>
+> 
+> Signed-off-by: Nishanth Menon <nm@ti.com>
+> Tested-by: Fabio Estevam <fabio.estevam@nxp.com>
+
+Applied to u-boot/master, thanks!
+
+-- 
+Tom
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180629/08d07bcf/attachment.sig>
