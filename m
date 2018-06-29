@@ -1,89 +1,64 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 29 Jun 2018 11:53:34 +0100
-Subject: [PATCH] arm64: acpi: reenumerate topology ids
-In-Reply-To: <d797ebc5-bd7b-4f72-d4fc-840ba7345a15@arm.com>
-References: <20180628145128.10057-1-drjones@redhat.com>
- <a38fb684-c023-1a96-464e-dd268f3132ea@arm.com>
- <d797ebc5-bd7b-4f72-d4fc-840ba7345a15@arm.com>
-Message-ID: <20180629105334.GB18043@e107155-lin>
+From: vkoul@kernel.org (Vinod)
+Date: Fri, 29 Jun 2018 16:33:46 +0530
+Subject: [PATCH v5 1/7] tty: serial: imx: correct dma cookie status
+In-Reply-To: <20180626192252.6qdpwzpbpn6s5sd3@pengutronix.de>
+References: <1529427424-12321-1-git-send-email-yibin.gong@nxp.com>
+ <1529427424-12321-2-git-send-email-yibin.gong@nxp.com>
+ <20180626192252.6qdpwzpbpn6s5sd3@pengutronix.de>
+Message-ID: <20180629110346.GD22377@vkoul-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 28, 2018 at 12:12:00PM -0500, Jeremy Linton wrote:
-> Hi,
+On 26-06-18, 21:22, Uwe Kleine-K?nig wrote:
+> On Wed, Jun 20, 2018 at 12:56:58AM +0800, Robin Gong wrote:
+> > Correct to check the right rx dma cookie status in spit of it
+> > works because only one cookie is running in the current sdma.
+> > But it will not once sdma driver support multi cookies
+> > running based on virt-dma.
+> > 
+> > Signed-off-by: Robin Gong <yibin.gong@nxp.com>
+> Looks wrong (because of tx_status vs rx_cookie), but is right
+> nevertheless I think:
+
+hehe, tx refers to transfer status for rx (receive) cookie and not
+transmit .. yeah notations can be better!
+
 > 
-> On 06/28/2018 11:30 AM, Sudeep Holla wrote:
-
-[...]
-
-> >I am not sure if we can ever guarantee that DT and ACPI will get the
-> >same ids whatever counter we use as it depends on the order presented in
-> >the firmware(DT or ACPI). So I am not for generating ids for core and
-> >threads in that way.
-> >
-> >So I would like to keep it simple and just have this counters for
-> >package ids as demonstrated in Shunyong's patch.
->
-> So, currently on a non threaded system, the core id's look nice because they
-> are just the ACPI ids. Its the package id's that look strange, we could just
-> fix the package ids, but on threaded machines the threads have the nice acpi
-> ids, and the core ids are then funny numbers. So, I suspect that is driving
-> this as much as the strange package ids.
->
-
-Yes, I know that and that's what made be look at topology_get_acpi_cpu_tag
-For me, if the PPTT has valid ID, we should use that. Just becuase DT lacks
-it and uses counter doesn't mean ACPI also needs to follow that.
-
-I am sure some vendor will put valid UID and expect that to be in the
-sysfs.
-
-> (and as a side, I actually like the PE has a acpi id behavior, but for
-> threads its being lost with this patch...)
+> Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 > 
-> Given i've seen odd package/core ids on x86s a few years ago, it never
-> bothered me much as a lot of userspace tools are just using what is
-> effectively the logical processor number anyway.
->
-
-Indeed.
-
-> Further, this table may be having some clarifications published for some of
-> these fields. I'm not sure the final wording will help us, but it might.
->
-
-I prefer that. We can then just use the IDs if valid, else offset if
-PPTT ignores those fields. What's the point in having all these in
-specification and vendors ignoring them altogether. Since this is new
-feature, we can always enforce and say we don't care if firmware doesn't,
-sorry.
-
-> >
-> >
-> >Also looking @ topology_get_acpi_cpu_tag again now, we should have
-> >valid flag check instead of level = 0. Jeremy ?
+> Thanks
+> Uwe
 > 
-> ? I'm not sure I understand, but your saying for the leaf nodes we should be
-> checking the valid flag rather than whether the caller requested level 0?
+> > ---
+> >  drivers/tty/serial/imx.c | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+> > index 4e85357..2879407 100644
+> > --- a/drivers/tty/serial/imx.c
+> > +++ b/drivers/tty/serial/imx.c
+> > @@ -1051,7 +1051,7 @@ static void imx_uart_dma_rx_callback(void *data)
+> >  	unsigned int r_bytes;
+> >  	unsigned int bd_size;
+> >  
+> > -	status = dmaengine_tx_status(chan, (dma_cookie_t)0, &state);
+> > +	status = dmaengine_tx_status(chan, sport->rx_cookie, &state);
+> >  
+> >  	if (status == DMA_ERROR) {
+> >  		imx_uart_clear_rx_errors(sport);
+> > -- 
+> > 2.7.4
+> > 
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> > 
 > 
-> I don't think that is right. The original PPTT spec is unclear about proper
-> use of the valid flag. So, while this part of the spec may be clarified in
-> the near future, (AFAIK) there are already tables in the wild which fail to
-> set valid on the leaf nodes! So I think using the level check is the safest
-> at the moment.
->
+> -- 
+> Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
 
-If it's unclear, we can fix it. I really don't like to support something
-based on the counters as the logic is arbitrary.
-
-> Depending on what happens with the next rev of the ACPI spec (or whenever)
-> some of this whole discussion might be bypassed simply by using whatever id
-> is marked valid on the node, as you suggest, but until then...
-
-I will check if that can be done or enforced. I am sure if we add some
-counter based logic, we will break something in future. So I would rather
-stay with UID/offset though it's not mandatory in the specification.
-
---
-Regards,
-Sudeep
+-- 
+~Vinod
