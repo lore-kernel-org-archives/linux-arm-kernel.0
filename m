@@ -1,47 +1,43 @@
 From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Fri, 29 Jun 2018 13:51:05 +1000
-Subject: [PATCH 6/7] arm: configs: Add USB gadget to Aspeed G5 defconfig
+Date: Fri, 29 Jun 2018 13:51:00 +1000
+Subject: [PATCH 1/7] arm: dts: aspeed: Add aspeed G4 USB pinmux
 In-Reply-To: <20180629035106.27181-1-benh@kernel.crashing.org>
 References: <20180629035106.27181-1-benh@kernel.crashing.org>
-Message-ID: <20180629035106.27181-7-benh@kernel.crashing.org>
+Message-ID: <20180629035106.27181-2-benh@kernel.crashing.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the vhub driver is upstream and the device-trees
-updated, let's enable this by default.
+Set the default pinmux for EHCI so boards don't have to do
+it an document why it is not set for UHCI.
 
 Signed-off-by: Benjamin Herrenschmidt <benh@kernel.crashing.org>
 ---
- arch/arm/configs/aspeed_g5_defconfig | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+ arch/arm/boot/dts/aspeed-g4.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm/configs/aspeed_g5_defconfig b/arch/arm/configs/aspeed_g5_defconfig
-index 8c7ea033cdc2..38e9b2d43df3 100644
---- a/arch/arm/configs/aspeed_g5_defconfig
-+++ b/arch/arm/configs/aspeed_g5_defconfig
-@@ -140,6 +140,23 @@ CONFIG_USB_DYNAMIC_MINORS=y
- CONFIG_USB_EHCI_HCD=y
- CONFIG_USB_EHCI_ROOT_HUB_TT=y
- CONFIG_USB_EHCI_HCD_PLATFORM=y
-+CONFIG_USB_GADGET=y
-+CONFIG_U_SERIAL_CONSOLE=y
-+CONFIG_USB_ASPEED_VHUB=y
-+CONFIG_USB_CONFIGFS=y
-+CONFIG_USB_CONFIGFS_SERIAL=y
-+CONFIG_USB_CONFIGFS_ACM=y
-+CONFIG_USB_CONFIGFS_OBEX=y
-+CONFIG_USB_CONFIGFS_NCM=y
-+CONFIG_USB_CONFIGFS_ECM=y
-+CONFIG_USB_CONFIGFS_ECM_SUBSET=y
-+CONFIG_USB_CONFIGFS_RNDIS=y
-+CONFIG_USB_CONFIGFS_EEM=y
-+CONFIG_USB_CONFIGFS_MASS_STORAGE=y
-+CONFIG_USB_CONFIGFS_F_LB_SS=y
-+CONFIG_USB_CONFIGFS_F_FS=y
-+CONFIG_USB_CONFIGFS_F_HID=y
-+CONFIG_USB_CONFIGFS_F_PRINTER=y
- CONFIG_NEW_LEDS=y
- CONFIG_LEDS_CLASS=y
- CONFIG_LEDS_CLASS_FLASH=y
+diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
+index 75df1573380e..1d7ffa9fdb11 100644
+--- a/arch/arm/boot/dts/aspeed-g4.dtsi
++++ b/arch/arm/boot/dts/aspeed-g4.dtsi
+@@ -113,6 +113,8 @@
+ 			reg = <0x1e6a1000 0x100>;
+ 			interrupts = <5>;
+ 			clocks = <&syscon ASPEED_CLK_GATE_USBPORT1CLK>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_usb2h_default>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -123,6 +125,10 @@
+ 			#ports = <3>;
+ 			clocks = <&syscon ASPEED_CLK_GATE_USBUHCICLK>;
+ 			status = "disabled";
++			/*
++			 * No default pinmux, it will follow EHCI, use an explicit pinmux
++			 * override if you don't enable EHCI
++			 */
+ 		};
+ 
+ 		apb {
 -- 
 2.17.1
