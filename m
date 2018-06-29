@@ -1,27 +1,25 @@
 From: lkp@intel.com (kbuild test robot)
-Date: Sat, 30 Jun 2018 06:22:16 +0800
-Subject: [rjarzmik:pxa/for-next 17/17] sound/arm/pxa2xx-pcm-lib.c:128:51:
- sparse: call with no type!
-Message-ID: <201806300612.SzBlvRq2%fengguang.wu@intel.com>
+Date: Sat, 30 Jun 2018 06:24:36 +0800
+Subject: [rjarzmik:pxa/for-next 17/17] sound/arm/pxa2xx-pcm-lib.c:129:6:
+ error: 'pxad_filter_fn' undeclared; did you mean 'dma_filter_fn'?
+Message-ID: <201806300632.BcUpBL8f%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 tree:   https://github.com/rjarzmik/linux pxa/for-next
 head:   0d0b16b8e008825834684163799ab944920aabce
 commit: 0d0b16b8e008825834684163799ab944920aabce [17/17] dmaengine: pxa: make the filter function internal
+config: i386-allmodconfig (attached as .config)
+compiler: gcc-7 (Debian 7.3.0-16) 7.3.0
 reproduce:
-        # apt-get install sparse
         git checkout 0d0b16b8e008825834684163799ab944920aabce
-        make ARCH=x86_64 allmodconfig
-        make C=1 CF=-D__CHECK_ENDIAN__
+        # save the attached .config to linux build tree
+        make ARCH=i386 
 
+All errors (new ones prefixed by >>):
 
-sparse warnings: (new ones prefixed by >>)
-
-   sound/arm/pxa2xx-pcm-lib.c:129:41: sparse: undefined identifier 'pxad_filter_fn'
->> sound/arm/pxa2xx-pcm-lib.c:128:51: sparse: call with no type!
    sound/arm/pxa2xx-pcm-lib.c: In function '__pxa2xx_pcm_open':
-   sound/arm/pxa2xx-pcm-lib.c:129:6: error: 'pxad_filter_fn' undeclared (first use in this function); did you mean 'dma_filter_fn'?
+>> sound/arm/pxa2xx-pcm-lib.c:129:6: error: 'pxad_filter_fn' undeclared (first use in this function); did you mean 'dma_filter_fn'?
          pxad_filter_fn,
          ^~~~~~~~~~~~~~
          dma_filter_fn
@@ -30,7 +28,7 @@ sparse warnings: (new ones prefixed by >>)
     }
     ^
 
-vim +128 sound/arm/pxa2xx-pcm-lib.c
+vim +129 sound/arm/pxa2xx-pcm-lib.c
 
 a6d77317 Dmitry Eremin-Solenikov 2008-09-10   94  
 a6d77317 Dmitry Eremin-Solenikov 2008-09-10   95  int __pxa2xx_pcm_open(struct snd_pcm_substream *substream)
@@ -66,14 +64,14 @@ a6d77317 Dmitry Eremin-Solenikov 2008-09-10  124  					    SNDRV_PCM_HW_PARAM_PE
 a6d77317 Dmitry Eremin-Solenikov 2008-09-10  125  	if (ret < 0)
 a6d77317 Dmitry Eremin-Solenikov 2008-09-10  126  		return ret;
 58ceb57e Daniel Mack             2015-09-30  127  
-58ceb57e Daniel Mack             2015-09-30 @128  	return snd_dmaengine_pcm_open_request_chan(substream,
+58ceb57e Daniel Mack             2015-09-30  128  	return snd_dmaengine_pcm_open_request_chan(substream,
 58ceb57e Daniel Mack             2015-09-30 @129  					pxad_filter_fn,
 58ceb57e Daniel Mack             2015-09-30  130  					dma_params->filter_data);
 a6d77317 Dmitry Eremin-Solenikov 2008-09-10  131  }
 a6d77317 Dmitry Eremin-Solenikov 2008-09-10  132  EXPORT_SYMBOL(__pxa2xx_pcm_open);
 a6d77317 Dmitry Eremin-Solenikov 2008-09-10  133  
 
-:::::: The code at line 128 was first introduced by commit
+:::::: The code at line 129 was first introduced by commit
 :::::: 58ceb57ec1be928bec2faeca11fe0752f930669d ASoC: pxa: pxa-pcm-lib: switch over to snd-soc-dmaengine-pcm
 
 :::::: TO: Daniel Mack <zonque@gmail.com>
@@ -82,3 +80,10 @@ a6d77317 Dmitry Eremin-Solenikov 2008-09-10  133
 ---
 0-DAY kernel test infrastructure                Open Source Technology Center
 https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 64130 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180630/04a6e41a/attachment-0001.gz>
