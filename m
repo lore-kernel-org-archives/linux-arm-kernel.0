@@ -1,76 +1,64 @@
-From: david@lechnology.com (David Lechner)
-Date: Fri, 29 Jun 2018 15:09:34 -0500
-Subject: [PATCH v4 08/18] net: davinci_emac: potentially get the MAC
- address from MTD
-In-Reply-To: <20180629094039.7543-9-brgl@bgdev.pl>
-References: <20180629094039.7543-1-brgl@bgdev.pl>
- <20180629094039.7543-9-brgl@bgdev.pl>
-Message-ID: <e2579b81-7c66-8be6-fcad-ab7a3a5b0765@lechnology.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Fri, 29 Jun 2018 13:19:47 -0700
+Subject: [PATCH] arm64: Clear the stack
+In-Reply-To: <20180629190553.7282-1-labbott@redhat.com>
+References: <20180629190553.7282-1-labbott@redhat.com>
+Message-ID: <CAGXu5jL8kZHtg-MdScZ5m_6xH_Ho4TsdKGWH83zEL9Y5rutncw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/29/2018 04:40 AM, Bartosz Golaszewski wrote:
-> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> 
-> On da850-evm board we can read the MAC address from MTD. It's currently
-> done in the relevant board file, but we want to get rid of all the MAC
-> reading callbacks from the board file (SPI and NAND). Move the reading
-> of the MAC address from SPI to the emac driver's probe function.
-> 
-> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> ---
->   drivers/net/ethernet/ti/davinci_emac.c | 20 ++++++++++++++++++--
->   1 file changed, 18 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/net/ethernet/ti/davinci_emac.c b/drivers/net/ethernet/ti/davinci_emac.c
-> index a1a6445b5a7e..48e6a7755811 100644
-> --- a/drivers/net/ethernet/ti/davinci_emac.c
-> +++ b/drivers/net/ethernet/ti/davinci_emac.c
-> @@ -67,7 +67,7 @@
->   #include <linux/of_irq.h>
->   #include <linux/of_net.h>
->   #include <linux/mfd/syscon.h>
-> -
-> +#include <linux/mtd/mtd.h>
->   #include <asm/irq.h>
->   #include <asm/page.h>
->   
-> @@ -1783,7 +1783,10 @@ static int davinci_emac_probe(struct platform_device *pdev)
->   	struct cpdma_params dma_params;
->   	struct clk *emac_clk;
->   	unsigned long emac_bus_frequency;
-> -
-> +#ifdef CONFIG_MTD
-> +	size_t mac_addr_len;
-> +	struct mtd_info *mtd;
-> +#endif /* CONFIG_MTD */
->   
->   	/* obtain emac clock from kernel */
->   	emac_clk = devm_clk_get(&pdev->dev, NULL);
-> @@ -1815,6 +1818,19 @@ static int davinci_emac_probe(struct platform_device *pdev)
->   		goto err_free_netdev;
->   	}
->   
-> +#ifdef CONFIG_MTD
+On Fri, Jun 29, 2018 at 12:05 PM, Laura Abbott <labbott@redhat.com> wrote:
+> Implementation of stackleak based heavily on the x86 version
+>
+> Signed-off-by: Laura Abbott <labbott@redhat.com>
+> [...]
+> +#define current_top_of_stack() (task_stack_page(current) + THREAD_SIZE)
+> +#define on_thread_stack()      (on_task_stack(current, current_stack_pointer))
 
-What about the case when MTD is compiled as a module?
+nit on types here. I get some warnings:
 
-> +	mtd = get_mtd_device_nm("MAC-Address");
+kernel/stackleak.c:55:12: warning: assignment makes integer from
+pointer without a cast [-Wint-conversion]
+   boundary = current_top_of_stack();
+            ^
+kernel/stackleak.c:65:24: warning: assignment makes integer from
+pointer without a cast [-Wint-conversion]
+  current->lowest_stack = current_top_of_stack() - THREAD_SIZE / 64;
+                        ^
 
-What about the case when PTR_ERR(mtd) == -EPROBE_DEFER?
+So I think this needs to be:
 
-> +	if (!IS_ERR(mtd)) {
-> +		rc = mtd_read(mtd, 0, ETH_ALEN,
-> +			      &mac_addr_len, priv->mac_addr);
-> +		if (rc == 0)
-> +			dev_info(&pdev->dev,
-> +				 "Read MAC addr from SPI Flash: %pM\n",
-> +				 priv->mac_addr);
-> +		put_mtd_device(mtd);
-> +	}
-> +#endif /* CONFIG_MTD */
-> +
->   	/* MAC addr and PHY mask , RMII enable info from platform_data */
->   	memcpy(priv->mac_addr, pdata->mac_addr, ETH_ALEN);
->   	priv->phy_id = pdata->phy_id;
-> 
++#define current_top_of_stack() ((unsigned long)task_stack_page(current) + \
++                                THREAD_SIZE)
+
+> diff --git a/scripts/Makefile.gcc-plugins b/scripts/Makefile.gcc-plugins
+> index a535742a1c06..972ce4ca7f6a 100644
+> --- a/scripts/Makefile.gcc-plugins
+> +++ b/scripts/Makefile.gcc-plugins
+> @@ -37,11 +37,14 @@ ifdef CONFIG_GCC_PLUGINS
+>
+>    gcc-plugin-$(CONFIG_GCC_PLUGIN_STACKLEAK)    += stackleak_plugin.so
+>    gcc-plugin-cflags-$(CONFIG_GCC_PLUGIN_STACKLEAK)     += -DSTACKLEAK_PLUGIN -fplugin-arg-stackleak_plugin-track-min-size=$(CONFIG_STACKLEAK_TRACK_MIN_SIZE)
+> +  ifdef CONFIG_GCC_PLUGIN_STACKLEAK
+> +    DISABLE_STACKLEAK_PLUGIN           += -fplugin-arg-stackleak_plugin-disable
+> +  endif
+>
+>    GCC_PLUGINS_CFLAGS := $(strip $(addprefix -fplugin=$(objtree)/scripts/gcc-plugins/, $(gcc-plugin-y)) $(gcc-plugin-cflags-y))
+>
+>    export PLUGINCC GCC_PLUGINS_CFLAGS GCC_PLUGIN GCC_PLUGIN_SUBDIR
+> -  export SANCOV_PLUGIN DISABLE_LATENT_ENTROPY_PLUGIN
+> +  export SANCOV_PLUGIN DISABLE_LATENT_ENTROPY_PLUGIN DISABLE_STACKLEAK_PLUGIN
+>
+>    ifneq ($(PLUGINCC),)
+>      # SANCOV_PLUGIN can be only in CFLAGS_KCOV because avoid duplication.
+
+If there is a v14, I think this hunk should be taken there, since it's
+part of the common code.
+
+Otherwise, this works for me and passes the lkdtm tests.
+
+-Kees
+
+-- 
+Kees Cook
+Pixel Security
