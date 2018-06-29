@@ -1,94 +1,58 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 28 Jun 2018 20:00:15 -0700
-Subject: [PATCH v4 1/6] Documentation: DT: Consolidate SP805 binding docs
-In-Reply-To: <42b856bf-2dc1-f69b-44e1-f5a04715f673@broadcom.com>
-References: <1527530497-10392-2-git-send-email-ray.jui@broadcom.com>
- <20180605194124.GA26885@rob-hp-laptop>
- <e91c75f3-f7a4-6f51-9911-7e22d5d05084@roeck-us.net>
- <CABGGisxEvWDy16SKE2RG-vhUHBZHSCCHyfwJsPY16B1fQS-=cA@mail.gmail.com>
- <09c870cd-0a44-6634-58d8-f57f9fcd0cb5@broadcom.com>
- <46ca340f-4347-94ca-6463-d38bece820e2@broadcom.com>
- <20180627183327.GD16753@roeck-us.net>
- <a18733e2-be06-4ea9-dbfb-1d4f756a97e7@broadcom.com>
- <20180627184234.GA19538@roeck-us.net>
- <8483f675-0c7d-4b0f-25fd-a5eff4bc7937@broadcom.com>
- <20180627185529.GB19743@roeck-us.net>
- <42b856bf-2dc1-f69b-44e1-f5a04715f673@broadcom.com>
-Message-ID: <08e99a9e-1d87-f8c3-f566-73ef8cbf1111@roeck-us.net>
+From: ravi.bangoria@linux.ibm.com (Ravi Bangoria)
+Date: Fri, 29 Jun 2018 08:53:28 +0530
+Subject: [PATCH v5 06/10] Uprobes: Support SDT markers having reference
+ count (semaphore)
+In-Reply-To: <20180628195106.GA3952@redhat.com>
+References: <20180628052209.13056-1-ravi.bangoria@linux.ibm.com>
+ <20180628052209.13056-7-ravi.bangoria@linux.ibm.com>
+ <20180628195106.GA3952@redhat.com>
+Message-ID: <cd95a4cc-4301-0dca-5fdd-53cc016dcfe1@linux.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/28/2018 04:50 PM, Ray Jui wrote:
-> Hi Guenter/Florian,
+Hi Oleg,
+
+On 06/29/2018 01:21 AM, Oleg Nesterov wrote:
+> I have to admit that after a quick glance I can't understand this patch
+> at all... I'll try to read it again tomorrow, but could you at least explain
+> how find_node_in_range/build_probe_list can work if off_type==REF_CTR_OFFSET?
 > 
-> On 6/27/2018 11:55 AM, Guenter Roeck wrote:
->> On Wed, Jun 27, 2018 at 11:47:21AM -0700, Ray Jui wrote:
->>>
->>>
->>> On 6/27/2018 11:42 AM, Guenter Roeck wrote:
->>>> On Wed, Jun 27, 2018 at 11:38:48AM -0700, Ray Jui wrote:
->>>>>
->>>>>
->>>>> On 6/27/2018 11:33 AM, Guenter Roeck wrote:
->>>>>> On Wed, Jun 20, 2018 at 10:39:16AM -0700, Ray Jui wrote:
->>>>>>> Hi Guenter/Rob,
->>>>>>>
->>>>>>> Kindly let me know how you want to proceed with this?
->>>>>>>
->>>>>>
->>>>>> If I recall correctly, the patch series does not add a new problem
->>>>>> but merely exposes one. Is my recollection correct ? If so, maybe
->>>>>> we should just add a note somewhere indicating what might be wrong
->>>>>> and otherwise apply the series.
->>>>>>
->>>>>> Does this make sense ?
->>>>>
->>>>> Yes this makes a lot of sense to me. This patch series exposes potential
->>>>> problems in some SoCs that they might not be feeding the correct clock into
->>>>> WDT, at least based on clock names from their DT entries.
->>>>>
->>>>> This patch series does not change/affect how SP805 works on those systems.
->>>>>
->>>>> Where should the note be added?
->>>>>
->>>>
->>>> I would suggest to add a note into the driver where the clock is used,
->>>> with the details discussed here.
->>>
->>> I assume you meant adding the notes to the SP805 driver where the clock is
->>> used.
->>>
->>> If so, I think that makes sense. That notes deserves its own patch because
->>> it really has nothing to do with any of the change in this patch series.
->>>
->>> Do you want me to 1) embed that patch into this patch series and send out
->>> v5; or 2) leave the patch series as it is and send out a separate patch to
->>> add the notes to the driver?
->>>
->> 2) is fine. I don't have the series here right now; if I recall correctly
->> all patches in the series are all marked as Reviewed-by: and/or Acked-by:.
->> If so, I'll apply them to my tree tonight, or at least the ones that will
->> go in through the watchdog tree.
+> On 06/28, Ravi Bangoria wrote:
 >>
->> Guenter
->>
+>> -find_node_in_range(struct inode *inode, loff_t min, loff_t max)
+>> +find_node_in_range(struct inode *inode, int off_type, loff_t min, loff_t max)
+>>  {
+>>  	struct rb_node *n = uprobes_tree.rb_node;
+>>  
+>>  	while (n) {
+>>  		struct uprobe *u = rb_entry(n, struct uprobe, rb_node);
+>> +		loff_t offset = uprobe_get_offset(u, off_type);
+>>  
+>>  		if (inode < u->inode) {
+>>  			n = n->rb_left;
+>>  		} else if (inode > u->inode) {
+>>  			n = n->rb_right;
+>>  		} else {
+>> -			if (max < u->offset)
+>> +			if (max < offset)
+>>  				n = n->rb_left;
+>> -			else if (min > u->offset)
+>> +			else if (min > offset)
+>>  				n = n->rb_right;
+>>  			else
+>>  				break;
 > 
-> Guenter, please let us know once you take the first 4 patches.
+> To simplify, lets forget about uprobe->inode (which acts as a key too). So uprobes_tree
+> is a binary tree sorted by uprobe->offset key and that is why the binary search works.
+> 
+> But it is not sorted by uprobe->ref_ctr_offset. So for example n->rb_left can have the
+> n->ref_ctr_offset key that is greater than the n's ref_ctr_offset. So how we can use the
+> binary search if REF_CTR_OFFSET?
+> 
+> I must have missed something, I assume you tested this patch and it works somehow...
 > 
 
-Patches are in my tree. Wim, it would be great if you can pick up the tree
-so it shows up in -next.
+Right, I've misinterpreted that code. Will check it.
 
-Thanks,
-Guenter
-
-> Florian, could you please help with the last 2, once Guenter confirmed the first 4 are merged.
-> 
-> Thanks!
-> 
-> Ray
-> -- 
-> To unsubscribe from this list: send the line "unsubscribe linux-watchdog" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at? http://vger.kernel.org/majordomo-info.html
-> 
+Thanks for explaining,
+Ravi
