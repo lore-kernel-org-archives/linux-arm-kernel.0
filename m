@@ -1,96 +1,96 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 29 Jun 2018 14:29:23 +0100
-Subject: [PATCH v3 5/7] arm64: perf: Clean up armv8pmu_select_counter
-In-Reply-To: <1529403342-17899-6-git-send-email-suzuki.poulose@arm.com>
-References: <1529403342-17899-1-git-send-email-suzuki.poulose@arm.com>
- <1529403342-17899-6-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20180629132922.la6lntd54kut5c4y@lakrids.cambridge.arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Fri, 29 Jun 2018 14:29:34 +0100
+Subject: [PATCH] arm64: acpi: reenumerate topology ids
+In-Reply-To: <20180629112354.hefdl2pe72frl6x3@kamzik.brq.redhat.com>
+References: <20180628145128.10057-1-drjones@redhat.com>
+ <a38fb684-c023-1a96-464e-dd268f3132ea@arm.com>
+ <20180628173243.obydzakh2stfs26w@kamzik.brq.redhat.com>
+ <20180629102927.GA18043@e107155-lin>
+ <20180629112354.hefdl2pe72frl6x3@kamzik.brq.redhat.com>
+Message-ID: <20180629132934.GA16282@e107155-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 19, 2018 at 11:15:40AM +0100, Suzuki K Poulose wrote:
-> armv8pmu_select_counter always returns the passed idx. So
-> let us make that void and get rid of the pointless checks.
+On Fri, Jun 29, 2018 at 01:23:54PM +0200, Andrew Jones wrote:
+> On Fri, Jun 29, 2018 at 11:29:27AM +0100, Sudeep Holla wrote:
+> > On Thu, Jun 28, 2018 at 07:32:43PM +0200, Andrew Jones wrote:
+> > > On Thu, Jun 28, 2018 at 05:30:51PM +0100, Sudeep Holla wrote:
+> > > > I am not sure if we can ever guarantee that DT and ACPI will get the
+> > > > same ids whatever counter we use as it depends on the order presented in
+> > > > the firmware(DT or ACPI). So I am not for generating ids for core and
+> > > > threads in that way.
+> > >
+> > > I don't believe we have to guarantee that the exact (package,core,thread)
+> > > triplet describing a PE with DT matches ACPI. We just need to guarantee
+> > > that each triplet we select properly puts a PE in the same group as its
+> > > peers. So, as long as we keep the grouping described by DT or ACPI, then
+> > > the (package,core,thread) IDs assigned are pretty arbitrary.
+> > >
+> > 
+> > If that's the requirement, we already do that. The IDs are just too
+> > arbitrary :)
 > 
-> Suggested-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> Right. The patch doesn't fix anything, it just makes the IDs less weird
+> looking to humans, and brings some consistency to IDs across systems
+> and hardware descriptions.
+>
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
+I agree, but don't think counter like this will be harmless. It can create
+some other inconsistency in some other way.
 
-Mark.
-
-> ---
->  arch/arm64/kernel/perf_event.c | 29 +++++++++++++++++++----------
->  1 file changed, 19 insertions(+), 10 deletions(-)
+> > 
+> > > I could change the commit message to state we can generate IDs *like*
+> > > DT does (i.e. with counters), even if they may not result in identical
+> > > triplet to PE mappings.
+> > >
+> > 
+> > Why we need to make it *like DT* ?
 > 
-> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-> index 66a2ffd..9ce3729 100644
-> --- a/arch/arm64/kernel/perf_event.c
-> +++ b/arch/arm64/kernel/perf_event.c
-> @@ -503,13 +503,17 @@ static inline int armv8pmu_counter_has_overflowed(u32 pmnc, int idx)
->  	return pmnc & BIT(ARMV8_IDX_TO_COUNTER(idx));
->  }
->  
-> -static inline int armv8pmu_select_counter(int idx)
-> +static inline void armv8pmu_select_counter(int idx)
->  {
->  	u32 counter = ARMV8_IDX_TO_COUNTER(idx);
->  	write_sysreg(counter, pmselr_el0);
->  	isb();
-> +}
->  
-> -	return idx;
-> +static inline u32 armv8pmu_read_evcntr(int idx)
-> +{
-> +	armv8pmu_select_counter(idx);
-> +	return read_sysreg(pmxevcntr_el0);
->  }
->  
->  static inline u64 armv8pmu_read_counter(struct perf_event *event)
-> @@ -524,12 +528,18 @@ static inline u64 armv8pmu_read_counter(struct perf_event *event)
->  			smp_processor_id(), idx);
->  	else if (idx == ARMV8_IDX_CYCLE_COUNTER)
->  		value = read_sysreg(pmccntr_el0);
-> -	else if (armv8pmu_select_counter(idx) == idx)
-> -		value = read_sysreg(pmxevcntr_el0);
-> +	else
-> +		value = armv8pmu_read_evcntr(idx);
->  
->  	return value;
->  }
->  
-> +static inline void armv8pmu_write_evcntr(int idx, u32 value)
-> +{
-> +	armv8pmu_select_counter(idx);
-> +	write_sysreg(value, pmxevcntr_el0);
-> +}
-> +
->  static inline void armv8pmu_write_counter(struct perf_event *event, u64 value)
->  {
->  	struct arm_pmu *cpu_pmu = to_arm_pmu(event->pmu);
-> @@ -547,16 +557,15 @@ static inline void armv8pmu_write_counter(struct perf_event *event, u64 value)
->  		 */
->  		value |= 0xffffffff00000000ULL;
->  		write_sysreg(value, pmccntr_el0);
-> -	} else if (armv8pmu_select_counter(idx) == idx)
-> -		write_sysreg(value, pmxevcntr_el0);
-> +	} else
-> +		armv8pmu_write_evcntr(idx, value);
->  }
->  
->  static inline void armv8pmu_write_evtype(int idx, u32 val)
->  {
-> -	if (armv8pmu_select_counter(idx) == idx) {
-> -		val &= ARMV8_PMU_EVTYPE_MASK;
-> -		write_sysreg(val, pmxevtyper_el0);
-> -	}
-> +	armv8pmu_select_counter(idx);
-> +	val &= ARMV8_PMU_EVTYPE_MASK;
-> +	write_sysreg(val, pmxevtyper_el0);
->  }
->  
->  static inline int armv8pmu_enable_counter(int idx)
-> -- 
-> 2.7.4
+> Because the DT parser considers human readers, which, IMHO, is nicer.
 > 
+> The consistency remapping to counters brings shouldn't be overlooked. If
+> both ACPI and DT present the CPUs in the same order (i.e.  cpu0 is mpidr0,
+> cpu1 is mpidr1, ...) using their respective descriptions, then this patch
+> will ensure topology IDs are the same. 
+
+Yes, it's all fine in theory. But firmware is the one presenting it and
+ACPI PPTT has UID for a reason and I want that to be the single source
+for these IDs.
+
+> Also, when going from machine to
+> machine, it's nice to expect package/core/thread-id to be within
+> the same range and to vary by a set difference (1), rather than have
+> IDs that increment by 20 on one system and by 160 on another,
+> depending on how the ACPI table nodes are laid out.
+>
+
+If it matters a lot, vendors must use UID for consistency. Since OS doesn't
+use those IDs for any particular reason, OS must not care.
+
+> > 
+> > > >
+> > > > So I would like to keep it simple and just have this counters for
+> > > > package ids as demonstrated in Shunyong's patch.
+> > > >
+> > >
+> > > If we don't also handle cores when there are threads, then the cores
+> > > will also end up having weird IDs.
+> > >
+> > 
+> > Yes, but if PPTT says it has valid ID, I would prefer that over DT like
+> > generated.
+> 
+> Valid *ACPI* ID, which just means it's a guaranteed unique ACPI UID,
+> which isn't likely going to be anything useful to a user.
+> 
+
+How is that different from OS generated one from user's perspective ?
+Vendors might assign sockets UID and he may help them to replace one.
+Having some generated counter based id is not helpful.
+
+So if someone needs to have valid IDs there, better to pass it via PPTT.
+OS will otherwise put any value(current offset is good choice)
+
+--
+Regards,
+Sudeep
