@@ -1,57 +1,72 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 29 Jun 2018 12:15:23 +0100
-Subject: [PATCH v3 03/20] arm64: Add a helper for PARange to physical shift
- conversion
+Date: Fri, 29 Jun 2018 12:15:22 +0100
+Subject: [PATCH v3 02/20] virtio: pci-legacy: Validate queue pfn
 In-Reply-To: <1530270944-11351-1-git-send-email-suzuki.poulose@arm.com>
 References: <1530270944-11351-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1530270944-11351-4-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1530270944-11351-3-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On arm64, ID_AA64MMFR0_EL1.PARange encodes the maximum Physical
-Address range supported by the CPU. Add a helper to decode this
-to actual physical shift. If we hit an unallocated value, return
-the maximum range supported by the kernel.
-This is will be used by the KVM to set the VTCR_EL2.T0SZ, as it
-is about to move its place. Having this helper keeps the code
-movement cleaner.
+Legacy PCI over virtio uses a 32bit PFN for the queue. If the
+queue pfn is too large to fit in 32bits, which we could hit on
+arm64 systems with 52bit physical addresses (even with 64K page
+size), we simply miss out a proper link to the other side of
+the queue.
 
-Cc: Catalin Marinas <catalin.marinas@arm.com>
+Add a check to validate the PFN, rather than silently breaking
+the devices.
+
+Cc: "Michael S. Tsirkin" <mst@redhat.com>
+Cc: Jason Wang <jasowang@redhat.com>
 Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: James Morse <james.morse@arm.com>
 Cc: Christoffer Dall <cdall@kernel.org>
+Cc: Peter Maydel <peter.maydell@linaro.org>
+Cc: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
-Changes since V2:
- - Split the patch
- - Limit the physical shift only for values unrecognized.
+Changes since v2:
+ - Change errno to -E2BIG
 ---
- arch/arm64/include/asm/cpufeature.h | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ drivers/virtio/virtio_pci_legacy.c | 12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index 1717ba1..855cf0e 100644
---- a/arch/arm64/include/asm/cpufeature.h
-+++ b/arch/arm64/include/asm/cpufeature.h
-@@ -530,6 +530,19 @@ void arm64_set_ssbd_mitigation(bool state);
- static inline void arm64_set_ssbd_mitigation(bool state) {}
- #endif
+diff --git a/drivers/virtio/virtio_pci_legacy.c b/drivers/virtio/virtio_pci_legacy.c
+index 2780886..c0d6987a 100644
+--- a/drivers/virtio/virtio_pci_legacy.c
++++ b/drivers/virtio/virtio_pci_legacy.c
+@@ -122,6 +122,7 @@ static struct virtqueue *setup_vq(struct virtio_pci_device *vp_dev,
+ 	struct virtqueue *vq;
+ 	u16 num;
+ 	int err;
++	u64 q_pfn;
  
-+static inline u32 id_aa64mmfr0_parange_to_phys_shift(int parange)
-+{
-+	switch (parange) {
-+	case 0: return 32;
-+	case 1: return 36;
-+	case 2: return 40;
-+	case 3: return 42;
-+	case 4: return 44;
-+	case 5: return 48;
-+	case 6: return 52;
-+	default: return CONFIG_ARM64_PA_BITS;
+ 	/* Select the queue we're interested in */
+ 	iowrite16(index, vp_dev->ioaddr + VIRTIO_PCI_QUEUE_SEL);
+@@ -141,9 +142,15 @@ static struct virtqueue *setup_vq(struct virtio_pci_device *vp_dev,
+ 	if (!vq)
+ 		return ERR_PTR(-ENOMEM);
+ 
++	q_pfn = virtqueue_get_desc_addr(vq) >> VIRTIO_PCI_QUEUE_ADDR_SHIFT;
++	if (q_pfn >> 32) {
++		dev_err(&vp_dev->pci_dev->dev, "virtio-pci queue PFN too large\n");
++		err = -E2BIG;
++		goto out_del_vq;
 +	}
-+}
- #endif /* __ASSEMBLY__ */
++
+ 	/* activate the queue */
+-	iowrite32(virtqueue_get_desc_addr(vq) >> VIRTIO_PCI_QUEUE_ADDR_SHIFT,
+-		  vp_dev->ioaddr + VIRTIO_PCI_QUEUE_PFN);
++	iowrite32(q_pfn, vp_dev->ioaddr + VIRTIO_PCI_QUEUE_PFN);
  
- #endif
+ 	vq->priv = (void __force *)vp_dev->ioaddr + VIRTIO_PCI_QUEUE_NOTIFY;
+ 
+@@ -160,6 +167,7 @@ static struct virtqueue *setup_vq(struct virtio_pci_device *vp_dev,
+ 
+ out_deactivate:
+ 	iowrite32(0, vp_dev->ioaddr + VIRTIO_PCI_QUEUE_PFN);
++out_del_vq:
+ 	vring_del_virtqueue(vq);
+ 	return ERR_PTR(err);
+ }
 -- 
 2.7.4
