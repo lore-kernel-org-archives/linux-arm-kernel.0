@@ -1,43 +1,88 @@
-From: dianders@chromium.org (Douglas Anderson)
-Date: Fri, 29 Jun 2018 11:45:27 -0700
-Subject: [PATCH] arm64: dts: sdm845: Default qupv3_id_0 as "disabled" like
- _id_1
-Message-ID: <20180629184527.161970-1-dianders@chromium.org>
+From: keescook@chromium.org (Kees Cook)
+Date: Fri, 29 Jun 2018 11:46:18 -0700
+Subject: [PATCH] KVM: arm64: vgic-its: Remove VLA usage
+Message-ID: <20180629184618.GA37364@beast>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In commit 8e4947ee477d ("arm64: dts: qcom: sdm845: Add I2C, SPI, and
-UART9 nodes") I accidentally forgot to add the line:
+In the quest to remove all stack VLA usage from the kernel[1], this
+switches to using a maximum size and adds sanity checks. Additionally
+cleans up some of the int-vs-u32 usage and adds additional bounds checking.
+As it currently stands, this will always be 8 bytes until the ABI changes.
 
-  status = "disabled";
+[1] https://lkml.kernel.org/r/CA+55aFzCG-zNmZwX4A2FQpadafLfEzK6CC=qPXydAacU1RqZWA at mail.gmail.com
 
-to qupv3_id_0 to match qupv3_id_1.  Add it now.  NOTE: right now the
-only sdm845 board with a device tree in mainline is MTP and that board
-currently doesn't have any peripherals under qupv3_id_0.  If any board
-was currently using peripherals under qupv3_id_0 then that board would
-need to add this snippet to their board dts file:
-
-  &qupv3_id_0 {
-     status = "okay";
-  };
-
-Signed-off-by: Douglas Anderson <dianders@chromium.org>
+Cc: Christoffer Dall <christoffer.dall@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Eric Auger <eric.auger@redhat.com>
+Cc: Andre Przywara <andre.przywara@arm.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: kvmarm at lists.cs.columbia.edu
+Signed-off-by: Kees Cook <keescook@chromium.org>
 ---
+ virt/kvm/arm/vgic/vgic-its.c | 19 +++++++++++++++----
+ 1 file changed, 15 insertions(+), 4 deletions(-)
 
- arch/arm64/boot/dts/qcom/sdm845.dtsi | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-index 00722b533a92..9c10ff5e5843 100644
---- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
-+++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-@@ -258,6 +258,7 @@
- 			#address-cells = <1>;
- 			#size-cells = <1>;
- 			ranges;
-+			status = "disabled";
+diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+index 4ed79c939fb4..3143fc047fcf 100644
+--- a/virt/kvm/arm/vgic/vgic-its.c
++++ b/virt/kvm/arm/vgic/vgic-its.c
+@@ -168,8 +168,14 @@ struct vgic_its_abi {
+ 	int (*commit)(struct vgic_its *its);
+ };
  
- 			i2c0: i2c at 880000 {
- 				compatible = "qcom,geni-i2c";
++#define ABI_0_ESZ	8
++#define ESZ_MAX		ABI_0_ESZ
++
+ static const struct vgic_its_abi its_table_abi_versions[] = {
+-	[0] = {.cte_esz = 8, .dte_esz = 8, .ite_esz = 8,
++	[0] = {
++	 .cte_esz = ABI_0_ESZ,
++	 .dte_esz = ABI_0_ESZ,
++	 .ite_esz = ABI_0_ESZ,
+ 	 .save_tables = vgic_its_save_tables_v0,
+ 	 .restore_tables = vgic_its_restore_tables_v0,
+ 	 .commit = vgic_its_commit_v0,
+@@ -180,10 +186,12 @@ static const struct vgic_its_abi its_table_abi_versions[] = {
+ 
+ inline const struct vgic_its_abi *vgic_its_get_abi(struct vgic_its *its)
+ {
++	if (WARN_ON(its->abi_rev >= NR_ITS_ABIS))
++		return NULL;
+ 	return &its_table_abi_versions[its->abi_rev];
+ }
+ 
+-int vgic_its_set_abi(struct vgic_its *its, int rev)
++static int vgic_its_set_abi(struct vgic_its *its, u32 rev)
+ {
+ 	const struct vgic_its_abi *abi;
+ 
+@@ -1881,16 +1889,19 @@ typedef int (*entry_fn_t)(struct vgic_its *its, u32 id, void *entry,
+  * Return: < 0 on error, 0 if last element was identified, 1 otherwise
+  * (the last element may not be found on second level tables)
+  */
+-static int scan_its_table(struct vgic_its *its, gpa_t base, int size, int esz,
++static int scan_its_table(struct vgic_its *its, gpa_t base, int size, u32 esz,
+ 			  int start_id, entry_fn_t fn, void *opaque)
+ {
+ 	struct kvm *kvm = its->dev->kvm;
+ 	unsigned long len = size;
+ 	int id = start_id;
+ 	gpa_t gpa = base;
+-	char entry[esz];
++	char entry[ESZ_MAX];
+ 	int ret;
+ 
++	if (WARN_ON(esz > ESZ_MAX))
++		return -EINVAL;
++
+ 	memset(entry, 0, esz);
+ 
+ 	while (len > 0) {
 -- 
-2.18.0.399.gad0ab374a1-goog
+2.17.1
+
+
+-- 
+Kees Cook
+Pixel Security
