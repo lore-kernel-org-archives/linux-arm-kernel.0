@@ -1,50 +1,77 @@
-From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
-Date: Fri, 29 Jun 2018 11:22:28 +0200
-Subject: [PATCH 0/3] PCI: emulated PCI bridge common logic
-Message-ID: <20180629092231.32207-1-thomas.petazzoni@bootlin.com>
+From: christoffer.dall@arm.com (Christoffer Dall)
+Date: Fri, 29 Jun 2018 11:28:16 +0200
+Subject: [PATCH 0/4] KVM: arm/arm64: vgic: Virtual interrupt grouping
+ support
+In-Reply-To: <86h8lmyn28.wl-marc.zyngier@arm.com>
+References: <20180624221103.15055-1-christoffer.dall@arm.com>
+ <CAFEAcA_C6Voh_6Ljj9--cbo14X_uWTOekM30dU=Rp9CtZK-6ow@mail.gmail.com>
+ <20180625101347.GF8004@C02W217FHV2R.local>
+ <20180625115603.GG8004@C02W217FHV2R.local>
+ <86h8lmyn28.wl-marc.zyngier@arm.com>
+Message-ID: <20180629092816.GE8441@e113682-lin.lund.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Fri, Jun 29, 2018 at 10:11:27AM +0100, Marc Zyngier wrote:
+> On Mon, 25 Jun 2018 12:56:03 +0100,
+> Christoffer Dall <christoffer.dall@arm.com> wrote:
+> >
+> > On Mon, Jun 25, 2018 at 12:13:47PM +0200, Christoffer Dall wrote:
+> > > On Mon, Jun 25, 2018 at 10:52:41AM +0100, Peter Maydell wrote:
+> > > > On 24 June 2018 at 23:10, Christoffer Dall <christoffer.dall@arm.com> wrote:
+> > > > > This small series addresses a peculiarity of the current VGIC
+> > > > > implementation, namely that we don't support interrupt grouping.
+> > > > >
+> > > > > KVM either implements a GICv2 without support for the security
+> > > > > extensions, or a GICv3 with DS=1.  For GICv2, on systems without the
+> > > > > security extensions, group 0 interrupts can be configured to be either
+> > > > > signalled as FIQs or as IRQs by the VM, whereas group 1 interrupts are
+> > > > > always IRQs.  For GICv3, with DS=1, group 1 interrupts are always IRQs
+> > > > > and group 0 interrupts are always FIQs, and there is no concept of
+> > > > > secure vs. non-secure group 1 interrupts when DS=1.
+> > > > >
+> > > > > We were treating all interrupts on GICv2 as group 0, but yet telling the
+> > > > > geust that they were group 1.  The first patch changes this behavior,
+> > > > > which seems to have no effect on no known guests, but still.
+> > > > >
+> > > > > The remaining patches introduce proper interrupt grouping support, along
+> > > > > with MMIO accessors for the VM and userspace to retrieve and set the
+> > > > > which group SGIs, PPIs, and SPIs belong to.  LPIs are always group 1
+> > > > > interrupts as per the architecture, and there is no way to modify this
+> > > > > configuration (no IGROUPR registers for LPIs or equivalent ITS
+> > > > > commands).
+> > > >
+> > > > How do we handle migration compatibility here? For instance if
+> > > > we have a guest running on an old kernel with GICv2, presumably
+> > > > it reports the GICD_IGROUPRn to userspace as being all-1 (but
+> > > > they behave as group 0); then when we load on the new kernel
+> > > > the new kernel will honour the IGROUPRn values and the interrupts
+> > > > will start behaving like group 1 ? Maybe this works because the
+> > > > guest is expecting them to be signalled as IRQ either way...
+> > > >
+> > >
+> > > Interesting.  For GICv2, I think this will actually break, and the
+> > > migrated Linux guest won't see any interrupts anymore (Linux only sets
+> > > bit 0 in GICD_CTLR).  For GICv3, everything stays group 1 unless the
+> > > guest is specifically trying to configure group 0 for something.
+> > >
+> > > I suppose this means we need to let userspace request
+> > > ARCH_COMPLIANT_GICV2 and otherwise ignore userspace writes to IGROUPR?
+> > >
+> > Alternatively, we could deny (fail) migration where the
+> > GICD_IIDR.Revision does not match the source, and just let userspace fix
+> > things up.  Thoughts?
+>
+> That's exactly the kind of thing I had in mind when I suggested to
+> bump up the IIDR. It allows us to push the knowledge of the quirks to
+> both the guest and userspace, instead of adding more esoteric API
+> features.
+>
 
-The pci-mvebu driver already contains some logic to emulate a root
-port PCI bridge. It turns out that we have a similar need for the
-pci-aardvark driver. Instead of duplicating the same logic in two
-drivers, this patch series starts by adding a small common
-infrastructure that helps emulate a root port PCI bridge, converts
-pci-mvebu to use it, and finally extends pci-aardvark to use it as
-well.
+The problem with that is that upgrading the kernel (but not QEMU) on
+your destination machine now breaks migration.  Is that acceptable?
 
-Thanks to this, Marvell Armada 3720 based systems, which use the
-Aarkvark PCI controller, will have better PCI support, by having a
-root port PCI bridge exposed.
 
-The emulated PCI bridge common logic is a proposal, I very much
-welcome comments and suggestions. Also, if you feel that adding a
-common logic for only two drivers is too early, I'm fine with
-duplicating a bit of code betwen pci-mvebu and pci-aardvark.
-
-Best regards,
-
-Thomas
-
-Thomas Petazzoni (2):
-  PCI: Introduce PCI software bridge common logic
-  PCI: mvebu: Convert to PCI software bridge
-
-Zachary Zhang (1):
-  PCI: aardvark: Implement emulated root PCI bridge
-
- drivers/pci/Kconfig                   |   3 +
- drivers/pci/Makefile                  |   1 +
- drivers/pci/controller/Kconfig        |   2 +
- drivers/pci/controller/pci-aardvark.c | 119 ++++++++++-
- drivers/pci/controller/pci-mvebu.c    | 370 ++++++++++------------------------
- drivers/pci/pci-sw-bridge.c           | 149 ++++++++++++++
- include/linux/pci-sw-bridge.h         | 125 ++++++++++++
- 7 files changed, 497 insertions(+), 272 deletions(-)
- create mode 100644 drivers/pci/pci-sw-bridge.c
- create mode 100644 include/linux/pci-sw-bridge.h
-
--- 
-2.14.4
+Thanks,
+-Christoffer
+IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
