@@ -1,66 +1,88 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Fri, 29 Jun 2018 11:40:36 +0200
-Subject: [PATCH v4 15/18] ARM: davinci: dm646x-evm: use device properties for
- at24 eeprom
-In-Reply-To: <20180629094039.7543-1-brgl@bgdev.pl>
-References: <20180629094039.7543-1-brgl@bgdev.pl>
-Message-ID: <20180629094039.7543-16-brgl@bgdev.pl>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 29 Jun 2018 15:21:46 +0530
+Subject: [PATCH] PM / Domains: Don't power on at attach for the multi PM
+ domain case
+In-Reply-To: <20180629091537.26864-1-ulf.hansson@linaro.org>
+References: <20180629091537.26864-1-ulf.hansson@linaro.org>
+Message-ID: <20180629095146.gljbdw2zbhmj6gwl@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+On 29-06-18, 11:15, Ulf Hansson wrote:
+> There are no legacy behavior in drivers to consider while attaching a
+> device to genpd - for the multiple PM domain case.
+> 
+> For that reason, let's instead require the driver to runtime resume the
+> device, via calling pm_runtime_get_sync() for example, when it needs to
+> power on the corresponding PM domain.
+> 
+> This allows us to improve the situation during attach. Instead of always
+> power on the PM domain, which may be unnecessary, let's leave it in its
+> current state. Additionally, to avoid the PM domain to stay powered on,
+> let's schedule a power off work.
+> 
+> Fixes: 3c095f32a92b ("PM / Domains: Add support for multi PM domains...")
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> ---
+>  drivers/base/power/domain.c | 16 +++++++++-------
+>  1 file changed, 9 insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+> index c298de8a8308..9e8484189034 100644
+> --- a/drivers/base/power/domain.c
+> +++ b/drivers/base/power/domain.c
+> @@ -2235,7 +2235,7 @@ static void genpd_dev_pm_sync(struct device *dev)
+>  }
+>  
+>  static int __genpd_dev_pm_attach(struct device *dev, struct device_node *np,
+> -				 unsigned int index)
+> +				 unsigned int index, bool power_on)
+>  {
+>  	struct of_phandle_args pd_args;
+>  	struct generic_pm_domain *pd;
+> @@ -2271,9 +2271,11 @@ static int __genpd_dev_pm_attach(struct device *dev, struct device_node *np,
+>  	dev->pm_domain->detach = genpd_dev_pm_detach;
+>  	dev->pm_domain->sync = genpd_dev_pm_sync;
+>  
+> -	genpd_lock(pd);
+> -	ret = genpd_power_on(pd, 0);
+> -	genpd_unlock(pd);
+> +	if (power_on) {
+> +		genpd_lock(pd);
+> +		ret = genpd_power_on(pd, 0);
+> +		genpd_unlock(pd);
+> +	}
+>  
+>  	if (ret)
+>  		genpd_remove_device(pd, dev);
+> @@ -2307,7 +2309,7 @@ int genpd_dev_pm_attach(struct device *dev)
+>  				       "#power-domain-cells") != 1)
+>  		return 0;
+>  
+> -	return __genpd_dev_pm_attach(dev, dev->of_node, 0);
+> +	return __genpd_dev_pm_attach(dev, dev->of_node, 0, true);
+>  }
+>  EXPORT_SYMBOL_GPL(genpd_dev_pm_attach);
+>  
+> @@ -2359,14 +2361,14 @@ struct device *genpd_dev_pm_attach_by_id(struct device *dev,
+>  	}
+>  
+>  	/* Try to attach the device to the PM domain at the specified index. */
+> -	ret = __genpd_dev_pm_attach(genpd_dev, dev->of_node, index);
+> +	ret = __genpd_dev_pm_attach(genpd_dev, dev->of_node, index, false);
+>  	if (ret < 1) {
+>  		device_unregister(genpd_dev);
+>  		return ret ? ERR_PTR(ret) : NULL;
+>  	}
+>  
+> -	pm_runtime_set_active(genpd_dev);
+>  	pm_runtime_enable(genpd_dev);
+> +	genpd_queue_power_off_work(dev_to_genpd(genpd_dev));
+>  
+>  	return genpd_dev;
+>  }
 
-We want to work towards phasing out the at24_platform_data structure.
-There are few users and its contents can be represented using generic
-device properties. Using device properties only will allow us to
-significantly simplify the at24 configuration code.
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-Remove the at24_platform_data structure and replace it with an array
-of property entries. Drop the byte_len/size property, as the model name
-already implies the EEPROM's size.
-
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
----
- arch/arm/mach-davinci/board-dm646x-evm.c | 13 +++++--------
- 1 file changed, 5 insertions(+), 8 deletions(-)
-
-diff --git a/arch/arm/mach-davinci/board-dm646x-evm.c b/arch/arm/mach-davinci/board-dm646x-evm.c
-index 5a9de47bc8a2..5049f0c6cd1a 100644
---- a/arch/arm/mach-davinci/board-dm646x-evm.c
-+++ b/arch/arm/mach-davinci/board-dm646x-evm.c
-@@ -22,7 +22,7 @@
- #include <linux/gpio.h>
- #include <linux/platform_device.h>
- #include <linux/i2c.h>
--#include <linux/platform_data/at24.h>
-+#include <linux/property.h>
- #include <linux/platform_data/pcf857x.h>
- 
- #include <media/i2c/tvp514x.h>
-@@ -320,12 +320,9 @@ static struct nvmem_cell_lookup dm646x_evm_mac_address_cell = {
- 	.nvmem_name = "1-00500",
- };
- 
--static struct at24_platform_data eeprom_info = {
--	.byte_len       = (256*1024) / 8,
--	.page_size      = 64,
--	.flags          = AT24_FLAG_ADDR16,
--	.setup          = davinci_get_mac_addr,
--	.context	= (void *)0x7f00,
-+static const struct property_entry eeprom_properties[] = {
-+	PROPERTY_ENTRY_U32("pagesize", 64),
-+	{ }
- };
- #endif
- 
-@@ -396,7 +393,7 @@ static void evm_init_cpld(void)
- static struct i2c_board_info __initdata i2c_info[] =  {
- 	{
- 		I2C_BOARD_INFO("24c256", 0x50),
--		.platform_data  = &eeprom_info,
-+		.properties  = eeprom_properties,
- 	},
- 	{
- 		I2C_BOARD_INFO("pcf8574a", 0x38),
 -- 
-2.17.1
+viresh
