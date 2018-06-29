@@ -1,63 +1,97 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 29 Jun 2018 14:01:56 +0100
-Subject: [PATCH v4 00/17] khwasan: kernel hardware assisted address
- sanitizer
-In-Reply-To: <CAAeHK+xsBOKghUp9XhpfXGqU=gjSYuy3G2GH14zWNEmaLPy8_w@mail.gmail.com>
-References: <cover.1530018818.git.andreyknvl@google.com>
- <20180627160800.3dc7f9ee41c0badbf7342520@linux-foundation.org>
- <CAAeHK+xz552VNpZxgWwU-hbTqF5_F6YVDw3fSv=4OT8mNrqPzg@mail.gmail.com>
- <20180628124039.8a42ab5e2994fb2876ff4f75@linux-foundation.org>
- <CAAeHK+xsBOKghUp9XhpfXGqU=gjSYuy3G2GH14zWNEmaLPy8_w@mail.gmail.com>
-Message-ID: <20180629130155.e7ztz5ikxfl352ff@lakrids.cambridge.arm.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Fri, 29 Jun 2018 09:05:30 -0400
+Subject: [PATCH] arm64/acpi: Add fixup for HPE m400 quirks
+In-Reply-To: <d1ed8486-077b-6360-9c98-03aff5051762@arm.com>
+References: <51d3d738-cdf5-2992-bba5-c3e1f34096c2@infradead.org>
+ <098e6d53-8dc7-439f-7165-adbe0e7c4941@arm.com>
+ <8a3034b9-6cf3-5182-717f-dd1dc8a087aa@infradead.org>
+ <5b03f754-3a98-c01d-3e2a-615a8b1ea537@arm.com>
+ <0cbc68d5-9a8f-1734-4eea-d1f037927137@infradead.org>
+ <cb5aa4ee12422ecc5f6530f3a74bcfa553b42c80.camel@redhat.com>
+ <a59fa0f8-4123-bcd9-670a-8885d34f37ed@arm.com>
+ <0be5ce017286a4ec494e0f0969bb10126b8501ce.camel@redhat.com>
+ <bd5fc825573c3394b80365ad2dc47bde7b22044a.camel@gmail.com>
+ <950b3034-08a8-38b9-b8f9-514d3e2519fa@arm.com>
+ <257bbf8d90669921cede5b2e7555b9523311b795.camel@redhat.com>
+ <d1ed8486-077b-6360-9c98-03aff5051762@arm.com>
+Message-ID: <f09927a6ab2f951bf24c02846e603a987663e5bb.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 29, 2018 at 02:45:08PM +0200, Andrey Konovalov wrote:
-> On Thu, Jun 28, 2018 at 9:40 PM, Andrew Morton
-> <akpm@linux-foundation.org> wrote:
-> > On Thu, 28 Jun 2018 20:29:07 +0200 Andrey Konovalov <andreyknvl@google.com> wrote:
-> >
-> >> >> Slab memory usage after boot [2]:
-> >> >> * ~40 kb for clean kernel
-> >> >> * ~105 kb + 1/8th shadow ~= 118 kb for KASAN
-> >> >> * ~47 kb + 1/16th shadow ~= 50 kb for KHWASAN
-> >> >>
-> >> >> Network performance [3]:
-> >> >> * 8.33 Gbits/sec for clean kernel
-> >> >> * 3.17 Gbits/sec for KASAN
-> >> >> * 2.85 Gbits/sec for KHWASAN
-> >> >>
-> >> >> Note, that KHWASAN (compared to KASAN) doesn't require quarantine.
-> >> >>
-> >> >> [1] Time before the ext4 driver is initialized.
-> >> >> [2] Measured as `cat /proc/meminfo | grep Slab`.
-> >> >> [3] Measured as `iperf -s & iperf -c 127.0.0.1 -t 30`.
-> >> >
-> >> > The above doesn't actually demonstrate the whole point of the
-> >> > patchset: to reduce KASAN's very high memory consumption?
-> >>
-> >> You mean that memory usage numbers collected after boot don't give a
-> >> representative picture of actual memory consumption on real workloads?
-> >>
-> >> What kind of memory consumption testing would you like to see?
-> >
-> > Well, 100kb or so is a teeny amount on virtually any machine.  I'm
-> > assuming the savings are (much) more significant once the machine gets
-> > loaded up and doing work?
+On Thu, 2018-06-28 at 11:06 +0100, James Morse wrote:
+> Hi Mark,
 > 
-> So with clean kernel after boot we get 40 kb memory usage. With KASAN
-> it is ~120 kb, which is 200% overhead. With KHWASAN it's 50 kb, which
-> is 25% overhead. This should approximately scale to any amounts of
-> used slab memory. For example with 100 mb memory usage we would get
-> +200 mb for KASAN and +25 mb with KHWASAN. (And KASAN also requires
-> quarantine for better use-after-free detection). I can explicitly
-> mention the overhead in %s in the changelog.
+> On 26/06/18 21:20, Mark Salter wrote:
+> > On Tue, 2018-06-26 at 15:51 +0100, James Morse wrote:
+> > > On 25/06/18 16:34, Mark Salter wrote:
+> > > > On Fri, 2018-06-22 at 11:19 -0400, Mark Salter wrote:
+> > > > > I'm going to hack something to get to the ghes info earlier in boot and
+> > > > > check the things you mention above wrt Error Status Block and GHES.0.
+> > > > 
+> > > > So I had to end up instrumenting the EFI stub to see where the error came
+> > > > from. At the start of the stub, there is no GHES.2 error. The error first
+> > > > shows up after the stub's call to ExitBootServices returns.
+> > > 
+> > > What's the notification type of GHES.2? I'm guessing POLLed or some kind of IRQ.
+> > > These systems don't have EL3, so the CPU must continue running while something
+> > > external generates the CPER records. The records being visible is the last point
+> > > the faulty-access could have been made, with the window of time depending on how
+> > > fast this external-thing receives and processes the error.
+> > 
+> > There's a System Control Processor (slimpro) on the SoC which can interact with
+> > the CPU in various ways and which has access to memory and other hw.
+> 
+> Thanks, saves me guessing!
+> 
+> 
+> > > > So it looks
+> > > > like the firmware itself is causing the error. There's still a chance that
+> > > > the stub is doing something wrong with the memory map passed to the
+> > > > firmware, so I'll try to eliminate that as well.
+> > > 
+> > > adding delay loops will help prove the EFIStub is innocent.
+> > 
+> > Didn't change anything.
+> 
 
-Could you elaborate on where that SLAB overhead comes from?
+Just closing the loop on this...
 
-IIUC that's not for the shadow itself (since it's allocated up-front and
-not accounted to SLAB), and that doesn't take into account the
-quarantine, so what's eating that space?
+> Okay, so just to clarify, a delay before ExitBootServices doesn't cause the
+> error to show up before ExitBootServices, so the error hasn't occurred prior to
+> this point.
 
-Thanks,
-Mark.
+Correct. I have never seen the error before ExitBootServices.
+
+> And a delay after ExitBootServices allows us to see the error before we exit
+> into head.S. (this rules out a bug in head.S)
+> The delays should be long enough to tell us this slimpro isn't generating the
+> error records N seconds after reset.
+
+No delay needed after ExitBootServices. The error would be there right after the
+call returns back to stub.
+
+
+> 
+> Given this I agree we should disable_hest based on the DMI platform name and the
+> UEFI version number. (it may be earlier firmware didn't have this bug).
+> 
+> 
+> I don't have anything to test this on, so I've picked the DMI strings out the
+> demsg output on that bugzilla entry. Any chance you could give it a test?
+> 
+> 
+> > > Are redhat able to rebuild UEFI on these systems? (Can it be fixed?)
+> > > https://bugzilla.redhat.com/show_bug.cgi?id=1285107 is about the m400
+> > > description of the GIC, comments 15 and 16 show a UEFI patch to something other
+> > > than the upstream platforms tree[0], and new firmware being tested.
+> > > (although this may be wishful thinking)
+> > 
+> > HPe would respond to bug reports until m400 reached EOL. They have been pretty
+> > clear that no more firmware updates will be done.
+> 
+> Thanks, it was a bit murky from that ticket...
+> 
+> 
+> Thanks for doing this!
+> 
+> James
