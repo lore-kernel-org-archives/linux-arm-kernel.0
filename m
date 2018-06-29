@@ -1,71 +1,87 @@
-From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Fri, 29 Jun 2018 09:40:35 +0200
-Subject: [PATCH v3 01/17] platform-msi: allow creation of MSI domain
- without interrupt number
-In-Reply-To: <c5b38c34-5ba0-6545-3635-45be1858fa3b@arm.com>
-References: <20180622151432.1566-1-miquel.raynal@bootlin.com>
- <20180622151432.1566-2-miquel.raynal@bootlin.com>
- <c5b38c34-5ba0-6545-3635-45be1858fa3b@arm.com>
-Message-ID: <20180629094035.5199fe89@xps13>
+From: andrea.merello@gmail.com (Andrea Merello)
+Date: Fri, 29 Jun 2018 09:46:49 +0200
+Subject: [PATCH v3 1/5] dmaengine: xilinx_dma: in axidma slave_sg and
+ dma_cylic mode align split descriptors
+In-Reply-To: <20180629072552.GY22377@vkoul-mobl>
+References: <20180625092724.22164-1-andrea.merello@gmail.com>
+ <20180629072552.GY22377@vkoul-mobl>
+Message-ID: <CAN8YU5Owh2Sb+-mOR0nVFkdZpD=dRd2jCin5MCdnsNLPo5zwwg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+On Fri, Jun 29, 2018 at 9:25 AM, Vinod <vkoul@kernel.org> wrote:
+> On 25-06-18, 11:27, Andrea Merello wrote:
+>> Whenever a single or cyclic transaction is prepared, the driver
+>> could eventually split it over several SG descriptors in order
+>> to deal with the HW maximum transfer length.
+>>
+>> This could end up in DMA operations starting from a misaligned
+>> address. This seems fatal for the HW if DRE is not enabled.
+>>
+>> This patch eventually adjusts the transfer size in order to make sure
+>> all operations start from an aligned address.
+>>
+>> Cc: Radhey Shyam Pandey <radhey.shyam.pandey@xilinx.com>
+>> Signed-off-by: Andrea Merello <andrea.merello@gmail.com>
+>> Reviewed-by: Radhey Shyam Pandey <radhey.shyam.pandey@xilinx.com>
+>> ---
+>> Changes in v2:
+>>         - don't introduce copy_mask field, rather rely on already-esistent
+>>           copy_align field. Suggested by Radhey Shyam Pandey
+>>         - reword title
+>> Changes in v3:
+>>       - fix bug introduced in v2: wrong copy size when DRE is enabled
+>>         use implementation suggested by Radhey Shyam Pandey
+>> ---
+>>  drivers/dma/xilinx/xilinx_dma.c | 20 ++++++++++++++++++++
+>>  1 file changed, 20 insertions(+)
+>>
+>> diff --git a/drivers/dma/xilinx/xilinx_dma.c b/drivers/dma/xilinx/xilinx_dma.c
+>> index 27b523530c4a..113d9bf1b6a1 100644
+>> --- a/drivers/dma/xilinx/xilinx_dma.c
+>> +++ b/drivers/dma/xilinx/xilinx_dma.c
+>> @@ -1793,6 +1793,16 @@ static struct dma_async_tx_descriptor *xilinx_dma_prep_slave_sg(
+>>                        */
+>>                       copy = min_t(size_t, sg_dma_len(sg) - sg_used,
+>>                                    XILINX_DMA_MAX_TRANS_LEN);
+>> +
+>> +                     if ((copy + sg_used < sg_dma_len(sg)) &&
+>> +                         chan->xdev->common.copy_align) {
+>> +                             /*
+>> +                              * If this is not the last descriptor, make sure
+>> +                              * the next one will be properly aligned
+>> +                              */
+>> +                             copy = rounddown(copy,
+>> +                                     (1 << chan->xdev->common.copy_align));
+>> +                     }
+>>                       hw = &segment->hw;
+>>
+>>                       /* Fill in the descriptor */
+>> @@ -1898,6 +1908,16 @@ static struct dma_async_tx_descriptor *xilinx_dma_prep_dma_cyclic(
+>>                        */
+>>                       copy = min_t(size_t, period_len - sg_used,
+>>                                    XILINX_DMA_MAX_TRANS_LEN);
+>> +
+>> +                     if ((copy + sg_used < period_len) &&
+>> +                         chan->xdev->common.copy_align) {
+>> +                             /*
+>> +                              * If this is not the last descriptor, make sure
+>> +                              * the next one will be properly aligned
+>> +                              */
+>> +                             copy = rounddown(copy,
+>> +                                     (1 << chan->xdev->common.copy_align));
+>> +                     }
+>
+> same code pasted twice, can we have a routine for this... perhaps more
+> code can be made common too
 
-Marc Zyngier <marc.zyngier@arm.com> wrote on Thu, 28 Jun 2018 12:12:04
-+0100:
+Yes, I see.. Indeed there was duplicated code before this series and
+it is still there after it.
 
-> On 22/06/18 16:14, Miquel Raynal wrote:
-> > platform_msi_alloc_priv_data() checks that a number of interrupts is
-> > always given. This extra-check has no real impact and just prevents
-> > uselessly the user to create an MSI tree domain: remove it.
-> > 
-> > Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
-> > ---
-> >  drivers/base/platform-msi.c | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/base/platform-msi.c b/drivers/base/platform-msi.c
-> > index 60d6cc618f1c..9f001f4ccc0f 100644
-> > --- a/drivers/base/platform-msi.c
-> > +++ b/drivers/base/platform-msi.c
-> > @@ -203,7 +203,7 @@ platform_msi_alloc_priv_data(struct device *dev, unsigned int nvec,
-> >  	 * accordingly (which would impact the max number of MSI
-> >  	 * capable devices).
-> >  	 */
-> > -	if (!dev->msi_domain || !write_msi_msg || !nvec || nvec > MAX_DEV_MSIS)
-> > +	if (!dev->msi_domain || !write_msi_msg || nvec > MAX_DEV_MSIS)
-> >  		return ERR_PTR(-EINVAL);
-> >  
-> >  	if (dev->msi_domain->bus_token != DOMAIN_BUS_PLATFORM_MSI) {
-> >   
-> 
-> Huh... It's not that simple.
-> 
-> Yes, it allows you to get a tree via platform_msi_create_device_domain
-> (assuming that's why you're changing it -- your commit message doesn't
-> say much)
+I can see if we can have a routine as you suggested at least for the
+code portions touched by this patch. Do you eventually want this extra
+change to be done in the same patch 1/5 or do you want a separate
+patch i.e. 2/6 or 6/6 ?
 
-Indeed. That was exactly my intention.
-
-> but it also has some impact on the way msi_domain_prepare_irqs
-> works (see how it is called from platform_msi_create_device_domain).
-> 
-> Importantly, the msi_prepare callback takes nvec as a parameter, and
-> that ends up trickling down to the irqchip, or whatever will setup the
-> MSI domain. Things like the GICv3 ITS do rely on that to carve out the
-> LPI space that subsequently gets used to populate the domain.
-> 
-> So no, you can't do it like that. If you really want a tree, add a
-> helper that does so.
-
-So if I understand correctly, what should be done is writting a new
-helper that would do something similar to
-platform_msi_create_device_domain(), but creating instead a tree domain
-and still giving msi_domain_prepare_irqs() a meaningful number (as
-nvec) that would be the maximum number of MSIs that could be allocated.
-Am I right here?
-
-
-Thanks,
-Miqu?l
+> --
+> ~Vinod
