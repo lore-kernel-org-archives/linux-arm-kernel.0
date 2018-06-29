@@ -1,86 +1,121 @@
-From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Fri, 29 Jun 2018 16:43:23 +0200
-Subject: [PATCH v3 01/17] platform-msi: allow creation of MSI domain
- without interrupt number
-In-Reply-To: <86bmbtzmhk.wl-marc.zyngier@arm.com>
-References: <20180622151432.1566-1-miquel.raynal@bootlin.com>
- <20180622151432.1566-2-miquel.raynal@bootlin.com>
- <c5b38c34-5ba0-6545-3635-45be1858fa3b@arm.com>
- <20180629094035.5199fe89@xps13>
- <86bmbtzmhk.wl-marc.zyngier@arm.com>
-Message-ID: <20180629164323.7fb2a0c3@xps13>
+From: gregory.clement@bootlin.com (Gregory CLEMENT)
+Date: Fri, 29 Jun 2018 16:44:02 +0200
+Subject: [PATCH 1/2] clk: mvebu: armada-37xx-periph: Fix switching CPU
+ rate from 300Mhz to 1.2GHz
+In-Reply-To: <20180619123446.694-2-gregory.clement@bootlin.com> (Gregory
+ CLEMENT's message of "Tue, 19 Jun 2018 14:34:45 +0200")
+References: <20180619123446.694-1-gregory.clement@bootlin.com>
+ <20180619123446.694-2-gregory.clement@bootlin.com>
+Message-ID: <87tvpl4pql.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+Hi,
+ 
+ On mar., juin 19 2018, Gregory CLEMENT <gregory.clement@bootlin.com> wrote:
 
-Marc Zyngier <marc.zyngier@arm.com> wrote on Fri, 29 Jun 2018 15:38:31
-+0100:
+> Switching the CPU from the L2 or L3 frequencies (300 and 200 Mhz
+> respectively) to L0 frequency (1.2 Ghz) requires a significant amount
+> of time to let VDD stabilize to the appropriate voltage. This amount of
+> time is large enough that it cannot be covered by the hardware
+> countdown register. Due to this, the CPU might start operating at L0
+> before the voltage is stabilized, leading to CPU stalls.
+>
+> To work around this problem, we prevent switching directly from the
+> L2/L3 frequencies to the L0 frequency, and instead switch to the L1
+> frequency in-between. The sequence therefore becomes:
+>
+> 1. First switch from L2/L3(200/300MHz) to L1(600MHZ)
+> 2. Sleep 20ms for stabling VDD voltage
+> 3. Then switch from L1(600MHZ) to L0(1200Mhz).
 
-> On Fri, 29 Jun 2018 08:40:35 +0100,
-> Miquel Raynal <miquel.raynal@bootlin.com> wrote:
-> > 
-> > Hi Marc,
-> > 
-> > Marc Zyngier <marc.zyngier@arm.com> wrote on Thu, 28 Jun 2018 12:12:04
-> > +0100:
-> >   
-> > > On 22/06/18 16:14, Miquel Raynal wrote:  
-> > > > platform_msi_alloc_priv_data() checks that a number of interrupts is
-> > > > always given. This extra-check has no real impact and just prevents
-> > > > uselessly the user to create an MSI tree domain: remove it.
-> > > > 
-> > > > Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
-> > > > ---
-> > > >  drivers/base/platform-msi.c | 2 +-
-> > > >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > > > 
-> > > > diff --git a/drivers/base/platform-msi.c b/drivers/base/platform-msi.c
-> > > > index 60d6cc618f1c..9f001f4ccc0f 100644
-> > > > --- a/drivers/base/platform-msi.c
-> > > > +++ b/drivers/base/platform-msi.c
-> > > > @@ -203,7 +203,7 @@ platform_msi_alloc_priv_data(struct device *dev, unsigned int nvec,
-> > > >  	 * accordingly (which would impact the max number of MSI
-> > > >  	 * capable devices).
-> > > >  	 */
-> > > > -	if (!dev->msi_domain || !write_msi_msg || !nvec || nvec > MAX_DEV_MSIS)
-> > > > +	if (!dev->msi_domain || !write_msi_msg || nvec > MAX_DEV_MSIS)
-> > > >  		return ERR_PTR(-EINVAL);
-> > > >  
-> > > >  	if (dev->msi_domain->bus_token != DOMAIN_BUS_PLATFORM_MSI) {
-> > > >     
-> > > 
-> > > Huh... It's not that simple.
-> > > 
-> > > Yes, it allows you to get a tree via platform_msi_create_device_domain
-> > > (assuming that's why you're changing it -- your commit message doesn't
-> > > say much)  
-> > 
-> > Indeed. That was exactly my intention.
-> >   
-> > > but it also has some impact on the way msi_domain_prepare_irqs
-> > > works (see how it is called from platform_msi_create_device_domain).
-> > > 
-> > > Importantly, the msi_prepare callback takes nvec as a parameter, and
-> > > that ends up trickling down to the irqchip, or whatever will setup the
-> > > MSI domain. Things like the GICv3 ITS do rely on that to carve out the
-> > > LPI space that subsequently gets used to populate the domain.
-> > > 
-> > > So no, you can't do it like that. If you really want a tree, add a
-> > > helper that does so.  
-> > 
-> > So if I understand correctly, what should be done is writting a new
-> > helper that would do something similar to
-> > platform_msi_create_device_domain(), but creating instead a tree domain
-> > and still giving msi_domain_prepare_irqs() a meaningful number (as
-> > nvec) that would be the maximum number of MSIs that could be allocated.
-> > Am I right here?  
-> 
-> What I have in mind is the following (untested) patch. Let me know if
-> that works for you.
+Do you have any comment on this fix?
 
-Ok, that's really close to what I wrote this morning, cool. I was not
-sure that was the only thing to modify.
+Gregory
 
-Thanks,
-Miqu?l
+>
+> It is based on the work done by Ken Ma <make@marvell.com>
+>
+> Cc: stable at vger.kernel.org
+> Fixes: 2089dc33ea0e ("clk: mvebu: armada-37xx-periph: add DVFS support for cpu clocks")
+> Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
+> ---
+>  drivers/clk/mvebu/armada-37xx-periph.c | 38 ++++++++++++++++++++++++++
+>  1 file changed, 38 insertions(+)
+>
+> diff --git a/drivers/clk/mvebu/armada-37xx-periph.c b/drivers/clk/mvebu/armada-37xx-periph.c
+> index 6860bd5a37c5..44e4e27eddad 100644
+> --- a/drivers/clk/mvebu/armada-37xx-periph.c
+> +++ b/drivers/clk/mvebu/armada-37xx-periph.c
+> @@ -35,6 +35,7 @@
+>  #define CLK_SEL		0x10
+>  #define CLK_DIS		0x14
+>  
+> +#define  ARMADA_37XX_DVFS_LOAD_1 1
+>  #define LOAD_LEVEL_NR	4
+>  
+>  #define ARMADA_37XX_NB_L0L1	0x18
+> @@ -507,6 +508,40 @@ static long clk_pm_cpu_round_rate(struct clk_hw *hw, unsigned long rate,
+>  	return -EINVAL;
+>  }
+>  
+> +/*
+> + * Switching the CPU from the L2 or L3 frequencies (300 and 200 Mhz
+> + * respectively) to L0 frequency (1.2 Ghz) requires a significant
+> + * amount of time to let VDD stabilize to the appropriate
+> + * voltage. This amount of time is large enough that it cannot be
+> + * covered by the hardware countdown register. Due to this, the CPU
+> + * might start operating at L0 before the voltage is stabilized,
+> + * leading to CPU stalls.
+> + *
+> + * To work around this problem, we prevent switching directly from the
+> + * L2/L3 frequencies to the L0 frequency, and instead switch to the L1
+> + * frequency in-between. The sequence therefore becomes:
+> + * 1. First switch from L2/L3(200/300MHz) to L1(600MHZ)
+> + * 2. Sleep 20ms for stabling VDD voltage
+> + * 3. Then switch from L1(600MHZ) to L0(1200Mhz).
+> + */
+> +static void clk_pm_cpu_set_rate_wa(unsigned long rate, struct regmap *base)
+> +{
+> +	unsigned int cur_level;
+> +
+> +	if (rate != 1200 * 1000 * 1000)
+> +		return;
+> +
+> +	regmap_read(base, ARMADA_37XX_NB_CPU_LOAD, &cur_level);
+> +	cur_level &= ARMADA_37XX_NB_CPU_LOAD_MASK;
+> +	if (cur_level <= ARMADA_37XX_DVFS_LOAD_1)
+> +		return;
+> +
+> +	regmap_update_bits(base, ARMADA_37XX_NB_CPU_LOAD,
+> +			   ARMADA_37XX_NB_CPU_LOAD_MASK,
+> +			   ARMADA_37XX_DVFS_LOAD_1);
+> +	msleep(20);
+> +}
+> +
+>  static int clk_pm_cpu_set_rate(struct clk_hw *hw, unsigned long rate,
+>  			       unsigned long parent_rate)
+>  {
+> @@ -537,6 +572,9 @@ static int clk_pm_cpu_set_rate(struct clk_hw *hw, unsigned long rate,
+>  			 */
+>  			reg = ARMADA_37XX_NB_CPU_LOAD;
+>  			mask = ARMADA_37XX_NB_CPU_LOAD_MASK;
+> +
+> +			clk_pm_cpu_set_rate_wa(rate, base);
+> +
+>  			regmap_update_bits(base, reg, mask, load_level);
+>  
+>  			return rate;
+> -- 
+> 2.17.1
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+-- 
+Gregory Clement, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+http://bootlin.com
