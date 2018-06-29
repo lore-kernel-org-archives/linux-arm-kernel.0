@@ -1,19 +1,54 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Fri, 29 Jun 2018 10:18:48 -0700
-Subject: [PATCH] clkdev: Remove duplicated negative index check from
- __of_clk_get()
-In-Reply-To: <1526641120-1585-1-git-send-email-geert+renesas@glider.be>
-References: <1526641120-1585-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <153029272800.143105.1065337298977850107@swboyd.mtv.corp.google.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 29 Jun 2018 18:20:37 +0100
+Subject: [GIT PULL] arm64 fixes for 4.18-rc3
+Message-ID: <20180629172035.mmkauxlu7taulubu@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Geert Uytterhoeven (2018-05-18 03:58:40)
-> __of_clk_get() calls of_parse_phandle_with_args(), which rejects
-> negative indices since commit bd69f73f2c81eed9 ("of: Create function for
-> counting number of phandles in a property").
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> ---
+Hi Linus,
 
-Applied to clk-next
+Please pull the arm64 fixes below. Thanks.
+
+The following changes since commit 7daf201d7fe8334e2d2364d4e8ed3394ec9af819:
+
+  Linux 4.18-rc2 (2018-06-24 20:54:29 +0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-fixes
+
+for you to fetch changes up to 24fe1b0efad4fcdd32ce46cffeab297f22581707:
+
+  arm64: Remove unnecessary ISBs from set_{pte,pmd,pud} (2018-06-27 18:26:20 +0100)
+
+----------------------------------------------------------------
+arm64 fixes:
+
+- The alternatives patching code uses flush_icache_range() which itself
+  uses alternatives. Change the code to use an unpatched variant of
+  cache maintenance
+
+- Remove unnecessary ISBs from set_{pte,pmd,pud}
+
+- perf: xgene_pmu: Fix IOB SLOW PMU parser error
+
+----------------------------------------------------------------
+Catalin Marinas (1):
+      Merge branch 'perf/fixes' of git://git.kernel.org/.../will/linux
+
+Hoan Tran (1):
+      drivers/perf: xgene_pmu: Fix IOB SLOW PMU parser error
+
+Will Deacon (2):
+      arm64: Avoid flush_icache_range() in alternatives patching code
+      arm64: Remove unnecessary ISBs from set_{pte,pmd,pud}
+
+ arch/arm64/include/asm/alternative.h |  7 ++++-
+ arch/arm64/include/asm/pgtable.h     |  6 +----
+ arch/arm64/kernel/alternative.c      | 51 +++++++++++++++++++++++++++++++-----
+ arch/arm64/kernel/module.c           |  5 ++--
+ drivers/perf/xgene_pmu.c             |  2 +-
+ 5 files changed, 54 insertions(+), 17 deletions(-)
+
+-- 
+Catalin
