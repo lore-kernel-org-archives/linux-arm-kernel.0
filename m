@@ -1,69 +1,64 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Fri, 29 Jun 2018 11:40:29 +0200
-Subject: [PATCH v4 08/18] net: davinci_emac: potentially get the MAC address
- from MTD
+Date: Fri, 29 Jun 2018 11:40:33 +0200
+Subject: [PATCH v4 12/18] ARM: davinci: dm365-evm: use device properties for
+ at24 eeprom
 In-Reply-To: <20180629094039.7543-1-brgl@bgdev.pl>
 References: <20180629094039.7543-1-brgl@bgdev.pl>
-Message-ID: <20180629094039.7543-9-brgl@bgdev.pl>
+Message-ID: <20180629094039.7543-13-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-On da850-evm board we can read the MAC address from MTD. It's currently
-done in the relevant board file, but we want to get rid of all the MAC
-reading callbacks from the board file (SPI and NAND). Move the reading
-of the MAC address from SPI to the emac driver's probe function.
+We want to work towards phasing out the at24_platform_data structure.
+There are few users and its contents can be represented using generic
+device properties. Using device properties only will allow us to
+significantly simplify the at24 configuration code.
+
+Remove the at24_platform_data structure and replace it with an array
+of property entries. Drop the byte_len/size property, as the model name
+already implies the EEPROM's size.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- drivers/net/ethernet/ti/davinci_emac.c | 20 ++++++++++++++++++--
- 1 file changed, 18 insertions(+), 2 deletions(-)
+ arch/arm/mach-davinci/board-dm365-evm.c | 13 +++++--------
+ 1 file changed, 5 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/net/ethernet/ti/davinci_emac.c b/drivers/net/ethernet/ti/davinci_emac.c
-index a1a6445b5a7e..48e6a7755811 100644
---- a/drivers/net/ethernet/ti/davinci_emac.c
-+++ b/drivers/net/ethernet/ti/davinci_emac.c
-@@ -67,7 +67,7 @@
- #include <linux/of_irq.h>
- #include <linux/of_net.h>
- #include <linux/mfd/syscon.h>
--
-+#include <linux/mtd/mtd.h>
- #include <asm/irq.h>
- #include <asm/page.h>
+diff --git a/arch/arm/mach-davinci/board-dm365-evm.c b/arch/arm/mach-davinci/board-dm365-evm.c
+index cb0ac92a278e..b360d26e6caa 100644
+--- a/arch/arm/mach-davinci/board-dm365-evm.c
++++ b/arch/arm/mach-davinci/board-dm365-evm.c
+@@ -18,7 +18,7 @@
+ #include <linux/i2c.h>
+ #include <linux/io.h>
+ #include <linux/clk.h>
+-#include <linux/platform_data/at24.h>
++#include <linux/property.h>
+ #include <linux/leds.h>
+ #include <linux/mtd/mtd.h>
+ #include <linux/mtd/partitions.h>
+@@ -179,18 +179,15 @@ static struct nvmem_cell_lookup dm365evm_mac_address_cell = {
+ 	.nvmem_name = "1-00500",
+ };
  
-@@ -1783,7 +1783,10 @@ static int davinci_emac_probe(struct platform_device *pdev)
- 	struct cpdma_params dma_params;
- 	struct clk *emac_clk;
- 	unsigned long emac_bus_frequency;
--
-+#ifdef CONFIG_MTD
-+	size_t mac_addr_len;
-+	struct mtd_info *mtd;
-+#endif /* CONFIG_MTD */
+-static struct at24_platform_data eeprom_info = {
+-	.byte_len       = (256*1024) / 8,
+-	.page_size      = 64,
+-	.flags          = AT24_FLAG_ADDR16,
+-	.setup          = davinci_get_mac_addr,
+-	.context	= (void *)0x7f00,
++static const struct property_entry eeprom_properties[] = {
++	PROPERTY_ENTRY_U32("pagesize", 64),
++	{ }
+ };
  
- 	/* obtain emac clock from kernel */
- 	emac_clk = devm_clk_get(&pdev->dev, NULL);
-@@ -1815,6 +1818,19 @@ static int davinci_emac_probe(struct platform_device *pdev)
- 		goto err_free_netdev;
- 	}
- 
-+#ifdef CONFIG_MTD
-+	mtd = get_mtd_device_nm("MAC-Address");
-+	if (!IS_ERR(mtd)) {
-+		rc = mtd_read(mtd, 0, ETH_ALEN,
-+			      &mac_addr_len, priv->mac_addr);
-+		if (rc == 0)
-+			dev_info(&pdev->dev,
-+				 "Read MAC addr from SPI Flash: %pM\n",
-+				 priv->mac_addr);
-+		put_mtd_device(mtd);
-+	}
-+#endif /* CONFIG_MTD */
-+
- 	/* MAC addr and PHY mask , RMII enable info from platform_data */
- 	memcpy(priv->mac_addr, pdata->mac_addr, ETH_ALEN);
- 	priv->phy_id = pdata->phy_id;
+ static struct i2c_board_info i2c_info[] = {
+ 	{
+ 		I2C_BOARD_INFO("24c256", 0x50),
+-		.platform_data	= &eeprom_info,
++		.properties = eeprom_properties,
+ 	},
+ 	{
+ 		I2C_BOARD_INFO("tlv320aic3x", 0x18),
 -- 
 2.17.1
