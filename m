@@ -1,62 +1,67 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Fri, 29 Jun 2018 11:40:38 +0200
-Subject: [PATCH v4 17/18] ARM: davinci: sffsdr: use device properties for at24
- eeprom
+Date: Fri, 29 Jun 2018 11:40:39 +0200
+Subject: [PATCH v4 18/18] ARM: davinci: remove dead code related to MAC
+ address reading
 In-Reply-To: <20180629094039.7543-1-brgl@bgdev.pl>
 References: <20180629094039.7543-1-brgl@bgdev.pl>
-Message-ID: <20180629094039.7543-18-brgl@bgdev.pl>
+Message-ID: <20180629094039.7543-19-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-We want to work towards phasing out the at24_platform_data structure.
-There are few users and its contents can be represented using generic
-device properties. Using device properties only will allow us to
-significantly simplify the at24 configuration code.
-
-Remove the at24_platform_data structure and replace it with an array
-of property entries. Drop the byte_len/size property, as the model name
-already implies the EEPROM's size.
+There are no more users of davinci_get_mac_addr(). Remove it. Also
+remove the mac_addr field from the emac platform data struct.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- arch/arm/mach-davinci/board-sffsdr.c | 11 +++++------
- 1 file changed, 5 insertions(+), 6 deletions(-)
+ arch/arm/mach-davinci/common.c | 15 ---------------
+ include/linux/davinci_emac.h   |  2 --
+ 2 files changed, 17 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/board-sffsdr.c b/arch/arm/mach-davinci/board-sffsdr.c
-index f6a4d094cbc3..680e5d7628a8 100644
---- a/arch/arm/mach-davinci/board-sffsdr.c
-+++ b/arch/arm/mach-davinci/board-sffsdr.c
-@@ -26,7 +26,7 @@
- #include <linux/init.h>
- #include <linux/platform_device.h>
- #include <linux/i2c.h>
--#include <linux/platform_data/at24.h>
-+#include <linux/property.h>
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/rawnand.h>
- #include <linux/mtd/partitions.h>
-@@ -92,16 +92,15 @@ static struct platform_device davinci_sffsdr_nandflash_device = {
- 	.resource	= davinci_sffsdr_nandflash_resource,
+diff --git a/arch/arm/mach-davinci/common.c b/arch/arm/mach-davinci/common.c
+index bcb6a7ba84e9..0c6cc354a4aa 100644
+--- a/arch/arm/mach-davinci/common.c
++++ b/arch/arm/mach-davinci/common.c
+@@ -28,21 +28,6 @@ EXPORT_SYMBOL(davinci_soc_info);
+ void __iomem *davinci_intc_base;
+ int davinci_intc_type;
+ 
+-void davinci_get_mac_addr(struct nvmem_device *nvmem, void *context)
+-{
+-	char *mac_addr = davinci_soc_info.emac_pdata->mac_addr;
+-	off_t offset = (off_t)context;
+-
+-	if (!IS_BUILTIN(CONFIG_NVMEM)) {
+-		pr_warn("Cannot read MAC addr from EEPROM without CONFIG_NVMEM\n");
+-		return;
+-	}
+-
+-	/* Read MAC addr from EEPROM */
+-	if (nvmem_device_read(nvmem, offset, ETH_ALEN, mac_addr) == ETH_ALEN)
+-		pr_info("Read MAC addr from EEPROM: %pM\n", mac_addr);
+-}
+-
+ static int __init davinci_init_id(struct davinci_soc_info *soc_info)
+ {
+ 	int			i;
+diff --git a/include/linux/davinci_emac.h b/include/linux/davinci_emac.h
+index 05b97144d342..19888b27706d 100644
+--- a/include/linux/davinci_emac.h
++++ b/include/linux/davinci_emac.h
+@@ -19,7 +19,6 @@ struct mdio_platform_data {
  };
  
--static struct at24_platform_data eeprom_info = {
--	.byte_len	= (64*1024) / 8,
--	.page_size	= 32,
--	.flags		= AT24_FLAG_ADDR16,
-+static const struct property_entry eeprom_properties[] = {
-+	PROPERTY_ENTRY_U32("pagesize", 32),
-+	{ },
+ struct emac_platform_data {
+-	char mac_addr[ETH_ALEN];
+ 	u32 ctrl_reg_offset;
+ 	u32 ctrl_mod_reg_offset;
+ 	u32 ctrl_ram_offset;
+@@ -46,5 +45,4 @@ enum {
+ 	EMAC_VERSION_2,	/* DM646x */
  };
  
- static struct i2c_board_info __initdata i2c_info[] =  {
- 	{
- 		I2C_BOARD_INFO("24c64", 0x50),
--		.platform_data	= &eeprom_info,
-+		.properties = eeprom_properties,
- 	},
- 	/* Other I2C devices:
- 	 * MSP430,  addr 0x23 (not used)
+-void davinci_get_mac_addr(struct nvmem_device *nvmem, void *context);
+ #endif
 -- 
 2.17.1
