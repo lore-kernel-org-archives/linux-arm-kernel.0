@@ -1,88 +1,44 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 29 Jun 2018 15:21:46 +0530
-Subject: [PATCH] PM / Domains: Don't power on at attach for the multi PM
- domain case
-In-Reply-To: <20180629091537.26864-1-ulf.hansson@linaro.org>
-References: <20180629091537.26864-1-ulf.hansson@linaro.org>
-Message-ID: <20180629095146.gljbdw2zbhmj6gwl@vireshk-i7>
+From: lkp@intel.com (kbuild test robot)
+Date: Fri, 29 Jun 2018 17:51:50 +0800
+Subject: [PATCH 2/2] reset: uniphier: add USB3 controller reset control
+In-Reply-To: <1530259891-18822-3-git-send-email-hayashi.kunihiko@socionext.com>
+References: <1530259891-18822-3-git-send-email-hayashi.kunihiko@socionext.com>
+Message-ID: <201806291748.vJuFn1CE%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29-06-18, 11:15, Ulf Hansson wrote:
-> There are no legacy behavior in drivers to consider while attaching a
-> device to genpd - for the multiple PM domain case.
-> 
-> For that reason, let's instead require the driver to runtime resume the
-> device, via calling pm_runtime_get_sync() for example, when it needs to
-> power on the corresponding PM domain.
-> 
-> This allows us to improve the situation during attach. Instead of always
-> power on the PM domain, which may be unnecessary, let's leave it in its
-> current state. Additionally, to avoid the PM domain to stay powered on,
-> let's schedule a power off work.
-> 
-> Fixes: 3c095f32a92b ("PM / Domains: Add support for multi PM domains...")
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> ---
->  drivers/base/power/domain.c | 16 +++++++++-------
->  1 file changed, 9 insertions(+), 7 deletions(-)
-> 
-> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-> index c298de8a8308..9e8484189034 100644
-> --- a/drivers/base/power/domain.c
-> +++ b/drivers/base/power/domain.c
-> @@ -2235,7 +2235,7 @@ static void genpd_dev_pm_sync(struct device *dev)
->  }
->  
->  static int __genpd_dev_pm_attach(struct device *dev, struct device_node *np,
-> -				 unsigned int index)
-> +				 unsigned int index, bool power_on)
->  {
->  	struct of_phandle_args pd_args;
->  	struct generic_pm_domain *pd;
-> @@ -2271,9 +2271,11 @@ static int __genpd_dev_pm_attach(struct device *dev, struct device_node *np,
->  	dev->pm_domain->detach = genpd_dev_pm_detach;
->  	dev->pm_domain->sync = genpd_dev_pm_sync;
->  
-> -	genpd_lock(pd);
-> -	ret = genpd_power_on(pd, 0);
-> -	genpd_unlock(pd);
-> +	if (power_on) {
-> +		genpd_lock(pd);
-> +		ret = genpd_power_on(pd, 0);
-> +		genpd_unlock(pd);
-> +	}
->  
->  	if (ret)
->  		genpd_remove_device(pd, dev);
-> @@ -2307,7 +2309,7 @@ int genpd_dev_pm_attach(struct device *dev)
->  				       "#power-domain-cells") != 1)
->  		return 0;
->  
-> -	return __genpd_dev_pm_attach(dev, dev->of_node, 0);
-> +	return __genpd_dev_pm_attach(dev, dev->of_node, 0, true);
->  }
->  EXPORT_SYMBOL_GPL(genpd_dev_pm_attach);
->  
-> @@ -2359,14 +2361,14 @@ struct device *genpd_dev_pm_attach_by_id(struct device *dev,
->  	}
->  
->  	/* Try to attach the device to the PM domain at the specified index. */
-> -	ret = __genpd_dev_pm_attach(genpd_dev, dev->of_node, index);
-> +	ret = __genpd_dev_pm_attach(genpd_dev, dev->of_node, index, false);
->  	if (ret < 1) {
->  		device_unregister(genpd_dev);
->  		return ret ? ERR_PTR(ret) : NULL;
->  	}
->  
-> -	pm_runtime_set_active(genpd_dev);
->  	pm_runtime_enable(genpd_dev);
-> +	genpd_queue_power_off_work(dev_to_genpd(genpd_dev));
->  
->  	return genpd_dev;
->  }
+Hi Kunihiko,
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Thank you for the patch! Yet something to improve:
 
--- 
-viresh
+[auto build test ERROR on pza/reset/next]
+[also build test ERROR on v4.18-rc2 next-20180628]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+
+url:    https://github.com/0day-ci/linux/commits/Kunihiko-Hayashi/reset-uniphier-add-USB3-controller-reset-support/20180629-162836
+base:   git://git.pengutronix.de/git/pza/linux reset/next
+config: ia64-allmodconfig (attached as .config)
+compiler: ia64-linux-gcc (GCC) 8.1.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        GCC_VERSION=8.1.0 make.cross ARCH=ia64 
+
+All errors (new ones prefixed by >>):
+
+   ERROR: "ia64_delay_loop" [drivers/spi/spi-thunderx.ko] undefined!
+>> ERROR: "reset_simple_ops" [drivers/reset/reset-uniphier-usb3.ko] undefined!
+   ERROR: "__sw_hweight8" [drivers/net/wireless/mediatek/mt76/mt76.ko] undefined!
+   ERROR: "ia64_delay_loop" [drivers/net/phy/mdio-cavium.ko] undefined!
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 49877 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180629/5fb3c9a9/attachment-0001.gz>
