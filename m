@@ -1,88 +1,56 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 29 Jun 2018 13:04:31 +0200
-Subject: [PATCH 2/3] PM / Domains: Introduce option to attach a device by name
- to genpd
-In-Reply-To: <20180629110432.5179-1-ulf.hansson@linaro.org>
+Date: Fri, 29 Jun 2018 13:07:26 +0200
+Subject: [PATCH 1/3] PM / Domains: dt: Add a power-domain-names property
+In-Reply-To: <20180629110432.5179-2-ulf.hansson@linaro.org>
 References: <20180629110432.5179-1-ulf.hansson@linaro.org>
-Message-ID: <20180629110432.5179-3-ulf.hansson@linaro.org>
+ <20180629110432.5179-2-ulf.hansson@linaro.org>
+Message-ID: <CAPDyKFpM51t13xtNT54d-9_n-0P=HuzV=TOy+r073NymM+=YhA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For the multiple PM domain case, let's introduce a new function called
-genpd_dev_pm_attach_by_name(). This allows a device to be associated with
-its PM domain through genpd, by using a name based lookup.
++devicetree list, Rob
 
-Note that, genpd_dev_pm_attach_by_name() shall only be called by the driver
-core / PM core, similar to how the existing dev_pm_domain_attach_by_id()
-makes use of genpd_dev_pm_attach_by_id(). However, this is implemented by
-following changes on top.
-
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
- drivers/base/power/domain.c | 24 ++++++++++++++++++++++++
- include/linux/pm_domain.h   |  8 ++++++++
- 2 files changed, 32 insertions(+)
-
-diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-index c298de8a8308..a70e4b7a3b14 100644
---- a/drivers/base/power/domain.c
-+++ b/drivers/base/power/domain.c
-@@ -2372,6 +2372,30 @@ struct device *genpd_dev_pm_attach_by_id(struct device *dev,
- }
- EXPORT_SYMBOL_GPL(genpd_dev_pm_attach_by_id);
- 
-+/**
-+ * genpd_dev_pm_attach_by_name - Associate a device with one of its PM domains.
-+ * @dev: The device used to lookup the PM domain.
-+ * @name: The name of the PM domain.
-+ *
-+ * Parse device's OF node to find a PM domain specifier using the
-+ * power-domain-names DT property. For further description see
-+ * genpd_dev_pm_attach_by_id().
-+ */
-+struct device *genpd_dev_pm_attach_by_name(struct device *dev, char *name)
-+{
-+	int index;
-+
-+	if (!dev->of_node)
-+		return NULL;
-+
-+	index = of_property_match_string(dev->of_node, "power-domain-names",
-+					 name);
-+	if (index < 0)
-+		return NULL;
-+
-+	return genpd_dev_pm_attach_by_id(dev, index);
-+}
-+
- static const struct of_device_id idle_state_match[] = {
- 	{ .compatible = "domain-idle-state", },
- 	{ }
-diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
-index cb8d84090cfb..03e14a38462d 100644
---- a/include/linux/pm_domain.h
-+++ b/include/linux/pm_domain.h
-@@ -239,6 +239,8 @@ unsigned int of_genpd_opp_to_performance_state(struct device *dev,
- int genpd_dev_pm_attach(struct device *dev);
- struct device *genpd_dev_pm_attach_by_id(struct device *dev,
- 					 unsigned int index);
-+struct device *genpd_dev_pm_attach_by_name(struct device *dev,
-+					   char *name);
- #else /* !CONFIG_PM_GENERIC_DOMAINS_OF */
- static inline int of_genpd_add_provider_simple(struct device_node *np,
- 					struct generic_pm_domain *genpd)
-@@ -290,6 +292,12 @@ static inline struct device *genpd_dev_pm_attach_by_id(struct device *dev,
- 	return NULL;
- }
- 
-+static inline struct device *genpd_dev_pm_attach_by_name(struct device *dev,
-+							 char *name)
-+{
-+	return NULL;
-+}
-+
- static inline
- struct generic_pm_domain *of_genpd_remove_last(struct device_node *np)
- {
--- 
-2.17.1
+On 29 June 2018 at 13:04, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> Let's add a power-domain-names property, to allow consumer drivers to match
+> the power-domains specifiers via a list of power domain names. This follows
+> the same concept as for other similar DT bindings.
+>
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> ---
+>  Documentation/devicetree/bindings/power/power_domain.txt | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+>
+> diff --git a/Documentation/devicetree/bindings/power/power_domain.txt b/Documentation/devicetree/bindings/power/power_domain.txt
+> index 9b387f861aed..4d6bc8829468 100644
+> --- a/Documentation/devicetree/bindings/power/power_domain.txt
+> +++ b/Documentation/devicetree/bindings/power/power_domain.txt
+> @@ -114,18 +114,26 @@ Required properties:
+>   - power-domains : A list of PM domain specifiers, as defined by bindings of
+>                 the power controller that is the PM domain provider.
+>
+> +Optional properties:
+> + - power-domain-names : A list of power domain name strings sorted in the same
+> +               order as the power-domains property. Consumers drivers will use
+> +               power-domain-names to match power domains with power-domains
+> +               specifiers.
+> +
+>  Example:
+>
+>         leaky-device at 12350000 {
+>                 compatible = "foo,i-leak-current";
+>                 reg = <0x12350000 0x1000>;
+>                 power-domains = <&power 0>;
+> +               power-domain-names = "io";
+>         };
+>
+>         leaky-device at 12351000 {
+>                 compatible = "foo,i-leak-current";
+>                 reg = <0x12351000 0x1000>;
+>                 power-domains = <&power 0>, <&power 1> ;
+> +               power-domain-names = "io", "clk";
+>         };
+>
+>  The first example above defines a typical PM domain consumer device, which is
+> --
+> 2.17.1
+>
