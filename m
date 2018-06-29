@@ -1,146 +1,75 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 29 Jun 2018 12:15:36 +0100
-Subject: [PATCH v3 16/20] kvm: arm64: Switch to per VM IPA limit
-In-Reply-To: <1530270944-11351-1-git-send-email-suzuki.poulose@arm.com>
-References: <1530270944-11351-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1530270944-11351-17-git-send-email-suzuki.poulose@arm.com>
+From: drjones@redhat.com (Andrew Jones)
+Date: Fri, 29 Jun 2018 13:42:27 +0200
+Subject: [PATCH] arm64: acpi: reenumerate topology ids
+In-Reply-To: <20180629105334.GB18043@e107155-lin>
+References: <20180628145128.10057-1-drjones@redhat.com>
+ <a38fb684-c023-1a96-464e-dd268f3132ea@arm.com>
+ <d797ebc5-bd7b-4f72-d4fc-840ba7345a15@arm.com>
+ <20180629105334.GB18043@e107155-lin>
+Message-ID: <20180629114227.4noje2kx3lcjbcpd@kamzik.brq.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we can manage the stage2 page table per VM, switch the
-configuration details to per VM instance. We keep track of the
-IPA bits, number of page table levels and the VTCR bits (which
-depends on the IPA and the number of levels). While at it, remove
-unused pgd_lock field from kvm_arch for arm64.
+On Fri, Jun 29, 2018 at 11:53:34AM +0100, Sudeep Holla wrote:
+> On Thu, Jun 28, 2018 at 12:12:00PM -0500, Jeremy Linton wrote:
+> > Hi,
+> > 
+> > On 06/28/2018 11:30 AM, Sudeep Holla wrote:
+> 
+> [...]
+> 
+> > >I am not sure if we can ever guarantee that DT and ACPI will get the
+> > >same ids whatever counter we use as it depends on the order presented in
+> > >the firmware(DT or ACPI). So I am not for generating ids for core and
+> > >threads in that way.
+> > >
+> > >So I would like to keep it simple and just have this counters for
+> > >package ids as demonstrated in Shunyong's patch.
+> >
+> > So, currently on a non threaded system, the core id's look nice because they
+> > are just the ACPI ids. Its the package id's that look strange, we could just
+> > fix the package ids, but on threaded machines the threads have the nice acpi
+> > ids, and the core ids are then funny numbers. So, I suspect that is driving
+> > this as much as the strange package ids.
+> >
+> 
+> Yes, I know that and that's what made be look at topology_get_acpi_cpu_tag
+> For me, if the PPTT has valid ID, we should use that. Just becuase DT lacks
+> it and uses counter doesn't mean ACPI also needs to follow that.
 
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Christoffer Dall <cdall@kernel.org>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
- arch/arm64/include/asm/kvm_host.h       | 14 ++++++++++++--
- arch/arm64/include/asm/kvm_hyp.h        |  3 +--
- arch/arm64/include/asm/kvm_mmu.h        | 20 ++++++++++++++++++--
- arch/arm64/include/asm/stage2_pgtable.h |  1 -
- virt/kvm/arm/mmu.c                      |  4 ++++
- 5 files changed, 35 insertions(+), 7 deletions(-)
+AFAIK, a valid ACPI UID doesn't need to be something derivable directly
+from the hardware, so it's just as arbitrary as the CPU phandle that is
+in the DT cpu-map, i.e. DT *does* have an analogous leaf node integer.
 
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 328f472..9a15860 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -61,13 +61,23 @@ struct kvm_arch {
- 	u64    vmid_gen;
- 	u32    vmid;
- 
--	/* 1-level 2nd stage table and lock */
--	spinlock_t pgd_lock;
-+	/* stage-2 page table */
- 	pgd_t *pgd;
- 
- 	/* VTTBR value associated with above pgd and vmid */
- 	u64    vttbr;
- 
-+	/* Private bits of VTCR_EL2 for this VM */
-+	u64    vtcr_private;
-+	/* Size of the PA size for this guest */
-+	u8     phys_shift;
-+	/*
-+	 * Number of levels in page table. We could always calculate
-+	 * it from phys_shift above. We cache it for faster switches
-+	 * in stage2 page table helpers.
-+	 */
-+	u8     s2_levels;
-+
- 	/* The last vcpu id that ran on each physical CPU */
- 	int __percpu *last_vcpu_ran;
- 
-diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
-index 3e8052d1..699f678 100644
---- a/arch/arm64/include/asm/kvm_hyp.h
-+++ b/arch/arm64/include/asm/kvm_hyp.h
-@@ -166,8 +166,7 @@ static __always_inline void __hyp_text __load_guest_stage2(struct kvm *kvm)
- 	u64 vtcr = read_sysreg(vtcr_el2);
- 
- 	vtcr &= ~VTCR_EL2_PRIVATE_MASK;
--	vtcr |= VTCR_EL2_SL0(kvm_stage2_levels(kvm)) |
--		VTCR_EL2_T0SZ(kvm_phys_shift(kvm));
-+	vtcr |= kvm->arch.vtcr_private;
- 	write_sysreg(vtcr, vtcr_el2);
- 	write_sysreg(kvm->arch.vttbr, vttbr_el2);
- }
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index f3fb05a3..a291cdc 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -143,9 +143,10 @@ static inline unsigned long __kern_hyp_va(unsigned long v)
-  */
- #define KVM_PHYS_SHIFT	(40)
- 
--#define kvm_phys_shift(kvm)		KVM_PHYS_SHIFT
-+#define kvm_phys_shift(kvm)		(kvm->arch.phys_shift)
- #define kvm_phys_size(kvm)		(_AC(1, ULL) << kvm_phys_shift(kvm))
- #define kvm_phys_mask(kvm)		(kvm_phys_size(kvm) - _AC(1, ULL))
-+#define kvm_stage2_levels(kvm)		(kvm->arch.s2_levels)
- 
- static inline bool kvm_page_empty(void *ptr)
- {
-@@ -528,6 +529,18 @@ static inline u64 kvm_vttbr_baddr_mask(struct kvm *kvm)
- 
- static inline void *stage2_alloc_pgd(struct kvm *kvm)
- {
-+	u32 ipa, lvls;
-+
-+	/*
-+	 * Stage2 page table can support concatenation of (upto 16) tables
-+	 * at the entry level, thereby reducing the number of levels.
-+	 */
-+	ipa = kvm_phys_shift(kvm);
-+	lvls = stage2_pt_levels(ipa);
-+
-+	kvm->arch.s2_levels = lvls;
-+	kvm->arch.vtcr_private = VTCR_EL2_SL0(lvls) | TCR_T0SZ(ipa);
-+
- 	return alloc_pages_exact(stage2_pgd_size(kvm),
- 				 GFP_KERNEL | __GFP_ZERO);
- }
-@@ -537,7 +550,10 @@ static inline u32 kvm_get_ipa_limit(void)
- 	return KVM_PHYS_SHIFT;
- }
- 
--static inline void kvm_config_stage2(struct kvm *kvm, u32 ipa_shift) {}
-+static inline void kvm_config_stage2(struct kvm *kvm, u32 ipa_shift)
-+{
-+	kvm->arch.phys_shift = ipa_shift;
-+}
- 
- #endif /* __ASSEMBLY__ */
- #endif /* __ARM64_KVM_MMU_H__ */
-diff --git a/arch/arm64/include/asm/stage2_pgtable.h b/arch/arm64/include/asm/stage2_pgtable.h
-index ffc37cc..91d7936 100644
---- a/arch/arm64/include/asm/stage2_pgtable.h
-+++ b/arch/arm64/include/asm/stage2_pgtable.h
-@@ -65,7 +65,6 @@
- #define __s2_pgd_ptrs(pa, lvls)	(1 << ((pa) - pt_levels_pgdir_shift((lvls))))
- #define __s2_pgd_size(pa, lvls)	(__s2_pgd_ptrs((pa), (lvls)) * sizeof(pgd_t))
- 
--#define kvm_stage2_levels(kvm)		stage2_pt_levels(kvm_phys_shift(kvm))
- #define stage2_pgdir_shift(kvm)	\
- 		pt_levels_pgdir_shift(kvm_stage2_levels(kvm))
- #define stage2_pgdir_size(kvm)		(_AC(1, UL) << stage2_pgdir_shift((kvm)))
-diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-index a339e00..d7822e1 100644
---- a/virt/kvm/arm/mmu.c
-+++ b/virt/kvm/arm/mmu.c
-@@ -867,6 +867,10 @@ int kvm_alloc_stage2_pgd(struct kvm *kvm)
- 		return -EINVAL;
- 	}
- 
-+	/* Make sure we have the stage2 configured for this VM */
-+	if (WARN_ON(!kvm_phys_shift(kvm)))
-+		return -EINVAL;
-+
- 	/* Allocate the HW PGD, making sure that each page gets its own refcount */
- 	pgd = stage2_alloc_pgd(kvm);
- 	if (!pgd)
--- 
-2.7.4
+> 
+> I am sure some vendor will put valid UID and expect that to be in the
+> sysfs.
+
+I can't think of any reason that would be useful, especially when the
+UID is for a thread, which isn't even displayed by sysfs.
+
+> 
+> > (and as a side, I actually like the PE has a acpi id behavior, but for
+> > threads its being lost with this patch...)
+> > 
+> > Given i've seen odd package/core ids on x86s a few years ago, it never
+
+So this inspired me to grep some x86 topology code. I found
+arch/x86/kernel/smpboot.c:topology_update_package_map(), which uses
+a counter to set the logical package id and Documentation/x86/topology.txt
+states
+
+"""
+  - cpuinfo_x86.logical_id:
+
+    The logical ID of the package. As we do not trust BIOSes to enumerate the
+    packages in a consistent way, we introduced the concept of logical package
+    ID so we can sanely calculate the number of maximum possible packages in
+    the system and have the packages enumerated linearly.
+"""
+
+Which I see as x86 precedent for the consistency argument I made in my
+other reply.
+
+Thanks,
+drew
