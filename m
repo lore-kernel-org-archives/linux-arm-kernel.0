@@ -1,88 +1,20 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Fri, 29 Jun 2018 11:46:18 -0700
-Subject: [PATCH] KVM: arm64: vgic-its: Remove VLA usage
-Message-ID: <20180629184618.GA37364@beast>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Fri, 29 Jun 2018 11:47:09 -0700
+Subject: [PATCH] clk: imx6: fix video_27m parent for IMX6QDL_CLK_CKO1_SEL
+In-Reply-To: <20180608101924.31195-1-pp@emlix.com>
+References: <20180608101924.31195-1-pp@emlix.com>
+Message-ID: <153029802935.143105.13959674411016503894@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the quest to remove all stack VLA usage from the kernel[1], this
-switches to using a maximum size and adds sanity checks. Additionally
-cleans up some of the int-vs-u32 usage and adds additional bounds checking.
-As it currently stands, this will always be 8 bytes until the ABI changes.
+Quoting Philipp Puschmann (2018-06-08 03:19:24)
+> q/dl datasheets list the 5th selection value for ck01_sel as
+> video_27M_clk_root.
+> 
+> By replacing the dummy value we then can set IMX6QDL_CLK_VIDEO_27M
+> as parent for IMX6QDL_CLK_CKO1_SEL.
+> 
+> Signed-off-by: Philipp Puschmann <pp@emlix.com>
+> ---
 
-[1] https://lkml.kernel.org/r/CA+55aFzCG-zNmZwX4A2FQpadafLfEzK6CC=qPXydAacU1RqZWA at mail.gmail.com
-
-Cc: Christoffer Dall <christoffer.dall@arm.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Eric Auger <eric.auger@redhat.com>
-Cc: Andre Przywara <andre.przywara@arm.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: kvmarm at lists.cs.columbia.edu
-Signed-off-by: Kees Cook <keescook@chromium.org>
----
- virt/kvm/arm/vgic/vgic-its.c | 19 +++++++++++++++----
- 1 file changed, 15 insertions(+), 4 deletions(-)
-
-diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index 4ed79c939fb4..3143fc047fcf 100644
---- a/virt/kvm/arm/vgic/vgic-its.c
-+++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -168,8 +168,14 @@ struct vgic_its_abi {
- 	int (*commit)(struct vgic_its *its);
- };
- 
-+#define ABI_0_ESZ	8
-+#define ESZ_MAX		ABI_0_ESZ
-+
- static const struct vgic_its_abi its_table_abi_versions[] = {
--	[0] = {.cte_esz = 8, .dte_esz = 8, .ite_esz = 8,
-+	[0] = {
-+	 .cte_esz = ABI_0_ESZ,
-+	 .dte_esz = ABI_0_ESZ,
-+	 .ite_esz = ABI_0_ESZ,
- 	 .save_tables = vgic_its_save_tables_v0,
- 	 .restore_tables = vgic_its_restore_tables_v0,
- 	 .commit = vgic_its_commit_v0,
-@@ -180,10 +186,12 @@ static const struct vgic_its_abi its_table_abi_versions[] = {
- 
- inline const struct vgic_its_abi *vgic_its_get_abi(struct vgic_its *its)
- {
-+	if (WARN_ON(its->abi_rev >= NR_ITS_ABIS))
-+		return NULL;
- 	return &its_table_abi_versions[its->abi_rev];
- }
- 
--int vgic_its_set_abi(struct vgic_its *its, int rev)
-+static int vgic_its_set_abi(struct vgic_its *its, u32 rev)
- {
- 	const struct vgic_its_abi *abi;
- 
-@@ -1881,16 +1889,19 @@ typedef int (*entry_fn_t)(struct vgic_its *its, u32 id, void *entry,
-  * Return: < 0 on error, 0 if last element was identified, 1 otherwise
-  * (the last element may not be found on second level tables)
-  */
--static int scan_its_table(struct vgic_its *its, gpa_t base, int size, int esz,
-+static int scan_its_table(struct vgic_its *its, gpa_t base, int size, u32 esz,
- 			  int start_id, entry_fn_t fn, void *opaque)
- {
- 	struct kvm *kvm = its->dev->kvm;
- 	unsigned long len = size;
- 	int id = start_id;
- 	gpa_t gpa = base;
--	char entry[esz];
-+	char entry[ESZ_MAX];
- 	int ret;
- 
-+	if (WARN_ON(esz > ESZ_MAX))
-+		return -EINVAL;
-+
- 	memset(entry, 0, esz);
- 
- 	while (len > 0) {
--- 
-2.17.1
-
-
--- 
-Kees Cook
-Pixel Security
+Applied to clk-next
