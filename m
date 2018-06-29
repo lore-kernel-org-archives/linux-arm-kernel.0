@@ -1,98 +1,43 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Fri, 29 Jun 2018 10:15:09 +0200
-Subject: [PATCH] ARM: dts: imx6: correct anatop regulators range
-In-Reply-To: <1530258861-11666-1-git-send-email-Anson.Huang@nxp.com>
-References: <1530258861-11666-1-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <1530260109.22468.60.camel@pengutronix.de>
+From: vkoul@kernel.org (Vinod)
+Date: Fri, 29 Jun 2018 13:49:39 +0530
+Subject: [PATCH v3 1/5] dmaengine: xilinx_dma: in axidma slave_sg and
+ dma_cylic mode align split descriptors
+In-Reply-To: <CAN8YU5Owh2Sb+-mOR0nVFkdZpD=dRd2jCin5MCdnsNLPo5zwwg@mail.gmail.com>
+References: <20180625092724.22164-1-andrea.merello@gmail.com>
+ <20180629072552.GY22377@vkoul-mobl>
+ <CAN8YU5Owh2Sb+-mOR0nVFkdZpD=dRd2jCin5MCdnsNLPo5zwwg@mail.gmail.com>
+Message-ID: <20180629081939.GA22377@vkoul-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, den 29.06.2018, 15:54 +0800 schrieb Anson Huang:
-> Correct some i.MX6 SoCs anatop regulators range
-> according to reference manual.
+On 29-06-18, 09:46, Andrea Merello wrote:
+> On Fri, Jun 29, 2018 at 9:25 AM, Vinod <vkoul@kernel.org> wrote:
+
+> >> +
+> >> +                     if ((copy + sg_used < period_len) &&
+> >> +                         chan->xdev->common.copy_align) {
+> >> +                             /*
+> >> +                              * If this is not the last descriptor, make sure
+> >> +                              * the next one will be properly aligned
+> >> +                              */
+> >> +                             copy = rounddown(copy,
+> >> +                                     (1 << chan->xdev->common.copy_align));
+> >> +                     }
+> >
+> > same code pasted twice, can we have a routine for this... perhaps more
+> > code can be made common too
 > 
-> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
-
-NACK.
-
-This is wrong. While the regulator supports this range, the SoC
-doesn't.?The current settings are derived from the allowed operating
-ranges of the SoC (at least for the MX6QDL), which is in accordance
-with how regulator constraints in DT are meant to be used.
-
-Regards,
-Lucas
-
-> ---
-> ?arch/arm/boot/dts/imx6qdl.dtsi | 12 ++++++------
-> ?arch/arm/boot/dts/imx6sl.dtsi??|??4 ++--
-> ?arch/arm/boot/dts/imx6sx.dtsi??|??4 ++--
-> ?3 files changed, 10 insertions(+), 10 deletions(-)
+> Yes, I see.. Indeed there was duplicated code before this series and
+> it is still there after it.
 > 
-> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-> index 911141e..d9f98dd 100644
-> --- a/arch/arm/boot/dts/imx6qdl.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
-> @@ -689,8 +689,8 @@
-> > ?				regulator-1p1 {
-> > ?					compatible = "fsl,anatop-regulator";
-> > ?					regulator-name = "vdd1p1";
-> > -					regulator-min-microvolt = <1000000>;
-> > -					regulator-max-microvolt = <1200000>;
-> > +					regulator-min-microvolt = <800000>;
-> > +					regulator-max-microvolt = <1375000>;
-> > ?					regulator-always-on;
-> > ?					anatop-reg-offset = <0x110>;
-> > ?					anatop-vol-bit-shift = <8>;
-> @@ -704,8 +704,8 @@
-> > ?				regulator-3p0 {
-> > ?					compatible = "fsl,anatop-regulator";
-> > ?					regulator-name = "vdd3p0";
-> > -					regulator-min-microvolt = <2800000>;
-> > -					regulator-max-microvolt = <3150000>;
-> > +					regulator-min-microvolt = <2625000>;
-> > +					regulator-max-microvolt = <3400000>;
-> > ?					regulator-always-on;
-> > ?					anatop-reg-offset = <0x120>;
-> > ?					anatop-vol-bit-shift = <8>;
-> @@ -719,8 +719,8 @@
-> > ?				regulator-2p5 {
-> > ?					compatible = "fsl,anatop-regulator";
-> > ?					regulator-name = "vdd2p5";
-> > -					regulator-min-microvolt = <2250000>;
-> > -					regulator-max-microvolt = <2750000>;
-> > +					regulator-min-microvolt = <2100000>;
-> > +					regulator-max-microvolt = <2875000>;
-> > ?					regulator-always-on;
-> > ?					anatop-reg-offset = <0x130>;
-> > ?					anatop-vol-bit-shift = <8>;
-> diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-> index 81f48116..3d7931b 100644
-> --- a/arch/arm/boot/dts/imx6sl.dtsi
-> +++ b/arch/arm/boot/dts/imx6sl.dtsi
-> @@ -539,8 +539,8 @@
-> > ?				regulator-3p0 {
-> > ?					compatible = "fsl,anatop-regulator";
-> > ?					regulator-name = "vdd3p0";
-> > -					regulator-min-microvolt = <2800000>;
-> > -					regulator-max-microvolt = <3150000>;
-> > +					regulator-min-microvolt = <2625000>;
-> > +					regulator-max-microvolt = <3400000>;
-> > ?					regulator-always-on;
-> > ?					anatop-reg-offset = <0x120>;
-> > ?					anatop-vol-bit-shift = <8>;
-> diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
-> index 7130ab8..f26f611 100644
-> --- a/arch/arm/boot/dts/imx6sx.dtsi
-> +++ b/arch/arm/boot/dts/imx6sx.dtsi
-> @@ -607,8 +607,8 @@
-> > ?				regulator-3p0 {
-> > ?					compatible = "fsl,anatop-regulator";
-> > ?					regulator-name = "vdd3p0";
-> > -					regulator-min-microvolt = <2800000>;
-> > -					regulator-max-microvolt = <3150000>;
-> > +					regulator-min-microvolt = <2625000>;
-> > +					regulator-max-microvolt = <3400000>;
-> > ?					regulator-always-on;
-> > ?					anatop-reg-offset = <0x120>;
-> > ?					anatop-vol-bit-shift = <8>;
+> I can see if we can have a routine as you suggested at least for the
+> code portions touched by this patch. Do you eventually want this extra
+> change to be done in the same patch 1/5 or do you want a separate
+> patch i.e. 2/6 or 6/6 ?
+
+Each patch should do one thing, so would make sense to move first and
+then add you on top of that. 1/6 commonize and 2/6 add this bit.
+
+
+-- 
+~Vinod
