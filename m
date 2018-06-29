@@ -1,310 +1,134 @@
-From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
-Date: Fri, 29 Jun 2018 17:22:13 +0900
-Subject: [PATCH 2/2] regulator: uniphier: add regulator driver for UniPhier SoC
-In-Reply-To: <1530260533-19415-1-git-send-email-hayashi.kunihiko@socionext.com>
-References: <1530260533-19415-1-git-send-email-hayashi.kunihiko@socionext.com>
-Message-ID: <1530260533-19415-3-git-send-email-hayashi.kunihiko@socionext.com>
+From: anson.huang@nxp.com (Anson Huang)
+Date: Fri, 29 Jun 2018 08:27:41 +0000
+Subject: [PATCH] ARM: dts: imx6: correct anatop regulators range
+In-Reply-To: <1530260109.22468.60.camel@pengutronix.de>
+References: <1530258861-11666-1-git-send-email-Anson.Huang@nxp.com>
+ <1530260109.22468.60.camel@pengutronix.de>
+Message-ID: <AM3PR04MB13157A4948E36BAE60A8DC49F54E0@AM3PR04MB1315.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Initial commit to add support for regulators implemented in UniPhier SoCs.
-This supports USB VBUS only.
+Hi, Lucas
 
-Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
----
- drivers/regulator/Kconfig              |   8 ++
- drivers/regulator/Makefile             |   1 +
- drivers/regulator/uniphier-regulator.c | 251 +++++++++++++++++++++++++++++++++
- 3 files changed, 260 insertions(+)
- create mode 100644 drivers/regulator/uniphier-regulator.c
+Anson Huang
+Best Regards!
 
-diff --git a/drivers/regulator/Kconfig b/drivers/regulator/Kconfig
-index 097f617..7f7ad0d 100644
---- a/drivers/regulator/Kconfig
-+++ b/drivers/regulator/Kconfig
-@@ -932,6 +932,14 @@ config REGULATOR_TWL4030
- 	  This driver supports the voltage regulators provided by
- 	  this family of companion chips.
+
+> -----Original Message-----
+> From: Lucas Stach [mailto:l.stach at pengutronix.de]
+> Sent: Friday, June 29, 2018 4:15 PM
+> To: Anson Huang <anson.huang@nxp.com>; shawnguo at kernel.org;
+> s.hauer at pengutronix.de; kernel at pengutronix.de; Fabio Estevam
+> <fabio.estevam@nxp.com>; robh+dt at kernel.org; mark.rutland at arm.com;
+> linux-arm-kernel at lists.infradead.org; devicetree at vger.kernel.org;
+> linux-kernel at vger.kernel.org
+> Cc: dl-linux-imx <linux-imx@nxp.com>
+> Subject: Re: [PATCH] ARM: dts: imx6: correct anatop regulators range
+> 
+> Am Freitag, den 29.06.2018, 15:54 +0800 schrieb Anson Huang:
+> > Correct some i.MX6 SoCs anatop regulators range according to reference
+> > manual.
+> >
+> > Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+> 
+> NACK.
+> 
+> This is wrong. While the regulator supports this range, the SoC doesn't.?The
+> current settings are derived from the allowed operating ranges of the SoC (at
+> least for the MX6QDL), which is in accordance with how regulator constraints
+> in DT are meant to be used.
  
-+config REGULATOR_UNIPHIER
-+	tristate "UniPhier regulator driver"
-+	depends on ARCH_UNIPHIER || COMPILE_TEST
-+	depends on OF && MFD_SYSCON
-+	default ARCH_UNIPHIER
-+	help
-+	  Support for regulators implemented on Socionext UniPhier SoCs.
-+
- config REGULATOR_VCTRL
- 	tristate "Voltage controlled regulators"
- 	depends on OF
-diff --git a/drivers/regulator/Makefile b/drivers/regulator/Makefile
-index 590674f..c0dd281 100644
---- a/drivers/regulator/Makefile
-+++ b/drivers/regulator/Makefile
-@@ -116,6 +116,7 @@ obj-$(CONFIG_REGULATOR_TPS65912) += tps65912-regulator.o
- obj-$(CONFIG_REGULATOR_TPS80031) += tps80031-regulator.o
- obj-$(CONFIG_REGULATOR_TPS65132) += tps65132-regulator.o
- obj-$(CONFIG_REGULATOR_TWL4030) += twl-regulator.o twl6030-regulator.o
-+obj-$(CONFIG_REGULATOR_UNIPHIER) += uniphier-regulator.o
- obj-$(CONFIG_REGULATOR_VCTRL) += vctrl-regulator.o
- obj-$(CONFIG_REGULATOR_VEXPRESS) += vexpress-regulator.o
- obj-$(CONFIG_REGULATOR_WM831X) += wm831x-dcdc.o
-diff --git a/drivers/regulator/uniphier-regulator.c b/drivers/regulator/uniphier-regulator.c
-new file mode 100644
-index 0000000..b1f2649
---- /dev/null
-+++ b/drivers/regulator/uniphier-regulator.c
-@@ -0,0 +1,251 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * Regulator controller driver for UniPhier SoC
-+ * Copyright 2018 Socionext Inc.
-+ * Author: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/of_device.h>
-+#include <linux/platform_device.h>
-+#include <linux/regulator/driver.h>
-+#include <linux/regulator/of_regulator.h>
-+#include <linux/reset.h>
-+
-+#define MAX_CLKS	2
-+#define MAX_RSTS	2
-+
-+struct uniphier_regulator_soc_data {
-+	const char *clock_names[MAX_CLKS];
-+	const char *reset_names[MAX_RSTS];
-+	const struct regulator_desc *desc;
-+};
-+
-+struct uniphier_regulator_priv {
-+	void __iomem *base;
-+	int nclks;
-+	struct clk *clk[MAX_CLKS];
-+	int nrsts;
-+	struct reset_control *rst[MAX_RSTS];
-+	const struct uniphier_regulator_soc_data *data;
-+};
-+
-+static int uniphier_regulator_enable(struct regulator_dev *rdev)
-+{
-+	struct uniphier_regulator_priv *priv = rdev_get_drvdata(rdev);
-+	u32 val;
-+
-+	val = readl_relaxed(priv->base + rdev->desc->enable_reg);
-+	val &= ~rdev->desc->enable_mask;
-+	val |= rdev->desc->enable_val;
-+	writel_relaxed(val, priv->base + rdev->desc->enable_reg);
-+
-+	return 0;
-+}
-+
-+static int uniphier_regulator_disable(struct regulator_dev *rdev)
-+{
-+	struct uniphier_regulator_priv *priv = rdev_get_drvdata(rdev);
-+	u32 val;
-+
-+	val = readl_relaxed(priv->base + rdev->desc->enable_reg);
-+	val &= ~rdev->desc->enable_mask;
-+	val |= rdev->desc->disable_val;
-+	writel_relaxed(val, priv->base + rdev->desc->enable_reg);
-+
-+	return 0;
-+}
-+
-+static int uniphier_regulator_is_enabled(struct regulator_dev *rdev)
-+{
-+	struct uniphier_regulator_priv *priv = rdev_get_drvdata(rdev);
-+	u32 val;
-+	int ret = -EINVAL;
-+
-+	val = readl(priv->base + rdev->desc->enable_reg);
-+	val &= rdev->desc->enable_mask;
-+
-+	if (val == rdev->desc->enable_val)
-+		ret = 1;
-+	else if (val == rdev->desc->disable_val)
-+		ret = 0;
-+
-+	return ret;
-+}
-+
-+static struct regulator_ops uniphier_regulator_ops = {
-+	.enable     = uniphier_regulator_enable,
-+	.disable    = uniphier_regulator_disable,
-+	.is_enabled = uniphier_regulator_is_enabled,
-+};
-+
-+static int uniphier_regulator_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct uniphier_regulator_priv *priv;
-+	struct regulator_config config = { };
-+	struct regulator_dev *rdev;
-+	struct resource *res;
-+	const char *name;
-+	int i, ret, nc, nr;
-+
-+	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
-+	if (!priv)
-+		return -ENOMEM;
-+
-+	priv->data = of_device_get_match_data(dev);
-+	if (WARN_ON(!priv->data))
-+		return -EINVAL;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	priv->base = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(priv->base))
-+		return PTR_ERR(priv->base);
-+
-+	for (i = 0; i < MAX_CLKS; i++) {
-+		name = priv->data->clock_names[i];
-+		if (!name)
-+			break;
-+		priv->clk[i] = devm_clk_get(dev, name);
-+		if (IS_ERR(priv->clk[i]))
-+			return PTR_ERR(priv->clk[i]);
-+		priv->nclks++;
-+	}
-+
-+	for (i = 0; i < MAX_RSTS; i++) {
-+		name = priv->data->reset_names[i];
-+		if (!name)
-+			break;
-+		priv->rst[i] = devm_reset_control_get_shared(dev, name);
-+		if (IS_ERR(priv->rst[i]))
-+			return PTR_ERR(priv->rst[i]);
-+		priv->nrsts++;
-+	}
-+
-+	for (nc = 0; nc < priv->nclks; nc++) {
-+		ret = clk_prepare_enable(priv->clk[nc]);
-+		if (ret)
-+			goto out_clk_disable;
-+	}
-+
-+	for (nr = 0; nr < priv->nrsts; nr++) {
-+		ret = reset_control_deassert(priv->rst[nr]);
-+		if (ret)
-+			goto out_rst_assert;
-+	}
-+
-+	/* Register UniPhier regulator */
-+	config.dev = dev;
-+	config.driver_data = priv;
-+	config.of_node = dev->of_node;
-+	config.init_data = of_get_regulator_init_data(dev, dev->of_node,
-+						      priv->data->desc);
-+	rdev = devm_regulator_register(dev, priv->data->desc, &config);
-+	if (IS_ERR(rdev)) {
-+		ret = PTR_ERR(rdev);
-+		goto out_rst_assert;
-+	}
-+
-+	platform_set_drvdata(pdev, priv);
-+
-+	return 0;
-+
-+out_rst_assert:
-+	while (nr--)
-+		reset_control_assert(priv->rst[nr]);
-+out_clk_disable:
-+	while (nc--)
-+		clk_disable_unprepare(priv->clk[nc]);
-+
-+	return ret;
-+}
-+
-+static int uniphier_regulator_remove(struct platform_device *pdev)
-+{
-+	struct uniphier_regulator_priv *priv = platform_get_drvdata(pdev);
-+	int i;
-+
-+	for (i = 0; i < priv->nrsts; i++)
-+		reset_control_assert(priv->rst[i]);
-+	for (i = 0; i < priv->nclks; i++)
-+		clk_disable_unprepare(priv->clk[i]);
-+
-+	return 0;
-+}
-+
-+/* USB3 controller data */
-+#define USB3VBUS_OFFSET		0x0
-+#define USB3VBUS_REG		BIT(4)
-+#define USB3VBUS_REG_EN		BIT(3)
-+static const struct regulator_desc uniphier_usb3_regulator_desc = {
-+	.name = "vbus",
-+	.of_match = of_match_ptr("vbus"),
-+	.ops = &uniphier_regulator_ops,
-+	.type = REGULATOR_VOLTAGE,
-+	.owner = THIS_MODULE,
-+	.enable_reg  = USB3VBUS_OFFSET,
-+	.enable_mask = USB3VBUS_REG_EN | USB3VBUS_REG,
-+	.enable_val  = USB3VBUS_REG_EN | USB3VBUS_REG,
-+	.disable_val = USB3VBUS_REG_EN,
-+};
-+
-+static const struct uniphier_regulator_soc_data uniphier_pro4_usb3_data = {
-+	.clock_names = { "gio", "link", },
-+	.reset_names = { "gio", "link", },
-+	.desc = &uniphier_usb3_regulator_desc,
-+};
-+
-+static const struct uniphier_regulator_soc_data uniphier_pxs2_usb3_data = {
-+	.clock_names = { "link", },
-+	.reset_names = { "link", },
-+	.desc = &uniphier_usb3_regulator_desc,
-+};
-+
-+static const struct uniphier_regulator_soc_data uniphier_ld20_usb3_data = {
-+	.clock_names = { "link", },
-+	.reset_names = { "link", },
-+	.desc = &uniphier_usb3_regulator_desc,
-+};
-+
-+static const struct uniphier_regulator_soc_data uniphier_pxs3_usb3_data = {
-+	.clock_names = { "link", },
-+	.reset_names = { "link", },
-+	.desc = &uniphier_usb3_regulator_desc,
-+};
-+
-+static const struct of_device_id uniphier_regulator_match[] = {
-+	/* USB VBUS */
-+	{
-+		.compatible = "socionext,uniphier-pro4-usb3-regulator",
-+		.data = &uniphier_pro4_usb3_data,
-+	},
-+	{
-+		.compatible = "socionext,uniphier-pxs2-usb3-regulator",
-+		.data = &uniphier_pxs2_usb3_data,
-+	},
-+	{
-+		.compatible = "socionext,uniphier-ld20-usb3-regulator",
-+		.data = &uniphier_ld20_usb3_data,
-+	},
-+	{
-+		.compatible = "socionext,uniphier-pxs3-usb3-regulator",
-+		.data = &uniphier_pxs3_usb3_data,
-+	},
-+	{ /* Sentinel */ },
-+};
-+
-+static struct platform_driver uniphier_regulator_driver = {
-+	.probe = uniphier_regulator_probe,
-+	.remove = uniphier_regulator_remove,
-+	.driver = {
-+		.name  = "uniphier-regulator",
-+		.of_match_table = uniphier_regulator_match,
-+	},
-+};
-+module_platform_driver(uniphier_regulator_driver);
-+
-+MODULE_AUTHOR("Kunihiko Hayashi <hayashi.kunihiko@socionext.com>");
-+MODULE_DESCRIPTION("UniPhier Regulator Controller Driver");
-+MODULE_LICENSE("GPL");
--- 
-2.7.4
+Understand that normally these regulators' voltage are NOT adjusted, we just use
+the default value, let's just call the operating range of the SoC "SoC range",
+my intention is to make all i.MX6's anatop regulator settings aligned since they are in same series, 
+I saw some i.MX6 SoCs use same SoC range as anatop ldo range, but some are
+NOT, like imx6qdl/imx6sx/imx6sl use different SoC range than anatop ldo range,
+but imx6ul/ull/sll use same regulator range as anatop ldo, and regulator 1p1/2p5/3p0
+also have different settings, some are use SoC range and some are just same as anatop
+ldo range....this looks really confused.
+
+So, do you think we can adjust the imx6ul/ull/sll's regulator range to be SoC range rather than
+anatop ldo range? And how to define the SoC range? Like the 1p1 ldo range, how do
+we know which range is fine? As I saw it is 1v ~ 1.2v on imx6qdl, but 0.8v ~ 1.375v on imx6sl?
+
+Thanks.
+
+Anson.
+
+> 
+> Regards,
+> Lucas
+> 
+> > ---
+> > ?arch/arm/boot/dts/imx6qdl.dtsi | 12 ++++++------
+> > ?arch/arm/boot/dts/imx6sl.dtsi??|??4 ++--
+> > ?arch/arm/boot/dts/imx6sx.dtsi??|??4 ++--
+> > ?3 files changed, 10 insertions(+), 10 deletions(-)
+> >
+> > diff --git a/arch/arm/boot/dts/imx6qdl.dtsi
+> > b/arch/arm/boot/dts/imx6qdl.dtsi index 911141e..d9f98dd 100644
+> > --- a/arch/arm/boot/dts/imx6qdl.dtsi
+> > +++ b/arch/arm/boot/dts/imx6qdl.dtsi
+> > @@ -689,8 +689,8 @@
+> > > ?				regulator-1p1 {
+> > > ?					compatible = "fsl,anatop-regulator";
+> > > ?					regulator-name = "vdd1p1";
+> > > -					regulator-min-microvolt = <1000000>;
+> > > -					regulator-max-microvolt = <1200000>;
+> > > +					regulator-min-microvolt = <800000>;
+> > > +					regulator-max-microvolt = <1375000>;
+> > > ?					regulator-always-on;
+> > > ?					anatop-reg-offset = <0x110>;
+> > > ?					anatop-vol-bit-shift = <8>;
+> > @@ -704,8 +704,8 @@
+> > > ?				regulator-3p0 {
+> > > ?					compatible = "fsl,anatop-regulator";
+> > > ?					regulator-name = "vdd3p0";
+> > > -					regulator-min-microvolt = <2800000>;
+> > > -					regulator-max-microvolt = <3150000>;
+> > > +					regulator-min-microvolt = <2625000>;
+> > > +					regulator-max-microvolt = <3400000>;
+> > > ?					regulator-always-on;
+> > > ?					anatop-reg-offset = <0x120>;
+> > > ?					anatop-vol-bit-shift = <8>;
+> > @@ -719,8 +719,8 @@
+> > > ?				regulator-2p5 {
+> > > ?					compatible = "fsl,anatop-regulator";
+> > > ?					regulator-name = "vdd2p5";
+> > > -					regulator-min-microvolt = <2250000>;
+> > > -					regulator-max-microvolt = <2750000>;
+> > > +					regulator-min-microvolt = <2100000>;
+> > > +					regulator-max-microvolt = <2875000>;
+> > > ?					regulator-always-on;
+> > > ?					anatop-reg-offset = <0x130>;
+> > > ?					anatop-vol-bit-shift = <8>;
+> > diff --git a/arch/arm/boot/dts/imx6sl.dtsi
+> > b/arch/arm/boot/dts/imx6sl.dtsi index 81f48116..3d7931b 100644
+> > --- a/arch/arm/boot/dts/imx6sl.dtsi
+> > +++ b/arch/arm/boot/dts/imx6sl.dtsi
+> > @@ -539,8 +539,8 @@
+> > > ?				regulator-3p0 {
+> > > ?					compatible = "fsl,anatop-regulator";
+> > > ?					regulator-name = "vdd3p0";
+> > > -					regulator-min-microvolt = <2800000>;
+> > > -					regulator-max-microvolt = <3150000>;
+> > > +					regulator-min-microvolt = <2625000>;
+> > > +					regulator-max-microvolt = <3400000>;
+> > > ?					regulator-always-on;
+> > > ?					anatop-reg-offset = <0x120>;
+> > > ?					anatop-vol-bit-shift = <8>;
+> > diff --git a/arch/arm/boot/dts/imx6sx.dtsi
+> > b/arch/arm/boot/dts/imx6sx.dtsi index 7130ab8..f26f611 100644
+> > --- a/arch/arm/boot/dts/imx6sx.dtsi
+> > +++ b/arch/arm/boot/dts/imx6sx.dtsi
+> > @@ -607,8 +607,8 @@
+> > > ?				regulator-3p0 {
+> > > ?					compatible = "fsl,anatop-regulator";
+> > > ?					regulator-name = "vdd3p0";
+> > > -					regulator-min-microvolt = <2800000>;
+> > > -					regulator-max-microvolt = <3150000>;
+> > > +					regulator-min-microvolt = <2625000>;
+> > > +					regulator-max-microvolt = <3400000>;
+> > > ?					regulator-always-on;
+> > > ?					anatop-reg-offset = <0x120>;
+> > > ?					anatop-vol-bit-shift = <8>;
