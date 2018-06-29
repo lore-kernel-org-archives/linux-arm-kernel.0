@@ -1,73 +1,82 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 29 Jun 2018 10:11:27 +0100
-Subject: [PATCH 0/4] KVM: arm/arm64: vgic: Virtual interrupt grouping
- support
-In-Reply-To: <20180625115603.GG8004@C02W217FHV2R.local>
-References: <20180624221103.15055-1-christoffer.dall@arm.com>
- <CAFEAcA_C6Voh_6Ljj9--cbo14X_uWTOekM30dU=Rp9CtZK-6ow@mail.gmail.com>
- <20180625101347.GF8004@C02W217FHV2R.local>
- <20180625115603.GG8004@C02W217FHV2R.local>
-Message-ID: <86h8lmyn28.wl-marc.zyngier@arm.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 29 Jun 2018 11:15:37 +0200
+Subject: [PATCH] PM / Domains: Don't power on at attach for the multi PM
+ domain case
+Message-ID: <20180629091537.26864-1-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 25 Jun 2018 12:56:03 +0100,
-Christoffer Dall <christoffer.dall@arm.com> wrote:
-> 
-> On Mon, Jun 25, 2018 at 12:13:47PM +0200, Christoffer Dall wrote:
-> > On Mon, Jun 25, 2018 at 10:52:41AM +0100, Peter Maydell wrote:
-> > > On 24 June 2018 at 23:10, Christoffer Dall <christoffer.dall@arm.com> wrote:
-> > > > This small series addresses a peculiarity of the current VGIC
-> > > > implementation, namely that we don't support interrupt grouping.
-> > > >
-> > > > KVM either implements a GICv2 without support for the security
-> > > > extensions, or a GICv3 with DS=1.  For GICv2, on systems without the
-> > > > security extensions, group 0 interrupts can be configured to be either
-> > > > signalled as FIQs or as IRQs by the VM, whereas group 1 interrupts are
-> > > > always IRQs.  For GICv3, with DS=1, group 1 interrupts are always IRQs
-> > > > and group 0 interrupts are always FIQs, and there is no concept of
-> > > > secure vs. non-secure group 1 interrupts when DS=1.
-> > > >
-> > > > We were treating all interrupts on GICv2 as group 0, but yet telling the
-> > > > geust that they were group 1.  The first patch changes this behavior,
-> > > > which seems to have no effect on no known guests, but still.
-> > > >
-> > > > The remaining patches introduce proper interrupt grouping support, along
-> > > > with MMIO accessors for the VM and userspace to retrieve and set the
-> > > > which group SGIs, PPIs, and SPIs belong to.  LPIs are always group 1
-> > > > interrupts as per the architecture, and there is no way to modify this
-> > > > configuration (no IGROUPR registers for LPIs or equivalent ITS
-> > > > commands).
-> > > 
-> > > How do we handle migration compatibility here? For instance if
-> > > we have a guest running on an old kernel with GICv2, presumably
-> > > it reports the GICD_IGROUPRn to userspace as being all-1 (but
-> > > they behave as group 0); then when we load on the new kernel
-> > > the new kernel will honour the IGROUPRn values and the interrupts
-> > > will start behaving like group 1 ? Maybe this works because the
-> > > guest is expecting them to be signalled as IRQ either way...
-> > > 
-> > 
-> > Interesting.  For GICv2, I think this will actually break, and the
-> > migrated Linux guest won't see any interrupts anymore (Linux only sets
-> > bit 0 in GICD_CTLR).  For GICv3, everything stays group 1 unless the
-> > guest is specifically trying to configure group 0 for something.
-> > 
-> > I suppose this means we need to let userspace request
-> > ARCH_COMPLIANT_GICV2 and otherwise ignore userspace writes to IGROUPR?
-> > 
-> Alternatively, we could deny (fail) migration where the
-> GICD_IIDR.Revision does not match the source, and just let userspace fix
-> things up.  Thoughts?
+There are no legacy behavior in drivers to consider while attaching a
+device to genpd - for the multiple PM domain case.
 
-That's exactly the kind of thing I had in mind when I suggested to
-bump up the IIDR. It allows us to push the knowledge of the quirks to
-both the guest and userspace, instead of adding more esoteric API
-features.
+For that reason, let's instead require the driver to runtime resume the
+device, via calling pm_runtime_get_sync() for example, when it needs to
+power on the corresponding PM domain.
 
-Thanks,
+This allows us to improve the situation during attach. Instead of always
+power on the PM domain, which may be unnecessary, let's leave it in its
+current state. Additionally, to avoid the PM domain to stay powered on,
+let's schedule a power off work.
 
-	M.
+Fixes: 3c095f32a92b ("PM / Domains: Add support for multi PM domains...")
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+---
+ drivers/base/power/domain.c | 16 +++++++++-------
+ 1 file changed, 9 insertions(+), 7 deletions(-)
 
+diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+index c298de8a8308..9e8484189034 100644
+--- a/drivers/base/power/domain.c
++++ b/drivers/base/power/domain.c
+@@ -2235,7 +2235,7 @@ static void genpd_dev_pm_sync(struct device *dev)
+ }
+ 
+ static int __genpd_dev_pm_attach(struct device *dev, struct device_node *np,
+-				 unsigned int index)
++				 unsigned int index, bool power_on)
+ {
+ 	struct of_phandle_args pd_args;
+ 	struct generic_pm_domain *pd;
+@@ -2271,9 +2271,11 @@ static int __genpd_dev_pm_attach(struct device *dev, struct device_node *np,
+ 	dev->pm_domain->detach = genpd_dev_pm_detach;
+ 	dev->pm_domain->sync = genpd_dev_pm_sync;
+ 
+-	genpd_lock(pd);
+-	ret = genpd_power_on(pd, 0);
+-	genpd_unlock(pd);
++	if (power_on) {
++		genpd_lock(pd);
++		ret = genpd_power_on(pd, 0);
++		genpd_unlock(pd);
++	}
+ 
+ 	if (ret)
+ 		genpd_remove_device(pd, dev);
+@@ -2307,7 +2309,7 @@ int genpd_dev_pm_attach(struct device *dev)
+ 				       "#power-domain-cells") != 1)
+ 		return 0;
+ 
+-	return __genpd_dev_pm_attach(dev, dev->of_node, 0);
++	return __genpd_dev_pm_attach(dev, dev->of_node, 0, true);
+ }
+ EXPORT_SYMBOL_GPL(genpd_dev_pm_attach);
+ 
+@@ -2359,14 +2361,14 @@ struct device *genpd_dev_pm_attach_by_id(struct device *dev,
+ 	}
+ 
+ 	/* Try to attach the device to the PM domain at the specified index. */
+-	ret = __genpd_dev_pm_attach(genpd_dev, dev->of_node, index);
++	ret = __genpd_dev_pm_attach(genpd_dev, dev->of_node, index, false);
+ 	if (ret < 1) {
+ 		device_unregister(genpd_dev);
+ 		return ret ? ERR_PTR(ret) : NULL;
+ 	}
+ 
+-	pm_runtime_set_active(genpd_dev);
+ 	pm_runtime_enable(genpd_dev);
++	genpd_queue_power_off_work(dev_to_genpd(genpd_dev));
+ 
+ 	return genpd_dev;
+ }
 -- 
-Jazz is not dead, it just smell funny.
+2.17.1
