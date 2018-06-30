@@ -1,56 +1,49 @@
 From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Sat, 30 Jun 2018 19:03:27 +0530
-Subject: [PATCH v3 3/6] arm64: dts: actions: Add pinctrl definition for S900
- I2C controller
+Date: Sat, 30 Jun 2018 19:03:28 +0530
+Subject: [PATCH v3 4/6] arm64: dts: actions: Enable I2C1 and I2C2 in
+ Bubblegum-96 board
 In-Reply-To: <20180630133330.23858-1-manivannan.sadhasivam@linaro.org>
 References: <20180630133330.23858-1-manivannan.sadhasivam@linaro.org>
-Message-ID: <20180630133330.23858-4-manivannan.sadhasivam@linaro.org>
+Message-ID: <20180630133330.23858-5-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add pinctrl definition for Actions Semiconductor S900 I2C controller.
-Pinctrl definitions are only available for I2C0, I2C1, and I2C2.
+Enable I2C1 and I2C2 exposed on the low speed expansion connector in
+Bubblegum-96 board.
 
 Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 ---
- .../dts/actions/s900-bubblegum-96-pins.dtsi   | 29 +++++++++++++++++++
- 1 file changed, 29 insertions(+)
- create mode 100644 arch/arm64/boot/dts/actions/s900-bubblegum-96-pins.dtsi
+ arch/arm64/boot/dts/actions/s900-bubblegum-96.dts | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/actions/s900-bubblegum-96-pins.dtsi b/arch/arm64/boot/dts/actions/s900-bubblegum-96-pins.dtsi
-new file mode 100644
-index 000000000000..95e8b31071f9
---- /dev/null
-+++ b/arch/arm64/boot/dts/actions/s900-bubblegum-96-pins.dtsi
-@@ -0,0 +1,29 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+
-+&pinctrl {
-+
-+	i2c0_default: i2c0_default {
-+		pinmux {
-+			groups = "i2c0_mfp";
-+			function = "i2c0";
-+		};
-+		pinconf {
-+			pins = "i2c0_sclk", "i2c0_sdata";
-+			bias-pull-up;
-+		};
-+	};
-+
-+	i2c1_default: i2c1_default {
-+		pinconf {
-+			pins = "i2c1_sclk", "i2c1_sdata";
-+			bias-pull-up;
-+		};
-+	};
-+
-+	i2c2_default: i2c2_default {
-+		pinconf {
-+			pins = "i2c2_sclk", "i2c2_sdata";
-+			bias-pull-up;
-+		};
-+	};
+diff --git a/arch/arm64/boot/dts/actions/s900-bubblegum-96.dts b/arch/arm64/boot/dts/actions/s900-bubblegum-96.dts
+index d0ba35df9015..57ae374cfb5a 100644
+--- a/arch/arm64/boot/dts/actions/s900-bubblegum-96.dts
++++ b/arch/arm64/boot/dts/actions/s900-bubblegum-96.dts
+@@ -7,6 +7,7 @@
+ /dts-v1/;
+ 
+ #include "s900.dtsi"
++#include "s900-bubblegum-96-pins.dtsi"
+ 
+ / {
+ 	compatible = "ucrobotics,bubblegum-96", "actions,s900";
+@@ -35,6 +36,16 @@
+ 	clocks = <&cmu CLK_UART5>;
+ };
+ 
++&i2c1 {
++	status = "okay";
++	clocks = <&cmu CLK_I2C1>;
 +};
++
++&i2c2 {
++	status = "okay";
++	clocks = <&cmu CLK_I2C2>;
++};
++
+ /*
+  * GPIO name legend: proper name = the GPIO line is used as GPIO
+  *         NC = not connected (pin out but not routed from the chip to
 -- 
 2.17.1
