@@ -1,45 +1,21 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Sat, 30 Jun 2018 16:24:21 +0530
-Subject: [PATCH] mtd: spi-nor: cadence-quadspi: Fix direct mode write timeouts
-Message-ID: <20180630105421.550-1-vigneshr@ti.com>
+From: davem@davemloft.net (David Miller)
+Date: Sat, 30 Jun 2018 20:16:15 +0900 (KST)
+Subject: [PATCH v3 net-next 0/5] Fixes coding style in xilinx_emaclite.c
+In-Reply-To: <1530191510-10310-1-git-send-email-radhey.shyam.pandey@xilinx.com>
+References: <1530191510-10310-1-git-send-email-radhey.shyam.pandey@xilinx.com>
+Message-ID: <20180630.201615.1561953485703310312.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sometimes when writing large size files to flash in direct/memory mapped
-mode, it is seen that flash write enable command times out with error:
-[  503.146293] cadence-qspi 47040000.ospi: Flash command execution timed out.
+From: Radhey Shyam Pandey <radhey.shyam.pandey@xilinx.com>
+Date: Thu, 28 Jun 2018 18:41:45 +0530
 
-This is because, we need to make sure previous direct write operation
-is complete by polling for IDLE bit in CONFIG_REG before starting the
-next operation.
+> This patchset fixes checkpatch and kernel-doc warnings in
+> xilinx emaclite driver. No functional change.
+> 
+> Changes from v2:
+> -In 2/5 patch refactor if-else to make failure path return early.
+> -In 2/5 patch coalesce the format onto a single line and add the
+> missing space after the comma.
 
-Fix this by polling for IDLE bit after memory mapped write.
-
-Fixes: a27f2eaf2b27 ("mtd: spi-nor: cadence-quadspi: Add support for direct access mode")
-Cc: stable at vger.kernel.org
-Signed-off-by: Vignesh R <vigneshr@ti.com>
----
- drivers/mtd/spi-nor/cadence-quadspi.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/mtd/spi-nor/cadence-quadspi.c b/drivers/mtd/spi-nor/cadence-quadspi.c
-index c3f7aaa5d18f..d7e10b36a0b9 100644
---- a/drivers/mtd/spi-nor/cadence-quadspi.c
-+++ b/drivers/mtd/spi-nor/cadence-quadspi.c
-@@ -926,10 +926,12 @@ static ssize_t cqspi_write(struct spi_nor *nor, loff_t to,
- 	if (ret)
- 		return ret;
- 
--	if (f_pdata->use_direct_mode)
-+	if (f_pdata->use_direct_mode) {
- 		memcpy_toio(cqspi->ahb_base + to, buf, len);
--	else
-+		ret = cqspi_wait_idle(cqspi);
-+	} else {
- 		ret = cqspi_indirect_write_execute(nor, to, buf, len);
-+	}
- 	if (ret)
- 		return ret;
- 
--- 
-2.18.0
+Series applied.
