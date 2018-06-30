@@ -1,128 +1,77 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Sat, 30 Jun 2018 14:24:03 -0500
-Subject: [PATCH V3] PCI: Enable PASID when End-to-End TLP is supported by
- all bridges
-In-Reply-To: <1530372264-20653-1-git-send-email-okaya@codeaurora.org>
-References: <1530372264-20653-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <20180630192403.GC9547@bhelgaas-glaptop.roam.corp.google.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 30 Jun 2018 12:32:54 -0700
+Subject: [GIT PULL] ARM: SoC fixes
+Message-ID: <20180630193254.irrglaxamez7ryt2@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 30, 2018 at 11:24:24AM -0400, Sinan Kaya wrote:
-> A PCIe endpoint carries the process address space identifier (PASID) in
-> the TLP prefix as part of the memory read/write transaction. The address
-> information in the TLP is relevant only for a given PASID context.
-> 
-> An IOMMU takes PASID value and the address information from the
-> TLP to look up the physical address in the system.
-> 
-> PASID is an End-End TLP Prefix (PCIe r4.0, sec 6.20).  Sec 2.2.10.2 says
-> 
->   It is an error to receive a TLP with an End-End TLP Prefix by a
->   Receiver that does not support End-End TLP Prefixes. A TLP in
->   violation of this rule is handled as a Malformed TLP. This is a
->   reported error associated with the Receiving Port (see Section 6.2).
-> 
-> Prevent error condition by proactively requiring End-to-End TLP
-> prefix to be supported on the entire data path between the endpoint and
-> the root port before enabling PASID.
-> 
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+Hi Linus,
 
-Applied to pci/virtualization for v4.19, thanks!
 
-> ---
->  drivers/pci/ats.c             |  3 +++
->  drivers/pci/probe.c           | 24 ++++++++++++++++++++++++
->  include/linux/pci.h           |  1 +
->  include/uapi/linux/pci_regs.h |  1 +
->  4 files changed, 29 insertions(+)
-> 
-> diff --git a/drivers/pci/ats.c b/drivers/pci/ats.c
-> index 4923a2a..5b78f3b 100644
-> --- a/drivers/pci/ats.c
-> +++ b/drivers/pci/ats.c
-> @@ -273,6 +273,9 @@ int pci_enable_pasid(struct pci_dev *pdev, int features)
->  	if (WARN_ON(pdev->pasid_enabled))
->  		return -EBUSY;
->  
-> +	if (!pdev->eetlp_prefix_path)
-> +		return -EINVAL;
-> +
->  	pos = pci_find_ext_capability(pdev, PCI_EXT_CAP_ID_PASID);
->  	if (!pos)
->  		return -EINVAL;
-> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-> index ac876e3..39fd3ac 100644
-> --- a/drivers/pci/probe.c
-> +++ b/drivers/pci/probe.c
-> @@ -2042,6 +2042,29 @@ static void pci_configure_ltr(struct pci_dev *dev)
->  #endif
->  }
->  
-> +static void pci_configure_eetlp_prefix(struct pci_dev *dev)
-> +{
-> +#ifdef CONFIG_PCI_PASID
-> +	struct pci_dev *bridge;
-> +	u32 cap;
-> +
-> +	if (!pci_is_pcie(dev))
-> +		return;
-> +
-> +	pcie_capability_read_dword(dev, PCI_EXP_DEVCAP2, &cap);
-> +	if (!(cap & PCI_EXP_DEVCAP2_E2ETLP))
-> +		return;
-> +
-> +	if (pci_pcie_type(dev) == PCI_EXP_TYPE_ROOT_PORT)
-> +		dev->eetlp_prefix_path = 1;
-> +	else {
-> +		bridge = pci_upstream_bridge(dev);
-> +		if (bridge && bridge->eetlp_prefix_path)
-> +			dev->eetlp_prefix_path = 1;
-> +	}
-> +#endif
-> +}
-> +
->  static void pci_configure_device(struct pci_dev *dev)
->  {
->  	struct hotplug_params hpp;
-> @@ -2051,6 +2074,7 @@ static void pci_configure_device(struct pci_dev *dev)
->  	pci_configure_extended_tags(dev, NULL);
->  	pci_configure_relaxed_ordering(dev);
->  	pci_configure_ltr(dev);
-> +	pci_configure_eetlp_prefix(dev);
->  
->  	memset(&hpp, 0, sizeof(hpp));
->  	ret = pci_get_hp_params(dev, &hpp);
-> diff --git a/include/linux/pci.h b/include/linux/pci.h
-> index 340029b..6ba8184 100644
-> --- a/include/linux/pci.h
-> +++ b/include/linux/pci.h
-> @@ -350,6 +350,7 @@ struct pci_dev {
->  	unsigned int	ltr_path:1;	/* Latency Tolerance Reporting
->  					   supported from root to here */
->  #endif
-> +	unsigned int	eetlp_prefix_path:1;	/* End-to-End TLP Prefix */
->  
->  	pci_channel_state_t error_state;	/* Current connectivity state */
->  	struct device	dev;			/* Generic device interface */
-> diff --git a/include/uapi/linux/pci_regs.h b/include/uapi/linux/pci_regs.h
-> index 4da87e2..a617ab2 100644
-> --- a/include/uapi/linux/pci_regs.h
-> +++ b/include/uapi/linux/pci_regs.h
-> @@ -636,6 +636,7 @@
->  #define  PCI_EXP_DEVCAP2_OBFF_MASK	0x000c0000 /* OBFF support mechanism */
->  #define  PCI_EXP_DEVCAP2_OBFF_MSG	0x00040000 /* New message signaling */
->  #define  PCI_EXP_DEVCAP2_OBFF_WAKE	0x00080000 /* Re-use WAKE# for OBFF */
-> +#define PCI_EXP_DEVCAP2_E2ETLP		0x00200000 /* End-to-End TLP Prefix */
->  #define PCI_EXP_DEVCTL2		40	/* Device Control 2 */
->  #define  PCI_EXP_DEVCTL2_COMP_TIMEOUT	0x000f	/* Completion Timeout Value */
->  #define  PCI_EXP_DEVCTL2_COMP_TMOUT_DIS	0x0010	/* Completion Timeout Disable */
-> -- 
-> 2.7.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+The following changes since commit 86676c4685f774d818f7a6c401c925bbf2a92903:
+
+  arm64: dts: uniphier: fix widget name of headphone for LD11/LD20 boards (2018-06-27 07:14:47 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-fixes
+
+for you to fetch changes up to 4ca2f0b945fad835959fa596df47817797987cd2:
+
+  Merge tag 'davinci-fixes-for-v4.18' of git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci into fixes (2018-06-29 14:08:27 -0700)
+
+----------------------------------------------------------------
+ARM: SoC fixes for 4.18-rc
+
+A smaller batch for the end of the week (let's see if I can keep the
+weekly cadence going for once).
+
+All medium-grade fixes here, nothing worrisome:
+ - Fixes for some fairly old bugs around SD card write-protect detection
+   and GPIO interrupt assignments on Davinci.
+ - Wifi module suspend fix for Hikey.
+ - Minor DT tweaks to fix inaccuracies for Amlogic platforms, on of
+   which solves booting with third-party u-boot.
+
+----------------------------------------------------------------
+Adam Ford (1):
+      ARM: davinci: board-da850-evm: fix WP pin polarity for MMC/SD
+
+Jerome Brunet (2):
+      ARM64: dts: meson: disable sd-uhs modes on the libretech-cc
+      ARM64: dts: meson-axg: fix ethernet stability issue
+
+Keerthy (1):
+      ARM: dts: da850: Fix interrups property for gpio
+
+Kevin Hilman (2):
+      ARM64: dts: meson: fix register ranges for SD/eMMC
+      ARM64: dts: meson-gx: fix ATF reserved memory region
+
+Martin Blumenstingl (1):
+      ARM64: dts: meson-gxl: fix Mali GPU compatible string
+
+Neil Armstrong (1):
+      ARM64: dts: meson-gxl-s905x-p212: Add phy-supply for usb0
+
+Olof Johansson (3):
+      Merge tag 'amlogic-fixes' of https://git.kernel.org/.../khilman/linux-amlogic into fixes
+      Merge tag 'hisi-fixes-for-4.18' of git://github.com/hisilicon/linux-hisi into fixes
+      Merge tag 'davinci-fixes-for-v4.18' of git://git.kernel.org/.../nsekhar/linux-davinci into fixes
+
+oscardagrach (2):
+      arm64: dts: hikey: Define wl1835 power capabilities
+      arm64: dts: hikey960: Define wl1837 power capabilities
+
+ arch/arm/boot/dts/da850.dtsi                              |  6 +-----
+ arch/arm/mach-davinci/board-da850-evm.c                   |  2 +-
+ arch/arm64/boot/dts/amlogic/meson-axg-s400.dts            | 15 ++++++++++++++-
+ arch/arm64/boot/dts/amlogic/meson-axg.dtsi                |  4 ++--
+ arch/arm64/boot/dts/amlogic/meson-gx.dtsi                 | 12 +++++++++---
+ arch/arm64/boot/dts/amlogic/meson-gxl-mali.dtsi           |  2 +-
+ .../boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts     |  3 ---
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dtsi     |  7 +++++++
+ arch/arm64/boot/dts/amlogic/meson-gxl.dtsi                |  8 --------
+ arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts         |  2 ++
+ arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts            |  2 ++
+ 11 files changed, 39 insertions(+), 24 deletions(-)
