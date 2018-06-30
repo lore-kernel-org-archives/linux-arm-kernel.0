@@ -1,56 +1,56 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 30 Jun 2018 18:18:03 +0200
-Subject: [PATCH net-next 2/5] net: gemini: Improve connection prints
-In-Reply-To: <20180630161806.24312-1-linus.walleij@linaro.org>
-References: <20180630161806.24312-1-linus.walleij@linaro.org>
-Message-ID: <20180630161806.24312-2-linus.walleij@linaro.org>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Sat, 30 Jun 2018 15:21:33 +0200
+Subject: [PATCH] mtd: spi-nor: cadence-quadspi: Fix direct mode write
+ timeouts
+In-Reply-To: <20180630105421.550-1-vigneshr@ti.com>
+References: <20180630105421.550-1-vigneshr@ti.com>
+Message-ID: <b029ab9a-782b-b2d8-a80e-ae8e5c5e511d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of just specify that a PHY is connected at some
-speed, also specify which one. This is helpful with several
-PHYs on the system.
+On 06/30/2018 12:54 PM, Vignesh R wrote:
+> Sometimes when writing large size files to flash in direct/memory mapped
+> mode, it is seen that flash write enable command times out with error:
+> [  503.146293] cadence-qspi 47040000.ospi: Flash command execution timed out.
+> 
+> This is because, we need to make sure previous direct write operation
+> is complete by polling for IDLE bit in CONFIG_REG before starting the
+> next operation.
+> 
+> Fix this by polling for IDLE bit after memory mapped write.
+> 
+> Fixes: a27f2eaf2b27 ("mtd: spi-nor: cadence-quadspi: Add support for direct access mode")
+> Cc: stable at vger.kernel.org
+> Signed-off-by: Vignesh R <vigneshr@ti.com>
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/net/ethernet/cortina/gemini.c | 13 ++++++++-----
- 1 file changed, 8 insertions(+), 5 deletions(-)
+Reviewed-by: Marek Vasut <marek.vasut@gmail.com>
 
-diff --git a/drivers/net/ethernet/cortina/gemini.c b/drivers/net/ethernet/cortina/gemini.c
-index 8fc31723f700..b49ed8964026 100644
---- a/drivers/net/ethernet/cortina/gemini.c
-+++ b/drivers/net/ethernet/cortina/gemini.c
-@@ -300,23 +300,26 @@ static void gmac_speed_set(struct net_device *netdev)
- 		status.bits.speed = GMAC_SPEED_1000;
- 		if (phydev->interface == PHY_INTERFACE_MODE_RGMII)
- 			status.bits.mii_rmii = GMAC_PHY_RGMII_1000;
--		netdev_info(netdev, "connect to RGMII @ 1Gbit\n");
-+		netdev_info(netdev, "connect %s to RGMII @ 1Gbit\n",
-+			    phydev_name(phydev));
- 		break;
- 	case 100:
- 		status.bits.speed = GMAC_SPEED_100;
- 		if (phydev->interface == PHY_INTERFACE_MODE_RGMII)
- 			status.bits.mii_rmii = GMAC_PHY_RGMII_100_10;
--		netdev_info(netdev, "connect to RGMII @ 100 Mbit\n");
-+		netdev_info(netdev, "connect %s to RGMII @ 100 Mbit\n",
-+			    phydev_name(phydev));
- 		break;
- 	case 10:
- 		status.bits.speed = GMAC_SPEED_10;
- 		if (phydev->interface == PHY_INTERFACE_MODE_RGMII)
- 			status.bits.mii_rmii = GMAC_PHY_RGMII_100_10;
--		netdev_info(netdev, "connect to RGMII @ 10 Mbit\n");
-+		netdev_info(netdev, "connect %s to RGMII @ 10 Mbit\n",
-+			    phydev_name(phydev));
- 		break;
- 	default:
--		netdev_warn(netdev, "Not supported PHY speed (%d)\n",
--			    phydev->speed);
-+		netdev_warn(netdev, "Unsupported PHY speed (%d) on %s\n",
-+			    phydev->speed, phydev_name(phydev));
- 	}
- 
- 	if (phydev->duplex == DUPLEX_FULL) {
+> ---
+>  drivers/mtd/spi-nor/cadence-quadspi.c | 6 ++++--
+>  1 file changed, 4 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/mtd/spi-nor/cadence-quadspi.c b/drivers/mtd/spi-nor/cadence-quadspi.c
+> index c3f7aaa5d18f..d7e10b36a0b9 100644
+> --- a/drivers/mtd/spi-nor/cadence-quadspi.c
+> +++ b/drivers/mtd/spi-nor/cadence-quadspi.c
+> @@ -926,10 +926,12 @@ static ssize_t cqspi_write(struct spi_nor *nor, loff_t to,
+>  	if (ret)
+>  		return ret;
+>  
+> -	if (f_pdata->use_direct_mode)
+> +	if (f_pdata->use_direct_mode) {
+>  		memcpy_toio(cqspi->ahb_base + to, buf, len);
+> -	else
+> +		ret = cqspi_wait_idle(cqspi);
+> +	} else {
+>  		ret = cqspi_indirect_write_execute(nor, to, buf, len);
+> +	}
+>  	if (ret)
+>  		return ret;
+>  
+> 
+
+
 -- 
-2.17.1
+Best regards,
+Marek Vasut
