@@ -1,116 +1,96 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Sat, 30 Jun 2018 11:24:24 -0400
-Subject: [PATCH V3] PCI: Enable PASID when End-to-End TLP is supported by all
- bridges
-Message-ID: <1530372264-20653-1-git-send-email-okaya@codeaurora.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sat, 30 Jun 2018 18:18:02 +0200
+Subject: [PATCH net-next 1/5] net: gemini: Look up L3 maxlen from table
+Message-ID: <20180630161806.24312-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A PCIe endpoint carries the process address space identifier (PASID) in
-the TLP prefix as part of the memory read/write transaction. The address
-information in the TLP is relevant only for a given PASID context.
+The code to calculate the hardware register enumerator
+for the maximum L3 length isn't entirely simple to read.
+Use the existing defines and rewrite the function into a
+table look-up.
 
-An IOMMU takes PASID value and the address information from the
-TLP to look up the physical address in the system.
-
-PASID is an End-End TLP Prefix (PCIe r4.0, sec 6.20).  Sec 2.2.10.2 says
-
-  It is an error to receive a TLP with an End-End TLP Prefix by a
-  Receiver that does not support End-End TLP Prefixes. A TLP in
-  violation of this rule is handled as a Malformed TLP. This is a
-  reported error associated with the Receiving Port (see Section 6.2).
-
-Prevent error condition by proactively requiring End-to-End TLP
-prefix to be supported on the entire data path between the endpoint and
-the root port before enabling PASID.
-
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/pci/ats.c             |  3 +++
- drivers/pci/probe.c           | 24 ++++++++++++++++++++++++
- include/linux/pci.h           |  1 +
- include/uapi/linux/pci_regs.h |  1 +
- 4 files changed, 29 insertions(+)
+ drivers/net/ethernet/cortina/gemini.c | 61 ++++++++++++++++++++-------
+ 1 file changed, 46 insertions(+), 15 deletions(-)
 
-diff --git a/drivers/pci/ats.c b/drivers/pci/ats.c
-index 4923a2a..5b78f3b 100644
---- a/drivers/pci/ats.c
-+++ b/drivers/pci/ats.c
-@@ -273,6 +273,9 @@ int pci_enable_pasid(struct pci_dev *pdev, int features)
- 	if (WARN_ON(pdev->pasid_enabled))
- 		return -EBUSY;
- 
-+	if (!pdev->eetlp_prefix_path)
-+		return -EINVAL;
-+
- 	pos = pci_find_ext_capability(pdev, PCI_EXT_CAP_ID_PASID);
- 	if (!pos)
- 		return -EINVAL;
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index ac876e3..39fd3ac 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -2042,6 +2042,29 @@ static void pci_configure_ltr(struct pci_dev *dev)
- #endif
+diff --git a/drivers/net/ethernet/cortina/gemini.c b/drivers/net/ethernet/cortina/gemini.c
+index 6d7404f66f84..8fc31723f700 100644
+--- a/drivers/net/ethernet/cortina/gemini.c
++++ b/drivers/net/ethernet/cortina/gemini.c
+@@ -401,26 +401,57 @@ static int gmac_setup_phy(struct net_device *netdev)
+ 	return 0;
  }
  
-+static void pci_configure_eetlp_prefix(struct pci_dev *dev)
+-static int gmac_pick_rx_max_len(int max_l3_len)
+-{
+-	/* index = CONFIG_MAXLEN_XXX values */
+-	static const int max_len[8] = {
+-		1536, 1518, 1522, 1542,
+-		9212, 10236, 1518, 1518
+-	};
+-	int i, n = 5;
++/* The maximum frame length is not logically enumerated in the
++ * hardware, so we do a table lookup to find the applicable max
++ * frame length.
++ */
++struct gmac_max_framelen {
++	unsigned int max_l3_len;
++	u8 val;
++};
+ 
+-	max_l3_len += ETH_HLEN + VLAN_HLEN;
++static const struct gmac_max_framelen gmac_maxlens[] = {
++	{
++		.max_l3_len = 1518,
++		.val = CONFIG0_MAXLEN_1518,
++	},
++	{
++		.max_l3_len = 1522,
++		.val = CONFIG0_MAXLEN_1522,
++	},
++	{
++		.max_l3_len = 1536,
++		.val = CONFIG0_MAXLEN_1536,
++	},
++	{
++		.max_l3_len = 1542,
++		.val = CONFIG0_MAXLEN_1542,
++	},
++	{
++		.max_l3_len = 9212,
++		.val = CONFIG0_MAXLEN_9k,
++	},
++	{
++		.max_l3_len = 10236,
++		.val = CONFIG0_MAXLEN_10k,
++	},
++};
++
++static int gmac_pick_rx_max_len(unsigned int max_l3_len)
 +{
-+#ifdef CONFIG_PCI_PASID
-+	struct pci_dev *bridge;
-+	u32 cap;
-+
-+	if (!pci_is_pcie(dev))
-+		return;
-+
-+	pcie_capability_read_dword(dev, PCI_EXP_DEVCAP2, &cap);
-+	if (!(cap & PCI_EXP_DEVCAP2_E2ETLP))
-+		return;
-+
-+	if (pci_pcie_type(dev) == PCI_EXP_TYPE_ROOT_PORT)
-+		dev->eetlp_prefix_path = 1;
-+	else {
-+		bridge = pci_upstream_bridge(dev);
-+		if (bridge && bridge->eetlp_prefix_path)
-+			dev->eetlp_prefix_path = 1;
-+	}
-+#endif
-+}
-+
- static void pci_configure_device(struct pci_dev *dev)
- {
- 	struct hotplug_params hpp;
-@@ -2051,6 +2074,7 @@ static void pci_configure_device(struct pci_dev *dev)
- 	pci_configure_extended_tags(dev, NULL);
- 	pci_configure_relaxed_ordering(dev);
- 	pci_configure_ltr(dev);
-+	pci_configure_eetlp_prefix(dev);
++	const struct gmac_max_framelen *maxlen;
++	int maxtot;
++	int i;
  
- 	memset(&hpp, 0, sizeof(hpp));
- 	ret = pci_get_hp_params(dev, &hpp);
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index 340029b..6ba8184 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -350,6 +350,7 @@ struct pci_dev {
- 	unsigned int	ltr_path:1;	/* Latency Tolerance Reporting
- 					   supported from root to here */
- #endif
-+	unsigned int	eetlp_prefix_path:1;	/* End-to-End TLP Prefix */
+-	if (max_l3_len > max_len[n])
+-		return -1;
++	maxtot = max_l3_len + ETH_HLEN + VLAN_HLEN;
  
- 	pci_channel_state_t error_state;	/* Current connectivity state */
- 	struct device	dev;			/* Generic device interface */
-diff --git a/include/uapi/linux/pci_regs.h b/include/uapi/linux/pci_regs.h
-index 4da87e2..a617ab2 100644
---- a/include/uapi/linux/pci_regs.h
-+++ b/include/uapi/linux/pci_regs.h
-@@ -636,6 +636,7 @@
- #define  PCI_EXP_DEVCAP2_OBFF_MASK	0x000c0000 /* OBFF support mechanism */
- #define  PCI_EXP_DEVCAP2_OBFF_MSG	0x00040000 /* New message signaling */
- #define  PCI_EXP_DEVCAP2_OBFF_WAKE	0x00080000 /* Re-use WAKE# for OBFF */
-+#define PCI_EXP_DEVCAP2_E2ETLP		0x00200000 /* End-to-End TLP Prefix */
- #define PCI_EXP_DEVCTL2		40	/* Device Control 2 */
- #define  PCI_EXP_DEVCTL2_COMP_TIMEOUT	0x000f	/* Completion Timeout Value */
- #define  PCI_EXP_DEVCTL2_COMP_TMOUT_DIS	0x0010	/* Completion Timeout Disable */
+-	for (i = 0; i < 5; i++) {
+-		if (max_len[i] >= max_l3_len && max_len[i] < max_len[n])
+-			n = i;
++	for (i = 0; i < ARRAY_SIZE(gmac_maxlens); i++) {
++		maxlen = &gmac_maxlens[i];
++		if (maxtot <= maxlen->max_l3_len)
++			return maxlen->val;
+ 	}
+ 
+-	return n;
++	return -1;
+ }
+ 
+ static int gmac_init(struct net_device *netdev)
 -- 
-2.7.4
+2.17.1
