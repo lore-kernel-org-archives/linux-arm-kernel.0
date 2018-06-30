@@ -1,56 +1,58 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sat, 30 Jun 2018 15:21:33 +0200
-Subject: [PATCH] mtd: spi-nor: cadence-quadspi: Fix direct mode write
- timeouts
-In-Reply-To: <20180630105421.550-1-vigneshr@ti.com>
-References: <20180630105421.550-1-vigneshr@ti.com>
-Message-ID: <b029ab9a-782b-b2d8-a80e-ae8e5c5e511d@gmail.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Sat, 30 Jun 2018 14:19:59 -0500
+Subject: [PATCH V2] PCI: Enable PASID when End-to-End TLP is supported by
+ all bridges
+In-Reply-To: <568634cf-54d0-c67d-b0f8-766b67def610@codeaurora.org>
+References: <1529460886-23722-1-git-send-email-okaya@codeaurora.org>
+ <20180630004912.GI40928@bhelgaas-glaptop.roam.corp.google.com>
+ <568634cf-54d0-c67d-b0f8-766b67def610@codeaurora.org>
+Message-ID: <20180630191959.GB9547@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/30/2018 12:54 PM, Vignesh R wrote:
-> Sometimes when writing large size files to flash in direct/memory mapped
-> mode, it is seen that flash write enable command times out with error:
-> [  503.146293] cadence-qspi 47040000.ospi: Flash command execution timed out.
+On Sat, Jun 30, 2018 at 10:45:21AM -0400, Sinan Kaya wrote:
+> On 6/29/2018 8:49 PM, Bjorn Helgaas wrote:
+> > On Tue, Jun 19, 2018 at 10:14:46PM -0400, Sinan Kaya wrote:
+> >> A PCIe endpoint carries the process address space identifier (PASID) in
+> >> the TLP prefix as part of the memory read/write transaction. The address
+> >> information in the TLP is relevant only for a given PASID context.
+> >>
+> >> An IOMMU takes PASID value and the address information from the
+> >> TLP to look up the physical address in the system.
+> >>
+> >> If a bridge drops the TLP prefix, the translation agent can resolve the
+> >> address to an incorrect location and cause data corruption. Prevent
+> >> this condition by requiring End-to-End TLP prefix to be supported on the
+> >> entire data path between the endpoint and the root port.
+> > 
+> > PASID is an End-End TLP Prefix (PCIe r4.0, sec 6.20).  Sec 2.2.10.2 says
+> > 
+> >   It is an error to receive a TLP with an End-End TLP Prefix by a
+> >   Receiver that does not support End-End TLP Prefixes. A TLP in
+> >   violation of this rule is handled as a Malformed TLP. This is a
+> >   reported error associated with the Receiving Port (see Section 6.2).
+> > 
+> > So I agree that we shouldn't enable PASID in an endpoint unless all
+> > the switch ports leading to it support End-End prefixes.  But I don't
+> > see how a bridge can drop a prefix and cause data corruption -- if it
+> > doesn't support End-End prefixes, shouldn't the bridge raise a
+> > Malformed TLP error instead of forwarding the TLP?
 > 
-> This is because, we need to make sure previous direct write operation
-> is complete by polling for IDLE bit in CONFIG_REG before starting the
-> next operation.
+> It should under normal circumstances. 
 > 
-> Fix this by polling for IDLE bit after memory mapped write.
+> I remember reading that most PCIe switches don't support TLP prefixes.
+> I don't know if it is because of buggy behavior or if it is just plain
+> unsupported while dropping the request as Malformed TLP.
 > 
-> Fixes: a27f2eaf2b27 ("mtd: spi-nor: cadence-quadspi: Add support for direct access mode")
-> Cc: stable at vger.kernel.org
-> Signed-off-by: Vignesh R <vigneshr@ti.com>
+> I was trying to be proactive and not enable PASID if the entire path
+> is incapable.
 
-Reviewed-by: Marek Vasut <marek.vasut@gmail.com>
+Absolutely, that makes perfect sense.  Much better to fail to enable
+PASID rather than enabling it and seeing Malformed TLP errors or data
+corruption later.
 
-> ---
->  drivers/mtd/spi-nor/cadence-quadspi.c | 6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/mtd/spi-nor/cadence-quadspi.c b/drivers/mtd/spi-nor/cadence-quadspi.c
-> index c3f7aaa5d18f..d7e10b36a0b9 100644
-> --- a/drivers/mtd/spi-nor/cadence-quadspi.c
-> +++ b/drivers/mtd/spi-nor/cadence-quadspi.c
-> @@ -926,10 +926,12 @@ static ssize_t cqspi_write(struct spi_nor *nor, loff_t to,
->  	if (ret)
->  		return ret;
->  
-> -	if (f_pdata->use_direct_mode)
-> +	if (f_pdata->use_direct_mode) {
->  		memcpy_toio(cqspi->ahb_base + to, buf, len);
-> -	else
-> +		ret = cqspi_wait_idle(cqspi);
-> +	} else {
->  		ret = cqspi_indirect_write_execute(nor, to, buf, len);
-> +	}
->  	if (ret)
->  		return ret;
->  
-> 
+I was trying to figure out if you can actually force data corruption
+this way.  If you can, I'd say that sounds like a buggy switch that we
+might want to be aware of.
 
-
--- 
-Best regards,
-Marek Vasut
+Bjorn
