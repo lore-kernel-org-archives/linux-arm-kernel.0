@@ -1,96 +1,55 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Sat, 30 Jun 2018 22:57:46 +0200
-Subject: [PATCH v3 2/6] arm64: dts: actions: Add Actions Semiconductor
- S900 I2C controller nodes
-In-Reply-To: <20180630133330.23858-3-manivannan.sadhasivam@linaro.org>
-References: <20180630133330.23858-1-manivannan.sadhasivam@linaro.org>
- <20180630133330.23858-3-manivannan.sadhasivam@linaro.org>
-Message-ID: <F8B97397-EBE6-400A-A9A8-CD415EE24C55@axentia.se>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sat, 30 Jun 2018 18:22:31 -0300
+Subject: [PATCH] i.MX6: Allow thermal probe to fail gracefully in case of
+ bad calibration.
+In-Reply-To: <20180630205404.25568-1-jcd@tribudubois.net>
+References: <20180630205404.25568-1-jcd@tribudubois.net>
+Message-ID: <CAOMZO5BqpwxZ4+hWwuoK0uhb9a61oSj4LhrxHm9dyy6JAWH2fg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On June 30, 2018 3:33:26 PM GMT+02:00, Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org> wrote:
->Add I2C controller nodes for Actions Semiconductor S900 SoC.
->
->Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
->---
-> arch/arm64/boot/dts/actions/s900.dtsi | 60 +++++++++++++++++++++++++++
-> 1 file changed, 60 insertions(+)
->
->diff --git a/arch/arm64/boot/dts/actions/s900.dtsi
->b/arch/arm64/boot/dts/actions/s900.dtsi
->index 7ae8b931f000..6f7b89edbe4d 100644
->--- a/arch/arm64/boot/dts/actions/s900.dtsi
->+++ b/arch/arm64/boot/dts/actions/s900.dtsi
->@@ -174,6 +174,66 @@
-> 			#clock-cells = <1>;
-> 		};
-> 
->+		i2c0: i2c at e0170000 {
->+			compatible = "actions,s900-i2c";
->+			reg = <0 0xe0170000 0 0x1000>;
->+			interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
->+			#address-cells = <1>;
->+			#size-cells = <0>;
->+			status = "disabled";
->+			pinctrl-names = "default";
->+			pinctrl-0 = <&i2c0_default>;
->+		};
->+
->+		i2c1: i2c at e0172000 {
->+			compatible = "actions,s900-i2c";
->+			reg = <0 0xe0172000 0 0x1000>;
->+			interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
->+			#address-cells = <1>;
->+			#size-cells = <0>;
->+			status = "disabled";
->+			pinctrl-names = "default";
->+			pinctrl-0 = <&i2c1_default>;
->+		};
->+
->+		i2c2: i2c at e0174000 {
->+			compatible = "actions,s900-i2c";
->+			reg = <0 0xe0174000 0 0x1000>;
->+			interrupts = <GIC_SPI 27 IRQ_TYPE_LEVEL_HIGH>;
->+			#address-cells = <1>;
->+			#size-cells = <0>;
->+			status = "disabled";
->+			pinctrl-names = "default";
->+			pinctrl-0 = <&i2c2_default>;
->+		};
->+
->+		i2c3: i2c at e0176000 {
->+			compatible = "actions,s900-i2c";
->+			reg = <0 0xe0176000 0 0x1000>;
->+			interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>;
->+			#address-cells = <1>;
->+			#size-cells = <0>;
->+			status = "disabled";
->+		};
->+
->+		i2c4: i2c at e0178000 {
->+			compatible = "actions,s900-i2c";
->+			reg = <0 0xe0178000 0 0x1000>;
->+			interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
->+			#address-cells = <1>;
->+			#size-cells = <0>;
->+			status = "disabled";
->+		};
->+
->+		i2c5: i2c at e017a000 {
->+			compatible = "actions,s900-i2c";
->+			reg = <0 0xe017a000 0 0x1000>;
->+			interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>;
->+			#address-cells = <1>;
->+			#size-cells = <0>;
->+			status = "disabled";
->+		};
->+
-> 		pinctrl: pinctrl at e01b0000 {
-> 			compatible = "actions,s900-pinctrl";
-> 			reg = <0x0 0xe01b0000 0x0 0x1000>;
+Hi Jean-Christophe,
 
-This patch *still* depends on patch 3/6. You need to reorder the series so that it is properly bisectable.
+On Sat, Jun 30, 2018 at 5:54 PM, Jean-Christophe Dubois
+<jcd@tribudubois.net> wrote:
+> Without this fix, the thermal probe on i.MX6 might trigger a division
+> by zero exception later in the probe if the calibration does fail.
+>
+> Note: This linux behavior (Division by zero in kernel) has been triggered
+> on a Qemu i.MX6 emulation where parameters in nvmem were not set. With this
+> fix the division by zero is not triggeed anymore as the thermal probe does
+> fail early.
+>
+> Signed-off-by: Jean-Christophe Dubois <jcd@tribudubois.net>
 
-Cheers,
-Peter
+Nit: subject could be improved to:
+
+thermal: imx: Allow probe to fail gracefully in case of bad calibration
+
+Also, you missed to Cc the thermal maintainers.
+
+Please run ./scripts/get_maintainer.pl -f
+drivers/thermal/imx_thermal.c and add these people and lists on v2 of
+the patch.
+
+> ---
+>  drivers/thermal/imx_thermal.c | 5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/thermal/imx_thermal.c b/drivers/thermal/imx_thermal.c
+> index 334d98be03b9..b1f82d64253e 100644
+> --- a/drivers/thermal/imx_thermal.c
+> +++ b/drivers/thermal/imx_thermal.c
+> @@ -604,7 +604,10 @@ static int imx_init_from_nvmem_cells(struct platform_device *pdev)
+>         ret = nvmem_cell_read_u32(&pdev->dev, "calib", &val);
+>         if (ret)
+>                 return ret;
+> -       imx_init_calib(pdev, val);
+> +
+> +       ret = imx_init_calib(pdev, val);
+> +       if (ret)
+> +               return ret;
+
+This looks good:
+
+Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
