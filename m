@@ -1,93 +1,159 @@
 From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Sat, 30 Jun 2018 18:10:03 +0530
-Subject: [PATCH v2 1/6] dt-bindings: i2c: Add binding for Actions Semi
- OWL I2C controller
-In-Reply-To: <6809cab8-da3f-618c-05da-9935a99c1e1d@suse.de>
+Date: Sat, 30 Jun 2018 18:14:00 +0530
+Subject: [PATCH v2 5/6] i2c: Add Actions Semi OWL family S900 I2C driver
+In-Reply-To: <CAHp75Vd__qOXVxZTdxREwD6p1sEw49R2Kqb+esAmr_EhtT=gFg@mail.gmail.com>
 References: <20180628181042.2239-1-manivannan.sadhasivam@linaro.org>
- <20180628181042.2239-2-manivannan.sadhasivam@linaro.org>
- <6809cab8-da3f-618c-05da-9935a99c1e1d@suse.de>
-Message-ID: <20180630124003.GA16775@Mani-XPS-13-9360>
+ <20180628181042.2239-6-manivannan.sadhasivam@linaro.org>
+ <CAHp75Vd__qOXVxZTdxREwD6p1sEw49R2Kqb+esAmr_EhtT=gFg@mail.gmail.com>
+Message-ID: <20180630124400.GB16775@Mani-XPS-13-9360>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andreas,
+Hi Andy,
 
-On Sat, Jun 30, 2018 at 02:23:30PM +0200, Andreas F?rber wrote:
-> Am 28.06.2018 um 20:10 schrieb Manivannan Sadhasivam:
-> > Add devicetree binding for Actions Semi OWL I2C controller
-> > 
-> > Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-> > ---
-> >  .../devicetree/bindings/i2c/i2c-owl.txt       | 27 +++++++++++++++++++
-> >  1 file changed, 27 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/i2c/i2c-owl.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/i2c/i2c-owl.txt b/Documentation/devicetree/bindings/i2c/i2c-owl.txt
-> > new file mode 100644
-> > index 000000000000..9b691968cffd
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/i2c/i2c-owl.txt
-> > @@ -0,0 +1,27 @@
-> > +OWL I2C controller
+On Sat, Jun 30, 2018 at 03:14:37PM +0300, Andy Shevchenko wrote:
+> On Thu, Jun 28, 2018 at 9:10 PM, Manivannan Sadhasivam
+> <manivannan.sadhasivam@linaro.org> wrote:
+> > Add Actions Semi OWL family S900 I2C driver.
 > 
-> As mentioned elsewhere, please fix all subjects, commit messages and
-> bindings to say Owl, not OWL. There's no need to upper-case it besides
-> defines.
+> > +#include <linux/clk.h>
+> > +#include <linux/delay.h>
+> > +#include <linux/i2c.h>
+> > +#include <linux/interrupt.h>
+> > +#include <linux/module.h>
+> > +#include <linux/of_device.h>
 > 
-> Also, this title should mention Actions Semiconductor please, not just
-> the codename Owl.
+> > +#include <linux/io.h>
+> 
+> Perhaps keep in order?
 > 
 
-Sure
+Fixed in next revision.
 
+> > +#define OWL_I2C_DEFAULT_SPEED  100000
+> > +#define OWL_I2C_MAX_SPEED      400000
+> 
+> ..._SPEED -> ..._SPEED_HZ ?
+> 
+> DEFAULT -> DEF ?
+>
+
+Okay.
+
+> > +static int owl_i2c_reset(struct owl_i2c_dev *i2c_dev)
+> > +{
+> > +       unsigned int val, timeout = 0;
 > > +
-> > +Required properties:
-> > +
-> > +- compatible        : Should be "actions,s900-i2c".
+> > +       owl_i2c_update_reg(i2c_dev->base + OWL_I2C_REG_CTL,
+> > +                               OWL_I2C_CTL_EN, false);
 > 
-> What about S500? Are you expecting it to carry an S900 compatible? That
-> seems strange. Are there any differences in the implementations?
+> > +       mdelay(1);
+> 
+> 1 ms keeping CPU busy for nothing. Perhaps usleep_range() / msleep()?
+> Is it called in atomic context?
 > 
 
-I haven't tested it on S500 eventhough the implementation looks same. But
-anyway if we want to add support for S500 or S700 we can just do the
-modifications (if any) slightly and add a separate compatible like we
-did for other drivers.
+I have removed reset function from the interrupt handler and gave the
+justification to my reply to Peter's review.
+
+> > +       owl_i2c_update_reg(i2c_dev->base + OWL_I2C_REG_CTL,
+> > +                               OWL_I2C_CTL_EN, true);
+> > +
+> > +       /* Reset FIFO */
+> > +       owl_i2c_update_reg(i2c_dev->base + OWL_I2C_REG_FIFOCTL,
+> > +                               OWL_I2C_FIFOCTL_RFR | OWL_I2C_FIFOCTL_TFR,
+> > +                               true);
+> > +
+> > +       /* Wait 50ms for FIFO reset complete */
+> > +       do {
+> > +               val = readl(i2c_dev->base + OWL_I2C_REG_FIFOCTL);
+> > +               if (!(val & (OWL_I2C_FIFOCTL_RFR | OWL_I2C_FIFOCTL_TFR)))
+> > +                       break;
+> 
+> > +               mdelay(1);
+> 
+> Ditto.
+> 
+
+Same as above.
+
+> > +       } while (timeout++ < OWL_I2C_MAX_RETRIES);
+> 
+> OK, I see you call it from IRQ context. 50ms for IRQ handler is
+> inappropriate. (1ms either, but at least not so drastically).
+> 
+
+Same as above.
+
+> > +}
+> 
+> > +static irqreturn_t owl_i2c_interrupt(int irq, void *_dev)
+> > +{
+> 
+> > +       stat = readl(i2c_dev->base + OWL_I2C_REG_STAT);
+> > +       if (stat & OWL_I2C_STAT_BEB) {
+> > +               dev_dbg(&i2c_dev->adap.dev, "bus error");
+> 
+> > +               owl_i2c_reset(i2c_dev);
+> 
+> This is questionable to be here (looking at so loong delays in it).
+> 
+
+Same as above.
+
+> > +               goto stop;
+> > +       }
+> 
+> > +       return IRQ_HANDLED;
+> > +}
+> 
+> > +static int owl_i2c_master_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs,
+> > +                               int num)
+> > +{
+> 
+> > +       int ret = 0, idx;
+> 
+> Redundant assignment.
+> 
+
+No. Actually the return path will be fixed in next iteration. Please
+see my reply to Peter's review for explanation.
+
+> > +       ret = owl_i2c_hw_init(i2c_dev);
+> > +       if (ret)
+> > +               return ret;
+> 
+> > +}
+> 
+> > +static const struct i2c_algorithm owl_i2c_algorithm = {
+> > +       .master_xfer    = owl_i2c_master_xfer,
+> 
+> > +       .functionality  = owl_i2c_func
+> 
+> Slightly better to keep comma at the end
+> 
+
+Okay.
+
+> > +};
+> > +
+> > +static const struct i2c_adapter_quirks owl_i2c_quirks = {
+> > +       .flags          = I2C_AQ_COMB | I2C_AQ_COMB_WRITE_FIRST,
+> > +       .max_read_len   = 240,
+> > +       .max_write_len  = 240,
+> > +       .max_comb_1st_msg_len = 6,
+> > +       .max_comb_2nd_msg_len = 240
+> 
+> Ditto.
+> 
+
+Okay.
 
 Thanks,
 Mani
 
-> Otherwise looks okay.
-> 
-> Thanks,
-> Andreas
-> 
-> > +- reg               : Offset and length of the register set for the device.
-> > +- #address-cells    : Should be 1.
-> > +- #size-cells       : Should be 0.
-> > +- interrupts        : A single interrupt specifier.
-> > +- clocks            : Phandle of the clock feeding the I2C controller.
-> > +
-> > +Optional properties:
-> > +
-> > +- clock-frequency   : Desired I2C bus clock frequency in Hz. As only Normal and
-> > +                      Fast modes are supported, possible values are 100000 and
-> > +                      400000.
-> > +Examples:
-> > +
-> > +        i2c0: i2c at e0170000 {
-> > +                compatible = "actions,s900-i2c";
-> > +                reg = <0 0xe0170000 0 0x1000>;
-> > +                #address-cells = <1>;
-> > +                #size-cells = <0>;
-> > +                interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
-> > +                clocks = <&clock CLK_I2C0>;
-> > +                clock-frequency = <100000>;
-> > +        };
-> > 
-> 
+> > +};
 > 
 > -- 
-> SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-> GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-> HRB 21284 (AG N?rnberg)
+> With Best Regards,
+> Andy Shevchenko
