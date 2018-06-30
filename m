@@ -1,40 +1,228 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 30 Jun 2018 09:11:20 +0800
-Subject: [PATCH v3 16/24] drm/sun4i: Enable DW HDMI PHY clock
-In-Reply-To: <3131254.YlICBQirlu@jernej-laptop>
-References: <20180625120304.7543-1-jernej.skrabec@siol.net>
- <20180625120304.7543-17-jernej.skrabec@siol.net>
- <CAGb2v65En4RbVdRu7c6MJUztVhC36dWr0kaO9bqc9PtuXAcsww@mail.gmail.com>
- <3131254.YlICBQirlu@jernej-laptop>
-Message-ID: <CAGb2v64UY9t9oKPQiEJkFsTyxJOJTG9dvJMNJYoHy7CKQ4Ap2Q@mail.gmail.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Fri, 29 Jun 2018 20:13:06 -0500
+Subject: [PATCH V4] PCI: move early dump functionality from x86 arch into
+ the common code
+In-Reply-To: <1528164985-14099-1-git-send-email-okaya@codeaurora.org>
+References: <1528164985-14099-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <20180630011305.GK40928@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 30, 2018 at 3:19 AM, Jernej ?krabec <jernej.skrabec@siol.net> wrote:
-> Dne ?etrtek, 28. junij 2018 ob 04:22:36 CEST je Chen-Yu Tsai napisal(a):
->> On Mon, Jun 25, 2018 at 8:02 PM, Jernej Skrabec <jernej.skrabec@siol.net>
-> wrote:
->> > Current DW HDMI PHY code never prepares and enables PHY clock after it is
->> > created. It's just used as it is. This may work in some cases, but it's
->> > clearly wrong. Fix it by adding proper calls to enable/disable PHY
->> > clock.
->> >
->> > Fixes: 4f86e81748fe ("drm/sun4i: Add support for H3 HDMI PHY variant")
->> >
->> > Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
->>
->> So why does it work on the H3? Because there's only one PLL that the whole
->> display pipeline uses?
->>
->> We should probably tag this for stable. So,
->>
->> Cc: <stable@vger.kernel.org>
->> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
->
-> Same question as before, how this should be handled? Can I send separate patch
-> with same content to stable ML only?
+On Mon, Jun 04, 2018 at 10:16:09PM -0400, Sinan Kaya wrote:
+> Move early dump functionality into common code so that it is available for
+> all archtiectures. No need to carry arch specific reads around as the read
+> hooks are already initialized by the time pci_setup_device() is getting
+> called during scan.
+> 
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 
-Yes, including the hash of the commit which is already in Linus' tree. So
-you have to send it after the next -rc1.
+Applied with Andy's tested- and reviewed-by to pci/resource for v4.19,
+thanks!  This is really a nice generalization.
 
-ChenYu
+> ---
+>  Documentation/admin-guide/kernel-parameters.txt |  2 +-
+>  arch/x86/include/asm/pci-direct.h               |  4 ---
+>  arch/x86/kernel/setup.c                         |  5 ---
+>  arch/x86/pci/common.c                           |  4 ---
+>  arch/x86/pci/early.c                            | 44 -------------------------
+>  drivers/pci/pci.c                               |  5 +++
+>  drivers/pci/pci.h                               |  1 +
+>  drivers/pci/probe.c                             | 19 +++++++++++
+>  8 files changed, 26 insertions(+), 58 deletions(-)
+> 
+> diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
+> index e490902..e64f1d8 100644
+> --- a/Documentation/admin-guide/kernel-parameters.txt
+> +++ b/Documentation/admin-guide/kernel-parameters.txt
+> @@ -2995,7 +2995,7 @@
+>  			See also Documentation/blockdev/paride.txt.
+>  
+>  	pci=option[,option...]	[PCI] various PCI subsystem options:
+> -		earlydump	[X86] dump PCI config space before the kernel
+> +		earlydump	dump PCI config space before the kernel
+>  				changes anything
+>  		off		[X86] don't probe for the PCI bus
+>  		bios		[X86-32] force use of PCI BIOS, don't access
+> diff --git a/arch/x86/include/asm/pci-direct.h b/arch/x86/include/asm/pci-direct.h
+> index e1084f7..94597a3 100644
+> --- a/arch/x86/include/asm/pci-direct.h
+> +++ b/arch/x86/include/asm/pci-direct.h
+> @@ -15,8 +15,4 @@ extern void write_pci_config_byte(u8 bus, u8 slot, u8 func, u8 offset, u8 val);
+>  extern void write_pci_config_16(u8 bus, u8 slot, u8 func, u8 offset, u16 val);
+>  
+>  extern int early_pci_allowed(void);
+> -
+> -extern unsigned int pci_early_dump_regs;
+> -extern void early_dump_pci_device(u8 bus, u8 slot, u8 func);
+> -extern void early_dump_pci_devices(void);
+>  #endif /* _ASM_X86_PCI_DIRECT_H */
+> diff --git a/arch/x86/kernel/setup.c b/arch/x86/kernel/setup.c
+> index 2f86d88..480f250 100644
+> --- a/arch/x86/kernel/setup.c
+> +++ b/arch/x86/kernel/setup.c
+> @@ -991,11 +991,6 @@ void __init setup_arch(char **cmdline_p)
+>  		setup_clear_cpu_cap(X86_FEATURE_APIC);
+>  	}
+>  
+> -#ifdef CONFIG_PCI
+> -	if (pci_early_dump_regs)
+> -		early_dump_pci_devices();
+> -#endif
+> -
+>  	e820__reserve_setup_data();
+>  	e820__finish_early_params();
+>  
+> diff --git a/arch/x86/pci/common.c b/arch/x86/pci/common.c
+> index 563049c..d4ec117 100644
+> --- a/arch/x86/pci/common.c
+> +++ b/arch/x86/pci/common.c
+> @@ -22,7 +22,6 @@
+>  unsigned int pci_probe = PCI_PROBE_BIOS | PCI_PROBE_CONF1 | PCI_PROBE_CONF2 |
+>  				PCI_PROBE_MMCONF;
+>  
+> -unsigned int pci_early_dump_regs;
+>  static int pci_bf_sort;
+>  int pci_routeirq;
+>  int noioapicquirk;
+> @@ -599,9 +598,6 @@ char *__init pcibios_setup(char *str)
+>  		pci_probe |= PCI_BIG_ROOT_WINDOW;
+>  		return NULL;
+>  #endif
+> -	} else if (!strcmp(str, "earlydump")) {
+> -		pci_early_dump_regs = 1;
+> -		return NULL;
+>  	} else if (!strcmp(str, "routeirq")) {
+>  		pci_routeirq = 1;
+>  		return NULL;
+> diff --git a/arch/x86/pci/early.c b/arch/x86/pci/early.c
+> index e5f753c..f5fc953 100644
+> --- a/arch/x86/pci/early.c
+> +++ b/arch/x86/pci/early.c
+> @@ -57,47 +57,3 @@ int early_pci_allowed(void)
+>  			PCI_PROBE_CONF1;
+>  }
+>  
+> -void early_dump_pci_device(u8 bus, u8 slot, u8 func)
+> -{
+> -	u32 value[256 / 4];
+> -	int i;
+> -
+> -	pr_info("pci 0000:%02x:%02x.%d config space:\n", bus, slot, func);
+> -
+> -	for (i = 0; i < 256; i += 4)
+> -		value[i / 4] = read_pci_config(bus, slot, func, i);
+> -
+> -	print_hex_dump(KERN_INFO, "", DUMP_PREFIX_OFFSET, 16, 1, value, 256, false);
+> -}
+> -
+> -void early_dump_pci_devices(void)
+> -{
+> -	unsigned bus, slot, func;
+> -
+> -	if (!early_pci_allowed())
+> -		return;
+> -
+> -	for (bus = 0; bus < 256; bus++) {
+> -		for (slot = 0; slot < 32; slot++) {
+> -			for (func = 0; func < 8; func++) {
+> -				u32 class;
+> -				u8 type;
+> -
+> -				class = read_pci_config(bus, slot, func,
+> -							PCI_CLASS_REVISION);
+> -				if (class == 0xffffffff)
+> -					continue;
+> -
+> -				early_dump_pci_device(bus, slot, func);
+> -
+> -				if (func == 0) {
+> -					type = read_pci_config_byte(bus, slot,
+> -								    func,
+> -							       PCI_HEADER_TYPE);
+> -					if (!(type & 0x80))
+> -						break;
+> -				}
+> -			}
+> -		}
+> -	}
+> -}
+> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+> index 97acba7..04052dc 100644
+> --- a/drivers/pci/pci.c
+> +++ b/drivers/pci/pci.c
+> @@ -115,6 +115,9 @@ static bool pcie_ari_disabled;
+>  /* If set, the PCIe ATS capability will not be used. */
+>  static bool pcie_ats_disabled;
+>  
+> +/* If set, the PCI config space of each device is printed during boot. */
+> +bool pci_early_dump;
+> +
+>  bool pci_ats_disabled(void)
+>  {
+>  	return pcie_ats_disabled;
+> @@ -5805,6 +5808,8 @@ static int __init pci_setup(char *str)
+>  				pcie_ats_disabled = true;
+>  			} else if (!strcmp(str, "noaer")) {
+>  				pci_no_aer();
+> +			} else if (!strcmp(str, "earlydump")) {
+> +				pci_early_dump = true;
+>  			} else if (!strncmp(str, "realloc=", 8)) {
+>  				pci_realloc_get_opt(str + 8);
+>  			} else if (!strncmp(str, "realloc", 7)) {
+> diff --git a/drivers/pci/pci.h b/drivers/pci/pci.h
+> index c358e7a0..c33265e 100644
+> --- a/drivers/pci/pci.h
+> +++ b/drivers/pci/pci.h
+> @@ -7,6 +7,7 @@
+>  #define PCI_VSEC_ID_INTEL_TBT	0x1234	/* Thunderbolt */
+>  
+>  extern const unsigned char pcie_link_speed[];
+> +extern bool pci_early_dump;
+>  
+>  bool pcie_cap_has_lnkctl(const struct pci_dev *dev);
+>  
+> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+> index 56771f3..3678f0a 100644
+> --- a/drivers/pci/probe.c
+> +++ b/drivers/pci/probe.c
+> @@ -1545,6 +1545,23 @@ static int pci_intx_mask_broken(struct pci_dev *dev)
+>  	return 0;
+>  }
+>  
+> +static void early_dump_pci_device(struct pci_dev *pdev)
+> +{
+> +	u32 value[256 / 4];
+> +	int i;
+> +
+> +	if (!pci_early_dump)
+> +		return;
+> +
+> +	pci_info(pdev, "config space:\n");
+> +
+> +	for (i = 0; i < 256; i += 4)
+> +		pci_read_config_dword(pdev, i, &value[i / 4]);
+> +
+> +	print_hex_dump(KERN_INFO, "", DUMP_PREFIX_OFFSET, 16, 1, value,
+> +		       256, false);
+> +}
+> +
+>  /**
+>   * pci_setup_device - Fill in class and map information of a device
+>   * @dev: the device structure to fill
+> @@ -1594,6 +1611,8 @@ int pci_setup_device(struct pci_dev *dev)
+>  	pci_printk(KERN_DEBUG, dev, "[%04x:%04x] type %02x class %#08x\n",
+>  		   dev->vendor, dev->device, dev->hdr_type, dev->class);
+>  
+> +	early_dump_pci_device(dev);
+> +
+>  	/* Need to have dev->class ready */
+>  	dev->cfg_size = pci_cfg_space_size(dev);
+>  
+> -- 
+> 2.7.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
