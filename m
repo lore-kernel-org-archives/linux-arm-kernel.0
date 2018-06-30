@@ -1,37 +1,79 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 30 Jun 2018 18:18:04 +0200
-Subject: [PATCH net-next 3/5] net: gemini: Allow multiple ports to instantiate
+Date: Sat, 30 Jun 2018 18:18:05 +0200
+Subject: [PATCH net-next 4/5] net: gemini: Move main init to port
 In-Reply-To: <20180630161806.24312-1-linus.walleij@linaro.org>
 References: <20180630161806.24312-1-linus.walleij@linaro.org>
-Message-ID: <20180630161806.24312-3-linus.walleij@linaro.org>
+Message-ID: <20180630161806.24312-4-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The code was not tested with two ports actually in use at
-the same time. (I blame this on lack of actual hardware using
-that feature.) Now after locating a system using both ports,
-add necessary fix to make both ports come up.
+The initialization sequence for the ethernet, setting up
+interrupt routing and such things, need to be done after
+both the ports are clocked and reset. Before this the
+config will not "take". Move the initialization to the
+port probe function and keep track of init status in
+the state.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/net/ethernet/cortina/gemini.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ drivers/net/ethernet/cortina/gemini.c | 16 ++++++++++++++--
+ 1 file changed, 14 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/net/ethernet/cortina/gemini.c b/drivers/net/ethernet/cortina/gemini.c
-index b49ed8964026..8d192fcd51c8 100644
+index 8d192fcd51c8..79324bbfd768 100644
 --- a/drivers/net/ethernet/cortina/gemini.c
 +++ b/drivers/net/ethernet/cortina/gemini.c
-@@ -1787,7 +1787,10 @@ static int gmac_open(struct net_device *netdev)
- 	phy_start(netdev->phydev);
+@@ -146,6 +146,7 @@ struct gemini_ethernet {
+ 	void __iomem *base;
+ 	struct gemini_ethernet_port *port0;
+ 	struct gemini_ethernet_port *port1;
++	bool initialized;
  
- 	err = geth_resize_freeq(port);
--	if (err) {
-+	/* It's fine if it's just busy, the other port has set up
-+	 * the freeq in that case.
-+	 */
-+	if (err && (err != -EBUSY)) {
- 		netdev_err(netdev, "could not resize freeq\n");
- 		goto err_stop_phy;
- 	}
+ 	spinlock_t	irq_lock; /* Locks IRQ-related registers */
+ 	unsigned int	freeq_order;
+@@ -2301,6 +2302,14 @@ static void gemini_port_remove(struct gemini_ethernet_port *port)
+ 
+ static void gemini_ethernet_init(struct gemini_ethernet *geth)
+ {
++	/* Only do this once both ports are online */
++	if (geth->initialized)
++		return;
++	if (geth->port0 && geth->port1)
++		geth->initialized = true;
++	else
++		return;
++
+ 	writel(0, geth->base + GLOBAL_INTERRUPT_ENABLE_0_REG);
+ 	writel(0, geth->base + GLOBAL_INTERRUPT_ENABLE_1_REG);
+ 	writel(0, geth->base + GLOBAL_INTERRUPT_ENABLE_2_REG);
+@@ -2447,6 +2456,10 @@ static int gemini_ethernet_port_probe(struct platform_device *pdev)
+ 		geth->port0 = port;
+ 	else
+ 		geth->port1 = port;
++
++	/* This will just be done once both ports are up and reset */
++	gemini_ethernet_init(geth);
++
+ 	platform_set_drvdata(pdev, port);
+ 
+ 	/* Set up and register the netdev */
+@@ -2564,7 +2577,6 @@ static int gemini_ethernet_probe(struct platform_device *pdev)
+ 
+ 	spin_lock_init(&geth->irq_lock);
+ 	spin_lock_init(&geth->freeq_lock);
+-	gemini_ethernet_init(geth);
+ 
+ 	/* The children will use this */
+ 	platform_set_drvdata(pdev, geth);
+@@ -2577,8 +2589,8 @@ static int gemini_ethernet_remove(struct platform_device *pdev)
+ {
+ 	struct gemini_ethernet *geth = platform_get_drvdata(pdev);
+ 
+-	gemini_ethernet_init(geth);
+ 	geth_cleanup_freeq(geth);
++	geth->initialized = false;
+ 
+ 	return 0;
+ }
 -- 
 2.17.1
