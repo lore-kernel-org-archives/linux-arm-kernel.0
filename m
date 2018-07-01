@@ -1,42 +1,38 @@
-From: okaya@codeaurora.org (okaya at codeaurora.org)
-Date: Sun, 01 Jul 2018 13:24:28 -0400
-Subject: [PATCH V4 7/7] PCI: Handle link reset via hotplug if supported
-In-Reply-To: <20180701171443.GA28249@wunner.de>
-References: <1530214274-21139-1-git-send-email-okaya@codeaurora.org>
- <1530214274-21139-7-git-send-email-okaya@codeaurora.org>
- <20180701171443.GA28249@wunner.de>
-Message-ID: <7d0180b065e4a06a644ee754fb34b702@codeaurora.org>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Sun,  1 Jul 2018 22:53:05 +0530
+Subject: [PATCH v4 6/6] MAINTAINERS: Add entry for Actions Semiconductor Owl
+ I2C driver
+In-Reply-To: <20180701172305.15663-1-manivannan.sadhasivam@linaro.org>
+References: <20180701172305.15663-1-manivannan.sadhasivam@linaro.org>
+Message-ID: <20180701172305.15663-7-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-07-01 13:14, Lukas Wunner wrote:
-> On Thu, Jun 28, 2018 at 03:31:05PM -0400, Sinan Kaya wrote:
->> +static pci_ers_result_t pciehp_reset_link(struct pci_dev *pdev)
->> +{
->> +	struct pcie_device *pciedev;
->> +	struct controller *ctrl;
->> +	struct device *devhp;
->> +	struct slot *slot;
->> +	int rc;
->> +
->> +	devhp = pcie_port_find_device(pdev, PCIE_PORT_SERVICE_HP);
->> +	pciedev = to_pcie_device(devhp);
->> +	ctrl = get_service_data(pciedev);
->> +	slot = ctrl->slot;
->> +
->> +	rc = reset_slot(slot->hotplug_slot, 0);
->> +
->> +	return !rc ? PCI_ERS_RESULT_RECOVERED : PCI_ERS_RESULT_DISCONNECT;
->> +}
-> 
-> This looks like a bit of a detour.  There's a "struct pci_slot *slot"
-> pointer in struct pci_dev.  Any reason not to simply call:
-> 
-> 	rc = reset_slot(pdev->slot->hotplug_slot)
+Add entry for Actions Semiconductor Owl I2C driver under ARM/ACTIONS
 
-pdev here is the bridge. Slot pointers are only valid for children 
-objects.
+Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+---
+ MAINTAINERS | 2 ++
+ 1 file changed, 2 insertions(+)
 
-
-> 
-> Lukas
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 09b54e9ebc6f..5084c62712fa 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1145,12 +1145,14 @@ F:	arch/arm/boot/dts/owl-*
+ F:	arch/arm64/boot/dts/actions/
+ F:	drivers/clk/actions/
+ F:	drivers/clocksource/owl-*
++F:	drivers/i2c/busses/i2c-owl.c
+ F:	drivers/pinctrl/actions/*
+ F:	drivers/soc/actions/
+ F:	include/dt-bindings/power/owl-*
+ F:	include/linux/soc/actions/
+ F:	Documentation/devicetree/bindings/arm/actions.txt
+ F:	Documentation/devicetree/bindings/clock/actions,s900-cmu.txt
++F:	Documentation/devicetree/bindings/i2c/i2c-owl.txt
+ F:	Documentation/devicetree/bindings/pinctrl/actions,s900-pinctrl.txt
+ F:	Documentation/devicetree/bindings/power/actions,owl-sps.txt
+ F:	Documentation/devicetree/bindings/timer/actions,owl-timer.txt
+-- 
+2.17.1
