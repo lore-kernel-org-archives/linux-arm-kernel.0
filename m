@@ -1,470 +1,221 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Sun,  1 Jul 2018 13:08:01 +0200
-Subject: [RFC net-next 12/15] net: lora: Add USI WM-SG-SM-42
-In-Reply-To: <20180701110804.32415-1-afaerber@suse.de>
-References: <20180701110804.32415-1-afaerber@suse.de>
-Message-ID: <20180701110804.32415-13-afaerber@suse.de>
+Date: Sun,  1 Jul 2018 13:07:49 +0200
+Subject: [RFC net-next 00/15] net: A socket API for LoRa
+Message-ID: <20180701110804.32415-1-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The USI WM-SG-SM-42 offers a UART based AT command interface.
+Hello,
 
+LoRa is a long-range, low-power wireless technology by Semtech.
+Unlike other LPWAN technologies, users don't need to rely on infrastructure
+providers and SIM cards and expensive subscription plans, they can set up
+their own gateways. Modules, adapters and evaluation boards are available
+from a large number of vendors.
+
+Many vendors also make available Open Source software examples on GitHub.
+But when taking a closer look, many of them combine licenses in ways that are
+not redistributable. My reports have remained without response or solution.
+
+https://github.com/ernstdevreede/lmic_pi/issues/2
+https://github.com/Snootlab/lmic_chisterapi/issues/2
+https://github.com/Snootlab/lora_chisterapi/issues/2
+
+Another issue was that most such projects around the Raspberry Pi make use of
+spidev to communicate with the Semtech chipsets from userspace. The Linux spi
+maintainers have chosen to greet any such users of spidev with a friendly
+WARN_ON(), preferring in-kernel spi drivers and white-listing individual
+devices only.
+
+https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/drivers/spi/spidev.c?h=v4.17#n722
+https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/drivers/spi/spidev.c?h=v4.17#n667
+
+Also I don't quite see the point in having userspace probe what SPI devices
+are connected to a generic spidev driver when we have an easy Device Tree
+hardware description on arm/arm64 that could give us that info.
+
+I raised the topic during Q&A of a FOSDEM 2017 talk (cut off at the end
+of the video) but unfortunately found no one to collaborate on this.
+
+https://archive.fosdem.org/2017/schedule/event/lorawan/
+
+Instead of porting from wiringPi to a differently licensed GPIO library
+and dealing with seemingly unmaintained LoRaWAN code dumps, I started a
+spi kernel driver for SX1276 back in 2016. But obviously a kernel driver
+isn't too helpful without a userspace API to send and receive packets.
+
+This patchset, updated from 2017 and extended, is implementing kernel drivers
+for various LoRa chipsets and modules. As API I'm proposing a PF_LORA socket
+implementation. Why? LoRa uses data packets with headers and checksums
+and differing MTUs and multiple protocols layered on top of it. Apart from
+simple headers for addressing used by RadioHead library and IMST's LoRa P2P
+protocol, the main use case (not implemented in this patchset) is expected
+to be LoRaWAN. And LoRaWAN has competing proprietary protocols, such as
+Link Labs' Symphony Link or GlobalSat M.O.S.T. or RadioShuttle, that might
+at some point want to adopt a standard API for their implementations, too.
+
+Ready-made LoRa hardware modules come in three flavors,
+a) with SPI access to the underlying Semtech chipsets, needing a software
+   implementation of e.g. LoRaWAN protocol stack (i.e., a soft MAC),
+b) with a custom, often UART based interface and a pre-certified LoRaWAN
+   protocol stack already integrated (i.e., hard/full MAC), and
+c) with a microcontroller that serves not only for the protocol stack but
+   also as application processor, not offering a ready-made interface.
+
+This patchset focuses on option a). An SX1276 based LoRaWAN stack appeared
+to be the project of Jian-Hong Pan and is not included here.
+This patchset also includes drivers for b), from text based AT commands to
+a binary SLIP based HCI protocol.
+Hardware examples for c) are Murata CMWX1ZZABZ-078 and RAK813.
+
+This patchset is clearly not ready for merging, but is being submitted for
+discussion, as requested by Jiri, in particular of the design choices:
+
+1) PF_LORA/AF_LORA and associated identifiers are proposed to represent
+   this technology. While for an SX1276 - case a) above - it might work to
+   layer LoRaWAN as a protocol option for PF_LORA and add LoRaWAN address
+   fields to the union in my sockaddr_lora, how would that work for devices
+   that only support LoRaWAN but not pure LoRa? Do we need both AF_LORA and
+   AF_LORAWAN, or just a separate ETH_P_LORAWAN or ARPHRD_LORAWAN?
+
+2) PF_LORA is used with SOCK_DGRAM here. The assumption is that RAW mode
+   would be DGRAM plus preamble plus optional checksum.
+
+3) Only the transmit path is partially implemented already. The assumption
+   is that the devices should go into receive mode by default and only
+   interrupt that when asked to transmit.
+
+4) Some hardware settings need to be supplied externally, such as the radio
+   frequency for some modules, but many others can be runtime-configured,
+   such as Spreading Factor, Bandwidth, Sync Word, or which antenna to use.
+   What settings should be implemented as socket option vs. netlink layer
+   vs. ioctl vs. sysfs? What are the criteria to apply?
+
+5) Many of the modules support multiple modes, such as LoRa, LoRaWAN and FSK.
+   Lacking a LoRaWAN implementation, I am currently switching them into LoRa
+   mode at probe time wherever possible. How do we deal with that properly?
+
+  a) Is there any precedence from the Wifi world for dynamically selecting
+     between our own trusted Open Source implementation vs. hardware/firmware
+     accelerated and/or certified implementations?
+
+  b) Would a proof of concept for FSK (non-LoRa) modes be required for
+     merging any LoRa driver for chipsets that support both? Or is there any
+     facility or design guidelines that would allow us to focus on LoRa and
+     LoRaWAN and leave non-LoRa radio modes to later contributors?
+
+As evident by the many questions, this is my first deep dive into the Linux
+net subsystem. It's also my first experiments with the new serdev subsystem,
+so in particular the receive paths will need some review and optimizations.
+
+This patchset was developed and tested mainly as KMP, originally at
+https://github.com/afaerber/lora-modules. It was recently transformed into a
+linux-next based tree, still mostly tested on our openSUSE Tumbleweed kernel
+with a differing AF_LORA value below current AF_MAX limit.
+
+Some corresponding Device Tree Overlays have been collected here:
+https://github.com/afaerber/dt-overlays
+
+Only European models for 868 MHz and 433 MHz could be tested when available.
+Thanks to all companies and people that have supported this project so far.
+
+Have a lot of fun!
+
+Cheers,
+Andreas
+
+Cc: Jian-Hong Pan <starnight@g.ncu.edu.tw>
+Cc: Jiri Pirko <jiri@resnulli.us>
+Cc: Marcel Holtmann <marcel@holtmann.org>
+Cc: "David S. Miller" <davem@davemloft.net>
+Cc: Matthias Brugger <mbrugger@suse.com>
+Cc: Konstantin B?hm <konstantin.boehm@ancud.de>
+Cc: Jan Jongboom <jan.jongboom@arm.com>
+Cc: Janus Piwek <jpiwek@arroweurope.com>
+Cc: Michael R?der <michael.roeder@avnet.eu>
 Cc: Dollar Chen (???) <dollar.chen@wtmec.com>
-Signed-off-by: Andreas F?rber <afaerber@suse.de>
----
- drivers/net/lora/Kconfig  |   7 +
- drivers/net/lora/Makefile |   3 +
- drivers/net/lora/usi.c    | 411 ++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 421 insertions(+)
- create mode 100644 drivers/net/lora/usi.c
+Cc: Ken Yu (??) <ken.yu@rakwireless.com>
+Cc: Jon Ortego <Jon.Ortego@imst.de>
+Cc: contact at snootlab.com
+Cc: Ben Whitten <ben.whitten@lairdtech.com>
+Cc: Brian Ray <brian.ray@link-labs.com>
+Cc: lora at globalsat.com.tw
+Cc: lora at radioshuttle.de
+Cc: Alexander Graf <agraf@suse.de>
+Cc: Michal Kube?ek <mkubecek@suse.cz>
+Cc: Rob Herring <robh@kernel.org>
+Cc: devicetree at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: Steve deRosier <derosier@gmail.com>
+Cc: Mark Brown <broonie@kernel.org>
+Cc: linux-spi at vger.kernel.org
 
-diff --git a/drivers/net/lora/Kconfig b/drivers/net/lora/Kconfig
-index 2e05caef8645..72a9d2a0f2be 100644
---- a/drivers/net/lora/Kconfig
-+++ b/drivers/net/lora/Kconfig
-@@ -31,6 +31,13 @@ config LORA_SX1276
- 	help
- 	  Semtech SX1272/1276/1278
- 
-+config LORA_USI
-+	tristate "USI WM-SG-SM-42 driver"
-+	default y
-+	depends on SERIAL_DEV_BUS
-+	help
-+	  USI WM-SG-SM-42
-+
- config LORA_WIMOD
- 	tristate "IMST WiMOD driver"
- 	default y
-diff --git a/drivers/net/lora/Makefile b/drivers/net/lora/Makefile
-index ecb326c859a5..dfa9a43dcfb3 100644
---- a/drivers/net/lora/Makefile
-+++ b/drivers/net/lora/Makefile
-@@ -16,5 +16,8 @@ lora-rn2483-y += rn2483_cmd.o
- obj-$(CONFIG_LORA_SX1276) += lora-sx1276.o
- lora-sx1276-y := sx1276.o
- 
-+obj-$(CONFIG_LORA_USI) += lora-usi.o
-+lora-usi-y := usi.o
-+
- obj-$(CONFIG_LORA_WIMOD) += lora-wimod.o
- lora-wimod-y := wimod.o
-diff --git a/drivers/net/lora/usi.c b/drivers/net/lora/usi.c
-new file mode 100644
-index 000000000000..f0c697e2cde2
---- /dev/null
-+++ b/drivers/net/lora/usi.c
-@@ -0,0 +1,411 @@
-+// SPDX-License-Identifier: GPL-2.0-or-later
-+/*
-+ * USI WM-SG-SM-42
-+ *
-+ * Copyright (c) 2017-2018 Andreas F?rber
-+ */
-+
-+#include <linux/lora.h>
-+#include <linux/module.h>
-+#include <linux/netdevice.h>
-+#include <linux/of.h>
-+#include <linux/serdev.h>
-+#include <linux/lora/dev.h>
-+
-+struct usi_device {
-+	struct serdev_device *serdev;
-+
-+	int mode;
-+
-+	char rx_buf[4096];
-+	int rx_len;
-+
-+	struct completion prompt_recv_comp;
-+	struct completion tx_event_recv_comp;
-+};
-+
-+static bool usi_cmd_ok(const char *resp)
-+{
-+	int len = strlen(resp);
-+
-+	return (len == 4 && !strcmp(resp, "OK\r\n")) ||
-+	       (len >= 6 && !strcmp(resp + len - 6, "\r\nOK\r\n"));
-+}
-+
-+static int usi_send_command(struct usi_device *usidev, const char *cmd, char **data, unsigned long timeout)
-+{
-+	struct serdev_device *sdev = usidev->serdev;
-+	const char cr = '\r';
-+	int cmd_len, resp_len;
-+	char *resp;
-+
-+	cmd_len = strlen(cmd);
-+	serdev_device_write_buf(sdev, cmd, cmd_len);
-+	serdev_device_write_buf(sdev, &cr, 1);
-+
-+	timeout = wait_for_completion_timeout(&usidev->prompt_recv_comp, timeout);
-+	if (!timeout)
-+		return -ETIMEDOUT;
-+
-+	resp = usidev->rx_buf;
-+	resp_len = usidev->rx_len;
-+	if (!strncmp(resp, cmd, cmd_len) && resp[cmd_len] == '\r') {
-+		dev_dbg(&sdev->dev, "Skipping echo\n");
-+		resp += cmd_len + 1;
-+		resp_len -= cmd_len + 1;
-+	}
-+	dev_dbg(&sdev->dev, "Received: '%s'\n", resp);
-+	if (data)
-+		*data = kstrdup(resp, GFP_KERNEL);
-+
-+	usidev->rx_len = 0;
-+	reinit_completion(&usidev->prompt_recv_comp);
-+
-+	return 0;
-+}
-+
-+static int usi_simple_cmd(struct usi_device *usidev, const char *cmd, unsigned long timeout)
-+{
-+	char *resp;
-+	int ret;
-+
-+	ret = usi_send_command(usidev, cmd, &resp, timeout);
-+	if (ret)
-+		return ret;
-+
-+	if (strcmp(resp, "OK\r\n") == 0) {
-+		kfree(resp);
-+		return 0;
-+	}
-+
-+	kfree(resp);
-+
-+	return -EINVAL;
-+}
-+
-+static int usi_cmd_reset(struct usi_device *usidev)
-+{
-+	int ret;
-+
-+	ret = usi_send_command(usidev, "ATZ", NULL, HZ);
-+	if (ret)
-+		return ret;
-+
-+	mdelay(1000);
-+
-+	return 0;
-+}
-+
-+static int usi_cmd_read_reg(struct usi_device *usidev, u8 addr, u8 *val)
-+{
-+	char *cmd;
-+	char *resp;
-+	char *sz;
-+	int ret;
-+
-+	cmd = kasprintf(GFP_KERNEL, "AT+RREG=0x%02x", (int)addr);
-+	if (!cmd)
-+		return -ENOMEM;
-+
-+	ret = usi_send_command(usidev, cmd, &resp, HZ);
-+	if (ret) {
-+		kfree(cmd);
-+		return ret;
-+	}
-+	if (!usi_cmd_ok(resp)) {
-+		kfree(resp);
-+		kfree(cmd);
-+		return -EINVAL;
-+	}
-+	resp[strlen(resp) - 6] = '\0';
-+	sz = resp;
-+	if (strstarts(sz, "+Reg="))
-+		sz += 5;
-+	if (strncasecmp(sz, cmd + 8, 4) == 0 && strstarts(sz + 4, ", "))
-+		sz += 6;
-+
-+	kfree(cmd);
-+
-+	dev_dbg(&usidev->serdev->dev, "Parsing '%s'\n", sz);
-+	ret = kstrtou8(sz, 0, val);
-+	if (ret) {
-+		kfree(resp);
-+		return ret;
-+	}
-+
-+	kfree(resp);
-+
-+	return 0;
-+}
-+
-+static int usi_receive_buf(struct serdev_device *sdev, const u8 *data, size_t count)
-+{
-+	struct usi_device *usidev = serdev_device_get_drvdata(sdev);
-+	size_t i = 0;
-+	int len = 0;
-+
-+	dev_dbg(&sdev->dev, "Receive (%d)\n", (int)count);
-+
-+	for (i = 0; i < count; i++) {
-+		dev_dbg(&sdev->dev, "Receive: 0x%02x\n", (int)data[i]);
-+	}
-+	i = 0;
-+
-+	if (completion_done(&usidev->prompt_recv_comp) ||
-+	    completion_done(&usidev->tx_event_recv_comp)) {
-+		dev_info(&sdev->dev, "RX waiting on completion\n");
-+		return 0;
-+	}
-+	if (usidev->rx_len == sizeof(usidev->rx_buf) - 1) {
-+		dev_warn(&sdev->dev, "RX buffer full\n");
-+		return 0;
-+	}
-+
-+	i = min(count, sizeof(usidev->rx_buf) - 1 - usidev->rx_len);
-+	if (i > 0) {
-+		memcpy(&usidev->rx_buf[usidev->rx_len], data, i);
-+		usidev->rx_len += i;
-+		len += i;
-+	}
-+	if (usidev->rx_len >= 3 && strncmp(&usidev->rx_buf[usidev->rx_len - 3], "\r# ", 3) == 0) {
-+		usidev->rx_len -= 3;
-+		usidev->rx_buf[usidev->rx_len] = '\0';
-+		complete(&usidev->prompt_recv_comp);
-+	} else if (usidev->rx_len > 7 && strstarts(usidev->rx_buf, "+RCV") &&
-+			strncmp(&usidev->rx_buf[usidev->rx_len - 2], "\r\n", 2) == 0) {
-+		usidev->rx_buf[usidev->rx_len - 2] = '\0';
-+		dev_info(&sdev->dev, "RCV event: '%s'\n", usidev->rx_buf + 4);
-+		usidev->rx_len = 0;
-+	} else if (usidev->rx_len > 6 && strstarts(usidev->rx_buf, "+TX: ") &&
-+			strncmp(&usidev->rx_buf[usidev->rx_len - 2], "\r\n", 2) == 0) {
-+		usidev->rx_buf[usidev->rx_len - 2] = '\0';
-+		dev_info(&sdev->dev, "TX event: '%s'\n", usidev->rx_buf + 5);
-+		complete(&usidev->tx_event_recv_comp);
-+	}
-+
-+	return len;
-+}
-+
-+static const struct serdev_device_ops usi_serdev_client_ops = {
-+	.receive_buf = usi_receive_buf,
-+};
-+
-+static int usi_probe(struct serdev_device *sdev)
-+{
-+	struct usi_device *usidev;
-+	//unsigned long timeout;
-+	char *resp;
-+	u8 val;
-+	int ret;
-+
-+	dev_info(&sdev->dev, "Probing");
-+
-+	usidev = devm_kzalloc(&sdev->dev, sizeof(struct usi_device), GFP_KERNEL);
-+	if (!usidev)
-+		return -ENOMEM;
-+
-+	usidev->serdev = sdev;
-+	usidev->mode = -1;
-+	init_completion(&usidev->prompt_recv_comp);
-+	init_completion(&usidev->tx_event_recv_comp);
-+	serdev_device_set_drvdata(sdev, usidev);
-+
-+	ret = serdev_device_open(sdev);
-+	if (ret) {
-+		dev_err(&sdev->dev, "Failed to open (%d)", ret);
-+		return ret;
-+	}
-+
-+	serdev_device_set_baudrate(sdev, 115200);
-+	serdev_device_set_flow_control(sdev, false);
-+	serdev_device_set_client_ops(sdev, &usi_serdev_client_ops);
-+
-+	ret = usi_cmd_reset(usidev);
-+	if (ret)
-+		dev_warn(&sdev->dev, "Reset failed\n");
-+
-+	ret = usi_send_command(usidev, "ATE=0", NULL, HZ);
-+	if (ret)
-+		dev_warn(&sdev->dev, "ATE failed\n");
-+
-+	/* Dropped in firmware 2.8 */
-+	ret = usi_send_command(usidev, "ATI", &resp, HZ);
-+	if (!ret) {
-+		if (usi_cmd_ok(resp)) {
-+			resp[strlen(resp) - 6] = '\0';
-+			dev_info(&sdev->dev, "Firmware '%s'\n", resp);
-+		}
-+		kfree(resp);
-+	}
-+
-+	ret = usi_send_command(usidev, "AT+DEFMODE", &resp, HZ);
-+	if (ret) {
-+		dev_err(&sdev->dev, "Checking DEFMODE failed (%d)\n", ret);
-+		serdev_device_close(sdev);
-+		return ret;
-+	}
-+	if (usi_cmd_ok(resp)) {
-+		resp[strlen(resp) - 6] = '\0';
-+		dev_info(&sdev->dev, "Default mode '%s'\n", resp);
-+		if (!strcmp(resp, "MFG_WAN_MODE"))
-+			usidev->mode = 6;
-+		else if (!strcmp(resp, "MFG_TEST_IDLE"))
-+			usidev->mode = 0;
-+		else if (!strcmp(resp, "MFG_TX_TONE"))
-+			usidev->mode = 1;
-+		else if (!strcmp(resp, "MFG_TX_PACKET"))
-+			usidev->mode = 2;
-+		else if (!strcmp(resp, "MFG_ERROR_LESS_ARGUMENETS"))
-+			usidev->mode = 3;
-+		else if (!strcmp(resp, "MFG_TX_TEXT"))
-+			usidev->mode = 4;
-+		else if (!strcmp(resp, "MFG_TEST_STOP"))
-+			usidev->mode = 5;
-+	}
-+	kfree(resp);
-+
-+	if (usidev->mode != 3) {
-+		ret = usi_simple_cmd(usidev, "AT+DEFMODE=3", HZ);
-+		if (ret) {
-+			dev_err(&sdev->dev, "Setting DEFMODE failed (%d)\n", ret);
-+			serdev_device_close(sdev);
-+			return ret;
-+		}
-+
-+#if 1
-+		ret = usi_simple_cmd(usidev, "AT+WDCT", 5 * HZ);
-+		if (ret) {
-+			dev_err(&sdev->dev, "Writing DCT failed (%d)\n", ret);
-+			serdev_device_close(sdev);
-+			return ret;
-+		}
-+
-+		ret = usi_cmd_reset(usidev);
-+		if (ret) {
-+			dev_err(&sdev->dev, "Reset failed\n");
-+			serdev_device_close(sdev);
-+			return ret;
-+		}
-+
-+		ret = usi_send_command(usidev, "ATE=0", NULL, HZ);
-+		if (ret)
-+			dev_warn(&sdev->dev, "ATE failed\n");
-+#endif
-+
-+		usidev->mode = -1;
-+		ret = usi_send_command(usidev, "AT+DEFMODE", &resp, HZ);
-+		if (ret) {
-+			dev_err(&sdev->dev, "Checking DEFMODE failed (%d)\n", ret);
-+			serdev_device_close(sdev);
-+			return ret;
-+		}
-+		if (usi_cmd_ok(resp)) {
-+			resp[strlen(resp) - 6] = '\0';
-+			dev_info(&sdev->dev, "Default mode '%s'\n", resp);
-+			if (!strcmp(resp, "MFG_WAN_MODE")) {
-+				usidev->mode = 6;
-+			}
-+		}
-+		kfree(resp);
-+	}
-+
-+	ret = usi_send_command(usidev, "AT+VER", &resp, HZ);
-+	if (!ret) {
-+		if (usi_cmd_ok(resp)) {
-+			resp[strlen(resp) - 6] = '\0';
-+			dev_info(&sdev->dev, "LoRaWAN version '%s'\n",
-+				(strstarts(resp, "+VER=")) ? (resp + 5) : resp);
-+		}
-+		kfree(resp);
-+	}
-+
-+	ret = usi_simple_cmd(usidev, "AT+RF=20,868000000,7,0,1,0,8,0,0,0", HZ);
-+	if (ret) {
-+		dev_err(&sdev->dev, "AT+RF failed (%d)\n", ret);
-+		serdev_device_close(sdev);
-+		return ret;
-+	}
-+
-+	/*ret = usi_simple_cmd(usidev, "AT+TXT=1,deadbeef", 2 * HZ);
-+	if (ret) {
-+		dev_err(&sdev->dev, "TX failed (%d)\n", ret);
-+		serdev_device_close(sdev);
-+		return ret;
-+	}
-+
-+	timeout = wait_for_completion_timeout(&usidev->tx_event_recv_comp, 5 * HZ);
-+	if (!timeout) {
-+		serdev_device_close(sdev);
-+		return -ETIMEDOUT;
-+	}
-+	usidev->rx_len = 0;
-+	reinit_completion(&usidev->tx_event_recv_comp);*/
-+
-+	ret = usi_cmd_read_reg(usidev, 0x42, &val);
-+	if (!ret) {
-+		dev_info(&sdev->dev, "SX1272 VERSION 0x%02x\n", (int)val);
-+	}
-+
-+	ret = usi_cmd_read_reg(usidev, 0x39, &val);
-+	if (!ret) {
-+		dev_info(&sdev->dev, "SX1272 SyncWord 0x%02x\n", (int)val);
-+	}
-+
-+	ret = usi_cmd_read_reg(usidev, 0x01, &val);
-+	if (!ret) {
-+		dev_info(&sdev->dev, "SX1272 OpMode 0x%02x\n", (int)val);
-+	}
-+
-+	dev_info(&sdev->dev, "Done.");
-+
-+	return 0;
-+}
-+
-+static void usi_remove(struct serdev_device *sdev)
-+{
-+	struct usi_device *usidev = serdev_device_get_drvdata(sdev);
-+
-+	usi_send_command(usidev, "ATE=1\r", NULL, HZ);
-+
-+	serdev_device_close(sdev);
-+
-+	dev_info(&sdev->dev, "Removed\n");
-+}
-+
-+static const struct of_device_id usi_of_match[] = {
-+	{ .compatible = "usi,wm-sg-sm-42" },
-+	{}
-+};
-+MODULE_DEVICE_TABLE(of, usi_of_match);
-+
-+static struct serdev_device_driver usi_serdev_driver = {
-+	.probe = usi_probe,
-+	.remove = usi_remove,
-+	.driver = {
-+		.name = "usi",
-+		.of_match_table = usi_of_match,
-+	},
-+};
-+
-+static int __init usi_init(void)
-+{
-+	int ret;
-+
-+	ret = serdev_device_driver_register(&usi_serdev_driver);
-+	if (ret)
-+		return ret;
-+
-+	return 0;
-+}
-+
-+static void __exit usi_exit(void)
-+{
-+	serdev_device_driver_unregister(&usi_serdev_driver);
-+}
-+
-+module_init(usi_init);
-+module_exit(usi_exit);
-+
-+MODULE_DESCRIPTION("USI WM-SG-SM-42 serdev driver");
-+MODULE_AUTHOR("Andreas F?rber <afaerber@suse.de>");
-+MODULE_LICENSE("GPL");
+Andreas F?rber (15):
+  net: Reserve protocol numbers for LoRa
+  net: lora: Define sockaddr_lora
+  net: lora: Add protocol numbers
+  net: Add lora subsystem
+  HACK: net: lora: Deal with .poll_mask in 4.18-rc2
+  net: lora: Prepare for device drivers
+  net: lora: Add Semtech SX1276
+  net: lora: sx1276: Add debugfs
+  net: lora: Prepare EUI helpers
+  net: lora: Add Microchip RN2483
+  net: lora: Add IMST WiMOD
+  net: lora: Add USI WM-SG-SM-42
+  net: lora: Prepare RAK RAK811
+  net: lora: Prepare Semtech SX1257
+  net: lora: Add Semtech SX1301
+
+ drivers/net/Makefile                |   1 +
+ drivers/net/lora/Kconfig            |  72 ++++
+ drivers/net/lora/Makefile           |  32 ++
+ drivers/net/lora/dev.c              | 125 ++++++
+ drivers/net/lora/rak811.c           | 219 +++++++++++
+ drivers/net/lora/rn2483.c           | 344 +++++++++++++++++
+ drivers/net/lora/rn2483.h           |  40 ++
+ drivers/net/lora/rn2483_cmd.c       | 130 +++++++
+ drivers/net/lora/sx1257.c           |  96 +++++
+ drivers/net/lora/sx1276.c           | 740 ++++++++++++++++++++++++++++++++++++
+ drivers/net/lora/sx1301.c           | 446 ++++++++++++++++++++++
+ drivers/net/lora/usi.c              | 411 ++++++++++++++++++++
+ drivers/net/lora/wimod.c            | 597 +++++++++++++++++++++++++++++
+ include/linux/lora/dev.h            |  44 +++
+ include/linux/lora/skb.h            |  29 ++
+ include/linux/socket.h              |   4 +-
+ include/uapi/linux/if_arp.h         |   1 +
+ include/uapi/linux/if_ether.h       |   1 +
+ include/uapi/linux/lora.h           |  24 ++
+ net/Kconfig                         |   1 +
+ net/Makefile                        |   1 +
+ net/lora/Kconfig                    |  15 +
+ net/lora/Makefile                   |   8 +
+ net/lora/af_lora.c                  | 152 ++++++++
+ net/lora/af_lora.h                  |  13 +
+ net/lora/dgram.c                    | 297 +++++++++++++++
+ security/selinux/hooks.c            |   4 +-
+ security/selinux/include/classmap.h |   4 +-
+ 28 files changed, 3848 insertions(+), 3 deletions(-)
+ create mode 100644 drivers/net/lora/Kconfig
+ create mode 100644 drivers/net/lora/Makefile
+ create mode 100644 drivers/net/lora/dev.c
+ create mode 100644 drivers/net/lora/rak811.c
+ create mode 100644 drivers/net/lora/rn2483.c
+ create mode 100644 drivers/net/lora/rn2483.h
+ create mode 100644 drivers/net/lora/rn2483_cmd.c
+ create mode 100644 drivers/net/lora/sx1257.c
+ create mode 100644 drivers/net/lora/sx1276.c
+ create mode 100644 drivers/net/lora/sx1301.c
+ create mode 100644 drivers/net/lora/usi.c
+ create mode 100644 drivers/net/lora/wimod.c
+ create mode 100644 include/linux/lora/dev.h
+ create mode 100644 include/linux/lora/skb.h
+ create mode 100644 include/uapi/linux/lora.h
+ create mode 100644 net/lora/Kconfig
+ create mode 100644 net/lora/Makefile
+ create mode 100644 net/lora/af_lora.c
+ create mode 100644 net/lora/af_lora.h
+ create mode 100644 net/lora/dgram.c
+
 -- 
 2.16.4
