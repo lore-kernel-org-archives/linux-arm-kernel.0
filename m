@@ -1,657 +1,590 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Sun,  1 Jul 2018 13:08:00 +0200
-Subject: [RFC net-next 11/15] net: lora: Add IMST WiMOD
+Date: Sun,  1 Jul 2018 13:07:59 +0200
+Subject: [RFC net-next 10/15] net: lora: Add Microchip RN2483
 In-Reply-To: <20180701110804.32415-1-afaerber@suse.de>
 References: <20180701110804.32415-1-afaerber@suse.de>
-Message-ID: <20180701110804.32415-12-afaerber@suse.de>
+Message-ID: <20180701110804.32415-11-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The IMST WiMOD uses a SLIP based binary UART protocol. Two separate
-firmwares are available. By default it ships with a LoRaWAN firmware.
-The alternative firmware is a custom P2P addressing mode based on LoRa.
+The Microchip RN2483 and RN2903 are UART based modules exposing both
+LoRaWAN and LoRa. The RN2483 supports switching between 433 and 868 MHz.
 
-Cc: Jon Ortego <Jon.Ortego@imst.de>
 Signed-off-by: Andreas F?rber <afaerber@suse.de>
 ---
- drivers/net/lora/Kconfig  |   8 +
- drivers/net/lora/Makefile |   3 +
- drivers/net/lora/wimod.c  | 597 ++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 608 insertions(+)
- create mode 100644 drivers/net/lora/wimod.c
+ drivers/net/lora/Kconfig      |   7 +
+ drivers/net/lora/Makefile     |   4 +
+ drivers/net/lora/rn2483.c     | 344 ++++++++++++++++++++++++++++++++++++++++++
+ drivers/net/lora/rn2483.h     |  40 +++++
+ drivers/net/lora/rn2483_cmd.c | 130 ++++++++++++++++
+ 5 files changed, 525 insertions(+)
+ create mode 100644 drivers/net/lora/rn2483.c
+ create mode 100644 drivers/net/lora/rn2483.h
+ create mode 100644 drivers/net/lora/rn2483_cmd.c
 
 diff --git a/drivers/net/lora/Kconfig b/drivers/net/lora/Kconfig
-index 940bd2cbe106..2e05caef8645 100644
+index 0436f6b09a1c..940bd2cbe106 100644
 --- a/drivers/net/lora/Kconfig
 +++ b/drivers/net/lora/Kconfig
-@@ -31,6 +31,14 @@ config LORA_SX1276
- 	help
- 	  Semtech SX1272/1276/1278
+@@ -17,6 +17,13 @@ config LORA_DEV
  
-+config LORA_WIMOD
-+	tristate "IMST WiMOD driver"
+ if LORA_DEV
+ 
++config LORA_RN2483
++	tristate "Microchip RN2483/RN2903 driver"
 +	default y
 +	depends on SERIAL_DEV_BUS
-+	select CRC_CCITT
 +	help
-+	  IMST WiMOD
++	  Microchip RN2483/2903
 +
- endif
- 
- endmenu
+ config LORA_SX1276
+ 	tristate "Semtech SX127x SPI driver"
+ 	default y
 diff --git a/drivers/net/lora/Makefile b/drivers/net/lora/Makefile
-index 07839c3ce9f8..ecb326c859a5 100644
+index 8845542dba50..07839c3ce9f8 100644
 --- a/drivers/net/lora/Makefile
 +++ b/drivers/net/lora/Makefile
-@@ -15,3 +15,6 @@ lora-rn2483-y += rn2483_cmd.o
+@@ -9,5 +9,9 @@ lora-dev-y := dev.o
+ # Alphabetically sorted.
+ #
  
++obj-$(CONFIG_LORA_RN2483) += lora-rn2483.o
++lora-rn2483-y := rn2483.o
++lora-rn2483-y += rn2483_cmd.o
++
  obj-$(CONFIG_LORA_SX1276) += lora-sx1276.o
  lora-sx1276-y := sx1276.o
-+
-+obj-$(CONFIG_LORA_WIMOD) += lora-wimod.o
-+lora-wimod-y := wimod.o
-diff --git a/drivers/net/lora/wimod.c b/drivers/net/lora/wimod.c
+diff --git a/drivers/net/lora/rn2483.c b/drivers/net/lora/rn2483.c
 new file mode 100644
-index 000000000000..a70d5a6dc7c4
+index 000000000000..8b9ec2575ee2
 --- /dev/null
-+++ b/drivers/net/lora/wimod.c
-@@ -0,0 +1,597 @@
-+// SPDX-License-Identifier: GPL-2.0+
++++ b/drivers/net/lora/rn2483.c
+@@ -0,0 +1,344 @@
++// SPDX-License-Identifier: GPL-2.0-or-later
 +/*
-+ * IMST WiMOD
++ * Microchip RN2483/RN2903
 + *
 + * Copyright (c) 2017-2018 Andreas F?rber
 + */
 +
-+#include <linux/crc-ccitt.h>
++#include <linux/delay.h>
++#include <linux/gpio/consumer.h>
 +#include <linux/lora.h>
 +#include <linux/module.h>
 +#include <linux/netdevice.h>
 +#include <linux/of.h>
-+#include <linux/rculist.h>
 +#include <linux/serdev.h>
++#include <linux/lora/dev.h>
 +
-+#define WIMOD_HCI_PAYLOAD_MAX	300
-+#define WIMOD_HCI_PACKET_MAX	(1 + (2 + WIMOD_HCI_PAYLOAD_MAX + 2) * 2 + 1)
++#include "rn2483.h"
 +
-+struct wimod_device {
-+	struct serdev_device *serdev;
-+
-+	u8 rx_buf[WIMOD_HCI_PACKET_MAX];
-+	int rx_len;
-+	bool rx_esc;
-+	struct list_head packet_dispatchers;
++struct rn2483_priv {
++	struct lora_priv lora;
 +};
 +
-+#define SLIP_END	0300
-+#define SLIP_ESC	0333
-+#define SLIP_ESC_END	0334
-+#define SLIP_ESC_ESC	0335
-+
-+static inline void slip_print_bytes(const u8* buf, int len)
++static netdev_tx_t rn2483_loradev_start_xmit(struct sk_buff *skb, struct net_device *netdev)
 +{
-+	int i;
++	if (skb->protocol != htons(ETH_P_LORA)) {
++		kfree_skb(skb);
++		netdev->stats.tx_dropped++;
++		return NETDEV_TX_OK;
++	}
 +
-+	for (i = 0; i < len; i++)
-+		printk("%02x ", buf[i]);
++	netif_stop_queue(netdev);
++
++	/* TODO */
++	return NETDEV_TX_OK;
 +}
 +
-+static int slip_send_end(struct serdev_device *sdev, unsigned long timeout)
++static int rn2483_loradev_open(struct net_device *netdev)
 +{
-+	u8 val = SLIP_END;
-+
-+	return serdev_device_write(sdev, &val, 1, timeout);
-+}
-+
-+#if 0
-+static int slip_send_data(struct serdev_device *sdev, const u8 *buf, int len,
-+	unsigned long timeout)
-+{
-+	int last_idx = -1;
-+	int i;
-+	u8 esc[2] = { SLIP_ESC, 0 };
 +	int ret;
 +
-+	for (i = 0; i < len; i++) {
-+		if (buf[i] != SLIP_END &&
-+		    buf[i] != SLIP_ESC)
-+			continue;
++	netdev_dbg(netdev, "%s", __func__);
 +
-+		slip_print_bytes(&buf[last_idx + 1], i - (last_idx + 1));
++	ret = open_loradev(netdev);
++	if (ret)
++		return ret;
 +
-+		ret = serdev_device_write(sdev,
-+			&buf[last_idx + 1], i - (last_idx + 1), timeout);
-+		if (ret)
-+			return ret;
++	netif_start_queue(netdev);
 +
-+		switch (buf[i]) {
-+		case SLIP_END:
-+			esc[1] = SLIP_ESC_END;
-+			break;
-+		case SLIP_ESC:
-+			esc[1] = SLIP_ESC_ESC;
-+			break;
-+		}
-+		slip_print_bytes(esc, 2);
-+		ret = serdev_device_write(sdev, esc, 2, timeout);
-+		if (ret)
-+			return ret;
-+
-+		last_idx = i;
-+	}
-+
-+	slip_print_bytes(&buf[last_idx + 1], len - (last_idx + 1));
-+
-+	ret = serdev_device_write(sdev,
-+		&buf[last_idx + 1], len - (last_idx + 1), timeout);
-+
-+	return ret;
++	return 0;
 +}
-+#endif
 +
-+static int slip_write_data(u8 *buf, int buf_len, const u8 *data, int data_len)
++static int rn2483_loradev_stop(struct net_device *netdev)
 +{
-+	int last_idx = -1;
-+	int i, n;
-+	int count = 0;
++	netdev_dbg(netdev, "%s", __func__);
 +
-+	for (i = 0; i < data_len; i++) {
-+		if (data[i] != SLIP_END &&
-+		    data[i] != SLIP_ESC)
-+			continue;
++	netif_stop_queue(netdev);
++	close_loradev(netdev);
 +
-+		n = i - (last_idx + 1);
-+		if (count + n + 2 > buf_len)
-+			return -ENOMEM;
-+
-+		memcpy(buf + count, &data[last_idx + 1], n);
-+		count += n;
-+
-+		buf[count++] = SLIP_ESC;
-+		switch (data[i]) {
-+		case SLIP_END:
-+			buf[count++] = SLIP_ESC_END;
-+			break;
-+		case SLIP_ESC:
-+			buf[count++] = SLIP_ESC_ESC;
-+			break;
-+		}
-+
-+		last_idx = i;
-+	}
-+
-+	n = data_len - (last_idx + 1);
-+	if (count + n > buf_len)
-+		return -ENOMEM;
-+
-+	memcpy(buf + count, &data[last_idx + 1], n);
-+	count += n;
-+
-+	return count;
++	return 0;
 +}
 +
-+#define DEVMGMT_ID	0x01
-+
-+#define DEVMGMT_MSG_PING_REQ		0x01
-+#define DEVMGMT_MSG_PING_RSP		0x02
-+#define DEVMGMT_MSG_GET_DEVICE_INFO_REQ	0x03
-+#define DEVMGMT_MSG_GET_DEVICE_INFO_RSP	0x04
-+#define DEVMGMT_MSG_GET_FW_INFO_REQ	0x05
-+#define DEVMGMT_MSG_GET_FW_INFO_RSP	0x06
-+
-+#define DEVMGMT_STATUS_OK	0x00
-+
-+struct wimod_hci_packet_dispatcher {
-+	struct list_head list;
-+	u8 dst_id;
-+	u8 msg_id;
-+	void (*dispatchee)(const u8*, int, struct wimod_hci_packet_dispatcher *);
-+	void *priv;
++static const struct net_device_ops rn2483_net_device_ops = {
++	.ndo_open = rn2483_loradev_open,
++	.ndo_stop = rn2483_loradev_stop,
++	.ndo_start_xmit = rn2483_loradev_start_xmit,
 +};
 +
-+struct wimod_hci_packet_completion {
-+	struct wimod_hci_packet_dispatcher disp;
-+	struct completion comp;
-+	char *payload;
-+	int payload_len;
-+};
-+
-+static void wimod_hci_add_dispatcher(struct wimod_device *wmdev,
-+	struct wimod_hci_packet_dispatcher *entry)
++int rn2483_readline_timeout(struct rn2483_device *rndev, char **line, unsigned long timeout)
 +{
-+	list_add_tail_rcu(&entry->list, &wmdev->packet_dispatchers);
-+}
-+
-+static void wimod_hci_remove_dispatcher(struct wimod_device *wmdev,
-+	struct wimod_hci_packet_dispatcher *entry)
-+{
-+	list_del_rcu(&entry->list);
-+}
-+
-+static void wimod_hci_packet_dispatch_completion(const u8 *data, int len,
-+	struct wimod_hci_packet_dispatcher *d)
-+{
-+	struct wimod_hci_packet_completion *disp =
-+		container_of(d, struct wimod_hci_packet_completion, disp);
-+
-+	if (completion_done(&disp->comp))
-+		return;
-+
-+	disp->payload_len = len - 2;
-+	disp->payload = kzalloc(disp->payload_len, GFP_KERNEL);
-+	if (disp->payload)
-+		memcpy(disp->payload, data + 2, len - 2);
-+
-+	complete(&disp->comp);
-+}
-+
-+static int wimod_hci_send(struct serdev_device *sdev,
-+	u8 dst_id, u8 msg_id, const u8 *payload, int payload_len,
-+	unsigned long timeout)
-+{
-+	u8 buf[WIMOD_HCI_PACKET_MAX];
-+	int buf_len = 0;
-+	u16 crc = 0xffff;
-+	int ret, i;
-+
-+	if (payload_len > WIMOD_HCI_PAYLOAD_MAX)
-+		return -EINVAL;
-+
-+	for (i = 0; i < 30; i++) {
-+		ret = slip_send_end(sdev, timeout);
-+		if (ret) {
-+			dev_err(&sdev->dev, "%s: wakeup END %d failed\n", __func__, i);
-+			return ret;
-+		}
-+	}
-+
-+	crc = crc_ccitt_byte(crc, dst_id);
-+	crc = crc_ccitt_byte(crc, msg_id);
-+	if (payload_len > 0)
-+		crc = crc_ccitt(crc, payload, payload_len);
-+	crc = ~crc;
-+
-+	printk(KERN_INFO "sending: ");
-+
-+	/*ret = slip_send_end(sdev, timeout);
-+	if (ret) {
-+		dev_err(&sdev->dev, "%s: initial END failed\n", __func__);
-+		return ret;
-+	}
-+
-+	ret = slip_send_data(sdev, &dst_id, 1, timeout);
-+	if (ret) {
-+		dev_err(&sdev->dev, "%s: dst_id failed\n", __func__);
-+		return ret;
-+	}
-+
-+	ret = slip_send_data(sdev, &msg_id, 1, timeout);
-+	if (ret) {
-+		dev_err(&sdev->dev, "%s: msg_id failed\n", __func__);
-+		return ret;
-+	}*/
-+
-+	buf[buf_len++] = SLIP_END;
-+
-+	ret = slip_write_data(buf + buf_len, sizeof(buf) - buf_len, &dst_id, 1);
-+	if (ret < 0)
-+		return ret;
-+	buf_len += ret;
-+
-+	ret = slip_write_data(buf + buf_len, sizeof(buf) - buf_len, &msg_id, 1);
-+	if (ret < 0)
-+		return ret;
-+	buf_len += ret;
-+
-+	if (payload_len > 0) {
-+		/*ret = slip_send_data(sdev, payload, payload_len, timeout);
-+		if (ret) {
-+			dev_err(&sdev->dev, "%s: payload failed\n", __func__);
-+			return ret;
-+		}*/
-+		ret = slip_write_data(buf + buf_len, sizeof(buf) - buf_len, payload, payload_len);
-+		if (ret < 0)
-+			return ret;
-+		buf_len += ret;
-+	}
-+
-+	cpu_to_le16s(crc);
-+	/*ret = slip_send_data(sdev, (u8 *)&crc, 2, timeout);
-+	if (ret) {
-+		dev_err(&sdev->dev, "%s: FCS failed\n", __func__);
-+		return ret;
-+	}
-+
-+	ret = slip_send_end(sdev, timeout);
-+	if (ret) {
-+		dev_err(&sdev->dev, "%s: trailing END failed\n", __func__);
-+		return ret;
-+	}*/
-+
-+	ret = slip_write_data(buf + buf_len, sizeof(buf) - buf_len, (u8 *)&crc, 2);
-+	if (ret < 0)
-+		return ret;
-+	buf_len += ret;
-+
-+	buf[buf_len++] = SLIP_END;
-+
-+	slip_print_bytes(buf, buf_len);
-+
-+	return serdev_device_write(sdev, buf, buf_len, timeout);
-+
-+	//printk("\n");
-+
-+	//return 0;
-+}
-+
-+static int wimod_hci_devmgmt_status(u8 status)
-+{
-+	switch (status) {
-+	case DEVMGMT_STATUS_OK:
-+		return 0;
-+	default:
-+		pr_info("DEVMGMT status %u\n", (int)status);
-+		return -EINVAL;
-+	}
-+}
-+
-+static int wimod_hci_devmgmt_send_sync(struct wimod_device *wmdev,
-+	u8 req_msg_id, const u8 *req_payload, int req_payload_len,
-+	u8 rsp_msg_id, u8 **rsp_payload, int *rsp_payload_len,
-+	unsigned long timeout)
-+{
-+	struct wimod_hci_packet_completion packet = {0};
-+	int ret;
-+
-+	if (rsp_payload && !rsp_payload_len)
-+		return -EINVAL;
-+
-+	packet.disp.dst_id = DEVMGMT_ID;
-+	packet.disp.msg_id = rsp_msg_id;
-+	packet.disp.dispatchee = wimod_hci_packet_dispatch_completion;
-+	init_completion(&packet.comp);
-+
-+	wimod_hci_add_dispatcher(wmdev, &packet.disp);
-+
-+	ret = wimod_hci_send(wmdev->serdev, DEVMGMT_ID, req_msg_id, req_payload, req_payload_len, timeout);
-+	if (ret) {
-+		wimod_hci_remove_dispatcher(wmdev, &(packet.disp));
-+		return ret;
-+	}
-+
-+	timeout = wait_for_completion_timeout(&packet.comp, timeout);
-+	wimod_hci_remove_dispatcher(wmdev, &packet.disp);
++	timeout = wait_for_completion_timeout(&rndev->line_recv_comp, timeout);
 +	if (!timeout)
 +		return -ETIMEDOUT;
 +
-+	if (packet.payload_len < 1) {
-+		kfree(packet.payload);
-+		return -EINVAL;
-+	}
-+
-+	ret = wimod_hci_devmgmt_status(packet.payload[0]);
-+	if (ret || !rsp_payload)
-+		kfree(packet.payload);
-+	else if (rsp_payload) {
-+		*rsp_payload = packet.payload;
-+		*rsp_payload_len = packet.payload_len;
-+	}
-+	return ret;
-+}
-+
-+static int wimod_hci_ping(struct wimod_device *wmdev, unsigned long timeout)
-+{
-+	return wimod_hci_devmgmt_send_sync(wmdev,
-+		DEVMGMT_MSG_PING_REQ, NULL, 0,
-+		DEVMGMT_MSG_PING_RSP, NULL, NULL,
-+		timeout);
-+}
-+
-+static int wimod_hci_get_device_info(struct wimod_device *wmdev, u8 *buf, unsigned long timeout)
-+{
-+	u8 *payload;
-+	int payload_len;
-+	int ret;
-+
-+	ret = wimod_hci_devmgmt_send_sync(wmdev,
-+		DEVMGMT_MSG_GET_DEVICE_INFO_REQ, NULL, 0,
-+		DEVMGMT_MSG_GET_DEVICE_INFO_RSP, &payload, &payload_len,
-+		timeout);
-+	if (ret)
-+		return ret;
-+
-+	if (payload_len < 10) {
-+		dev_err(&wmdev->serdev->dev, "get_device_info: payload length (10)\n");
-+		kfree(payload);
-+		return -EINVAL;
-+	}
-+
-+	if (buf)
-+		memcpy(buf, payload + 1, min(payload_len - 1, 9));
-+
-+	kfree(payload);
-+	return 0;
-+}
-+
-+static int wimod_hci_get_fw_info(struct wimod_device *wmdev, u8 **info, int *info_len, unsigned long timeout)
-+{
-+	u8 *payload;
-+	int payload_len;
-+	int ret;
-+
-+	if (info && !info_len)
-+		return -EINVAL;
-+
-+	ret = wimod_hci_devmgmt_send_sync(wmdev,
-+		DEVMGMT_MSG_GET_FW_INFO_REQ, NULL, 0,
-+		DEVMGMT_MSG_GET_FW_INFO_RSP, &payload, &payload_len,
-+		timeout);
-+	if (ret)
-+		return ret;
-+
-+	if (info) {
-+		*info = payload + 1;
-+		*info_len = payload_len - 1;
-+	} else
-+		kfree(payload);
++	*line = devm_kstrdup(&rndev->serdev->dev, rndev->buf, GFP_KERNEL);
++	complete(&rndev->line_read_comp);
++	if (!*line)
++		return -ENOMEM;
 +
 +	return 0;
 +}
 +
-+static void wimod_hci_get_fw_info_free(u8* info)
++static void rn2483_receive_line(struct rn2483_device *rndev, const char *sz, size_t len)
 +{
-+	u8 *payload = info - 1;
++	dev_dbg(&rndev->serdev->dev, "Received line '%s' (%d)", sz, (int)len);
 +
-+	kfree(payload);
++	reinit_completion(&rndev->line_read_comp);
++	complete(&rndev->line_recv_comp);
++	wait_for_completion(&rndev->line_read_comp);
++	reinit_completion(&rndev->line_recv_comp);
 +}
 +
-+static void wimod_process_packet(struct serdev_device *sdev, const u8 *data, int len)
++static int rn2483_receive_buf(struct serdev_device *serdev, const u8 *data, size_t count)
 +{
-+	struct wimod_device *wmdev = serdev_device_get_drvdata(sdev);
-+	struct wimod_hci_packet_dispatcher *e;
-+	u16 crc;
++	struct rn2483_device *rndev = serdev_device_get_drvdata(serdev);
++	size_t i;
 +
-+	dev_info(&sdev->dev, "Processing incoming packet (%d)\n", len);
-+
-+	if (len < 4) {
-+		dev_dbg(&sdev->dev, "Discarding packet of length %d\n", len);
-+		return;
++	dev_dbg(&serdev->dev, "Receive (%d)", (int)count);
++	if (!rndev->buf) {
++		rndev->buf = devm_kmalloc(&serdev->dev, count, GFP_KERNEL);
++		if (!rndev->buf)
++			return 0;
++		rndev->buflen = 0;
++	} else {
++		void *tmp = devm_kmalloc(&serdev->dev, rndev->buflen + count, GFP_KERNEL);
++		if (!tmp)
++			return 0;
++		memcpy(tmp, rndev->buf, rndev->buflen);
++		devm_kfree(&serdev->dev, rndev->buf);
++		rndev->buf = tmp;
 +	}
 +
-+	crc = ~crc_ccitt(0xffff, data, len);
-+	if (crc != 0x0f47) {
-+		dev_dbg(&sdev->dev, "Discarding packet with wrong checksum\n");
-+		return;
++	for (i = 0; i < count; i++) {
++		if (data[i] == '\r') {
++			rndev->saw_cr = true;
++		} else if (data[i] == '\n' && rndev->saw_cr) {
++			if (i > 1)
++				memcpy(rndev->buf + rndev->buflen, data, i - 1);
++			((char *)rndev->buf)[rndev->buflen + i - 1] = 0;
++			rn2483_receive_line(rndev, rndev->buf, rndev->buflen + i - 1);
++			rndev->saw_cr = false;
++			devm_kfree(&serdev->dev, rndev->buf);
++			rndev->buf = NULL;
++			rndev->buflen = 0;
++			return i + 1;
++		} else
++			rndev->saw_cr = false;
 +	}
 +
-+	list_for_each_entry(e, &wmdev->packet_dispatchers, list) {
-+		if (e->dst_id == data[0] && e->msg_id == data[1]) {
-+			e->dispatchee(data, len - 2, e);
-+			break;
-+		}
-+	}
++	memcpy(rndev->buf + rndev->buflen, data, count);
++	rndev->buflen += count;
++	return count;
 +}
 +
-+static int wimod_receive_buf(struct serdev_device *sdev, const u8 *data, size_t count)
-+{
-+	struct wimod_device *wmdev = serdev_device_get_drvdata(sdev);
-+	size_t i = 0;
-+	int len = 0;
-+
-+	dev_dbg(&sdev->dev, "Receive (%d)\n", (int)count);
-+
-+	while (i < min(count, sizeof(wmdev->rx_buf) - wmdev->rx_len)) {
-+		if (wmdev->rx_esc) {
-+			wmdev->rx_esc = false;
-+			switch (data[i]) {
-+			case SLIP_ESC_END:
-+				wmdev->rx_buf[wmdev->rx_len++] = SLIP_END;
-+				break;
-+			case SLIP_ESC_ESC:
-+				wmdev->rx_buf[wmdev->rx_len++] = SLIP_ESC;
-+				break;
-+			default:
-+				dev_warn(&sdev->dev, "Ignoring unknown escape sequence 0300 0%o\n", data[i]);
-+				break;
-+			}
-+			len += i + 1;
-+			data += i + 1;
-+			count -= i + 1;
-+			i = 0;
-+			continue;
-+		}
-+		if (data[i] != SLIP_END &&
-+		    data[i] != SLIP_ESC) {
-+			i++;
-+			continue;
-+		}
-+		if (i > 0) {
-+			memcpy(&wmdev->rx_buf[wmdev->rx_len], data, i);
-+			wmdev->rx_len += i;
-+		}
-+		if (data[i] == SLIP_END && wmdev->rx_len > 0) {
-+			wimod_process_packet(sdev, wmdev->rx_buf, wmdev->rx_len);
-+			wmdev->rx_len = 0;
-+		} else if (data[i] == SLIP_ESC) {
-+			wmdev->rx_esc = true;
-+		}
-+		len += i + 1;
-+		data += i + 1;
-+		count -= i + 1;
-+		i = 0;
-+	}
-+
-+	dev_dbg(&sdev->dev, "Receive: processed %d\n", len);
-+
-+	return len;
-+}
-+
-+static const struct serdev_device_ops wimod_serdev_client_ops = {
-+	.receive_buf = wimod_receive_buf,
-+	.write_wakeup = serdev_device_write_wakeup,
++static const struct serdev_device_ops rn2483_serdev_client_ops = {
++	.receive_buf = rn2483_receive_buf,
 +};
 +
-+static int wimod_probe(struct serdev_device *sdev)
++static int rn2483_probe(struct serdev_device *sdev)
 +{
-+	struct wimod_device *wmdev;
-+	u8 buf[9];
-+	u8 *data;
-+	int data_len;
++	struct rn2483_device *rndev;
++	char *line, *cmd;
++	char sz[5];
++	u32 status;
 +	int ret;
 +
 +	dev_info(&sdev->dev, "Probing");
 +
-+	wmdev = devm_kzalloc(&sdev->dev, sizeof(struct wimod_device), GFP_KERNEL);
-+	if (!wmdev)
++	rndev = devm_kzalloc(&sdev->dev, sizeof(struct rn2483_device), GFP_KERNEL);
++	if (!rndev)
 +		return -ENOMEM;
 +
-+	wmdev->serdev = sdev;
-+	INIT_LIST_HEAD(&wmdev->packet_dispatchers);
-+	serdev_device_set_drvdata(sdev, wmdev);
++	rndev->serdev = sdev;
++	init_completion(&rndev->line_recv_comp);
++	init_completion(&rndev->line_read_comp);
++	mutex_init(&rndev->cmd_lock);
++	serdev_device_set_drvdata(sdev, rndev);
++
++	rndev->reset_gpio = devm_gpiod_get_optional(&sdev->dev, "reset", GPIOD_OUT_LOW);
++	if (IS_ERR(rndev->reset_gpio))
++		return PTR_ERR(rndev->reset_gpio);
 +
 +	ret = serdev_device_open(sdev);
 +	if (ret) {
-+		dev_err(&sdev->dev, "Failed to open (%d)\n", ret);
++		dev_err(&sdev->dev, "Failed to open (%d)", ret);
 +		return ret;
 +	}
 +
-+	serdev_device_set_baudrate(sdev, 115200);
++	serdev_device_set_baudrate(sdev, 57600);
 +	serdev_device_set_flow_control(sdev, false);
-+	serdev_device_set_client_ops(sdev, &wimod_serdev_client_ops);
 +
-+	ret = wimod_hci_ping(wmdev, HZ);
++	gpiod_set_value_cansleep(rndev->reset_gpio, 0);
++	msleep(5);
++	serdev_device_set_client_ops(sdev, &rn2483_serdev_client_ops);
++	gpiod_set_value_cansleep(rndev->reset_gpio, 1);
++	msleep(100);
++
++	ret = rn2483_readline_timeout(rndev, &line, HZ);
 +	if (ret) {
-+		dev_err(&sdev->dev, "Ping failed (%d)\n", ret);
-+		goto err;
++		if (ret != -ENOMEM)
++			dev_err(&sdev->dev, "Timeout waiting for firmware identification");
++		goto err_timeout;
 +	}
 +
-+	ret = wimod_hci_get_device_info(wmdev, buf, HZ);
-+	if (ret) {
-+		dev_err(&sdev->dev, "Failed to obtain device info (%d)\n", ret);
-+		goto err;
++	if (strlen(line) < strlen("RNxxxx X.Y.Z MMM DD YYYY HH:MM:SS") || line[6] != ' ' ||
++			strncmp(line, "RN", 2) != 0) {
++		dev_err(&sdev->dev, "Unexpected response '%s'", line);
++		devm_kfree(&sdev->dev, line);
++		ret = -EINVAL;
++		goto err_version;
 +	}
-+	dev_info(&sdev->dev, "Module type: 0x%02x\n", (int)buf[0]);
-+
-+	ret = wimod_hci_get_fw_info(wmdev, &data, &data_len, HZ);
-+	if (ret) {
-+		dev_err(&sdev->dev, "Failed to obtain firmware info (%d)\n", ret);
-+		goto err;
++	dev_info(&sdev->dev, "Firmware '%s'", line);
++	strncpy(sz, line + 2, 4);
++	sz[4] = 0;
++	devm_kfree(&sdev->dev, line);
++	ret = kstrtouint(sz, 10, &rndev->model);
++	if (ret)
++		goto err_model;
++	if (!(rndev->model == 2483 || rndev->model == 2903)) {
++		dev_err(&sdev->dev, "Unknown model %u", rndev->model);
++		ret = -ENOTSUPP;
++		goto err_model;
 +	}
-+	dev_info(&sdev->dev, "Firmware: %u.%u build %u '%s'\n",
-+		data[1], data[0], ((u16)data[3] << 8) | data[2], data + 4);
-+	wimod_hci_get_fw_info_free(data);
++	dev_info(&sdev->dev, "Detected RN%u", rndev->model);
 +
-+	dev_info(&sdev->dev, "Done.\n");
++	ret = rn2483_sys_get_hweui(rndev, &rndev->hweui);
++	if (ret) {
++		if (ret != -ENOMEM)
++			dev_err(&sdev->dev, "Failed to read HWEUI (%d)", ret);
++		goto err_hweui;
++	}
++	dev_info(&sdev->dev, "HWEUI " PRIxLORAEUI, LORA_EUI(rndev->hweui));
++
++	switch (rndev->model) {
++	case 2483:
++		ret = rn2483_mac_get_band(rndev, &rndev->band);
++		if (ret) {
++			dev_err(&sdev->dev, "Failed to read band (%d)", ret);
++			goto err_band;
++		}
++		dev_info(&sdev->dev, "Frequency band %u MHz", rndev->band);
++
++		ret = rn2483_mac_reset_band(rndev, 433);
++		if (ret) {
++			dev_err(&sdev->dev, "Failed to reset band (%d)", ret);
++			goto err_band;
++		}
++		rndev->band = 433;
++
++		ret = rn2483_mac_get_band(rndev, &rndev->band);
++		if (!ret)
++			dev_info(&sdev->dev, "New frequency band: %u MHz", rndev->band);
++		break;
++	case 2903:
++		/* No "mac get band" command available */
++		rndev->band = 915;
++		break;
++	}
++
++	ret = rn2483_mac_get_status(rndev, &status);
++	if (!ret)
++		dev_info(&sdev->dev, "MAC status %08x", status);
++
++	if (true) {
++		u32 pause;
++		ret = rn2483_mac_pause(rndev, &pause);
++		if (!ret)
++			dev_info(&sdev->dev, "MAC pausing (0x%08x)", pause);
++		ret = rn2483_mac_resume(rndev);
++		if (!ret)
++			dev_info(&sdev->dev, "MAC resuming");
++	}
++
++	cmd = "mac get sync";
++	mutex_lock(&rndev->cmd_lock);
++	ret = rn2483_send_command_timeout(rndev, cmd, &line, HZ);
++	mutex_unlock(&rndev->cmd_lock);
++	if (!ret) {
++		dev_info(&sdev->dev, "%s => '%s'", cmd, line);
++		devm_kfree(&sdev->dev, line);
++	}
++
++	rndev->netdev = alloc_loradev(sizeof(struct rn2483_priv));
++	if (!rndev->netdev) {
++		ret = -ENOMEM;
++		goto err_alloc_netdev;
++	}
++
++	rndev->netdev->netdev_ops = &rn2483_net_device_ops;
++	SET_NETDEV_DEV(rndev->netdev, &sdev->dev);
++
++	ret = register_loradev(rndev->netdev);
++	if (ret)
++		goto err_register_netdev;
++
++	dev_info(&sdev->dev, "Done.");
 +
 +	return 0;
-+err:
-+	serdev_device_close(sdev);
++
++err_register_netdev:
++	free_loradev(rndev->netdev);
++err_alloc_netdev:
++err_band:
++err_hweui:
++err_model:
++err_version:
++err_timeout:
++	gpiod_set_value_cansleep(rndev->reset_gpio, 0);
 +	return ret;
 +}
 +
-+static void wimod_remove(struct serdev_device *sdev)
++static void rn2483_remove(struct serdev_device *sdev)
 +{
++	struct rn2483_device *rndev = serdev_device_get_drvdata(sdev);
++
++	unregister_loradev(rndev->netdev);
++	free_loradev(rndev->netdev);
++
++	gpiod_set_value_cansleep(rndev->reset_gpio, 0);
++
++	complete(&rndev->line_read_comp);
++
 +	serdev_device_close(sdev);
 +
-+	dev_info(&sdev->dev, "Removed\n");
++	dev_info(&sdev->dev, "Removed");
 +}
 +
-+static const struct of_device_id wimod_of_match[] = {
-+	{ .compatible = "imst,wimod-hci" },
++static const struct of_device_id rn2483_of_match[] = {
++	{ .compatible = "microchip,rn2483" },
++	{ .compatible = "microchip,rn2903" },
 +	{}
 +};
-+MODULE_DEVICE_TABLE(of, wimod_of_match);
++MODULE_DEVICE_TABLE(of, rn2483_of_match);
 +
-+static struct serdev_device_driver wimod_serdev_driver = {
-+	.probe = wimod_probe,
-+	.remove = wimod_remove,
++static struct serdev_device_driver rn2483_serdev_driver = {
++	.probe = rn2483_probe,
++	.remove = rn2483_remove,
 +	.driver = {
-+		.name = "wimod",
-+		.of_match_table = wimod_of_match,
++		.name = "rn2483",
++		.of_match_table = rn2483_of_match,
 +	},
 +};
 +
-+static int __init wimod_init(void)
++static int __init rn2483_init(void)
 +{
 +	int ret;
 +
-+	ret = serdev_device_driver_register(&wimod_serdev_driver);
++	ret = serdev_device_driver_register(&rn2483_serdev_driver);
 +	if (ret)
 +		return ret;
 +
 +	return 0;
 +}
 +
-+static void __exit wimod_exit(void)
++static void __exit rn2483_exit(void)
 +{
-+	serdev_device_driver_unregister(&wimod_serdev_driver);
++	serdev_device_driver_unregister(&rn2483_serdev_driver);
 +}
 +
-+module_init(wimod_init);
-+module_exit(wimod_exit);
++module_init(rn2483_init);
++module_exit(rn2483_exit);
 +
-+MODULE_DESCRIPTION("WiMOD serdev driver");
++MODULE_DESCRIPTION("RN2483 serdev driver");
 +MODULE_AUTHOR("Andreas F?rber <afaerber@suse.de>");
 +MODULE_LICENSE("GPL");
+diff --git a/drivers/net/lora/rn2483.h b/drivers/net/lora/rn2483.h
+new file mode 100644
+index 000000000000..f92660286f15
+--- /dev/null
++++ b/drivers/net/lora/rn2483.h
+@@ -0,0 +1,40 @@
++/* SPDX-License-Identifier: GPL-2.0-or-later */
++/*
++ * Copyright (c) 2017-2018 Andreas F?rber
++ */
++#ifndef _RN2483_H
++#define _RN2483_H
++
++#include <linux/delay.h>
++#include <linux/gpio/consumer.h>
++#include <linux/netdevice.h>
++#include <linux/serdev.h>
++#include <linux/lora/dev.h>
++
++struct rn2483_device {
++	struct serdev_device *serdev;
++	struct gpio_desc *reset_gpio;
++	struct net_device *netdev;
++	unsigned model;
++	lora_eui hweui;
++	unsigned band;
++	bool saw_cr;
++	void *buf;
++	size_t buflen;
++	struct completion line_recv_comp;
++	struct completion line_read_comp;
++	struct mutex cmd_lock;
++};
++
++int rn2483_readline_timeout(struct rn2483_device *rndev, char **line, unsigned long timeout);
++int rn2483_send_command_timeout(struct rn2483_device *rndev,
++	const char *cmd, char **resp, unsigned long timeout);
++
++int rn2483_sys_get_hweui(struct rn2483_device *rndev, lora_eui *val);
++int rn2483_mac_get_band(struct rn2483_device *rndev, uint *val);
++int rn2483_mac_get_status(struct rn2483_device *rndev, u32 *val);
++int rn2483_mac_reset_band(struct rn2483_device *rndev, unsigned band);
++int rn2483_mac_pause(struct rn2483_device *rndev, u32 *max_pause);
++int rn2483_mac_resume(struct rn2483_device *rndev);
++
++#endif
+diff --git a/drivers/net/lora/rn2483_cmd.c b/drivers/net/lora/rn2483_cmd.c
+new file mode 100644
+index 000000000000..6d6fca8fa93c
+--- /dev/null
++++ b/drivers/net/lora/rn2483_cmd.c
+@@ -0,0 +1,130 @@
++// SPDX-License-Identifier: GPL-2.0-or-later
++/*
++ * Microchip RN2483/RN2903 - UART commands
++ *
++ * Copyright (c) 2017-2018 Andreas F?rber
++ */
++#include "rn2483.h"
++
++#define RN2483_CMD_TIMEOUT HZ
++
++int rn2483_send_command_timeout(struct rn2483_device *rndev,
++	const char *cmd, char **resp, unsigned long timeout)
++{
++	int ret;
++
++	ret = serdev_device_write_buf(rndev->serdev, cmd, strlen(cmd));
++	if (ret < 0)
++		return ret;
++
++	ret = serdev_device_write_buf(rndev->serdev, "\r\n", 2);
++	if (ret < 0)
++		return ret;
++
++	return rn2483_readline_timeout(rndev, resp, timeout);
++}
++
++int rn2483_sys_get_hweui(struct rn2483_device *rndev, lora_eui *val)
++{
++	int ret;
++	char *line;
++
++	mutex_lock(&rndev->cmd_lock);
++	ret = rn2483_send_command_timeout(rndev, "sys get hweui", &line, RN2483_CMD_TIMEOUT);
++	mutex_unlock(&rndev->cmd_lock);
++	if (ret)
++		return ret;
++
++	ret = lora_strtoeui(line, val);
++	devm_kfree(&rndev->serdev->dev, line);
++	return ret;
++}
++
++int rn2483_mac_get_band(struct rn2483_device *rndev, uint *val)
++{
++	int ret;
++	char *line;
++
++	mutex_lock(&rndev->cmd_lock);
++	ret = rn2483_send_command_timeout(rndev, "mac get band", &line, RN2483_CMD_TIMEOUT);
++	mutex_unlock(&rndev->cmd_lock);
++	if (ret)
++		return ret;
++
++	ret = kstrtouint(line, 10, val);
++	devm_kfree(&rndev->serdev->dev, line);
++
++	return ret;
++}
++
++int rn2483_mac_get_status(struct rn2483_device *rndev, u32 *val)
++{
++	int ret;
++	char *line;
++
++	mutex_lock(&rndev->cmd_lock);
++	ret = rn2483_send_command_timeout(rndev, "mac get status", &line, RN2483_CMD_TIMEOUT);
++	mutex_unlock(&rndev->cmd_lock);
++	if (ret)
++		return ret;
++
++	ret = kstrtou32(line, 16, val);
++	devm_kfree(&rndev->serdev->dev, line);
++	return ret;
++}
++
++int rn2483_mac_reset_band(struct rn2483_device *rndev, unsigned band)
++{
++	int ret;
++	char *line, *cmd;
++
++	cmd = devm_kasprintf(&rndev->serdev->dev, GFP_KERNEL, "mac reset %u", band);
++	mutex_lock(&rndev->cmd_lock);
++	ret = rn2483_send_command_timeout(rndev, cmd, &line, RN2483_CMD_TIMEOUT);
++	mutex_unlock(&rndev->cmd_lock);
++	devm_kfree(&rndev->serdev->dev, cmd);
++	if (ret)
++		return ret;
++
++	if (strcmp(line, "ok") == 0)
++		ret = 0;
++	else if (strcmp(line, "invalid_param") == 0)
++		ret = -EINVAL;
++	else
++		ret = -EPROTO;
++
++	devm_kfree(&rndev->serdev->dev, line);
++	return ret;
++}
++
++int rn2483_mac_pause(struct rn2483_device *rndev, u32 *max_pause)
++{
++	int ret;
++	char *line;
++
++	mutex_lock(&rndev->cmd_lock);
++	ret = rn2483_send_command_timeout(rndev, "mac pause", &line, RN2483_CMD_TIMEOUT);
++	mutex_unlock(&rndev->cmd_lock);
++	if (ret)
++		return ret;
++
++	ret = kstrtou32(line, 10, max_pause);
++	devm_kfree(&rndev->serdev->dev, line);
++	return ret;
++}
++
++int rn2483_mac_resume(struct rn2483_device *rndev)
++{
++	int ret;
++	char *line;
++
++	mutex_lock(&rndev->cmd_lock);
++	ret = rn2483_send_command_timeout(rndev, "mac resume", &line, RN2483_CMD_TIMEOUT);
++	mutex_unlock(&rndev->cmd_lock);
++	if (ret)
++		return ret;
++
++	ret = (strcmp(line, "ok") == 0) ? 0 : -EPROTO;
++	devm_kfree(&rndev->serdev->dev, line);
++	return ret;
++}
 -- 
 2.16.4
