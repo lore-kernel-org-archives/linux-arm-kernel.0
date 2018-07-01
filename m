@@ -1,49 +1,43 @@
 From: gregkh@linuxfoundation.org (gregkh at linuxfoundation.org)
 Date: Sun, 01 Jul 2018 11:01:21 +0200
-Subject: Patch "lib/vsprintf: Remove atomic-unsafe support for %pCr" has been
- added to the 4.17-stable tree
-Message-ID: <153043568114763@kroah.com>
+Subject: Patch "clk: renesas: cpg-mssr: Stop using printk format %pCr" has
+ been added to the 4.17-stable tree
+Message-ID: <1530435681633@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 This is a note to let you know that I've just added the patch titled
 
-    lib/vsprintf: Remove atomic-unsafe support for %pCr
+    clk: renesas: cpg-mssr: Stop using printk format %pCr
 
 to the 4.17-stable tree which can be found at:
     http://www.kernel.org/git/?p=linux/kernel/git/stable/stable-queue.git;a=summary
 
 The filename of the patch is:
-     lib-vsprintf-remove-atomic-unsafe-support-for-pcr.patch
+     clk-renesas-cpg-mssr-stop-using-printk-format-pcr.patch
 and it can be found in the queue-4.17 subdirectory.
 
 If you, or anyone else, feels it should not be added to the stable tree,
 please let <stable@vger.kernel.org> know about it.
 
 
->From 666902e42fd8344b923c02dc5b0f37948ff4f225 Mon Sep 17 00:00:00 2001
+>From ef4b0be62641d296cf4c0ad8f75ab83ab066ed51 Mon Sep 17 00:00:00 2001
 From: Geert Uytterhoeven <geert+renesas@glider.be>
-Date: Fri, 1 Jun 2018 11:28:22 +0200
-Subject: lib/vsprintf: Remove atomic-unsafe support for %pCr
+Date: Fri, 1 Jun 2018 11:28:19 +0200
+Subject: clk: renesas: cpg-mssr: Stop using printk format %pCr
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-commit 666902e42fd8344b923c02dc5b0f37948ff4f225 upstream.
+commit ef4b0be62641d296cf4c0ad8f75ab83ab066ed51 upstream.
 
-"%pCr" formats the current rate of a clock, and calls clk_get_rate().
-The latter obtains a mutex, hence it must not be called from atomic
-context.
+Printk format "%pCr" will be removed soon, as clk_get_rate() must not be
+called in atomic context.
 
-Remove support for this rarely-used format, as vsprintf() (and e.g.
-printk()) must be callable from any context.
+Replace it by open-coding the operation.  This is safe here, as the code
+runs in task context.
 
-Any remaining out-of-tree users will start seeing the clock's name
-printed instead of its rate.
-
-Reported-by: Jia-Ju Bai <baijiaju1990@gmail.com>
-Fixes: 900cca2944254edd ("lib/vsprintf: add %pC{,n,r} format specifiers for clocks")
-Link: http://lkml.kernel.org/r/1527845302-12159-5-git-send-email-geert+renesas at glider.be
+Link: http://lkml.kernel.org/r/1527845302-12159-2-git-send-email-geert+renesas at glider.be
 To: Jia-Ju Bai <baijiaju1990@gmail.com>
 To: Jonathan Corbet <corbet@lwn.net>
 To: Michael Turquette <mturquette@baylibre.com>
@@ -65,43 +59,48 @@ Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-renesas-soc at vger.kernel.org
 Cc: linux-kernel at vger.kernel.org
 Cc: Geert Uytterhoeven <geert+renesas@glider.be>
-Cc: stable at vger.kernel.org # 4.1+
+Cc: stable at vger.kernel.org # 4.5+
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Acked-by: Stephen Boyd <sboyd@kernel.org>
 Signed-off-by: Petr Mladek <pmladek@suse.com>
 Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 
 ---
- Documentation/core-api/printk-formats.rst |    3 +--
- lib/vsprintf.c                            |    3 ---
- 2 files changed, 1 insertion(+), 5 deletions(-)
+ drivers/clk/renesas/renesas-cpg-mssr.c |    9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
 
---- a/Documentation/core-api/printk-formats.rst
-+++ b/Documentation/core-api/printk-formats.rst
-@@ -419,11 +419,10 @@ struct clk
+--- a/drivers/clk/renesas/renesas-cpg-mssr.c
++++ b/drivers/clk/renesas/renesas-cpg-mssr.c
+@@ -258,8 +258,9 @@ struct clk *cpg_mssr_clk_src_twocell_get
+ 		dev_err(dev, "Cannot get %s clock %u: %ld", type, clkidx,
+ 		       PTR_ERR(clk));
+ 	else
+-		dev_dbg(dev, "clock (%u, %u) is %pC at %pCr Hz\n",
+-			clkspec->args[0], clkspec->args[1], clk, clk);
++		dev_dbg(dev, "clock (%u, %u) is %pC at %lu Hz\n",
++			clkspec->args[0], clkspec->args[1], clk,
++			clk_get_rate(clk));
+ 	return clk;
+ }
  
- 	%pC	pll1
- 	%pCn	pll1
--	%pCr	1560000000
+@@ -326,7 +327,7 @@ static void __init cpg_mssr_register_cor
+ 	if (IS_ERR_OR_NULL(clk))
+ 		goto fail;
  
- For printing struct clk structures. %pC and %pCn print the name
- (Common Clock Framework) or address (legacy clock framework) of the
--structure; %pCr prints the current clock rate.
-+structure.
+-	dev_dbg(dev, "Core clock %pC at %pCr Hz\n", clk, clk);
++	dev_dbg(dev, "Core clock %pC at %lu Hz\n", clk, clk_get_rate(clk));
+ 	priv->clks[id] = clk;
+ 	return;
  
- Passed by reference.
+@@ -392,7 +393,7 @@ static void __init cpg_mssr_register_mod
+ 	if (IS_ERR(clk))
+ 		goto fail;
  
---- a/lib/vsprintf.c
-+++ b/lib/vsprintf.c
-@@ -1456,9 +1456,6 @@ char *clock(char *buf, char *end, struct
- 		return string(buf, end, NULL, spec);
- 
- 	switch (fmt[1]) {
--	case 'r':
--		return number(buf, end, clk_get_rate(clk), spec);
--
- 	case 'n':
- 	default:
- #ifdef CONFIG_COMMON_CLK
+-	dev_dbg(dev, "Module clock %pC at %pCr Hz\n", clk, clk);
++	dev_dbg(dev, "Module clock %pC at %lu Hz\n", clk, clk_get_rate(clk));
+ 	priv->clks[id] = clk;
+ 	priv->smstpcr_saved[clock->index / 32].mask |= BIT(clock->index % 32);
+ 	return;
 
 
 Patches currently in stable-queue which might be from geert+renesas at glider.be are
