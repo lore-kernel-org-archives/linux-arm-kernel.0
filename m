@@ -1,34 +1,28 @@
 From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Sun,  1 Jul 2018 18:21:02 +0200
-Subject: [PATCH 4.9 016/101] lib/vsprintf: Remove atomic-unsafe support for
- %pCr
-In-Reply-To: <20180701160757.138608453@linuxfoundation.org>
-References: <20180701160757.138608453@linuxfoundation.org>
-Message-ID: <20180701160757.782482744@linuxfoundation.org>
+Date: Sun,  1 Jul 2018 18:21:33 +0200
+Subject: [PATCH 4.14 021/157] thermal: bcm2835: Stop using printk format %pCr
+In-Reply-To: <20180701160852.287307684@linuxfoundation.org>
+References: <20180701160852.287307684@linuxfoundation.org>
+Message-ID: <20180701160853.314692037@linuxfoundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-4.9-stable review patch.  If anyone has any objections, please let me know.
+4.14-stable review patch.  If anyone has any objections, please let me know.
 
 ------------------
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-commit 666902e42fd8344b923c02dc5b0f37948ff4f225 upstream.
+commit bd2a07f71a1e2e198f8a30cb551d9defe422d83d upstream.
 
-"%pCr" formats the current rate of a clock, and calls clk_get_rate().
-The latter obtains a mutex, hence it must not be called from atomic
+Printk format "%pCr" will be removed soon, as clk_get_rate() must not be
+called in atomic context.
+
+Replace it by printing the variable that already holds the clock rate.
+Note that calling clk_get_rate() is safe here, as the code runs in task
 context.
 
-Remove support for this rarely-used format, as vsprintf() (and e.g.
-printk()) must be callable from any context.
-
-Any remaining out-of-tree users will start seeing the clock's name
-printed instead of its rate.
-
-Reported-by: Jia-Ju Bai <baijiaju1990@gmail.com>
-Fixes: 900cca2944254edd ("lib/vsprintf: add %pC{,n,r} format specifiers for clocks")
-Link: http://lkml.kernel.org/r/1527845302-12159-5-git-send-email-geert+renesas at glider.be
+Link: http://lkml.kernel.org/r/1527845302-12159-3-git-send-email-geert+renesas at glider.be
 To: Jia-Ju Bai <baijiaju1990@gmail.com>
 To: Jonathan Corbet <corbet@lwn.net>
 To: Michael Turquette <mturquette@baylibre.com>
@@ -49,41 +43,26 @@ Cc: linux-serial at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-renesas-soc at vger.kernel.org
 Cc: linux-kernel at vger.kernel.org
-Cc: Geert Uytterhoeven <geert+renesas@glider.be>
-Cc: stable at vger.kernel.org # 4.1+
+Cc: stable at vger.kernel.org # 4.12+
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
 Signed-off-by: Petr Mladek <pmladek@suse.com>
 Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 
 ---
- Documentation/printk-formats.txt |    3 +--
- lib/vsprintf.c                   |    3 ---
- 2 files changed, 1 insertion(+), 5 deletions(-)
+ drivers/thermal/broadcom/bcm2835_thermal.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
---- a/Documentation/printk-formats.txt
-+++ b/Documentation/printk-formats.txt
-@@ -279,11 +279,10 @@ struct clk:
+--- a/drivers/thermal/broadcom/bcm2835_thermal.c
++++ b/drivers/thermal/broadcom/bcm2835_thermal.c
+@@ -213,8 +213,8 @@ static int bcm2835_thermal_probe(struct
+ 	rate = clk_get_rate(data->clk);
+ 	if ((rate < 1920000) || (rate > 5000000))
+ 		dev_warn(&pdev->dev,
+-			 "Clock %pCn running at %pCr Hz is outside of the recommended range: 1.92 to 5MHz\n",
+-			 data->clk, data->clk);
++			 "Clock %pCn running at %lu Hz is outside of the recommended range: 1.92 to 5MHz\n",
++			 data->clk, rate);
  
- 	%pC	pll1
- 	%pCn	pll1
--	%pCr	1560000000
- 
- 	For printing struct clk structures. '%pC' and '%pCn' print the name
- 	(Common Clock Framework) or address (legacy clock framework) of the
--	structure; '%pCr' prints the current clock rate.
-+	structure.
- 
- 	Passed by reference.
- 
---- a/lib/vsprintf.c
-+++ b/lib/vsprintf.c
-@@ -1391,9 +1391,6 @@ char *clock(char *buf, char *end, struct
- 		return string(buf, end, NULL, spec);
- 
- 	switch (fmt[1]) {
--	case 'r':
--		return number(buf, end, clk_get_rate(clk), spec);
--
- 	case 'n':
- 	default:
- #ifdef CONFIG_COMMON_CLK
+ 	/* register of thermal sensor and get info from DT */
+ 	tz = thermal_zone_of_sensor_register(&pdev->dev, 0, data,
