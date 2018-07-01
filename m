@@ -1,280 +1,189 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Sun,  1 Jul 2018 13:08:02 +0200
-Subject: [RFC net-next 13/15] net: lora: Prepare RAK RAK811
+Date: Sun,  1 Jul 2018 13:07:57 +0200
+Subject: [RFC net-next 08/15] net: lora: sx1276: Add debugfs
 In-Reply-To: <20180701110804.32415-1-afaerber@suse.de>
 References: <20180701110804.32415-1-afaerber@suse.de>
-Message-ID: <20180701110804.32415-14-afaerber@suse.de>
+Message-ID: <20180701110804.32415-9-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The RAK811 and RAK812 offer a UART based AT command interface.
-It allows both LoRaWAN and LoRa modes.
+Allow some interactive inspection at runtime via debugfs.
 
-Cc: Ken Yu (??) <ken.yu@rakwireless.com>
 Signed-off-by: Andreas F?rber <afaerber@suse.de>
 ---
- drivers/net/lora/Kconfig  |   7 ++
- drivers/net/lora/Makefile |   3 +
- drivers/net/lora/rak811.c | 219 ++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 229 insertions(+)
- create mode 100644 drivers/net/lora/rak811.c
+ drivers/net/lora/sx1276.c | 132 ++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 132 insertions(+)
 
-diff --git a/drivers/net/lora/Kconfig b/drivers/net/lora/Kconfig
-index 72a9d2a0f2be..3e384493cbdd 100644
---- a/drivers/net/lora/Kconfig
-+++ b/drivers/net/lora/Kconfig
-@@ -17,6 +17,13 @@ config LORA_DEV
+diff --git a/drivers/net/lora/sx1276.c b/drivers/net/lora/sx1276.c
+index d6732111247a..1072019cfcc1 100644
+--- a/drivers/net/lora/sx1276.c
++++ b/drivers/net/lora/sx1276.c
+@@ -5,6 +5,7 @@
+  * Copyright (c) 2016-2018 Andreas F?rber
+  */
  
- if LORA_DEV
++#include <linux/debugfs.h>
+ #include <linux/delay.h>
+ #include <linux/lora.h>
+ #include <linux/module.h>
+@@ -61,6 +62,8 @@ struct sx1276_priv {
  
-+config LORA_RAK811
-+	tristate "RAK RAK811 driver"
-+	default y
-+	depends on SERIAL_DEV_BUS
-+	help
-+	  RAK RAK811/RAK812
+ 	struct workqueue_struct *wq;
+ 	struct work_struct tx_work;
 +
- config LORA_RN2483
- 	tristate "Microchip RN2483/RN2903 driver"
- 	default y
-diff --git a/drivers/net/lora/Makefile b/drivers/net/lora/Makefile
-index dfa9a43dcfb3..6b6870ffbfd8 100644
---- a/drivers/net/lora/Makefile
-+++ b/drivers/net/lora/Makefile
-@@ -9,6 +9,9 @@ lora-dev-y := dev.o
- # Alphabetically sorted.
- #
++	struct dentry *debugfs;
+ };
  
-+obj-$(CONFIG_LORA_RAK811) += lora-rak811.o
-+lora-rak811-y := rak811.o
+ static int sx1276_read_single(struct spi_device *spi, u8 reg, u8 *val)
+@@ -416,6 +419,128 @@ static const struct net_device_ops sx1276_netdev_ops =  {
+ 	.ndo_start_xmit = sx1276_loradev_start_xmit,
+ };
+ 
++static ssize_t sx1276_freq_read(struct file *file, char __user *user_buf,
++				 size_t count, loff_t *ppos)
++{
++	struct net_device *netdev = file->private_data;
++	struct sx1276_priv *priv = netdev_priv(netdev);
++	struct spi_device *spi = priv->spi;
++	ssize_t size;
++	char *buf;
++	int ret;
++	u8 msb, mid, lsb;
++	u32 freq_xosc;
++	unsigned long long frf;
 +
- obj-$(CONFIG_LORA_RN2483) += lora-rn2483.o
- lora-rn2483-y := rn2483.o
- lora-rn2483-y += rn2483_cmd.o
-diff --git a/drivers/net/lora/rak811.c b/drivers/net/lora/rak811.c
-new file mode 100644
-index 000000000000..ad3d0980c489
---- /dev/null
-+++ b/drivers/net/lora/rak811.c
-@@ -0,0 +1,219 @@
-+// SPDX-License-Identifier: GPL-2.0-or-later
-+/*
-+ * RAK RAK811
-+ *
-+ * Copyright (c) 2017-2018 Andreas F?rber
-+ */
++	ret = of_property_read_u32(spi->dev.of_node, "clock-frequency", &freq_xosc);
++	if (ret)
++		return 0;
 +
-+#include <linux/delay.h>
-+#include <linux/lora.h>
-+#include <linux/module.h>
-+#include <linux/netdevice.h>
-+#include <linux/of.h>
-+#include <linux/serdev.h>
-+#include <linux/lora/dev.h>
++	mutex_lock(&priv->spi_lock);
 +
-+struct rak811_device {
-+	struct serdev_device *serdev;
++	ret = sx1276_read_single(spi, REG_FRF_MSB, &msb);
++	if (!ret)
++		ret = sx1276_read_single(spi, REG_FRF_MID, &mid);
++	if (!ret)
++		ret = sx1276_read_single(spi, REG_FRF_LSB, &lsb);
 +
-+	char rx_buf[4096];
-+	int rx_len;
++	mutex_unlock(&priv->spi_lock);
 +
-+	struct completion line_recv_comp;
++	if (ret)
++		return 0;
++
++	frf = freq_xosc;
++	frf *= ((ulong)msb << 16) | ((ulong)mid << 8) | lsb;
++	frf /= (1 << 19);
++
++	buf = kasprintf(GFP_KERNEL, "%llu\n", frf);
++	if (!buf)
++		return 0;
++
++	size = simple_read_from_buffer(user_buf, count, ppos, buf, strlen(buf));
++	kfree(buf);
++
++	return size;
++}
++
++static const struct file_operations sx1276_freq_fops = {
++	.owner = THIS_MODULE,
++	.open = simple_open,
++	.read = sx1276_freq_read,
 +};
 +
-+static int rak811_send_command(struct rak811_device *rakdev, const char *cmd, char **data, unsigned long timeout)
++static ssize_t sx1276_state_read(struct file *file, char __user *user_buf,
++				 size_t count, loff_t *ppos)
 +{
-+	struct serdev_device *sdev = rakdev->serdev;
-+	const char *crlf = "\r\n";
-+	char *resp;
-+
-+	serdev_device_write_buf(sdev, cmd, strlen(cmd));
-+	serdev_device_write_buf(sdev, crlf, 2);
-+
-+	timeout = wait_for_completion_timeout(&rakdev->line_recv_comp, timeout);
-+	if (!timeout)
-+		return -ETIMEDOUT;
-+
-+	resp = rakdev->rx_buf;
-+	dev_dbg(&sdev->dev, "Received: '%s'\n", resp);
-+	if (data)
-+		*data = kstrdup(resp, GFP_KERNEL);
-+
-+	rakdev->rx_len = 0;
-+	reinit_completion(&rakdev->line_recv_comp);
-+
-+	return 0;
-+}
-+
-+static int rak811_simple_cmd(struct rak811_device *rakdev, const char *cmd, unsigned long timeout)
-+{
-+	char *resp;
-+	int ret;
-+
-+	ret = rak811_send_command(rakdev, cmd, &resp, timeout);
-+	if (ret)
-+		return ret;
-+
-+	if (strncmp(resp, "OK", 2) == 0) {
-+		kfree(resp);
-+		return 0;
-+	}
-+
-+	kfree(resp);
-+
-+	return -EINVAL;
-+}
-+
-+static int rak811_get_version(struct rak811_device *rakdev, char **version, unsigned long timeout)
-+{
-+	char *resp;
-+	int ret;
-+
-+	ret = rak811_send_command(rakdev, "at+version", &resp, timeout);
-+	if (ret)
-+		return ret;
-+
-+	if (strncmp(resp, "OK", 2) == 0) {
-+		*version = kstrdup(resp + 2, GFP_KERNEL);
-+		kfree(resp);
-+		return 0;
-+	}
-+
-+	kfree(resp);
-+
-+	return -EINVAL;
-+}
-+
-+static int rak811_receive_buf(struct serdev_device *sdev, const u8 *data, size_t count)
-+{
-+	struct rak811_device *rakdev = serdev_device_get_drvdata(sdev);
-+	size_t i = 0;
++	struct net_device *netdev = file->private_data;
++	struct sx1276_priv *priv = netdev_priv(netdev);
++	struct spi_device *spi = priv->spi;
++	ssize_t size;
++	char *buf;
 +	int len = 0;
-+
-+	dev_dbg(&sdev->dev, "Receive (%d)\n", (int)count);
-+
-+	for (i = 0; i < count; i++) {
-+		dev_dbg(&sdev->dev, "Receive: 0x%02x\n", (int)data[i]);
-+	}
-+
-+	if (completion_done(&rakdev->line_recv_comp)) {
-+		dev_info(&sdev->dev, "RX waiting on completion\n");
-+		return 0;
-+	}
-+	if (rakdev->rx_len == sizeof(rakdev->rx_buf) - 1) {
-+		dev_warn(&sdev->dev, "RX buffer full\n");
-+		return 0;
-+	}
-+
-+	i = min(count, sizeof(rakdev->rx_buf) - 1 - rakdev->rx_len);
-+	if (i > 0) {
-+		memcpy(&rakdev->rx_buf[rakdev->rx_len], data, i);
-+		rakdev->rx_len += i;
-+		len += i;
-+	}
-+	if (rakdev->rx_len >= 2 && strncmp(&rakdev->rx_buf[rakdev->rx_len - 2], "\r\n", 2) == 0) {
-+		rakdev->rx_len -= 2;
-+		rakdev->rx_buf[rakdev->rx_len] = '\0';
-+		complete(&rakdev->line_recv_comp);
-+	}
-+
-+	return len;
-+}
-+
-+static const struct serdev_device_ops rak811_serdev_client_ops = {
-+	.receive_buf = rak811_receive_buf,
-+};
-+
-+static int rak811_probe(struct serdev_device *sdev)
-+{
-+	struct rak811_device *rakdev;
-+	char *sz;
 +	int ret;
++	u8 val;
++	bool lora_mode = true;
++	const int max_len = 4096;
 +
-+	dev_info(&sdev->dev, "Probing\n");
++	buf = kzalloc(max_len, GFP_KERNEL);
++	if (!buf)
++		return 0;
 +
-+	rakdev = devm_kzalloc(&sdev->dev, sizeof(struct rak811_device), GFP_KERNEL);
-+	if (!rakdev)
-+		return -ENOMEM;
++	mutex_lock(&priv->spi_lock);
 +
-+	rakdev->serdev = sdev;
-+	init_completion(&rakdev->line_recv_comp);
-+	serdev_device_set_drvdata(sdev, rakdev);
-+
-+	ret = serdev_device_open(sdev);
-+	if (ret) {
-+		dev_err(&sdev->dev, "Failed to open (%d)\n", ret);
-+		return ret;
++	ret = sx1276_read_single(spi, REG_OPMODE, &val);
++	if (!ret) {
++		len += snprintf(buf + len, max_len - len, "RegOpMode = 0x%02x\n", val);
++		lora_mode = (val & REG_OPMODE_LONG_RANGE_MODE) != 0;
 +	}
 +
-+	serdev_device_set_baudrate(sdev, 115200);
-+	serdev_device_set_flow_control(sdev, false);
-+	serdev_device_set_client_ops(sdev, &rak811_serdev_client_ops);
++	ret = sx1276_read_single(spi, REG_FRF_MSB, &val);
++	if (!ret)
++		len += snprintf(buf + len, max_len - len, "RegFrMsb = 0x%02x\n", val);
++	ret = sx1276_read_single(spi, REG_FRF_MID, &val);
++	if (!ret)
++		len += snprintf(buf + len, max_len - len, "RegFrMid = 0x%02x\n", val);
++	ret = sx1276_read_single(spi, REG_FRF_LSB, &val);
++	if (!ret)
++		len += snprintf(buf + len, max_len - len, "RegFrLsb = 0x%02x\n", val);
 +
-+	ret = rak811_get_version(rakdev, &sz, HZ);
-+	if (ret) {
-+		dev_err(&sdev->dev, "Failed to get version (%d)\n", ret);
-+		serdev_device_close(sdev);
-+		return ret;
++	ret = sx1276_read_single(spi, REG_PA_CONFIG, &val);
++	if (!ret)
++		len += snprintf(buf + len, max_len - len, "RegPaConfig = 0x%02x\n", val);
++
++	if (lora_mode) {
++		ret = sx1276_read_single(spi, LORA_REG_IRQ_FLAGS_MASK, &val);
++		if (!ret)
++			len += snprintf(buf + len, max_len - len, "RegIrqFlagsMask = 0x%02x\n", val);
++
++		ret = sx1276_read_single(spi, LORA_REG_IRQ_FLAGS, &val);
++		if (!ret)
++			len += snprintf(buf + len, max_len - len, "RegIrqFlags = 0x%02x\n", val);
++
++		ret = sx1276_read_single(spi, LORA_REG_SYNC_WORD, &val);
++		if (!ret)
++			len += snprintf(buf + len, max_len - len, "RegSyncWord = 0x%02x\n", val);
 +	}
 +
-+	dev_info(&sdev->dev, "firmware version: %s\n", sz);
-+	kfree(sz);
++	ret = sx1276_read_single(spi, REG_PA_DAC, &val);
++	if (!ret)
++		len += snprintf(buf + len, max_len - len, "RegPaDac = 0x%02x\n", val);
 +
-+	ret = rak811_simple_cmd(rakdev, "at+mode=1", 2 * HZ);
-+	if (ret) {
-+		dev_err(&sdev->dev, "Failed to set mode to P2P (%d)\n", ret);
-+		serdev_device_close(sdev);
-+		return ret;
-+	}
++	mutex_unlock(&priv->spi_lock);
 +
-+	dev_info(&sdev->dev, "Done.\n");
++	size = simple_read_from_buffer(user_buf, count, ppos, buf, len);
++	kfree(buf);
 +
-+	return 0;
++	return size;
 +}
 +
-+static void rak811_remove(struct serdev_device *sdev)
-+{
-+	serdev_device_close(sdev);
-+
-+	dev_info(&sdev->dev, "Removed\n");
-+}
-+
-+static const struct of_device_id rak811_of_match[] = {
-+	{ .compatible = "rakwireless,rak811" },
-+	{}
-+};
-+MODULE_DEVICE_TABLE(of, rak811_of_match);
-+
-+static struct serdev_device_driver rak811_serdev_driver = {
-+	.probe = rak811_probe,
-+	.remove = rak811_remove,
-+	.driver = {
-+		.name = "rak811",
-+		.of_match_table = rak811_of_match,
-+	},
++static const struct file_operations sx1276_state_fops = {
++	.owner = THIS_MODULE,
++	.open = simple_open,
++	.read = sx1276_state_read,
 +};
 +
-+static int __init rak811_init(void)
-+{
-+	int ret;
+ static int sx1276_probe(struct spi_device *spi)
+ {
+ 	struct net_device *netdev;
+@@ -566,6 +691,10 @@ static int sx1276_probe(struct spi_device *spi)
+ 		return ret;
+ 	}
+ 
++	priv->debugfs = debugfs_create_dir(dev_name(&spi->dev), NULL);
++	debugfs_create_file("state", S_IRUGO, priv->debugfs, netdev, &sx1276_state_fops);
++	debugfs_create_file("frequency", S_IRUGO, priv->debugfs, netdev, &sx1276_freq_fops);
 +
-+	ret = serdev_device_driver_register(&rak811_serdev_driver);
-+	if (ret)
-+		return ret;
+ 	dev_info(&spi->dev, "SX1276 module probed (SX%d)", model);
+ 
+ 	return 0;
+@@ -574,6 +703,9 @@ static int sx1276_probe(struct spi_device *spi)
+ static int sx1276_remove(struct spi_device *spi)
+ {
+ 	struct net_device *netdev = spi_get_drvdata(spi);
++	struct sx1276_priv *priv = netdev_priv(netdev);
 +
-+	return 0;
-+}
-+
-+static void __exit rak811_exit(void)
-+{
-+	serdev_device_driver_unregister(&rak811_serdev_driver);
-+}
-+
-+module_init(rak811_init);
-+module_exit(rak811_exit);
-+
-+MODULE_DESCRIPTION("RAK811 serdev driver");
-+MODULE_AUTHOR("Andreas F?rber <afaerber@suse.de>");
-+MODULE_LICENSE("GPL");
++	debugfs_remove_recursive(priv->debugfs);
+ 
+ 	unregister_loradev(netdev);
+ 	free_loradev(netdev);
 -- 
 2.16.4
