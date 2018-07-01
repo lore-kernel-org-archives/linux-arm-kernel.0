@@ -1,666 +1,469 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Sun,  1 Jul 2018 13:07:56 +0200
-Subject: [RFC net-next 07/15] net: lora: Add Semtech SX1276
+Date: Sun,  1 Jul 2018 13:08:01 +0200
+Subject: [RFC net-next 12/15] net: lora: Add USI WM-SG-SM-42
 In-Reply-To: <20180701110804.32415-1-afaerber@suse.de>
 References: <20180701110804.32415-1-afaerber@suse.de>
-Message-ID: <20180701110804.32415-8-afaerber@suse.de>
+Message-ID: <20180701110804.32415-13-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Semtech SX1276/77/78/79 and SX1272/73 are LoRa transceivers with a SPI
-interface. They also offer a non-LoRa mode (not exposed here).
+The USI WM-SG-SM-42 offers a UART based AT command interface.
 
+Cc: Dollar Chen (???) <dollar.chen@wtmec.com>
 Signed-off-by: Andreas F?rber <afaerber@suse.de>
 ---
- drivers/net/lora/Kconfig  |  11 +
+ drivers/net/lora/Kconfig  |   7 +
  drivers/net/lora/Makefile |   3 +
- drivers/net/lora/sx1276.c | 608 ++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 622 insertions(+)
- create mode 100644 drivers/net/lora/sx1276.c
+ drivers/net/lora/usi.c    | 411 ++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 421 insertions(+)
+ create mode 100644 drivers/net/lora/usi.c
 
 diff --git a/drivers/net/lora/Kconfig b/drivers/net/lora/Kconfig
-index 40969b148a50..0436f6b09a1c 100644
+index 2e05caef8645..72a9d2a0f2be 100644
 --- a/drivers/net/lora/Kconfig
 +++ b/drivers/net/lora/Kconfig
-@@ -15,4 +15,15 @@ config LORA_DEV
- # Alphabetically sorted.
- #
+@@ -31,6 +31,13 @@ config LORA_SX1276
+ 	help
+ 	  Semtech SX1272/1276/1278
  
-+if LORA_DEV
-+
-+config LORA_SX1276
-+	tristate "Semtech SX127x SPI driver"
++config LORA_USI
++	tristate "USI WM-SG-SM-42 driver"
 +	default y
-+	depends on SPI
++	depends on SERIAL_DEV_BUS
 +	help
-+	  Semtech SX1272/1276/1278
++	  USI WM-SG-SM-42
 +
-+endif
-+
- endmenu
+ config LORA_WIMOD
+ 	tristate "IMST WiMOD driver"
+ 	default y
 diff --git a/drivers/net/lora/Makefile b/drivers/net/lora/Makefile
-index 8f9d25ea4e70..8845542dba50 100644
+index ecb326c859a5..dfa9a43dcfb3 100644
 --- a/drivers/net/lora/Makefile
 +++ b/drivers/net/lora/Makefile
-@@ -8,3 +8,6 @@ lora-dev-y := dev.o
- #
- # Alphabetically sorted.
- #
+@@ -16,5 +16,8 @@ lora-rn2483-y += rn2483_cmd.o
+ obj-$(CONFIG_LORA_SX1276) += lora-sx1276.o
+ lora-sx1276-y := sx1276.o
+ 
++obj-$(CONFIG_LORA_USI) += lora-usi.o
++lora-usi-y := usi.o
 +
-+obj-$(CONFIG_LORA_SX1276) += lora-sx1276.o
-+lora-sx1276-y := sx1276.o
-diff --git a/drivers/net/lora/sx1276.c b/drivers/net/lora/sx1276.c
+ obj-$(CONFIG_LORA_WIMOD) += lora-wimod.o
+ lora-wimod-y := wimod.o
+diff --git a/drivers/net/lora/usi.c b/drivers/net/lora/usi.c
 new file mode 100644
-index 000000000000..d6732111247a
+index 000000000000..f0c697e2cde2
 --- /dev/null
-+++ b/drivers/net/lora/sx1276.c
-@@ -0,0 +1,608 @@
-+// SPDX-License-Identifier: GPL-2.0+
++++ b/drivers/net/lora/usi.c
+@@ -0,0 +1,411 @@
++// SPDX-License-Identifier: GPL-2.0-or-later
 +/*
-+ * Semtech SX1272/SX1276 LoRa transceiver
++ * USI WM-SG-SM-42
 + *
-+ * Copyright (c) 2016-2018 Andreas F?rber
++ * Copyright (c) 2017-2018 Andreas F?rber
 + */
 +
-+#include <linux/delay.h>
 +#include <linux/lora.h>
 +#include <linux/module.h>
 +#include <linux/netdevice.h>
 +#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/of_gpio.h>
++#include <linux/serdev.h>
 +#include <linux/lora/dev.h>
-+#include <linux/spi/spi.h>
 +
-+#define REG_FIFO			0x00
-+#define REG_OPMODE			0x01
-+#define REG_FRF_MSB			0x06
-+#define REG_FRF_MID			0x07
-+#define REG_FRF_LSB			0x08
-+#define REG_PA_CONFIG			0x09
-+#define LORA_REG_FIFO_ADDR_PTR		0x0d
-+#define LORA_REG_FIFO_TX_BASE_ADDR	0x0e
-+#define LORA_REG_IRQ_FLAGS_MASK		0x11
-+#define LORA_REG_IRQ_FLAGS		0x12
-+#define LORA_REG_PAYLOAD_LENGTH		0x22
-+#define LORA_REG_SYNC_WORD		0x39
-+#define REG_DIO_MAPPING1		0x40
-+#define REG_DIO_MAPPING2		0x41
-+#define REG_VERSION			0x42
-+#define REG_PA_DAC			0x4d
++struct usi_device {
++	struct serdev_device *serdev;
 +
-+#define REG_OPMODE_LONG_RANGE_MODE		BIT(7)
-+#define REG_OPMODE_LOW_FREQUENCY_MODE_ON	BIT(3)
-+#define REG_OPMODE_MODE_MASK			GENMASK(2, 0)
-+#define REG_OPMODE_MODE_SLEEP			(0x0 << 0)
-+#define REG_OPMODE_MODE_STDBY			(0x1 << 0)
-+#define REG_OPMODE_MODE_TX			(0x3 << 0)
-+#define REG_OPMODE_MODE_RXCONTINUOUS		(0x5 << 0)
-+#define REG_OPMODE_MODE_RXSINGLE		(0x6 << 0)
++	int mode;
 +
-+#define REG_PA_CONFIG_PA_SELECT			BIT(7)
++	char rx_buf[4096];
++	int rx_len;
 +
-+#define LORA_REG_IRQ_FLAGS_TX_DONE		BIT(3)
-+
-+#define REG_DIO_MAPPING1_DIO0_MASK	GENMASK(7, 6)
-+
-+struct sx1276_priv {
-+	struct lora_priv lora;
-+	struct spi_device *spi;
-+
-+	size_t fifosize;
-+	int dio_gpio[6];
-+
-+	struct mutex spi_lock;
-+
-+	struct sk_buff *tx_skb;
-+	int tx_len;
-+
-+	struct workqueue_struct *wq;
-+	struct work_struct tx_work;
++	struct completion prompt_recv_comp;
++	struct completion tx_event_recv_comp;
 +};
 +
-+static int sx1276_read_single(struct spi_device *spi, u8 reg, u8 *val)
++static bool usi_cmd_ok(const char *resp)
 +{
-+	u8 addr = reg & 0x7f;
-+	return spi_write_then_read(spi, &addr, 1, val, 1);
++	int len = strlen(resp);
++
++	return (len == 4 && !strcmp(resp, "OK\r\n")) ||
++	       (len >= 6 && !strcmp(resp + len - 6, "\r\nOK\r\n"));
 +}
 +
-+static int sx1276_write_single(struct spi_device *spi, u8 reg, u8 val)
++static int usi_send_command(struct usi_device *usidev, const char *cmd, char **data, unsigned long timeout)
 +{
-+	u8 buf[2];
++	struct serdev_device *sdev = usidev->serdev;
++	const char cr = '\r';
++	int cmd_len, resp_len;
++	char *resp;
 +
-+	buf[0] = reg | BIT(7);
-+	buf[1] = val;
-+	return spi_write(spi, buf, 2);
-+}
++	cmd_len = strlen(cmd);
++	serdev_device_write_buf(sdev, cmd, cmd_len);
++	serdev_device_write_buf(sdev, &cr, 1);
 +
-+static int sx1276_write_burst(struct spi_device *spi, u8 reg, size_t len, void *val)
-+{
-+	u8 buf = reg | BIT(7);
-+	struct spi_transfer xfers[2] = {
-+		[0] = {
-+			.tx_buf = &buf,
-+			.len = 1,
-+		},
-+		[1] = {
-+			.tx_buf = val,
-+			.len = len,
-+		},
-+	};
++	timeout = wait_for_completion_timeout(&usidev->prompt_recv_comp, timeout);
++	if (!timeout)
++		return -ETIMEDOUT;
 +
-+	return spi_sync_transfer(spi, xfers, 2);
-+}
-+
-+static int sx1276_write_fifo(struct spi_device *spi, size_t len, void *val)
-+{
-+	return sx1276_write_burst(spi, REG_FIFO, len, val);
-+}
-+
-+static netdev_tx_t sx1276_loradev_start_xmit(struct sk_buff *skb, struct net_device *netdev)
-+{
-+	struct sx1276_priv *priv = netdev_priv(netdev);
-+
-+	netdev_dbg(netdev, "%s\n", __func__);
-+
-+	if (priv->tx_skb || priv->tx_len) {
-+		netdev_warn(netdev, "TX busy\n");
-+		return NETDEV_TX_BUSY;
++	resp = usidev->rx_buf;
++	resp_len = usidev->rx_len;
++	if (!strncmp(resp, cmd, cmd_len) && resp[cmd_len] == '\r') {
++		dev_dbg(&sdev->dev, "Skipping echo\n");
++		resp += cmd_len + 1;
++		resp_len -= cmd_len + 1;
 +	}
++	dev_dbg(&sdev->dev, "Received: '%s'\n", resp);
++	if (data)
++		*data = kstrdup(resp, GFP_KERNEL);
 +
-+	if (skb->protocol != htons(ETH_P_LORA)) {
-+		kfree_skb(skb);
-+		netdev->stats.tx_dropped++;
-+		return NETDEV_TX_OK;
-+	}
-+
-+	netif_stop_queue(netdev);
-+	priv->tx_skb = skb;
-+	queue_work(priv->wq, &priv->tx_work);
-+
-+	return NETDEV_TX_OK;
-+}
-+
-+static int sx1276_tx(struct spi_device *spi, void *data, int data_len)
-+{
-+	u8 addr, val;
-+	int ret;
-+
-+	dev_dbg(&spi->dev, "%s\n", __func__);
-+
-+	ret = sx1276_read_single(spi, REG_OPMODE, &val);
-+	if (ret) {
-+		dev_err(&spi->dev, "Failed to read RegOpMode (%d)\n", ret);
-+		return ret;
-+	}
-+	dev_dbg(&spi->dev, "RegOpMode = 0x%02x\n", val);
-+	if (!(val & REG_OPMODE_LONG_RANGE_MODE))
-+		dev_err(&spi->dev, "LongRange Mode not active!\n");
-+	if ((val & REG_OPMODE_MODE_MASK) == REG_OPMODE_MODE_SLEEP)
-+		dev_err(&spi->dev, "Cannot access FIFO in Sleep Mode!\n");
-+
-+	ret = sx1276_read_single(spi, LORA_REG_FIFO_TX_BASE_ADDR, &addr);
-+	if (ret) {
-+		dev_err(&spi->dev, "Failed to read RegFifoTxBaseAddr (%d)\n", ret);
-+		return ret;
-+	}
-+	dev_dbg(&spi->dev, "RegFifoTxBaseAddr = 0x%02x\n", addr);
-+
-+	ret = sx1276_write_single(spi, LORA_REG_FIFO_ADDR_PTR, addr);
-+	if (ret) {
-+		dev_err(&spi->dev, "Failed to write RegFifoAddrPtr (%d)\n", ret);
-+		return ret;
-+	}
-+
-+	ret = sx1276_write_single(spi, LORA_REG_PAYLOAD_LENGTH, data_len);
-+	if (ret) {
-+		dev_err(&spi->dev, "Failed to write RegPayloadLength (%d)\n", ret);
-+		return ret;
-+	}
-+
-+	ret = sx1276_write_fifo(spi, data_len, data);
-+	if (ret) {
-+		dev_err(&spi->dev, "Failed to write into FIFO (%d)\n", ret);
-+		return ret;
-+	}
-+
-+	ret = sx1276_read_single(spi, LORA_REG_IRQ_FLAGS, &val);
-+	if (ret) {
-+		dev_err(&spi->dev, "Failed to read RegIrqFlags (%d)\n", ret);
-+		return ret;
-+	}
-+	dev_dbg(&spi->dev, "RegIrqFlags = 0x%02x\n", val);
-+
-+	ret = sx1276_write_single(spi, LORA_REG_IRQ_FLAGS, LORA_REG_IRQ_FLAGS_TX_DONE);
-+	if (ret) {
-+		dev_err(&spi->dev, "Failed to write RegIrqFlags (%d)\n", ret);
-+		return ret;
-+	}
-+
-+	ret = sx1276_read_single(spi, LORA_REG_IRQ_FLAGS_MASK, &val);
-+	if (ret) {
-+		dev_err(&spi->dev, "Failed to read RegIrqFlagsMask (%d)\n", ret);
-+		return ret;
-+	}
-+	dev_dbg(&spi->dev, "RegIrqFlagsMask = 0x%02x\n", val);
-+
-+	val &= ~LORA_REG_IRQ_FLAGS_TX_DONE;
-+	ret = sx1276_write_single(spi, LORA_REG_IRQ_FLAGS_MASK, val);
-+	if (ret) {
-+		dev_err(&spi->dev, "Failed to write RegIrqFlagsMask (%d)\n", ret);
-+		return ret;
-+	}
-+
-+	ret = sx1276_read_single(spi, REG_DIO_MAPPING1, &val);
-+	if (ret) {
-+		dev_err(&spi->dev, "Failed to read RegDioMapping1 (%d)\n", ret);
-+		return ret;
-+	}
-+
-+	val &= ~REG_DIO_MAPPING1_DIO0_MASK;
-+	val |= 0x1 << 6;
-+	ret = sx1276_write_single(spi, REG_DIO_MAPPING1, val);
-+	if (ret) {
-+		dev_err(&spi->dev, "Failed to write RegDioMapping1 (%d)\n", ret);
-+		return ret;
-+	}
-+
-+	ret = sx1276_read_single(spi, REG_OPMODE, &val);
-+	if (ret) {
-+		dev_err(&spi->dev, "Failed to read RegOpMode (%d)\n", ret);
-+		return ret;
-+	}
-+
-+	val &= ~REG_OPMODE_MODE_MASK;
-+	val |= REG_OPMODE_MODE_TX;
-+	ret = sx1276_write_single(spi, REG_OPMODE, val);
-+	if (ret) {
-+		dev_err(&spi->dev, "Failed to write RegOpMode (%d)\n", ret);
-+		return ret;
-+	}
-+
-+	dev_dbg(&spi->dev, "%s: done\n", __func__);
++	usidev->rx_len = 0;
++	reinit_completion(&usidev->prompt_recv_comp);
 +
 +	return 0;
 +}
 +
-+static void sx1276_tx_work_handler(struct work_struct *ws)
++static int usi_simple_cmd(struct usi_device *usidev, const char *cmd, unsigned long timeout)
 +{
-+	struct sx1276_priv *priv = container_of(ws, struct sx1276_priv, tx_work);
-+	struct spi_device *spi = priv->spi;
-+	struct net_device *netdev = spi_get_drvdata(spi);
-+
-+	netdev_dbg(netdev, "%s\n", __func__);
-+
-+	mutex_lock(&priv->spi_lock);
-+
-+	if (priv->tx_skb) {
-+		sx1276_tx(spi, priv->tx_skb->data, priv->tx_skb->data_len);
-+		priv->tx_len = 1 + priv->tx_skb->data_len;
-+		if (!(netdev->flags & IFF_ECHO) ||
-+			priv->tx_skb->pkt_type != PACKET_LOOPBACK ||
-+			priv->tx_skb->protocol != htons(ETH_P_LORA))
-+			kfree_skb(priv->tx_skb);
-+		priv->tx_skb = NULL;
-+	}
-+
-+	mutex_unlock(&priv->spi_lock);
-+}
-+
-+static irqreturn_t sx1276_dio_interrupt(int irq, void *dev_id)
-+{
-+	struct net_device *netdev = dev_id;
-+	struct sx1276_priv *priv = netdev_priv(netdev);
-+	struct spi_device *spi = priv->spi;
-+	u8 val;
++	char *resp;
 +	int ret;
 +
-+	netdev_dbg(netdev, "%s\n", __func__);
-+
-+	mutex_lock(&priv->spi_lock);
-+
-+	ret = sx1276_read_single(spi, LORA_REG_IRQ_FLAGS, &val);
-+	if (ret) {
-+		netdev_warn(netdev, "Failed to read RegIrqFlags (%d)\n", ret);
-+		val = 0;
-+	}
-+
-+	if (val & LORA_REG_IRQ_FLAGS_TX_DONE) {
-+		netdev_info(netdev, "TX done.\n");
-+		netdev->stats.tx_packets++;
-+		netdev->stats.tx_bytes += priv->tx_len - 1;
-+		priv->tx_len = 0;
-+		netif_wake_queue(netdev);
-+
-+		ret = sx1276_write_single(spi, LORA_REG_IRQ_FLAGS, LORA_REG_IRQ_FLAGS_TX_DONE);
-+		if (ret)
-+			netdev_warn(netdev, "Failed to write RegIrqFlags (%d)\n", ret);
-+	}
-+
-+	mutex_unlock(&priv->spi_lock);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static int sx1276_loradev_open(struct net_device *netdev)
-+{
-+	struct sx1276_priv *priv = netdev_priv(netdev);
-+	struct spi_device *spi = to_spi_device(netdev->dev.parent);
-+	u8 val;
-+	int ret, irq;
-+
-+	netdev_dbg(netdev, "%s\n", __func__);
-+
-+	ret = open_loradev(netdev);
++	ret = usi_send_command(usidev, cmd, &resp, timeout);
 +	if (ret)
 +		return ret;
 +
-+	mutex_lock(&priv->spi_lock);
-+
-+	ret = sx1276_read_single(spi, REG_OPMODE, &val);
-+	if (ret) {
-+		netdev_err(netdev, "Failed to read RegOpMode (%d)\n", ret);
-+		goto err_opmode;
++	if (strcmp(resp, "OK\r\n") == 0) {
++		kfree(resp);
++		return 0;
 +	}
 +
-+	val &= ~REG_OPMODE_MODE_MASK;
-+	val |= REG_OPMODE_MODE_STDBY;
-+	ret = sx1276_write_single(spi, REG_OPMODE, val);
-+	if (ret) {
-+		netdev_err(netdev, "Failed to write RegOpMode (%d)\n", ret);
-+		goto err_opmode;
-+	}
++	kfree(resp);
 +
-+	priv->tx_skb = NULL;
-+	priv->tx_len = 0;
-+
-+	priv->wq = alloc_workqueue("sx1276_wq", WQ_FREEZABLE | WQ_MEM_RECLAIM, 0);
-+	INIT_WORK(&priv->tx_work, sx1276_tx_work_handler);
-+
-+	if (gpio_is_valid(priv->dio_gpio[0])) {
-+		irq = gpio_to_irq(priv->dio_gpio[0]);
-+		if (irq <= 0)
-+			netdev_warn(netdev, "Failed to obtain interrupt for DIO0 (%d)\n", irq);
-+		else {
-+			netdev_info(netdev, "Succeeded in obtaining interrupt for DIO0: %d\n", irq);
-+			ret = request_threaded_irq(irq, NULL, sx1276_dio_interrupt, IRQF_ONESHOT | IRQF_TRIGGER_RISING, netdev->name, netdev);
-+			if (ret) {
-+				netdev_err(netdev, "Failed to request interrupt for DIO0 (%d)\n", ret);
-+				goto err_irq;
-+			}
-+		}
-+	}
-+
-+	netif_wake_queue(netdev);
-+
-+	mutex_unlock(&priv->spi_lock);
-+
-+	return 0;
-+
-+err_irq:
-+	destroy_workqueue(priv->wq);
-+	priv->wq = NULL;
-+err_opmode:
-+	close_loradev(netdev);
-+	mutex_unlock(&priv->spi_lock);
-+	return ret;
++	return -EINVAL;
 +}
 +
-+static int sx1276_loradev_stop(struct net_device *netdev)
++static int usi_cmd_reset(struct usi_device *usidev)
 +{
-+	struct sx1276_priv *priv = netdev_priv(netdev);
-+	struct spi_device *spi = to_spi_device(netdev->dev.parent);
-+	u8 val;
-+	int ret, irq;
++	int ret;
 +
-+	netdev_dbg(netdev, "%s\n", __func__);
++	ret = usi_send_command(usidev, "ATZ", NULL, HZ);
++	if (ret)
++		return ret;
 +
-+	close_loradev(netdev);
-+
-+	mutex_lock(&priv->spi_lock);
-+
-+	ret = sx1276_write_single(spi, LORA_REG_IRQ_FLAGS_MASK, 0xff);
-+	if (ret) {
-+		netdev_err(netdev, "Failed to write RegIrqFlagsMask (%d)\n", ret);
-+		goto err_irqmask;
-+	}
-+
-+	ret = sx1276_read_single(spi, REG_OPMODE, &val);
-+	if (ret) {
-+		netdev_err(netdev, "Failed to read RegOpMode (%d)\n", ret);
-+		goto err_opmode;
-+	}
-+
-+	val &= ~REG_OPMODE_MODE_MASK;
-+	val |= REG_OPMODE_MODE_SLEEP;
-+	ret = sx1276_write_single(spi, REG_OPMODE, val);
-+	if (ret) {
-+		netdev_err(netdev, "Failed to write RegOpMode (%d)\n", ret);
-+		goto err_opmode;
-+	}
-+
-+	if (gpio_is_valid(priv->dio_gpio[0])) {
-+		irq = gpio_to_irq(priv->dio_gpio[0]);
-+		if (irq > 0) {
-+			netdev_dbg(netdev, "Freeing IRQ %d\n", irq);
-+			free_irq(irq, netdev);
-+		}
-+	}
-+
-+	destroy_workqueue(priv->wq);
-+	priv->wq = NULL;
-+
-+	if (priv->tx_skb || priv->tx_len)
-+		netdev->stats.tx_errors++;
-+	if (priv->tx_skb)
-+		dev_kfree_skb(priv->tx_skb);
-+	priv->tx_skb = NULL;
-+	priv->tx_len = 0;
-+
-+	mutex_unlock(&priv->spi_lock);
++	mdelay(1000);
 +
 +	return 0;
-+
-+err_opmode:
-+err_irqmask:
-+	mutex_unlock(&priv->spi_lock);
-+	return ret;
 +}
 +
-+static const struct net_device_ops sx1276_netdev_ops =  {
-+	.ndo_open = sx1276_loradev_open,
-+	.ndo_stop = sx1276_loradev_stop,
-+	.ndo_start_xmit = sx1276_loradev_start_xmit,
-+};
-+
-+static int sx1276_probe(struct spi_device *spi)
++static int usi_cmd_read_reg(struct usi_device *usidev, u8 addr, u8 *val)
 +{
-+	struct net_device *netdev;
-+	struct sx1276_priv *priv;
-+	int rst, dio[6], ret, model, i;
-+	u32 freq_xosc, freq_band;
-+	unsigned long long freq_rf;
-+	u8 val;
++	char *cmd;
++	char *resp;
++	char *sz;
++	int ret;
 +
-+	rst = of_get_named_gpio(spi->dev.of_node, "reset-gpio", 0);
-+	if (rst == -ENOENT)
-+		dev_warn(&spi->dev, "no reset GPIO available, ignoring");
++	cmd = kasprintf(GFP_KERNEL, "AT+RREG=0x%02x", (int)addr);
++	if (!cmd)
++		return -ENOMEM;
 +
-+	for (i = 0; i < 6; i++) {
-+		dio[i] = of_get_named_gpio(spi->dev.of_node, "dio-gpios", i);
-+		if (dio[i] == -ENOENT)
-+			dev_dbg(&spi->dev, "DIO%d not available, ignoring", i);
-+		else {
-+			ret = gpio_direction_input(dio[i]);
-+			if (ret)
-+				dev_err(&spi->dev, "couldn't set DIO%d to input", i);
-+		}
-+	}
-+
-+	if (gpio_is_valid(rst)) {
-+		gpio_set_value(rst, 1);
-+		udelay(100);
-+		gpio_set_value(rst, 0);
-+		msleep(5);
-+	}
-+
-+	spi->bits_per_word = 8;
-+	spi_setup(spi);
-+
-+	ret = sx1276_read_single(spi, REG_VERSION, &val);
++	ret = usi_send_command(usidev, cmd, &resp, HZ);
 +	if (ret) {
-+		dev_err(&spi->dev, "version read failed");
++		kfree(cmd);
++		return ret;
++	}
++	if (!usi_cmd_ok(resp)) {
++		kfree(resp);
++		kfree(cmd);
++		return -EINVAL;
++	}
++	resp[strlen(resp) - 6] = '\0';
++	sz = resp;
++	if (strstarts(sz, "+Reg="))
++		sz += 5;
++	if (strncasecmp(sz, cmd + 8, 4) == 0 && strstarts(sz + 4, ", "))
++		sz += 6;
++
++	kfree(cmd);
++
++	dev_dbg(&usidev->serdev->dev, "Parsing '%s'\n", sz);
++	ret = kstrtou8(sz, 0, val);
++	if (ret) {
++		kfree(resp);
 +		return ret;
 +	}
 +
-+	if (val == 0x22)
-+		model = 1272;
-+	else {
-+		if (gpio_is_valid(rst)) {
-+			gpio_set_value(rst, 0);
-+			udelay(100);
-+			gpio_set_value(rst, 1);
-+			msleep(5);
-+		}
++	kfree(resp);
 +
-+		ret = sx1276_read_single(spi, REG_VERSION, &val);
++	return 0;
++}
++
++static int usi_receive_buf(struct serdev_device *sdev, const u8 *data, size_t count)
++{
++	struct usi_device *usidev = serdev_device_get_drvdata(sdev);
++	size_t i = 0;
++	int len = 0;
++
++	dev_dbg(&sdev->dev, "Receive (%d)\n", (int)count);
++
++	for (i = 0; i < count; i++) {
++		dev_dbg(&sdev->dev, "Receive: 0x%02x\n", (int)data[i]);
++	}
++	i = 0;
++
++	if (completion_done(&usidev->prompt_recv_comp) ||
++	    completion_done(&usidev->tx_event_recv_comp)) {
++		dev_info(&sdev->dev, "RX waiting on completion\n");
++		return 0;
++	}
++	if (usidev->rx_len == sizeof(usidev->rx_buf) - 1) {
++		dev_warn(&sdev->dev, "RX buffer full\n");
++		return 0;
++	}
++
++	i = min(count, sizeof(usidev->rx_buf) - 1 - usidev->rx_len);
++	if (i > 0) {
++		memcpy(&usidev->rx_buf[usidev->rx_len], data, i);
++		usidev->rx_len += i;
++		len += i;
++	}
++	if (usidev->rx_len >= 3 && strncmp(&usidev->rx_buf[usidev->rx_len - 3], "\r# ", 3) == 0) {
++		usidev->rx_len -= 3;
++		usidev->rx_buf[usidev->rx_len] = '\0';
++		complete(&usidev->prompt_recv_comp);
++	} else if (usidev->rx_len > 7 && strstarts(usidev->rx_buf, "+RCV") &&
++			strncmp(&usidev->rx_buf[usidev->rx_len - 2], "\r\n", 2) == 0) {
++		usidev->rx_buf[usidev->rx_len - 2] = '\0';
++		dev_info(&sdev->dev, "RCV event: '%s'\n", usidev->rx_buf + 4);
++		usidev->rx_len = 0;
++	} else if (usidev->rx_len > 6 && strstarts(usidev->rx_buf, "+TX: ") &&
++			strncmp(&usidev->rx_buf[usidev->rx_len - 2], "\r\n", 2) == 0) {
++		usidev->rx_buf[usidev->rx_len - 2] = '\0';
++		dev_info(&sdev->dev, "TX event: '%s'\n", usidev->rx_buf + 5);
++		complete(&usidev->tx_event_recv_comp);
++	}
++
++	return len;
++}
++
++static const struct serdev_device_ops usi_serdev_client_ops = {
++	.receive_buf = usi_receive_buf,
++};
++
++static int usi_probe(struct serdev_device *sdev)
++{
++	struct usi_device *usidev;
++	//unsigned long timeout;
++	char *resp;
++	u8 val;
++	int ret;
++
++	dev_info(&sdev->dev, "Probing");
++
++	usidev = devm_kzalloc(&sdev->dev, sizeof(struct usi_device), GFP_KERNEL);
++	if (!usidev)
++		return -ENOMEM;
++
++	usidev->serdev = sdev;
++	usidev->mode = -1;
++	init_completion(&usidev->prompt_recv_comp);
++	init_completion(&usidev->tx_event_recv_comp);
++	serdev_device_set_drvdata(sdev, usidev);
++
++	ret = serdev_device_open(sdev);
++	if (ret) {
++		dev_err(&sdev->dev, "Failed to open (%d)", ret);
++		return ret;
++	}
++
++	serdev_device_set_baudrate(sdev, 115200);
++	serdev_device_set_flow_control(sdev, false);
++	serdev_device_set_client_ops(sdev, &usi_serdev_client_ops);
++
++	ret = usi_cmd_reset(usidev);
++	if (ret)
++		dev_warn(&sdev->dev, "Reset failed\n");
++
++	ret = usi_send_command(usidev, "ATE=0", NULL, HZ);
++	if (ret)
++		dev_warn(&sdev->dev, "ATE failed\n");
++
++	/* Dropped in firmware 2.8 */
++	ret = usi_send_command(usidev, "ATI", &resp, HZ);
++	if (!ret) {
++		if (usi_cmd_ok(resp)) {
++			resp[strlen(resp) - 6] = '\0';
++			dev_info(&sdev->dev, "Firmware '%s'\n", resp);
++		}
++		kfree(resp);
++	}
++
++	ret = usi_send_command(usidev, "AT+DEFMODE", &resp, HZ);
++	if (ret) {
++		dev_err(&sdev->dev, "Checking DEFMODE failed (%d)\n", ret);
++		serdev_device_close(sdev);
++		return ret;
++	}
++	if (usi_cmd_ok(resp)) {
++		resp[strlen(resp) - 6] = '\0';
++		dev_info(&sdev->dev, "Default mode '%s'\n", resp);
++		if (!strcmp(resp, "MFG_WAN_MODE"))
++			usidev->mode = 6;
++		else if (!strcmp(resp, "MFG_TEST_IDLE"))
++			usidev->mode = 0;
++		else if (!strcmp(resp, "MFG_TX_TONE"))
++			usidev->mode = 1;
++		else if (!strcmp(resp, "MFG_TX_PACKET"))
++			usidev->mode = 2;
++		else if (!strcmp(resp, "MFG_ERROR_LESS_ARGUMENETS"))
++			usidev->mode = 3;
++		else if (!strcmp(resp, "MFG_TX_TEXT"))
++			usidev->mode = 4;
++		else if (!strcmp(resp, "MFG_TEST_STOP"))
++			usidev->mode = 5;
++	}
++	kfree(resp);
++
++	if (usidev->mode != 3) {
++		ret = usi_simple_cmd(usidev, "AT+DEFMODE=3", HZ);
 +		if (ret) {
-+			dev_err(&spi->dev, "version read failed");
++			dev_err(&sdev->dev, "Setting DEFMODE failed (%d)\n", ret);
++			serdev_device_close(sdev);
 +			return ret;
 +		}
 +
-+		if (val == 0x12)
-+			model = 1276;
-+		else {
-+			dev_err(&spi->dev, "transceiver not recognized (RegVersion = 0x%02x)", (unsigned)val);
-+			return -EINVAL;
++#if 1
++		ret = usi_simple_cmd(usidev, "AT+WDCT", 5 * HZ);
++		if (ret) {
++			dev_err(&sdev->dev, "Writing DCT failed (%d)\n", ret);
++			serdev_device_close(sdev);
++			return ret;
 +		}
-+	}
 +
-+	ret = of_property_read_u32(spi->dev.of_node, "clock-frequency", &freq_xosc);
-+	if (ret) {
-+		dev_err(&spi->dev, "failed reading clock-frequency");
-+		return ret;
-+	}
++		ret = usi_cmd_reset(usidev);
++		if (ret) {
++			dev_err(&sdev->dev, "Reset failed\n");
++			serdev_device_close(sdev);
++			return ret;
++		}
 +
-+	ret = of_property_read_u32(spi->dev.of_node, "radio-frequency", &freq_band);
-+	if (ret) {
-+		dev_err(&spi->dev, "failed reading radio-frequency");
-+		return ret;
-+	}
-+
-+	val = REG_OPMODE_LONG_RANGE_MODE | REG_OPMODE_MODE_SLEEP;
-+	if (freq_band < 525000000)
-+		val |= REG_OPMODE_LOW_FREQUENCY_MODE_ON;
-+	ret = sx1276_write_single(spi, REG_OPMODE, val);
-+	if (ret) {
-+		dev_err(&spi->dev, "failed writing opmode");
-+		return ret;
-+	}
-+
-+	freq_rf = freq_band;
-+	freq_rf *= (1 << 19);
-+	freq_rf /= freq_xosc;
-+	dev_dbg(&spi->dev, "Frf = %llu", freq_rf);
-+
-+	ret = sx1276_write_single(spi, REG_FRF_MSB, freq_rf >> 16);
-+	if (!ret)
-+		ret = sx1276_write_single(spi, REG_FRF_MID, freq_rf >> 8);
-+	if (!ret)
-+		ret = sx1276_write_single(spi, REG_FRF_LSB, freq_rf);
-+	if (ret) {
-+		dev_err(&spi->dev, "failed writing frequency (%d)", ret);
-+		return ret;
-+	}
-+
-+	ret = sx1276_read_single(spi, REG_PA_CONFIG, &val);
-+	if (ret) {
-+		dev_err(&spi->dev, "failed reading RegPaConfig\n");
-+		return ret;
-+	}
-+	if (true)
-+		val |= REG_PA_CONFIG_PA_SELECT;
-+	val &= ~GENMASK(3, 0);
-+	val |= (23 - 3) - 5;
-+	ret = sx1276_write_single(spi, REG_PA_CONFIG, val);
-+	if (ret) {
-+		dev_err(&spi->dev, "failed writing RegPaConfig\n");
-+		return ret;
-+	}
-+
-+	ret = sx1276_read_single(spi, REG_PA_DAC, &val);
-+	if (ret) {
-+		dev_err(&spi->dev, "failed reading RegPaDac\n");
-+		return ret;
-+	}
-+	val &= ~GENMASK(2, 0);
-+	val |= 0x7;
-+	ret = sx1276_write_single(spi, REG_PA_DAC, val);
-+	if (ret) {
-+		dev_err(&spi->dev, "failed writing RegPaDac\n");
-+		return ret;
-+	}
-+
-+	netdev = alloc_loradev(sizeof(struct sx1276_priv));
-+	if (!netdev)
-+		return -ENOMEM;
-+
-+	netdev->netdev_ops = &sx1276_netdev_ops;
-+	netdev->flags |= IFF_ECHO;
-+
-+	priv = netdev_priv(netdev);
-+	priv->spi = spi;
-+	mutex_init(&priv->spi_lock);
-+	for (i = 0; i < 6; i++)
-+		priv->dio_gpio[i] = dio[i];
-+
-+	spi_set_drvdata(spi, netdev);
-+	SET_NETDEV_DEV(netdev, &spi->dev);
-+
-+	ret = register_loradev(netdev);
-+	if (ret) {
-+		free_loradev(netdev);
-+		return ret;
-+	}
-+
-+	dev_info(&spi->dev, "SX1276 module probed (SX%d)", model);
-+
-+	return 0;
-+}
-+
-+static int sx1276_remove(struct spi_device *spi)
-+{
-+	struct net_device *netdev = spi_get_drvdata(spi);
-+
-+	unregister_loradev(netdev);
-+	free_loradev(netdev);
-+
-+	dev_info(&spi->dev, "SX1276 module removed");
-+
-+	return 0;
-+}
-+
-+#ifdef CONFIG_OF
-+static const struct of_device_id sx1276_dt_ids[] = {
-+	{ .compatible = "semtech,sx1272" },
-+	{ .compatible = "semtech,sx1276" },
-+	{}
-+};
-+MODULE_DEVICE_TABLE(of, sx1276_dt_ids);
++		ret = usi_send_command(usidev, "ATE=0", NULL, HZ);
++		if (ret)
++			dev_warn(&sdev->dev, "ATE failed\n");
 +#endif
 +
-+static struct spi_driver sx1276_spi_driver = {
++		usidev->mode = -1;
++		ret = usi_send_command(usidev, "AT+DEFMODE", &resp, HZ);
++		if (ret) {
++			dev_err(&sdev->dev, "Checking DEFMODE failed (%d)\n", ret);
++			serdev_device_close(sdev);
++			return ret;
++		}
++		if (usi_cmd_ok(resp)) {
++			resp[strlen(resp) - 6] = '\0';
++			dev_info(&sdev->dev, "Default mode '%s'\n", resp);
++			if (!strcmp(resp, "MFG_WAN_MODE")) {
++				usidev->mode = 6;
++			}
++		}
++		kfree(resp);
++	}
++
++	ret = usi_send_command(usidev, "AT+VER", &resp, HZ);
++	if (!ret) {
++		if (usi_cmd_ok(resp)) {
++			resp[strlen(resp) - 6] = '\0';
++			dev_info(&sdev->dev, "LoRaWAN version '%s'\n",
++				(strstarts(resp, "+VER=")) ? (resp + 5) : resp);
++		}
++		kfree(resp);
++	}
++
++	ret = usi_simple_cmd(usidev, "AT+RF=20,868000000,7,0,1,0,8,0,0,0", HZ);
++	if (ret) {
++		dev_err(&sdev->dev, "AT+RF failed (%d)\n", ret);
++		serdev_device_close(sdev);
++		return ret;
++	}
++
++	/*ret = usi_simple_cmd(usidev, "AT+TXT=1,deadbeef", 2 * HZ);
++	if (ret) {
++		dev_err(&sdev->dev, "TX failed (%d)\n", ret);
++		serdev_device_close(sdev);
++		return ret;
++	}
++
++	timeout = wait_for_completion_timeout(&usidev->tx_event_recv_comp, 5 * HZ);
++	if (!timeout) {
++		serdev_device_close(sdev);
++		return -ETIMEDOUT;
++	}
++	usidev->rx_len = 0;
++	reinit_completion(&usidev->tx_event_recv_comp);*/
++
++	ret = usi_cmd_read_reg(usidev, 0x42, &val);
++	if (!ret) {
++		dev_info(&sdev->dev, "SX1272 VERSION 0x%02x\n", (int)val);
++	}
++
++	ret = usi_cmd_read_reg(usidev, 0x39, &val);
++	if (!ret) {
++		dev_info(&sdev->dev, "SX1272 SyncWord 0x%02x\n", (int)val);
++	}
++
++	ret = usi_cmd_read_reg(usidev, 0x01, &val);
++	if (!ret) {
++		dev_info(&sdev->dev, "SX1272 OpMode 0x%02x\n", (int)val);
++	}
++
++	dev_info(&sdev->dev, "Done.");
++
++	return 0;
++}
++
++static void usi_remove(struct serdev_device *sdev)
++{
++	struct usi_device *usidev = serdev_device_get_drvdata(sdev);
++
++	usi_send_command(usidev, "ATE=1\r", NULL, HZ);
++
++	serdev_device_close(sdev);
++
++	dev_info(&sdev->dev, "Removed\n");
++}
++
++static const struct of_device_id usi_of_match[] = {
++	{ .compatible = "usi,wm-sg-sm-42" },
++	{}
++};
++MODULE_DEVICE_TABLE(of, usi_of_match);
++
++static struct serdev_device_driver usi_serdev_driver = {
++	.probe = usi_probe,
++	.remove = usi_remove,
 +	.driver = {
-+		.name = "sx1276",
-+		.of_match_table = of_match_ptr(sx1276_dt_ids),
++		.name = "usi",
++		.of_match_table = usi_of_match,
 +	},
-+	.probe = sx1276_probe,
-+	.remove = sx1276_remove,
 +};
 +
-+module_spi_driver(sx1276_spi_driver);
++static int __init usi_init(void)
++{
++	int ret;
 +
-+MODULE_DESCRIPTION("SX1276 SPI driver");
++	ret = serdev_device_driver_register(&usi_serdev_driver);
++	if (ret)
++		return ret;
++
++	return 0;
++}
++
++static void __exit usi_exit(void)
++{
++	serdev_device_driver_unregister(&usi_serdev_driver);
++}
++
++module_init(usi_init);
++module_exit(usi_exit);
++
++MODULE_DESCRIPTION("USI WM-SG-SM-42 serdev driver");
 +MODULE_AUTHOR("Andreas F?rber <afaerber@suse.de>");
 +MODULE_LICENSE("GPL");
 -- 
