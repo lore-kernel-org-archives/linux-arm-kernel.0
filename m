@@ -1,44 +1,49 @@
 From: gregkh@linuxfoundation.org (gregkh at linuxfoundation.org)
-Date: Sun, 01 Jul 2018 11:01:23 +0200
-Subject: Patch "thermal: bcm2835: Stop using printk format %pCr" has been
- added to the 4.17-stable tree
-Message-ID: <1530435683108101@kroah.com>
+Date: Sun, 01 Jul 2018 11:01:41 +0200
+Subject: Patch "lib/vsprintf: Remove atomic-unsafe support for %pCr" has been
+ added to the 4.4-stable tree
+Message-ID: <153043570120651@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 This is a note to let you know that I've just added the patch titled
 
-    thermal: bcm2835: Stop using printk format %pCr
+    lib/vsprintf: Remove atomic-unsafe support for %pCr
 
-to the 4.17-stable tree which can be found at:
+to the 4.4-stable tree which can be found at:
     http://www.kernel.org/git/?p=linux/kernel/git/stable/stable-queue.git;a=summary
 
 The filename of the patch is:
-     thermal-bcm2835-stop-using-printk-format-pcr.patch
-and it can be found in the queue-4.17 subdirectory.
+     lib-vsprintf-remove-atomic-unsafe-support-for-pcr.patch
+and it can be found in the queue-4.4 subdirectory.
 
 If you, or anyone else, feels it should not be added to the stable tree,
 please let <stable@vger.kernel.org> know about it.
 
 
->From bd2a07f71a1e2e198f8a30cb551d9defe422d83d Mon Sep 17 00:00:00 2001
+>From 666902e42fd8344b923c02dc5b0f37948ff4f225 Mon Sep 17 00:00:00 2001
 From: Geert Uytterhoeven <geert+renesas@glider.be>
-Date: Fri, 1 Jun 2018 11:28:20 +0200
-Subject: thermal: bcm2835: Stop using printk format %pCr
+Date: Fri, 1 Jun 2018 11:28:22 +0200
+Subject: lib/vsprintf: Remove atomic-unsafe support for %pCr
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-commit bd2a07f71a1e2e198f8a30cb551d9defe422d83d upstream.
+commit 666902e42fd8344b923c02dc5b0f37948ff4f225 upstream.
 
-Printk format "%pCr" will be removed soon, as clk_get_rate() must not be
-called in atomic context.
-
-Replace it by printing the variable that already holds the clock rate.
-Note that calling clk_get_rate() is safe here, as the code runs in task
+"%pCr" formats the current rate of a clock, and calls clk_get_rate().
+The latter obtains a mutex, hence it must not be called from atomic
 context.
 
-Link: http://lkml.kernel.org/r/1527845302-12159-3-git-send-email-geert+renesas at glider.be
+Remove support for this rarely-used format, as vsprintf() (and e.g.
+printk()) must be callable from any context.
+
+Any remaining out-of-tree users will start seeing the clock's name
+printed instead of its rate.
+
+Reported-by: Jia-Ju Bai <baijiaju1990@gmail.com>
+Fixes: 900cca2944254edd ("lib/vsprintf: add %pC{,n,r} format specifiers for clocks")
+Link: http://lkml.kernel.org/r/1527845302-12159-5-git-send-email-geert+renesas at glider.be
 To: Jia-Ju Bai <baijiaju1990@gmail.com>
 To: Jonathan Corbet <corbet@lwn.net>
 To: Michael Turquette <mturquette@baylibre.com>
@@ -59,34 +64,47 @@ Cc: linux-serial at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-renesas-soc at vger.kernel.org
 Cc: linux-kernel at vger.kernel.org
-Cc: stable at vger.kernel.org # 4.12+
+Cc: Geert Uytterhoeven <geert+renesas@glider.be>
+Cc: stable at vger.kernel.org # 4.1+
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
 Signed-off-by: Petr Mladek <pmladek@suse.com>
 Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 
 ---
- drivers/thermal/broadcom/bcm2835_thermal.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ Documentation/printk-formats.txt |    3 +--
+ lib/vsprintf.c                   |    3 ---
+ 2 files changed, 1 insertion(+), 5 deletions(-)
 
---- a/drivers/thermal/broadcom/bcm2835_thermal.c
-+++ b/drivers/thermal/broadcom/bcm2835_thermal.c
-@@ -213,8 +213,8 @@ static int bcm2835_thermal_probe(struct
- 	rate = clk_get_rate(data->clk);
- 	if ((rate < 1920000) || (rate > 5000000))
- 		dev_warn(&pdev->dev,
--			 "Clock %pCn running at %pCr Hz is outside of the recommended range: 1.92 to 5MHz\n",
--			 data->clk, data->clk);
-+			 "Clock %pCn running at %lu Hz is outside of the recommended range: 1.92 to 5MHz\n",
-+			 data->clk, rate);
+--- a/Documentation/printk-formats.txt
++++ b/Documentation/printk-formats.txt
+@@ -273,11 +273,10 @@ struct clk:
  
- 	/* register of thermal sensor and get info from DT */
- 	tz = thermal_zone_of_sensor_register(&pdev->dev, 0, data,
+ 	%pC	pll1
+ 	%pCn	pll1
+-	%pCr	1560000000
+ 
+ 	For printing struct clk structures. '%pC' and '%pCn' print the name
+ 	(Common Clock Framework) or address (legacy clock framework) of the
+-	structure; '%pCr' prints the current clock rate.
++	structure.
+ 
+ 	Passed by reference.
+ 
+--- a/lib/vsprintf.c
++++ b/lib/vsprintf.c
+@@ -1345,9 +1345,6 @@ char *clock(char *buf, char *end, struct
+ 		return string(buf, end, NULL, spec);
+ 
+ 	switch (fmt[1]) {
+-	case 'r':
+-		return number(buf, end, clk_get_rate(clk), spec);
+-
+ 	case 'n':
+ 	default:
+ #ifdef CONFIG_COMMON_CLK
 
 
 Patches currently in stable-queue which might be from geert+renesas at glider.be are
 
-queue-4.17/lib-vsprintf-remove-atomic-unsafe-support-for-pcr.patch
-queue-4.17/thermal-bcm2835-stop-using-printk-format-pcr.patch
-queue-4.17/serial-sh-sci-use-spin_-try-lock_irqsave-instead-of-open-coding-version.patch
-queue-4.17/clk-renesas-cpg-mssr-stop-using-printk-format-pcr.patch
+queue-4.4/lib-vsprintf-remove-atomic-unsafe-support-for-pcr.patch
+queue-4.4/serial-sh-sci-use-spin_-try-lock_irqsave-instead-of-open-coding-version.patch
