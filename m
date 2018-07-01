@@ -1,34 +1,53 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Sun, 1 Jul 2018 21:18:39 +0800
-Subject: [PATCH] crypto: arm/speck - fix building in Thumb2 mode
-In-Reply-To: <20180618223323.130072-1-ebiggers@google.com>
-References: <20180618223323.130072-1-ebiggers@google.com>
-Message-ID: <20180701131839.kpbwifrfgdf36p4p@gondor.apana.org.au>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Sun, 1 Jul 2018 21:20:09 +0800
+Subject: [PATCH 2/2] ARM: imx_v6_v7_defconfig: Select ULPI support
+In-Reply-To: <1529930043-6387-2-git-send-email-festevam@gmail.com>
+References: <1529930043-6387-1-git-send-email-festevam@gmail.com>
+ <1529930043-6387-2-git-send-email-festevam@gmail.com>
+Message-ID: <20180701132008.GP4348@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 18, 2018 at 03:33:23PM -0700, Eric Biggers wrote:
-> Building the kernel with CONFIG_THUMB2_KERNEL=y and
-> CONFIG_CRYPTO_SPECK_NEON set fails with the following errors:
+On Mon, Jun 25, 2018 at 09:34:03AM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@nxp.com>
 > 
->     arch/arm/crypto/speck-neon-core.S: Assembler messages:
+> Select CONFIG_USB_CHIPIDEA_ULPI and CONFIG_USB_ULPI_BUS so that
+> USB ULPI can be functional on some boards like imx51-babbge.
 > 
->     arch/arm/crypto/speck-neon-core.S:419: Error: r13 not allowed here -- `bic sp,#0xf'
->     arch/arm/crypto/speck-neon-core.S:423: Error: r13 not allowed here -- `bic sp,#0xf'
->     arch/arm/crypto/speck-neon-core.S:427: Error: r13 not allowed here -- `bic sp,#0xf'
->     arch/arm/crypto/speck-neon-core.S:431: Error: r13 not allowed here -- `bic sp,#0xf'
-> 
-> The problem is that the 'bic' instruction can't operate on the 'sp'
-> register in Thumb2 mode.  Fix it by using a temporary register.  This
-> isn't in the main loop, so the performance difference is negligible.
-> This also matches what aes-neonbs-core.S does.
-> 
-> Reported-by: Stefan Agner <stefan@agner.ch>
-> Fixes: ede9622162fa ("crypto: arm/speck - add NEON-accelerated implementation of Speck-XTS")
-> Signed-off-by: Eric Biggers <ebiggers@google.com>
+> This fixes a kernel hang in 4.18-rc1 on i.mx51-babbage when
+> the bootloader does not initialize USB.
 
-Patch applied.  Thanks.
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+Is this hang a regression or what?
+
+Shawn
+
+> 
+> Suggested-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+> ---
+>  arch/arm/configs/imx_v6_v7_defconfig | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+> index d14de86..2da678c 100644
+> --- a/arch/arm/configs/imx_v6_v7_defconfig
+> +++ b/arch/arm/configs/imx_v6_v7_defconfig
+> @@ -300,6 +300,7 @@ CONFIG_USB_STORAGE=y
+>  CONFIG_USB_CHIPIDEA=y
+>  CONFIG_USB_CHIPIDEA_UDC=y
+>  CONFIG_USB_CHIPIDEA_HOST=y
+> +CONFIG_USB_CHIPIDEA_ULPI=y
+>  CONFIG_USB_SERIAL=m
+>  CONFIG_USB_SERIAL_GENERIC=y
+>  CONFIG_USB_SERIAL_FTDI_SIO=m
+> @@ -336,6 +337,7 @@ CONFIG_USB_GADGETFS=m
+>  CONFIG_USB_FUNCTIONFS=m
+>  CONFIG_USB_MASS_STORAGE=m
+>  CONFIG_USB_G_SERIAL=m
+> +CONFIG_USB_ULPI_BUS=y
+>  CONFIG_MMC=y
+>  CONFIG_MMC_SDHCI=y
+>  CONFIG_MMC_SDHCI_PLTFM=y
+> -- 
+> 2.7.4
+> 
