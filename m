@@ -1,58 +1,36 @@
 From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Sun, 1 Jul 2018 20:09:33 +0200
-Subject: [PATCH] ARM: dts: armada-38x: use the new thermal binding
-In-Reply-To: <20180701153213.6mo3zf3pre4icd4m@tarshish>
-References: <bc62b7ec60e502afb7de69c1b060cd49fc6545f7.1530458089.git.baruch@tkos.co.il>
- <20180701153213.6mo3zf3pre4icd4m@tarshish>
-Message-ID: <94c2d9ab-6695-b551-c77e-a144a5462bb1@suse.de>
+Date: Sun, 1 Jul 2018 20:05:50 +0200
+Subject: [PATCH v2 0/3] Add clock driver for Actions S700 SoC
+In-Reply-To: <20180628191805.3722-1-sravanhome@gmail.com>
+References: <20180626192820.28237-3-sravanhome@gmail.com>
+ <20180628191805.3722-1-sravanhome@gmail.com>
+Message-ID: <8503ae31-aaf3-e4ba-f385-859a6cd3f8d6@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Saravannan,
 
-Am 01.07.2018 um 17:32 schrieb Baruch Siach:
-> Hi Marvell maintainers,
+Am 28.06.2018 um 21:18 schrieb Saravanan Sekar:
+> Changelog v2:
+> Fixed 0 day compilation warning
+> Modified existing dts Actions S900 clock bindings common to Actions
+> Soc family
+
+Please post v3 without --in-reply-to. It's becoming messy to read.
+
+> This patchset adds clock support for Actions Semi OWL series S700 SoC
+> with relevant clock bindings and device tree info. 
 > 
-> I forgot to Cc the list.
-> 
-> On Sun, Jul 01, 2018 at 06:14:49PM +0300, Baruch Siach wrote:
->> Commit 2f28e4c24b10e (thermal: armada: Clarify control registers
->> accesses) introduced the new thermal binding. The new biding extends the
+> Changed the UART clock using CMU instance and changes are tested in
+> cubieboard7
 
-"binding" (2nd occurrence)
+Did you find any better way of testing than my "reboot bootloader" from
+preinstalled Android?
 
->> seconds registers field size to 8. Switch to the new binding to fix
+In addition to missing Actions Semi you may want to CC Cubietech.
 
-"second", "registers'"?
-
-Regards,
+Thanks,
 Andreas
-
->> thermal reading values. Without this change the fix to errata #132698
->> introduced in commit 8c0b888f661 (thermal: armada: Change sensors trim
->> default value) is not effective.
->>
->> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
->> ---
->>  arch/arm/boot/dts/armada-38x.dtsi | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
->> index 18edc9bc7927..929459c42760 100644
->> --- a/arch/arm/boot/dts/armada-38x.dtsi
->> +++ b/arch/arm/boot/dts/armada-38x.dtsi
->> @@ -547,7 +547,7 @@
->>  
->>  			thermal: thermal at e8078 {
->>  				compatible = "marvell,armada380-thermal";
->> -				reg = <0xe4078 0x4>, <0xe4074 0x4>;
->> +				reg = <0xe4078 0x4>, <0xe4070 0x8>;
->>  				status = "okay";
->>  			};
-> 
-> baruch
-> 
-
 
 -- 
 SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
