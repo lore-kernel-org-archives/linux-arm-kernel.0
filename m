@@ -1,101 +1,72 @@
-From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Sun, 1 Jul 2018 23:07:06 +0530
-Subject: [PATCH v2 3/3] dt-bindings: clock: Modify Actions Soc clock
- bindings
-In-Reply-To: <15070ea0-aebf-2b7d-89f0-b21e729c927e@gmail.com>
-References: <20180626192820.28237-3-sravanhome@gmail.com>
- <20180628191805.3722-1-sravanhome@gmail.com>
- <20180628191805.3722-4-sravanhome@gmail.com>
- <20180630093202.GB7320@Mani-XPS-13-9360>
- <15070ea0-aebf-2b7d-89f0-b21e729c927e@gmail.com>
-Message-ID: <20180701173706.GA15895@Mani-XPS-13-9360>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Sun, 1 Jul 2018 19:39:43 +0200
+Subject: [PATCH v9 0/6] add support for relative references in special
+ sections
+In-Reply-To: <20180627151510.GE30631@arm.com>
+References: <20180626182802.19932-1-ard.biesheuvel@linaro.org>
+ <20180627151510.GE30631@arm.com>
+Message-ID: <CAKv+Gu-dkVEtRmvZwiAUpxPSHrkTVvzeGhCwczEmxRjcgfd+LQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 01, 2018 at 07:26:20PM +0200, Saravanan Sekar wrote:
-> Hi Mani
-> 
-> 
-> On 06/30/18 11:32, Manivannan Sadhasivam wrote:
-> > Hi Saravanan,
-> > 
-> > I agree with modifying the existing binding to accomodate other
-> > SoC's of the same family. But the binding should be
-> > "actions,owl-cmu.txt" since it reflects the family name.
-> 
-> Agree, will modify the name
-> 
-> > Andreas, what do you think?
-> > 
-> > On Thu, Jun 28, 2018 at 09:18:05PM +0200, Saravanan Sekar wrote:
-> > > Modify clock bindings common Actions Semi Soc family S700/S900.
-> > > 
-> > > Signed-off-by: Parthiban Nallathambi <pn@denx.de>
-> > > Signed-off-by: Saravanan Sekar <sravanhome@gmail.com>
-> > > ---
-> > >   ...tions,s900-cmu.txt => actions,sx00-cmu.txt} | 18 ++++++++++--------
-> > >   1 file changed, 10 insertions(+), 8 deletions(-)
-> > >   rename Documentation/devicetree/bindings/clock/{actions,s900-cmu.txt => actions,sx00-cmu.txt} (71%)
-> > > 
-> > > diff --git a/Documentation/devicetree/bindings/clock/actions,s900-cmu.txt b/Documentation/devicetree/bindings/clock/actions,sx00-cmu.txt
-> > > similarity index 71%
-> > > rename from Documentation/devicetree/bindings/clock/actions,s900-cmu.txt
-> > > rename to Documentation/devicetree/bindings/clock/actions,sx00-cmu.txt
-> > > index 93e4fb827cd6..8dc7edb4d198 100644
-> > > --- a/Documentation/devicetree/bindings/clock/actions,s900-cmu.txt
-> > > +++ b/Documentation/devicetree/bindings/clock/actions,sx00-cmu.txt
-> > > @@ -1,12 +1,14 @@
-> > > -* Actions S900 Clock Management Unit (CMU)
-> > > +* Actions S900/S700 Clock Management Unit (CMU)
-> > Same as above. Should be Actions OWL SoC's Clock Management Unit (CMU).
-> 
-> sure
+On 27 June 2018 at 17:15, Will Deacon <will.deacon@arm.com> wrote:
+> Hi Ard,
+>
+> On Tue, Jun 26, 2018 at 08:27:55PM +0200, Ard Biesheuvel wrote:
+>> This adds support for emitting special sections such as initcall arrays,
+>> PCI fixups and tracepoints as relative references rather than absolute
+>> references. This reduces the size by 50% on 64-bit architectures, but
+>> more importantly, it removes the need for carrying relocation metadata
+>> for these sections in relocatable kernels (e.g., for KASLR) that needs
+>> to be fixed up at boot time. On arm64, this reduces the vmlinux footprint
+>> of such a reference by 8x (8 byte absolute reference + 24 byte RELA entry
+>> vs 4 byte relative reference)
+>>
+>> Patch #3 was sent out before as a single patch. This series supersedes
+>> the previous submission. This version makes relative ksymtab entries
+>> dependent on the new Kconfig symbol HAVE_ARCH_PREL32_RELOCATIONS rather
+>> than trying to infer from kbuild test robot replies for which architectures
+>> it should be blacklisted.
+>>
+>> Patch #1 introduces the new Kconfig symbol HAVE_ARCH_PREL32_RELOCATIONS,
+>> and sets it for the main architectures that are expected to benefit the
+>> most from this feature, i.e., 64-bit architectures or ones that use
+>> runtime relocations.
+>>
+>> Patch #2 add support for #define'ing __DISABLE_EXPORTS to get rid of
+>> ksymtab/kcrctab sections in decompressor and EFI stub objects when
+>> rebuilding existing C files to run in a different context.
+>
+> I had a small question on patch 3, but it's really for my understanding.
+> So, for patches 1-3:
+>
+> Reviewed-by: Will Deacon <will.deacon@arm.com>
 >
 
-During the review of I2C controller driver, Andreas pointed out that
-we should use Owl instead of OWL in all places and also Actions should
-be replaced by Actions Semiconductor. So, please change it in relevant
-places. For this binding, title should be:
+Thanks all.
 
-Actions Semiconductor Owl SoC's Clock Management Unit (CMU).
+Thomas, Ingo,
 
-Thanks,
-Mani
+Except for the below tweak against patch #3 for powerpc, which may
+apparently get confused by an input section called .discard without
+any suffixes, this series is good to go, but requires your ack to
+proceed, so I would like to ask you to share your comments and/or
+objections. Also, any suggestions or recommendations regarding the
+route these patches should take are highly appreciated.
 
-> > > -The Actions S900 clock management unit generates and supplies clock to various
-> > > -controllers within the SoC. The clock binding described here is applicable to
-> > > -S900 SoC.
-> > > +The Actions S900/S700 clock management unit generates and supplies clock to
-> > > +various controllers within the SoC. The clock binding described here is
-> > > +applicable to S900/S700 SoC.
-> > >   Required Properties:
-> > > -- compatible: should be "actions,s900-cmu"
-> > > +- compatible: should be one of this
-> > Change to: compatible: should be one of the following:
-> 
-> sure
-> 
-> > Thanks,
-> > Mani
-> > 
-> > > +	"actions,s900-cmu"
-> > > +	"actions,s700-cmu"
-> > >   - reg: physical base address of the controller and length of memory mapped
-> > >     region.
-> > >   - clocks: Reference to the parent clocks ("hosc", "losc")
-> > > @@ -15,9 +17,9 @@ Required Properties:
-> > >   Each clock is assigned an identifier, and client nodes can use this identifier
-> > >   to specify the clock which they consume.
-> > > -All available clocks are defined as preprocessor macros in
-> > > -dt-bindings/clock/actions,s900-cmu.h header and can be used in device
-> > > -tree sources.
-> > > +All available clocks are defined as preprocessor macros in corresponding
-> > > +dt-bindings/clock/actions,s900-cmu.h or s700-cmu.h header and can be used in
-> > > +device tree sources.
-> > >   External clocks:
-> > > -- 
-> > > 2.18.0
-> > > 
-> 
-> Thanks,
-> Saravanan
+Ard.
+
+
+diff --git a/include/linux/compiler.h b/include/linux/compiler.h
+index 2d9c63f41031..61c844d4ab48 100644
+--- a/include/linux/compiler.h
++++ b/include/linux/compiler.h
+@@ -287,7 +287,7 @@ unsigned long read_word_at_a_time(const void *addr)
+  * visible to the compiler.
+  */
+ #define __ADDRESSABLE(sym) \
+-       static void * __attribute__((section(".discard"), used))        \
++       static void * __attribute__((section(".discard.addressable"), used)) \
+                __PASTE(__addressable_##sym, __LINE__) = (void *)&sym;
+
+ /**
