@@ -1,110 +1,16 @@
-From: gregkh@linuxfoundation.org (gregkh at linuxfoundation.org)
-Date: Sun, 01 Jul 2018 11:01:41 +0200
-Subject: Patch "lib/vsprintf: Remove atomic-unsafe support for %pCr" has been
- added to the 4.4-stable tree
-Message-ID: <153043570120651@kroah.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Sun, 1 Jul 2018 17:06:13 +0800
+Subject: [PATCH] ARM: dts: imx50: fix KPP pin definition typos
+In-Reply-To: <20180624055929.10011-1-akurz@blala.de>
+References: <20180624055929.10011-1-akurz@blala.de>
+Message-ID: <20180701090612.GL4348@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sun, Jun 24, 2018 at 05:59:29AM +0000, Alexander Kurz wrote:
+> iMX50 pin mux options for pads KEY_COL2 and KEY_COL3 allow muxing the same
+> KEY_COL instances as the pad name. Fix typos shifting KEY_COL instances.
+> 
+> Signed-off-by: Alexander Kurz <akurz@blala.de>
 
-This is a note to let you know that I've just added the patch titled
-
-    lib/vsprintf: Remove atomic-unsafe support for %pCr
-
-to the 4.4-stable tree which can be found at:
-    http://www.kernel.org/git/?p=linux/kernel/git/stable/stable-queue.git;a=summary
-
-The filename of the patch is:
-     lib-vsprintf-remove-atomic-unsafe-support-for-pcr.patch
-and it can be found in the queue-4.4 subdirectory.
-
-If you, or anyone else, feels it should not be added to the stable tree,
-please let <stable@vger.kernel.org> know about it.
-
-
->From 666902e42fd8344b923c02dc5b0f37948ff4f225 Mon Sep 17 00:00:00 2001
-From: Geert Uytterhoeven <geert+renesas@glider.be>
-Date: Fri, 1 Jun 2018 11:28:22 +0200
-Subject: lib/vsprintf: Remove atomic-unsafe support for %pCr
-
-From: Geert Uytterhoeven <geert+renesas@glider.be>
-
-commit 666902e42fd8344b923c02dc5b0f37948ff4f225 upstream.
-
-"%pCr" formats the current rate of a clock, and calls clk_get_rate().
-The latter obtains a mutex, hence it must not be called from atomic
-context.
-
-Remove support for this rarely-used format, as vsprintf() (and e.g.
-printk()) must be callable from any context.
-
-Any remaining out-of-tree users will start seeing the clock's name
-printed instead of its rate.
-
-Reported-by: Jia-Ju Bai <baijiaju1990@gmail.com>
-Fixes: 900cca2944254edd ("lib/vsprintf: add %pC{,n,r} format specifiers for clocks")
-Link: http://lkml.kernel.org/r/1527845302-12159-5-git-send-email-geert+renesas at glider.be
-To: Jia-Ju Bai <baijiaju1990@gmail.com>
-To: Jonathan Corbet <corbet@lwn.net>
-To: Michael Turquette <mturquette@baylibre.com>
-To: Stephen Boyd <sboyd@kernel.org>
-To: Zhang Rui <rui.zhang@intel.com>
-To: Eduardo Valentin <edubezval@gmail.com>
-To: Eric Anholt <eric@anholt.net>
-To: Stefan Wahren <stefan.wahren@i2se.com>
-To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Sergey Senozhatsky <sergey.senozhatsky.work@gmail.com>
-Cc: Petr Mladek <pmladek@suse.com>
-Cc: Linus Torvalds <torvalds@linux-foundation.org>
-Cc: Steven Rostedt <rostedt@goodmis.org>
-Cc: linux-doc at vger.kernel.org
-Cc: linux-clk at vger.kernel.org
-Cc: linux-pm at vger.kernel.org
-Cc: linux-serial at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-renesas-soc at vger.kernel.org
-Cc: linux-kernel at vger.kernel.org
-Cc: Geert Uytterhoeven <geert+renesas@glider.be>
-Cc: stable at vger.kernel.org # 4.1+
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Petr Mladek <pmladek@suse.com>
-Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-
----
- Documentation/printk-formats.txt |    3 +--
- lib/vsprintf.c                   |    3 ---
- 2 files changed, 1 insertion(+), 5 deletions(-)
-
---- a/Documentation/printk-formats.txt
-+++ b/Documentation/printk-formats.txt
-@@ -273,11 +273,10 @@ struct clk:
- 
- 	%pC	pll1
- 	%pCn	pll1
--	%pCr	1560000000
- 
- 	For printing struct clk structures. '%pC' and '%pCn' print the name
- 	(Common Clock Framework) or address (legacy clock framework) of the
--	structure; '%pCr' prints the current clock rate.
-+	structure.
- 
- 	Passed by reference.
- 
---- a/lib/vsprintf.c
-+++ b/lib/vsprintf.c
-@@ -1345,9 +1345,6 @@ char *clock(char *buf, char *end, struct
- 		return string(buf, end, NULL, spec);
- 
- 	switch (fmt[1]) {
--	case 'r':
--		return number(buf, end, clk_get_rate(clk), spec);
--
- 	case 'n':
- 	default:
- #ifdef CONFIG_COMMON_CLK
-
-
-Patches currently in stable-queue which might be from geert+renesas at glider.be are
-
-queue-4.4/lib-vsprintf-remove-atomic-unsafe-support-for-pcr.patch
-queue-4.4/serial-sh-sci-use-spin_-try-lock_irqsave-instead-of-open-coding-version.patch
+Applied, thanks.
