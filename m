@@ -1,161 +1,279 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Sun,  1 Jul 2018 13:08:03 +0200
-Subject: [RFC net-next 14/15] net: lora: Prepare Semtech SX1257
+Date: Sun,  1 Jul 2018 13:08:02 +0200
+Subject: [RFC net-next 13/15] net: lora: Prepare RAK RAK811
 In-Reply-To: <20180701110804.32415-1-afaerber@suse.de>
 References: <20180701110804.32415-1-afaerber@suse.de>
-Message-ID: <20180701110804.32415-15-afaerber@suse.de>
+Message-ID: <20180701110804.32415-14-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Semtech SX1257 and Sx1255 are usually used for radios A/B of SX1301.
-This will not implement a netdev itself, but rather needs to interface
-with SX130x somehow.
+The RAK811 and RAK812 offer a UART based AT command interface.
+It allows both LoRaWAN and LoRa modes.
 
-Cc: Ben Whitten <ben.whitten@lairdtech.com>
-Cc: Steve deRosier <derosier@gmail.com>
-Cc: Mark Brown <broonie@kernel.org>
-Cc: Michael R?der <michael.roeder@avnet.eu>
 Cc: Ken Yu (??) <ken.yu@rakwireless.com>
 Signed-off-by: Andreas F?rber <afaerber@suse.de>
 ---
- drivers/net/lora/Kconfig  |  7 ++++
- drivers/net/lora/Makefile |  3 ++
- drivers/net/lora/sx1257.c | 96 +++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 106 insertions(+)
- create mode 100644 drivers/net/lora/sx1257.c
+ drivers/net/lora/Kconfig  |   7 ++
+ drivers/net/lora/Makefile |   3 +
+ drivers/net/lora/rak811.c | 219 ++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 229 insertions(+)
+ create mode 100644 drivers/net/lora/rak811.c
 
 diff --git a/drivers/net/lora/Kconfig b/drivers/net/lora/Kconfig
-index 3e384493cbdd..68c7480d7812 100644
+index 72a9d2a0f2be..3e384493cbdd 100644
 --- a/drivers/net/lora/Kconfig
 +++ b/drivers/net/lora/Kconfig
-@@ -31,6 +31,13 @@ config LORA_RN2483
- 	help
- 	  Microchip RN2483/2903
+@@ -17,6 +17,13 @@ config LORA_DEV
  
-+config LORA_SX1257
-+	tristate "Semtech SX125x SPI driver"
+ if LORA_DEV
+ 
++config LORA_RAK811
++	tristate "RAK RAK811 driver"
 +	default y
-+	depends on SPI
++	depends on SERIAL_DEV_BUS
 +	help
-+	  Semtech SX1255/1257
++	  RAK RAK811/RAK812
 +
- config LORA_SX1276
- 	tristate "Semtech SX127x SPI driver"
+ config LORA_RN2483
+ 	tristate "Microchip RN2483/RN2903 driver"
  	default y
 diff --git a/drivers/net/lora/Makefile b/drivers/net/lora/Makefile
-index 6b6870ffbfd8..44c578bde7d5 100644
+index dfa9a43dcfb3..6b6870ffbfd8 100644
 --- a/drivers/net/lora/Makefile
 +++ b/drivers/net/lora/Makefile
-@@ -16,6 +16,9 @@ obj-$(CONFIG_LORA_RN2483) += lora-rn2483.o
+@@ -9,6 +9,9 @@ lora-dev-y := dev.o
+ # Alphabetically sorted.
+ #
+ 
++obj-$(CONFIG_LORA_RAK811) += lora-rak811.o
++lora-rak811-y := rak811.o
++
+ obj-$(CONFIG_LORA_RN2483) += lora-rn2483.o
  lora-rn2483-y := rn2483.o
  lora-rn2483-y += rn2483_cmd.o
- 
-+obj-$(CONFIG_LORA_SX1257) += lora-sx1257.o
-+lora-sx1257-y := sx1257.o
-+
- obj-$(CONFIG_LORA_SX1276) += lora-sx1276.o
- lora-sx1276-y := sx1276.o
- 
-diff --git a/drivers/net/lora/sx1257.c b/drivers/net/lora/sx1257.c
+diff --git a/drivers/net/lora/rak811.c b/drivers/net/lora/rak811.c
 new file mode 100644
-index 000000000000..c4e04ee3ec4b
+index 000000000000..ad3d0980c489
 --- /dev/null
-+++ b/drivers/net/lora/sx1257.c
-@@ -0,0 +1,96 @@
++++ b/drivers/net/lora/rak811.c
+@@ -0,0 +1,219 @@
 +// SPDX-License-Identifier: GPL-2.0-or-later
 +/*
-+ * Semtech SX1255/SX1257 LoRa transceiver
++ * RAK RAK811
 + *
-+ * Copyright (c) 2018 Andreas F?rber
-+ *
-+ * Based on SX1301 HAL code:
-+ * Copyright (c) 2013 Semtech-Cycleo
++ * Copyright (c) 2017-2018 Andreas F?rber
 + */
 +
++#include <linux/delay.h>
++#include <linux/lora.h>
 +#include <linux/module.h>
++#include <linux/netdevice.h>
 +#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/spi/spi.h>
++#include <linux/serdev.h>
++#include <linux/lora/dev.h>
 +
-+static int sx1257_write(struct spi_device *spi, u8 reg, u8 val)
++struct rak811_device {
++	struct serdev_device *serdev;
++
++	char rx_buf[4096];
++	int rx_len;
++
++	struct completion line_recv_comp;
++};
++
++static int rak811_send_command(struct rak811_device *rakdev, const char *cmd, char **data, unsigned long timeout)
 +{
-+	u8 buf[2];
++	struct serdev_device *sdev = rakdev->serdev;
++	const char *crlf = "\r\n";
++	char *resp;
 +
-+	buf[0] = reg | BIT(7);
-+	buf[1] = val;
-+	return spi_write(spi, buf, 2);
++	serdev_device_write_buf(sdev, cmd, strlen(cmd));
++	serdev_device_write_buf(sdev, crlf, 2);
++
++	timeout = wait_for_completion_timeout(&rakdev->line_recv_comp, timeout);
++	if (!timeout)
++		return -ETIMEDOUT;
++
++	resp = rakdev->rx_buf;
++	dev_dbg(&sdev->dev, "Received: '%s'\n", resp);
++	if (data)
++		*data = kstrdup(resp, GFP_KERNEL);
++
++	rakdev->rx_len = 0;
++	reinit_completion(&rakdev->line_recv_comp);
++
++	return 0;
 +}
 +
-+static int sx1257_read(struct spi_device *spi, u8 reg, u8 *val)
++static int rak811_simple_cmd(struct rak811_device *rakdev, const char *cmd, unsigned long timeout)
 +{
-+	u8 addr = reg & 0x7f;
-+	return spi_write_then_read(spi, &addr, 1, val, 1);
-+}
-+
-+static int sx1257_probe(struct spi_device *spi)
-+{
-+	u8 val;
++	char *resp;
 +	int ret;
 +
-+	if (true) {
-+		ret = sx1257_read(spi, 0x07, &val);
-+		if (ret) {
-+			dev_err(&spi->dev, "version read failed\n");
-+			return ret;
-+		}
++	ret = rak811_send_command(rakdev, cmd, &resp, timeout);
++	if (ret)
++		return ret;
 +
-+		dev_info(&spi->dev, "SX125x version: %02x\n", (unsigned)val);
++	if (strncmp(resp, "OK", 2) == 0) {
++		kfree(resp);
++		return 0;
 +	}
 +
-+	ret = sx1257_write(spi, 0x10, 1 /* + 2 */);
++	kfree(resp);
++
++	return -EINVAL;
++}
++
++static int rak811_get_version(struct rak811_device *rakdev, char **version, unsigned long timeout)
++{
++	char *resp;
++	int ret;
++
++	ret = rak811_send_command(rakdev, "at+version", &resp, timeout);
++	if (ret)
++		return ret;
++
++	if (strncmp(resp, "OK", 2) == 0) {
++		*version = kstrdup(resp + 2, GFP_KERNEL);
++		kfree(resp);
++		return 0;
++	}
++
++	kfree(resp);
++
++	return -EINVAL;
++}
++
++static int rak811_receive_buf(struct serdev_device *sdev, const u8 *data, size_t count)
++{
++	struct rak811_device *rakdev = serdev_device_get_drvdata(sdev);
++	size_t i = 0;
++	int len = 0;
++
++	dev_dbg(&sdev->dev, "Receive (%d)\n", (int)count);
++
++	for (i = 0; i < count; i++) {
++		dev_dbg(&sdev->dev, "Receive: 0x%02x\n", (int)data[i]);
++	}
++
++	if (completion_done(&rakdev->line_recv_comp)) {
++		dev_info(&sdev->dev, "RX waiting on completion\n");
++		return 0;
++	}
++	if (rakdev->rx_len == sizeof(rakdev->rx_buf) - 1) {
++		dev_warn(&sdev->dev, "RX buffer full\n");
++		return 0;
++	}
++
++	i = min(count, sizeof(rakdev->rx_buf) - 1 - rakdev->rx_len);
++	if (i > 0) {
++		memcpy(&rakdev->rx_buf[rakdev->rx_len], data, i);
++		rakdev->rx_len += i;
++		len += i;
++	}
++	if (rakdev->rx_len >= 2 && strncmp(&rakdev->rx_buf[rakdev->rx_len - 2], "\r\n", 2) == 0) {
++		rakdev->rx_len -= 2;
++		rakdev->rx_buf[rakdev->rx_len] = '\0';
++		complete(&rakdev->line_recv_comp);
++	}
++
++	return len;
++}
++
++static const struct serdev_device_ops rak811_serdev_client_ops = {
++	.receive_buf = rak811_receive_buf,
++};
++
++static int rak811_probe(struct serdev_device *sdev)
++{
++	struct rak811_device *rakdev;
++	char *sz;
++	int ret;
++
++	dev_info(&sdev->dev, "Probing\n");
++
++	rakdev = devm_kzalloc(&sdev->dev, sizeof(struct rak811_device), GFP_KERNEL);
++	if (!rakdev)
++		return -ENOMEM;
++
++	rakdev->serdev = sdev;
++	init_completion(&rakdev->line_recv_comp);
++	serdev_device_set_drvdata(sdev, rakdev);
++
++	ret = serdev_device_open(sdev);
 +	if (ret) {
-+		dev_err(&spi->dev, "clk write failed\n");
++		dev_err(&sdev->dev, "Failed to open (%d)\n", ret);
 +		return ret;
 +	}
 +
-+	dev_info(&spi->dev, "clk written\n");
++	serdev_device_set_baudrate(sdev, 115200);
++	serdev_device_set_flow_control(sdev, false);
++	serdev_device_set_client_ops(sdev, &rak811_serdev_client_ops);
 +
-+	if (true) {
-+		ret = sx1257_write(spi, 0x26, 13 + 2 * 16);
-+		if (ret) {
-+			dev_err(&spi->dev, "xosc write failed\n");
-+			return ret;
-+		}
++	ret = rak811_get_version(rakdev, &sz, HZ);
++	if (ret) {
++		dev_err(&sdev->dev, "Failed to get version (%d)\n", ret);
++		serdev_device_close(sdev);
++		return ret;
 +	}
 +
-+	dev_info(&spi->dev, "SX1257 module probed\n");
++	dev_info(&sdev->dev, "firmware version: %s\n", sz);
++	kfree(sz);
++
++	ret = rak811_simple_cmd(rakdev, "at+mode=1", 2 * HZ);
++	if (ret) {
++		dev_err(&sdev->dev, "Failed to set mode to P2P (%d)\n", ret);
++		serdev_device_close(sdev);
++		return ret;
++	}
++
++	dev_info(&sdev->dev, "Done.\n");
 +
 +	return 0;
 +}
 +
-+static int sx1257_remove(struct spi_device *spi)
++static void rak811_remove(struct serdev_device *sdev)
 +{
-+	dev_info(&spi->dev, "SX1257 module removed\n");
++	serdev_device_close(sdev);
 +
-+	return 0;
++	dev_info(&sdev->dev, "Removed\n");
 +}
 +
-+#ifdef CONFIG_OF
-+static const struct of_device_id sx1257_dt_ids[] = {
-+	{ .compatible = "semtech,sx1255" },
-+	{ .compatible = "semtech,sx1257" },
++static const struct of_device_id rak811_of_match[] = {
++	{ .compatible = "rakwireless,rak811" },
 +	{}
 +};
-+MODULE_DEVICE_TABLE(of, sx1257_dt_ids);
-+#endif
++MODULE_DEVICE_TABLE(of, rak811_of_match);
 +
-+static struct spi_driver sx1257_spi_driver = {
++static struct serdev_device_driver rak811_serdev_driver = {
++	.probe = rak811_probe,
++	.remove = rak811_remove,
 +	.driver = {
-+		.name = "sx1257",
-+		.of_match_table = of_match_ptr(sx1257_dt_ids),
++		.name = "rak811",
++		.of_match_table = rak811_of_match,
 +	},
-+	.probe = sx1257_probe,
-+	.remove = sx1257_remove,
 +};
 +
-+module_spi_driver(sx1257_spi_driver);
++static int __init rak811_init(void)
++{
++	int ret;
 +
-+MODULE_DESCRIPTION("SX1257 SPI driver");
++	ret = serdev_device_driver_register(&rak811_serdev_driver);
++	if (ret)
++		return ret;
++
++	return 0;
++}
++
++static void __exit rak811_exit(void)
++{
++	serdev_device_driver_unregister(&rak811_serdev_driver);
++}
++
++module_init(rak811_init);
++module_exit(rak811_exit);
++
++MODULE_DESCRIPTION("RAK811 serdev driver");
 +MODULE_AUTHOR("Andreas F?rber <afaerber@suse.de>");
 +MODULE_LICENSE("GPL");
 -- 
