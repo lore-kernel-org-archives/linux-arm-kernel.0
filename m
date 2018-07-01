@@ -1,10 +1,9 @@
 From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Sun,  1 Jul 2018 18:20:56 +0200
-Subject: [PATCH 4.17 032/220] clk: renesas: cpg-mssr: Stop using printk format
- %pCr
+Date: Sun,  1 Jul 2018 18:20:55 +0200
+Subject: [PATCH 4.17 031/220] thermal: bcm2835: Stop using printk format %pCr
 In-Reply-To: <20180701160908.272447118@linuxfoundation.org>
 References: <20180701160908.272447118@linuxfoundation.org>
-Message-ID: <20180701160909.674646762@linuxfoundation.org>
+Message-ID: <20180701160909.632858221@linuxfoundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,15 +13,16 @@ List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-commit ef4b0be62641d296cf4c0ad8f75ab83ab066ed51 upstream.
+commit bd2a07f71a1e2e198f8a30cb551d9defe422d83d upstream.
 
 Printk format "%pCr" will be removed soon, as clk_get_rate() must not be
 called in atomic context.
 
-Replace it by open-coding the operation.  This is safe here, as the code
-runs in task context.
+Replace it by printing the variable that already holds the clock rate.
+Note that calling clk_get_rate() is safe here, as the code runs in task
+context.
 
-Link: http://lkml.kernel.org/r/1527845302-12159-2-git-send-email-geert+renesas at glider.be
+Link: http://lkml.kernel.org/r/1527845302-12159-3-git-send-email-geert+renesas at glider.be
 To: Jia-Ju Bai <baijiaju1990@gmail.com>
 To: Jonathan Corbet <corbet@lwn.net>
 To: Michael Turquette <mturquette@baylibre.com>
@@ -43,46 +43,26 @@ Cc: linux-serial at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-renesas-soc at vger.kernel.org
 Cc: linux-kernel at vger.kernel.org
-Cc: Geert Uytterhoeven <geert+renesas@glider.be>
-Cc: stable at vger.kernel.org # 4.5+
+Cc: stable at vger.kernel.org # 4.12+
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Acked-by: Stephen Boyd <sboyd@kernel.org>
+Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
 Signed-off-by: Petr Mladek <pmladek@suse.com>
 Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 
 ---
- drivers/clk/renesas/renesas-cpg-mssr.c |    9 +++++----
- 1 file changed, 5 insertions(+), 4 deletions(-)
+ drivers/thermal/broadcom/bcm2835_thermal.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
---- a/drivers/clk/renesas/renesas-cpg-mssr.c
-+++ b/drivers/clk/renesas/renesas-cpg-mssr.c
-@@ -258,8 +258,9 @@ struct clk *cpg_mssr_clk_src_twocell_get
- 		dev_err(dev, "Cannot get %s clock %u: %ld", type, clkidx,
- 		       PTR_ERR(clk));
- 	else
--		dev_dbg(dev, "clock (%u, %u) is %pC at %pCr Hz\n",
--			clkspec->args[0], clkspec->args[1], clk, clk);
-+		dev_dbg(dev, "clock (%u, %u) is %pC at %lu Hz\n",
-+			clkspec->args[0], clkspec->args[1], clk,
-+			clk_get_rate(clk));
- 	return clk;
- }
+--- a/drivers/thermal/broadcom/bcm2835_thermal.c
++++ b/drivers/thermal/broadcom/bcm2835_thermal.c
+@@ -213,8 +213,8 @@ static int bcm2835_thermal_probe(struct
+ 	rate = clk_get_rate(data->clk);
+ 	if ((rate < 1920000) || (rate > 5000000))
+ 		dev_warn(&pdev->dev,
+-			 "Clock %pCn running at %pCr Hz is outside of the recommended range: 1.92 to 5MHz\n",
+-			 data->clk, data->clk);
++			 "Clock %pCn running at %lu Hz is outside of the recommended range: 1.92 to 5MHz\n",
++			 data->clk, rate);
  
-@@ -326,7 +327,7 @@ static void __init cpg_mssr_register_cor
- 	if (IS_ERR_OR_NULL(clk))
- 		goto fail;
- 
--	dev_dbg(dev, "Core clock %pC at %pCr Hz\n", clk, clk);
-+	dev_dbg(dev, "Core clock %pC at %lu Hz\n", clk, clk_get_rate(clk));
- 	priv->clks[id] = clk;
- 	return;
- 
-@@ -392,7 +393,7 @@ static void __init cpg_mssr_register_mod
- 	if (IS_ERR(clk))
- 		goto fail;
- 
--	dev_dbg(dev, "Module clock %pC at %pCr Hz\n", clk, clk);
-+	dev_dbg(dev, "Module clock %pC at %lu Hz\n", clk, clk_get_rate(clk));
- 	priv->clks[id] = clk;
- 	priv->smstpcr_saved[clock->index / 32].mask |= BIT(clock->index % 32);
- 	return;
+ 	/* register of thermal sensor and get info from DT */
+ 	tz = thermal_zone_of_sensor_register(&pdev->dev, 0, data,
