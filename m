@@ -1,72 +1,66 @@
-From: srikar@linux.vnet.ibm.com (Srikar Dronamraju)
-Date: Mon, 2 Jul 2018 09:01:58 -0700
-Subject: [PATCH v5 06/10] Uprobes: Support SDT markers having reference
- count (semaphore)
-In-Reply-To: <20180628052209.13056-7-ravi.bangoria@linux.ibm.com>
-References: <20180628052209.13056-1-ravi.bangoria@linux.ibm.com>
- <20180628052209.13056-7-ravi.bangoria@linux.ibm.com>
-Message-ID: <20180702160158.GD65296@linux.vnet.ibm.com>
+From: gshark.jeong@gmail.com (Daniel Jeong)
+Date: Mon, 2 Jul 2018 03:00:46 +0900
+Subject: [PATCH] media: i2c: lm3560: add support for lm3559 chip
+In-Reply-To: <20180623213328.GA19154@amd>
+References: <20180506080607.GA24212@amd> <20180623213328.GA19154@amd>
+Message-ID: <92fcf91d-f955-9a16-bf99-aad95f39a92a@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Implement the reference counter logic in core uprobe. User will be
-> able to use it from trace_uprobe as well as from kernel module. New
-> trace_uprobe definition with reference counter will now be:
-> 
->     <path>:<offset>[(ref_ctr_offset)]
-> 
-> where ref_ctr_offset is an optional field. For kernel module, new
-> variant of uprobe_register() has been introduced:
-> 
->     uprobe_register_refctr(inode, offset, ref_ctr_offset, consumer)
-> 
+Hi Pavel,
 
-Sorry for bringing this again, but I would actually think the ref_ctr is
-a consumer property. i.e the ref_ctr_offset should be part of
-uprobe_consumer.
+> On Sun 2018-05-06 10:06:07, Pavel Machek wrote:
+>> Add support for LM3559, as found in Motorola Droid 4 phone, for
+>> example. SW interface seems to be identical.
+>>
+>> Signed-off-by: Pavel Machek <pavel@ucw.cz>
+> Ping?
 
-The advantages of doing that would be
-1. Dont need to expose uprobe structure and just update our
-uprobe_consumer which is already an exported structure.
-- Exporting uprobe structure would expose some of our internal
-  implementation details, basically reduce the freedom of changing stuff
-  internally.
-- we came up with uprobe_arch for the parts that we wanted to expose
-  to archs. exposing uprobe and uprobe_arch looks weird.
+>fping daniel
+daniel is alive. :)
 
-2. ref_ctr_offset is necessarily a consumer property, its not a uprobe
-property at all.
+>
+> Could this and media: i2c: lm3560: use conservative defaults be
+> applied for v4.19? This is not too complex...
+>
+> 								Pavel
 
-3. We dont need to change/add new uprobe_register functions.
+The lm3559 datasheet should be reviewed first
+to know whether those products have same register map and field data for each register.
 
-The way I look at it is.
-
-Based on the ref_ctr_offset field in consumer, we update_ref_ctr()
-around install_breakpoint/remove_breakpoint.
-
-> +static int delayed_uprobe_add(struct uprobe *uprobe, struct mm_struct *mm)
-> +{
-> +	struct delayed_uprobe *du;
-> +
-> +	if (delayed_uprobe_check(uprobe, mm))
-> +		return 0;
-> +
-> +	du  = kzalloc(sizeof(*du), GFP_KERNEL);
-> +	if (!du)
-> +		return -ENOMEM;
-> +
-> +	du->uprobe = uprobe;
-> +	du->mm = mm;
-> +	list_add(&du->list, &delayed_uprobe_list);
-> +	return 0;
-> +}
-> +
-
-If I understood the delayed_uprobe stuff, its when we could insert a
-breakpoint but the vma that has the ref_ctr_offset is not loaded. Is
-that correct?
-
-> 
-> -- 
-> 2.14.4
-> 
+> 								
+>> diff --git a/drivers/media/i2c/lm3560.c b/drivers/media/i2c/lm3560.c
+>> index b600e03a..c4e5ed5 100644
+>> --- a/drivers/media/i2c/lm3560.c
+>> +++ b/drivers/media/i2c/lm3560.c
+>> @@ -1,6 +1,6 @@
+>>   /*
+>>    * drivers/media/i2c/lm3560.c
+>> - * General device driver for TI lm3560, FLASH LED Driver
+>> + * General device driver for TI lm3559, lm3560, FLASH LED Driver
+>>    *
+>>    * Copyright (C) 2013 Texas Instruments
+>>    *
+>> @@ -465,6 +479,7 @@ static int lm3560_remove(struct i2c_client *client)
+>>   }
+>>   
+>>   static const struct i2c_device_id lm3560_id_table[] = {
+>> +	{LM3559_NAME, 0},
+>>   	{LM3560_NAME, 0},
+>>   	{}
+>>   };
+>> diff --git a/include/media/i2c/lm3560.h b/include/media/i2c/lm3560.h
+>> index a5bd310..0e2b1c7 100644
+>> --- a/include/media/i2c/lm3560.h
+>> +++ b/include/media/i2c/lm3560.h
+>> @@ -22,6 +22,7 @@
+>>   
+>>   #include <media/v4l2-subdev.h>
+>>   
+>> +#define LM3559_NAME	"lm3559"
+>>   #define LM3560_NAME	"lm3560"
+>>   #define LM3560_I2C_ADDR	(0x53)
+>>   
+>>
+>
+>
