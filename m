@@ -1,43 +1,44 @@
 From: gregkh@linuxfoundation.org (gregkh at linuxfoundation.org)
-Date: Sun, 01 Jul 2018 11:01:00 +0200
-Subject: Patch "clk: renesas: cpg-mssr: Stop using printk format %pCr" has
- been added to the 4.14-stable tree
-Message-ID: <153043566073210@kroah.com>
+Date: Sun, 01 Jul 2018 11:01:02 +0200
+Subject: Patch "thermal: bcm2835: Stop using printk format %pCr" has been
+ added to the 4.14-stable tree
+Message-ID: <15304356623499@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 This is a note to let you know that I've just added the patch titled
 
-    clk: renesas: cpg-mssr: Stop using printk format %pCr
+    thermal: bcm2835: Stop using printk format %pCr
 
 to the 4.14-stable tree which can be found at:
     http://www.kernel.org/git/?p=linux/kernel/git/stable/stable-queue.git;a=summary
 
 The filename of the patch is:
-     clk-renesas-cpg-mssr-stop-using-printk-format-pcr.patch
+     thermal-bcm2835-stop-using-printk-format-pcr.patch
 and it can be found in the queue-4.14 subdirectory.
 
 If you, or anyone else, feels it should not be added to the stable tree,
 please let <stable@vger.kernel.org> know about it.
 
 
->From ef4b0be62641d296cf4c0ad8f75ab83ab066ed51 Mon Sep 17 00:00:00 2001
+>From bd2a07f71a1e2e198f8a30cb551d9defe422d83d Mon Sep 17 00:00:00 2001
 From: Geert Uytterhoeven <geert+renesas@glider.be>
-Date: Fri, 1 Jun 2018 11:28:19 +0200
-Subject: clk: renesas: cpg-mssr: Stop using printk format %pCr
+Date: Fri, 1 Jun 2018 11:28:20 +0200
+Subject: thermal: bcm2835: Stop using printk format %pCr
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-commit ef4b0be62641d296cf4c0ad8f75ab83ab066ed51 upstream.
+commit bd2a07f71a1e2e198f8a30cb551d9defe422d83d upstream.
 
 Printk format "%pCr" will be removed soon, as clk_get_rate() must not be
 called in atomic context.
 
-Replace it by open-coding the operation.  This is safe here, as the code
-runs in task context.
+Replace it by printing the variable that already holds the clock rate.
+Note that calling clk_get_rate() is safe here, as the code runs in task
+context.
 
-Link: http://lkml.kernel.org/r/1527845302-12159-2-git-send-email-geert+renesas at glider.be
+Link: http://lkml.kernel.org/r/1527845302-12159-3-git-send-email-geert+renesas at glider.be
 To: Jia-Ju Bai <baijiaju1990@gmail.com>
 To: Jonathan Corbet <corbet@lwn.net>
 To: Michael Turquette <mturquette@baylibre.com>
@@ -58,49 +59,29 @@ Cc: linux-serial at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-renesas-soc at vger.kernel.org
 Cc: linux-kernel at vger.kernel.org
-Cc: Geert Uytterhoeven <geert+renesas@glider.be>
-Cc: stable at vger.kernel.org # 4.5+
+Cc: stable at vger.kernel.org # 4.12+
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Acked-by: Stephen Boyd <sboyd@kernel.org>
+Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
 Signed-off-by: Petr Mladek <pmladek@suse.com>
 Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 
 ---
- drivers/clk/renesas/renesas-cpg-mssr.c |    9 +++++----
- 1 file changed, 5 insertions(+), 4 deletions(-)
+ drivers/thermal/broadcom/bcm2835_thermal.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
---- a/drivers/clk/renesas/renesas-cpg-mssr.c
-+++ b/drivers/clk/renesas/renesas-cpg-mssr.c
-@@ -248,8 +248,9 @@ struct clk *cpg_mssr_clk_src_twocell_get
- 		dev_err(dev, "Cannot get %s clock %u: %ld", type, clkidx,
- 		       PTR_ERR(clk));
- 	else
--		dev_dbg(dev, "clock (%u, %u) is %pC at %pCr Hz\n",
--			clkspec->args[0], clkspec->args[1], clk, clk);
-+		dev_dbg(dev, "clock (%u, %u) is %pC at %lu Hz\n",
-+			clkspec->args[0], clkspec->args[1], clk,
-+			clk_get_rate(clk));
- 	return clk;
- }
+--- a/drivers/thermal/broadcom/bcm2835_thermal.c
++++ b/drivers/thermal/broadcom/bcm2835_thermal.c
+@@ -213,8 +213,8 @@ static int bcm2835_thermal_probe(struct
+ 	rate = clk_get_rate(data->clk);
+ 	if ((rate < 1920000) || (rate > 5000000))
+ 		dev_warn(&pdev->dev,
+-			 "Clock %pCn running at %pCr Hz is outside of the recommended range: 1.92 to 5MHz\n",
+-			 data->clk, data->clk);
++			 "Clock %pCn running at %lu Hz is outside of the recommended range: 1.92 to 5MHz\n",
++			 data->clk, rate);
  
-@@ -314,7 +315,7 @@ static void __init cpg_mssr_register_cor
- 	if (IS_ERR_OR_NULL(clk))
- 		goto fail;
- 
--	dev_dbg(dev, "Core clock %pC at %pCr Hz\n", clk, clk);
-+	dev_dbg(dev, "Core clock %pC at %lu Hz\n", clk, clk_get_rate(clk));
- 	priv->clks[id] = clk;
- 	return;
- 
-@@ -380,7 +381,7 @@ static void __init cpg_mssr_register_mod
- 	if (IS_ERR(clk))
- 		goto fail;
- 
--	dev_dbg(dev, "Module clock %pC at %pCr Hz\n", clk, clk);
-+	dev_dbg(dev, "Module clock %pC at %lu Hz\n", clk, clk_get_rate(clk));
- 	priv->clks[id] = clk;
- 	return;
- 
+ 	/* register of thermal sensor and get info from DT */
+ 	tz = thermal_zone_of_sensor_register(&pdev->dev, 0, data,
 
 
 Patches currently in stable-queue which might be from geert+renesas at glider.be are
