@@ -1,23 +1,16 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Sun, 1 Jul 2018 21:48:55 +0800
-Subject: [PATCH 2/4] ARM: dts: imx6qdl-zii-rdu2: Populate RAVE SP EEPROM
- nodes
-In-Reply-To: <CAHQ1cqHpX_nz+xyyPg30kXsn2oTp2BBzk-qpCi3z3kezg1PTWg@mail.gmail.com>
-References: <20180628042424.12664-1-andrew.smirnov@gmail.com>
- <20180628042424.12664-3-andrew.smirnov@gmail.com>
- <CAHQ1cqHpX_nz+xyyPg30kXsn2oTp2BBzk-qpCi3z3kezg1PTWg@mail.gmail.com>
-Message-ID: <20180701134854.GV4348@dragon>
+Date: Sun, 1 Jul 2018 21:52:38 +0800
+Subject: [PATCH V2] ARM: dts: imx6sll-evk: enable usdhc3 slot
+In-Reply-To: <1530147867-24159-1-git-send-email-Anson.Huang@nxp.com>
+References: <1530147867-24159-1-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <20180701135237.GW4348@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 27, 2018 at 09:39:37PM -0700, Andrey Smirnov wrote:
-> On Wed, Jun 27, 2018 at 9:24 PM Andrey Smirnov <andrew.smirnov@gmail.com> wrote:
-> >
-> > ZII's RDU1s come with two EEPROMs attached to RAVE SP. Add
+On Thu, Jun 28, 2018 at 09:04:27AM +0800, Anson Huang wrote:
+> On i.MX6SLL EVK board, SD3 slot can be used for
+> WiFi and other SD accessories, enable it.
 > 
-> Ugh, the description should read RDU2, not RDU1. Will fix in v2,
-> tomorrow. Sorry about that.
+> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
 
-I fixed it up and applied the series.
-
-Shawn
+Applied, thanks.
