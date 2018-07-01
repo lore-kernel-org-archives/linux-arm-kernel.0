@@ -1,50 +1,253 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Sun,  1 Jul 2018 13:07:58 +0200
-Subject: [RFC net-next 09/15] net: lora: Prepare EUI helpers
+Date: Sun,  1 Jul 2018 13:07:55 +0200
+Subject: [RFC net-next 06/15] net: lora: Prepare for device drivers
 In-Reply-To: <20180701110804.32415-1-afaerber@suse.de>
 References: <20180701110804.32415-1-afaerber@suse.de>
-Message-ID: <20180701110804.32415-10-afaerber@suse.de>
+Message-ID: <20180701110804.32415-7-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These will be used by the RN2483 and other LoRaWAN capable modules.
+Implement helper functions for use by LoRa device drivers.
 
 Signed-off-by: Andreas F?rber <afaerber@suse.de>
 ---
- include/linux/lora/dev.h | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+ drivers/net/Makefile      |   1 +
+ drivers/net/lora/Kconfig  |  18 +++++++
+ drivers/net/lora/Makefile |  10 ++++
+ drivers/net/lora/dev.c    | 125 ++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/lora/dev.h  |  23 +++++++++
+ net/lora/Kconfig          |   6 +++
+ 6 files changed, 183 insertions(+)
+ create mode 100644 drivers/net/lora/Kconfig
+ create mode 100644 drivers/net/lora/Makefile
+ create mode 100644 drivers/net/lora/dev.c
+ create mode 100644 include/linux/lora/dev.h
 
-diff --git a/include/linux/lora/dev.h b/include/linux/lora/dev.h
-index 531e68f0c9a6..153f9b2992ca 100644
---- a/include/linux/lora/dev.h
-+++ b/include/linux/lora/dev.h
-@@ -9,6 +9,27 @@
- 
- #include <linux/netdevice.h>
- 
-+typedef u8 lora_eui[8];
+diff --git a/drivers/net/Makefile b/drivers/net/Makefile
+index 21cde7e78621..9819bf28633d 100644
+--- a/drivers/net/Makefile
++++ b/drivers/net/Makefile
+@@ -45,6 +45,7 @@ obj-$(CONFIG_ETHERNET) += ethernet/
+ obj-$(CONFIG_FDDI) += fddi/
+ obj-$(CONFIG_HIPPI) += hippi/
+ obj-$(CONFIG_HAMRADIO) += hamradio/
++obj-$(CONFIG_LORA) += lora/
+ obj-$(CONFIG_PLIP) += plip/
+ obj-$(CONFIG_PPP) += ppp/
+ obj-$(CONFIG_PPP_ASYNC) += ppp/
+diff --git a/drivers/net/lora/Kconfig b/drivers/net/lora/Kconfig
+new file mode 100644
+index 000000000000..40969b148a50
+--- /dev/null
++++ b/drivers/net/lora/Kconfig
+@@ -0,0 +1,18 @@
++#
++# LoRa
++#
 +
-+#define PRIxLORAEUI "%02x%02x%02x%02x%02x%02x%02x%02x"
-+#define PRIXLORAEUI "%02X%02X%02X%02X%02X%02X%02X%02X"
-+#define LORA_EUI(x) x[0], x[1], x[2], x[3], x[4], x[5], x[6], x[7]
++menu "LoRa Device Drivers"
 +
-+static inline int lora_strtoeui(const char *str, lora_eui *val)
++config LORA_DEV
++	tristate "LoRa drivers"
++	default y
++	help
++	  LoRa ...
++	  If unsure, say Y.
++
++#
++# Alphabetically sorted.
++#
++
++endmenu
+diff --git a/drivers/net/lora/Makefile b/drivers/net/lora/Makefile
+new file mode 100644
+index 000000000000..8f9d25ea4e70
+--- /dev/null
++++ b/drivers/net/lora/Makefile
+@@ -0,0 +1,10 @@
++#
++# LoRa
++#
++
++obj-$(CONFIG_LORA_DEV) += lora-dev.o
++lora-dev-y := dev.o
++
++#
++# Alphabetically sorted.
++#
+diff --git a/drivers/net/lora/dev.c b/drivers/net/lora/dev.c
+new file mode 100644
+index 000000000000..8c01106008be
+--- /dev/null
++++ b/drivers/net/lora/dev.c
+@@ -0,0 +1,125 @@
++// SPDX-License-Identifier: GPL-2.0-or-later
++/*
++ * Copyright (c) 2017-2018 Andreas F?rber
++ */
++
++#include <linux/if_arp.h>
++#include <linux/lora.h>
++#include <linux/module.h>
++#include <linux/netdevice.h>
++#include <linux/lora/dev.h>
++#include <linux/lora/skb.h>
++#include <net/rtnetlink.h>
++
++#define LORA_MTU 256 /* XXX */
++
++struct sk_buff *alloc_lora_skb(struct net_device *dev, u8 **data)
 +{
-+        char buf[3];
-+        int i, ret;
++	struct sk_buff *skb;
 +
-+        for (i = 0; i < 8; i++) {
-+                strncpy(buf, str + i * 2, 2);
-+                buf[2] = 0;
-+                ret = kstrtou8(buf, 16, &(*val)[i]);
-+                if (ret)
-+                        return ret;
-+        }
-+        return 0;
++	skb = netdev_alloc_skb(dev, sizeof(struct lora_skb_priv) + LORA_MTU);
++	if (unlikely(!skb))
++		return NULL;
++
++	skb->protocol = htons(ETH_P_LORA);
++	skb->pkt_type = PACKET_BROADCAST;
++	skb->ip_summed = CHECKSUM_UNNECESSARY;
++
++	skb_reset_mac_header(skb);
++	skb_reset_network_header(skb);
++	skb_reset_transport_header(skb);
++
++	lora_skb_reserve(skb);
++	lora_skb_prv(skb)->ifindex = dev->ifindex;
++
++	return skb;
++}
++EXPORT_SYMBOL_GPL(alloc_lora_skb);
++
++int open_loradev(struct net_device *dev)
++{
++	if (!netif_carrier_ok(dev))
++		netif_carrier_on(dev);
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(open_loradev);
++
++void close_loradev(struct net_device *dev)
++{
++}
++EXPORT_SYMBOL_GPL(close_loradev);
++
++static void lora_setup(struct net_device *dev)
++{
++	dev->type = ARPHRD_LORA;
++	dev->mtu = LORA_MTU;
++	dev->hard_header_len = 0;
++	dev->addr_len = 0;
++	dev->tx_queue_len = 10;
++
++	dev->flags = IFF_NOARP;
++	dev->features = 0;
 +}
 +
- struct net_device *alloc_loradev(int sizeof_priv);
- void free_loradev(struct net_device *dev);
- int register_loradev(struct net_device *dev);
++struct net_device *alloc_loradev(int sizeof_priv)
++{
++	struct net_device *dev;
++	struct lora_priv *priv;
++
++	dev = alloc_netdev(sizeof_priv, "lora%d", NET_NAME_UNKNOWN, lora_setup);
++	if (!dev)
++		return NULL;
++
++	priv = netdev_priv(dev);
++	priv->dev = dev;
++
++	return dev;
++}
++EXPORT_SYMBOL_GPL(alloc_loradev);
++
++void free_loradev(struct net_device *dev)
++{
++	free_netdev(dev);
++}
++EXPORT_SYMBOL_GPL(free_loradev);
++
++static struct rtnl_link_ops lora_link_ops __read_mostly = {
++	.kind = "lora",
++	.setup = lora_setup,
++};
++
++int register_loradev(struct net_device *dev)
++{
++	dev->rtnl_link_ops = &lora_link_ops;
++	return register_netdev(dev);
++}
++EXPORT_SYMBOL_GPL(register_loradev);
++
++void unregister_loradev(struct net_device *dev)
++{
++	unregister_netdev(dev);
++}
++EXPORT_SYMBOL_GPL(unregister_loradev);
++
++static int __init lora_dev_init(void)
++{
++	printk("lora-dev: init\n");
++
++	return rtnl_link_register(&lora_link_ops);
++}
++
++static void __exit lora_dev_exit(void)
++{
++	printk("lora-dev: exit\n");
++
++	rtnl_link_unregister(&lora_link_ops);
++}
++
++module_init(lora_dev_init);
++module_exit(lora_dev_exit);
++
++MODULE_DESCRIPTION("LoRa device driver interface");
++MODULE_ALIAS_RTNL_LINK("lora");
++MODULE_LICENSE("GPL");
++MODULE_AUTHOR("Andreas F?rber");
+diff --git a/include/linux/lora/dev.h b/include/linux/lora/dev.h
+new file mode 100644
+index 000000000000..531e68f0c9a6
+--- /dev/null
++++ b/include/linux/lora/dev.h
+@@ -0,0 +1,23 @@
++/* SPDX-License-Identifier: GPL-2.0-or-later */
++/*
++ * linux/lora/dev.h
++ *
++ * Copyright (c) 2017-2018 Andreas F?rber
++ */
++#ifndef _LORA_DEV_H
++#define _LORA_DEV_H
++
++#include <linux/netdevice.h>
++
++struct net_device *alloc_loradev(int sizeof_priv);
++void free_loradev(struct net_device *dev);
++int register_loradev(struct net_device *dev);
++void unregister_loradev(struct net_device *dev);
++int open_loradev(struct net_device *dev);
++void close_loradev(struct net_device *dev);
++
++struct lora_priv {
++	struct net_device *dev;
++};
++
++#endif /* _LORA_DEV_H */
+diff --git a/net/lora/Kconfig b/net/lora/Kconfig
+index 44972ea8769f..20658fea3c7c 100644
+--- a/net/lora/Kconfig
++++ b/net/lora/Kconfig
+@@ -7,3 +7,9 @@ menuconfig LORA
+ 	tristate "LoRa subsystem support"
+ 	help
+ 	  LoRa ...
++
++if LORA
++
++source "drivers/net/lora/Kconfig"
++
++endif
 -- 
 2.16.4
