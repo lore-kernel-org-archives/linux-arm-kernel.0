@@ -1,152 +1,194 @@
 From: honghui.zhang@mediatek.com (honghui.zhang at mediatek.com)
-Date: Mon, 2 Jul 2018 11:49:44 +0800
-Subject: [PATCH v2 4/4] PCI: mediatek: Add loadable kernel module support
+Date: Mon, 2 Jul 2018 11:49:42 +0800
+Subject: [PATCH v2 2/4] PCI: mediatek: enable msi after clock enabled
 In-Reply-To: <1530503384-1218-1-git-send-email-honghui.zhang@mediatek.com>
 References: <1530503384-1218-1-git-send-email-honghui.zhang@mediatek.com>
-Message-ID: <1530503384-1218-5-git-send-email-honghui.zhang@mediatek.com>
+Message-ID: <1530503384-1218-3-git-send-email-honghui.zhang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Honghui Zhang <honghui.zhang@mediatek.com>
 
-Implement remove callback function for Mediatek PCIe driver to add
-loadable kernel module support.
+The clocks was not enabled when enable MSI. This patch fix this
+issue by calling mtk_pcie_enable_msi in mtk_pcie_startup_port_v2
+since the clock was all enabled at that time.
+
+The function of mtk_pcie_startup_port_v2's define location is
+re-arranged to avoid mtk_pcie_enable_msi's forward declaration.
 
 Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
+Reviewed-by: Ryder Lee <ryder.lee@mediatek.com>
 ---
- drivers/pci/controller/Kconfig         |  2 +-
- drivers/pci/controller/pcie-mediatek.c | 60 +++++++++++++++++++++++++++++++---
- 2 files changed, 57 insertions(+), 5 deletions(-)
+ drivers/pci/controller/pcie-mediatek.c | 143 +++++++++++++++++----------------
+ 1 file changed, 72 insertions(+), 71 deletions(-)
 
-diff --git a/drivers/pci/controller/Kconfig b/drivers/pci/controller/Kconfig
-index 18fa09b..6c61ac65 100644
---- a/drivers/pci/controller/Kconfig
-+++ b/drivers/pci/controller/Kconfig
-@@ -234,7 +234,7 @@ config PCIE_ROCKCHIP_EP
- 	  available to support GEN2 with 4 slots.
- 
- config PCIE_MEDIATEK
--	bool "MediaTek PCIe controller"
-+	tristate "MediaTek PCIe controller"
- 	depends on ARCH_MEDIATEK || COMPILE_TEST
- 	depends on OF
- 	depends on PCI_MSI_IRQ_DOMAIN
 diff --git a/drivers/pci/controller/pcie-mediatek.c b/drivers/pci/controller/pcie-mediatek.c
-index c530539..b17cac6 100644
+index b43f41d..86918d4 100644
 --- a/drivers/pci/controller/pcie-mediatek.c
 +++ b/drivers/pci/controller/pcie-mediatek.c
-@@ -15,6 +15,7 @@
- #include <linux/irqdomain.h>
- #include <linux/kernel.h>
- #include <linux/msi.h>
-+#include <linux/module.h>
- #include <linux/of_address.h>
- #include <linux/of_pci.h>
- #include <linux/of_platform.h>
-@@ -184,6 +185,7 @@ struct mtk_pcie_port {
- 	struct phy *phy;
- 	u32 lane;
- 	u32 slot;
-+	int irq;
- 	struct irq_domain *irq_domain;
- 	struct irq_domain *inner_domain;
- 	struct irq_domain *msi_domain;
-@@ -538,6 +540,27 @@ static void mtk_pcie_enable_msi(struct mtk_pcie_port *port)
- 	writel(val, port->base + PCIE_INT_MASK);
- }
+@@ -398,75 +398,6 @@ static struct pci_ops mtk_pcie_ops_v2 = {
+ 	.write = mtk_pcie_config_write,
+ };
  
-+static void mtk_pcie_irq_teardown(struct mtk_pcie *pcie)
-+{
-+	struct mtk_pcie_port *port, *tmp;
-+
-+	list_for_each_entry_safe(port, tmp, &pcie->ports, list) {
-+		irq_set_chained_handler_and_data(port->irq, NULL, NULL);
-+
-+		if (port->irq_domain)
-+			irq_domain_remove(port->irq_domain);
-+
-+		if (IS_ENABLED(CONFIG_PCI_MSI)) {
-+			if (port->msi_domain)
-+				irq_domain_remove(port->msi_domain);
-+			if (port->inner_domain)
-+				irq_domain_remove(port->inner_domain);
-+		}
-+
-+		irq_dispose_mapping(port->irq);
-+	}
-+}
-+
- static int mtk_pcie_intx_map(struct irq_domain *domain, unsigned int irq,
- 			     irq_hw_number_t hwirq)
+-static int mtk_pcie_startup_port_v2(struct mtk_pcie_port *port)
+-{
+-	struct mtk_pcie *pcie = port->pcie;
+-	struct resource *mem = &pcie->mem;
+-	const struct mtk_pcie_soc *soc = port->pcie->soc;
+-	u32 val;
+-	size_t size;
+-	int err;
+-
+-	/* MT7622 platforms need to enable LTSSM and ASPM from PCIe subsys */
+-	if (pcie->base) {
+-		val = readl(pcie->base + PCIE_SYS_CFG_V2);
+-		val |= PCIE_CSR_LTSSM_EN(port->slot) |
+-		       PCIE_CSR_ASPM_L1_EN(port->slot);
+-		writel(val, pcie->base + PCIE_SYS_CFG_V2);
+-	}
+-
+-	/* Assert all reset signals */
+-	writel(0, port->base + PCIE_RST_CTRL);
+-
+-	/*
+-	 * Enable PCIe link down reset, if link status changed from link up to
+-	 * link down, this will reset MAC control registers and configuration
+-	 * space.
+-	 */
+-	writel(PCIE_LINKDOWN_RST_EN, port->base + PCIE_RST_CTRL);
+-
+-	/* De-assert PHY, PE, PIPE, MAC and configuration reset	*/
+-	val = readl(port->base + PCIE_RST_CTRL);
+-	val |= PCIE_PHY_RSTB | PCIE_PERSTB | PCIE_PIPE_SRSTB |
+-	       PCIE_MAC_SRSTB | PCIE_CRSTB;
+-	writel(val, port->base + PCIE_RST_CTRL);
+-
+-	/* Set up vendor ID and class code */
+-	if (soc->need_fix_class_id) {
+-		val = PCI_VENDOR_ID_MEDIATEK;
+-		writew(val, port->base + PCIE_CONF_VEND_ID);
+-
+-		val = PCI_CLASS_BRIDGE_HOST;
+-		writew(val, port->base + PCIE_CONF_CLASS_ID);
+-	}
+-
+-	/* 100ms timeout value should be enough for Gen1/2 training */
+-	err = readl_poll_timeout(port->base + PCIE_LINK_STATUS_V2, val,
+-				 !!(val & PCIE_PORT_LINKUP_V2), 20,
+-				 100 * USEC_PER_MSEC);
+-	if (err)
+-		return -ETIMEDOUT;
+-
+-	/* Set INTx mask */
+-	val = readl(port->base + PCIE_INT_MASK);
+-	val &= ~INTX_MASK;
+-	writel(val, port->base + PCIE_INT_MASK);
+-
+-	/* Set AHB to PCIe translation windows */
+-	size = mem->end - mem->start;
+-	val = lower_32_bits(mem->start) | AHB2PCIE_SIZE(fls(size));
+-	writel(val, port->base + PCIE_AHB_TRANS_BASE0_L);
+-
+-	val = upper_32_bits(mem->start);
+-	writel(val, port->base + PCIE_AHB_TRANS_BASE0_H);
+-
+-	/* Set PCIe to AXI translation memory space.*/
+-	val = fls(0xffffffff) | WIN_ENABLE;
+-	writel(val, port->base + PCIE_AXI_WINDOW0);
+-
+-	return 0;
+-}
+-
+ static void mtk_compose_msi_msg(struct irq_data *data, struct msi_msg *msg)
  {
-@@ -628,7 +651,7 @@ static int mtk_pcie_setup_irq(struct mtk_pcie_port *port,
- 	struct mtk_pcie *pcie = port->pcie;
- 	struct device *dev = pcie->dev;
- 	struct platform_device *pdev = to_platform_device(dev);
--	int err, irq;
-+	int err;
- 
- 	err = mtk_pcie_init_irq_domain(port, node);
- 	if (err) {
-@@ -636,8 +659,9 @@ static int mtk_pcie_setup_irq(struct mtk_pcie_port *port,
- 		return err;
+ 	struct mtk_pcie_port *port = irq_data_get_irq_chip_data(data);
+@@ -643,8 +574,6 @@ static int mtk_pcie_init_irq_domain(struct mtk_pcie_port *port,
+ 		ret = mtk_pcie_allocate_msi_domains(port);
+ 		if (ret)
+ 			return ret;
+-
+-		mtk_pcie_enable_msi(port);
  	}
  
--	irq = platform_get_irq(pdev, port->slot);
--	irq_set_chained_handler_and_data(irq, mtk_pcie_intr_handler, port);
-+	port->irq = platform_get_irq(pdev, port->slot);
-+	irq_set_chained_handler_and_data(port->irq,
-+					 mtk_pcie_intr_handler, port);
- 
+ 	return 0;
+@@ -711,6 +640,78 @@ static int mtk_pcie_setup_irq(struct mtk_pcie_port *port,
  	return 0;
  }
-@@ -1199,6 +1223,32 @@ static int mtk_pcie_probe(struct platform_device *pdev)
- 	return err;
- }
  
-+
-+static void mtk_pcie_free_resources(struct mtk_pcie *pcie)
++static int mtk_pcie_startup_port_v2(struct mtk_pcie_port *port)
 +{
-+	struct pci_host_bridge *host = pci_host_bridge_from_priv(pcie);
-+	struct list_head *windows = &host->windows;
++	struct mtk_pcie *pcie = port->pcie;
++	struct resource *mem = &pcie->mem;
++	const struct mtk_pcie_soc *soc = port->pcie->soc;
++	u32 val;
++	size_t size;
++	int err;
 +
-+	pci_unmap_iospace(&pcie->pio);
-+	pci_free_resource_list(windows);
-+}
++	/* MT7622 platforms need to enable LTSSM and ASPM from PCIe subsys */
++	if (pcie->base) {
++		val = readl(pcie->base + PCIE_SYS_CFG_V2);
++		val |= PCIE_CSR_LTSSM_EN(port->slot) |
++		       PCIE_CSR_ASPM_L1_EN(port->slot);
++		writel(val, pcie->base + PCIE_SYS_CFG_V2);
++	}
 +
-+static int mtk_pcie_remove(struct platform_device *pdev)
-+{
-+	struct mtk_pcie *pcie = platform_get_drvdata(pdev);
-+	struct pci_host_bridge *host = pci_host_bridge_from_priv(pcie);
++	/* Assert all reset signals */
++	writel(0, port->base + PCIE_RST_CTRL);
 +
-+	pci_stop_root_bus(host->bus);
-+	pci_remove_root_bus(host->bus);
-+	mtk_pcie_free_resources(pcie);
++	/*
++	 * Enable PCIe link down reset, if link status changed from link up to
++	 * link down, this will reset MAC control registers and configuration
++	 * space.
++	 */
++	writel(PCIE_LINKDOWN_RST_EN, port->base + PCIE_RST_CTRL);
 +
-+	mtk_pcie_irq_teardown(pcie);
++	/* De-assert PHY, PE, PIPE, MAC and configuration reset	*/
++	val = readl(port->base + PCIE_RST_CTRL);
++	val |= PCIE_PHY_RSTB | PCIE_PERSTB | PCIE_PIPE_SRSTB |
++	       PCIE_MAC_SRSTB | PCIE_CRSTB;
++	writel(val, port->base + PCIE_RST_CTRL);
 +
-+	mtk_pcie_put_resources(pcie);
++	/* Set up vendor ID and class code */
++	if (soc->need_fix_class_id) {
++		val = PCI_VENDOR_ID_MEDIATEK;
++		writew(val, port->base + PCIE_CONF_VEND_ID);
++
++		val = PCI_CLASS_BRIDGE_HOST;
++		writew(val, port->base + PCIE_CONF_CLASS_ID);
++	}
++
++	/* 100ms timeout value should be enough for Gen1/2 training */
++	err = readl_poll_timeout(port->base + PCIE_LINK_STATUS_V2, val,
++				 !!(val & PCIE_PORT_LINKUP_V2), 20,
++				 100 * USEC_PER_MSEC);
++	if (err)
++		return -ETIMEDOUT;
++
++	/* Set INTx mask */
++	val = readl(port->base + PCIE_INT_MASK);
++	val &= ~INTX_MASK;
++	writel(val, port->base + PCIE_INT_MASK);
++
++	if (IS_ENABLED(CONFIG_PCI_MSI))
++		mtk_pcie_enable_msi(port);
++
++	/* Set AHB to PCIe translation windows */
++	size = mem->end - mem->start;
++	val = lower_32_bits(mem->start) | AHB2PCIE_SIZE(fls(size));
++	writel(val, port->base + PCIE_AHB_TRANS_BASE0_L);
++
++	val = upper_32_bits(mem->start);
++	writel(val, port->base + PCIE_AHB_TRANS_BASE0_H);
++
++	/* Set PCIe to AXI translation memory space.*/
++	val = fls(0xffffffff) | WIN_ENABLE;
++	writel(val, port->base + PCIE_AXI_WINDOW0);
 +
 +	return 0;
 +}
 +
- static int __maybe_unused mtk_pcie_suspend_noirq(struct device *dev)
+ static void __iomem *mtk_pcie_map_bus(struct pci_bus *bus,
+ 				      unsigned int devfn, int where)
  {
- 	struct mtk_pcie *pcie = dev_get_drvdata(dev);
-@@ -1291,6 +1341,7 @@ static const struct of_device_id mtk_pcie_ids[] = {
- 
- static struct platform_driver mtk_pcie_driver = {
- 	.probe = mtk_pcie_probe,
-+	.remove = mtk_pcie_remove,
- 	.driver = {
- 		.name = "mtk-pcie",
- 		.of_match_table = mtk_pcie_ids,
-@@ -1298,4 +1349,5 @@ static struct platform_driver mtk_pcie_driver = {
- 		.pm = &mtk_pcie_pm_ops,
- 	},
- };
--builtin_platform_driver(mtk_pcie_driver);
-+module_platform_driver(mtk_pcie_driver);
-+MODULE_LICENSE("GPL v2");
 -- 
 2.6.4
