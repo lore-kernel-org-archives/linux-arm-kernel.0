@@ -1,51 +1,152 @@
 From: honghui.zhang@mediatek.com (honghui.zhang at mediatek.com)
-Date: Mon, 2 Jul 2018 11:49:40 +0800
-Subject: [PATCH v2 0/4] PCI: mediatek: fixup find_port, enable_msi and add pm,
- module support
-Message-ID: <1530503384-1218-1-git-send-email-honghui.zhang@mediatek.com>
+Date: Mon, 2 Jul 2018 11:49:44 +0800
+Subject: [PATCH v2 4/4] PCI: mediatek: Add loadable kernel module support
+In-Reply-To: <1530503384-1218-1-git-send-email-honghui.zhang@mediatek.com>
+References: <1530503384-1218-1-git-send-email-honghui.zhang@mediatek.com>
+Message-ID: <1530503384-1218-5-git-send-email-honghui.zhang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Honghui Zhang <honghui.zhang@mediatek.com>
 
-This patchset includes misc patchs:
+Implement remove callback function for Mediatek PCIe driver to add
+loadable kernel module support.
 
-The first patch fixup the mtk_pcie_find_port logical which will cause system
-could not touch the EP's configuration space which was connected to PCIe slot 1.
+Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
+---
+ drivers/pci/controller/Kconfig         |  2 +-
+ drivers/pci/controller/pcie-mediatek.c | 60 +++++++++++++++++++++++++++++++---
+ 2 files changed, 57 insertions(+), 5 deletions(-)
 
-The second patch fixup the enable msi logical, the operation to enable msi
-should be after system clock is enabled. The function of mtk_pcie_startup_port_v2's
-define location is re-arranged to avoid mtk_pcie_enable_msi's forward declaration.
-And call mtk_pcie_enable_msi in mtk_pcie_startup_port_v2 since the clock was all
-enabled at that time.
-
-The third patch was rebased and refactor of the v4 patch[1], changes are:
- -Add PM support for MT7622.
- -Using mtk_pcie_enable_port to re-establish the link when resumed.
- -Rebase on the previous two patches.
-
-The fourth patch add loadable kernel module support.
-
-Some of those patches was already reviewed-by Ryder Lee <ryder.lee@mediatek.com>,
-so I just add the Reviewed-by tags in those patches.
-
-[1] https://patchwork.kernel.org/patch/10479079
-
-Change since v1:
- - A bit of code refact of the first patch suggested by Andy Shevchenko, and
-   commit message updated.
- - Using __maybe_unused.
- - Remove the redundant list_empty check of the fourth patch.
-
-Honghui Zhang (4):
-  PCI: mediatek: fixup mtk_pcie_find_port logical
-  PCI: mediatek: enable msi after clock enabled
-  PCI: mediatek: Add system pm support for MT2712 and MT7622
-  PCI: mediatek: Add loadable kernel module support
-
- drivers/pci/controller/Kconfig         |   2 +-
- drivers/pci/controller/pcie-mediatek.c | 289 ++++++++++++++++++++++++---------
- 2 files changed, 213 insertions(+), 78 deletions(-)
-
+diff --git a/drivers/pci/controller/Kconfig b/drivers/pci/controller/Kconfig
+index 18fa09b..6c61ac65 100644
+--- a/drivers/pci/controller/Kconfig
++++ b/drivers/pci/controller/Kconfig
+@@ -234,7 +234,7 @@ config PCIE_ROCKCHIP_EP
+ 	  available to support GEN2 with 4 slots.
+ 
+ config PCIE_MEDIATEK
+-	bool "MediaTek PCIe controller"
++	tristate "MediaTek PCIe controller"
+ 	depends on ARCH_MEDIATEK || COMPILE_TEST
+ 	depends on OF
+ 	depends on PCI_MSI_IRQ_DOMAIN
+diff --git a/drivers/pci/controller/pcie-mediatek.c b/drivers/pci/controller/pcie-mediatek.c
+index c530539..b17cac6 100644
+--- a/drivers/pci/controller/pcie-mediatek.c
++++ b/drivers/pci/controller/pcie-mediatek.c
+@@ -15,6 +15,7 @@
+ #include <linux/irqdomain.h>
+ #include <linux/kernel.h>
+ #include <linux/msi.h>
++#include <linux/module.h>
+ #include <linux/of_address.h>
+ #include <linux/of_pci.h>
+ #include <linux/of_platform.h>
+@@ -184,6 +185,7 @@ struct mtk_pcie_port {
+ 	struct phy *phy;
+ 	u32 lane;
+ 	u32 slot;
++	int irq;
+ 	struct irq_domain *irq_domain;
+ 	struct irq_domain *inner_domain;
+ 	struct irq_domain *msi_domain;
+@@ -538,6 +540,27 @@ static void mtk_pcie_enable_msi(struct mtk_pcie_port *port)
+ 	writel(val, port->base + PCIE_INT_MASK);
+ }
+ 
++static void mtk_pcie_irq_teardown(struct mtk_pcie *pcie)
++{
++	struct mtk_pcie_port *port, *tmp;
++
++	list_for_each_entry_safe(port, tmp, &pcie->ports, list) {
++		irq_set_chained_handler_and_data(port->irq, NULL, NULL);
++
++		if (port->irq_domain)
++			irq_domain_remove(port->irq_domain);
++
++		if (IS_ENABLED(CONFIG_PCI_MSI)) {
++			if (port->msi_domain)
++				irq_domain_remove(port->msi_domain);
++			if (port->inner_domain)
++				irq_domain_remove(port->inner_domain);
++		}
++
++		irq_dispose_mapping(port->irq);
++	}
++}
++
+ static int mtk_pcie_intx_map(struct irq_domain *domain, unsigned int irq,
+ 			     irq_hw_number_t hwirq)
+ {
+@@ -628,7 +651,7 @@ static int mtk_pcie_setup_irq(struct mtk_pcie_port *port,
+ 	struct mtk_pcie *pcie = port->pcie;
+ 	struct device *dev = pcie->dev;
+ 	struct platform_device *pdev = to_platform_device(dev);
+-	int err, irq;
++	int err;
+ 
+ 	err = mtk_pcie_init_irq_domain(port, node);
+ 	if (err) {
+@@ -636,8 +659,9 @@ static int mtk_pcie_setup_irq(struct mtk_pcie_port *port,
+ 		return err;
+ 	}
+ 
+-	irq = platform_get_irq(pdev, port->slot);
+-	irq_set_chained_handler_and_data(irq, mtk_pcie_intr_handler, port);
++	port->irq = platform_get_irq(pdev, port->slot);
++	irq_set_chained_handler_and_data(port->irq,
++					 mtk_pcie_intr_handler, port);
+ 
+ 	return 0;
+ }
+@@ -1199,6 +1223,32 @@ static int mtk_pcie_probe(struct platform_device *pdev)
+ 	return err;
+ }
+ 
++
++static void mtk_pcie_free_resources(struct mtk_pcie *pcie)
++{
++	struct pci_host_bridge *host = pci_host_bridge_from_priv(pcie);
++	struct list_head *windows = &host->windows;
++
++	pci_unmap_iospace(&pcie->pio);
++	pci_free_resource_list(windows);
++}
++
++static int mtk_pcie_remove(struct platform_device *pdev)
++{
++	struct mtk_pcie *pcie = platform_get_drvdata(pdev);
++	struct pci_host_bridge *host = pci_host_bridge_from_priv(pcie);
++
++	pci_stop_root_bus(host->bus);
++	pci_remove_root_bus(host->bus);
++	mtk_pcie_free_resources(pcie);
++
++	mtk_pcie_irq_teardown(pcie);
++
++	mtk_pcie_put_resources(pcie);
++
++	return 0;
++}
++
+ static int __maybe_unused mtk_pcie_suspend_noirq(struct device *dev)
+ {
+ 	struct mtk_pcie *pcie = dev_get_drvdata(dev);
+@@ -1291,6 +1341,7 @@ static const struct of_device_id mtk_pcie_ids[] = {
+ 
+ static struct platform_driver mtk_pcie_driver = {
+ 	.probe = mtk_pcie_probe,
++	.remove = mtk_pcie_remove,
+ 	.driver = {
+ 		.name = "mtk-pcie",
+ 		.of_match_table = mtk_pcie_ids,
+@@ -1298,4 +1349,5 @@ static struct platform_driver mtk_pcie_driver = {
+ 		.pm = &mtk_pcie_pm_ops,
+ 	},
+ };
+-builtin_platform_driver(mtk_pcie_driver);
++module_platform_driver(mtk_pcie_driver);
++MODULE_LICENSE("GPL v2");
 -- 
 2.6.4
