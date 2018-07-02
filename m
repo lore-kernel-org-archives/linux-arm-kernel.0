@@ -1,25 +1,66 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 2 Jul 2018 17:50:03 +0100
-Subject: [PATCH] perf/arm-cci: Remove VLA usage
-In-Reply-To: <20180629184536.GA37337@beast>
-References: <20180629184536.GA37337@beast>
-Message-ID: <20180702165003.GC23687@arm.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Mon, 2 Jul 2018 18:56:47 +0200
+Subject: [PATCH 4/6] arm64: dts: mediatek: Add missing cooling device
+ properties for CPUs
+In-Reply-To: <49b1086c104b0ee22f6e992a0abb380de9320c09.1527225682.git.viresh.kumar@linaro.org>
+References: <cover.1527225682.git.viresh.kumar@linaro.org>
+ <49b1086c104b0ee22f6e992a0abb380de9320c09.1527225682.git.viresh.kumar@linaro.org>
+Message-ID: <003321e5-3d47-9626-ee65-be5abd54a3ae@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 29, 2018 at 11:45:36AM -0700, Kees Cook wrote:
-> In the quest to remove all stack VLA usage from the kernel[1], this
-> removes the VLA in favor of a maximum size and adds a sanity check
-> at registration time. The sizes are all explicitly enumerated already,
-> so this just collects them into macros.
+
+
+On 25/05/18 07:40, Viresh Kumar wrote:
+> The cooling device properties, like "#cooling-cells" and
+> "dynamic-power-coefficient", should either be present for all the CPUs
+> of a cluster or none. If these are present only for a subset of CPUs of
+> a cluster then things will start falling apart as soon as the CPUs are
+> brought online in a different order. For example, this will happen
+> because the operating system looks for such properties in the CPU node
+> it is trying to bring up, so that it can register a cooling device.
 > 
-> [1] https://lkml.kernel.org/r/CA+55aFzCG-zNmZwX4A2FQpadafLfEzK6CC=qPXydAacU1RqZWA at mail.gmail.com
+> Add such missing properties.
 > 
-> Signed-off-by: Kees Cook <keescook@chromium.org>
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+
+pushed now to v4.18-next/dts64
+
 > ---
->  drivers/perf/arm-cci.c | 38 ++++++++++++++++++++++++++------------
->  1 file changed, 26 insertions(+), 12 deletions(-)
-
-Thanks, I'll queue this up for 4.19.
-
-Will
+>  arch/arm64/boot/dts/mediatek/mt7622.dtsi | 1 +
+>  arch/arm64/boot/dts/mediatek/mt8173.dtsi | 2 ++
+>  2 files changed, 3 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/mediatek/mt7622.dtsi b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
+> index 9213c966c224..d49fe125e770 100644
+> --- a/arch/arm64/boot/dts/mediatek/mt7622.dtsi
+> +++ b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
+> @@ -89,6 +89,7 @@
+>  				 <&apmixedsys CLK_APMIXED_MAIN_CORE_EN>;
+>  			clock-names = "cpu", "intermediate";
+>  			operating-points-v2 = <&cpu_opp_table>;
+> +			#cooling-cells = <2>;
+>  			enable-method = "psci";
+>  			clock-frequency = <1300000000>;
+>  		};
+> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> index 94597e33c806..abd2f15a544b 100644
+> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> @@ -168,6 +168,7 @@
+>  			reg = <0x001>;
+>  			enable-method = "psci";
+>  			cpu-idle-states = <&CPU_SLEEP_0>;
+> +			#cooling-cells = <2>;
+>  			clocks = <&infracfg CLK_INFRA_CA53SEL>,
+>  				 <&apmixedsys CLK_APMIXED_MAINPLL>;
+>  			clock-names = "cpu", "intermediate";
+> @@ -193,6 +194,7 @@
+>  			reg = <0x101>;
+>  			enable-method = "psci";
+>  			cpu-idle-states = <&CPU_SLEEP_0>;
+> +			#cooling-cells = <2>;
+>  			clocks = <&infracfg CLK_INFRA_CA57SEL>,
+>  				 <&apmixedsys CLK_APMIXED_MAINPLL>;
+>  			clock-names = "cpu", "intermediate";
+> 
