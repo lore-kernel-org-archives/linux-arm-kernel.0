@@ -1,250 +1,100 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Mon, 2 Jul 2018 15:50:00 -0600
-Subject: [PATCH v2 2/2] arm64: dts: mediatek: add mt6765 support
-In-Reply-To: <1529978646-28976-3-git-send-email-mars.cheng@mediatek.com>
-References: <1529978646-28976-1-git-send-email-mars.cheng@mediatek.com>
- <1529978646-28976-3-git-send-email-mars.cheng@mediatek.com>
-Message-ID: <CAL_JsqKxvCxn3eb0sZVFwhUudDAkoHH5uyUgt1NY06zt-yKkQQ@mail.gmail.com>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Mon, 2 Jul 2018 23:52:59 +0200
+Subject: 4.18rc3 TX2 boot failure with "ACPICA: AML parser: attempt to
+ continue loading table after error"
+In-Reply-To: <c49a3666-7d23-6a05-703c-1273d79a00cd@arm.com>
+References: <c49a3666-7d23-6a05-703c-1273d79a00cd@arm.com>
+Message-ID: <CAJZ5v0h5+O8xf_EqRPfdvtjQ7BvxLp8veaxB-7WsD8wq7RUFpA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 25, 2018 at 8:04 PM Mars Cheng <mars.cheng@mediatek.com> wrote:
+On Mon, Jul 2, 2018 at 11:41 PM, Jeremy Linton <jeremy.linton@arm.com> wrote:
+> Hi,
 >
-> This adds basic chip support for MT6765 SoC.
+> I'm experiencing two problems with commit 5088814a6e931 which is "ACPICA:
+> AML parser: attempt to continue loading table after error"
 >
-> Signed-off-by: Mars Cheng <mars.cheng@mediatek.com>
-> ---
->  arch/arm64/boot/dts/mediatek/Makefile       |    1 +
->  arch/arm64/boot/dts/mediatek/mt6765-evb.dts |   33 ++++++
->  arch/arm64/boot/dts/mediatek/mt6765.dtsi    |  158 +++++++++++++++++++++++++++
->  3 files changed, 192 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/mediatek/mt6765-evb.dts
->  create mode 100644 arch/arm64/boot/dts/mediatek/mt6765.dtsi
+> The first is this boot failure on a thunderX2:
 >
-> diff --git a/arch/arm64/boot/dts/mediatek/Makefile b/arch/arm64/boot/dts/mediatek/Makefile
-> index ac17f60..7506b0d 100644
-> --- a/arch/arm64/boot/dts/mediatek/Makefile
-> +++ b/arch/arm64/boot/dts/mediatek/Makefile
-> @@ -1,6 +1,7 @@
->  # SPDX-License-Identifier: GPL-2.0
->  dtb-$(CONFIG_ARCH_MEDIATEK) += mt2712-evb.dtb
->  dtb-$(CONFIG_ARCH_MEDIATEK) += mt6755-evb.dtb
-> +dtb-$(CONFIG_ARCH_MEDIATEK) += mt6765-evb.dtb
->  dtb-$(CONFIG_ARCH_MEDIATEK) += mt6795-evb.dtb
->  dtb-$(CONFIG_ARCH_MEDIATEK) += mt6797-evb.dtb
->  dtb-$(CONFIG_ARCH_MEDIATEK) += mt7622-rfb1.dtb
-> diff --git a/arch/arm64/boot/dts/mediatek/mt6765-evb.dts b/arch/arm64/boot/dts/mediatek/mt6765-evb.dts
-> new file mode 100644
-> index 0000000..36dddff2
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/mediatek/mt6765-evb.dts
-> @@ -0,0 +1,33 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +/*
-> + * dts file for Mediatek MT6765
-> + *
-> + * (C) Copyright 2018. Mediatek, Inc.
-> + *
-> + * Mars Cheng <mars.cheng@mediatek.com>
-> + */
-> +
-> +/dts-v1/;
-> +#include "mt6765.dtsi"
-> +
-> +/ {
-> +       model = "MediaTek MT6765 EVB";
-> +       compatible = "mediatek,mt6765-evb", "mediatek,mt6765";
-> +
-> +       aliases {
-> +               serial0 = &uart0;
-> +       };
-> +
-> +       memory at 40000000 {
-> +               device_type = "memory";
-> +               reg = <0 0x40000000 0 0x1e800000>;
-> +       };
-> +
-> +       chosen {
-> +               stdout-path = "serial0:921600n8";
-> +       };
-> +};
-> +
-> +&uart0 {
-> +       status = "okay";
-> +};
-> diff --git a/arch/arm64/boot/dts/mediatek/mt6765.dtsi b/arch/arm64/boot/dts/mediatek/mt6765.dtsi
-> new file mode 100644
-> index 0000000..ab34c0f
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/mediatek/mt6765.dtsi
-> @@ -0,0 +1,158 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +/*
-> + * dts file for Mediatek MT6765
-> + *
-> + * (C) Copyright 2018. Mediatek, Inc.
-> + *
-> + * Mars Cheng <mars.cheng@mediatek.com>
-> + */
-> +
-> +#include <dt-bindings/interrupt-controller/irq.h>
-> +#include <dt-bindings/interrupt-controller/arm-gic.h>
-> +
-> +/ {
-> +       compatible = "mediatek,mt6765";
-> +       interrupt-parent = <&sysirq>;
-> +       #address-cells = <2>;
-> +       #size-cells = <2>;
-> +
-> +       psci {
-> +               compatible = "arm,psci-0.2";
-> +               method = "smc";
-> +       };
-> +
-> +       cpus {
-> +               #address-cells = <1>;
-> +               #size-cells = <0>;
-> +
-> +               cpu0: cpu at 0 {
-
-Really need labels for cpu nodes?
-
-> +                       device_type = "cpu";
-> +                       compatible = "arm,cortex-a53";
-> +                       enable-method = "psci";
-> +                       reg = <0x000>;
-> +               };
-> +
-> +               cpu1: cpu at 1 {
-> +                       device_type = "cpu";
-> +                       compatible = "arm,cortex-a53";
-> +                       enable-method = "psci";
-> +                       reg = <0x001>;
-> +               };
-> +
-> +               cpu2: cpu at 2 {
-> +                       device_type = "cpu";
-> +                       compatible = "arm,cortex-a53";
-> +                       enable-method = "psci";
-> +                       reg = <0x002>;
-> +               };
-> +
-> +               cpu3: cpu at 3 {
-> +                       device_type = "cpu";
-> +                       compatible = "arm,cortex-a53";
-> +                       enable-method = "psci";
-> +                       reg = <0x003>;
-> +               };
-> +
-> +               cpu4: cpu at 100 {
-> +                       device_type = "cpu";
-> +                       compatible = "arm,cortex-a53";
-> +                       enable-method = "psci";
-> +                       reg = <0x100>;
-> +               };
-> +
-> +               cpu5: cpu at 101 {
-> +                       device_type = "cpu";
-> +                       compatible = "arm,cortex-a53";
-> +                       enable-method = "psci";
-> +                       reg = <0x101>;
-> +               };
-> +
-> +               cpu6: cpu at 102 {
-> +                       device_type = "cpu";
-> +                       compatible = "arm,cortex-a53";
-> +                       enable-method = "psci";
-> +                       reg = <0x102>;
-> +               };
-> +
-> +               cpu7: cpu at 103 {
-> +                       device_type = "cpu";
-> +                       compatible = "arm,cortex-a53";
-> +                       enable-method = "psci";
-> +                       reg = <0x103>;
-> +               };
-> +       };
-> +
-> +       baud_clk: dummy26m {
-> +               compatible = "fixed-clock";
-> +               clock-frequency = <26000000>;
-> +               #clock-cells = <0>;
-> +       };
-> +
-> +       sys_clk: dummyclk {
-> +               compatible = "fixed-clock";
-> +               clock-frequency = <26000000>;
-> +               #clock-cells = <0>;
-> +       };
-> +
-> +       timer {
-> +               compatible = "arm,armv8-timer";
-> +               interrupt-parent = <&gic>;
-> +               interrupts = <GIC_PPI 13
-> +                            (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
-> +                            <GIC_PPI 14
-> +                            (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
-> +                            <GIC_PPI 11
-> +                            (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
-> +                            <GIC_PPI 10
-> +                            (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>;
-> +       };
-> +
-> +       soc {
-> +               #address-cells = <2>;
-> +               #size-cells = <2>;
-> +               compatible = "simple-bus";
-> +               ranges;
-> +
-> +               sysirq: intpol-controller at 10200a80 {
-
-interrupt-controller at ...
-
-> +                       compatible = "mediatek,mt6765-sysirq",
-> +                                    "mediatek,mt6577-sysirq";
-> +                       interrupt-controller;
-> +                       #interrupt-cells = <3>;
-> +                       interrupt-parent = <&gic>;
-> +                       reg = <0 0x10200a80 0 0x50>;
-> +               };
-> +
-> +               gic: interrupt-controller at 0c000000 {
-
-Drop the leading 0. Build your dts with W=12 and fix the warnings like this.
-
-> +                       compatible = "arm,gic-v3";
-> +                       #interrupt-cells = <3>;
-> +                       #address-cells = <2>;
-> +                       #size-cells = <2>;
-> +                       #redistributor-regions = <1>;
-> +                       interrupt-parent = <&gic>;
-> +                       interrupt-controller;
-> +                       reg = <0 0x0c000000 0 0x40000>, // distributor
-> +                             <0 0x0c100000 0 0x200000>; // redistributor
-> +                       interrupts = <GIC_PPI 9 IRQ_TYPE_LEVEL_HIGH>;
-> +               };
-> +
-> +               uart0: serial at 11002000 {
-> +                       compatible = "mediatek,mt6765-uart",
-> +                                    "mediatek,mt6577-uart";
-> +                       reg = <0 0x11002000 0 0x400>;
-> +                       interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_LOW>;
-> +                       clocks = <&baud_clk>, <&sys_clk>;
-> +                       clock-names = "baud", "bus";
-> +                       status = "disabled";
-> +               };
-> +
-> +               uart1: serial at 11003000 {
-> +                       compatible = "mediatek,mt6765-uart",
-> +                                    "mediatek,mt6577-uart";
-> +                       reg = <0 0x11003000 0 0x400>;
-> +                       interrupts = <GIC_SPI 92 IRQ_TYPE_LEVEL_LOW>;
-> +                       clocks = <&baud_clk>, <&sys_clk>;
-> +                       clock-names = "baud", "bus";
-> +                       status = "disabled";
-> +               };
-> +       }; /* end of soc */
-> +};
-> --
-> 1.7.9.5
+> [   10.770098] ACPI Error: Ignore error and continue table load
+> (20180531/psobject-604)
+>     [   10.777926] Unable to handle kernel NULL pointer dereference at
+> virtual address 0000000000000000
+>     [   10.786809] Mem abort info:
+>     [   10.789623]   ESR = 0x96000004
+>     [   10.792702]   Exception class = DABT (current EL), IL = 32 bits
+>     [   10.798682]   SET = 0, FnV = 0
+>     [   10.801760]   EA = 0, S1PTW = 0
+>     [   10.804925] Data abort info:
+>     [   10.807827]   ISV = 0, ISS = 0x00000004
+>     [   10.811698]   CM = 0, WnR = 0
+>     [   10.814689] [0000000000000000] user address but active_mm is swapper
+>     [   10.821108] Internal error: Oops: 96000004 [#1] SMP
+>     [   10.826032] Modules linked in:
+>     [   10.829113] CPU: 30 PID: 1 Comm: swapper/0 Not tainted
+> 4.18.0-rc3PPTT4k+ #53
+>     [   10.836234] Hardware name: Default string Cavium ThunderX2/Default
+> string, BIOS L50_5.13_1.0.0 05/16/2018
+>     [   10.845905] pstate: 00400009 (nzcv daif +PAN -UAO)
+>     [   10.850746] pc : acpi_ps_peek_opcode+0x1c/0x40
+>     [   10.855231] lr : acpi_ps_create_op+0x54/0x278
+>     [   10.859627] sp : ffff000009a8ba30
+>     [   10.862969] x29: ffff000009a8ba30 x28: 0000000054445353
+>     [   10.868334] x27: 0000000000004008 x26: 0000000000000000
+>     [   10.873698] x25: ffff000009767f23 x24: ffff000008d59000
+>     [   10.879063] x23: ffff802672799030 x22: ffff000009a8bb28
+>     [   10.884427] x21: 0000000000000000 x20: ffff000008d59000
+>     [   10.889791] x19: ffff802672799030 x18: ffffffffffffffff
+>     [   10.895155] x17: 0000000000000013 x16: 0000000000000000
+>     [   10.900519] x15: ffff000008d59708 x14: 2d7463656a626f73
+>     [   10.905883] x13: 702f313335303831 x12: 3032282064616f6c
+>     [   10.911246] x11: 20656c6261742065 x10: 756e69746e6f6320
+>     [   10.916610] x9 : 0000000000000058 x8 : ffff000008570998
+>     [   10.921974] x7 : 203a726f72724520 x6 : 0000000000000334
+>     [   10.927338] x5 : 0000000000000012 x4 : 0000000000000000
+>     [   10.932701] x3 : 0000000000000000 x2 : ffff000009a8bb28
+>     [   10.938065] x1 : 0000000000000000 x0 : ffff000008505790
+>     [   10.943430] Process swapper/0 (pid: 1, stack limit =
+> 0x(____ptrval____))
+>     [   10.950199] Call trace:
+>     [   10.952663]  acpi_ps_peek_opcode+0x1c/0x40
+>     [   10.956797]  acpi_ps_create_op+0x54/0x278
+>     [   10.960842]  acpi_ps_parse_loop+0x1b4/0x6c8
+>     [   10.965063]  acpi_ps_parse_aml+0xe0/0x2b4
+>     [   10.969108]  acpi_ps_execute_table+0xa0/0x104
+>     [   10.973505]  acpi_ns_execute_table+0x120/0x194
+>     [   10.977989]  acpi_ns_parse_table+0x34/0x68
+>     [   10.982122]  acpi_ns_load_table+0x4c/0xbc
+>     [   10.986169]  acpi_tb_load_namespace+0x1d4/0x240
+>     [   10.990744]  acpi_load_tables+0x50/0xbc
+>     [   10.994614]  acpi_init+0xb8/0x374
+>     [   10.997959]  do_one_initcall+0x54/0x208
+>     [   11.001829]  kernel_init_freeable+0x224/0x300
+>     [   11.006229]  kernel_init+0x18/0x118
+>     [   11.009747]  ret_from_fork+0x10/0x18
+>     [   11.013354] Code: aa0003f3 aa1e03e0 d503201f f9400661 (39400020)
+>     [   11.019535] ---[ end trace 2bd8068593cf8acc ]---
+>     [   11.024195] Kernel panic - not syncing: Fatal exception
+>     [   11.029488] SMP: stopping secondary CPUs
+>     [   11.033480] ---[ end Kernel panic - not syncing: Fatal exception ]---
 >
+> Which does appear to be the result of some bad data in the table, but it was
+> working with 4.17, and reverting this commit solves the problem.
+
+But this commit fixes another regression which was more widespread.
+
+Apparently, we can't work around all of the errors in the tables out
+there at the same time. :-/
+
+> Also the messages now newly being prefixed with '\n' are slightly corrupted
+> like:
+>
+> "3ACPI BIOS Error (bug):"
+>
+> because the KERN_XXX macro is being encoded after the CR which keeps it from
+> being processed correctly.
+
+Yes, that's a known issue which should be fixed in -rc4.
+
+Thanks,
+Rafael
