@@ -1,186 +1,134 @@
-From: Ben.Whitten@lairdtech.com (Ben Whitten)
-Date: Mon, 2 Jul 2018 20:43:55 +0000
-Subject: [RFC net-next 15/15] net: lora: Add Semtech SX1301
-In-Reply-To: <4e06cc72-2092-70f3-c801-bf6e4c3cbec2@suse.de>
-References: <20180701110804.32415-1-afaerber@suse.de>
- <20180701110804.32415-16-afaerber@suse.de>
- <20180702161258.GA18744@sirena.org.uk>
- <4e06cc72-2092-70f3-c801-bf6e4c3cbec2@suse.de>
-Message-ID: <BY1PR02MB111481D94EB0D68AD5FCA689E7430@BY1PR02MB1114.namprd02.prod.outlook.com>
+From: mka@chromium.org (Matthias Kaehlcke)
+Date: Mon, 2 Jul 2018 13:46:11 -0700
+Subject: [PATCH v2 2/2] arm64: dts: qcom: pm8998: Add pm8998 thermal zone
+In-Reply-To: <CAD=FV=WH8q-3Rt89Get0N357+hWmKiEsruaKtWzo_JoE6gd_3g@mail.gmail.com>
+References: <20180702181005.18247-1-mka@chromium.org>
+ <20180702181005.18247-2-mka@chromium.org>
+ <CAD=FV=WH8q-3Rt89Get0N357+hWmKiEsruaKtWzo_JoE6gd_3g@mail.gmail.com>
+Message-ID: <20180702204611.GZ129942@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Subject: Re: [RFC net-next 15/15] net: lora: Add Semtech SX1301
+On Mon, Jul 02, 2018 at 12:53:44PM -0700, Doug Anderson wrote:
+> Hi,
 > 
-> Hi Mark,
-> 
-> This driver is still evolving, there's newer code on my lora-next branch
-> already: https://github.com/afaerber/linux/commits/lora-next
-> 
-> The reason you're in CC on this RFC is two-fold:
-> 
-> 1) You applied Ben's patch to associate "semtech,sx1301" with spidev,
-> whereas I am now preparing a new driver for the same compatible.
-> 
-> 2) This SPI device is in turn exposing the two SPI masters that you
-> already found below, and I didn't see a sane way to split that code out
-> into drivers/spi/, so it's in drivers/net/lora/ here - has there been
-> any precedence either way?
-
-In my work in progress driver I just register one controller for the sx1301 with two chip selects and use the chip select information to choose the correct radio to send to, this is based on the DT reg information. No need to register two separate masters.
-
-> More inline ...
-> 
-> Am 02.07.2018 um 18:12 schrieb Mark Brown:
-> > On Sun, Jul 01, 2018 at 01:08:04PM +0200, Andreas F?rber wrote:
+> On Mon, Jul 2, 2018 at 11:10 AM, Matthias Kaehlcke <mka@chromium.org> wrote:
+> > The thermal zone uses spmi-temp-alarm as sensor. If the sensor is
+> > configured without an IIO input it always reports 37?C for temperatures
+> > below the first hardware trip point at 105?C. This hardware trip point
+> > is configured as critical trip point, to initiate a system shutdown
+> > before the temperature reaches the next hardware trip point at 125?C,
+> > where the PMIC performs a partial shutdown.
 > >
-> >> +static void sx1301_radio_spi_set_cs(struct spi_device *spi, bool enable)
-> >> +{
-> >> +	int ret;
-> >> +
-> >> +	dev_dbg(&spi->dev, "setting SPI CS to %s\n", enable ? "1" : "0");
-> >> +
-> >> +	if (enable)
-> >> +		return;
-> >> +
-> >> +	ret = sx1301_radio_set_cs(spi->controller, enable);
-> >> +	if (ret)
-> >> +		dev_warn(&spi->dev, "failed to write CS (%d)\n", ret);
-> >> +}
+> > The temperature of the critical trip point can be raised after adding
+> > the die temperature ADC as IIO input for spmi-temp-alarm, which
+> > significantly increases the precision of the temperature measurements.
 > >
-> > So we never disable chip select?
+> > Signed-off-by: Matthias Kaehlcke <mka@chromium.org>
+> > ---
+> > Changes in v2:
+> > - defined 'thermal-zones' node in pm8998.dtsi instead of using a label
+> >   to refer to it
+> > - use 105?C hardware trip point as critical trip point
 > 
-> Not here, I instead did that in transfer_one below.
+> I'm not sure this was right.  I guess you're trying to avoid
+> Temperature Stage 2?
+
+Indeed
+
+> From Davi'd email in response to v1:
 > 
-> Unfortunately there seems to be no documentation, only reference code:
+> > The PMIC TEMP_ALARM hardware peripheral will perform an automatic partial
+> > PMIC shutdown upon hitting over-temperature stage 2 (125 C).  This turns
+> > off peripherals within the PMIC that are expected to draw significant
+> > current.  The set of peripherals included varies between PMICs.  This
+> > partial shutdown will occur simultaneously with the triggering of an
+> > interrupt to the APPS processor that informs the qcom-spmi-temp-alarm
+> > driver that an over-temperature threshold has been crossed.
 > 
-> https://github.com/Lora-
-> net/lora_gateway/blob/master/libloragw/src/loragw_radio.c#L121
-> https://github.com/Lora-
-> net/lora_gateway/blob/master/libloragw/src/loragw_radio.c#L165
+> I think it's actually OK to use Temperature Stage 2 as the "critical"
+> point, which is why it still interrupts the CPU.  At "critical" the
+> system will shut down, right?  ...so presumably it's OK if the drivers
+> can't recover from having the power yanked out from underneath them as
+> long as they don't hang/crash the system in this case.  If I had to
+> guess the whole point of this stage is to give the system shutdown a
+> better chance of succeeding without getting to stage 3.
+
+That was my starting point, however in my tests the system reset
+several times when the temperature got close to 125?C, not allowing
+for a proper shutdown. Apparently the partial shutdown of the PMIC can
+result in a full reset at least on some systems.
+
+> I do agree, however, that removing the "145" from the device tree was
+> the right thing to do since software will never see that.  The system
+> will just shut down.
 > 
-> It sets CS to 0 before writing to address and data registers, then
-> immediately sets CS to 1 and back to 0 before reading or ending the
-> write transaction. I've tried to force the same behavior in this driver.
-> My guess was that CS is high-active during the short 1-0 cycle, because
-> if it's low-active during the register writes then why the heck is it
-> set to 0 again in the end instead of keeping at 1... confusing.
 > 
-> Maybe the Semtech folks CC'ed can comment how these registers work?
+> > - reduced number of trip points to 2
+> > - lowered temperature of passive trip point
 > 
-> >> +	if (tx_buf) {
-> >> +		ret = sx1301_write(ssx->parent, ssx->regs +
-> REG_RADIO_X_ADDR, tx_buf ? tx_buf[0] : 0);
+> This won't actually do anything until the ADC gets hooked up, right?
+
+Correct
+
+> I guess I would have expected:
+> - 105: passive
+> - 125: critical
+> 
+> ...and then we could add (if we wanted) a "hot" between passive and
+> critical once we have the ADC hooked up?
+
+Exactly, once we have more granularity we could add (an)other trip point(s).
+
+> > - updated trip point names and added labels
+> > - updated commit message
 > >
-> > This looks confused.  We're in an if (tx_buf) block but there's a use of
-> > the ternery operator that appears to be checking if we have a tx_buf?
-> 
-> Yeah, as mentioned this RFC is not ready for merging - checkpatch.pl
-> will complain about lines too long, and TODOs are sprinkled all over or
-> not even mentioned. It's a Proof of Concept that a net_device could work
-> for a wide range of spi and serdev based drivers, and on top this device
-> has more than one channel, which may influence network-level design
-> discussions.
-> 
-> That said, I'll happily drop the second check. Thanks for spotting!
-> 
-> >> +		if (ret) {
-> >> +			dev_err(&spi->dev, "SPI radio address write
-> failed\n");
-> >> +			return ret;
-> >> +		}
-> >> +
-> >> +		ret = sx1301_write(ssx->parent, ssx->regs +
-> REG_RADIO_X_DATA, (tx_buf && xfr->len >= 2) ? tx_buf[1] : 0);
-> >> +		if (ret) {
-> >> +			dev_err(&spi->dev, "SPI radio data write failed\n");
-> >> +			return ret;
-> >> +		}
+> >  arch/arm64/boot/dts/qcom/pm8998.dtsi | 25 +++++++++++++++++++++++++
+> >  1 file changed, 25 insertions(+)
 > >
-> > This looks awfully like you're coming in at the wrong abstraction layer
-> > and the hardware actually implements a register abstraction rather than
-> > a SPI one so you should be using regmap as the abstraction.
-> 
-> I don't understand. Ben has suggested using regmap for the SPI _device_
-> that we're talking to, which may be a good idea. But this SX1301 device
-> in turn has two SPI _masters_ talking to an SX125x slave each. I don't
-> see how using regmap instead of my wrappers avoids this spi_controller?
-> The whole point of this spi_controller is to abstract and separate the
-> SX1255 vs. SX1257 vs. whatever-radio-attached into a separate driver,
-> instead of mixing it into the SX1301 driver - to me that looks cleaner
-> and more extensible. It also has the side-effect that we could configure
-> the two radios via DT (frequencies, clk output, etc.).
-
-You want an SPI controller in the SX1301 as the down stream radios are SPI and could be attached directly to a host SPI bus, makes sense to have one radio driver and talk through the SX1301.
-But you should use the regmap to access the SX1301 master controller registers.
-Example I use with one SPI master and some clock info:
-eg:
-	sx1301: sx1301 at 0 {
-		compatible = "semtech,sx1301";
-		reg = <0>;
-		#address-cells = <1>;
-		#size-cells = <0>;
-		spi-max-frequency = <8000000>;
-		gpios-reset = <&pioA 26 GPIO_ACTIVE_HIGH>;
-		clocks = <&radio1 0>, <&clkhs 0>;
-		clock-names = "clk32m", "clkhs";
-
-		radio0: sx1257 at 0 {
-			compatible = "semtech,sx125x";
-			reg = <0>;
-			spi-max-frequency = <8000000>;
-			tx;
-			clocks = <&tcxo 0>;
-			clock-names = "tcxo";
-		};
-
-		radio1: sx1257 at 1 {
-			compatible = "semtech,sx125x";
-			reg = <1>;
-			spi-max-frequency = <8000000>;
-			#clock-cells = <0>;
-			clocks = <&tcxo 0>;
-			clock-names = "tcxo";
-			clock-output-names = "clk32m";
-		};
-};
-
-
-> You will find a datasheet with some diagrams mentioning "SPI" at:
-> https://www.semtech.com/products/wireless-rf/lora-gateways/SX1301
-> 
-> >> +	if (rx_buf) {
-> >> +		ret = sx1301_read(ssx->parent, ssx->regs +
-> REG_RADIO_X_DATA_READBACK, &rx_buf[xfr->len - 1]);
-> >> +		if (ret) {
-> >> +			dev_err(&spi->dev, "SPI radio data read failed\n");
-> >> +			return ret;
-> >> +		}
-> >> +	}
+> > diff --git a/arch/arm64/boot/dts/qcom/pm8998.dtsi b/arch/arm64/boot/dts/qcom/pm8998.dtsi
+> > index 2f4989e7ef68..e7caa334e6c7 100644
+> > --- a/arch/arm64/boot/dts/qcom/pm8998.dtsi
+> > +++ b/arch/arm64/boot/dts/qcom/pm8998.dtsi
+> > @@ -3,6 +3,7 @@
 > >
-> > For a read we never set an address?
-> 
-> To read, you first write the address via tx_buf, then either in the same
-> transfer in the third byte or in a subsequent one-byte transfer as first
-> byte you get the data.
-> 
-> If you have better ideas how to structure this, do let me know.
-> 
-> >> +static void sx1301_radio_setup(struct spi_controller *ctrl)
-> >> +{
-> >> +	ctrl->mode_bits = SPI_CS_HIGH | SPI_NO_CS;
+> >  #include <dt-bindings/spmi/spmi.h>
+> >  #include <dt-bindings/interrupt-controller/irq.h>
+> > +#include <dt-bindings/thermal/thermal.h>
 > >
-> > This controller has no chip select but we provided a set_cs operation?
+> >  &spmi_bus {
+> >         pm8998_lsid0: pmic at 0 {
+> > @@ -60,3 +61,27 @@
+> >                 #size-cells = <0>;
+> >         };
+> >  };
+> > +
+> > +/ {
+> > +       thermal-zones {
+> > +               pm8998 {
+> > +                       polling-delay-passive = <250>;
+> > +                       polling-delay = <1000>;
+> > +
+> > +                       thermal-sensors = <&pm8998_temp>;
+> > +
+> > +                       trips {
+> > +                               pm8998_alert0: pm8998-alert0 {
+> > +                                       temperature = <95000>;
+> > +                                       hysteresis = <2000>;
+> > +                                       type = "passive";
+> > +                               };
+> > +                               pm8998_crit: pm8998-crit {
+> > +                                       temperature = <105000>;
+> > +                                       hysteresis = <2000>;
+> > +                                       type = "critical";
+> > +                               };
+> > +                       };
+> > +               };
+> > +       };
+> > +};
 > 
-> Oops, I played around with those two options and was hoping SPI_NO_CS
-> would avoid the undesired set_cs invocations, but it didn't work as
-> expected and so I added the "if (enabled)" check above.
-> 
-> Thanks for your review,
-> 
-> Andreas
-> 
-> --
-> SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-> GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-> HRB 21284 (AG N?rnberg)
+> A nit, but I think convention is to actually put additions straight to
+> the root node before reference to phandles, so I would have put this
+> above the "&spmi_bus" part.
+
+Ok, thanks, will do in v3
