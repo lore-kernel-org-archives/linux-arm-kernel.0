@@ -1,71 +1,47 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Mon, 2 Jul 2018 08:23:47 -0500
-Subject: [PATCH] ACPI/PPTT: use ACPI ID whenever
- ACPI_PPTT_ACPI_PROCESSOR_ID_VALID is set
-In-Reply-To: <1530289077-2444-1-git-send-email-sudeep.holla@arm.com>
-References: <1530289077-2444-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <2d723ddc-e3c0-6024-8dcf-cdccd50a383e@arm.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 2 Jul 2018 15:23:34 +0200
+Subject: [PATCH] mm: cma: honor __GFP_ZERO flag in cma_alloc()
+In-Reply-To: <20180613133913.GD20315@dhcp22.suse.cz>
+References: <CGME20180613085851eucas1p20337d050face8ff8ea87674e16a9ccd2@eucas1p2.samsung.com>
+ <20180613085851eucas1p20337d050face8ff8ea87674e16a9ccd2~3rI_9nj8b0455904559eucas1p2C@eucas1p2.samsung.com>
+ <20180613122359.GA8695@bombadil.infradead.org>
+ <20180613124001eucas1p2422f7916367ce19fecd40d6131990383~3uKFrT3ML1977219772eucas1p2G@eucas1p2.samsung.com>
+ <20180613125546.GB32016@infradead.org>
+ <20180613133913.GD20315@dhcp22.suse.cz>
+Message-ID: <20180702132335eucas1p1323fbf51cd5e82a59939d72097acee04~9kAizDyji0466904669eucas1p1w@eucas1p1.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Michal,
 
-On 06/29/2018 11:17 AM, Sudeep Holla wrote:
-> Currently we use the ACPI processor ID only for the leaf/processor nodes
-> as the specification states it must match the value of ACPI processor ID
-> field in the processor?s entry in the MADT.
-> 
-> However, if a PPTT structure represents processors group, it match a
-> processor container UID in the namespace and ACPI_PPTT_ACPI_PROCESSOR_ID_VALID
-> flag describe whether the ACPI processor ID is valid.
-> 
-> Lets use UID whenever ACPI_PPTT_ACPI_PROCESSOR_ID_VALID is set to be
-> consistent instead of using table offset as it's currently done for non
-> leaf nodes.
-> 
-> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> ---
->   drivers/acpi/pptt.c | 10 ++++++++--
->   1 file changed, 8 insertions(+), 2 deletions(-)
-> 
-> Hi,
-> 
-> There's ongoing discussion on assigning ID based in OS using simple
-> counters. It can never be consistent with firmware's view. So if the
-> firmware provides valid UID for non-processors node, we must use it.
-> 
-> Regards,
-> Sudeep
-> 
-> diff --git a/drivers/acpi/pptt.c b/drivers/acpi/pptt.c
-> index e5ea1974d1e3..d1e26cb599bf 100644
-> --- a/drivers/acpi/pptt.c
-> +++ b/drivers/acpi/pptt.c
-> @@ -481,8 +481,14 @@ static int topology_get_acpi_cpu_tag(struct acpi_table_header *table,
->   	if (cpu_node) {
->   		cpu_node = acpi_find_processor_package_id(table, cpu_node,
->   							  level, flag);
-> -		/* Only the first level has a guaranteed id */
-> -		if (level == 0)
-> +		/*
-> +		 * As per specification if the processor structure represents
-> +		 * an actual processor, then ACPI processor ID must be valid.
-> +		 * For processor containers ACPI_PPTT_ACPI_PROCESSOR_ID_VALID
-> +		 * should be set if the UID is valid
-> +		 */
-> +		if (level == 0 ||
-> +		    cpu_node->flags & ACPI_PPTT_ACPI_PROCESSOR_ID_VALID)
->   			return cpu_node->acpi_processor_id;
->   		return ACPI_PTR_DIFF(cpu_node, table);
->   	}
-> 
+On 2018-06-13 15:39, Michal Hocko wrote:
+> On Wed 13-06-18 05:55:46, Christoph Hellwig wrote:
+>> On Wed, Jun 13, 2018 at 02:40:00PM +0200, Marek Szyprowski wrote:
+>>> It is not only the matter of the spinlocks. GFP_ATOMIC is not supported
+>>> by the
+>>> memory compaction code, which is used in alloc_contig_range(). Right, this
+>>> should be also noted in the documentation.
+>> Documentation is good, asserts are better.  The code should reject any
+>> flag not explicitly supported, or even better have its own flags type
+>> with the few actually supported flags.
+> Agreed. Is the cma allocator used for anything other than GFP_KERNEL
+> btw.? If not then, shouldn't we simply drop the gfp argument altogether
+> rather than give users a false hope for differen gfp modes that are not
+> really supported and grow broken code?
 
-Ok sure,
+Nope, all cma_alloc() callers are expected to use it with GFP_KERNEL gfp 
+mask.
+The only flag which is now checked is __GFP_NOWARN. I can change the 
+function
+signature of cma_alloc to:
+struct page *cma_alloc(struct cma *cma, size_t count, unsigned int 
+align, bool no_warn);
 
-Acked-by: Jeremy Linton <jeremy.linton@arm.com>
+What about clearing the allocated buffer? Should it be another bool 
+parameter,
+done unconditionally or moved to the callers?
 
-
-PS: To table implementers, the spec today mandates that setting the 
-valid flag on a non leaf node means there is a matching _UID processor 
-container in DSDT/SSDT.
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
