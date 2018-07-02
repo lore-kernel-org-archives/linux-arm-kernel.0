@@ -1,23 +1,26 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 2 Jul 2018 15:57:03 +0200
-Subject: [PATCH 5/5] arm64: tegra: Add ethernet controller on Tegra194
-In-Reply-To: <20180620125406.11906-5-mperttunen@nvidia.com>
-References: <20180620125406.11906-1-mperttunen@nvidia.com>
- <20180620125406.11906-5-mperttunen@nvidia.com>
-Message-ID: <20180702135703.GL13096@ulmo>
+Date: Mon, 2 Jul 2018 15:57:54 +0200
+Subject: [PATCH v2 2/2] arm64: tegra: Add CPU nodes to Tegra194 device tree
+In-Reply-To: <20180702121131.13461-2-mperttunen@nvidia.com>
+References: <20180702121131.13461-1-mperttunen@nvidia.com>
+ <20180702121131.13461-2-mperttunen@nvidia.com>
+Message-ID: <20180702135754.GM13096@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 20, 2018 at 03:54:06PM +0300, Mikko Perttunen wrote:
-> The Tegra194 contains the same ethernet controller as the Tegra186.
-> Add the device tree node for it, and correspondingly the PHY node
-> on the board device tree.
+On Mon, Jul 02, 2018 at 03:11:31PM +0300, Mikko Perttunen wrote:
+> Add CPU and PSCI nodes to device tree. The Tegra194 SoC contains
+> eight NVIDIA Carmel CPUs.
 > 
 > Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
 > ---
->  arch/arm64/boot/dts/nvidia/tegra194-p2888.dtsi | 20 ++++++++++++++++++++
->  arch/arm64/boot/dts/nvidia/tegra194.dtsi       | 22 ++++++++++++++++++++++
->  2 files changed, 42 insertions(+)
+> 
+> Notes:
+>     v2:
+>     - Moved PSCI node/properties to SoC device tree
+> 
+>  arch/arm64/boot/dts/nvidia/tegra194.dtsi | 67 ++++++++++++++++++++++++++++++++
+>  1 file changed, 67 insertions(+)
 
 Applied, thanks.
 
@@ -28,4 +31,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180702/d0df3522/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180702/52fafbe9/attachment.sig>
