@@ -1,99 +1,58 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon,  2 Jul 2018 12:03:58 +0100
-Subject: [PATCHv4 02/19] arm64: move SCTLR_EL{1,
- 2} assertions to <asm/sysreg.h>
+Date: Mon,  2 Jul 2018 12:04:00 +0100
+Subject: [PATCHv4 04/19] arm64: kill change_cpacr()
 In-Reply-To: <20180702110415.10465-1-mark.rutland@arm.com>
 References: <20180702110415.10465-1-mark.rutland@arm.com>
-Message-ID: <20180702110415.10465-3-mark.rutland@arm.com>
+Message-ID: <20180702110415.10465-5-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we assert that the SCTLR_EL{1,2}_{SET,CLEAR} bits are
-self-consistent with an assertion in config_sctlr_el1(). This is a bit
-unusual, since config_sctlr_el1() doesn't make use of these definitions,
-and is far away from the definitions themselves.
+Now that we have sysreg_clear_set(), we can use this instead of
+change_cpacr().
 
-We can use the CPP #error directive to have equivalent assertions in
-<asm/sysreg.h>, next to the definitions of the set/clear bits, which is
-a bit clearer and simpler.
-
-At the same time, lets fill in the upper 32 bits for both registers in
-their respective RES0 definitions. This could be a little nicer with
-GENMASK_ULL(63, 32), but this currently lives in <linux/bitops.h>, which
-cannot safely be included from assembly, as <asm/sysreg.h> can.
-
-Note the when the preprocessor evaluates an expression for an #if
-directive, all signed or unsigned values are treated as intmax_t or
-uintmax_t respectively. To avoid ambiguity, we define explicitly define
-the mask of all 64 bits.
+Note that the order of the set and clear arguments differs between
+change_cpacr() and sysreg_clear_set(), so these are flipped as part of
+the conversion. Also, sve_user_enable() redundantly clears
+CPACR_EL1_ZEN_EL0EN before setting it; this is removed for clarity.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Reviewed-by: Dave Martin <dave.martin@arm.com>
 Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Dave Martin <dave.martin@arm.com>
 Cc: James Morse <james.morse@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/sysreg.h | 20 ++++++++++----------
- 1 file changed, 10 insertions(+), 10 deletions(-)
+ arch/arm64/kernel/fpsimd.c | 13 ++-----------
+ 1 file changed, 2 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index a8f84812c6e8..fefc17dae8ee 100644
---- a/arch/arm64/include/asm/sysreg.h
-+++ b/arch/arm64/include/asm/sysreg.h
-@@ -436,7 +436,8 @@
- #define SCTLR_EL2_RES0	((1 << 6)  | (1 << 7)  | (1 << 8)  | (1 << 9)  | \
- 			 (1 << 10) | (1 << 13) | (1 << 14) | (1 << 15) | \
- 			 (1 << 17) | (1 << 20) | (1 << 24) | (1 << 26) | \
--			 (1 << 27) | (1 << 30) | (1 << 31))
-+			 (1 << 27) | (1 << 30) | (1 << 31) | \
-+			 (0xffffffffUL << 32))
+diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+index 84c68b14f1b2..a98a7f96aff1 100644
+--- a/arch/arm64/kernel/fpsimd.c
++++ b/arch/arm64/kernel/fpsimd.c
+@@ -159,23 +159,14 @@ static void sve_free(struct task_struct *task)
+ 	__sve_free(task);
+ }
  
- #ifdef CONFIG_CPU_BIG_ENDIAN
- #define ENDIAN_SET_EL2		SCTLR_ELx_EE
-@@ -452,9 +453,9 @@
- 			 SCTLR_ELx_SA     | SCTLR_ELx_I    | SCTLR_ELx_WXN | \
- 			 ENDIAN_CLEAR_EL2 | SCTLR_EL2_RES0)
- 
--/* Check all the bits are accounted for */
--#define SCTLR_EL2_BUILD_BUG_ON_MISSING_BITS	BUILD_BUG_ON((SCTLR_EL2_SET ^ SCTLR_EL2_CLEAR) != ~0)
+-static void change_cpacr(u64 val, u64 mask)
+-{
+-	u64 cpacr = read_sysreg(CPACR_EL1);
+-	u64 new = (cpacr & ~mask) | val;
 -
-+#if (SCTLR_EL2_SET ^ SCTLR_EL2_CLEAR) != 0xffffffffffffffff
-+#error "Inconsistent SCTLR_EL2 set/clear bits"
-+#endif
- 
- /* SCTLR_EL1 specific flags. */
- #define SCTLR_EL1_UCI		(1 << 26)
-@@ -473,7 +474,8 @@
- #define SCTLR_EL1_RES1	((1 << 11) | (1 << 20) | (1 << 22) | (1 << 28) | \
- 			 (1 << 29))
- #define SCTLR_EL1_RES0  ((1 << 6)  | (1 << 10) | (1 << 13) | (1 << 17) | \
--			 (1 << 27) | (1 << 30) | (1 << 31))
-+			 (1 << 27) | (1 << 30) | (1 << 31) | \
-+			 (0xffffffffUL << 32))
- 
- #ifdef CONFIG_CPU_BIG_ENDIAN
- #define ENDIAN_SET_EL1		(SCTLR_EL1_E0E | SCTLR_ELx_EE)
-@@ -492,8 +494,9 @@
- 			 SCTLR_EL1_UMA | SCTLR_ELx_WXN     | ENDIAN_CLEAR_EL1 |\
- 			 SCTLR_EL1_RES0)
- 
--/* Check all the bits are accounted for */
--#define SCTLR_EL1_BUILD_BUG_ON_MISSING_BITS	BUILD_BUG_ON((SCTLR_EL1_SET ^ SCTLR_EL1_CLEAR) != ~0)
-+#if (SCTLR_EL1_SET ^ SCTLR_EL1_CLEAR) != 0xffffffffffffffff
-+#error "Inconsistent SCTLR_EL1 set/clear bits"
-+#endif
- 
- /* id_aa64isar0 */
- #define ID_AA64ISAR0_TS_SHIFT		52
-@@ -743,9 +746,6 @@ static inline void config_sctlr_el1(u32 clear, u32 set)
+-	if (new != cpacr)
+-		write_sysreg(new, CPACR_EL1);
+-}
+-
+ static void sve_user_disable(void)
  {
- 	u32 val;
+-	change_cpacr(0, CPACR_EL1_ZEN_EL0EN);
++	sysreg_clear_set(cpacr_el1, CPACR_EL1_ZEN_EL0EN, 0);
+ }
  
--	SCTLR_EL2_BUILD_BUG_ON_MISSING_BITS;
--	SCTLR_EL1_BUILD_BUG_ON_MISSING_BITS;
--
- 	val = read_sysreg(sctlr_el1);
- 	val &= ~clear;
- 	val |= set;
+ static void sve_user_enable(void)
+ {
+-	change_cpacr(CPACR_EL1_ZEN_EL0EN, CPACR_EL1_ZEN_EL0EN);
++	sysreg_clear_set(cpacr_el1, 0, CPACR_EL1_ZEN_EL0EN);
+ }
+ 
+ /*
 -- 
 2.11.0
