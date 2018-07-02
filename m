@@ -1,70 +1,63 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 2 Jul 2018 15:47:31 +0200
-Subject: [PATCH v3 6/8] serial: Add Tegra Combined UART driver
-In-Reply-To: <50c4702b-3d59-e443-5075-c888f83a2615@kapsi.fi>
-References: <20180702114033.15654-1-mperttunen@nvidia.com>
- <20180702114033.15654-7-mperttunen@nvidia.com>
- <20180702131851.GH13096@ulmo>
- <50c4702b-3d59-e443-5075-c888f83a2615@kapsi.fi>
-Message-ID: <20180702134731.GI13096@ulmo>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Mon, 02 Jul 2018 15:49:26 +0200
+Subject: Clarifying dma_wmb behavior in presence of non-coherent masters
+ and outer caches
+In-Reply-To: <20180629174321.GA20909@arm.com>
+References: <1530275290.22468.69.camel@pengutronix.de>
+ <20180629142539.GH17271@n2100.armlinux.org.uk>
+ <20180629162248.GB20010@arm.com>
+ <20180629164801.GJ17271@n2100.armlinux.org.uk>
+ <20180629174321.GA20909@arm.com>
+Message-ID: <1530539366.22468.89.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 02, 2018 at 04:30:07PM +0300, Mikko Perttunen wrote:
-> On 02.07.2018 16:18, Thierry Reding wrote:
-> > On Mon, Jul 02, 2018 at 02:40:31PM +0300, Mikko Perttunen wrote:
-> > > The Tegra Combined UART (TCU) is a mailbox-based mechanism that allows
-> > > multiplexing multiple "virtual UARTs" into a single hardware serial
-> > > port. The TCU is the primary serial port on Tegra194 devices.
-> > > 
-> > > Add a TCU driver utilizing the mailbox framework, as the used mailboxes
-> > > are part of Tegra HSP blocks that are already controlled by the Tegra
-> > > HSP mailbox driver.
-> > > 
-> > > Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
-> > > ---
-> > > 
-> > > Notes:
-> > >      v2:
-> > >      - Removed (void) casts for unused variables.
-> > >      - Changed the uart_set_options() call to be on one line, even if its
-> > >        over 80 characters.
-> > >      - Added defines for magic numbers.
-> > >      - Style fixes.
-> > >      - Changed Kconfig entry to depend on the Tegra HSP driver instead of
-> > >        just the mailbox framework.
-> > >      v3:
-> > >      - Removed FLUSH bit, as it's unnecessary and slows down printing
-> > >      - Removed call to uart_set_options
-> > >      - Added mbox_free_channel calls to remove()
-> > > 
-> > >   drivers/tty/serial/Kconfig       |   9 ++
-> > >   drivers/tty/serial/Makefile      |   1 +
-> > >   drivers/tty/serial/tegra-tcu.c   | 291 +++++++++++++++++++++++++++++++++++++++
-> > >   include/uapi/linux/serial_core.h |   3 +
-> > >   4 files changed, 304 insertions(+)
-> > >   create mode 100644 drivers/tty/serial/tegra-tcu.c
-> > 
-> > The driver looks good to me. But for my own understanding, is there some
-> > way we can make use of the multiplexing? That is, could we add a
-> > mechanism to have the driver filter out only a specific stream? Could we
-> > also specify which stream to send data back to? What happens by default?
-> > Which stream is data sent to?
+Hi Will,
+
+Am Freitag, den 29.06.2018, 18:43 +0100 schrieb Will Deacon:
+> Hi Russell,
 > 
-> There is no multiplexing on the producer/device side (i.e. what this driver
-> does). The mailbox specified in device tree specifies the stream we send
-> stuff to. The mailboxes are per-CPU (we use the CCPLEX mailbox here), so it
-> cannot really be changed.
+> On Fri, Jun 29, 2018 at 05:48:01PM +0100, Russell King - ARM Linux wrote:
+> > On Fri, Jun 29, 2018 at 05:22:48PM +0100, Will Deacon wrote:
+> > > On Fri, Jun 29, 2018 at 03:25:39PM +0100, Russell King - ARM Linux wrote:
+> > > > Maybe Will can shed some light on this topic.
+> > > 
+> > > You're right that cacheability and shareability are different things. For
+> > > the purposes of ordering and coherence, we care about shareability. Normal
+> > > non-cacheable is outer-shareable (which is a superset of inner-shareable),
+> > 
+> > What does it mean when the "implementation" doesn't define two shareable
+> > domains - does it mean that inner and outer shareable are combined into
+> > just one "shareable" domain, or is outer shareable always treated as
+> > "everything but inner shareable"?
+> 
+> If there is only one shareability domain, then the inner and outer shareable
+> domains refer to that domain (i.e. they're the same).
+> 
+> > From the paragraph I quoted from the ARM ARM, it seems that the former
+> > applies, which should also mean that "dmb ish*" and "dmb osh*" are
+> > functionally equivalent, and only touch the inner shareable domain.
+> 
+> In this case, yes. In practice, there is usually one inner-shareable domain
+> which contains the CPUs and coherent DMA devices, and there is one
+> outer-shareable domain containing that inner-shareable domain, where
+> non-coherent DMA lives only in the outer-shareable domain. I don't know
+> of any systems where that isn't the case, and I'm not sure that our
+> interconnects even permit building anything else (I'd need to check).
+> 
+Sorry for not citing from the ARM ARM, but [1] seems to partly
+contradict what you said above. Especially the table detailing the
+shareability domains and the related picture seem to clash with the
+above statement that most systems just have an outer-shareable domain
+covering the whole system.
 
-Oh, I see, so there is one stream per pair of mailboxes? That is, the
-mailboxes we specify in the DT define which stream we receive from and
-send to?
+Also the section "External caches", "Before AMBA4 ACE" seems to suggest
+that the barriers aren't fully propagated to the PL310 write-caches and
+master ports. I'm unsure if this is just an artifact of the mentioned
+MMIO access, so handling of normal vs. device memory transactions in
+the PL310.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180702/2c680b43/attachment-0001.sig>
+Regards,
+Lucas
+
+[1] https://community.arm.com/processors/b/blog/posts/memory-access-ordering-part-3---memory-access-ordering-in-the-arm-architecture
