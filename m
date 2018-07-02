@@ -1,53 +1,48 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Mon, 2 Jul 2018 10:53:57 -0700
-Subject: [PATCH v4 0/6] thermal: tsens: Refactoring for TSENSv2 IP
-In-Reply-To: <cover.1530533998.git.amit.kucheria@linaro.org>
-References: <cover.1530533998.git.amit.kucheria@linaro.org>
-Message-ID: <20180702175357.GA28713@localhost.localdomain>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Mon, 2 Jul 2018 19:57:57 +0200
+Subject: [RFC net-next 08/15] net: lora: sx1276: Add debugfs
+In-Reply-To: <20180702162649.GC2737@nanopsycho.orion>
+References: <20180701110804.32415-1-afaerber@suse.de>
+ <20180701110804.32415-9-afaerber@suse.de>
+ <20180702162649.GC2737@nanopsycho.orion>
+Message-ID: <d6aa15a0-9660-0687-9da0-53749c1235f8@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 02, 2018 at 06:14:03PM +0530, Amit Kucheria wrote:
-> This series is a mixed bag:
-> - Some code moves to allow code sharing between various v2.x.y versions of
->   the TSENS IP,
-> - new qcom,tsens-v2.4.0 DT property for SDM845 and a generic qcom,tsens-v2
->   property as a fallback compatible for all v2.x.y platforms,
-> - new platform support (sdm845)
-> - a cleanup patch and
-> - a DT change to have a common way to deal with the SROT and TM registers
->   despite slightly different features across the IP family and different
->   register offsets.
+Am 02.07.2018 um 18:26 schrieb Jiri Pirko:
+> Sun, Jul 01, 2018 at 01:07:57PM CEST, afaerber at suse.de wrote:
+>> Allow some interactive inspection at runtime via debugfs.
+>>
+>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+[...]
+>> @@ -566,6 +691,10 @@ static int sx1276_probe(struct spi_device *spi)
+>> 		return ret;
+>> 	}
+>>
+>> +	priv->debugfs = debugfs_create_dir(dev_name(&spi->dev), NULL);
+>> +	debugfs_create_file("state", S_IRUGO, priv->debugfs, netdev, &sx1276_state_fops);
+>> +	debugfs_create_file("frequency", S_IRUGO, priv->debugfs, netdev, &sx1276_freq_fops);
 > 
-> Rob mentioned offline that we should expose the full version string of the
-> TSENS IP (x.y.z) and have a fallback compatible. I hope patch 4 does what
-> you were looking for.
+> Hmm. These look like useful information not only for debugging. I think
+> it would be worth to expose these via some standard uapi. Like generic
+> netlink, similar to nl80211
 
-Applied patches 1, 3, and 4. Patch 5 needs a description. Patches 2 and
-6 go via your arch tree.
+Which API to use for reading/writing such config data was question 4) in
+my cover letter. :)
 
-> 
-> Regards,
-> Amit
-> 
-> Amit Kucheria (6):
->   thermal: tsens: Get rid of unused fields in structure
->   dt: qcom: 8996: thermal: Move to DT initialisation
->   thermal: tsens: Rename tsens-8996 to tsens-v2 for reuse
->   thermal: tsens: Add support for SDM845
->   thermal: tsens: Check if we have valid data before reading
->   arm64: dts: sdm845: Add tsens nodes
-> 
->  .../devicetree/bindings/thermal/qcom-tsens.txt     |  2 ++
->  arch/arm64/boot/dts/qcom/msm8996.dtsi              | 12 ++++++-
->  arch/arm64/boot/dts/qcom/sdm845.dtsi               | 16 +++++++++
->  drivers/thermal/qcom/Makefile                      |  2 +-
->  drivers/thermal/qcom/{tsens-8996.c => tsens-v2.c}  | 39 ++++++++++++----------
->  drivers/thermal/qcom/tsens.c                       |  6 ++++
->  drivers/thermal/qcom/tsens.h                       |  7 ++--
->  7 files changed, 62 insertions(+), 22 deletions(-)
->  rename drivers/thermal/qcom/{tsens-8996.c => tsens-v2.c} (66%)
-> 
-> -- 
-> 2.7.4
-> 
+"frequency" was added first and helped me debug a calculation overflow.
+Netlink might indeed be an option here, haven't worked on it before,
+I'll look into nl80211. Thanks.
+
+"state" was just a partial dump of SPI registers, to monitor status
+changes after the initial probe or other callbacks with printks, while
+debugging GPIO interrupts iirc. So I'd think merging that to mainline
+would be unnecessary, but it could remain useful during development.
+
+Cheers,
+Andreas
+
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
