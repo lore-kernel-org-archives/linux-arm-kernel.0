@@ -1,73 +1,23 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Mon, 2 Jul 2018 13:30:21 -0700
+From: willy@infradead.org (Matthew Wilcox)
+Date: Mon, 2 Jul 2018 13:33:21 -0700
 Subject: [PATCH v4 00/17] khwasan: kernel hardware assisted address
  sanitizer
-In-Reply-To: <CAFKCwri_W8qEw-qMs+gXGqMGdZO82WpCiVpzcG4kinEyL7+zGg@mail.gmail.com>
+In-Reply-To: <CAN=P9pivApAo76Kjc0TUDE0kvJn0pET=47xU6e=ioZV2VqO0Rg@mail.gmail.com>
 References: <cover.1530018818.git.andreyknvl@google.com>
  <20180627160800.3dc7f9ee41c0badbf7342520@linux-foundation.org>
- <CAAeHK+xz552VNpZxgWwU-hbTqF5_F6YVDw3fSv=4OT8mNrqPzg@mail.gmail.com>
- <20180628124039.8a42ab5e2994fb2876ff4f75@linux-foundation.org>
- <CAAeHK+xsBOKghUp9XhpfXGqU=gjSYuy3G2GH14zWNEmaLPy8_w@mail.gmail.com>
- <20180629194117.01b2d31e805808eee5c97b4d@linux-foundation.org>
- <CAFKCwrjxGEa6CLJnjmNy+92d2GSUkoymQ6Sm91CDpMZcJCcWCA@mail.gmail.com>
- <20180702122112.267261b1e1609cf522753cf3@linux-foundation.org>
- <CAFKCwri_W8qEw-qMs+gXGqMGdZO82WpCiVpzcG4kinEyL7+zGg@mail.gmail.com>
-Message-ID: <20180702133021.3016ad80fbdea8d2e984147c@linux-foundation.org>
+ <CAN=P9pivApAo76Kjc0TUDE0kvJn0pET=47xU6e=ioZV2VqO0Rg@mail.gmail.com>
+Message-ID: <20180702203321.GA8371@bombadil.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2 Jul 2018 13:22:23 -0700 Evgenii Stepanov <eugenis@google.com> wrote:
+On Wed, Jun 27, 2018 at 05:04:28PM -0700, Kostya Serebryany wrote:
+> The problem is more significant on mobile devices than on desktop/server.
+> I'd love to have [K]HWASAN on x86_64 as well, but it's less trivial since x86_64
+> doesn't have an analog of aarch64's top-byte-ignore hardware feature.
 
-> On Mon, Jul 2, 2018 at 12:21 PM, Andrew Morton
-> <akpm@linux-foundation.org> wrote:
-> > On Mon, 2 Jul 2018 12:16:42 -0700 Evgenii Stepanov <eugenis@google.com> wrote:
-> >
-> >> On Fri, Jun 29, 2018 at 7:41 PM, Andrew Morton
-> >> <akpm@linux-foundation.org> wrote:
-> >> > On Fri, 29 Jun 2018 14:45:08 +0200 Andrey Konovalov <andreyknvl@google.com> wrote:
-> >> >
-> >> >> >> What kind of memory consumption testing would you like to see?
-> >> >> >
-> >> >> > Well, 100kb or so is a teeny amount on virtually any machine.  I'm
-> >> >> > assuming the savings are (much) more significant once the machine gets
-> >> >> > loaded up and doing work?
-> >> >>
-> >> >> So with clean kernel after boot we get 40 kb memory usage. With KASAN
-> >> >> it is ~120 kb, which is 200% overhead. With KHWASAN it's 50 kb, which
-> >> >> is 25% overhead. This should approximately scale to any amounts of
-> >> >> used slab memory. For example with 100 mb memory usage we would get
-> >> >> +200 mb for KASAN and +25 mb with KHWASAN. (And KASAN also requires
-> >> >> quarantine for better use-after-free detection). I can explicitly
-> >> >> mention the overhead in %s in the changelog.
-> >> >>
-> >> >> If you think it makes sense, I can also make separate measurements
-> >> >> with some workload. What kind of workload should I use?
-> >> >
-> >> > Whatever workload people were running when they encountered problems
-> >> > with KASAN memory consumption ;)
-> >> >
-> >> > I dunno, something simple.  `find / > /dev/null'?
-> >> >
-> >>
-> >> Looking at a live Android device under load, slab (according to
-> >> /proc/meminfo) + kernel stack take 8-10% available RAM (~350MB).
-> >> Kasan's overhead of 2x - 3x on top of it is not insignificant.
-> >>
-> >
-> > (top-posting repaired.  Please don't)
-> >
-> > For a debugging, not-for-production-use feature, that overhead sounds
-> > quite acceptable to me.  What problems is it known to cause?
-> 
-> Not having this overhead enables near-production use - ex. running
-> kasan/khasan kernel on a personal, daily-use device to catch bugs that
-> do not reproduce in test configuration. These are the ones that often
-> cost the most engineering time to track down.
-> 
-> CPU overhead is bad, but generally tolerable. RAM is critical, in our
-> experience. Once it gets low enough, OOM-killer makes your life
-> miserable.
+Well, can we emulate it in software?
 
-OK, anecdotal experience works for me.  But this is all stuff that
-should have been in the changelog from day zero, please.  It describes
-the reason for the patchset's existence!
+We've got 48 bits of virtual address space on x86.  If we need all 8
+bits, then that takes us down to 40 bits (39 bits for user and 39 bits
+for kernel).  My laptop only has 34 bits of physical memory, so could
+we come up with a memory layout which works for me?
