@@ -1,106 +1,124 @@
-From: christoffer.dall@arm.com (Christoffer Dall)
-Date: Mon, 2 Jul 2018 20:39:54 +0200
-Subject: [RFC PATCH] KVM: arm/arm64: Enable adaptative WFE trapping
-In-Reply-To: <20180702164621.9899-1-marc.zyngier@arm.com>
-References: <20180702164621.9899-1-marc.zyngier@arm.com>
-Message-ID: <20180702183954.GB10663@C02W217FHV2R.local>
+From: keescook@chromium.org (Kees Cook)
+Date: Mon, 2 Jul 2018 11:29:55 -0700
+Subject: [PATCH v2 8/8] jump_table: move entries into ro_after_init region
+In-Reply-To: <20180702181145.4799-9-ard.biesheuvel@linaro.org>
+References: <20180702181145.4799-1-ard.biesheuvel@linaro.org>
+ <20180702181145.4799-9-ard.biesheuvel@linaro.org>
+Message-ID: <CAGXu5jK0_vjuaig1Wz=TGyWh81LXg0zbGkoJDR-_YYig6yTqng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 02, 2018 at 05:46:21PM +0100, Marc Zyngier wrote:
-> Trapping blocking WFE is extremely beneficial in situations where
-> the system is oversubscribed, as it allows another thread to run
-> while being blocked. In a non-oversubscribed environment, this is
-> the complete opposite, and trapping WFE is just unnecessary overhead.
-> 
-> Let's only enable WFE trapping if the CPU has more than a single task
-> to run (that is, more than just the vcpu thread).
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+On Mon, Jul 2, 2018 at 11:11 AM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+> The __jump_table sections emitted into the core kernel and into
+> each module consist of statically initialized references into
+> other parts of the code, and with the exception of entries that
+> point into init code, which are defused at post-init time, these
+> data structures are never modified.
+>
+> So let's move them into the ro_after_init section, to prevent them
+> from being corrupted inadvertently by buggy code, or deliberately
+> by an attacker.
+>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
+Yay more things read-only! :)
+
+Reviewed-by: Kees Cook <keescook@chromium.org>
 
 > ---
-> This small patchlet seem to have some interesting effects in my limited
-> testing. Installing 100 concurrent Debian VMs results results in about
-> 90 million WFE exits without this patch, and only 7.6 millions with it
-> (TX1, 96 cores, 2 vcpu guests). I haven't measured any significant
-> performance variation in that process.
-> 
-> I'd welcome any benchmarking result from people with more interesting
-> workloads than mine so that I could make my mind about it.
-> 
->  arch/arm/include/asm/kvm_emulate.h   | 10 ++++++++++
->  arch/arm64/include/asm/kvm_emulate.h | 10 ++++++++++
->  virt/kvm/arm/arm.c                   |  6 ++++++
->  3 files changed, 26 insertions(+)
-> 
-> diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
-> index 6493bd479ddc..b50fe8380868 100644
-> --- a/arch/arm/include/asm/kvm_emulate.h
-> +++ b/arch/arm/include/asm/kvm_emulate.h
-> @@ -107,6 +107,16 @@ static inline unsigned long *vcpu_hcr(const struct kvm_vcpu *vcpu)
->  	return (unsigned long *)&vcpu->arch.hcr;
->  }
->  
-> +static inline void vcpu_clear_wfe_traps(struct kvm_vcpu *vcpu)
-> +{
-> +	vcpu->arch.hcr &= ~HCR_TWE;
-> +}
+>  arch/arm/kernel/vmlinux-xip.lds.S |  1 +
+>  arch/s390/kernel/vmlinux.lds.S    |  1 +
+>  include/asm-generic/vmlinux.lds.h | 11 +++++++----
+>  kernel/module.c                   |  9 +++++++++
+>  4 files changed, 18 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm/kernel/vmlinux-xip.lds.S b/arch/arm/kernel/vmlinux-xip.lds.S
+> index 3593d5c1acd2..763c41068ecc 100644
+> --- a/arch/arm/kernel/vmlinux-xip.lds.S
+> +++ b/arch/arm/kernel/vmlinux-xip.lds.S
+> @@ -118,6 +118,7 @@ SECTIONS
+>         RW_DATA_SECTION(L1_CACHE_BYTES, PAGE_SIZE, THREAD_SIZE)
+>         .data.ro_after_init : AT(ADDR(.data.ro_after_init) - LOAD_OFFSET) {
+>                 *(.data..ro_after_init)
+> +               JUMP_TABLE_DATA
+>         }
+>         _edata = .;
+>
+> diff --git a/arch/s390/kernel/vmlinux.lds.S b/arch/s390/kernel/vmlinux.lds.S
+> index f0414f52817b..a7cf61e46f88 100644
+> --- a/arch/s390/kernel/vmlinux.lds.S
+> +++ b/arch/s390/kernel/vmlinux.lds.S
+> @@ -67,6 +67,7 @@ SECTIONS
+>         __start_ro_after_init = .;
+>         .data..ro_after_init : {
+>                  *(.data..ro_after_init)
+> +               JUMP_TABLE_DATA
+>         }
+>         EXCEPTION_TABLE(16)
+>         . = ALIGN(PAGE_SIZE);
+> diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
+> index e373e2e10f6a..ed6befa4c47b 100644
+> --- a/include/asm-generic/vmlinux.lds.h
+> +++ b/include/asm-generic/vmlinux.lds.h
+> @@ -256,10 +256,6 @@
+>         STRUCT_ALIGN();                                                 \
+>         *(__tracepoints)                                                \
+>         /* implement dynamic printk debug */                            \
+> -       . = ALIGN(8);                                                   \
+> -       __start___jump_table = .;                                       \
+> -       KEEP(*(__jump_table))                                           \
+> -       __stop___jump_table = .;                                        \
+>         . = ALIGN(8);                                                   \
+>         __start___verbose = .;                                          \
+>         KEEP(*(__verbose))                                              \
+> @@ -303,6 +299,12 @@
+>         . = __start_init_task + THREAD_SIZE;                            \
+>         __end_init_task = .;
+>
+> +#define JUMP_TABLE_DATA                                                        \
+> +       . = ALIGN(8);                                                   \
+> +       __start___jump_table = .;                                       \
+> +       KEEP(*(__jump_table))                                           \
+> +       __stop___jump_table = .;
 > +
-> +static inline void vcpu_set_wfe_traps(struct kvm_vcpu *vcpu)
-> +{
-> +	vcpu->arch.hcr |= HCR_TWE;
-> +}
-> +
->  static inline bool vcpu_mode_is_32bit(const struct kvm_vcpu *vcpu)
->  {
->  	return 1;
-> diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
-> index 1dab3a984608..a71e5af816a9 100644
-> --- a/arch/arm64/include/asm/kvm_emulate.h
-> +++ b/arch/arm64/include/asm/kvm_emulate.h
-> @@ -81,6 +81,16 @@ static inline unsigned long *vcpu_hcr(struct kvm_vcpu *vcpu)
->  	return (unsigned long *)&vcpu->arch.hcr_el2;
->  }
->  
-> +static inline void vcpu_clear_wfe_traps(struct kvm_vcpu *vcpu)
-> +{
-> +	vcpu->arch.hcr_el2 &= ~HCR_TWE;
-> +}
-> +
-> +static inline void vcpu_set_wfe_traps(struct kvm_vcpu *vcpu)
-> +{
-> +	vcpu->arch.hcr_el2 |= HCR_TWE;
-> +}
-> +
->  static inline void vcpu_set_vsesr(struct kvm_vcpu *vcpu, u64 vsesr)
->  {
->  	vcpu->arch.vsesr_el2 = vsesr;
-> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-> index 04e554cae3a2..8e66b89a3db2 100644
-> --- a/virt/kvm/arm/arm.c
-> +++ b/virt/kvm/arm/arm.c
-> @@ -30,6 +30,7 @@
->  #include <linux/kvm.h>
->  #include <linux/kvm_irqfd.h>
->  #include <linux/irqbypass.h>
-> +#include <linux/sched/stat.h>
->  #include <trace/events/kvm.h>
->  #include <kvm/arm_pmu.h>
->  #include <kvm/arm_psci.h>
-> @@ -380,6 +381,11 @@ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
->  	kvm_timer_vcpu_load(vcpu);
->  	kvm_vcpu_load_sysregs(vcpu);
->  	kvm_arch_vcpu_load_fp(vcpu);
-> +
-> +	if (single_task_running())
-> +		vcpu_clear_wfe_traps(vcpu);
-> +	else
-> +		vcpu_set_wfe_traps(vcpu);
->  }
->  
->  void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
-> -- 
+>  /*
+>   * Allow architectures to handle ro_after_init data on their
+>   * own by defining an empty RO_AFTER_INIT_DATA.
+> @@ -311,6 +313,7 @@
+>  #define RO_AFTER_INIT_DATA                                             \
+>         __start_ro_after_init = .;                                      \
+>         *(.data..ro_after_init)                                         \
+> +       JUMP_TABLE_DATA                                                 \
+>         __end_ro_after_init = .;
+>  #endif
+>
+> diff --git a/kernel/module.c b/kernel/module.c
+> index 7cb82e0fcac0..0d4e320e41cd 100644
+> --- a/kernel/module.c
+> +++ b/kernel/module.c
+> @@ -3349,6 +3349,15 @@ static struct module *layout_and_allocate(struct load_info *info, int flags)
+>          * Note: ro_after_init sections also have SHF_{WRITE,ALLOC} set.
+>          */
+>         ndx = find_sec(info, ".data..ro_after_init");
+> +       if (ndx)
+> +               info->sechdrs[ndx].sh_flags |= SHF_RO_AFTER_INIT;
+> +       /*
+> +        * Mark the __jump_table section as ro_after_init as well: these data
+> +        * structures are never modified, with the exception of entries that
+> +        * refer to code in the __init section, which are annotated as such
+> +        * at module load time.
+> +        */
+> +       ndx = find_sec(info, "__jump_table");
+>         if (ndx)
+>                 info->sechdrs[ndx].sh_flags |= SHF_RO_AFTER_INIT;
+>
+> --
 > 2.17.1
-> 
+>
+
+
+
+-- 
+Kees Cook
+Pixel Security
