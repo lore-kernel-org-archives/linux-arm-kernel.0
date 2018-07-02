@@ -1,44 +1,39 @@
-From: groeck@google.com (Guenter Roeck)
-Date: Mon, 2 Jul 2018 07:43:30 -0700
-Subject: [PATCH 3/3] Input: keyboard: Fix ChromeOS EC keyboard help
- message.
-In-Reply-To: <20180702102201.13461-4-enric.balletbo@collabora.com>
-References: <20180702102201.13461-1-enric.balletbo@collabora.com>
- <20180702102201.13461-4-enric.balletbo@collabora.com>
-Message-ID: <CABXOdTfLS-x_sPWBi2mmjkUTtN0Spd9ObEy5fYtEB-hoLJTPEg@mail.gmail.com>
+From: srikar@linux.vnet.ibm.com (Srikar Dronamraju)
+Date: Mon, 2 Jul 2018 07:45:33 -0700
+Subject: [PATCH v5 10/10] perf probe: Support SDT markers having
+ reference counter (semaphore)
+In-Reply-To: <20180628052209.13056-11-ravi.bangoria@linux.ibm.com>
+References: <20180628052209.13056-1-ravi.bangoria@linux.ibm.com>
+ <20180628052209.13056-11-ravi.bangoria@linux.ibm.com>
+Message-ID: <20180702144533.GA65296@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 2, 2018 at 3:22 AM Enric Balletbo i Serra
-<enric.balletbo@collabora.com> wrote:
->
-> The cros-ec I2C and SPI transport drivers have been moved from MFD
-> subsystem to platform/chrome, at the same time, the config symbol
-> has been renamed and lost the MFD_ prefix So, update the help message
-> accordingly.
->
-> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+* Ravi Bangoria <ravi.bangoria@linux.ibm.com> [2018-06-28 10:52:09]:
 
-Reviewed-by: Guenter Roeck <groeck@chromium.org>
+> With this, perf buildid-cache will save SDT markers with reference
+> counter in probe cache. Perf probe will be able to probe markers
+> having reference counter. Ex,
+> 
+>   # readelf -n /tmp/tick | grep -A1 loop2
+>     Name: loop2
+>     ... Semaphore: 0x0000000010020036
+> 
+>   # ./perf buildid-cache --add /tmp/tick
+>   # ./perf probe sdt_tick:loop2
+>   # ./perf stat -e sdt_tick:loop2 /tmp/tick
+>     hi: 0
+>     hi: 1
+>     hi: 2
+>     ^C
+>      Performance counter stats for '/tmp/tick':
+>                  3      sdt_tick:loop2
+>        2.561851452 seconds time elapsed
+> 
+> Signed-off-by: Ravi Bangoria <ravi.bangoria@linux.ibm.com>
+> Acked-by: Masami Hiramatsu <mhiramat@kernel.org>
+> 
 
-> ---
->
->  drivers/input/keyboard/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/input/keyboard/Kconfig b/drivers/input/keyboard/Kconfig
-> index 6bd97ffee761..4713957b0cbb 100644
-> --- a/drivers/input/keyboard/Kconfig
-> +++ b/drivers/input/keyboard/Kconfig
-> @@ -721,7 +721,7 @@ config KEYBOARD_CROS_EC
->         help
->           Say Y here to enable the matrix keyboard used by ChromeOS devices
->           and implemented on the ChromeOS EC. You must enable one bus option
-> -         (MFD_CROS_EC_I2C or MFD_CROS_EC_SPI) to use this.
-> +         (CROS_EC_I2C or CROS_EC_SPI) to use this.
->
->           To compile this driver as a module, choose M here: the
->           module will be called cros_ec_keyb.
-> --
-> 2.18.0
->
+Looks good to me.
+
+Acked-by: Srikar Dronamraju <srikar@linux.vnet.ibm.com>
