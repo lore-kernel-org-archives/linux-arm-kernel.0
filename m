@@ -1,39 +1,99 @@
-From: rdunlap@infradead.org (Randy Dunlap)
-Date: Mon, 2 Jul 2018 09:41:16 -0700
-Subject: linux-next: Tree for Jul 2 (sound/soc/pxa/)
-In-Reply-To: <2276786f-3f50-0740-0500-68a26a49704a@infradead.org>
-References: <20180702145158.10190101@canb.auug.org.au>
- <2276786f-3f50-0740-0500-68a26a49704a@infradead.org>
-Message-ID: <c12cc7c4-03d0-4b0b-d02f-7e72b8a135d4@infradead.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon,  2 Jul 2018 17:46:21 +0100
+Subject: [RFC PATCH] KVM: arm/arm64: Enable adaptative WFE trapping
+Message-ID: <20180702164621.9899-1-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[add other maintainers]
+Trapping blocking WFE is extremely beneficial in situations where
+the system is oversubscribed, as it allows another thread to run
+while being blocked. In a non-oversubscribed environment, this is
+the complete opposite, and trapping WFE is just unnecessary overhead.
 
-On 07/02/18 09:09, Randy Dunlap wrote:
-> On 07/01/18 21:51, Stephen Rothwell wrote:
->> Hi all,
->>
->> Changes since 20180629:
->>
-> 
-> on i386 or x86_64:
-> 
-> builtin:
-> sound/soc/pxa/pxa-ssp.o:(.rodata+0x228): undefined reference to `pxa2xx_soc_pcm_new'
-> sound/soc/pxa/pxa-ssp.o:(.rodata+0x22c): undefined reference to `pxa2xx_pcm_free_dma_buffers'
-> sound/soc/pxa/pxa-ssp.o:(.rodata+0x250): undefined reference to `pxa2xx_pcm_ops'
-> /home/rdunlap/lnx/next/linux-next-20180702/Makefile:1023: recipe for target 'vmlinux' failed
-> 
-> modular:
-> ERROR: "pxa2xx_pcm_ops" [sound/soc/pxa/snd-soc-pxa-ssp.ko] undefined!
-> ERROR: "pxa2xx_pcm_free_dma_buffers" [sound/soc/pxa/snd-soc-pxa-ssp.ko] undefined!
-> ERROR: "pxa2xx_soc_pcm_new" [sound/soc/pxa/snd-soc-pxa-ssp.ko] undefined!
-> 
-> 
-> x86_64 [modular] randconfig file is attached.
-> 
+Let's only enable WFE trapping if the CPU has more than a single task
+to run (that is, more than just the vcpu thread).
 
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+This small patchlet seem to have some interesting effects in my limited
+testing. Installing 100 concurrent Debian VMs results results in about
+90 million WFE exits without this patch, and only 7.6 millions with it
+(TX1, 96 cores, 2 vcpu guests). I haven't measured any significant
+performance variation in that process.
 
+I'd welcome any benchmarking result from people with more interesting
+workloads than mine so that I could make my mind about it.
+
+ arch/arm/include/asm/kvm_emulate.h   | 10 ++++++++++
+ arch/arm64/include/asm/kvm_emulate.h | 10 ++++++++++
+ virt/kvm/arm/arm.c                   |  6 ++++++
+ 3 files changed, 26 insertions(+)
+
+diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
+index 6493bd479ddc..b50fe8380868 100644
+--- a/arch/arm/include/asm/kvm_emulate.h
++++ b/arch/arm/include/asm/kvm_emulate.h
+@@ -107,6 +107,16 @@ static inline unsigned long *vcpu_hcr(const struct kvm_vcpu *vcpu)
+ 	return (unsigned long *)&vcpu->arch.hcr;
+ }
+ 
++static inline void vcpu_clear_wfe_traps(struct kvm_vcpu *vcpu)
++{
++	vcpu->arch.hcr &= ~HCR_TWE;
++}
++
++static inline void vcpu_set_wfe_traps(struct kvm_vcpu *vcpu)
++{
++	vcpu->arch.hcr |= HCR_TWE;
++}
++
+ static inline bool vcpu_mode_is_32bit(const struct kvm_vcpu *vcpu)
+ {
+ 	return 1;
+diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+index 1dab3a984608..a71e5af816a9 100644
+--- a/arch/arm64/include/asm/kvm_emulate.h
++++ b/arch/arm64/include/asm/kvm_emulate.h
+@@ -81,6 +81,16 @@ static inline unsigned long *vcpu_hcr(struct kvm_vcpu *vcpu)
+ 	return (unsigned long *)&vcpu->arch.hcr_el2;
+ }
+ 
++static inline void vcpu_clear_wfe_traps(struct kvm_vcpu *vcpu)
++{
++	vcpu->arch.hcr_el2 &= ~HCR_TWE;
++}
++
++static inline void vcpu_set_wfe_traps(struct kvm_vcpu *vcpu)
++{
++	vcpu->arch.hcr_el2 |= HCR_TWE;
++}
++
+ static inline void vcpu_set_vsesr(struct kvm_vcpu *vcpu, u64 vsesr)
+ {
+ 	vcpu->arch.vsesr_el2 = vsesr;
+diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+index 04e554cae3a2..8e66b89a3db2 100644
+--- a/virt/kvm/arm/arm.c
++++ b/virt/kvm/arm/arm.c
+@@ -30,6 +30,7 @@
+ #include <linux/kvm.h>
+ #include <linux/kvm_irqfd.h>
+ #include <linux/irqbypass.h>
++#include <linux/sched/stat.h>
+ #include <trace/events/kvm.h>
+ #include <kvm/arm_pmu.h>
+ #include <kvm/arm_psci.h>
+@@ -380,6 +381,11 @@ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
+ 	kvm_timer_vcpu_load(vcpu);
+ 	kvm_vcpu_load_sysregs(vcpu);
+ 	kvm_arch_vcpu_load_fp(vcpu);
++
++	if (single_task_running())
++		vcpu_clear_wfe_traps(vcpu);
++	else
++		vcpu_set_wfe_traps(vcpu);
+ }
+ 
+ void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
 -- 
-~Randy
+2.17.1
