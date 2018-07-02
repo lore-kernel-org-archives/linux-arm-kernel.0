@@ -1,59 +1,44 @@
-From: evgreen@chromium.org (Evan Green)
-Date: Mon, 2 Jul 2018 10:08:32 -0700
-Subject: [PATCH v5 6/8] interconnect: qcom: Add msm8916 interconnect
- provider driver
-In-Reply-To: <8e2218b4-a193-3bb4-b732-3608a4019977@linaro.org>
-References: <20180620121141.15403-1-georgi.djakov@linaro.org>
- <20180620121141.15403-7-georgi.djakov@linaro.org>
- <CAE=gft6pbLzeLLtpWd-jHbvYuURi=SpODOVqgY7mdHhmz=ZP9A@mail.gmail.com>
- <8e2218b4-a193-3bb4-b732-3608a4019977@linaro.org>
-Message-ID: <CAE=gft489LjMLp6YW1C_TywGDx0BPLAc8nSac1qCGiRDpAV9Ng@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 2 Jul 2018 10:09:41 -0700
+Subject: [GIT PULL] Renesas ARM64 Based SoC DT Updates for v4.19
+In-Reply-To: <cover.1529933747.git.horms+renesas@verge.net.au>
+References: <cover.1529933747.git.horms+renesas@verge.net.au>
+Message-ID: <CAOesGMhZD0VS+NbZhgJOqhpP5A5X_pXVfUdkUnGmqLbnagJZaA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 1, 2018 at 5:12 AM Georgi Djakov <georgi.djakov@linaro.org> wrote:
+On Mon, Jun 25, 2018 at 7:03 AM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
 >
-> Hi Evan,
+> Please consider these Renesas ARM64 based SoC DT updates for v4.19.
 >
-> On 06/26/2018 11:48 PM, Evan Green wrote:
-> > On Wed, Jun 20, 2018 at 5:11 AM Georgi Djakov <georgi.djakov@linaro.org> wrote:
 >
-> >> +static int qcom_icc_init(struct icc_node *node)
-> >> +{
-> >> +       struct qcom_icc_provider *qp = to_qcom_provider(node->provider);
-> >> +       int ret;
-> >> +
-> >> +       /* TODO: init qos and priority */
-> >> +
-> >> +       clk_set_rate(qp->bus_clk, INT_MAX);
-> >
-> > Vroom! What's the rationale here? I wonder if it might be better to
-> > avoid touching the clocks initially, and expect that the boot loader
-> > sets up a decent initial set of bus frequencies for consumers that
-> > never enable bus scaling? Otherwise, I worry that this driver becomes
-> > basically an essential driver for the platform solely because of this
-> > line and the one below, when really it might not be.
+> The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
 >
-> The idea is to run the interconnects at max rate until consumers start
-> sending requests, but i understand your worry and we can live without
-> this for now. The better solution would be to set maximum bandwidth and
-> remove it at late_init (after consumers are registered) or use this
-> patchset: https://lkml.org/lkml/2018/3/21/897
-> Actually I have some patches which add support for interconnects to keep
-> the bandwidth constraints active until consumers are registered. The
-> whole boot constraint thing adds complexity and introduces some
-> overhead, but hopefully can be optimized.
+>   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+>
+> are available in the git repository at:
+>
+>   https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm64-dt-for-v4.19
+>
+> for you to fetch changes up to 6b284a81307848b4331453b02cf7a33c09719d4b:
+>
+>   arm64: dts: renesas: r8a77995: Add MSIOF device nodes (2018-06-25 15:30:39 +0200)
 
-Ah, that makes sense. This is a trickier issue than I was thinking
-before. On one hand, you don't want to shut off bandwidth to a device
-that was set up correctly by the boot environment and should keep
-working until the driver comes up, like LCD. But on the other hand, if
-a driver fails to come up, or fails to ask for bus bandwidth, you're
-now burning at max. And then there's the issue of whether or not this
-should be a required or optional driver for platforms that support it
-(it would be nice if the system booted even without this driver, but
-maybe for others that's a non-goal). I agree this is shouldn't hold up
-this initial set of framework patches, we can solve this in a future
-set.
+Thanks, merged into next/dt.
 
--Evan
+I think you can still collapse some commits a bit further, for example
+when a large number of devices are added to a new SoC, you don't need
+a commit per device (i.e. the r8a77980 series).
+
+It's not a problem if it's just a few, but like last merge window when
+it really added to a lot of small trivial patches it's adding noise to
+someone looking at changelogs -- it's harder to get a feel for what
+new things are going in on a larger scope. Keep in mind that you, as
+maintainer, should feel free to squash together patches when you apply
+them if it makes sense -- just make sure you retain authorship and
+credits/COO.
+
+
+-Olof
