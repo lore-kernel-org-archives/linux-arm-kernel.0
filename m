@@ -1,205 +1,52 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Mon, 02 Jul 2018 14:05:45 +0200
-Subject: [PATCH 2/2] soc: imx: gpc: Power off PU domain in
- suspend/resume on 6qp
-In-Reply-To: <cf9aaa345a27b3d5fcd306635270123f9d01e8c3.1530530881.git.leonard.crestez@nxp.com>
-References: <cover.1530530881.git.leonard.crestez@nxp.com>
- <cf9aaa345a27b3d5fcd306635270123f9d01e8c3.1530530881.git.leonard.crestez@nxp.com>
-Message-ID: <1530533145.22468.85.camel@pengutronix.de>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 2 Jul 2018 17:38:24 +0530
+Subject: [PATCH v7 0/4] ARM: davinci: complete the conversion to using the
+ reset framework
+In-Reply-To: <CAMRc=Me1JTuw40tMWaai2oKMxmc_ktN2OKBhF8tmGt0cQ6magg@mail.gmail.com>
+References: <20180621073706.22812-1-brgl@bgdev.pl>
+ <9ec10627-49a5-07ad-8c9d-5ac873096cc0@ti.com>
+ <CAMRc=Me1JTuw40tMWaai2oKMxmc_ktN2OKBhF8tmGt0cQ6magg@mail.gmail.com>
+Message-ID: <e4bd9f57-617a-a59e-5d05-be1a6b3e6b3d@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, den 02.07.2018, 14:52 +0300 schrieb Leonard Crestez:
-> On imx6qp power gating on the PU domain is disabled because of errata
-> ERR009619. However power gating on suspend/resume can still work.
+Hi Bjorn,
+
+On Thursday 21 June 2018 05:11 PM, Bartosz Golaszewski wrote:
+> 2018-06-21 12:52 GMT+02:00 Sekhar Nori <nsekhar@ti.com>:
+>> Hi Bartosz,
+>>
+>> On Thursday 21 June 2018 01:07 PM, Bartosz Golaszewski wrote:
+>>> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>>>
+>>> These are the remaining patches that still need to be merged in order
+>>> to complete the conversion of the davinci dsp driver to using the reset
+>>> framework.
+>>>
+>>> They apply on top of v4.18-rc1 with David Lechner's remaining patches
+>>> merged.
+>>
+>> Series looks good to me.
+>>
+>> To preserve bisect, shouldn't the order of applying be patch #3, #4, #1
+>> and #2 ?
+>>
+>> Given the dependencies and to preserve bisect its easiest if I take the
+>> series with acks from remoteproc and clock maintainers.
+>>
+>> Open to other suggestions as well.
+>>
+>> Thanks,
+>> Sekhar
 > 
-> Enable this by calling the on/off functions directly from suspend code in
-> mach-imx.
+> Oops you're right about the order. Do you want me to resend?
 
-Sorry, but no. Please keep those two parts split. We don't want them to
-interact.
+With your ack, I can queue 1/4 for v4.19 and provide an immutable commit
+to you (on top of v4.18-rc1) for you to merge any further changes you
+want to queue from your tree.
 
-What keeps you from using standard system suspend PM ops in the GPC
-driver? The domain drivers within the GPC power management code are all
-standard platform devices, so can implement PM ops themselves. There is
-no need for any of this reaching between different drivers.
+Bartosz, given the number of moving pieces, I think its better to keep
+2/4 for v4.20 release - once all other other dependencies have been merged.
 
-Regards,
-Lucas
-
-> Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
-> 
-> ---
-> ?arch/arm/mach-imx/gpc.c | 10 +++++++
-> ?drivers/soc/imx/gpc.c???| 58 ++++++++++++++++++++++++++++++-----------
-> ?2 files changed, 53 insertions(+), 15 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/gpc.c b/arch/arm/mach-imx/gpc.c
-> index de535cb679b3..e99258238210 100644
-> --- a/arch/arm/mach-imx/gpc.c
-> +++ b/arch/arm/mach-imx/gpc.c
-> @@ -32,10 +32,14 @@
-> ?
-> ?static void __iomem *gpc_base;
-> ?static u32 gpc_wake_irqs[IMR_NUM];
-> ?static u32 gpc_saved_imrs[IMR_NUM];
-> ?
-> +/* implemented in drivers/soc/imx/gpc.c */
-> +extern void _imx6_pm_pu_power_off(void);
-> +extern void _imx6_pm_pu_power_on(void);
-> +
-> ?void imx_gpc_set_arm_power_up_timing(u32 sw2iso, u32 sw)
-> ?{
-> > ?	writel_relaxed((sw2iso << GPC_PGC_SW2ISO_SHIFT) |
-> > ?		(sw << GPC_PGC_SW_SHIFT), gpc_base + GPC_PGC_CPU_PUPSCR);
-> ?}
-> @@ -54,10 +58,13 @@ void imx_gpc_set_arm_power_in_lpm(bool power_off)
-> ?void imx_gpc_pre_suspend(bool arm_power_off)
-> ?{
-> > ?	void __iomem *reg_imr1 = gpc_base + GPC_IMR1;
-> > ?	int i;
-> ?
-> > +	if (cpu_is_imx6q() && imx_get_soc_revision() >= IMX_CHIP_REVISION_2_0)
-> > +		_imx6_pm_pu_power_off();
-> +
-> > ?	/* Tell GPC to power off ARM core when suspend */
-> > ?	if (arm_power_off)
-> > ?		imx_gpc_set_arm_power_in_lpm(arm_power_off);
-> ?
-> > ?	for (i = 0; i < IMR_NUM; i++) {
-> @@ -69,10 +76,13 @@ void imx_gpc_pre_suspend(bool arm_power_off)
-> ?void imx_gpc_post_resume(void)
-> ?{
-> > ?	void __iomem *reg_imr1 = gpc_base + GPC_IMR1;
-> > ?	int i;
-> ?
-> > +	if (cpu_is_imx6q() && imx_get_soc_revision() >= IMX_CHIP_REVISION_2_0)
-> > +		_imx6_pm_pu_power_on();
-> +
-> > ?	/* Keep ARM core powered on for other low-power modes */
-> > ?	imx_gpc_set_arm_power_in_lpm(false);
-> ?
-> > ?	for (i = 0; i < IMR_NUM; i++)
-> > ?		writel_relaxed(gpc_saved_imrs[i], reg_imr1 + i * 4);
-> diff --git a/drivers/soc/imx/gpc.c b/drivers/soc/imx/gpc.c
-> index 83cb275592e9..dddc2469eaac 100644
-> --- a/drivers/soc/imx/gpc.c
-> +++ b/drivers/soc/imx/gpc.c
-> @@ -54,19 +54,16 @@ static inline struct imx_pm_domain *
-> ?to_imx_pm_domain(struct generic_pm_domain *genpd)
-> ?{
-> > ?	return container_of(genpd, struct imx_pm_domain, base);
-> ?}
-> ?
-> -static int imx6_pm_domain_power_off(struct generic_pm_domain *genpd)
-> +static void _imx6_pm_domain_power_off(struct generic_pm_domain *genpd)
-> ?{
-> > ?	struct imx_pm_domain *pd = to_imx_pm_domain(genpd);
-> > ?	int iso, iso2sw;
-> > ?	u32 val;
-> ?
-> > -	if (pd->flags & PGC_DOMAIN_FLAG_NO_PD)
-> > -		return -EBUSY;
-> -
-> > ?	/* Read ISO and ISO2SW power down delays */
-> > ?	regmap_read(pd->regmap, pd->reg_offs + GPC_PGC_PUPSCR_OFFS, &val);
-> > ?	iso = val & 0x3f;
-> > ?	iso2sw = (val >> 8) & 0x3f;
-> ?
-> @@ -78,32 +75,33 @@ static int imx6_pm_domain_power_off(struct generic_pm_domain *genpd)
-> > ?	val = BIT(pd->cntr_pdn_bit);
-> > ?	regmap_update_bits(pd->regmap, GPC_CNTR, val, val);
-> ?
-> > ?	/* Wait ISO + ISO2SW IPG clock cycles */
-> > ?	udelay(DIV_ROUND_UP(iso + iso2sw, pd->ipg_rate_mhz));
-> +}
-> +
-> +static int imx6_pm_domain_power_off(struct generic_pm_domain *genpd)
-> +{
-> > +	struct imx_pm_domain *pd = to_imx_pm_domain(genpd);
-> +
-> > +	if (to_imx_pm_domain(genpd)->flags & PGC_DOMAIN_FLAG_NO_PD)
-> > +		return -EBUSY;
-> +
-> > +	_imx6_pm_domain_power_off(genpd);
-> ?
-> > ?	if (pd->supply)
-> > ?		regulator_disable(pd->supply);
-> ?
-> > ?	return 0;
-> ?}
-> ?
-> -static int imx6_pm_domain_power_on(struct generic_pm_domain *genpd)
-> +static void _imx6_pm_domain_power_on(struct generic_pm_domain *genpd)
-> ?{
-> > ?	struct imx_pm_domain *pd = to_imx_pm_domain(genpd);
-> > -	int i, ret, sw, sw2iso;
-> > +	int i, sw, sw2iso;
-> > ?	u32 val;
-> ?
-> > -	if (pd->supply) {
-> > -		ret = regulator_enable(pd->supply);
-> > -		if (ret) {
-> > -			pr_err("%s: failed to enable regulator: %d\n",
-> > -			???????__func__, ret);
-> > -			return ret;
-> > -		}
-> > -	}
-> -
-> > ?	/* Enable reset clocks for all devices in the domain */
-> > ?	for (i = 0; i < pd->num_clks; i++)
-> > ?		clk_prepare_enable(pd->clk[i]);
-> ?
-> > ?	/* Gate off domain when powered down */
-> @@ -123,10 +121,27 @@ static int imx6_pm_domain_power_on(struct generic_pm_domain *genpd)
-> > ?	udelay(DIV_ROUND_UP(sw + sw2iso, pd->ipg_rate_mhz));
-> ?
-> > ?	/* Disable reset clocks for all devices in the domain */
-> > ?	for (i = 0; i < pd->num_clks; i++)
-> > ?		clk_disable_unprepare(pd->clk[i]);
-> +}
-> +
-> +static int imx6_pm_domain_power_on(struct generic_pm_domain *genpd)
-> +{
-> > +	struct imx_pm_domain *pd = to_imx_pm_domain(genpd);
-> > +	int ret;
-> +
-> > +	if (pd->supply) {
-> > +		ret = regulator_enable(pd->supply);
-> > +		if (ret) {
-> > +			pr_err("%s: failed to enable regulator: %d\n",
-> > +			???????__func__, ret);
-> > +			return ret;
-> > +		}
-> > +	}
-> +
-> > +	_imx6_pm_domain_power_on(genpd);
-> ?
-> > ?	return 0;
-> ?}
-> ?
-> ?static int imx_pgc_get_clocks(struct device *dev, struct imx_pm_domain *domain)
-> @@ -337,10 +352,23 @@ static const struct regmap_config imx_gpc_regmap_config = {
-> > ?	.val_bits = 32,
-> > ?	.reg_stride = 4,
-> > ?	.max_register = 0x2ac,
-> ?};
-> ?
-> +/* exported for suspend/resume code in arch/arm/mach-imx/gpc.c */
-> +void _imx6_pm_pu_power_off(void)
-> +{
-> > +	_imx6_pm_domain_power_off(&imx_gpc_domains[GPC_PGC_DOMAIN_PU].base);
-> +}
-> +EXPORT_SYMBOL_GPL(_imx6_pm_pu_power_off);
-> +
-> +void _imx6_pm_pu_power_on(void)
-> +{
-> > +	_imx6_pm_domain_power_on(&imx_gpc_domains[GPC_PGC_DOMAIN_PU].base);
-> +}
-> +EXPORT_SYMBOL_GPL(_imx6_pm_pu_power_on);
-> +
-> ?static struct generic_pm_domain *imx_gpc_onecell_domains[] = {
-> > ?	&imx_gpc_domains[0].base,
-> > ?	&imx_gpc_domains[1].base,
-> ?};
-> ?
+Thanks,
+Sekhar
