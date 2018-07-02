@@ -1,80 +1,79 @@
-From: leo.yan@linaro.org (leo.yan at linaro.org)
-Date: Mon, 2 Jul 2018 10:35:45 +0800
-Subject: [PATCH v1 0/6] perf cs-etm: Fix tracing packet handling and
- minor refactoring
-In-Reply-To: <20180619181943.GL20477@kernel.org>
-References: <1529298599-3876-1-git-send-email-leo.yan@linaro.org>
- <CANLsYkyxuz+tPrC7wb1omsw+qj=7ZB5t6FRbqZz54994g62q6g@mail.gmail.com>
- <20180619181943.GL20477@kernel.org>
-Message-ID: <20180702023545.GA13629@leoy-ThinkPad-X240s>
+From: honghui.zhang@mediatek.com (honghui.zhang at mediatek.com)
+Date: Mon, 2 Jul 2018 11:49:41 +0800
+Subject: [PATCH v2 1/4] PCI: mediatek: fixup mtk_pcie_find_port logical
+In-Reply-To: <1530503384-1218-1-git-send-email-honghui.zhang@mediatek.com>
+References: <1530503384-1218-1-git-send-email-honghui.zhang@mediatek.com>
+Message-ID: <1530503384-1218-2-git-send-email-honghui.zhang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnaldo,
+From: Honghui Zhang <honghui.zhang@mediatek.com>
 
-On Tue, Jun 19, 2018 at 03:19:43PM -0300, Arnaldo Carvalho de Melo wrote:
-> Em Tue, Jun 19, 2018 at 11:46:02AM -0600, Mathieu Poirier escreveu:
-> > On Sun, 17 Jun 2018 at 23:10, Leo Yan <leo.yan@linaro.org> wrote:
-> > >
-> > > Due the current code is missing to handle cs-etm start tracing packet
-> > > and CS_ETM_TRACE_ON packet, we fail to generate branch sample for them.
-> > >
-> > > This patch series is to fix cs-etm tracing packet handling:
-> > >
-> > > Patch 0001 is to add invalid address macro for readable coding;
-> > >
-> > > Patch 0002 is one minor fixing to return error code for instruction
-> > > sample failure;
-> > >
-> > > Patches 0003~0006 are fixing patches for start tracing packet
-> > > and CS_ETM_TRACE_ON packet.
-> > >
-> > > This patch series is applied on acme tree [1] on branch perf/core with
-> > > latest commit: e238cf2e3d2e ("perf intel-pt: Fix packet decoding of CYC
-> > > packets").  Also applied successfully this patch series on Linus tree
-> > > on 4.18-rc1.
-> > >
-> > > This patch series has been verified on Hikey620 platform with below two
-> > > commands:
-> > > perf script --itrace=i10000il128 -F cpu,event,ip,addr,sym -k ./vmlinux
-> > > perf script -F cpu,event,ip,addr,sym -k ./vmlinux
-> > >
-> > > [1] https://git.kernel.org/pub/scm/linux/kernel/git/acme/linux.git
-> > >
-> > >
-> > > Leo Yan (6):
-> > >   perf cs-etm: Introduce invalid address macro
-> > >   perf cs-etm: Bail out immediately for instruction sample failure
-> > >   perf cs-etm: Fix start tracing packet handling
-> > >   perf cs-etm: Support dummy address value for CS_ETM_TRACE_ON packet
-> > >   perf cs-etm: Generate branch sample when receiving a CS_ETM_TRACE_ON
-> > >     packet
-> > >   perf cs-etm: Generate branch sample for CS_ETM_TRACE_ON packet
-> > >
-> > >  tools/perf/util/cs-etm-decoder/cs-etm-decoder.c | 10 ++--
-> > >  tools/perf/util/cs-etm-decoder/cs-etm-decoder.h |  1 +
-> > >  tools/perf/util/cs-etm.c                        | 71 +++++++++++++++++++++----
-> > >  3 files changed, 68 insertions(+), 14 deletions(-)
-> > 
-> > Good day Arnaldo,
-> > 
-> > I am good with this set:
-> > 
-> > Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-> > 
-> > Please consider for inclusion in your tree if you are satisfied with the work.
-> 
-> I'll take a look and get it into perf/core, now I'm concentrating on
-> perf/urgent work.
+The Mediatek's host controller has two slots, each with it's own control
+registers. The host driver need to identify which slot was connected
+in order to access the device's configuration space. There's problem
+for current host driver to find out which slot was connected to for
+a given EP device.
 
-Gentle ping for this patch series.
+Assuming each slot have connect with one EP device as below:
 
-I tested this patch series on perf/core branch with latest commit
-87b40003b17a ("perf tests: Check that complex event name is parsed
-correctly"), this patch series is still valid and can pass testing.
+                host bridge
+  bus 0 --> __________|_______
+           |                  |
+           |                  |
+         slot 0             slot 1
+  bus 1 -->|        bus 2 --> |
+           |                  |
+         EP 0               EP 1
 
-Could you pick up them?  If you want me to resend this patch series,
-please let me know.
+During PCI enumeration, system software will scan all the PCI device
+starting from devfn 0. So it will get the proper port for slot0 and
+slot1 device when using PCI_SLOT(devfn) for match. But it will get
+the wrong slot for EP1: The devfn will be start from 0 when scanning
+EP1 behind slot1, it will get port0 since the PCI_SLOT(EP1) is match
+for port0's slot value. So the host driver should not using EP's devfn
+but the slot's devfn(the slot which EP was connected to) for match.
 
-Thanks,
-Leo Yan
+This patch fix the mtk_pcie_find_port's logical by using the slot's
+devfn for match.
+
+Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
+---
+ drivers/pci/controller/pcie-mediatek.c | 19 +++++++++++++++++--
+ 1 file changed, 17 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/pci/controller/pcie-mediatek.c b/drivers/pci/controller/pcie-mediatek.c
+index 0baabe3..b43f41d 100644
+--- a/drivers/pci/controller/pcie-mediatek.c
++++ b/drivers/pci/controller/pcie-mediatek.c
+@@ -337,11 +337,26 @@ static struct mtk_pcie_port *mtk_pcie_find_port(struct pci_bus *bus,
+ {
+ 	struct mtk_pcie *pcie = bus->sysdata;
+ 	struct mtk_pcie_port *port;
++	struct pci_dev *dev;
++	struct pci_bus *pbus;
+ 
+-	list_for_each_entry(port, &pcie->ports, list)
+-		if (port->slot == PCI_SLOT(devfn))
++	list_for_each_entry(port, &pcie->ports, list) {
++		if (!bus->number && port->slot == PCI_SLOT(devfn))
+ 			return port;
+ 
++		if (bus->number) {
++			pbus = bus;
++
++			while (pbus->number) {
++				dev = pbus->self;
++				pbus = dev->bus;
++			}
++
++			if (port->slot == PCI_SLOT(dev->devfn))
++				return port;
++		}
++	}
++
+ 	return NULL;
+ }
+ 
+-- 
+2.6.4
