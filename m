@@ -1,58 +1,60 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Mon, 02 Jul 2018 11:58:35 +0200
-Subject: Clarifying dma_wmb behavior in presence of non-coherent masters
- and outer caches
-In-Reply-To: <20180629174622.GB20909@arm.com>
-References: <1530275290.22468.69.camel@pengutronix.de>
- <20180629142539.GH17271@n2100.armlinux.org.uk>
- <20180629162248.GB20010@arm.com> <1530292490.22468.76.camel@pengutronix.de>
- <20180629174622.GB20909@arm.com>
-Message-ID: <1530525515.22468.82.camel@pengutronix.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 2 Jul 2018 10:59:32 +0100
+Subject: [PATCH] arm64: Clear the stack
+In-Reply-To: <CAGXu5jLW5FJdRdRXcP=xPOEcQ=Tg+uSi=vj6vQ39iVp=QHSRAQ@mail.gmail.com>
+References: <20180629190553.7282-1-labbott@redhat.com>
+ <CAGXu5jL8kZHtg-MdScZ5m_6xH_Ho4TsdKGWH83zEL9Y5rutncw@mail.gmail.com>
+ <706dc06b-0157-89cb-33a6-d0b9d811dcf0@redhat.com>
+ <CAGXu5jLW5FJdRdRXcP=xPOEcQ=Tg+uSi=vj6vQ39iVp=QHSRAQ@mail.gmail.com>
+Message-ID: <20180702095931.GB28665@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, den 29.06.2018, 18:46 +0100 schrieb Will Deacon:
-> On Fri, Jun 29, 2018 at 07:14:50PM +0200, Lucas Stach wrote:
-> > Am Freitag, den 29.06.2018, 17:22 +0100 schrieb Will Deacon:
-> > > You're right that cacheability and shareability are different things. For
-> > > the purposes of ordering and coherence, we care about shareability. Normal
-> > > non-cacheable is outer-shareable (which is a superset of inner-shareable),
-> > > so DMB OSH is sufficient to order accesses to that buffer from the
-> > > perspective of all observers.
-> > 
-> > Can you point me to something where this mapping from normal, non-
-> > cacheable to outer-sharable is defined? Why is there a distinction
-> > between OSH and SY in the barriers, if all non-coherent masters are in
-> > the outer sharable domain?
-> > 
-> > /me is still confused
-> 
-> Hopefully my reply to Russell will help you here. The distinction between
-> OSH and SY is for handling masters that are not coherent at all, even when
-> using non-cacheable mappings. But as I mentioned to Russell, I think this
-> is largely theoretical and nobody builds systems like this.
-> 
-> > > ?Since we use Normal non-cacheable mappings
-> > > for non-coherent DMA buffers (and there is no such thing as a
-> > > system-shareable memory type), then these barriers are sufficient to provide
-> > > ordering in this case too.
-> > > 
-> > > Ideally, we'd limit the DMA barriers to the inner-shareable domain when
-> > > dealing with coherent devices, but there's no way to determine that from
-> > > the barrier macros.
-> > > 
-> > > Lucas -- did changing the shareability of the DMA barriers actually solve
-> > > your problem?
-> > 
-> > There isn't enough data at this point to conclusively answer this. But
-> > reading the code, this struck me as being odd enough to warrant some
-> > clarifications from experts.
-> 
-> Have you checked that you have bit 22 set in the PL310 aux ctrl register?
+Hi Kees,
 
-Yep, that was one of the first things we checked, as I know that not
-setting this bit results in the PL310 being nonconformant to the ARM
-ARM clarifications about mismatched page mappings.
+On Fri, Jun 29, 2018 at 01:25:20PM -0700, Kees Cook wrote:
+> On Fri, Jun 29, 2018 at 1:22 PM, Laura Abbott <labbott@redhat.com> wrote:
+> > On 06/29/2018 01:19 PM, Kees Cook wrote:
+> >>
+> >> On Fri, Jun 29, 2018 at 12:05 PM, Laura Abbott <labbott@redhat.com> wrote:
+> >>>
+> >>> Implementation of stackleak based heavily on the x86 version
+> >>>
+> >>> Signed-off-by: Laura Abbott <labbott@redhat.com>
+> >>> [...]
+> >>> +#define current_top_of_stack() (task_stack_page(current) + THREAD_SIZE)
+> >>> +#define on_thread_stack()      (on_task_stack(current,
+> >>> current_stack_pointer))
+> >>
+> >>
+> >> nit on types here. I get some warnings:
+> >>
+> >> kernel/stackleak.c:55:12: warning: assignment makes integer from
+> >> pointer without a cast [-Wint-conversion]
+> >>     boundary = current_top_of_stack();
+> >>              ^
+> >> kernel/stackleak.c:65:24: warning: assignment makes integer from
+> >> pointer without a cast [-Wint-conversion]
+> >>    current->lowest_stack = current_top_of_stack() - THREAD_SIZE / 64;
+> >>                          ^
+> >>
+> >> So I think this needs to be:
+> >>
+> >> +#define current_top_of_stack() ((unsigned long)task_stack_page(current) +
+> >> \
+> >> +                                THREAD_SIZE)
+> >>
+> >
+> > Argh, missed that in an amend, can fix for next version if there
+> > are no other objections to this approach.
+> 
+> No worries! I've made the change locally and will push this out to
+> -next unless there are objections?
 
-Regards,
-Lucas
+I'm a bit wary of conflicts in entry.S, since it's likely that we're going
+to have a lot going on in there for 4.19.
+
+Could I take this via arm64 instead, please, or are there dependencies
+on other parts of your tree?
+
+Will
