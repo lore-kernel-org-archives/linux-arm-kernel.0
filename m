@@ -1,148 +1,66 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Mon, 2 Jul 2018 19:34:21 +0200
-Subject: [RFC net-next 15/15] net: lora: Add Semtech SX1301
-In-Reply-To: <20180702161258.GA18744@sirena.org.uk>
-References: <20180701110804.32415-1-afaerber@suse.de>
- <20180701110804.32415-16-afaerber@suse.de>
- <20180702161258.GA18744@sirena.org.uk>
-Message-ID: <4e06cc72-2092-70f3-c801-bf6e4c3cbec2@suse.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 2 Jul 2018 18:45:53 +0100
+Subject: Clarifying dma_wmb behavior in presence of non-coherent masters
+ and outer caches
+In-Reply-To: <1530539366.22468.89.camel@pengutronix.de>
+References: <1530275290.22468.69.camel@pengutronix.de>
+ <20180629142539.GH17271@n2100.armlinux.org.uk>
+ <20180629162248.GB20010@arm.com>
+ <20180629164801.GJ17271@n2100.armlinux.org.uk>
+ <20180629174321.GA20909@arm.com>
+ <1530539366.22468.89.camel@pengutronix.de>
+Message-ID: <20180702174552.GD23687@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On Mon, Jul 02, 2018 at 03:49:26PM +0200, Lucas Stach wrote:
+> Am Freitag, den 29.06.2018, 18:43 +0100 schrieb Will Deacon:
+> > On Fri, Jun 29, 2018 at 05:48:01PM +0100, Russell King - ARM Linux wrote:
+> > > On Fri, Jun 29, 2018 at 05:22:48PM +0100, Will Deacon wrote:
+> > > > On Fri, Jun 29, 2018 at 03:25:39PM +0100, Russell King - ARM Linux wrote:
+> > > > > Maybe Will can shed some light on this topic.
+> > > > 
+> > > > You're right that cacheability and shareability are different things. For
+> > > > the purposes of ordering and coherence, we care about shareability. Normal
+> > > > non-cacheable is outer-shareable (which is a superset of inner-shareable),
+> > > 
+> > > What does it mean when the "implementation" doesn't define two shareable
+> > > domains - does it mean that inner and outer shareable are combined into
+> > > just one "shareable" domain, or is outer shareable always treated as
+> > > "everything but inner shareable"?
+> > 
+> > If there is only one shareability domain, then the inner and outer shareable
+> > domains refer to that domain (i.e. they're the same).
+> > 
+> > > From the paragraph I quoted from the ARM ARM, it seems that the former
+> > > applies, which should also mean that "dmb ish*" and "dmb osh*" are
+> > > functionally equivalent, and only touch the inner shareable domain.
+> > 
+> > In this case, yes. In practice, there is usually one inner-shareable domain
+> > which contains the CPUs and coherent DMA devices, and there is one
+> > outer-shareable domain containing that inner-shareable domain, where
+> > non-coherent DMA lives only in the outer-shareable domain. I don't know
+> > of any systems where that isn't the case, and I'm not sure that our
+> > interconnects even permit building anything else (I'd need to check).
+> > 
+> Sorry for not citing from the ARM ARM, but [1] seems to partly
+> contradict what you said above. Especially the table detailing the
+> shareability domains and the related picture seem to clash with the
+> above statement that most systems just have an outer-shareable domain
+> covering the whole system.
 
-This driver is still evolving, there's newer code on my lora-next branch
-already: https://github.com/afaerber/linux/commits/lora-next
+I don't think the picture in that article is representative of a real SoC
+design, but I'm pretty much just relaying the feedback from the architecture
+team here.
 
-The reason you're in CC on this RFC is two-fold:
+> Also the section "External caches", "Before AMBA4 ACE" seems to suggest
+> that the barriers aren't fully propagated to the PL310 write-caches and
+> master ports. I'm unsure if this is just an artifact of the mentioned
+> MMIO access, so handling of normal vs. device memory transactions in
+> the PL310.
 
-1) You applied Ben's patch to associate "semtech,sx1301" with spidev,
-whereas I am now preparing a new driver for the same compatible.
+I'll check with the hardware folks about the PL310, but I don't see how
+you could propagate barriers over AXI3 anyway because I don't think this
+stuff existed back then.
 
-2) This SPI device is in turn exposing the two SPI masters that you
-already found below, and I didn't see a sane way to split that code out
-into drivers/spi/, so it's in drivers/net/lora/ here - has there been
-any precedence either way?
-
-More inline ...
-
-Am 02.07.2018 um 18:12 schrieb Mark Brown:
-> On Sun, Jul 01, 2018 at 01:08:04PM +0200, Andreas F?rber wrote:
-> 
->> +static void sx1301_radio_spi_set_cs(struct spi_device *spi, bool enable)
->> +{
->> +	int ret;
->> +
->> +	dev_dbg(&spi->dev, "setting SPI CS to %s\n", enable ? "1" : "0");
->> +
->> +	if (enable)
->> +		return;
->> +
->> +	ret = sx1301_radio_set_cs(spi->controller, enable);
->> +	if (ret)
->> +		dev_warn(&spi->dev, "failed to write CS (%d)\n", ret);
->> +}
-> 
-> So we never disable chip select?
-
-Not here, I instead did that in transfer_one below.
-
-Unfortunately there seems to be no documentation, only reference code:
-
-https://github.com/Lora-net/lora_gateway/blob/master/libloragw/src/loragw_radio.c#L121
-https://github.com/Lora-net/lora_gateway/blob/master/libloragw/src/loragw_radio.c#L165
-
-It sets CS to 0 before writing to address and data registers, then
-immediately sets CS to 1 and back to 0 before reading or ending the
-write transaction. I've tried to force the same behavior in this driver.
-My guess was that CS is high-active during the short 1-0 cycle, because
-if it's low-active during the register writes then why the heck is it
-set to 0 again in the end instead of keeping at 1... confusing.
-
-Maybe the Semtech folks CC'ed can comment how these registers work?
-
->> +	if (tx_buf) {
->> +		ret = sx1301_write(ssx->parent, ssx->regs + REG_RADIO_X_ADDR, tx_buf ? tx_buf[0] : 0);
-> 
-> This looks confused.  We're in an if (tx_buf) block but there's a use of
-> the ternery operator that appears to be checking if we have a tx_buf?
-
-Yeah, as mentioned this RFC is not ready for merging - checkpatch.pl
-will complain about lines too long, and TODOs are sprinkled all over or
-not even mentioned. It's a Proof of Concept that a net_device could work
-for a wide range of spi and serdev based drivers, and on top this device
-has more than one channel, which may influence network-level design
-discussions.
-
-That said, I'll happily drop the second check. Thanks for spotting!
-
->> +		if (ret) {
->> +			dev_err(&spi->dev, "SPI radio address write failed\n");
->> +			return ret;
->> +		}
->> +
->> +		ret = sx1301_write(ssx->parent, ssx->regs + REG_RADIO_X_DATA, (tx_buf && xfr->len >= 2) ? tx_buf[1] : 0);
->> +		if (ret) {
->> +			dev_err(&spi->dev, "SPI radio data write failed\n");
->> +			return ret;
->> +		}
-> 
-> This looks awfully like you're coming in at the wrong abstraction layer
-> and the hardware actually implements a register abstraction rather than
-> a SPI one so you should be using regmap as the abstraction.
-
-I don't understand. Ben has suggested using regmap for the SPI _device_
-that we're talking to, which may be a good idea. But this SX1301 device
-in turn has two SPI _masters_ talking to an SX125x slave each. I don't
-see how using regmap instead of my wrappers avoids this spi_controller?
-The whole point of this spi_controller is to abstract and separate the
-SX1255 vs. SX1257 vs. whatever-radio-attached into a separate driver,
-instead of mixing it into the SX1301 driver - to me that looks cleaner
-and more extensible. It also has the side-effect that we could configure
-the two radios via DT (frequencies, clk output, etc.).
-
-You will find a datasheet with some diagrams mentioning "SPI" at:
-https://www.semtech.com/products/wireless-rf/lora-gateways/SX1301
-
->> +	if (rx_buf) {
->> +		ret = sx1301_read(ssx->parent, ssx->regs + REG_RADIO_X_DATA_READBACK, &rx_buf[xfr->len - 1]);
->> +		if (ret) {
->> +			dev_err(&spi->dev, "SPI radio data read failed\n");
->> +			return ret;
->> +		}
->> +	}
-> 
-> For a read we never set an address?
-
-To read, you first write the address via tx_buf, then either in the same
-transfer in the third byte or in a subsequent one-byte transfer as first
-byte you get the data.
-
-If you have better ideas how to structure this, do let me know.
-
->> +static void sx1301_radio_setup(struct spi_controller *ctrl)
->> +{
->> +	ctrl->mode_bits = SPI_CS_HIGH | SPI_NO_CS;
-> 
-> This controller has no chip select but we provided a set_cs operation?
-
-Oops, I played around with those two options and was hoping SPI_NO_CS
-would avoid the undesired set_cs invocations, but it didn't work as
-expected and so I added the "if (enabled)" check above.
-
-Thanks for your review,
-
-Andreas
-
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180702/74036afd/attachment-0001.sig>
+Will
