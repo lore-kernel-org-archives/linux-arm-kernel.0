@@ -1,44 +1,110 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Mon, 2 Jul 2018 16:07:42 +0200
-Subject: [PATCH v3 0/8] Tegra Combined UART driver
-In-Reply-To: <20180702140343.GO13096@ulmo>
-References: <20180702114033.15654-1-mperttunen@nvidia.com>
- <20180702140343.GO13096@ulmo>
-Message-ID: <20180702140742.GA7977@kroah.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 2 Jul 2018 15:12:25 +0100
+Subject: [PATCH] pci: fix I/O space page leak
+In-Reply-To: <CAMuHMdUCNPrpYx1xOBTL0F23r3H2jc+kg+T5-rqMe0V-2w-LqQ@mail.gmail.com>
+References: <1ca6adde-a91e-84d0-c7dc-fd01bfd9edcc@cogentembedded.com>
+ <20180628132259.GB90450@bhelgaas-glaptop.roam.corp.google.com>
+ <20180628142615.GA9101@red-moon>
+ <ac015f99-c310-3701-35ce-846393b61235@cogentembedded.com>
+ <20180702103316.GA10784@red-moon>
+ <CAMuHMdUCNPrpYx1xOBTL0F23r3H2jc+kg+T5-rqMe0V-2w-LqQ@mail.gmail.com>
+Message-ID: <20180702141216.GA30712@e107981-ln.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 02, 2018 at 04:03:43PM +0200, Thierry Reding wrote:
-> On Mon, Jul 02, 2018 at 02:40:25PM +0300, Mikko Perttunen wrote:
-> > Hi, here's v3. Changes are in individual patches. Acks are still
-> > missing from the following patches:
-> > 
-> > mailbox: Add transmit done by blocking option
-> > mailbox: tegra-hsp: Refactor in preparation of mailboxes
-> > mailbox: tegra-hsp: Add support for shared mailboxes
-> > serial: Add Tegra Combined UART driver
+On Mon, Jul 02, 2018 at 01:08:45PM +0200, Geert Uytterhoeven wrote:
+> Hi Lorenzo,
 > 
-> There don't seem to be any build-time dependencies between the above, so
-> technically I guess these could be applied to the respective trees
-> separately. The only thing we need to be careful about is to not merge
-> the final patch before the others, because it will break serial console
-> if the other patches aren't applied.
+> On Mon, Jul 2, 2018 at 12:31 PM Lorenzo Pieralisi
+> <lorenzo.pieralisi@arm.com> wrote:
+> > On Sat, Jun 30, 2018 at 01:37:18PM +0300, Sergei Shtylyov wrote:
+> > > On 6/28/2018 5:26 PM, Lorenzo Pieralisi wrote:
+> > > >>>When testing the R-Car PCIe driver on the Condor board, I noticed that iff
+> > > >>>I  left the PCIe PHY driver disabled, the kernel crashed  with this BUG:
+> > > >>>
+> > > >>>[    1.225819] kernel BUG at lib/ioremap.c:72!
 > 
-> Jassi, Greg,
+> > > >>>It turned out that pci_remap_iospace() wasn't undone when the driver's
+> > > >>>probe failed, and since devm_phy_optional_get() returned -EPROBE_DEFER,
+> > > >>>the probe was retried,  finally causing the BUG due to trying to remap
+> > > >>>already remapped pages.
+> > > >>>
+> > > >>>The most feasible solution seems to introduce devm_pci_remap_iospace()
+> > > >>>and call it instead of pci_remap_iospace(), so that the pages get unmapped
+> > > >>>automagically on any probe failure.
+> > > >>>
+> > > >>>And  while fixing pci_parse_request_of_pci_ranges(), aslo fix the other
+> > > >>>drivers that have probably copied the bad example...
+> > > >>>
+> > > >>>Fixes: 4e64dbe226e7 ("PCI: generic: Expose pci_host_common_probe() for use by other drivers")
+> > > >>>Fixes: cbce7900598c ("PCI: designware: Make driver arch-agnostic")
+> > > >>>Fixes: 8c39d710363c ("PCI: aardvark: Add Aardvark PCI host controller driver")
+> > > >>>Fixes: d3c68e0a7e34 ("PCI: faraday: Add Faraday Technology FTPCI100 PCI Host Bridge driver")
+> > > >>>Fixes: 68a15eb7bd0c ("PCI: v3-semi: Add V3 Semiconductor PCI host driver")
+> > > >>>Fixes: b7e78170efd4 ("PCI: versatile: Add DT-based ARM Versatile PB PCIe host driver")
+> > > >>>Fixes: 5f6b6ccdbe1c ("PCI: xgene: Add APM X-Gene PCIe driver")
+> > > >>>Fixes: 637cfacae96f ("PCI: mediatek: Add MediaTek PCIe host controller support")
+> > > >>>Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> > > >>>Cc: stable at vger.kernel.org
+> > > >>
+> > > >>Let me know if you want me to take this, Lorenzo, otherwise:
+> > > >>s/pci: fix/PCI: Fix/ and
+> > > >>
+> > > >>Acked-by: Bjorn Helgaas <bhelgaas@google.com>
+> > > >
+> > > >Thank you Bjorn, yes it could go in as a fix but IMO it has to be split,
+> > > >more so given the stable tag (and I think that each "Fixes" tag should
+> > > >be self-contained),
+> > >
+> > >    It cannot be self-contained because it'll depend on the initial
+> > > commit adding devm_pci_remap_iobase(). If you mean finding the
+> > > earliest broken driver and introduce the deviec managed API while
+> > > fixing it and then make use of that
+> > > API in the subsequent patches, that surely can be done.
+> >
+> > Yes I think that's the best course of action.
+> >
+> > > >merging it as-is would give Greg (and us) a
+> > > >headache when it comes to backporting it.
+> > >
+> > >    The patch interdependency would give him headache too, and I was
+> > > hoping to relieve those with the monilitic patch. :-)
+> >
+> > The problem is that if any of the fixes has to be reverted we have
+> > to revert the whole thing instead of just the problematic patch,
+> > which, given that we are sending this to stable kernels may easily
+> > turn out quite complicated.
+> >
+> > So, I would add the new API along with the earliest broken driver
+> > and mark it for stable.
+> >
+> > In the same thread, add all other fixes (one per patch) without the
+> > stable tag. When the first fix gets merged into the mainline (and
+> > consequently goes to stable) we can send the stable backports for the
+> > remainder of fixes.
+> >
+> > How does that sound ?
 > 
-> What I could do to resolve the runtime dependency is pull the mailbox
-> patches into a separate branch, create another separate branch for the
-> TCU driver that is based on the mailbox branch and then base the DT
-> changes on that branch, or possibly send a separate pull request for
-> just the DT change late in the merge window or shortly after v4.19-rc1.
-> 
-> Obviously the latter would be equivalent to you guys merging the patches
-> through your trees for v4.19-rc1 and me sending out a late pull request
-> for the DT bits.
+> If you want to be prepared for reverting, why not split off the first fix
+> from the patch that provides the new API as well?
+> Yes, it does mean a dependency for backporting, but it avoids the mess if
+> it turns out the first fix is the (only) one that needs to be reverted.
 
-No need for me to take the serial driver if these types of dependancies
-are required, you are free to take that in your tree if you want to.
+Problem is that that would give Bjorn a hard time asking to merge the
+new API as a fix as a standalone patch for an -rc, hence I suggested we
+merged it for v4.19 but Sergei is not happy with that and I understand
+his point.
 
-does that help?
+To be honest I'd rather start with fixing RCAR (by "fixing" the
+pci_parse_request_of_pci_ranges() call with the new devm_ API) without
+any stable tag (with commit log reporting the RCAR regression), we will
+work out how to fix and backport the rest of the drivers later.
 
-greg k-h
+I am not even sure this fix per-se is stable kernel material, that's
+moot given that there exists an pci_unmap_iospace() API that could be
+used in drivers before they were converted to
+pci_parse_request_of_pci_ranges().
+
+Please let me know if that's reasonable, thanks.
+
+Lorenzo
