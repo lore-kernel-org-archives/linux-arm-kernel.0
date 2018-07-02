@@ -1,186 +1,106 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon,  2 Jul 2018 20:11:38 +0200
-Subject: [PATCH v2 1/8] kernel/jump_label: abstract jump_entry member accessors
-In-Reply-To: <20180702181145.4799-1-ard.biesheuvel@linaro.org>
-References: <20180702181145.4799-1-ard.biesheuvel@linaro.org>
-Message-ID: <20180702181145.4799-2-ard.biesheuvel@linaro.org>
+From: christoffer.dall@arm.com (Christoffer Dall)
+Date: Mon, 2 Jul 2018 20:39:54 +0200
+Subject: [RFC PATCH] KVM: arm/arm64: Enable adaptative WFE trapping
+In-Reply-To: <20180702164621.9899-1-marc.zyngier@arm.com>
+References: <20180702164621.9899-1-marc.zyngier@arm.com>
+Message-ID: <20180702183954.GB10663@C02W217FHV2R.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation of allowing architectures to use relative references
-in jump_label entries [which can dramatically reduce the memory
-footprint], introduce abstractions for references to the 'code',
-'target' and 'key' members of struct jump_entry.
+On Mon, Jul 02, 2018 at 05:46:21PM +0100, Marc Zyngier wrote:
+> Trapping blocking WFE is extremely beneficial in situations where
+> the system is oversubscribed, as it allows another thread to run
+> while being blocked. In a non-oversubscribed environment, this is
+> the complete opposite, and trapping WFE is just unnecessary overhead.
+> 
+> Let's only enable WFE trapping if the CPU has more than a single task
+> to run (that is, more than just the vcpu thread).
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- include/linux/jump_label.h | 34 +++++++++++++++++
- kernel/jump_label.c        | 40 ++++++++------------
- 2 files changed, 49 insertions(+), 25 deletions(-)
+Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
 
-diff --git a/include/linux/jump_label.h b/include/linux/jump_label.h
-index b46b541c67c4..4603a1c88e48 100644
---- a/include/linux/jump_label.h
-+++ b/include/linux/jump_label.h
-@@ -119,6 +119,40 @@ struct static_key {
- 
- #ifdef HAVE_JUMP_LABEL
- #include <asm/jump_label.h>
-+
-+#ifndef __ASSEMBLY__
-+
-+static inline unsigned long jump_entry_code(const struct jump_entry *entry)
-+{
-+	return entry->code;
-+}
-+
-+static inline unsigned long jump_entry_target(const struct jump_entry *entry)
-+{
-+	return entry->target;
-+}
-+
-+static inline struct static_key *jump_entry_key(const struct jump_entry *entry)
-+{
-+	return (struct static_key *)((unsigned long)entry->key & ~1UL);
-+}
-+
-+static inline bool jump_entry_is_branch(const struct jump_entry *entry)
-+{
-+	return (unsigned long)entry->key & 1UL;
-+}
-+
-+static inline bool jump_entry_is_init(const struct jump_entry *entry)
-+{
-+	return entry->code == 0;
-+}
-+
-+static inline void jump_entry_set_init(struct jump_entry *entry)
-+{
-+	entry->code = 0;
-+}
-+
-+#endif
- #endif
- 
- #ifndef __ASSEMBLY__
-diff --git a/kernel/jump_label.c b/kernel/jump_label.c
-index 01ebdf1f9f40..8a3ac4f5f490 100644
---- a/kernel/jump_label.c
-+++ b/kernel/jump_label.c
-@@ -38,10 +38,10 @@ static int jump_label_cmp(const void *a, const void *b)
- 	const struct jump_entry *jea = a;
- 	const struct jump_entry *jeb = b;
- 
--	if (jea->key < jeb->key)
-+	if (jump_entry_key(jea) < jump_entry_key(jeb))
- 		return -1;
- 
--	if (jea->key > jeb->key)
-+	if (jump_entry_key(jea) > jump_entry_key(jeb))
- 		return 1;
- 
- 	return 0;
-@@ -261,8 +261,8 @@ EXPORT_SYMBOL_GPL(jump_label_rate_limit);
- 
- static int addr_conflict(struct jump_entry *entry, void *start, void *end)
- {
--	if (entry->code <= (unsigned long)end &&
--		entry->code + JUMP_LABEL_NOP_SIZE > (unsigned long)start)
-+	if (jump_entry_code(entry) <= (unsigned long)end &&
-+	    jump_entry_code(entry) + JUMP_LABEL_NOP_SIZE > (unsigned long)start)
- 		return 1;
- 
- 	return 0;
-@@ -321,16 +321,6 @@ static inline void static_key_set_linked(struct static_key *key)
- 	key->type |= JUMP_TYPE_LINKED;
- }
- 
--static inline struct static_key *jump_entry_key(struct jump_entry *entry)
--{
--	return (struct static_key *)((unsigned long)entry->key & ~1UL);
--}
--
--static bool jump_entry_branch(struct jump_entry *entry)
--{
--	return (unsigned long)entry->key & 1UL;
--}
--
- /***
-  * A 'struct static_key' uses a union such that it either points directly
-  * to a table of 'struct jump_entry' or to a linked list of modules which in
-@@ -355,7 +345,7 @@ static enum jump_label_type jump_label_type(struct jump_entry *entry)
- {
- 	struct static_key *key = jump_entry_key(entry);
- 	bool enabled = static_key_enabled(key);
--	bool branch = jump_entry_branch(entry);
-+	bool branch = jump_entry_is_branch(entry);
- 
- 	/* See the comment in linux/jump_label.h */
- 	return enabled ^ branch;
-@@ -370,12 +360,12 @@ static void __jump_label_update(struct static_key *key,
- 		 * An entry->code of 0 indicates an entry which has been
- 		 * disabled because it was in an init text area.
- 		 */
--		if (entry->code) {
--			if (kernel_text_address(entry->code))
-+		if (!jump_entry_is_init(entry)) {
-+			if (kernel_text_address(jump_entry_code(entry)))
- 				arch_jump_label_transform(entry, jump_label_type(entry));
- 			else
- 				WARN_ONCE(1, "can't patch jump_label at %pS",
--					  (void *)(unsigned long)entry->code);
-+					  (void *)jump_entry_code(entry));
- 		}
- 	}
- }
-@@ -430,8 +420,8 @@ void __init jump_label_invalidate_initmem(void)
- 	struct jump_entry *iter;
- 
- 	for (iter = iter_start; iter < iter_stop; iter++) {
--		if (init_section_contains((void *)(unsigned long)iter->code, 1))
--			iter->code = 0;
-+		if (init_section_contains((void *)jump_entry_code(iter), 1))
-+			jump_entry_set_init(iter);
- 	}
- }
- 
-@@ -441,7 +431,7 @@ static enum jump_label_type jump_label_init_type(struct jump_entry *entry)
- {
- 	struct static_key *key = jump_entry_key(entry);
- 	bool type = static_key_type(key);
--	bool branch = jump_entry_branch(entry);
-+	bool branch = jump_entry_is_branch(entry);
- 
- 	/* See the comment in linux/jump_label.h */
- 	return type ^ branch;
-@@ -565,7 +555,7 @@ static int jump_label_add_module(struct module *mod)
- 			continue;
- 
- 		key = iterk;
--		if (within_module(iter->key, mod)) {
-+		if (within_module((unsigned long)key, mod)) {
- 			static_key_set_entries(key, iter);
- 			continue;
- 		}
-@@ -615,7 +605,7 @@ static void jump_label_del_module(struct module *mod)
- 
- 		key = jump_entry_key(iter);
- 
--		if (within_module(iter->key, mod))
-+		if (within_module((unsigned long)key, mod))
- 			continue;
- 
- 		/* No memory during module load */
-@@ -659,8 +649,8 @@ static void jump_label_invalidate_module_init(struct module *mod)
- 	struct jump_entry *iter;
- 
- 	for (iter = iter_start; iter < iter_stop; iter++) {
--		if (within_module_init(iter->code, mod))
--			iter->code = 0;
-+		if (within_module_init(jump_entry_code(iter), mod))
-+			jump_entry_set_init(iter);
- 	}
- }
- 
--- 
-2.17.1
+> ---
+> This small patchlet seem to have some interesting effects in my limited
+> testing. Installing 100 concurrent Debian VMs results results in about
+> 90 million WFE exits without this patch, and only 7.6 millions with it
+> (TX1, 96 cores, 2 vcpu guests). I haven't measured any significant
+> performance variation in that process.
+> 
+> I'd welcome any benchmarking result from people with more interesting
+> workloads than mine so that I could make my mind about it.
+> 
+>  arch/arm/include/asm/kvm_emulate.h   | 10 ++++++++++
+>  arch/arm64/include/asm/kvm_emulate.h | 10 ++++++++++
+>  virt/kvm/arm/arm.c                   |  6 ++++++
+>  3 files changed, 26 insertions(+)
+> 
+> diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
+> index 6493bd479ddc..b50fe8380868 100644
+> --- a/arch/arm/include/asm/kvm_emulate.h
+> +++ b/arch/arm/include/asm/kvm_emulate.h
+> @@ -107,6 +107,16 @@ static inline unsigned long *vcpu_hcr(const struct kvm_vcpu *vcpu)
+>  	return (unsigned long *)&vcpu->arch.hcr;
+>  }
+>  
+> +static inline void vcpu_clear_wfe_traps(struct kvm_vcpu *vcpu)
+> +{
+> +	vcpu->arch.hcr &= ~HCR_TWE;
+> +}
+> +
+> +static inline void vcpu_set_wfe_traps(struct kvm_vcpu *vcpu)
+> +{
+> +	vcpu->arch.hcr |= HCR_TWE;
+> +}
+> +
+>  static inline bool vcpu_mode_is_32bit(const struct kvm_vcpu *vcpu)
+>  {
+>  	return 1;
+> diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+> index 1dab3a984608..a71e5af816a9 100644
+> --- a/arch/arm64/include/asm/kvm_emulate.h
+> +++ b/arch/arm64/include/asm/kvm_emulate.h
+> @@ -81,6 +81,16 @@ static inline unsigned long *vcpu_hcr(struct kvm_vcpu *vcpu)
+>  	return (unsigned long *)&vcpu->arch.hcr_el2;
+>  }
+>  
+> +static inline void vcpu_clear_wfe_traps(struct kvm_vcpu *vcpu)
+> +{
+> +	vcpu->arch.hcr_el2 &= ~HCR_TWE;
+> +}
+> +
+> +static inline void vcpu_set_wfe_traps(struct kvm_vcpu *vcpu)
+> +{
+> +	vcpu->arch.hcr_el2 |= HCR_TWE;
+> +}
+> +
+>  static inline void vcpu_set_vsesr(struct kvm_vcpu *vcpu, u64 vsesr)
+>  {
+>  	vcpu->arch.vsesr_el2 = vsesr;
+> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+> index 04e554cae3a2..8e66b89a3db2 100644
+> --- a/virt/kvm/arm/arm.c
+> +++ b/virt/kvm/arm/arm.c
+> @@ -30,6 +30,7 @@
+>  #include <linux/kvm.h>
+>  #include <linux/kvm_irqfd.h>
+>  #include <linux/irqbypass.h>
+> +#include <linux/sched/stat.h>
+>  #include <trace/events/kvm.h>
+>  #include <kvm/arm_pmu.h>
+>  #include <kvm/arm_psci.h>
+> @@ -380,6 +381,11 @@ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
+>  	kvm_timer_vcpu_load(vcpu);
+>  	kvm_vcpu_load_sysregs(vcpu);
+>  	kvm_arch_vcpu_load_fp(vcpu);
+> +
+> +	if (single_task_running())
+> +		vcpu_clear_wfe_traps(vcpu);
+> +	else
+> +		vcpu_set_wfe_traps(vcpu);
+>  }
+>  
+>  void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
+> -- 
+> 2.17.1
+> 
