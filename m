@@ -1,59 +1,36 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 2 Jul 2018 10:18:33 -0700
-Subject: [GIT PULL] tee driver for v4.18
-In-Reply-To: <20180702121013.GA17791@jax.urgonet>
-References: <20180702121013.GA17791@jax.urgonet>
-Message-ID: <CAOesGMj=OG0j_3rOY8XmJiY5c8bhJL6boxcBUm2B2yyKQTTRog@mail.gmail.com>
+Date: Mon, 2 Jul 2018 10:19:41 -0700
+Subject: [GIT PULL] SoCFPGA updates for v4.19, part1
+In-Reply-To: <1530540338-27657-1-git-send-email-dinguyen@kernel.org>
+References: <1530540338-27657-1-git-send-email-dinguyen@kernel.org>
+Message-ID: <CAOesGMiQqE8SssVt_KW7epbz=Sn-GPB4R=EN7tA3KG4as9QdYQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jens,
+On Mon, Jul 2, 2018 at 7:05 AM, Dinh Nguyen <dinguyen@kernel.org> wrote:
+> Hi Arnd, Kevin, and Olof:
+>
+> Please pull in these SoCFPGA updates for v4.19. The reason it's based on
+> v4.18-rc3 is that there are some dependencies on fixes that went into
+> v4.18-rc2.
 
+That's fine, I'm basing all next/* branches on -rc3 since it's where
+the defconfig renormalization went in, and it's easiest to avoid
+conflicts that way.
 
-On Mon, Jul 2, 2018 at 5:10 AM, Jens Wiklander
-<jens.wiklander@linaro.org> wrote:
-> Hello arm-soc maintainers,
+> The following changes since commit 021c91791a5e7e85c567452f1be3e4c2c6cb6063:
 >
-> Please pull these small tee driver enhancements. There's a new config
-> option for the OP-TEE driver, OPTEE_SHM_NUM_PRIV_PAGES. Also the OP-TEE
-> driver reads current time with ktime_get_real_ts64() from now on.
+>   Linux 4.18-rc3 (2018-07-01 16:04:53 -0700)
 >
-> Thanks,
-> Jens
+> are available in the git repository at:
 >
-> The following changes since commit 29dcea88779c856c7dc92040a0c01233263101d4:
+>   git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git tags/socfpga_updates_for_v4.19_part1
 >
->   Linux 4.17 (2018-06-03 14:15:21 -0700)
+> for you to fetch changes up to 70455ac7ffb6b707af1e56e1993af82906fddaae:
 >
-> are available in the Git repository at:
->
->   git://git.linaro.org/people/jens.wiklander/linux-tee.git tags/tee-drv-for-4.18
->
-> for you to fetch changes up to 3249527f19d660c5adfb2b6f4ffd4ca0506b8755:
->
->   tee: optee: making OPTEE_SHM_NUM_PRIV_PAGES configurable via Kconfig (2018-06-20 11:20:36 +0200)
->
-> ----------------------------------------------------------------
-> Misc enhancement for tee driver subsystem
->
-> * Replaces getnstimeofday64() with ktime_get_real_ts64()
-> * Adds OPTEE_SHM_NUM_PRIV_PAGES to configure how many pages should be
->   statically reserved for driver private allocations
->
-> ----------------------------------------------------------------
-> Arnd Bergmann (1):
->       tee: replace getnstimeofday64() with ktime_get_real_ts64()
->
-> Sahil Malhotra (1):
->       tee: optee: making OPTEE_SHM_NUM_PRIV_PAGES configurable via Kconfig
+>   arm64: dts: stratix10: Add SPI node clocks for Stratix10 (2018-07-02 08:44:15 -0500)
 
-This doesn't seem to be bugfixes (and not regression fixes in
-particular), so I took the liberty of queuing these for 4.19 (in
-next/drivers) instead of fixes for v4.18.
+Merged into next/dt. Thanks!
 
-Let me know if this was an inaccurate assessment and I can move them over.
-
-
-Thanks!
 
 -Olof
