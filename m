@@ -1,34 +1,29 @@
-From: digetx@gmail.com (Dmitry Osipenko)
-Date: Mon, 02 Jul 2018 17:48:36 +0300
-Subject: [PATCH v2 0/5] Initial support of Trusted Foundations on Tegra30
-In-Reply-To: <d99935be-797d-4676-c186-a045a590f01b@gmail.com>
-References: <20180619110027.16935-1-digetx@gmail.com>
- <d99935be-797d-4676-c186-a045a590f01b@gmail.com>
-Message-ID: <11534185.70fb5jbPr6@dimapc>
+From: srikar@linux.vnet.ibm.com (Srikar Dronamraju)
+Date: Mon, 2 Jul 2018 07:54:44 -0700
+Subject: [PATCH v5 09/10] Uprobes/sdt: Document about reference counter
+In-Reply-To: <20180628052209.13056-10-ravi.bangoria@linux.ibm.com>
+References: <20180628052209.13056-1-ravi.bangoria@linux.ibm.com>
+ <20180628052209.13056-10-ravi.bangoria@linux.ibm.com>
+Message-ID: <20180702145444.GB65296@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, 29 June 2018 22:37:02 MSK Peter Geis wrote:
-> Good Afternoon,
-> 
-> I have tested these patches on the Ouya T3 device.
-> They work great to enable the L2 cache controller, however they do not
-> respect explicitly disabling the L2 cache controller via the kernel
-> config nor device tree.
-> 
-> With CONFIG_CACHE_L2X0 disabled, but CONFIG_TRUSTED_FOUNDATIONS enabled,
-> the L2 cache controller is silently enabled and allows all four cores to
-> boot.
-> 
+* Ravi Bangoria <ravi.bangoria@linux.ibm.com> [2018-06-28 10:52:08]:
 
-I don't see how cache could be enabled with CONFIG_CACHE_L2X0 disabled, there 
-is no code to do that. Could you elaborate please?
-
-Secondary cores do not depend on the cache state, disabled cache shouldn't 
-prevent them to boot.
-
-> One must also disable CONFIG_TRUSTED_FOUNDATIONS to stop the L2 cache
-> controller from spinning up.
+> Reference counter gate the invocation of probe. If present,
+> by default reference count is 0. Kernel needs to increment
+> it before tracing the probe and decrement it when done. This
+> is identical to semaphore in Userspace Statically Defined
+> Tracepoints (USDT).
 > 
-> Tested-by: Peter Geis <pgwipeout@gmail.com>
+> Document usage of reference counter.
 > 
+> Signed-off-by: Ravi Bangoria <ravi.bangoria@linux.ibm.com>
+> Acked-by: Masami Hiramatsu <mhiramat@kernel.org>
+
+Unlike perf, this mechanism cannot detect ref count and depends on the
+users data. What happens if the user mistakenly provides a wrong location?
+I guess he can corrupt some other data structures?
+
+Hence I would think twice of advertising this mechanism. i.e keep this
+as an undocumented feature.
