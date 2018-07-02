@@ -1,69 +1,28 @@
-From: pgwipeout@gmail.com (Peter Geis)
-Date: Mon, 2 Jul 2018 14:53:08 -0400
-Subject: [PATCH v2 0/5] Initial support of Trusted Foundations on Tegra30
-In-Reply-To: <11534185.70fb5jbPr6@dimapc>
-References: <20180619110027.16935-1-digetx@gmail.com>
- <d99935be-797d-4676-c186-a045a590f01b@gmail.com> <11534185.70fb5jbPr6@dimapc>
-Message-ID: <5c47ef70-b90e-6e81-39dd-fbcfad2b93e5@gmail.com>
+From: david@lechnology.com (David Lechner)
+Date: Mon, 2 Jul 2018 13:13:40 -0500
+Subject: [PATCH v7 00/10] Introduce the Counter subsystem
+In-Reply-To: <cover.1529607879.git.vilhelm.gray@gmail.com>
+References: <cover.1529607879.git.vilhelm.gray@gmail.com>
+Message-ID: <603b0373-f1e1-5938-fa53-8328c9a5964f@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 06/21/2018 04:06 PM, William Breathitt Gray wrote:
+> I decided to strip down these devices to arrive at the core essence of
+> what constitutes a "counter device" and therefore design a "generic
+> counter" abstraction to better represent these devices and prevent the
+> ambiguity we discovered with the existing IIO Counter interface. This
+> abstraction became the Generic Counter paradigm, which is explained in
+> detail within the Documentation/driver-api/generic-counter.rst file
+> introduced by this patchset.
 
+I'm curious if you have given any thought to the time aspect of counters.
+I am interested in the rate at which the counters are counting (e.g. how
+many counts per second). I realize that you can calculate this in
+userspace or in the kernel using the system timer, but it is not very
+accurate since Linux is not a realtime OS. So, I would like to get the
+rate directly from the hardware. For example, the TI eQEP[1], like the
+one found in BeagleBones, has a couple ways of measuring time (see link
+for details).
 
-On 07/02/2018 10:48 AM, Dmitry Osipenko wrote:
-> On Friday, 29 June 2018 22:37:02 MSK Peter Geis wrote:
->> Good Afternoon,
->>
->> I have tested these patches on the Ouya T3 device.
->> They work great to enable the L2 cache controller, however they do not
->> respect explicitly disabling the L2 cache controller via the kernel
->> config nor device tree.
->>
->> With CONFIG_CACHE_L2X0 disabled, but CONFIG_TRUSTED_FOUNDATIONS enabled,
->> the L2 cache controller is silently enabled and allows all four cores to
->> boot.
->>
-> 
-> I don't see how cache could be enabled with CONFIG_CACHE_L2X0 disabled, there
-> is no code to do that. Could you elaborate please?
-> 
-> Secondary cores do not depend on the cache state, disabled cache shouldn't
-> prevent them to boot.
-
-On the untouched mainline kernel running on a Trusted Foundations T3 
-device, I observed the following indications:
-With the L2 cache controller enabled, all four processor cores were 
-enabled, but it would immediately panic for writing to a secure register 
-from insecure mode.
-With the L2 cache controller disabled, only the boot core is detected, 
-but it successfully boots.
-This is the issue that I inquired originally to you about.
-
-With your patch running on the same device, the following is observed:
-With the L2 controller enabled, all four cores are active, and the cache 
-controller appears to function.
-With the L2 controller disabled, but trusted foundations enabled, the L2 
-controller enabled kernel message is missing, however all four cores 
-still enable.
-
-After looking through the code a little more deeply, I see you modified 
-the reset handler for handling offline cores.
-I am wondering if you fixed an additional issue inadvertently.
-
-The reason I discovered this is I am working with kexec as a bootloader.
-On a device without trusted foundations, kexec works without issue.
-On a device with trusted foundations and your patch, I found that 
-disabling the l2 cache controller and trusted foundations allow kexec to 
-occur.
-I haven't tried an either/or scenario, though now you have me thinking I 
-should.
-> 
->> One must also disable CONFIG_TRUSTED_FOUNDATIONS to stop the L2 cache
->> controller from spinning up.
->>
->> Tested-by: Peter Geis <pgwipeout@gmail.com>
->>
-> 
-> 
-> 
-> 
+[1]: http://www.ti.com/lit/ug/sprug05a/sprug05a.pdf
