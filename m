@@ -1,38 +1,132 @@
-From: eugenis@google.com (Evgenii Stepanov)
-Date: Mon, 2 Jul 2018 16:39:51 -0700
-Subject: [PATCH v4 00/17] khwasan: kernel hardware assisted address
- sanitizer
-In-Reply-To: <20180702203321.GA8371@bombadil.infradead.org>
-References: <cover.1530018818.git.andreyknvl@google.com>
- <20180627160800.3dc7f9ee41c0badbf7342520@linux-foundation.org>
- <CAN=P9pivApAo76Kjc0TUDE0kvJn0pET=47xU6e=ioZV2VqO0Rg@mail.gmail.com>
- <20180702203321.GA8371@bombadil.infradead.org>
-Message-ID: <CAFKCwrg=3J-ARaOJgc73oRE7hQxs1VV7YiZEPS7Dt8Gfn6cWQA@mail.gmail.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Mon,  2 Jul 2018 18:58:55 -0400
+Subject: [PATCH V5 6/6] PCI: Rename pci_try_reset_bus() to pci_reset_bus()
+In-Reply-To: <1530572336-20296-1-git-send-email-okaya@codeaurora.org>
+References: <1530572336-20296-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <1530572336-20296-7-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 2, 2018 at 1:33 PM, Matthew Wilcox <willy@infradead.org> wrote:
-> On Wed, Jun 27, 2018 at 05:04:28PM -0700, Kostya Serebryany wrote:
->> The problem is more significant on mobile devices than on desktop/server.
->> I'd love to have [K]HWASAN on x86_64 as well, but it's less trivial since x86_64
->> doesn't have an analog of aarch64's top-byte-ignore hardware feature.
->
-> Well, can we emulate it in software?
->
-> We've got 48 bits of virtual address space on x86.  If we need all 8
-> bits, then that takes us down to 40 bits (39 bits for user and 39 bits
-> for kernel).  My laptop only has 34 bits of physical memory, so could
-> we come up with a memory layout which works for me?
+Now that the old implementation of pci_reset_bus() is gone, replace
+pci_try_reset_bus() with pci_reset_bus().
 
-Yes, probably.
+Compared to the old implementation, new code will fail immmediately with
+-EAGAIN if object lock cannot be obtained.
 
-We've tried this in userspace by mapping a file multiple times, but
-that's very slow, likely because of the extra TLB pressure.
-It should be possible to achieve better performance in the kernel with
-some page table tricks (i.e. if we take top 8 bits out of 48, then
-there would be only two second-level tables, and the top-level table
-will look like [p1, p2, p1, p2, ...]). I'm not 100% sure if that would
-work.
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+---
+ drivers/infiniband/hw/hfi1/pcie.c |  2 +-
+ drivers/pci/pci.c                 | 16 ++++++++--------
+ drivers/vfio/pci/vfio_pci.c       |  4 ++--
+ include/linux/pci.h               |  2 +-
+ 4 files changed, 12 insertions(+), 12 deletions(-)
 
-I don't think this should be part of this patchset, but it's good to
-keep this in mind.
+diff --git a/drivers/infiniband/hw/hfi1/pcie.c b/drivers/infiniband/hw/hfi1/pcie.c
+index df4f2d3..baf7c32 100644
+--- a/drivers/infiniband/hw/hfi1/pcie.c
++++ b/drivers/infiniband/hw/hfi1/pcie.c
+@@ -905,7 +905,7 @@ static int trigger_sbr(struct hfi1_devdata *dd)
+ 	 * delay after a reset is required.  Per spec requirements,
+ 	 * the link is either working or not after that point.
+ 	 */
+-	return pci_try_reset_bus(dev);
++	return pci_reset_bus(dev);
+ }
+ 
+ /*
+diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+index 7e3f2e9..bd19350 100644
+--- a/drivers/pci/pci.c
++++ b/drivers/pci/pci.c
+@@ -4784,7 +4784,7 @@ int pci_probe_reset_slot(struct pci_slot *slot)
+ EXPORT_SYMBOL_GPL(pci_probe_reset_slot);
+ 
+ /**
+- * __pci_try_reset_slot - Try to reset a PCI slot
++ * __pci_reset_slot - Try to reset a PCI slot
+  * @slot: PCI slot to reset
+  *`
+  * A PCI bus may host multiple slots, each slot may support a reset mechanism
+@@ -4798,7 +4798,7 @@ EXPORT_SYMBOL_GPL(pci_probe_reset_slot);
+  *
+  * Same as above except return -EAGAIN if the slot cannot be locked
+  */
+-static int __pci_try_reset_slot(struct pci_slot *slot)
++static int __pci_reset_slot(struct pci_slot *slot)
+ {
+ 	int rc;
+ 
+@@ -4854,12 +4854,12 @@ int pci_probe_reset_bus(struct pci_bus *bus)
+ EXPORT_SYMBOL_GPL(pci_probe_reset_bus);
+ 
+ /**
+- * __pci_try_reset_bus - Try to reset a PCI bus
++ * __pci_reset_bus - Try to reset a PCI bus
+  * @bus: top level PCI bus to reset
+  *
+  * Same as above except return -EAGAIN if the bus cannot be locked
+  */
+-static int __pci_try_reset_bus(struct pci_bus *bus)
++static int __pci_reset_bus(struct pci_bus *bus)
+ {
+ 	int rc;
+ 
+@@ -4882,17 +4882,17 @@ static int __pci_try_reset_bus(struct pci_bus *bus)
+ }
+ 
+ /**
+- * pci_try_reset_bus - Try to reset a PCI bus
++ * pci_reset_bus - Try to reset a PCI bus
+  * @pdev: top level PCI device to reset via slot/bus
+  *
+  * Same as above except return -EAGAIN if the bus cannot be locked
+  */
+-int pci_try_reset_bus(struct pci_dev *pdev)
++int pci_reset_bus(struct pci_dev *pdev)
+ {
+ 	return pci_probe_reset_slot(pdev->slot) ?
+-	    __pci_try_reset_slot(pdev->slot) : __pci_try_reset_bus(pdev->bus);
++	    __pci_reset_slot(pdev->slot) : __pci_reset_bus(pdev->bus);
+ }
+-EXPORT_SYMBOL_GPL(pci_try_reset_bus);
++EXPORT_SYMBOL_GPL(pci_reset_bus);
+ 
+ /**
+  * pcix_get_max_mmrbc - get PCI-X maximum designed memory read byte count
+diff --git a/drivers/vfio/pci/vfio_pci.c b/drivers/vfio/pci/vfio_pci.c
+index 71018ec..345c0dc 100644
+--- a/drivers/vfio/pci/vfio_pci.c
++++ b/drivers/vfio/pci/vfio_pci.c
+@@ -1010,7 +1010,7 @@ static long vfio_pci_ioctl(void *device_data,
+ 						    &info, slot);
+ 		if (!ret)
+ 			/* User has access, do the reset */
+-			ret = pci_try_reset_bus(vdev->pdev);
++			ret = pci_reset_bus(vdev->pdev);
+ 
+ hot_reset_release:
+ 		for (i--; i >= 0; i--)
+@@ -1372,7 +1372,7 @@ static void vfio_pci_try_bus_reset(struct vfio_pci_device *vdev)
+ 	}
+ 
+ 	if (needs_reset)
+-		ret = pci_try_reset_bus(vdev->pdev);
++		ret = pci_reset_bus(vdev->pdev);
+ 
+ put_devs:
+ 	for (i = 0; i < devs.cur_index; i++) {
+diff --git a/include/linux/pci.h b/include/linux/pci.h
+index ad0c89a..79a2c27 100644
+--- a/include/linux/pci.h
++++ b/include/linux/pci.h
+@@ -1096,7 +1096,7 @@ int pci_reset_function_locked(struct pci_dev *dev);
+ int pci_try_reset_function(struct pci_dev *dev);
+ int pci_probe_reset_slot(struct pci_slot *slot);
+ int pci_probe_reset_bus(struct pci_bus *bus);
+-int pci_try_reset_bus(struct pci_dev *dev);
++int pci_reset_bus(struct pci_dev *dev);
+ void pci_reset_secondary_bus(struct pci_dev *dev);
+ void pcibios_reset_secondary_bus(struct pci_dev *dev);
+ void pci_update_resource(struct pci_dev *dev, int resno);
+-- 
+2.7.4
