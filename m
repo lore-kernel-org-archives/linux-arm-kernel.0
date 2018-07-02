@@ -1,98 +1,117 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon,  2 Jul 2018 20:11:41 +0200
-Subject: [PATCH v2 4/8] x86: add support for 64-bit place relative relocations
+Date: Mon,  2 Jul 2018 20:11:43 +0200
+Subject: [PATCH v2 6/8] x86/kernel: jump_table: use relative references
 In-Reply-To: <20180702181145.4799-1-ard.biesheuvel@linaro.org>
 References: <20180702181145.4799-1-ard.biesheuvel@linaro.org>
-Message-ID: <20180702181145.4799-5-ard.biesheuvel@linaro.org>
+Message-ID: <20180702181145.4799-7-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for R_X86_64_PC64 relocations, which operate on 64-bit
-quantities holding a relative symbol reference. This allows jump
-table entries to be emitted in a way that makes them invariant under
-runtime relocation, which means that no metadata needs to be emitted
-into the kernel image to describe such data structures, resulting in
-a size reduction.
+Similar to the arm64 case, 64-bit x86 can benefit from using relative
+references rather than absolute ones when emitting struct jump_entry
+instances. Not only does this reduce the memory footprint of the entries
+themselves by 33%, it also removes the need for carrying relocation
+metadata on relocatable builds (i.e., for KASLR) which saves a fair
+chunk of .init space as well (although the savings are not as dramatic
+as on arm64)
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/x86/include/asm/elf.h         |  1 +
- arch/x86/kernel/machine_kexec_64.c |  4 ++++
- arch/x86/kernel/module.c           |  6 ++++++
- arch/x86/tools/relocs.c            | 10 ++++++++++
- 4 files changed, 21 insertions(+)
+ arch/x86/Kconfig                  |  1 +
+ arch/x86/include/asm/jump_label.h | 24 +++++++-------------
+ tools/objtool/special.c           |  4 ++--
+ 3 files changed, 11 insertions(+), 18 deletions(-)
 
-diff --git a/arch/x86/include/asm/elf.h b/arch/x86/include/asm/elf.h
-index 0d157d2a1e2a..d3925d684296 100644
---- a/arch/x86/include/asm/elf.h
-+++ b/arch/x86/include/asm/elf.h
-@@ -62,6 +62,7 @@ typedef struct user_fxsr_struct elf_fpxregset_t;
- #define R_X86_64_PC16		13	/* 16 bit sign extended pc relative */
- #define R_X86_64_8		14	/* Direct 8 bit sign extended  */
- #define R_X86_64_PC8		15	/* 8 bit sign extended pc relative */
-+#define R_X86_64_PC64		24	/* Place relative 64-bit signed */
+diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
+index e10a3542db7e..dd71258ec1cc 100644
+--- a/arch/x86/Kconfig
++++ b/arch/x86/Kconfig
+@@ -118,6 +118,7 @@ config X86
+ 	select HAVE_ARCH_AUDITSYSCALL
+ 	select HAVE_ARCH_HUGE_VMAP		if X86_64 || X86_PAE
+ 	select HAVE_ARCH_JUMP_LABEL
++	select HAVE_ARCH_JUMP_LABEL_RELATIVE
+ 	select HAVE_ARCH_KASAN			if X86_64
+ 	select HAVE_ARCH_KGDB
+ 	select HAVE_ARCH_MMAP_RND_BITS		if MMU
+diff --git a/arch/x86/include/asm/jump_label.h b/arch/x86/include/asm/jump_label.h
+index 8c0de4282659..21efc9d07ed9 100644
+--- a/arch/x86/include/asm/jump_label.h
++++ b/arch/x86/include/asm/jump_label.h
+@@ -37,7 +37,8 @@ static __always_inline bool arch_static_branch(struct static_key *key, bool bran
+ 		".byte " __stringify(STATIC_KEY_INIT_NOP) "\n\t"
+ 		".pushsection __jump_table,  \"aw\" \n\t"
+ 		_ASM_ALIGN "\n\t"
+-		_ASM_PTR "1b, %l[l_yes], %c0 + %c1 \n\t"
++		".long 1b - ., %l[l_yes] - . \n\t"
++		_ASM_PTR "%c0 + %c1 - .\n\t"
+ 		".popsection \n\t"
+ 		: :  "i" (key), "i" (branch) : : l_yes);
  
- #define R_X86_64_NUM		16
+@@ -53,7 +54,8 @@ static __always_inline bool arch_static_branch_jump(struct static_key *key, bool
+ 		"2:\n\t"
+ 		".pushsection __jump_table,  \"aw\" \n\t"
+ 		_ASM_ALIGN "\n\t"
+-		_ASM_PTR "1b, %l[l_yes], %c0 + %c1 \n\t"
++		".long 1b - ., %l[l_yes] - . \n\t"
++		_ASM_PTR "%c0 + %c1 - .\n\t"
+ 		".popsection \n\t"
+ 		: :  "i" (key), "i" (branch) : : l_yes);
  
-diff --git a/arch/x86/kernel/machine_kexec_64.c b/arch/x86/kernel/machine_kexec_64.c
-index 4c8acdfdc5a7..6638d1edb2be 100644
---- a/arch/x86/kernel/machine_kexec_64.c
-+++ b/arch/x86/kernel/machine_kexec_64.c
-@@ -496,6 +496,10 @@ int arch_kexec_apply_relocations_add(struct purgatory_info *pi,
- 			value -= (u64)address;
- 			*(u32 *)location = value;
- 			break;
-+		case R_X86_64_PC64:
-+			value -= (u64)address;
-+			*(u64 *)location = value;
-+			break;
- 		default:
- 			pr_err("Unknown rela relocation: %llu\n",
- 			       ELF64_R_TYPE(rel[i].r_info));
-diff --git a/arch/x86/kernel/module.c b/arch/x86/kernel/module.c
-index f58336af095c..b052e883dd8c 100644
---- a/arch/x86/kernel/module.c
-+++ b/arch/x86/kernel/module.c
-@@ -201,6 +201,12 @@ int apply_relocate_add(Elf64_Shdr *sechdrs,
- 				goto overflow;
- #endif
- 			break;
-+		case R_X86_64_PC64:
-+			if (*(u64 *)loc != 0)
-+				goto invalid_relocation;
-+			val -= (u64)loc;
-+			*(u64 *)loc = val;
-+			break;
- 		default:
- 			pr_err("%s: Unknown rela relocation: %llu\n",
- 			       me->name, ELF64_R_TYPE(rel[i].r_info));
-diff --git a/arch/x86/tools/relocs.c b/arch/x86/tools/relocs.c
-index 220e97841e49..a4075bc37e8f 100644
---- a/arch/x86/tools/relocs.c
-+++ b/arch/x86/tools/relocs.c
-@@ -195,6 +195,7 @@ static const char *rel_type(unsigned type)
- #if ELF_BITS == 64
- 		REL_TYPE(R_X86_64_NONE),
- 		REL_TYPE(R_X86_64_64),
-+		REL_TYPE(R_X86_64_PC64),
- 		REL_TYPE(R_X86_64_PC32),
- 		REL_TYPE(R_X86_64_GOT32),
- 		REL_TYPE(R_X86_64_PLT32),
-@@ -781,6 +782,15 @@ static int do_reloc64(struct section *sec, Elf_Rel *rel, ElfW(Sym) *sym,
- 			add_reloc(&relocs32neg, offset);
- 		break;
+@@ -62,18 +64,6 @@ static __always_inline bool arch_static_branch_jump(struct static_key *key, bool
+ 	return true;
+ }
  
-+	case R_X86_64_PC64:
-+		/*
-+		 * Only used by jump labels
-+		 */
-+		if (is_percpu_sym(sym, symname))
-+			die("Invalid R_X86_64_PC64 relocation against per-CPU symbol %s\n",
-+			    symname);
-+		break;
-+
- 	case R_X86_64_32:
- 	case R_X86_64_32S:
- 	case R_X86_64_64:
+-#ifdef CONFIG_X86_64
+-typedef u64 jump_label_t;
+-#else
+-typedef u32 jump_label_t;
+-#endif
+-
+-struct jump_entry {
+-	jump_label_t code;
+-	jump_label_t target;
+-	jump_label_t key;
+-};
+-
+ #else	/* __ASSEMBLY__ */
+ 
+ .macro STATIC_JUMP_IF_TRUE target, key, def
+@@ -88,7 +78,8 @@ struct jump_entry {
+ 	.endif
+ 	.pushsection __jump_table, "aw"
+ 	_ASM_ALIGN
+-	_ASM_PTR	.Lstatic_jump_\@, \target, \key
++	.long		.Lstatic_jump_\@ - ., \target - .
++	_ASM_PTR	\key - .
+ 	.popsection
+ .endm
+ 
+@@ -104,7 +95,8 @@ struct jump_entry {
+ 	.endif
+ 	.pushsection __jump_table, "aw"
+ 	_ASM_ALIGN
+-	_ASM_PTR	.Lstatic_jump_\@, \target, \key + 1
++	.long		.Lstatic_jump_\@ - ., \target - .
++	_ASM_PTR	\key + 1 - .
+ 	.popsection
+ .endm
+ 
+diff --git a/tools/objtool/special.c b/tools/objtool/special.c
+index 84f001d52322..50af4e1274b3 100644
+--- a/tools/objtool/special.c
++++ b/tools/objtool/special.c
+@@ -30,9 +30,9 @@
+ #define EX_ORIG_OFFSET		0
+ #define EX_NEW_OFFSET		4
+ 
+-#define JUMP_ENTRY_SIZE		24
++#define JUMP_ENTRY_SIZE		16
+ #define JUMP_ORIG_OFFSET	0
+-#define JUMP_NEW_OFFSET		8
++#define JUMP_NEW_OFFSET		4
+ 
+ #define ALT_ENTRY_SIZE		13
+ #define ALT_ORIG_OFFSET		0
 -- 
 2.17.1
