@@ -1,52 +1,28 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 2 Jul 2018 14:54:36 +0100
-Subject: [PATCH v3 19/20] kvm: arm64: Allow IPA size supported by the
- system
-In-Reply-To: <8dcb10d8-d0ff-feb9-4ca8-38d7eeb5e6ce@arm.com>
-References: <1530270944-11351-1-git-send-email-suzuki.poulose@arm.com>
- <1530270944-11351-20-git-send-email-suzuki.poulose@arm.com>
- <8dcb10d8-d0ff-feb9-4ca8-38d7eeb5e6ce@arm.com>
-Message-ID: <72472fe5-69a2-9272-c0ef-d0b981ee0446@arm.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 2 Jul 2018 15:56:35 +0200
+Subject: [PATCH 3/5] arm64: tegra: Add GPIO controller on Tegra194
+In-Reply-To: <20180620125406.11906-3-mperttunen@nvidia.com>
+References: <20180620125406.11906-1-mperttunen@nvidia.com>
+ <20180620125406.11906-3-mperttunen@nvidia.com>
+Message-ID: <20180702135635.GJ13096@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/07/18 14:50, Marc Zyngier wrote:
-> On 29/06/18 12:15, Suzuki K Poulose wrote:
->> So far we have restricted the IPA size of the VM to the default
->> value (40bits). Now that we can manage the IPA size per VM and
->> support dynamic stage2 page tables, allow VMs to have larger IPA.
->> This is done by setting the IPA limit to the one supported by
->> the hardware and kernel. This patch also moves the check for
->> the default IPA size support to kvm_get_ipa_limit().
->>
->> Since the stage2 page table code is dependent on the stage1
->> page table, we always ensure that :
->>
->>    Number of Levels at Stage1 >= Number of Levels at Stage2
->>
->> So we limit the IPA to make sure that the above condition
->> is satisfied. This will affect the following combinations
->> of VA_BITS and IPA for different page sizes.
->>
->>    39bit VA, 4K  - IPA > 43 (Upto 48)
->>    36bit VA, 16K - IPA > 40 (Upto 48)
->>    42bit VA, 64K - IPA > 46 (Upto 52)
+On Wed, Jun 20, 2018 at 03:54:04PM +0300, Mikko Perttunen wrote:
+> Add the device tree node for the GPIO controller on Tegra194.
 > 
-> I'm not sure I get it. Are these the IPA sizes that we forbid based on
-> the host VA size and page size configuration?
+> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
+> ---
+>  arch/arm64/boot/dts/nvidia/tegra194.dtsi | 17 +++++++++++++++++
+>  1 file changed, 17 insertions(+)
 
-Yes, thats right.
+Applied, thanks.
 
-> If so, can you rewrite
-> this as:
-> 
->     host configuration | unsupported IPA range
->     39bit VA, 4k       | [44, 48]
->     36bit VA, 16K      | [41, 48]
->     42bit VA, 64k      | [47, 52]
-> 
-> and say that all the other combinations are supported?
-
-Sure, that looks much better. Thanks
-
-Suzuki
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180702/fc83b2bf/attachment.sig>
