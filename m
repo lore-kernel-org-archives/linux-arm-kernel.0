@@ -1,93 +1,77 @@
-From: ravi.bangoria@linux.ibm.com (Ravi Bangoria)
-Date: Mon, 2 Jul 2018 10:46:55 +0530
-Subject: [PATCH v5 06/10] Uprobes: Support SDT markers having reference
- count (semaphore)
-In-Reply-To: <20180701210935.GA14404@redhat.com>
-References: <20180628052209.13056-1-ravi.bangoria@linux.ibm.com>
- <20180628052209.13056-7-ravi.bangoria@linux.ibm.com>
- <20180701210935.GA14404@redhat.com>
-Message-ID: <0c543791-f3b7-5a4b-f002-e1c76bb430c0@linux.ibm.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Mon,  2 Jul 2018 07:57:32 +0200
+Subject: [PATCH 1/2] ARM: dts: pxa: add pincontrol helpers
+Message-ID: <20180702055733.18578-1-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Oleg,
+Add 3 helpers so that pincontrol definitions for pxa25x and pxa27x are
+easier, and can be easily converted from old mfp mach-pxa code to
+devicetree.
 
-On 07/02/2018 02:39 AM, Oleg Nesterov wrote:
-> On 06/28, Ravi Bangoria wrote:
->>
->> @@ -294,6 +462,15 @@ int uprobe_write_opcode(struct uprobe *uprobe, struct mm_struct *mm,
->>  	if (ret <= 0)
->>  		goto put_old;
->>  
->> +	/* Update the ref_ctr if we are going to replace instruction. */
->> +	if (!ref_ctr_updated) {
->> +		ret = update_ref_ctr(uprobe, mm, is_register);
->> +		if (ret)
->> +			goto put_old;
->> +
->> +		ref_ctr_updated = 1;
->> +	}
-> 
-> Why can't this code live in install_breakpoint() and remove_breakpoint() ?
-> this way we do not need to export "struct uprobe" and change set_swbp/set_orig_insn,
-> and the logic will be more simple.
+An example of such conversion would be :
+static unsigned long mioa701_pin_config[] = {
+	GPIO32_MMC_CLK,
+	GPIO92_MMC_DAT_0,
+	GPIO109_MMC_DAT_1,
+	GPIO110_MMC_DAT_2,
+	GPIO111_MMC_DAT_3,
+	GPIO112_MMC_CMD,
+	MIO_CFG_IN(GPIO78_SDIO_RO, AF0),
+	MIO_CFG_IN(GPIO15_SDIO_INSERT, AF0),
+	MIO_CFG_OUT(GPIO91_SDIO_EN, AF0, DRIVE_LOW),
+};
+into:
+	pinctrl_mmc_default: mmc-default {
+		PMMUX(sd-insert, 15, gpio_in);
+		PMMUX(mmclk, 32, MMCLK);
+		PMMUX(sd-ro, 78, gpio_in);
+		PMMUX_LPM_LOW(sd-enable, 91, gpio_out);
+		PMMUX(mmdat0, 92, MMDAT<0>);
+		PMMUX(mmdat1, 109, MMDAT<1>);
+		PMMUX(mmdat2, 110, MMDAT<2>);
+		PMMUX(mmdat3, 111, MMDAT<3>);
+		PMMUX(mmcmd, 112, MMCMD);
+	};
 
-IMO, it's more easier with current approach. Updating reference counter
-inside uprobe_write_opcode() makes it tightly coupled with instruction
-patching. Basically, reference counter gets incremented only when first
-consumer gets activated and will get decremented only when last consumer
-is going away.
+The third column of PMMUX*() helpers can be found in pincontrol muxing
+functions, either in pinctrl-pxa27x.c (or pinctrl-pxa25x.c), or by
+inspecting the pincontrol once booted in debugfs.
 
-Advantage is, we can get rid of sdt_mm_list patch*, because increment and
-decrement are anyway happening in sync. This makes the implementation lot
-more simpler. If I do it inside install_breakpoit()/ remove_breakpoint(),
-I've to reintroduce sdt_mm_list which makes code more complicated and ugly.
+Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+---
+ arch/arm/boot/dts/pxa2xx.dtsi | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-* https://lkml.org/lkml/2018/4/17/28
-
-BTW, is there any harm in exporting struct uprobe outside of uprobe.c?
-
-> 
-> And let me ask again... May be you have already explained this, but I can't
-> find the previous discussion.
-> 
-> So why do we need a counter but not a boolean? IIRC, because the counter can
-> be shared, in particular 2 different uprobes can have the same >ref_ctr_offset,
-> right?
-
-Actually, it's by design. This counter keeps track of current tracers
-tracing on a particular SDT marker. So only boolean can't work here.
-Also, yes, multiple markers can share the same reference counter.
-
-> 
-> But who else can use this counter and how? Say, can userspace update it too?
-
-There are many different ways user can change the reference counter.
-Ex, systemtap and bcc both uses uprobe to probe on a marker but reference
-counter update logic is different in both of them. Systemtap records all
-exec/mmap events and updates the counter when it finds interested process/
-vma. bcc directly hooks into process's memory (/proc/pid/mem).
-
-> If yes, why this can't race with __update_ref_ctr() ?
-
-Right. But there is no synchronization mechanism provided by the SDT
-infrastructure and this is all userspace so there are chances of race.
-At least, this patch still tries to make sure that reference counter
-does not go negative. If so, throw a warning and don't update it.
-
-> 
-> And btw, why does __update_ref_ctr() use FOLL_FORCE? This vma should be writeable
-> or valid_ref_ctr_vma() should nack it?
-
-I don't remember the exact reason but seem its unnecessary. Let me try to
-recall the reason, otherwise will remove it in the next version.
-
-> 
-> And shouldn't valid_ref_ctr_vma() check VM_SHARED? IIUC we do not want to write
-> to this file?
-
-Hmm, I haven't seen reference counter shared across processes. But as this
-is a generic infrastructure, I'll add a check there.
-
-Thanks for the review,
-Ravi
+diff --git a/arch/arm/boot/dts/pxa2xx.dtsi b/arch/arm/boot/dts/pxa2xx.dtsi
+index e4ebcde17837..f609dbb86abf 100644
+--- a/arch/arm/boot/dts/pxa2xx.dtsi
++++ b/arch/arm/boot/dts/pxa2xx.dtsi
+@@ -9,6 +9,25 @@
+ #include "skeleton.dtsi"
+ #include "dt-bindings/clock/pxa-clock.h"
+ 
++#define PMGROUP(pin) #pin
++#define PMMUX(func, pin, af)			\
++	mux- ## func {				\
++		groups = PMGROUP(P ## pin);	\
++		function = #af;			\
++	}
++#define PMMUX_LPM_LOW(func, pin, af)		\
++	mux- ## func {				\
++		groups = PMGROUP(P ## pin);	\
++		function = #af;			\
++		low-power-disable;		\
++	}
++#define PMMUX_LPM_HIGH(func, pin, af)		\
++	mux- ## func {				\
++		groups = PMGROUP(P ## pin);	\
++		function = #af;			\
++		low-power-enable;		\
++	}
++
+ / {
+ 	model = "Marvell PXA2xx family SoC";
+ 	compatible = "marvell,pxa2xx";
+-- 
+2.11.0
