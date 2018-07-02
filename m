@@ -1,120 +1,90 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 2 Jul 2018 12:53:44 -0700
-Subject: [PATCH v2 2/2] arm64: dts: qcom: pm8998: Add pm8998 thermal zone
-In-Reply-To: <20180702181005.18247-2-mka@chromium.org>
-References: <20180702181005.18247-1-mka@chromium.org>
- <20180702181005.18247-2-mka@chromium.org>
-Message-ID: <CAD=FV=WH8q-3Rt89Get0N357+hWmKiEsruaKtWzo_JoE6gd_3g@mail.gmail.com>
+From: david@lechnology.com (David Lechner)
+Date: Mon, 2 Jul 2018 14:56:26 -0500
+Subject: [v7,07/10] dt-bindings: counter: Document stm32 quadrature encoder
+In-Reply-To: <c1cc3d567d0a5799c3afe6e24ca9ec3b1547224e.1529607879.git.vilhelm.gray@gmail.com>
+References: <c1cc3d567d0a5799c3afe6e24ca9ec3b1547224e.1529607879.git.vilhelm.gray@gmail.com>
+Message-ID: <cf8231e3-0255-a4da-145c-69ccfe7288b2@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 06/21/2018 04:08 PM, William Breathitt Gray wrote:
+> From: Benjamin Gaignard <benjamin.gaignard@st.com>
+> 
+> Add bindings for STM32 Timer quadrature encoder.
+> It is a sub-node of STM32 Timer which implement the
+> quadratic encoder part of the hardware.
 
-On Mon, Jul 2, 2018 at 11:10 AM, Matthias Kaehlcke <mka@chromium.org> wrote:
-> The thermal zone uses spmi-temp-alarm as sensor. If the sensor is
-> configured without an IIO input it always reports 37?C for temperatures
-> below the first hardware trip point at 105?C. This hardware trip point
-> is configured as critical trip point, to initiate a system shutdown
-> before the temperature reaches the next hardware trip point at 125?C,
-> where the PMIC performs a partial shutdown.
->
-> The temperature of the critical trip point can be raised after adding
-> the die temperature ADC as IIO input for spmi-temp-alarm, which
-> significantly increases the precision of the temperature measurements.
->
-> Signed-off-by: Matthias Kaehlcke <mka@chromium.org>
+quadradic? or quadrature?
+
+> 
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+> Signed-off-by: William Breathitt Gray <vilhelm.gray@gmail.com>
 > ---
-> Changes in v2:
-> - defined 'thermal-zones' node in pm8998.dtsi instead of using a label
->   to refer to it
-> - use 105?C hardware trip point as critical trip point
-
-I'm not sure this was right.  I guess you're trying to avoid
-Temperature Stage 2?  From Davi'd email in response to v1:
-
-> The PMIC TEMP_ALARM hardware peripheral will perform an automatic partial
-> PMIC shutdown upon hitting over-temperature stage 2 (125 C).  This turns
-> off peripherals within the PMIC that are expected to draw significant
-> current.  The set of peripherals included varies between PMICs.  This
-> partial shutdown will occur simultaneously with the triggering of an
-> interrupt to the APPS processor that informs the qcom-spmi-temp-alarm
-> driver that an over-temperature threshold has been crossed.
-
-I think it's actually OK to use Temperature Stage 2 as the "critical"
-point, which is why it still interrupts the CPU.  At "critical" the
-system will shut down, right?  ...so presumably it's OK if the drivers
-can't recover from having the power yanked out from underneath them as
-long as they don't hang/crash the system in this case.  If I had to
-guess the whole point of this stage is to give the system shutdown a
-better chance of succeeding without getting to stage 3.
-
-
-I do agree, however, that removing the "145" from the device tree was
-the right thing to do since software will never see that.  The system
-will just shut down.
-
-
-> - reduced number of trip points to 2
-> - lowered temperature of passive trip point
-
-This won't actually do anything until the ADC gets hooked up, right?
-
-I guess I would have expected:
-- 105: passive
-- 125: critical
-
-...and then we could add (if we wanted) a "hot" between passive and
-critical once we have the ADC hooked up?
-
-
-
-> - updated trip point names and added labels
-> - updated commit message
->
->  arch/arm64/boot/dts/qcom/pm8998.dtsi | 25 +++++++++++++++++++++++++
->  1 file changed, 25 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/qcom/pm8998.dtsi b/arch/arm64/boot/dts/qcom/pm8998.dtsi
-> index 2f4989e7ef68..e7caa334e6c7 100644
-> --- a/arch/arm64/boot/dts/qcom/pm8998.dtsi
-> +++ b/arch/arm64/boot/dts/qcom/pm8998.dtsi
-> @@ -3,6 +3,7 @@
->
->  #include <dt-bindings/spmi/spmi.h>
->  #include <dt-bindings/interrupt-controller/irq.h>
-> +#include <dt-bindings/thermal/thermal.h>
->
->  &spmi_bus {
->         pm8998_lsid0: pmic at 0 {
-> @@ -60,3 +61,27 @@
->                 #size-cells = <0>;
->         };
->  };
+>   .../bindings/counter/stm32-timer-cnt.txt      | 31 +++++++++++++++++++
+>   .../devicetree/bindings/mfd/stm32-timers.txt  |  7 +++++
+>   2 files changed, 38 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/counter/stm32-timer-cnt.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/counter/stm32-timer-cnt.txt b/Documentation/devicetree/bindings/counter/stm32-timer-cnt.txt
+> new file mode 100644
+> index 000000000000..c52fcdd4bf6c
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/counter/stm32-timer-cnt.txt
+> @@ -0,0 +1,31 @@
+> +STMicroelectronics STM32 Timer quadrature encoder
 > +
-> +/ {
-> +       thermal-zones {
-> +               pm8998 {
-> +                       polling-delay-passive = <250>;
-> +                       polling-delay = <1000>;
+> +STM32 Timer provides quadrature encoder to detect
+> +angular position and direction of rotary elements,
+> +from IN1 and IN2 input signals.
 > +
-> +                       thermal-sensors = <&pm8998_temp>;
+> +Must be a sub-node of an STM32 Timer device tree node.
+> +See ../mfd/stm32-timers.txt for details about the parent node.
 > +
-> +                       trips {
-> +                               pm8998_alert0: pm8998-alert0 {
-> +                                       temperature = <95000>;
-> +                                       hysteresis = <2000>;
-> +                                       type = "passive";
-> +                               };
-> +                               pm8998_crit: pm8998-crit {
-> +                                       temperature = <105000>;
-> +                                       hysteresis = <2000>;
-> +                                       type = "critical";
-> +                               };
-> +                       };
-> +               };
-> +       };
-> +};
-
-A nit, but I think convention is to actually put additions straight to
-the root node before reference to phandles, so I would have put this
-above the "&spmi_bus" part.
+> +Required properties:
+> +- compatible:		Must be "st,stm32-timer-counter".
+> +- pinctrl-names: 	Set to "default".
+> +- pinctrl-0: 		List of phandles pointing to pin configuration nodes,
+> +			to set CH1/CH2 pins in mode of operation for STM32
+> +			Timer input on external pin.
+> +
+> +Example:
+> +	timers at 40010000 {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		compatible = "st,stm32-timers";
+> +		reg = <0x40010000 0x400>;
+> +		clocks = <&rcc 0 160>;
+> +		clock-names = "int";
+> +
+> +		counter {
+> +			compatible = "st,stm32-timer-counter";
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&tim1_in_pins>;
+> +		};
+> +	};
+> diff --git a/Documentation/devicetree/bindings/mfd/stm32-timers.txt b/Documentation/devicetree/bindings/mfd/stm32-timers.txt
+> index 1db6e0057a63..ff9c14ada30b 100644
+> --- a/Documentation/devicetree/bindings/mfd/stm32-timers.txt
+> +++ b/Documentation/devicetree/bindings/mfd/stm32-timers.txt
+> @@ -23,6 +23,7 @@ Optional parameters:
+>   Optional subnodes:
+>   - pwm:			See ../pwm/pwm-stm32.txt
+>   - timer:		See ../iio/timer/stm32-timer-trigger.txt
+> +- counter:		See ../counter/stm32-timer-cnt.txt
+>   
+>   Example:
+>   	timers at 40010000 {
+> @@ -43,4 +44,10 @@ Example:
+>   			compatible = "st,stm32-timer-trigger";
+>   			reg = <0>;
+>   		};
+> +
+> +		counter {
+> +			compatible = "st,stm32-timer-counter";
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&tim1_in_pins>;
+> +		};
+>   	};
+> 
