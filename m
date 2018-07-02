@@ -1,75 +1,79 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 2 Jul 2018 01:05:05 -0700
-Subject: [PATCH] regulator: core: Pass max_uV value to
- regulator_set_voltage_rdev
-In-Reply-To: <1529330913-11152-1-git-send-email-m.purski@samsung.com>
-References: <20180615112916.GK112168@atomide.com>
- <CGME20180618140856eucas1p281619f9bf003655a3c2eac356216ab25@eucas1p2.samsung.com>
- <1529330913-11152-1-git-send-email-m.purski@samsung.com>
-Message-ID: <20180702080505.GN112168@atomide.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Mon, 02 Jul 2018 10:18:25 +0200
+Subject: [PATCH V2] ARM: dts: imx6: correct anatop regulators range
+In-Reply-To: <1530497076-15509-1-git-send-email-Anson.Huang@nxp.com>
+References: <1530497076-15509-1-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <1530519505.22468.77.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Maciej Purski <m.purski@samsung.com> [180618 14:11]:
-> If the regulator is not coupled, balance_voltage() should preserve
-> its desired max uV, instead of setting the exact value like in
-> coupled regulators case.
+Am Montag, den 02.07.2018, 10:04 +0800 schrieb Anson Huang:
+> According to i.MX6 datasheet, the LDO_1P1's typical
+> programming operating range is 1.0V to 1.2V, and
+> the LDO_2P5's typical programming operating range
+> is 2.25V to 2.75V, correct LDO_1P1 and LDO_2P5's
+> regulator range settings for i.MX6 SoCs.
 > 
-> Remove debugs, which are not necessary for now.
+> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
 
-Sorry for the delay in testing. I gave your series with this one
-a quick boot test on beagleboard-x15 and now the output is
-different. So instead of just hanging it seems to be stuck in
-some eternal loop see below.
+Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
 
-Regards,
-
-Tony
-
-8< -------
- * Loading modules ...[   14.490595] omap-mailbox 48840000.mailbox: omap mailbox rev 0x400
-[   14.498515] omap-mailbox 48842000.mailbox: omap mailbox rev 0x400
-[   14.535853] omap_wdt: OMAP Watchdog Timer Rev 0x01: initial timeout 60 sec
-[   14.937029] lib80211: common routines for IEEE802.11 drivers
-[   15.350565] cfg80211: Loading compiled-in X.509 certificates for regulatory database
-[   15.448875] cfg80211: Loaded X.509 cert 'sforshee: 00b28ddf47aef9cea7'
-[   15.460831] platform regulatory.0: Direct firmware load for regulatory.db failed with error -2
-[   15.469916] cfg80211: failed to load regulatory.db
-[   16.092151] cpu cpu0: regulator_set_voltage: 3387
-[   16.097313] smps12: regulator_set_voltage_unlocked:  3040
-[   16.109880] smps12: optimal uV: 1154000 current uV: 970000, max uV: 1250000
-[   16.117085] smps12: regulator_set_voltage_rdev: 3110
-[   16.122696] smps12: _regulator_do_set_voltage: 2907
-[   16.130443] smps12: optimal uV: 1154000 current uV: 1160000, max uV: 1250000
-[   16.137824] smps12: regulator_set_voltage_rdev: 3110
-[   16.143334] smps12: _regulator_do_set_voltage: 2907
-[   16.149849] smps12: optimal uV: 1154000 current uV: 1160000, max uV: 1250000
-[   16.157174] smps12: regulator_set_voltage_rdev: 3110
-[   16.162683] smps12: _regulator_do_set_voltage: 2907
-[   16.169069] smps12: optimal uV: 1154000 current uV: 1160000, max uV: 1250000
-[   16.176391] smps12: regulator_set_voltage_rdev: 3110
-[   16.181932] smps12: _regulator_do_set_voltage: 2907
-[   16.188353] smps12: optimal uV: 1154000 current uV: 1160000, max uV: 1250000
-[   16.195614] smps12: regulator_set_voltage_rdev: 3110
-[   16.201199] smps12: _regulator_do_set_voltage: 2907
-[   16.207676] smps12: optimal uV: 1154000 current uV: 1160000, max uV: 1250000
-[   16.214931] smps12: regulator_set_voltage_rdev: 3110
-[   16.220614] smps12: _regulator_do_set_voltage: 2907
-[   16.227159] smps12: optimal uV: 1154000 current uV: 1160000, max uV: 1250000
-[   16.234379] smps12: regulator_set_voltage_rdev: 3110
-[   16.239961] smps12: _regulator_do_set_voltage: 2907
-[   16.246494] smps12: optimal uV: 1154000 current uV: 1160000, max uV: 1250000
-[   16.253746] smps12: regulator_set_voltage_rdev: 3110
-[   16.259890] smps12: _regulator_do_set_voltage: 2907
-[   16.267013] smps12: optimal uV: 1154000 current uV: 1160000, max uV: 1250000
-[   16.274114] smps12: regulator_set_voltage_rdev: 3110
-[   16.279565] smps12: _regulator_do_set_voltage: 2907
-[   16.288426] smps12: optimal uV: 1154000 current uV: 1160000, max uV: 1250000
-[   16.295562] smps12: regulator_set_voltage_rdev: 3110
-[   16.301580] smps12: _regulator_do_set_voltage: 2907
-[   16.308331] smps12: optimal uV: 1154000 current uV: 1160000, max uV: 1250000
-[   16.315655] smps12: regulator_set_voltage_rdev: 3110
-[   16.321328] smps12: _regulator_do_set_voltage: 2907
-[   16.327686] smps12: optimal uV: 1154000 current uV: 1160000, max uV: 1250000
-[   16.334945] smps12: regulator_set_voltage_rdev: 3110
-[   16.340662] smps12: _regulator_do_set_voltage: 2907
+> ---
+> changes since V1:
+> 	Correct the regulator range according to datasheet's statement.
+> ?arch/arm/boot/dts/imx6sl.dtsi | 8 ++++----
+> ?arch/arm/boot/dts/imx6sx.dtsi | 8 ++++----
+> ?2 files changed, 8 insertions(+), 8 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
+> index 81f48116..c64bd90 100644
+> --- a/arch/arm/boot/dts/imx6sl.dtsi
+> +++ b/arch/arm/boot/dts/imx6sl.dtsi
+> @@ -524,8 +524,8 @@
+> > ?				regulator-1p1 {
+> > ?					compatible = "fsl,anatop-regulator";
+> > ?					regulator-name = "vdd1p1";
+> > -					regulator-min-microvolt = <800000>;
+> > -					regulator-max-microvolt = <1375000>;
+> > +					regulator-min-microvolt = <1000000>;
+> > +					regulator-max-microvolt = <1200000>;
+> > ?					regulator-always-on;
+> > ?					anatop-reg-offset = <0x110>;
+> > ?					anatop-vol-bit-shift = <8>;
+> @@ -554,8 +554,8 @@
+> > ?				regulator-2p5 {
+> > ?					compatible = "fsl,anatop-regulator";
+> > ?					regulator-name = "vdd2p5";
+> > -					regulator-min-microvolt = <2100000>;
+> > -					regulator-max-microvolt = <2850000>;
+> > +					regulator-min-microvolt = <2250000>;
+> > +					regulator-max-microvolt = <2750000>;
+> > ?					regulator-always-on;
+> > ?					anatop-reg-offset = <0x130>;
+> > ?					anatop-vol-bit-shift = <8>;
+> diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
+> index 7130ab8..596763c 100644
+> --- a/arch/arm/boot/dts/imx6sx.dtsi
+> +++ b/arch/arm/boot/dts/imx6sx.dtsi
+> @@ -592,8 +592,8 @@
+> > ?				regulator-1p1 {
+> > ?					compatible = "fsl,anatop-regulator";
+> > ?					regulator-name = "vdd1p1";
+> > -					regulator-min-microvolt = <800000>;
+> > -					regulator-max-microvolt = <1375000>;
+> > +					regulator-min-microvolt = <1000000>;
+> > +					regulator-max-microvolt = <1200000>;
+> > ?					regulator-always-on;
+> > ?					anatop-reg-offset = <0x110>;
+> > ?					anatop-vol-bit-shift = <8>;
+> @@ -622,8 +622,8 @@
+> > ?				regulator-2p5 {
+> > ?					compatible = "fsl,anatop-regulator";
+> > ?					regulator-name = "vdd2p5";
+> > -					regulator-min-microvolt = <2100000>;
+> > -					regulator-max-microvolt = <2875000>;
+> > +					regulator-min-microvolt = <2250000>;
+> > +					regulator-max-microvolt = <2750000>;
+> > ?					regulator-always-on;
+> > ?					anatop-reg-offset = <0x130>;
+> > ?					anatop-vol-bit-shift = <8>;
