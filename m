@@ -1,89 +1,42 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 2 Jul 2018 16:23:55 +0100
-Subject: [PATCH v4 1/2] ARM: dma-mapping: Set proper DMA ops in
- arm_iommu_detach_device()
-In-Reply-To: <20180702115317.GB5280@ulmo>
-References: <20180530140625.21247-1-thierry.reding@gmail.com>
- <20180530140625.21247-2-thierry.reding@gmail.com>
- <20180702115317.GB5280@ulmo>
-Message-ID: <20180702152355.GM17271@n2100.armlinux.org.uk>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 2 Jul 2018 17:28:08 +0200
+Subject: [PATCH] dma: ste_dma40: Remove VLA usage
+In-Reply-To: <CACRpkdYbmu_Y6N1G3M3q3M=3ZaECFdgije6Qgwoo6qra4g06_A@mail.gmail.com>
+References: <20180629185107.GA37488@beast>
+ <CAK8P3a30Q1ezvCWfudUY=z1q3NHdrkbwRsmSDso4s7TifQAmNQ@mail.gmail.com>
+ <CACRpkdYbmu_Y6N1G3M3q3M=3ZaECFdgije6Qgwoo6qra4g06_A@mail.gmail.com>
+Message-ID: <CAMuHMdUWATshtf8PX+QxwrOHaXt60j2e_GYx=L-UbWjYVL80yA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 02, 2018 at 01:53:17PM +0200, Thierry Reding wrote:
-> On Wed, May 30, 2018 at 04:06:24PM +0200, Thierry Reding wrote:
-> > From: Thierry Reding <treding@nvidia.com>
-> > 
-> > Instead of setting the DMA ops pointer to NULL, set the correct,
-> > non-IOMMU ops depending on the device's coherency setting.
-> > 
-> > Signed-off-by: Thierry Reding <treding@nvidia.com>
-> > ---
-> > Changes in v4:
-> > - new patch to fix existing arm_iommu_detach_device() to do what we need
-> > 
-> >  arch/arm/mm/dma-mapping.c | 12 ++++++------
-> >  1 file changed, 6 insertions(+), 6 deletions(-)
-> 
-> Christoph, Russell,
-> 
-> could either of you provide an Acked-by for this? I think it makes the
-> most sense for Ben to pick this up into the Nouveau tree along with
-> patch 2/2.
+On Mon, Jul 2, 2018 at 4:22 PM Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Fri, Jun 29, 2018 at 11:22 PM Arnd Bergmann <arnd@arndb.de> wrote:
+>
+> > - Nobody uses this driver in practice, as the hardware platform
+> >   was a dead end
+>
+> Depends what you mean with dead end.
+>
+> The hardware was deployed in a few million handsets from Samsung
+> and Sony.
+>
+> Some have been picked up as targets for PostmarketOS:
+> https://wiki.postmarketos.org/wiki/Samsung_Galaxy_S_Advance_(samsung-i9070)
+> https://wiki.postmarketos.org/wiki/Samsung_Galaxy_SIII_mini_(samsung-i8190)
+>
+> So it is no more dead end than anything else discontinued, and it
+> has a living community who want it suppored by the mainline
+> kernel if possible.
 
-Looks fine to me.
+Mixup with SuperH-based ST40?
 
-Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
+Gr{oetje,eeting}s,
 
-Thanks.
-
-> 
-> Thierry
-> 
-> > diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> > index af27f1c22d93..87a0037574e4 100644
-> > --- a/arch/arm/mm/dma-mapping.c
-> > +++ b/arch/arm/mm/dma-mapping.c
-> > @@ -1151,6 +1151,11 @@ int arm_dma_supported(struct device *dev, u64 mask)
-> >  	return __dma_supported(dev, mask, false);
-> >  }
-> >  
-> > +static const struct dma_map_ops *arm_get_dma_map_ops(bool coherent)
-> > +{
-> > +	return coherent ? &arm_coherent_dma_ops : &arm_dma_ops;
-> > +}
-> > +
-> >  #ifdef CONFIG_ARM_DMA_USE_IOMMU
-> >  
-> >  static int __dma_info_to_prot(enum dma_data_direction dir, unsigned long attrs)
-> > @@ -2296,7 +2301,7 @@ void arm_iommu_detach_device(struct device *dev)
-> >  	iommu_detach_device(mapping->domain, dev);
-> >  	kref_put(&mapping->kref, release_iommu_mapping);
-> >  	to_dma_iommu_mapping(dev) = NULL;
-> > -	set_dma_ops(dev, NULL);
-> > +	set_dma_ops(dev, arm_get_dma_map_ops(dev->archdata.dma_coherent));
-> >  
-> >  	pr_debug("Detached IOMMU controller from %s device.\n", dev_name(dev));
-> >  }
-> > @@ -2357,11 +2362,6 @@ static void arm_teardown_iommu_dma_ops(struct device *dev) { }
-> >  
-> >  #endif	/* CONFIG_ARM_DMA_USE_IOMMU */
-> >  
-> > -static const struct dma_map_ops *arm_get_dma_map_ops(bool coherent)
-> > -{
-> > -	return coherent ? &arm_coherent_dma_ops : &arm_dma_ops;
-> > -}
-> > -
-> >  void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
-> >  			const struct iommu_ops *iommu, bool coherent)
-> >  {
-> > -- 
-> > 2.17.0
-> > 
-
-
+                        Geert
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
