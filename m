@@ -1,73 +1,46 @@
-From: amit.kucheria@linaro.org (Amit Kucheria)
-Date: Mon, 2 Jul 2018 19:30:11 +0530
-Subject: [PATCH v4 0/6] thermal: tsens: Refactoring for TSENSv2 IP
-In-Reply-To: <cover.1530533998.git.amit.kucheria@linaro.org>
-References: <cover.1530533998.git.amit.kucheria@linaro.org>
-Message-ID: <CAHLCerNj83pYHDJg2aHoqOqJ6NEg+OWHT-RW4SDbEHrwJXYEtw@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 2 Jul 2018 16:03:43 +0200
+Subject: [PATCH v3 0/8] Tegra Combined UART driver
+In-Reply-To: <20180702114033.15654-1-mperttunen@nvidia.com>
+References: <20180702114033.15654-1-mperttunen@nvidia.com>
+Message-ID: <20180702140343.GO13096@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 2, 2018 at 6:14 PM, Amit Kucheria <amit.kucheria@linaro.org> wrote:
-> This series is a mixed bag:
-> - Some code moves to allow code sharing between various v2.x.y versions of
->   the TSENS IP,
-> - new qcom,tsens-v2.4.0 DT property for SDM845 and a generic qcom,tsens-v2
->   property as a fallback compatible for all v2.x.y platforms,
-> - new platform support (sdm845)
-> - a cleanup patch and
-> - a DT change to have a common way to deal with the SROT and TM registers
->   despite slightly different features across the IP family and different
->   register offsets.
->
-> Rob mentioned offline that we should expose the full version string of the
-> TSENS IP (x.y.z) and have a fallback compatible. I hope patch 4 does what
-> you were looking for.
->
-> Regards,
-> Amit
+On Mon, Jul 02, 2018 at 02:40:25PM +0300, Mikko Perttunen wrote:
+> Hi, here's v3. Changes are in individual patches. Acks are still
+> missing from the following patches:
+> 
+> mailbox: Add transmit done by blocking option
+> mailbox: tegra-hsp: Refactor in preparation of mailboxes
+> mailbox: tegra-hsp: Add support for shared mailboxes
+> serial: Add Tegra Combined UART driver
 
-Forgot to append the changelog. Here it is.
+There don't seem to be any build-time dependencies between the above, so
+technically I guess these could be applied to the respective trees
+separately. The only thing we need to be careful about is to not merge
+the final patch before the others, because it will break serial console
+if the other patches aren't applied.
 
-Changes since v3:
-- Introduce qcom,tsens-v2.4.0 property and make qcom,tsens-v2 a
-  fallback, compatible property.
-- Rename ops_v2 to ops_generic_v2
+Jassi, Greg,
 
-Changes since v2:
-- Based on review, moved tsens-8996.c to tsens-v2.c and changed
-  corresponding function names, struct names to allow for generic tsensv2
-  platforms
-- All v2 platforms will now only need to use the qcom,tsen-v2 property
-- Added a DT patch to initialize tsens driver on sdm845, now that 4.18-rc1
-  will contain an sdm845.dtsi
+What I could do to resolve the runtime dependency is pull the mailbox
+patches into a separate branch, create another separate branch for the
+TCU driver that is based on the mailbox branch and then base the DT
+changes on that branch, or possibly send a separate pull request for
+just the DT change late in the merge window or shortly after v4.19-rc1.
 
-Changes since v1:
-- Move get_temp() from tsens-8996 to tsens-common and rename
-- Change 8996 DT entry to allow init_common() to work across sdm845 and
-  8996 due to different offsets
+Obviously the latter would be equivalent to you guys merging the patches
+through your trees for v4.19-rc1 and me sending out a late pull request
+for the DT bits.
 
-> Amit Kucheria (6):
->   thermal: tsens: Get rid of unused fields in structure
->   dt: qcom: 8996: thermal: Move to DT initialisation
->   thermal: tsens: Rename tsens-8996 to tsens-v2 for reuse
->   thermal: tsens: Add support for SDM845
->   thermal: tsens: Check if we have valid data before reading
->   arm64: dts: sdm845: Add tsens nodes
->
->  .../devicetree/bindings/thermal/qcom-tsens.txt     |  2 ++
->  arch/arm64/boot/dts/qcom/msm8996.dtsi              | 12 ++++++-
->  arch/arm64/boot/dts/qcom/sdm845.dtsi               | 16 +++++++++
->  drivers/thermal/qcom/Makefile                      |  2 +-
->  drivers/thermal/qcom/{tsens-8996.c => tsens-v2.c}  | 39 ++++++++++++----------
->  drivers/thermal/qcom/tsens.c                       |  6 ++++
->  drivers/thermal/qcom/tsens.h                       |  7 ++--
->  7 files changed, 62 insertions(+), 22 deletions(-)
->  rename drivers/thermal/qcom/{tsens-8996.c => tsens-v2.c} (66%)
->
-> --
-> 2.7.4
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Any preference?
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180702/964ac526/attachment.sig>
