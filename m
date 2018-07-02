@@ -1,88 +1,102 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 2 Jul 2018 10:15:59 -0700
-Subject: [GIT PULL] Renesas ARM Based SoC Arm SoC Updates for v4.19
-In-Reply-To: <cover.1529934908.git.horms+renesas@verge.net.au>
-References: <cover.1529934908.git.horms+renesas@verge.net.au>
-Message-ID: <CAOesGMjunEcbcPj3fw=VktkNdkO9UNWPXo+t6L=xf+HR3gVyvw@mail.gmail.com>
+From: leonard.crestez@nxp.com (Leonard Crestez)
+Date: Mon, 2 Jul 2018 17:18:17 +0000
+Subject: [PATCH 2/2] PCI: imx: Initial imx7d pm support
+In-Reply-To: <1528468422.26356.20.camel@pengutronix.de>
+References: <cover.1527621510.git.leonard.crestez@nxp.com>
+ <a6176c8bcfbca08ce4e93e304bdcd48c4600f8e2.1527621510.git.leonard.crestez@nxp.com>
+ <1528468422.26356.20.camel@pengutronix.de>
+Message-ID: <02207512447db4585a4e879e2a059ba223d57dbe.camel@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+On Fri, 2018-06-08 at 16:33 +0200, Lucas Stach wrote:
+> Am Dienstag, den 29.05.2018, 22:39 +0300 schrieb Leonard Crestez:
+> > On imx7d the phy is turned off in suspend and must be reset on resume.
+> > Right now lspci -v fails after a suspend/resume cycle, fix this by
+> > adding minimal suspend/resume code from the nxp vendor tree.
+> > 
+> > This is currently only enabled for imx7 but the same sequence can be
+> > applied to other imx pcie variants.
+
+> > +#ifdef CONFIG_PM_SLEEP
+> > +static int imx6_pcie_suspend_noirq(struct device *dev)
+> > +{
+> > +	struct imx6_pcie *imx6_pcie = dev_get_drvdata(dev);
+> > +
+> > +	if (imx6_pcie->variant == IMX7D) {
+> 
+> Instead of this large indented block, please just have an early return
+> at the start of this function, like:
+> 
+> if (imx6_pcie->variant != IMX7D)
+> 	return 0;
+> 
+> Same for the resume function.
+
+OK. The resume sequence is mostly the same for all SOCs where it
+applies.
+
+> > +static int imx6_pcie_resume_noirq(struct device *dev)
+> > +{
+> > +	int ret = 0;
+> > +	struct imx6_pcie *imx6_pcie = dev_get_drvdata(dev);
+> > +	struct pcie_port *pp = &imx6_pcie->pci->pp;
+> > 
+> > +
+> > +	if (imx6_pcie->variant == IMX7D) {
+> > +		imx6_pcie_ltssm_disable(dev);
+> 
+> The LTSSM disable seems misplaced here. I would have expected it to be
+> in the suspend function.
+
+This is a requirement for reinitializing the core: LTSSM needs to be
+turned off during initialization.
+
+> > +		/*
+> > +		 * controller maybe turn off, re-configure again
+> > +		 */
+> > +		dw_pcie_setup_rc(pp);
+> > +
+> > +		imx6_pcie_ltssm_enable(dev);
+> > +
+> > +		ret = imx6_pcie_wait_for_link(imx6_pcie);
+> > +		if (ret < 0)
+> > +			pr_info("pcie link is down after resume.\n");
+> 
+> If the PHY has been powered down and LTSSM stopped I guess we need to
+> do the full imx6_pcie_establish_link() dance again here to reliably re-
+> establish the link. The above seems unsafe.
+
+What imx6_pcie_establish_link does additionally is some workaround for
+link gen detection. I agree that it should be included.
+
+This would make resume mostly the same as imx_pcie_host_init except for
+dw_pcie_msi_init; that needs to be saved/restored separately.
 
 
-On Mon, Jun 25, 2018 at 7:05 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
->
-> Please consider these Renesas ARM based SoC arm SoC updates for v4.19.
->
->
-> The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
->
->   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
->
-> are available in the git repository at:
->
->   https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm-soc-for-v4.19
->
-> for you to fetch changes up to c44e182e537492baaa37303fc0ee299222fce921:
->
->   ARM: shmobile: convert to SPDX identifier (2018-06-18 12:00:29 +0200)
+Another issue that should be discussed here is that on 6sx and 7d the
+gpc PCIE power domain is not defined correctly: the PCIE block is in
+the DISPMIX domain on both SOCs and it is only PCIE_PHY which has a
+separate power domain.
 
-I've merged this into next/soc but wanted to give a bit of feedback on
-the tag description for future consideration:
+This matters: enabling power-gating for displays will break pcie if
+this relationship is not taken into account. Here are some options:
 
-> ----------------------------------------------------------------
-> Renesas ARM Based SoC Arm SoC Updates for v4.19
->
-> * Convert to SPDX identifier
->
-> * Remove legacy SMP fallback code
->
->   Geert Uytterhoeven says "R-Car H2 and M2-W have been supporting SMP
->   enablement from DT using the "renesas,apmu" enable-method since v4.8.
->   A legacy fallback was left in place for backwards compatibility with old
->   DTBs.
->
->   This patch series removes the legacy SMP fallbacks for R-Car H2 and
->   M2-W, and consolidates their support in the common R-Car Gen2 machine
->   definition.2
+1) Make &pd_pcie a child of &pd_disp by hacking into gpc probe
+functions and calling pm_genpd_add_subdomain. Not very nice.
 
-Can you please edit a little more when you write these pull requests?
-Distilling the information into a higher concentration.
+2) Support nesting PGCs in GPC code? Lots of code and still an
+incorrect representation of hardware.
 
-This could have been something like:
+3) Set power-domains = <&pd_disp> and enable runtime PM on &pd_pcie?
 
- - Remove legacy SMP fallback code for R-Car H2 and M2-W
-    DT enablement has been in since 4.8 and it's no longer needed.
+4) Add separate devices for the pcie-phy. These would be mostly empty
+but still different, for example on imx6sx the PHY is not even
+accessible on the bus but only though PCIE registers.
 
-> * APMU cleanups after legacy SMP fallback removal
->   - Move cpu_leave_lowpower() from HOTPLUG_CPU || SUSPEND section to the
->     SUSPEND section as it is only used for suspend
->   - Remove shmobile_smp_apmu_prepare_cpus() as it is no longer used
->   - Remove platsmp-apmu.h
+Solutions 1-3 seem like workarounds while 4 seems excessive, would
+appreciate some feedback.
 
-These are typical "what" descriptions, not "why". Just as with patch
-descriptions, it's usually more important to describe why something is
-changed than exactly what (since what can be derived from looking at
-the diff).
-
-It's a bit different for cleanups, of course, but general rule of
-thumb still applies.
-
->
-> * Drop legacy SYSC fallbacks
->
->   Geert Uytterhoeven says "When DT SYSC support was introduced in v4.7,
->   legacy fallbacks were kept to keep secondary CPUs working on R-Car H1,
->   H2, and M2-W using old DTBs.  However, the time has come to drop these
->   fallbacks, and clean up the resulting code"
-
-Again, this could have a single-sentence description similar to SMP
-fallback removal.
-
-
-Thanks,
-
-
--Olof
+--
+Regards,
+Leonard
