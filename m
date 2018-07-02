@@ -1,51 +1,32 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 2 Jul 2018 15:13:00 +0200
-Subject: [PATCH v3 5/8] mailbox: tegra-hsp: Add support for shared
- mailboxes
-In-Reply-To: <20180702114033.15654-6-mperttunen@nvidia.com>
-References: <20180702114033.15654-1-mperttunen@nvidia.com>
- <20180702114033.15654-6-mperttunen@nvidia.com>
-Message-ID: <20180702131300.GG13096@ulmo>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 2 Jul 2018 14:13:59 +0100
+Subject: [PATCH v3 15/20] kvm: arm/arm64: Allow tuning the physical
+ address size for VM
+In-Reply-To: <1530270944-11351-16-git-send-email-suzuki.poulose@arm.com>
+References: <1530270944-11351-1-git-send-email-suzuki.poulose@arm.com>
+ <1530270944-11351-16-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <f7715da8-73ea-28fb-9883-8d0c048e0792@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 02, 2018 at 02:40:30PM +0300, Mikko Perttunen wrote:
-> The Tegra HSP block supports 'shared mailboxes' that are simple 32-bit
-> registers consisting of a FULL bit in MSB position and 31 bits of data.
-> The hardware can be configured to trigger interrupts when a mailbox
-> is empty or full. Add support for these shared mailboxes to the HSP
-> driver.
-> 
-> The initial use for the mailboxes is the Tegra Combined UART. For this
-> purpose, we use interrupts to receive data, and spinning to wait for
-> the transmit mailbox to be emptied to minimize unnecessary overhead.
-> 
-> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
-> Reviewed-by: Jon Hunter <jonathanh@nvidia.com>
-> ---
-> 
-> Notes:
->     v3:
->     - Added define HSP_INT0_IE_FULL_SHIFT
->     - Added Jon's Reviewed-by
->     
->     v2:
->     - Added defines for some register fields
->     - Simplified bit looping logic in interrupt handler
->     - Changed write done polling to use readl_poll_timeout
->     - Removed unnecessary zero assignments
->     - Fixed two error cases in probe to do proper cleanup
-> 
->  drivers/mailbox/tegra-hsp.c | 211 +++++++++++++++++++++++++++++++++++++++-----
->  1 file changed, 191 insertions(+), 20 deletions(-)
+On 29/06/18 12:15, Suzuki K Poulose wrote:
+> Allow specifying the physical address size for a new VM via
+> the kvm_type argument for KVM_CREATE_VM ioctl. This allows
+> us to finalise the stage2 page table format as early as possible
+> and hence perform the right checks on the memory slots without
+> complication. The size is encoded as Log2(PA_Size) in the bits[7:0]
+> of the type field and can encode more information in the future if
+> required. The IPA size is still capped at 40bits.
 
-Looks good to me:
+Can't we relax this? There is no technical reason (AFAICS) not to allow
+going down to 36bit IPA if the user has requested it.
 
-Acked-by: Thierry Reding <treding@nvidia.com>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180702/58638bcb/attachment.sig>
+If we run on a 36bit IPA system, the default would fail. But if the user
+specified "please give me a 36bit IPA VM", we could satisfy that
+requirement and allow them to run their stupidly small guest!
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
