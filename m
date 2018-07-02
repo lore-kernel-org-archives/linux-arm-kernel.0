@@ -1,48 +1,34 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon,  2 Jul 2018 12:04:06 +0100
-Subject: [PATCHv4 10/19] arm64: don't restore GPRs when context tracking
-In-Reply-To: <20180702110415.10465-1-mark.rutland@arm.com>
-References: <20180702110415.10465-1-mark.rutland@arm.com>
-Message-ID: <20180702110415.10465-11-mark.rutland@arm.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Mon, 2 Jul 2018 13:05:40 +0200
+Subject: [PATCH 2/3] arm/arm64: configs: Remove the MFD_ prefix for
+ MFD_CROS_EC_I2C/SPI symbols.
+In-Reply-To: <20180702102201.13461-3-enric.balletbo@collabora.com>
+References: <20180702102201.13461-1-enric.balletbo@collabora.com>
+ <20180702102201.13461-3-enric.balletbo@collabora.com>
+Message-ID: <CAJKOXPd51yU8-zObXszc4zJpHsGtMNFTsbQsQdKBFg=k22xZLA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that syscalls are invoked with pt_regs, we no longer need to ensure
-that the argument regsiters are live in the entry assembly, and it's
-fine to not restore them after context_tracking_user_exit() has
-corrupted them.
+On 2 July 2018 at 12:22, Enric Balletbo i Serra
+<enric.balletbo@collabora.com> wrote:
+> The cros-ec I2C and SPI transport drivers have been moved from MFD
+> subsystem to platform/chrome, at the same time, the config symbol has
+> been renamed and lost the MFD_ prefix, so update all configs to the new
+> config symbol name.
+>
+> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+> ---
+>
+>  arch/arm/configs/exynos_defconfig   | 4 ++--
+>  arch/arm/configs/multi_v7_defconfig | 4 ++--
+>  arch/arm/configs/pxa_defconfig      | 4 ++--
+>  arch/arm64/configs/defconfig        | 4 ++--
+>  4 files changed, 8 insertions(+), 8 deletions(-)
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/kernel/entry.S | 12 +-----------
- 1 file changed, 1 insertion(+), 11 deletions(-)
+Since you put in one patch multiple defconfigs belonging to multiple
+maintainers, I assume you are pushing this through arm-soc or Russell.
+In such case, for Exynos boards:
+Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
 
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 156c4e3fd1a4..c41b84d06644 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -41,19 +41,9 @@
-  * Context tracking subsystem.  Used to instrument transitions
-  * between user and kernel mode.
-  */
--	.macro ct_user_exit, syscall = 0
-+	.macro ct_user_exit
- #ifdef CONFIG_CONTEXT_TRACKING
- 	bl	context_tracking_user_exit
--	.if \syscall == 1
--	/*
--	 * Save/restore needed during syscalls.  Restore syscall arguments from
--	 * the values already saved on stack during kernel_entry.
--	 */
--	ldp	x0, x1, [sp]
--	ldp	x2, x3, [sp, #S_X2]
--	ldp	x4, x5, [sp, #S_X4]
--	ldp	x6, x7, [sp, #S_X6]
--	.endif
- #endif
- 	.endm
- 
--- 
-2.11.0
+Best regards,
+Krzysztof
