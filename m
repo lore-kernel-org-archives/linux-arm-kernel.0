@@ -1,129 +1,27 @@
-From: radheys@xilinx.com (Radhey Shyam Pandey)
-Date: Mon, 2 Jul 2018 06:59:58 +0000
-Subject: [RFC] dmaengine: Add metadat_ops for dma_async_tx_descriptor
-In-Reply-To: <20180601102429.16429-1-peter.ujfalusi@ti.com>
-References: <32208a9c-2b15-d345-1432-f1e387531f9b@ti.com>
- <20180601102429.16429-1-peter.ujfalusi@ti.com>
-Message-ID: <DM6PR02MB4361262830FF320B16B8486AC7430@DM6PR02MB4361.namprd02.prod.outlook.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 2 Jul 2018 12:38:06 +0530
+Subject: [PATCH 0/3] PM / Domains: Enable name based lookup at attach
+In-Reply-To: <20180629110432.5179-1-ulf.hansson@linaro.org>
+References: <20180629110432.5179-1-ulf.hansson@linaro.org>
+Message-ID: <20180702070806.tuzzh6mu65lrq4xq@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Peter Ujfalusi [mailto:peter.ujfalusi at ti.com]
-> Sent: Friday, June 1, 2018 3:54 PM
-> To: Radhey Shyam Pandey <radheys@xilinx.com>; vinod.koul at intel.com
-> Cc: lars at metafoo.de; michal.simek at xilinx.com; linux-
-> kernel at vger.kernel.org; dmaengine at vger.kernel.org;
-> dan.j.williams at intel.com; Appana Durga Kedareswara Rao
-> <appanad@xilinx.com>; linux-arm-kernel at lists.infradead.org
-> Subject: [RFC] dmaengine: Add metadat_ops for dma_async_tx_descriptor
+On 29-06-18, 13:04, Ulf Hansson wrote:
+> Recently we added support to manage multiple PM domains per device. Consumer
+> drivers were provided an API, dev_pm_domain_attach_by_id() to associate its
+> device with one of its PM domain, by using an index.
 > 
-> If the DMA supports per descriptor metadata it can implement the attach,
-> get_ptr/set_len callbacks.
+> Let's extend this to allow the association to be done using a name based
+> lookup, which follows the similar concept as for other resource types, such as
+> clocks for example.
 > 
-> Client drivers must only use either attach or get_ptr/set_len to avoid
-> miss configuration.
-> 
-> Wrappers are also added for the metadata_ops:
-> dmaengine_desc_attach_metadata()
-> dmaengine_desc_get_metadata_ptr()
-> dmaengine_desc_set_metadata_len()
-> 
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> ---
-> Hi,
-> 
-> since attachments are bouncing back, I send the patch separately
-> 
-> Regards,
-> Peter
-> 
->  include/linux/dmaengine.h | 50
-> +++++++++++++++++++++++++++++++++++++++
->  1 file changed, 50 insertions(+)
-> 
-> diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
-> index 51fbb861e84b..ac42ace36aa3 100644
-> --- a/include/linux/dmaengine.h
-> +++ b/include/linux/dmaengine.h
-> @@ -491,6 +491,18 @@ struct dmaengine_unmap_data {
->  	dma_addr_t addr[0];
->  };
-> 
-> +struct dma_async_tx_descriptor;
-> +
-> +struct dma_descriptor_metadata_ops {
-> +	int (*attach)(struct dma_async_tx_descriptor *desc, void *data,
-> +		      size_t len);
-> +
-> +	void *(*get_ptr)(struct dma_async_tx_descriptor *desc,
-> +			 size_t *payload_len, size_t *max_len);
-> +	int (*set_len)(struct dma_async_tx_descriptor *desc,
-> +		       size_t payload_len);
-> +};
-> +
->  /**
->   * struct dma_async_tx_descriptor - async transaction descriptor
->   * ---dma generic offload fields---
-> @@ -520,6 +532,7 @@ struct dma_async_tx_descriptor {
->  	dma_async_tx_callback_result callback_result;
->  	void *callback_param;
->  	struct dmaengine_unmap_data *unmap;
-> +	struct dma_descriptor_metadata_ops *metadata_ops;
->  #ifdef CONFIG_ASYNC_TX_ENABLE_CHANNEL_SWITCH
->  	struct dma_async_tx_descriptor *next;
->  	struct dma_async_tx_descriptor *parent;
-> @@ -932,6 +945,43 @@ static inline struct dma_async_tx_descriptor
-> *dmaengine_prep_dma_memcpy(
->  						    len, flags);
->  }
-> 
-> +static inline int dmaengine_desc_attach_metadata(
-> +		struct dma_async_tx_descriptor *desc, void *data, size_t
-> len)
-> +{
-> +	if (!desc)
-> +		return 0;
-> +
-> +	if (!desc->metadata_ops || !desc->metadata_ops->attach)
-> +		return -ENOTSUPP;
-> +
-> +	return desc->metadata_ops->attach(desc, data, len);
-> +}
-> +
-> +static inline void *dmaengine_desc_get_metadata_ptr(
-> +		struct dma_async_tx_descriptor *desc, size_t *payload_len,
-> +		size_t *max_len)
-> +{
-> +	if (!desc)
-> +		return NULL;
-> +
-> +	if (!desc->metadata_ops || !desc->metadata_ops->get_ptr)
-> +		return ERR_PTR(-ENOTSUPP);
-> +
-> +	return desc->metadata_ops->get_ptr(desc, payload_len, max_len);
-> +}
-> +
-> +static inline int dmaengine_desc_set_metadata_len(
-> +		struct dma_async_tx_descriptor *desc, size_t payload_len)
-> +{
-> +	if (!desc)
-> +		return 0;
-> +
-> +	if (!desc->metadata_ops || !desc->metadata_ops->set_len)
-> +		return -ENOTSUPP;
-> +
-> +	return desc->metadata_ops->set_len(desc, payload_len);
-> +}
-> +
-Thanks for the RFC patchset. It looks fine to me. We also need to update
-documentation. Let's wait for Vinod/Lars feedback.
+> Ulf Hansson (3):
+>   PM / Domains: dt: Add a power-domain-names property
+>   PM / Domains: Introduce option to attach a device by name to genpd
+>   PM / Domains: Introduce dev_pm_domain_attach_by_name()
 
->  /**
->   * dmaengine_terminate_all() - Terminate all active DMA transfers
->   * @chan: The channel for which to terminate the transfers
-> --
-> Peter
-> 
-> Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
-> Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
+
+-- 
+viresh
