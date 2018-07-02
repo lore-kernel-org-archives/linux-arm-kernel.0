@@ -1,61 +1,71 @@
-From: anson.huang@nxp.com (Anson Huang)
-Date: Mon, 2 Jul 2018 01:19:20 +0000
-Subject: [PATCH v1] ARM: dts: imx6sl-evk: keep sw4 always on
-In-Reply-To: <CAOMZO5BdtxKjQge5ONpnjr1yNVeTJf4u8Gh-fPqpHz7G9ipOTg@mail.gmail.com>
-References: <1529930051-14122-1-git-send-email-yibin.gong@nxp.com>
- <20180701093402.GN4348@dragon>
- <CAOMZO5BjOEGWv2dC-bp0BYHq+PhLssEKic+o7ock8_1Dobd=sQ@mail.gmail.com>
- <AM3PR04MB131507901BFEE1A5E426EECBF5430@AM3PR04MB1315.eurprd04.prod.outlook.com>
- <CAOMZO5D8tjnjbwMdLGd7KF7_4PwqRWX8XH8kdcF3-5e-r2YQEA@mail.gmail.com>
- <AM3PR04MB1315E7AED2BCE2265E6C443DF5430@AM3PR04MB1315.eurprd04.prod.outlook.com>
- <CAOMZO5D8v4KM9S4ooHTDbA+vc8BZN_eO_wDuOPA+8Hcq-SmLDw@mail.gmail.com>
- <AM3PR04MB1315C7C7CFF990615732FFBCF5430@AM3PR04MB1315.eurprd04.prod.outlook.com>
- <CAOMZO5AM5VRS7UiWuvAQ8vvTB8OM+iwofuYrbsL_yB9e0Z9Kyg@mail.gmail.com>
- <AM3PR04MB13155B8D567ABEF7EF03249AF5430@AM3PR04MB1315.eurprd04.prod.outlook.com>
- <CAOMZO5BdtxKjQge5ONpnjr1yNVeTJf4u8Gh-fPqpHz7G9ipOTg@mail.gmail.com>
-Message-ID: <AM3PR04MB1315D8EF80847B4AF1FF4BA5F5430@AM3PR04MB1315.eurprd04.prod.outlook.com>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Mon, 2 Jul 2018 09:39:10 +0800
+Subject: [PATCH v7 00/29] Add support for mediatek SOC MT2712
+In-Reply-To: <1529482771-2153-1-git-send-email-stu.hsieh@mediatek.com>
+References: <1529482771-2153-1-git-send-email-stu.hsieh@mediatek.com>
+Message-ID: <1530495550.4568.2.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi, Stu:
 
+On Wed, 2018-06-20 at 16:19 +0800, Stu Hsieh wrote:
+> This patch add support for the Mediatek MT2712 DISP subsystem.
+> MT2712 is base on MT8173, there are some difference as following:
+> MT2712 support three disp output(two ovl and one rdma)
+> 
 
-Anson Huang
-Best Regards!
+For the series, applied to mediatek-drm-next-4.19 [1], the patch
+'drm/mediatek: Add support for mediatek SOC MT2712' has line over 80
+character, so I've modified it.
 
+[1]
+https://github.com/ckhu-mediatek/linux.git-tags/commits/mediatek-drm-next-4.19
 
-> -----Original Message-----
-> From: Fabio Estevam [mailto:festevam at gmail.com]
-> Sent: Monday, July 2, 2018 9:17 AM
-> To: Anson Huang <anson.huang@nxp.com>
-> Cc: Shawn Guo <shawnguo@kernel.org>; Robin Gong <yibin.gong@nxp.com>;
-> Mark Rutland <mark.rutland@arm.com>; open list:OPEN FIRMWARE AND
-> FLATTENED DEVICE TREE BINDINGS <devicetree@vger.kernel.org>;
-> linux-kernel <linux-kernel@vger.kernel.org>; Rob Herring
-> <robh+dt@kernel.org>; dl-linux-imx <linux-imx@nxp.com>; Sascha Hauer
-> <kernel@pengutronix.de>; Fabio Estevam <fabio.estevam@nxp.com>;
-> moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE
-> <linux-arm-kernel@lists.infradead.org>
-> Subject: Re: [PATCH v1] ARM: dts: imx6sl-evk: keep sw4 always on
-> 
-> On Sun, Jul 1, 2018 at 10:09 PM, Anson Huang <anson.huang@nxp.com>
-> wrote:
-> 
-> > On some new i.MX platforms, PFuze switches are used for supplying
-> > GPU/VPU or other non-critical modules only, these switches need to be
-> > turned off by runtime PM to avoid very high power leakage, like on
-> mScale850D.
-> 
-> Ok, in this case I suggest adding a new property so that the switches can be
-> turned off only when the new property is present.
-> 
-> When this new property is absent, then we keep the current behavior and avoid
-> dtb breakage.
-> 
-> Since MX8M support is not in place yet, this is not urgent, so I will send a revert
-> and then you can re-work the patch so that it does not affect the old dtbs.
-> 
-> Do you agree with such approach?
+Regards,
+CK
 
-Sure, I agree for now. As I did NOT want to have any breakage. Thanks.
- 
-Anson.
+> Change in v6:
+> - Update commit message for the patch
+>   "drm/mediatek: Update the definition of connection from RDMA1 to DPI0"
+> 
+> Stu Hsieh (29):
+>   drm/mediatek: update dt-bindings for mt2712
+>   drm/mediatek: support maximum 64 mutex mod
+>   drm/mediatek: add ddp component AAL1
+>   drm/mediatek: add ddp component OD1
+>   drm/mediatek: add ddp component PWM1
+>   drm/mediatek: add ddp component PWM2
+>   drm/mediatek: add component DPI1
+>   drm/mediatek: add component DSI2
+>   drm/mediatek: add component DSI3
+>   drm/mediatek: add the DSI1 for component init condition
+>   drm/mediatek: add connection from OD1 to RDMA1
+>   drm/mediatek: Update the definition of connection from RDMA1 to DPI0
+>   drm/mediatek: add connection from RDMA0 to DPI0
+>   drm/mediatek: add connection from RDMA0 to DSI2
+>   drm/mediatek: add connection from RDMA0 to DSI3
+>   drm/mediatek: add connection from RDMA1 to DPI1
+>   drm/mediatek: add connection from RDMA1 to DSI1
+>   drm/mediatek: add connection from RDMA1 to DSI2
+>   drm/mediatek: add connection from RDMA1 to DSI3
+>   drm/mediatek: add connection from RDMA2 to DPI0
+>   drm/mediatek: add connection from RDMA2 to DPI1
+>   drm/mediatek: add connection from RDMA2 to DSI1
+>   drm/mediatek: add connection from RDMA2 to DSI2
+>   drm/mediatek: add connection from RDMA2 to DSI3
+>   drm/mediatek: add DPI1 support for mutex
+>   drm/mediatek: add DSI2 support for mutex
+>   drm/mediatek: add DSI3 support for mutex
+>   drm/mediatek: add third ddp path
+>   drm/mediatek: Add support for mediatek SOC MT2712
+> 
+>  .../bindings/display/mediatek/mediatek,disp.txt    |   2 +-
+>  drivers/gpu/drm/mediatek/mtk_drm_crtc.c            |   3 +
+>  drivers/gpu/drm/mediatek/mtk_drm_ddp.c             | 235 ++++++++++++++++++---
+>  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c        |  15 +-
+>  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h        |  10 +-
+>  drivers/gpu/drm/mediatek/mtk_drm_drv.c             |  47 ++++-
+>  drivers/gpu/drm/mediatek/mtk_drm_drv.h             |   5 +-
+>  7 files changed, 274 insertions(+), 43 deletions(-)
+> 
