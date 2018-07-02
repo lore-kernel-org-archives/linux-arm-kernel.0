@@ -1,100 +1,202 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon,  2 Jul 2018 12:03:56 +0100
-Subject: [PATCHv4 00/19] arm64: invoke syscalls with pt_regs
-Message-ID: <20180702110415.10465-1-mark.rutland@arm.com>
+Date: Mon,  2 Jul 2018 12:04:03 +0100
+Subject: [PATCHv4 07/19] arm64: convert raw syscall invocation to C
+In-Reply-To: <20180702110415.10465-1-mark.rutland@arm.com>
+References: <20180702110415.10465-1-mark.rutland@arm.com>
+Message-ID: <20180702110415.10465-8-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series reworks arm64's syscall handling to minimize the propagation
-of user-controlled register values into speculated code paths. As with
-x86 [1], a wrapper is generated for each syscall, which extracts the
-argument from a struct pt_regs. During kernel entry from userspace,
-registers are zeroed.
+As a first step towards invoking syscalls with a pt_regs argument,
+convert the raw syscall invocation logic to C. We end up with a bit more
+register shuffling, but the unified invocation logic means we can unify
+the tracing paths, too.
 
-The arm64 kernel code directly invokes some syscalls which the x86 code
-doesn't, so I've added ksys_* wrappers for these, following the x86
-example. The rest of the series is arm64-specific.
+Previously, assembly had to open-code calls to ni_sys() when the system
+call number was out-of-bounds for the relevant syscall table. This case
+is now handled by invoke_syscall(), and the assembly no longer need to
+handle this case explicitly. This allows the tracing paths to be
+simplified and unified, as we no longer need the __ni_sys_trace path and
+the __sys_trace_return label.
 
-I've pushed the series out to my arm64/syscall-regs branch [2] on
-kernel.org.
+This only converts the invocation of the syscall. The rest of the
+syscall triage and tracing is left in assembly for now, and will be
+converted in subsequent patches.
 
-Since v1 [3]:
-* Rebase atop of arm64 for-next/core (for SSBD conflicts)
-* Move ksys_personality logic into <linux/syscalls.h>
-* Move kcompat_sys_* wrappers to <linux/compat.h>
-* Fix scno bounds check to use unsigned comparison
-* Fix sve_user_reset() call in el0_svc_handler()
-* Add BUILD_BUG() to the !CONFIG_ARM64_SVE stubs
-* Accumulate acked-by / reviewed-by tags
-
-Since v2 [4]:
-* Rebase to v4.18-rc1
-* Take upper 32 RES0 bits of SCTLR_ELx into account
-* Accumulate acks
-
-Since v3 [5]:
-* Rebase to v4.18-rc3 to avoid conflict with FPSIMD/SVE fixes
-* Accumulate acks / reviewed-by tags
-* Rework __invoke_syscall() for consistency with do_ni_syscall()
-* Rename sve_user_reset() to sve_user_discard()
-* Tidied up comment placement
-* Typo fixes
-
-Thanks,
-Mark.
-
-[1] https://lkml.kernel.org/r/20180330093720.6780-1-linux at dominikbrodowski.net
-[2] git://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git
-[3] https://lkml.kernel.org/r/20180514094640.27569-1-mark.rutland at arm.com
-[4] https://lkml.kernel.org/r/20180601112441.37810-1-mark.rutland at arm.com
-[5] https://lkml.kernel.org/r/20180618120310.39527-1-mark.rutland at arm.com
-
-Mark Rutland (19):
-  arm64: consistently use unsigned long for thread flags
-  arm64: move SCTLR_EL{1,2} assertions to <asm/sysreg.h>
-  arm64: kill config_sctlr_el1()
-  arm64: kill change_cpacr()
-  arm64: move sve_user_{enable,disable} to <asm/fpsimd.h>
-  arm64: remove sigreturn wrappers
-  arm64: convert raw syscall invocation to C
-  arm64: convert syscall trace logic to C
-  arm64: convert native/compat syscall entry to C
-  arm64: don't restore GPRs when context tracking
-  arm64: don't reload GPRs after apply_ssbd
-  arm64: zero GPRs upon entry from EL0
-  kernel: add ksys_personality()
-  kernel: add kcompat_sys_{f,}statfs64()
-  arm64: remove in-kernel call to sys_personality()
-  arm64: use {COMPAT,}SYSCALL_DEFINE0 for sigreturn
-  arm64: use SYSCALL_DEFINE6() for mmap
-  arm64: convert compat wrappers to C
-  arm64: implement syscall wrappers
-
- arch/arm64/Kconfig                       |   1 +
- arch/arm64/include/asm/fpsimd.h          |  17 +++-
- arch/arm64/include/asm/syscall_wrapper.h |  80 ++++++++++++++++
- arch/arm64/include/asm/sysreg.h          |  30 ++----
- arch/arm64/include/asm/unistd32.h        |  26 ++---
- arch/arm64/kernel/Makefile               |   5 +-
- arch/arm64/kernel/armv8_deprecated.c     |   8 +-
- arch/arm64/kernel/cpu_errata.c           |   3 +-
- arch/arm64/kernel/entry.S                | 157 ++++---------------------------
- arch/arm64/kernel/entry32.S              | 121 ------------------------
- arch/arm64/kernel/fpsimd.c               |  19 ----
- arch/arm64/kernel/signal.c               |   5 +-
- arch/arm64/kernel/signal32.c             |   6 +-
- arch/arm64/kernel/sys.c                  |  19 ++--
- arch/arm64/kernel/sys32.c                | 127 ++++++++++++++++++++++---
- arch/arm64/kernel/syscall.c              | 137 +++++++++++++++++++++++++++
- arch/arm64/kernel/traps.c                |  18 +---
- arch/arm64/mm/fault.c                    |   2 +-
- fs/statfs.c                              |  14 ++-
- include/linux/compat.h                   |  11 +++
- include/linux/syscalls.h                 |  11 +++
- 21 files changed, 453 insertions(+), 364 deletions(-)
- create mode 100644 arch/arm64/include/asm/syscall_wrapper.h
- delete mode 100644 arch/arm64/kernel/entry32.S
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/kernel/Makefile  |  3 ++-
+ arch/arm64/kernel/entry.S   | 36 +++++++++------------------------
+ arch/arm64/kernel/syscall.c | 49 +++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/traps.c   | 16 ---------------
+ 4 files changed, 61 insertions(+), 43 deletions(-)
  create mode 100644 arch/arm64/kernel/syscall.c
 
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index 0025f8691046..4e24d2244bd1 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -18,7 +18,8 @@ arm64-obj-y		:= debug-monitors.o entry.o irq.o fpsimd.o		\
+ 			   hyp-stub.o psci.o cpu_ops.o insn.o	\
+ 			   return_address.o cpuinfo.o cpu_errata.o		\
+ 			   cpufeature.o alternative.o cacheinfo.o		\
+-			   smp.o smp_spin_table.o topology.o smccc-call.o
++			   smp.o smp_spin_table.o topology.o smccc-call.o	\
++			   syscall.o
+ 
+ extra-$(CONFIG_EFI)			:= efi-entry.o
+ 
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index 62f2876f9c63..c0392f78e392 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -903,7 +903,6 @@ ENDPROC(el0_error)
+  */
+ ret_fast_syscall:
+ 	disable_daif
+-	str	x0, [sp, #S_X0]			// returned x0
+ 	ldr	x1, [tsk, #TSK_TI_FLAGS]	// re-check for syscall tracing
+ 	and	x2, x1, #_TIF_SYSCALL_WORK
+ 	cbnz	x2, ret_fast_syscall_trace
+@@ -976,15 +975,11 @@ el0_svc_naked:					// compat entry point
+ 
+ 	tst	x16, #_TIF_SYSCALL_WORK		// check for syscall hooks
+ 	b.ne	__sys_trace
+-	cmp     wscno, wsc_nr			// check upper syscall limit
+-	b.hs	ni_sys
+-	mask_nospec64 xscno, xsc_nr, x19	// enforce bounds for syscall number
+-	ldr	x16, [stbl, xscno, lsl #3]	// address in the syscall table
+-	blr	x16				// call sys_* routine
+-	b	ret_fast_syscall
+-ni_sys:
+ 	mov	x0, sp
+-	bl	do_ni_syscall
++	mov	w1, wscno
++	mov	w2, wsc_nr
++	mov	x3, stbl
++	bl	invoke_syscall
+ 	b	ret_fast_syscall
+ ENDPROC(el0_svc)
+ 
+@@ -1001,29 +996,18 @@ __sys_trace:
+ 	bl	syscall_trace_enter
+ 	cmp	w0, #NO_SYSCALL			// skip the syscall?
+ 	b.eq	__sys_trace_return_skipped
+-	mov	wscno, w0			// syscall number (possibly new)
+-	mov	x1, sp				// pointer to regs
+-	cmp	wscno, wsc_nr			// check upper syscall limit
+-	b.hs	__ni_sys_trace
+-	ldp	x0, x1, [sp]			// restore the syscall args
+-	ldp	x2, x3, [sp, #S_X2]
+-	ldp	x4, x5, [sp, #S_X4]
+-	ldp	x6, x7, [sp, #S_X6]
+-	ldr	x16, [stbl, xscno, lsl #3]	// address in the syscall table
+-	blr	x16				// call sys_* routine
+ 
+-__sys_trace_return:
+-	str	x0, [sp, #S_X0]			// save returned x0
++	mov	x0, sp
++	mov	w1, wscno
++	mov	w2, wsc_nr
++	mov	x3, stbl
++	bl	invoke_syscall
++
+ __sys_trace_return_skipped:
+ 	mov	x0, sp
+ 	bl	syscall_trace_exit
+ 	b	ret_to_user
+ 
+-__ni_sys_trace:
+-	mov	x0, sp
+-	bl	do_ni_syscall
+-	b	__sys_trace_return
+-
+ 	.popsection				// .entry.text
+ 
+ #ifdef CONFIG_UNMAP_KERNEL_AT_EL0
+diff --git a/arch/arm64/kernel/syscall.c b/arch/arm64/kernel/syscall.c
+new file mode 100644
+index 000000000000..8bc2530c8472
+--- /dev/null
++++ b/arch/arm64/kernel/syscall.c
+@@ -0,0 +1,49 @@
++// SPDX-License-Identifier: GPL-2.0
++
++#include <linux/errno.h>
++#include <linux/nospec.h>
++#include <linux/ptrace.h>
++#include <linux/syscalls.h>
++
++long compat_arm_syscall(struct pt_regs *regs);
++
++asmlinkage long do_ni_syscall(struct pt_regs *regs)
++{
++#ifdef CONFIG_COMPAT
++	long ret;
++	if (is_compat_task()) {
++		ret = compat_arm_syscall(regs);
++		if (ret != -ENOSYS)
++			return ret;
++	}
++#endif
++
++	return sys_ni_syscall();
++}
++
++typedef long (*syscall_fn_t)(unsigned long, unsigned long,
++			     unsigned long, unsigned long,
++			     unsigned long, unsigned long);
++
++static long __invoke_syscall(struct pt_regs *regs, syscall_fn_t syscall_fn)
++{
++	return syscall_fn(regs->regs[0], regs->regs[1], regs->regs[2],
++			  regs->regs[3], regs->regs[4], regs->regs[5]);
++}
++
++asmlinkage void invoke_syscall(struct pt_regs *regs, unsigned int scno,
++			       unsigned int sc_nr,
++			       syscall_fn_t syscall_table[])
++{
++	long ret;
++
++	if (scno < sc_nr) {
++		syscall_fn_t syscall_fn;
++		syscall_fn = syscall_table[array_index_nospec(scno, sc_nr)];
++		ret = __invoke_syscall(regs, syscall_fn);
++	} else {
++		ret = do_ni_syscall(regs);
++	}
++
++	regs->regs[0] = ret;
++}
+diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+index c27292703bd1..039e9ff379cc 100644
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -547,22 +547,6 @@ asmlinkage void __exception do_sysinstr(unsigned int esr, struct pt_regs *regs)
+ 	do_undefinstr(regs);
+ }
+ 
+-long compat_arm_syscall(struct pt_regs *regs);
+-
+-asmlinkage long do_ni_syscall(struct pt_regs *regs)
+-{
+-#ifdef CONFIG_COMPAT
+-	long ret;
+-	if (is_compat_task()) {
+-		ret = compat_arm_syscall(regs);
+-		if (ret != -ENOSYS)
+-			return ret;
+-	}
+-#endif
+-
+-	return sys_ni_syscall();
+-}
+-
+ static const char *esr_class_str[] = {
+ 	[0 ... ESR_ELx_EC_MAX]		= "UNRECOGNIZED EC",
+ 	[ESR_ELx_EC_UNKNOWN]		= "Unknown/Uncategorized",
 -- 
 2.11.0
