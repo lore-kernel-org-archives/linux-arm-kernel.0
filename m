@@ -1,73 +1,63 @@
-From: james.morse@arm.com (James Morse)
-Date: Mon, 2 Jul 2018 11:53:26 +0100
-Subject: question about arm64 exception handling
-In-Reply-To: <5B39FF98.7010002@broadcom.com>
-References: <5B34CD7D.5090002@broadcom.com>
- <e54b3d4c-dbd0-b39d-28a2-063f34068dfd@arm.com>
- <5B39FF98.7010002@broadcom.com>
-Message-ID: <815c6a58-2444-a050-421b-68c873337b67@arm.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Mon, 2 Jul 2018 11:57:34 +0100
+Subject: [PATCH v3 09/20] kvm: arm64: Make stage2 page table layout dynamic
+In-Reply-To: <1530270944-11351-10-git-send-email-suzuki.poulose@arm.com>
+References: <1530270944-11351-1-git-send-email-suzuki.poulose@arm.com>
+ <1530270944-11351-10-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <8a6b81ef-ff78-41b5-b004-c60ba7e5a9a7@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arend,
-
-On 02/07/18 11:34, Arend van Spriel wrote:
-> On 6/28/2018 6:13 PM, James Morse wrote:
->> On 28/06/18 12:58, Arend van Spriel wrote:
->>> I am looking at some issues we are seeing on a custom arm platform and I had
->>> some questions regarding exception handling and hope you can help me with that.
->>>
->>> The platform has 4 cortex a53 cores running 4.1.51 kernel.
-
->>> On the platform upon
->>> accessing our wifi devices over PCIe, we observe two issue intermittently.
->>>
->>> 1) synchronous external abort
-
->> Can you share the backtrace for the Synchronous External Abort? It should point
->> at the instruction in the (probably) driver that causes the abort.
+On 29/06/18 12:15, Suzuki K Poulose wrote:
+> So far we had a static stage2 page table handling code, based on a
+> fixed IPA of 40bits. As we prepare for a configurable IPA size per
+> VM, make our stage2 page table code dynamic, to do the right thing
+> for a given VM. We ensure the existing condition is always true even
+> when we lift the limit on the IPA. i.e,
 > 
-> 15:05:24.284? LOG?? 4908REF2?? Unhandled fault: synchronous external abort
-> (0x96000210) at 0xffffff80010a4154
+> 	page table levels in stage1 >= page table levels in stage2
+> 
+> Support for the IPA size configuration needs other changes in the way
+> we configure the EL2 registers (VTTBR and VTCR). So, the IPA is still
+> fixed to 40bits. The patch also moves the kvm_page_empty() in asm/kvm_mmu.h
+> to the top, before including the asm/stage2_pgtable.h to avoid a forward
+> declaration.
+> 
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Christoffer Dall <cdall@kernel.org>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
+> Changes since V2
+>   - Restrict the stage2 page table to allow reusing the host page table
+>     helpers for now, until we get stage1 independent page table helpers.
 
-I'm not sure where this 'LOG 4908REF2' is coming from, but from the kernel you
-should get a stack trace after the external abort message. Looks a bit like [0]
-(also a v4.1 kernel).
+...
+
+> -#define stage2_pgd_none(kvm, pgd)		pgd_none(pgd)
+> -#define stage2_pgd_clear(kvm, pgd)		pgd_clear(pgd)
+> -#define stage2_pgd_present(kvm, pgd)		pgd_present(pgd)
+> -#define stage2_pgd_populate(kvm, pgd, pud)	pgd_populate(NULL, pgd, pud)
+> -#define stage2_pud_offset(kvm, pgd, address)	pud_offset(pgd, address)
+> -#define stage2_pud_free(kvm, pud)		pud_free(NULL, pud)
+> +#define __s2_pud_index(addr) \
+> +	(((addr) >> __S2_PUD_SHIFT) & (PTRS_PER_PTE - 1))
+> +#define __s2_pmd_index(addr) \
+> +	(((addr) >> __S2_PMD_SHIFT) & (PTRS_PER_PTE - 1))
+>   
+> -#define stage2_pud_table_empty(kvm, pudp)	kvm_page_empty(pudp)
+> +#define __kvm_has_stage2_levels(kvm, min_levels)	\
+> +  ((CONFIG_PGTABLE_LEVELS >= min_levels) && (kvm_stage2_levels(kvm) >= min_levels))
+
+On another look, I have renamed the helpers as follows :
+
+kvm_stage2_has_pud(kvm) => kvm_stage2_has_pmd(kvm)
+kvm_stage2_has_pgd(kvm) => kvm_stage2_has_pud(kvm)
+
+below and everywhere.
+
+> +
+> +#define kvm_stage2_has_pgd(kvm)	__kvm_has_stage2_levels(kvm, 4)
+> +#define kvm_stage2_has_pud(kvm) __kvm_has_stage2_levels(kvm, 3)
 
 
-> So between brackets is the ESR. Looking in the TRM I can only conclude it is
-> exception class 0x25 whatever that is.
-
-"Data abort taken without a change in exception level."
-This happened because EL1 made a load/store that the device on the other end
-rejected with an abort.
-
-Your ISS decodes as a load, not on a translation table walk, with the 'EA' bit set.
-
-(The EA bit is used by the CPU to classify some external aborts from some other
-type. Its implementation-defined, and not likely to be helpful here).
-
-
-> Need to dive in armv8a arch doc. So the address 0xffffff80010a4154 is the fault address. 
-
-32bit aligned address. It may be the device on the other end wanted 64bit
-alignment. (I'm guessing)
-
-
-> It is not in the range of my
-> wireless driver, but it is probably in the PCIe host driver accessing the device.
-
-Another guess: whatever whatever mapped that address space used the wrong memory
-attributes.
-
-
-> Thanks for the pointers. Digging deeper.
-
-Good luck!
-
-
-Thanks,
-
-James
-
-[0] https://lists.gt.net/linux/kernel/2223260
+Suzuki
