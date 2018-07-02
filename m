@@ -1,119 +1,98 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon,  2 Jul 2018 20:11:42 +0200
-Subject: [PATCH v2 5/8] x86: jump_label: switch to jump_entry accessors
+Date: Mon,  2 Jul 2018 20:11:41 +0200
+Subject: [PATCH v2 4/8] x86: add support for 64-bit place relative relocations
 In-Reply-To: <20180702181145.4799-1-ard.biesheuvel@linaro.org>
 References: <20180702181145.4799-1-ard.biesheuvel@linaro.org>
-Message-ID: <20180702181145.4799-6-ard.biesheuvel@linaro.org>
+Message-ID: <20180702181145.4799-5-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation of switching x86 to use place-relative references for
-the code, target and key members of struct jump_entry, replace direct
-references to the struct members with invocations of the new accessors.
-This will allow us to make the switch by modifying the accessors only.
+Add support for R_X86_64_PC64 relocations, which operate on 64-bit
+quantities holding a relative symbol reference. This allows jump
+table entries to be emitted in a way that makes them invariant under
+runtime relocation, which means that no metadata needs to be emitted
+into the kernel image to describe such data structures, resulting in
+a size reduction.
 
-This incorporates a cleanup of __jump_label_transform() proposed by
-Peter.
-
-Cc: Peter Zijlstra <peterz@infradead.org>
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/x86/kernel/jump_label.c | 62 ++++++++------------
- 1 file changed, 25 insertions(+), 37 deletions(-)
+ arch/x86/include/asm/elf.h         |  1 +
+ arch/x86/kernel/machine_kexec_64.c |  4 ++++
+ arch/x86/kernel/module.c           |  6 ++++++
+ arch/x86/tools/relocs.c            | 10 ++++++++++
+ 4 files changed, 21 insertions(+)
 
-diff --git a/arch/x86/kernel/jump_label.c b/arch/x86/kernel/jump_label.c
-index e56c95be2808..023768222a94 100644
---- a/arch/x86/kernel/jump_label.c
-+++ b/arch/x86/kernel/jump_label.c
-@@ -42,52 +42,37 @@ static void __jump_label_transform(struct jump_entry *entry,
- 				   void *(*poker)(void *, const void *, size_t),
- 				   int init)
- {
--	union jump_code_union code;
-+	union jump_code_union jmp;
- 	const unsigned char default_nop[] = { STATIC_KEY_INIT_NOP };
- 	const unsigned char *ideal_nop = ideal_nops[NOP_ATOMIC5];
-+	const void *expect, *code;
-+	int line;
-+
-+	jmp.jump = 0xe9;
-+	jmp.offset = jump_entry_target(entry) -
-+		     (jump_entry_code(entry) + JUMP_LABEL_NOP_SIZE);
+diff --git a/arch/x86/include/asm/elf.h b/arch/x86/include/asm/elf.h
+index 0d157d2a1e2a..d3925d684296 100644
+--- a/arch/x86/include/asm/elf.h
++++ b/arch/x86/include/asm/elf.h
+@@ -62,6 +62,7 @@ typedef struct user_fxsr_struct elf_fpxregset_t;
+ #define R_X86_64_PC16		13	/* 16 bit sign extended pc relative */
+ #define R_X86_64_8		14	/* Direct 8 bit sign extended  */
+ #define R_X86_64_PC8		15	/* 8 bit sign extended pc relative */
++#define R_X86_64_PC64		24	/* Place relative 64-bit signed */
  
- 	if (type == JUMP_LABEL_JMP) {
- 		if (init) {
--			/*
--			 * Jump label is enabled for the first time.
--			 * So we expect a default_nop...
--			 */
--			if (unlikely(memcmp((void *)entry->code, default_nop, 5)
--				     != 0))
--				bug_at((void *)entry->code, __LINE__);
-+			expect = default_nop; line = __LINE__;
- 		} else {
--			/*
--			 * ...otherwise expect an ideal_nop. Otherwise
--			 * something went horribly wrong.
--			 */
--			if (unlikely(memcmp((void *)entry->code, ideal_nop, 5)
--				     != 0))
--				bug_at((void *)entry->code, __LINE__);
-+			expect = ideal_nop; line = __LINE__;
- 		}
+ #define R_X86_64_NUM		16
  
--		code.jump = 0xe9;
--		code.offset = entry->target -
--				(entry->code + JUMP_LABEL_NOP_SIZE);
-+		code = &jmp.code;
- 	} else {
--		/*
--		 * We are disabling this jump label. If it is not what
--		 * we think it is, then something must have gone wrong.
--		 * If this is the first initialization call, then we
--		 * are converting the default nop to the ideal nop.
--		 */
- 		if (init) {
--			if (unlikely(memcmp((void *)entry->code, default_nop, 5) != 0))
--				bug_at((void *)entry->code, __LINE__);
-+			expect = default_nop; line = __LINE__;
- 		} else {
--			code.jump = 0xe9;
--			code.offset = entry->target -
--				(entry->code + JUMP_LABEL_NOP_SIZE);
--			if (unlikely(memcmp((void *)entry->code, &code, 5) != 0))
--				bug_at((void *)entry->code, __LINE__);
-+			expect = &jmp.code; line = __LINE__;
- 		}
--		memcpy(&code, ideal_nops[NOP_ATOMIC5], JUMP_LABEL_NOP_SIZE);
-+
-+		code = ideal_nop;
- 	}
+diff --git a/arch/x86/kernel/machine_kexec_64.c b/arch/x86/kernel/machine_kexec_64.c
+index 4c8acdfdc5a7..6638d1edb2be 100644
+--- a/arch/x86/kernel/machine_kexec_64.c
++++ b/arch/x86/kernel/machine_kexec_64.c
+@@ -496,6 +496,10 @@ int arch_kexec_apply_relocations_add(struct purgatory_info *pi,
+ 			value -= (u64)address;
+ 			*(u32 *)location = value;
+ 			break;
++		case R_X86_64_PC64:
++			value -= (u64)address;
++			*(u64 *)location = value;
++			break;
+ 		default:
+ 			pr_err("Unknown rela relocation: %llu\n",
+ 			       ELF64_R_TYPE(rel[i].r_info));
+diff --git a/arch/x86/kernel/module.c b/arch/x86/kernel/module.c
+index f58336af095c..b052e883dd8c 100644
+--- a/arch/x86/kernel/module.c
++++ b/arch/x86/kernel/module.c
+@@ -201,6 +201,12 @@ int apply_relocate_add(Elf64_Shdr *sechdrs,
+ 				goto overflow;
+ #endif
+ 			break;
++		case R_X86_64_PC64:
++			if (*(u64 *)loc != 0)
++				goto invalid_relocation;
++			val -= (u64)loc;
++			*(u64 *)loc = val;
++			break;
+ 		default:
+ 			pr_err("%s: Unknown rela relocation: %llu\n",
+ 			       me->name, ELF64_R_TYPE(rel[i].r_info));
+diff --git a/arch/x86/tools/relocs.c b/arch/x86/tools/relocs.c
+index 220e97841e49..a4075bc37e8f 100644
+--- a/arch/x86/tools/relocs.c
++++ b/arch/x86/tools/relocs.c
+@@ -195,6 +195,7 @@ static const char *rel_type(unsigned type)
+ #if ELF_BITS == 64
+ 		REL_TYPE(R_X86_64_NONE),
+ 		REL_TYPE(R_X86_64_64),
++		REL_TYPE(R_X86_64_PC64),
+ 		REL_TYPE(R_X86_64_PC32),
+ 		REL_TYPE(R_X86_64_GOT32),
+ 		REL_TYPE(R_X86_64_PLT32),
+@@ -781,6 +782,15 @@ static int do_reloc64(struct section *sec, Elf_Rel *rel, ElfW(Sym) *sym,
+ 			add_reloc(&relocs32neg, offset);
+ 		break;
  
-+	if (memcmp((void *)jump_entry_code(entry), expect, JUMP_LABEL_NOP_SIZE))
-+		bug_at((void *)jump_entry_code(entry), line);
++	case R_X86_64_PC64:
++		/*
++		 * Only used by jump labels
++		 */
++		if (is_percpu_sym(sym, symname))
++			die("Invalid R_X86_64_PC64 relocation against per-CPU symbol %s\n",
++			    symname);
++		break;
 +
- 	/*
- 	 * Make text_poke_bp() a default fallback poker.
- 	 *
-@@ -96,11 +81,14 @@ static void __jump_label_transform(struct jump_entry *entry,
- 	 * always nop being the 'currently valid' instruction
- 	 *
- 	 */
--	if (poker)
--		(*poker)((void *)entry->code, &code, JUMP_LABEL_NOP_SIZE);
--	else
--		text_poke_bp((void *)entry->code, &code, JUMP_LABEL_NOP_SIZE,
--			     (void *)entry->code + JUMP_LABEL_NOP_SIZE);
-+	if (poker) {
-+		(*poker)((void *)jump_entry_code(entry), code,
-+			 JUMP_LABEL_NOP_SIZE);
-+		return;
-+	}
-+
-+	text_poke_bp((void *)jump_entry_code(entry), code, JUMP_LABEL_NOP_SIZE,
-+		     (void *)jump_entry_code(entry) + JUMP_LABEL_NOP_SIZE);
- }
- 
- void arch_jump_label_transform(struct jump_entry *entry,
+ 	case R_X86_64_32:
+ 	case R_X86_64_32S:
+ 	case R_X86_64_64:
 -- 
 2.17.1
