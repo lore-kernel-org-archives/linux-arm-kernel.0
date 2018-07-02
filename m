@@ -1,50 +1,116 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Mon, 2 Jul 2018 13:01:54 +0200
-Subject: [PATCH] ACPI/PPTT: use ACPI ID whenever
- ACPI_PPTT_ACPI_PROCESSOR_ID_VALID is set
-In-Reply-To: <3895a0d8-9cca-2512-a06e-0ee2ac7db773@arm.com>
-References: <1530289077-2444-1-git-send-email-sudeep.holla@arm.com>
- <CAJZ5v0gnspK3soa5j8iqU9QDM78MMBbz8YC9s7TOJ5Qwh7=mZg@mail.gmail.com>
- <3895a0d8-9cca-2512-a06e-0ee2ac7db773@arm.com>
-Message-ID: <CAJZ5v0gh0-psU7bbLf5zDGW5adQNALSdWdedbCgDoh1F-peh0g@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon,  2 Jul 2018 12:03:59 +0100
+Subject: [PATCHv4 03/19] arm64: kill config_sctlr_el1()
+In-Reply-To: <20180702110415.10465-1-mark.rutland@arm.com>
+References: <20180702110415.10465-1-mark.rutland@arm.com>
+Message-ID: <20180702110415.10465-4-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 2, 2018 at 11:57 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->
->
-> On 02/07/18 10:06, Rafael J. Wysocki wrote:
->> On Fri, Jun 29, 2018 at 6:17 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->>> Currently we use the ACPI processor ID only for the leaf/processor nodes
->>> as the specification states it must match the value of ACPI processor ID
->>> field in the processor?s entry in the MADT.
->>>
->>> However, if a PPTT structure represents processors group, it match a
->>> processor container UID in the namespace and ACPI_PPTT_ACPI_PROCESSOR_ID_VALID
->>> flag describe whether the ACPI processor ID is valid.
->>>
->>> Lets use UID whenever ACPI_PPTT_ACPI_PROCESSOR_ID_VALID is set to be
->>> consistent instead of using table offset as it's currently done for non
->>> leaf nodes.
->>>
->>> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
->>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
->>> ---
->>>  drivers/acpi/pptt.c | 10 ++++++++--
->>>  1 file changed, 8 insertions(+), 2 deletions(-)
->>>
->>> Hi,
->>>
->>> There's ongoing discussion on assigning ID based in OS using simple
->>> counters. It can never be consistent with firmware's view. So if the
->>> firmware provides valid UID for non-processors node, we must use it.
->>
->> OK
->>
->> Do you regard this as a fix for the recently merged PPTT material?  If
->> so, I should apply it as a fix for 4.18.
->>
->
-> Yes, it should be considered as fix IMO.
+Now that we have sysreg_clear_set(), we can consistently use this
+instead of config_sctlr_el1().
 
-So any chance to provide a Fixes: tag?
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Reviewed-by: Dave Martin <dave.martin@arm.com>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Cc: James Morse <james.morse@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/include/asm/sysreg.h      | 10 ----------
+ arch/arm64/kernel/armv8_deprecated.c |  8 ++++----
+ arch/arm64/kernel/cpu_errata.c       |  3 +--
+ arch/arm64/kernel/traps.c            |  2 +-
+ arch/arm64/mm/fault.c                |  2 +-
+ 5 files changed, 7 insertions(+), 18 deletions(-)
+
+diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+index fefc17dae8ee..e205ec8489e9 100644
+--- a/arch/arm64/include/asm/sysreg.h
++++ b/arch/arm64/include/asm/sysreg.h
+@@ -742,16 +742,6 @@ asm(
+ 		write_sysreg(__scs_new, sysreg);			\
+ } while (0)
+ 
+-static inline void config_sctlr_el1(u32 clear, u32 set)
+-{
+-	u32 val;
+-
+-	val = read_sysreg(sctlr_el1);
+-	val &= ~clear;
+-	val |= set;
+-	write_sysreg(val, sctlr_el1);
+-}
+-
+ #endif
+ 
+ #endif	/* __ASM_SYSREG_H */
+diff --git a/arch/arm64/kernel/armv8_deprecated.c b/arch/arm64/kernel/armv8_deprecated.c
+index d4707abb2f16..d01c7fc0463c 100644
+--- a/arch/arm64/kernel/armv8_deprecated.c
++++ b/arch/arm64/kernel/armv8_deprecated.c
+@@ -511,9 +511,9 @@ static int cp15barrier_handler(struct pt_regs *regs, u32 instr)
+ static int cp15_barrier_set_hw_mode(bool enable)
+ {
+ 	if (enable)
+-		config_sctlr_el1(0, SCTLR_EL1_CP15BEN);
++		sysreg_clear_set(sctlr_el1, 0, SCTLR_EL1_CP15BEN);
+ 	else
+-		config_sctlr_el1(SCTLR_EL1_CP15BEN, 0);
++		sysreg_clear_set(sctlr_el1, SCTLR_EL1_CP15BEN, 0);
+ 	return 0;
+ }
+ 
+@@ -548,9 +548,9 @@ static int setend_set_hw_mode(bool enable)
+ 		return -EINVAL;
+ 
+ 	if (enable)
+-		config_sctlr_el1(SCTLR_EL1_SED, 0);
++		sysreg_clear_set(sctlr_el1, SCTLR_EL1_SED, 0);
+ 	else
+-		config_sctlr_el1(0, SCTLR_EL1_SED);
++		sysreg_clear_set(sctlr_el1, 0, SCTLR_EL1_SED);
+ 	return 0;
+ }
+ 
+diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+index 1d2b6d768efe..92128ea53102 100644
+--- a/arch/arm64/kernel/cpu_errata.c
++++ b/arch/arm64/kernel/cpu_errata.c
+@@ -76,8 +76,7 @@ has_mismatched_cache_line_size(const struct arm64_cpu_capabilities *entry,
+ static void
+ cpu_enable_trap_ctr_access(const struct arm64_cpu_capabilities *__unused)
+ {
+-	/* Clear SCTLR_EL1.UCT */
+-	config_sctlr_el1(SCTLR_EL1_UCT, 0);
++	sysreg_clear_set(sctlr_el1, SCTLR_EL1_UCT, 0);
+ }
+ 
+ atomic_t arm64_el2_vector_last_slot = ATOMIC_INIT(-1);
+diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+index d399d459397b..c27292703bd1 100644
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -411,7 +411,7 @@ asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
+ 
+ void cpu_enable_cache_maint_trap(const struct arm64_cpu_capabilities *__unused)
+ {
+-	config_sctlr_el1(SCTLR_EL1_UCI, 0);
++	sysreg_clear_set(sctlr_el1, SCTLR_EL1_UCI, 0);
+ }
+ 
+ #define __user_cache_maint(insn, address, res)			\
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+index b8eecc7b9531..ea591c9e5144 100644
+--- a/arch/arm64/mm/fault.c
++++ b/arch/arm64/mm/fault.c
+@@ -879,7 +879,7 @@ void cpu_enable_pan(const struct arm64_cpu_capabilities *__unused)
+ 	 */
+ 	WARN_ON_ONCE(in_interrupt());
+ 
+-	config_sctlr_el1(SCTLR_EL1_SPAN, 0);
++	sysreg_clear_set(sctlr_el1, SCTLR_EL1_SPAN, 0);
+ 	asm(SET_PSTATE_PAN(1));
+ }
+ #endif /* CONFIG_ARM64_PAN */
+-- 
+2.11.0
