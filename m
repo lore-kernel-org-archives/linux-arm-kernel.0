@@ -1,100 +1,80 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Mon, 2 Jul 2018 09:36:44 +0200
-Subject: [PATCH] KVM: arm64: vgic-its: Remove VLA usage
-In-Reply-To: <20180629184618.GA37364@beast>
-References: <20180629184618.GA37364@beast>
-Message-ID: <19f9ddb1-6009-850c-1949-3a8cdacdd2fc@redhat.com>
+From: honghui.zhang@mediatek.com (honghui.zhang at mediatek.com)
+Date: Mon, 2 Jul 2018 15:57:41 +0800
+Subject: [PATCH v3 1/4] PCI: mediatek: fixup mtk_pcie_find_port logical
+In-Reply-To: <1530518264-6125-1-git-send-email-honghui.zhang@mediatek.com>
+References: <1530518264-6125-1-git-send-email-honghui.zhang@mediatek.com>
+Message-ID: <1530518264-6125-2-git-send-email-honghui.zhang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kees,
+From: Honghui Zhang <honghui.zhang@mediatek.com>
 
-On 06/29/2018 08:46 PM, Kees Cook wrote:
-> In the quest to remove all stack VLA usage from the kernel[1], this
-> switches to using a maximum size and adds sanity checks. Additionally
-> cleans up some of the int-vs-u32 usage and adds additional bounds checking.
-> As it currently stands, this will always be 8 bytes until the ABI changes.
-> 
-> [1] https://lkml.kernel.org/r/CA+55aFzCG-zNmZwX4A2FQpadafLfEzK6CC=qPXydAacU1RqZWA at mail.gmail.com
-> 
-> Cc: Christoffer Dall <christoffer.dall@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Eric Auger <eric.auger@redhat.com>
-> Cc: Andre Przywara <andre.przywara@arm.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: kvmarm at lists.cs.columbia.edu
-> Signed-off-by: Kees Cook <keescook@chromium.org>
-> ---
->  virt/kvm/arm/vgic/vgic-its.c | 19 +++++++++++++++----
->  1 file changed, 15 insertions(+), 4 deletions(-)
-> 
-> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-> index 4ed79c939fb4..3143fc047fcf 100644
-> --- a/virt/kvm/arm/vgic/vgic-its.c
-> +++ b/virt/kvm/arm/vgic/vgic-its.c
-> @@ -168,8 +168,14 @@ struct vgic_its_abi {
->  	int (*commit)(struct vgic_its *its);
->  };
->  
-> +#define ABI_0_ESZ	8
-> +#define ESZ_MAX		ABI_0_ESZ
-> +
->  static const struct vgic_its_abi its_table_abi_versions[] = {
-> -	[0] = {.cte_esz = 8, .dte_esz = 8, .ite_esz = 8,
-> +	[0] = {
-> +	 .cte_esz = ABI_0_ESZ,
-> +	 .dte_esz = ABI_0_ESZ,
-> +	 .ite_esz = ABI_0_ESZ,
->  	 .save_tables = vgic_its_save_tables_v0,
->  	 .restore_tables = vgic_its_restore_tables_v0,
->  	 .commit = vgic_its_commit_v0,
-> @@ -180,10 +186,12 @@ static const struct vgic_its_abi its_table_abi_versions[] = {
->  
->  inline const struct vgic_its_abi *vgic_its_get_abi(struct vgic_its *its)
->  {
-> +	if (WARN_ON(its->abi_rev >= NR_ITS_ABIS))
-> +		return NULL;
->  	return &its_table_abi_versions[its->abi_rev];
->  }
->  
-> -int vgic_its_set_abi(struct vgic_its *its, int rev)
-> +static int vgic_its_set_abi(struct vgic_its *its, u32 rev)
->  {
-if vgic_its_get_abi is likely to return NULL, don't we need to check abi
-!= NULL in all call sites.
+The Mediatek's host controller has two slots, each with it's own control
+registers. The host driver need to identify which slot was connected
+in order to access the device's configuration space. There's problem
+for current host driver to find out which slot was connected to for
+a given EP device.
 
-abi_rev is actually set by vgic_its_set_abi() which is actually called
-by vgic_mmio_uaccess_write_its_iidr() and vgic_its_create().
+Assuming each slot have connect with one EP device as below:
 
-Only vgic_mmio_uaccess_write_its_iidr allows the userspace to overwrite
-the default abi_rev. At this point a check against NR_ITS_ABIS is
-already done. So to me the check is done at the source?
+                host bridge
+  bus 0 --> __________|_______
+           |                  |
+           |                  |
+         slot 0             slot 1
+  bus 1 -->|        bus 2 --> |
+           |                  |
+         EP 0               EP 1
 
-Thanks
+During PCI enumeration, system software will scan all the PCI device
+starting from devfn 0. So it will get the proper port for slot0 and
+slot1 device when using PCI_SLOT(devfn) for match. But it will get
+the wrong slot for EP1: The devfn will be start from 0 when scanning
+EP1 behind slot1, it will get port0 since the PCI_SLOT(EP1) is match
+for port0's slot value. So the host driver should not using EP's devfn
+but the slot's devfn(the slot which EP was connected to) for match.
 
-Eric
->  	const struct vgic_its_abi *abi;
->  
-> @@ -1881,16 +1889,19 @@ typedef int (*entry_fn_t)(struct vgic_its *its, u32 id, void *entry,
->   * Return: < 0 on error, 0 if last element was identified, 1 otherwise
->   * (the last element may not be found on second level tables)
->   */
-> -static int scan_its_table(struct vgic_its *its, gpa_t base, int size, int esz,
-> +static int scan_its_table(struct vgic_its *its, gpa_t base, int size, u32 esz,
->  			  int start_id, entry_fn_t fn, void *opaque)
->  {
->  	struct kvm *kvm = its->dev->kvm;
->  	unsigned long len = size;
->  	int id = start_id;
->  	gpa_t gpa = base;
-> -	char entry[esz];
-> +	char entry[ESZ_MAX];
->  	int ret;
->  
-> +	if (WARN_ON(esz > ESZ_MAX))
-> +		return -EINVAL;
-> +
->  	memset(entry, 0, esz);
->  
->  	while (len > 0) {
-> 
+This patch fix the mtk_pcie_find_port's logical by using the slot's
+devfn for match.
+
+Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
+Acked-by: Ryder Lee <ryder.lee@mediatek.com>
+---
+ drivers/pci/controller/pcie-mediatek.c | 19 +++++++++++++++++--
+ 1 file changed, 17 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/pci/controller/pcie-mediatek.c b/drivers/pci/controller/pcie-mediatek.c
+index 0baabe3..b43f41d 100644
+--- a/drivers/pci/controller/pcie-mediatek.c
++++ b/drivers/pci/controller/pcie-mediatek.c
+@@ -337,11 +337,26 @@ static struct mtk_pcie_port *mtk_pcie_find_port(struct pci_bus *bus,
+ {
+ 	struct mtk_pcie *pcie = bus->sysdata;
+ 	struct mtk_pcie_port *port;
++	struct pci_dev *dev;
++	struct pci_bus *pbus;
+ 
+-	list_for_each_entry(port, &pcie->ports, list)
+-		if (port->slot == PCI_SLOT(devfn))
++	list_for_each_entry(port, &pcie->ports, list) {
++		if (!bus->number && port->slot == PCI_SLOT(devfn))
+ 			return port;
+ 
++		if (bus->number) {
++			pbus = bus;
++
++			while (pbus->number) {
++				dev = pbus->self;
++				pbus = dev->bus;
++			}
++
++			if (port->slot == PCI_SLOT(dev->devfn))
++				return port;
++		}
++	}
++
+ 	return NULL;
+ }
+ 
+-- 
+2.6.4
