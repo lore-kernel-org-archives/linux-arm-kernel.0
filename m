@@ -1,33 +1,41 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 2 Jul 2018 20:14:49 -0300
-Subject: [PATCH v1] ARM: dts: imx6sl-evk: keep sw4 always on
-In-Reply-To: <1530526335.15665.13.camel@nxp.com>
-References: <1529930051-14122-1-git-send-email-yibin.gong@nxp.com>
- <20180701093402.GN4348@dragon>
- <CAOMZO5BjOEGWv2dC-bp0BYHq+PhLssEKic+o7ock8_1Dobd=sQ@mail.gmail.com>
- <AM3PR04MB131507901BFEE1A5E426EECBF5430@AM3PR04MB1315.eurprd04.prod.outlook.com>
- <CAOMZO5D8tjnjbwMdLGd7KF7_4PwqRWX8XH8kdcF3-5e-r2YQEA@mail.gmail.com>
- <AM3PR04MB1315E7AED2BCE2265E6C443DF5430@AM3PR04MB1315.eurprd04.prod.outlook.com>
- <CAOMZO5D8v4KM9S4ooHTDbA+vc8BZN_eO_wDuOPA+8Hcq-SmLDw@mail.gmail.com>
- <AM3PR04MB1315C7C7CFF990615732FFBCF5430@AM3PR04MB1315.eurprd04.prod.outlook.com>
- <CAOMZO5AM5VRS7UiWuvAQ8vvTB8OM+iwofuYrbsL_yB9e0Z9Kyg@mail.gmail.com>
- <AM3PR04MB13155B8D567ABEF7EF03249AF5430@AM3PR04MB1315.eurprd04.prod.outlook.com>
- <CAOMZO5BdtxKjQge5ONpnjr1yNVeTJf4u8Gh-fPqpHz7G9ipOTg@mail.gmail.com>
- <1530526335.15665.13.camel@nxp.com>
-Message-ID: <CAOMZO5AxsvOhWi47goBm7YuqiLEhZ5fgK4BtCqg_hyLtdWfqfA@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 2 Jul 2018 16:27:35 -0700
+Subject: [PATCH 12/15] arm: dts: highbank: Add missing OPP properties for
+ CPUs
+In-Reply-To: <CAL_JsqJRKMREfJ8LoDfuda8BU3g5Eq1AX5cPZGzO3uN3vUhrAQ@mail.gmail.com>
+References: <cover.1527244200.git.viresh.kumar@linaro.org>
+ <f8a4e5c3062397736475ec599de730206846cb9b.1527244201.git.viresh.kumar@linaro.org>
+ <CAL_JsqJRKMREfJ8LoDfuda8BU3g5Eq1AX5cPZGzO3uN3vUhrAQ@mail.gmail.com>
+Message-ID: <20180702232735.eocdrdfwyj37577h@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+On Mon, Jul 02, 2018 at 02:25:40PM -0600, Rob Herring wrote:
+> On Fri, May 25, 2018 at 4:32 AM Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> >
+> > The OPP properties, like "operating-points", should either be present
+> > for all the CPUs of a cluster or none. If these are present only for a
+> > subset of CPUs of a cluster then things will start falling apart as soon
+> > as the CPUs are brought online in a different order. For example, this
+> > will happen because the operating system looks for such properties in
+> > the CPU node it is trying to bring up, so that it can create an OPP
+> > table.
+> >
+> > Add such missing properties.
+> >
+> > Fix other missing property (clock latency) as well to make it all
+> > work.
+> >
+> > Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> > ---
+> >  arch/arm/boot/dts/highbank.dts | 30 ++++++++++++++++++++++++++++++
+> >  1 file changed, 30 insertions(+)
+> 
+> Acked-by: Rob Herring <robh@kernel.org>
+> 
+> ARM-SOC maintainers, Please apply this.
 
-On Sun, Jul 1, 2018 at 11:12 PM, Robin Gong <yibin.gong@nxp.com> wrote:
+Applied to next/dt.
 
-> But in fact, the original dts is not correct without 'regulator-always-
-> on'since SW4 is the critical DDR power rail, although, it's kept on in
-> the previous kernel by no switches enable/disable interfaces provided
-> in pfuze driver. Adding new property which can be done totally by the
-> common 'regulator-always-on' is not a good choice. Keep the dts patch
-> adding 'regulator-always-on' ahead of pfuze driver pach adding
-> enable/disable interface is enough for such case I think.
 
-We really want to avoid  breaking old dtb's running a new kernel.
+-Olof
