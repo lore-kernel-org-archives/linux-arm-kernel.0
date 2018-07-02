@@ -1,63 +1,92 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon,  2 Jul 2018 12:04:12 +0100
-Subject: [PATCHv4 16/19] arm64: use {COMPAT,}SYSCALL_DEFINE0 for sigreturn
+Date: Mon,  2 Jul 2018 12:04:10 +0100
+Subject: [PATCHv4 14/19] kernel: add kcompat_sys_{f,}statfs64()
 In-Reply-To: <20180702110415.10465-1-mark.rutland@arm.com>
 References: <20180702110415.10465-1-mark.rutland@arm.com>
-Message-ID: <20180702110415.10465-17-mark.rutland@arm.com>
+Message-ID: <20180702110415.10465-15-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We don't currently annotate our various sigreturn functions as syscalls,
-as we need to do to use pt_regs syscall wrappers.
+Using this helper allows us to avoid the in-kernel calls to the
+compat_sys_{f,}statfs64() sycalls, as are necessary for parameter
+mangling in arm64's compat handling.
 
-Let's mark them as real syscalls.
+Following the example of ksys_* functions, kcompat_sys_* functions are
+intended to be a drop-in replacement for their compat_sys_*
+counterparts, with the same calling convention.
 
-For compat_sys_sigreturn and compat_sys_rt_sigreturn, this changes the
-return type from int to long, matching the prototypes in sys32.c.
+This is necessary to enable conversion of arm64's syscall handling to
+use pt_regs wrappers.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Reviewed-by: Dominik Brodowski <linux@dominikbrodowski.net>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
+Cc: Al Viro <viro@zeniv.linux.org.uk>
+Cc: linux-fsdevel at vger.kernel.org
 ---
- arch/arm64/kernel/signal.c   | 2 +-
- arch/arm64/kernel/signal32.c | 4 ++--
- 2 files changed, 3 insertions(+), 3 deletions(-)
+ fs/statfs.c            | 14 ++++++++++++--
+ include/linux/compat.h | 11 +++++++++++
+ 2 files changed, 23 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-index f03e664f773f..f8b0ba50e55e 100644
---- a/arch/arm64/kernel/signal.c
-+++ b/arch/arm64/kernel/signal.c
-@@ -539,7 +539,7 @@ static int restore_sigframe(struct pt_regs *regs,
- 	return err;
- }
- 
--asmlinkage long sys_rt_sigreturn(void)
-+SYSCALL_DEFINE0(rt_sigreturn)
- {
- 	struct pt_regs *regs = current_pt_regs();
- 	struct rt_sigframe __user *frame;
-diff --git a/arch/arm64/kernel/signal32.c b/arch/arm64/kernel/signal32.c
-index cb10588a7cb2..1948566dcccf 100644
---- a/arch/arm64/kernel/signal32.c
-+++ b/arch/arm64/kernel/signal32.c
-@@ -282,7 +282,7 @@ static int compat_restore_sigframe(struct pt_regs *regs,
- 	return err;
- }
- 
--asmlinkage int compat_sys_sigreturn(void)
-+COMPAT_SYSCALL_DEFINE0(sigreturn)
- {
- 	struct pt_regs *regs = current_pt_regs();
- 	struct compat_sigframe __user *frame;
-@@ -313,7 +313,7 @@ asmlinkage int compat_sys_sigreturn(void)
+diff --git a/fs/statfs.c b/fs/statfs.c
+index 5b2a24f0f263..f0216629621d 100644
+--- a/fs/statfs.c
++++ b/fs/statfs.c
+@@ -335,7 +335,7 @@ static int put_compat_statfs64(struct compat_statfs64 __user *ubuf, struct kstat
  	return 0;
  }
  
--asmlinkage int compat_sys_rt_sigreturn(void)
-+COMPAT_SYSCALL_DEFINE0(rt_sigreturn)
+-COMPAT_SYSCALL_DEFINE3(statfs64, const char __user *, pathname, compat_size_t, sz, struct compat_statfs64 __user *, buf)
++int kcompat_sys_statfs64(const char __user * pathname, compat_size_t sz, struct compat_statfs64 __user * buf)
  {
- 	struct pt_regs *regs = current_pt_regs();
- 	struct compat_rt_sigframe __user *frame;
+ 	struct kstatfs tmp;
+ 	int error;
+@@ -349,7 +349,12 @@ COMPAT_SYSCALL_DEFINE3(statfs64, const char __user *, pathname, compat_size_t, s
+ 	return error;
+ }
+ 
+-COMPAT_SYSCALL_DEFINE3(fstatfs64, unsigned int, fd, compat_size_t, sz, struct compat_statfs64 __user *, buf)
++COMPAT_SYSCALL_DEFINE3(statfs64, const char __user *, pathname, compat_size_t, sz, struct compat_statfs64 __user *, buf)
++{
++	return kcompat_sys_statfs64(pathname, sz, buf);
++}
++
++int kcompat_sys_fstatfs64(unsigned int fd, compat_size_t sz, struct compat_statfs64 __user * buf)
+ {
+ 	struct kstatfs tmp;
+ 	int error;
+@@ -363,6 +368,11 @@ COMPAT_SYSCALL_DEFINE3(fstatfs64, unsigned int, fd, compat_size_t, sz, struct co
+ 	return error;
+ }
+ 
++COMPAT_SYSCALL_DEFINE3(fstatfs64, unsigned int, fd, compat_size_t, sz, struct compat_statfs64 __user *, buf)
++{
++	return kcompat_sys_fstatfs64(fd, sz, buf);
++}
++
+ /*
+  * This is a copy of sys_ustat, just dealing with a structure layout.
+  * Given how simple this syscall is that apporach is more maintainable
+diff --git a/include/linux/compat.h b/include/linux/compat.h
+index c68acc47da57..43f4ed44c5d5 100644
+--- a/include/linux/compat.h
++++ b/include/linux/compat.h
+@@ -1028,6 +1028,17 @@ static inline struct compat_timeval ns_to_compat_timeval(s64 nsec)
+ 	return ctv;
+ }
+ 
++/*
++ * Kernel code should not call compat syscalls (i.e., compat_sys_xyzyyz())
++ * directly.  Instead, use one of the functions which work equivalently, such
++ * as the kcompat_sys_xyzyyz() functions prototyped below.
++ */
++
++int kcompat_sys_statfs64(const char __user * pathname, compat_size_t sz,
++		     struct compat_statfs64 __user * buf);
++int kcompat_sys_fstatfs64(unsigned int fd, compat_size_t sz,
++			  struct compat_statfs64 __user * buf);
++
+ #else /* !CONFIG_COMPAT */
+ 
+ #define is_compat_task() (0)
 -- 
 2.11.0
