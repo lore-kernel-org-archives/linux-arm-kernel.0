@@ -1,76 +1,128 @@
-From: mka@chromium.org (Matthias Kaehlcke)
-Date: Mon,  2 Jul 2018 11:10:05 -0700
-Subject: [PATCH v2 2/2] arm64: dts: qcom: pm8998: Add pm8998 thermal zone
-In-Reply-To: <20180702181005.18247-1-mka@chromium.org>
-References: <20180702181005.18247-1-mka@chromium.org>
-Message-ID: <20180702181005.18247-2-mka@chromium.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon,  2 Jul 2018 20:11:39 +0200
+Subject: [PATCH v2 2/8] kernel/jump_label: implement generic support for
+ relative references
+In-Reply-To: <20180702181145.4799-1-ard.biesheuvel@linaro.org>
+References: <20180702181145.4799-1-ard.biesheuvel@linaro.org>
+Message-ID: <20180702181145.4799-3-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The thermal zone uses spmi-temp-alarm as sensor. If the sensor is
-configured without an IIO input it always reports 37?C for temperatures
-below the first hardware trip point at 105?C. This hardware trip point
-is configured as critical trip point, to initiate a system shutdown
-before the temperature reaches the next hardware trip point at 125?C,
-where the PMIC performs a partial shutdown.
+To reduce the size taken up by absolute references in jump label
+entries themselves and the associated relocation records in the
+.init segment, add support for emitting them as relative references
+instead.
 
-The temperature of the critical trip point can be raised after adding
-the die temperature ADC as IIO input for spmi-temp-alarm, which
-significantly increases the precision of the temperature measurements.
+Note that this requires some extra care in the sorting routine, given
+that the offsets change when entries are moved around in the jump_entry
+table.
 
-Signed-off-by: Matthias Kaehlcke <mka@chromium.org>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
-Changes in v2:
-- defined 'thermal-zones' node in pm8998.dtsi instead of using a label
-  to refer to it
-- use 105?C hardware trip point as critical trip point
-- reduced number of trip points to 2
-- lowered temperature of passive trip point
-- updated trip point names and added labels
-- updated commit message
+ arch/Kconfig               |  3 +++
+ include/linux/jump_label.h | 28 ++++++++++++++++++++
+ kernel/jump_label.c        | 22 ++++++++++++++-
+ 3 files changed, 52 insertions(+), 1 deletion(-)
 
- arch/arm64/boot/dts/qcom/pm8998.dtsi | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/qcom/pm8998.dtsi b/arch/arm64/boot/dts/qcom/pm8998.dtsi
-index 2f4989e7ef68..e7caa334e6c7 100644
---- a/arch/arm64/boot/dts/qcom/pm8998.dtsi
-+++ b/arch/arm64/boot/dts/qcom/pm8998.dtsi
-@@ -3,6 +3,7 @@
+diff --git a/arch/Kconfig b/arch/Kconfig
+index 2b8b70820002..22fa3792626e 100644
+--- a/arch/Kconfig
++++ b/arch/Kconfig
+@@ -348,6 +348,9 @@ config HAVE_PERF_USER_STACK_DUMP
+ config HAVE_ARCH_JUMP_LABEL
+ 	bool
  
- #include <dt-bindings/spmi/spmi.h>
- #include <dt-bindings/interrupt-controller/irq.h>
-+#include <dt-bindings/thermal/thermal.h>
++config HAVE_ARCH_JUMP_LABEL_RELATIVE
++	bool
++
+ config HAVE_RCU_TABLE_FREE
+ 	bool
  
- &spmi_bus {
- 	pm8998_lsid0: pmic at 0 {
-@@ -60,3 +61,27 @@
- 		#size-cells = <0>;
- 	};
- };
+diff --git a/include/linux/jump_label.h b/include/linux/jump_label.h
+index 4603a1c88e48..871826fd0c3b 100644
+--- a/include/linux/jump_label.h
++++ b/include/linux/jump_label.h
+@@ -121,6 +121,32 @@ struct static_key {
+ #include <asm/jump_label.h>
+ 
+ #ifndef __ASSEMBLY__
++#ifdef CONFIG_HAVE_ARCH_JUMP_LABEL_RELATIVE
 +
-+/ {
-+	thermal-zones {
-+		pm8998 {
-+			polling-delay-passive = <250>;
-+			polling-delay = <1000>;
-+
-+			thermal-sensors = <&pm8998_temp>;
-+
-+			trips {
-+				pm8998_alert0: pm8998-alert0 {
-+					temperature = <95000>;
-+					hysteresis = <2000>;
-+					type = "passive";
-+				};
-+				pm8998_crit: pm8998-crit {
-+					temperature = <105000>;
-+					hysteresis = <2000>;
-+					type = "critical";
-+				};
-+			};
-+		};
-+	};
++struct jump_entry {
++	s32 code;
++	s32 target;
++	long key;	// key may be far away from the core kernel under KASLR
 +};
++
++static inline unsigned long jump_entry_code(const struct jump_entry *entry)
++{
++	return (unsigned long)&entry->code + entry->code;
++}
++
++static inline unsigned long jump_entry_target(const struct jump_entry *entry)
++{
++	return (unsigned long)&entry->target + entry->target;
++}
++
++static inline struct static_key *jump_entry_key(const struct jump_entry *entry)
++{
++	long offset = entry->key & ~1L;
++
++	return (struct static_key *)((unsigned long)&entry->key + offset);
++}
++
++#else
+ 
+ static inline unsigned long jump_entry_code(const struct jump_entry *entry)
+ {
+@@ -137,6 +163,8 @@ static inline struct static_key *jump_entry_key(const struct jump_entry *entry)
+ 	return (struct static_key *)((unsigned long)entry->key & ~1UL);
+ }
+ 
++#endif
++
+ static inline bool jump_entry_is_branch(const struct jump_entry *entry)
+ {
+ 	return (unsigned long)entry->key & 1UL;
+diff --git a/kernel/jump_label.c b/kernel/jump_label.c
+index 8a3ac4f5f490..d424e1d22d63 100644
+--- a/kernel/jump_label.c
++++ b/kernel/jump_label.c
+@@ -47,14 +47,34 @@ static int jump_label_cmp(const void *a, const void *b)
+ 	return 0;
+ }
+ 
++static void jump_label_swap(void *a, void *b, int size)
++{
++	long delta = (unsigned long)a - (unsigned long)b;
++	struct jump_entry *jea = a;
++	struct jump_entry *jeb = b;
++	struct jump_entry tmp = *jea;
++
++	jea->code	= jeb->code - delta;
++	jea->target	= jeb->target - delta;
++	jea->key	= jeb->key - delta;
++
++	jeb->code	= tmp.code + delta;
++	jeb->target	= tmp.target + delta;
++	jeb->key	= tmp.key + delta;
++}
++
+ static void
+ jump_label_sort_entries(struct jump_entry *start, struct jump_entry *stop)
+ {
+ 	unsigned long size;
++	void *swapfn = NULL;
++
++	if (IS_ENABLED(CONFIG_HAVE_ARCH_JUMP_LABEL_RELATIVE))
++		swapfn = jump_label_swap;
+ 
+ 	size = (((unsigned long)stop - (unsigned long)start)
+ 					/ sizeof(struct jump_entry));
+-	sort(start, size, sizeof(struct jump_entry), jump_label_cmp, NULL);
++	sort(start, size, sizeof(struct jump_entry), jump_label_cmp, swapfn);
+ }
+ 
+ static void jump_label_update(struct static_key *key);
 -- 
-2.18.0.399.gad0ab374a1-goog
+2.17.1
