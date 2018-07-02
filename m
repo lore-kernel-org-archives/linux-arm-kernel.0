@@ -1,107 +1,70 @@
-From: jmkrzyszt@gmail.com (Janusz Krzysztofik)
-Date: Tue,  3 Jul 2018 00:28:28 +0200
-Subject: [PATCH] ARM: OMAP1: ams-delta: move late devices back to init_machine
-Message-ID: <20180702222828.27779-1-jmkrzyszt@gmail.com>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Mon, 2 Jul 2018 17:30:16 -0500
+Subject: 4.18rc3 TX2 boot failure with "ACPICA: AML parser: attempt to
+ continue loading table after error"
+In-Reply-To: <CAJZ5v0h5+O8xf_EqRPfdvtjQ7BvxLp8veaxB-7WsD8wq7RUFpA@mail.gmail.com>
+References: <c49a3666-7d23-6a05-703c-1273d79a00cd@arm.com>
+ <CAJZ5v0h5+O8xf_EqRPfdvtjQ7BvxLp8veaxB-7WsD8wq7RUFpA@mail.gmail.com>
+Message-ID: <9a9ef2bc-a66f-2af7-8766-b74426f062a6@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Initialization of several Amstrad Delta devices was once moved to
-late_initcall by commit f7519d8c8290 ("ARM: OMAP1: ams-delta: register
-latch dependent devices later").  The purpose of that move was to allow
-smooth conversion of Amstrad Delta latches to GPIO.
+Hi,
 
-After successful conversion only ams_delta_serio driver was moved back
-to device_initcall by commit 8d09a1bb3147 ("input: serio: ams-delta:
-toggle keyboard power over GPIO").  Registration of ams-delta-nand and
-lcd_ams_delta devices was kept in late_initcall in order to avoid
-corrupt data reported by the serio driver on boot.  Registration of
-cx20442-codec device was kept there for it to be probed after a
-regulator on which it depended was ready.
+On 07/02/2018 04:52 PM, Rafael J. Wysocki wrote:
+> On Mon, Jul 2, 2018 at 11:41 PM, Jeremy Linton <jeremy.linton@arm.com> wrote:
+>> Hi,
+>>
+>> I'm experiencing two problems with commit 5088814a6e931 which is "ACPICA:
+>> AML parser: attempt to continue loading table after error"
+>>
+>> The first is this boot failure on a thunderX2:
+>>
+>> [   10.770098] ACPI Error: Ignore error and continue table load
+>> (20180531/psobject-604)
+>>      [   10.777926] Unable to handle kernel NULL pointer dereference at
+>>      [   10.950199] Call trace:
+>>      [   10.952663]  acpi_ps_peek_opcode+0x1c/0x40
+>>      [   10.956797]  acpi_ps_create_op+0x54/0x278
+>>      [   10.960842]  acpi_ps_parse_loop+0x1b4/0x6c8
+>>      [   10.965063]  acpi_ps_parse_aml+0xe0/0x2b4
+>>      [   10.969108]  acpi_ps_execute_table+0xa0/0x104
+>>      [   10.973505]  acpi_ns_execute_table+0x120/0x194
+>>      [   10.977989]  acpi_ns_parse_table+0x34/0x68
+>>      [   10.982122]  acpi_ns_load_table+0x4c/0xbc
+>>      [   10.986169]  acpi_tb_load_namespace+0x1d4/0x240
+>>      [   10.990744]  acpi_load_tables+0x50/0xbc
+>>      [   10.994614]  acpi_init+0xb8/0x374
+>>      [   10.997959]  do_one_initcall+0x54/0x208
+>>      [   11.001829]  kernel_init_freeable+0x224/0x300
+>>      [   11.006229]  kernel_init+0x18/0x118
+>>      [   11.009747]  ret_from_fork+0x10/0x18
+>>      [   11.013354] Code: aa0003f3 aa1e03e0 d503201f f9400661 (39400020)
+>>      [   11.019535] ---[ end trace 2bd8068593cf8acc ]---
+>>      [   11.024195] Kernel panic - not syncing: Fatal exception
+>>      [   11.029488] SMP: stopping secondary CPUs
+>>      [   11.033480] ---[ end Kernel panic - not syncing: Fatal exception ]---
+>>
+>> Which does appear to be the result of some bad data in the table, but it was
+>> working with 4.17, and reverting this commit solves the problem.
+> 
+> But this commit fixes another regression which was more widespread.
+> 
+> Apparently, we can't work around all of the errors in the tables out
+> there at the same time. :-/
 
-The issue of "keybrd_dataout" GPIO pin not initilized to GPIO_OUT_LOW
-before other latch2 pins causing the corruption have been apparently
-fixed by commit 5322c19b117a ("ARM: OMAP1: ams-delta: Hog
-"keybrd_dataout" GPIO pin").  In turn, the issue of missing regulator
-has been fixed by commit 50c678772a0b ("ASoC: cx20442: Don't ignore
-regulator_get() errors.").
+NP, Let me see if I can come up with a way to harden the 
+parse_loop/create_op code enough that it doesn't crash the machine.
 
-Simplify the board init code by moving registration of those devices
-back to init_machine.
+> 
+>> Also the messages now newly being prefixed with '\n' are slightly corrupted
+>> like:
+>>
+>> "3ACPI BIOS Error (bug):"
+>>
+>> because the KERN_XXX macro is being encoded after the CR which keeps it from
+>> being processed correctly.
+> 
+> Yes, that's a known issue which should be fixed in -rc4.
 
-Signed-off-by: Janusz Krzysztofik <jmkrzyszt@gmail.com>
----
-Created and testet on top of recent commits 3e14de3bfb3a ("ARM: OMAP1:
-ams-delta: refactor late_init()") and 5322c19b117a ("ARM: OMAP1:
-ams-delta: Hog "keybrd_dataout" GPIO pin") found in branch
-omap-for-v4.19/omap1 of linux-omap tree as well as on commit
-50c678772a0b ("ASoC: cx20442: Don't ignore regulator_get() errors.")
-already found in linux-next tree.
-
- arch/arm/mach-omap1/board-ams-delta.c | 24 ++----------------------
- 1 file changed, 2 insertions(+), 22 deletions(-)
-
-diff --git a/arch/arm/mach-omap1/board-ams-delta.c b/arch/arm/mach-omap1/board-ams-delta.c
-index 22f9be297c2a..dd28d2614d7f 100644
---- a/arch/arm/mach-omap1/board-ams-delta.c
-+++ b/arch/arm/mach-omap1/board-ams-delta.c
-@@ -596,9 +596,6 @@ static struct platform_device *ams_delta_devices[] __initdata = {
- 	&ams_delta_camera_device,
- 	&ams_delta_audio_device,
- 	&ams_delta_serio_device,
--};
--
--static struct platform_device *late_devices[] __initdata = {
- 	&ams_delta_nand_device,
- 	&ams_delta_lcd_device,
- 	&cx20442_codec_device,
-@@ -607,9 +604,6 @@ static struct platform_device *late_devices[] __initdata = {
- static struct gpiod_lookup_table *ams_delta_gpio_tables[] __initdata = {
- 	&ams_delta_audio_gpio_table,
- 	&keybrd_pwr_gpio_table,
--};
--
--static struct gpiod_lookup_table *late_gpio_tables[] __initdata = {
- 	&ams_delta_lcd_gpio_table,
- 	&ams_delta_nand_gpio_table,
- };
-@@ -713,6 +707,8 @@ static void __init ams_delta_init(void)
- 	ams_delta_audio_gpio_table.dev_id =
- 			dev_name(&ams_delta_audio_device.dev);
- 	keybrd_pwr_gpio_table.dev_id = dev_name(&keybrd_pwr_device.dev);
-+	ams_delta_nand_gpio_table.dev_id = dev_name(&ams_delta_nand_device.dev);
-+	ams_delta_lcd_gpio_table.dev_id = dev_name(&ams_delta_lcd_device.dev);
- 
- 	/*
- 	 * Once GPIO lookup tables are populated with dev_names, register them.
-@@ -836,20 +832,6 @@ static int __init ams_delta_gpio_init(void)
- }
- device_initcall_sync(ams_delta_gpio_init);
- 
--static void __init ams_delta_late_devices(void)
--{
--	platform_add_devices(late_devices, ARRAY_SIZE(late_devices));
--
--	/*
--	 * As soon as devices have been registered, assign their dev_names
--	 * to respective GPIO lookup tables before they are added.
--	 */
--	ams_delta_lcd_gpio_table.dev_id = dev_name(&ams_delta_lcd_device.dev);
--	ams_delta_nand_gpio_table.dev_id = dev_name(&ams_delta_nand_device.dev);
--
--	gpiod_add_lookup_tables(late_gpio_tables, ARRAY_SIZE(late_gpio_tables));
--}
--
- static int __init modem_nreset_init(void)
- {
- 	int err;
-@@ -894,8 +876,6 @@ static int __init late_init(void)
- {
- 	int err;
- 
--	ams_delta_late_devices();
--
- 	err = modem_nreset_init();
- 	if (err)
- 		return err;
--- 
-2.16.4
+Oh.. Yes I see that now, thanks.
