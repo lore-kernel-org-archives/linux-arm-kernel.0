@@ -1,52 +1,68 @@
-From: anson.huang@nxp.com (Anson Huang)
-Date: Mon, 2 Jul 2018 01:09:02 +0000
-Subject: [PATCH v1] ARM: dts: imx6sl-evk: keep sw4 always on
-In-Reply-To: <CAOMZO5AM5VRS7UiWuvAQ8vvTB8OM+iwofuYrbsL_yB9e0Z9Kyg@mail.gmail.com>
-References: <1529930051-14122-1-git-send-email-yibin.gong@nxp.com>
- <20180701093402.GN4348@dragon>
- <CAOMZO5BjOEGWv2dC-bp0BYHq+PhLssEKic+o7ock8_1Dobd=sQ@mail.gmail.com>
- <AM3PR04MB131507901BFEE1A5E426EECBF5430@AM3PR04MB1315.eurprd04.prod.outlook.com>
- <CAOMZO5D8tjnjbwMdLGd7KF7_4PwqRWX8XH8kdcF3-5e-r2YQEA@mail.gmail.com>
- <AM3PR04MB1315E7AED2BCE2265E6C443DF5430@AM3PR04MB1315.eurprd04.prod.outlook.com>
- <CAOMZO5D8v4KM9S4ooHTDbA+vc8BZN_eO_wDuOPA+8Hcq-SmLDw@mail.gmail.com>
- <AM3PR04MB1315C7C7CFF990615732FFBCF5430@AM3PR04MB1315.eurprd04.prod.outlook.com>
- <CAOMZO5AM5VRS7UiWuvAQ8vvTB8OM+iwofuYrbsL_yB9e0Z9Kyg@mail.gmail.com>
-Message-ID: <AM3PR04MB13155B8D567ABEF7EF03249AF5430@AM3PR04MB1315.eurprd04.prod.outlook.com>
+From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
+Date: Mon, 02 Jul 2018 10:10:35 +0900
+Subject: [PATCH 2/2] regulator: uniphier: add regulator driver for
+ UniPhier SoC
+In-Reply-To: <20180629110341.GA6556@sirena.org.uk>
+References: <1530260533-19415-3-git-send-email-hayashi.kunihiko@socionext.com>
+ <20180629110341.GA6556@sirena.org.uk>
+Message-ID: <20180702101034.23E8.4A936039@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Mark,
+Thank you for your comments.
 
+On Fri, 29 Jun 2018 12:03:41 +0100 <broonie@kernel.org> wrote:
 
-Anson Huang
-Best Regards!
-
-
-> -----Original Message-----
-> From: Fabio Estevam [mailto:festevam at gmail.com]
-> Sent: Monday, July 2, 2018 9:05 AM
-> To: Anson Huang <anson.huang@nxp.com>
-> Cc: Shawn Guo <shawnguo@kernel.org>; Robin Gong <yibin.gong@nxp.com>;
-> Mark Rutland <mark.rutland@arm.com>; open list:OPEN FIRMWARE AND
-> FLATTENED DEVICE TREE BINDINGS <devicetree@vger.kernel.org>;
-> linux-kernel <linux-kernel@vger.kernel.org>; Rob Herring
-> <robh+dt@kernel.org>; dl-linux-imx <linux-imx@nxp.com>; Sascha Hauer
-> <kernel@pengutronix.de>; Fabio Estevam <fabio.estevam@nxp.com>;
-> moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE
-> <linux-arm-kernel@lists.infradead.org>
-> Subject: Re: [PATCH v1] ARM: dts: imx6sl-evk: keep sw4 always on
+> On Fri, Jun 29, 2018 at 05:22:13PM +0900, Kunihiko Hayashi wrote:
 > 
-> On Sun, Jul 1, 2018 at 10:03 PM, Anson Huang <anson.huang@nxp.com>
-> wrote:
+> > +++ b/drivers/regulator/uniphier-regulator.c
+> > @@ -0,0 +1,251 @@
+> > +// SPDX-License-Identifier: GPL-2.0
+> > +/*
+> > + * Regulator controller driver for UniPhier SoC
+> > + * Copyright 2018 Socionext Inc.
+> > + * Author: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+> > + */
 > 
-> > So that mean such kind of kernel patch will never be into kernel? Even
-> > if it is a necessary patch for fixing some other issues? I just wonder
-> > how this case being handled.
+> Please make the entire header a C++ comment so that it looks intentional
+> rather than mixing C and C++ like this.
+
+Okay, I'll rewrite it as a C++ comment.
+
 > 
-> What is the issue that 5fe156f1cab4f fixes? It is not clear by looking at the
-> commit log.
+> > +static int uniphier_regulator_enable(struct regulator_dev *rdev)
+> > +{
+> > +	struct uniphier_regulator_priv *priv = rdev_get_drvdata(rdev);
+> > +	u32 val;
+> > +
+> > +	val = readl_relaxed(priv->base + rdev->desc->enable_reg);
+> > +	val &= ~rdev->desc->enable_mask;
+> > +	val |= rdev->desc->enable_val;
+> > +	writel_relaxed(val, priv->base + rdev->desc->enable_reg);
+> > +
+> > +	return 0;
+> > +}
+> 
+> Could you use a MMIO regmap for this driver?  All the operations look
+> like they're just straight up operations of the sort the standard
+> helpers support them and it means the driver will be able to take
+> advantage of any improvements the core makes for free.
 
-On some new i.MX platforms, PFuze switches are used for supplying GPU/VPU
-or other non-critical modules only, these switches need to be turned off by
-runtime PM to avoid very high power leakage, like on mScale850D.
+Indeed. In this case, I can use a MMIO regmap and it's reasonable and
+simply to use it.
 
-Anson
+
+> Otherwise this looks great, and the above two issues can be fixed as
+> followup patches so I'll apply.
+
+And more, as with uniphier_usb3_reset [1], I can reuse soc_data and
+use clk_bulk in it. If it's no problem, I'll rewrite like that next.
+
+[1] https://lkml.org/lkml/2018/6/29/183
+
+Thank you,
+
+---
+Best Regards,
+Kunihiko Hayashi
