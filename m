@@ -1,71 +1,60 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 2 Jul 2018 14:03:21 -0700
-Subject: [PATCH v2 1/2] arm64: dts: qcom: pm8998: Add spmi-temp-alarm node
-In-Reply-To: <20180702205146.GA129942@google.com>
-References: <20180702181005.18247-1-mka@chromium.org>
- <CAD=FV=VSnKWqeRj-Kr9tkzeuqxm86Ex6E0uT6Qka=EqjurizNg@mail.gmail.com>
- <20180702205146.GA129942@google.com>
-Message-ID: <CAD=FV=WmK_PtZqQLVwZ7NFN8qJngH4j-oarS8Jv48x79wR5cNA@mail.gmail.com>
+From: nkela@cisco.com (Nikunj Kela)
+Date: Mon,  2 Jul 2018 14:04:50 -0700
+Subject: [PATCH 1/2] arm64: add kconfig symbol to configure section size
+Message-ID: <20180702210451.16057-1-nkela@cisco.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Currently, section size is fixed to 1024MB. This change
+adds a config that would allow it to be customized.
+This could be useful in reducing kernel memory usage.
 
-On Mon, Jul 2, 2018 at 1:51 PM, Matthias Kaehlcke <mka@chromium.org> wrote:
->> > +                       compatible = "qcom,spmi-temp-alarm";
->> > +                       reg = <0x2400 0x100>;
->>
->> Why are there two numbers for the "reg"?  Should just be 0x2400.
->
-> From /Documentation/devicetree/bindings/thermal/qcom-spmi-temp-alarm.txt:
->
-> Required properties:
-> ...
-> - reg:             Specifies the SPMI address and length of the controller's
->                    registers.
-
-Hrm, something isn't adding up here.
-
-A) Do a "git grep" and you'll see that nobody else has the length.
-
-$ git grep -C2 -- qcom,spmi-temp-alarm | grep reg
-
-arch/arm/boot/dts/qcom-pm8841.dtsi-                     reg = <0x2400>;
-arch/arm/boot/dts/qcom-pm8941.dtsi-                     reg = <0x2400>;
-arch/arm/boot/dts/qcom-pma8084.dtsi-                    reg = <0x2400>;
-arch/arm64/boot/dts/qcom/pm8916.dtsi-                   reg = <0x2400>;
-
+Cc: xe-kernel at external.cisco.com
+Cc: Nikunj Kela <nkela@cisco.com>
+Signed-off-by: Nikunj Kela <nkela@cisco.com>
 ---
+ arch/arm64/Kconfig                 | 15 +++++++++++++++
+ arch/arm64/include/asm/sparsemem.h |  2 +-
+ 2 files changed, 16 insertions(+), 1 deletion(-)
 
-B) The SPMI bus you're adding it to has "#size-cells = <0>;"  ...as do
-all other SPMI busses:
-
-$ git grep -C5 qcom,spmi-pmic | grep size-cells
-arch/arm/boot/dts/qcom-pm8841.dtsi-             #size-cells = <0>;
-arch/arm/boot/dts/qcom-pm8841.dtsi-             #size-cells = <0>;
-arch/arm/boot/dts/qcom-pm8941.dtsi-             #size-cells = <0>;
-arch/arm/boot/dts/qcom-pm8941.dtsi-             #size-cells = <0>;
-arch/arm/boot/dts/qcom-pma8084.dtsi-            #size-cells = <0>;
-arch/arm/boot/dts/qcom-pma8084.dtsi-            #size-cells = <0>;
-arch/arm64/boot/dts/qcom/pm8004.dtsi-           #size-cells = <0>;
-arch/arm64/boot/dts/qcom/pm8004.dtsi-           #size-cells = <0>;
-arch/arm64/boot/dts/qcom/pm8005.dtsi-           #size-cells = <0>;
-arch/arm64/boot/dts/qcom/pm8005.dtsi-           #size-cells = <0>;
-arch/arm64/boot/dts/qcom/pm8916.dtsi-           #size-cells = <0>;
-arch/arm64/boot/dts/qcom/pm8916.dtsi-           #size-cells = <0>;
-arch/arm64/boot/dts/qcom/pm8994.dtsi-           #size-cells = <0>;
-arch/arm64/boot/dts/qcom/pm8994.dtsi-           #size-cells = <0>;
-arch/arm64/boot/dts/qcom/pm8998.dtsi-           #size-cells = <0>;
-arch/arm64/boot/dts/qcom/pm8998.dtsi-           #size-cells = <0>;
-arch/arm64/boot/dts/qcom/pmi8994.dtsi-          #size-cells = <0>;
-arch/arm64/boot/dts/qcom/pmi8994.dtsi-          #size-cells = <0>;
-
-...I have no SPMI history, but my guess is that upstream dropped this
-because all SPMI devices have 256-byte regions (see
-qcom,spmi-pmic.txt)?
-
-
-So probably the right thing is to fix the qcom,spmi-temp-alarm not to
-have the size...
-
--Doug
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 42c090c..edf327f 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -687,6 +687,21 @@ config ARM64_PA_BITS
+ 	default 48 if ARM64_PA_BITS_48
+ 	default 52 if ARM64_PA_BITS_52
+ 
++choice
++	prompt "Section size"
++	default ARM64_SEC_BITS_30
++	help
++	  Choose the maximum amount of memory in a section.
++
++config ARM64_SEC_BITS_30
++	bool "30-bit"
++
++endchoice
++
++config ARM64_SEC_BITS
++	int
++	default 30 if ARM64_SEC_BITS_30
++
+ config CPU_BIG_ENDIAN
+        bool "Build big-endian kernel"
+        help
+diff --git a/arch/arm64/include/asm/sparsemem.h b/arch/arm64/include/asm/sparsemem.h
+index b299929..dc8fb4b 100644
+--- a/arch/arm64/include/asm/sparsemem.h
++++ b/arch/arm64/include/asm/sparsemem.h
+@@ -18,7 +18,7 @@
+ 
+ #ifdef CONFIG_SPARSEMEM
+ #define MAX_PHYSMEM_BITS	CONFIG_ARM64_PA_BITS
+-#define SECTION_SIZE_BITS	30
++#define SECTION_SIZE_BITS	CONFIG_ARM64_SEC_BITS
+ #endif
+ 
+ #endif
+-- 
+2.5.0
