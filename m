@@ -1,109 +1,100 @@
-From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Mon, 2 Jul 2018 09:41:36 +0200
-Subject: [PATCH v4 08/18] net: davinci_emac: potentially get the MAC
- address from MTD
-In-Reply-To: <ee49a8de-0812-a619-25be-4c6d8a35cc81@lechnology.com>
-References: <20180629094039.7543-1-brgl@bgdev.pl>
- <20180629094039.7543-9-brgl@bgdev.pl>
- <e2579b81-7c66-8be6-fcad-ab7a3a5b0765@lechnology.com>
- <ee49a8de-0812-a619-25be-4c6d8a35cc81@lechnology.com>
-Message-ID: <CAMpxmJV2kC+Na5uiWsTtBtSev65ba3+jZhzzeoktXR0TAQQtKw@mail.gmail.com>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Mon, 2 Jul 2018 09:36:44 +0200
+Subject: [PATCH] KVM: arm64: vgic-its: Remove VLA usage
+In-Reply-To: <20180629184618.GA37364@beast>
+References: <20180629184618.GA37364@beast>
+Message-ID: <19f9ddb1-6009-850c-1949-3a8cdacdd2fc@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-06-29 22:35 GMT+02:00 David Lechner <david@lechnology.com>:
-> On 06/29/2018 03:09 PM, David Lechner wrote:
->>
->> On 06/29/2018 04:40 AM, Bartosz Golaszewski wrote:
->>>
->>> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->>>
->>> On da850-evm board we can read the MAC address from MTD. It's currently
->>> done in the relevant board file, but we want to get rid of all the MAC
->>> reading callbacks from the board file (SPI and NAND). Move the reading
->>> of the MAC address from SPI to the emac driver's probe function.
->>>
->>> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->>> ---
->>>   drivers/net/ethernet/ti/davinci_emac.c | 20 ++++++++++++++++++--
->>>   1 file changed, 18 insertions(+), 2 deletions(-)
->>>
->>> diff --git a/drivers/net/ethernet/ti/davinci_emac.c
->>> b/drivers/net/ethernet/ti/davinci_emac.c
->>> index a1a6445b5a7e..48e6a7755811 100644
->>> --- a/drivers/net/ethernet/ti/davinci_emac.c
->>> +++ b/drivers/net/ethernet/ti/davinci_emac.c
->>> @@ -67,7 +67,7 @@
->>>   #include <linux/of_irq.h>
->>>   #include <linux/of_net.h>
->>>   #include <linux/mfd/syscon.h>
->>> -
->>> +#include <linux/mtd/mtd.h>
->>>   #include <asm/irq.h>
->>>   #include <asm/page.h>
->>> @@ -1783,7 +1783,10 @@ static int davinci_emac_probe(struct
->>> platform_device *pdev)
->>>       struct cpdma_params dma_params;
->>>       struct clk *emac_clk;
->>>       unsigned long emac_bus_frequency;
->>> -
->>> +#ifdef CONFIG_MTD
->>> +    size_t mac_addr_len;
->>> +    struct mtd_info *mtd;
->>> +#endif /* CONFIG_MTD */
->>>       /* obtain emac clock from kernel */
->>>       emac_clk = devm_clk_get(&pdev->dev, NULL);
->>> @@ -1815,6 +1818,19 @@ static int davinci_emac_probe(struct
->>> platform_device *pdev)
->>>           goto err_free_netdev;
->>>       }
->>> +#ifdef CONFIG_MTD
->>
->>
->> What about the case when MTD is compiled as a module?
->>
->>> +    mtd = get_mtd_device_nm("MAC-Address");
->>
->>
->> What about the case when PTR_ERR(mtd) == -EPROBE_DEFER?
->
->
-> To answer my own question: because get_mtd_device_nm() doesn't
-> ever return -EPROBE_DEFER.
->
-> I'm trying to make this work on LCDK, but the emac driver probes
-> before any mtd device is registered, so, I just get -ENODEV even
-> though I've added a partition to the device tree labeled
-> "MAC-Address". You can see in the kernel messages that MTD is
-> not probed until later.
->
+Hi Kees,
 
-I tested it on da850-evm - all MTD & SPI related modules need to be
-built-in for it to work, so:
+On 06/29/2018 08:46 PM, Kees Cook wrote:
+> In the quest to remove all stack VLA usage from the kernel[1], this
+> switches to using a maximum size and adds sanity checks. Additionally
+> cleans up some of the int-vs-u32 usage and adds additional bounds checking.
+> As it currently stands, this will always be 8 bytes until the ABI changes.
+> 
+> [1] https://lkml.kernel.org/r/CA+55aFzCG-zNmZwX4A2FQpadafLfEzK6CC=qPXydAacU1RqZWA at mail.gmail.com
+> 
+> Cc: Christoffer Dall <christoffer.dall@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Eric Auger <eric.auger@redhat.com>
+> Cc: Andre Przywara <andre.przywara@arm.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: kvmarm at lists.cs.columbia.edu
+> Signed-off-by: Kees Cook <keescook@chromium.org>
+> ---
+>  virt/kvm/arm/vgic/vgic-its.c | 19 +++++++++++++++----
+>  1 file changed, 15 insertions(+), 4 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+> index 4ed79c939fb4..3143fc047fcf 100644
+> --- a/virt/kvm/arm/vgic/vgic-its.c
+> +++ b/virt/kvm/arm/vgic/vgic-its.c
+> @@ -168,8 +168,14 @@ struct vgic_its_abi {
+>  	int (*commit)(struct vgic_its *its);
+>  };
+>  
+> +#define ABI_0_ESZ	8
+> +#define ESZ_MAX		ABI_0_ESZ
+> +
+>  static const struct vgic_its_abi its_table_abi_versions[] = {
+> -	[0] = {.cte_esz = 8, .dte_esz = 8, .ite_esz = 8,
+> +	[0] = {
+> +	 .cte_esz = ABI_0_ESZ,
+> +	 .dte_esz = ABI_0_ESZ,
+> +	 .ite_esz = ABI_0_ESZ,
+>  	 .save_tables = vgic_its_save_tables_v0,
+>  	 .restore_tables = vgic_its_restore_tables_v0,
+>  	 .commit = vgic_its_commit_v0,
+> @@ -180,10 +186,12 @@ static const struct vgic_its_abi its_table_abi_versions[] = {
+>  
+>  inline const struct vgic_its_abi *vgic_its_get_abi(struct vgic_its *its)
+>  {
+> +	if (WARN_ON(its->abi_rev >= NR_ITS_ABIS))
+> +		return NULL;
+>  	return &its_table_abi_versions[its->abi_rev];
+>  }
+>  
+> -int vgic_its_set_abi(struct vgic_its *its, int rev)
+> +static int vgic_its_set_abi(struct vgic_its *its, u32 rev)
+>  {
+if vgic_its_get_abi is likely to return NULL, don't we need to check abi
+!= NULL in all call sites.
 
-CONFIG_MTD=y
-CONFIG_MTD_M25P80=y
-CONFIG_SPI_DAVINCI=y
+abi_rev is actually set by vgic_its_set_abi() which is actually called
+by vgic_mmio_uaccess_write_its_iidr() and vgic_its_create().
 
-Best regards,
-Bartosz Golaszewski
+Only vgic_mmio_uaccess_write_its_iidr allows the userspace to overwrite
+the default abi_rev. At this point a check against NR_ITS_ABIS is
+already done. So to me the check is done at the source?
 
->
->>
->>> +    if (!IS_ERR(mtd)) {
->>> +        rc = mtd_read(mtd, 0, ETH_ALEN,
->>> +                  &mac_addr_len, priv->mac_addr);
->>> +        if (rc == 0)
->>> +            dev_info(&pdev->dev,
->>> +                 "Read MAC addr from SPI Flash: %pM\n",
->>> +                 priv->mac_addr);
->>> +        put_mtd_device(mtd);
->>> +    }
->>> +#endif /* CONFIG_MTD */
->>> +
->>>       /* MAC addr and PHY mask , RMII enable info from platform_data */
->>>       memcpy(priv->mac_addr, pdata->mac_addr, ETH_ALEN);
->>>       priv->phy_id = pdata->phy_id;
->>>
->>
->
+Thanks
+
+Eric
+>  	const struct vgic_its_abi *abi;
+>  
+> @@ -1881,16 +1889,19 @@ typedef int (*entry_fn_t)(struct vgic_its *its, u32 id, void *entry,
+>   * Return: < 0 on error, 0 if last element was identified, 1 otherwise
+>   * (the last element may not be found on second level tables)
+>   */
+> -static int scan_its_table(struct vgic_its *its, gpa_t base, int size, int esz,
+> +static int scan_its_table(struct vgic_its *its, gpa_t base, int size, u32 esz,
+>  			  int start_id, entry_fn_t fn, void *opaque)
+>  {
+>  	struct kvm *kvm = its->dev->kvm;
+>  	unsigned long len = size;
+>  	int id = start_id;
+>  	gpa_t gpa = base;
+> -	char entry[esz];
+> +	char entry[ESZ_MAX];
+>  	int ret;
+>  
+> +	if (WARN_ON(esz > ESZ_MAX))
+> +		return -EINVAL;
+> +
+>  	memset(entry, 0, esz);
+>  
+>  	while (len > 0) {
+> 
