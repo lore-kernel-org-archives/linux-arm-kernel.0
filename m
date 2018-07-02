@@ -1,45 +1,106 @@
-From: jhugo@codeaurora.org (Jeffrey Hugo)
-Date: Mon, 2 Jul 2018 08:58:17 -0600
-Subject: [PATCH] arm64: acpi: reenumerate topology ids
-In-Reply-To: <20180629154608.nqudibf54ti6dpjc@kamzik.brq.redhat.com>
-References: <20180628145128.10057-1-drjones@redhat.com>
- <a38fb684-c023-1a96-464e-dd268f3132ea@arm.com>
- <20180628173243.obydzakh2stfs26w@kamzik.brq.redhat.com>
- <20180629102927.GA18043@e107155-lin>
- <20180629112354.hefdl2pe72frl6x3@kamzik.brq.redhat.com>
- <20180629132934.GA16282@e107155-lin>
- <20180629154608.nqudibf54ti6dpjc@kamzik.brq.redhat.com>
-Message-ID: <3a393398-b340-84f0-3478-ebd7dba9a0ae@codeaurora.org>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Mon, 2 Jul 2018 16:59:43 +0200
+Subject: [PATCH v3 11/20] kvm: arm64: Helper for computing VTCR_EL2.SL0
+In-Reply-To: <1530270944-11351-12-git-send-email-suzuki.poulose@arm.com>
+References: <1530270944-11351-1-git-send-email-suzuki.poulose@arm.com>
+ <1530270944-11351-12-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <8faab60c-3025-d37f-6dd2-4f26bc32447c@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/29/2018 9:46 AM, Andrew Jones wrote:
-> On Fri, Jun 29, 2018 at 02:29:34PM +0100, Sudeep Holla wrote:
->> If it matters a lot, vendors must use UID for consistency. Since OS doesn't
->> use those IDs for any particular reason, OS must not care.
+Hi Suzuki,
+
+On 06/29/2018 01:15 PM, Suzuki K Poulose wrote:
+> VTCR_EL2 holds the following key stage2 translation table
+> parameters:
+>   SL0  - Entry level in the page table lookup.
+>   T0SZ - Denotes the size of the memory addressed by the table.
 > 
-> That depends. If you look at how topology_logical_package_id() is used in
-> x86 code you'll see it gets used as an index to an array in a couple
-> places. If we don't remap arbitrary IDs to counters than we may miss out
-> on some opportunities to avoid lists.
+> We have been using fixed values for the SL0 depending on the
+> page size as we have a fixed IPA size. But since we are about
+> to make it dynamic, we need to calculate the SL0 at runtime
+> per VM. This patch adds a helper to comput the value of SL0 for
+compute
+> a given IPA.
 > 
-> Also, we're talking about what's visible to users. I think it's much more
-> likely to break a user app by exposing topology IDs that have values
-> greater than the linear CPU numbers (even though properly written apps
-> shouldn't expect them to be strictly <=), than the opposite.
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Christoffer Dall <cdall@arm.com>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
+> Changes since v2:
+>  - Part 2 of split from VTCR & VTTBR dynamic configuration
+> ---
+>  arch/arm64/include/asm/kvm_arm.h | 35 ++++++++++++++++++++++++++++++++---
+>  1 file changed, 32 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+> index c557f45..11a7db0 100644
+> --- a/arch/arm64/include/asm/kvm_arm.h
+> +++ b/arch/arm64/include/asm/kvm_arm.h
+> @@ -153,7 +153,8 @@
+>   * 2 level page tables (SL = 1)
+>   */
+>  #define VTCR_EL2_TGRAN_FLAGS		(VTCR_EL2_TG0_64K | VTCR_EL2_SL0_LVL1)
+> -#define VTTBR_X_TGRAN_MAGIC		38
+> +#define VTCR_EL2_TGRAN_SL0_BASE		3UL
+> +
+>  #elif defined(CONFIG_ARM64_16K_PAGES)
+>  /*
+>   * Stage2 translation configuration:
+> @@ -161,7 +162,7 @@
+>   * 2 level page tables (SL = 1)
+>   */
+>  #define VTCR_EL2_TGRAN_FLAGS		(VTCR_EL2_TG0_16K | VTCR_EL2_SL0_LVL1)
+> -#define VTTBR_X_TGRAN_MAGIC		42
+> +#define VTCR_EL2_TGRAN_SL0_BASE		3UL
+>  #else	/* 4K */
+>  /*
+>   * Stage2 translation configuration:
+> @@ -169,11 +170,39 @@
+>   * 3 level page tables (SL = 1)
+>   */
+>  #define VTCR_EL2_TGRAN_FLAGS		(VTCR_EL2_TG0_4K | VTCR_EL2_SL0_LVL1)
+> -#define VTTBR_X_TGRAN_MAGIC		37
+> +#define VTCR_EL2_TGRAN_SL0_BASE		2UL
+>  #endif
+>  
+>  #define VTCR_EL2_FLAGS			(VTCR_EL2_COMMON_BITS | VTCR_EL2_TGRAN_FLAGS)
+>  /*
+> + * VTCR_EL2:SL0 indicates the entry level for Stage2 translation.
+> + * Interestingly, it depends on the page size.
+> + * See D.10.2.110, VTCR_EL2, in ARM DDI 0487B.b
+update ref to the last one?
+> + *
+> + *	-----------------------------------------
+> + *	| Entry level		|  4K  | 16K/64K |
+> + *	------------------------------------------
+> + *	| Level: 0		|  2   |   -     |
+> + *	------------------------------------------
+> + *	| Level: 1		|  1   |   2     |
+> + *	------------------------------------------
+> + *	| Level: 2		|  0   |   1     |
+> + *	------------------------------------------
+> + *	| Level: 3		|  -   |   0     |
+> + *	------------------------------------------
+> + *
+> + * That table roughly translates to :
+> + *
+> + *	SL0(PAGE_SIZE, Entry_level) = SL0_BASE(PAGE_SIZE) - Entry_Level
+> + *
+> + * Where SL0_BASE(4K) = 2 and SL0_BASE(16K) = 3, SL0_BASE(64K) = 3, provided
+> + * we take care of ruling out the unsupported cases and
+> + * Entry_Level = 4 - Number_of_levels.
+> + *
+> + */
+> +#define VTCR_EL2_SL0(levels) \
+> +	((VTCR_EL2_TGRAN_SL0_BASE - (4 - (levels))) << VTCR_EL2_SL0_SHIFT)
+> +/*
+>   * ARM VMSAv8-64 defines an algorithm for finding the translation table
+>   * descriptors in section D4.2.8 in ARM DDI 0487B.b.
+>   *
+> 
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
 
-Libvirt has the assumption already that the sysfs numbers correspond to 
-linear CPU numbers, and has an arbitrary limit of 4k.  When spinning up 
-a VM, if libvirt sees a CPU ID > 4k, it fails to init the VM since it 
-assumes the host has more than 4k CPUs, which is unsupported.
+Thanks
 
-We found this when we were making our UIDs to be the same as MPIDR in 
-MADT.  We changed our UIDs to be sequential 0-N numbering to workaround 
-the issue.
-
--- 
-Jeffrey Hugo
-Qualcomm Datacenter Technologies as an affiliate of Qualcomm 
-Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+Eric
