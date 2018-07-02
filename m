@@ -1,75 +1,70 @@
-From: gengdongjiu@huawei.com (Dongjiu Geng)
-Date: Mon, 2 Jul 2018 21:43:06 +0800
-Subject: [PATCH RESEND v6 2/2] arm64: KVM: export the capability to set guest
- SError syndrome
-In-Reply-To: <1530538986-4024-1-git-send-email-gengdongjiu@huawei.com>
-References: <1530538986-4024-1-git-send-email-gengdongjiu@huawei.com>
-Message-ID: <1530538986-4024-3-git-send-email-gengdongjiu@huawei.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 2 Jul 2018 15:47:31 +0200
+Subject: [PATCH v3 6/8] serial: Add Tegra Combined UART driver
+In-Reply-To: <50c4702b-3d59-e443-5075-c888f83a2615@kapsi.fi>
+References: <20180702114033.15654-1-mperttunen@nvidia.com>
+ <20180702114033.15654-7-mperttunen@nvidia.com>
+ <20180702131851.GH13096@ulmo>
+ <50c4702b-3d59-e443-5075-c888f83a2615@kapsi.fi>
+Message-ID: <20180702134731.GI13096@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For the arm64 RAS Extension, user space can inject a virtual-SError
-with specified ESR. So user space needs to know whether KVM support
-to inject such SError, this interface adds this query for this capability.
+On Mon, Jul 02, 2018 at 04:30:07PM +0300, Mikko Perttunen wrote:
+> On 02.07.2018 16:18, Thierry Reding wrote:
+> > On Mon, Jul 02, 2018 at 02:40:31PM +0300, Mikko Perttunen wrote:
+> > > The Tegra Combined UART (TCU) is a mailbox-based mechanism that allows
+> > > multiplexing multiple "virtual UARTs" into a single hardware serial
+> > > port. The TCU is the primary serial port on Tegra194 devices.
+> > > 
+> > > Add a TCU driver utilizing the mailbox framework, as the used mailboxes
+> > > are part of Tegra HSP blocks that are already controlled by the Tegra
+> > > HSP mailbox driver.
+> > > 
+> > > Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
+> > > ---
+> > > 
+> > > Notes:
+> > >      v2:
+> > >      - Removed (void) casts for unused variables.
+> > >      - Changed the uart_set_options() call to be on one line, even if its
+> > >        over 80 characters.
+> > >      - Added defines for magic numbers.
+> > >      - Style fixes.
+> > >      - Changed Kconfig entry to depend on the Tegra HSP driver instead of
+> > >        just the mailbox framework.
+> > >      v3:
+> > >      - Removed FLUSH bit, as it's unnecessary and slows down printing
+> > >      - Removed call to uart_set_options
+> > >      - Added mbox_free_channel calls to remove()
+> > > 
+> > >   drivers/tty/serial/Kconfig       |   9 ++
+> > >   drivers/tty/serial/Makefile      |   1 +
+> > >   drivers/tty/serial/tegra-tcu.c   | 291 +++++++++++++++++++++++++++++++++++++++
+> > >   include/uapi/linux/serial_core.h |   3 +
+> > >   4 files changed, 304 insertions(+)
+> > >   create mode 100644 drivers/tty/serial/tegra-tcu.c
+> > 
+> > The driver looks good to me. But for my own understanding, is there some
+> > way we can make use of the multiplexing? That is, could we add a
+> > mechanism to have the driver filter out only a specific stream? Could we
+> > also specify which stream to send data back to? What happens by default?
+> > Which stream is data sent to?
+> 
+> There is no multiplexing on the producer/device side (i.e. what this driver
+> does). The mailbox specified in device tree specifies the stream we send
+> stuff to. The mailboxes are per-CPU (we use the CCPLEX mailbox here), so it
+> cannot really be changed.
 
-KVM will check whether system support RAS Extension, if supported, KVM
-returns true to user space, otherwise returns false.
+Oh, I see, so there is one stream per pair of mailboxes? That is, the
+mailboxes we specify in the DT define which stream we receive from and
+send to?
 
-Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
-Reviewed-by: James Morse <james.morse@arm.com>
----
-change since v5:
-1. Rebase this patch to v4.18-rc3
----
- Documentation/virtual/kvm/api.txt | 11 +++++++++++
- arch/arm64/kvm/reset.c            |  3 +++
- include/uapi/linux/kvm.h          |  1 +
- 3 files changed, 15 insertions(+)
-
-diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-index e3940f8..480fa64 100644
---- a/Documentation/virtual/kvm/api.txt
-+++ b/Documentation/virtual/kvm/api.txt
-@@ -4643,3 +4643,14 @@ This capability indicates that KVM supports paravirtualized Hyper-V TLB Flush
- hypercalls:
- HvFlushVirtualAddressSpace, HvFlushVirtualAddressSpaceEx,
- HvFlushVirtualAddressList, HvFlushVirtualAddressListEx.
-+
-+8.19 KVM_CAP_ARM_SET_SERROR_ESR
-+
-+Architectures: arm, arm64
-+
-+This capability indicates that userspace can specify the syndrome value reported
-+to the guest OS when guest takes a virtual SError interrupt exception.
-+If KVM has this capability, userspace can only specify the ISS field for the ESR
-+syndrome, it can not specify the EC field which is not under control by KVM.
-+If this virtual SError is taken to EL1 using AArch64, this value will be reported
-+in ISS filed of ESR_EL1.
-diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
-index a3db01a..067c6ba 100644
---- a/arch/arm64/kvm/reset.c
-+++ b/arch/arm64/kvm/reset.c
-@@ -77,6 +77,9 @@ int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
- 	case KVM_CAP_ARM_PMU_V3:
- 		r = kvm_arm_support_pmu_v3();
- 		break;
-+	case KVM_CAP_ARM_INJECT_SERROR_ESR:
-+		r = cpus_have_const_cap(ARM64_HAS_RAS_EXTN);
-+		break;
- 	case KVM_CAP_SET_GUEST_DEBUG:
- 	case KVM_CAP_VCPU_ATTRIBUTES:
- 	case KVM_CAP_VCPU_EVENTS:
-diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
-index b6270a3..a7d9bc4 100644
---- a/include/uapi/linux/kvm.h
-+++ b/include/uapi/linux/kvm.h
-@@ -949,6 +949,7 @@ struct kvm_ppc_resize_hpt {
- #define KVM_CAP_GET_MSR_FEATURES 153
- #define KVM_CAP_HYPERV_EVENTFD 154
- #define KVM_CAP_HYPERV_TLBFLUSH 155
-+#define KVM_CAP_ARM_INJECT_SERROR_ESR 156
- 
- #ifdef KVM_CAP_IRQ_ROUTING
- 
--- 
-2.7.4
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180702/2c680b43/attachment-0001.sig>
