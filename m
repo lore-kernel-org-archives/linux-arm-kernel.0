@@ -1,68 +1,35 @@
-From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
-Date: Mon, 02 Jul 2018 10:10:35 +0900
-Subject: [PATCH 2/2] regulator: uniphier: add regulator driver for
- UniPhier SoC
-In-Reply-To: <20180629110341.GA6556@sirena.org.uk>
-References: <1530260533-19415-3-git-send-email-hayashi.kunihiko@socionext.com>
- <20180629110341.GA6556@sirena.org.uk>
-Message-ID: <20180702101034.23E8.4A936039@socionext.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sun, 1 Jul 2018 22:17:15 -0300
+Subject: [PATCH v1] ARM: dts: imx6sl-evk: keep sw4 always on
+In-Reply-To: <AM3PR04MB13155B8D567ABEF7EF03249AF5430@AM3PR04MB1315.eurprd04.prod.outlook.com>
+References: <1529930051-14122-1-git-send-email-yibin.gong@nxp.com>
+ <20180701093402.GN4348@dragon>
+ <CAOMZO5BjOEGWv2dC-bp0BYHq+PhLssEKic+o7ock8_1Dobd=sQ@mail.gmail.com>
+ <AM3PR04MB131507901BFEE1A5E426EECBF5430@AM3PR04MB1315.eurprd04.prod.outlook.com>
+ <CAOMZO5D8tjnjbwMdLGd7KF7_4PwqRWX8XH8kdcF3-5e-r2YQEA@mail.gmail.com>
+ <AM3PR04MB1315E7AED2BCE2265E6C443DF5430@AM3PR04MB1315.eurprd04.prod.outlook.com>
+ <CAOMZO5D8v4KM9S4ooHTDbA+vc8BZN_eO_wDuOPA+8Hcq-SmLDw@mail.gmail.com>
+ <AM3PR04MB1315C7C7CFF990615732FFBCF5430@AM3PR04MB1315.eurprd04.prod.outlook.com>
+ <CAOMZO5AM5VRS7UiWuvAQ8vvTB8OM+iwofuYrbsL_yB9e0Z9Kyg@mail.gmail.com>
+ <AM3PR04MB13155B8D567ABEF7EF03249AF5430@AM3PR04MB1315.eurprd04.prod.outlook.com>
+Message-ID: <CAOMZO5BdtxKjQge5ONpnjr1yNVeTJf4u8Gh-fPqpHz7G9ipOTg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
-Thank you for your comments.
+On Sun, Jul 1, 2018 at 10:09 PM, Anson Huang <anson.huang@nxp.com> wrote:
 
-On Fri, 29 Jun 2018 12:03:41 +0100 <broonie@kernel.org> wrote:
+> On some new i.MX platforms, PFuze switches are used for supplying GPU/VPU
+> or other non-critical modules only, these switches need to be turned off by
+> runtime PM to avoid very high power leakage, like on mScale850D.
 
-> On Fri, Jun 29, 2018 at 05:22:13PM +0900, Kunihiko Hayashi wrote:
-> 
-> > +++ b/drivers/regulator/uniphier-regulator.c
-> > @@ -0,0 +1,251 @@
-> > +// SPDX-License-Identifier: GPL-2.0
-> > +/*
-> > + * Regulator controller driver for UniPhier SoC
-> > + * Copyright 2018 Socionext Inc.
-> > + * Author: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
-> > + */
-> 
-> Please make the entire header a C++ comment so that it looks intentional
-> rather than mixing C and C++ like this.
+Ok, in this case I suggest adding a new property so that the switches
+can be turned off only when the new property is present.
 
-Okay, I'll rewrite it as a C++ comment.
+When this new property is absent, then we keep the current behavior
+and avoid dtb breakage.
 
-> 
-> > +static int uniphier_regulator_enable(struct regulator_dev *rdev)
-> > +{
-> > +	struct uniphier_regulator_priv *priv = rdev_get_drvdata(rdev);
-> > +	u32 val;
-> > +
-> > +	val = readl_relaxed(priv->base + rdev->desc->enable_reg);
-> > +	val &= ~rdev->desc->enable_mask;
-> > +	val |= rdev->desc->enable_val;
-> > +	writel_relaxed(val, priv->base + rdev->desc->enable_reg);
-> > +
-> > +	return 0;
-> > +}
-> 
-> Could you use a MMIO regmap for this driver?  All the operations look
-> like they're just straight up operations of the sort the standard
-> helpers support them and it means the driver will be able to take
-> advantage of any improvements the core makes for free.
+Since MX8M support is not in place yet, this is not urgent, so I will
+send a revert and then you can re-work the patch so that it does not
+affect the old dtbs.
 
-Indeed. In this case, I can use a MMIO regmap and it's reasonable and
-simply to use it.
-
-
-> Otherwise this looks great, and the above two issues can be fixed as
-> followup patches so I'll apply.
-
-And more, as with uniphier_usb3_reset [1], I can reuse soc_data and
-use clk_bulk in it. If it's no problem, I'll rewrite like that next.
-
-[1] https://lkml.org/lkml/2018/6/29/183
-
-Thank you,
-
----
-Best Regards,
-Kunihiko Hayashi
+Do you agree with such approach?
