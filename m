@@ -1,35 +1,48 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon,  2 Jul 2018 12:04:11 +0100
-Subject: [PATCHv4 15/19] arm64: remove in-kernel call to sys_personality()
+Date: Mon,  2 Jul 2018 12:04:06 +0100
+Subject: [PATCHv4 10/19] arm64: don't restore GPRs when context tracking
 In-Reply-To: <20180702110415.10465-1-mark.rutland@arm.com>
 References: <20180702110415.10465-1-mark.rutland@arm.com>
-Message-ID: <20180702110415.10465-16-mark.rutland@arm.com>
+Message-ID: <20180702110415.10465-11-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With pt_regs syscall wrappers, the calling convention for
-sys_personality() will change. Use ksys_personality(), which is
-functionally equivalent.
+Now that syscalls are invoked with pt_regs, we no longer need to ensure
+that the argument regsiters are live in the entry assembly, and it's
+fine to not restore them after context_tracking_user_exit() has
+corrupted them.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/kernel/sys.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/kernel/entry.S | 12 +-----------
+ 1 file changed, 1 insertion(+), 11 deletions(-)
 
-diff --git a/arch/arm64/kernel/sys.c b/arch/arm64/kernel/sys.c
-index 31045f3fed92..a82c3f7a9a90 100644
---- a/arch/arm64/kernel/sys.c
-+++ b/arch/arm64/kernel/sys.c
-@@ -42,7 +42,7 @@ SYSCALL_DEFINE1(arm64_personality, unsigned int, personality)
- 	if (personality(personality) == PER_LINUX32 &&
- 		!system_supports_32bit_el0())
- 		return -EINVAL;
--	return sys_personality(personality);
-+	return ksys_personality(personality);
- }
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index 156c4e3fd1a4..c41b84d06644 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -41,19 +41,9 @@
+  * Context tracking subsystem.  Used to instrument transitions
+  * between user and kernel mode.
+  */
+-	.macro ct_user_exit, syscall = 0
++	.macro ct_user_exit
+ #ifdef CONFIG_CONTEXT_TRACKING
+ 	bl	context_tracking_user_exit
+-	.if \syscall == 1
+-	/*
+-	 * Save/restore needed during syscalls.  Restore syscall arguments from
+-	 * the values already saved on stack during kernel_entry.
+-	 */
+-	ldp	x0, x1, [sp]
+-	ldp	x2, x3, [sp, #S_X2]
+-	ldp	x4, x5, [sp, #S_X4]
+-	ldp	x6, x7, [sp, #S_X6]
+-	.endif
+ #endif
+ 	.endm
  
- /*
 -- 
 2.11.0
