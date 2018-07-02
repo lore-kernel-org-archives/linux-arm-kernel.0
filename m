@@ -1,83 +1,96 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon,  2 Jul 2018 12:04:07 +0100
-Subject: [PATCHv4 11/19] arm64: don't reload GPRs after apply_ssbd
-In-Reply-To: <20180702110415.10465-1-mark.rutland@arm.com>
-References: <20180702110415.10465-1-mark.rutland@arm.com>
-Message-ID: <20180702110415.10465-12-mark.rutland@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 2 Jul 2018 11:08:16 +0100
+Subject: [PATCH] ACPI/PPTT: use ACPI ID whenever
+ ACPI_PPTT_ACPI_PROCESSOR_ID_VALID is set
+In-Reply-To: <955705e0-1d31-2c4b-3c5a-9c10603e36f8@arm.com>
+References: <1530289077-2444-1-git-send-email-sudeep.holla@arm.com>
+ <955705e0-1d31-2c4b-3c5a-9c10603e36f8@arm.com>
+Message-ID: <6d30ca76-37bd-e206-2bd4-b4f703a22672@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that all of the syscall logic works on the saved pt_regs, apply_ssbd
-can safely corrupt x0-x3 in the entry paths, and we no longer need to
-restore them. So let's remove the logic doing so.
 
-With that logic gone, we can fold the branch target into the macro, so
-that callers need not deal with this. GAS provides \@, which provides a
-unique value per macro invocation, which we can use to create a unique
-label.
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/kernel/entry.S | 20 +++++++-------------
- 1 file changed, 7 insertions(+), 13 deletions(-)
+On 29/06/18 19:18, Jeremy Linton wrote:
+> Hi,
+> 
+> On 06/29/2018 11:17 AM, Sudeep Holla wrote:
+>> Currently we use the ACPI processor ID only for the leaf/processor nodes
+>> as the specification states it must match the value of ACPI processor ID
+>> field in the processor?s entry in the MADT.
+>>
+>> However, if a PPTT structure represents processors group, it match a
+>> processor container UID in the namespace and
+>> ACPI_PPTT_ACPI_PROCESSOR_ID_VALID
+>> flag describe whether the ACPI processor ID is valid.
+>>
+>> Lets use UID whenever ACPI_PPTT_ACPI_PROCESSOR_ID_VALID is set to be
+>> consistent instead of using table offset as it's currently done for non
+>> leaf nodes.
+>>
+>> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+>> ---
+>> ? drivers/acpi/pptt.c | 10 ++++++++--
+>> ? 1 file changed, 8 insertions(+), 2 deletions(-)
+>>
+>> Hi,
+>>
+>> There's ongoing discussion on assigning ID based in OS using simple
+>> counters. It can never be consistent with firmware's view. So if the
+>> firmware provides valid UID for non-processors node, we must use it.
+>>
+>> Regards,
+>> Sudeep
+>>
+>> diff --git a/drivers/acpi/pptt.c b/drivers/acpi/pptt.c
+>> index e5ea1974d1e3..d1e26cb599bf 100644
+>> --- a/drivers/acpi/pptt.c
+>> +++ b/drivers/acpi/pptt.c
+>> @@ -481,8 +481,14 @@ static int topology_get_acpi_cpu_tag(struct
+>> acpi_table_header *table,
+>> ????? if (cpu_node) {
+>> ????????? cpu_node = acpi_find_processor_package_id(table, cpu_node,
+>> ??????????????????????????????? level, flag);
+>> -??????? /* Only the first level has a guaranteed id */
+>> -??????? if (level == 0)
+>> +??????? /*
+>> +???????? * As per specification if the processor structure represents
+>> +???????? * an actual processor, then ACPI processor ID must be valid.
+>> +???????? * For processor containers ACPI_PPTT_ACPI_PROCESSOR_ID_VALID
+>> +???????? * should be set if the UID is valid
+>> +???????? */
+>> +??????? if (level == 0 ||
+>> +??????????? cpu_node->flags & ACPI_PPTT_ACPI_PROCESSOR_ID_VALID)
+>> ????????????? return cpu_node->acpi_processor_id;
+> 
+> While, for some machines this likely helps create more human readable
+> ID's... What happens when the ID namespaces conflict with each other?
+> 
 
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index c41b84d06644..728bc7cc5bbb 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -130,20 +130,21 @@ alternative_else_nop_endif
- 
- 	// This macro corrupts x0-x3. It is the caller's duty
- 	// to save/restore them if required.
--	.macro	apply_ssbd, state, targ, tmp1, tmp2
-+	.macro	apply_ssbd, state, tmp1, tmp2
- #ifdef CONFIG_ARM64_SSBD
- alternative_cb	arm64_enable_wa2_handling
--	b	\targ
-+	b	skip_apply_ssbd\@
- alternative_cb_end
- 	ldr_this_cpu	\tmp2, arm64_ssbd_callback_required, \tmp1
--	cbz	\tmp2, \targ
-+	cbz	\tmp2, skip_apply_ssbd\@
- 	ldr	\tmp2, [tsk, #TSK_TI_FLAGS]
--	tbnz	\tmp2, #TIF_SSBD, \targ
-+	tbnz	\tmp2, #TIF_SSBD, skip_apply_ssbd\@
- 	mov	w0, #ARM_SMCCC_ARCH_WORKAROUND_2
- 	mov	w1, #\state
- alternative_cb	arm64_update_smccc_conduit
- 	nop					// Patched to SMC/HVC #0
- alternative_cb_end
-+skip_apply_ssbd\@:
- #endif
- 	.endm
- 
-@@ -173,13 +174,7 @@ alternative_cb_end
- 	ldr	x19, [tsk, #TSK_TI_FLAGS]	// since we can unmask debug
- 	disable_step_tsk x19, x20		// exceptions when scheduling.
- 
--	apply_ssbd 1, 1f, x22, x23
--
--#ifdef CONFIG_ARM64_SSBD
--	ldp	x0, x1, [sp, #16 * 0]
--	ldp	x2, x3, [sp, #16 * 1]
--#endif
--1:
-+	apply_ssbd 1, x22, x23
- 
- 	mov	x29, xzr			// fp pointed to user-space
- 	.else
-@@ -321,8 +316,7 @@ alternative_if ARM64_WORKAROUND_845719
- alternative_else_nop_endif
- #endif
- 3:
--	apply_ssbd 0, 5f, x0, x1
--5:
-+	apply_ssbd 0, x0, x1
- 	.endif
- 
- 	msr	elr_el1, x21			// set up the return data
+That's entirely left to the platform firmware. It should help userspace
+to identify the topology in a way firmware is describing and no more
+than that. If users use them for anything more, it's at their own risk.
+
+> AKA, I'm a little shy of this change because your going from something
+> we can guarantee is unique to depending on an portion of the PPTT
+> definition that has a couple different ways that it can be interpreted.
+> 
+
+No, I am not guaranteeing anything here. I am just passing valid UID if
+present to the caller. Interpretation is left to the caller and in ARM64
+we should just use(at least my preference) the value as is for sysfs
+topology.
+
+> OTOH the change is probably safe at the moment because i don't think
+> anyone has partially marked nodes at a given PPTT "level" valid, or put
+> structures that aren't part of the PE/cache's in the tree (outside of my
+> juno test tree with the GPU's/etc).
+> 
+
+Even if they are present, I don't see issue. If that's how firmware
+presents the CPU topology, that should be exactly the way we too need to.
+
 -- 
-2.11.0
+Regards,
+Sudeep
