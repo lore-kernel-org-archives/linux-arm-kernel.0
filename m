@@ -1,153 +1,185 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon,  2 Jul 2018 12:04:05 +0100
-Subject: [PATCHv4 09/19] arm64: convert native/compat syscall entry to C
+Date: Mon,  2 Jul 2018 12:04:04 +0100
+Subject: [PATCHv4 08/19] arm64: convert syscall trace logic to C
 In-Reply-To: <20180702110415.10465-1-mark.rutland@arm.com>
 References: <20180702110415.10465-1-mark.rutland@arm.com>
-Message-ID: <20180702110415.10465-10-mark.rutland@arm.com>
+Message-ID: <20180702110415.10465-9-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the syscall invocation logic is in C, we can migrate the rest
-of the syscall entry logic over, so that the entry assembly needn't look
-at the register values at all.
+Currently syscall tracing is a tricky assembly state machine, which can
+be rather difficult to follow, and even harder to modify. Before we
+start fiddling with it for pt_regs syscalls, let's convert it to C.
 
-The SVE reset across syscall logic now unconditionally clears TIF_SVE,
-but sve_user_disable() will only write back to CPACR_EL1 when SVE is
-actually enabled.
+This is not intended to have any functional change.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-Reviewed-by: Dave Martin <dave.martin@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/kernel/entry.S   | 42 ++++--------------------------------------
- arch/arm64/kernel/syscall.c | 41 +++++++++++++++++++++++++++++++++++++++--
- 2 files changed, 43 insertions(+), 40 deletions(-)
+ arch/arm64/kernel/entry.S   | 53 ++---------------------------------------
+ arch/arm64/kernel/syscall.c | 58 ++++++++++++++++++++++++++++++++++++++++++---
+ 2 files changed, 57 insertions(+), 54 deletions(-)
 
 diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 05b9f03f3e00..156c4e3fd1a4 100644
+index c0392f78e392..05b9f03f3e00 100644
 --- a/arch/arm64/kernel/entry.S
 +++ b/arch/arm64/kernel/entry.S
-@@ -720,14 +720,9 @@ el0_sync_compat:
- 	b.ge	el0_dbg
- 	b	el0_inv
- el0_svc_compat:
--	/*
--	 * AArch32 syscall handling
--	 */
--	ldr	x16, [tsk, #TSK_TI_FLAGS]	// load thread flags
--	adrp	stbl, compat_sys_call_table	// load compat syscall table pointer
--	mov	wscno, w7			// syscall number in w7 (r7)
--	mov     wsc_nr, #__NR_compat_syscalls
--	b	el0_svc_naked
-+	mov	x0, sp
-+	bl	el0_svc_compat_handler
-+	b	ret_to_user
+@@ -896,24 +896,6 @@ el0_error_naked:
+ 	b	ret_to_user
+ ENDPROC(el0_error)
  
- 	.align	6
- el0_irq_compat:
-@@ -925,37 +920,8 @@ ENDPROC(ret_to_user)
-  */
- 	.align	6
- el0_svc:
--	ldr	x16, [tsk, #TSK_TI_FLAGS]	// load thread flags
--	adrp	stbl, sys_call_table		// load syscall table pointer
--	mov	wscno, w8			// syscall number in w8
--	mov	wsc_nr, #__NR_syscalls
 -
--#ifdef CONFIG_ARM64_SVE
--alternative_if_not ARM64_SVE
--	b	el0_svc_naked
--alternative_else_nop_endif
--	tbz	x16, #TIF_SVE, el0_svc_naked	// Skip unless TIF_SVE set:
--	bic	x16, x16, #_TIF_SVE		// discard SVE state
--	str	x16, [tsk, #TSK_TI_FLAGS]
+-/*
+- * This is the fast syscall return path.  We do as little as possible here,
+- * and this includes saving x0 back into the kernel stack.
+- */
+-ret_fast_syscall:
+-	disable_daif
+-	ldr	x1, [tsk, #TSK_TI_FLAGS]	// re-check for syscall tracing
+-	and	x2, x1, #_TIF_SYSCALL_WORK
+-	cbnz	x2, ret_fast_syscall_trace
+-	and	x2, x1, #_TIF_WORK_MASK
+-	cbnz	x2, work_pending
+-	enable_step_tsk x1, x2
+-	kernel_exit 0
+-ret_fast_syscall_trace:
+-	enable_daif
+-	b	__sys_trace_return_skipped	// we already saved x0
+-
+ /*
+  * Ok, we need to do extra processing, enter the slow path.
+  */
+@@ -969,44 +951,13 @@ alternative_else_nop_endif
+ #endif
+ 
+ el0_svc_naked:					// compat entry point
+-	stp	x0, xscno, [sp, #S_ORIG_X0]	// save the original x0 and syscall number
+-	enable_daif
+-	ct_user_exit 1
+-
+-	tst	x16, #_TIF_SYSCALL_WORK		// check for syscall hooks
+-	b.ne	__sys_trace
+ 	mov	x0, sp
+ 	mov	w1, wscno
+ 	mov	w2, wsc_nr
+ 	mov	x3, stbl
+-	bl	invoke_syscall
+-	b	ret_fast_syscall
+-ENDPROC(el0_svc)
 -
 -	/*
--	 * task_fpsimd_load() won't be called to update CPACR_EL1 in
--	 * ret_to_user unless TIF_FOREIGN_FPSTATE is still set, which only
--	 * happens if a context switch or kernel_neon_begin() or context
--	 * modification (sigreturn, ptrace) intervenes.
--	 * So, ensure that CPACR_EL1 is already correct for the fast-path case:
+-	 * This is the really slow path.  We're going to be doing context
+-	 * switches, and waiting for our parent to respond.
 -	 */
--	mrs	x9, cpacr_el1
--	bic	x9, x9, #CPACR_EL1_ZEN_EL0EN	// disable SVE for el0
--	msr	cpacr_el1, x9			// synchronised by eret to el0
--#endif
+-__sys_trace:
+-	cmp     wscno, #NO_SYSCALL		// user-issued syscall(-1)?
+-	b.ne	1f
+-	mov	x0, #-ENOSYS			// set default errno if so
+-	str	x0, [sp, #S_X0]
+-1:	mov	x0, sp
+-	bl	syscall_trace_enter
+-	cmp	w0, #NO_SYSCALL			// skip the syscall?
+-	b.eq	__sys_trace_return_skipped
 -
--el0_svc_naked:					// compat entry point
- 	mov	x0, sp
+-	mov	x0, sp
 -	mov	w1, wscno
 -	mov	w2, wsc_nr
 -	mov	x3, stbl
--	bl	el0_svc_common
-+	bl	el0_svc_handler
+-	bl	invoke_syscall
+-
+-__sys_trace_return_skipped:
+-	mov	x0, sp
+-	bl	syscall_trace_exit
++	bl	el0_svc_common
  	b	ret_to_user
- ENDPROC(el0_svc)
++ENDPROC(el0_svc)
+ 
+ 	.popsection				// .entry.text
  
 diff --git a/arch/arm64/kernel/syscall.c b/arch/arm64/kernel/syscall.c
-index e3153ffe7f8e..ea4fc5eea182 100644
+index 8bc2530c8472..e3153ffe7f8e 100644
 --- a/arch/arm64/kernel/syscall.c
 +++ b/arch/arm64/kernel/syscall.c
-@@ -8,7 +8,9 @@
+@@ -1,10 +1,15 @@
+ // SPDX-License-Identifier: GPL-2.0
+ 
++#include <linux/compiler.h>
++#include <linux/context_tracking.h>
+ #include <linux/errno.h>
+ #include <linux/nospec.h>
+ #include <linux/ptrace.h>
  #include <linux/syscalls.h>
  
- #include <asm/daifflags.h>
-+#include <asm/fpsimd.h>
- #include <asm/thread_info.h>
-+#include <asm/unistd.h>
- 
++#include <asm/daifflags.h>
++#include <asm/thread_info.h>
++
  long compat_arm_syscall(struct pt_regs *regs);
  
-@@ -61,8 +63,8 @@ static inline bool has_syscall_work(unsigned long flags)
- int syscall_trace_enter(struct pt_regs *regs);
- void syscall_trace_exit(struct pt_regs *regs);
+ asmlinkage long do_ni_syscall(struct pt_regs *regs)
+@@ -31,9 +36,9 @@ static long __invoke_syscall(struct pt_regs *regs, syscall_fn_t syscall_fn)
+ 			  regs->regs[3], regs->regs[4], regs->regs[5]);
+ }
  
--asmlinkage void el0_svc_common(struct pt_regs *regs, int scno, int sc_nr,
+-asmlinkage void invoke_syscall(struct pt_regs *regs, unsigned int scno,
+-			       unsigned int sc_nr,
 -			       syscall_fn_t syscall_table[])
-+static void el0_svc_common(struct pt_regs *regs, int scno, int sc_nr,
++static void invoke_syscall(struct pt_regs *regs, unsigned int scno,
++			   unsigned int sc_nr,
 +			   syscall_fn_t syscall_table[])
  {
- 	unsigned long flags = current_thread_info()->flags;
+ 	long ret;
  
-@@ -99,3 +101,38 @@ asmlinkage void el0_svc_common(struct pt_regs *regs, int scno, int sc_nr,
- trace_exit:
- 	syscall_trace_exit(regs);
+@@ -47,3 +52,50 @@ asmlinkage void invoke_syscall(struct pt_regs *regs, unsigned int scno,
+ 
+ 	regs->regs[0] = ret;
  }
 +
-+static inline void sve_user_discard(void)
++static inline bool has_syscall_work(unsigned long flags)
 +{
-+	if (!system_supports_sve())
-+		return;
++	return unlikely(flags & _TIF_SYSCALL_WORK);
++}
 +
-+	clear_thread_flag(TIF_SVE);
++int syscall_trace_enter(struct pt_regs *regs);
++void syscall_trace_exit(struct pt_regs *regs);
++
++asmlinkage void el0_svc_common(struct pt_regs *regs, int scno, int sc_nr,
++			       syscall_fn_t syscall_table[])
++{
++	unsigned long flags = current_thread_info()->flags;
++
++	regs->orig_x0 = regs->regs[0];
++	regs->syscallno = scno;
++
++	local_daif_restore(DAIF_PROCCTX);
++	user_exit();
++
++	if (has_syscall_work(flags)) {
++		/* set default errno for user-issued syscall(-1) */
++		if (scno == NO_SYSCALL)
++			regs->regs[0] = -ENOSYS;
++		scno = syscall_trace_enter(regs);
++		if (scno == NO_SYSCALL)
++			goto trace_exit;
++	}
++
++	invoke_syscall(regs, scno, sc_nr, syscall_table);
 +
 +	/*
-+	 * task_fpsimd_load() won't be called to update CPACR_EL1 in
-+	 * ret_to_user unless TIF_FOREIGN_FPSTATE is still set, which only
-+	 * happens if a context switch or kernel_neon_begin() or context
-+	 * modification (sigreturn, ptrace) intervenes.
-+	 * So, ensure that CPACR_EL1 is already correct for the fast-path case.
++	 * The tracing status may have changed under our feet, so we have to
++	 * check again. However, if we were tracing entry, then we always trace
++	 * exit regardless, as the old entry assembly did.
 +	 */
-+	sve_user_disable();
++	if (!has_syscall_work(flags)) {
++		local_daif_mask();
++		flags = current_thread_info()->flags;
++		if (!has_syscall_work(flags))
++			return;
++		local_daif_restore(DAIF_PROCCTX);
++	}
++
++trace_exit:
++	syscall_trace_exit(regs);
 +}
-+
-+extern syscall_fn_t sys_call_table[];
-+
-+asmlinkage void el0_svc_handler(struct pt_regs *regs)
-+{
-+	sve_user_discard();
-+	el0_svc_common(regs, regs->regs[8], __NR_syscalls, sys_call_table);
-+}
-+
-+#ifdef CONFIG_COMPAT
-+extern syscall_fn_t compat_sys_call_table[];
-+
-+asmlinkage void el0_svc_compat_handler(struct pt_regs *regs)
-+{
-+	el0_svc_common(regs, regs->regs[7], __NR_compat_syscalls,
-+		       compat_sys_call_table);
-+}
-+#endif
 -- 
 2.11.0
