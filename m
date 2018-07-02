@@ -1,135 +1,72 @@
-From: honghui.zhang@mediatek.com (honghui.zhang at mediatek.com)
-Date: Mon, 2 Jul 2018 11:49:43 +0800
-Subject: [PATCH v2 3/4] PCI: mediatek: Add system pm support for MT2712 and
- MT7622
-In-Reply-To: <1530503384-1218-1-git-send-email-honghui.zhang@mediatek.com>
-References: <1530503384-1218-1-git-send-email-honghui.zhang@mediatek.com>
-Message-ID: <1530503384-1218-4-git-send-email-honghui.zhang@mediatek.com>
+From: gengdongjiu@huawei.com (gengdongjiu)
+Date: Mon, 2 Jul 2018 12:18:02 +0800
+Subject: [PATCH v5 2/2] arm64: KVM: export the capability to set guest
+ SError syndrome
+In-Reply-To: <bca12032-c465-1d10-f7d4-71fc044ac695@arm.com>
+References: <1529960309-2513-1-git-send-email-gengdongjiu@huawei.com>
+ <1529960309-2513-3-git-send-email-gengdongjiu@huawei.com>
+ <bca12032-c465-1d10-f7d4-71fc044ac695@arm.com>
+Message-ID: <fd33f8b6-db05-f956-a1fc-ecb4fa3f1b79@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Honghui Zhang <honghui.zhang@mediatek.com>
+Hi James,
 
-The MTCMOS of PCIe Host for MT2712 and MT7622 will be off when system
-suspend, and all the internal control register will be reset after system
-resume. The PCIe link should be re-established and the related control
-register values should be re-set after system resume.
+On 2018/6/29 23:58, James Morse wrote:
+> Hi Dongjiu Geng,
+> 
+> This patch doesn't apply on v4.18-rc2.
+> 
+> Documentation/virtual/kvm/api.txt already has a 8.18 section. I guess you based
+> this on v4.17.
 
-Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
----
- drivers/pci/controller/pcie-mediatek.c | 67 ++++++++++++++++++++++++++++++++++
- 1 file changed, 67 insertions(+)
+Yes, indeed I based on v4.17.
 
-diff --git a/drivers/pci/controller/pcie-mediatek.c b/drivers/pci/controller/pcie-mediatek.c
-index 86918d4..c530539 100644
---- a/drivers/pci/controller/pcie-mediatek.c
-+++ b/drivers/pci/controller/pcie-mediatek.c
-@@ -134,12 +134,14 @@ struct mtk_pcie_port;
- /**
-  * struct mtk_pcie_soc - differentiate between host generations
-  * @need_fix_class_id: whether this host's class ID needed to be fixed or not
-+ * @pm_support: whether the host's MTCMOS will be off when suspend
-  * @ops: pointer to configuration access functions
-  * @startup: pointer to controller setting functions
-  * @setup_irq: pointer to initialize IRQ functions
-  */
- struct mtk_pcie_soc {
- 	bool need_fix_class_id;
-+	bool pm_support;
- 	struct pci_ops *ops;
- 	int (*startup)(struct mtk_pcie_port *port);
- 	int (*setup_irq)(struct mtk_pcie_port *port, struct device_node *node);
-@@ -1197,12 +1199,75 @@ static int mtk_pcie_probe(struct platform_device *pdev)
- 	return err;
- }
- 
-+static int __maybe_unused mtk_pcie_suspend_noirq(struct device *dev)
-+{
-+	struct mtk_pcie *pcie = dev_get_drvdata(dev);
-+	const struct mtk_pcie_soc *soc = pcie->soc;
-+	struct mtk_pcie_port *port;
-+
-+	if (!soc->pm_support)
-+		return 0;
-+
-+	if (list_empty(&pcie->ports))
-+		return 0;
-+
-+	list_for_each_entry(port, &pcie->ports, list) {
-+		clk_disable_unprepare(port->pipe_ck);
-+		clk_disable_unprepare(port->obff_ck);
-+		clk_disable_unprepare(port->axi_ck);
-+		clk_disable_unprepare(port->aux_ck);
-+		clk_disable_unprepare(port->ahb_ck);
-+		clk_disable_unprepare(port->sys_ck);
-+		phy_power_off(port->phy);
-+		phy_exit(port->phy);
-+	}
-+
-+	mtk_pcie_subsys_powerdown(pcie);
-+
-+	return 0;
-+}
-+
-+static int __maybe_unused mtk_pcie_resume_noirq(struct device *dev)
-+{
-+	struct mtk_pcie *pcie = dev_get_drvdata(dev);
-+	const struct mtk_pcie_soc *soc = pcie->soc;
-+	struct mtk_pcie_port *port;
-+
-+	if (!soc->pm_support)
-+		return 0;
-+
-+	if (list_empty(&pcie->ports))
-+		return 0;
-+
-+	if (dev->pm_domain) {
-+		pm_runtime_enable(dev);
-+		pm_runtime_get_sync(dev);
-+	}
-+
-+	clk_prepare_enable(pcie->free_ck);
-+
-+	list_for_each_entry_safe(port, &pcie->ports, list)
-+		mtk_pcie_enable_port(port);
-+
-+	/* In case of EP was removed while system suspend. */
-+	if (list_empty(&pcie->ports))
-+		mtk_pcie_subsys_powerdown(pcie);
-+
-+	return 0;
-+}
-+
-+static const struct dev_pm_ops mtk_pcie_pm_ops = {
-+	SET_NOIRQ_SYSTEM_SLEEP_PM_OPS(mtk_pcie_suspend_noirq,
-+				      mtk_pcie_resume_noirq)
-+};
-+
- static const struct mtk_pcie_soc mtk_pcie_soc_v1 = {
- 	.ops = &mtk_pcie_ops,
- 	.startup = mtk_pcie_startup_port,
- };
- 
- static const struct mtk_pcie_soc mtk_pcie_soc_mt2712 = {
-+	.pm_support = true,
- 	.ops = &mtk_pcie_ops_v2,
- 	.startup = mtk_pcie_startup_port_v2,
- 	.setup_irq = mtk_pcie_setup_irq,
-@@ -1210,6 +1275,7 @@ static const struct mtk_pcie_soc mtk_pcie_soc_mt2712 = {
- 
- static const struct mtk_pcie_soc mtk_pcie_soc_mt7622 = {
- 	.need_fix_class_id = true,
-+	.pm_support = true,
- 	.ops = &mtk_pcie_ops_v2,
- 	.startup = mtk_pcie_startup_port_v2,
- 	.setup_irq = mtk_pcie_setup_irq,
-@@ -1229,6 +1295,7 @@ static struct platform_driver mtk_pcie_driver = {
- 		.name = "mtk-pcie",
- 		.of_match_table = mtk_pcie_ids,
- 		.suppress_bind_attrs = true,
-+		.pm = &mtk_pcie_pm_ops,
- 	},
- };
- builtin_platform_driver(mtk_pcie_driver);
--- 
-2.6.4
+> 
+> For posting patches, please use the latest 'rc' from Linus' tree, (or the
+> maintainer's tree listed in MAINTAINERS for the tree you are targeting if the
+> maintainer has started to pick up patches).
+Ok, I will rebase it using the latest 'rc' from Linus' tree. thanks for the reminder.
+
+
+> 
+> 
+> Thanks,
+> 
+> James
+> 
+> 
+> On 25/06/18 21:58, Dongjiu Geng wrote:
+>> For the arm64 RAS Extension, user space can inject a virtual-SError
+>> with specified ESR. So user space needs to know whether KVM support
+>> to inject such SError, this interface adds this query for this capability.
+>>
+>> KVM will check whether system support RAS Extension, if supported, KVM
+>> returns true to user space, otherwise returns false.
+> 
+> 
+>> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+>> index 3732097..86b3808 100644
+>> --- a/Documentation/virtual/kvm/api.txt
+>> +++ b/Documentation/virtual/kvm/api.txt
+>> @@ -4628,3 +4628,14 @@ Architectures: s390
+>>  This capability indicates that kvm will implement the interfaces to handle
+>>  reset, migration and nested KVM for branch prediction blocking. The stfle
+>>  facility 82 should not be provided to the guest without this capability.
+>> +
+>> +8.14 KVM_CAP_ARM_SET_SERROR_ESR
+>> +
+>> +Architectures: arm, arm64
+>> +
+>> +This capability indicates that userspace can specify the syndrome value reported
+>> +to the guest OS when guest takes a virtual SError interrupt exception.
+>> +If KVM has this capability, userspace can only specify the ISS field for the ESR
+>> +syndrome, it can not specify the EC field which is not under control by KVM.
+>> +If this virtual SError is taken to EL1 using AArch64, this value will be reported
+>> +in ISS filed of ESR_EL1.
+> 
+> 
+> 
+> 
+> .
+> 
