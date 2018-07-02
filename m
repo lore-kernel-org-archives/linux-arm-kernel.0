@@ -1,41 +1,63 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 2 Jul 2018 11:01:51 +0100
-Subject: [PATCH v3 06/20] kvm: arm/arm64: Remove spurious WARN_ON
-In-Reply-To: <1530270944-11351-7-git-send-email-suzuki.poulose@arm.com>
-References: <1530270944-11351-1-git-send-email-suzuki.poulose@arm.com>
- <1530270944-11351-7-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <daa9d67d-069a-c413-223f-28444341d99d@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 2 Jul 2018 11:01:49 +0100
+Subject: [PATCH] ACPI/PPTT: use ACPI ID whenever
+ ACPI_PPTT_ACPI_PROCESSOR_ID_VALID is set
+In-Reply-To: <20180630071620.gszzib7oha3jn3j2@hawk.localdomain>
+References: <1530289077-2444-1-git-send-email-sudeep.holla@arm.com>
+ <20180630071620.gszzib7oha3jn3j2@hawk.localdomain>
+Message-ID: <a6c51606-05a5-84ce-8e6b-c66c7f2c77f2@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/06/18 12:15, Suzuki K Poulose wrote:
-> On a 4-level page table pgd entry can be empty, unlike a 3-level
-> page table. Remove the spurious WARN_ON() in stage_get_pud().
+
+
+On 30/06/18 08:16, Andrew Jones wrote:
+> On Fri, Jun 29, 2018 at 05:17:57PM +0100, Sudeep Holla wrote:
+>> Currently we use the ACPI processor ID only for the leaf/processor nodes
+>> as the specification states it must match the value of ACPI processor ID
+>> field in the processor?s entry in the MADT.
+>>
+>> However, if a PPTT structure represents processors group, it match a
+>> processor container UID in the namespace and ACPI_PPTT_ACPI_PROCESSOR_ID_VALID
+>> flag describe whether the ACPI processor ID is valid.
+>>
+>> Lets use UID whenever ACPI_PPTT_ACPI_PROCESSOR_ID_VALID is set to be
+>> consistent instead of using table offset as it's currently done for non
+>> leaf nodes.
+>>
+>> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+>> ---
+>>  drivers/acpi/pptt.c | 10 ++++++++--
+>>  1 file changed, 8 insertions(+), 2 deletions(-)
+>>
+>> Hi,
+>>
+>> There's ongoing discussion on assigning ID based in OS using simple
+>> counters. It can never be consistent with firmware's view. So if the
+>> firmware provides valid UID for non-processors node, we must use it.
 > 
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Acked-by: Christoffer Dall <cdall@kernel.org>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->  virt/kvm/arm/mmu.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-> index 061e6b3..308171c 100644
-> --- a/virt/kvm/arm/mmu.c
-> +++ b/virt/kvm/arm/mmu.c
-> @@ -976,7 +976,7 @@ static pud_t *stage2_get_pud(struct kvm *kvm, struct kvm_mmu_memory_cache *cache
->  	pud_t *pud;
->  
->  	pgd = kvm->arch.pgd + stage2_pgd_index(addr);
-> -	if (WARN_ON(stage2_pgd_none(*pgd))) {
-> +	if (stage2_pgd_none(*pgd)) {
->  		if (!cache)
->  			return NULL;
->  		pud = mmu_memory_cache_alloc(cache);
+> I agree with this. I've been so focused on the fact that the ACPI offsets
+> are arbitrary, and thus counters can't be worse, that I nearly forgot how
+> these IDs are actually defined:
 > 
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Yes, it's platform dependent and I now realize that I never explicitly
+mentioned that, let alone emphasize on that. I was for UID for the same
+reason.
 
-	M.
+[...]
+
+> 
+> When the valid flag is set we'll now return a [hopefully] correct platform
+> dependent ID, but when it's not we'll return an ACPI table offset. How
+> will users of the ID know? Also, it's possible to return -ENOENT for the
+> ID when calling find_acpi_cpu_topology(). How can we distinguish that from
+> an arbitrary platform dependent ID?
+> 
+
+But why should one need to distinguish that ? Even offset is kind of
+sparsely distributed UID.
 -- 
-Jazz is not dead. It just smells funny...
+Regards,
+Sudeep
