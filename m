@@ -1,46 +1,35 @@
-From: jens.wiklander@linaro.org (Jens Wiklander)
-Date: Mon, 2 Jul 2018 14:10:13 +0200
-Subject: [GIT PULL] tee driver for v4.18
-Message-ID: <20180702121013.GA17791@jax.urgonet>
+From: mperttunen@nvidia.com (Mikko Perttunen)
+Date: Mon, 2 Jul 2018 15:11:30 +0300
+Subject: [PATCH v2 1/2] dt-bindings: arm: Add compatible string for NVIDIA
+ Carmel
+Message-ID: <20180702121131.13461-1-mperttunen@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello arm-soc maintainers,
+Add compatibility string for the Carmel CPU in Tegra194.
 
-Please pull these small tee driver enhancements. There's a new config
-option for the OP-TEE driver, OPTEE_SHM_NUM_PRIV_PAGES. Also the OP-TEE
-driver reads current time with ktime_get_real_ts64() from now on.
+Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
+Acked-by: Rob Herring <robh@kernel.org>
+---
 
-Thanks,
-Jens
+Notes:
+    v2:
+    - Added Rob's Acked-by
 
-The following changes since commit 29dcea88779c856c7dc92040a0c01233263101d4:
+ Documentation/devicetree/bindings/arm/cpus.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-  Linux 4.17 (2018-06-03 14:15:21 -0700)
-
-are available in the Git repository at:
-
-  git://git.linaro.org/people/jens.wiklander/linux-tee.git tags/tee-drv-for-4.18
-
-for you to fetch changes up to 3249527f19d660c5adfb2b6f4ffd4ca0506b8755:
-
-  tee: optee: making OPTEE_SHM_NUM_PRIV_PAGES configurable via Kconfig (2018-06-20 11:20:36 +0200)
-
-----------------------------------------------------------------
-Misc enhancement for tee driver subsystem
-
-* Replaces getnstimeofday64() with ktime_get_real_ts64()
-* Adds OPTEE_SHM_NUM_PRIV_PAGES to configure how many pages should be
-  statically reserved for driver private allocations
-
-----------------------------------------------------------------
-Arnd Bergmann (1):
-      tee: replace getnstimeofday64() with ktime_get_real_ts64()
-
-Sahil Malhotra (1):
-      tee: optee: making OPTEE_SHM_NUM_PRIV_PAGES configurable via Kconfig
-
- drivers/tee/optee/Kconfig | 8 ++++++++
- drivers/tee/optee/core.c  | 2 +-
- drivers/tee/optee/rpc.c   | 2 +-
- 3 files changed, 10 insertions(+), 2 deletions(-)
+diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+index 29e1dc5d506d..c4090c5a4f9f 100644
+--- a/Documentation/devicetree/bindings/arm/cpus.txt
++++ b/Documentation/devicetree/bindings/arm/cpus.txt
+@@ -183,6 +183,7 @@ described below.
+ 			    "marvell,sheeva-v5"
+ 			    "nvidia,tegra132-denver"
+ 			    "nvidia,tegra186-denver"
++			    "nvidia,tegra194-carmel"
+ 			    "qcom,krait"
+ 			    "qcom,kryo"
+ 			    "qcom,kryo385"
+-- 
+2.16.1
