@@ -1,59 +1,129 @@
-From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Mon, 2 Jul 2018 14:48:19 +0800
-Subject: [PATCH v2 0/4] PCI: mediatek: fixup find_port, enable_msi and
- add pm, module support
-In-Reply-To: <1530503384-1218-1-git-send-email-honghui.zhang@mediatek.com>
-References: <1530503384-1218-1-git-send-email-honghui.zhang@mediatek.com>
-Message-ID: <1530514099.6415.1.camel@mtkswgap22>
+From: radheys@xilinx.com (Radhey Shyam Pandey)
+Date: Mon, 2 Jul 2018 06:59:58 +0000
+Subject: [RFC] dmaengine: Add metadat_ops for dma_async_tx_descriptor
+In-Reply-To: <20180601102429.16429-1-peter.ujfalusi@ti.com>
+References: <32208a9c-2b15-d345-1432-f1e387531f9b@ti.com>
+ <20180601102429.16429-1-peter.ujfalusi@ti.com>
+Message-ID: <DM6PR02MB4361262830FF320B16B8486AC7430@DM6PR02MB4361.namprd02.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2018-07-02 at 11:49 +0800, honghui.zhang at mediatek.com wrote:
-> From: Honghui Zhang <honghui.zhang@mediatek.com>
+> -----Original Message-----
+> From: Peter Ujfalusi [mailto:peter.ujfalusi at ti.com]
+> Sent: Friday, June 1, 2018 3:54 PM
+> To: Radhey Shyam Pandey <radheys@xilinx.com>; vinod.koul at intel.com
+> Cc: lars at metafoo.de; michal.simek at xilinx.com; linux-
+> kernel at vger.kernel.org; dmaengine at vger.kernel.org;
+> dan.j.williams at intel.com; Appana Durga Kedareswara Rao
+> <appanad@xilinx.com>; linux-arm-kernel at lists.infradead.org
+> Subject: [RFC] dmaengine: Add metadat_ops for dma_async_tx_descriptor
 > 
-> This patchset includes misc patchs:
+> If the DMA supports per descriptor metadata it can implement the attach,
+> get_ptr/set_len callbacks.
 > 
-> The first patch fixup the mtk_pcie_find_port logical which will cause system
-> could not touch the EP's configuration space which was connected to PCIe slot 1.
+> Client drivers must only use either attach or get_ptr/set_len to avoid
+> miss configuration.
 > 
-> The second patch fixup the enable msi logical, the operation to enable msi
-> should be after system clock is enabled. The function of mtk_pcie_startup_port_v2's
-> define location is re-arranged to avoid mtk_pcie_enable_msi's forward declaration.
-> And call mtk_pcie_enable_msi in mtk_pcie_startup_port_v2 since the clock was all
-> enabled at that time.
+> Wrappers are also added for the metadata_ops:
+> dmaengine_desc_attach_metadata()
+> dmaengine_desc_get_metadata_ptr()
+> dmaengine_desc_set_metadata_len()
 > 
-> The third patch was rebased and refactor of the v4 patch[1], changes are:
->  -Add PM support for MT7622.
->  -Using mtk_pcie_enable_port to re-establish the link when resumed.
->  -Rebase on the previous two patches.
+> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> ---
+> Hi,
 > 
-> The fourth patch add loadable kernel module support.
+> since attachments are bouncing back, I send the patch separately
 > 
-> Some of those patches was already reviewed-by Ryder Lee <ryder.lee@mediatek.com>,
-> so I just add the Reviewed-by tags in those patches.
+> Regards,
+> Peter
 > 
-> [1] https://patchwork.kernel.org/patch/10479079
+>  include/linux/dmaengine.h | 50
+> +++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 50 insertions(+)
 > 
-> Change since v1:
->  - A bit of code refact of the first patch suggested by Andy Shevchenko, and
->    commit message updated.
->  - Using __maybe_unused.
->  - Remove the redundant list_empty check of the fourth patch.
+> diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
+> index 51fbb861e84b..ac42ace36aa3 100644
+> --- a/include/linux/dmaengine.h
+> +++ b/include/linux/dmaengine.h
+> @@ -491,6 +491,18 @@ struct dmaengine_unmap_data {
+>  	dma_addr_t addr[0];
+>  };
 > 
-> Honghui Zhang (4):
->   PCI: mediatek: fixup mtk_pcie_find_port logical
->   PCI: mediatek: enable msi after clock enabled
->   PCI: mediatek: Add system pm support for MT2712 and MT7622
->   PCI: mediatek: Add loadable kernel module support
+> +struct dma_async_tx_descriptor;
+> +
+> +struct dma_descriptor_metadata_ops {
+> +	int (*attach)(struct dma_async_tx_descriptor *desc, void *data,
+> +		      size_t len);
+> +
+> +	void *(*get_ptr)(struct dma_async_tx_descriptor *desc,
+> +			 size_t *payload_len, size_t *max_len);
+> +	int (*set_len)(struct dma_async_tx_descriptor *desc,
+> +		       size_t payload_len);
+> +};
+> +
+>  /**
+>   * struct dma_async_tx_descriptor - async transaction descriptor
+>   * ---dma generic offload fields---
+> @@ -520,6 +532,7 @@ struct dma_async_tx_descriptor {
+>  	dma_async_tx_callback_result callback_result;
+>  	void *callback_param;
+>  	struct dmaengine_unmap_data *unmap;
+> +	struct dma_descriptor_metadata_ops *metadata_ops;
+>  #ifdef CONFIG_ASYNC_TX_ENABLE_CHANNEL_SWITCH
+>  	struct dma_async_tx_descriptor *next;
+>  	struct dma_async_tx_descriptor *parent;
+> @@ -932,6 +945,43 @@ static inline struct dma_async_tx_descriptor
+> *dmaengine_prep_dma_memcpy(
+>  						    len, flags);
+>  }
 > 
->  drivers/pci/controller/Kconfig         |   2 +-
->  drivers/pci/controller/pcie-mediatek.c | 289 ++++++++++++++++++++++++---------
->  2 files changed, 213 insertions(+), 78 deletions(-)
-> 
+> +static inline int dmaengine_desc_attach_metadata(
+> +		struct dma_async_tx_descriptor *desc, void *data, size_t
+> len)
+> +{
+> +	if (!desc)
+> +		return 0;
+> +
+> +	if (!desc->metadata_ops || !desc->metadata_ops->attach)
+> +		return -ENOTSUPP;
+> +
+> +	return desc->metadata_ops->attach(desc, data, len);
+> +}
+> +
+> +static inline void *dmaengine_desc_get_metadata_ptr(
+> +		struct dma_async_tx_descriptor *desc, size_t *payload_len,
+> +		size_t *max_len)
+> +{
+> +	if (!desc)
+> +		return NULL;
+> +
+> +	if (!desc->metadata_ops || !desc->metadata_ops->get_ptr)
+> +		return ERR_PTR(-ENOTSUPP);
+> +
+> +	return desc->metadata_ops->get_ptr(desc, payload_len, max_len);
+> +}
+> +
+> +static inline int dmaengine_desc_set_metadata_len(
+> +		struct dma_async_tx_descriptor *desc, size_t payload_len)
+> +{
+> +	if (!desc)
+> +		return 0;
+> +
+> +	if (!desc->metadata_ops || !desc->metadata_ops->set_len)
+> +		return -ENOTSUPP;
+> +
+> +	return desc->metadata_ops->set_len(desc, payload_len);
+> +}
+> +
+Thanks for the RFC patchset. It looks fine to me. We also need to update
+documentation. Let's wait for Vinod/Lars feedback.
 
-For the series:
-
-Acked-by: Ryder Lee <ryder.lee@mediatek.com>
-
-
-Thanks.
+>  /**
+>   * dmaengine_terminate_all() - Terminate all active DMA transfers
+>   * @chan: The channel for which to terminate the transfers
+> --
+> Peter
+> 
+> Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
+> Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
