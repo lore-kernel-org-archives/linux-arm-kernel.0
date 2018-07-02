@@ -1,58 +1,30 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 2 Jul 2018 15:18:51 +0200
-Subject: [PATCH v3 6/8] serial: Add Tegra Combined UART driver
-In-Reply-To: <20180702114033.15654-7-mperttunen@nvidia.com>
-References: <20180702114033.15654-1-mperttunen@nvidia.com>
- <20180702114033.15654-7-mperttunen@nvidia.com>
-Message-ID: <20180702131851.GH13096@ulmo>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 2 Jul 2018 14:23:00 +0100
+Subject: [PATCH] arm64: kexec: always reset to EL2 if present
+In-Reply-To: <20180702131753.12949-1-mark.rutland@arm.com>
+References: <20180702131753.12949-1-mark.rutland@arm.com>
+Message-ID: <5259486f-126c-a343-c279-628846603cb6@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 02, 2018 at 02:40:31PM +0300, Mikko Perttunen wrote:
-> The Tegra Combined UART (TCU) is a mailbox-based mechanism that allows
-> multiplexing multiple "virtual UARTs" into a single hardware serial
-> port. The TCU is the primary serial port on Tegra194 devices.
+On 02/07/18 14:17, Mark Rutland wrote:
+> Currently machine_kexec() doesn't reset to EL2 in the case of a
+> crashdump kernel. This leaves potentially dodgy state active at EL2, and
+> means that if the crashdump kernel attempts to online secondary CPUs,
+> these will be booted as mismatched ELs.
 > 
-> Add a TCU driver utilizing the mailbox framework, as the used mailboxes
-> are part of Tegra HSP blocks that are already controlled by the Tegra
-> HSP mailbox driver.
+> Let's reset to EL2, as we do in all other cases, and simplify things. If
+> EL2 state is corrupt, things are already sufficiently bad that kdump is
+> unlikely to work, and it's best-effort regardless.
 > 
-> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
-> ---
-> 
-> Notes:
->     v2:
->     - Removed (void) casts for unused variables.
->     - Changed the uart_set_options() call to be on one line, even if its
->       over 80 characters.
->     - Added defines for magic numbers.
->     - Style fixes.
->     - Changed Kconfig entry to depend on the Tegra HSP driver instead of
->       just the mailbox framework.
->     
->     v3:
->     - Removed FLUSH bit, as it's unnecessary and slows down printing
->     - Removed call to uart_set_options
->     - Added mbox_free_channel calls to remove()
-> 
->  drivers/tty/serial/Kconfig       |   9 ++
->  drivers/tty/serial/Makefile      |   1 +
->  drivers/tty/serial/tegra-tcu.c   | 291 +++++++++++++++++++++++++++++++++++++++
->  include/uapi/linux/serial_core.h |   3 +
->  4 files changed, 304 insertions(+)
->  create mode 100644 drivers/tty/serial/tegra-tcu.c
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: James Morse <james.morse@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
 
-The driver looks good to me. But for my own understanding, is there some
-way we can make use of the multiplexing? That is, could we add a
-mechanism to have the driver filter out only a specific stream? Could we
-also specify which stream to send data back to? What happens by default?
-Which stream is data sent to?
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180702/c50f8145/attachment.sig>
+	M.
+-- 
+Jazz is not dead. It just smells funny...
