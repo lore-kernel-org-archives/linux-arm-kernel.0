@@ -1,7 +1,7 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sun, 1 Jul 2018 22:17:15 -0300
+From: anson.huang@nxp.com (Anson Huang)
+Date: Mon, 2 Jul 2018 01:19:20 +0000
 Subject: [PATCH v1] ARM: dts: imx6sl-evk: keep sw4 always on
-In-Reply-To: <AM3PR04MB13155B8D567ABEF7EF03249AF5430@AM3PR04MB1315.eurprd04.prod.outlook.com>
+In-Reply-To: <CAOMZO5BdtxKjQge5ONpnjr1yNVeTJf4u8Gh-fPqpHz7G9ipOTg@mail.gmail.com>
 References: <1529930051-14122-1-git-send-email-yibin.gong@nxp.com>
  <20180701093402.GN4348@dragon>
  <CAOMZO5BjOEGWv2dC-bp0BYHq+PhLssEKic+o7ock8_1Dobd=sQ@mail.gmail.com>
@@ -12,24 +12,50 @@ References: <1529930051-14122-1-git-send-email-yibin.gong@nxp.com>
  <AM3PR04MB1315C7C7CFF990615732FFBCF5430@AM3PR04MB1315.eurprd04.prod.outlook.com>
  <CAOMZO5AM5VRS7UiWuvAQ8vvTB8OM+iwofuYrbsL_yB9e0Z9Kyg@mail.gmail.com>
  <AM3PR04MB13155B8D567ABEF7EF03249AF5430@AM3PR04MB1315.eurprd04.prod.outlook.com>
-Message-ID: <CAOMZO5BdtxKjQge5ONpnjr1yNVeTJf4u8Gh-fPqpHz7G9ipOTg@mail.gmail.com>
+ <CAOMZO5BdtxKjQge5ONpnjr1yNVeTJf4u8Gh-fPqpHz7G9ipOTg@mail.gmail.com>
+Message-ID: <AM3PR04MB1315D8EF80847B4AF1FF4BA5F5430@AM3PR04MB1315.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 1, 2018 at 10:09 PM, Anson Huang <anson.huang@nxp.com> wrote:
 
-> On some new i.MX platforms, PFuze switches are used for supplying GPU/VPU
-> or other non-critical modules only, these switches need to be turned off by
-> runtime PM to avoid very high power leakage, like on mScale850D.
 
-Ok, in this case I suggest adding a new property so that the switches
-can be turned off only when the new property is present.
+Anson Huang
+Best Regards!
 
-When this new property is absent, then we keep the current behavior
-and avoid dtb breakage.
 
-Since MX8M support is not in place yet, this is not urgent, so I will
-send a revert and then you can re-work the patch so that it does not
-affect the old dtbs.
+> -----Original Message-----
+> From: Fabio Estevam [mailto:festevam at gmail.com]
+> Sent: Monday, July 2, 2018 9:17 AM
+> To: Anson Huang <anson.huang@nxp.com>
+> Cc: Shawn Guo <shawnguo@kernel.org>; Robin Gong <yibin.gong@nxp.com>;
+> Mark Rutland <mark.rutland@arm.com>; open list:OPEN FIRMWARE AND
+> FLATTENED DEVICE TREE BINDINGS <devicetree@vger.kernel.org>;
+> linux-kernel <linux-kernel@vger.kernel.org>; Rob Herring
+> <robh+dt@kernel.org>; dl-linux-imx <linux-imx@nxp.com>; Sascha Hauer
+> <kernel@pengutronix.de>; Fabio Estevam <fabio.estevam@nxp.com>;
+> moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE
+> <linux-arm-kernel@lists.infradead.org>
+> Subject: Re: [PATCH v1] ARM: dts: imx6sl-evk: keep sw4 always on
+> 
+> On Sun, Jul 1, 2018 at 10:09 PM, Anson Huang <anson.huang@nxp.com>
+> wrote:
+> 
+> > On some new i.MX platforms, PFuze switches are used for supplying
+> > GPU/VPU or other non-critical modules only, these switches need to be
+> > turned off by runtime PM to avoid very high power leakage, like on
+> mScale850D.
+> 
+> Ok, in this case I suggest adding a new property so that the switches can be
+> turned off only when the new property is present.
+> 
+> When this new property is absent, then we keep the current behavior and avoid
+> dtb breakage.
+> 
+> Since MX8M support is not in place yet, this is not urgent, so I will send a revert
+> and then you can re-work the patch so that it does not affect the old dtbs.
+> 
+> Do you agree with such approach?
 
-Do you agree with such approach?
+Sure, I agree for now. As I did NOT want to have any breakage. Thanks.
+ 
+Anson.
