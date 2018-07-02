@@ -1,32 +1,38 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 2 Jul 2018 14:13:59 +0100
-Subject: [PATCH v3 15/20] kvm: arm/arm64: Allow tuning the physical
- address size for VM
-In-Reply-To: <1530270944-11351-16-git-send-email-suzuki.poulose@arm.com>
-References: <1530270944-11351-1-git-send-email-suzuki.poulose@arm.com>
- <1530270944-11351-16-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <f7715da8-73ea-28fb-9883-8d0c048e0792@arm.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 2 Jul 2018 15:17:32 +0200
+Subject: [PATCH v3 0/2] mmc: sdhci-of-arasan: workaround for broken clocks
+In-Reply-To: <cover.1529493667.git.h.grohne@intenta.de>
+References: <20180615081830.zrgx6arwn6ga27gu@laureti-dev>
+ <cover.1529493667.git.h.grohne@intenta.de>
+Message-ID: <CAPDyKFp518uXGyiXL2_ejzHnyCN0RSQDvjCDxNg+_pqw9VANUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/06/18 12:15, Suzuki K Poulose wrote:
-> Allow specifying the physical address size for a new VM via
-> the kvm_type argument for KVM_CREATE_VM ioctl. This allows
-> us to finalise the stage2 page table format as early as possible
-> and hence perform the right checks on the memory slots without
-> complication. The size is encoded as Log2(PA_Size) in the bits[7:0]
-> of the type field and can encode more information in the future if
-> required. The IPA size is still capped at 40bits.
+On 20 June 2018 at 13:32, Helmut Grohne <h.grohne@intenta.de> wrote:
+> This patch series works around the internal clock indicating stability too
+> quickly to operate. It manifests itself as:
+>
+>     mmc0: error -84 whilst initialising SD card
+>
+> Changes since v2:
+>  * Ulf Hansson requested splitting the patch in accordance with
+>    Documentation/devicetree/bindings/submitting-patches.txt. Also update
+>    recipient list accordingly.
+>  * Added Acked-by from Adrian Hunter.
+>
+> Helmut Grohne (2):
+>   dt-bindings: mmc: broken clock stable indicator on arasan controllers
+>   mmc: sdhci-of-arasan: Add quirk for unstable clocks
+>
+>  Documentation/devicetree/bindings/mmc/arasan,sdhci.txt |  2 ++
+>  drivers/mmc/host/sdhci-of-arasan.c                     | 16 ++++++++++++++++
+>  2 files changed, 18 insertions(+)
+>
+> --
+> 2.11.0
+>
 
-Can't we relax this? There is no technical reason (AFAICS) not to allow
-going down to 36bit IPA if the user has requested it.
+Thanks, applied for next!
 
-If we run on a 36bit IPA system, the default would fail. But if the user
-specified "please give me a 36bit IPA VM", we could satisfy that
-requirement and allow them to run their stupidly small guest!
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Kind regards
+Uffe
