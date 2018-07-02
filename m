@@ -1,140 +1,61 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon,  2 Jul 2018 18:58:53 -0400
-Subject: [PATCH V5 4/6] PCI: Unify try slot and bus reset API
-In-Reply-To: <1530572336-20296-1-git-send-email-okaya@codeaurora.org>
-References: <1530572336-20296-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1530572336-20296-5-git-send-email-okaya@codeaurora.org>
+From: bleung@google.com (Benson Leung)
+Date: Mon, 2 Jul 2018 16:02:26 -0700
+Subject: [PATCH 2/3] arm/arm64: configs: Remove the MFD_ prefix for
+ MFD_CROS_EC_I2C/SPI symbols.
+In-Reply-To: <CAJKOXPd51yU8-zObXszc4zJpHsGtMNFTsbQsQdKBFg=k22xZLA@mail.gmail.com>
+References: <20180702102201.13461-1-enric.balletbo@collabora.com>
+ <20180702102201.13461-3-enric.balletbo@collabora.com>
+ <CAJKOXPd51yU8-zObXszc4zJpHsGtMNFTsbQsQdKBFg=k22xZLA@mail.gmail.com>
+Message-ID: <20180702230226.GA86110@decatoncale.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Drivers are expected to call pci_try_reset_slot() or pci_try_reset_bus() by
-querying if a system supports hotplug or not. A survey showed that most
-drivers don't do this and we are leaking hotplug capability to the user.
+Hi Krzysztof,
 
-Hide pci_try_slot_reset() from drivers and embed into pci_try_bus_reset().
-Change pci_try_reset_bus() parameter from struct pci_bus to struct pci_dev.
+On Mon, Jul 02, 2018 at 01:05:40PM +0200, Krzysztof Kozlowski wrote:
+> On 2 July 2018 at 12:22, Enric Balletbo i Serra
+> <enric.balletbo@collabora.com> wrote:
+> > The cros-ec I2C and SPI transport drivers have been moved from MFD
+> > subsystem to platform/chrome, at the same time, the config symbol has
+> > been renamed and lost the MFD_ prefix, so update all configs to the new
+> > config symbol name.
+> >
+> > Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+> > ---
+> >
+> >  arch/arm/configs/exynos_defconfig   | 4 ++--
+> >  arch/arm/configs/multi_v7_defconfig | 4 ++--
+> >  arch/arm/configs/pxa_defconfig      | 4 ++--
+> >  arch/arm64/configs/defconfig        | 4 ++--
+> >  4 files changed, 8 insertions(+), 8 deletions(-)
+> 
+> Since you put in one patch multiple defconfigs belonging to multiple
+> maintainers, I assume you are pushing this through arm-soc or Russell.
+> In such case, for Exynos boards:
+> Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
+> 
+> Best regards,
+> Krzysztof
 
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- drivers/infiniband/hw/hfi1/pcie.c |  2 +-
- drivers/pci/pci.c                 | 21 ++++++++++++++++-----
- drivers/vfio/pci/vfio_pci.c       |  6 ++----
- include/linux/pci.h               |  3 +--
- 4 files changed, 20 insertions(+), 12 deletions(-)
+I was planning on creating an immutable branch for this series and merging it
+through platform/chrome.
 
-diff --git a/drivers/infiniband/hw/hfi1/pcie.c b/drivers/infiniband/hw/hfi1/pcie.c
-index 4570c4d..df4f2d3 100644
---- a/drivers/infiniband/hw/hfi1/pcie.c
-+++ b/drivers/infiniband/hw/hfi1/pcie.c
-@@ -905,7 +905,7 @@ static int trigger_sbr(struct hfi1_devdata *dd)
- 	 * delay after a reset is required.  Per spec requirements,
- 	 * the link is either working or not after that point.
- 	 */
--	return pci_try_reset_bus(dev->bus);
-+	return pci_try_reset_bus(dev);
- }
- 
- /*
-diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-index 236220c..a31e6db 100644
---- a/drivers/pci/pci.c
-+++ b/drivers/pci/pci.c
-@@ -4817,12 +4817,12 @@ int pci_reset_slot(struct pci_slot *slot)
- EXPORT_SYMBOL_GPL(pci_reset_slot);
- 
- /**
-- * pci_try_reset_slot - Try to reset a PCI slot
-+ * __pci_try_reset_slot - Try to reset a PCI slot
-  * @slot: PCI slot to reset
-  *
-  * Same as above except return -EAGAIN if the slot cannot be locked
-  */
--int pci_try_reset_slot(struct pci_slot *slot)
-+static int __pci_try_reset_slot(struct pci_slot *slot)
- {
- 	int rc;
- 
-@@ -4843,7 +4843,6 @@ int pci_try_reset_slot(struct pci_slot *slot)
- 
- 	return rc;
- }
--EXPORT_SYMBOL_GPL(pci_try_reset_slot);
- 
- static int pci_bus_reset(struct pci_bus *bus, int probe)
- {
-@@ -4906,12 +4905,12 @@ int pci_reset_bus(struct pci_bus *bus)
- EXPORT_SYMBOL_GPL(pci_reset_bus);
- 
- /**
-- * pci_try_reset_bus - Try to reset a PCI bus
-+ * __pci_try_reset_bus - Try to reset a PCI bus
-  * @bus: top level PCI bus to reset
-  *
-  * Same as above except return -EAGAIN if the bus cannot be locked
-  */
--int pci_try_reset_bus(struct pci_bus *bus)
-+static int __pci_try_reset_bus(struct pci_bus *bus)
- {
- 	int rc;
- 
-@@ -4932,6 +4931,18 @@ int pci_try_reset_bus(struct pci_bus *bus)
- 
- 	return rc;
- }
-+
-+/**
-+ * pci_try_reset_bus - Try to reset a PCI bus
-+ * @pdev: top level PCI device to reset via slot/bus
-+ *
-+ * Same as above except return -EAGAIN if the bus cannot be locked
-+ */
-+int pci_try_reset_bus(struct pci_dev *pdev)
-+{
-+	return pci_probe_reset_slot(pdev->slot) ?
-+	    __pci_try_reset_slot(pdev->slot) : __pci_try_reset_bus(pdev->bus);
-+}
- EXPORT_SYMBOL_GPL(pci_try_reset_bus);
- 
- /**
-diff --git a/drivers/vfio/pci/vfio_pci.c b/drivers/vfio/pci/vfio_pci.c
-index b423a30..71018ec 100644
---- a/drivers/vfio/pci/vfio_pci.c
-+++ b/drivers/vfio/pci/vfio_pci.c
-@@ -1010,8 +1010,7 @@ static long vfio_pci_ioctl(void *device_data,
- 						    &info, slot);
- 		if (!ret)
- 			/* User has access, do the reset */
--			ret = slot ? pci_try_reset_slot(vdev->pdev->slot) :
--				     pci_try_reset_bus(vdev->pdev->bus);
-+			ret = pci_try_reset_bus(vdev->pdev);
- 
- hot_reset_release:
- 		for (i--; i >= 0; i--)
-@@ -1373,8 +1372,7 @@ static void vfio_pci_try_bus_reset(struct vfio_pci_device *vdev)
- 	}
- 
- 	if (needs_reset)
--		ret = slot ? pci_try_reset_slot(vdev->pdev->slot) :
--			     pci_try_reset_bus(vdev->pdev->bus);
-+		ret = pci_try_reset_bus(vdev->pdev);
- 
- put_devs:
- 	for (i = 0; i < devs.cur_index; i++) {
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index 6b12ce2..f5c85b6 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -1096,10 +1096,9 @@ int pci_reset_function_locked(struct pci_dev *dev);
- int pci_try_reset_function(struct pci_dev *dev);
- int pci_probe_reset_slot(struct pci_slot *slot);
- int pci_reset_slot(struct pci_slot *slot);
--int pci_try_reset_slot(struct pci_slot *slot);
- int pci_probe_reset_bus(struct pci_bus *bus);
- int pci_reset_bus(struct pci_bus *bus);
--int pci_try_reset_bus(struct pci_bus *bus);
-+int pci_try_reset_bus(struct pci_dev *dev);
- void pci_reset_secondary_bus(struct pci_dev *dev);
- void pcibios_reset_secondary_bus(struct pci_dev *dev);
- void pci_update_resource(struct pci_dev *dev, int resno);
+Lee, Russell, Dmitry, what do you think?
+
+Benson
+
 -- 
-2.7.4
+Benson Leung
+Staff Software Engineer
+Chrome OS Kernel
+Google Inc.
+bleung at google.com
+Chromium OS Project
+bleung at chromium.org
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180702/7a33b31c/attachment.sig>
