@@ -1,126 +1,59 @@
-From: o.rempel@pengutronix.de (Oleksij Rempel)
-Date: Mon,  2 Jul 2018 08:27:55 +0200
-Subject: [PATCH v2] ARM: imx: Provide support for NXP i.MX7D Cortex-M4
-Message-ID: <20180702062755.17263-1-o.rempel@pengutronix.de>
+From: ryder.lee@mediatek.com (Ryder Lee)
+Date: Mon, 2 Jul 2018 14:48:19 +0800
+Subject: [PATCH v2 0/4] PCI: mediatek: fixup find_port, enable_msi and
+ add pm, module support
+In-Reply-To: <1530503384-1218-1-git-send-email-honghui.zhang@mediatek.com>
+References: <1530503384-1218-1-git-send-email-honghui.zhang@mediatek.com>
+Message-ID: <1530514099.6415.1.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cortex M4 part can be started from a boot loader or over
-Linux remoteproc framework.
+On Mon, 2018-07-02 at 11:49 +0800, honghui.zhang at mediatek.com wrote:
+> From: Honghui Zhang <honghui.zhang@mediatek.com>
+> 
+> This patchset includes misc patchs:
+> 
+> The first patch fixup the mtk_pcie_find_port logical which will cause system
+> could not touch the EP's configuration space which was connected to PCIe slot 1.
+> 
+> The second patch fixup the enable msi logical, the operation to enable msi
+> should be after system clock is enabled. The function of mtk_pcie_startup_port_v2's
+> define location is re-arranged to avoid mtk_pcie_enable_msi's forward declaration.
+> And call mtk_pcie_enable_msi in mtk_pcie_startup_port_v2 since the clock was all
+> enabled at that time.
+> 
+> The third patch was rebased and refactor of the v4 patch[1], changes are:
+>  -Add PM support for MT7622.
+>  -Using mtk_pcie_enable_port to re-establish the link when resumed.
+>  -Rebase on the previous two patches.
+> 
+> The fourth patch add loadable kernel module support.
+> 
+> Some of those patches was already reviewed-by Ryder Lee <ryder.lee@mediatek.com>,
+> so I just add the Reviewed-by tags in those patches.
+> 
+> [1] https://patchwork.kernel.org/patch/10479079
+> 
+> Change since v1:
+>  - A bit of code refact of the first patch suggested by Andy Shevchenko, and
+>    commit message updated.
+>  - Using __maybe_unused.
+>  - Remove the redundant list_empty check of the fourth patch.
+> 
+> Honghui Zhang (4):
+>   PCI: mediatek: fixup mtk_pcie_find_port logical
+>   PCI: mediatek: enable msi after clock enabled
+>   PCI: mediatek: Add system pm support for MT2712 and MT7622
+>   PCI: mediatek: Add loadable kernel module support
+> 
+>  drivers/pci/controller/Kconfig         |   2 +-
+>  drivers/pci/controller/pcie-mediatek.c | 289 ++++++++++++++++++++++++---------
+>  2 files changed, 213 insertions(+), 78 deletions(-)
+> 
 
-Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
----
- arch/arm/boot/dts/Makefile         |  2 +-
- arch/arm/mach-imx/Kconfig          | 33 +++++++++++++++++++-----------
- arch/arm/mach-imx/Makefile         |  3 ++-
- arch/arm/mach-imx/mach-imx7d-cm4.c | 21 +++++++++++++++++++
- 4 files changed, 45 insertions(+), 14 deletions(-)
- create mode 100644 arch/arm/mach-imx/mach-imx7d-cm4.c
+For the series:
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 7e2424957809..e3fe1bfbc404 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -539,7 +539,7 @@ dtb-$(CONFIG_SOC_IMX6UL) += \
- 	imx6ull-14x14-evk.dtb \
- 	imx6ull-colibri-eval-v3.dtb \
- 	imx6ull-colibri-wifi-eval-v3.dtb
--dtb-$(CONFIG_SOC_IMX7D) += \
-+dtb-$(CONFIG_SOC_IMX7D_CA7) += \
- 	imx7d-cl-som-imx7.dtb \
- 	imx7d-colibri-emmc-eval-v3.dtb \
- 	imx7d-colibri-eval-v3.dtb \
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index e47fa13f4b0c..5ad58b1cb4bc 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -522,18 +522,6 @@ config SOC_IMX6UL
- 	help
- 	  This enables support for Freescale i.MX6 UltraLite processor.
- 
--config SOC_IMX7D
--	bool "i.MX7 Dual support"
--	select PINCTRL_IMX7D
--	select ARM_GIC
--	select HAVE_ARM_ARCH_TIMER
--	select HAVE_IMX_ANATOP
--	select HAVE_IMX_MMDC
--	select HAVE_IMX_SRC
--	select IMX_GPCV2
--	help
--		This enables support for Freescale i.MX7 Dual processor.
--
- config SOC_LS1021A
- 	bool "Freescale LS1021A support"
- 	select ARM_GIC
-@@ -548,6 +536,27 @@ comment "Cortex-A/Cortex-M asymmetric multiprocessing platforms"
- 
- if ARCH_MULTI_V7 || ARM_SINGLE_ARMV7M
- 
-+config SOC_IMX7D_CA7
-+	bool
-+	select ARM_GIC
-+	select HAVE_ARM_ARCH_TIMER
-+	select HAVE_IMX_ANATOP
-+	select HAVE_IMX_MMDC
-+	select HAVE_IMX_SRC
-+	select IMX_GPCV2
-+
-+config SOC_IMX7D_CM4
-+	bool
-+	select ARMV7M_SYSTICK
-+
-+config SOC_IMX7D
-+	bool "i.MX7 Dual support"
-+	select PINCTRL_IMX7D
-+	select SOC_IMX7D_CA7 if ARCH_MULTI_V7
-+	select SOC_IMX7D_CM4 if ARM_SINGLE_ARMV7M
-+	help
-+		This enables support for Freescale i.MX7 Dual processor.
-+
- config SOC_VF610
- 	bool "Vybrid Family VF610 support"
- 	select ARM_GIC if ARCH_MULTI_V7
-diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index 2327e3e876d8..64ebeb6a4f30 100644
---- a/arch/arm/mach-imx/Makefile
-+++ b/arch/arm/mach-imx/Makefile
-@@ -81,7 +81,8 @@ obj-$(CONFIG_SOC_IMX6SL) += mach-imx6sl.o
- obj-$(CONFIG_SOC_IMX6SLL) += mach-imx6sl.o
- obj-$(CONFIG_SOC_IMX6SX) += mach-imx6sx.o
- obj-$(CONFIG_SOC_IMX6UL) += mach-imx6ul.o
--obj-$(CONFIG_SOC_IMX7D) += mach-imx7d.o
-+obj-$(CONFIG_SOC_IMX7D_CA7) += mach-imx7d.o
-+obj-$(CONFIG_SOC_IMX7D_CM4) += mach-imx7d-cm4.o
- 
- ifeq ($(CONFIG_SUSPEND),y)
- AFLAGS_suspend-imx6.o :=-Wa,-march=armv7-a
-diff --git a/arch/arm/mach-imx/mach-imx7d-cm4.c b/arch/arm/mach-imx/mach-imx7d-cm4.c
-new file mode 100644
-index 000000000000..c36dea79aeb8
---- /dev/null
-+++ b/arch/arm/mach-imx/mach-imx7d-cm4.c
-@@ -0,0 +1,21 @@
-+/*
-+ * Copyright 2017 Pengutronix
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <asm/v7m.h>
-+#include <asm/mach/arch.h>
-+
-+static const char * const imx7d_cm4_dt_compat[] __initconst = {
-+	"fsl,imx7d-cm4",
-+	NULL,
-+};
-+
-+DT_MACHINE_START(IMX7D, "Freescale i.MX7 Dual Cortex-M4 (Device Tree)")
-+	.dt_compat = imx7d_cm4_dt_compat,
-+	.restart = armv7m_restart,
-+MACHINE_END
--- 
-2.17.1
+Acked-by: Ryder Lee <ryder.lee@mediatek.com>
+
+
+Thanks.
