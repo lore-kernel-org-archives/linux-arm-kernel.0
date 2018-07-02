@@ -1,38 +1,153 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon,  2 Jul 2018 18:58:51 -0400
-Subject: [PATCH V5 2/6] IB/hfi1: Use pci_try_reset_bus() for initiating pci
- secondary bus reset
+Date: Mon,  2 Jul 2018 18:58:50 -0400
+Subject: [PATCH V5 1/6] PCI: Handle error return from
+ pci_reset_bridge_secondary_bus()
 In-Reply-To: <1530572336-20296-1-git-send-email-okaya@codeaurora.org>
 References: <1530572336-20296-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1530572336-20296-3-git-send-email-okaya@codeaurora.org>
+Message-ID: <1530572336-20296-2-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Getting ready to hide pci_reset_bridge_secondary_bus() from the drivers.
-pci_reset_bridge_secondary_bus() should only be used internally by the
-PCI code itself.
+commit 01fd61c0b9bd ("PCI: Add a return type for
+pci_reset_bridge_secondary_bus()") added a return value to the function to
+return if a device is accessible following a reset. Callers are not
+checking the value.
 
-Other drivers should rely on higher level pci_try_reset_bus() API.
+Pass error code up high in the stack if device is not accessible.
 
+Fixes: 01fd61c0b9bd ("PCI: Add a return type for pci_reset_bridge_secondary_bus()")
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/infiniband/hw/hfi1/pcie.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+ drivers/pci/hotplug/pciehp_hpc.c |  5 +++--
+ drivers/pci/pci.c                | 12 ++++++------
+ drivers/pci/pcie/aer.c           |  5 +++--
+ drivers/pci/pcie/err.c           |  6 ++++--
+ 4 files changed, 16 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/infiniband/hw/hfi1/pcie.c b/drivers/infiniband/hw/hfi1/pcie.c
-index 4d4371b..4570c4d 100644
---- a/drivers/infiniband/hw/hfi1/pcie.c
-+++ b/drivers/infiniband/hw/hfi1/pcie.c
-@@ -905,9 +905,7 @@ static int trigger_sbr(struct hfi1_devdata *dd)
- 	 * delay after a reset is required.  Per spec requirements,
- 	 * the link is either working or not after that point.
- 	 */
+diff --git a/drivers/pci/hotplug/pciehp_hpc.c b/drivers/pci/hotplug/pciehp_hpc.c
+index 718b607..bbaa211 100644
+--- a/drivers/pci/hotplug/pciehp_hpc.c
++++ b/drivers/pci/hotplug/pciehp_hpc.c
+@@ -728,6 +728,7 @@ int pciehp_reset_slot(struct slot *slot, int probe)
+ 	struct controller *ctrl = slot->ctrl;
+ 	struct pci_dev *pdev = ctrl_dev(ctrl);
+ 	u16 stat_mask = 0, ctrl_mask = 0;
++	int rc;
+ 
+ 	if (probe)
+ 		return 0;
+@@ -745,7 +746,7 @@ int pciehp_reset_slot(struct slot *slot, int probe)
+ 	if (pciehp_poll_mode)
+ 		del_timer_sync(&ctrl->poll_timer);
+ 
+-	pci_reset_bridge_secondary_bus(ctrl->pcie->port);
++	rc = pci_reset_bridge_secondary_bus(ctrl->pcie->port);
+ 
+ 	pcie_capability_write_word(pdev, PCI_EXP_SLTSTA, stat_mask);
+ 	pcie_write_cmd_nowait(ctrl, ctrl_mask, ctrl_mask);
+@@ -753,7 +754,7 @@ int pciehp_reset_slot(struct slot *slot, int probe)
+ 		 pci_pcie_cap(ctrl->pcie->port) + PCI_EXP_SLTCTL, ctrl_mask);
+ 	if (pciehp_poll_mode)
+ 		int_poll_timeout(&ctrl->poll_timer);
+-	return 0;
++	return rc;
+ }
+ 
+ int pcie_init_notification(struct controller *ctrl)
+diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+index 97acba7..98d1490 100644
+--- a/drivers/pci/pci.c
++++ b/drivers/pci/pci.c
+@@ -4253,9 +4253,7 @@ static int pci_parent_bus_reset(struct pci_dev *dev, int probe)
+ 	if (probe)
+ 		return 0;
+ 
 -	pci_reset_bridge_secondary_bus(dev->bus->self);
 -
 -	return 0;
-+	return pci_try_reset_bus(dev->bus);
++	return pci_reset_bridge_secondary_bus(dev->bus->self);
  }
  
- /*
+ static int pci_reset_hotplug_slot(struct hotplug_slot *hotplug, int probe)
+@@ -4850,6 +4848,8 @@ EXPORT_SYMBOL_GPL(pci_try_reset_slot);
+ 
+ static int pci_bus_reset(struct pci_bus *bus, int probe)
+ {
++	int ret;
++
+ 	if (!bus->self || !pci_bus_resetable(bus))
+ 		return -ENOTTY;
+ 
+@@ -4860,11 +4860,11 @@ static int pci_bus_reset(struct pci_bus *bus, int probe)
+ 
+ 	might_sleep();
+ 
+-	pci_reset_bridge_secondary_bus(bus->self);
++	ret = pci_reset_bridge_secondary_bus(bus->self);
+ 
+ 	pci_bus_unlock(bus);
+ 
+-	return 0;
++	return ret;
+ }
+ 
+ /**
+@@ -4924,7 +4924,7 @@ int pci_try_reset_bus(struct pci_bus *bus)
+ 
+ 	if (pci_bus_trylock(bus)) {
+ 		might_sleep();
+-		pci_reset_bridge_secondary_bus(bus->self);
++		rc = pci_reset_bridge_secondary_bus(bus->self);
+ 		pci_bus_unlock(bus);
+ 	} else
+ 		rc = -EAGAIN;
+diff --git a/drivers/pci/pcie/aer.c b/drivers/pci/pcie/aer.c
+index a2e8838..bde723d 100644
+--- a/drivers/pci/pcie/aer.c
++++ b/drivers/pci/pcie/aer.c
+@@ -1305,6 +1305,7 @@ static pci_ers_result_t aer_root_reset(struct pci_dev *dev)
+ {
+ 	u32 reg32;
+ 	int pos;
++	int rc;
+ 
+ 	pos = dev->aer_cap;
+ 
+@@ -1313,7 +1314,7 @@ static pci_ers_result_t aer_root_reset(struct pci_dev *dev)
+ 	reg32 &= ~ROOT_PORT_INTR_ON_MESG_MASK;
+ 	pci_write_config_dword(dev, pos + PCI_ERR_ROOT_COMMAND, reg32);
+ 
+-	pci_reset_bridge_secondary_bus(dev);
++	rc = pci_reset_bridge_secondary_bus(dev);
+ 	pci_printk(KERN_DEBUG, dev, "Root Port link has been reset\n");
+ 
+ 	/* Clear Root Error Status */
+@@ -1325,7 +1326,7 @@ static pci_ers_result_t aer_root_reset(struct pci_dev *dev)
+ 	reg32 |= ROOT_PORT_INTR_ON_MESG_MASK;
+ 	pci_write_config_dword(dev, pos + PCI_ERR_ROOT_COMMAND, reg32);
+ 
+-	return PCI_ERS_RESULT_RECOVERED;
++	return rc ? PCI_ERS_RESULT_DISCONNECT : PCI_ERS_RESULT_RECOVERED;
+ }
+ 
+ /**
+diff --git a/drivers/pci/pcie/err.c b/drivers/pci/pcie/err.c
+index f7ce0cb..03075cf 100644
+--- a/drivers/pci/pcie/err.c
++++ b/drivers/pci/pcie/err.c
+@@ -175,9 +175,11 @@ static int report_resume(struct pci_dev *dev, void *data)
+  */
+ static pci_ers_result_t default_reset_link(struct pci_dev *dev)
+ {
+-	pci_reset_bridge_secondary_bus(dev);
++	int rc;
++
++	rc = pci_reset_bridge_secondary_bus(dev);
+ 	pci_printk(KERN_DEBUG, dev, "downstream link has been reset\n");
+-	return PCI_ERS_RESULT_RECOVERED;
++	return rc ? PCI_ERS_RESULT_DISCONNECT : PCI_ERS_RESULT_RECOVERED;
+ }
+ 
+ static pci_ers_result_t reset_link(struct pci_dev *dev, u32 service)
 -- 
 2.7.4
