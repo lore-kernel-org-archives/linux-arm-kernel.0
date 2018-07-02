@@ -1,35 +1,27 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 2 Jul 2018 14:37:48 +0200
-Subject: [PATCH v3 1/8] dt-bindings: tegra186-hsp: Add shared interrupts
-In-Reply-To: <20180702114033.15654-2-mperttunen@nvidia.com>
-References: <20180702114033.15654-1-mperttunen@nvidia.com>
- <20180702114033.15654-2-mperttunen@nvidia.com>
-Message-ID: <20180702123748.GA13096@ulmo>
+Date: Mon, 2 Jul 2018 14:38:58 +0200
+Subject: [PATCH 2/5] gpio: tegra186: Add support for Tegra194
+In-Reply-To: <CACRpkdY899HBsj4BAtVGXj7=KLhpJmLYzKLmyDL3TcJjp8a6SA@mail.gmail.com>
+References: <20180620125406.11906-1-mperttunen@nvidia.com>
+ <20180620125406.11906-2-mperttunen@nvidia.com>
+ <CACRpkdY899HBsj4BAtVGXj7=KLhpJmLYzKLmyDL3TcJjp8a6SA@mail.gmail.com>
+Message-ID: <20180702123858.GB13096@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 02, 2018 at 02:40:26PM +0300, Mikko Perttunen wrote:
-> HSP interrupts can be routed through exposed "shared interrupts". These
-> interrupts can be mapped to various internal interrupt lines. Add
-> interrupt properties for shared interrupts to the tegra186-hsp device
-> tree bindings.
+On Fri, Jun 29, 2018 at 10:14:12AM +0200, Linus Walleij wrote:
+> On Wed, Jun 20, 2018 at 2:54 PM Mikko Perttunen <mperttunen@nvidia.com> wrote:
 > 
-> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
-> Acked-by: Jon Hunter <jonathanh@nvidia.com>
-> Reviewed-by: Rob Herring <robh@kernel.org>
-> ---
+> > Add support for the Tegra194 GPIO bank configuration.
+> >
+> > Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
 > 
-> Notes:
->     v2:
->     - Edited commit message to not say that doorbell interrupts cannot be
->       routed to shared interrupts.
->     - Added tegra194 compatibility string.
->     
->     v3:
->     - Added Jon's A-b and Rob's R-b
-> 
->  Documentation/devicetree/bindings/mailbox/nvidia,tegra186-hsp.txt | 3 +++
->  1 file changed, 3 insertions(+)
+> Patch applied as pretty straight forward.
+> I don't think Thierry would mind, in worst case I can revert
+> it.
+
+Sorry for not getting back sooner, I was out sick last week. I don't
+mind at all, so for what it's worth:
 
 Acked-by: Thierry Reding <treding@nvidia.com>
 -------------- next part --------------
@@ -38,4 +30,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180702/3a5c8a64/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180702/56e57beb/attachment.sig>
