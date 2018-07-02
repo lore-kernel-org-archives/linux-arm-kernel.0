@@ -1,38 +1,28 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 2 Jul 2018 15:17:32 +0200
-Subject: [PATCH v3 0/2] mmc: sdhci-of-arasan: workaround for broken clocks
-In-Reply-To: <cover.1529493667.git.h.grohne@intenta.de>
-References: <20180615081830.zrgx6arwn6ga27gu@laureti-dev>
- <cover.1529493667.git.h.grohne@intenta.de>
-Message-ID: <CAPDyKFp518uXGyiXL2_ejzHnyCN0RSQDvjCDxNg+_pqw9VANUw@mail.gmail.com>
+From: vkoul@kernel.org (Vinod)
+Date: Mon, 2 Jul 2018 18:47:37 +0530
+Subject: [PATCH v5 0/7] add virt-dma support for imx-sdma
+In-Reply-To: <1530527489.15665.22.camel@nxp.com>
+References: <1529427424-12321-1-git-send-email-yibin.gong@nxp.com>
+ <1530025442.9910.44.camel@pengutronix.de>
+ <1530527489.15665.22.camel@nxp.com>
+Message-ID: <20180702131737.GJ22377@vkoul-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 June 2018 at 13:32, Helmut Grohne <h.grohne@intenta.de> wrote:
-> This patch series works around the internal clock indicating stability too
-> quickly to operate. It manifests itself as:
->
->     mmc0: error -84 whilst initialising SD card
->
-> Changes since v2:
->  * Ulf Hansson requested splitting the patch in accordance with
->    Documentation/devicetree/bindings/submitting-patches.txt. Also update
->    recipient list accordingly.
->  * Added Acked-by from Adrian Hunter.
->
-> Helmut Grohne (2):
->   dt-bindings: mmc: broken clock stable indicator on arasan controllers
->   mmc: sdhci-of-arasan: Add quirk for unstable clocks
->
->  Documentation/devicetree/bindings/mmc/arasan,sdhci.txt |  2 ++
->  drivers/mmc/host/sdhci-of-arasan.c                     | 16 ++++++++++++++++
->  2 files changed, 18 insertions(+)
->
-> --
-> 2.11.0
->
+On 02-07-18, 02:32, Robin Gong wrote:
+> Hi Vinod,
+> 	Do you have any comment for this patchset? Lucas and Sascha
+> acked it and tty patch already merged in.
 
-Thanks, applied for next!
+I was actually waiting for ACK/action on patch 1 :)
 
-Kind regards
-Uffe
+I have reviewed the series, some nitpicks nothing major, so I have
+applied this good cleanup and conversion :) along with fixes for typos
+in code, GFP_ fix and removed unused variable.
+
+My buildchain noticed warns (with W=1) on this file, esp now that
+structs are moved around. Pls fix the struct descriptions.
+
+Thanks
+-- 
+~Vinod
