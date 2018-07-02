@@ -1,66 +1,36 @@
-From: eugenis@google.com (Evgenii Stepanov)
-Date: Mon, 2 Jul 2018 13:22:23 -0700
-Subject: [PATCH v4 00/17] khwasan: kernel hardware assisted address
- sanitizer
-In-Reply-To: <20180702122112.267261b1e1609cf522753cf3@linux-foundation.org>
-References: <cover.1530018818.git.andreyknvl@google.com>
- <20180627160800.3dc7f9ee41c0badbf7342520@linux-foundation.org>
- <CAAeHK+xz552VNpZxgWwU-hbTqF5_F6YVDw3fSv=4OT8mNrqPzg@mail.gmail.com>
- <20180628124039.8a42ab5e2994fb2876ff4f75@linux-foundation.org>
- <CAAeHK+xsBOKghUp9XhpfXGqU=gjSYuy3G2GH14zWNEmaLPy8_w@mail.gmail.com>
- <20180629194117.01b2d31e805808eee5c97b4d@linux-foundation.org>
- <CAFKCwrjxGEa6CLJnjmNy+92d2GSUkoymQ6Sm91CDpMZcJCcWCA@mail.gmail.com>
- <20180702122112.267261b1e1609cf522753cf3@linux-foundation.org>
-Message-ID: <CAFKCwri_W8qEw-qMs+gXGqMGdZO82WpCiVpzcG4kinEyL7+zGg@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 2 Jul 2018 14:25:40 -0600
+Subject: [PATCH 12/15] arm: dts: highbank: Add missing OPP properties for
+ CPUs
+In-Reply-To: <f8a4e5c3062397736475ec599de730206846cb9b.1527244201.git.viresh.kumar@linaro.org>
+References: <cover.1527244200.git.viresh.kumar@linaro.org>
+ <f8a4e5c3062397736475ec599de730206846cb9b.1527244201.git.viresh.kumar@linaro.org>
+Message-ID: <CAL_JsqJRKMREfJ8LoDfuda8BU3g5Eq1AX5cPZGzO3uN3vUhrAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 2, 2018 at 12:21 PM, Andrew Morton
-<akpm@linux-foundation.org> wrote:
-> On Mon, 2 Jul 2018 12:16:42 -0700 Evgenii Stepanov <eugenis@google.com> wrote:
+On Fri, May 25, 2018 at 4:32 AM Viresh Kumar <viresh.kumar@linaro.org> wrote:
 >
->> On Fri, Jun 29, 2018 at 7:41 PM, Andrew Morton
->> <akpm@linux-foundation.org> wrote:
->> > On Fri, 29 Jun 2018 14:45:08 +0200 Andrey Konovalov <andreyknvl@google.com> wrote:
->> >
->> >> >> What kind of memory consumption testing would you like to see?
->> >> >
->> >> > Well, 100kb or so is a teeny amount on virtually any machine.  I'm
->> >> > assuming the savings are (much) more significant once the machine gets
->> >> > loaded up and doing work?
->> >>
->> >> So with clean kernel after boot we get 40 kb memory usage. With KASAN
->> >> it is ~120 kb, which is 200% overhead. With KHWASAN it's 50 kb, which
->> >> is 25% overhead. This should approximately scale to any amounts of
->> >> used slab memory. For example with 100 mb memory usage we would get
->> >> +200 mb for KASAN and +25 mb with KHWASAN. (And KASAN also requires
->> >> quarantine for better use-after-free detection). I can explicitly
->> >> mention the overhead in %s in the changelog.
->> >>
->> >> If you think it makes sense, I can also make separate measurements
->> >> with some workload. What kind of workload should I use?
->> >
->> > Whatever workload people were running when they encountered problems
->> > with KASAN memory consumption ;)
->> >
->> > I dunno, something simple.  `find / > /dev/null'?
->> >
->>
->> Looking at a live Android device under load, slab (according to
->> /proc/meminfo) + kernel stack take 8-10% available RAM (~350MB).
->> Kasan's overhead of 2x - 3x on top of it is not insignificant.
->>
+> The OPP properties, like "operating-points", should either be present
+> for all the CPUs of a cluster or none. If these are present only for a
+> subset of CPUs of a cluster then things will start falling apart as soon
+> as the CPUs are brought online in a different order. For example, this
+> will happen because the operating system looks for such properties in
+> the CPU node it is trying to bring up, so that it can create an OPP
+> table.
 >
-> (top-posting repaired.  Please don't)
+> Add such missing properties.
 >
-> For a debugging, not-for-production-use feature, that overhead sounds
-> quite acceptable to me.  What problems is it known to cause?
+> Fix other missing property (clock latency) as well to make it all
+> work.
+>
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> ---
+>  arch/arm/boot/dts/highbank.dts | 30 ++++++++++++++++++++++++++++++
+>  1 file changed, 30 insertions(+)
 
-Not having this overhead enables near-production use - ex. running
-kasan/khasan kernel on a personal, daily-use device to catch bugs that
-do not reproduce in test configuration. These are the ones that often
-cost the most engineering time to track down.
+Acked-by: Rob Herring <robh@kernel.org>
 
-CPU overhead is bad, but generally tolerable. RAM is critical, in our
-experience. Once it gets low enough, OOM-killer makes your life
-miserable.
+ARM-SOC maintainers, Please apply this.
+
+Rob
