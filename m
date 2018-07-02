@@ -1,47 +1,108 @@
 From: yibin.gong@nxp.com (Robin Gong)
-Date: Mon, 2 Jul 2018 02:12:52 +0000
-Subject: [PATCH v1] ARM: dts: imx6sl-evk: keep sw4 always on
-In-Reply-To: <CAOMZO5BdtxKjQge5ONpnjr1yNVeTJf4u8Gh-fPqpHz7G9ipOTg@mail.gmail.com>
-References: <1529930051-14122-1-git-send-email-yibin.gong@nxp.com>
- <20180701093402.GN4348@dragon>
- <CAOMZO5BjOEGWv2dC-bp0BYHq+PhLssEKic+o7ock8_1Dobd=sQ@mail.gmail.com>
- <AM3PR04MB131507901BFEE1A5E426EECBF5430@AM3PR04MB1315.eurprd04.prod.outlook.com>
- <CAOMZO5D8tjnjbwMdLGd7KF7_4PwqRWX8XH8kdcF3-5e-r2YQEA@mail.gmail.com>
- <AM3PR04MB1315E7AED2BCE2265E6C443DF5430@AM3PR04MB1315.eurprd04.prod.outlook.com>
- <CAOMZO5D8v4KM9S4ooHTDbA+vc8BZN_eO_wDuOPA+8Hcq-SmLDw@mail.gmail.com>
- <AM3PR04MB1315C7C7CFF990615732FFBCF5430@AM3PR04MB1315.eurprd04.prod.outlook.com>
- <CAOMZO5AM5VRS7UiWuvAQ8vvTB8OM+iwofuYrbsL_yB9e0Z9Kyg@mail.gmail.com>
- <AM3PR04MB13155B8D567ABEF7EF03249AF5430@AM3PR04MB1315.eurprd04.prod.outlook.com>
- <CAOMZO5BdtxKjQge5ONpnjr1yNVeTJf4u8Gh-fPqpHz7G9ipOTg@mail.gmail.com>
-Message-ID: <1530526335.15665.13.camel@nxp.com>
+Date: Mon, 2 Jul 2018 02:32:05 +0000
+Subject: [PATCH v5 0/7] add virt-dma support for imx-sdma
+In-Reply-To: <1530025442.9910.44.camel@pengutronix.de>
+References: <1529427424-12321-1-git-send-email-yibin.gong@nxp.com>
+ <1530025442.9910.44.camel@pengutronix.de>
+Message-ID: <1530527489.15665.22.camel@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On ?, 2018-07-01 at 22:17 -0300, Fabio Estevam wrote:
-> On Sun, Jul 1, 2018 at 10:09 PM, Anson Huang <anson.huang@nxp.com>
-> wrote:
+Hi Vinod,
+	Do you have any comment for this patchset? Lucas and Sascha
+acked it and tty patch already merged in.
+
+On ?, 2018-06-26 at 17:04 +0200, Lucas Stach wrote:
+> Hi Robin,
 > 
+> I've tested this whole series with the SDMA being used for SPI, UART
+> and SSI with no regressions spotted. As this should cover most common
+> use-cases, I think this series is good to go in.
+> 
+> Tested-by: Lucas Stach <l.stach@pengutronix.de>
+> 
+> Regards,
+> Lucas
+> 
+> Am Mittwoch, den 20.06.2018, 00:56 +0800 schrieb Robin Gong:
 > > 
-> > On some new i.MX platforms, PFuze switches are used for supplying
-> > GPU/VPU
-> > or other non-critical modules only, these switches need to be
-> > turned off by
-> > runtime PM to avoid very high power leakage, like on mScale850D.
-> Ok, in this case I suggest adding a new property so that the switches
-> can be turned off only when the new property is present.
-> 
-> When this new property is absent, then we keep the current behavior
-> and avoid dtb breakage.
-> 
-> Since MX8M support is not in place yet, this is not urgent, so I will
-> send a revert and then you can re-work the patch so that it does not
-> affect the old dtbs.
-> 
-> Do you agree with such approach?
-But in fact, the original dts is not correct without 'regulator-always-
-on'since SW4 is the critical DDR power rail, although, it's kept on in
-the previous kernel by no switches enable/disable interfaces provided
-in pfuze driver. Adding new property which can be done totally by the
-common 'regulator-always-on' is not a good choice. Keep the dts patch
-adding 'regulator-always-on' ahead of pfuze driver pach adding
-enable/disable interface is enough for such case I think.?
+> > The legacy sdma driver has below limitations or drawbacks:
+> > ? 1. Hardcode the max BDs number as "PAGE_SIZE / sizeof(*)", and
+> > alloc
+> > ?????one page size for one channel regardless of only few BDs
+> > needed
+> > ?????most time. But in few cases, the max PAGE_SIZE maybe not
+> > enough.
+> > ? 2. One SDMA channel can't stop immediatley once channel disabled
+> > which
+> > ?????means SDMA interrupt may come in after this channel
+> > terminated.There
+> > ?????are some patches for this corner case such as commit
+> > "2746e2c389f9",
+> > ?????but not cover non-cyclic.
+> > 
+> > The common virt-dma overcomes the above limitations. It can alloc
+> > bd
+> > dynamically and free bd once this tx transfer done. No memory
+> > wasted or
+> > maximum limititation here, only depends on how many memory can be
+> > requested
+> > from kernel. For No.2, such issue can be workaround by checking if
+> > there
+> > is available descript("sdmac->desc") now once the unwanted
+> > interrupt
+> > coming. At last the common virt-dma is easier for sdma driver
+> > maintain.
+> > 
+> > Change from v4:
+> > ? 1. identify lockdep issue which caused by allocate memory with
+> > ?????'GFP_KERNEL', change to 'GFP_NOWAIT' instead so that lockdep
+> > ?????ignore check. That also make sense since Audio/uart driver may
+> > ?????call dma function after spin_lock_irqsave()...
+> > ? 2. use dma pool instead for bd description allocated,since audio
+> > ?????driver may call dma_terminate_all in irq. Please refer to 7/7.
+> > ? 3. remove 7/7 serial patch in v4, since lockdep issued fixed by
+> > No.1?
+> > 
+> > Change from v3:
+> > ? 1. add two uart patches which impacted by this patchset.
+> > ? 2. unlock 'vc.lock' before cyclic dma callback and lock again
+> > after
+> > ?????it because some driver such as uart will call
+> > dmaengine_tx_status
+> > ?????which will acquire 'vc.lock' again and dead lock comes out.
+> > ? 3. remove 'Revert commit' stuff since that patch is not wrong and
+> > ?????combine two patch into one patch as Sascha's comment.
+> > 
+> > Change from v2:
+> > ? 1. include Sascha's patch to make the main patch easier to
+> > review.
+> > ?????Thanks Sacha.
+> > ? 2. remove useless 'desc'/'chan' in struct sdma_channe.
+> > 
+> > Change from v1:
+> > ? 1. split v1 patch into 5 patches.
+> > ? 2. remove some unnecessary condition check.
+> > ? 3. remove unnecessary 'pending' list.
+> > 
+> > Robin Gong (6):
+> > ? tty: serial: imx: correct dma cookie status
+> > ? dmaengine: imx-sdma: add virt-dma support
+> > ? dmaengine: imx-sdma: remove useless 'lock' and 'enabled' in
+> > 'struct
+> > ????sdma_channel'
+> > ? dmaengine: imx-sdma: remove the maximum limitation for bd numbers
+> > ? dmaengine: imx-sdma: add sdma_transfer_init to decrease code
+> > overlap
+> > ? dmaengine: imx-sdma: alloclate bd memory from dma pool
+> > 
+> > Sascha Hauer (1):
+> > ? dmaengine: imx-sdma: factor out a struct sdma_desc from struct
+> > ????sdma_channel
+> > 
+> > ?drivers/dma/Kconfig??????|???1 +
+> > ?drivers/dma/imx-sdma.c???| 400 +++++++++++++++++++++++++++------
+> > --------------
+> > ?drivers/tty/serial/imx.c |???2 +-
+> > ?3 files changed, 235 insertions(+), 168 deletions(-)
+> > 
