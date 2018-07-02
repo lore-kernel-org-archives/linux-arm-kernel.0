@@ -1,46 +1,57 @@
-From: contact@paulk.fr (Paul Kocialkowski)
-Date: Mon,  2 Jul 2018 11:16:59 +0200
-Subject: [PATCH] arm64: Use aarch64elf and aarch64elfb emulation mode variants
-Message-ID: <20180702091659.17571-1-contact@paulk.fr>
+From: liwei213@huawei.com (Li Wei)
+Date: Mon, 2 Jul 2018 17:35:43 +0800
+Subject: [PATCH v11 0/4] scsi: ufs: add ufs driver code for Hisilicon Hi3660
+ SoC
+Message-ID: <20180702093547.39507-1-liwei213@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The aarch64linux and aarch64linuxb emulation modes are not supported by
-bare-metal toolchains and Linux using them forbids building the kernel
-with these toolchains.
+This patchset adds driver support for UFS for Hi3660 SoC. It is verified on HiKey960 board.
 
-Since there is apparently no reason to target these emulation modes, the
-more generic elf modes are used instead, allowing to build on bare-metal
-toolchains as well as the already-supported ones.
+Li Wei (4):
+  scsi: ufs: add Hisilicon ufs driver code
+  dt-bindings: scsi: ufs: add document for hisi-ufs
+  arm64: dts: add ufs dts node
+  arm64: defconfig: enable configs for Hisilicon ufs
 
-Fixes: 3d6a7b99e3fa ("arm64: ensure the kernel is compiled for LP64")
+ Documentation/devicetree/bindings/ufs/ufs-hisi.txt |  41 ++
+ .../devicetree/bindings/ufs/ufshcd-pltfrm.txt      |  10 +-
+ arch/arm64/boot/dts/hisilicon/hi3660.dtsi          |  18 +
+ arch/arm64/configs/defconfig                       |   1 +
+ drivers/scsi/ufs/Kconfig                           |   9 +
+ drivers/scsi/ufs/Makefile                          |   1 +
+ drivers/scsi/ufs/ufs-hisi.c                        | 619 +++++++++++++++++++++
+ drivers/scsi/ufs/ufs-hisi.h                        | 115 ++++
+ 8 files changed, 811 insertions(+), 3 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/ufs/ufs-hisi.txt
+ create mode 100644 drivers/scsi/ufs/ufs-hisi.c
+ create mode 100644 drivers/scsi/ufs/ufs-hisi.h
 
-Cc: stable at vger.kernel.org
-Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
----
- arch/arm64/Makefile | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-index 87f7d2f9f17c..3e959ac43b40 100644
---- a/arch/arm64/Makefile
-+++ b/arch/arm64/Makefile
-@@ -67,14 +67,14 @@ KBUILD_CPPFLAGS	+= -mbig-endian
- CHECKFLAGS	+= -D__AARCH64EB__
- AS		+= -EB
- LD		+= -EB
--LDFLAGS		+= -maarch64linuxb
-+LDFLAGS		+= -maarch64elfb
- UTS_MACHINE	:= aarch64_be
- else
- KBUILD_CPPFLAGS	+= -mlittle-endian
- CHECKFLAGS	+= -D__AARCH64EL__
- AS		+= -EL
- LD		+= -EL
--LDFLAGS		+= -maarch64linux
-+LDFLAGS		+= -maarch64elf
- UTS_MACHINE	:= aarch64
- endif
- 
+Major changes in v11:
+ - solve review comments from John Stultz.
+  *include Rob Herring's Reviewed-by tag to the dt-binding patch.
+  *drop the defconfig changes, such as f2fs and squashfs related.
+Major changes in v10:
+ - solve review comments from Rob Herring.
+   *Modify the "reset-names" describe in ufs-hisi.txt binding file.
+   *List clocks in ufs-hisi.txt binding file.
+   *remove the "arst" and keep only "rst" in the binging files.
+   *remove the "arst" member from both dts and c code. 
+Major changes in v9:
+ - solve review comments from Rob Herring.
+   *remove freq-table-hz in ufs-hisi.txt binding file.
+   *Move the rst to the ufshcd_pltfm.txt common binding file.
+   *Modify the member "assert" of UFS host structure to "arst".
+Major changes in v8:
+ - solve review comments from zhangfei.
+   *Add Version history.
+ - solve review comments from Rob Herring.
+   *remove freq-table-hz.
+ -  solve review comments from Riku Voipio.
+   *Add MODULE_DEVICE_TABLE for ufs driver.
 -- 
-2.17.1
+Major changes in v7:
+ - solve review comments from Philippe Ombredanne.
+   *use the new SPDX license ids instead of the GNU General Public License.
+-- 
+2.15.0
