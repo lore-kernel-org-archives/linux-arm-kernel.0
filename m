@@ -1,44 +1,115 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 2 Jul 2018 10:09:41 -0700
-Subject: [GIT PULL] Renesas ARM64 Based SoC DT Updates for v4.19
-In-Reply-To: <cover.1529933747.git.horms+renesas@verge.net.au>
-References: <cover.1529933747.git.horms+renesas@verge.net.au>
-Message-ID: <CAOesGMhZD0VS+NbZhgJOqhpP5A5X_pXVfUdkUnGmqLbnagJZaA@mail.gmail.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Mon, 2 Jul 2018 10:15:27 -0700
+Subject: [PATCH] KVM: arm64: vgic-its: Remove VLA usage
+In-Reply-To: <19f9ddb1-6009-850c-1949-3a8cdacdd2fc@redhat.com>
+References: <20180629184618.GA37364@beast>
+ <19f9ddb1-6009-850c-1949-3a8cdacdd2fc@redhat.com>
+Message-ID: <CAGXu5jJcqMX7HjvgqcR37jnuN48PtyHd+VVmfcQH6YfXXSpO_g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 25, 2018 at 7:03 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
+On Mon, Jul 2, 2018 at 12:36 AM, Auger Eric <eric.auger@redhat.com> wrote:
+> Hi Kees,
 >
-> Please consider these Renesas ARM64 based SoC DT updates for v4.19.
->
->
-> The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
->
->   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
->
-> are available in the git repository at:
->
->   https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm64-dt-for-v4.19
->
-> for you to fetch changes up to 6b284a81307848b4331453b02cf7a33c09719d4b:
->
->   arm64: dts: renesas: r8a77995: Add MSIOF device nodes (2018-06-25 15:30:39 +0200)
+> On 06/29/2018 08:46 PM, Kees Cook wrote:
+>> In the quest to remove all stack VLA usage from the kernel[1], this
+>> switches to using a maximum size and adds sanity checks. Additionally
+>> cleans up some of the int-vs-u32 usage and adds additional bounds checking.
+>> As it currently stands, this will always be 8 bytes until the ABI changes.
+>>
+>> [1] https://lkml.kernel.org/r/CA+55aFzCG-zNmZwX4A2FQpadafLfEzK6CC=qPXydAacU1RqZWA at mail.gmail.com
+>>
+>> Cc: Christoffer Dall <christoffer.dall@arm.com>
+>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>> Cc: Eric Auger <eric.auger@redhat.com>
+>> Cc: Andre Przywara <andre.przywara@arm.com>
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> Cc: kvmarm at lists.cs.columbia.edu
+>> Signed-off-by: Kees Cook <keescook@chromium.org>
+>> ---
+>>  virt/kvm/arm/vgic/vgic-its.c | 19 +++++++++++++++----
+>>  1 file changed, 15 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+>> index 4ed79c939fb4..3143fc047fcf 100644
+>> --- a/virt/kvm/arm/vgic/vgic-its.c
+>> +++ b/virt/kvm/arm/vgic/vgic-its.c
+>> @@ -168,8 +168,14 @@ struct vgic_its_abi {
+>>       int (*commit)(struct vgic_its *its);
+>>  };
+>>
+>> +#define ABI_0_ESZ    8
+>> +#define ESZ_MAX              ABI_0_ESZ
+>> +
+>>  static const struct vgic_its_abi its_table_abi_versions[] = {
+>> -     [0] = {.cte_esz = 8, .dte_esz = 8, .ite_esz = 8,
+>> +     [0] = {
+>> +      .cte_esz = ABI_0_ESZ,
+>> +      .dte_esz = ABI_0_ESZ,
+>> +      .ite_esz = ABI_0_ESZ,
+>>        .save_tables = vgic_its_save_tables_v0,
+>>        .restore_tables = vgic_its_restore_tables_v0,
+>>        .commit = vgic_its_commit_v0,
+>> @@ -180,10 +186,12 @@ static const struct vgic_its_abi its_table_abi_versions[] = {
+>>
+>>  inline const struct vgic_its_abi *vgic_its_get_abi(struct vgic_its *its)
+>>  {
+>> +     if (WARN_ON(its->abi_rev >= NR_ITS_ABIS))
+>> +             return NULL;
+>>       return &its_table_abi_versions[its->abi_rev];
+>>  }
+>>
+>> -int vgic_its_set_abi(struct vgic_its *its, int rev)
+>> +static int vgic_its_set_abi(struct vgic_its *its, u32 rev)
+>>  {
+> if vgic_its_get_abi is likely to return NULL, don't we need to check abi
+> != NULL in all call sites.
 
-Thanks, merged into next/dt.
+My thinking was that since it should never happen, a WARN_ON would be
+sufficient. But I can drop all these changes if you want. I just
+wanted to see the VLA removed. :)
 
-I think you can still collapse some commits a bit further, for example
-when a large number of devices are added to a new SoC, you don't need
-a commit per device (i.e. the r8a77980 series).
+-Kees
 
-It's not a problem if it's just a few, but like last merge window when
-it really added to a lot of small trivial patches it's adding noise to
-someone looking at changelogs -- it's harder to get a feel for what
-new things are going in on a larger scope. Keep in mind that you, as
-maintainer, should feel free to squash together patches when you apply
-them if it makes sense -- just make sure you retain authorship and
-credits/COO.
+>
+> abi_rev is actually set by vgic_its_set_abi() which is actually called
+> by vgic_mmio_uaccess_write_its_iidr() and vgic_its_create().
+>
+> Only vgic_mmio_uaccess_write_its_iidr allows the userspace to overwrite
+> the default abi_rev. At this point a check against NR_ITS_ABIS is
+> already done. So to me the check is done at the source?
+>
+> Thanks
+>
+> Eric
+>>       const struct vgic_its_abi *abi;
+>>
+>> @@ -1881,16 +1889,19 @@ typedef int (*entry_fn_t)(struct vgic_its *its, u32 id, void *entry,
+>>   * Return: < 0 on error, 0 if last element was identified, 1 otherwise
+>>   * (the last element may not be found on second level tables)
+>>   */
+>> -static int scan_its_table(struct vgic_its *its, gpa_t base, int size, int esz,
+>> +static int scan_its_table(struct vgic_its *its, gpa_t base, int size, u32 esz,
+>>                         int start_id, entry_fn_t fn, void *opaque)
+>>  {
+>>       struct kvm *kvm = its->dev->kvm;
+>>       unsigned long len = size;
+>>       int id = start_id;
+>>       gpa_t gpa = base;
+>> -     char entry[esz];
+>> +     char entry[ESZ_MAX];
+>>       int ret;
+>>
+>> +     if (WARN_ON(esz > ESZ_MAX))
+>> +             return -EINVAL;
+>> +
+>>       memset(entry, 0, esz);
+>>
+>>       while (len > 0) {
+>>
 
 
--Olof
+
+-- 
+Kees Cook
+Pixel Security
