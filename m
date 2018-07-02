@@ -1,61 +1,117 @@
-From: bleung@google.com (Benson Leung)
-Date: Mon, 2 Jul 2018 16:02:26 -0700
-Subject: [PATCH 2/3] arm/arm64: configs: Remove the MFD_ prefix for
- MFD_CROS_EC_I2C/SPI symbols.
-In-Reply-To: <CAJKOXPd51yU8-zObXszc4zJpHsGtMNFTsbQsQdKBFg=k22xZLA@mail.gmail.com>
-References: <20180702102201.13461-1-enric.balletbo@collabora.com>
- <20180702102201.13461-3-enric.balletbo@collabora.com>
- <CAJKOXPd51yU8-zObXszc4zJpHsGtMNFTsbQsQdKBFg=k22xZLA@mail.gmail.com>
-Message-ID: <20180702230226.GA86110@decatoncale.mtv.corp.google.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Mon,  2 Jul 2018 18:58:54 -0400
+Subject: [PATCH V5 5/6] PCI: Deprecate pci_reset_bus() and pci_reset_slot()
+ functions
+In-Reply-To: <1530572336-20296-1-git-send-email-okaya@codeaurora.org>
+References: <1530572336-20296-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <1530572336-20296-6-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+pci_reset_bus() and pci_reset_slot() functions are not being used by
+any code. Remove them from the kernel in favor of pci_try_reset_bus()
+and pci_try_reset_slot() functions.
 
-On Mon, Jul 02, 2018 at 01:05:40PM +0200, Krzysztof Kozlowski wrote:
-> On 2 July 2018 at 12:22, Enric Balletbo i Serra
-> <enric.balletbo@collabora.com> wrote:
-> > The cros-ec I2C and SPI transport drivers have been moved from MFD
-> > subsystem to platform/chrome, at the same time, the config symbol has
-> > been renamed and lost the MFD_ prefix, so update all configs to the new
-> > config symbol name.
-> >
-> > Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
-> > ---
-> >
-> >  arch/arm/configs/exynos_defconfig   | 4 ++--
-> >  arch/arm/configs/multi_v7_defconfig | 4 ++--
-> >  arch/arm/configs/pxa_defconfig      | 4 ++--
-> >  arch/arm64/configs/defconfig        | 4 ++--
-> >  4 files changed, 8 insertions(+), 8 deletions(-)
-> 
-> Since you put in one patch multiple defconfigs belonging to multiple
-> maintainers, I assume you are pushing this through arm-soc or Russell.
-> In such case, for Exynos boards:
-> Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
-> 
-> Best regards,
-> Krzysztof
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+---
+ drivers/pci/pci.c   | 55 ++---------------------------------------------------
+ include/linux/pci.h |  2 --
+ 2 files changed, 2 insertions(+), 55 deletions(-)
 
-I was planning on creating an immutable branch for this series and merging it
-through platform/chrome.
-
-Lee, Russell, Dmitry, what do you think?
-
-Benson
-
+diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+index a31e6db..7e3f2e9 100644
+--- a/drivers/pci/pci.c
++++ b/drivers/pci/pci.c
+@@ -4784,9 +4784,9 @@ int pci_probe_reset_slot(struct pci_slot *slot)
+ EXPORT_SYMBOL_GPL(pci_probe_reset_slot);
+ 
+ /**
+- * pci_reset_slot - reset a PCI slot
++ * __pci_try_reset_slot - Try to reset a PCI slot
+  * @slot: PCI slot to reset
+- *
++ *`
+  * A PCI bus may host multiple slots, each slot may support a reset mechanism
+  * independent of other slots.  For instance, some slots may support slot power
+  * control.  In the case of a 1:1 bus to slot architecture, this function may
+@@ -4796,30 +4796,6 @@ EXPORT_SYMBOL_GPL(pci_probe_reset_slot);
+  * through this function.  PCI config space of all devices in the slot and
+  * behind the slot is saved before and restored after reset.
+  *
+- * Return 0 on success, non-zero on error.
+- */
+-int pci_reset_slot(struct pci_slot *slot)
+-{
+-	int rc;
+-
+-	rc = pci_slot_reset(slot, 1);
+-	if (rc)
+-		return rc;
+-
+-	pci_slot_save_and_disable(slot);
+-
+-	rc = pci_slot_reset(slot, 0);
+-
+-	pci_slot_restore(slot);
+-
+-	return rc;
+-}
+-EXPORT_SYMBOL_GPL(pci_reset_slot);
+-
+-/**
+- * __pci_try_reset_slot - Try to reset a PCI slot
+- * @slot: PCI slot to reset
+- *
+  * Same as above except return -EAGAIN if the slot cannot be locked
+  */
+ static int __pci_try_reset_slot(struct pci_slot *slot)
+@@ -4878,33 +4854,6 @@ int pci_probe_reset_bus(struct pci_bus *bus)
+ EXPORT_SYMBOL_GPL(pci_probe_reset_bus);
+ 
+ /**
+- * pci_reset_bus - reset a PCI bus
+- * @bus: top level PCI bus to reset
+- *
+- * Do a bus reset on the given bus and any subordinate buses, saving
+- * and restoring state of all devices.
+- *
+- * Return 0 on success, non-zero on error.
+- */
+-int pci_reset_bus(struct pci_bus *bus)
+-{
+-	int rc;
+-
+-	rc = pci_bus_reset(bus, 1);
+-	if (rc)
+-		return rc;
+-
+-	pci_bus_save_and_disable(bus);
+-
+-	rc = pci_bus_reset(bus, 0);
+-
+-	pci_bus_restore(bus);
+-
+-	return rc;
+-}
+-EXPORT_SYMBOL_GPL(pci_reset_bus);
+-
+-/**
+  * __pci_try_reset_bus - Try to reset a PCI bus
+  * @bus: top level PCI bus to reset
+  *
+diff --git a/include/linux/pci.h b/include/linux/pci.h
+index f5c85b6..ad0c89a 100644
+--- a/include/linux/pci.h
++++ b/include/linux/pci.h
+@@ -1095,9 +1095,7 @@ int pci_reset_function(struct pci_dev *dev);
+ int pci_reset_function_locked(struct pci_dev *dev);
+ int pci_try_reset_function(struct pci_dev *dev);
+ int pci_probe_reset_slot(struct pci_slot *slot);
+-int pci_reset_slot(struct pci_slot *slot);
+ int pci_probe_reset_bus(struct pci_bus *bus);
+-int pci_reset_bus(struct pci_bus *bus);
+ int pci_try_reset_bus(struct pci_dev *dev);
+ void pci_reset_secondary_bus(struct pci_dev *dev);
+ void pcibios_reset_secondary_bus(struct pci_dev *dev);
 -- 
-Benson Leung
-Staff Software Engineer
-Chrome OS Kernel
-Google Inc.
-bleung at google.com
-Chromium OS Project
-bleung at chromium.org
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180702/7a33b31c/attachment.sig>
+2.7.4
