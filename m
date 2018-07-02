@@ -1,35 +1,44 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 2 Jul 2018 16:06:02 +0200
-Subject: [PATCH][V2] pinctrl: actions: fix unsigned less than zero
- comparison
-In-Reply-To: <20180702124708.7295-1-colin.king@canonical.com>
-References: <20180702124708.7295-1-colin.king@canonical.com>
-Message-ID: <CACRpkda2CkPFRPcpHSukBNjH+m6szCxq6Cfs+uK5fLHthQmZkg@mail.gmail.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Mon, 2 Jul 2018 16:07:42 +0200
+Subject: [PATCH v3 0/8] Tegra Combined UART driver
+In-Reply-To: <20180702140343.GO13096@ulmo>
+References: <20180702114033.15654-1-mperttunen@nvidia.com>
+ <20180702140343.GO13096@ulmo>
+Message-ID: <20180702140742.GA7977@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 2, 2018 at 2:47 PM Colin King <colin.king@canonical.com> wrote:
+On Mon, Jul 02, 2018 at 04:03:43PM +0200, Thierry Reding wrote:
+> On Mon, Jul 02, 2018 at 02:40:25PM +0300, Mikko Perttunen wrote:
+> > Hi, here's v3. Changes are in individual patches. Acks are still
+> > missing from the following patches:
+> > 
+> > mailbox: Add transmit done by blocking option
+> > mailbox: tegra-hsp: Refactor in preparation of mailboxes
+> > mailbox: tegra-hsp: Add support for shared mailboxes
+> > serial: Add Tegra Combined UART driver
+> 
+> There don't seem to be any build-time dependencies between the above, so
+> technically I guess these could be applied to the respective trees
+> separately. The only thing we need to be careful about is to not merge
+> the final patch before the others, because it will break serial console
+> if the other patches aren't applied.
+> 
+> Jassi, Greg,
+> 
+> What I could do to resolve the runtime dependency is pull the mailbox
+> patches into a separate branch, create another separate branch for the
+> TCU driver that is based on the mailbox branch and then base the DT
+> changes on that branch, or possibly send a separate pull request for
+> just the DT change late in the merge window or shortly after v4.19-rc1.
+> 
+> Obviously the latter would be equivalent to you guys merging the patches
+> through your trees for v4.19-rc1 and me sending out a late pull request
+> for the DT bits.
 
-> From: Colin Ian King <colin.king@canonical.com>
->
-> The check to see if platform_get_irq failed is performed on the
-> unsigned value of pctrl->irq[i] and the check is never true because
-> an unsigned cannot be less than zero.  Fix this by assinging the
-> signed int ret to the return of platform_get_irq and checking ret
-> instead.
->
-> Detected by CoverityScan, CID#1470247 ("Unsigned comparison against 0")
->
-> Fixes: 6c5d0736e9c0 ("pinctrl: actions: Add interrupt support for OWL S900 SoC")
-> Signed-off-by: Colin Ian King <colin.king@canonical.com>
-> ---
->
-> V2: move pctrl->irq[i] = ret assignment below the check on ret, thanks
-> to Manivannan Sadhasivam for suggesting this change.
+No need for me to take the serial driver if these types of dependancies
+are required, you are free to take that in your tree if you want to.
 
-Patch applied with Manivannan's ACK!
+does that help?
 
-(Hope it's the right version now.)
-
-Yours,
-Linus Walleij
+greg k-h
