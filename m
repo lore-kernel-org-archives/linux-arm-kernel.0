@@ -1,102 +1,88 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 2 Jul 2018 13:08:45 +0200
-Subject: [PATCH] pci: fix I/O space page leak
-In-Reply-To: <20180702103316.GA10784@red-moon>
-References: <1ca6adde-a91e-84d0-c7dc-fd01bfd9edcc@cogentembedded.com>
- <20180628132259.GB90450@bhelgaas-glaptop.roam.corp.google.com>
- <20180628142615.GA9101@red-moon>
- <ac015f99-c310-3701-35ce-846393b61235@cogentembedded.com>
- <20180702103316.GA10784@red-moon>
-Message-ID: <CAMuHMdUCNPrpYx1xOBTL0F23r3H2jc+kg+T5-rqMe0V-2w-LqQ@mail.gmail.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Mon, 2 Jul 2018 11:17:44 +0300
+Subject: New remoteproc driver for TI PRU
+In-Reply-To: <8fc18d40-72f5-9215-26f0-1492e3a6c0e7@lechnology.com>
+References: <20180623210810.21232-1-david@lechnology.com>
+ <e0a883af-8228-5b06-3186-f57d8f898aaa@ti.com>
+ <8fc18d40-72f5-9215-26f0-1492e3a6c0e7@lechnology.com>
+Message-ID: <419db83e-7918-7b54-c18a-d786c47e8ef5@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
+On 29/06/18 20:44, David Lechner wrote:
+> On 06/29/2018 04:58 AM, Roger Quadros wrote:
+>> +Suman & Tero
+>>
+>> Hi David,
+>>
+>> On 24/06/18 00:08, David Lechner wrote:
+>>>
+>>> Date: Sat, 23 Jun 2018 15:43:59 -0500
+>>> Subject: [PATCH 0/8] New remoteproc driver for TI PRU
+>>>
+>>> This series adds a new remoteproc driver for the TI Programmable Runtime Unit
+>>> (PRU) that is present in some TI Sitara processors. This code has been tested
+>>> working on AM1808 (LEGO MINDSTORMS EV3) and AM3358 (BeagleBone Green).
+>>
+>> This is great. We have been working on something similar and I think it would
+>> be great if we can collaborate to get all our needs addressed.
+> 
+> Yes, I have used the PRU with the TI kernel on BeagleBone so I've seen the TI
+> implementation. My primary interest is in the AM1808, which has a far simpler
+> PRU than other SoCs. So, I was hoping I could get away with just implementing
+> the basic stuff that I need and let TI add the more complex stuff later.
+> 
 
-On Mon, Jul 2, 2018 at 12:31 PM Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
-> On Sat, Jun 30, 2018 at 01:37:18PM +0300, Sergei Shtylyov wrote:
-> > On 6/28/2018 5:26 PM, Lorenzo Pieralisi wrote:
-> > >>>When testing the R-Car PCIe driver on the Condor board, I noticed that iff
-> > >>>I  left the PCIe PHY driver disabled, the kernel crashed  with this BUG:
-> > >>>
-> > >>>[    1.225819] kernel BUG at lib/ioremap.c:72!
+The PRUSS core is essentially the same thing on most of our SoCs. They might
+be varying in amount of RAM and integrated modules though. So PRUSS core support
+should be scalable across all SoCs.
 
-> > >>>It turned out that pci_remap_iospace() wasn't undone when the driver's
-> > >>>probe failed, and since devm_phy_optional_get() returned -EPROBE_DEFER,
-> > >>>the probe was retried,  finally causing the BUG due to trying to remap
-> > >>>already remapped pages.
-> > >>>
-> > >>>The most feasible solution seems to introduce devm_pci_remap_iospace()
-> > >>>and call it instead of pci_remap_iospace(), so that the pages get unmapped
-> > >>>automagically on any probe failure.
-> > >>>
-> > >>>And  while fixing pci_parse_request_of_pci_ranges(), aslo fix the other
-> > >>>drivers that have probably copied the bad example...
-> > >>>
-> > >>>Fixes: 4e64dbe226e7 ("PCI: generic: Expose pci_host_common_probe() for use by other drivers")
-> > >>>Fixes: cbce7900598c ("PCI: designware: Make driver arch-agnostic")
-> > >>>Fixes: 8c39d710363c ("PCI: aardvark: Add Aardvark PCI host controller driver")
-> > >>>Fixes: d3c68e0a7e34 ("PCI: faraday: Add Faraday Technology FTPCI100 PCI Host Bridge driver")
-> > >>>Fixes: 68a15eb7bd0c ("PCI: v3-semi: Add V3 Semiconductor PCI host driver")
-> > >>>Fixes: b7e78170efd4 ("PCI: versatile: Add DT-based ARM Versatile PB PCIe host driver")
-> > >>>Fixes: 5f6b6ccdbe1c ("PCI: xgene: Add APM X-Gene PCIe driver")
-> > >>>Fixes: 637cfacae96f ("PCI: mediatek: Add MediaTek PCIe host controller support")
-> > >>>Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> > >>>Cc: stable at vger.kernel.org
-> > >>
-> > >>Let me know if you want me to take this, Lorenzo, otherwise:
-> > >>s/pci: fix/PCI: Fix/ and
-> > >>
-> > >>Acked-by: Bjorn Helgaas <bhelgaas@google.com>
-> > >
-> > >Thank you Bjorn, yes it could go in as a fix but IMO it has to be split,
-> > >more so given the stable tag (and I think that each "Fixes" tag should
-> > >be self-contained),
-> >
-> >    It cannot be self-contained because it'll depend on the initial
-> > commit adding devm_pci_remap_iobase(). If you mean finding the
-> > earliest broken driver and introduce the deviec managed API while
-> > fixing it and then make use of that
-> > API in the subsequent patches, that surely can be done.
->
-> Yes I think that's the best course of action.
->
-> > >merging it as-is would give Greg (and us) a
-> > >headache when it comes to backporting it.
-> >
-> >    The patch interdependency would give him headache too, and I was
-> > hoping to relieve those with the monilitic patch. :-)
->
-> The problem is that if any of the fixes has to be reverted we have
-> to revert the whole thing instead of just the problematic patch,
-> which, given that we are sending this to stable kernels may easily
-> turn out quite complicated.
->
-> So, I would add the new API along with the earliest broken driver
-> and mark it for stable.
->
-> In the same thread, add all other fixes (one per patch) without the
-> stable tag. When the first fix gets merged into the mainline (and
-> consequently goes to stable) we can send the stable backports for the
-> remainder of fixes.
->
-> How does that sound ?
+It is perfectly fine to get basic support in first and add the rest as we go along.
 
-If you want to be prepared for reverting, why not split off the first fix
-from the patch that provides the new API as well?
-Yes, it does mean a dependency for backporting, but it avoids the mess if
-it turns out the first fix is the (only) one that needs to be reverted.
-
-Thanks!
-
-Gr{oetje,eeting}s,
-
-                        Geert
+>>
+>> Our primary requirement is that it should be possible for a user (e.g. kernel driver) to
+>> - request a specific PRU core load a specific firmware blob and boot/stop the PRU.
+> 
+> For this, I was thinking of suggesting a generic remoteproc provider/consumer
+> binding that is similar to other subsystems. For example:
+> 
+> Provider node has:
+> 
+> ????#remoteproc-cells = <1>;
+> 
+> And consumer has:
+> 
+> ????remoteprocs = <&pruss 0>, <&pruss 1>;
+> ????remoteproc-names = "pru0", "pru1";
+> 
+> The consumer device would be responsible for determining the firmware file
+> and for calling the rproc boot function.
+> 
+> 
+>> - configure INTC interrupt mapping based on either resource table or DT
+>> - use request_irq to request and use an interrupt.
+> 
+> I didn't consider creating a new interrupt controller in device tree, but
+> that makes sense. I will have to look into it some more.
+> 
+> 
+>> - request access to DRAM/SRAM
+> 
+> Can the existing device tree bindings for reserved-memory be used for this?
+> I would expect the consumer nodes to use this and not the PRUSS provider node.
+> 
+> 
+>> - configure gpimode/miirt/xfr (CFG space)
+> 
+> I have no idea what this stuff is. :-)
+> 
+> (This is what I was referring to when I said I was hoping that someone
+> else could add more later).
+> 
 
 -- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+cheers,
+-roger
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
+Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
