@@ -1,83 +1,43 @@
-From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
-Date: Mon, 2 Jul 2018 18:05:45 +0800
-Subject: [PATCH 1/2] serial: 8250: introduce get_divisor() and set_divisor()
- hook
-In-Reply-To: <20180702180428.331b36c5@xhacker.debian>
-References: <20180702180428.331b36c5@xhacker.debian>
-Message-ID: <20180702180545.7570b40b@xhacker.debian>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 2 Jul 2018 10:59:38 +0100
+Subject: [PATCH v3 05/20] kvm: arm/arm64: Fix stage2_flush_memslot for 4
+ level page table
+In-Reply-To: <1530270944-11351-6-git-send-email-suzuki.poulose@arm.com>
+References: <1530270944-11351-1-git-send-email-suzuki.poulose@arm.com>
+ <1530270944-11351-6-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <bc7b51fe-c210-76fd-8df1-66ba33e6769b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For Synopsys DesignWare 8250 uart which version >= 4.00a, there's a
-valid divisor latch fraction register. The fractional divisor width is
-4bits ~ 6bits. Add get_divisor() and set_divisor() hook to prepare
-supporting this feature in next commit.
+On 29/06/18 12:15, Suzuki K Poulose wrote:
+> So far we have only supported 3 level page table with fixed IPA of 40bits.
+> Fix stage2_flush_memslot() to accommodate for 4 level tables.
+> 
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Acked-by: Christoffer Dall <cdall@kernel.org>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
+>  virt/kvm/arm/mmu.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+> index 1d90d79..061e6b3 100644
+> --- a/virt/kvm/arm/mmu.c
+> +++ b/virt/kvm/arm/mmu.c
+> @@ -379,7 +379,8 @@ static void stage2_flush_memslot(struct kvm *kvm,
+>  	pgd = kvm->arch.pgd + stage2_pgd_index(addr);
+>  	do {
+>  		next = stage2_pgd_addr_end(addr, end);
+> -		stage2_flush_puds(kvm, pgd, addr, next);
+> +		if (!stage2_pgd_none(*pgd))
+> +			stage2_flush_puds(kvm, pgd, addr, next);
+>  	} while (pgd++, addr = next, addr != end);
+>  }
+>  
+> 
 
-Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
----
- drivers/tty/serial/8250/8250_core.c | 4 ++++
- drivers/tty/serial/8250/8250_port.c | 8 ++++++++
- include/linux/serial_8250.h         | 7 +++++++
- 3 files changed, 19 insertions(+)
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 
-diff --git a/drivers/tty/serial/8250/8250_core.c b/drivers/tty/serial/8250/8250_core.c
-index 9342fc2ee7df..da0f3849bfce 100644
---- a/drivers/tty/serial/8250/8250_core.c
-+++ b/drivers/tty/serial/8250/8250_core.c
-@@ -1035,6 +1035,10 @@ int serial8250_register_8250_port(struct uart_8250_port *up)
- 			uart->dl_read = up->dl_read;
- 		if (up->dl_write)
- 			uart->dl_write = up->dl_write;
-+		if (up->get_divisor)
-+			uart->get_divisor = up->get_divisor;
-+		if (up->set_divisor)
-+			uart->set_divisor = up->set_divisor;
- 
- 		if (uart->port.type != PORT_8250_CIR) {
- 			if (serial8250_isa_config != NULL)
-diff --git a/drivers/tty/serial/8250/8250_port.c b/drivers/tty/serial/8250/8250_port.c
-index cf541aab2bd0..0060ec54a522 100644
---- a/drivers/tty/serial/8250/8250_port.c
-+++ b/drivers/tty/serial/8250/8250_port.c
-@@ -2505,6 +2505,9 @@ static unsigned int serial8250_get_divisor(struct uart_8250_port *up,
- 	struct uart_port *port = &up->port;
- 	unsigned int quot;
- 
-+	if (up->get_divisor)
-+		return up->get_divisor(up, baud, frac);
-+
- 	/*
- 	 * Handle magic divisors for baud rates above baud_base on
- 	 * SMSC SuperIO chips.
-@@ -2575,6 +2578,11 @@ static void serial8250_set_divisor(struct uart_port *port, unsigned int baud,
- {
- 	struct uart_8250_port *up = up_to_u8250p(port);
- 
-+	if (up->set_divisor) {
-+		up->set_divisor(up, baud, quot, quot_frac);
-+		return;
-+	}
-+
- 	/* Workaround to enable 115200 baud on OMAP1510 internal ports */
- 	if (is_omap1510_8250(up)) {
- 		if (baud == 115200) {
-diff --git a/include/linux/serial_8250.h b/include/linux/serial_8250.h
-index 76b9db71e489..5093c9ca0980 100644
---- a/include/linux/serial_8250.h
-+++ b/include/linux/serial_8250.h
-@@ -132,6 +132,13 @@ struct uart_8250_port {
- 	/* 8250 specific callbacks */
- 	int			(*dl_read)(struct uart_8250_port *);
- 	void			(*dl_write)(struct uart_8250_port *, int);
-+	unsigned int		(*get_divisor)(struct uart_8250_port *up,
-+					       unsigned int baud,
-+					       unsigned int *frac);
-+	void			(*set_divisor)(struct uart_8250_port *up,
-+					       unsigned int baud,
-+					       unsigned int quot,
-+					       unsigned int quot_frac);
- 
- 	struct uart_8250_em485 *em485;
- };
+	M.
 -- 
-2.18.0
+Jazz is not dead. It just smells funny...
