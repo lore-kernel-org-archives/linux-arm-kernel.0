@@ -1,55 +1,79 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon,  2 Jul 2018 16:33:24 -0600
-Subject: [PATCH 0/6] perf: Add ioctl for PMU driver configuration 
-Message-ID: <1530570810-28929-1-git-send-email-mathieu.poirier@linaro.org>
+Date: Mon,  2 Jul 2018 16:33:25 -0600
+Subject: [PATCH 1/6] perf tools: Use ioctl to communicate driver configuration
+ to kernel
+In-Reply-To: <1530570810-28929-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1530570810-28929-1-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1530570810-28929-2-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This set follows what has been done for filters by adding an ioctl
-to communicate PMU specific driver configuration to the kernel.
+Following in the footsteps of what was done for filters, adding the
+necessary mechanic needed to push down driver specific configuration
+to the kernel using an ioctl. By proceeding this way PMU specific
+configuration can be communicated to each event.
 
-Patch 01 and 02 provide the functionality in user space while patch 04
-and 05 take care of the kernel part.  Patches 03 and 06 use the newly
-added functionality to communicate the selection of CoreSight sink
-for each event.
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+---
+ include/uapi/linux/perf_event.h       | 1 +
+ tools/include/uapi/linux/perf_event.h | 1 +
+ tools/perf/util/evsel.c               | 7 +++++++
+ tools/perf/util/evsel.h               | 1 +
+ 4 files changed, 10 insertions(+)
 
-This functionality is needed to identify the CoreSight sink to use when
-working with CPU-wide trace scenarios.  It also paves the way to support
-complex tracer configurations where dozens of trace parameters need to
-be communicated to the CoreSight PMU driver.
-
-Applies cleanly on v4.18-rc3.
-
-Best regards,
-Mathieu
-
-Mathieu Poirier (6):
-  perf tools: Use ioctl to communicate driver configuration to kernel
-  perf tools: Make perf_evsel accessible to PMU driver configuration
-    code
-  perf tools: Use ioctl function to send sink configuration to kernel
-  perf/aux: Make perf_event accessible to setup_aux()
-  perf/core: Use ioctl to communicate driver configuration to kernel
-  coresight: Use PMU driver configuration for sink selection
-
- arch/s390/kernel/perf_cpum_sf.c                  |   4 +-
- arch/x86/events/intel/bts.c                      |   4 +-
- arch/x86/events/intel/pt.c                       |   5 +-
- drivers/hwtracing/coresight/coresight-etm-perf.c | 134 ++++++++++++++++++++---
- drivers/hwtracing/coresight/coresight-etm-perf.h |  10 ++
- drivers/perf/arm_spe_pmu.c                       |   6 +-
- include/linux/perf_event.h                       |  56 +++++++++-
- include/uapi/linux/perf_event.h                  |   1 +
- kernel/events/core.c                             | 110 +++++++++++++++++++
- kernel/events/ring_buffer.c                      |   2 +-
- tools/include/uapi/linux/perf_event.h            |   1 +
- tools/perf/arch/arm/util/cs-etm.c                |  60 +++-------
- tools/perf/arch/arm/util/cs-etm.h                |   3 +-
- tools/perf/util/drv_configs.c                    |  30 ++---
- tools/perf/util/evsel.c                          |   7 ++
- tools/perf/util/evsel.h                          |   1 +
- tools/perf/util/pmu.h                            |   3 +-
- 17 files changed, 345 insertions(+), 92 deletions(-)
-
+diff --git a/include/uapi/linux/perf_event.h b/include/uapi/linux/perf_event.h
+index b8e288a1f740..b5b3241877df 100644
+--- a/include/uapi/linux/perf_event.h
++++ b/include/uapi/linux/perf_event.h
+@@ -460,6 +460,7 @@ struct perf_event_query_bpf {
+ #define PERF_EVENT_IOC_PAUSE_OUTPUT		_IOW('$', 9, __u32)
+ #define PERF_EVENT_IOC_QUERY_BPF		_IOWR('$', 10, struct perf_event_query_bpf *)
+ #define PERF_EVENT_IOC_MODIFY_ATTRIBUTES	_IOW('$', 11, struct perf_event_attr *)
++#define PERF_EVENT_IOC_SET_DRV_CONFIG		_IOW('$', 12, char *)
+ 
+ enum perf_event_ioc_flags {
+ 	PERF_IOC_FLAG_GROUP		= 1U << 0,
+diff --git a/tools/include/uapi/linux/perf_event.h b/tools/include/uapi/linux/perf_event.h
+index b8e288a1f740..b5b3241877df 100644
+--- a/tools/include/uapi/linux/perf_event.h
++++ b/tools/include/uapi/linux/perf_event.h
+@@ -460,6 +460,7 @@ struct perf_event_query_bpf {
+ #define PERF_EVENT_IOC_PAUSE_OUTPUT		_IOW('$', 9, __u32)
+ #define PERF_EVENT_IOC_QUERY_BPF		_IOWR('$', 10, struct perf_event_query_bpf *)
+ #define PERF_EVENT_IOC_MODIFY_ATTRIBUTES	_IOW('$', 11, struct perf_event_attr *)
++#define PERF_EVENT_IOC_SET_DRV_CONFIG		_IOW('$', 12, char *)
+ 
+ enum perf_event_ioc_flags {
+ 	PERF_IOC_FLAG_GROUP		= 1U << 0,
+diff --git a/tools/perf/util/evsel.c b/tools/perf/util/evsel.c
+index 94fce4f537e9..534aca4c642c 100644
+--- a/tools/perf/util/evsel.c
++++ b/tools/perf/util/evsel.c
+@@ -1162,6 +1162,13 @@ static int perf_evsel__append_filter(struct perf_evsel *evsel,
+ 	return -1;
+ }
+ 
++int perf_evsel__apply_drv_config(struct perf_evsel *evsel, const char *config)
++{
++	return perf_evsel__run_ioctl(evsel,
++				     PERF_EVENT_IOC_SET_DRV_CONFIG,
++				     (void *)config);
++}
++
+ int perf_evsel__append_tp_filter(struct perf_evsel *evsel, const char *filter)
+ {
+ 	return perf_evsel__append_filter(evsel, "(%s) && (%s)", filter);
+diff --git a/tools/perf/util/evsel.h b/tools/perf/util/evsel.h
+index d277930b19a1..0f671bd2a988 100644
+--- a/tools/perf/util/evsel.h
++++ b/tools/perf/util/evsel.h
+@@ -271,6 +271,7 @@ int perf_evsel__append_tp_filter(struct perf_evsel *evsel, const char *filter);
+ int perf_evsel__append_addr_filter(struct perf_evsel *evsel,
+ 				   const char *filter);
+ int perf_evsel__apply_filter(struct perf_evsel *evsel, const char *filter);
++int perf_evsel__apply_drv_config(struct perf_evsel *evsel, const char *config);
+ int perf_evsel__enable(struct perf_evsel *evsel);
+ int perf_evsel__disable(struct perf_evsel *evsel);
+ 
 -- 
 2.7.4
