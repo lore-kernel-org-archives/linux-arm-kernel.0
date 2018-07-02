@@ -1,85 +1,75 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Mon, 2 Jul 2018 17:01:31 +0200
-Subject: [PATCH v3 08/20] kvm: arm/arm64: Abstract stage2 pgd table
- allocation
-In-Reply-To: <1530270944-11351-9-git-send-email-suzuki.poulose@arm.com>
-References: <1530270944-11351-1-git-send-email-suzuki.poulose@arm.com>
- <1530270944-11351-9-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <ac15d082-22eb-54d1-d695-6a0a3ac2d1eb@redhat.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon,  2 Jul 2018 16:02:44 +0100
+Subject: [PATCH v4 0/6] KVM/arm64: Cache maintenance relaxations
+Message-ID: <20180702150250.16550-1-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suzuki
+This small series makes use of features recently introduced in the
+ARMv8 architecture to relax the cache maintenance operations on CPUs
+that implement these features.
 
-On 06/29/2018 01:15 PM, Suzuki K Poulose wrote:
-> Abstract the allocation of stage2 entry level tables for
-> given VM, so that later we can choose to fall back to the
-> normal page table levels (i.e, avoid entry level table
-> concatenation) on arm64.
+FWB is the most important one. It allows stage-2 to enforce the
+cacheability of memory, no matter what the guest says. It also
+mandates that the whole machine is cache coherent (no non-coherent
+I/O), meaning we can drop a whole class of cache maintenance
+operations.
 
-the justification is not crystal clear to me but it does no harm I think.
-> 
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Christoffer Dall <cdall@kernel.org>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
-> Changes since V2:
->  - New patch
-> ---
->  arch/arm/include/asm/kvm_mmu.h   | 6 ++++++
->  arch/arm64/include/asm/kvm_mmu.h | 6 ++++++
->  virt/kvm/arm/mmu.c               | 2 +-
->  3 files changed, 13 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-> index f36eb20..b2da5a4 100644
-> --- a/arch/arm/include/asm/kvm_mmu.h
-> +++ b/arch/arm/include/asm/kvm_mmu.h
-> @@ -372,6 +372,12 @@ static inline int hyp_map_aux_data(void)
->  	return 0;
->  }
->  
-> +static inline void *stage2_alloc_pgd(struct kvm *kvm)
-> +{
-> +	return alloc_pages_exact(stage2_pgd_size(kvm),
-> +				 GFP_KERNEL | __GFP_ZERO);
-> +}
-> +
->  #define kvm_phys_to_vttbr(addr)		(addr)
->  
->  #endif	/* !__ASSEMBLY__ */
-> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-> index 5da8f52..dbaf513 100644
-> --- a/arch/arm64/include/asm/kvm_mmu.h
-> +++ b/arch/arm64/include/asm/kvm_mmu.h
-> @@ -501,5 +501,11 @@ static inline int hyp_map_aux_data(void)
->  
->  #define kvm_phys_to_vttbr(addr)		phys_to_ttbr(addr)
->  
-> +static inline void *stage2_alloc_pgd(struct kvm *kvm)
-> +{
-> +	return alloc_pages_exact(stage2_pgd_size(kvm),
-> +				 GFP_KERNEL | __GFP_ZERO);
-> +}
-> +
->  #endif /* __ASSEMBLY__ */
->  #endif /* __ARM64_KVM_MMU_H__ */
-> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-> index 82dd571..a339e00 100644
-> --- a/virt/kvm/arm/mmu.c
-> +++ b/virt/kvm/arm/mmu.c
-> @@ -868,7 +868,7 @@ int kvm_alloc_stage2_pgd(struct kvm *kvm)
->  	}
->  
->  	/* Allocate the HW PGD, making sure that each page gets its own refcount */
-> -	pgd = alloc_pages_exact(stage2_pgd_size(kvm), GFP_KERNEL | __GFP_ZERO);
-> +	pgd = stage2_alloc_pgd(kvm);
->  	if (!pgd)
->  		return -ENOMEM;
->  
-> 
-Reviewed-by: Eric Auger <eric.auger@redhat.com>
+FWB also has the same effect as CTR_EL0.IDC being set, and when
+combined with CTR_EL0.DIC allows the removal of all cache maintenance
+and tracking of pages being executed.
 
-Thanks
+We also take the opportunity to drop a few useless CMOs that were
+applied to the HYP page tables, but that were never necessary. This
+ended up requiring quite a few changes in out page table accessors so
+that they get consistent barriers. These barriers are a bit on the
+heavy side, and could be further optimized, although that's probably
+for a different patch series
 
-Eric
+Unless someone screams now, I plan to apply this to kvmarm/next
+shortly.
+
+* From v1:
+  - Reordered the series in a slightly more consistent order
+  - Added patches refactoring the PT accessors before dropping
+    the CMOs
+  - Removed final dsb(ishst) from the last patch, as all PT accessors
+    now have their own barriers
+  - Collected Acks from Catalin
+
+* From v2:
+  - Dropped the clean to PoU when FWB, as it always implies IDC
+  - Added comments about the pertinence of Set/Way CMOs in guests
+  - Collected Acks and RBs
+
+* From v3:
+  - Fixed P[MU]D_TYPE_TABLE position in entry constructors
+  - Clarified comment about FWB vs cleaning to PoU/PoC
+  - Resplit patches 4 and 5
+  - Dropped obsolete prototyped for a vanished function
+  - Collected RBs
+
+Marc Zyngier (6):
+  arm64: KVM: Add support for Stage-2 control of memory types and
+    cacheability
+  arm64: KVM: Handle Set/Way CMOs as NOPs if FWB is present
+  arm64: KVM: Avoid marking pages as XN in Stage-2 if CTR_EL0.DIC is set
+  KVM: arm/arm64: Consolidate page-table accessors
+  KVM: arm/arm64: Stop using the kernel's {pmd,pud,pgd}_populate helpers
+  KVM: arm/arm64: Remove unnecessary CMOs when creating HYP page tables
+
+ arch/arm/include/asm/kvm_mmu.h        | 14 ++-------
+ arch/arm64/include/asm/cpucaps.h      |  3 +-
+ arch/arm64/include/asm/kvm_arm.h      |  1 +
+ arch/arm64/include/asm/kvm_emulate.h  |  2 ++
+ arch/arm64/include/asm/kvm_mmu.h      | 35 ++++++++++++++++-----
+ arch/arm64/include/asm/memory.h       |  7 +++++
+ arch/arm64/include/asm/pgtable-prot.h | 24 ++++++++++++--
+ arch/arm64/include/asm/sysreg.h       |  1 +
+ arch/arm64/kernel/cpufeature.c        | 20 ++++++++++++
+ arch/arm64/kvm/sys_regs.c             | 11 ++++++-
+ virt/kvm/arm/mmu.c                    | 45 ++++++++++++++++++++++-----
+ 11 files changed, 132 insertions(+), 31 deletions(-)
+
+-- 
+2.17.1
