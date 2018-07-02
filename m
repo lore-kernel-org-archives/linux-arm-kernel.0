@@ -1,65 +1,59 @@
-From: mka@chromium.org (Matthias Kaehlcke)
-Date: Mon, 2 Jul 2018 15:35:00 -0700
-Subject: [PATCH v2 2/2] arm64: dts: qcom: pm8998: Add pm8998 thermal zone
-In-Reply-To: <20180702204611.GZ129942@google.com>
-References: <20180702181005.18247-1-mka@chromium.org>
- <20180702181005.18247-2-mka@chromium.org>
- <CAD=FV=WH8q-3Rt89Get0N357+hWmKiEsruaKtWzo_JoE6gd_3g@mail.gmail.com>
- <20180702204611.GZ129942@google.com>
-Message-ID: <20180702223500.GB129942@google.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Mon,  2 Jul 2018 18:52:44 -0400
+Subject: [PATCH V5 0/3] PCI: separate hotplug handling from fatal error
+ handling
+Message-ID: <1530571967-19099-1-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 02, 2018 at 01:46:11PM -0700, Matthias Kaehlcke wrote:
-> On Mon, Jul 02, 2018 at 12:53:44PM -0700, Doug Anderson wrote:
-> > Hi,
-> > 
-> > On Mon, Jul 2, 2018 at 11:10 AM, Matthias Kaehlcke <mka@chromium.org> wrote:
-> > > The thermal zone uses spmi-temp-alarm as sensor. If the sensor is
-> > > configured without an IIO input it always reports 37?C for temperatures
-> > > below the first hardware trip point at 105?C. This hardware trip point
-> > > is configured as critical trip point, to initiate a system shutdown
-> > > before the temperature reaches the next hardware trip point at 125?C,
-> > > where the PMIC performs a partial shutdown.
-> > >
-> > > The temperature of the critical trip point can be raised after adding
-> > > the die temperature ADC as IIO input for spmi-temp-alarm, which
-> > > significantly increases the precision of the temperature measurements.
-> > >
-> > > Signed-off-by: Matthias Kaehlcke <mka@chromium.org>
-> > > ---
-> > > Changes in v2:
-> > > - defined 'thermal-zones' node in pm8998.dtsi instead of using a label
-> > >   to refer to it
-> > > - use 105?C hardware trip point as critical trip point
-> > 
-> > I'm not sure this was right.  I guess you're trying to avoid
-> > Temperature Stage 2?
-> 
-> Indeed
-> 
-> > From Davi'd email in response to v1:
-> > 
-> > > The PMIC TEMP_ALARM hardware peripheral will perform an automatic partial
-> > > PMIC shutdown upon hitting over-temperature stage 2 (125 C).  This turns
-> > > off peripherals within the PMIC that are expected to draw significant
-> > > current.  The set of peripherals included varies between PMICs.  This
-> > > partial shutdown will occur simultaneously with the triggering of an
-> > > interrupt to the APPS processor that informs the qcom-spmi-temp-alarm
-> > > driver that an over-temperature threshold has been crossed.
-> > 
-> > I think it's actually OK to use Temperature Stage 2 as the "critical"
-> > point, which is why it still interrupts the CPU.  At "critical" the
-> > system will shut down, right?  ...so presumably it's OK if the drivers
-> > can't recover from having the power yanked out from underneath them as
-> > long as they don't hang/crash the system in this case.  If I had to
-> > guess the whole point of this stage is to give the system shutdown a
-> > better chance of succeeding without getting to stage 3.
-> 
-> That was my starting point, however in my tests the system reset
-> several times when the temperature got close to 125?C, not allowing
-> for a proper shutdown. Apparently the partial shutdown of the PMIC can
-> result in a full reset at least on some systems.
+This is what happens when you insert a fatal error to a hotplug slot. See
+multiple link up/down messages.
 
-For the record: Linux does a proper shutdown when software override
-for stage 2 is enabled (bit OVRD_ST2_EN in TEMP_ALARM_SHUTDOWN_CTL1).
+/_#_[__333.699731]_pcieport_0001:00:00.0:_AER:_Uncorrected_(Fatal)_error_received:_id=0000
+[  333.748116] pcieport 0001:00:00.0: PCIe Bus Error: severity=Uncorrected (Fatal), type=Transaction Layer, id
+[  333.816044] pcieport 0001:00:00.0:   device [17cb:0404] error status/mask=00040000/00400000
+[  333.871581] pcieport 0001:00:00.0:    [18] Malformed TLP (First)
+[  333.914675] pcieport 0001:00:00.0:   TLP Header: 40000001 000000ff 00000000 00000000
+[  333.968397] pciehp 0001:00:00.0:pcie004: Slot(2): Link Down
+[  334.043234] iommu: Removing device 0001:01:00.4 from group 0
+[  334.095952] iommu: Removing device 0001:01:00.3 from group 0
+[  334.144644] iommu: Removing device 0001:01:00.2 from group 0
+[  334.194653] iommu: Removing device 0001:01:00.1 from group 0
+[  334.243564] pciehp 0001:00:00.0:pcie004: Slot(2): Link Up
+[  334.282556] iommu: Removing device 0001:01:00.0 from group 0
+[  334.330994] pciehp 0001:00:00.0:pcie004: Slot(2): Link Up event queued;
+currently getting powered off
+[  334.890587] pciehp 0001:00:00.0:pcie004: Timeout on hotplug command
+0x13f1 (issued 282900 msec ago)
+[  335.070190] pciehp 0001:00:00.0:pcie004: Slot(2): Link Down
+[  335.106960] pciehp 0001:00:00.0:pcie004: Slot(2): Link Down event queued; currently getting powered on
+[  335.191119] pcieport 0001:00:00.0: AER: Device recovery failed
+[  346.590153] pciehp 0001:00:00.0:pcie004: Timeout on hotplug command 0x17f1 (issued 10250 msec ago)
+
+
+Since DPC/AER patch to refactor fatal error handling, both hotplug
+driver and AER/DPC driver will try removing devices and perform enumeration on
+link events/AER events.
+
+Perfect environment for race condition without a change.
+
+Try to mask hotplug interrupts during AER/DPC fatal error handling.
+
+Changes from v4:
+* add mask_irq() and unmask_irq() callbacks to struct pcie_driver
+* refactor reset_slot() to use pciehp_mask_irq() an pciehp_unmask_irq()
+
+Sinan Kaya (3):
+  PCI: pciehp: implement mask and unmask interrupt functions
+  PCI: pciehp: reuse pciehp_mask/unmask_irq() in reset_slot()
+  PCI: Mask and unmask hotplug interrupts during reset
+
+ drivers/pci/hotplug/pciehp.h      |  2 ++
+ drivers/pci/hotplug/pciehp_core.c | 19 +++++++++++++++++++
+ drivers/pci/hotplug/pciehp_hpc.c  | 36 ++++++++++++++++++++++++++++--------
+ drivers/pci/pcie/err.c            | 11 +++++++++++
+ drivers/pci/pcie/portdrv.h        |  2 ++
+ 5 files changed, 62 insertions(+), 8 deletions(-)
+
+-- 
+2.7.4
