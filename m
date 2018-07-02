@@ -1,198 +1,39 @@
-From: jiri@resnulli.us (Jiri Pirko)
-Date: Mon, 2 Jul 2018 18:26:49 +0200
-Subject: [RFC net-next 08/15] net: lora: sx1276: Add debugfs
-In-Reply-To: <20180701110804.32415-9-afaerber@suse.de>
-References: <20180701110804.32415-1-afaerber@suse.de>
- <20180701110804.32415-9-afaerber@suse.de>
-Message-ID: <20180702162649.GC2737@nanopsycho.orion>
+From: rdunlap@infradead.org (Randy Dunlap)
+Date: Mon, 2 Jul 2018 09:41:16 -0700
+Subject: linux-next: Tree for Jul 2 (sound/soc/pxa/)
+In-Reply-To: <2276786f-3f50-0740-0500-68a26a49704a@infradead.org>
+References: <20180702145158.10190101@canb.auug.org.au>
+ <2276786f-3f50-0740-0500-68a26a49704a@infradead.org>
+Message-ID: <c12cc7c4-03d0-4b0b-d02f-7e72b8a135d4@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sun, Jul 01, 2018 at 01:07:57PM CEST, afaerber at suse.de wrote:
->Allow some interactive inspection at runtime via debugfs.
->
->Signed-off-by: Andreas F?rber <afaerber@suse.de>
->---
-> drivers/net/lora/sx1276.c | 132 ++++++++++++++++++++++++++++++++++++++++++++++
-> 1 file changed, 132 insertions(+)
->
->diff --git a/drivers/net/lora/sx1276.c b/drivers/net/lora/sx1276.c
->index d6732111247a..1072019cfcc1 100644
->--- a/drivers/net/lora/sx1276.c
->+++ b/drivers/net/lora/sx1276.c
->@@ -5,6 +5,7 @@
->  * Copyright (c) 2016-2018 Andreas F?rber
->  */
-> 
->+#include <linux/debugfs.h>
-> #include <linux/delay.h>
-> #include <linux/lora.h>
-> #include <linux/module.h>
->@@ -61,6 +62,8 @@ struct sx1276_priv {
-> 
-> 	struct workqueue_struct *wq;
-> 	struct work_struct tx_work;
->+
->+	struct dentry *debugfs;
-> };
-> 
-> static int sx1276_read_single(struct spi_device *spi, u8 reg, u8 *val)
->@@ -416,6 +419,128 @@ static const struct net_device_ops sx1276_netdev_ops =  {
-> 	.ndo_start_xmit = sx1276_loradev_start_xmit,
-> };
-> 
->+static ssize_t sx1276_freq_read(struct file *file, char __user *user_buf,
->+				 size_t count, loff_t *ppos)
->+{
->+	struct net_device *netdev = file->private_data;
->+	struct sx1276_priv *priv = netdev_priv(netdev);
->+	struct spi_device *spi = priv->spi;
->+	ssize_t size;
->+	char *buf;
->+	int ret;
->+	u8 msb, mid, lsb;
->+	u32 freq_xosc;
->+	unsigned long long frf;
->+
->+	ret = of_property_read_u32(spi->dev.of_node, "clock-frequency", &freq_xosc);
->+	if (ret)
->+		return 0;
->+
->+	mutex_lock(&priv->spi_lock);
->+
->+	ret = sx1276_read_single(spi, REG_FRF_MSB, &msb);
->+	if (!ret)
->+		ret = sx1276_read_single(spi, REG_FRF_MID, &mid);
->+	if (!ret)
->+		ret = sx1276_read_single(spi, REG_FRF_LSB, &lsb);
->+
->+	mutex_unlock(&priv->spi_lock);
->+
->+	if (ret)
->+		return 0;
->+
->+	frf = freq_xosc;
->+	frf *= ((ulong)msb << 16) | ((ulong)mid << 8) | lsb;
->+	frf /= (1 << 19);
->+
->+	buf = kasprintf(GFP_KERNEL, "%llu\n", frf);
->+	if (!buf)
->+		return 0;
->+
->+	size = simple_read_from_buffer(user_buf, count, ppos, buf, strlen(buf));
->+	kfree(buf);
->+
->+	return size;
->+}
->+
->+static const struct file_operations sx1276_freq_fops = {
->+	.owner = THIS_MODULE,
->+	.open = simple_open,
->+	.read = sx1276_freq_read,
->+};
->+
->+static ssize_t sx1276_state_read(struct file *file, char __user *user_buf,
->+				 size_t count, loff_t *ppos)
->+{
->+	struct net_device *netdev = file->private_data;
->+	struct sx1276_priv *priv = netdev_priv(netdev);
->+	struct spi_device *spi = priv->spi;
->+	ssize_t size;
->+	char *buf;
->+	int len = 0;
->+	int ret;
->+	u8 val;
->+	bool lora_mode = true;
->+	const int max_len = 4096;
->+
->+	buf = kzalloc(max_len, GFP_KERNEL);
->+	if (!buf)
->+		return 0;
->+
->+	mutex_lock(&priv->spi_lock);
->+
->+	ret = sx1276_read_single(spi, REG_OPMODE, &val);
->+	if (!ret) {
->+		len += snprintf(buf + len, max_len - len, "RegOpMode = 0x%02x\n", val);
->+		lora_mode = (val & REG_OPMODE_LONG_RANGE_MODE) != 0;
->+	}
->+
->+	ret = sx1276_read_single(spi, REG_FRF_MSB, &val);
->+	if (!ret)
->+		len += snprintf(buf + len, max_len - len, "RegFrMsb = 0x%02x\n", val);
->+	ret = sx1276_read_single(spi, REG_FRF_MID, &val);
->+	if (!ret)
->+		len += snprintf(buf + len, max_len - len, "RegFrMid = 0x%02x\n", val);
->+	ret = sx1276_read_single(spi, REG_FRF_LSB, &val);
->+	if (!ret)
->+		len += snprintf(buf + len, max_len - len, "RegFrLsb = 0x%02x\n", val);
->+
->+	ret = sx1276_read_single(spi, REG_PA_CONFIG, &val);
->+	if (!ret)
->+		len += snprintf(buf + len, max_len - len, "RegPaConfig = 0x%02x\n", val);
->+
->+	if (lora_mode) {
->+		ret = sx1276_read_single(spi, LORA_REG_IRQ_FLAGS_MASK, &val);
->+		if (!ret)
->+			len += snprintf(buf + len, max_len - len, "RegIrqFlagsMask = 0x%02x\n", val);
->+
->+		ret = sx1276_read_single(spi, LORA_REG_IRQ_FLAGS, &val);
->+		if (!ret)
->+			len += snprintf(buf + len, max_len - len, "RegIrqFlags = 0x%02x\n", val);
->+
->+		ret = sx1276_read_single(spi, LORA_REG_SYNC_WORD, &val);
->+		if (!ret)
->+			len += snprintf(buf + len, max_len - len, "RegSyncWord = 0x%02x\n", val);
->+	}
->+
->+	ret = sx1276_read_single(spi, REG_PA_DAC, &val);
->+	if (!ret)
->+		len += snprintf(buf + len, max_len - len, "RegPaDac = 0x%02x\n", val);
->+
->+	mutex_unlock(&priv->spi_lock);
->+
->+	size = simple_read_from_buffer(user_buf, count, ppos, buf, len);
->+	kfree(buf);
->+
->+	return size;
->+}
->+
->+static const struct file_operations sx1276_state_fops = {
->+	.owner = THIS_MODULE,
->+	.open = simple_open,
->+	.read = sx1276_state_read,
->+};
->+
-> static int sx1276_probe(struct spi_device *spi)
-> {
-> 	struct net_device *netdev;
->@@ -566,6 +691,10 @@ static int sx1276_probe(struct spi_device *spi)
-> 		return ret;
-> 	}
-> 
->+	priv->debugfs = debugfs_create_dir(dev_name(&spi->dev), NULL);
->+	debugfs_create_file("state", S_IRUGO, priv->debugfs, netdev, &sx1276_state_fops);
->+	debugfs_create_file("frequency", S_IRUGO, priv->debugfs, netdev, &sx1276_freq_fops);
+[add other maintainers]
 
-Hmm. These look like useful information not only for debugging. I think
-it would be worth to expose these via some standard uapi. Like generic
-netlink, similar to nl80211
+On 07/02/18 09:09, Randy Dunlap wrote:
+> On 07/01/18 21:51, Stephen Rothwell wrote:
+>> Hi all,
+>>
+>> Changes since 20180629:
+>>
+> 
+> on i386 or x86_64:
+> 
+> builtin:
+> sound/soc/pxa/pxa-ssp.o:(.rodata+0x228): undefined reference to `pxa2xx_soc_pcm_new'
+> sound/soc/pxa/pxa-ssp.o:(.rodata+0x22c): undefined reference to `pxa2xx_pcm_free_dma_buffers'
+> sound/soc/pxa/pxa-ssp.o:(.rodata+0x250): undefined reference to `pxa2xx_pcm_ops'
+> /home/rdunlap/lnx/next/linux-next-20180702/Makefile:1023: recipe for target 'vmlinux' failed
+> 
+> modular:
+> ERROR: "pxa2xx_pcm_ops" [sound/soc/pxa/snd-soc-pxa-ssp.ko] undefined!
+> ERROR: "pxa2xx_pcm_free_dma_buffers" [sound/soc/pxa/snd-soc-pxa-ssp.ko] undefined!
+> ERROR: "pxa2xx_soc_pcm_new" [sound/soc/pxa/snd-soc-pxa-ssp.ko] undefined!
+> 
+> 
+> x86_64 [modular] randconfig file is attached.
+> 
 
 
->+
-> 	dev_info(&spi->dev, "SX1276 module probed (SX%d)", model);
-> 
-> 	return 0;
->@@ -574,6 +703,9 @@ static int sx1276_probe(struct spi_device *spi)
-> static int sx1276_remove(struct spi_device *spi)
-> {
-> 	struct net_device *netdev = spi_get_drvdata(spi);
->+	struct sx1276_priv *priv = netdev_priv(netdev);
->+
->+	debugfs_remove_recursive(priv->debugfs);
-> 
-> 	unregister_loradev(netdev);
-> 	free_loradev(netdev);
->-- 
->2.16.4
->
+-- 
+~Randy
