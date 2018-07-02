@@ -1,135 +1,172 @@
-From: groeck@google.com (Guenter Roeck)
-Date: Mon, 2 Jul 2018 07:39:45 -0700
-Subject: [PATCH 1/3] platform/chrome: Move cros-ec transport drivers to
- drivers/platform.
-In-Reply-To: <20180702102201.13461-2-enric.balletbo@collabora.com>
-References: <20180702102201.13461-1-enric.balletbo@collabora.com>
- <20180702102201.13461-2-enric.balletbo@collabora.com>
-Message-ID: <CABXOdTcWnCTbn4NTmyZY53asOVXB47Uc2PNV4WC-kwbXU5tj3A@mail.gmail.com>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Mon, 2 Jul 2018 16:41:09 +0200
+Subject: [PATCH v3 10/20] kvm: arm64: Dynamic configuration of VTTBR mask
+In-Reply-To: <1530270944-11351-11-git-send-email-suzuki.poulose@arm.com>
+References: <1530270944-11351-1-git-send-email-suzuki.poulose@arm.com>
+ <1530270944-11351-11-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <e0c8dc62-42e8-ee24-5519-e19b2739160b@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 2, 2018 at 3:22 AM Enric Balletbo i Serra
-<enric.balletbo@collabora.com> wrote:
->
-> There are some cros-ec transport drivers (I2C, SPI) living in MFD, while
-> others (LPC) living in drivers/platform. The transport drivers are more
-> platform specific. So, move the I2C and SPI transport drivers to the
-> platform/chrome directory. The patch also removes the MFD_ prefix of
-> their Kconfig symbols.
->
-> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+Hi Suzuki,
 
-Reviewed-by: Guenter Roeck <groeck@chromium.org>
-
+On 06/29/2018 01:15 PM, Suzuki K Poulose wrote:
+> On arm64 VTTBR_EL2:BADDR holds the base address for the stage2
+> translation table. The Arm ARM mandates that the bits BADDR[x-1:0]
+> should be 0, where 'x' is defined for a given IPA Size and the
+> number of levels for a translation granule size. It is defined
+> using some magical constants. This patch is a reverse engineered
+> implementation to calculate the 'x' at runtime for a given ipa and
+> number of page table levels. See patch for more details.
+> 
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Christoffer Dall <cdall@kernel.org>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 > ---
->
->  drivers/mfd/Kconfig                           | 20 -------------------
->  drivers/mfd/Makefile                          |  2 --
->  drivers/platform/chrome/Kconfig               | 20 +++++++++++++++++++
->  drivers/platform/chrome/Makefile              |  2 ++
->  .../{mfd => platform/chrome}/cros_ec_i2c.c    |  0
->  .../{mfd => platform/chrome}/cros_ec_spi.c    |  0
->  6 files changed, 22 insertions(+), 22 deletions(-)
->  rename drivers/{mfd => platform/chrome}/cros_ec_i2c.c (100%)
->  rename drivers/{mfd => platform/chrome}/cros_ec_spi.c (100%)
->
-> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-> index b860eb5aa194..013458e728dc 100644
-> --- a/drivers/mfd/Kconfig
-> +++ b/drivers/mfd/Kconfig
-> @@ -202,26 +202,6 @@ config MFD_CROS_EC
->           You also need to enable the driver for the bus you are using. The
->           protocol for talking to the EC is defined by the bus driver.
->
-> -config MFD_CROS_EC_I2C
-> -       tristate "ChromeOS Embedded Controller (I2C)"
-> -       depends on MFD_CROS_EC && I2C
-> -
-> -       help
-> -         If you say Y here, you get support for talking to the ChromeOS
-> -         EC through an I2C bus. This uses a simple byte-level protocol with
-> -         a checksum. Failing accesses will be retried three times to
-> -         improve reliability.
-> -
-> -config MFD_CROS_EC_SPI
-> -       tristate "ChromeOS Embedded Controller (SPI)"
-> -       depends on MFD_CROS_EC && SPI
-> -
-> -       ---help---
-> -         If you say Y here, you get support for talking to the ChromeOS EC
-> -         through a SPI bus, using a byte-level protocol. Since the EC's
-> -         response time cannot be guaranteed, we support ignoring
-> -         'pre-amble' bytes before the response actually starts.
-> -
->  config MFD_CROS_EC_CHARDEV
->          tristate "Chrome OS Embedded Controller userspace device interface"
->          depends on MFD_CROS_EC
-> diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
-> index e9fd20dba18d..d13e859d7c1e 100644
-> --- a/drivers/mfd/Makefile
-> +++ b/drivers/mfd/Makefile
-> @@ -14,8 +14,6 @@ obj-$(CONFIG_MFD_BCM590XX)    += bcm590xx.o
->  obj-$(CONFIG_MFD_BD9571MWV)    += bd9571mwv.o
->  cros_ec_core-objs              := cros_ec.o
->  obj-$(CONFIG_MFD_CROS_EC)      += cros_ec_core.o
-> -obj-$(CONFIG_MFD_CROS_EC_I2C)  += cros_ec_i2c.o
-> -obj-$(CONFIG_MFD_CROS_EC_SPI)  += cros_ec_spi.o
->  obj-$(CONFIG_MFD_CROS_EC_CHARDEV) += cros_ec_dev.o
->  obj-$(CONFIG_MFD_EXYNOS_LPASS) += exynos-lpass.o
->
-> diff --git a/drivers/platform/chrome/Kconfig b/drivers/platform/chrome/Kconfig
-> index cb0df9eb3e0f..16b1615958aa 100644
-> --- a/drivers/platform/chrome/Kconfig
-> +++ b/drivers/platform/chrome/Kconfig
-> @@ -52,6 +52,26 @@ config CHROMEOS_TBMC
->  config CROS_EC_CTL
->          tristate
->
-> +config CROS_EC_I2C
-> +       tristate "ChromeOS Embedded Controller (I2C)"
-> +       depends on MFD_CROS_EC && I2C
+> Changes since V2:
+>  - Part 1 of spilt from VTCR & VTTBR dynamic configuration
+> ---
+>  arch/arm64/include/asm/kvm_arm.h | 60 +++++++++++++++++++++++++++++++++++++---
+>  arch/arm64/include/asm/kvm_mmu.h | 25 ++++++++++++++++-
+>  2 files changed, 80 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+> index 3dffd38..c557f45 100644
+> --- a/arch/arm64/include/asm/kvm_arm.h
+> +++ b/arch/arm64/include/asm/kvm_arm.h
+> @@ -140,8 +140,6 @@
+>   * Note that when using 4K pages, we concatenate two first level page tables
+>   * together. With 16K pages, we concatenate 16 first level page tables.
+>   *
+> - * The magic numbers used for VTTBR_X in this patch can be found in Tables
+> - * D4-23 and D4-25 in ARM DDI 0487A.b.
+Isn't it a pretty old reference? Could you refer to C.a?
+
+>   */
+>  
+>  #define VTCR_EL2_T0SZ_IPA	VTCR_EL2_T0SZ_40B
+> @@ -175,9 +173,63 @@
+>  #endif
+>  
+>  #define VTCR_EL2_FLAGS			(VTCR_EL2_COMMON_BITS | VTCR_EL2_TGRAN_FLAGS)
+> -#define VTTBR_X				(VTTBR_X_TGRAN_MAGIC - VTCR_EL2_T0SZ_IPA)
+> +/*
+> + * ARM VMSAv8-64 defines an algorithm for finding the translation table
+> + * descriptors in section D4.2.8 in ARM DDI 0487B.b.
+another one ;-)
+> + *
+> + * The algorithm defines the expectations on the BaseAddress (for the page
+> + * table) bits resolved at each level based on the page size, entry level
+> + * and T0SZ. The variable "x" in the algorithm also affects the VTTBR:BADDR
+> + * for stage2 page table.
+> + *
+> + * The value of "x" is calculated as :
+> + *	x = Magic_N - T0SZ
+> + *
+> + * where Magic_N is an integer depending on the page size and the entry
+> + * level of the page table as below:
+> + *
+> + *	--------------------------------------------
+> + *	| Entry level		|  4K    16K   64K |
+> + *	--------------------------------------------
+> + *	| Level: 0 (4 levels)	| 28   |  -  |  -  |
+> + *	--------------------------------------------
+> + *	| Level: 1 (3 levels)	| 37   | 31  | 25  |
+> + *	--------------------------------------------
+> + *	| Level: 2 (2 levels)	| 46   | 42  | 38  |
+> + *	--------------------------------------------
+> + *	| Level: 3 (1 level)	| -    | 53  | 51  |
+> + *	--------------------------------------------
+I understand entry level = Lookup level in the table.
+But you may want to compute x for BaseAddress matching lookup level 2
+with number of levels = 4.
+So shouldn't you s/Number of levels/4 - entry_level?
+for BADDR we want the BaseAddr of the initial lookup level so
+effectively the entry level we are interested in is 4 - number of levels
+and we don't care or d) condition. At least this is my understanding ;-)
+If correct you may slightly reword the explanation?
+> + *
+> + * We have a magic formula for the Magic_N below.
+> + *
+> + *  Magic_N(PAGE_SIZE, Entry_Level) = 64 - ((PAGE_SHIFT - 3) * Number of levels)
+> + *
+> + * where number of levels = (4 - Entry_Level).
+> + *
+> + * So, given that T0SZ = (64 - PA_SHIFT), we can compute 'x' as follows:
+Isn't it IPA_SHIFT instead?
+> + *
+> + *	x = (64 - ((PAGE_SHIFT - 3) * Number_of_levels)) - (64 - PA_SHIFT)
+> + *	  = PA_SHIFT - ((PAGE_SHIFT - 3) * Number of levels)
+> + *
+> + * Here is one way to explain the Magic Formula:
+> + *
+> + *  x = log2(Size_of_Entry_Level_Table)
+> + *
+> + * Since, we can resolve (PAGE_SHIFT - 3) bits at each level, and another
+> + * PAGE_SHIFT bits in the PTE, we have :
+> + *
+> + *  Bits_Entry_level = PA_SHIFT - ((PAGE_SHIFT - 3) * (n - 1) + PAGE_SHIFT)
+> + *		     = PA_SHIFT - (PAGE_SHIFT - 3) * n - 3
+> + *  where n = number of levels, and since each pointer is 8bytes, we have:
+> + *
+> + *  x = Bits_Entry_Level + 3
+> + *    = PA_SHIFT - (PAGE_SHIFT - 3) * n
+> + *
+> + * The only constraint here is that, we have to find the number of page table
+> + * levels for a given IPA size (which we do, see stage2_pt_levels())
+> + */
+> +#define ARM64_VTTBR_X(ipa, levels)	((ipa) - ((levels) * (PAGE_SHIFT - 3)))
+>  
+> -#define VTTBR_BADDR_MASK  (((UL(1) << (PHYS_MASK_SHIFT - VTTBR_X)) - 1) << VTTBR_X)
+>  #define VTTBR_VMID_SHIFT  (UL(48))
+>  #define VTTBR_VMID_MASK(size) (_AT(u64, (1 << size) - 1) << VTTBR_VMID_SHIFT)
+>  
+> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+> index a351722..813a72a 100644
+> --- a/arch/arm64/include/asm/kvm_mmu.h
+> +++ b/arch/arm64/include/asm/kvm_mmu.h
+> @@ -146,7 +146,6 @@ static inline unsigned long __kern_hyp_va(unsigned long v)
+>  #define kvm_phys_shift(kvm)		KVM_PHYS_SHIFT
+>  #define kvm_phys_size(kvm)		(_AC(1, ULL) << kvm_phys_shift(kvm))
+>  #define kvm_phys_mask(kvm)		(kvm_phys_size(kvm) - _AC(1, ULL))
+> -#define kvm_vttbr_baddr_mask(kvm)	VTTBR_BADDR_MASK
+>  
+>  static inline bool kvm_page_empty(void *ptr)
+>  {
+> @@ -503,6 +502,30 @@ static inline int hyp_map_aux_data(void)
+>  
+>  #define kvm_phys_to_vttbr(addr)		phys_to_ttbr(addr)
+>  
+> +/*
+> + * Get the magic number 'x' for VTTBR:BADDR of this KVM instance.
+> + * With v8.2 LVA extensions, 'x' should be a minimum of 6 with
+> + * 52bit IPS.
+Link to the spec?
+> + */
+> +static inline int arm64_vttbr_x(u32 ipa_shift, u32 levels)
+> +{
+> +	int x = ARM64_VTTBR_X(ipa_shift, levels);
 > +
-> +       help
-> +         If you say Y here, you get support for talking to the ChromeOS
-> +         EC through an I2C bus. This uses a simple byte-level protocol with
-> +         a checksum. Failing accesses will be retried three times to
-> +         improve reliability.
+> +	return (IS_ENABLED(CONFIG_ARM64_PA_BITS_52) && x < 6) ? 6 : x;
+> +}
 > +
-> +config CROS_EC_SPI
-> +       tristate "ChromeOS Embedded Controller (SPI)"
-> +       depends on MFD_CROS_EC && SPI
+> +static inline u64 vttbr_baddr_mask(u32 ipa_shift, u32 levels)
+> +{
+> +	unsigned int x = arm64_vttbr_x(ipa_shift, levels);
 > +
-> +       ---help---
-> +         If you say Y here, you get support for talking to the ChromeOS EC
-> +         through a SPI bus, using a byte-level protocol. Since the EC's
-> +         response time cannot be guaranteed, we support ignoring
-> +         'pre-amble' bytes before the response actually starts.
+> +	return GENMASK_ULL(PHYS_MASK_SHIFT - 1, x);
+> +}
 > +
->  config CROS_EC_LPC
->          tristate "ChromeOS Embedded Controller (LPC)"
->          depends on MFD_CROS_EC && ACPI && (X86 || COMPILE_TEST)
-> diff --git a/drivers/platform/chrome/Makefile b/drivers/platform/chrome/Makefile
-> index e44c37a63fa9..cd591bf872bb 100644
-> --- a/drivers/platform/chrome/Makefile
-> +++ b/drivers/platform/chrome/Makefile
-> @@ -6,6 +6,8 @@ obj-$(CONFIG_CHROMEOS_TBMC)             += chromeos_tbmc.o
->  cros_ec_ctl-objs                       := cros_ec_sysfs.o cros_ec_lightbar.o \
->                                            cros_ec_vbc.o cros_ec_debugfs.o
->  obj-$(CONFIG_CROS_EC_CTL)              += cros_ec_ctl.o
-> +obj-$(CONFIG_CROS_EC_I2C)              += cros_ec_i2c.o
-> +obj-$(CONFIG_CROS_EC_SPI)              += cros_ec_spi.o
->  cros_ec_lpcs-objs                      := cros_ec_lpc.o cros_ec_lpc_reg.o
->  cros_ec_lpcs-$(CONFIG_CROS_EC_LPC_MEC) += cros_ec_lpc_mec.o
->  obj-$(CONFIG_CROS_EC_LPC)              += cros_ec_lpcs.o
-> diff --git a/drivers/mfd/cros_ec_i2c.c b/drivers/platform/chrome/cros_ec_i2c.c
-> similarity index 100%
-> rename from drivers/mfd/cros_ec_i2c.c
-> rename to drivers/platform/chrome/cros_ec_i2c.c
-> diff --git a/drivers/mfd/cros_ec_spi.c b/drivers/platform/chrome/cros_ec_spi.c
-> similarity index 100%
-> rename from drivers/mfd/cros_ec_spi.c
-> rename to drivers/platform/chrome/cros_ec_spi.c
-> --
-> 2.18.0
->
+> +static inline u64 kvm_vttbr_baddr_mask(struct kvm *kvm)
+> +{
+> +	return vttbr_baddr_mask(kvm_phys_shift(kvm), kvm_stage2_levels(kvm));
+> +}
+> +
+>  static inline void *stage2_alloc_pgd(struct kvm *kvm)
+>  {
+>  	return alloc_pages_exact(stage2_pgd_size(kvm),
+> 
+
+Thanks
+
+Eric
