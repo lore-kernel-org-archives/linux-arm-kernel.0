@@ -1,242 +1,125 @@
-From: yixun.lan@amlogic.com (Yixun Lan)
-Date: Mon, 2 Jul 2018 15:17:36 +0800
-Subject: [PATCH 2/2] mtd: rawnand: meson: add support for Amlogic NAND
- flash controller
-In-Reply-To: <7hr2kqfpam.fsf@baylibre.com>
-References: <20180613161314.14894-1-yixun.lan@amlogic.com>
- <20180613161314.14894-3-yixun.lan@amlogic.com>
- <20180624213844.2207ca6f@bbrezillon> <7ha7rfiz3c.fsf@baylibre.com>
- <20180628090034.0637a062@xps13> <7hr2kqfpam.fsf@baylibre.com>
-Message-ID: <3afe2a61-d15d-63e8-ef59-b36d891dbfb7@amlogic.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 02 Jul 2018 10:19:25 +0300
+Subject: [PATCH v4 6/6] dt-bindings: media: rcar-vin: Clarify optional
+ props
+In-Reply-To: <20180627052431.GO5237@bigcity.dyn.berto.se>
+References: <1528813566-17927-1-git-send-email-jacopo+renesas@jmondi.org>
+ <20180613085455.GC4952@w540> <20180627052431.GO5237@bigcity.dyn.berto.se>
+Message-ID: <39247463.ySXe3lkPXm@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HI Kevin
+Hi Niklas,
 
-On 06/29/18 07:45, Kevin Hilman wrote:
-> Hi Miquel,
+On Wednesday, 27 June 2018 08:24:31 EEST Niklas S?derlund wrote:
+> On 2018-06-13 10:54:55 +0200, Jacopo Mondi wrote:
+> > On Tue, Jun 12, 2018 at 06:45:53PM +0300, Sakari Ailus wrote:
+> >> On Tue, Jun 12, 2018 at 04:26:06PM +0200, Jacopo Mondi wrote:
+> >>> Add a note to the R-Car VIN interface bindings to clarify that all
+> >>> properties listed as generic properties in video-interfaces.txt can
+> >>> be included in port at 0 endpoint, but if not explicitly listed in the
+> >>> interface bindings documentation, they do not modify it behaviour.
+> >>> 
+> >>> Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+> >>> ---
+> >>> 
+> >>>  Documentation/devicetree/bindings/media/rcar_vin.txt | 6 ++++++
+> >>>  1 file changed, 6 insertions(+)
+> >>> 
+> >>> diff --git a/Documentation/devicetree/bindings/media/rcar_vin.txt
+> >>> b/Documentation/devicetree/bindings/media/rcar_vin.txt index
+> >>> 8130849..03544c7 100644
+> >>> --- a/Documentation/devicetree/bindings/media/rcar_vin.txt
+> >>> +++ b/Documentation/devicetree/bindings/media/rcar_vin.txt
+> >>> @@ -55,6 +55,12 @@ from local SoC CSI-2 receivers (port1) depending on
+> >>> SoC.
+> >>> 
+> >>>        instances that are connected to external pins should have port
+> >>>        0.
+> >>> 
+> >>>        - Optional properties for endpoint nodes of port at 0:
+> >>> +
+> >>> +        All properties described in [1] and which apply to the
+> >>> selected
+> >>> +        media bus type could be optionally listed here to better
+> >>> describe
+> >>> +        the current hardware configuration, but only the following
+> >>> ones do
+> >>> +        actually modify the VIN interface behaviour:
+> >>> +
 > 
-> Miquel Raynal <miquel.raynal@bootlin.com> writes:
-> 
->> On Wed, 27 Jun 2018 16:33:43 -0700, Kevin Hilman <khilman@baylibre.com>
->> wrote:
->>
->>> Hi Boris,
->>>
->>> Boris Brezillon <boris.brezillon@bootlin.com> writes:
->>>
->>>> Hi Yixun,
->>>>
->>>> On Wed, 13 Jun 2018 16:13:14 +0000
->>>> Yixun Lan <yixun.lan@amlogic.com> wrote:
->>>>  
->>>>> From: Liang Yang <liang.yang@amlogic.com>
->>>>>
->>>>> Add initial support for the Amlogic NAND flash controller which found
->>>>> in the Meson-GXBB/GXL/AXG SoCs.
->>>>>
->>>>> Singed-off-by: Liang Yang <liang.yang@amlogic.com>
->>>>> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
->>>>> ---
->>>>>  drivers/mtd/nand/raw/Kconfig      |    8 +
->>>>>  drivers/mtd/nand/raw/Makefile     |    3 +
->>>>>  drivers/mtd/nand/raw/meson_nand.c | 1422 +++++++++++++++++++++++++++++
->>>>>  3 files changed, 1433 insertions(+)
->>>>>  create mode 100644 drivers/mtd/nand/raw/meson_nand.c  
->>>>
->>>> Can you run checkpatch.pl --strict and fix the coding style issues?
->>>>  
->>>>>
->>>>> diff --git a/drivers/mtd/nand/raw/Kconfig b/drivers/mtd/nand/raw/Kconfig
->>>>> index 19a2b283fbbe..b3c17a3ca8f4 100644
->>>>> --- a/drivers/mtd/nand/raw/Kconfig
->>>>> +++ b/drivers/mtd/nand/raw/Kconfig
->>>>> @@ -534,4 +534,12 @@ config MTD_NAND_MTK
->>>>>  	  Enables support for NAND controller on MTK SoCs.
->>>>>  	  This controller is found on mt27xx, mt81xx, mt65xx SoCs.
->>>>>  
->>>>> +config MTD_NAND_MESON
->>>>> +	tristate "Support for NAND flash controller on Amlogic's Meson SoCs"
->>>>> +	depends on ARCH_MESON || COMPILE_TEST
->>>>> +	select COMMON_CLK_REGMAP_MESON
->>>>> +	select MFD_SYSCON
->>>>> +	help
->>>>> +	  Enables support for NAND controller on Amlogic's Meson SoCs.
->>>>> +
->>>>>  endif # MTD_NAND
->>>>> diff --git a/drivers/mtd/nand/raw/Makefile b/drivers/mtd/nand/raw/Makefile
->>>>> index 165b7ef9e9a1..cdf6162f38c3 100644
->>>>> --- a/drivers/mtd/nand/raw/Makefile
->>>>> +++ b/drivers/mtd/nand/raw/Makefile
->>>>> @@ -1,5 +1,7 @@
->>>>>  # SPDX-License-Identifier: GPL-2.0
->>>>>  
->>>>> +ccflags-$(CONFIG_MTD_NAND_MESON) += -I$(srctree)/drivers/clk/meson  
->>>>
->>>> Please don't do that. If you need to expose common regs, put them
->>>> in include/linux/soc/meson/. I'm also not sure why you need to access
->>>> the clk regs directly. Why can't you expose the MMC/NAND clk as a clk
->>>> provider whose driver would be placed in drivers/clk and which would use
->>>> the mmc syscon. This way the same clk driver could be used for both
->>>> MMC and NAND clk indifferently, and the NAND driver would be much
->>>> simpler.  
->>>
->>> [...]
->>>
->>>>> +
->>>>> +	return 0;
->>>>> +}
->>>>> +
->>>>> +static const char * sd_emmc_ext_clk0_parent_names[MUX_CLK_NUM_PARENTS];
->>>>> +
->>>>> +static struct clk_regmap sd_emmc_c_ext_clk0_sel = {
->>>>> +	.data = &(struct clk_regmap_mux_data){
->>>>> +		.offset = SD_EMMC_CLOCK,
->>>>> +		.mask = 0x3,
->>>>> +		.shift = 6,
->>>>> +	},
->>>>> +	.hw.init = &(struct clk_init_data) {
->>>>> +		.name = "sd_emmc_c_nand_clk_mux",
->>>>> +		.ops = &clk_regmap_mux_ops,
->>>>> +		.parent_names = sd_emmc_ext_clk0_parent_names,
->>>>> +		.num_parents = ARRAY_SIZE(sd_emmc_ext_clk0_parent_names),
->>>>> +		.flags = CLK_SET_RATE_PARENT,
->>>>> +	},
->>>>> +};
->>>>> +
->>>>> +static struct clk_regmap sd_emmc_c_ext_clk0_div = {
->>>>> +	.data = &(struct clk_regmap_div_data){
->>>>> +		.offset = SD_EMMC_CLOCK,
->>>>> +		.shift = 0,
->>>>> +		.width = 6,
->>>>> +		.flags = CLK_DIVIDER_ROUND_CLOSEST | CLK_DIVIDER_ONE_BASED,
->>>>> +	},
->>>>> +	.hw.init = &(struct clk_init_data) {
->>>>> +		.name = "sd_emmc_c_nand_clk_div",
->>>>> +		.ops = &clk_regmap_divider_ops,
->>>>> +		.parent_names = (const char *[]){ "sd_emmc_c_nand_clk_mux" },
->>>>> +		.num_parents = 1,
->>>>> +		.flags = CLK_SET_RATE_PARENT,
->>>>> +	},
->>>>> +};
->>>>> +
->>>>> +static int meson_nfc_clk_init(struct meson_nfc *nfc)
->>>>> +{
->>>>> +	struct clk_regmap *mux = &sd_emmc_c_ext_clk0_sel;
->>>>> +	struct clk_regmap *div = &sd_emmc_c_ext_clk0_div;
->>>>> +	struct clk *clk;
->>>>> +	int i, ret;
->>>>> +
->>>>> +	/* request core clock */
->>>>> +	nfc->core_clk = devm_clk_get(nfc->dev, "core");
->>>>> +	if (IS_ERR(nfc->core_clk)) {
->>>>> +		dev_err(nfc->dev, "failed to get core clk\n");
->>>>> +		return PTR_ERR(nfc->core_clk);
->>>>> +	}
->>>>> +
->>>>> +	/* init SD_EMMC_CLOCK to sane defaults w/min clock rate */
->>>>> +	regmap_update_bits(nfc->reg_clk, 0,
->>>>> +			CLK_SELECT_NAND | CLK_ALWAYS_ON | CLK_DIV_MASK,
->>>>> +			CLK_SELECT_NAND | CLK_ALWAYS_ON | CLK_DIV_MASK);
->>>>> +
->>>>> +	/* get the mux parents */
->>>>> +	for (i = 0; i < MUX_CLK_NUM_PARENTS; i++) {
->>>>> +		char name[16];
->>>>> +
->>>>> +		snprintf(name, sizeof(name), "clkin%d", i);
->>>>> +		clk = devm_clk_get(nfc->dev, name);
->>>>> +		if (IS_ERR(clk)) {
->>>>> +			if (clk != ERR_PTR(-EPROBE_DEFER))
->>>>> +				dev_err(nfc->dev, "Missing clock %s\n", name);
->>>>> +			return PTR_ERR(clk);
->>>>> +		}
->>>>> +
->>>>> +		sd_emmc_ext_clk0_parent_names[i] = __clk_get_name(clk);
->>>>> +	}
->>>>> +
->>>>> +	mux->map = nfc->reg_clk;
->>>>> +	clk = devm_clk_register(nfc->dev, &mux->hw);
->>>>> +	if (WARN_ON(IS_ERR(clk)))
->>>>> +		return PTR_ERR(clk);
->>>>> +
->>>>> +	div->map = nfc->reg_clk;
->>>>> +	nfc->device_clk = devm_clk_register(nfc->dev, &div->hw);
->>>>> +	if (WARN_ON(IS_ERR(nfc->device_clk)))
->>>>> +		return PTR_ERR(nfc->device_clk);
->>>>> +
->>>>> +	ret = clk_prepare_enable(nfc->core_clk);
->>>>> +	if (ret) {
->>>>> +		dev_err(nfc->dev, "failed to enable core clk\n");
->>>>> +		return ret;
->>>>> +	}
->>>>> +
->>>>> +	ret = clk_prepare_enable(nfc->device_clk);
->>>>> +	if (ret) {
->>>>> +		dev_err(nfc->dev, "failed to enable device clk\n");
->>>>> +		clk_disable_unprepare(nfc->core_clk);
->>>>> +		return ret;
->>>>> +	}
->>>>> +
->>>>> +	return 0;
->>>>> +}  
->>>>
->>>>
->>>> As said above, I don't like having a clk driver here, especially since
->>>> the registers you're accessing are not part of the NAND controller
->>>> registers. Please try to create a driver in drivers/clk/ for that.  
->>>
->>> We went back and forth on this one on some off-list reviews.
->>>
->>> Had we known that the NAND controller was (re)using the clock registers
->>> internal to the MMC IP block from the beginning, we would have written a
->>> clock provider in drivers/clk for this, and shared it.
->>>
->>> However, when I wrote the MMC driver[1] (already upstream) along with
->>> the bindings[2], we did not fathom that the internal mux and divider
->>> would be "borrowed" by another device. :(
->>>
->>> We only recently found out that the NAND controller "borrows" one of the
->>> MMC clocks, whose registers are inside the MMC range.  Taking the clock
->>> out of the MMC driver and into its own clock-provider implies redoing
->>> the MMC driver, as well as its bindings, which we wanted to avoid
->>> (especially the binding changes.)
->>>
->>> We (I can take the blame) decided that since the MMC and NAND are
->>> mutually exclusive (they also share pins), that allowing NAND to reuse
->>> the MMC range would be a good compromise.  The DT still accurately
->>> describes the hardware, but we don't have to throw a large wrench into
->>> the DT bindings just for a newly discovered shared clock.
->>>
->>> I agree, it's not the prettiest thing, but when we cannot know the full
->>> details of the hardware when we start, sometimes we end up in a bit of a
->>> mess that requires some compromise.
->>
->> I totally understand your situation but as MMC and NAND are mutually
->> exclusive, how is this a problem to have a dedicated clock driver used
->> only by the NAND controller (as maybe a first step)? I mean, if you
->> don't change the MMC bindings, then the MMC driver will still use its
->> own 'local' clock driver, right?
-> 
-> Yeah, I think you're right.  That would work too.
-> 
->> I don't know if you can have two nodes reserving the same address
->> range though.
-> 
-> You can, but it's a race who gets to claim the region.
-> 
-> You'd have to have the new clock-controler disabled by default, and have
-> any boards that use the NAND disable the MMC and enable the clock
-> controller node.
-> 
-> But I think that should work.
-> 
-> Yixun, can you give this approach a try?
-Yes, It actually works here, I'll send out the clock patches later for
-review.
+> I'm not sure the description have to be as explicit to that the
+> properties in 'video-interfaces.txt' are not currently used by the
+> driver. I find it not relevant which ones are used or not, what is
+> important for me is that all properties in 'video-interfaces.txt' which
+> can be used to describe the specific bus are valid for the DT
+> description.
 
-Thanks everyone for the suggestion
+I agree with you. The driver is irrelevant in this context. What matters is 
+which properties are applicable to the bus. For instance, if the VIN parallel 
+input supports configurable polarities for the h/v sync signals, hsync-active 
+and vsync-active should be listed in the bindings. On the other hand, if the 
+polarities are fixed, then the properties are not needed.
+
+> On a side note, in rcar_vin.txt we have this section describing the Gen2
+> bindings:
 > 
-> Kevin
+>   The per-board settings Gen2 platforms:
+>    - port sub-node describing a single endpoint connected to the vin
+>      as described in video-interfaces.txt[1]. Only the first one will
+>      be considered as each vin interface has one input port.
 > 
-> .
+> This whole series only deals with documenting the Gen3 optional
+> properties and not the Gen2. Maybe with parallel input support for Gen3
+> patches on there way to making it upstream this series should be
+> extended to in a good way merge the port at 0 optional properties for both
+> generations of hardware?
+
+That would be nice too :-)
+
+> >> I don't think this should be needed. You should only have properties
+> >> that describe the hardware configuration in a given system.
+> > 
+> > There has been quite some debate on this, and please bear with me
+> > here for re-proposing it: I started by removing properties in some DT
+> > files for older Renesas board which listed endpoint properties not
+> > documented in the VIN's bindings and not parsed by the VIN driver [1]
+> > Niklas (but Simon and Geert seems to agree here) opposed to that
+> > patch, as those properties where described in 'video-interfaces.txt' and
+> > even if not parsed by the current driver implementation, they actually
+> > describe hardware. I rebated that only properties listed in the device
+> > bindings documentation should actually be used, and having properties
+> > not parsed by the driver confuses users, which may expect changing
+> > them modifies the interface configuration, which does not happens at
+> > the moment.
+> > 
+> > This came out as a middle ground from a discussion with Niklas. As
+> > stated in the cover letter if this patch makes someone uncomfortable, feel
+> > free to drop it not to hold back the rest of the series which has been
+> > well received instead.
 > 
+> What I don't agree with and sparked this debate from my side was the
+> deletion of properties in dts files which correctly does describe the
+> bus but which are not currently parsed by the driver. To me that is
+> decreasing the value of the dts. If on the other hand the goal is to
+> deprecate a property from the video-interfaces.txt by slowly removing
+> them from dts where the driver don't use them I'm all for it. But I
+> don't think this is the case here right?
+
+I think you're right, I don't think that's the case.
+
+We should not remove properties from the dts files when they correctly 
+describe the hardware and have an added-value. On the other hand, if a 
+property correctly describes the hardware, but is constrained to a single 
+value due to hardware limitations, then we can omit it.
+
+> > [1] https://www.spinics.net/lists/arm-kernel/msg656302.html
+> > 
+> >>> - hsync-active: see [1] for description. Default is active high.
+> >>> - vsync-active: see [1] for description. Default is active high.
+> >>> - data-enable-active: polarity of CLKENB signal, see [1] for
+
+-- 
+Regards,
+
+Laurent Pinchart
