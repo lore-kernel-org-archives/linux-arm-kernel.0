@@ -1,37 +1,43 @@
-From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Mon, 02 Jul 2018 13:18:42 +0300
-Subject: [PATCH 0/2] serial: 8250_dw: add fractional divisor support
-In-Reply-To: <20180702180428.331b36c5@xhacker.debian>
-References: <20180702180428.331b36c5@xhacker.debian>
-Message-ID: <fef0bf484ead5e0998666168ced86438bf935ce5.camel@linux.intel.com>
+From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
+Date: Mon,  2 Jul 2018 12:21:58 +0200
+Subject: [PATCH 0/3] platform/chrome: mfd: Move cros-ec transport drivers to
+ drivers/platform
+Message-ID: <20180702102201.13461-1-enric.balletbo@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2018-07-02 at 18:04 +0800, Jisheng Zhang wrote:
-> For Synopsys DesignWare 8250 uart which version >= 4.00a, there's a
-> valid divisor latch fraction register. The fractional divisor width is
-> 4bits ~ 6bits.
-> 
+Hi,
 
-There are several serial IPs that have fractional divider built-in. None
-is using any specific hooks. Why do you need in your case, esp. taking
-into consideration that we have a custom ->set_termios() callback?
+The cros-ec transport drivers are placed in two subsystems, in MFD and
+in platform/chrome. As far as I know there is no reason for this, so,
+move the I2C and the SPI cros-ec transport driver from the MFD subsystem
+to the platform/chrome. The series also removes the MFD_ prefix for the
+Kconfig symbols, modifies the defconfigs that used these symbols and
+fixes the KEYBOARD_CROS_EC Kconfig help.
 
-> patch1 introduces necessary hooks to 8250 core.
-> patch2 implement the fractional divisor support for Synopsys DW 8250.
-> 
-> Jisheng Zhang (2):
->   serial: 8250: introduce get_divisor() and set_divisor() hook
->   serial: 8250_dw: add fractional divisor support
-> 
->  drivers/tty/serial/8250/8250_core.c |  4 +++
->  drivers/tty/serial/8250/8250_dw.c   | 54
-> +++++++++++++++++++++++++++++
->  drivers/tty/serial/8250/8250_port.c |  8 +++++
->  include/linux/serial_8250.h         |  7 ++++
->  4 files changed, 73 insertions(+)
-> 
+Best regards,
+ Enric
+
+Enric Balletbo i Serra (3):
+  platform/chrome: Move cros-ec transport drivers to drivers/platform.
+  arm/arm64: configs: Remove the MFD_ prefix for MFD_CROS_EC_I2C/SPI
+    symbols.
+  Input: keyboard: Fix ChromeOS EC keyboard help message.
+
+ arch/arm/configs/exynos_defconfig             |  4 ++--
+ arch/arm/configs/multi_v7_defconfig           |  4 ++--
+ arch/arm/configs/pxa_defconfig                |  4 ++--
+ arch/arm64/configs/defconfig                  |  4 ++--
+ drivers/input/keyboard/Kconfig                |  2 +-
+ drivers/mfd/Kconfig                           | 20 -------------------
+ drivers/mfd/Makefile                          |  2 --
+ drivers/platform/chrome/Kconfig               | 20 +++++++++++++++++++
+ drivers/platform/chrome/Makefile              |  2 ++
+ .../{mfd => platform/chrome}/cros_ec_i2c.c    |  0
+ .../{mfd => platform/chrome}/cros_ec_spi.c    |  0
+ 11 files changed, 31 insertions(+), 31 deletions(-)
+ rename drivers/{mfd => platform/chrome}/cros_ec_i2c.c (100%)
+ rename drivers/{mfd => platform/chrome}/cros_ec_spi.c (100%)
 
 -- 
-Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-Intel Finland Oy
+2.18.0
