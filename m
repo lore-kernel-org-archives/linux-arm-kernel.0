@@ -1,22 +1,67 @@
-From: hch@infradead.org (Christoph Hellwig)
-Date: Mon, 2 Jul 2018 06:30:16 -0700
-Subject: [PATCH] mm: cma: honor __GFP_ZERO flag in cma_alloc()
-In-Reply-To: <20180702132335eucas1p1323fbf51cd5e82a59939d72097acee04~9kAizDyji0466904669eucas1p1w@eucas1p1.samsung.com>
-References: <CGME20180613085851eucas1p20337d050face8ff8ea87674e16a9ccd2@eucas1p2.samsung.com>
- <20180613085851eucas1p20337d050face8ff8ea87674e16a9ccd2~3rI_9nj8b0455904559eucas1p2C@eucas1p2.samsung.com>
- <20180613122359.GA8695@bombadil.infradead.org>
- <20180613124001eucas1p2422f7916367ce19fecd40d6131990383~3uKFrT3ML1977219772eucas1p2G@eucas1p2.samsung.com>
- <20180613125546.GB32016@infradead.org>
- <20180613133913.GD20315@dhcp22.suse.cz>
- <20180702132335eucas1p1323fbf51cd5e82a59939d72097acee04~9kAizDyji0466904669eucas1p1w@eucas1p1.samsung.com>
-Message-ID: <20180702133016.GA16909@infradead.org>
+From: cyndis@kapsi.fi (Mikko Perttunen)
+Date: Mon, 2 Jul 2018 16:30:07 +0300
+Subject: [PATCH v3 6/8] serial: Add Tegra Combined UART driver
+In-Reply-To: <20180702131851.GH13096@ulmo>
+References: <20180702114033.15654-1-mperttunen@nvidia.com>
+ <20180702114033.15654-7-mperttunen@nvidia.com> <20180702131851.GH13096@ulmo>
+Message-ID: <50c4702b-3d59-e443-5075-c888f83a2615@kapsi.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 02, 2018 at 03:23:34PM +0200, Marek Szyprowski wrote:
-> What about clearing the allocated buffer? Should it be another bool 
-> parameter,
-> done unconditionally or moved to the callers?
+On 02.07.2018 16:18, Thierry Reding wrote:
+> On Mon, Jul 02, 2018 at 02:40:31PM +0300, Mikko Perttunen wrote:
+>> The Tegra Combined UART (TCU) is a mailbox-based mechanism that allows
+>> multiplexing multiple "virtual UARTs" into a single hardware serial
+>> port. The TCU is the primary serial port on Tegra194 devices.
+>>
+>> Add a TCU driver utilizing the mailbox framework, as the used mailboxes
+>> are part of Tegra HSP blocks that are already controlled by the Tegra
+>> HSP mailbox driver.
+>>
+>> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
+>> ---
+>>
+>> Notes:
+>>      v2:
+>>      - Removed (void) casts for unused variables.
+>>      - Changed the uart_set_options() call to be on one line, even if its
+>>        over 80 characters.
+>>      - Added defines for magic numbers.
+>>      - Style fixes.
+>>      - Changed Kconfig entry to depend on the Tegra HSP driver instead of
+>>        just the mailbox framework.
+>>      
+>>      v3:
+>>      - Removed FLUSH bit, as it's unnecessary and slows down printing
+>>      - Removed call to uart_set_options
+>>      - Added mbox_free_channel calls to remove()
+>>
+>>   drivers/tty/serial/Kconfig       |   9 ++
+>>   drivers/tty/serial/Makefile      |   1 +
+>>   drivers/tty/serial/tegra-tcu.c   | 291 +++++++++++++++++++++++++++++++++++++++
+>>   include/uapi/linux/serial_core.h |   3 +
+>>   4 files changed, 304 insertions(+)
+>>   create mode 100644 drivers/tty/serial/tegra-tcu.c
+> 
+> The driver looks good to me. But for my own understanding, is there some
+> way we can make use of the multiplexing? That is, could we add a
+> mechanism to have the driver filter out only a specific stream? Could we
+> also specify which stream to send data back to? What happens by default?
+> Which stream is data sent to?
 
-Please keep it in the callers.  I plan to push it up even higher
-from the current callers short to midterm.
+There is no multiplexing on the producer/device side (i.e. what this 
+driver does). The mailbox specified in device tree specifies the stream 
+we send stuff to. The mailboxes are per-CPU (we use the CCPLEX mailbox 
+here), so it cannot really be changed.
+
+The consumer then sees the multiplexing in that it can receive from and 
+transmit to all of the various CPUs in the system at the same time. AIUI 
+there is also a secondary form of multiplexing where the outputs of 
+different VMs can be multiplexed by the hypervisor, but I'm not very 
+familiar with that.
+
+Mikko
+
+> 
+> Thierry
+> 
