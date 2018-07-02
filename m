@@ -1,50 +1,72 @@
-From: dinguyen@kernel.org (Dinh Nguyen)
-Date: Mon,  2 Jul 2018 09:05:38 -0500
-Subject: [GIT PULL] SoCFPGA updates for v4.19, part1
-Message-ID: <1530540338-27657-1-git-send-email-dinguyen@kernel.org>
+From: srikar@linux.vnet.ibm.com (Srikar Dronamraju)
+Date: Mon, 2 Jul 2018 09:01:58 -0700
+Subject: [PATCH v5 06/10] Uprobes: Support SDT markers having reference
+ count (semaphore)
+In-Reply-To: <20180628052209.13056-7-ravi.bangoria@linux.ibm.com>
+References: <20180628052209.13056-1-ravi.bangoria@linux.ibm.com>
+ <20180628052209.13056-7-ravi.bangoria@linux.ibm.com>
+Message-ID: <20180702160158.GD65296@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Kevin, and Olof:
+> Implement the reference counter logic in core uprobe. User will be
+> able to use it from trace_uprobe as well as from kernel module. New
+> trace_uprobe definition with reference counter will now be:
+> 
+>     <path>:<offset>[(ref_ctr_offset)]
+> 
+> where ref_ctr_offset is an optional field. For kernel module, new
+> variant of uprobe_register() has been introduced:
+> 
+>     uprobe_register_refctr(inode, offset, ref_ctr_offset, consumer)
+> 
 
-Please pull in these SoCFPGA updates for v4.19. The reason it's based on
-v4.18-rc3 is that there are some dependencies on fixes that went into
-v4.18-rc2.
+Sorry for bringing this again, but I would actually think the ref_ctr is
+a consumer property. i.e the ref_ctr_offset should be part of
+uprobe_consumer.
 
-Thanks,
-Dinh
+The advantages of doing that would be
+1. Dont need to expose uprobe structure and just update our
+uprobe_consumer which is already an exported structure.
+- Exporting uprobe structure would expose some of our internal
+  implementation details, basically reduce the freedom of changing stuff
+  internally.
+- we came up with uprobe_arch for the parts that we wanted to expose
+  to archs. exposing uprobe and uprobe_arch looks weird.
 
-The following changes since commit 021c91791a5e7e85c567452f1be3e4c2c6cb6063:
+2. ref_ctr_offset is necessarily a consumer property, its not a uprobe
+property at all.
 
-  Linux 4.18-rc3 (2018-07-01 16:04:53 -0700)
+3. We dont need to change/add new uprobe_register functions.
 
-are available in the git repository at:
+The way I look at it is.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git tags/socfpga_updates_for_v4.19_part1
+Based on the ref_ctr_offset field in consumer, we update_ref_ctr()
+around install_breakpoint/remove_breakpoint.
 
-for you to fetch changes up to 70455ac7ffb6b707af1e56e1993af82906fddaae:
+> +static int delayed_uprobe_add(struct uprobe *uprobe, struct mm_struct *mm)
+> +{
+> +	struct delayed_uprobe *du;
+> +
+> +	if (delayed_uprobe_check(uprobe, mm))
+> +		return 0;
+> +
+> +	du  = kzalloc(sizeof(*du), GFP_KERNEL);
+> +	if (!du)
+> +		return -ENOMEM;
+> +
+> +	du->uprobe = uprobe;
+> +	du->mm = mm;
+> +	list_add(&du->list, &delayed_uprobe_list);
+> +	return 0;
+> +}
+> +
 
-  arm64: dts: stratix10: Add SPI node clocks for Stratix10 (2018-07-02 08:44:15 -0500)
+If I understood the delayed_uprobe stuff, its when we could insert a
+breakpoint but the vma that has the ref_ctr_offset is not loaded. Is
+that correct?
 
-----------------------------------------------------------------
-SoCFPGA DTS updates for v4.19
-- Add SPI node for Arria10
-- Stratix10 platform updates
-  - Add QSPI support on devkit
-  - Add clocks for SPI/USB/watchdog
-  - Add additional OCP reset property
-
-----------------------------------------------------------------
-Dinh Nguyen (2):
-      arm64: dts: stratix10: fill in clocks field for usb and watchdog
-      arm64: dts: stratix10: add OCP reset property for ethernet
-
-Thor Thayer (3):
-      arm64: dts: stratix10: Add QSPI support for Stratix10
-      ARM: dts: Add SPI0 node for Arria10
-      arm64: dts: stratix10: Add SPI node clocks for Stratix10
-
- arch/arm/boot/dts/socfpga_arria10.dtsi             | 12 +++++++
- arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi  | 41 ++++++++++++++++++----
- .../boot/dts/altera/socfpga_stratix10_socdk.dts    | 35 ++++++++++++++++++
- 3 files changed, 82 insertions(+), 6 deletions(-)
+> 
+> -- 
+> 2.14.4
+> 
