@@ -1,68 +1,26 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Mon, 2 Jul 2018 09:23:33 +0200
-Subject: [PATCH v5 1/8] interconnect: Add generic on-chip interconnect API
-In-Reply-To: <730fac43-e99f-e4bd-bc40-eddeb8338e6e@linaro.org>
-References: <20180620121141.15403-1-georgi.djakov@linaro.org>
- <20180620121141.15403-2-georgi.djakov@linaro.org>
- <CAKfTPtBApjf9rhJm3paeXdgbVG50ALeun=zMUddc-f+RnrvkqQ@mail.gmail.com>
- <730fac43-e99f-e4bd-bc40-eddeb8338e6e@linaro.org>
-Message-ID: <CAKfTPtBFcwSGm8oxd7e-xqUvyHjRfOawFrJiKeF_E4Lj=qPZ7w@mail.gmail.com>
+From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
+Date: Mon, 2 Jul 2018 09:28:47 +0200
+Subject: [PATCH v4 09/18] ARM: davinci: da850-evm: remove dead MTD code
+In-Reply-To: <46acbc64-6d22-d361-941c-f67aa3029242@lechnology.com>
+References: <20180629094039.7543-1-brgl@bgdev.pl>
+ <20180629094039.7543-10-brgl@bgdev.pl>
+ <46acbc64-6d22-d361-941c-f67aa3029242@lechnology.com>
+Message-ID: <CAMpxmJW2L+nYoPgR0G63uML_bqrhVRwpNRDFEv2e=3r4Yd9NBQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 1 Jul 2018 at 13:09, Georgi Djakov <georgi.djakov@linaro.org> wrote:
+2018-06-29 19:09 GMT+02:00 David Lechner <david@lechnology.com>:
+> On 06/29/2018 04:40 AM, Bartosz Golaszewski wrote:
+>>
+>> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>>
+>> We no longer need to register the MTD notifier to read the MAC address
+>> as it's now being done in the emac address.
 >
-> Hi Vincent,
 >
-> On 27.06.18 ?. 9:19, Vincent Guittot wrote:
-> > Hi Georgi
-> >
-> > On Wed, 20 Jun 2018 at 14:11, Georgi Djakov <georgi.djakov@linaro.org> wrote:
-> >
-> > [snip]
-> >
-> >> +
-> >> +static struct icc_path *path_allocate(struct icc_node *dst, ssize_t num_nodes)
-> >> +{
-> >> +       struct icc_node *node = dst;
-> >> +       struct icc_path *path;
-> >> +       size_t i;
-> >> +
-> >> +       path = kzalloc(sizeof(*path) + num_nodes * sizeof(*path->reqs),
-> >
-> > Should be (num_nodes -1) * sizeof(*path->reqs) as there is already 1
-> > icc_req in icc_path struct
->
-> reqs[] is a flexible array member and it's size is not included in
-> sizeof(*path)
+> I think you mean "it's now being done in the emac _driver_"
 
-ah yes, my eyes saw "struct icc_req reqs[0];"  but my brain was
-reading "struct icc_req reqs[1]"
+Haha yes I do. :)
 
-Sorry for the noise
-
->
-> Thanks,
-> Georgi
->
-> >> +                      GFP_KERNEL);
-> >> +       if (!path)
-> >> +               return ERR_PTR(-ENOMEM);
-> >> +
-> >> +       path->num_nodes = num_nodes;
-> >> +
-> >> +       for (i = 0; i < num_nodes; i++) {
-> >> +               hlist_add_head(&path->reqs[i].req_node, &node->req_list);
-> >> +
-> >> +               path->reqs[i].node = node;
-> >> +               /* reference to previous node was saved during path traversal */
-> >> +               node = node->reverse;
-> >> +       }
-> >> +
-> >> +       return path;
-> >> +}
-> >> +
-> >
-> > [snip]
-> >
->
+Thanks,
+Bart
