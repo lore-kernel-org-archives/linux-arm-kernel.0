@@ -1,185 +1,83 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon,  2 Jul 2018 12:04:04 +0100
-Subject: [PATCHv4 08/19] arm64: convert syscall trace logic to C
+Date: Mon,  2 Jul 2018 12:04:07 +0100
+Subject: [PATCHv4 11/19] arm64: don't reload GPRs after apply_ssbd
 In-Reply-To: <20180702110415.10465-1-mark.rutland@arm.com>
 References: <20180702110415.10465-1-mark.rutland@arm.com>
-Message-ID: <20180702110415.10465-9-mark.rutland@arm.com>
+Message-ID: <20180702110415.10465-12-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently syscall tracing is a tricky assembly state machine, which can
-be rather difficult to follow, and even harder to modify. Before we
-start fiddling with it for pt_regs syscalls, let's convert it to C.
+Now that all of the syscall logic works on the saved pt_regs, apply_ssbd
+can safely corrupt x0-x3 in the entry paths, and we no longer need to
+restore them. So let's remove the logic doing so.
 
-This is not intended to have any functional change.
+With that logic gone, we can fold the branch target into the macro, so
+that callers need not deal with this. GAS provides \@, which provides a
+unique value per macro invocation, which we can use to create a unique
+label.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/kernel/entry.S   | 53 ++---------------------------------------
- arch/arm64/kernel/syscall.c | 58 ++++++++++++++++++++++++++++++++++++++++++---
- 2 files changed, 57 insertions(+), 54 deletions(-)
+ arch/arm64/kernel/entry.S | 20 +++++++-------------
+ 1 file changed, 7 insertions(+), 13 deletions(-)
 
 diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index c0392f78e392..05b9f03f3e00 100644
+index c41b84d06644..728bc7cc5bbb 100644
 --- a/arch/arm64/kernel/entry.S
 +++ b/arch/arm64/kernel/entry.S
-@@ -896,24 +896,6 @@ el0_error_naked:
- 	b	ret_to_user
- ENDPROC(el0_error)
+@@ -130,20 +130,21 @@ alternative_else_nop_endif
  
--
--/*
-- * This is the fast syscall return path.  We do as little as possible here,
-- * and this includes saving x0 back into the kernel stack.
-- */
--ret_fast_syscall:
--	disable_daif
--	ldr	x1, [tsk, #TSK_TI_FLAGS]	// re-check for syscall tracing
--	and	x2, x1, #_TIF_SYSCALL_WORK
--	cbnz	x2, ret_fast_syscall_trace
--	and	x2, x1, #_TIF_WORK_MASK
--	cbnz	x2, work_pending
--	enable_step_tsk x1, x2
--	kernel_exit 0
--ret_fast_syscall_trace:
--	enable_daif
--	b	__sys_trace_return_skipped	// we already saved x0
--
- /*
-  * Ok, we need to do extra processing, enter the slow path.
-  */
-@@ -969,44 +951,13 @@ alternative_else_nop_endif
+ 	// This macro corrupts x0-x3. It is the caller's duty
+ 	// to save/restore them if required.
+-	.macro	apply_ssbd, state, targ, tmp1, tmp2
++	.macro	apply_ssbd, state, tmp1, tmp2
+ #ifdef CONFIG_ARM64_SSBD
+ alternative_cb	arm64_enable_wa2_handling
+-	b	\targ
++	b	skip_apply_ssbd\@
+ alternative_cb_end
+ 	ldr_this_cpu	\tmp2, arm64_ssbd_callback_required, \tmp1
+-	cbz	\tmp2, \targ
++	cbz	\tmp2, skip_apply_ssbd\@
+ 	ldr	\tmp2, [tsk, #TSK_TI_FLAGS]
+-	tbnz	\tmp2, #TIF_SSBD, \targ
++	tbnz	\tmp2, #TIF_SSBD, skip_apply_ssbd\@
+ 	mov	w0, #ARM_SMCCC_ARCH_WORKAROUND_2
+ 	mov	w1, #\state
+ alternative_cb	arm64_update_smccc_conduit
+ 	nop					// Patched to SMC/HVC #0
+ alternative_cb_end
++skip_apply_ssbd\@:
  #endif
+ 	.endm
  
- el0_svc_naked:					// compat entry point
--	stp	x0, xscno, [sp, #S_ORIG_X0]	// save the original x0 and syscall number
--	enable_daif
--	ct_user_exit 1
+@@ -173,13 +174,7 @@ alternative_cb_end
+ 	ldr	x19, [tsk, #TSK_TI_FLAGS]	// since we can unmask debug
+ 	disable_step_tsk x19, x20		// exceptions when scheduling.
+ 
+-	apply_ssbd 1, 1f, x22, x23
 -
--	tst	x16, #_TIF_SYSCALL_WORK		// check for syscall hooks
--	b.ne	__sys_trace
- 	mov	x0, sp
- 	mov	w1, wscno
- 	mov	w2, wsc_nr
- 	mov	x3, stbl
--	bl	invoke_syscall
--	b	ret_fast_syscall
--ENDPROC(el0_svc)
--
--	/*
--	 * This is the really slow path.  We're going to be doing context
--	 * switches, and waiting for our parent to respond.
--	 */
--__sys_trace:
--	cmp     wscno, #NO_SYSCALL		// user-issued syscall(-1)?
--	b.ne	1f
--	mov	x0, #-ENOSYS			// set default errno if so
--	str	x0, [sp, #S_X0]
--1:	mov	x0, sp
--	bl	syscall_trace_enter
--	cmp	w0, #NO_SYSCALL			// skip the syscall?
--	b.eq	__sys_trace_return_skipped
--
--	mov	x0, sp
--	mov	w1, wscno
--	mov	w2, wsc_nr
--	mov	x3, stbl
--	bl	invoke_syscall
--
--__sys_trace_return_skipped:
--	mov	x0, sp
--	bl	syscall_trace_exit
-+	bl	el0_svc_common
- 	b	ret_to_user
-+ENDPROC(el0_svc)
+-#ifdef CONFIG_ARM64_SSBD
+-	ldp	x0, x1, [sp, #16 * 0]
+-	ldp	x2, x3, [sp, #16 * 1]
+-#endif
+-1:
++	apply_ssbd 1, x22, x23
  
- 	.popsection				// .entry.text
+ 	mov	x29, xzr			// fp pointed to user-space
+ 	.else
+@@ -321,8 +316,7 @@ alternative_if ARM64_WORKAROUND_845719
+ alternative_else_nop_endif
+ #endif
+ 3:
+-	apply_ssbd 0, 5f, x0, x1
+-5:
++	apply_ssbd 0, x0, x1
+ 	.endif
  
-diff --git a/arch/arm64/kernel/syscall.c b/arch/arm64/kernel/syscall.c
-index 8bc2530c8472..e3153ffe7f8e 100644
---- a/arch/arm64/kernel/syscall.c
-+++ b/arch/arm64/kernel/syscall.c
-@@ -1,10 +1,15 @@
- // SPDX-License-Identifier: GPL-2.0
- 
-+#include <linux/compiler.h>
-+#include <linux/context_tracking.h>
- #include <linux/errno.h>
- #include <linux/nospec.h>
- #include <linux/ptrace.h>
- #include <linux/syscalls.h>
- 
-+#include <asm/daifflags.h>
-+#include <asm/thread_info.h>
-+
- long compat_arm_syscall(struct pt_regs *regs);
- 
- asmlinkage long do_ni_syscall(struct pt_regs *regs)
-@@ -31,9 +36,9 @@ static long __invoke_syscall(struct pt_regs *regs, syscall_fn_t syscall_fn)
- 			  regs->regs[3], regs->regs[4], regs->regs[5]);
- }
- 
--asmlinkage void invoke_syscall(struct pt_regs *regs, unsigned int scno,
--			       unsigned int sc_nr,
--			       syscall_fn_t syscall_table[])
-+static void invoke_syscall(struct pt_regs *regs, unsigned int scno,
-+			   unsigned int sc_nr,
-+			   syscall_fn_t syscall_table[])
- {
- 	long ret;
- 
-@@ -47,3 +52,50 @@ asmlinkage void invoke_syscall(struct pt_regs *regs, unsigned int scno,
- 
- 	regs->regs[0] = ret;
- }
-+
-+static inline bool has_syscall_work(unsigned long flags)
-+{
-+	return unlikely(flags & _TIF_SYSCALL_WORK);
-+}
-+
-+int syscall_trace_enter(struct pt_regs *regs);
-+void syscall_trace_exit(struct pt_regs *regs);
-+
-+asmlinkage void el0_svc_common(struct pt_regs *regs, int scno, int sc_nr,
-+			       syscall_fn_t syscall_table[])
-+{
-+	unsigned long flags = current_thread_info()->flags;
-+
-+	regs->orig_x0 = regs->regs[0];
-+	regs->syscallno = scno;
-+
-+	local_daif_restore(DAIF_PROCCTX);
-+	user_exit();
-+
-+	if (has_syscall_work(flags)) {
-+		/* set default errno for user-issued syscall(-1) */
-+		if (scno == NO_SYSCALL)
-+			regs->regs[0] = -ENOSYS;
-+		scno = syscall_trace_enter(regs);
-+		if (scno == NO_SYSCALL)
-+			goto trace_exit;
-+	}
-+
-+	invoke_syscall(regs, scno, sc_nr, syscall_table);
-+
-+	/*
-+	 * The tracing status may have changed under our feet, so we have to
-+	 * check again. However, if we were tracing entry, then we always trace
-+	 * exit regardless, as the old entry assembly did.
-+	 */
-+	if (!has_syscall_work(flags)) {
-+		local_daif_mask();
-+		flags = current_thread_info()->flags;
-+		if (!has_syscall_work(flags))
-+			return;
-+		local_daif_restore(DAIF_PROCCTX);
-+	}
-+
-+trace_exit:
-+	syscall_trace_exit(regs);
-+}
+ 	msr	elr_el1, x21			// set up the return data
 -- 
 2.11.0
