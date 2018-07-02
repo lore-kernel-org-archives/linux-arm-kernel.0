@@ -1,90 +1,45 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Mon, 2 Jul 2018 21:13:54 +0200
-Subject: [PATCH v3 12/20] kvm: arm64: Add helper for loading the stage2
- setting for a VM
-In-Reply-To: <1530270944-11351-13-git-send-email-suzuki.poulose@arm.com>
-References: <1530270944-11351-1-git-send-email-suzuki.poulose@arm.com>
- <1530270944-11351-13-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <c8091c05-b7ea-92fa-6d04-917619691381@redhat.com>
+From: eugenis@google.com (Evgenii Stepanov)
+Date: Mon, 2 Jul 2018 12:16:42 -0700
+Subject: [PATCH v4 00/17] khwasan: kernel hardware assisted address
+ sanitizer
+In-Reply-To: <20180629194117.01b2d31e805808eee5c97b4d@linux-foundation.org>
+References: <cover.1530018818.git.andreyknvl@google.com>
+ <20180627160800.3dc7f9ee41c0badbf7342520@linux-foundation.org>
+ <CAAeHK+xz552VNpZxgWwU-hbTqF5_F6YVDw3fSv=4OT8mNrqPzg@mail.gmail.com>
+ <20180628124039.8a42ab5e2994fb2876ff4f75@linux-foundation.org>
+ <CAAeHK+xsBOKghUp9XhpfXGqU=gjSYuy3G2GH14zWNEmaLPy8_w@mail.gmail.com>
+ <20180629194117.01b2d31e805808eee5c97b4d@linux-foundation.org>
+Message-ID: <CAFKCwrjxGEa6CLJnjmNy+92d2GSUkoymQ6Sm91CDpMZcJCcWCA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suzuki,
+Looking at a live Android device under load, slab (according to
+/proc/meminfo) + kernel stack take 8-10% available RAM (~350MB).
+Kasan's overhead of 2x - 3x on top of it is not insignificant.
 
-On 06/29/2018 01:15 PM, Suzuki K Poulose wrote:
-> We load the stage2 context of a guest for different operations,
-> including running the guest and tlb maintenance on behalf of the
-> guest. As of now only the vttbr is private to the guest, but this
-> is about to change with IPA per VM. Add a helper to load the stage2
-> configuration for a VM, which could do the right thing with the
-> future changes.
-> 
-> Cc: Christoffer Dall <cdall@kernel.org>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-Reviewed-by: Eric Auger <eric.auger@redhat.com>
-
-Thanks
-
-Eric
-> ---
-> Changes since v2:
->  - New patch
-> ---
->  arch/arm64/include/asm/kvm_hyp.h | 6 ++++++
->  arch/arm64/kvm/hyp/switch.c      | 2 +-
->  arch/arm64/kvm/hyp/tlb.c         | 4 ++--
->  3 files changed, 9 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
-> index 384c343..82f9994 100644
-> --- a/arch/arm64/include/asm/kvm_hyp.h
-> +++ b/arch/arm64/include/asm/kvm_hyp.h
-> @@ -155,5 +155,11 @@ void deactivate_traps_vhe_put(void);
->  u64 __guest_enter(struct kvm_vcpu *vcpu, struct kvm_cpu_context *host_ctxt);
->  void __noreturn __hyp_do_panic(unsigned long, ...);
->  
-> +/* Must be called from hyp code running at EL2 */
-> +static __always_inline void __hyp_text __load_guest_stage2(struct kvm *kvm)
-> +{
-> +	write_sysreg(kvm->arch.vttbr, vttbr_el2);
-> +}
-> +
->  #endif /* __ARM64_KVM_HYP_H__ */
->  
-> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-> index d496ef5..355fb25 100644
-> --- a/arch/arm64/kvm/hyp/switch.c
-> +++ b/arch/arm64/kvm/hyp/switch.c
-> @@ -195,7 +195,7 @@ void deactivate_traps_vhe_put(void)
->  
->  static void __hyp_text __activate_vm(struct kvm *kvm)
->  {
-> -	write_sysreg(kvm->arch.vttbr, vttbr_el2);
-> +	__load_guest_stage2(kvm);
->  }
->  
->  static void __hyp_text __deactivate_vm(struct kvm_vcpu *vcpu)
-> diff --git a/arch/arm64/kvm/hyp/tlb.c b/arch/arm64/kvm/hyp/tlb.c
-> index 131c777..4dbd9c6 100644
-> --- a/arch/arm64/kvm/hyp/tlb.c
-> +++ b/arch/arm64/kvm/hyp/tlb.c
-> @@ -30,7 +30,7 @@ static void __hyp_text __tlb_switch_to_guest_vhe(struct kvm *kvm)
->  	 * bits. Changing E2H is impossible (goodbye TTBR1_EL2), so
->  	 * let's flip TGE before executing the TLB operation.
->  	 */
-> -	write_sysreg(kvm->arch.vttbr, vttbr_el2);
-> +	__load_guest_stage2(kvm);
->  	val = read_sysreg(hcr_el2);
->  	val &= ~HCR_TGE;
->  	write_sysreg(val, hcr_el2);
-> @@ -39,7 +39,7 @@ static void __hyp_text __tlb_switch_to_guest_vhe(struct kvm *kvm)
->  
->  static void __hyp_text __tlb_switch_to_guest_nvhe(struct kvm *kvm)
->  {
-> -	write_sysreg(kvm->arch.vttbr, vttbr_el2);
-> +	__load_guest_stage2(kvm);
->  	isb();
->  }
->  
-> 
+On Fri, Jun 29, 2018 at 7:41 PM, Andrew Morton
+<akpm@linux-foundation.org> wrote:
+> On Fri, 29 Jun 2018 14:45:08 +0200 Andrey Konovalov <andreyknvl@google.com> wrote:
+>
+>> >> What kind of memory consumption testing would you like to see?
+>> >
+>> > Well, 100kb or so is a teeny amount on virtually any machine.  I'm
+>> > assuming the savings are (much) more significant once the machine gets
+>> > loaded up and doing work?
+>>
+>> So with clean kernel after boot we get 40 kb memory usage. With KASAN
+>> it is ~120 kb, which is 200% overhead. With KHWASAN it's 50 kb, which
+>> is 25% overhead. This should approximately scale to any amounts of
+>> used slab memory. For example with 100 mb memory usage we would get
+>> +200 mb for KASAN and +25 mb with KHWASAN. (And KASAN also requires
+>> quarantine for better use-after-free detection). I can explicitly
+>> mention the overhead in %s in the changelog.
+>>
+>> If you think it makes sense, I can also make separate measurements
+>> with some workload. What kind of workload should I use?
+>
+> Whatever workload people were running when they encountered problems
+> with KASAN memory consumption ;)
+>
+> I dunno, something simple.  `find / > /dev/null'?
+>
