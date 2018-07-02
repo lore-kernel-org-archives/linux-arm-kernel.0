@@ -1,58 +1,63 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon,  2 Jul 2018 12:04:09 +0100
-Subject: [PATCHv4 13/19] kernel: add ksys_personality()
+Date: Mon,  2 Jul 2018 12:04:12 +0100
+Subject: [PATCHv4 16/19] arm64: use {COMPAT,}SYSCALL_DEFINE0 for sigreturn
 In-Reply-To: <20180702110415.10465-1-mark.rutland@arm.com>
 References: <20180702110415.10465-1-mark.rutland@arm.com>
-Message-ID: <20180702110415.10465-14-mark.rutland@arm.com>
+Message-ID: <20180702110415.10465-17-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Using this helper allows us to avoid the in-kernel call to the
-sys_personality() syscall. The ksys_ prefix denotes that this function
-is meant as a drop-in replacement for the syscall. In particular, it
-uses the same calling convention as sys_personality().
+We don't currently annotate our various sigreturn functions as syscalls,
+as we need to do to use pt_regs syscall wrappers.
 
-Since ksys_personality is trivial, it is implemented directly in
-<linux/syscalls.h>, as we do for ksys_close() and friends.
+Let's mark them as real syscalls.
 
-This helper is necessary to enable conversion of arm64's syscall
-handling to use pt_regs wrappers.
+For compat_sys_sigreturn and compat_sys_rt_sigreturn, this changes the
+return type from int to long, matching the prototypes in sys32.c.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Reviewed-by: Dominik Brodowski <linux@dominikbrodowski.net>
-Cc: Al Viro <viro@zeniv.linux.org.uk>
-Cc: Christoph Hellwig <hch@infradead.org>
-Cc: Dave Martin <dave.martin@arm.com>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
 ---
- include/linux/syscalls.h | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ arch/arm64/kernel/signal.c   | 2 +-
+ arch/arm64/kernel/signal32.c | 4 ++--
+ 2 files changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/include/linux/syscalls.h b/include/linux/syscalls.h
-index a368a68cb667..abfe12d8a9c5 100644
---- a/include/linux/syscalls.h
-+++ b/include/linux/syscalls.h
-@@ -80,6 +80,7 @@ union bpf_attr;
- #include <linux/unistd.h>
- #include <linux/quota.h>
- #include <linux/key.h>
-+#include <linux/personality.h>
- #include <trace/syscall.h>
- 
- #ifdef CONFIG_ARCH_HAS_SYSCALL_WRAPPER
-@@ -1281,4 +1282,14 @@ static inline long ksys_truncate(const char __user *pathname, loff_t length)
- 	return do_sys_truncate(pathname, length);
+diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+index f03e664f773f..f8b0ba50e55e 100644
+--- a/arch/arm64/kernel/signal.c
++++ b/arch/arm64/kernel/signal.c
+@@ -539,7 +539,7 @@ static int restore_sigframe(struct pt_regs *regs,
+ 	return err;
  }
  
-+static inline unsigned int ksys_personality(unsigned int personality)
-+{
-+	unsigned int old = current->personality;
-+
-+	if (personality != 0xffffffff)
-+		set_personality(personality);
-+
-+	return old;
-+}
-+
- #endif
+-asmlinkage long sys_rt_sigreturn(void)
++SYSCALL_DEFINE0(rt_sigreturn)
+ {
+ 	struct pt_regs *regs = current_pt_regs();
+ 	struct rt_sigframe __user *frame;
+diff --git a/arch/arm64/kernel/signal32.c b/arch/arm64/kernel/signal32.c
+index cb10588a7cb2..1948566dcccf 100644
+--- a/arch/arm64/kernel/signal32.c
++++ b/arch/arm64/kernel/signal32.c
+@@ -282,7 +282,7 @@ static int compat_restore_sigframe(struct pt_regs *regs,
+ 	return err;
+ }
+ 
+-asmlinkage int compat_sys_sigreturn(void)
++COMPAT_SYSCALL_DEFINE0(sigreturn)
+ {
+ 	struct pt_regs *regs = current_pt_regs();
+ 	struct compat_sigframe __user *frame;
+@@ -313,7 +313,7 @@ asmlinkage int compat_sys_sigreturn(void)
+ 	return 0;
+ }
+ 
+-asmlinkage int compat_sys_rt_sigreturn(void)
++COMPAT_SYSCALL_DEFINE0(rt_sigreturn)
+ {
+ 	struct pt_regs *regs = current_pt_regs();
+ 	struct compat_rt_sigframe __user *frame;
 -- 
 2.11.0
