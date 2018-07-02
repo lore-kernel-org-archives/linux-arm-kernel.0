@@ -1,38 +1,45 @@
-From: srikar@linux.vnet.ibm.com (Srikar Dronamraju)
-Date: Mon, 2 Jul 2018 07:57:27 -0700
-Subject: [PATCH v5 10/10] perf probe: Support SDT markers having
- reference counter (semaphore)
-In-Reply-To: <20180628052209.13056-11-ravi.bangoria@linux.ibm.com>
-References: <20180628052209.13056-1-ravi.bangoria@linux.ibm.com>
- <20180628052209.13056-11-ravi.bangoria@linux.ibm.com>
-Message-ID: <20180702145727.GC65296@linux.vnet.ibm.com>
+From: jhugo@codeaurora.org (Jeffrey Hugo)
+Date: Mon, 2 Jul 2018 08:58:17 -0600
+Subject: [PATCH] arm64: acpi: reenumerate topology ids
+In-Reply-To: <20180629154608.nqudibf54ti6dpjc@kamzik.brq.redhat.com>
+References: <20180628145128.10057-1-drjones@redhat.com>
+ <a38fb684-c023-1a96-464e-dd268f3132ea@arm.com>
+ <20180628173243.obydzakh2stfs26w@kamzik.brq.redhat.com>
+ <20180629102927.GA18043@e107155-lin>
+ <20180629112354.hefdl2pe72frl6x3@kamzik.brq.redhat.com>
+ <20180629132934.GA16282@e107155-lin>
+ <20180629154608.nqudibf54ti6dpjc@kamzik.brq.redhat.com>
+Message-ID: <3a393398-b340-84f0-3478-ebd7dba9a0ae@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Ravi Bangoria <ravi.bangoria@linux.ibm.com> [2018-06-28 10:52:09]:
-
-> With this, perf buildid-cache will save SDT markers with reference
-> counter in probe cache. Perf probe will be able to probe markers
-> having reference counter. Ex,
+On 6/29/2018 9:46 AM, Andrew Jones wrote:
+> On Fri, Jun 29, 2018 at 02:29:34PM +0100, Sudeep Holla wrote:
+>> If it matters a lot, vendors must use UID for consistency. Since OS doesn't
+>> use those IDs for any particular reason, OS must not care.
 > 
->   # readelf -n /tmp/tick | grep -A1 loop2
->     Name: loop2
->     ... Semaphore: 0x0000000010020036
+> That depends. If you look at how topology_logical_package_id() is used in
+> x86 code you'll see it gets used as an index to an array in a couple
+> places. If we don't remap arbitrary IDs to counters than we may miss out
+> on some opportunities to avoid lists.
 > 
->   # ./perf buildid-cache --add /tmp/tick
+> Also, we're talking about what's visible to users. I think it's much more
+> likely to break a user app by exposing topology IDs that have values
+> greater than the linear CPU numbers (even though properly written apps
+> shouldn't expect them to be strictly <=), than the opposite.
 
-Would this perf buildid-cache work if the executable is stripped of
-symbols?
+Libvirt has the assumption already that the sysfs numbers correspond to 
+linear CPU numbers, and has an arbitrary limit of 4k.  When spinning up 
+a VM, if libvirt sees a CPU ID > 4k, it fails to init the VM since it 
+assumes the host has more than 4k CPUs, which is unsupported.
 
->   # ./perf probe sdt_tick:loop2
->   # ./perf stat -e sdt_tick:loop2 /tmp/tick
->     hi: 0
->     hi: 1
->     hi: 2
->     ^C
->      Performance counter stats for '/tmp/tick':
->                  3      sdt_tick:loop2
->        2.561851452 seconds time elapsed
+We found this when we were making our UIDs to be the same as MPIDR in 
+MADT.  We changed our UIDs to be sequential 0-N numbering to workaround 
+the issue.
 
-Also can we document how to use SDT markers with perf under perf-probe
-or perf-build-cache?
+-- 
+Jeffrey Hugo
+Qualcomm Datacenter Technologies as an affiliate of Qualcomm 
+Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
