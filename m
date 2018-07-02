@@ -1,38 +1,38 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon,  2 Jul 2018 18:58:49 -0400
-Subject: [PATCH V5 0/6] PCI: unify slot and bus reset calls
-Message-ID: <1530572336-20296-1-git-send-email-okaya@codeaurora.org>
+Date: Mon,  2 Jul 2018 18:58:51 -0400
+Subject: [PATCH V5 2/6] IB/hfi1: Use pci_try_reset_bus() for initiating pci
+ secondary bus reset
+In-Reply-To: <1530572336-20296-1-git-send-email-okaya@codeaurora.org>
+References: <1530572336-20296-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <1530572336-20296-3-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pci_reset_slot() and pci_reset_bus() functions require user to query if a
-device is behind a hotplug slot. External users are not following this
-requirement.
+Getting ready to hide pci_reset_bridge_secondary_bus() from the drivers.
+pci_reset_bridge_secondary_bus() should only be used internally by the
+PCI code itself.
 
-Hide the implemetnation into PCI core and check hotplug association on
-behalf of the user internally.
+Other drivers should rely on higher level pci_try_reset_bus() API.
 
-Changes from v4:
-* return code factoring per Andy.
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+---
+ drivers/infiniband/hw/hfi1/pcie.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-Sinan Kaya (6):
-  PCI: Handle error return from pci_reset_bridge_secondary_bus()
-  IB/hfi1: Use pci_try_reset_bus() for initiating pci secondary bus
-    reset
-  PCI: Hide pci_reset_bridge_secondary_bus() from drivers
-  PCI: Unify try slot and bus reset API
-  PCI: Deprecate pci_reset_bus() and pci_reset_slot() functions
-  PCI: Rename pci_try_reset_bus() to pci_reset_bus()
-
- drivers/infiniband/hw/hfi1/pcie.c |  4 +-
- drivers/pci/hotplug/pciehp_hpc.c  |  5 ++-
- drivers/pci/pci.c                 | 91 +++++++++++----------------------------
- drivers/pci/pci.h                 |  1 +
- drivers/pci/pcie/aer.c            |  5 ++-
- drivers/pci/pcie/err.c            |  6 ++-
- drivers/vfio/pci/vfio_pci.c       |  6 +--
- include/linux/pci.h               |  6 +--
- 8 files changed, 40 insertions(+), 84 deletions(-)
-
+diff --git a/drivers/infiniband/hw/hfi1/pcie.c b/drivers/infiniband/hw/hfi1/pcie.c
+index 4d4371b..4570c4d 100644
+--- a/drivers/infiniband/hw/hfi1/pcie.c
++++ b/drivers/infiniband/hw/hfi1/pcie.c
+@@ -905,9 +905,7 @@ static int trigger_sbr(struct hfi1_devdata *dd)
+ 	 * delay after a reset is required.  Per spec requirements,
+ 	 * the link is either working or not after that point.
+ 	 */
+-	pci_reset_bridge_secondary_bus(dev->bus->self);
+-
+-	return 0;
++	return pci_try_reset_bus(dev->bus);
+ }
+ 
+ /*
 -- 
 2.7.4
