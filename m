@@ -1,58 +1,41 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon,  2 Jul 2018 12:04:00 +0100
-Subject: [PATCHv4 04/19] arm64: kill change_cpacr()
+Date: Mon,  2 Jul 2018 12:03:57 +0100
+Subject: [PATCHv4 01/19] arm64: consistently use unsigned long for thread flags
 In-Reply-To: <20180702110415.10465-1-mark.rutland@arm.com>
 References: <20180702110415.10465-1-mark.rutland@arm.com>
-Message-ID: <20180702110415.10465-5-mark.rutland@arm.com>
+Message-ID: <20180702110415.10465-2-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have sysreg_clear_set(), we can use this instead of
-change_cpacr().
+In do_notify_resume, we manipulate thread_flags as a 32-bit unsigned
+int, whereas thread_info::flags is a 64-bit unsigned long, and elsewhere
+(e.g. in the entry assembly) we manipulate the flags as a 64-bit
+quantity.
 
-Note that the order of the set and clear arguments differs between
-change_cpacr() and sysreg_clear_set(), so these are flipped as part of
-the conversion. Also, sve_user_enable() redundantly clears
-CPACR_EL1_ZEN_EL0EN before setting it; this is removed for clarity.
+For consistency, and to avoid problems if we end up with more than 32
+flags, let's make do_notify_resume take the flags as a 64-bit unsigned
+long.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Reviewed-by: Dave Martin <dave.martin@arm.com>
 Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Cc: James Morse <james.morse@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/kernel/fpsimd.c | 13 ++-----------
- 1 file changed, 2 insertions(+), 11 deletions(-)
+ arch/arm64/kernel/signal.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index 84c68b14f1b2..a98a7f96aff1 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -159,23 +159,14 @@ static void sve_free(struct task_struct *task)
- 	__sve_free(task);
+diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+index 511af13e8d8f..70287634706e 100644
+--- a/arch/arm64/kernel/signal.c
++++ b/arch/arm64/kernel/signal.c
+@@ -910,7 +910,7 @@ static void do_signal(struct pt_regs *regs)
  }
  
--static void change_cpacr(u64 val, u64 mask)
--{
--	u64 cpacr = read_sysreg(CPACR_EL1);
--	u64 new = (cpacr & ~mask) | val;
--
--	if (new != cpacr)
--		write_sysreg(new, CPACR_EL1);
--}
--
- static void sve_user_disable(void)
+ asmlinkage void do_notify_resume(struct pt_regs *regs,
+-				 unsigned int thread_flags)
++				 unsigned long thread_flags)
  {
--	change_cpacr(0, CPACR_EL1_ZEN_EL0EN);
-+	sysreg_clear_set(cpacr_el1, CPACR_EL1_ZEN_EL0EN, 0);
- }
- 
- static void sve_user_enable(void)
- {
--	change_cpacr(CPACR_EL1_ZEN_EL0EN, CPACR_EL1_ZEN_EL0EN);
-+	sysreg_clear_set(cpacr_el1, 0, CPACR_EL1_ZEN_EL0EN);
- }
- 
- /*
+ 	/*
+ 	 * The assembly code enters us with IRQs off, but it hasn't
 -- 
 2.11.0
