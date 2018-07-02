@@ -1,80 +1,55 @@
 From: honghui.zhang@mediatek.com (honghui.zhang at mediatek.com)
-Date: Mon, 2 Jul 2018 15:57:41 +0800
-Subject: [PATCH v3 1/4] PCI: mediatek: fixup mtk_pcie_find_port logical
-In-Reply-To: <1530518264-6125-1-git-send-email-honghui.zhang@mediatek.com>
-References: <1530518264-6125-1-git-send-email-honghui.zhang@mediatek.com>
-Message-ID: <1530518264-6125-2-git-send-email-honghui.zhang@mediatek.com>
+Date: Mon, 2 Jul 2018 15:57:40 +0800
+Subject: [PATCH v3 0/4] PCI: mediatek: fixup find_port, enable_msi and add pm,
+ module support
+Message-ID: <1530518264-6125-1-git-send-email-honghui.zhang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Honghui Zhang <honghui.zhang@mediatek.com>
 
-The Mediatek's host controller has two slots, each with it's own control
-registers. The host driver need to identify which slot was connected
-in order to access the device's configuration space. There's problem
-for current host driver to find out which slot was connected to for
-a given EP device.
+This patchset includes misc patchs:
 
-Assuming each slot have connect with one EP device as below:
+The first patch fixup the mtk_pcie_find_port logical which will cause system
+could not touch the EP's configuration space which was connected to PCIe slot 1.
 
-                host bridge
-  bus 0 --> __________|_______
-           |                  |
-           |                  |
-         slot 0             slot 1
-  bus 1 -->|        bus 2 --> |
-           |                  |
-         EP 0               EP 1
+The second patch fixup the enable msi logical, the operation to enable msi
+should be after system clock is enabled. The function of mtk_pcie_startup_port_v2's
+define location is re-arranged to avoid mtk_pcie_enable_msi's forward declaration.
+And call mtk_pcie_enable_msi in mtk_pcie_startup_port_v2 since the clock was all
+enabled at that time.
 
-During PCI enumeration, system software will scan all the PCI device
-starting from devfn 0. So it will get the proper port for slot0 and
-slot1 device when using PCI_SLOT(devfn) for match. But it will get
-the wrong slot for EP1: The devfn will be start from 0 when scanning
-EP1 behind slot1, it will get port0 since the PCI_SLOT(EP1) is match
-for port0's slot value. So the host driver should not using EP's devfn
-but the slot's devfn(the slot which EP was connected to) for match.
+The third patch was rebased and refactor of the v4 patch[1], changes are:
+ -Add PM support for MT7622.
+ -Using mtk_pcie_enable_port to re-establish the link when resumed.
+ -Rebase on the previous two patches.
 
-This patch fix the mtk_pcie_find_port's logical by using the slot's
-devfn for match.
+The fourth patch add loadable kernel module support.
 
-Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
-Acked-by: Ryder Lee <ryder.lee@mediatek.com>
----
- drivers/pci/controller/pcie-mediatek.c | 19 +++++++++++++++++--
- 1 file changed, 17 insertions(+), 2 deletions(-)
+Some of those patches was already reviewed-by Ryder Lee <ryder.lee@mediatek.com>,
+so I just add the Reviewed-by tags in those patches.
 
-diff --git a/drivers/pci/controller/pcie-mediatek.c b/drivers/pci/controller/pcie-mediatek.c
-index 0baabe3..b43f41d 100644
---- a/drivers/pci/controller/pcie-mediatek.c
-+++ b/drivers/pci/controller/pcie-mediatek.c
-@@ -337,11 +337,26 @@ static struct mtk_pcie_port *mtk_pcie_find_port(struct pci_bus *bus,
- {
- 	struct mtk_pcie *pcie = bus->sysdata;
- 	struct mtk_pcie_port *port;
-+	struct pci_dev *dev;
-+	struct pci_bus *pbus;
- 
--	list_for_each_entry(port, &pcie->ports, list)
--		if (port->slot == PCI_SLOT(devfn))
-+	list_for_each_entry(port, &pcie->ports, list) {
-+		if (!bus->number && port->slot == PCI_SLOT(devfn))
- 			return port;
- 
-+		if (bus->number) {
-+			pbus = bus;
-+
-+			while (pbus->number) {
-+				dev = pbus->self;
-+				pbus = dev->bus;
-+			}
-+
-+			if (port->slot == PCI_SLOT(dev->devfn))
-+				return port;
-+		}
-+	}
-+
- 	return NULL;
- }
- 
+[1] https://patchwork.kernel.org/patch/10479079
+
+Change since v2:
+ - Fix the list_for_each_entry_safe parameter error.
+ - Add Ryder's Acked-by flag.
+
+Change since v1:
+ - A bit of code refact of the first patch suggested by Andy Shevchenko, and
+   commit message updated.
+ - Using __maybe_unused.
+ - Remove the redundant list_empty check of the fourth patch.
+
+Honghui Zhang (4):
+  PCI: mediatek: fixup mtk_pcie_find_port logical
+  PCI: mediatek: enable msi after clock enabled
+  PCI: mediatek: Add system pm support for MT2712 and MT7622
+  PCI: mediatek: Add loadable kernel module support
+
+ drivers/pci/controller/Kconfig         |   2 +-
+ drivers/pci/controller/pcie-mediatek.c | 289 ++++++++++++++++++++++++---------
+ 2 files changed, 213 insertions(+), 78 deletions(-)
+
 -- 
 2.6.4
