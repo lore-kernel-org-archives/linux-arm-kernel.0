@@ -1,50 +1,58 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 2 Jul 2018 10:57:47 +0100
-Subject: [PATCH] ACPI/PPTT: use ACPI ID whenever
- ACPI_PPTT_ACPI_PROCESSOR_ID_VALID is set
-In-Reply-To: <CAJZ5v0gnspK3soa5j8iqU9QDM78MMBbz8YC9s7TOJ5Qwh7=mZg@mail.gmail.com>
-References: <1530289077-2444-1-git-send-email-sudeep.holla@arm.com>
- <CAJZ5v0gnspK3soa5j8iqU9QDM78MMBbz8YC9s7TOJ5Qwh7=mZg@mail.gmail.com>
-Message-ID: <3895a0d8-9cca-2512-a06e-0ee2ac7db773@arm.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Mon, 02 Jul 2018 11:58:35 +0200
+Subject: Clarifying dma_wmb behavior in presence of non-coherent masters
+ and outer caches
+In-Reply-To: <20180629174622.GB20909@arm.com>
+References: <1530275290.22468.69.camel@pengutronix.de>
+ <20180629142539.GH17271@n2100.armlinux.org.uk>
+ <20180629162248.GB20010@arm.com> <1530292490.22468.76.camel@pengutronix.de>
+ <20180629174622.GB20909@arm.com>
+Message-ID: <1530525515.22468.82.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 02/07/18 10:06, Rafael J. Wysocki wrote:
-> On Fri, Jun 29, 2018 at 6:17 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->> Currently we use the ACPI processor ID only for the leaf/processor nodes
->> as the specification states it must match the value of ACPI processor ID
->> field in the processor?s entry in the MADT.
->>
->> However, if a PPTT structure represents processors group, it match a
->> processor container UID in the namespace and ACPI_PPTT_ACPI_PROCESSOR_ID_VALID
->> flag describe whether the ACPI processor ID is valid.
->>
->> Lets use UID whenever ACPI_PPTT_ACPI_PROCESSOR_ID_VALID is set to be
->> consistent instead of using table offset as it's currently done for non
->> leaf nodes.
->>
->> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
->> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
->> ---
->>  drivers/acpi/pptt.c | 10 ++++++++--
->>  1 file changed, 8 insertions(+), 2 deletions(-)
->>
->> Hi,
->>
->> There's ongoing discussion on assigning ID based in OS using simple
->> counters. It can never be consistent with firmware's view. So if the
->> firmware provides valid UID for non-processors node, we must use it.
+Am Freitag, den 29.06.2018, 18:46 +0100 schrieb Will Deacon:
+> On Fri, Jun 29, 2018 at 07:14:50PM +0200, Lucas Stach wrote:
+> > Am Freitag, den 29.06.2018, 17:22 +0100 schrieb Will Deacon:
+> > > You're right that cacheability and shareability are different things. For
+> > > the purposes of ordering and coherence, we care about shareability. Normal
+> > > non-cacheable is outer-shareable (which is a superset of inner-shareable),
+> > > so DMB OSH is sufficient to order accesses to that buffer from the
+> > > perspective of all observers.
+> > 
+> > Can you point me to something where this mapping from normal, non-
+> > cacheable to outer-sharable is defined? Why is there a distinction
+> > between OSH and SY in the barriers, if all non-coherent masters are in
+> > the outer sharable domain?
+> > 
+> > /me is still confused
 > 
-> OK
+> Hopefully my reply to Russell will help you here. The distinction between
+> OSH and SY is for handling masters that are not coherent at all, even when
+> using non-cacheable mappings. But as I mentioned to Russell, I think this
+> is largely theoretical and nobody builds systems like this.
 > 
-> Do you regard this as a fix for the recently merged PPTT material?  If
-> so, I should apply it as a fix for 4.18.
+> > > ?Since we use Normal non-cacheable mappings
+> > > for non-coherent DMA buffers (and there is no such thing as a
+> > > system-shareable memory type), then these barriers are sufficient to provide
+> > > ordering in this case too.
+> > > 
+> > > Ideally, we'd limit the DMA barriers to the inner-shareable domain when
+> > > dealing with coherent devices, but there's no way to determine that from
+> > > the barrier macros.
+> > > 
+> > > Lucas -- did changing the shareability of the DMA barriers actually solve
+> > > your problem?
+> > 
+> > There isn't enough data at this point to conclusively answer this. But
+> > reading the code, this struck me as being odd enough to warrant some
+> > clarifications from experts.
 > 
+> Have you checked that you have bit 22 set in the PL310 aux ctrl register?
 
-Yes, it should be considered as fix IMO.
+Yep, that was one of the first things we checked, as I know that not
+setting this bit results in the PL310 being nonconformant to the ARM
+ARM clarifications about mismatched page mappings.
 
--- 
 Regards,
-Sudeep
+Lucas
