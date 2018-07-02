@@ -1,42 +1,54 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 2 Jul 2018 17:28:08 +0200
-Subject: [PATCH] dma: ste_dma40: Remove VLA usage
-In-Reply-To: <CACRpkdYbmu_Y6N1G3M3q3M=3ZaECFdgije6Qgwoo6qra4g06_A@mail.gmail.com>
-References: <20180629185107.GA37488@beast>
- <CAK8P3a30Q1ezvCWfudUY=z1q3NHdrkbwRsmSDso4s7TifQAmNQ@mail.gmail.com>
- <CACRpkdYbmu_Y6N1G3M3q3M=3ZaECFdgije6Qgwoo6qra4g06_A@mail.gmail.com>
-Message-ID: <CAMuHMdUWATshtf8PX+QxwrOHaXt60j2e_GYx=L-UbWjYVL80yA@mail.gmail.com>
+From: david@lechnology.com (David Lechner)
+Date: Mon, 2 Jul 2018 10:27:53 -0500
+Subject: [PATCH v7 0/4] ARM: davinci: complete the conversion to using the
+ reset framework
+In-Reply-To: <e4bd9f57-617a-a59e-5d05-be1a6b3e6b3d@ti.com>
+References: <20180621073706.22812-1-brgl@bgdev.pl>
+ <9ec10627-49a5-07ad-8c9d-5ac873096cc0@ti.com>
+ <CAMRc=Me1JTuw40tMWaai2oKMxmc_ktN2OKBhF8tmGt0cQ6magg@mail.gmail.com>
+ <e4bd9f57-617a-a59e-5d05-be1a6b3e6b3d@ti.com>
+Message-ID: <345aed22-629a-abf6-df22-adee88a43df6@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 2, 2018 at 4:22 PM Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Fri, Jun 29, 2018 at 11:22 PM Arnd Bergmann <arnd@arndb.de> wrote:
->
-> > - Nobody uses this driver in practice, as the hardware platform
-> >   was a dead end
->
-> Depends what you mean with dead end.
->
-> The hardware was deployed in a few million handsets from Samsung
-> and Sony.
->
-> Some have been picked up as targets for PostmarketOS:
-> https://wiki.postmarketos.org/wiki/Samsung_Galaxy_S_Advance_(samsung-i9070)
-> https://wiki.postmarketos.org/wiki/Samsung_Galaxy_SIII_mini_(samsung-i8190)
->
-> So it is no more dead end than anything else discontinued, and it
-> has a living community who want it suppored by the mainline
-> kernel if possible.
+On 07/02/2018 07:08 AM, Sekhar Nori wrote:
+> Hi Bjorn,
+> 
+> On Thursday 21 June 2018 05:11 PM, Bartosz Golaszewski wrote:
+>> 2018-06-21 12:52 GMT+02:00 Sekhar Nori <nsekhar@ti.com>:
+>>> Hi Bartosz,
+>>>
+>>> On Thursday 21 June 2018 01:07 PM, Bartosz Golaszewski wrote:
+>>>> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>>>>
+>>>> These are the remaining patches that still need to be merged in order
+>>>> to complete the conversion of the davinci dsp driver to using the reset
+>>>> framework.
+>>>>
+>>>> They apply on top of v4.18-rc1 with David Lechner's remaining patches
+>>>> merged.
+>>>
+>>> Series looks good to me.
+>>>
+>>> To preserve bisect, shouldn't the order of applying be patch #3, #4, #1
+>>> and #2 ?
+>>>
+>>> Given the dependencies and to preserve bisect its easiest if I take the
+>>> series with acks from remoteproc and clock maintainers.
+>>>
+>>> Open to other suggestions as well.
+>>>
+>>> Thanks,
+>>> Sekhar
+>>
+>> Oops you're right about the order. Do you want me to resend?
+> 
+> With your ack, I can queue 1/4 for v4.19 and provide an immutable commit
+> to you (on top of v4.18-rc1) for you to merge any further changes you
+> want to queue from your tree.
+> 
+> Bartosz, given the number of moving pieces, I think its better to keep
+> 2/4 for v4.20 release - once all other other dependencies have been merged.
 
-Mixup with SuperH-based ST40?
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
--- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+I was thinking the same thing as well. I will pick it up in a
+clk-davinci-4.20 branch if that sounds OK.
