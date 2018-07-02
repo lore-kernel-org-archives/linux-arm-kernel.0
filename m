@@ -1,56 +1,69 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Mon, 2 Jul 2018 11:50:52 -0700
-Subject: [PATCH v4 6/6] arm64: dts: sdm845: Add tsens nodes
-In-Reply-To: <a52b77ad84867774a0659f51ccb79b17ba7638ab.1530533998.git.amit.kucheria@linaro.org>
-References: <cover.1530533998.git.amit.kucheria@linaro.org>
- <a52b77ad84867774a0659f51ccb79b17ba7638ab.1530533998.git.amit.kucheria@linaro.org>
-Message-ID: <20180702185052.GB2050@tuxbook-pro>
+From: pgwipeout@gmail.com (Peter Geis)
+Date: Mon, 2 Jul 2018 14:53:08 -0400
+Subject: [PATCH v2 0/5] Initial support of Trusted Foundations on Tegra30
+In-Reply-To: <11534185.70fb5jbPr6@dimapc>
+References: <20180619110027.16935-1-digetx@gmail.com>
+ <d99935be-797d-4676-c186-a045a590f01b@gmail.com> <11534185.70fb5jbPr6@dimapc>
+Message-ID: <5c47ef70-b90e-6e81-39dd-fbcfad2b93e5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 02 Jul 05:44 PDT 2018, Amit Kucheria wrote:
 
-> SDM845 has two tsens blocks, one with 13 sensors and the other with 8
-> sensors.
+
+On 07/02/2018 10:48 AM, Dmitry Osipenko wrote:
+> On Friday, 29 June 2018 22:37:02 MSK Peter Geis wrote:
+>> Good Afternoon,
+>>
+>> I have tested these patches on the Ouya T3 device.
+>> They work great to enable the L2 cache controller, however they do not
+>> respect explicitly disabling the L2 cache controller via the kernel
+>> config nor device tree.
+>>
+>> With CONFIG_CACHE_L2X0 disabled, but CONFIG_TRUSTED_FOUNDATIONS enabled,
+>> the L2 cache controller is silently enabled and allows all four cores to
+>> boot.
+>>
 > 
-> Signed-off-by: Amit Kucheria <amit.kucheria@linaro.org>
-
-Reviewed-by: Bjorn Andersson <bjorn.andersson@linaro.org>
-
-Regards,
-Bjorn
-
-> ---
->  arch/arm64/boot/dts/qcom/sdm845.dtsi | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
+> I don't see how cache could be enabled with CONFIG_CACHE_L2X0 disabled, there
+> is no code to do that. Could you elaborate please?
 > 
-> diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-> index cdaabeb..edf8505 100644
-> --- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
-> +++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-> @@ -221,6 +221,22 @@
->  			#interrupt-cells = <2>;
->  		};
->  
-> +		tsens0: tsens at c222000 {
-> +			compatible = "qcom,tsens-v2.4.0", "qcom,tsens-v2";
-> +			reg = <0xc263000 0x1ff>, /* TM */
-> +			      <0xc222000 0x1ff>; /* SROT */
-> +			#qcom,sensors = <13>;
-> +			#thermal-sensor-cells = <1>;
-> +		};
-> +
-> +		tsens1: tsens at c223000 {
-> +			compatible = "qcom,tsens-v2.4.0", "qcom,tsens-v2";
-> +			reg = <0xc265000 0x1ff>, /* TM */
-> +			      <0xc223000 0x1ff>; /* SROT */
-> +			#qcom,sensors = <8>;
-> +			#thermal-sensor-cells = <1>;
-> +		};
-> +
->  		spmi_bus: spmi at c440000 {
->  			compatible = "qcom,spmi-pmic-arb";
->  			reg = <0xc440000 0x1100>,
-> -- 
-> 2.7.4
+> Secondary cores do not depend on the cache state, disabled cache shouldn't
+> prevent them to boot.
+
+On the untouched mainline kernel running on a Trusted Foundations T3 
+device, I observed the following indications:
+With the L2 cache controller enabled, all four processor cores were 
+enabled, but it would immediately panic for writing to a secure register 
+from insecure mode.
+With the L2 cache controller disabled, only the boot core is detected, 
+but it successfully boots.
+This is the issue that I inquired originally to you about.
+
+With your patch running on the same device, the following is observed:
+With the L2 controller enabled, all four cores are active, and the cache 
+controller appears to function.
+With the L2 controller disabled, but trusted foundations enabled, the L2 
+controller enabled kernel message is missing, however all four cores 
+still enable.
+
+After looking through the code a little more deeply, I see you modified 
+the reset handler for handling offline cores.
+I am wondering if you fixed an additional issue inadvertently.
+
+The reason I discovered this is I am working with kexec as a bootloader.
+On a device without trusted foundations, kexec works without issue.
+On a device with trusted foundations and your patch, I found that 
+disabling the l2 cache controller and trusted foundations allow kexec to 
+occur.
+I haven't tried an either/or scenario, though now you have me thinking I 
+should.
+> 
+>> One must also disable CONFIG_TRUSTED_FOUNDATIONS to stop the L2 cache
+>> controller from spinning up.
+>>
+>> Tested-by: Peter Geis <pgwipeout@gmail.com>
+>>
+> 
+> 
+> 
 > 
