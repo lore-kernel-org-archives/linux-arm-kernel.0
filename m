@@ -1,83 +1,175 @@
 From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Tue, 3 Jul 2018 05:01:27 +0200
+Date: Tue, 3 Jul 2018 05:21:36 +0200
 Subject: [RFC net-next 15/15] net: lora: Add Semtech SX1301
-In-Reply-To: <BY1PR02MB11148FFC047AE7509DD811E0E7430@BY1PR02MB1114.namprd02.prod.outlook.com>
+In-Reply-To: <BY1PR02MB111481D94EB0D68AD5FCA689E7430@BY1PR02MB1114.namprd02.prod.outlook.com>
 References: <20180701110804.32415-1-afaerber@suse.de>
  <20180701110804.32415-16-afaerber@suse.de>
- <BY1PR02MB11148FFC047AE7509DD811E0E7430@BY1PR02MB1114.namprd02.prod.outlook.com>
-Message-ID: <c68e5336-1647-e0e4-0a1d-3efdcfb4fe9c@suse.de>
+ <20180702161258.GA18744@sirena.org.uk>
+ <4e06cc72-2092-70f3-c801-bf6e4c3cbec2@suse.de>
+ <BY1PR02MB111481D94EB0D68AD5FCA689E7430@BY1PR02MB1114.namprd02.prod.outlook.com>
+Message-ID: <8d514feb-41c7-8ec4-ace2-94e627187a0b@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Ben,
 
-Am 02.07.2018 um 13:51 schrieb Ben Whitten:
-> Excellent work on doing this I have also been working on and off
-> this personally for some time.
+Am 02.07.2018 um 22:43 schrieb Ben Whitten:
+>> 2) This SPI device is in turn exposing the two SPI masters that you
+>> already found below, and I didn't see a sane way to split that code out
+>> into drivers/spi/, so it's in drivers/net/lora/ here - has there been
+>> any precedence either way?
+> 
+> In my work in progress driver I just register one controller for the sx1301 with two chip selects and use the chip select information to choose the correct radio to send to, this is based on the DT reg information. No need to register two separate masters.
 
-Thanks. Colliding work is always unfortunate, I can relate...
+I had considered that and discarded it. The SX1301 has not just two CS
+registers though but also two pairs of addr, data registers. That speaks
+for two masters with a single chip-select each, unless I'm
+misunderstanding the meaning of the registers.
 
-> Have a look at my repository [1] for sx1301 and sx1257 drivers,
-> I use regmaps capability of switching pages which should simplify
-> your driver considerably, I also have a full register map and bit field.
+>> Am 02.07.2018 um 18:12 schrieb Mark Brown:
+>>> On Sun, Jul 01, 2018 at 01:08:04PM +0200, Andreas F?rber wrote:
+>>>
+>>>> +static void sx1301_radio_spi_set_cs(struct spi_device *spi, bool enable)
+>>>> +{
+>>>> +	int ret;
+>>>> +
+>>>> +	dev_dbg(&spi->dev, "setting SPI CS to %s\n", enable ? "1" : "0");
+>>>> +
+>>>> +	if (enable)
+>>>> +		return;
+>>>> +
+>>>> +	ret = sx1301_radio_set_cs(spi->controller, enable);
+>>>> +	if (ret)
+>>>> +		dev_warn(&spi->dev, "failed to write CS (%d)\n", ret);
+>>>> +}
+>>>
+>>> So we never disable chip select?
+>>
+>> Not here, I instead did that in transfer_one below.
+>>
+>> Unfortunately there seems to be no documentation, only reference code:
+>>
+>> https://github.com/Lora-
+>> net/lora_gateway/blob/master/libloragw/src/loragw_radio.c#L121
+>> https://github.com/Lora-
+>> net/lora_gateway/blob/master/libloragw/src/loragw_radio.c#L165
+>>
+>> It sets CS to 0 before writing to address and data registers, then
+>> immediately sets CS to 1 and back to 0 before reading or ending the
+>> write transaction. I've tried to force the same behavior in this driver.
+>> My guess was that CS is high-active during the short 1-0 cycle, because
+>> if it's low-active during the register writes then why the heck is it
+>> set to 0 again in the end instead of keeping at 1... confusing.
+>>
+>> Maybe the Semtech folks CC'ed can comment how these registers work?
+>>
+>>>> +	if (tx_buf) {
+>>>> +		ret = sx1301_write(ssx->parent, ssx->regs +
+>> REG_RADIO_X_ADDR, tx_buf ? tx_buf[0] : 0);
+>>>
+>>> This looks confused.  We're in an if (tx_buf) block but there's a use of
+>>> the ternery operator that appears to be checking if we have a tx_buf?
+>>
+>> Yeah, as mentioned this RFC is not ready for merging - checkpatch.pl
+>> will complain about lines too long, and TODOs are sprinkled all over or
+>> not even mentioned. It's a Proof of Concept that a net_device could work
+>> for a wide range of spi and serdev based drivers, and on top this device
+>> has more than one channel, which may influence network-level design
+>> discussions.
+>>
+>> That said, I'll happily drop the second check. Thanks for spotting!
+>>
+>>>> +		if (ret) {
+>>>> +			dev_err(&spi->dev, "SPI radio address write
+>> failed\n");
+>>>> +			return ret;
+>>>> +		}
+>>>> +
+>>>> +		ret = sx1301_write(ssx->parent, ssx->regs +
+>> REG_RADIO_X_DATA, (tx_buf && xfr->len >= 2) ? tx_buf[1] : 0);
+>>>> +		if (ret) {
+>>>> +			dev_err(&spi->dev, "SPI radio data write failed\n");
+>>>> +			return ret;
+>>>> +		}
+>>>
+>>> This looks awfully like you're coming in at the wrong abstraction layer
+>>> and the hardware actually implements a register abstraction rather than
+>>> a SPI one so you should be using regmap as the abstraction.
+>>
+>> I don't understand. Ben has suggested using regmap for the SPI _device_
+>> that we're talking to, which may be a good idea. But this SX1301 device
+>> in turn has two SPI _masters_ talking to an SX125x slave each. I don't
+>> see how using regmap instead of my wrappers avoids this spi_controller?
+>> The whole point of this spi_controller is to abstract and separate the
+>> SX1255 vs. SX1257 vs. whatever-radio-attached into a separate driver,
+>> instead of mixing it into the SX1301 driver - to me that looks cleaner
+>> and more extensible. It also has the side-effect that we could configure
+>> the two radios via DT (frequencies, clk output, etc.).
+> 
+> You want an SPI controller in the SX1301 as the down stream radios are SPI and could be attached directly to a host SPI bus, makes sense to have one radio driver and talk through the SX1301.
+> But you should use the regmap to access the SX1301 master controller registers.
+> Example I use with one SPI master and some clock info:
+> eg:
+> 	sx1301: sx1301 at 0 {
 
-Please note that my lora-next branch already has bug fixes and cleanups
-over this patch. The probe error handling was broken, and I implemented
-wrappers for paged reads and writes as well as burst modes, plus the
-firmware loading.
+Node names should not repeat the chipset, that goes into compatible.
 
-https://github.com/afaerber/linux/commits/lora-next
+lora-concentrator at 0?
 
-I took a quick look at your sx1257 and noticed you licensed it as GPLv2.
-Is there any particular reason for that? Since I wrote my driver without
-copying from GPLv2 code, I prefer the less restrictive GPLv2+.
+> 		compatible = "semtech,sx1301";
+> 		reg = <0>;
+> 		#address-cells = <1>;
+> 		#size-cells = <0>;
 
-So far a work day has passed with no maintainer objecting to or
-commenting on the underlying PF_LORA network layer design. Meanwhile
-there's already three of us with code and more people have inquired
-about testing and contributing, so I'm thinking about setting up a
-staging tree on kernel.org to collaborate on...
+I would still find it cleaner to have (a) sub-node(s) for the radios.
 
-Would you be willing to contribute your regmap ideas to my driver as a
-patch to squash? Needs a Signed-off-by of course, which your GitHub
-commits are lacking, so I can't merge them on my own.
+> 		spi-max-frequency = <8000000>;
 
-> I have also been trying to use the clk framework to capture the various
-> routing that the cards have.
+Datasheet says 10 MHz, why 8 MHz?
 
-I thought about clk too, but won't that cause name conflicts when
-probing multiple concentrators? Would be nice to use that for
-configuring the SX1257 clock output instead of my current hack.
+> 		gpios-reset = <&pioA 26 GPIO_ACTIVE_HIGH>;
 
-Another thought I haven't investigated yet is whether we could use
-remoteproc for ARB and AGC. I would at least prefer to have the firmware
-as a binary loaded via the usual request_firmware(), not as byte array.
-But then again the AGC gets firmware loaded twice, so maybe too complex
-for remoteproc.
+reset-gpios?
 
-BTW do you have any insights on what MCU is in there? Would be nice to
-understand in form of source code what the firmware is doing, to avoid
-the hard dependency on a specific firmware version (imagine user
-updating kernel-firmware - containing versions X,Y,Z - and kernel and
-booting two different kernel versions, the older one stops working).
+> 		clocks = <&radio1 0>, <&clkhs 0>;
+> 		clock-names = "clk32m", "clkhs";
+> 
+> 		radio0: sx1257 at 0 {
 
-https://www.thethingsnetwork.org/forum/t/secret-price-of-a-lora-gateway/5730/74
+lora at 0?
+
+> 			compatible = "semtech,sx125x";
+
+No wildcards in bindings please, use concrete "semtech,sx1257".
+
+> 			reg = <0>;
+> 			spi-max-frequency = <8000000>;
+
+Datasheet says 10 ns - I reported to Semtech that it should probably say
+10 MHz, too.
+
+> 			tx;
+
+Might we configure that on the sx1301 instead?
+
+> 			clocks = <&tcxo 0>;
+> 			clock-names = "tcxo";
+> 		};
+> 
+> 		radio1: sx1257 at 1 {
+> 			compatible = "semtech,sx125x";
+> 			reg = <1>;
+> 			spi-max-frequency = <8000000>;
+> 			#clock-cells = <0>;
+> 			clocks = <&tcxo 0>;
+> 			clock-names = "tcxo";
+> 			clock-output-names = "clk32m";
+> 		};
+> };
+[snip]
 
 Regards,
 Andreas
-
-> I will dig into this series this evening.
-> 
-> [1] https://github.com/BWhitten/linux-stable/tree/971aadc8fdfe842020d912449bdd71b33d576fe3/drivers/net/lora
-[...]
->> diff --git a/drivers/net/lora/sx1301.c b/drivers/net/lora/sx1301.c
->> new file mode 100644
->> index 000000000000..5c936c1116d1
->> --- /dev/null
->> +++ b/drivers/net/lora/sx1301.c
->> @@ -0,0 +1,446 @@
->> +// SPDX-License-Identifier: GPL-2.0-or-later
-[snip]
 
 -- 
 SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
