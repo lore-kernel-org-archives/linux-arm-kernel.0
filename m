@@ -1,115 +1,86 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 3 Jul 2018 08:04:16 +0100
-Subject: [v3 01/10] dt-bindings: mediatek: mmsys: Add support for mfd
-In-Reply-To: <4ead47f6-2f69-2afa-bfcc-a240a9845dc4@gmail.com>
-References: <cover.1524820923.git.mbrugger@suse.com>
- <64ca273429d92f581568a48f3efe6035af65f579.1524820923.git.mbrugger@suse.com>
- <20180430103029.GD5147@dell>
- <4ead47f6-2f69-2afa-bfcc-a240a9845dc4@gmail.com>
-Message-ID: <20180703070416.GD20176@dell>
+From: andrew@aj.id.au (Andrew Jeffery)
+Date: Tue,  3 Jul 2018 17:04:11 +1000
+Subject: [RFC PATCH 2/4] Documentation: ABI: Add sysfs-class-bmc documentation
+ to testing
+In-Reply-To: <20180703070413.28756-1-andrew@aj.id.au>
+References: <20180703070413.28756-1-andrew@aj.id.au>
+Message-ID: <20180703070413.28756-3-andrew@aj.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 25 Jun 2018, Matthias Brugger wrote:
+Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
+---
+ Documentation/ABI/testing/sysfs-class-bmc | 62 +++++++++++++++++++++++
+ 1 file changed, 62 insertions(+)
+ create mode 100644 Documentation/ABI/testing/sysfs-class-bmc
 
-> 
-> 
-> On 30/04/18 12:30, Lee Jones wrote:
-> > On Fri, 27 Apr 2018, matthias.bgg at kernel.org wrote:
-> > 
-> >> From: Matthias Brugger <mbrugger@suse.com>
-> >>
-> >> Add binding description for the mmsys mfd for some Mediatek
-> >> devices. mmsys has some registers to control clock gates (which is
-> >> used in the clk driver) and some registers to set the routing and enable
-> >> the differnet blocks of the display subsystem.
-> >>
-> >> Signed-off-by: Matthias Brugger <mbrugger@suse.com>
-> >> ---
-> >>  .../bindings/arm/mediatek/mediatek,mmsys.txt       |  2 --
-> >>  .../bindings/display/mediatek/mediatek,disp.txt    |  2 +-
-> >>  .../devicetree/bindings/mfd/mediatek,mmsys.txt     | 27 ++++++++++++++++++++++
-> >>  3 files changed, 28 insertions(+), 3 deletions(-)
-> >>  create mode 100644 Documentation/devicetree/bindings/mfd/mediatek,mmsys.txt
-> >>
-> >> diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt
-> >> index 4eb8bbe15c01..4468345f8b1a 100644
-> >> --- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt
-> >> +++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt
-> >> @@ -6,10 +6,8 @@ The Mediatek mmsys controller provides various clocks to the system.
-> >>  Required Properties:
-> >>  
-> >>  - compatible: Should be one of:
-> >> -	- "mediatek,mt2701-mmsys", "syscon"
-> >>  	- "mediatek,mt2712-mmsys", "syscon"
-> >>  	- "mediatek,mt6797-mmsys", "syscon"
-> >> -	- "mediatek,mt8173-mmsys", "syscon"
-> >>  - #clock-cells: Must be 1
-> >>  
-> >>  The mmsys controller uses the common clk binding from
-> >> diff --git a/Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt b/Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt
-> >> index 383183a89164..85a3b4ec06cd 100644
-> >> --- a/Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt
-> >> +++ b/Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt
-> >> @@ -9,7 +9,7 @@ function block.
-> >>  
-> >>  All DISP device tree nodes must be siblings to the central MMSYS_CONFIG node.
-> >>  For a description of the MMSYS_CONFIG binding, see
-> >> -Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt.
-> >> +Documentation/devicetree/bindings/mfd/mediatek,mmsys.txt
-> >>  
-> >>  DISP function blocks
-> >>  ====================
-> >> diff --git a/Documentation/devicetree/bindings/mfd/mediatek,mmsys.txt b/Documentation/devicetree/bindings/mfd/mediatek,mmsys.txt
-> >> new file mode 100644
-> >> index 000000000000..2331ae16917e
-> >> --- /dev/null
-> >> +++ b/Documentation/devicetree/bindings/mfd/mediatek,mmsys.txt
-> >> @@ -0,0 +1,27 @@
-> >> +MediaTek MMSYS Multifunction Device Driver
-> > 
-> > What is "MMSYS"?
-> > 
-> > "Multi-Function Driver"s are specific to Linux.
-> > 
-> > What actually is the device?
-> 
-> It's includes all the DRM parts of the SoC together with the clocks for the
-> device. MMSYS IMHO stands for Multi-Media-System.
-
-Please update the document with that information.
-
-Is there a datasheet I can view?
-
-> >> +MMSYS is a multifunction device with the following sub modules:
-> >> +- clocks for the multi-media subsystem
-> >> +- central node for the DRM subsystem.
-> >> +
-> >> +This document describes the binding for MFD device. The MFD takes care to initailize
-> >> +the clock driver and the DRM driver. More info see
-> >> +Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt
-> >> +
-> >> +Required properties:
-> >> +- compatible: Should be one of:
-> >> +	- "mediatek,mt2701-mmsys", "syscon"
-> >> +	- "mediatek,mt8173-mmsys", "syscon"
-> >> +- #clock-cells: Must be 1
-> >> +
-> >> +Optional properties:
-> >> +- power-domains: list of powerdomains needed for the subsystem to work
-> >> +
-> >> +Example:
-> >> +
-> >> +mmsys: clock-controller at 14000000 {
-> >> +	compatible = "mediatek,mt8173-mmsys", "syscon";
-> >> +	reg = <0 0x14000000 0 0x1000>;
-> >> +	power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
-> >> +	#clock-cells = <1>;
-> >> +};
-> > 
-
+diff --git a/Documentation/ABI/testing/sysfs-class-bmc b/Documentation/ABI/testing/sysfs-class-bmc
+new file mode 100644
+index 000000000000..9d42106b89f9
+--- /dev/null
++++ b/Documentation/ABI/testing/sysfs-class-bmc
+@@ -0,0 +1,62 @@
++This document defines the sysfs attributes common to the bmc device class. See
++Documentation/devicetree/bindings/misc/bmc-misc-ctrl.txt for exhaustive list of
++field definitions.
++
++What:		/sys/class/bmc/<field>/label
++Date:		July, 2018
++KernelVersion:	v4.19
++Contact:	openbmc at lists.ozlabs.org
++Description:
++		The name of the field of interest. Corresponds to the value of
++		<field> in the path
++Users:		openbmc at lists.ozlabs.org
++
++What:		/sys/class/bmc/<field>/value
++Date:		July, 2018
++KernelVersion:	v4.19
++Contact:	openbmc at lists.ozlabs.org
++Description:
++		The value of the field of interest.
++
++		If the field is exposed from a read-modify-write register this
++		attribute will be RW, where writes will set the field to the
++		value written. Writing values that exceed the width of the
++		field will return an error.
++
++		If the field is exposed from a write-1-set/write-1-clear
++		register this attribute will be RO, and the attributes 'set'
++		and 'clear' will be present as write-only.
++Users:		openbmc at lists.ozlabs.org
++
++What:		/sys/class/bmc/<field>/mask
++Date:		July, 2018
++KernelVersion:	v4.19
++Contact:	openbmc at lists.ozlabs.org
++Description:
++		The mask applied to the value read/written from the 'value'
++		attribute.
++Users:		openbmc at lists.ozlabs.org
++
++What:		/sys/class/bmc/<field>/set
++Users:		openbmc at lists.ozlabs.org
++Date:		July, 2018
++KernelVersion:	v4.19
++Contact:	openbmc at lists.ozlabs.org
++Description:
++		For fields backed by write-1-set/write-1-clear registers,
++		set bits in the value written will be set in hardware. Zero
++		values are ignored. Writing values that exceed the width of the
++		mask value will return an error.
++Users:		openbmc at lists.ozlabs.org
++
++What:		/sys/class/bmc/<field>/clear
++Users:		openbmc at lists.ozlabs.org
++Date:		July, 2018
++KernelVersion:	v4.19
++Contact:	openbmc at lists.ozlabs.org
++Description:
++		For fields backed by write-1-set/write-1-clear registers,
++		set bits in the value written will be cleared in hardware. Zero
++		values are ignored. Writing values that exceed the width of the
++		mask value will return an error.
++Users:		openbmc at lists.ozlabs.org
 -- 
-Lee Jones [???]
-Linaro Services Technical Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+2.17.1
