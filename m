@@ -1,32 +1,57 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 3 Jul 2018 15:34:31 +0800
-Subject: [PATCH 2/6] arm64: dts: freescale: Add missing cooling device
- properties for CPUs
-In-Reply-To: <e4504945d2b684fae2850bbcf03a6d02917a8c8a.1527225682.git.viresh.kumar@linaro.org>
-References: <cover.1527225682.git.viresh.kumar@linaro.org>
- <e4504945d2b684fae2850bbcf03a6d02917a8c8a.1527225682.git.viresh.kumar@linaro.org>
-Message-ID: <CAAQ0ZWRsroAAKRyxdd9ZCreriAjdBecmJy01sRy+6i_iQsMKgw@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 3 Jul 2018 00:36:09 -0700
+Subject: [RFC 3/5] ARM: OMAP2+: Add AM3517 MUSB setup to pdata quirks.
+In-Reply-To: <20180625001233.9785-4-aford173@gmail.com>
+References: <20180625001233.9785-1-aford173@gmail.com>
+ <20180625001233.9785-4-aford173@gmail.com>
+Message-ID: <20180703073609.GP112168@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 25, 2018 at 1:40 PM Viresh Kumar <viresh.kumar@linaro.org> wrote:
->
-> The cooling device properties, like "#cooling-cells" and
-> "dynamic-power-coefficient", should either be present for all the CPUs
-> of a cluster or none. If these are present only for a subset of CPUs of
-> a cluster then things will start falling apart as soon as the CPUs are
-> brought online in a different order. For example, this will happen
-> because the operating system looks for such properties in the CPU node
-> it is trying to bring up, so that it can register a cooling device.
->
-> Add such missing properties.
->
-> Do minor rearrangement as well to keep ordering consistent.
->
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+* Adam Ford <aford173@gmail.com> [180625 00:15]:
+> The pin muxing and clock definitions for the MUSB controller are
+> not done through the same registers/pin mux options, so this
+> explicitly configures the registers and pin-mux options for MUSB
+> on AM3517-EVM
+> 
+> Signed-off-by: Adam Ford <aford173@gmail.com>
+> 
+> diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
+> index 7f02743edbe4..e0c7ac2c87c1 100644
+> --- a/arch/arm/mach-omap2/pdata-quirks.c
+> +++ b/arch/arm/mach-omap2/pdata-quirks.c
+> @@ -258,9 +258,28 @@ static void __init omap3_sbc_t3517_legacy_init(void)
+>  	omap3_sbc_t3517_wifi_init();
+>  }
+>  
+> +/* The pin muxing for AM3517 OTG isn't done through the normal means */
+> +static __init void am3517_evm_musb_init(void)
+> +{
+> +	u32 devconf2;
+> +
+> +	/*
+> +	 * Set up USB clock/mode in the DEVCONF2 register.
+> +	 */
+> +	devconf2 = omap_ctrl_readl(AM35XX_CONTROL_DEVCONF2);
+> +
+> +	/* USB2.0 PHY reference clock is 13 MHz */
+> +	devconf2 &= ~(CONF2_REFFREQ | CONF2_OTGMODE | CONF2_PHY_GPIOMODE);
+> +	devconf2 |=  CONF2_REFFREQ_13MHZ | CONF2_SESENDEN | CONF2_VBDTCTEN
+> +			| CONF2_DATPOL;
+> +
+> +	omap_ctrl_writel(devconf2, AM35XX_CONTROL_DEVCONF2);
+> +}
+> +
+>  static void __init am3517_evm_legacy_init(void)
+>  {
+>  	am35xx_emac_reset();
+> +	am3517_evm_musb_init();
+>  }
 
-Applied, thanks.
+To me it seems you should do this with a simple drivers/phy driver.
+There might be already something similar that you can use, see the
+da and dm related drivers under drivers/phy/ti.
 
-Please use my kernel.org email address for future patches.
+Regards,
 
-Shawn
+Tony
