@@ -1,40 +1,290 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Tue, 3 Jul 2018 16:31:09 +0200
-Subject: [RFC PATCH 1/4] dts: misc: Add bindings documentation for
- bmc-misc-ctrl
-In-Reply-To: <a1c3ecd4fed28e2b33c95a476452318dba58cd7e.camel@kernel.crashing.org>
-References: <20180703070413.28756-1-andrew@aj.id.au>
- <20180703070413.28756-2-andrew@aj.id.au>
- <20180703075009.GA27649@kroah.com>
- <a1c3ecd4fed28e2b33c95a476452318dba58cd7e.camel@kernel.crashing.org>
-Message-ID: <20180703143109.GB2043@kroah.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Tue, 3 Jul 2018 16:31:56 +0200
+Subject: [PATCH 1/3] soc: amlogic: Add Meson GX Clock Measure driver
+In-Reply-To: <1530624110-4687-2-git-send-email-narmstrong@baylibre.com>
+References: <1530624110-4687-1-git-send-email-narmstrong@baylibre.com>
+ <1530624110-4687-2-git-send-email-narmstrong@baylibre.com>
+Message-ID: <01c816a5-a3d5-492f-7aee-854217bb2940@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 04, 2018 at 12:16:49AM +1000, Benjamin Herrenschmidt wrote:
-> On Tue, 2018-07-03 at 09:50 +0200, Greg KH wrote:
-> > On Tue, Jul 03, 2018 at 05:04:10PM +1000, Andrew Jeffery wrote:
-> > > Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
-> > > ---
-> > 
-> > I can't take patches without any changelog text at all :(
+On 03/07/2018 15:21, Neil Armstrong wrote:
+> The Amlogic Meson GX SoCs embeds a clock measurer IP to measure the internal
+> clock paths frequencies.
+> The precision is in the order of the MHz.
+
+The precision is more around 30Khz.
+
 > 
-> Greg (and replying to your other comments as well)...
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> ---
+>  drivers/soc/amlogic/Kconfig                |   8 ++
+>  drivers/soc/amlogic/Makefile               |   1 +
+>  drivers/soc/amlogic/meson-gx-clk-measure.c | 224 +++++++++++++++++++++++++++++
+>  3 files changed, 233 insertions(+)
+>  create mode 100644 drivers/soc/amlogic/meson-gx-clk-measure.c
 > 
-> This is an RFC series, it's not meant for you to take at this point,
-> it's about discussing the overall approach to exposing BMC random
-> "tunables" as explained in patch 0 of the series.
+> diff --git a/drivers/soc/amlogic/Kconfig b/drivers/soc/amlogic/Kconfig
+> index b04f6e4..4a3217d 100644
+> --- a/drivers/soc/amlogic/Kconfig
+> +++ b/drivers/soc/amlogic/Kconfig
+> @@ -1,5 +1,13 @@
+>  menu "Amlogic SoC drivers"
+>  
+> +config MESON_GX_CLK_MEASURE
+> +	bool "Amlogic Meson GX SoC Clock Measure driver"
+> +	depends on ARCH_MESON || COMPILE_TEST
+> +	default ARCH_MESON
+> +	help
+> +	  Say yes to support of Measuring a set of internal SoC clocks
+> +	  from the debugfs interface.
+> +
+>  config MESON_GX_SOCINFO
+>  	bool "Amlogic Meson GX SoC Information driver"
+>  	depends on ARCH_MESON || COMPILE_TEST
+> diff --git a/drivers/soc/amlogic/Makefile b/drivers/soc/amlogic/Makefile
+> index 8fa3218..a0ad966 100644
+> --- a/drivers/soc/amlogic/Makefile
+> +++ b/drivers/soc/amlogic/Makefile
+> @@ -1,3 +1,4 @@
+> +obj-$(CONFIG_MESON_GX_CLK_MEASURE) += meson-gx-clk-measure.o
+>  obj-$(CONFIG_MESON_GX_SOCINFO) += meson-gx-socinfo.o
+>  obj-$(CONFIG_MESON_GX_PM_DOMAINS) += meson-gx-pwrc-vpu.o
+>  obj-$(CONFIG_MESON_MX_SOCINFO) += meson-mx-socinfo.o
+> diff --git a/drivers/soc/amlogic/meson-gx-clk-measure.c b/drivers/soc/amlogic/meson-gx-clk-measure.c
+> new file mode 100644
+> index 0000000..434d9f3
+> --- /dev/null
+> +++ b/drivers/soc/amlogic/meson-gx-clk-measure.c
+> @@ -0,0 +1,224 @@
+> +// SPDX-License-Identifier: GPL-2.0+
+> +/*
+> + * Copyright (c) 2017 BayLibre, SAS
+> + * Author: Neil Armstrong <narmstrong@baylibre.com>
+> + */
+> +
+> +#include <linux/of_address.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/bitfield.h>
+> +#include <linux/seq_file.h>
+> +#include <linux/debugfs.h>
+> +#include <linux/regmap.h>
+> +
+> +#define MSR_CLK_DUTY		0x0
+> +#define MSR_CLK_REG0		0x4
+> +#define MSR_CLK_REG1		0x8
+> +#define MSR_CLK_REG2		0xc
+> +
+> +#define MSR_CLK_DIV		GENMASK(15, 0)
+> +#define MSR_ENABLE		BIT(16)
+> +#define MSR_CONT		BIT(17) /* continuous measurement */
+> +#define MSR_INTR		BIT(18) /* interrupts */
+> +#define MSR_RUN			BIT(19)
+> +#define MSR_CLK_SRC		GENMASK(26, 20)
+> +#define MSR_BUSY		BIT(31)
+> +
+> +#define MSR_VAL_MASK		GENMASK(15, 0)
+> +
+> +#define DIV_50US		64
+> +
+> +#define CLK_MSR_MAX		128
+> +
+> +struct meson_gx_msr {
+> +	struct regmap *regmap;
+> +};
+> +
+> +struct meson_gx_msr_id {
+> +	struct meson_gx_msr *priv;
+> +	unsigned int id;
+> +	const char *name;
+> +};
+> +
+> +#define CLK_MSR_ID(__id, __name) \
+> +	[__id] = {.id = __id, .name = __name,}
+> +
+> +static struct meson_gx_msr_id clk_msr[CLK_MSR_MAX] = {
+> +	CLK_MSR_ID(0, "ring_osc_out_ee_0"),
+> +	CLK_MSR_ID(1, "ring_osc_out_ee_1"),
+> +	CLK_MSR_ID(2, "ring_osc_out_ee_2"),
+> +	CLK_MSR_ID(3, "a53_ring_osc"),
+> +	CLK_MSR_ID(4, "gp0_pll"),
+> +	CLK_MSR_ID(6, "enci"),
+> +	CLK_MSR_ID(7, "clk81"),
+> +	CLK_MSR_ID(8, "encp"),
+> +	CLK_MSR_ID(9, "encl"),
+> +	CLK_MSR_ID(10, "vdac"),
+> +	CLK_MSR_ID(11, "rgmii_tx"),
+> +	CLK_MSR_ID(12, "pdm"),
+> +	CLK_MSR_ID(13, "amclk"),
+> +	CLK_MSR_ID(14, "fec_0"),
+> +	CLK_MSR_ID(15, "fec_1"),
+> +	CLK_MSR_ID(16, "fec_2"),
+> +	CLK_MSR_ID(17, "sys_pll_div16"),
+> +	CLK_MSR_ID(18, "sys_cpu_div16"),
+> +	CLK_MSR_ID(19, "hdmitx_sys"),
+> +	CLK_MSR_ID(20, "rtc_osc_out"),
+> +	CLK_MSR_ID(21, "i2s_in_src0"),
+> +	CLK_MSR_ID(22, "eth_phy_ref"),
+> +	CLK_MSR_ID(23, "hdmi_todig"),
+> +	CLK_MSR_ID(26, "sc_int"),
+> +	CLK_MSR_ID(28, "sar_adc"),
+> +	CLK_MSR_ID(31, "mpll_test_out"),
+> +	CLK_MSR_ID(32, "vdec"),
+> +	CLK_MSR_ID(35, "mali"),
+> +	CLK_MSR_ID(36, "hdmi_tx_pixel"),
+> +	CLK_MSR_ID(37, "i958"),
+> +	CLK_MSR_ID(38, "vdin_meas"),
+> +	CLK_MSR_ID(39, "pcm_sclk"),
+> +	CLK_MSR_ID(40, "pcm_mclk"),
+> +	CLK_MSR_ID(41, "eth_rx_or_rmii"),
+> +	CLK_MSR_ID(42, "mp0_out"),
+> +	CLK_MSR_ID(43, "fclk_div5"),
+> +	CLK_MSR_ID(44, "pwm_b"),
+> +	CLK_MSR_ID(45, "pwm_a"),
+> +	CLK_MSR_ID(46, "vpu"),
+> +	CLK_MSR_ID(47, "ddr_dpll_pt"),
+> +	CLK_MSR_ID(48, "mp1_out"),
+> +	CLK_MSR_ID(49, "mp2_out"),
+> +	CLK_MSR_ID(50, "mp3_out"),
+> +	CLK_MSR_ID(51, "nand_core"),
+> +	CLK_MSR_ID(52, "sd_emmc_b"),
+> +	CLK_MSR_ID(53, "sd_emmc_a"),
+> +	CLK_MSR_ID(55, "vid_pll_div_out"),
+> +	CLK_MSR_ID(56, "cci"),
+> +	CLK_MSR_ID(57, "wave420l_c"),
+> +	CLK_MSR_ID(58, "wave420l_b"),
+> +	CLK_MSR_ID(59, "hcodec"),
+> +	CLK_MSR_ID(60, "alt_32k"),
+> +	CLK_MSR_ID(61, "gpio_msr"),
+> +	CLK_MSR_ID(62, "hevc"),
+> +	CLK_MSR_ID(66, "vid_lock"),
+> +	CLK_MSR_ID(70, "pwm_f"),
+> +	CLK_MSR_ID(71, "pwm_e"),
+> +	CLK_MSR_ID(72, "pwm_d"),
+> +	CLK_MSR_ID(73, "pwm_C"),
+> +	CLK_MSR_ID(75, "aoclkx2_int"),
+> +	CLK_MSR_ID(76, "aoclk_int"),
+> +	CLK_MSR_ID(77, "rng_ring_osc_0"),
+> +	CLK_MSR_ID(78, "rng_ring_osc_1"),
+> +	CLK_MSR_ID(79, "rng_ring_osc_2"),
+> +	CLK_MSR_ID(80, "rng_ring_osc_3"),
+> +	CLK_MSR_ID(81, "vapb"),
+> +	CLK_MSR_ID(82, "ge2d"),
+> +};
+> +
+> +static int meson_gx_measure_id(struct meson_gx_msr *priv, unsigned int id)
+> +{
+> +	unsigned int val;
+> +	int ret;
+> +
+> +	regmap_write(priv->regmap, MSR_CLK_REG0, 0);
+> +
+> +	/* Set measurement gate to 50uS */
+> +	regmap_update_bits(priv->regmap, MSR_CLK_REG0, MSR_CLK_DIV,
+> +			   FIELD_PREP(MSR_CLK_DIV, DIV_50US));
+
+Slight error, this should be DIV_50US - 1
+
+> +
+> +	/* Set ID */
+> +	regmap_update_bits(priv->regmap, MSR_CLK_REG0, MSR_CLK_SRC,
+> +			   FIELD_PREP(MSR_CLK_SRC, id));
+> +
+> +	/* Enable & Start */
+> +	regmap_update_bits(priv->regmap, MSR_CLK_REG0,
+> +			   MSR_RUN | MSR_ENABLE,
+> +			   MSR_RUN | MSR_ENABLE);
+> +
+> +	ret = regmap_read_poll_timeout(priv->regmap, MSR_CLK_REG0,
+> +				       val, !(val & MSR_BUSY), 10, 1000);
+> +	if (ret)
+> +		return ret;
+> +
+> +	/* Disable */
+> +	regmap_update_bits(priv->regmap, MSR_CLK_REG0, MSR_ENABLE, 0);
+> +
+> +	/* Get the value in MHz*64 */
+> +	regmap_read(priv->regmap, MSR_CLK_REG2, &val);
+> +
+> +	return (((val + 31) & MSR_VAL_MASK) / 64) * 1000000;
+
+And we can show the full calculation by pre-multiplying by 1000000 before dividing.
+
+> +}
+> +
+> +static int clk_msr_show(struct seq_file *s, void *data)
+> +{
+> +	struct meson_gx_msr_id *clk_msr_id = s->private;
+> +	int val;
+> +
+> +	val = meson_gx_measure_id(clk_msr_id->priv, clk_msr_id->id);
+> +	if (val < 0)
+> +		return val;
+> +
+> +	seq_printf(s, "%d\n", val);
+> +
+> +	return 0;
+> +}
+> +DEFINE_SHOW_ATTRIBUTE(clk_msr);
+> +
+> +static const struct regmap_config clk_msr_regmap_config = {
+> +	.reg_bits = 32,
+> +	.val_bits = 32,
+> +	.reg_stride = 4,
+> +	.max_register = MSR_CLK_REG2,
+> +};
+> +
+> +static int meson_gx_msr_probe(struct platform_device *pdev)
+> +{
+> +	struct meson_gx_msr *priv;
+> +	struct resource *res;
+> +	struct dentry *root;
+> +	void __iomem *base;
+> +	int i;
+> +
+> +	priv = devm_kzalloc(&pdev->dev, sizeof(struct meson_gx_msr),
+> +			    GFP_KERNEL);
+> +	if (!priv)
+> +		return -ENOMEM;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	base = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(base)) {
+> +		dev_err(&pdev->dev, "io resource mapping failed\n");
+> +		return PTR_ERR(base);
+> +	}
+> +
+> +	priv->regmap = devm_regmap_init_mmio(&pdev->dev, base,
+> +					      &clk_msr_regmap_config);
+> +	if (IS_ERR(priv->regmap))
+> +		return PTR_ERR(priv->regmap);
+> +
+> +	root = debugfs_create_dir("meson-clk-msr", NULL);
+> +
+> +	for (i = 0 ; i < CLK_MSR_MAX ; ++i) {
+> +		if (!clk_msr[i].name)
+> +			continue;
+> +
+> +		clk_msr[i].priv = priv;
+> +
+> +		debugfs_create_file(clk_msr[i].name, 0444, root,
+> +				    &clk_msr[i], &clk_msr_fops);
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id meson_gx_msr_match_table[] = {
+> +	{ .compatible = "amlogic,meson-gx-clk-measure" },
+> +	{ /* sentinel */ }
+> +};
+> +
+> +static struct platform_driver meson_gx_msr_driver = {
+> +	.probe	= meson_gx_msr_probe,
+> +	.driver = {
+> +		.name		= "meson_gx_msr",
+> +		.of_match_table	= meson_gx_msr_match_table,
+> +	},
+> +};
+> +builtin_platform_driver(meson_gx_msr_driver);
 > 
-> Yes the individual patches aren't yet at the level of polish for a
-> formal submission, we (naively ?) thought that's what the whole RFC tag
-> is about :-)
-
-Oh come on, putting a basic "here is what this patch does" comment
-should be part of every patch, otherwise what is there to comment on if
-we don't know what is going on in the patch itself?
-
-Anyway, I provided a bunch of feedback to the "real" patch in this
-series...
-
-
-greg k-h
