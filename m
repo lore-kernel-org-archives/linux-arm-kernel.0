@@ -1,39 +1,49 @@
-From: christoffer.dall@arm.com (Christoffer Dall)
-Date: Tue,  3 Jul 2018 23:26:15 +0200
-Subject: [PATCH] KVM: arm/arm64: Fix vgic init race
-Message-ID: <1530653175-11999-1-git-send-email-christoffer.dall@arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 3 Jul 2018 15:30:11 -0600
+Subject: [PATCH v2 18/23] dt-bindings: thermal: armada: add reference to
+ new bindings
+In-Reply-To: <20180625151239.20976-19-miquel.raynal@bootlin.com>
+References: <20180625151239.20976-1-miquel.raynal@bootlin.com>
+ <20180625151239.20976-19-miquel.raynal@bootlin.com>
+Message-ID: <20180703213011.GA13190@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The vgic_init function can race with kvm_arch_vcpu_create() which does
-not hold kvm_lock() and we therefore have no synchronization primitives
-to ensure we're doing the right thing.
+On Mon, Jun 25, 2018 at 05:12:34PM +0200, Miquel Raynal wrote:
+> New bindings (with the syscon and the overheat interrupt) are available
 
-As the user is trying to initialize or run the VM while at the same time
-creating more VCPUs, we just have to refuse to initialize the VGIC in
-this case rather than silently failing with a broken VCPU.
+What interrupt? It's not in your new binding.
 
-Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
----
- virt/kvm/arm/vgic/vgic-init.c | 4 ++++
- 1 file changed, 4 insertions(+)
+> for AP806 and CP110 compatibles. Add a reference to these files from the
+> original documentation.
+> 
+> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+> ---
+>  Documentation/devicetree/bindings/thermal/armada-thermal.txt | 5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/thermal/armada-thermal.txt b/Documentation/devicetree/bindings/thermal/armada-thermal.txt
+> index e0d013a2e66d..f3b441100890 100644
+> --- a/Documentation/devicetree/bindings/thermal/armada-thermal.txt
+> +++ b/Documentation/devicetree/bindings/thermal/armada-thermal.txt
+> @@ -10,6 +10,11 @@ Required properties:
+>      * marvell,armada-ap806-thermal
+>      * marvell,armada-cp110-thermal
 
-diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
-index 9406eaf..c0c0b88 100644
---- a/virt/kvm/arm/vgic/vgic-init.c
-+++ b/virt/kvm/arm/vgic/vgic-init.c
-@@ -286,6 +286,10 @@ int vgic_init(struct kvm *kvm)
-        if (vgic_initialized(kvm))
-                return 0;
+Really you should not be using the same compatible for both. Now you 
+have 2 drivers matching to same compatibles.
 
-+       /* Are we also in the middle of creating a VCPU? */
-+       if (kvm->created_vcpus != atomic_read(&kvm->online_vcpus))
-+               return -EBUSY;
-+
-        /* freeze the number of spis */
-        if (!dist->nr_spis)
-                dist->nr_spis = VGIC_NR_IRQS_LEGACY - VGIC_NR_PRIVATE_IRQS;
---
-2.7.4
+Can't you make this a child of the syscon without breaking the binding?
 
-IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+>  
+> +Note: these bindings are deprecated for AP806/CP110 and should instead
+> +follow the rules described in:
+> +Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt
+> +Documentation/devicetree/bindings/arm/marvell/cp110-system-controller.txt
+> +
+>  - reg: Device's register space.
+>    Two entries are expected, see the examples below. The first one points
+>    to the status register (4B). The second one points to the control
+> -- 
+> 2.14.1
+> 
