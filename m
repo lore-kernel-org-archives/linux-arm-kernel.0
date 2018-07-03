@@ -1,9 +1,9 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Wed,  4 Jul 2018 00:00:07 +0200
-Subject: [PATCH v2 10/32] mtd: rawnand: hisi504: convert driver to nand_scan()
+Date: Wed,  4 Jul 2018 00:00:02 +0200
+Subject: [PATCH v2 05/32] mtd: rawnand: denali: convert to nand_scan()
 In-Reply-To: <20180703220029.19565-1-miquel.raynal@bootlin.com>
 References: <20180703220029.19565-1-miquel.raynal@bootlin.com>
-Message-ID: <20180703220029.19565-11-miquel.raynal@bootlin.com>
+Message-ID: <20180703220029.19565-6-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,105 +14,191 @@ both nand_scan_ident() and nand_scan_tail().
 
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 ---
- drivers/mtd/nand/raw/hisi504_nand.c | 74 ++++++++++++++++++++-----------------
- 1 file changed, 40 insertions(+), 34 deletions(-)
+ drivers/mtd/nand/raw/denali.c | 134 +++++++++++++++++++++++-------------------
+ 1 file changed, 73 insertions(+), 61 deletions(-)
 
-diff --git a/drivers/mtd/nand/raw/hisi504_nand.c b/drivers/mtd/nand/raw/hisi504_nand.c
-index a1e009c8e556..d814a459b4d6 100644
---- a/drivers/mtd/nand/raw/hisi504_nand.c
-+++ b/drivers/mtd/nand/raw/hisi504_nand.c
-@@ -709,9 +709,46 @@ static int hisi_nfc_ecc_probe(struct hinfc_host *host)
+diff --git a/drivers/mtd/nand/raw/denali.c b/drivers/mtd/nand/raw/denali.c
+index 4d53f41ada08..09b85d749552 100644
+--- a/drivers/mtd/nand/raw/denali.c
++++ b/drivers/mtd/nand/raw/denali.c
+@@ -1205,62 +1205,12 @@ static int denali_multidev_fixup(struct denali_nand_info *denali)
  	return 0;
  }
  
-+static int hisi_nfc_attach_chip(struct nand_chip *chip)
-+{
-+	struct mtd_info *mtd = nand_to_mtd(chip);
-+	struct hinfc_host *host = nand_get_controller_data(chip);
-+	int flag;
-+
-+	host->buffer = dmam_alloc_coherent(host->dev,
-+					   mtd->writesize + mtd->oobsize,
-+					   &host->dma_buffer, GFP_KERNEL);
-+	if (!host->buffer)
+-int denali_init(struct denali_nand_info *denali)
++static int denali_attach_chip(struct nand_chip *chip)
+ {
+-	struct nand_chip *chip = &denali->nand;
+ 	struct mtd_info *mtd = nand_to_mtd(chip);
+-	u32 features = ioread32(denali->reg + FEATURES);
++	struct denali_nand_info *denali = mtd_to_denali(mtd);
+ 	int ret;
+ 
+-	mtd->dev.parent = denali->dev;
+-	denali_hw_init(denali);
+-
+-	init_completion(&denali->complete);
+-	spin_lock_init(&denali->irq_lock);
+-
+-	denali_clear_irq_all(denali);
+-
+-	ret = devm_request_irq(denali->dev, denali->irq, denali_isr,
+-			       IRQF_SHARED, DENALI_NAND_NAME, denali);
+-	if (ret) {
+-		dev_err(denali->dev, "Unable to request IRQ\n");
+-		return ret;
+-	}
+-
+-	denali_enable_irq(denali);
+-	denali_reset_banks(denali);
+-
+-	denali->active_bank = DENALI_INVALID_BANK;
+-
+-	nand_set_flash_node(chip, denali->dev->of_node);
+-	/* Fallback to the default name if DT did not give "label" property */
+-	if (!mtd->name)
+-		mtd->name = "denali-nand";
+-
+-	chip->select_chip = denali_select_chip;
+-	chip->read_byte = denali_read_byte;
+-	chip->write_byte = denali_write_byte;
+-	chip->read_word = denali_read_word;
+-	chip->cmd_ctrl = denali_cmd_ctrl;
+-	chip->dev_ready = denali_dev_ready;
+-	chip->waitfunc = denali_waitfunc;
+-
+-	if (features & FEATURES__INDEX_ADDR) {
+-		denali->host_read = denali_indexed_read;
+-		denali->host_write = denali_indexed_write;
+-	} else {
+-		denali->host_read = denali_direct_read;
+-		denali->host_write = denali_direct_write;
+-	}
+-
+-	/* clk rate info is needed for setup_data_interface */
+-	if (denali->clk_rate && denali->clk_x_rate)
+-		chip->setup_data_interface = denali_setup_data_interface;
+-
+-	ret = nand_scan_ident(mtd, denali->max_banks, NULL);
+-	if (ret)
+-		goto disable_irq;
+-
+ 	if (ioread32(denali->reg + FEATURES) & FEATURES__DMA)
+ 		denali->dma_avail = 1;
+ 
+@@ -1293,7 +1243,7 @@ int denali_init(struct denali_nand_info *denali)
+ 				   mtd->oobsize - denali->oob_skip_bytes);
+ 	if (ret) {
+ 		dev_err(denali->dev, "Failed to setup ECC settings.\n");
+-		goto disable_irq;
++		return ret;
+ 	}
+ 
+ 	dev_dbg(denali->dev,
+@@ -1337,7 +1287,7 @@ int denali_init(struct denali_nand_info *denali)
+ 
+ 	ret = denali_multidev_fixup(denali);
+ 	if (ret)
+-		goto disable_irq;
++		return ret;
+ 
+ 	/*
+ 	 * This buffer is DMA-mapped by denali_{read,write}_page_raw.  Do not
+@@ -1345,26 +1295,88 @@ int denali_init(struct denali_nand_info *denali)
+ 	 * guarantee DMA-safe alignment.
+ 	 */
+ 	denali->buf = kmalloc(mtd->writesize + mtd->oobsize, GFP_KERNEL);
+-	if (!denali->buf) {
+-		ret = -ENOMEM;
+-		goto disable_irq;
++	if (!denali->buf)
 +		return -ENOMEM;
-+
-+	host->dma_oob = host->dma_buffer + mtd->writesize;
-+	memset(host->buffer, 0xff, mtd->writesize + mtd->oobsize);
-+
-+	flag = hinfc_read(host, HINFC504_CON);
-+	flag &= ~(HINFC504_CON_PAGESIZE_MASK << HINFC504_CON_PAGEISZE_SHIFT);
-+	switch (mtd->writesize) {
-+	case 2048:
-+		flag |= (0x001 << HINFC504_CON_PAGEISZE_SHIFT);
-+		break;
-+	/*
-+	 * TODO: add more pagesize support,
-+	 * default pagesize has been set in hisi_nfc_host_init
-+	 */
-+	default:
-+		dev_err(host->dev, "NON-2KB page size nand flash\n");
-+		return -EINVAL;
-+	}
-+	hinfc_write(host, flag, HINFC504_CON);
-+
-+	if (chip->ecc.mode == NAND_ECC_HW)
-+		hisi_nfc_ecc_probe(host);
 +
 +	return 0;
 +}
 +
- static int hisi_nfc_probe(struct platform_device *pdev)
- {
--	int ret = 0, irq, flag, max_chips = HINFC504_MAX_CHIP;
-+	int ret = 0, irq, max_chips = HINFC504_MAX_CHIP;
- 	struct device *dev = &pdev->dev;
- 	struct hinfc_host *host;
- 	struct nand_chip  *chip;
-@@ -769,42 +806,11 @@ static int hisi_nfc_probe(struct platform_device *pdev)
- 		return ret;
++static void denali_detach_chip(struct nand_chip *chip)
++{
++	struct mtd_info *mtd = nand_to_mtd(chip);
++	struct denali_nand_info *denali = mtd_to_denali(mtd);
++
++	kfree(denali->buf);
++}
++
++int denali_init(struct denali_nand_info *denali)
++{
++	struct nand_chip *chip = &denali->nand;
++	struct mtd_info *mtd = nand_to_mtd(chip);
++	u32 features = ioread32(denali->reg + FEATURES);
++	int ret;
++
++	mtd->dev.parent = denali->dev;
++	denali_hw_init(denali);
++
++	init_completion(&denali->complete);
++	spin_lock_init(&denali->irq_lock);
++
++	denali_clear_irq_all(denali);
++
++	ret = devm_request_irq(denali->dev, denali->irq, denali_isr,
++			       IRQF_SHARED, DENALI_NAND_NAME, denali);
++	if (ret) {
++		dev_err(denali->dev, "Unable to request IRQ\n");
++		return ret;
  	}
  
--	ret = nand_scan_ident(mtd, max_chips, NULL);
-+	chip->hwcontrol.attach_chip = hisi_nfc_attach_chip;
-+	ret = nand_scan(mtd, max_chips);
- 	if (ret)
- 		return ret;
- 
--	host->buffer = dmam_alloc_coherent(dev, mtd->writesize + mtd->oobsize,
--		&host->dma_buffer, GFP_KERNEL);
--	if (!host->buffer)
--		return -ENOMEM;
--
--	host->dma_oob = host->dma_buffer + mtd->writesize;
--	memset(host->buffer, 0xff, mtd->writesize + mtd->oobsize);
--
--	flag = hinfc_read(host, HINFC504_CON);
--	flag &= ~(HINFC504_CON_PAGESIZE_MASK << HINFC504_CON_PAGEISZE_SHIFT);
--	switch (mtd->writesize) {
--	case 2048:
--		flag |= (0x001 << HINFC504_CON_PAGEISZE_SHIFT); break;
--	/*
--	 * TODO: add more pagesize support,
--	 * default pagesize has been set in hisi_nfc_host_init
--	 */
--	default:
--		dev_err(dev, "NON-2KB page size nand flash\n");
--		return -EINVAL;
--	}
--	hinfc_write(host, flag, HINFC504_CON);
--
--	if (chip->ecc.mode == NAND_ECC_HW)
--		hisi_nfc_ecc_probe(host);
--
 -	ret = nand_scan_tail(mtd);
--	if (ret) {
--		dev_err(dev, "nand_scan_tail failed: %d\n", ret);
--		return ret;
--	}
--
++	denali_enable_irq(denali);
++	denali_reset_banks(denali);
++
++	denali->active_bank = DENALI_INVALID_BANK;
++
++	nand_set_flash_node(chip, denali->dev->of_node);
++	/* Fallback to the default name if DT did not give "label" property */
++	if (!mtd->name)
++		mtd->name = "denali-nand";
++
++	chip->select_chip = denali_select_chip;
++	chip->read_byte = denali_read_byte;
++	chip->write_byte = denali_write_byte;
++	chip->read_word = denali_read_word;
++	chip->cmd_ctrl = denali_cmd_ctrl;
++	chip->dev_ready = denali_dev_ready;
++	chip->waitfunc = denali_waitfunc;
++
++	if (features & FEATURES__INDEX_ADDR) {
++		denali->host_read = denali_indexed_read;
++		denali->host_write = denali_indexed_write;
++	} else {
++		denali->host_read = denali_direct_read;
++		denali->host_write = denali_direct_write;
++	}
++
++	/* clk rate info is needed for setup_data_interface */
++	if (denali->clk_rate && denali->clk_x_rate)
++		chip->setup_data_interface = denali_setup_data_interface;
++
++	chip->hwcontrol.attach_chip = denali_attach_chip;
++	chip->hwcontrol.detach_chip = denali_detach_chip;
++	ret = nand_scan(mtd, denali->max_banks);
+ 	if (ret)
+-		goto free_buf;
++		goto disable_irq;
+ 
  	ret = mtd_device_register(mtd, NULL, 0);
  	if (ret) {
- 		dev_err(dev, "Err MTD partition=%d\n", ret);
+ 		dev_err(denali->dev, "Failed to register MTD: %d\n", ret);
+ 		goto cleanup_nand;
+ 	}
++
+ 	return 0;
+ 
+ cleanup_nand:
+ 	nand_cleanup(chip);
+-free_buf:
+-	kfree(denali->buf);
+ disable_irq:
+ 	denali_disable_irq(denali);
+ 
 -- 
 2.14.1
