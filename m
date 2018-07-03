@@ -1,29 +1,36 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue,  3 Jul 2018 15:21:47 +0200
-Subject: [PATCH 0/3] Add Amlogic Meson GX SoC Clock Measure Driver
-Message-ID: <1530624110-4687-1-git-send-email-narmstrong@baylibre.com>
+Date: Tue,  3 Jul 2018 15:21:50 +0200
+Subject: [PATCH 3/3] ARM64: dts: meson-gx: Add Internal Clock Measurer node
+In-Reply-To: <1530624110-4687-1-git-send-email-narmstrong@baylibre.com>
+References: <1530624110-4687-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1530624110-4687-4-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The Amlogic Meson GX SoCs embeds a clock measurer IP to measure the internal
-clocks frequency in the order of the MHz.
+clock paths frequencies.
+This patch adds the node in the top-level meson-gx dtsi.
 
-Thsi patchset includes the dt-bindings, driver and the DT node added to the
-meson-gx dtsi.
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+---
+ arch/arm64/boot/dts/amlogic/meson-gx.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-Neil Armstrong (3):
-  soc: amlogic: Add Meson GX Clock Measure driver
-  dt-bindings: amlogic: Add Internal Clock Measurer bindings
-  ARM64: dts: meson-gx: Add Internal Clock Measurer node
-
- .../bindings/soc/amlogic/clk-measure.txt           |  15 ++
- arch/arm64/boot/dts/amlogic/meson-gx.dtsi          |   5 +
- drivers/soc/amlogic/Kconfig                        |   8 +
- drivers/soc/amlogic/Makefile                       |   1 +
- drivers/soc/amlogic/meson-gx-clk-measure.c         | 224 +++++++++++++++++++++
- 5 files changed, 253 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/soc/amlogic/clk-measure.txt
- create mode 100644 drivers/soc/amlogic/meson-gx-clk-measure.c
-
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
+index b8dc4db..7767cab 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
+@@ -262,6 +262,11 @@
+ 				status = "disabled";
+ 			};
+ 
++			clock-measure at 8758 {
++				compatible = "amlogic,meson-gx-clk-measure";
++				reg = <0x0 0x8758 0x0 0x10>;
++			};
++
+ 			i2c_B: i2c at 87c0 {
+ 				compatible = "amlogic,meson-gx-i2c", "amlogic,meson-gxbb-i2c";
+ 				reg = <0x0 0x087c0 0x0 0x20>;
 -- 
 2.7.4
