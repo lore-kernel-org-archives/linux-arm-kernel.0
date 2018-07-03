@@ -1,43 +1,34 @@
-From: ravi.bangoria@linux.ibm.com (Ravi Bangoria)
-Date: Tue, 3 Jul 2018 13:20:29 +0530
-Subject: [PATCH v5 09/10] Uprobes/sdt: Document about reference counter
-In-Reply-To: <20180702145444.GB65296@linux.vnet.ibm.com>
-References: <20180628052209.13056-1-ravi.bangoria@linux.ibm.com>
- <20180628052209.13056-10-ravi.bangoria@linux.ibm.com>
- <20180702145444.GB65296@linux.vnet.ibm.com>
-Message-ID: <0110cd8a-9785-c761-e2a5-ba8ab92745e9@linux.ibm.com>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Tue, 3 Jul 2018 09:54:12 +0200
+Subject: [PATCH v8 00/26] PM / Domains: Support hierarchical CPU
+ arrangement (PSCI/ARM)
+In-Reply-To: <CAPDyKFpy8rpjRTBsHUFa_L0M_C=vH+6qjq=Kxdn+0j+T5NNSMQ@mail.gmail.com>
+References: <20180620172226.15012-1-ulf.hansson@linaro.org>
+ <CAPDyKFpy8rpjRTBsHUFa_L0M_C=vH+6qjq=Kxdn+0j+T5NNSMQ@mail.gmail.com>
+Message-ID: <CAJZ5v0hcBiYPMh8V50yq0jQud32Ey8V-ukiavJkP4PU4zAiFyg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Srikar,
+On Tue, Jul 3, 2018 at 7:44 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> Rafael,
+>
+> On 20 June 2018 at 19:22, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>> Changes in v8:
+>>  - Added some tags for reviews and acks.
+>>  - Cleanup timer patch (patch6) according to comments from Rafael.
+>>  - Rebased series on top of v4.18rc1 - it applied cleanly, except for patch 5.
+>>  - While adopting patch 5 to new genpd changes, I took the opportunity to
+>>    improve the new function description a bit.
+>>  - Corrected malformed SPDX-License-Identifier in patch20.
+>
+> There have only been a minor comment from you at patch3 (about
+> squashing it with patch21), with that fixed and assuming there are no
+> further comments - would you like me to collect the changes and send
+> it to you as a pull request?
 
-On 07/02/2018 08:24 PM, Srikar Dronamraju wrote:
-> * Ravi Bangoria <ravi.bangoria@linux.ibm.com> [2018-06-28 10:52:08]:
-> 
->> Reference counter gate the invocation of probe. If present,
->> by default reference count is 0. Kernel needs to increment
->> it before tracing the probe and decrement it when done. This
->> is identical to semaphore in Userspace Statically Defined
->> Tracepoints (USDT).
->>
->> Document usage of reference counter.
->>
->> Signed-off-by: Ravi Bangoria <ravi.bangoria@linux.ibm.com>
->> Acked-by: Masami Hiramatsu <mhiramat@kernel.org>
-> 
-> Unlike perf, this mechanism cannot detect ref count and depends on the
-> users data. What happens if the user mistakenly provides a wrong location?
-> I guess he can corrupt some other data structures?
+I have not looked at them in detail yet, sorry.
 
-Yes, if user is giving wrong ref_ctr_offset, uprobe infrastructure will
-corrupt some user data.
-
-> 
-> Hence I would think twice of advertising this mechanism. i.e keep this
-> as an undocumented feature.
-> 
-
-I don't mind.
+I any case, I'll apply the patches by hand.
 
 Thanks,
-Ravi
+Rafael
