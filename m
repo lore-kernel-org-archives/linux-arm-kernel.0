@@ -1,64 +1,116 @@
-From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
-Date: Tue, 3 Jul 2018 10:22:57 +0800
-Subject: [PATCH 0/2] serial: 8250_dw: add fractional divisor support
-In-Reply-To: <59b14f97234271a7d859fa07f27bd66ec252ccc9.camel@linux.intel.com>
-References: <20180702180428.331b36c5@xhacker.debian>
- <fef0bf484ead5e0998666168ced86438bf935ce5.camel@linux.intel.com>
- <59b14f97234271a7d859fa07f27bd66ec252ccc9.camel@linux.intel.com>
-Message-ID: <20180703102257.678db6a8@xhacker.debian>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 2 Jul 2018 20:30:40 -0600
+Subject: [PATCH v22 1/4] dt-bindings: soc: Add documentation for the
+ MediaTek GCE unit
+In-Reply-To: <1530098172-31385-2-git-send-email-houlong.wei@mediatek.com>
+References: <1530098172-31385-1-git-send-email-houlong.wei@mediatek.com>
+ <1530098172-31385-2-git-send-email-houlong.wei@mediatek.com>
+Message-ID: <20180703023040.GA24508@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, 2 Jul 2018 14:51:03 +0300 Andy Shevchenko wrote:
-
-> On Mon, 2018-07-02 at 13:18 +0300, Andy Shevchenko wrote:
-> > On Mon, 2018-07-02 at 18:04 +0800, Jisheng Zhang wrote:  
-> > > For Synopsys DesignWare 8250 uart which version >= 4.00a, there's a
-> > > valid divisor latch fraction register. The fractional divisor width
-> > > is
-> > > 4bits ~ 6bits.
-> > >   
-> > 
-> > There are several serial IPs that have fractional divider built-in.
-> > None
-> > is using any specific hooks. Why do you need in your case, esp. taking
-> > into consideration that we have a custom ->set_termios() callback?  
+On Wed, Jun 27, 2018 at 07:16:09PM +0800, Houlong Wei wrote:
+> This adds documentation for the MediaTek Global Command Engine (GCE) unit
+> found in MT8173 SoCs.
 > 
-> Okay, I see that in 8250 we have hooks embedded into 8250_port.c which
-> is not the best solution.
+> Signed-off-by: Houlong Wei <houlong.wei@mediatek.com>
+> Signed-off-by: HS Liao <hs.liao@mediatek.com>
+> ---
+> Hi Rob,
+>   I don't add your ACK in this version since the dt-binding description
+> has been changed. Thanks.
+> ---
+>  .../devicetree/bindings/mailbox/mtk-gce.txt        |   65 ++++++++++++++++++++
+>  include/dt-bindings/gce/mt8173-gce.h               |   48 +++++++++++++++
+>  2 files changed, 113 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mailbox/mtk-gce.txt
+>  create mode 100644 include/dt-bindings/gce/mt8173-gce.h
 > 
-> For example it prevents better splitting Exar code.
-> So, we would need these hooks, but better to integrate them in the same
-> way like it's done for the rest of 8250 ones, i.e.
-> - rename existing to have a "do" word
-> - create new functions which would be a replacement that choose between
-> "do" variant and custom one
-> - not sure if we need to export "do" variants (at least for now)
+> diff --git a/Documentation/devicetree/bindings/mailbox/mtk-gce.txt b/Documentation/devicetree/bindings/mailbox/mtk-gce.txt
+> new file mode 100644
+> index 0000000..26f65a4
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mailbox/mtk-gce.txt
+> @@ -0,0 +1,65 @@
+> +MediaTek GCE
+> +===============
+> +
+> +The Global Command Engine (GCE) is used to help read/write registers with
+> +critical time limitation, such as updating display configuration during the
+> +vblank. The GCE can be used to implement the Command Queue (CMDQ) driver.
+> +
+> +CMDQ driver uses mailbox framework for communication. Please refer to
+> +mailbox.txt for generic information about mailbox device-tree bindings.
+> +
+> +Required properties:
+> +- compatible: Must be "mediatek,mt8173-gce"
+> +- reg: Address range of the GCE unit
+> +- interrupts: The interrupt signal from the GCE block
+> +- clock: Clocks according to the common clock binding
+> +- clock-names: Must be "gce" to stand for GCE clock
+> +- thread-num: Maximum threads count of GCE.
 
-So you mean add the support as following:
+mediatek,thread-num
 
-1.rename current serial8250_set_divisor as serial8250_do_set_divisor
+Is this needed for anything other than error checking the thread id in 
+the mbox cells? if that's it, then drop it. 
 
-2.add a new serial8250_set_divisor which will be as simple as
+> +- #mbox-cells: Should be 4.
+> +	<&phandle channel timeout priority atomic_exec>
+> +	phandle: Label name of a gce node.
+> +	channel: Channel of mailbox. Be equal to the thread id of GCE.
+> +	timeout: Maximum time of software waiting GCE processing done, in unit
+> +		of millisecond.
+> +	priority: Priority of GCE thread.
+> +	atomic_exec: GCE processing continuous packets of commands in atomic
+> +		way.
+> +
+> +Required properties for a client device:
+> +- mboxes: Client use mailbox to communicate with GCE, it should have this
+> +  property and list of phandle, mailbox specifiers.
+> +- gce-subsys: Specify the sub-system id which is corresponding to the register
+> +  address.
 
-static void serial8250_set_divisor(struct uart_port *port, ...)
-{
-	struct uart_8250_port *up = up_to_u8250p(port);
+What is this for?
 
-	if (up->set_divisor)
-		up->set_divisor(...);
-	else
-		serial8250_do_set_divisor(...);
-}
+> +
+> +Optional properties for a client device:
+> +- gce-event: Specify the event if the client has any. Because the event is
+> +  parsed by client, so client can replace 'gce-event' with other meaningful
+> +  name.
 
-could you please confirm?
+If the client sets the name, then no point having here. It must be 
+documented in the client binding. But then, what is this for in the 
+first place?
 
-Another issue is I'm not sure which struct to add the hook,
-struct uart_port or struct uart_8250_port? Currently, it seems that only
-uart_8250_port needs this hook, sure, adding the hook to struct uart_port
-is fine either. Could you please kindly give some suggestions?
+> +
+> +Some vaules of properties are defined in 'dt-bindings/gce/mt8173-gce.h'. Such as
+> +thread number, sub-system ids, thread priority, event ids.
+> +
+> +Example:
+> +
+> +	gce: gce at 10212000 {
 
-Thanks,
-Jisheng
+mailbox at ...
+
+> +		compatible = "mediatek,mt8173-gce";
+> +		reg = <0 0x10212000 0 0x1000>;
+> +		interrupts = <GIC_SPI 135 IRQ_TYPE_LEVEL_LOW>;
+> +		clocks = <&infracfg CLK_INFRA_GCE>;
+> +		clock-names = "gce";
+> +		thread-num = CMDQ_THR_MAX_COUNT;
+> +		#mbox-cells = <4>;
+> +	};
+> +
+> +Example for a client device:
+> +
+> +	mmsys: clock-controller at 14000000 {
+> +		compatible = "mediatek,mt8173-mmsys";
+> +		mboxes = <&gce 0 2000 CMDQ_THR_PRIO_LOWEST 1>,
+> +			 <&gce 1 2000 CMDQ_THR_PRIO_LOWEST 1>;
+> +		gce-subsys = <SUBSYS_1400XXXX>;
+> +		mutex-event-eof = <CMDQ_EVENT_MUTEX0_STREAM_EOF
+> +				CMDQ_EVENT_MUTEX1_STREAM_EOF>;
+> +
+> +		...
+> +	};
