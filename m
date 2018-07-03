@@ -1,33 +1,21 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 3 Jul 2018 10:51:36 -0700
-Subject: [PATCH] ARM: disable KCOV for trusted foundations code
-In-Reply-To: <20180529103636.1535457-1-arnd@arndb.de>
-References: <20180529103636.1535457-1-arnd@arndb.de>
-Message-ID: <20180703175136.vfx2nap7dsv5zen5@localhost>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Tue, 03 Jul 2018 20:12:51 +0200
+Subject: [PATCH v2 1/3] dt-bindings: Add vendor prefix for Vamrs Ltd.
+In-Reply-To: <20180628220830.9089-1-ezequiel@collabora.com>
+References: <20180628220830.9089-1-ezequiel@collabora.com>
+Message-ID: <3174671.ydEnH79Blk@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 29, 2018 at 12:36:26PM +0200, Arnd Bergmann wrote:
-> The ARM trusted foundations code is currently broken in linux-next
-> when CONFIG_KCOV_INSTRUMENT_ALL is set:
+Am Freitag, 29. Juni 2018, 00:08:28 CEST schrieb Ezequiel Garcia:
+> Vamrs Ltd. is a hardware solutions provider based in China.
 > 
-> /tmp/ccHdQsCI.s: Assembler messages:
-> /tmp/ccHdQsCI.s:37: Error: .err encountered
-> /tmp/ccHdQsCI.s:38: Error: .err encountered
-> /tmp/ccHdQsCI.s:39: Error: .err encountered
-> scripts/Makefile.build:311: recipe for target 'arch/arm/firmware/trusted_foundations.o' failed
+> Website: http://vamrs.com/
 > 
-> I could not find a function attribute that lets me disable
-> -fsanitize-coverage=trace-pc for just one function, so this
-> turns it off for the entire file instead.
-> 
-> Fixes: mmotm ("arm: port KCOV to arm")
-> Cc: Dmitry Vyukov <dvyukov@google.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Andrew Morton <akpm@linux-foundation.org>
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Ezequiel Garcia <ezequiel@collabora.com>
 
-Applied to arm-soc fixes branch for v4.18.
+Recipient list is missing devicetree maintainers + devicetree list
+Otherwise looks good of course.
 
 
--Olof
+Heiko
