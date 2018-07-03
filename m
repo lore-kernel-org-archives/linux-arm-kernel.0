@@ -1,69 +1,118 @@
-From: cyndis@kapsi.fi (Mikko Perttunen)
-Date: Tue, 3 Jul 2018 09:40:16 +0300
-Subject: [PATCH v3 6/8] serial: Add Tegra Combined UART driver
-In-Reply-To: <20180702134731.GI13096@ulmo>
-References: <20180702114033.15654-1-mperttunen@nvidia.com>
- <20180702114033.15654-7-mperttunen@nvidia.com> <20180702131851.GH13096@ulmo>
- <50c4702b-3d59-e443-5075-c888f83a2615@kapsi.fi> <20180702134731.GI13096@ulmo>
-Message-ID: <02120216-e305-5968-3567-d7174c2a8b13@kapsi.fi>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Tue, 3 Jul 2018 15:47:27 +0900
+Subject: [PATCH v2 1/4] arm64: export memblock_reserve()d regions via
+ /proc/iomem
+In-Reply-To: <891c3e5a-9760-1353-4a2c-0900082dd245@oracle.com>
+References: <20180619064424.6642-1-takahiro.akashi@linaro.org>
+ <20180619064424.6642-2-takahiro.akashi@linaro.org>
+ <72307608-90e0-4842-edc1-d3b284782940@oracle.com>
+ <ca9e5d9d-e090-f9e0-bc10-3297c9e3b7e1@arm.com>
+ <891c3e5a-9760-1353-4a2c-0900082dd245@oracle.com>
+Message-ID: <20180703064726.GU23681@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02.07.2018 16:47, Thierry Reding wrote:
-> On Mon, Jul 02, 2018 at 04:30:07PM +0300, Mikko Perttunen wrote:
->> On 02.07.2018 16:18, Thierry Reding wrote:
->>> On Mon, Jul 02, 2018 at 02:40:31PM +0300, Mikko Perttunen wrote:
->>>> The Tegra Combined UART (TCU) is a mailbox-based mechanism that allows
->>>> multiplexing multiple "virtual UARTs" into a single hardware serial
->>>> port. The TCU is the primary serial port on Tegra194 devices.
->>>>
->>>> Add a TCU driver utilizing the mailbox framework, as the used mailboxes
->>>> are part of Tegra HSP blocks that are already controlled by the Tegra
->>>> HSP mailbox driver.
->>>>
->>>> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
->>>> ---
->>>>
->>>> Notes:
->>>>       v2:
->>>>       - Removed (void) casts for unused variables.
->>>>       - Changed the uart_set_options() call to be on one line, even if its
->>>>         over 80 characters.
->>>>       - Added defines for magic numbers.
->>>>       - Style fixes.
->>>>       - Changed Kconfig entry to depend on the Tegra HSP driver instead of
->>>>         just the mailbox framework.
->>>>       v3:
->>>>       - Removed FLUSH bit, as it's unnecessary and slows down printing
->>>>       - Removed call to uart_set_options
->>>>       - Added mbox_free_channel calls to remove()
->>>>
->>>>    drivers/tty/serial/Kconfig       |   9 ++
->>>>    drivers/tty/serial/Makefile      |   1 +
->>>>    drivers/tty/serial/tegra-tcu.c   | 291 +++++++++++++++++++++++++++++++++++++++
->>>>    include/uapi/linux/serial_core.h |   3 +
->>>>    4 files changed, 304 insertions(+)
->>>>    create mode 100644 drivers/tty/serial/tegra-tcu.c
->>>
->>> The driver looks good to me. But for my own understanding, is there some
->>> way we can make use of the multiplexing? That is, could we add a
->>> mechanism to have the driver filter out only a specific stream? Could we
->>> also specify which stream to send data back to? What happens by default?
->>> Which stream is data sent to?
->>
->> There is no multiplexing on the producer/device side (i.e. what this driver
->> does). The mailbox specified in device tree specifies the stream we send
->> stuff to. The mailboxes are per-CPU (we use the CCPLEX mailbox here), so it
->> cannot really be changed.
+On Tue, Jun 19, 2018 at 10:22:46AM -0500, Dave Kleikamp wrote:
+> On 06/19/2018 10:00 AM, James Morse wrote:
+> > Hi Dave,
+> > 
+> > On 19/06/18 14:37, Dave Kleikamp wrote:
+> >> On 06/19/2018 01:44 AM, AKASHI Takahiro wrote:
+> >>> +static int __init reserve_memblock_reserved_regions(void)
+> >>> +{
+> >>> +	phys_addr_t start, end, roundup_end = 0;
+> >>> +	struct resource *mem, *res;
+> >>> +	u64 i;
+> >>> +
+> >>> +	for_each_reserved_mem_region(i, &start, &end) {
+> >>> +		if (end <= roundup_end)
+> >>> +			continue; /* done already */
+> >>> +
+> >>> +		start = __pfn_to_phys(PFN_DOWN(start));
+> >>> +		end = __pfn_to_phys(PFN_UP(end)) - 1;
+> >>> +		roundup_end = end;
+> >>> +
+> >>> +		res = kzalloc(sizeof(*res), GFP_ATOMIC);
+> >>> +		if (WARN_ON(!res))
+> >>> +			return -ENOMEM;
+> >>> +		res->start = start;
+> >>> +		res->end = end;
+> >>> +		res->name  = "reserved";
+> >>> +		res->flags = IORESOURCE_MEM;
+> >>> +
+> >>> +		mem = request_resource_conflict(&iomem_resource, res);
+> >>> +		/*
+> >>> +		 * We expected memblock_reserve() regions to conflict with
+> >>> +		 * memory created by request_standard_resources().
+> >>> +		 */
+> >>> +		if (WARN_ON_ONCE(!mem))
+> >>> +			continue;
+> >>> +		kfree(res);
+> >>
+> >> Why is kfree() after the conditional continue? This is a memory leak.
+> > 
+> > request_resource_conflict() inserts res into the iomem_resource tree, or returns
+> > the conflict if there is already something at this address.
+> > 
+> > We expect something at this address: a 'System RAM' section added by
+> > request_resource(). This code wants the conflicting 'System RAM' entry so that
+> > reserve_region_with_split() can fill in the gaps below it with 'reserved'. See
+> > the commit-message for an example.
+> > 
+> > If there was no conflict, it means the memory map doesn't look like we expect,
+> > we can't pass NULL to reserve_region_with_split(), and we just inserted the
+> > 'reserved' at the top level. Freeing res at this point would be a use-after-free
+> > hanging from /proc/iomem.
+> > This code generates a WARN_ON_ONCE() and leaves the 'reserved' description where
+> > it is.
 > 
-> Oh, I see, so there is one stream per pair of mailboxes? That is, the
-> mailboxes we specify in the DT define which stream we receive from and
-> send to?
-
-Correct.
-
-Mikko
-
+> Okay. I get it.
 > 
-> Thierry
+> > Trying to cleanup here is pointless, we can remove the resource entry and free
+> > it ... but we still want to report it as reserved, which is what just happened,
+> > just not quite how we we wanted it.
+> > 
+> > If you ever see this warning, it means some RAM stopped being nomap between
+> > request_resources() and reserve_memblock_reserved_regions(). I can't find any
+> > case where that ever happens.
+> > 
+> > 
+> > If all that makes sense: how can I improve the comment above the WARN_ON_ONCE()
+> > to make it clearer?
 > 
+> I guess something like you described above.
+> 
+> /*
+>  * We expect a 'System RAM' section at this address. In the unexpected
+>  * case where one is not found, request_resource_conflict() will insert
+>  * res into the iomem_resource tree.
+>  */
+> 
+> Do you think this is clearer?
+
+If this is the only change needed in my patchset, I'd like the maintainers
+to take care of it instead of my posting another version.
+
+Thanks,
+-Takahiro AKASHI
+
+> > 
+> > 
+> > Thanks,
+> > 
+> > James
+> > 
+> > 
+> >>> +
+> >>> +		reserve_region_with_split(mem, start, end, "reserved");
+> >>> +	}
+> >>> +
+> >>> +	return 0;
+> >>> +}
+> >>> +arch_initcall(reserve_memblock_reserved_regions);
+> >>> +
+> >>>  u64 __cpu_logical_map[NR_CPUS] = { [0 ... NR_CPUS-1] = INVALID_HWID };
+> >>>  
+> >>>  void __init setup_arch(char **cmdline_p)
+> >>>
+> > 
