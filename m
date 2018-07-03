@@ -1,58 +1,65 @@
-From: faiz_abbas@ti.com (Faiz Abbas)
-Date: Tue, 3 Jul 2018 12:59:34 +0530
-Subject: [PATCH v3 4/6] bus: ti-sysc: Add support for software reset
-In-Reply-To: <20180703070743.GG112168@atomide.com>
-References: <20180606060826.14671-5-faiz_abbas@ti.com>
- <20180607073530.GH5738@atomide.com>
- <a169ba7f-53f2-cf9a-a9ee-daffd6b53279@ti.com>
- <20180608062158.GI5738@atomide.com>
- <acdfef83-8778-e8f4-e423-ed04a9a8a649@ti.com>
- <20180611060957.GN5738@atomide.com>
- <f460481f-85a9-2a41-a894-6f25122dee8a@ti.com>
- <20180611062904.GO5738@atomide.com>
- <89d55b0b-fe9e-793b-2694-25755ac2bc15@ti.com>
- <20180611070332.GP5738@atomide.com> <20180703070743.GG112168@atomide.com>
-Message-ID: <ee54c3ea-6200-33dd-83da-491f5fdd9f5c@ti.com>
+From: stefan@olimex.com (Stefan Mavrodiev)
+Date: Tue,  3 Jul 2018 10:28:43 +0300
+Subject: [PATCH 1/1] mmc: sunxi: Disable irq during pm_suspend
+Message-ID: <1530602925-7714-1-git-send-email-stefan@olimex.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+When mmc host controller enters suspend state, the clocks are
+disabled, but irqs are not. For some reason the irqchip emmits
+false interrupts, which causes system lock loop.
 
-On Tuesday 03 July 2018 12:37 PM, Tony Lindgren wrote:
-> * Tony Lindgren <tony@atomide.com> [180611 07:06]:
->> * Faiz Abbas <faiz_abbas@ti.com> [180611 06:48]:
->>> Hi,
->>>
->>> On Monday 11 June 2018 11:59 AM, Tony Lindgren wrote:
->>>> * Faiz Abbas <faiz_abbas@ti.com> [180611 06:28]:
->>>>> Great. I thought I completely misunderstood you. But I don't see what
->>>>> adding another function will accomplish. A QUIRK flag used in the same
->>>>> function would work well enough>
->>>> Fine with me as long as the function stays simple for both
->>>> syss and sysc reset.
->>>>
->>>
->>>
->>> In general a reset status bit being in sysstatus is the norm and it
->>> being in sysconfig should be the "quirk" for which a flag needs to be
->>> added. What do you think?
->>
->> Sure makes sense to me.
->>
->>> As an aside, naming bitshifts by the name of the platform they were
->>> originally added in seems weird. There should be some generic mask
->>> saying "soft reset is the 0th bit". Currently I am using
->>> SYSC_OMAP4_SOFTRESET for a dra76x module. I guess it depends on how many
->>> different sysconfig types we have.
->>
->> Sure we could have a macro for that.
-> 
-> So what's the conclusion on this one? Are you going to do one
-> more version of the ti-sysc driver patch?
-> 
+Debug log is:
+  ...
+  sunxi-mmc 1c11000.mmc: setting clk to 52000000, rounded 51200000
+  sunxi-mmc 1c11000.mmc: enabling the clock
+  sunxi-mmc 1c11000.mmc: cmd 13(8000014d) arg 10000 ie 0x0000bbc6 len 0
+  sunxi-mmc 1c11000.mmc: irq: rq (ptrval) mi 00000004 idi 00000000
+  sunxi-mmc 1c11000.mmc: cmd 6(80000146) arg 3210101 ie 0x0000bbc6 len 0
+  sunxi-mmc 1c11000.mmc: irq: rq (ptrval) mi 00000004 idi 00000000
+  sunxi-mmc 1c11000.mmc: cmd 13(8000014d) arg 10000 ie 0x0000bbc6 len 0
+  sunxi-mmc 1c11000.mmc: irq: rq (ptrval) mi 00000004 idi 00000000
+  mmc1: new DDR MMC card at address 0001
+  mmcblk1: mmc1:0001 AGND3R 14.6 GiB
+  mmcblk1boot0: mmc1:0001 AGND3R partition 1 4.00 MiB
+  mmcblk1boot1: mmc1:0001 AGND3R partition 2 4.00 MiB
+  sunxi-mmc 1c11000.mmc: cmd 18(80003352) arg 0 ie 0x0000fbc2 len 409
+  sunxi-mmc 1c11000.mmc: irq: rq (ptrval) mi 00004000 idi 00000002
+   mmcblk1: p1
+  sunxi-mmc 1c11000.mmc: irq: rq   (null) mi 00000000 idi 00000000
+  sunxi-mmc 1c11000.mmc: irq: rq   (null) mi 00000000 idi 00000000
+  sunxi-mmc 1c11000.mmc: irq: rq   (null) mi 00000000 idi 00000000
+  sunxi-mmc 1c11000.mmc: irq: rq   (null) mi 00000000 idi 00000000
+and so on...
 
-Yes. I have just now been able to get back to this. Will post a v4 by
-tomorrow.
+This issue apears on eMMC cards, routed on MMC2 slot. The patch is
+tested with A20-OLinuXino-MICRO/LIME/LIME2 boards.
 
-Thanks,
-Faiz
+Fixes: 9a8e1e8cc2c0 ("mmc: sunxi: Add runtime_pm support")
+Signed-off-by: Stefan Mavrodiev <stefan@olimex.com>
+---
+ drivers/mmc/host/sunxi-mmc.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+index e747259..acae7a8 100644
+--- a/drivers/mmc/host/sunxi-mmc.c
++++ b/drivers/mmc/host/sunxi-mmc.c
+@@ -1446,6 +1446,7 @@ static int sunxi_mmc_runtime_resume(struct device *dev)
+ 	sunxi_mmc_init_host(host);
+ 	sunxi_mmc_set_bus_width(host, mmc->ios.bus_width);
+ 	sunxi_mmc_set_clk(host, &mmc->ios);
++	enable_irq(host->irq);
+ 
+ 	return 0;
+ }
+@@ -1455,6 +1456,7 @@ static int sunxi_mmc_runtime_suspend(struct device *dev)
+ 	struct mmc_host	*mmc = dev_get_drvdata(dev);
+ 	struct sunxi_mmc_host *host = mmc_priv(mmc);
+ 
++	disable_irq(host->irq);
+ 	sunxi_mmc_reset_host(host);
+ 	sunxi_mmc_disable(host);
+ 
+-- 
+2.7.4
