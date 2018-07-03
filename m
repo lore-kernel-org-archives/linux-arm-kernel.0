@@ -1,177 +1,42 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Tue, 3 Jul 2018 05:21:36 +0200
-Subject: [RFC net-next 15/15] net: lora: Add Semtech SX1301
-In-Reply-To: <BY1PR02MB111481D94EB0D68AD5FCA689E7430@BY1PR02MB1114.namprd02.prod.outlook.com>
-References: <20180701110804.32415-1-afaerber@suse.de>
- <20180701110804.32415-16-afaerber@suse.de>
- <20180702161258.GA18744@sirena.org.uk>
- <4e06cc72-2092-70f3-c801-bf6e4c3cbec2@suse.de>
- <BY1PR02MB111481D94EB0D68AD5FCA689E7430@BY1PR02MB1114.namprd02.prod.outlook.com>
-Message-ID: <8d514feb-41c7-8ec4-ace2-94e627187a0b@suse.de>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Tue,  3 Jul 2018 06:24:20 +0300
+Subject: [PATCH v2] ARM: dts: armada-38x: use the new thermal binding
+Message-ID: <fa45caea9ab04a515805e80b8c02a74a00a908e0.1530588260.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ben,
+Commit 2f28e4c24b10e (thermal: armada: Clarify control registers
+accesses) introduced the new thermal binding. The new binding extends
+the second registers field size to 8. Switch to the new binding to fix
+thermal reading values. Without this change the fix for errata #132698
+introduced in commit 8c0b888f661 (thermal: armada: Change sensors trim
+default value) has no effect.
 
-Am 02.07.2018 um 22:43 schrieb Ben Whitten:
->> 2) This SPI device is in turn exposing the two SPI masters that you
->> already found below, and I didn't see a sane way to split that code out
->> into drivers/spi/, so it's in drivers/net/lora/ here - has there been
->> any precedence either way?
-> 
-> In my work in progress driver I just register one controller for the sx1301 with two chip selects and use the chip select information to choose the correct radio to send to, this is based on the DT reg information. No need to register two separate masters.
+Cc: stable at vger.kernel.org # v4.16+
+Reviewed-by: Miquel Raynal <miquel.raynal@bootlin.com>
+Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+---
+v2:
+  * Typo fixes (Andreas F?rber)
+  * Add Miquel's review tag
+  * Minor wording changes
+  * Cc stable
+---
+ arch/arm/boot/dts/armada-38x.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-I had considered that and discarded it. The SX1301 has not just two CS
-registers though but also two pairs of addr, data registers. That speaks
-for two masters with a single chip-select each, unless I'm
-misunderstanding the meaning of the registers.
-
->> Am 02.07.2018 um 18:12 schrieb Mark Brown:
->>> On Sun, Jul 01, 2018 at 01:08:04PM +0200, Andreas F?rber wrote:
->>>
->>>> +static void sx1301_radio_spi_set_cs(struct spi_device *spi, bool enable)
->>>> +{
->>>> +	int ret;
->>>> +
->>>> +	dev_dbg(&spi->dev, "setting SPI CS to %s\n", enable ? "1" : "0");
->>>> +
->>>> +	if (enable)
->>>> +		return;
->>>> +
->>>> +	ret = sx1301_radio_set_cs(spi->controller, enable);
->>>> +	if (ret)
->>>> +		dev_warn(&spi->dev, "failed to write CS (%d)\n", ret);
->>>> +}
->>>
->>> So we never disable chip select?
->>
->> Not here, I instead did that in transfer_one below.
->>
->> Unfortunately there seems to be no documentation, only reference code:
->>
->> https://github.com/Lora-
->> net/lora_gateway/blob/master/libloragw/src/loragw_radio.c#L121
->> https://github.com/Lora-
->> net/lora_gateway/blob/master/libloragw/src/loragw_radio.c#L165
->>
->> It sets CS to 0 before writing to address and data registers, then
->> immediately sets CS to 1 and back to 0 before reading or ending the
->> write transaction. I've tried to force the same behavior in this driver.
->> My guess was that CS is high-active during the short 1-0 cycle, because
->> if it's low-active during the register writes then why the heck is it
->> set to 0 again in the end instead of keeping at 1... confusing.
->>
->> Maybe the Semtech folks CC'ed can comment how these registers work?
->>
->>>> +	if (tx_buf) {
->>>> +		ret = sx1301_write(ssx->parent, ssx->regs +
->> REG_RADIO_X_ADDR, tx_buf ? tx_buf[0] : 0);
->>>
->>> This looks confused.  We're in an if (tx_buf) block but there's a use of
->>> the ternery operator that appears to be checking if we have a tx_buf?
->>
->> Yeah, as mentioned this RFC is not ready for merging - checkpatch.pl
->> will complain about lines too long, and TODOs are sprinkled all over or
->> not even mentioned. It's a Proof of Concept that a net_device could work
->> for a wide range of spi and serdev based drivers, and on top this device
->> has more than one channel, which may influence network-level design
->> discussions.
->>
->> That said, I'll happily drop the second check. Thanks for spotting!
->>
->>>> +		if (ret) {
->>>> +			dev_err(&spi->dev, "SPI radio address write
->> failed\n");
->>>> +			return ret;
->>>> +		}
->>>> +
->>>> +		ret = sx1301_write(ssx->parent, ssx->regs +
->> REG_RADIO_X_DATA, (tx_buf && xfr->len >= 2) ? tx_buf[1] : 0);
->>>> +		if (ret) {
->>>> +			dev_err(&spi->dev, "SPI radio data write failed\n");
->>>> +			return ret;
->>>> +		}
->>>
->>> This looks awfully like you're coming in at the wrong abstraction layer
->>> and the hardware actually implements a register abstraction rather than
->>> a SPI one so you should be using regmap as the abstraction.
->>
->> I don't understand. Ben has suggested using regmap for the SPI _device_
->> that we're talking to, which may be a good idea. But this SX1301 device
->> in turn has two SPI _masters_ talking to an SX125x slave each. I don't
->> see how using regmap instead of my wrappers avoids this spi_controller?
->> The whole point of this spi_controller is to abstract and separate the
->> SX1255 vs. SX1257 vs. whatever-radio-attached into a separate driver,
->> instead of mixing it into the SX1301 driver - to me that looks cleaner
->> and more extensible. It also has the side-effect that we could configure
->> the two radios via DT (frequencies, clk output, etc.).
-> 
-> You want an SPI controller in the SX1301 as the down stream radios are SPI and could be attached directly to a host SPI bus, makes sense to have one radio driver and talk through the SX1301.
-> But you should use the regmap to access the SX1301 master controller registers.
-> Example I use with one SPI master and some clock info:
-> eg:
-> 	sx1301: sx1301 at 0 {
-
-Node names should not repeat the chipset, that goes into compatible.
-
-lora-concentrator at 0?
-
-> 		compatible = "semtech,sx1301";
-> 		reg = <0>;
-> 		#address-cells = <1>;
-> 		#size-cells = <0>;
-
-I would still find it cleaner to have (a) sub-node(s) for the radios.
-
-> 		spi-max-frequency = <8000000>;
-
-Datasheet says 10 MHz, why 8 MHz?
-
-> 		gpios-reset = <&pioA 26 GPIO_ACTIVE_HIGH>;
-
-reset-gpios?
-
-> 		clocks = <&radio1 0>, <&clkhs 0>;
-> 		clock-names = "clk32m", "clkhs";
-> 
-> 		radio0: sx1257 at 0 {
-
-lora at 0?
-
-> 			compatible = "semtech,sx125x";
-
-No wildcards in bindings please, use concrete "semtech,sx1257".
-
-> 			reg = <0>;
-> 			spi-max-frequency = <8000000>;
-
-Datasheet says 10 ns - I reported to Semtech that it should probably say
-10 MHz, too.
-
-> 			tx;
-
-Might we configure that on the sx1301 instead?
-
-> 			clocks = <&tcxo 0>;
-> 			clock-names = "tcxo";
-> 		};
-> 
-> 		radio1: sx1257 at 1 {
-> 			compatible = "semtech,sx125x";
-> 			reg = <1>;
-> 			spi-max-frequency = <8000000>;
-> 			#clock-cells = <0>;
-> 			clocks = <&tcxo 0>;
-> 			clock-names = "tcxo";
-> 			clock-output-names = "clk32m";
-> 		};
-> };
-[snip]
-
-Regards,
-Andreas
-
+diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
+index 18edc9bc7927..929459c42760 100644
+--- a/arch/arm/boot/dts/armada-38x.dtsi
++++ b/arch/arm/boot/dts/armada-38x.dtsi
+@@ -547,7 +547,7 @@
+ 
+ 			thermal: thermal at e8078 {
+ 				compatible = "marvell,armada380-thermal";
+-				reg = <0xe4078 0x4>, <0xe4074 0x4>;
++				reg = <0xe4078 0x4>, <0xe4070 0x8>;
+ 				status = "okay";
+ 			};
+ 
 -- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+2.18.0
