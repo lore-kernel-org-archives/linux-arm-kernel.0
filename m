@@ -1,95 +1,50 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Tue, 03 Jul 2018 15:13:21 +0200
-Subject: Self-detected stall on CPU when using SD card
-In-Reply-To: <0f262b04fab61ec75b7e368a8f4968aa@agner.ch>
-References: <037cbd3560a68bad0cea92f453c1b819@agner.ch>
- <0f262b04fab61ec75b7e368a8f4968aa@agner.ch>
-Message-ID: <aaa1f8ec2668ce0c654b6225a7d8737c@agner.ch>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Tue, 3 Jul 2018 14:13:44 +0100
+Subject: [PATCH v4 4/7] arm_pmu: Tidy up clear_event_idx call backs
+In-Reply-To: <20180703124905.75uttsh7xrrzh55q@lakrids.cambridge.arm.com>
+References: <1530568788-26458-1-git-send-email-suzuki.poulose@arm.com>
+ <1530568788-26458-5-git-send-email-suzuki.poulose@arm.com>
+ <20180703124905.75uttsh7xrrzh55q@lakrids.cambridge.arm.com>
+Message-ID: <6592be36-3b16-f566-96ff-15f97964d4c4@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dong Aisheng,
-
-Maybe you can shed some light on the issue below?
-
-
-On 26.06.2018 16:45, Stefan Agner wrote:
-> On 26.06.2018 12:53, Stefan Agner wrote:
->> Hi,
+On 03/07/18 13:49, Mark Rutland wrote:
+> On Mon, Jul 02, 2018 at 10:59:45PM +0100, Suzuki K Poulose wrote:
+>> The armpmu uses get_event_idx callback to allocate an event
+>> counter for a given event, which marks the selected counter
+>> as "used". Now, when we delete the counter, the arm_pmu goes
+>> ahead and clears the "used" bit and then invokes the "clear_event_idx"
+>> call back, which kind of splits the job between the core code
+>> and the backend. To keep things tidy, mandate the implementation
+>> of clear_event_idx() and add it for exisiting backends.
+>> This will be useful for adding the chained event support, where
+>> we leave the event idx maintenance to the backend.
 >>
->> On our Colibri iMX6 (arch/arm/boot/dts/imx6qdl-colibri.dtsi) we
->> experience the following stack trace when a SD card is plugged in:
+>> Also, when an event is removed from the PMU, reset the hw.idx
+>> to indicate that a counter is not allocated for this event,
+>> to help the backends do better checks. This will be also used
+>> for the chain counter support.
 >>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> Reviewed-by: Julien Thierry <julien.thierry@arm.com>
+>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>> ---
+>> Changes since v3:
+>>   - Add clear_event_idx call back for backends.
+>> ---
+>>   arch/arm/kernel/perf_event_v6.c | 8 ++++++++
+>>   arch/arm/kernel/perf_event_v7.c | 9 +++++++++
+>>   arch/arm64/kernel/perf_event.c  | 7 +++++++
+>>   drivers/perf/arm_pmu.c          | 7 +++----
+>>   4 files changed, 27 insertions(+), 4 deletions(-)
 > 
-> [...]
-> 
->> [<c08396f4>] (esdhc_pltfm_set_clock) from [<c083622c>]
->> (sdhci_set_ios+0xd8/0x584)
->>  r10:ffffe000 r9:c1105900 r8:00004097 r7:d818f2e8 r6:d818f480
->> r5:d818f2e8
->>  r4:d818f000
->> [<c0836154>] (sdhci_set_ios) from [<c0836070>]
->> (sdhci_runtime_resume_host+0xa0/0x184)
->>  r9:c1105900 r8:00004097 r7:d818f2e8 r6:d818f648 r5:d818f000 r4:d818f480
-> 
-> [...]
-> 
->>
->> It used to work in v4.9, so I started a git bisect. It pointed me to
->> this commit:
->>
->> Commit d1e4f74f911d ("mmc: sdhci: Do not use spin lock in set_ios
->> paths").
->>
->> Reverting the commit on-top of v4.18-rc1 seems to fix the issue too.
->>
->> Any idea?
-> 
-> I figured out that the same platform had a GPIO Key which triggered all
-> the time. This seems to exacerbate the MMC issue such that it triggers
-> on very boot, about rootfs mount time.
-> 
-> This change seems to fix the issue as well, not sure though whether this
-> is a proper fix:
-> 
-> --- a/drivers/mmc/host/sdhci-esdhc-imx.c
-> +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-> @@ -697,6 +697,7 @@ static inline void esdhc_pltfm_set_clock(struct
-> sdhci_host *host,
->         int ddr_pre_div = imx_data->is_ddr ? 2 : 1;
->         int pre_div = 1;
->         int div = 1;
-> +       unsigned long flags;
->         u32 temp, val;
->  
->         if (clock == 0) {
-> @@ -724,6 +725,7 @@ static inline void esdhc_pltfm_set_clock(struct
-> sdhci_host *host,
->                         pre_div = 2;
->         }
->  
-> +       spin_lock_irqsave(&host->lock, flags);
->         temp = sdhci_readl(host, ESDHC_SYSTEM_CONTROL);
->         temp &= ~(ESDHC_CLOCK_IPGEN | ESDHC_CLOCK_HCKEN |
-> ESDHC_CLOCK_PEREN
->                 | ESDHC_CLOCK_MASK);
-> @@ -754,6 +756,7 @@ static inline void esdhc_pltfm_set_clock(struct
-> sdhci_host *host,
->                 writel(val | ESDHC_VENDOR_SPEC_FRC_SDCLK_ON,
->                 host->ioaddr + ESDHC_VENDOR_SPEC);
->         }
-> +       spin_unlock_irqrestore(&host->lock, flags);
+> I beleive this is missing the xscale PMU code.
 
-The bits ESDHC_CLOCK_IPGEN, ESDHC_CLOCK_HCKEN, ESDHC_CLOCK_PEREN which
-are cleared and written in that section are actually mentioned as
-"Reserved. Always write as 1." in the reference manual...
-
---
-Stefan
-
->  
->         mdelay(1);
->  }
+Ah! Thanks for spotting. I will fix that.
 > 
-> --
-> Stefan
+> Otherwiwse, this looks good to me.
+
+Thanks
+Suzuki
