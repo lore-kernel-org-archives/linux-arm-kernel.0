@@ -1,41 +1,60 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 3 Jul 2018 08:10:32 -0300
-Subject: [PATCH v1] ARM: dts: imx6sl-evk: keep sw4 always on
-In-Reply-To: <AM3PR04MB131542D42FCD798FDBBA54BFF5420@AM3PR04MB1315.eurprd04.prod.outlook.com>
-References: <CAOMZO5BjOEGWv2dC-bp0BYHq+PhLssEKic+o7ock8_1Dobd=sQ@mail.gmail.com>
- <AM3PR04MB131507901BFEE1A5E426EECBF5430@AM3PR04MB1315.eurprd04.prod.outlook.com>
- <CAOMZO5D8tjnjbwMdLGd7KF7_4PwqRWX8XH8kdcF3-5e-r2YQEA@mail.gmail.com>
- <AM3PR04MB1315E7AED2BCE2265E6C443DF5430@AM3PR04MB1315.eurprd04.prod.outlook.com>
- <CAOMZO5D8v4KM9S4ooHTDbA+vc8BZN_eO_wDuOPA+8Hcq-SmLDw@mail.gmail.com>
- <AM3PR04MB1315C7C7CFF990615732FFBCF5430@AM3PR04MB1315.eurprd04.prod.outlook.com>
- <CAOMZO5AM5VRS7UiWuvAQ8vvTB8OM+iwofuYrbsL_yB9e0Z9Kyg@mail.gmail.com>
- <AM3PR04MB13155B8D567ABEF7EF03249AF5430@AM3PR04MB1315.eurprd04.prod.outlook.com>
- <CAOMZO5BdtxKjQge5ONpnjr1yNVeTJf4u8Gh-fPqpHz7G9ipOTg@mail.gmail.com>
- <1530526335.15665.13.camel@nxp.com> <20180703053843.GC4348@dragon>
- <AM3PR04MB131542D42FCD798FDBBA54BFF5420@AM3PR04MB1315.eurprd04.prod.outlook.com>
-Message-ID: <CAOMZO5BY99f5jjU+73=8WjqwBKr_q2S1mvx90URZUBkgOVn9YA@mail.gmail.com>
+From: okaya@codeaurora.org (okaya at codeaurora.org)
+Date: Tue, 03 Jul 2018 07:30:28 -0400
+Subject: [PATCH V5 3/3] PCI: Mask and unmask hotplug interrupts during
+ reset
+In-Reply-To: <20180703083447.GA2689@wunner.de>
+References: <1530571967-19099-1-git-send-email-okaya@codeaurora.org>
+ <1530571967-19099-4-git-send-email-okaya@codeaurora.org>
+ <20180703083447.GA2689@wunner.de>
+Message-ID: <8b6ce0f415858463d1c0588c29e30415@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Anson,
+On 2018-07-03 04:34, Lukas Wunner wrote:
+> On Mon, Jul 02, 2018 at 06:52:47PM -0400, Sinan Kaya wrote:
+>> If a bridge supports hotplug and observes a PCIe fatal error, the 
+>> following
+>> events happen:
+>> 
+>> 1. AER driver removes the devices from PCI tree on fatal error
+>> 2. AER driver brings down the link by issuing a secondary bus reset 
+>> waits
+>> for the link to come up.
+>> 3. Hotplug driver observes a link down interrupt
+>> 4. Hotplug driver tries to remove the devices waiting for the rescan 
+>> lock
+>> but devices are already removed by the AER driver and AER driver is 
+>> waiting
+>> for the link to come back up.
+>> 5. AER driver tries to re-enumerate devices after polling for the link
+>> state to go up.
+>> 6. Hotplug driver obtains the lock and tries to remove the devices 
+>> again.
+>> 
+>> If a bridge is a hotplug capable bridge, mask hotplug interrupts 
+>> before the
+>> reset and unmask afterwards.
+> 
+> Would it work for you if you just amended the AER driver to skip
+> removal and re-enumeration of devices if the port is a hotplug bridge?
+> Just check for is_hotplug_bridge in struct pci_dev.
 
-On Tue, Jul 3, 2018 at 4:44 AM, Anson Huang <anson.huang@nxp.com> wrote:
+The reason why we want to remove devices before secondary bus reset is 
+to quiesce pcie bus traffic before issuing a reset.
 
-> It is NOT easy to identify which switch is critical or NOT, and different platforms
-> have different board design, it will introduce many platform specified code, so I think
-> just revert the pfuze100 switch enable/disable patch should be OK for now.
+Skipping this step might cause transactions to be lost in the middle of 
+the reset as there will be active traffic flowing and drivers will 
+suddenly start reading ffs.
 
-I have sent the pfuze100 regulator patch revert and it is linux-next
-now. Should probably reach 4.18-rc4.
+I don't think we can skip this step.
 
-> After a couple of release cycles, add the pfuze100 switch enable/disable patch
-> back to support this feature, I believe users should switch to new dtb with "regulator-always-on"
-> existing already.
 
-That will still break old dtb compatibility.
-
-You cannot force users to use "regulator-always-on" and the old dtbs
-need to always work.
-
-So whatever new feature you need to introduce it needs to be done in
-such a way that the existing dtb's will continue working.
+> 
+> That would seem like a much simpler solution, given that it is known
+> that the link will flap on reset, causing the hotplug driver to remove
+> and re-enumerate devices.  That would also cover cases where hotplug is
+> handled by a different driver than pciehp, or by the platform firmware.
+> 
+> Thanks,
+> 
+> Lukas
