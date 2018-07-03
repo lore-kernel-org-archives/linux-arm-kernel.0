@@ -1,80 +1,95 @@
-From: james.morse@arm.com (James Morse)
-Date: Tue, 3 Jul 2018 17:36:24 +0100
-Subject: [PATCH v10 03/14] powerpc, kexec_file: factor out memblock-based
- arch_kexec_walk_mem()
-In-Reply-To: <20180623022058.10935-4-takahiro.akashi@linaro.org>
-References: <20180623022058.10935-1-takahiro.akashi@linaro.org>
- <20180623022058.10935-4-takahiro.akashi@linaro.org>
-Message-ID: <8a59db79-6379-550b-b20e-01036626904e@arm.com>
+From: oleg@redhat.com (Oleg Nesterov)
+Date: Tue, 3 Jul 2018 18:36:45 +0200
+Subject: [PATCH v5 06/10] Uprobes: Support SDT markers having reference
+ count (semaphore)
+In-Reply-To: <f19e3801-d56a-4e34-0acc-1040a071cf91@linux.ibm.com>
+References: <20180628052209.13056-1-ravi.bangoria@linux.ibm.com>
+ <20180628052209.13056-7-ravi.bangoria@linux.ibm.com>
+ <20180701210935.GA14404@redhat.com>
+ <0c543791-f3b7-5a4b-f002-e1c76bb430c0@linux.ibm.com>
+ <20180702180156.GA31400@redhat.com>
+ <f19e3801-d56a-4e34-0acc-1040a071cf91@linux.ibm.com>
+Message-ID: <20180703163645.GA23144@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Akashi,
+On 07/03, Ravi Bangoria wrote:
+>
+> Ok let me explain the difference.
+>
+> Current approach:
+>
+>     ------------
+>     register_for_each_vma() / uprobe_mmap()
+>       install_breakpoint()
+>         uprobe_write_opcode() {
+>                 if (instruction is not already patched) {
+>                         /* Gets called only _once_. */
+>                         increment the reference counter;
+>                         patch the instruction;
+>                 }
+>         }
 
-On 23/06/18 03:20, AKASHI Takahiro wrote:
-> Memblock list is another source for usable system memory layout.
-> A merged new arch_kexec_walk_mem() will walk through either io resource
-> list or memblock list depending on CONFIG_ARCH_DISCARD_MEMBLOCK so that
-> arm64, in addition to powerpc, will be able to utilize this generic
-> function for kexec_file.
+Yes I see. And I am not sure this all is correct. And I still hope we can do
+something better, I'll write another email.
 
-> diff --git a/arch/powerpc/kernel/machine_kexec_file_64.c b/arch/powerpc/kernel/machine_kexec_file_64.c
-> index 0bd23dc789a4..3d4be91786ce 100644
-> --- a/arch/powerpc/kernel/machine_kexec_file_64.c
-> +++ b/arch/powerpc/kernel/machine_kexec_file_64.c
+For now, let's discuss your current approach.
 
-Does this file still need its memblock.h include?
+> Now, if I put it inside install_breakpoint():
+>
+>     ------------
+>     uprobe_register()
+>       register_for_each_vma()
+>         install_breakpoint() {
+>                 /* Called _for each consumer_ */
 
+How so? it is not called for each consumer. I think you misread this code.
 
-> diff --git a/kernel/kexec_file.c b/kernel/kexec_file.c
-> index 63c7ce1c0c3e..563acd1c9a61 100644
-> --- a/kernel/kexec_file.c
-> +++ b/kernel/kexec_file.c
-> @@ -16,6 +16,7 @@
->  #include <linux/file.h>
->  #include <linux/slab.h>
->  #include <linux/kexec.h>
-> +#include <linux/memblock.h>
->  #include <linux/mutex.h>
->  #include <linux/list.h>
->  #include <linux/fs.h>
-> @@ -501,6 +502,53 @@ static int locate_mem_hole_callback(struct resource *res, void *arg)
->  	return locate_mem_hole_bottom_up(start, end, kbuf);
->  }
->  
-> +#if defined(CONFIG_HAVE_MEMBLOCK) && !defined(CONFIG_ARCH_DISCARD_MEMBLOCK)
+>                 increment the reference counter _once_;
+>                 uprobe_write_opcode()
+> 		...
+>         }
 
-The only caller is also guarded by these same ifdefs. Can't we remove this and
-rely on the compilers dead-code elimination to remove this function when its not
-needed?
+So. I meant that you can move the _same_ logic into install_breakpoint() and
+remove_breakpoint(). And note that ref_ctr_updated in uprobe_write_opcode() is
+only needed because it can retry the fault.
 
+IOW, you can simply do update_ref_ctr(is_register => 1) at the start of
+install_breakpoint(), and update_ref_ctr(0) in remove_breakpoint(), there are
+no other callers of uprobe_write_opcode(). To clarify, it is indirectly called
+by set_swbp() and set_orig_insn(), but this doesn't matter.
 
-> +static int kexec_walk_memblock(struct kexec_buf *kbuf,
-> +			       int (*func)(struct resource *, void *))
-> +{
-> +	u64 i;
-> +	phys_addr_t mstart, mend;
-> +	struct resource res = { };
-> +	int ret = 0;
+Or you can kill update_ref_ctr() and (roughly) do
 
+	rc_vma = find_ref_ctr_vma(...);
+	if (rc_vma)
+		__update_ref_ctr(..., 1);
+	else
+		delayed_uprobe_add(...);
 
-Keeping this patch as 'just' moving code would avoid having to play
-spot-the-difference:
+at the start of install_breakpoint() and
 
-> +	if (kbuf->image->type == KEXEC_TYPE_CRASH)
-> +		return func(&crashk_res, kbuf);
+	rc_vma = find_ref_ctr_vma(...);
+	if (rc_vma)
+		__update_ref_ctr(..., -1);
+	delayed_uprobe_remove(...);
 
-This will be new for powerpc, but any attempt to use it should be caught by
-arch_kexec_kernel_image_probe(), which has:
-|	/* We don't support crash kernels yet. */
-|	if (image->type == KEXEC_TYPE_CRASH)
-|		return -EOPNOTSUPP;
-
-
-Looks good to me! For what its worth:
-Acked-by: James Morse <james.morse@arm.com>
+in remove_breakpoint().
 
 
-Thanks,
+>     uprobe_mmap()
+>       install_breakpoint() {
+>                 increment the reference counter _for each consumer_;
 
-James
+Again, I do not understand where do you see the "for each consumer" thing.
+
+>                 uprobe_write_opcode()
+
+In short. There is a 1:1 relationship between uprobe_write_opcode(is_register => 1)
+and install_breakpoint(), and between uprobe_write_opcode(is_register => 0) and
+remove_breakpoint(). Whatever uprobe_write_opcode() can do if is_register == 1 can be
+done in install_breakpoint(), the same for is_register == 0 and remove_breakpont().
+
+What have I missed?
+
+Oleg.
