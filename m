@@ -1,114 +1,59 @@
-From: james.morse@arm.com (James Morse)
-Date: Tue, 3 Jul 2018 17:32:09 +0100
-Subject: [PATCH v10 08/14] arm64: kexec_file: load initrd and device-tree
-In-Reply-To: <20180623022058.10935-9-takahiro.akashi@linaro.org>
-References: <20180623022058.10935-1-takahiro.akashi@linaro.org>
- <20180623022058.10935-9-takahiro.akashi@linaro.org>
-Message-ID: <1e401f4e-6176-990d-476c-31ae3f28f26c@arm.com>
+From: leoyang.li@nxp.com (Leo Li)
+Date: Tue, 3 Jul 2018 16:32:43 +0000
+Subject: [PATCH] MAINTAINERS: add Freescale Layerscape ARM architecture
+ entry
+In-Reply-To: <1530620991-1621-1-git-send-email-shawnguo@kernel.org>
+References: <1530620991-1621-1-git-send-email-shawnguo@kernel.org>
+Message-ID: <AM4PR0401MB1699B0A7BA81049CA28849518F420@AM4PR0401MB1699.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Akashi,
 
-On 23/06/18 03:20, AKASHI Takahiro wrote:
-> load_other_segments() is expected to allocate and place all the necessary
-> memory segments other than kernel, including initrd and device-tree
-> blob (and elf core header for crash).
-> While most of the code was borrowed from kexec-tools' counterpart,
-> users may not be allowed to specify dtb explicitly, instead, the dtb
-> presented by the original boot loader is reused.
+
+> -----Original Message-----
+> From: Shawn Guo [mailto:shawnguo at kernel.org]
+> Sent: Tuesday, July 3, 2018 7:30 AM
+> To: linux-arm-kernel at lists.infradead.org
+> Cc: Shawn Guo <shawnguo@kernel.org>; Leo Li <leoyang.li@nxp.com>
+> Subject: [PATCH] MAINTAINERS: add Freescale Layerscape ARM architecture
+> entry
 > 
-> arch_kimage_kernel_post_load_cleanup() is responsible for freeing arm64-
-> specific data allocated in load_other_segments().
+> I have been collecting Freescale Layerscape device tree source files for a
+> while.  Add a MAINTAINERS entry for it, so that relevant patches can reach
+> my mail box.
+> 
+> Cc: Li Yang <leoyang.li@nxp.com>
+> Signed-off-by: Shawn Guo <shawnguo@kernel.org>
 
+Acked-by: Li Yang <leoyang.li@nxp.com>
 
-> diff --git a/arch/arm64/kernel/machine_kexec_file.c b/arch/arm64/kernel/machine_kexec_file.c
-> index c38a8048ed00..7115c4f915dc 100644
-> --- a/arch/arm64/kernel/machine_kexec_file.c
-> +++ b/arch/arm64/kernel/machine_kexec_file.c
-
-> +static int setup_dtb(struct kimage *image,
-> +		unsigned long initrd_load_addr, unsigned long initrd_len,
-> +		char *cmdline, unsigned long cmdline_len,
-> +		char **dtb_buf, size_t *dtb_buf_len)
-> +{
-> +	char *buf = NULL;
-> +	size_t buf_size;
-> +	int nodeoffset;
-> +	u64 value;
-> +	int ret;
+> ---
+>  MAINTAINERS | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
+> 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 9d5eeff51b5f..d72f1162daea 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -1442,6 +1442,16 @@ T:	git
+> git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git
+>  F:	arch/arm/mach-imx/*vf610*
+>  F:	arch/arm/boot/dts/vf*
+> 
+> +ARM/FREESCALE LAYERSCAPE ARM ARCHITECTURE
+> +M:	Shawn Guo <shawnguo@kernel.org>
+> +M:	Li Yang <leoyang.li@nxp.com>
+> +L:	linux-arm-kernel at lists.infradead.org (moderated for non-
+> subscribers)
+> +S:	Maintained
+> +T:	git git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git
+> +F:	arch/arm/boot/dts/ls1021a*
+> +F:	arch/arm64/boot/dts/freescale/fsl-*
+> +F:	arch/arm64/boot/dts/freescale/qoriq-*
 > +
-> +	/* duplicate dt blob */
-> +	buf_size = fdt_totalsize(initial_boot_params);
-> +
-> +	if (initrd_load_addr) {
-> +		buf_size += fdt_prop_len("linux,initrd-start", sizeof(u64));
-> +		buf_size += fdt_prop_len("linux,initrd-end", sizeof(u64));
-> +	}
-> +
-> +	if (cmdline)
-> +		buf_size += fdt_prop_len("bootargs", cmdline_len + 1);
-
-(a comment here about the possibility of an embedded NULL may avoid surprises later)
-
-
-> +	buf = vmalloc(buf_size);
-> +	if (!buf) {
-> +		ret = -ENOMEM;
-> +		goto out_err;
-> +	}
-> +
-> +	ret = fdt_open_into(initial_boot_params, buf, buf_size);
-> +	if (ret)
-> +		goto out_err;
-> +
-> +	nodeoffset = fdt_path_offset(buf, "/chosen");
-> +	if (nodeoffset < 0)
-> +		goto out_err;
-
-This doesn't update 'ret', so we return the 0/success from above...
-
-
-> +
-> +	/* add bootargs */
-> +	if (cmdline) {
-> +		ret = fdt_setprop(buf, nodeoffset, "bootargs",
-> +						cmdline, cmdline_len + 1);
-> +		if (ret)
-> +			goto out_err;
-> +	}
-
-So (cmdline_len == 0) from user-space means keep the old cmdline. Sounds
-sensible. Is this documented anywhere?
-
-powerpc does the opposite, it deletes the bootargs in this case. Are we happy
-making his a per-arch thing?
-
-
-> +	/* add initrd-* */
-> +	if (initrd_load_addr) {
-> +		value = cpu_to_fdt64(initrd_load_addr);
-> +		ret = fdt_setprop_u64(buf, nodeoffset, "linux,initrd-start",
-> +							value);
-> +		if (ret)
-> +			goto out_err;
-> +
-> +		value = cpu_to_fdt64(initrd_load_addr + initrd_len);
-> +		ret = fdt_setprop_u64(buf, nodeoffset, "linux,initrd-end",
-> +							value);
-> +		if (ret)
-> +			goto out_err;
-> +	}
-
-Won't this do the same with the initrd? Re-use the old values if no new one was
-provided? I can't find anything that deletes the property by the time we come to
-kexec, and the old physical addresses may have been re-used by who-knows-what.
-
-(powerpc has some code to: /* If there's no new initrd, delete the old initrd's
-info. */)
-
-
-
-Thanks,
-
-James
+>  ARM/GLOMATION GESBC9312SX MACHINE SUPPORT
+>  M:	Lennert Buytenhek <kernel@wantstofly.org>
+>  L:	linux-arm-kernel at lists.infradead.org (moderated for non-
+> subscribers)
+> --
+> 1.9.1
