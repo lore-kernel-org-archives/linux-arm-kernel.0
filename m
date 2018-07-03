@@ -1,433 +1,160 @@
-From: andrew@aj.id.au (Andrew Jeffery)
-Date: Tue,  3 Jul 2018 17:04:12 +1000
-Subject: [RFC PATCH 3/4] misc: Add bmc-misc-ctrl
-In-Reply-To: <20180703070413.28756-1-andrew@aj.id.au>
-References: <20180703070413.28756-1-andrew@aj.id.au>
-Message-ID: <20180703070413.28756-4-andrew@aj.id.au>
+From: o.rempel@pengutronix.de (Oleksij Rempel)
+Date: Tue, 3 Jul 2018 09:06:47 +0200
+Subject: [PATCH v2] ARM: imx: Provide support for NXP i.MX7D Cortex-M4
+In-Reply-To: <20180703065724.GL4348@dragon>
+References: <20180702062755.17263-1-o.rempel@pengutronix.de>
+ <20180703065724.GL4348@dragon>
+Message-ID: <522e3bdf-9cdf-f584-b063-38dd23982096@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-bmc-misc-ctrl is used to expose miscellaneous Baseboard
-Management Controller (BMC) hardware features described in the devicetree
-to userspace.
 
-Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
----
- MAINTAINERS                  |   1 +
- drivers/misc/Kconfig         |   8 +
- drivers/misc/Makefile        |   1 +
- drivers/misc/bmc-misc-ctrl.c | 363 +++++++++++++++++++++++++++++++++++
- 4 files changed, 373 insertions(+)
- create mode 100644 drivers/misc/bmc-misc-ctrl.c
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 9766d7832d8b..30d39440b6f2 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -2741,6 +2741,7 @@ R:	Andrew Jeffery <andrew@aj.id.au>
- L:	openbmc at lists.ozlabs.org (moderated for non-subscribers)
- S:	Supported
- F:	Documentation/devicetree/bindings/misc/bmc-misc-ctrl.txt
-+F:	drivers/misc/bmc-misc-ctrl.c
- 
- BPF (Safe dynamic programs and tools)
- M:	Alexei Starovoitov <ast@kernel.org>
-diff --git a/drivers/misc/Kconfig b/drivers/misc/Kconfig
-index 3726eacdf65d..f46bc8208b50 100644
---- a/drivers/misc/Kconfig
-+++ b/drivers/misc/Kconfig
-@@ -513,6 +513,14 @@ config MISC_RTSX
- 	tristate
- 	default MISC_RTSX_PCI || MISC_RTSX_USB
- 
-+config BMC_MISC_CTRL
-+	tristate "Miscellaneous BMC Control Interfaces"
-+	depends on REGMAP && MFD_SYSCON
-+	help
-+	  Say yes to expose scratch registers used to communicate between the
-+	  host and BMC along with other miscellaneous control interfaces
-+	  provided by BMC SoCs
-+
- source "drivers/misc/c2port/Kconfig"
- source "drivers/misc/eeprom/Kconfig"
- source "drivers/misc/cb710/Kconfig"
-diff --git a/drivers/misc/Makefile b/drivers/misc/Makefile
-index af22bbc3d00c..4fb2fac7a486 100644
---- a/drivers/misc/Makefile
-+++ b/drivers/misc/Makefile
-@@ -58,3 +58,4 @@ obj-$(CONFIG_ASPEED_LPC_SNOOP)	+= aspeed-lpc-snoop.o
- obj-$(CONFIG_PCI_ENDPOINT_TEST)	+= pci_endpoint_test.o
- obj-$(CONFIG_OCXL)		+= ocxl/
- obj-$(CONFIG_MISC_RTSX)		+= cardreader/
-+obj-$(CONFIG_BMC_MISC_CTRL)     += bmc-misc-ctrl.o
-diff --git a/drivers/misc/bmc-misc-ctrl.c b/drivers/misc/bmc-misc-ctrl.c
-new file mode 100644
-index 000000000000..ff907029163f
---- /dev/null
-+++ b/drivers/misc/bmc-misc-ctrl.c
-@@ -0,0 +1,363 @@
-+// SPDX-License-Identifier: GPL-2.0+
-+// Copyright 2018 IBM Corp.
-+
-+#include <linux/bitops.h>
-+#include <linux/device.h>
-+#include <linux/kobject.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+#include <linux/regmap.h>
-+
-+struct bmc_ctrl {
-+	struct device *dev;
-+	struct regmap *map;
-+	bool ro;
-+	u32 shift;
-+	u32 mask;
-+	struct kobj_attribute mask_attr;
-+	const char *label;
-+	struct kobj_attribute label_attr;
-+	union {
-+		struct {
-+			u32 value;
-+			struct kobj_attribute value_attr;
-+		};
-+		struct {
-+			u32 read;
-+			u32 set;
-+			u32 clear;
-+			struct kobj_attribute read_attr;
-+			struct kobj_attribute set_attr;
-+			struct kobj_attribute clear_attr;
-+		};
-+	};
-+};
-+
-+static ssize_t bmc_misc_rmw_show(struct kobject *kobj,
-+					struct kobj_attribute *attr, char *buf)
-+{
-+	struct bmc_ctrl *ctrl;
-+	unsigned int val;
-+	int rc;
-+
-+	ctrl = container_of(attr, struct bmc_ctrl, value_attr);
-+	rc = regmap_read(ctrl->map, ctrl->value, &val);
-+	if (rc)
-+		return rc;
-+
-+	val = (val & ctrl->mask) >> ctrl->shift;
-+
-+	return sprintf(buf, "%u\n", val);
-+}
-+
-+static ssize_t bmc_misc_rmw_store(struct kobject *kobj,
-+					 struct kobj_attribute *attr,
-+					 const char *buf, size_t count)
-+{
-+	struct bmc_ctrl *ctrl;
-+	long val;
-+	int rc;
-+
-+	rc = kstrtol(buf, 0, &val);
-+	if (rc)
-+		return rc;
-+
-+	ctrl = container_of(attr, struct bmc_ctrl, value_attr);
-+	val <<= ctrl->shift;
-+	if (val & ~ctrl->mask)
-+		return -EINVAL;
-+	rc = regmap_update_bits(ctrl->map, ctrl->value, ctrl->mask, val);
-+
-+	return rc < 0 ? rc : count;
-+}
-+
-+static void bmc_misc_add_rmw_attrs(struct bmc_ctrl *ctrl,
-+				   struct attribute *attrs[6])
-+{
-+	sysfs_attr_init(&ctrl->attr.attr);
-+	ctrl->value_attr.attr.name = "value";
-+	ctrl->value_attr.attr.mode = 0664;
-+	ctrl->value_attr.show = bmc_misc_rmw_show;
-+	ctrl->value_attr.store = bmc_misc_rmw_store;
-+	attrs[2] = &ctrl->value_attr.attr;
-+	attrs[3] = NULL;
-+}
-+
-+static int bmc_misc_init_rmw(struct bmc_ctrl *ctrl, struct device_node *node,
-+			     struct attribute *attrs[6])
-+{
-+	u32 val;
-+	int rc;
-+
-+	rc = of_property_read_u32(node, "offset", &ctrl->value);
-+	if (rc < 0)
-+		return rc;
-+
-+	if (!of_property_read_u32(node, "default-value", &val)) {
-+		val <<= ctrl->shift;
-+		if (val & ~ctrl->mask)
-+			return -EINVAL;
-+		val &= ctrl->mask;
-+		regmap_update_bits(ctrl->map, ctrl->value, ctrl->mask, val);
-+	}
-+
-+	bmc_misc_add_rmw_attrs(ctrl, attrs);
-+
-+	return 0;
-+}
-+
-+static ssize_t bmc_misc_sc_read_show(struct kobject *kobj,
-+					struct kobj_attribute *attr, char *buf)
-+{
-+	struct bmc_ctrl *ctrl;
-+	unsigned int val;
-+	int rc;
-+
-+	ctrl = container_of(attr, struct bmc_ctrl, read_attr);
-+	rc = regmap_read(ctrl->map, ctrl->read, &val);
-+	if (rc)
-+		return rc;
-+
-+	val = (val & ctrl->mask) >> ctrl->shift;
-+
-+	return sprintf(buf, "%u\n", val);
-+
-+}
-+
-+static ssize_t bmc_misc_sc_set_store(struct kobject *kobj,
-+					    struct kobj_attribute *attr,
-+					    const char *buf, size_t count)
-+{
-+	struct bmc_ctrl *ctrl;
-+	long val;
-+	int rc;
-+
-+	rc = kstrtol(buf, 0, &val);
-+	if (rc)
-+		return rc;
-+
-+	ctrl = container_of(attr, struct bmc_ctrl, set_attr);
-+	val <<= ctrl->shift;
-+	if (val & ~ctrl->mask)
-+		return -EINVAL;
-+	val &= ctrl->mask;
-+	rc = regmap_write(ctrl->map, ctrl->set, val);
-+
-+	return rc < 0 ? rc : count;
-+}
-+
-+static ssize_t bmc_misc_sc_clear_store(struct kobject *kobj,
-+					      struct kobj_attribute *attr,
-+					      const char *buf, size_t count)
-+{
-+	struct bmc_ctrl *ctrl;
-+	long val;
-+	int rc;
-+
-+	rc = kstrtol(buf, 0, &val);
-+	if (rc)
-+		return rc;
-+
-+	ctrl = container_of(attr, struct bmc_ctrl, clear_attr);
-+	val <<= ctrl->shift;
-+	if (val & ~ctrl->mask)
-+		return -EINVAL;
-+	val &= ctrl->mask;
-+	rc = regmap_write(ctrl->map, ctrl->clear, val);
-+
-+	return rc < 0 ? rc : count;
-+}
-+
-+static void bmc_misc_add_sc_attrs(struct bmc_ctrl *ctrl,
-+				  struct attribute *attrs[6])
-+{
-+	sysfs_attr_init(&ctrl->read_attr.attr);
-+	ctrl->read_attr.attr.name = "value";
-+	ctrl->read_attr.attr.mode = 0444;
-+	ctrl->read_attr.show = bmc_misc_sc_read_show;
-+	attrs[2] = &ctrl->read_attr.attr;
-+
-+	sysfs_attr_init(&ctrl->set_attr.attr);
-+	ctrl->set_attr.attr.name = "set";
-+	ctrl->set_attr.attr.mode = 0200;
-+	ctrl->set_attr.store = bmc_misc_sc_set_store;
-+	attrs[3] = &ctrl->set_attr.attr;
-+
-+	sysfs_attr_init(&ctrl->clear_attr.attr);
-+	ctrl->clear_attr.attr.name = "clear";
-+	ctrl->clear_attr.attr.mode = 0200;
-+	ctrl->clear_attr.store = bmc_misc_sc_clear_store;
-+	attrs[4] = &ctrl->clear_attr.attr;
-+
-+	attrs[5] = NULL;
-+}
-+
-+static int bmc_misc_init_sc(struct bmc_ctrl *ctrl, struct device_node *node,
-+			    struct attribute *attrs[6])
-+{
-+	int rc;
-+
-+	rc = of_property_read_u32_array(node, "offset", &ctrl->read, 3);
-+	if (rc < 0)
-+		return rc;
-+
-+	if (of_property_read_bool(node, "default-set"))
-+		regmap_write(ctrl->map, ctrl->set, ctrl->mask);
-+	else if (of_property_read_bool(node, "default-clear"))
-+		regmap_write(ctrl->map, ctrl->clear, ctrl->mask);
-+
-+	bmc_misc_add_sc_attrs(ctrl, attrs);
-+
-+	return 0;
-+}
-+
-+static ssize_t bmc_misc_label_show(struct kobject *kobj,
-+				   struct kobj_attribute *attr, char *buf)
-+{
-+	struct bmc_ctrl *ctrl = container_of(attr, struct bmc_ctrl, label_attr);
-+
-+	return sprintf(buf, "%s\n", ctrl->label);
-+}
-+
-+static ssize_t bmc_misc_mask_show(struct kobject *kobj,
-+				   struct kobj_attribute *attr, char *buf)
-+{
-+	struct bmc_ctrl *ctrl = container_of(attr, struct bmc_ctrl, mask_attr);
-+
-+	return sprintf(buf, "0x%x\n", ctrl->mask >> ctrl->shift);
-+}
-+
-+static int bmc_misc_init_dt(struct bmc_ctrl *ctrl, struct device_node *node,
-+			    struct attribute *attrs[6])
-+{
-+	int rc;
-+
-+	/* Example children:
-+	 *
-+	 * field at 80.6 {
-+	 *      compatible = "bmc-misc-control";
-+	 *      reg = <0x80>;
-+	 *      bit-mask = <0x1>;
-+	 *      bit-shift = <6>;
-+	 *      label = "ilpc2ahb-disable";
-+	 * };
-+	 *
-+	 * field at 70.6 {
-+	 *      compatible = "bmc-misc-control";
-+	 *      // Write-1-set/Write-1-clear semantics
-+	 *      set-clear;
-+	 *      default-set;
-+	 *      reg = <0x70 0x70 0x7c>
-+	 *      bit-mask = <0x1>;
-+	 *      bit-shift = <6>;
-+	 *      label = "lpc-sio-decode-disable";
-+	 * };
-+	 *
-+	 * field at 50.0 {
-+	 *	compatible = "bmc-misc-control";
-+	 *	read-only;
-+	 *	reg = <0x50>;
-+	 *	bit-mask = <0xffffffff>;
-+	 *	bit-shift = <0>;
-+	 *	label = "vga-scratch-1";
-+	 * };
-+	 */
-+	rc = of_property_read_u32(node, "mask", &ctrl->mask);
-+	if (rc < 0)
-+		return rc;
-+
-+	ctrl->shift = __ffs(ctrl->mask);
-+	ctrl->ro = of_property_read_bool(node, "read-only");
-+
-+	rc = of_property_read_string(node, "label", &ctrl->label);
-+	if (rc < 0)
-+		return rc;
-+
-+	ctrl->label_attr.attr.name = "label";
-+	ctrl->label_attr.attr.mode = 0444;
-+	ctrl->label_attr.show = bmc_misc_label_show;
-+	attrs[0] = &ctrl->label_attr.attr;
-+
-+	ctrl->mask_attr.attr.name = "mask";
-+	ctrl->mask_attr.attr.mode = 0444;
-+	ctrl->mask_attr.show = bmc_misc_mask_show;
-+	attrs[1] = &ctrl->mask_attr.attr;
-+
-+	if (of_property_read_bool(node, "set-clear"))
-+		return bmc_misc_init_sc(ctrl, node, attrs);
-+
-+	return bmc_misc_init_rmw(ctrl, node, attrs);
-+}
-+
-+static struct class bmc_class = {
-+	.name =		"bmc",
-+};
-+
-+static int bmc_misc_probe(struct platform_device *pdev)
-+{
-+	struct attribute *attrs[6];
-+	struct attribute **attr;
-+	struct bmc_ctrl *ctrl;
-+	int rc;
-+
-+	ctrl = devm_kzalloc(&pdev->dev, sizeof(*ctrl), GFP_KERNEL);
-+	if (!ctrl)
-+		return -ENOMEM;
-+
-+	ctrl->map = syscon_node_to_regmap(pdev->dev.parent->of_node);
-+
-+	rc = bmc_misc_init_dt(ctrl, pdev->dev.of_node, attrs);
-+	if (rc < 0)
-+		return rc;
-+
-+	ctrl->dev = device_create(&bmc_class, &pdev->dev, 0, ctrl, "%s",
-+			     ctrl->label);
-+	if (IS_ERR(ctrl->dev))
-+		return PTR_ERR(ctrl->dev);
-+
-+	for (attr = &attrs[0]; *attr; attr++) {
-+		rc = sysfs_create_file(&ctrl->dev->kobj, *attr);
-+		if (rc < 0)
-+			/* FIXME: Cleanup */
-+			return rc;
-+	}
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id bmc_misc_match[] = {
-+	{ .compatible = "bmc-misc-ctrl" },
-+	{ },
-+};
-+
-+static struct platform_driver bmc_misc = {
-+	.driver = {
-+		.name		=  "bmc-misc-ctrl",
-+		.of_match_table = bmc_misc_match,
-+	},
-+	.probe = bmc_misc_probe,
-+};
-+
-+static int bmc_misc_ctrl_init(void)
-+{
-+	int rc;
-+
-+	rc = class_register(&bmc_class);
-+	if (rc < 0)
-+		return rc;
-+
-+	return platform_driver_register(&bmc_misc);
-+}
-+module_init(bmc_misc_ctrl_init);
-+
-+static void bmc_misc_ctrl_exit(void)
-+{
-+	platform_driver_unregister(&bmc_misc);
-+	class_unregister(&bmc_class);
-+}
-+module_exit(bmc_misc_ctrl_exit);
-+
-+MODULE_LICENSE("GPL");
-+MODULE_AUTHOR("Andrew Jeffery <andrew@aj.id.au>");
--- 
-2.17.1
+On 03.07.2018 08:57, Shawn Guo wrote:
+> On Mon, Jul 02, 2018 at 08:27:55AM +0200, Oleksij Rempel wrote:
+>> Cortex M4 part can be started from a boot loader or over
+>> Linux remoteproc framework.
+>>
+>> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
+>> ---
+>>  arch/arm/boot/dts/Makefile         |  2 +-
+>>  arch/arm/mach-imx/Kconfig          | 33 +++++++++++++++++++-----------
+>>  arch/arm/mach-imx/Makefile         |  3 ++-
+>>  arch/arm/mach-imx/mach-imx7d-cm4.c | 21 +++++++++++++++++++
+>>  4 files changed, 45 insertions(+), 14 deletions(-)
+>>  create mode 100644 arch/arm/mach-imx/mach-imx7d-cm4.c
+>>
+>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>> index 7e2424957809..e3fe1bfbc404 100644
+>> --- a/arch/arm/boot/dts/Makefile
+>> +++ b/arch/arm/boot/dts/Makefile
+>> @@ -539,7 +539,7 @@ dtb-$(CONFIG_SOC_IMX6UL) += \
+>>  	imx6ull-14x14-evk.dtb \
+>>  	imx6ull-colibri-eval-v3.dtb \
+>>  	imx6ull-colibri-wifi-eval-v3.dtb
+>> -dtb-$(CONFIG_SOC_IMX7D) += \
+>> +dtb-$(CONFIG_SOC_IMX7D_CA7) += \
+> 
+> We agreed to keep this unchanged, no?
+
+yes. sorry.
+
+>>  	imx7d-cl-som-imx7.dtb \
+>>  	imx7d-colibri-emmc-eval-v3.dtb \
+>>  	imx7d-colibri-eval-v3.dtb \
+>> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+>> index e47fa13f4b0c..5ad58b1cb4bc 100644
+>> --- a/arch/arm/mach-imx/Kconfig
+>> +++ b/arch/arm/mach-imx/Kconfig
+>> @@ -522,18 +522,6 @@ config SOC_IMX6UL
+>>  	help
+>>  	  This enables support for Freescale i.MX6 UltraLite processor.
+>>  
+>> -config SOC_IMX7D
+>> -	bool "i.MX7 Dual support"
+>> -	select PINCTRL_IMX7D
+>> -	select ARM_GIC
+>> -	select HAVE_ARM_ARCH_TIMER
+>> -	select HAVE_IMX_ANATOP
+>> -	select HAVE_IMX_MMDC
+>> -	select HAVE_IMX_SRC
+>> -	select IMX_GPCV2
+>> -	help
+>> -		This enables support for Freescale i.MX7 Dual processor.
+>> -
+>>  config SOC_LS1021A
+>>  	bool "Freescale LS1021A support"
+>>  	select ARM_GIC
+>> @@ -548,6 +536,27 @@ comment "Cortex-A/Cortex-M asymmetric multiprocessing platforms"
+>>  
+>>  if ARCH_MULTI_V7 || ARM_SINGLE_ARMV7M
+>>  
+>> +config SOC_IMX7D_CA7
+>> +	bool
+>> +	select ARM_GIC
+>> +	select HAVE_ARM_ARCH_TIMER
+>> +	select HAVE_IMX_ANATOP
+>> +	select HAVE_IMX_MMDC
+>> +	select HAVE_IMX_SRC
+>> +	select IMX_GPCV2
+>> +
+>> +config SOC_IMX7D_CM4
+>> +	bool
+>> +	select ARMV7M_SYSTICK
+>> +
+>> +config SOC_IMX7D
+>> +	bool "i.MX7 Dual support"
+>> +	select PINCTRL_IMX7D
+>> +	select SOC_IMX7D_CA7 if ARCH_MULTI_V7
+>> +	select SOC_IMX7D_CM4 if ARM_SINGLE_ARMV7M
+>> +	help
+>> +		This enables support for Freescale i.MX7 Dual processor.
+>> +
+>>  config SOC_VF610
+>>  	bool "Vybrid Family VF610 support"
+>>  	select ARM_GIC if ARCH_MULTI_V7
+>> diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+>> index 2327e3e876d8..64ebeb6a4f30 100644
+>> --- a/arch/arm/mach-imx/Makefile
+>> +++ b/arch/arm/mach-imx/Makefile
+>> @@ -81,7 +81,8 @@ obj-$(CONFIG_SOC_IMX6SL) += mach-imx6sl.o
+>>  obj-$(CONFIG_SOC_IMX6SLL) += mach-imx6sl.o
+>>  obj-$(CONFIG_SOC_IMX6SX) += mach-imx6sx.o
+>>  obj-$(CONFIG_SOC_IMX6UL) += mach-imx6ul.o
+>> -obj-$(CONFIG_SOC_IMX7D) += mach-imx7d.o
+>> +obj-$(CONFIG_SOC_IMX7D_CA7) += mach-imx7d.o
+>> +obj-$(CONFIG_SOC_IMX7D_CM4) += mach-imx7d-cm4.o
+>>  
+>>  ifeq ($(CONFIG_SUSPEND),y)
+>>  AFLAGS_suspend-imx6.o :=-Wa,-march=armv7-a
+>> diff --git a/arch/arm/mach-imx/mach-imx7d-cm4.c b/arch/arm/mach-imx/mach-imx7d-cm4.c
+>> new file mode 100644
+>> index 000000000000..c36dea79aeb8
+>> --- /dev/null
+>> +++ b/arch/arm/mach-imx/mach-imx7d-cm4.c
+>> @@ -0,0 +1,21 @@
+>> +/*
+>> + * Copyright 2017 Pengutronix
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + */
+> 
+> Can we use SPDX tag for new file?
+
+ok.
+
+> Shawn
+> 
+>> +
+>> +#include <linux/kernel.h>
+>> +#include <asm/v7m.h>
+>> +#include <asm/mach/arch.h>
+>> +
+>> +static const char * const imx7d_cm4_dt_compat[] __initconst = {
+>> +	"fsl,imx7d-cm4",
+>> +	NULL,
+>> +};
+>> +
+>> +DT_MACHINE_START(IMX7D, "Freescale i.MX7 Dual Cortex-M4 (Device Tree)")
+>> +	.dt_compat = imx7d_cm4_dt_compat,
+>> +	.restart = armv7m_restart,
+>> +MACHINE_END
+>> -- 
+>> 2.17.1
+>>
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180703/b4295a22/attachment.sig>
