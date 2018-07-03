@@ -1,9 +1,9 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Wed,  4 Jul 2018 00:00:26 +0200
-Subject: [PATCH v2 29/32] mtd: rawnand: qcom: convert driver to nand_scan()
+Date: Wed,  4 Jul 2018 00:00:27 +0200
+Subject: [PATCH v2 30/32] mtd: rawnand: jz4740: convert driver to nand_scan()
 In-Reply-To: <20180703220029.19565-1-miquel.raynal@bootlin.com>
 References: <20180703220029.19565-1-miquel.raynal@bootlin.com>
-Message-ID: <20180703220029.19565-30-miquel.raynal@bootlin.com>
+Message-ID: <20180703220029.19565-31-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,130 +14,118 @@ both nand_scan_ident() and nand_scan_tail().
 
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 ---
- drivers/mtd/nand/raw/qcom_nandc.c | 67 ++++++++++++---------------------------
- 1 file changed, 20 insertions(+), 47 deletions(-)
+ drivers/mtd/nand/raw/jz4740_nand.c | 42 +++++++++++++++++++++++---------------
+ 1 file changed, 25 insertions(+), 17 deletions(-)
 
-diff --git a/drivers/mtd/nand/raw/qcom_nandc.c b/drivers/mtd/nand/raw/qcom_nandc.c
-index 160acdff7d86..9407357ff77a 100644
---- a/drivers/mtd/nand/raw/qcom_nandc.c
-+++ b/drivers/mtd/nand/raw/qcom_nandc.c
-@@ -2423,10 +2423,10 @@ qcom_nandc_calc_ecc_bytes(int step_size, int strength)
- NAND_ECC_CAPS_SINGLE(qcom_nandc_ecc_caps, qcom_nandc_calc_ecc_bytes,
- 		     NANDC_STEP_SIZE, 4, 8);
+diff --git a/drivers/mtd/nand/raw/jz4740_nand.c b/drivers/mtd/nand/raw/jz4740_nand.c
+index 613b00a9604b..2e95b618dc47 100644
+--- a/drivers/mtd/nand/raw/jz4740_nand.c
++++ b/drivers/mtd/nand/raw/jz4740_nand.c
+@@ -59,6 +59,7 @@
  
--static int qcom_nand_host_setup(struct qcom_nand_host *host)
-+static int qcom_nand_attach_chip(struct nand_chip *chip)
- {
--	struct nand_chip *chip = &host->chip;
- 	struct mtd_info *mtd = nand_to_mtd(chip);
-+	struct qcom_nand_host *host = to_qcom_nand_host(chip);
- 	struct nand_ecc_ctrl *ecc = &chip->ecc;
- 	struct qcom_nand_controller *nandc = get_qcom_nand_controller(chip);
- 	int cwperpage, bad_block_byte, ret;
-@@ -2729,9 +2729,9 @@ static int qcom_nandc_setup(struct qcom_nand_controller *nandc)
- 	return 0;
- }
+ struct jz_nand {
+ 	struct nand_chip chip;
++	struct platform_device *pdev;
+ 	void __iomem *base;
+ 	struct resource *mem;
  
--static int qcom_nand_host_init(struct qcom_nand_controller *nandc,
--			       struct qcom_nand_host *host,
--			       struct device_node *dn)
-+static int qcom_nand_host_init_and_register(struct qcom_nand_controller *nandc,
-+					    struct qcom_nand_host *host,
-+					    struct device_node *dn)
- {
- 	struct nand_chip *chip = &host->chip;
- 	struct mtd_info *mtd = nand_to_mtd(chip);
-@@ -2778,30 +2778,14 @@ static int qcom_nand_host_init(struct qcom_nand_controller *nandc,
- 	/* set up initial status value */
- 	host->status = NAND_STATUS_READY | NAND_STATUS_WP;
+@@ -329,8 +330,8 @@ static int jz_nand_detect_bank(struct platform_device *pdev,
+ 	writel(ctrl, nand->base + JZ_REG_NAND_CTRL);
  
--	ret = nand_scan_ident(mtd, 1, NULL);
--	if (ret)
--		return ret;
--
--	ret = qcom_nand_host_setup(host);
--
--	return ret;
--}
--
--static int qcom_nand_mtd_register(struct qcom_nand_controller *nandc,
--				  struct qcom_nand_host *host,
--				  struct device_node *dn)
--{
--	struct nand_chip *chip = &host->chip;
--	struct mtd_info *mtd = nand_to_mtd(chip);
--	int ret;
--
--	ret = nand_scan_tail(mtd);
-+	chip->controller->attach_chip = qcom_nand_attach_chip;
-+	ret = nand_scan(mtd, 1);
- 	if (ret)
- 		return ret;
+ 	if (chipnr == 0) {
+-		/* Detect first chip. */
+-		ret = nand_scan_ident(mtd, 1, NULL);
++		/* Detect the first chip and register it */
++		ret = nand_scan(mtd, 1);
+ 		if (ret)
+ 			goto notfound_id;
  
- 	ret = mtd_device_register(mtd, NULL, 0);
- 	if (ret)
--		nand_cleanup(mtd_to_nand(mtd));
-+		nand_cleanup(chip);
- 
+@@ -367,6 +368,21 @@ static int jz_nand_detect_bank(struct platform_device *pdev,
  	return ret;
  }
-@@ -2810,9 +2794,19 @@ static int qcom_probe_nand_devices(struct qcom_nand_controller *nandc)
- {
- 	struct device *dev = nandc->dev;
- 	struct device_node *dn = dev->of_node, *child;
--	struct qcom_nand_host *host, *tmp;
-+	struct qcom_nand_host *host;
- 	int ret;
  
-+	if (nandc->props->is_bam) {
-+		free_bam_transaction(nandc);
-+		nandc->bam_txn = alloc_bam_transaction(nandc);
-+		if (!nandc->bam_txn) {
-+			dev_err(nandc->dev,
-+				"failed to allocate bam transaction\n");
-+			return -ENOMEM;
-+		}
++static int jz_nand_attach_chip(struct nand_chip *chip)
++{
++	struct mtd_info *mtd = nand_to_mtd(chip);
++	struct jz_nand *nand = mtd_to_jz_nand(mtd);
++	struct device *dev = mtd->dev.parent;
++	struct jz_nand_platform_data *pdata = dev_get_platdata(dev);
++
++	if (pdata && pdata->ident_callback) {
++		pdata->ident_callback(nand->pdev, mtd, &pdata->partitions,
++				      &pdata->num_partitions);
 +	}
 +
- 	for_each_available_child_of_node(dn, child) {
- 		host = devm_kzalloc(dev, sizeof(*host), GFP_KERNEL);
- 		if (!host) {
-@@ -2820,7 +2814,7 @@ static int qcom_probe_nand_devices(struct qcom_nand_controller *nandc)
- 			return -ENOMEM;
- 		}
++	return 0;
++}
++
+ static int jz_nand_probe(struct platform_device *pdev)
+ {
+ 	int ret;
+@@ -397,6 +413,7 @@ static int jz_nand_probe(struct platform_device *pdev)
+ 	mtd		= nand_to_mtd(chip);
+ 	mtd->dev.parent = &pdev->dev;
+ 	mtd->name	= "jz4740-nand";
++	nand->pdev	= pdev;
  
--		ret = qcom_nand_host_init(nandc, host, child);
-+		ret = qcom_nand_host_init_and_register(nandc, host, child);
- 		if (ret) {
- 			devm_kfree(dev, host);
- 			continue;
-@@ -2829,27 +2823,6 @@ static int qcom_probe_nand_devices(struct qcom_nand_controller *nandc)
- 		list_add_tail(&host->node, &nandc->host_list);
+ 	chip->ecc.hwctl		= jz_nand_hwctl;
+ 	chip->ecc.calculate	= jz_nand_calculate_ecc_rs;
+@@ -410,6 +427,7 @@ static int jz_nand_probe(struct platform_device *pdev)
+ 	chip->chip_delay = 50;
+ 	chip->cmd_ctrl = jz_nand_cmd_ctrl;
+ 	chip->select_chip = jz_nand_select_chip;
++	chip->hwcontrol.attach_chip = jz_nand_attach_chip;
+ 
+ 	if (nand->busy_gpio)
+ 		chip->dev_ready = jz_nand_dev_ready;
+@@ -450,20 +468,10 @@ static int jz_nand_probe(struct platform_device *pdev)
+ 		else
+ 			nand->banks[chipnr] = 0;
+ 	}
++
+ 	if (chipnr == 0) {
+ 		dev_err(&pdev->dev, "No NAND chips found\n");
+-		goto err_iounmap_mmio;
+-	}
+-
+-	if (pdata && pdata->ident_callback) {
+-		pdata->ident_callback(pdev, mtd, &pdata->partitions,
+-					&pdata->num_partitions);
+-	}
+-
+-	ret = nand_scan_tail(mtd);
+-	if (ret) {
+-		dev_err(&pdev->dev,  "Failed to scan NAND\n");
+-		goto err_unclaim_banks;
++		goto err_nand_release;
  	}
  
--	if (list_empty(&nandc->host_list))
--		return -ENODEV;
--
--	if (nandc->props->is_bam) {
--		free_bam_transaction(nandc);
--		nandc->bam_txn = alloc_bam_transaction(nandc);
--		if (!nandc->bam_txn) {
--			dev_err(nandc->dev,
--				"failed to allocate bam transaction\n");
--			return -ENOMEM;
--		}
--	}
--
--	list_for_each_entry_safe(host, tmp, &nandc->host_list, node) {
--		ret = qcom_nand_mtd_register(nandc, host, child);
--		if (ret) {
--			list_del(&host->node);
--			devm_kfree(dev, host);
--		}
--	}
--
- 	if (list_empty(&nandc->host_list))
- 		return -ENODEV;
+ 	ret = mtd_device_parse_register(mtd, NULL, NULL,
+@@ -472,15 +480,13 @@ static int jz_nand_probe(struct platform_device *pdev)
  
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "Failed to add mtd device\n");
+-		goto err_nand_release;
++		goto err_unclaim_banks;
+ 	}
+ 
+ 	dev_info(&pdev->dev, "Successfully registered JZ4740 NAND driver\n");
+ 
+ 	return 0;
+ 
+-err_nand_release:
+-	nand_release(mtd);
+ err_unclaim_banks:
+ 	while (chipnr--) {
+ 		unsigned char bank = nand->banks[chipnr];
+@@ -488,6 +494,8 @@ static int jz_nand_probe(struct platform_device *pdev)
+ 					 nand->bank_base[bank - 1]);
+ 	}
+ 	writel(0, nand->base + JZ_REG_NAND_CTRL);
++err_nand_release:
++	nand_release(mtd);
+ err_iounmap_mmio:
+ 	jz_nand_iounmap_resource(nand->mem, nand->base);
+ err_free:
 -- 
 2.14.1
