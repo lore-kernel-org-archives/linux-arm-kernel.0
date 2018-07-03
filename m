@@ -1,83 +1,40 @@
-From: poza@codeaurora.org (poza at codeaurora.org)
-Date: Tue, 03 Jul 2018 19:59:21 +0530
-Subject: [PATCH V5 3/3] PCI: Mask and unmask hotplug interrupts during
- reset
-In-Reply-To: <20180703141255.GB18639@wunner.de>
-References: <1530571967-19099-1-git-send-email-okaya@codeaurora.org>
- <1530571967-19099-4-git-send-email-okaya@codeaurora.org>
- <20180703083447.GA2689@wunner.de>
- <8b6ce0f415858463d1c0588c29e30415@codeaurora.org>
- <20180703141255.GB18639@wunner.de>
-Message-ID: <237b7dd4036d8a6156b9e1cb605c84c9@codeaurora.org>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Tue, 3 Jul 2018 16:31:09 +0200
+Subject: [RFC PATCH 1/4] dts: misc: Add bindings documentation for
+ bmc-misc-ctrl
+In-Reply-To: <a1c3ecd4fed28e2b33c95a476452318dba58cd7e.camel@kernel.crashing.org>
+References: <20180703070413.28756-1-andrew@aj.id.au>
+ <20180703070413.28756-2-andrew@aj.id.au>
+ <20180703075009.GA27649@kroah.com>
+ <a1c3ecd4fed28e2b33c95a476452318dba58cd7e.camel@kernel.crashing.org>
+Message-ID: <20180703143109.GB2043@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-07-03 19:42, Lukas Wunner wrote:
-> On Tue, Jul 03, 2018 at 07:30:28AM -0400, okaya at codeaurora.org wrote:
->> On 2018-07-03 04:34, Lukas Wunner wrote:
->> >On Mon, Jul 02, 2018 at 06:52:47PM -0400, Sinan Kaya wrote:
->> >>If a bridge supports hotplug and observes a PCIe fatal error, the
->> >>following
->> >>events happen:
->> >>
->> >>1. AER driver removes the devices from PCI tree on fatal error
->> >>2. AER driver brings down the link by issuing a secondary bus reset
->> >>waits
->> >>for the link to come up.
->> >>3. Hotplug driver observes a link down interrupt
->> >>4. Hotplug driver tries to remove the devices waiting for the rescan
->> >>lock
->> >>but devices are already removed by the AER driver and AER driver is
->> >>waiting
->> >>for the link to come back up.
->> >>5. AER driver tries to re-enumerate devices after polling for the link
->> >>state to go up.
->> >>6. Hotplug driver obtains the lock and tries to remove the devices
->> >>again.
->> >>
->> >>If a bridge is a hotplug capable bridge, mask hotplug interrupts before
->> >>the
->> >>reset and unmask afterwards.
->> >
->> >Would it work for you if you just amended the AER driver to skip
->> >removal and re-enumeration of devices if the port is a hotplug bridge?
->> >Just check for is_hotplug_bridge in struct pci_dev.
->> 
->> The reason why we want to remove devices before secondary bus reset is 
->> to
->> quiesce pcie bus traffic before issuing a reset.
->> 
->> Skipping this step might cause transactions to be lost in the middle 
->> of the
->> reset as there will be active traffic flowing and drivers will 
->> suddenly
->> start reading ffs.
+On Wed, Jul 04, 2018 at 12:16:49AM +1000, Benjamin Herrenschmidt wrote:
+> On Tue, 2018-07-03 at 09:50 +0200, Greg KH wrote:
+> > On Tue, Jul 03, 2018 at 05:04:10PM +1000, Andrew Jeffery wrote:
+> > > Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
+> > > ---
+> > 
+> > I can't take patches without any changelog text at all :(
 > 
-> Interesting, I think that merits a code comment.
+> Greg (and replying to your other comments as well)...
 > 
-> FWIW, macOS has a "PCI pause" callback to quiesce a device:
-> https://opensource.apple.com/source/IOPCIFamily/IOPCIFamily-239.1.2/pause.rtf
+> This is an RFC series, it's not meant for you to take at this point,
+> it's about discussing the overall approach to exposing BMC random
+> "tunables" as explained in patch 0 of the series.
 > 
-> They're using it to reconfigure a device's BAR and bus number
-> at runtime (sic!), e.g. if mmio windows need to be moved around
-> on Thunderbolt hotplug if there's insufficient space:
-> 
-> 	"During pause reconfiguration, the following may be changed:
-> 	 - device BAR registers
-> 	 - the devices bus number
-> 	 - registry properties reflecting these values ("ranges",
-> 	   "assigned-addresses", "reg")
-> 	 - device MSI block values for address and value, but not the
-> 	   number of MSIs allocated"
-> 
-> Conceptually, "PCI pause" is similar to putting the device in a suspend
-> state.  I'm wondering if suspending the devices below the bridge would
-> make more sense than removing them in the AER driver.
-> 
+> Yes the individual patches aren't yet at the level of polish for a
+> formal submission, we (naively ?) thought that's what the whole RFC tag
+> is about :-)
 
-the code is shared by not only AER but also DPC, where if DPC event 
-happens the devices are removed.
-also if the bridge is hotplug capable, then the devices beneath might 
-have changed and resume might break.
+Oh come on, putting a basic "here is what this patch does" comment
+should be part of every patch, otherwise what is there to comment on if
+we don't know what is going on in the patch itself?
 
-> Lukas
+Anyway, I provided a bunch of feedback to the "real" patch in this
+series...
+
+
+greg k-h
