@@ -1,24 +1,66 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 3 Jul 2018 18:08:28 +0800
-Subject: [PATCH 2/6] arm64: dts: freescale: Add missing cooling device
- properties for CPUs
-In-Reply-To: <20180703083431.l4rbnept2lwjocol@vireshk-i7>
-References: <cover.1527225682.git.viresh.kumar@linaro.org>
- <e4504945d2b684fae2850bbcf03a6d02917a8c8a.1527225682.git.viresh.kumar@linaro.org>
- <CAAQ0ZWRsroAAKRyxdd9ZCreriAjdBecmJy01sRy+6i_iQsMKgw@mail.gmail.com>
- <20180703083431.l4rbnept2lwjocol@vireshk-i7>
-Message-ID: <20180703100827.GP4348@dragon>
+From: yixun.lan@amlogic.com (Yixun Lan)
+Date: Tue, 3 Jul 2018 18:17:00 +0800
+Subject: [PATCH v2 2/2] clk: meson-axg: add clocks required by pcie driver
+In-Reply-To: <1530609862.2900.187.camel@baylibre.com>
+References: <20180702213118.19222-1-yixun.lan@amlogic.com>
+ <20180702213118.19222-3-yixun.lan@amlogic.com>
+ <1530609862.2900.187.camel@baylibre.com>
+Message-ID: <7c8b47a9-67bc-b685-8c90-084299631fb0@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 03, 2018 at 02:04:31PM +0530, Viresh Kumar wrote:
-> On 03-07-18, 15:34, Shawn Guo wrote:
-> > Please use my kernel.org email address for future patches.
+Hi Jerome:
+
+
+On 07/03/18 17:24, Jerome Brunet wrote:
+> On Mon, 2018-07-02 at 21:31 +0000, Yixun Lan wrote:
+>> Adding clocks for the pcie driver. Due to the ASIC design,
+>> the pcie controller re-use part of the mipi clock logic,
+>> so the mipi clock is also added.
+>>
+>> Tested-by: Jianxin Qin <jianxin.qin@amlogic.com>
+>> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+>> ---
+>>  drivers/clk/meson/axg.c | 148 ++++++++++++++++++++++++++++++++++++++++
+>>  drivers/clk/meson/axg.h |   6 +-
+>>  2 files changed, 153 insertions(+), 1 deletion(-)
+>>
+>>
 > 
-> As there were many patches I relied on get_maintainers to do that
-> stuff and it didn't pick you up by default. Maybe try fixing
-> MAINTAINERS to add an entry against your email id ?
+> [...]
+> 
+>> +
+>> +/* skip the partent 0, it's for debug only */
+>> +static u32 mux_table_pcie_ref[]	= { 1 };
+>> +static const char * const pcie_ref_parent_names[] = { "pcie_mux" };
+> 
+> Dropped these symbols.
+> 
+>> +
+>> +static struct clk_regmap axg_pcie_ref = {
+>> +	.data = &(struct clk_regmap_mux_data){
+>> +		.offset = HHI_PCIE_PLL_CNTL6,
+>> +		.mask = 0x1,
+>> +		.shift = 1,
+>> +		.table = mux_table_pcie_ref,
+> 
+> Replaced with the table itself
+> 
+>> +	},
+>> +	.hw.init = &(struct clk_init_data){
+>> +		.name = "pcie_ref",
+>> +		.ops = &clk_regmap_mux_ops,
+>> +		.parent_names = pcie_ref_parent_names,
+>> +		.num_parents = ARRAY_SIZE(pcie_ref_parent_names),
+> 
+> Replaced with the table itself and applied. Thx
+> 
+>> +		.flags = CLK_SET_RATE_PARENT,
+>> +	},
+>> +};
+>> +
 
-Good point.  Will patch MAINTAINERS for arm64 freescale DTS.
+I'm seeing you already applied this patch, so would you like to
+fix/amend the patch for me, or want me send another patch version?
 
-Shawn
+thanks
