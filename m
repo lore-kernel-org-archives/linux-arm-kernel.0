@@ -1,137 +1,119 @@
-From: bhsharma@redhat.com (Bhupesh Sharma)
-Date: Tue, 3 Jul 2018 17:44:37 +0530
-Subject: [PATCH v2 1/4] arm64: export memblock_reserve()d regions via
- /proc/iomem
-In-Reply-To: <20180703064726.GU23681@linaro.org>
-References: <20180619064424.6642-1-takahiro.akashi@linaro.org>
- <20180619064424.6642-2-takahiro.akashi@linaro.org>
- <72307608-90e0-4842-edc1-d3b284782940@oracle.com>
- <ca9e5d9d-e090-f9e0-bc10-3297c9e3b7e1@arm.com>
- <891c3e5a-9760-1353-4a2c-0900082dd245@oracle.com>
- <20180703064726.GU23681@linaro.org>
-Message-ID: <CACi5LpNhQ+jBvNL2F2w5aMpUd61JkzZSV=HsBLxCx6DRy2d7Vw@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 3 Jul 2018 13:14:41 +0100
+Subject: [PATCH] arm64: Clear the stack
+In-Reply-To: <1b97aa7d-2b6c-a5df-0caa-1cd16e18a816@redhat.com>
+References: <20180629190553.7282-1-labbott@redhat.com>
+ <9733d929-3c6a-40e1-6110-8f79975323d3@linux.com>
+ <1b97aa7d-2b6c-a5df-0caa-1cd16e18a816@redhat.com>
+Message-ID: <20180703121440.v4olvwqb3ykgt5fm@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 3, 2018 at 12:17 PM, AKASHI Takahiro
-<takahiro.akashi@linaro.org> wrote:
-> On Tue, Jun 19, 2018 at 10:22:46AM -0500, Dave Kleikamp wrote:
->> On 06/19/2018 10:00 AM, James Morse wrote:
->> > Hi Dave,
->> >
->> > On 19/06/18 14:37, Dave Kleikamp wrote:
->> >> On 06/19/2018 01:44 AM, AKASHI Takahiro wrote:
->> >>> +static int __init reserve_memblock_reserved_regions(void)
->> >>> +{
->> >>> + phys_addr_t start, end, roundup_end = 0;
->> >>> + struct resource *mem, *res;
->> >>> + u64 i;
->> >>> +
->> >>> + for_each_reserved_mem_region(i, &start, &end) {
->> >>> +         if (end <= roundup_end)
->> >>> +                 continue; /* done already */
->> >>> +
->> >>> +         start = __pfn_to_phys(PFN_DOWN(start));
->> >>> +         end = __pfn_to_phys(PFN_UP(end)) - 1;
->> >>> +         roundup_end = end;
->> >>> +
->> >>> +         res = kzalloc(sizeof(*res), GFP_ATOMIC);
->> >>> +         if (WARN_ON(!res))
->> >>> +                 return -ENOMEM;
->> >>> +         res->start = start;
->> >>> +         res->end = end;
->> >>> +         res->name  = "reserved";
->> >>> +         res->flags = IORESOURCE_MEM;
->> >>> +
->> >>> +         mem = request_resource_conflict(&iomem_resource, res);
->> >>> +         /*
->> >>> +          * We expected memblock_reserve() regions to conflict with
->> >>> +          * memory created by request_standard_resources().
->> >>> +          */
->> >>> +         if (WARN_ON_ONCE(!mem))
->> >>> +                 continue;
->> >>> +         kfree(res);
->> >>
->> >> Why is kfree() after the conditional continue? This is a memory leak.
->> >
->> > request_resource_conflict() inserts res into the iomem_resource tree, or returns
->> > the conflict if there is already something at this address.
->> >
->> > We expect something at this address: a 'System RAM' section added by
->> > request_resource(). This code wants the conflicting 'System RAM' entry so that
->> > reserve_region_with_split() can fill in the gaps below it with 'reserved'. See
->> > the commit-message for an example.
->> >
->> > If there was no conflict, it means the memory map doesn't look like we expect,
->> > we can't pass NULL to reserve_region_with_split(), and we just inserted the
->> > 'reserved' at the top level. Freeing res at this point would be a use-after-free
->> > hanging from /proc/iomem.
->> > This code generates a WARN_ON_ONCE() and leaves the 'reserved' description where
->> > it is.
->>
->> Okay. I get it.
->>
->> > Trying to cleanup here is pointless, we can remove the resource entry and free
->> > it ... but we still want to report it as reserved, which is what just happened,
->> > just not quite how we we wanted it.
->> >
->> > If you ever see this warning, it means some RAM stopped being nomap between
->> > request_resources() and reserve_memblock_reserved_regions(). I can't find any
->> > case where that ever happens.
->> >
->> >
->> > If all that makes sense: how can I improve the comment above the WARN_ON_ONCE()
->> > to make it clearer?
->>
->> I guess something like you described above.
->>
->> /*
->>  * We expect a 'System RAM' section at this address. In the unexpected
->>  * case where one is not found, request_resource_conflict() will insert
->>  * res into the iomem_resource tree.
->>  */
->>
->> Do you think this is clearer?
->
-> If this is the only change needed in my patchset, I'd like the maintainers
-> to take care of it instead of my posting another version.
->
+On Mon, Jul 02, 2018 at 11:48:05AM -0700, Laura Abbott wrote:
+> On 07/02/2018 06:02 AM, Alexander Popov wrote:
+> > On 29.06.2018 22:05, Laura Abbott wrote:
+> > > Implementation of stackleak based heavily on the x86 version
+> > > 
+> > > Signed-off-by: Laura Abbott <labbott@redhat.com>
+> > > ---
+> > > Changes since last time:
+> > > - Minor name change in entry.S
+> > > - Converted to use the generic interfaces so there's minimal additions.
+> > > - Added the fast syscall path.
+> > > - Addition of on_thread_stack and current_top_of_stack
+> > > - Disable stackleak on hyp per suggestion
+> > > - Added a define for check_alloca. I'm still not sure about keeping it
+> > >    since the x86 version got reworked?
+> > > 
+> > > I've mostly kept this as one patch with a minimal commit text. I can
+> > > split it up and elaborate more before final merging.
+> > > ---
 
-+1.
+[...]
 
-crashkernel booting on arm64 machines which support boot via acpi
-tables is broken since a long time, so it would be great to get these
-into upstream asap.
+> > > diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> > > index ec2ee720e33e..31c9da7d401e 100644
+> > > --- a/arch/arm64/kernel/entry.S
+> > > +++ b/arch/arm64/kernel/entry.S
+> > > @@ -401,6 +401,11 @@ tsk	.req	x28		// current thread_info
+> > >   	.text
+> > > +	.macro	stackleak_erase
+> > 
+> > Could you rename the macro to STACKLEAK_ERASE for similarity with x86?
+> > 
+> 
+> Mark Rutland had previously asked for this to be lowercase.
+> I really don't care one way or the other so I'll defer to
+> someone else to have the final word.
 
-I think the comment can be addressed while picking up the patchset in
-the maintainer's tree.
+Will, Catalin, could you chime in either way?
 
-I am not sure whether it will go through the ARM tree (Will) or the
-EFI tree (Ard), but since this has a Tested-by (from myself) and
-Reviewed-by (from James), probably this can be pulled in to allow
-further tests via the maintainer's tree.
+I'd previously asked for lower-case for consistency with our other
+assembly macros.
+
+[...]
+
+> > > diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+> > > index f08a2ed9db0d..9f0f135f8b66 100644
+> > > --- a/arch/arm64/kernel/process.c
+> > > +++ b/arch/arm64/kernel/process.c
+> > > @@ -493,3 +493,19 @@ void arch_setup_new_exec(void)
+> > >   {
+> > >   	current->mm->context.flags = is_compat_task() ? MMCF_AARCH32 : 0;
+> > >   }
+> > > +
+> > > +#ifdef CONFIG_GCC_PLUGIN_STACKLEAK
+> > > +#define MIN_STACK_LEFT	256
+> > > +
+> > > +void __used stackleak_check_alloca(unsigned long size)
+> > > +{
+> > > +	unsigned long sp, stack_left;
+> > > +
+> > > +	sp = current_stack_pointer;
+> > > +
+> > > +	stack_left = sp & (THREAD_SIZE - 1);
+> > > +	BUG_ON(stack_left < MIN_STACK_LEFT ||
+> > > +		size >= stack_left - MIN_STACK_LEFT);
+> > > +}
+> > > +EXPORT_SYMBOL(stackleak_check_alloca);
+> > > +#endif
+> > 
+> > This code should be updated.
+> > You may remember the troubles I had with MIN_STACK_LEFT:
+> > http://openwall.com/lists/kernel-hardening/2018/05/11/12
+> > Please see that thread where Mark Rutland and I worked out the solution.
+> > 
+> 
+> Ah yeah, I missed the details in that thread. Thanks for
+> that pointer.
+> 
+> > By the way, different stacks on x86_64 have different sizes. Is it false for arm64?
+> 
+> Currently everything except the overflow stack looks to be
+> the same size but there's also another stack I missed.
+
+Assuming I've followed the code correctly, we currently have:
+
+stack		size		alignment (minimum)
+---------------------------------------------------
+task		THREAD_SIZE	THREAD_ALIGN
+irq		THREAD_SIZE	16
+overflow	SZ_4K		16
+sdei_normal	THREAD_SIZE	THREAD_ALIGN
+sdei_critical	THREAD_SIZE	THREAD_ALIGN
+
+... since IRQ_STACK_SIZE is defined as THREAD_SIZE, and SDEI_STACK_SIZE
+is defined as IRQ_STACK_SIZE.
+
+So we can't just mask the sp, unfortunately.
+
+> It might be cleaner just to use on_accessible_stack and then another
+> function to get the top of stack. This also might just be
+> reimplementing what x86 already has? (Mark, Ard?)
+
+It looks like we could build a get_stack_info() as they have.
+
+We could probably clean up our stack traced atop of that, too.
 
 Thanks,
-Bhupesh
-
-
->> >
->> >
->> > Thanks,
->> >
->> > James
->> >
->> >
->> >>> +
->> >>> +         reserve_region_with_split(mem, start, end, "reserved");
->> >>> + }
->> >>> +
->> >>> + return 0;
->> >>> +}
->> >>> +arch_initcall(reserve_memblock_reserved_regions);
->> >>> +
->> >>>  u64 __cpu_logical_map[NR_CPUS] = { [0 ... NR_CPUS-1] = INVALID_HWID };
->> >>>
->> >>>  void __init setup_arch(char **cmdline_p)
->> >>>
->> >
+Mark.
