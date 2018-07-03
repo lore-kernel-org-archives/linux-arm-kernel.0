@@ -1,28 +1,38 @@
-From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
-Date: Tue, 3 Jul 2018 12:27:25 +0300
-Subject: [PATCH 4/6] perf/aux: Make perf_event accessible to setup_aux()
-In-Reply-To: <1530570810-28929-5-git-send-email-mathieu.poirier@linaro.org>
-References: <1530570810-28929-1-git-send-email-mathieu.poirier@linaro.org>
- <1530570810-28929-5-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <20180703092725.j7x2qxiwjgkejox2@um.fi.intel.com>
+From: ijc@debian.org (Ian Campbell)
+Date: Tue, 03 Jul 2018 10:30:21 +0100
+Subject: [PATCH] arm64/acpi: Add fixup for HPE m400 quirks
+In-Reply-To: <45b96b937687b199bdbd6966491ab23f50bb20e7.camel@redhat.com>
+References: <51d3d738-cdf5-2992-bba5-c3e1f34096c2@infradead.org>
+ <098e6d53-8dc7-439f-7165-adbe0e7c4941@arm.com>
+ <8a3034b9-6cf3-5182-717f-dd1dc8a087aa@infradead.org>
+ <5b03f754-3a98-c01d-3e2a-615a8b1ea537@arm.com>
+ <0cbc68d5-9a8f-1734-4eea-d1f037927137@infradead.org>
+ <cb5aa4ee12422ecc5f6530f3a74bcfa553b42c80.camel@redhat.com>
+ <a59fa0f8-4123-bcd9-670a-8885d34f37ed@arm.com>
+ <0be5ce017286a4ec494e0f0969bb10126b8501ce.camel@redhat.com>
+ <bd5fc825573c3394b80365ad2dc47bde7b22044a.camel@gmail.com>
+ <950b3034-08a8-38b9-b8f9-514d3e2519fa@arm.com>
+ <257bbf8d90669921cede5b2e7555b9523311b795.camel@redhat.com>
+ <CAKv+Gu9VfK8itWr5EoOGAdSA-OkrXystw-sbooOq2ZOpFwi9vw@mail.gmail.com>
+ <45b96b937687b199bdbd6966491ab23f50bb20e7.camel@redhat.com>
+Message-ID: <1530610221.9841.128.camel@debian.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 02, 2018 at 04:33:28PM -0600, Mathieu Poirier wrote:
-> It can be advantagous to have access to all the information conveyed by
-> a perf_event when setting up the AUX buffer, as it is the case when
-> dealing with PMU specific driver configuration communicated to the kernel
-> using an ioctl() call.
+On Wed, 2018-06-27 at 08:25 -0400, Mark Salter wrote:
+> On Wed, 2018-06-27 at 10:48 +0200, Ard Biesheuvel wrote:
+> > On 26 June 2018 at 22:20, Mark Salter <msalter@redhat.com> wrote:
+> > > [040h 0064   8]                      Address : 0000004FF7E9F0E0
+> > > 
+> > 
+> > This is a reserved region in the memory map. Does that apply to the
+> > other occurrences as well?
 > 
-> As such simply replace the cpu information by the complete perf_event
-> structure and change all affected customers.
+> Yes, they are all in the same reserved region.
 
-Ok, but can you provide details about which parts of perf_event you need
-and how they are used? Is it the attribute? What's the ioctl command in
-question? Also, should we worry that the PMU specific configuration isn't
-part of the attribute? Or, if not, why? I think we talked about this
-before, but I forgot and this patch needs to explain it anyway.
+I wonder if it corresponds to some actual peripheral on a different X-
+gene based platform (e.g. perhaps a reference design)?
 
-Thanks!
---
-Alex
+Not sure what one would do with that information, just curious.
+
+Ian.
