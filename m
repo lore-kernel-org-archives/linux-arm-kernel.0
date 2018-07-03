@@ -1,54 +1,59 @@
-From: richard.gong@linux.intel.com (richard.gong at linux.intel.com)
-Date: Tue,  3 Jul 2018 09:46:51 -0500
-Subject: [PATCHv6 4/8] dt-bindings: fpga: add Stratix10 SoC FPGA manager
- binding
-In-Reply-To: <1530629215-26990-1-git-send-email-richard.gong@linux.intel.com>
-References: <1530629215-26990-1-git-send-email-richard.gong@linux.intel.com>
-Message-ID: <1530629215-26990-5-git-send-email-richard.gong@linux.intel.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 3 Jul 2018 16:03:49 +0100
+Subject: [PATCH] arm64: Clear the stack
+In-Reply-To: <20180703121440.v4olvwqb3ykgt5fm@lakrids.cambridge.arm.com>
+References: <20180629190553.7282-1-labbott@redhat.com>
+ <9733d929-3c6a-40e1-6110-8f79975323d3@linux.com>
+ <1b97aa7d-2b6c-a5df-0caa-1cd16e18a816@redhat.com>
+ <20180703121440.v4olvwqb3ykgt5fm@lakrids.cambridge.arm.com>
+Message-ID: <20180703150349.fndcq7h5hl3mtain@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alan Tull <atull@kernel.org>
+On Tue, Jul 03, 2018 at 01:14:41PM +0100, Mark Rutland wrote:
+> On Mon, Jul 02, 2018 at 11:48:05AM -0700, Laura Abbott wrote:
+> > On 07/02/2018 06:02 AM, Alexander Popov wrote:
+> > > On 29.06.2018 22:05, Laura Abbott wrote:
+> > > > Implementation of stackleak based heavily on the x86 version
+> > > > 
+> > > > Signed-off-by: Laura Abbott <labbott@redhat.com>
+> > > > ---
+> > > > Changes since last time:
+> > > > - Minor name change in entry.S
+> > > > - Converted to use the generic interfaces so there's minimal additions.
+> > > > - Added the fast syscall path.
+> > > > - Addition of on_thread_stack and current_top_of_stack
+> > > > - Disable stackleak on hyp per suggestion
+> > > > - Added a define for check_alloca. I'm still not sure about keeping it
+> > > >    since the x86 version got reworked?
+> > > > 
+> > > > I've mostly kept this as one patch with a minimal commit text. I can
+> > > > split it up and elaborate more before final merging.
+> > > > ---
+> 
+> [...]
+> 
+> > > > diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> > > > index ec2ee720e33e..31c9da7d401e 100644
+> > > > --- a/arch/arm64/kernel/entry.S
+> > > > +++ b/arch/arm64/kernel/entry.S
+> > > > @@ -401,6 +401,11 @@ tsk	.req	x28		// current thread_info
+> > > >   	.text
+> > > > +	.macro	stackleak_erase
+> > > 
+> > > Could you rename the macro to STACKLEAK_ERASE for similarity with x86?
+> > > 
+> > 
+> > Mark Rutland had previously asked for this to be lowercase.
+> > I really don't care one way or the other so I'll defer to
+> > someone else to have the final word.
+> 
+> Will, Catalin, could you chime in either way?
+> 
+> I'd previously asked for lower-case for consistency with our other
+> assembly macros.
 
-Add a Device Tree binding for the Intel Stratix10 SoC FPGA manager.
+I'd keep it lowercase as the other arm64 macros in this file.
 
-Signed-off-by: Alan Tull <atull@kernel.org>
-Signed-off-by: Richard Gong <richard.gong@intel.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
----
-v2: this patch is added in patch set version 2
-v3: change to put fpga_mgr node under firmware/svc node
-v4: s/fpga-mgr at 0/fpga-mgr/ to remove unit_address
-    add Richard's signed-off-by
-v5: add Reviewed-by Rob Herring
-v6: no change
----
- .../bindings/fpga/intel-stratix10-soc-fpga-mgr.txt      | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/fpga/intel-stratix10-soc-fpga-mgr.txt
-
-diff --git a/Documentation/devicetree/bindings/fpga/intel-stratix10-soc-fpga-mgr.txt b/Documentation/devicetree/bindings/fpga/intel-stratix10-soc-fpga-mgr.txt
-new file mode 100644
-index 0000000..6e03f79
---- /dev/null
-+++ b/Documentation/devicetree/bindings/fpga/intel-stratix10-soc-fpga-mgr.txt
-@@ -0,0 +1,17 @@
-+Intel Stratix10 SoC FPGA Manager
-+
-+Required properties:
-+The fpga_mgr node has the following mandatory property, must be located under
-+firmware/svc node.
-+
-+- compatible : should contain "intel,stratix10-soc-fpga-mgr"
-+
-+Example:
-+
-+	firmware {
-+		svc {
-+			fpga_mgr: fpga-mgr {
-+				compatible = "intel,stratix10-soc-fpga-mgr";
-+			};
-+		};
-+	};
 -- 
-2.7.4
+Catalin
