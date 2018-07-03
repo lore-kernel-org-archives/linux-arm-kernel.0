@@ -1,62 +1,45 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 03 Jul 2018 10:56:47 +0200
-Subject: [PATCH 15/15] arm: dts: imx: Add missing OPP properties for CPUs
-In-Reply-To: <20180703071215.GM4348@dragon>
-References: <cover.1527244200.git.viresh.kumar@linaro.org>
- <264124e14b966a1bbc07c364fbd89fc55aa765e6.1527244201.git.viresh.kumar@linaro.org>
- <1527248760.3472.6.camel@pengutronix.de>
- <20180528110739.ewmhlf72sl7u5ju7@vireshk-i7> <20180703071215.GM4348@dragon>
-Message-ID: <1530608207.22468.104.camel@pengutronix.de>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Tue, 3 Jul 2018 09:59:47 +0100
+Subject: [PATCH] ARM: tegra: Fix Tegra30 Cardhu PCA954x reset
+Message-ID: <1530608387-9591-1-git-send-email-jonathanh@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+On all versions of Tegra30 Cardhu, the reset signal to the NXP PCA9546
+I2C mux is connected to the Tegra GPIO BB0. Currently, this pin on the
+Tegra is not configured as a GPIO but as a special-function IO (SFIO)
+that is multiplexing the pin to an I2S controller. On exiting system
+suspend, I2C commands sent to the PCA9546 are failing because there is
+no ACK. Although it is not possible to see exactly what is happening
+to the reset during suspend, by ensuring it is configured as a GPIO
+and driven high, to de-assert the reset, the failures are no longer
+seen.
 
-Am Dienstag, den 03.07.2018, 15:12 +0800 schrieb Shawn Guo:
-> On Mon, May 28, 2018 at 04:37:39PM +0530, Viresh Kumar wrote:
-> > Hi Lucas,
-> > 
-> > On 25-05-18, 13:46, Lucas Stach wrote:
-> > > This is a lot of duplicate information for what is effectively a shared
-> > > ?cluster wide thing. This does absolutely not _feel_ right.
-> > 
-> > I cannot agree more :)
-> > 
-> > > What problem are you solving here? Why do we need all this duplicate
-> > > information? Why can't we fix it by falling back to looking at cpu0 if
-> > > needed?
-> > 
-> > Let me try explaining one of the problem scenarios to you as your
-> > platform is a single cluster one. Make cpufreq driver as module, don't
-> > insert it, hotplug out CPU0 and now insert the cpufreq driver. The
-> > cpufreq core will try adding the cpufreq policy for CPU1 but wouldn't
-> > find the required information in the DT node of CPU1 and so will fail
-> > or behave incorrectly.
-> > 
-> > We can't look at CPU0 as we don't know they are related at all.
-> > Nothing tells that to us. The right solution to fix the duplication is
-> > to move to OPP-v2 bindings, which allow us to create a single OPP
-> > table node and refer to it from all the CPU nodes. Because in case of
-> > imx platforms getting updated here, we use the old and some platforms
-> > specific frequency tables, we have to duplicate it everywhere.
-> > 
-> > But looking from DT otherwise, all the device should anyway have all
-> > the information required right in their node. That can be simplified
-> > with things like phandle to opp-v2 node, but still everything needs to
-> > be there. We shouldn't really rely on other CPU nodes to make it work.
-> > That would be an incomplete definition of the hardware IMHO.
-> 
-> Lucas,
-> 
-> Are you fine with the patch now considering the respond from Viresh?
+Please note that this GPIO is also used to drive the reset signal
+going to the camera connector on the board. However, given that there
+is no camera support currently for Cardhu, this should not have any
+impact.
 
-I still don't like the huge duplication of information in the DT, but I
-agree that it's currently necessary for correctness. Long term I hope
-we can get away from cpufreq-imx6 and the custom SoC OPPs, which would
-allow us to switch over to OPPv2.
+Fixes: 40431d16ff11 ("ARM: tegra: enable PCA9546 on Cardhu")
 
-So patch is:
-Reluctantly-acked-by: Lucas Stach <l.stach@pengutronix.de>
+Cc: stable at vger.kernel.org
 
-Regards,
-Lucas
+Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
+---
+ arch/arm/boot/dts/tegra30-cardhu.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/boot/dts/tegra30-cardhu.dtsi b/arch/arm/boot/dts/tegra30-cardhu.dtsi
+index 92a9740c533f..3b1db7b9ec50 100644
+--- a/arch/arm/boot/dts/tegra30-cardhu.dtsi
++++ b/arch/arm/boot/dts/tegra30-cardhu.dtsi
+@@ -206,6 +206,7 @@
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			reg = <0x70>;
++			reset-gpio = <&gpio TEGRA_GPIO(BB, 0) GPIO_ACTIVE_LOW>;
+ 		};
+ 	};
+ 
+-- 
+1.9.1
