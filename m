@@ -1,132 +1,44 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon,  2 Jul 2018 18:58:55 -0400
-Subject: [PATCH V5 6/6] PCI: Rename pci_try_reset_bus() to pci_reset_bus()
-In-Reply-To: <1530572336-20296-1-git-send-email-okaya@codeaurora.org>
-References: <1530572336-20296-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1530572336-20296-7-git-send-email-okaya@codeaurora.org>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Tue,  3 Jul 2018 10:21:58 +0900
+Subject: [PATCH 0/3] arm, arm64,
+ microblaze: add endianness options to LDFLAGS instead of LD
+Message-ID: <1530580921-23340-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the old implementation of pci_reset_bus() is gone, replace
-pci_try_reset_bus() with pci_reset_bus().
 
-Compared to the old implementation, new code will fail immmediately with
--EAGAIN if object lock cannot be obtained.
+We are able to evaluate compiler / toolchain capability in the
+Kconfig phase.
+(If you do not know the background of this work, please read
+ the commit log of 316d55d55f49eca442e4fd948f5fa92bab0c8312)
 
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- drivers/infiniband/hw/hfi1/pcie.c |  2 +-
- drivers/pci/pci.c                 | 16 ++++++++--------
- drivers/vfio/pci/vfio_pci.c       |  4 ++--
- include/linux/pci.h               |  2 +-
- 4 files changed, 12 insertions(+), 12 deletions(-)
+To achieve this, 'CC', 'LD', etc. must be passed to Kconfig.
 
-diff --git a/drivers/infiniband/hw/hfi1/pcie.c b/drivers/infiniband/hw/hfi1/pcie.c
-index df4f2d3..baf7c32 100644
---- a/drivers/infiniband/hw/hfi1/pcie.c
-+++ b/drivers/infiniband/hw/hfi1/pcie.c
-@@ -905,7 +905,7 @@ static int trigger_sbr(struct hfi1_devdata *dd)
- 	 * delay after a reset is required.  Per spec requirements,
- 	 * the link is either working or not after that point.
- 	 */
--	return pci_try_reset_bus(dev);
-+	return pci_reset_bus(dev);
- }
- 
- /*
-diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-index 7e3f2e9..bd19350 100644
---- a/drivers/pci/pci.c
-+++ b/drivers/pci/pci.c
-@@ -4784,7 +4784,7 @@ int pci_probe_reset_slot(struct pci_slot *slot)
- EXPORT_SYMBOL_GPL(pci_probe_reset_slot);
- 
- /**
-- * __pci_try_reset_slot - Try to reset a PCI slot
-+ * __pci_reset_slot - Try to reset a PCI slot
-  * @slot: PCI slot to reset
-  *`
-  * A PCI bus may host multiple slots, each slot may support a reset mechanism
-@@ -4798,7 +4798,7 @@ EXPORT_SYMBOL_GPL(pci_probe_reset_slot);
-  *
-  * Same as above except return -EAGAIN if the slot cannot be locked
-  */
--static int __pci_try_reset_slot(struct pci_slot *slot)
-+static int __pci_reset_slot(struct pci_slot *slot)
- {
- 	int rc;
- 
-@@ -4854,12 +4854,12 @@ int pci_probe_reset_bus(struct pci_bus *bus)
- EXPORT_SYMBOL_GPL(pci_probe_reset_bus);
- 
- /**
-- * __pci_try_reset_bus - Try to reset a PCI bus
-+ * __pci_reset_bus - Try to reset a PCI bus
-  * @bus: top level PCI bus to reset
-  *
-  * Same as above except return -EAGAIN if the bus cannot be locked
-  */
--static int __pci_try_reset_bus(struct pci_bus *bus)
-+static int __pci_reset_bus(struct pci_bus *bus)
- {
- 	int rc;
- 
-@@ -4882,17 +4882,17 @@ static int __pci_try_reset_bus(struct pci_bus *bus)
- }
- 
- /**
-- * pci_try_reset_bus - Try to reset a PCI bus
-+ * pci_reset_bus - Try to reset a PCI bus
-  * @pdev: top level PCI device to reset via slot/bus
-  *
-  * Same as above except return -EAGAIN if the bus cannot be locked
-  */
--int pci_try_reset_bus(struct pci_dev *pdev)
-+int pci_reset_bus(struct pci_dev *pdev)
- {
- 	return pci_probe_reset_slot(pdev->slot) ?
--	    __pci_try_reset_slot(pdev->slot) : __pci_try_reset_bus(pdev->bus);
-+	    __pci_reset_slot(pdev->slot) : __pci_reset_bus(pdev->bus);
- }
--EXPORT_SYMBOL_GPL(pci_try_reset_bus);
-+EXPORT_SYMBOL_GPL(pci_reset_bus);
- 
- /**
-  * pcix_get_max_mmrbc - get PCI-X maximum designed memory read byte count
-diff --git a/drivers/vfio/pci/vfio_pci.c b/drivers/vfio/pci/vfio_pci.c
-index 71018ec..345c0dc 100644
---- a/drivers/vfio/pci/vfio_pci.c
-+++ b/drivers/vfio/pci/vfio_pci.c
-@@ -1010,7 +1010,7 @@ static long vfio_pci_ioctl(void *device_data,
- 						    &info, slot);
- 		if (!ret)
- 			/* User has access, do the reset */
--			ret = pci_try_reset_bus(vdev->pdev);
-+			ret = pci_reset_bus(vdev->pdev);
- 
- hot_reset_release:
- 		for (i--; i >= 0; i--)
-@@ -1372,7 +1372,7 @@ static void vfio_pci_try_bus_reset(struct vfio_pci_device *vdev)
- 	}
- 
- 	if (needs_reset)
--		ret = pci_try_reset_bus(vdev->pdev);
-+		ret = pci_reset_bus(vdev->pdev);
- 
- put_devs:
- 	for (i = 0; i < devs.cur_index; i++) {
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index ad0c89a..79a2c27 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -1096,7 +1096,7 @@ int pci_reset_function_locked(struct pci_dev *dev);
- int pci_try_reset_function(struct pci_dev *dev);
- int pci_probe_reset_slot(struct pci_slot *slot);
- int pci_probe_reset_bus(struct pci_bus *bus);
--int pci_try_reset_bus(struct pci_dev *dev);
-+int pci_reset_bus(struct pci_dev *dev);
- void pci_reset_secondary_bus(struct pci_dev *dev);
- void pcibios_reset_secondary_bus(struct pci_dev *dev);
- void pci_update_resource(struct pci_dev *dev, int resno);
+arch/*/Makefile should not tweak such environment variables
+depending on CONFIG options - this would cause circular dependency.
+  - We want to pass $(LD) from Makefile to Kconfig
+  - CONFIG_CPU_BIG_ENDIAN is defined by Kconfig, then given
+    back to Makefile
+
+Nicholas already fixed this issue for PowerPC in commit 1421dc6d48296a.
+
+I need to fix arm, arm64, microblaze as well
+before I start moving linker option tests to Kconfig from Makefile.
+
+arch maintainers:
+Please pick up a proper patch for your tree.
+
+
+
+Masahiro Yamada (3):
+  ARM: add endianness option to LDFLAGS instead of LD
+  arm64: add endianness option to LDFLAGS instead of LD
+  microblaze: add endianness options to LDFLAGS instead of LD
+
+ arch/arm/Makefile        | 4 ++--
+ arch/arm64/Makefile      | 6 ++----
+ arch/microblaze/Makefile | 4 ++--
+ 3 files changed, 6 insertions(+), 8 deletions(-)
+
 -- 
 2.7.4
