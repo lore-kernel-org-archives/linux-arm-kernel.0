@@ -1,30 +1,21 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 3 Jul 2018 07:44:36 +0200
-Subject: [PATCH v8 00/26] PM / Domains: Support hierarchical CPU
- arrangement (PSCI/ARM)
-In-Reply-To: <20180620172226.15012-1-ulf.hansson@linaro.org>
-References: <20180620172226.15012-1-ulf.hansson@linaro.org>
-Message-ID: <CAPDyKFpy8rpjRTBsHUFa_L0M_C=vH+6qjq=Kxdn+0j+T5NNSMQ@mail.gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 3 Jul 2018 13:45:48 +0800
+Subject: [PATCH 2/2] ARM: dts: imx51-babbage: Make use of pinctrl_usbh1reg
+In-Reply-To: <20180628043713.14425-2-andrew.smirnov@gmail.com>
+References: <20180628043713.14425-1-andrew.smirnov@gmail.com>
+ <20180628043713.14425-2-andrew.smirnov@gmail.com>
+Message-ID: <20180703054547.GD4348@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rafael,
+On Wed, Jun 27, 2018 at 09:37:13PM -0700, Andrey Smirnov wrote:
+> Pinctrl_usbh1reg defines pinmux setting for reset GPIO used by
+> usbh1phy, but is not referenced by that node. Fix that.
+> 
+> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 
-On 20 June 2018 at 19:22, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> Changes in v8:
->  - Added some tags for reviews and acks.
->  - Cleanup timer patch (patch6) according to comments from Rafael.
->  - Rebased series on top of v4.18rc1 - it applied cleanly, except for patch 5.
->  - While adopting patch 5 to new genpd changes, I took the opportunity to
->    improve the new function description a bit.
->  - Corrected malformed SPDX-License-Identifier in patch20.
-
-There have only been a minor comment from you at patch3 (about
-squashing it with patch21), with that fixed and assuming there are no
-further comments - would you like me to collect the changes and send
-it to you as a pull request?
-
-[...]
-
-Kind regards
-Uffe
+Applied, thanks.
