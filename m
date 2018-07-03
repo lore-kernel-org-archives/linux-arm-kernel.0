@@ -1,23 +1,101 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 3 Jul 2018 13:31:46 -0600
-Subject: [PATCH 1/2] clk: imx6sll: add GPIO LPCGs
-In-Reply-To: <1529649154-5724-1-git-send-email-Anson.Huang@nxp.com>
-References: <1529649154-5724-1-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <20180703193146.GA29496@rob-hp-laptop>
+From: leonard.crestez@nxp.com (Leonard Crestez)
+Date: Tue,  3 Jul 2018 22:39:16 +0300
+Subject: [RFC] soc: imx: gpc: Unregister pgc children on remove
+Message-ID: <652cc0c045dbd4490752ef117e98ffbcc84de822.1530646251.git.leonard.crestez@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 22, 2018 at 02:32:33PM +0800, Anson Huang wrote:
-> According to Reference Manual Rev.0, 06/2017,
-> there are GPIO LPCGs defined in CCM CCGRs,
-> add them into clock tree.
-> 
-> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
-> ---
->  drivers/clk/imx/clk-imx6sll.c             | 6 ++++++
+If the gpc device is removed the platform_devices for its
+imx-pgc-power-domains are still registered and trying to probe gpc again
+results in an error.
 
->  include/dt-bindings/clock/imx6sll-clock.h | 9 ++++++++-
+Fix this by iterating children inside imx_gpc_remove and calling
+platfrom_device_unregister.
 
-Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
+---
+ drivers/soc/imx/gpc.c | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
->  2 files changed, 14 insertions(+), 1 deletion(-)
+This was prompted by the rejection of the following series:
+	https://lkml.org/lkml/2018/7/2/534
+
+Tested glxgears after rebinding gpc and etnaviv by echo to
+/sys/bus/platform/drivers/{imx-gpc,etnaviv-gpu}/{unbind,bind}
+
+When doing probe again it triggers a warning inside
+driver_links_drivers_bound:
+
+	WARN_ON(link->status != DL_STATE_CONSUMER_PROBE);
+
+This seems to be because devicelink code does not expect consumers to
+bind before suppliers but GPC code adds PGC children during its
+probe function and they register a device-link to their still-probing
+parent.
+
+The warning doesn't trigger on normal boot because the pgc driver is
+registered after gpc and probing is not nested. The warning can be made
+to reproduce in a normal boot by making imx_gpc_probe return
+-EPROBE_DEFER once (no other changes required).
+
+This does not seem to be a valid scenario for device links so fix this
+by adding a check in imx_pgc_power_domain_probe to defer if parent is not
+probed.
+
+This check is not very nice, device_is_bound seems like something that
+should be internal to the driver core.
+
+diff --git a/drivers/soc/imx/gpc.c b/drivers/soc/imx/gpc.c
+index 32f0748fd067..b4acdfd3cffd 100644
+--- a/drivers/soc/imx/gpc.c
++++ b/drivers/soc/imx/gpc.c
+@@ -182,10 +182,13 @@ static int imx_pgc_power_domain_probe(struct platform_device *pdev)
+ {
+ 	struct imx_pm_domain *domain = pdev->dev.platform_data;
+ 	struct device *dev = &pdev->dev;
+ 	int ret;
+ 
++	if (!device_is_bound(dev->parent))
++		return -EPROBE_DEFER;
++
+ 	/* if this PD is associated with a DT node try to parse it */
+ 	if (dev->of_node) {
+ 		ret = imx_pgc_parse_dt(dev, domain);
+ 		if (ret)
+ 			return ret;
+@@ -475,10 +478,19 @@ static int imx_gpc_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	return 0;
+ }
+ 
++static int __imx_gpc_unregister_child(struct device *dev, void *data)
++{
++	struct platform_device *pdev = to_platform_device(dev);
++
++	platform_device_unregister(pdev);
++
++	return 0;
++}
++
+ static int imx_gpc_remove(struct platform_device *pdev)
+ {
+ 	struct device_node *pgc_node;
+ 	int ret;
+ 
+@@ -502,10 +514,13 @@ static int imx_gpc_remove(struct platform_device *pdev)
+ 		imx_pgc_put_clocks(&imx_gpc_domains[GPC_PGC_DOMAIN_PU]);
+ 
+ 		ret = pm_genpd_remove(&imx_gpc_domains[GPC_PGC_DOMAIN_ARM].base);
+ 		if (ret)
+ 			return ret;
++	} else {
++		device_for_each_child(&pdev->dev, NULL,
++				__imx_gpc_unregister_child);
+ 	}
+ 
+ 	return 0;
+ }
+ 
+-- 
+2.17.1
