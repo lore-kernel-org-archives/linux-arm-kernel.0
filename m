@@ -1,56 +1,64 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 3 Jul 2018 15:33:39 -0600
-Subject: [PATCH v2 19/23] arm64: dts: marvell: rename ap806 syscon node
-In-Reply-To: <20180625151239.20976-20-miquel.raynal@bootlin.com>
-References: <20180625151239.20976-1-miquel.raynal@bootlin.com>
- <20180625151239.20976-20-miquel.raynal@bootlin.com>
-Message-ID: <20180703213339.GA29809@rob-hp-laptop>
+From: mka@chromium.org (Matthias Kaehlcke)
+Date: Tue, 3 Jul 2018 14:48:22 -0700
+Subject: [PATCH v4 6/6] arm64: dts: sdm845: Add tsens nodes
+In-Reply-To: <a52b77ad84867774a0659f51ccb79b17ba7638ab.1530533998.git.amit.kucheria@linaro.org>
+References: <cover.1530533998.git.amit.kucheria@linaro.org>
+ <a52b77ad84867774a0659f51ccb79b17ba7638ab.1530533998.git.amit.kucheria@linaro.org>
+Message-ID: <20180703214822.GD129942@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 25, 2018 at 05:12:35PM +0200, Miquel Raynal wrote:
-> In CP files, the syscons are called CP110_LABEL(syscon<x>) in case of
-> future additions. Use the same logic here to prepare the addition of a
-> second syscon to access both the thermal IP, the DFX server registers
-> and later probably other registers within this same memory area.
+Hi,
 
-You are renaming labels, not nodes.
-
-The example is just an example. Drop that change as it is not necessary.
-
+On Mon, Jul 02, 2018 at 06:14:09PM +0530, Amit Kucheria wrote:
+> SDM845 has two tsens blocks, one with 13 sensors and the other with 8
+> sensors.
 > 
-> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+> Signed-off-by: Amit Kucheria <amit.kucheria@linaro.org>
 > ---
->  .../devicetree/bindings/arm/marvell/ap806-system-controller.txt         | 2 +-
->  arch/arm64/boot/dts/marvell/armada-ap806.dtsi                           | 2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
+>  arch/arm64/boot/dts/qcom/sdm845.dtsi | 16 ++++++++++++++++
+>  1 file changed, 16 insertions(+)
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt b/Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt
-> index a265f1628f36..108e8da600e4 100644
-> --- a/Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt
-> +++ b/Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt
-> @@ -79,7 +79,7 @@ Required properties:
->  - offset: offset address inside the syscon block
+> diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+> index cdaabeb..edf8505 100644
+> --- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
+> +++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+> @@ -221,6 +221,22 @@
+>  			#interrupt-cells = <2>;
+>  		};
 >  
->  Example:
-> -ap_syscon: system-controller at 6f4000 {
-> +ap_syscon0: system-controller at 6f4000 {
->  	compatible = "syscon", "simple-mfd";
->  	reg = <0x6f4000 0x1000>;
->  
-> diff --git a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-> index 4f2a704615b0..550f03b8c96f 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-> +++ b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-> @@ -230,7 +230,7 @@
->  				status = "disabled";
->  			};
->  
-> -			ap_syscon: system-controller at 6f4000 {
-> +			ap_syscon0: system-controller at 6f4000 {
->  				compatible = "syscon", "simple-mfd";
->  				reg = <0x6f4000 0x2000>;
->  
-> -- 
-> 2.14.1
-> 
+> +		tsens0: tsens at c222000 {
+> +			compatible = "qcom,tsens-v2.4.0", "qcom,tsens-v2";
+> +			reg = <0xc263000 0x1ff>, /* TM */
+> +			      <0xc222000 0x1ff>; /* SROT */
+> +			#qcom,sensors = <13>;
+> +			#thermal-sensor-cells = <1>;
+> +		};
+> +
+> +		tsens1: tsens at c223000 {
+> +			compatible = "qcom,tsens-v2.4.0", "qcom,tsens-v2";
+> +			reg = <0xc265000 0x1ff>, /* TM */
+> +			      <0xc223000 0x1ff>; /* SROT */
+> +			#qcom,sensors = <8>;
+> +			#thermal-sensor-cells = <1>;
+> +		};
+> +
+>  		spmi_bus: spmi at c440000 {
+>  			compatible = "qcom,spmi-pmic-arb";
+>  			reg = <0xc440000 0x1100>,
+
+I tested this series on an SDM845 board. Temperatures can be read from
+the tsens0 sensors, however for tsens1 sensors I get:
+
+cat temp
+cat: temp: No data available
+
+TRDY_READY_BIT set when reading TRDY_OFFSET in get_temp_tsens_v2().
+Unfortunately I currently have no documentation of the registers or the
+thermal sensors in general and couldn't investigate further.
+
+Any idea what could be the problem?
+
+Thanks
+
+Matthias
