@@ -1,45 +1,21 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue,  3 Jul 2018 10:31:37 +0200
-Subject: [PATCH] ARM: dts: ux500: Fix LCDA clock line muxing
-Message-ID: <20180703083137.5922-1-linus.walleij@linaro.org>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 3 Jul 2018 14:04:31 +0530
+Subject: [PATCH 2/6] arm64: dts: freescale: Add missing cooling device
+ properties for CPUs
+In-Reply-To: <CAAQ0ZWRsroAAKRyxdd9ZCreriAjdBecmJy01sRy+6i_iQsMKgw@mail.gmail.com>
+References: <cover.1527225682.git.viresh.kumar@linaro.org>
+ <e4504945d2b684fae2850bbcf03a6d02917a8c8a.1527225682.git.viresh.kumar@linaro.org>
+ <CAAQ0ZWRsroAAKRyxdd9ZCreriAjdBecmJy01sRy+6i_iQsMKgw@mail.gmail.com>
+Message-ID: <20180703083431.l4rbnept2lwjocol@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The "lcdaclk_b_1" group is muxed with the function "lcd"
-but needs a separate entry to be muxed in with "lcda"
-rather than "lcd".
+On 03-07-18, 15:34, Shawn Guo wrote:
+> Please use my kernel.org email address for future patches.
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/boot/dts/ste-href-family-pinctrl.dtsi | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
+As there were many patches I relied on get_maintainers to do that
+stuff and it didn't pick you up by default. Maybe try fixing
+MAINTAINERS to add an entry against your email id ?
 
-diff --git a/arch/arm/boot/dts/ste-href-family-pinctrl.dtsi b/arch/arm/boot/dts/ste-href-family-pinctrl.dtsi
-index 5c5cea232743..1ec193b0c506 100644
---- a/arch/arm/boot/dts/ste-href-family-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/ste-href-family-pinctrl.dtsi
-@@ -607,16 +607,20 @@
- 
- 			mcde {
- 				lcd_default_mode: lcd_default {
--					default_mux {
-+					default_mux1 {
- 						/* Mux in VSI0 and all the data lines */
- 						function = "lcd";
- 						groups =
- 						"lcdvsi0_a_1", /* VSI0 for LCD */
- 						"lcd_d0_d7_a_1", /* Data lines */
- 						"lcd_d8_d11_a_1", /* TV-out */
--						"lcdaclk_b_1", /* Clock line for TV-out */
- 						"lcdvsi1_a_1"; /* VSI1 for HDMI */
- 					};
-+					default_mux2 {
-+						function = "lcda";
-+						groups =
-+						"lcdaclk_b_1"; /* Clock line for TV-out */
-+					};
- 					default_cfg1 {
- 						pins =
- 						"GPIO68_E1", /* VSI0 */
 -- 
-2.17.0
+viresh
