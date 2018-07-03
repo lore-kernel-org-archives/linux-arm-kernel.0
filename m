@@ -1,31 +1,21 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 3 Jul 2018 07:20:14 +0100
-Subject: [PATCH] ARM: imx: enable bus auto clock gating function for
- i.mx6sll
-In-Reply-To: <20180701085111.GK4348@dragon>
-References: <1529645568-3786-1-git-send-email-Anson.Huang@nxp.com>
- <20180701085111.GK4348@dragon>
-Message-ID: <20180703062014.GB4242@dell>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 2 Jul 2018 23:24:19 -0700
+Subject: [PATCH] ARM: dts: am335x-bone-common: Fix mmc0 Write Protect
+In-Reply-To: <20180702202143.25343-1-robertcnelson@gmail.com>
+References: <20180702202143.25343-1-robertcnelson@gmail.com>
+Message-ID: <20180703062419.GB112168@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 01 Jul 2018, Shawn Guo wrote:
+* Robert Nelson <robertcnelson@gmail.com> [180702 20:24]:
+> Mainline Commit b74c2b21e1551018af53ee6c1efc051dfce2d788 added the pinmux
+> settings for mmc1, however this pin (0x9a0) is routed to P9_42 on the cape
+> header. Thus any BeagleBone cape that utilizes P9_42 triggers mmc0's Write
+> Protect.
 
-> On Fri, Jun 22, 2018 at 01:32:48PM +0800, Anson Huang wrote:
-> > i.MX6SLL has HW bus auto clock gating function, enable
-> > it by default to save VDD_SOC_IN power, about 5% ~ 20%
-> > saved depends on different use cases.
-> > 
-> > Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
-> 
-> Applied, thanks.
+Thanks applying into omap-for-v4.18/fixes. I'll also add a Fixes tag for
+it.
 
-Since this touches MFD, please apply my Ack to the patch.
+Regards,
 
-  Acked-by: Lee Jones <lee.jones@linaro.org>
-
--- 
-Lee Jones [???]
-Linaro Services Technical Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Tony
