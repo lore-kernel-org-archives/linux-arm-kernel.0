@@ -1,36 +1,48 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 3 Jul 2018 07:32:30 +0100
-Subject: [PATCH 1/3] platform/chrome: Move cros-ec transport drivers to
- drivers/platform.
-In-Reply-To: <20180702102201.13461-2-enric.balletbo@collabora.com>
+Date: Tue, 3 Jul 2018 07:33:20 +0100
+Subject: [PATCH 2/3] arm/arm64: configs: Remove the MFD_ prefix for
+ MFD_CROS_EC_I2C/SPI symbols.
+In-Reply-To: <20180702230226.GA86110@decatoncale.mtv.corp.google.com>
 References: <20180702102201.13461-1-enric.balletbo@collabora.com>
- <20180702102201.13461-2-enric.balletbo@collabora.com>
-Message-ID: <20180703063230.GC4242@dell>
+ <20180702102201.13461-3-enric.balletbo@collabora.com>
+ <CAJKOXPd51yU8-zObXszc4zJpHsGtMNFTsbQsQdKBFg=k22xZLA@mail.gmail.com>
+ <20180702230226.GA86110@decatoncale.mtv.corp.google.com>
+Message-ID: <20180703063320.GD4242@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 02 Jul 2018, Enric Balletbo i Serra wrote:
-
-> There are some cros-ec transport drivers (I2C, SPI) living in MFD, while
-> others (LPC) living in drivers/platform. The transport drivers are more
-> platform specific. So, move the I2C and SPI transport drivers to the
-> platform/chrome directory. The patch also removes the MFD_ prefix of
-> their Kconfig symbols.
+On Mon, 02 Jul 2018, Benson Leung wrote:
+> On Mon, Jul 02, 2018 at 01:05:40PM +0200, Krzysztof Kozlowski wrote:
+> > On 2 July 2018 at 12:22, Enric Balletbo i Serra
+> > <enric.balletbo@collabora.com> wrote:
+> > > The cros-ec I2C and SPI transport drivers have been moved from MFD
+> > > subsystem to platform/chrome, at the same time, the config symbol has
+> > > been renamed and lost the MFD_ prefix, so update all configs to the new
+> > > config symbol name.
+> > >
+> > > Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+> > > ---
+> > >
+> > >  arch/arm/configs/exynos_defconfig   | 4 ++--
+> > >  arch/arm/configs/multi_v7_defconfig | 4 ++--
+> > >  arch/arm/configs/pxa_defconfig      | 4 ++--
+> > >  arch/arm64/configs/defconfig        | 4 ++--
+> > >  4 files changed, 8 insertions(+), 8 deletions(-)
+> > 
+> > Since you put in one patch multiple defconfigs belonging to multiple
+> > maintainers, I assume you are pushing this through arm-soc or Russell.
+> > In such case, for Exynos boards:
+> > Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
+> > 
+> > Best regards,
+> > Krzysztof
 > 
-> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
-> ---
+> I was planning on creating an immutable branch for this series and merging it
+> through platform/chrome.
 > 
->  drivers/mfd/Kconfig                           | 20 -------------------
->  drivers/mfd/Makefile                          |  2 --
->  drivers/platform/chrome/Kconfig               | 20 +++++++++++++++++++
->  drivers/platform/chrome/Makefile              |  2 ++
->  .../{mfd => platform/chrome}/cros_ec_i2c.c    |  0
->  .../{mfd => platform/chrome}/cros_ec_spi.c    |  0
->  6 files changed, 22 insertions(+), 22 deletions(-)
->  rename drivers/{mfd => platform/chrome}/cros_ec_i2c.c (100%)
->  rename drivers/{mfd => platform/chrome}/cros_ec_spi.c (100%)
+> Lee, Russell, Dmitry, what do you think?
 
-Acked-by: Lee Jones <lee.jones@linaro.org>
+Fine by me.
 
 -- 
 Lee Jones [???]
