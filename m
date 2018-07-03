@@ -1,265 +1,214 @@
-From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
-Date: Tue, 3 Jul 2018 13:03:48 +0300
-Subject: [PATCH 5/6] perf/core: Use ioctl to communicate driver
- configuration to kernel
-In-Reply-To: <1530570810-28929-6-git-send-email-mathieu.poirier@linaro.org>
-References: <1530570810-28929-1-git-send-email-mathieu.poirier@linaro.org>
- <1530570810-28929-6-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <20180703100348.fy43f4fosw3fdc6i@um.fi.intel.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 3 Jul 2018 11:58:52 +0100
+Subject: [PATCH v3 13/20] kvm: arm64: Configure VTCR per VM
+In-Reply-To: <9107b977-c861-e0e1-15e8-f7801e190145@arm.com>
+References: <1530270944-11351-1-git-send-email-suzuki.poulose@arm.com>
+ <1530270944-11351-14-git-send-email-suzuki.poulose@arm.com>
+ <df7d8f89-1af4-4131-217d-000a25ba1fce@arm.com>
+ <9107b977-c861-e0e1-15e8-f7801e190145@arm.com>
+Message-ID: <7dea5045-6462-838d-52d7-16fd3d763671@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 02, 2018 at 04:33:29PM -0600, Mathieu Poirier wrote:
-> This patch follows what has been done for filters by adding an ioctl()
-> option to communicate to the kernel arbitrary PMU specific configuration
-> that don't fit in the conventional struct perf_event_attr to the kernel.
-
-Ok, so what *is* the PMU specific configuration that doesn't fit in the
-attribute and needs to be re-configured by the driver using the generation
-tracking?
-
-> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-> ---
->  include/linux/perf_event.h |  54 ++++++++++++++++++++++
->  kernel/events/core.c       | 110 +++++++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 164 insertions(+)
+On 03/07/18 11:48, Suzuki K Poulose wrote:
+> On 02/07/18 13:16, Marc Zyngier wrote:
+>> On 29/06/18 12:15, Suzuki K Poulose wrote:
+>>> We set VTCR_EL2 very early during the stage2 init and don't
+>>> touch it ever. This is fine as we had a fixed IPA size. This
+>>> patch changes the behavior to set the VTCR for a given VM,
+>>> depending on its stage2 table. The common configuration for
+>>> VTCR is still performed during the early init as we have to
+>>> retain the hardware access flag update bits (VTCR_EL2_HA)
+>>> per CPU (as they are only set for the CPUs which are capabile).
+>>
+>> capable
+>>
+>>> The bits defining the number of levels in the page table (SL0)
+>>> and and the size of the Input address to the translation (T0SZ)
+>>> are programmed for each VM upon entry to the guest.
+>>>
+>>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>>> Cc: Christoffer Dall <cdall@kernel.org>
+>>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>>> ---
+>>> Change since V2:
+>>>   - Load VTCR for TLB operations
+>>> ---
+>>>   arch/arm64/include/asm/kvm_arm.h  | 19 +++++++++----------
+>>>   arch/arm64/include/asm/kvm_asm.h  |  2 +-
+>>>   arch/arm64/include/asm/kvm_host.h |  9 ++++++---
+>>>   arch/arm64/include/asm/kvm_hyp.h  | 11 +++++++++++
+>>>   arch/arm64/kvm/hyp/s2-setup.c     | 17 +----------------
+>>>   5 files changed, 28 insertions(+), 30 deletions(-)
+>>>
+>>> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+>>> index 11a7db0..b02c316 100644
+>>> --- a/arch/arm64/include/asm/kvm_arm.h
+>>> +++ b/arch/arm64/include/asm/kvm_arm.h
+>>> @@ -120,9 +120,7 @@
+>>>   #define VTCR_EL2_IRGN0_WBWA	TCR_IRGN0_WBWA
+>>>   #define VTCR_EL2_SL0_SHIFT	6
+>>>   #define VTCR_EL2_SL0_MASK	(3 << VTCR_EL2_SL0_SHIFT)
+>>> -#define VTCR_EL2_SL0_LVL1	(1 << VTCR_EL2_SL0_SHIFT)
+>>>   #define VTCR_EL2_T0SZ_MASK	0x3f
+>>> -#define VTCR_EL2_T0SZ_40B	24
+>>>   #define VTCR_EL2_VS_SHIFT	19
+>>>   #define VTCR_EL2_VS_8BIT	(0 << VTCR_EL2_VS_SHIFT)
+>>>   #define VTCR_EL2_VS_16BIT	(1 << VTCR_EL2_VS_SHIFT)
+>>> @@ -137,43 +135,44 @@
+>>>    * VTCR_EL2.PS is extracted from ID_AA64MMFR0_EL1.PARange at boot time
+>>>    * (see hyp-init.S).
+>>>    *
+>>> + * VTCR_EL2.SL0 and T0SZ are configured per VM at runtime before switching to
+>>> + * the VM.
+>>> + *
+>>>    * Note that when using 4K pages, we concatenate two first level page tables
+>>>    * together. With 16K pages, we concatenate 16 first level page tables.
+>>>    *
+>>>    */
+>>>   
+>>> -#define VTCR_EL2_T0SZ_IPA	VTCR_EL2_T0SZ_40B
+>>>   #define VTCR_EL2_COMMON_BITS	(VTCR_EL2_SH0_INNER | VTCR_EL2_ORGN0_WBWA | \
+>>>   				 VTCR_EL2_IRGN0_WBWA | VTCR_EL2_RES1)
+>>> +#define VTCR_EL2_PRIVATE_MASK	(VTCR_EL2_SL0_MASK | VTCR_EL2_T0SZ_MASK)
+>>
+>> What does "private" mean here? It really is the IPA configuration, so
+>> I'd rather have a naming that reflects that.
+>>
+>>>   #ifdef CONFIG_ARM64_64K_PAGES
+>>>   /*
+>>>    * Stage2 translation configuration:
+>>>    * 64kB pages (TG0 = 1)
+>>> - * 2 level page tables (SL = 1)
+>>>    */
+>>> -#define VTCR_EL2_TGRAN_FLAGS		(VTCR_EL2_TG0_64K | VTCR_EL2_SL0_LVL1)
+>>> +#define VTCR_EL2_TGRAN			VTCR_EL2_TG0_64K
+>>>   #define VTCR_EL2_TGRAN_SL0_BASE		3UL
+>>>   
+>>>   #elif defined(CONFIG_ARM64_16K_PAGES)
+>>>   /*
+>>>    * Stage2 translation configuration:
+>>>    * 16kB pages (TG0 = 2)
+>>> - * 2 level page tables (SL = 1)
+>>>    */
+>>> -#define VTCR_EL2_TGRAN_FLAGS		(VTCR_EL2_TG0_16K | VTCR_EL2_SL0_LVL1)
+>>> +#define VTCR_EL2_TGRAN			VTCR_EL2_TG0_16K
+>>>   #define VTCR_EL2_TGRAN_SL0_BASE		3UL
+>>>   #else	/* 4K */
+>>>   /*
+>>>    * Stage2 translation configuration:
+>>>    * 4kB pages (TG0 = 0)
+>>> - * 3 level page tables (SL = 1)
+>>>    */
+>>> -#define VTCR_EL2_TGRAN_FLAGS		(VTCR_EL2_TG0_4K | VTCR_EL2_SL0_LVL1)
+>>> +#define VTCR_EL2_TGRAN			VTCR_EL2_TG0_4K
+>>>   #define VTCR_EL2_TGRAN_SL0_BASE		2UL
+>>>   #endif
+>>>   
+>>> -#define VTCR_EL2_FLAGS			(VTCR_EL2_COMMON_BITS | VTCR_EL2_TGRAN_FLAGS)
+>>> +#define VTCR_EL2_FLAGS		(VTCR_EL2_COMMON_BITS | VTCR_EL2_TGRAN)
+>>> +
+>>>   /*
+>>>    * VTCR_EL2:SL0 indicates the entry level for Stage2 translation.
+>>>    * Interestingly, it depends on the page size.
+>>> diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+>>> index 102b5a5..91372eb 100644
+>>> --- a/arch/arm64/include/asm/kvm_asm.h
+>>> +++ b/arch/arm64/include/asm/kvm_asm.h
+>>> @@ -72,7 +72,7 @@ extern void __vgic_v3_init_lrs(void);
+>>>   
+>>>   extern u32 __kvm_get_mdcr_el2(void);
+>>>   
+>>> -extern u32 __init_stage2_translation(void);
+>>> +extern void __init_stage2_translation(void);
+>>>   
+>>>   /* Home-grown __this_cpu_{ptr,read} variants that always work at HYP */
+>>>   #define __hyp_this_cpu_ptr(sym)						\
+>>> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+>>> index fe8777b..328f472 100644
+>>> --- a/arch/arm64/include/asm/kvm_host.h
+>>> +++ b/arch/arm64/include/asm/kvm_host.h
+>>> @@ -442,10 +442,13 @@ int kvm_arm_vcpu_arch_has_attr(struct kvm_vcpu *vcpu,
+>>>   
+>>>   static inline void __cpu_init_stage2(void)
+>>>   {
+>>> -	u32 parange = kvm_call_hyp(__init_stage2_translation);
+>>> +	u32 ps;
+>>>   
+>>> -	WARN_ONCE(parange < 40,
+>>> -		  "PARange is %d bits, unsupported configuration!", parange);
+>>> +	kvm_call_hyp(__init_stage2_translation);
+>>> +	/* Sanity check for minimum IPA size support */
+>>> +	ps = id_aa64mmfr0_parange_to_phys_shift(read_sysreg(id_aa64mmfr0_el1) & 0x7);
+>>> +	WARN_ONCE(ps < 40,
+>>> +		  "PARange is %d bits, unsupported configuration!", ps);
+>>>   }
+>>>   
+>>>   /* Guest/host FPSIMD coordination helpers */
+>>> diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
+>>> index 82f9994..3e8052d1 100644
+>>> --- a/arch/arm64/include/asm/kvm_hyp.h
+>>> +++ b/arch/arm64/include/asm/kvm_hyp.h
+>>> @@ -20,6 +20,7 @@
+>>>   
+>>>   #include <linux/compiler.h>
+>>>   #include <linux/kvm_host.h>
+>>> +#include <asm/kvm_mmu.h>
+>>>   #include <asm/sysreg.h>
+>>>   
+>>>   #define __hyp_text __section(.hyp.text) notrace
+>>> @@ -158,6 +159,16 @@ void __noreturn __hyp_do_panic(unsigned long, ...);
+>>>   /* Must be called from hyp code running at EL2 */
 > 
-> diff --git a/include/linux/perf_event.h b/include/linux/perf_event.h
-> index 4d9c8f30ca6c..6e06b63c262f 100644
-> --- a/include/linux/perf_event.h
-> +++ b/include/linux/perf_event.h
-> @@ -178,6 +178,12 @@ struct hw_perf_event {
->  	/* Last sync'ed generation of filters */
->  	unsigned long			addr_filters_gen;
->  
-> +	/* PMU driver configuration */
-> +	void				*drv_config;
-> +
-> +	/* Last sync'ed generation of driver config */
-> +	unsigned long			drv_config_gen;
-> +
->  /*
->   * hw_perf_event::state flags; used to track the PERF_EF_* state.
->   */
-> @@ -447,6 +453,26 @@ struct pmu {
->  	 * Filter events for PMU-specific reasons.
->  	 */
->  	int (*filter_match)		(struct perf_event *event); /* optional */
-> +
-> +	/*
-> +	 * Valiate complex PMU configuration that don't fit in the
-> +	 * perf_event_attr struct.  Returns a PMU specific pointer or an error
-> +	 * value < 0.
-> +	 *
-> +	 * As with addr_filters_validate(), runs in the context of the ioctl()
-> +	 * process and is not serialized with the rest of the PMU callbacks.
+> Marc,
+> 
+>>>   static __always_inline void __hyp_text __load_guest_stage2(struct kvm *kvm)
+>>>   {
+>>> +	/*
+>>> +	 * Configure the VTCR translation control bits
+>>> +	 * for this VM.
+>>> +	 */
+>>> +	u64 vtcr = read_sysreg(vtcr_el2);
+>>> +
+>>> +	vtcr &= ~VTCR_EL2_PRIVATE_MASK;
+>>> +	vtcr |= VTCR_EL2_SL0(kvm_stage2_levels(kvm)) |
+>>> +		VTCR_EL2_T0SZ(kvm_phys_shift(kvm));
+>>> +	write_sysreg(vtcr, vtcr_el2);
+>>
+>> Can't we generate the whole vtcr value in one go, without reading it
+>> back? Specially given that on patch 16, you're actually switching to a
+>> per-VM variable, and it would make a lot of sense to start with that here.
+> 
+> ...
+> 
+>>> -u32 __hyp_text __init_stage2_translation(void)
+>>> +void __hyp_text __init_stage2_translation(void)
+> ..
+> 
+>>
+>> And then most of the code here could run on a per-VM basis.
+> 
+> There is one problem with generating the entire vtcr for a VM.
+> On a system with mismatched CPU features, we need to have either :
+> 
+>   - Per CPU VTCR fixed bits
+>      OR
+>   - Track system wide safe VTCR bits. (Not ideal with dirty bit and access
+>   flag updates, if and when we support them ).
+> 
+> So far the only fields of interest are HA & HD, which may be turned on
+> for CPUs that can support the feature. Rest can be filled in from the
+> sanitised EL1 system registers and IPA limit and the others would need
+> to be filled as RES0. This could potentially have some issues on
+> newer versions of the architecture running on older kernels.
 
-Yes, but what is it? I get it that it's probably in one of the other
-patches, but we still need to mention it somewhere here.
+For HA and HD, we can perfectly set them if if only one CPU in the
+system has it. We already do this for other system registers on the
+ground that if the CPU doesn't honour the RES0 behaviour, then it is
+terminally broken.
 
-> +	 */
-> +	void *(*drv_config_validate)	(struct perf_event *event,
-> +					 char *config_str);
-> +
-> +	/* Synchronize PMU driver configuration */
-> +	void (*drv_config_sync)		(struct perf_event *event);
-> +
-> +	/*
-> +	 * Release PMU specific configuration acquired by
-> +	 * drv_config_validate()
-> +	 */
-> +	void (*drv_config_free)		(void *drv_data);
->  };
->  
->  enum perf_addr_filter_action_t {
-> @@ -489,6 +515,11 @@ struct perf_addr_filters_head {
->  	unsigned int		nr_file_filters;
->  };
->  
-> +struct perf_drv_config {
-> +	void		*drv_config;
-> +	raw_spinlock_t	lock;
-> +};
-> +
->  /**
->   * enum perf_event_state - the states of a event
->   */
-> @@ -668,6 +699,10 @@ struct perf_event {
->  	unsigned long			*addr_filters_offs;
->  	unsigned long			addr_filters_gen;
->  
-> +	/* PMU driver specific configuration */
-> +	struct perf_drv_config		drv_config;
-> +	unsigned long			drv_config_gen;
-> +
->  	void (*destroy)(struct perf_event *);
->  	struct rcu_head			rcu_head;
->  
-> @@ -1234,6 +1269,13 @@ static inline bool has_addr_filter(struct perf_event *event)
->  	return event->pmu->nr_addr_filters;
->  }
->  
-> +static inline bool has_drv_config(struct perf_event *event)
-> +{
-> +	return event->pmu->drv_config_validate &&
-> +	       event->pmu->drv_config_sync &&
-> +	       event->pmu->drv_config_free;
-> +}
-> +
->  /*
->   * An inherited event uses parent's filters
->   */
-> @@ -1248,7 +1290,19 @@ perf_event_addr_filters(struct perf_event *event)
->  	return ifh;
->  }
->  
-> +static inline struct perf_drv_config *
-> +perf_event_get_drv_config(struct perf_event *event)
-> +{
-> +	struct perf_drv_config *cfg = &event->drv_config;
-> +
-> +	if (event->parent)
-> +		cfg = &event->parent->drv_config;
-> +
-> +	return cfg;
-> +}
-> +
->  extern void perf_event_addr_filters_sync(struct perf_event *event);
-> +extern void perf_event_drv_config_sync(struct perf_event *event);
->  
->  extern int perf_output_begin(struct perf_output_handle *handle,
->  			     struct perf_event *event, unsigned int size);
-> diff --git a/kernel/events/core.c b/kernel/events/core.c
-> index 8f0434a9951a..701839866789 100644
-> --- a/kernel/events/core.c
-> +++ b/kernel/events/core.c
-> @@ -2829,6 +2829,29 @@ void perf_event_addr_filters_sync(struct perf_event *event)
->  }
->  EXPORT_SYMBOL_GPL(perf_event_addr_filters_sync);
->  
-> +/*
-> + * PMU driver configuration works the same way as filter management above,
-> + * but without the need to deal with memory mapping.  Driver configuration
-> + * arrives through the SET_DRV_CONFIG ioctl() where it is validated and applied
-> + * to the event.  When the PMU is ready it calls perf_event_drv_config_sync() to
-> + * bring the configuration information within reach of the PMU.
+Thanks,
 
-Wait a second. The reason why we dance around with the generations of filters
-is the locking order of ctx::mutex vs mmap_sem. In an mmap path, where we're
-notified about mapping changes, we're called under the latter, and we'd need
-to grab the former to update the event configuration. In your case, the
-update comes in via perf_ioctl(), where we're already holding the ctx::mutex,
-so you can just kick the PMU right there, via an event_function_call() or
-perf_event_stop(restart=1). In the latter case, your pmu::start() would just
-grab the new configuration. Should also be about 90% less code. :)
-
-Would this work for you or am I misunderstanding something about your
-requirements?
-
-> + */
-> +void perf_event_drv_config_sync(struct perf_event *event)
-> +{
-> +	struct perf_drv_config *drv_config = perf_event_get_drv_config(event);
-> +
-> +	if (!has_drv_config(event))
-> +		return;
-> +
-> +	raw_spin_lock(&drv_config->lock);
-> +	if (event->drv_config_gen != event->hw.drv_config_gen) {
-> +		event->pmu->drv_config_sync(event);
-> +		event->hw.drv_config_gen = event->drv_config_gen;
-> +	}
-> +	raw_spin_unlock(&drv_config->lock);
-> +}
-> +EXPORT_SYMBOL_GPL(perf_event_drv_config_sync);
-> +
->  static int _perf_event_refresh(struct perf_event *event, int refresh)
->  {
->  	/*
-> @@ -4410,6 +4433,7 @@ static bool exclusive_event_installable(struct perf_event *event,
->  
->  static void perf_addr_filters_splice(struct perf_event *event,
->  				       struct list_head *head);
-> +static void perf_drv_config_splice(struct perf_event *event, void *drv_data);
->  
->  static void _free_event(struct perf_event *event)
->  {
-> @@ -4440,6 +4464,7 @@ static void _free_event(struct perf_event *event)
->  	perf_event_free_bpf_prog(event);
->  	perf_addr_filters_splice(event, NULL);
->  	kfree(event->addr_filters_offs);
-> +	perf_drv_config_splice(event, NULL);
->  
->  	if (event->destroy)
->  		event->destroy(event);
-> @@ -5002,6 +5027,8 @@ static inline int perf_fget_light(int fd, struct fd *p)
->  static int perf_event_set_output(struct perf_event *event,
->  				 struct perf_event *output_event);
->  static int perf_event_set_filter(struct perf_event *event, void __user *arg);
-> +static int perf_event_set_drv_config(struct perf_event *event,
-> +				     void __user *arg);
->  static int perf_event_set_bpf_prog(struct perf_event *event, u32 prog_fd);
->  static int perf_copy_attr(struct perf_event_attr __user *uattr,
->  			  struct perf_event_attr *attr);
-> @@ -5088,6 +5115,10 @@ static long _perf_ioctl(struct perf_event *event, unsigned int cmd, unsigned lon
->  
->  		return perf_event_modify_attr(event,  &new_attr);
->  	}
-> +
-> +	case PERF_EVENT_IOC_SET_DRV_CONFIG:
-> +		return perf_event_set_drv_config(event, (void __user *)arg);
-> +
->  	default:
->  		return -ENOTTY;
->  	}
-> @@ -9086,6 +9117,85 @@ static int perf_event_set_filter(struct perf_event *event, void __user *arg)
->  	return ret;
->  }
->  
-> +static void perf_drv_config_splice(struct perf_event *event, void *drv_data)
-
-I think the address filter counterpart is called "splice" because it takes
-a list_head as a parameter and splices that list into the list of filters.
-I'd suggest that this one is more like "replace", but up to you.
-
-> +{
-> +	unsigned long flags;
-> +	void *old_drv_data;
-> +
-> +	if (!has_drv_config(event))
-> +		return;
-> +
-> +	/* Children take their configuration from their parent */
-> +	if (event->parent)
-> +		return;
-> +
-> +	raw_spin_lock_irqsave(&event->drv_config.lock, flags);
-> +
-> +	old_drv_data = event->drv_config.drv_config;
-> +	event->drv_config.drv_config = drv_data;
-
-Now I'm thinking: should we reset the generation here (and also in the
-address filters bit)? At least, it deserves a comment.
-
-> +
-> +	raw_spin_unlock_irqrestore(&event->drv_config.lock, flags);
-> +
-> +	event->pmu->drv_config_free(old_drv_data);
-> +}
-> +
-> +static void perf_event_drv_config_apply(struct perf_event *event)
-> +{
-> +	unsigned long flags;
-> +	struct perf_drv_config *drv_config = perf_event_get_drv_config(event);
-> +
-> +	/* Notify event that a new configuration is available */
-> +	raw_spin_lock_irqsave(&drv_config->lock, flags);
-> +	event->drv_config_gen++;
-> +	raw_spin_unlock_irqrestore(&drv_config->lock, flags);
-
-Should we also mention how this new locks fits into the existing locking
-order?
-
-Regards,
---
-Alex
+	M.
+-- 
+Jazz is not dead. It just smells funny...
