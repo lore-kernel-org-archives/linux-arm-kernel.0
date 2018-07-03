@@ -1,90 +1,27 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Tue, 03 Jul 2018 10:09:33 +0200
-Subject: [PATCH 2/3] clk: meson: add sub EMMC clock dt-bindings IDs
-In-Reply-To: <4b88c509-27ea-2605-023b-de208921e157@amlogic.com>
-References: <20180703145716.31860-1-yixun.lan@amlogic.com>
- <20180703145716.31860-3-yixun.lan@amlogic.com>
- <20180703092107.51497a8f@bbrezillon>
- <4b88c509-27ea-2605-023b-de208921e157@amlogic.com>
-Message-ID: <1530605373.2900.158.camel@baylibre.com>
+From: ravi.bangoria@linux.ibm.com (Ravi Bangoria)
+Date: Tue, 3 Jul 2018 13:41:09 +0530
+Subject: [PATCH v5 06/10] Uprobes: Support SDT markers having reference
+ count (semaphore)
+In-Reply-To: <f19e3801-d56a-4e34-0acc-1040a071cf91@linux.ibm.com>
+References: <20180628052209.13056-1-ravi.bangoria@linux.ibm.com>
+ <20180628052209.13056-7-ravi.bangoria@linux.ibm.com>
+ <20180701210935.GA14404@redhat.com>
+ <0c543791-f3b7-5a4b-f002-e1c76bb430c0@linux.ibm.com>
+ <20180702180156.GA31400@redhat.com>
+ <f19e3801-d56a-4e34-0acc-1040a071cf91@linux.ibm.com>
+Message-ID: <21a40b31-8b2d-7645-70aa-4168d4a5d094@linux.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2018-07-03 at 15:36 +0800, Yixun Lan wrote:
-> Hi Broris
-> 
->  thanks for your quick response, and see my comments below
-> 
-> On 07/03/18 15:21, Boris Brezillon wrote:
-> > On Tue, 3 Jul 2018 14:57:15 +0000
-> > Yixun Lan <yixun.lan@amlogic.com> wrote:
-> > 
-> > > Add two clock bindings IDs which provided by the EMMC clock controller,
-> > > These two clocks will be used by EMMC or NAND driver.
-> > > 
-> > > Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
-> > > ---
-> > >  include/dt-bindings/clock/emmc-clkc.h | 14 ++++++++++++++
-> > >  1 file changed, 14 insertions(+)
-> > >  create mode 100644 include/dt-bindings/clock/emmc-clkc.h
-> > > 
-> > > diff --git a/include/dt-bindings/clock/emmc-clkc.h b/include/dt-bindings/clock/emmc-clkc.h
-> > > new file mode 100644
-> > > index 000000000000..d9972c400e58
-> > > --- /dev/null
-> > > +++ b/include/dt-bindings/clock/emmc-clkc.h
-> > > @@ -0,0 +1,14 @@
-> > > +/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
-> > > +/*
-> > > + * Meson EMMC sub clock tree IDs
-> > > + *
-> > > + * Copyright (c) 2018 Amlogic, Inc. All rights reserved.
-> > > + */
-> > > +
-> > > +#ifndef __EMMC_CLKC_H
-> > > +#define __EMMC_CLKC_H
-> > > +
-> > > +#define CLKID_EMMC_C_MUX				0
-> > 
-> > Looks like the MUX clk is the parent of the DIV one, and I guess the clk
-> > driver is able to select the best parent+div pair for a requested rate.
-> > Do you really need to expose the MUX to users?
-> > 
-> 
-> Yes, It's true, the mux is parent of the div clock.
-> 
-> while testing for the NAND driver, I find it's kind of loose about the
-> parent of the clock, so selecting the div (and let CCF decide freely) is
-> actually works fine
-> 
-> but for the EMMC driver, especially when running at high clock, it's
-> kind of picky about the parent of the clock, 
 
-It would be nice to get an explanation about this behavior.
-it seems that even of the rate provided by CLKID_SD_EMMC_X_CLK0 (main clock
-controller) is correct, the eMMC cannot reliably tune with it.
 
-Could you elaborate on this ?
+On 07/03/2018 11:00 AM, Ravi Bangoria wrote:
+> In short, if I put it inside install_breakpoint()/remove_breakpoint(),
+> I'll have to put the same logic there with more complication to
+> increment / decrement counter for each consumer. And additionally,
+> I've to maintain sdt_mm_list to make sure increment and decrement
+> happen in sync. With current approach, this all happens by default :)
 
-> so the driver may want to
-> manually choose the parent of the mux clock (example fclk_div2 here).
-> That's why I'm exporting this clock ID.
+s/this all happens by default/no need to maintain all this/
 
-ATM the EMMC driver will not use this provider. If this is the only reason, it
-could be done later.
-
-Is the NAND driver "picky" as well ?
-
-> 
-> 
-> > > +#define CLKID_EMMC_C_DIV				1
-> > > +
-> > > +#endif
-> > 
-> > .
-> > 
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-clk" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+-Ravi
