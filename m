@@ -1,182 +1,97 @@
-From: atull@kernel.org (Alan Tull)
-Date: Tue, 3 Jul 2018 10:16:41 -0500
-Subject: [RFC PATCH 1/2] fpga: fpga-mgr: Add readback support
-In-Reply-To: <1530607463-6287-1-git-send-email-appana.durga.rao@xilinx.com>
-References: <1530607463-6287-1-git-send-email-appana.durga.rao@xilinx.com>
-Message-ID: <CANk1AXRhRDmsqUxVi4p+vE-X+OL0ayQ=4zpM-4PxZBqJXjPsRw@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 3 Jul 2018 17:17:27 +0200
+Subject: [RFC/RFT PATCH 0/2] disable_hest quirk on HP m400 with bad UEFI
+ firmwware
+In-Reply-To: <1530607466.9841.124.camel@debian.org>
+References: <20180628100656.10692-1-james.morse@arm.com>
+ <CAKv+Gu9ZHAGzcfgHShM1qvZ3qf4gb1pD_XfoceJu9Qy+5_pEsg@mail.gmail.com>
+ <1530607466.9841.124.camel@debian.org>
+Message-ID: <CAKv+Gu8VYZ1dCggPjakcvqOxfUCeCAABEADmF2Bm-q3=y3J4ng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 3, 2018 at 3:44 AM, Appana Durga Kedareswara rao
-<appana.durga.rao@xilinx.com> wrote:
-
-Hi Appana,
-
-> Inorder to debug issues with fpga's users would
-> like to read the fpga configuration information.
-> This patch adds readback support for fpga configuration data
-> in the framework through debugfs interface.
+On 3 July 2018 at 10:44, Ian Campbell <ijc@debian.org> wrote:
+> On Thu, 2018-06-28 at 12:25 +0200, Ard Biesheuvel wrote:
+>> I understand the desire to keep running these M400s as long as they
+>> have some life left in them, but the reality is that they are end of
+>> life already, and not many were manufactured to begin with.
 >
-> Usage:
->         cat /sys/kernel/debug/fpga/readback
-
-Two things here: I'd prefer calling the attribute "image" rather than "readback"
-
-This should be an entry per fpga manager, not one entry for the whole
-framework, so
-
-cat /sys/kernel/debug/fpga/fpga0/image
-
+> Linux has a long history of supporting such devices so long as there is
+> someone around willing to keep them running (witness for example how
+> long x86/voyager lived with just 1 in existence in a motivated
+> developer's basement, probably some number of entire architectures and
+> I bet a not insubstantial chunk of the platform support in arch/arm).
 >
-> Signed-off-by: Appana Durga Kedareswara rao <appana.durga.rao@xilinx.com>
-> ---
->  drivers/fpga/fpga-mgr.c       | 52 +++++++++++++++++++++++++++++++++++++++++++
->  include/linux/fpga/fpga-mgr.h |  6 +++++
->  2 files changed, 58 insertions(+)
+
+I wonder how many such quirks fall into the 'user cannot be bothered
+to add a kernel command line option' category.
+
+>> Given how the upstream kernel is aimed at future development,
 >
-> diff --git a/drivers/fpga/fpga-mgr.c b/drivers/fpga/fpga-mgr.c
-> index 9939d2c..7a9fd7c 100644
-> --- a/drivers/fpga/fpga-mgr.c
-> +++ b/drivers/fpga/fpga-mgr.c
-> @@ -484,6 +484,39 @@ void fpga_mgr_put(struct fpga_manager *mgr)
->  }
->  EXPORT_SYMBOL_GPL(fpga_mgr_put);
+> That might be true in some sense but I don't think it can be said to
+> extends to "not worried about running on existing hardware".
 >
-> +#ifdef CONFIG_DEBUG_FS
-> +#include <linux/debugfs.h>
-> +
-> +static int fpga_mgr_read(struct seq_file *s, void *data)
-> +{
-> +       struct fpga_manager *mgr = (struct fpga_manager *)s->private;
-> +       int ret = 0;
-
-Here you should return an error for mgr's that don't support read function:
-
-if (!mgr->mops->read)
-    return -ENOENT;
-
-Then you probably should lock the mgr so that nobody tries to write it
-while you are reading.  If you can't lock it, return -EBUSY.
-
-> +
-> +       if (mgr->state != FPGA_MGR_STATE_OPERATING)
-> +               return -EBUSY;
-
-If the FPGA isn't programmed, I'm not sure that EBUSY would be the
-correct error.
-
-> +
-> +       /* Read the FPGA configuration data from the fabric */
-> +       ret = mgr->mops->read(mgr, s);
-> +       if (ret) {
-> +               dev_err(&mgr->dev, "Error while reading configuration data from FPGA\n");
-> +               return ret;
-
-Don't need this return here since we return right afterwards anyway.
-
-> +       }
-> +
-> +       return ret;
-> +}
-> +
-> +static int fpga_mgr_read_open(struct inode *inode, struct file *file)
-> +{
-> +       return single_open(file, fpga_mgr_read, inode->i_private);
-> +}
-> +
-> +static const struct file_operations fpga_mgr_debugops = {
-
-Suggest including the name of the debugfs file in the name since more
-debugfs files will be added over time, so
-
-s/fpga_mgr_debugops/fpga_mgr_ops_image/ or something.
-
-> +       .owner = THIS_MODULE,
-> +       .open = fpga_mgr_read_open,
-> +       .read = seq_read,
-> +};
-> +#endif
-> +
->  /**
->   * fpga_mgr_lock - Lock FPGA manager for exclusive use
->   * @mgr:       fpga manager
-> @@ -581,6 +614,21 @@ int fpga_mgr_register(struct device *dev, const char *name,
->         if (ret)
->                 goto error_device;
+>>  I don't
+>> think we should fix this in the upstream kernel at all. Distros are
+>> free to do what they like, of course, and I'm sure RedHat already have
+>> a fix for this in their downstream kernel. But putting this upstream
+>> means we will never be able to remove it again,
 >
-> +#ifdef CONFIG_DEBUG_FS
-
-I'd prefer an added config such as CONFIG_FPGA_MGR_DEBUG_FS.
-
-> +       mgr->dir = debugfs_create_dir("fpga", NULL);
-> +       if (!mgr->dir)
-> +               goto error_device;
-> +
-> +       mgr->parent = mgr->dir;
-> +       mgr->dir = debugfs_create_file("readback", 0644, mgr->parent, mgr,
-> +                                      &fpga_mgr_debugops);
-> +       if (!mgr->dir) {
-> +               debugfs_remove_recursive(mgr->parent);
-> +               mgr->parent = NULL;
-> +               goto error_device;
-> +       }
-> +#endif
-> +
->         dev_info(&mgr->dev, "%s registered\n", mgr->name);
+> Quirks are pretty self contained and should be very unobtrusive to the
+> common code paths though. Also I expect that quirks _can_ be removed
+> once the platform has actually died in reality (not just no longer
+> produced) or becomes too much of a burden for other reasons (which AIUI
+> is what eventually happened to Voyager).
 >
->         return 0;
-> @@ -604,6 +652,10 @@ void fpga_mgr_unregister(struct device *dev)
+>>  which would be
+>> especially unfortunate given that it is the first ever DMI quirk for
+>> arm64, which we tried *very* hard to avoid, also because we don't
+>> initialize the DMI framework as early as x86 does, and so once we open
+>> the floodgates,
 >
->         dev_info(&mgr->dev, "%s %s\n", __func__, mgr->name);
+> The "flood" is inversely proportional to the quality of the firmware
+> certification and it isn't too overwhelming on x86, which historically
+> had next to no certification apart from "runs Windows", so it seems
+> unlikely to me that on arm64, where some attempts have been made at
+> validation and test suites from very near the start, that the flood
+> will be all that overwhelming.
 >
-> +#ifdef CONFIG_DEBUG_FS
-> +       debugfs_remove_recursive(mgr->parent);
-> +       mgr->parent = NULL;
-> +#endif
->         /*
->          * If the low level driver provides a method for putting fpga into
->          * a desired state upon unregister, do it.
-> diff --git a/include/linux/fpga/fpga-mgr.h b/include/linux/fpga/fpga-mgr.h
-> index 3c6de23..6013809 100644
-> --- a/include/linux/fpga/fpga-mgr.h
-> +++ b/include/linux/fpga/fpga-mgr.h
-> @@ -114,6 +114,7 @@ struct fpga_image_info {
->   * @write: write count bytes of configuration data to the FPGA
->   * @write_sg: write the scatter list of configuration data to the FPGA
->   * @write_complete: set FPGA to operating state after writing is done
-> + * @read: read FPGA configuration information
+>>  we will run into issues where we will need to reorder
+>> the init sequence to make DMI data available early enough.
+>
+>> a) DMI quirks will be permitted on arm64
+>> b) we care about m400 enough to put this quirk in the upstream kernel
+>
+> In general arm64 Linux is going to need to be able to cope with
+> firmware in the field which is either rubbish to some degree or which
+> predates the addition of some support in the kernel and turns out not
+> to be fully functional when that support is enabled (the latter it
+> seems being what happened in the m400 case).
+>
+> So, I think DMI quirks are probably, in reality, inevitable unless you
+> think firmware authors are going to be infaliable or the
+> testing/certification suites never has any gaps in it.
+>
 
-Please add note that the read ops is optional similar to below.
+Oh, obviously. But this is exactly my point about flood gates: we know
+we need implement support for them, but that fact alone does not
+justify adding quirks for dead platforms for issues that can be
+trivially worked around.
 
->   * @fpga_remove: optional: Set FPGA into a specific state during driver remove
->   * @groups: optional attribute groups.
->   *
-> @@ -131,6 +132,7 @@ struct fpga_manager_ops {
->         int (*write_sg)(struct fpga_manager *mgr, struct sg_table *sgt);
->         int (*write_complete)(struct fpga_manager *mgr,
->                               struct fpga_image_info *info);
-> +       int (*read)(struct fpga_manager *mgr, struct seq_file *s);
->         void (*fpga_remove)(struct fpga_manager *mgr);
->         const struct attribute_group **groups;
->  };
-> @@ -151,6 +153,10 @@ struct fpga_manager {
->         enum fpga_mgr_states state;
->         const struct fpga_manager_ops *mops;
->         void *priv;
-> +#ifdef CONFIG_DEBUG_FS
-> +       struct dentry *dir;
-> +       struct dentry *parent;
-> +#endif
->  };
->
->  #define to_fpga_manager(d) container_of(d, struct fpga_manager, dev)
-> --
-> 2.7.4
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-fpga" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+On a related note: what we *could* do to accommodate platforms such as
+m400 that are affected by quirks that can be worked around by a
+command line parameter: we could teach the stub to look at the
+contents of the 'LinuxExtraArgs' EFI environment variable and append
+it to the kernel command line. This is trivial to implement, given
+that we already manipulate and parse the command line in the stub, and
+would allow for a 'fix and forget' tweak to be applied to such
+platforms., without having to accumulate quirks for broken platforms
+that are difficult to remove later.
 
-Thanks,
-Alan
+> Given that, the overhead of then supporting m400 seems pretty trivial.
+>
+> That said, maybe there are more appropriate mechanisms than DMI on
+> arm64 for detecting and activating quirks?
+>
+> Cheers,
+> Ian.
