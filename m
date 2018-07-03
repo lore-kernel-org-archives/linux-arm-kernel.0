@@ -1,40 +1,36 @@
-From: dkos@cadence.com (Damian Kos)
-Date: Tue, 3 Jul 2018 11:02:18 +0100
-Subject: [PATCH 07/12] drm/dp: fix drm_dp_link_train_clock_recovery_delay for
- DP 1.4
-In-Reply-To: <1530612152-27555-1-git-send-email-dkos@cadence.com>
-References: <1530612152-27555-1-git-send-email-dkos@cadence.com>
-Message-ID: <1530612152-27555-8-git-send-email-dkos@cadence.com>
+From: robertcnelson@gmail.com (Robert Nelson)
+Date: Tue, 3 Jul 2018 05:23:45 -0500
+Subject: [PATCH] ARM: dts: am335x-bone-common: Fix mmc0 Write Protect
+In-Reply-To: <6c0eb111-a301-d6c9-46c9-7bc45c82511c@ti.com>
+References: <20180702202143.25343-1-robertcnelson@gmail.com>
+ <20180703062419.GB112168@atomide.com>
+ <6c0eb111-a301-d6c9-46c9-7bc45c82511c@ti.com>
+Message-ID: <CAOCHtYjki+_qGUXzweTwNCdqfG-Z0kLmq+HqpqFZ8dB14fy_yA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Quentin Schulz <quentin.schulz@free-electrons.com>
+On Tue, Jul 3, 2018 at 1:31 AM, Faiz Abbas <faiz_abbas@ti.com> wrote:
+> Hi,
+>
+> On Tuesday 03 July 2018 11:54 AM, Tony Lindgren wrote:
+>> * Robert Nelson <robertcnelson@gmail.com> [180702 20:24]:
+>>> Mainline Commit b74c2b21e1551018af53ee6c1efc051dfce2d788 added the pinmux
+>>> settings for mmc1, however this pin (0x9a0) is routed to P9_42 on the cape
+>>> header. Thus any BeagleBone cape that utilizes P9_42 triggers mmc0's Write
+>>> Protect.
+>>
+>> Thanks applying into omap-for-v4.18/fixes. I'll also add a Fixes tag for
+>> it.
+>>
+>
+> The evm sk sdwp needs to be removed as well. I guess I'll post a
+> separate patch as this is already applied.
 
-In DP 1.4, interval between link status and adjust request read for the
-clock recovery phase is fixed to 100us whatever the value of the
-register is.
+Yeah, i don't have an evm sk, while i found found one schematic that
+made it look okay, wasn't 100% sure on all the revisions..
 
-Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-Signed-off-by: Damian Kos <dkos@cadence.com>
----
- drivers/gpu/drm/drm_dp_helper.c |    5 +++++
- 1 files changed, 5 insertions(+), 0 deletions(-)
+Regards,
 
-diff --git a/drivers/gpu/drm/drm_dp_helper.c b/drivers/gpu/drm/drm_dp_helper.c
-index b6a27ab..92f3880 100644
---- a/drivers/gpu/drm/drm_dp_helper.c
-+++ b/drivers/gpu/drm/drm_dp_helper.c
-@@ -152,6 +152,11 @@ void drm_dp_link_train_clock_recovery_delay(const u8 dpcd[DP_RECEIVER_CAP_SIZE])
- 	unsigned int training_interval = dpcd[DP_TRAINING_AUX_RD_INTERVAL] &
- 		DP_TRAINING_AUX_RD_INTERVAL_MASK;
- 
-+	if (dpcd[DP_DPCD_REV] == 0x14) {
-+		udelay(100);
-+		return;
-+	}
-+
- 	if (training_interval == 0)
- 		udelay(100);
- 	else
 -- 
-1.7.1
+Robert Nelson
+https://rcn-ee.com/
