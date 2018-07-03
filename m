@@ -1,105 +1,148 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Tue,  3 Jul 2018 23:59:58 +0200
-Subject: [PATCH v2 01/32] mtd: rawnand: add hooks that may be called during
- nand_scan()
-In-Reply-To: <20180703220029.19565-1-miquel.raynal@bootlin.com>
-References: <20180703220029.19565-1-miquel.raynal@bootlin.com>
-Message-ID: <20180703220029.19565-2-miquel.raynal@bootlin.com>
+Date: Tue,  3 Jul 2018 23:59:57 +0200
+Subject: [PATCH v2 00/32] Allow dynamic allocations during NAND chip
+ identification phase
+Message-ID: <20180703220029.19565-1-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to remove the limitation that forbids dynamic allocation in
-nand_scan_ident(), we must create a path that will be the same for all
-controller drivers. The idea is to use nand_scan() instead of the widely
-implemented nand_scan_ident()/nand_scan_tail() couple. In order to
-achieve this, controller drivers will need to adjust some parameters
-between these two functions depending on the NAND chip wired on them.
+Hello,
 
-For that, a hook called ->attach_chip() is created in the
-nand_hw_control structure. This structure may be referenced by two ways:
-1/ if the driver does not implement its own controller, the
-   chip->controller hook is not populated before nand_scan() so it
-   cannot be dereferenced: use chip->hwcontrol instead (which is
-   statically allocated and will be referenced later by chip->controller
-   anyway).
-2/ through chip->controller if the driver implements its own controller.
+This series make a quite deep change in the NAND framework. Until now,
+the NAND chip identification phase could be done in two manners from the
+controller driver perspective:
 
-Another hook, ->detach_chip() is also introduced in order to clean the
-controller driver's potential allocations in case of failure of
-nand_scan_tail(). There is no need for the controller driver to call the
-->detach_chip() hook directly upon error after a successful nand_scan().
-In this situation, calling nand_release() as before is enough.
+1/ Call nand_scan()
 
-Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
----
- drivers/mtd/nand/raw/nand_base.c | 21 +++++++++++++++++++--
- include/linux/mtd/rawnand.h      |  6 ++++++
- 2 files changed, 25 insertions(+), 2 deletions(-)
+  or
 
-diff --git a/drivers/mtd/nand/raw/nand_base.c b/drivers/mtd/nand/raw/nand_base.c
-index faac82b1e058..97a74d48b0cf 100644
---- a/drivers/mtd/nand/raw/nand_base.c
-+++ b/drivers/mtd/nand/raw/nand_base.c
-@@ -6712,11 +6712,23 @@ EXPORT_SYMBOL(nand_scan_tail);
- int nand_scan_with_ids(struct mtd_info *mtd, int maxchips,
- 		       struct nand_flash_dev *ids)
- {
-+	struct nand_chip *chip = mtd_to_nand(mtd);
- 	int ret;
- 
- 	ret = nand_scan_ident(mtd, maxchips, ids);
--	if (!ret)
--		ret = nand_scan_tail(mtd);
-+	if (ret)
-+		return ret;
-+
-+	if (chip->controller->attach_chip) {
-+		ret = chip->controller->attach_chip(chip);
-+		if (ret)
-+			return ret;
-+	}
-+
-+	ret = nand_scan_tail(mtd);
-+	if (ret && chip->controller->detach_chip)
-+		chip->controller->detach_chip(chip);
-+
- 	return ret;
- }
- EXPORT_SYMBOL(nand_scan_with_ids);
-@@ -6744,7 +6756,12 @@ void nand_cleanup(struct nand_chip *chip)
- 
- 	/* Free manufacturer priv data. */
- 	nand_manufacturer_cleanup(chip);
-+
-+	/* Free controller specific allocations after chip identification */
-+	if (chip->controller->detach_chip)
-+		chip->controller->detach_chip(chip);
- }
-+
- EXPORT_SYMBOL_GPL(nand_cleanup);
- 
- /**
-diff --git a/include/linux/mtd/rawnand.h b/include/linux/mtd/rawnand.h
-index 0c6fb316b409..81654211e520 100644
---- a/include/linux/mtd/rawnand.h
-+++ b/include/linux/mtd/rawnand.h
-@@ -517,11 +517,17 @@ struct nand_id {
-  * @wq:			wait queue to sleep on if a NAND operation is in
-  *			progress used instead of the per chip wait queue
-  *			when a hw controller is available.
-+ * @attach_chip:	Callback that may be called between nand_detect() and
-+ *			nand_scan_tail() during nand_scan() (optional).
-+ * @detach_chip:	Callback that may be called if nand_scan_tail() fails
-+ *			(optional).
-  */
- struct nand_hw_control {
- 	spinlock_t lock;
- 	struct nand_chip *active;
- 	wait_queue_head_t wq;
-+	int (*attach_chip)(struct nand_chip *chip);
-+	void (*detach_chip)(struct nand_chip *chip);
- };
- 
- static inline void nand_hw_control_init(struct nand_hw_control *nfc)
+1/ Call nand_scan_ident()
+2/ Do some controller-dependent configuration
+3/ Call nand_scan_tail().
+
+The fact that the identifaction could be split in two operations
+involved that in the NAND framework, it was not possible to do any
+dynamic allocation without risking a memory leak. What if the core
+allocates a structure, then the driver between nand_scan_ident() and
+nand_scan_tail() decides it cannot handle the chip and errors out?
+The structure allocated by the core is lost: it is a memory leak. One
+solution could have been to add a nand_scan_ident_cleanup() function,
+but that would mean patching all the drivers anyway to make them call
+this function when something fails between nand_scan_ident() and
+nand_scan_tail().
+
+To avoid this situation, we migrate all drivers to use nand_scan(). But
+because drivers need to do some configuration before nand_scan_tail(), a
+first hook is offered, embedded in the nand_hw_ctrl structure, called
+->attach_chip(). Drivers that need to tweak their configuration after
+nand_scan_ident() should implement it. Any dynamically allocated space
+in ->attach_chip() must be freed in the second hook: ->detach_chip().
+
+The ->detach_chip() does not have to be called upon error in the
+controller driver probe function. The nand_cleanup() helper already
+exists for that and will do the call if needed. Of course, this helper
+must be called on error after a successful nand_scan(), just like
+before.
+
+Once all drivers not using nand_scan() (yet) are migrated,
+nand_scan_ident() and nand_scan_tail() are unexported and only available
+internally.
+
+A previous work [1] removed the ONFI/JEDEC parameter pages and instead
+allocated a nand_parameters structure in nand_chip, embedding both
+generic entries and ONFI-related ones. The deal was, once dynamic
+allocation possible, allocate in nand_scan_ident() the ONFI strcuture
+only if actually needed. This is done in the last patches.
+
+All these changes have been tested with the GPMI driver and tested by
+the 0-day robot. They apply now on top of another previous series that
+cleaned the error path of all the drivers touched in this series.
+
+Thank you,
+Miqu?l
+
+[1] http://lists.infradead.org/pipermail/linux-mtd/2018-March/079456.html
+
+Changes since v1:
+=================
+* Rebased on top of nand/next.
+* Light rewording of the cover letter about the possibility to have a
+  nand_scan_ident_cleanup() function (just as example of how this series
+  could have been done differently).
+* Changed the hooks to reside in the nand_hw_ctrl structure instead of
+  being part of nand_ecc_ctrl as these hooks are more
+  controller-related.
+
+
+Miquel Raynal (32):
+  mtd: rawnand: add hooks that may be called during nand_scan()
+  mtd: rawnand: brcmnand: convert driver to nand_scan()
+  mtd: rawnand: cafe: convert driver to nand_scan()
+  mtd: rawnand: davinci: convert driver to nand_scan()
+  mtd: rawnand: denali: convert to nand_scan()
+  mtd: rawnand: fsl_elbc: convert driver to nand_scan()
+  mtd: rawnand: fsl_ifc: convert driver to nand_scan()
+  mtd: rawnand: fsmc: convert driver to nand_scan()
+  mtd: rawnand: gpmi: convert driver to nand_scan()
+  mtd: rawnand: hisi504: convert driver to nand_scan()
+  mtd: rawnand: jz4780: convert driver to nand_scan()
+  mtd: rawnand: lpc32xx_mlc: convert driver to nand_scan()
+  mtd: rawnand: lpc32xx_slc: convert driver to nand_scan()
+  mtd: rawnand: marvell: convert driver to nand_scan()
+  mtd: rawnand: mtk: convert driver to nand_scan()
+  mtd: rawnand: mxc: convert driver to nand_scan()
+  mtd: rawnand: nandsim: convert driver to nand_scan()
+  mtd: rawnand: omap2: convert driver to nand_scan()
+  mtd: rawnand: s3c2410: convert driver to nand_scan()
+  mtd: rawnand: sh_flctl: move all NAND chip related setup in one
+    function
+  mtd: rawnand: sh_flctl: convert driver to nand_scan()
+  mtd: rawnand: sunxi: convert driver to nand_scan()
+  mtd: rawnand: tango: convert driver to nand_scan()
+  mtd: rawnand: txx9ndfmc: convert driver to nand_scan()
+  mtd: rawnand: vf610: convert driver to nand_scan()
+  mtd: rawnand: atmel: convert driver to nand_scan()
+  mtd: rawnand: sm_common: convert driver to nand_scan_with_ids()
+  mtd: rawnand: docg4: convert driver to nand_scan()
+  mtd: rawnand: qcom: convert driver to nand_scan()
+  mtd: rawnand: jz4740: convert driver to nand_scan()
+  mtd: rawnand: do not export nand_scan_[ident|tail]() anymore
+  mtd: rawnand: allocate dynamically ONFI parameters during detection
+
+ drivers/mtd/nand/raw/atmel/nand-controller.c |  70 ++--
+ drivers/mtd/nand/raw/brcmnand/brcmnand.c     |  43 ++-
+ drivers/mtd/nand/raw/cafe_nand.c             | 131 ++++---
+ drivers/mtd/nand/raw/davinci_nand.c          | 186 +++++-----
+ drivers/mtd/nand/raw/denali.c                | 134 +++----
+ drivers/mtd/nand/raw/docg4.c                 |  51 +--
+ drivers/mtd/nand/raw/fsl_elbc_nand.c         |  15 +-
+ drivers/mtd/nand/raw/fsl_ifc_nand.c          |  15 +-
+ drivers/mtd/nand/raw/fsmc_nand.c             | 144 ++++----
+ drivers/mtd/nand/raw/gpmi-nand/gpmi-nand.c   |  52 +--
+ drivers/mtd/nand/raw/hisi504_nand.c          |  74 ++--
+ drivers/mtd/nand/raw/jz4740_nand.c           |  42 ++-
+ drivers/mtd/nand/raw/jz4780_nand.c           |  30 +-
+ drivers/mtd/nand/raw/lpc32xx_mlc.c           | 105 +++---
+ drivers/mtd/nand/raw/lpc32xx_slc.c           |  73 ++--
+ drivers/mtd/nand/raw/marvell_nand.c          | 201 ++++++-----
+ drivers/mtd/nand/raw/mtk_nand.c              |  71 ++--
+ drivers/mtd/nand/raw/mxc_nand.c              | 132 +++----
+ drivers/mtd/nand/raw/nand_base.c             | 132 +++++--
+ drivers/mtd/nand/raw/nand_micron.c           |   6 +-
+ drivers/mtd/nand/raw/nand_timings.c          |  12 +-
+ drivers/mtd/nand/raw/nandsim.c               |  78 ++--
+ drivers/mtd/nand/raw/omap2.c                 | 517 +++++++++++++--------------
+ drivers/mtd/nand/raw/qcom_nandc.c            |  67 ++--
+ drivers/mtd/nand/raw/s3c2410.c               |  26 +-
+ drivers/mtd/nand/raw/sh_flctl.c              |  53 ++-
+ drivers/mtd/nand/raw/sm_common.c             |  35 +-
+ drivers/mtd/nand/raw/sunxi_nand.c            |  38 +-
+ drivers/mtd/nand/raw/tango_nand.c            |  36 +-
+ drivers/mtd/nand/raw/txx9ndfmc.c             |  25 +-
+ drivers/mtd/nand/raw/vf610_nfc.c             | 123 +++----
+ include/linux/mtd/rawnand.h                  |  23 +-
+ include/linux/mtd/sh_flctl.h                 |   1 +
+ 33 files changed, 1414 insertions(+), 1327 deletions(-)
+
 -- 
 2.14.1
