@@ -1,55 +1,64 @@
-From: ravi.bangoria@linux.ibm.com (Ravi Bangoria)
-Date: Tue, 3 Jul 2018 13:30:01 +0530
-Subject: [PATCH v5 10/10] perf probe: Support SDT markers having reference
- counter (semaphore)
-In-Reply-To: <20180702145727.GC65296@linux.vnet.ibm.com>
-References: <20180628052209.13056-1-ravi.bangoria@linux.ibm.com>
- <20180628052209.13056-11-ravi.bangoria@linux.ibm.com>
- <20180702145727.GC65296@linux.vnet.ibm.com>
-Message-ID: <c29309ae-65ff-8a68-42ef-7e9f77227571@linux.ibm.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Tue, 3 Jul 2018 09:04:01 +0100
+Subject: [PATCH v3 01/20] virtio: mmio-v1: Validate queue PFN
+In-Reply-To: <20180629200816-mutt-send-email-mst@kernel.org>
+References: <1530270944-11351-1-git-send-email-suzuki.poulose@arm.com>
+ <1530270944-11351-2-git-send-email-suzuki.poulose@arm.com>
+ <20180629200816-mutt-send-email-mst@kernel.org>
+Message-ID: <5124334c-b3c8-4c59-b652-d26ea1101807@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Srikar,
+Hi Michael,
 
-On 07/02/2018 08:27 PM, Srikar Dronamraju wrote:
-> * Ravi Bangoria <ravi.bangoria@linux.ibm.com> [2018-06-28 10:52:09]:
-> 
->> With this, perf buildid-cache will save SDT markers with reference
->> counter in probe cache. Perf probe will be able to probe markers
->> having reference counter. Ex,
+On 06/29/2018 06:42 PM, Michael S. Tsirkin wrote:
+> On Fri, Jun 29, 2018 at 12:15:21PM +0100, Suzuki K Poulose wrote:
+>> virtio-mmio with virtio-v1 uses a 32bit PFN for the queue.
+>> If the queue pfn is too large to fit in 32bits, which
+>> we could hit on arm64 systems with 52bit physical addresses
+>> (even with 64K page size), we simply miss out a proper link
+>> to the other side of the queue.
 >>
->>   # readelf -n /tmp/tick | grep -A1 loop2
->>     Name: loop2
->>     ... Semaphore: 0x0000000010020036
+>> Add a check to validate the PFN, rather than silently breaking
+>> the devices.
 >>
->>   # ./perf buildid-cache --add /tmp/tick
+>> Cc: "Michael S. Tsirkin" <mst@redhat.com>
+>> Cc: Jason Wang <jasowang@redhat.com>
+>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>> Cc: Christoffer Dall <cdall@kernel.org>
+>> Cc: Peter Maydel <peter.maydell@linaro.org>
+>> Cc: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
+>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>> ---
+>> Changes since v2:
+>>   - Change errno to -E2BIG
+>> ---
+>>   drivers/virtio/virtio_mmio.c | 18 ++++++++++++++++--
+>>   1 file changed, 16 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/virtio/virtio_mmio.c b/drivers/virtio/virtio_mmio.c
+>> index 67763d3..82cedc8 100644
+>> --- a/drivers/virtio/virtio_mmio.c
+>> +++ b/drivers/virtio/virtio_mmio.c
+>> @@ -397,9 +397,21 @@ static struct virtqueue *vm_setup_vq(struct virtio_device *vdev, unsigned index,
+>>   	/* Activate the queue */
+>>   	writel(virtqueue_get_vring_size(vq), vm_dev->base + VIRTIO_MMIO_QUEUE_NUM);
+>>   	if (vm_dev->version == 1) {
+>> +		u64 q_pfn = virtqueue_get_desc_addr(vq) >> PAGE_SHIFT;
+>> +
+>> +		/*
+>> +		 * virtio-mmio v1 uses a 32bit QUEUE PFN. If we have something
+>> +		 * that doesn't fit in 32bit, fail the setup rather than
+>> +		 * pretending to be successful.
+>> +		 */
+>> +		if (q_pfn >> 32) {
+>> +			dev_err(&vdev->dev, "virtio-mmio: queue address too large\n");
 > 
-> Would this perf buildid-cache work if the executable is stripped of
-> symbols?
+> How about:
+> 	"hypervisor bug: legacy virtio-mmio must not be used with more than 0x%llx Gigabytes of memory",
+> 	0x1ULL << (32 - 30) << PAGE_SHIFT
 
-Description of SDT markers resides in .notes section. If .notes section
-is there, binary has SDT markers, if .notes section is not there, binary
-does not have any SDT markers. So SDT markers does not have anything to
-do with symbol table.
+nit : Do we need change "hypervisor" => "platform" ? Virtio is used by 
+other tools (e.g, emulators) and not just virtual machines.
 
-> 
->>   # ./perf probe sdt_tick:loop2
->>   # ./perf stat -e sdt_tick:loop2 /tmp/tick
->>     hi: 0
->>     hi: 1
->>     hi: 2
->>     ^C
->>      Performance counter stats for '/tmp/tick':
->>                  3      sdt_tick:loop2
->>        2.561851452 seconds time elapsed
-> 
-> Also can we document how to use SDT markers with perf under perf-probe
-> or perf-build-cache?
-> 
-
-Yes, perf-buildid-cache and perf-probe man pages describes about SDT
-markers.
-
-Thanks,
-Ravi
+Suzuki
