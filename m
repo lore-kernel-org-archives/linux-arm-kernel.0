@@ -1,40 +1,47 @@
-From: luaraneda@gmail.com (Luis Araneda)
-Date: Tue, 3 Jul 2018 03:18:49 -0400
-Subject: [RFC PATCH 5/5] arm: dts: zynq: remove "zynq" prefix from
- compatible property
-In-Reply-To: <042f6632-f4f6-d278-9859-b8998468c3bf@xilinx.com>
-References: <20180628054205.17737-1-luaraneda@gmail.com>
- <20180628054205.17737-6-luaraneda@gmail.com>
- <042f6632-f4f6-d278-9859-b8998468c3bf@xilinx.com>
-Message-ID: <CAHbBuxpuAC0PDfFBQ+D_zJu-AmWFNhEWCojr8LAWfO-ootLqEg@mail.gmail.com>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Tue, 3 Jul 2018 09:21:07 +0200
+Subject: [PATCH 2/3] clk: meson: add sub EMMC clock dt-bindings IDs
+In-Reply-To: <20180703145716.31860-3-yixun.lan@amlogic.com>
+References: <20180703145716.31860-1-yixun.lan@amlogic.com>
+ <20180703145716.31860-3-yixun.lan@amlogic.com>
+Message-ID: <20180703092107.51497a8f@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michal,
+On Tue, 3 Jul 2018 14:57:15 +0000
+Yixun Lan <yixun.lan@amlogic.com> wrote:
 
-On Thu, Jun 28, 2018 at 2:42 AM Michal Simek <michal.simek@xilinx.com> wrote:
-> zynq name here is correct which is saying that hardblock is going to be
-> described. Without it it is suggesting that hardblock is not used and it
-> is for example on zybo with microblaze.
+> Add two clock bindings IDs which provided by the EMMC clock controller,
+> These two clocks will be used by EMMC or NAND driver.
+> 
+> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+> ---
+>  include/dt-bindings/clock/emmc-clkc.h | 14 ++++++++++++++
+>  1 file changed, 14 insertions(+)
+>  create mode 100644 include/dt-bindings/clock/emmc-clkc.h
+> 
+> diff --git a/include/dt-bindings/clock/emmc-clkc.h b/include/dt-bindings/clock/emmc-clkc.h
+> new file mode 100644
+> index 000000000000..d9972c400e58
+> --- /dev/null
+> +++ b/include/dt-bindings/clock/emmc-clkc.h
+> @@ -0,0 +1,14 @@
+> +/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
+> +/*
+> + * Meson EMMC sub clock tree IDs
+> + *
+> + * Copyright (c) 2018 Amlogic, Inc. All rights reserved.
+> + */
+> +
+> +#ifndef __EMMC_CLKC_H
+> +#define __EMMC_CLKC_H
+> +
+> +#define CLKID_EMMC_C_MUX				0
 
-In my opinion, the zynq name is just adding redundant information to
-the "xlnx,zynq-7000" value.
-Taking the Zybo board, the current compatible property is:
-> compatible = "digilent,zynq-zybo", "xlnx,zynq-7000";
+Looks like the MUX clk is the parent of the DIV one, and I guess the clk
+driver is able to select the best parent+div pair for a requested rate.
+Do you really need to expose the MUX to users?
 
-I'm proposing to change it to:
-> compatible = "digilent,zybo", "xlnx,zynq-7000";
-(I know I must keep the old value too,  I'm simplifying)
-
-In the case of a Zybo board with a microblaze, the property could be:
-> compatible = "digilent,zybo", "xlnx,microblaze";
-
-That would allow to differentiate between zynq and microblaze.
-
-I have no problem on dropping the patch if you like. There might be
-something that I'm not seeing or a use case that I'm missing.
-
-
-Thanks,
-
-Luis Araneda.
+> +#define CLKID_EMMC_C_DIV				1
+> +
+> +#endif
