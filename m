@@ -1,150 +1,126 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 3 Jul 2018 17:01:49 +0100
-Subject: [PATCH 4/7 v5] iommu: arm-smmu: Add support for the fsl-mc bus
-In-Reply-To: <1526824191-7000-5-git-send-email-nipun.gupta@nxp.com>
-References: <1526824191-7000-1-git-send-email-nipun.gupta@nxp.com>
- <1526824191-7000-5-git-send-email-nipun.gupta@nxp.com>
-Message-ID: <83174f21-50f3-2ed2-bf04-6136af591567@arm.com>
+From: dave.kleikamp@oracle.com (Dave Kleikamp)
+Date: Tue, 3 Jul 2018 11:12:23 -0500
+Subject: [PATCH v2 1/4] arm64: export memblock_reserve()d regions via
+ /proc/iomem
+In-Reply-To: <20180703064726.GU23681@linaro.org>
+References: <20180619064424.6642-1-takahiro.akashi@linaro.org>
+ <20180619064424.6642-2-takahiro.akashi@linaro.org>
+ <72307608-90e0-4842-edc1-d3b284782940@oracle.com>
+ <ca9e5d9d-e090-f9e0-bc10-3297c9e3b7e1@arm.com>
+ <891c3e5a-9760-1353-4a2c-0900082dd245@oracle.com>
+ <20180703064726.GU23681@linaro.org>
+Message-ID: <a9c38b0d-db67-2f5b-ea0e-ec6e45d2c4c9@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/05/18 14:49, Nipun Gupta wrote:
-> Implement bus specific support for the fsl-mc bus including
-> registering arm_smmu_ops and bus specific device add operations.
+On 07/03/2018 01:47 AM, AKASHI Takahiro wrote:
+> On Tue, Jun 19, 2018 at 10:22:46AM -0500, Dave Kleikamp wrote:
+>> On 06/19/2018 10:00 AM, James Morse wrote:
+>>> Hi Dave,
+>>>
+>>> On 19/06/18 14:37, Dave Kleikamp wrote:
+>>>> On 06/19/2018 01:44 AM, AKASHI Takahiro wrote:
+>>>>> +static int __init reserve_memblock_reserved_regions(void)
+>>>>> +{
+>>>>> +	phys_addr_t start, end, roundup_end = 0;
+>>>>> +	struct resource *mem, *res;
+>>>>> +	u64 i;
+>>>>> +
+>>>>> +	for_each_reserved_mem_region(i, &start, &end) {
+>>>>> +		if (end <= roundup_end)
+>>>>> +			continue; /* done already */
+>>>>> +
+>>>>> +		start = __pfn_to_phys(PFN_DOWN(start));
+>>>>> +		end = __pfn_to_phys(PFN_UP(end)) - 1;
+>>>>> +		roundup_end = end;
+>>>>> +
+>>>>> +		res = kzalloc(sizeof(*res), GFP_ATOMIC);
+>>>>> +		if (WARN_ON(!res))
+>>>>> +			return -ENOMEM;
+>>>>> +		res->start = start;
+>>>>> +		res->end = end;
+>>>>> +		res->name  = "reserved";
+>>>>> +		res->flags = IORESOURCE_MEM;
+>>>>> +
+>>>>> +		mem = request_resource_conflict(&iomem_resource, res);
+>>>>> +		/*
+>>>>> +		 * We expected memblock_reserve() regions to conflict with
+>>>>> +		 * memory created by request_standard_resources().
+>>>>> +		 */
+>>>>> +		if (WARN_ON_ONCE(!mem))
+>>>>> +			continue;
+>>>>> +		kfree(res);
+>>>>
+>>>> Why is kfree() after the conditional continue? This is a memory leak.
+>>>
+>>> request_resource_conflict() inserts res into the iomem_resource tree, or returns
+>>> the conflict if there is already something at this address.
+>>>
+>>> We expect something at this address: a 'System RAM' section added by
+>>> request_resource(). This code wants the conflicting 'System RAM' entry so that
+>>> reserve_region_with_split() can fill in the gaps below it with 'reserved'. See
+>>> the commit-message for an example.
+>>>
+>>> If there was no conflict, it means the memory map doesn't look like we expect,
+>>> we can't pass NULL to reserve_region_with_split(), and we just inserted the
+>>> 'reserved' at the top level. Freeing res at this point would be a use-after-free
+>>> hanging from /proc/iomem.
+>>> This code generates a WARN_ON_ONCE() and leaves the 'reserved' description where
+>>> it is.
+>>
+>> Okay. I get it.
+>>
+>>> Trying to cleanup here is pointless, we can remove the resource entry and free
+>>> it ... but we still want to report it as reserved, which is what just happened,
+>>> just not quite how we we wanted it.
+>>>
+>>> If you ever see this warning, it means some RAM stopped being nomap between
+>>> request_resources() and reserve_memblock_reserved_regions(). I can't find any
+>>> case where that ever happens.
+>>>
+>>>
+>>> If all that makes sense: how can I improve the comment above the WARN_ON_ONCE()
+>>> to make it clearer?
+>>
+>> I guess something like you described above.
+>>
+>> /*
+>>  * We expect a 'System RAM' section at this address. In the unexpected
+>>  * case where one is not found, request_resource_conflict() will insert
+>>  * res into the iomem_resource tree.
+>>  */
+>>
+>> Do you think this is clearer?
 > 
-> Signed-off-by: Nipun Gupta <nipun.gupta@nxp.com>
-> ---
->   drivers/iommu/arm-smmu.c |  7 +++++++
->   drivers/iommu/iommu.c    | 21 +++++++++++++++++++++
->   include/linux/fsl/mc.h   |  8 ++++++++
->   include/linux/iommu.h    |  2 ++
->   4 files changed, 38 insertions(+)
+> If this is the only change needed in my patchset, I'd like the maintainers
+> to take care of it instead of my posting another version.
+
+Agreed. The sooner this gets fixed, the better.
+
+Thanks,
+Dave
+
 > 
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index 69e7c60..e1d5090 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -52,6 +52,7 @@
->   #include <linux/spinlock.h>
->   
->   #include <linux/amba/bus.h>
-> +#include <linux/fsl/mc.h>
->   
->   #include "io-pgtable.h"
->   #include "arm-smmu-regs.h"
-> @@ -1459,6 +1460,8 @@ static struct iommu_group *arm_smmu_device_group(struct device *dev)
->   
->   	if (dev_is_pci(dev))
->   		group = pci_device_group(dev);
-> +	else if (dev_is_fsl_mc(dev))
-> +		group = fsl_mc_device_group(dev);
->   	else
->   		group = generic_device_group(dev);
->   
-> @@ -2037,6 +2040,10 @@ static void arm_smmu_bus_init(void)
->   		bus_set_iommu(&pci_bus_type, &arm_smmu_ops);
->   	}
->   #endif
-> +#ifdef CONFIG_FSL_MC_BUS
-> +	if (!iommu_present(&fsl_mc_bus_type))
-> +		bus_set_iommu(&fsl_mc_bus_type, &arm_smmu_ops);
-> +#endif
->   }
->   
->   static int arm_smmu_device_probe(struct platform_device *pdev)
-> diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
-> index d2aa2320..6d4ce35 100644
-> --- a/drivers/iommu/iommu.c
-> +++ b/drivers/iommu/iommu.c
-> @@ -32,6 +32,7 @@
->   #include <linux/pci.h>
->   #include <linux/bitops.h>
->   #include <linux/property.h>
-> +#include <linux/fsl/mc.h>
->   #include <trace/events/iommu.h>
->   
->   static struct kset *iommu_group_kset;
-> @@ -987,6 +988,26 @@ struct iommu_group *pci_device_group(struct device *dev)
->   	return iommu_group_alloc();
->   }
->   
-> +/* Get the IOMMU group for device on fsl-mc bus */
-> +struct iommu_group *fsl_mc_device_group(struct device *dev)
-> +{
-> +	struct device *cont_dev = fsl_mc_cont_dev(dev);
-> +	struct iommu_group *group;
-> +
-> +	/* Container device is responsible for creating the iommu group */
-> +	if (fsl_mc_is_cont_dev(dev)) {
-
-Why duplicate what fsl_mc_cont_dev() has already figured out?
-
-AFAICS the overall operation here boils down to something like:
-
-	cont_dev = fsl_mc_cont_dev(dev);
-	group = iommu_group_get(cont_dev);
-	if (!group)
-		group = iommu_group_alloc();
-	return group;
-
-> +		group = iommu_group_alloc();
-> +		if (IS_ERR(group))
-> +			return NULL;
-
-iommu_group_get_for_dev() expects a PTR_ERR, so I don't think munging 
-the return here is the right thing to do.
-
-> +	} else {
-> +		get_device(cont_dev);
-
-If races are a concern, isn't this a bit late? Maybe in that case you 
-want {get,put}_fsl_mc_cont_dev() routines instead of the simple macro 
-below. But on the other hand if dev already has cont_dev as its parent, 
-wouldn't the reference taken in device_add() be sufficient to prevent it 
-from vanishing unexpectedly in this timescale?
-
-Robin.
-
-> +		group = iommu_group_get(cont_dev);
-> +		put_device(cont_dev);
-> +	}
-> +
-> +	return group;
-> +}
-> +
->   /**
->    * iommu_group_get_for_dev - Find or create the IOMMU group for a device
->    * @dev: target device
-> diff --git a/include/linux/fsl/mc.h b/include/linux/fsl/mc.h
-> index f27cb14..dddaca1 100644
-> --- a/include/linux/fsl/mc.h
-> +++ b/include/linux/fsl/mc.h
-> @@ -351,6 +351,14 @@ struct fsl_mc_io {
->   #define dev_is_fsl_mc(_dev) (0)
->   #endif
->   
-> +/* Macro to check if a device is a container device */
-> +#define fsl_mc_is_cont_dev(_dev) (to_fsl_mc_device(_dev)->flags & \
-> +	FSL_MC_IS_DPRC)
-> +
-> +/* Macro to get the container device of a MC device */
-> +#define fsl_mc_cont_dev(_dev) (fsl_mc_is_cont_dev(_dev) ? \
-> +	(_dev) : (_dev)->parent)
-> +
->   /*
->    * module_fsl_mc_driver() - Helper macro for drivers that don't do
->    * anything special in module init/exit.  This eliminates a lot of
-> diff --git a/include/linux/iommu.h b/include/linux/iommu.h
-> index 19938ee..2981200 100644
-> --- a/include/linux/iommu.h
-> +++ b/include/linux/iommu.h
-> @@ -389,6 +389,8 @@ static inline size_t iommu_map_sg(struct iommu_domain *domain,
->   extern struct iommu_group *pci_device_group(struct device *dev);
->   /* Generic device grouping function */
->   extern struct iommu_group *generic_device_group(struct device *dev);
-> +/* FSL-MC device grouping function */
-> +struct iommu_group *fsl_mc_device_group(struct device *dev);
->   
->   /**
->    * struct iommu_fwspec - per-device IOMMU instance data
+> Thanks,
+> -Takahiro AKASHI
 > 
+>>>
+>>>
+>>> Thanks,
+>>>
+>>> James
+>>>
+>>>
+>>>>> +
+>>>>> +		reserve_region_with_split(mem, start, end, "reserved");
+>>>>> +	}
+>>>>> +
+>>>>> +	return 0;
+>>>>> +}
+>>>>> +arch_initcall(reserve_memblock_reserved_regions);
+>>>>> +
+>>>>>  u64 __cpu_logical_map[NR_CPUS] = { [0 ... NR_CPUS-1] = INVALID_HWID };
+>>>>>  
+>>>>>  void __init setup_arch(char **cmdline_p)
+>>>>>
+>>>
