@@ -1,162 +1,81 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Wed,  4 Jul 2018 00:00:22 +0200
-Subject: [PATCH v2 25/32] mtd: rawnand: vf610: convert driver to nand_scan()
+Date: Wed,  4 Jul 2018 00:00:24 +0200
+Subject: [PATCH v2 27/32] mtd: rawnand: sm_common: convert driver to
+ nand_scan_with_ids()
 In-Reply-To: <20180703220029.19565-1-miquel.raynal@bootlin.com>
 References: <20180703220029.19565-1-miquel.raynal@bootlin.com>
-Message-ID: <20180703220029.19565-26-miquel.raynal@bootlin.com>
+Message-ID: <20180703220029.19565-28-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Two helpers have been added to the core to make ECC-related
 configuration between the detection phase and the final NAND scan. Use
-these hooks and convert the driver to just use nand_scan() instead of
+these hooks and convert the driver to just use nand_scan_with_ids()
+(alternative to nand_scan() for passing a flash IDs table) instead of
 both nand_scan_ident() and nand_scan_tail().
 
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 ---
- drivers/mtd/nand/raw/vf610_nfc.c | 123 ++++++++++++++++++++-------------------
- 1 file changed, 62 insertions(+), 61 deletions(-)
+ drivers/mtd/nand/raw/sm_common.c | 35 +++++++++++++++++++++--------------
+ 1 file changed, 21 insertions(+), 14 deletions(-)
 
-diff --git a/drivers/mtd/nand/raw/vf610_nfc.c b/drivers/mtd/nand/raw/vf610_nfc.c
-index d5a22fc96878..150da1adbb8c 100644
---- a/drivers/mtd/nand/raw/vf610_nfc.c
-+++ b/drivers/mtd/nand/raw/vf610_nfc.c
-@@ -747,6 +747,65 @@ static void vf610_nfc_init_controller(struct vf610_nfc *nfc)
- 	}
- }
+diff --git a/drivers/mtd/nand/raw/sm_common.c b/drivers/mtd/nand/raw/sm_common.c
+index 7f5044a79f01..b8c9cc74b1c6 100644
+--- a/drivers/mtd/nand/raw/sm_common.c
++++ b/drivers/mtd/nand/raw/sm_common.c
+@@ -160,19 +160,9 @@ static struct nand_flash_dev nand_xd_flash_ids[] = {
+ 	{NULL}
+ };
  
-+static int vf610_nfc_attach_chip(struct nand_chip *chip)
-+{
+-int sm_register_device(struct mtd_info *mtd, int smartmedia)
++static int sm_attach_chip(struct nand_chip *chip)
+ {
+-	struct nand_chip *chip = mtd_to_nand(mtd);
+-	int ret;
+-
+-	chip->options |= NAND_SKIP_BBTSCAN;
+-
+-	/* Scan for card properties */
+-	ret = nand_scan_ident(mtd, 1, smartmedia ?
+-		nand_smartmedia_flash_ids : nand_xd_flash_ids);
+-
+-	if (ret)
+-		return ret;
 +	struct mtd_info *mtd = nand_to_mtd(chip);
-+	struct vf610_nfc *nfc = mtd_to_nfc(mtd);
-+
-+	vf610_nfc_init_controller(nfc);
-+
-+	/* Bad block options. */
-+	if (chip->bbt_options & NAND_BBT_USE_FLASH)
-+		chip->bbt_options |= NAND_BBT_NO_OOB;
-+
-+	/* Single buffer only, max 256 OOB minus ECC status */
-+	if (mtd->writesize + mtd->oobsize > PAGE_2K + OOB_MAX - 8) {
-+		dev_err(nfc->dev, "Unsupported flash page size\n");
-+		return -ENXIO;
-+	}
-+
-+	if (chip->ecc.mode != NAND_ECC_HW)
-+		return 0;
-+
-+	if (mtd->writesize != PAGE_2K && mtd->oobsize < 64) {
-+		dev_err(nfc->dev, "Unsupported flash with hwecc\n");
-+		return -ENXIO;
-+	}
-+
-+	if (chip->ecc.size != mtd->writesize) {
-+		dev_err(nfc->dev, "Step size needs to be page size\n");
-+		return -ENXIO;
-+	}
-+
-+	/* Only 64 byte ECC layouts known */
-+	if (mtd->oobsize > 64)
-+		mtd->oobsize = 64;
-+
-+	/* Use default large page ECC layout defined in NAND core */
-+	mtd_set_ooblayout(mtd, &nand_ooblayout_lp_ops);
-+	if (chip->ecc.strength == 32) {
-+		nfc->ecc_mode = ECC_60_BYTE;
-+		chip->ecc.bytes = 60;
-+	} else if (chip->ecc.strength == 24) {
-+		nfc->ecc_mode = ECC_45_BYTE;
-+		chip->ecc.bytes = 45;
-+	} else {
-+		dev_err(nfc->dev, "Unsupported ECC strength\n");
-+		return -ENXIO;
-+	}
-+
-+	chip->ecc.read_page = vf610_nfc_read_page;
-+	chip->ecc.write_page = vf610_nfc_write_page;
-+	chip->ecc.read_page_raw = vf610_nfc_read_page_raw;
-+	chip->ecc.write_page_raw = vf610_nfc_write_page_raw;
-+	chip->ecc.read_oob = vf610_nfc_read_oob;
-+	chip->ecc.write_oob = vf610_nfc_write_oob;
-+
-+	chip->ecc.size = PAGE_2K;
-+
+ 
+ 	/* Bad block marker position */
+ 	chip->badblockpos = 0x05;
+@@ -187,12 +177,29 @@ int sm_register_device(struct mtd_info *mtd, int smartmedia)
+ 	else
+ 		return -ENODEV;
+ 
+-	ret = nand_scan_tail(mtd);
 +	return 0;
 +}
+ 
++int sm_register_device(struct mtd_info *mtd, int smartmedia)
++{
++	struct nand_chip *chip = mtd_to_nand(mtd);
++	struct nand_flash_dev *flash_ids;
++	int ret;
 +
- static int vf610_nfc_probe(struct platform_device *pdev)
- {
- 	struct vf610_nfc *nfc;
-@@ -827,67 +886,9 @@ static int vf610_nfc_probe(struct platform_device *pdev)
++	chip->options |= NAND_SKIP_BBTSCAN;
++
++	/* Scan for card properties */
++	chip->hwcontrol.attach_chip = sm_attach_chip;
++	flash_ids = smartmedia ? nand_smartmedia_flash_ids : nand_xd_flash_ids;
++	ret = nand_scan_with_ids(mtd, 1, flash_ids);
+ 	if (ret)
+ 		return ret;
  
- 	vf610_nfc_preinit_controller(nfc);
- 
--	/* first scan to find the device and get the page size */
--	err = nand_scan_ident(mtd, 1, NULL);
--	if (err)
--		goto err_disable_clk;
--
--	vf610_nfc_init_controller(nfc);
--
--	/* Bad block options. */
--	if (chip->bbt_options & NAND_BBT_USE_FLASH)
--		chip->bbt_options |= NAND_BBT_NO_OOB;
--
--	/* Single buffer only, max 256 OOB minus ECC status */
--	if (mtd->writesize + mtd->oobsize > PAGE_2K + OOB_MAX - 8) {
--		dev_err(nfc->dev, "Unsupported flash page size\n");
--		err = -ENXIO;
--		goto err_disable_clk;
--	}
--
--	if (chip->ecc.mode == NAND_ECC_HW) {
--		if (mtd->writesize != PAGE_2K && mtd->oobsize < 64) {
--			dev_err(nfc->dev, "Unsupported flash with hwecc\n");
--			err = -ENXIO;
--			goto err_disable_clk;
--		}
--
--		if (chip->ecc.size != mtd->writesize) {
--			dev_err(nfc->dev, "Step size needs to be page size\n");
--			err = -ENXIO;
--			goto err_disable_clk;
--		}
--
--		/* Only 64 byte ECC layouts known */
--		if (mtd->oobsize > 64)
--			mtd->oobsize = 64;
--
--		/* Use default large page ECC layout defined in NAND core */
--		mtd_set_ooblayout(mtd, &nand_ooblayout_lp_ops);
--		if (chip->ecc.strength == 32) {
--			nfc->ecc_mode = ECC_60_BYTE;
--			chip->ecc.bytes = 60;
--		} else if (chip->ecc.strength == 24) {
--			nfc->ecc_mode = ECC_45_BYTE;
--			chip->ecc.bytes = 45;
--		} else {
--			dev_err(nfc->dev, "Unsupported ECC strength\n");
--			err = -ENXIO;
--			goto err_disable_clk;
--		}
--
--		chip->ecc.read_page = vf610_nfc_read_page;
--		chip->ecc.write_page = vf610_nfc_write_page;
--		chip->ecc.read_page_raw = vf610_nfc_read_page_raw;
--		chip->ecc.write_page_raw = vf610_nfc_write_page_raw;
--		chip->ecc.read_oob = vf610_nfc_read_oob;
--		chip->ecc.write_oob = vf610_nfc_write_oob;
--
--		chip->ecc.size = PAGE_2K;
--	}
--
--	/* second phase scan */
--	err = nand_scan_tail(mtd);
-+	/* Scan the NAND chip */
-+	chip->hwcontrol.attach_chip = vf610_nfc_attach_chip;
-+	err = nand_scan(mtd, 1);
- 	if (err)
- 		goto err_disable_clk;
+-	return mtd_device_register(mtd, NULL, 0);
++	ret = mtd_device_register(mtd, NULL, 0);
++	if (ret)
++		nand_release(mtd);
++
++	return ret;
+ }
+ EXPORT_SYMBOL_GPL(sm_register_device);
  
 -- 
 2.14.1
