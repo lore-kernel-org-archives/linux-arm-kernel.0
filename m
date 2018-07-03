@@ -1,66 +1,37 @@
-From: yixun.lan@amlogic.com (Yixun Lan)
-Date: Tue, 3 Jul 2018 18:17:00 +0800
-Subject: [PATCH v2 2/2] clk: meson-axg: add clocks required by pcie driver
-In-Reply-To: <1530609862.2900.187.camel@baylibre.com>
-References: <20180702213118.19222-1-yixun.lan@amlogic.com>
- <20180702213118.19222-3-yixun.lan@amlogic.com>
- <1530609862.2900.187.camel@baylibre.com>
-Message-ID: <7c8b47a9-67bc-b685-8c90-084299631fb0@amlogic.com>
+From: dkos@cadence.com (Damian Kos)
+Date: Tue, 3 Jul 2018 11:02:19 +0100
+Subject: [PATCH 08/12] drm/dp: add max number of lanes supported
+In-Reply-To: <1530612152-27555-1-git-send-email-dkos@cadence.com>
+References: <1530612152-27555-1-git-send-email-dkos@cadence.com>
+Message-ID: <1530612152-27555-9-git-send-email-dkos@cadence.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jerome:
+From: Quentin Schulz <quentin.schulz@free-electrons.com>
 
+Currently, a maximum of 4 lanes is supported in DP.
 
-On 07/03/18 17:24, Jerome Brunet wrote:
-> On Mon, 2018-07-02 at 21:31 +0000, Yixun Lan wrote:
->> Adding clocks for the pcie driver. Due to the ASIC design,
->> the pcie controller re-use part of the mipi clock logic,
->> so the mipi clock is also added.
->>
->> Tested-by: Jianxin Qin <jianxin.qin@amlogic.com>
->> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
->> ---
->>  drivers/clk/meson/axg.c | 148 ++++++++++++++++++++++++++++++++++++++++
->>  drivers/clk/meson/axg.h |   6 +-
->>  2 files changed, 153 insertions(+), 1 deletion(-)
->>
->>
-> 
-> [...]
-> 
->> +
->> +/* skip the partent 0, it's for debug only */
->> +static u32 mux_table_pcie_ref[]	= { 1 };
->> +static const char * const pcie_ref_parent_names[] = { "pcie_mux" };
-> 
-> Dropped these symbols.
-> 
->> +
->> +static struct clk_regmap axg_pcie_ref = {
->> +	.data = &(struct clk_regmap_mux_data){
->> +		.offset = HHI_PCIE_PLL_CNTL6,
->> +		.mask = 0x1,
->> +		.shift = 1,
->> +		.table = mux_table_pcie_ref,
-> 
-> Replaced with the table itself
-> 
->> +	},
->> +	.hw.init = &(struct clk_init_data){
->> +		.name = "pcie_ref",
->> +		.ops = &clk_regmap_mux_ops,
->> +		.parent_names = pcie_ref_parent_names,
->> +		.num_parents = ARRAY_SIZE(pcie_ref_parent_names),
-> 
-> Replaced with the table itself and applied. Thx
-> 
->> +		.flags = CLK_SET_RATE_PARENT,
->> +	},
->> +};
->> +
+It can be useful to add this maximum so that we can e.g. create arrays
+in drivers that can store data for several lanes (e.g.
+DP_TRAINING_LANEx_SET).
 
-I'm seeing you already applied this patch, so would you like to
-fix/amend the patch for me, or want me send another patch version?
+Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+Signed-off-by: Damian Kos <dkos@cadence.com>
+---
+ include/drm/drm_dp_helper.h |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-thanks
+diff --git a/include/drm/drm_dp_helper.h b/include/drm/drm_dp_helper.h
+index a63a548..accefbb 100644
+--- a/include/drm/drm_dp_helper.h
++++ b/include/drm/drm_dp_helper.h
+@@ -69,6 +69,7 @@
+ 
+ #define DP_MAX_LANE_COUNT                   0x002
+ # define DP_MAX_LANE_COUNT_MASK		    0x1f
++# define DP_MAX_NUM_LANES		    4
+ # define DP_TPS3_SUPPORTED		    (1 << 6) /* 1.2 */
+ # define DP_ENHANCED_FRAME_CAP		    (1 << 7)
+ 
+-- 
+1.7.1
