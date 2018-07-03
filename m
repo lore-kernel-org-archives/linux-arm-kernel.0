@@ -1,49 +1,56 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue, 3 Jul 2018 15:30:11 -0600
-Subject: [PATCH v2 18/23] dt-bindings: thermal: armada: add reference to
- new bindings
-In-Reply-To: <20180625151239.20976-19-miquel.raynal@bootlin.com>
+Date: Tue, 3 Jul 2018 15:33:39 -0600
+Subject: [PATCH v2 19/23] arm64: dts: marvell: rename ap806 syscon node
+In-Reply-To: <20180625151239.20976-20-miquel.raynal@bootlin.com>
 References: <20180625151239.20976-1-miquel.raynal@bootlin.com>
- <20180625151239.20976-19-miquel.raynal@bootlin.com>
-Message-ID: <20180703213011.GA13190@rob-hp-laptop>
+ <20180625151239.20976-20-miquel.raynal@bootlin.com>
+Message-ID: <20180703213339.GA29809@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 25, 2018 at 05:12:34PM +0200, Miquel Raynal wrote:
-> New bindings (with the syscon and the overheat interrupt) are available
+On Mon, Jun 25, 2018 at 05:12:35PM +0200, Miquel Raynal wrote:
+> In CP files, the syscons are called CP110_LABEL(syscon<x>) in case of
+> future additions. Use the same logic here to prepare the addition of a
+> second syscon to access both the thermal IP, the DFX server registers
+> and later probably other registers within this same memory area.
 
-What interrupt? It's not in your new binding.
+You are renaming labels, not nodes.
 
-> for AP806 and CP110 compatibles. Add a reference to these files from the
-> original documentation.
+The example is just an example. Drop that change as it is not necessary.
+
 > 
 > Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 > ---
->  Documentation/devicetree/bindings/thermal/armada-thermal.txt | 5 +++++
->  1 file changed, 5 insertions(+)
+>  .../devicetree/bindings/arm/marvell/ap806-system-controller.txt         | 2 +-
+>  arch/arm64/boot/dts/marvell/armada-ap806.dtsi                           | 2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/thermal/armada-thermal.txt b/Documentation/devicetree/bindings/thermal/armada-thermal.txt
-> index e0d013a2e66d..f3b441100890 100644
-> --- a/Documentation/devicetree/bindings/thermal/armada-thermal.txt
-> +++ b/Documentation/devicetree/bindings/thermal/armada-thermal.txt
-> @@ -10,6 +10,11 @@ Required properties:
->      * marvell,armada-ap806-thermal
->      * marvell,armada-cp110-thermal
-
-Really you should not be using the same compatible for both. Now you 
-have 2 drivers matching to same compatibles.
-
-Can't you make this a child of the syscon without breaking the binding?
-
+> diff --git a/Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt b/Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt
+> index a265f1628f36..108e8da600e4 100644
+> --- a/Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt
+> +++ b/Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt
+> @@ -79,7 +79,7 @@ Required properties:
+>  - offset: offset address inside the syscon block
 >  
-> +Note: these bindings are deprecated for AP806/CP110 and should instead
-> +follow the rules described in:
-> +Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt
-> +Documentation/devicetree/bindings/arm/marvell/cp110-system-controller.txt
-> +
->  - reg: Device's register space.
->    Two entries are expected, see the examples below. The first one points
->    to the status register (4B). The second one points to the control
+>  Example:
+> -ap_syscon: system-controller at 6f4000 {
+> +ap_syscon0: system-controller at 6f4000 {
+>  	compatible = "syscon", "simple-mfd";
+>  	reg = <0x6f4000 0x1000>;
+>  
+> diff --git a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
+> index 4f2a704615b0..550f03b8c96f 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
+> +++ b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
+> @@ -230,7 +230,7 @@
+>  				status = "disabled";
+>  			};
+>  
+> -			ap_syscon: system-controller at 6f4000 {
+> +			ap_syscon0: system-controller at 6f4000 {
+>  				compatible = "syscon", "simple-mfd";
+>  				reg = <0x6f4000 0x2000>;
+>  
 > -- 
 > 2.14.1
 > 
