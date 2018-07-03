@@ -1,82 +1,39 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 3 Jul 2018 15:14:35 -0600
-Subject: [PATCH v2 17/23] dt-bindings: cp110: add the thermal node in the
- syscon file
-In-Reply-To: <20180625151239.20976-18-miquel.raynal@bootlin.com>
-References: <20180625151239.20976-1-miquel.raynal@bootlin.com>
- <20180625151239.20976-18-miquel.raynal@bootlin.com>
-Message-ID: <20180703211435.GA11282@rob-hp-laptop>
+From: christoffer.dall@arm.com (Christoffer Dall)
+Date: Tue,  3 Jul 2018 23:26:15 +0200
+Subject: [PATCH] KVM: arm/arm64: Fix vgic init race
+Message-ID: <1530653175-11999-1-git-send-email-christoffer.dall@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 25, 2018 at 05:12:33PM +0200, Miquel Raynal wrote:
-> Explain the thermal bindings now that the thermal IP is described being
-> inside of a system controller. Add a reference to the thermal-zone node.
-> 
-> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
-> ---
->  .../arm/marvell/cp110-system-controller.txt        | 37 ++++++++++++++++++++++
->  1 file changed, 37 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/marvell/cp110-system-controller.txt b/Documentation/devicetree/bindings/arm/marvell/cp110-system-controller.txt
-> index 54b0d64ce819..cd4a7a57491e 100644
-> --- a/Documentation/devicetree/bindings/arm/marvell/cp110-system-controller.txt
-> +++ b/Documentation/devicetree/bindings/arm/marvell/cp110-system-controller.txt
-> @@ -11,6 +11,9 @@ For the top level node:
->   - compatible: must be: "syscon", "simple-mfd";
->   - reg: register area of the CP110 system controller
->  
-> +SYSTEM CONTROLLER 0
-> +===================
-> +
->  Clocks:
->  -------
->  
-> @@ -186,3 +189,37 @@ CP110_LABEL(syscon0): system-controller at 440000 {
->  	};
->  
->  };
-> +
-> +SYSTEM CONTROLLER 1
-> +===================
-> +
-> +Thermal:
-> +--------
-> +
-> +The thermal IP can probe the temperature all around the processor. It
-> +may feature several channels, each of them wired to one sensor.
-> +
-> +For common binding part and usage, refer to
-> +Documentation/devicetree/bindings/thermal/thermal.txt
-> +
-> +Required properties:
-> +- compatible: must be one of:
-> +  * marvell,armada-cp110-thermal
-> +- reg: register range associated with the thermal functions.
-> +
-> +Optional properties:
-> +- #thermal-sensor-cells: shall be <1> when thermal-zones subnodes refer
-> +  to this IP and represents the channel ID. There is one sensor per
-> +  channel. O refers to the thermal IP internal channel.
-> +
-> +Example:
-> +CP110_LABEL(syscon1): system-controller at 6f8000 {
-> +	compatible = "syscon", "simple-mfd";
-> +	reg = <0x6f8000 0x1000>;
-> +
-> +	CP110_LABEL(thermal): ap-thermal at 70 {
+The vgic_init function can race with kvm_arch_vcpu_create() which does
+not hold kvm_lock() and we therefore have no synchronization primitives
+to ensure we're doing the right thing.
 
-thermal-sensor at ...
+As the user is trying to initialize or run the VM while at the same time
+creating more VCPUs, we just have to refuse to initialize the VGIC in
+this case rather than silently failing with a broken VCPU.
 
-With that,
+Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
+---
+ virt/kvm/arm/vgic/vgic-init.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
+index 9406eaf..c0c0b88 100644
+--- a/virt/kvm/arm/vgic/vgic-init.c
++++ b/virt/kvm/arm/vgic/vgic-init.c
+@@ -286,6 +286,10 @@ int vgic_init(struct kvm *kvm)
+        if (vgic_initialized(kvm))
+                return 0;
 
-> +		compatible = "marvell,armada-cp110-thermal";
-> +		reg = <0x70 0x10>;
-> +		#thermal-sensor-cells = <1>;
-> +	};
-> +};
-> -- 
-> 2.14.1
-> 
++       /* Are we also in the middle of creating a VCPU? */
++       if (kvm->created_vcpus != atomic_read(&kvm->online_vcpus))
++               return -EBUSY;
++
+        /* freeze the number of spis */
+        if (!dist->nr_spis)
+                dist->nr_spis = VGIC_NR_IRQS_LEGACY - VGIC_NR_PRIVATE_IRQS;
+--
+2.7.4
+
+IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
