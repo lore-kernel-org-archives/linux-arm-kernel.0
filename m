@@ -1,62 +1,89 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Tue, 3 Jul 2018 16:31:37 +0100
-Subject: [RFC net-next 15/15] net: lora: Add Semtech SX1301
-In-Reply-To: <809fc546-6012-37f3-9485-cfd8eaf99488@suse.de>
-References: <20180701110804.32415-1-afaerber@suse.de>
- <20180701110804.32415-16-afaerber@suse.de>
- <20180702161258.GA18744@sirena.org.uk>
- <4e06cc72-2092-70f3-c801-bf6e4c3cbec2@suse.de>
- <20180703145022.GA13744@sirena.org.uk>
- <809fc546-6012-37f3-9485-cfd8eaf99488@suse.de>
-Message-ID: <20180703153137.GB13744@sirena.org.uk>
+Date: Tue, 03 Jul 2018 16:33:55 +0100
+Subject: Applied "ASoC: atmel-i2s: dt-bindings: Remove unnecessary phandle to
+ aclk" to the asoc tree
+In-Reply-To: <20180703145631.15246-3-codrin.ciubotariu@microchip.com>
+Message-ID: <E1faNJT-0003di-5D@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 03, 2018 at 05:09:38PM +0200, Andreas F?rber wrote:
-> Am 03.07.2018 um 16:50 schrieb Mark Brown:
+The patch
 
-> >> 2) This SPI device is in turn exposing the two SPI masters that you
-> >> already found below, and I didn't see a sane way to split that code out
-> >> into drivers/spi/, so it's in drivers/net/lora/ here - has there been
-> >> any precedence either way?
+   ASoC: atmel-i2s: dt-bindings: Remove unnecessary phandle to aclk
 
-> > A MFD?
+has been applied to the asoc tree at
 
-> I know of mfd, but how would the the the net vs. spi pieces interact
-> then? Some functions would need to be exported then or is there an
-> easier way without needing to set a cross-module API in stone?
+   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
 
-It's an in-kernel ABI it's not exactly set in stone but yeah, you'll
-need some interface.  A lot of devices work by having the children know
-that they're part of a MFD and fish things out of the parent device,
-either the pdata or (in the common case where the MFD bit mostly just
-instantiates subdevices and holds a regmap) with dev_get_regmap().
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
 
-> > A register map would work just as well here, we already have plenty of
-> > devices that abstract at this level (most obviously the I2C/SPI devices
-> > that use it to offer both interfaces with a single core driver).
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
 
-> The address and data registers together form a two-byte SPI message!
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
 
-> It is transmitted by writing to the CS register.
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
 
-> The received data is afterwards available in another register.
+Thanks,
+Mark
 
-Right, but it seems from the code that the hardware understands that
-it's formatting register I/O and not just shifting in and out a byte
-stream which is what a SPI controller does.  I'd not be surprised to
-learn that the register you're calling a chip select register is a
-strobe that initiates the transfer (and that this may be some of the
-difficulty you're having with handling it in the way the framework
-expects), the pattern with writing 1 followed immediately by 0 is a bit
-of a flag here.
+>From 2bd368d7bf21028f37a123041a138922254d4840 Mon Sep 17 00:00:00 2001
+From: Codrin Ciubotariu <codrin.ciubotariu@microchip.com>
+Date: Tue, 3 Jul 2018 17:56:31 +0300
+Subject: [PATCH] ASoC: atmel-i2s: dt-bindings: Remove unnecessary phandle to
+ aclk
 
-I've seen such before hardware where I know it was intentionally
-designed that way so it wouldn't be totally surprising.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180703/dd8f2013/attachment.sig>
+The optional clock phandle to aclk (Audio PLL clock) is no longer needed
+by the driver.
+
+Signed-off-by: Codrin Ciubotariu <codrin.ciubotariu@microchip.com>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ Documentation/devicetree/bindings/sound/atmel-i2s.txt | 11 +++++------
+ 1 file changed, 5 insertions(+), 6 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/sound/atmel-i2s.txt b/Documentation/devicetree/bindings/sound/atmel-i2s.txt
+index 735368b8a73f..40549f496a81 100644
+--- a/Documentation/devicetree/bindings/sound/atmel-i2s.txt
++++ b/Documentation/devicetree/bindings/sound/atmel-i2s.txt
+@@ -15,7 +15,6 @@ Required properties:
+ - clock-names:    Should be one of each entry matching the clocks phandles list:
+                   - "pclk" (peripheral clock) Required.
+                   - "gclk" (generated clock) Optional (1).
+-                  - "aclk" (Audio PLL clock) Optional (1).
+                   - "muxclk" (I2S mux clock) Optional (1).
+ 
+ Optional properties:
+@@ -23,9 +22,9 @@ Optional properties:
+ - princtrl-names: Should contain only one value - "default".
+ 
+ 
+-(1) : Only the peripheral clock is required. The generated clock, the Audio
+-      PLL clock adn the I2S mux clock are optional and should only be set
+-      together, when Master Mode is required.
++(1) : Only the peripheral clock is required. The generated clock and the I2S
++      mux clock are optional and should only be set together, when Master Mode
++      is required.
+ 
+ Example:
+ 
+@@ -40,8 +39,8 @@ Example:
+ 			(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
+ 			 AT91_XDMAC_DT_PERID(32))>;
+ 		dma-names = "tx", "rx";
+-		clocks = <&i2s0_clk>, <&i2s0_gclk>, <&audio_pll_pmc>, <&i2s0muxck>;
+-		clock-names = "pclk", "gclk", "aclk", "muxclk";
++		clocks = <&i2s0_clk>, <&i2s0_gclk>, <&i2s0muxck>;
++		clock-names = "pclk", "gclk", "muxclk";
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&pinctrl_i2s0_default>;
+ 	};
+-- 
+2.18.0.rc2
