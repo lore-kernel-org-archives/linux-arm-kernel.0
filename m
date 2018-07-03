@@ -1,59 +1,77 @@
 From: richard.gong@linux.intel.com (richard.gong at linux.intel.com)
-Date: Tue,  3 Jul 2018 09:46:52 -0500
-Subject: [PATCHv6 5/8] arm64: dts: stratix10: add fpga manager and region
+Date: Tue,  3 Jul 2018 09:46:55 -0500
+Subject: [PATCHv6 8/8] Documentation: driver-api: add stratix10 service layer
 In-Reply-To: <1530629215-26990-1-git-send-email-richard.gong@linux.intel.com>
 References: <1530629215-26990-1-git-send-email-richard.gong@linux.intel.com>
-Message-ID: <1530629215-26990-6-git-send-email-richard.gong@linux.intel.com>
+Message-ID: <1530629215-26990-9-git-send-email-richard.gong@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alan Tull <atull@kernel.org>
+From: Richard Gong <richard.gong@intel.com>
 
-Add the Stratix10 FPGA manager and a FPGA region to the
-device tree.
+Add new file stratix10-svc.rst
+Add stratix10-svc.rst to driver-api/index.rst
 
-Signed-off-by: Alan Tull <atull@kernel.org>
 Signed-off-by: Richard Gong <richard.gong@intel.com>
+Signed-off-by: Alan Tull <atull@kernel.org>
 ---
-v2: this patch is added in patch set version 2
-v3: change to put fpga_mgr node under firmware/svc node
-v4: s/fpga-mgr at 0/fpga-mgr/ to remove unit_address
-    add Richard's signed-off-by
-v5: no change
+v5: this patch is added in patch set version 5
 v6: no change
 ---
- arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ Documentation/driver-api/index.rst         |  1 +
+ Documentation/driver-api/stratix10-svc.rst | 32 ++++++++++++++++++++++++++++++
+ 2 files changed, 33 insertions(+)
+ create mode 100644 Documentation/driver-api/stratix10-svc.rst
 
-diff --git a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
-index 1ba9a1c..5431c8a 100644
---- a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
-+++ b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
-@@ -106,6 +106,14 @@
- 		interrupt-parent = <&intc>;
- 		ranges = <0 0 0 0xffffffff>;
+diff --git a/Documentation/driver-api/index.rst b/Documentation/driver-api/index.rst
+index 6d9f2f9..d4d2671 100644
+--- a/Documentation/driver-api/index.rst
++++ b/Documentation/driver-api/index.rst
+@@ -53,6 +53,7 @@ available subsections can be seen below.
+    slimbus
+    soundwire/index
+    fpga/index
++   stratix10-svc
  
-+		base_fpga_region {
-+			#address-cells = <0x1>;
-+			#size-cells = <0x1>;
+ .. only::  subproject and html
+ 
+diff --git a/Documentation/driver-api/stratix10-svc.rst b/Documentation/driver-api/stratix10-svc.rst
+new file mode 100644
+index 0000000..ed361d8
+--- /dev/null
++++ b/Documentation/driver-api/stratix10-svc.rst
+@@ -0,0 +1,32 @@
 +
-+			compatible = "fpga-region";
-+			fpga-mgr = <&fpga_mgr>;
-+		};
++Intel Stratix10 SoC Service Layer
++=================================
 +
- 		clkmgr: clock-controller at ffd10000 {
- 			compatible = "intel,stratix10-clkmgr";
- 			reg = <0xffd10000 0x1000>;
-@@ -500,6 +508,10 @@
- 				compatible = "intel,stratix10-svc";
- 				method = "smc";
- 				memory-region = <&service_reserved>;
++Some features of the Intel Stratix10 SoC require a level of privilege
++higher than the kernel is granted. Such secure features include
++FPGA programming. In terms of the ARMv8 architecture, the kernel runs
++at Exception Level 1 (EL1), access to the features requires
++Exception Level 3 (EL3).
 +
-+				fpga_mgr: fpga-mgr {
-+					compatible = "intel,stratix10-soc-fpga-mgr";
-+				};
- 			};
- 		};
- 	};
++The Intel Stratix10 SoC service layer provides an in kernel API for
++drivers to request access to the secure features. The requests are queued
++and processed one by one. ARM?s SMCCC is used to pass the execution
++of the requests on to a secure monitor (EL3).
++
++.. kernel-doc:: include/linux/stratix10-svc-client.h
++   :functions: stratix10_svc_command_code
++
++.. kernel-doc:: include/linux/stratix10-svc-client.h
++   :functions: stratix10_svc_client_msg
++
++.. kernel-doc:: include/linux/stratix10-svc-client.h
++   :functions: stratix10_svc_command_reconfig_payload
++
++.. kernel-doc:: include/linux/stratix10-svc-client.h
++   :functions: stratix10_svc_cb_data
++
++.. kernel-doc:: include/linux/stratix10-svc-client.h
++   :functions: stratix10_svc_client
++
++.. kernel-doc:: drivers/misc/stratix10-svc.c
++   :export:
 -- 
 2.7.4
