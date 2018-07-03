@@ -1,7 +1,7 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 3 Jul 2018 00:07:43 -0700
+From: faiz_abbas@ti.com (Faiz Abbas)
+Date: Tue, 3 Jul 2018 12:59:34 +0530
 Subject: [PATCH v3 4/6] bus: ti-sysc: Add support for software reset
-In-Reply-To: <20180611070332.GP5738@atomide.com>
+In-Reply-To: <20180703070743.GG112168@atomide.com>
 References: <20180606060826.14671-5-faiz_abbas@ti.com>
  <20180607073530.GH5738@atomide.com>
  <a169ba7f-53f2-cf9a-a9ee-daffd6b53279@ti.com>
@@ -11,42 +11,48 @@ References: <20180606060826.14671-5-faiz_abbas@ti.com>
  <f460481f-85a9-2a41-a894-6f25122dee8a@ti.com>
  <20180611062904.GO5738@atomide.com>
  <89d55b0b-fe9e-793b-2694-25755ac2bc15@ti.com>
- <20180611070332.GP5738@atomide.com>
-Message-ID: <20180703070743.GG112168@atomide.com>
+ <20180611070332.GP5738@atomide.com> <20180703070743.GG112168@atomide.com>
+Message-ID: <ee54c3ea-6200-33dd-83da-491f5fdd9f5c@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [180611 07:06]:
-> * Faiz Abbas <faiz_abbas@ti.com> [180611 06:48]:
-> > Hi,
-> > 
-> > On Monday 11 June 2018 11:59 AM, Tony Lindgren wrote:
-> > > * Faiz Abbas <faiz_abbas@ti.com> [180611 06:28]:
-> > >> Great. I thought I completely misunderstood you. But I don't see what
-> > >> adding another function will accomplish. A QUIRK flag used in the same
-> > >> function would work well enough>
-> > > Fine with me as long as the function stays simple for both
-> > > syss and sysc reset.
-> > >
-> > 
-> > 
-> > In general a reset status bit being in sysstatus is the norm and it
-> > being in sysconfig should be the "quirk" for which a flag needs to be
-> > added. What do you think?
-> 
-> Sure makes sense to me.
-> 
-> > As an aside, naming bitshifts by the name of the platform they were
-> > originally added in seems weird. There should be some generic mask
-> > saying "soft reset is the 0th bit". Currently I am using
-> > SYSC_OMAP4_SOFTRESET for a dra76x module. I guess it depends on how many
-> > different sysconfig types we have.
-> 
-> Sure we could have a macro for that.
+Hi,
 
-So what's the conclusion on this one? Are you going to do one
-more version of the ti-sysc driver patch?
+On Tuesday 03 July 2018 12:37 PM, Tony Lindgren wrote:
+> * Tony Lindgren <tony@atomide.com> [180611 07:06]:
+>> * Faiz Abbas <faiz_abbas@ti.com> [180611 06:48]:
+>>> Hi,
+>>>
+>>> On Monday 11 June 2018 11:59 AM, Tony Lindgren wrote:
+>>>> * Faiz Abbas <faiz_abbas@ti.com> [180611 06:28]:
+>>>>> Great. I thought I completely misunderstood you. But I don't see what
+>>>>> adding another function will accomplish. A QUIRK flag used in the same
+>>>>> function would work well enough>
+>>>> Fine with me as long as the function stays simple for both
+>>>> syss and sysc reset.
+>>>>
+>>>
+>>>
+>>> In general a reset status bit being in sysstatus is the norm and it
+>>> being in sysconfig should be the "quirk" for which a flag needs to be
+>>> added. What do you think?
+>>
+>> Sure makes sense to me.
+>>
+>>> As an aside, naming bitshifts by the name of the platform they were
+>>> originally added in seems weird. There should be some generic mask
+>>> saying "soft reset is the 0th bit". Currently I am using
+>>> SYSC_OMAP4_SOFTRESET for a dra76x module. I guess it depends on how many
+>>> different sysconfig types we have.
+>>
+>> Sure we could have a macro for that.
+> 
+> So what's the conclusion on this one? Are you going to do one
+> more version of the ti-sysc driver patch?
+> 
 
-Regards,
+Yes. I have just now been able to get back to this. Will post a v4 by
+tomorrow.
 
-Tony
+Thanks,
+Faiz
