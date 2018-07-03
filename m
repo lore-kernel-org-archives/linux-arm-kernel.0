@@ -1,146 +1,50 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 3 Jul 2018 08:11:03 +0100
-Subject: [v3 03/10] mfd: mtk-mmsys: Add mmsys driver
-In-Reply-To: <5269ccfd-0274-3c12-7eeb-5de923197d92@gmail.com>
-References: <cover.1524820923.git.mbrugger@suse.com>
- <e0894c97775e46ce6d9a441dc05e2e2479a4b612.1524820923.git.mbrugger@suse.com>
- <20180430101826.GC5147@dell>
- <5269ccfd-0274-3c12-7eeb-5de923197d92@gmail.com>
-Message-ID: <20180703071103.GE20176@dell>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 3 Jul 2018 15:12:16 +0800
+Subject: [PATCH 15/15] arm: dts: imx: Add missing OPP properties for CPUs
+In-Reply-To: <20180528110739.ewmhlf72sl7u5ju7@vireshk-i7>
+References: <cover.1527244200.git.viresh.kumar@linaro.org>
+ <264124e14b966a1bbc07c364fbd89fc55aa765e6.1527244201.git.viresh.kumar@linaro.org>
+ <1527248760.3472.6.camel@pengutronix.de>
+ <20180528110739.ewmhlf72sl7u5ju7@vireshk-i7>
+Message-ID: <20180703071215.GM4348@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 25 Jun 2018, Matthias Brugger wrote:
-> On 30/04/18 12:18, Lee Jones wrote:
-> > On Fri, 27 Apr 2018, matthias.bgg at kernel.org wrote:
-> > 
-> >> From: Matthias Brugger <mbrugger@suse.com>
-> >>
-> >> The MMSYS subsystem includes clocks and drm components.
-> >> This patch adds a MFD device to probe both drivers from the same
-> >> device tree compatible.
-> >>
-> >> Signed-off-by: Matthias Brugger <mbrugger@suse.com>
-> >> ---
-> >>  drivers/mfd/Kconfig     |  9 ++++++
-> >>  drivers/mfd/Makefile    |  2 ++
-> >>  drivers/mfd/mtk-mmsys.c | 79 +++++++++++++++++++++++++++++++++++++++++++++++++
-> >>  3 files changed, 90 insertions(+)
-> >>  create mode 100644 drivers/mfd/mtk-mmsys.c
-> >>
-> >> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-> >> index b860eb5aa194..d23a3b9a2c58 100644
-> >> --- a/drivers/mfd/Kconfig
-> >> +++ b/drivers/mfd/Kconfig
-> >> @@ -378,6 +378,15 @@ config MFD_MC13XXX_I2C
-> >>  	help
-> >>  	  Select this if your MC13xxx is connected via an I2C bus.
-> >>  
-> >> +config MFD_MEDIATEK_MMSYS
-> >> +	tristate "Mediatek MMSYS interface"
-> >> +	select MFD_CORE
-> >> +	select REGMAP_MMIO
-> >> +	help
-> >> +	  Select this if you have a MMSYS subsystem in your SoC. The
-> >> +	  MMSYS subsystem has at least a clock driver part and some
-> >> +	  DRM components.
-> >> +
-> >>  config MFD_MXS_LRADC
-> >>  	tristate "Freescale i.MX23/i.MX28 LRADC"
-> >>  	depends on ARCH_MXS || COMPILE_TEST
-> >> diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
-> >> index d9d2cf0d32ef..b96118bd68d9 100644
-> >> --- a/drivers/mfd/Makefile
-> >> +++ b/drivers/mfd/Makefile
-> >> @@ -98,6 +98,8 @@ obj-$(CONFIG_MFD_MC13XXX)	+= mc13xxx-core.o
-> >>  obj-$(CONFIG_MFD_MC13XXX_SPI)	+= mc13xxx-spi.o
-> >>  obj-$(CONFIG_MFD_MC13XXX_I2C)	+= mc13xxx-i2c.o
-> >>  
-> >> +obj-$(CONFIG_MFD_MEDIATEK_MMSYS) += mtk-mmsys.o
-> >> +
-> >>  obj-$(CONFIG_MFD_CORE)		+= mfd-core.o
-> >>  
-> >>  obj-$(CONFIG_EZX_PCAP)		+= ezx-pcap.o
-> >> diff --git a/drivers/mfd/mtk-mmsys.c b/drivers/mfd/mtk-mmsys.c
-> >> new file mode 100644
-> >> index 000000000000..c802343fb1c6
-> >> --- /dev/null
-> >> +++ b/drivers/mfd/mtk-mmsys.c
-> >> @@ -0,0 +1,79 @@
-> >> +// SPDX-License-Identifier: GPL-2.0+
-> >> +
-> >> +/*
-> >> + * mtk-mmsys.c -- Mediatek MMSYS multi-function driver
-> >> + *
-> >> + * Copyright (c) 2018 Matthias Brugger <matthias.bgg@gmail.com>
-> >> + *
-> >> + * Author: Matthias Brugger <matthias.bgg@gmail.com>
-> >> + */
-> >> +
-> >> +#include <linux/module.h>
-> >> +#include <linux/init.h>
-> >> +#include <linux/mfd/core.h>
-> >> +#include <linux/of.h>
-> >> +#include <linux/of_address.h>
-> >> +#include <linux/of_device.h>
-> >> +#include <linux/platform_device.h>
-> >> +#include <linux/regmap.h>
-> >> +
-> >> +enum {
-> >> +	MMSYS_MT2701 = 1,
-> >> +};
-> >> +
-> >> +static const struct mfd_cell mmsys_mt2701_devs[] = {
-> >> +	{ .name = "clk-mt2701-mm", },
-> >> +	{ .name = "drm-mt2701-mm", },
-> >> +};
-> >> +
-> >> +static int mmsys_probe(struct platform_device *pdev)
-> >> +{
-> >> +	const struct mfd_cell *mmsys_cells;
-> >> +	int nr_cells;
-> >> +	long id;
-> >> +	int ret;
-> >> +
-> >> +	id = (long) of_device_get_match_data(&pdev->dev);
-> >> +	if (!id) {
-> >> +		dev_err(&pdev->dev, "of_device_get match_data() failed\n");
-> >> +		return -EINVAL;
-> >> +	}
-> >> +
-> >> +	switch (id) {
-> >> +	case MMSYS_MT2701:
-> >> +		mmsys_cells = mmsys_mt2701_devs;
-> >> +		nr_cells = ARRAY_SIZE(mmsys_mt2701_devs);
-> >> +		break;
-> >> +	default:
-> >> +		return -ENODEV;
-> >> +	}
-> >> +
-> >> +	ret = devm_mfd_add_devices(&pdev->dev, 0, mmsys_cells, nr_cells,
-> >> +					NULL, 0, NULL);
-> >> +	if (ret) {
-> >> +		dev_err(&pdev->dev, "failed to add MFD devices %d\n", ret);
-> >> +		return ret;
-> >> +	}
-> >> +
-> >> +	return 0;
-> >> +};
-> > 
-> > This driver is pretty pointless.  It doesn't actually do anything.
-> > 
-> > I think you just want to use "simple-mfd" instead.
-> > 
+On Mon, May 28, 2018 at 04:37:39PM +0530, Viresh Kumar wrote:
+> Hi Lucas,
 > 
-> I think the problem is, that right now we have two drivers which use the same
-> devicetree binding, which are clk and drm driver. With a simple-mfd we would
-> need two compatibles, and this would break backwards compatibility.
+> On 25-05-18, 13:46, Lucas Stach wrote:
+> > This is a lot of duplicate information for what is effectively a shared
+> >  cluster wide thing. This does absolutely not _feel_ right.
+> 
+> I cannot agree more :)
+> 
+> > What problem are you solving here? Why do we need all this duplicate
+> > information? Why can't we fix it by falling back to looking at cpu0 if
+> > needed?
+> 
+> Let me try explaining one of the problem scenarios to you as your
+> platform is a single cluster one. Make cpufreq driver as module, don't
+> insert it, hotplug out CPU0 and now insert the cpufreq driver. The
+> cpufreq core will try adding the cpufreq policy for CPU1 but wouldn't
+> find the required information in the DT node of CPU1 and so will fail
+> or behave incorrectly.
+> 
+> We can't look at CPU0 as we don't know they are related at all.
+> Nothing tells that to us. The right solution to fix the duplication is
+> to move to OPP-v2 bindings, which allow us to create a single OPP
+> table node and refer to it from all the CPU nodes. Because in case of
+> imx platforms getting updated here, we use the old and some platforms
+> specific frequency tables, we have to duplicate it everywhere.
+> 
+> But looking from DT otherwise, all the device should anyway have all
+> the information required right in their node. That can be simplified
+> with things like phandle to opp-v2 node, but still everything needs to
+> be there. We shouldn't really rely on other CPU nodes to make it work.
+> That would be an incomplete definition of the hardware IMHO.
 
-So what functionality does this driver provide you with that you do
-not have currently?
+Lucas,
 
--- 
-Lee Jones [???]
-Linaro Services Technical Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Are you fine with the patch now considering the respond from Viresh?
+
+Shawn
