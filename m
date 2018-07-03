@@ -1,125 +1,78 @@
-From: ravi.bangoria@linux.ibm.com (Ravi Bangoria)
-Date: Tue, 3 Jul 2018 13:13:58 +0530
-Subject: [PATCH v5 06/10] Uprobes: Support SDT markers having reference
- count (semaphore)
-In-Reply-To: <20180703061612.GG65296@linux.vnet.ibm.com>
-References: <20180628052209.13056-1-ravi.bangoria@linux.ibm.com>
- <20180628052209.13056-7-ravi.bangoria@linux.ibm.com>
- <20180701210935.GA14404@redhat.com>
- <0c543791-f3b7-5a4b-f002-e1c76bb430c0@linux.ibm.com>
- <20180702180156.GA31400@redhat.com>
- <f19e3801-d56a-4e34-0acc-1040a071cf91@linux.ibm.com>
- <20180703061612.GG65296@linux.vnet.ibm.com>
-Message-ID: <c21db380-7dc0-2165-8616-8dcb519aa787@linux.ibm.com>
+From: anson.huang@nxp.com (Anson Huang)
+Date: Tue, 3 Jul 2018 07:44:10 +0000
+Subject: [PATCH v1] ARM: dts: imx6sl-evk: keep sw4 always on
+In-Reply-To: <20180703053843.GC4348@dragon>
+References: <CAOMZO5BjOEGWv2dC-bp0BYHq+PhLssEKic+o7ock8_1Dobd=sQ@mail.gmail.com>
+ <AM3PR04MB131507901BFEE1A5E426EECBF5430@AM3PR04MB1315.eurprd04.prod.outlook.com>
+ <CAOMZO5D8tjnjbwMdLGd7KF7_4PwqRWX8XH8kdcF3-5e-r2YQEA@mail.gmail.com>
+ <AM3PR04MB1315E7AED2BCE2265E6C443DF5430@AM3PR04MB1315.eurprd04.prod.outlook.com>
+ <CAOMZO5D8v4KM9S4ooHTDbA+vc8BZN_eO_wDuOPA+8Hcq-SmLDw@mail.gmail.com>
+ <AM3PR04MB1315C7C7CFF990615732FFBCF5430@AM3PR04MB1315.eurprd04.prod.outlook.com>
+ <CAOMZO5AM5VRS7UiWuvAQ8vvTB8OM+iwofuYrbsL_yB9e0Z9Kyg@mail.gmail.com>
+ <AM3PR04MB13155B8D567ABEF7EF03249AF5430@AM3PR04MB1315.eurprd04.prod.outlook.com>
+ <CAOMZO5BdtxKjQge5ONpnjr1yNVeTJf4u8Gh-fPqpHz7G9ipOTg@mail.gmail.com>
+ <1530526335.15665.13.camel@nxp.com> <20180703053843.GC4348@dragon>
+Message-ID: <AM3PR04MB131542D42FCD798FDBBA54BFF5420@AM3PR04MB1315.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Srikar,
+Hi, Shawn
 
-On 07/03/2018 11:46 AM, Srikar Dronamraju wrote:
->> Current approach:
->>
->>     ------------
->>     register_for_each_vma() / uprobe_mmap()
->>       install_breakpoint()
->>         uprobe_write_opcode() {
->>                 if (instruction is not already patched) {
->>                         /* Gets called only _once_. */
->>                         increment the reference counter;
->>                         patch the instruction;
->>                 }
->>         }
->>     ------------
->>
+Anson Huang
+Best Regards!
+
+
+> -----Original Message-----
+> From: Shawn Guo [mailto:shawnguo at kernel.org]
+> Sent: Tuesday, July 3, 2018 1:39 PM
+> To: Robin Gong <yibin.gong@nxp.com>
+> Cc: festevam at gmail.com; Anson Huang <anson.huang@nxp.com>;
+> mark.rutland at arm.com; devicetree at vger.kernel.org;
+> linux-kernel at vger.kernel.org; robh+dt at kernel.org; dl-linux-imx
+> <linux-imx@nxp.com>; kernel at pengutronix.de; Fabio Estevam
+> <fabio.estevam@nxp.com>; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH v1] ARM: dts: imx6sl-evk: keep sw4 always on
 > 
-> Lets say a user just installs a breakpoint which is part of USDT (using
-> either a trace or perf (or some other utility) 
-> Since the semaphore is not updated, it never hits the probe.
-> This is correct.
+> On Mon, Jul 02, 2018 at 02:12:52AM +0000, Robin Gong wrote:
+> > But in fact, the original dts is not correct without
+> > 'regulator-always- on'since SW4 is the critical DDR power rail,
+> > although, it's kept on in the previous kernel by no switches
+> > enable/disable interfaces provided in pfuze driver. Adding new
+> > property which can be done totally by the common 'regulator-always-on'
+> > is not a good choice. Keep the dts patch adding 'regulator-always-on'
+> > ahead of pfuze driver pach adding enable/disable interface is enough for such
+> case I think.
 > 
-> Now he toggles the semaphore and places a probe at the same spot using
-> systemtap or bcc.
-> The probes will now be active and we see hits.
-> This is also correct.
+> We can not just break the installed DTBs like this.  If patching regulator driver
+> with a new property is really difficult, we could migrate the existing users in a
+> 'soft' way:
+ 
+Patching regulator driver needs to add property for those regulators can be OFF,
+it will make users confuse with original regulator framework knowledge, NOT a
+good idea.
+
 > 
-> If the user toggles the semaphore or deletes the probe using
-> systemtap/bcc. The probes will still be active.
-> Since the reference count is removed on the last consumer deletion. No?
-> This may be wrong because, we may be unnecessarily hitting the probes.
+>  - Add required regulator-always-on for regulator nodes in DTS.
+ 
+I & Yibin already sent out patch to add " regulator-always-on " for regulator nodes in DTS,
+so they can be applied first?
 
 
-I'm not sure if I get your concerns but let me try to explain what happens
-in such cases. please let me know if I misunderstood your point.
+>  - Patch i.MX platform code to check the presence of regulator-always-on
+>    property for critical regulators, and give a big warning if it's
+>    missing.
+It is NOT easy to identify which switch is critical or NOT, and different platforms
+have different board design, it will introduce many platform specified code, so I think
+just revert the pfuze100 switch enable/disable patch should be OK for now. 
 
-1. Install a probe using perf.
-  # ./perf probe sdt_tick:loop2
+>  - Wait for a couple of release cycles for users to migrate.
+>  - Add regulator driver patch back and break users who keep ignoring
+>    the warning.
+After a couple of release cycles, add the pfuze100 switch enable/disable patch
+back to support this feature, I believe users should switch to new dtb with "regulator-always-on" 
+existing already.
 
-  This does not do anything. Just creates an entry in trace_uprobe.
+Anson.
 
-2. Start record using perf:
-  # ./perf record -a -e sdt_tick:loop2
-
-  This will call uprobe_register_refctr(inode, offfset, ref_ctr_offset)
-  and will create an object of struct uprobe.
-
-3. Start target process
-  # ./tick
-
-  When we start 'tick', kernel will load the binary and start creating
-  vmas, which will basically call uprobe_mmap(). First vma will be of
-  text section and thus instruction will be patched. But vma holding
-  reference counter is not present yet and thus the uprobe will be
-  added to delayed_uprobe_list. Now kernel will map the data section
-  holding reference counter and uprobe_mmap() will check for any
-  delayed_uprobe. It will find the uprobe and thus it will increment
-  the reference counter.
-
-  So, Reference counter = 1, instruction is patched with trap.
-
-4. For simplicity, I'm using kernel module instead of systemtap / bcc.
-   User loads a kernel module that registers a probe on the same uprobe
-   by calling uprobe_register_refctr(inode, offset, ref_ctr_offset).
-
-  # insmod test-sdt.ko
-
-  The sequence of function call here will be:
-    uprobe_register_refctr()
-      register_for_each_vma()
-        install_breakpoint()
-          set_swbp()
-            uprobe_write_opcode()
-
-  But uprobe_write_opcode will find instruction is already patched and
-  thus return without doing anything.
-
-  So, Reference counter = 1, instruction is patched.
-
-5. Let's say user kills perf record started in step 2. Function call
-   sequence here will be:
-
-     uprobe_unregister()
-       register_for_each_vma() {
-         if (!filter_chain())
-            remove_breakpoint();
-       }
-
-   Here filter_chain return true because other consumer is active on the
-   same uprobe. so uprobe_unregister() will return without doing anything.
-
-   So, Reference counter = 1, instruction is patched.
-
-6. User unloads the kernel module.
-   # rmmod test-sdt.ko
-
-   Same function sequence as step 5 but this time filter_chain() will
-   return false because there are no consumer left. And thus
-   remove_breakpoint() will get called which will reset instruction and
-   decrement the counter.
-
-  So, Reference counter = 0, instruction is reset.
-
-
-Does this explain your concerns?
-
-Thanks,
-Ravi
+> 
+> Shawn
