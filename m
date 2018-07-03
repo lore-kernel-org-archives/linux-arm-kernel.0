@@ -1,85 +1,90 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue,  3 Jul 2018 10:05:34 +0200
-Subject: [PATCH] ARM: dts: ux500: Get rid of DTC warnings
-Message-ID: <20180703080534.28397-1-linus.walleij@linaro.org>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Tue, 03 Jul 2018 10:09:33 +0200
+Subject: [PATCH 2/3] clk: meson: add sub EMMC clock dt-bindings IDs
+In-Reply-To: <4b88c509-27ea-2605-023b-de208921e157@amlogic.com>
+References: <20180703145716.31860-1-yixun.lan@amlogic.com>
+ <20180703145716.31860-3-yixun.lan@amlogic.com>
+ <20180703092107.51497a8f@bbrezillon>
+ <4b88c509-27ea-2605-023b-de208921e157@amlogic.com>
+Message-ID: <1530605373.2900.158.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-By removing the reference to skeleton.dtsi, defining chosen {}
-and proper memory nodes we get warning-free device trees for
-the Ux500.
+On Tue, 2018-07-03 at 15:36 +0800, Yixun Lan wrote:
+> Hi Broris
+> 
+>  thanks for your quick response, and see my comments below
+> 
+> On 07/03/18 15:21, Boris Brezillon wrote:
+> > On Tue, 3 Jul 2018 14:57:15 +0000
+> > Yixun Lan <yixun.lan@amlogic.com> wrote:
+> > 
+> > > Add two clock bindings IDs which provided by the EMMC clock controller,
+> > > These two clocks will be used by EMMC or NAND driver.
+> > > 
+> > > Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+> > > ---
+> > >  include/dt-bindings/clock/emmc-clkc.h | 14 ++++++++++++++
+> > >  1 file changed, 14 insertions(+)
+> > >  create mode 100644 include/dt-bindings/clock/emmc-clkc.h
+> > > 
+> > > diff --git a/include/dt-bindings/clock/emmc-clkc.h b/include/dt-bindings/clock/emmc-clkc.h
+> > > new file mode 100644
+> > > index 000000000000..d9972c400e58
+> > > --- /dev/null
+> > > +++ b/include/dt-bindings/clock/emmc-clkc.h
+> > > @@ -0,0 +1,14 @@
+> > > +/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
+> > > +/*
+> > > + * Meson EMMC sub clock tree IDs
+> > > + *
+> > > + * Copyright (c) 2018 Amlogic, Inc. All rights reserved.
+> > > + */
+> > > +
+> > > +#ifndef __EMMC_CLKC_H
+> > > +#define __EMMC_CLKC_H
+> > > +
+> > > +#define CLKID_EMMC_C_MUX				0
+> > 
+> > Looks like the MUX clk is the parent of the DIV one, and I guess the clk
+> > driver is able to select the best parent+div pair for a requested rate.
+> > Do you really need to expose the MUX to users?
+> > 
+> 
+> Yes, It's true, the mux is parent of the div clock.
+> 
+> while testing for the NAND driver, I find it's kind of loose about the
+> parent of the clock, so selecting the div (and let CCF decide freely) is
+> actually works fine
+> 
+> but for the EMMC driver, especially when running at high clock, it's
+> kind of picky about the parent of the clock, 
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/boot/dts/ste-dbx5x0.dtsi      | 7 ++++++-
- arch/arm/boot/dts/ste-hrefprev60.dtsi  | 5 +++++
- arch/arm/boot/dts/ste-hrefv60plus.dtsi | 5 +++++
- arch/arm/boot/dts/ste-snowball.dts     | 1 +
- 4 files changed, 17 insertions(+), 1 deletion(-)
+It would be nice to get an explanation about this behavior.
+it seems that even of the rate provided by CLKID_SD_EMMC_X_CLK0 (main clock
+controller) is correct, the eMMC cannot reliably tune with it.
 
-diff --git a/arch/arm/boot/dts/ste-dbx5x0.dtsi b/arch/arm/boot/dts/ste-dbx5x0.dtsi
-index 3dc0028e108b..a58ce6f68d7d 100644
---- a/arch/arm/boot/dts/ste-dbx5x0.dtsi
-+++ b/arch/arm/boot/dts/ste-dbx5x0.dtsi
-@@ -15,9 +15,14 @@
- #include <dt-bindings/arm/ux500_pm_domains.h>
- #include <dt-bindings/gpio/gpio.h>
- #include <dt-bindings/clock/ste-ab8500.h>
--#include "skeleton.dtsi"
- 
- / {
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+
-+	chosen {
-+	};
-+
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-diff --git a/arch/arm/boot/dts/ste-hrefprev60.dtsi b/arch/arm/boot/dts/ste-hrefprev60.dtsi
-index 3f14b4df69b4..594be14b14fa 100644
---- a/arch/arm/boot/dts/ste-hrefprev60.dtsi
-+++ b/arch/arm/boot/dts/ste-hrefprev60.dtsi
-@@ -16,6 +16,11 @@
- #include "ste-href.dtsi"
- 
- / {
-+	memory {
-+		device_type = "memory";
-+		reg = <0x00000000 0x20000000>;
-+	};
-+
- 	gpio_keys {
- 		button at 1 {
- 			gpios = <&tc3589x_gpio 7 GPIO_ACTIVE_HIGH>;
-diff --git a/arch/arm/boot/dts/ste-hrefv60plus.dtsi b/arch/arm/boot/dts/ste-hrefv60plus.dtsi
-index bf259bbd1d0a..e5be8a94a03a 100644
---- a/arch/arm/boot/dts/ste-hrefv60plus.dtsi
-+++ b/arch/arm/boot/dts/ste-hrefv60plus.dtsi
-@@ -17,6 +17,11 @@
- 	model = "ST-Ericsson HREF (v60+) platform with Device Tree";
- 	compatible = "st-ericsson,hrefv60+", "st-ericsson,u8500";
- 
-+	memory {
-+		device_type = "memory";
-+		reg = <0x00000000 0x20000000>;
-+	};
-+
- 	soc {
- 		/* Name the GPIO muxed rails on the HREF boards */
- 		gpio at 8012e000 {
-diff --git a/arch/arm/boot/dts/ste-snowball.dts b/arch/arm/boot/dts/ste-snowball.dts
-index b0b94d053098..8fa025251dc6 100644
---- a/arch/arm/boot/dts/ste-snowball.dts
-+++ b/arch/arm/boot/dts/ste-snowball.dts
-@@ -26,6 +26,7 @@
- 	};
- 
- 	memory {
-+		device_type = "memory";
- 		reg = <0x00000000 0x20000000>;
- 	};
- 
--- 
-2.17.0
+Could you elaborate on this ?
+
+> so the driver may want to
+> manually choose the parent of the mux clock (example fclk_div2 here).
+> That's why I'm exporting this clock ID.
+
+ATM the EMMC driver will not use this provider. If this is the only reason, it
+could be done later.
+
+Is the NAND driver "picky" as well ?
+
+> 
+> 
+> > > +#define CLKID_EMMC_C_DIV				1
+> > > +
+> > > +#endif
+> > 
+> > .
+> > 
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-clk" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
