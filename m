@@ -1,38 +1,83 @@
 From: dkos@cadence.com (Damian Kos)
-Date: Tue, 3 Jul 2018 11:02:12 +0100
-Subject: [PATCH 01/12] HACK: increase timeout for
- drm_atomic_helper_wait_for_vblanks
+Date: Tue, 3 Jul 2018 11:02:14 +0100
+Subject: [PATCH 03/12] drm/dp: add helpers for
+ drm_dp_set_adjust_request_pre_emphasis and drm_dp_set_adjust_request_voltage
 In-Reply-To: <1530612152-27555-1-git-send-email-dkos@cadence.com>
 References: <1530612152-27555-1-git-send-email-dkos@cadence.com>
-Message-ID: <1530612152-27555-2-git-send-email-dkos@cadence.com>
+Message-ID: <1530612152-27555-4-git-send-email-dkos@cadence.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Quentin Schulz <quentin.schulz@free-electrons.com>
 
-Due to the DP IP being simulated in a different and way slower way than
-the rest of the hardware, increase the timeout in
-drm_atomic_helper_wait_for_vblanks so that we don't miss the vblank
-event.
+We already have functions to get the adjust request voltage and
+pre-emphasis for a lane so it makes also sense to be able to set them so
+that we can then easily update them via a DPCD write.
+
+Add helpers for drm_dp_set_adjust_request_pre_emphasis and
+drm_dp_set_adjust_request_voltage that respectively set the
+pre-emphasis and voltage of a lane in the link status array.
 
 Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
 Signed-off-by: Damian Kos <dkos@cadence.com>
 ---
- drivers/gpu/drm/drm_atomic_helper.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ drivers/gpu/drm/drm_dp_helper.c |   28 ++++++++++++++++++++++++++++
+ include/drm/drm_dp_helper.h     |    4 ++++
+ 2 files changed, 32 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/gpu/drm/drm_atomic_helper.c b/drivers/gpu/drm/drm_atomic_helper.c
-index c356545..0171249 100644
---- a/drivers/gpu/drm/drm_atomic_helper.c
-+++ b/drivers/gpu/drm/drm_atomic_helper.c
-@@ -1345,7 +1345,7 @@ int drm_atomic_helper_wait_for_fences(struct drm_device *dev,
- 		ret = wait_event_timeout(dev->vblank[i].queue,
- 				old_state->crtcs[i].last_vblank_count !=
- 					drm_crtc_vblank_count(crtc),
--				msecs_to_jiffies(50));
-+				msecs_to_jiffies(4000));
+diff --git a/drivers/gpu/drm/drm_dp_helper.c b/drivers/gpu/drm/drm_dp_helper.c
+index 3bc2e98..ca2f469 100644
+--- a/drivers/gpu/drm/drm_dp_helper.c
++++ b/drivers/gpu/drm/drm_dp_helper.c
+@@ -120,6 +120,34 @@ u8 drm_dp_get_adjust_request_pre_emphasis(const u8 link_status[DP_LINK_STATUS_SI
+ }
+ EXPORT_SYMBOL(drm_dp_get_adjust_request_pre_emphasis);
  
- 		WARN(!ret, "[CRTC:%d:%s] vblank wait timed out\n",
- 		     crtc->base.id, crtc->name);
++void drm_dp_set_adjust_request_voltage(u8 link_status[DP_LINK_STATUS_SIZE],
++				       int lane, u8 volt)
++{
++	int i = DP_ADJUST_REQUEST_LANE0_1 + (lane >> 1);
++	int s = ((lane & 1) ?
++		 DP_ADJUST_VOLTAGE_SWING_LANE1_SHIFT :
++		 DP_ADJUST_VOLTAGE_SWING_LANE0_SHIFT);
++	int idx = i - DP_LANE0_1_STATUS;
++
++	link_status[idx] &= ~(DP_ADJUST_VOLTAGE_SWING_LANE0_MASK << s);
++	link_status[idx] |= volt << s;
++}
++EXPORT_SYMBOL(drm_dp_set_adjust_request_voltage);
++
++void drm_dp_set_adjust_request_pre_emphasis(u8 link_status[DP_LINK_STATUS_SIZE],
++					    int lane, u8 pre_emphasis)
++{
++	int i = DP_ADJUST_REQUEST_LANE0_1 + (lane >> 1);
++	int s = ((lane & 1) ?
++		 DP_ADJUST_PRE_EMPHASIS_LANE1_SHIFT :
++		 DP_ADJUST_PRE_EMPHASIS_LANE0_SHIFT);
++	int idx = i - DP_LANE0_1_STATUS;
++
++	link_status[idx] &= ~(DP_ADJUST_PRE_EMPHASIS_LANE0_MASK << s);
++	link_status[idx] |= pre_emphasis << s;
++}
++EXPORT_SYMBOL(drm_dp_set_adjust_request_pre_emphasis);
++
+ void drm_dp_link_train_clock_recovery_delay(const u8 dpcd[DP_RECEIVER_CAP_SIZE]) {
+ 	if (dpcd[DP_TRAINING_AUX_RD_INTERVAL] == 0)
+ 		udelay(100);
+diff --git a/include/drm/drm_dp_helper.h b/include/drm/drm_dp_helper.h
+index a488af0..6e64b2a 100644
+--- a/include/drm/drm_dp_helper.h
++++ b/include/drm/drm_dp_helper.h
+@@ -946,6 +946,10 @@ u8 drm_dp_get_adjust_request_voltage(const u8 link_status[DP_LINK_STATUS_SIZE],
+ 				     int lane);
+ u8 drm_dp_get_adjust_request_pre_emphasis(const u8 link_status[DP_LINK_STATUS_SIZE],
+ 					  int lane);
++void drm_dp_set_adjust_request_voltage(u8 link_status[DP_LINK_STATUS_SIZE],
++				       int lane, u8 volt);
++void drm_dp_set_adjust_request_pre_emphasis(u8 link_status[DP_LINK_STATUS_SIZE],
++					    int lane, u8 pre_emphasis);
+ 
+ #define DP_BRANCH_OUI_HEADER_SIZE	0xc
+ #define DP_RECEIVER_CAP_SIZE		0xf
 -- 
 1.7.1
