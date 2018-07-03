@@ -1,15 +1,15 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Tue, 03 Jul 2018 16:33:55 +0100
-Subject: Applied "ASoC: atmel-i2s: dt-bindings: Remove unnecessary phandle to
- aclk" to the asoc tree
-In-Reply-To: <20180703145631.15246-3-codrin.ciubotariu@microchip.com>
-Message-ID: <E1faNJT-0003di-5D@debutante>
+Date: Tue, 03 Jul 2018 16:33:57 +0100
+Subject: Applied "ASoC: atmel-i2s: Remove unnecessary audio PLL clock (aclk)"
+ to the asoc tree
+In-Reply-To: <20180703145631.15246-2-codrin.ciubotariu@microchip.com>
+Message-ID: <E1faNJV-0003et-Ai@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   ASoC: atmel-i2s: dt-bindings: Remove unnecessary phandle to aclk
+   ASoC: atmel-i2s: Remove unnecessary audio PLL clock (aclk)
 
 has been applied to the asoc tree at
 
@@ -34,56 +34,121 @@ to this mail.
 Thanks,
 Mark
 
->From 2bd368d7bf21028f37a123041a138922254d4840 Mon Sep 17 00:00:00 2001
+>From 73ad0df572901e03fc703b6f114e4442291f45c2 Mon Sep 17 00:00:00 2001
 From: Codrin Ciubotariu <codrin.ciubotariu@microchip.com>
-Date: Tue, 3 Jul 2018 17:56:31 +0300
-Subject: [PATCH] ASoC: atmel-i2s: dt-bindings: Remove unnecessary phandle to
- aclk
+Date: Tue, 3 Jul 2018 17:56:30 +0300
+Subject: [PATCH] ASoC: atmel-i2s: Remove unnecessary audio PLL clock (aclk)
 
-The optional clock phandle to aclk (Audio PLL clock) is no longer needed
-by the driver.
+The generated clock (gclk) driver is able to set aclk as its parent and
+change its rate alone, if needed. This means that our driver no longer
+needs to configure aclk and we can let gclk select and configure its
+clock source.
 
 Signed-off-by: Codrin Ciubotariu <codrin.ciubotariu@microchip.com>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- Documentation/devicetree/bindings/sound/atmel-i2s.txt | 11 +++++------
- 1 file changed, 5 insertions(+), 6 deletions(-)
+ sound/soc/atmel/atmel-i2s.c | 46 ++++++-------------------------------
+ 1 file changed, 7 insertions(+), 39 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/sound/atmel-i2s.txt b/Documentation/devicetree/bindings/sound/atmel-i2s.txt
-index 735368b8a73f..40549f496a81 100644
---- a/Documentation/devicetree/bindings/sound/atmel-i2s.txt
-+++ b/Documentation/devicetree/bindings/sound/atmel-i2s.txt
-@@ -15,7 +15,6 @@ Required properties:
- - clock-names:    Should be one of each entry matching the clocks phandles list:
-                   - "pclk" (peripheral clock) Required.
-                   - "gclk" (generated clock) Optional (1).
--                  - "aclk" (Audio PLL clock) Optional (1).
-                   - "muxclk" (I2S mux clock) Optional (1).
+diff --git a/sound/soc/atmel/atmel-i2s.c b/sound/soc/atmel/atmel-i2s.c
+index 5d3b5af9fd92..d88c1d995036 100644
+--- a/sound/soc/atmel/atmel-i2s.c
++++ b/sound/soc/atmel/atmel-i2s.c
+@@ -206,7 +206,6 @@ struct atmel_i2s_dev {
+ 	struct regmap				*regmap;
+ 	struct clk				*pclk;
+ 	struct clk				*gclk;
+-	struct clk				*aclk;
+ 	struct snd_dmaengine_dai_dma_data	playback;
+ 	struct snd_dmaengine_dai_dma_data	capture;
+ 	unsigned int				fmt;
+@@ -303,7 +302,7 @@ static int atmel_i2s_get_gck_param(struct atmel_i2s_dev *dev, int fs)
+ {
+ 	int i, best;
  
- Optional properties:
-@@ -23,9 +22,9 @@ Optional properties:
- - princtrl-names: Should contain only one value - "default".
+-	if (!dev->gclk || !dev->aclk) {
++	if (!dev->gclk) {
+ 		dev_err(dev->dev, "cannot generate the I2S Master Clock\n");
+ 		return -EINVAL;
+ 	}
+@@ -421,7 +420,7 @@ static int atmel_i2s_switch_mck_generator(struct atmel_i2s_dev *dev,
+ 					  bool enabled)
+ {
+ 	unsigned int mr, mr_mask;
+-	unsigned long aclk_rate;
++	unsigned long gclk_rate;
+ 	int ret;
  
+ 	mr = 0;
+@@ -445,35 +444,18 @@ static int atmel_i2s_switch_mck_generator(struct atmel_i2s_dev *dev,
+ 		/* Disable/unprepare the PMC generated clock. */
+ 		clk_disable_unprepare(dev->gclk);
  
--(1) : Only the peripheral clock is required. The generated clock, the Audio
--      PLL clock adn the I2S mux clock are optional and should only be set
--      together, when Master Mode is required.
-+(1) : Only the peripheral clock is required. The generated clock and the I2S
-+      mux clock are optional and should only be set together, when Master Mode
-+      is required.
+-		/* Disable/unprepare the PLL audio clock. */
+-		clk_disable_unprepare(dev->aclk);
+ 		return 0;
+ 	}
  
- Example:
+ 	if (!dev->gck_param)
+ 		return -EINVAL;
  
-@@ -40,8 +39,8 @@ Example:
- 			(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
- 			 AT91_XDMAC_DT_PERID(32))>;
- 		dma-names = "tx", "rx";
--		clocks = <&i2s0_clk>, <&i2s0_gclk>, <&audio_pll_pmc>, <&i2s0muxck>;
--		clock-names = "pclk", "gclk", "aclk", "muxclk";
-+		clocks = <&i2s0_clk>, <&i2s0_gclk>, <&i2s0muxck>;
-+		clock-names = "pclk", "gclk", "muxclk";
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&pinctrl_i2s0_default>;
- 	};
+-	aclk_rate = dev->gck_param->mck * (dev->gck_param->imckdiv + 1);
++	gclk_rate = dev->gck_param->mck * (dev->gck_param->imckdiv + 1);
+ 
+-	/* Fist change the PLL audio clock frequency ... */
+-	ret = clk_set_rate(dev->aclk, aclk_rate);
++	ret = clk_set_rate(dev->gclk, gclk_rate);
+ 	if (ret)
+ 		return ret;
+ 
+-	/*
+-	 * ... then set the PMC generated clock rate to the very same frequency
+-	 * to set the gclk parent to aclk.
+-	 */
+-	ret = clk_set_rate(dev->gclk, aclk_rate);
+-	if (ret)
+-		return ret;
+-
+-	/* Prepare and enable the PLL audio clock first ... */
+-	ret = clk_prepare_enable(dev->aclk);
+-	if (ret)
+-		return ret;
+-
+-	/* ... then prepare and enable the PMC generated clock. */
+ 	ret = clk_prepare_enable(dev->gclk);
+ 	if (ret)
+ 		return ret;
+@@ -668,28 +650,14 @@ static int atmel_i2s_probe(struct platform_device *pdev)
+ 		return err;
+ 	}
+ 
+-	/* Get audio clocks to generate the I2S Master Clock (I2S_MCK) */
+-	dev->aclk = devm_clk_get(&pdev->dev, "aclk");
++	/* Get audio clock to generate the I2S Master Clock (I2S_MCK) */
+ 	dev->gclk = devm_clk_get(&pdev->dev, "gclk");
+-	if (IS_ERR(dev->aclk) && IS_ERR(dev->gclk)) {
+-		if (PTR_ERR(dev->aclk) == -EPROBE_DEFER ||
+-		    PTR_ERR(dev->gclk) == -EPROBE_DEFER)
++	if (IS_ERR(dev->gclk)) {
++		if (PTR_ERR(dev->gclk) == -EPROBE_DEFER)
+ 			return -EPROBE_DEFER;
+ 		/* Master Mode not supported */
+-		dev->aclk = NULL;
+ 		dev->gclk = NULL;
+-	} else if (IS_ERR(dev->gclk)) {
+-		err = PTR_ERR(dev->gclk);
+-		dev_err(&pdev->dev,
+-			"failed to get the PMC generated clock: %d\n", err);
+-		return err;
+-	} else if (IS_ERR(dev->aclk)) {
+-		err = PTR_ERR(dev->aclk);
+-		dev_err(&pdev->dev,
+-			"failed to get the PLL audio clock: %d\n", err);
+-		return err;
+ 	}
+-
+ 	dev->dev = &pdev->dev;
+ 	dev->regmap = regmap;
+ 	platform_set_drvdata(pdev, dev);
 -- 
 2.18.0.rc2
