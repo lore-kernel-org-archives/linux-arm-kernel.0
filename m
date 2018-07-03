@@ -1,72 +1,62 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 3 Jul 2018 16:30:35 +0100
-Subject: [PATCH 3/7 v5] iommu: support iommu configuration for fsl-mc
- devices
-In-Reply-To: <1526824191-7000-4-git-send-email-nipun.gupta@nxp.com>
-References: <1526824191-7000-1-git-send-email-nipun.gupta@nxp.com>
- <1526824191-7000-4-git-send-email-nipun.gupta@nxp.com>
-Message-ID: <947a6e16-98ff-9389-b15c-d3025b7be4be@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 3 Jul 2018 16:31:37 +0100
+Subject: [RFC net-next 15/15] net: lora: Add Semtech SX1301
+In-Reply-To: <809fc546-6012-37f3-9485-cfd8eaf99488@suse.de>
+References: <20180701110804.32415-1-afaerber@suse.de>
+ <20180701110804.32415-16-afaerber@suse.de>
+ <20180702161258.GA18744@sirena.org.uk>
+ <4e06cc72-2092-70f3-c801-bf6e4c3cbec2@suse.de>
+ <20180703145022.GA13744@sirena.org.uk>
+ <809fc546-6012-37f3-9485-cfd8eaf99488@suse.de>
+Message-ID: <20180703153137.GB13744@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/05/18 14:49, Nipun Gupta wrote:
-> With of_pci_map_rid available for all the busses, use the function
-> for configuration of devices on fsl-mc bus
+On Tue, Jul 03, 2018 at 05:09:38PM +0200, Andreas F?rber wrote:
+> Am 03.07.2018 um 16:50 schrieb Mark Brown:
 
-FWIW I had a quick hack at factoring out the commonality with 
-of_pci_iommu_init(), at which point I reckon this change is easier to 
-follow as-is for the moment, so:
+> >> 2) This SPI device is in turn exposing the two SPI masters that you
+> >> already found below, and I didn't see a sane way to split that code out
+> >> into drivers/spi/, so it's in drivers/net/lora/ here - has there been
+> >> any precedence either way?
 
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+> > A MFD?
 
-> Signed-off-by: Nipun Gupta <nipun.gupta@nxp.com>
-> ---
->   drivers/iommu/of_iommu.c | 20 ++++++++++++++++++++
->   1 file changed, 20 insertions(+)
-> 
-> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
-> index 811e160..284474d 100644
-> --- a/drivers/iommu/of_iommu.c
-> +++ b/drivers/iommu/of_iommu.c
-> @@ -24,6 +24,7 @@
->   #include <linux/of_iommu.h>
->   #include <linux/of_pci.h>
->   #include <linux/slab.h>
-> +#include <linux/fsl/mc.h>
->   
->   #define NO_IOMMU	1
->   
-> @@ -159,6 +160,23 @@ static int of_pci_iommu_init(struct pci_dev *pdev, u16 alias, void *data)
->   	return err;
->   }
->   
-> +static int of_fsl_mc_iommu_init(struct fsl_mc_device *mc_dev,
-> +				struct device_node *master_np)
-> +{
-> +	struct of_phandle_args iommu_spec = { .args_count = 1 };
-> +	int err;
-> +
-> +	err = of_map_rid(master_np, mc_dev->icid, "iommu-map",
-> +			 "iommu-map-mask", &iommu_spec.np,
-> +			 iommu_spec.args);
-> +	if (err)
-> +		return err == -ENODEV ? NO_IOMMU : err;
-> +
-> +	err = of_iommu_xlate(&mc_dev->dev, &iommu_spec);
-> +	of_node_put(iommu_spec.np);
-> +	return err;
-> +}
-> +
->   const struct iommu_ops *of_iommu_configure(struct device *dev,
->   					   struct device_node *master_np)
->   {
-> @@ -190,6 +208,8 @@ const struct iommu_ops *of_iommu_configure(struct device *dev,
->   
->   		err = pci_for_each_dma_alias(to_pci_dev(dev),
->   					     of_pci_iommu_init, &info);
-> +	} else if (dev_is_fsl_mc(dev)) {
-> +		err = of_fsl_mc_iommu_init(to_fsl_mc_device(dev), master_np);
->   	} else {
->   		struct of_phandle_args iommu_spec;
->   		int idx = 0;
-> 
+> I know of mfd, but how would the the the net vs. spi pieces interact
+> then? Some functions would need to be exported then or is there an
+> easier way without needing to set a cross-module API in stone?
+
+It's an in-kernel ABI it's not exactly set in stone but yeah, you'll
+need some interface.  A lot of devices work by having the children know
+that they're part of a MFD and fish things out of the parent device,
+either the pdata or (in the common case where the MFD bit mostly just
+instantiates subdevices and holds a regmap) with dev_get_regmap().
+
+> > A register map would work just as well here, we already have plenty of
+> > devices that abstract at this level (most obviously the I2C/SPI devices
+> > that use it to offer both interfaces with a single core driver).
+
+> The address and data registers together form a two-byte SPI message!
+
+> It is transmitted by writing to the CS register.
+
+> The received data is afterwards available in another register.
+
+Right, but it seems from the code that the hardware understands that
+it's formatting register I/O and not just shifting in and out a byte
+stream which is what a SPI controller does.  I'd not be surprised to
+learn that the register you're calling a chip select register is a
+strobe that initiates the transfer (and that this may be some of the
+difficulty you're having with handling it in the way the framework
+expects), the pattern with writing 1 followed immediately by 0 is a bit
+of a flag here.
+
+I've seen such before hardware where I know it was intentionally
+designed that way so it wouldn't be totally surprising.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180703/dd8f2013/attachment.sig>
