@@ -1,30 +1,64 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 3 Jul 2018 10:07:32 +0800
-Subject: [PATCH 2/2] ARM: imx_v6_v7_defconfig: Select ULPI support
-In-Reply-To: <20180703020236.GY4348@dragon>
-References: <1529930043-6387-1-git-send-email-festevam@gmail.com>
- <1529930043-6387-2-git-send-email-festevam@gmail.com>
- <20180703020236.GY4348@dragon>
-Message-ID: <20180703020731.GA4348@dragon>
+From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
+Date: Tue, 3 Jul 2018 10:22:57 +0800
+Subject: [PATCH 0/2] serial: 8250_dw: add fractional divisor support
+In-Reply-To: <59b14f97234271a7d859fa07f27bd66ec252ccc9.camel@linux.intel.com>
+References: <20180702180428.331b36c5@xhacker.debian>
+ <fef0bf484ead5e0998666168ced86438bf935ce5.camel@linux.intel.com>
+ <59b14f97234271a7d859fa07f27bd66ec252ccc9.camel@linux.intel.com>
+Message-ID: <20180703102257.678db6a8@xhacker.debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 03, 2018 at 10:02:37AM +0800, Shawn Guo wrote:
-> On Mon, Jun 25, 2018 at 09:34:03AM -0300, Fabio Estevam wrote:
-> > From: Fabio Estevam <fabio.estevam@nxp.com>
+Hi,
+
+On Mon, 2 Jul 2018 14:51:03 +0300 Andy Shevchenko wrote:
+
+> On Mon, 2018-07-02 at 13:18 +0300, Andy Shevchenko wrote:
+> > On Mon, 2018-07-02 at 18:04 +0800, Jisheng Zhang wrote:  
+> > > For Synopsys DesignWare 8250 uart which version >= 4.00a, there's a
+> > > valid divisor latch fraction register. The fractional divisor width
+> > > is
+> > > 4bits ~ 6bits.
+> > >   
 > > 
-> > Select CONFIG_USB_CHIPIDEA_ULPI and CONFIG_USB_ULPI_BUS so that
-> > USB ULPI can be functional on some boards like imx51-babbge.
-> > 
-> > This fixes a kernel hang in 4.18-rc1 on i.mx51-babbage when
-> > the bootloader does not initialize USB.
-> > 
-> > Suggested-by: Andrey Smirnov <andrew.smirnov@gmail.com>
-> > Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+> > There are several serial IPs that have fractional divider built-in.
+> > None
+> > is using any specific hooks. Why do you need in your case, esp. taking
+> > into consideration that we have a custom ->set_termios() callback?  
 > 
-> Applied this one as a fix.
+> Okay, I see that in 8250 we have hooks embedded into 8250_port.c which
+> is not the best solution.
+> 
+> For example it prevents better splitting Exar code.
+> So, we would need these hooks, but better to integrate them in the same
+> way like it's done for the rest of 8250 ones, i.e.
+> - rename existing to have a "do" word
+> - create new functions which would be a replacement that choose between
+> "do" variant and custom one
+> - not sure if we need to export "do" variants (at least for now)
 
-Dropped for now, as I suspect that such selection should be done by
-driver Kconfig as a dependency.
+So you mean add the support as following:
 
-Shawn
+1.rename current serial8250_set_divisor as serial8250_do_set_divisor
+
+2.add a new serial8250_set_divisor which will be as simple as
+
+static void serial8250_set_divisor(struct uart_port *port, ...)
+{
+	struct uart_8250_port *up = up_to_u8250p(port);
+
+	if (up->set_divisor)
+		up->set_divisor(...);
+	else
+		serial8250_do_set_divisor(...);
+}
+
+could you please confirm?
+
+Another issue is I'm not sure which struct to add the hook,
+struct uart_port or struct uart_8250_port? Currently, it seems that only
+uart_8250_port needs this hook, sure, adding the hook to struct uart_port
+is fine either. Could you please kindly give some suggestions?
+
+Thanks,
+Jisheng
