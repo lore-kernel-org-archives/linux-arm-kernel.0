@@ -1,19 +1,19 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 3 Jul 2018 14:38:41 +0800
-Subject: [PATCH] ARM: dts: imx6sll: Fix the SPDX notation for header file
-In-Reply-To: <1530485761-5931-1-git-send-email-festevam@gmail.com>
-References: <1530485761-5931-1-git-send-email-festevam@gmail.com>
-Message-ID: <20180703063840.GJ4348@dragon>
+Date: Tue, 3 Jul 2018 14:39:43 +0800
+Subject: [PATCH V2] ARM: dts: imx6: correct anatop regulators range
+In-Reply-To: <1530497076-15509-1-git-send-email-Anson.Huang@nxp.com>
+References: <1530497076-15509-1-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <20180703063942.GK4348@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 01, 2018 at 07:56:01PM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@nxp.com>
+On Mon, Jul 02, 2018 at 10:04:36AM +0800, Anson Huang wrote:
+> According to i.MX6 datasheet, the LDO_1P1's typical
+> programming operating range is 1.0V to 1.2V, and
+> the LDO_2P5's typical programming operating range
+> is 2.25V to 2.75V, correct LDO_1P1 and LDO_2P5's
+> regulator range settings for i.MX6 SoCs.
 > 
-> Per Documentation/process/license-rules.rst the SPDX notation for
-> header file should be /* */ style, so fix it accordingly.
-> 
-> Fixes: 9f30b6b1a957 ("ARM: dts: imx: Add basic dtsi file for imx6sll")
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
 
 Applied, thanks.
