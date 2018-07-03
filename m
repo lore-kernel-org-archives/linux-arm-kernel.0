@@ -1,60 +1,150 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 3 Jul 2018 11:49:47 -0400
-Subject: [PATCH V5 3/3] PCI: Mask and unmask hotplug interrupts during
- reset
-In-Reply-To: <fda77cee8e379f2e9b7ab55fefe17cad@codeaurora.org>
-References: <1530571967-19099-1-git-send-email-okaya@codeaurora.org>
- <1530571967-19099-4-git-send-email-okaya@codeaurora.org>
- <20180703143434.GA4086@wunner.de>
- <fda77cee8e379f2e9b7ab55fefe17cad@codeaurora.org>
-Message-ID: <867e1f69-8b77-ecb0-d4e3-ab0636a49a2e@codeaurora.org>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 3 Jul 2018 17:01:49 +0100
+Subject: [PATCH 4/7 v5] iommu: arm-smmu: Add support for the fsl-mc bus
+In-Reply-To: <1526824191-7000-5-git-send-email-nipun.gupta@nxp.com>
+References: <1526824191-7000-1-git-send-email-nipun.gupta@nxp.com>
+ <1526824191-7000-5-git-send-email-nipun.gupta@nxp.com>
+Message-ID: <83174f21-50f3-2ed2-bf04-6136af591567@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/3/2018 11:12 AM, poza at codeaurora.org wrote:
-> if (!pci_probe_reset_slot(dev->slot))
-> {
-> ??? pci_reset_slot(dev->slot)
-> ??? result = reset_link(udev, service); >> in this case aer_root_reset must not call pci_reset_bridge_secondary_bus()
-> } else
-> ??? result = reset_link(udev, service); >> in this case aer_root_reset must call pci_reset_bridge_secondary_bus() [since bridge is not hotplug capable)
+On 20/05/18 14:49, Nipun Gupta wrote:
+> Implement bus specific support for the fsl-mc bus including
+> registering arm_smmu_ops and bus specific device add operations.
+> 
+> Signed-off-by: Nipun Gupta <nipun.gupta@nxp.com>
+> ---
+>   drivers/iommu/arm-smmu.c |  7 +++++++
+>   drivers/iommu/iommu.c    | 21 +++++++++++++++++++++
+>   include/linux/fsl/mc.h   |  8 ++++++++
+>   include/linux/iommu.h    |  2 ++
+>   4 files changed, 38 insertions(+)
+> 
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> index 69e7c60..e1d5090 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -52,6 +52,7 @@
+>   #include <linux/spinlock.h>
+>   
+>   #include <linux/amba/bus.h>
+> +#include <linux/fsl/mc.h>
+>   
+>   #include "io-pgtable.h"
+>   #include "arm-smmu-regs.h"
+> @@ -1459,6 +1460,8 @@ static struct iommu_group *arm_smmu_device_group(struct device *dev)
+>   
+>   	if (dev_is_pci(dev))
+>   		group = pci_device_group(dev);
+> +	else if (dev_is_fsl_mc(dev))
+> +		group = fsl_mc_device_group(dev);
+>   	else
+>   		group = generic_device_group(dev);
+>   
+> @@ -2037,6 +2040,10 @@ static void arm_smmu_bus_init(void)
+>   		bus_set_iommu(&pci_bus_type, &arm_smmu_ops);
+>   	}
+>   #endif
+> +#ifdef CONFIG_FSL_MC_BUS
+> +	if (!iommu_present(&fsl_mc_bus_type))
+> +		bus_set_iommu(&fsl_mc_bus_type, &arm_smmu_ops);
+> +#endif
+>   }
+>   
+>   static int arm_smmu_device_probe(struct platform_device *pdev)
+> diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
+> index d2aa2320..6d4ce35 100644
+> --- a/drivers/iommu/iommu.c
+> +++ b/drivers/iommu/iommu.c
+> @@ -32,6 +32,7 @@
+>   #include <linux/pci.h>
+>   #include <linux/bitops.h>
+>   #include <linux/property.h>
+> +#include <linux/fsl/mc.h>
+>   #include <trace/events/iommu.h>
+>   
+>   static struct kset *iommu_group_kset;
+> @@ -987,6 +988,26 @@ struct iommu_group *pci_device_group(struct device *dev)
+>   	return iommu_group_alloc();
+>   }
+>   
+> +/* Get the IOMMU group for device on fsl-mc bus */
+> +struct iommu_group *fsl_mc_device_group(struct device *dev)
+> +{
+> +	struct device *cont_dev = fsl_mc_cont_dev(dev);
+> +	struct iommu_group *group;
+> +
+> +	/* Container device is responsible for creating the iommu group */
+> +	if (fsl_mc_is_cont_dev(dev)) {
 
-Here are two different flow for two different FATAL error sources
+Why duplicate what fsl_mc_cont_dev() has already figured out?
 
-dpc_irq
-	link is down due to DPC
-	pcie_do_fatal_recovery()
-		pci_reset_slot()
-			mask hotplug IRQ
-			secondary bus reset
-			unmask hotplug IRQ
-			undefined behavior as link went down due to DPC
-		dpc_reset_link()
-			undefined behavior secondary bus reset happened
-					   while a DPC event is pending
-			link may or may not be up at this moment
-			recover the link via DPC way if HW can cope with this undefined behavior.
+AFAICS the overall operation here boils down to something like:
 
+	cont_dev = fsl_mc_cont_dev(dev);
+	group = iommu_group_get(cont_dev);
+	if (!group)
+		group = iommu_group_alloc();
+	return group;
 
-aer_irq
-	link is up
-	pcie_do_fatal_recovery()
-		pci_reset_slot()
-			mask hotplug IRQ
-			secondary bus reset
-			unmask hotplug IRQ
-			link goes up
-		aer_reset_link()
-			secondary bus reset
-			hotplug link down interrupt again
+> +		group = iommu_group_alloc();
+> +		if (IS_ERR(group))
+> +			return NULL;
 
-I tried to change pci_reset_slot() such that we do
+iommu_group_get_for_dev() expects a PTR_ERR, so I don't think munging 
+the return here is the right thing to do.
 
-mask hotplug IRQ
-go to AER/DPC reset_link based on error source
-unmask hotplug IRQ
+> +	} else {
+> +		get_device(cont_dev);
 
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+If races are a concern, isn't this a bit late? Maybe in that case you 
+want {get,put}_fsl_mc_cont_dev() routines instead of the simple macro 
+below. But on the other hand if dev already has cont_dev as its parent, 
+wouldn't the reference taken in device_add() be sufficient to prevent it 
+from vanishing unexpectedly in this timescale?
+
+Robin.
+
+> +		group = iommu_group_get(cont_dev);
+> +		put_device(cont_dev);
+> +	}
+> +
+> +	return group;
+> +}
+> +
+>   /**
+>    * iommu_group_get_for_dev - Find or create the IOMMU group for a device
+>    * @dev: target device
+> diff --git a/include/linux/fsl/mc.h b/include/linux/fsl/mc.h
+> index f27cb14..dddaca1 100644
+> --- a/include/linux/fsl/mc.h
+> +++ b/include/linux/fsl/mc.h
+> @@ -351,6 +351,14 @@ struct fsl_mc_io {
+>   #define dev_is_fsl_mc(_dev) (0)
+>   #endif
+>   
+> +/* Macro to check if a device is a container device */
+> +#define fsl_mc_is_cont_dev(_dev) (to_fsl_mc_device(_dev)->flags & \
+> +	FSL_MC_IS_DPRC)
+> +
+> +/* Macro to get the container device of a MC device */
+> +#define fsl_mc_cont_dev(_dev) (fsl_mc_is_cont_dev(_dev) ? \
+> +	(_dev) : (_dev)->parent)
+> +
+>   /*
+>    * module_fsl_mc_driver() - Helper macro for drivers that don't do
+>    * anything special in module init/exit.  This eliminates a lot of
+> diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+> index 19938ee..2981200 100644
+> --- a/include/linux/iommu.h
+> +++ b/include/linux/iommu.h
+> @@ -389,6 +389,8 @@ static inline size_t iommu_map_sg(struct iommu_domain *domain,
+>   extern struct iommu_group *pci_device_group(struct device *dev);
+>   /* Generic device grouping function */
+>   extern struct iommu_group *generic_device_group(struct device *dev);
+> +/* FSL-MC device grouping function */
+> +struct iommu_group *fsl_mc_device_group(struct device *dev);
+>   
+>   /**
+>    * struct iommu_fwspec - per-device IOMMU instance data
+> 
