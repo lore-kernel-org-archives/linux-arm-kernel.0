@@ -1,98 +1,34 @@
-From: erik.schmauss@intel.com (Schmauss, Erik)
-Date: Tue, 3 Jul 2018 20:31:35 +0000
-Subject: 4.18rc3 TX2 boot failure with "ACPICA: AML parser: attempt to
- continue loading table after error"
-In-Reply-To: <CAJZ5v0j+9QOw1s3W07QRPDRydsdw7uSAgpvOwF_5302+zeViOg@mail.gmail.com>
-References: <c49a3666-7d23-6a05-703c-1273d79a00cd@arm.com>
- <CAJZ5v0h5+O8xf_EqRPfdvtjQ7BvxLp8veaxB-7WsD8wq7RUFpA@mail.gmail.com>
- <9a9ef2bc-a66f-2af7-8766-b74426f062a6@arm.com>
- <CAJZ5v0j+9QOw1s3W07QRPDRydsdw7uSAgpvOwF_5302+zeViOg@mail.gmail.com>
-Message-ID: <CF6A88132359CE47947DB4C6E1709ED53BB365F0@ORSMSX110.amr.corp.intel.com>
+From: alex.popov@linux.com (Alexander Popov)
+Date: Tue, 3 Jul 2018 23:38:08 +0300
+Subject: [PATCH] arm64: Clear the stack
+In-Reply-To: <20180703150349.fndcq7h5hl3mtain@armageddon.cambridge.arm.com>
+References: <20180629190553.7282-1-labbott@redhat.com>
+ <9733d929-3c6a-40e1-6110-8f79975323d3@linux.com>
+ <1b97aa7d-2b6c-a5df-0caa-1cd16e18a816@redhat.com>
+ <20180703121440.v4olvwqb3ykgt5fm@lakrids.cambridge.arm.com>
+ <20180703150349.fndcq7h5hl3mtain@armageddon.cambridge.arm.com>
+Message-ID: <6ca7144a-2659-3877-b208-ce043d1393dc@linux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-> -----Original Message-----
-> From: linux-acpi-owner at vger.kernel.org [mailto:linux-acpi-
-> owner at vger.kernel.org] On Behalf Of Rafael J. Wysocki
-> Sent: Tuesday, July 3, 2018 12:52 AM
-> To: Jeremy Linton <jeremy.linton@arm.com>
-> Cc: Rafael J. Wysocki <rafael@kernel.org>; Schmauss, Erik
-> <erik.schmauss@intel.com>; linux-acpi at vger.kernel.org; linux-
-> kernel at vger.kernel.org; Rafael J . Wysocki <rjw@rjwysocki.net>; linux-arm-
-> kernel at lists.infradead.org; Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Subject: Re: 4.18rc3 TX2 boot failure with "ACPICA: AML parser: attempt to
-> continue loading table after error"
+On 03.07.2018 18:03, Catalin Marinas wrote:
+> On Tue, Jul 03, 2018 at 01:14:41PM +0100, Mark Rutland wrote:
+>> On Mon, Jul 02, 2018 at 11:48:05AM -0700, Laura Abbott wrote:
+>>> On 07/02/2018 06:02 AM, Alexander Popov wrote:
+>>>> Could you rename the macro to STACKLEAK_ERASE for similarity with x86?
+>>>
+>>> Mark Rutland had previously asked for this to be lowercase.
+>>> I really don't care one way or the other so I'll defer to
+>>> someone else to have the final word.
+>>
+>> Will, Catalin, could you chime in either way?
+>>
+>> I'd previously asked for lower-case for consistency with our other
+>> assembly macros.
 > 
-> On Tue, Jul 3, 2018 at 12:30 AM, Jeremy Linton <jeremy.linton@arm.com>
-> wrote:
-> > Hi,
-> >
-> > On 07/02/2018 04:52 PM, Rafael J. Wysocki wrote:
-> >>
-> >> On Mon, Jul 2, 2018 at 11:41 PM, Jeremy Linton
-> >> <jeremy.linton@arm.com>
-> >> wrote:
-> >>>
-> >>> Hi,
-> >>>
-> >>> I'm experiencing two problems with commit 5088814a6e931 which is
-> "ACPICA:
-> >>> AML parser: attempt to continue loading table after error"
-> >>>
-> >>> The first is this boot failure on a thunderX2:
-> >>>
-> >>> [   10.770098] ACPI Error: Ignore error and continue table load
-> >>> (20180531/psobject-604)
-> >>>      [   10.777926] Unable to handle kernel NULL pointer dereference at
-> >>>      [   10.950199] Call trace:
-> >>>
-> >>>      [   10.952663]  acpi_ps_peek_opcode+0x1c/0x40
-> >>>      [   10.956797]  acpi_ps_create_op+0x54/0x278
-> >>>      [   10.960842]  acpi_ps_parse_loop+0x1b4/0x6c8
-> >>>      [   10.965063]  acpi_ps_parse_aml+0xe0/0x2b4
-> >>>      [   10.969108]  acpi_ps_execute_table+0xa0/0x104
-> >>>      [   10.973505]  acpi_ns_execute_table+0x120/0x194
-> >>>      [   10.977989]  acpi_ns_parse_table+0x34/0x68
-> >>>      [   10.982122]  acpi_ns_load_table+0x4c/0xbc
-> >>>      [   10.986169]  acpi_tb_load_namespace+0x1d4/0x240
-> >>>      [   10.990744]  acpi_load_tables+0x50/0xbc
-> >>>      [   10.994614]  acpi_init+0xb8/0x374
-> >>>      [   10.997959]  do_one_initcall+0x54/0x208
-> >>>      [   11.001829]  kernel_init_freeable+0x224/0x300
-> >>>      [   11.006229]  kernel_init+0x18/0x118
-> >>>      [   11.009747]  ret_from_fork+0x10/0x18
-> >>>      [   11.013354] Code: aa0003f3 aa1e03e0 d503201f f9400661 (39400020)
-> >>>      [   11.019535] ---[ end trace 2bd8068593cf8acc ]---
-> >>>      [   11.024195] Kernel panic - not syncing: Fatal exception
-> >>>      [   11.029488] SMP: stopping secondary CPUs
-> >>>      [   11.033480] ---[ end Kernel panic - not syncing: Fatal exception
-> >>> ]---
-> >>>
-> >>> Which does appear to be the result of some bad data in the table,
-> >>> but it was working with 4.17, and reverting this commit solves the
-> >>> problem.
-> >>
-> >>
-> >> But this commit fixes another regression which was more widespread.
-> >>
-> >> Apparently, we can't work around all of the errors in the tables out
-> >> there at the same time. :-/
-> >
-> >
-> > NP, Let me see if I can come up with a way to harden the
-> > parse_loop/create_op code enough that it doesn't crash the machine.
-> 
-> Sure.  I'll look at it too.
+> I'd keep it lowercase as the other arm64 macros in this file.
 
-I it looks like there are error cases that have yet to be implemented...
-Jeremy, could send an ACPI dump of this thunderX2 machine?
+Ok, thanks, I'm fine with it.
 
-Thanks,
-Erik
-
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in the body of
-> a message to majordomo at vger.kernel.org More majordomo info at
-> http://vger.kernel.org/majordomo-info.html
+Best regards,
+Alexander
