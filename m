@@ -1,21 +1,40 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 3 Jul 2018 17:33:35 -0600
-Subject: [PATCH 2/5] dt-bindings: phy-mtk-tphy: add optional properties
- for u2phy
-In-Reply-To: <86d49766059a738e7182a49e6c113a12403b3b01.1530238400.git.chunfeng.yun@mediatek.com>
-References: <54260d59ae39c2335e97892fe85db16cac30b33b.1530238400.git.chunfeng.yun@mediatek.com>
- <86d49766059a738e7182a49e6c113a12403b3b01.1530238400.git.chunfeng.yun@mediatek.com>
-Message-ID: <20180703233335.GA32530@rob-hp-laptop>
+From: labbott@redhat.com (Laura Abbott)
+Date: Tue,  3 Jul 2018 16:34:29 -0700
+Subject: [PATCHv5 3/4] powerpc: Add build salt to the vDSO
+In-Reply-To: <20180703233430.14416-1-labbott@redhat.com>
+References: <20180703233430.14416-1-labbott@redhat.com>
+Message-ID: <20180703233430.14416-4-labbott@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 29, 2018 at 10:20:28AM +0800, Chunfeng Yun wrote:
-> Add some optional properties for eye diagram test and BC12 of
-> u2phy
-> 
-> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-> ---
->  Documentation/devicetree/bindings/phy/phy-mtk-tphy.txt | 6 ++++++
->  1 file changed, 6 insertions(+)
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+The vDSO needs to have a unique build id in a similar manner
+to the kernel and modules. Use the build salt macro.
+
+Signed-off-by: Laura Abbott <labbott@redhat.com>
+---
+v5: New approach with the BUILD_SALT macro
+---
+ arch/powerpc/kernel/vdso32/note.S | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/arch/powerpc/kernel/vdso32/note.S b/arch/powerpc/kernel/vdso32/note.S
+index d4b5be4f3d5f..ec1d05265c75 100644
+--- a/arch/powerpc/kernel/vdso32/note.S
++++ b/arch/powerpc/kernel/vdso32/note.S
+@@ -5,6 +5,7 @@
+ 
+ #include <linux/uts.h>
+ #include <linux/version.h>
++#include <linux/build-salt.h>
+ 
+ #define ASM_ELF_NOTE_BEGIN(name, flags, vendor, type)			      \
+ 	.section name, flags;						      \
+@@ -23,3 +24,5 @@
+ 	ASM_ELF_NOTE_BEGIN(".note.kernel-version", "a", UTS_SYSNAME, 0)
+ 	.long LINUX_VERSION_CODE
+ 	ASM_ELF_NOTE_END
++
++BUILD_SALT;
+-- 
+2.17.1
