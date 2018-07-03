@@ -1,68 +1,87 @@
-From: vilhelm.gray@gmail.com (William Breathitt Gray)
-Date: Mon, 2 Jul 2018 22:48:35 -0400
-Subject: [PATCH v7 00/10] Introduce the Counter subsystem
-In-Reply-To: <603b0373-f1e1-5938-fa53-8328c9a5964f@lechnology.com>
-References: <cover.1529607879.git.vilhelm.gray@gmail.com>
- <603b0373-f1e1-5938-fa53-8328c9a5964f@lechnology.com>
-Message-ID: <20180703024835.GA9493@sophia>
+From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
+Date: Tue, 3 Jul 2018 10:48:16 +0800
+Subject: [PATCH 0/2] serial: 8250_dw: add fractional divisor support
+In-Reply-To: <20180703102257.678db6a8@xhacker.debian>
+References: <20180702180428.331b36c5@xhacker.debian>
+ <fef0bf484ead5e0998666168ced86438bf935ce5.camel@linux.intel.com>
+ <59b14f97234271a7d859fa07f27bd66ec252ccc9.camel@linux.intel.com>
+ <20180703102257.678db6a8@xhacker.debian>
+Message-ID: <20180703104816.031abbfc@xhacker.debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 02, 2018 at 01:13:40PM -0500, David Lechner wrote:
->On 06/21/2018 04:06 PM, William Breathitt Gray wrote:
->> I decided to strip down these devices to arrive at the core essence of
->> what constitutes a "counter device" and therefore design a "generic
->> counter" abstraction to better represent these devices and prevent the
->> ambiguity we discovered with the existing IIO Counter interface. This
->> abstraction became the Generic Counter paradigm, which is explained in
->> detail within the Documentation/driver-api/generic-counter.rst file
->> introduced by this patchset.
->
->I'm curious if you have given any thought to the time aspect of counters.
->I am interested in the rate at which the counters are counting (e.g. how
->many counts per second). I realize that you can calculate this in
->userspace or in the kernel using the system timer, but it is not very
->accurate since Linux is not a realtime OS. So, I would like to get the
->rate directly from the hardware. For example, the TI eQEP[1], like the
->one found in BeagleBones, has a couple ways of measuring time (see link
->for details).
->
->[1]: http://www.ti.com/lit/ug/sprug05a/sprug05a.pdf
+On Tue, 3 Jul 2018 10:22:57 +0800 Jisheng Zhang wrote:
 
-Ah yes, I see you initially attempted adding a frequency channel type to
-the IIO code. I agree with you that this calculation is best kept away
-from the operating system, not just because of the realtime requirement
-considerations, but also because the hardware likely knows best its own
-data, so let's expose it!
+> Hi,
+> 
+> On Mon, 2 Jul 2018 14:51:03 +0300 Andy Shevchenko wrote:
+> 
+> > On Mon, 2018-07-02 at 13:18 +0300, Andy Shevchenko wrote:  
+> > > On Mon, 2018-07-02 at 18:04 +0800, Jisheng Zhang wrote:    
+> > > > For Synopsys DesignWare 8250 uart which version >= 4.00a, there's a
+> > > > valid divisor latch fraction register. The fractional divisor width
+> > > > is
+> > > > 4bits ~ 6bits.
+> > > >     
+> > > 
+> > > There are several serial IPs that have fractional divider built-in.
+> > > None
+> > > is using any specific hooks. Why do you need in your case, esp. taking
+> > > into consideration that we have a custom ->set_termios() callback?    
+> > 
+> > Okay, I see that in 8250 we have hooks embedded into 8250_port.c which
+> > is not the best solution.
+> > 
+> > For example it prevents better splitting Exar code.
+> > So, we would need these hooks, but better to integrate them in the same
+> > way like it's done for the rest of 8250 ones, i.e.
+> > - rename existing to have a "do" word
+> > - create new functions which would be a replacement that choose between
+> > "do" variant and custom one
+> > - not sure if we need to export "do" variants (at least for now)  
+> 
+> So you mean add the support as following:
+> 
+> 1.rename current serial8250_set_divisor as serial8250_do_set_divisor
+> 
+> 2.add a new serial8250_set_divisor which will be as simple as
+> 
+> static void serial8250_set_divisor(struct uart_port *port, ...)
+> {
+> 	struct uart_8250_port *up = up_to_u8250p(port);
+> 
+> 	if (up->set_divisor)
+> 		up->set_divisor(...);
+> 	else
+> 		serial8250_do_set_divisor(...);
+> }
+> 
+> could you please confirm?
+> 
+> Another issue is I'm not sure which struct to add the hook,
+> struct uart_port or struct uart_8250_port? Currently, it seems that only
+> uart_8250_port needs this hook, sure, adding the hook to struct uart_port
+> is fine either. Could you please kindly give some suggestions?
 
-Regarding the Generic Counter interface, a frequency attribute can be
-added quite easily in a technical sense, so this discussion should be
-focused more on the warrant for exposing this data. I understand from
-the discussion thread on your initial patch submission that you're
-working with hot-swappable encoder wheels and would like to expose a
-counting rate since you have trouble otherwise knowing the number of
-counts equal to one revolution due to the various possible encoder
-wheels that could be installed -- do I understand this correctly?
+patching struct uart_port seems a bit overhead. After reading the code
+again, I propose another solution, similar as what dl_write() is used in
+8250 core:
 
-Luckily the Generic Counter interface is a more abstract paradigm, so
-the hot-swappable encoder wheels should not be a problem for us as long
-as we nail down a consistent and thorough definition for this attribute.
-To that end, since the Generic Counter paradigm is designed to abstract
-away specifics of counter devices in order to present the final data of
-interest to users (e.g. the count value, the mode of operation, etc.),
-let's make sure frequency is actually what we want to expose and not
-just a middle-step datum on the path to the final result.
+1.introduce the hook to struct uart_8250_port as my previous patches do, 
 
-What is the real life use-case for this information (are you tracking
-position)? Does the relevant hardware report the number of counts equal
-to one revolution, or are you calculating this from frequency? Are you
-using this frequency to simply track the number of revolutions? Should
-revolution count also be exposed? Is frequency useful for other
-applications on its own (perhaps velocity of an automobile device
-equipped with an encoder wheel for some reason or other)?
+2.rename current serial8250_set_divisor() as default_serial_get_divisor()
+then introduce a new serial8250_set_divisor() as:
+static inline void serial8250_set_divisor(struct uart_8250_port *up,....)
+{
+	up->set_divisor();
+}
 
-Once we figure out how this data is used, we can determine the best
-design and place to introduce it into the Generic Counter interface,
-then move on to integration from there.
+and point up->set-divisor to default_serial_get_divisor
 
-William Breathitt Gray
+what do you think about this solution?
+
+Thanks
+
+> 
+> Thanks,
+> Jisheng
