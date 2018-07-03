@@ -1,65 +1,24 @@
-From: dkos@cadence.com (Damian Kos)
-Date: Tue, 3 Jul 2018 11:02:21 +0100
-Subject: [PATCH 10/12] dt-bindings: drm/bridge: Document Cadence MHDP bridge
- bindings
-In-Reply-To: <1530612152-27555-1-git-send-email-dkos@cadence.com>
-References: <1530612152-27555-1-git-send-email-dkos@cadence.com>
-Message-ID: <1530612152-27555-11-git-send-email-dkos@cadence.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 3 Jul 2018 18:08:28 +0800
+Subject: [PATCH 2/6] arm64: dts: freescale: Add missing cooling device
+ properties for CPUs
+In-Reply-To: <20180703083431.l4rbnept2lwjocol@vireshk-i7>
+References: <cover.1527225682.git.viresh.kumar@linaro.org>
+ <e4504945d2b684fae2850bbcf03a6d02917a8c8a.1527225682.git.viresh.kumar@linaro.org>
+ <CAAQ0ZWRsroAAKRyxdd9ZCreriAjdBecmJy01sRy+6i_iQsMKgw@mail.gmail.com>
+ <20180703083431.l4rbnept2lwjocol@vireshk-i7>
+Message-ID: <20180703100827.GP4348@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document the bindings used for the Cadence MHDP DPI/DP bridge.
+On Tue, Jul 03, 2018 at 02:04:31PM +0530, Viresh Kumar wrote:
+> On 03-07-18, 15:34, Shawn Guo wrote:
+> > Please use my kernel.org email address for future patches.
+> 
+> As there were many patches I relied on get_maintainers to do that
+> stuff and it didn't pick you up by default. Maybe try fixing
+> MAINTAINERS to add an entry against your email id ?
 
-Signed-off-by: Damian Kos <dkos@cadence.com>
----
- .../bindings/display/bridge/cdns,mhdp.txt          |   39 ++++++++++++++++++++
- 1 files changed, 39 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/display/bridge/cdns,mhdp.txt
+Good point.  Will patch MAINTAINERS for arm64 freescale DTS.
 
-diff --git a/Documentation/devicetree/bindings/display/bridge/cdns,mhdp.txt b/Documentation/devicetree/bindings/display/bridge/cdns,mhdp.txt
-new file mode 100644
-index 0000000..d872e26
---- /dev/null
-+++ b/Documentation/devicetree/bindings/display/bridge/cdns,mhdp.txt
-@@ -0,0 +1,39 @@
-+Cadence MHDP bridge
-+==========================
-+
-+The Cadence MHDP bridge is a DPI to DP bridge.
-+
-+Required properties:
-+ - compatible: should be "cdns,mhdp",
-+ - reg: physical base address and length of the controller's registers,
-+ - clocks: DP bridge clock, it's used by the IP to know how to translate
-+	   a number of clock cycles into a time (which is used to comply
-+	   with DP standard timings and delays),
-+ - clock-names: must be "clk",
-+
-+Required subnodes:
-+ - ports: Ports as described in Documentation/devictree/bindings/graph.txt
-+   Currently contains a single input port at address 0 representing the DPI
-+   input.
-+   Port 0 should be connected to a DPI encoder output.
-+
-+Example:
-+
-+	mhdp: mhdp at 0xf0fb000000 {
-+		compatible = "cdns,mhdp";
-+		reg = <0xf0 0xfb000000 0x0 0x1000000>;
-+		clocks = <&mhdp_clock>;
-+		clock-names = "clk";
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			port at 0 {
-+				reg = <0>;
-+				mhdp0_dpi_input: endpoint {
-+					remote-endpoint = <&xxx_dpi_output>;
-+				};
-+			};
-+		};
-+	};
--- 
-1.7.1
+Shawn
