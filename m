@@ -1,40 +1,207 @@
-From: samuel@sholland.org (Samuel Holland)
-Date: Tue, 3 Jul 2018 13:42:33 -0500
-Subject: [PATCH 0/2] Allwinner A64 timer workaround
-In-Reply-To: <2c16d5ab-38f7-8f3e-875c-19e8032f440a@arm.com>
-References: <20180511022751.9096-1-samuel@sholland.org>
- <2c16d5ab-38f7-8f3e-875c-19e8032f440a@arm.com>
-Message-ID: <bdfb1a31-2c4a-d258-7bf6-aaab8cee4663@sholland.org>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Tue, 3 Jul 2018 20:58:13 +0200
+Subject: [PATCH 3/3] clk: meson: add sub EMMC clock controller driver
+In-Reply-To: <20180703145716.31860-4-yixun.lan@amlogic.com>
+References: <20180703145716.31860-1-yixun.lan@amlogic.com>
+ <20180703145716.31860-4-yixun.lan@amlogic.com>
+Message-ID: <CAFBinCCFQr+_k7bkda0a3wVQdyG8DzEyim6v_OBikUifCxyVXg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/03/18 10:09, Marc Zyngier wrote:
-> On 11/05/18 03:27, Samuel Holland wrote:
->> Hello,
->> 
->> Several people (including me) have experienced extremely large system
->> clock jumps on their A64-based devices, apparently due to the architectural
->> timer going backward, which is interpreted by Linux as the timer wrapping
->> around after 2^56 cycles.
->> 
->> Investigation led to discovery of some obvious problems with this SoC's 
->> architectural timer, and this patch series introduces what I believe is
->> the simplest workaround. More details are in the commit message for patch
->> 1. Patch 2 simply enables the workaround in the device tree.
-> 
-> What's the deal with this series? There was a couple of nits to address, and 
-> I was more or less expecting a v2.
+Hi Yixun,
 
-I got reports that people were still occasionally having clock jumps after
-applying this series, so I wanted to attempt a more complete fix, but I haven't
-had time to do any deeper investigation. I think this series is still beneficial
-even if it's not a complete solution, so I'll come back with another patch on
-top of this if/once I get it fully fixed.
+apart from what Jerome found this looks good to me.
+one small "issue" and a question are inline below
 
-I'll prepare a v2 with a bounded loop. Presumably, 3 * (max CPU Hz) / (24MHz
-timer) ? 150 should be a conservative iteration limit?
+On Tue, Jul 3, 2018 at 9:00 AM Yixun Lan <yixun.lan@amlogic.com> wrote:
+>
+> This patch will add a EMMC clock controller driver support,
+> It provide a mux and divider clock.
+>
+> This clock driver can be protentially used by either EMMC and
+> NAND driver.
+>
+> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+> ---
+>  drivers/clk/meson/Kconfig     |   9 +++
+>  drivers/clk/meson/Makefile    |   1 +
+>  drivers/clk/meson/emmc-clkc.c | 136 ++++++++++++++++++++++++++++++++++
+>  3 files changed, 146 insertions(+)
+>  create mode 100644 drivers/clk/meson/emmc-clkc.c
+>
+> diff --git a/drivers/clk/meson/Kconfig b/drivers/clk/meson/Kconfig
+> index efaa70f682b4..2f27ff08e4eb 100644
+> --- a/drivers/clk/meson/Kconfig
+> +++ b/drivers/clk/meson/Kconfig
+> @@ -15,6 +15,15 @@ config COMMON_CLK_MESON_AO
+>         select COMMON_CLK_REGMAP_MESON
+>         select RESET_CONTROLLER
+>
+> +config COMMON_CLK_EMMC_MESON
+> +       tristate "Meson EMMC Sub Clock Controller Driver"
+> +       depends on COMMON_CLK_AMLOGIC
+> +       select MFD_SYSCON
+> +       select REGMAP
+> +       help
+> +         Support for the EMMC sub clock controller on AmLogic Meson Platform,
+> +         Say Y if you want this clock enabled.
+> +
+>  config COMMON_CLK_REGMAP_MESON
+>         bool
+>         select REGMAP
+> diff --git a/drivers/clk/meson/Makefile b/drivers/clk/meson/Makefile
+> index 72ec8c40d848..2f04f77ba4de 100644
+> --- a/drivers/clk/meson/Makefile
+> +++ b/drivers/clk/meson/Makefile
+> @@ -9,4 +9,5 @@ obj-$(CONFIG_COMMON_CLK_MESON8B) += meson8b.o
+>  obj-$(CONFIG_COMMON_CLK_GXBB)   += gxbb.o gxbb-aoclk.o gxbb-aoclk-32k.o
+>  obj-$(CONFIG_COMMON_CLK_AXG)    += axg.o axg-aoclk.o
+>  obj-$(CONFIG_COMMON_CLK_AXG_AUDIO)     += axg-audio.o
+> +obj-$(CONFIG_COMMON_CLK_EMMC_MESON)    += emmc-clkc.o
+>  obj-$(CONFIG_COMMON_CLK_REGMAP_MESON)  += clk-regmap.o
+> diff --git a/drivers/clk/meson/emmc-clkc.c b/drivers/clk/meson/emmc-clkc.c
+> new file mode 100644
+> index 000000000000..cf5bb9f34327
+> --- /dev/null
+> +++ b/drivers/clk/meson/emmc-clkc.c
+> @@ -0,0 +1,136 @@
+> +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+> +/*
+> + * Amlogic Meson EMMC Sub Clock Controller Driver
+> + *
+> + * Copyright (c) 2018 Amlogic, inc.
+> + * Author: Yixun Lan <yixun.lan@amlogic.com>
+> + */
+> +
+> +#include <linux/clk.h>
+> +#include <linux/clk-provider.h>
+> +#include <linux/init.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_device.h>
+> +#include <linux/mfd/syscon.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/regmap.h>
+> +
+> +#include <dt-bindings/clock/emmc-clkc.h>
+> +
+> +#include "clkc.h"
+> +
+> +#define SD_EMMC_CLOCK          0
+> +#define MUX_CLK_NUM_PARENTS    2
+> +#define EMMC_MAX_CLKS          2
+> +#define CLK_NAME_LEN           48
+> +
+> +static struct clk_regmap_mux_data emmc_clkc_mux_data = {
+> +       .offset = SD_EMMC_CLOCK,
+> +       .mask = 0x3,
+> +       .shift = 6,
+> +};
+> +
+> +static struct clk_regmap_div_data emmc_clkc_div_data = {
+> +       .offset = SD_EMMC_CLOCK,
+> +       .shift = 0,
+> +       .width = 6,
+> +       .flags = CLK_DIVIDER_ROUND_CLOSEST | CLK_DIVIDER_ONE_BASED,
+> +};
+> +
+> +static const struct of_device_id clkc_match_table[] = {
+> +       { .compatible = "amlogic,emmc-clkc" },
+shouldn't this be "amlogic,meson-axg-emmc-clkc" (and optionally also
+"amlogic,meson-gx-emmc-clkc")?
 
-Also, does this make sense to CC to stable?
+> +       {}
+> +};
+> +
+> +static int emmc_clkc_probe(struct platform_device *pdev)
+> +{
+> +       struct device *dev = &pdev->dev;
+> +       struct clk_regmap *mux, *div;
+> +       struct regmap *map;
+> +       struct clk *clk;
+> +       int i, ret;
+> +       const char *parent_names[MUX_CLK_NUM_PARENTS];
+> +       struct clk_init_data init;
+> +       char mux_name[CLK_NAME_LEN], div_name[CLK_NAME_LEN];
+> +       struct clk_hw_onecell_data *onecell_data;
+> +
+> +       map = syscon_node_to_regmap(dev->of_node);
+> +
+> +       mux = devm_kzalloc(dev, sizeof(*mux), GFP_KERNEL);
+> +       div = devm_kzalloc(dev, sizeof(*div), GFP_KERNEL);
+> +
+> +       onecell_data = devm_kzalloc(dev, sizeof(*onecell_data) +
+> +                                   sizeof(*onecell_data->hws) * EMMC_MAX_CLKS,
+> +                                   GFP_KERNEL);
+> +
+> +       if (!mux || !div || !onecell_data)
+> +               return -ENOMEM;
+> +
+> +       for (i = 0; i < MUX_CLK_NUM_PARENTS; i++) {
+> +               char name[8];
+> +
+> +               snprintf(name, sizeof(name), "clkin%d", i);
+> +               clk = devm_clk_get(dev, name);
+> +               if (IS_ERR(clk)) {
+> +                       if (clk != ERR_PTR(-EPROBE_DEFER))
+> +                               dev_err(dev, "Missing clock %s\n", name);
+> +                       return PTR_ERR(clk);
+> +               }
+> +
+> +               parent_names[i] = __clk_get_name(clk);
+> +       }
+> +
+> +       mux->map = map;
+> +       mux->data = &emmc_clkc_mux_data;
+> +
+> +       snprintf(mux_name, CLK_NAME_LEN, "%s#emmc_mux", dev_name(dev));
+> +
+> +       init.name = mux_name;
+> +       init.ops = &clk_regmap_mux_ops;
+> +       init.flags = CLK_SET_RATE_PARENT;
+> +       init.parent_names = parent_names;
+> +       init.num_parents = MUX_CLK_NUM_PARENTS;
+> +
+> +       mux->hw.init = &init;
+> +       ret = devm_clk_hw_register(dev, &mux->hw);
+> +       if (ret) {
+> +               dev_err(dev, "Mux clock registration failed\n");
+> +               return ret;
+> +       }
+> +
+> +       parent_names[0] = mux_name;
+> +       div->map = map;
+> +       div->data = &emmc_clkc_div_data;
+> +
+> +       snprintf(div_name, CLK_NAME_LEN, "%s#emmc_div", dev_name(dev));
+> +
+> +       init.name = div_name;
+> +       init.ops = &clk_regmap_divider_ops;
+> +       init.flags = CLK_SET_RATE_PARENT;
+> +       init.parent_names = parent_names;
+> +       init.num_parents = 1;
+> +
+> +       div->hw.init = &init;
+> +       ret = devm_clk_hw_register(dev, &div->hw);
+> +       if (ret) {
+> +               dev_err(dev, "Div clock registration failed\n");
+> +               return ret;
+> +       }
+> +
+> +       onecell_data->hws[CLKID_EMMC_C_MUX] = &mux->hw,
+> +       onecell_data->hws[CLKID_EMMC_C_DIV] = &div->hw,
+> +       onecell_data->num = EMMC_MAX_CLKS;
+you are describing the mux and the divider here
+however, meson-gx-mmc.c has a few more clock related bits:
+- CLK_CORE_PHASE_MASK
+- CLK_TX_PHASE_MASK
+- CLK_RX_PHASE_MASK
+- CLK_V2_TX_DELAY_MASK / CLK_V3_TX_DELAY_MASK
+- CLK_V2_RX_DELAY_MASK / CLK_V3_RX_DELAY_MASK
+- CLK_V2_ALWAYS_ON / CLK_V3_ALWAYS_ON
 
-Thanks,
-Samuel
+are these used for the MMC clock or are some of these routed to the
+NAND pins as well?
+
+
+Regards
+Martin
