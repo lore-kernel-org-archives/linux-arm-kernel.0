@@ -1,9 +1,9 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Wed,  4 Jul 2018 00:00:02 +0200
-Subject: [PATCH v2 05/32] mtd: rawnand: denali: convert to nand_scan()
+Date: Wed,  4 Jul 2018 00:00:11 +0200
+Subject: [PATCH v2 14/32] mtd: rawnand: marvell: convert driver to nand_scan()
 In-Reply-To: <20180703220029.19565-1-miquel.raynal@bootlin.com>
 References: <20180703220029.19565-1-miquel.raynal@bootlin.com>
-Message-ID: <20180703220029.19565-6-miquel.raynal@bootlin.com>
+Message-ID: <20180703220029.19565-15-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,191 +14,229 @@ both nand_scan_ident() and nand_scan_tail().
 
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 ---
- drivers/mtd/nand/raw/denali.c | 134 +++++++++++++++++++++++-------------------
- 1 file changed, 73 insertions(+), 61 deletions(-)
+ drivers/mtd/nand/raw/marvell_nand.c | 201 +++++++++++++++++++-----------------
+ 1 file changed, 104 insertions(+), 97 deletions(-)
 
-diff --git a/drivers/mtd/nand/raw/denali.c b/drivers/mtd/nand/raw/denali.c
-index 4d53f41ada08..09b85d749552 100644
---- a/drivers/mtd/nand/raw/denali.c
-+++ b/drivers/mtd/nand/raw/denali.c
-@@ -1205,62 +1205,12 @@ static int denali_multidev_fixup(struct denali_nand_info *denali)
+diff --git a/drivers/mtd/nand/raw/marvell_nand.c b/drivers/mtd/nand/raw/marvell_nand.c
+index ba6889bbe802..ed4a0419962a 100644
+--- a/drivers/mtd/nand/raw/marvell_nand.c
++++ b/drivers/mtd/nand/raw/marvell_nand.c
+@@ -2295,6 +2295,107 @@ static int marvell_nfc_setup_data_interface(struct mtd_info *mtd, int chipnr,
  	return 0;
  }
  
--int denali_init(struct denali_nand_info *denali)
-+static int denali_attach_chip(struct nand_chip *chip)
- {
--	struct nand_chip *chip = &denali->nand;
- 	struct mtd_info *mtd = nand_to_mtd(chip);
--	u32 features = ioread32(denali->reg + FEATURES);
-+	struct denali_nand_info *denali = mtd_to_denali(mtd);
- 	int ret;
- 
--	mtd->dev.parent = denali->dev;
--	denali_hw_init(denali);
--
--	init_completion(&denali->complete);
--	spin_lock_init(&denali->irq_lock);
--
--	denali_clear_irq_all(denali);
--
--	ret = devm_request_irq(denali->dev, denali->irq, denali_isr,
--			       IRQF_SHARED, DENALI_NAND_NAME, denali);
--	if (ret) {
--		dev_err(denali->dev, "Unable to request IRQ\n");
--		return ret;
--	}
--
--	denali_enable_irq(denali);
--	denali_reset_banks(denali);
--
--	denali->active_bank = DENALI_INVALID_BANK;
--
--	nand_set_flash_node(chip, denali->dev->of_node);
--	/* Fallback to the default name if DT did not give "label" property */
--	if (!mtd->name)
--		mtd->name = "denali-nand";
--
--	chip->select_chip = denali_select_chip;
--	chip->read_byte = denali_read_byte;
--	chip->write_byte = denali_write_byte;
--	chip->read_word = denali_read_word;
--	chip->cmd_ctrl = denali_cmd_ctrl;
--	chip->dev_ready = denali_dev_ready;
--	chip->waitfunc = denali_waitfunc;
--
--	if (features & FEATURES__INDEX_ADDR) {
--		denali->host_read = denali_indexed_read;
--		denali->host_write = denali_indexed_write;
--	} else {
--		denali->host_read = denali_direct_read;
--		denali->host_write = denali_direct_write;
--	}
--
--	/* clk rate info is needed for setup_data_interface */
--	if (denali->clk_rate && denali->clk_x_rate)
--		chip->setup_data_interface = denali_setup_data_interface;
--
--	ret = nand_scan_ident(mtd, denali->max_banks, NULL);
--	if (ret)
--		goto disable_irq;
--
- 	if (ioread32(denali->reg + FEATURES) & FEATURES__DMA)
- 		denali->dma_avail = 1;
- 
-@@ -1293,7 +1243,7 @@ int denali_init(struct denali_nand_info *denali)
- 				   mtd->oobsize - denali->oob_skip_bytes);
- 	if (ret) {
- 		dev_err(denali->dev, "Failed to setup ECC settings.\n");
--		goto disable_irq;
++static int marvell_nand_attach_chip(struct nand_chip *chip)
++{
++	struct mtd_info *mtd = nand_to_mtd(chip);
++	struct marvell_nand_chip *marvell_nand = to_marvell_nand(chip);
++	struct marvell_nfc *nfc = to_marvell_nfc(chip->controller);
++	struct pxa3xx_nand_platform_data *pdata = dev_get_platdata(nfc->dev);
++	int ret;
++
++	if (pdata && pdata->flash_bbt)
++		chip->bbt_options |= NAND_BBT_USE_FLASH;
++
++	if (chip->bbt_options & NAND_BBT_USE_FLASH) {
++		/*
++		 * We'll use a bad block table stored in-flash and don't
++		 * allow writing the bad block marker to the flash.
++		 */
++		chip->bbt_options |= NAND_BBT_NO_OOB_BBM;
++		chip->bbt_td = &bbt_main_descr;
++		chip->bbt_md = &bbt_mirror_descr;
++	}
++
++	/* Save the chip-specific fields of NDCR */
++	marvell_nand->ndcr = NDCR_PAGE_SZ(mtd->writesize);
++	if (chip->options & NAND_BUSWIDTH_16)
++		marvell_nand->ndcr |= NDCR_DWIDTH_M | NDCR_DWIDTH_C;
++
++	/*
++	 * On small page NANDs, only one cycle is needed to pass the
++	 * column address.
++	 */
++	if (mtd->writesize <= 512) {
++		marvell_nand->addr_cyc = 1;
++	} else {
++		marvell_nand->addr_cyc = 2;
++		marvell_nand->ndcr |= NDCR_RA_START;
++	}
++
++	/*
++	 * Now add the number of cycles needed to pass the row
++	 * address.
++	 *
++	 * Addressing a chip using CS 2 or 3 should also need the third row
++	 * cycle but due to inconsistance in the documentation and lack of
++	 * hardware to test this situation, this case is not supported.
++	 */
++	if (chip->options & NAND_ROW_ADDR_3)
++		marvell_nand->addr_cyc += 3;
++	else
++		marvell_nand->addr_cyc += 2;
++
++	if (pdata) {
++		chip->ecc.size = pdata->ecc_step_size;
++		chip->ecc.strength = pdata->ecc_strength;
++	}
++
++	ret = marvell_nand_ecc_init(mtd, &chip->ecc);
++	if (ret) {
++		dev_err(nfc->dev, "ECC init failed: %d\n", ret);
 +		return ret;
- 	}
- 
- 	dev_dbg(denali->dev,
-@@ -1337,7 +1287,7 @@ int denali_init(struct denali_nand_info *denali)
- 
- 	ret = denali_multidev_fixup(denali);
- 	if (ret)
--		goto disable_irq;
-+		return ret;
- 
- 	/*
- 	 * This buffer is DMA-mapped by denali_{read,write}_page_raw.  Do not
-@@ -1345,26 +1295,88 @@ int denali_init(struct denali_nand_info *denali)
- 	 * guarantee DMA-safe alignment.
- 	 */
- 	denali->buf = kmalloc(mtd->writesize + mtd->oobsize, GFP_KERNEL);
--	if (!denali->buf) {
--		ret = -ENOMEM;
--		goto disable_irq;
-+	if (!denali->buf)
-+		return -ENOMEM;
++	}
++
++	if (chip->ecc.mode == NAND_ECC_HW) {
++		/*
++		 * Subpage write not available with hardware ECC, prohibit also
++		 * subpage read as in userspace subpage access would still be
++		 * allowed and subpage write, if used, would lead to numerous
++		 * uncorrectable ECC errors.
++		 */
++		chip->options |= NAND_NO_SUBPAGE_WRITE;
++	}
++
++	if (pdata || nfc->caps->legacy_of_bindings) {
++		/*
++		 * We keep the MTD name unchanged to avoid breaking platforms
++		 * where the MTD cmdline parser is used and the bootloader
++		 * has not been updated to use the new naming scheme.
++		 */
++		mtd->name = "pxa3xx_nand-0";
++	} else if (!mtd->name) {
++		/*
++		 * If the new bindings are used and the bootloader has not been
++		 * updated to pass a new mtdparts parameter on the cmdline, you
++		 * should define the following property in your NAND node, ie:
++		 *
++		 *	label = "main-storage";
++		 *
++		 * This way, mtd->name will be set by the core when
++		 * nand_set_flash_node() is called.
++		 */
++		mtd->name = devm_kasprintf(nfc->dev, GFP_KERNEL,
++					   "%s:nand.%d", dev_name(nfc->dev),
++					   marvell_nand->sels[0].cs);
++		if (!mtd->name) {
++			dev_err(nfc->dev, "Failed to allocate mtd->name\n");
++			return -ENOMEM;
++		}
++	}
 +
 +	return 0;
 +}
 +
-+static void denali_detach_chip(struct nand_chip *chip)
-+{
-+	struct mtd_info *mtd = nand_to_mtd(chip);
-+	struct denali_nand_info *denali = mtd_to_denali(mtd);
-+
-+	kfree(denali->buf);
-+}
-+
-+int denali_init(struct denali_nand_info *denali)
-+{
-+	struct nand_chip *chip = &denali->nand;
-+	struct mtd_info *mtd = nand_to_mtd(chip);
-+	u32 features = ioread32(denali->reg + FEATURES);
-+	int ret;
-+
-+	mtd->dev.parent = denali->dev;
-+	denali_hw_init(denali);
-+
-+	init_completion(&denali->complete);
-+	spin_lock_init(&denali->irq_lock);
-+
-+	denali_clear_irq_all(denali);
-+
-+	ret = devm_request_irq(denali->dev, denali->irq, denali_isr,
-+			       IRQF_SHARED, DENALI_NAND_NAME, denali);
-+	if (ret) {
-+		dev_err(denali->dev, "Unable to request IRQ\n");
-+		return ret;
- 	}
+ static int marvell_nand_chip_init(struct device *dev, struct marvell_nfc *nfc,
+ 				  struct device_node *np)
+ {
+@@ -2437,105 +2538,11 @@ static int marvell_nand_chip_init(struct device *dev, struct marvell_nfc *nfc,
+ 	marvell_nand->ndtr1 = readl_relaxed(nfc->regs + NDTR1);
+ 
+ 	chip->options |= NAND_BUSWIDTH_AUTO;
+-	ret = nand_scan_ident(mtd, marvell_nand->nsels, NULL);
+-	if (ret) {
+-		dev_err(dev, "could not identify the nand chip\n");
+-		return ret;
+-	}
+-
+-	if (pdata && pdata->flash_bbt)
+-		chip->bbt_options |= NAND_BBT_USE_FLASH;
+-
+-	if (chip->bbt_options & NAND_BBT_USE_FLASH) {
+-		/*
+-		 * We'll use a bad block table stored in-flash and don't
+-		 * allow writing the bad block marker to the flash.
+-		 */
+-		chip->bbt_options |= NAND_BBT_NO_OOB_BBM;
+-		chip->bbt_td = &bbt_main_descr;
+-		chip->bbt_md = &bbt_mirror_descr;
+-	}
+-
+-	/* Save the chip-specific fields of NDCR */
+-	marvell_nand->ndcr = NDCR_PAGE_SZ(mtd->writesize);
+-	if (chip->options & NAND_BUSWIDTH_16)
+-		marvell_nand->ndcr |= NDCR_DWIDTH_M | NDCR_DWIDTH_C;
+-
+-	/*
+-	 * On small page NANDs, only one cycle is needed to pass the
+-	 * column address.
+-	 */
+-	if (mtd->writesize <= 512) {
+-		marvell_nand->addr_cyc = 1;
+-	} else {
+-		marvell_nand->addr_cyc = 2;
+-		marvell_nand->ndcr |= NDCR_RA_START;
+-	}
+-
+-	/*
+-	 * Now add the number of cycles needed to pass the row
+-	 * address.
+-	 *
+-	 * Addressing a chip using CS 2 or 3 should also need the third row
+-	 * cycle but due to inconsistance in the documentation and lack of
+-	 * hardware to test this situation, this case is not supported.
+-	 */
+-	if (chip->options & NAND_ROW_ADDR_3)
+-		marvell_nand->addr_cyc += 3;
+-	else
+-		marvell_nand->addr_cyc += 2;
+-
+-	if (pdata) {
+-		chip->ecc.size = pdata->ecc_step_size;
+-		chip->ecc.strength = pdata->ecc_strength;
+-	}
+-
+-	ret = marvell_nand_ecc_init(mtd, &chip->ecc);
+-	if (ret) {
+-		dev_err(dev, "ECC init failed: %d\n", ret);
+-		return ret;
+-	}
+-
+-	if (chip->ecc.mode == NAND_ECC_HW) {
+-		/*
+-		 * Subpage write not available with hardware ECC, prohibit also
+-		 * subpage read as in userspace subpage access would still be
+-		 * allowed and subpage write, if used, would lead to numerous
+-		 * uncorrectable ECC errors.
+-		 */
+-		chip->options |= NAND_NO_SUBPAGE_WRITE;
+-	}
+-
+-	if (pdata || nfc->caps->legacy_of_bindings) {
+-		/*
+-		 * We keep the MTD name unchanged to avoid breaking platforms
+-		 * where the MTD cmdline parser is used and the bootloader
+-		 * has not been updated to use the new naming scheme.
+-		 */
+-		mtd->name = "pxa3xx_nand-0";
+-	} else if (!mtd->name) {
+-		/*
+-		 * If the new bindings are used and the bootloader has not been
+-		 * updated to pass a new mtdparts parameter on the cmdline, you
+-		 * should define the following property in your NAND node, ie:
+-		 *
+-		 *	label = "main-storage";
+-		 *
+-		 * This way, mtd->name will be set by the core when
+-		 * nand_set_flash_node() is called.
+-		 */
+-		mtd->name = devm_kasprintf(nfc->dev, GFP_KERNEL,
+-					   "%s:nand.%d", dev_name(nfc->dev),
+-					   marvell_nand->sels[0].cs);
+-		if (!mtd->name) {
+-			dev_err(nfc->dev, "Failed to allocate mtd->name\n");
+-			return -ENOMEM;
+-		}
+-	}
  
 -	ret = nand_scan_tail(mtd);
-+	denali_enable_irq(denali);
-+	denali_reset_banks(denali);
-+
-+	denali->active_bank = DENALI_INVALID_BANK;
-+
-+	nand_set_flash_node(chip, denali->dev->of_node);
-+	/* Fallback to the default name if DT did not give "label" property */
-+	if (!mtd->name)
-+		mtd->name = "denali-nand";
-+
-+	chip->select_chip = denali_select_chip;
-+	chip->read_byte = denali_read_byte;
-+	chip->write_byte = denali_write_byte;
-+	chip->read_word = denali_read_word;
-+	chip->cmd_ctrl = denali_cmd_ctrl;
-+	chip->dev_ready = denali_dev_ready;
-+	chip->waitfunc = denali_waitfunc;
-+
-+	if (features & FEATURES__INDEX_ADDR) {
-+		denali->host_read = denali_indexed_read;
-+		denali->host_write = denali_indexed_write;
-+	} else {
-+		denali->host_read = denali_direct_read;
-+		denali->host_write = denali_direct_write;
-+	}
-+
-+	/* clk rate info is needed for setup_data_interface */
-+	if (denali->clk_rate && denali->clk_x_rate)
-+		chip->setup_data_interface = denali_setup_data_interface;
-+
-+	chip->hwcontrol.attach_chip = denali_attach_chip;
-+	chip->hwcontrol.detach_chip = denali_detach_chip;
-+	ret = nand_scan(mtd, denali->max_banks);
- 	if (ret)
--		goto free_buf;
-+		goto disable_irq;
- 
- 	ret = mtd_device_register(mtd, NULL, 0);
++	chip->controller->attach_chip = marvell_nand_attach_chip;
++	ret = nand_scan(mtd, marvell_nand->nsels);
  	if (ret) {
- 		dev_err(denali->dev, "Failed to register MTD: %d\n", ret);
- 		goto cleanup_nand;
+-		dev_err(dev, "nand_scan_tail failed: %d\n", ret);
++		dev_err(dev, "could not scan the nand chip\n");
+ 		return ret;
  	}
-+
- 	return 0;
- 
- cleanup_nand:
- 	nand_cleanup(chip);
--free_buf:
--	kfree(denali->buf);
- disable_irq:
- 	denali_disable_irq(denali);
  
 -- 
 2.14.1
