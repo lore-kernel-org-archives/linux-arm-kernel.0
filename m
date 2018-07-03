@@ -1,80 +1,46 @@
 From: dkos@cadence.com (Damian Kos)
-Date: Tue, 3 Jul 2018 11:02:16 +0100
-Subject: [PATCH 05/12] drm/dp: fix link probing for devices supporting DP 1.4+
+Date: Tue, 3 Jul 2018 11:02:20 +0100
+Subject: [PATCH 09/12] drm/dp: add pixel encoding and colorimetry format
+ indicator field in MISC1
 In-Reply-To: <1530612152-27555-1-git-send-email-dkos@cadence.com>
 References: <1530612152-27555-1-git-send-email-dkos@cadence.com>
-Message-ID: <1530612152-27555-6-git-send-email-dkos@cadence.com>
+Message-ID: <1530612152-27555-10-git-send-email-dkos@cadence.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Quentin Schulz <quentin.schulz@free-electrons.com>
+From: Quentin Schulz <quentin.schulz@bootlin.com>
 
-DP 1.4 introduced a DP_EXTENDED_RCVR_CAPA_FIELD_PRESENT bit in
-DP_TRAINING_AUX_RD_INTERVAL register. If set, DPCD registers from
-DP_DPCD_REV to DP_ADAPTER_CAP should be retrieved starting from
-DP_DPCD_REV_EXTENDED. All registers are copied except DP_DPCD_REV,
-DP_MAX_LINK_RATE and DP_DOWNSTREAMPORT_PRESENT which represent the
-"true capabilities" of DPRX device.
+If DP_TEST_COLOR_FORMAT_RAW_Y_ONLY is set, if MISC0 color format is
+DP_COLOR_FORMAT_RGB and all other bits are 0, then color format is
+actually Y-Only.
 
-Original DP_DPCD_REV, DP_MAX_LINK_RATE and DP_DOWNSTREAMPORT_PRESENT
-might falsely return lower capabilities to "avoid interoperability
-issues with some of the existing DP Source devices that malfunction
-when they discover the higher capabilities within those three
-registers.".
+If DP_TEST_COLOR_FORMAT_RAW_Y_ONLY is set, if MISC0 color format is
+DP_COLOR_FORMAT_YCbCr422, DP_TEST_DYNAMIC_RANGE_CEA is not set and
+chosen ITU is 601, then color format is actually RAW.
 
-Before DP 1.4, DP_EXTENDED_RCVR_CAPA_FIELD_PRESENT bit was reserved
-and read 0 so it's safe to check against it even if DP revision is
-<1.4
+If DP_TEST_VSC_SDP is set, then DP_TEST_COLOR_FORMAT_RAW_Y_ONLY,
+DP_TEST_COLOR_FORMAT, DP_TEST_DYNAMIC_RANGE_CEA,
+DP_TEST_YCBCR_COEFFICIENTS and DP_TEST_BIT_DEPTH are ignored and we
+should use VSC SDP for setting the colorimetry. This is used for Y420.
 
-Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+Signed-off-by: Quentin Schulz <quentin.schulz@bootlin.com>
 Signed-off-by: Damian Kos <dkos@cadence.com>
 ---
- drivers/gpu/drm/drm_dp_helper.c |   30 +++++++++++++++++++++++++++++-
- 1 files changed, 29 insertions(+), 1 deletions(-)
+ include/drm/drm_dp_helper.h |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/gpu/drm/drm_dp_helper.c b/drivers/gpu/drm/drm_dp_helper.c
-index 7f5d568..b6a27ab 100644
---- a/drivers/gpu/drm/drm_dp_helper.c
-+++ b/drivers/gpu/drm/drm_dp_helper.c
-@@ -370,10 +370,38 @@ int drm_dp_link_probe(struct drm_dp_aux *aux, struct drm_dp_link *link)
- {
- 	u8 values[3];
- 	int err;
-+	unsigned int addr;
+diff --git a/include/drm/drm_dp_helper.h b/include/drm/drm_dp_helper.h
+index accefbb..22f6c3e 100644
+--- a/include/drm/drm_dp_helper.h
++++ b/include/drm/drm_dp_helper.h
+@@ -609,6 +609,8 @@
+ #define DP_TEST_MISC1                       0x233
+ # define DP_TEST_REFRESH_DENOMINATOR        (1 << 0)
+ # define DP_TEST_INTERLACED                 (1 << 1)
++# define DP_TEST_VSC_SDP		    (1 << 6) /* 1.3+ */
++# define DP_TEST_COLOR_FORMAT_RAW_Y_ONLY    (1 << 7)
  
- 	memset(link, 0, sizeof(*link));
- 
--	err = drm_dp_dpcd_read(aux, DP_DPCD_REV, values, sizeof(values));
-+	/*
-+	 * DP 1.4 introduced a DP_EXTENDED_RCVR_CAPA_FIELD_PRESENT bit in
-+	 * DP_TRAINING_AUX_RD_INTERVAL register. If set, DPCD registers from
-+	 * DP_DPCD_REV to DP_ADAPTER_CAP should be retrieved starting from
-+	 * DP_DPCD_REV_EXTENDED. All registers are copied except DP_DPCD_REV,
-+	 * DP_MAX_LINK_RATE and DP_DOWNSTREAMPORT_PRESENT which represent the
-+	 * "true capabilities" of DPRX device.
-+	 *
-+	 * Original DP_DPCD_REV, DP_MAX_LINK_RATE and DP_DOWNSTREAMPORT_PRESENT
-+	 * might falsely return lower capabilities to "avoid interoperability
-+	 * issues with some of the existing DP Source devices that malfunction
-+	 * when they discover the higher capabilities within those three
-+	 * registers.".
-+	 *
-+	 * Before DP 1.4, DP_EXTENDED_RCVR_CAPA_FIELD_PRESENT bit was reserved
-+	 * and read 0 so it's safe to check against it even if DP revision is
-+	 * <1.4
-+	 */
-+	err = drm_dp_dpcd_readb(aux, DP_TRAINING_AUX_RD_INTERVAL, values);
-+	if (err < 0)
-+		return err;
-+
-+	if (values[0] & DP_EXTENDED_RCVR_CAPA_FIELD_PRESENT)
-+		addr = DP_DP13_DPCD_REV;
-+	else
-+		addr = DP_DPCD_REV;
-+
-+	err = drm_dp_dpcd_read(aux, addr, values, sizeof(values));
- 	if (err < 0)
- 		return err;
+ #define DP_TEST_REFRESH_RATE_NUMERATOR      0x234
  
 -- 
 1.7.1
