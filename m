@@ -1,94 +1,64 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 3 Jul 2018 14:59:32 -0600
-Subject: [PATCH 4/8] dt-bindings: add bindings for TI PRU as remoteproc
-In-Reply-To: <20180623210810.21232-5-david@lechnology.com>
-References: <20180623210810.21232-1-david@lechnology.com>
- <20180623210810.21232-5-david@lechnology.com>
-Message-ID: <20180703205932.GA28054@rob-hp-laptop>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 3 Jul 2018 23:02:15 +0200 (CEST)
+Subject: [PATCH v4 2/3] ioremap: Update pgtable free interfaces with addr
+In-Reply-To: <1530287995.14039.361.camel@hpe.com>
+References: <20180627141348.21777-1-toshi.kani@hpe.com>
+ <20180627141348.21777-3-toshi.kani@hpe.com> <20180627155632.GH30631@arm.com>
+ <1530115885.14039.295.camel@hpe.com> <20180629122358.GC17859@arm.com>
+ <1530287995.14039.361.camel@hpe.com>
+Message-ID: <alpine.DEB.2.21.1807032301140.1816@nanos.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 23, 2018 at 04:08:06PM -0500, David Lechner wrote:
-> This adds a new binding for the TI Programmable Runtime Unit (PRU)
-> as a remoteproc device.
+On Fri, 29 Jun 2018, Kani, Toshi wrote:
+> On Fri, 2018-06-29 at 13:23 +0100, Will Deacon wrote:
+> > Hi Toshi, Thomas,
+> > 
+> > On Wed, Jun 27, 2018 at 04:13:22PM +0000, Kani, Toshi wrote:
+> > > On Wed, 2018-06-27 at 16:56 +0100, Will Deacon wrote:
+> > > > On Wed, Jun 27, 2018 at 08:13:47AM -0600, Toshi Kani wrote:
+> > > > > From: Chintan Pandya <cpandya@codeaurora.org>
+> > > > > 
+> > > > > The following kernel panic was observed on ARM64 platform due to a stale
+> > > > > TLB entry.
+> > > > > 
+> > > > >  1. ioremap with 4K size, a valid pte page table is set.
+> > > > >  2. iounmap it, its pte entry is set to 0.
+> > > > >  3. ioremap the same address with 2M size, update its pmd entry with
+> > > > >     a new value.
+> > > > >  4. CPU may hit an exception because the old pmd entry is still in TLB,
+> > > > >     which leads to a kernel panic.
+> > > > > 
+> > > > > Commit b6bdb7517c3d ("mm/vmalloc: add interfaces to free unmapped page
+> > > > > table") has addressed this panic by falling to pte mappings in the above
+> > > > > case on ARM64.
+> > > > > 
+> > > > > To support pmd mappings in all cases, TLB purge needs to be performed
+> > > > > in this case on ARM64.
+> > > > > 
+> > > > > Add a new arg, 'addr', to pud_free_pmd_page() and pmd_free_pte_page()
+> > > > > so that TLB purge can be added later in seprate patches.
+> > > > 
+> > > > So I acked v13 of Chintan's series posted here:
+> > > > 
+> > > > http://lists.infradead.org/pipermail/linux-arm-kernel/2018-June/582953.html
+> > > > 
+> > > > any chance this lot could all be merged together, please?
+> > > 
+> > > Chintan's patch 2/3 and 3/3 apply cleanly on top of my series. Can you
+> > > please coordinate with Thomas on the logistics?
+> > 
+> > Sure. I guess having this series on a common branch that I can pull into
+> > arm64 and apply Chintan's other patches on top would work.
+> > 
+> > How does that sound?
 > 
-> Signed-off-by: David Lechner <david@lechnology.com>
-> ---
->  .../bindings/remoteproc/ti_pru_rproc.txt      | 51 +++++++++++++++++++
->  1 file changed, 51 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/remoteproc/ti_pru_rproc.txt
+> Should this go thru -mm tree then?
 > 
-> diff --git a/Documentation/devicetree/bindings/remoteproc/ti_pru_rproc.txt b/Documentation/devicetree/bindings/remoteproc/ti_pru_rproc.txt
-> new file mode 100644
-> index 000000000000..0e80a8db46d0
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/remoteproc/ti_pru_rproc.txt
-> @@ -0,0 +1,51 @@
-> +TI Programmable Realtime Unit (PRU)
-> +===================================
-> +
-> +Some TI Sitara SoCs contain a Programmable Realtime Unit subsystem with two
-> +processor cores that can be used for hard-realtime tasks.
-> +
-> +
-> +Required properties:
-> +--------------------
-> +The following are the mandatory properties:
-> +
-> +- compatible:		Should be one of the following,
-> +			    "ti,da850-pru-rproc" for AM18xx/OMAPL138 SoCs
-> +			    "ti,am3352-pru-rproc" for AM355x SoCs
-> +
-> +- reg:			Should contain the memory region for the PRUSS
-> +
-> +- interrupts: 		Should contain the interrupt number used to receive the
-> +			virtualqueue kick interrupts from the PRU (i.e.
-> +			PRU_EVTOUT0 and PRU_EVTOUT1)
-> +
-> +- interrupt-names	Should contain "pru0-vq", "pru1-vq"
-> +
-> +Optional properties:
-> +--------------------
-> +
-> +- power-domains:	A phandle to the power domain that powers the PRUSS
+> Andrew, Thomas, what do you think? 
 
-Only for da850?
+I just pick it up and provide Will a branch to pull that lot from.
 
-> +
-> +- ti,hwmods:		Name of the hwmod associated to the PRUSS, which is
-> +			typically "pruss"
+Thanks,
 
-Only for am3352?
-
-typically? You should enumerate possible values.
-
-> +
-> +Example:
-> +--------
-> +
-> +	// AM18xx
-> +	pru_rproc: cpu at 30000 {
-
-cpu is reserved for cpu nodes.
-
-> +		compatible = "ti,da850-pru-rproc";
-> +		reg = <0x30000 0x10000>;
-> +		interrupts = <3>, <4>;
-> +		interrupt-names = "pru0-vq", "pru1-vq";
-> +		power-domains = <&psc0 13>;
-> +	};
-> +
-> +	// AM335x
-> +	pru_rproc: cpu at 4a300000 {
-> +		compatible = "ti,am3352-pru-rproc";
-> +		reg = <0x4a300000 0x80000>;
-> +		interrupts = <20>, <21>;
-> +		interrupt-names = "pru0-vq", "pru1-vq";
-> +		ti,hwmods = "pruss";
-> +	};
-
-Really need 2 examples?
-
-> -- 
-> 2.17.1
-> 
+	tglx
