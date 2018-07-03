@@ -1,142 +1,26 @@
-From: fabio.estevam@nxp.com (Fabio Estevam)
-Date: Tue,  3 Jul 2018 10:05:54 -0300
-Subject: [PATCH v3] ARM: dts: imx51: Fix USB PHY duplicate unit-address
-Message-ID: <1530623154-11091-1-git-send-email-fabio.estevam@nxp.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 3 Jul 2018 21:10:51 +0800
+Subject: [PATCH 2/2] ARM: imx_v6_v7_defconfig: Select ULPI support
+In-Reply-To: <1529930043-6387-2-git-send-email-festevam@gmail.com>
+References: <1529930043-6387-1-git-send-email-festevam@gmail.com>
+ <1529930043-6387-2-git-send-email-festevam@gmail.com>
+Message-ID: <20180703131050.GT4348@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the following DTC warnings are seen with W=1:
+On Mon, Jun 25, 2018 at 09:34:03AM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@nxp.com>
+> 
+> Select CONFIG_USB_CHIPIDEA_ULPI and CONFIG_USB_ULPI_BUS so that
+> USB ULPI can be functional on some boards like imx51-babbge.
+> 
+> This fixes a kernel hang in 4.18-rc1 on i.mx51-babbage when
+> the bootloader does not initialize USB.
+> 
+> Suggested-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 
-arch/arm/boot/dts/imx51-babbage.dtb: Warning (unique_unit_address): /usbphy/usbphy at 0: duplicate unit-address (also used in node /usbphy/usbh1phy at 0)
-arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dtb: Warning (unique_unit_address): /usbphy/usbphy at 0: duplicate unit-address (also used in node /usbphy/usbh1phy at 0)
+Applied with editing the commit log a bit to mention commit
+03e6275ae381 ("usb: chipidea: Fix ULPI on imx51").
 
-Fix it by moving the USB PHY nodes outside of simple-bus and drop the
-unneeded unit-address, which matches the bindings documentation
-at Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt
-
-While at it rename the USB PHY node to usbphy1 for consistency.
-
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
----
-Changes since v2:
-- Name the node as usbphy1 for consistency (Shawn).
-
- arch/arm/boot/dts/imx51-babbage.dts                | 27 ++++++++--------------
- .../boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts  | 21 ++++++-----------
- arch/arm/boot/dts/imx51.dtsi                       | 17 ++++----------
- 3 files changed, 22 insertions(+), 43 deletions(-)
-
-diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
-index 4fb0d4d..a4a6d4a 100644
---- a/arch/arm/boot/dts/imx51-babbage.dts
-+++ b/arch/arm/boot/dts/imx51-babbage.dts
-@@ -170,22 +170,15 @@
- 		mux-ext-port = <3>;
- 	};
- 
--	usbphy {
--		#address-cells = <1>;
--		#size-cells = <0>;
--		compatible = "simple-bus";
--
--		usbh1phy: usbh1phy at 0 {
--			compatible = "usb-nop-xceiv";
--			pinctrl-names = "default";
--			pinctrl-0 = <&pinctrl_usbh1reg>;
--			reg = <0>;
--			clocks = <&clk_usb>;
--			clock-names = "main_clk";
--			reset-gpios = <&gpio2 5 GPIO_ACTIVE_LOW>;
--			vcc-supply = <&vusb_reg>;
--			#phy-cells = <0>;
--		};
-+	usbphy1: usbphy1 {
-+		compatible = "usb-nop-xceiv";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_usbh1reg>;
-+		clocks = <&clk_usb>;
-+		clock-names = "main_clk";
-+		reset-gpios = <&gpio2 5 GPIO_ACTIVE_LOW>;
-+		vcc-supply = <&vusb_reg>;
-+		#phy-cells = <0>;
- 	};
- };
- 
-@@ -431,7 +424,7 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_usbh1>;
- 	vbus-supply = <&reg_hub_reset>;
--	fsl,usbphy = <&usbh1phy>;
-+	fsl,usbphy = <&usbphy1>;
- 	phy_type = "ulpi";
- 	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts
-index b3d952f..e9e819f 100644
---- a/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts
-+++ b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts
-@@ -83,19 +83,12 @@
- 		fsl,mux-ext-port = <3>;
- 	};
- 
--	usbphy {
--		#address-cells = <1>;
--		#size-cells = <0>;
--		compatible = "simple-bus";
--
--		usbh1phy: usbh1phy at 0 {
--			compatible = "usb-nop-xceiv";
--			reg = <0>;
--			clocks = <&clks IMX5_CLK_USB_PHY_GATE>;
--			clock-names = "main_clk";
--			clock-frequency = <19200000>;
--			#phy-cells = <0>;
--		};
-+	usbphy1: usbphy1 {
-+		compatible = "usb-nop-xceiv";
-+		clocks = <&clks IMX5_CLK_USB_PHY_GATE>;
-+		clock-names = "main_clk";
-+		clock-frequency = <19200000>;
-+		#phy-cells = <0>;
- 	};
- };
- 
-@@ -275,7 +268,7 @@
- &usbh1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_usbh1>;
--	fsl,usbphy = <&usbh1phy>;
-+	fsl,usbphy = <&usbphy1>;
- 	dr_mode = "host";
- 	phy_type = "ulpi";
- 	status = "okay";
-diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
-index 5bb727a..66e4187 100644
---- a/arch/arm/boot/dts/imx51.dtsi
-+++ b/arch/arm/boot/dts/imx51.dtsi
-@@ -93,18 +93,11 @@
- 		};
- 	};
- 
--	usbphy {
--		#address-cells = <1>;
--		#size-cells = <0>;
--		compatible = "simple-bus";
--
--		usbphy0: usbphy at 0 {
--			compatible = "usb-nop-xceiv";
--			reg = <0>;
--			clocks = <&clks IMX5_CLK_USB_PHY_GATE>;
--			clock-names = "main_clk";
--			#phy-cells = <0>;
--		};
-+	usbphy0: usbphy0 {
-+		compatible = "usb-nop-xceiv";
-+		clocks = <&clks IMX5_CLK_USB_PHY_GATE>;
-+		clock-names = "main_clk";
-+		#phy-cells = <0>;
- 	};
- 
- 	display-subsystem {
--- 
-2.7.4
+Shawn
