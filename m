@@ -1,80 +1,182 @@
-From: poza@codeaurora.org (poza at codeaurora.org)
-Date: Tue, 03 Jul 2018 20:42:12 +0530
-Subject: [PATCH V5 3/3] PCI: Mask and unmask hotplug interrupts during
- reset
-In-Reply-To: <20180703143434.GA4086@wunner.de>
-References: <1530571967-19099-1-git-send-email-okaya@codeaurora.org>
- <1530571967-19099-4-git-send-email-okaya@codeaurora.org>
- <20180703143434.GA4086@wunner.de>
-Message-ID: <fda77cee8e379f2e9b7ab55fefe17cad@codeaurora.org>
+From: atull@kernel.org (Alan Tull)
+Date: Tue, 3 Jul 2018 10:16:41 -0500
+Subject: [RFC PATCH 1/2] fpga: fpga-mgr: Add readback support
+In-Reply-To: <1530607463-6287-1-git-send-email-appana.durga.rao@xilinx.com>
+References: <1530607463-6287-1-git-send-email-appana.durga.rao@xilinx.com>
+Message-ID: <CANk1AXRhRDmsqUxVi4p+vE-X+OL0ayQ=4zpM-4PxZBqJXjPsRw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-07-03 20:04, Lukas Wunner wrote:
-> On Mon, Jul 02, 2018 at 06:52:47PM -0400, Sinan Kaya wrote:
->> @@ -308,8 +310,17 @@ void pcie_do_fatal_recovery(struct pci_dev *dev, 
->> u32 service)
->>  		pci_dev_put(pdev);
->>  	}
->> 
->> +	hpsvc = pcie_port_find_service(udev, PCIE_PORT_SERVICE_HP);
->> +	hpdev = pcie_port_find_device(udev, PCIE_PORT_SERVICE_HP);
->> +
->> +	if (hpdev && hpsvc)
->> +		hpsvc->mask_irq(to_pcie_device(hpdev));
->> +
->>  	result = reset_link(udev, service);
->> 
->> +	if (hpdev && hpsvc)
->> +		hpsvc->unmask_irq(to_pcie_device(hpdev));
->> +
-> 
-> We've already got the ->reset_slot callback in struct hotplug_slot_ops,
-> I'm wondering if we really need additional ones for this use case.
-> 
-> If you just do...
-> 
-> 	if (!pci_probe_reset_slot(dev->slot))
-> 		pci_reset_slot(dev->slot)
-> 	else {
-> 		/* regular code path */
-> 	}
-> 
-> would that not be equivalent?
-> 
+On Tue, Jul 3, 2018 at 3:44 AM, Appana Durga Kedareswara rao
+<appana.durga.rao@xilinx.com> wrote:
 
-pcie_do_fatal_recovery() calls
-           reset_link()
-              which calls dpc_reset_link() or aer_root_reset() depending 
-on the event.
+Hi Appana,
 
-and dpc_reset_link() and aer_root_reset() do their own cleanup stuffs.
-infact, aer_root_reset() is the only function which actually triggers 
-pci_reset_bridge_secondary_bus().
+> Inorder to debug issues with fpga's users would
+> like to read the fpga configuration information.
+> This patch adds readback support for fpga configuration data
+> in the framework through debugfs interface.
+>
+> Usage:
+>         cat /sys/kernel/debug/fpga/readback
 
-So if we try to fit in your suggestion:
+Two things here: I'd prefer calling the attribute "image" rather than "readback"
 
-if (!pci_probe_reset_slot(dev->slot))
-{
-     pci_reset_slot(dev->slot)
-     result = reset_link(udev, service); >> in this case aer_root_reset 
-must not call pci_reset_bridge_secondary_bus()
-} else
-     result = reset_link(udev, service); >> in this case aer_root_reset 
-must call pci_reset_bridge_secondary_bus() [since bridge is not hotplug 
-capable)
+This should be an entry per fpga manager, not one entry for the whole
+framework, so
 
-Did I get your suggestion right ?
+cat /sys/kernel/debug/fpga/fpga0/image
 
-Regards,
-Oza.
+>
+> Signed-off-by: Appana Durga Kedareswara rao <appana.durga.rao@xilinx.com>
+> ---
+>  drivers/fpga/fpga-mgr.c       | 52 +++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/fpga/fpga-mgr.h |  6 +++++
+>  2 files changed, 58 insertions(+)
+>
+> diff --git a/drivers/fpga/fpga-mgr.c b/drivers/fpga/fpga-mgr.c
+> index 9939d2c..7a9fd7c 100644
+> --- a/drivers/fpga/fpga-mgr.c
+> +++ b/drivers/fpga/fpga-mgr.c
+> @@ -484,6 +484,39 @@ void fpga_mgr_put(struct fpga_manager *mgr)
+>  }
+>  EXPORT_SYMBOL_GPL(fpga_mgr_put);
+>
+> +#ifdef CONFIG_DEBUG_FS
+> +#include <linux/debugfs.h>
+> +
+> +static int fpga_mgr_read(struct seq_file *s, void *data)
+> +{
+> +       struct fpga_manager *mgr = (struct fpga_manager *)s->private;
+> +       int ret = 0;
 
-> (It's worth noting though that pciehp is the only hotplug driver
-> implementing the ->reset_slot callback.  If hotplug is handled by
-> a different driver or by the platform firmware, devices may still
-> be removed and re-enumerated twice.)
-> 
+Here you should return an error for mgr's that don't support read function:
 
-> Thanks,
-> 
-> Lukas
+if (!mgr->mops->read)
+    return -ENOENT;
+
+Then you probably should lock the mgr so that nobody tries to write it
+while you are reading.  If you can't lock it, return -EBUSY.
+
+> +
+> +       if (mgr->state != FPGA_MGR_STATE_OPERATING)
+> +               return -EBUSY;
+
+If the FPGA isn't programmed, I'm not sure that EBUSY would be the
+correct error.
+
+> +
+> +       /* Read the FPGA configuration data from the fabric */
+> +       ret = mgr->mops->read(mgr, s);
+> +       if (ret) {
+> +               dev_err(&mgr->dev, "Error while reading configuration data from FPGA\n");
+> +               return ret;
+
+Don't need this return here since we return right afterwards anyway.
+
+> +       }
+> +
+> +       return ret;
+> +}
+> +
+> +static int fpga_mgr_read_open(struct inode *inode, struct file *file)
+> +{
+> +       return single_open(file, fpga_mgr_read, inode->i_private);
+> +}
+> +
+> +static const struct file_operations fpga_mgr_debugops = {
+
+Suggest including the name of the debugfs file in the name since more
+debugfs files will be added over time, so
+
+s/fpga_mgr_debugops/fpga_mgr_ops_image/ or something.
+
+> +       .owner = THIS_MODULE,
+> +       .open = fpga_mgr_read_open,
+> +       .read = seq_read,
+> +};
+> +#endif
+> +
+>  /**
+>   * fpga_mgr_lock - Lock FPGA manager for exclusive use
+>   * @mgr:       fpga manager
+> @@ -581,6 +614,21 @@ int fpga_mgr_register(struct device *dev, const char *name,
+>         if (ret)
+>                 goto error_device;
+>
+> +#ifdef CONFIG_DEBUG_FS
+
+I'd prefer an added config such as CONFIG_FPGA_MGR_DEBUG_FS.
+
+> +       mgr->dir = debugfs_create_dir("fpga", NULL);
+> +       if (!mgr->dir)
+> +               goto error_device;
+> +
+> +       mgr->parent = mgr->dir;
+> +       mgr->dir = debugfs_create_file("readback", 0644, mgr->parent, mgr,
+> +                                      &fpga_mgr_debugops);
+> +       if (!mgr->dir) {
+> +               debugfs_remove_recursive(mgr->parent);
+> +               mgr->parent = NULL;
+> +               goto error_device;
+> +       }
+> +#endif
+> +
+>         dev_info(&mgr->dev, "%s registered\n", mgr->name);
+>
+>         return 0;
+> @@ -604,6 +652,10 @@ void fpga_mgr_unregister(struct device *dev)
+>
+>         dev_info(&mgr->dev, "%s %s\n", __func__, mgr->name);
+>
+> +#ifdef CONFIG_DEBUG_FS
+> +       debugfs_remove_recursive(mgr->parent);
+> +       mgr->parent = NULL;
+> +#endif
+>         /*
+>          * If the low level driver provides a method for putting fpga into
+>          * a desired state upon unregister, do it.
+> diff --git a/include/linux/fpga/fpga-mgr.h b/include/linux/fpga/fpga-mgr.h
+> index 3c6de23..6013809 100644
+> --- a/include/linux/fpga/fpga-mgr.h
+> +++ b/include/linux/fpga/fpga-mgr.h
+> @@ -114,6 +114,7 @@ struct fpga_image_info {
+>   * @write: write count bytes of configuration data to the FPGA
+>   * @write_sg: write the scatter list of configuration data to the FPGA
+>   * @write_complete: set FPGA to operating state after writing is done
+> + * @read: read FPGA configuration information
+
+Please add note that the read ops is optional similar to below.
+
+>   * @fpga_remove: optional: Set FPGA into a specific state during driver remove
+>   * @groups: optional attribute groups.
+>   *
+> @@ -131,6 +132,7 @@ struct fpga_manager_ops {
+>         int (*write_sg)(struct fpga_manager *mgr, struct sg_table *sgt);
+>         int (*write_complete)(struct fpga_manager *mgr,
+>                               struct fpga_image_info *info);
+> +       int (*read)(struct fpga_manager *mgr, struct seq_file *s);
+>         void (*fpga_remove)(struct fpga_manager *mgr);
+>         const struct attribute_group **groups;
+>  };
+> @@ -151,6 +153,10 @@ struct fpga_manager {
+>         enum fpga_mgr_states state;
+>         const struct fpga_manager_ops *mops;
+>         void *priv;
+> +#ifdef CONFIG_DEBUG_FS
+> +       struct dentry *dir;
+> +       struct dentry *parent;
+> +#endif
+>  };
+>
+>  #define to_fpga_manager(d) container_of(d, struct fpga_manager, dev)
+> --
+> 2.7.4
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-fpga" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+Thanks,
+Alan
