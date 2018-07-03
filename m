@@ -1,70 +1,46 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 3 Jul 2018 11:34:45 -0400
-Subject: [PATCH V5 3/3] PCI: Mask and unmask hotplug interrupts during
- reset
-In-Reply-To: <20180703135956.GA18639@wunner.de>
-References: <1530571967-19099-1-git-send-email-okaya@codeaurora.org>
- <1530571967-19099-4-git-send-email-okaya@codeaurora.org>
- <20180703083447.GA2689@wunner.de>
- <8b6ce0f415858463d1c0588c29e30415@codeaurora.org>
- <9e871cc3978fbdca12ccf8a91f34ad07@codeaurora.org>
- <2640af5e-f00f-d814-425d-78ac57714f6d@codeaurora.org>
- <bd04c9d1-6dfe-3071-69f9-beb0d649b6c0@codeaurora.org>
- <20180703135956.GA18639@wunner.de>
-Message-ID: <42e72f83-3b24-f7ef-e5bc-290fae99259a@codeaurora.org>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Wed, 04 Jul 2018 01:39:53 +1000
+Subject: [RFC PATCH 1/4] dts: misc: Add bindings documentation for
+ bmc-misc-ctrl
+In-Reply-To: <20180703143109.GB2043@kroah.com>
+References: <20180703070413.28756-1-andrew@aj.id.au>
+ <20180703070413.28756-2-andrew@aj.id.au> <20180703075009.GA27649@kroah.com>
+ <a1c3ecd4fed28e2b33c95a476452318dba58cd7e.camel@kernel.crashing.org>
+ <20180703143109.GB2043@kroah.com>
+Message-ID: <6f0c3d6d81202e385fee55a2c8aaec18d1d2acda.camel@kernel.crashing.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/3/2018 9:59 AM, Lukas Wunner wrote:
-> On Tue, Jul 03, 2018 at 09:31:24AM -0400, Sinan Kaya wrote:
->> Issue is observing hotplug link down event in the middle of AER recovery
->> as in my previous reply.
->>
->> If we mask hotplug interrupts before secondary bus reset via my patch,
->> then hotplug driver will not observe both link up and link down interrupts.
->>
->> If we don't mask hotplug interrupts, we have a race condition.
+On Tue, 2018-07-03 at 16:31 +0200, Greg KH wrote:
+> On Wed, Jul 04, 2018 at 12:16:49AM +1000, Benjamin Herrenschmidt wrote:
+> > On Tue, 2018-07-03 at 09:50 +0200, Greg KH wrote:
+> > > On Tue, Jul 03, 2018 at 05:04:10PM +1000, Andrew Jeffery wrote:
+> > > > Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
+> > > > ---
+> > > 
+> > > I can't take patches without any changelog text at all :(
+> > 
+> > Greg (and replying to your other comments as well)...
+> > 
+> > This is an RFC series, it's not meant for you to take at this point,
+> > it's about discussing the overall approach to exposing BMC random
+> > "tunables" as explained in patch 0 of the series.
+> > 
+> > Yes the individual patches aren't yet at the level of polish for a
+> > formal submission, we (naively ?) thought that's what the whole RFC tag
+> > is about :-)
 > 
-> I assume that a bus reset not only causes a link and presence event but
-> also clears the Presence Detect State bit in the Slot Status register
-> and the Data Link Layer Link Active bit in the Link Status register
-> momentarily.
+> Oh come on, putting a basic "here is what this patch does" comment
+> should be part of every patch, otherwise what is there to comment on if
+> we don't know what is going on in the patch itself?
+
+Well, it adds documentation :-) You can just read the patch which is
+... the documentation :)
 > 
-> pciehp may access those two bits concurrently to the AER driver
-> performing a slot reset.  So it may not be sufficient to mask
-> the interrupt.
-> 
-> I've posted this patch to address the issue:
-> https://patchwork.ozlabs.org/patch/930391/
+> Anyway, I provided a bunch of feedback to the "real" patch in this
+> series...
 
-Very interesting!
+Yes, you did that's fine. Thanks.
 
-I missed this completely.
-
-I know for a fact that bus reset clears the Data Link Layer Active bit
-as soon as link goes down. It gets set again following link up.
-
-Presence detect depends on the HW implementation. 
-
-QDT root ports don't change presence detect for instance since nobody
-actually removed the card.
-
-If an implementation supports in-band presence detect, the answer is yes.
-As soon as the link goes down, presence detect bit will get cleared until
-recovery.
-
-It sounds like we need to update your lock change with my proposal.
-
-lock() in mask_irq() and unlock() in unmask_irq()
-
-> 
-> Thanks,
-> 
-> Lukas
-> 
-
-
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Cheers,
+Ben.
