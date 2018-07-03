@@ -1,9 +1,9 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Wed,  4 Jul 2018 00:00:01 +0200
-Subject: [PATCH v2 04/32] mtd: rawnand: davinci: convert driver to nand_scan()
+Date: Wed,  4 Jul 2018 00:00:00 +0200
+Subject: [PATCH v2 03/32] mtd: rawnand: cafe: convert driver to nand_scan()
 In-Reply-To: <20180703220029.19565-1-miquel.raynal@bootlin.com>
 References: <20180703220029.19565-1-miquel.raynal@bootlin.com>
-Message-ID: <20180703220029.19565-5-miquel.raynal@bootlin.com>
+Message-ID: <20180703220029.19565-4-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,237 +12,179 @@ configuration between the detection phase and the final NAND scan. Use
 these hooks and convert the driver to just use nand_scan() instead of
 both nand_scan_ident() and nand_scan_tail().
 
-Also change the unused "struct device *dev" parameter of the driver
-structure into a platform device to reuse it in the ->attach_chip()
-hook.
-
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 ---
- drivers/mtd/nand/raw/davinci_nand.c | 186 +++++++++++++++++++-----------------
- 1 file changed, 98 insertions(+), 88 deletions(-)
+ drivers/mtd/nand/raw/cafe_nand.c | 131 ++++++++++++++++++++++-----------------
+ 1 file changed, 75 insertions(+), 56 deletions(-)
 
-diff --git a/drivers/mtd/nand/raw/davinci_nand.c b/drivers/mtd/nand/raw/davinci_nand.c
-index cd12e5abafde..f27ce709f5b0 100644
---- a/drivers/mtd/nand/raw/davinci_nand.c
-+++ b/drivers/mtd/nand/raw/davinci_nand.c
-@@ -53,7 +53,7 @@
- struct davinci_nand_info {
- 	struct nand_chip	chip;
+diff --git a/drivers/mtd/nand/raw/cafe_nand.c b/drivers/mtd/nand/raw/cafe_nand.c
+index d721f489b38b..035061606e39 100644
+--- a/drivers/mtd/nand/raw/cafe_nand.c
++++ b/drivers/mtd/nand/raw/cafe_nand.c
+@@ -71,7 +71,9 @@ struct cafe_priv {
+ 	unsigned char *dmabuf;
+ };
  
--	struct device		*dev;
-+	struct platform_device	*pdev;
+-static int usedma = 1;
++#define CAFE_DEFAULT_DMA	1
++
++static int usedma = CAFE_DEFAULT_DMA;
+ module_param(usedma, int, 0644);
  
- 	bool			is_readmode;
- 
-@@ -606,6 +606,100 @@ static struct davinci_nand_pdata
+ static int skipbbt = 0;
+@@ -598,6 +600,74 @@ static int cafe_mul(int x)
+ 	return gf4096_mul(x, 0xe01);
  }
- #endif
  
-+static int davinci_nand_attach_chip(struct nand_chip *chip)
++static int cafe_nand_attach_chip(struct nand_chip *chip)
 +{
 +	struct mtd_info *mtd = nand_to_mtd(chip);
-+	struct davinci_nand_info *info = to_davinci_nand(mtd);
-+	struct davinci_nand_pdata *pdata = nand_davinci_get_pdata(info->pdev);
-+	int ret = 0;
++	struct cafe_priv *cafe = nand_get_controller_data(chip);
++	int err = 0;
 +
-+	if (IS_ERR(pdata))
-+		return PTR_ERR(pdata);
++	cafe->dmabuf = dma_alloc_coherent(&cafe->pdev->dev, 2112,
++					  &cafe->dmaaddr, GFP_KERNEL);
++	if (!cafe->dmabuf)
++		return -ENOMEM;
 +
-+	switch (info->chip.ecc.mode) {
-+	case NAND_ECC_NONE:
-+		pdata->ecc_bits = 0;
-+		break;
-+	case NAND_ECC_SOFT:
-+		pdata->ecc_bits = 0;
-+		/*
-+		 * This driver expects Hamming based ECC when ecc_mode is set
-+		 * to NAND_ECC_SOFT. Force ecc.algo to NAND_ECC_HAMMING to
-+		 * avoid adding an extra ->ecc_algo field to
-+		 * davinci_nand_pdata.
-+		 */
-+		info->chip.ecc.algo = NAND_ECC_HAMMING;
-+		break;
-+	case NAND_ECC_HW:
-+		if (pdata->ecc_bits == 4) {
-+			/*
-+			 * No sanity checks:  CPUs must support this,
-+			 * and the chips may not use NAND_BUSWIDTH_16.
-+			 */
++	/* Set up DMA address */
++	cafe_writel(cafe, lower_32_bits(cafe->dmaaddr), NAND_DMA_ADDR0);
++	cafe_writel(cafe, upper_32_bits(cafe->dmaaddr), NAND_DMA_ADDR1);
 +
-+			/* No sharing 4-bit hardware between chipselects yet */
-+			spin_lock_irq(&davinci_nand_lock);
-+			if (ecc4_busy)
-+				ret = -EBUSY;
-+			else
-+				ecc4_busy = true;
-+			spin_unlock_irq(&davinci_nand_lock);
++	cafe_dev_dbg(&cafe->pdev->dev, "Set DMA address to %x (virt %p)\n",
++		     cafe_readl(cafe, NAND_DMA_ADDR0), cafe->dmabuf);
 +
-+			if (ret == -EBUSY)
-+				return ret;
++	/* Restore the DMA flag */
++	usedma = CAFE_DEFAULT_DMA;
 +
-+			info->chip.ecc.calculate = nand_davinci_calculate_4bit;
-+			info->chip.ecc.correct = nand_davinci_correct_4bit;
-+			info->chip.ecc.hwctl = nand_davinci_hwctl_4bit;
-+			info->chip.ecc.bytes = 10;
-+			info->chip.ecc.options = NAND_ECC_GENERIC_ERASED_CHECK;
-+			info->chip.ecc.algo = NAND_ECC_BCH;
-+		} else {
-+			/* 1bit ecc hamming */
-+			info->chip.ecc.calculate = nand_davinci_calculate_1bit;
-+			info->chip.ecc.correct = nand_davinci_correct_1bit;
-+			info->chip.ecc.hwctl = nand_davinci_hwctl_1bit;
-+			info->chip.ecc.bytes = 3;
-+			info->chip.ecc.algo = NAND_ECC_HAMMING;
-+		}
-+		info->chip.ecc.size = 512;
-+		info->chip.ecc.strength = pdata->ecc_bits;
-+		break;
-+	default:
-+		return -EINVAL;
++	cafe->ctl2 = BIT(27); /* Reed-Solomon ECC */
++	if (mtd->writesize == 2048)
++		cafe->ctl2 |= BIT(29); /* 2KiB page size */
++
++	/* Set up ECC according to the type of chip we found */
++	mtd_set_ooblayout(mtd, &cafe_ooblayout_ops);
++	if (mtd->writesize == 2048) {
++		cafe->nand.bbt_td = &cafe_bbt_main_descr_2048;
++		cafe->nand.bbt_md = &cafe_bbt_mirror_descr_2048;
++	} else if (mtd->writesize == 512) {
++		cafe->nand.bbt_td = &cafe_bbt_main_descr_512;
++		cafe->nand.bbt_md = &cafe_bbt_mirror_descr_512;
++	} else {
++		dev_warn(&cafe->pdev->dev,
++			 "Unexpected NAND flash writesize %d. Aborting\n",
++			 mtd->writesize);
++		err = -ENOTSUPP;
++		goto out_free_dma;
 +	}
 +
-+	/*
-+	 * Update ECC layout if needed ... for 1-bit HW ECC, the default
-+	 * is OK, but it allocates 6 bytes when only 3 are needed (for
-+	 * each 512 bytes).  For the 4-bit HW ECC, that default is not
-+	 * usable:  10 bytes are needed, not 6.
-+	 */
-+	if (pdata->ecc_bits == 4) {
-+		int chunks = mtd->writesize / 512;
++	cafe->nand.ecc.mode = NAND_ECC_HW_SYNDROME;
++	cafe->nand.ecc.size = mtd->writesize;
++	cafe->nand.ecc.bytes = 14;
++	cafe->nand.ecc.strength = 4;
++	cafe->nand.ecc.hwctl  = (void *)cafe_nand_bug;
++	cafe->nand.ecc.calculate = (void *)cafe_nand_bug;
++	cafe->nand.ecc.correct  = (void *)cafe_nand_bug;
++	cafe->nand.ecc.write_page = cafe_nand_write_page_lowlevel;
++	cafe->nand.ecc.write_oob = cafe_nand_write_oob;
++	cafe->nand.ecc.read_page = cafe_nand_read_page;
++	cafe->nand.ecc.read_oob = cafe_nand_read_oob;
 +
-+		if (!chunks || mtd->oobsize < 16) {
-+			dev_dbg(&info->pdev->dev, "too small\n");
-+			return -EINVAL;
-+		}
++	return 0;
 +
-+		/* For small page chips, preserve the manufacturer's
-+		 * badblock marking data ... and make sure a flash BBT
-+		 * table marker fits in the free bytes.
-+		 */
-+		if (chunks == 1) {
-+			mtd_set_ooblayout(mtd, &hwecc4_small_ooblayout_ops);
-+		} else if (chunks == 4 || chunks == 8) {
-+			mtd_set_ooblayout(mtd, &nand_ooblayout_lp_ops);
-+			info->chip.ecc.mode = NAND_ECC_HW_OOB_FIRST;
-+		} else {
-+			return -EIO;
-+		}
-+	}
++ out_free_dma:
++	dma_free_coherent(&cafe->pdev->dev, 2112, cafe->dmabuf, cafe->dmaaddr);
 +
-+	return ret;
++	return err;
 +}
 +
- static int nand_davinci_probe(struct platform_device *pdev)
++static void cafe_nand_detach_chip(struct nand_chip *chip)
++{
++	struct cafe_priv *cafe = nand_get_controller_data(chip);
++
++	dma_free_coherent(&cafe->pdev->dev, 2112, cafe->dmabuf, cafe->dmaaddr);
++}
++
+ static int cafe_nand_probe(struct pci_dev *pdev,
+ 				     const struct pci_device_id *ent)
  {
- 	struct davinci_nand_pdata	*pdata;
-@@ -659,7 +753,7 @@ static int nand_davinci_probe(struct platform_device *pdev)
- 		return -EADDRNOTAVAIL;
- 	}
+@@ -713,65 +783,16 @@ static int cafe_nand_probe(struct pci_dev *pdev,
+ 		cafe_readl(cafe, GLOBAL_CTRL),
+ 		cafe_readl(cafe, GLOBAL_IRQ_MASK));
  
--	info->dev		= &pdev->dev;
-+	info->pdev		= pdev;
- 	info->base		= base;
- 	info->vaddr		= vaddr;
+-	/* Do not use the DMA for the nand_scan_ident() */
+-	old_dma = usedma;
++	/* Do not use the DMA during the NAND identification */
+ 	usedma = 0;
  
-@@ -711,97 +805,13 @@ static int nand_davinci_probe(struct platform_device *pdev)
- 	spin_unlock_irq(&davinci_nand_lock);
+ 	/* Scan to find existence of the device */
+-	err = nand_scan_ident(mtd, 2, NULL);
++	cafe->nand.hwcontrol.attach_chip = cafe_nand_attach_chip;
++	cafe->nand.hwcontrol.detach_chip = cafe_nand_detach_chip;
++	err = nand_scan(mtd, 2);
+ 	if (err)
+ 		goto out_irq;
  
- 	/* Scan to find existence of the device(s) */
--	ret = nand_scan_ident(mtd, pdata->mask_chipsel ? 2 : 1, NULL);
-+	info->chip.hwcontrol.attach_chip = davinci_nand_attach_chip;
-+	ret = nand_scan(mtd, pdata->mask_chipsel ? 2 : 1);
- 	if (ret < 0) {
- 		dev_dbg(&pdev->dev, "no NAND chip(s) found\n");
- 		return ret;
- 	}
- 
--	switch (info->chip.ecc.mode) {
--	case NAND_ECC_NONE:
--		pdata->ecc_bits = 0;
--		break;
--	case NAND_ECC_SOFT:
--		pdata->ecc_bits = 0;
--		/*
--		 * This driver expects Hamming based ECC when ecc_mode is set
--		 * to NAND_ECC_SOFT. Force ecc.algo to NAND_ECC_HAMMING to
--		 * avoid adding an extra ->ecc_algo field to
--		 * davinci_nand_pdata.
--		 */
--		info->chip.ecc.algo = NAND_ECC_HAMMING;
--		break;
--	case NAND_ECC_HW:
--		if (pdata->ecc_bits == 4) {
--			/* No sanity checks:  CPUs must support this,
--			 * and the chips may not use NAND_BUSWIDTH_16.
--			 */
--
--			/* No sharing 4-bit hardware between chipselects yet */
--			spin_lock_irq(&davinci_nand_lock);
--			if (ecc4_busy)
--				ret = -EBUSY;
--			else
--				ecc4_busy = true;
--			spin_unlock_irq(&davinci_nand_lock);
--
--			if (ret == -EBUSY)
--				return ret;
--
--			info->chip.ecc.calculate = nand_davinci_calculate_4bit;
--			info->chip.ecc.correct = nand_davinci_correct_4bit;
--			info->chip.ecc.hwctl = nand_davinci_hwctl_4bit;
--			info->chip.ecc.bytes = 10;
--			info->chip.ecc.options = NAND_ECC_GENERIC_ERASED_CHECK;
--			info->chip.ecc.algo = NAND_ECC_BCH;
--		} else {
--			/* 1bit ecc hamming */
--			info->chip.ecc.calculate = nand_davinci_calculate_1bit;
--			info->chip.ecc.correct = nand_davinci_correct_1bit;
--			info->chip.ecc.hwctl = nand_davinci_hwctl_1bit;
--			info->chip.ecc.bytes = 3;
--			info->chip.ecc.algo = NAND_ECC_HAMMING;
--		}
--		info->chip.ecc.size = 512;
--		info->chip.ecc.strength = pdata->ecc_bits;
--		break;
--	default:
--		return -EINVAL;
+-	cafe->dmabuf = dma_alloc_coherent(&cafe->pdev->dev, 2112,
+-					  &cafe->dmaaddr, GFP_KERNEL);
+-	if (!cafe->dmabuf) {
+-		err = -ENOMEM;
+-		goto out_irq;
 -	}
 -
--	/* Update ECC layout if needed ... for 1-bit HW ECC, the default
--	 * is OK, but it allocates 6 bytes when only 3 are needed (for
--	 * each 512 bytes).  For the 4-bit HW ECC, that default is not
--	 * usable:  10 bytes are needed, not 6.
--	 */
--	if (pdata->ecc_bits == 4) {
--		int	chunks = mtd->writesize / 512;
+-	/* Set up DMA address */
+-	cafe_writel(cafe, lower_32_bits(cafe->dmaaddr), NAND_DMA_ADDR0);
+-	cafe_writel(cafe, upper_32_bits(cafe->dmaaddr), NAND_DMA_ADDR1);
 -
--		if (!chunks || mtd->oobsize < 16) {
--			dev_dbg(&pdev->dev, "too small\n");
--			ret = -EINVAL;
--			goto err;
--		}
+-	cafe_dev_dbg(&cafe->pdev->dev, "Set DMA address to %x (virt %p)\n",
+-		cafe_readl(cafe, NAND_DMA_ADDR0), cafe->dmabuf);
 -
--		/* For small page chips, preserve the manufacturer's
--		 * badblock marking data ... and make sure a flash BBT
--		 * table marker fits in the free bytes.
--		 */
--		if (chunks == 1) {
--			mtd_set_ooblayout(mtd, &hwecc4_small_ooblayout_ops);
--		} else if (chunks == 4 || chunks == 8) {
--			mtd_set_ooblayout(mtd, &nand_ooblayout_lp_ops);
--			info->chip.ecc.mode = NAND_ECC_HW_OOB_FIRST;
--		} else {
--			ret = -EIO;
--			goto err;
--		}
+-	/* Restore the DMA flag */
+-	usedma = old_dma;
+-
+-	cafe->ctl2 = 1<<27; /* Reed-Solomon ECC */
+-	if (mtd->writesize == 2048)
+-		cafe->ctl2 |= 1<<29; /* 2KiB page size */
+-
+-	/* Set up ECC according to the type of chip we found */
+-	mtd_set_ooblayout(mtd, &cafe_ooblayout_ops);
+-	if (mtd->writesize == 2048) {
+-		cafe->nand.bbt_td = &cafe_bbt_main_descr_2048;
+-		cafe->nand.bbt_md = &cafe_bbt_mirror_descr_2048;
+-	} else if (mtd->writesize == 512) {
+-		cafe->nand.bbt_td = &cafe_bbt_main_descr_512;
+-		cafe->nand.bbt_md = &cafe_bbt_mirror_descr_512;
+-	} else {
+-		pr_warn("Unexpected NAND flash writesize %d. Aborting\n",
+-			mtd->writesize);
+-		goto out_free_dma;
 -	}
+-	cafe->nand.ecc.mode = NAND_ECC_HW_SYNDROME;
+-	cafe->nand.ecc.size = mtd->writesize;
+-	cafe->nand.ecc.bytes = 14;
+-	cafe->nand.ecc.strength = 4;
+-	cafe->nand.ecc.hwctl  = (void *)cafe_nand_bug;
+-	cafe->nand.ecc.calculate = (void *)cafe_nand_bug;
+-	cafe->nand.ecc.correct  = (void *)cafe_nand_bug;
+-	cafe->nand.ecc.write_page = cafe_nand_write_page_lowlevel;
+-	cafe->nand.ecc.write_oob = cafe_nand_write_oob;
+-	cafe->nand.ecc.read_page = cafe_nand_read_page;
+-	cafe->nand.ecc.read_oob = cafe_nand_read_oob;
 -
--	ret = nand_scan_tail(mtd);
--	if (ret < 0)
--		goto err;
+-	err = nand_scan_tail(mtd);
+-	if (err)
+-		goto out_free_dma;
 -
- 	if (pdata->parts)
- 		ret = mtd_device_parse_register(mtd, NULL, NULL,
- 					pdata->parts, pdata->nr_parts);
+ 	pci_set_drvdata(pdev, mtd);
+ 
+ 	mtd->name = "cafe_nand";
+@@ -783,8 +804,6 @@ static int cafe_nand_probe(struct pci_dev *pdev,
+ 
+  out_cleanup_nand:
+ 	nand_cleanup(&cafe->nand);
+- out_free_dma:
+-	dma_free_coherent(&cafe->pdev->dev, 2112, cafe->dmabuf, cafe->dmaaddr);
+  out_irq:
+ 	/* Disable NAND IRQ in global IRQ mask register */
+ 	cafe_writel(cafe, ~1 & cafe_readl(cafe, GLOBAL_IRQ_MASK), GLOBAL_IRQ_MASK);
 -- 
 2.14.1
