@@ -1,44 +1,45 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue,  3 Jul 2018 10:21:58 +0900
-Subject: [PATCH 0/3] arm, arm64,
- microblaze: add endianness options to LDFLAGS instead of LD
-Message-ID: <1530580921-23340-1-git-send-email-yamada.masahiro@socionext.com>
+Date: Tue,  3 Jul 2018 10:21:59 +0900
+Subject: [PATCH 1/3] ARM: add endianness option to LDFLAGS instead of LD
+In-Reply-To: <1530580921-23340-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1530580921-23340-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1530580921-23340-2-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+With the recent syntax extension, Kconfig is now able to evaluate the
+compiler / toolchain capability.
 
-We are able to evaluate compiler / toolchain capability in the
-Kconfig phase.
-(If you do not know the background of this work, please read
- the commit log of 316d55d55f49eca442e4fd948f5fa92bab0c8312)
+However, accumulating flags to 'LD' is not compatible with the way
+it works; 'LD' must be passed to Kconfig to call $(ld-option,...)
+from Kconfig files.  If you tweak 'LD' in arch Makefile depending on
+CONFIG_CPU_BIG_ENDIAN, this would end up with circular dependency
+between Makefile and Kconfig.
 
-To achieve this, 'CC', 'LD', etc. must be passed to Kconfig.
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
-arch/*/Makefile should not tweak such environment variables
-depending on CONFIG options - this would cause circular dependency.
-  - We want to pass $(LD) from Makefile to Kconfig
-  - CONFIG_CPU_BIG_ENDIAN is defined by Kconfig, then given
-    back to Makefile
+ arch/arm/Makefile | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Nicholas already fixed this issue for PowerPC in commit 1421dc6d48296a.
-
-I need to fix arm, arm64, microblaze as well
-before I start moving linker option tests to Kconfig from Makefile.
-
-arch maintainers:
-Please pick up a proper patch for your tree.
-
-
-
-Masahiro Yamada (3):
-  ARM: add endianness option to LDFLAGS instead of LD
-  arm64: add endianness option to LDFLAGS instead of LD
-  microblaze: add endianness options to LDFLAGS instead of LD
-
- arch/arm/Makefile        | 4 ++--
- arch/arm64/Makefile      | 6 ++----
- arch/microblaze/Makefile | 4 ++--
- 3 files changed, 6 insertions(+), 8 deletions(-)
-
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index fc26c3d..62ebeae 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -46,12 +46,12 @@ ifeq ($(CONFIG_CPU_BIG_ENDIAN),y)
+ KBUILD_CPPFLAGS	+= -mbig-endian
+ CHECKFLAGS	+= -D__ARMEB__
+ AS		+= -EB
+-LD		+= -EB
++LDFLAGS		+= -EB
+ else
+ KBUILD_CPPFLAGS	+= -mlittle-endian
+ CHECKFLAGS	+= -D__ARMEL__
+ AS		+= -EL
+-LD		+= -EL
++LDFLAGS		+= -EL
+ endif
+ 
+ #
 -- 
 2.7.4
