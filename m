@@ -1,120 +1,39 @@
-From: poza@codeaurora.org (poza at codeaurora.org)
-Date: Tue, 03 Jul 2018 16:22:25 +0530
-Subject: [PATCH V5 3/3] PCI: Mask and unmask hotplug interrupts during
- reset
-In-Reply-To: <20180703083447.GA2689@wunner.de>
-References: <1530571967-19099-1-git-send-email-okaya@codeaurora.org>
- <1530571967-19099-4-git-send-email-okaya@codeaurora.org>
- <20180703083447.GA2689@wunner.de>
-Message-ID: <324f8cf2fe6f7bdc43ca8a646eea908d@codeaurora.org>
+From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
+Date: Tue, 3 Jul 2018 13:56:52 +0300
+Subject: [PATCH 5/6] perf/core: Use ioctl to communicate driver
+ configuration to kernel
+In-Reply-To: <20180703100348.fy43f4fosw3fdc6i@um.fi.intel.com>
+References: <1530570810-28929-1-git-send-email-mathieu.poirier@linaro.org>
+ <1530570810-28929-6-git-send-email-mathieu.poirier@linaro.org>
+ <20180703100348.fy43f4fosw3fdc6i@um.fi.intel.com>
+Message-ID: <20180703105652.psjq5cq4t7o2j6zk@um.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-07-03 14:04, Lukas Wunner wrote:
-> On Mon, Jul 02, 2018 at 06:52:47PM -0400, Sinan Kaya wrote:
->> If a bridge supports hotplug and observes a PCIe fatal error, the 
->> following
->> events happen:
->> 
->> 1. AER driver removes the devices from PCI tree on fatal error
->> 2. AER driver brings down the link by issuing a secondary bus reset 
->> waits
->> for the link to come up.
->> 3. Hotplug driver observes a link down interrupt
->> 4. Hotplug driver tries to remove the devices waiting for the rescan 
->> lock
->> but devices are already removed by the AER driver and AER driver is 
->> waiting
->> for the link to come back up.
->> 5. AER driver tries to re-enumerate devices after polling for the link
->> state to go up.
->> 6. Hotplug driver obtains the lock and tries to remove the devices 
->> again.
->> 
->> If a bridge is a hotplug capable bridge, mask hotplug interrupts 
->> before the
->> reset and unmask afterwards.
+On Tue, Jul 03, 2018 at 01:03:48PM +0300, Alexander Shishkin wrote:
+> On Mon, Jul 02, 2018 at 04:33:29PM -0600, Mathieu Poirier wrote:
+> > +/*
+> > + * PMU driver configuration works the same way as filter management above,
+> > + * but without the need to deal with memory mapping.  Driver configuration
+> > + * arrives through the SET_DRV_CONFIG ioctl() where it is validated and applied
+> > + * to the event.  When the PMU is ready it calls perf_event_drv_config_sync() to
+> > + * bring the configuration information within reach of the PMU.
 > 
-> Would it work for you if you just amended the AER driver to skip
-> removal and re-enumeration of devices if the port is a hotplug bridge?
-> Just check for is_hotplug_bridge in struct pci_dev.
-> 
+> Wait a second. The reason why we dance around with the generations of filters
+> is the locking order of ctx::mutex vs mmap_sem. In an mmap path, where we're
+> notified about mapping changes, we're called under the latter, and we'd need
+> to grab the former to update the event configuration. In your case, the
+> update comes in via perf_ioctl(), where we're already holding the ctx::mutex,
+> so you can just kick the PMU right there, via an event_function_call() or
+> perf_event_stop(restart=1). In the latter case, your pmu::start() would just
+> grab the new configuration. Should also be about 90% less code. :)
 
-I tend to agree with you Lukas.
+Also, since it affects the AUX buffer configuration, it is probably a one
+time ioctl command that you issue before you mmap the buffer. If that's
+the case, you don't even have to worry about stopping the event, as it
+shouldn't be running, because without the buffer perf_aux_output_begin()
+should fail and so should the pmu::add() iirc.
 
-on this line I already have follow up patches
-although I am waiting for Bjorn to review some patch-series before that.
-[PATCH v2 0/6] Fix issues and cleanup for ERR_FATAL and ERR_NONFATAL
-
-It doesn't look to me a an entirely a race condition since its guarded 
-by pci_lock_rescan_remove())
-I observed that both hotplug and aer/dpc comes out of it in a quiet sane 
-state.
-
-My thinking is: Disabling hotplug interrupts during ERR_FATAL,
-is something little away from natural course of link_down event 
-handling, which is handled by pciehp more maturely.
-so it would be just easy not to take any action e.g. removal and 
-re-enumeration of devices from ERR_FATAL handling point of view.
-
-I leave it to Bjorn.
-
-follwing is the patch wich I am trying to set it right and under test.
-so till now I am in an opinion to handle this by checking in err.c
-
-diff --git a/drivers/pci/pcie/err.c b/drivers/pci/pcie/err.c
-index 410c35c..607a234 100644
---- a/drivers/pci/pcie/err.c
-+++ b/drivers/pci/pcie/err.c
-@@ -292,15 +292,17 @@ void pcie_do_fatal_recovery(struct pci_dev *dev, 
-u32 service)
-
-         parent = udev->subordinate;
-         pci_lock_rescan_remove();
--       list_for_each_entry_safe_reverse(pdev, temp, &parent->devices,
--                                        bus_list) {
--               pci_dev_get(pdev);
--               pci_dev_set_disconnected(pdev, NULL);
--               if (pci_has_subordinate(pdev))
--                       pci_walk_bus(pdev->subordinate,
--                                    pci_dev_set_disconnected, NULL);
--               pci_stop_and_remove_bus_device(pdev);
--               pci_dev_put(pdev);
-+       if (!udev->is_hotplug_bridge) {
-+               list_for_each_entry_safe_reverse(pdev, temp, 
-&parent->devices,
-+                                                bus_list) {
-+                       pci_dev_get(pdev);
-+                       pci_dev_set_disconnected(pdev, NULL);
-+                       if (pci_has_subordinate(pdev))
-+                               pci_walk_bus(pdev->subordinate,
-+                                            pci_dev_set_disconnected, 
-NULL);
-+                       pci_stop_and_remove_bus_device(pdev);
-+                       pci_dev_put(pdev);
-+               }
-         }
-
-         result = reset_link(udev, service);
-@@ -318,7 +320,7 @@ void pcie_do_fatal_recovery(struct pci_dev *dev, u32 
-service)
-         }
-
-         if (result == PCI_ERS_RESULT_RECOVERED) {
--               if (pcie_wait_for_link(udev, true))
-+               if (pcie_wait_for_link(udev, true) && 
-!udev->is_hotplug_bridge)
-                         pci_rescan_bus(udev->bus);
-                 pci_info(dev, "Device recovery from fatal error 
-successful\n");
-                 dev->error_state = pci_channel_io_normal;
-
-
-> That would seem like a much simpler solution, given that it is known
-> that the link will flap on reset, causing the hotplug driver to remove
-> and re-enumerate devices.  That would also cover cases where hotplug is
-> handled by a different driver than pciehp, or by the platform firmware.
-> 
-> Thanks,
-> 
-> Lukas
+Regards,
+--
+Alex
