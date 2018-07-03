@@ -1,67 +1,80 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 3 Jul 2018 17:35:42 +0100
-Subject: [PATCH 7/7 v5] arm64: dts: ls208xa: comply with the iommu map
- binding for fsl_mc
-In-Reply-To: <1526824191-7000-8-git-send-email-nipun.gupta@nxp.com>
-References: <1526824191-7000-1-git-send-email-nipun.gupta@nxp.com>
- <1526824191-7000-8-git-send-email-nipun.gupta@nxp.com>
-Message-ID: <88626adc-6f5b-86df-88a0-620d258f8053@arm.com>
+From: james.morse@arm.com (James Morse)
+Date: Tue, 3 Jul 2018 17:36:24 +0100
+Subject: [PATCH v10 03/14] powerpc, kexec_file: factor out memblock-based
+ arch_kexec_walk_mem()
+In-Reply-To: <20180623022058.10935-4-takahiro.akashi@linaro.org>
+References: <20180623022058.10935-1-takahiro.akashi@linaro.org>
+ <20180623022058.10935-4-takahiro.akashi@linaro.org>
+Message-ID: <8a59db79-6379-550b-b20e-01036626904e@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/05/18 14:49, Nipun Gupta wrote:
-> fsl-mc bus support the new iommu-map property. Comply to this binding
-> for fsl_mc bus.
-> 
-> Signed-off-by: Nipun Gupta <nipun.gupta@nxp.com>
-> Reviewed-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
-> ---
->   arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi | 6 +++++-
->   1 file changed, 5 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
-> index 137ef4d..6010505 100644
-> --- a/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
-> +++ b/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
-> @@ -184,6 +184,7 @@
->   		#address-cells = <2>;
->   		#size-cells = <2>;
->   		ranges;
-> +		dma-ranges = <0x0 0x0 0x0 0x0 0x10000 0x00000000>;
->   
->   		clockgen: clocking at 1300000 {
->   			compatible = "fsl,ls2080a-clockgen";
-> @@ -357,6 +358,8 @@
->   			reg = <0x00000008 0x0c000000 0 0x40>,	 /* MC portal base */
->   			      <0x00000000 0x08340000 0 0x40000>; /* MC control reg */
->   			msi-parent = <&its>;
-> +			iommu-map = <0 &smmu 0 0>;	/* This is fixed-up by u-boot */
-> +			dma-coherent;
->   			#address-cells = <3>;
->   			#size-cells = <1>;
->   
-> @@ -460,6 +463,8 @@
->   			compatible = "arm,mmu-500";
->   			reg = <0 0x5000000 0 0x800000>;
->   			#global-interrupts = <12>;
-> +			#iommu-cells = <1>;
-> +			stream-match-mask = <0x7C00>;
->   			interrupts = <0 13 4>, /* global secure fault */
->   				     <0 14 4>, /* combined secure interrupt */
->   				     <0 15 4>, /* global non-secure fault */
-> @@ -502,7 +507,6 @@
->   				     <0 204 4>, <0 205 4>,
->   				     <0 206 4>, <0 207 4>,
->   				     <0 208 4>, <0 209 4>;
-> -			mmu-masters = <&fsl_mc 0x300 0>;
+Hi Akashi,
 
-Since we're in here, is the SMMU itself also coherent? If it is, you 
-probably want to say so and avoid the overhead of pointlessly cleaning 
-cache lines on every page table update.
+On 23/06/18 03:20, AKASHI Takahiro wrote:
+> Memblock list is another source for usable system memory layout.
+> A merged new arch_kexec_walk_mem() will walk through either io resource
+> list or memblock list depending on CONFIG_ARCH_DISCARD_MEMBLOCK so that
+> arm64, in addition to powerpc, will be able to utilize this generic
+> function for kexec_file.
 
-Robin.
+> diff --git a/arch/powerpc/kernel/machine_kexec_file_64.c b/arch/powerpc/kernel/machine_kexec_file_64.c
+> index 0bd23dc789a4..3d4be91786ce 100644
+> --- a/arch/powerpc/kernel/machine_kexec_file_64.c
+> +++ b/arch/powerpc/kernel/machine_kexec_file_64.c
 
->   		};
->   
->   		dspi: dspi at 2100000 {
-> 
+Does this file still need its memblock.h include?
+
+
+> diff --git a/kernel/kexec_file.c b/kernel/kexec_file.c
+> index 63c7ce1c0c3e..563acd1c9a61 100644
+> --- a/kernel/kexec_file.c
+> +++ b/kernel/kexec_file.c
+> @@ -16,6 +16,7 @@
+>  #include <linux/file.h>
+>  #include <linux/slab.h>
+>  #include <linux/kexec.h>
+> +#include <linux/memblock.h>
+>  #include <linux/mutex.h>
+>  #include <linux/list.h>
+>  #include <linux/fs.h>
+> @@ -501,6 +502,53 @@ static int locate_mem_hole_callback(struct resource *res, void *arg)
+>  	return locate_mem_hole_bottom_up(start, end, kbuf);
+>  }
+>  
+> +#if defined(CONFIG_HAVE_MEMBLOCK) && !defined(CONFIG_ARCH_DISCARD_MEMBLOCK)
+
+The only caller is also guarded by these same ifdefs. Can't we remove this and
+rely on the compilers dead-code elimination to remove this function when its not
+needed?
+
+
+> +static int kexec_walk_memblock(struct kexec_buf *kbuf,
+> +			       int (*func)(struct resource *, void *))
+> +{
+> +	u64 i;
+> +	phys_addr_t mstart, mend;
+> +	struct resource res = { };
+> +	int ret = 0;
+
+
+Keeping this patch as 'just' moving code would avoid having to play
+spot-the-difference:
+
+> +	if (kbuf->image->type == KEXEC_TYPE_CRASH)
+> +		return func(&crashk_res, kbuf);
+
+This will be new for powerpc, but any attempt to use it should be caught by
+arch_kexec_kernel_image_probe(), which has:
+|	/* We don't support crash kernels yet. */
+|	if (image->type == KEXEC_TYPE_CRASH)
+|		return -EOPNOTSUPP;
+
+
+Looks good to me! For what its worth:
+Acked-by: James Morse <james.morse@arm.com>
+
+
+Thanks,
+
+James
