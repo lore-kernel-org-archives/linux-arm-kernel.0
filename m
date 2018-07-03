@@ -1,28 +1,114 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 3 Jul 2018 02:38:23 -0700
-Subject: [PATCH] ARM: hwmod: RTC: Don't assume lock/unlock will be called
- with irq enabled
-In-Reply-To: <1529572388-21890-1-git-send-email-j-keerthy@ti.com>
-References: <1529572388-21890-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <20180703093823.GU112168@atomide.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 3 Jul 2018 09:58:44 +0100
+Subject: panic kexec broken on ARM64?
+In-Reply-To: <20180703070106.GV23681@linaro.org>
+References: <20180605100151.7fd54381@ezekiel.suse.cz>
+ <8028219f-0d14-eafd-86b7-359ee927bcd3@arm.com>
+ <5e539510-01b7-ebc5-778e-b49a5261f9bc@i2se.com>
+ <2865150f-ebca-4c6b-fc4b-93bfab5f0e91@arm.com>
+ <86lgbm96dq.wl-marc.zyngier@arm.com> <20180703070106.GV23681@linaro.org>
+Message-ID: <86601wzn3h.wl-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Keerthy <j-keerthy@ti.com> [180621 02:16]:
-> From: Dave Gerlach <d-gerlach@ti.com>
+On 03/07/18 08:01, takahiro.akashi at linaro.org wrote:
+> Marc, James,
 > 
-> When the RTC lock and unlock functions were introduced it was likely
-> assumed that they would always be called from irq enabled context, hence
-> the use of local_irq_disable/enable. This is no longer true as the
-> RTC+DDR path makes a late call during the suspend path after irqs
-> have been disabled to enable the RTC hwmod which calls both unlock and
-> lock, leading to IRQs being reenabled through the local_irq_enable call
-> in omap_hwmod_rtc_lock call.
+> I'd like to re-ignite the discussion.
 > 
-> To avoid this change the local_irq_disable/enable to
-> local_irq_save/restore to ensure that from whatever context this is
-> called the proper IRQ configuration is maintained.
+> On Sun, Jun 10, 2018 at 01:24:17PM +0100, Marc Zyngier wrote:
+>> On Wed, 06 Jun 2018 12:37:02 +0100,
+>> James Morse wrote:
+>>>
+>>> Hi Stefan,
+>>>
+>>> On 06/06/18 08:02, Stefan Wahren wrote:
+>>>> Am 05.06.2018 um 19:46 schrieb James Morse:
+>>>>> On 05/06/18 09:01, Petr Tesarik wrote:
+>>>>>> I attached a hardware debugger and found
+>>>>>> out that all CPU cores were stopped except one which was stuck in the
+>>>>>> idle thread. It seems that irq_set_irqchip_state() may sleep, which is
+>>>>>> definitely not safe after a kernel panic.
+>>>
+>>>>> I don't know much about irqchip stuff, but __irq_get_desc_lock() takes a
+>>>>> raw_spin_lock(), and calls gic_irq_get_irqchip_state() which is just poking
+>>>>> around in mmio registers, this should all be safe unless you re-entered the same
+>>>>> code.
+>>>
+>>>>>> If I'm right, then this is broken in general, but I have only ever seen
+>>>>>> it on RPi 3 Model B+ (even RPi3 Model B works fine), so the issue may
+>>>>>> be more subtle.
+>>>
+>>>>> Is there a hardware difference around the interrupt controller on these?
+>>>
+>>>> No, but the RPi 3 B has a different USB network chip on board (smsc95xx, Fast
+>>>> ethernet) instead of lan78xx (Gigabit ethernet).
+>>>
+>>> Bingo: its the lan78xx driver that is sleeping from the irqchip
+>>> callbacks; The smsc95xx driver doesn't have a struct irq_chip, which
+>>> is why the RPi-3-B doesn't do this.
+>>>
+>>> It may be valid for kdump to only teardown the 'root irqdomain' (if
+>>> that even means anything). I assume these secondary irqchip's would
+>>> have a summary-interrupt that goes to another irqchip. But I can't
+>>> see a way to tell them apart..,
+>>
+>> There is none. A cascaded irqchip is just like a root irqchip, just
+>> that its output line is connected to another irqchip. But we have no
+>> easy way to identify the parent. Also, this particular driver looks
+>> quite creative (it reinvents the wheel for chained interrupts -- see
+>> intr_complete and lan78xx_status), meaning that even if we could have
+>> a magic way of identify a chained irqchip, we'd miss that one. Broken.
+>>
+>>> I think we need to wait until after the merge window for Marc's
+>>> wisdom on this!
+>>
+>> Overall, I can't think of an easy fix. We have a few options, but none
+>> of them involve a centralised change:
+>>
+>> 1) We provide a reset infrastructure for irqchips, with an opt-in
+>>    mechanism. This involves changing the way we teardown irqs at
+>>    crash-time, and we'd then need some notion of reset ordering (think
+>>    of the layered ITS and GICv3, for example).
+> 
+> Does this mean that all the irqchips have to be implemented with reset?
 
-Thanks applying into omap-for-v4.19/soc.
+No. Only those that want to be reset at kexec time.
 
-Tony
+>>
+>> 2) We provide a way to identify interrupts that are ultimately backed
+>>    by a root controller, which implies walking down the hierarchy for
+> 
+> To be clear, from bottom to top (or root), right?
+
+I'm not sure I understand your question. The idea is to walk the
+irq_data chain, until we hit a root irqchip. If we do hit one, we
+deactivate/eoi/disable this interrupt. If we don't, we do nothing.
+
+This would avoid the above brokenness, and still ensures that no
+interrupt reaches the CPU.
+
+> 
+>>    each one of them. Fairly expensive, but minimal in way of changes
+>>    in the crash code. Requires a per-irqchip flag, but ordering comes
+>>    in for free.
+>>
+>> 3) We do the same as (2), but at the irqdomain level. Not sure that's
+>>    any better, and it may be even more complicated and bring back some
+>>    ordering issues.
+> 
+> Do you think that the same thing may happen in case of pci/msi?
+> I have no confidence but MSI has some kind of irq domain hierarchy.
+
+Anything can happen, as people implement their interrupt infrastructure
+in weird and wonderful ways. So we need to be prepared for the worse.
+
+I've pushed 3 patches on a branch[1]. It is mostly untested, but it
+should allow the above RPi3 disaster to cope with kexec.
+
+	M.
+
+[1]: https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git/log/?h=irq/root-irqchip
+
+-- 
+Jazz is not dead, it just smell funny.
