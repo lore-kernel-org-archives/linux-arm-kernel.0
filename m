@@ -1,117 +1,43 @@
-From: jeyu@kernel.org (Jessica Yu)
-Date: Tue, 3 Jul 2018 09:50:13 +0200
-Subject: [PATCH v2 8/8] jump_table: move entries into ro_after_init region
-In-Reply-To: <20180702181145.4799-9-ard.biesheuvel@linaro.org>
-References: <20180702181145.4799-1-ard.biesheuvel@linaro.org>
- <20180702181145.4799-9-ard.biesheuvel@linaro.org>
-Message-ID: <20180703075013.ntyu7zlw5rijfeyn@linux-5o07>
+From: ravi.bangoria@linux.ibm.com (Ravi Bangoria)
+Date: Tue, 3 Jul 2018 13:20:29 +0530
+Subject: [PATCH v5 09/10] Uprobes/sdt: Document about reference counter
+In-Reply-To: <20180702145444.GB65296@linux.vnet.ibm.com>
+References: <20180628052209.13056-1-ravi.bangoria@linux.ibm.com>
+ <20180628052209.13056-10-ravi.bangoria@linux.ibm.com>
+ <20180702145444.GB65296@linux.vnet.ibm.com>
+Message-ID: <0110cd8a-9785-c761-e2a5-ba8ab92745e9@linux.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+++ Ard Biesheuvel [02/07/18 20:11 +0200]:
->The __jump_table sections emitted into the core kernel and into
->each module consist of statically initialized references into
->other parts of the code, and with the exception of entries that
->point into init code, which are defused at post-init time, these
->data structures are never modified.
->
->So let's move them into the ro_after_init section, to prevent them
->from being corrupted inadvertently by buggy code, or deliberately
->by an attacker.
->
->Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Hi Srikar,
 
-For module parts:
+On 07/02/2018 08:24 PM, Srikar Dronamraju wrote:
+> * Ravi Bangoria <ravi.bangoria@linux.ibm.com> [2018-06-28 10:52:08]:
+> 
+>> Reference counter gate the invocation of probe. If present,
+>> by default reference count is 0. Kernel needs to increment
+>> it before tracing the probe and decrement it when done. This
+>> is identical to semaphore in Userspace Statically Defined
+>> Tracepoints (USDT).
+>>
+>> Document usage of reference counter.
+>>
+>> Signed-off-by: Ravi Bangoria <ravi.bangoria@linux.ibm.com>
+>> Acked-by: Masami Hiramatsu <mhiramat@kernel.org>
+> 
+> Unlike perf, this mechanism cannot detect ref count and depends on the
+> users data. What happens if the user mistakenly provides a wrong location?
+> I guess he can corrupt some other data structures?
 
-Acked-by: Jessica Yu <jeyu@kernel.org>
+Yes, if user is giving wrong ref_ctr_offset, uprobe infrastructure will
+corrupt some user data.
 
->---
-> arch/arm/kernel/vmlinux-xip.lds.S |  1 +
-> arch/s390/kernel/vmlinux.lds.S    |  1 +
-> include/asm-generic/vmlinux.lds.h | 11 +++++++----
-> kernel/module.c                   |  9 +++++++++
-> 4 files changed, 18 insertions(+), 4 deletions(-)
->
->diff --git a/arch/arm/kernel/vmlinux-xip.lds.S b/arch/arm/kernel/vmlinux-xip.lds.S
->index 3593d5c1acd2..763c41068ecc 100644
->--- a/arch/arm/kernel/vmlinux-xip.lds.S
->+++ b/arch/arm/kernel/vmlinux-xip.lds.S
->@@ -118,6 +118,7 @@ SECTIONS
-> 	RW_DATA_SECTION(L1_CACHE_BYTES, PAGE_SIZE, THREAD_SIZE)
-> 	.data.ro_after_init : AT(ADDR(.data.ro_after_init) - LOAD_OFFSET) {
-> 		*(.data..ro_after_init)
->+		JUMP_TABLE_DATA
-> 	}
-> 	_edata = .;
->
->diff --git a/arch/s390/kernel/vmlinux.lds.S b/arch/s390/kernel/vmlinux.lds.S
->index f0414f52817b..a7cf61e46f88 100644
->--- a/arch/s390/kernel/vmlinux.lds.S
->+++ b/arch/s390/kernel/vmlinux.lds.S
->@@ -67,6 +67,7 @@ SECTIONS
-> 	__start_ro_after_init = .;
-> 	.data..ro_after_init : {
-> 		 *(.data..ro_after_init)
->+		JUMP_TABLE_DATA
-> 	}
-> 	EXCEPTION_TABLE(16)
-> 	. = ALIGN(PAGE_SIZE);
->diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
->index e373e2e10f6a..ed6befa4c47b 100644
->--- a/include/asm-generic/vmlinux.lds.h
->+++ b/include/asm-generic/vmlinux.lds.h
->@@ -256,10 +256,6 @@
-> 	STRUCT_ALIGN();							\
-> 	*(__tracepoints)						\
-> 	/* implement dynamic printk debug */				\
->-	. = ALIGN(8);                                                   \
->-	__start___jump_table = .;					\
->-	KEEP(*(__jump_table))                                           \
->-	__stop___jump_table = .;					\
-> 	. = ALIGN(8);							\
-> 	__start___verbose = .;						\
-> 	KEEP(*(__verbose))                                              \
->@@ -303,6 +299,12 @@
-> 	. = __start_init_task + THREAD_SIZE;				\
-> 	__end_init_task = .;
->
->+#define JUMP_TABLE_DATA							\
->+	. = ALIGN(8);							\
->+	__start___jump_table = .;					\
->+	KEEP(*(__jump_table))						\
->+	__stop___jump_table = .;
->+
-> /*
->  * Allow architectures to handle ro_after_init data on their
->  * own by defining an empty RO_AFTER_INIT_DATA.
->@@ -311,6 +313,7 @@
-> #define RO_AFTER_INIT_DATA						\
-> 	__start_ro_after_init = .;					\
-> 	*(.data..ro_after_init)						\
->+	JUMP_TABLE_DATA							\
-> 	__end_ro_after_init = .;
-> #endif
->
->diff --git a/kernel/module.c b/kernel/module.c
->index 7cb82e0fcac0..0d4e320e41cd 100644
->--- a/kernel/module.c
->+++ b/kernel/module.c
->@@ -3349,6 +3349,15 @@ static struct module *layout_and_allocate(struct load_info *info, int flags)
-> 	 * Note: ro_after_init sections also have SHF_{WRITE,ALLOC} set.
-> 	 */
-> 	ndx = find_sec(info, ".data..ro_after_init");
->+	if (ndx)
->+		info->sechdrs[ndx].sh_flags |= SHF_RO_AFTER_INIT;
->+	/*
->+	 * Mark the __jump_table section as ro_after_init as well: these data
->+	 * structures are never modified, with the exception of entries that
->+	 * refer to code in the __init section, which are annotated as such
->+	 * at module load time.
->+	 */
->+	ndx = find_sec(info, "__jump_table");
-> 	if (ndx)
-> 		info->sechdrs[ndx].sh_flags |= SHF_RO_AFTER_INIT;
->
->-- 
->2.17.1
->
+> 
+> Hence I would think twice of advertising this mechanism. i.e keep this
+> as an undocumented feature.
+> 
+
+I don't mind.
+
+Thanks,
+Ravi
