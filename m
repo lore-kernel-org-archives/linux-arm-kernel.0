@@ -1,119 +1,40 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 3 Jul 2018 13:14:41 +0100
-Subject: [PATCH] arm64: Clear the stack
-In-Reply-To: <1b97aa7d-2b6c-a5df-0caa-1cd16e18a816@redhat.com>
-References: <20180629190553.7282-1-labbott@redhat.com>
- <9733d929-3c6a-40e1-6110-8f79975323d3@linux.com>
- <1b97aa7d-2b6c-a5df-0caa-1cd16e18a816@redhat.com>
-Message-ID: <20180703121440.v4olvwqb3ykgt5fm@lakrids.cambridge.arm.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue,  3 Jul 2018 20:29:51 +0800
+Subject: [PATCH] MAINTAINERS: add Freescale Layerscape ARM architecture entry
+Message-ID: <1530620991-1621-1-git-send-email-shawnguo@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 02, 2018 at 11:48:05AM -0700, Laura Abbott wrote:
-> On 07/02/2018 06:02 AM, Alexander Popov wrote:
-> > On 29.06.2018 22:05, Laura Abbott wrote:
-> > > Implementation of stackleak based heavily on the x86 version
-> > > 
-> > > Signed-off-by: Laura Abbott <labbott@redhat.com>
-> > > ---
-> > > Changes since last time:
-> > > - Minor name change in entry.S
-> > > - Converted to use the generic interfaces so there's minimal additions.
-> > > - Added the fast syscall path.
-> > > - Addition of on_thread_stack and current_top_of_stack
-> > > - Disable stackleak on hyp per suggestion
-> > > - Added a define for check_alloca. I'm still not sure about keeping it
-> > >    since the x86 version got reworked?
-> > > 
-> > > I've mostly kept this as one patch with a minimal commit text. I can
-> > > split it up and elaborate more before final merging.
-> > > ---
+I have been collecting Freescale Layerscape device tree source files for
+a while.  Add a MAINTAINERS entry for it, so that relevant patches can
+reach my mail box.
 
-[...]
+Cc: Li Yang <leoyang.li@nxp.com>
+Signed-off-by: Shawn Guo <shawnguo@kernel.org>
+---
+ MAINTAINERS | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-> > > diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> > > index ec2ee720e33e..31c9da7d401e 100644
-> > > --- a/arch/arm64/kernel/entry.S
-> > > +++ b/arch/arm64/kernel/entry.S
-> > > @@ -401,6 +401,11 @@ tsk	.req	x28		// current thread_info
-> > >   	.text
-> > > +	.macro	stackleak_erase
-> > 
-> > Could you rename the macro to STACKLEAK_ERASE for similarity with x86?
-> > 
-> 
-> Mark Rutland had previously asked for this to be lowercase.
-> I really don't care one way or the other so I'll defer to
-> someone else to have the final word.
-
-Will, Catalin, could you chime in either way?
-
-I'd previously asked for lower-case for consistency with our other
-assembly macros.
-
-[...]
-
-> > > diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-> > > index f08a2ed9db0d..9f0f135f8b66 100644
-> > > --- a/arch/arm64/kernel/process.c
-> > > +++ b/arch/arm64/kernel/process.c
-> > > @@ -493,3 +493,19 @@ void arch_setup_new_exec(void)
-> > >   {
-> > >   	current->mm->context.flags = is_compat_task() ? MMCF_AARCH32 : 0;
-> > >   }
-> > > +
-> > > +#ifdef CONFIG_GCC_PLUGIN_STACKLEAK
-> > > +#define MIN_STACK_LEFT	256
-> > > +
-> > > +void __used stackleak_check_alloca(unsigned long size)
-> > > +{
-> > > +	unsigned long sp, stack_left;
-> > > +
-> > > +	sp = current_stack_pointer;
-> > > +
-> > > +	stack_left = sp & (THREAD_SIZE - 1);
-> > > +	BUG_ON(stack_left < MIN_STACK_LEFT ||
-> > > +		size >= stack_left - MIN_STACK_LEFT);
-> > > +}
-> > > +EXPORT_SYMBOL(stackleak_check_alloca);
-> > > +#endif
-> > 
-> > This code should be updated.
-> > You may remember the troubles I had with MIN_STACK_LEFT:
-> > http://openwall.com/lists/kernel-hardening/2018/05/11/12
-> > Please see that thread where Mark Rutland and I worked out the solution.
-> > 
-> 
-> Ah yeah, I missed the details in that thread. Thanks for
-> that pointer.
-> 
-> > By the way, different stacks on x86_64 have different sizes. Is it false for arm64?
-> 
-> Currently everything except the overflow stack looks to be
-> the same size but there's also another stack I missed.
-
-Assuming I've followed the code correctly, we currently have:
-
-stack		size		alignment (minimum)
----------------------------------------------------
-task		THREAD_SIZE	THREAD_ALIGN
-irq		THREAD_SIZE	16
-overflow	SZ_4K		16
-sdei_normal	THREAD_SIZE	THREAD_ALIGN
-sdei_critical	THREAD_SIZE	THREAD_ALIGN
-
-... since IRQ_STACK_SIZE is defined as THREAD_SIZE, and SDEI_STACK_SIZE
-is defined as IRQ_STACK_SIZE.
-
-So we can't just mask the sp, unfortunately.
-
-> It might be cleaner just to use on_accessible_stack and then another
-> function to get the top of stack. This also might just be
-> reimplementing what x86 already has? (Mark, Ard?)
-
-It looks like we could build a get_stack_info() as they have.
-
-We could probably clean up our stack traced atop of that, too.
-
-Thanks,
-Mark.
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 9d5eeff51b5f..d72f1162daea 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1442,6 +1442,16 @@ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git
+ F:	arch/arm/mach-imx/*vf610*
+ F:	arch/arm/boot/dts/vf*
+ 
++ARM/FREESCALE LAYERSCAPE ARM ARCHITECTURE
++M:	Shawn Guo <shawnguo@kernel.org>
++M:	Li Yang <leoyang.li@nxp.com>
++L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
++S:	Maintained
++T:	git git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git
++F:	arch/arm/boot/dts/ls1021a*
++F:	arch/arm64/boot/dts/freescale/fsl-*
++F:	arch/arm64/boot/dts/freescale/qoriq-*
++
+ ARM/GLOMATION GESBC9312SX MACHINE SUPPORT
+ M:	Lennert Buytenhek <kernel@wantstofly.org>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+-- 
+1.9.1
