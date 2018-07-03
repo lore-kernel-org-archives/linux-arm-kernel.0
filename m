@@ -1,48 +1,25 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue,  3 Jul 2018 10:22:00 +0900
-Subject: [PATCH 2/3] arm64: add endianness option to LDFLAGS instead of LD
-In-Reply-To: <1530580921-23340-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1530580921-23340-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1530580921-23340-3-git-send-email-yamada.masahiro@socionext.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 3 Jul 2018 10:02:37 +0800
+Subject: [PATCH 2/2] ARM: imx_v6_v7_defconfig: Select ULPI support
+In-Reply-To: <1529930043-6387-2-git-send-email-festevam@gmail.com>
+References: <1529930043-6387-1-git-send-email-festevam@gmail.com>
+ <1529930043-6387-2-git-send-email-festevam@gmail.com>
+Message-ID: <20180703020236.GY4348@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the recent syntax extension, Kconfig is now able to evaluate the
-compiler / toolchain capability.
+On Mon, Jun 25, 2018 at 09:34:03AM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@nxp.com>
+> 
+> Select CONFIG_USB_CHIPIDEA_ULPI and CONFIG_USB_ULPI_BUS so that
+> USB ULPI can be functional on some boards like imx51-babbge.
+> 
+> This fixes a kernel hang in 4.18-rc1 on i.mx51-babbage when
+> the bootloader does not initialize USB.
+> 
+> Suggested-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 
-However, accumulating flags to 'LD' is not compatible with the way
-it works; 'LD' must be passed to Kconfig to call $(ld-option,...)
-from Kconfig files.  If you tweak 'LD' in arch Makefile depending on
-CONFIG_CPU_BIG_ENDIAN, this would end up with circular dependency
-between Makefile and Kconfig.
+Applied this one as a fix.
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
-
- arch/arm64/Makefile | 6 ++----
- 1 file changed, 2 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-index 4527226..8f73da3 100644
---- a/arch/arm64/Makefile
-+++ b/arch/arm64/Makefile
-@@ -60,15 +60,13 @@ ifeq ($(CONFIG_CPU_BIG_ENDIAN), y)
- KBUILD_CPPFLAGS	+= -mbig-endian
- CHECKFLAGS	+= -D__AARCH64EB__
- AS		+= -EB
--LD		+= -EB
--LDFLAGS		+= -maarch64linuxb
-+LDFLAGS		+= -EB -maarch64linuxb
- UTS_MACHINE	:= aarch64_be
- else
- KBUILD_CPPFLAGS	+= -mlittle-endian
- CHECKFLAGS	+= -D__AARCH64EL__
- AS		+= -EL
--LD		+= -EL
--LDFLAGS		+= -maarch64linux
-+LDFLAGS		+= -EL -maarch64linux
- UTS_MACHINE	:= aarch64
- endif
- 
--- 
-2.7.4
+Shawn
