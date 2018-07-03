@@ -1,154 +1,70 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 03 Jul 2018 16:33:57 +0100
-Subject: Applied "ASoC: atmel-i2s: Remove unnecessary audio PLL clock (aclk)"
- to the asoc tree
-In-Reply-To: <20180703145631.15246-2-codrin.ciubotariu@microchip.com>
-Message-ID: <E1faNJV-0003et-Ai@debutante>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Tue, 3 Jul 2018 11:34:45 -0400
+Subject: [PATCH V5 3/3] PCI: Mask and unmask hotplug interrupts during
+ reset
+In-Reply-To: <20180703135956.GA18639@wunner.de>
+References: <1530571967-19099-1-git-send-email-okaya@codeaurora.org>
+ <1530571967-19099-4-git-send-email-okaya@codeaurora.org>
+ <20180703083447.GA2689@wunner.de>
+ <8b6ce0f415858463d1c0588c29e30415@codeaurora.org>
+ <9e871cc3978fbdca12ccf8a91f34ad07@codeaurora.org>
+ <2640af5e-f00f-d814-425d-78ac57714f6d@codeaurora.org>
+ <bd04c9d1-6dfe-3071-69f9-beb0d649b6c0@codeaurora.org>
+ <20180703135956.GA18639@wunner.de>
+Message-ID: <42e72f83-3b24-f7ef-e5bc-290fae99259a@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+On 7/3/2018 9:59 AM, Lukas Wunner wrote:
+> On Tue, Jul 03, 2018 at 09:31:24AM -0400, Sinan Kaya wrote:
+>> Issue is observing hotplug link down event in the middle of AER recovery
+>> as in my previous reply.
+>>
+>> If we mask hotplug interrupts before secondary bus reset via my patch,
+>> then hotplug driver will not observe both link up and link down interrupts.
+>>
+>> If we don't mask hotplug interrupts, we have a race condition.
+> 
+> I assume that a bus reset not only causes a link and presence event but
+> also clears the Presence Detect State bit in the Slot Status register
+> and the Data Link Layer Link Active bit in the Link Status register
+> momentarily.
+> 
+> pciehp may access those two bits concurrently to the AER driver
+> performing a slot reset.  So it may not be sufficient to mask
+> the interrupt.
+> 
+> I've posted this patch to address the issue:
+> https://patchwork.ozlabs.org/patch/930391/
 
-   ASoC: atmel-i2s: Remove unnecessary audio PLL clock (aclk)
+Very interesting!
 
-has been applied to the asoc tree at
+I missed this completely.
 
-   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+I know for a fact that bus reset clears the Data Link Layer Active bit
+as soon as link goes down. It gets set again following link up.
 
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
+Presence detect depends on the HW implementation. 
 
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
+QDT root ports don't change presence detect for instance since nobody
+actually removed the card.
 
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
+If an implementation supports in-band presence detect, the answer is yes.
+As soon as the link goes down, presence detect bit will get cleared until
+recovery.
 
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
+It sounds like we need to update your lock change with my proposal.
 
-Thanks,
-Mark
+lock() in mask_irq() and unlock() in unmask_irq()
 
->From 73ad0df572901e03fc703b6f114e4442291f45c2 Mon Sep 17 00:00:00 2001
-From: Codrin Ciubotariu <codrin.ciubotariu@microchip.com>
-Date: Tue, 3 Jul 2018 17:56:30 +0300
-Subject: [PATCH] ASoC: atmel-i2s: Remove unnecessary audio PLL clock (aclk)
+> 
+> Thanks,
+> 
+> Lukas
+> 
 
-The generated clock (gclk) driver is able to set aclk as its parent and
-change its rate alone, if needed. This means that our driver no longer
-needs to configure aclk and we can let gclk select and configure its
-clock source.
 
-Signed-off-by: Codrin Ciubotariu <codrin.ciubotariu@microchip.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- sound/soc/atmel/atmel-i2s.c | 46 ++++++-------------------------------
- 1 file changed, 7 insertions(+), 39 deletions(-)
-
-diff --git a/sound/soc/atmel/atmel-i2s.c b/sound/soc/atmel/atmel-i2s.c
-index 5d3b5af9fd92..d88c1d995036 100644
---- a/sound/soc/atmel/atmel-i2s.c
-+++ b/sound/soc/atmel/atmel-i2s.c
-@@ -206,7 +206,6 @@ struct atmel_i2s_dev {
- 	struct regmap				*regmap;
- 	struct clk				*pclk;
- 	struct clk				*gclk;
--	struct clk				*aclk;
- 	struct snd_dmaengine_dai_dma_data	playback;
- 	struct snd_dmaengine_dai_dma_data	capture;
- 	unsigned int				fmt;
-@@ -303,7 +302,7 @@ static int atmel_i2s_get_gck_param(struct atmel_i2s_dev *dev, int fs)
- {
- 	int i, best;
- 
--	if (!dev->gclk || !dev->aclk) {
-+	if (!dev->gclk) {
- 		dev_err(dev->dev, "cannot generate the I2S Master Clock\n");
- 		return -EINVAL;
- 	}
-@@ -421,7 +420,7 @@ static int atmel_i2s_switch_mck_generator(struct atmel_i2s_dev *dev,
- 					  bool enabled)
- {
- 	unsigned int mr, mr_mask;
--	unsigned long aclk_rate;
-+	unsigned long gclk_rate;
- 	int ret;
- 
- 	mr = 0;
-@@ -445,35 +444,18 @@ static int atmel_i2s_switch_mck_generator(struct atmel_i2s_dev *dev,
- 		/* Disable/unprepare the PMC generated clock. */
- 		clk_disable_unprepare(dev->gclk);
- 
--		/* Disable/unprepare the PLL audio clock. */
--		clk_disable_unprepare(dev->aclk);
- 		return 0;
- 	}
- 
- 	if (!dev->gck_param)
- 		return -EINVAL;
- 
--	aclk_rate = dev->gck_param->mck * (dev->gck_param->imckdiv + 1);
-+	gclk_rate = dev->gck_param->mck * (dev->gck_param->imckdiv + 1);
- 
--	/* Fist change the PLL audio clock frequency ... */
--	ret = clk_set_rate(dev->aclk, aclk_rate);
-+	ret = clk_set_rate(dev->gclk, gclk_rate);
- 	if (ret)
- 		return ret;
- 
--	/*
--	 * ... then set the PMC generated clock rate to the very same frequency
--	 * to set the gclk parent to aclk.
--	 */
--	ret = clk_set_rate(dev->gclk, aclk_rate);
--	if (ret)
--		return ret;
--
--	/* Prepare and enable the PLL audio clock first ... */
--	ret = clk_prepare_enable(dev->aclk);
--	if (ret)
--		return ret;
--
--	/* ... then prepare and enable the PMC generated clock. */
- 	ret = clk_prepare_enable(dev->gclk);
- 	if (ret)
- 		return ret;
-@@ -668,28 +650,14 @@ static int atmel_i2s_probe(struct platform_device *pdev)
- 		return err;
- 	}
- 
--	/* Get audio clocks to generate the I2S Master Clock (I2S_MCK) */
--	dev->aclk = devm_clk_get(&pdev->dev, "aclk");
-+	/* Get audio clock to generate the I2S Master Clock (I2S_MCK) */
- 	dev->gclk = devm_clk_get(&pdev->dev, "gclk");
--	if (IS_ERR(dev->aclk) && IS_ERR(dev->gclk)) {
--		if (PTR_ERR(dev->aclk) == -EPROBE_DEFER ||
--		    PTR_ERR(dev->gclk) == -EPROBE_DEFER)
-+	if (IS_ERR(dev->gclk)) {
-+		if (PTR_ERR(dev->gclk) == -EPROBE_DEFER)
- 			return -EPROBE_DEFER;
- 		/* Master Mode not supported */
--		dev->aclk = NULL;
- 		dev->gclk = NULL;
--	} else if (IS_ERR(dev->gclk)) {
--		err = PTR_ERR(dev->gclk);
--		dev_err(&pdev->dev,
--			"failed to get the PMC generated clock: %d\n", err);
--		return err;
--	} else if (IS_ERR(dev->aclk)) {
--		err = PTR_ERR(dev->aclk);
--		dev_err(&pdev->dev,
--			"failed to get the PLL audio clock: %d\n", err);
--		return err;
- 	}
--
- 	dev->dev = &pdev->dev;
- 	dev->regmap = regmap;
- 	platform_set_drvdata(pdev, dev);
 -- 
-2.18.0.rc2
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
