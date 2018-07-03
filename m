@@ -1,138 +1,103 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 3 Jul 2018 14:57:26 +0800
-Subject: [PATCH v2] ARM: imx: Provide support for NXP i.MX7D Cortex-M4
-In-Reply-To: <20180702062755.17263-1-o.rempel@pengutronix.de>
-References: <20180702062755.17263-1-o.rempel@pengutronix.de>
-Message-ID: <20180703065724.GL4348@dragon>
+From: takahiro.akashi@linaro.org (takahiro.akashi at linaro.org)
+Date: Tue, 3 Jul 2018 16:01:08 +0900
+Subject: panic kexec broken on ARM64?
+In-Reply-To: <86lgbm96dq.wl-marc.zyngier@arm.com>
+References: <20180605100151.7fd54381@ezekiel.suse.cz>
+ <8028219f-0d14-eafd-86b7-359ee927bcd3@arm.com>
+ <5e539510-01b7-ebc5-778e-b49a5261f9bc@i2se.com>
+ <2865150f-ebca-4c6b-fc4b-93bfab5f0e91@arm.com>
+ <86lgbm96dq.wl-marc.zyngier@arm.com>
+Message-ID: <20180703070106.GV23681@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 02, 2018 at 08:27:55AM +0200, Oleksij Rempel wrote:
-> Cortex M4 part can be started from a boot loader or over
-> Linux remoteproc framework.
+Marc, James,
+
+I'd like to re-ignite the discussion.
+
+On Sun, Jun 10, 2018 at 01:24:17PM +0100, Marc Zyngier wrote:
+> On Wed, 06 Jun 2018 12:37:02 +0100,
+> James Morse wrote:
+> > 
+> > Hi Stefan,
+> > 
+> > On 06/06/18 08:02, Stefan Wahren wrote:
+> > > Am 05.06.2018 um 19:46 schrieb James Morse:
+> > >> On 05/06/18 09:01, Petr Tesarik wrote:
+> > >>> I attached a hardware debugger and found
+> > >>> out that all CPU cores were stopped except one which was stuck in the
+> > >>> idle thread. It seems that irq_set_irqchip_state() may sleep, which is
+> > >>> definitely not safe after a kernel panic.
+> > 
+> > >> I don't know much about irqchip stuff, but __irq_get_desc_lock() takes a
+> > >> raw_spin_lock(), and calls gic_irq_get_irqchip_state() which is just poking
+> > >> around in mmio registers, this should all be safe unless you re-entered the same
+> > >> code.
+> > 
+> > >>> If I'm right, then this is broken in general, but I have only ever seen
+> > >>> it on RPi 3 Model B+ (even RPi3 Model B works fine), so the issue may
+> > >>> be more subtle.
+> > 
+> > >> Is there a hardware difference around the interrupt controller on these?
+> > 
+> > > No, but the RPi 3 B has a different USB network chip on board (smsc95xx, Fast
+> > > ethernet) instead of lan78xx (Gigabit ethernet).
+> > 
+> > Bingo: its the lan78xx driver that is sleeping from the irqchip
+> > callbacks; The smsc95xx driver doesn't have a struct irq_chip, which
+> > is why the RPi-3-B doesn't do this.
+> > 
+> > It may be valid for kdump to only teardown the 'root irqdomain' (if
+> > that even means anything). I assume these secondary irqchip's would
+> > have a summary-interrupt that goes to another irqchip. But I can't
+> > see a way to tell them apart..,
 > 
-> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
-> ---
->  arch/arm/boot/dts/Makefile         |  2 +-
->  arch/arm/mach-imx/Kconfig          | 33 +++++++++++++++++++-----------
->  arch/arm/mach-imx/Makefile         |  3 ++-
->  arch/arm/mach-imx/mach-imx7d-cm4.c | 21 +++++++++++++++++++
->  4 files changed, 45 insertions(+), 14 deletions(-)
->  create mode 100644 arch/arm/mach-imx/mach-imx7d-cm4.c
+> There is none. A cascaded irqchip is just like a root irqchip, just
+> that its output line is connected to another irqchip. But we have no
+> easy way to identify the parent. Also, this particular driver looks
+> quite creative (it reinvents the wheel for chained interrupts -- see
+> intr_complete and lan78xx_status), meaning that even if we could have
+> a magic way of identify a chained irqchip, we'd miss that one. Broken.
 > 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 7e2424957809..e3fe1bfbc404 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -539,7 +539,7 @@ dtb-$(CONFIG_SOC_IMX6UL) += \
->  	imx6ull-14x14-evk.dtb \
->  	imx6ull-colibri-eval-v3.dtb \
->  	imx6ull-colibri-wifi-eval-v3.dtb
-> -dtb-$(CONFIG_SOC_IMX7D) += \
-> +dtb-$(CONFIG_SOC_IMX7D_CA7) += \
+> > I think we need to wait until after the merge window for Marc's
+> > wisdom on this!
+> 
+> Overall, I can't think of an easy fix. We have a few options, but none
+> of them involve a centralised change:
+> 
+> 1) We provide a reset infrastructure for irqchips, with an opt-in
+>    mechanism. This involves changing the way we teardown irqs at
+>    crash-time, and we'd then need some notion of reset ordering (think
+>    of the layered ITS and GICv3, for example).
 
-We agreed to keep this unchanged, no?
+Does this mean that all the irqchips have to be implemented with reset?
+> 
+> 2) We provide a way to identify interrupts that are ultimately backed
+>    by a root controller, which implies walking down the hierarchy for
 
->  	imx7d-cl-som-imx7.dtb \
->  	imx7d-colibri-emmc-eval-v3.dtb \
->  	imx7d-colibri-eval-v3.dtb \
-> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-> index e47fa13f4b0c..5ad58b1cb4bc 100644
-> --- a/arch/arm/mach-imx/Kconfig
-> +++ b/arch/arm/mach-imx/Kconfig
-> @@ -522,18 +522,6 @@ config SOC_IMX6UL
->  	help
->  	  This enables support for Freescale i.MX6 UltraLite processor.
->  
-> -config SOC_IMX7D
-> -	bool "i.MX7 Dual support"
-> -	select PINCTRL_IMX7D
-> -	select ARM_GIC
-> -	select HAVE_ARM_ARCH_TIMER
-> -	select HAVE_IMX_ANATOP
-> -	select HAVE_IMX_MMDC
-> -	select HAVE_IMX_SRC
-> -	select IMX_GPCV2
-> -	help
-> -		This enables support for Freescale i.MX7 Dual processor.
-> -
->  config SOC_LS1021A
->  	bool "Freescale LS1021A support"
->  	select ARM_GIC
-> @@ -548,6 +536,27 @@ comment "Cortex-A/Cortex-M asymmetric multiprocessing platforms"
->  
->  if ARCH_MULTI_V7 || ARM_SINGLE_ARMV7M
->  
-> +config SOC_IMX7D_CA7
-> +	bool
-> +	select ARM_GIC
-> +	select HAVE_ARM_ARCH_TIMER
-> +	select HAVE_IMX_ANATOP
-> +	select HAVE_IMX_MMDC
-> +	select HAVE_IMX_SRC
-> +	select IMX_GPCV2
-> +
-> +config SOC_IMX7D_CM4
-> +	bool
-> +	select ARMV7M_SYSTICK
-> +
-> +config SOC_IMX7D
-> +	bool "i.MX7 Dual support"
-> +	select PINCTRL_IMX7D
-> +	select SOC_IMX7D_CA7 if ARCH_MULTI_V7
-> +	select SOC_IMX7D_CM4 if ARM_SINGLE_ARMV7M
-> +	help
-> +		This enables support for Freescale i.MX7 Dual processor.
-> +
->  config SOC_VF610
->  	bool "Vybrid Family VF610 support"
->  	select ARM_GIC if ARCH_MULTI_V7
-> diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-> index 2327e3e876d8..64ebeb6a4f30 100644
-> --- a/arch/arm/mach-imx/Makefile
-> +++ b/arch/arm/mach-imx/Makefile
-> @@ -81,7 +81,8 @@ obj-$(CONFIG_SOC_IMX6SL) += mach-imx6sl.o
->  obj-$(CONFIG_SOC_IMX6SLL) += mach-imx6sl.o
->  obj-$(CONFIG_SOC_IMX6SX) += mach-imx6sx.o
->  obj-$(CONFIG_SOC_IMX6UL) += mach-imx6ul.o
-> -obj-$(CONFIG_SOC_IMX7D) += mach-imx7d.o
-> +obj-$(CONFIG_SOC_IMX7D_CA7) += mach-imx7d.o
-> +obj-$(CONFIG_SOC_IMX7D_CM4) += mach-imx7d-cm4.o
->  
->  ifeq ($(CONFIG_SUSPEND),y)
->  AFLAGS_suspend-imx6.o :=-Wa,-march=armv7-a
-> diff --git a/arch/arm/mach-imx/mach-imx7d-cm4.c b/arch/arm/mach-imx/mach-imx7d-cm4.c
-> new file mode 100644
-> index 000000000000..c36dea79aeb8
-> --- /dev/null
-> +++ b/arch/arm/mach-imx/mach-imx7d-cm4.c
-> @@ -0,0 +1,21 @@
-> +/*
-> + * Copyright 2017 Pengutronix
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
+To be clear, from bottom to top (or root), right?
 
-Can we use SPDX tag for new file?
+>    each one of them. Fairly expensive, but minimal in way of changes
+>    in the crash code. Requires a per-irqchip flag, but ordering comes
+>    in for free.
+> 
+> 3) We do the same as (2), but at the irqdomain level. Not sure that's
+>    any better, and it may be even more complicated and bring back some
+>    ordering issues.
 
-Shawn
+Do you think that the same thing may happen in case of pci/msi?
+I have no confidence but MSI has some kind of irq domain hierarchy.
 
-> +
-> +#include <linux/kernel.h>
-> +#include <asm/v7m.h>
-> +#include <asm/mach/arch.h>
-> +
-> +static const char * const imx7d_cm4_dt_compat[] __initconst = {
-> +	"fsl,imx7d-cm4",
-> +	NULL,
-> +};
-> +
-> +DT_MACHINE_START(IMX7D, "Freescale i.MX7 Dual Cortex-M4 (Device Tree)")
-> +	.dt_compat = imx7d_cm4_dt_compat,
-> +	.restart = armv7m_restart,
-> +MACHINE_END
+Thanks,
+-Takahiro AKASHI
+
+> I'm currently angling for (2), with (1) as a final hammer option once
+> we have nuked all the individual interrupts (useful for the GICv3
+> redistributor case).
+> 
+> Thoughts?
+> 
+> 	M.
+> 
 > -- 
-> 2.17.1
-> 
+> Jazz is not dead, it just smell funny.
