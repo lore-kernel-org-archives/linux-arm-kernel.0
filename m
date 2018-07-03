@@ -1,70 +1,111 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Tue, 3 Jul 2018 10:38:53 +0200
-Subject: [PATCH v9 0/6] add support for relative references in special
- sections
-In-Reply-To: <CAKv+Gu-dkVEtRmvZwiAUpxPSHrkTVvzeGhCwczEmxRjcgfd+LQ@mail.gmail.com>
-References: <20180626182802.19932-1-ard.biesheuvel@linaro.org>
- <20180627151510.GE30631@arm.com>
- <CAKv+Gu-dkVEtRmvZwiAUpxPSHrkTVvzeGhCwczEmxRjcgfd+LQ@mail.gmail.com>
-Message-ID: <20180703083853.GA5369@gmail.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Tue, 03 Jul 2018 10:42:08 +0200
+Subject: [PATCH 2/2] PCI: imx: Initial imx7d pm support
+In-Reply-To: <02207512447db4585a4e879e2a059ba223d57dbe.camel@nxp.com>
+References: <cover.1527621510.git.leonard.crestez@nxp.com>
+ <a6176c8bcfbca08ce4e93e304bdcd48c4600f8e2.1527621510.git.leonard.crestez@nxp.com>
+ <1528468422.26356.20.camel@pengutronix.de>
+ <02207512447db4585a4e879e2a059ba223d57dbe.camel@nxp.com>
+Message-ID: <1530607328.22468.102.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-* Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-
-> On 27 June 2018 at 17:15, Will Deacon <will.deacon@arm.com> wrote:
-> > Hi Ard,
-> >
-> > On Tue, Jun 26, 2018 at 08:27:55PM +0200, Ard Biesheuvel wrote:
-> >> This adds support for emitting special sections such as initcall arrays,
-> >> PCI fixups and tracepoints as relative references rather than absolute
-> >> references. This reduces the size by 50% on 64-bit architectures, but
-> >> more importantly, it removes the need for carrying relocation metadata
-> >> for these sections in relocatable kernels (e.g., for KASLR) that needs
-> >> to be fixed up at boot time. On arm64, this reduces the vmlinux footprint
-> >> of such a reference by 8x (8 byte absolute reference + 24 byte RELA entry
-> >> vs 4 byte relative reference)
-> >>
-> >> Patch #3 was sent out before as a single patch. This series supersedes
-> >> the previous submission. This version makes relative ksymtab entries
-> >> dependent on the new Kconfig symbol HAVE_ARCH_PREL32_RELOCATIONS rather
-> >> than trying to infer from kbuild test robot replies for which architectures
-> >> it should be blacklisted.
-> >>
-> >> Patch #1 introduces the new Kconfig symbol HAVE_ARCH_PREL32_RELOCATIONS,
-> >> and sets it for the main architectures that are expected to benefit the
-> >> most from this feature, i.e., 64-bit architectures or ones that use
-> >> runtime relocations.
-> >>
-> >> Patch #2 add support for #define'ing __DISABLE_EXPORTS to get rid of
-> >> ksymtab/kcrctab sections in decompressor and EFI stub objects when
-> >> rebuilding existing C files to run in a different context.
-> >
-> > I had a small question on patch 3, but it's really for my understanding.
-> > So, for patches 1-3:
-> >
-> > Reviewed-by: Will Deacon <will.deacon@arm.com>
-> >
+Am Montag, den 02.07.2018, 17:18 +0000 schrieb Leonard Crestez:
+> On Fri, 2018-06-08 at 16:33 +0200, Lucas Stach wrote:
+> > Am Dienstag, den 29.05.2018, 22:39 +0300 schrieb Leonard Crestez:
+> > > On imx7d the phy is turned off in suspend and must be reset on resume.
+> > > Right now lspci -v fails after a suspend/resume cycle, fix this by
+> > > adding minimal suspend/resume code from the nxp vendor tree.
+> > > 
+> > > This is currently only enabled for imx7 but the same sequence can be
+> > > applied to other imx pcie variants.
+> > > +#ifdef CONFIG_PM_SLEEP
+> > > +static int imx6_pcie_suspend_noirq(struct device *dev)
+> > > +{
+> > > > > > +	struct imx6_pcie *imx6_pcie = dev_get_drvdata(dev);
+> > > +
+> > > +	if (imx6_pcie->variant == IMX7D) {
+> > 
+> > Instead of this large indented block, please just have an early return
+> > at the start of this function, like:
+> > 
+> > if (imx6_pcie->variant != IMX7D)
+> > 	return 0;
+> > 
+> > Same for the resume function.
 > 
-> Thanks all.
+> OK. The resume sequence is mostly the same for all SOCs where it
+> applies.
 > 
-> Thomas, Ingo,
+> > > +static int imx6_pcie_resume_noirq(struct device *dev)
+> > > +{
+> > > > > > +	int ret = 0;
+> > > > > > +	struct imx6_pcie *imx6_pcie = dev_get_drvdata(dev);
+> > > > > > +	struct pcie_port *pp = &imx6_pcie->pci->pp;
+> > > 
+> > > +
+> > > > > > +	if (imx6_pcie->variant == IMX7D) {
+> > > +		imx6_pcie_ltssm_disable(dev);
+> > 
+> > The LTSSM disable seems misplaced here. I would have expected it to be
+> > in the suspend function.
 > 
-> Except for the below tweak against patch #3 for powerpc, which may
-> apparently get confused by an input section called .discard without
-> any suffixes, this series is good to go, but requires your ack to
-> proceed, so I would like to ask you to share your comments and/or
-> objections. Also, any suggestions or recommendations regarding the
-> route these patches should take are highly appreciated.
+> This is a requirement for reinitializing the core: LTSSM needs to be
+> turned off during initialization.
 
-LGTM:
+If you disable LTSSM during suspend, it should be off when entering
+this resume function, no?
 
-Acked-by: Ingo Molnar <mingo@kernel.org>
+> > > +		/*
+> > > > > > +		?* controller maybe turn off, re-configure again
+> > > > > > +		?*/
+> > > > > > +		dw_pcie_setup_rc(pp);
+> > > +
+> > > > > > +		imx6_pcie_ltssm_enable(dev);
+> > > +
+> > > > > > +		ret = imx6_pcie_wait_for_link(imx6_pcie);
+> > > > > > +		if (ret < 0)
+> > > +			pr_info("pcie link is down after resume.\n");
+> > 
+> > If the PHY has been powered down and LTSSM stopped I guess we need to
+> > do the full imx6_pcie_establish_link() dance again here to reliably re-
+> > establish the link. The above seems unsafe.
+> 
+> What imx6_pcie_establish_link does additionally is some workaround for
+> link gen detection. I agree that it should be included.
+> 
+> This would make resume mostly the same as imx_pcie_host_init except for
+> dw_pcie_msi_init; that needs to be saved/restored separately.
 
-Regarding route - I suspect -mm would be good, or any other tree that does a lot 
-of cross-arch testing?
+Right, so maybe we can even cut down on lines of code by splitting and
+reusing existing functions.
 
-Thanks,
+> 
+> Another issue that should be discussed here is that on 6sx and 7d the
+> gpc PCIE power domain is not defined correctly: the PCIE block is in
+> the DISPMIX domain on both SOCs and it is only PCIE_PHY which has a
+> separate power domain.
+> 
+> This matters: enabling power-gating for displays will break pcie if
+> this relationship is not taken into account. Here are some options:
+> 
+> 1) Make &pd_pcie a child of &pd_disp by hacking into gpc probe
+> functions and calling pm_genpd_add_subdomain. Not very nice.
+> 
+> 2) Support nesting PGCs in GPC code? Lots of code and still an
+> incorrect representation of hardware.
+> 
+> 3) Set power-domains = <&pd_disp> and enable runtime PM on &pd_pcie?
+> 
+> 4) Add separate devices for the pcie-phy. These would be mostly empty
+> but still different, for example on imx6sx the PHY is not even
+> accessible on the bus but only though PCIE registers.
 
-	Ingo
+5) Take a look at the linux-pm list. ;) The power domain framework has
+just gained support for multiple power domains per device. I think that
+ is the right solution for this, as like you mentioned the PHY isn't
+really a separate block on i.MX6, but part of the PCIe controller
+device.
+
+Regards,
+Lucas
