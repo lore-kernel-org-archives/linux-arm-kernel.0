@@ -1,111 +1,75 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 03 Jul 2018 10:42:08 +0200
-Subject: [PATCH 2/2] PCI: imx: Initial imx7d pm support
-In-Reply-To: <02207512447db4585a4e879e2a059ba223d57dbe.camel@nxp.com>
-References: <cover.1527621510.git.leonard.crestez@nxp.com>
- <a6176c8bcfbca08ce4e93e304bdcd48c4600f8e2.1527621510.git.leonard.crestez@nxp.com>
- <1528468422.26356.20.camel@pengutronix.de>
- <02207512447db4585a4e879e2a059ba223d57dbe.camel@nxp.com>
-Message-ID: <1530607328.22468.102.camel@pengutronix.de>
+From: ijc@debian.org (Ian Campbell)
+Date: Tue, 03 Jul 2018 09:44:26 +0100
+Subject: [RFC/RFT PATCH 0/2] disable_hest quirk on HP m400 with bad UEFI
+ firmwware
+In-Reply-To: <CAKv+Gu9ZHAGzcfgHShM1qvZ3qf4gb1pD_XfoceJu9Qy+5_pEsg@mail.gmail.com>
+References: <20180628100656.10692-1-james.morse@arm.com>
+ <CAKv+Gu9ZHAGzcfgHShM1qvZ3qf4gb1pD_XfoceJu9Qy+5_pEsg@mail.gmail.com>
+Message-ID: <1530607466.9841.124.camel@debian.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, den 02.07.2018, 17:18 +0000 schrieb Leonard Crestez:
-> On Fri, 2018-06-08 at 16:33 +0200, Lucas Stach wrote:
-> > Am Dienstag, den 29.05.2018, 22:39 +0300 schrieb Leonard Crestez:
-> > > On imx7d the phy is turned off in suspend and must be reset on resume.
-> > > Right now lspci -v fails after a suspend/resume cycle, fix this by
-> > > adding minimal suspend/resume code from the nxp vendor tree.
-> > > 
-> > > This is currently only enabled for imx7 but the same sequence can be
-> > > applied to other imx pcie variants.
-> > > +#ifdef CONFIG_PM_SLEEP
-> > > +static int imx6_pcie_suspend_noirq(struct device *dev)
-> > > +{
-> > > > > > +	struct imx6_pcie *imx6_pcie = dev_get_drvdata(dev);
-> > > +
-> > > +	if (imx6_pcie->variant == IMX7D) {
-> > 
-> > Instead of this large indented block, please just have an early return
-> > at the start of this function, like:
-> > 
-> > if (imx6_pcie->variant != IMX7D)
-> > 	return 0;
-> > 
-> > Same for the resume function.
-> 
-> OK. The resume sequence is mostly the same for all SOCs where it
-> applies.
-> 
-> > > +static int imx6_pcie_resume_noirq(struct device *dev)
-> > > +{
-> > > > > > +	int ret = 0;
-> > > > > > +	struct imx6_pcie *imx6_pcie = dev_get_drvdata(dev);
-> > > > > > +	struct pcie_port *pp = &imx6_pcie->pci->pp;
-> > > 
-> > > +
-> > > > > > +	if (imx6_pcie->variant == IMX7D) {
-> > > +		imx6_pcie_ltssm_disable(dev);
-> > 
-> > The LTSSM disable seems misplaced here. I would have expected it to be
-> > in the suspend function.
-> 
-> This is a requirement for reinitializing the core: LTSSM needs to be
-> turned off during initialization.
+On Thu, 2018-06-28 at 12:25 +0200, Ard Biesheuvel wrote:
+> I understand the desire to keep running these M400s as long as they
+> have some life left in them, but the reality is that they are end of
+> life already, and not many were manufactured to begin with.
 
-If you disable LTSSM during suspend, it should be off when entering
-this resume function, no?
+Linux has a long history of supporting such devices so long as there is
+someone around willing to keep them running (witness for example how
+long x86/voyager lived with just 1 in existence in a motivated
+developer's basement, probably some number of entire architectures and
+I bet a not insubstantial chunk of the platform support in arch/arm).
 
-> > > +		/*
-> > > > > > +		?* controller maybe turn off, re-configure again
-> > > > > > +		?*/
-> > > > > > +		dw_pcie_setup_rc(pp);
-> > > +
-> > > > > > +		imx6_pcie_ltssm_enable(dev);
-> > > +
-> > > > > > +		ret = imx6_pcie_wait_for_link(imx6_pcie);
-> > > > > > +		if (ret < 0)
-> > > +			pr_info("pcie link is down after resume.\n");
-> > 
-> > If the PHY has been powered down and LTSSM stopped I guess we need to
-> > do the full imx6_pcie_establish_link() dance again here to reliably re-
-> > establish the link. The above seems unsafe.
-> 
-> What imx6_pcie_establish_link does additionally is some workaround for
-> link gen detection. I agree that it should be included.
-> 
-> This would make resume mostly the same as imx_pcie_host_init except for
-> dw_pcie_msi_init; that needs to be saved/restored separately.
+> Given how the upstream kernel is aimed at future development,
 
-Right, so maybe we can even cut down on lines of code by splitting and
-reusing existing functions.
+That might be true in some sense but I don't think it can be said to
+extends to "not worried about running on existing hardware".
 
-> 
-> Another issue that should be discussed here is that on 6sx and 7d the
-> gpc PCIE power domain is not defined correctly: the PCIE block is in
-> the DISPMIX domain on both SOCs and it is only PCIE_PHY which has a
-> separate power domain.
-> 
-> This matters: enabling power-gating for displays will break pcie if
-> this relationship is not taken into account. Here are some options:
-> 
-> 1) Make &pd_pcie a child of &pd_disp by hacking into gpc probe
-> functions and calling pm_genpd_add_subdomain. Not very nice.
-> 
-> 2) Support nesting PGCs in GPC code? Lots of code and still an
-> incorrect representation of hardware.
-> 
-> 3) Set power-domains = <&pd_disp> and enable runtime PM on &pd_pcie?
-> 
-> 4) Add separate devices for the pcie-phy. These would be mostly empty
-> but still different, for example on imx6sx the PHY is not even
-> accessible on the bus but only though PCIE registers.
+>  I don't
+> think we should fix this in the upstream kernel at all. Distros are
+> free to do what they like, of course, and I'm sure RedHat already have
+> a fix for this in their downstream kernel. But putting this upstream
+> means we will never be able to remove it again,
 
-5) Take a look at the linux-pm list. ;) The power domain framework has
-just gained support for multiple power domains per device. I think that
- is the right solution for this, as like you mentioned the PHY isn't
-really a separate block on i.MX6, but part of the PCIe controller
-device.
+Quirks are pretty self contained and should be very unobtrusive to the
+common code paths though. Also I expect that quirks _can_ be removed
+once the platform has actually died in reality (not just no longer
+produced) or becomes too much of a burden for other reasons (which AIUI
+is what eventually happened to Voyager).
 
-Regards,
-Lucas
+>  which would be
+> especially unfortunate given that it is the first ever DMI quirk for
+> arm64, which we tried *very* hard to avoid, also because we don't
+> initialize the DMI framework as early as x86 does, and so once we open
+> the floodgates,
+
+The "flood" is inversely proportional to the quality of the firmware
+certification and it isn't too overwhelming on x86, which historically
+had next to no certification apart from "runs Windows", so it seems
+unlikely to me that on arm64, where some attempts have been made at
+validation and test suites from very near the start, that the flood
+will be all that overwhelming.
+
+>  we will run into issues where we will need to reorder
+> the init sequence to make DMI data available early enough.
+
+> a) DMI quirks will be permitted on arm64
+> b) we care about m400 enough to put this quirk in the upstream kernel
+
+In general arm64 Linux is going to need to be able to cope with
+firmware in the field which is either rubbish to some degree or which
+predates the addition of some support in the kernel and turns out not
+to be fully functional when that support is enabled (the latter it
+seems being what happened in the m400 case).
+
+So, I think DMI quirks are probably, in reality, inevitable unless you
+think firmware authors are going to be infaliable or the
+testing/certification suites never has any gaps in it.
+
+Given that, the overhead of then supporting m400 seems pretty trivial.
+
+That said, maybe there are more appropriate mechanisms than DMI on
+arm64 for detecting and activating quirks?
+
+Cheers,
+Ian.
