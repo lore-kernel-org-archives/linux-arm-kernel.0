@@ -1,42 +1,72 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Tue, 03 Jul 2018 11:20:44 -0400
-Subject: [PATCH] arm64/acpi: Add fixup for HPE m400 quirks
-In-Reply-To: <1530610221.9841.128.camel@debian.org>
-References: <51d3d738-cdf5-2992-bba5-c3e1f34096c2@infradead.org>
- <098e6d53-8dc7-439f-7165-adbe0e7c4941@arm.com>
- <8a3034b9-6cf3-5182-717f-dd1dc8a087aa@infradead.org>
- <5b03f754-3a98-c01d-3e2a-615a8b1ea537@arm.com>
- <0cbc68d5-9a8f-1734-4eea-d1f037927137@infradead.org>
- <cb5aa4ee12422ecc5f6530f3a74bcfa553b42c80.camel@redhat.com>
- <a59fa0f8-4123-bcd9-670a-8885d34f37ed@arm.com>
- <0be5ce017286a4ec494e0f0969bb10126b8501ce.camel@redhat.com>
- <bd5fc825573c3394b80365ad2dc47bde7b22044a.camel@gmail.com>
- <950b3034-08a8-38b9-b8f9-514d3e2519fa@arm.com>
- <257bbf8d90669921cede5b2e7555b9523311b795.camel@redhat.com>
- <CAKv+Gu9VfK8itWr5EoOGAdSA-OkrXystw-sbooOq2ZOpFwi9vw@mail.gmail.com>
- <45b96b937687b199bdbd6966491ab23f50bb20e7.camel@redhat.com>
- <1530610221.9841.128.camel@debian.org>
-Message-ID: <ff46b8ab2786eae798a9a650d24cb20ea1504fd2.camel@redhat.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 3 Jul 2018 16:30:35 +0100
+Subject: [PATCH 3/7 v5] iommu: support iommu configuration for fsl-mc
+ devices
+In-Reply-To: <1526824191-7000-4-git-send-email-nipun.gupta@nxp.com>
+References: <1526824191-7000-1-git-send-email-nipun.gupta@nxp.com>
+ <1526824191-7000-4-git-send-email-nipun.gupta@nxp.com>
+Message-ID: <947a6e16-98ff-9389-b15c-d3025b7be4be@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2018-07-03 at 10:30 +0100, Ian Campbell wrote:
-> On Wed, 2018-06-27 at 08:25 -0400, Mark Salter wrote:
-> > On Wed, 2018-06-27 at 10:48 +0200, Ard Biesheuvel wrote:
-> > > On 26 June 2018 at 22:20, Mark Salter <msalter@redhat.com> wrote:
-> > > > [040h 0064   8]                      Address : 0000004FF7E9F0E0
-> > > > 
-> > > 
-> > > This is a reserved region in the memory map. Does that apply to the
-> > > other occurrences as well?
-> > 
-> > Yes, they are all in the same reserved region.
-> 
-> I wonder if it corresponds to some actual peripheral on a different X-
-> gene based platform (e.g. perhaps a reference design)?
-> 
-> Not sure what one would do with that information, just curious.
-> 
-> Ian.
+On 20/05/18 14:49, Nipun Gupta wrote:
+> With of_pci_map_rid available for all the busses, use the function
+> for configuration of devices on fsl-mc bus
 
-It's a reserved region of system RAM.
+FWIW I had a quick hack at factoring out the commonality with 
+of_pci_iommu_init(), at which point I reckon this change is easier to 
+follow as-is for the moment, so:
+
+Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+
+> Signed-off-by: Nipun Gupta <nipun.gupta@nxp.com>
+> ---
+>   drivers/iommu/of_iommu.c | 20 ++++++++++++++++++++
+>   1 file changed, 20 insertions(+)
+> 
+> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+> index 811e160..284474d 100644
+> --- a/drivers/iommu/of_iommu.c
+> +++ b/drivers/iommu/of_iommu.c
+> @@ -24,6 +24,7 @@
+>   #include <linux/of_iommu.h>
+>   #include <linux/of_pci.h>
+>   #include <linux/slab.h>
+> +#include <linux/fsl/mc.h>
+>   
+>   #define NO_IOMMU	1
+>   
+> @@ -159,6 +160,23 @@ static int of_pci_iommu_init(struct pci_dev *pdev, u16 alias, void *data)
+>   	return err;
+>   }
+>   
+> +static int of_fsl_mc_iommu_init(struct fsl_mc_device *mc_dev,
+> +				struct device_node *master_np)
+> +{
+> +	struct of_phandle_args iommu_spec = { .args_count = 1 };
+> +	int err;
+> +
+> +	err = of_map_rid(master_np, mc_dev->icid, "iommu-map",
+> +			 "iommu-map-mask", &iommu_spec.np,
+> +			 iommu_spec.args);
+> +	if (err)
+> +		return err == -ENODEV ? NO_IOMMU : err;
+> +
+> +	err = of_iommu_xlate(&mc_dev->dev, &iommu_spec);
+> +	of_node_put(iommu_spec.np);
+> +	return err;
+> +}
+> +
+>   const struct iommu_ops *of_iommu_configure(struct device *dev,
+>   					   struct device_node *master_np)
+>   {
+> @@ -190,6 +208,8 @@ const struct iommu_ops *of_iommu_configure(struct device *dev,
+>   
+>   		err = pci_for_each_dma_alias(to_pci_dev(dev),
+>   					     of_pci_iommu_init, &info);
+> +	} else if (dev_is_fsl_mc(dev)) {
+> +		err = of_fsl_mc_iommu_init(to_fsl_mc_device(dev), master_np);
+>   	} else {
+>   		struct of_phandle_args iommu_spec;
+>   		int idx = 0;
+> 
