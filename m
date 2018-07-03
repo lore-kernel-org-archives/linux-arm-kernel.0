@@ -1,90 +1,50 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 3 Jul 2018 14:00:27 +0100
-Subject: [PATCH v4 7/7] arm64: perf: Add support for chaining event
- counters
-In-Reply-To: <1530568788-26458-8-git-send-email-suzuki.poulose@arm.com>
-References: <1530568788-26458-1-git-send-email-suzuki.poulose@arm.com>
- <1530568788-26458-8-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20180703130027.4nfd7pxml4ziyl5l@lakrids.cambridge.arm.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 3 Jul 2018 21:00:32 +0800
+Subject: [PATCH] MAINTAINERS: add Freescale Layerscape ARM architecture
+ entry
+In-Reply-To: <20180703124702.ck64qrdzu33y5zjt@tarshish>
+References: <1530620991-1621-1-git-send-email-shawnguo@kernel.org>
+ <20180703124702.ck64qrdzu33y5zjt@tarshish>
+Message-ID: <20180703130031.GS4348@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 02, 2018 at 10:59:48PM +0100, Suzuki K Poulose wrote:
-> Add support for 64bit event by using chained event counters
-> and 64bit cycle counters.
+Hi Baruch,
+
+On Tue, Jul 03, 2018 at 03:47:02PM +0300, Baruch Siach wrote:
+> Hi Shawn,
 > 
-> PMUv3 allows chaining a pair of adjacent 32-bit counters, effectively
-> forming a 64-bit counter. The low/even counter is programmed to count
-> the event of interest, and the high/odd counter is programmed to count
-> the CHAIN event, taken when the low/even counter overflows.
+> On Tue, Jul 03, 2018 at 08:29:51PM +0800, Shawn Guo wrote:
+> > I have been collecting Freescale Layerscape device tree source files for
+> > a while.  Add a MAINTAINERS entry for it, so that relevant patches can
+> > reach my mail box.
+> > 
+> > Cc: Li Yang <leoyang.li@nxp.com>
+> > Signed-off-by: Shawn Guo <shawnguo@kernel.org>
+> > ---
+> >  MAINTAINERS | 10 ++++++++++
+> >  1 file changed, 10 insertions(+)
+> > 
+> > diff --git a/MAINTAINERS b/MAINTAINERS
+> > index 9d5eeff51b5f..d72f1162daea 100644
+> > --- a/MAINTAINERS
+> > +++ b/MAINTAINERS
+> > @@ -1442,6 +1442,16 @@ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git
+> >  F:	arch/arm/mach-imx/*vf610*
+> >  F:	arch/arm/boot/dts/vf*
+> >  
+> > +ARM/FREESCALE LAYERSCAPE ARM ARCHITECTURE
+> > +M:	Shawn Guo <shawnguo@kernel.org>
+> > +M:	Li Yang <leoyang.li@nxp.com>
+> > +L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> > +S:	Maintained
+> > +T:	git git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git
+> > +F:	arch/arm/boot/dts/ls1021a*
+> > +F:	arch/arm64/boot/dts/freescale/fsl-*
 > 
-> For CPU cycles, when 64bit mode is requested, the cycle counter
-> is used in 64bit mode. If the cycle counter is not available,
-> falls back to chaining.
-> 
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
-> Changes since v3:
->  - Rename format name from "bits64 => long"
->  - Address other comments on style.
-> ---
->  arch/arm64/kernel/perf_event.c | 185 +++++++++++++++++++++++++++++++++++------
->  drivers/perf/arm_pmu.c         |  13 ++-
->  2 files changed, 164 insertions(+), 34 deletions(-)
+> This pattern would soon (hopefully) match i.MX8 systems.
 
-> +static int armv8pmu_get_chain_idx(struct pmu_hw_events *cpuc,
-> +				   struct arm_pmu *cpu_pmu)
-> +{
-> +	int idx;
-> +
-> +	/*
-> +	 * Chaining requires two consecutive event counters, where
-> +	 * the lower idx must be even.
-> +	 */
-> +	for (idx = ARMV8_IDX_COUNTER0 + 1; idx < cpu_pmu->num_events; idx += 2) {
-> +		if (!test_and_set_bit(idx, cpuc->used_mask)) {
-> +			/* Check if the preceding even counter is available */
-> +			if (!test_and_set_bit(idx - 1, cpuc->used_mask))
-> +				return idx;
-> +			/* Release the Odd counter */
-> +			clear_bit(idx, cpuc->used_mask);
-> +		}
-> +	}
-> +	return -EAGAIN;
-> +}
+We will have arch/arm64/boot/dts/freescale/imx* in entry
+'ARM/FREESCALE IMX / MXC ARM ARCHITECTURE'.
 
-This means that we'll sometimes fail to pack events, but I guess that
-most of the time the rotation logic will save us.
-
-We might need to defer counter allocation in future if that's a real
-problem.
-
-> @@ -665,14 +665,13 @@ static void cpu_pm_pmu_setup(struct arm_pmu *armpmu, unsigned long cmd)
->  	int idx;
->  
->  	for (idx = 0; idx < armpmu->num_events; idx++) {
-> -		/*
-> -		 * If the counter is not used skip it, there is no
-> -		 * need of stopping/restarting it.
-> -		 */
-> -		if (!test_bit(idx, hw_events->used_mask))
-> -			continue;
-> -
->  		event = hw_events->events[idx];
-> +		/*
-> +		 * If there is no event at this idx (e.g, an idx used
-> +		 * by a chained event in Arm v8 PMUv3), skip it.
-> +		 */
-> +		if (!event)
-> +			continue;
-
-I think we can drop the comment here.
-
-Other than the above and the xscale fixup, this looks good to me.
-
-Have you thrown the perf fuzzer at this?
-
-Thanks,
-Mark.
+Shawn
