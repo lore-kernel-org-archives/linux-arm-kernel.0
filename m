@@ -1,9 +1,10 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue,  3 Jul 2018 10:21:59 +0900
-Subject: [PATCH 1/3] ARM: add endianness option to LDFLAGS instead of LD
+Date: Tue,  3 Jul 2018 10:22:01 +0900
+Subject: [PATCH 3/3] microblaze: add endianness options to LDFLAGS instead of
+ LD
 In-Reply-To: <1530580921-23340-1-git-send-email-yamada.masahiro@socionext.com>
 References: <1530580921-23340-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1530580921-23340-2-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1530580921-23340-4-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -19,27 +20,26 @@ between Makefile and Kconfig.
 Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
 
- arch/arm/Makefile | 4 ++--
+ arch/microblaze/Makefile | 4 ++--
  1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index fc26c3d..62ebeae 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -46,12 +46,12 @@ ifeq ($(CONFIG_CPU_BIG_ENDIAN),y)
- KBUILD_CPPFLAGS	+= -mbig-endian
- CHECKFLAGS	+= -D__ARMEB__
- AS		+= -EB
--LD		+= -EB
-+LDFLAGS		+= -EB
+diff --git a/arch/microblaze/Makefile b/arch/microblaze/Makefile
+index d269dd4b..7333036 100644
+--- a/arch/microblaze/Makefile
++++ b/arch/microblaze/Makefile
+@@ -40,11 +40,11 @@ CPUFLAGS-$(CONFIG_XILINX_MICROBLAZE0_USE_PCMP_INSTR) += -mxl-pattern-compare
+ ifdef CONFIG_CPU_BIG_ENDIAN
+ KBUILD_CFLAGS += -mbig-endian
+ KBUILD_AFLAGS += -mbig-endian
+-LD += -EB
++LDFLAGS += -EB
  else
- KBUILD_CPPFLAGS	+= -mlittle-endian
- CHECKFLAGS	+= -D__ARMEL__
- AS		+= -EL
--LD		+= -EL
-+LDFLAGS		+= -EL
+ KBUILD_CFLAGS += -mlittle-endian
+ KBUILD_AFLAGS += -mlittle-endian
+-LD += -EL
++LDFLAGS += -EL
  endif
  
- #
+ CPUFLAGS-1 += $(call cc-option,-mcpu=v$(CPU_VER))
 -- 
 2.7.4
