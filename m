@@ -1,114 +1,94 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 3 Jul 2018 09:58:44 +0100
-Subject: panic kexec broken on ARM64?
-In-Reply-To: <20180703070106.GV23681@linaro.org>
-References: <20180605100151.7fd54381@ezekiel.suse.cz>
- <8028219f-0d14-eafd-86b7-359ee927bcd3@arm.com>
- <5e539510-01b7-ebc5-778e-b49a5261f9bc@i2se.com>
- <2865150f-ebca-4c6b-fc4b-93bfab5f0e91@arm.com>
- <86lgbm96dq.wl-marc.zyngier@arm.com> <20180703070106.GV23681@linaro.org>
-Message-ID: <86601wzn3h.wl-marc.zyngier@arm.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Tue, 3 Jul 2018 10:44:13 +0100
+Subject: [RFC PATCH 6/8] dts: coresight: Clean up the device tree graph
+ bindings
+In-Reply-To: <CAL_Jsq+0kExVY33kdDoR6bAxbr2VzRUzW2j0k+2wmv4CSNVnpQ@mail.gmail.com>
+References: <1527858967-16047-1-git-send-email-suzuki.poulose@arm.com>
+ <1527858967-16047-7-git-send-email-suzuki.poulose@arm.com>
+ <20180612204802.GA15817@rob-hp-laptop>
+ <a1c0749b-9c97-b45f-716f-a62ae07af278@arm.com>
+ <5448BBB7-93FE-400F-9D87-FABF5DE0539C@arm.com>
+ <c0d531ec-9201-bfd8-e6c3-9140698b0697@arm.com>
+ <HE1PR0802MB24127EC935B9AF6F82AB3B6EEE7E0@HE1PR0802MB2412.eurprd08.prod.outlook.com>
+ <075b99a1-2a29-f6dc-e9f2-99f895c27d35@arm.com>
+ <CANLsYkx9cjV-bWg7aLg-kJT7x7DtwTHdsYzzM8A3+cFFnu_mNg@mail.gmail.com>
+ <HE1PR0802MB24121F0EEF8D7D643BC391A1EE7E0@HE1PR0802MB2412.eurprd08.prod.outlook.com>
+ <5e013d65-9931-6b8d-ce7c-4333309d4ada@arm.com>
+ <CAL_Jsq+0kExVY33kdDoR6bAxbr2VzRUzW2j0k+2wmv4CSNVnpQ@mail.gmail.com>
+Message-ID: <79d24815-278a-5465-65eb-afd3535236e7@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/07/18 08:01, takahiro.akashi at linaro.org wrote:
-> Marc, James,
-> 
-> I'd like to re-ignite the discussion.
-> 
-> On Sun, Jun 10, 2018 at 01:24:17PM +0100, Marc Zyngier wrote:
->> On Wed, 06 Jun 2018 12:37:02 +0100,
->> James Morse wrote:
+Hi Rob,
+
+On 14/06/18 14:59, Rob Herring wrote:
+> On Thu, Jun 14, 2018 at 2:53 AM, Suzuki K Poulose
+> <Suzuki.Poulose@arm.com> wrote:
+>> On 13/06/18 22:07, Matt Sealey wrote:
 >>>
->>> Hi Stefan,
 >>>
->>> On 06/06/18 08:02, Stefan Wahren wrote:
->>>> Am 05.06.2018 um 19:46 schrieb James Morse:
->>>>> On 05/06/18 09:01, Petr Tesarik wrote:
->>>>>> I attached a hardware debugger and found
->>>>>> out that all CPU cores were stopped except one which was stuck in the
->>>>>> idle thread. It seems that irq_set_irqchip_state() may sleep, which is
->>>>>> definitely not safe after a kernel panic.
 >>>
->>>>> I don't know much about irqchip stuff, but __irq_get_desc_lock() takes a
->>>>> raw_spin_lock(), and calls gic_irq_get_irqchip_state() which is just poking
->>>>> around in mmio registers, this should all be safe unless you re-entered the same
->>>>> code.
->>>
->>>>>> If I'm right, then this is broken in general, but I have only ever seen
->>>>>> it on RPi 3 Model B+ (even RPi3 Model B works fine), so the issue may
->>>>>> be more subtle.
->>>
->>>>> Is there a hardware difference around the interrupt controller on these?
->>>
->>>> No, but the RPi 3 B has a different USB network chip on board (smsc95xx, Fast
->>>> ethernet) instead of lan78xx (Gigabit ethernet).
->>>
->>> Bingo: its the lan78xx driver that is sleeping from the irqchip
->>> callbacks; The smsc95xx driver doesn't have a struct irq_chip, which
->>> is why the RPi-3-B doesn't do this.
->>>
->>> It may be valid for kdump to only teardown the 'root irqdomain' (if
->>> that even means anything). I assume these secondary irqchip's would
->>> have a summary-interrupt that goes to another irqchip. But I can't
->>> see a way to tell them apart..,
+>>>> -----Original Message-----
+>>>> From: Mathieu Poirier <mathieu.poirier@linaro.org>
+>>>>
+>>>>> So, if the suggestion is to use an existing property "unit", I am fine
+>>>>> with it, if people agree to it.
+>>>>
+>>>>
+>>>> If we're going to have something sharply different than ACPI I prefer
+>>>> Rob's idea.
 >>
->> There is none. A cascaded irqchip is just like a root irqchip, just
->> that its output line is connected to another irqchip. But we have no
->> easy way to identify the parent. Also, this particular driver looks
->> quite creative (it reinvents the wheel for chained interrupts -- see
->> intr_complete and lan78xx_status), meaning that even if we could have
->> a magic way of identify a chained irqchip, we'd miss that one. Broken.
 >>
->>> I think we need to wait until after the merge window for Marc's
->>> wisdom on this!
->>
->> Overall, I can't think of an easy fix. We have a few options, but none
->> of them involve a centralised change:
->>
->> 1) We provide a reset infrastructure for irqchips, with an opt-in
->>    mechanism. This involves changing the way we teardown irqs at
->>    crash-time, and we'd then need some notion of reset ordering (think
->>    of the layered ITS and GICv3, for example).
+>> No, the above comment is about using "unit" ( if it is a standard property
+>> for specifying something specific to hardware) instead of "coresight,hwid".
+>> I would prefer to stick to the DT graph bindings, because :
 > 
-> Does this mean that all the irqchips have to be implemented with reset?
-
-No. Only those that want to be reset at kexec time.
-
+> "unit" is not a standard property and I don't like it either.
+> 
 >>
->> 2) We provide a way to identify interrupts that are ultimately backed
->>    by a root controller, which implies walking down the hierarchy for
-> 
-> To be clear, from bottom to top (or root), right?
-
-I'm not sure I understand your question. The idea is to walk the
-irq_data chain, until we hit a root irqchip. If we do hit one, we
-deactivate/eoi/disable this interrupt. If we don't, we do nothing.
-
-This would avoid the above brokenness, and still ensures that no
-interrupt reaches the CPU.
-
-> 
->>    each one of them. Fairly expensive, but minimal in way of changes
->>    in the crash code. Requires a per-irqchip flag, but ordering comes
->>    in for free.
+>> 1) The connections are bi-directional => Well, not necessarily
+>> bi-directional
+>> in terms of the data flow. But the connection information is critical. i.e,
+>> we need information about both the end-points of a connection, which the DT
+>> graph bindings solves.
 >>
->> 3) We do the same as (2), but at the irqdomain level. Not sure that's
->>    any better, and it may be even more complicated and bring back some
->>    ordering issues.
+>> All we are missing is a way for specifying the "hardware port" number and
+>> the
+>> direction of flow. I don't see why do we need to create something new just
+>> for
+>> these two properties for something that exists today and works reasonably
+>> well
+>> for the usecase.
 > 
-> Do you think that the same thing may happen in case of pci/msi?
-> I have no confidence but MSI has some kind of irq domain hierarchy.
+> If you have "in-ports" and "out-ports" nodes, then that gives you
+> direction and you can use reg for the "hardware port".
+> 
+> in-ports {
+>    port at 0 {
+>      reg = <0>;
+>      endpoint {...};
+>    };
+>    port at 1 {
+>      reg = <1>;
+>      endpoint {...};
+>    };
+> };
+> out-ports {
+>    port at 0 {
+>      reg = <0>;
+>      endpoint {...};
+>    };
+> };
+> 
+> I'll need to check, but dtc may need an update to not warn about this.
+> 
 
-Anything can happen, as people implement their interrupt infrastructure
-in weird and wonderful ways. So we need to be prepared for the worse.
+I did a quick check with the upstream dtc tool and the above form is
+doesn't generate any errors.
 
-I've pushed 3 patches on a branch[1]. It is mostly untested, but it
-should allow the above RPi3 disaster to cope with kexec.
+Mathieu, Rob,
 
-	M.
+Shall I proceed with the proposal above ?
 
-[1]: https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git/log/?h=irq/root-irqchip
 
--- 
-Jazz is not dead, it just smell funny.
+Suzuki
