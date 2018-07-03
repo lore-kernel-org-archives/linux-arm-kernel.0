@@ -1,36 +1,38 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 3 Jul 2018 15:15:44 +0800
-Subject: [PATCH] ARM: imx: enable bus auto clock gating function for
- i.mx6sll
-In-Reply-To: <20180703062014.GB4242@dell>
-References: <1529645568-3786-1-git-send-email-Anson.Huang@nxp.com>
- <20180701085111.GK4348@dragon> <20180703062014.GB4242@dell>
-Message-ID: <20180703071542.GN4348@dragon>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Tue, 3 Jul 2018 09:17:11 +0200
+Subject: [PATCH 0/3] clk: meson: add a sub EMMC clock controller support
+In-Reply-To: <20180703145716.31860-1-yixun.lan@amlogic.com>
+References: <20180703145716.31860-1-yixun.lan@amlogic.com>
+Message-ID: <20180703091711.1d52c278@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 03, 2018 at 07:20:14AM +0100, Lee Jones wrote:
-> On Sun, 01 Jul 2018, Shawn Guo wrote:
-> 
-> > On Fri, Jun 22, 2018 at 01:32:48PM +0800, Anson Huang wrote:
-> > > i.MX6SLL has HW bus auto clock gating function, enable
-> > > it by default to save VDD_SOC_IN power, about 5% ~ 20%
-> > > saved depends on different use cases.
-> > > 
-> > > Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
-> > 
-> > Applied, thanks.
-> 
-> Since this touches MFD, please apply my Ack to the patch.
-> 
->   Acked-by: Lee Jones <lee.jones@linaro.org>
+On Tue, 3 Jul 2018 14:57:13 +0000
+Yixun Lan <yixun.lan@amlogic.com> wrote:
 
-Done.  Thanks for reminding, Lee.
+> This driver will add a EMMC clock controller driver support.
+> The original idea about adding a clock controller is during the
+> discussion in the NAND driver mainline effort[1].
+> 
+> I've tested this in the S400 board (AXG platform) by using NAND driver.
+> 
+> [1] https://lkml.kernel.org/r/20180628090034.0637a062 at xps13
+
+This is much better :-).
 
 > 
-> -- 
-> Lee Jones [???]
-
-Nice Chinese name, BTW ;)
-
-Shawn
+> Yixun Lan (3):
+>   clk: meson: add DT documentation for emmc clock controller
+>   clk: meson: add sub EMMC clock dt-bindings IDs
+>   clk: meson: add sub EMMC clock controller driver
+> 
+>  .../bindings/clock/amlogic,emmc-clkc.txt      |  45 ++++++
+>  drivers/clk/meson/Kconfig                     |   9 ++
+>  drivers/clk/meson/Makefile                    |   1 +
+>  drivers/clk/meson/emmc-clkc.c                 | 136 ++++++++++++++++++
+>  include/dt-bindings/clock/emmc-clkc.h         |  14 ++
+>  5 files changed, 205 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/amlogic,emmc-clkc.txt
+>  create mode 100644 drivers/clk/meson/emmc-clkc.c
+>  create mode 100644 include/dt-bindings/clock/emmc-clkc.h
+> 
