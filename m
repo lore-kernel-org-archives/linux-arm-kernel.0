@@ -1,44 +1,67 @@
-From: james.morse@arm.com (James Morse)
-Date: Tue, 3 Jul 2018 17:34:34 +0100
-Subject: [PATCH v10 05/14] arm64: add image head flag definitions
-In-Reply-To: <20180623022058.10935-6-takahiro.akashi@linaro.org>
-References: <20180623022058.10935-1-takahiro.akashi@linaro.org>
- <20180623022058.10935-6-takahiro.akashi@linaro.org>
-Message-ID: <15a8c694-ea85-8d9f-7498-62995f46ca1a@arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 3 Jul 2018 17:35:42 +0100
+Subject: [PATCH 7/7 v5] arm64: dts: ls208xa: comply with the iommu map
+ binding for fsl_mc
+In-Reply-To: <1526824191-7000-8-git-send-email-nipun.gupta@nxp.com>
+References: <1526824191-7000-1-git-send-email-nipun.gupta@nxp.com>
+ <1526824191-7000-8-git-send-email-nipun.gupta@nxp.com>
+Message-ID: <88626adc-6f5b-86df-88a0-620d258f8053@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Akashi,
+On 20/05/18 14:49, Nipun Gupta wrote:
+> fsl-mc bus support the new iommu-map property. Comply to this binding
+> for fsl_mc bus.
+> 
+> Signed-off-by: Nipun Gupta <nipun.gupta@nxp.com>
+> Reviewed-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
+> ---
+>   arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi | 6 +++++-
+>   1 file changed, 5 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
+> index 137ef4d..6010505 100644
+> --- a/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
+> +++ b/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
+> @@ -184,6 +184,7 @@
+>   		#address-cells = <2>;
+>   		#size-cells = <2>;
+>   		ranges;
+> +		dma-ranges = <0x0 0x0 0x0 0x0 0x10000 0x00000000>;
+>   
+>   		clockgen: clocking at 1300000 {
+>   			compatible = "fsl,ls2080a-clockgen";
+> @@ -357,6 +358,8 @@
+>   			reg = <0x00000008 0x0c000000 0 0x40>,	 /* MC portal base */
+>   			      <0x00000000 0x08340000 0 0x40000>; /* MC control reg */
+>   			msi-parent = <&its>;
+> +			iommu-map = <0 &smmu 0 0>;	/* This is fixed-up by u-boot */
+> +			dma-coherent;
+>   			#address-cells = <3>;
+>   			#size-cells = <1>;
+>   
+> @@ -460,6 +463,8 @@
+>   			compatible = "arm,mmu-500";
+>   			reg = <0 0x5000000 0 0x800000>;
+>   			#global-interrupts = <12>;
+> +			#iommu-cells = <1>;
+> +			stream-match-mask = <0x7C00>;
+>   			interrupts = <0 13 4>, /* global secure fault */
+>   				     <0 14 4>, /* combined secure interrupt */
+>   				     <0 15 4>, /* global non-secure fault */
+> @@ -502,7 +507,6 @@
+>   				     <0 204 4>, <0 205 4>,
+>   				     <0 206 4>, <0 207 4>,
+>   				     <0 208 4>, <0 209 4>;
+> -			mmu-masters = <&fsl_mc 0x300 0>;
 
-On 23/06/18 03:20, AKASHI Takahiro wrote:
-> Those image head's flags will be used later by kexec_file loader.
+Since we're in here, is the SMMU itself also coherent? If it is, you 
+probably want to say so and avoid the overhead of pointlessly cleaning 
+cache lines on every page table update.
 
-> diff --git a/arch/arm64/include/asm/boot.h b/arch/arm64/include/asm/boot.h
-> index 355e552a9175..0bab7eed3012 100644
-> --- a/arch/arm64/include/asm/boot.h
-> +++ b/arch/arm64/include/asm/boot.h
-> @@ -5,6 +5,21 @@
->  
->  #include <asm/sizes.h>
->  
-> +#define ARM64_MAGIC		"ARM\x64"
-> +
-> +#define HEAD_FLAG_BE_SHIFT		0
-> +#define HEAD_FLAG_PAGE_SIZE_SHIFT	1
-> +#define HEAD_FLAG_BE_MASK		0x1
-> +#define HEAD_FLAG_PAGE_SIZE_MASK	0x3
-> +
-> +#define HEAD_FLAG_BE			1
-> +#define HEAD_FLAG_PAGE_SIZE_4K		1
-> +#define HEAD_FLAG_PAGE_SIZE_16K		2
-> +#define HEAD_FLAG_PAGE_SIZE_64K		3
+Robin.
 
-These match the linker-script-header kernel/image.h.
-Generating one from the other is something we can do later.
-
-Acked-by: James Morse <james.morse@arm.com>
-
-
-Thanks,
-
-James
+>   		};
+>   
+>   		dspi: dspi at 2100000 {
+> 
