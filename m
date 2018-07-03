@@ -1,123 +1,87 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 3 Jul 2018 12:54:26 +0100
-Subject: [PATCH v3 10/20] kvm: arm64: Dynamic configuration of VTTBR mask
-In-Reply-To: <e0c8dc62-42e8-ee24-5519-e19b2739160b@redhat.com>
-References: <1530270944-11351-1-git-send-email-suzuki.poulose@arm.com>
- <1530270944-11351-11-git-send-email-suzuki.poulose@arm.com>
- <e0c8dc62-42e8-ee24-5519-e19b2739160b@redhat.com>
-Message-ID: <a6fa912a-b2ff-ac1e-0120-b2f7eabb6f7f@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 3 Jul 2018 13:01:50 +0100
+Subject: [PATCH 1/1] mmc: sunxi: Disable irq during pm_suspend
+In-Reply-To: <1530602925-7714-1-git-send-email-stefan@olimex.com>
+References: <1530602925-7714-1-git-send-email-stefan@olimex.com>
+Message-ID: <627d5e40-651a-062c-aac4-742727b23ddb@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
+On 03/07/18 08:28, Stefan Mavrodiev wrote:
+> When mmc host controller enters suspend state, the clocks are
+> disabled, but irqs are not. For some reason the irqchip emmits
 
-On 02/07/18 15:41, Auger Eric wrote:
-> Hi Suzuki,
+Not so much the irqchip, but the device itself.
+
+> false interrupts, which causes system lock loop.
+
+I'm not sure the interrupts are fake. They are indicative of some state
+of the HW...
+
 > 
-> On 06/29/2018 01:15 PM, Suzuki K Poulose wrote:
->> On arm64 VTTBR_EL2:BADDR holds the base address for the stage2
->> translation table. The Arm ARM mandates that the bits BADDR[x-1:0]
->> should be 0, where 'x' is defined for a given IPA Size and the
->> number of levels for a translation granule size. It is defined
->> using some magical constants. This patch is a reverse engineered
->> implementation to calculate the 'x' at runtime for a given ipa and
->> number of page table levels. See patch for more details.
->>
->> Cc: Marc Zyngier <marc.zyngier@arm.com>
->> Cc: Christoffer Dall <cdall@kernel.org>
->> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->> ---
->> Changes since V2:
->>   - Part 1 of spilt from VTCR & VTTBR dynamic configuration
->> ---
->>   arch/arm64/include/asm/kvm_arm.h | 60 +++++++++++++++++++++++++++++++++++++---
->>   arch/arm64/include/asm/kvm_mmu.h | 25 ++++++++++++++++-
->>   2 files changed, 80 insertions(+), 5 deletions(-)
->>
->> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
->> index 3dffd38..c557f45 100644
->> --- a/arch/arm64/include/asm/kvm_arm.h
->> +++ b/arch/arm64/include/asm/kvm_arm.h
->> @@ -140,8 +140,6 @@
->>    * Note that when using 4K pages, we concatenate two first level page tables
->>    * together. With 16K pages, we concatenate 16 first level page tables.
->>    *
->> - * The magic numbers used for VTTBR_X in this patch can be found in Tables
->> - * D4-23 and D4-25 in ARM DDI 0487A.b.
-> Isn't it a pretty old reference? Could you refer to C.a?
+> Debug log is:
+>   ...
+>   sunxi-mmc 1c11000.mmc: setting clk to 52000000, rounded 51200000
+>   sunxi-mmc 1c11000.mmc: enabling the clock
+>   sunxi-mmc 1c11000.mmc: cmd 13(8000014d) arg 10000 ie 0x0000bbc6 len 0
+>   sunxi-mmc 1c11000.mmc: irq: rq (ptrval) mi 00000004 idi 00000000
+>   sunxi-mmc 1c11000.mmc: cmd 6(80000146) arg 3210101 ie 0x0000bbc6 len 0
+>   sunxi-mmc 1c11000.mmc: irq: rq (ptrval) mi 00000004 idi 00000000
+>   sunxi-mmc 1c11000.mmc: cmd 13(8000014d) arg 10000 ie 0x0000bbc6 len 0
+>   sunxi-mmc 1c11000.mmc: irq: rq (ptrval) mi 00000004 idi 00000000
+>   mmc1: new DDR MMC card at address 0001
+>   mmcblk1: mmc1:0001 AGND3R 14.6 GiB
+>   mmcblk1boot0: mmc1:0001 AGND3R partition 1 4.00 MiB
+>   mmcblk1boot1: mmc1:0001 AGND3R partition 2 4.00 MiB
+>   sunxi-mmc 1c11000.mmc: cmd 18(80003352) arg 0 ie 0x0000fbc2 len 409
+>   sunxi-mmc 1c11000.mmc: irq: rq (ptrval) mi 00004000 idi 00000002
+>    mmcblk1: p1
+>   sunxi-mmc 1c11000.mmc: irq: rq   (null) mi 00000000 idi 00000000
+>   sunxi-mmc 1c11000.mmc: irq: rq   (null) mi 00000000 idi 00000000
+>   sunxi-mmc 1c11000.mmc: irq: rq   (null) mi 00000000 idi 00000000
+>   sunxi-mmc 1c11000.mmc: irq: rq   (null) mi 00000000 idi 00000000
+> and so on...
 
-Sure, I will update the references everywhere.
+The clock is off, and yet the thing manages to generate interrupts. Great...
 
->> + *
->> + * The algorithm defines the expectations on the BaseAddress (for the page
->> + * table) bits resolved at each level based on the page size, entry level
->> + * and T0SZ. The variable "x" in the algorithm also affects the VTTBR:BADDR
->> + * for stage2 page table.
->> + *
->> + * The value of "x" is calculated as :
->> + *	x = Magic_N - T0SZ
->> + *
->> + * where Magic_N is an integer depending on the page size and the entry
->> + * level of the page table as below:
->> + *
->> + *	--------------------------------------------
->> + *	| Entry level		|  4K    16K   64K |
->> + *	--------------------------------------------
->> + *	| Level: 0 (4 levels)	| 28   |  -  |  -  |
->> + *	--------------------------------------------
->> + *	| Level: 1 (3 levels)	| 37   | 31  | 25  |
->> + *	--------------------------------------------
->> + *	| Level: 2 (2 levels)	| 46   | 42  | 38  |
->> + *	--------------------------------------------
->> + *	| Level: 3 (1 level)	| -    | 53  | 51  |
->> + *	--------------------------------------------
-> I understand entry level = Lookup level in the table.
+> 
+> This issue apears on eMMC cards, routed on MMC2 slot. The patch is
+> tested with A20-OLinuXino-MICRO/LIME/LIME2 boards.
+> 
+> Fixes: 9a8e1e8cc2c0 ("mmc: sunxi: Add runtime_pm support")
+> Signed-off-by: Stefan Mavrodiev <stefan@olimex.com>
+> ---
+>  drivers/mmc/host/sunxi-mmc.c | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+> index e747259..acae7a8 100644
+> --- a/drivers/mmc/host/sunxi-mmc.c
+> +++ b/drivers/mmc/host/sunxi-mmc.c
+> @@ -1446,6 +1446,7 @@ static int sunxi_mmc_runtime_resume(struct device *dev)
+>  	sunxi_mmc_init_host(host);
+>  	sunxi_mmc_set_bus_width(host, mmc->ios.bus_width);
+>  	sunxi_mmc_set_clk(host, &mmc->ios);
+> +	enable_irq(host->irq);
+>  
+>  	return 0;
+>  }
+> @@ -1455,6 +1456,7 @@ static int sunxi_mmc_runtime_suspend(struct device *dev)
+>  	struct mmc_host	*mmc = dev_get_drvdata(dev);
+>  	struct sunxi_mmc_host *host = mmc_priv(mmc);
+>  
+> +	disable_irq(host->irq);
+>  	sunxi_mmc_reset_host(host);
+>  	sunxi_mmc_disable(host);
+>  
+> 
 
-Entry level => The level at which we start the page table walk for
-a given address (This is in line with the ARM ARM). So,
+For the record, this patch fixes the boot issues I've observed on my
+cubietruck.
 
-Entry_level = (4 - Number_of_Page_table_levels)
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Tested-by: Marc Zyngier <marc.zyngier@arm.com>
 
-> But you may want to compute x for BaseAddress matching lookup level 2
-> with number of levels = 4.
-
-No, the BaseAddress is only calcualted for the "Entry_level". So the
-above case doesn't exist at all.
-
-> So shouldn't you s/Number of levels/4 - entry_level?
-
-Ok, I now understood what you are referring to [0]
-> for BADDR we want the BaseAddr of the initial lookup level so
-> effectively the entry level we are interested in is 4 - number of levels
-> and we don't care or d) condition. At least this is my understanding ;-)
-> If correct you may slightly reword the explanation?
-
-
->> + *
->> + * We have a magic formula for the Magic_N below.
->> + *
->> + *  Magic_N(PAGE_SIZE, Entry_Level) = 64 - ((PAGE_SHIFT - 3) * Number of levels)
-
-[0] ^^^
-
-
-
->> + *
->> + * where number of levels = (4 - Entry_Level).
-
-^^^ Doesn't this help make it clear ? Using the expansion makes it a bit more
-unreadable below.
-
->>   
->> +/*
->> + * Get the magic number 'x' for VTTBR:BADDR of this KVM instance.
->> + * With v8.2 LVA extensions, 'x' should be a minimum of 6 with
->> + * 52bit IPS.
-> Link to the spec?
-
-Sure, will add it.
-
-Thanks for the patience to review :-)
-
-Cheers
-Suzuki
+	M.
+-- 
+Jazz is not dead. It just smells funny...
