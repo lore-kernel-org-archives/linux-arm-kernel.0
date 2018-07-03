@@ -1,25 +1,32 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Tue, 3 Jul 2018 15:33:31 -0700
-Subject: [PATCH v11 1/4] scsi: ufs: add Hisilicon ufs driver code
-In-Reply-To: <20180702093547.39507-2-liwei213@huawei.com>
-References: <20180702093547.39507-1-liwei213@huawei.com>
- <20180702093547.39507-2-liwei213@huawei.com>
-Message-ID: <CALAqxLUMcsAe4mLakRxewtE_9A0mSzxgZR76nCaQQyUt4HZVVA@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 3 Jul 2018 16:45:54 -0600
+Subject: [RFC PATCH v2 6/6] dt-bindings: spi: QuadSPI driver for Atmel
+ SAMA5D2
+In-Reply-To: <20180627131609.13681-7-bugalski.piotr@gmail.com>
+References: <20180627131609.13681-1-bugalski.piotr@gmail.com>
+ <20180627131609.13681-7-bugalski.piotr@gmail.com>
+Message-ID: <20180703224554.GA13754@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 2, 2018 at 2:35 AM, Li Wei <liwei213@huawei.com> wrote:
-> add Hisilicon ufs driver code.
->
-> Signed-off-by: Li Wei <liwei213@huawei.com>
-> Signed-off-by: Geng Jianfeng <gengjianfeng@hisilicon.com>
-> Signed-off-by: Zang Leigang <zangleigang@hisilicon.com>
-> Signed-off-by: Yu Jianfeng <steven.yujianfeng@hisilicon.com>
+On Wed, Jun 27, 2018 at 03:16:09PM +0200, Piotr Bugalski wrote:
+> Atmel SAMA5D2 QuadSPI driver was moved from mtd to spi subsystem,
+> this change is just moving DT-binding documentation.
+> 
+> Suggested-by: Boris Brezillon <boris.brezillon@bootlin.com>
+> Signed-off-by: Piotr Bugalski <pbu@cryptera.com>
+> ---
+>  Documentation/devicetree/bindings/{mtd => spi}/atmel-quadspi.txt | 0
+>  1 file changed, 0 insertions(+), 0 deletions(-)
+>  rename Documentation/devicetree/bindings/{mtd => spi}/atmel-quadspi.txt (100%)
 
-Tested-by: John Stultz <john.stultz@linaro.org>
+Acked-by: Rob Herring <robh@kernel.org>
 
-So this patchset has been floating around for over a year now. Can I
-nudge someone to pick it up?
-
-thanks
--john
+> 
+> diff --git a/Documentation/devicetree/bindings/mtd/atmel-quadspi.txt b/Documentation/devicetree/bindings/spi/atmel-quadspi.txt
+> similarity index 100%
+> rename from Documentation/devicetree/bindings/mtd/atmel-quadspi.txt
+> rename to Documentation/devicetree/bindings/spi/atmel-quadspi.txt
+> -- 
+> 2.11.0
+> 
