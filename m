@@ -1,101 +1,45 @@
-From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Tue,  3 Jul 2018 22:39:16 +0300
-Subject: [RFC] soc: imx: gpc: Unregister pgc children on remove
-Message-ID: <652cc0c045dbd4490752ef117e98ffbcc84de822.1530646251.git.leonard.crestez@nxp.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 3 Jul 2018 21:43:23 +0200
+Subject: [PATCH] dma: ste_dma40: Remove VLA usage
+In-Reply-To: <CAMuHMdUWATshtf8PX+QxwrOHaXt60j2e_GYx=L-UbWjYVL80yA@mail.gmail.com>
+References: <20180629185107.GA37488@beast>
+ <CAK8P3a30Q1ezvCWfudUY=z1q3NHdrkbwRsmSDso4s7TifQAmNQ@mail.gmail.com>
+ <CACRpkdYbmu_Y6N1G3M3q3M=3ZaECFdgije6Qgwoo6qra4g06_A@mail.gmail.com>
+ <CAMuHMdUWATshtf8PX+QxwrOHaXt60j2e_GYx=L-UbWjYVL80yA@mail.gmail.com>
+Message-ID: <CAK8P3a13um6=hNz1EFNTCPA5Be2nH8Y1bD26cOry3GmFw8astA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the gpc device is removed the platform_devices for its
-imx-pgc-power-domains are still registered and trying to probe gpc again
-results in an error.
+On Mon, Jul 2, 2018 at 5:28 PM, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+> On Mon, Jul 2, 2018 at 4:22 PM Linus Walleij <linus.walleij@linaro.org> wrote:
+>> On Fri, Jun 29, 2018 at 11:22 PM Arnd Bergmann <arnd@arndb.de> wrote:
+>>
+>> > - Nobody uses this driver in practice, as the hardware platform
+>> >   was a dead end
+>>
+>> Depends what you mean with dead end.
+>>
+>> The hardware was deployed in a few million handsets from Samsung
+>> and Sony.
+>>
+>> Some have been picked up as targets for PostmarketOS:
+>> https://wiki.postmarketos.org/wiki/Samsung_Galaxy_S_Advance_(samsung-i9070)
+>> https://wiki.postmarketos.org/wiki/Samsung_Galaxy_SIII_mini_(samsung-i8190)
+>>
+>> So it is no more dead end than anything else discontinued, and it
+>> has a living community who want it suppored by the mainline
+>> kernel if possible.
 
-Fix this by iterating children inside imx_gpc_remove and calling
-platfrom_device_unregister.
+I meant that when ST-Ericsson imploded, STMicroelectronics inherited the
+SoC family but never did any follow-up chips. We only really ever supported the
+original U8500 but not the later models (which have partial support), and that
+is very unlikely to change, so all the devices that can run this
+driver are already
+known. This is only relevant because the dynamic allocation size depends on
+the chip model.
 
-Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
----
- drivers/soc/imx/gpc.c | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+> Mixup with SuperH-based ST40?
 
-This was prompted by the rejection of the following series:
-	https://lkml.org/lkml/2018/7/2/534
+No, but I wouldn't be surprised to find an ST40 inside the D40 engine ;-)
 
-Tested glxgears after rebinding gpc and etnaviv by echo to
-/sys/bus/platform/drivers/{imx-gpc,etnaviv-gpu}/{unbind,bind}
-
-When doing probe again it triggers a warning inside
-driver_links_drivers_bound:
-
-	WARN_ON(link->status != DL_STATE_CONSUMER_PROBE);
-
-This seems to be because devicelink code does not expect consumers to
-bind before suppliers but GPC code adds PGC children during its
-probe function and they register a device-link to their still-probing
-parent.
-
-The warning doesn't trigger on normal boot because the pgc driver is
-registered after gpc and probing is not nested. The warning can be made
-to reproduce in a normal boot by making imx_gpc_probe return
--EPROBE_DEFER once (no other changes required).
-
-This does not seem to be a valid scenario for device links so fix this
-by adding a check in imx_pgc_power_domain_probe to defer if parent is not
-probed.
-
-This check is not very nice, device_is_bound seems like something that
-should be internal to the driver core.
-
-diff --git a/drivers/soc/imx/gpc.c b/drivers/soc/imx/gpc.c
-index 32f0748fd067..b4acdfd3cffd 100644
---- a/drivers/soc/imx/gpc.c
-+++ b/drivers/soc/imx/gpc.c
-@@ -182,10 +182,13 @@ static int imx_pgc_power_domain_probe(struct platform_device *pdev)
- {
- 	struct imx_pm_domain *domain = pdev->dev.platform_data;
- 	struct device *dev = &pdev->dev;
- 	int ret;
- 
-+	if (!device_is_bound(dev->parent))
-+		return -EPROBE_DEFER;
-+
- 	/* if this PD is associated with a DT node try to parse it */
- 	if (dev->of_node) {
- 		ret = imx_pgc_parse_dt(dev, domain);
- 		if (ret)
- 			return ret;
-@@ -475,10 +478,19 @@ static int imx_gpc_probe(struct platform_device *pdev)
- 	}
- 
- 	return 0;
- }
- 
-+static int __imx_gpc_unregister_child(struct device *dev, void *data)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+
-+	platform_device_unregister(pdev);
-+
-+	return 0;
-+}
-+
- static int imx_gpc_remove(struct platform_device *pdev)
- {
- 	struct device_node *pgc_node;
- 	int ret;
- 
-@@ -502,10 +514,13 @@ static int imx_gpc_remove(struct platform_device *pdev)
- 		imx_pgc_put_clocks(&imx_gpc_domains[GPC_PGC_DOMAIN_PU]);
- 
- 		ret = pm_genpd_remove(&imx_gpc_domains[GPC_PGC_DOMAIN_ARM].base);
- 		if (ret)
- 			return ret;
-+	} else {
-+		device_for_each_child(&pdev->dev, NULL,
-+				__imx_gpc_unregister_child);
- 	}
- 
- 	return 0;
- }
- 
--- 
-2.17.1
+      Arnd
