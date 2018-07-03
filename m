@@ -1,92 +1,87 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 3 Jul 2018 15:50:22 +0100
-Subject: [RFC net-next 15/15] net: lora: Add Semtech SX1301
-In-Reply-To: <4e06cc72-2092-70f3-c801-bf6e4c3cbec2@suse.de>
-References: <20180701110804.32415-1-afaerber@suse.de>
- <20180701110804.32415-16-afaerber@suse.de>
- <20180702161258.GA18744@sirena.org.uk>
- <4e06cc72-2092-70f3-c801-bf6e4c3cbec2@suse.de>
-Message-ID: <20180703145022.GA13744@sirena.org.uk>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Tue, 3 Jul 2018 16:54:52 +0200
+Subject: [PATCH 1/1] mmc: sunxi: Disable irq during pm_suspend
+In-Reply-To: <1530602925-7714-1-git-send-email-stefan@olimex.com>
+References: <1530602925-7714-1-git-send-email-stefan@olimex.com>
+Message-ID: <20180703145452.o2zbchnnvncpvwfj@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 02, 2018 at 07:34:21PM +0200, Andreas F?rber wrote:
-> Hi Mark,
+Hi Stefan,
+
+On Tue, Jul 03, 2018 at 10:28:43AM +0300, Stefan Mavrodiev wrote:
+> When mmc host controller enters suspend state, the clocks are
+> disabled, but irqs are not. For some reason the irqchip emmits
+> false interrupts, which causes system lock loop.
 > 
-> This driver is still evolving, there's newer code on my lora-next branch
-> already: https://github.com/afaerber/linux/commits/lora-next
+> Debug log is:
+>   ...
+>   sunxi-mmc 1c11000.mmc: setting clk to 52000000, rounded 51200000
+>   sunxi-mmc 1c11000.mmc: enabling the clock
+>   sunxi-mmc 1c11000.mmc: cmd 13(8000014d) arg 10000 ie 0x0000bbc6 len 0
+>   sunxi-mmc 1c11000.mmc: irq: rq (ptrval) mi 00000004 idi 00000000
+>   sunxi-mmc 1c11000.mmc: cmd 6(80000146) arg 3210101 ie 0x0000bbc6 len 0
+>   sunxi-mmc 1c11000.mmc: irq: rq (ptrval) mi 00000004 idi 00000000
+>   sunxi-mmc 1c11000.mmc: cmd 13(8000014d) arg 10000 ie 0x0000bbc6 len 0
+>   sunxi-mmc 1c11000.mmc: irq: rq (ptrval) mi 00000004 idi 00000000
+>   mmc1: new DDR MMC card at address 0001
+>   mmcblk1: mmc1:0001 AGND3R 14.6 GiB
+>   mmcblk1boot0: mmc1:0001 AGND3R partition 1 4.00 MiB
+>   mmcblk1boot1: mmc1:0001 AGND3R partition 2 4.00 MiB
+>   sunxi-mmc 1c11000.mmc: cmd 18(80003352) arg 0 ie 0x0000fbc2 len 409
+>   sunxi-mmc 1c11000.mmc: irq: rq (ptrval) mi 00004000 idi 00000002
+>    mmcblk1: p1
+>   sunxi-mmc 1c11000.mmc: irq: rq   (null) mi 00000000 idi 00000000
+>   sunxi-mmc 1c11000.mmc: irq: rq   (null) mi 00000000 idi 00000000
+>   sunxi-mmc 1c11000.mmc: irq: rq   (null) mi 00000000 idi 00000000
+>   sunxi-mmc 1c11000.mmc: irq: rq   (null) mi 00000000 idi 00000000
+> and so on...
+> 
+> This issue apears on eMMC cards, routed on MMC2 slot. The patch is
+> tested with A20-OLinuXino-MICRO/LIME/LIME2 boards.
+> 
+> Fixes: 9a8e1e8cc2c0 ("mmc: sunxi: Add runtime_pm support")
+> Signed-off-by: Stefan Mavrodiev <stefan@olimex.com>
 
-Please don't top post, reply in line with needed context.  This allows
-readers to readily follow the flow of conversation and understand what
-you are talking about and also helps ensure that everything in the
-discussion is being addressed.
+Thanks a lot for figuring this out, I have a (very) minor comment though..
 
-> 2) This SPI device is in turn exposing the two SPI masters that you
-> already found below, and I didn't see a sane way to split that code out
-> into drivers/spi/, so it's in drivers/net/lora/ here - has there been
-> any precedence either way?
+> ---
+>  drivers/mmc/host/sunxi-mmc.c | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+> index e747259..acae7a8 100644
+> --- a/drivers/mmc/host/sunxi-mmc.c
+> +++ b/drivers/mmc/host/sunxi-mmc.c
+> @@ -1446,6 +1446,7 @@ static int sunxi_mmc_runtime_resume(struct device *dev)
+>  	sunxi_mmc_init_host(host);
+>  	sunxi_mmc_set_bus_width(host, mmc->ios.bus_width);
+>  	sunxi_mmc_set_clk(host, &mmc->ios);
+> +	enable_irq(host->irq);
+>  
+>  	return 0;
+>  }
+> @@ -1455,6 +1456,7 @@ static int sunxi_mmc_runtime_suspend(struct device *dev)
+>  	struct mmc_host	*mmc = dev_get_drvdata(dev);
+>  	struct sunxi_mmc_host *host = mmc_priv(mmc);
+>  
+> +	disable_irq(host->irq);
 
-A MFD?
+Can you add a comment there stating why we need them in the first
+place (which is basically what you described) so that it's obvious for
+anyone editing it.
 
-> Am 02.07.2018 um 18:12 schrieb Mark Brown:
-> > On Sun, Jul 01, 2018 at 01:08:04PM +0200, Andreas F?rber wrote:
+Thanks!
+Maxime
 
-> >> +static void sx1301_radio_spi_set_cs(struct spi_device *spi, bool enable)
-> >> +{
-> >> +	int ret;
-> >> +
-> >> +	dev_dbg(&spi->dev, "setting SPI CS to %s\n", enable ? "1" : "0");
-> >> +
-> >> +	if (enable)
-> >> +		return;
-
-> > So we never disable chip select?
-
-> Not here, I instead did that in transfer_one below.
-
-That's obviously at best going to be fragile, you're implementing half
-the operation here and half somewhere else which is most likely going to
-break at some point when the framework changes.
-
-> >> +		if (ret) {
-> >> +			dev_err(&spi->dev, "SPI radio address write failed\n");
-> >> +			return ret;
-> >> +		}
-> >> +
-> >> +		ret = sx1301_write(ssx->parent, ssx->regs + REG_RADIO_X_DATA, (tx_buf && xfr->len >= 2) ? tx_buf[1] : 0);
-> >> +		if (ret) {
-> >> +			dev_err(&spi->dev, "SPI radio data write failed\n");
-> >> +			return ret;
-> >> +		}
-
-> > This looks awfully like you're coming in at the wrong abstraction layer
-> > and the hardware actually implements a register abstraction rather than
-> > a SPI one so you should be using regmap as the abstraction.
-
-> I don't understand. Ben has suggested using regmap for the SPI _device_
-> that we're talking to, which may be a good idea. But this SX1301 device
-> in turn has two SPI _masters_ talking to an SX125x slave each. I don't
-> see how using regmap instead of my wrappers avoids this spi_controller?
-
-It seems obvious from the code that this isn't actually interacting with
-a SPI controller, you're writing an address and a value to a register
-map rather than dealing with a byte stream.  There may be a SPI bus
-somewhere behind some other hardware but you don't seem to be
-interacting with it as such.
-
-> The whole point of this spi_controller is to abstract and separate the
-> SX1255 vs. SX1257 vs. whatever-radio-attached into a separate driver,
-> instead of mixing it into the SX1301 driver - to me that looks cleaner
-> and more extensible. It also has the side-effect that we could configure
-> the two radios via DT (frequencies, clk output, etc.).
-
-A register map would work just as well here, we already have plenty of
-devices that abstract at this level (most obviously the I2C/SPI devices
-that use it to offer both interfaces with a single core driver).
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 488 bytes
+Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180703/3ba28a7e/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180703/1fd0b70d/attachment-0001.sig>
