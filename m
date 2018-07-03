@@ -1,56 +1,63 @@
-From: codrin.ciubotariu@microchip.com (Codrin Ciubotariu)
-Date: Tue, 3 Jul 2018 17:56:31 +0300
-Subject: [PATCH 2/2] ASoC: atmel-i2s: dt-bindings: Remove unnecessary phandle
- to aclk
-In-Reply-To: <20180703145631.15246-1-codrin.ciubotariu@microchip.com>
-References: <20180703145631.15246-1-codrin.ciubotariu@microchip.com>
-Message-ID: <20180703145631.15246-3-codrin.ciubotariu@microchip.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 3 Jul 2018 07:46:34 -0700
+Subject: [PATCH 12/15] arm: dts: highbank: Add missing OPP properties for
+ CPUs
+In-Reply-To: <20180703041321.k2ewqta76cnqhsmm@vireshk-i7>
+References: <cover.1527244200.git.viresh.kumar@linaro.org>
+ <f8a4e5c3062397736475ec599de730206846cb9b.1527244201.git.viresh.kumar@linaro.org>
+ <CAL_JsqJRKMREfJ8LoDfuda8BU3g5Eq1AX5cPZGzO3uN3vUhrAQ@mail.gmail.com>
+ <20180702232735.eocdrdfwyj37577h@localhost>
+ <20180703041321.k2ewqta76cnqhsmm@vireshk-i7>
+Message-ID: <CAOesGMjtFSVg1yu-9TAxXTTtvzGaUGn6P9-hnK5XrgHVFVHDOQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The optional clock phandle to aclk (Audio PLL clock) is no longer needed
-by the driver.
+On Mon, Jul 2, 2018 at 9:13 PM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> On 02-07-18, 16:27, Olof Johansson wrote:
+>> On Mon, Jul 02, 2018 at 02:25:40PM -0600, Rob Herring wrote:
+>> > On Fri, May 25, 2018 at 4:32 AM Viresh Kumar <viresh.kumar@linaro.org> wrote:
+>> > >
+>> > > The OPP properties, like "operating-points", should either be present
+>> > > for all the CPUs of a cluster or none. If these are present only for a
+>> > > subset of CPUs of a cluster then things will start falling apart as soon
+>> > > as the CPUs are brought online in a different order. For example, this
+>> > > will happen because the operating system looks for such properties in
+>> > > the CPU node it is trying to bring up, so that it can create an OPP
+>> > > table.
+>> > >
+>> > > Add such missing properties.
+>> > >
+>> > > Fix other missing property (clock latency) as well to make it all
+>> > > work.
+>> > >
+>> > > Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+>> > > ---
+>> > >  arch/arm/boot/dts/highbank.dts | 30 ++++++++++++++++++++++++++++++
+>> > >  1 file changed, 30 insertions(+)
+>> >
+>> > Acked-by: Rob Herring <robh@kernel.org>
+>> >
+>> > ARM-SOC maintainers, Please apply this.
+>>
+>> Applied to next/dt.
+>
+> Thanks Olof.
+>
+> Can you also apply other patches in this series, that haven't been
+> applied yet by SoC maintainers ? And same for the arm64 series..
 
-Signed-off-by: Codrin Ciubotariu <codrin.ciubotariu@microchip.com>
----
- Documentation/devicetree/bindings/sound/atmel-i2s.txt | 11 +++++------
- 1 file changed, 5 insertions(+), 6 deletions(-)
+This is the kind of patch that should be applied by the maintainers
+for active platforms, where they have systems to test with and can
+make sure you haven't regressed something on them.
 
-diff --git a/Documentation/devicetree/bindings/sound/atmel-i2s.txt b/Documentation/devicetree/bindings/sound/atmel-i2s.txt
-index 735368b8a73f..40549f496a81 100644
---- a/Documentation/devicetree/bindings/sound/atmel-i2s.txt
-+++ b/Documentation/devicetree/bindings/sound/atmel-i2s.txt
-@@ -15,7 +15,6 @@ Required properties:
- - clock-names:    Should be one of each entry matching the clocks phandles list:
-                   - "pclk" (peripheral clock) Required.
-                   - "gclk" (generated clock) Optional (1).
--                  - "aclk" (Audio PLL clock) Optional (1).
-                   - "muxclk" (I2S mux clock) Optional (1).
- 
- Optional properties:
-@@ -23,9 +22,9 @@ Optional properties:
- - princtrl-names: Should contain only one value - "default".
- 
- 
--(1) : Only the peripheral clock is required. The generated clock, the Audio
--      PLL clock adn the I2S mux clock are optional and should only be set
--      together, when Master Mode is required.
-+(1) : Only the peripheral clock is required. The generated clock and the I2S
-+      mux clock are optional and should only be set together, when Master Mode
-+      is required.
- 
- Example:
- 
-@@ -40,8 +39,8 @@ Example:
- 			(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
- 			 AT91_XDMAC_DT_PERID(32))>;
- 		dma-names = "tx", "rx";
--		clocks = <&i2s0_clk>, <&i2s0_gclk>, <&audio_pll_pmc>, <&i2s0muxck>;
--		clock-names = "pclk", "gclk", "aclk", "muxclk";
-+		clocks = <&i2s0_clk>, <&i2s0_gclk>, <&i2s0muxck>;
-+		clock-names = "pclk", "gclk", "muxclk";
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&pinctrl_i2s0_default>;
- 	};
--- 
-2.17.1
+For very low patch rate platforms we can apply directly through
+maintainer acks, like in this case.
+
+So, my recommendation is to repost the series to the maintainers.
+Please don't patchbomb arm at kernel.org though, so keep us off of cc by
+default (you can add our individual addresses if you want).
+
+
+Thanks,
+
+-Olof
