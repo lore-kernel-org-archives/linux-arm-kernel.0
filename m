@@ -1,75 +1,34 @@
-From: james.morse@arm.com (James Morse)
-Date: Tue, 3 Jul 2018 18:47:38 +0100
-Subject: [PATCH v10 13/14] arm64: kexec_file: add kernel signature
- verification support
-In-Reply-To: <20180623022058.10935-14-takahiro.akashi@linaro.org>
-References: <20180623022058.10935-1-takahiro.akashi@linaro.org>
- <20180623022058.10935-14-takahiro.akashi@linaro.org>
-Message-ID: <ff77f2d9-82c6-8fbb-3696-e1fcfd61c333@arm.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 3 Jul 2018 09:47:59 -0700
+Subject: i.MX fixes for 4.18, round 2
+In-Reply-To: <20180703134422.GV4348@dragon>
+References: <20180703134422.GV4348@dragon>
+Message-ID: <20180703164759.6ljtckniqhyfh6di@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Akashi,
-
-On 23/06/18 03:20, AKASHI Takahiro wrote:
-> With this patch, kernel verification can be done without IMA security
-> subsystem enabled. Turn on CONFIG_KEXEC_VERIFY_SIG instead.
+On Tue, Jul 03, 2018 at 09:44:23PM +0800, Shawn Guo wrote:
+> The following changes since commit 1bcfe0564044be578841744faea1c2f46adc8178:
 > 
-> On x86, a signature is embedded into a PE file (Microsoft's format) header
-> of binary. Since arm64's "Image" can also be seen as a PE file as far as
-> CONFIG_EFI is enabled, we adopt this format for kernel signing.
+>   ARM: dts: imx6sx: fix irq for pcie bridge (2018-06-19 14:39:36 +0800)
 > 
-> You can create a signed kernel image with:
->     $ sbsign --key ${KEY} --cert ${CERT} Image
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-fixes-4.18-2
+> 
+> for you to fetch changes up to 2ceb2780b790b74bc408a949f6aedbad8afa693e:
+> 
+>   ARM: imx_v4_v5_defconfig: Select ULPI support (2018-07-03 21:12:04 +0800)
+> 
+> ----------------------------------------------------------------
+> i.MX fixes for 4.18, round 2:
+>  - A couple of imx defconfig updates selecting USB ULPI support to fix
+>    a regression seen with USB driver, which is caused by commit
+>    03e6275ae381 ("usb: chipidea: Fix ULPI on imx51").
+>  - A fix on imx51-zii-rdu1 board touchscreen pinctrl setting, which
+>    causes an interrupt storm.
 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index f68318f61c85..5133c22a01ab 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -845,6 +845,30 @@ config KEXEC_FILE
->  	  for kernel and initramfs as opposed to list of segments as
->  	  accepted by previous system call.
->  
-> +config KEXEC_VERIFY_SIG
-> +	bool "Verify kernel signature during kexec_file_load() syscall"
-> +	depends on KEXEC_FILE
-> +	help
-> +	  Select this option to verify a signature with loaded kernel
-> +	  image. If configured, any attempt of loading a image without
-> +	  valid signature will fail.
-> +
-> +	  In addition to that option, you need to enable signature
-> +	  verification for the corresponding kernel image type being
-> +	  loaded in order for this to work.
-> +
-> +config KEXEC_IMAGE_VERIFY_SIG
-> +	bool "Enable Image signature verification support"
-> +	default y
-> +	depends on KEXEC_VERIFY_SIG
-> +	depends on EFI && SIGNED_PE_FILE_VERIFICATION
-> +	help
-> +	  Enable Image signature verification support.
-> +
-> +comment "Image signature verification is missing yet"
-> +	depends on KEXEC_VERIFY_SIG
-> +	depends on !EFI || !SIGNED_PE_FILE_VERIFICATION
+Merged, thanks!
 
 
-This comment thing is a good idea, but its also a bit confusing... it took me
-quite a while to work out what was missing. Could we phrase it something like:
-"Support for PE file signature verification disabled!"
-This tells us its about PE files, and its probably a missing config option
-somewhere, not some code that hasn't been written yet. (which was my first
-assumption!).
-
-KEXEC_VERIFY_SIG presumably turns on just the IMA verification, which verifies
-the Image, but not in the same way as KEXEC_IMAGE_VERIFY_SIG.... (if I've
-understood it properly) Is there any reason to have these as separate enables?
-Couldn't we 'select SIGNED_PE_FILE_VERIFICATION if EFI' in KEXEC_VERIFY_SIG?
-This would mean there is one option to verify signatures, instead of two...
-(does it really depend on EFI?)
-
-
-Thanks,
-
-James
+-Olof
