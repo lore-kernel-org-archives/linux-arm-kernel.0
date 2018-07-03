@@ -1,291 +1,98 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 3 Jul 2018 14:30:48 -0600
-Subject: [PATCH 5/6] perf/core: Use ioctl to communicate driver
- configuration to kernel
-In-Reply-To: <20180703100348.fy43f4fosw3fdc6i@um.fi.intel.com>
-References: <1530570810-28929-1-git-send-email-mathieu.poirier@linaro.org>
- <1530570810-28929-6-git-send-email-mathieu.poirier@linaro.org>
- <20180703100348.fy43f4fosw3fdc6i@um.fi.intel.com>
-Message-ID: <CANLsYkxpLyqN76KQ3VyLq8H27hLsHxLy+zZA1xRyUXGXwx42AA@mail.gmail.com>
+From: erik.schmauss@intel.com (Schmauss, Erik)
+Date: Tue, 3 Jul 2018 20:31:35 +0000
+Subject: 4.18rc3 TX2 boot failure with "ACPICA: AML parser: attempt to
+ continue loading table after error"
+In-Reply-To: <CAJZ5v0j+9QOw1s3W07QRPDRydsdw7uSAgpvOwF_5302+zeViOg@mail.gmail.com>
+References: <c49a3666-7d23-6a05-703c-1273d79a00cd@arm.com>
+ <CAJZ5v0h5+O8xf_EqRPfdvtjQ7BvxLp8veaxB-7WsD8wq7RUFpA@mail.gmail.com>
+ <9a9ef2bc-a66f-2af7-8766-b74426f062a6@arm.com>
+ <CAJZ5v0j+9QOw1s3W07QRPDRydsdw7uSAgpvOwF_5302+zeViOg@mail.gmail.com>
+Message-ID: <CF6A88132359CE47947DB4C6E1709ED53BB365F0@ORSMSX110.amr.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alex,
 
-On Tue, 3 Jul 2018 at 04:03, Alexander Shishkin
-<alexander.shishkin@linux.intel.com> wrote:
->
-> On Mon, Jul 02, 2018 at 04:33:29PM -0600, Mathieu Poirier wrote:
-> > This patch follows what has been done for filters by adding an ioctl()
-> > option to communicate to the kernel arbitrary PMU specific configuration
-> > that don't fit in the conventional struct perf_event_attr to the kernel.
->
-> Ok, so what *is* the PMU specific configuration that doesn't fit in the
-> attribute and needs to be re-configured by the driver using the generation
-> tracking?
->
 
-In this patchset I'm am after the specification of sink information
-for each event, i.e what sink a CPU is supposed to use for the
-session.  I simply don't see putting something that PMU specific in
-the generic perf_event_attr structure.  I also intend to use the same
-ioctl mechanism to communicate complex tracer configuration for
-sequencers, counters and input events.  I don't see a nice way of
-doing that from the perf_event_attr, and that is even without thinking
-about the different flavours of tracers out there, all with their own
-features.
+> -----Original Message-----
+> From: linux-acpi-owner at vger.kernel.org [mailto:linux-acpi-
+> owner at vger.kernel.org] On Behalf Of Rafael J. Wysocki
+> Sent: Tuesday, July 3, 2018 12:52 AM
+> To: Jeremy Linton <jeremy.linton@arm.com>
+> Cc: Rafael J. Wysocki <rafael@kernel.org>; Schmauss, Erik
+> <erik.schmauss@intel.com>; linux-acpi at vger.kernel.org; linux-
+> kernel at vger.kernel.org; Rafael J . Wysocki <rjw@rjwysocki.net>; linux-arm-
+> kernel at lists.infradead.org; Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Subject: Re: 4.18rc3 TX2 boot failure with "ACPICA: AML parser: attempt to
+> continue loading table after error"
+> 
+> On Tue, Jul 3, 2018 at 12:30 AM, Jeremy Linton <jeremy.linton@arm.com>
+> wrote:
+> > Hi,
+> >
+> > On 07/02/2018 04:52 PM, Rafael J. Wysocki wrote:
+> >>
+> >> On Mon, Jul 2, 2018 at 11:41 PM, Jeremy Linton
+> >> <jeremy.linton@arm.com>
+> >> wrote:
+> >>>
+> >>> Hi,
+> >>>
+> >>> I'm experiencing two problems with commit 5088814a6e931 which is
+> "ACPICA:
+> >>> AML parser: attempt to continue loading table after error"
+> >>>
+> >>> The first is this boot failure on a thunderX2:
+> >>>
+> >>> [   10.770098] ACPI Error: Ignore error and continue table load
+> >>> (20180531/psobject-604)
+> >>>      [   10.777926] Unable to handle kernel NULL pointer dereference at
+> >>>      [   10.950199] Call trace:
+> >>>
+> >>>      [   10.952663]  acpi_ps_peek_opcode+0x1c/0x40
+> >>>      [   10.956797]  acpi_ps_create_op+0x54/0x278
+> >>>      [   10.960842]  acpi_ps_parse_loop+0x1b4/0x6c8
+> >>>      [   10.965063]  acpi_ps_parse_aml+0xe0/0x2b4
+> >>>      [   10.969108]  acpi_ps_execute_table+0xa0/0x104
+> >>>      [   10.973505]  acpi_ns_execute_table+0x120/0x194
+> >>>      [   10.977989]  acpi_ns_parse_table+0x34/0x68
+> >>>      [   10.982122]  acpi_ns_load_table+0x4c/0xbc
+> >>>      [   10.986169]  acpi_tb_load_namespace+0x1d4/0x240
+> >>>      [   10.990744]  acpi_load_tables+0x50/0xbc
+> >>>      [   10.994614]  acpi_init+0xb8/0x374
+> >>>      [   10.997959]  do_one_initcall+0x54/0x208
+> >>>      [   11.001829]  kernel_init_freeable+0x224/0x300
+> >>>      [   11.006229]  kernel_init+0x18/0x118
+> >>>      [   11.009747]  ret_from_fork+0x10/0x18
+> >>>      [   11.013354] Code: aa0003f3 aa1e03e0 d503201f f9400661 (39400020)
+> >>>      [   11.019535] ---[ end trace 2bd8068593cf8acc ]---
+> >>>      [   11.024195] Kernel panic - not syncing: Fatal exception
+> >>>      [   11.029488] SMP: stopping secondary CPUs
+> >>>      [   11.033480] ---[ end Kernel panic - not syncing: Fatal exception
+> >>> ]---
+> >>>
+> >>> Which does appear to be the result of some bad data in the table,
+> >>> but it was working with 4.17, and reverting this commit solves the
+> >>> problem.
+> >>
+> >>
+> >> But this commit fixes another regression which was more widespread.
+> >>
+> >> Apparently, we can't work around all of the errors in the tables out
+> >> there at the same time. :-/
+> >
+> >
+> > NP, Let me see if I can come up with a way to harden the
+> > parse_loop/create_op code enough that it doesn't crash the machine.
+> 
+> Sure.  I'll look at it too.
 
-I've looked around and the only clean way I found to support this is
-via an ioctl().  That way each tracer can easily identify the sink it
-should be using without smearing the perf_event_attr structure.  I
-would be happy to explore a different avenue should you think of
-something.
+I it looks like there are error cases that have yet to be implemented...
+Jeremy, could send an ACPI dump of this thunderX2 machine?
 
 Thanks,
-Mathieu
+Erik
 
-> > Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-> > ---
-> >  include/linux/perf_event.h |  54 ++++++++++++++++++++++
-> >  kernel/events/core.c       | 110 +++++++++++++++++++++++++++++++++++++++++++++
-> >  2 files changed, 164 insertions(+)
-> >
-> > diff --git a/include/linux/perf_event.h b/include/linux/perf_event.h
-> > index 4d9c8f30ca6c..6e06b63c262f 100644
-> > --- a/include/linux/perf_event.h
-> > +++ b/include/linux/perf_event.h
-> > @@ -178,6 +178,12 @@ struct hw_perf_event {
-> >       /* Last sync'ed generation of filters */
-> >       unsigned long                   addr_filters_gen;
-> >
-> > +     /* PMU driver configuration */
-> > +     void                            *drv_config;
-> > +
-> > +     /* Last sync'ed generation of driver config */
-> > +     unsigned long                   drv_config_gen;
-> > +
-> >  /*
-> >   * hw_perf_event::state flags; used to track the PERF_EF_* state.
-> >   */
-> > @@ -447,6 +453,26 @@ struct pmu {
-> >        * Filter events for PMU-specific reasons.
-> >        */
-> >       int (*filter_match)             (struct perf_event *event); /* optional */
-> > +
-> > +     /*
-> > +      * Valiate complex PMU configuration that don't fit in the
-> > +      * perf_event_attr struct.  Returns a PMU specific pointer or an error
-> > +      * value < 0.
-> > +      *
-> > +      * As with addr_filters_validate(), runs in the context of the ioctl()
-> > +      * process and is not serialized with the rest of the PMU callbacks.
->
-> Yes, but what is it? I get it that it's probably in one of the other
-> patches, but we still need to mention it somewhere here.
->
-> > +      */
-> > +     void *(*drv_config_validate)    (struct perf_event *event,
-> > +                                      char *config_str);
-> > +
-> > +     /* Synchronize PMU driver configuration */
-> > +     void (*drv_config_sync)         (struct perf_event *event);
-> > +
-> > +     /*
-> > +      * Release PMU specific configuration acquired by
-> > +      * drv_config_validate()
-> > +      */
-> > +     void (*drv_config_free)         (void *drv_data);
-> >  };
-> >
-> >  enum perf_addr_filter_action_t {
-> > @@ -489,6 +515,11 @@ struct perf_addr_filters_head {
-> >       unsigned int            nr_file_filters;
-> >  };
-> >
-> > +struct perf_drv_config {
-> > +     void            *drv_config;
-> > +     raw_spinlock_t  lock;
-> > +};
-> > +
-> >  /**
-> >   * enum perf_event_state - the states of a event
-> >   */
-> > @@ -668,6 +699,10 @@ struct perf_event {
-> >       unsigned long                   *addr_filters_offs;
-> >       unsigned long                   addr_filters_gen;
-> >
-> > +     /* PMU driver specific configuration */
-> > +     struct perf_drv_config          drv_config;
-> > +     unsigned long                   drv_config_gen;
-> > +
-> >       void (*destroy)(struct perf_event *);
-> >       struct rcu_head                 rcu_head;
-> >
-> > @@ -1234,6 +1269,13 @@ static inline bool has_addr_filter(struct perf_event *event)
-> >       return event->pmu->nr_addr_filters;
-> >  }
-> >
-> > +static inline bool has_drv_config(struct perf_event *event)
-> > +{
-> > +     return event->pmu->drv_config_validate &&
-> > +            event->pmu->drv_config_sync &&
-> > +            event->pmu->drv_config_free;
-> > +}
-> > +
-> >  /*
-> >   * An inherited event uses parent's filters
-> >   */
-> > @@ -1248,7 +1290,19 @@ perf_event_addr_filters(struct perf_event *event)
-> >       return ifh;
-> >  }
-> >
-> > +static inline struct perf_drv_config *
-> > +perf_event_get_drv_config(struct perf_event *event)
-> > +{
-> > +     struct perf_drv_config *cfg = &event->drv_config;
-> > +
-> > +     if (event->parent)
-> > +             cfg = &event->parent->drv_config;
-> > +
-> > +     return cfg;
-> > +}
-> > +
-> >  extern void perf_event_addr_filters_sync(struct perf_event *event);
-> > +extern void perf_event_drv_config_sync(struct perf_event *event);
-> >
-> >  extern int perf_output_begin(struct perf_output_handle *handle,
-> >                            struct perf_event *event, unsigned int size);
-> > diff --git a/kernel/events/core.c b/kernel/events/core.c
-> > index 8f0434a9951a..701839866789 100644
-> > --- a/kernel/events/core.c
-> > +++ b/kernel/events/core.c
-> > @@ -2829,6 +2829,29 @@ void perf_event_addr_filters_sync(struct perf_event *event)
-> >  }
-> >  EXPORT_SYMBOL_GPL(perf_event_addr_filters_sync);
-> >
-> > +/*
-> > + * PMU driver configuration works the same way as filter management above,
-> > + * but without the need to deal with memory mapping.  Driver configuration
-> > + * arrives through the SET_DRV_CONFIG ioctl() where it is validated and applied
-> > + * to the event.  When the PMU is ready it calls perf_event_drv_config_sync() to
-> > + * bring the configuration information within reach of the PMU.
->
-> Wait a second. The reason why we dance around with the generations of filters
-> is the locking order of ctx::mutex vs mmap_sem. In an mmap path, where we're
-> notified about mapping changes, we're called under the latter, and we'd need
-> to grab the former to update the event configuration. In your case, the
-> update comes in via perf_ioctl(), where we're already holding the ctx::mutex,
-> so you can just kick the PMU right there, via an event_function_call() or
-> perf_event_stop(restart=1). In the latter case, your pmu::start() would just
-> grab the new configuration. Should also be about 90% less code. :)
->
-> Would this work for you or am I misunderstanding something about your
-> requirements?
->
-> > + */
-> > +void perf_event_drv_config_sync(struct perf_event *event)
-> > +{
-> > +     struct perf_drv_config *drv_config = perf_event_get_drv_config(event);
-> > +
-> > +     if (!has_drv_config(event))
-> > +             return;
-> > +
-> > +     raw_spin_lock(&drv_config->lock);
-> > +     if (event->drv_config_gen != event->hw.drv_config_gen) {
-> > +             event->pmu->drv_config_sync(event);
-> > +             event->hw.drv_config_gen = event->drv_config_gen;
-> > +     }
-> > +     raw_spin_unlock(&drv_config->lock);
-> > +}
-> > +EXPORT_SYMBOL_GPL(perf_event_drv_config_sync);
-> > +
-> >  static int _perf_event_refresh(struct perf_event *event, int refresh)
-> >  {
-> >       /*
-> > @@ -4410,6 +4433,7 @@ static bool exclusive_event_installable(struct perf_event *event,
-> >
-> >  static void perf_addr_filters_splice(struct perf_event *event,
-> >                                      struct list_head *head);
-> > +static void perf_drv_config_splice(struct perf_event *event, void *drv_data);
-> >
-> >  static void _free_event(struct perf_event *event)
-> >  {
-> > @@ -4440,6 +4464,7 @@ static void _free_event(struct perf_event *event)
-> >       perf_event_free_bpf_prog(event);
-> >       perf_addr_filters_splice(event, NULL);
-> >       kfree(event->addr_filters_offs);
-> > +     perf_drv_config_splice(event, NULL);
-> >
-> >       if (event->destroy)
-> >               event->destroy(event);
-> > @@ -5002,6 +5027,8 @@ static inline int perf_fget_light(int fd, struct fd *p)
-> >  static int perf_event_set_output(struct perf_event *event,
-> >                                struct perf_event *output_event);
-> >  static int perf_event_set_filter(struct perf_event *event, void __user *arg);
-> > +static int perf_event_set_drv_config(struct perf_event *event,
-> > +                                  void __user *arg);
-> >  static int perf_event_set_bpf_prog(struct perf_event *event, u32 prog_fd);
-> >  static int perf_copy_attr(struct perf_event_attr __user *uattr,
-> >                         struct perf_event_attr *attr);
-> > @@ -5088,6 +5115,10 @@ static long _perf_ioctl(struct perf_event *event, unsigned int cmd, unsigned lon
-> >
-> >               return perf_event_modify_attr(event,  &new_attr);
-> >       }
-> > +
-> > +     case PERF_EVENT_IOC_SET_DRV_CONFIG:
-> > +             return perf_event_set_drv_config(event, (void __user *)arg);
-> > +
-> >       default:
-> >               return -ENOTTY;
-> >       }
-> > @@ -9086,6 +9117,85 @@ static int perf_event_set_filter(struct perf_event *event, void __user *arg)
-> >       return ret;
-> >  }
-> >
-> > +static void perf_drv_config_splice(struct perf_event *event, void *drv_data)
->
-> I think the address filter counterpart is called "splice" because it takes
-> a list_head as a parameter and splices that list into the list of filters.
-> I'd suggest that this one is more like "replace", but up to you.
->
-> > +{
-> > +     unsigned long flags;
-> > +     void *old_drv_data;
-> > +
-> > +     if (!has_drv_config(event))
-> > +             return;
-> > +
-> > +     /* Children take their configuration from their parent */
-> > +     if (event->parent)
-> > +             return;
-> > +
-> > +     raw_spin_lock_irqsave(&event->drv_config.lock, flags);
-> > +
-> > +     old_drv_data = event->drv_config.drv_config;
-> > +     event->drv_config.drv_config = drv_data;
->
-> Now I'm thinking: should we reset the generation here (and also in the
-> address filters bit)? At least, it deserves a comment.
->
-> > +
-> > +     raw_spin_unlock_irqrestore(&event->drv_config.lock, flags);
-> > +
-> > +     event->pmu->drv_config_free(old_drv_data);
-> > +}
-> > +
-> > +static void perf_event_drv_config_apply(struct perf_event *event)
-> > +{
-> > +     unsigned long flags;
-> > +     struct perf_drv_config *drv_config = perf_event_get_drv_config(event);
-> > +
-> > +     /* Notify event that a new configuration is available */
-> > +     raw_spin_lock_irqsave(&drv_config->lock, flags);
-> > +     event->drv_config_gen++;
-> > +     raw_spin_unlock_irqrestore(&drv_config->lock, flags);
->
-> Should we also mention how this new locks fits into the existing locking
-> order?
->
-> Regards,
 > --
-> Alex
+> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in the body of
+> a message to majordomo at vger.kernel.org More majordomo info at
+> http://vger.kernel.org/majordomo-info.html
