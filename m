@@ -1,119 +1,63 @@
-From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
-Date: Tue, 3 Jul 2018 10:01:50 -0700
-Subject: [PATCH linux-next v6 04/13] dt-bindings: Add a document of PECI
- adapter driver for ASPEED AST24xx/25xx SoCs
-In-Reply-To: <20180703165148.GA11628@rob-hp-laptop>
-References: <20180621193721.20588-1-jae.hyun.yoo@linux.intel.com>
- <20180621194024.20771-1-jae.hyun.yoo@linux.intel.com>
- <20180703165148.GA11628@rob-hp-laptop>
-Message-ID: <7f7d1045-ca1f-6086-8fce-ceab53568bcd@linux.intel.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 3 Jul 2018 18:12:51 +0100
+Subject: [RFC/RFT PATCH 0/2] disable_hest quirk on HP m400 with bad UEFI
+ firmwware
+In-Reply-To: <1530632871.9841.139.camel@debian.org>
+References: <20180628100656.10692-1-james.morse@arm.com>
+ <CAKv+Gu9ZHAGzcfgHShM1qvZ3qf4gb1pD_XfoceJu9Qy+5_pEsg@mail.gmail.com>
+ <1530607466.9841.124.camel@debian.org>
+ <CAKv+Gu8VYZ1dCggPjakcvqOxfUCeCAABEADmF2Bm-q3=y3J4ng@mail.gmail.com>
+ <1530632871.9841.139.camel@debian.org>
+Message-ID: <20180703171251.GC11614@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
-
-Thanks a lot for the review. Please check my inline answer.
-
-On 7/3/2018 9:51 AM, Rob Herring wrote:
-> On Thu, Jun 21, 2018 at 12:40:24PM -0700, Jae Hyun Yoo wrote:
->> This commit adds a dt-bindings document of PECI adapter driver for ASPEED
->> AST24xx/25xx SoCs.
->>
->> Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
->> Reviewed-by: Haiyue Wang <haiyue.wang@linux.intel.com>
->> Reviewed-by: James Feist <james.feist@linux.intel.com>
->> Reviewed-by: Vernon Mauery <vernon.mauery@linux.intel.com>
->> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
->> Cc: Greg KH <gregkh@linuxfoundation.org>
->> Cc: Jason M Biils <jason.m.bills@linux.intel.com>
->> Cc: Milton Miller II <miltonm@us.ibm.com>
->> Cc: Pavel Machek <pavel@ucw.cz>
->> Cc: Robin Murphy <robin.murphy@arm.com>
->> Cc: Ryan Chen <ryan_chen@aspeedtech.com>
->> ---
->>   .../devicetree/bindings/peci/peci-aspeed.txt  | 57 +++++++++++++++++++
->>   1 file changed, 57 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/peci/peci-aspeed.txt
->>
->> diff --git a/Documentation/devicetree/bindings/peci/peci-aspeed.txt b/Documentation/devicetree/bindings/peci/peci-aspeed.txt
->> new file mode 100644
->> index 000000000000..8c35f905589d
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/peci/peci-aspeed.txt
->> @@ -0,0 +1,57 @@
->> +Device tree configuration for PECI buses on the AST24XX and AST25XX SoCs.
->> +
->> +Required properties:
->> +- compatible        : Should be "aspeed,ast2400-peci" or "aspeed,ast2500-peci"
->> +		      - aspeed,ast2400-peci: ASPEED AST2400 family PECI
->> +					     controller
->> +		      - aspeed,ast2500-peci: ASPEED AST2500 family PECI
->> +					     controller
+On Tue, Jul 03, 2018 at 04:47:51PM +0100, Ian Campbell wrote:
+> On Tue, 2018-07-03 at 17:17 +0200, Ard Biesheuvel wrote:
+> > On 3 July 2018 at 10:44, Ian Campbell <ijc@debian.org> wrote:
+> > > On Thu, 2018-06-28 at 12:25 +0200, Ard Biesheuvel wrote:
+> > > > I understand the desire to keep running these M400s as long as they
+> > > > have some life left in them, but the reality is that they are end of
+> > > > life already, and not many were manufactured to begin with.
+> > > 
+> > > Linux has a long history of supporting such devices so long as there is
+> > > someone around willing to keep them running (witness for example how
+> > > long x86/voyager lived with just 1 in existence in a motivated
+> > > developer's basement, probably some number of entire architectures and
+> > > I bet a not insubstantial chunk of the platform support in arch/arm).
+> > > 
+> > 
+> > I wonder how many such quirks fall into the 'user cannot be bothered
+> > to add a kernel command line option' category.
 > 
-> Just this is sufficient:
+> I don't know the overall picture, but the very first one I happened to
+> look at in arch/x86/kernel/acpi/boot.c (picked by grepping for quirk
+> and looking for acpi) just now was half a dozen quirks setting
+> acpi_skip_timer_override which is also settable on the command line.
+> There's also a bunch in there which just disable ACPI completely which
+> is also possible on the command line.
 > 
-> Should be one of:
-> 	"aspeed,ast2400-peci"
-> 	"aspeed,ast2500-peci"
+> My gut feeling is that these are the rule not the exception.
 > 
-> With that,
+> > > So, I think DMI quirks are probably, in reality, inevitable unless
+> > > you
+> > > think firmware authors are going to be infaliable or the
+> > > testing/certification suites never has any gaps in it.
+> > > 
+> > 
+> > Oh, obviously. But this is exactly my point about flood gates: we know
+> > we need implement support for them, but that fact alone does not
+> > justify adding quirks for dead platforms for issues that can be
+> > trivially worked around.
 > 
-> Reviewed-by: Rob Herring <robh@kernel.org>
-> 
+> Is m400 really dead? There certainly seem to be people around who care
+> about keeping it running and have access to them.
 
-Thanks! I'll change it as you commented out.
+I do not think anybody is preventing that, it is just that we do not
+see the reason for adding a DMI quirk to the mainline kernel to enable
+a platform with broken firmware that cripples one of the main feature
+it is supposed to implement, we can go on forever about this but that's
+the gist.
 
-Jae
-
->> +- reg               : Should contain PECI controller registers location and
->> +		      length.
->> +- #address-cells    : Should be <1> required to define a client address.
->> +- #size-cells       : Should be <0> required to define a client address.
->> +- interrupts        : Should contain PECI controller interrupt.
->> +- clocks            : Should contain clock source for PECI controller. Should
->> +		      reference the external oscillator clock in the second
->> +		      cell.
->> +- resets            : Should contain phandle to reset controller with the reset
->> +		      number in the second cell.
->> +- clock-frequency   : Should contain the operation frequency of PECI controller
->> +		      in units of Hz.
->> +		      187500 ~ 24000000
->> +
->> +Optional properties:
->> +- msg-timing        : Message timing negotiation period. This value will
->> +		      determine the period of message timing negotiation to be
->> +		      issued by PECI controller. The unit of the programmed
->> +		      value is four times of PECI clock period.
->> +		      0 ~ 255 (default: 1)
->> +- addr-timing       : Address timing negotiation period. This value will
->> +		      determine the period of address timing negotiation to be
->> +		      issued by PECI controller. The unit of the programmed
->> +		      value is four times of PECI clock period.
->> +		      0 ~ 255 (default: 1)
->> +- rd-sampling-point : Read sampling point selection. The whole period of a bit
->> +		      time will be divided into 16 time frames. This value will
->> +		      determine the time frame in which the controller will
->> +		      sample PECI signal for data read back. Usually in the
->> +		      middle of a bit time is the best.
->> +		      0 ~ 15 (default: 8)
->> +- cmd-timeout-ms    : Command timeout in units of ms.
->> +		      1 ~ 60000 (default: 1000)
->> +
->> +Example:
->> +	peci0: peci-bus at 0 {
->> +		compatible = "aspeed,ast2500-peci";
->> +		reg = <0x0 0x60>;
->> +		#address-cells = <1>;
->> +		#size-cells = <0>;
->> +		interrupts = <15>;
->> +		clocks = <&syscon ASPEED_CLK_GATE_REFCLK>;
->> +		resets = <&syscon ASPEED_RESET_PECI>;
->> +		clock-frequency = <24000000>;
->> +		msg-timing = <1>;
->> +		addr-timing = <1>;
->> +		rd-sampling-point = <8>;
->> +		cmd-timeout-ms = <1000>;
->> +	};
->> -- 
->> 2.17.1
->>
+Thanks,
+Lorenzo
