@@ -1,39 +1,110 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 3 Jul 2018 21:44:23 +0800
-Subject: i.MX fixes for 4.18, round 2
-Message-ID: <20180703134422.GV4348@dragon>
+From: vilhelm.gray@gmail.com (William Breathitt Gray)
+Date: Tue, 3 Jul 2018 10:04:06 -0400
+Subject: [v7, 02/10] counter: Documentation: Add Generic Counter sysfs
+ documentation
+In-Reply-To: <2c7ae044-c09b-3d51-bd16-3ecf35154024@lechnology.com>
+References: <27299151c2c7c57e70c49b4f7b794839d00cd750.1529607879.git.vilhelm.gray@gmail.com>
+ <2c7ae044-c09b-3d51-bd16-3ecf35154024@lechnology.com>
+Message-ID: <20180703140406.GA14958@sophia>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 1bcfe0564044be578841744faea1c2f46adc8178:
+On Mon, Jul 02, 2018 at 02:11:35PM -0500, David Lechner wrote:
+>On 06/21/2018 04:07 PM, William Breathitt Gray wrote:
+>> +What:		/sys/bus/counter/devices/counterX/countY/count_mode
+>> +KernelVersion:	4.19
+>> +Contact:	linux-iio at vger.kernel.org
+>> +Description:
+>> +		Count mode for channel Y. The ceiling and floor values for
+>> +		Count Y are used by the count mode where required. The following
+>> +		count modes are available:
+>> +
+>> +		Normal:
+>> +			Counting is continuous in either direction.
+>> +
+>> +		Range Limit:
+>> +			An upper or lower limit is set, mimicking limit switches
+>> +			in the mechanical counterpart. The upper limit is set to
+>> +			the Count Y ceiling value, while the lower limit is set
+>> +			to the Count Y floor value. The counter freezes at
+>> +			count = ceiling when counting up, and at count = floor
+>> +			when counting down. At either of these limits, the
+>> +			counting is resumed only when the count direction is
+>> +			reversed.
+>> +
+>> +		Non-Recycle:
+>> +			The counter is disabled whenever a counter overflow or
+>> +			underflow takes place. The counter is re-enabled when a
+>> +			new count value is loaded to the counter via a preset
+>> +			operation or direct write.
+>> +
+>> +		Modulo-N:
+>> +			A count value boundary is set between the Count Y floor
+>> +			value and the Count Y ceiling value. The counter is
+>> +			reset to the Cunt Y floor value at count = ceiling when
+>> +			counting up, while the counter is set to the Count Y
+>> +			ceiling value at count = floor when counting down; the
+>> +			counter does not freeze at the boundary points, but
+>> +			counts continuously throughout.
+>> +
+>
+>This might be a bit misleading since the values returned are all lower case,
+>e.g. "rising edge", whereas they are listed here in Title Case.
 
-  ARM: dts: imx6sx: fix irq for pcie bridge (2018-06-19 14:39:36 +0800)
+Fair point, the options explicitly listed in the documentation should
+match how they appear on the system. I'll make sure to consolidate these
+and the others you mentioned in the next revision.
 
-are available in the git repository at:
+>> +What:		/sys/bus/counter/devices/counterX/countY/preset
+>> +KernelVersion:	4.19
+>> +Contact:	linux-iio at vger.kernel.org
+>> +Description:
+>> +		If the counter device supports preset registers -- registers
+>> +		used to load counter channels to a set count upon device-defined
+>> +		preset operation trigger events -- the preset count for channel
+>> +		Y is provided by this attribute.
+>
+>Should this be presetZ in case a device has more than one preset?
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-fixes-4.18-2
+I suppose it could be possible for a device to feature more than one
+preset register for a count. However, in those cases a simple numbering
+scheme such as presetZ would be ambigious: which preset register is
+evaluated at which point?
 
-for you to fetch changes up to 2ceb2780b790b74bc408a949f6aedbad8afa693e:
+I suspect in these kind of devices the preset registers are designated
+specific triggers; for example, perhaps preset0 is evaluated when the
+count reaches a ceiling, while preset1 is evaluated when a count reaches
+a floor. In those sort of cases, it may be better to be more explicit
+and define them as preset_ceiling and preset_floor (or something
+similar) to make their behavior and use more apparent.
 
-  ARM: imx_v4_v5_defconfig: Select ULPI support (2018-07-03 21:12:04 +0800)
+Alternatively, if the multiple presets are configurable, then there may
+be value with a presetZ scheme if we have a respective presetZ_op
+attribute (or similar) to expose the preset operation trigger condition
+to the user. I haven't personally encountered devices like this, but I
+can see it as possible, so we can consider this design once we try to
+add support for a device that requires it.
 
-----------------------------------------------------------------
-i.MX fixes for 4.18, round 2:
- - A couple of imx defconfig updates selecting USB ULPI support to fix
-   a regression seen with USB driver, which is caused by commit
-   03e6275ae381 ("usb: chipidea: Fix ULPI on imx51").
- - A fix on imx51-zii-rdu1 board touchscreen pinctrl setting, which
-   causes an interrupt storm.
+>> +What:		/sys/bus/counter/devices/counterX/signalY/signal
+>> +KernelVersion:	4.19
+>> +Contact:	linux-iio at vger.kernel.org
+>> +Description:
+>> +		Signal data of Signal Y represented as a string.
+>
+>I guess the actual value returned depends on the type of signal? Would we
+>need /sys/bus/counter/devices/counterX/signalY/type to indicate this so we
+>know how to interpret the value?
 
-----------------------------------------------------------------
-Fabio Estevam (2):
-      ARM: imx_v6_v7_defconfig: Select ULPI support
-      ARM: imx_v4_v5_defconfig: Select ULPI support
+I'm not sure how useful such an attribute would be. If we're using some
+sort of generic utility to list out counter device information, then it
+can print out the signal data directly because it's reported as a
+character string. On the other hand, if the utility is specific for your
+particular device, it should already know the format of the signal data
+to parse at the very least from the respective documentation.
 
-Nick Dyer (1):
-      ARM: dts: imx51-zii-rdu1: fix touchscreen pinctrl
+I don't believe adding this attribute would be technically difficult,
+but I would hold off on adding it until we see a situation that requires
+it (perhaps a device with multiple signal sources of different types for
+example).
 
- arch/arm/boot/dts/imx51-zii-rdu1.dts | 2 +-
- arch/arm/configs/imx_v4_v5_defconfig | 2 ++
- arch/arm/configs/imx_v6_v7_defconfig | 2 ++
- 3 files changed, 5 insertions(+), 1 deletion(-)
+William Breathitt Gray
