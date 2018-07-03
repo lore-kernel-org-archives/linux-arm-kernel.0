@@ -1,9 +1,9 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Wed,  4 Jul 2018 00:00:04 +0200
-Subject: [PATCH v2 07/32] mtd: rawnand: fsl_ifc: convert driver to nand_scan()
+Date: Wed,  4 Jul 2018 00:00:03 +0200
+Subject: [PATCH v2 06/32] mtd: rawnand: fsl_elbc: convert driver to nand_scan()
 In-Reply-To: <20180703220029.19565-1-miquel.raynal@bootlin.com>
 References: <20180703220029.19565-1-miquel.raynal@bootlin.com>
-Message-ID: <20180703220029.19565-8-miquel.raynal@bootlin.com>
+Message-ID: <20180703220029.19565-7-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,26 +14,26 @@ both nand_scan_ident() and nand_scan_tail().
 
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 ---
- drivers/mtd/nand/raw/fsl_ifc_nand.c | 15 ++++-----------
+ drivers/mtd/nand/raw/fsl_elbc_nand.c | 15 ++++-----------
  1 file changed, 4 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/mtd/nand/raw/fsl_ifc_nand.c b/drivers/mtd/nand/raw/fsl_ifc_nand.c
-index 382b67e97174..faefa186e9d3 100644
---- a/drivers/mtd/nand/raw/fsl_ifc_nand.c
-+++ b/drivers/mtd/nand/raw/fsl_ifc_nand.c
-@@ -714,9 +714,9 @@ static int fsl_ifc_write_page(struct mtd_info *mtd, struct nand_chip *chip,
- 	return nand_prog_page_end_op(chip);
+diff --git a/drivers/mtd/nand/raw/fsl_elbc_nand.c b/drivers/mtd/nand/raw/fsl_elbc_nand.c
+index 51f0b340bc0d..e535c8440f63 100644
+--- a/drivers/mtd/nand/raw/fsl_elbc_nand.c
++++ b/drivers/mtd/nand/raw/fsl_elbc_nand.c
+@@ -637,9 +637,9 @@ static int fsl_elbc_wait(struct mtd_info *mtd, struct nand_chip *chip)
+ 	return (elbc_fcm_ctrl->mdr & 0xff) | NAND_STATUS_WP;
  }
  
--static int fsl_ifc_chip_init_tail(struct mtd_info *mtd)
-+static int fsl_ifc_attach_chip(struct nand_chip *chip)
+-static int fsl_elbc_chip_init_tail(struct mtd_info *mtd)
++static int fsl_elbc_attach_chip(struct nand_chip *chip)
  {
 -	struct nand_chip *chip = mtd_to_nand(mtd);
 +	struct mtd_info *mtd = nand_to_mtd(chip);
- 	struct fsl_ifc_mtd *priv = nand_get_controller_data(chip);
- 
- 	dev_dbg(priv->dev, "%s: nand->numchips = %d\n", __func__,
-@@ -1046,15 +1046,8 @@ static int fsl_ifc_nand_probe(struct platform_device *dev)
+ 	struct fsl_elbc_mtd *priv = nand_get_controller_data(chip);
+ 	struct fsl_lbc_ctrl *ctrl = priv->ctrl;
+ 	struct fsl_lbc_regs __iomem *lbc = ctrl->regs;
+@@ -910,15 +910,8 @@ static int fsl_elbc_nand_probe(struct platform_device *pdev)
  	if (ret)
  		goto err;
  
@@ -41,12 +41,12 @@ index 382b67e97174..faefa186e9d3 100644
 -	if (ret)
 -		goto err;
 -
--	ret = fsl_ifc_chip_init_tail(mtd);
+-	ret = fsl_elbc_chip_init_tail(mtd);
 -	if (ret)
 -		goto err;
 -
 -	ret = nand_scan_tail(mtd);
-+	priv->chip.controller->attach_chip = fsl_ifc_attach_chip;
++	priv->chip->controller->attach_chip = fsl_elbc_attach_chip;
 +	ret = nand_scan(mtd, 1);
  	if (ret)
  		goto err;
