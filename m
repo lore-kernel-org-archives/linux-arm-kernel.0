@@ -1,35 +1,39 @@
-From: jolsa@redhat.com (Jiri Olsa)
-Date: Tue, 3 Jul 2018 15:41:39 +0200
-Subject: [PATCH 5/6] perf/core: Use ioctl to communicate driver
- configuration to kernel
-In-Reply-To: <1530570810-28929-6-git-send-email-mathieu.poirier@linaro.org>
-References: <1530570810-28929-1-git-send-email-mathieu.poirier@linaro.org>
- <1530570810-28929-6-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <20180703134139.GB3728@krava>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 3 Jul 2018 21:44:23 +0800
+Subject: i.MX fixes for 4.18, round 2
+Message-ID: <20180703134422.GV4348@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 02, 2018 at 04:33:29PM -0600, Mathieu Poirier wrote:
+The following changes since commit 1bcfe0564044be578841744faea1c2f46adc8178:
 
-SNIP
+  ARM: dts: imx6sx: fix irq for pcie bridge (2018-06-19 14:39:36 +0800)
 
-> +	ret = 0;
-> +out:
-> +	return ret;
-> +}
-> +
-> +static int perf_event_set_drv_config(struct perf_event *event, void __user *arg)
-> +{
-> +	int ret = -EINVAL;
-> +	char *config_str;
-> +
-> +	config_str = strndup_user(arg, PAGE_SIZE);
-> +	if (IS_ERR(config_str))
-> +		return PTR_ERR(config_str);
-> +
-> +	if (has_drv_config(event))
+are available in the git repository at:
 
-would it be better to make this check before
-the alloc/copy data from user takes place?
+  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-fixes-4.18-2
 
-jirka
+for you to fetch changes up to 2ceb2780b790b74bc408a949f6aedbad8afa693e:
+
+  ARM: imx_v4_v5_defconfig: Select ULPI support (2018-07-03 21:12:04 +0800)
+
+----------------------------------------------------------------
+i.MX fixes for 4.18, round 2:
+ - A couple of imx defconfig updates selecting USB ULPI support to fix
+   a regression seen with USB driver, which is caused by commit
+   03e6275ae381 ("usb: chipidea: Fix ULPI on imx51").
+ - A fix on imx51-zii-rdu1 board touchscreen pinctrl setting, which
+   causes an interrupt storm.
+
+----------------------------------------------------------------
+Fabio Estevam (2):
+      ARM: imx_v6_v7_defconfig: Select ULPI support
+      ARM: imx_v4_v5_defconfig: Select ULPI support
+
+Nick Dyer (1):
+      ARM: dts: imx51-zii-rdu1: fix touchscreen pinctrl
+
+ arch/arm/boot/dts/imx51-zii-rdu1.dts | 2 +-
+ arch/arm/configs/imx_v4_v5_defconfig | 2 ++
+ arch/arm/configs/imx_v6_v7_defconfig | 2 ++
+ 3 files changed, 5 insertions(+), 1 deletion(-)
