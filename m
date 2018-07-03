@@ -1,60 +1,123 @@
-From: okaya@codeaurora.org (okaya at codeaurora.org)
-Date: Tue, 03 Jul 2018 07:30:28 -0400
-Subject: [PATCH V5 3/3] PCI: Mask and unmask hotplug interrupts during
- reset
-In-Reply-To: <20180703083447.GA2689@wunner.de>
-References: <1530571967-19099-1-git-send-email-okaya@codeaurora.org>
- <1530571967-19099-4-git-send-email-okaya@codeaurora.org>
- <20180703083447.GA2689@wunner.de>
-Message-ID: <8b6ce0f415858463d1c0588c29e30415@codeaurora.org>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Tue, 3 Jul 2018 12:54:26 +0100
+Subject: [PATCH v3 10/20] kvm: arm64: Dynamic configuration of VTTBR mask
+In-Reply-To: <e0c8dc62-42e8-ee24-5519-e19b2739160b@redhat.com>
+References: <1530270944-11351-1-git-send-email-suzuki.poulose@arm.com>
+ <1530270944-11351-11-git-send-email-suzuki.poulose@arm.com>
+ <e0c8dc62-42e8-ee24-5519-e19b2739160b@redhat.com>
+Message-ID: <a6fa912a-b2ff-ac1e-0120-b2f7eabb6f7f@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-07-03 04:34, Lukas Wunner wrote:
-> On Mon, Jul 02, 2018 at 06:52:47PM -0400, Sinan Kaya wrote:
->> If a bridge supports hotplug and observes a PCIe fatal error, the 
->> following
->> events happen:
->> 
->> 1. AER driver removes the devices from PCI tree on fatal error
->> 2. AER driver brings down the link by issuing a secondary bus reset 
->> waits
->> for the link to come up.
->> 3. Hotplug driver observes a link down interrupt
->> 4. Hotplug driver tries to remove the devices waiting for the rescan 
->> lock
->> but devices are already removed by the AER driver and AER driver is 
->> waiting
->> for the link to come back up.
->> 5. AER driver tries to re-enumerate devices after polling for the link
->> state to go up.
->> 6. Hotplug driver obtains the lock and tries to remove the devices 
->> again.
->> 
->> If a bridge is a hotplug capable bridge, mask hotplug interrupts 
->> before the
->> reset and unmask afterwards.
+Hi Eric,
+
+On 02/07/18 15:41, Auger Eric wrote:
+> Hi Suzuki,
 > 
-> Would it work for you if you just amended the AER driver to skip
-> removal and re-enumeration of devices if the port is a hotplug bridge?
-> Just check for is_hotplug_bridge in struct pci_dev.
+> On 06/29/2018 01:15 PM, Suzuki K Poulose wrote:
+>> On arm64 VTTBR_EL2:BADDR holds the base address for the stage2
+>> translation table. The Arm ARM mandates that the bits BADDR[x-1:0]
+>> should be 0, where 'x' is defined for a given IPA Size and the
+>> number of levels for a translation granule size. It is defined
+>> using some magical constants. This patch is a reverse engineered
+>> implementation to calculate the 'x' at runtime for a given ipa and
+>> number of page table levels. See patch for more details.
+>>
+>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>> Cc: Christoffer Dall <cdall@kernel.org>
+>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>> ---
+>> Changes since V2:
+>>   - Part 1 of spilt from VTCR & VTTBR dynamic configuration
+>> ---
+>>   arch/arm64/include/asm/kvm_arm.h | 60 +++++++++++++++++++++++++++++++++++++---
+>>   arch/arm64/include/asm/kvm_mmu.h | 25 ++++++++++++++++-
+>>   2 files changed, 80 insertions(+), 5 deletions(-)
+>>
+>> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+>> index 3dffd38..c557f45 100644
+>> --- a/arch/arm64/include/asm/kvm_arm.h
+>> +++ b/arch/arm64/include/asm/kvm_arm.h
+>> @@ -140,8 +140,6 @@
+>>    * Note that when using 4K pages, we concatenate two first level page tables
+>>    * together. With 16K pages, we concatenate 16 first level page tables.
+>>    *
+>> - * The magic numbers used for VTTBR_X in this patch can be found in Tables
+>> - * D4-23 and D4-25 in ARM DDI 0487A.b.
+> Isn't it a pretty old reference? Could you refer to C.a?
 
-The reason why we want to remove devices before secondary bus reset is 
-to quiesce pcie bus traffic before issuing a reset.
+Sure, I will update the references everywhere.
 
-Skipping this step might cause transactions to be lost in the middle of 
-the reset as there will be active traffic flowing and drivers will 
-suddenly start reading ffs.
+>> + *
+>> + * The algorithm defines the expectations on the BaseAddress (for the page
+>> + * table) bits resolved at each level based on the page size, entry level
+>> + * and T0SZ. The variable "x" in the algorithm also affects the VTTBR:BADDR
+>> + * for stage2 page table.
+>> + *
+>> + * The value of "x" is calculated as :
+>> + *	x = Magic_N - T0SZ
+>> + *
+>> + * where Magic_N is an integer depending on the page size and the entry
+>> + * level of the page table as below:
+>> + *
+>> + *	--------------------------------------------
+>> + *	| Entry level		|  4K    16K   64K |
+>> + *	--------------------------------------------
+>> + *	| Level: 0 (4 levels)	| 28   |  -  |  -  |
+>> + *	--------------------------------------------
+>> + *	| Level: 1 (3 levels)	| 37   | 31  | 25  |
+>> + *	--------------------------------------------
+>> + *	| Level: 2 (2 levels)	| 46   | 42  | 38  |
+>> + *	--------------------------------------------
+>> + *	| Level: 3 (1 level)	| -    | 53  | 51  |
+>> + *	--------------------------------------------
+> I understand entry level = Lookup level in the table.
 
-I don't think we can skip this step.
+Entry level => The level at which we start the page table walk for
+a given address (This is in line with the ARM ARM). So,
+
+Entry_level = (4 - Number_of_Page_table_levels)
+
+> But you may want to compute x for BaseAddress matching lookup level 2
+> with number of levels = 4.
+
+No, the BaseAddress is only calcualted for the "Entry_level". So the
+above case doesn't exist at all.
+
+> So shouldn't you s/Number of levels/4 - entry_level?
+
+Ok, I now understood what you are referring to [0]
+> for BADDR we want the BaseAddr of the initial lookup level so
+> effectively the entry level we are interested in is 4 - number of levels
+> and we don't care or d) condition. At least this is my understanding ;-)
+> If correct you may slightly reword the explanation?
 
 
-> 
-> That would seem like a much simpler solution, given that it is known
-> that the link will flap on reset, causing the hotplug driver to remove
-> and re-enumerate devices.  That would also cover cases where hotplug is
-> handled by a different driver than pciehp, or by the platform firmware.
-> 
-> Thanks,
-> 
-> Lukas
+>> + *
+>> + * We have a magic formula for the Magic_N below.
+>> + *
+>> + *  Magic_N(PAGE_SIZE, Entry_Level) = 64 - ((PAGE_SHIFT - 3) * Number of levels)
+
+[0] ^^^
+
+
+
+>> + *
+>> + * where number of levels = (4 - Entry_Level).
+
+^^^ Doesn't this help make it clear ? Using the expansion makes it a bit more
+unreadable below.
+
+>>   
+>> +/*
+>> + * Get the magic number 'x' for VTTBR:BADDR of this KVM instance.
+>> + * With v8.2 LVA extensions, 'x' should be a minimum of 6 with
+>> + * 52bit IPS.
+> Link to the spec?
+
+Sure, will add it.
+
+Thanks for the patience to review :-)
+
+Cheers
+Suzuki
