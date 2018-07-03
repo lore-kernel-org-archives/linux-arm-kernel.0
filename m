@@ -1,47 +1,34 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Tue, 03 Jul 2018 16:44:50 +0200
-Subject: [PATCH 1/3] dt-bindings: marvell: Add documentation for the
- Armada 3700 AVS binding
-In-Reply-To: <20180619124402.902-2-gregory.clement@bootlin.com>
-References: <20180619124402.902-1-gregory.clement@bootlin.com>
- <20180619124402.902-2-gregory.clement@bootlin.com>
-Message-ID: <7581910.yGXAn98Nt4@aspire.rjw.lan>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Tue, 3 Jul 2018 16:50:20 +0200
+Subject: [linux-sunxi] ARM: dts: sun8i: h3: Enable dwmac-sun8i on the
+ Beelink X2
+In-Reply-To: <20180630062720.24225-1-codekipper@gmail.com>
+References: <20180630062720.24225-1-codekipper@gmail.com>
+Message-ID: <20180703145020.hkct43ccbpteleht@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, June 19, 2018 2:44:00 PM CEST Gregory CLEMENT wrote:
-> Extend the documentation of the Armada 37xx SoC with the Adaptive Voltage
-> Scaling (AVS) registers.
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
-> ---
->  .../bindings/arm/marvell/armada-37xx.txt         | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/marvell/armada-37xx.txt b/Documentation/devicetree/bindings/arm/marvell/armada-37xx.txt
-> index 35c3c3460d17..22438f659d1e 100644
-> --- a/Documentation/devicetree/bindings/arm/marvell/armada-37xx.txt
-> +++ b/Documentation/devicetree/bindings/arm/marvell/armada-37xx.txt
-> @@ -33,3 +33,19 @@ nb_pm: syscon at 14000 {
->  	compatible = "marvell,armada-3700-nb-pm", "syscon";
->  	reg = <0x14000 0x60>;
->  }
-> +
-> +AVS
-> +---
-> +
-> +For AVS an other component is needed:
-> +
-> +Required properties:
-> +- compatible     : should contain "marvell,armada-3700-avs", "syscon";
-> +- reg            : the register start and length for the AVS
-> +
-> +Example:
-> +avs: avs at 11500 {
-> +	compatible = "marvell,armada-3700-avs", "syscon";
-> +	reg = <0x11500 0x40>;
-> +}
-> +
-> 
+Hi,
 
-I can't apply this one without a Rob's ACK.
+On Sat, Jun 30, 2018 at 08:27:20AM +0200, codekipper at gmail.com wrote:
+> From: Marcus Cooper <codekipper@gmail.com>
+> 
+> The enabling of the emac was reverted when stability issues were
+> discovered.
+
+What stability issues exactly? Have they been fixed? If so, by which
+commit?
+
+Maxime
+
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180703/4a705a6f/attachment.sig>
