@@ -1,26 +1,55 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 3 Jul 2018 08:59:11 +0100
-Subject: [PATCH 16/20] dts: arm: omap: Update coresight bindings for
- hardware ports
-In-Reply-To: <20180703070951.GH112168@atomide.com>
-References: <1528235011-30691-1-git-send-email-suzuki.poulose@arm.com>
- <1528235011-30691-17-git-send-email-suzuki.poulose@arm.com>
- <20180703070951.GH112168@atomide.com>
-Message-ID: <10a95b43-09d8-2e8e-fa44-a8c9227b3053@arm.com>
+From: ravi.bangoria@linux.ibm.com (Ravi Bangoria)
+Date: Tue, 3 Jul 2018 13:30:01 +0530
+Subject: [PATCH v5 10/10] perf probe: Support SDT markers having reference
+ counter (semaphore)
+In-Reply-To: <20180702145727.GC65296@linux.vnet.ibm.com>
+References: <20180628052209.13056-1-ravi.bangoria@linux.ibm.com>
+ <20180628052209.13056-11-ravi.bangoria@linux.ibm.com>
+ <20180702145727.GC65296@linux.vnet.ibm.com>
+Message-ID: <c29309ae-65ff-8a68-42ef-7e9f77227571@linux.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Srikar,
 
-
-Hi Tony,
-
-On 07/03/2018 08:09 AM, Tony Lindgren wrote:
-> * Suzuki K Poulose <suzuki.poulose@arm.com> [180605 14:48]:
->> Switch to the new coresight bindings for hardware ports
+On 07/02/2018 08:27 PM, Srikar Dronamraju wrote:
+> * Ravi Bangoria <ravi.bangoria@linux.ibm.com> [2018-06-28 10:52:09]:
 > 
-> So is this patch safe for me to pick separately for v4.19?
+>> With this, perf buildid-cache will save SDT markers with reference
+>> counter in probe cache. Perf probe will be able to probe markers
+>> having reference counter. Ex,
+>>
+>>   # readelf -n /tmp/tick | grep -A1 loop2
+>>     Name: loop2
+>>     ... Semaphore: 0x0000000010020036
+>>
+>>   # ./perf buildid-cache --add /tmp/tick
+> 
+> Would this perf buildid-cache work if the executable is stripped of
+> symbols?
 
-No. Please ignore this for now. The bindings are still under
-discussion. Sorry for the inconvenience.
+Description of SDT markers resides in .notes section. If .notes section
+is there, binary has SDT markers, if .notes section is not there, binary
+does not have any SDT markers. So SDT markers does not have anything to
+do with symbol table.
 
-Suzuki
+> 
+>>   # ./perf probe sdt_tick:loop2
+>>   # ./perf stat -e sdt_tick:loop2 /tmp/tick
+>>     hi: 0
+>>     hi: 1
+>>     hi: 2
+>>     ^C
+>>      Performance counter stats for '/tmp/tick':
+>>                  3      sdt_tick:loop2
+>>        2.561851452 seconds time elapsed
+> 
+> Also can we document how to use SDT markers with perf under perf-probe
+> or perf-build-cache?
+> 
+
+Yes, perf-buildid-cache and perf-probe man pages describes about SDT
+markers.
+
+Thanks,
+Ravi
