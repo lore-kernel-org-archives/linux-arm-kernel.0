@@ -1,41 +1,68 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Tue, 3 Jul 2018 10:39:42 +0800
-Subject: [PATCH 2/2] ARM: dts: pxa: add mioa701 board description
-In-Reply-To: <20180702055733.18578-2-robert.jarzmik@free.fr>
-References: <20180702055733.18578-2-robert.jarzmik@free.fr>
-Message-ID: <201807031051.W2hlGCaM%fengguang.wu@intel.com>
+From: vilhelm.gray@gmail.com (William Breathitt Gray)
+Date: Mon, 2 Jul 2018 22:48:35 -0400
+Subject: [PATCH v7 00/10] Introduce the Counter subsystem
+In-Reply-To: <603b0373-f1e1-5938-fa53-8328c9a5964f@lechnology.com>
+References: <cover.1529607879.git.vilhelm.gray@gmail.com>
+ <603b0373-f1e1-5938-fa53-8328c9a5964f@lechnology.com>
+Message-ID: <20180703024835.GA9493@sophia>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robert,
+On Mon, Jul 02, 2018 at 01:13:40PM -0500, David Lechner wrote:
+>On 06/21/2018 04:06 PM, William Breathitt Gray wrote:
+>> I decided to strip down these devices to arrive at the core essence of
+>> what constitutes a "counter device" and therefore design a "generic
+>> counter" abstraction to better represent these devices and prevent the
+>> ambiguity we discovered with the existing IIO Counter interface. This
+>> abstraction became the Generic Counter paradigm, which is explained in
+>> detail within the Documentation/driver-api/generic-counter.rst file
+>> introduced by this patchset.
+>
+>I'm curious if you have given any thought to the time aspect of counters.
+>I am interested in the rate at which the counters are counting (e.g. how
+>many counts per second). I realize that you can calculate this in
+>userspace or in the kernel using the system timer, but it is not very
+>accurate since Linux is not a realtime OS. So, I would like to get the
+>rate directly from the hardware. For example, the TI eQEP[1], like the
+>one found in BeagleBones, has a couple ways of measuring time (see link
+>for details).
+>
+>[1]: http://www.ti.com/lit/ug/sprug05a/sprug05a.pdf
 
-I love your patch! Yet something to improve:
+Ah yes, I see you initially attempted adding a frequency channel type to
+the IIO code. I agree with you that this calculation is best kept away
+from the operating system, not just because of the realtime requirement
+considerations, but also because the hardware likely knows best its own
+data, so let's expose it!
 
-[auto build test ERROR on robh/for-next]
-[also build test ERROR on v4.18-rc3 next-20180702]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+Regarding the Generic Counter interface, a frequency attribute can be
+added quite easily in a technical sense, so this discussion should be
+focused more on the warrant for exposing this data. I understand from
+the discussion thread on your initial patch submission that you're
+working with hot-swappable encoder wheels and would like to expose a
+counting rate since you have trouble otherwise knowing the number of
+counts equal to one revolution due to the various possible encoder
+wheels that could be installed -- do I understand this correctly?
 
-url:    https://github.com/0day-ci/linux/commits/Robert-Jarzmik/ARM-dts-pxa-add-pincontrol-helpers/20180702-140342
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
-config: arm-u8500_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        GCC_VERSION=7.2.0 make.cross ARCH=arm 
+Luckily the Generic Counter interface is a more abstract paradigm, so
+the hot-swappable encoder wheels should not be a problem for us as long
+as we nail down a consistent and thorough definition for this attribute.
+To that end, since the Generic Counter paradigm is designed to abstract
+away specifics of counter devices in order to present the final data of
+interest to users (e.g. the count value, the mode of operation, etc.),
+let's make sure frequency is actually what we want to expose and not
+just a middle-step datum on the path to the final result.
 
-All errors (new ones prefixed by >>):
+What is the real life use-case for this information (are you tracking
+position)? Does the relevant hardware report the number of counts equal
+to one revolution, or are you calculating this from frequency? Are you
+using this frequency to simply track the number of revolutions? Should
+revolution count also be exposed? Is frequency useful for other
+applications on its own (perhaps velocity of an automobile device
+equipped with an encoder wheel for some reason or other)?
 
->> ERROR: Input tree has errors, aborting (use -f to force output)
+Once we figure out how this data is used, we can determine the best
+design and place to introduce it into the Generic Counter interface,
+then move on to integration from there.
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 22657 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180703/ed8da4d4/attachment-0001.gz>
+William Breathitt Gray
