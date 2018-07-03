@@ -1,96 +1,67 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 3 Jul 2018 11:43:26 -0400
-Subject: [PATCH V5 3/3] PCI: Mask and unmask hotplug interrupts during
- reset
-In-Reply-To: <20180703143434.GA4086@wunner.de>
-References: <1530571967-19099-1-git-send-email-okaya@codeaurora.org>
- <1530571967-19099-4-git-send-email-okaya@codeaurora.org>
- <20180703143434.GA4086@wunner.de>
-Message-ID: <12fc8de5-ff03-cb00-52cb-25a43c71d03a@codeaurora.org>
+From: ijc@debian.org (Ian Campbell)
+Date: Tue, 03 Jul 2018 16:47:51 +0100
+Subject: [RFC/RFT PATCH 0/2] disable_hest quirk on HP m400 with bad UEFI
+ firmwware
+In-Reply-To: <CAKv+Gu8VYZ1dCggPjakcvqOxfUCeCAABEADmF2Bm-q3=y3J4ng@mail.gmail.com>
+References: <20180628100656.10692-1-james.morse@arm.com>
+ <CAKv+Gu9ZHAGzcfgHShM1qvZ3qf4gb1pD_XfoceJu9Qy+5_pEsg@mail.gmail.com>
+ <1530607466.9841.124.camel@debian.org>
+ <CAKv+Gu8VYZ1dCggPjakcvqOxfUCeCAABEADmF2Bm-q3=y3J4ng@mail.gmail.com>
+Message-ID: <1530632871.9841.139.camel@debian.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/3/2018 10:34 AM, Lukas Wunner wrote:
-> On Mon, Jul 02, 2018 at 06:52:47PM -0400, Sinan Kaya wrote:
->> @@ -308,8 +310,17 @@ void pcie_do_fatal_recovery(struct pci_dev *dev, u32 service)
->>  		pci_dev_put(pdev);
->>  	}
->>  
->> +	hpsvc = pcie_port_find_service(udev, PCIE_PORT_SERVICE_HP);
->> +	hpdev = pcie_port_find_device(udev, PCIE_PORT_SERVICE_HP);
->> +
->> +	if (hpdev && hpsvc)
->> +		hpsvc->mask_irq(to_pcie_device(hpdev));
->> +
->>  	result = reset_link(udev, service);
->>  
->> +	if (hpdev && hpsvc)
->> +		hpsvc->unmask_irq(to_pcie_device(hpdev));
->> +
+On Tue, 2018-07-03 at 17:17 +0200, Ard Biesheuvel wrote:
+> On 3 July 2018 at 10:44, Ian Campbell <ijc@debian.org> wrote:
+> > On Thu, 2018-06-28 at 12:25 +0200, Ard Biesheuvel wrote:
+> > > I understand the desire to keep running these M400s as long as they
+> > > have some life left in them, but the reality is that they are end of
+> > > life already, and not many were manufactured to begin with.
+> > 
+> > Linux has a long history of supporting such devices so long as there is
+> > someone around willing to keep them running (witness for example how
+> > long x86/voyager lived with just 1 in existence in a motivated
+> > developer's basement, probably some number of entire architectures and
+> > I bet a not insubstantial chunk of the platform support in arch/arm).
+> > 
 > 
-> We've already got the ->reset_slot callback in struct hotplug_slot_ops,
-> I'm wondering if we really need additional ones for this use case.
+> I wonder how many such quirks fall into the 'user cannot be bothered
+> to add a kernel command line option' category.
+
+I don't know the overall picture, but the very first one I happened to
+look at in arch/x86/kernel/acpi/boot.c (picked by grepping for quirk
+and looking for acpi) just now was half a dozen quirks setting
+acpi_skip_timer_override which is also settable on the command line.
+There's also a bunch in there which just disable ACPI completely which
+is also possible on the command line.
+
+My gut feeling is that these are the rule not the exception.
+
+> > So, I think DMI quirks are probably, in reality, inevitable unless
+> > you
+> > think firmware authors are going to be infaliable or the
+> > testing/certification suites never has any gaps in it.
+> > 
 > 
-> If you just do...
-> 
-> 	if (!pci_probe_reset_slot(dev->slot))
-> 		pci_reset_slot(dev->slot)
-> 	else {
-> 		/* regular code path */
-> 	}
-> 
-> would that not be equivalent?
+> Oh, obviously. But this is exactly my point about flood gates: we know
+> we need implement support for them, but that fact alone does not
+> justify adding quirks for dead platforms for issues that can be
+> trivially worked around.
 
-As I have informed you before on my previous reply, the pdev->slot is
-only valid for children objects such as endpoints not for a bridge when
-using pciehp.
+Is m400 really dead? There certainly seem to be people around who care
+about keeping it running and have access to them.
 
-The pointer is NULL for the host bridge itself.
+> On a related note: what we *could* do to accommodate platforms such as
+> m400 that are affected by quirks that can be worked around by a
+> command line parameter: we could teach the stub to look at the
+> contents of the 'LinuxExtraArgs' EFI environment variable and append
+> it to the kernel command line. This is trivial to implement, given
+> that we already manipulate and parse the command line in the stub, and
+> would allow for a 'fix and forget' tweak to be applied to such
+> platforms., without having to accumulate quirks for broken platforms
+> that are difficult to remove later.
 
-I reached out to reset_slot() callback in v4 of this implementation.
+Ideally the quirk would be a single entry in a table, which is
+unobtrusive enough not to worry about removing.
 
-https://patchwork.kernel.org/patch/10494971/
-
-However, as Oza explained FATAL error handling gets called from two different
-paths as AER and DPC.
-
-If the link goes down due to DPC, calling pci_reset_slot() would be a mistake
-as DPC has its own recovery mechanism by programming the DPC capabilities.
-pci_reset_slot() performs a secondary bus reset following hotplug interrupt
-mask.
-
-Issuing a secondary bus reset to a DPC event would be a mistake for recovery.
-
-That's why, I extracted the hotplug mask and unmask IRQ calls into service
-layer so that I can mask hotplug interrupts regardless of the source of the
-FATAL error whether it is DPC or AER.
-
-If error source is DPC, it still goes to DPC driver's reset_link() callback
-for DPC specific clean up.
-
-If error source is AER, it still goes to AER driver's reset_link() callback
-for secondary bus reset.
-
-Remember that AER driver completely bypasses pci_reset_slot() today. The lock
-mechanism you are putting will not be useful for FATAL error case where
-pci_secondary_bus_reset() is called directly.
-
-pci_reset_slot() only gets called from external drivers such as VFIO to initiate
-a reset to the slot if hotplug is supported.
-
-> 
-> (It's worth noting though that pciehp is the only hotplug driver
-> implementing the ->reset_slot callback.  If hotplug is handled by
-> a different driver or by the platform firmware, devices may still
-> be removed and re-enumerated twice.)
-> 
-> Thanks,
-> 
-> Lukas
-> 
-
-
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Ian.
