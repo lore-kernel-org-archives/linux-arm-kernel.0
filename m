@@ -1,64 +1,68 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed,  4 Jul 2018 14:52:50 -0300
-Subject: [PATCH] ARM: dts: imx: Remove optional 'fsl,sec-era' property
-Message-ID: <1530726770-814-1-git-send-email-festevam@gmail.com>
+From: vivek.gautam@codeaurora.org (Vivek Gautam)
+Date: Wed, 4 Jul 2018 23:39:49 +0530
+Subject: [PATCH 2/2] device core: Add flag to autoremove device link on
+ supplier unbind
+In-Reply-To: <2991909.NMIP74eIIJ@aspire.rjw.lan>
+References: <20180627125056.12851-1-vivek.gautam@codeaurora.org>
+ <20180627125056.12851-2-vivek.gautam@codeaurora.org>
+ <5b2d17e8-2224-512c-e01c-212828ecf74b@codeaurora.org>
+ <2991909.NMIP74eIIJ@aspire.rjw.lan>
+Message-ID: <52724c9d-4650-9095-fb68-c4dff21a48f6@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@nxp.com>
 
-Since commit 654f2b937b38 ("crypto: caam - allow retrieving 'era' from
-register") the CAAM driver is capable of obtaining the era version by
-reading the appropriate CAAM registers, so let the CAAM driver discover
-the era version in run-time instead of hardcoding such information in the
-device tree.
 
-According to Documentation/devicetree/bindings/crypto/fsl-sec4.txt the
-'fsl,sec-era' is an optional property and this can be safely removed
-now.
+On 7/4/2018 4:14 PM, Rafael J. Wysocki wrote:
+> On Wednesday, July 4, 2018 9:16:20 AM CEST Vivek Gautam wrote:
+>> Adding Ulf and Marek.
+>>
+>> On 6/27/2018 6:20 PM, Vivek Gautam wrote:
+>>> Add a flag to autoremove the device links on supplier driver
+>>> unbind. This obviates the need to explicitly delete the link
+>>> in the remove path.
+>>> We remove these links only when the supplier's link to its
+>>> consumers has gone to DL_STATE_SUPPLIER_UNBIND state.
+>>>
+>>> Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
+>>> Suggested-by: Lukas Wunner <lukas@wunner.de>
+>>> Cc: Jonathan Corbet <corbet@lwn.net>
+>>> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>>> Cc: Robin Murphy <robin.murphy@arm.com>
+>>> Cc: linux-doc at vger.kernel.org
+>>> Cc: linux-arm-kernel at lists.infradead.org
+>>> Cc: linux-pm at vger.kernel.org
+>>> Cc: linux-arm-msm at vger.kernel.org
+>>> ---
+>> Hi Rafael, et al.
+>>
+>> Gentle ping.
+>> Do you have comments on this series. I would really like to conclude these
+>> device link additions sooner, and get things moving on the long awaited
+>> arm-smmu clock/runtime support series.
+>>
+>> Thanks again for reviewing these patches.
+> They are fine by me.
+>
+> I can queue them up for 4.19 if no one has objections (Greg in
+> particular).
 
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
----
- arch/arm/boot/dts/imx6qdl.dtsi | 1 -
- arch/arm/boot/dts/imx6sx.dtsi  | 1 -
- arch/arm/boot/dts/imx7s.dtsi   | 1 -
- 3 files changed, 3 deletions(-)
+Hi Rafael,
 
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index 911141e..61d2d26 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -922,7 +922,6 @@
- 
- 			crypto: caam at 2100000 {
- 				compatible = "fsl,sec-v4.0";
--				fsl,sec-era = <4>;
- 				#address-cells = <1>;
- 				#size-cells = <1>;
- 				reg = <0x2100000 0x10000>;
-diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
-index c8970bf..ddbde46 100644
---- a/arch/arm/boot/dts/imx6sx.dtsi
-+++ b/arch/arm/boot/dts/imx6sx.dtsi
-@@ -815,7 +815,6 @@
- 
- 			crypto: caam at 2100000 {
- 				compatible = "fsl,sec-v4.0";
--				fsl,sec-era = <4>;
- 				#address-cells = <1>;
- 				#size-cells = <1>;
- 				reg = <0x2100000 0x10000>;
-diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
-index 9ced589..a052198 100644
---- a/arch/arm/boot/dts/imx7s.dtsi
-+++ b/arch/arm/boot/dts/imx7s.dtsi
-@@ -842,7 +842,6 @@
- 
- 			crypto: caam at 30900000 {
- 				compatible = "fsl,sec-v4.0";
--				fsl,sec-era = <8>;
- 				#address-cells = <1>;
- 				#size-cells = <1>;
- 				reg = <0x30900000 0x40000>;
--- 
-2.7.4
+I will resubmit these 2 patches as part of the arm-smmu series, as one
+of the patch in the series depends on addition of 
+DL_FLAG_AUTOREMOVE_SUPPLIER.
+So these 2 patches and arm-smmu series should go together.
+Can you please consider givnig your Ack?
+
+Best regards
+Vivek
+
+>
+> Thanks,
+> Rafael
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
