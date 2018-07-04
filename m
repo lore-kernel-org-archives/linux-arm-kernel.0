@@ -1,53 +1,97 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Wed, 4 Jul 2018 13:52:13 +0100
-Subject: [linux-sunxi] Re: [PATCH 0/2] Allwinner A64 timer workaround
-In-Reply-To: <bdfb1a31-2c4a-d258-7bf6-aaab8cee4663@sholland.org>
-References: <20180511022751.9096-1-samuel@sholland.org>
- <2c16d5ab-38f7-8f3e-875c-19e8032f440a@arm.com>
- <bdfb1a31-2c4a-d258-7bf6-aaab8cee4663@sholland.org>
-Message-ID: <2ccf60d0-9ea0-0631-ca89-6e67426173f2@arm.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 4 Jul 2018 14:55:33 +0200
+Subject: [PATCH 2/2] device core: Add flag to autoremove device link on
+ supplier unbind
+In-Reply-To: <20180627125056.12851-2-vivek.gautam@codeaurora.org>
+References: <20180627125056.12851-1-vivek.gautam@codeaurora.org>
+ <20180627125056.12851-2-vivek.gautam@codeaurora.org>
+Message-ID: <CAPDyKFoXOJA85fr-80inQoORAFW5mDy1QktkVLey6Vs4QERH8A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 27 June 2018 at 14:50, Vivek Gautam <vivek.gautam@codeaurora.org> wrote:
+> Add a flag to autoremove the device links on supplier driver
+> unbind. This obviates the need to explicitly delete the link
+> in the remove path.
+> We remove these links only when the supplier's link to its
+> consumers has gone to DL_STATE_SUPPLIER_UNBIND state.
+>
+> Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
+> Suggested-by: Lukas Wunner <lukas@wunner.de>
+> Cc: Jonathan Corbet <corbet@lwn.net>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Robin Murphy <robin.murphy@arm.com>
+> Cc: linux-doc at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-pm at vger.kernel.org
+> Cc: linux-arm-msm at vger.kernel.org
 
-On 03/07/18 19:42, Samuel Holland wrote:
-> On 07/03/18 10:09, Marc Zyngier wrote:
->> On 11/05/18 03:27, Samuel Holland wrote:
->>> Hello,
->>>
->>> Several people (including me) have experienced extremely large system
->>> clock jumps on their A64-based devices, apparently due to the architectural
->>> timer going backward, which is interpreted by Linux as the timer wrapping
->>> around after 2^56 cycles.
->>>
->>> Investigation led to discovery of some obvious problems with this SoC's 
->>> architectural timer, and this patch series introduces what I believe is
->>> the simplest workaround. More details are in the commit message for patch
->>> 1. Patch 2 simply enables the workaround in the device tree.
->>
->> What's the deal with this series? There was a couple of nits to address, and 
->> I was more or less expecting a v2.
-> 
-> I got reports that people were still occasionally having clock jumps after
-> applying this series, so I wanted to attempt a more complete fix, but I haven't
-> had time to do any deeper investigation.
+Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
 
-Looking at the FSL workaround, I see that they cover TVAL reads as well.
-Not sure entirely why, but maybe it's worth to follow this lead?
+Kind regards
+Uffe
 
-Cheers,
-Andre.
-
-> I think this series is still beneficial
-> even if it's not a complete solution, so I'll come back with another patch on
-> top of this if/once I get it fully fixed.
-> 
-> I'll prepare a v2 with a bounded loop. Presumably, 3 * (max CPU Hz) / (24MHz
-> timer) ? 150 should be a conservative iteration limit?
-> 
-> Also, does this make sense to CC to stable?
-> 
-> Thanks,
-> Samuel
-> 
+> ---
+>  Documentation/driver-api/device_link.rst |  4 ++++
+>  drivers/base/core.c                      | 10 ++++++++++
+>  include/linux/device.h                   |  2 ++
+>  3 files changed, 16 insertions(+)
+>
+> diff --git a/Documentation/driver-api/device_link.rst b/Documentation/driver-api/device_link.rst
+> index a005b904a264..d6763272e747 100644
+> --- a/Documentation/driver-api/device_link.rst
+> +++ b/Documentation/driver-api/device_link.rst
+> @@ -86,6 +86,10 @@ automatically purged when the consumer fails to probe or later unbinds.
+>  This obviates the need to explicitly delete the link in the ``->remove``
+>  callback or in the error path of the ``->probe`` callback.
+>
+> +Similarly, when the device link is added from supplier's ``->probe`` callback,
+> +``DL_FLAG_AUTOREMOVE_SUPPLIER`` causes the device link to be automatically
+> +purged when the supplier fails to probe or later unbinds.
+> +
+>  Limitations
+>  ===========
+>
+> diff --git a/drivers/base/core.c b/drivers/base/core.c
+> index 14c1e3151e08..e721218bf352 100644
+> --- a/drivers/base/core.c
+> +++ b/drivers/base/core.c
+> @@ -518,6 +518,16 @@ void device_links_driver_cleanup(struct device *dev)
+>
+>                 WARN_ON(link->flags & DL_FLAG_AUTOREMOVE_CONSUMER);
+>                 WARN_ON(link->status != DL_STATE_SUPPLIER_UNBIND);
+> +
+> +               /*
+> +                * autoremove the links between this @dev and its consumer
+> +                * devices that are not active, i.e. where the link state
+> +                * has moved to DL_STATE_SUPPLIER_UNBIND.
+> +                */
+> +               if (link->status == DL_STATE_SUPPLIER_UNBIND &&
+> +                   link->flags & DL_FLAG_AUTOREMOVE_SUPPLIER)
+> +                       kref_put(&link->kref, __device_link_del);
+> +
+>                 WRITE_ONCE(link->status, DL_STATE_DORMANT);
+>         }
+>
+> diff --git a/include/linux/device.h b/include/linux/device.h
+> index 3929805cdd59..e80920452b49 100644
+> --- a/include/linux/device.h
+> +++ b/include/linux/device.h
+> @@ -787,11 +787,13 @@ enum device_link_state {
+>   * AUTOREMOVE_CONSUMER: Remove the link automatically on consumer driver unbind.
+>   * PM_RUNTIME: If set, the runtime PM framework will use this link.
+>   * RPM_ACTIVE: Run pm_runtime_get_sync() on the supplier during link creation.
+> + * AUTOREMOVE_SUPPLIER: Remove the link automatically on supplier driver unbind.
+>   */
+>  #define DL_FLAG_STATELESS              BIT(0)
+>  #define DL_FLAG_AUTOREMOVE_CONSUMER    BIT(1)
+>  #define DL_FLAG_PM_RUNTIME             BIT(2)
+>  #define DL_FLAG_RPM_ACTIVE             BIT(3)
+> +#define DL_FLAG_AUTOREMOVE_SUPPLIER    BIT(4)
+>
+>  /**
+>   * struct device_link - Device link representation.
+> --
+> QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
+> of Code Aurora Forum, hosted by The Linux Foundation
+>
