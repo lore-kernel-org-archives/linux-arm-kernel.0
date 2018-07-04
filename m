@@ -1,59 +1,124 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 4 Jul 2018 12:05:43 +0800
-Subject: [linux-sunxi] Re: [PATCH v3 15/24] dt-bindings: display:
- sun4i-drm: Add description of A64 HDMI PHY
-In-Reply-To: <1814959.07NGAI1aoU@jernej-laptop>
-References: <20180625120304.7543-1-jernej.skrabec@siol.net>
- <1669385.k4L9lni8DF@jernej-laptop>
- <CAGb2v67iRZZTQuTH8inwmPC6S0BRecFgPEpKrxgThQbsYaZgmQ@mail.gmail.com>
- <1814959.07NGAI1aoU@jernej-laptop>
-Message-ID: <CAGb2v65RUiEFSKe9YO8=bROmtozHKRN4s76QHpY+38PJPLaG7w@mail.gmail.com>
+From: j-keerthy@ti.com (Keerthy)
+Date: Wed, 4 Jul 2018 09:53:03 +0530
+Subject: [PATCH RESEND 1/2] ti: wkup_m3_ipc: Add rtc_only with ddr in self
+ refresh mode support
+In-Reply-To: <1529572954-22244-1-git-send-email-j-keerthy@ti.com>
+References: <1529572954-22244-1-git-send-email-j-keerthy@ti.com>
+Message-ID: <f83093e3-b681-f33f-8d2e-42cabee03b7f@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 30, 2018 at 3:32 AM, Jernej ?krabec <jernej.skrabec@siol.net> wrote:
-> Dne ?etrtek, 28. junij 2018 ob 09:00:32 CEST je Chen-Yu Tsai napisal(a):
->> On Thu, Jun 28, 2018 at 12:51 PM, Jernej ?krabec
->>
->> <jernej.skrabec@siol.net> wrote:
->> > Dne ?etrtek, 28. junij 2018 ob 04:19:55 CEST je Chen-Yu Tsai napisal(a):
->> >> On Mon, Jun 25, 2018 at 8:02 PM, Jernej Skrabec <jernej.skrabec@siol.net>
->> >
->> > wrote:
->> >> > A64 HDMI PHY is similar to H3 HDMI PHY except it has two possible PLL
->> >> > clock parents. It is compatible to other HDMI PHYs, like that found in
->> >> > R40.
->> >> >
->> >> > Acked-by: Rob Herring <robh@kernel.org>
->> >> > Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
->> >> > ---
->> >> >
->> >> >  Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 4 +++-
->> >> >  1 file changed, 3 insertions(+), 1 deletion(-)
->> >> >
->> >> > diff --git
->> >> > a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
->> >> > b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt index
->> >> > 84fe38dbb900..dc83f21ef188 100644
->> >> > --- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
->> >> > +++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
->> >> > @@ -101,6 +101,7 @@ DWC HDMI PHY
->> >> >
->> >> >  Required properties:
->> >> >    - compatible: value must be one of:
->> >> > +    * allwinner,sun50i-a64-hdmi-phy
->> >> >
->> >> >      * allwinner,sun8i-a83t-hdmi-phy
->> >> >      * allwinner,sun8i-h3-hdmi-phy
->> >>
->> >> Nit: the list is sorted by family first, then SoC name, so it should
->> >> be the last on the list.
->> >
->> > I went alphabetically, since "5" is before "8"...
->>
->> I see. I think version sort applies here, given that sun50i is newer
->> than sun8i.
->
-> Should I make a patch for that?
 
-Yes, please.
+
+On Thursday 21 June 2018 02:52 PM, Keerthy wrote:
+> Adds rtc_only support. This needs resume function to shutdown and
+> reboot the m3.
+
+A gentle ping on this series.
+
+> 
+> Signed-off-by: Keerthy <j-keerthy@ti.com>
+> ---
+> 
+> This is tested on am437x-gp-evm and target for 4.19
+> 
+>  drivers/soc/ti/wkup_m3_ipc.c | 41 +++++++++++++++++++++++++++++++++++++++++
+>  include/linux/wkup_m3_ipc.h  |  3 +++
+>  2 files changed, 44 insertions(+)
+> 
+> diff --git a/drivers/soc/ti/wkup_m3_ipc.c b/drivers/soc/ti/wkup_m3_ipc.c
+> index 369aef5..b732c39 100644
+> --- a/drivers/soc/ti/wkup_m3_ipc.c
+> +++ b/drivers/soc/ti/wkup_m3_ipc.c
+> @@ -329,12 +329,24 @@ static int wkup_m3_finish_low_power(struct wkup_m3_ipc *m3_ipc)
+>  	return 0;
+>  }
+>  
+> +/**
+> + * wkup_m3_set_rtc_only - Set the rtc_only flag
+> + * @wkup_m3_wakeup: struct wkup_m3_wakeup_src * gets assigned the
+> + *                  wakeup src value
+> + */
+> +static void wkup_m3_set_rtc_only(struct wkup_m3_ipc *m3_ipc)
+> +{
+> +	if (m3_ipc_state)
+> +		m3_ipc_state->is_rtc_only = true;
+> +}
+> +
+>  static struct wkup_m3_ipc_ops ipc_ops = {
+>  	.set_mem_type = wkup_m3_set_mem_type,
+>  	.set_resume_address = wkup_m3_set_resume_address,
+>  	.prepare_low_power = wkup_m3_prepare_low_power,
+>  	.finish_low_power = wkup_m3_finish_low_power,
+>  	.request_pm_status = wkup_m3_request_pm_status,
+> +	.set_rtc_only = wkup_m3_set_rtc_only,
+>  };
+>  
+>  /**
+> @@ -484,6 +496,32 @@ static int wkup_m3_ipc_remove(struct platform_device *pdev)
+>  	return 0;
+>  }
+>  
+> +#ifdef CONFIG_PM
+> +static int wkup_m3_ipc_suspend(struct device *dev)
+> +{
+> +	/*
+> +	 * Nothing needs to be done on suspend even with rtc_only flag set
+> +	 */
+> +	return 0;
+> +}
+> +
+> +static int wkup_m3_ipc_resume(struct device *dev)
+> +{
+> +	if (m3_ipc_state->is_rtc_only) {
+> +		rproc_shutdown(m3_ipc_state->rproc);
+> +		rproc_boot(m3_ipc_state->rproc);
+> +	}
+> +
+> +	m3_ipc_state->is_rtc_only = false;
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct dev_pm_ops wkup_m3_ipc_pm_ops = {
+> +	SET_SYSTEM_SLEEP_PM_OPS(wkup_m3_ipc_suspend, wkup_m3_ipc_resume)
+> +};
+> +#endif
+> +
+>  static const struct of_device_id wkup_m3_ipc_of_match[] = {
+>  	{ .compatible = "ti,am3352-wkup-m3-ipc", },
+>  	{ .compatible = "ti,am4372-wkup-m3-ipc", },
+> @@ -497,6 +535,9 @@ static int wkup_m3_ipc_remove(struct platform_device *pdev)
+>  	.driver = {
+>  		.name = "wkup_m3_ipc",
+>  		.of_match_table = wkup_m3_ipc_of_match,
+> +#ifdef CONFIG_PM
+> +		.pm = &wkup_m3_ipc_pm_ops,
+> +#endif
+>  	},
+>  };
+>  
+> diff --git a/include/linux/wkup_m3_ipc.h b/include/linux/wkup_m3_ipc.h
+> index d6ba7d3..d639df1 100644
+> --- a/include/linux/wkup_m3_ipc.h
+> +++ b/include/linux/wkup_m3_ipc.h
+> @@ -40,6 +40,7 @@ struct wkup_m3_ipc {
+>  	struct mbox_chan *mbox;
+>  
+>  	struct wkup_m3_ipc_ops *ops;
+> +	int is_rtc_only;
+>  };
+>  
+>  struct wkup_m3_ipc_ops {
+> @@ -48,8 +49,10 @@ struct wkup_m3_ipc_ops {
+>  	int (*prepare_low_power)(struct wkup_m3_ipc *m3_ipc, int state);
+>  	int (*finish_low_power)(struct wkup_m3_ipc *m3_ipc);
+>  	int (*request_pm_status)(struct wkup_m3_ipc *m3_ipc);
+> +	void (*set_rtc_only)(struct wkup_m3_ipc *m3_ipc);
+>  };
+>  
+>  struct wkup_m3_ipc *wkup_m3_ipc_get(void);
+>  void wkup_m3_ipc_put(struct wkup_m3_ipc *m3_ipc);
+> +void wkup_m3_set_rtc_only_mode(void);
+>  #endif /* _LINUX_WKUP_M3_IPC_H */
+> 
