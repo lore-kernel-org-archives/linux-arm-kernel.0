@@ -1,24 +1,37 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 4 Jul 2018 17:12:12 +0100
-Subject: [PATCHv4 00/10] ARMv8.3 pointer authentication userspace support
-In-Reply-To: <20180503132031.25705-1-mark.rutland@arm.com>
-References: <20180503132031.25705-1-mark.rutland@arm.com>
-Message-ID: <20180704161212.GS4828@arm.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed,  4 Jul 2018 13:14:01 -0300
+Subject: [PATCH 1/2] ARM: dts: imx51: Add M4IF support
+Message-ID: <1530720842-28281-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HI Mark,
+From: Fabio Estevam <fabio.estevam@nxp.com>
 
-On Thu, May 03, 2018 at 02:20:21PM +0100, Mark Rutland wrote:
-> This series adds support for the ARMv8.3 pointer authentication extension,
-> enabling userspace return address protection with recent versions of GCC.
+As per the i.MX51 Reference Manual the M4IF register region
+starts at 0x83fd8000 and has a 4kB address range.
 
-As discussed off-list, I'd really like to get a feel for how we might use
-this to protect the kernel before we commit to a userspace ABI, especially
-given that there is some level of resource sharing with the keys.
+Add support for it.
 
-So ideally, we'd merge this along with the support for the kernel side.
-In the meantime, is it worth taking any of the ID register sanity checks
-now?
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+---
+ arch/arm/boot/dts/imx51.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-Will
+diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
+index 66e4187..b417c39 100644
+--- a/arch/arm/boot/dts/imx51.dtsi
++++ b/arch/arm/boot/dts/imx51.dtsi
+@@ -531,6 +531,11 @@
+ 				status = "disabled";
+ 			};
+ 
++			m4if: m4if at 83fd8000 {
++				compatible = "fsl,imx51-m4if";
++				reg = <0x83fd8000 0x1000>;
++			};
++
+ 			weim: weim at 83fda000 {
+ 				#address-cells = <2>;
+ 				#size-cells = <1>;
+-- 
+2.7.4
