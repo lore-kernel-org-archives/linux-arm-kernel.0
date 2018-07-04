@@ -1,133 +1,188 @@
 From: christoffer.dall@arm.com (Christoffer Dall)
-Date: Wed,  4 Jul 2018 11:38:18 +0200
-Subject: [PATCH v2 4/6] KVM: arm/arm64: vgic: Add group field to struct irq
+Date: Wed,  4 Jul 2018 11:38:20 +0200
+Subject: [PATCH v2 6/6] KVM: arm/arm64: vgic: Allow configuration of interrupt
+ groups
 In-Reply-To: <1530697100-22419-1-git-send-email-christoffer.dall@arm.com>
 References: <1530697100-22419-1-git-send-email-christoffer.dall@arm.com>
-Message-ID: <1530697100-22419-5-git-send-email-christoffer.dall@arm.com>
+Message-ID: <1530697100-22419-7-git-send-email-christoffer.dall@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation for proper group 0 and group 1 support in the vgic, we
-add a field in the struct irq to store the group of all interrupts.
+Implement the required MMIO accessors for GICv2 and GICv3 for the
+IGROUPR distributor and redistributor registers.
 
-We initialize the group to group 0 when emulating GICv2 and to group 1
-when emulating GICv3, just like we treat them today.  LPIs are always
-group 1.  We also continue to ignore writes from the guest, preserving
-existing functionality, for now.
+This can allow guests to change behavior compared to running on previous
+versions of KVM, but only to align with the architecture and hardware
+implementations.
 
-Finally, we also add this field to the vgic debug logic to show the
-group for all interrupts.
+This also allows userspace to configure the groups for interrupts.  Note
+that this potentially results in GICv2 guests not receiving interrupts
+after migration if migrating from an older kernel that exposes GICv2
+interrupts as group 1.
 
+Cc: Andrew Jones <drjones@redhat.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
 ---
- include/kvm/arm_vgic.h         |  1 +
- virt/kvm/arm/vgic/vgic-debug.c |  8 +++++---
- virt/kvm/arm/vgic/vgic-init.c  | 19 +++++++++++++++++--
- virt/kvm/arm/vgic/vgic-its.c   |  1 +
- 4 files changed, 24 insertions(+), 5 deletions(-)
+I implemented (but stashed) a version of this which predicated the
+behavior based on the value of GICD_IIDR revision field, falling back to
+ignoring writes and resetting GICv2 groups to 0 if the guest wrote a
+revision less than 2.  However, current QEMU implementations simply
+don't write the GICD_IIDR, so this doesn't help at all without changing
+QEMU anyhow.
 
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 7e64c46..c661d0e 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -133,6 +133,7 @@ struct vgic_irq {
-        u8 source;                      /* GICv2 SGIs only */
-        u8 active_source;               /* GICv2 SGIs only */
-        u8 priority;
-+       u8 group;                       /* 0 == group 0, 1 == group 1 */
-        enum vgic_irq_config config;    /* Level or edge */
+The only actual fix I can see here to work around the problem in the
+kernel is to require an opt-in to allow restoring groups from userspace,
+but that's a lot of logic to support cross-kernel version migration.
 
-        /*
-diff --git a/virt/kvm/arm/vgic/vgic-debug.c b/virt/kvm/arm/vgic/vgic-debug.c
-index c589d4c..d3a403f 100644
---- a/virt/kvm/arm/vgic/vgic-debug.c
-+++ b/virt/kvm/arm/vgic/vgic-debug.c
-@@ -148,6 +148,7 @@ static void print_dist_state(struct seq_file *s, struct vgic_dist *dist)
+Question: Do we expect that cross-kernel version migration is a critical
+feature that people really expect to work, and do we actually have
+examples of catering to this in the kernel elsewhere?  (Also, how would
+then that relate to the whole 'adding a new sysreg breaks migration'
+situation?)
 
-        seq_printf(s, "P=pending_latch, L=line_level, A=active\n");
-        seq_printf(s, "E=enabled, H=hw, C=config (level=1, edge=0)\n");
-+       seq_printf(s, "G=group\n");
- }
+ virt/kvm/arm/vgic/vgic-init.c    |  2 +-
+ virt/kvm/arm/vgic/vgic-mmio-v2.c |  4 +++-
+ virt/kvm/arm/vgic/vgic-mmio-v3.c | 11 +++++++++--
+ virt/kvm/arm/vgic/vgic-mmio.c    | 38 ++++++++++++++++++++++++++++++++++++++
+ virt/kvm/arm/vgic/vgic-mmio.h    |  6 ++++++
+ 5 files changed, 57 insertions(+), 4 deletions(-)
 
- static void print_header(struct seq_file *s, struct vgic_irq *irq,
-@@ -162,8 +163,8 @@ static void print_header(struct seq_file *s, struct vgic_irq *irq,
-        }
-
-        seq_printf(s, "\n");
--       seq_printf(s, "%s%2d TYP   ID TGT_ID PLAEHC     HWID   TARGET SRC PRI VCPU_ID\n", hdr, id);
--       seq_printf(s, "---------------------------------------------------------------\n");
-+       seq_printf(s, "%s%2d TYP   ID TGT_ID PLAEHCG     HWID   TARGET SRC PRI VCPU_ID\n", hdr, id);
-+       seq_printf(s, "----------------------------------------------------------------\n");
- }
-
- static void print_irq_state(struct seq_file *s, struct vgic_irq *irq,
-@@ -182,7 +183,7 @@ static void print_irq_state(struct seq_file *s, struct vgic_irq *irq,
-
-        seq_printf(s, "       %s %4d "
-                      "    %2d "
--                     "%d%d%d%d%d%d "
-+                     "%d%d%d%d%d%d%d "
-                      "%8d "
-                      "%8x "
-                      " %2x "
-@@ -197,6 +198,7 @@ static void print_irq_state(struct seq_file *s, struct vgic_irq *irq,
-                        irq->enabled,
-                        irq->hw,
-                        irq->config == VGIC_CONFIG_LEVEL,
-+                       irq->group,
-                        irq->hwintid,
-                        irq->mpidr,
-                        irq->source,
 diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
-index 230c922..a7c19cd 100644
+index a7c19cd..c0c0b88 100644
 --- a/virt/kvm/arm/vgic/vgic-init.c
 +++ b/virt/kvm/arm/vgic/vgic-init.c
-@@ -175,10 +175,13 @@ static int kvm_vgic_dist_init(struct kvm *kvm, unsigned int nr_spis)
-                irq->vcpu = NULL;
-                irq->target_vcpu = vcpu0;
-                kref_init(&irq->refcount);
--               if (dist->vgic_model == KVM_DEV_TYPE_ARM_VGIC_V2)
-+               if (dist->vgic_model == KVM_DEV_TYPE_ARM_VGIC_V2) {
-                        irq->targets = 0;
--               else
-+                       irq->group = 0;
-+               } else {
-                        irq->mpidr = 0;
-+                       irq->group = 1;
-+               }
-        }
-        return 0;
+@@ -313,7 +313,7 @@ int vgic_init(struct kvm *kvm)
+
+        vgic_debug_init(kvm);
+
+-       dist->implementation_rev = 1;
++       dist->implementation_rev = 2;
+        dist->initialized = true;
+
+ out:
+diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+index db646f1..a7f09b5 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
++++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+@@ -26,6 +26,8 @@
+  * The Revision field in the IIDR have the following meanings:
+  *
+  * Revision 1: Report GICv2 interrupts as group 0 instead of group 1
++ * Revision 2: Interrupt groups are guest-configurable and signaled using
++ *            their configured groups.
+  */
+
+ static unsigned long vgic_mmio_read_v2_misc(struct kvm_vcpu *vcpu,
+@@ -371,7 +373,7 @@ static const struct vgic_register_region vgic_v2_dist_registers[] = {
+                vgic_mmio_read_v2_misc, vgic_mmio_write_v2_misc, 12,
+                VGIC_ACCESS_32bit),
+        REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_IGROUP,
+-               vgic_mmio_read_raz, vgic_mmio_write_wi, NULL, NULL, 1,
++               vgic_mmio_read_group, vgic_mmio_write_group, NULL, NULL, 1,
+                VGIC_ACCESS_32bit),
+        REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ENABLE_SET,
+                vgic_mmio_read_enable, vgic_mmio_write_senable, NULL, NULL, 1,
+diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+index ebe10a0..49df2a1 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
++++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+@@ -59,6 +59,13 @@ bool vgic_supports_direct_msis(struct kvm *kvm)
+        return kvm_vgic_global_state.has_gicv4 && vgic_has_its(kvm);
  }
-@@ -227,6 +230,18 @@ int kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
-                        /* PPIs */
-                        irq->config = VGIC_CONFIG_LEVEL;
-                }
+
++/*
++ * The Revision field in the IIDR have the following meanings:
++ *
++ * Revision 2: Interrupt groups are guest-configurable and signaled using
++ *            their configured groups.
++ */
 +
-+               /*
-+                * GICv3 can only be created via the KVM_DEVICE_CREATE API and
-+                * so we always know the emulation type at this point as it's
-+                * either explicitly configured as GICv3, or explicitly
-+                * configured as GICv2, or not configured yet which also
-+                * implies GICv2.
-+                */
-+               if (dist->vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3)
-+                       irq->group = 1;
-+               else
-+                       irq->group = 0;
-        }
+ static unsigned long vgic_mmio_read_v3_misc(struct kvm_vcpu *vcpu,
+                                            gpa_t addr, unsigned int len)
+ {
+@@ -454,7 +461,7 @@ static const struct vgic_register_region vgic_v3_dist_registers[] = {
+                vgic_mmio_read_rao, vgic_mmio_write_wi, 4,
+                VGIC_ACCESS_32bit),
+        REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_IGROUPR,
+-               vgic_mmio_read_rao, vgic_mmio_write_wi, NULL, NULL, 1,
++               vgic_mmio_read_group, vgic_mmio_write_group, NULL, NULL, 1,
+                VGIC_ACCESS_32bit),
+        REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_ISENABLER,
+                vgic_mmio_read_enable, vgic_mmio_write_senable, NULL, NULL, 1,
+@@ -527,7 +534,7 @@ static const struct vgic_register_region vgic_v3_rdbase_registers[] = {
 
-        if (!irqchip_in_kernel(vcpu->kvm))
-diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index 4ed79c9..92840c0 100644
---- a/virt/kvm/arm/vgic/vgic-its.c
-+++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -71,6 +71,7 @@ static struct vgic_irq *vgic_add_lpi(struct kvm *kvm, u32 intid,
-        kref_init(&irq->refcount);
-        irq->intid = intid;
-        irq->target_vcpu = vcpu;
-+       irq->group = 1;
+ static const struct vgic_register_region vgic_v3_sgibase_registers[] = {
+        REGISTER_DESC_WITH_LENGTH(GICR_IGROUPR0,
+-               vgic_mmio_read_rao, vgic_mmio_write_wi, 4,
++               vgic_mmio_read_group, vgic_mmio_write_group, 4,
+                VGIC_ACCESS_32bit),
+        REGISTER_DESC_WITH_LENGTH(GICR_ISENABLER0,
+                vgic_mmio_read_enable, vgic_mmio_write_senable, 4,
+diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
+index ff9655c..ae31bd0 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio.c
++++ b/virt/kvm/arm/vgic/vgic-mmio.c
+@@ -40,6 +40,44 @@ void vgic_mmio_write_wi(struct kvm_vcpu *vcpu, gpa_t addr,
+        /* Ignore */
+ }
 
-        spin_lock_irqsave(&dist->lpi_list_lock, flags);
++unsigned long vgic_mmio_read_group(struct kvm_vcpu *vcpu,
++                                  gpa_t addr, unsigned int len)
++{
++       u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
++       u32 value = 0;
++       int i;
++
++       /* Loop over all IRQs affected by this read */
++       for (i = 0; i < len * 8; i++) {
++               struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
++
++               if (irq->group)
++                       value |= BIT(i);
++
++               vgic_put_irq(vcpu->kvm, irq);
++       }
++
++       return value;
++}
++
++void vgic_mmio_write_group(struct kvm_vcpu *vcpu, gpa_t addr,
++                          unsigned int len, unsigned long val)
++{
++       u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
++       int i;
++       unsigned long flags;
++
++       for (i = 0; i < len * 8; i++) {
++               struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
++
++               spin_lock_irqsave(&irq->irq_lock, flags);
++               irq->group = !!(val & BIT(i));
++               vgic_queue_irq_unlock(vcpu->kvm, irq, flags);
++
++               vgic_put_irq(vcpu->kvm, irq);
++       }
++}
++
+ /*
+  * Read accesses to both GICD_ICENABLER and GICD_ISENABLER return the value
+  * of the enabled bit, so there is only one function for both here.
+diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
+index 5693f6df..1079862 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio.h
++++ b/virt/kvm/arm/vgic/vgic-mmio.h
+@@ -134,6 +134,12 @@ unsigned long vgic_mmio_read_rao(struct kvm_vcpu *vcpu,
+ void vgic_mmio_write_wi(struct kvm_vcpu *vcpu, gpa_t addr,
+                        unsigned int len, unsigned long val);
+
++unsigned long vgic_mmio_read_group(struct kvm_vcpu *vcpu, gpa_t addr,
++                                  unsigned int len);
++
++void vgic_mmio_write_group(struct kvm_vcpu *vcpu, gpa_t addr,
++                          unsigned int len, unsigned long val);
++
+ unsigned long vgic_mmio_read_enable(struct kvm_vcpu *vcpu,
+                                    gpa_t addr, unsigned int len);
 
 --
 2.7.4
