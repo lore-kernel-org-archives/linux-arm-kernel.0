@@ -1,101 +1,61 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 4 Jul 2018 12:50:42 +0200
-Subject: [PATCH v2 1/1] mmc: sunxi: Disable irq during pm_suspend
-In-Reply-To: <1530685741-20604-1-git-send-email-stefan@olimex.com>
-References: <1530685741-20604-1-git-send-email-stefan@olimex.com>
-Message-ID: <CAPDyKFo_fadfNbt8YMS3MMjaxjt1B54DtZJ+-LoH9y5JeRi5pQ@mail.gmail.com>
+From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
+Date: Wed, 04 Jul 2018 13:51:22 +0300
+Subject: [PATCH 5/6] perf/core: Use ioctl to communicate driver
+ configuration to kernel
+In-Reply-To: <CANLsYkxpLyqN76KQ3VyLq8H27hLsHxLy+zZA1xRyUXGXwx42AA@mail.gmail.com>
+References: <1530570810-28929-1-git-send-email-mathieu.poirier@linaro.org>
+ <1530570810-28929-6-git-send-email-mathieu.poirier@linaro.org>
+ <20180703100348.fy43f4fosw3fdc6i@um.fi.intel.com>
+ <CANLsYkxpLyqN76KQ3VyLq8H27hLsHxLy+zZA1xRyUXGXwx42AA@mail.gmail.com>
+Message-ID: <87bmbn6zpx.fsf@ashishki-desk.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Marc
+Mathieu Poirier <mathieu.poirier@linaro.org> writes:
 
-On 4 July 2018 at 08:28, Stefan Mavrodiev <stefan@olimex.com> wrote:
-> When mmc host controller enters suspend state, the clocks are
-> disabled, but irqs are not. For some reason the irqchip emits
-> false interrupts, which causes system lock loop.
->
-> Debug log is:
->   ...
->   sunxi-mmc 1c11000.mmc: setting clk to 52000000, rounded 51200000
->   sunxi-mmc 1c11000.mmc: enabling the clock
->   sunxi-mmc 1c11000.mmc: cmd 13(8000014d) arg 10000 ie 0x0000bbc6 len 0
->   sunxi-mmc 1c11000.mmc: irq: rq (ptrval) mi 00000004 idi 00000000
->   sunxi-mmc 1c11000.mmc: cmd 6(80000146) arg 3210101 ie 0x0000bbc6 len 0
->   sunxi-mmc 1c11000.mmc: irq: rq (ptrval) mi 00000004 idi 00000000
->   sunxi-mmc 1c11000.mmc: cmd 13(8000014d) arg 10000 ie 0x0000bbc6 len 0
->   sunxi-mmc 1c11000.mmc: irq: rq (ptrval) mi 00000004 idi 00000000
->   mmc1: new DDR MMC card at address 0001
->   mmcblk1: mmc1:0001 AGND3R 14.6 GiB
->   mmcblk1boot0: mmc1:0001 AGND3R partition 1 4.00 MiB
->   mmcblk1boot1: mmc1:0001 AGND3R partition 2 4.00 MiB
->   sunxi-mmc 1c11000.mmc: cmd 18(80003352) arg 0 ie 0x0000fbc2 len 409
->   sunxi-mmc 1c11000.mmc: irq: rq (ptrval) mi 00004000 idi 00000002
->    mmcblk1: p1
->   sunxi-mmc 1c11000.mmc: irq: rq   (null) mi 00000000 idi 00000000
->   sunxi-mmc 1c11000.mmc: irq: rq   (null) mi 00000000 idi 00000000
->   sunxi-mmc 1c11000.mmc: irq: rq   (null) mi 00000000 idi 00000000
->   sunxi-mmc 1c11000.mmc: irq: rq   (null) mi 00000000 idi 00000000
-> and so on...
->
-> This issue apears on eMMC cards, routed on MMC2 slot. The patch is
-> tested with A20-OLinuXino-MICRO/LIME/LIME2 boards.
->
-> Fixes: 9a8e1e8cc2c0 ("mmc: sunxi: Add runtime_pm support")
-> Signed-off-by: Stefan Mavrodiev <stefan@olimex.com>
-> ---
->  Changes in v2:
->   - Add comment why disable_irq() is necessary
->
-> ---
->  drivers/mmc/host/sunxi-mmc.c | 7 +++++++
->  1 file changed, 7 insertions(+)
->
-> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-> index e747259..8e7f3e3 100644
-> --- a/drivers/mmc/host/sunxi-mmc.c
-> +++ b/drivers/mmc/host/sunxi-mmc.c
-> @@ -1446,6 +1446,7 @@ static int sunxi_mmc_runtime_resume(struct device *dev)
->         sunxi_mmc_init_host(host);
->         sunxi_mmc_set_bus_width(host, mmc->ios.bus_width);
->         sunxi_mmc_set_clk(host, &mmc->ios);
-> +       enable_irq(host->irq);
->
->         return 0;
->  }
-> @@ -1455,6 +1456,12 @@ static int sunxi_mmc_runtime_suspend(struct device *dev)
->         struct mmc_host *mmc = dev_get_drvdata(dev);
->         struct sunxi_mmc_host *host = mmc_priv(mmc);
->
-> +       /*
-> +        * When clocks are off, it's possible receiving
-> +        * fake interrupts, which will stall the system.
-> +        * Disabling the irq  will prevent this.
-> +        */
-> +       disable_irq(host->irq);
+> Hi Alex,
 
-No, this doesn't work for shared IRQs.
+Hi Mathieu,
 
->         sunxi_mmc_reset_host(host);
->         sunxi_mmc_disable(host);
+> On Tue, 3 Jul 2018 at 04:03, Alexander Shishkin
+> <alexander.shishkin@linux.intel.com> wrote:
+>>
+>> On Mon, Jul 02, 2018 at 04:33:29PM -0600, Mathieu Poirier wrote:
+>> > This patch follows what has been done for filters by adding an ioctl()
+>> > option to communicate to the kernel arbitrary PMU specific configuration
+>> > that don't fit in the conventional struct perf_event_attr to the kernel.
+>>
+>> Ok, so what *is* the PMU specific configuration that doesn't fit in the
+>> attribute and needs to be re-configured by the driver using the generation
+>> tracking?
+>>
 >
-> --
-> 2.7.4
->
+> In this patchset I'm am after the specification of sink information
+> for each event, i.e what sink a CPU is supposed to use for the
+> session.  I simply don't see putting something that PMU specific in
+> the generic perf_event_attr structure.  I also intend to use the same
+> ioctl mechanism to communicate complex tracer configuration for
+> sequencers, counters and input events.  I don't see a nice way of
+> doing that from the perf_event_attr, and that is even without thinking
+> about the different flavours of tracers out there, all with their own
+> features.
 
-The only option today is to use free_irq() in runtime suspend and then
-re-request the irq to re-install the handler at runtime resume.
+Yes, the sequencers and counters seem tricky. Here's a wild idea: can
+the sequencer/counter configuration be expressed as an eBPF program? Or,
+can an eBPF program be used to program those?
 
-That's not an optimal solution, which is pointed out in the below
-discussion as well. Moreover, it has also turned out using free_irq()
-is also problematic in cases threaded handlers are used.
+> I've looked around and the only clean way I found to support this is
+> via an ioctl().  That way each tracer can easily identify the sink it
+> should be using without smearing the perf_event_attr structure.  I
+> would be happy to explore a different avenue should you think of
+> something.
 
-Here's the link to the discussion, it's not the only one I know of, so
-this is common problem.
-https://lkml.org/lkml/2016/1/28/213
+Yes, I also have something similar on my todo list and I was previously
+thinking along the lines of pipe()/splice(). As in, you take the AUX
+event file descriptor and feed it to the sink, at which point the trace
+path is configured. I need to dig up the notes that I made back in the
+day to continue this conversation in more concrete terms.
 
-Care to have a hack on the "common" solution, which in principle means
-adding APIs to genirq that can disable/enable handlers from being
-called, rather than the entire IRQ line.
-
-Kind regards
-Uffe
+Regards,
+--
+Alex
