@@ -1,66 +1,75 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 4 Jul 2018 23:03:10 +0100
-Subject: [PATCH v3 15/20] kvm: arm/arm64: Allow tuning the physical
- address size for VM
-In-Reply-To: <20180704155104.GN4828@arm.com>
-References: <1530270944-11351-1-git-send-email-suzuki.poulose@arm.com>
- <1530270944-11351-16-git-send-email-suzuki.poulose@arm.com>
- <20180704155104.GN4828@arm.com>
-Message-ID: <12d1832a-1a13-7dd4-662b-addf58400789@arm.com>
+Date: Wed,  4 Jul 2018 23:07:46 +0100
+Subject: [PATCH 2/2] arm64: Handle mismatched cache type
+In-Reply-To: <1530742066-16276-1-git-send-email-suzuki.poulose@arm.com>
+References: <1530742066-16276-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1530742066-16276-3-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/04/2018 04:51 PM, Will Deacon wrote:
-> Hi Suzuki,
-> 
-> On Fri, Jun 29, 2018 at 12:15:35PM +0100, Suzuki K Poulose wrote:
->> Allow specifying the physical address size for a new VM via
->> the kvm_type argument for KVM_CREATE_VM ioctl. This allows
->> us to finalise the stage2 page table format as early as possible
->> and hence perform the right checks on the memory slots without
->> complication. The size is encoded as Log2(PA_Size) in the bits[7:0]
->> of the type field and can encode more information in the future if
->> required. The IPA size is still capped at 40bits.
->>
->> Cc: Marc Zyngier <marc.zyngier@arm.com>
->> Cc: Christoffer Dall <cdall@kernel.org>
->> Cc: Peter Maydel <peter.maydell@linaro.org>
->> Cc: Paolo Bonzini <pbonzini@redhat.com>
->> Cc: Radim Kr?m?? <rkrcmar@redhat.com>
->> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->> ---
->>   arch/arm/include/asm/kvm_mmu.h   |  2 ++
->>   arch/arm64/include/asm/kvm_arm.h | 10 +++-------
->>   arch/arm64/include/asm/kvm_mmu.h |  2 ++
->>   include/uapi/linux/kvm.h         | 10 ++++++++++
->>   virt/kvm/arm/arm.c               | 24 ++++++++++++++++++++++--
->>   5 files changed, 39 insertions(+), 9 deletions(-)
-> 
-> [...]
-> 
->> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
->> index 4df9bb6..fa4cab0 100644
->> --- a/include/uapi/linux/kvm.h
->> +++ b/include/uapi/linux/kvm.h
->> @@ -751,6 +751,16 @@ struct kvm_ppc_resize_hpt {
->>   #define KVM_S390_SIE_PAGE_OFFSET 1
->>   
->>   /*
->> + * On arm/arm64, machine type can be used to request the physical
->> + * address size for the VM. Bits [7-0] have been reserved for the
->> + * PA size shift (i.e, log2(PA_Size)). For backward compatibility,
->> + * value 0 implies the default IPA size, which is 40bits.
->> + */
->> +#define KVM_VM_TYPE_ARM_PHYS_SHIFT_MASK	0xff
->> +#define KVM_VM_TYPE_ARM_PHYS_SHIFT(x)		\
->> +	((x) & KVM_VM_TYPE_ARM_PHYS_SHIFT_MASK)
-> 
-> This seems like you're allocating quite a lot of bits in a non-extensible
-> interface to a fairly esoteric parameter. Would it be better to add another
-> ioctl, or condense the number of sizes you support instead?
+Track mismatches in the cache type register (CTR_EL0), other
+than the D/I min line sizes and trap user accesses if there are any.
 
-As I explained in the other thread, we need the size as soon as the VM
-is created. The major challenge is keeping the backward compatibility by
-mapping 0 to 40bits. I will give it a thought.
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+---
+ arch/arm64/include/asm/cpucaps.h |  3 ++-
+ arch/arm64/kernel/cpu_errata.c   | 17 ++++++++++++++---
+ 2 files changed, 16 insertions(+), 4 deletions(-)
 
-Suzuki
+diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
+index 8a699c7..be3bf3d 100644
+--- a/arch/arm64/include/asm/cpucaps.h
++++ b/arch/arm64/include/asm/cpucaps.h
+@@ -49,7 +49,8 @@
+ #define ARM64_HAS_CACHE_DIC			28
+ #define ARM64_HW_DBM				29
+ #define ARM64_SSBD				30
++#define ARM64_MISMATCHED_CACHE_TYPE		31
+ 
+-#define ARM64_NCAPS				31
++#define ARM64_NCAPS				32
+ 
+ #endif /* __ASM_CPUCAPS_H */
+diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+index 5d1fa92..5d59ff9 100644
+--- a/arch/arm64/kernel/cpu_errata.c
++++ b/arch/arm64/kernel/cpu_errata.c
+@@ -65,11 +65,15 @@ is_kryo_midr(const struct arm64_cpu_capabilities *entry, int scope)
+ }
+ 
+ static bool
+-has_mismatched_cache_line_size(const struct arm64_cpu_capabilities *entry,
+-				int scope)
++has_mismatched_cache_type(const struct arm64_cpu_capabilities *entry,
++			  int scope)
+ {
+ 	u64 mask = CTR_CACHE_MINLINE_MASK;
+ 
++	/* Skip matching the min line sizes for cache type check */
++	if (entry->capability == ARM64_MISMATCHED_CACHE_TYPE)
++		mask ^= arm64_ftr_reg_ctrel0.strict_mask;
++
+ 	WARN_ON(scope != SCOPE_LOCAL_CPU || preemptible());
+ 	return (read_cpuid_cachetype() & mask) !=
+ 	       (arm64_ftr_reg_ctrel0.sys_val & mask);
+@@ -615,7 +619,14 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
+ 	{
+ 		.desc = "Mismatched cache line size",
+ 		.capability = ARM64_MISMATCHED_CACHE_LINE_SIZE,
+-		.matches = has_mismatched_cache_line_size,
++		.matches = has_mismatched_cache_type,
++		.type = ARM64_CPUCAP_LOCAL_CPU_ERRATUM,
++		.cpu_enable = cpu_enable_trap_ctr_access,
++	},
++	{
++		.desc = "Mismatched cache type",
++		.capability = ARM64_MISMATCHED_CACHE_TYPE,
++		.matches = has_mismatched_cache_type,
+ 		.type = ARM64_CPUCAP_LOCAL_CPU_ERRATUM,
+ 		.cpu_enable = cpu_enable_trap_ctr_access,
+ 	},
+-- 
+2.9.5
