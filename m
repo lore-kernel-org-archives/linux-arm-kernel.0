@@ -1,70 +1,49 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 04 Jul 2018 15:35:26 +0100
-Subject: Applied "ASoC: qdsp6: q6afe-dai: do not close port if its not opened"
- to the asoc tree
-In-Reply-To: <20180704094944.16440-6-srinivas.kandagatla@linaro.org>
-Message-ID: <E1faisQ-0003PO-Rt@debutante>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 4 Jul 2018 15:37:28 +0100
+Subject: [PATCH v5 00/20] APEI in_nmi() rework and arm64 SDEI wire-up
+In-Reply-To: <20180626170116.25825-1-james.morse@arm.com>
+References: <20180626170116.25825-1-james.morse@arm.com>
+Message-ID: <20180704143727.GI4828@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+Hi James,
 
-   ASoC: qdsp6: q6afe-dai: do not close port if its not opened
+On Tue, Jun 26, 2018 at 06:00:56PM +0100, James Morse wrote:
+> The aim of this series is to wire arm64's SDEI into APEI.
+> 
+> On arm64 we have three APEI notifications that are NMI-like, and
+> in the unlikely event that all three are supported by a platform,
+> they can interrupt each other.
+> The GHES driver shouldn't have to deal with this, so this series aims
+> to make it re-entrant.
+> 
+> To do that, we refactor the estatus queue to allow multiple notifications
+> to use it, then convert NOTIFY_SEA to always be described as NMI-like,
+> and to use the estatus queue.
+> 
+> From here we push the locking and fixmap choices out to the notification
+> functions, and remove the use of per-ghes estatus and flags. This removes
+> the in_nmi() 'timebomb' in ghes_copy_tofrom_phys().
+> 
+> Things get sticky when an NMI notification needs to know how big the
+> CPER records might be, before reading it. This series splits
+> ghes_estatus_read() to let us peek at the buffer. A side effect of this
+> is the 20byte header will get read twice. (how does it work today? it
+> reads the records into a per-ghes worst-case sized buffer, allocates
+> the correct size and copies the records. in_nmi() use of this per-ghes
+> buffer needs eliminating).
+> 
+> One alternative was to trust firmware's 'max raw data length' and use
+> that to allocate 'enough' memory. We don't use this value today, so its
+> probably wrong on some sytem somewhere.
+> 
+> Since v4 patches 5,8-15 are new, otherwise changes are noted in the patch.
 
-has been applied to the asoc tree at
+The little bits touching arch/arm64/ all look fine to me here, but it looks
+like other patches need review separately and ultimately I suspect you're
+going to route it via some other tree.
 
-   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+Let me know if you need me to help with anything.
 
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
-
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
-
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
-
-Thanks,
-Mark
-
->From 110743189c863e96dc08a581d56c50b965870a3f Mon Sep 17 00:00:00 2001
-From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-Date: Wed, 4 Jul 2018 10:49:43 +0100
-Subject: [PATCH] ASoC: qdsp6: q6afe-dai: do not close port if its not opened
-
-afe ports are open as part of prepare, so for use cases like
-"aplay sample.wav" were sample.wav is not present. This would
-call port close eventhough port was never opened. DSP would
-return errors for such use cases.
-
-Avoid doing this by checking the port state.
-
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- sound/soc/qcom/qdsp6/q6afe-dai.c | 3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/sound/soc/qcom/qdsp6/q6afe-dai.c b/sound/soc/qcom/qdsp6/q6afe-dai.c
-index 5002dd05bf27..a373ca5523ff 100644
---- a/sound/soc/qcom/qdsp6/q6afe-dai.c
-+++ b/sound/soc/qcom/qdsp6/q6afe-dai.c
-@@ -315,6 +315,9 @@ static void q6afe_dai_shutdown(struct snd_pcm_substream *substream,
- 	struct q6afe_dai_data *dai_data = dev_get_drvdata(dai->dev);
- 	int rc;
- 
-+	if (!dai_data->is_port_started[dai->id])
-+		return;
-+
- 	rc = q6afe_port_stop(dai_data->port[dai->id]);
- 	if (rc < 0)
- 		dev_err(dai->dev, "fail to close AFE port (%d)\n", rc);
--- 
-2.18.0.rc2
+Will
