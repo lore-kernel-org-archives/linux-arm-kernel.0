@@ -1,45 +1,85 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 4 Jul 2018 15:09:43 +0100
-Subject: [kvmtool test PATCH 22/24] kvmtool: arm64: Add support for guest
- physical address size
-In-Reply-To: <1530270944-11351-23-git-send-email-suzuki.poulose@arm.com>
-References: <1530270944-11351-1-git-send-email-suzuki.poulose@arm.com>
- <1530270944-11351-23-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20180704140943.GF4828@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 4 Jul 2018 15:11:06 +0100
+Subject: [PATCH v2 3/7] arm64: topology: add support to remove cpu
+ topology sibling masks
+In-Reply-To: <20180704135809.GB4828@arm.com>
+References: <1529327923-17911-1-git-send-email-sudeep.holla@arm.com>
+ <1529327923-17911-4-git-send-email-sudeep.holla@arm.com>
+ <20180704135809.GB4828@arm.com>
+Message-ID: <40adc362-79b4-d118-7148-cca4c99242fc@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 29, 2018 at 12:15:42PM +0100, Suzuki K Poulose wrote:
-> Add an option to specify the physical address size used by this
-> VM.
+
+
+On 04/07/18 14:58, Will Deacon wrote:
+> On Mon, Jun 18, 2018 at 02:18:39PM +0100, Sudeep Holla wrote:
+>> This patch adds support to remove all the CPU topology information using
+>> clear_cpu_topology and also resetting the sibling information on other
+>> sibling CPUs. This will be used in cpu_disable so that all the topology
+>> sibling information is removed on CPU hotplug out.
+>>
+>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+>> ---
+>>  arch/arm64/include/asm/topology.h |  1 +
+>>  arch/arm64/kernel/topology.c      | 15 +++++++++++++++
+>>  2 files changed, 16 insertions(+)
+>>
+>> diff --git a/arch/arm64/include/asm/topology.h b/arch/arm64/include/asm/topology.h
+>> index df48212f767b..fb996f454305 100644
+>> --- a/arch/arm64/include/asm/topology.h
+>> +++ b/arch/arm64/include/asm/topology.h
+>> @@ -23,6 +23,7 @@ extern struct cpu_topology cpu_topology[NR_CPUS];
+>>
+>>  void init_cpu_topology(void);
+>>  void store_cpu_topology(unsigned int cpuid);
+>> +void remove_cpu_topology(unsigned int cpuid);
+>>  const struct cpumask *cpu_coregroup_mask(int cpu);
+>>
+>>  #ifdef CONFIG_NUMA
+>> diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+>> index 6ea3ec49d418..38b102013708 100644
+>> --- a/arch/arm64/kernel/topology.c
+>> +++ b/arch/arm64/kernel/topology.c
+>> @@ -322,6 +322,21 @@ static void __init reset_cpu_topology(void)
+>>  		clear_cpu_topology(cpu, true);
+>>  }
+>>
+>> +#define cpu_llc_shared_mask(cpu)	(&cpu_topology[cpu].llc_siblings)
 > 
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->  arm/aarch64/include/kvm/kvm-config-arch.h | 5 ++++-
->  arm/include/arm-common/kvm-config-arch.h  | 1 +
->  2 files changed, 5 insertions(+), 1 deletion(-)
+> Why doesn't this live in topology.h with the other topology masks?
 > 
-> diff --git a/arm/aarch64/include/kvm/kvm-config-arch.h b/arm/aarch64/include/kvm/kvm-config-arch.h
-> index 04be43d..dabd22c 100644
-> --- a/arm/aarch64/include/kvm/kvm-config-arch.h
-> +++ b/arm/aarch64/include/kvm/kvm-config-arch.h
-> @@ -8,7 +8,10 @@
->  			"Create PMUv3 device"),				\
->  	OPT_U64('\0', "kaslr-seed", &(cfg)->kaslr_seed,			\
->  			"Specify random seed for Kernel Address Space "	\
-> -			"Layout Randomization (KASLR)"),
-> +			"Layout Randomization (KASLR)"),		\
-> +	OPT_INTEGER('\0', "phys-shift", &(cfg)->phys_shift,		\
-> +			"Specify maximum physical address size (not "	\
-> +			"the amount of memory)"),
 
-Given that this is a shift value, I think the help message could be more
-informative. Something like:
+The other macros are aligned with other archs and is used in
+drivers/base/topology.c which provides sysfs access. This llc mask
+is not exposed to userspace and hence I thought of containing it along
+with the sole user. I am fine if you prefer to move, but then may be we
+need the name to be aligned to topology_llc_shared_mask or something
+like that.
 
-	"Specify maximum number of bits in a guest physical address"
+>> +void remove_cpu_topology(unsigned int cpu)
+>> +{
+>> +	int sibling;
+>> +
+>> +	for_each_cpu(sibling, topology_core_cpumask(cpu))
+>> +		cpumask_clear_cpu(cpu, topology_core_cpumask(sibling));
+>> +	for_each_cpu(sibling, topology_sibling_cpumask(cpu))
+>> +		cpumask_clear_cpu(cpu, topology_sibling_cpumask(sibling));
+>> +	for_each_cpu(sibling, cpu_llc_shared_mask(cpu))
+>> +		cpumask_clear_cpu(cpu, cpu_llc_shared_mask(sibling));
+>> +
+>> +	clear_cpu_topology(cpu, false);
+> 
+> If there are only two callers of clear_cpu_topology, I'd be inclined to drop
+> the boolean parameter (which is always impossible to read) and just inline
+> the reset code in reset_cpu_topology.
+> 
 
-I think I'd actually leave out any mention of memory, because this does
-actually have an effect on the amount of addressable memory in a way that I
-don't think we want to describe in half of a usage message line :)
+Sure, now that I look at the code again, that makes it much easier to
+read. Will do that.
 
-Will
+-- 
+Regards,
+Sudeep
