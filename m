@@ -1,28 +1,81 @@
-From: ladis@linux-mips.org (Ladislav Michl)
-Date: Wed, 4 Jul 2018 21:45:56 +0200
-Subject: droid 4: connection refused from voltage_now
-In-Reply-To: <20180704171156.GA3158@amd>
-References: <20180704171156.GA3158@amd>
-Message-ID: <20180704194556.GA9189@lenoch>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Wed, 4 Jul 2018 21:49:07 +0200 (CEST)
+Subject: [linux-sunxi] Re: [PATCH 0/2] Allwinner A64 timer workaround
+In-Reply-To: <d87ce7ad-4f85-d7c1-11d1-fa6fb6c3481b@arm.com>
+References: <20180511022751.9096-1-samuel@sholland.org>
+ <2c16d5ab-38f7-8f3e-875c-19e8032f440a@arm.com>
+ <bdfb1a31-2c4a-d258-7bf6-aaab8cee4663@sholland.org>
+ <5283f98e-6443-db7a-fe51-6379ed19002c@arm.com>
+ <24b78819-5e3f-431f-3987-f7409742ef07@linaro.org>
+ <1d75c538-9166-5eec-a08c-b168f9770bd1@arm.com>
+ <alpine.DEB.2.21.1807041151530.1816@nanos.tec.linutronix.de>
+ <1a36f63c-0259-bdcd-bb96-d5230c2564ea@arm.com>
+ <alpine.DEB.2.21.1807041628440.1752@nanos.tec.linutronix.de>
+ <55fc9e48-6329-df75-3a12-60cc42d91a31@arm.com>
+ <alpine.DEB.2.21.1807041704570.1752@nanos.tec.linutronix.de>
+ <d87ce7ad-4f85-d7c1-11d1-fa6fb6c3481b@arm.com>
+Message-ID: <alpine.DEB.2.21.1807042141440.28271@nanos.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 04, 2018 at 07:11:56PM +0200, Pavel Machek wrote:
-> Hi!
+On Wed, 4 Jul 2018, Andre Przywara wrote:
+> On 04/07/18 16:14, Thomas Gleixner wrote:
+> > On Wed, 4 Jul 2018, Andre Przywara wrote:
+> >> On 04/07/18 15:31, Thomas Gleixner wrote:
+> >>> If that's the case then you need to find a different functional timer for
+> >>> time keeping. Having an erratic behaving timer for time keeping is not an
+> >>> option at all.
+> >>
+> >> That's not an option on arm64. There are other usable time sources in
+> >> the SoC, but the arch timer is somewhat mandatory for all practical
+> >> purposes on arm64. We rely on it in some many places that it's not
+> >> feasible to run without it. That's why we call it "architected" timer
+> >> after all ;-)
+> > 
+> > The argument that it has to be used just because someone defined it as
+> > 'architected' is bullshit and doesn't change the fact that it's broken and
+> > not usable for timekeeping. There is no wiggle room. Either it works or
+> > not, but works mostly is not an option.
 > 
-> I started to use droid 4 as my primary phone... so I have battery
-> monitor running for hours... Once every few days it dies with
-> "connection refused" error reading battery's "voltage_now". I restart
-> it and it continues working...
+> The "architected" part of the arch timer is fine, it's just that
+> eventually someone has to implement that at some point. And as you
+> mention below, this is where Murphy's law is kicking in ;-) Especially
+> for such seemingly simple tasks as connecting a counter in the "uncore"
+> part of the chip (Allwinner SoC) to the counter register interface in
+> the core (ARM Cortex-A53) [1]. Apparently the propagation is not really
+> atomic for all bits here ...
 
-Ha! What exactly that "connection refused" means? Is it ECONNREFUSED (111)?
-I have custom at91 based board here with few custom power supply drivers
-and it sometimes ends with voltage_now of my driver being unreadable.
-(I modified userspace code and waiting what's in errno in case reading fails)
+I've immediately spotted the fail in that document:
 
-> That was with v4.17; in v4.18, I'm getting "red screen" a lot.
+  The Cortex-A53 processor does not include the system counter. This
+  resides in the SoC.
 
-Tests are also done v4.17.
-Adding linux-pm at vger.kernel.org as it seems to be subsytem, specific.
+> >> But I am quite confident that we can find a correct workaround. Maybe
+> >> it's really the TVAL (the downcounter) write which is the culprit here,
+> >> since the hardware actually writes "now() + TVAL" into the CVAL
+> >> (upcounter) register. This internal counter access may be flawed as well.
+> > 
+> > If the write to the event device is wreckaging the counter which provides
+> > time, then there is something seriously wrong either in the design or in
+> > that particular piece of silicon.
+> 
+> Apologies, that was my lousy wording: There is one 64-bit comparison
+> register (CVAL), which signals when the counter (an independent
+> register) is greater or equal. TVAL is just a different *view* of that
+> same relation. So this part is fine, it's really that the "strictly
+> monotonic counter" nature of CNTPCT is not really observed by the chip.
+> 
+> > Yet another proof for the theory that timers are implemented by janitors
+> > and that silicon/IP vendors have a competition running who can create the
+> > most subtly broken timers. Intel surely had a head start with that, but ARM
+> > is definitely catching up.
+> 
+> ARM is trying really hard to be actually better ;-)
 
-	ladis
+Better in terms of subtle brokenness? I surely can do consulting for
+that. I've seen most of it in all colours, but I surely can come up with
+new even subtler ways to wreckage them. You know how to reach me.
+
+Thanks,
+
+	tglx
