@@ -1,36 +1,68 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 4 Jul 2018 12:00:11 +0200 (CEST)
-Subject: [PATCH 0/2] Allwinner A64 timer workaround
-In-Reply-To: <1d75c538-9166-5eec-a08c-b168f9770bd1@arm.com>
-References: <20180511022751.9096-1-samuel@sholland.org>
- <2c16d5ab-38f7-8f3e-875c-19e8032f440a@arm.com>
- <bdfb1a31-2c4a-d258-7bf6-aaab8cee4663@sholland.org>
- <5283f98e-6443-db7a-fe51-6379ed19002c@arm.com>
- <24b78819-5e3f-431f-3987-f7409742ef07@linaro.org>
- <1d75c538-9166-5eec-a08c-b168f9770bd1@arm.com>
-Message-ID: <alpine.DEB.2.21.1807041151530.1816@nanos.tec.linutronix.de>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Wed, 04 Jul 2018 13:00:11 +0300
+Subject: [PATCH v2 1/3] serial: 8250: let serial8250_get_divisor() get
+ uart_port * as param
+In-Reply-To: <20180704170040.39ac9cf3@xhacker.debian>
+References: <20180704165908.4bb8b090@xhacker.debian>
+ <20180704170040.39ac9cf3@xhacker.debian>
+Message-ID: <8d29c0ab0c3a6bc3e9bdf3d4bc54d47e7db8cc94.camel@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 4 Jul 2018, Marc Zyngier wrote:
-> On 04/07/18 09:23, Daniel Lezcano wrote:
-> > 
-> > If the patches fix a bug which already exist, it makes sense to
-> > propagated the fix back to the stable versions.
->
-> That's your call, but I'm not supportive of that decision, specially as
-> we have information from the person developing the workaround that this
-> doesn't fully address the issue.
+On Wed, 2018-07-04 at 17:00 +0800, Jisheng Zhang wrote:
+> Align serial8250_get_divisor() with serial8250_set_divisor() to accept
+> uart_port pointer as the first parameter. No functionality changes.
+> 
 
-The patches should not be applied at all. Simply because they don't fix the
-issue completely.
+Reviewed-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
 
->From a quick glance at various links and information about this, this very
-much smells like the FSL_ERRATUM_A008585.
+> Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
+> ---
+>  drivers/tty/serial/8250/8250_port.c | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/tty/serial/8250/8250_port.c
+> b/drivers/tty/serial/8250/8250_port.c
+> index cf541aab2bd0..709fe6b4265c 100644
+> --- a/drivers/tty/serial/8250/8250_port.c
+> +++ b/drivers/tty/serial/8250/8250_port.c
+> @@ -2498,11 +2498,11 @@ static unsigned int npcm_get_divisor(struct
+> uart_8250_port *up,
+>  	return DIV_ROUND_CLOSEST(port->uartclk, 16 * baud + 2) - 2;
+>  }
+>  
+> -static unsigned int serial8250_get_divisor(struct uart_8250_port *up,
+> +static unsigned int serial8250_get_divisor(struct uart_port *port,
+>  					   unsigned int baud,
+>  					   unsigned int *frac)
+>  {
+> -	struct uart_port *port = &up->port;
+> +	struct uart_8250_port *up = up_to_u8250p(port);
+>  	unsigned int quot;
+>  
+>  	/*
+> @@ -2636,7 +2636,7 @@ serial8250_do_set_termios(struct uart_port
+> *port, struct ktermios *termios,
+>  	cval = serial8250_compute_lcr(up, termios->c_cflag);
+>  
+>  	baud = serial8250_get_baud_rate(port, termios, old);
+> -	quot = serial8250_get_divisor(up, baud, &frac);
+> +	quot = serial8250_get_divisor(port, baud, &frac);
+>  
+>  	/*
+>  	 * Ok, we're now changing the port state.  Do it with
+> @@ -3197,7 +3197,7 @@ static void serial8250_console_restore(struct
+> uart_8250_port *up)
+>  		termios.c_cflag = port->state->port.tty-
+> >termios.c_cflag;
+>  
+>  	baud = serial8250_get_baud_rate(port, &termios, NULL);
+> -	quot = serial8250_get_divisor(up, baud, &frac);
+> +	quot = serial8250_get_divisor(port, baud, &frac);
+>  
+>  	serial8250_set_divisor(port, baud, quot, frac);
+>  	serial_port_out(port, UART_LCR, up->lcr);
 
-Has that been tried? It looks way more robust than the magic 11 bit
-crystal ball logic.
-
-Thanks,
-
-	tglx
+-- 
+Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Intel Finland Oy
