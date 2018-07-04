@@ -1,112 +1,80 @@
-From: john.garry@huawei.com (John Garry)
-Date: Wed, 4 Jul 2018 12:23:08 +0100
-Subject: [PATCH] arm64: numa: rework ACPI NUMA initialization
-In-Reply-To: <aeb3d665-4135-f6ea-7f65-13b08983673e@huawei.com>
-References: <20180625130552.5636-1-lorenzo.pieralisi@arm.com>
- <aeb3d665-4135-f6ea-7f65-13b08983673e@huawei.com>
-Message-ID: <e8ddb2a4-ead5-e0b5-3078-c7c0fc4ed7b3@huawei.com>
+From: digetx@gmail.com (Dmitry Osipenko)
+Date: Wed, 04 Jul 2018 14:25:11 +0300
+Subject: [PATCH v2 0/5] Initial support of Trusted Foundations on Tegra30
+In-Reply-To: <5c47ef70-b90e-6e81-39dd-fbcfad2b93e5@gmail.com>
+References: <20180619110027.16935-1-digetx@gmail.com>
+ <11534185.70fb5jbPr6@dimapc> <5c47ef70-b90e-6e81-39dd-fbcfad2b93e5@gmail.com>
+Message-ID: <1635370.HnqPZmo3Ue@dimapc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/06/2018 13:55, Hanjun Guo wrote:
-> On 2018/6/25 21:05, Lorenzo Pieralisi wrote:
->> Current ACPI ARM64 NUMA initialization code in
->>
->> acpi_numa_gicc_affinity_init()
->>
->> carries out NUMA nodes creation and cpu<->node mappings at the same time
->> in the arch backend so that a single SRAT walk is needed to parse both
->> pieces of information.  This implies that the cpu<->node mappings must
->> be stashed in an array (sized NR_CPUS) so that SMP code can later use
->> the stashed values to avoid another SRAT table walk to set-up the early
->> cpu<->node mappings.
->>
->> If the kernel is configured with a NR_CPUS value less than the actual
->> processor entries in the SRAT (and MADT), the logic in
->> acpi_numa_gicc_affinity_init() is broken in that the cpu<->node mapping
->> is only carried out (and stashed for future use) only for a number of
->> SRAT entries up to NR_CPUS, which do not necessarily correspond to the
->> possible cpus detected at SMP initialization in
->> acpi_map_gic_cpu_interface() (ie MADT and SRAT processor entries order
->> is not enforced), which leaves the kernel with broken cpu<->node
->> mappings.
->>
->> Furthermore, given the current ACPI NUMA code parsing logic in
->> acpi_numa_gicc_affinity_init(), PXM domains for CPUs that are not parsed
->> because they exceed NR_CPUS entries are not mapped to NUMA nodes (ie the
->> PXM corresponding node is not created in the kernel) leaving the system
->> with a broken NUMA topology.
->>
->> Rework the ACPI ARM64 NUMA initialization process so that the NUMA
->> nodes creation and cpu<->node mappings are decoupled. cpu<->node
->> mappings are moved to SMP initialization code (where they are needed),
->> at the cost of an extra SRAT walk so that ACPI NUMA mappings can be
->> batched before being applied, fixing current parsing pitfalls.
->>
->> Fixes: d8b47fca8c23 ("arm64, ACPI, NUMA: NUMA support based on SRAT and
->> SLIT")
->> Link: http://lkml.kernel.org/r/1527768879-88161-2-git-send-email-xiexiuqi at huawei.com
->> Reported-by: Xie XiuQi <xiexiuqi@huawei.com>
->> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->> Cc: Punit Agrawal <punit.agrawal@arm.com>
->> Cc: Jonathan Cameron <jonathan.cameron@huawei.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Cc: Hanjun Guo <guohanjun@huawei.com>
->> Cc: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
->> Cc: Jeremy Linton <jeremy.linton@arm.com>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> Cc: Xie XiuQi <xiexiuqi@huawei.com>
->> ---
->>  arch/arm64/include/asm/acpi.h |  6 ++-
->>  arch/arm64/kernel/acpi_numa.c | 88 ++++++++++++++++++++++++++-----------------
->>  arch/arm64/kernel/smp.c       | 39 +++++++++++++------
->>  3 files changed, 85 insertions(+), 48 deletions(-)
->
-> Looks good to me,
->
-> Acked-by: Hanjun Guo <hanjun.guo@linaro.org>
->
-> Tested on D05 with NR_CPUS=48 (with last NUMA node boot
-> without CPUs), the system works fine. If Xiuqi can test
-> this patch on D06 with memory-less node, that would be
-> more helpful.
->
+On Monday, 2 July 2018 21:53:08 MSK Peter Geis wrote:
+> On 07/02/2018 10:48 AM, Dmitry Osipenko wrote:
+> > On Friday, 29 June 2018 22:37:02 MSK Peter Geis wrote:
+> >> Good Afternoon,
+> >> 
+> >> I have tested these patches on the Ouya T3 device.
+> >> They work great to enable the L2 cache controller, however they do not
+> >> respect explicitly disabling the L2 cache controller via the kernel
+> >> config nor device tree.
+> >> 
+> >> With CONFIG_CACHE_L2X0 disabled, but CONFIG_TRUSTED_FOUNDATIONS enabled,
+> >> the L2 cache controller is silently enabled and allows all four cores to
+> >> boot.
+> > 
+> > I don't see how cache could be enabled with CONFIG_CACHE_L2X0 disabled,
+> > there is no code to do that. Could you elaborate please?
+> > 
+> > Secondary cores do not depend on the cache state, disabled cache shouldn't
+> > prevent them to boot.
+> 
+> On the untouched mainline kernel running on a Trusted Foundations T3
+> device, I observed the following indications:
+> With the L2 cache controller enabled, all four processor cores were
+> enabled, but it would immediately panic for writing to a secure register
+> from insecure mode.
+> With the L2 cache controller disabled, only the boot core is detected,
+> but it successfully boots.
+> This is the issue that I inquired originally to you about.
+> 
+> With your patch running on the same device, the following is observed:
+> With the L2 controller enabled, all four cores are active, and the cache
+> controller appears to function.
+> With the L2 controller disabled, but trusted foundations enabled, the L2
+> controller enabled kernel message is missing, however all four cores
+> still enable.
+> 
 
-Hi Lorenzo,
+This is the correct behaviour.
 
-Thanks for this. I have noticed we now miss this log, which I think was 
-somewhat useful:
-ACPI: NUMA: SRAT: cpu_to_node_map[5] is too small, may not be able to 
-use all cpus
+> After looking through the code a little more deeply, I see you modified
+> the reset handler for handling offline cores.
+> I am wondering if you fixed an additional issue inadvertently.
+> 
 
-(I tested arbitary 5 CPUs)
+CPU will fail to boot if it tries to apply erratas via accessing the secure 
+registers. I've changed the reset handler to skip erratas on T20/30 if trusted 
+foundations present, see "Don't apply CPU erratas in insecure mode" patch. 
+This is an intentional change.
 
-For example, the default ARM64 defconfig specifies NR_CPUs default at 
-64, while some boards now have > 64 CPUs, so this info would be missed 
-with a vanilla kernel, right?
+> The reason I discovered this is I am working with kexec as a bootloader.
+> On a device without trusted foundations, kexec works without issue.
+> On a device with trusted foundations and your patch, I found that
+> disabling the l2 cache controller and trusted foundations allow kexec to
+> occur.
+> I haven't tried an either/or scenario, though now you have me thinking I
+> should.
+> 
 
-Also, please note that we now have this log:
-[    0.390565] smp: Brought up 4 nodes, 5 CPUs
+Secondary cores are dying in the reset handler in a case of disabled L2 + 
+disabled TF. Looks like there is something wrong in regards to stopping 
+secondary CPU cores / flushing CPU caches, the suspend-resume isn't working 
+right now because of it and likely that kexec is suffering from the same 
+issue.
 
-while before we had:
-[    0.390561] smp: Brought up 1 node, 5 CPUs
+> >> One must also disable CONFIG_TRUSTED_FOUNDATIONS to stop the L2 cache
+> >> controller from spinning up.
+> >> 
+> >> Tested-by: Peter Geis <pgwipeout@gmail.com>
 
-Maybe my understanding is wrong, but I find this misleading as only 1 
-node was "Brought up".
-
-But the patch fixes our crash on D06:
-Tested-by: John Garry <john.garry@huawei.com>
-
-Thanks very much,
-John
-
-> Thanks
-> Hanjun
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
-> .
->
+Thanks for testing!
