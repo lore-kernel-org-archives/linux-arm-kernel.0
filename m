@@ -1,39 +1,36 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Wed,  4 Jul 2018 10:49:44 +0100
-Subject: [PATCH 6/6] ASoC: qdsp6: q6asm-dai: do not close port if its not
- opened
-In-Reply-To: <20180704094944.16440-1-srinivas.kandagatla@linaro.org>
-References: <20180704094944.16440-1-srinivas.kandagatla@linaro.org>
-Message-ID: <20180704094944.16440-7-srinivas.kandagatla@linaro.org>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Wed, 4 Jul 2018 12:00:11 +0200 (CEST)
+Subject: [PATCH 0/2] Allwinner A64 timer workaround
+In-Reply-To: <1d75c538-9166-5eec-a08c-b168f9770bd1@arm.com>
+References: <20180511022751.9096-1-samuel@sholland.org>
+ <2c16d5ab-38f7-8f3e-875c-19e8032f440a@arm.com>
+ <bdfb1a31-2c4a-d258-7bf6-aaab8cee4663@sholland.org>
+ <5283f98e-6443-db7a-fe51-6379ed19002c@arm.com>
+ <24b78819-5e3f-431f-3987-f7409742ef07@linaro.org>
+ <1d75c538-9166-5eec-a08c-b168f9770bd1@arm.com>
+Message-ID: <alpine.DEB.2.21.1807041151530.1816@nanos.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-asm ports are open as part of prepare, so for use cases like
-"aplay sample.wav" were sample.wav is not present. This would
-call port close eventhough port was never opened. DSP would
-return errors for such use cases.
+On Wed, 4 Jul 2018, Marc Zyngier wrote:
+> On 04/07/18 09:23, Daniel Lezcano wrote:
+> > 
+> > If the patches fix a bug which already exist, it makes sense to
+> > propagated the fix back to the stable versions.
+>
+> That's your call, but I'm not supportive of that decision, specially as
+> we have information from the person developing the workaround that this
+> doesn't fully address the issue.
 
-Avoid doing this by checking the port state.
+The patches should not be applied at all. Simply because they don't fix the
+issue completely.
 
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
----
- sound/soc/qcom/qdsp6/q6asm-dai.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+>From a quick glance at various links and information about this, this very
+much smells like the FSL_ERRATUM_A008585.
 
-diff --git a/sound/soc/qcom/qdsp6/q6asm-dai.c b/sound/soc/qcom/qdsp6/q6asm-dai.c
-index 1196dc7483d2..199d0fb6f90a 100644
---- a/sound/soc/qcom/qdsp6/q6asm-dai.c
-+++ b/sound/soc/qcom/qdsp6/q6asm-dai.c
-@@ -390,7 +390,9 @@ static int q6asm_dai_close(struct snd_pcm_substream *substream)
- 	struct q6asm_dai_rtd *prtd = runtime->private_data;
- 
- 	if (prtd->audio_client) {
--		q6asm_cmd(prtd->audio_client, CMD_CLOSE);
-+		if (prtd->state)
-+			q6asm_cmd(prtd->audio_client, CMD_CLOSE);
-+
- 		q6asm_unmap_memory_regions(substream->stream,
- 					   prtd->audio_client);
- 		q6asm_audio_client_free(prtd->audio_client);
--- 
-2.16.2
+Has that been tried? It looks way more robust than the magic 11 bit
+crystal ball logic.
+
+Thanks,
+
+	tglx
