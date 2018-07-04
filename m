@@ -1,41 +1,32 @@
-From: sergey.lapin@cogentembedded.com (Sergey Lapin)
-Date: Wed, 4 Jul 2018 21:25:11 +0300
-Subject: [PATCH 1/2] ARM: dts: imx51: Add M4IF support
-In-Reply-To: <1530720842-28281-1-git-send-email-festevam@gmail.com>
-References: <1530720842-28281-1-git-send-email-festevam@gmail.com>
-Message-ID: <CACDsZ46F34R1RboGzACb+6MBax_3dympmLBfcLCW4U3itpOX1w@mail.gmail.com>
+From: stefan@datenfreihafen.org (Stefan Schmidt)
+Date: Wed, 4 Jul 2018 20:26:13 +0200
+Subject: [RFC net-next 00/15] net: A socket API for LoRa
+In-Reply-To: <20180701110804.32415-1-afaerber@suse.de>
+References: <20180701110804.32415-1-afaerber@suse.de>
+Message-ID: <487df785-ddf5-ed81-a253-6afb7f2de811@datenfreihafen.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> From: Fabio Estevam <fabio.estevam@nxp.com>
->
-> As per the i.MX51 Reference Manual the M4IF register region
-> starts at 0x83fd8000 and has a 4kB address range.
->
-> Add support for it.
->
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
-> ---
->  arch/arm/boot/dts/imx51.dtsi | 5 +++++
->  1 file changed, 5 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
-> index 66e4187..b417c39 100644
-> --- a/arch/arm/boot/dts/imx51.dtsi
-> +++ b/arch/arm/boot/dts/imx51.dtsi
-> @@ -531,6 +531,11 @@
->                                 status = "disabled";
->                         };
->
-> +                       m4if: m4if at 83fd8000 {
-> +                               compatible = "fsl,imx51-m4if";
-> +                               reg = <0x83fd8000 0x1000>;
-> +                       };
-> +
->                         weim: weim at 83fda000 {
->                                 #address-cells = <2>;
->                                 #size-cells = <1>;
-> --
-> 2.7.4
->
-Tested-by: Sergey Lapin <sergey.lapin@cogentembedded.com>
+Hello.
+
+On 01.07.2018 13:07, Andreas F?rber wrote:
+> 
+> This patchset, updated from 2017 and extended, is implementing kernel drivers
+> for various LoRa chipsets and modules.
+
+I am very happy to see that we now have three people (you, Jian-Hong and
+Ben) working towards a lora subsystem for protocol stack and drivers.
+
+Will allocate some time to look over this and provide some review and
+feedback how we handled things in the ieee802154 and 6lowpan subsystems.
+
+We are also having a IoT protocols workshop during NetDev Conf next week
+in Montreal (short notice if you are not already planning to attend). If
+you (or Ben) has soem topics wanted to bring up their please let me know
+by pm. Jian-Hong will be there presenting on his lora work and I would
+love to get more input from you and Ben on your views on this.
+
+https://netdevconf.org/0x12/session.html?workshop-on-iot-related-mac-layers-header-compression-and-routing-protocols
+
+regards
+Stefan Schmidt
