@@ -1,146 +1,85 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed,  4 Jul 2018 10:36:51 +0200
-Subject: [PATCH v10 6/6] kernel: tracepoints: add support for relative
- references
+Date: Wed,  4 Jul 2018 10:36:46 +0200
+Subject: [PATCH v10 1/6] arch: enable relative relocations for arm64,
+ power and x86
 In-Reply-To: <20180704083651.24360-1-ard.biesheuvel@linaro.org>
 References: <20180704083651.24360-1-ard.biesheuvel@linaro.org>
-Message-ID: <20180704083651.24360-7-ard.biesheuvel@linaro.org>
+Message-ID: <20180704083651.24360-2-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To avoid the need for relocating absolute references to tracepoint
-structures at boot time when running relocatable kernels (which may
-take a disproportionate amount of space), add the option to emit
-these tables as relative references instead.
+Before updating certain subsystems to use place relative 32-bit
+relocations in special sections, to save space and reduce the
+number of absolute relocations that need to be processed at runtime
+by relocatable kernels, introduce the Kconfig symbol and define it
+for some architectures that should be able to support and benefit
+from it.
 
 Acked-by: Michael Ellerman <mpe@ellerman.id.au>
+Reviewed-by: Will Deacon <will.deacon@arm.com>
 Acked-by: Ingo Molnar <mingo@kernel.org>
-Acked-by: Steven Rostedt (VMware) <rostedt@goodmis.org>
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- include/linux/tracepoint.h | 19 ++++++--
- kernel/tracepoint.c        | 49 +++++++++++---------
- 2 files changed, 41 insertions(+), 27 deletions(-)
+ arch/Kconfig         | 10 ++++++++++
+ arch/arm64/Kconfig   |  1 +
+ arch/powerpc/Kconfig |  1 +
+ arch/x86/Kconfig     |  1 +
+ 4 files changed, 13 insertions(+)
 
-diff --git a/include/linux/tracepoint.h b/include/linux/tracepoint.h
-index 19a690b559ca..b130e40d82cb 100644
---- a/include/linux/tracepoint.h
-+++ b/include/linux/tracepoint.h
-@@ -225,6 +225,19 @@ extern void syscall_unregfunc(void);
- 		return static_key_false(&__tracepoint_##name.key);	\
- 	}
+diff --git a/arch/Kconfig b/arch/Kconfig
+index 1aa59063f1fd..2b8b70820002 100644
+--- a/arch/Kconfig
++++ b/arch/Kconfig
+@@ -971,4 +971,14 @@ config REFCOUNT_FULL
+ 	  against various use-after-free conditions that can be used in
+ 	  security flaw exploits.
  
-+#ifdef CONFIG_HAVE_ARCH_PREL32_RELOCATIONS
-+#define __TRACEPOINT_ENTRY(name)					\
-+	asm("	.section \"__tracepoints_ptrs\", \"a\"		\n"	\
-+	    "	.balign 4					\n"	\
-+	    "	.long 	__tracepoint_" #name " - .		\n"	\
-+	    "	.previous					\n")
-+#else
-+#define __TRACEPOINT_ENTRY(name)					 \
-+	static struct tracepoint * const __tracepoint_ptr_##name __used	 \
-+	__attribute__((section("__tracepoints_ptrs"))) =		 \
-+		&__tracepoint_##name
-+#endif
++config HAVE_ARCH_PREL32_RELOCATIONS
++	bool
++	help
++	  May be selected by an architecture if it supports place-relative
++	  32-bit relocations, both in the toolchain and in the module loader,
++	  in which case relative references can be used in special sections
++	  for PCI fixup, initcalls etc which are only half the size on 64 bit
++	  architectures, and don't require runtime relocation on relocatable
++	  kernels.
 +
- /*
-  * We have no guarantee that gcc and the linker won't up-align the tracepoint
-  * structures, so we create an array of pointers that will be used for iteration
-@@ -234,11 +247,9 @@ extern void syscall_unregfunc(void);
- 	static const char __tpstrtab_##name[]				 \
- 	__attribute__((section("__tracepoints_strings"))) = #name;	 \
- 	struct tracepoint __tracepoint_##name				 \
--	__attribute__((section("__tracepoints"))) =			 \
-+	__attribute__((section("__tracepoints"), used)) =		 \
- 		{ __tpstrtab_##name, STATIC_KEY_INIT_FALSE, reg, unreg, NULL };\
--	static struct tracepoint * const __tracepoint_ptr_##name __used	 \
--	__attribute__((section("__tracepoints_ptrs"))) =		 \
--		&__tracepoint_##name;
-+	__TRACEPOINT_ENTRY(name);
- 
- #define DEFINE_TRACE(name)						\
- 	DEFINE_TRACE_FN(name, NULL, NULL);
-diff --git a/kernel/tracepoint.c b/kernel/tracepoint.c
-index 6dc6356c3327..451c8f5e8345 100644
---- a/kernel/tracepoint.c
-+++ b/kernel/tracepoint.c
-@@ -325,6 +325,27 @@ int tracepoint_probe_unregister(struct tracepoint *tp, void *probe, void *data)
- }
- EXPORT_SYMBOL_GPL(tracepoint_probe_unregister);
- 
-+static void for_each_tracepoint_range(struct tracepoint * const *begin,
-+		struct tracepoint * const *end,
-+		void (*fct)(struct tracepoint *tp, void *priv),
-+		void *priv)
-+{
-+	if (!begin)
-+		return;
-+
-+	if (IS_ENABLED(CONFIG_HAVE_ARCH_PREL32_RELOCATIONS)) {
-+		const int *iter;
-+
-+		for (iter = (const int *)begin; iter < (const int *)end; iter++)
-+			fct(offset_to_ptr(iter), priv);
-+	} else {
-+		struct tracepoint * const *iter;
-+
-+		for (iter = begin; iter < end; iter++)
-+			fct(*iter, priv);
-+	}
-+}
-+
- #ifdef CONFIG_MODULES
- bool trace_module_has_bad_taint(struct module *mod)
- {
-@@ -389,15 +410,9 @@ EXPORT_SYMBOL_GPL(unregister_tracepoint_module_notifier);
-  * Ensure the tracer unregistered the module's probes before the module
-  * teardown is performed. Prevents leaks of probe and data pointers.
-  */
--static void tp_module_going_check_quiescent(struct tracepoint * const *begin,
--		struct tracepoint * const *end)
-+static void tp_module_going_check_quiescent(struct tracepoint *tp, void *priv)
- {
--	struct tracepoint * const *iter;
--
--	if (!begin)
--		return;
--	for (iter = begin; iter < end; iter++)
--		WARN_ON_ONCE((*iter)->funcs);
-+	WARN_ON_ONCE(tp->funcs);
- }
- 
- static int tracepoint_module_coming(struct module *mod)
-@@ -448,8 +463,9 @@ static void tracepoint_module_going(struct module *mod)
- 			 * Called the going notifier before checking for
- 			 * quiescence.
- 			 */
--			tp_module_going_check_quiescent(mod->tracepoints_ptrs,
--				mod->tracepoints_ptrs + mod->num_tracepoints);
-+			for_each_tracepoint_range(mod->tracepoints_ptrs,
-+				mod->tracepoints_ptrs + mod->num_tracepoints,
-+				tp_module_going_check_quiescent, NULL);
- 			break;
- 		}
- 	}
-@@ -501,19 +517,6 @@ static __init int init_tracepoints(void)
- __initcall(init_tracepoints);
- #endif /* CONFIG_MODULES */
- 
--static void for_each_tracepoint_range(struct tracepoint * const *begin,
--		struct tracepoint * const *end,
--		void (*fct)(struct tracepoint *tp, void *priv),
--		void *priv)
--{
--	struct tracepoint * const *iter;
--
--	if (!begin)
--		return;
--	for (iter = begin; iter < end; iter++)
--		fct(*iter, priv);
--}
--
- /**
-  * for_each_kernel_tracepoint - iteration on all kernel tracepoints
-  * @fct: callback
+ source "kernel/gcov/Kconfig"
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 42c090cf0292..1940c6405d04 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -95,6 +95,7 @@ config ARM64
+ 	select HAVE_ARCH_KGDB
+ 	select HAVE_ARCH_MMAP_RND_BITS
+ 	select HAVE_ARCH_MMAP_RND_COMPAT_BITS if COMPAT
++	select HAVE_ARCH_PREL32_RELOCATIONS
+ 	select HAVE_ARCH_SECCOMP_FILTER
+ 	select HAVE_ARCH_THREAD_STRUCT_WHITELIST
+ 	select HAVE_ARCH_TRACEHOOK
+diff --git a/arch/powerpc/Kconfig b/arch/powerpc/Kconfig
+index 9f2b75fe2c2d..e4fe19789b8b 100644
+--- a/arch/powerpc/Kconfig
++++ b/arch/powerpc/Kconfig
+@@ -177,6 +177,7 @@ config PPC
+ 	select HAVE_ARCH_KGDB
+ 	select HAVE_ARCH_MMAP_RND_BITS
+ 	select HAVE_ARCH_MMAP_RND_COMPAT_BITS	if COMPAT
++	select HAVE_ARCH_PREL32_RELOCATIONS
+ 	select HAVE_ARCH_SECCOMP_FILTER
+ 	select HAVE_ARCH_TRACEHOOK
+ 	select HAVE_CBPF_JIT			if !PPC64
+diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
+index f1dbb4ee19d7..e10a3542db7e 100644
+--- a/arch/x86/Kconfig
++++ b/arch/x86/Kconfig
+@@ -123,6 +123,7 @@ config X86
+ 	select HAVE_ARCH_MMAP_RND_BITS		if MMU
+ 	select HAVE_ARCH_MMAP_RND_COMPAT_BITS	if MMU && COMPAT
+ 	select HAVE_ARCH_COMPAT_MMAP_BASES	if MMU && COMPAT
++	select HAVE_ARCH_PREL32_RELOCATIONS
+ 	select HAVE_ARCH_SECCOMP_FILTER
+ 	select HAVE_ARCH_THREAD_STRUCT_WHITELIST
+ 	select HAVE_ARCH_TRACEHOOK
 -- 
 2.17.1
