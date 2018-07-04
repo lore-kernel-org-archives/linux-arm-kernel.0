@@ -1,62 +1,49 @@
 From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 04 Jul 2018 12:38:12 +0200
-Subject: [PATCH] ACPI/PPTT: use ACPI ID whenever
- ACPI_PPTT_ACPI_PROCESSOR_ID_VALID is set
-In-Reply-To: <8fe4ee5c-23b8-12bb-3f2e-5589ca4de24b@arm.com>
-References: <1530289077-2444-1-git-send-email-sudeep.holla@arm.com>
- <CAJZ5v0gh0-psU7bbLf5zDGW5adQNALSdWdedbCgDoh1F-peh0g@mail.gmail.com>
- <8fe4ee5c-23b8-12bb-3f2e-5589ca4de24b@arm.com>
-Message-ID: <3678832.fJrbWfqCFa@aspire.rjw.lan>
+Date: Wed, 04 Jul 2018 12:44:20 +0200
+Subject: [PATCH 2/2] device core: Add flag to autoremove device link on
+ supplier unbind
+In-Reply-To: <5b2d17e8-2224-512c-e01c-212828ecf74b@codeaurora.org>
+References: <20180627125056.12851-1-vivek.gautam@codeaurora.org>
+ <20180627125056.12851-2-vivek.gautam@codeaurora.org>
+ <5b2d17e8-2224-512c-e01c-212828ecf74b@codeaurora.org>
+Message-ID: <2991909.NMIP74eIIJ@aspire.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, July 2, 2018 2:52:24 PM CEST Sudeep Holla wrote:
+On Wednesday, July 4, 2018 9:16:20 AM CEST Vivek Gautam wrote:
+> Adding Ulf and Marek.
 > 
-> On 02/07/18 12:01, Rafael J. Wysocki wrote:
-> > On Mon, Jul 2, 2018 at 11:57 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
-> >>
-> >>
-> >> On 02/07/18 10:06, Rafael J. Wysocki wrote:
-> >>> On Fri, Jun 29, 2018 at 6:17 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
-> >>>> Currently we use the ACPI processor ID only for the leaf/processor nodes
-> >>>> as the specification states it must match the value of ACPI processor ID
-> >>>> field in the processor?s entry in the MADT.
-> >>>>
-> >>>> However, if a PPTT structure represents processors group, it match a
-> >>>> processor container UID in the namespace and ACPI_PPTT_ACPI_PROCESSOR_ID_VALID
-> >>>> flag describe whether the ACPI processor ID is valid.
-> >>>>
-> >>>> Lets use UID whenever ACPI_PPTT_ACPI_PROCESSOR_ID_VALID is set to be
-> >>>> consistent instead of using table offset as it's currently done for non
-> >>>> leaf nodes.
-> >>>>
-> >>>> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-> >>>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> >>>> ---
-> >>>>  drivers/acpi/pptt.c | 10 ++++++++--
-> >>>>  1 file changed, 8 insertions(+), 2 deletions(-)
-> >>>>
-> >>>> Hi,
-> >>>>
-> >>>> There's ongoing discussion on assigning ID based in OS using simple
-> >>>> counters. It can never be consistent with firmware's view. So if the
-> >>>> firmware provides valid UID for non-processors node, we must use it.
-> >>>
-> >>> OK
-> >>>
-> >>> Do you regard this as a fix for the recently merged PPTT material?  If
-> >>> so, I should apply it as a fix for 4.18.
-> >>>
-> >>
-> >> Yes, it should be considered as fix IMO.
-> > 
-> > So any chance to provide a Fixes: tag?
+> On 6/27/2018 6:20 PM, Vivek Gautam wrote:
+> > Add a flag to autoremove the device links on supplier driver
+> > unbind. This obviates the need to explicitly delete the link
+> > in the remove path.
+> > We remove these links only when the supplier's link to its
+> > consumers has gone to DL_STATE_SUPPLIER_UNBIND state.
+> >
+> > Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
+> > Suggested-by: Lukas Wunner <lukas@wunner.de>
+> > Cc: Jonathan Corbet <corbet@lwn.net>
+> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> > Cc: Robin Murphy <robin.murphy@arm.com>
+> > Cc: linux-doc at vger.kernel.org
+> > Cc: linux-arm-kernel at lists.infradead.org
+> > Cc: linux-pm at vger.kernel.org
+> > Cc: linux-arm-msm at vger.kernel.org
+> > ---
 > 
-> Sure, since it was in the same release, I didn't add it.
+> Hi Rafael, et al.
 > 
-> Fixes: 2bd00bcd73e5 ("ACPI/PPTT: Add Processor Properties Topology Table
-> parsing")
+> Gentle ping.
+> Do you have comments on this series. I would really like to conclude these
+> device link additions sooner, and get things moving on the long awaited
+> arm-smmu clock/runtime support series.
 > 
-> 
+> Thanks again for reviewing these patches.
 
-Applied now, thanks!
+They are fine by me.
+
+I can queue them up for 4.19 if no one has objections (Greg in
+particular).
+
+Thanks,
+Rafael
