@@ -1,16 +1,16 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 4 Jul 2018 16:19:39 +0800
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 4 Jul 2018 10:23:51 +0200
 Subject: [PATCH 0/2] Allwinner A64 timer workaround
 In-Reply-To: <5283f98e-6443-db7a-fe51-6379ed19002c@arm.com>
 References: <20180511022751.9096-1-samuel@sholland.org>
  <2c16d5ab-38f7-8f3e-875c-19e8032f440a@arm.com>
  <bdfb1a31-2c4a-d258-7bf6-aaab8cee4663@sholland.org>
  <5283f98e-6443-db7a-fe51-6379ed19002c@arm.com>
-Message-ID: <CAGb2v67NvccReOk1OMBpUrr+A8i_f7swc23_Ko8rxXr_tJ6HUg@mail.gmail.com>
+Message-ID: <24b78819-5e3f-431f-3987-f7409742ef07@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 4, 2018 at 4:16 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+On 04/07/2018 10:16, Marc Zyngier wrote:
 > On 03/07/18 19:42, Samuel Holland wrote:
 >> On 07/03/18 10:09, Marc Zyngier wrote:
 >>> On 11/05/18 03:27, Samuel Holland wrote:
@@ -21,12 +21,12 @@ On Wed, Jul 4, 2018 at 4:16 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
 >>>> timer going backward, which is interpreted by Linux as the timer wrapping
 >>>> around after 2^56 cycles.
 >>>>
->>>> Investigation led to discovery of some obvious problems with this SoC's
+>>>> Investigation led to discovery of some obvious problems with this SoC's 
 >>>> architectural timer, and this patch series introduces what I believe is
 >>>> the simplest workaround. More details are in the commit message for patch
 >>>> 1. Patch 2 simply enables the workaround in the device tree.
 >>>
->>> What's the deal with this series? There was a couple of nits to address, and
+>>> What's the deal with this series? There was a couple of nits to address, and 
 >>> I was more or less expecting a v2.
 >>
 >> I got reports that people were still occasionally having clock jumps after
@@ -37,19 +37,25 @@ On Wed, Jul 4, 2018 at 4:16 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
 >>
 >> I'll prepare a v2 with a bounded loop. Presumably, 3 * (max CPU Hz) / (24MHz
 >> timer) ? 150 should be a conservative iteration limit?
->
+> 
 > Should be OK.
->
+> 
 > Maxime: How do you want to deal with the documentation aspect? We need
 > an erratum number, but AFAIU the concept hasn't made it into the silicom
 > vendor's brain yet. Any chance you could come up with something that
 > uniquely identifies this?
->
+> 
 >> Also, does this make sense to CC to stable?
->
+> 
 > Probably not, as the HW never worked, so it is not a regression.
 
-A64 support has been in for a few releases now. So while this is not
-fixing a regression, people will still benefit from it being in stable.
+If the patches fix a bug which already exist, it makes sense to
+propagated the fix back to the stable versions.
 
-ChenYu
+
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
