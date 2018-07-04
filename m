@@ -1,39 +1,57 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 04 Jul 2018 15:20:05 +0100
-Subject: panic kexec broken on ARM64?
-In-Reply-To: <a2796dc8-2f0f-468f-0c9f-ec296f3b302a@suse.com>
-References: <20180605100151.7fd54381@ezekiel.suse.cz>
- <8028219f-0d14-eafd-86b7-359ee927bcd3@arm.com>
- <5e539510-01b7-ebc5-778e-b49a5261f9bc@i2se.com>
- <2865150f-ebca-4c6b-fc4b-93bfab5f0e91@arm.com>
- <86lgbm96dq.wl-marc.zyngier@arm.com>
- <20180703070106.GV23681@linaro.org>
- <86601wzn3h.wl-marc.zyngier@arm.com>
- <a2796dc8-2f0f-468f-0c9f-ec296f3b302a@suse.com>
-Message-ID: <864lhfytey.wl-marc.zyngier@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 4 Jul 2018 15:22:42 +0100
+Subject: [kvmtool test PATCH 24/24] kvmtool: arm: Add support for
+ creating VM with PA size
+In-Reply-To: <1530270944-11351-25-git-send-email-suzuki.poulose@arm.com>
+References: <1530270944-11351-1-git-send-email-suzuki.poulose@arm.com>
+ <1530270944-11351-25-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20180704142241.GG4828@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 04 Jul 2018 15:08:38 +0100,
-Matthias Brugger <mbrugger@suse.com> wrote:
-> On 03/07/18 10:58, Marc Zyngier wrote:
-> > I've pushed 3 patches on a branch[1]. It is mostly untested, but it
-> > should allow the above RPi3 disaster to cope with kexec.
-> > 
-> > 	M.
-> > 
-> > [1]: https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git/log/?h=irq/root-irqchip
-> > 
-> 
-> I threw the kernel on my RPi3+ model but I wasn't able to start the crash
-> kernel. Unfortunately I don't have a JTAG adapter to check if it hangs for the
-> same reason.
+On Fri, Jun 29, 2018 at 12:15:44PM +0100, Suzuki K Poulose wrote:
+> diff --git a/arm/kvm.c b/arm/kvm.c
+> index 5701d41..b1969be 100644
+> --- a/arm/kvm.c
+> +++ b/arm/kvm.c
+> @@ -11,6 +11,8 @@
+>  #include <linux/kvm.h>
+>  #include <linux/sizes.h>
+>  
+> +unsigned long kvm_arm_type;
+> +
+>  struct kvm_ext kvm_req_ext[] = {
+>  	{ DEFINE_KVM_EXT(KVM_CAP_IRQCHIP) },
+>  	{ DEFINE_KVM_EXT(KVM_CAP_ONE_REG) },
+> @@ -18,6 +20,26 @@ struct kvm_ext kvm_req_ext[] = {
+>  	{ 0, 0 },
+>  };
+>  
+> +#ifndef KVM_ARM_GET_MAX_VM_PHYS_SHIFT
+> +#define KVM_ARM_GET_MAX_VM_PHYS_SHIFT		_IO(KVMIO, 0x0b)
+> +#endif
+> +
+> +void kvm__arch_init_hyp(struct kvm *kvm)
+> +{
+> +	int max_ipa;
+> +
+> +	max_ipa = ioctl(kvm->sys_fd, KVM_ARM_GET_MAX_VM_PHYS_SHIFT);
+> +	if (max_ipa < 0)
+> +		max_ipa = 40;
+> +	if (!kvm->cfg.arch.phys_shift)
+> +		kvm->cfg.arch.phys_shift = 40;
+> +	if (kvm->cfg.arch.phys_shift > max_ipa)
+> +		die("Requested PA size (%u) is not supported by the host (%ubits)\n",
+> +		    kvm->cfg.arch.phys_shift, max_ipa);
+> +	if (kvm->cfg.arch.phys_shift != 40)
+> +		kvm_arm_type = kvm->cfg.arch.phys_shift;
+> +}
 
-Have you annotated the RPi3 root irq_chip structure so that the arm64
-kexec code knows that this is the root interrupt controller? I've only
-done so on the GIC drivers.
+Seems a bit weird that the "machine type identifier" to KVM_CREATE_VM is
+dedicated entirely to holding the physical address shift verbatim. Is this
+really the ABI?
 
-      M.
+Also, couldn't KVM figure it out automatically if you add memslots at high
+addresses, making this a niche tunable outside of testing?
 
--- 
-Jazz is not dead, it just smell funny.
+Will
