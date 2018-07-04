@@ -1,93 +1,70 @@
-From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
-Date: Wed,  4 Jul 2018 16:40:55 +0200
-Subject: [RESEND PATCH] ARM: multi_v7_defconfig: Enable missing drivers for
- supported Chromebooks.
-Message-ID: <20180704144055.22005-1-enric.balletbo@collabora.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 04 Jul 2018 15:41:18 +0100
+Subject: [kvmtool test PATCH 24/24] kvmtool: arm: Add support for creating
+ VM with PA size
+In-Reply-To: <20180704142241.GG4828@arm.com>
+References: <1530270944-11351-1-git-send-email-suzuki.poulose@arm.com>
+ <1530270944-11351-25-git-send-email-suzuki.poulose@arm.com>
+ <20180704142241.GG4828@arm.com>
+Message-ID: <8636wzysfl.wl-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable following drivers for merged devices:
-- Batteries with BQ27XXX chips for Minnie boards.
-- Elan eKTH I2C touchscreen for Minnie boards.
-- GPIO charger for all Veyron boards..
-- Rockchip SARADC driver for all rk3288 boards.
-- Rockchip eFUSE driver for all rk3288 boards.
-- TPM security chip for all Veyron boards.
-- ChromeOS EC userspace interface for all chromebooks boards.
-- ChromeOS EC light and proximity sensors for some chromebooks.
+On Wed, 04 Jul 2018 15:22:42 +0100,
+Will Deacon <will.deacon@arm.com> wrote:
+> 
+> On Fri, Jun 29, 2018 at 12:15:44PM +0100, Suzuki K Poulose wrote:
+> > diff --git a/arm/kvm.c b/arm/kvm.c
+> > index 5701d41..b1969be 100644
+> > --- a/arm/kvm.c
+> > +++ b/arm/kvm.c
+> > @@ -11,6 +11,8 @@
+> >  #include <linux/kvm.h>
+> >  #include <linux/sizes.h>
+> >  
+> > +unsigned long kvm_arm_type;
+> > +
+> >  struct kvm_ext kvm_req_ext[] = {
+> >  	{ DEFINE_KVM_EXT(KVM_CAP_IRQCHIP) },
+> >  	{ DEFINE_KVM_EXT(KVM_CAP_ONE_REG) },
+> > @@ -18,6 +20,26 @@ struct kvm_ext kvm_req_ext[] = {
+> >  	{ 0, 0 },
+> >  };
+> >  
+> > +#ifndef KVM_ARM_GET_MAX_VM_PHYS_SHIFT
+> > +#define KVM_ARM_GET_MAX_VM_PHYS_SHIFT		_IO(KVMIO, 0x0b)
+> > +#endif
+> > +
+> > +void kvm__arch_init_hyp(struct kvm *kvm)
+> > +{
+> > +	int max_ipa;
+> > +
+> > +	max_ipa = ioctl(kvm->sys_fd, KVM_ARM_GET_MAX_VM_PHYS_SHIFT);
+> > +	if (max_ipa < 0)
+> > +		max_ipa = 40;
+> > +	if (!kvm->cfg.arch.phys_shift)
+> > +		kvm->cfg.arch.phys_shift = 40;
+> > +	if (kvm->cfg.arch.phys_shift > max_ipa)
+> > +		die("Requested PA size (%u) is not supported by the host (%ubits)\n",
+> > +		    kvm->cfg.arch.phys_shift, max_ipa);
+> > +	if (kvm->cfg.arch.phys_shift != 40)
+> > +		kvm_arm_type = kvm->cfg.arch.phys_shift;
+> > +}
+> 
+> Seems a bit weird that the "machine type identifier" to KVM_CREATE_VM is
+> dedicated entirely to holding the physical address shift verbatim. Is this
+> really the ABI?
+> 
+> Also, couldn't KVM figure it out automatically if you add memslots at high
+> addresses, making this a niche tunable outside of testing?
 
-Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
----
-Fixed some conflicts when I picked up the old patch [1]
+Not really. Let's say I want my IPA space split in two: memory covers
+the low 47 bit, and I want MMIO spanning the top 47 bit. With your
+scheme, you'd end-up with a 47bit IPA space, while you really want 48
+bits (MMIO space implemented by userspace isn't registered to the
+kernel).
 
-[1] https://patchwork.kernel.org/patch/10300677/
+	M.
 
- arch/arm/configs/multi_v7_defconfig | 11 +++++++++++
- 1 file changed, 11 insertions(+)
-
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 8f6be1982545..764b14ac271c 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -280,6 +280,7 @@ CONFIG_MOUSE_CYAPA=m
- CONFIG_MOUSE_ELAN_I2C=y
- CONFIG_INPUT_TOUCHSCREEN=y
- CONFIG_TOUCHSCREEN_ATMEL_MXT=m
-+CONFIG_TOUCHSCREEN_ELAN=m
- CONFIG_TOUCHSCREEN_MMS114=m
- CONFIG_TOUCHSCREEN_WM97XX=m
- CONFIG_TOUCHSCREEN_ST1232=m
-@@ -340,6 +341,8 @@ CONFIG_SERIAL_DEV_BUS=y
- CONFIG_VIRTIO_CONSOLE=y
- CONFIG_HW_RANDOM=y
- CONFIG_HW_RANDOM_ST=y
-+CONFIG_TCG_TPM=m
-+CONFIG_TCG_TIS_I2C_INFINEON=m
- CONFIG_I2C_CHARDEV=y
- CONFIG_I2C_ARB_GPIO_CHALLENGE=m
- CONFIG_I2C_MUX_PCA954x=y
-@@ -433,9 +436,11 @@ CONFIG_POWER_RESET_RMOBILE=y
- CONFIG_BATTERY_ACT8945A=y
- CONFIG_BATTERY_CPCAP=m
- CONFIG_BATTERY_SBS=y
-+CONFIG_BATTERY_BQ27XXX=m
- CONFIG_AXP20X_POWER=m
- CONFIG_BATTERY_MAX17040=m
- CONFIG_BATTERY_MAX17042=m
-+CONFIG_CHARGER_GPIO=m
- CONFIG_CHARGER_CPCAP=m
- CONFIG_CHARGER_MAX14577=m
- CONFIG_CHARGER_MAX77693=m
-@@ -492,6 +497,7 @@ CONFIG_MFD_AXP20X_RSB=y
- CONFIG_MFD_CROS_EC=m
- CONFIG_MFD_CROS_EC_I2C=m
- CONFIG_MFD_CROS_EC_SPI=m
-+CONFIG_MFD_CROS_EC_CHARDEV=m
- CONFIG_MFD_DA9063=m
- CONFIG_MFD_MAX14577=y
- CONFIG_MFD_MAX77686=y
-@@ -892,10 +898,14 @@ CONFIG_AT91_SAMA5D2_ADC=m
- CONFIG_BERLIN2_ADC=m
- CONFIG_CPCAP_ADC=m
- CONFIG_EXYNOS_ADC=m
-+CONFIG_ROCKCHIP_SARADC=m
- CONFIG_VF610_ADC=m
- CONFIG_XILINX_XADC=y
-+CONFIG_IIO_CROS_EC_SENSORS_CORE=m
-+CONFIG_IIO_CROS_EC_SENSORS=m
- CONFIG_MPU3050_I2C=y
- CONFIG_CM36651=m
-+CONFIG_IIO_CROS_EC_LIGHT_PROX=m
- CONFIG_SENSORS_ISL29018=y
- CONFIG_SENSORS_ISL29028=y
- CONFIG_AK8975=y
-@@ -936,6 +946,7 @@ CONFIG_PHY_DM816X_USB=m
- CONFIG_OMAP_USB2=y
- CONFIG_TI_PIPE3=y
- CONFIG_TWL4030_USB=m
-+CONFIG_ROCKCHIP_EFUSE=m
- CONFIG_NVMEM_IMX_OCOTP=y
- CONFIG_NVMEM_SUNXI_SID=y
- CONFIG_NVMEM_VF610_OCOTP=y
 -- 
-2.18.0
+Jazz is not dead, it just smell funny.
