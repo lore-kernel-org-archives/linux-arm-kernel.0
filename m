@@ -1,40 +1,38 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 4 Jul 2018 15:01:23 +0100
-Subject: [PATCH v2 0/7] arm64: numa/topology/smp: update the cpumasks for
- CPU hotplug
-In-Reply-To: <20180704140034.GC4828@arm.com>
-References: <1529327923-17911-1-git-send-email-sudeep.holla@arm.com>
- <20180704140034.GC4828@arm.com>
-Message-ID: <6351d9eb-3c7e-cee4-5948-9e84a9eb0bad@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 4 Jul 2018 15:04:04 +0100
+Subject: [PATCH] arm64: Clear the stack
+In-Reply-To: <CAGXu5jJSUFFUpaWYToiKQymKR-wwem55WgAgbygWXdTfHQUs4Q@mail.gmail.com>
+References: <20180629190553.7282-1-labbott@redhat.com>
+ <CAGXu5jL8kZHtg-MdScZ5m_6xH_Ho4TsdKGWH83zEL9Y5rutncw@mail.gmail.com>
+ <706dc06b-0157-89cb-33a6-d0b9d811dcf0@redhat.com>
+ <CAGXu5jLW5FJdRdRXcP=xPOEcQ=Tg+uSi=vj6vQ39iVp=QHSRAQ@mail.gmail.com>
+ <20180702095931.GB28665@arm.com>
+ <CAGXu5jJSUFFUpaWYToiKQymKR-wwem55WgAgbygWXdTfHQUs4Q@mail.gmail.com>
+Message-ID: <20180704140403.GE4828@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Kees,
 
-
-On 04/07/18 15:00, Will Deacon wrote:
-> Hi Sudeep,
+On Mon, Jul 02, 2018 at 10:29:24AM -0700, Kees Cook wrote:
+> On Mon, Jul 2, 2018 at 2:59 AM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Fri, Jun 29, 2018 at 01:25:20PM -0700, Kees Cook wrote:
+> >> No worries! I've made the change locally and will push this out to
+> >> -next unless there are objections?
+> >
+> > I'm a bit wary of conflicts in entry.S, since it's likely that we're going
+> > to have a lot going on in there for 4.19.
+> >
+> > Could I take this via arm64 instead, please, or are there dependencies
+> > on other parts of your tree?
 > 
-> On Mon, Jun 18, 2018 at 02:18:36PM +0100, Sudeep Holla wrote:
->> was reported to cause some hotplug and system suspend regressions when
->> it was merged. On investigation, it was found that unlike x86/PPC,
->> arm64 doesn't update the cpu and numa masks on CPU hotplug. That's
->> somewhat expected from the scheduler.
->>
->> Since these changes were bit invasive as a solution to the above
->> mentioned regression, as small change was temporarily applied as a fix.
->> This series updates the cpu and numa masks on CPU hotplug and reverts
->> that temporary fix.
->>
->> It would be good to get this tested(CPU hotplug - few and all CPUs in
->> a socket) on multi-socket/NUMA systems from Cavium and Huawei/Hisilicon.
-> 
-> This is looking pretty good to me. I've made some minor comments on a couple
-> of the patches, so please address those and repost with the Tested-bys that
-> you received, then I can queue this for 4.19.
-> 
+> It depends on the plugin existing, but we could split it up so the
+> arm64 part could go separately. It would just be a no-op in the arm64
+> tree since CONFIG_GCC_PLUGIN_STACKLEAK won't exist there. Whatever
+> works best for you!
 
-Sure, will do so. Thanks Will.
+If you could split it up then that would be really helpful, please.
 
--- 
-Regards,
-Sudeep
+Thanks,
+
+Will
