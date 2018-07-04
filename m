@@ -1,128 +1,60 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed,  4 Jul 2018 17:49:19 +0200
-Subject: [RFC PATCH 2/2] efi/libstub: taken contents of LinuxExtraArgs UEFI
- variable into account
-In-Reply-To: <20180704154919.18564-1-ard.biesheuvel@linaro.org>
-References: <20180704154919.18564-1-ard.biesheuvel@linaro.org>
-Message-ID: <20180704154919.18564-3-ard.biesheuvel@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 4 Jul 2018 16:51:04 +0100
+Subject: [PATCH v3 15/20] kvm: arm/arm64: Allow tuning the physical
+ address size for VM
+In-Reply-To: <1530270944-11351-16-git-send-email-suzuki.poulose@arm.com>
+References: <1530270944-11351-1-git-send-email-suzuki.poulose@arm.com>
+ <1530270944-11351-16-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20180704155104.GN4828@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to allow UEFI platforms to persistently configure Linux kernel
-options without relying on the contents of the EFI System Partition (ESP)
-or other block devices, implement support for passing extra kernel
-command line arguments via the LinuxExtraArgs UEFI variable.
+Hi Suzuki,
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- drivers/firmware/efi/libstub/efi-stub-helper.c | 51 ++++++++++++++++++++
- include/linux/efi.h                            |  1 +
- 2 files changed, 52 insertions(+)
+On Fri, Jun 29, 2018 at 12:15:35PM +0100, Suzuki K Poulose wrote:
+> Allow specifying the physical address size for a new VM via
+> the kvm_type argument for KVM_CREATE_VM ioctl. This allows
+> us to finalise the stage2 page table format as early as possible
+> and hence perform the right checks on the memory slots without
+> complication. The size is encoded as Log2(PA_Size) in the bits[7:0]
+> of the type field and can encode more information in the future if
+> required. The IPA size is still capped at 40bits.
+> 
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Christoffer Dall <cdall@kernel.org>
+> Cc: Peter Maydel <peter.maydell@linaro.org>
+> Cc: Paolo Bonzini <pbonzini@redhat.com>
+> Cc: Radim Kr?m?? <rkrcmar@redhat.com>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
+>  arch/arm/include/asm/kvm_mmu.h   |  2 ++
+>  arch/arm64/include/asm/kvm_arm.h | 10 +++-------
+>  arch/arm64/include/asm/kvm_mmu.h |  2 ++
+>  include/uapi/linux/kvm.h         | 10 ++++++++++
+>  virt/kvm/arm/arm.c               | 24 ++++++++++++++++++++++--
+>  5 files changed, 39 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/firmware/efi/libstub/efi-stub-helper.c b/drivers/firmware/efi/libstub/efi-stub-helper.c
-index 97a2423782af..49a3b03b9f1f 100644
---- a/drivers/firmware/efi/libstub/efi-stub-helper.c
-+++ b/drivers/firmware/efi/libstub/efi-stub-helper.c
-@@ -35,6 +35,9 @@ static unsigned long __chunk_size = EFI_READ_CHUNK_SIZE;
- static int __section(.data) __nokaslr;
- static int __section(.data) __quiet;
- 
-+static const efi_guid_t linux_args_guid = LINUX_EFI_EXTRA_ARGS_GUID;
-+static const efi_char16_t linux_args_name[] = L"LinuxExtraArgs";
-+
- int __pure nokaslr(void)
- {
- 	return __nokaslr;
-@@ -786,6 +789,33 @@ static u8 *efi_utf16_to_utf8(u8 *dst, const u16 *src, int n)
- #define MAX_CMDLINE_ADDRESS	ULONG_MAX
- #endif
- 
-+static u16 *get_extra_args(efi_system_table_t *sys_table_arg,
-+			   unsigned long *extra_args_size)
-+{
-+	u16 *extra_args;
-+	efi_status_t status;
-+
-+	*extra_args_size = 0;
-+	status = efi_call_runtime(get_variable, (efi_char16_t *)linux_args_name,
-+				  (efi_guid_t *)&linux_args_guid, NULL,
-+				  extra_args_size, NULL);
-+	if (status != EFI_BUFFER_TOO_SMALL)
-+		return NULL;
-+
-+	status = efi_call_early(allocate_pool, EFI_LOADER_DATA,
-+				*extra_args_size, (void **)&extra_args);
-+	if (status != EFI_SUCCESS)
-+		return NULL;
-+
-+	status = efi_call_runtime(get_variable, (efi_char16_t *)linux_args_name,
-+				  (efi_guid_t *)&linux_args_guid, NULL,
-+				  extra_args_size, extra_args);
-+	if (status != EFI_SUCCESS)
-+		return NULL;
-+
-+	return extra_args;
-+}
-+
- /*
-  * Convert the unicode UEFI command line to ASCII to pass to kernel.
-  * Size of memory allocated return in *cmd_line_len.
-@@ -799,9 +829,12 @@ char *efi_convert_cmdline(efi_system_table_t *sys_table_arg,
- 	unsigned long cmdline_addr = 0;
- 	int load_options_chars = image->load_options_size / 2; /* UTF-16 */
- 	const u16 *options = image->load_options;
-+	u16 *extra_args;
- 	int cmd_line_bytes = 0;  /* UTF-8 bytes */
- 	int options_chars = 0;  /* UTF-16 chars */
-+	int extra_args_chars = 0;  /* UTF-16 chars */
- 	efi_status_t status;
-+	unsigned long extra_args_size;
- 	u16 zero = 0;
- 
- 	if (options)
-@@ -813,6 +846,19 @@ char *efi_convert_cmdline(efi_system_table_t *sys_table_arg,
- 		options = &zero;
- 	}
- 
-+	extra_args = get_extra_args(sys_table_arg, &extra_args_size);
-+	if (extra_args) {
-+		cmd_line_bytes += 1 + count_utf8_bytes(extra_args,
-+						       extra_args_size / 2,
-+						       &extra_args_chars);
-+
-+		pr_efi(sys_table_arg,
-+		       "Appending contents of 'LinuxExtraArgs' UEFI variable to kernel command line.\n");
-+	} else if (extra_args_size > 0) {
-+		pr_efi_err(sys_table_arg,
-+			   "Failed to read 'LinuxExtraArgs' UEFI variable\n");
-+	}
-+
- 	cmd_line_bytes++;	/* NUL termination */
- 
- 	status = efi_high_alloc(sys_table_arg, cmd_line_bytes, 0,
-@@ -821,6 +867,11 @@ char *efi_convert_cmdline(efi_system_table_t *sys_table_arg,
- 		return NULL;
- 
- 	s1 = efi_utf16_to_utf8((u8 *)cmdline_addr, options, options_chars);
-+	if (extra_args) {
-+		*s1++ = ' ';
-+		s1 = efi_utf16_to_utf8(s1, extra_args, extra_args_chars);
-+		efi_call_early(free_pool, extra_args);
-+	}
- 	*s1 = '\0';
- 
- 	*cmd_line_len = cmd_line_bytes;
-diff --git a/include/linux/efi.h b/include/linux/efi.h
-index 56add823f190..c0902384fa13 100644
---- a/include/linux/efi.h
-+++ b/include/linux/efi.h
-@@ -672,6 +672,7 @@ void efi_native_runtime_setup(void);
- #define LINUX_EFI_LOADER_ENTRY_GUID		EFI_GUID(0x4a67b082, 0x0a4c, 0x41cf,  0xb6, 0xc7, 0x44, 0x0b, 0x29, 0xbb, 0x8c, 0x4f)
- #define LINUX_EFI_RANDOM_SEED_TABLE_GUID	EFI_GUID(0x1ce1e5bc, 0x7ceb, 0x42f2,  0x81, 0xe5, 0x8a, 0xad, 0xf1, 0x80, 0xf5, 0x7b)
- #define LINUX_EFI_TPM_EVENT_LOG_GUID		EFI_GUID(0xb7799cb0, 0xeca2, 0x4943,  0x96, 0x67, 0x1f, 0xae, 0x07, 0xb7, 0x47, 0xfa)
-+#define LINUX_EFI_EXTRA_ARGS_GUID		EFI_GUID(0x7cae4e6a, 0x08d7, 0x4079,  0x8e, 0xcd, 0x8c, 0x2e, 0xf4, 0x72, 0x30, 0x40)
- 
- typedef struct {
- 	efi_guid_t guid;
--- 
-2.17.1
+[...]
+
+> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+> index 4df9bb6..fa4cab0 100644
+> --- a/include/uapi/linux/kvm.h
+> +++ b/include/uapi/linux/kvm.h
+> @@ -751,6 +751,16 @@ struct kvm_ppc_resize_hpt {
+>  #define KVM_S390_SIE_PAGE_OFFSET 1
+>  
+>  /*
+> + * On arm/arm64, machine type can be used to request the physical
+> + * address size for the VM. Bits [7-0] have been reserved for the
+> + * PA size shift (i.e, log2(PA_Size)). For backward compatibility,
+> + * value 0 implies the default IPA size, which is 40bits.
+> + */
+> +#define KVM_VM_TYPE_ARM_PHYS_SHIFT_MASK	0xff
+> +#define KVM_VM_TYPE_ARM_PHYS_SHIFT(x)		\
+> +	((x) & KVM_VM_TYPE_ARM_PHYS_SHIFT_MASK)
+
+This seems like you're allocating quite a lot of bits in a non-extensible
+interface to a fairly esoteric parameter. Would it be better to add another
+ioctl, or condense the number of sizes you support instead?
+
+Will
