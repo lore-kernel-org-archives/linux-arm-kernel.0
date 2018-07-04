@@ -1,15 +1,15 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Wed, 04 Jul 2018 15:35:24 +0100
-Subject: Applied "ASoC: qdsp6: q6asm-dai: do not close port if its not opened"
+Date: Wed, 04 Jul 2018 15:35:26 +0100
+Subject: Applied "ASoC: qdsp6: q6afe-dai: do not close port if its not opened"
  to the asoc tree
-In-Reply-To: <20180704094944.16440-7-srinivas.kandagatla@linaro.org>
-Message-ID: <E1faisO-0003OI-Mz@debutante>
+In-Reply-To: <20180704094944.16440-6-srinivas.kandagatla@linaro.org>
+Message-ID: <E1faisQ-0003PO-Rt@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   ASoC: qdsp6: q6asm-dai: do not close port if its not opened
+   ASoC: qdsp6: q6afe-dai: do not close port if its not opened
 
 has been applied to the asoc tree at
 
@@ -34,12 +34,12 @@ to this mail.
 Thanks,
 Mark
 
->From 5dffc1752cabde6396fca28ff8343febfa524512 Mon Sep 17 00:00:00 2001
+>From 110743189c863e96dc08a581d56c50b965870a3f Mon Sep 17 00:00:00 2001
 From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-Date: Wed, 4 Jul 2018 10:49:44 +0100
-Subject: [PATCH] ASoC: qdsp6: q6asm-dai: do not close port if its not opened
+Date: Wed, 4 Jul 2018 10:49:43 +0100
+Subject: [PATCH] ASoC: qdsp6: q6afe-dai: do not close port if its not opened
 
-asm ports are open as part of prepare, so for use cases like
+afe ports are open as part of prepare, so for use cases like
 "aplay sample.wav" were sample.wav is not present. This would
 call port close eventhough port was never opened. DSP would
 return errors for such use cases.
@@ -49,23 +49,22 @@ Avoid doing this by checking the port state.
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- sound/soc/qcom/qdsp6/q6asm-dai.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ sound/soc/qcom/qdsp6/q6afe-dai.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/sound/soc/qcom/qdsp6/q6asm-dai.c b/sound/soc/qcom/qdsp6/q6asm-dai.c
-index 349c6a883c63..360936703b3d 100644
---- a/sound/soc/qcom/qdsp6/q6asm-dai.c
-+++ b/sound/soc/qcom/qdsp6/q6asm-dai.c
-@@ -390,7 +390,9 @@ static int q6asm_dai_close(struct snd_pcm_substream *substream)
- 	struct q6asm_dai_rtd *prtd = runtime->private_data;
+diff --git a/sound/soc/qcom/qdsp6/q6afe-dai.c b/sound/soc/qcom/qdsp6/q6afe-dai.c
+index 5002dd05bf27..a373ca5523ff 100644
+--- a/sound/soc/qcom/qdsp6/q6afe-dai.c
++++ b/sound/soc/qcom/qdsp6/q6afe-dai.c
+@@ -315,6 +315,9 @@ static void q6afe_dai_shutdown(struct snd_pcm_substream *substream,
+ 	struct q6afe_dai_data *dai_data = dev_get_drvdata(dai->dev);
+ 	int rc;
  
- 	if (prtd->audio_client) {
--		q6asm_cmd(prtd->audio_client, CMD_CLOSE);
-+		if (prtd->state)
-+			q6asm_cmd(prtd->audio_client, CMD_CLOSE);
++	if (!dai_data->is_port_started[dai->id])
++		return;
 +
- 		q6asm_unmap_memory_regions(substream->stream,
- 					   prtd->audio_client);
- 		q6asm_audio_client_free(prtd->audio_client);
+ 	rc = q6afe_port_stop(dai_data->port[dai->id]);
+ 	if (rc < 0)
+ 		dev_err(dai->dev, "fail to close AFE port (%d)\n", rc);
 -- 
 2.18.0.rc2
