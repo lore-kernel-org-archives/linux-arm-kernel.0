@@ -1,82 +1,62 @@
-From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
-Date: Wed, 04 Jul 2018 13:34:41 +0300
-Subject: [PATCH 5/6] perf/core: Use ioctl to communicate driver
- configuration to kernel
-In-Reply-To: <CANLsYkw4w-zRczcb2uddO4UsxXrCCoXCSkPko2it-OJX2H0ecA@mail.gmail.com>
-References: <1530570810-28929-1-git-send-email-mathieu.poirier@linaro.org>
- <1530570810-28929-6-git-send-email-mathieu.poirier@linaro.org>
- <20180703100348.fy43f4fosw3fdc6i@um.fi.intel.com>
- <20180703105652.psjq5cq4t7o2j6zk@um.fi.intel.com>
- <CANLsYkw4w-zRczcb2uddO4UsxXrCCoXCSkPko2it-OJX2H0ecA@mail.gmail.com>
-Message-ID: <87fu0z70hq.fsf@ashishki-desk.ger.corp.intel.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Wed, 04 Jul 2018 12:38:12 +0200
+Subject: [PATCH] ACPI/PPTT: use ACPI ID whenever
+ ACPI_PPTT_ACPI_PROCESSOR_ID_VALID is set
+In-Reply-To: <8fe4ee5c-23b8-12bb-3f2e-5589ca4de24b@arm.com>
+References: <1530289077-2444-1-git-send-email-sudeep.holla@arm.com>
+ <CAJZ5v0gh0-psU7bbLf5zDGW5adQNALSdWdedbCgDoh1F-peh0g@mail.gmail.com>
+ <8fe4ee5c-23b8-12bb-3f2e-5589ca4de24b@arm.com>
+Message-ID: <3678832.fJrbWfqCFa@aspire.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mathieu Poirier <mathieu.poirier@linaro.org> writes:
+On Monday, July 2, 2018 2:52:24 PM CEST Sudeep Holla wrote:
+> 
+> On 02/07/18 12:01, Rafael J. Wysocki wrote:
+> > On Mon, Jul 2, 2018 at 11:57 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+> >>
+> >>
+> >> On 02/07/18 10:06, Rafael J. Wysocki wrote:
+> >>> On Fri, Jun 29, 2018 at 6:17 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+> >>>> Currently we use the ACPI processor ID only for the leaf/processor nodes
+> >>>> as the specification states it must match the value of ACPI processor ID
+> >>>> field in the processor?s entry in the MADT.
+> >>>>
+> >>>> However, if a PPTT structure represents processors group, it match a
+> >>>> processor container UID in the namespace and ACPI_PPTT_ACPI_PROCESSOR_ID_VALID
+> >>>> flag describe whether the ACPI processor ID is valid.
+> >>>>
+> >>>> Lets use UID whenever ACPI_PPTT_ACPI_PROCESSOR_ID_VALID is set to be
+> >>>> consistent instead of using table offset as it's currently done for non
+> >>>> leaf nodes.
+> >>>>
+> >>>> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+> >>>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> >>>> ---
+> >>>>  drivers/acpi/pptt.c | 10 ++++++++--
+> >>>>  1 file changed, 8 insertions(+), 2 deletions(-)
+> >>>>
+> >>>> Hi,
+> >>>>
+> >>>> There's ongoing discussion on assigning ID based in OS using simple
+> >>>> counters. It can never be consistent with firmware's view. So if the
+> >>>> firmware provides valid UID for non-processors node, we must use it.
+> >>>
+> >>> OK
+> >>>
+> >>> Do you regard this as a fix for the recently merged PPTT material?  If
+> >>> so, I should apply it as a fix for 4.18.
+> >>>
+> >>
+> >> Yes, it should be considered as fix IMO.
+> > 
+> > So any chance to provide a Fixes: tag?
+> 
+> Sure, since it was in the same release, I didn't add it.
+> 
+> Fixes: 2bd00bcd73e5 ("ACPI/PPTT: Add Processor Properties Topology Table
+> parsing")
+> 
+> 
 
-> On Tue, 3 Jul 2018 at 04:57, Alexander Shishkin
-> <alexander.shishkin@linux.intel.com> wrote:
->>
->> On Tue, Jul 03, 2018 at 01:03:48PM +0300, Alexander Shishkin wrote:
->> > On Mon, Jul 02, 2018 at 04:33:29PM -0600, Mathieu Poirier wrote:
->> > > +/*
->> > > + * PMU driver configuration works the same way as filter management above,
->> > > + * but without the need to deal with memory mapping.  Driver configuration
->> > > + * arrives through the SET_DRV_CONFIG ioctl() where it is validated and applied
->> > > + * to the event.  When the PMU is ready it calls perf_event_drv_config_sync() to
->> > > + * bring the configuration information within reach of the PMU.
->> >
->> > Wait a second. The reason why we dance around with the generations of filters
->> > is the locking order of ctx::mutex vs mmap_sem. In an mmap path, where we're
->> > notified about mapping changes, we're called under the latter, and we'd need
->> > to grab the former to update the event configuration. In your case, the
->> > update comes in via perf_ioctl(), where we're already holding the ctx::mutex,
->> > so you can just kick the PMU right there, via an event_function_call() or
->> > perf_event_stop(restart=1). In the latter case, your pmu::start() would just
->> > grab the new configuration. Should also be about 90% less code. :)
->>
->> Also, since it affects the AUX buffer configuration, it is probably a one
->> time ioctl command that you issue before you mmap the buffer. If that's
->> the case, you don't even have to worry about stopping the event, as it
->> shouldn't be running, because without the buffer perf_aux_output_begin()
->> should fail and so should the pmu::add() iirc.
->>
->
-> The idea behind the current approach was to make the SET_DRV_CONFIG
-> ioctl() usable by other drivers where multiple ioctl() calls could be
-> performed while a session in ongoing.  I also opted to introduce a
-> _sync() function to let the PMU refresh its configuration at the time
-> of its own choosing rather than having to interrupt the session.
-
-Yes, but the times of PMU's own choosing would still be more or less
-limited to ->start()/->stop().
-
-You can also do an event_function_call(), which would call
-->config_sync(), which would be free to decide what to do with the new
-information, up to and including doing a ->stop()/->start() sequence. My
-guess is that you'd want to do either of the following:
- * decide to apply the new configuration immediately, and do the
- start-stop thing,
- * decide to defer the new configuration until the next ->start().
-
-Both should work via cross call directly from the ioctl() call.
-
-> But all I need for coresight is to have available the sink information
-> and PMU configuration (in an upcoming patchset) by the time
-> setup_aux() is called.  You are correct, this is a one time
-> configuration and since the event isn't running there is no need for
-> locking - I should be able to access the PMU when the ioctl is called.
->
-> If you are fine with this bare-bone scenario and don't care much about
-> usability in different situation, I'll do a respin with minimal
-> functionality that cover my needs.
-
-It doesn't have to be bare-bones, what I'm saying is that you shouldn't
-need the event->drv_config, as you can directly call
-pmu::config(new_config) (or config_sync(), but I'm guessing the _sync
-part is redundant if you don't keep the configuration in 2 parts) from
-the ioctl() and it should cover all your bases.
-
-Regards,
---
-Alex
+Applied now, thanks!
