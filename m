@@ -1,80 +1,83 @@
-From: digetx@gmail.com (Dmitry Osipenko)
-Date: Wed, 04 Jul 2018 14:25:11 +0300
-Subject: [PATCH v2 0/5] Initial support of Trusted Foundations on Tegra30
-In-Reply-To: <5c47ef70-b90e-6e81-39dd-fbcfad2b93e5@gmail.com>
-References: <20180619110027.16935-1-digetx@gmail.com>
- <11534185.70fb5jbPr6@dimapc> <5c47ef70-b90e-6e81-39dd-fbcfad2b93e5@gmail.com>
-Message-ID: <1635370.HnqPZmo3Ue@dimapc>
+From: stefan@agner.ch (Stefan Agner)
+Date: Wed, 04 Jul 2018 13:30:28 +0200
+Subject: [PATCH] ARM: ftrace: Only set kernel memory back to read-only
+ after boot
+In-Reply-To: <20180621124710.453ee0ae@gandalf.local.home>
+References: <20180621124710.453ee0ae@gandalf.local.home>
+Message-ID: <7aa5a479aa484775f492dc5251bcf5c9@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, 2 July 2018 21:53:08 MSK Peter Geis wrote:
-> On 07/02/2018 10:48 AM, Dmitry Osipenko wrote:
-> > On Friday, 29 June 2018 22:37:02 MSK Peter Geis wrote:
-> >> Good Afternoon,
-> >> 
-> >> I have tested these patches on the Ouya T3 device.
-> >> They work great to enable the L2 cache controller, however they do not
-> >> respect explicitly disabling the L2 cache controller via the kernel
-> >> config nor device tree.
-> >> 
-> >> With CONFIG_CACHE_L2X0 disabled, but CONFIG_TRUSTED_FOUNDATIONS enabled,
-> >> the L2 cache controller is silently enabled and allows all four cores to
-> >> boot.
-> > 
-> > I don't see how cache could be enabled with CONFIG_CACHE_L2X0 disabled,
-> > there is no code to do that. Could you elaborate please?
-> > 
-> > Secondary cores do not depend on the cache state, disabled cache shouldn't
-> > prevent them to boot.
+On 21.06.2018 18:47, Steven Rostedt wrote:
+> From: Steven Rostedt (VMware) <rostedt@goodmis.org>
 > 
-> On the untouched mainline kernel running on a Trusted Foundations T3
-> device, I observed the following indications:
-> With the L2 cache controller enabled, all four processor cores were
-> enabled, but it would immediately panic for writing to a secure register
-> from insecure mode.
-> With the L2 cache controller disabled, only the boot core is detected,
-> but it successfully boots.
-> This is the issue that I inquired originally to you about.
+> Dynamic ftrace requires modifying the code segments that are usually
+> set to read-only. To do this, a per arch function is called both before
+> and after the ftrace modifications are performed. The "before" function
+> will set kernel code text to read-write to allow for ftrace to make the
+> modifications, and the "after" function will set the kernel code text
+> back to "read-only" to keep the kernel code text protected.
 > 
-> With your patch running on the same device, the following is observed:
-> With the L2 controller enabled, all four cores are active, and the cache
-> controller appears to function.
-> With the L2 controller disabled, but trusted foundations enabled, the L2
-> controller enabled kernel message is missing, however all four cores
-> still enable.
+> The issue happens when dynamic ftrace is tested at boot up. The test is
+> done before the kernel code text has been set to read-only. But the
+> "before" and "after" calls are still performed. The "after" call will
+> change the kernel code text to read-only prematurely, and other boot
+> code that expects this code to be read-write will fail.
 > 
-
-This is the correct behaviour.
-
-> After looking through the code a little more deeply, I see you modified
-> the reset handler for handling offline cores.
-> I am wondering if you fixed an additional issue inadvertently.
+> The solution is to add a variable that is set when the kernel code text
+> is expected to be converted to read-only, and make the ftrace "before"
+> and "after" calls do nothing if that variable is not yet set. This is
+> similar to the x86 solution from commit 162396309745 ("ftrace, x86:
+> make kernel text writable only for conversions").
 > 
+> Reported-by: Stefan Agner <stefan@agner.ch>
+> Tested-by: Stefan Agner <stefan@agner.ch>
+> Link: http://lkml.kernel.org/r/20180620212906.24b7b66e at vmware.local.home
+> Signed-off-by: Steven Rostedt (VMware) <rostedt@goodmis.org>
+> ---
+> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+> index c186474422f3..0cc8e04295a4 100644
+> --- a/arch/arm/mm/init.c
+> +++ b/arch/arm/mm/init.c
 
-CPU will fail to boot if it tries to apply erratas via accessing the secure 
-registers. I've changed the reset handler to skip erratas on T20/30 if trusted 
-foundations present, see "Don't apply CPU erratas in insecure mode" patch. 
-This is an intentional change.
+I guess this can be seen as reviewed?
 
-> The reason I discovered this is I am working with kexec as a bootloader.
-> On a device without trusted foundations, kexec works without issue.
-> On a device with trusted foundations and your patch, I found that
-> disabling the l2 cache controller and trusted foundations allow kexec to
-> occur.
-> I haven't tried an either/or scenario, though now you have me thinking I
-> should.
-> 
+Patches touching core ARM port usually go through Russels patch tracker.
 
-Secondary cores are dying in the reset handler in a case of disabled L2 + 
-disabled TF. Looks like there is something wrong in regards to stopping 
-secondary CPU cores / flushing CPU caches, the suspend-resume isn't working 
-right now because of it and likely that kexec is suffering from the same 
-issue.
+You have to submit the patch here:
+http://www.armlinux.org.uk/developer/patches/
 
-> >> One must also disable CONFIG_TRUSTED_FOUNDATIONS to stop the L2 cache
-> >> controller from spinning up.
-> >> 
-> >> Tested-by: Peter Geis <pgwipeout@gmail.com>
+--
+Stefan
 
-Thanks for testing!
+
+> @@ -736,20 +736,29 @@ static int __mark_rodata_ro(void *unused)
+>  	return 0;
+>  }
+>  
+> +static int kernel_set_to_readonly __read_mostly;
+> +
+>  void mark_rodata_ro(void)
+>  {
+> +	kernel_set_to_readonly = 1;
+>  	stop_machine(__mark_rodata_ro, NULL, NULL);
+>  	debug_checkwx();
+>  }
+>  
+>  void set_kernel_text_rw(void)
+>  {
+> +	if (!kernel_set_to_readonly)
+> +		return;
+> +
+>  	set_section_perms(ro_perms, ARRAY_SIZE(ro_perms), false,
+>  				current->active_mm);
+>  }
+>  
+>  void set_kernel_text_ro(void)
+>  {
+> +	if (!kernel_set_to_readonly)
+> +		return;
+> +
+>  	set_section_perms(ro_perms, ARRAY_SIZE(ro_perms), true,
+>  				current->active_mm);
+>  }
