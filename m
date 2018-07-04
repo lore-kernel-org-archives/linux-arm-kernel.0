@@ -1,61 +1,64 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Wed,  4 Jul 2018 10:49:39 +0100
-Subject: [PATCH 1/6] ASoC: qdsp6: q6afe: Add missing slimbus capture ports
+Date: Wed,  4 Jul 2018 10:49:41 +0100
+Subject: [PATCH 3/6] ASoC: qdsp6: q6routing: add slim rx routings
 In-Reply-To: <20180704094944.16440-1-srinivas.kandagatla@linaro.org>
 References: <20180704094944.16440-1-srinivas.kandagatla@linaro.org>
-Message-ID: <20180704094944.16440-2-srinivas.kandagatla@linaro.org>
+Message-ID: <20180704094944.16440-4-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Existing code already has support for SLIMbus TX and RX, only thing
-that was missing from TX side was mapping between virtual to actual
-DSP port ids.
-
-This patch adds those mappings.
+This patch add routings mixer controls for slim rx ports.
 
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 ---
- sound/soc/qcom/qdsp6/q6afe.c | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+ sound/soc/qcom/qdsp6/q6routing.c | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
-diff --git a/sound/soc/qcom/qdsp6/q6afe.c b/sound/soc/qcom/qdsp6/q6afe.c
-index 621b67b34db9..90e2d8e658bf 100644
---- a/sound/soc/qcom/qdsp6/q6afe.c
-+++ b/sound/soc/qcom/qdsp6/q6afe.c
-@@ -514,6 +514,20 @@ static struct afe_port_map port_maps[AFE_PORT_MAX] = {
- 				SLIMBUS_5_RX, 1, 1},
- 	[SLIMBUS_6_RX] = { AFE_PORT_ID_SLIMBUS_MULTI_CHAN_6_RX,
- 				SLIMBUS_6_RX, 1, 1},
-+	[SLIMBUS_0_TX] = { AFE_PORT_ID_SLIMBUS_MULTI_CHAN_0_TX,
-+				SLIMBUS_0_TX, 0, 1},
-+	[SLIMBUS_1_TX] = { AFE_PORT_ID_SLIMBUS_MULTI_CHAN_1_TX,
-+				SLIMBUS_1_TX, 0, 1},
-+	[SLIMBUS_2_TX] = { AFE_PORT_ID_SLIMBUS_MULTI_CHAN_2_TX,
-+				SLIMBUS_2_TX, 0, 1},
-+	[SLIMBUS_3_TX] = { AFE_PORT_ID_SLIMBUS_MULTI_CHAN_3_TX,
-+				SLIMBUS_3_TX, 0, 1},
-+	[SLIMBUS_4_TX] = { AFE_PORT_ID_SLIMBUS_MULTI_CHAN_4_TX,
-+				SLIMBUS_4_TX, 0, 1},
-+	[SLIMBUS_5_TX] = { AFE_PORT_ID_SLIMBUS_MULTI_CHAN_5_TX,
-+				SLIMBUS_5_TX, 0, 1},
-+	[SLIMBUS_6_TX] = { AFE_PORT_ID_SLIMBUS_MULTI_CHAN_6_TX,
-+				SLIMBUS_6_TX, 0, 1},
- 	[PRIMARY_MI2S_RX] = { AFE_PORT_ID_PRIMARY_MI2S_RX,
- 				PRIMARY_MI2S_RX, 1, 1},
- 	[PRIMARY_MI2S_TX] = { AFE_PORT_ID_PRIMARY_MI2S_TX,
-@@ -1372,6 +1386,13 @@ struct q6afe_port *q6afe_port_get_from_id(struct device *dev, int id)
- 	case AFE_PORT_ID_MULTICHAN_HDMI_RX:
- 		cfg_type = AFE_PARAM_ID_HDMI_CONFIG;
- 		break;
-+	case AFE_PORT_ID_SLIMBUS_MULTI_CHAN_0_TX:
-+	case AFE_PORT_ID_SLIMBUS_MULTI_CHAN_1_TX:
-+	case AFE_PORT_ID_SLIMBUS_MULTI_CHAN_2_TX:
-+	case AFE_PORT_ID_SLIMBUS_MULTI_CHAN_3_TX:
-+	case AFE_PORT_ID_SLIMBUS_MULTI_CHAN_4_TX:
-+	case AFE_PORT_ID_SLIMBUS_MULTI_CHAN_5_TX:
-+	case AFE_PORT_ID_SLIMBUS_MULTI_CHAN_6_TX:
- 	case AFE_PORT_ID_SLIMBUS_MULTI_CHAN_0_RX:
- 	case AFE_PORT_ID_SLIMBUS_MULTI_CHAN_1_RX:
- 	case AFE_PORT_ID_SLIMBUS_MULTI_CHAN_2_RX:
+diff --git a/sound/soc/qcom/qdsp6/q6routing.c b/sound/soc/qcom/qdsp6/q6routing.c
+index c80fdbc2442e..35269b492761 100644
+--- a/sound/soc/qcom/qdsp6/q6routing.c
++++ b/sound/soc/qcom/qdsp6/q6routing.c
+@@ -68,6 +68,13 @@
+ 	{ mix_name, "SEC_MI2S_TX", "SEC_MI2S_TX" },	\
+ 	{ mix_name, "QUAT_MI2S_TX", "QUAT_MI2S_TX" },	\
+ 	{ mix_name, "TERT_MI2S_TX", "TERT_MI2S_TX" },		\
++	{ mix_name, "SLIMBUS_0_TX", "SLIMBUS_0_TX" },		\
++	{ mix_name, "SLIMBUS_1_TX", "SLIMBUS_1_TX" },		\
++	{ mix_name, "SLIMBUS_2_TX", "SLIMBUS_2_TX" },		\
++	{ mix_name, "SLIMBUS_3_TX", "SLIMBUS_3_TX" },		\
++	{ mix_name, "SLIMBUS_4_TX", "SLIMBUS_4_TX" },		\
++	{ mix_name, "SLIMBUS_5_TX", "SLIMBUS_5_TX" },		\
++	{ mix_name, "SLIMBUS_6_TX", "SLIMBUS_6_TX" },		\
+ 	{ mix_name, "PRIMARY_TDM_TX_0", "PRIMARY_TDM_TX_0"},	\
+ 	{ mix_name, "PRIMARY_TDM_TX_1", "PRIMARY_TDM_TX_1"},	\
+ 	{ mix_name, "PRIMARY_TDM_TX_2", "PRIMARY_TDM_TX_2"},	\
+@@ -122,6 +129,27 @@
+ 	SOC_SINGLE_EXT("QUAT_MI2S_TX", QUATERNARY_MI2S_TX,		\
+ 		id, 1, 0, msm_routing_get_audio_mixer,			\
+ 		msm_routing_put_audio_mixer),				\
++	SOC_SINGLE_EXT("SLIMBUS_0_TX", SLIMBUS_0_TX,			\
++		id, 1, 0, msm_routing_get_audio_mixer,			\
++		msm_routing_put_audio_mixer),				\
++	SOC_SINGLE_EXT("SLIMBUS_1_TX", SLIMBUS_1_TX,			\
++		id, 1, 0, msm_routing_get_audio_mixer,			\
++		msm_routing_put_audio_mixer),				\
++	SOC_SINGLE_EXT("SLIMBUS_2_TX", SLIMBUS_2_TX,			\
++		id, 1, 0, msm_routing_get_audio_mixer,			\
++		msm_routing_put_audio_mixer),				\
++	SOC_SINGLE_EXT("SLIMBUS_3_TX", SLIMBUS_3_TX,			\
++		id, 1, 0, msm_routing_get_audio_mixer,			\
++		msm_routing_put_audio_mixer),				\
++	SOC_SINGLE_EXT("SLIMBUS_4_TX", SLIMBUS_4_TX,			\
++		id, 1, 0, msm_routing_get_audio_mixer,			\
++		msm_routing_put_audio_mixer),				\
++	SOC_SINGLE_EXT("SLIMBUS_5_TX", SLIMBUS_5_TX,			\
++		id, 1, 0, msm_routing_get_audio_mixer,			\
++		msm_routing_put_audio_mixer),				\
++	SOC_SINGLE_EXT("SLIMBUS_6_TX", SLIMBUS_6_TX,			\
++		id, 1, 0, msm_routing_get_audio_mixer,			\
++		msm_routing_put_audio_mixer),				\
+ 	SOC_SINGLE_EXT("PRIMARY_TDM_TX_0", PRIMARY_TDM_TX_0,		\
+ 		id, 1, 0, msm_routing_get_audio_mixer,			\
+ 		msm_routing_put_audio_mixer),				\
 -- 
 2.16.2
