@@ -1,59 +1,60 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Wed, 4 Jul 2018 09:44:35 +0200
-Subject: [PATCH v2 1/1] mmc: sunxi: Disable irq during pm_suspend
-In-Reply-To: <1530685741-20604-1-git-send-email-stefan@olimex.com>
-References: <1530685741-20604-1-git-send-email-stefan@olimex.com>
-Message-ID: <20180704074435.46aqhuthrn2vok5x@flea>
+From: mars.cheng@mediatek.com (Mars Cheng)
+Date: Wed, 4 Jul 2018 15:47:53 +0800
+Subject: [PATCH v3 4/4] arm64: dts: mediatek: add mt6765 support
+In-Reply-To: <f482708c-ea5e-5d81-a176-d69be9ccdf63@arm.com>
+References: <1530669174-17623-1-git-send-email-mars.cheng@mediatek.com>
+ <1530669174-17623-5-git-send-email-mars.cheng@mediatek.com>
+ <f482708c-ea5e-5d81-a176-d69be9ccdf63@arm.com>
+Message-ID: <1530690473.16183.3.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 04, 2018 at 09:28:59AM +0300, Stefan Mavrodiev wrote:
-> When mmc host controller enters suspend state, the clocks are
-> disabled, but irqs are not. For some reason the irqchip emits
-> false interrupts, which causes system lock loop.
-> 
-> Debug log is:
->   ...
->   sunxi-mmc 1c11000.mmc: setting clk to 52000000, rounded 51200000
->   sunxi-mmc 1c11000.mmc: enabling the clock
->   sunxi-mmc 1c11000.mmc: cmd 13(8000014d) arg 10000 ie 0x0000bbc6 len 0
->   sunxi-mmc 1c11000.mmc: irq: rq (ptrval) mi 00000004 idi 00000000
->   sunxi-mmc 1c11000.mmc: cmd 6(80000146) arg 3210101 ie 0x0000bbc6 len 0
->   sunxi-mmc 1c11000.mmc: irq: rq (ptrval) mi 00000004 idi 00000000
->   sunxi-mmc 1c11000.mmc: cmd 13(8000014d) arg 10000 ie 0x0000bbc6 len 0
->   sunxi-mmc 1c11000.mmc: irq: rq (ptrval) mi 00000004 idi 00000000
->   mmc1: new DDR MMC card at address 0001
->   mmcblk1: mmc1:0001 AGND3R 14.6 GiB
->   mmcblk1boot0: mmc1:0001 AGND3R partition 1 4.00 MiB
->   mmcblk1boot1: mmc1:0001 AGND3R partition 2 4.00 MiB
->   sunxi-mmc 1c11000.mmc: cmd 18(80003352) arg 0 ie 0x0000fbc2 len 409
->   sunxi-mmc 1c11000.mmc: irq: rq (ptrval) mi 00004000 idi 00000002
->    mmcblk1: p1
->   sunxi-mmc 1c11000.mmc: irq: rq   (null) mi 00000000 idi 00000000
->   sunxi-mmc 1c11000.mmc: irq: rq   (null) mi 00000000 idi 00000000
->   sunxi-mmc 1c11000.mmc: irq: rq   (null) mi 00000000 idi 00000000
->   sunxi-mmc 1c11000.mmc: irq: rq   (null) mi 00000000 idi 00000000
-> and so on...
-> 
-> This issue apears on eMMC cards, routed on MMC2 slot. The patch is
-> tested with A20-OLinuXino-MICRO/LIME/LIME2 boards.
-> 
-> Fixes: 9a8e1e8cc2c0 ("mmc: sunxi: Add runtime_pm support")
-> Signed-off-by: Stefan Mavrodiev <stefan@olimex.com>
+Hi Marc
 
-Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
+On Wed, 2018-07-04 at 08:35 +0100, Marc Zyngier wrote:
+> On 04/07/18 02:52, Mars Cheng wrote:
+> > This adds basic chip support for MT6765 SoC.
+> > 
+> > Signed-off-by: Mars Cheng <mars.cheng@mediatek.com>
+> > ---
+> >  arch/arm64/boot/dts/mediatek/Makefile       |    1 +
+> >  arch/arm64/boot/dts/mediatek/mt6765-evb.dts |   33 ++++++
+> >  arch/arm64/boot/dts/mediatek/mt6765.dtsi    |  155 +++++++++++++++++++++++++++
+> >  3 files changed, 189 insertions(+)
+> >  create mode 100644 arch/arm64/boot/dts/mediatek/mt6765-evb.dts
+> >  create mode 100644 arch/arm64/boot/dts/mediatek/mt6765.dtsi
+> > 
+> 
+> [...]
+> 
+> > +
+> > +		gic: interrupt-controller at c000000 {
+> > +			compatible = "arm,gic-v3";
+> > +			#interrupt-cells = <3>;
+> > +			#address-cells = <2>;
+> > +			#size-cells = <2>;
+> > +			#redistributor-regions = <1>;
+> > +			interrupt-parent = <&gic>;
+> > +			interrupt-controller;
+> > +			reg = <0 0x0c000000 0 0x40000>, // distributor
+> > +			      <0 0x0c100000 0 0x200000>, // redistributor
+> > +			      <0 0x0c400000 0 0x40000>; // gicc
+> 
+> For the second time: please add *all* the GIC CPU interface regions,
+> described in the Cortex-A53 TRM[1] (GICC, GICH, and GICV).
+> 
 
-Thanks!
-Maxime
+MT6765 has no GICH/GICV/ITS in mediatek design. Have confirmed with our
+designer.  
 
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180704/4406d8ca/attachment.sig>
+MT6797 had similar question from you. Sorry for not mentioned it first.
+
+http://lists.infradead.org/pipermail/linux-mediatek/2017-February/008074.html
+
+Thanks.
+> Thanks,
+> 
+> 	M.
+> 
+> [1]
+> https://urldefense.proofpoint.com/v2/url?u=http-3A__infocenter.arm.com_help_topic_com.arm.doc.ddi0500g_ch09s02s01.html&d=DwICaQ&c=X9NHckmGz7LNQmqtvpDCYVnn6eFXNivfZeknqiAo-n0&r=Ph_SbcClVGRWmGxVhfr-5CZF9ffiUOE7TZ47ns4ROh4&m=9L01qJc7apuzwLobX_nhN0ik8IFdu_X7hJ139x5dNNw&s=0zeZXtWPeITLj01RSxAQ6NfNkTUu9Il0Dddgk07-6QA&e= 
