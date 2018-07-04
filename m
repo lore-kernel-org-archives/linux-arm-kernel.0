@@ -1,34 +1,68 @@
-From: ravi.bangoria@linux.ibm.com (Ravi Bangoria)
-Date: Wed, 4 Jul 2018 10:56:42 +0530
-Subject: [PATCH v5 06/10] Uprobes: Support SDT markers having reference
- count (semaphore)
-In-Reply-To: <20180703192634.GA32223@redhat.com>
-References: <20180628052209.13056-1-ravi.bangoria@linux.ibm.com>
- <20180628052209.13056-7-ravi.bangoria@linux.ibm.com>
- <20180702160158.GD65296@linux.vnet.ibm.com>
- <ac5ab301-7df6-90fb-748b-3dc4624ea3c4@linux.ibm.com>
- <20180703192634.GA32223@redhat.com>
-Message-ID: <20d12c56-77f6-4d87-8498-d5bc090444e5@linux.ibm.com>
+From: mst@redhat.com (Michael S. Tsirkin)
+Date: Wed, 4 Jul 2018 08:37:42 +0300
+Subject: [PATCH v3 01/20] virtio: mmio-v1: Validate queue PFN
+In-Reply-To: <5124334c-b3c8-4c59-b652-d26ea1101807@arm.com>
+References: <1530270944-11351-1-git-send-email-suzuki.poulose@arm.com>
+ <1530270944-11351-2-git-send-email-suzuki.poulose@arm.com>
+ <20180629200816-mutt-send-email-mst@kernel.org>
+ <5124334c-b3c8-4c59-b652-d26ea1101807@arm.com>
+Message-ID: <20180704083618-mutt-send-email-mst@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 07/04/2018 12:56 AM, Oleg Nesterov wrote:
-> On 07/03, Ravi Bangoria wrote:
->>
->> Now about adding ref_ctr_offset into uprobe_consumer. Actually, I
->> didn't want to change the uprobe_consumer definition because it's
->> already exported and tools like systemtap are using it.
+On Tue, Jul 03, 2018 at 09:04:01AM +0100, Suzuki K Poulose wrote:
+> Hi Michael,
 > 
-> So what? Yes, the out-of-tree modules should be updated, but this doesn't
-> mean we can add the new features.
+> On 06/29/2018 06:42 PM, Michael S. Tsirkin wrote:
+> > On Fri, Jun 29, 2018 at 12:15:21PM +0100, Suzuki K Poulose wrote:
+> > > virtio-mmio with virtio-v1 uses a 32bit PFN for the queue.
+> > > If the queue pfn is too large to fit in 32bits, which
+> > > we could hit on arm64 systems with 52bit physical addresses
+> > > (even with 64K page size), we simply miss out a proper link
+> > > to the other side of the queue.
+> > > 
+> > > Add a check to validate the PFN, rather than silently breaking
+> > > the devices.
+> > > 
+> > > Cc: "Michael S. Tsirkin" <mst@redhat.com>
+> > > Cc: Jason Wang <jasowang@redhat.com>
+> > > Cc: Marc Zyngier <marc.zyngier@arm.com>
+> > > Cc: Christoffer Dall <cdall@kernel.org>
+> > > Cc: Peter Maydel <peter.maydell@linaro.org>
+> > > Cc: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
+> > > Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> > > ---
+> > > Changes since v2:
+> > >   - Change errno to -E2BIG
+> > > ---
+> > >   drivers/virtio/virtio_mmio.c | 18 ++++++++++++++++--
+> > >   1 file changed, 16 insertions(+), 2 deletions(-)
+> > > 
+> > > diff --git a/drivers/virtio/virtio_mmio.c b/drivers/virtio/virtio_mmio.c
+> > > index 67763d3..82cedc8 100644
+> > > --- a/drivers/virtio/virtio_mmio.c
+> > > +++ b/drivers/virtio/virtio_mmio.c
+> > > @@ -397,9 +397,21 @@ static struct virtqueue *vm_setup_vq(struct virtio_device *vdev, unsigned index,
+> > >   	/* Activate the queue */
+> > >   	writel(virtqueue_get_vring_size(vq), vm_dev->base + VIRTIO_MMIO_QUEUE_NUM);
+> > >   	if (vm_dev->version == 1) {
+> > > +		u64 q_pfn = virtqueue_get_desc_addr(vq) >> PAGE_SHIFT;
+> > > +
+> > > +		/*
+> > > +		 * virtio-mmio v1 uses a 32bit QUEUE PFN. If we have something
+> > > +		 * that doesn't fit in 32bit, fail the setup rather than
+> > > +		 * pretending to be successful.
+> > > +		 */
+> > > +		if (q_pfn >> 32) {
+> > > +			dev_err(&vdev->dev, "virtio-mmio: queue address too large\n");
+> > 
+> > How about:
+> > 	"hypervisor bug: legacy virtio-mmio must not be used with more than 0x%llx Gigabytes of memory",
+> > 	0x1ULL << (32 - 30) << PAGE_SHIFT
 > 
-> And, speaking of systemtap, it already has to do build-time checks to verify
-> that uprobe_consumer->ret_handler member exists. So it will need another
-> STAPCONF_INODE_REFCNT and that is all.
+> nit : Do we need change "hypervisor" => "platform" ? Virtio is used by other
+> tools (e.g, emulators) and not just virtual machines.
+> 
+> Suzuki
 
-Ok. let me explore that possibility as well.
-
-Thanks,
-Ravi
+OK.
