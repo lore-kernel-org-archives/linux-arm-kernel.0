@@ -1,41 +1,50 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 4 Jul 2018 12:05:29 +0530
-Subject: [PATCH v3 00/13] ARM: davinci: remove duplicate aemif support
-In-Reply-To: <59fdc532-bb72-ffae-cfb6-a7f156c14771@lechnology.com>
-References: <20180628095748.4462-1-brgl@bgdev.pl>
- <52a274f1-283a-a14a-54f3-4b95b6605c4f@ti.com>
- <59fdc532-bb72-ffae-cfb6-a7f156c14771@lechnology.com>
-Message-ID: <e1222b3c-dfa4-4cb0-eebf-8e2550e9d674@ti.com>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Wed, 4 Jul 2018 08:49:53 +0200
+Subject: [PATCH] KVM: arm/arm64: Fix vgic init race
+In-Reply-To: <1530653175-11999-1-git-send-email-christoffer.dall@arm.com>
+References: <1530653175-11999-1-git-send-email-christoffer.dall@arm.com>
+Message-ID: <d1bdc392-5632-0eb8-3bb2-a014f1f47834@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+Hi Christoffer,
 
-On Monday 02 July 2018 09:02 PM, David Lechner wrote:
-> On 07/02/2018 07:28 AM, Sekhar Nori wrote:
->> Hi David, Stephen,
->>
->> On Thursday 28 June 2018 03:27 PM, Bartosz Golaszewski wrote:
->>> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->>>
->>> This series moves all aemif/nand users to using the ti-aemif platform
->>> driver located in drivers/memory instead of the older API located in
->>> mach-davinci.
->>>
->>> First five patches add necessary changes to the clock driver. Next
->>> seven convert the board files to using the ti-aemif driver. Last patch
->>> removes now dead code.
->>
->> How do you want to handle this series? I can apply the series and
->> provide you an immutable branch on v4.18-rc1 with the clock patches
->> applied if that can work.
+On 07/03/2018 11:26 PM, Christoffer Dall wrote:
+> The vgic_init function can race with kvm_arch_vcpu_create() which does
+> not hold kvm_lock() and we therefore have no synchronization primitives
+> to ensure we're doing the right thing.
 > 
-> Sounds good to me. But I'm new to this maintainer thing, so maybe
-> there is something to consider that I haven't thought of?
+> As the user is trying to initialize or run the VM while at the same time
+> creating more VCPUs, we just have to refuse to initialize the VGIC in
+> this case rather than silently failing with a broken VCPU.
+> 
+> Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
 
-I don't think there is more to it. Ultimately there should not be two
-commits for the same patch. Either you can apply and share the commit to
-use or I can do that as well. I am equally fine either way.
+Thanks
 
-Regards,
-Sekhar
+Eric
+> ---
+>  virt/kvm/arm/vgic/vgic-init.c | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
+> index 9406eaf..c0c0b88 100644
+> --- a/virt/kvm/arm/vgic/vgic-init.c
+> +++ b/virt/kvm/arm/vgic/vgic-init.c
+> @@ -286,6 +286,10 @@ int vgic_init(struct kvm *kvm)
+>         if (vgic_initialized(kvm))
+>                 return 0;
+> 
+> +       /* Are we also in the middle of creating a VCPU? */
+> +       if (kvm->created_vcpus != atomic_read(&kvm->online_vcpus))
+> +               return -EBUSY;
+> +
+>         /* freeze the number of spis */
+>         if (!dist->nr_spis)
+>                 dist->nr_spis = VGIC_NR_IRQS_LEGACY - VGIC_NR_PRIVATE_IRQS;
+> --
+> 2.7.4
+> 
+> IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+> 
