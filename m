@@ -1,263 +1,146 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Wed, 4 Jul 2018 15:44:09 +0200
-Subject: [PATCH 1/3] soc: amlogic: Add Meson GX Clock Measure driver
-In-Reply-To: <7d83a0a4-5cde-7e4f-78a8-372ae8cb03d0@baylibre.com>
-References: <1530624110-4687-1-git-send-email-narmstrong@baylibre.com>
- <1530624110-4687-2-git-send-email-narmstrong@baylibre.com>
- <CAFBinCDBEbVSEzhM2WOhxNX1DZLiSrkeo7GWdxGzBpOUH3PKQw@mail.gmail.com>
- <7d83a0a4-5cde-7e4f-78a8-372ae8cb03d0@baylibre.com>
-Message-ID: <CAFBinCA5B87TkfOtQd==PxDK74kJ+XWMgY-36QK2TT9p-vAEUA@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 4 Jul 2018 14:45:32 +0100
+Subject: [PATCH v2 1/1] mmc: sunxi: Disable irq during pm_suspend
+In-Reply-To: <CAPDyKFp8Hrmr0XCGnhFYrC3Q79dZizYC5KfRE92AUNa0FRDS5A@mail.gmail.com>
+References: <1530685741-20604-1-git-send-email-stefan@olimex.com>
+ <CAPDyKFo_fadfNbt8YMS3MMjaxjt1B54DtZJ+-LoH9y5JeRi5pQ@mail.gmail.com>
+ <9b8f30fd-12aa-46ba-ced9-aed38ada0059@arm.com>
+ <CAPDyKFp8Hrmr0XCGnhFYrC3Q79dZizYC5KfRE92AUNa0FRDS5A@mail.gmail.com>
+Message-ID: <42693731-6020-2fdd-cc68-01e9dd1fb6a3@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Neil,
+On 04/07/18 14:34, Ulf Hansson wrote:
+> On 4 July 2018 at 13:34, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> On 04/07/18 11:50, Ulf Hansson wrote:
+>>> + Marc
+>>>
+>>> On 4 July 2018 at 08:28, Stefan Mavrodiev <stefan@olimex.com> wrote:
+>>>> When mmc host controller enters suspend state, the clocks are
+>>>> disabled, but irqs are not. For some reason the irqchip emits
+>>>> false interrupts, which causes system lock loop.
+>>>>
+>>>> Debug log is:
+>>>>   ...
+>>>>   sunxi-mmc 1c11000.mmc: setting clk to 52000000, rounded 51200000
+>>>>   sunxi-mmc 1c11000.mmc: enabling the clock
+>>>>   sunxi-mmc 1c11000.mmc: cmd 13(8000014d) arg 10000 ie 0x0000bbc6 len 0
+>>>>   sunxi-mmc 1c11000.mmc: irq: rq (ptrval) mi 00000004 idi 00000000
+>>>>   sunxi-mmc 1c11000.mmc: cmd 6(80000146) arg 3210101 ie 0x0000bbc6 len 0
+>>>>   sunxi-mmc 1c11000.mmc: irq: rq (ptrval) mi 00000004 idi 00000000
+>>>>   sunxi-mmc 1c11000.mmc: cmd 13(8000014d) arg 10000 ie 0x0000bbc6 len 0
+>>>>   sunxi-mmc 1c11000.mmc: irq: rq (ptrval) mi 00000004 idi 00000000
+>>>>   mmc1: new DDR MMC card at address 0001
+>>>>   mmcblk1: mmc1:0001 AGND3R 14.6 GiB
+>>>>   mmcblk1boot0: mmc1:0001 AGND3R partition 1 4.00 MiB
+>>>>   mmcblk1boot1: mmc1:0001 AGND3R partition 2 4.00 MiB
+>>>>   sunxi-mmc 1c11000.mmc: cmd 18(80003352) arg 0 ie 0x0000fbc2 len 409
+>>>>   sunxi-mmc 1c11000.mmc: irq: rq (ptrval) mi 00004000 idi 00000002
+>>>>    mmcblk1: p1
+>>>>   sunxi-mmc 1c11000.mmc: irq: rq   (null) mi 00000000 idi 00000000
+>>>>   sunxi-mmc 1c11000.mmc: irq: rq   (null) mi 00000000 idi 00000000
+>>>>   sunxi-mmc 1c11000.mmc: irq: rq   (null) mi 00000000 idi 00000000
+>>>>   sunxi-mmc 1c11000.mmc: irq: rq   (null) mi 00000000 idi 00000000
+>>>> and so on...
+>>>>
+>>>> This issue apears on eMMC cards, routed on MMC2 slot. The patch is
+>>>> tested with A20-OLinuXino-MICRO/LIME/LIME2 boards.
+>>>>
+>>>> Fixes: 9a8e1e8cc2c0 ("mmc: sunxi: Add runtime_pm support")
+>>>> Signed-off-by: Stefan Mavrodiev <stefan@olimex.com>
+>>>> ---
+>>>>  Changes in v2:
+>>>>   - Add comment why disable_irq() is necessary
+>>>>
+>>>> ---
+>>>>  drivers/mmc/host/sunxi-mmc.c | 7 +++++++
+>>>>  1 file changed, 7 insertions(+)
+>>>>
+>>>> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+>>>> index e747259..8e7f3e3 100644
+>>>> --- a/drivers/mmc/host/sunxi-mmc.c
+>>>> +++ b/drivers/mmc/host/sunxi-mmc.c
+>>>> @@ -1446,6 +1446,7 @@ static int sunxi_mmc_runtime_resume(struct device *dev)
+>>>>         sunxi_mmc_init_host(host);
+>>>>         sunxi_mmc_set_bus_width(host, mmc->ios.bus_width);
+>>>>         sunxi_mmc_set_clk(host, &mmc->ios);
+>>>> +       enable_irq(host->irq);
+>>>>
+>>>>         return 0;
+>>>>  }
+>>>> @@ -1455,6 +1456,12 @@ static int sunxi_mmc_runtime_suspend(struct device *dev)
+>>>>         struct mmc_host *mmc = dev_get_drvdata(dev);
+>>>>         struct sunxi_mmc_host *host = mmc_priv(mmc);
+>>>>
+>>>> +       /*
+>>>> +        * When clocks are off, it's possible receiving
+>>>> +        * fake interrupts, which will stall the system.
+>>>> +        * Disabling the irq  will prevent this.
+>>>> +        */
+>>>> +       disable_irq(host->irq);
+>>>
+>>> No, this doesn't work for shared IRQs.
+>>
+>> Well, in this case, it does work, because that interrupt line cannot be
+>> shared with anything else, if I understand how the SoC is wired: each
+>> MMC controller has a dedicated interrupt line to the GIC, and it isn't
+>> shared with anything (that's on the A20 though, and I don't know about
+>> other SoCs integrating the same IP).
+> 
+> That's the problem. This may work on some SoCs but not on others.
+> 
+>>
+>>>
+>>>>         sunxi_mmc_reset_host(host);
+>>>>         sunxi_mmc_disable(host);
+>>>>
+>>>> --
+>>>> 2.7.4
+>>>>
+>>>
+>>> The only option today is to use free_irq() in runtime suspend and then
+>>> re-request the irq to re-install the handler at runtime resume.
+>>>
+>>> That's not an optimal solution, which is pointed out in the below
+>>> discussion as well. Moreover, it has also turned out using free_irq()
+>>> is also problematic in cases threaded handlers are used.
+>>>
+>>> Here's the link to the discussion, it's not the only one I know of, so
+>>> this is common problem.
+>>> https://lkml.org/lkml/2016/1/28/213
+>>>
+>>> Care to have a hack on the "common" solution, which in principle means
+>>> adding APIs to genirq that can disable/enable handlers from being
+>>> called, rather than the entire IRQ line.
+>>
+>> That doesn't work. You still end-up with a screaming interrupt, and you
+>> will still spend 100% of your time in interrupt context for nothing.
+>>
+>> Eventually, the kernel will have enough (the /other/ shared handlers
+>> returning IRQ_NONE all the time), and will forcefully kill that
+>> particular interrupt interrupt line, meaning you end-up in the same
+>> situation of having the line disabled for all the users of that
+>> interrupt line. Except that now, it is disabled forever.
+> 
+> Ahh, correct!
+> 
+> Sounds like free_irq() is what we need. Only that it's bit heavy
+> weight as we need to re-install handlers.
+> 
+>>
+>> A better fix would be to kill the interrupt generation at the source
+>> (the MMC controller in this particular case) when suspending.
+> 
+> Right. But using disable_irq() doesn't work a general solution, so
+> something else is needed.
 
-On Wed, Jul 4, 2018 at 10:41 AM Neil Armstrong <narmstrong@baylibre.com> wrote:
->
-> Hi Martin,
->
-> On 03/07/2018 21:18, Martin Blumenstingl wrote:
-> > Hi Neil,
-> >
-> > On Tue, Jul 3, 2018 at 3:23 PM Neil Armstrong <narmstrong@baylibre.com> wrote:
-> >>
-> >> The Amlogic Meson GX SoCs embeds a clock measurer IP to measure the internal
-> >> clock paths frequencies.
-> >> The precision is in the order of the MHz.
-> >>
-> >> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> >> ---
-> >>  drivers/soc/amlogic/Kconfig                |   8 ++
-> >>  drivers/soc/amlogic/Makefile               |   1 +
-> >>  drivers/soc/amlogic/meson-gx-clk-measure.c | 224 +++++++++++++++++++++++++++++
-> >>  3 files changed, 233 insertions(+)
-> >>  create mode 100644 drivers/soc/amlogic/meson-gx-clk-measure.c
-> >>
-> >> diff --git a/drivers/soc/amlogic/Kconfig b/drivers/soc/amlogic/Kconfig
-> >> index b04f6e4..4a3217d 100644
-> >> --- a/drivers/soc/amlogic/Kconfig
-> >> +++ b/drivers/soc/amlogic/Kconfig
-> >> @@ -1,5 +1,13 @@
-> >>  menu "Amlogic SoC drivers"
-> >>
-> >> +config MESON_GX_CLK_MEASURE
-> >> +       bool "Amlogic Meson GX SoC Clock Measure driver"
-> >> +       depends on ARCH_MESON || COMPILE_TEST
-> >> +       default ARCH_MESON
-> >> +       help
-> >> +         Say yes to support of Measuring a set of internal SoC clocks
-> >> +         from the debugfs interface.
-> >> +
-> >>  config MESON_GX_SOCINFO
-> >>         bool "Amlogic Meson GX SoC Information driver"
-> >>         depends on ARCH_MESON || COMPILE_TEST
-> >> diff --git a/drivers/soc/amlogic/Makefile b/drivers/soc/amlogic/Makefile
-> >> index 8fa3218..a0ad966 100644
-> >> --- a/drivers/soc/amlogic/Makefile
-> >> +++ b/drivers/soc/amlogic/Makefile
-> >> @@ -1,3 +1,4 @@
-> >> +obj-$(CONFIG_MESON_GX_CLK_MEASURE) += meson-gx-clk-measure.o
-> >>  obj-$(CONFIG_MESON_GX_SOCINFO) += meson-gx-socinfo.o
-> >>  obj-$(CONFIG_MESON_GX_PM_DOMAINS) += meson-gx-pwrc-vpu.o
-> >>  obj-$(CONFIG_MESON_MX_SOCINFO) += meson-mx-socinfo.o
-> >> diff --git a/drivers/soc/amlogic/meson-gx-clk-measure.c b/drivers/soc/amlogic/meson-gx-clk-measure.c
-> >> new file mode 100644
-> >> index 0000000..434d9f3
-> >> --- /dev/null
-> >> +++ b/drivers/soc/amlogic/meson-gx-clk-measure.c
->
-> [...]
->
-> >> +       CLK_MSR_ID(57, "wave420l_c"),
-> >> +       CLK_MSR_ID(58, "wave420l_b"),
-> > AFAIK the Chips&Media WAVE420L video codec is only available on GXM (S912)
-> > I assume reading this on GXBB or GXL simply reads 0?
->
-> Yes
->
-> >
-> >> +       CLK_MSR_ID(59, "hcodec"),
-> >> +       CLK_MSR_ID(60, "alt_32k"),
-> >> +       CLK_MSR_ID(61, "gpio_msr"),
-> >> +       CLK_MSR_ID(62, "hevc"),
-> >> +       CLK_MSR_ID(66, "vid_lock"),
-> >> +       CLK_MSR_ID(70, "pwm_f"),
-> >> +       CLK_MSR_ID(71, "pwm_e"),
-> >> +       CLK_MSR_ID(72, "pwm_d"),
-> >> +       CLK_MSR_ID(73, "pwm_C"),
-> > should this be pwm_c (instead of pwm_C)?
-> >
-> >> +       CLK_MSR_ID(75, "aoclkx2_int"),
-> >> +       CLK_MSR_ID(76, "aoclk_int"),
-> >> +       CLK_MSR_ID(77, "rng_ring_osc_0"),
-> >> +       CLK_MSR_ID(78, "rng_ring_osc_1"),
-> >> +       CLK_MSR_ID(79, "rng_ring_osc_2"),
-> >> +       CLK_MSR_ID(80, "rng_ring_osc_3"),
-> >> +       CLK_MSR_ID(81, "vapb"),
-> >> +       CLK_MSR_ID(82, "ge2d"),
-> >> +};
-> > I did a quick check whether the clock IDs are really the same for all GX SoCs:
-> > apart from clocks missing on older SoCs (see for example the WAVE420L
-> > clocks above) there were only minor renames but no conflicts!
->
-> I did the same work ! I will add this detail to the commit log.
-> Thanks for checking ;-)
-:)
+Which is why I asked whether there was a way to prevent interrupts from
+being generated at the MMC controller level. Most IPs have something
+there, and I'd be surprised if there wasn't anything to that effect in
+the SDHCI spec.
 
-> >
-> >> +
-> >> +static int meson_gx_measure_id(struct meson_gx_msr *priv, unsigned int id)
-> >> +{
-> >> +       unsigned int val;
-> >> +       int ret;
-> >> +
-> >> +       regmap_write(priv->regmap, MSR_CLK_REG0, 0);
-> >> +
-> >> +       /* Set measurement gate to 50uS */
-> >> +       regmap_update_bits(priv->regmap, MSR_CLK_REG0, MSR_CLK_DIV,
-> >> +                          FIELD_PREP(MSR_CLK_DIV, DIV_50US));
-> >> +
-> >> +       /* Set ID */
-> >> +       regmap_update_bits(priv->regmap, MSR_CLK_REG0, MSR_CLK_SRC,
-> >> +                          FIELD_PREP(MSR_CLK_SRC, id));
-> >> +
-> >> +       /* Enable & Start */
-> >> +       regmap_update_bits(priv->regmap, MSR_CLK_REG0,
-> >> +                          MSR_RUN | MSR_ENABLE,
-> >> +                          MSR_RUN | MSR_ENABLE);
-> >> +
-> >> +       ret = regmap_read_poll_timeout(priv->regmap, MSR_CLK_REG0,
-> >> +                                      val, !(val & MSR_BUSY), 10, 1000);
-> >> +       if (ret)
-> >> +               return ret;
-> >> +
-> >> +       /* Disable */
-> >> +       regmap_update_bits(priv->regmap, MSR_CLK_REG0, MSR_ENABLE, 0);
-> >> +
-> >> +       /* Get the value in MHz*64 */
-> >> +       regmap_read(priv->regmap, MSR_CLK_REG2, &val);
-> >> +
-> >> +       return (((val + 31) & MSR_VAL_MASK) / 64) * 1000000;
-> >> +}
-> >> +
-> >> +static int clk_msr_show(struct seq_file *s, void *data)
-> >> +{
-> >> +       struct meson_gx_msr_id *clk_msr_id = s->private;
-> >> +       int val;
-> >> +
-> >> +       val = meson_gx_measure_id(clk_msr_id->priv, clk_msr_id->id);
-> >> +       if (val < 0)
-> >> +               return val;
-> >> +
-> >> +       seq_printf(s, "%d\n", val);
->
-> With jerome, we managed to have a much higher precision by cycling over the divider
-> and checking when the counter overflows. And I will print the precision in the clock debugfs
-> entry.
-great that you could even improve the precision!
+Thanks,
 
-> >> +
-> >> +       return 0;
-> >> +}
-> >> +DEFINE_SHOW_ATTRIBUTE(clk_msr);
-> > have you considered modelling this as clock driver instead?
->
-> Yes, but it can wait.
-> Actually this clk-msr can be feed to GEN_CLK and be outputted to a pad,
-> but all this is only for debug, so we can stick to debugfs for now.
->
-> Question, should I separate the clocks in a subdirectory and add a summary file like
-> for the clk debugfs ?
->
->
-> /sys/kernel/debug/meson-clk-msr
-> ------------------|--- summary
-> ------------------|--- clks
-> -----------------------|--- ring_osc_out_ee_0
-> ...
-> -----------------------|--- ge2d
->
-> ?
-this is exactly why I was curious if you considered implementing this
-as clock driver instead
-based on your description above each measured clock will have the
-following properties:
-- id (passed to the clkmsr IP block)
-- name (human readable name)
-- clock rate
-- accuracy
-
-doesn't CCF provide everything except "id"? you'll even get the summary
-
-can you explain how you would use the clkmsr output?
-here's how I would use it:
-- assume I'm debugging something broken
-- I suspect that it may be due to the clock setup
-- grep "suspicious-clock" /sys/kernel/debug/clk/clk_summary
-- compare the grep output with /sys/kernel/debug/meson-clk-msr/suspicious-clock
-
-if it was a CCF driver I could simply do:
-grep "suspicious-clock" /sys/kernel/debug/clk/clk_summary
--> this would return "suspicious-clock" (which is what the kernel can
-configure) and "clkmsr_suspicious-clock" (which is what clkmsr reads)
-
-> >
-> >> +
-> >> +static const struct regmap_config clk_msr_regmap_config = {
-> >> +       .reg_bits = 32,
-> >> +       .val_bits = 32,
-> >> +       .reg_stride = 4,
-> >> +       .max_register = MSR_CLK_REG2,
-> >> +};
-> >> +
-> >> +static int meson_gx_msr_probe(struct platform_device *pdev)
-> >> +{
-> >> +       struct meson_gx_msr *priv;
-> >> +       struct resource *res;
-> >> +       struct dentry *root;
-> >> +       void __iomem *base;
-> >> +       int i;
-> >> +
-> >> +       priv = devm_kzalloc(&pdev->dev, sizeof(struct meson_gx_msr),
-> >> +                           GFP_KERNEL);
-> >> +       if (!priv)
-> >> +               return -ENOMEM;
-> >> +
-> >> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> >> +       base = devm_ioremap_resource(&pdev->dev, res);
-> >> +       if (IS_ERR(base)) {
-> >> +               dev_err(&pdev->dev, "io resource mapping failed\n");
-> >> +               return PTR_ERR(base);
-> >> +       }
-> >> +
-> >> +       priv->regmap = devm_regmap_init_mmio(&pdev->dev, base,
-> >> +                                             &clk_msr_regmap_config);
-> >> +       if (IS_ERR(priv->regmap))
-> >> +               return PTR_ERR(priv->regmap);
-> >> +
-> >> +       root = debugfs_create_dir("meson-clk-msr", NULL);
-> >> +
-> >> +       for (i = 0 ; i < CLK_MSR_MAX ; ++i) {
-> >> +               if (!clk_msr[i].name)
-> >> +                       continue;
-> >> +
-> >> +               clk_msr[i].priv = priv;
-> >> +
-> >> +               debugfs_create_file(clk_msr[i].name, 0444, root,
-> >> +                                   &clk_msr[i], &clk_msr_fops);
-> >> +       }
-> >> +
-> >> +       return 0;
-> >> +}
-> >> +
-> >> +static const struct of_device_id meson_gx_msr_match_table[] = {
-> >> +       { .compatible = "amlogic,meson-gx-clk-measure" },
-> > maybe pass the meson_gx_msr_id table here because it seems easy to add
-> > support for AXG and Meson8/Meson8b/Meson8m2 later on
->
-> Yes, I will rename the driver to be generic and pass the table as match data.
-great, thank you!
-
-
-Regards
-Martin
+	M.
+-- 
+Jazz is not dead. It just smells funny...
