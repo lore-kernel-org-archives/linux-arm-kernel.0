@@ -1,68 +1,62 @@
 From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Wed, 04 Jul 2018 15:26:08 +0200
-Subject: [PATCH 1/3] dt-bindings: marvell: Add documentation for the
- Armada 3700 AVS binding
-In-Reply-To: <CABGGisyEO+XVQm87sVn-D0SbkRrqHfRo0R9iVc=PjbY5uyUemA@mail.gmail.com>
- (Rob Herring's message of "Tue, 3 Jul 2018 10:13:29 -0600")
-References: <20180619124402.902-1-gregory.clement@bootlin.com>
- <20180619124402.902-2-gregory.clement@bootlin.com>
- <7581910.yGXAn98Nt4@aspire.rjw.lan>
- <CABGGisyEO+XVQm87sVn-D0SbkRrqHfRo0R9iVc=PjbY5uyUemA@mail.gmail.com>
-Message-ID: <87tvpf2kun.fsf@bootlin.com>
+Date: Wed, 04 Jul 2018 15:29:37 +0200
+Subject: [PATCH v2] ARM: dts: armada-38x: use the new thermal binding
+In-Reply-To: <fa45caea9ab04a515805e80b8c02a74a00a908e0.1530588260.git.baruch@tkos.co.il>
+ (Baruch Siach's message of "Tue, 3 Jul 2018 06:24:20 +0300")
+References: <fa45caea9ab04a515805e80b8c02a74a00a908e0.1530588260.git.baruch@tkos.co.il>
+Message-ID: <87muv72kou.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Hi Baruch,
  
- On mar., juil. 03 2018, Rob Herring <rob.herring@linaro.org> wrote:
+ On mar., juil. 03 2018, Baruch Siach <baruch@tkos.co.il> wrote:
 
-> On Tue, Jul 3, 2018 at 8:46 AM Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
->>
->> On Tuesday, June 19, 2018 2:44:00 PM CEST Gregory CLEMENT wrote:
->> > Extend the documentation of the Armada 37xx SoC with the Adaptive Voltage
->> > Scaling (AVS) registers.
->> >
->> > Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
->> > ---
->> >  .../bindings/arm/marvell/armada-37xx.txt         | 16 ++++++++++++++++
->> >  1 file changed, 16 insertions(+)
->> >
->> > diff --git a/Documentation/devicetree/bindings/arm/marvell/armada-37xx.txt b/Documentation/devicetree/bindings/arm/marvell/armada-37xx.txt
->> > index 35c3c3460d17..22438f659d1e 100644
->> > --- a/Documentation/devicetree/bindings/arm/marvell/armada-37xx.txt
->> > +++ b/Documentation/devicetree/bindings/arm/marvell/armada-37xx.txt
->> > @@ -33,3 +33,19 @@ nb_pm: syscon at 14000 {
->> >       compatible = "marvell,armada-3700-nb-pm", "syscon";
->> >       reg = <0x14000 0x60>;
->> >  }
->> > +
->> > +AVS
->> > +---
->> > +
->> > +For AVS an other component is needed:
->> > +
->> > +Required properties:
->> > +- compatible     : should contain "marvell,armada-3700-avs", "syscon";
->> > +- reg            : the register start and length for the AVS
->> > +
->> > +Example:
->> > +avs: avs at 11500 {
->> > +     compatible = "marvell,armada-3700-avs", "syscon";
->> > +     reg = <0x11500 0x40>;
->> > +}
->> > +
->> >
->>
->> I can't apply this one without a Rob's ACK.
+> Commit 2f28e4c24b10e (thermal: armada: Clarify control registers
+> accesses) introduced the new thermal binding. The new binding extends
+> the second registers field size to 8. Switch to the new binding to fix
+> thermal reading values. Without this change the fix for errata #132698
+> introduced in commit 8c0b888f661 (thermal: armada: Change sensors trim
+> default value) has no effect.
 >
-> Which won't happen if not sent to the DT list.
+> Cc: stable at vger.kernel.org # v4.16+
+> Reviewed-by: Miquel Raynal <miquel.raynal@bootlin.com>
+> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
 
-Now it's done.
+
+Applied on mvebu/fixes
+
+Thanks,
 
 Gregory
 
+
+> ---
+> v2:
+>   * Typo fixes (Andreas F?rber)
+>   * Add Miquel's review tag
+>   * Minor wording changes
+>   * Cc stable
+> ---
+>  arch/arm/boot/dts/armada-38x.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 >
-> Rob
+> diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
+> index 18edc9bc7927..929459c42760 100644
+> --- a/arch/arm/boot/dts/armada-38x.dtsi
+> +++ b/arch/arm/boot/dts/armada-38x.dtsi
+> @@ -547,7 +547,7 @@
+>  
+>  			thermal: thermal at e8078 {
+>  				compatible = "marvell,armada380-thermal";
+> -				reg = <0xe4078 0x4>, <0xe4074 0x4>;
+> +				reg = <0xe4078 0x4>, <0xe4070 0x8>;
+>  				status = "okay";
+>  			};
+>  
+> -- 
+> 2.18.0
+>
 
 -- 
 Gregory Clement, Bootlin (formerly Free Electrons)
