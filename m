@@ -1,103 +1,84 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Wed, 4 Jul 2018 13:48:10 +0200
-Subject: [PATCH v2 1/1] mmc: sunxi: Disable irq during pm_suspend
-In-Reply-To: <9b8f30fd-12aa-46ba-ced9-aed38ada0059@arm.com>
-References: <1530685741-20604-1-git-send-email-stefan@olimex.com>
- <CAPDyKFo_fadfNbt8YMS3MMjaxjt1B54DtZJ+-LoH9y5JeRi5pQ@mail.gmail.com>
- <9b8f30fd-12aa-46ba-ced9-aed38ada0059@arm.com>
-Message-ID: <20180704114810.nwy763c7gvtgb4bq@flea>
+From: hjc@rock-chips.com (Sandy Huang)
+Date: Wed, 4 Jul 2018 20:09:56 +0800
+Subject: [PATCH v4 1/2] devicetree/bindings: display: Add document for
+ rockchip RGB output
+In-Reply-To: <20180703182559.GA12809@rob-hp-laptop>
+References: <1529997340-156879-1-git-send-email-hjc@rock-chips.com>
+ <1529997340-156879-2-git-send-email-hjc@rock-chips.com>
+ <20180703182559.GA12809@rob-hp-laptop>
+Message-ID: <725cc93f-a441-22bc-ef58-b4b38ec34e17@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 04, 2018 at 12:34:01PM +0100, Marc Zyngier wrote:
-> On 04/07/18 11:50, Ulf Hansson wrote:
-> > + Marc
-> > 
-> > On 4 July 2018 at 08:28, Stefan Mavrodiev <stefan@olimex.com> wrote:
-> >> When mmc host controller enters suspend state, the clocks are
-> >> disabled, but irqs are not. For some reason the irqchip emits
-> >> false interrupts, which causes system lock loop.
-> >>
-> >> Debug log is:
-> >>   ...
-> >>   sunxi-mmc 1c11000.mmc: setting clk to 52000000, rounded 51200000
-> >>   sunxi-mmc 1c11000.mmc: enabling the clock
-> >>   sunxi-mmc 1c11000.mmc: cmd 13(8000014d) arg 10000 ie 0x0000bbc6 len 0
-> >>   sunxi-mmc 1c11000.mmc: irq: rq (ptrval) mi 00000004 idi 00000000
-> >>   sunxi-mmc 1c11000.mmc: cmd 6(80000146) arg 3210101 ie 0x0000bbc6 len 0
-> >>   sunxi-mmc 1c11000.mmc: irq: rq (ptrval) mi 00000004 idi 00000000
-> >>   sunxi-mmc 1c11000.mmc: cmd 13(8000014d) arg 10000 ie 0x0000bbc6 len 0
-> >>   sunxi-mmc 1c11000.mmc: irq: rq (ptrval) mi 00000004 idi 00000000
-> >>   mmc1: new DDR MMC card at address 0001
-> >>   mmcblk1: mmc1:0001 AGND3R 14.6 GiB
-> >>   mmcblk1boot0: mmc1:0001 AGND3R partition 1 4.00 MiB
-> >>   mmcblk1boot1: mmc1:0001 AGND3R partition 2 4.00 MiB
-> >>   sunxi-mmc 1c11000.mmc: cmd 18(80003352) arg 0 ie 0x0000fbc2 len 409
-> >>   sunxi-mmc 1c11000.mmc: irq: rq (ptrval) mi 00004000 idi 00000002
-> >>    mmcblk1: p1
-> >>   sunxi-mmc 1c11000.mmc: irq: rq   (null) mi 00000000 idi 00000000
-> >>   sunxi-mmc 1c11000.mmc: irq: rq   (null) mi 00000000 idi 00000000
-> >>   sunxi-mmc 1c11000.mmc: irq: rq   (null) mi 00000000 idi 00000000
-> >>   sunxi-mmc 1c11000.mmc: irq: rq   (null) mi 00000000 idi 00000000
-> >> and so on...
-> >>
-> >> This issue apears on eMMC cards, routed on MMC2 slot. The patch is
-> >> tested with A20-OLinuXino-MICRO/LIME/LIME2 boards.
-> >>
-> >> Fixes: 9a8e1e8cc2c0 ("mmc: sunxi: Add runtime_pm support")
-> >> Signed-off-by: Stefan Mavrodiev <stefan@olimex.com>
-> >> ---
-> >>  Changes in v2:
-> >>   - Add comment why disable_irq() is necessary
-> >>
-> >> ---
-> >>  drivers/mmc/host/sunxi-mmc.c | 7 +++++++
-> >>  1 file changed, 7 insertions(+)
-> >>
-> >> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-> >> index e747259..8e7f3e3 100644
-> >> --- a/drivers/mmc/host/sunxi-mmc.c
-> >> +++ b/drivers/mmc/host/sunxi-mmc.c
-> >> @@ -1446,6 +1446,7 @@ static int sunxi_mmc_runtime_resume(struct device *dev)
-> >>         sunxi_mmc_init_host(host);
-> >>         sunxi_mmc_set_bus_width(host, mmc->ios.bus_width);
-> >>         sunxi_mmc_set_clk(host, &mmc->ios);
-> >> +       enable_irq(host->irq);
-> >>
-> >>         return 0;
-> >>  }
-> >> @@ -1455,6 +1456,12 @@ static int sunxi_mmc_runtime_suspend(struct device *dev)
-> >>         struct mmc_host *mmc = dev_get_drvdata(dev);
-> >>         struct sunxi_mmc_host *host = mmc_priv(mmc);
-> >>
-> >> +       /*
-> >> +        * When clocks are off, it's possible receiving
-> >> +        * fake interrupts, which will stall the system.
-> >> +        * Disabling the irq  will prevent this.
-> >> +        */
-> >> +       disable_irq(host->irq);
-> > 
-> > No, this doesn't work for shared IRQs.
+Hi Rob Herring,
+Thanks for your review.
+
+? 2018/7/4 2:25, Rob Herring ??:
+> On Tue, Jun 26, 2018 at 03:15:39PM +0800, Sandy Huang wrote:
+>> This path add support rv1108 and px30 rgb output interface driver.
 > 
-> Well, in this case, it does work, because that interrupt line cannot be
-> shared with anything else, if I understand how the SoC is wired: each
-> MMC controller has a dedicated interrupt line to the GIC, and it isn't
-> shared with anything (that's on the A20 though, and I don't know about
-> other SoCs integrating the same IP).
+> Bindings are for h/w, not drivers.
+> 
+I will update at next version as following:
+This patch add support rv1108 and px30 rgb output interface
+>>
+>> Signed-off-by: Sandy Huang <hjc@rock-chips.com>
+>> Link: https://patchwork.freedesktop.org/patch/msgid/1509522765-118759-1-git-send-email-hjc at rock-chips.com
+>> ---
+>>
+>> Changes in v4: Add support px30
+>> Changes in v3: None
+>> Changes in v2: None
+>>
+>> .../bindings/display/rockchip/rockchip-rgb.txt     | 73 ++++++++++++++++++++++
+>>   1 file changed, 73 insertions(+)
+>>   create mode 100644 Documentation/devicetree/bindings/display/rockchip/rockchip-rgb.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/display/rockchip/rockchip-rgb.txt b/Documentation/devicetree/bindings/display/rockchip/rockchip-rgb.txt
+>> new file mode 100644
+>> index 0000000..077b9ad
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/display/rockchip/rockchip-rgb.txt
+>> @@ -0,0 +1,73 @@
+>> +Rockchip RV1108 RGB interface
+>> +================================
+>> +
+>> +Required properties:
+>> +- compatible: matching the soc type:
+>> +	- "rockchip,px30-rgb";
+>> +	- "rockchip,rv1108-rgb";
+> 
+> This doesn't look right? What (and how) is getting programmed here
+> because you don't have any register interface.
+> 
+This is register for DRM encoder and connecter or bridge for some RGB 
+convert chips driver.
+so far we don't have any register for rgb interface, but it's most 
+probable need to config some register for rgb interface in feauture for 
+rockchip platform.
 
-Yeah, and I've never seen a shared interrupt line within the Allwinner
-SoCs, so I guess we're pretty safe from that regard.
-
-Maxime
-
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180704/35f7ec6b/attachment.sig>
+>> +
+>> +Optional properties:
+>> +- pinctrl-names: should be a "lcdc" entry or a "default" entry.
+>> +- pinctrl-0: pin control group to be used for this interface.
+>> +
+>> +The rgb has two video ports described by:
+>> +	Documentation/devicetree/bindings/media/video-interfaces.txt
+>> +Their connections are modeled using the OF graph bindings specified in
+>> +	Documentation/devicetree/bindings/graph.txt.
+>> +
+>> +- video port 0 for the VOP input, the remote endpoint maybe vopb/vopl/vop
+> 
+> So there is a mux for these inputs and they are switched with pinctrl?
+> 
+connetced can connect to vopb/vopl/vop which is same with other 
+connenter like edp/dsi/lvds, there is a sample for edp 
+at:Documentation/devicetree/bindings/display/rockchip/rockchip-vop.txt
+> Just put the pinctrl nodes of the sources and enable whichever one is
+> active.
+> 
+Do you think i need add pinctrl nodes here? Or am I wrong?
+> Rob
+> 
+> 
+> 
