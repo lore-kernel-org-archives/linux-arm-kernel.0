@@ -1,112 +1,27 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 4 Jul 2018 18:06:55 +0100
-Subject: [PATCH v2 3/4] efi/arm: map UEFI memory map earlier on boot
-In-Reply-To: <20180619064424.6642-4-takahiro.akashi@linaro.org>
-References: <20180619064424.6642-1-takahiro.akashi@linaro.org>
- <20180619064424.6642-4-takahiro.akashi@linaro.org>
-Message-ID: <20180704170655.GD8370@arm.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 4 Jul 2018 19:11:56 +0200
+Subject: droid 4: connection refused from voltage_now
+Message-ID: <20180704171156.GA3158@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Hi!
 
-[Ard -- please can you look at the EFI parts of this patch]
+I started to use droid 4 as my primary phone... so I have battery
+monitor running for hours... Once every few days it dies with
+"connection refused" error reading battery's "voltage_now". I restart
+it and it continues working...
 
-On Tue, Jun 19, 2018 at 03:44:23PM +0900, AKASHI Takahiro wrote:
-> Since arm_enter_runtime_services() was modified to always create a virtual
-> mapping of UEFI memory map in the previous patch, it is now renamed to
-> efi_enter_virtual_mode() and called earlier before acpi_load_tables()
-> in acpi_early_init().
-> 
-> This will allow us to use UEFI memory map in acpi_os_ioremap() to create
-> mappings of ACPI tables using memory attributes described in UEFI memory
-> map.
-> 
-> See a relevant commit:
->     arm64: acpi: fix alignment fault in accessing ACPI tables
-> 
-> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Cc: Andrew Morton <akpm@linux-foundation.org>
-> ---
->  drivers/firmware/efi/arm-runtime.c | 15 ++++++---------
->  init/main.c                        |  3 +++
->  2 files changed, 9 insertions(+), 9 deletions(-)
-> 
-> diff --git a/drivers/firmware/efi/arm-runtime.c b/drivers/firmware/efi/arm-runtime.c
-> index 30ac5c82051e..566ef0a9edb5 100644
-> --- a/drivers/firmware/efi/arm-runtime.c
-> +++ b/drivers/firmware/efi/arm-runtime.c
-> @@ -106,46 +106,43 @@ static bool __init efi_virtmap_init(void)
->   * non-early mapping of the UEFI system table and virtual mappings for all
->   * EFI_MEMORY_RUNTIME regions.
->   */
-> -static int __init arm_enable_runtime_services(void)
-> +void __init efi_enter_virtual_mode(void)
->  {
->  	u64 mapsize;
->  
->  	if (!efi_enabled(EFI_BOOT)) {
->  		pr_info("EFI services will not be available.\n");
-> -		return 0;
-> +		return;
->  	}
->  
->  	mapsize = efi.memmap.desc_size * efi.memmap.nr_map;
->  
->  	if (efi_memmap_init_late(efi.memmap.phys_map, mapsize)) {
->  		pr_err("Failed to remap EFI memory map\n");
-> -		return 0;
-> +		return;
->  	}
->  
->  	if (efi_runtime_disabled()) {
->  		pr_info("EFI runtime services will be disabled.\n");
-> -		return 0;
-> +		return;
->  	}
->  
->  	if (efi_enabled(EFI_RUNTIME_SERVICES)) {
->  		pr_info("EFI runtime services access via paravirt.\n");
-> -		return 0;
-> +		return;
->  	}
->  
->  	pr_info("Remapping and enabling EFI services.\n");
->  
->  	if (!efi_virtmap_init()) {
->  		pr_err("UEFI virtual mapping missing or invalid -- runtime services will not be available\n");
-> -		return -ENOMEM;
-> +		return;
->  	}
->  
->  	/* Set up runtime services function pointers */
->  	efi_native_runtime_setup();
->  	set_bit(EFI_RUNTIME_SERVICES, &efi.flags);
-> -
-> -	return 0;
->  }
-> -early_initcall(arm_enable_runtime_services);
->  
->  void efi_virtmap_load(void)
->  {
-> diff --git a/init/main.c b/init/main.c
-> index 3b4ada11ed52..532fc0d02353 100644
-> --- a/init/main.c
-> +++ b/init/main.c
-> @@ -694,6 +694,9 @@ asmlinkage __visible void __init start_kernel(void)
->  	debug_objects_mem_init();
->  	setup_per_cpu_pageset();
->  	numa_policy_init();
-> +	if (IS_ENABLED(CONFIG_EFI) &&
-> +	    (IS_ENABLED(CONFIG_ARM64) || IS_ENABLED(CONFIG_ARM)))
-> +		efi_enter_virtual_mode();
+That was with v4.17; in v4.18, I'm getting "red screen" a lot.
 
-Hmm, this is ugly as hell. Is there nothing else we can piggy-back off?
-It's also fairly jarring that, on x86, efi_enter_virtual_mode() is called
-a few lines later, *after* acpi_early_init() has been called.
-
-The rest of the series looks fine to me, but I'm not comfortable taking
-changes like this via the arm64 tree.
-
-Will
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180704/bf7ef6a9/attachment.sig>
