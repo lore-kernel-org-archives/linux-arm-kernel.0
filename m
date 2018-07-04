@@ -1,33 +1,49 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Wed, 4 Jul 2018 09:44:08 +0200
-Subject: [linux-sunxi] ARM: dts: sun8i: h3: Enable dwmac-sun8i on the
- Beelink X2
-In-Reply-To: <CAEKpxBmCLF8PMQ2h2qghfMEMktQYdDZEPaFRLvN8-uzDr0mi9g@mail.gmail.com>
-References: <20180630062720.24225-1-codekipper@gmail.com>
- <20180703145020.hkct43ccbpteleht@flea>
- <CAEKpxBmCLF8PMQ2h2qghfMEMktQYdDZEPaFRLvN8-uzDr0mi9g@mail.gmail.com>
-Message-ID: <20180704074408.sx4ek6lvbaiyj5ut@flea>
+Date: Wed, 4 Jul 2018 09:44:35 +0200
+Subject: [PATCH v2 1/1] mmc: sunxi: Disable irq during pm_suspend
+In-Reply-To: <1530685741-20604-1-git-send-email-stefan@olimex.com>
+References: <1530685741-20604-1-git-send-email-stefan@olimex.com>
+Message-ID: <20180704074435.46aqhuthrn2vok5x@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 03, 2018 at 07:19:16PM +0200, Code Kipper wrote:
-> On 3 July 2018 at 16:50, Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> > Hi,
-> >
-> > On Sat, Jun 30, 2018 at 08:27:20AM +0200, codekipper at gmail.com wrote:
-> >> From: Marcus Cooper <codekipper@gmail.com>
-> >>
-> >> The enabling of the emac was reverted when stability issues were
-> >> discovered.
-> >
-> > What stability issues exactly? Have they been fixed? If so, by which
-> > commit?
+On Wed, Jul 04, 2018 at 09:28:59AM +0300, Stefan Mavrodiev wrote:
+> When mmc host controller enters suspend state, the clocks are
+> disabled, but irqs are not. For some reason the irqchip emits
+> false interrupts, which causes system lock loop.
 > 
-> They were fixed by 4904337fe34f (ARM: dts: sunxi: Restore EMAC changes
-> (boards)) but this board was missed.
+> Debug log is:
+>   ...
+>   sunxi-mmc 1c11000.mmc: setting clk to 52000000, rounded 51200000
+>   sunxi-mmc 1c11000.mmc: enabling the clock
+>   sunxi-mmc 1c11000.mmc: cmd 13(8000014d) arg 10000 ie 0x0000bbc6 len 0
+>   sunxi-mmc 1c11000.mmc: irq: rq (ptrval) mi 00000004 idi 00000000
+>   sunxi-mmc 1c11000.mmc: cmd 6(80000146) arg 3210101 ie 0x0000bbc6 len 0
+>   sunxi-mmc 1c11000.mmc: irq: rq (ptrval) mi 00000004 idi 00000000
+>   sunxi-mmc 1c11000.mmc: cmd 13(8000014d) arg 10000 ie 0x0000bbc6 len 0
+>   sunxi-mmc 1c11000.mmc: irq: rq (ptrval) mi 00000004 idi 00000000
+>   mmc1: new DDR MMC card at address 0001
+>   mmcblk1: mmc1:0001 AGND3R 14.6 GiB
+>   mmcblk1boot0: mmc1:0001 AGND3R partition 1 4.00 MiB
+>   mmcblk1boot1: mmc1:0001 AGND3R partition 2 4.00 MiB
+>   sunxi-mmc 1c11000.mmc: cmd 18(80003352) arg 0 ie 0x0000fbc2 len 409
+>   sunxi-mmc 1c11000.mmc: irq: rq (ptrval) mi 00004000 idi 00000002
+>    mmcblk1: p1
+>   sunxi-mmc 1c11000.mmc: irq: rq   (null) mi 00000000 idi 00000000
+>   sunxi-mmc 1c11000.mmc: irq: rq   (null) mi 00000000 idi 00000000
+>   sunxi-mmc 1c11000.mmc: irq: rq   (null) mi 00000000 idi 00000000
+>   sunxi-mmc 1c11000.mmc: irq: rq   (null) mi 00000000 idi 00000000
+> and so on...
+> 
+> This issue apears on eMMC cards, routed on MMC2 slot. The patch is
+> tested with A20-OLinuXino-MICRO/LIME/LIME2 boards.
+> 
+> Fixes: 9a8e1e8cc2c0 ("mmc: sunxi: Add runtime_pm support")
+> Signed-off-by: Stefan Mavrodiev <stefan@olimex.com>
 
-Please add that to the commit log, and what the issue was.
+Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
 
+Thanks!
 Maxime
 
 -- 
@@ -40,4 +56,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180704/98da5e68/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180704/4406d8ca/attachment.sig>
