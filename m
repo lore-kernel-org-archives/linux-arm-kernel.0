@@ -1,54 +1,105 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 4 Jul 2018 09:16:32 +0100
-Subject: [PATCH 0/2] Allwinner A64 timer workaround
-In-Reply-To: <bdfb1a31-2c4a-d258-7bf6-aaab8cee4663@sholland.org>
-References: <20180511022751.9096-1-samuel@sholland.org>
- <2c16d5ab-38f7-8f3e-875c-19e8032f440a@arm.com>
- <bdfb1a31-2c4a-d258-7bf6-aaab8cee4663@sholland.org>
-Message-ID: <5283f98e-6443-db7a-fe51-6379ed19002c@arm.com>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Wed, 4 Jul 2018 10:16:49 +0200
+Subject: [PATCH 03/12] drm/dp: add helpers for
+ drm_dp_set_adjust_request_pre_emphasis and drm_dp_set_adjust_request_voltage
+In-Reply-To: <1530612152-27555-4-git-send-email-dkos@cadence.com>
+References: <1530612152-27555-1-git-send-email-dkos@cadence.com>
+ <1530612152-27555-4-git-send-email-dkos@cadence.com>
+Message-ID: <20180704081648.GI3891@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/07/18 19:42, Samuel Holland wrote:
-> On 07/03/18 10:09, Marc Zyngier wrote:
->> On 11/05/18 03:27, Samuel Holland wrote:
->>> Hello,
->>>
->>> Several people (including me) have experienced extremely large system
->>> clock jumps on their A64-based devices, apparently due to the architectural
->>> timer going backward, which is interpreted by Linux as the timer wrapping
->>> around after 2^56 cycles.
->>>
->>> Investigation led to discovery of some obvious problems with this SoC's 
->>> architectural timer, and this patch series introduces what I believe is
->>> the simplest workaround. More details are in the commit message for patch
->>> 1. Patch 2 simply enables the workaround in the device tree.
->>
->> What's the deal with this series? There was a couple of nits to address, and 
->> I was more or less expecting a v2.
+On Tue, Jul 03, 2018 at 11:02:14AM +0100, Damian Kos wrote:
+> From: Quentin Schulz <quentin.schulz@free-electrons.com>
 > 
-> I got reports that people were still occasionally having clock jumps after
-> applying this series, so I wanted to attempt a more complete fix, but I haven't
-> had time to do any deeper investigation. I think this series is still beneficial
-> even if it's not a complete solution, so I'll come back with another patch on
-> top of this if/once I get it fully fixed.
+> We already have functions to get the adjust request voltage and
+> pre-emphasis for a lane so it makes also sense to be able to set them so
+> that we can then easily update them via a DPCD write.
 > 
-> I'll prepare a v2 with a bounded loop. Presumably, 3 * (max CPU Hz) / (24MHz
-> timer) ? 150 should be a conservative iteration limit?
+> Add helpers for drm_dp_set_adjust_request_pre_emphasis and
+> drm_dp_set_adjust_request_voltage that respectively set the
+> pre-emphasis and voltage of a lane in the link status array.
+> 
+> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+> Signed-off-by: Damian Kos <dkos@cadence.com>
 
-Should be OK.
+Hm usually this is source dependent - some sources only have one
+adj/pre-emph value for all lanes, some only 2 (for groups of 2), some for
+all four. That's kinda why we don't have helpers for this stuff.
 
-Maxime: How do you want to deal with the documentation aspect? We need
-an erratum number, but AFAIU the concept hasn't made it into the silicom
-vendor's brain yet. Any chance you could come up with something that
-uniquely identifies this?
+An excellent way to show that your new helpers are useful would be to go
+through existing drivers and convert them over, where it makes sense. Same
+kinda holds for patch 1.
 
-> Also, does this make sense to CC to stable?
+Thanks, Daniel
+> ---
+>  drivers/gpu/drm/drm_dp_helper.c |   28 ++++++++++++++++++++++++++++
+>  include/drm/drm_dp_helper.h     |    4 ++++
+>  2 files changed, 32 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/drm_dp_helper.c b/drivers/gpu/drm/drm_dp_helper.c
+> index 3bc2e98..ca2f469 100644
+> --- a/drivers/gpu/drm/drm_dp_helper.c
+> +++ b/drivers/gpu/drm/drm_dp_helper.c
+> @@ -120,6 +120,34 @@ u8 drm_dp_get_adjust_request_pre_emphasis(const u8 link_status[DP_LINK_STATUS_SI
+>  }
+>  EXPORT_SYMBOL(drm_dp_get_adjust_request_pre_emphasis);
+>  
+> +void drm_dp_set_adjust_request_voltage(u8 link_status[DP_LINK_STATUS_SIZE],
+> +				       int lane, u8 volt)
+> +{
+> +	int i = DP_ADJUST_REQUEST_LANE0_1 + (lane >> 1);
+> +	int s = ((lane & 1) ?
+> +		 DP_ADJUST_VOLTAGE_SWING_LANE1_SHIFT :
+> +		 DP_ADJUST_VOLTAGE_SWING_LANE0_SHIFT);
+> +	int idx = i - DP_LANE0_1_STATUS;
+> +
+> +	link_status[idx] &= ~(DP_ADJUST_VOLTAGE_SWING_LANE0_MASK << s);
+> +	link_status[idx] |= volt << s;
+> +}
+> +EXPORT_SYMBOL(drm_dp_set_adjust_request_voltage);
+> +
+> +void drm_dp_set_adjust_request_pre_emphasis(u8 link_status[DP_LINK_STATUS_SIZE],
+> +					    int lane, u8 pre_emphasis)
+> +{
+> +	int i = DP_ADJUST_REQUEST_LANE0_1 + (lane >> 1);
+> +	int s = ((lane & 1) ?
+> +		 DP_ADJUST_PRE_EMPHASIS_LANE1_SHIFT :
+> +		 DP_ADJUST_PRE_EMPHASIS_LANE0_SHIFT);
+> +	int idx = i - DP_LANE0_1_STATUS;
+> +
+> +	link_status[idx] &= ~(DP_ADJUST_PRE_EMPHASIS_LANE0_MASK << s);
+> +	link_status[idx] |= pre_emphasis << s;
+> +}
+> +EXPORT_SYMBOL(drm_dp_set_adjust_request_pre_emphasis);
+> +
+>  void drm_dp_link_train_clock_recovery_delay(const u8 dpcd[DP_RECEIVER_CAP_SIZE]) {
+>  	if (dpcd[DP_TRAINING_AUX_RD_INTERVAL] == 0)
+>  		udelay(100);
+> diff --git a/include/drm/drm_dp_helper.h b/include/drm/drm_dp_helper.h
+> index a488af0..6e64b2a 100644
+> --- a/include/drm/drm_dp_helper.h
+> +++ b/include/drm/drm_dp_helper.h
+> @@ -946,6 +946,10 @@ u8 drm_dp_get_adjust_request_voltage(const u8 link_status[DP_LINK_STATUS_SIZE],
+>  				     int lane);
+>  u8 drm_dp_get_adjust_request_pre_emphasis(const u8 link_status[DP_LINK_STATUS_SIZE],
+>  					  int lane);
+> +void drm_dp_set_adjust_request_voltage(u8 link_status[DP_LINK_STATUS_SIZE],
+> +				       int lane, u8 volt);
+> +void drm_dp_set_adjust_request_pre_emphasis(u8 link_status[DP_LINK_STATUS_SIZE],
+> +					    int lane, u8 pre_emphasis);
+>  
+>  #define DP_BRANCH_OUI_HEADER_SIZE	0xc
+>  #define DP_RECEIVER_CAP_SIZE		0xf
+> -- 
+> 1.7.1
+> 
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
 
-Probably not, as the HW never worked, so it is not a regression.
-
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
