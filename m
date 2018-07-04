@@ -1,139 +1,76 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 4 Jul 2018 15:34:36 +0200
-Subject: [PATCH v2 1/1] mmc: sunxi: Disable irq during pm_suspend
-In-Reply-To: <9b8f30fd-12aa-46ba-ced9-aed38ada0059@arm.com>
-References: <1530685741-20604-1-git-send-email-stefan@olimex.com>
- <CAPDyKFo_fadfNbt8YMS3MMjaxjt1B54DtZJ+-LoH9y5JeRi5pQ@mail.gmail.com>
- <9b8f30fd-12aa-46ba-ced9-aed38ada0059@arm.com>
-Message-ID: <CAPDyKFp8Hrmr0XCGnhFYrC3Q79dZizYC5KfRE92AUNa0FRDS5A@mail.gmail.com>
+From: faiz_abbas@ti.com (Faiz Abbas)
+Date: Wed, 4 Jul 2018 19:06:35 +0530
+Subject: [PATCH v3 4/6] bus: ti-sysc: Add support for software reset
+In-Reply-To: <20180703073139.GN112168@atomide.com>
+References: <a169ba7f-53f2-cf9a-a9ee-daffd6b53279@ti.com>
+ <20180608062158.GI5738@atomide.com>
+ <acdfef83-8778-e8f4-e423-ed04a9a8a649@ti.com>
+ <20180611060957.GN5738@atomide.com>
+ <f460481f-85a9-2a41-a894-6f25122dee8a@ti.com>
+ <20180611062904.GO5738@atomide.com>
+ <89d55b0b-fe9e-793b-2694-25755ac2bc15@ti.com>
+ <20180611070332.GP5738@atomide.com> <20180703070743.GG112168@atomide.com>
+ <ee54c3ea-6200-33dd-83da-491f5fdd9f5c@ti.com>
+ <20180703073139.GN112168@atomide.com>
+Message-ID: <1138704c-b7a4-391f-3404-e1bd25a4a0ff@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 July 2018 at 13:34, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 04/07/18 11:50, Ulf Hansson wrote:
->> + Marc
->>
->> On 4 July 2018 at 08:28, Stefan Mavrodiev <stefan@olimex.com> wrote:
->>> When mmc host controller enters suspend state, the clocks are
->>> disabled, but irqs are not. For some reason the irqchip emits
->>> false interrupts, which causes system lock loop.
->>>
->>> Debug log is:
->>>   ...
->>>   sunxi-mmc 1c11000.mmc: setting clk to 52000000, rounded 51200000
->>>   sunxi-mmc 1c11000.mmc: enabling the clock
->>>   sunxi-mmc 1c11000.mmc: cmd 13(8000014d) arg 10000 ie 0x0000bbc6 len 0
->>>   sunxi-mmc 1c11000.mmc: irq: rq (ptrval) mi 00000004 idi 00000000
->>>   sunxi-mmc 1c11000.mmc: cmd 6(80000146) arg 3210101 ie 0x0000bbc6 len 0
->>>   sunxi-mmc 1c11000.mmc: irq: rq (ptrval) mi 00000004 idi 00000000
->>>   sunxi-mmc 1c11000.mmc: cmd 13(8000014d) arg 10000 ie 0x0000bbc6 len 0
->>>   sunxi-mmc 1c11000.mmc: irq: rq (ptrval) mi 00000004 idi 00000000
->>>   mmc1: new DDR MMC card at address 0001
->>>   mmcblk1: mmc1:0001 AGND3R 14.6 GiB
->>>   mmcblk1boot0: mmc1:0001 AGND3R partition 1 4.00 MiB
->>>   mmcblk1boot1: mmc1:0001 AGND3R partition 2 4.00 MiB
->>>   sunxi-mmc 1c11000.mmc: cmd 18(80003352) arg 0 ie 0x0000fbc2 len 409
->>>   sunxi-mmc 1c11000.mmc: irq: rq (ptrval) mi 00004000 idi 00000002
->>>    mmcblk1: p1
->>>   sunxi-mmc 1c11000.mmc: irq: rq   (null) mi 00000000 idi 00000000
->>>   sunxi-mmc 1c11000.mmc: irq: rq   (null) mi 00000000 idi 00000000
->>>   sunxi-mmc 1c11000.mmc: irq: rq   (null) mi 00000000 idi 00000000
->>>   sunxi-mmc 1c11000.mmc: irq: rq   (null) mi 00000000 idi 00000000
->>> and so on...
->>>
->>> This issue apears on eMMC cards, routed on MMC2 slot. The patch is
->>> tested with A20-OLinuXino-MICRO/LIME/LIME2 boards.
->>>
->>> Fixes: 9a8e1e8cc2c0 ("mmc: sunxi: Add runtime_pm support")
->>> Signed-off-by: Stefan Mavrodiev <stefan@olimex.com>
->>> ---
->>>  Changes in v2:
->>>   - Add comment why disable_irq() is necessary
->>>
->>> ---
->>>  drivers/mmc/host/sunxi-mmc.c | 7 +++++++
->>>  1 file changed, 7 insertions(+)
->>>
->>> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
->>> index e747259..8e7f3e3 100644
->>> --- a/drivers/mmc/host/sunxi-mmc.c
->>> +++ b/drivers/mmc/host/sunxi-mmc.c
->>> @@ -1446,6 +1446,7 @@ static int sunxi_mmc_runtime_resume(struct device *dev)
->>>         sunxi_mmc_init_host(host);
->>>         sunxi_mmc_set_bus_width(host, mmc->ios.bus_width);
->>>         sunxi_mmc_set_clk(host, &mmc->ios);
->>> +       enable_irq(host->irq);
->>>
->>>         return 0;
->>>  }
->>> @@ -1455,6 +1456,12 @@ static int sunxi_mmc_runtime_suspend(struct device *dev)
->>>         struct mmc_host *mmc = dev_get_drvdata(dev);
->>>         struct sunxi_mmc_host *host = mmc_priv(mmc);
->>>
->>> +       /*
->>> +        * When clocks are off, it's possible receiving
->>> +        * fake interrupts, which will stall the system.
->>> +        * Disabling the irq  will prevent this.
->>> +        */
->>> +       disable_irq(host->irq);
->>
->> No, this doesn't work for shared IRQs.
->
-> Well, in this case, it does work, because that interrupt line cannot be
-> shared with anything else, if I understand how the SoC is wired: each
-> MMC controller has a dedicated interrupt line to the GIC, and it isn't
-> shared with anything (that's on the A20 though, and I don't know about
-> other SoCs integrating the same IP).
+Hi,
 
-That's the problem. This may work on some SoCs but not on others.
-
->
+On Tuesday 03 July 2018 01:01 PM, Tony Lindgren wrote:
+> * Faiz Abbas <faiz_abbas@ti.com> [180703 07:31]:
+>> Hi,
 >>
->>>         sunxi_mmc_reset_host(host);
->>>         sunxi_mmc_disable(host);
+>> On Tuesday 03 July 2018 12:37 PM, Tony Lindgren wrote:
+>>> * Tony Lindgren <tony@atomide.com> [180611 07:06]:
+>>>> * Faiz Abbas <faiz_abbas@ti.com> [180611 06:48]:
+>>>>> Hi,
+>>>>>
+>>>>> On Monday 11 June 2018 11:59 AM, Tony Lindgren wrote:
+>>>>>> * Faiz Abbas <faiz_abbas@ti.com> [180611 06:28]:
+>>>>>>> Great. I thought I completely misunderstood you. But I don't see what
+>>>>>>> adding another function will accomplish. A QUIRK flag used in the same
+>>>>>>> function would work well enough>
+>>>>>> Fine with me as long as the function stays simple for both
+>>>>>> syss and sysc reset.
+>>>>>>
+>>>>>
+>>>>>
+>>>>> In general a reset status bit being in sysstatus is the norm and it
+>>>>> being in sysconfig should be the "quirk" for which a flag needs to be
+>>>>> added. What do you think?
+>>>>
+>>>> Sure makes sense to me.
+>>>>
+>>>>> As an aside, naming bitshifts by the name of the platform they were
+>>>>> originally added in seems weird. There should be some generic mask
+>>>>> saying "soft reset is the 0th bit". Currently I am using
+>>>>> SYSC_OMAP4_SOFTRESET for a dra76x module. I guess it depends on how many
+>>>>> different sysconfig types we have.
+>>>>
+>>>> Sure we could have a macro for that.
 >>>
->>> --
->>> 2.7.4
+>>> So what's the conclusion on this one? Are you going to do one
+>>> more version of the ti-sysc driver patch?
 >>>
 >>
->> The only option today is to use free_irq() in runtime suspend and then
->> re-request the irq to re-install the handler at runtime resume.
->>
->> That's not an optimal solution, which is pointed out in the below
->> discussion as well. Moreover, it has also turned out using free_irq()
->> is also problematic in cases threaded handlers are used.
->>
->> Here's the link to the discussion, it's not the only one I know of, so
->> this is common problem.
->> https://lkml.org/lkml/2016/1/28/213
->>
->> Care to have a hack on the "common" solution, which in principle means
->> adding APIs to genirq that can disable/enable handlers from being
->> called, rather than the entire IRQ line.
->
-> That doesn't work. You still end-up with a screaming interrupt, and you
-> will still spend 100% of your time in interrupt context for nothing.
->
-> Eventually, the kernel will have enough (the /other/ shared handlers
-> returning IRQ_NONE all the time), and will forcefully kill that
-> particular interrupt interrupt line, meaning you end-up in the same
-> situation of having the line disabled for all the users of that
-> interrupt line. Except that now, it is disabled forever.
+>> Yes. I have just now been able to get back to this. Will post a v4 by
+>> tomorrow.
+> 
+> OK thanks!
+> 
 
-Ahh, correct!
+After taking a second look at this thread, I don't see anything big to
+be modified.
 
-Sounds like free_irq() is what we need. Only that it's bit heavy
-weight as we need to re-install handlers.
+We both agree that "reset status bit in sysconfig register" is the quirk
+case which can be added once such an IP is discovered in ti-sysc.
 
->
-> A better fix would be to kill the interrupt generation at the source
-> (the MMC controller in this particular case) when suspending.
+All I need to change is SYSC_OMAP4_SOFTRESET to SYSC_SOFT_RESET_SHIFT_0
+for better readability and rebase it to the latest mainline.
 
-Right. But using disable_irq() doesn't work a general solution, so
-something else is needed.
+Do reply if you differ on the above.
 
-An option is to allow us to use disable|enable_irq() for this
-particular case as a simple fix, then work on a long term solution.
-
-Kind regards
-Uffe
+Thanks,
+Faiz
