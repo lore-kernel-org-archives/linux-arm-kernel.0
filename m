@@ -1,51 +1,41 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Wed, 4 Jul 2018 14:08:17 +0100
-Subject: [linux-sunxi] Re: [PATCH 0/2] Allwinner A64 timer workaround
-In-Reply-To: <alpine.DEB.2.21.1807041151530.1816@nanos.tec.linutronix.de>
-References: <20180511022751.9096-1-samuel@sholland.org>
- <2c16d5ab-38f7-8f3e-875c-19e8032f440a@arm.com>
- <bdfb1a31-2c4a-d258-7bf6-aaab8cee4663@sholland.org>
- <5283f98e-6443-db7a-fe51-6379ed19002c@arm.com>
- <24b78819-5e3f-431f-3987-f7409742ef07@linaro.org>
- <1d75c538-9166-5eec-a08c-b168f9770bd1@arm.com>
- <alpine.DEB.2.21.1807041151530.1816@nanos.tec.linutronix.de>
-Message-ID: <1a36f63c-0259-bdcd-bb96-d5230c2564ea@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 4 Jul 2018 14:12:33 +0100
+Subject: [PATCH 6/7] kvm/arm: use PSR_AA32 definitions
+In-Reply-To: <20180625144421.11511-7-mark.rutland@arm.com>
+References: <20180625144421.11511-1-mark.rutland@arm.com>
+ <20180625144421.11511-7-mark.rutland@arm.com>
+Message-ID: <20180704131232.GB2798@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 04/07/18 11:00, Thomas Gleixner wrote:
-> On Wed, 4 Jul 2018, Marc Zyngier wrote:
->> On 04/07/18 09:23, Daniel Lezcano wrote:
->>>
->>> If the patches fix a bug which already exist, it makes sense to
->>> propagated the fix back to the stable versions.
->>
->> That's your call, but I'm not supportive of that decision, specially as
->> we have information from the person developing the workaround that this
->> doesn't fully address the issue.
+On Mon, Jun 25, 2018 at 03:44:20PM +0100, Mark Rutland wrote:
+> Some code cares about the SPSR_ELx format for exceptions taken from
+> AArch32 to inspect or manipulate the SPSR_ELx value, which is already in
+> the SPSR_ELx format, and not in the AArch32 PSR format.
 > 
-> The patches should not be applied at all. Simply because they don't fix the
-> issue completely.
+> To separate these from cases where we care about the AArch32 PSR format,
+> migrate these cases to use the PSR_AA32_* definitions rather than
+> COMPAT_PSR_*.
 > 
-> From a quick glance at various links and information about this, this very
-> much smells like the FSL_ERRATUM_A008585.
-> Has that been tried? It looks way more robust than the magic 11 bit
-> crystal ball logic.
+> There should be no functional change as a result of this patch.
+> 
+> Note that arm64 KVM does not support a compat KVM API, and always uses
+> the SPSR_ELx format, even for AArch32 guests.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Christoffer Dall <christoffer.dall@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm/include/asm/kvm_emulate.h       | 14 +++++++-------
+>  arch/arm64/include/asm/kvm_emulate.h     | 10 +++++-----
+>  arch/arm64/kvm/guest.c                   | 14 +++++++-------
+>  arch/arm64/kvm/hyp/vgic-v2-cpuif-proxy.c |  2 +-
+>  arch/arm64/kvm/regmap.c                  | 22 +++++++++++-----------
+>  arch/arm64/kvm/reset.c                   |  4 ++--
+>  virt/kvm/arm/aarch32.c                   | 20 ++++++++++----------
+>  7 files changed, 43 insertions(+), 43 deletions(-)
 
-The Freescale erratum is similar, but not identical [1].
-It seems like the A64 is less variable, so we can use a cheaper
-workaround, which gets away with normally just one sysreg read. But then
-again the newer error reports may actually suggest otherwise ...
+I need an ack from the KVM maintainers before I can take this. I can also
+put this series on a separate branch if necessary.
 
-And as it currently stands, the Freescale erratum has the drawback of
-relying on the CPU running much faster than the timer. The A64 can run
-at 24 MHz (for power savings, or possibly during DVFS transitions),
-which is the timer frequency. So subsequent counter reads will never
-return the same value and the workaround times out.
-
-Cheers,
-Andre.
-
-[1] https://lists.denx.de/pipermail/u-boot/2016-November/271836.html
+Will
