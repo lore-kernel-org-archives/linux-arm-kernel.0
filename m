@@ -1,85 +1,94 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed,  4 Jul 2018 10:36:46 +0200
-Subject: [PATCH v10 1/6] arch: enable relative relocations for arm64,
- power and x86
+Date: Wed,  4 Jul 2018 10:36:50 +0200
+Subject: [PATCH v10 5/6] PCI: Add support for relative addressing in quirk
+ tables
 In-Reply-To: <20180704083651.24360-1-ard.biesheuvel@linaro.org>
 References: <20180704083651.24360-1-ard.biesheuvel@linaro.org>
-Message-ID: <20180704083651.24360-2-ard.biesheuvel@linaro.org>
+Message-ID: <20180704083651.24360-6-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Before updating certain subsystems to use place relative 32-bit
-relocations in special sections, to save space and reduce the
-number of absolute relocations that need to be processed at runtime
-by relocatable kernels, introduce the Kconfig symbol and define it
-for some architectures that should be able to support and benefit
-from it.
+Allow the PCI quirk tables to be emitted in a way that avoids absolute
+references to the hook functions. This reduces the size of the entries,
+and, more importantly, makes them invariant under runtime relocation
+(e.g., for KASLR)
 
+Acked-by: Bjorn Helgaas <bhelgaas@google.com>
 Acked-by: Michael Ellerman <mpe@ellerman.id.au>
-Reviewed-by: Will Deacon <will.deacon@arm.com>
 Acked-by: Ingo Molnar <mingo@kernel.org>
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/Kconfig         | 10 ++++++++++
- arch/arm64/Kconfig   |  1 +
- arch/powerpc/Kconfig |  1 +
- arch/x86/Kconfig     |  1 +
- 4 files changed, 13 insertions(+)
+ drivers/pci/quirks.c | 12 +++++++++---
+ include/linux/pci.h  | 20 ++++++++++++++++++++
+ 2 files changed, 29 insertions(+), 3 deletions(-)
 
-diff --git a/arch/Kconfig b/arch/Kconfig
-index 1aa59063f1fd..2b8b70820002 100644
---- a/arch/Kconfig
-+++ b/arch/Kconfig
-@@ -971,4 +971,14 @@ config REFCOUNT_FULL
- 	  against various use-after-free conditions that can be used in
- 	  security flaw exploits.
+diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
+index f439de848658..0ba4e446e5db 100644
+--- a/drivers/pci/quirks.c
++++ b/drivers/pci/quirks.c
+@@ -64,9 +64,15 @@ static void pci_do_fixups(struct pci_dev *dev, struct pci_fixup *f,
+ 		     f->vendor == (u16) PCI_ANY_ID) &&
+ 		    (f->device == dev->device ||
+ 		     f->device == (u16) PCI_ANY_ID)) {
+-			calltime = fixup_debug_start(dev, f->hook);
+-			f->hook(dev);
+-			fixup_debug_report(dev, calltime, f->hook);
++			void (*hook)(struct pci_dev *dev);
++#ifdef CONFIG_HAVE_ARCH_PREL32_RELOCATIONS
++			hook = offset_to_ptr(&f->hook_offset);
++#else
++			hook = f->hook;
++#endif
++			calltime = fixup_debug_start(dev, hook);
++			hook(dev);
++			fixup_debug_report(dev, calltime, hook);
+ 		}
+ }
  
-+config HAVE_ARCH_PREL32_RELOCATIONS
-+	bool
-+	help
-+	  May be selected by an architecture if it supports place-relative
-+	  32-bit relocations, both in the toolchain and in the module loader,
-+	  in which case relative references can be used in special sections
-+	  for PCI fixup, initcalls etc which are only half the size on 64 bit
-+	  architectures, and don't require runtime relocation on relocatable
-+	  kernels.
-+
- source "kernel/gcov/Kconfig"
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 42c090cf0292..1940c6405d04 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -95,6 +95,7 @@ config ARM64
- 	select HAVE_ARCH_KGDB
- 	select HAVE_ARCH_MMAP_RND_BITS
- 	select HAVE_ARCH_MMAP_RND_COMPAT_BITS if COMPAT
-+	select HAVE_ARCH_PREL32_RELOCATIONS
- 	select HAVE_ARCH_SECCOMP_FILTER
- 	select HAVE_ARCH_THREAD_STRUCT_WHITELIST
- 	select HAVE_ARCH_TRACEHOOK
-diff --git a/arch/powerpc/Kconfig b/arch/powerpc/Kconfig
-index 9f2b75fe2c2d..e4fe19789b8b 100644
---- a/arch/powerpc/Kconfig
-+++ b/arch/powerpc/Kconfig
-@@ -177,6 +177,7 @@ config PPC
- 	select HAVE_ARCH_KGDB
- 	select HAVE_ARCH_MMAP_RND_BITS
- 	select HAVE_ARCH_MMAP_RND_COMPAT_BITS	if COMPAT
-+	select HAVE_ARCH_PREL32_RELOCATIONS
- 	select HAVE_ARCH_SECCOMP_FILTER
- 	select HAVE_ARCH_TRACEHOOK
- 	select HAVE_CBPF_JIT			if !PPC64
-diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-index f1dbb4ee19d7..e10a3542db7e 100644
---- a/arch/x86/Kconfig
-+++ b/arch/x86/Kconfig
-@@ -123,6 +123,7 @@ config X86
- 	select HAVE_ARCH_MMAP_RND_BITS		if MMU
- 	select HAVE_ARCH_MMAP_RND_COMPAT_BITS	if MMU && COMPAT
- 	select HAVE_ARCH_COMPAT_MMAP_BASES	if MMU && COMPAT
-+	select HAVE_ARCH_PREL32_RELOCATIONS
- 	select HAVE_ARCH_SECCOMP_FILTER
- 	select HAVE_ARCH_THREAD_STRUCT_WHITELIST
- 	select HAVE_ARCH_TRACEHOOK
+diff --git a/include/linux/pci.h b/include/linux/pci.h
+index 340029b2fb38..51baa3ab5195 100644
+--- a/include/linux/pci.h
++++ b/include/linux/pci.h
+@@ -1795,7 +1795,11 @@ struct pci_fixup {
+ 	u16 device;			/* Or PCI_ANY_ID */
+ 	u32 class;			/* Or PCI_ANY_ID */
+ 	unsigned int class_shift;	/* should be 0, 8, 16 */
++#ifdef CONFIG_HAVE_ARCH_PREL32_RELOCATIONS
++	int hook_offset;
++#else
+ 	void (*hook)(struct pci_dev *dev);
++#endif
+ };
+ 
+ enum pci_fixup_pass {
+@@ -1809,12 +1813,28 @@ enum pci_fixup_pass {
+ 	pci_fixup_suspend_late,	/* pci_device_suspend_late() */
+ };
+ 
++#ifdef CONFIG_HAVE_ARCH_PREL32_RELOCATIONS
++#define __DECLARE_PCI_FIXUP_SECTION(sec, name, vendor, device, class,	\
++				    class_shift, hook)			\
++	__ADDRESSABLE(hook)						\
++	asm(".section "	#sec ", \"a\"				\n"	\
++	    ".balign	16					\n"	\
++	    ".short "	#vendor ", " #device "			\n"	\
++	    ".long "	#class ", " #class_shift "		\n"	\
++	    ".long "	#hook " - .				\n"	\
++	    ".previous						\n");
++#define DECLARE_PCI_FIXUP_SECTION(sec, name, vendor, device, class,	\
++				  class_shift, hook)			\
++	__DECLARE_PCI_FIXUP_SECTION(sec, name, vendor, device, class,	\
++				  class_shift, hook)
++#else
+ /* Anonymous variables would be nice... */
+ #define DECLARE_PCI_FIXUP_SECTION(section, name, vendor, device, class,	\
+ 				  class_shift, hook)			\
+ 	static const struct pci_fixup __PASTE(__pci_fixup_##name,__LINE__) __used	\
+ 	__attribute__((__section__(#section), aligned((sizeof(void *)))))    \
+ 		= { vendor, device, class, class_shift, hook };
++#endif
+ 
+ #define DECLARE_PCI_FIXUP_CLASS_EARLY(vendor, device, class,		\
+ 					 class_shift, hook)		\
 -- 
 2.17.1
