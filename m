@@ -1,70 +1,97 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 04 Jul 2018 15:41:18 +0100
-Subject: [kvmtool test PATCH 24/24] kvmtool: arm: Add support for creating
- VM with PA size
-In-Reply-To: <20180704142241.GG4828@arm.com>
-References: <1530270944-11351-1-git-send-email-suzuki.poulose@arm.com>
- <1530270944-11351-25-git-send-email-suzuki.poulose@arm.com>
- <20180704142241.GG4828@arm.com>
-Message-ID: <8636wzysfl.wl-marc.zyngier@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 04 Jul 2018 15:41:57 +0100
+Subject: Applied "ASoC: qdsp6: q6routing: add slim rx routings" to the asoc
+ tree
+In-Reply-To: <20180704094944.16440-4-srinivas.kandagatla@linaro.org>
+Message-ID: <E1faiyj-0003xf-9K@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 04 Jul 2018 15:22:42 +0100,
-Will Deacon <will.deacon@arm.com> wrote:
-> 
-> On Fri, Jun 29, 2018 at 12:15:44PM +0100, Suzuki K Poulose wrote:
-> > diff --git a/arm/kvm.c b/arm/kvm.c
-> > index 5701d41..b1969be 100644
-> > --- a/arm/kvm.c
-> > +++ b/arm/kvm.c
-> > @@ -11,6 +11,8 @@
-> >  #include <linux/kvm.h>
-> >  #include <linux/sizes.h>
-> >  
-> > +unsigned long kvm_arm_type;
-> > +
-> >  struct kvm_ext kvm_req_ext[] = {
-> >  	{ DEFINE_KVM_EXT(KVM_CAP_IRQCHIP) },
-> >  	{ DEFINE_KVM_EXT(KVM_CAP_ONE_REG) },
-> > @@ -18,6 +20,26 @@ struct kvm_ext kvm_req_ext[] = {
-> >  	{ 0, 0 },
-> >  };
-> >  
-> > +#ifndef KVM_ARM_GET_MAX_VM_PHYS_SHIFT
-> > +#define KVM_ARM_GET_MAX_VM_PHYS_SHIFT		_IO(KVMIO, 0x0b)
-> > +#endif
-> > +
-> > +void kvm__arch_init_hyp(struct kvm *kvm)
-> > +{
-> > +	int max_ipa;
-> > +
-> > +	max_ipa = ioctl(kvm->sys_fd, KVM_ARM_GET_MAX_VM_PHYS_SHIFT);
-> > +	if (max_ipa < 0)
-> > +		max_ipa = 40;
-> > +	if (!kvm->cfg.arch.phys_shift)
-> > +		kvm->cfg.arch.phys_shift = 40;
-> > +	if (kvm->cfg.arch.phys_shift > max_ipa)
-> > +		die("Requested PA size (%u) is not supported by the host (%ubits)\n",
-> > +		    kvm->cfg.arch.phys_shift, max_ipa);
-> > +	if (kvm->cfg.arch.phys_shift != 40)
-> > +		kvm_arm_type = kvm->cfg.arch.phys_shift;
-> > +}
-> 
-> Seems a bit weird that the "machine type identifier" to KVM_CREATE_VM is
-> dedicated entirely to holding the physical address shift verbatim. Is this
-> really the ABI?
-> 
-> Also, couldn't KVM figure it out automatically if you add memslots at high
-> addresses, making this a niche tunable outside of testing?
+The patch
 
-Not really. Let's say I want my IPA space split in two: memory covers
-the low 47 bit, and I want MMIO spanning the top 47 bit. With your
-scheme, you'd end-up with a 47bit IPA space, while you really want 48
-bits (MMIO space implemented by userspace isn't registered to the
-kernel).
+   ASoC: qdsp6: q6routing: add slim rx routings
 
-	M.
+has been applied to the asoc tree at
 
+   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
+
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
+
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
+
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
+
+Thanks,
+Mark
+
+>From 9191ffe2d212f64aa2ec311f4294ba7066d1f8a1 Mon Sep 17 00:00:00 2001
+From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+Date: Wed, 4 Jul 2018 10:49:41 +0100
+Subject: [PATCH] ASoC: qdsp6: q6routing: add slim rx routings
+
+This patch add routings mixer controls for slim rx ports.
+
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ sound/soc/qcom/qdsp6/q6routing.c | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
+
+diff --git a/sound/soc/qcom/qdsp6/q6routing.c b/sound/soc/qcom/qdsp6/q6routing.c
+index c80fdbc2442e..35269b492761 100644
+--- a/sound/soc/qcom/qdsp6/q6routing.c
++++ b/sound/soc/qcom/qdsp6/q6routing.c
+@@ -68,6 +68,13 @@
+ 	{ mix_name, "SEC_MI2S_TX", "SEC_MI2S_TX" },	\
+ 	{ mix_name, "QUAT_MI2S_TX", "QUAT_MI2S_TX" },	\
+ 	{ mix_name, "TERT_MI2S_TX", "TERT_MI2S_TX" },		\
++	{ mix_name, "SLIMBUS_0_TX", "SLIMBUS_0_TX" },		\
++	{ mix_name, "SLIMBUS_1_TX", "SLIMBUS_1_TX" },		\
++	{ mix_name, "SLIMBUS_2_TX", "SLIMBUS_2_TX" },		\
++	{ mix_name, "SLIMBUS_3_TX", "SLIMBUS_3_TX" },		\
++	{ mix_name, "SLIMBUS_4_TX", "SLIMBUS_4_TX" },		\
++	{ mix_name, "SLIMBUS_5_TX", "SLIMBUS_5_TX" },		\
++	{ mix_name, "SLIMBUS_6_TX", "SLIMBUS_6_TX" },		\
+ 	{ mix_name, "PRIMARY_TDM_TX_0", "PRIMARY_TDM_TX_0"},	\
+ 	{ mix_name, "PRIMARY_TDM_TX_1", "PRIMARY_TDM_TX_1"},	\
+ 	{ mix_name, "PRIMARY_TDM_TX_2", "PRIMARY_TDM_TX_2"},	\
+@@ -122,6 +129,27 @@
+ 	SOC_SINGLE_EXT("QUAT_MI2S_TX", QUATERNARY_MI2S_TX,		\
+ 		id, 1, 0, msm_routing_get_audio_mixer,			\
+ 		msm_routing_put_audio_mixer),				\
++	SOC_SINGLE_EXT("SLIMBUS_0_TX", SLIMBUS_0_TX,			\
++		id, 1, 0, msm_routing_get_audio_mixer,			\
++		msm_routing_put_audio_mixer),				\
++	SOC_SINGLE_EXT("SLIMBUS_1_TX", SLIMBUS_1_TX,			\
++		id, 1, 0, msm_routing_get_audio_mixer,			\
++		msm_routing_put_audio_mixer),				\
++	SOC_SINGLE_EXT("SLIMBUS_2_TX", SLIMBUS_2_TX,			\
++		id, 1, 0, msm_routing_get_audio_mixer,			\
++		msm_routing_put_audio_mixer),				\
++	SOC_SINGLE_EXT("SLIMBUS_3_TX", SLIMBUS_3_TX,			\
++		id, 1, 0, msm_routing_get_audio_mixer,			\
++		msm_routing_put_audio_mixer),				\
++	SOC_SINGLE_EXT("SLIMBUS_4_TX", SLIMBUS_4_TX,			\
++		id, 1, 0, msm_routing_get_audio_mixer,			\
++		msm_routing_put_audio_mixer),				\
++	SOC_SINGLE_EXT("SLIMBUS_5_TX", SLIMBUS_5_TX,			\
++		id, 1, 0, msm_routing_get_audio_mixer,			\
++		msm_routing_put_audio_mixer),				\
++	SOC_SINGLE_EXT("SLIMBUS_6_TX", SLIMBUS_6_TX,			\
++		id, 1, 0, msm_routing_get_audio_mixer,			\
++		msm_routing_put_audio_mixer),				\
+ 	SOC_SINGLE_EXT("PRIMARY_TDM_TX_0", PRIMARY_TDM_TX_0,		\
+ 		id, 1, 0, msm_routing_get_audio_mixer,			\
+ 		msm_routing_put_audio_mixer),				\
 -- 
-Jazz is not dead, it just smell funny.
+2.18.0.rc2
