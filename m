@@ -1,67 +1,59 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Wed, 4 Jul 2018 12:59:00 +0900
-Subject: [PATCHv5 1/4] kbuild: Add build salt to the kernel and modules
-In-Reply-To: <20180703233430.14416-2-labbott@redhat.com>
-References: <20180703233430.14416-1-labbott@redhat.com>
- <20180703233430.14416-2-labbott@redhat.com>
-Message-ID: <CAK7LNAS7XBwDidNaLKC1wD+G30AyAvTHG5GN=UAiP5zz1EO8JA@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 4 Jul 2018 12:05:43 +0800
+Subject: [linux-sunxi] Re: [PATCH v3 15/24] dt-bindings: display:
+ sun4i-drm: Add description of A64 HDMI PHY
+In-Reply-To: <1814959.07NGAI1aoU@jernej-laptop>
+References: <20180625120304.7543-1-jernej.skrabec@siol.net>
+ <1669385.k4L9lni8DF@jernej-laptop>
+ <CAGb2v67iRZZTQuTH8inwmPC6S0BRecFgPEpKrxgThQbsYaZgmQ@mail.gmail.com>
+ <1814959.07NGAI1aoU@jernej-laptop>
+Message-ID: <CAGb2v65RUiEFSKe9YO8=bROmtozHKRN4s76QHpY+38PJPLaG7w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi.
-
-Thanks for the update.
-
-
-2018-07-04 8:34 GMT+09:00 Laura Abbott <labbott@redhat.com>:
+On Sat, Jun 30, 2018 at 3:32 AM, Jernej ?krabec <jernej.skrabec@siol.net> wrote:
+> Dne ?etrtek, 28. junij 2018 ob 09:00:32 CEST je Chen-Yu Tsai napisal(a):
+>> On Thu, Jun 28, 2018 at 12:51 PM, Jernej ?krabec
+>>
+>> <jernej.skrabec@siol.net> wrote:
+>> > Dne ?etrtek, 28. junij 2018 ob 04:19:55 CEST je Chen-Yu Tsai napisal(a):
+>> >> On Mon, Jun 25, 2018 at 8:02 PM, Jernej Skrabec <jernej.skrabec@siol.net>
+>> >
+>> > wrote:
+>> >> > A64 HDMI PHY is similar to H3 HDMI PHY except it has two possible PLL
+>> >> > clock parents. It is compatible to other HDMI PHYs, like that found in
+>> >> > R40.
+>> >> >
+>> >> > Acked-by: Rob Herring <robh@kernel.org>
+>> >> > Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+>> >> > ---
+>> >> >
+>> >> >  Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 4 +++-
+>> >> >  1 file changed, 3 insertions(+), 1 deletion(-)
+>> >> >
+>> >> > diff --git
+>> >> > a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+>> >> > b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt index
+>> >> > 84fe38dbb900..dc83f21ef188 100644
+>> >> > --- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+>> >> > +++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+>> >> > @@ -101,6 +101,7 @@ DWC HDMI PHY
+>> >> >
+>> >> >  Required properties:
+>> >> >    - compatible: value must be one of:
+>> >> > +    * allwinner,sun50i-a64-hdmi-phy
+>> >> >
+>> >> >      * allwinner,sun8i-a83t-hdmi-phy
+>> >> >      * allwinner,sun8i-h3-hdmi-phy
+>> >>
+>> >> Nit: the list is sorted by family first, then SoC name, so it should
+>> >> be the last on the list.
+>> >
+>> > I went alphabetically, since "5" is before "8"...
+>>
+>> I see. I think version sort applies here, given that sun50i is newer
+>> than sun8i.
 >
-> The build id generated from --build-id can be generated in several different
-> ways, with the default being the sha1 on the output of the linked file. For
-> distributions, it can be useful to make sure this ID is unique, even if the
-> actual file contents don't change. The easiest way to do this is to insert
-> a section with some data.
->
-> Add an ELF note to both the kernel and module which contains some data based
-> off of a config option.
->
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> Signed-off-by: Laura Abbott <labbott@redhat.com>
-> ---
-> v5: I used S-o-b here since the majority of the code was written
-> already.
+> Should I make a patch for that?
 
-
-I think Suggested-by is good enough.
-S-o-b is appended as a patch is passed from people to people.
-
-Anyway, this looks good except one bike-shed.
-
-> Please feel free to change the tag if you think it's not
-> appropriate. I also tweaked this to take an ascii string instead of just
-> a hex value since this makes things much easier on the distribution
-> side.
-> ---
-
-
-> diff --git a/init/Kconfig b/init/Kconfig
-> index 041f3a022122..8de789f40db9 100644
-> --- a/init/Kconfig
-> +++ b/init/Kconfig
-> @@ -107,6 +107,15 @@ config LOCALVERSION_AUTO
->
->           which is done within the script "scripts/setlocalversion".)
->
-> +config BUILD_SALT
-> +       string "Build ID Salt"
-> +       default "Linux"
-
-
-How about empty string ""
-for default?
-
-
-
-
--- 
-Best Regards
-Masahiro Yamada
+Yes, please.
