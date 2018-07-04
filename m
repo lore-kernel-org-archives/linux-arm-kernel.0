@@ -1,84 +1,53 @@
-From: hjc@rock-chips.com (Sandy Huang)
-Date: Wed, 4 Jul 2018 20:09:56 +0800
-Subject: [PATCH v4 1/2] devicetree/bindings: display: Add document for
- rockchip RGB output
-In-Reply-To: <20180703182559.GA12809@rob-hp-laptop>
-References: <1529997340-156879-1-git-send-email-hjc@rock-chips.com>
- <1529997340-156879-2-git-send-email-hjc@rock-chips.com>
- <20180703182559.GA12809@rob-hp-laptop>
-Message-ID: <725cc93f-a441-22bc-ef58-b4b38ec34e17@rock-chips.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Wed, 4 Jul 2018 13:52:13 +0100
+Subject: [linux-sunxi] Re: [PATCH 0/2] Allwinner A64 timer workaround
+In-Reply-To: <bdfb1a31-2c4a-d258-7bf6-aaab8cee4663@sholland.org>
+References: <20180511022751.9096-1-samuel@sholland.org>
+ <2c16d5ab-38f7-8f3e-875c-19e8032f440a@arm.com>
+ <bdfb1a31-2c4a-d258-7bf6-aaab8cee4663@sholland.org>
+Message-ID: <2ccf60d0-9ea0-0631-ca89-6e67426173f2@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob Herring,
-Thanks for your review.
+Hi,
 
-? 2018/7/4 2:25, Rob Herring ??:
-> On Tue, Jun 26, 2018 at 03:15:39PM +0800, Sandy Huang wrote:
->> This path add support rv1108 and px30 rgb output interface driver.
-> 
-> Bindings are for h/w, not drivers.
-> 
-I will update at next version as following:
-This patch add support rv1108 and px30 rgb output interface
+On 03/07/18 19:42, Samuel Holland wrote:
+> On 07/03/18 10:09, Marc Zyngier wrote:
+>> On 11/05/18 03:27, Samuel Holland wrote:
+>>> Hello,
+>>>
+>>> Several people (including me) have experienced extremely large system
+>>> clock jumps on their A64-based devices, apparently due to the architectural
+>>> timer going backward, which is interpreted by Linux as the timer wrapping
+>>> around after 2^56 cycles.
+>>>
+>>> Investigation led to discovery of some obvious problems with this SoC's 
+>>> architectural timer, and this patch series introduces what I believe is
+>>> the simplest workaround. More details are in the commit message for patch
+>>> 1. Patch 2 simply enables the workaround in the device tree.
 >>
->> Signed-off-by: Sandy Huang <hjc@rock-chips.com>
->> Link: https://patchwork.freedesktop.org/patch/msgid/1509522765-118759-1-git-send-email-hjc at rock-chips.com
->> ---
->>
->> Changes in v4: Add support px30
->> Changes in v3: None
->> Changes in v2: None
->>
->> .../bindings/display/rockchip/rockchip-rgb.txt     | 73 ++++++++++++++++++++++
->>   1 file changed, 73 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/display/rockchip/rockchip-rgb.txt
->>
->> diff --git a/Documentation/devicetree/bindings/display/rockchip/rockchip-rgb.txt b/Documentation/devicetree/bindings/display/rockchip/rockchip-rgb.txt
->> new file mode 100644
->> index 0000000..077b9ad
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/display/rockchip/rockchip-rgb.txt
->> @@ -0,0 +1,73 @@
->> +Rockchip RV1108 RGB interface
->> +================================
->> +
->> +Required properties:
->> +- compatible: matching the soc type:
->> +	- "rockchip,px30-rgb";
->> +	- "rockchip,rv1108-rgb";
+>> What's the deal with this series? There was a couple of nits to address, and 
+>> I was more or less expecting a v2.
 > 
-> This doesn't look right? What (and how) is getting programmed here
-> because you don't have any register interface.
-> 
-This is register for DRM encoder and connecter or bridge for some RGB 
-convert chips driver.
-so far we don't have any register for rgb interface, but it's most 
-probable need to config some register for rgb interface in feauture for 
-rockchip platform.
+> I got reports that people were still occasionally having clock jumps after
+> applying this series, so I wanted to attempt a more complete fix, but I haven't
+> had time to do any deeper investigation.
 
->> +
->> +Optional properties:
->> +- pinctrl-names: should be a "lcdc" entry or a "default" entry.
->> +- pinctrl-0: pin control group to be used for this interface.
->> +
->> +The rgb has two video ports described by:
->> +	Documentation/devicetree/bindings/media/video-interfaces.txt
->> +Their connections are modeled using the OF graph bindings specified in
->> +	Documentation/devicetree/bindings/graph.txt.
->> +
->> +- video port 0 for the VOP input, the remote endpoint maybe vopb/vopl/vop
+Looking at the FSL workaround, I see that they cover TVAL reads as well.
+Not sure entirely why, but maybe it's worth to follow this lead?
+
+Cheers,
+Andre.
+
+> I think this series is still beneficial
+> even if it's not a complete solution, so I'll come back with another patch on
+> top of this if/once I get it fully fixed.
 > 
-> So there is a mux for these inputs and they are switched with pinctrl?
+> I'll prepare a v2 with a bounded loop. Presumably, 3 * (max CPU Hz) / (24MHz
+> timer) ? 150 should be a conservative iteration limit?
 > 
-connetced can connect to vopb/vopl/vop which is same with other 
-connenter like edp/dsi/lvds, there is a sample for edp 
-at:Documentation/devicetree/bindings/display/rockchip/rockchip-vop.txt
-> Just put the pinctrl nodes of the sources and enable whichever one is
-> active.
+> Also, does this make sense to CC to stable?
 > 
-Do you think i need add pinctrl nodes here? Or am I wrong?
-> Rob
-> 
-> 
+> Thanks,
+> Samuel
 > 
