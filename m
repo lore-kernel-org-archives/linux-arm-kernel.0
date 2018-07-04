@@ -1,39 +1,31 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Wed,  4 Jul 2018 13:43:28 +0200
-Subject: [PATCH 0/5] ARM: shmobile: defconfig: Miscellaneous updates
-Message-ID: <20180704114333.27584-1-geert+renesas@glider.be>
+Date: Wed,  4 Jul 2018 13:43:30 +0200
+Subject: [PATCH 2/5] ARM: shmobile: defconfig: Enable reset controller support
+In-Reply-To: <20180704114333.27584-1-geert+renesas@glider.be>
+References: <20180704114333.27584-1-geert+renesas@glider.be>
+Message-ID: <20180704114333.27584-3-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-	Hi Simon, Magnus,
+R-Car Gen2 and RZ/G1 SoCs can make use of the optional reset controller
+support in the Renesas CPG/MSSR driver.
 
-Here are a few updates for shmobile_defconfig, all fairly independant.
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+ arch/arm/configs/shmobile_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-If accepted, I'll submit the corresponding changes for
-multi_v7_defconfig.
-
-Thanks!
-
-Geert Uytterhoeven (5):
-  ARM: shmobile: defconfig: Drop NET_VENDOR_<FOO>=n
-  ARM: shmobile: defconfig: Enable reset controller support
-  ARM: shmobile: defconfig: Enable support for RZN1D-DB
-  ARM: shmobile: defconfig: Disable /sbin/hotplug fork-bomb
-  ARM: shmobile: defconfig: Set CONFIG_LOCALVERSION
-
- arch/arm/configs/shmobile_defconfig | 18 ++++--------------
- 1 file changed, 4 insertions(+), 14 deletions(-)
-
+diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
+index 393697a54fb40e08..a08d0bcdca750d28 100644
+--- a/arch/arm/configs/shmobile_defconfig
++++ b/arch/arm/configs/shmobile_defconfig
+@@ -193,6 +193,7 @@ CONFIG_AK8975=y
+ CONFIG_PWM=y
+ CONFIG_PWM_RCAR=y
+ CONFIG_PWM_RENESAS_TPU=y
++CONFIG_RESET_CONTROLLER=y
+ CONFIG_GENERIC_PHY=y
+ CONFIG_PHY_RCAR_GEN2=y
+ # CONFIG_DNOTIFY is not set
 -- 
 2.17.1
-
-Gr{oetje,eeting}s,
-
-						Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-							    -- Linus Torvalds
