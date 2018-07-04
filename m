@@ -1,70 +1,239 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 4 Jul 2018 10:41:16 +0200
-Subject: [PATCH 0/2] Allwinner A64 timer workaround
-In-Reply-To: <5283f98e-6443-db7a-fe51-6379ed19002c@arm.com>
-References: <20180511022751.9096-1-samuel@sholland.org>
- <2c16d5ab-38f7-8f3e-875c-19e8032f440a@arm.com>
- <bdfb1a31-2c4a-d258-7bf6-aaab8cee4663@sholland.org>
- <5283f98e-6443-db7a-fe51-6379ed19002c@arm.com>
-Message-ID: <d72937af-cb46-27cf-809a-507ba5e47568@linaro.org>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Wed, 4 Jul 2018 10:41:51 +0200
+Subject: [PATCH 1/3] soc: amlogic: Add Meson GX Clock Measure driver
+In-Reply-To: <CAFBinCDBEbVSEzhM2WOhxNX1DZLiSrkeo7GWdxGzBpOUH3PKQw@mail.gmail.com>
+References: <1530624110-4687-1-git-send-email-narmstrong@baylibre.com>
+ <1530624110-4687-2-git-send-email-narmstrong@baylibre.com>
+ <CAFBinCDBEbVSEzhM2WOhxNX1DZLiSrkeo7GWdxGzBpOUH3PKQw@mail.gmail.com>
+Message-ID: <7d83a0a4-5cde-7e4f-78a8-372ae8cb03d0@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/07/2018 10:16, Marc Zyngier wrote:
-> On 03/07/18 19:42, Samuel Holland wrote:
->> On 07/03/18 10:09, Marc Zyngier wrote:
->>> On 11/05/18 03:27, Samuel Holland wrote:
->>>> Hello,
->>>>
->>>> Several people (including me) have experienced extremely large system
->>>> clock jumps on their A64-based devices, apparently due to the architectural
->>>> timer going backward, which is interpreted by Linux as the timer wrapping
->>>> around after 2^56 cycles.
->>>>
->>>> Investigation led to discovery of some obvious problems with this SoC's 
->>>> architectural timer, and this patch series introduces what I believe is
->>>> the simplest workaround. More details are in the commit message for patch
->>>> 1. Patch 2 simply enables the workaround in the device tree.
->>>
->>> What's the deal with this series? There was a couple of nits to address, and 
->>> I was more or less expecting a v2.
+Hi Martin,
+
+On 03/07/2018 21:18, Martin Blumenstingl wrote:
+> Hi Neil,
+> 
+> On Tue, Jul 3, 2018 at 3:23 PM Neil Armstrong <narmstrong@baylibre.com> wrote:
 >>
->> I got reports that people were still occasionally having clock jumps after
->> applying this series, so I wanted to attempt a more complete fix, but I haven't
->> had time to do any deeper investigation. I think this series is still beneficial
->> even if it's not a complete solution, so I'll come back with another patch on
->> top of this if/once I get it fully fixed.
+>> The Amlogic Meson GX SoCs embeds a clock measurer IP to measure the internal
+>> clock paths frequencies.
+>> The precision is in the order of the MHz.
 >>
->> I'll prepare a v2 with a bounded loop. Presumably, 3 * (max CPU Hz) / (24MHz
->> timer) ? 150 should be a conservative iteration limit?
-> 
-> Should be OK.
-> 
-> Maxime: How do you want to deal with the documentation aspect? We need
-> an erratum number, but AFAIU the concept hasn't made it into the silicom
-> vendor's brain yet. Any chance you could come up with something that
-> uniquely identifies this?
+>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+>> ---
+>>  drivers/soc/amlogic/Kconfig                |   8 ++
+>>  drivers/soc/amlogic/Makefile               |   1 +
+>>  drivers/soc/amlogic/meson-gx-clk-measure.c | 224 +++++++++++++++++++++++++++++
+>>  3 files changed, 233 insertions(+)
+>>  create mode 100644 drivers/soc/amlogic/meson-gx-clk-measure.c
+>>
+>> diff --git a/drivers/soc/amlogic/Kconfig b/drivers/soc/amlogic/Kconfig
+>> index b04f6e4..4a3217d 100644
+>> --- a/drivers/soc/amlogic/Kconfig
+>> +++ b/drivers/soc/amlogic/Kconfig
+>> @@ -1,5 +1,13 @@
+>>  menu "Amlogic SoC drivers"
+>>
+>> +config MESON_GX_CLK_MEASURE
+>> +       bool "Amlogic Meson GX SoC Clock Measure driver"
+>> +       depends on ARCH_MESON || COMPILE_TEST
+>> +       default ARCH_MESON
+>> +       help
+>> +         Say yes to support of Measuring a set of internal SoC clocks
+>> +         from the debugfs interface.
+>> +
+>>  config MESON_GX_SOCINFO
+>>         bool "Amlogic Meson GX SoC Information driver"
+>>         depends on ARCH_MESON || COMPILE_TEST
+>> diff --git a/drivers/soc/amlogic/Makefile b/drivers/soc/amlogic/Makefile
+>> index 8fa3218..a0ad966 100644
+>> --- a/drivers/soc/amlogic/Makefile
+>> +++ b/drivers/soc/amlogic/Makefile
+>> @@ -1,3 +1,4 @@
+>> +obj-$(CONFIG_MESON_GX_CLK_MEASURE) += meson-gx-clk-measure.o
+>>  obj-$(CONFIG_MESON_GX_SOCINFO) += meson-gx-socinfo.o
+>>  obj-$(CONFIG_MESON_GX_PM_DOMAINS) += meson-gx-pwrc-vpu.o
+>>  obj-$(CONFIG_MESON_MX_SOCINFO) += meson-mx-socinfo.o
+>> diff --git a/drivers/soc/amlogic/meson-gx-clk-measure.c b/drivers/soc/amlogic/meson-gx-clk-measure.c
+>> new file mode 100644
+>> index 0000000..434d9f3
+>> --- /dev/null
+>> +++ b/drivers/soc/amlogic/meson-gx-clk-measure.c
 
-I went through the different pointers provided in the description but I
-did not find a clear statement that is a hardware issue or may be I
-missed it.
+[...]
 
-Are we sure there isn't another subsystem responsible on this
-instability ? (eg PM or something else)
+>> +       CLK_MSR_ID(57, "wave420l_c"),
+>> +       CLK_MSR_ID(58, "wave420l_b"),
+> AFAIK the Chips&Media WAVE420L video codec is only available on GXM (S912)
+> I assume reading this on GXBB or GXL simply reads 0?
 
->> Also, does this make sense to CC to stable?
+Yes
+
 > 
-> Probably not, as the HW never worked, so it is not a regression.
+>> +       CLK_MSR_ID(59, "hcodec"),
+>> +       CLK_MSR_ID(60, "alt_32k"),
+>> +       CLK_MSR_ID(61, "gpio_msr"),
+>> +       CLK_MSR_ID(62, "hevc"),
+>> +       CLK_MSR_ID(66, "vid_lock"),
+>> +       CLK_MSR_ID(70, "pwm_f"),
+>> +       CLK_MSR_ID(71, "pwm_e"),
+>> +       CLK_MSR_ID(72, "pwm_d"),
+>> +       CLK_MSR_ID(73, "pwm_C"),
+> should this be pwm_c (instead of pwm_C)?
 > 
-> Thanks,
+>> +       CLK_MSR_ID(75, "aoclkx2_int"),
+>> +       CLK_MSR_ID(76, "aoclk_int"),
+>> +       CLK_MSR_ID(77, "rng_ring_osc_0"),
+>> +       CLK_MSR_ID(78, "rng_ring_osc_1"),
+>> +       CLK_MSR_ID(79, "rng_ring_osc_2"),
+>> +       CLK_MSR_ID(80, "rng_ring_osc_3"),
+>> +       CLK_MSR_ID(81, "vapb"),
+>> +       CLK_MSR_ID(82, "ge2d"),
+>> +};
+> I did a quick check whether the clock IDs are really the same for all GX SoCs:
+> apart from clocks missing on older SoCs (see for example the WAVE420L
+> clocks above) there were only minor renames but no conflicts!
+
+I did the same work ! I will add this detail to the commit log.
+Thanks for checking ;-)
+
 > 
-> 	M.
-> 
+>> +
+>> +static int meson_gx_measure_id(struct meson_gx_msr *priv, unsigned int id)
+>> +{
+>> +       unsigned int val;
+>> +       int ret;
+>> +
+>> +       regmap_write(priv->regmap, MSR_CLK_REG0, 0);
+>> +
+>> +       /* Set measurement gate to 50uS */
+>> +       regmap_update_bits(priv->regmap, MSR_CLK_REG0, MSR_CLK_DIV,
+>> +                          FIELD_PREP(MSR_CLK_DIV, DIV_50US));
+>> +
+>> +       /* Set ID */
+>> +       regmap_update_bits(priv->regmap, MSR_CLK_REG0, MSR_CLK_SRC,
+>> +                          FIELD_PREP(MSR_CLK_SRC, id));
+>> +
+>> +       /* Enable & Start */
+>> +       regmap_update_bits(priv->regmap, MSR_CLK_REG0,
+>> +                          MSR_RUN | MSR_ENABLE,
+>> +                          MSR_RUN | MSR_ENABLE);
+>> +
+>> +       ret = regmap_read_poll_timeout(priv->regmap, MSR_CLK_REG0,
+>> +                                      val, !(val & MSR_BUSY), 10, 1000);
+>> +       if (ret)
+>> +               return ret;
+>> +
+>> +       /* Disable */
+>> +       regmap_update_bits(priv->regmap, MSR_CLK_REG0, MSR_ENABLE, 0);
+>> +
+>> +       /* Get the value in MHz*64 */
+>> +       regmap_read(priv->regmap, MSR_CLK_REG2, &val);
+>> +
+>> +       return (((val + 31) & MSR_VAL_MASK) / 64) * 1000000;
+>> +}
+>> +
+>> +static int clk_msr_show(struct seq_file *s, void *data)
+>> +{
+>> +       struct meson_gx_msr_id *clk_msr_id = s->private;
+>> +       int val;
+>> +
+>> +       val = meson_gx_measure_id(clk_msr_id->priv, clk_msr_id->id);
+>> +       if (val < 0)
+>> +               return val;
+>> +
+>> +       seq_printf(s, "%d\n", val);
+
+With jerome, we managed to have a much higher precision by cycling over the divider
+and checking when the counter overflows. And I will print the precision in the clock debugfs
+entry.
+
+>> +
+>> +       return 0;
+>> +}
+>> +DEFINE_SHOW_ATTRIBUTE(clk_msr);
+> have you considered modelling this as clock driver instead?
+
+Yes, but it can wait.
+Actually this clk-msr can be feed to GEN_CLK and be outputted to a pad,
+but all this is only for debug, so we can stick to debugfs for now.
+
+Question, should I separate the clocks in a subdirectory and add a summary file like
+for the clk debugfs ?
 
 
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+/sys/kernel/debug/meson-clk-msr
+------------------|--- summary
+------------------|--- clks
+-----------------------|--- ring_osc_out_ee_0
+...
+-----------------------|--- ge2d
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+?
+
+> 
+>> +
+>> +static const struct regmap_config clk_msr_regmap_config = {
+>> +       .reg_bits = 32,
+>> +       .val_bits = 32,
+>> +       .reg_stride = 4,
+>> +       .max_register = MSR_CLK_REG2,
+>> +};
+>> +
+>> +static int meson_gx_msr_probe(struct platform_device *pdev)
+>> +{
+>> +       struct meson_gx_msr *priv;
+>> +       struct resource *res;
+>> +       struct dentry *root;
+>> +       void __iomem *base;
+>> +       int i;
+>> +
+>> +       priv = devm_kzalloc(&pdev->dev, sizeof(struct meson_gx_msr),
+>> +                           GFP_KERNEL);
+>> +       if (!priv)
+>> +               return -ENOMEM;
+>> +
+>> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> +       base = devm_ioremap_resource(&pdev->dev, res);
+>> +       if (IS_ERR(base)) {
+>> +               dev_err(&pdev->dev, "io resource mapping failed\n");
+>> +               return PTR_ERR(base);
+>> +       }
+>> +
+>> +       priv->regmap = devm_regmap_init_mmio(&pdev->dev, base,
+>> +                                             &clk_msr_regmap_config);
+>> +       if (IS_ERR(priv->regmap))
+>> +               return PTR_ERR(priv->regmap);
+>> +
+>> +       root = debugfs_create_dir("meson-clk-msr", NULL);
+>> +
+>> +       for (i = 0 ; i < CLK_MSR_MAX ; ++i) {
+>> +               if (!clk_msr[i].name)
+>> +                       continue;
+>> +
+>> +               clk_msr[i].priv = priv;
+>> +
+>> +               debugfs_create_file(clk_msr[i].name, 0444, root,
+>> +                                   &clk_msr[i], &clk_msr_fops);
+>> +       }
+>> +
+>> +       return 0;
+>> +}
+>> +
+>> +static const struct of_device_id meson_gx_msr_match_table[] = {
+>> +       { .compatible = "amlogic,meson-gx-clk-measure" },
+> maybe pass the meson_gx_msr_id table here because it seems easy to add
+> support for AXG and Meson8/Meson8b/Meson8m2 later on
+
+Yes, I will rename the driver to be generic and pass the table as match data.
+
+> 
+> 
+> Regards
+> Martin
+> 
+
+Thanks for reviewing !
+
+Neil
