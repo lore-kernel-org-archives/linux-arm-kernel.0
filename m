@@ -1,124 +1,27 @@
-From: j-keerthy@ti.com (Keerthy)
-Date: Wed, 4 Jul 2018 09:53:03 +0530
+From: santosh.shilimkar@oracle.com (santosh.shilimkar at oracle.com)
+Date: Tue, 3 Jul 2018 21:37:36 -0700
 Subject: [PATCH RESEND 1/2] ti: wkup_m3_ipc: Add rtc_only with ddr in self
  refresh mode support
-In-Reply-To: <1529572954-22244-1-git-send-email-j-keerthy@ti.com>
+In-Reply-To: <f83093e3-b681-f33f-8d2e-42cabee03b7f@ti.com>
 References: <1529572954-22244-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <f83093e3-b681-f33f-8d2e-42cabee03b7f@ti.com>
+ <f83093e3-b681-f33f-8d2e-42cabee03b7f@ti.com>
+Message-ID: <8d347d42-371f-4e75-d781-aa67d093e1a3@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 7/3/18 9:23 PM, Keerthy wrote:
+> 
+> 
+> On Thursday 21 June 2018 02:52 PM, Keerthy wrote:
+>> Adds rtc_only support. This needs resume function to shutdown and
+>> reboot the m3.
+> 
+> A gentle ping on this series.
+> 
+>>
+>> Signed-off-by: Keerthy <j-keerthy@ti.com>
+>> ---
+>>
+>> This is tested on am437x-gp-evm and target for 4.19
 
-
-On Thursday 21 June 2018 02:52 PM, Keerthy wrote:
-> Adds rtc_only support. This needs resume function to shutdown and
-> reboot the m3.
-
-A gentle ping on this series.
-
-> 
-> Signed-off-by: Keerthy <j-keerthy@ti.com>
-> ---
-> 
-> This is tested on am437x-gp-evm and target for 4.19
-> 
->  drivers/soc/ti/wkup_m3_ipc.c | 41 +++++++++++++++++++++++++++++++++++++++++
->  include/linux/wkup_m3_ipc.h  |  3 +++
->  2 files changed, 44 insertions(+)
-> 
-> diff --git a/drivers/soc/ti/wkup_m3_ipc.c b/drivers/soc/ti/wkup_m3_ipc.c
-> index 369aef5..b732c39 100644
-> --- a/drivers/soc/ti/wkup_m3_ipc.c
-> +++ b/drivers/soc/ti/wkup_m3_ipc.c
-> @@ -329,12 +329,24 @@ static int wkup_m3_finish_low_power(struct wkup_m3_ipc *m3_ipc)
->  	return 0;
->  }
->  
-> +/**
-> + * wkup_m3_set_rtc_only - Set the rtc_only flag
-> + * @wkup_m3_wakeup: struct wkup_m3_wakeup_src * gets assigned the
-> + *                  wakeup src value
-> + */
-> +static void wkup_m3_set_rtc_only(struct wkup_m3_ipc *m3_ipc)
-> +{
-> +	if (m3_ipc_state)
-> +		m3_ipc_state->is_rtc_only = true;
-> +}
-> +
->  static struct wkup_m3_ipc_ops ipc_ops = {
->  	.set_mem_type = wkup_m3_set_mem_type,
->  	.set_resume_address = wkup_m3_set_resume_address,
->  	.prepare_low_power = wkup_m3_prepare_low_power,
->  	.finish_low_power = wkup_m3_finish_low_power,
->  	.request_pm_status = wkup_m3_request_pm_status,
-> +	.set_rtc_only = wkup_m3_set_rtc_only,
->  };
->  
->  /**
-> @@ -484,6 +496,32 @@ static int wkup_m3_ipc_remove(struct platform_device *pdev)
->  	return 0;
->  }
->  
-> +#ifdef CONFIG_PM
-> +static int wkup_m3_ipc_suspend(struct device *dev)
-> +{
-> +	/*
-> +	 * Nothing needs to be done on suspend even with rtc_only flag set
-> +	 */
-> +	return 0;
-> +}
-> +
-> +static int wkup_m3_ipc_resume(struct device *dev)
-> +{
-> +	if (m3_ipc_state->is_rtc_only) {
-> +		rproc_shutdown(m3_ipc_state->rproc);
-> +		rproc_boot(m3_ipc_state->rproc);
-> +	}
-> +
-> +	m3_ipc_state->is_rtc_only = false;
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct dev_pm_ops wkup_m3_ipc_pm_ops = {
-> +	SET_SYSTEM_SLEEP_PM_OPS(wkup_m3_ipc_suspend, wkup_m3_ipc_resume)
-> +};
-> +#endif
-> +
->  static const struct of_device_id wkup_m3_ipc_of_match[] = {
->  	{ .compatible = "ti,am3352-wkup-m3-ipc", },
->  	{ .compatible = "ti,am4372-wkup-m3-ipc", },
-> @@ -497,6 +535,9 @@ static int wkup_m3_ipc_remove(struct platform_device *pdev)
->  	.driver = {
->  		.name = "wkup_m3_ipc",
->  		.of_match_table = wkup_m3_ipc_of_match,
-> +#ifdef CONFIG_PM
-> +		.pm = &wkup_m3_ipc_pm_ops,
-> +#endif
->  	},
->  };
->  
-> diff --git a/include/linux/wkup_m3_ipc.h b/include/linux/wkup_m3_ipc.h
-> index d6ba7d3..d639df1 100644
-> --- a/include/linux/wkup_m3_ipc.h
-> +++ b/include/linux/wkup_m3_ipc.h
-> @@ -40,6 +40,7 @@ struct wkup_m3_ipc {
->  	struct mbox_chan *mbox;
->  
->  	struct wkup_m3_ipc_ops *ops;
-> +	int is_rtc_only;
->  };
->  
->  struct wkup_m3_ipc_ops {
-> @@ -48,8 +49,10 @@ struct wkup_m3_ipc_ops {
->  	int (*prepare_low_power)(struct wkup_m3_ipc *m3_ipc, int state);
->  	int (*finish_low_power)(struct wkup_m3_ipc *m3_ipc);
->  	int (*request_pm_status)(struct wkup_m3_ipc *m3_ipc);
-> +	void (*set_rtc_only)(struct wkup_m3_ipc *m3_ipc);
->  };
->  
->  struct wkup_m3_ipc *wkup_m3_ipc_get(void);
->  void wkup_m3_ipc_put(struct wkup_m3_ipc *m3_ipc);
-> +void wkup_m3_set_rtc_only_mode(void);
->  #endif /* _LINUX_WKUP_M3_IPC_H */
-> 
+Am I suppose to pick up this series ?
