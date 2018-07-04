@@ -1,75 +1,84 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Wed,  4 Jul 2018 23:07:46 +0100
-Subject: [PATCH 2/2] arm64: Handle mismatched cache type
+Date: Wed,  4 Jul 2018 23:07:45 +0100
+Subject: [PATCH 1/2] arm64: Fix mismatched cache line size detection
 In-Reply-To: <1530742066-16276-1-git-send-email-suzuki.poulose@arm.com>
 References: <1530742066-16276-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1530742066-16276-3-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1530742066-16276-2-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Track mismatches in the cache type register (CTR_EL0), other
-than the D/I min line sizes and trap user accesses if there are any.
+If there is a mismatch in the I/D min line size, we must
+always use the system wide safe value both in applications
+and in the kernel, while performing cache operations. However,
+we have been checking more bits than just the min line sizes,
+which triggers false negatives. We may need to trap the user
+accesses in such cases, but not necessarily patch the kernel.
 
+This patch fixes the check to do the right thing as advertised.
+A new capability will be added to check mismatches in other
+fields and ensure we trap the CTR accesses.
+
+Reported-by: Will Deacon <will.deacon@arm.com>
 Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/include/asm/cpucaps.h |  3 ++-
- arch/arm64/kernel/cpu_errata.c   | 17 ++++++++++++++---
- 2 files changed, 16 insertions(+), 4 deletions(-)
+ arch/arm64/include/asm/cache.h | 4 ++++
+ arch/arm64/kernel/cpu_errata.c | 6 ++++--
+ arch/arm64/kernel/cpufeature.c | 2 +-
+ 3 files changed, 9 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
-index 8a699c7..be3bf3d 100644
---- a/arch/arm64/include/asm/cpucaps.h
-+++ b/arch/arm64/include/asm/cpucaps.h
-@@ -49,7 +49,8 @@
- #define ARM64_HAS_CACHE_DIC			28
- #define ARM64_HW_DBM				29
- #define ARM64_SSBD				30
-+#define ARM64_MISMATCHED_CACHE_TYPE		31
+diff --git a/arch/arm64/include/asm/cache.h b/arch/arm64/include/asm/cache.h
+index 5df5cfe..5ee5bca 100644
+--- a/arch/arm64/include/asm/cache.h
++++ b/arch/arm64/include/asm/cache.h
+@@ -21,12 +21,16 @@
+ #define CTR_L1IP_SHIFT		14
+ #define CTR_L1IP_MASK		3
+ #define CTR_DMINLINE_SHIFT	16
++#define CTR_IMINLINE_SHIFT	0
+ #define CTR_ERG_SHIFT		20
+ #define CTR_CWG_SHIFT		24
+ #define CTR_CWG_MASK		15
+ #define CTR_IDC_SHIFT		28
+ #define CTR_DIC_SHIFT		29
  
--#define ARM64_NCAPS				31
-+#define ARM64_NCAPS				32
++#define CTR_CACHE_MINLINE_MASK	\
++	(0xf << CTR_DMINLINE_SHIFT | 0xf << CTR_IMINLINE_SHIFT)
++
+ #define CTR_L1IP(ctr)		(((ctr) >> CTR_L1IP_SHIFT) & CTR_L1IP_MASK)
  
- #endif /* __ASM_CPUCAPS_H */
+ #define ICACHE_POLICY_VPIPT	0
 diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index 5d1fa92..5d59ff9 100644
+index 1d2b6d7..5d1fa92 100644
 --- a/arch/arm64/kernel/cpu_errata.c
 +++ b/arch/arm64/kernel/cpu_errata.c
-@@ -65,11 +65,15 @@ is_kryo_midr(const struct arm64_cpu_capabilities *entry, int scope)
- }
- 
- static bool
--has_mismatched_cache_line_size(const struct arm64_cpu_capabilities *entry,
--				int scope)
-+has_mismatched_cache_type(const struct arm64_cpu_capabilities *entry,
-+			  int scope)
+@@ -68,9 +68,11 @@ static bool
+ has_mismatched_cache_line_size(const struct arm64_cpu_capabilities *entry,
+ 				int scope)
  {
- 	u64 mask = CTR_CACHE_MINLINE_MASK;
- 
-+	/* Skip matching the min line sizes for cache type check */
-+	if (entry->capability == ARM64_MISMATCHED_CACHE_TYPE)
-+		mask ^= arm64_ftr_reg_ctrel0.strict_mask;
++	u64 mask = CTR_CACHE_MINLINE_MASK;
 +
  	WARN_ON(scope != SCOPE_LOCAL_CPU || preemptible());
- 	return (read_cpuid_cachetype() & mask) !=
- 	       (arm64_ftr_reg_ctrel0.sys_val & mask);
-@@ -615,7 +619,14 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
- 	{
- 		.desc = "Mismatched cache line size",
- 		.capability = ARM64_MISMATCHED_CACHE_LINE_SIZE,
--		.matches = has_mismatched_cache_line_size,
-+		.matches = has_mismatched_cache_type,
-+		.type = ARM64_CPUCAP_LOCAL_CPU_ERRATUM,
-+		.cpu_enable = cpu_enable_trap_ctr_access,
-+	},
-+	{
-+		.desc = "Mismatched cache type",
-+		.capability = ARM64_MISMATCHED_CACHE_TYPE,
-+		.matches = has_mismatched_cache_type,
- 		.type = ARM64_CPUCAP_LOCAL_CPU_ERRATUM,
- 		.cpu_enable = cpu_enable_trap_ctr_access,
- 	},
+-	return (read_cpuid_cachetype() & arm64_ftr_reg_ctrel0.strict_mask) !=
+-		(arm64_ftr_reg_ctrel0.sys_val & arm64_ftr_reg_ctrel0.strict_mask);
++	return (read_cpuid_cachetype() & mask) !=
++	       (arm64_ftr_reg_ctrel0.sys_val & mask);
+ }
+ 
+ static void
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index f24892a..25d5cef 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -214,7 +214,7 @@ static const struct arm64_ftr_bits ftr_ctr[] = {
+ 	 * If we have differing I-cache policies, report it as the weakest - VIPT.
+ 	 */
+ 	ARM64_FTR_BITS(FTR_VISIBLE, FTR_NONSTRICT, FTR_EXACT, 14, 2, ICACHE_POLICY_VIPT),	/* L1Ip */
+-	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, 0, 4, 0),	/* IminLine */
++	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, CTR_IMINLINE_SHIFT, 4, 0),
+ 	ARM64_FTR_END,
+ };
+ 
 -- 
 2.9.5
