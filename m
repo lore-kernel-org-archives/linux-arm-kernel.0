@@ -1,117 +1,170 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 4 Jul 2018 17:37:23 +0100
-Subject: [PATCH 2/2] PCI: imx: Initial imx7d pm support
-In-Reply-To: <1530607328.22468.102.camel@pengutronix.de>
-References: <cover.1527621510.git.leonard.crestez@nxp.com>
- <a6176c8bcfbca08ce4e93e304bdcd48c4600f8e2.1527621510.git.leonard.crestez@nxp.com>
- <1528468422.26356.20.camel@pengutronix.de>
- <02207512447db4585a4e879e2a059ba223d57dbe.camel@nxp.com>
- <1530607328.22468.102.camel@pengutronix.de>
-Message-ID: <20180704163723.GB13155@red-moon>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 4 Jul 2018 17:45:40 +0100
+Subject: [v3 03/10] mfd: mtk-mmsys: Add mmsys driver
+In-Reply-To: <b6301691-a9f6-64fe-dd8a-ffe51fad6799@suse.com>
+References: <cover.1524820923.git.mbrugger@suse.com>
+ <e0894c97775e46ce6d9a441dc05e2e2479a4b612.1524820923.git.mbrugger@suse.com>
+ <20180430101826.GC5147@dell>
+ <5269ccfd-0274-3c12-7eeb-5de923197d92@gmail.com>
+ <20180703071103.GE20176@dell>
+ <b6301691-a9f6-64fe-dd8a-ffe51fad6799@suse.com>
+Message-ID: <20180704164540.GH496@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 03, 2018 at 10:42:08AM +0200, Lucas Stach wrote:
-> Am Montag, den 02.07.2018, 17:18 +0000 schrieb Leonard Crestez:
-> > On Fri, 2018-06-08 at 16:33 +0200, Lucas Stach wrote:
-> > > Am Dienstag, den 29.05.2018, 22:39 +0300 schrieb Leonard Crestez:
-> > > > On imx7d the phy is turned off in suspend and must be reset on resume.
-> > > > Right now lspci -v fails after a suspend/resume cycle, fix this by
-> > > > adding minimal suspend/resume code from the nxp vendor tree.
-> > > > 
-> > > > This is currently only enabled for imx7 but the same sequence can be
-> > > > applied to other imx pcie variants.
-> > > > +#ifdef CONFIG_PM_SLEEP
-> > > > +static int imx6_pcie_suspend_noirq(struct device *dev)
-> > > > +{
-> > > > > > > +	struct imx6_pcie *imx6_pcie = dev_get_drvdata(dev);
-> > > > +
-> > > > +	if (imx6_pcie->variant == IMX7D) {
-> > > 
-> > > Instead of this large indented block, please just have an early return
-> > > at the start of this function, like:
-> > > 
-> > > if (imx6_pcie->variant != IMX7D)
-> > > 	return 0;
-> > > 
-> > > Same for the resume function.
-> > 
-> > OK. The resume sequence is mostly the same for all SOCs where it
-> > applies.
-> > 
-> > > > +static int imx6_pcie_resume_noirq(struct device *dev)
-> > > > +{
-> > > > > > > +	int ret = 0;
-> > > > > > > +	struct imx6_pcie *imx6_pcie = dev_get_drvdata(dev);
-> > > > > > > +	struct pcie_port *pp = &imx6_pcie->pci->pp;
-> > > > 
-> > > > +
-> > > > > > > +	if (imx6_pcie->variant == IMX7D) {
-> > > > +		imx6_pcie_ltssm_disable(dev);
-> > > 
-> > > The LTSSM disable seems misplaced here. I would have expected it to be
-> > > in the suspend function.
-> > 
-> > This is a requirement for reinitializing the core: LTSSM needs to be
-> > turned off during initialization.
-> 
-> If you disable LTSSM during suspend, it should be off when entering
-> this resume function, no?
-> 
-> > > > +		/*
-> > > > > > > +		?* controller maybe turn off, re-configure again
-> > > > > > > +		?*/
-> > > > > > > +		dw_pcie_setup_rc(pp);
-> > > > +
-> > > > > > > +		imx6_pcie_ltssm_enable(dev);
-> > > > +
-> > > > > > > +		ret = imx6_pcie_wait_for_link(imx6_pcie);
-> > > > > > > +		if (ret < 0)
-> > > > +			pr_info("pcie link is down after resume.\n");
-> > > 
-> > > If the PHY has been powered down and LTSSM stopped I guess we need to
-> > > do the full imx6_pcie_establish_link() dance again here to reliably re-
-> > > establish the link. The above seems unsafe.
-> > 
-> > What imx6_pcie_establish_link does additionally is some workaround for
-> > link gen detection. I agree that it should be included.
-> > 
-> > This would make resume mostly the same as imx_pcie_host_init except for
-> > dw_pcie_msi_init; that needs to be saved/restored separately.
-> 
-> Right, so maybe we can even cut down on lines of code by splitting and
-> reusing existing functions.
-> 
-> > 
-> > Another issue that should be discussed here is that on 6sx and 7d the
-> > gpc PCIE power domain is not defined correctly: the PCIE block is in
-> > the DISPMIX domain on both SOCs and it is only PCIE_PHY which has a
-> > separate power domain.
-> > 
-> > This matters: enabling power-gating for displays will break pcie if
-> > this relationship is not taken into account. Here are some options:
-> > 
-> > 1) Make &pd_pcie a child of &pd_disp by hacking into gpc probe
-> > functions and calling pm_genpd_add_subdomain. Not very nice.
-> > 
-> > 2) Support nesting PGCs in GPC code? Lots of code and still an
-> > incorrect representation of hardware.
-> > 
-> > 3) Set power-domains = <&pd_disp> and enable runtime PM on &pd_pcie?
-> > 
-> > 4) Add separate devices for the pcie-phy. These would be mostly empty
-> > but still different, for example on imx6sx the PHY is not even
-> > accessible on the bus but only though PCIE registers.
-> 
-> 5) Take a look at the linux-pm list. ;) The power domain framework has
-> just gained support for multiple power domains per device. I think that
->  is the right solution for this, as like you mentioned the PHY isn't
-> really a separate block on i.MX6, but part of the PCIe controller
-> device.
+On Wed, 04 Jul 2018, Matthias Brugger wrote:
 
->From the discussion I take this as there is going to be a v2 so
-I will mark this as Changes Requested, please let me know if that's
-a problem.
+> 
+> 
+> On 03/07/18 09:11, Lee Jones wrote:
+> > On Mon, 25 Jun 2018, Matthias Brugger wrote:
+> >> On 30/04/18 12:18, Lee Jones wrote:
+> >>> On Fri, 27 Apr 2018, matthias.bgg at kernel.org wrote:
+> >>>
+> >>>> From: Matthias Brugger <mbrugger@suse.com>
+> >>>>
+> >>>> The MMSYS subsystem includes clocks and drm components.
+> >>>> This patch adds a MFD device to probe both drivers from the same
+> >>>> device tree compatible.
+> >>>>
+> >>>> Signed-off-by: Matthias Brugger <mbrugger@suse.com>
+> >>>> ---
+> >>>>  drivers/mfd/Kconfig     |  9 ++++++
+> >>>>  drivers/mfd/Makefile    |  2 ++
+> >>>>  drivers/mfd/mtk-mmsys.c | 79 +++++++++++++++++++++++++++++++++++++++++++++++++
+> >>>>  3 files changed, 90 insertions(+)
+> >>>>  create mode 100644 drivers/mfd/mtk-mmsys.c
+> >>>>
+> >>>> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+> >>>> index b860eb5aa194..d23a3b9a2c58 100644
+> >>>> --- a/drivers/mfd/Kconfig
+> >>>> +++ b/drivers/mfd/Kconfig
+> >>>> @@ -378,6 +378,15 @@ config MFD_MC13XXX_I2C
+> >>>>  	help
+> >>>>  	  Select this if your MC13xxx is connected via an I2C bus.
+> >>>>  
+> >>>> +config MFD_MEDIATEK_MMSYS
+> >>>> +	tristate "Mediatek MMSYS interface"
+> >>>> +	select MFD_CORE
+> >>>> +	select REGMAP_MMIO
+> >>>> +	help
+> >>>> +	  Select this if you have a MMSYS subsystem in your SoC. The
+> >>>> +	  MMSYS subsystem has at least a clock driver part and some
+> >>>> +	  DRM components.
+> >>>> +
+> >>>>  config MFD_MXS_LRADC
+> >>>>  	tristate "Freescale i.MX23/i.MX28 LRADC"
+> >>>>  	depends on ARCH_MXS || COMPILE_TEST
+> >>>> diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
+> >>>> index d9d2cf0d32ef..b96118bd68d9 100644
+> >>>> --- a/drivers/mfd/Makefile
+> >>>> +++ b/drivers/mfd/Makefile
+> >>>> @@ -98,6 +98,8 @@ obj-$(CONFIG_MFD_MC13XXX)	+= mc13xxx-core.o
+> >>>>  obj-$(CONFIG_MFD_MC13XXX_SPI)	+= mc13xxx-spi.o
+> >>>>  obj-$(CONFIG_MFD_MC13XXX_I2C)	+= mc13xxx-i2c.o
+> >>>>  
+> >>>> +obj-$(CONFIG_MFD_MEDIATEK_MMSYS) += mtk-mmsys.o
+> >>>> +
+> >>>>  obj-$(CONFIG_MFD_CORE)		+= mfd-core.o
+> >>>>  
+> >>>>  obj-$(CONFIG_EZX_PCAP)		+= ezx-pcap.o
+> >>>> diff --git a/drivers/mfd/mtk-mmsys.c b/drivers/mfd/mtk-mmsys.c
+> >>>> new file mode 100644
+> >>>> index 000000000000..c802343fb1c6
+> >>>> --- /dev/null
+> >>>> +++ b/drivers/mfd/mtk-mmsys.c
+> >>>> @@ -0,0 +1,79 @@
+> >>>> +// SPDX-License-Identifier: GPL-2.0+
+> >>>> +
+> >>>> +/*
+> >>>> + * mtk-mmsys.c -- Mediatek MMSYS multi-function driver
+> >>>> + *
+> >>>> + * Copyright (c) 2018 Matthias Brugger <matthias.bgg@gmail.com>
+> >>>> + *
+> >>>> + * Author: Matthias Brugger <matthias.bgg@gmail.com>
+> >>>> + */
+> >>>> +
+> >>>> +#include <linux/module.h>
+> >>>> +#include <linux/init.h>
+> >>>> +#include <linux/mfd/core.h>
+> >>>> +#include <linux/of.h>
+> >>>> +#include <linux/of_address.h>
+> >>>> +#include <linux/of_device.h>
+> >>>> +#include <linux/platform_device.h>
+> >>>> +#include <linux/regmap.h>
+> >>>> +
+> >>>> +enum {
+> >>>> +	MMSYS_MT2701 = 1,
+> >>>> +};
+> >>>> +
+> >>>> +static const struct mfd_cell mmsys_mt2701_devs[] = {
+> >>>> +	{ .name = "clk-mt2701-mm", },
+> >>>> +	{ .name = "drm-mt2701-mm", },
+> >>>> +};
+> >>>> +
+> >>>> +static int mmsys_probe(struct platform_device *pdev)
+> >>>> +{
+> >>>> +	const struct mfd_cell *mmsys_cells;
+> >>>> +	int nr_cells;
+> >>>> +	long id;
+> >>>> +	int ret;
+> >>>> +
+> >>>> +	id = (long) of_device_get_match_data(&pdev->dev);
+> >>>> +	if (!id) {
+> >>>> +		dev_err(&pdev->dev, "of_device_get match_data() failed\n");
+> >>>> +		return -EINVAL;
+> >>>> +	}
+> >>>> +
+> >>>> +	switch (id) {
+> >>>> +	case MMSYS_MT2701:
+> >>>> +		mmsys_cells = mmsys_mt2701_devs;
+> >>>> +		nr_cells = ARRAY_SIZE(mmsys_mt2701_devs);
+> >>>> +		break;
+> >>>> +	default:
+> >>>> +		return -ENODEV;
+> >>>> +	}
+> >>>> +
+> >>>> +	ret = devm_mfd_add_devices(&pdev->dev, 0, mmsys_cells, nr_cells,
+> >>>> +					NULL, 0, NULL);
+> >>>> +	if (ret) {
+> >>>> +		dev_err(&pdev->dev, "failed to add MFD devices %d\n", ret);
+> >>>> +		return ret;
+> >>>> +	}
+> >>>> +
+> >>>> +	return 0;
+> >>>> +};
+> >>>
+> >>> This driver is pretty pointless.  It doesn't actually do anything.
+> >>>
+> >>> I think you just want to use "simple-mfd" instead.
+> >>>
+> >>
+> >> I think the problem is, that right now we have two drivers which use the same
+> >> devicetree binding, which are clk and drm driver. With a simple-mfd we would
+> >> need two compatibles, and this would break backwards compatibility.
+> > 
+> > So what functionality does this driver provide you with that you do
+> > not have currently?
+> > 
+> 
+> I'm not sure if I get your question. Point is, that the MMSYS implementation for
+> mt8173 is broken, as it assumes that we can probe two drivers with the
+> mediatek,mt8173-mmsys compatible. Somehow it used to work, but from what I
+> understand it was a bug. So older devicetrees use just on mt8173-mmsys
+> compatible in ther DTB.
 
-Thanks,
-Lorenzo
+Okay, that is what I was getting at.  Thanks for the explanation.
+
+Do you have a datasheet I can look at?
+
+> I would like to keep backwards compatibility for the device tree, that's why I
+> was searching for a solution where we can probe two drivers and came up with
+> this mfd solution.
+>
+> So no new functionality, the clk driver provides the clock the drm components need.
+
+-- 
+Lee Jones [???]
+Linaro Services Technical Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
