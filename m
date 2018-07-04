@@ -1,59 +1,69 @@
-From: ravi.bangoria@linux.ibm.com (Ravi Bangoria)
-Date: Wed, 4 Jul 2018 14:54:25 +0530
-Subject: [PATCH v5 06/10] Uprobes: Support SDT markers having reference
- count (semaphore)
-In-Reply-To: <20180704091652.GA21902@linux.vnet.ibm.com>
-References: <20180628052209.13056-1-ravi.bangoria@linux.ibm.com>
- <20180628052209.13056-7-ravi.bangoria@linux.ibm.com>
- <20180701210935.GA14404@redhat.com>
- <0c543791-f3b7-5a4b-f002-e1c76bb430c0@linux.ibm.com>
- <20180702180156.GA31400@redhat.com>
- <f19e3801-d56a-4e34-0acc-1040a071cf91@linux.ibm.com>
- <20180703061612.GG65296@linux.vnet.ibm.com>
- <c21db380-7dc0-2165-8616-8dcb519aa787@linux.ibm.com>
- <20180704091652.GA21902@linux.vnet.ibm.com>
-Message-ID: <bca2cd84-ed4f-7364-687e-b10e3e930b06@linux.ibm.com>
+From: christoffer.dall@arm.com (Christoffer Dall)
+Date: Wed,  4 Jul 2018 11:38:14 +0200
+Subject: [PATCH v2 0/6] KVM: arm/arm64: vgic: Virtual interrupt grouping
+ support
+Message-ID: <1530697100-22419-1-git-send-email-christoffer.dall@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Srikar,
+This small series addresses a peculiarity of the current VGIC
+implementation, namely that we don't support interrupt grouping.
 
-On 07/04/2018 02:46 PM, Srikar Dronamraju wrote:
->>
->> I'm not sure if I get your concerns but let me try to explain what happens
->> in such cases. please let me know if I misunderstood your point.
->>
->> 1. Install a probe using perf.
->>   # ./perf probe sdt_tick:loop2
->>
->>
->>
->> Does this explain your concerns?
->>
-> 
-> 
-> No, this was not my concern.
-> My concern is with two users on the same USDT.
-> 1. First user enables the probe point but doesn't increment the ref_cnt.
-> via uprobe_register
-> 
-> 2. Second user tries to enable the probe point and also increments the
-> ref_cnt via uprobe_register_refctr.
+KVM either implements a GICv2 without support for the security
+extensions, or a GICv3 with DS=1.  For GICv2, on systems without the
+security extensions, group 0 interrupts can be configured to be either
+signalled as FIQs or as IRQs by the VM, whereas group 1 interrupts are
+always IRQs.  For GICv3, with DS=1, group 1 interrupts are always IRQs
+and group 0 interrupts are always FIQs, and there is no concept of
+secure vs. non-secure group 1 interrupts when DS=1.
 
+We were treating all interrupts on GICv2 as group 0, but yet telling the
+guest that they were group 1.  The first patch changes this behavior,
+which seems to have no effect on no known guests, but still.
 
-Ok got it. uprobe_register_refctr() will return with error because we don't
-allow one uprobe(inode+offset) with multiple reference counter.
+The remaining patches introduce proper interrupt grouping support, along
+with MMIO accessors for the VM and userspace to retrieve and set the
+which group SGIs, PPIs, and SPIs belong to.  LPIs are always group 1
+interrupts as per the architecture, and there is no way to modify this
+configuration (no IGROUPR registers for LPIs or equivalent ITS
+commands).
 
-i.e. If inode+offset matches for two uprobes, ref_ctr_offset must match as
-well. Patch 8/10 takes care of this.
+Lightly tested on Seattle, TX1, and the foundation model.  I've run a
+GICv2 guest on a GICv3 host on the foundation model.  I've tested
+migration on Seattle, and as expected, migrating a payload from an older
+kernel fails, but migration on same kernel works fine both before and
+after this series.  See the last patch for more info.
 
+Applies to v4.18-rc3.
 
-> 
-> 3. If the second user now removes the probe point via uprobe_unregister.
-> 
-> 4. What is the state of the ref_cnt?
-> 
-> --
-> Thanks and Regards
-> Srikar
-> 
+Changes since v1:
+ - Bumped implementation revision field in GICD_IIDR along with changes
+ - Changed logic in init code to correctly detect vgic emulation type
+ - Rebased to v4.18-rc3
+
+Christoffer Dall (6):
+  KVM: arm/arm64: vgic: Define GICD_IIDR fields for GICv2 and GIv3
+  KVM: arm/arm64: vgic: Keep track of implementation revision
+  KVM: arm/arm64: vgic: GICv2 IGROUPR should read as zero
+  KVM: arm/arm64: vgic: Add group field to struct irq
+  KVM: arm/arm64: vgic: Signal IRQs using their configured group
+  KVM: arm/arm64: vgic: Allow configuration of interrupt groups
+
+ include/kvm/arm_vgic.h             |  4 ++++
+ include/linux/irqchip/arm-gic-v3.h | 10 ++++++++++
+ include/linux/irqchip/arm-gic.h    | 11 +++++++++++
+ virt/kvm/arm/vgic/vgic-debug.c     |  8 +++++---
+ virt/kvm/arm/vgic/vgic-init.c      | 20 ++++++++++++++++++--
+ virt/kvm/arm/vgic/vgic-its.c       |  1 +
+ virt/kvm/arm/vgic/vgic-mmio-v2.c   | 19 +++++++++++++++----
+ virt/kvm/arm/vgic/vgic-mmio-v3.c   | 20 +++++++++++++++-----
+ virt/kvm/arm/vgic/vgic-mmio.c      | 38 ++++++++++++++++++++++++++++++++++++++
+ virt/kvm/arm/vgic/vgic-mmio.h      |  6 ++++++
+ virt/kvm/arm/vgic/vgic-v2.c        |  3 +++
+ virt/kvm/arm/vgic/vgic-v3.c        |  6 +-----
+ 12 files changed, 127 insertions(+), 19 deletions(-)
+
+--
+2.7.4
+
+IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
