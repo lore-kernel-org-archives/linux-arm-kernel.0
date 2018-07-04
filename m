@@ -1,57 +1,68 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 4 Jul 2018 15:22:42 +0100
-Subject: [kvmtool test PATCH 24/24] kvmtool: arm: Add support for
- creating VM with PA size
-In-Reply-To: <1530270944-11351-25-git-send-email-suzuki.poulose@arm.com>
-References: <1530270944-11351-1-git-send-email-suzuki.poulose@arm.com>
- <1530270944-11351-25-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20180704142241.GG4828@arm.com>
+Date: Wed, 4 Jul 2018 15:27:25 +0100
+Subject: [PATCH v2 3/7] arm64: topology: add support to remove cpu
+ topology sibling masks
+In-Reply-To: <40adc362-79b4-d118-7148-cca4c99242fc@arm.com>
+References: <1529327923-17911-1-git-send-email-sudeep.holla@arm.com>
+ <1529327923-17911-4-git-send-email-sudeep.holla@arm.com>
+ <20180704135809.GB4828@arm.com>
+ <40adc362-79b4-d118-7148-cca4c99242fc@arm.com>
+Message-ID: <20180704142724.GH4828@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 29, 2018 at 12:15:44PM +0100, Suzuki K Poulose wrote:
-> diff --git a/arm/kvm.c b/arm/kvm.c
-> index 5701d41..b1969be 100644
-> --- a/arm/kvm.c
-> +++ b/arm/kvm.c
-> @@ -11,6 +11,8 @@
->  #include <linux/kvm.h>
->  #include <linux/sizes.h>
->  
-> +unsigned long kvm_arm_type;
-> +
->  struct kvm_ext kvm_req_ext[] = {
->  	{ DEFINE_KVM_EXT(KVM_CAP_IRQCHIP) },
->  	{ DEFINE_KVM_EXT(KVM_CAP_ONE_REG) },
-> @@ -18,6 +20,26 @@ struct kvm_ext kvm_req_ext[] = {
->  	{ 0, 0 },
->  };
->  
-> +#ifndef KVM_ARM_GET_MAX_VM_PHYS_SHIFT
-> +#define KVM_ARM_GET_MAX_VM_PHYS_SHIFT		_IO(KVMIO, 0x0b)
-> +#endif
-> +
-> +void kvm__arch_init_hyp(struct kvm *kvm)
-> +{
-> +	int max_ipa;
-> +
-> +	max_ipa = ioctl(kvm->sys_fd, KVM_ARM_GET_MAX_VM_PHYS_SHIFT);
-> +	if (max_ipa < 0)
-> +		max_ipa = 40;
-> +	if (!kvm->cfg.arch.phys_shift)
-> +		kvm->cfg.arch.phys_shift = 40;
-> +	if (kvm->cfg.arch.phys_shift > max_ipa)
-> +		die("Requested PA size (%u) is not supported by the host (%ubits)\n",
-> +		    kvm->cfg.arch.phys_shift, max_ipa);
-> +	if (kvm->cfg.arch.phys_shift != 40)
-> +		kvm_arm_type = kvm->cfg.arch.phys_shift;
-> +}
+On Wed, Jul 04, 2018 at 03:11:06PM +0100, Sudeep Holla wrote:
+> 
+> 
+> On 04/07/18 14:58, Will Deacon wrote:
+> > On Mon, Jun 18, 2018 at 02:18:39PM +0100, Sudeep Holla wrote:
+> >> This patch adds support to remove all the CPU topology information using
+> >> clear_cpu_topology and also resetting the sibling information on other
+> >> sibling CPUs. This will be used in cpu_disable so that all the topology
+> >> sibling information is removed on CPU hotplug out.
+> >>
+> >> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> >> Cc: Will Deacon <will.deacon@arm.com>
+> >> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> >> ---
+> >>  arch/arm64/include/asm/topology.h |  1 +
+> >>  arch/arm64/kernel/topology.c      | 15 +++++++++++++++
+> >>  2 files changed, 16 insertions(+)
+> >>
+> >> diff --git a/arch/arm64/include/asm/topology.h b/arch/arm64/include/asm/topology.h
+> >> index df48212f767b..fb996f454305 100644
+> >> --- a/arch/arm64/include/asm/topology.h
+> >> +++ b/arch/arm64/include/asm/topology.h
+> >> @@ -23,6 +23,7 @@ extern struct cpu_topology cpu_topology[NR_CPUS];
+> >>
+> >>  void init_cpu_topology(void);
+> >>  void store_cpu_topology(unsigned int cpuid);
+> >> +void remove_cpu_topology(unsigned int cpuid);
+> >>  const struct cpumask *cpu_coregroup_mask(int cpu);
+> >>
+> >>  #ifdef CONFIG_NUMA
+> >> diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+> >> index 6ea3ec49d418..38b102013708 100644
+> >> --- a/arch/arm64/kernel/topology.c
+> >> +++ b/arch/arm64/kernel/topology.c
+> >> @@ -322,6 +322,21 @@ static void __init reset_cpu_topology(void)
+> >>  		clear_cpu_topology(cpu, true);
+> >>  }
+> >>
+> >> +#define cpu_llc_shared_mask(cpu)	(&cpu_topology[cpu].llc_siblings)
+> > 
+> > Why doesn't this live in topology.h with the other topology masks?
+> > 
+> 
+> The other macros are aligned with other archs and is used in
+> drivers/base/topology.c which provides sysfs access. This llc mask
+> is not exposed to userspace and hence I thought of containing it along
+> with the sole user. I am fine if you prefer to move, but then may be we
+> need the name to be aligned to topology_llc_shared_mask or something
+> like that.
 
-Seems a bit weird that the "machine type identifier" to KVM_CREATE_VM is
-dedicated entirely to holding the physical address shift verbatim. Is this
-really the ABI?
-
-Also, couldn't KVM figure it out automatically if you add memslots at high
-addresses, making this a niche tunable outside of testing?
+I'm just suggesting to name it topology_llc_cpumask and put it in our
+asm/topology.h. That doesn't get exposed to userspace afaict (but please
+shout it I missed something).
 
 Will
