@@ -1,54 +1,44 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 4 Jul 2018 16:31:04 +0200 (CEST)
-Subject: [linux-sunxi] Re: [PATCH 0/2] Allwinner A64 timer workaround
-In-Reply-To: <1a36f63c-0259-bdcd-bb96-d5230c2564ea@arm.com>
-References: <20180511022751.9096-1-samuel@sholland.org>
- <2c16d5ab-38f7-8f3e-875c-19e8032f440a@arm.com>
- <bdfb1a31-2c4a-d258-7bf6-aaab8cee4663@sholland.org>
- <5283f98e-6443-db7a-fe51-6379ed19002c@arm.com>
- <24b78819-5e3f-431f-3987-f7409742ef07@linaro.org>
- <1d75c538-9166-5eec-a08c-b168f9770bd1@arm.com>
- <alpine.DEB.2.21.1807041151530.1816@nanos.tec.linutronix.de>
- <1a36f63c-0259-bdcd-bb96-d5230c2564ea@arm.com>
-Message-ID: <alpine.DEB.2.21.1807041628440.1752@nanos.tec.linutronix.de>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 4 Jul 2018 15:32:07 +0100
+Subject: [RFC net-next 15/15] net: lora: Add Semtech SX1301
+In-Reply-To: <BY1PR02MB1114BC0F12654B1E7C614108E7410@BY1PR02MB1114.namprd02.prod.outlook.com>
+References: <20180701110804.32415-1-afaerber@suse.de>
+ <20180701110804.32415-16-afaerber@suse.de>
+ <20180702161258.GA18744@sirena.org.uk>
+ <4e06cc72-2092-70f3-c801-bf6e4c3cbec2@suse.de>
+ <20180703145022.GA13744@sirena.org.uk>
+ <809fc546-6012-37f3-9485-cfd8eaf99488@suse.de>
+ <20180703153137.GB13744@sirena.org.uk>
+ <3f6289f9-d345-39a7-f0dd-9d5fa7c86e82@suse.de>
+ <20180704114355.GB11693@sirena.org.uk>
+ <BY1PR02MB1114BC0F12654B1E7C614108E7410@BY1PR02MB1114.namprd02.prod.outlook.com>
+Message-ID: <20180704143207.GD11693@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 4 Jul 2018, Andre Przywara wrote:
-> On 04/07/18 11:00, Thomas Gleixner wrote:
-> > On Wed, 4 Jul 2018, Marc Zyngier wrote:
-> >> On 04/07/18 09:23, Daniel Lezcano wrote:
-> >>>
-> >>> If the patches fix a bug which already exist, it makes sense to
-> >>> propagated the fix back to the stable versions.
-> >>
-> >> That's your call, but I'm not supportive of that decision, specially as
-> >> we have information from the person developing the workaround that this
-> >> doesn't fully address the issue.
-> > 
-> > The patches should not be applied at all. Simply because they don't fix the
-> > issue completely.
-> > 
-> > From a quick glance at various links and information about this, this very
-> > much smells like the FSL_ERRATUM_A008585.
-> > Has that been tried? It looks way more robust than the magic 11 bit
-> > crystal ball logic.
-> 
-> The Freescale erratum is similar, but not identical [1].
-> It seems like the A64 is less variable, so we can use a cheaper
-> workaround, which gets away with normally just one sysreg read. But then
-> again the newer error reports may actually suggest otherwise ...
-> 
-> And as it currently stands, the Freescale erratum has the drawback of
-> relying on the CPU running much faster than the timer. The A64 can run
-> at 24 MHz (for power savings, or possibly during DVFS transitions),
-> which is the timer frequency. So subsequent counter reads will never
-> return the same value and the workaround times out.
+On Wed, Jul 04, 2018 at 01:41:42PM +0000, Ben Whitten wrote:
 
-If that's the case then you need to find a different functional timer for
-time keeping. Having an erratic behaving timer for time keeping is not an
-option at all.
+Please fix your mail client to word wrap within paragraphs at something
+substantially less than 80 columns.  Doing this makes your messages much
+easier to read and reply to.
 
-Thanks,
+> In my SX1257 driver currently the regmap is backed via SPI with
+> devm_regmap_init_spi, please correct me if I am wrong but if I
+> understand correctly this could be split out to regmap backed by SPI
+> in the case of a direct host connection, and a regmap backed by the
+> SX1301's regmapped strobing register interface, regmap_bus?
 
-	tglx
+Yes.
+
+> Is there a precedent to this I can examine?
+
+There's lots of devices that provide both SPI and I2C, you'd just be
+using a regmap_bus instead of the I2C one.  I can't recall an example of
+the specific combination you're looking for though.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180704/9142e5f2/attachment.sig>
