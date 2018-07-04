@@ -1,68 +1,51 @@
-From: mst@redhat.com (Michael S. Tsirkin)
-Date: Wed, 4 Jul 2018 08:37:42 +0300
-Subject: [PATCH v3 01/20] virtio: mmio-v1: Validate queue PFN
-In-Reply-To: <5124334c-b3c8-4c59-b652-d26ea1101807@arm.com>
-References: <1530270944-11351-1-git-send-email-suzuki.poulose@arm.com>
- <1530270944-11351-2-git-send-email-suzuki.poulose@arm.com>
- <20180629200816-mutt-send-email-mst@kernel.org>
- <5124334c-b3c8-4c59-b652-d26ea1101807@arm.com>
-Message-ID: <20180704083618-mutt-send-email-mst@kernel.org>
+From: alex@ghiti.fr (Alexandre Ghiti)
+Date: Wed,  4 Jul 2018 05:51:57 +0000
+Subject: [PATCH 01/11] hugetlb: Harmonize hugetlb.h arch specific defines with
+ pgtable.h
+In-Reply-To: <20180704055207.27978-1-alex@ghiti.fr>
+References: <20180704055207.27978-1-alex@ghiti.fr>
+Message-ID: <20180704055207.27978-2-alex@ghiti.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 03, 2018 at 09:04:01AM +0100, Suzuki K Poulose wrote:
-> Hi Michael,
-> 
-> On 06/29/2018 06:42 PM, Michael S. Tsirkin wrote:
-> > On Fri, Jun 29, 2018 at 12:15:21PM +0100, Suzuki K Poulose wrote:
-> > > virtio-mmio with virtio-v1 uses a 32bit PFN for the queue.
-> > > If the queue pfn is too large to fit in 32bits, which
-> > > we could hit on arm64 systems with 52bit physical addresses
-> > > (even with 64K page size), we simply miss out a proper link
-> > > to the other side of the queue.
-> > > 
-> > > Add a check to validate the PFN, rather than silently breaking
-> > > the devices.
-> > > 
-> > > Cc: "Michael S. Tsirkin" <mst@redhat.com>
-> > > Cc: Jason Wang <jasowang@redhat.com>
-> > > Cc: Marc Zyngier <marc.zyngier@arm.com>
-> > > Cc: Christoffer Dall <cdall@kernel.org>
-> > > Cc: Peter Maydel <peter.maydell@linaro.org>
-> > > Cc: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
-> > > Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> > > ---
-> > > Changes since v2:
-> > >   - Change errno to -E2BIG
-> > > ---
-> > >   drivers/virtio/virtio_mmio.c | 18 ++++++++++++++++--
-> > >   1 file changed, 16 insertions(+), 2 deletions(-)
-> > > 
-> > > diff --git a/drivers/virtio/virtio_mmio.c b/drivers/virtio/virtio_mmio.c
-> > > index 67763d3..82cedc8 100644
-> > > --- a/drivers/virtio/virtio_mmio.c
-> > > +++ b/drivers/virtio/virtio_mmio.c
-> > > @@ -397,9 +397,21 @@ static struct virtqueue *vm_setup_vq(struct virtio_device *vdev, unsigned index,
-> > >   	/* Activate the queue */
-> > >   	writel(virtqueue_get_vring_size(vq), vm_dev->base + VIRTIO_MMIO_QUEUE_NUM);
-> > >   	if (vm_dev->version == 1) {
-> > > +		u64 q_pfn = virtqueue_get_desc_addr(vq) >> PAGE_SHIFT;
-> > > +
-> > > +		/*
-> > > +		 * virtio-mmio v1 uses a 32bit QUEUE PFN. If we have something
-> > > +		 * that doesn't fit in 32bit, fail the setup rather than
-> > > +		 * pretending to be successful.
-> > > +		 */
-> > > +		if (q_pfn >> 32) {
-> > > +			dev_err(&vdev->dev, "virtio-mmio: queue address too large\n");
-> > 
-> > How about:
-> > 	"hypervisor bug: legacy virtio-mmio must not be used with more than 0x%llx Gigabytes of memory",
-> > 	0x1ULL << (32 - 30) << PAGE_SHIFT
-> 
-> nit : Do we need change "hypervisor" => "platform" ? Virtio is used by other
-> tools (e.g, emulators) and not just virtual machines.
-> 
-> Suzuki
+asm-generic/hugetlb.h proposes generic implementations of hugetlb
+related functions: use __HAVE_ARCH_HUGE* defines in order to make arch
+specific implementations of hugetlb functions consistent with pgtable.h
+scheme.
 
-OK.
+Signed-off-by: Alexandre Ghiti <alex@ghiti.fr>
+---
+ arch/arm64/include/asm/hugetlb.h | 2 +-
+ include/asm-generic/hugetlb.h    | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/include/asm/hugetlb.h b/arch/arm64/include/asm/hugetlb.h
+index e73f68569624..3fcf14663dfa 100644
+--- a/arch/arm64/include/asm/hugetlb.h
++++ b/arch/arm64/include/asm/hugetlb.h
+@@ -81,9 +81,9 @@ extern void huge_ptep_set_wrprotect(struct mm_struct *mm,
+ 				    unsigned long addr, pte_t *ptep);
+ extern void huge_ptep_clear_flush(struct vm_area_struct *vma,
+ 				  unsigned long addr, pte_t *ptep);
++#define __HAVE_ARCH_HUGE_PTE_CLEAR
+ extern void huge_pte_clear(struct mm_struct *mm, unsigned long addr,
+ 			   pte_t *ptep, unsigned long sz);
+-#define huge_pte_clear huge_pte_clear
+ extern void set_huge_swap_pte_at(struct mm_struct *mm, unsigned long addr,
+ 				 pte_t *ptep, pte_t pte, unsigned long sz);
+ #define set_huge_swap_pte_at set_huge_swap_pte_at
+diff --git a/include/asm-generic/hugetlb.h b/include/asm-generic/hugetlb.h
+index 9d0cde8ab716..3da7cff52360 100644
+--- a/include/asm-generic/hugetlb.h
++++ b/include/asm-generic/hugetlb.h
+@@ -32,7 +32,7 @@ static inline pte_t huge_pte_modify(pte_t pte, pgprot_t newprot)
+ 	return pte_modify(pte, newprot);
+ }
+ 
+-#ifndef huge_pte_clear
++#ifndef __HAVE_ARCH_HUGE_PTE_CLEAR
+ static inline void huge_pte_clear(struct mm_struct *mm, unsigned long addr,
+ 		    pte_t *ptep, unsigned long sz)
+ {
+-- 
+2.16.2
