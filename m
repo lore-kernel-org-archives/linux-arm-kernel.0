@@ -1,109 +1,34 @@
 From: ravi.bangoria@linux.ibm.com (Ravi Bangoria)
-Date: Wed, 4 Jul 2018 10:55:15 +0530
+Date: Wed, 4 Jul 2018 10:56:42 +0530
 Subject: [PATCH v5 06/10] Uprobes: Support SDT markers having reference
  count (semaphore)
-In-Reply-To: <20180703182313.GA26120@redhat.com>
+In-Reply-To: <20180703192634.GA32223@redhat.com>
 References: <20180628052209.13056-1-ravi.bangoria@linux.ibm.com>
  <20180628052209.13056-7-ravi.bangoria@linux.ibm.com>
- <20180701210935.GA14404@redhat.com>
- <0c543791-f3b7-5a4b-f002-e1c76bb430c0@linux.ibm.com>
- <20180702180156.GA31400@redhat.com>
- <f19e3801-d56a-4e34-0acc-1040a071cf91@linux.ibm.com>
- <20180703171255.GB23144@redhat.com> <20180703182313.GA26120@redhat.com>
-Message-ID: <cb360870-a618-9d5b-92ac-7052c70b3233@linux.ibm.com>
+ <20180702160158.GD65296@linux.vnet.ibm.com>
+ <ac5ab301-7df6-90fb-748b-3dc4624ea3c4@linux.ibm.com>
+ <20180703192634.GA32223@redhat.com>
+Message-ID: <20d12c56-77f6-4d87-8498-d5bc090444e5@linux.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Oleg,
 
-On 07/03/2018 11:53 PM, Oleg Nesterov wrote:
-> forgot to mention...
+
+On 07/04/2018 12:56 AM, Oleg Nesterov wrote:
+> On 07/03, Ravi Bangoria wrote:
+>>
+>> Now about adding ref_ctr_offset into uprobe_consumer. Actually, I
+>> didn't want to change the uprobe_consumer definition because it's
+>> already exported and tools like systemtap are using it.
 > 
-> Of course, I am not sure that UPROBE_KERN_CTR can actually work, there are a lot
-> of details. But if it can, then we can also make ->ref_ctr_offset a consumer property.
+> So what? Yes, the out-of-tree modules should be updated, but this doesn't
+> mean we can add the new features.
 > 
-> On 07/03, Oleg Nesterov wrote:
->>
->> On 07/03, Ravi Bangoria wrote:
->>>
->>>> OK, and how exactly they update the counter? I mean, can we assume that, say,
->>>> bcc or systemtap can only increment or decrement it?
->>>
->>> I don't think we can assume anything here because this is all in user's
->>> control. User can even manually go and update the counter by directly
->>> hooking into the memory.
->>
->> Then how this all can work? I understand that user-space can do anything with
->> this counter, but we do not care if it does something wrong, say nullifies the
->> ctr incremented by kernel.
->>
->> I don't understand this. I think that if a user registers uprobe with
->> ->ref_ctr_offset != 0 we can safely assume that this is a counter, and we do
->> not care if userspace corrupts it.
+> And, speaking of systemtap, it already has to do build-time checks to verify
+> that uprobe_consumer->ret_handler member exists. So it will need another
+> STAPCONF_INODE_REFCNT and that is all.
 
-
-Right, that's what I meant. We can't assume anything. Our(kernel) job
-is just to:
- 1. Increment / decrement counter in sync. No matter what is the value
-    of counter before operation.
- 2. Make sure that counter does not go negative by the kernel.
- 3. Make sure that kernel is not harmed in any case.
-
-
->>
->>>> If yes, perhaps we can simplify the kernel code...
->>>
->>> Sure, let me know if you have any better idea.
->>
->> Can't we (ab)use the most significant bit in this counter?
->>
->> To simplify, lets suppose for the moment that 2 different uprobes can't have
->> the same ->ref_ctr_offset. Then we can do something like
->>
->> 	#define UPROBE_KERN_CTR		(SHRT_MAX + 1)	// MSB
->>
->> 	install_breakpoint:
->>
->> 		for (each valid_ref_ctr_vma which maps uprobe->ref_ctr_offset)
->> 			*ctr_ptr |= UPROBE_KERN_CTR;
->>
->> 		set_swbp();
->>
->> and
->>
->> 	remove_breakpoint:
->>
->> 		for (each valid_ref_ctr_vma which maps uprobe->ref_ctr_offset)
->> 			*ctr_ptr &= ~UPROBE_KERN_CTR;
->>
->> 		set_orig_insn();
->>
->> IOW, we increment/decrement by UPROBE_KERN_CTR, not by 1. But this way the
->> "increment" is idempotent, we do not care if "|=" or "&=" was applied more than
->> once, we do not need to record the fact that the counter was already incremented,
->> and inc/dec are always balanced.
->>
->>
->> Now, lets recall that multiple uprobes can share the same counter. install_breakpoint()
->> is still fine, and we only need to add the additional code into remove_breakpoint:
->>
->> 		for (each uprobe with the same inode and ref_ctr_offset)
->> 			if (filter_chain(uprobe))
->> 				goto keep_ctr;
->>
->> 		for (each valid_ref_ctr_vma which maps uprobe->ref_ctr_offset)
->> 			*ctr_ptr &= ~UPROBE_KERN_CTR;
->>
->> 	keep_ctr:
->> 		set_orig_insn();
->>
->>
->> Just an idea.
->>
->> What do you think?
-
-
-This is really a cool idea. Let me explore that.
+Ok. let me explore that possibility as well.
 
 Thanks,
 Ravi
