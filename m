@@ -1,165 +1,171 @@
-From: alex@ghiti.fr (Alexandre Ghiti)
-Date: Wed,  4 Jul 2018 05:52:01 +0000
-Subject: [PATCH 05/11] hugetlb: Introduce generic version of
- huge_ptep_clear_flush
-In-Reply-To: <20180704055207.27978-1-alex@ghiti.fr>
-References: <20180704055207.27978-1-alex@ghiti.fr>
-Message-ID: <20180704055207.27978-6-alex@ghiti.fr>
+From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara rao)
+Date: Wed, 4 Jul 2018 11:29:53 +0530
+Subject: [RFC PATCH v2 1/2] fpga: fpga-mgr: Add readback support
+Message-ID: <1530683993-27179-1-git-send-email-appana.durga.rao@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arm, x86 architectures use the same version of
-huge_ptep_clear_flush, so move this generic implementation into
-asm-generic/hugetlb.h.
+Inorder to debug issues with fpga's users would
+like to read the fpga configuration information.
+This patch adds readback support for fpga configuration data
+in the framework through debugfs interface.
 
-Signed-off-by: Alexandre Ghiti <alex@ghiti.fr>
+Usage:
+        cat /sys/kernel/debug/fpga/fpga0/image
+
+Signed-off-by: Appana Durga Kedareswara rao <appana.durga.rao@xilinx.com>
 ---
- arch/arm/include/asm/hugetlb-3level.h | 6 ------
- arch/arm64/include/asm/hugetlb.h      | 1 +
- arch/ia64/include/asm/hugetlb.h       | 1 +
- arch/mips/include/asm/hugetlb.h       | 1 +
- arch/parisc/include/asm/hugetlb.h     | 1 +
- arch/powerpc/include/asm/hugetlb.h    | 1 +
- arch/sh/include/asm/hugetlb.h         | 1 +
- arch/sparc/include/asm/hugetlb.h      | 1 +
- arch/x86/include/asm/hugetlb.h        | 6 ------
- include/asm-generic/hugetlb.h         | 8 ++++++++
- 10 files changed, 15 insertions(+), 12 deletions(-)
+Changes for v2:
+--> Fixed debug attribute path and name
+as suggested by Alan
+--> Add config entry for DEBUG as suggested by Alan
+--> Fixed trival coding style issues.
 
-diff --git a/arch/arm/include/asm/hugetlb-3level.h b/arch/arm/include/asm/hugetlb-3level.h
-index ad36e84b819a..b897541520ef 100644
---- a/arch/arm/include/asm/hugetlb-3level.h
-+++ b/arch/arm/include/asm/hugetlb-3level.h
-@@ -37,12 +37,6 @@ static inline pte_t huge_ptep_get(pte_t *ptep)
- 	return retval;
- }
+ drivers/fpga/Kconfig          |  7 +++++
+ drivers/fpga/fpga-mgr.c       | 68 +++++++++++++++++++++++++++++++++++++++++++
+ include/linux/fpga/fpga-mgr.h |  5 ++++
+ 3 files changed, 80 insertions(+)
+
+diff --git a/drivers/fpga/Kconfig b/drivers/fpga/Kconfig
+index 53d3f55..838ad4e 100644
+--- a/drivers/fpga/Kconfig
++++ b/drivers/fpga/Kconfig
+@@ -11,6 +11,13 @@ menuconfig FPGA
  
--static inline void huge_ptep_clear_flush(struct vm_area_struct *vma,
--					 unsigned long addr, pte_t *ptep)
--{
--	ptep_clear_flush(vma, addr, ptep);
--}
--
- static inline void huge_ptep_set_wrprotect(struct mm_struct *mm,
- 					   unsigned long addr, pte_t *ptep)
- {
-diff --git a/arch/arm64/include/asm/hugetlb.h b/arch/arm64/include/asm/hugetlb.h
-index 6ae0bcafe162..4c8dd488554d 100644
---- a/arch/arm64/include/asm/hugetlb.h
-+++ b/arch/arm64/include/asm/hugetlb.h
-@@ -71,6 +71,7 @@ extern pte_t huge_ptep_get_and_clear(struct mm_struct *mm,
- 				     unsigned long addr, pte_t *ptep);
- extern void huge_ptep_set_wrprotect(struct mm_struct *mm,
- 				    unsigned long addr, pte_t *ptep);
-+#define __HAVE_ARCH_HUGE_PTEP_CLEAR_FLUSH
- extern void huge_ptep_clear_flush(struct vm_area_struct *vma,
- 				  unsigned long addr, pte_t *ptep);
- #define __HAVE_ARCH_HUGE_PTE_CLEAR
-diff --git a/arch/ia64/include/asm/hugetlb.h b/arch/ia64/include/asm/hugetlb.h
-index 6719c74da0de..41b5f6adeee4 100644
---- a/arch/ia64/include/asm/hugetlb.h
-+++ b/arch/ia64/include/asm/hugetlb.h
-@@ -20,6 +20,7 @@ static inline int is_hugepage_only_range(struct mm_struct *mm,
- 		REGION_NUMBER((addr)+(len)-1) == RGN_HPAGE);
- }
+ if FPGA
  
-+#define __HAVE_ARCH_HUGE_PTEP_CLEAR_FLUSH
- static inline void huge_ptep_clear_flush(struct vm_area_struct *vma,
- 					 unsigned long addr, pte_t *ptep)
- {
-diff --git a/arch/mips/include/asm/hugetlb.h b/arch/mips/include/asm/hugetlb.h
-index 0959cc5a41fa..7df1f116a3cc 100644
---- a/arch/mips/include/asm/hugetlb.h
-+++ b/arch/mips/include/asm/hugetlb.h
-@@ -48,6 +48,7 @@ static inline pte_t huge_ptep_get_and_clear(struct mm_struct *mm,
- 	return pte;
++config FPGA_MGR_DEBUG_FS
++	tristate "FPGA Debug fs"
++	select DEBUG_FS
++	help
++	  FPGA manager debug provides support for reading fpga configuration
++	  information.
++
+ config FPGA_MGR_SOCFPGA
+ 	tristate "Altera SOCFPGA FPGA Manager"
+ 	depends on ARCH_SOCFPGA || COMPILE_TEST
+diff --git a/drivers/fpga/fpga-mgr.c b/drivers/fpga/fpga-mgr.c
+index 9939d2c..4bea860 100644
+--- a/drivers/fpga/fpga-mgr.c
++++ b/drivers/fpga/fpga-mgr.c
+@@ -484,6 +484,48 @@ void fpga_mgr_put(struct fpga_manager *mgr)
  }
+ EXPORT_SYMBOL_GPL(fpga_mgr_put);
  
-+#define __HAVE_ARCH_HUGE_PTEP_CLEAR_FLUSH
- static inline void huge_ptep_clear_flush(struct vm_area_struct *vma,
- 					 unsigned long addr, pte_t *ptep)
- {
-diff --git a/arch/parisc/include/asm/hugetlb.h b/arch/parisc/include/asm/hugetlb.h
-index 6e281e1bb336..9afff26747a1 100644
---- a/arch/parisc/include/asm/hugetlb.h
-+++ b/arch/parisc/include/asm/hugetlb.h
-@@ -32,6 +32,7 @@ static inline int prepare_hugepage_range(struct file *file,
- 	return 0;
- }
- 
-+#define __HAVE_ARCH_HUGE_PTEP_CLEAR_FLUSH
- static inline void huge_ptep_clear_flush(struct vm_area_struct *vma,
- 					 unsigned long addr, pte_t *ptep)
- {
-diff --git a/arch/powerpc/include/asm/hugetlb.h b/arch/powerpc/include/asm/hugetlb.h
-index ec3e0c2e78f8..de0769f0b5b2 100644
---- a/arch/powerpc/include/asm/hugetlb.h
-+++ b/arch/powerpc/include/asm/hugetlb.h
-@@ -143,6 +143,7 @@ static inline pte_t huge_ptep_get_and_clear(struct mm_struct *mm,
- #endif
- }
- 
-+#define __HAVE_ARCH_HUGE_PTEP_CLEAR_FLUSH
- static inline void huge_ptep_clear_flush(struct vm_area_struct *vma,
- 					 unsigned long addr, pte_t *ptep)
- {
-diff --git a/arch/sh/include/asm/hugetlb.h b/arch/sh/include/asm/hugetlb.h
-index 08ee6c00b5e9..9abf9c86b769 100644
---- a/arch/sh/include/asm/hugetlb.h
-+++ b/arch/sh/include/asm/hugetlb.h
-@@ -25,6 +25,7 @@ static inline int prepare_hugepage_range(struct file *file,
- 	return 0;
- }
- 
-+#define __HAVE_ARCH_HUGE_PTEP_CLEAR_FLUSH
- static inline void huge_ptep_clear_flush(struct vm_area_struct *vma,
- 					 unsigned long addr, pte_t *ptep)
- {
-diff --git a/arch/sparc/include/asm/hugetlb.h b/arch/sparc/include/asm/hugetlb.h
-index 944e3a4bfaff..651a9593fcee 100644
---- a/arch/sparc/include/asm/hugetlb.h
-+++ b/arch/sparc/include/asm/hugetlb.h
-@@ -42,6 +42,7 @@ static inline int prepare_hugepage_range(struct file *file,
- 	return 0;
- }
- 
-+#define __HAVE_ARCH_HUGE_PTEP_CLEAR_FLUSH
- static inline void huge_ptep_clear_flush(struct vm_area_struct *vma,
- 					 unsigned long addr, pte_t *ptep)
- {
-diff --git a/arch/x86/include/asm/hugetlb.h b/arch/x86/include/asm/hugetlb.h
-index 48b8d9b13cc6..8347d5abf882 100644
---- a/arch/x86/include/asm/hugetlb.h
-+++ b/arch/x86/include/asm/hugetlb.h
-@@ -27,12 +27,6 @@ static inline int prepare_hugepage_range(struct file *file,
- 	return 0;
- }
- 
--static inline void huge_ptep_clear_flush(struct vm_area_struct *vma,
--					 unsigned long addr, pte_t *ptep)
--{
--	ptep_clear_flush(vma, addr, ptep);
--}
--
- static inline int huge_pte_none(pte_t pte)
- {
- 	return pte_none(pte);
-diff --git a/include/asm-generic/hugetlb.h b/include/asm-generic/hugetlb.h
-index 0f6f151780dd..ffa63fd8388d 100644
---- a/include/asm-generic/hugetlb.h
-+++ b/include/asm-generic/hugetlb.h
-@@ -65,4 +65,12 @@ static inline pte_t huge_ptep_get_and_clear(struct mm_struct *mm,
- }
- #endif
- 
-+#ifndef __HAVE_ARCH_HUGE_PTEP_CLEAR_FLUSH
-+static inline void huge_ptep_clear_flush(struct vm_area_struct *vma,
-+		unsigned long addr, pte_t *ptep)
++#ifdef CONFIG_FPGA_MGR_DEBUG_FS
++#include <linux/debugfs.h>
++
++static int fpga_mgr_read(struct seq_file *s, void *data)
 +{
-+	ptep_clear_flush(vma, addr, ptep);
++	struct fpga_manager *mgr = (struct fpga_manager *)s->private;
++	int ret = 0;
++
++	if (!mgr->mops->read)
++		return -ENOENT;
++
++	if (!mutex_trylock(&mgr->ref_mutex))
++		return -EBUSY;
++
++	if (mgr->state != FPGA_MGR_STATE_OPERATING) {
++		ret = -EPERM;
++		goto err_unlock;
++	}
++
++	/* Read the FPGA configuration data from the fabric */
++	ret = mgr->mops->read(mgr, s);
++	if (ret)
++		dev_err(&mgr->dev, "Error while reading configuration data from FPGA\n");
++
++err_unlock:
++	mutex_unlock(&mgr->ref_mutex);
++
++	return ret;
 +}
++
++static int fpga_mgr_read_open(struct inode *inode, struct file *file)
++{
++	return single_open(file, fpga_mgr_read, inode->i_private);
++}
++
++static const struct file_operations fpga_mgr_ops_image = {
++	.owner = THIS_MODULE,
++	.open = fpga_mgr_read_open,
++	.read = seq_read,
++};
 +#endif
 +
- #endif /* _ASM_GENERIC_HUGETLB_H */
+ /**
+  * fpga_mgr_lock - Lock FPGA manager for exclusive use
+  * @mgr:	fpga manager
+@@ -581,6 +623,29 @@ int fpga_mgr_register(struct device *dev, const char *name,
+ 	if (ret)
+ 		goto error_device;
+ 
++#ifdef CONFIG_FPGA_MGR_DEBUG_FS
++	struct dentry *d, *parent;
++
++	mgr->dir = debugfs_create_dir("fpga", NULL);
++	if (!mgr->dir)
++		goto error_device;
++
++	parent = mgr->dir;
++	d = debugfs_create_dir(mgr->dev.kobj.name, parent);
++	if (!d) {
++		debugfs_remove_recursive(parent);
++		goto error_device;
++	}
++
++	parent = d;
++	d = debugfs_create_file("image", 0644, parent, mgr,
++				&fpga_mgr_ops_image);
++	if (!d) {
++		debugfs_remove_recursive(mgr->dir);
++		goto error_device;
++	}
++#endif
++
+ 	dev_info(&mgr->dev, "%s registered\n", mgr->name);
+ 
+ 	return 0;
+@@ -604,6 +669,9 @@ void fpga_mgr_unregister(struct device *dev)
+ 
+ 	dev_info(&mgr->dev, "%s %s\n", __func__, mgr->name);
+ 
++#ifdef CONFIG_FPGA_MGR_DEBUG_FS
++	debugfs_remove_recursive(mgr->dir);
++#endif
+ 	/*
+ 	 * If the low level driver provides a method for putting fpga into
+ 	 * a desired state upon unregister, do it.
+diff --git a/include/linux/fpga/fpga-mgr.h b/include/linux/fpga/fpga-mgr.h
+index 3c6de23..e9e17a9 100644
+--- a/include/linux/fpga/fpga-mgr.h
++++ b/include/linux/fpga/fpga-mgr.h
+@@ -114,6 +114,7 @@ struct fpga_image_info {
+  * @write: write count bytes of configuration data to the FPGA
+  * @write_sg: write the scatter list of configuration data to the FPGA
+  * @write_complete: set FPGA to operating state after writing is done
++ * @read: optional: read FPGA configuration information
+  * @fpga_remove: optional: Set FPGA into a specific state during driver remove
+  * @groups: optional attribute groups.
+  *
+@@ -131,6 +132,7 @@ struct fpga_manager_ops {
+ 	int (*write_sg)(struct fpga_manager *mgr, struct sg_table *sgt);
+ 	int (*write_complete)(struct fpga_manager *mgr,
+ 			      struct fpga_image_info *info);
++	int (*read)(struct fpga_manager *mgr, struct seq_file *s);
+ 	void (*fpga_remove)(struct fpga_manager *mgr);
+ 	const struct attribute_group **groups;
+ };
+@@ -151,6 +153,9 @@ struct fpga_manager {
+ 	enum fpga_mgr_states state;
+ 	const struct fpga_manager_ops *mops;
+ 	void *priv;
++#ifdef CONFIG_FPGA_MGR_DEBUG_FS
++	struct dentry *dir;
++#endif
+ };
+ 
+ #define to_fpga_manager(d) container_of(d, struct fpga_manager, dev)
 -- 
-2.16.2
+2.7.4
