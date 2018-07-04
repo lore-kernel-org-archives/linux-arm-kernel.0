@@ -1,34 +1,34 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 04 Jul 2018 11:43:36 +0200
-Subject: [PATCH 0/4] arm64: dts: rockchip: add RK3399-Gru-Bob and prepare
- for Scarlet
-In-Reply-To: <20180614113039.29117-1-heiko@sntech.de>
-References: <20180614113039.29117-1-heiko@sntech.de>
-Message-ID: <6791706.GCJnhTN1Ea@phil>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 4 Jul 2018 15:14:32 +0530
+Subject: [PATCH] ARM: dts: da850: Add power-domains to CPPI 4.1 node
+Message-ID: <20180704094432.5424-1-nsekhar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 14. Juni 2018, 13:30:35 CEST schrieb Heiko Stuebner:
-> So far the Gru series of ChromeOS devices has seen 3 public devices.
-> Two clamshell devices with the already supported Kevin and Bob
-> (aka Chromebook Flip C101PA), as well as one table-style device Scarlet.
-> 
-> So this series not only adds a devicetree file for Bob, but also prepares
-> for Scarlets arrival, in that common properties of the clamshell-devices
-> get moved into a rk3399-gru-chromebook.dtsi, similar to what we have on
-> RK3288-Veyron, as Scarlet does some things a bit differently.
-> 
-> Scarlet itself needs a bit more time, as its display is connected via
-> dual-dsi, where the patches are still pending.
-> 
-> 
-> Heiko Stuebner (4):
->   arm64: dts: rockchip: move Chromebook-specific Gru-parts to a separate
->     file
->   arm64: dts: rockchip: add phandles to some nodes on rk3399-gru
->   arm64: dts: rockchip: move core edp from rk3399-kevin to shared
->     chromebook
->   arm64: dts: rockchip: add Google Bob
+This adds the power-domains property to CPPI 4.1 node.
 
-nobody complained for 3 weeks, so I've applied these 4 patches
-for 4.19.
+The CPPI 4.1 DMA driver uses pm_runtime to manage the clocks,
+so it needs this property in order to find and enable the clock
+properly.
+
+Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+---
+Applies for v4.19/dt branch of my tree.
+
+ arch/arm/boot/dts/da850.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+index 9e05a5a709c0..07f215e7e5b8 100644
+--- a/arch/arm/boot/dts/da850.dtsi
++++ b/arch/arm/boot/dts/da850.dtsi
+@@ -637,6 +637,7 @@
+ 				interrupts = <58>;
+ 				#dma-cells = <2>;
+ 				#dma-channels = <4>;
++				power-domains = <&psc1 1>;
+ 				status = "okay";
+ 			};
+ 		};
+-- 
+2.16.2
