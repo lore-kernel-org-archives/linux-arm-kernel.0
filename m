@@ -1,194 +1,54 @@
-From: mchehab+samsung@kernel.org (Mauro Carvalho Chehab)
-Date: Wed, 4 Jul 2018 14:30:26 -0300
-Subject: [PATCH v4] media: helene: add I2C device probe function
-In-Reply-To: <20180702051211.21942-1-suzuki.katsuhiro@socionext.com>
-References: <20180702051211.21942-1-suzuki.katsuhiro@socionext.com>
-Message-ID: <20180704143026.036df3c4@coco.lan>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 4 Jul 2018 18:33:48 +0100
+Subject: [PATCH 0/7] arm64: PSR <-> SPSR_ELx mapping fixes
+In-Reply-To: <20180625144421.11511-1-mark.rutland@arm.com>
+References: <20180625144421.11511-1-mark.rutland@arm.com>
+Message-ID: <20180704173347.GA9668@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Katsushiro-san,
+Mark,
 
-Em Mon,  2 Jul 2018 14:12:11 +0900
-Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com> escreveu:
-
-> This patch adds I2C probe function to use dvb_module_probe()
-> with this driver.
+On Mon, Jun 25, 2018 at 03:44:14PM +0100, Mark Rutland wrote:
+> The SPSR_ELx format has diverged from the AArch32-native SPSR format since the
+> addition of DIT. Thus, we need to map between the two for certain compat
+> operations.
 > 
-> Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
+> Also, when we added support for DIT, we forgot to account for this in
+> valid_user_regs(), causing PSTATE.DIT to be cleared upon sigreturn.
 > 
-> ---
+> These patches (based on v4.18-rc2) fix those issues, cleaning up the COMPAT_PSR
+> definitions to try to avoid confusiong in future.
 > 
-> Changes since v3:
->   - Drop wrong patch 2/2 from v3 series, no changes in this patch
-> 
-> Changes since v2:
->   - Nothing
-> 
-> Changes since v1:
->   - Add documents for dvb_frontend member of helene_config
-> ---
->  drivers/media/dvb-frontends/helene.c | 88 ++++++++++++++++++++++++++--
->  drivers/media/dvb-frontends/helene.h |  3 +
->  2 files changed, 87 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/media/dvb-frontends/helene.c b/drivers/media/dvb-frontends/helene.c
-> index a0d0b53c91d7..04033f0c278b 100644
-> --- a/drivers/media/dvb-frontends/helene.c
-> +++ b/drivers/media/dvb-frontends/helene.c
-> @@ -666,7 +666,7 @@ static int helene_set_params_s(struct dvb_frontend *fe)
->  	return 0;
->  }
->  
-> -static int helene_set_params(struct dvb_frontend *fe)
-> +static int helene_set_params_t(struct dvb_frontend *fe)
->  {
->  	u8 data[MAX_WRITE_REGSIZE];
->  	u32 frequency;
-> @@ -835,6 +835,19 @@ static int helene_set_params(struct dvb_frontend *fe)
->  	return 0;
->  }
->  
-> +static int helene_set_params(struct dvb_frontend *fe)
-> +{
-> +	struct dtv_frontend_properties *p = &fe->dtv_property_cache;
-> +
-> +	if (p->delivery_system == SYS_DVBT ||
-> +	    p->delivery_system == SYS_DVBT2 ||
-> +	    p->delivery_system == SYS_ISDBT ||
-> +	    p->delivery_system == SYS_DVBC_ANNEX_A)
-> +		return helene_set_params_t(fe);
-> +
-> +	return helene_set_params_s(fe);
-> +}
-> +
->  static int helene_get_frequency(struct dvb_frontend *fe, u32 *frequency)
->  {
->  	struct helene_priv *priv = fe->tuner_priv;
-> @@ -843,7 +856,7 @@ static int helene_get_frequency(struct dvb_frontend *fe, u32 *frequency)
->  	return 0;
->  }
->  
-> -static const struct dvb_tuner_ops helene_tuner_ops = {
-> +static const struct dvb_tuner_ops helene_tuner_ops_t = {
->  	.info = {
->  		.name = "Sony HELENE Ter tuner",
->  		.frequency_min = 1000000,
-> @@ -853,7 +866,7 @@ static const struct dvb_tuner_ops helene_tuner_ops = {
->  	.init = helene_init,
->  	.release = helene_release,
->  	.sleep = helene_sleep,
-> -	.set_params = helene_set_params,
-> +	.set_params = helene_set_params_t,
->  	.get_frequency = helene_get_frequency,
->  };
->  
-> @@ -871,6 +884,20 @@ static const struct dvb_tuner_ops helene_tuner_ops_s = {
->  	.get_frequency = helene_get_frequency,
->  };
->  
-> +static const struct dvb_tuner_ops helene_tuner_ops = {
-> +	.info = {
-> +		.name = "Sony HELENE Sat/Ter tuner",
-> +		.frequency_min = 500000,
-> +		.frequency_max = 1200000000,
-> +		.frequency_step = 1000,
-> +	},
-> +	.init = helene_init,
-> +	.release = helene_release,
-> +	.sleep = helene_sleep,
-> +	.set_params = helene_set_params,
-> +	.get_frequency = helene_get_frequency,
-> +};
+> The COMPAT_PSR_ definitions are now used for the AArch32-native SPR format
+> (i.e. they are the compat userspace view), with PSR_AA32_ definitions used for
+> the AArch64 view of the PSR for AArch32 tasks.
 
-About the same issue as I commented on your driver: this is
-wrong.
+I applied this, but it doesn't even build with defconfig :(
 
-See, for ISDB-T, frequencies are interpreted in Hz. The above
-says that this device would be able to range frequencies
-between 500 kHz to 1.2 MHz. I doubt that this silicon would be
-a frequency of 500 kHz!
+How much testing has this seen? I also get some other errors because code
+is trying to refer to COMPAT definitions that you've removed. So I've dropped
+all of this for now.
 
-For ISDB-S, that would mean a range from 500 MHz to 1.2 GHz.
-Again, that's wrong.
+arch/arm64/include/asm/ptrace.h: Assembler messages:
+arch/arm64/include/asm/ptrace.h:71: Error: unknown mnemonic `static' -- `static inline unsigned long compat_psr_to_pstate(const unsigned long psr)'
+arch/arm64/include/asm/ptrace.h:72: Error: junk at end of line, first unrecognised character is `{'
+arch/arm64/include/asm/ptrace.h:73: Error: unknown mnemonic `unsigned' -- `unsigned long pstate'
+arch/arm64/include/asm/ptrace.h:77: Error: unknown mnemonic `if' -- `if (psr&0x00200000)'
+arch/arm64/include/asm/ptrace.h:78: Error: unknown mnemonic `pstate' -- `pstate |=0x01000000'
+arch/arm64/include/asm/ptrace.h:80: Error: unknown mnemonic `return' -- `return pstate'
+arch/arm64/include/asm/ptrace.h:81: Error: junk at end of line, first unrecognised character is `}'
+arch/arm64/include/asm/ptrace.h:83: Error: unknown mnemonic `static' -- `static inline unsigned long pstate_to_compat_psr(const unsigned long pstate)'
+arch/arm64/include/asm/ptrace.h:84: Error: junk at end of line, first unrecognised character is `{'
+arch/arm64/include/asm/ptrace.h:85: Error: unknown mnemonic `unsigned' -- `unsigned long psr'
+arch/arm64/include/asm/ptrace.h:89: Error: unknown mnemonic `if' -- `if (pstate&0x01000000)'
+arch/arm64/include/asm/ptrace.h:90: Error: unknown mnemonic `psr' -- `psr |=0x00200000'
+arch/arm64/include/asm/ptrace.h:92: Error: unknown mnemonic `return' -- `return psr'
+arch/arm64/include/asm/ptrace.h:93: Error: junk at end of line, first unrecognised character is `}'
+/tmp/ccvDpb9g.s: Error: symbol definition loop encountered at `pstate'
+/tmp/ccvDpb9g.s: Error: invalid operands (*GAS `expr' section* and *ABS* sections) for `&' when setting `psr'
+/tmp/ccvDpb9g.s: Error: Invalid operation on symbol
+/tmp/ccvDpb9g.s: Error: can't resolve value for symbol `pstate'
+make[2]: *** [arch/arm64/crypto/sha1-ce-core.o] Error 1
 
-The frequency step will also be interpreted wrong (either
-for ISDB-T or ISDB-S).
-
-I see two possible fixes for it:
-
-1) Consider all frequencies in Hz for the .info field. That will
-require touching all satellite drivers to multiply frequencies
-by 1000. It will also require fixing a DVBv3 backward code for
-FE_GET_INFO, as userspace expect those values in kHZ.
-
-The change at the core should be simple, but it will require touching
-all satellite drivers, in order to consider the frequency in Hz.
-
-Also, it will be hacky, as it will be abusing the DVBv3 uAPI
-struct.
-
-2) Apply the enclosed patch at the headers, and adjust everything to work
-with frequencies in Hz.
-
-The changes will be large, as all frontend drivers will require changes,
-but it will provide a better long term solution.
-
-Perhaps we could do a mid-term approach, adding the new fields in
-order to be used by new drivers.
-
-Regards,
-Mauro
-
-diff --git a/include/media/dvb_frontend.h b/include/media/dvb_frontend.h
-index 331c8269c00e..6c5b919552db 100644
---- a/include/media/dvb_frontend.h
-+++ b/include/media/dvb_frontend.h
-@@ -73,22 +73,19 @@ struct dvb_frontend;
-  * struct dvb_tuner_info - Frontend name and min/max ranges/bandwidths
-  *
-  * @name:		name of the Frontend
-- * @frequency_min:	minimal frequency supported
-- * @frequency_max:	maximum frequency supported
-- * @frequency_step:	frequency step
-+ * @frequency_min_hz:	minimal frequency supported in Hz
-+ * @frequency_max_hz:	maximum frequency supported in Hz
-+ * @frequency_step_hz:	frequency step in Hz
-  * @bandwidth_min:	minimal frontend bandwidth supported
-  * @bandwidth_max:	maximum frontend bandwidth supported
-  * @bandwidth_step:	frontend bandwidth step
-- *
-- * NOTE: frequency parameters are in Hz, for terrestrial/cable or kHz for
-- * satellite.
-  */
- struct dvb_tuner_info {
- 	char name[128];
- 
--	u32 frequency_min;
--	u32 frequency_max;
--	u32 frequency_step;
-+	u32 frequency_min_hz;
-+	u32 frequency_max_hz;
-+	u32 frequency_step_hz;
- 
- 	u32 bandwidth_min;
- 	u32 bandwidth_max;
-@@ -403,7 +400,15 @@ struct dtv_frontend_properties;
-  * @analog_ops:		pointer to &struct analog_demod_ops
-  */
- struct dvb_frontend_ops {
--	struct dvb_frontend_info info;
-+	char       name[128];
-+	__u32      frequency_min_hz;
-+	__u32      frequency_max_hz;
-+	__u32      frequency_stepsize_hz;
-+	__u32      frequency_tolerance_hz;
-+	__u32      symbol_rate_min;
-+	__u32      symbol_rate_max;
-+	__u32      symbol_rate_tolerance;
-+	enum fe_caps caps;
- 
- 	u8 delsys[MAX_DELSYS];
-
-Thanks,
-Mauro
+Will
