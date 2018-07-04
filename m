@@ -1,38 +1,123 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 4 Jul 2018 15:04:04 +0100
-Subject: [PATCH] arm64: Clear the stack
-In-Reply-To: <CAGXu5jJSUFFUpaWYToiKQymKR-wwem55WgAgbygWXdTfHQUs4Q@mail.gmail.com>
-References: <20180629190553.7282-1-labbott@redhat.com>
- <CAGXu5jL8kZHtg-MdScZ5m_6xH_Ho4TsdKGWH83zEL9Y5rutncw@mail.gmail.com>
- <706dc06b-0157-89cb-33a6-d0b9d811dcf0@redhat.com>
- <CAGXu5jLW5FJdRdRXcP=xPOEcQ=Tg+uSi=vj6vQ39iVp=QHSRAQ@mail.gmail.com>
- <20180702095931.GB28665@arm.com>
- <CAGXu5jJSUFFUpaWYToiKQymKR-wwem55WgAgbygWXdTfHQUs4Q@mail.gmail.com>
-Message-ID: <20180704140403.GE4828@arm.com>
+From: mbrugger@suse.com (Matthias Brugger)
+Date: Wed, 4 Jul 2018 16:08:38 +0200
+Subject: panic kexec broken on ARM64?
+In-Reply-To: <86601wzn3h.wl-marc.zyngier@arm.com>
+References: <20180605100151.7fd54381@ezekiel.suse.cz>
+ <8028219f-0d14-eafd-86b7-359ee927bcd3@arm.com>
+ <5e539510-01b7-ebc5-778e-b49a5261f9bc@i2se.com>
+ <2865150f-ebca-4c6b-fc4b-93bfab5f0e91@arm.com>
+ <86lgbm96dq.wl-marc.zyngier@arm.com> <20180703070106.GV23681@linaro.org>
+ <86601wzn3h.wl-marc.zyngier@arm.com>
+Message-ID: <a2796dc8-2f0f-468f-0c9f-ec296f3b302a@suse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kees,
 
-On Mon, Jul 02, 2018 at 10:29:24AM -0700, Kees Cook wrote:
-> On Mon, Jul 2, 2018 at 2:59 AM, Will Deacon <will.deacon@arm.com> wrote:
-> > On Fri, Jun 29, 2018 at 01:25:20PM -0700, Kees Cook wrote:
-> >> No worries! I've made the change locally and will push this out to
-> >> -next unless there are objections?
-> >
-> > I'm a bit wary of conflicts in entry.S, since it's likely that we're going
-> > to have a lot going on in there for 4.19.
-> >
-> > Could I take this via arm64 instead, please, or are there dependencies
-> > on other parts of your tree?
+
+On 03/07/18 10:58, Marc Zyngier wrote:
+> On 03/07/18 08:01, takahiro.akashi at linaro.org wrote:
+>> Marc, James,
+>>
+>> I'd like to re-ignite the discussion.
+>>
+>> On Sun, Jun 10, 2018 at 01:24:17PM +0100, Marc Zyngier wrote:
+>>> On Wed, 06 Jun 2018 12:37:02 +0100,
+>>> James Morse wrote:
+>>>>
+>>>> Hi Stefan,
+>>>>
+>>>> On 06/06/18 08:02, Stefan Wahren wrote:
+>>>>> Am 05.06.2018 um 19:46 schrieb James Morse:
+>>>>>> On 05/06/18 09:01, Petr Tesarik wrote:
+>>>>>>> I attached a hardware debugger and found
+>>>>>>> out that all CPU cores were stopped except one which was stuck in the
+>>>>>>> idle thread. It seems that irq_set_irqchip_state() may sleep, which is
+>>>>>>> definitely not safe after a kernel panic.
+>>>>
+>>>>>> I don't know much about irqchip stuff, but __irq_get_desc_lock() takes a
+>>>>>> raw_spin_lock(), and calls gic_irq_get_irqchip_state() which is just poking
+>>>>>> around in mmio registers, this should all be safe unless you re-entered the same
+>>>>>> code.
+>>>>
+>>>>>>> If I'm right, then this is broken in general, but I have only ever seen
+>>>>>>> it on RPi 3 Model B+ (even RPi3 Model B works fine), so the issue may
+>>>>>>> be more subtle.
+>>>>
+>>>>>> Is there a hardware difference around the interrupt controller on these?
+>>>>
+>>>>> No, but the RPi 3 B has a different USB network chip on board (smsc95xx, Fast
+>>>>> ethernet) instead of lan78xx (Gigabit ethernet).
+>>>>
+>>>> Bingo: its the lan78xx driver that is sleeping from the irqchip
+>>>> callbacks; The smsc95xx driver doesn't have a struct irq_chip, which
+>>>> is why the RPi-3-B doesn't do this.
+>>>>
+>>>> It may be valid for kdump to only teardown the 'root irqdomain' (if
+>>>> that even means anything). I assume these secondary irqchip's would
+>>>> have a summary-interrupt that goes to another irqchip. But I can't
+>>>> see a way to tell them apart..,
+>>>
+>>> There is none. A cascaded irqchip is just like a root irqchip, just
+>>> that its output line is connected to another irqchip. But we have no
+>>> easy way to identify the parent. Also, this particular driver looks
+>>> quite creative (it reinvents the wheel for chained interrupts -- see
+>>> intr_complete and lan78xx_status), meaning that even if we could have
+>>> a magic way of identify a chained irqchip, we'd miss that one. Broken.
+>>>
+>>>> I think we need to wait until after the merge window for Marc's
+>>>> wisdom on this!
+>>>
+>>> Overall, I can't think of an easy fix. We have a few options, but none
+>>> of them involve a centralised change:
+>>>
+>>> 1) We provide a reset infrastructure for irqchips, with an opt-in
+>>>    mechanism. This involves changing the way we teardown irqs at
+>>>    crash-time, and we'd then need some notion of reset ordering (think
+>>>    of the layered ITS and GICv3, for example).
+>>
+>> Does this mean that all the irqchips have to be implemented with reset?
 > 
-> It depends on the plugin existing, but we could split it up so the
-> arm64 part could go separately. It would just be a no-op in the arm64
-> tree since CONFIG_GCC_PLUGIN_STACKLEAK won't exist there. Whatever
-> works best for you!
+> No. Only those that want to be reset at kexec time.
+> 
+>>>
+>>> 2) We provide a way to identify interrupts that are ultimately backed
+>>>    by a root controller, which implies walking down the hierarchy for
+>>
+>> To be clear, from bottom to top (or root), right?
+> 
+> I'm not sure I understand your question. The idea is to walk the
+> irq_data chain, until we hit a root irqchip. If we do hit one, we
+> deactivate/eoi/disable this interrupt. If we don't, we do nothing.
+> 
+> This would avoid the above brokenness, and still ensures that no
+> interrupt reaches the CPU.
+> 
+>>
+>>>    each one of them. Fairly expensive, but minimal in way of changes
+>>>    in the crash code. Requires a per-irqchip flag, but ordering comes
+>>>    in for free.
+>>>
+>>> 3) We do the same as (2), but at the irqdomain level. Not sure that's
+>>>    any better, and it may be even more complicated and bring back some
+>>>    ordering issues.
+>>
+>> Do you think that the same thing may happen in case of pci/msi?
+>> I have no confidence but MSI has some kind of irq domain hierarchy.
+> 
+> Anything can happen, as people implement their interrupt infrastructure
+> in weird and wonderful ways. So we need to be prepared for the worse.
+> 
+> I've pushed 3 patches on a branch[1]. It is mostly untested, but it
+> should allow the above RPi3 disaster to cope with kexec.
+> 
+> 	M.
+> 
+> [1]: https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git/log/?h=irq/root-irqchip
+> 
 
-If you could split it up then that would be really helpful, please.
+I threw the kernel on my RPi3+ model but I wasn't able to start the crash
+kernel. Unfortunately I don't have a JTAG adapter to check if it hangs for the
+same reason.
 
-Thanks,
-
-Will
+Regards,
+Matthias
