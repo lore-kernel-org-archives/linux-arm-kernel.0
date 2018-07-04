@@ -1,230 +1,178 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed,  4 Jul 2018 10:36:49 +0200
-Subject: [PATCH v10 4/6] init: allow initcall tables to be emitted using
- relative references
-In-Reply-To: <20180704083651.24360-1-ard.biesheuvel@linaro.org>
-References: <20180704083651.24360-1-ard.biesheuvel@linaro.org>
-Message-ID: <20180704083651.24360-5-ard.biesheuvel@linaro.org>
+Date: Wed,  4 Jul 2018 10:36:45 +0200
+Subject: [PATCH v10 0/6] add support for relative references in special
+ sections
+Message-ID: <20180704083651.24360-1-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow the initcall tables to be emitted using relative references that
-are only half the size on 64-bit architectures and don't require fixups
-at runtime on relocatable kernels.
+This adds support for emitting special sections such as initcall arrays,
+PCI fixups and tracepoints as relative references rather than absolute
+references. This reduces the size by 50% on 64-bit architectures, but
+more importantly, it removes the need for carrying relocation metadata
+for these sections in relocatable kernels (e.g., for KASLR) that needs
+to be fixed up at boot time. On arm64, this reduces the vmlinux footprint
+of such a reference by 8x (8 byte absolute reference + 24 byte RELA entry
+vs 4 byte relative reference)
 
-Acked-by: James Morris <james.morris@microsoft.com>
-Acked-by: Sergey Senozhatsky <sergey.senozhatsky@gmail.com>
-Acked-by: Petr Mladek <pmladek@suse.com>
-Acked-by: Michael Ellerman <mpe@ellerman.id.au>
-Acked-by: Ingo Molnar <mingo@kernel.org>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- include/linux/init.h   | 44 +++++++++++++++-----
- init/main.c            | 32 +++++++-------
- kernel/printk/printk.c | 16 +++----
- security/security.c    | 17 ++++----
- 4 files changed, 68 insertions(+), 41 deletions(-)
+Patch #3 was sent out before as a single patch. This series supersedes
+the previous submission. This version makes relative ksymtab entries
+dependent on the new Kconfig symbol HAVE_ARCH_PREL32_RELOCATIONS rather
+than trying to infer from kbuild test robot replies for which architectures
+it should be blacklisted.
 
-diff --git a/include/linux/init.h b/include/linux/init.h
-index bc27cf03c41e..2538d176dd1f 100644
---- a/include/linux/init.h
-+++ b/include/linux/init.h
-@@ -116,8 +116,24 @@
- typedef int (*initcall_t)(void);
- typedef void (*exitcall_t)(void);
- 
--extern initcall_t __con_initcall_start[], __con_initcall_end[];
--extern initcall_t __security_initcall_start[], __security_initcall_end[];
-+#ifdef CONFIG_HAVE_ARCH_PREL32_RELOCATIONS
-+typedef int initcall_entry_t;
-+
-+static inline initcall_t initcall_from_entry(initcall_entry_t *entry)
-+{
-+	return offset_to_ptr(entry);
-+}
-+#else
-+typedef initcall_t initcall_entry_t;
-+
-+static inline initcall_t initcall_from_entry(initcall_entry_t *entry)
-+{
-+	return *entry;
-+}
-+#endif
-+
-+extern initcall_entry_t __con_initcall_start[], __con_initcall_end[];
-+extern initcall_entry_t __security_initcall_start[], __security_initcall_end[];
- 
- /* Used for contructor calls. */
- typedef void (*ctor_fn_t)(void);
-@@ -167,9 +183,20 @@ extern bool initcall_debug;
-  * as KEEP() in the linker script.
-  */
- 
--#define __define_initcall(fn, id) \
-+#ifdef CONFIG_HAVE_ARCH_PREL32_RELOCATIONS
-+#define ___define_initcall(fn, id, __sec)			\
-+	__ADDRESSABLE(fn)					\
-+	asm(".section	\"" #__sec ".init\", \"a\"	\n"	\
-+	"__initcall_" #fn #id ":			\n"	\
-+	    ".long	" #fn " - .			\n"	\
-+	    ".previous					\n");
-+#else
-+#define ___define_initcall(fn, id, __sec) \
- 	static initcall_t __initcall_##fn##id __used \
--	__attribute__((__section__(".initcall" #id ".init"))) = fn;
-+		__attribute__((__section__(#__sec ".init"))) = fn;
-+#endif
-+
-+#define __define_initcall(fn, id) ___define_initcall(fn, id, .initcall##id)
- 
- /*
-  * Early initcalls run before initializing SMP.
-@@ -208,13 +235,8 @@ extern bool initcall_debug;
- #define __exitcall(fn)						\
- 	static exitcall_t __exitcall_##fn __exit_call = fn
- 
--#define console_initcall(fn)					\
--	static initcall_t __initcall_##fn			\
--	__used __section(.con_initcall.init) = fn
--
--#define security_initcall(fn)					\
--	static initcall_t __initcall_##fn			\
--	__used __section(.security_initcall.init) = fn
-+#define console_initcall(fn)	___define_initcall(fn,, .con_initcall)
-+#define security_initcall(fn)	___define_initcall(fn,, .security_initcall)
- 
- struct obs_kernel_param {
- 	const char *str;
-diff --git a/init/main.c b/init/main.c
-index 3b4ada11ed52..e59a01f163d6 100644
---- a/init/main.c
-+++ b/init/main.c
-@@ -901,18 +901,18 @@ int __init_or_module do_one_initcall(initcall_t fn)
- }
- 
- 
--extern initcall_t __initcall_start[];
--extern initcall_t __initcall0_start[];
--extern initcall_t __initcall1_start[];
--extern initcall_t __initcall2_start[];
--extern initcall_t __initcall3_start[];
--extern initcall_t __initcall4_start[];
--extern initcall_t __initcall5_start[];
--extern initcall_t __initcall6_start[];
--extern initcall_t __initcall7_start[];
--extern initcall_t __initcall_end[];
--
--static initcall_t *initcall_levels[] __initdata = {
-+extern initcall_entry_t __initcall_start[];
-+extern initcall_entry_t __initcall0_start[];
-+extern initcall_entry_t __initcall1_start[];
-+extern initcall_entry_t __initcall2_start[];
-+extern initcall_entry_t __initcall3_start[];
-+extern initcall_entry_t __initcall4_start[];
-+extern initcall_entry_t __initcall5_start[];
-+extern initcall_entry_t __initcall6_start[];
-+extern initcall_entry_t __initcall7_start[];
-+extern initcall_entry_t __initcall_end[];
-+
-+static initcall_entry_t *initcall_levels[] __initdata = {
- 	__initcall0_start,
- 	__initcall1_start,
- 	__initcall2_start,
-@@ -938,7 +938,7 @@ static char *initcall_level_names[] __initdata = {
- 
- static void __init do_initcall_level(int level)
- {
--	initcall_t *fn;
-+	initcall_entry_t *fn;
- 
- 	strcpy(initcall_command_line, saved_command_line);
- 	parse_args(initcall_level_names[level],
-@@ -949,7 +949,7 @@ static void __init do_initcall_level(int level)
- 
- 	trace_initcall_level(initcall_level_names[level]);
- 	for (fn = initcall_levels[level]; fn < initcall_levels[level+1]; fn++)
--		do_one_initcall(*fn);
-+		do_one_initcall(initcall_from_entry(fn));
- }
- 
- static void __init do_initcalls(void)
-@@ -980,11 +980,11 @@ static void __init do_basic_setup(void)
- 
- static void __init do_pre_smp_initcalls(void)
- {
--	initcall_t *fn;
-+	initcall_entry_t *fn;
- 
- 	trace_initcall_level("early");
- 	for (fn = __initcall_start; fn < __initcall0_start; fn++)
--		do_one_initcall(*fn);
-+		do_one_initcall(initcall_from_entry(fn));
- }
- 
- /*
-diff --git a/kernel/printk/printk.c b/kernel/printk/printk.c
-index 247808333ba4..688a27b0888c 100644
---- a/kernel/printk/printk.c
-+++ b/kernel/printk/printk.c
-@@ -2772,7 +2772,8 @@ EXPORT_SYMBOL(unregister_console);
- void __init console_init(void)
- {
- 	int ret;
--	initcall_t *call;
-+	initcall_t call;
-+	initcall_entry_t *ce;
- 
- 	/* Setup the default TTY line discipline. */
- 	n_tty_init();
-@@ -2781,13 +2782,14 @@ void __init console_init(void)
- 	 * set up the console device so that later boot sequences can
- 	 * inform about problems etc..
- 	 */
--	call = __con_initcall_start;
-+	ce = __con_initcall_start;
- 	trace_initcall_level("console");
--	while (call < __con_initcall_end) {
--		trace_initcall_start((*call));
--		ret = (*call)();
--		trace_initcall_finish((*call), ret);
--		call++;
-+	while (ce < __con_initcall_end) {
-+		call = initcall_from_entry(ce);
-+		trace_initcall_start(call);
-+		ret = call();
-+		trace_initcall_finish(call, ret);
-+		ce++;
- 	}
- }
- 
-diff --git a/security/security.c b/security/security.c
-index 68f46d849abe..1e7b1486d82a 100644
---- a/security/security.c
-+++ b/security/security.c
-@@ -48,14 +48,17 @@ static __initdata char chosen_lsm[SECURITY_NAME_MAX + 1] =
- static void __init do_security_initcalls(void)
- {
- 	int ret;
--	initcall_t *call;
--	call = __security_initcall_start;
-+	initcall_t call;
-+	initcall_entry_t *ce;
-+
-+	ce = __security_initcall_start;
- 	trace_initcall_level("security");
--	while (call < __security_initcall_end) {
--		trace_initcall_start((*call));
--		ret = (*call) ();
--		trace_initcall_finish((*call), ret);
--		call++;
-+	while (ce < __security_initcall_end) {
-+		call = initcall_from_entry(ce);
-+		trace_initcall_start(call);
-+		ret = call();
-+		trace_initcall_finish(call, ret);
-+		ce++;
- 	}
- }
- 
+Patch #1 introduces the new Kconfig symbol HAVE_ARCH_PREL32_RELOCATIONS,
+and sets it for the main architectures that are expected to benefit the
+most from this feature, i.e., 64-bit architectures or ones that use
+runtime relocations.
+
+Patch #2 add support for #define'ing __DISABLE_EXPORTS to get rid of
+ksymtab/kcrctab sections in decompressor and EFI stub objects when
+rebuilding existing C files to run in a different context.
+
+Patches #4 - #6 implement relative references for initcalls, PCI fixups
+and tracepoints, respectively, all of which produce sections with order
+~1000 entries on an arm64 defconfig kernel with tracing enabled. This
+means we save about 28 KB of vmlinux space for each of these patches.
+
+[From the v7 series blurb, which included the jump_label patches as well]:
+  For the arm64 kernel, all patches combined reduce the memory footprint of
+  vmlinux by about 1.3 MB (using a config copied from Ubuntu that has KASLR
+  enabled), of which ~1 MB is the size reduction of the RELA section in .init,
+  and the remaining 300 KB is reduction of .text/.data.
+
+Branch:
+git://git.kernel.org/pub/scm/linux/kernel/git/ardb/linux.git relative-special-sections-v10
+
+Andrew, this series now has all the prerequisite acks in place. Could you please
+take this through the -mm tree? Thanks.
+
+Changes since v9:
+- use .discard.addressable section (not .discard) for emitting dummy symbol
+  references, to work around a build issue on powerpc
+- add acks from Michael, Ingo, Will, James, Petr and Sergey
+
+Changes since v8:
+- add Nico's ack (#2)
+- drop 'const' qualifier from __ADDRESSABLE(sym) to prevent mismatching
+  attributes for the .discard section (#3)
+- drop all uses of VMLINUX_SYMBOL_STR(), which is on its way out (#3 - #6)
+
+Changes since v7:
+- dropped the jump_label patches, these will be revisited in a separate series
+- reorder __DISABLE_EXPORTS with __KSYM_DEPS__ check in #2
+- use offset_to_ptr() helper function to abstract the relative pointer
+  conversion [int *off -> (ulong)off + *off] (#3 - #6)
+- rebase onto v4.16-rc3
+
+Changes since v6:
+- drop S390 from patch #1 introducing HAVE_ARCH_PREL32_RELOCATIONS: kbuild
+  robot threw me some s390 curveballs, and given that s390 does not define
+  CONFIG_RELOCATABLE in the first place, it does not benefit as much from
+  relative references as arm64, x86 and power do
+- add patch to allow symbol exports to be disabled at compilation unit
+  granularity (#2)
+- get rid of arm64 vmlinux.lds.S hunk to ensure code generated by __ADDRESSABLE
+  gets discarded from the EFI stub - it is no longer needed after adding #2 (#1)
+- change _ADDRESSABLE() to emit a data reference, not a code reference - this
+  is another simplification made possible by patch #2 (#3)
+- add Steven's ack to #6
+- split x86 jump_label patch into two (#9, #10)
+
+Changes since v5:
+- add missing jump_label prototypes to s390 jump_label.h (#6)
+- fix inverted condition in call to jump_entry_is_module_init() (#6)
+
+Changes since v4:
+- add patches to convert x86 and arm64 to use relative references for jump
+  tables (#6 - #8)
+- rename PCI patch and add Bjorn's ack (#4)
+- rebase onto v4.15-rc5
+
+Changes since v3:
+- fix module unload issue in patch #5 reported by Jessica, by reusing the
+  updated routine for_each_tracepoint_range() for the quiescent check at
+  module unload time; this requires this routine to be moved before
+  tracepoint_module_going() in kernel/tracepoint.c
+- add Jessica's ack to #2
+- rebase onto v4.14-rc1
+
+Changes since v2:
+- Revert my slightly misguided attempt to appease checkpatch, which resulted
+  in needless churn and worse code. This v3 is based on v1 with a few tweaks
+  that were actually reasonable checkpatch warnings: unnecessary braces (as
+  pointed out by Ingo) and other minor whitespace misdemeanors.
+
+Changes since v1:
+- Remove checkpatch errors to the extent feasible: in some cases, this
+  involves moving extern declarations into C files, and switching to
+  struct definitions rather than typedefs. Some errors are impossible
+  to fix: please find the remaining ones after the diffstat.
+- Used 'int' instead if 'signed int' for the various offset fields: there
+  is no ambiguity between architectures regarding its signedness (unlike
+  'char')
+- Refactor the different patches to be more uniform in the way they define
+  the section entry type and accessors in the .h file, and avoid the need to
+  add #ifdefs to the C code.
+
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Kees Cook <keescook@chromium.org>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Michael Ellerman <mpe@ellerman.id.au>
+Cc: Thomas Garnier <thgarnie@google.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: "Serge E. Hallyn" <serge@hallyn.com>
+Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: Paul Mackerras <paulus@samba.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Petr Mladek <pmladek@suse.com>
+Cc: Ingo Molnar <mingo@redhat.com>
+Cc: James Morris <jmorris@namei.org>
+Cc: Andrew Morton <akpm@linux-foundation.org>
+Cc: Nicolas Pitre <nico@linaro.org>
+Cc: Josh Poimboeuf <jpoimboe@redhat.com>
+Cc: Steven Rostedt <rostedt@goodmis.org>
+Cc: Sergey Senozhatsky <sergey.senozhatsky@gmail.com>
+Cc: Linus Torvalds <torvalds@linux-foundation.org>
+Cc: Jessica Yu <jeyu@kernel.org>
+
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+Cc: linuxppc-dev at lists.ozlabs.org
+Cc: x86 at kernel.org
+
+Ard Biesheuvel (6):
+  arch: enable relative relocations for arm64, power and x86
+  module: allow symbol exports to be disabled
+  module: use relative references for __ksymtab entries
+  init: allow initcall tables to be emitted using relative references
+  PCI: Add support for relative addressing in quirk tables
+  kernel: tracepoints: add support for relative references
+
+ arch/Kconfig                          | 10 ++++
+ arch/arm64/Kconfig                    |  1 +
+ arch/powerpc/Kconfig                  |  1 +
+ arch/x86/Kconfig                      |  1 +
+ arch/x86/boot/compressed/kaslr.c      |  5 +-
+ arch/x86/include/asm/Kbuild           |  1 +
+ arch/x86/include/asm/export.h         |  5 --
+ drivers/firmware/efi/libstub/Makefile |  3 +-
+ drivers/pci/quirks.c                  | 12 +++--
+ include/asm-generic/export.h          | 12 ++++-
+ include/linux/compiler.h              | 19 +++++++
+ include/linux/export.h                | 57 +++++++++++++++-----
+ include/linux/init.h                  | 44 +++++++++++----
+ include/linux/pci.h                   | 20 +++++++
+ include/linux/tracepoint.h            | 19 +++++--
+ init/main.c                           | 32 +++++------
+ kernel/module.c                       | 32 ++++++++---
+ kernel/printk/printk.c                | 16 +++---
+ kernel/tracepoint.c                   | 49 +++++++++--------
+ security/security.c                   | 17 +++---
+ 20 files changed, 255 insertions(+), 101 deletions(-)
+ delete mode 100644 arch/x86/include/asm/export.h
+
 -- 
 2.17.1
