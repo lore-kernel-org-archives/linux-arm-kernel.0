@@ -1,167 +1,68 @@
-From: heiko.carstens@de.ibm.com (Heiko Carstens)
-Date: Wed, 4 Jul 2018 09:59:23 +0200
-Subject: [PATCH v2 0/8] add support for relative references in jump tables
-In-Reply-To: <20180702181145.4799-1-ard.biesheuvel@linaro.org>
-References: <20180702181145.4799-1-ard.biesheuvel@linaro.org>
-Message-ID: <20180704075923.GF3701@osiris>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 4 Jul 2018 08:59:56 +0100
+Subject: [PATCH v3 4/4] arm64: dts: mediatek: add mt6765 support
+In-Reply-To: <1530690473.16183.3.camel@mtkswgap22>
+References: <1530669174-17623-1-git-send-email-mars.cheng@mediatek.com>
+ <1530669174-17623-5-git-send-email-mars.cheng@mediatek.com>
+ <f482708c-ea5e-5d81-a176-d69be9ccdf63@arm.com>
+ <1530690473.16183.3.camel@mtkswgap22>
+Message-ID: <304dc0a7-bcba-961c-40f4-b324ecc2d003@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 02, 2018 at 08:11:37PM +0200, Ard Biesheuvel wrote:
-> This series implements support for emitting the data structures associated
-> with jump tables as 32-bit relative references instead of absolute
-> references, which take up more space on builds that target 64-bit
-> architectures, or implement self relocation [or both].
+On 04/07/18 08:47, Mars Cheng wrote:
+> Hi Marc
 > 
-> This series enables it for arm64 and x86, although other architectures
-> might benefit as well.
+> On Wed, 2018-07-04 at 08:35 +0100, Marc Zyngier wrote:
+>> On 04/07/18 02:52, Mars Cheng wrote:
+>>> This adds basic chip support for MT6765 SoC.
+>>>
+>>> Signed-off-by: Mars Cheng <mars.cheng@mediatek.com>
+>>> ---
+>>>  arch/arm64/boot/dts/mediatek/Makefile       |    1 +
+>>>  arch/arm64/boot/dts/mediatek/mt6765-evb.dts |   33 ++++++
+>>>  arch/arm64/boot/dts/mediatek/mt6765.dtsi    |  155 +++++++++++++++++++++++++++
+>>>  3 files changed, 189 insertions(+)
+>>>  create mode 100644 arch/arm64/boot/dts/mediatek/mt6765-evb.dts
+>>>  create mode 100644 arch/arm64/boot/dts/mediatek/mt6765.dtsi
+>>>
+>>
+>> [...]
+>>
+>>> +
+>>> +		gic: interrupt-controller at c000000 {
+>>> +			compatible = "arm,gic-v3";
+>>> +			#interrupt-cells = <3>;
+>>> +			#address-cells = <2>;
+>>> +			#size-cells = <2>;
+>>> +			#redistributor-regions = <1>;
+>>> +			interrupt-parent = <&gic>;
+>>> +			interrupt-controller;
+>>> +			reg = <0 0x0c000000 0 0x40000>, // distributor
+>>> +			      <0 0x0c100000 0 0x200000>, // redistributor
+>>> +			      <0 0x0c400000 0 0x40000>; // gicc
+>>
+>> For the second time: please add *all* the GIC CPU interface regions,
+>> described in the Cortex-A53 TRM[1] (GICC, GICH, and GICV).
+>>
+> 
+> MT6765 has no GICH/GICV/ITS in mediatek design. Have confirmed with our
+> designer.  
 
-Hello Ard,
+The only way *not* to have GICH or GICV is to assert GICCDISABLE on the
+CPU, in which case you don't have GICC either, nor any support for the
+GICv3 at all. So either the designer is wrong or the documentation is
+wrong. Which one is it, do you think?
 
-feel free to add the patch below which adds support for s390 to your series.
+As for the ITS, that's a perfectly optional part of the design, and not
+part of the CPU.
 
-> Changes since v1:
-> - change the relative reference to the static key to a 64-bit wide one on 64
->   bit architectures; this is necessary on arm64, which allows modules to
->   reside anywhere within a 4 GB window covering the core kernel text, which
->   means a 32-bit signed quantity with its +/- 2 GB range is insufficient.
->   Note that x86_64 changes are in preparation that widen the relocation
->   range as well (using the PIE linker), so I assumed that the same change
->   is appropriate for x86 as well.
+> MT6797 had similar question from you. Sorry for not mentioned it first.
+> 
+> http://lists.infradead.org/pipermail/linux-mediatek/2017-February/008074.html
 
-FWIW, kernel modules on s390 are since ages more than 2GB away from the
-core kernel text. So this is required for s390 as well.
+Well, that's wrong too.
 
->From 77d87236f3d5474f33c25534d8ba2c7c54c88c55 Mon Sep 17 00:00:00 2001
-From: Heiko Carstens <heiko.carstens@de.ibm.com>
-Date: Wed, 4 Jul 2018 09:13:37 +0200
-Subject: [PATCH] s390/jump_label: switch to relative references
-
-Signed-off-by: Heiko Carstens <heiko.carstens@de.ibm.com>
----
- arch/s390/Kconfig                  |  1 +
- arch/s390/include/asm/jump_label.h | 40 +++++++++++++++-----------------------
- arch/s390/kernel/jump_label.c      | 11 ++++++-----
- 3 files changed, 23 insertions(+), 29 deletions(-)
-
-diff --git a/arch/s390/Kconfig b/arch/s390/Kconfig
-index baed39772c84..0349fb06a2ec 100644
---- a/arch/s390/Kconfig
-+++ b/arch/s390/Kconfig
-@@ -121,6 +121,7 @@ config S390
- 	select HAVE_ALIGNED_STRUCT_PAGE if SLUB
- 	select HAVE_ARCH_AUDITSYSCALL
- 	select HAVE_ARCH_JUMP_LABEL
-+	select HAVE_ARCH_JUMP_LABEL_RELATIVE
- 	select CPU_NO_EFFICIENT_FFS if !HAVE_MARCH_Z9_109_FEATURES
- 	select HAVE_ARCH_SECCOMP_FILTER
- 	select HAVE_ARCH_SOFT_DIRTY
-diff --git a/arch/s390/include/asm/jump_label.h b/arch/s390/include/asm/jump_label.h
-index 40f651292aa7..e2d3e6c43395 100644
---- a/arch/s390/include/asm/jump_label.h
-+++ b/arch/s390/include/asm/jump_label.h
-@@ -14,41 +14,33 @@
-  * We use a brcl 0,2 instruction for jump labels at compile time so it
-  * can be easily distinguished from a hotpatch generated instruction.
-  */
--static __always_inline bool arch_static_branch(struct static_key *key, bool branch)
-+static inline bool arch_static_branch(struct static_key *key, bool branch)
- {
--	asm_volatile_goto("0:	brcl 0,"__stringify(JUMP_LABEL_NOP_OFFSET)"\n"
--		".pushsection __jump_table, \"aw\"\n"
--		".balign 8\n"
--		".quad 0b, %l[label], %0\n"
--		".popsection\n"
--		: : "X" (&((char *)key)[branch]) : : label);
--
-+	asm_volatile_goto("0:	brcl	0,"__stringify(JUMP_LABEL_NOP_OFFSET)"\n"
-+			  ".pushsection __jump_table,\"aw\"\n"
-+			  ".balign	8\n"
-+			  ".long	0b-.,%l[label]-.\n"
-+			  ".quad	%0-.\n"
-+			  ".popsection\n"
-+			  : : "X" (&((char *)key)[branch]) : : label);
- 	return false;
- label:
- 	return true;
- }
- 
--static __always_inline bool arch_static_branch_jump(struct static_key *key, bool branch)
-+static inline bool arch_static_branch_jump(struct static_key *key, bool branch)
- {
--	asm_volatile_goto("0:	brcl 15, %l[label]\n"
--		".pushsection __jump_table, \"aw\"\n"
--		".balign 8\n"
--		".quad 0b, %l[label], %0\n"
--		".popsection\n"
--		: : "X" (&((char *)key)[branch]) : : label);
--
-+	asm_volatile_goto("0:	brcl 15,%l[label]\n"
-+			  ".pushsection __jump_table,\"aw\"\n"
-+			  ".balign	8\n"
-+			  ".long	0b-.,%l[label]-.\n"
-+			  ".quad	%0-.\n"
-+			  ".popsection\n"
-+			  : : "X" (&((char *)key)[branch]) : : label);
- 	return false;
- label:
- 	return true;
- }
- 
--typedef unsigned long jump_label_t;
--
--struct jump_entry {
--	jump_label_t code;
--	jump_label_t target;
--	jump_label_t key;
--};
--
- #endif  /* __ASSEMBLY__ */
- #endif
-diff --git a/arch/s390/kernel/jump_label.c b/arch/s390/kernel/jump_label.c
-index 43f8430fb67d..50a1798604a8 100644
---- a/arch/s390/kernel/jump_label.c
-+++ b/arch/s390/kernel/jump_label.c
-@@ -33,13 +33,13 @@ static void jump_label_make_branch(struct jump_entry *entry, struct insn *insn)
- {
- 	/* brcl 15,offset */
- 	insn->opcode = 0xc0f4;
--	insn->offset = (entry->target - entry->code) >> 1;
-+	insn->offset = (jump_entry_target(entry) - jump_entry_code(entry)) >> 1;
- }
- 
- static void jump_label_bug(struct jump_entry *entry, struct insn *expected,
- 			   struct insn *new)
- {
--	unsigned char *ipc = (unsigned char *)entry->code;
-+	unsigned char *ipc = (unsigned char *)jump_entry_code(entry);
- 	unsigned char *ipe = (unsigned char *)expected;
- 	unsigned char *ipn = (unsigned char *)new;
- 
-@@ -59,6 +59,7 @@ static void __jump_label_transform(struct jump_entry *entry,
- 				   enum jump_label_type type,
- 				   int init)
- {
-+	void *code = (void *)jump_entry_code(entry);
- 	struct insn old, new;
- 
- 	if (type == JUMP_LABEL_JMP) {
-@@ -69,13 +70,13 @@ static void __jump_label_transform(struct jump_entry *entry,
- 		jump_label_make_nop(entry, &new);
- 	}
- 	if (init) {
--		if (memcmp((void *)entry->code, &orignop, sizeof(orignop)))
-+		if (memcmp(code, &orignop, sizeof(orignop)))
- 			jump_label_bug(entry, &orignop, &new);
- 	} else {
--		if (memcmp((void *)entry->code, &old, sizeof(old)))
-+		if (memcmp(code, &old, sizeof(old)))
- 			jump_label_bug(entry, &old, &new);
- 	}
--	s390_kernel_write((void *)entry->code, &new, sizeof(new));
-+	s390_kernel_write(code, &new, sizeof(new));
- }
- 
- static int __sm_arch_jump_label_transform(void *data)
+	M.
 -- 
-2.16.4
+Jazz is not dead. It just smells funny...
