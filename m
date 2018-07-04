@@ -1,123 +1,90 @@
-From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Wed, 4 Jul 2018 17:16:22 +0200
-Subject: [PATCH v3 09/17] irqchip/irq-mvebu-icu: support ICU subnodes
-In-Reply-To: <f4d1d42c-98b9-a485-0baf-2248114f8c8a@arm.com>
-References: <20180622151432.1566-1-miquel.raynal@bootlin.com>
- <20180622151432.1566-10-miquel.raynal@bootlin.com>
- <61ff2e4f-55b6-cf70-5f04-32cd197c35f8@arm.com>
- <20180704110917.65557d0a@xps13>
- <f4d1d42c-98b9-a485-0baf-2248114f8c8a@arm.com>
-Message-ID: <20180704171622.2df87519@xps13>
+From: samuel@sholland.org (Samuel Holland)
+Date: Wed, 4 Jul 2018 10:23:18 -0500
+Subject: [linux-sunxi] Re: [PATCH 0/2] Allwinner A64 timer workaround
+In-Reply-To: <861scjyrio.wl-marc.zyngier@arm.com>
+References: <20180511022751.9096-1-samuel@sholland.org>
+ <2c16d5ab-38f7-8f3e-875c-19e8032f440a@arm.com>
+ <bdfb1a31-2c4a-d258-7bf6-aaab8cee4663@sholland.org>
+ <5283f98e-6443-db7a-fe51-6379ed19002c@arm.com>
+ <24b78819-5e3f-431f-3987-f7409742ef07@linaro.org>
+ <1d75c538-9166-5eec-a08c-b168f9770bd1@arm.com>
+ <alpine.DEB.2.21.1807041151530.1816@nanos.tec.linutronix.de>
+ <1a36f63c-0259-bdcd-bb96-d5230c2564ea@arm.com>
+ <alpine.DEB.2.21.1807041628440.1752@nanos.tec.linutronix.de>
+ <55fc9e48-6329-df75-3a12-60cc42d91a31@arm.com>
+ <861scjyrio.wl-marc.zyngier@arm.com>
+Message-ID: <0cfd26d9-e1a5-3755-09b2-044eff37ff99@sholland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
-
-Marc Zyngier <marc.zyngier@arm.com> wrote on Wed, 4 Jul 2018 13:43:58
-+0100:
-
-> On 04/07/18 10:09, Miquel Raynal wrote:
-> > Hi Marc,
-> > 
-> > Marc Zyngier <marc.zyngier@arm.com> wrote on Thu, 28 Jun 2018 13:45:09
-> > +0100:
-> >   
-> >> On 22/06/18 16:14, Miquel Raynal wrote:  
-> >>> The ICU can handle several type of interrupt, each of them being handled
-> >>> differently on AP side. On CP side, the ICU should be able to make the
-> >>> distinction between each interrupt group by pointing to the right parent.
-> >>>
-> >>> This is done through the introduction of new bindings, presenting the ICU
-> >>> node as the parent of multiple ICU sub-nodes, each of them being an
-> >>> interrupt type with a different interrupt parent. ICU interrupt 'clients'
-> >>> now directly point to the right sub-node, avoiding the need for the extra
-> >>> ICU_GRP_* parameter.
-> >>>
-> >>> ICU subnodes are probed automatically with devm_platform_populate(). If
-> >>> the node as no child, the probe function for NSRs will still be called
-> >>> 'manually' in order to preserve backward compatibility with DT using the
-> >>> old binding.
-> >>>
-> >>> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
-> >>> ---
-> >>>  drivers/irqchip/irq-mvebu-icu.c | 88 ++++++++++++++++++++++++++++++++++-------
-> >>>  1 file changed, 74 insertions(+), 14 deletions(-)
-> >>>
-> >>> diff --git a/drivers/irqchip/irq-mvebu-icu.c b/drivers/irqchip/irq-mvebu-icu.c
-> >>> index 24d45186eb6b..f7c2ede9c222 100644
-> >>> --- a/drivers/irqchip/irq-mvebu-icu.c
-> >>> +++ b/drivers/irqchip/irq-mvebu-icu.c
-> >>> @@ -43,6 +43,7 @@ struct mvebu_icu {
-> >>>  	struct regmap *regmap;
-> >>>  	struct device *dev;
-> >>>  	atomic_t initialized;
-> >>> +	bool legacy_bindings;
-> >>>  };
-> >>>  
-> >>>  struct mvebu_icu_irq_data {
-> >>> @@ -51,6 +52,30 @@ struct mvebu_icu_irq_data {
-> >>>  	unsigned int type;
-> >>>  };
-> >>>  
-> >>> +static struct mvebu_icu *mvebu_icu_dev_get_drvdata(struct platform_device *pdev)
-> >>> +{
-> >>> +	struct mvebu_icu *icu;
-> >>> +
-> >>> +	/*
-> >>> +	 * Device data being populated means we should be using legacy bindings.
-> >>> +	 * Using the _parent_ device data means we should be using new bindings.
-> >>> +	 */
-> >>> +	icu = dev_get_drvdata(&pdev->dev);
-> >>> +	if (icu) {
-> >>> +		if (!icu->legacy_bindings)
-> >>> +			return ERR_PTR(-EINVAL);
-> >>> +	} else {
-> >>> +		icu = dev_get_drvdata(pdev->dev.parent);
-> >>> +		if (!icu)
-> >>> +			return ERR_PTR(-ENODEV);
-> >>> +
-> >>> +		if (icu->legacy_bindings)
-> >>> +			return ERR_PTR(-EINVAL);
-> >>> +	}    
-> >>
-> >> Doesn't this make legacy_bindings completely redundant? Either the
-> >> pointer is !NULL in the device, and this is using a legacy binging, or
-> >> it is stored in the parent, and this is a new binding. You could even
-> >> have a helper for that:
-> >>
-> >> static bool is_legacy(struct platform_device *pdev)
-> >> {
-> >> 	return !dev_get_drvdata(&pdev->dev);
-> >> }
-> >>
-> >> The driver really doesn't need to be defending against itself, if
-> >> anything, and it would save you quite a bit of error handling in the
-> >> callers of this function.  
-> > 
-> > I simplified the sanity checks but I had to keep an icu->is_legacy
-> > boolean because the above function would not have worked, for instance,
-> > in the *_translate() hook. As this hook does not receive a struct
-> > device * (or platform_device) as parameter, I tried to use icu->dev
-> > instead. This cannot work as it always points to the device having the
-> > driver data attached.  
+On 07/04/18 10:01, Marc Zyngier wrote:
+> On Wed, 04 Jul 2018 15:44:36, Andre Przywara <andre.przywara@arm.com> wrote:
+>> On 04/07/18 15:31, Thomas Gleixner wrote:
+>>> On Wed, 4 Jul 2018, Andre Przywara wrote:
+>>>> On 04/07/18 11:00, Thomas Gleixner wrote:
+>>>>> On Wed, 4 Jul 2018, Marc Zyngier wrote:
+>>>>>> On 04/07/18 09:23, Daniel Lezcano wrote:
+>>>>>>> 
+>>>>>>> If the patches fix a bug which already exist, it makes sense to 
+>>>>>>> propagated the fix back to the stable versions.
+>>>>>> 
+>>>>>> That's your call, but I'm not supportive of that decision, 
+>>>>>> specially as we have information from the person developing the 
+>>>>>> workaround that this doesn't fully address the issue.
+>>>>> 
+>>>>> The patches should not be applied at all. Simply because they don't 
+>>>>> fix the issue completely.
+>>>>> 
+>>>>> From a quick glance at various links and information about this,
+>>>>> this very much smells like the FSL_ERRATUM_A008585. Has that been
+>>>>> tried? It looks way more robust than the magic 11 bit crystal ball
+>>>>> logic.
+>>>> 
+>>>> The Freescale erratum is similar, but not identical [1]. It seems like 
+>>>> the A64 is less variable, so we can use a cheaper workaround, which 
+>>>> gets away with normally just one sysreg read. But then again the newer 
+>>>> error reports may actually suggest otherwise ...
+>>>> 
+>>>> And as it currently stands, the Freescale erratum has the drawback of 
+>>>> relying on the CPU running much faster than the timer. The A64 can run
+>>>>  at 24 MHz (for power savings, or possibly during DVFS transitions), 
+>>>> which is the timer frequency. So subsequent counter reads will never 
+>>>> return the same value and the workaround times out.
+>>> 
+>>> If that's the case then you need to find a different functional timer for
+>>> time keeping. Having an erratic behaving timer for time keeping is not an
+>>> option at all.
+>> 
+>> That's not an option on arm64. There are other usable time sources in the 
+>> SoC, but the arch timer is somewhat mandatory for all practical purposes
+>> on arm64. We rely on it in some many places that it's not feasible to run 
+>> without it. That's why we call it "architected" timer after all ;-) But I 
+>> am quite confident that we can find a correct workaround. Maybe it's
+>> really the TVAL (the downcounter) write which is the culprit here, since
+>> the hardware actually writes "now() + TVAL" into the CVAL (upcounter)
+>> register. This internal counter access may be flawed as well.
 > 
-> You could still have the pdev as part of the domain host_data, right?
-> Isn't that just a matter of having a pointer to the pdev as part of the
-> icu data structure?
+> You got it backward: CVAL is not a counter at all. It is a Comparator. And 
+> TVAL has an implicit read from the counter, as it is defined as "CVAL - CNT" 
+> (i.e. the number of ticks until the timer expires).
+> 
+> So it might be worth trying to handle TVAL entirely in SW.
+> 
+> But this relies on being able to read the timer and get a number of correct 
+> values out of it. One possibility would be to sacrifice precision and always 
+> ignore some of the bottom bits, but this is always going to suck terribly.
+> 
+> The alternative is burn that thing, and pretend it never existed.
 
-There is already a 'struct device *dev' pointer in the ICU data
-structure. This pointer is set to "&pdev->dev" in the main probe
-function.
+>From the testing I have done, this patch series fully stabilizes reading CNTPCT
+and CNTVCT. So with the workaround, the timer *can* accurately count time. So
+merging this would be an improvement on the current situation.
 
-Legacy: dev is the unique ICU device, the driver data is attached to it.
-Now: dev is the 'host' ICU device that is the parent of two other
-devices, ICU NSR controller and SEI NSR controller. The driver data is
-also attached to this device.
+The system clock jumps might be explained by interaction with CVAL/TVAL, and
+that's the part I haven't investigated yet. As I mentioned before, and Andre
+just mentioned again, the BSP provided by the vendor has another workaround for
+writing the TVAL register. Hopefully, that's the missing piece which will fix
+the clock jumps.
 
-So in both situations checking dev_get_drvdata(icu->dev) would return a
-valid pointer.
-
-Does this answer your question?
-
-Kind regards,
-Miqu?l
+Thanks,
+Samuel
