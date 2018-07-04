@@ -1,35 +1,69 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 04 Jul 2018 12:08:15 +0200
-Subject: [PATCH v3 0/4] clk: rockchip: support clock controller for px30
- SoC
-In-Reply-To: <1529029011-15021-1-git-send-email-zhangqing@rock-chips.com>
-References: <1529029011-15021-1-git-send-email-zhangqing@rock-chips.com>
-Message-ID: <19643053.9AiPb2dtV0@phil>
+From: vivek.gautam@codeaurora.org (Vivek Gautam)
+Date: Wed, 4 Jul 2018 16:49:26 +0530
+Subject: [PATCH 2/2] device core: Add flag to autoremove device link on
+ supplier unbind
+In-Reply-To: <2991909.NMIP74eIIJ@aspire.rjw.lan>
+References: <20180627125056.12851-1-vivek.gautam@codeaurora.org>
+ <20180627125056.12851-2-vivek.gautam@codeaurora.org>
+ <5b2d17e8-2224-512c-e01c-212828ecf74b@codeaurora.org>
+ <2991909.NMIP74eIIJ@aspire.rjw.lan>
+Message-ID: <105f8027-782b-b16c-3267-cc07cde34d34@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Elaine,
 
-Am Freitag, 15. Juni 2018, 04:16:47 CEST schrieb Elaine Zhang:
-> Change in V3:
-> [PATCH v3 1/4]: Correct description
-> [PATCH v3 2/4]: Use an SPDX tag instead.
-> [PATCH v3 3/4]: Use an SPDX tag instead,
-> 		parent_rate might overflow and fix it.
-> 		fix up the checkpatch warning.
-> 		add more CMPOSITE_xxx_HALFdiv.
-> 
-> Change in V2:
-> [PATCH v2 2/4]: modify the Author name
-> [PATCH v2 3/4]: provide a bit more explanation for commit message
-> 
-> Elaine Zhang (4):
->   dt-bindings: add bindings for px30 clock controller
->   clk: rockchip: add dt-binding header for px30
->   clk: rockchip: add support for half divider
->   clk: rockchip: add clock controller for px30
 
-I've applied the set for 4.19 but dropped the panic-notifier
-dump function from the px30 clock driver.
+On 7/4/2018 4:14 PM, Rafael J. Wysocki wrote:
+> On Wednesday, July 4, 2018 9:16:20 AM CEST Vivek Gautam wrote:
+>> Adding Ulf and Marek.
+>>
+>> On 6/27/2018 6:20 PM, Vivek Gautam wrote:
+>>> Add a flag to autoremove the device links on supplier driver
+>>> unbind. This obviates the need to explicitly delete the link
+>>> in the remove path.
+>>> We remove these links only when the supplier's link to its
+>>> consumers has gone to DL_STATE_SUPPLIER_UNBIND state.
+>>>
+>>> Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
+>>> Suggested-by: Lukas Wunner <lukas@wunner.de>
+>>> Cc: Jonathan Corbet <corbet@lwn.net>
+>>> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>>> Cc: Robin Murphy <robin.murphy@arm.com>
+>>> Cc: linux-doc at vger.kernel.org
+>>> Cc: linux-arm-kernel at lists.infradead.org
+>>> Cc: linux-pm at vger.kernel.org
+>>> Cc: linux-arm-msm at vger.kernel.org
+>>> ---
+>> Hi Rafael, et al.
+>>
+>> Gentle ping.
+>> Do you have comments on this series. I would really like to conclude these
+>> device link additions sooner, and get things moving on the long awaited
+>> arm-smmu clock/runtime support series.
+>>
+>> Thanks again for reviewing these patches.
+> Hi Rafael,
 
-Heiko
+> They are fine by me.
+
+Cool.
+
+>
+> I can queue them up for 4.19 if no one has objections (Greg in
+> particular).
+
+Thanks for this.
+Robin, If this approach is fine with you too, then I can go ahead and 
+respin the
+smmu patch series - updating the device link flag.
+
+Best regards
+Vivek
+
+> Thanks,
+> Rafael
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
