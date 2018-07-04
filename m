@@ -1,204 +1,214 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Wed, 4 Jul 2018 10:39:14 +0800
-Subject: [PATCH v22 4/4] soc: mediatek: Add Mediatek CMDQ helper
-In-Reply-To: <1530665257.24157.7.camel@mhfsdcap03>
-References: <1530098172-31385-1-git-send-email-houlong.wei@mediatek.com>
- <1530098172-31385-5-git-send-email-houlong.wei@mediatek.com>
- <1530182516.8518.11.camel@mtksdaap41>
- <1530228739.21991.14.camel@mhfsdcap03>
- <1530264123.22098.12.camel@mtksdaap41>
- <1530665257.24157.7.camel@mhfsdcap03>
-Message-ID: <1530671954.8732.10.camel@mtksdaap41>
+From: appanad@xilinx.com (Appana Durga Kedareswara Rao)
+Date: Wed, 4 Jul 2018 03:51:04 +0000
+Subject: [RFC PATCH 1/2] fpga: fpga-mgr: Add readback support
+In-Reply-To: <CANk1AXRhRDmsqUxVi4p+vE-X+OL0ayQ=4zpM-4PxZBqJXjPsRw@mail.gmail.com>
+References: <1530607463-6287-1-git-send-email-appana.durga.rao@xilinx.com>
+ <CANk1AXRhRDmsqUxVi4p+vE-X+OL0ayQ=4zpM-4PxZBqJXjPsRw@mail.gmail.com>
+Message-ID: <CY1PR02MB1692CB8072255597611E27D3DC410@CY1PR02MB1692.namprd02.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Houlong:
+Hi Alan,
 
-On Wed, 2018-07-04 at 08:47 +0800, houlong wei wrote:
-> On Fri, 2018-06-29 at 17:22 +0800, CK Hu wrote:
-> > Hi, Houlong:
-> > 
-> > On Fri, 2018-06-29 at 07:32 +0800, houlong wei wrote:
-> > > On Thu, 2018-06-28 at 18:41 +0800, CK Hu wrote:
-> > > > Hi, Houlong:
-> > > > 
-> > > > Some inline comment.
-> > > > 
-> > > > On Wed, 2018-06-27 at 19:16 +0800, Houlong Wei wrote:
-> > > > > Add Mediatek CMDQ helper to create CMDQ packet and assemble GCE op code.
-> > > > > 
-> > > > > Signed-off-by: Houlong Wei <houlong.wei@mediatek.com>
-> > > > > Signed-off-by: HS Liao <hs.liao@mediatek.com>
-> > > > > ---
-> > > > >  drivers/soc/mediatek/Kconfig           |   12 ++
-> > > > >  drivers/soc/mediatek/Makefile          |    1 +
-> > > > >  drivers/soc/mediatek/mtk-cmdq-helper.c |  258 ++++++++++++++++++++++++++++++++
-> > > > >  include/linux/soc/mediatek/mtk-cmdq.h  |  132 ++++++++++++++++
-> > > > >  4 files changed, 403 insertions(+)
-> > > > >  create mode 100644 drivers/soc/mediatek/mtk-cmdq-helper.c
-> > > > >  create mode 100644 include/linux/soc/mediatek/mtk-cmdq.h
-> > > > > 
-> > > > > diff --git a/drivers/soc/mediatek/Kconfig b/drivers/soc/mediatek/Kconfig
-> > > > > index a7d0667..17bd759 100644
-> > > > > --- a/drivers/soc/mediatek/Kconfig
-> > > > > +++ b/drivers/soc/mediatek/Kconfig
-> > > > > @@ -4,6 +4,18 @@
-> > > > >  menu "MediaTek SoC drivers"
-> > > > >  	depends on ARCH_MEDIATEK || COMPILE_TEST
-> > > > >  
-> > > > 
-> > 
-> > [...]
-> > 
-> > > > > +
-> > > > > +static int cmdq_pkt_finalize(struct cmdq_pkt *pkt)
-> > > > > +{
-> > > > > +	int err;
-> > > > > +
-> > > > > +	if (cmdq_pkt_is_finalized(pkt))
-> > > > > +		return 0;
-> > > > > +
-> > > > > +	/* insert EOC and generate IRQ for each command iteration */
-> > > > > +	err = cmdq_pkt_append_command(pkt, CMDQ_CODE_EOC, 0, CMDQ_EOC_IRQ_EN);
-> > > > > +	if (err < 0)
-> > > > > +		return err;
-> > > > > +
-> > > > > +	/* JUMP to end */
-> > > > > +	err = cmdq_pkt_append_command(pkt, CMDQ_CODE_JUMP, 0, CMDQ_JUMP_PASS);
-> > > > > +	if (err < 0)
-> > > > > +		return err;
-> > > > > +
-> > > > > +	return 0;
-> > > > > +}
-> > > > > +
-> > > > > +int cmdq_pkt_flush_async(struct cmdq_client *client, struct cmdq_pkt *pkt,
-> > > > > +			 cmdq_async_flush_cb cb, void *data)
-> > > > > +{
-> > > > > +	int err;
-> > > > > +	struct device *dev;
-> > > > > +	dma_addr_t dma_addr;
-> > > > > +
-> > > > > +	err = cmdq_pkt_finalize(pkt);
-> > > > > +	if (err < 0)
-> > > > > +		return err;
-> > > > > +
-> > > > > +	dev = client->chan->mbox->dev;
-> > > > > +	dma_addr = dma_map_single(dev, pkt->va_base, pkt->cmd_buf_size,
-> > > > > +		DMA_TO_DEVICE);
-> > > > 
-> > > > You map here, but I could not find unmap, so the unmap should be done in
-> > > > client driver. I would prefer a symmetric map/unmap which means that
-> > > > both map and unmap are done in client driver. I think you put map here
-> > > > because you should map after finalize. 
-> > > 
-> > > The unmap is done before callback to client, in function
-> > > cmdq_task_exec_done, mtk-cmdq-mailbox.c.
-> > 
-> > You put unmap in mailbox controller, and map here (here would be mailbox
-> > client), so this is not symmetric. If the code is asymmetric, it's easy
-> > to cause bug and not easy to maintain. So I would like move both
-> > map/unmap to client driver.
-> > 
-> 
-> Since map/unmap is common code for client drivers, can we move unmap to
-> CMDQ helper and do not put in client driver?
-> 
-> > > 
-> > > > Therefore, export
-> > > > cmdq_pkt_finalize() to client driver and let client do finalize, so
-> > > > there is no finalize in flush function. This method have a benefit that
-> > > > if client reuse command buffer, it need not to map/unmap frequently.
-> > > 
-> > > If client reuse command buffer or cmdq_pkt(command queue packet), client
-> > > will add new commands to the cmdq_pkt, so map/unmap are necessary for
-> > > each cmdq_pkt flush.
-> > 
-> > If the buffer size is 4K bytes, client driver could map the whole 4K at
-> > initialization. Before it write new command, it call
-> > dma_sync_single_for_cpu(), after it write new command, it call
-> > dma_sync_single_for_device(). And then it could flush this buffer to
-> > mailbox controller. So client driver just call dma sync function when it
-> > reuse the command buffer. dma sync function is much lightweight then dma
-> > map because map would search the memory area which could be mapped.
-> > 
-> > Regards,
-> > CK
-> 
-> Maybe we can do dma map/unmap/sync in cmdq helper, and make client
-> driver simple.
-> 
+	Thanks for the review... 
+Please find comments inline... 
 
-Why are map/unmap common code for client drivers? I've mentioned that
-some client driver may just call dma sync function before flush, so it
-does not map for every flush. Frequently map/unmap has some drawback:
-
-1. Waste CPU resource: this also waste power.
-2. Risk of mapping fail: to reduce this risk, client driver could map at
-initialization.
-
-I think reducing these drawback is more important than making client
-driver simple.
-
-Regards,
-CK
-
-> > 
-> > > 
-> > > > 
-> > > > Regards,
-> > > > CK
-> > > > 
-> > > > > +	if (dma_mapping_error(dev, dma_addr)) {
-> > > > > +		dev_err(client->chan->mbox->dev, "dma map failed\n");
-> > > > > +		return -ENOMEM;
-> > > > > +	}
-> > > > > +
-> > > > > +	pkt->pa_base = dma_addr;
-> > > > > +	pkt->cb.cb = cb;
-> > > > > +	pkt->cb.data = data;
-> > > > > +
-> > > > > +	mbox_send_message(client->chan, pkt);
-> > > > > +	/* We can send next packet immediately, so just call txdone. */
-> > > > > +	mbox_client_txdone(client->chan, 0);
-> > > > > +
-> > > > > +	return 0;
-> > > > > +}
-> > > > > +EXPORT_SYMBOL(cmdq_pkt_flush_async);
-> > > > > +
-> > > > > +struct cmdq_flush_completion {
-> > > > > +	struct completion cmplt;
-> > > > > +	bool err;
-> > > > > +};
-> > > > > +
-> > > > > +static void cmdq_pkt_flush_cb(struct cmdq_cb_data data)
-> > > > > +{
-> > > > > +	struct cmdq_flush_completion *cmplt = data.data;
-> > > > > +
-> > > > > +	cmplt->err = data.err;
-> > > > > +	complete(&cmplt->cmplt);
-> > > > > +}
-> > > > > +
-> > > > > +int cmdq_pkt_flush(struct cmdq_client *client, struct cmdq_pkt *pkt)
-> > > > > +{
-> > > > > +	struct cmdq_flush_completion cmplt;
-> > > > > +	int err;
-> > > > > +
-> > > > > +	init_completion(&cmplt.cmplt);
-> > > > > +	err = cmdq_pkt_flush_async(client, pkt, cmdq_pkt_flush_cb, &cmplt);
-> > > > > +	if (err < 0)
-> > > > > +		return err;
-> > > > > +	wait_for_completion(&cmplt.cmplt);
-> > > > > +
-> > > > > +	return cmplt.err ? -EFAULT : 0;
-> > > > > +}
-> > > > > +EXPORT_SYMBOL(cmdq_pkt_flush);
-> > > > 
-> > > > [...]
-> > > > 
-> > > > 
-> > > 
-> > > 
-> > 
-> > 
+<Snip>
 > 
+> Hi Appana,
 > 
+> > Inorder to debug issues with fpga's users would like to read the fpga
+> > configuration information.
+> > This patch adds readback support for fpga configuration data in the
+> > framework through debugfs interface.
+> >
+> > Usage:
+> >         cat /sys/kernel/debug/fpga/readback
+> 
+> Two things here: I'd prefer calling the attribute "image" rather than
+> "readback"
+> 
+> This should be an entry per fpga manager, not one entry for the whole
+> framework, so
+> 
+> cat /sys/kernel/debug/fpga/fpga0/image
+
+Sure will fix in v2... 
+
+> 
+> >
+> > Signed-off-by: Appana Durga Kedareswara rao
+> > <appana.durga.rao@xilinx.com>
+> > ---
+> >  drivers/fpga/fpga-mgr.c       | 52
+> +++++++++++++++++++++++++++++++++++++++++++
+> >  include/linux/fpga/fpga-mgr.h |  6 +++++
+> >  2 files changed, 58 insertions(+)
+> >
+> > diff --git a/drivers/fpga/fpga-mgr.c b/drivers/fpga/fpga-mgr.c index
+> > 9939d2c..7a9fd7c 100644
+> > --- a/drivers/fpga/fpga-mgr.c
+> > +++ b/drivers/fpga/fpga-mgr.c
+> > @@ -484,6 +484,39 @@ void fpga_mgr_put(struct fpga_manager *mgr)  }
+> > EXPORT_SYMBOL_GPL(fpga_mgr_put);
+> >
+> > +#ifdef CONFIG_DEBUG_FS
+> > +#include <linux/debugfs.h>
+> > +
+> > +static int fpga_mgr_read(struct seq_file *s, void *data) {
+> > +       struct fpga_manager *mgr = (struct fpga_manager *)s->private;
+> > +       int ret = 0;
+> 
+> Here you should return an error for mgr's that don't support read function:
+> 
+> if (!mgr->mops->read)
+>     return -ENOENT;
+
+Will fix in v2...
+
+> 
+> Then you probably should lock the mgr so that nobody tries to write it while
+> you are reading.  If you can't lock it, return -EBUSY.
+
+Ok sure will fix in v2... 
+
+> 
+> > +
+> > +       if (mgr->state != FPGA_MGR_STATE_OPERATING)
+> > +               return -EBUSY;
+> 
+> If the FPGA isn't programmed, I'm not sure that EBUSY would be the correct
+> error.
+
+Ok, Should I return EPERM (or) EAGAIN here??? 
+
+> 
+> > +
+> > +       /* Read the FPGA configuration data from the fabric */
+> > +       ret = mgr->mops->read(mgr, s);
+> > +       if (ret) {
+> > +               dev_err(&mgr->dev, "Error while reading configuration data from
+> FPGA\n");
+> > +               return ret;
+> 
+> Don't need this return here since we return right afterwards anyway.
+
+Will fix in v2...
+
+> 
+> > +       }
+> > +
+> > +       return ret;
+> > +}
+> > +
+> > +static int fpga_mgr_read_open(struct inode *inode, struct file *file)
+> > +{
+> > +       return single_open(file, fpga_mgr_read, inode->i_private); }
+> > +
+> > +static const struct file_operations fpga_mgr_debugops = {
+> 
+> Suggest including the name of the debugfs file in the name since more
+> debugfs files will be added over time, so
+> 
+> s/fpga_mgr_debugops/fpga_mgr_ops_image/ or something.
+
+Sure will use fpga_mgr_ops_image 
+
+> 
+> > +       .owner = THIS_MODULE,
+> > +       .open = fpga_mgr_read_open,
+> > +       .read = seq_read,
+> > +};
+> > +#endif
+> > +
+> >  /**
+> >   * fpga_mgr_lock - Lock FPGA manager for exclusive use
+> >   * @mgr:       fpga manager
+> > @@ -581,6 +614,21 @@ int fpga_mgr_register(struct device *dev, const
+> char *name,
+> >         if (ret)
+> >                 goto error_device;
+> >
+> > +#ifdef CONFIG_DEBUG_FS
+> 
+> I'd prefer an added config such as CONFIG_FPGA_MGR_DEBUG_FS.
+
+Ok, will add an entry in the Kconfig with the name as you suggested in v2...  
+
+> 
+> > +       mgr->dir = debugfs_create_dir("fpga", NULL);
+> > +       if (!mgr->dir)
+> > +               goto error_device;
+> > +
+> > +       mgr->parent = mgr->dir;
+> > +       mgr->dir = debugfs_create_file("readback", 0644, mgr->parent, mgr,
+> > +                                      &fpga_mgr_debugops);
+> > +       if (!mgr->dir) {
+> > +               debugfs_remove_recursive(mgr->parent);
+> > +               mgr->parent = NULL;
+> > +               goto error_device;
+> > +       }
+> > +#endif
+> > +
+> >         dev_info(&mgr->dev, "%s registered\n", mgr->name);
+> >
+> >         return 0;
+> > @@ -604,6 +652,10 @@ void fpga_mgr_unregister(struct device *dev)
+> >
+> >         dev_info(&mgr->dev, "%s %s\n", __func__, mgr->name);
+> >
+> > +#ifdef CONFIG_DEBUG_FS
+> > +       debugfs_remove_recursive(mgr->parent);
+> > +       mgr->parent = NULL;
+> > +#endif
+> >         /*
+> >          * If the low level driver provides a method for putting fpga into
+> >          * a desired state upon unregister, do it.
+> > diff --git a/include/linux/fpga/fpga-mgr.h
+> > b/include/linux/fpga/fpga-mgr.h index 3c6de23..6013809 100644
+> > --- a/include/linux/fpga/fpga-mgr.h
+> > +++ b/include/linux/fpga/fpga-mgr.h
+> > @@ -114,6 +114,7 @@ struct fpga_image_info {
+> >   * @write: write count bytes of configuration data to the FPGA
+> >   * @write_sg: write the scatter list of configuration data to the FPGA
+> >   * @write_complete: set FPGA to operating state after writing is done
+> > + * @read: read FPGA configuration information
+> 
+> Please add note that the read ops is optional similar to below.
+
+Sure will add notes in v2... 
+
+> 
+> >   * @fpga_remove: optional: Set FPGA into a specific state during driver
+> remove
+> >   * @groups: optional attribute groups.
+> >   *
+> > @@ -131,6 +132,7 @@ struct fpga_manager_ops {
+> >         int (*write_sg)(struct fpga_manager *mgr, struct sg_table *sgt);
+> >         int (*write_complete)(struct fpga_manager *mgr,
+> >                               struct fpga_image_info *info);
+> > +       int (*read)(struct fpga_manager *mgr, struct seq_file *s);
+> >         void (*fpga_remove)(struct fpga_manager *mgr);
+> >         const struct attribute_group **groups;  }; @@ -151,6 +153,10
+> > @@ struct fpga_manager {
+> >         enum fpga_mgr_states state;
+> >         const struct fpga_manager_ops *mops;
+> >         void *priv;
+> > +#ifdef CONFIG_DEBUG_FS
+> > +       struct dentry *dir;
+> > +       struct dentry *parent;
+> > +#endif
+> >  };
+> >
+> >  #define to_fpga_manager(d) container_of(d, struct fpga_manager, dev)
+> > --
+> > 2.7.4
+> >
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-fpga"
+> > in the body of a message to majordomo at vger.kernel.org More
+> majordomo
+> > info at  http://vger.kernel.org/majordomo-info.html
+> 
+> Thanks,
+> Alan
