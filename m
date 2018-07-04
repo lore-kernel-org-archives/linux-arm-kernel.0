@@ -1,47 +1,32 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Wed,  4 Jul 2018 13:43:29 +0200
-Subject: [PATCH 1/5] ARM: shmobile: defconfig: Drop NET_VENDOR_<FOO>=n
-In-Reply-To: <20180704114333.27584-1-geert+renesas@glider.be>
-References: <20180704114333.27584-1-geert+renesas@glider.be>
-Message-ID: <20180704114333.27584-2-geert+renesas@glider.be>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 4 Jul 2018 12:43:55 +0100
+Subject: [RFC net-next 15/15] net: lora: Add Semtech SX1301
+In-Reply-To: <3f6289f9-d345-39a7-f0dd-9d5fa7c86e82@suse.de>
+References: <20180701110804.32415-1-afaerber@suse.de>
+ <20180701110804.32415-16-afaerber@suse.de>
+ <20180702161258.GA18744@sirena.org.uk>
+ <4e06cc72-2092-70f3-c801-bf6e4c3cbec2@suse.de>
+ <20180703145022.GA13744@sirena.org.uk>
+ <809fc546-6012-37f3-9485-cfd8eaf99488@suse.de>
+ <20180703153137.GB13744@sirena.org.uk>
+ <3f6289f9-d345-39a7-f0dd-9d5fa7c86e82@suse.de>
+Message-ID: <20180704114355.GB11693@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enabling NET_VENDOR_* Kconfig options does not directly affect the
-kernel, so there is no need to explicitly disable them.
-The individual network drivers under them are still disabled.
+On Tue, Jul 03, 2018 at 06:40:41PM +0200, Andreas F?rber wrote:
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
- arch/arm/configs/shmobile_defconfig | 13 -------------
- 1 file changed, 13 deletions(-)
+> Do you have an alternative solution for abstraction? A regmap would seem
+> to require putting everything into a monolithic SX1301 driver despite
+> those connected chipsets actually being regular, external SPI chips that
+> could also be attached to non-SX1301 SPI masters.
 
-diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
-index 4d0d5a00a18854f0..393697a54fb40e08 100644
---- a/arch/arm/configs/shmobile_defconfig
-+++ b/arch/arm/configs/shmobile_defconfig
-@@ -73,22 +73,9 @@ CONFIG_BLK_DEV_SD=y
- CONFIG_ATA=y
- CONFIG_SATA_RCAR=y
- CONFIG_NETDEVICES=y
--# CONFIG_NET_VENDOR_ARC is not set
--# CONFIG_NET_CADENCE is not set
--# CONFIG_NET_VENDOR_BROADCOM is not set
--# CONFIG_NET_VENDOR_CIRRUS is not set
--# CONFIG_NET_VENDOR_FARADAY is not set
--# CONFIG_NET_VENDOR_INTEL is not set
--# CONFIG_NET_VENDOR_MARVELL is not set
--# CONFIG_NET_VENDOR_MICREL is not set
--# CONFIG_NET_VENDOR_NATSEMI is not set
- CONFIG_SH_ETH=y
- CONFIG_RAVB=y
--# CONFIG_NET_VENDOR_SEEQ is not set
- CONFIG_SMSC911X=y
--# CONFIG_NET_VENDOR_STMICRO is not set
--# CONFIG_NET_VENDOR_VIA is not set
--# CONFIG_NET_VENDOR_WIZNET is not set
- CONFIG_MICREL_PHY=y
- CONFIG_SMSC_PHY=y
- CONFIG_INPUT_EVDEV=y
--- 
-2.17.1
+I'm suggesting a regmap for those external SPI chips.  It doesn't matter
+what the host uses.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180704/f1ba9f60/attachment-0001.sig>
