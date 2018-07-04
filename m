@@ -1,59 +1,42 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 4 Jul 2018 16:52:31 +0100
-Subject: [kvmtool test PATCH 22/24] kvmtool: arm64: Add support for guest
- physical address size
-In-Reply-To: <8c9bb3cd-f673-17f3-656f-66b7e14fc73c@arm.com>
-References: <1530270944-11351-1-git-send-email-suzuki.poulose@arm.com>
- <1530270944-11351-23-git-send-email-suzuki.poulose@arm.com>
- <20180704140943.GF4828@arm.com>
- <8c9bb3cd-f673-17f3-656f-66b7e14fc73c@arm.com>
-Message-ID: <20180704155231.GP4828@arm.com>
+Date: Wed, 4 Jul 2018 17:09:09 +0100
+Subject: [PATCHv4 05/10] arm64/cpufeature: detect pointer authentication
+In-Reply-To: <20180525100137.mte5z2sonob3vffq@lakrids.cambridge.arm.com>
+References: <20180503132031.25705-1-mark.rutland@arm.com>
+ <20180503132031.25705-6-mark.rutland@arm.com>
+ <4c057e99-61a9-7f75-664d-1f16f2631766@arm.com>
+ <20180525100137.mte5z2sonob3vffq@lakrids.cambridge.arm.com>
+Message-ID: <20180704160909.GR4828@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 04, 2018 at 04:00:11PM +0100, Julien Grall wrote:
-> On 04/07/18 15:09, Will Deacon wrote:
-> >On Fri, Jun 29, 2018 at 12:15:42PM +0100, Suzuki K Poulose wrote:
-> >>Add an option to specify the physical address size used by this
-> >>VM.
-> >>
-> >>Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> >>---
-> >>  arm/aarch64/include/kvm/kvm-config-arch.h | 5 ++++-
-> >>  arm/include/arm-common/kvm-config-arch.h  | 1 +
-> >>  2 files changed, 5 insertions(+), 1 deletion(-)
-> >>
-> >>diff --git a/arm/aarch64/include/kvm/kvm-config-arch.h b/arm/aarch64/include/kvm/kvm-config-arch.h
-> >>index 04be43d..dabd22c 100644
-> >>--- a/arm/aarch64/include/kvm/kvm-config-arch.h
-> >>+++ b/arm/aarch64/include/kvm/kvm-config-arch.h
-> >>@@ -8,7 +8,10 @@
-> >>  			"Create PMUv3 device"),				\
-> >>  	OPT_U64('\0', "kaslr-seed", &(cfg)->kaslr_seed,			\
-> >>  			"Specify random seed for Kernel Address Space "	\
-> >>-			"Layout Randomization (KASLR)"),
-> >>+			"Layout Randomization (KASLR)"),		\
-> >>+	OPT_INTEGER('\0', "phys-shift", &(cfg)->phys_shift,		\
-> >>+			"Specify maximum physical address size (not "	\
-> >>+			"the amount of memory)"),
-> >
-> >Given that this is a shift value, I think the help message could be more
-> >informative. Something like:
-> >
-> >	"Specify maximum number of bits in a guest physical address"
-> >
-> >I think I'd actually leave out any mention of memory, because this does
-> >actually have an effect on the amount of addressable memory in a way that I
-> >don't think we want to describe in half of a usage message line :)
-> Is there any particular reasons to expose this option to the user?
+On Fri, May 25, 2018 at 11:01:37AM +0100, Mark Rutland wrote:
+> On Wed, May 23, 2018 at 09:48:28AM +0100, Suzuki K Poulose wrote:
+> > On 03/05/18 14:20, Mark Rutland wrote:
+> > > diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
+> > > index bc51b72fafd4..9dcb4d1b14f5 100644
+> > > --- a/arch/arm64/include/asm/cpucaps.h
+> > > +++ b/arch/arm64/include/asm/cpucaps.h
+> > > @@ -48,7 +48,10 @@
+> > >   #define ARM64_HAS_CACHE_IDC			27
+> > >   #define ARM64_HAS_CACHE_DIC			28
+> > >   #define ARM64_HW_DBM				29
+> > > +#define ARM64_HAS_ADDRESS_AUTH_ARCH		30
+> > > +#define ARM64_HAS_ADDRESS_AUTH_IMP_DEF		31
+> > 
+> > Where are these caps used ? I couldn't find anything in the series
+> > that uses them. Otherwise looks good to me.
 > 
-> I have recently sent a series to allow the user to specify the position
-> of the RAM [1]. With that series in mind, I think the user would not really
-> need to specify the maximum physical shift. Instead we could automatically
-> find it.
+> Those were consumed by KVM support, which needed to detect if CPUs had
+> mismatched support. Currently they're just placeholders as I need a
+> cpucap value for the separate IMP-DEF / architected probing cases.
+> 
+> I *could* get rid of those and just have the ARM64_HAS_ADDRESS_AUTH case
+> log "Address authentication", but I wanted to have separate messages for
+> IMP-DEF vs architected.
 
-Marc makes a good point that it doesn't help for MMIO regions, so I'm trying
-to understand whether we can do something differently there and avoid
-sacrificing the type parameter.
+Why? Surely it only matters if we find a mixture, and then you'll shout
+loudly. I'd certainly be in favour of reducing the number of caps you're
+adding here, particularly if they're just there for a line in dmesg.
 
 Will
