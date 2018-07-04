@@ -1,32 +1,28 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 4 Jul 2018 21:39:50 +0200 (CEST)
-Subject: [PATCH v4 2/3] ioremap: Update pgtable free interfaces with addr
-In-Reply-To: <20180704173605.GB9668@arm.com>
-References: <20180627141348.21777-1-toshi.kani@hpe.com>
- <20180627141348.21777-3-toshi.kani@hpe.com> <20180627155632.GH30631@arm.com>
- <1530115885.14039.295.camel@hpe.com> <20180629122358.GC17859@arm.com>
- <1530287995.14039.361.camel@hpe.com>
- <alpine.DEB.2.21.1807032301140.1816@nanos.tec.linutronix.de>
- <20180704173605.GB9668@arm.com>
-Message-ID: <alpine.DEB.2.21.1807042137330.28271@nanos.tec.linutronix.de>
+From: ladis@linux-mips.org (Ladislav Michl)
+Date: Wed, 4 Jul 2018 21:45:56 +0200
+Subject: droid 4: connection refused from voltage_now
+In-Reply-To: <20180704171156.GA3158@amd>
+References: <20180704171156.GA3158@amd>
+Message-ID: <20180704194556.GA9189@lenoch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 4 Jul 2018, Will Deacon wrote:
-> On Tue, Jul 03, 2018 at 11:02:15PM +0200, Thomas Gleixner wrote:
+On Wed, Jul 04, 2018 at 07:11:56PM +0200, Pavel Machek wrote:
+> Hi!
 > 
-> > I just pick it up and provide Will a branch to pull that lot from.
-> 
-> Thanks, Thomas. Please let me know once you've pushed something out.
+> I started to use droid 4 as my primary phone... so I have battery
+> monitor running for hours... Once every few days it dies with
+> "connection refused" error reading battery's "voltage_now". I restart
+> it and it continues working...
 
-Just pushed it out into tip x86/mm branch. It's based on -rc3 and you can
-consume it up to
+Ha! What exactly that "connection refused" means? Is it ECONNREFUSED (111)?
+I have custom at91 based board here with few custom power supply drivers
+and it sometimes ends with voltage_now of my driver being unreadable.
+(I modified userspace code and waiting what's in errno in case reading fails)
 
-  5e0fb5df2ee8 ("x86/mm: Add TLB purge to free pmd/pte page interfaces")
+> That was with v4.17; in v4.18, I'm getting "red screen" a lot.
 
-Please wait until tomorrow morning so the 0day robot can chew on it. If
-nothing breaks, then it should be good to pull from.
+Tests are also done v4.17.
+Adding linux-pm at vger.kernel.org as it seems to be subsytem, specific.
 
-Thanks,
-
-	tglx
+	ladis
