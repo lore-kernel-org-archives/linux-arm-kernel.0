@@ -1,96 +1,101 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Wed, 4 Jul 2018 09:14:12 +0200
-Subject: [PATCH v2 02/32] mtd: rawnand: brcmnand: convert driver to
- nand_scan()
-In-Reply-To: <20180703220029.19565-3-miquel.raynal@bootlin.com>
-References: <20180703220029.19565-1-miquel.raynal@bootlin.com>
- <20180703220029.19565-3-miquel.raynal@bootlin.com>
-Message-ID: <20180704091412.1118c857@bbrezillon>
+From: vivek.gautam@codeaurora.org (Vivek Gautam)
+Date: Wed, 4 Jul 2018 12:46:20 +0530
+Subject: [PATCH 2/2] device core: Add flag to autoremove device link on
+ supplier unbind
+In-Reply-To: <20180627125056.12851-2-vivek.gautam@codeaurora.org>
+References: <20180627125056.12851-1-vivek.gautam@codeaurora.org>
+ <20180627125056.12851-2-vivek.gautam@codeaurora.org>
+Message-ID: <5b2d17e8-2224-512c-e01c-212828ecf74b@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue,  3 Jul 2018 23:59:59 +0200
-Miquel Raynal <miquel.raynal@bootlin.com> wrote:
+Adding Ulf and Marek.
 
-> Two helpers have been added to the core to make ECC-related
-> configuration between the detection phase and the final NAND scan. Use
-> these hooks and convert the driver to just use nand_scan() instead of
-> both nand_scan_ident() and nand_scan_tail().
-> 
-> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+On 6/27/2018 6:20 PM, Vivek Gautam wrote:
+> Add a flag to autoremove the device links on supplier driver
+> unbind. This obviates the need to explicitly delete the link
+> in the remove path.
+> We remove these links only when the supplier's link to its
+> consumers has gone to DL_STATE_SUPPLIER_UNBIND state.
+>
+> Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
+> Suggested-by: Lukas Wunner <lukas@wunner.de>
+> Cc: Jonathan Corbet <corbet@lwn.net>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Robin Murphy <robin.murphy@arm.com>
+> Cc: linux-doc at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-pm at vger.kernel.org
+> Cc: linux-arm-msm at vger.kernel.org
 > ---
->  drivers/mtd/nand/raw/brcmnand/brcmnand.c | 43 ++++++++++++++++++--------------
->  1 file changed, 24 insertions(+), 19 deletions(-)
-> 
-> diff --git a/drivers/mtd/nand/raw/brcmnand/brcmnand.c b/drivers/mtd/nand/raw/brcmnand/brcmnand.c
-> index 1306aaa7a8bf..99ab7b93756c 100644
-> --- a/drivers/mtd/nand/raw/brcmnand/brcmnand.c
-> +++ b/drivers/mtd/nand/raw/brcmnand/brcmnand.c
-> @@ -2208,6 +2208,28 @@ static int brcmnand_setup_dev(struct brcmnand_host *host)
->  	return 0;
->  }
->  
-> +static int brcmnand_attach_chip(struct nand_chip *chip)
-> +{
-> +	struct mtd_info *mtd = nand_to_mtd(chip);
-> +	struct brcmnand_host *host = nand_get_controller_data(chip);
-> +	int ret;
-> +
-> +	if (chip->bbt_options & NAND_BBT_USE_FLASH)
-> +		chip->bbt_options |= NAND_BBT_NO_OOB;
-> +
-> +	if (brcmnand_setup_dev(host))
-> +		return -ENXIO;
-> +
-> +	chip->ecc.size = host->hwcfg.sector_size_1k ? 1024 : 512;
-> +
-> +	/* only use our internal HW threshold */
-> +	mtd->bitflip_threshold = 1;
-> +
-> +	ret = brcmstb_choose_ecc_layout(host);
-> +
-> +	return ret;
-> +}
-> +
->  static int brcmnand_init_cs(struct brcmnand_host *host, struct device_node *dn)
->  {
->  	struct brcmnand_controller *ctrl = host->ctrl;
-> @@ -2267,10 +2289,6 @@ static int brcmnand_init_cs(struct brcmnand_host *host, struct device_node *dn)
->  	nand_writereg(ctrl, cfg_offs,
->  		      nand_readreg(ctrl, cfg_offs) & ~CFG_BUS_WIDTH);
->  
-> -	ret = nand_scan_ident(mtd, 1, NULL);
-> -	if (ret)
-> -		return ret;
-> -
->  	chip->options |= NAND_NO_SUBPAGE_WRITE;
->  	/*
->  	 * Avoid (for instance) kmap()'d buffers from JFFS2, which we can't DMA
-> @@ -2279,21 +2297,8 @@ static int brcmnand_init_cs(struct brcmnand_host *host, struct device_node *dn)
->  	 */
->  	chip->options |= NAND_USE_BOUNCE_BUFFER;
->  
-> -	if (chip->bbt_options & NAND_BBT_USE_FLASH)
-> -		chip->bbt_options |= NAND_BBT_NO_OOB;
-> -
-> -	if (brcmnand_setup_dev(host))
-> -		return -ENXIO;
-> -
-> -	chip->ecc.size = host->hwcfg.sector_size_1k ? 1024 : 512;
-> -	/* only use our internal HW threshold */
-> -	mtd->bitflip_threshold = 1;
-> -
-> -	ret = brcmstb_choose_ecc_layout(host);
-> -	if (ret)
-> -		return ret;
-> -
-> -	ret = nand_scan_tail(mtd);
-> +	chip->controller->attach_chip = brcmnand_attach_chip;
 
-Hm, this assignment should be done once, when initializing the
-controller (in brcmnand_probe()), not every time you add a NAND chip.
+Hi Rafael, et al.
 
-> +	ret = nand_scan(mtd, 1);
->  	if (ret)
->  		return ret;
->  
+Gentle ping.
+Do you have comments on this series. I would really like to conclude these
+device link additions sooner, and get things moving on the long awaited
+arm-smmu clock/runtime support series.
+
+Thanks again for reviewing these patches.
+
+Best regards
+Vivek
+>   Documentation/driver-api/device_link.rst |  4 ++++
+>   drivers/base/core.c                      | 10 ++++++++++
+>   include/linux/device.h                   |  2 ++
+>   3 files changed, 16 insertions(+)
+>
+> diff --git a/Documentation/driver-api/device_link.rst b/Documentation/driver-api/device_link.rst
+> index a005b904a264..d6763272e747 100644
+> --- a/Documentation/driver-api/device_link.rst
+> +++ b/Documentation/driver-api/device_link.rst
+> @@ -86,6 +86,10 @@ automatically purged when the consumer fails to probe or later unbinds.
+>   This obviates the need to explicitly delete the link in the ``->remove``
+>   callback or in the error path of the ``->probe`` callback.
+>   
+> +Similarly, when the device link is added from supplier's ``->probe`` callback,
+> +``DL_FLAG_AUTOREMOVE_SUPPLIER`` causes the device link to be automatically
+> +purged when the supplier fails to probe or later unbinds.
+> +
+>   Limitations
+>   ===========
+>   
+> diff --git a/drivers/base/core.c b/drivers/base/core.c
+> index 14c1e3151e08..e721218bf352 100644
+> --- a/drivers/base/core.c
+> +++ b/drivers/base/core.c
+> @@ -518,6 +518,16 @@ void device_links_driver_cleanup(struct device *dev)
+>   
+>   		WARN_ON(link->flags & DL_FLAG_AUTOREMOVE_CONSUMER);
+>   		WARN_ON(link->status != DL_STATE_SUPPLIER_UNBIND);
+> +
+> +		/*
+> +		 * autoremove the links between this @dev and its consumer
+> +		 * devices that are not active, i.e. where the link state
+> +		 * has moved to DL_STATE_SUPPLIER_UNBIND.
+> +		 */
+> +		if (link->status == DL_STATE_SUPPLIER_UNBIND &&
+> +		    link->flags & DL_FLAG_AUTOREMOVE_SUPPLIER)
+> +			kref_put(&link->kref, __device_link_del);
+> +
+>   		WRITE_ONCE(link->status, DL_STATE_DORMANT);
+>   	}
+>   
+> diff --git a/include/linux/device.h b/include/linux/device.h
+> index 3929805cdd59..e80920452b49 100644
+> --- a/include/linux/device.h
+> +++ b/include/linux/device.h
+> @@ -787,11 +787,13 @@ enum device_link_state {
+>    * AUTOREMOVE_CONSUMER: Remove the link automatically on consumer driver unbind.
+>    * PM_RUNTIME: If set, the runtime PM framework will use this link.
+>    * RPM_ACTIVE: Run pm_runtime_get_sync() on the supplier during link creation.
+> + * AUTOREMOVE_SUPPLIER: Remove the link automatically on supplier driver unbind.
+>    */
+>   #define DL_FLAG_STATELESS		BIT(0)
+>   #define DL_FLAG_AUTOREMOVE_CONSUMER	BIT(1)
+>   #define DL_FLAG_PM_RUNTIME		BIT(2)
+>   #define DL_FLAG_RPM_ACTIVE		BIT(3)
+> +#define DL_FLAG_AUTOREMOVE_SUPPLIER	BIT(4)
+>   
+>   /**
+>    * struct device_link - Device link representation.
