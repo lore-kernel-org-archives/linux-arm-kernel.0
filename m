@@ -1,61 +1,145 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 4 Jul 2018 10:23:51 +0200
-Subject: [PATCH 0/2] Allwinner A64 timer workaround
-In-Reply-To: <5283f98e-6443-db7a-fe51-6379ed19002c@arm.com>
-References: <20180511022751.9096-1-samuel@sholland.org>
- <2c16d5ab-38f7-8f3e-875c-19e8032f440a@arm.com>
- <bdfb1a31-2c4a-d258-7bf6-aaab8cee4663@sholland.org>
- <5283f98e-6443-db7a-fe51-6379ed19002c@arm.com>
-Message-ID: <24b78819-5e3f-431f-3987-f7409742ef07@linaro.org>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Wed, 4 Jul 2018 10:24:38 +0200
+Subject: [PATCH v3 10/20] kvm: arm64: Dynamic configuration of VTTBR mask
+In-Reply-To: <a6fa912a-b2ff-ac1e-0120-b2f7eabb6f7f@arm.com>
+References: <1530270944-11351-1-git-send-email-suzuki.poulose@arm.com>
+ <1530270944-11351-11-git-send-email-suzuki.poulose@arm.com>
+ <e0c8dc62-42e8-ee24-5519-e19b2739160b@redhat.com>
+ <a6fa912a-b2ff-ac1e-0120-b2f7eabb6f7f@arm.com>
+Message-ID: <3192c7dc-4127-ec97-6ba3-262fa3ff6243@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/07/2018 10:16, Marc Zyngier wrote:
-> On 03/07/18 19:42, Samuel Holland wrote:
->> On 07/03/18 10:09, Marc Zyngier wrote:
->>> On 11/05/18 03:27, Samuel Holland wrote:
->>>> Hello,
->>>>
->>>> Several people (including me) have experienced extremely large system
->>>> clock jumps on their A64-based devices, apparently due to the architectural
->>>> timer going backward, which is interpreted by Linux as the timer wrapping
->>>> around after 2^56 cycles.
->>>>
->>>> Investigation led to discovery of some obvious problems with this SoC's 
->>>> architectural timer, and this patch series introduces what I believe is
->>>> the simplest workaround. More details are in the commit message for patch
->>>> 1. Patch 2 simply enables the workaround in the device tree.
+Hi Suzuki,
+
+On 07/03/2018 01:54 PM, Suzuki K Poulose wrote:
+> Hi Eric,
+> 
+> On 02/07/18 15:41, Auger Eric wrote:
+>> Hi Suzuki,
+>>
+>> On 06/29/2018 01:15 PM, Suzuki K Poulose wrote:
+>>> On arm64 VTTBR_EL2:BADDR holds the base address for the stage2
+>>> translation table. The Arm ARM mandates that the bits BADDR[x-1:0]
+>>> should be 0, where 'x' is defined for a given IPA Size and the
+>>> number of levels for a translation granule size. It is defined
+>>> using some magical constants. This patch is a reverse engineered
+>>> implementation to calculate the 'x' at runtime for a given ipa and
+>>> number of page table levels. See patch for more details.
 >>>
->>> What's the deal with this series? There was a couple of nits to address, and 
->>> I was more or less expecting a v2.
->>
->> I got reports that people were still occasionally having clock jumps after
->> applying this series, so I wanted to attempt a more complete fix, but I haven't
->> had time to do any deeper investigation. I think this series is still beneficial
->> even if it's not a complete solution, so I'll come back with another patch on
->> top of this if/once I get it fully fixed.
->>
->> I'll prepare a v2 with a bounded loop. Presumably, 3 * (max CPU Hz) / (24MHz
->> timer) ? 150 should be a conservative iteration limit?
+>>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>>> Cc: Christoffer Dall <cdall@kernel.org>
+>>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>>> ---
+>>> Changes since V2:
+>>>   - Part 1 of spilt from VTCR & VTTBR dynamic configuration
+>>> ---
+>>>   arch/arm64/include/asm/kvm_arm.h | 60
+>>> +++++++++++++++++++++++++++++++++++++---
+>>>   arch/arm64/include/asm/kvm_mmu.h | 25 ++++++++++++++++-
+>>>   2 files changed, 80 insertions(+), 5 deletions(-)
+>>>
+>>> diff --git a/arch/arm64/include/asm/kvm_arm.h
+>>> b/arch/arm64/include/asm/kvm_arm.h
+>>> index 3dffd38..c557f45 100644
+>>> --- a/arch/arm64/include/asm/kvm_arm.h
+>>> +++ b/arch/arm64/include/asm/kvm_arm.h
+>>> @@ -140,8 +140,6 @@
+>>>    * Note that when using 4K pages, we concatenate two first level
+>>> page tables
+>>>    * together. With 16K pages, we concatenate 16 first level page
+>>> tables.
+>>>    *
+>>> - * The magic numbers used for VTTBR_X in this patch can be found in
+>>> Tables
+>>> - * D4-23 and D4-25 in ARM DDI 0487A.b.
+>> Isn't it a pretty old reference? Could you refer to C.a?
 > 
-> Should be OK.
+> Sure, I will update the references everywhere.
 > 
-> Maxime: How do you want to deal with the documentation aspect? We need
-> an erratum number, but AFAIU the concept hasn't made it into the silicom
-> vendor's brain yet. Any chance you could come up with something that
-> uniquely identifies this?
+>>> + *
+>>> + * The algorithm defines the expectations on the BaseAddress (for
+>>> the page
+>>> + * table) bits resolved at each level based on the page size, entry
+>>> level
+>>> + * and T0SZ. The variable "x" in the algorithm also affects the
+>>> VTTBR:BADDR
+>>> + * for stage2 page table.
+>>> + *
+>>> + * The value of "x" is calculated as :
+>>> + *    x = Magic_N - T0SZ
+>>> + *
+>>> + * where Magic_N is an integer depending on the page size and the entry
+>>> + * level of the page table as below:
+>>> + *
+>>> + *    --------------------------------------------
+>>> + *    | Entry level        |  4K    16K   64K |
+>>> + *    --------------------------------------------
+>>> + *    | Level: 0 (4 levels)    | 28   |  -  |  -  |
+>>> + *    --------------------------------------------
+>>> + *    | Level: 1 (3 levels)    | 37   | 31  | 25  |
+>>> + *    --------------------------------------------
+>>> + *    | Level: 2 (2 levels)    | 46   | 42  | 38  |
+>>> + *    --------------------------------------------
+>>> + *    | Level: 3 (1 level)    | -    | 53  | 51  |
+>>> + *    --------------------------------------------
+>> I understand entry level = Lookup level in the table.
 > 
->> Also, does this make sense to CC to stable?
+> Entry level => The level at which we start the page table walk for
+> a given address (This is in line with the ARM ARM). So,
 > 
-> Probably not, as the HW never worked, so it is not a regression.
+> Entry_level = (4 - Number_of_Page_table_levels)
+> 
+>> But you may want to compute x for BaseAddress matching lookup level 2
+>> with number of levels = 4.
+> 
+> No, the BaseAddress is only calcualted for the "Entry_level". So the
+> above case doesn't exist at all.
+> 
+>> So shouldn't you s/Number of levels/4 - entry_level?
+> 
+> Ok, I now understood what you are referring to [0]
+>> for BADDR we want the BaseAddr of the initial lookup level so
+>> effectively the entry level we are interested in is 4 - number of levels
+>> and we don't care or d) condition. At least this is my understanding ;-)
+>> If correct you may slightly reword the explanation?
+> 
+> 
+>>> + *
+>>> + * We have a magic formula for the Magic_N below.
+>>> + *
+>>> + *  Magic_N(PAGE_SIZE, Entry_Level) = 64 - ((PAGE_SHIFT - 3) *
+>>> Number of levels)
+> 
+> [0] ^^^
+> 
+> 
+> 
+>>> + *
+>>> + * where number of levels = (4 - Entry_Level).
+> 
+> ^^^ Doesn't this help make it clear ? Using the expansion makes it a bit
+> more
+> unreadable below.
 
-If the patches fix a bug which already exist, it makes sense to
-propagated the fix back to the stable versions.
+I just wanted to mention the tables you refer (D4-23 and D4-25) give
+Magic_N for a larger scope as they deal with any lookup level while we
+only care about the entry level for BADDR. So I was a little bit
+confused when reading the explanation but that's not a big deal.
 
+> 
+>>>   +/*
+>>> + * Get the magic number 'x' for VTTBR:BADDR of this KVM instance.
+>>> + * With v8.2 LVA extensions, 'x' should be a minimum of 6 with
+>>> + * 52bit IPS.
+>> Link to the spec?
+> 
+> Sure, will add it.
+> 
+> Thanks for the patience to review :-)
+you're welcome ;-)
 
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Eric
+> 
+> Cheers
+> Suzuki
