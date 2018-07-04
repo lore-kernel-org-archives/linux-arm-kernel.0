@@ -1,60 +1,31 @@
-From: mars.cheng@mediatek.com (Mars Cheng)
-Date: Wed, 4 Jul 2018 15:47:53 +0800
-Subject: [PATCH v3 4/4] arm64: dts: mediatek: add mt6765 support
-In-Reply-To: <f482708c-ea5e-5d81-a176-d69be9ccdf63@arm.com>
-References: <1530669174-17623-1-git-send-email-mars.cheng@mediatek.com>
- <1530669174-17623-5-git-send-email-mars.cheng@mediatek.com>
- <f482708c-ea5e-5d81-a176-d69be9ccdf63@arm.com>
-Message-ID: <1530690473.16183.3.camel@mtkswgap22>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 4 Jul 2018 08:33:49 +0100
+Subject: [PATCH 3/5] mfd: axp20x: Support AXP806 in I2C mode
+In-Reply-To: <20180620051540.25617-4-wens@csie.org>
+References: <20180620051540.25617-1-wens@csie.org>
+ <20180620051540.25617-4-wens@csie.org>
+Message-ID: <20180704073349.GI20176@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc
+On Wed, 20 Jun 2018, Chen-Yu Tsai wrote:
 
-On Wed, 2018-07-04 at 08:35 +0100, Marc Zyngier wrote:
-> On 04/07/18 02:52, Mars Cheng wrote:
-> > This adds basic chip support for MT6765 SoC.
-> > 
-> > Signed-off-by: Mars Cheng <mars.cheng@mediatek.com>
-> > ---
-> >  arch/arm64/boot/dts/mediatek/Makefile       |    1 +
-> >  arch/arm64/boot/dts/mediatek/mt6765-evb.dts |   33 ++++++
-> >  arch/arm64/boot/dts/mediatek/mt6765.dtsi    |  155 +++++++++++++++++++++++++++
-> >  3 files changed, 189 insertions(+)
-> >  create mode 100644 arch/arm64/boot/dts/mediatek/mt6765-evb.dts
-> >  create mode 100644 arch/arm64/boot/dts/mediatek/mt6765.dtsi
-> > 
+> The Pine64 H64 board uses an AXP806 PMIC in I2C and self-working mode.
+> The H64 SoC does not have the usual RSB controller.
 > 
-> [...]
+> This patch adds AXP806 to the list of devices supported in I2C mode.
+> In theory, all RSB-based PMICs can also be used in I2C mode.
 > 
-> > +
-> > +		gic: interrupt-controller at c000000 {
-> > +			compatible = "arm,gic-v3";
-> > +			#interrupt-cells = <3>;
-> > +			#address-cells = <2>;
-> > +			#size-cells = <2>;
-> > +			#redistributor-regions = <1>;
-> > +			interrupt-parent = <&gic>;
-> > +			interrupt-controller;
-> > +			reg = <0 0x0c000000 0 0x40000>, // distributor
-> > +			      <0 0x0c100000 0 0x200000>, // redistributor
-> > +			      <0 0x0c400000 0 0x40000>; // gicc
-> 
-> For the second time: please add *all* the GIC CPU interface regions,
-> described in the Cortex-A53 TRM[1] (GICC, GICH, and GICV).
-> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>  drivers/mfd/axp20x-i2c.c | 2 ++
+>  1 file changed, 2 insertions(+)
 
-MT6765 has no GICH/GICV/ITS in mediatek design. Have confirmed with our
-designer.  
+For my own reference:
+  Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
 
-MT6797 had similar question from you. Sorry for not mentioned it first.
-
-http://lists.infradead.org/pipermail/linux-mediatek/2017-February/008074.html
-
-Thanks.
-> Thanks,
-> 
-> 	M.
-> 
-> [1]
-> https://urldefense.proofpoint.com/v2/url?u=http-3A__infocenter.arm.com_help_topic_com.arm.doc.ddi0500g_ch09s02s01.html&d=DwICaQ&c=X9NHckmGz7LNQmqtvpDCYVnn6eFXNivfZeknqiAo-n0&r=Ph_SbcClVGRWmGxVhfr-5CZF9ffiUOE7TZ47ns4ROh4&m=9L01qJc7apuzwLobX_nhN0ik8IFdu_X7hJ139x5dNNw&s=0zeZXtWPeITLj01RSxAQ6NfNkTUu9Il0Dddgk07-6QA&e= 
+-- 
+Lee Jones [???]
+Linaro Services Technical Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
