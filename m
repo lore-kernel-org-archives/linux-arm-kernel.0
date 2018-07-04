@@ -1,234 +1,204 @@
-From: mars.cheng@mediatek.com (Mars Cheng)
-Date: Wed, 4 Jul 2018 09:52:54 +0800
-Subject: [PATCH v3 4/4] arm64: dts: mediatek: add mt6765 support
-In-Reply-To: <1530669174-17623-1-git-send-email-mars.cheng@mediatek.com>
-References: <1530669174-17623-1-git-send-email-mars.cheng@mediatek.com>
-Message-ID: <1530669174-17623-5-git-send-email-mars.cheng@mediatek.com>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Wed, 4 Jul 2018 10:39:14 +0800
+Subject: [PATCH v22 4/4] soc: mediatek: Add Mediatek CMDQ helper
+In-Reply-To: <1530665257.24157.7.camel@mhfsdcap03>
+References: <1530098172-31385-1-git-send-email-houlong.wei@mediatek.com>
+ <1530098172-31385-5-git-send-email-houlong.wei@mediatek.com>
+ <1530182516.8518.11.camel@mtksdaap41>
+ <1530228739.21991.14.camel@mhfsdcap03>
+ <1530264123.22098.12.camel@mtksdaap41>
+ <1530665257.24157.7.camel@mhfsdcap03>
+Message-ID: <1530671954.8732.10.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds basic chip support for MT6765 SoC.
+Hi, Houlong:
 
-Signed-off-by: Mars Cheng <mars.cheng@mediatek.com>
----
- arch/arm64/boot/dts/mediatek/Makefile       |    1 +
- arch/arm64/boot/dts/mediatek/mt6765-evb.dts |   33 ++++++
- arch/arm64/boot/dts/mediatek/mt6765.dtsi    |  155 +++++++++++++++++++++++++++
- 3 files changed, 189 insertions(+)
- create mode 100644 arch/arm64/boot/dts/mediatek/mt6765-evb.dts
- create mode 100644 arch/arm64/boot/dts/mediatek/mt6765.dtsi
+On Wed, 2018-07-04 at 08:47 +0800, houlong wei wrote:
+> On Fri, 2018-06-29 at 17:22 +0800, CK Hu wrote:
+> > Hi, Houlong:
+> > 
+> > On Fri, 2018-06-29 at 07:32 +0800, houlong wei wrote:
+> > > On Thu, 2018-06-28 at 18:41 +0800, CK Hu wrote:
+> > > > Hi, Houlong:
+> > > > 
+> > > > Some inline comment.
+> > > > 
+> > > > On Wed, 2018-06-27 at 19:16 +0800, Houlong Wei wrote:
+> > > > > Add Mediatek CMDQ helper to create CMDQ packet and assemble GCE op code.
+> > > > > 
+> > > > > Signed-off-by: Houlong Wei <houlong.wei@mediatek.com>
+> > > > > Signed-off-by: HS Liao <hs.liao@mediatek.com>
+> > > > > ---
+> > > > >  drivers/soc/mediatek/Kconfig           |   12 ++
+> > > > >  drivers/soc/mediatek/Makefile          |    1 +
+> > > > >  drivers/soc/mediatek/mtk-cmdq-helper.c |  258 ++++++++++++++++++++++++++++++++
+> > > > >  include/linux/soc/mediatek/mtk-cmdq.h  |  132 ++++++++++++++++
+> > > > >  4 files changed, 403 insertions(+)
+> > > > >  create mode 100644 drivers/soc/mediatek/mtk-cmdq-helper.c
+> > > > >  create mode 100644 include/linux/soc/mediatek/mtk-cmdq.h
+> > > > > 
+> > > > > diff --git a/drivers/soc/mediatek/Kconfig b/drivers/soc/mediatek/Kconfig
+> > > > > index a7d0667..17bd759 100644
+> > > > > --- a/drivers/soc/mediatek/Kconfig
+> > > > > +++ b/drivers/soc/mediatek/Kconfig
+> > > > > @@ -4,6 +4,18 @@
+> > > > >  menu "MediaTek SoC drivers"
+> > > > >  	depends on ARCH_MEDIATEK || COMPILE_TEST
+> > > > >  
+> > > > 
+> > 
+> > [...]
+> > 
+> > > > > +
+> > > > > +static int cmdq_pkt_finalize(struct cmdq_pkt *pkt)
+> > > > > +{
+> > > > > +	int err;
+> > > > > +
+> > > > > +	if (cmdq_pkt_is_finalized(pkt))
+> > > > > +		return 0;
+> > > > > +
+> > > > > +	/* insert EOC and generate IRQ for each command iteration */
+> > > > > +	err = cmdq_pkt_append_command(pkt, CMDQ_CODE_EOC, 0, CMDQ_EOC_IRQ_EN);
+> > > > > +	if (err < 0)
+> > > > > +		return err;
+> > > > > +
+> > > > > +	/* JUMP to end */
+> > > > > +	err = cmdq_pkt_append_command(pkt, CMDQ_CODE_JUMP, 0, CMDQ_JUMP_PASS);
+> > > > > +	if (err < 0)
+> > > > > +		return err;
+> > > > > +
+> > > > > +	return 0;
+> > > > > +}
+> > > > > +
+> > > > > +int cmdq_pkt_flush_async(struct cmdq_client *client, struct cmdq_pkt *pkt,
+> > > > > +			 cmdq_async_flush_cb cb, void *data)
+> > > > > +{
+> > > > > +	int err;
+> > > > > +	struct device *dev;
+> > > > > +	dma_addr_t dma_addr;
+> > > > > +
+> > > > > +	err = cmdq_pkt_finalize(pkt);
+> > > > > +	if (err < 0)
+> > > > > +		return err;
+> > > > > +
+> > > > > +	dev = client->chan->mbox->dev;
+> > > > > +	dma_addr = dma_map_single(dev, pkt->va_base, pkt->cmd_buf_size,
+> > > > > +		DMA_TO_DEVICE);
+> > > > 
+> > > > You map here, but I could not find unmap, so the unmap should be done in
+> > > > client driver. I would prefer a symmetric map/unmap which means that
+> > > > both map and unmap are done in client driver. I think you put map here
+> > > > because you should map after finalize. 
+> > > 
+> > > The unmap is done before callback to client, in function
+> > > cmdq_task_exec_done, mtk-cmdq-mailbox.c.
+> > 
+> > You put unmap in mailbox controller, and map here (here would be mailbox
+> > client), so this is not symmetric. If the code is asymmetric, it's easy
+> > to cause bug and not easy to maintain. So I would like move both
+> > map/unmap to client driver.
+> > 
+> 
+> Since map/unmap is common code for client drivers, can we move unmap to
+> CMDQ helper and do not put in client driver?
+> 
+> > > 
+> > > > Therefore, export
+> > > > cmdq_pkt_finalize() to client driver and let client do finalize, so
+> > > > there is no finalize in flush function. This method have a benefit that
+> > > > if client reuse command buffer, it need not to map/unmap frequently.
+> > > 
+> > > If client reuse command buffer or cmdq_pkt(command queue packet), client
+> > > will add new commands to the cmdq_pkt, so map/unmap are necessary for
+> > > each cmdq_pkt flush.
+> > 
+> > If the buffer size is 4K bytes, client driver could map the whole 4K at
+> > initialization. Before it write new command, it call
+> > dma_sync_single_for_cpu(), after it write new command, it call
+> > dma_sync_single_for_device(). And then it could flush this buffer to
+> > mailbox controller. So client driver just call dma sync function when it
+> > reuse the command buffer. dma sync function is much lightweight then dma
+> > map because map would search the memory area which could be mapped.
+> > 
+> > Regards,
+> > CK
+> 
+> Maybe we can do dma map/unmap/sync in cmdq helper, and make client
+> driver simple.
+> 
 
-diff --git a/arch/arm64/boot/dts/mediatek/Makefile b/arch/arm64/boot/dts/mediatek/Makefile
-index ac17f60..7506b0d 100644
---- a/arch/arm64/boot/dts/mediatek/Makefile
-+++ b/arch/arm64/boot/dts/mediatek/Makefile
-@@ -1,6 +1,7 @@
- # SPDX-License-Identifier: GPL-2.0
- dtb-$(CONFIG_ARCH_MEDIATEK) += mt2712-evb.dtb
- dtb-$(CONFIG_ARCH_MEDIATEK) += mt6755-evb.dtb
-+dtb-$(CONFIG_ARCH_MEDIATEK) += mt6765-evb.dtb
- dtb-$(CONFIG_ARCH_MEDIATEK) += mt6795-evb.dtb
- dtb-$(CONFIG_ARCH_MEDIATEK) += mt6797-evb.dtb
- dtb-$(CONFIG_ARCH_MEDIATEK) += mt7622-rfb1.dtb
-diff --git a/arch/arm64/boot/dts/mediatek/mt6765-evb.dts b/arch/arm64/boot/dts/mediatek/mt6765-evb.dts
-new file mode 100644
-index 0000000..36dddff2
---- /dev/null
-+++ b/arch/arm64/boot/dts/mediatek/mt6765-evb.dts
-@@ -0,0 +1,33 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * dts file for Mediatek MT6765
-+ *
-+ * (C) Copyright 2018. Mediatek, Inc.
-+ *
-+ * Mars Cheng <mars.cheng@mediatek.com>
-+ */
-+
-+/dts-v1/;
-+#include "mt6765.dtsi"
-+
-+/ {
-+	model = "MediaTek MT6765 EVB";
-+	compatible = "mediatek,mt6765-evb", "mediatek,mt6765";
-+
-+	aliases {
-+		serial0 = &uart0;
-+	};
-+
-+	memory at 40000000 {
-+		device_type = "memory";
-+		reg = <0 0x40000000 0 0x1e800000>;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:921600n8";
-+	};
-+};
-+
-+&uart0 {
-+	status = "okay";
-+};
-diff --git a/arch/arm64/boot/dts/mediatek/mt6765.dtsi b/arch/arm64/boot/dts/mediatek/mt6765.dtsi
-new file mode 100644
-index 0000000..051545b
---- /dev/null
-+++ b/arch/arm64/boot/dts/mediatek/mt6765.dtsi
-@@ -0,0 +1,155 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * dts file for Mediatek MT6765
-+ *
-+ * (C) Copyright 2018. Mediatek, Inc.
-+ *
-+ * Mars Cheng <mars.cheng@mediatek.com>
-+ */
-+
-+#include <dt-bindings/interrupt-controller/irq.h>
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+
-+/ {
-+	compatible = "mediatek,mt6765";
-+	interrupt-parent = <&sysirq>;
-+	#address-cells = <2>;
-+	#size-cells = <2>;
-+
-+	psci {
-+		compatible = "arm,psci-0.2";
-+		method = "smc";
-+	};
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53";
-+			enable-method = "psci";
-+			reg = <0x000>;
-+		};
-+
-+		cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53";
-+			enable-method = "psci";
-+			reg = <0x001>;
-+		};
-+
-+		cpu at 2 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53";
-+			enable-method = "psci";
-+			reg = <0x002>;
-+		};
-+
-+		cpu at 3 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53";
-+			enable-method = "psci";
-+			reg = <0x003>;
-+		};
-+
-+		cpu at 100 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53";
-+			enable-method = "psci";
-+			reg = <0x100>;
-+		};
-+
-+		cpu at 101 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53";
-+			enable-method = "psci";
-+			reg = <0x101>;
-+		};
-+
-+		cpu at 102 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53";
-+			enable-method = "psci";
-+			reg = <0x102>;
-+		};
-+
-+		cpu at 103 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53";
-+			enable-method = "psci";
-+			reg = <0x103>;
-+		};
-+	};
-+
-+	baud_clk: dummy26m {
-+		compatible = "fixed-clock";
-+		clock-frequency = <26000000>;
-+		#clock-cells = <0>;
-+	};
-+
-+	sys_clk: dummyclk {
-+		compatible = "fixed-clock";
-+		clock-frequency = <26000000>;
-+		#clock-cells = <0>;
-+	};
-+
-+	timer {
-+		compatible = "arm,armv8-timer";
-+		interrupt-parent = <&gic>;
-+		interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_LOW>,
-+			     <GIC_PPI 14 IRQ_TYPE_LEVEL_LOW>,
-+			     <GIC_PPI 11 IRQ_TYPE_LEVEL_LOW>,
-+			     <GIC_PPI 10 IRQ_TYPE_LEVEL_LOW>;
-+	};
-+
-+	soc {
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		compatible = "simple-bus";
-+		ranges;
-+
-+		sysirq: interrupt-controller at 10200a80 {
-+			compatible = "mediatek,mt6765-sysirq",
-+				     "mediatek,mt6577-sysirq";
-+			interrupt-controller;
-+			#interrupt-cells = <3>;
-+			interrupt-parent = <&gic>;
-+			reg = <0 0x10200a80 0 0x50>;
-+		};
-+
-+		gic: interrupt-controller at c000000 {
-+			compatible = "arm,gic-v3";
-+			#interrupt-cells = <3>;
-+			#address-cells = <2>;
-+			#size-cells = <2>;
-+			#redistributor-regions = <1>;
-+			interrupt-parent = <&gic>;
-+			interrupt-controller;
-+			reg = <0 0x0c000000 0 0x40000>, // distributor
-+			      <0 0x0c100000 0 0x200000>, // redistributor
-+			      <0 0x0c400000 0 0x40000>; // gicc
-+			interrupts = <GIC_PPI 9 IRQ_TYPE_LEVEL_HIGH>;
-+		};
-+
-+		uart0: serial at 11002000 {
-+			compatible = "mediatek,mt6765-uart",
-+				     "mediatek,mt6577-uart";
-+			reg = <0 0x11002000 0 0x400>;
-+			interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_LOW>;
-+			clocks = <&baud_clk>, <&sys_clk>;
-+			clock-names = "baud", "bus";
-+			status = "disabled";
-+		};
-+
-+		uart1: serial at 11003000 {
-+			compatible = "mediatek,mt6765-uart",
-+				     "mediatek,mt6577-uart";
-+			reg = <0 0x11003000 0 0x400>;
-+			interrupts = <GIC_SPI 92 IRQ_TYPE_LEVEL_LOW>;
-+			clocks = <&baud_clk>, <&sys_clk>;
-+			clock-names = "baud", "bus";
-+			status = "disabled";
-+		};
-+	}; /* end of soc */
-+};
--- 
-1.7.9.5
+Why are map/unmap common code for client drivers? I've mentioned that
+some client driver may just call dma sync function before flush, so it
+does not map for every flush. Frequently map/unmap has some drawback:
+
+1. Waste CPU resource: this also waste power.
+2. Risk of mapping fail: to reduce this risk, client driver could map at
+initialization.
+
+I think reducing these drawback is more important than making client
+driver simple.
+
+Regards,
+CK
+
+> > 
+> > > 
+> > > > 
+> > > > Regards,
+> > > > CK
+> > > > 
+> > > > > +	if (dma_mapping_error(dev, dma_addr)) {
+> > > > > +		dev_err(client->chan->mbox->dev, "dma map failed\n");
+> > > > > +		return -ENOMEM;
+> > > > > +	}
+> > > > > +
+> > > > > +	pkt->pa_base = dma_addr;
+> > > > > +	pkt->cb.cb = cb;
+> > > > > +	pkt->cb.data = data;
+> > > > > +
+> > > > > +	mbox_send_message(client->chan, pkt);
+> > > > > +	/* We can send next packet immediately, so just call txdone. */
+> > > > > +	mbox_client_txdone(client->chan, 0);
+> > > > > +
+> > > > > +	return 0;
+> > > > > +}
+> > > > > +EXPORT_SYMBOL(cmdq_pkt_flush_async);
+> > > > > +
+> > > > > +struct cmdq_flush_completion {
+> > > > > +	struct completion cmplt;
+> > > > > +	bool err;
+> > > > > +};
+> > > > > +
+> > > > > +static void cmdq_pkt_flush_cb(struct cmdq_cb_data data)
+> > > > > +{
+> > > > > +	struct cmdq_flush_completion *cmplt = data.data;
+> > > > > +
+> > > > > +	cmplt->err = data.err;
+> > > > > +	complete(&cmplt->cmplt);
+> > > > > +}
+> > > > > +
+> > > > > +int cmdq_pkt_flush(struct cmdq_client *client, struct cmdq_pkt *pkt)
+> > > > > +{
+> > > > > +	struct cmdq_flush_completion cmplt;
+> > > > > +	int err;
+> > > > > +
+> > > > > +	init_completion(&cmplt.cmplt);
+> > > > > +	err = cmdq_pkt_flush_async(client, pkt, cmdq_pkt_flush_cb, &cmplt);
+> > > > > +	if (err < 0)
+> > > > > +		return err;
+> > > > > +	wait_for_completion(&cmplt.cmplt);
+> > > > > +
+> > > > > +	return cmplt.err ? -EFAULT : 0;
+> > > > > +}
+> > > > > +EXPORT_SYMBOL(cmdq_pkt_flush);
+> > > > 
+> > > > [...]
+> > > > 
+> > > > 
+> > > 
+> > > 
+> > 
+> > 
+> 
+> 
