@@ -1,74 +1,180 @@
-From: tudor.ambarus@microchip.com (Tudor Ambarus)
-Date: Wed, 4 Jul 2018 11:42:25 +0300
-Subject: [PATCH v2] mtd: atmel-quadspi: add suspend/resume hooks
-In-Reply-To: <1528101993-4772-1-git-send-email-claudiu.beznea@microchip.com>
-References: <1528101993-4772-1-git-send-email-claudiu.beznea@microchip.com>
-Message-ID: <d2264ba9-78db-a3e8-fe4d-5c04f241468c@microchip.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 4 Jul 2018 10:50:02 +0200
+Subject: [PATCH v2 0/8] add support for relative references in jump tables
+In-Reply-To: <20180704075923.GF3701@osiris>
+References: <20180702181145.4799-1-ard.biesheuvel@linaro.org>
+ <20180704075923.GF3701@osiris>
+Message-ID: <CAKv+Gu-O3mMJHH2P7L9anXeKZtEQYcN8Am4-3xkzAQSFWUN+=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Claudiu,
+On 4 July 2018 at 09:59, Heiko Carstens <heiko.carstens@de.ibm.com> wrote:
+> On Mon, Jul 02, 2018 at 08:11:37PM +0200, Ard Biesheuvel wrote:
+>> This series implements support for emitting the data structures associated
+>> with jump tables as 32-bit relative references instead of absolute
+>> references, which take up more space on builds that target 64-bit
+>> architectures, or implement self relocation [or both].
+>>
+>> This series enables it for arm64 and x86, although other architectures
+>> might benefit as well.
+>
+> Hello Ard,
+>
+> feel free to add the patch below which adds support for s390 to your series.
+>
 
-On 06/04/2018 11:46 AM, Claudiu Beznea wrote:
-> Implement suspend/resume hooks.
-> 
-> Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
+Thanks, I will incorporate it into v3 and beyond.
+
+>> Changes since v1:
+>> - change the relative reference to the static key to a 64-bit wide one on 64
+>>   bit architectures; this is necessary on arm64, which allows modules to
+>>   reside anywhere within a 4 GB window covering the core kernel text, which
+>>   means a 32-bit signed quantity with its +/- 2 GB range is insufficient.
+>>   Note that x86_64 changes are in preparation that widen the relocation
+>>   range as well (using the PIE linker), so I assumed that the same change
+>>   is appropriate for x86 as well.
+>
+> FWIW, kernel modules on s390 are since ages more than 2GB away from the
+> core kernel text. So this is required for s390 as well.
+>
+
+OK, good to know.
+
+-- 
+Ard.
+
+
+> From 77d87236f3d5474f33c25534d8ba2c7c54c88c55 Mon Sep 17 00:00:00 2001
+> From: Heiko Carstens <heiko.carstens@de.ibm.com>
+> Date: Wed, 4 Jul 2018 09:13:37 +0200
+> Subject: [PATCH] s390/jump_label: switch to relative references
+>
+> Signed-off-by: Heiko Carstens <heiko.carstens@de.ibm.com>
 > ---
-> 
-> Changes in v2:
-> - use __maybe_unused instead of #ifdef CONFIG_PM_SLEEP
-> 
->  drivers/mtd/spi-nor/atmel-quadspi.c | 21 +++++++++++++++++++++
->  1 file changed, 21 insertions(+)
-> 
-> diff --git a/drivers/mtd/spi-nor/atmel-quadspi.c b/drivers/mtd/spi-nor/atmel-quadspi.c
-> index 6c5708bacad8..ceaaef47f02e 100644
-> --- a/drivers/mtd/spi-nor/atmel-quadspi.c
-> +++ b/drivers/mtd/spi-nor/atmel-quadspi.c
-> @@ -737,6 +737,26 @@ static int atmel_qspi_remove(struct platform_device *pdev)
->  	return 0;
+>  arch/s390/Kconfig                  |  1 +
+>  arch/s390/include/asm/jump_label.h | 40 +++++++++++++++-----------------------
+>  arch/s390/kernel/jump_label.c      | 11 ++++++-----
+>  3 files changed, 23 insertions(+), 29 deletions(-)
+>
+> diff --git a/arch/s390/Kconfig b/arch/s390/Kconfig
+> index baed39772c84..0349fb06a2ec 100644
+> --- a/arch/s390/Kconfig
+> +++ b/arch/s390/Kconfig
+> @@ -121,6 +121,7 @@ config S390
+>         select HAVE_ALIGNED_STRUCT_PAGE if SLUB
+>         select HAVE_ARCH_AUDITSYSCALL
+>         select HAVE_ARCH_JUMP_LABEL
+> +       select HAVE_ARCH_JUMP_LABEL_RELATIVE
+>         select CPU_NO_EFFICIENT_FFS if !HAVE_MARCH_Z9_109_FEATURES
+>         select HAVE_ARCH_SECCOMP_FILTER
+>         select HAVE_ARCH_SOFT_DIRTY
+> diff --git a/arch/s390/include/asm/jump_label.h b/arch/s390/include/asm/jump_label.h
+> index 40f651292aa7..e2d3e6c43395 100644
+> --- a/arch/s390/include/asm/jump_label.h
+> +++ b/arch/s390/include/asm/jump_label.h
+> @@ -14,41 +14,33 @@
+>   * We use a brcl 0,2 instruction for jump labels at compile time so it
+>   * can be easily distinguished from a hotpatch generated instruction.
+>   */
+> -static __always_inline bool arch_static_branch(struct static_key *key, bool branch)
+> +static inline bool arch_static_branch(struct static_key *key, bool branch)
+>  {
+> -       asm_volatile_goto("0:   brcl 0,"__stringify(JUMP_LABEL_NOP_OFFSET)"\n"
+> -               ".pushsection __jump_table, \"aw\"\n"
+> -               ".balign 8\n"
+> -               ".quad 0b, %l[label], %0\n"
+> -               ".popsection\n"
+> -               : : "X" (&((char *)key)[branch]) : : label);
+> -
+> +       asm_volatile_goto("0:   brcl    0,"__stringify(JUMP_LABEL_NOP_OFFSET)"\n"
+> +                         ".pushsection __jump_table,\"aw\"\n"
+> +                         ".balign      8\n"
+> +                         ".long        0b-.,%l[label]-.\n"
+> +                         ".quad        %0-.\n"
+> +                         ".popsection\n"
+> +                         : : "X" (&((char *)key)[branch]) : : label);
+>         return false;
+>  label:
+>         return true;
 >  }
->  
-> +static int __maybe_unused atmel_qspi_suspend(struct device *dev)
-> +{
-> +	struct atmel_qspi *aq = dev_get_drvdata(dev);
-> +
-> +	clk_disable_unprepare(aq->clk);
-> +
-> +	return 0;
-> +}
-> +
-> +static int __maybe_unused atmel_qspi_resume(struct device *dev)
-> +{
-> +	struct atmel_qspi *aq = dev_get_drvdata(dev);
-> +
-> +	clk_prepare_enable(aq->clk);
-
-You missed to verify the return value of clk_prepare_enable. Otherwise looks
-good. I've also looked over the test with suspending while copying on a ubifs
-mounted on QSPI NOR, looks good too.
-
-After checking the return value, please add:
-Reviewed-by: Tudor Ambarus <tudor.ambarus@microchip.com>
-
-Best,
-ta
-
-> +
-> +	return atmel_qspi_init(aq);
-> +}
-> +
-> +static SIMPLE_DEV_PM_OPS(atmel_qspi_pm_ops, atmel_qspi_suspend,
-> +			 atmel_qspi_resume);
->  
->  static const struct of_device_id atmel_qspi_dt_ids[] = {
->  	{ .compatible = "atmel,sama5d2-qspi" },
-> @@ -749,6 +769,7 @@ static struct platform_driver atmel_qspi_driver = {
->  	.driver = {
->  		.name	= "atmel_qspi",
->  		.of_match_table	= atmel_qspi_dt_ids,
-> +		.pm	= &atmel_qspi_pm_ops,
->  	},
->  	.probe		= atmel_qspi_probe,
->  	.remove		= atmel_qspi_remove,
-> 
+>
+> -static __always_inline bool arch_static_branch_jump(struct static_key *key, bool branch)
+> +static inline bool arch_static_branch_jump(struct static_key *key, bool branch)
+>  {
+> -       asm_volatile_goto("0:   brcl 15, %l[label]\n"
+> -               ".pushsection __jump_table, \"aw\"\n"
+> -               ".balign 8\n"
+> -               ".quad 0b, %l[label], %0\n"
+> -               ".popsection\n"
+> -               : : "X" (&((char *)key)[branch]) : : label);
+> -
+> +       asm_volatile_goto("0:   brcl 15,%l[label]\n"
+> +                         ".pushsection __jump_table,\"aw\"\n"
+> +                         ".balign      8\n"
+> +                         ".long        0b-.,%l[label]-.\n"
+> +                         ".quad        %0-.\n"
+> +                         ".popsection\n"
+> +                         : : "X" (&((char *)key)[branch]) : : label);
+>         return false;
+>  label:
+>         return true;
+>  }
+>
+> -typedef unsigned long jump_label_t;
+> -
+> -struct jump_entry {
+> -       jump_label_t code;
+> -       jump_label_t target;
+> -       jump_label_t key;
+> -};
+> -
+>  #endif  /* __ASSEMBLY__ */
+>  #endif
+> diff --git a/arch/s390/kernel/jump_label.c b/arch/s390/kernel/jump_label.c
+> index 43f8430fb67d..50a1798604a8 100644
+> --- a/arch/s390/kernel/jump_label.c
+> +++ b/arch/s390/kernel/jump_label.c
+> @@ -33,13 +33,13 @@ static void jump_label_make_branch(struct jump_entry *entry, struct insn *insn)
+>  {
+>         /* brcl 15,offset */
+>         insn->opcode = 0xc0f4;
+> -       insn->offset = (entry->target - entry->code) >> 1;
+> +       insn->offset = (jump_entry_target(entry) - jump_entry_code(entry)) >> 1;
+>  }
+>
+>  static void jump_label_bug(struct jump_entry *entry, struct insn *expected,
+>                            struct insn *new)
+>  {
+> -       unsigned char *ipc = (unsigned char *)entry->code;
+> +       unsigned char *ipc = (unsigned char *)jump_entry_code(entry);
+>         unsigned char *ipe = (unsigned char *)expected;
+>         unsigned char *ipn = (unsigned char *)new;
+>
+> @@ -59,6 +59,7 @@ static void __jump_label_transform(struct jump_entry *entry,
+>                                    enum jump_label_type type,
+>                                    int init)
+>  {
+> +       void *code = (void *)jump_entry_code(entry);
+>         struct insn old, new;
+>
+>         if (type == JUMP_LABEL_JMP) {
+> @@ -69,13 +70,13 @@ static void __jump_label_transform(struct jump_entry *entry,
+>                 jump_label_make_nop(entry, &new);
+>         }
+>         if (init) {
+> -               if (memcmp((void *)entry->code, &orignop, sizeof(orignop)))
+> +               if (memcmp(code, &orignop, sizeof(orignop)))
+>                         jump_label_bug(entry, &orignop, &new);
+>         } else {
+> -               if (memcmp((void *)entry->code, &old, sizeof(old)))
+> +               if (memcmp(code, &old, sizeof(old)))
+>                         jump_label_bug(entry, &old, &new);
+>         }
+> -       s390_kernel_write((void *)entry->code, &new, sizeof(new));
+> +       s390_kernel_write(code, &new, sizeof(new));
+>  }
+>
+>  static int __sm_arch_jump_label_transform(void *data)
+> --
+> 2.16.4
+>
