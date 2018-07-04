@@ -1,183 +1,109 @@
-From: houlong.wei@mediatek.com (houlong wei)
-Date: Wed, 4 Jul 2018 08:47:37 +0800
-Subject: [PATCH v22 4/4] soc: mediatek: Add Mediatek CMDQ helper
-In-Reply-To: <1530264123.22098.12.camel@mtksdaap41>
-References: <1530098172-31385-1-git-send-email-houlong.wei@mediatek.com>
- <1530098172-31385-5-git-send-email-houlong.wei@mediatek.com>
- <1530182516.8518.11.camel@mtksdaap41>
- <1530228739.21991.14.camel@mhfsdcap03>
- <1530264123.22098.12.camel@mtksdaap41>
-Message-ID: <1530665257.24157.7.camel@mhfsdcap03>
+From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
+Date: Wed, 04 Jul 2018 10:09:38 +0900
+Subject: [PATCH 1/2] dt-bindings: reset: uniphier: add USB3 controller
+ reset support
+In-Reply-To: <20180703233747.GA850@rob-hp-laptop>
+References: <1530259891-18822-2-git-send-email-hayashi.kunihiko@socionext.com>
+ <20180703233747.GA850@rob-hp-laptop>
+Message-ID: <20180704100938.8235.4A936039@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2018-06-29 at 17:22 +0800, CK Hu wrote:
-> Hi, Houlong:
-> 
-> On Fri, 2018-06-29 at 07:32 +0800, houlong wei wrote:
-> > On Thu, 2018-06-28 at 18:41 +0800, CK Hu wrote:
-> > > Hi, Houlong:
-> > > 
-> > > Some inline comment.
-> > > 
-> > > On Wed, 2018-06-27 at 19:16 +0800, Houlong Wei wrote:
-> > > > Add Mediatek CMDQ helper to create CMDQ packet and assemble GCE op code.
-> > > > 
-> > > > Signed-off-by: Houlong Wei <houlong.wei@mediatek.com>
-> > > > Signed-off-by: HS Liao <hs.liao@mediatek.com>
-> > > > ---
-> > > >  drivers/soc/mediatek/Kconfig           |   12 ++
-> > > >  drivers/soc/mediatek/Makefile          |    1 +
-> > > >  drivers/soc/mediatek/mtk-cmdq-helper.c |  258 ++++++++++++++++++++++++++++++++
-> > > >  include/linux/soc/mediatek/mtk-cmdq.h  |  132 ++++++++++++++++
-> > > >  4 files changed, 403 insertions(+)
-> > > >  create mode 100644 drivers/soc/mediatek/mtk-cmdq-helper.c
-> > > >  create mode 100644 include/linux/soc/mediatek/mtk-cmdq.h
-> > > > 
-> > > > diff --git a/drivers/soc/mediatek/Kconfig b/drivers/soc/mediatek/Kconfig
-> > > > index a7d0667..17bd759 100644
-> > > > --- a/drivers/soc/mediatek/Kconfig
-> > > > +++ b/drivers/soc/mediatek/Kconfig
-> > > > @@ -4,6 +4,18 @@
-> > > >  menu "MediaTek SoC drivers"
-> > > >  	depends on ARCH_MEDIATEK || COMPILE_TEST
-> > > >  
-> > > 
-> 
-> [...]
-> 
-> > > > +
-> > > > +static int cmdq_pkt_finalize(struct cmdq_pkt *pkt)
-> > > > +{
-> > > > +	int err;
-> > > > +
-> > > > +	if (cmdq_pkt_is_finalized(pkt))
-> > > > +		return 0;
-> > > > +
-> > > > +	/* insert EOC and generate IRQ for each command iteration */
-> > > > +	err = cmdq_pkt_append_command(pkt, CMDQ_CODE_EOC, 0, CMDQ_EOC_IRQ_EN);
-> > > > +	if (err < 0)
-> > > > +		return err;
-> > > > +
-> > > > +	/* JUMP to end */
-> > > > +	err = cmdq_pkt_append_command(pkt, CMDQ_CODE_JUMP, 0, CMDQ_JUMP_PASS);
-> > > > +	if (err < 0)
-> > > > +		return err;
-> > > > +
-> > > > +	return 0;
-> > > > +}
-> > > > +
-> > > > +int cmdq_pkt_flush_async(struct cmdq_client *client, struct cmdq_pkt *pkt,
-> > > > +			 cmdq_async_flush_cb cb, void *data)
-> > > > +{
-> > > > +	int err;
-> > > > +	struct device *dev;
-> > > > +	dma_addr_t dma_addr;
-> > > > +
-> > > > +	err = cmdq_pkt_finalize(pkt);
-> > > > +	if (err < 0)
-> > > > +		return err;
-> > > > +
-> > > > +	dev = client->chan->mbox->dev;
-> > > > +	dma_addr = dma_map_single(dev, pkt->va_base, pkt->cmd_buf_size,
-> > > > +		DMA_TO_DEVICE);
-> > > 
-> > > You map here, but I could not find unmap, so the unmap should be done in
-> > > client driver. I would prefer a symmetric map/unmap which means that
-> > > both map and unmap are done in client driver. I think you put map here
-> > > because you should map after finalize. 
-> > 
-> > The unmap is done before callback to client, in function
-> > cmdq_task_exec_done, mtk-cmdq-mailbox.c.
-> 
-> You put unmap in mailbox controller, and map here (here would be mailbox
-> client), so this is not symmetric. If the code is asymmetric, it's easy
-> to cause bug and not easy to maintain. So I would like move both
-> map/unmap to client driver.
-> 
+Hi Rob,
 
-Since map/unmap is common code for client drivers, can we move unmap to
-CMDQ helper and do not put in client driver?
+On Tue, 3 Jul 2018 17:37:47 -0600 <robh@kernel.org> wrote:
 
+> On Fri, Jun 29, 2018 at 05:11:30PM +0900, Kunihiko Hayashi wrote:
+> > Add DT bindings for reset control of USB3 controller implemented in
+> > UniPhier SoCs.
 > > 
-> > > Therefore, export
-> > > cmdq_pkt_finalize() to client driver and let client do finalize, so
-> > > there is no finalize in flush function. This method have a benefit that
-> > > if client reuse command buffer, it need not to map/unmap frequently.
+> > Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+> > ---
+> >  .../devicetree/bindings/reset/uniphier-reset.txt   | 45 ++++++++++++++++++++++
+> >  1 file changed, 45 insertions(+)
 > > 
-> > If client reuse command buffer or cmdq_pkt(command queue packet), client
-> > will add new commands to the cmdq_pkt, so map/unmap are necessary for
-> > each cmdq_pkt flush.
+> > diff --git a/Documentation/devicetree/bindings/reset/uniphier-reset.txt b/Documentation/devicetree/bindings/reset/uniphier-reset.txt
+> > index 93efed6..f21d81c 100644
+> > --- a/Documentation/devicetree/bindings/reset/uniphier-reset.txt
+> > +++ b/Documentation/devicetree/bindings/reset/uniphier-reset.txt
+> > @@ -118,3 +118,48 @@ Example:
+> >  
+> >  		other nodes ...
+> >  	};
+> > +
+> > +
+> > +USB3 controller reset
+> > +---------------------
+> > +
+> > +Required properties:
+> > +- compatible: Should be
+> > +    "socionext,uniphier-pro4-usb3-reset" - for Pro4 SoC
+> > +    "socionext,uniphier-pxs2-usb3-reset" - for PXs2 SoC
+> > +    "socionext,uniphier-ld20-usb3-reset" - for LD20 SoC
+> > +    "socionext,uniphier-pxs3-usb3-reset" - for PXs3 SoC
+> > +- #reset-cells: Should be 1.
+> > +- reg: Specifies offset and length of the register set for the device.
+> > +- clocks: A list of phandles to the clock gate for USB3 glue layer.
+> > +	According to the clock-names, appropriate clocks are required.
+> > +- clock-names: Should contain
+> > +    "gio", "link" - for Pro4 SoC
+> > +    "link"        - for others
+> > +- resets: A list of phandles to the reset control for USB3 glue layer.
+> > +	According to the reset-names, appropriate resets are required.
+> > +- reset-names: Should contain
+> > +    "gio", "link" - for Pro4 SoC
+> > +    "link"        - for others
+> > +
+> > +Example:
+> > +
+> > +	usb-glue at 65b00000 {
+> > +		compatible = "socionext,uniphier-ld20-dwc3-glue",
+> > +			     "simple-mfd";
+> > +		#address-cells = <1>;
+> > +		#size-cells = <1>;
+> > +		ranges = <0 0x65b00000 0x400>;
+> > +
+> > +		usb_rst: reset at 0 {
+> > +			compatible = "socionext,uniphier-ld20-usb3-reset";
 > 
-> If the buffer size is 4K bytes, client driver could map the whole 4K at
-> initialization. Before it write new command, it call
-> dma_sync_single_for_cpu(), after it write new command, it call
-> dma_sync_single_for_device(). And then it could flush this buffer to
-> mailbox controller. So client driver just call dma sync function when it
-> reuse the command buffer. dma sync function is much lightweight then dma
-> map because map would search the memory area which could be mapped.
-> 
-> Regards,
-> CK
+> This looks weird. You have a reset controller within the USB block? And 
+> then a parent reset controller too?
 
-Maybe we can do dma map/unmap/sync in cmdq helper, and make client
-driver simple.
+Yes, this reset control is included in USB3 glue layer, and this is necessary 
+to enable USB3 core. The following diagram shows those relationships.
 
+	USB3 block
+	|
+	+---USB3 glue layer
+	|   |
+	|   +--- usb3-reset
+	|   |
+	|   +--- usb3-regluator
+	|   |
+	|   +--- usb3-phy
+	|
+	+---USB3 core
+
+The system reset, as parent reset controller, is necessary to enable
+the entire USB3 block including the glue layer.
+
+> > +			reg = <0x0 0x4>;
+> > +			#reset-cells = <1>;
+> > +			clock-names = "link";
+> > +			clocks = <&sys_clk 14>;
+> > +			clock-names = "link";
+> > +			resets = <&sys_rst 14>;
+> > +		};
+> > +
+> > +		other nodes ...
 > 
-> > 
-> > > 
-> > > Regards,
-> > > CK
-> > > 
-> > > > +	if (dma_mapping_error(dev, dma_addr)) {
-> > > > +		dev_err(client->chan->mbox->dev, "dma map failed\n");
-> > > > +		return -ENOMEM;
-> > > > +	}
-> > > > +
-> > > > +	pkt->pa_base = dma_addr;
-> > > > +	pkt->cb.cb = cb;
-> > > > +	pkt->cb.data = data;
-> > > > +
-> > > > +	mbox_send_message(client->chan, pkt);
-> > > > +	/* We can send next packet immediately, so just call txdone. */
-> > > > +	mbox_client_txdone(client->chan, 0);
-> > > > +
-> > > > +	return 0;
-> > > > +}
-> > > > +EXPORT_SYMBOL(cmdq_pkt_flush_async);
-> > > > +
-> > > > +struct cmdq_flush_completion {
-> > > > +	struct completion cmplt;
-> > > > +	bool err;
-> > > > +};
-> > > > +
-> > > > +static void cmdq_pkt_flush_cb(struct cmdq_cb_data data)
-> > > > +{
-> > > > +	struct cmdq_flush_completion *cmplt = data.data;
-> > > > +
-> > > > +	cmplt->err = data.err;
-> > > > +	complete(&cmplt->cmplt);
-> > > > +}
-> > > > +
-> > > > +int cmdq_pkt_flush(struct cmdq_client *client, struct cmdq_pkt *pkt)
-> > > > +{
-> > > > +	struct cmdq_flush_completion cmplt;
-> > > > +	int err;
-> > > > +
-> > > > +	init_completion(&cmplt.cmplt);
-> > > > +	err = cmdq_pkt_flush_async(client, pkt, cmdq_pkt_flush_cb, &cmplt);
-> > > > +	if (err < 0)
-> > > > +		return err;
-> > > > +	wait_for_completion(&cmplt.cmplt);
-> > > > +
-> > > > +	return cmplt.err ? -EFAULT : 0;
-> > > > +}
-> > > > +EXPORT_SYMBOL(cmdq_pkt_flush);
-> > > 
-> > > [...]
-> > > 
-> > > 
-> > 
-> > 
-> 
-> 
+> What other nodes?
+
+As mentioned above, the glue layer consists of reset, regulator, and phy.
+I assume that the "other nodes" mean that these nodes are placed.
+
+Thank you,
+
+---
+Best Regards,
+Kunihiko Hayashi
