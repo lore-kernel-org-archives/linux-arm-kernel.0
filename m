@@ -1,15 +1,15 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Wed, 04 Jul 2018 15:41:57 +0100
-Subject: Applied "ASoC: qdsp6: q6routing: add slim rx routings" to the asoc
- tree
-In-Reply-To: <20180704094944.16440-4-srinivas.kandagatla@linaro.org>
-Message-ID: <E1faiyj-0003xf-9K@debutante>
+Date: Wed, 04 Jul 2018 15:41:55 +0100
+Subject: Applied "ASoC: qdsp6: q6afe-dai: Do not overwrite slim dai
+ num_channels" to the asoc tree
+In-Reply-To: <20180704094944.16440-5-srinivas.kandagatla@linaro.org>
+Message-ID: <E1faiyh-0003wX-4A@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   ASoC: qdsp6: q6routing: add slim rx routings
+   ASoC: qdsp6: q6afe-dai: Do not overwrite slim dai num_channels
 
 has been applied to the asoc tree at
 
@@ -34,64 +34,32 @@ to this mail.
 Thanks,
 Mark
 
->From 9191ffe2d212f64aa2ec311f4294ba7066d1f8a1 Mon Sep 17 00:00:00 2001
+>From f1478a1476d45c5d7b070c726f46a7b581d3103c Mon Sep 17 00:00:00 2001
 From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-Date: Wed, 4 Jul 2018 10:49:41 +0100
-Subject: [PATCH] ASoC: qdsp6: q6routing: add slim rx routings
+Date: Wed, 4 Jul 2018 10:49:42 +0100
+Subject: [PATCH] ASoC: qdsp6: q6afe-dai: Do not overwrite slim dai
+ num_channels
 
-This patch add routings mixer controls for slim rx ports.
+num_channels for slim dais are aready set int set_channel_map,
+do not overwrite them in hw_params.
 
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- sound/soc/qcom/qdsp6/q6routing.c | 28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
+ sound/soc/qcom/qdsp6/q6afe-dai.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/sound/soc/qcom/qdsp6/q6routing.c b/sound/soc/qcom/qdsp6/q6routing.c
-index c80fdbc2442e..35269b492761 100644
---- a/sound/soc/qcom/qdsp6/q6routing.c
-+++ b/sound/soc/qcom/qdsp6/q6routing.c
-@@ -68,6 +68,13 @@
- 	{ mix_name, "SEC_MI2S_TX", "SEC_MI2S_TX" },	\
- 	{ mix_name, "QUAT_MI2S_TX", "QUAT_MI2S_TX" },	\
- 	{ mix_name, "TERT_MI2S_TX", "TERT_MI2S_TX" },		\
-+	{ mix_name, "SLIMBUS_0_TX", "SLIMBUS_0_TX" },		\
-+	{ mix_name, "SLIMBUS_1_TX", "SLIMBUS_1_TX" },		\
-+	{ mix_name, "SLIMBUS_2_TX", "SLIMBUS_2_TX" },		\
-+	{ mix_name, "SLIMBUS_3_TX", "SLIMBUS_3_TX" },		\
-+	{ mix_name, "SLIMBUS_4_TX", "SLIMBUS_4_TX" },		\
-+	{ mix_name, "SLIMBUS_5_TX", "SLIMBUS_5_TX" },		\
-+	{ mix_name, "SLIMBUS_6_TX", "SLIMBUS_6_TX" },		\
- 	{ mix_name, "PRIMARY_TDM_TX_0", "PRIMARY_TDM_TX_0"},	\
- 	{ mix_name, "PRIMARY_TDM_TX_1", "PRIMARY_TDM_TX_1"},	\
- 	{ mix_name, "PRIMARY_TDM_TX_2", "PRIMARY_TDM_TX_2"},	\
-@@ -122,6 +129,27 @@
- 	SOC_SINGLE_EXT("QUAT_MI2S_TX", QUATERNARY_MI2S_TX,		\
- 		id, 1, 0, msm_routing_get_audio_mixer,			\
- 		msm_routing_put_audio_mixer),				\
-+	SOC_SINGLE_EXT("SLIMBUS_0_TX", SLIMBUS_0_TX,			\
-+		id, 1, 0, msm_routing_get_audio_mixer,			\
-+		msm_routing_put_audio_mixer),				\
-+	SOC_SINGLE_EXT("SLIMBUS_1_TX", SLIMBUS_1_TX,			\
-+		id, 1, 0, msm_routing_get_audio_mixer,			\
-+		msm_routing_put_audio_mixer),				\
-+	SOC_SINGLE_EXT("SLIMBUS_2_TX", SLIMBUS_2_TX,			\
-+		id, 1, 0, msm_routing_get_audio_mixer,			\
-+		msm_routing_put_audio_mixer),				\
-+	SOC_SINGLE_EXT("SLIMBUS_3_TX", SLIMBUS_3_TX,			\
-+		id, 1, 0, msm_routing_get_audio_mixer,			\
-+		msm_routing_put_audio_mixer),				\
-+	SOC_SINGLE_EXT("SLIMBUS_4_TX", SLIMBUS_4_TX,			\
-+		id, 1, 0, msm_routing_get_audio_mixer,			\
-+		msm_routing_put_audio_mixer),				\
-+	SOC_SINGLE_EXT("SLIMBUS_5_TX", SLIMBUS_5_TX,			\
-+		id, 1, 0, msm_routing_get_audio_mixer,			\
-+		msm_routing_put_audio_mixer),				\
-+	SOC_SINGLE_EXT("SLIMBUS_6_TX", SLIMBUS_6_TX,			\
-+		id, 1, 0, msm_routing_get_audio_mixer,			\
-+		msm_routing_put_audio_mixer),				\
- 	SOC_SINGLE_EXT("PRIMARY_TDM_TX_0", PRIMARY_TDM_TX_0,		\
- 		id, 1, 0, msm_routing_get_audio_mixer,			\
- 		msm_routing_put_audio_mixer),				\
+diff --git a/sound/soc/qcom/qdsp6/q6afe-dai.c b/sound/soc/qcom/qdsp6/q6afe-dai.c
+index 8dd3683eb367..074582afda85 100644
+--- a/sound/soc/qcom/qdsp6/q6afe-dai.c
++++ b/sound/soc/qcom/qdsp6/q6afe-dai.c
+@@ -81,7 +81,6 @@ static int q6slim_hw_params(struct snd_pcm_substream *substream,
+ 	struct q6afe_dai_data *dai_data = dev_get_drvdata(dai->dev);
+ 	struct q6afe_slim_cfg *slim = &dai_data->port_config[dai->id].slim;
+ 
+-	slim->num_channels = params_channels(params);
+ 	slim->sample_rate = params_rate(params);
+ 
+ 	switch (params_format(params)) {
 -- 
 2.18.0.rc2
