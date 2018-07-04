@@ -1,34 +1,111 @@
-From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
-Date: Wed, 4 Jul 2018 16:59:08 +0800
-Subject: [PATCH v2 0/3] serial: 8250_dw: add fractional divisor support
-Message-ID: <20180704165908.4bb8b090@xhacker.debian>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 4 Jul 2018 10:02:24 +0100
+Subject: panic kexec broken on ARM64?
+In-Reply-To: <20180704084123.GC28220@linaro.org>
+References: <20180605100151.7fd54381@ezekiel.suse.cz>
+ <8028219f-0d14-eafd-86b7-359ee927bcd3@arm.com>
+ <5e539510-01b7-ebc5-778e-b49a5261f9bc@i2se.com>
+ <2865150f-ebca-4c6b-fc4b-93bfab5f0e91@arm.com>
+ <86lgbm96dq.wl-marc.zyngier@arm.com> <20180703070106.GV23681@linaro.org>
+ <86601wzn3h.wl-marc.zyngier@arm.com> <20180704084123.GC28220@linaro.org>
+Message-ID: <23306e9e-fec6-298d-af2d-018f63b06ab1@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For Synopsys DesignWare 8250 uart which version >= 4.00a, there's a
-valid divisor latch fraction register. The fractional divisor width is
-4bits ~ 6bits.
+On 04/07/18 09:41, takahiro.akashi at linaro.org wrote:
+> On Tue, Jul 03, 2018 at 09:58:44AM +0100, Marc Zyngier wrote:
+>> On 03/07/18 08:01, takahiro.akashi at linaro.org wrote:
+>>> Marc, James,
+>>>
+>>> I'd like to re-ignite the discussion.
+>>>
+>>> On Sun, Jun 10, 2018 at 01:24:17PM +0100, Marc Zyngier wrote:
+>>>> On Wed, 06 Jun 2018 12:37:02 +0100,
+>>>> James Morse wrote:
+>>>>>
+>>>>> Hi Stefan,
+>>>>>
+>>>>> On 06/06/18 08:02, Stefan Wahren wrote:
+>>>>>> Am 05.06.2018 um 19:46 schrieb James Morse:
+>>>>>>> On 05/06/18 09:01, Petr Tesarik wrote:
+>>>>>>>> I attached a hardware debugger and found
+>>>>>>>> out that all CPU cores were stopped except one which was stuck in the
+>>>>>>>> idle thread. It seems that irq_set_irqchip_state() may sleep, which is
+>>>>>>>> definitely not safe after a kernel panic.
+>>>>>
+>>>>>>> I don't know much about irqchip stuff, but __irq_get_desc_lock() takes a
+>>>>>>> raw_spin_lock(), and calls gic_irq_get_irqchip_state() which is just poking
+>>>>>>> around in mmio registers, this should all be safe unless you re-entered the same
+>>>>>>> code.
+>>>>>
+>>>>>>>> If I'm right, then this is broken in general, but I have only ever seen
+>>>>>>>> it on RPi 3 Model B+ (even RPi3 Model B works fine), so the issue may
+>>>>>>>> be more subtle.
+>>>>>
+>>>>>>> Is there a hardware difference around the interrupt controller on these?
+>>>>>
+>>>>>> No, but the RPi 3 B has a different USB network chip on board (smsc95xx, Fast
+>>>>>> ethernet) instead of lan78xx (Gigabit ethernet).
+>>>>>
+>>>>> Bingo: its the lan78xx driver that is sleeping from the irqchip
+>>>>> callbacks; The smsc95xx driver doesn't have a struct irq_chip, which
+>>>>> is why the RPi-3-B doesn't do this.
+>>>>>
+>>>>> It may be valid for kdump to only teardown the 'root irqdomain' (if
+>>>>> that even means anything). I assume these secondary irqchip's would
+>>>>> have a summary-interrupt that goes to another irqchip. But I can't
+>>>>> see a way to tell them apart..,
+>>>>
+>>>> There is none. A cascaded irqchip is just like a root irqchip, just
+>>>> that its output line is connected to another irqchip. But we have no
+>>>> easy way to identify the parent. Also, this particular driver looks
+>>>> quite creative (it reinvents the wheel for chained interrupts -- see
+>>>> intr_complete and lan78xx_status), meaning that even if we could have
+>>>> a magic way of identify a chained irqchip, we'd miss that one. Broken.
+>>>>
+>>>>> I think we need to wait until after the merge window for Marc's
+>>>>> wisdom on this!
+>>>>
+>>>> Overall, I can't think of an easy fix. We have a few options, but none
+>>>> of them involve a centralised change:
+>>>>
+>>>> 1) We provide a reset infrastructure for irqchips, with an opt-in
+>>>>    mechanism. This involves changing the way we teardown irqs at
+>>>>    crash-time, and we'd then need some notion of reset ordering (think
+>>>>    of the layered ITS and GICv3, for example).
+>>>
+>>> Does this mean that all the irqchips have to be implemented with reset?
+>>
+>> No. Only those that want to be reset at kexec time.
+> 
+> I don't get the point yet. Who should have reset interface?
+> What is the criteria?
 
-patch1 lets serial8250_get_divisor() get uart_port * as param
-patch2 introduces necessary hooks to 8250 core.
-patch3 implements the fractional divisor support for Synopsys DW 8250.
+The criteria is "this irqchip requires a reset to be safely used in the
+secondary kernel". This is a judgement call from the person writing the
+driver.
 
-Since v1:
- - add an extra patch to let serial8250_get_divisor() get uart_port *
-   as param
- - take Andy's suggestions to "integrates hooks in the same way like
-   it's done for the rest of 8250 ones". Many thanks to Andy.
+> 
+>>>>
+>>>> 2) We provide a way to identify interrupts that are ultimately backed
+>>>>    by a root controller, which implies walking down the hierarchy for
+>>>
+>>> To be clear, from bottom to top (or root), right?
+>>
+>> I'm not sure I understand your question. The idea is to walk the
+>> irq_data chain, until we hit a root irqchip. If we do hit one, we
+>> deactivate/eoi/disable this interrupt. If we don't, we do nothing.
+> 
+> I thought that we would traverse the (chained irq) hierarchy from
+> bottom to top and call deactivate or others in that order.
+> Am I wrong here?
 
-Jisheng Zhang (3):
-  serial: 8250: let serial8250_get_divisor() get uart_port * as param
-  serial: 8250: introduce get_divisor() and set_divisor() hook
-  serial: 8250_dw: add fractional divisor support
+You *cannot* traverse a hierarchy through a chained irq. At that stage,
+irq_data->parent_data is NULL. The only thing you can do is to iterate
+over all the interrupts and deactivate those that are directly on the
+root interrupt controller. This will have the effect of stopping the
+interrupts that are behind a chained controller.
 
- drivers/tty/serial/8250/8250_core.c |  4 +++
- drivers/tty/serial/8250/8250_dw.c   | 53 +++++++++++++++++++++++++++++
- drivers/tty/serial/8250/8250_port.c | 33 ++++++++++++++----
- include/linux/serial_core.h         |  7 ++++
- 4 files changed, 90 insertions(+), 7 deletions(-)
-
+	M.
 -- 
-2.18.0
+Jazz is not dead. It just smells funny...
