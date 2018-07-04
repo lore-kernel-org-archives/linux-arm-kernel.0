@@ -1,127 +1,96 @@
 From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Wed, 4 Jul 2018 09:09:42 +0200
-Subject: [PATCH v2 01/32] mtd: rawnand: add hooks that may be called
- during nand_scan()
-In-Reply-To: <20180703220029.19565-2-miquel.raynal@bootlin.com>
+Date: Wed, 4 Jul 2018 09:14:12 +0200
+Subject: [PATCH v2 02/32] mtd: rawnand: brcmnand: convert driver to
+ nand_scan()
+In-Reply-To: <20180703220029.19565-3-miquel.raynal@bootlin.com>
 References: <20180703220029.19565-1-miquel.raynal@bootlin.com>
- <20180703220029.19565-2-miquel.raynal@bootlin.com>
-Message-ID: <20180704090942.24a17db1@bbrezillon>
+ <20180703220029.19565-3-miquel.raynal@bootlin.com>
+Message-ID: <20180704091412.1118c857@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Miquel,
-
-On Tue,  3 Jul 2018 23:59:58 +0200
+On Tue,  3 Jul 2018 23:59:59 +0200
 Miquel Raynal <miquel.raynal@bootlin.com> wrote:
 
-> In order to remove the limitation that forbids dynamic allocation in
-> nand_scan_ident(), we must create a path that will be the same for all
-> controller drivers. The idea is to use nand_scan() instead of the widely
-> implemented nand_scan_ident()/nand_scan_tail() couple. In order to
-> achieve this, controller drivers will need to adjust some parameters
-> between these two functions depending on the NAND chip wired on them.
-> 
-> For that, a hook called ->attach_chip() is created in the
-> nand_hw_control structure. This structure may be referenced by two ways:
-> 1/ if the driver does not implement its own controller, the
->    chip->controller hook is not populated before nand_scan() so it
->    cannot be dereferenced: use chip->hwcontrol instead (which is
->    statically allocated and will be referenced later by chip->controller
->    anyway).
-> 2/ through chip->controller if the driver implements its own controller.
-> 
-> Another hook, ->detach_chip() is also introduced in order to clean the
-> controller driver's potential allocations in case of failure of
-> nand_scan_tail(). There is no need for the controller driver to call the
-> ->detach_chip() hook directly upon error after a successful nand_scan().  
-> In this situation, calling nand_release() as before is enough.
+> Two helpers have been added to the core to make ECC-related
+> configuration between the detection phase and the final NAND scan. Use
+> these hooks and convert the driver to just use nand_scan() instead of
+> both nand_scan_ident() and nand_scan_tail().
 > 
 > Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 > ---
->  drivers/mtd/nand/raw/nand_base.c | 21 +++++++++++++++++++--
->  include/linux/mtd/rawnand.h      |  6 ++++++
->  2 files changed, 25 insertions(+), 2 deletions(-)
+>  drivers/mtd/nand/raw/brcmnand/brcmnand.c | 43 ++++++++++++++++++--------------
+>  1 file changed, 24 insertions(+), 19 deletions(-)
 > 
-> diff --git a/drivers/mtd/nand/raw/nand_base.c b/drivers/mtd/nand/raw/nand_base.c
-> index faac82b1e058..97a74d48b0cf 100644
-> --- a/drivers/mtd/nand/raw/nand_base.c
-> +++ b/drivers/mtd/nand/raw/nand_base.c
-> @@ -6712,11 +6712,23 @@ EXPORT_SYMBOL(nand_scan_tail);
->  int nand_scan_with_ids(struct mtd_info *mtd, int maxchips,
->  		       struct nand_flash_dev *ids)
+> diff --git a/drivers/mtd/nand/raw/brcmnand/brcmnand.c b/drivers/mtd/nand/raw/brcmnand/brcmnand.c
+> index 1306aaa7a8bf..99ab7b93756c 100644
+> --- a/drivers/mtd/nand/raw/brcmnand/brcmnand.c
+> +++ b/drivers/mtd/nand/raw/brcmnand/brcmnand.c
+> @@ -2208,6 +2208,28 @@ static int brcmnand_setup_dev(struct brcmnand_host *host)
+>  	return 0;
+>  }
+>  
+> +static int brcmnand_attach_chip(struct nand_chip *chip)
+> +{
+> +	struct mtd_info *mtd = nand_to_mtd(chip);
+> +	struct brcmnand_host *host = nand_get_controller_data(chip);
+> +	int ret;
+> +
+> +	if (chip->bbt_options & NAND_BBT_USE_FLASH)
+> +		chip->bbt_options |= NAND_BBT_NO_OOB;
+> +
+> +	if (brcmnand_setup_dev(host))
+> +		return -ENXIO;
+> +
+> +	chip->ecc.size = host->hwcfg.sector_size_1k ? 1024 : 512;
+> +
+> +	/* only use our internal HW threshold */
+> +	mtd->bitflip_threshold = 1;
+> +
+> +	ret = brcmstb_choose_ecc_layout(host);
+> +
+> +	return ret;
+> +}
+> +
+>  static int brcmnand_init_cs(struct brcmnand_host *host, struct device_node *dn)
 >  {
-> +	struct nand_chip *chip = mtd_to_nand(mtd);
->  	int ret;
+>  	struct brcmnand_controller *ctrl = host->ctrl;
+> @@ -2267,10 +2289,6 @@ static int brcmnand_init_cs(struct brcmnand_host *host, struct device_node *dn)
+>  	nand_writereg(ctrl, cfg_offs,
+>  		      nand_readreg(ctrl, cfg_offs) & ~CFG_BUS_WIDTH);
 >  
->  	ret = nand_scan_ident(mtd, maxchips, ids);
-> -	if (!ret)
-> -		ret = nand_scan_tail(mtd);
-> +	if (ret)
-> +		return ret;
-> +
-> +	if (chip->controller->attach_chip) {
-> +		ret = chip->controller->attach_chip(chip);
-> +		if (ret)
-> +			return ret;
-> +	}
-> +
-> +	ret = nand_scan_tail(mtd);
-> +	if (ret && chip->controller->detach_chip)
-> +		chip->controller->detach_chip(chip);
-> +
->  	return ret;
->  }
->  EXPORT_SYMBOL(nand_scan_with_ids);
-> @@ -6744,7 +6756,12 @@ void nand_cleanup(struct nand_chip *chip)
+> -	ret = nand_scan_ident(mtd, 1, NULL);
+> -	if (ret)
+> -		return ret;
+> -
+>  	chip->options |= NAND_NO_SUBPAGE_WRITE;
+>  	/*
+>  	 * Avoid (for instance) kmap()'d buffers from JFFS2, which we can't DMA
+> @@ -2279,21 +2297,8 @@ static int brcmnand_init_cs(struct brcmnand_host *host, struct device_node *dn)
+>  	 */
+>  	chip->options |= NAND_USE_BOUNCE_BUFFER;
 >  
->  	/* Free manufacturer priv data. */
->  	nand_manufacturer_cleanup(chip);
-> +
-> +	/* Free controller specific allocations after chip identification */
-> +	if (chip->controller->detach_chip)
-> +		chip->controller->detach_chip(chip);
->  }
-> +
->  EXPORT_SYMBOL_GPL(nand_cleanup);
+> -	if (chip->bbt_options & NAND_BBT_USE_FLASH)
+> -		chip->bbt_options |= NAND_BBT_NO_OOB;
+> -
+> -	if (brcmnand_setup_dev(host))
+> -		return -ENXIO;
+> -
+> -	chip->ecc.size = host->hwcfg.sector_size_1k ? 1024 : 512;
+> -	/* only use our internal HW threshold */
+> -	mtd->bitflip_threshold = 1;
+> -
+> -	ret = brcmstb_choose_ecc_layout(host);
+> -	if (ret)
+> -		return ret;
+> -
+> -	ret = nand_scan_tail(mtd);
+> +	chip->controller->attach_chip = brcmnand_attach_chip;
+
+Hm, this assignment should be done once, when initializing the
+controller (in brcmnand_probe()), not every time you add a NAND chip.
+
+> +	ret = nand_scan(mtd, 1);
+>  	if (ret)
+>  		return ret;
 >  
->  /**
-> diff --git a/include/linux/mtd/rawnand.h b/include/linux/mtd/rawnand.h
-> index 0c6fb316b409..81654211e520 100644
-> --- a/include/linux/mtd/rawnand.h
-> +++ b/include/linux/mtd/rawnand.h
-> @@ -517,11 +517,17 @@ struct nand_id {
->   * @wq:			wait queue to sleep on if a NAND operation is in
->   *			progress used instead of the per chip wait queue
->   *			when a hw controller is available.
-> + * @attach_chip:	Callback that may be called between nand_detect() and
-> + *			nand_scan_tail() during nand_scan() (optional).
-> + * @detach_chip:	Callback that may be called if nand_scan_tail() fails
-> + *			(optional).
->   */
->  struct nand_hw_control {
->  	spinlock_t lock;
->  	struct nand_chip *active;
->  	wait_queue_head_t wq;
-> +	int (*attach_chip)(struct nand_chip *chip);
-> +	void (*detach_chip)(struct nand_chip *chip);
->  };
-
-Can we instead declare a nand_controller_ops struct and then have
-nand_hw_control point to it. Something like:
-
-struct nand_controller_ops {
-	int (*attach_chip)(struct nand_chip *chip);
-	void (*detach_chip)(struct nand_chip *chip);
-};
-
-struct nand_hw_control {
-	...
-	const struct nand_controller_ops *ops;
-};
-
->  
->  static inline void nand_hw_control_init(struct nand_hw_control *nfc)
-
-Regards,
-
-Boris
