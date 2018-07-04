@@ -1,29 +1,107 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Wed, 4 Jul 2018 15:25:14 +0000
-Subject: [RESEND PATCH] dt-bindings: input: Add common keyboard document
- bindings
-In-Reply-To: <1529649595.14396.18.camel@mhfsdcap03>
-References: <1529648198-14231-1-git-send-email-chen.zhong@mediatek.com>
- <1529649595.14396.18.camel@mhfsdcap03>
-Message-ID: <20180704152514.33h52ujqp34hpj2o@penguin>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Wed, 4 Jul 2018 17:29:46 +0200
+Subject: [PATCH v2 1/1] mmc: sunxi: Disable irq during pm_suspend
+In-Reply-To: <CAPDyKFp8Hrmr0XCGnhFYrC3Q79dZizYC5KfRE92AUNa0FRDS5A@mail.gmail.com>
+References: <1530685741-20604-1-git-send-email-stefan@olimex.com>
+ <CAPDyKFo_fadfNbt8YMS3MMjaxjt1B54DtZJ+-LoH9y5JeRi5pQ@mail.gmail.com>
+ <9b8f30fd-12aa-46ba-ced9-aed38ada0059@arm.com>
+ <CAPDyKFp8Hrmr0XCGnhFYrC3Q79dZizYC5KfRE92AUNa0FRDS5A@mail.gmail.com>
+Message-ID: <20180704152946.xe2ajttfj4uzlbel@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 22, 2018 at 02:39:55PM +0800, Chen Zhong wrote:
-> Hi Dmitry,
+On Wed, Jul 04, 2018 at 03:34:36PM +0200, Ulf Hansson wrote:
+> On 4 July 2018 at 13:34, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> > On 04/07/18 11:50, Ulf Hansson wrote:
+> >> + Marc
+> >>
+> >> On 4 July 2018 at 08:28, Stefan Mavrodiev <stefan@olimex.com> wrote:
+> >>> When mmc host controller enters suspend state, the clocks are
+> >>> disabled, but irqs are not. For some reason the irqchip emits
+> >>> false interrupts, which causes system lock loop.
+> >>>
+> >>> Debug log is:
+> >>>   ...
+> >>>   sunxi-mmc 1c11000.mmc: setting clk to 52000000, rounded 51200000
+> >>>   sunxi-mmc 1c11000.mmc: enabling the clock
+> >>>   sunxi-mmc 1c11000.mmc: cmd 13(8000014d) arg 10000 ie 0x0000bbc6 len 0
+> >>>   sunxi-mmc 1c11000.mmc: irq: rq (ptrval) mi 00000004 idi 00000000
+> >>>   sunxi-mmc 1c11000.mmc: cmd 6(80000146) arg 3210101 ie 0x0000bbc6 len 0
+> >>>   sunxi-mmc 1c11000.mmc: irq: rq (ptrval) mi 00000004 idi 00000000
+> >>>   sunxi-mmc 1c11000.mmc: cmd 13(8000014d) arg 10000 ie 0x0000bbc6 len 0
+> >>>   sunxi-mmc 1c11000.mmc: irq: rq (ptrval) mi 00000004 idi 00000000
+> >>>   mmc1: new DDR MMC card at address 0001
+> >>>   mmcblk1: mmc1:0001 AGND3R 14.6 GiB
+> >>>   mmcblk1boot0: mmc1:0001 AGND3R partition 1 4.00 MiB
+> >>>   mmcblk1boot1: mmc1:0001 AGND3R partition 2 4.00 MiB
+> >>>   sunxi-mmc 1c11000.mmc: cmd 18(80003352) arg 0 ie 0x0000fbc2 len 409
+> >>>   sunxi-mmc 1c11000.mmc: irq: rq (ptrval) mi 00004000 idi 00000002
+> >>>    mmcblk1: p1
+> >>>   sunxi-mmc 1c11000.mmc: irq: rq   (null) mi 00000000 idi 00000000
+> >>>   sunxi-mmc 1c11000.mmc: irq: rq   (null) mi 00000000 idi 00000000
+> >>>   sunxi-mmc 1c11000.mmc: irq: rq   (null) mi 00000000 idi 00000000
+> >>>   sunxi-mmc 1c11000.mmc: irq: rq   (null) mi 00000000 idi 00000000
+> >>> and so on...
+> >>>
+> >>> This issue apears on eMMC cards, routed on MMC2 slot. The patch is
+> >>> tested with A20-OLinuXino-MICRO/LIME/LIME2 boards.
+> >>>
+> >>> Fixes: 9a8e1e8cc2c0 ("mmc: sunxi: Add runtime_pm support")
+> >>> Signed-off-by: Stefan Mavrodiev <stefan@olimex.com>
+> >>> ---
+> >>>  Changes in v2:
+> >>>   - Add comment why disable_irq() is necessary
+> >>>
+> >>> ---
+> >>>  drivers/mmc/host/sunxi-mmc.c | 7 +++++++
+> >>>  1 file changed, 7 insertions(+)
+> >>>
+> >>> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+> >>> index e747259..8e7f3e3 100644
+> >>> --- a/drivers/mmc/host/sunxi-mmc.c
+> >>> +++ b/drivers/mmc/host/sunxi-mmc.c
+> >>> @@ -1446,6 +1446,7 @@ static int sunxi_mmc_runtime_resume(struct device *dev)
+> >>>         sunxi_mmc_init_host(host);
+> >>>         sunxi_mmc_set_bus_width(host, mmc->ios.bus_width);
+> >>>         sunxi_mmc_set_clk(host, &mmc->ios);
+> >>> +       enable_irq(host->irq);
+> >>>
+> >>>         return 0;
+> >>>  }
+> >>> @@ -1455,6 +1456,12 @@ static int sunxi_mmc_runtime_suspend(struct device *dev)
+> >>>         struct mmc_host *mmc = dev_get_drvdata(dev);
+> >>>         struct sunxi_mmc_host *host = mmc_priv(mmc);
+> >>>
+> >>> +       /*
+> >>> +        * When clocks are off, it's possible receiving
+> >>> +        * fake interrupts, which will stall the system.
+> >>> +        * Disabling the irq  will prevent this.
+> >>> +        */
+> >>> +       disable_irq(host->irq);
+> >>
+> >> No, this doesn't work for shared IRQs.
+> >
+> > Well, in this case, it does work, because that interrupt line cannot be
+> > shared with anything else, if I understand how the SoC is wired: each
+> > MMC controller has a dedicated interrupt line to the GIC, and it isn't
+> > shared with anything (that's on the A20 though, and I don't know about
+> > other SoCs integrating the same IP).
 > 
-> The other patches in the series to add mediatek pmic keys support are
-> now available in 4.18-rc1, but this patch seems not being merged.
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git
-> ib-mfd-input-rtc-v4.18
-> 
-> I have resend the patch, and rebase to 4.18-rc1.
-> Could you help to see if it is good enough to be merged into your tree?
+> That's the problem. This may work on some SoCs but not on others.
 
-I thought Rob would pick it up, but since he hasn't I'll do it.
+I don't really expect that driver to be used on some other SoCs, and
+if that ever happens, maybe we can fix it when it does?
 
-Thanks.
+Maxime
 
 -- 
-Dmitry
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180704/c142c72d/attachment.sig>
