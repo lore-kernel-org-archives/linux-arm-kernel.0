@@ -1,113 +1,63 @@
-From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
-Date: Wed, 4 Jul 2018 17:03:10 +0800
-Subject: [PATCH v2 3/3] serial: 8250_dw: add fractional divisor support
-In-Reply-To: <20180704165908.4bb8b090@xhacker.debian>
-References: <20180704165908.4bb8b090@xhacker.debian>
-Message-ID: <20180704170310.56772d77@xhacker.debian>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Wed, 4 Jul 2018 11:06:50 +0200
+Subject: [PATCH 0/2] Allwinner A64 timer workaround
+In-Reply-To: <5283f98e-6443-db7a-fe51-6379ed19002c@arm.com>
+References: <20180511022751.9096-1-samuel@sholland.org>
+ <2c16d5ab-38f7-8f3e-875c-19e8032f440a@arm.com>
+ <bdfb1a31-2c4a-d258-7bf6-aaab8cee4663@sholland.org>
+ <5283f98e-6443-db7a-fe51-6379ed19002c@arm.com>
+Message-ID: <20180704090650.hr3j7a6wn7nwfkvq@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For Synopsys DesignWare 8250 uart which version >= 4.00a, there's a
-valid divisor latch fraction register. The fractional divisor width is
-4bits ~ 6bits.
+On Wed, Jul 04, 2018 at 09:16:32AM +0100, Marc Zyngier wrote:
+> On 03/07/18 19:42, Samuel Holland wrote:
+> > On 07/03/18 10:09, Marc Zyngier wrote:
+> >> On 11/05/18 03:27, Samuel Holland wrote:
+> >>> Hello,
+> >>>
+> >>> Several people (including me) have experienced extremely large system
+> >>> clock jumps on their A64-based devices, apparently due to the architectural
+> >>> timer going backward, which is interpreted by Linux as the timer wrapping
+> >>> around after 2^56 cycles.
+> >>>
+> >>> Investigation led to discovery of some obvious problems with this SoC's 
+> >>> architectural timer, and this patch series introduces what I believe is
+> >>> the simplest workaround. More details are in the commit message for patch
+> >>> 1. Patch 2 simply enables the workaround in the device tree.
+> >>
+> >> What's the deal with this series? There was a couple of nits to address, and 
+> >> I was more or less expecting a v2.
+> > 
+> > I got reports that people were still occasionally having clock jumps after
+> > applying this series, so I wanted to attempt a more complete fix, but I haven't
+> > had time to do any deeper investigation. I think this series is still beneficial
+> > even if it's not a complete solution, so I'll come back with another patch on
+> > top of this if/once I get it fully fixed.
+> > 
+> > I'll prepare a v2 with a bounded loop. Presumably, 3 * (max CPU Hz) / (24MHz
+> > timer) ? 150 should be a conservative iteration limit?
+> 
+> Should be OK.
+> 
+> Maxime: How do you want to deal with the documentation aspect? We need
+> an erratum number, but AFAIU the concept hasn't made it into the silicom
+> vendor's brain yet. Any chance you could come up with something that
+> uniquely identifies this?
 
-Now the preparation is done, it's easy to add the feature support.
-This patch firstly checks the component version during probe, if
-version >= 4.00a, then calculates the fractional divisor width, then
-setups dw specific get_divisor() and set_divisor() hook.
+Yeah, I don't know how we can address that unfortunately. Or maybe we
+can call it timer-broken-1 ? It's as good as an ID than any other ID :)
 
-Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
----
- drivers/tty/serial/8250/8250_dw.c | 53 +++++++++++++++++++++++++++++++
- 1 file changed, 53 insertions(+)
+Maxime
 
-diff --git a/drivers/tty/serial/8250/8250_dw.c b/drivers/tty/serial/8250/8250_dw.c
-index aff04f1de3a5..b9630f633388 100644
---- a/drivers/tty/serial/8250/8250_dw.c
-+++ b/drivers/tty/serial/8250/8250_dw.c
-@@ -31,9 +31,12 @@
- 
- /* Offsets for the DesignWare specific registers */
- #define DW_UART_USR	0x1f /* UART Status Register */
-+#define DW_UART_DLF	0xc0 /* Divisor Latch Fraction Register */
- #define DW_UART_CPR	0xf4 /* Component Parameter Register */
- #define DW_UART_UCV	0xf8 /* UART Component Version */
- 
-+#define DW_FRAC_MIN_VERS		0x3430302A
-+
- /* Component Parameter Register bits */
- #define DW_UART_CPR_ABP_DATA_WIDTH	(3 << 0)
- #define DW_UART_CPR_AFCE_MODE		(1 << 4)
-@@ -65,6 +68,7 @@ struct dw8250_data {
- 
- 	unsigned int		skip_autocfg:1;
- 	unsigned int		uart_16550_compatible:1;
-+	unsigned int		dlf_size:3;
- };
- 
- static inline int dw8250_modify_msr(struct uart_port *p, int offset, int value)
-@@ -351,6 +355,33 @@ static bool dw8250_idma_filter(struct dma_chan *chan, void *param)
- 	return param == chan->device->dev->parent;
- }
- 
-+/*
-+ * For version >= 4.00a, the dw uarts have a valid divisor latch fraction
-+ * register. Calculate divisor with extra 4bits ~ 6bits fractional portion.
-+ */
-+static unsigned int dw8250_get_divisor(struct uart_port *p,
-+				       unsigned int baud,
-+				       unsigned int *frac)
-+{
-+	unsigned int quot;
-+	struct dw8250_data *d = p->private_data;
-+
-+	quot = DIV_ROUND_CLOSEST(p->uartclk << (d->dlf_size - 4), baud);
-+	*frac = quot & (~0U >> (32 - d->dlf_size));
-+
-+	return quot >> d->dlf_size;
-+}
-+
-+static void dw8250_set_divisor(struct uart_port *p, unsigned int baud,
-+			       unsigned int quot, unsigned int quot_frac)
-+{
-+	struct uart_8250_port *up = up_to_u8250p(p);
-+
-+	serial_port_out(p, DW_UART_DLF >> p->regshift, quot_frac);
-+	serial_port_out(p, UART_LCR, up->lcr | UART_LCR_DLAB);
-+	serial_dl_write(up, quot);
-+}
-+
- static void dw8250_quirks(struct uart_port *p, struct dw8250_data *data)
- {
- 	if (p->dev->of_node) {
-@@ -414,6 +445,28 @@ static void dw8250_setup_port(struct uart_port *p)
- 	dev_dbg(p->dev, "Designware UART version %c.%c%c\n",
- 		(reg >> 24) & 0xff, (reg >> 16) & 0xff, (reg >> 8) & 0xff);
- 
-+	/*
-+	 * For version >= 4.00a, the dw uarts have a valid divisor latch
-+	 * fraction register. Calculate the fractional divisor width.
-+	 */
-+	if (reg >= DW_FRAC_MIN_VERS) {
-+		struct dw8250_data *d = p->private_data;
-+
-+		if (p->iotype == UPIO_MEM32BE) {
-+			iowrite32be(~0U, p->membase + DW_UART_DLF);
-+			reg = ioread32be(p->membase + DW_UART_DLF);
-+		} else {
-+			writel(~0U, p->membase + DW_UART_DLF);
-+			reg = readl(p->membase + DW_UART_DLF);
-+		}
-+		d->dlf_size = fls(reg);
-+
-+		if (d->dlf_size) {
-+			p->get_divisor = dw8250_get_divisor;
-+			p->set_divisor = dw8250_set_divisor;
-+		}
-+	}
-+
- 	if (p->iotype == UPIO_MEM32BE)
- 		reg = ioread32be(p->membase + DW_UART_CPR);
- 	else
 -- 
-2.18.0
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180704/0afc6017/attachment.sig>
