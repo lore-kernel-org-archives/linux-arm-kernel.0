@@ -1,129 +1,137 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 4 Jul 2018 20:49:32 +0200
-Subject: [PATCH v2 3/4] efi/arm: map UEFI memory map earlier on boot
-In-Reply-To: <20180704170655.GD8370@arm.com>
-References: <20180619064424.6642-1-takahiro.akashi@linaro.org>
- <20180619064424.6642-4-takahiro.akashi@linaro.org>
- <20180704170655.GD8370@arm.com>
-Message-ID: <CAKv+Gu9_rYYyQ+t89otz46DR0D4GDj-cCjhx9q=p+D8LWFRkgQ@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed,  4 Jul 2018 21:17:57 +0200
+Subject: [PATCH 1/3] ARM: dts: Add WAN ethernet port to the SQ201
+Message-ID: <20180704191759.12577-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 July 2018 at 19:06, Will Deacon <will.deacon@arm.com> wrote:
-> Hi all,
->
-> [Ard -- please can you look at the EFI parts of this patch]
->
-> On Tue, Jun 19, 2018 at 03:44:23PM +0900, AKASHI Takahiro wrote:
->> Since arm_enter_runtime_services() was modified to always create a virtual
->> mapping of UEFI memory map in the previous patch, it is now renamed to
->> efi_enter_virtual_mode() and called earlier before acpi_load_tables()
->> in acpi_early_init().
->>
->> This will allow us to use UEFI memory map in acpi_os_ioremap() to create
->> mappings of ACPI tables using memory attributes described in UEFI memory
->> map.
->>
->> See a relevant commit:
->>     arm64: acpi: fix alignment fault in accessing ACPI tables
->>
->> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
->> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> Cc: Andrew Morton <akpm@linux-foundation.org>
->> ---
->>  drivers/firmware/efi/arm-runtime.c | 15 ++++++---------
->>  init/main.c                        |  3 +++
->>  2 files changed, 9 insertions(+), 9 deletions(-)
->>
->> diff --git a/drivers/firmware/efi/arm-runtime.c b/drivers/firmware/efi/arm-runtime.c
->> index 30ac5c82051e..566ef0a9edb5 100644
->> --- a/drivers/firmware/efi/arm-runtime.c
->> +++ b/drivers/firmware/efi/arm-runtime.c
->> @@ -106,46 +106,43 @@ static bool __init efi_virtmap_init(void)
->>   * non-early mapping of the UEFI system table and virtual mappings for all
->>   * EFI_MEMORY_RUNTIME regions.
->>   */
->> -static int __init arm_enable_runtime_services(void)
->> +void __init efi_enter_virtual_mode(void)
->>  {
->>       u64 mapsize;
->>
->>       if (!efi_enabled(EFI_BOOT)) {
->>               pr_info("EFI services will not be available.\n");
->> -             return 0;
->> +             return;
->>       }
->>
->>       mapsize = efi.memmap.desc_size * efi.memmap.nr_map;
->>
->>       if (efi_memmap_init_late(efi.memmap.phys_map, mapsize)) {
->>               pr_err("Failed to remap EFI memory map\n");
->> -             return 0;
->> +             return;
->>       }
->>
->>       if (efi_runtime_disabled()) {
->>               pr_info("EFI runtime services will be disabled.\n");
->> -             return 0;
->> +             return;
->>       }
->>
->>       if (efi_enabled(EFI_RUNTIME_SERVICES)) {
->>               pr_info("EFI runtime services access via paravirt.\n");
->> -             return 0;
->> +             return;
->>       }
->>
->>       pr_info("Remapping and enabling EFI services.\n");
->>
->>       if (!efi_virtmap_init()) {
->>               pr_err("UEFI virtual mapping missing or invalid -- runtime services will not be available\n");
->> -             return -ENOMEM;
->> +             return;
->>       }
->>
->>       /* Set up runtime services function pointers */
->>       efi_native_runtime_setup();
->>       set_bit(EFI_RUNTIME_SERVICES, &efi.flags);
->> -
->> -     return 0;
->>  }
->> -early_initcall(arm_enable_runtime_services);
->>
->>  void efi_virtmap_load(void)
->>  {
->> diff --git a/init/main.c b/init/main.c
->> index 3b4ada11ed52..532fc0d02353 100644
->> --- a/init/main.c
->> +++ b/init/main.c
->> @@ -694,6 +694,9 @@ asmlinkage __visible void __init start_kernel(void)
->>       debug_objects_mem_init();
->>       setup_per_cpu_pageset();
->>       numa_policy_init();
->> +     if (IS_ENABLED(CONFIG_EFI) &&
->> +         (IS_ENABLED(CONFIG_ARM64) || IS_ENABLED(CONFIG_ARM)))
->> +             efi_enter_virtual_mode();
->
-> Hmm, this is ugly as hell. Is there nothing else we can piggy-back off?
-> It's also fairly jarring that, on x86, efi_enter_virtual_mode() is called
-> a few lines later, *after* acpi_early_init() has been called.
->
+This sets up the ethernet interface and PHY for the
+WAN ethernet port which uses a Marvell PHY.
 
-Currently, there is a gap where we have already torn down the early
-mapping and haven't created the definitive mapping of the UEFI memory
-map. There are other reasons why this is an issue, and I recently
-proposed [0] myself to address one of them (and I didn't remember this
-particular series, or the fact that I actually suggested this approach
-IIRC)
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/boot/dts/gemini-sq201.dts | 85 ++++++++++++++++++++++++++++++
+ 1 file changed, 85 insertions(+)
 
-Akashi-san, could you please confirm whether the patch below would be
-sufficient for you? Apologies for going back and forth on this, but I
-agree with Will that we should try to avoid warts like the one above
-in generic code.
-
-[0] https://marc.info/?l=linux-efi&m=152930773507524&w=2
-
-> The rest of the series looks fine to me, but I'm not comfortable taking
-> changes like this via the arm64 tree.
->
-> Will
+diff --git a/arch/arm/boot/dts/gemini-sq201.dts b/arch/arm/boot/dts/gemini-sq201.dts
+index e5cf9d1a98cd..2706b86e06f1 100644
+--- a/arch/arm/boot/dts/gemini-sq201.dts
++++ b/arch/arm/boot/dts/gemini-sq201.dts
+@@ -55,6 +55,21 @@
+ 		};
+ 	};
+ 
++	mdio0: ethernet-phy {
++		compatible = "virtual,mdio-gpio";
++		/* Uses MDC and MDIO */
++		gpios = <&gpio0 22 GPIO_ACTIVE_HIGH>, /* MDC */
++			<&gpio0 21 GPIO_ACTIVE_HIGH>; /* MDIO */
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		/* This is a Marvell 88E1111 ethernet transciever */
++		phy0: ethernet-phy at 1 {
++			reg = <1>;
++			device_type = "ethernet-phy";
++		};
++	};
++
+ 	soc {
+ 		flash at 30000000 {
+ 			/*
+@@ -108,6 +123,7 @@
+ 				/*
+ 				 * gpio0fgrp cover line 18 used by reset button
+ 				 * gpio0ggrp cover line 20 used by info LED
++				 * gpio0hgrp cover line 21, 22 used by MDIO for Marvell PHY
+ 				 * gpio0kgrp cover line 31 used by USB LED
+ 				 */
+ 				gpio0_default_pins: pinctrl-gpio0 {
+@@ -115,9 +131,66 @@
+ 						function = "gpio0";
+ 						groups = "gpio0fgrp",
+ 						"gpio0ggrp",
++						"gpio0hgrp",
+ 						"gpio0kgrp";
+ 					};
+ 				};
++				pinctrl-gmii {
++					mux {
++						function = "gmii";
++						groups = "gmii_gmac0_grp", "gmii_gmac1_grp";
++					};
++					/* Settings come from memory dump in PLATO */
++					conf0 {
++						pins = "V8 GMAC0 RXDV";
++						skew-delay = <0>;
++					};
++					conf1 {
++						pins = "Y7 GMAC0 RXC";
++						skew-delay = <15>;
++					};
++					conf2 {
++						pins = "T8 GMAC0 TXEN";
++						skew-delay = <7>;
++					};
++					conf3 {
++						pins = "U8 GMAC0 TXC";
++						skew-delay = <10>;
++					};
++					conf4 {
++						pins = "T10 GMAC1 RXDV";
++						skew-delay = <7>;
++					};
++					conf5 {
++						pins = "Y11 GMAC1 RXC";
++						skew-delay = <8>;
++					};
++					conf6 {
++						pins = "W11 GMAC1 TXEN";
++						skew-delay = <7>;
++					};
++					conf7 {
++						pins = "V11 GMAC1 TXC";
++						skew-delay = <5>;
++					};
++					conf8 {
++						/* The data lines all have default skew */
++						pins = "W8 GMAC0 RXD0", "V9 GMAC0 RXD1",
++						       "Y8 GMAC0 RXD2", "U9 GMAC0 RXD3",
++						       "T7 GMAC0 TXD0", "U6 GMAC0 TXD1",
++						       "V7 GMAC0 TXD2", "U7 GMAC0 TXD3",
++						       "Y12 GMAC1 RXD0", "V12 GMAC1 RXD1",
++						       "T11 GMAC1 RXD2", "W12 GMAC1 RXD3",
++						       "U10 GMAC1 TXD0", "Y10 GMAC1 TXD1",
++						       "W10 GMAC1 TXD2", "T9 GMAC1 TXD3";
++						skew-delay = <7>;
++					};
++					/* Set up drive strength on GMAC0 and GMAC1 to 16 mA */
++					conf9 {
++						groups = "gmii_gmac0_grp", "gmii_gmac1_grp";
++						drive-strength = <16>;
++					};
++				};
+ 			};
+ 		};
+ 
+@@ -154,6 +227,18 @@
+ 				<0x6000 0 0 4 &pci_intc 2>;
+ 		};
+ 
++		ethernet at 60000000 {
++			status = "okay";
++
++			ethernet-port at 0 {
++				phy-mode = "rgmii";
++				phy-handle = <&phy0>;
++			};
++			ethernet-port at 1 {
++				/* Used for the Vitesse G5 chip, add later */
++			};
++		};
++
+ 		ata at 63000000 {
+ 			status = "okay";
+ 		};
+-- 
+2.17.1
