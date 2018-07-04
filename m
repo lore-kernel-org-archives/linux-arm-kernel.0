@@ -1,71 +1,106 @@
-From: james.morse@arm.com (James Morse)
-Date: Wed, 4 Jul 2018 13:47:11 +0100
-Subject: panic kexec broken on ARM64?
-In-Reply-To: <20180704084123.GC28220@linaro.org>
-References: <20180605100151.7fd54381@ezekiel.suse.cz>
- <8028219f-0d14-eafd-86b7-359ee927bcd3@arm.com>
- <5e539510-01b7-ebc5-778e-b49a5261f9bc@i2se.com>
- <2865150f-ebca-4c6b-fc4b-93bfab5f0e91@arm.com>
- <86lgbm96dq.wl-marc.zyngier@arm.com> <20180703070106.GV23681@linaro.org>
- <86601wzn3h.wl-marc.zyngier@arm.com> <20180704084123.GC28220@linaro.org>
-Message-ID: <3df2d32d-867b-2237-d2a0-9fd6d7302eb3@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 4 Jul 2018 13:43:58 +0100
+Subject: [PATCH v3 09/17] irqchip/irq-mvebu-icu: support ICU subnodes
+In-Reply-To: <20180704110917.65557d0a@xps13>
+References: <20180622151432.1566-1-miquel.raynal@bootlin.com>
+ <20180622151432.1566-10-miquel.raynal@bootlin.com>
+ <61ff2e4f-55b6-cf70-5f04-32cd197c35f8@arm.com>
+ <20180704110917.65557d0a@xps13>
+Message-ID: <f4d1d42c-98b9-a485-0baf-2248114f8c8a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Akashi,
-
-On 04/07/18 09:41, takahiro.akashi at linaro.org wrote:
-> On Tue, Jul 03, 2018 at 09:58:44AM +0100, Marc Zyngier wrote:
->> On 03/07/18 08:01, takahiro.akashi at linaro.org wrote:
->>> On Sun, Jun 10, 2018 at 01:24:17PM +0100, Marc Zyngier wrote:
->>>> On Wed, 06 Jun 2018 12:37:02 +0100 James Morse wrote:,
->>>>> Bingo: its the lan78xx driver that is sleeping from the irqchip
->>>>> callbacks; The smsc95xx driver doesn't have a struct irq_chip, which
->>>>> is why the RPi-3-B doesn't do this.
->>>>>
->>>>> It may be valid for kdump to only teardown the 'root irqdomain' (if
->>>>> that even means anything). I assume these secondary irqchip's would
->>>>> have a summary-interrupt that goes to another irqchip. But I can't
->>>>> see a way to tell them apart..,
-
->>>> Overall, I can't think of an easy fix. We have a few options, but none
->>>> of them involve a centralised change:
->>>>
->>>> 1) We provide a reset infrastructure for irqchips, with an opt-in
->>>>    mechanism. This involves changing the way we teardown irqs at
->>>>    crash-time, and we'd then need some notion of reset ordering (think
->>>>    of the layered ITS and GICv3, for example).
->>>
->>> Does this mean that all the irqchips have to be implemented with reset?
->>
->> No. Only those that want to be reset at kexec time.
+On 04/07/18 10:09, Miquel Raynal wrote:
+> Hi Marc,
 > 
-> I don't get the point yet.
+> Marc Zyngier <marc.zyngier@arm.com> wrote on Thu, 28 Jun 2018 13:45:09
+> +0100:
+> 
+>> On 22/06/18 16:14, Miquel Raynal wrote:
+>>> The ICU can handle several type of interrupt, each of them being handled
+>>> differently on AP side. On CP side, the ICU should be able to make the
+>>> distinction between each interrupt group by pointing to the right parent.
+>>>
+>>> This is done through the introduction of new bindings, presenting the ICU
+>>> node as the parent of multiple ICU sub-nodes, each of them being an
+>>> interrupt type with a different interrupt parent. ICU interrupt 'clients'
+>>> now directly point to the right sub-node, avoiding the need for the extra
+>>> ICU_GRP_* parameter.
+>>>
+>>> ICU subnodes are probed automatically with devm_platform_populate(). If
+>>> the node as no child, the probe function for NSRs will still be called
+>>> 'manually' in order to preserve backward compatibility with DT using the
+>>> old binding.
+>>>
+>>> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+>>> ---
+>>>  drivers/irqchip/irq-mvebu-icu.c | 88 ++++++++++++++++++++++++++++++++++-------
+>>>  1 file changed, 74 insertions(+), 14 deletions(-)
+>>>
+>>> diff --git a/drivers/irqchip/irq-mvebu-icu.c b/drivers/irqchip/irq-mvebu-icu.c
+>>> index 24d45186eb6b..f7c2ede9c222 100644
+>>> --- a/drivers/irqchip/irq-mvebu-icu.c
+>>> +++ b/drivers/irqchip/irq-mvebu-icu.c
+>>> @@ -43,6 +43,7 @@ struct mvebu_icu {
+>>>  	struct regmap *regmap;
+>>>  	struct device *dev;
+>>>  	atomic_t initialized;
+>>> +	bool legacy_bindings;
+>>>  };
+>>>  
+>>>  struct mvebu_icu_irq_data {
+>>> @@ -51,6 +52,30 @@ struct mvebu_icu_irq_data {
+>>>  	unsigned int type;
+>>>  };
+>>>  
+>>> +static struct mvebu_icu *mvebu_icu_dev_get_drvdata(struct platform_device *pdev)
+>>> +{
+>>> +	struct mvebu_icu *icu;
+>>> +
+>>> +	/*
+>>> +	 * Device data being populated means we should be using legacy bindings.
+>>> +	 * Using the _parent_ device data means we should be using new bindings.
+>>> +	 */
+>>> +	icu = dev_get_drvdata(&pdev->dev);
+>>> +	if (icu) {
+>>> +		if (!icu->legacy_bindings)
+>>> +			return ERR_PTR(-EINVAL);
+>>> +	} else {
+>>> +		icu = dev_get_drvdata(pdev->dev.parent);
+>>> +		if (!icu)
+>>> +			return ERR_PTR(-ENODEV);
+>>> +
+>>> +		if (icu->legacy_bindings)
+>>> +			return ERR_PTR(-EINVAL);
+>>> +	}  
+>>
+>> Doesn't this make legacy_bindings completely redundant? Either the
+>> pointer is !NULL in the device, and this is using a legacy binging, or
+>> it is stored in the parent, and this is a new binding. You could even
+>> have a helper for that:
+>>
+>> static bool is_legacy(struct platform_device *pdev)
+>> {
+>> 	return !dev_get_drvdata(&pdev->dev);
+>> }
+>>
+>> The driver really doesn't need to be defending against itself, if
+>> anything, and it would save you quite a bit of error handling in the
+>> callers of this function.
+> 
+> I simplified the sanity checks but I had to keep an icu->is_legacy
+> boolean because the above function would not have worked, for instance,
+> in the *_translate() hook. As this hook does not receive a struct
+> device * (or platform_device) as parameter, I tried to use icu->dev
+> instead. This cannot work as it always points to the device having the
+> driver data attached.
 
-(this stuff is new to me, below terminology is probably wrong:)
-
-It seems there is actually a tree of irqchips, which feed interrupts through the
-tree via some summary-interrupt.
-The problem is one of these later-irqchips is on the other end of the USB bus,
-and requires a fair amount of sleeping in order to reset it.
-
-The trick is everything comes through the root irqchip. So we can reset that to
-disable all the other interrupts in this tree.
-
-This only works until the new kernel re-enables the summary-interrupt, it needs
-to reset the irqchip that the summary-interrupt leads to first.
-
-(I assume shared summary-interrupts are somehow forbidden).
-
-
-> Who should have reset interface?
-> What is the criteria?
-
-(reset-interface -> be reset at kdump time)
-
-Just the root irchip that all interrupts have to come through.
-
+You could still have the pdev as part of the domain host_data, right?
+Isn't that just a matter of having a pointer to the pdev as part of the
+icu data structure?
 
 Thanks,
 
-James
+	M.
+-- 
+Jazz is not dead. It just smells funny...
