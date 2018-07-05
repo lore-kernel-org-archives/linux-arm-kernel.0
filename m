@@ -1,25 +1,29 @@
-From: luaraneda@gmail.com (Luis Araneda)
-Date: Thu, 5 Jul 2018 17:12:00 -0400
-Subject: [RFC PATCH 5/5] arm: dts: zynq: remove "zynq" prefix from
- compatible property
-In-Reply-To: <20180703230745.GA2129@rob-hp-laptop>
-References: <20180628054205.17737-1-luaraneda@gmail.com>
- <20180628054205.17737-6-luaraneda@gmail.com>
- <042f6632-f4f6-d278-9859-b8998468c3bf@xilinx.com>
- <CAHbBuxpuAC0PDfFBQ+D_zJu-AmWFNhEWCojr8LAWfO-ootLqEg@mail.gmail.com>
- <20180703230745.GA2129@rob-hp-laptop>
-Message-ID: <CAHbBuxpO6egKoHQizuuWM3LrK-m+-GpTjrcPey55UBMP02zozQ@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 5 Jul 2018 15:13:00 -0600
+Subject: [PATCH v7 07/10] dt-bindings: counter: Document stm32 quadrature
+ encoder
+In-Reply-To: <c1cc3d567d0a5799c3afe6e24ca9ec3b1547224e.1529607879.git.vilhelm.gray@gmail.com>
+References: <cover.1529607879.git.vilhelm.gray@gmail.com>
+ <c1cc3d567d0a5799c3afe6e24ca9ec3b1547224e.1529607879.git.vilhelm.gray@gmail.com>
+Message-ID: <20180705211300.GA18202@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On Thu, Jun 21, 2018 at 05:08:34PM -0400, William Breathitt Gray wrote:
+> From: Benjamin Gaignard <benjamin.gaignard@st.com>
+> 
+> Add bindings for STM32 Timer quadrature encoder.
+> It is a sub-node of STM32 Timer which implement the
+> quadratic encoder part of the hardware.
+> 
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+> Signed-off-by: William Breathitt Gray <vilhelm.gray@gmail.com>
+> ---
+>  .../bindings/counter/stm32-timer-cnt.txt      | 31 +++++++++++++++++++
+>  .../devicetree/bindings/mfd/stm32-timers.txt  |  7 +++++
+>  2 files changed, 38 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/counter/stm32-timer-cnt.txt
 
-On Tue, Jul 3, 2018 at 7:07 PM Rob Herring <robh@kernel.org> wrote:
-> Maybe so, but you can't just go around changing compatible strings. Once
-> set, it's an ABI.
-
-Ok, I'll drop the patch from v2.
-
-Thanks,
-
-Luis Araneda.
+Acked-by: Rob Herring <robh@kernel.org> 
