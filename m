@@ -1,78 +1,38 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 5 Jul 2018 12:03:04 -0600
-Subject: [PATCH v2 18/23] dt-bindings: thermal: armada: add reference to
- new bindings
-In-Reply-To: <20180705120528.4b923e16@xps13>
-References: <20180625151239.20976-1-miquel.raynal@bootlin.com>
- <20180625151239.20976-19-miquel.raynal@bootlin.com>
- <20180703213011.GA13190@rob-hp-laptop>
- <20180705120528.4b923e16@xps13>
-Message-ID: <CAL_JsqL9h4RExZtm5cER-5kNvMpDzH-4MwcmY7VOLXB9-uEYYA@mail.gmail.com>
+Date: Thu, 5 Jul 2018 12:04:57 -0600
+Subject: [PATCH v2] pinctrl: at91-pio4: add support for drive strength
+In-Reply-To: <20180629081533.31885-1-ludovic.desroches@microchip.com>
+References: <20180629081533.31885-1-ludovic.desroches@microchip.com>
+Message-ID: <20180705180457.GA5809@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 5, 2018 at 4:05 AM Miquel Raynal <miquel.raynal@bootlin.com> wrote:
->
-> Hi Rob,
->
-> Rob Herring <robh@kernel.org> wrote on Tue, 3 Jul 2018 15:30:11 -0600:
->
-> > On Mon, Jun 25, 2018 at 05:12:34PM +0200, Miquel Raynal wrote:
-> > > New bindings (with the syscon and the overheat interrupt) are available
-> >
-> > What interrupt? It's not in your new binding.
+On Fri, Jun 29, 2018 at 10:15:33AM +0200, Ludovic Desroches wrote:
+> Add support for the drive strength configuration. Usually, this value is
+> expressed in mA. Since the numeric value depends on VDDIOP voltage, a
+> value we can't retrieve at runtime, the controller uses low, medium and
+> high to define the drive strength.
+> 
+> The PIO controller accepts two values for the low drive configuration: 0
+> and 1. Most of the time, we don't care about the drive strength. So we
+> keep the default value which is 0. The drive strength is advertised
+> through the sysfs only when it has been explicitly set in the device
+> tree i.e. if its value is different from 0.
+> 
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
+> ---
+> 
+> Changes:
+> - v2: use atmel,drive-strength property instead of drive-strengh one
+> since it is not expressend in mA and there is no way to retrieve this
+> value at runtime.
+> - v1: https://www.spinics.net/lists/linux-gpio/msg27789.html
+> 
+>  .../bindings/pinctrl/atmel,at91-pio4-pinctrl.txt   |  3 ++
+>  drivers/pinctrl/pinctrl-at91-pio4.c                | 42 ++++++++++++++++++++++
+>  include/dt-bindings/pinctrl/at91.h                 |  4 +++
+>  3 files changed, 49 insertions(+)
 
-???
+For the DT parts,
 
-
-
-> > > for AP806 and CP110 compatibles. Add a reference to these files from the
-> > > original documentation.
-> > >
-> > > Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
-> > > ---
-> > >  Documentation/devicetree/bindings/thermal/armada-thermal.txt | 5 +++++
-> > >  1 file changed, 5 insertions(+)
-> > >
-> > > diff --git a/Documentation/devicetree/bindings/thermal/armada-thermal.txt b/Documentation/devicetree/bindings/thermal/armada-thermal.txt
-> > > index e0d013a2e66d..f3b441100890 100644
-> > > --- a/Documentation/devicetree/bindings/thermal/armada-thermal.txt
-> > > +++ b/Documentation/devicetree/bindings/thermal/armada-thermal.txt
-> > > @@ -10,6 +10,11 @@ Required properties:
-> > >      * marvell,armada-ap806-thermal
-> > >      * marvell,armada-cp110-thermal
-> >
-> > Really you should not be using the same compatible for both. Now you
-> > have 2 drivers matching to same compatibles.
-> >
-> > Can't you make this a child of the syscon without breaking the binding?
->
-> We are talking about only 1 driver here, so I'm not sure how I should
-> understand your last sentence. Do you want me to add a second
-> compatible (for the same piece of hardware) for thermal node declared
-> as a child of the syscon?
-
-I don't know what I'm suggesting. Your changes look like they break
-compatibility to me. What happens if you use this new binding without
-any kernel change?
-
-> I could handle this situation in the driver by creating the missing
-> regmap in case we are using the old compatible. If this is the solution
-> you prefer, how should I name the new compatibles ?
->
-> >
-> > >
-> > > +Note: these bindings are deprecated for AP806/CP110 and should instead
-> > > +follow the rules described in:
-> > > +Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt
-> > > +Documentation/devicetree/bindings/arm/marvell/cp110-system-controller.txt
-> > > +
-> > >  - reg: Device's register space.
-> > >    Two entries are expected, see the examples below. The first one points
-> > >    to the status register (4B). The second one points to the control
-> > > --
-> > > 2.14.1
-> > >
->
-> Thanks,
-> Miqu?l
+Acked-by: Rob Herring <robh@kernel.org>
