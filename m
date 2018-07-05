@@ -1,103 +1,226 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Thu, 5 Jul 2018 15:46:50 +0200
-Subject: [kvmtool test PATCH 22/24] kvmtool: arm64: Add support for guest
- physical address size
-In-Reply-To: <d0c005f8-eae4-3784-1ebc-d279df4ee608@arm.com>
-References: <1530270944-11351-1-git-send-email-suzuki.poulose@arm.com>
- <1530270944-11351-23-git-send-email-suzuki.poulose@arm.com>
- <20180704140943.GF4828@arm.com>
- <8c9bb3cd-f673-17f3-656f-66b7e14fc73c@arm.com>
- <20180704155231.GP4828@arm.com>
- <ca05f552-d0d7-b5b8-954b-7254e8c1e529@arm.com>
- <d0c005f8-eae4-3784-1ebc-d279df4ee608@arm.com>
-Message-ID: <bd5186ce-66ab-e2fa-3531-46a4a87b84d8@redhat.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 5 Jul 2018 15:48:02 +0200
+Subject: [PATCH 05/19] mmc: mmci: allow to overwrite clock/power procedure
+ to specific variant
+In-Reply-To: <1528809280-31116-6-git-send-email-ludovic.Barre@st.com>
+References: <1528809280-31116-1-git-send-email-ludovic.Barre@st.com>
+ <1528809280-31116-6-git-send-email-ludovic.Barre@st.com>
+Message-ID: <CAPDyKFpwVMX9LoC_abHm09UNhLse8MJBUpCCHkR8NnK7fOU5Yg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+On 12 June 2018 at 15:14, Ludovic Barre <ludovic.Barre@st.com> wrote:
+> From: Ludovic Barre <ludovic.barre@st.com>
+>
+> A specific variant could have different power or clock procedures.
+> This patch allows to overwrite the default mmci_set_clkreg and
+> mmci_set_pwrreg for a specific variant.
+>
+> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+> ---
+>  drivers/mmc/host/mmci.c | 96 +++++++++++++++++++++++++++++--------------------
+>  drivers/mmc/host/mmci.h |  7 ++++
+>  2 files changed, 64 insertions(+), 39 deletions(-)
+>
+> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+> index ede95b7..801c86b 100644
+> --- a/drivers/mmc/host/mmci.c
+> +++ b/drivers/mmc/host/mmci.c
+> @@ -374,6 +374,52 @@ static void mmci_set_clkreg(struct mmci_host *host, unsigned int desired)
+>         mmci_write_clkreg(host, clk);
+>  }
+>
+> +static void mmci_set_pwrreg(struct mmci_host *host, unsigned char power_mode,
+> +                           unsigned int pwr)
+> +{
+> +       struct variant_data *variant = host->variant;
+> +       struct mmc_host *mmc = host->mmc;
+> +
+> +       switch (power_mode) {
+> +       case MMC_POWER_OFF:
+> +               if (!IS_ERR(mmc->supply.vmmc))
+> +                       mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, 0);
+> +
+> +               if (!IS_ERR(mmc->supply.vqmmc) && host->vqmmc_enabled) {
+> +                       regulator_disable(mmc->supply.vqmmc);
+> +                       host->vqmmc_enabled = false;
+> +               }
+> +
+> +               break;
+> +       case MMC_POWER_UP:
+> +               if (!IS_ERR(mmc->supply.vmmc))
+> +                       mmc_regulator_set_ocr(mmc, mmc->supply.vmmc,
+> +                                             mmc->ios.vdd);
+> +
+> +               /*
+> +                * The ST Micro variant doesn't have the PL180s MCI_PWR_UP
+> +                * and instead uses MCI_PWR_ON so apply whatever value is
+> +                * configured in the variant data.
+> +                */
+> +               pwr |= variant->pwrreg_powerup;
+> +
+> +               break;
+> +       case MMC_POWER_ON:
+> +               if (!IS_ERR(mmc->supply.vqmmc) && !host->vqmmc_enabled) {
+> +                       if (regulator_enable(mmc->supply.vqmmc) < 0)
+> +                               dev_err(mmc_dev(mmc),
+> +                                       "failed to enable vqmmc regulator\n");
+> +                       else
+> +                               host->vqmmc_enabled = true;
+> +               }
+> +
+> +               pwr |= MCI_PWR_ON;
+> +               break;
+> +       }
+> +
+> +       mmci_write_pwrreg(host, pwr);
+> +}
+> +
+>  static void
+>  mmci_request_end(struct mmci_host *host, struct mmc_request *mrq)
+>  {
+> @@ -1031,7 +1077,7 @@ static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+>  {
+>         struct mmci_host *host = mmc_priv(mmc);
+>         struct variant_data *variant = host->variant;
+> -       u32 pwr = 0;
+> +       unsigned int pwr = 0;
 
-On 07/05/2018 03:20 PM, Marc Zyngier wrote:
-> On 05/07/18 13:47, Julien Grall wrote:
->> Hi Will,
->>
->> On 04/07/18 16:52, Will Deacon wrote:
->>> On Wed, Jul 04, 2018 at 04:00:11PM +0100, Julien Grall wrote:
->>>> On 04/07/18 15:09, Will Deacon wrote:
->>>>> On Fri, Jun 29, 2018 at 12:15:42PM +0100, Suzuki K Poulose wrote:
->>>>>> Add an option to specify the physical address size used by this
->>>>>> VM.
->>>>>>
->>>>>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->>>>>> ---
->>>>>>   arm/aarch64/include/kvm/kvm-config-arch.h | 5 ++++-
->>>>>>   arm/include/arm-common/kvm-config-arch.h  | 1 +
->>>>>>   2 files changed, 5 insertions(+), 1 deletion(-)
->>>>>>
->>>>>> diff --git a/arm/aarch64/include/kvm/kvm-config-arch.h b/arm/aarch64/include/kvm/kvm-config-arch.h
->>>>>> index 04be43d..dabd22c 100644
->>>>>> --- a/arm/aarch64/include/kvm/kvm-config-arch.h
->>>>>> +++ b/arm/aarch64/include/kvm/kvm-config-arch.h
->>>>>> @@ -8,7 +8,10 @@
->>>>>>   			"Create PMUv3 device"),				\
->>>>>>   	OPT_U64('\0', "kaslr-seed", &(cfg)->kaslr_seed,			\
->>>>>>   			"Specify random seed for Kernel Address Space "	\
->>>>>> -			"Layout Randomization (KASLR)"),
->>>>>> +			"Layout Randomization (KASLR)"),		\
->>>>>> +	OPT_INTEGER('\0', "phys-shift", &(cfg)->phys_shift,		\
->>>>>> +			"Specify maximum physical address size (not "	\
->>>>>> +			"the amount of memory)"),
->>>>>
->>>>> Given that this is a shift value, I think the help message could be more
->>>>> informative. Something like:
->>>>>
->>>>> 	"Specify maximum number of bits in a guest physical address"
->>>>>
->>>>> I think I'd actually leave out any mention of memory, because this does
->>>>> actually have an effect on the amount of addressable memory in a way that I
->>>>> don't think we want to describe in half of a usage message line :)
->>>> Is there any particular reasons to expose this option to the user?
->>>>
->>>> I have recently sent a series to allow the user to specify the position
->>>> of the RAM [1]. With that series in mind, I think the user would not really
->>>> need to specify the maximum physical shift. Instead we could automatically
->>>> find it.
->>>
->>> Marc makes a good point that it doesn't help for MMIO regions, so I'm trying
->>> to understand whether we can do something differently there and avoid
->>> sacrificing the type parameter.
->>
->> I am not sure to understand this. kvmtools knows the memory layout 
->> (including MMIOs) of the guest, so couldn't it guess the maximum 
->> physical shift for that?
-> 
-> That's exactly what Will was trying to avoid, by having KVM to compute
-> the size of the IPA space based on the registered memslots. We've now
-> established that it doesn't work, so what we need to define is:
-> 
-> - whether we need another ioctl(), or do we carry on piggy-backing on
-> the CPU type,
-kvm type I guess
-> - assuming the latter, whether we can reduce the number of bits used in
-> the ioctl parameter by subtly encoding the IPA size.
-Getting benefit from your Freudian slip, how should guest CPU PARange
-and maximum number of bits in a guest physical address relate?
+?
 
-My understanding is they are not correlated at the moment and our guest
-PARange is fixed at the moment. But shouldn't they?
+>         unsigned long flags;
+>         int ret;
+>
+> @@ -1039,42 +1085,6 @@ static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+>                 host->plat->ios_handler(mmc_dev(mmc), ios))
+>                         dev_err(mmc_dev(mmc), "platform ios_handler failed\n");
+>
+> -       switch (ios->power_mode) {
+> -       case MMC_POWER_OFF:
+> -               if (!IS_ERR(mmc->supply.vmmc))
+> -                       mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, 0);
+> -
+> -               if (!IS_ERR(mmc->supply.vqmmc) && host->vqmmc_enabled) {
+> -                       regulator_disable(mmc->supply.vqmmc);
+> -                       host->vqmmc_enabled = false;
+> -               }
+> -
+> -               break;
+> -       case MMC_POWER_UP:
+> -               if (!IS_ERR(mmc->supply.vmmc))
+> -                       mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, ios->vdd);
+> -
+> -               /*
+> -                * The ST Micro variant doesn't have the PL180s MCI_PWR_UP
+> -                * and instead uses MCI_PWR_ON so apply whatever value is
+> -                * configured in the variant data.
+> -                */
+> -               pwr |= variant->pwrreg_powerup;
+> -
+> -               break;
+> -       case MMC_POWER_ON:
+> -               if (!IS_ERR(mmc->supply.vqmmc) && !host->vqmmc_enabled) {
+> -                       ret = regulator_enable(mmc->supply.vqmmc);
+> -                       if (ret < 0)
+> -                               dev_err(mmc_dev(mmc),
+> -                                       "failed to enable vqmmc regulator\n");
+> -                       else
+> -                               host->vqmmc_enabled = true;
+> -               }
+> -
+> -               pwr |= MCI_PWR_ON;
+> -               break;
+> -       }
 
-On Intel there is
-   qemu-system-x86_64 -M pc,accel=kvm -cpu SandyBridge,phys-bits=36
-or
-   qemu-system-x86_64 -M pc,accel=kvm -cpu SandyBridge,host-phys-bits=true
+This above looks like pure re-factoring. Please make the above change
+a separate patch.
 
-where phys-bits, as far as I understand has a a similar semantics as the
-PARange.
+>
+>         if (variant->signal_direction && ios->power_mode != MMC_POWER_OFF) {
+>                 /*
+> @@ -1126,8 +1136,16 @@ static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+>
+>         spin_lock_irqsave(&host->lock, flags);
+>
+> -       mmci_set_clkreg(host, ios->clock);
+> -       mmci_write_pwrreg(host, pwr);
+> +       if (variant->set_clkreg)
+> +               variant->set_clkreg(host, ios->clock);
+> +       else
+> +               mmci_set_clkreg(host, ios->clock);
 
-Thanks
+This means a change in behavior, which I don't think is what you want.
 
-Eric
-> 
-> Thanks,
-> 
-> 	M.
-> 
+1) The spin lock will be held while doing the regulator operations.
+2) The clock register will be written to before the regulator
+operations have been done. Not sure if that works fine!?
+
+An overall comment, I think we should create a mmci_host_ops structure
+and put the needed callbacks in there (kept to a minimum of course),
+rather than putting them as a part of the variant struct. More
+importantly, also the legacy mmci variants should get a mmci_host_ops
+structure assigned during probe.
+
+The point is, I think it makes the code above (and future wise) more
+flexible. It should also allow us to better share functions between
+the variants. In principle, I expect that we end up with a bunch of
+"library" mmci functions that can be invoked from variant's
+mmci_host_ops (if not assigned directly).
+
+> +
+> +       if (variant->set_pwrreg)
+> +               variant->set_pwrreg(host, ios->power_mode, pwr);
+> +       else
+> +               mmci_set_pwrreg(host, ios->power_mode, pwr);
+> +
+>         mmci_reg_delay(host);
+>
+>         spin_unlock_irqrestore(&host->lock, flags);
+> diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
+> index 2ba9640..7265ca6 100644
+> --- a/drivers/mmc/host/mmci.h
+> +++ b/drivers/mmc/host/mmci.h
+> @@ -231,6 +231,7 @@
+>
+>  struct clk;
+>  struct dma_chan;
+> +struct mmci_host;
+>
+>  /**
+>   * struct variant_data - MMCI variant-specific quirks
+> @@ -273,6 +274,8 @@ struct dma_chan;
+>   *            register.
+>   * @opendrain: bitmask identifying the OPENDRAIN bit inside MMCIPOWER register
+>   * @mmci_dma: Pointer to platform-specific DMA callbacks.
+> + * @set_clk_ios: if clock procedure of variant is specific
+> + * @set_pwr_ios: if power procedure of variant is specific
+>   */
+>  struct variant_data {
+>         unsigned int            clkreg;
+> @@ -307,6 +310,9 @@ struct variant_data {
+>         u32                     start_err;
+>         u32                     opendrain;
+>         struct mmci_dma_ops     *mmci_dma;
+> +       void (*set_clkreg)(struct mmci_host *host, unsigned int desired);
+> +       void (*set_pwrreg)(struct mmci_host *host, unsigned char power_mode,
+> +                          unsigned int pwr);
+>  };
+>
+>  struct mmci_host {
+> @@ -328,6 +334,7 @@ struct mmci_host {
+>         u32                     pwr_reg;
+>         u32                     pwr_reg_add;
+>         u32                     clk_reg;
+> +       u32                     clk_reg_add;
+
+What's this? Some leftover I guess?
+
+>         u32                     datactrl_reg;
+>         u32                     busy_status;
+>         u32                     mask1_reg;
+> --
+> 2.7.4
+>
+
+Kind regards
+Uffe
