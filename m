@@ -1,62 +1,36 @@
-From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Thu, 5 Jul 2018 17:53:46 +0200
-Subject: [PATCH v2 06/23] thermal: armada: convert driver to syscon
- register accesses
-In-Reply-To: <20180705144333.2cf0fe6a@xps13>
-References: <20180625151239.20976-1-miquel.raynal@bootlin.com>
- <20180625151239.20976-7-miquel.raynal@bootlin.com>
- <20180626033724.q7radxgjeqtsl7ae@tarshish>
- <20180626092931.7f0f0ad4@xps13>
- <20180702172918.GA28262@localhost.localdomain>
- <20180705144333.2cf0fe6a@xps13>
-Message-ID: <20180705175346.0ff7a906@xps13>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 5 Jul 2018 17:55:15 +0200
+Subject: [PATCH 5/5] ARM: shmobile: defconfig: Set CONFIG_LOCALVERSION
+In-Reply-To: <20180704114333.27584-6-geert+renesas@glider.be>
+References: <20180704114333.27584-1-geert+renesas@glider.be>
+ <20180704114333.27584-6-geert+renesas@glider.be>
+Message-ID: <20180705155513.ooppf45agiebi732@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eduardo,
+On Wed, Jul 04, 2018 at 01:43:33PM +0200, Geert Uytterhoeven wrote:
+> This allows to derive the kernel flavor from the kernel version at
+> runtime.
 
-Miquel Raynal <miquel.raynal@bootlin.com> wrote on Thu, 5 Jul 2018
-14:43:33 +0200:
+For my edification could you expand on what this is used for?
 
-> Hi Eduardo,
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> ---
+> v2:
+>   - shmobile_defconfig is the only shmobile defconfig left.
+> ---
+>  arch/arm/configs/shmobile_defconfig | 1 +
+>  1 file changed, 1 insertion(+)
 > 
-> Eduardo Valentin <edubezval@gmail.com> wrote on Mon, 2 Jul 2018
-> 10:29:19 -0700:
+> diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
+> index ac3dad3c3b9dc9c6..b961c121515b7f06 100644
+> --- a/arch/arm/configs/shmobile_defconfig
+> +++ b/arch/arm/configs/shmobile_defconfig
+> @@ -1,3 +1,4 @@
+> +CONFIG_LOCALVERSION="-shmobile"
+>  CONFIG_SYSVIPC=y
+>  CONFIG_NO_HZ=y
+>  CONFIG_IKCONFIG=y
+> -- 
+> 2.17.1
 > 
-> > Miquel,
-> > 
-> > On Tue, Jun 26, 2018 at 09:29:31AM +0200, Miquel Raynal wrote:  
-> > > Hi Baruch,
-> > > 
-> > > On Tue, 26 Jun 2018 06:37:24 +0300, Baruch Siach <baruch@tkos.co.il>
-> > > wrote:
-> > >     
-> > > > Hi Miquel,
-> > > > 
-> > > > On Mon, Jun 25, 2018 at 05:12:22PM +0200, Miquel Raynal wrote:    
-> > > > > Until recently, only one register was referenced in MVEBU thermal IP
-> > > > > node. Recent changes added a second entry pointing to another
-> > > > > register right next to it. We cannot know for sure that we will not
-> > > > > have to access other registers. That will be actually the case when
-> > > > > overheat interrupt feature will come, where it will be needed to access
-> > > > > DFX registers in the same area.
-> > > > > 
-> > > > > This approach is not scalable so intead of adding consinuously memory
-> > > > > areas in the DT (and change de DT bindings, while keeping backward      
-> > > > 
-> > > > s/de/the/    
-> > > 
-> > > Oh and s/intead/instead/ too.    
-> > 
-> > Can you please fix the minor above and also refresh against linus master
-> > branch? Patch does not apply clean anymore.  
-> 
-> Sure, I'll send a new version rebased on top of Linus's master branch.
-
-Actually this series was based on v4.18-rc1. When I rebased on top of
-Linus's master branch I had no conflicts to fix. I will repost a v3 but
-if the problem persists you might want to share the conflicts or give
-me a branch on top of which I should base this work.
-
-Thanks,
-Miqu?l
