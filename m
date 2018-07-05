@@ -1,493 +1,199 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 5 Jul 2018 17:26:58 +0200
-Subject: [PATCH 02/19] mmc: mmci: merge qcom dml feature into mmci dma
-In-Reply-To: <1528809280-31116-3-git-send-email-ludovic.Barre@st.com>
-References: <1528809280-31116-1-git-send-email-ludovic.Barre@st.com>
- <1528809280-31116-3-git-send-email-ludovic.Barre@st.com>
-Message-ID: <CAPDyKFqOOvbNc79hdWhdS4pxkYrh48At-BLuGmX0jDMER3Akdw@mail.gmail.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Thu, 05 Jul 2018 17:29:31 +0200
+Subject: [PATCH v2] soc: imx: gpc: Turn PU domain on/off in sleep on 6qp
+In-Reply-To: <72f3e615f4df69ee6d802efbd1e1e52692c8e134.1530803324.git.leonard.crestez@nxp.com>
+References: <72f3e615f4df69ee6d802efbd1e1e52692c8e134.1530803324.git.leonard.crestez@nxp.com>
+Message-ID: <1530804571.15725.4.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 June 2018 at 15:14, Ludovic Barre <ludovic.Barre@st.com> wrote:
-> From: Ludovic Barre <ludovic.barre@st.com>
->
-> This patch integrates qcom dml feature into mmci_dma file.
-> Qualcomm Data Mover lite/local is already a variant of mmci dmaengine.
->
-> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+Am Donnerstag, den 05.07.2018, 18:12 +0300 schrieb Leonard Crestez:
+> On imx6qp power gating on the PU domain is disabled because of errata
+> ERR009619. However power gating during suspend/resume can still be
+> performed.
+> 
+> Enable this by implementing SLEEP_PM_OPS in imx_pgc_power_domain_driver.
+> 
+> > Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
+
+This looks much better than the previous version.
+
 > ---
->  drivers/mmc/host/Makefile        |   1 -
->  drivers/mmc/host/mmci.c          |   1 -
->  drivers/mmc/host/mmci.h          |  35 ++++++++
->  drivers/mmc/host/mmci_dma.c      | 135 ++++++++++++++++++++++++++++-
->  drivers/mmc/host/mmci_qcom_dml.c | 177 ---------------------------------------
->  drivers/mmc/host/mmci_qcom_dml.h |  31 -------
->  6 files changed, 169 insertions(+), 211 deletions(-)
->  delete mode 100644 drivers/mmc/host/mmci_qcom_dml.c
->  delete mode 100644 drivers/mmc/host/mmci_qcom_dml.h
+> ?drivers/soc/imx/gpc.c | 72 ++++++++++++++++++++++++++++++++++---------
+> ?1 file changed, 57 insertions(+), 15 deletions(-)
+> 
+> Changes since v1: Implement SLEEP_PM_OPS instead of calling from
+> platform-level suspend code, as suggested by Lucas.
+> 
+> I'm not sure if doing interesting things in the pm_ops for PM providers
+> is recommended. Is correct ordering guaranteed in such a case???Any
+> VPU/GPU suspend code must execute before imx_pgc_suspend or it might try
+> to access registers in a region which is powered off.
+> 
+> Perhaps ordering needs to be guaranteed by implementing device_attach
+> and adding explicit device links to pgc platform_device?
 
-No, this is not the way to go. Instead I I think there are two options.
+Yes, I think we need device links between the users of the power
+domains and the PGC devices. Since this is one of the use-cases for
+which device links were conceived I would guess that implementing this
+should be fairly straight-forward.
 
-1) Keep mmci_qcom_dml.c|h and thus add new files for the stm32 dma variant.
-
-2) Start by renaming mmci_qcom_dml.* to mmc_dma.* and then in the next
-step add the code for stm32 dma into the renamed files.
-
-I guess if there is some overlap in functionality, 2) may be best as
-it could easier avoid open coding. However, I am fine with whatever
-option and I expect that you knows what is best.
-
-Kind regards
-Uffe
-
->
-> diff --git a/drivers/mmc/host/Makefile b/drivers/mmc/host/Makefile
-> index daecaa98..608a020 100644
-> --- a/drivers/mmc/host/Makefile
-> +++ b/drivers/mmc/host/Makefile
-> @@ -5,7 +5,6 @@
->
->  obj-$(CONFIG_MMC_ARMMMCI) += armmmci.o
->  armmmci-y := mmci.o mmci_dma.o
-> -armmmci-$(CONFIG_MMC_QCOM_DML) += mmci_qcom_dml.o
->  obj-$(CONFIG_MMC_PXA)          += pxamci.o
->  obj-$(CONFIG_MMC_MXC)          += mxcmmc.o
->  obj-$(CONFIG_MMC_MXS)          += mxs-mmc.o
-> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-> index 8868be0..7a15afd 100644
-> --- a/drivers/mmc/host/mmci.c
-> +++ b/drivers/mmc/host/mmci.c
-> @@ -43,7 +43,6 @@
->
->  #include "mmci.h"
->  #include "mmci_dma.h"
-> -#include "mmci_qcom_dml.h"
->
->  #define DRIVER_NAME "mmci-pl18x"
->
-> diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
-> index a73bb98..f7cba35 100644
-> --- a/drivers/mmc/host/mmci.h
-> +++ b/drivers/mmc/host/mmci.h
-> @@ -194,6 +194,41 @@
->
->  #define MMCI_PINCTRL_STATE_OPENDRAIN "opendrain"
->
-> +/* QCOM DML Registers */
-> +#define DML_CONFIG                     0x00
-> +#define PRODUCER_CRCI_MSK              GENMASK(1, 0)
-> +#define PRODUCER_CRCI_DISABLE          0
-> +#define PRODUCER_CRCI_X_SEL            BIT(0)
-> +#define PRODUCER_CRCI_Y_SEL            BIT(1)
-> +#define CONSUMER_CRCI_MSK              GENMASK(3, 2)
-> +#define CONSUMER_CRCI_DISABLE          0
-> +#define CONSUMER_CRCI_X_SEL            BIT(2)
-> +#define CONSUMER_CRCI_Y_SEL            BIT(3)
-> +#define PRODUCER_TRANS_END_EN          BIT(4)
-> +#define BYPASS                         BIT(16)
-> +#define DIRECT_MODE                    BIT(17)
-> +#define INFINITE_CONS_TRANS            BIT(18)
-> +
-> +#define DML_SW_RESET                   0x08
-> +#define DML_PRODUCER_START             0x0c
-> +#define DML_CONSUMER_START             0x10
-> +#define DML_PRODUCER_PIPE_LOGICAL_SIZE 0x14
-> +#define DML_CONSUMER_PIPE_LOGICAL_SIZE 0x18
-> +#define DML_PIPE_ID                    0x1c
-> +#define PRODUCER_PIPE_ID_SHFT          0
-> +#define PRODUCER_PIPE_ID_MSK           GENMASK(4, 0)
-> +#define CONSUMER_PIPE_ID_SHFT          16
-> +#define CONSUMER_PIPE_ID_MSK           GENMASK(20, 16)
-> +
-> +#define DML_PRODUCER_BAM_BLOCK_SIZE    0x24
-> +#define DML_PRODUCER_BAM_TRANS_SIZE    0x28
-> +
-> +/* other definitions */
-> +#define PRODUCER_PIPE_LOGICAL_SIZE     4096
-> +#define CONSUMER_PIPE_LOGICAL_SIZE     4096
-> +
-> +#define DML_OFFSET                     0x800
-> +
->  struct clk;
->  struct dma_chan;
->
-> diff --git a/drivers/mmc/host/mmci_dma.c b/drivers/mmc/host/mmci_dma.c
-> index 98a542d..dd7dae5 100644
-> --- a/drivers/mmc/host/mmci_dma.c
-> +++ b/drivers/mmc/host/mmci_dma.c
-> @@ -8,11 +8,11 @@
->  #include <linux/dmaengine.h>
->  #include <linux/mmc/host.h>
->  #include <linux/mmc/card.h>
-> +#include <linux/of.h>
->  #include <linux/scatterlist.h>
->
->  #include "mmci.h"
->  #include "mmci_dma.h"
-> -#include "mmci_qcom_dml.h"
->
->  int mmci_dma_setup(struct mmci_host *host)
->  {
-> @@ -101,6 +101,139 @@ struct dmaengine_priv {
->
->  #define dma_inprogress(dmae) ((dmae)->dma_in_progress)
->
-> +#ifdef CONFIG_MMC_QCOM_DML
-> +void dml_start_xfer(struct mmci_host *host, struct mmc_data *data)
-> +{
-> +       u32 config;
-> +       void __iomem *base = host->base + DML_OFFSET;
-> +
-> +       if (data->flags & MMC_DATA_READ) {
-> +               /* Read operation: configure DML for producer operation */
-> +               /* Set producer CRCI-x and disable consumer CRCI */
-> +               config = readl_relaxed(base + DML_CONFIG);
-> +               config = (config & ~PRODUCER_CRCI_MSK) | PRODUCER_CRCI_X_SEL;
-> +               config = (config & ~CONSUMER_CRCI_MSK) | CONSUMER_CRCI_DISABLE;
-> +               writel_relaxed(config, base + DML_CONFIG);
-> +
-> +               /* Set the Producer BAM block size */
-> +               writel_relaxed(data->blksz, base + DML_PRODUCER_BAM_BLOCK_SIZE);
-> +
-> +               /* Set Producer BAM Transaction size */
-> +               writel_relaxed(data->blocks * data->blksz,
-> +                              base + DML_PRODUCER_BAM_TRANS_SIZE);
-> +               /* Set Producer Transaction End bit */
-> +               config = readl_relaxed(base + DML_CONFIG);
-> +               config |= PRODUCER_TRANS_END_EN;
-> +               writel_relaxed(config, base + DML_CONFIG);
-> +               /* Trigger producer */
-> +               writel_relaxed(1, base + DML_PRODUCER_START);
-> +       } else {
-> +               /* Write operation: configure DML for consumer operation */
-> +               /* Set consumer CRCI-x and disable producer CRCI*/
-> +               config = readl_relaxed(base + DML_CONFIG);
-> +               config = (config & ~CONSUMER_CRCI_MSK) | CONSUMER_CRCI_X_SEL;
-> +               config = (config & ~PRODUCER_CRCI_MSK) | PRODUCER_CRCI_DISABLE;
-> +               writel_relaxed(config, base + DML_CONFIG);
-> +               /* Clear Producer Transaction End bit */
-> +               config = readl_relaxed(base + DML_CONFIG);
-> +               config &= ~PRODUCER_TRANS_END_EN;
-> +               writel_relaxed(config, base + DML_CONFIG);
-> +               /* Trigger consumer */
-> +               writel_relaxed(1, base + DML_CONSUMER_START);
-> +       }
-> +
-> +       /* make sure the dml is configured before dma is triggered */
-> +       wmb();
+> Link to v1: https://lkml.org/lkml/2018/7/2/370
+> 
+> diff --git a/drivers/soc/imx/gpc.c b/drivers/soc/imx/gpc.c
+> index b4acdfd3cffd..96d9e882d583 100644
+> --- a/drivers/soc/imx/gpc.c
+> +++ b/drivers/soc/imx/gpc.c
+> @@ -54,19 +54,16 @@ static inline struct imx_pm_domain *
+> ?to_imx_pm_domain(struct generic_pm_domain *genpd)
+> ?{
+> > ?	return container_of(genpd, struct imx_pm_domain, base);
+> ?}
+> ?
+> -static int imx6_pm_domain_power_off(struct generic_pm_domain *genpd)
+> +static void _imx6_pm_domain_power_off(struct generic_pm_domain *genpd)
+> ?{
+> > ?	struct imx_pm_domain *pd = to_imx_pm_domain(genpd);
+> > ?	int iso, iso2sw;
+> > ?	u32 val;
+> ?
+> > -	if (pd->flags & PGC_DOMAIN_FLAG_NO_PD)
+> > -		return -EBUSY;
+> -
+> > ?	/* Read ISO and ISO2SW power down delays */
+> > ?	regmap_read(pd->regmap, pd->reg_offs + GPC_PGC_PUPSCR_OFFS, &val);
+> > ?	iso = val & 0x3f;
+> > ?	iso2sw = (val >> 8) & 0x3f;
+> ?
+> @@ -78,32 +75,33 @@ static int imx6_pm_domain_power_off(struct generic_pm_domain *genpd)
+> > ?	val = BIT(pd->cntr_pdn_bit);
+> > ?	regmap_update_bits(pd->regmap, GPC_CNTR, val, val);
+> ?
+> > ?	/* Wait ISO + ISO2SW IPG clock cycles */
+> > ?	udelay(DIV_ROUND_UP(iso + iso2sw, pd->ipg_rate_mhz));
 > +}
 > +
-> +static int of_get_dml_pipe_index(struct device_node *np, const char *name)
+> +static int imx6_pm_domain_power_off(struct generic_pm_domain *genpd)
 > +{
-> +       int index;
-> +       struct of_phandle_args dma_spec;
+> > +	struct imx_pm_domain *pd = to_imx_pm_domain(genpd);
 > +
-> +       index = of_property_match_string(np, "dma-names", name);
+> > +	if (pd->flags & PGC_DOMAIN_FLAG_NO_PD)
+> > +		return -EBUSY;
 > +
-> +       if (index < 0)
-> +               return -ENODEV;
-> +
-> +       if (of_parse_phandle_with_args(np, "dmas", "#dma-cells", index,
-> +                                      &dma_spec))
-> +               return -ENODEV;
-> +
-> +       if (dma_spec.args_count)
-> +               return dma_spec.args[0];
-> +
-> +       return -ENODEV;
+> > +	_imx6_pm_domain_power_off(genpd);
+> ?
+> > ?	if (pd->supply)
+> ?		regulator_disable(pd->supply);
+
+If possible the regulator should also be disabled in the system suspend
+path, as this might reduce power consumption some more. But then this
+might have issues with suspend ordering of the regulator.
+
+As I don't want to send you down the rabbit hole too much with adding
+ordering to this stuff, I won't object to this going in as-is. If this
+is in fact due to a ordering limitation I would like to see this
+documented in a code comment.
+
+Regards,
+Lucas
+
+> ?
+> > ?	return 0;
+> ?}
+> ?
+> -static int imx6_pm_domain_power_on(struct generic_pm_domain *genpd)
+> +static void _imx6_pm_domain_power_on(struct generic_pm_domain *genpd)
+> ?{
+> > ?	struct imx_pm_domain *pd = to_imx_pm_domain(genpd);
+> > -	int i, ret, sw, sw2iso;
+> > +	int i, sw, sw2iso;
+> > ?	u32 val;
+> ?
+> > -	if (pd->supply) {
+> > -		ret = regulator_enable(pd->supply);
+> > -		if (ret) {
+> > -			pr_err("%s: failed to enable regulator: %d\n",
+> > -			???????__func__, ret);
+> > -			return ret;
+> > -		}
+> > -	}
+> -
+> > ?	/* Enable reset clocks for all devices in the domain */
+> > ?	for (i = 0; i < pd->num_clks; i++)
+> > ?		clk_prepare_enable(pd->clk[i]);
+> ?
+> > ?	/* Gate off domain when powered down */
+> @@ -123,10 +121,27 @@ static int imx6_pm_domain_power_on(struct generic_pm_domain *genpd)
+> > ?	udelay(DIV_ROUND_UP(sw + sw2iso, pd->ipg_rate_mhz));
+> ?
+> > ?	/* Disable reset clocks for all devices in the domain */
+> > ?	for (i = 0; i < pd->num_clks; i++)
+> > ?		clk_disable_unprepare(pd->clk[i]);
 > +}
 > +
-> +/* Initialize the dml hardware connected to SD Card controller */
-> +int dml_hw_init(struct mmci_host *host, struct device_node *np)
+> +static int imx6_pm_domain_power_on(struct generic_pm_domain *genpd)
 > +{
-> +       u32 config;
-> +       void __iomem *base;
-> +       int consumer_id, producer_id;
+> > +	struct imx_pm_domain *pd = to_imx_pm_domain(genpd);
+> > +	int ret;
 > +
-> +       consumer_id = of_get_dml_pipe_index(np, "tx");
-> +       producer_id = of_get_dml_pipe_index(np, "rx");
+> > +	if (pd->supply) {
+> > +		ret = regulator_enable(pd->supply);
+> > +		if (ret) {
+> > +			pr_err("%s: failed to enable regulator: %d\n",
+> > +			???????__func__, ret);
+> > +			return ret;
+> > +		}
+> > +	}
 > +
-> +       if (producer_id < 0 || consumer_id < 0)
-> +               return -ENODEV;
-> +
-> +       base = host->base + DML_OFFSET;
-> +
-> +       /* Reset the DML block */
-> +       writel_relaxed(1, base + DML_SW_RESET);
-> +
-> +       /* Disable the producer and consumer CRCI */
-> +       config = (PRODUCER_CRCI_DISABLE | CONSUMER_CRCI_DISABLE);
-> +       /*
-> +        * Disable the bypass mode. Bypass mode will only be used
-> +        * if data transfer is to happen in PIO mode and don't
-> +        * want the BAM interface to connect with SDCC-DML.
-> +        */
-> +       config &= ~BYPASS;
-> +       /*
-> +        * Disable direct mode as we don't DML to MASTER the AHB bus.
-> +        * BAM connected with DML should MASTER the AHB bus.
-> +        */
-> +       config &= ~DIRECT_MODE;
-> +       /*
-> +        * Disable infinite mode transfer as we won't be doing any
-> +        * infinite size data transfers. All data transfer will be
-> +        * of finite data size.
-> +        */
-> +       config &= ~INFINITE_CONS_TRANS;
-> +       writel_relaxed(config, base + DML_CONFIG);
-> +
-> +       /*
-> +        * Initialize the logical BAM pipe size for producer
-> +        * and consumer.
-> +        */
-> +       writel_relaxed(PRODUCER_PIPE_LOGICAL_SIZE,
-> +                      base + DML_PRODUCER_PIPE_LOGICAL_SIZE);
-> +       writel_relaxed(CONSUMER_PIPE_LOGICAL_SIZE,
-> +                      base + DML_CONSUMER_PIPE_LOGICAL_SIZE);
-> +
-> +       /* Initialize Producer/consumer pipe id */
-> +       writel_relaxed(producer_id | (consumer_id << CONSUMER_PIPE_ID_SHFT),
-> +                      base + DML_PIPE_ID);
-> +
-> +       /* Make sure dml initialization is finished */
-> +       mb();
-> +
-> +       return 0;
-> +}
-> +#else
-> +static inline int dml_hw_init(struct mmci_host *host, struct device_node *np)
+> > +	_imx6_pm_domain_power_on(genpd);
+> ?
+> > ?	return 0;
+> ?}
+> ?
+> ?static int imx_pgc_get_clocks(struct device *dev, struct imx_pm_domain *domain)
+> @@ -227,18 +242,45 @@ static int imx_pgc_power_domain_remove(struct platform_device *pdev)
+> > ?	}
+> ?
+> > ?	return 0;
+> ?}
+> ?
+> +static int imx_pgc_suspend(struct device *dev)
 > +{
-> +       return -EINVAL;
+> > +	struct platform_device *pdev = to_platform_device(dev);
+> > +	struct imx_pm_domain *pd = pdev->dev.platform_data;
+> +
+> > +	if (pd->flags & PGC_DOMAIN_FLAG_NO_PD)
+> > +		_imx6_pm_domain_power_off(&pd->base);
+> +
+> > +	return 0;
 > +}
 > +
-> +static inline void dml_start_xfer(struct mmci_host *host, struct mmc_data *data)
+> +static int imx_pgc_resume(struct device *dev)
 > +{
-> +}
-> +#endif /* CONFIG_MMC_QCOM_DML */
+> > +	struct platform_device *pdev = to_platform_device(dev);
+> > +	struct imx_pm_domain *pd = pdev->dev.platform_data;
 > +
->  static int dmaengine_setup(struct mmci_host *host)
->  {
->         const char *rxname, *txname;
-> diff --git a/drivers/mmc/host/mmci_qcom_dml.c b/drivers/mmc/host/mmci_qcom_dml.c
-> deleted file mode 100644
-> index 00750c9..0000000
-> --- a/drivers/mmc/host/mmci_qcom_dml.c
-> +++ /dev/null
-> @@ -1,177 +0,0 @@
-> -/*
-> - *
-> - * Copyright (c) 2011, The Linux Foundation. All rights reserved.
-> - *
-> - * This program is free software; you can redistribute it and/or modify
-> - * it under the terms of the GNU General Public License version 2 and
-> - * only version 2 as published by the Free Software Foundation.
-> - *
-> - * This program is distributed in the hope that it will be useful,
-> - * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> - * GNU General Public License for more details.
-> - *
-> - */
-> -#include <linux/of.h>
-> -#include <linux/of_dma.h>
-> -#include <linux/bitops.h>
-> -#include <linux/mmc/host.h>
-> -#include <linux/mmc/card.h>
-> -#include "mmci.h"
-> -
-> -/* Registers */
-> -#define DML_CONFIG                     0x00
-> -#define PRODUCER_CRCI_MSK              GENMASK(1, 0)
-> -#define PRODUCER_CRCI_DISABLE          0
-> -#define PRODUCER_CRCI_X_SEL            BIT(0)
-> -#define PRODUCER_CRCI_Y_SEL            BIT(1)
-> -#define CONSUMER_CRCI_MSK              GENMASK(3, 2)
-> -#define CONSUMER_CRCI_DISABLE          0
-> -#define CONSUMER_CRCI_X_SEL            BIT(2)
-> -#define CONSUMER_CRCI_Y_SEL            BIT(3)
-> -#define PRODUCER_TRANS_END_EN          BIT(4)
-> -#define BYPASS                         BIT(16)
-> -#define DIRECT_MODE                    BIT(17)
-> -#define INFINITE_CONS_TRANS            BIT(18)
-> -
-> -#define DML_SW_RESET                   0x08
-> -#define DML_PRODUCER_START             0x0c
-> -#define DML_CONSUMER_START             0x10
-> -#define DML_PRODUCER_PIPE_LOGICAL_SIZE 0x14
-> -#define DML_CONSUMER_PIPE_LOGICAL_SIZE 0x18
-> -#define DML_PIPE_ID                    0x1c
-> -#define PRODUCER_PIPE_ID_SHFT          0
-> -#define PRODUCER_PIPE_ID_MSK           GENMASK(4, 0)
-> -#define CONSUMER_PIPE_ID_SHFT          16
-> -#define CONSUMER_PIPE_ID_MSK           GENMASK(20, 16)
-> -
-> -#define DML_PRODUCER_BAM_BLOCK_SIZE    0x24
-> -#define DML_PRODUCER_BAM_TRANS_SIZE    0x28
-> -
-> -/* other definitions */
-> -#define PRODUCER_PIPE_LOGICAL_SIZE     4096
-> -#define CONSUMER_PIPE_LOGICAL_SIZE     4096
-> -
-> -#define DML_OFFSET                     0x800
-> -
-> -void dml_start_xfer(struct mmci_host *host, struct mmc_data *data)
-> -{
-> -       u32 config;
-> -       void __iomem *base = host->base + DML_OFFSET;
-> -
-> -       if (data->flags & MMC_DATA_READ) {
-> -               /* Read operation: configure DML for producer operation */
-> -               /* Set producer CRCI-x and disable consumer CRCI */
-> -               config = readl_relaxed(base + DML_CONFIG);
-> -               config = (config & ~PRODUCER_CRCI_MSK) | PRODUCER_CRCI_X_SEL;
-> -               config = (config & ~CONSUMER_CRCI_MSK) | CONSUMER_CRCI_DISABLE;
-> -               writel_relaxed(config, base + DML_CONFIG);
-> -
-> -               /* Set the Producer BAM block size */
-> -               writel_relaxed(data->blksz, base + DML_PRODUCER_BAM_BLOCK_SIZE);
-> -
-> -               /* Set Producer BAM Transaction size */
-> -               writel_relaxed(data->blocks * data->blksz,
-> -                              base + DML_PRODUCER_BAM_TRANS_SIZE);
-> -               /* Set Producer Transaction End bit */
-> -               config = readl_relaxed(base + DML_CONFIG);
-> -               config |= PRODUCER_TRANS_END_EN;
-> -               writel_relaxed(config, base + DML_CONFIG);
-> -               /* Trigger producer */
-> -               writel_relaxed(1, base + DML_PRODUCER_START);
-> -       } else {
-> -               /* Write operation: configure DML for consumer operation */
-> -               /* Set consumer CRCI-x and disable producer CRCI*/
-> -               config = readl_relaxed(base + DML_CONFIG);
-> -               config = (config & ~CONSUMER_CRCI_MSK) | CONSUMER_CRCI_X_SEL;
-> -               config = (config & ~PRODUCER_CRCI_MSK) | PRODUCER_CRCI_DISABLE;
-> -               writel_relaxed(config, base + DML_CONFIG);
-> -               /* Clear Producer Transaction End bit */
-> -               config = readl_relaxed(base + DML_CONFIG);
-> -               config &= ~PRODUCER_TRANS_END_EN;
-> -               writel_relaxed(config, base + DML_CONFIG);
-> -               /* Trigger consumer */
-> -               writel_relaxed(1, base + DML_CONSUMER_START);
-> -       }
-> -
-> -       /* make sure the dml is configured before dma is triggered */
-> -       wmb();
-> -}
-> -
-> -static int of_get_dml_pipe_index(struct device_node *np, const char *name)
-> -{
-> -       int index;
-> -       struct of_phandle_args  dma_spec;
-> -
-> -       index = of_property_match_string(np, "dma-names", name);
-> -
-> -       if (index < 0)
-> -               return -ENODEV;
-> -
-> -       if (of_parse_phandle_with_args(np, "dmas", "#dma-cells", index,
-> -                                      &dma_spec))
-> -               return -ENODEV;
-> -
-> -       if (dma_spec.args_count)
-> -               return dma_spec.args[0];
-> -
-> -       return -ENODEV;
-> -}
-> -
-> -/* Initialize the dml hardware connected to SD Card controller */
-> -int dml_hw_init(struct mmci_host *host, struct device_node *np)
-> -{
-> -       u32 config;
-> -       void __iomem *base;
-> -       int consumer_id, producer_id;
-> -
-> -       consumer_id = of_get_dml_pipe_index(np, "tx");
-> -       producer_id = of_get_dml_pipe_index(np, "rx");
-> -
-> -       if (producer_id < 0 || consumer_id < 0)
-> -               return -ENODEV;
-> -
-> -       base = host->base + DML_OFFSET;
-> -
-> -       /* Reset the DML block */
-> -       writel_relaxed(1, base + DML_SW_RESET);
-> -
-> -       /* Disable the producer and consumer CRCI */
-> -       config = (PRODUCER_CRCI_DISABLE | CONSUMER_CRCI_DISABLE);
-> -       /*
-> -        * Disable the bypass mode. Bypass mode will only be used
-> -        * if data transfer is to happen in PIO mode and don't
-> -        * want the BAM interface to connect with SDCC-DML.
-> -        */
-> -       config &= ~BYPASS;
-> -       /*
-> -        * Disable direct mode as we don't DML to MASTER the AHB bus.
-> -        * BAM connected with DML should MASTER the AHB bus.
-> -        */
-> -       config &= ~DIRECT_MODE;
-> -       /*
-> -        * Disable infinite mode transfer as we won't be doing any
-> -        * infinite size data transfers. All data transfer will be
-> -        * of finite data size.
-> -        */
-> -       config &= ~INFINITE_CONS_TRANS;
-> -       writel_relaxed(config, base + DML_CONFIG);
-> -
-> -       /*
-> -        * Initialize the logical BAM pipe size for producer
-> -        * and consumer.
-> -        */
-> -       writel_relaxed(PRODUCER_PIPE_LOGICAL_SIZE,
-> -                      base + DML_PRODUCER_PIPE_LOGICAL_SIZE);
-> -       writel_relaxed(CONSUMER_PIPE_LOGICAL_SIZE,
-> -                      base + DML_CONSUMER_PIPE_LOGICAL_SIZE);
-> -
-> -       /* Initialize Producer/consumer pipe id */
-> -       writel_relaxed(producer_id | (consumer_id << CONSUMER_PIPE_ID_SHFT),
-> -                      base + DML_PIPE_ID);
-> -
-> -       /* Make sure dml initialization is finished */
-> -       mb();
-> -
-> -       return 0;
-> -}
-> diff --git a/drivers/mmc/host/mmci_qcom_dml.h b/drivers/mmc/host/mmci_qcom_dml.h
-> deleted file mode 100644
-> index 6e405d0..0000000
-> --- a/drivers/mmc/host/mmci_qcom_dml.h
-> +++ /dev/null
-> @@ -1,31 +0,0 @@
-> -/*
-> - *
-> - * Copyright (c) 2011, The Linux Foundation. All rights reserved.
-> - *
-> - * This program is free software; you can redistribute it and/or modify
-> - * it under the terms of the GNU General Public License version 2 and
-> - * only version 2 as published by the Free Software Foundation.
-> - *
-> - * This program is distributed in the hope that it will be useful,
-> - * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> - * GNU General Public License for more details.
-> - *
-> - */
-> -#ifndef __MMC_QCOM_DML_H__
-> -#define __MMC_QCOM_DML_H__
-> -
-> -#ifdef CONFIG_MMC_QCOM_DML
-> -int dml_hw_init(struct mmci_host *host, struct device_node *np);
-> -void dml_start_xfer(struct mmci_host *host, struct mmc_data *data);
-> -#else
-> -static inline int dml_hw_init(struct mmci_host *host, struct device_node *np)
-> -{
-> -       return -ENOSYS;
-> -}
-> -static inline void dml_start_xfer(struct mmci_host *host, struct mmc_data *data)
-> -{
-> -}
-> -#endif /* CONFIG_MMC_QCOM_DML */
-> -
-> -#endif /* __MMC_QCOM_DML_H__ */
-> --
-> 2.7.4
->
+> > +	if (pd->flags & PGC_DOMAIN_FLAG_NO_PD)
+> > +		_imx6_pm_domain_power_on(&pd->base);
+> +
+> > +	return 0;
+> +}
+> +
+> +static const struct dev_pm_ops imx_pgc_pm_ops = {
+> > +	SET_SYSTEM_SLEEP_PM_OPS(imx_pgc_suspend, imx_pgc_resume)
+> +};
+> +
+> ?static const struct platform_device_id imx_pgc_power_domain_id[] = {
+> > ?	{ "imx-pgc-power-domain"},
+> > ?	{ },
+> ?};
+> ?
+> ?static struct platform_driver imx_pgc_power_domain_driver = {
+> > ?	.driver = {
+> > ?		.name = "imx-pgc-pd",
+> > +		.pm = &imx_pgc_pm_ops,
+> > ?	},
+> > ?	.probe = imx_pgc_power_domain_probe,
+> > ?	.remove = imx_pgc_power_domain_remove,
+> > ?	.id_table = imx_pgc_power_domain_id,
+> ?};
