@@ -1,38 +1,49 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu,  5 Jul 2018 10:39:22 +0530
-Subject: [PATCH 0/2] dt: thermal: Fix broken cooling-maps
-Message-ID: <cover.1530766981.git.viresh.kumar@linaro.org>
+Date: Thu,  5 Jul 2018 10:39:24 +0530
+Subject: [PATCH 2/2] arm64: dts: hi6220: Add all CPUs in cooling maps
+In-Reply-To: <cover.1530766981.git.viresh.kumar@linaro.org>
+References: <cover.1530766981.git.viresh.kumar@linaro.org>
+Message-ID: <fd741a8140809406ce86c479bbf6f03319490a64.1530766981.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Each CPU can (and does) participate in cooling down the system but the
+DT only captures the CPU0 in the cooling maps. Things work by chance as
+under normal circumstances its the CPU0 which is used by the operating
+systems to probe the cooling devices. But as soon as that ordering
+changes and any other CPU is used to bring up the cooling device, we
+will start seeing errors.
 
-This is an attempt to fix the broken or partially defined DT bindings
-for cooling-maps. We should list every device that participates in
-cooling down at a certain trip point, instead of just the first in the
-list as that depends on certain ordering of events to work properly.
+On the other hand, the hardware is partially defined in DT in these
+cases and we must do a better job by capturing all devices.
 
-The first patch extends the binding to allow a list of phandles in
-"cooling-device" property and the second patch fixes one of the
-platform's DT.
+Add all devices (CPUs here) in the cooling maps which are also affected
+by the trip point.
 
-This will be followed up by fixing all platform DT bindings that have
-these issues after this set is accepted.
+Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+---
+ arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
 
-The kernel also requires some changes to handle the phandle list, but
-wouldn't break with these changes as it reads the first phandle in the
-list for now. We can update that separately.
-
---
-viresh
-
-Viresh Kumar (2):
-  dt-bindings: thermal: Allow multiple devices to share cooling map
-  arm64: dts: hi6220: Add all CPUs in cooling maps
-
- Documentation/devicetree/bindings/thermal/thermal.txt | 11 +++--------
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi             |  9 ++++++++-
- 2 files changed, 11 insertions(+), 9 deletions(-)
-
+diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+index 247024df714f..919d36b91bf3 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
++++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+@@ -886,7 +886,14 @@
+ 				cooling-maps {
+ 					map0 {
+ 						trip = <&target>;
+-						cooling-device = <&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
++						cooling-device = <&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>,
++								 <&cpu1 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>,
++								 <&cpu2 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>,
++								 <&cpu3 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>,
++								 <&cpu4 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>,
++								 <&cpu5 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>,
++								 <&cpu6 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>,
++								 <&cpu7 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
+ 					};
+ 				};
+ 			};
 -- 
 2.18.0.rc1.242.g61856ae69a2c
