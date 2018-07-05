@@ -1,31 +1,32 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 4 Jul 2018 22:05:45 -0300
-Subject: [PATCH 0/3] ARM: dts: imx31: add device tree description of basic
- controllers
-In-Reply-To: <20180703192934.6080-1-vz@mleia.com>
-References: <20180703192934.6080-1-vz@mleia.com>
-Message-ID: <CAOMZO5AWr=o1xgD5m7Q6SwrXgf__aVtXTk2GHFV_CryfV4tGiQ@mail.gmail.com>
+From: chen.zhong@mediatek.com (Chen Zhong)
+Date: Thu, 5 Jul 2018 09:27:14 +0800
+Subject: [RESEND PATCH] dt-bindings: input: Add common keyboard document
+ bindings
+In-Reply-To: <20180704152514.33h52ujqp34hpj2o@penguin>
+References: <1529648198-14231-1-git-send-email-chen.zhong@mediatek.com>
+ <1529649595.14396.18.camel@mhfsdcap03>
+ <20180704152514.33h52ujqp34hpj2o@penguin>
+Message-ID: <1530754034.14396.19.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vladimir,
+On Wed, 2018-07-04 at 15:25 +0000, Dmitry Torokhov wrote:
+> On Fri, Jun 22, 2018 at 02:39:55PM +0800, Chen Zhong wrote:
+> > Hi Dmitry,
+> > 
+> > The other patches in the series to add mediatek pmic keys support are
+> > now available in 4.18-rc1, but this patch seems not being merged.
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git
+> > ib-mfd-input-rtc-v4.18
+> > 
+> > I have resend the patch, and rebase to 4.18-rc1.
+> > Could you help to see if it is good enough to be merged into your tree?
+> 
+> I thought Rob would pick it up, but since he hasn't I'll do it.
+> 
+> Thanks.
+> 
 
-On Tue, Jul 3, 2018 at 4:29 PM, Vladimir Zapolskiy <vz@mleia.com> wrote:
-> The changeset combines a number of essential updates to support device tree
-> on Freescale i.MX31 powered boards:
-> * removal of bogus RNGA registration for i.MX31 (device tree only),
-> * the core controllers on the i.MX31 SoC are now properly described,
-> * for reference and testing I add basic support of LogicPD MX31Lite board.
->
-> There are some missing compatibles in the change 2/3, however at the moment
-> I assume that either adding the values can be omitted or deferred, here is
-> the exact list:
-> * "fsl,imx31-pata"
-> * "fsl,imx31-rtc"
-> * "fsl,imx31-nand"
-> * "fsl,imx31-weim"
->
-> To test the changes I used a LogicPD reference board, however note that
-> still I have to add a workaround to the old known issue within imx-wdt
-
-Hopefully you and Uwe can reach an agreement on the imx31 watchdog fix :-)
+That would be great helpful.
+Thank you.
