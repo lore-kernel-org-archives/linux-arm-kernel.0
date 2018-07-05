@@ -1,61 +1,117 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 5 Jul 2018 15:15:22 +0100
-Subject: [PATCH 1/2] PCI: aardvark: Size bridges before resources
- allocation
-In-Reply-To: <20180629091620.31503-2-thomas.petazzoni@bootlin.com>
-References: <20180629091620.31503-1-thomas.petazzoni@bootlin.com>
- <20180629091620.31503-2-thomas.petazzoni@bootlin.com>
-Message-ID: <20180705141522.GA13716@red-moon>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 5 Jul 2018 15:15:46 +0100
+Subject: [kvmtool test PATCH 22/24] kvmtool: arm64: Add support for guest
+ physical address size
+In-Reply-To: <bd5186ce-66ab-e2fa-3531-46a4a87b84d8@redhat.com>
+References: <1530270944-11351-1-git-send-email-suzuki.poulose@arm.com>
+ <1530270944-11351-23-git-send-email-suzuki.poulose@arm.com>
+ <20180704140943.GF4828@arm.com>
+ <8c9bb3cd-f673-17f3-656f-66b7e14fc73c@arm.com>
+ <20180704155231.GP4828@arm.com>
+ <ca05f552-d0d7-b5b8-954b-7254e8c1e529@arm.com>
+ <d0c005f8-eae4-3784-1ebc-d279df4ee608@arm.com>
+ <bd5186ce-66ab-e2fa-3531-46a4a87b84d8@redhat.com>
+Message-ID: <29208b59-0224-00d2-0e2a-6f53a0cbc963@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 29, 2018 at 11:16:19AM +0200, Thomas Petazzoni wrote:
-> From: Zachary Zhang <zhangzg@marvell.com>
-> 
-> The PCIE I/O and MEM resource allocation mechanism is that root bus
-> goes through the following steps:
-> 
-> 1. Check PCI bridges' range and computes I/O and Mem base/limits.
-> 
-> 2. Sort all subordinate devices I/O and MEM resource requirements and
->    allocate the resources and writes/updates subordinate devices'
->    requirements to PCI bridges I/O and Mem MEM/limits registers.
-> 
-> Currently, PCI Aardvark driver only handles the second step and lacks
-> the first step, so there is an I/O and MEM resource allocation failure
-> when using a PCI switch. This commit fixes that by sizing bridges
-> before doing the resource allocation.
-> 
-> Signed-off-by: Zachary Zhang <zhangzg@marvell.com>
-> [Thomas: edit commit log.]
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
-> ---
->  drivers/pci/controller/pci-aardvark.c | 1 +
->  1 file changed, 1 insertion(+)
+Hi Eric,
 
-Hi Thomas,
+On 05/07/18 14:46, Auger Eric wrote:
+> Hi Marc,
+> 
+> On 07/05/2018 03:20 PM, Marc Zyngier wrote:
+>> On 05/07/18 13:47, Julien Grall wrote:
+>>> Hi Will,
+>>>
+>>> On 04/07/18 16:52, Will Deacon wrote:
+>>>> On Wed, Jul 04, 2018 at 04:00:11PM +0100, Julien Grall wrote:
+>>>>> On 04/07/18 15:09, Will Deacon wrote:
+>>>>>> On Fri, Jun 29, 2018 at 12:15:42PM +0100, Suzuki K Poulose wrote:
+>>>>>>> Add an option to specify the physical address size used by this
+>>>>>>> VM.
+>>>>>>>
+>>>>>>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>>>>>>> ---
+>>>>>>>   arm/aarch64/include/kvm/kvm-config-arch.h | 5 ++++-
+>>>>>>>   arm/include/arm-common/kvm-config-arch.h  | 1 +
+>>>>>>>   2 files changed, 5 insertions(+), 1 deletion(-)
+>>>>>>>
+>>>>>>> diff --git a/arm/aarch64/include/kvm/kvm-config-arch.h b/arm/aarch64/include/kvm/kvm-config-arch.h
+>>>>>>> index 04be43d..dabd22c 100644
+>>>>>>> --- a/arm/aarch64/include/kvm/kvm-config-arch.h
+>>>>>>> +++ b/arm/aarch64/include/kvm/kvm-config-arch.h
+>>>>>>> @@ -8,7 +8,10 @@
+>>>>>>>   			"Create PMUv3 device"),				\
+>>>>>>>   	OPT_U64('\0', "kaslr-seed", &(cfg)->kaslr_seed,			\
+>>>>>>>   			"Specify random seed for Kernel Address Space "	\
+>>>>>>> -			"Layout Randomization (KASLR)"),
+>>>>>>> +			"Layout Randomization (KASLR)"),		\
+>>>>>>> +	OPT_INTEGER('\0', "phys-shift", &(cfg)->phys_shift,		\
+>>>>>>> +			"Specify maximum physical address size (not "	\
+>>>>>>> +			"the amount of memory)"),
+>>>>>>
+>>>>>> Given that this is a shift value, I think the help message could be more
+>>>>>> informative. Something like:
+>>>>>>
+>>>>>> 	"Specify maximum number of bits in a guest physical address"
+>>>>>>
+>>>>>> I think I'd actually leave out any mention of memory, because this does
+>>>>>> actually have an effect on the amount of addressable memory in a way that I
+>>>>>> don't think we want to describe in half of a usage message line :)
+>>>>> Is there any particular reasons to expose this option to the user?
+>>>>>
+>>>>> I have recently sent a series to allow the user to specify the position
+>>>>> of the RAM [1]. With that series in mind, I think the user would not really
+>>>>> need to specify the maximum physical shift. Instead we could automatically
+>>>>> find it.
+>>>>
+>>>> Marc makes a good point that it doesn't help for MMIO regions, so I'm trying
+>>>> to understand whether we can do something differently there and avoid
+>>>> sacrificing the type parameter.
+>>>
+>>> I am not sure to understand this. kvmtools knows the memory layout 
+>>> (including MMIOs) of the guest, so couldn't it guess the maximum 
+>>> physical shift for that?
+>>
+>> That's exactly what Will was trying to avoid, by having KVM to compute
+>> the size of the IPA space based on the registered memslots. We've now
+>> established that it doesn't work, so what we need to define is:
+>>
+>> - whether we need another ioctl(), or do we carry on piggy-backing on
+>> the CPU type,
+> kvm type I guess
 
-I am queueing these two patches but this one seems a serious bug,
-I reckon we should send it to stable kernels (and would be grateful
-if you provide me with a Fixes tag and a kernel log to add to the
-commit log).
+I really meant target here. Whatever you pass as a "-cpu" on your QEMU
+command line.
+
+>> - assuming the latter, whether we can reduce the number of bits used in
+>> the ioctl parameter by subtly encoding the IPA size.
+> Getting benefit from your Freudian slip, how should guest CPU PARange
+> and maximum number of bits in a guest physical address relate?
+
+Freudian? I'm not on the sofa yet... ;-)
+
+> My understanding is they are not correlated at the moment and our guest
+> PARange is fixed at the moment. But shouldn't they?
+> 
+> On Intel there is
+>    qemu-system-x86_64 -M pc,accel=kvm -cpu SandyBridge,phys-bits=36
+> or
+>    qemu-system-x86_64 -M pc,accel=kvm -cpu SandyBridge,host-phys-bits=true
+> 
+> where phys-bits, as far as I understand has a a similar semantics as the
+> PARange.
+
+I think there is value in having it global, just like on x86. We don't
+really support heterogeneous guests anyway.
+
+Independently, we should also repaint/satinize PARange so that the guest
+observes the same thing, no matter what CPU it runs on (an A53/A57
+system could be confusing in that respect).
 
 Thanks,
-Lorenzo
 
-> 
-> diff --git a/drivers/pci/controller/pci-aardvark.c b/drivers/pci/controller/pci-aardvark.c
-> index 486c41721c89..8e92231214e3 100644
-> --- a/drivers/pci/controller/pci-aardvark.c
-> +++ b/drivers/pci/controller/pci-aardvark.c
-> @@ -1065,6 +1065,7 @@ static int advk_pcie_probe(struct platform_device *pdev)
->  
->  	bus = bridge->bus;
->  
-> +	pci_bus_size_bridges(bus);
->  	pci_bus_assign_resources(bus);
->  
->  	list_for_each_entry(child, &bus->children, node)
-> -- 
-> 2.14.4
-> 
+	M.
+-- 
+Jazz is not dead. It just smells funny...
