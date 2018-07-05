@@ -1,46 +1,58 @@
 From: faiz_abbas@ti.com (Faiz Abbas)
-Date: Thu, 5 Jul 2018 19:53:15 +0530
-Subject: [PATCH v4 2/6] clk: ti: dra7: Add clkctrl clock data for the mcan
- clocks
-In-Reply-To: <20180705142319.19583-1-faiz_abbas@ti.com>
-References: <20180705142319.19583-1-faiz_abbas@ti.com>
-Message-ID: <20180705142319.19583-3-faiz_abbas@ti.com>
+Date: Thu, 5 Jul 2018 19:53:13 +0530
+Subject: [PATCH v4 0/6] Add MCAN Support for dra76x
+Message-ID: <20180705142319.19583-1-faiz_abbas@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add clkctrl data for the m_can clocks and register it within the
-clkctrl driver
+The following patches add dts and sysconfig support
+for MCAN on TI's dra76 SOCs
 
-Acked-by: Rob Herring <robh@kernel.org>
-CC: Tero Kristo <t-kristo@ti.com>
-Signed-off-by: Faiz Abbas <faiz_abbas@ti.com>
----
- drivers/clk/ti/clk-7xx.c         | 1 +
- include/dt-bindings/clock/dra7.h | 1 +
- 2 files changed, 2 insertions(+)
+Changes in v4:
+ 1. Rebased to latest kernel
+ 2. Using ddata->cfg.syss_mask instead of ddata->cfg.quirks
+    for checking if poll on reset status is required.
 
-diff --git a/drivers/clk/ti/clk-7xx.c b/drivers/clk/ti/clk-7xx.c
-index fb249a1637a5..71a122b2dc67 100644
---- a/drivers/clk/ti/clk-7xx.c
-+++ b/drivers/clk/ti/clk-7xx.c
-@@ -708,6 +708,7 @@ static const struct omap_clkctrl_reg_data dra7_wkupaon_clkctrl_regs[] __initcons
- 	{ DRA7_COUNTER_32K_CLKCTRL, NULL, 0, "wkupaon_iclk_mux" },
- 	{ DRA7_UART10_CLKCTRL, dra7_uart10_bit_data, CLKF_SW_SUP, "wkupaon_cm:clk:0060:24" },
- 	{ DRA7_DCAN1_CLKCTRL, dra7_dcan1_bit_data, CLKF_SW_SUP, "wkupaon_cm:clk:0068:24" },
-+	{ DRA7_ADC_CLKCTRL, NULL, CLKF_SW_SUP, "mcan_clk"},
- 	{ 0 },
- };
- 
-diff --git a/include/dt-bindings/clock/dra7.h b/include/dt-bindings/clock/dra7.h
-index 5e1061b15aed..d7549c57cac3 100644
---- a/include/dt-bindings/clock/dra7.h
-+++ b/include/dt-bindings/clock/dra7.h
-@@ -168,5 +168,6 @@
- #define DRA7_COUNTER_32K_CLKCTRL	DRA7_CLKCTRL_INDEX(0x50)
- #define DRA7_UART10_CLKCTRL	DRA7_CLKCTRL_INDEX(0x80)
- #define DRA7_DCAN1_CLKCTRL	DRA7_CLKCTRL_INDEX(0x88)
-+#define DRA7_ADC_CLKCTRL	DRA7_CLKCTRL_INDEX(0xa0)
- 
- #endif
+Changes in v3:
+ 1. Added reset functionality to the ti-sysc
+    driver. This enables me to drop the hwmod
+    data patch as everything is being done in dt.
+
+ 2. Dropped ti,hwmods from the dts nodes
+
+ 3. Fixed the unit address of target-module
+    and mcan
+
+ 4. Removed the status="disabled" in dtsi
+    followed by status="okay" in dts.
+
+Changes in v2:
+ 1. Added Support for mcan in the ti-sysc driver
+    Also added the target-module node for the same
+
+ 2. Added clkctrl data for mcan clocks
+
+Faiz Abbas (4):
+  clk: ti: dra7: Add clkctrl clock data for the mcan clocks
+  bus: ti-sysc: Add support for using ti-sysc for MCAN on dra76x
+  bus: ti-sysc: Add support for software reset
+  ARM: dts: Add generic interconnect target module node for MCAN
+
+Franklin S Cooper Jr (1):
+  ARM: dts: dra76x: Add MCAN node
+
+Lokesh Vutla (1):
+  ARM: dts: dra762: Add MCAN clock support
+
+ .../devicetree/bindings/bus/ti-sysc.txt       |  1 +
+ arch/arm/boot/dts/dra76-evm.dts               |  6 ++
+ arch/arm/boot/dts/dra76x.dtsi                 | 64 +++++++++++++++++++
+ drivers/bus/ti-sysc.c                         | 57 +++++++++++++++++
+ drivers/clk/ti/clk-7xx.c                      |  1 +
+ include/dt-bindings/bus/ti-sysc.h             |  2 +
+ include/dt-bindings/clock/dra7.h              |  1 +
+ include/linux/platform_data/ti-sysc.h         |  1 +
+ 8 files changed, 133 insertions(+)
+
 -- 
 2.17.0
