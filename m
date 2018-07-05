@@ -1,131 +1,63 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 5 Jul 2018 09:19:24 +0100
-Subject: [PATCH v3 09/17] irqchip/irq-mvebu-icu: support ICU subnodes
-In-Reply-To: <20180704171622.2df87519@xps13>
-References: <20180622151432.1566-1-miquel.raynal@bootlin.com>
- <20180622151432.1566-10-miquel.raynal@bootlin.com>
- <61ff2e4f-55b6-cf70-5f04-32cd197c35f8@arm.com>
- <20180704110917.65557d0a@xps13>
- <f4d1d42c-98b9-a485-0baf-2248114f8c8a@arm.com>
- <20180704171622.2df87519@xps13>
-Message-ID: <1caaca86-aafc-c006-f2df-e42daf9f866b@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 5 Jul 2018 01:26:52 -0700
+Subject: Charge counter on droid 4
+In-Reply-To: <20180704195655.GB13932@amd>
+References: <20180615080014.GA29192@amd> <20180615083156.GA32102@amd>
+ <20180618065827.GN112168@atomide.com> <20180618074023.GA16955@amd>
+ <20180618082858.GO112168@atomide.com> <20180618093459.GA21391@amd>
+ <20180618114832.GR112168@atomide.com> <20180704195655.GB13932@amd>
+Message-ID: <20180705082652.GW112168@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/07/18 16:16, Miquel Raynal wrote:
-> Hi Marc,
+* Pavel Machek <pavel@ucw.cz> [180704 19:59]:
+> On Mon 2018-06-18 04:48:32, Tony Lindgren wrote:
+> > * Pavel Machek <pavel@ucw.cz> [180618 09:37]:
+> > > On Mon 2018-06-18 01:28:58, Tony Lindgren wrote:
+> > > > * Pavel Machek <pavel@ucw.cz> [180618 07:43]:
+> > > > > 
+> > > > > So... there are mA, mAh values. Those come from hardware, and I
+> > > > > believe we should keep them.
+> > > > > 
+> > > > > But there are also mW, mWh values, which are synthetic. Userland can
+> > > > > compute them from mV, mA values... and it is confusing that kernel
+> > > > > provides them. (My tendency was to start computing these synthetic
+> > > > > values in userland, to compare them with "real hardware" values from
+> > > > > kernel. But then I looked at kernel implementation, and realized they
+> > > > > are synthetic, tooo...)
+> > > > 
+> > > > Hmm mWh value is based on the hardware sampled shunt
+> > > > values and number of samples gathered between the
+> > > > two readings. I'd rather call the calculated values
+> > > > based on userland reading mV and mA values "synthetic" :)
+> > > 
+> > > As far as I know, shunt resistors provide you with current (mA) not
+> > > power (mW) measurement... and cpcap-battery computes power_now as
+> > > voltage * current. I'd rather have kernel tell me "hardware can't
+> > > measure power" and do "voltage*current" computation in userspace.
+> > 
+> > Yup you are correct the hardware samples mA and we still need
+> > to calculate mW based on the voltage.
+> > 
+> > But considering it works and seems to match the power supply
+> > provided average power consumption numbers pretty well and at
+> > least I'm using it.. What is your reasoning for removing such
+> > a usable interface?
 > 
-> Marc Zyngier <marc.zyngier@arm.com> wrote on Wed, 4 Jul 2018 13:43:58
-> +0100:
-> 
->> On 04/07/18 10:09, Miquel Raynal wrote:
->>> Hi Marc,
->>>
->>> Marc Zyngier <marc.zyngier@arm.com> wrote on Thu, 28 Jun 2018 13:45:09
->>> +0100:
->>>   
->>>> On 22/06/18 16:14, Miquel Raynal wrote:  
->>>>> The ICU can handle several type of interrupt, each of them being handled
->>>>> differently on AP side. On CP side, the ICU should be able to make the
->>>>> distinction between each interrupt group by pointing to the right parent.
->>>>>
->>>>> This is done through the introduction of new bindings, presenting the ICU
->>>>> node as the parent of multiple ICU sub-nodes, each of them being an
->>>>> interrupt type with a different interrupt parent. ICU interrupt 'clients'
->>>>> now directly point to the right sub-node, avoiding the need for the extra
->>>>> ICU_GRP_* parameter.
->>>>>
->>>>> ICU subnodes are probed automatically with devm_platform_populate(). If
->>>>> the node as no child, the probe function for NSRs will still be called
->>>>> 'manually' in order to preserve backward compatibility with DT using the
->>>>> old binding.
->>>>>
->>>>> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
->>>>> ---
->>>>>  drivers/irqchip/irq-mvebu-icu.c | 88 ++++++++++++++++++++++++++++++++++-------
->>>>>  1 file changed, 74 insertions(+), 14 deletions(-)
->>>>>
->>>>> diff --git a/drivers/irqchip/irq-mvebu-icu.c b/drivers/irqchip/irq-mvebu-icu.c
->>>>> index 24d45186eb6b..f7c2ede9c222 100644
->>>>> --- a/drivers/irqchip/irq-mvebu-icu.c
->>>>> +++ b/drivers/irqchip/irq-mvebu-icu.c
->>>>> @@ -43,6 +43,7 @@ struct mvebu_icu {
->>>>>  	struct regmap *regmap;
->>>>>  	struct device *dev;
->>>>>  	atomic_t initialized;
->>>>> +	bool legacy_bindings;
->>>>>  };
->>>>>  
->>>>>  struct mvebu_icu_irq_data {
->>>>> @@ -51,6 +52,30 @@ struct mvebu_icu_irq_data {
->>>>>  	unsigned int type;
->>>>>  };
->>>>>  
->>>>> +static struct mvebu_icu *mvebu_icu_dev_get_drvdata(struct platform_device *pdev)
->>>>> +{
->>>>> +	struct mvebu_icu *icu;
->>>>> +
->>>>> +	/*
->>>>> +	 * Device data being populated means we should be using legacy bindings.
->>>>> +	 * Using the _parent_ device data means we should be using new bindings.
->>>>> +	 */
->>>>> +	icu = dev_get_drvdata(&pdev->dev);
->>>>> +	if (icu) {
->>>>> +		if (!icu->legacy_bindings)
->>>>> +			return ERR_PTR(-EINVAL);
->>>>> +	} else {
->>>>> +		icu = dev_get_drvdata(pdev->dev.parent);
->>>>> +		if (!icu)
->>>>> +			return ERR_PTR(-ENODEV);
->>>>> +
->>>>> +		if (icu->legacy_bindings)
->>>>> +			return ERR_PTR(-EINVAL);
->>>>> +	}    
->>>>
->>>> Doesn't this make legacy_bindings completely redundant? Either the
->>>> pointer is !NULL in the device, and this is using a legacy binging, or
->>>> it is stored in the parent, and this is a new binding. You could even
->>>> have a helper for that:
->>>>
->>>> static bool is_legacy(struct platform_device *pdev)
->>>> {
->>>> 	return !dev_get_drvdata(&pdev->dev);
->>>> }
->>>>
->>>> The driver really doesn't need to be defending against itself, if
->>>> anything, and it would save you quite a bit of error handling in the
->>>> callers of this function.  
->>>
->>> I simplified the sanity checks but I had to keep an icu->is_legacy
->>> boolean because the above function would not have worked, for instance,
->>> in the *_translate() hook. As this hook does not receive a struct
->>> device * (or platform_device) as parameter, I tried to use icu->dev
->>> instead. This cannot work as it always points to the device having the
->>> driver data attached.  
->>
->> You could still have the pdev as part of the domain host_data, right?
->> Isn't that just a matter of having a pointer to the pdev as part of the
->> icu data structure?
-> 
-> There is already a 'struct device *dev' pointer in the ICU data
-> structure. This pointer is set to "&pdev->dev" in the main probe
-> function.
-> 
-> Legacy: dev is the unique ICU device, the driver data is attached to it.
-> Now: dev is the 'host' ICU device that is the parent of two other
-> devices, ICU NSR controller and SEI NSR controller. The driver data is
-> also attached to this device.
-> 
-> So in both situations checking dev_get_drvdata(icu->dev) would return a
-> valid pointer.
-> 
-> Does this answer your question?
+> Well, it is confusing for the userland, because it has no way of
+> knowing data is synthetic.
 
-I think I need to see the full picture again. Post the updated series,
-and we'll see what we can do.
+Also the average current is as synthetic. And we don't
+want to rely on user space polling the voltage as that
+will mess up measurements for low-power idle states.
 
-Thanks,
+If there is a problem let's fix it by adding a timer
+to refresh average current and power once a minute or
+something like that.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+I'd rather not have to rely on user space apps for
+any knowledge about how to use it.
+
+Regards,
+
+Tony
