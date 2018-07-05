@@ -1,60 +1,58 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu,  5 Jul 2018 11:11:02 +0800
-Subject: [PATCH v2 1/5] dt-bindings: mfd: axp20x: Add "self-working" mode for
- AXP806
+Date: Thu,  5 Jul 2018 11:11:05 +0800
+Subject: [PATCH v2 4/5] arm64: dts: allwinner: h6: Use macros for R_CCU clock
+ and reset indices
 In-Reply-To: <20180705031106.344-1-wens@csie.org>
 References: <20180705031106.344-1-wens@csie.org>
-Message-ID: <20180705031106.344-2-wens@csie.org>
+Message-ID: <20180705031106.344-5-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AXP806 has three operation modes:
+Now that the device tree binding headers for the R_CCU have been merged,
+we can use the macros, instead of raw numbers.
 
-  - master mode: The PMIC is the first or only AXP PMIC in the system,
-		 but is not in charge of power management, i.e. only
-		 provides regulator functions.
+Switch to R_CCU macros for clock and reset indices.
 
-  - slave mode: The PMIC is the second AXP PMIC in the system, chained
-		to the first, or master, one.
-
-  - self-working mode: The PMIC is the only AXP PMIC in the system, and
-		       is in charge of power sequencing.
-
-The functional differences between these modes can be found in the
-"Control and Operation" chapter of the AXP806 (in Chinese) and AXP805
-(in English) datasheets. These include how the PMIC responds to external
-signals, whether it takes an external voltage reference or uses its own,
-and whether the EN/PWRON pin functions as an enable switch or power button.
-
-We already support both slave and master mode. This patch adds a property
-for describing the self-working mode, and reworks the description for
-the mode properties.
-
-Reviewed-by: Rob Herring <robh@kernel.org>
 Reviewed-by: Icenowy Zheng <icenowy@aosc.io>
 Tested-by: Icenowy Zheng <icenowy@aosc.io>
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- Documentation/devicetree/bindings/mfd/axp20x.txt | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+ arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
-index d1762f3b30af..eaaf79c01e1e 100644
---- a/Documentation/devicetree/bindings/mfd/axp20x.txt
-+++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
-@@ -45,8 +45,11 @@ Optional properties:
- 			  board is driving OTG VBus or not.
- 			  (axp221 / axp223 / axp803/ axp813 only)
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
+index c72da8cd9ef5..37c2e11fca2e 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
+@@ -5,7 +5,9 @@
  
--- x-powers,master-mode: Boolean (axp806 only). Set this when the PMIC is
--			wired for master mode. The default is slave mode.
-+- x-powers,self-working-mode and
-+  x-powers,master-mode: Boolean (axp806 only). Set either of these when the
-+			PMIC is wired for self-working mode or master mode.
-+			If neither is set then slave mode is assumed.
-+			This corresponds to how the MODESET pin is wired.
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+ #include <dt-bindings/clock/sun50i-h6-ccu.h>
++#include <dt-bindings/clock/sun50i-h6-r-ccu.h>
+ #include <dt-bindings/reset/sun50i-h6-ccu.h>
++#include <dt-bindings/reset/sun50i-h6-r-ccu.h>
  
- - <input>-supply: a phandle to the regulator supply node. May be omitted if
- 		  inputs are unregulated, such as using the IPSOUT output
+ / {
+ 	interrupt-parent = <&gic>;
+@@ -198,7 +200,7 @@
+ 			reg = <0x07022000 0x400>;
+ 			interrupts = <GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH>,
+ 				     <GIC_SPI 111 IRQ_TYPE_LEVEL_HIGH>;
+-			clocks = <&r_ccu 2>, <&osc24M>, <&osc32k>;
++			clocks = <&r_ccu CLK_R_APB1>, <&osc24M>, <&osc32k>;
+ 			clock-names = "apb", "hosc", "losc";
+ 			gpio-controller;
+ 			#gpio-cells = <3>;
+@@ -215,8 +217,8 @@
+ 			compatible = "allwinner,sun6i-a31-i2c";
+ 			reg = <0x07081400 0x400>;
+ 			interrupts = <GIC_SPI 107 IRQ_TYPE_LEVEL_HIGH>;
+-			clocks = <&r_ccu 8>;
+-			resets = <&r_ccu 4>;
++			clocks = <&r_ccu CLK_R_APB2_I2C>;
++			resets = <&r_ccu RST_R_APB2_I2C>;
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&r_i2c_pins>;
+ 			status = "disabled";
 -- 
 2.18.0
