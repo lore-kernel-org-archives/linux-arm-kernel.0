@@ -1,57 +1,23 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 5 Jul 2018 00:41:54 +0100
-Subject: [offlist] Re: Crash in netlink/sk_filter_trim_cap on ARMv7 on
- 4.18rc1
-In-Reply-To: <CALeDE9OJomWstG+AcftR543WBi5Bo8ANQj3T-pOW3BfBNzB=uw@mail.gmail.com>
-References: <CALeDE9PP__kPHX_aW24kwzGf9BgA0gQOQJSY+Qw0yFMOLn4Pcw@mail.gmail.com>
- <7ff516fd-1d01-4d7a-1d5d-b58932c0c69d@gmail.com>
- <CALeDE9Nkz+cbueruiez_43ZS1ebAiQHDaVZRARE8raypYz323A@mail.gmail.com>
- <ad98d60c-bd60-b495-c4bd-507fc29c8bcd@iogearbox.net>
- <CALeDE9PBZWJBp8KB0mB4zoNXqscmzxWzz+LnuqRA-z4t1e9T8g@mail.gmail.com>
- <CALeDE9OOrZUnaNpzkYPU30iN=4HFQaqEomjf14EO5EtcnHu8OQ@mail.gmail.com>
- <CALeDE9MykqKyk5hJKn2OxZx2USW76ySm8Wxsw3eVgxa2g7PKXg@mail.gmail.com>
- <fe05405a-c06d-d8fe-07fa-5840e498bb13@iogearbox.net>
- <CALeDE9OJomWstG+AcftR543WBi5Bo8ANQj3T-pOW3BfBNzB=uw@mail.gmail.com>
-Message-ID: <20180704234154.GT17271@n2100.armlinux.org.uk>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 4 Jul 2018 21:55:54 -0300
+Subject: [PATCH 1/3] ARM: i.MX31: remove rnga registration as a platform
+ device
+In-Reply-To: <20180703192934.6080-2-vz@mleia.com>
+References: <20180703192934.6080-1-vz@mleia.com>
+ <20180703192934.6080-2-vz@mleia.com>
+Message-ID: <CAOMZO5ByGiOwEX2RNedqKmmhpqFMYuLuoVwEnS3jV4WWAppe7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Subject says offlist, but this isn't...
+On Tue, Jul 3, 2018 at 4:29 PM, Vladimir Zapolskiy <vz@mleia.com> wrote:
+> On i.MX31 powered boards with OF support Security Random Number
+> Generator Accelerator RNGA controller is initialized from device tree,
+> its registration as a platform device is redundant and actually it is
+> broken due to missing clock information:
+>
+>   mxc_rnga mxc_rnga: Could not get rng_clk!
+>   mxc_rnga: probe of mxc_rnga failed with error -2
+>
+> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
 
-On Wed, Jul 04, 2018 at 08:33:20AM +0100, Peter Robinson wrote:
-> Sorry for the delay on this from my end. I noticed there was some bpf
-> bits land in the last net fixes pull request landed Monday so I built
-> a kernel with the JIT reenabled. It seems it's improved in that the
-> completely dead no output boot has gone but the original problem that
-> arrived in the merge window still persists:
-> 
-> [   17.564142] note: systemd-udevd[194] exited with preempt_count 1
-> [   17.592739] Unable to handle kernel NULL pointer dereference at
-> virtual address 0000000c
-> [   17.601002] pgd = (ptrval)
-> [   17.603819] [0000000c] *pgd=00000000
-> [   17.607487] Internal error: Oops: 805 [#10] SMP ARM
-> [   17.612396] Modules linked in:
-> [   17.615484] CPU: 0 PID: 195 Comm: systemd-udevd Tainted: G      D
->         4.18.0-0.rc3.git1.1.bpf1.fc29.armv7hl #1
-> [   17.626056] Hardware name: Generic AM33XX (Flattened Device Tree)
-> [   17.632198] PC is at sk_filter_trim_cap+0x218/0x2fc
-> [   17.637102] LR is at   (null)
-> [   17.640086] pc : [<c0ab03b4>]    lr : [<00000000>]    psr: 60000013
-> [   17.646384] sp : cfe1dd48  ip : 00000000  fp : 00000000
-> [   17.651635] r10: d837e000  r9 : d833be00  r8 : 00000000
-> [   17.656887] r7 : 00000001  r6 : e003d000  r5 : 00000000  r4 : 00000000
-> [   17.663447] r3 : 00000007  r2 : 00000000  r1 : 00000000  r0 : 00000000
-> [   17.670009] Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment none
-> [   17.677180] Control: 10c5387d  Table: 8fe20019  DAC: 00000051
-> [   17.682956] Process systemd-udevd (pid: 195, stack limit = 0x(ptrval))
-> [   17.689518] Stack: (0xcfe1dd48 to 0xcfe1e000)
-
-Can you provide a full disassembly of sk_filter_trim_cap from vmlinux
-(iow, annotated with its linked address) for the above dump please -
-alternatively a new dump with matching disassembly.  Thanks.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
-According to speedtest.net: 13Mbps down 490kbps up
+Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
