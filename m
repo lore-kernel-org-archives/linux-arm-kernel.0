@@ -1,36 +1,32 @@
 From: ezequiel@collabora.com (Ezequiel Garcia)
-Date: Thu,  5 Jul 2018 12:08:16 -0300
-Subject: [PATCH v3 0/2] arm64: rockchip: support RK3399 Ficus board
-Message-ID: <20180705150818.29931-1-ezequiel@collabora.com>
+Date: Thu,  5 Jul 2018 12:08:17 -0300
+Subject: [PATCH v3 1/2] dt-bindings: Add vendor prefix for Vamrs Ltd.
+In-Reply-To: <20180705150818.29931-1-ezequiel@collabora.com>
+References: <20180705150818.29931-1-ezequiel@collabora.com>
+Message-ID: <20180705150818.29931-2-ezequiel@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here's the third spin for the RK3399 Ficus support.
+Vamrs Ltd. is a hardware solutions provider based in China.
 
-Changes from v2:
- * Dropped rk3399.dtsi changes and rebased on top of Randy's patch.
- * Removed double empty line.
- * Coalesced schematics comment
+Website: http://vamrs.com/
 
-Changes from v1:
- * Dropoed USB support as it's not working.
- * Added schematics.
- * Splitted rk3399.dtsi from new ficus.dts file.
- * Added new vendor.
- * Cleaned regulators syntax and stlye.
+Signed-off-by: Ezequiel Garcia <ezequiel@collabora.com>
+---
+ Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-Series based on: 600b359d2b98 ("arm64: dts: rockchip: add some common pin-settings to rk3399").
-
-Ezequiel Garcia (2):
-  dt-bindings: Add vendor prefix for Vamrs Ltd.
-  arm64: dts: rockchip: add 96boards RK3399 Ficus board
-
- .../devicetree/bindings/arm/rockchip.txt      |   5 +
- .../devicetree/bindings/vendor-prefixes.txt   |   1 +
- arch/arm64/boot/dts/rockchip/Makefile         |   1 +
- arch/arm64/boot/dts/rockchip/rk3399-ficus.dts | 514 ++++++++++++++++++
- 4 files changed, 521 insertions(+)
- create mode 100644 arch/arm64/boot/dts/rockchip/rk3399-ficus.dts
-
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index 7cad066191ee..5dc2c5f49e37 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -393,6 +393,7 @@ urt	United Radiant Technology Corporation
+ usi	Universal Scientific Industrial Co., Ltd.
+ v3	V3 Semiconductor
+ variscite	Variscite Ltd.
++vamrs	Vamrs Ltd.
+ via	VIA Technologies, Inc.
+ virtio	Virtual I/O Device Specification, developed by the OASIS consortium
+ vivante	Vivante Corporation
 -- 
 2.18.0.rc2
