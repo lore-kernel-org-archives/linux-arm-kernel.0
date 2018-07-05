@@ -1,50 +1,56 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu,  5 Jul 2018 11:50:41 +0200
-Subject: [PATCH 0/2] Add support for S805X based P241 Reference Design board
-Message-ID: <1530784243-20823-1-git-send-email-narmstrong@baylibre.com>
+From: james.morse@arm.com (James Morse)
+Date: Thu, 5 Jul 2018 12:02:15 +0100
+Subject: [PATCH v2 3/4] efi/arm: map UEFI memory map earlier on boot
+In-Reply-To: <20180705094313.GL28220@linaro.org>
+References: <20180619064424.6642-1-takahiro.akashi@linaro.org>
+ <20180619064424.6642-4-takahiro.akashi@linaro.org>
+ <20180704170655.GD8370@arm.com>
+ <CAKv+Gu9_rYYyQ+t89otz46DR0D4GDj-cCjhx9q=p+D8LWFRkgQ@mail.gmail.com>
+ <20180705094313.GL28220@linaro.org>
+Message-ID: <ec1a5f0f-99e3-fda1-9a64-5c2539817190@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Amlogic P241 board is the Reference Design board for the S805X
-variant of the Amlogic Meson GXL SoC family.
+Hi Akashi,
 
-The S805X is a variant of the Amlogic Meson GXL SoC family with the
-following physical limitations :
-- No SDCard interface
-- No GPIOCLK pins
-- No USB OTG ID pin (but Gadget feature can stil be forced)
-- No 5V regulator
-- Reduced ADC inputs (only ADC0 and ADC1)
-- GPIODV_26, GPIOAO_3, GPIOAO_4, GPIOAO_5, GPIOAO_6, GPIOX_14,
-  GPIOX_15, GPIOH_3 are no more exposed on the package
+On 05/07/18 10:43, AKASHI Takahiro wrote:
+> On Wed, Jul 04, 2018 at 08:49:32PM +0200, Ard Biesheuvel wrote:
+>> On 4 July 2018 at 19:06, Will Deacon <will.deacon@arm.com> wrote:
+>>> On Tue, Jun 19, 2018 at 03:44:23PM +0900, AKASHI Takahiro wrote:
+>>>> Since arm_enter_runtime_services() was modified to always create a virtual
+>>>> mapping of UEFI memory map in the previous patch, it is now renamed to
+>>>> efi_enter_virtual_mode() and called earlier before acpi_load_tables()
+>>>> in acpi_early_init().
+>>>>
+>>>> This will allow us to use UEFI memory map in acpi_os_ioremap() to create
+>>>> mappings of ACPI tables using memory attributes described in UEFI memory
+>>>> map.
 
-Amlogic exposes the following SW limitations :
-- HDMI max resolution should be 1080p60, VPU clock should be downgraded
-- Video Decoding should be limited to 1080p60, VDEC clock should be downgraded
-- CPU speed should be limited by SCPI OPP table to 1.2GHz
-- DRAM interface is limited to DDR4 16bit up to 1GiB
+>>> Hmm, this is ugly as hell. Is there nothing else we can piggy-back off?
+>>> It's also fairly jarring that, on x86, efi_enter_virtual_mode() is called
+>>> a few lines later, *after* acpi_early_init() has been called.
 
-The P241 board has the following features :
-- 1GiB DDR4 Memory
-- HDMI Connector with CEC
-- A/V jack with Stereo Audio and CVBS
-- 10/100 Ethernet
-- 2x USB2.0 Type-A
-- On-board WiFi SDIO Module
-- On-board eMMC storage
-- Infraread Received
-- Factory Reset button
-- UART connector
+>> Currently, there is a gap where we have already torn down the early
+>> mapping and haven't created the definitive mapping of the UEFI memory
+>> map. There are other reasons why this is an issue, and I recently
+>> proposed [0] myself to address one of them
 
-Neil Armstrong (2):
-  dt-bindings: amlogic: Add support for GXL S805X and the P241 board
-  ARM64: dts: add S805X based P241 board
+>> Akashi-san, could you please confirm whether the patch below would be
+>> sufficient for you? Apologies for going back and forth on this, but I
+>> agree with Will that we should try to avoid warts like the one above
+>> in generic code.
+>>
+>> [0] https://marc.info/?l=linux-efi&m=152930773507524&w=2
+> 
+> I think that this patch will also work.
+> Please drop my patch#2 and #3 if you want to pick up my patchset, Will.
 
- Documentation/devicetree/bindings/arm/amlogic.txt  |   6 +
- arch/arm64/boot/dts/amlogic/Makefile               |   1 +
- .../boot/dts/amlogic/meson-gxl-s805x-p241.dts      | 218 +++++++++++++++++++++
- 3 files changed, 225 insertions(+)
- create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl-s805x-p241.dts
+Patch 2 is what changes arm_enable_runtime_services() to map the efi memory map
+before bailing out due to efi=noruntime.
 
--- 
-2.7.4
+Without it, 'efi=noruntime' means no-acpi-tables.
+
+
+Thanks,
+
+James
