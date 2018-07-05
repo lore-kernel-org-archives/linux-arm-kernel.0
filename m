@@ -1,98 +1,103 @@
-From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Thu, 05 Jul 2018 15:28:30 +0200
-Subject: [PATCH] arm64: dts: marvell: fix CP110 ICU node size
-In-Reply-To: <87k1q924qv.fsf@bootlin.com> (Gregory CLEMENT's message of "Thu,
- 05 Jul 2018 15:26:16 +0200")
-References: <20180705123449.6052-1-miquel.raynal@bootlin.com>
- <87k1q924qv.fsf@bootlin.com>
-Message-ID: <87fu0x24n5.fsf@bootlin.com>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Thu, 5 Jul 2018 15:46:50 +0200
+Subject: [kvmtool test PATCH 22/24] kvmtool: arm64: Add support for guest
+ physical address size
+In-Reply-To: <d0c005f8-eae4-3784-1ebc-d279df4ee608@arm.com>
+References: <1530270944-11351-1-git-send-email-suzuki.poulose@arm.com>
+ <1530270944-11351-23-git-send-email-suzuki.poulose@arm.com>
+ <20180704140943.GF4828@arm.com>
+ <8c9bb3cd-f673-17f3-656f-66b7e14fc73c@arm.com>
+ <20180704155231.GP4828@arm.com>
+ <ca05f552-d0d7-b5b8-954b-7254e8c1e529@arm.com>
+ <d0c005f8-eae4-3784-1ebc-d279df4ee608@arm.com>
+Message-ID: <bd5186ce-66ab-e2fa-3531-46a4a87b84d8@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
- 
- On jeu., juil. 05 2018, Gregory CLEMENT <gregory.clement@bootlin.com> wrote:
+Hi Marc,
 
-> Hi Miquel,
->  
->  On jeu., juil. 05 2018, Miquel Raynal <miquel.raynal@bootlin.com> wrote:
->
->> commit 2f872ddcdb1e8e2186162616cea4581b8403849d upstream.
+On 07/05/2018 03:20 PM, Marc Zyngier wrote:
+> On 05/07/18 13:47, Julien Grall wrote:
+>> Hi Will,
 >>
->> ICU size in CP110 is not 0x10 but at least 0x440 bytes long (from the
->> specification).
+>> On 04/07/18 16:52, Will Deacon wrote:
+>>> On Wed, Jul 04, 2018 at 04:00:11PM +0100, Julien Grall wrote:
+>>>> On 04/07/18 15:09, Will Deacon wrote:
+>>>>> On Fri, Jun 29, 2018 at 12:15:42PM +0100, Suzuki K Poulose wrote:
+>>>>>> Add an option to specify the physical address size used by this
+>>>>>> VM.
+>>>>>>
+>>>>>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>>>>>> ---
+>>>>>>   arm/aarch64/include/kvm/kvm-config-arch.h | 5 ++++-
+>>>>>>   arm/include/arm-common/kvm-config-arch.h  | 1 +
+>>>>>>   2 files changed, 5 insertions(+), 1 deletion(-)
+>>>>>>
+>>>>>> diff --git a/arm/aarch64/include/kvm/kvm-config-arch.h b/arm/aarch64/include/kvm/kvm-config-arch.h
+>>>>>> index 04be43d..dabd22c 100644
+>>>>>> --- a/arm/aarch64/include/kvm/kvm-config-arch.h
+>>>>>> +++ b/arm/aarch64/include/kvm/kvm-config-arch.h
+>>>>>> @@ -8,7 +8,10 @@
+>>>>>>   			"Create PMUv3 device"),				\
+>>>>>>   	OPT_U64('\0', "kaslr-seed", &(cfg)->kaslr_seed,			\
+>>>>>>   			"Specify random seed for Kernel Address Space "	\
+>>>>>> -			"Layout Randomization (KASLR)"),
+>>>>>> +			"Layout Randomization (KASLR)"),		\
+>>>>>> +	OPT_INTEGER('\0', "phys-shift", &(cfg)->phys_shift,		\
+>>>>>> +			"Specify maximum physical address size (not "	\
+>>>>>> +			"the amount of memory)"),
+>>>>>
+>>>>> Given that this is a shift value, I think the help message could be more
+>>>>> informative. Something like:
+>>>>>
+>>>>> 	"Specify maximum number of bits in a guest physical address"
+>>>>>
+>>>>> I think I'd actually leave out any mention of memory, because this does
+>>>>> actually have an effect on the amount of addressable memory in a way that I
+>>>>> don't think we want to describe in half of a usage message line :)
+>>>> Is there any particular reasons to expose this option to the user?
+>>>>
+>>>> I have recently sent a series to allow the user to specify the position
+>>>> of the RAM [1]. With that series in mind, I think the user would not really
+>>>> need to specify the maximum physical shift. Instead we could automatically
+>>>> find it.
+>>>
+>>> Marc makes a good point that it doesn't help for MMIO regions, so I'm trying
+>>> to understand whether we can do something differently there and avoid
+>>> sacrificing the type parameter.
 >>
->> Fixes: 6ef84a827c37 ("arm64: dts: marvell: enable GICP and ICU on Armada 7K/8K")
->> Cc: stable at vger.kernel.org # 4.14.x
->> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
->> Reviewed-by: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
->> Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
->
-> See
-> https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=2f872ddcdb1e8e2186162616cea4581b8403849d
->
-> it is already in the linux kernel.
->
-> Gregory
+>> I am not sure to understand this. kvmtools knows the memory layout 
+>> (including MMIOs) of the guest, so couldn't it guess the maximum 
+>> physical shift for that?
+> 
+> That's exactly what Will was trying to avoid, by having KVM to compute
+> the size of the IPA space based on the registered memslots. We've now
+> established that it doesn't work, so what we need to define is:
+> 
+> - whether we need another ioctl(), or do we carry on piggy-backing on
+> the CPU type,
+kvm type I guess
+> - assuming the latter, whether we can reduce the number of bits used in
+> the ioctl parameter by subtly encoding the IPA size.
+Getting benefit from your Freudian slip, how should guest CPU PARange
+and maximum number of bits in a guest physical address relate?
 
-I missed the comment below and the fact it was for the stable branch.
+My understanding is they are not correlated at the moment and our guest
+PARange is fixed at the moment. But shouldn't they?
 
-Sorryt for the noise!
+On Intel there is
+   qemu-system-x86_64 -M pc,accel=kvm -cpu SandyBridge,phys-bits=36
+or
+   qemu-system-x86_64 -M pc,accel=kvm -cpu SandyBridge,host-phys-bits=true
 
-Gregory
+where phys-bits, as far as I understand has a a similar semantics as the
+PARange.
 
->
->> ---
->>
->> Backport to 4.14 stable tree: the original patch did not applied
->> because of the effort of DT de-duplication that merged two files in one.
->>
->>
->>  arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 2 +-
->>  arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi  | 2 +-
->>  2 files changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
->> index 9a7b63cd63a3..7c19f32d0f44 100644
->> --- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
->> +++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
->> @@ -169,7 +169,7 @@
->>  
->>  			cpm_icu: interrupt-controller at 1e0000 {
->>  				compatible = "marvell,cp110-icu";
->> -				reg = <0x1e0000 0x10>;
->> +				reg = <0x1e0000 0x440>;
->>  				#interrupt-cells = <3>;
->>  				interrupt-controller;
->>  				msi-parent = <&gicp>;
->> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
->> index faf28633a309..150e97a1dfea 100644
->> --- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
->> +++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
->> @@ -169,7 +169,7 @@
->>  
->>  			cps_icu: interrupt-controller at 1e0000 {
->>  				compatible = "marvell,cp110-icu";
->> -				reg = <0x1e0000 0x10>;
->> +				reg = <0x1e0000 0x440>;
->>  				#interrupt-cells = <3>;
->>  				interrupt-controller;
->>  				msi-parent = <&gicp>;
->> -- 
->> 2.14.1
->>
->
-> -- 
-> Gregory Clement, Bootlin (formerly Free Electrons)
-> Embedded Linux and Kernel engineering
-> http://bootlin.com
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Thanks
 
--- 
-Gregory Clement, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-http://bootlin.com
+Eric
+> 
+> Thanks,
+> 
+> 	M.
+> 
