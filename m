@@ -1,35 +1,28 @@
 From: hugues.fruchet@st.com (Hugues Fruchet)
-Date: Thu, 5 Jul 2018 11:01:42 +0200
-Subject: [PATCH] MAINTAINERS: Add entry for STM32 DCMI media driver
-Message-ID: <1530781302-6675-1-git-send-email-hugues.fruchet@st.com>
+Date: Thu, 5 Jul 2018 11:05:32 +0200
+Subject: [PATCH] ARM: multi_v7_defconfig: enable STM32 DCMI media support
+Message-ID: <1530781532-7125-1-git-send-email-hugues.fruchet@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add an entry to make myself a maintainer of STM32 DCMI media driver.
+Enables support of STM32 DCMI V4L2 media driver.
 
 Signed-off-by: Hugues Fruchet <hugues.fruchet@st.com>
 ---
- MAINTAINERS | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/configs/multi_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 07d1576..1032c05 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -8955,6 +8955,14 @@ T:	git git://linuxtv.org/media_tree.git
- S:	Maintained
- F:	drivers/media/dvb-frontends/stv6111*
- 
-+MEDIA DRIVERS FOR STM32 - DCMI
-+M:	Hugues Fruchet <hugues.fruchet@st.com>
-+L:	linux-media at vger.kernel.org
-+T:	git git://linuxtv.org/media_tree.git
-+S:	Supported
-+F:	Documentation/devicetree/bindings/media/st,stm32-dcmi.txt
-+F:	drivers/media/platform/stm32/stm32-dcmi.c
-+
- MEDIA DRIVERS FOR NVIDIA TEGRA - VDE
- M:	Dmitry Osipenko <digetx@gmail.com>
- L:	linux-media at vger.kernel.org
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 8f6be19..42ad73f76 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -578,6 +578,7 @@ CONFIG_VIDEO_SAMSUNG_EXYNOS_GSC=m
+ CONFIG_VIDEO_STI_BDISP=m
+ CONFIG_VIDEO_STI_HVA=m
+ CONFIG_VIDEO_STI_DELTA=m
++CONFIG_VIDEO_STM32_DCMI=m
+ CONFIG_VIDEO_RENESAS_JPU=m
+ CONFIG_VIDEO_RENESAS_VSP1=m
+ CONFIG_V4L_TEST_DRIVERS=y
 -- 
 1.9.1
