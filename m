@@ -1,223 +1,216 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu,  5 Jul 2018 16:13:42 -0600
-Subject: [PATCH v2 2/7] perf/core: Use ioctl to communicate driver
- configuration to kernel
+Date: Thu,  5 Jul 2018 16:13:44 -0600
+Subject: [PATCH v2 4/7] coresight: Use PMU driver configuration for sink
+ selection
 In-Reply-To: <1530828827-11604-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1530828827-11604-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1530828827-11604-3-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1530828827-11604-5-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the mechanic needed for user space to send PMU specific
-configuration to the kernel driver using an ioctl() command.  That way
-events can keep track of options that don't fit in the perf_event_attr
-structure like the selection of a CoreSight sink to use for the session.
+This patch uses the PMU driver configuration held in event::hw::drv_config
+to select a sink for each event that is created (the old sysFS way of
+working is kept around for backward compatibility).
+
+By proceeding in this way a sink can be used by multiple sessions
+without having to play games with entries in sysFS.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- include/linux/perf_event.h | 45 +++++++++++++++++++++++++++
- kernel/events/core.c       | 77 ++++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 122 insertions(+)
+ drivers/hwtracing/coresight/coresight-etm-perf.c | 130 ++++++++++++++++++++---
+ drivers/hwtracing/coresight/coresight-etm-perf.h |   4 +
+ 2 files changed, 122 insertions(+), 12 deletions(-)
 
-diff --git a/include/linux/perf_event.h b/include/linux/perf_event.h
-index 1fa12887ec02..7064b513ca2b 100644
---- a/include/linux/perf_event.h
-+++ b/include/linux/perf_event.h
-@@ -114,6 +114,14 @@ struct hw_perf_event_extra {
- 	int		idx;	/* index in shared_regs->regs[] */
- };
+diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
+index 0f5e03e4df22..5c2cce60da5e 100644
+--- a/drivers/hwtracing/coresight/coresight-etm-perf.c
++++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
+@@ -11,6 +11,7 @@
+ #include <linux/list.h>
+ #include <linux/mm.h>
+ #include <linux/init.h>
++#include <linux/parser.h>
+ #include <linux/perf_event.h>
+ #include <linux/slab.h>
+ #include <linux/types.h>
+@@ -22,6 +23,8 @@
+ static struct pmu etm_pmu;
+ static bool etm_perf_up;
  
-+/*
-+ * PMU driver configuration
-+ */
-+struct pmu_drv_config {
-+	void		*config;
-+	raw_spinlock_t	lock;
-+};
++#define CORESIGHT_DEVICE_MAX_NAME_LEN	256
 +
  /**
-  * struct hw_perf_event - performance event hardware details:
-  */
-@@ -178,6 +186,9 @@ struct hw_perf_event {
- 	/* Last sync'ed generation of filters */
- 	unsigned long			addr_filters_gen;
+  * struct etm_event_data - Coresight specifics associated to an event
+  * @work:		Handle to free allocated memory outside IRQ context.
+@@ -181,6 +184,74 @@ static void etm_free_aux(void *data)
+ 	schedule_work(&event_data->work);
+ }
  
-+	/* PMU driver configuration */
-+	struct pmu_drv_config		drv_config;
++static char *etm_drv_config_sync(struct perf_event *event)
++{
++	char *sink;
++	int node = event->cpu == -1 ? -1 : cpu_to_node(event->cpu);
++	struct pmu_drv_config *drv_config = perf_event_get_drv_config(event);
 +
- /*
-  * hw_perf_event::state flags; used to track the PERF_EF_* state.
-  */
-@@ -447,6 +458,23 @@ struct pmu {
- 	 * Filter events for PMU-specific reasons.
- 	 */
- 	int (*filter_match)		(struct perf_event *event); /* optional */
++	sink = kmalloc_node(CORESIGHT_DEVICE_MAX_NAME_LEN, GFP_KERNEL, node);
++	if (!sink)
++		return NULL;
 +
 +	/*
-+	 * Valiate complex PMU configuration that don't fit in the
-+	 * perf_event_attr struct.  Returns a PMU specific pointer or an error
-+	 * value < 0.
-+	 *
-+	 * As with addr_filters_validate(), runs in the context of the ioctl()
-+	 * process and is not serialized with the rest of the PMU callbacks.
++	 * Make sure we don't race with perf_drv_config_replace() in
++	 * kernel/events/core.c.
 +	 */
-+	void *(*drv_config_validate)	(struct perf_event *event,
-+					 char *config_str);
++	raw_spin_lock(&drv_config->lock);
++	memcpy(sink, drv_config->config, CORESIGHT_DEVICE_MAX_NAME_LEN);
++	raw_spin_unlock(&drv_config->lock);
++
++	return sink;
++}
++
++static struct coresight_device *etm_event_get_sink(struct perf_event *event)
++{
++	struct pmu_drv_config *drv_config = perf_event_get_drv_config(event);
 +
 +	/*
-+	 * Release PMU specific configuration acquired by
-+	 * drv_config_validate()
++	 * Try the preferred method first, i.e getting the sink information
++	 * using the ioctl() method.
 +	 */
-+	void (*drv_config_free)		(void *drv_data);
- };
- 
- enum perf_addr_filter_action_t {
-@@ -1234,6 +1262,12 @@ static inline bool has_addr_filter(struct perf_event *event)
- 	return event->pmu->nr_addr_filters;
- }
- 
-+static inline bool has_drv_config(struct perf_event *event)
-+{
-+	return event->pmu->drv_config_validate &&
-+	       event->pmu->drv_config_free;
-+}
++	if (drv_config->config) {
++		char *drv_config;
++		struct device *dev;
++		struct coresight_device *sink;
 +
- /*
-  * An inherited event uses parent's filters
-  */
-@@ -1248,6 +1282,17 @@ perf_event_addr_filters(struct perf_event *event)
- 	return ifh;
- }
- 
-+static inline struct pmu_drv_config *
-+perf_event_get_drv_config(struct perf_event *event)
-+{
-+	struct pmu_drv_config *cfg = &event->hw.drv_config;
++		/*
++		 * Get sink from event->hw.drv_config.config - see
++		 * _perf_ioctl() _SET_DRV_CONFIG.
++		 */
++		drv_config = etm_drv_config_sync(event);
++		if (!drv_config)
++			goto out;
 +
-+	if (event->parent)
-+		cfg = &event->parent->hw.drv_config;
++		/* Look for the device of that name on the CS bus. */
++		dev = bus_find_device_by_name(&coresight_bustype, NULL,
++					      drv_config);
++		kfree(drv_config);
 +
-+	return cfg;
-+}
-+
- extern void perf_event_addr_filters_sync(struct perf_event *event);
- 
- extern int perf_output_begin(struct perf_output_handle *handle,
-diff --git a/kernel/events/core.c b/kernel/events/core.c
-index 8f0434a9951a..ccff64e9451e 100644
---- a/kernel/events/core.c
-+++ b/kernel/events/core.c
-@@ -4410,6 +4410,7 @@ static bool exclusive_event_installable(struct perf_event *event,
- 
- static void perf_addr_filters_splice(struct perf_event *event,
- 				       struct list_head *head);
-+static void perf_drv_config_replace(struct perf_event *event, void *drv_data);
- 
- static void _free_event(struct perf_event *event)
- {
-@@ -4440,6 +4441,7 @@ static void _free_event(struct perf_event *event)
- 	perf_event_free_bpf_prog(event);
- 	perf_addr_filters_splice(event, NULL);
- 	kfree(event->addr_filters_offs);
-+	perf_drv_config_replace(event, NULL);
- 
- 	if (event->destroy)
- 		event->destroy(event);
-@@ -5002,6 +5004,8 @@ static inline int perf_fget_light(int fd, struct fd *p)
- static int perf_event_set_output(struct perf_event *event,
- 				 struct perf_event *output_event);
- static int perf_event_set_filter(struct perf_event *event, void __user *arg);
-+static int perf_event_set_drv_config(struct perf_event *event,
-+				     void __user *arg);
- static int perf_event_set_bpf_prog(struct perf_event *event, u32 prog_fd);
- static int perf_copy_attr(struct perf_event_attr __user *uattr,
- 			  struct perf_event_attr *attr);
-@@ -5088,6 +5092,10 @@ static long _perf_ioctl(struct perf_event *event, unsigned int cmd, unsigned lon
- 
- 		return perf_event_modify_attr(event,  &new_attr);
- 	}
-+
-+	case PERF_EVENT_IOC_SET_DRV_CONFIG:
-+		return perf_event_set_drv_config(event, (void __user *)arg);
-+
- 	default:
- 		return -ENOTTY;
- 	}
-@@ -9086,6 +9094,75 @@ static int perf_event_set_filter(struct perf_event *event, void __user *arg)
- 	return ret;
- }
- 
-+static void perf_drv_config_replace(struct perf_event *event, void *drv_data)
-+{
-+	unsigned long flags;
-+	void *old_drv_data;
-+	struct pmu_drv_config *drv_config = &event->hw.drv_config;
-+
-+	if (!has_drv_config(event))
-+		return;
-+
-+	/* Children take their configuration from their parent */
-+	if (event->parent)
-+		return;
-+
-+	/* Make sure the PMU doesn't get a handle on the data */
-+	raw_spin_lock_irqsave(&drv_config->lock, flags);
-+
-+	old_drv_data = drv_config->config;
-+	drv_config->config = drv_data;
-+
-+	raw_spin_unlock_irqrestore(&drv_config->lock, flags);
-+
-+	/* Free PMU private data allocated by pmu::drv_config_validate() */
-+	event->pmu->drv_config_free(old_drv_data);
-+}
-+
-+static int
-+perf_event_process_drv_config(struct perf_event *event, char *config_str)
-+{
-+	int ret = -EINVAL;
-+	void *drv_data;
-+
-+	/* Make sure ctx.mutex is held */
-+	lockdep_assert_held(&event->ctx->mutex);
-+
-+	/* Children take their configuration from their parent */
-+	if (WARN_ON_ONCE(event->parent))
-+		goto out;
-+
-+	drv_data = event->pmu->drv_config_validate(event, config_str);
-+	if (IS_ERR(drv_data)) {
-+		ret = PTR_ERR(drv_data);
-+		goto out;
++		if (dev) {
++			sink = to_coresight_device(dev);
++			/* Put reference from 'bus_find_device()' */
++			put_device(dev);
++			return sink;
++		}
 +	}
 +
-+	perf_drv_config_replace(event, drv_data);
-+
-+	ret = 0;
++	/*
++	 * No luck with the above method, so we are working with an older user
++	 * space.  See if a sink has been set using sysFS.  If this is the case
++	 * CPU-wide session will only be able to use a single sink.
++	 *
++	 * When operated from sysFS users are responsible to enable the sink
++	 * while from perf, the perf tools will do it based on the choice made
++	 * on the cmd line.  As such the "enable_sink" flag in sysFS is reset.
++	 */
 +out:
-+	return ret;
++	return coresight_get_enabled_sink(true);
 +}
 +
-+static int perf_event_set_drv_config(struct perf_event *event, void __user *arg)
+ static void *etm_setup_aux(struct perf_event *event, void **pages,
+ 			   int nr_pages, bool overwrite)
+ {
+@@ -194,18 +265,8 @@ static void *etm_setup_aux(struct perf_event *event, void **pages,
+ 		return NULL;
+ 	INIT_WORK(&event_data->work, free_event_data);
+ 
+-	/*
+-	 * In theory nothing prevent tracers in a trace session from being
+-	 * associated with different sinks, nor having a sink per tracer.  But
+-	 * until we have HW with this kind of topology we need to assume tracers
+-	 * in a trace session are using the same sink.  Therefore go through
+-	 * the coresight bus and pick the first enabled sink.
+-	 *
+-	 * When operated from sysFS users are responsible to enable the sink
+-	 * while from perf, the perf tools will do it based on the choice made
+-	 * on the cmd line.  As such the "enable_sink" flag in sysFS is reset.
+-	 */
+-	sink = coresight_get_enabled_sink(true);
++	/* First get the sink to use for this event */
++	sink = etm_event_get_sink(event);
+ 	if (!sink)
+ 		goto err;
+ 
+@@ -442,6 +503,49 @@ static void etm_addr_filters_sync(struct perf_event *event)
+ 	filters->nr_filters = i;
+ }
+ 
++static const match_table_t config_tokens = {
++	{ ETM_CFG_SINK,		"%u.%s" },
++	{ ETM_CFG_NONE,		NULL },
++};
++
++static void *etm_drv_config_validate(struct perf_event *event, char *cstr)
 +{
-+	int ret = -EINVAL;
-+	char *config_str;
++	char *str, *to_parse, *sink = NULL;
++	int token, ret = -EINVAL;
++	substring_t args[MAX_OPT_ARGS];
 +
-+	if (!has_drv_config(event))
-+		return ret;
++	to_parse = kstrdup(cstr, GFP_KERNEL);
++	if (!to_parse)
++		return ERR_PTR(-ENOMEM);
 +
-+	config_str = strndup_user(arg, PAGE_SIZE);
-+	if (IS_ERR(config_str))
-+		return PTR_ERR(config_str);
++	while ((str = strsep(&to_parse, " ,\n")) != NULL) {
++		if (!*str)
++			continue;
 +
-+	ret = perf_event_process_drv_config(event, config_str);
++		token = match_token(str, config_tokens, args);
++		switch (token) {
++		case ETM_CFG_SINK:
++			sink = kstrdup(str, GFP_KERNEL);
++			if (!sink) {
++				ret = -ENOMEM;
++				goto out;
++			}
++			break;
++		default:
++			goto out;
++		}
++	}
 +
-+	kfree(config_str);
-+	return ret;
++out:
++	kfree(to_parse);
++	return sink ? sink : ERR_PTR(ret);
 +}
 +
- /*
-  * hrtimer based swevent callback
-  */
++static void etm_drv_config_free(void *drv_data)
++{
++	kfree(drv_data);
++}
++
+ int etm_perf_symlink(struct coresight_device *csdev, bool link)
+ {
+ 	char entry[sizeof("cpu9999999")];
+@@ -486,6 +590,8 @@ static int __init etm_perf_init(void)
+ 	etm_pmu.addr_filters_sync	= etm_addr_filters_sync;
+ 	etm_pmu.addr_filters_validate	= etm_addr_filters_validate;
+ 	etm_pmu.nr_addr_filters		= ETM_ADDR_CMP_MAX;
++	etm_pmu.drv_config_validate	= etm_drv_config_validate;
++	etm_pmu.drv_config_free		= etm_drv_config_free;
+ 
+ 	ret = perf_pmu_register(&etm_pmu, CORESIGHT_ETM_PMU_NAME, -1);
+ 	if (ret == 0)
+diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.h b/drivers/hwtracing/coresight/coresight-etm-perf.h
+index 4197df4faf5e..37a98230fc34 100644
+--- a/drivers/hwtracing/coresight/coresight-etm-perf.h
++++ b/drivers/hwtracing/coresight/coresight-etm-perf.h
+@@ -42,6 +42,10 @@ struct etm_filters {
+ 	bool			ssstatus;
+ };
+ 
++enum etm_config_elem_type {
++	ETM_CFG_NONE = -1,
++	ETM_CFG_SINK,
++};
+ 
+ #ifdef CONFIG_CORESIGHT
+ int etm_perf_symlink(struct coresight_device *csdev, bool link);
 -- 
 2.7.4
