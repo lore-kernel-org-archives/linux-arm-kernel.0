@@ -1,83 +1,47 @@
-From: christophe.leroy@c-s.fr (Christophe Leroy)
-Date: Thu, 5 Jul 2018 10:22:30 +0000
-Subject: [PATCH v3 02/11] hugetlb: Introduce generic version of
- hugetlb_free_pgd_range
-In-Reply-To: <20180705051640.790-3-alex@ghiti.fr>
-References: <20180705051640.790-1-alex@ghiti.fr>
- <20180705051640.790-3-alex@ghiti.fr>
-Message-ID: <005bf713-fb51-bf29-5f86-6f244cd49f35@c-s.fr>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Thu,  5 Jul 2018 12:27:26 +0200
+Subject: [PATCH 1/8] mtd: rawnand: Kill cafe_nand_bug()
+In-Reply-To: <20180705102733.29673-1-boris.brezillon@bootlin.com>
+References: <20180705102733.29673-1-boris.brezillon@bootlin.com>
+Message-ID: <20180705102733.29673-2-boris.brezillon@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Leaving a function pointer to NULL should be enough to trigger a NULL
+pointer exception, and anyway, if we want to BUG() when some missing
+hooks are called, this should be done in the core, so let's drop the
+cafe_nand_bug() dummy function.
 
+Signed-off-by: Boris Brezillon <boris.brezillon@bootlin.com>
+---
+ drivers/mtd/nand/raw/cafe_nand.c | 8 --------
+ 1 file changed, 8 deletions(-)
 
-On 07/05/2018 05:16 AM, Alexandre Ghiti wrote:
-> arm, arm64, mips, parisc, sh, x86 architectures use the
-> same version of hugetlb_free_pgd_range, so move this generic
-> implementation into asm-generic/hugetlb.h.
-> 
-> Signed-off-by: Alexandre Ghiti <alex@ghiti.fr>
-
-Build failure on mpc885_ads_defconfig
-
-   CC      arch/powerpc/kernel/setup-common.o
-In file included from arch/powerpc/kernel/setup-common.c:37:
-./include/linux/hugetlb.h:191:65: error: expected identifier or '(' 
-before '{' token
-  #define hugetlb_free_pgd_range(tlb, addr, end, floor, ceiling) 
-({BUG(); 0; })
-                                                                  ^
-./include/asm-generic/hugetlb.h:44:20: note: in expansion of macro 
-'hugetlb_free_pgd_range'
-  static inline void hugetlb_free_pgd_range(struct mmu_gather *tlb,
-                     ^~~~~~~~~~~~~~~~~~~~~~
-
-see below
-
-> ---
->   arch/arm/include/asm/hugetlb.h     | 12 ++----------
->   arch/arm64/include/asm/hugetlb.h   | 10 ----------
->   arch/ia64/include/asm/hugetlb.h    |  5 +++--
->   arch/mips/include/asm/hugetlb.h    | 13 ++-----------
->   arch/parisc/include/asm/hugetlb.h  | 12 ++----------
->   arch/powerpc/include/asm/hugetlb.h |  4 +++-
->   arch/sh/include/asm/hugetlb.h      | 12 ++----------
->   arch/sparc/include/asm/hugetlb.h   |  4 +++-
->   arch/x86/include/asm/hugetlb.h     | 11 ++---------
->   include/asm-generic/hugetlb.h      | 11 +++++++++++
->   10 files changed, 30 insertions(+), 64 deletions(-)
-> 
-
-[snip]
-
-> diff --git a/arch/powerpc/include/asm/hugetlb.h b/arch/powerpc/include/asm/hugetlb.h
-> index 3225eb6402cc..de46ee16b615 100644
-> --- a/arch/powerpc/include/asm/hugetlb.h
-> +++ b/arch/powerpc/include/asm/hugetlb.h
-> @@ -4,7 +4,6 @@
->   
->   #ifdef CONFIG_HUGETLB_PAGE
->   #include <asm/page.h>
-> -#include <asm-generic/hugetlb.h>
->   
->   extern struct kmem_cache *hugepte_cache;
->   
-> @@ -113,6 +112,7 @@ static inline void flush_hugetlb_page(struct vm_area_struct *vma,
->   void flush_hugetlb_page(struct vm_area_struct *vma, unsigned long vmaddr);
->   #endif
->   
-> +#define __HAVE_ARCH_HUGETLB_FREE_PGD_RANGE
->   void hugetlb_free_pgd_range(struct mmu_gather *tlb, unsigned long addr,
->   			    unsigned long end, unsigned long floor,
->   			    unsigned long ceiling);
-> @@ -193,4 +193,6 @@ static inline pte_t *hugepte_offset(hugepd_t hpd, unsigned long addr,
->   }
->   #endif /* CONFIG_HUGETLB_PAGE */
->   
-> +#include <asm-generic/hugetlb.h>
-> +
-
-That include was previously inside #ifdef CONFIG_HUGETLB_PAGE.
-Why put it outside ?
-
-Christophe
+diff --git a/drivers/mtd/nand/raw/cafe_nand.c b/drivers/mtd/nand/raw/cafe_nand.c
+index d721f489b38b..ac0be933a490 100644
+--- a/drivers/mtd/nand/raw/cafe_nand.c
++++ b/drivers/mtd/nand/raw/cafe_nand.c
+@@ -345,11 +345,6 @@ static irqreturn_t cafe_nand_interrupt(int irq, void *id)
+ 	return IRQ_HANDLED;
+ }
+ 
+-static void cafe_nand_bug(struct mtd_info *mtd)
+-{
+-	BUG();
+-}
+-
+ static int cafe_nand_write_oob(struct mtd_info *mtd,
+ 			       struct nand_chip *chip, int page)
+ {
+@@ -760,9 +755,6 @@ static int cafe_nand_probe(struct pci_dev *pdev,
+ 	cafe->nand.ecc.size = mtd->writesize;
+ 	cafe->nand.ecc.bytes = 14;
+ 	cafe->nand.ecc.strength = 4;
+-	cafe->nand.ecc.hwctl  = (void *)cafe_nand_bug;
+-	cafe->nand.ecc.calculate = (void *)cafe_nand_bug;
+-	cafe->nand.ecc.correct  = (void *)cafe_nand_bug;
+ 	cafe->nand.ecc.write_page = cafe_nand_write_page_lowlevel;
+ 	cafe->nand.ecc.write_oob = cafe_nand_write_oob;
+ 	cafe->nand.ecc.read_page = cafe_nand_read_page;
+-- 
+2.14.1
