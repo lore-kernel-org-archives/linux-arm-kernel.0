@@ -1,9 +1,9 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu,  5 Jul 2018 15:16:52 +0100
-Subject: [PATCHv2 5/7] arm64: use PSR_AA32 definitions
+Date: Thu,  5 Jul 2018 15:16:53 +0100
+Subject: [PATCHv2 6/7] kvm/arm: use PSR_AA32 definitions
 In-Reply-To: <20180705141654.8714-1-mark.rutland@arm.com>
 References: <20180705141654.8714-1-mark.rutland@arm.com>
-Message-ID: <20180705141654.8714-6-mark.rutland@arm.com>
+Message-ID: <20180705141654.8714-7-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,238 +17,267 @@ COMPAT_PSR_*.
 
 There should be no functional change as a result of this patch.
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/include/asm/processor.h   |  6 +++---
- arch/arm64/include/asm/ptrace.h      |  2 +-
- arch/arm64/kernel/armv8_deprecated.c | 24 ++++++++++++------------
- arch/arm64/kernel/cpufeature.c       |  2 +-
- arch/arm64/kernel/process.c          | 20 ++++++++++----------
- arch/arm64/kernel/ptrace.c           | 20 ++++++++++----------
- arch/arm64/kernel/signal32.c         | 10 +++++-----
- 7 files changed, 42 insertions(+), 42 deletions(-)
+Note that arm64 KVM does not support a compat KVM API, and always uses
+the SPSR_ELx format, even for AArch32 guests.
 
-diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-index a73ae1e49200..e02612105d78 100644
---- a/arch/arm64/include/asm/processor.h
-+++ b/arch/arm64/include/asm/processor.h
-@@ -182,12 +182,12 @@ static inline void compat_start_thread(struct pt_regs *regs, unsigned long pc,
- 				       unsigned long sp)
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Christoffer Dall <christoffer.dall@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/include/asm/kvm_emulate.h       | 14 +++++++-------
+ arch/arm64/include/asm/kvm_emulate.h     | 10 +++++-----
+ arch/arm64/kvm/guest.c                   | 14 +++++++-------
+ arch/arm64/kvm/hyp/vgic-v2-cpuif-proxy.c |  2 +-
+ arch/arm64/kvm/regmap.c                  | 22 +++++++++++-----------
+ arch/arm64/kvm/reset.c                   |  4 ++--
+ virt/kvm/arm/aarch32.c                   | 20 ++++++++++----------
+ 7 files changed, 43 insertions(+), 43 deletions(-)
+
+diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
+index 6493bd479ddc..fe2fb1ddd771 100644
+--- a/arch/arm/include/asm/kvm_emulate.h
++++ b/arch/arm/include/asm/kvm_emulate.h
+@@ -26,13 +26,13 @@
+ #include <asm/cputype.h>
+ 
+ /* arm64 compatibility macros */
+-#define COMPAT_PSR_MODE_ABT	ABT_MODE
+-#define COMPAT_PSR_MODE_UND	UND_MODE
+-#define COMPAT_PSR_T_BIT	PSR_T_BIT
+-#define COMPAT_PSR_I_BIT	PSR_I_BIT
+-#define COMPAT_PSR_A_BIT	PSR_A_BIT
+-#define COMPAT_PSR_E_BIT	PSR_E_BIT
+-#define COMPAT_PSR_IT_MASK	PSR_IT_MASK
++#define PSR_AA32_MODE_ABT	ABT_MODE
++#define PSR_AA32_MODE_UND	UND_MODE
++#define PSR_AA32_T_BIT		PSR_T_BIT
++#define PSR_AA32_I_BIT		PSR_I_BIT
++#define PSR_AA32_A_BIT		PSR_A_BIT
++#define PSR_AA32_E_BIT		PSR_E_BIT
++#define PSR_AA32_IT_MASK	PSR_IT_MASK
+ 
+ unsigned long *vcpu_reg(struct kvm_vcpu *vcpu, u8 reg_num);
+ 
+diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+index 1dab3a984608..0c97e45d1dc3 100644
+--- a/arch/arm64/include/asm/kvm_emulate.h
++++ b/arch/arm64/include/asm/kvm_emulate.h
+@@ -140,7 +140,7 @@ static inline void kvm_skip_instr(struct kvm_vcpu *vcpu, bool is_wide_instr)
+ 
+ static inline void vcpu_set_thumb(struct kvm_vcpu *vcpu)
  {
- 	start_thread_common(regs, pc);
--	regs->pstate = COMPAT_PSR_MODE_USR;
-+	regs->pstate = PSR_AA32_MODE_USR;
- 	if (pc & 1)
--		regs->pstate |= COMPAT_PSR_T_BIT;
-+		regs->pstate |= PSR_AA32_T_BIT;
+-	*vcpu_cpsr(vcpu) |= COMPAT_PSR_T_BIT;
++	*vcpu_cpsr(vcpu) |= PSR_AA32_T_BIT;
+ }
  
- #ifdef __AARCH64EB__
--	regs->pstate |= COMPAT_PSR_E_BIT;
-+	regs->pstate |= PSR_AA32_E_BIT;
- #endif
+ /*
+@@ -190,8 +190,8 @@ static inline bool vcpu_mode_priv(const struct kvm_vcpu *vcpu)
+ 	u32 mode;
  
- 	regs->compat_sp = sp;
-diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
-index 1b2a253de6a1..d55237eb89bb 100644
---- a/arch/arm64/include/asm/ptrace.h
-+++ b/arch/arm64/include/asm/ptrace.h
-@@ -211,7 +211,7 @@ static inline void forget_syscall(struct pt_regs *regs)
- 
- #ifdef CONFIG_COMPAT
- #define compat_thumb_mode(regs) \
--	(((regs)->pstate & COMPAT_PSR_T_BIT))
-+	(((regs)->pstate & PSR_AA32_T_BIT))
- #else
- #define compat_thumb_mode(regs) (0)
- #endif
-diff --git a/arch/arm64/kernel/armv8_deprecated.c b/arch/arm64/kernel/armv8_deprecated.c
-index d4707abb2f16..d2c0938ccaec 100644
---- a/arch/arm64/kernel/armv8_deprecated.c
-+++ b/arch/arm64/kernel/armv8_deprecated.c
-@@ -441,8 +441,8 @@ static struct undef_hook swp_hooks[] = {
- 	{
- 		.instr_mask	= 0x0fb00ff0,
- 		.instr_val	= 0x01000090,
--		.pstate_mask	= COMPAT_PSR_MODE_MASK,
--		.pstate_val	= COMPAT_PSR_MODE_USR,
-+		.pstate_mask	= PSR_AA32_MODE_MASK,
-+		.pstate_val	= PSR_AA32_MODE_USR,
- 		.fn		= swp_handler
- 	},
- 	{ }
-@@ -521,15 +521,15 @@ static struct undef_hook cp15_barrier_hooks[] = {
- 	{
- 		.instr_mask	= 0x0fff0fdf,
- 		.instr_val	= 0x0e070f9a,
--		.pstate_mask	= COMPAT_PSR_MODE_MASK,
--		.pstate_val	= COMPAT_PSR_MODE_USR,
-+		.pstate_mask	= PSR_AA32_MODE_MASK,
-+		.pstate_val	= PSR_AA32_MODE_USR,
- 		.fn		= cp15barrier_handler,
- 	},
- 	{
- 		.instr_mask	= 0x0fff0fff,
- 		.instr_val	= 0x0e070f95,
--		.pstate_mask	= COMPAT_PSR_MODE_MASK,
--		.pstate_val	= COMPAT_PSR_MODE_USR,
-+		.pstate_mask	= PSR_AA32_MODE_MASK,
-+		.pstate_val	= PSR_AA32_MODE_USR,
- 		.fn		= cp15barrier_handler,
- 	},
- 	{ }
-@@ -562,10 +562,10 @@ static int compat_setend_handler(struct pt_regs *regs, u32 big_endian)
- 
- 	if (big_endian) {
- 		insn = "setend be";
--		regs->pstate |= COMPAT_PSR_E_BIT;
-+		regs->pstate |= PSR_AA32_E_BIT;
- 	} else {
- 		insn = "setend le";
--		regs->pstate &= ~COMPAT_PSR_E_BIT;
-+		regs->pstate &= ~PSR_AA32_E_BIT;
+ 	if (vcpu_mode_is_32bit(vcpu)) {
+-		mode = *vcpu_cpsr(vcpu) & COMPAT_PSR_MODE_MASK;
+-		return mode > COMPAT_PSR_MODE_USR;
++		mode = *vcpu_cpsr(vcpu) & PSR_AA32_MODE_MASK;
++		return mode > PSR_AA32_MODE_USR;
  	}
  
- 	trace_instruction_emulation(insn, regs->pc);
-@@ -593,16 +593,16 @@ static struct undef_hook setend_hooks[] = {
- 	{
- 		.instr_mask	= 0xfffffdff,
- 		.instr_val	= 0xf1010000,
--		.pstate_mask	= COMPAT_PSR_MODE_MASK,
--		.pstate_val	= COMPAT_PSR_MODE_USR,
-+		.pstate_mask	= PSR_AA32_MODE_MASK,
-+		.pstate_val	= PSR_AA32_MODE_USR,
- 		.fn		= a32_setend_handler,
- 	},
- 	{
- 		/* Thumb mode */
- 		.instr_mask	= 0x0000fff7,
- 		.instr_val	= 0x0000b650,
--		.pstate_mask	= (COMPAT_PSR_T_BIT | COMPAT_PSR_MODE_MASK),
--		.pstate_val	= (COMPAT_PSR_T_BIT | COMPAT_PSR_MODE_USR),
-+		.pstate_mask	= (PSR_AA32_T_BIT | PSR_AA32_MODE_MASK),
-+		.pstate_val	= (PSR_AA32_T_BIT | PSR_AA32_MODE_USR),
- 		.fn		= t16_setend_handler,
- 	},
- 	{}
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index f24892a40d2c..48d813defe5e 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -1723,7 +1723,7 @@ static int emulate_mrs(struct pt_regs *regs, u32 insn)
- static struct undef_hook mrs_hook = {
- 	.instr_mask = 0xfff00000,
- 	.instr_val  = 0xd5300000,
--	.pstate_mask = COMPAT_PSR_MODE_MASK,
-+	.pstate_mask = PSR_AA32_MODE_MASK,
- 	.pstate_val = PSR_MODE_EL0t,
- 	.fn = emulate_mrs,
+ 	mode = *vcpu_cpsr(vcpu) & PSR_MODE_MASK;
+@@ -329,7 +329,7 @@ static inline unsigned long kvm_vcpu_get_mpidr_aff(struct kvm_vcpu *vcpu)
+ static inline void kvm_vcpu_set_be(struct kvm_vcpu *vcpu)
+ {
+ 	if (vcpu_mode_is_32bit(vcpu)) {
+-		*vcpu_cpsr(vcpu) |= COMPAT_PSR_E_BIT;
++		*vcpu_cpsr(vcpu) |= PSR_AA32_E_BIT;
+ 	} else {
+ 		u64 sctlr = vcpu_read_sys_reg(vcpu, SCTLR_EL1);
+ 		sctlr |= (1 << 25);
+@@ -340,7 +340,7 @@ static inline void kvm_vcpu_set_be(struct kvm_vcpu *vcpu)
+ static inline bool kvm_vcpu_is_be(struct kvm_vcpu *vcpu)
+ {
+ 	if (vcpu_mode_is_32bit(vcpu))
+-		return !!(*vcpu_cpsr(vcpu) & COMPAT_PSR_E_BIT);
++		return !!(*vcpu_cpsr(vcpu) & PSR_AA32_E_BIT);
+ 
+ 	return !!(vcpu_read_sys_reg(vcpu, SCTLR_EL1) & (1 << 25));
+ }
+diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
+index 56a0260ceb11..cdd4d9d6d575 100644
+--- a/arch/arm64/kvm/guest.c
++++ b/arch/arm64/kvm/guest.c
+@@ -107,14 +107,14 @@ static int set_core_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+ 	}
+ 
+ 	if (off == KVM_REG_ARM_CORE_REG(regs.pstate)) {
+-		u32 mode = (*(u32 *)valp) & COMPAT_PSR_MODE_MASK;
++		u32 mode = (*(u32 *)valp) & PSR_AA32_MODE_MASK;
+ 		switch (mode) {
+-		case COMPAT_PSR_MODE_USR:
+-		case COMPAT_PSR_MODE_FIQ:
+-		case COMPAT_PSR_MODE_IRQ:
+-		case COMPAT_PSR_MODE_SVC:
+-		case COMPAT_PSR_MODE_ABT:
+-		case COMPAT_PSR_MODE_UND:
++		case PSR_AA32_MODE_USR:
++		case PSR_AA32_MODE_FIQ:
++		case PSR_AA32_MODE_IRQ:
++		case PSR_AA32_MODE_SVC:
++		case PSR_AA32_MODE_ABT:
++		case PSR_AA32_MODE_UND:
+ 		case PSR_MODE_EL0t:
+ 		case PSR_MODE_EL1t:
+ 		case PSR_MODE_EL1h:
+diff --git a/arch/arm64/kvm/hyp/vgic-v2-cpuif-proxy.c b/arch/arm64/kvm/hyp/vgic-v2-cpuif-proxy.c
+index 39be799d0417..215c7c0eb3b0 100644
+--- a/arch/arm64/kvm/hyp/vgic-v2-cpuif-proxy.c
++++ b/arch/arm64/kvm/hyp/vgic-v2-cpuif-proxy.c
+@@ -27,7 +27,7 @@
+ static bool __hyp_text __is_be(struct kvm_vcpu *vcpu)
+ {
+ 	if (vcpu_mode_is_32bit(vcpu))
+-		return !!(read_sysreg_el2(spsr) & COMPAT_PSR_E_BIT);
++		return !!(read_sysreg_el2(spsr) & PSR_AA32_E_BIT);
+ 
+ 	return !!(read_sysreg(SCTLR_EL1) & SCTLR_ELx_EE);
+ }
+diff --git a/arch/arm64/kvm/regmap.c b/arch/arm64/kvm/regmap.c
+index eefe403a2e63..7a5173ea2276 100644
+--- a/arch/arm64/kvm/regmap.c
++++ b/arch/arm64/kvm/regmap.c
+@@ -112,22 +112,22 @@ static const unsigned long vcpu_reg_offsets[VCPU_NR_MODES][16] = {
+ unsigned long *vcpu_reg32(const struct kvm_vcpu *vcpu, u8 reg_num)
+ {
+ 	unsigned long *reg_array = (unsigned long *)&vcpu->arch.ctxt.gp_regs.regs;
+-	unsigned long mode = *vcpu_cpsr(vcpu) & COMPAT_PSR_MODE_MASK;
++	unsigned long mode = *vcpu_cpsr(vcpu) & PSR_AA32_MODE_MASK;
+ 
+ 	switch (mode) {
+-	case COMPAT_PSR_MODE_USR ... COMPAT_PSR_MODE_SVC:
++	case PSR_AA32_MODE_USR ... PSR_AA32_MODE_SVC:
+ 		mode &= ~PSR_MODE32_BIT; /* 0 ... 3 */
+ 		break;
+ 
+-	case COMPAT_PSR_MODE_ABT:
++	case PSR_AA32_MODE_ABT:
+ 		mode = 4;
+ 		break;
+ 
+-	case COMPAT_PSR_MODE_UND:
++	case PSR_AA32_MODE_UND:
+ 		mode = 5;
+ 		break;
+ 
+-	case COMPAT_PSR_MODE_SYS:
++	case PSR_AA32_MODE_SYS:
+ 		mode = 0;	/* SYS maps to USR */
+ 		break;
+ 
+@@ -143,13 +143,13 @@ unsigned long *vcpu_reg32(const struct kvm_vcpu *vcpu, u8 reg_num)
+  */
+ static int vcpu_spsr32_mode(const struct kvm_vcpu *vcpu)
+ {
+-	unsigned long mode = *vcpu_cpsr(vcpu) & COMPAT_PSR_MODE_MASK;
++	unsigned long mode = *vcpu_cpsr(vcpu) & PSR_AA32_MODE_MASK;
+ 	switch (mode) {
+-	case COMPAT_PSR_MODE_SVC: return KVM_SPSR_SVC;
+-	case COMPAT_PSR_MODE_ABT: return KVM_SPSR_ABT;
+-	case COMPAT_PSR_MODE_UND: return KVM_SPSR_UND;
+-	case COMPAT_PSR_MODE_IRQ: return KVM_SPSR_IRQ;
+-	case COMPAT_PSR_MODE_FIQ: return KVM_SPSR_FIQ;
++	case PSR_AA32_MODE_SVC: return KVM_SPSR_SVC;
++	case PSR_AA32_MODE_ABT: return KVM_SPSR_ABT;
++	case PSR_AA32_MODE_UND: return KVM_SPSR_UND;
++	case PSR_AA32_MODE_IRQ: return KVM_SPSR_IRQ;
++	case PSR_AA32_MODE_FIQ: return KVM_SPSR_FIQ;
+ 	default: BUG();
+ 	}
+ }
+diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+index a74311beda35..4e4aedaf7ab7 100644
+--- a/arch/arm64/kvm/reset.c
++++ b/arch/arm64/kvm/reset.c
+@@ -42,8 +42,8 @@ static const struct kvm_regs default_regs_reset = {
  };
-diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-index e10bc363f533..740b31f77ade 100644
---- a/arch/arm64/kernel/process.c
-+++ b/arch/arm64/kernel/process.c
-@@ -177,16 +177,16 @@ static void print_pstate(struct pt_regs *regs)
- 	if (compat_user_mode(regs)) {
- 		printk("pstate: %08llx (%c%c%c%c %c %s %s %c%c%c)\n",
- 			pstate,
--			pstate & COMPAT_PSR_N_BIT ? 'N' : 'n',
--			pstate & COMPAT_PSR_Z_BIT ? 'Z' : 'z',
--			pstate & COMPAT_PSR_C_BIT ? 'C' : 'c',
--			pstate & COMPAT_PSR_V_BIT ? 'V' : 'v',
--			pstate & COMPAT_PSR_Q_BIT ? 'Q' : 'q',
--			pstate & COMPAT_PSR_T_BIT ? "T32" : "A32",
--			pstate & COMPAT_PSR_E_BIT ? "BE" : "LE",
--			pstate & COMPAT_PSR_A_BIT ? 'A' : 'a',
--			pstate & COMPAT_PSR_I_BIT ? 'I' : 'i',
--			pstate & COMPAT_PSR_F_BIT ? 'F' : 'f');
-+			pstate & PSR_AA32_N_BIT ? 'N' : 'n',
-+			pstate & PSR_AA32_Z_BIT ? 'Z' : 'z',
-+			pstate & PSR_AA32_C_BIT ? 'C' : 'c',
-+			pstate & PSR_AA32_V_BIT ? 'V' : 'v',
-+			pstate & PSR_AA32_Q_BIT ? 'Q' : 'q',
-+			pstate & PSR_AA32_T_BIT ? "T32" : "A32",
-+			pstate & PSR_AA32_E_BIT ? "BE" : "LE",
-+			pstate & PSR_AA32_A_BIT ? 'A' : 'a',
-+			pstate & PSR_AA32_I_BIT ? 'I' : 'i',
-+			pstate & PSR_AA32_F_BIT ? 'F' : 'f');
- 	} else {
- 		printk("pstate: %08llx (%c%c%c%c %c%c%c%c %cPAN %cUAO)\n",
- 			pstate,
-diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-index bc07e8ec062b..ee2677bdc41e 100644
---- a/arch/arm64/kernel/ptrace.c
-+++ b/arch/arm64/kernel/ptrace.c
-@@ -1681,15 +1681,15 @@ static int valid_compat_regs(struct user_pt_regs *regs)
  
- 	if (!system_supports_mixed_endian_el0()) {
- 		if (IS_ENABLED(CONFIG_CPU_BIG_ENDIAN))
--			regs->pstate |= COMPAT_PSR_E_BIT;
-+			regs->pstate |= PSR_AA32_E_BIT;
- 		else
--			regs->pstate &= ~COMPAT_PSR_E_BIT;
-+			regs->pstate &= ~PSR_AA32_E_BIT;
- 	}
+ static const struct kvm_regs default_regs_reset32 = {
+-	.regs.pstate = (COMPAT_PSR_MODE_SVC | COMPAT_PSR_A_BIT |
+-			COMPAT_PSR_I_BIT | COMPAT_PSR_F_BIT),
++	.regs.pstate = (PSR_AA32_MODE_SVC | PSR_AA32_A_BIT |
++			PSR_AA32_I_BIT | PSR_AA32_F_BIT),
+ };
  
- 	if (user_mode(regs) && (regs->pstate & PSR_MODE32_BIT) &&
--	    (regs->pstate & COMPAT_PSR_A_BIT) == 0 &&
--	    (regs->pstate & COMPAT_PSR_I_BIT) == 0 &&
--	    (regs->pstate & COMPAT_PSR_F_BIT) == 0) {
-+	    (regs->pstate & PSR_AA32_A_BIT) == 0 &&
-+	    (regs->pstate & PSR_AA32_I_BIT) == 0 &&
-+	    (regs->pstate & PSR_AA32_F_BIT) == 0) {
- 		return 1;
- 	}
- 
-@@ -1697,11 +1697,11 @@ static int valid_compat_regs(struct user_pt_regs *regs)
- 	 * Force PSR to a valid 32-bit EL0t, preserving the same bits as
- 	 * arch/arm.
- 	 */
--	regs->pstate &= COMPAT_PSR_N_BIT | COMPAT_PSR_Z_BIT |
--			COMPAT_PSR_C_BIT | COMPAT_PSR_V_BIT |
--			COMPAT_PSR_Q_BIT | COMPAT_PSR_IT_MASK |
--			COMPAT_PSR_GE_MASK | COMPAT_PSR_E_BIT |
--			COMPAT_PSR_T_BIT;
-+	regs->pstate &= PSR_AA32_N_BIT | PSR_AA32_Z_BIT |
-+			PSR_AA32_C_BIT | PSR_AA32_V_BIT |
-+			PSR_AA32_Q_BIT | PSR_AA32_IT_MASK |
-+			PSR_AA32_GE_MASK | PSR_AA32_E_BIT |
-+			PSR_AA32_T_BIT;
- 	regs->pstate |= PSR_MODE32_BIT;
- 
- 	return 0;
-diff --git a/arch/arm64/kernel/signal32.c b/arch/arm64/kernel/signal32.c
-index 12aec0a66376..fca761be18c8 100644
---- a/arch/arm64/kernel/signal32.c
-+++ b/arch/arm64/kernel/signal32.c
-@@ -375,22 +375,22 @@ static void compat_setup_return(struct pt_regs *regs, struct k_sigaction *ka,
+ static bool cpu_has_32bit_el1(void)
+diff --git a/virt/kvm/arm/aarch32.c b/virt/kvm/arm/aarch32.c
+index efc84cbe8277..5abbe9b3c652 100644
+--- a/virt/kvm/arm/aarch32.c
++++ b/virt/kvm/arm/aarch32.c
+@@ -108,9 +108,9 @@ static void __hyp_text kvm_adjust_itstate(struct kvm_vcpu *vcpu)
  {
- 	compat_ulong_t handler = ptr_to_compat(ka->sa.sa_handler);
- 	compat_ulong_t retcode;
--	compat_ulong_t spsr = regs->pstate & ~(PSR_f | COMPAT_PSR_E_BIT);
-+	compat_ulong_t spsr = regs->pstate & ~(PSR_f | PSR_AA32_E_BIT);
- 	int thumb;
+ 	unsigned long itbits, cond;
+ 	unsigned long cpsr = *vcpu_cpsr(vcpu);
+-	bool is_arm = !(cpsr & COMPAT_PSR_T_BIT);
++	bool is_arm = !(cpsr & PSR_AA32_T_BIT);
  
- 	/* Check if the handler is written for ARM or Thumb */
- 	thumb = handler & 1;
+-	if (is_arm || !(cpsr & COMPAT_PSR_IT_MASK))
++	if (is_arm || !(cpsr & PSR_AA32_IT_MASK))
+ 		return;
  
- 	if (thumb)
--		spsr |= COMPAT_PSR_T_BIT;
-+		spsr |= PSR_AA32_T_BIT;
+ 	cond = (cpsr & 0xe000) >> 13;
+@@ -123,7 +123,7 @@ static void __hyp_text kvm_adjust_itstate(struct kvm_vcpu *vcpu)
  	else
--		spsr &= ~COMPAT_PSR_T_BIT;
-+		spsr &= ~PSR_AA32_T_BIT;
+ 		itbits = (itbits << 1) & 0x1f;
  
- 	/* The IT state must be cleared for both ARM and Thumb-2 */
--	spsr &= ~COMPAT_PSR_IT_MASK;
-+	spsr &= ~PSR_AA32_IT_MASK;
+-	cpsr &= ~COMPAT_PSR_IT_MASK;
++	cpsr &= ~PSR_AA32_IT_MASK;
+ 	cpsr |= cond << 13;
+ 	cpsr |= (itbits & 0x1c) << (10 - 2);
+ 	cpsr |= (itbits & 0x3) << 25;
+@@ -138,7 +138,7 @@ void __hyp_text kvm_skip_instr32(struct kvm_vcpu *vcpu, bool is_wide_instr)
+ {
+ 	bool is_thumb;
  
- 	/* Restore the original endianness */
--	spsr |= COMPAT_PSR_ENDSTATE;
-+	spsr |= PSR_AA32_ENDSTATE;
+-	is_thumb = !!(*vcpu_cpsr(vcpu) & COMPAT_PSR_T_BIT);
++	is_thumb = !!(*vcpu_cpsr(vcpu) & PSR_AA32_T_BIT);
+ 	if (is_thumb && !is_wide_instr)
+ 		*vcpu_pc(vcpu) += 2;
+ 	else
+@@ -164,16 +164,16 @@ static void prepare_fault32(struct kvm_vcpu *vcpu, u32 mode, u32 vect_offset)
+ {
+ 	unsigned long cpsr;
+ 	unsigned long new_spsr_value = *vcpu_cpsr(vcpu);
+-	bool is_thumb = (new_spsr_value & COMPAT_PSR_T_BIT);
++	bool is_thumb = (new_spsr_value & PSR_AA32_T_BIT);
+ 	u32 return_offset = return_offsets[vect_offset >> 2][is_thumb];
+ 	u32 sctlr = vcpu_cp15(vcpu, c1_SCTLR);
  
- 	if (ka->sa.sa_flags & SA_RESTORER) {
- 		retcode = ptr_to_compat(ka->sa.sa_restorer);
+-	cpsr = mode | COMPAT_PSR_I_BIT;
++	cpsr = mode | PSR_AA32_I_BIT;
+ 
+ 	if (sctlr & (1 << 30))
+-		cpsr |= COMPAT_PSR_T_BIT;
++		cpsr |= PSR_AA32_T_BIT;
+ 	if (sctlr & (1 << 25))
+-		cpsr |= COMPAT_PSR_E_BIT;
++		cpsr |= PSR_AA32_E_BIT;
+ 
+ 	*vcpu_cpsr(vcpu) = cpsr;
+ 
+@@ -192,7 +192,7 @@ static void prepare_fault32(struct kvm_vcpu *vcpu, u32 mode, u32 vect_offset)
+ 
+ void kvm_inject_undef32(struct kvm_vcpu *vcpu)
+ {
+-	prepare_fault32(vcpu, COMPAT_PSR_MODE_UND, 4);
++	prepare_fault32(vcpu, PSR_AA32_MODE_UND, 4);
+ }
+ 
+ /*
+@@ -216,7 +216,7 @@ static void inject_abt32(struct kvm_vcpu *vcpu, bool is_pabt,
+ 		fsr = &vcpu_cp15(vcpu, c5_DFSR);
+ 	}
+ 
+-	prepare_fault32(vcpu, COMPAT_PSR_MODE_ABT | COMPAT_PSR_A_BIT, vect_offset);
++	prepare_fault32(vcpu, PSR_AA32_MODE_ABT | PSR_AA32_A_BIT, vect_offset);
+ 
+ 	*far = addr;
+ 
 -- 
 2.11.0
