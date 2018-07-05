@@ -1,74 +1,48 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Thu, 5 Jul 2018 12:08:28 -0700
-Subject: [PATCHv5 2/4] x86: Add build salt to the vDSO
-In-Reply-To: <CALCETrVZi2WYbBSifaNV4wajj52PyG-w7z9DekfJvSuZAKi1nA@mail.gmail.com>
-References: <20180703233430.14416-1-labbott@redhat.com>
- <20180703233430.14416-3-labbott@redhat.com>
- <CALCETrVZi2WYbBSifaNV4wajj52PyG-w7z9DekfJvSuZAKi1nA@mail.gmail.com>
-Message-ID: <2abd8138-0f62-79a5-5a2c-8e08aee171b8@redhat.com>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Thu, 5 Jul 2018 22:09:27 +0300
+Subject: [PATCH 2/3] ARM: dts: imx31: add device tree description of basic
+ controllers
+In-Reply-To: <CAOMZO5AW6QryKAjcG_kE011G1anLD=-EaJFhAaWzaqbf3aKNUQ@mail.gmail.com>
+References: <20180703192934.6080-1-vz@mleia.com>
+ <20180703192934.6080-3-vz@mleia.com>
+ <CAOMZO5AW6QryKAjcG_kE011G1anLD=-EaJFhAaWzaqbf3aKNUQ@mail.gmail.com>
+Message-ID: <430434fe-da1d-ffd9-0b54-a0c7d63c6284@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/05/2018 08:58 AM, Andy Lutomirski wrote:
-> On Tue, Jul 3, 2018 at 4:34 PM, Laura Abbott <labbott@redhat.com> wrote:
->>
->> The vDSO needs to have a unique build id in a similar manner
->> to the kernel and modules. Use the build salt macro.
->>
-> 
-> Looks good to me.  I have no idea whose tree these would go through.
-> 
+Hi Fabio,
 
-I was intending this to go through kbuild tree. Can I take this
-as an Ack?
+On 07/05/2018 04:01 AM, Fabio Estevam wrote:
+> On Tue, Jul 3, 2018 at 4:29 PM, Vladimir Zapolskiy <vz@mleia.com> wrote:
+>> The change adds a number of basic peripherals found on i.MX31 SoC:
+>> * GPIO controllers,
+>> * I2C master controllers,
+>> * SPI master controllers,
+>> * ATA controller,
+>> * SDHC controllers,
+>> * RTC, watchdog and PWM contollers,
+>> * SDMA,
+>> * IRAM,
+>> * NAND and WEIM controllers on EMI.
+>>
+>> The added controller devices were tested on Freescale i.MX31 powered
+>> LogicPD Lite SoM and baseboard.
+>>
+>> DMA functionality was tested on SDHC and SPI controllers so far,
+>> thus dmas properties are added to those device nodes only.
+>>
+>> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+> 
+> Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
 
->> Signed-off-by: Laura Abbott <labbott@redhat.com>
->> ---
->> v5: Switched to using the single line BUILD_SALT macro
->> ---
->>   arch/x86/entry/vdso/vdso-note.S   | 3 +++
->>   arch/x86/entry/vdso/vdso32/note.S | 3 +++
->>   2 files changed, 6 insertions(+)
->>
->> diff --git a/arch/x86/entry/vdso/vdso-note.S b/arch/x86/entry/vdso/vdso-note.S
->> index 79a071e4357e..79423170118f 100644
->> --- a/arch/x86/entry/vdso/vdso-note.S
->> +++ b/arch/x86/entry/vdso/vdso-note.S
->> @@ -3,6 +3,7 @@
->>    * Here we can supply some information useful to userland.
->>    */
->>
->> +#include <linux/build-salt.h>
->>   #include <linux/uts.h>
->>   #include <linux/version.h>
->>   #include <linux/elfnote.h>
->> @@ -10,3 +11,5 @@
->>   ELFNOTE_START(Linux, 0, "a")
->>          .long LINUX_VERSION_CODE
->>   ELFNOTE_END
->> +
->> +BUILD_SALT
->> diff --git a/arch/x86/entry/vdso/vdso32/note.S b/arch/x86/entry/vdso/vdso32/note.S
->> index 9fd51f206314..e78047d119f6 100644
->> --- a/arch/x86/entry/vdso/vdso32/note.S
->> +++ b/arch/x86/entry/vdso/vdso32/note.S
->> @@ -4,6 +4,7 @@
->>    * Here we can supply some information useful to userland.
->>    */
->>
->> +#include <linux/build-salt.h>
->>   #include <linux/version.h>
->>   #include <linux/elfnote.h>
->>
->> @@ -14,6 +15,8 @@ ELFNOTE_START(Linux, 0, "a")
->>          .long LINUX_VERSION_CODE
->>   ELFNOTE_END
->>
->> +BUILD_SALT
->> +
->>   #ifdef CONFIG_XEN
->>   /*
->>    * Add a special note telling glibc's dynamic linker a fake hardware
->> --
->> 2.17.1
->>
+thank you for review, please note that I've just sent v2 with a couple
+of minor fixes as a reply to v1 2/3, I hope that I didn't introduce
+a mess to the series.
+
+And again I hope that a number of missing SoC specific compatibles
+could be added to the documentation later on, at the moment generic
+variants are good enough to run the corresponding drivers.
+
+--
+Best wishes,
+Vladimir
