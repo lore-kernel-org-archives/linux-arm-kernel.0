@@ -1,97 +1,134 @@
-From: roy.pledge@nxp.com (Roy Pledge)
-Date: Thu,  5 Jul 2018 14:41:13 -0500
-Subject: [PATCH 2/2] drivers/staging: Remove fsl-mc driver from staging
-In-Reply-To: <20180705194113.16256-1-roy.pledge@nxp.com>
-References: <20180705194113.16256-1-roy.pledge@nxp.com>
-Message-ID: <20180705194113.16256-3-roy.pledge@nxp.com>
+From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
+Date: Thu, 05 Jul 2018 22:03:35 +0200
+Subject: [linux-sunxi] Re: [PATCH v3 09/24] drm/sun4i: Don't skip TCONs if
+ they don't have channel 0
+In-Reply-To: <20180705070358.7ng4shuo3pxp62q6@flea>
+References: <20180625120304.7543-1-jernej.skrabec@siol.net>
+ <CAGb2v66_6RoYk6MRtTJeqg0Z09A7y+pvSxs7qeeND+iKPE_+BA@mail.gmail.com>
+ <20180705070358.7ng4shuo3pxp62q6@flea>
+Message-ID: <1699738.FoQmAThxyL@jernej-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the staging/drivers/fsl-mc directory from the staging
-area now that all the components have been moved to the main
-kernel areas.
+Dne ?etrtek, 05. julij 2018 ob 09:03:58 CEST je Maxime Ripard napisal(a):
+> On Sun, Jul 01, 2018 at 11:11:06PM +0800, Chen-Yu Tsai wrote:
+> > On Sun, Jul 1, 2018 at 4:27 PM, Jernej ?krabec <jernej.skrabec@siol.net> 
+wrote:
+> > > Dne ?etrtek, 28. junij 2018 ob 08:24:34 CEST je Chen-Yu Tsai napisal(a):
+> > >> On Thu, Jun 28, 2018 at 12:45 PM, Jernej ?krabec
+> > >> 
+> > >> <jernej.skrabec@siol.net> wrote:
+> > >> > Dne ?etrtek, 28. junij 2018 ob 03:51:31 CEST je Chen-Yu Tsai 
+napisal(a):
+> > >> >> On Mon, Jun 25, 2018 at 8:02 PM, Jernej Skrabec
+> > >> >> <jernej.skrabec@siol.net>
+> > >> > 
+> > >> > wrote:
+> > >> >> > TV TCONs (channel 1 only) are always connected to TV or HDMI
+> > >> >> > encoder.
+> > >> >> > Because of that, all output endpoints on such TCON node will point
+> > >> >> > to a
+> > >> >> > encoder which is part of component framework.
+> > >> >> > 
+> > >> >> > Correct current graph traversing algorithm in such way that it
+> > >> >> > doesn't
+> > >> >> > skip output enpoints with id 0 on TV TCONs.
+> > >> >> 
+> > >> >> No. Our bindings say that endpoint 0 _is_ channel 0. For TCONs that
+> > >> >> don't
+> > >> >> have channel 0, it must be skipped.
+> > >> > 
+> > >> > I'm not sure where this is stated. I read TCON binding again. Can you
+> > >> > please point me to it?
+> > >> 
+> > >> https://elixir.bootlin.com/linux/latest/source/Documentation/devicetree
+> > >> /bind ings/display/sunxi/sun4i-drm.txt#L169
+> > >> 
+> > >> Our TCON driver still expects RGB or LVDS panel / bridges on endpoint
+> > >> 0.
+> > > 
+> > > Yes, but that can only happen on TCON which has channel 0. TV TCONs
+> > > (those
+> > > with channel 1 only) can't have panels or bridges connected to them,
+> > > because they are internally always connected to either HDMI or TV
+> > > encoder or both. Actually, R40 is the only SoC, where same TV TCON can
+> > > be connected to TV encoder or HDMI. Others have specialized TV TCONs,
+> > > which are connect to only one encoder.
+> > > 
+> > > IMO TV TCONs are really just stripped down LCD TCONs to support one (or
+> > > max
+> > > two) specific encoder.
+> > 
+> > I agree. We've seen these first in the H3, and the reverse, TCONs only
+> > with
+> > LCD, on the A23/A33.
+> > 
+> > >> So I guess this was sort of implied historically. It's no longer true.
+> > >> This is something we should probably fix.
+> > > 
+> > > Fixed in what way? You mean update bindings to mention that TCON output
+> > > endpoint 0 is reserved for panels or bridges?
+> > 
+> > Either that, or have the drm driver look at other endpoints. I guess we
+> > should ask Maxime if this is already done or not, since the DSI driver
+> > isn't endpoint 0 in the A33 dtsi.
+> 
+> The DSI driver isn't really a good example for this, since the panel
+> isn't described as part of the OF graph, but DSI binding require that
+> it's a child of the DSI controller node.
 
-Signed-off-by: Roy Pledge <roy.pledge@nxp.com>
----
- drivers/staging/Kconfig             | 2 --
- drivers/staging/Makefile            | 1 -
- drivers/staging/fsl-mc/Kconfig      | 2 --
- drivers/staging/fsl-mc/Makefile     | 3 ---
- drivers/staging/fsl-mc/bus/Kconfig  | 7 -------
- drivers/staging/fsl-mc/bus/Makefile | 7 -------
- 6 files changed, 22 deletions(-)
- delete mode 100644 drivers/staging/fsl-mc/Kconfig
- delete mode 100644 drivers/staging/fsl-mc/Makefile
- delete mode 100644 drivers/staging/fsl-mc/bus/Kconfig
- delete mode 100644 drivers/staging/fsl-mc/bus/Makefile
+So should be new behaviour reverted? I mean ignoring endpoint 0 on TV TCONs.
 
-diff --git a/drivers/staging/Kconfig b/drivers/staging/Kconfig
-index 9339af2..344fcf1 100644
---- a/drivers/staging/Kconfig
-+++ b/drivers/staging/Kconfig
-@@ -90,8 +90,6 @@ source "drivers/staging/clocking-wizard/Kconfig"
- 
- source "drivers/staging/fbtft/Kconfig"
- 
--source "drivers/staging/fsl-mc/Kconfig"
--
- source "drivers/staging/fsl-dpaa2/Kconfig"
- 
- source "drivers/staging/wilc1000/Kconfig"
-diff --git a/drivers/staging/Makefile b/drivers/staging/Makefile
-index aa40b1f..2a84679 100644
---- a/drivers/staging/Makefile
-+++ b/drivers/staging/Makefile
-@@ -35,7 +35,6 @@ obj-$(CONFIG_GS_FPGABOOT)	+= gs_fpgaboot/
- obj-$(CONFIG_UNISYSSPAR)	+= unisys/
- obj-$(CONFIG_COMMON_CLK_XLNX_CLKWZRD)	+= clocking-wizard/
- obj-$(CONFIG_FB_TFT)		+= fbtft/
--obj-$(CONFIG_FSL_MC_BUS)	+= fsl-mc/
- obj-$(CONFIG_FSL_DPAA2)		+= fsl-dpaa2/
- obj-$(CONFIG_WILC1000)		+= wilc1000/
- obj-$(CONFIG_MOST)		+= most/
-diff --git a/drivers/staging/fsl-mc/Kconfig b/drivers/staging/fsl-mc/Kconfig
-deleted file mode 100644
-index 3002229..0000000
---- a/drivers/staging/fsl-mc/Kconfig
-+++ /dev/null
-@@ -1,2 +0,0 @@
--# SPDX-License-Identifier: GPL-2.0
--source "drivers/staging/fsl-mc/bus/Kconfig"
-diff --git a/drivers/staging/fsl-mc/Makefile b/drivers/staging/fsl-mc/Makefile
-deleted file mode 100644
-index 1468388..0000000
---- a/drivers/staging/fsl-mc/Makefile
-+++ /dev/null
-@@ -1,3 +0,0 @@
--# SPDX-License-Identifier: GPL-2.0
--# Freescale Management Complex (MC) bus drivers
--obj-$(CONFIG_FSL_MC_BUS)	+= bus/
-diff --git a/drivers/staging/fsl-mc/bus/Kconfig b/drivers/staging/fsl-mc/bus/Kconfig
-deleted file mode 100644
-index 90f234d..0000000
---- a/drivers/staging/fsl-mc/bus/Kconfig
-+++ /dev/null
-@@ -1,7 +0,0 @@
--# SPDX-License-Identifier: GPL-2.0
--#
--# DPAA2 fsl-mc bus
--#
--# Copyright (C) 2014-2016 Freescale Semiconductor, Inc.
--#
--
-diff --git a/drivers/staging/fsl-mc/bus/Makefile b/drivers/staging/fsl-mc/bus/Makefile
-deleted file mode 100644
-index 2141e4b..0000000
---- a/drivers/staging/fsl-mc/bus/Makefile
-+++ /dev/null
-@@ -1,7 +0,0 @@
--# SPDX-License-Identifier: GPL-2.0
--#
--# Freescale Management Complex (MC) bus drivers
--#
--# Copyright (C) 2014 Freescale Semiconductor, Inc.
--#
--
--- 
-2.7.4
+For me, it doesn't make sense to check for panel or bridges on TV TCONs, 
+because they are never exposed on physical pins. They are always connected to 
+TVE or HDMI encoder internally.
+
+> 
+> > >> In practice our drivers don't look at it (yet), but rely on the
+> > >> downstream
+> > >> encoder type to determine which channel to use.
+> > >> 
+> > >> But please add the "allwinner,tcon-channel" property as specified in
+> > >> the binding.
+> > > 
+> > > It's my understanding of TCON binding documentation that property
+> > > "allwinner,tcon-channel" is needed only if TCON supports both channels.
+> > > TV
+> > > TCON clearly supports only channel 1. In that case, there is no doubt to
+> > > which channel output endpoint belongs.
+> > > 
+> > > If that's not true, dt bindings documentation should be reworded to
+> > > contain
+> > > word "needed" or something similar. Currently, no DT for newer SoC
+> > > contains
+> > > that property (for example, A83T, H3, H5 or even A33).
+> 
+> Yeah, but that's mainly because we have a single output enabled for
+> each channel on those newer SoCs. When / if we enable the RGB and LVDS
+> output for example, we will have to set this.
+
+So just to be clear, before I send follow up series, I have to add 
+"allwinner,tcon-channel" property to DT, because both TV TCONs can be 
+connected to either TVE or HDMI (trough TCON TOP)?
+
+BTW, since this property is not used at all in the code, why not just simply 
+deprecate it and remove it from existing DTs? I noticed this is standard 
+practice for obsolete properties.
+
+Best regards,
+Jernej
+
+> 
+> > > On A33 this is even more interesting, since tcon0 has only channel
+> > > 0 and has DSI output endpoint with number 1. According to TCON
+> > > binding docs, if "allwinner,tcon-channel" is not preset, endpoint
+> > > number represent channel. So, that would mean DSI needs channel 1
+> > > on tcon which supports clearly only channel 0. So either there
+> > > TCON bindings documentation needs updates or DT for A33 has to be
+> > > updated.
+> > 
+> > Maxime? You did the A33 DSI stuff.
+> 
+> I guess it's missing on the A33 DSI endpoint.
+> 
+> Maxime
