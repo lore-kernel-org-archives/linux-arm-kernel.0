@@ -1,572 +1,178 @@
-From: ezequiel@collabora.com (Ezequiel Garcia)
-Date: Thu,  5 Jul 2018 12:08:18 -0300
-Subject: [PATCH v3 2/2] arm64: dts: rockchip: add 96boards RK3399 Ficus board
-In-Reply-To: <20180705150818.29931-1-ezequiel@collabora.com>
-References: <20180705150818.29931-1-ezequiel@collabora.com>
-Message-ID: <20180705150818.29931-3-ezequiel@collabora.com>
+From: leonard.crestez@nxp.com (Leonard Crestez)
+Date: Thu,  5 Jul 2018 18:12:43 +0300
+Subject: [PATCH v2] soc: imx: gpc: Turn PU domain on/off in sleep on 6qp
+Message-ID: <72f3e615f4df69ee6d802efbd1e1e52692c8e134.1530803324.git.leonard.crestez@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The RK3399 Ficus board is an Enterprise Edition board
-manufactured by Vamrs Ltd., based on the Rockchip RK3399 SoC.
+On imx6qp power gating on the PU domain is disabled because of errata
+ERR009619. However power gating during suspend/resume can still be
+performed.
 
-The board exposes a bunch of nice peripherals, including
-SATA, HDMI, MIPI CSI, Ethernet, WiFi, and PCIe.
+Enable this by implementing SLEEP_PM_OPS in imx_pgc_power_domain_driver.
 
-Signed-off-by: Ezequiel Garcia <ezequiel@collabora.com>
+Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
+
 ---
- .../devicetree/bindings/arm/rockchip.txt      |   5 +
- arch/arm64/boot/dts/rockchip/Makefile         |   1 +
- arch/arm64/boot/dts/rockchip/rk3399-ficus.dts | 514 ++++++++++++++++++
- 3 files changed, 520 insertions(+)
- create mode 100644 arch/arm64/boot/dts/rockchip/rk3399-ficus.dts
+ drivers/soc/imx/gpc.c | 72 ++++++++++++++++++++++++++++++++++---------
+ 1 file changed, 57 insertions(+), 15 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/rockchip.txt b/Documentation/devicetree/bindings/arm/rockchip.txt
-index 1c1d62d03c4f..d46c5d43e27f 100644
---- a/Documentation/devicetree/bindings/arm/rockchip.txt
-+++ b/Documentation/devicetree/bindings/arm/rockchip.txt
-@@ -1,5 +1,10 @@
- Rockchip platforms device tree bindings
- ---------------------------------------
+Changes since v1: Implement SLEEP_PM_OPS instead of calling from
+platform-level suspend code, as suggested by Lucas.
+
+I'm not sure if doing interesting things in the pm_ops for PM providers
+is recommended. Is correct ordering guaranteed in such a case?  Any
+VPU/GPU suspend code must execute before imx_pgc_suspend or it might try
+to access registers in a region which is powered off.
+
+Perhaps ordering needs to be guaranteed by implementing device_attach
+and adding explicit device links to pgc platform_device?
+
+Link to v1: https://lkml.org/lkml/2018/7/2/370
+
+diff --git a/drivers/soc/imx/gpc.c b/drivers/soc/imx/gpc.c
+index b4acdfd3cffd..96d9e882d583 100644
+--- a/drivers/soc/imx/gpc.c
++++ b/drivers/soc/imx/gpc.c
+@@ -54,19 +54,16 @@ static inline struct imx_pm_domain *
+ to_imx_pm_domain(struct generic_pm_domain *genpd)
+ {
+ 	return container_of(genpd, struct imx_pm_domain, base);
+ }
+ 
+-static int imx6_pm_domain_power_off(struct generic_pm_domain *genpd)
++static void _imx6_pm_domain_power_off(struct generic_pm_domain *genpd)
+ {
+ 	struct imx_pm_domain *pd = to_imx_pm_domain(genpd);
+ 	int iso, iso2sw;
+ 	u32 val;
+ 
+-	if (pd->flags & PGC_DOMAIN_FLAG_NO_PD)
+-		return -EBUSY;
+-
+ 	/* Read ISO and ISO2SW power down delays */
+ 	regmap_read(pd->regmap, pd->reg_offs + GPC_PGC_PUPSCR_OFFS, &val);
+ 	iso = val & 0x3f;
+ 	iso2sw = (val >> 8) & 0x3f;
+ 
+@@ -78,32 +75,33 @@ static int imx6_pm_domain_power_off(struct generic_pm_domain *genpd)
+ 	val = BIT(pd->cntr_pdn_bit);
+ 	regmap_update_bits(pd->regmap, GPC_CNTR, val, val);
+ 
+ 	/* Wait ISO + ISO2SW IPG clock cycles */
+ 	udelay(DIV_ROUND_UP(iso + iso2sw, pd->ipg_rate_mhz));
++}
 +
-+- 96boards RK3399 Ficus (ROCK960 Enterprise Edition)
-+    Required root node properties:
-+      - compatible = "vamrs,ficus", "rockchip,rk3399";
++static int imx6_pm_domain_power_off(struct generic_pm_domain *genpd)
++{
++	struct imx_pm_domain *pd = to_imx_pm_domain(genpd);
 +
- - Amarula Vyasa RK3288 board
-     Required root node properties:
-       - compatible = "amarula,vyasa-rk3288", "rockchip,rk3288";
-diff --git a/arch/arm64/boot/dts/rockchip/Makefile b/arch/arm64/boot/dts/rockchip/Makefile
-index 48a83f882947..2811fb701f12 100644
---- a/arch/arm64/boot/dts/rockchip/Makefile
-+++ b/arch/arm64/boot/dts/rockchip/Makefile
-@@ -9,6 +9,7 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-orion-r68-meta.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-px5-evb.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-r88.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-evb.dtb
-+dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-ficus.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-firefly.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-gru-kevin.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-puma-haikou.dtb
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-ficus.dts b/arch/arm64/boot/dts/rockchip/rk3399-ficus.dts
-new file mode 100644
-index 000000000000..b17b831df90e
---- /dev/null
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-ficus.dts
-@@ -0,0 +1,514 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+/*
-+ * Copyright (c) 2018 Collabora Ltd.
-+ * Copyright (c) 2018 Fuzhou Rockchip Electronics Co., Ltd.
-+ *
-+ * Schematics available at https://dl.vamrs.com/products/ficus/docs/hw
-+ */
++	if (pd->flags & PGC_DOMAIN_FLAG_NO_PD)
++		return -EBUSY;
 +
-+/dts-v1/;
-+#include "rk3399.dtsi"
-+#include "rk3399-opp.dtsi"
++	_imx6_pm_domain_power_off(genpd);
+ 
+ 	if (pd->supply)
+ 		regulator_disable(pd->supply);
+ 
+ 	return 0;
+ }
+ 
+-static int imx6_pm_domain_power_on(struct generic_pm_domain *genpd)
++static void _imx6_pm_domain_power_on(struct generic_pm_domain *genpd)
+ {
+ 	struct imx_pm_domain *pd = to_imx_pm_domain(genpd);
+-	int i, ret, sw, sw2iso;
++	int i, sw, sw2iso;
+ 	u32 val;
+ 
+-	if (pd->supply) {
+-		ret = regulator_enable(pd->supply);
+-		if (ret) {
+-			pr_err("%s: failed to enable regulator: %d\n",
+-			       __func__, ret);
+-			return ret;
+-		}
+-	}
+-
+ 	/* Enable reset clocks for all devices in the domain */
+ 	for (i = 0; i < pd->num_clks; i++)
+ 		clk_prepare_enable(pd->clk[i]);
+ 
+ 	/* Gate off domain when powered down */
+@@ -123,10 +121,27 @@ static int imx6_pm_domain_power_on(struct generic_pm_domain *genpd)
+ 	udelay(DIV_ROUND_UP(sw + sw2iso, pd->ipg_rate_mhz));
+ 
+ 	/* Disable reset clocks for all devices in the domain */
+ 	for (i = 0; i < pd->num_clks; i++)
+ 		clk_disable_unprepare(pd->clk[i]);
++}
 +
-+/ {
-+	model = "96boards RK3399 Ficus";
-+	compatible = "vamrs,ficus", "rockchip,rk3399";
++static int imx6_pm_domain_power_on(struct generic_pm_domain *genpd)
++{
++	struct imx_pm_domain *pd = to_imx_pm_domain(genpd);
++	int ret;
 +
-+	chosen {
-+		stdout-path = "serial2:1500000n8";
-+	};
++	if (pd->supply) {
++		ret = regulator_enable(pd->supply);
++		if (ret) {
++			pr_err("%s: failed to enable regulator: %d\n",
++			       __func__, ret);
++			return ret;
++		}
++	}
 +
-+	clkin_gmac: external-gmac-clock {
-+		compatible = "fixed-clock";
-+		clock-frequency = <125000000>;
-+		clock-output-names = "clkin_gmac";
-+		#clock-cells = <0>;
-+	};
++	_imx6_pm_domain_power_on(genpd);
+ 
+ 	return 0;
+ }
+ 
+ static int imx_pgc_get_clocks(struct device *dev, struct imx_pm_domain *domain)
+@@ -227,18 +242,45 @@ static int imx_pgc_power_domain_remove(struct platform_device *pdev)
+ 	}
+ 
+ 	return 0;
+ }
+ 
++static int imx_pgc_suspend(struct device *dev)
++{
++	struct platform_device *pdev = to_platform_device(dev);
++	struct imx_pm_domain *pd = pdev->dev.platform_data;
 +
-+	vcc1v8_s0: vcc1v8-s0 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vcc1v8_s0";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <1800000>;
-+		regulator-always-on;
-+	};
++	if (pd->flags & PGC_DOMAIN_FLAG_NO_PD)
++		_imx6_pm_domain_power_off(&pd->base);
 +
-+	vcc_sys: vcc-sys {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vcc_sys";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-always-on;
-+	};
++	return 0;
++}
 +
-+	vcc3v3_sys: vcc3v3-sys {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vcc3v3_sys";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-always-on;
-+		vin-supply = <&vcc_sys>;
-+	};
++static int imx_pgc_resume(struct device *dev)
++{
++	struct platform_device *pdev = to_platform_device(dev);
++	struct imx_pm_domain *pd = pdev->dev.platform_data;
 +
-+	vcc3v3_pcie: vcc3v3-pcie-regulator {
-+		compatible = "regulator-fixed";
-+		enable-active-high;
-+		gpio = <&gpio1 24 GPIO_ACTIVE_HIGH>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pcie_drv>;
-+		regulator-boot-on;
-+		regulator-name = "vcc3v3_pcie";
-+		vin-supply = <&vcc3v3_sys>;
-+	};
++	if (pd->flags & PGC_DOMAIN_FLAG_NO_PD)
++		_imx6_pm_domain_power_on(&pd->base);
 +
-+	vdd_log: vdd-log {
-+		compatible = "pwm-regulator";
-+		pwms = <&pwm2 0 25000 0>;
-+		regulator-name = "vdd_log";
-+		regulator-min-microvolt = <800000>;
-+		regulator-max-microvolt = <1400000>;
-+		regulator-always-on;
-+		regulator-boot-on;
++	return 0;
++}
 +
-+		/* for rockchip boot on */
-+		rockchip,pwm_id= <2>;
-+		rockchip,pwm_voltage = <900000>;
-+
-+		vin-supply = <&vcc_sys>;
-+	};
-+
++static const struct dev_pm_ops imx_pgc_pm_ops = {
++	SET_SYSTEM_SLEEP_PM_OPS(imx_pgc_suspend, imx_pgc_resume)
 +};
 +
-+&cpu_l0 {
-+	cpu-supply = <&vdd_cpu_l>;
-+};
-+
-+&cpu_l1 {
-+	cpu-supply = <&vdd_cpu_l>;
-+};
-+
-+&cpu_l2 {
-+	cpu-supply = <&vdd_cpu_l>;
-+};
-+
-+&cpu_l3 {
-+	cpu-supply = <&vdd_cpu_l>;
-+};
-+
-+&cpu_b0 {
-+	cpu-supply = <&vdd_cpu_b>;
-+};
-+
-+&cpu_b1 {
-+	cpu-supply = <&vdd_cpu_b>;
-+};
-+
-+&emmc_phy {
-+	status = "okay";
-+};
-+
-+&gmac {
-+	assigned-clocks = <&cru SCLK_RMII_SRC>;
-+	assigned-clock-parents = <&clkin_gmac>;
-+	clock_in_out = "input";
-+	phy-supply = <&vcc3v3_sys>;
-+	phy-mode = "rgmii";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&rgmii_pins>;
-+	snps,reset-gpio = <&gpio3 RK_PB7 GPIO_ACTIVE_LOW>;
-+	snps,reset-active-low;
-+	snps,reset-delays-us = <0 10000 50000>;
-+	tx_delay = <0x28>;
-+	rx_delay = <0x11>;
-+	status = "okay";
-+};
-+
-+&hdmi {
-+	ddc-i2c-bus = <&i2c3>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&hdmi_cec>;
-+	status = "okay";
-+};
-+
-+&i2c0 {
-+	clock-frequency = <400000>;
-+	i2c-scl-rising-time-ns = <168>;
-+	i2c-scl-falling-time-ns = <4>;
-+	status = "okay";
-+
-+	vdd_cpu_b: syr827 at 40 {
-+		compatible = "silergy,syr827";
-+		reg = <0x40>;
-+		fcs,suspend-voltage-selector = <1>;
-+		regulator-name = "vdd_cpu_b";
-+		regulator-min-microvolt = <712500>;
-+		regulator-max-microvolt = <1500000>;
-+		regulator-ramp-delay = <1000>;
-+		regulator-always-on;
-+		regulator-boot-on;
-+		vin-supply = <&vcc_sys>;
-+		status = "okay";
-+
-+		regulator-state-mem {
-+			regulator-off-in-suspend;
-+		};
-+	};
-+
-+	vdd_gpu: regulator at 41 {
-+		compatible = "silergy,syr828";
-+		reg = <0x41>;
-+		fcs,suspend-voltage-selector = <1>;
-+		regulator-name = "vdd_gpu";
-+		regulator-min-microvolt = <712500>;
-+		regulator-max-microvolt = <1500000>;
-+		regulator-ramp-delay = <1000>;
-+		regulator-always-on;
-+		regulator-boot-on;
-+		vin-supply = <&vcc_sys>;
-+		regulator-state-mem {
-+			regulator-off-in-suspend;
-+		};
-+	};
-+
-+	rk808: pmic at 1b {
-+		compatible = "rockchip,rk808";
-+		reg = <0x1b>;
-+		interrupt-parent = <&gpio1>;
-+		interrupts = <21 IRQ_TYPE_LEVEL_LOW>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pmic_int_l>;
-+		rockchip,system-power-controller;
-+		wakeup-source;
-+		#clock-cells = <1>;
-+		clock-output-names = "xin32k", "rk808-clkout2";
-+
-+		vcc1-supply = <&vcc_sys>;
-+		vcc2-supply = <&vcc_sys>;
-+		vcc3-supply = <&vcc_sys>;
-+		vcc4-supply = <&vcc_sys>;
-+		vcc6-supply = <&vcc_sys>;
-+		vcc7-supply = <&vcc_sys>;
-+		vcc8-supply = <&vcc3v3_sys>;
-+		vcc9-supply = <&vcc_sys>;
-+		vcc10-supply = <&vcc_sys>;
-+		vcc11-supply = <&vcc_sys>;
-+		vcc12-supply = <&vcc3v3_sys>;
-+		vddio-supply = <&vcc_1v8>;
-+
-+		regulators {
-+			vdd_center: DCDC_REG1 {
-+				regulator-name = "vdd_center";
-+				regulator-min-microvolt = <750000>;
-+				regulator-max-microvolt = <1350000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
-+			};
-+
-+			vdd_cpu_l: DCDC_REG2 {
-+				regulator-name = "vdd_cpu_l";
-+				regulator-min-microvolt = <750000>;
-+				regulator-max-microvolt = <1350000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
-+			};
-+
-+			vcc_ddr: DCDC_REG3 {
-+				regulator-name = "vcc_ddr";
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+				};
-+			};
-+
-+			vcc_1v8: DCDC_REG4 {
-+				regulator-name = "vcc_1v8";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <1800000>;
-+				};
-+			};
-+
-+			vcc1v8_dvp: LDO_REG1 {
-+				regulator-name = "vcc1v8_dvp";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <1800000>;
-+				};
-+			};
-+
-+			vcca1v8_hdmi: LDO_REG2 {
-+				regulator-name = "vcca1v8_hdmi";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <1800000>;
-+				};
-+			};
-+
-+			vcca_1v8: LDO_REG3 {
-+				regulator-name = "vcca_1v8";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <1800000>;
-+				};
-+			};
-+
-+			vcc_sd: LDO_REG4 {
-+				regulator-name = "vcc_sd";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <3300000>;
-+				};
-+			};
-+
-+			vcc3v0_sd: LDO_REG5 {
-+				regulator-name = "vcc3v0_sd";
-+				regulator-min-microvolt = <3000000>;
-+				regulator-max-microvolt = <3000000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <3000000>;
-+				};
-+			};
-+
-+			vcc_1v5: LDO_REG6 {
-+				regulator-name = "vcc_1v5";
-+				regulator-min-microvolt = <1500000>;
-+				regulator-max-microvolt = <1500000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <1500000>;
-+				};
-+			};
-+
-+			vcca0v9_hdmi: LDO_REG7 {
-+				regulator-name = "vcca0v9_hdmi";
-+				regulator-min-microvolt = <900000>;
-+				regulator-max-microvolt = <900000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <900000>;
-+				};
-+			};
-+
-+			vcc_3v0: LDO_REG8 {
-+				regulator-name = "vcc_3v0";
-+				regulator-min-microvolt = <3000000>;
-+				regulator-max-microvolt = <3000000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <3000000>;
-+				};
-+			};
-+
-+			vcc3v3_s3: SWITCH_REG1 {
-+				regulator-name = "vcc3v3_s3";
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+				};
-+			};
-+
-+			vcc3v3_s0: SWITCH_REG2 {
-+				regulator-name = "vcc3v3_s0";
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+				};
-+			};
-+		};
-+	};
-+};
-+
-+&i2c1 {
-+	status = "okay";
-+};
-+
-+&i2c2 {
-+	status = "okay";
-+};
-+
-+&i2c3 {
-+	status = "okay";
-+};
-+
-+&i2c4 {
-+	status = "okay";
-+};
-+
-+&io_domains {
-+	bt656-supply = <&vcc1v8_s0>; /* bt656_gpio2ab_ms */
-+	audio-supply = <&vcc1v8_s0>; /* audio_gpio3d4a_ms */
-+	sdmmc-supply = <&vcc_sd>; /* sdmmc_gpio4b_ms */
-+	gpio1830-supply = <&vcc_3v0>; /* gpio1833_gpio4cd_ms */
-+	status = "okay";
-+};
-+
-+&pcie_phy {
-+	status = "okay";
-+};
-+
-+&pcie0 {
-+	ep-gpios = <&gpio4 RK_PD4 GPIO_ACTIVE_HIGH>;
-+	num-lanes = <4>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pcie_clkreqn_cpm>;
-+	vpcie3v3-supply = <&vcc3v3_pcie>;
-+	status = "okay";
-+};
-+
-+&pmu_io_domains {
-+	pmu1830-supply = <&vcc_1v8>;
-+	status = "okay";
-+};
-+
-+&pinctrl {
-+	gmac {
-+		rgmii_sleep_pins: rgmii-sleep-pins {
-+			rockchip,pins =
-+				<3 15 RK_FUNC_GPIO &pcfg_output_low>;
-+		};
-+	};
-+
-+	sdmmc {
-+		sdmmc_bus1: sdmmc-bus1 {
-+			rockchip,pins =
-+				<4 8 RK_FUNC_1 &pcfg_pull_up_8ma>;
-+		};
-+
-+		sdmmc_bus4: sdmmc-bus4 {
-+			rockchip,pins =
-+				<4 8 RK_FUNC_1 &pcfg_pull_up_8ma>,
-+				<4 9 RK_FUNC_1 &pcfg_pull_up_8ma>,
-+				<4 10 RK_FUNC_1 &pcfg_pull_up_8ma>,
-+				<4 11 RK_FUNC_1 &pcfg_pull_up_8ma>;
-+		};
-+
-+		sdmmc_clk: sdmmc-clk {
-+			rockchip,pins =
-+				<4 12 RK_FUNC_1 &pcfg_pull_none_18ma>;
-+		};
-+
-+		sdmmc_cmd: sdmmc-cmd {
-+			rockchip,pins =
-+				<4 13 RK_FUNC_1 &pcfg_pull_up_8ma>;
-+		};
-+	};
-+
-+	pcie {
-+		pcie_drv: pcie-drv {
-+			rockchip,pins =
-+				<1 24 RK_FUNC_GPIO &pcfg_pull_none>;
-+			};
-+	};
-+
-+	pmic {
-+		pmic_int_l: pmic-int-l {
-+			rockchip,pins =
-+				<1 21 RK_FUNC_GPIO &pcfg_pull_up>;
-+		};
-+
-+		vsel1_gpio: vsel1-gpio {
-+			rockchip,pins =
-+				<1 17 RK_FUNC_GPIO &pcfg_pull_down>;
-+		};
-+
-+		vsel2_gpio: vsel2-gpio {
-+			rockchip,pins =
-+				<1 14 RK_FUNC_GPIO &pcfg_pull_down>;
-+		};
-+	};
-+};
-+
-+&pwm2 {
-+	status = "okay";
-+};
-+
-+&pwm3 {
-+	status = "okay";
-+};
-+
-+&sdhci {
-+	bus-width = <8>;
-+	mmc-hs400-1_8v;
-+	mmc-hs400-enhanced-strobe;
-+	non-removable;
-+	status = "okay";
-+};
-+
-+&sdmmc {
-+	bus-width = <4>;
-+	cap-mmc-highspeed;
-+	cap-sd-highspeed;
-+	clock-frequency = <100000000>;
-+	clock-freq-min-max = <100000 100000000>;
-+	disable-wp;
-+	sd-uhs-sdr104;
-+	vqmmc-supply = <&vcc_sd>;
-+	card-detect-delay = <800>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&sdmmc_clk &sdmmc_cmd &sdmmc_cd &sdmmc_bus4>;
-+	status = "okay";
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_xfer &uart0_cts>;
-+	status = "okay";
-+};
-+
-+&uart2 {
-+	status = "okay";
-+};
-+
-+&vopb {
-+	status = "okay";
-+};
-+
-+&vopb_mmu {
-+	status = "okay";
-+};
-+
-+&vopl {
-+	status = "okay";
-+};
-+
-+&vopl_mmu {
-+	status = "okay";
-+};
+ static const struct platform_device_id imx_pgc_power_domain_id[] = {
+ 	{ "imx-pgc-power-domain"},
+ 	{ },
+ };
+ 
+ static struct platform_driver imx_pgc_power_domain_driver = {
+ 	.driver = {
+ 		.name = "imx-pgc-pd",
++		.pm = &imx_pgc_pm_ops,
+ 	},
+ 	.probe = imx_pgc_power_domain_probe,
+ 	.remove = imx_pgc_power_domain_remove,
+ 	.id_table = imx_pgc_power_domain_id,
+ };
 -- 
-2.18.0.rc2
+2.17.1
