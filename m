@@ -1,60 +1,123 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 5 Jul 2018 17:48:24 +0100
-Subject: [PATCH v2 3/4] efi/arm: map UEFI memory map earlier on boot
-In-Reply-To: <ec1a5f0f-99e3-fda1-9a64-5c2539817190@arm.com>
-References: <20180619064424.6642-1-takahiro.akashi@linaro.org>
- <20180619064424.6642-4-takahiro.akashi@linaro.org>
- <20180704170655.GD8370@arm.com>
- <CAKv+Gu9_rYYyQ+t89otz46DR0D4GDj-cCjhx9q=p+D8LWFRkgQ@mail.gmail.com>
- <20180705094313.GL28220@linaro.org>
- <ec1a5f0f-99e3-fda1-9a64-5c2539817190@arm.com>
-Message-ID: <20180705164824.GA7445@arm.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Thu, 5 Jul 2018 17:48:37 +0100
+Subject: [PATCH v4 4/7] KVM: arm64: Support PUD hugepage in
+ stage2_is_exec()
+In-Reply-To: <20180705140850.5801-5-punit.agrawal@arm.com>
+References: <20180705140850.5801-1-punit.agrawal@arm.com>
+ <20180705140850.5801-5-punit.agrawal@arm.com>
+Message-ID: <442d0f4b-cb23-9788-1ebd-b14c89c52c45@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 05, 2018 at 12:02:15PM +0100, James Morse wrote:
-> On 05/07/18 10:43, AKASHI Takahiro wrote:
-> > On Wed, Jul 04, 2018 at 08:49:32PM +0200, Ard Biesheuvel wrote:
-> >> On 4 July 2018 at 19:06, Will Deacon <will.deacon@arm.com> wrote:
-> >>> On Tue, Jun 19, 2018 at 03:44:23PM +0900, AKASHI Takahiro wrote:
-> >>>> Since arm_enter_runtime_services() was modified to always create a virtual
-> >>>> mapping of UEFI memory map in the previous patch, it is now renamed to
-> >>>> efi_enter_virtual_mode() and called earlier before acpi_load_tables()
-> >>>> in acpi_early_init().
-> >>>>
-> >>>> This will allow us to use UEFI memory map in acpi_os_ioremap() to create
-> >>>> mappings of ACPI tables using memory attributes described in UEFI memory
-> >>>> map.
-> 
-> >>> Hmm, this is ugly as hell. Is there nothing else we can piggy-back off?
-> >>> It's also fairly jarring that, on x86, efi_enter_virtual_mode() is called
-> >>> a few lines later, *after* acpi_early_init() has been called.
-> 
-> >> Currently, there is a gap where we have already torn down the early
-> >> mapping and haven't created the definitive mapping of the UEFI memory
-> >> map. There are other reasons why this is an issue, and I recently
-> >> proposed [0] myself to address one of them
-> 
-> >> Akashi-san, could you please confirm whether the patch below would be
-> >> sufficient for you? Apologies for going back and forth on this, but I
-> >> agree with Will that we should try to avoid warts like the one above
-> >> in generic code.
-> >>
-> >> [0] https://marc.info/?l=linux-efi&m=152930773507524&w=2
-> > 
-> > I think that this patch will also work.
-> > Please drop my patch#2 and #3 if you want to pick up my patchset, Will.
-> 
-> Patch 2 is what changes arm_enable_runtime_services() to map the efi memory map
-> before bailing out due to efi=noruntime.
-> 
-> Without it, 'efi=noruntime' means no-acpi-tables.
+Hi Punit,
 
-So it sounds like we want patch 2. Akashi, given that this series is only
-four patches, please can you send out a v3 with the stuff that should be
-reviewed and merged? Otherwise, there's a real risk we end up with breakage
-that goes unnoticed initially.
+On 05/07/18 15:08, Punit Agrawal wrote:
+> In preparation for creating PUD hugepages at stage 2, add support for
+> detecting execute permissions on PUD page table entries. Faults due to
+> lack of execute permissions on page table entries is used to perform
+> i-cache invalidation on first execute.
+> 
+> Provide trivial implementations of arm32 helpers to allow sharing of
+> code.
+> 
+> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+> Cc: Christoffer Dall <christoffer.dall@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Russell King <linux@armlinux.org.uk>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>   arch/arm/include/asm/kvm_mmu.h         |  6 ++++++
+>   arch/arm64/include/asm/kvm_mmu.h       |  5 +++++
+>   arch/arm64/include/asm/pgtable-hwdef.h |  2 ++
+>   virt/kvm/arm/mmu.c                     | 10 +++++++++-
+>   4 files changed, 22 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+> index c23722f75d5c..d05c8986e495 100644
+> --- a/arch/arm/include/asm/kvm_mmu.h
+> +++ b/arch/arm/include/asm/kvm_mmu.h
+> @@ -96,6 +96,12 @@ static inline bool kvm_s2pud_readonly(pud_t *pud)
+>   }
+>   
+>   
+> +static inline bool kvm_s2pud_exec(pud_t *pud)
+> +{
+> +	BUG();
+> +	return false;
+> +}
+> +
+>   static inline void kvm_set_pmd(pmd_t *pmd, pmd_t new_pmd)
+>   {
+>   	*pmd = new_pmd;
+> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+> index 84051930ddfe..15bc1be8f82f 100644
+> --- a/arch/arm64/include/asm/kvm_mmu.h
+> +++ b/arch/arm64/include/asm/kvm_mmu.h
+> @@ -249,6 +249,11 @@ static inline bool kvm_s2pud_readonly(pud_t *pudp)
+>   	return kvm_s2pte_readonly((pte_t *)pudp);
+>   }
+>   
+> +static inline bool kvm_s2pud_exec(pud_t *pudp)
+> +{
+> +	return !(READ_ONCE(pud_val(*pudp)) & PUD_S2_XN);
+> +}
+> +
+>   static inline bool kvm_page_empty(void *ptr)
+>   {
+>   	struct page *ptr_page = virt_to_page(ptr);
+> diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
+> index fd208eac9f2a..10ae592b78b8 100644
+> --- a/arch/arm64/include/asm/pgtable-hwdef.h
+> +++ b/arch/arm64/include/asm/pgtable-hwdef.h
+> @@ -193,6 +193,8 @@
+>   #define PMD_S2_RDWR		(_AT(pmdval_t, 3) << 6)   /* HAP[2:1] */
+>   #define PMD_S2_XN		(_AT(pmdval_t, 2) << 53)  /* XN[1:0] */
+>   
+> +#define PUD_S2_XN		(_AT(pudval_t, 2) << 53)  /* XN[1:0] */
+> +
 
-Thanks,
+The changes above look good to me. Please see below.
 
-Will
+>   /*
+>    * Memory Attribute override for Stage-2 (MemAttr[3:0])
+>    */
+> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+> index db04b18218c1..ccdea0edabb3 100644
+> --- a/virt/kvm/arm/mmu.c
+> +++ b/virt/kvm/arm/mmu.c
+> @@ -1040,10 +1040,18 @@ static int stage2_set_pmd_huge(struct kvm *kvm, struct kvm_mmu_memory_cache
+>   
+>   static bool stage2_is_exec(struct kvm *kvm, phys_addr_t addr)
+>   {
+> +	pud_t *pudp;
+>   	pmd_t *pmdp;
+>   	pte_t *ptep;
+>   
+> -	pmdp = stage2_get_pmd(kvm, NULL, addr);
+> +	pudp = stage2_get_pud(kvm, NULL, addr);
+> +	if (!pudp || pud_none(*pudp) || !pud_present(*pudp))
+> +		return false;
+> +
+> +	if (pud_huge(*pudp))
+> +		return kvm_s2pud_exec(pudp);
+> +
+> +	pmdp = stage2_pmd_offset(pudp, addr);
+>   	if (!pmdp || pmd_none(*pmdp) || !pmd_present(*pmdp))
+>   		return false;
+
+I am wondering if we need a slightly better way to deal with this
+kind of operation. We seem to duplicate the above operation (here and
+in the following patches), i.e, finding the "leaf entry" for a given
+address and follow the checks one level up at a time.
+
+So instead of doing, stage2_get_pud() and walking down everywhere this
+is needed, how about adding :
+
+/* Returns true if the leaf entry is found and updates the relevant pointer */
+found = stage2_get_leaf_entry(kvm, NULL, addr, &pudp, &pmdp, &ptep)
+
+which could set the appropriate entry and we could check the result here.
+
+Cheers
+Suzuki
