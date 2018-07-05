@@ -1,55 +1,38 @@
-From: alex@ghiti.fr (Alexandre Ghiti)
-Date: Thu,  5 Jul 2018 05:03:12 +0000
-Subject: [PATCH v2 00/11] hugetlb: Factorize architecture hugetlb primitives
-Message-ID: <20180705050323.301-1-alex@ghiti.fr>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu,  5 Jul 2018 10:39:22 +0530
+Subject: [PATCH 0/2] dt: thermal: Fix broken cooling-maps
+Message-ID: <cover.1530766981.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to reduce copy/paste of functions across architectures and then
-make riscv hugetlb port (and future ports) simpler and smaller, this
-patchset intends to factorize the numerous hugetlb primitives that are defined
-across all the architectures.
+Hi,
 
-Except for prepare_hugepage_range, this patchset moves the versions that
-are just pass-through to standard pte primitives into
-asm-generic/hugetlb.h by using the same #ifdef semantic that can be
-found in asm-generic/pgtable.h, i.e. __HAVE_ARCH_***.
+This is an attempt to fix the broken or partially defined DT bindings
+for cooling-maps. We should list every device that participates in
+cooling down at a certain trip point, instead of just the first in the
+list as that depends on certain ordering of events to work properly.
 
-s390 architecture has not been tackled in this serie since it does not
-use asm-generic/hugetlb.h at all.
-powerpc could be factorized a bit more (cf huge_ptep_set_wrprotect).
+The first patch extends the binding to allow a list of phandles in
+"cooling-device" property and the second patch fixes one of the
+platform's DT.
 
-This patchset has been compiled on x86 only.
+This will be followed up by fixing all platform DT bindings that have
+these issues after this set is accepted.
 
-Alexandre Ghiti (11):
-  hugetlb: Harmonize hugetlb.h arch specific defines with pgtable.h
-  hugetlb: Introduce generic version of hugetlb_free_pgd_range
-  hugetlb: Introduce generic version of set_huge_pte_at
-  hugetlb: Introduce generic version of huge_ptep_get_and_clear
-  hugetlb: Introduce generic version of huge_ptep_clear_flush
-  hugetlb: Introduce generic version of huge_pte_none
-  hugetlb: Introduce generic version of huge_pte_wrprotect
-  hugetlb: Introduce generic version of prepare_hugepage_range
-  hugetlb: Introduce generic version of huge_ptep_set_wrprotect
-  hugetlb: Introduce generic version of huge_ptep_set_access_flags
-  hugetlb: Introduce generic version of huge_ptep_get
+The kernel also requires some changes to handle the phandle list, but
+wouldn't break with these changes as it reads the first phandle in the
+list for now. We can update that separately.
 
- arch/arm/include/asm/hugetlb-3level.h        | 32 +---------
- arch/arm/include/asm/hugetlb.h               | 33 +----------
- arch/arm64/include/asm/hugetlb.h             | 39 +++---------
- arch/ia64/include/asm/hugetlb.h              | 47 ++-------------
- arch/mips/include/asm/hugetlb.h              | 40 +++----------
- arch/parisc/include/asm/hugetlb.h            | 33 +++--------
- arch/powerpc/include/asm/book3s/32/pgtable.h |  2 +
- arch/powerpc/include/asm/book3s/64/pgtable.h |  1 +
- arch/powerpc/include/asm/hugetlb.h           | 43 ++------------
- arch/powerpc/include/asm/nohash/32/pgtable.h |  2 +
- arch/powerpc/include/asm/nohash/64/pgtable.h |  1 +
- arch/sh/include/asm/hugetlb.h                | 54 ++---------------
- arch/sparc/include/asm/hugetlb.h             | 40 +++----------
- arch/x86/include/asm/hugetlb.h               | 72 +----------------------
- include/asm-generic/hugetlb.h                | 88 +++++++++++++++++++++++++++-
- 15 files changed, 143 insertions(+), 384 deletions(-)
+--
+viresh
+
+Viresh Kumar (2):
+  dt-bindings: thermal: Allow multiple devices to share cooling map
+  arm64: dts: hi6220: Add all CPUs in cooling maps
+
+ Documentation/devicetree/bindings/thermal/thermal.txt | 11 +++--------
+ arch/arm64/boot/dts/hisilicon/hi6220.dtsi             |  9 ++++++++-
+ 2 files changed, 11 insertions(+), 9 deletions(-)
 
 -- 
-2.16.2
+2.18.0.rc1.242.g61856ae69a2c
