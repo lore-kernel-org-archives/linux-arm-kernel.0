@@ -1,45 +1,132 @@
-From: arnaud.ferraris.external@sigfox.com (Arnaud Ferraris)
-Date: Thu,  5 Jul 2018 16:30:41 +0200
-Subject: [PATCH] arm64: dts: marvell: a3700: reserve ATF memory
-Message-ID: <1530801041-6909-1-git-send-email-arnaud.ferraris.external@sigfox.com>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Thu, 5 Jul 2018 16:37:43 +0200
+Subject: [kvmtool test PATCH 22/24] kvmtool: arm64: Add support for guest
+ physical address size
+In-Reply-To: <29208b59-0224-00d2-0e2a-6f53a0cbc963@arm.com>
+References: <1530270944-11351-1-git-send-email-suzuki.poulose@arm.com>
+ <1530270944-11351-23-git-send-email-suzuki.poulose@arm.com>
+ <20180704140943.GF4828@arm.com>
+ <8c9bb3cd-f673-17f3-656f-66b7e14fc73c@arm.com>
+ <20180704155231.GP4828@arm.com>
+ <ca05f552-d0d7-b5b8-954b-7254e8c1e529@arm.com>
+ <d0c005f8-eae4-3784-1ebc-d279df4ee608@arm.com>
+ <bd5186ce-66ab-e2fa-3531-46a4a87b84d8@redhat.com>
+ <29208b59-0224-00d2-0e2a-6f53a0cbc963@arm.com>
+Message-ID: <52eb61a0-e114-14ac-8f5e-fa99f566d1cb@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Marvell Armada 3700, the ARM Trusted Firmware is loaded in RAM at address
-0x04000000, and can use up to 16MiB (0x01000000).
+Hi Suzuki, Marc,
 
-As the ATF is responsible for handling PSCI calls (including, but not limited
-to, system reset management), its memory area should never be overwritten
-during runtime.
+On 07/05/2018 04:15 PM, Marc Zyngier wrote:
+> Hi Eric,
+> 
+> On 05/07/18 14:46, Auger Eric wrote:
+>> Hi Marc,
+>>
+>> On 07/05/2018 03:20 PM, Marc Zyngier wrote:
+>>> On 05/07/18 13:47, Julien Grall wrote:
+>>>> Hi Will,
+>>>>
+>>>> On 04/07/18 16:52, Will Deacon wrote:
+>>>>> On Wed, Jul 04, 2018 at 04:00:11PM +0100, Julien Grall wrote:
+>>>>>> On 04/07/18 15:09, Will Deacon wrote:
+>>>>>>> On Fri, Jun 29, 2018 at 12:15:42PM +0100, Suzuki K Poulose wrote:
+>>>>>>>> Add an option to specify the physical address size used by this
+>>>>>>>> VM.
+>>>>>>>>
+>>>>>>>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>>>>>>>> ---
+>>>>>>>>   arm/aarch64/include/kvm/kvm-config-arch.h | 5 ++++-
+>>>>>>>>   arm/include/arm-common/kvm-config-arch.h  | 1 +
+>>>>>>>>   2 files changed, 5 insertions(+), 1 deletion(-)
+>>>>>>>>
+>>>>>>>> diff --git a/arm/aarch64/include/kvm/kvm-config-arch.h b/arm/aarch64/include/kvm/kvm-config-arch.h
+>>>>>>>> index 04be43d..dabd22c 100644
+>>>>>>>> --- a/arm/aarch64/include/kvm/kvm-config-arch.h
+>>>>>>>> +++ b/arm/aarch64/include/kvm/kvm-config-arch.h
+>>>>>>>> @@ -8,7 +8,10 @@
+>>>>>>>>   			"Create PMUv3 device"),				\
+>>>>>>>>   	OPT_U64('\0', "kaslr-seed", &(cfg)->kaslr_seed,			\
+>>>>>>>>   			"Specify random seed for Kernel Address Space "	\
+>>>>>>>> -			"Layout Randomization (KASLR)"),
+>>>>>>>> +			"Layout Randomization (KASLR)"),		\
+>>>>>>>> +	OPT_INTEGER('\0', "phys-shift", &(cfg)->phys_shift,		\
+>>>>>>>> +			"Specify maximum physical address size (not "	\
+>>>>>>>> +			"the amount of memory)"),
+>>>>>>>
+>>>>>>> Given that this is a shift value, I think the help message could be more
+>>>>>>> informative. Something like:
+>>>>>>>
+>>>>>>> 	"Specify maximum number of bits in a guest physical address"
+>>>>>>>
+>>>>>>> I think I'd actually leave out any mention of memory, because this does
+>>>>>>> actually have an effect on the amount of addressable memory in a way that I
+>>>>>>> don't think we want to describe in half of a usage message line :)
+>>>>>> Is there any particular reasons to expose this option to the user?
+>>>>>>
+>>>>>> I have recently sent a series to allow the user to specify the position
+>>>>>> of the RAM [1]. With that series in mind, I think the user would not really
+>>>>>> need to specify the maximum physical shift. Instead we could automatically
+>>>>>> find it.
+>>>>>
+>>>>> Marc makes a good point that it doesn't help for MMIO regions, so I'm trying
+>>>>> to understand whether we can do something differently there and avoid
+>>>>> sacrificing the type parameter.
+>>>>
+>>>> I am not sure to understand this. kvmtools knows the memory layout 
+>>>> (including MMIOs) of the guest, so couldn't it guess the maximum 
+>>>> physical shift for that?
+>>>
+>>> That's exactly what Will was trying to avoid, by having KVM to compute
+>>> the size of the IPA space based on the registered memslots. We've now
+>>> established that it doesn't work, so what we need to define is:
+>>>
+>>> - whether we need another ioctl(), or do we carry on piggy-backing on
+>>> the CPU type,
+>> kvm type I guess
+> 
+> I really meant target here. Whatever you pass as a "-cpu" on your QEMU
+> command line.
+Oh OK. It was not a slip then ;-)
+> 
+>>> - assuming the latter, whether we can reduce the number of bits used in
+>>> the ioctl parameter by subtly encoding the IPA size.
+>> Getting benefit from your Freudian slip, how should guest CPU PARange
+>> and maximum number of bits in a guest physical address relate?
+> 
+> Freudian? I'm not on the sofa yet... ;-)
+> 
+>> My understanding is they are not correlated at the moment and our guest
+>> PARange is fixed at the moment. But shouldn't they?
+>>
+>> On Intel there is
+>>    qemu-system-x86_64 -M pc,accel=kvm -cpu SandyBridge,phys-bits=36
+>> or
+>>    qemu-system-x86_64 -M pc,accel=kvm -cpu SandyBridge,host-phys-bits=true
+>>
+>> where phys-bits, as far as I understand has a a similar semantics as the
+>> PARange.
+> 
+> I think there is value in having it global, just like on x86. We don't
+> really support heterogeneous guests anyway.
 
-Declaring a range of reserved memory solves this problem.
+Assuming we would use such a ",phys-bits=n" cpu option, is my
+understanding correct that it would set both
+- guest CPU PARange an
+- maximum number of bits in a guest physical address
+to n?
 
-Signed-off-by: Arnaud Ferraris <arnaud.ferraris.external@sigfox.com>
----
- arch/arm64/boot/dts/marvell/armada-37xx.dtsi | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+Thanks
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-index 3353252..2110e7d 100644
---- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-@@ -34,6 +34,17 @@
- 		};
- 	};
- 
-+	reserved-memory {
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		ranges;
-+
-+		arm-trusted-firmware at 4000000 {
-+			no-map;
-+			reg = <0x0 0x04000000 0x0 0x01000000>;
-+		};
-+	};
-+
- 	psci {
- 		compatible = "arm,psci-0.2";
- 		method = "smc";
--- 
-2.7.4
+Eric
+> 
+> Independently, we should also repaint/satinize PARange so that the guest
+> observes the same thing, no matter what CPU it runs on (an A53/A57
+> system could be confusing in that respect).
+
+> 
+> Thanks,
+> 
+> 	M.
+> 
