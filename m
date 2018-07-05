@@ -1,162 +1,165 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 5 Jul 2018 13:12:40 +0200
-Subject: [PATCH v2 1/1] mmc: sunxi: Disable irq during pm_suspend
-In-Reply-To: <20180704212951.43c6a62a@why.wild-wind.fr.eu.org>
-References: <1530685741-20604-1-git-send-email-stefan@olimex.com>
- <CAPDyKFo_fadfNbt8YMS3MMjaxjt1B54DtZJ+-LoH9y5JeRi5pQ@mail.gmail.com>
- <9b8f30fd-12aa-46ba-ced9-aed38ada0059@arm.com>
- <CAPDyKFp8Hrmr0XCGnhFYrC3Q79dZizYC5KfRE92AUNa0FRDS5A@mail.gmail.com>
- <20180704212951.43c6a62a@why.wild-wind.fr.eu.org>
-Message-ID: <CAPDyKFpmd5T249HfQfuovD+=ZrBZw=kV4OUhVAHAiywo7m=haA@mail.gmail.com>
+From: alex@ghiti.fr (Alexandre Ghiti)
+Date: Thu,  5 Jul 2018 11:07:10 +0000
+Subject: [PATCH v4 05/11] hugetlb: Introduce generic version of
+ huge_ptep_clear_flush
+In-Reply-To: <20180705110716.3919-1-alex@ghiti.fr>
+References: <20180705110716.3919-1-alex@ghiti.fr>
+Message-ID: <20180705110716.3919-6-alex@ghiti.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 July 2018 at 22:29, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On Wed, 4 Jul 2018 15:34:36 +0200
-> Ulf Hansson <ulf.hansson@linaro.org> wrote:
->
->> On 4 July 2018 at 13:34, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> > On 04/07/18 11:50, Ulf Hansson wrote:
->> >> + Marc
->> >>
->> >> On 4 July 2018 at 08:28, Stefan Mavrodiev <stefan@olimex.com> wrote:
->> >>> When mmc host controller enters suspend state, the clocks are
->> >>> disabled, but irqs are not. For some reason the irqchip emits
->> >>> false interrupts, which causes system lock loop.
->> >>>
->> >>> Debug log is:
->> >>>   ...
->> >>>   sunxi-mmc 1c11000.mmc: setting clk to 52000000, rounded 51200000
->> >>>   sunxi-mmc 1c11000.mmc: enabling the clock
->> >>>   sunxi-mmc 1c11000.mmc: cmd 13(8000014d) arg 10000 ie 0x0000bbc6 len 0
->> >>>   sunxi-mmc 1c11000.mmc: irq: rq (ptrval) mi 00000004 idi 00000000
->> >>>   sunxi-mmc 1c11000.mmc: cmd 6(80000146) arg 3210101 ie 0x0000bbc6 len 0
->> >>>   sunxi-mmc 1c11000.mmc: irq: rq (ptrval) mi 00000004 idi 00000000
->> >>>   sunxi-mmc 1c11000.mmc: cmd 13(8000014d) arg 10000 ie 0x0000bbc6 len 0
->> >>>   sunxi-mmc 1c11000.mmc: irq: rq (ptrval) mi 00000004 idi 00000000
->> >>>   mmc1: new DDR MMC card at address 0001
->> >>>   mmcblk1: mmc1:0001 AGND3R 14.6 GiB
->> >>>   mmcblk1boot0: mmc1:0001 AGND3R partition 1 4.00 MiB
->> >>>   mmcblk1boot1: mmc1:0001 AGND3R partition 2 4.00 MiB
->> >>>   sunxi-mmc 1c11000.mmc: cmd 18(80003352) arg 0 ie 0x0000fbc2 len 409
->> >>>   sunxi-mmc 1c11000.mmc: irq: rq (ptrval) mi 00004000 idi 00000002
->> >>>    mmcblk1: p1
->> >>>   sunxi-mmc 1c11000.mmc: irq: rq   (null) mi 00000000 idi 00000000
->> >>>   sunxi-mmc 1c11000.mmc: irq: rq   (null) mi 00000000 idi 00000000
->> >>>   sunxi-mmc 1c11000.mmc: irq: rq   (null) mi 00000000 idi 00000000
->> >>>   sunxi-mmc 1c11000.mmc: irq: rq   (null) mi 00000000 idi 00000000
->> >>> and so on...
->> >>>
->> >>> This issue apears on eMMC cards, routed on MMC2 slot. The patch is
->> >>> tested with A20-OLinuXino-MICRO/LIME/LIME2 boards.
->> >>>
->> >>> Fixes: 9a8e1e8cc2c0 ("mmc: sunxi: Add runtime_pm support")
->> >>> Signed-off-by: Stefan Mavrodiev <stefan@olimex.com>
->> >>> ---
->> >>>  Changes in v2:
->> >>>   - Add comment why disable_irq() is necessary
->> >>>
->> >>> ---
->> >>>  drivers/mmc/host/sunxi-mmc.c | 7 +++++++
->> >>>  1 file changed, 7 insertions(+)
->> >>>
->> >>> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
->> >>> index e747259..8e7f3e3 100644
->> >>> --- a/drivers/mmc/host/sunxi-mmc.c
->> >>> +++ b/drivers/mmc/host/sunxi-mmc.c
->> >>> @@ -1446,6 +1446,7 @@ static int sunxi_mmc_runtime_resume(struct device *dev)
->> >>>         sunxi_mmc_init_host(host);
->> >>>         sunxi_mmc_set_bus_width(host, mmc->ios.bus_width);
->> >>>         sunxi_mmc_set_clk(host, &mmc->ios);
->> >>> +       enable_irq(host->irq);
->> >>>
->> >>>         return 0;
->> >>>  }
->> >>> @@ -1455,6 +1456,12 @@ static int sunxi_mmc_runtime_suspend(struct device *dev)
->> >>>         struct mmc_host *mmc = dev_get_drvdata(dev);
->> >>>         struct sunxi_mmc_host *host = mmc_priv(mmc);
->> >>>
->> >>> +       /*
->> >>> +        * When clocks are off, it's possible receiving
->> >>> +        * fake interrupts, which will stall the system.
->> >>> +        * Disabling the irq  will prevent this.
->> >>> +        */
->> >>> +       disable_irq(host->irq);
->> >>
->> >> No, this doesn't work for shared IRQs.
->> >
->> > Well, in this case, it does work, because that interrupt line cannot be
->> > shared with anything else, if I understand how the SoC is wired: each
->> > MMC controller has a dedicated interrupt line to the GIC, and it isn't
->> > shared with anything (that's on the A20 though, and I don't know about
->> > other SoCs integrating the same IP).
->>
->> That's the problem. This may work on some SoCs but not on others.
->>
->> >
->> >>
->> >>>         sunxi_mmc_reset_host(host);
->> >>>         sunxi_mmc_disable(host);
->> >>>
->> >>> --
->> >>> 2.7.4
->> >>>
->> >>
->> >> The only option today is to use free_irq() in runtime suspend and then
->> >> re-request the irq to re-install the handler at runtime resume.
->> >>
->> >> That's not an optimal solution, which is pointed out in the below
->> >> discussion as well. Moreover, it has also turned out using free_irq()
->> >> is also problematic in cases threaded handlers are used.
->> >>
->> >> Here's the link to the discussion, it's not the only one I know of, so
->> >> this is common problem.
->> >> https://lkml.org/lkml/2016/1/28/213
->> >>
->> >> Care to have a hack on the "common" solution, which in principle means
->> >> adding APIs to genirq that can disable/enable handlers from being
->> >> called, rather than the entire IRQ line.
->> >
->> > That doesn't work. You still end-up with a screaming interrupt, and you
->> > will still spend 100% of your time in interrupt context for nothing.
->> >
->> > Eventually, the kernel will have enough (the /other/ shared handlers
->> > returning IRQ_NONE all the time), and will forcefully kill that
->> > particular interrupt interrupt line, meaning you end-up in the same
->> > situation of having the line disabled for all the users of that
->> > interrupt line. Except that now, it is disabled forever.
->>
->> Ahh, correct!
->>
->> Sounds like free_irq() is what we need. Only that it's bit heavy
->> weight as we need to re-install handlers.
->
-> BTW, free_irq() doesn't help you either in the case of a shared
-> handler. You'll end-up in the exact same scenario as above.
+arm, x86 architectures use the same version of
+huge_ptep_clear_flush, so move this generic implementation into
+asm-generic/hugetlb.h.
 
-In regards to the spurious interrupt storm issue, yes, I fully agree.
+Signed-off-by: Alexandre Ghiti <alex@ghiti.fr>
+---
+ arch/arm/include/asm/hugetlb-3level.h | 6 ------
+ arch/arm64/include/asm/hugetlb.h      | 1 +
+ arch/ia64/include/asm/hugetlb.h       | 1 +
+ arch/mips/include/asm/hugetlb.h       | 1 +
+ arch/parisc/include/asm/hugetlb.h     | 1 +
+ arch/powerpc/include/asm/hugetlb.h    | 1 +
+ arch/sh/include/asm/hugetlb.h         | 1 +
+ arch/sparc/include/asm/hugetlb.h      | 1 +
+ arch/x86/include/asm/hugetlb.h        | 6 ------
+ include/asm-generic/hugetlb.h         | 8 ++++++++
+ 10 files changed, 15 insertions(+), 12 deletions(-)
 
-On the other hand, in case of a shared IRQ, don't we want the genirq
-core to deal with disabling the IRQ, rather than the driver?
-
-Also, don't forget the other related issue, which is when the IRQ
-handler gets invoked (not as a storm, but once is enough), either
-because of a spurious IRQ or because of a shared IRQ - while the
-device is in a low power state (runtime suspended with clock gated for
-example). If that happens and the handler accesses a register the
-handler may hang.
-
->
-> The real solution to this is to prevent the device itself from
-> generating interrupts (or to forbid interrupt sharing if it isn't
-> possible).
-
-I fully agree that the device should be configured to not deliver
-interrupt, this is the first and most important step a driver should
-take. For example it should mask its device's IRQ register bits.
-
-However, this isn't sufficient, because of shared IRQs and buggy HWs
-delivering spurious IRQs.
-
-Kind regards
-Uffe
+diff --git a/arch/arm/include/asm/hugetlb-3level.h b/arch/arm/include/asm/hugetlb-3level.h
+index ad36e84b819a..b897541520ef 100644
+--- a/arch/arm/include/asm/hugetlb-3level.h
++++ b/arch/arm/include/asm/hugetlb-3level.h
+@@ -37,12 +37,6 @@ static inline pte_t huge_ptep_get(pte_t *ptep)
+ 	return retval;
+ }
+ 
+-static inline void huge_ptep_clear_flush(struct vm_area_struct *vma,
+-					 unsigned long addr, pte_t *ptep)
+-{
+-	ptep_clear_flush(vma, addr, ptep);
+-}
+-
+ static inline void huge_ptep_set_wrprotect(struct mm_struct *mm,
+ 					   unsigned long addr, pte_t *ptep)
+ {
+diff --git a/arch/arm64/include/asm/hugetlb.h b/arch/arm64/include/asm/hugetlb.h
+index 6ae0bcafe162..4c8dd488554d 100644
+--- a/arch/arm64/include/asm/hugetlb.h
++++ b/arch/arm64/include/asm/hugetlb.h
+@@ -71,6 +71,7 @@ extern pte_t huge_ptep_get_and_clear(struct mm_struct *mm,
+ 				     unsigned long addr, pte_t *ptep);
+ extern void huge_ptep_set_wrprotect(struct mm_struct *mm,
+ 				    unsigned long addr, pte_t *ptep);
++#define __HAVE_ARCH_HUGE_PTEP_CLEAR_FLUSH
+ extern void huge_ptep_clear_flush(struct vm_area_struct *vma,
+ 				  unsigned long addr, pte_t *ptep);
+ #define __HAVE_ARCH_HUGE_PTE_CLEAR
+diff --git a/arch/ia64/include/asm/hugetlb.h b/arch/ia64/include/asm/hugetlb.h
+index 6719c74da0de..41b5f6adeee4 100644
+--- a/arch/ia64/include/asm/hugetlb.h
++++ b/arch/ia64/include/asm/hugetlb.h
+@@ -20,6 +20,7 @@ static inline int is_hugepage_only_range(struct mm_struct *mm,
+ 		REGION_NUMBER((addr)+(len)-1) == RGN_HPAGE);
+ }
+ 
++#define __HAVE_ARCH_HUGE_PTEP_CLEAR_FLUSH
+ static inline void huge_ptep_clear_flush(struct vm_area_struct *vma,
+ 					 unsigned long addr, pte_t *ptep)
+ {
+diff --git a/arch/mips/include/asm/hugetlb.h b/arch/mips/include/asm/hugetlb.h
+index 0959cc5a41fa..7df1f116a3cc 100644
+--- a/arch/mips/include/asm/hugetlb.h
++++ b/arch/mips/include/asm/hugetlb.h
+@@ -48,6 +48,7 @@ static inline pte_t huge_ptep_get_and_clear(struct mm_struct *mm,
+ 	return pte;
+ }
+ 
++#define __HAVE_ARCH_HUGE_PTEP_CLEAR_FLUSH
+ static inline void huge_ptep_clear_flush(struct vm_area_struct *vma,
+ 					 unsigned long addr, pte_t *ptep)
+ {
+diff --git a/arch/parisc/include/asm/hugetlb.h b/arch/parisc/include/asm/hugetlb.h
+index 6e281e1bb336..9afff26747a1 100644
+--- a/arch/parisc/include/asm/hugetlb.h
++++ b/arch/parisc/include/asm/hugetlb.h
+@@ -32,6 +32,7 @@ static inline int prepare_hugepage_range(struct file *file,
+ 	return 0;
+ }
+ 
++#define __HAVE_ARCH_HUGE_PTEP_CLEAR_FLUSH
+ static inline void huge_ptep_clear_flush(struct vm_area_struct *vma,
+ 					 unsigned long addr, pte_t *ptep)
+ {
+diff --git a/arch/powerpc/include/asm/hugetlb.h b/arch/powerpc/include/asm/hugetlb.h
+index 970101cf9c82..0b02856aa85b 100644
+--- a/arch/powerpc/include/asm/hugetlb.h
++++ b/arch/powerpc/include/asm/hugetlb.h
+@@ -143,6 +143,7 @@ static inline pte_t huge_ptep_get_and_clear(struct mm_struct *mm,
+ #endif
+ }
+ 
++#define __HAVE_ARCH_HUGE_PTEP_CLEAR_FLUSH
+ static inline void huge_ptep_clear_flush(struct vm_area_struct *vma,
+ 					 unsigned long addr, pte_t *ptep)
+ {
+diff --git a/arch/sh/include/asm/hugetlb.h b/arch/sh/include/asm/hugetlb.h
+index 08ee6c00b5e9..9abf9c86b769 100644
+--- a/arch/sh/include/asm/hugetlb.h
++++ b/arch/sh/include/asm/hugetlb.h
+@@ -25,6 +25,7 @@ static inline int prepare_hugepage_range(struct file *file,
+ 	return 0;
+ }
+ 
++#define __HAVE_ARCH_HUGE_PTEP_CLEAR_FLUSH
+ static inline void huge_ptep_clear_flush(struct vm_area_struct *vma,
+ 					 unsigned long addr, pte_t *ptep)
+ {
+diff --git a/arch/sparc/include/asm/hugetlb.h b/arch/sparc/include/asm/hugetlb.h
+index 944e3a4bfaff..651a9593fcee 100644
+--- a/arch/sparc/include/asm/hugetlb.h
++++ b/arch/sparc/include/asm/hugetlb.h
+@@ -42,6 +42,7 @@ static inline int prepare_hugepage_range(struct file *file,
+ 	return 0;
+ }
+ 
++#define __HAVE_ARCH_HUGE_PTEP_CLEAR_FLUSH
+ static inline void huge_ptep_clear_flush(struct vm_area_struct *vma,
+ 					 unsigned long addr, pte_t *ptep)
+ {
+diff --git a/arch/x86/include/asm/hugetlb.h b/arch/x86/include/asm/hugetlb.h
+index 48b8d9b13cc6..8347d5abf882 100644
+--- a/arch/x86/include/asm/hugetlb.h
++++ b/arch/x86/include/asm/hugetlb.h
+@@ -27,12 +27,6 @@ static inline int prepare_hugepage_range(struct file *file,
+ 	return 0;
+ }
+ 
+-static inline void huge_ptep_clear_flush(struct vm_area_struct *vma,
+-					 unsigned long addr, pte_t *ptep)
+-{
+-	ptep_clear_flush(vma, addr, ptep);
+-}
+-
+ static inline int huge_pte_none(pte_t pte)
+ {
+ 	return pte_none(pte);
+diff --git a/include/asm-generic/hugetlb.h b/include/asm-generic/hugetlb.h
+index 0f6f151780dd..ffa63fd8388d 100644
+--- a/include/asm-generic/hugetlb.h
++++ b/include/asm-generic/hugetlb.h
+@@ -65,4 +65,12 @@ static inline pte_t huge_ptep_get_and_clear(struct mm_struct *mm,
+ }
+ #endif
+ 
++#ifndef __HAVE_ARCH_HUGE_PTEP_CLEAR_FLUSH
++static inline void huge_ptep_clear_flush(struct vm_area_struct *vma,
++		unsigned long addr, pte_t *ptep)
++{
++	ptep_clear_flush(vma, addr, ptep);
++}
++#endif
++
+ #endif /* _ASM_GENERIC_HUGETLB_H */
+-- 
+2.16.2
