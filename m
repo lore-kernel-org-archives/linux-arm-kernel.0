@@ -1,146 +1,93 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Thu, 05 Jul 2018 17:57:30 +0100
-Subject: [PATCH v4 1/7] KVM: arm/arm64: Share common code in
- user_mem_abort()
-In-Reply-To: <b08f02c6-c44a-2016-3d95-7d818ec5f02d@arm.com> (Marc Zyngier's
- message of "Thu, 5 Jul 2018 17:24:14 +0100")
-References: <20180705140850.5801-1-punit.agrawal@arm.com>
- <20180705140850.5801-2-punit.agrawal@arm.com>
- <b08f02c6-c44a-2016-3d95-7d818ec5f02d@arm.com>
-Message-ID: <87sh4xr56t.fsf@e105922-lin.cambridge.arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu,  5 Jul 2018 17:40:52 +0100
+Subject: [PATCHv3 11/12] atomics: check generated headers are up-to-date
+In-Reply-To: <20180705164053.10073-1-mark.rutland@arm.com>
+References: <20180705164053.10073-1-mark.rutland@arm.com>
+Message-ID: <20180705164053.10073-12-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc Zyngier <marc.zyngier@arm.com> writes:
+Now that all the generated atomic headers are in place, it would be good
+to ensure that:
 
-> Hi Punit,
->
-> On 05/07/18 15:08, Punit Agrawal wrote:
->> The code for operations such as marking the pfn as dirty, and
->> dcache/icache maintenance during stage 2 fault handling is duplicated
->> between normal pages and PMD hugepages.
->> 
->> Instead of creating another copy of the operations when we introduce
->> PUD hugepages, let's share them across the different pagesizes.
->> 
->> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
->> Cc: Christoffer Dall <christoffer.dall@arm.com>
->> Cc: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  virt/kvm/arm/mmu.c | 68 +++++++++++++++++++++++++++-------------------
->>  1 file changed, 40 insertions(+), 28 deletions(-)
->> 
->> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
->> index 1d90d79706bd..dd14cc36c51c 100644
->> --- a/virt/kvm/arm/mmu.c
->> +++ b/virt/kvm/arm/mmu.c
->> @@ -1398,6 +1398,21 @@ static void invalidate_icache_guest_page(kvm_pfn_t pfn, unsigned long size)
->>  	__invalidate_icache_guest_page(pfn, size);
->>  }
->>  
->> +static bool stage2_should_exec(struct kvm *kvm, phys_addr_t addr,
->> +			       bool exec_fault, unsigned long fault_status)
->
-> I find this "should exec" very confusing.
->
->> +{
->> +	/*
->> +	 * If we took an execution fault we will have made the
->> +	 * icache/dcache coherent and should now let the s2 mapping be
->> +	 * executable.
->> +	 *
->> +	 * Write faults (!exec_fault && FSC_PERM) are orthogonal to
->> +	 * execute permissions, and we preserve whatever we have.
->> +	 */
->> +	return exec_fault ||
->> +		(fault_status == FSC_PERM && stage2_is_exec(kvm, addr));
->> +}
->> +
->>  static void kvm_send_hwpoison_signal(unsigned long address,
->>  				     struct vm_area_struct *vma)
->>  {
->> @@ -1431,7 +1446,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->>  	kvm_pfn_t pfn;
->>  	pgprot_t mem_type = PAGE_S2;
->>  	bool logging_active = memslot_is_logging(memslot);
->> -	unsigned long flags = 0;
->> +	unsigned long vma_pagesize, flags = 0;
->>  
->>  	write_fault = kvm_is_write_fault(vcpu);
->>  	exec_fault = kvm_vcpu_trap_is_iabt(vcpu);
->> @@ -1451,7 +1466,8 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->>  		return -EFAULT;
->>  	}
->>  
->> -	if (vma_kernel_pagesize(vma) == PMD_SIZE && !logging_active) {
->> +	vma_pagesize = vma_kernel_pagesize(vma);
->> +	if (vma_pagesize == PMD_SIZE && !logging_active) {
->>  		hugetlb = true;
->>  		gfn = (fault_ipa & PMD_MASK) >> PAGE_SHIFT;
->>  	} else {
->> @@ -1520,28 +1536,34 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->>  	if (mmu_notifier_retry(kvm, mmu_seq))
->>  		goto out_unlock;
->>  
->> -	if (!hugetlb && !force_pte)
->> +	if (!hugetlb && !force_pte) {
->> +		/*
->> +		 * Only PMD_SIZE transparent hugepages(THP) are
->> +		 * currently supported. This code will need to be
->> +		 * updated to support other THP sizes.
->> +		 */
->>  		hugetlb = transparent_hugepage_adjust(&pfn, &fault_ipa);
->> +		if (hugetlb)
->> +			vma_pagesize = PMD_SIZE;
->> +	}
->> +
->> +	if (writable)
->> +		kvm_set_pfn_dirty(pfn);
->>  
->> -	if (hugetlb) {
->> +	if (fault_status != FSC_PERM)
->> +		clean_dcache_guest_page(pfn, vma_pagesize);
->> +
->> +	if (exec_fault)
->> +		invalidate_icache_guest_page(pfn, vma_pagesize);
->> +
->> +	if (hugetlb && vma_pagesize == PMD_SIZE) {
->>  		pmd_t new_pmd = pfn_pmd(pfn, mem_type);
->>  		new_pmd = pmd_mkhuge(new_pmd);
->> -		if (writable) {
->> +		if (writable)
->>  			new_pmd = kvm_s2pmd_mkwrite(new_pmd);
->> -			kvm_set_pfn_dirty(pfn);
->> -		}
->>  
->> -		if (fault_status != FSC_PERM)
->> -			clean_dcache_guest_page(pfn, PMD_SIZE);
->> -
->> -		if (exec_fault) {
->> +		if (stage2_should_exec(kvm, fault_ipa, exec_fault, fault_status))
->>  			new_pmd = kvm_s2pmd_mkexec(new_pmd);
->
-> OK, I find this absolutely horrid... ;-)
->
-> The rest of the function deals with discrete flags, and all of a sudden
-> we have a function call with a bunch of seemingly unrelated parameters.
-> And you are repeating it for each vma_pagesize...
->
-> How about something like:
->
-> 	bool needs_exec;
->
-> 	[...]
->
-> 	needs_exec = exec_fault || (fault_status == FSC_PERM &&
-> 				    stage2_is_exec(kvm, fault_ipa);
->
-> And then you just check needs_exec to update the pte/pmd. And you drop
-> this helper.
+a) the headers are up-to-date when scripting changes.
 
-That does look a lot better. I'll roll the change into the next version.
+b) developers don't directly modify the generated headers.
 
-Thanks,
-Punit
+To ensure both of these properties, let's add a Kbuild step to check
+that the generated headers are up-to-date.
 
-[...]
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Boqun Feng <boqun.feng@gmail.com>
+Cc: Ingo Molnar <mingo@kernel.org>
+Cc: Peter Zijlstra (Intel) <peterz@infradead.org>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ Kbuild                          | 18 ++++++++++++++++--
+ scripts/atomic/check-atomics.sh | 19 +++++++++++++++++++
+ 2 files changed, 35 insertions(+), 2 deletions(-)
+ create mode 100755 scripts/atomic/check-atomics.sh
+
+diff --git a/Kbuild b/Kbuild
+index 005304205482..47c9fe175bd9 100644
+--- a/Kbuild
++++ b/Kbuild
+@@ -6,7 +6,8 @@
+ # 2) Generate timeconst.h
+ # 3) Generate asm-offsets.h (may need bounds.h and timeconst.h)
+ # 4) Check for missing system calls
+-# 5) Generate constants.py (may need bounds.h)
++# 5) check atomics headers are up-to-date
++# 6) Generate constants.py (may need bounds.h)
+ 
+ #####
+ # 1) Generate bounds.h
+@@ -72,7 +73,20 @@ missing-syscalls: scripts/checksyscalls.sh $(offsets-file) FORCE
+ 	$(call cmd,syscalls)
+ 
+ #####
+-# 5) Generate constants for Python GDB integration
++# 5) Check atomic headers are up-to-date
++#
++
++always += old-atomics
++targets += old-atomics
++
++quiet_cmd_atomics = CALL    $<
++      cmd_atomics = $(CONFIG_SHELL) scripts/atomic/check-atomics.sh
++
++old-atomics: scripts/atomic/check-atomics.sh FORCE
++	$(call cmd,atomics)
++
++#####
++# 6) Generate constants for Python GDB integration
+ #
+ 
+ extra-$(CONFIG_GDB_SCRIPTS) += build_constants_py
+diff --git a/scripts/atomic/check-atomics.sh b/scripts/atomic/check-atomics.sh
+new file mode 100755
+index 000000000000..c30101cddf2d
+--- /dev/null
++++ b/scripts/atomic/check-atomics.sh
+@@ -0,0 +1,19 @@
++#!/bin/sh
++# SPDX-License-Identifier: GPL-2.0
++#
++# Check if atomic headers are up-to-date
++
++ATOMICDIR=$(dirname $0)
++ATOMICTBL=${ATOMICDIR}/atomics.tbl
++LINUXDIR=${ATOMICDIR}/../..
++
++cat <<EOF |
++gen-atomic-instrumented.sh      asm-generic/atomic-instrumented.h
++gen-atomic-long.sh              asm-generic/atomic-long.h
++gen-atomic-fallback.sh          linux/atomic-fallback.h
++EOF
++while read script header; do
++	if ! (${ATOMICDIR}/${script} ${ATOMICTBL} | diff - ${LINUXDIR}/include/${header} > /dev/null); then
++		printf "warning: include/${header} is out-of-date.\n"
++	fi
++done
+-- 
+2.11.0
