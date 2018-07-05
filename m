@@ -1,35 +1,33 @@
 From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Thu,  5 Jul 2018 12:27:29 +0200
-Subject: [PATCH 4/8] mtd: rawnand: Remove forward declaration of device_node
+Date: Thu,  5 Jul 2018 12:27:27 +0200
+Subject: [PATCH 2/8] mtd: rawnand: Remove nand_do_read() prototype from
+ rawnand.h
 In-Reply-To: <20180705102733.29673-1-boris.brezillon@bootlin.com>
 References: <20180705102733.29673-1-boris.brezillon@bootlin.com>
-Message-ID: <20180705102733.29673-5-boris.brezillon@bootlin.com>
+Message-ID: <20180705102733.29673-3-boris.brezillon@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-struct device_node is defined in linux/of.h. Let's include this file
-instead of having a forward declaration of this struct.
+nand_do_read() is a static function implemented in nand_base.c. There's
+no good reason to expose its prototype in rawnand.h.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@bootlin.com>
 ---
- include/linux/mtd/rawnand.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ include/linux/mtd/rawnand.h | 2 --
+ 1 file changed, 2 deletions(-)
 
 diff --git a/include/linux/mtd/rawnand.h b/include/linux/mtd/rawnand.h
-index 32145b302585..83ab6779144e 100644
+index 0c6fb316b409..4d7a46c42900 100644
 --- a/include/linux/mtd/rawnand.h
 +++ b/include/linux/mtd/rawnand.h
-@@ -21,10 +21,10 @@
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/flashchip.h>
- #include <linux/mtd/bbm.h>
-+#include <linux/of.h>
- #include <linux/types.h>
+@@ -1545,8 +1545,6 @@ int nand_isreserved_bbt(struct mtd_info *mtd, loff_t offs);
+ int nand_isbad_bbt(struct mtd_info *mtd, loff_t offs, int allowbbt);
+ int nand_erase_nand(struct mtd_info *mtd, struct erase_info *instr,
+ 		    int allowbbt);
+-int nand_do_read(struct mtd_info *mtd, loff_t from, size_t len,
+-		 size_t *retlen, uint8_t *buf);
  
- struct nand_flash_dev;
--struct device_node;
- 
- /* Scan and identify a NAND device */
- int nand_scan_with_ids(struct mtd_info *mtd, int max_chips,
+ /**
+  * struct platform_nand_chip - chip level device structure
 -- 
 2.14.1
