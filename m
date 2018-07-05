@@ -1,15 +1,16 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu,  5 Jul 2018 15:16:50 +0100
-Subject: [PATCHv2 3/7] arm64: compat: map SPSR_ELx<->PSR for signals
+Date: Thu,  5 Jul 2018 15:16:51 +0100
+Subject: [PATCHv2 4/7] arm64: ptrace: map SPSR_ELx<->PSR for compat tasks
 In-Reply-To: <20180705141654.8714-1-mark.rutland@arm.com>
 References: <20180705141654.8714-1-mark.rutland@arm.com>
-Message-ID: <20180705141654.8714-4-mark.rutland@arm.com>
+Message-ID: <20180705141654.8714-5-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SPSR_ELx format for exceptions taken from AArch32 differs from the
-AArch32 PSR format. Thus, we must translate between the two when setting
-up a compat sigframe, or restoring context from a compat sigframe.
+The SPSR_ELx format for exceptions taken from AArch32 is slightly
+different to the AArch32 PSR format.
+
+Map between the two in the compat ptrace code.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Fixes: 7206dc93a58fb764 ("arm64: Expose Arm v8.4 features")
@@ -17,48 +18,28 @@ Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Suzuki Poulose <suzuki.poulose@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/kernel/signal32.c | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
+ arch/arm64/kernel/ptrace.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm64/kernel/signal32.c b/arch/arm64/kernel/signal32.c
-index 77b91f478995..12aec0a66376 100644
---- a/arch/arm64/kernel/signal32.c
-+++ b/arch/arm64/kernel/signal32.c
-@@ -243,6 +243,7 @@ static int compat_restore_sigframe(struct pt_regs *regs,
- 	int err;
- 	sigset_t set;
- 	struct compat_aux_sigframe __user *aux;
-+	unsigned long psr;
- 
- 	err = get_sigset_t(&set, &sf->uc.uc_sigmask);
- 	if (err == 0) {
-@@ -266,7 +267,9 @@ static int compat_restore_sigframe(struct pt_regs *regs,
- 	__get_user_error(regs->compat_sp, &sf->uc.uc_mcontext.arm_sp, err);
- 	__get_user_error(regs->compat_lr, &sf->uc.uc_mcontext.arm_lr, err);
- 	__get_user_error(regs->pc, &sf->uc.uc_mcontext.arm_pc, err);
--	__get_user_error(regs->pstate, &sf->uc.uc_mcontext.arm_cpsr, err);
-+	__get_user_error(psr, &sf->uc.uc_mcontext.arm_cpsr, err);
-+
-+	regs->pstate = compat_psr_to_pstate(psr);
- 
- 	/*
- 	 * Avoid compat_sys_sigreturn() restarting.
-@@ -414,6 +417,7 @@ static int compat_setup_sigframe(struct compat_sigframe __user *sf,
- 				 struct pt_regs *regs, sigset_t *set)
- {
- 	struct compat_aux_sigframe __user *aux;
-+	unsigned long psr = pstate_to_compat_psr(regs->pstate);
- 	int err = 0;
- 
- 	__put_user_error(regs->regs[0], &sf->uc.uc_mcontext.arm_r0, err);
-@@ -432,7 +436,7 @@ static int compat_setup_sigframe(struct compat_sigframe __user *sf,
- 	__put_user_error(regs->compat_sp, &sf->uc.uc_mcontext.arm_sp, err);
- 	__put_user_error(regs->compat_lr, &sf->uc.uc_mcontext.arm_lr, err);
- 	__put_user_error(regs->pc, &sf->uc.uc_mcontext.arm_pc, err);
--	__put_user_error(regs->pstate, &sf->uc.uc_mcontext.arm_cpsr, err);
-+	__put_user_error(psr, &sf->uc.uc_mcontext.arm_cpsr, err);
- 
- 	__put_user_error((compat_ulong_t)0, &sf->uc.uc_mcontext.trap_no, err);
- 	/* set the compat FSR WnR */
+diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
+index fff665988e21..bc07e8ec062b 100644
+--- a/arch/arm64/kernel/ptrace.c
++++ b/arch/arm64/kernel/ptrace.c
+@@ -1076,6 +1076,7 @@ static int compat_gpr_get(struct task_struct *target,
+ 			break;
+ 		case 16:
+ 			reg = task_pt_regs(target)->pstate;
++			reg = pstate_to_compat_psr(reg);
+ 			break;
+ 		case 17:
+ 			reg = task_pt_regs(target)->orig_x0;
+@@ -1143,6 +1144,7 @@ static int compat_gpr_set(struct task_struct *target,
+ 			newregs.pc = reg;
+ 			break;
+ 		case 16:
++			reg = compat_psr_to_pstate(reg);
+ 			newregs.pstate = reg;
+ 			break;
+ 		case 17:
 -- 
 2.11.0
