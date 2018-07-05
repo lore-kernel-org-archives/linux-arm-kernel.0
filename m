@@ -1,68 +1,39 @@
-From: luto@kernel.org (Andy Lutomirski)
-Date: Thu, 5 Jul 2018 08:58:09 -0700
-Subject: [PATCHv5 2/4] x86: Add build salt to the vDSO
-In-Reply-To: <20180703233430.14416-3-labbott@redhat.com>
-References: <20180703233430.14416-1-labbott@redhat.com>
- <20180703233430.14416-3-labbott@redhat.com>
-Message-ID: <CALCETrVZi2WYbBSifaNV4wajj52PyG-w7z9DekfJvSuZAKi1nA@mail.gmail.com>
+From: miquel.raynal@bootlin.com (Miquel Raynal)
+Date: Thu,  5 Jul 2018 18:04:17 +0200
+Subject: [PATCH v3 03/23] thermal: armada: remove misleading comments
+In-Reply-To: <20180705160437.12325-1-miquel.raynal@bootlin.com>
+References: <20180705160437.12325-1-miquel.raynal@bootlin.com>
+Message-ID: <20180705160437.12325-4-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 3, 2018 at 4:34 PM, Laura Abbott <labbott@redhat.com> wrote:
->
-> The vDSO needs to have a unique build id in a similar manner
-> to the kernel and modules. Use the build salt macro.
->
+On older versions of this thermal IP, TSEN referred as the internal
+sensor in the thermal IP while EXT_TSEN referred as sensors outside of
+this IP, ie in the CPUs most of the time. The bit names in the
+specifications do not follow this rule anymore, so remove these comments
+that are misleading.
 
-Looks good to me.  I have no idea whose tree these would go through.
+Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+---
+ drivers/thermal/armada_thermal.c | 2 --
+ 1 file changed, 2 deletions(-)
 
-> Signed-off-by: Laura Abbott <labbott@redhat.com>
-> ---
-> v5: Switched to using the single line BUILD_SALT macro
-> ---
->  arch/x86/entry/vdso/vdso-note.S   | 3 +++
->  arch/x86/entry/vdso/vdso32/note.S | 3 +++
->  2 files changed, 6 insertions(+)
->
-> diff --git a/arch/x86/entry/vdso/vdso-note.S b/arch/x86/entry/vdso/vdso-note.S
-> index 79a071e4357e..79423170118f 100644
-> --- a/arch/x86/entry/vdso/vdso-note.S
-> +++ b/arch/x86/entry/vdso/vdso-note.S
-> @@ -3,6 +3,7 @@
->   * Here we can supply some information useful to userland.
->   */
->
-> +#include <linux/build-salt.h>
->  #include <linux/uts.h>
->  #include <linux/version.h>
->  #include <linux/elfnote.h>
-> @@ -10,3 +11,5 @@
->  ELFNOTE_START(Linux, 0, "a")
->         .long LINUX_VERSION_CODE
->  ELFNOTE_END
-> +
-> +BUILD_SALT
-> diff --git a/arch/x86/entry/vdso/vdso32/note.S b/arch/x86/entry/vdso/vdso32/note.S
-> index 9fd51f206314..e78047d119f6 100644
-> --- a/arch/x86/entry/vdso/vdso32/note.S
-> +++ b/arch/x86/entry/vdso/vdso32/note.S
-> @@ -4,6 +4,7 @@
->   * Here we can supply some information useful to userland.
->   */
->
-> +#include <linux/build-salt.h>
->  #include <linux/version.h>
->  #include <linux/elfnote.h>
->
-> @@ -14,6 +15,8 @@ ELFNOTE_START(Linux, 0, "a")
->         .long LINUX_VERSION_CODE
->  ELFNOTE_END
->
-> +BUILD_SALT
-> +
->  #ifdef CONFIG_XEN
->  /*
->   * Add a special note telling glibc's dynamic linker a fake hardware
-> --
-> 2.17.1
->
+diff --git a/drivers/thermal/armada_thermal.c b/drivers/thermal/armada_thermal.c
+index 6fdb90b3c001..18155e43e67f 100644
+--- a/drivers/thermal/armada_thermal.c
++++ b/drivers/thermal/armada_thermal.c
+@@ -51,12 +51,10 @@
+ #define CONTROL0_TSEN_TC_TRIM_MASK	0x7
+ #define CONTROL0_TSEN_TC_TRIM_VAL	0x3
+ 
+-/* TSEN refers to the temperature sensors within the AP */
+ #define CONTROL0_TSEN_START		BIT(0)
+ #define CONTROL0_TSEN_RESET		BIT(1)
+ #define CONTROL0_TSEN_ENABLE		BIT(2)
+ 
+-/* EXT_TSEN refers to the external temperature sensors, out of the AP */
+ #define CONTROL1_EXT_TSEN_SW_RESET	BIT(7)
+ #define CONTROL1_EXT_TSEN_HW_RESETn	BIT(8)
+ 
+-- 
+2.14.1
