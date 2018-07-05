@@ -1,31 +1,23 @@
 From: hch@lst.de (Christoph Hellwig)
-Date: Thu, 5 Jul 2018 21:37:38 +0200
-Subject: [RFC PATCH 1/2] dma-mapping: Clean up dma_set_*mask() hooks
-In-Reply-To: <55ac9550c311f056dcfeed9b2c8265375f17b155.1530726467.git.robin.murphy@arm.com>
+Date: Thu, 5 Jul 2018 21:38:46 +0200
+Subject: [RFC PATCH 2/2] dma-mapping: Clean up dma_get_required_mask()
+ hooks
+In-Reply-To: <08256121f325ceed7f6b88c1a5d3cf949698787d.1530726467.git.robin.murphy@arm.com>
 References: <55ac9550c311f056dcfeed9b2c8265375f17b155.1530726467.git.robin.murphy@arm.com>
-Message-ID: <20180705193738.GB28905@lst.de>
+ <08256121f325ceed7f6b88c1a5d3cf949698787d.1530726467.git.robin.murphy@arm.com>
+Message-ID: <20180705193846.GC28905@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 04, 2018 at 06:50:11PM +0100, Robin Murphy wrote:
-> Arch-specific implementions for dma_set_{coherent_,}mask() currently
-> rely on an inconsistent mix of arch-defined Kconfig symbols and macro
-> overrides. Now that we have a nice centralised home for DMA API gubbins,
-> let's consolidate these loose ends under consistent config options.
-> 
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> ---
-> 
-> Here's hoping the buildbot comes by to point out what I've inevitably
-> missed, although I did check a cursory cross-compile of ppc64_defconfig
-> to iron out the obvious howlers.
+On Wed, Jul 04, 2018 at 06:50:12PM +0100, Robin Murphy wrote:
+> As for the other mask-related hooks, standardise the arch override into
+> a Kconfig option, and also pull the generic implementation into the DMA
+> mapping code rather than having it hide away in the platform bus code.
 
-The patch looks sensible to me, although I was hoping to get rid of these
-hooks in this or the next merge window as they are a horrible bad idea.
+Heh, I have a somewhat similar patch in my queue.  I didn't want it out
+because dma_get_required_mask is rather ill defined at the moment and
+I wanted to clean that up first.  But I guess I could apply this first
+and clean up later.
 
-> The motivation here is that I'm looking at adding set_mask overrides
-> for arm64, and having discovered a bit of a mess it seemed prudent to
-> clean up before ingraining it any more.
-
-What are you trying to do?  I really don't want to see more users of
-the hooks as they are are a horribly bad idea.
+I just fear you might be wanting to add an arm64 user, so I'd really like
+to understand why and how.
