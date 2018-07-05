@@ -1,58 +1,64 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu,  5 Jul 2018 15:16:49 +0100
-Subject: [PATCHv2 2/7] arm64: don't zero DIT on signal return
+Date: Thu,  5 Jul 2018 15:16:50 +0100
+Subject: [PATCHv2 3/7] arm64: compat: map SPSR_ELx<->PSR for signals
 In-Reply-To: <20180705141654.8714-1-mark.rutland@arm.com>
 References: <20180705141654.8714-1-mark.rutland@arm.com>
-Message-ID: <20180705141654.8714-3-mark.rutland@arm.com>
+Message-ID: <20180705141654.8714-4-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently valid_user_regs() treats SPSR_ELx.DIT as a RES0 bit, causing
-it to be zeroed upon exception return, rather than preserved. Thus, code
-relying on DIT will not function as expected, and may expose an
-unexpected timing sidechannel.
-
-Let's remove DIT from the set of RES0 bits, such that it is preserved.
-At the same time, the related comment is updated to better describe the
-situation, and to take into account the most recent documentation of
-SPSR_ELx, in ARM DDI 0487C.a.
+The SPSR_ELx format for exceptions taken from AArch32 differs from the
+AArch32 PSR format. Thus, we must translate between the two when setting
+up a compat sigframe, or restoring context from a compat sigframe.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Fixes: 7206dc93a58fb764 ("arm64: Expose Arm v8.4 features")
 Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
+Cc: Suzuki Poulose <suzuki.poulose@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/kernel/ptrace.c | 12 ++++++++----
- 1 file changed, 8 insertions(+), 4 deletions(-)
+ arch/arm64/kernel/signal32.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-index 5c338ce5a7fa..fff665988e21 100644
---- a/arch/arm64/kernel/ptrace.c
-+++ b/arch/arm64/kernel/ptrace.c
-@@ -1659,15 +1659,19 @@ asmlinkage void syscall_trace_exit(struct pt_regs *regs)
- }
+diff --git a/arch/arm64/kernel/signal32.c b/arch/arm64/kernel/signal32.c
+index 77b91f478995..12aec0a66376 100644
+--- a/arch/arm64/kernel/signal32.c
++++ b/arch/arm64/kernel/signal32.c
+@@ -243,6 +243,7 @@ static int compat_restore_sigframe(struct pt_regs *regs,
+ 	int err;
+ 	sigset_t set;
+ 	struct compat_aux_sigframe __user *aux;
++	unsigned long psr;
  
- /*
-- * Bits which are always architecturally RES0 per ARM DDI 0487A.h
-+ * SPSR_ELx bits which are always architecturally RES0 per ARM DDI 0487C.a 
-+ * We also take into account DIT (bit 24), which is not yet documented, and
-+ * treat PAN and UAO as RES0 bits, as they are meaningless at EL0, and may be
-+ * allocated an EL0 meaning in future.
-  * Userspace cannot use these until they have an architectural meaning.
-+ * Note that this follows the SPSR_ELx format, not the AArch32 PSR format.
-  * We also reserve IL for the kernel; SS is handled dynamically.
-  */
- #define SPSR_EL1_AARCH64_RES0_BITS \
--	(GENMASK_ULL(63,32) | GENMASK_ULL(27, 22) | GENMASK_ULL(20, 10) | \
--	 GENMASK_ULL(5, 5))
-+	(GENMASK_ULL(63,32) | GENMASK_ULL(27, 25) | GENMASK_ULL(23, 22) | \
-+	 GENMASK_ULL(20, 10) | GENMASK_ULL(5, 5))
- #define SPSR_EL1_AARCH32_RES0_BITS \
--	(GENMASK_ULL(63,32) | GENMASK_ULL(24, 22) | GENMASK_ULL(20,20))
-+	(GENMASK_ULL(63,32) | GENMASK_ULL(23, 22) | GENMASK_ULL(20,20))
+ 	err = get_sigset_t(&set, &sf->uc.uc_sigmask);
+ 	if (err == 0) {
+@@ -266,7 +267,9 @@ static int compat_restore_sigframe(struct pt_regs *regs,
+ 	__get_user_error(regs->compat_sp, &sf->uc.uc_mcontext.arm_sp, err);
+ 	__get_user_error(regs->compat_lr, &sf->uc.uc_mcontext.arm_lr, err);
+ 	__get_user_error(regs->pc, &sf->uc.uc_mcontext.arm_pc, err);
+-	__get_user_error(regs->pstate, &sf->uc.uc_mcontext.arm_cpsr, err);
++	__get_user_error(psr, &sf->uc.uc_mcontext.arm_cpsr, err);
++
++	regs->pstate = compat_psr_to_pstate(psr);
  
- static int valid_compat_regs(struct user_pt_regs *regs)
+ 	/*
+ 	 * Avoid compat_sys_sigreturn() restarting.
+@@ -414,6 +417,7 @@ static int compat_setup_sigframe(struct compat_sigframe __user *sf,
+ 				 struct pt_regs *regs, sigset_t *set)
  {
+ 	struct compat_aux_sigframe __user *aux;
++	unsigned long psr = pstate_to_compat_psr(regs->pstate);
+ 	int err = 0;
+ 
+ 	__put_user_error(regs->regs[0], &sf->uc.uc_mcontext.arm_r0, err);
+@@ -432,7 +436,7 @@ static int compat_setup_sigframe(struct compat_sigframe __user *sf,
+ 	__put_user_error(regs->compat_sp, &sf->uc.uc_mcontext.arm_sp, err);
+ 	__put_user_error(regs->compat_lr, &sf->uc.uc_mcontext.arm_lr, err);
+ 	__put_user_error(regs->pc, &sf->uc.uc_mcontext.arm_pc, err);
+-	__put_user_error(regs->pstate, &sf->uc.uc_mcontext.arm_cpsr, err);
++	__put_user_error(psr, &sf->uc.uc_mcontext.arm_cpsr, err);
+ 
+ 	__put_user_error((compat_ulong_t)0, &sf->uc.uc_mcontext.trap_no, err);
+ 	/* set the compat FSR WnR */
 -- 
 2.11.0
