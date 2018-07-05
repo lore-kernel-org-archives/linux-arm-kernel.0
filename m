@@ -1,33 +1,118 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Thu,  5 Jul 2018 14:40:05 +0200
-Subject: [PATCH v4 08/14] arm64: marvell: enable SEI driver
+Date: Thu,  5 Jul 2018 14:40:02 +0200
+Subject: [PATCH v4 05/14] irqchip/irq-mvebu-icu: disociate ICU and NSR
 In-Reply-To: <20180705124011.7661-1-miquel.raynal@bootlin.com>
 References: <20180705124011.7661-1-miquel.raynal@bootlin.com>
-Message-ID: <20180705124011.7661-9-miquel.raynal@bootlin.com>
+Message-ID: <20180705124011.7661-6-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the newly introduced Marvell SEI driver for the 64-bit Marvell
-EBU platforms.
+NSR (non-secure interrupts) are handled in the ICU driver like if there
+was only this type of interrupt in the ICU. Change this behavior to
+prepare the introduction of SEI (System Error Interrupts) support by
+moving the NSR code in a separate function. This is done under the form
+of a 'probe' function to ease future migration to NSR/SEI being platform
+devices part of the ICU. The 'icu' structure is passed as driver data
+and not as a parameter for the same reason.
 
-Suggested-by: Haim Boot <hayim@marvell.com>
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
-Reviewed-by: Gregory CLEMENT <gregory.clement@bootlin.com>
+Reviewed-by: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
 ---
- arch/arm64/Kconfig.platforms | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/irqchip/irq-mvebu-icu.c | 57 +++++++++++++++++++++++------------------
+ 1 file changed, 32 insertions(+), 25 deletions(-)
 
-diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-index d5aeac351fc3..67086a8a8307 100644
---- a/arch/arm64/Kconfig.platforms
-+++ b/arch/arm64/Kconfig.platforms
-@@ -121,6 +121,7 @@ config ARCH_MVEBU
- 	select MVEBU_ICU
- 	select MVEBU_ODMI
- 	select MVEBU_PIC
-+	select MVEBU_SEI
- 	select OF_GPIO
- 	select PINCTRL
- 	select PINCTRL_ARMADA_37XX
+diff --git a/drivers/irqchip/irq-mvebu-icu.c b/drivers/irqchip/irq-mvebu-icu.c
+index 0f2655d7f19e..d09f220a2701 100644
+--- a/drivers/irqchip/irq-mvebu-icu.c
++++ b/drivers/irqchip/irq-mvebu-icu.c
+@@ -39,7 +39,6 @@
+ struct mvebu_icu {
+ 	struct irq_chip irq_chip;
+ 	void __iomem *base;
+-	struct irq_domain *domain;
+ 	struct device *dev;
+ 	atomic_t initialized;
+ };
+@@ -204,11 +203,39 @@ static const struct irq_domain_ops mvebu_icu_domain_ops = {
+ 	.free      = mvebu_icu_irq_domain_free,
+ };
+ 
++static int mvebu_icu_subset_probe(struct platform_device *pdev)
++{
++	struct device_node *msi_parent_dn;
++	struct device *dev = &pdev->dev;
++	struct irq_domain *irq_domain;
++	struct mvebu_icu *icu;
++
++	icu = dev_get_drvdata(dev);
++
++	dev->msi_domain = of_msi_get_domain(dev, dev->of_node,
++					    DOMAIN_BUS_PLATFORM_MSI);
++	if (!dev->msi_domain)
++		return -EPROBE_DEFER;
++
++	msi_parent_dn = irq_domain_get_of_node(dev->msi_domain);
++	if (!msi_parent_dn)
++		return -ENODEV;
++
++	irq_domain = platform_msi_create_device_tree_domain(dev, ICU_MAX_IRQS,
++							    mvebu_icu_write_msg,
++							    &mvebu_icu_domain_ops,
++							    icu);
++	if (!irq_domain) {
++		dev_err(dev, "Failed to create ICU MSI domain\n");
++		return -ENOMEM;
++	}
++
++	return 0;
++}
++
+ static int mvebu_icu_probe(struct platform_device *pdev)
+ {
+ 	struct mvebu_icu *icu;
+-	struct device_node *node = pdev->dev.of_node;
+-	struct device_node *gicp_dn;
+ 	struct resource *res;
+ 	int i;
+ 
+@@ -240,19 +267,6 @@ static int mvebu_icu_probe(struct platform_device *pdev)
+ 	icu->irq_chip.irq_set_affinity = irq_chip_set_affinity_parent;
+ #endif
+ 
+-	/*
+-	 * We're probed after MSI domains have been resolved, so force
+-	 * resolution here.
+-	 */
+-	pdev->dev.msi_domain = of_msi_get_domain(&pdev->dev, node,
+-						 DOMAIN_BUS_PLATFORM_MSI);
+-	if (!pdev->dev.msi_domain)
+-		return -EPROBE_DEFER;
+-
+-	gicp_dn = irq_domain_get_of_node(pdev->dev.msi_domain);
+-	if (!gicp_dn)
+-		return -ENODEV;
+-
+ 	/*
+ 	 * Clean all ICU interrupts with type SPI_NSR, required to
+ 	 * avoid unpredictable SPI assignments done by firmware.
+@@ -267,16 +281,9 @@ static int mvebu_icu_probe(struct platform_device *pdev)
+ 			writel_relaxed(0x0, icu->base + ICU_INT_CFG(i));
+ 	}
+ 
+-	icu->domain =
+-		platform_msi_create_device_domain(&pdev->dev, ICU_MAX_IRQS,
+-						  mvebu_icu_write_msg,
+-						  &mvebu_icu_domain_ops, icu);
+-	if (!icu->domain) {
+-		dev_err(&pdev->dev, "Failed to create ICU domain\n");
+-		return -ENOMEM;
+-	}
++	platform_set_drvdata(pdev, icu);
+ 
+-	return 0;
++	return mvebu_icu_subset_probe(pdev);
+ }
+ 
+ static const struct of_device_id mvebu_icu_of_match[] = {
 -- 
 2.14.1
