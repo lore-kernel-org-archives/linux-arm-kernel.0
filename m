@@ -1,28 +1,69 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 5 Jul 2018 15:00:06 -0700
-Subject: [GIT PULL] omap fixes for v4.18-rc cycle
-In-Reply-To: <pull-1530780550-652944@atomide.com>
-References: <pull-1530780550-652944@atomide.com>
-Message-ID: <CAOesGMgk2n8kH+x7dFY_Z3d7tazMskKxALZbFF=BDK1FbOMVWQ@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 6 Jul 2018 00:01:55 +0200
+Subject: [PATCH 3/3] ARM: dts: Add devicetree for Storlink/Storm SL93512R
+In-Reply-To: <20180704205627.GF23469@lunn.ch>
+References: <20180704191759.12577-1-linus.walleij@linaro.org>
+ <20180704191759.12577-3-linus.walleij@linaro.org>
+ <20180704205627.GF23469@lunn.ch>
+Message-ID: <CACRpkdbgoVjCaTE3xg1Q_-UKG3cdVdDdNFW4j1UOA9bX0o-wpQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 5, 2018 at 1:50 AM, Tony Lindgren <tony@atomide.com> wrote:
-> From: "Tony Lindgren" <tony@atomide.com>
->
-> The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
->
->   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
->
-> are available in the Git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.18/fixes-signed
->
-> for you to fetch changes up to 0144eb204cdcdf09a76794b4a294291388e739bc:
->
->   ARM: dts: omap3: Fix am3517 mdio and emac clock references (2018-07-03 00:39:09 -0700)
-
-Merged, thanks!
+On Wed, Jul 4, 2018 at 10:56 PM Andrew Lunn <andrew@lunn.ch> wrote:
+> On Wed, Jul 04, 2018 at 09:17:59PM +0200, Linus Walleij wrote:
 
 
--Olof
+> > +                             vsc: port at 6 {
+> > +                                     reg = <6>;
+> > +                                     label = "cpu";
+> > +                                     ethernet = <&gmac1>;
+> > +                                     phy-mode = "rgmii";
+> > +                                     fixed-link {
+> > +                                             speed = <1000>;
+> > +                                             full-duplex;
+> > +                                             pause;
+> > +                                     };
+
+So this DSA side is fine like so.
+(...)
+
+> > +             ethernet at 60000000 {
+> > +                     status = "okay";
+> > +
+> > +                     ethernet-port at 0 {
+> > +                             phy-mode = "rgmii";
+> > +                             phy-handle = <&phy0>;
+> > +                     };
+> > +                     ethernet-port at 1 {
+> > +                             phy-mode = "rgmii";
+> > +                             phy-handle = <&vsc>;
+>
+> This looks odd. The switch port is not a PHY. Normally you use a
+> fixed-phy.
+
+I tried some stuff but can't figure this out any other way that also
+works :(
+
+I guess you mean a fixed-link as the kernel has no references
+to fixed-phy.
+
+This works:
+
+            ethernet-port at 1 {
+                phy-mode = "rgmii";
+                phy-handle = <&vsc>;
+                fixed-link {
+                    speed = <1000>;
+                    full-duplex;
+                    pause;
+                };
+            };
+
+Is it better? It is still using phy-handle... I couldn't find a way to live
+without that. But maybe this was all you expected? phy-mode
+and phy-handle still OK despite being named phy-something?
+
+Or do you have some example of how it should look?
+
+Yours,
+Linus Walleij
