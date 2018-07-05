@@ -1,69 +1,62 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 6 Jul 2018 00:01:55 +0200
-Subject: [PATCH 3/3] ARM: dts: Add devicetree for Storlink/Storm SL93512R
-In-Reply-To: <20180704205627.GF23469@lunn.ch>
-References: <20180704191759.12577-1-linus.walleij@linaro.org>
- <20180704191759.12577-3-linus.walleij@linaro.org>
- <20180704205627.GF23469@lunn.ch>
-Message-ID: <CACRpkdbgoVjCaTE3xg1Q_-UKG3cdVdDdNFW4j1UOA9bX0o-wpQ@mail.gmail.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Thu,  5 Jul 2018 16:13:40 -0600
+Subject: [PATCH v2 0/7] perf: Add ioctl for PMU driver configuration
+Message-ID: <1530828827-11604-1-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 4, 2018 at 10:56 PM Andrew Lunn <andrew@lunn.ch> wrote:
-> On Wed, Jul 04, 2018 at 09:17:59PM +0200, Linus Walleij wrote:
+This set adds the capability to communiate event specific configuration
+to the PMU kernel driver using an ioctl().  The functionatlity is made
+generic enough for anyone to use but is targeted at the identification
+of CoreSight sinks when operating in CPU-wide trace scenarios.
 
+Other than the changes highlighted below I have moved things around,
+deciding to start with the kernel portion rather than user space -
+hopefully this will be easier to review.
 
-> > +                             vsc: port at 6 {
-> > +                                     reg = <6>;
-> > +                                     label = "cpu";
-> > +                                     ethernet = <&gmac1>;
-> > +                                     phy-mode = "rgmii";
-> > +                                     fixed-link {
-> > +                                             speed = <1000>;
-> > +                                             full-duplex;
-> > +                                             pause;
-> > +                                     };
+Applies cleanly on v4.18-rc3.
 
-So this DSA side is fine like so.
-(...)
+Thanks,
+Mathieu
 
-> > +             ethernet at 60000000 {
-> > +                     status = "okay";
-> > +
-> > +                     ethernet-port at 0 {
-> > +                             phy-mode = "rgmii";
-> > +                             phy-handle = <&phy0>;
-> > +                     };
-> > +                     ethernet-port at 1 {
-> > +                             phy-mode = "rgmii";
-> > +                             phy-handle = <&vsc>;
->
-> This looks odd. The switch port is not a PHY. Normally you use a
-> fixed-phy.
+---
+Changes for V2:
+. Fixed s390 problem reported by buildbot.
+. Removed uneeded check in perf_event_process_drv_config() (Jiri)
+. Reordered data copy in perf_event_set_drv_config() (Jiri)
+. Went from 2 to 1 step driver configuration process (Alex)
+. Moved structure name "perf_drv_config" to "pmu_drv_config".
 
-I tried some stuff but can't figure this out any other way that also
-works :(
+V1: https://lkml.org/lkml/2018/7/2/1008
 
-I guess you mean a fixed-link as the kernel has no references
-to fixed-phy.
+Mathieu Poirier (7):
+  perf: Introduce ioctl to communicate driver configuration to kernel
+  perf/core: Use ioctl to communicate driver configuration to kernel
+  perf/aux: Make perf_event accessible to setup_aux()
+  coresight: Use PMU driver configuration for sink selection
+  perf tools: Use ioctl to communicate driver configuration to kernel
+  perf tools: Make perf_evsel accessible to PMU driver configuration
+    code
+  perf tools: Use ioctl function to send sink configuration to kernel
 
-This works:
+ arch/s390/kernel/perf_cpum_sf.c                  |   6 +-
+ arch/x86/events/intel/bts.c                      |   4 +-
+ arch/x86/events/intel/pt.c                       |   5 +-
+ drivers/hwtracing/coresight/coresight-etm-perf.c | 136 ++++++++++++++++++++---
+ drivers/hwtracing/coresight/coresight-etm-perf.h |   4 +
+ drivers/perf/arm_spe_pmu.c                       |   6 +-
+ include/linux/perf_event.h                       |  47 +++++++-
+ include/uapi/linux/perf_event.h                  |   1 +
+ kernel/events/core.c                             |  77 +++++++++++++
+ kernel/events/ring_buffer.c                      |   2 +-
+ tools/include/uapi/linux/perf_event.h            |   1 +
+ tools/perf/arch/arm/util/cs-etm.c                |  60 +++-------
+ tools/perf/arch/arm/util/cs-etm.h                |   3 +-
+ tools/perf/util/drv_configs.c                    |  30 ++---
+ tools/perf/util/evsel.c                          |   7 ++
+ tools/perf/util/evsel.h                          |   1 +
+ tools/perf/util/pmu.h                            |   3 +-
+ 17 files changed, 300 insertions(+), 93 deletions(-)
 
-            ethernet-port at 1 {
-                phy-mode = "rgmii";
-                phy-handle = <&vsc>;
-                fixed-link {
-                    speed = <1000>;
-                    full-duplex;
-                    pause;
-                };
-            };
-
-Is it better? It is still using phy-handle... I couldn't find a way to live
-without that. But maybe this was all you expected? phy-mode
-and phy-handle still OK despite being named phy-something?
-
-Or do you have some example of how it should look?
-
-Yours,
-Linus Walleij
+-- 
+2.7.4
