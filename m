@@ -1,26 +1,31 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 4 Jul 2018 22:03:09 -0300
-Subject: [PATCH 3/3] ARM: dts: imx31: add LogicPD MX31Lite board
- description
-In-Reply-To: <20180703192934.6080-4-vz@mleia.com>
+Date: Wed, 4 Jul 2018 22:05:45 -0300
+Subject: [PATCH 0/3] ARM: dts: imx31: add device tree description of basic
+ controllers
+In-Reply-To: <20180703192934.6080-1-vz@mleia.com>
 References: <20180703192934.6080-1-vz@mleia.com>
- <20180703192934.6080-4-vz@mleia.com>
-Message-ID: <CAOMZO5CFDUJPoTLppwD6+E5x8gficanore-T-6bGpSEdCwNW0g@mail.gmail.com>
+Message-ID: <CAOMZO5AWr=o1xgD5m7Q6SwrXgf__aVtXTk2GHFV_CryfV4tGiQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 3, 2018 at 4:29 PM, Vladimir Zapolskiy <vz@mleia.com> wrote:
-> The added DTS contains a combined description of LogicPD MX31 Lite
-> SoM devices, peripherals are routed to ports on a baseboard:
-> * PATA controller,
-> * SD/MMC controller,
-> * 2 GPIO LEDs,
-> * UART controllers,
-> * Freescale MC13783 MFD connected over SPI,
-> * SMSC LAN9117,
-> * ST Micro NAND SLC, 64 MiB,
-> * Intel NOR flash, 16 MiB.
->
-> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+Hi Vladimir,
 
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+On Tue, Jul 3, 2018 at 4:29 PM, Vladimir Zapolskiy <vz@mleia.com> wrote:
+> The changeset combines a number of essential updates to support device tree
+> on Freescale i.MX31 powered boards:
+> * removal of bogus RNGA registration for i.MX31 (device tree only),
+> * the core controllers on the i.MX31 SoC are now properly described,
+> * for reference and testing I add basic support of LogicPD MX31Lite board.
+>
+> There are some missing compatibles in the change 2/3, however at the moment
+> I assume that either adding the values can be omitted or deferred, here is
+> the exact list:
+> * "fsl,imx31-pata"
+> * "fsl,imx31-rtc"
+> * "fsl,imx31-nand"
+> * "fsl,imx31-weim"
+>
+> To test the changes I used a LogicPD reference board, however note that
+> still I have to add a workaround to the old known issue within imx-wdt
+
+Hopefully you and Uwe can reach an agreement on the imx31 watchdog fix :-)
