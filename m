@@ -1,25 +1,31 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Thu, 05 Jul 2018 21:32:31 +0200
-Subject: [PATCH 8/8] mtd: rawnand: plat_nand: Kill pdata->ctrl.{hwcontrol,
- read_byte}()
-In-Reply-To: <20180705102733.29673-9-boris.brezillon@bootlin.com> (Boris
- Brezillon's message of "Thu, 5 Jul 2018 12:27:33 +0200")
-References: <20180705102733.29673-1-boris.brezillon@bootlin.com>
- <20180705102733.29673-9-boris.brezillon@bootlin.com>
-Message-ID: <878t6ph41c.fsf@belgarion.home>
+From: hch@lst.de (Christoph Hellwig)
+Date: Thu, 5 Jul 2018 21:37:38 +0200
+Subject: [RFC PATCH 1/2] dma-mapping: Clean up dma_set_*mask() hooks
+In-Reply-To: <55ac9550c311f056dcfeed9b2c8265375f17b155.1530726467.git.robin.murphy@arm.com>
+References: <55ac9550c311f056dcfeed9b2c8265375f17b155.1530726467.git.robin.murphy@arm.com>
+Message-ID: <20180705193738.GB28905@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Boris Brezillon <boris.brezillon@bootlin.com> writes:
+On Wed, Jul 04, 2018 at 06:50:11PM +0100, Robin Murphy wrote:
+> Arch-specific implementions for dma_set_{coherent_,}mask() currently
+> rely on an inconsistent mix of arch-defined Kconfig symbols and macro
+> overrides. Now that we have a nice centralised home for DMA API gubbins,
+> let's consolidate these loose ends under consistent config options.
+> 
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> ---
+> 
+> Here's hoping the buildbot comes by to point out what I've inevitably
+> missed, although I did check a cursory cross-compile of ppc64_defconfig
+> to iron out the obvious howlers.
 
-> None of the board files are overloading those hooks, so let's drop them
-> from struct platform_nand_ctrl.
->
-> Signed-off-by: Boris Brezillon <boris.brezillon@bootlin.com>
-For mach-pxa :
-Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
+The patch looks sensible to me, although I was hoping to get rid of these
+hooks in this or the next merge window as they are a horrible bad idea.
 
-Cheers.
+> The motivation here is that I'm looking at adding set_mask overrides
+> for arm64, and having discovered a bit of a mess it seemed prudent to
+> clean up before ingraining it any more.
 
---
-Robert
+What are you trying to do?  I really don't want to see more users of
+the hooks as they are are a horribly bad idea.
