@@ -1,138 +1,142 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Thu, 5 Jul 2018 18:43:14 +0900
-Subject: [PATCH v2 3/4] efi/arm: map UEFI memory map earlier on boot
-In-Reply-To: <CAKv+Gu9_rYYyQ+t89otz46DR0D4GDj-cCjhx9q=p+D8LWFRkgQ@mail.gmail.com>
-References: <20180619064424.6642-1-takahiro.akashi@linaro.org>
- <20180619064424.6642-4-takahiro.akashi@linaro.org>
- <20180704170655.GD8370@arm.com>
- <CAKv+Gu9_rYYyQ+t89otz46DR0D4GDj-cCjhx9q=p+D8LWFRkgQ@mail.gmail.com>
-Message-ID: <20180705094313.GL28220@linaro.org>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Thu, 05 Jul 2018 11:50:33 +0200
+Subject: [PATCH v5 00/20] APEI in_nmi() rework and arm64 SDEI wire-up
+In-Reply-To: <20180626170116.25825-1-james.morse@arm.com>
+References: <20180626170116.25825-1-james.morse@arm.com>
+Message-ID: <4409985.sv3PbRGN0l@aspire.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 04, 2018 at 08:49:32PM +0200, Ard Biesheuvel wrote:
-> On 4 July 2018 at 19:06, Will Deacon <will.deacon@arm.com> wrote:
-> > Hi all,
-> >
-> > [Ard -- please can you look at the EFI parts of this patch]
-> >
-> > On Tue, Jun 19, 2018 at 03:44:23PM +0900, AKASHI Takahiro wrote:
-> >> Since arm_enter_runtime_services() was modified to always create a virtual
-> >> mapping of UEFI memory map in the previous patch, it is now renamed to
-> >> efi_enter_virtual_mode() and called earlier before acpi_load_tables()
-> >> in acpi_early_init().
-> >>
-> >> This will allow us to use UEFI memory map in acpi_os_ioremap() to create
-> >> mappings of ACPI tables using memory attributes described in UEFI memory
-> >> map.
-> >>
-> >> See a relevant commit:
-> >>     arm64: acpi: fix alignment fault in accessing ACPI tables
-> >>
-> >> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> >> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> >> Cc: Andrew Morton <akpm@linux-foundation.org>
-> >> ---
-> >>  drivers/firmware/efi/arm-runtime.c | 15 ++++++---------
-> >>  init/main.c                        |  3 +++
-> >>  2 files changed, 9 insertions(+), 9 deletions(-)
-> >>
-> >> diff --git a/drivers/firmware/efi/arm-runtime.c b/drivers/firmware/efi/arm-runtime.c
-> >> index 30ac5c82051e..566ef0a9edb5 100644
-> >> --- a/drivers/firmware/efi/arm-runtime.c
-> >> +++ b/drivers/firmware/efi/arm-runtime.c
-> >> @@ -106,46 +106,43 @@ static bool __init efi_virtmap_init(void)
-> >>   * non-early mapping of the UEFI system table and virtual mappings for all
-> >>   * EFI_MEMORY_RUNTIME regions.
-> >>   */
-> >> -static int __init arm_enable_runtime_services(void)
-> >> +void __init efi_enter_virtual_mode(void)
-> >>  {
-> >>       u64 mapsize;
-> >>
-> >>       if (!efi_enabled(EFI_BOOT)) {
-> >>               pr_info("EFI services will not be available.\n");
-> >> -             return 0;
-> >> +             return;
-> >>       }
-> >>
-> >>       mapsize = efi.memmap.desc_size * efi.memmap.nr_map;
-> >>
-> >>       if (efi_memmap_init_late(efi.memmap.phys_map, mapsize)) {
-> >>               pr_err("Failed to remap EFI memory map\n");
-> >> -             return 0;
-> >> +             return;
-> >>       }
-> >>
-> >>       if (efi_runtime_disabled()) {
-> >>               pr_info("EFI runtime services will be disabled.\n");
-> >> -             return 0;
-> >> +             return;
-> >>       }
-> >>
-> >>       if (efi_enabled(EFI_RUNTIME_SERVICES)) {
-> >>               pr_info("EFI runtime services access via paravirt.\n");
-> >> -             return 0;
-> >> +             return;
-> >>       }
-> >>
-> >>       pr_info("Remapping and enabling EFI services.\n");
-> >>
-> >>       if (!efi_virtmap_init()) {
-> >>               pr_err("UEFI virtual mapping missing or invalid -- runtime services will not be available\n");
-> >> -             return -ENOMEM;
-> >> +             return;
-> >>       }
-> >>
-> >>       /* Set up runtime services function pointers */
-> >>       efi_native_runtime_setup();
-> >>       set_bit(EFI_RUNTIME_SERVICES, &efi.flags);
-> >> -
-> >> -     return 0;
-> >>  }
-> >> -early_initcall(arm_enable_runtime_services);
-> >>
-> >>  void efi_virtmap_load(void)
-> >>  {
-> >> diff --git a/init/main.c b/init/main.c
-> >> index 3b4ada11ed52..532fc0d02353 100644
-> >> --- a/init/main.c
-> >> +++ b/init/main.c
-> >> @@ -694,6 +694,9 @@ asmlinkage __visible void __init start_kernel(void)
-> >>       debug_objects_mem_init();
-> >>       setup_per_cpu_pageset();
-> >>       numa_policy_init();
-> >> +     if (IS_ENABLED(CONFIG_EFI) &&
-> >> +         (IS_ENABLED(CONFIG_ARM64) || IS_ENABLED(CONFIG_ARM)))
-> >> +             efi_enter_virtual_mode();
-> >
-> > Hmm, this is ugly as hell. Is there nothing else we can piggy-back off?
-> > It's also fairly jarring that, on x86, efi_enter_virtual_mode() is called
-> > a few lines later, *after* acpi_early_init() has been called.
-> >
+On Tuesday, June 26, 2018 7:00:56 PM CEST James Morse wrote:
+> The aim of this series is to wire arm64's SDEI into APEI.
 > 
-> Currently, there is a gap where we have already torn down the early
-> mapping and haven't created the definitive mapping of the UEFI memory
-> map. There are other reasons why this is an issue, and I recently
-> proposed [0] myself to address one of them (and I didn't remember this
-> particular series, or the fact that I actually suggested this approach
-> IIRC)
+> On arm64 we have three APEI notifications that are NMI-like, and
+> in the unlikely event that all three are supported by a platform,
+> they can interrupt each other.
+> The GHES driver shouldn't have to deal with this, so this series aims
+> to make it re-entrant.
 > 
-> Akashi-san, could you please confirm whether the patch below would be
-> sufficient for you? Apologies for going back and forth on this, but I
-> agree with Will that we should try to avoid warts like the one above
-> in generic code.
+> To do that, we refactor the estatus queue to allow multiple notifications
+> to use it, then convert NOTIFY_SEA to always be described as NMI-like,
+> and to use the estatus queue.
 > 
-> [0] https://marc.info/?l=linux-efi&m=152930773507524&w=2
+> From here we push the locking and fixmap choices out to the notification
+> functions, and remove the use of per-ghes estatus and flags. This removes
+> the in_nmi() 'timebomb' in ghes_copy_tofrom_phys().
+> 
+> Things get sticky when an NMI notification needs to know how big the
+> CPER records might be, before reading it. This series splits
+> ghes_estatus_read() to let us peek at the buffer. A side effect of this
+> is the 20byte header will get read twice. (how does it work today? it
+> reads the records into a per-ghes worst-case sized buffer, allocates
+> the correct size and copies the records. in_nmi() use of this per-ghes
+> buffer needs eliminating).
+> 
+> One alternative was to trust firmware's 'max raw data length' and use
+> that to allocate 'enough' memory. We don't use this value today, so its
+> probably wrong on some sytem somewhere.
+> 
+> Since v4 patches 5,8-15 are new, otherwise changes are noted in the patch.
+> 
+> 
+> The earlier boiler-plate:
+> 
+> What's SDEI? Its ARM's "Software Delegated Exception Interface" [0]. It's
+> used by firmware to tell the OS about firmware-first RAS events.
+> 
+> These Software exceptions can interrupt anything, so I describe them as
+> NMI-like. They aren't the only NMI-like way to notify the OS about
+> firmware-first RAS events, the ACPI spec also defines 'NOTFIY_SEA' and
+> 'NOTIFY_SEI'.
+> 
+> (Acronyms: SEA, Synchronous External Abort. The CPU requested some memory,
+> but the owner of that memory said no. These are always synchronous with the
+> instruction that caused them. SEI, System-Error Interrupt, commonly called
+> SError. This is an asynchronous external abort, the memory-owner didn't say no
+> at the right point. Collectively these things are called external-aborts
+> How is firmware involved? It traps these and re-injects them into the kernel
+> once its written the CPER records).
+> 
+> APEI's GHES code only expects one source of NMI. If a platform implements
+> more than one of these mechanisms, APEI needs to handle the interaction.
+> 'SEA' and 'SEI' can interact as 'SEI' is asynchronous. SDEI can interact
+> with itself: its exceptions can be 'normal' or 'critical', and firmware
+> could use both types for RAS. (errors using normal, 'panic-now' using
+> critical).
+> 
+> 
+> ghes.c became clearer to me when I worked out that it has three sets of
+> functions with 'estatus' in the name. One is a pool of memory that can be
+> allocated-from atomically. This is grown/shrunk when new NMI users are
+> allocated.
+> The second is the estatus-cache, which holds recent notifications so it
+> can suppress notifications we've already handled.
+> The last it the estatus-queue, which holds data from NMI-like notifications
+> (in pool memory) to be processed from irq_work.
+> 
+> 
+> Testing?
+> Tested with the SDEI FVP based software model and a mocked up NOTFIY_SEA using
+> KVM. I've added a case where 'corrected errors' are discovered at probe time
+> to exercise ghes_probe() during boot. I've only build tested this on x86.
+> 
+> This series based on v4.18-rc2 can be retrieved from:
+> git://linux-arm.org/linux-jm.git -b apei_sdei/v5
+> 
+> 
+> Thanks,
+> 
+> James
+> 
+> [0] http://infocenter.arm.com/help/topic/com.arm.doc.den0054a/ARM_DEN0054A_Software_Delegated_Exception_Interface.pdf
+> 
+> James Morse (20):
+>   ACPI / APEI: Move the estatus queue code up, and under its own ifdef
+>   ACPI / APEI: Generalise the estatus queue's add/remove and notify code
+>   ACPI / APEI: don't wait to serialise with oops messages when
+>     panic()ing
+>   ACPI / APEI: Switch NOTIFY_SEA to use the estatus queue
+>   ACPI / APEI: Make estatus queue a Kconfig symbol
+>   KVM: arm/arm64: Add kvm_ras.h to collect kvm specific RAS plumbing
+>   arm64: KVM/mm: Move SEA handling behind a single 'claim' interface
+>   ACPI / APEI: Move locking to the notification helper
+>   ACPI / APEI: Let the notification helper specify the fixmap slot
+>   ACPI / APEI: preparatory split of ghes->estatus
+>   ACPI / APEI: Remove silent flag from ghes_read_estatus()
+>   ACPI / APEI: Don't store CPER records physical address in struct ghes
+>   ACPI / APEI: Don't update struct ghes' flags in read/clear estatus
+>   ACPI / APEI: Split ghes_read_estatus() to read CPER length
+>   ACPI / APEI: Only use queued estatus entry during _in_nmi_notify_one()
+>   ACPI / APEI: Split fixmap pages for arm64 NMI-like notifications
+>   firmware: arm_sdei: Add ACPI GHES registration helper
+>   ACPI / APEI: Add support for the SDEI GHES Notification type
+>   mm/memory-failure: increase queued recovery work's priority
+>   arm64: acpi: Make apei_claim_sea() synchronise with APEI's irq work
+> 
+>  arch/arm/include/asm/kvm_ras.h       |  14 +
+>  arch/arm/include/asm/system_misc.h   |   5 -
+>  arch/arm64/include/asm/acpi.h        |   4 +
+>  arch/arm64/include/asm/daifflags.h   |   1 +
+>  arch/arm64/include/asm/fixmap.h      |   8 +-
+>  arch/arm64/include/asm/kvm_ras.h     |  25 ++
+>  arch/arm64/include/asm/system_misc.h |   2 -
+>  arch/arm64/kernel/acpi.c             |  49 ++
+>  arch/arm64/mm/fault.c                |  30 +-
+>  drivers/acpi/apei/Kconfig            |  11 +
+>  drivers/acpi/apei/ghes.c             | 649 ++++++++++++++++-----------
+>  drivers/firmware/Kconfig             |   1 +
+>  drivers/firmware/arm_sdei.c          |  66 +++
+>  include/acpi/ghes.h                  |   2 -
+>  include/linux/arm_sdei.h             |   9 +
+>  mm/memory-failure.c                  |  11 +-
+>  virt/kvm/arm/mmu.c                   |   4 +-
+>  17 files changed, 591 insertions(+), 300 deletions(-)
+>  create mode 100644 arch/arm/include/asm/kvm_ras.h
+>  create mode 100644 arch/arm64/include/asm/kvm_ras.h
 
-I think that this patch will also work.
-Please drop my patch#2 and #3 if you want to pick up my patchset, Will.
+Tony, I need your help with reviewing the APEI-related material here.
+Can you please have a look at this series and let me know if there are
+any concerns regarding it?
 
 Thanks,
--Takahiro AKASHI
-
-
-> > The rest of the series looks fine to me, but I'm not comfortable taking
-> > changes like this via the arm64 tree.
-> >
-> > Will
+Rafael
