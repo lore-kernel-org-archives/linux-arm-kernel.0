@@ -1,20 +1,38 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 5 Jul 2018 17:23:40 -0600
-Subject: [PATCH v3 3/4] dt-bindings: interrupt-controller: add binding
- for mt6765
-In-Reply-To: <1530669174-17623-4-git-send-email-mars.cheng@mediatek.com>
-References: <1530669174-17623-1-git-send-email-mars.cheng@mediatek.com>
- <1530669174-17623-4-git-send-email-mars.cheng@mediatek.com>
-Message-ID: <20180705232340.GA14969@rob-hp-laptop>
+Date: Thu, 5 Jul 2018 17:38:15 -0600
+Subject: [PATCH v3 1/2] dt-bindings: Add vendor prefix for Vamrs Ltd.
+In-Reply-To: <20180705150818.29931-2-ezequiel@collabora.com>
+References: <20180705150818.29931-1-ezequiel@collabora.com>
+ <20180705150818.29931-2-ezequiel@collabora.com>
+Message-ID: <20180705233815.GA31327@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 04, 2018 at 09:52:53AM +0800, Mars Cheng wrote:
-> Update the dt-binding documentation of sysirq for mt6765
+On Thu, Jul 05, 2018 at 12:08:17PM -0300, Ezequiel Garcia wrote:
+> Vamrs Ltd. is a hardware solutions provider based in China.
 > 
-> Signed-off-by: Mars Cheng <mars.cheng@mediatek.com>
+> Website: http://vamrs.com/
+> 
+> Signed-off-by: Ezequiel Garcia <ezequiel@collabora.com>
 > ---
->  .../interrupt-controller/mediatek,sysirq.txt       |    1 +
+>  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
 >  1 file changed, 1 insertion(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> index 7cad066191ee..5dc2c5f49e37 100644
+> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
+> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> @@ -393,6 +393,7 @@ urt	United Radiant Technology Corporation
+>  usi	Universal Scientific Industrial Co., Ltd.
+>  v3	V3 Semiconductor
+>  variscite	Variscite Ltd.
+> +vamrs	Vamrs Ltd.
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+Alphabetical order please.
+
+>  via	VIA Technologies, Inc.
+>  virtio	Virtual I/O Device Specification, developed by the OASIS consortium
+>  vivante	Vivante Corporation
+> -- 
+> 2.18.0.rc2
+> 
