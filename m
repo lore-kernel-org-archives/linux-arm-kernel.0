@@ -1,32 +1,122 @@
-From: chen.zhong@mediatek.com (Chen Zhong)
-Date: Thu, 5 Jul 2018 09:27:14 +0800
-Subject: [RESEND PATCH] dt-bindings: input: Add common keyboard document
- bindings
-In-Reply-To: <20180704152514.33h52ujqp34hpj2o@penguin>
-References: <1529648198-14231-1-git-send-email-chen.zhong@mediatek.com>
- <1529649595.14396.18.camel@mhfsdcap03>
- <20180704152514.33h52ujqp34hpj2o@penguin>
-Message-ID: <1530754034.14396.19.camel@mhfsdcap03>
+From: suzuki.katsuhiro@socionext.com (Katsuhiro Suzuki)
+Date: Thu, 5 Jul 2018 10:58:42 +0900
+Subject: [PATCH v3] media: dvb-frontends: add Socionext SC1501A ISDB-S/T
+ demodulator driver
+In-Reply-To: <20180704135657.3fd607cb@coco.lan>
+References: <20180621031748.21703-1-suzuki.katsuhiro@socionext.com>
+ <20180704135657.3fd607cb@coco.lan>
+Message-ID: <000401d41403$b33db490$19b91db0$@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2018-07-04 at 15:25 +0000, Dmitry Torokhov wrote:
-> On Fri, Jun 22, 2018 at 02:39:55PM +0800, Chen Zhong wrote:
-> > Hi Dmitry,
-> > 
-> > The other patches in the series to add mediatek pmic keys support are
-> > now available in 4.18-rc1, but this patch seems not being merged.
-> > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git
-> > ib-mfd-input-rtc-v4.18
-> > 
-> > I have resend the patch, and rebase to 4.18-rc1.
-> > Could you help to see if it is good enough to be merged into your tree?
+Hi Mauro,
+
+> -----Original Message-----
+> From: Mauro Carvalho Chehab <mchehab+samsung@kernel.org>
+> Sent: Thursday, July 5, 2018 1:58 AM
+> To: Suzuki, Katsuhiro/?? ?? <suzuki.katsuhiro@socionext.com>
+> Cc: linux-media at vger.kernel.org; Masami Hiramatsu
+<masami.hiramatsu@linaro.org>;
+> Jassi Brar <jaswinder.singh@linaro.org>; linux-arm-kernel at lists.infradead.org;
+> linux-kernel at vger.kernel.org
+> Subject: Re: [PATCH v3] media: dvb-frontends: add Socionext SC1501A ISDB-S/T
+> demodulator driver
 > 
-> I thought Rob would pick it up, but since he hasn't I'll do it.
+> Hi Katsuhiro-san,
 > 
-> Thanks.
+> Em Thu, 21 Jun 2018 12:17:48 +0900
+> Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com> escreveu:
+> 
+> > This patch adds a frontend driver for the Socionext SC1501A series
+> > and Socionext MN88443x ISDB-S/T demodulators.
+> 
+> Sorry for taking so long to review it. We're missing a sub-maintainer
+> for DVB, with would otherwise speed up reviews of DVB patches.
+
+No problem, thank you for reviewing! I appreciate it.
+
+
+> >
+> > The maximum and minimum frequency of Socionext SC1501A comes from
+> > ISDB-S and ISDB-T so frequency range is the following:
+> >   - ISDB-S (BS/CS110 IF frequency in kHz, Local freq 10.678GHz)
+> >     - Min: BS-1: 1032000 => 1032.23MHz
+> >     - Max: ND24: 2701000 => 2070.25MHz
+> >   - ISDB-T (in Hz)
+> >     - Min: ch13: 470000000 => 470.357857MHz
+> >     - Max: ch62: 770000000 => 769.927857MHz
+> 
+> There is actually an error on that part of the driver. Right now,
+> the DVB core expects Satellite frequencies (DVB-S, ISDB-S, ...)
+> in kHz. For all other delivery systems, it is in Hz.
+> 
+> It is this way due to historic reasons. While it won't be hard to
+> change the core, that would require to touch all Satellite drivers.
+> 
+> As there are very few frontend drivers that accept both Satellite
+> and Terrestrial standards, what we do, instead, is to setup
+> two frontends. See, for example, drivers/media/dvb-frontends/helene.c.
 > 
 
-That would be great helpful.
-Thank you.
+Thank you for describing it. I understand our device is rare case, and 
+the reason why Helene has Terrestrial and Satellite structures.
+
+I'm using MN884434 device that has 2 cores. I want to setup DVB adapter 
+devices (/dev/dvb/adapter0/*) for our frontend system as the following:
+
+  - adapter0: for core 0, ISDB-T, ISDB-S
+  - adapter1: for core 1, ISDB-T, ISDB-S
+
+But it seems one DVB adapter device support only ISDB-T or only ISDB-S 
+if I divide structures. So I define the adapters as the following:
+
+  - adapter0: for core 0, ISDB-T
+  - adapter1: for core 0, ISDB-S
+  - adapter2: for core 1, ISDB-T
+  - adapter3: for core 1, ISDB-S
+
+Is this correct?
+
+
+> ...
+> > +static const struct dvb_frontend_ops sc1501a_ops = {
+> > +	.delsys = { SYS_ISDBS, SYS_ISDBT },
+> > +	.info = {
+> > +		.name          = "Socionext SC1501A",
+> > +		.frequency_min = 1032000,
+> > +		.frequency_max = 770000000,
+> > +		.caps = FE_CAN_INVERSION_AUTO | FE_CAN_FEC_AUTO |
+> > +			FE_CAN_QAM_AUTO | FE_CAN_TRANSMISSION_MODE_AUTO |
+> > +			FE_CAN_GUARD_INTERVAL_AUTO | FE_CAN_HIERARCHY_AUTO,
+> > +	},
+> > +
+> > +	.sleep                   = sc1501a_sleep,
+> > +	.set_frontend            = sc1501a_set_frontend,
+> > +	.get_tune_settings       = sc1501a_get_tune_settings,
+> > +	.read_status             = sc1501a_read_status,
+> > +};
+> 
+> In other words, you'll need to declare two structs here, one for ISDB-T
+> and another one for ISDB-S.
+> 
+
+OK, I'm going to divide this structure for Terrestrial and Satellite. And
+add attach functions same as Helene driver.
+
+I'll send v4 patch.
+
+
+> Yeah, I know that this sucks. If you are in the mood of touching the
+> DVB core, I'm willing to consider a patch that would fix this, provided
+> that it won't break backward compatibility with other drivers (or would
+> convert the other satellite drivers to use the new way).
+> 
+> Thanks,
+> Mauro
+
+Hmm, I don't know the details of DVB core, I try to investigate it.
+
+
+Regards,
+--
+Katsuhiro Suzuki
