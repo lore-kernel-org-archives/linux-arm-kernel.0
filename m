@@ -1,225 +1,122 @@
-From: alex@ghiti.fr (Alexandre Ghiti)
-Date: Thu,  5 Jul 2018 11:07:13 +0000
-Subject: [PATCH v4 08/11] hugetlb: Introduce generic version of
- prepare_hugepage_range
-In-Reply-To: <20180705110716.3919-1-alex@ghiti.fr>
-References: <20180705110716.3919-1-alex@ghiti.fr>
-Message-ID: <20180705110716.3919-9-alex@ghiti.fr>
+From: frieder.schrempf@exceet.de (Frieder Schrempf)
+Date: Thu,  5 Jul 2018 13:15:02 +0200
+Subject: [PATCH v2 06/12] ARM: dts: Reflect change of FSL QSPI driver and
+ remove unused properties
+In-Reply-To: <1530789310-16254-1-git-send-email-frieder.schrempf@exceet.de>
+References: <1530789310-16254-1-git-send-email-frieder.schrempf@exceet.de>
+Message-ID: <1530789310-16254-7-git-send-email-frieder.schrempf@exceet.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arm, arm64, powerpc, sparc, x86 architectures use the same version of
-prepare_hugepage_range, so move this generic implementation into
-asm-generic/hugetlb.h.
+The FSL QSPI driver was moved to the SPI framework and it now
+acts as a SPI controller. Therefore the subnodes need to set
+spi-[rx/tx]-bus-width = <4>, so quad mode is used just as before.
 
-Signed-off-by: Alexandre Ghiti <alex@ghiti.fr>
+Also the properties 'bus-num', 'fsl,spi-num-chipselects' and
+'fsl,spi-flash-chipselects' were never read by the driver and
+can be removed.
+
+The 'reg' properties are adjusted to reflect the what bus and
+chipselect the flash is connected to, as the new driver needs
+this information.
+
+The property 'fsl,qspi-has-second-chip' is not needed anymore
+and will be removed after the old driver was disabled to avoid
+breaking ls1021a-moxa-uc-8410a.dts.
+
+Signed-off-by: Frieder Schrempf <frieder.schrempf@exceet.de>
 ---
- arch/arm/include/asm/hugetlb.h     | 11 -----------
- arch/arm64/include/asm/hugetlb.h   | 11 -----------
- arch/ia64/include/asm/hugetlb.h    |  1 +
- arch/mips/include/asm/hugetlb.h    |  1 +
- arch/parisc/include/asm/hugetlb.h  |  1 +
- arch/powerpc/include/asm/hugetlb.h | 15 ---------------
- arch/sh/include/asm/hugetlb.h      |  1 +
- arch/sparc/include/asm/hugetlb.h   | 16 ----------------
- arch/x86/include/asm/hugetlb.h     | 15 ---------------
- include/asm-generic/hugetlb.h      | 15 +++++++++++++++
- 10 files changed, 19 insertions(+), 68 deletions(-)
+ arch/arm/boot/dts/imx6sx-sdb-reva.dts       | 8 ++++++--
+ arch/arm/boot/dts/imx6sx-sdb.dts            | 8 ++++++--
+ arch/arm/boot/dts/imx6ul-14x14-evk.dtsi     | 2 ++
+ arch/arm/boot/dts/ls1021a-moxa-uc-8410a.dts | 5 ++---
+ 4 files changed, 16 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/include/asm/hugetlb.h b/arch/arm/include/asm/hugetlb.h
-index 1e718a626ef9..34fb401efe81 100644
---- a/arch/arm/include/asm/hugetlb.h
-+++ b/arch/arm/include/asm/hugetlb.h
-@@ -32,17 +32,6 @@ static inline int is_hugepage_only_range(struct mm_struct *mm,
- 	return 0;
- }
+diff --git a/arch/arm/boot/dts/imx6sx-sdb-reva.dts b/arch/arm/boot/dts/imx6sx-sdb-reva.dts
+index e3533e7..1a6f680 100644
+--- a/arch/arm/boot/dts/imx6sx-sdb-reva.dts
++++ b/arch/arm/boot/dts/imx6sx-sdb-reva.dts
+@@ -131,13 +131,17 @@
+ 		#size-cells = <1>;
+ 		compatible = "spansion,s25fl128s", "jedec,spi-nor";
+ 		spi-max-frequency = <66000000>;
++		spi-rx-bus-width = <4>;
++		spi-tx-bus-width = <4>;
+ 	};
  
--static inline int prepare_hugepage_range(struct file *file,
--					 unsigned long addr, unsigned long len)
--{
--	struct hstate *h = hstate_file(file);
--	if (len & ~huge_page_mask(h))
--		return -EINVAL;
--	if (addr & ~huge_page_mask(h))
--		return -EINVAL;
--	return 0;
--}
--
- static inline void arch_clear_hugepage_flags(struct page *page)
- {
- 	clear_bit(PG_dcache_clean, &page->flags);
-diff --git a/arch/arm64/include/asm/hugetlb.h b/arch/arm64/include/asm/hugetlb.h
-index 1fd64ebf0cd7..3e7f6e69b28d 100644
---- a/arch/arm64/include/asm/hugetlb.h
-+++ b/arch/arm64/include/asm/hugetlb.h
-@@ -31,17 +31,6 @@ static inline int is_hugepage_only_range(struct mm_struct *mm,
- 	return 0;
- }
+-	flash1: s25fl128s at 1 {
+-		reg = <1>;
++	flash1: s25fl128s at 2 {
++		reg = <2>;
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+ 		compatible = "spansion,s25fl128s", "jedec,spi-nor";
+ 		spi-max-frequency = <66000000>;
++		spi-rx-bus-width = <4>;
++		spi-tx-bus-width = <4>;
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/imx6sx-sdb.dts b/arch/arm/boot/dts/imx6sx-sdb.dts
+index 6dd9beb..9acfda8 100644
+--- a/arch/arm/boot/dts/imx6sx-sdb.dts
++++ b/arch/arm/boot/dts/imx6sx-sdb.dts
+@@ -117,15 +117,19 @@
+ 		#size-cells = <1>;
+ 		compatible = "micron,n25q256a", "jedec,spi-nor";
+ 		spi-max-frequency = <29000000>;
++		spi-rx-bus-width = <4>;
++		spi-tx-bus-width = <4>;
+ 		reg = <0>;
+ 	};
  
--static inline int prepare_hugepage_range(struct file *file,
--					 unsigned long addr, unsigned long len)
--{
--	struct hstate *h = hstate_file(file);
--	if (len & ~huge_page_mask(h))
--		return -EINVAL;
--	if (addr & ~huge_page_mask(h))
--		return -EINVAL;
--	return 0;
--}
--
- static inline void arch_clear_hugepage_flags(struct page *page)
- {
- 	clear_bit(PG_dcache_clean, &page->flags);
-diff --git a/arch/ia64/include/asm/hugetlb.h b/arch/ia64/include/asm/hugetlb.h
-index 82fe3d7a38d9..cbe296271030 100644
---- a/arch/ia64/include/asm/hugetlb.h
-+++ b/arch/ia64/include/asm/hugetlb.h
-@@ -9,6 +9,7 @@ void hugetlb_free_pgd_range(struct mmu_gather *tlb, unsigned long addr,
- 			    unsigned long end, unsigned long floor,
- 			    unsigned long ceiling);
+-	flash1: n25q256a at 1 {
++	flash1: n25q256a at 2 {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+ 		compatible = "micron,n25q256a", "jedec,spi-nor";
+ 		spi-max-frequency = <29000000>;
+-		reg = <1>;
++		spi-rx-bus-width = <4>;
++		spi-tx-bus-width = <4>;
++		reg = <2>;
+ 	};
+ };
  
-+#define __HAVE_ARCH_PREPARE_HUGEPAGE_RANGE
- int prepare_hugepage_range(struct file *file,
- 			unsigned long addr, unsigned long len);
+diff --git a/arch/arm/boot/dts/imx6ul-14x14-evk.dtsi b/arch/arm/boot/dts/imx6ul-14x14-evk.dtsi
+index 32a0723..c2c9a2a 100644
+--- a/arch/arm/boot/dts/imx6ul-14x14-evk.dtsi
++++ b/arch/arm/boot/dts/imx6ul-14x14-evk.dtsi
+@@ -176,6 +176,8 @@
+ 		#size-cells = <1>;
+ 		compatible = "micron,n25q256a";
+ 		spi-max-frequency = <29000000>;
++		spi-rx-bus-width = <4>;
++		spi-tx-bus-width = <4>;
+ 		reg = <0>;
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/ls1021a-moxa-uc-8410a.dts b/arch/arm/boot/dts/ls1021a-moxa-uc-8410a.dts
+index d01f64b..6a83f30 100644
+--- a/arch/arm/boot/dts/ls1021a-moxa-uc-8410a.dts
++++ b/arch/arm/boot/dts/ls1021a-moxa-uc-8410a.dts
+@@ -203,9 +203,6 @@
+ };
  
-diff --git a/arch/mips/include/asm/hugetlb.h b/arch/mips/include/asm/hugetlb.h
-index b3d6bb53ee6e..6ff2531cfb1d 100644
---- a/arch/mips/include/asm/hugetlb.h
-+++ b/arch/mips/include/asm/hugetlb.h
-@@ -18,6 +18,7 @@ static inline int is_hugepage_only_range(struct mm_struct *mm,
- 	return 0;
- }
+ &qspi {
+-	bus-num = <0>;
+-	fsl,spi-num-chipselects = <2>;
+-	fsl,spi-flash-chipselects = <0>;
+ 	fsl,qspi-has-second-chip;
+ 	status = "okay";
  
-+#define __HAVE_ARCH_PREPARE_HUGEPAGE_RANGE
- static inline int prepare_hugepage_range(struct file *file,
- 					 unsigned long addr,
- 					 unsigned long len)
-diff --git a/arch/parisc/include/asm/hugetlb.h b/arch/parisc/include/asm/hugetlb.h
-index 5a102d7251e4..fb7e0fd858a3 100644
---- a/arch/parisc/include/asm/hugetlb.h
-+++ b/arch/parisc/include/asm/hugetlb.h
-@@ -22,6 +22,7 @@ static inline int is_hugepage_only_range(struct mm_struct *mm,
-  * If the arch doesn't supply something else, assume that hugepage
-  * size aligned regions are ok without further preparation.
-  */
-+#define __HAVE_ARCH_PREPARE_HUGEPAGE_RANGE
- static inline int prepare_hugepage_range(struct file *file,
- 			unsigned long addr, unsigned long len)
- {
-diff --git a/arch/powerpc/include/asm/hugetlb.h b/arch/powerpc/include/asm/hugetlb.h
-index 7123599089c6..69c14ecac133 100644
---- a/arch/powerpc/include/asm/hugetlb.h
-+++ b/arch/powerpc/include/asm/hugetlb.h
-@@ -117,21 +117,6 @@ void hugetlb_free_pgd_range(struct mmu_gather *tlb, unsigned long addr,
- 			    unsigned long end, unsigned long floor,
- 			    unsigned long ceiling);
+@@ -214,6 +211,8 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+ 		spi-max-frequency = <20000000>;
++		spi-rx-bus-width = <4>;
++		spi-tx-bus-width = <4>;
+ 		reg = <0>;
  
--/*
-- * If the arch doesn't supply something else, assume that hugepage
-- * size aligned regions are ok without further preparation.
-- */
--static inline int prepare_hugepage_range(struct file *file,
--			unsigned long addr, unsigned long len)
--{
--	struct hstate *h = hstate_file(file);
--	if (len & ~huge_page_mask(h))
--		return -EINVAL;
--	if (addr & ~huge_page_mask(h))
--		return -EINVAL;
--	return 0;
--}
--
- #define __HAVE_ARCH_HUGE_PTEP_GET_AND_CLEAR
- static inline pte_t huge_ptep_get_and_clear(struct mm_struct *mm,
- 					    unsigned long addr, pte_t *ptep)
-diff --git a/arch/sh/include/asm/hugetlb.h b/arch/sh/include/asm/hugetlb.h
-index 54f65094efe6..f1bbd255ee43 100644
---- a/arch/sh/include/asm/hugetlb.h
-+++ b/arch/sh/include/asm/hugetlb.h
-@@ -15,6 +15,7 @@ static inline int is_hugepage_only_range(struct mm_struct *mm,
-  * If the arch doesn't supply something else, assume that hugepage
-  * size aligned regions are ok without further preparation.
-  */
-+#define __HAVE_ARCH_PREPARE_HUGEPAGE_RANGE
- static inline int prepare_hugepage_range(struct file *file,
- 			unsigned long addr, unsigned long len)
- {
-diff --git a/arch/sparc/include/asm/hugetlb.h b/arch/sparc/include/asm/hugetlb.h
-index f661362376e0..2101ea217f33 100644
---- a/arch/sparc/include/asm/hugetlb.h
-+++ b/arch/sparc/include/asm/hugetlb.h
-@@ -26,22 +26,6 @@ static inline int is_hugepage_only_range(struct mm_struct *mm,
- 	return 0;
- }
- 
--/*
-- * If the arch doesn't supply something else, assume that hugepage
-- * size aligned regions are ok without further preparation.
-- */
--static inline int prepare_hugepage_range(struct file *file,
--			unsigned long addr, unsigned long len)
--{
--	struct hstate *h = hstate_file(file);
--
--	if (len & ~huge_page_mask(h))
--		return -EINVAL;
--	if (addr & ~huge_page_mask(h))
--		return -EINVAL;
--	return 0;
--}
--
- #define __HAVE_ARCH_HUGE_PTEP_CLEAR_FLUSH
- static inline void huge_ptep_clear_flush(struct vm_area_struct *vma,
- 					 unsigned long addr, pte_t *ptep)
-diff --git a/arch/x86/include/asm/hugetlb.h b/arch/x86/include/asm/hugetlb.h
-index 19668672ab37..2e5117d37c7d 100644
---- a/arch/x86/include/asm/hugetlb.h
-+++ b/arch/x86/include/asm/hugetlb.h
-@@ -12,21 +12,6 @@ static inline int is_hugepage_only_range(struct mm_struct *mm,
- 	return 0;
- }
- 
--/*
-- * If the arch doesn't supply something else, assume that hugepage
-- * size aligned regions are ok without further preparation.
-- */
--static inline int prepare_hugepage_range(struct file *file,
--			unsigned long addr, unsigned long len)
--{
--	struct hstate *h = hstate_file(file);
--	if (len & ~huge_page_mask(h))
--		return -EINVAL;
--	if (addr & ~huge_page_mask(h))
--		return -EINVAL;
--	return 0;
--}
--
- static inline void huge_ptep_set_wrprotect(struct mm_struct *mm,
- 					   unsigned long addr, pte_t *ptep)
- {
-diff --git a/include/asm-generic/hugetlb.h b/include/asm-generic/hugetlb.h
-index cd9697672b79..6c0c8b0c71e0 100644
---- a/include/asm-generic/hugetlb.h
-+++ b/include/asm-generic/hugetlb.h
-@@ -87,4 +87,19 @@ static inline pte_t huge_pte_wrprotect(pte_t pte)
- }
- #endif
- 
-+#ifndef __HAVE_ARCH_PREPARE_HUGEPAGE_RANGE
-+static inline int prepare_hugepage_range(struct file *file,
-+		unsigned long addr, unsigned long len)
-+{
-+	struct hstate *h = hstate_file(file);
-+
-+	if (len & ~huge_page_mask(h))
-+		return -EINVAL;
-+	if (addr & ~huge_page_mask(h))
-+		return -EINVAL;
-+
-+	return 0;
-+}
-+#endif
-+
- #endif /* _ASM_GENERIC_HUGETLB_H */
+ 		partitions at 0 {
 -- 
-2.16.2
+2.7.4
