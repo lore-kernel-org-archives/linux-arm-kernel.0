@@ -1,46 +1,119 @@
-From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
-Date: Thu, 5 Jul 2018 16:19:09 +0200
-Subject: [PATCH 1/2] PCI: aardvark: Size bridges before resources
- allocation
-In-Reply-To: <20180705141522.GA13716@red-moon>
-References: <20180629091620.31503-1-thomas.petazzoni@bootlin.com>
- <20180629091620.31503-2-thomas.petazzoni@bootlin.com>
- <20180705141522.GA13716@red-moon>
-Message-ID: <20180705161909.2a7a6030@windsurf>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 5 Jul 2018 16:20:43 +0200
+Subject: [PATCH 06/19] mmc: mmci: add variant properties to define cpsm &
+ cmdresp bits
+In-Reply-To: <1528809280-31116-7-git-send-email-ludovic.Barre@st.com>
+References: <1528809280-31116-1-git-send-email-ludovic.Barre@st.com>
+ <1528809280-31116-7-git-send-email-ludovic.Barre@st.com>
+Message-ID: <CAPDyKFoFkfX=4znJL1z94kj9ZTojMe=t76xXUCAzYRX59=rpPQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Lorenzo,
+On 12 June 2018 at 15:14, Ludovic Barre <ludovic.Barre@st.com> wrote:
+> From: Ludovic Barre <ludovic.barre@st.com>
+>
+> This patch adds command variant properties to define
+> cpsm enable bit and responses.
+> Needed to support the STM32 variant (shift of cpsm bit,
+> specific definition of commands response).
+>
+> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+> ---
+>  drivers/mmc/host/mmci.c | 47 +++++++++++++++++++++++++++++++++++++++++++----
+>  drivers/mmc/host/mmci.h |  8 ++++++++
+>  2 files changed, 51 insertions(+), 4 deletions(-)
+>
+> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+> index 801c86b..52562fc 100644
+> --- a/drivers/mmc/host/mmci.c
+> +++ b/drivers/mmc/host/mmci.c
+> @@ -51,6 +51,10 @@ static unsigned int fmax = 515633;
+>  static struct variant_data variant_arm = {
+>         .fifosize               = 16 * 4,
+>         .fifohalfsize           = 8 * 4,
+> +       .cmdreg_cpsm_enable     = MCI_CPSM_ENABLE,
+> +       .cmdreg_lrsp_crc        = MCI_CPSM_RESPONSE | MCI_CPSM_LONGRSP,
+> +       .cmdreg_srsp_crc        = MCI_CPSM_RESPONSE,
+> +       .cmdreg_srsp            = MCI_CPSM_RESPONSE,
 
-Thanks for your feedback!
+Do these really needs to be a superset of each other?
 
-On Thu, 5 Jul 2018 15:15:22 +0100, Lorenzo Pieralisi wrote:
+Maybe it becomes easier for the STM32 variant later though...
 
-> I am queueing these two patches but this one seems a serious bug,
-> I reckon we should send it to stable kernels (and would be grateful
-> if you provide me with a Fixes tag and a kernel log to add to the
-> commit log).
+[...]
 
-It is a serious bug, but it is not a regression. I.e whatever is fixed
-by this patch never worked. So if you take a conservative view on
-pushing patches to stable and only want to fix regressions, this one
-doesn't qualify. However, if you take a more open approach and say you
-want to fix obvious bugs/issues even in older stable kernels, then
-indeed this patch qualifies.
+> @@ -603,16 +639,19 @@ mmci_start_command(struct mmci_host *host, struct mmc_command *cmd, u32 c)
 
-If you are within the kernel developers with this more open approach to
-sending patches to stable, then you can add:
+While at it, would you mind folding in a cleanup patch removing the
+"u32 c" as in-parameter? It's currently always set to "0" by the
+caller, so it's not needed.
 
-Fixes: 8c39d710363c1 ("PCI: aardvark: Add Aardvark PCI host controller driver")
-Cc: <stable@vger.kernel.org>
+>         dev_dbg(mmc_dev(host->mmc), "op %02x arg %08x flags %08x\n",
+>             cmd->opcode, cmd->arg, cmd->flags);
+>
+> -       if (readl(base + MMCICOMMAND) & MCI_CPSM_ENABLE) {
+> +       if (readl(base + MMCICOMMAND) & host->variant->cmdreg_cpsm_enable) {
+>                 writel(0, base + MMCICOMMAND);
+>                 mmci_reg_delay(host);
+>         }
+>
+> -       c |= cmd->opcode | MCI_CPSM_ENABLE;
+> +       c |= cmd->opcode | host->variant->cmdreg_cpsm_enable;
+>         if (cmd->flags & MMC_RSP_PRESENT) {
+>                 if (cmd->flags & MMC_RSP_136)
+> -                       c |= MCI_CPSM_LONGRSP;
+> -               c |= MCI_CPSM_RESPONSE;
+> +                       c |= host->variant->cmdreg_lrsp_crc;
 
-when applying the patch. Unless of course you want me to resend the
-patch series with this added. Just let met know what you prefer.
+This looks weird. Probably because of the naming of the variant data.
 
-Thanks!
+Perhaps rename to "cmdreg_lrsp", thus skipping the "_crc" suffix?
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+> +               else if (cmd->flags & MMC_RSP_CRC)
+> +                       c |= host->variant->cmdreg_srsp_crc;
+
+Why is here an else? We can have both MMC_RSP_136 and MMC_RSP_CRC bits
+set, right!?
+
+> +               else
+> +                       c |= host->variant->cmdreg_srsp;
+
+What do you think about using a switch-case, perhaps with fall-through
+- and then adding those bits that are needed for each response
+bit+variant instead? Could that make this more readable?
+
+>         }
+>         if (/*interrupt*/0)
+>                 c |= MCI_CPSM_INTERRUPT;
+> diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
+> index 7265ca6..e173305 100644
+> --- a/drivers/mmc/host/mmci.h
+> +++ b/drivers/mmc/host/mmci.h
+> @@ -239,6 +239,10 @@ struct mmci_host;
+>   * @clkreg_enable: enable value for MMCICLOCK register
+>   * @clkreg_8bit_bus_enable: enable value for 8 bit bus
+>   * @clkreg_neg_edge_enable: enable value for inverted data/cmd output
+> + * @cmdreg_cpsm_enable: enable value for CPSM
+> + * @cmdreg_lrsp_crc: enable value for long response with crc
+> + * @cmdreg_srsp_crc: enable value for short response with crc
+> + * @cmdreg_srsp: enable value for short response without crc
+>   * @datalength_bits: number of bits in the MMCIDATALENGTH register
+>   * @fifosize: number of bytes that can be written when MMCI_TXFIFOEMPTY
+>   *           is asserted (likewise for RX)
+> @@ -282,6 +286,10 @@ struct variant_data {
+>         unsigned int            clkreg_enable;
+>         unsigned int            clkreg_8bit_bus_enable;
+>         unsigned int            clkreg_neg_edge_enable;
+> +       unsigned int            cmdreg_cpsm_enable;
+> +       unsigned int            cmdreg_lrsp_crc;
+> +       unsigned int            cmdreg_srsp_crc;
+> +       unsigned int            cmdreg_srsp;
+>         unsigned int            datalength_bits;
+>         unsigned int            fifosize;
+>         unsigned int            fifohalfsize;
+> --
+> 2.7.4
+>
+
+Kind regards
+Uffe
