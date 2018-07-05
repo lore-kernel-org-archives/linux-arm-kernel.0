@@ -1,165 +1,159 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 5 Jul 2018 14:08:13 -0600
-Subject: [PATCH v22 1/4] dt-bindings: soc: Add documentation for the
- MediaTek GCE unit
-In-Reply-To: <1530661158.21991.45.camel@mhfsdcap03>
-References: <1530098172-31385-1-git-send-email-houlong.wei@mediatek.com>
- <1530098172-31385-2-git-send-email-houlong.wei@mediatek.com>
- <20180703023040.GA24508@rob-hp-laptop> <1530661158.21991.45.camel@mhfsdcap03>
-Message-ID: <CAL_JsqLZ-+-kY2QSY3cZMoR2zZuuZA8C9VUoHG=F7rpa4s5fgA@mail.gmail.com>
+From: agustinv@codeaurora.org (Agustin Vega-Frias)
+Date: Thu,  5 Jul 2018 16:23:19 -0400
+Subject: [RFC V4 2/4] arm_pmu: acpi: add support for CPU PMU variant detection
+In-Reply-To: <1530822201-5890-1-git-send-email-agustinv@codeaurora.org>
+References: <1530822201-5890-1-git-send-email-agustinv@codeaurora.org>
+Message-ID: <1530822201-5890-3-git-send-email-agustinv@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 3, 2018 at 5:39 PM houlong wei <houlong.wei@mediatek.com> wrote:
->
-> On Tue, 2018-07-03 at 10:30 +0800, Rob Herring wrote:
-> > On Wed, Jun 27, 2018 at 07:16:09PM +0800, Houlong Wei wrote:
-> > > This adds documentation for the MediaTek Global Command Engine (GCE) unit
-> > > found in MT8173 SoCs.
-> > >
-> > > Signed-off-by: Houlong Wei <houlong.wei@mediatek.com>
-> > > Signed-off-by: HS Liao <hs.liao@mediatek.com>
-> > > ---
-> > > Hi Rob,
-> > >   I don't add your ACK in this version since the dt-binding description
-> > > has been changed. Thanks.
-> > > ---
-> > >  .../devicetree/bindings/mailbox/mtk-gce.txt        |   65 ++++++++++++++++++++
-> > >  include/dt-bindings/gce/mt8173-gce.h               |   48 +++++++++++++++
-> > >  2 files changed, 113 insertions(+)
-> > >  create mode 100644 Documentation/devicetree/bindings/mailbox/mtk-gce.txt
-> > >  create mode 100644 include/dt-bindings/gce/mt8173-gce.h
-> > >
-> > > diff --git a/Documentation/devicetree/bindings/mailbox/mtk-gce.txt b/Documentation/devicetree/bindings/mailbox/mtk-gce.txt
-> > > new file mode 100644
-> > > index 0000000..26f65a4
-> > > --- /dev/null
-> > > +++ b/Documentation/devicetree/bindings/mailbox/mtk-gce.txt
-> > > @@ -0,0 +1,65 @@
-> > > +MediaTek GCE
-> > > +===============
-> > > +
-> > > +The Global Command Engine (GCE) is used to help read/write registers with
-> > > +critical time limitation, such as updating display configuration during the
-> > > +vblank. The GCE can be used to implement the Command Queue (CMDQ) driver.
-> > > +
-> > > +CMDQ driver uses mailbox framework for communication. Please refer to
-> > > +mailbox.txt for generic information about mailbox device-tree bindings.
-> > > +
-> > > +Required properties:
-> > > +- compatible: Must be "mediatek,mt8173-gce"
-> > > +- reg: Address range of the GCE unit
-> > > +- interrupts: The interrupt signal from the GCE block
-> > > +- clock: Clocks according to the common clock binding
-> > > +- clock-names: Must be "gce" to stand for GCE clock
-> > > +- thread-num: Maximum threads count of GCE.
-> >
-> > mediatek,thread-num
-> >
-> > Is this needed for anything other than error checking the thread id in
-> > the mbox cells? if that's it, then drop it.
-> >
->
-> 'thread-num' is used to configure the GCE thread number, which is the
-> channel number of gce mailbox. This property is read in
-> cmdq_probe()/mtk-cmdq-mailbox.c and a mailbox's channel array is
-> allocated according to the number.
-> Since the thread number may be different on different SoC, we wish it
-> could be configured in device tree.
+DT allows CPU PMU variant detection via the PMU device compatible
+property. ACPI does not have an equivalent mechanism so we introduce
+a probe table to allow this via a device nested inside the CPU device
+in the DSDT:
 
-You should have different compatible strings for different SoCs and
-can imply the number of threads from that.
+Device (CPU0)
+{
+    Name (_HID, "ACPI0007" /* Processor Device */)
+    ...
+    Device (PMU0)
+    {
+        Name (_HID, "QCOM8150") /* Qualcomm Falkor PMU device */
 
-Or if the number of threads doesn't vary greatly, just allocate the
-max # of channels. Or allocate the per thread data when a thread is
-actually in use.
+        /*
+         * The device might also contain _DSD properties to indicate other
+         * IMPLEMENTATION DEFINED PMU features.
+         */
+        Name (_DSD, Package ()
+        {
+            ToUUID("daffd814-6eba-4d8c-8a91-bc9bbf4aa301"),
+            Package ()
+            {
+                ...
+            }
+        })
+    }
+}
 
->
-> > > +- #mbox-cells: Should be 4.
-> > > +   <&phandle channel timeout priority atomic_exec>
-> > > +   phandle: Label name of a gce node.
-> > > +   channel: Channel of mailbox. Be equal to the thread id of GCE.
-> > > +   timeout: Maximum time of software waiting GCE processing done, in unit
-> > > +           of millisecond.
-> > > +   priority: Priority of GCE thread.
-> > > +   atomic_exec: GCE processing continuous packets of commands in atomic
-> > > +           way.
-> > > +
-> > > +Required properties for a client device:
-> > > +- mboxes: Client use mailbox to communicate with GCE, it should have this
-> > > +  property and list of phandle, mailbox specifiers.
-> > > +- gce-subsys: Specify the sub-system id which is corresponding to the register
-> > > +  address.
-> >
-> > What is this for?
->
-> You mean the new added property 'gce-subsys'?
-> It is used for GCE to distinguish the high 16-bit of a hardware register
-> address. When a client driver packets a register setting into a GCE
-> instruction, it uses a sub-system code and register offset instead of
-> the 32-bit register address.
-> Since sub-system code may be different on different SoC, we wish it
-> could be configured in device tree.
+With this in place we can declare the variant:
 
-Okay. It needs a vendor prefix and to specify the size and type of the value.
+    ACPI_DECLARE_PMU_VARIANT(qcom_falkor, "QCOM8150", falkor_pmu_init);
 
->
-> >
-> > > +
-> > > +Optional properties for a client device:
-> > > +- gce-event: Specify the event if the client has any. Because the event is
-> > > +  parsed by client, so client can replace 'gce-event' with other meaningful
-> > > +  name.
-> >
-> > If the client sets the name, then no point having here. It must be
-> > documented in the client binding. But then, what is this for in the
-> > first place?
->
-> Since display driver will use GCE firstly, so we will move the
-> description to
-> 'Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt'
-> when display driver start using the GCE driver.
-> Is that ok?
+The init function is called after the default PMU initialization and is
+passed a pointer to the arm_pmu structure and a pointer to the PMU device.
+The init function can then override arm_pmu callbacks and attributes and
+query more properties from the PMU device.
 
-Not sure. I don't understand how it is used.
+Signed-off-by: Agustin Vega-Frias <agustinv@codeaurora.org>
+---
+ drivers/perf/arm_pmu_acpi.c       | 27 +++++++++++++++++++++++++++
+ include/asm-generic/vmlinux.lds.h |  1 +
+ include/linux/acpi.h              | 11 +++++++++++
+ include/linux/perf/arm_pmu.h      |  1 +
+ 4 files changed, 40 insertions(+)
 
-> > > +
-> > > +Some vaules of properties are defined in 'dt-bindings/gce/mt8173-gce.h'. Such as
-> > > +thread number, sub-system ids, thread priority, event ids.
-> > > +
-> > > +Example:
-> > > +
-> > > +   gce: gce at 10212000 {
-> >
-> > mailbox at ...
->
-> Will do.
->
-> >
-> > > +           compatible = "mediatek,mt8173-gce";
-> > > +           reg = <0 0x10212000 0 0x1000>;
-> > > +           interrupts = <GIC_SPI 135 IRQ_TYPE_LEVEL_LOW>;
-> > > +           clocks = <&infracfg CLK_INFRA_GCE>;
-> > > +           clock-names = "gce";
-> > > +           thread-num = CMDQ_THR_MAX_COUNT;
-> > > +           #mbox-cells = <4>;
-> > > +   };
-> > > +
-> > > +Example for a client device:
-> > > +
-> > > +   mmsys: clock-controller at 14000000 {
-> > > +           compatible = "mediatek,mt8173-mmsys";
-> > > +           mboxes = <&gce 0 2000 CMDQ_THR_PRIO_LOWEST 1>,
-> > > +                    <&gce 1 2000 CMDQ_THR_PRIO_LOWEST 1>;
-> > > +           gce-subsys = <SUBSYS_1400XXXX>;
-> > > +           mutex-event-eof = <CMDQ_EVENT_MUTEX0_STREAM_EOF
-> > > +                           CMDQ_EVENT_MUTEX1_STREAM_EOF>;
-> > > +
-> > > +           ...
-> > > +   };
->
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+diff --git a/drivers/perf/arm_pmu_acpi.c b/drivers/perf/arm_pmu_acpi.c
+index 0f19751..6b0ca71 100644
+--- a/drivers/perf/arm_pmu_acpi.c
++++ b/drivers/perf/arm_pmu_acpi.c
+@@ -220,6 +220,26 @@ static int arm_pmu_acpi_cpu_starting(unsigned int cpu)
+ 	return 0;
+ }
+ 
++/*
++ * Check if the given child device of the CPU device matches a PMU variant
++ * device declared with ACPI_DECLARE_PMU_VARIANT, if so, pass the arm_pmu
++ * structure and the matching device for further initialization.
++ */
++static int arm_pmu_variant_init(struct device *dev, void *data)
++{
++	extern struct acpi_device_id ACPI_PROBE_TABLE(pmu);
++	unsigned int cpu = *((unsigned int *)data);
++	const struct acpi_device_id *id;
++
++	id = acpi_match_device(&ACPI_PROBE_TABLE(pmu), dev);
++	if (id) {
++		armpmu_acpi_init_fn fn = (armpmu_acpi_init_fn)id->driver_data;
++
++		return fn(per_cpu(probed_pmus, cpu), dev);
++	}
++	return 0;
++}
++
+ int arm_pmu_acpi_probe(armpmu_init_fn init_fn)
+ {
+ 	int pmu_idx = 0;
+@@ -240,6 +260,7 @@ int arm_pmu_acpi_probe(armpmu_init_fn init_fn)
+ 	 */
+ 	for_each_possible_cpu(cpu) {
+ 		struct arm_pmu *pmu = per_cpu(probed_pmus, cpu);
++		struct device *dev = get_cpu_device(cpu);
+ 		char *base_name;
+ 
+ 		if (!pmu || pmu->name)
+@@ -254,6 +275,10 @@ int arm_pmu_acpi_probe(armpmu_init_fn init_fn)
+ 			return ret;
+ 		}
+ 
++		ret = device_for_each_child(dev, &cpu, arm_pmu_variant_init);
++		if (ret == -ENODEV)
++			pr_warn("Failed PMU re-init, fallback to plain PMUv3");
++
+ 		base_name = pmu->name;
+ 		pmu->name = kasprintf(GFP_KERNEL, "%s_%d", base_name, pmu_idx++);
+ 		if (!pmu->name) {
+@@ -290,3 +315,5 @@ static int arm_pmu_acpi_init(void)
+ 	return ret;
+ }
+ subsys_initcall(arm_pmu_acpi_init)
++
++ACPI_DECLARE_PMU_SENTINEL();
+diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
+index 1ec0411..03d1673 100644
+--- a/include/asm-generic/vmlinux.lds.h
++++ b/include/asm-generic/vmlinux.lds.h
+@@ -609,6 +609,7 @@
+ 	IRQCHIP_OF_MATCH_TABLE()					\
+ 	ACPI_PROBE_TABLE(irqchip)					\
+ 	ACPI_PROBE_TABLE(timer)						\
++	ACPI_PROBE_TABLE(pmu)						\
+ 	EARLYCON_TABLE()
+ 
+ #define INIT_TEXT							\
+diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+index e54f409..99c6698 100644
+--- a/include/linux/acpi.h
++++ b/include/linux/acpi.h
+@@ -1158,6 +1158,17 @@ struct acpi_probe_entry {
+ 					  (&ACPI_PROBE_TABLE_END(t) -	\
+ 					   &ACPI_PROBE_TABLE(t)));	\
+ 	})
++
++#define ACPI_DECLARE_PMU_VARIANT(name, hid, init_fn)			\
++	static const struct acpi_device_id __acpi_probe_##name		\
++		__used __section(__pmu_acpi_probe_table)		\
++		= { .id = hid, .driver_data = (kernel_ulong_t)init_fn }
++
++#define ACPI_DECLARE_PMU_SENTINEL()					\
++	static const struct acpi_device_id __acpi_probe_sentinel	\
++		__used __section(__pmu_acpi_probe_table_end)		\
++		= { .id = "", .driver_data = 0 }
++
+ #else
+ static inline int acpi_dev_get_property(struct acpi_device *adev,
+ 					const char *name, acpi_object_type type,
+diff --git a/include/linux/perf/arm_pmu.h b/include/linux/perf/arm_pmu.h
+index ad54444..b02ac52 100644
+--- a/include/linux/perf/arm_pmu.h
++++ b/include/linux/perf/arm_pmu.h
+@@ -123,6 +123,7 @@ int armpmu_map_event(struct perf_event *event,
+ 		     u32 raw_event_mask);
+ 
+ typedef int (*armpmu_init_fn)(struct arm_pmu *);
++typedef int (*armpmu_acpi_init_fn)(struct arm_pmu *, struct device *);
+ 
+ struct pmu_probe_info {
+ 	unsigned int cpuid;
+-- 
+Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
