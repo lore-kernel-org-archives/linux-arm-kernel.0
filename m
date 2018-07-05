@@ -1,64 +1,254 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu,  5 Jul 2018 15:16:54 +0100
-Subject: [PATCHv2 7/7] arm64: remove unused COMPAT_PSR definitions
+Date: Thu,  5 Jul 2018 15:16:52 +0100
+Subject: [PATCHv2 5/7] arm64: use PSR_AA32 definitions
 In-Reply-To: <20180705141654.8714-1-mark.rutland@arm.com>
 References: <20180705141654.8714-1-mark.rutland@arm.com>
-Message-ID: <20180705141654.8714-8-mark.rutland@arm.com>
+Message-ID: <20180705141654.8714-6-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that users have been migrated to PSR_AA32, kill the unused
-COMPAT_PSR definitions.
+Some code cares about the SPSR_ELx format for exceptions taken from
+AArch32 to inspect or manipulate the SPSR_ELx value, which is already in
+the SPSR_ELx format, and not in the AArch32 PSR format.
 
-The only difference we need a definition for is COMPAT_PSR_DIT_BIT,
-which differs from PSR_AA32_DIT_BIT.
+To separate these from cases where we care about the AArch32 PSR format,
+migrate these cases to use the PSR_AA32_* definitions rather than
+COMPAT_PSR_*.
+
+There should be no functional change as a result of this patch.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/ptrace.h | 28 ----------------------------
- 1 file changed, 28 deletions(-)
+ arch/arm64/include/asm/processor.h   |  6 +++---
+ arch/arm64/include/asm/ptrace.h      |  2 +-
+ arch/arm64/kernel/armv8_deprecated.c | 24 ++++++++++++------------
+ arch/arm64/kernel/cpufeature.c       |  2 +-
+ arch/arm64/kernel/process.c          | 20 ++++++++++----------
+ arch/arm64/kernel/ptrace.c           | 20 ++++++++++----------
+ arch/arm64/kernel/signal32.c         | 10 +++++-----
+ 7 files changed, 42 insertions(+), 42 deletions(-)
 
-diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
-index d55237eb89bb..177b851ca6d9 100644
---- a/arch/arm64/include/asm/ptrace.h
-+++ b/arch/arm64/include/asm/ptrace.h
-@@ -66,35 +66,7 @@
+diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+index a73ae1e49200..e02612105d78 100644
+--- a/arch/arm64/include/asm/processor.h
++++ b/arch/arm64/include/asm/processor.h
+@@ -182,12 +182,12 @@ static inline void compat_start_thread(struct pt_regs *regs, unsigned long pc,
+ 				       unsigned long sp)
+ {
+ 	start_thread_common(regs, pc);
+-	regs->pstate = COMPAT_PSR_MODE_USR;
++	regs->pstate = PSR_AA32_MODE_USR;
+ 	if (pc & 1)
+-		regs->pstate |= COMPAT_PSR_T_BIT;
++		regs->pstate |= PSR_AA32_T_BIT;
+ 
+ #ifdef __AARCH64EB__
+-	regs->pstate |= COMPAT_PSR_E_BIT;
++	regs->pstate |= PSR_AA32_E_BIT;
  #endif
  
- /* AArch32 CPSR bits, as seen in AArch32 */
--#define COMPAT_PSR_MODE_MASK	0x0000001f
--#define COMPAT_PSR_MODE_USR	0x00000010
--#define COMPAT_PSR_MODE_FIQ	0x00000011
--#define COMPAT_PSR_MODE_IRQ	0x00000012
--#define COMPAT_PSR_MODE_SVC	0x00000013
--#define COMPAT_PSR_MODE_ABT	0x00000017
--#define COMPAT_PSR_MODE_HYP	0x0000001a
--#define COMPAT_PSR_MODE_UND	0x0000001b
--#define COMPAT_PSR_MODE_SYS	0x0000001f
--#define COMPAT_PSR_T_BIT	0x00000020
--#define COMPAT_PSR_F_BIT	0x00000040
--#define COMPAT_PSR_I_BIT	0x00000080
--#define COMPAT_PSR_A_BIT	0x00000100
--#define COMPAT_PSR_E_BIT	0x00000200
- #define COMPAT_PSR_DIT_BIT	0x00200000
--#define COMPAT_PSR_J_BIT	0x01000000
--#define COMPAT_PSR_Q_BIT	0x08000000
--#define COMPAT_PSR_V_BIT	0x10000000
--#define COMPAT_PSR_C_BIT	0x20000000
--#define COMPAT_PSR_Z_BIT	0x40000000
--#define COMPAT_PSR_N_BIT	0x80000000
--#define COMPAT_PSR_IT_MASK	0x0600fc00	/* If-Then execution state mask */
--#define COMPAT_PSR_GE_MASK	0x000f0000
--
--#ifdef CONFIG_CPU_BIG_ENDIAN
--#define COMPAT_PSR_ENDSTATE	COMPAT_PSR_E_BIT
--#else
--#define COMPAT_PSR_ENDSTATE	0
--#endif
+ 	regs->compat_sp = sp;
+diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
+index 1b2a253de6a1..d55237eb89bb 100644
+--- a/arch/arm64/include/asm/ptrace.h
++++ b/arch/arm64/include/asm/ptrace.h
+@@ -211,7 +211,7 @@ static inline void forget_syscall(struct pt_regs *regs)
  
- /*
-  * These are 'magic' values for PTRACE_PEEKUSR that return info about where a
+ #ifdef CONFIG_COMPAT
+ #define compat_thumb_mode(regs) \
+-	(((regs)->pstate & COMPAT_PSR_T_BIT))
++	(((regs)->pstate & PSR_AA32_T_BIT))
+ #else
+ #define compat_thumb_mode(regs) (0)
+ #endif
+diff --git a/arch/arm64/kernel/armv8_deprecated.c b/arch/arm64/kernel/armv8_deprecated.c
+index d4707abb2f16..d2c0938ccaec 100644
+--- a/arch/arm64/kernel/armv8_deprecated.c
++++ b/arch/arm64/kernel/armv8_deprecated.c
+@@ -441,8 +441,8 @@ static struct undef_hook swp_hooks[] = {
+ 	{
+ 		.instr_mask	= 0x0fb00ff0,
+ 		.instr_val	= 0x01000090,
+-		.pstate_mask	= COMPAT_PSR_MODE_MASK,
+-		.pstate_val	= COMPAT_PSR_MODE_USR,
++		.pstate_mask	= PSR_AA32_MODE_MASK,
++		.pstate_val	= PSR_AA32_MODE_USR,
+ 		.fn		= swp_handler
+ 	},
+ 	{ }
+@@ -521,15 +521,15 @@ static struct undef_hook cp15_barrier_hooks[] = {
+ 	{
+ 		.instr_mask	= 0x0fff0fdf,
+ 		.instr_val	= 0x0e070f9a,
+-		.pstate_mask	= COMPAT_PSR_MODE_MASK,
+-		.pstate_val	= COMPAT_PSR_MODE_USR,
++		.pstate_mask	= PSR_AA32_MODE_MASK,
++		.pstate_val	= PSR_AA32_MODE_USR,
+ 		.fn		= cp15barrier_handler,
+ 	},
+ 	{
+ 		.instr_mask	= 0x0fff0fff,
+ 		.instr_val	= 0x0e070f95,
+-		.pstate_mask	= COMPAT_PSR_MODE_MASK,
+-		.pstate_val	= COMPAT_PSR_MODE_USR,
++		.pstate_mask	= PSR_AA32_MODE_MASK,
++		.pstate_val	= PSR_AA32_MODE_USR,
+ 		.fn		= cp15barrier_handler,
+ 	},
+ 	{ }
+@@ -562,10 +562,10 @@ static int compat_setend_handler(struct pt_regs *regs, u32 big_endian)
+ 
+ 	if (big_endian) {
+ 		insn = "setend be";
+-		regs->pstate |= COMPAT_PSR_E_BIT;
++		regs->pstate |= PSR_AA32_E_BIT;
+ 	} else {
+ 		insn = "setend le";
+-		regs->pstate &= ~COMPAT_PSR_E_BIT;
++		regs->pstate &= ~PSR_AA32_E_BIT;
+ 	}
+ 
+ 	trace_instruction_emulation(insn, regs->pc);
+@@ -593,16 +593,16 @@ static struct undef_hook setend_hooks[] = {
+ 	{
+ 		.instr_mask	= 0xfffffdff,
+ 		.instr_val	= 0xf1010000,
+-		.pstate_mask	= COMPAT_PSR_MODE_MASK,
+-		.pstate_val	= COMPAT_PSR_MODE_USR,
++		.pstate_mask	= PSR_AA32_MODE_MASK,
++		.pstate_val	= PSR_AA32_MODE_USR,
+ 		.fn		= a32_setend_handler,
+ 	},
+ 	{
+ 		/* Thumb mode */
+ 		.instr_mask	= 0x0000fff7,
+ 		.instr_val	= 0x0000b650,
+-		.pstate_mask	= (COMPAT_PSR_T_BIT | COMPAT_PSR_MODE_MASK),
+-		.pstate_val	= (COMPAT_PSR_T_BIT | COMPAT_PSR_MODE_USR),
++		.pstate_mask	= (PSR_AA32_T_BIT | PSR_AA32_MODE_MASK),
++		.pstate_val	= (PSR_AA32_T_BIT | PSR_AA32_MODE_USR),
+ 		.fn		= t16_setend_handler,
+ 	},
+ 	{}
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index f24892a40d2c..48d813defe5e 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -1723,7 +1723,7 @@ static int emulate_mrs(struct pt_regs *regs, u32 insn)
+ static struct undef_hook mrs_hook = {
+ 	.instr_mask = 0xfff00000,
+ 	.instr_val  = 0xd5300000,
+-	.pstate_mask = COMPAT_PSR_MODE_MASK,
++	.pstate_mask = PSR_AA32_MODE_MASK,
+ 	.pstate_val = PSR_MODE_EL0t,
+ 	.fn = emulate_mrs,
+ };
+diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+index e10bc363f533..740b31f77ade 100644
+--- a/arch/arm64/kernel/process.c
++++ b/arch/arm64/kernel/process.c
+@@ -177,16 +177,16 @@ static void print_pstate(struct pt_regs *regs)
+ 	if (compat_user_mode(regs)) {
+ 		printk("pstate: %08llx (%c%c%c%c %c %s %s %c%c%c)\n",
+ 			pstate,
+-			pstate & COMPAT_PSR_N_BIT ? 'N' : 'n',
+-			pstate & COMPAT_PSR_Z_BIT ? 'Z' : 'z',
+-			pstate & COMPAT_PSR_C_BIT ? 'C' : 'c',
+-			pstate & COMPAT_PSR_V_BIT ? 'V' : 'v',
+-			pstate & COMPAT_PSR_Q_BIT ? 'Q' : 'q',
+-			pstate & COMPAT_PSR_T_BIT ? "T32" : "A32",
+-			pstate & COMPAT_PSR_E_BIT ? "BE" : "LE",
+-			pstate & COMPAT_PSR_A_BIT ? 'A' : 'a',
+-			pstate & COMPAT_PSR_I_BIT ? 'I' : 'i',
+-			pstate & COMPAT_PSR_F_BIT ? 'F' : 'f');
++			pstate & PSR_AA32_N_BIT ? 'N' : 'n',
++			pstate & PSR_AA32_Z_BIT ? 'Z' : 'z',
++			pstate & PSR_AA32_C_BIT ? 'C' : 'c',
++			pstate & PSR_AA32_V_BIT ? 'V' : 'v',
++			pstate & PSR_AA32_Q_BIT ? 'Q' : 'q',
++			pstate & PSR_AA32_T_BIT ? "T32" : "A32",
++			pstate & PSR_AA32_E_BIT ? "BE" : "LE",
++			pstate & PSR_AA32_A_BIT ? 'A' : 'a',
++			pstate & PSR_AA32_I_BIT ? 'I' : 'i',
++			pstate & PSR_AA32_F_BIT ? 'F' : 'f');
+ 	} else {
+ 		printk("pstate: %08llx (%c%c%c%c %c%c%c%c %cPAN %cUAO)\n",
+ 			pstate,
+diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
+index bc07e8ec062b..ee2677bdc41e 100644
+--- a/arch/arm64/kernel/ptrace.c
++++ b/arch/arm64/kernel/ptrace.c
+@@ -1681,15 +1681,15 @@ static int valid_compat_regs(struct user_pt_regs *regs)
+ 
+ 	if (!system_supports_mixed_endian_el0()) {
+ 		if (IS_ENABLED(CONFIG_CPU_BIG_ENDIAN))
+-			regs->pstate |= COMPAT_PSR_E_BIT;
++			regs->pstate |= PSR_AA32_E_BIT;
+ 		else
+-			regs->pstate &= ~COMPAT_PSR_E_BIT;
++			regs->pstate &= ~PSR_AA32_E_BIT;
+ 	}
+ 
+ 	if (user_mode(regs) && (regs->pstate & PSR_MODE32_BIT) &&
+-	    (regs->pstate & COMPAT_PSR_A_BIT) == 0 &&
+-	    (regs->pstate & COMPAT_PSR_I_BIT) == 0 &&
+-	    (regs->pstate & COMPAT_PSR_F_BIT) == 0) {
++	    (regs->pstate & PSR_AA32_A_BIT) == 0 &&
++	    (regs->pstate & PSR_AA32_I_BIT) == 0 &&
++	    (regs->pstate & PSR_AA32_F_BIT) == 0) {
+ 		return 1;
+ 	}
+ 
+@@ -1697,11 +1697,11 @@ static int valid_compat_regs(struct user_pt_regs *regs)
+ 	 * Force PSR to a valid 32-bit EL0t, preserving the same bits as
+ 	 * arch/arm.
+ 	 */
+-	regs->pstate &= COMPAT_PSR_N_BIT | COMPAT_PSR_Z_BIT |
+-			COMPAT_PSR_C_BIT | COMPAT_PSR_V_BIT |
+-			COMPAT_PSR_Q_BIT | COMPAT_PSR_IT_MASK |
+-			COMPAT_PSR_GE_MASK | COMPAT_PSR_E_BIT |
+-			COMPAT_PSR_T_BIT;
++	regs->pstate &= PSR_AA32_N_BIT | PSR_AA32_Z_BIT |
++			PSR_AA32_C_BIT | PSR_AA32_V_BIT |
++			PSR_AA32_Q_BIT | PSR_AA32_IT_MASK |
++			PSR_AA32_GE_MASK | PSR_AA32_E_BIT |
++			PSR_AA32_T_BIT;
+ 	regs->pstate |= PSR_MODE32_BIT;
+ 
+ 	return 0;
+diff --git a/arch/arm64/kernel/signal32.c b/arch/arm64/kernel/signal32.c
+index 12aec0a66376..fca761be18c8 100644
+--- a/arch/arm64/kernel/signal32.c
++++ b/arch/arm64/kernel/signal32.c
+@@ -375,22 +375,22 @@ static void compat_setup_return(struct pt_regs *regs, struct k_sigaction *ka,
+ {
+ 	compat_ulong_t handler = ptr_to_compat(ka->sa.sa_handler);
+ 	compat_ulong_t retcode;
+-	compat_ulong_t spsr = regs->pstate & ~(PSR_f | COMPAT_PSR_E_BIT);
++	compat_ulong_t spsr = regs->pstate & ~(PSR_f | PSR_AA32_E_BIT);
+ 	int thumb;
+ 
+ 	/* Check if the handler is written for ARM or Thumb */
+ 	thumb = handler & 1;
+ 
+ 	if (thumb)
+-		spsr |= COMPAT_PSR_T_BIT;
++		spsr |= PSR_AA32_T_BIT;
+ 	else
+-		spsr &= ~COMPAT_PSR_T_BIT;
++		spsr &= ~PSR_AA32_T_BIT;
+ 
+ 	/* The IT state must be cleared for both ARM and Thumb-2 */
+-	spsr &= ~COMPAT_PSR_IT_MASK;
++	spsr &= ~PSR_AA32_IT_MASK;
+ 
+ 	/* Restore the original endianness */
+-	spsr |= COMPAT_PSR_ENDSTATE;
++	spsr |= PSR_AA32_ENDSTATE;
+ 
+ 	if (ka->sa.sa_flags & SA_RESTORER) {
+ 		retcode = ptr_to_compat(ka->sa.sa_restorer);
 -- 
 2.11.0
