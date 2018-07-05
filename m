@@ -1,56 +1,96 @@
-From: james.morse@arm.com (James Morse)
-Date: Thu, 5 Jul 2018 12:02:15 +0100
-Subject: [PATCH v2 3/4] efi/arm: map UEFI memory map earlier on boot
-In-Reply-To: <20180705094313.GL28220@linaro.org>
-References: <20180619064424.6642-1-takahiro.akashi@linaro.org>
- <20180619064424.6642-4-takahiro.akashi@linaro.org>
- <20180704170655.GD8370@arm.com>
- <CAKv+Gu9_rYYyQ+t89otz46DR0D4GDj-cCjhx9q=p+D8LWFRkgQ@mail.gmail.com>
- <20180705094313.GL28220@linaro.org>
-Message-ID: <ec1a5f0f-99e3-fda1-9a64-5c2539817190@arm.com>
+From: alex@ghiti.fr (Alex Ghiti)
+Date: Thu, 5 Jul 2018 10:48:53 +0000
+Subject: [PATCH v3 02/11] hugetlb: Introduce generic version of
+ hugetlb_free_pgd_range
+In-Reply-To: <005bf713-fb51-bf29-5f86-6f244cd49f35@c-s.fr>
+References: <20180705051640.790-1-alex@ghiti.fr>
+ <20180705051640.790-3-alex@ghiti.fr>
+ <005bf713-fb51-bf29-5f86-6f244cd49f35@c-s.fr>
+Message-ID: <bd8ee99c-a89b-c114-9b0e-8e36601c50c6@ghiti.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Akashi,
+My bad, when I moved the #include <asm-generic/hugeltb.h> at the bottom 
+of the file, I did not pay attention to that #ifdef.
+I'm going to fix powerpc and check other architectures if I did not make 
+the same mistake.
+I'll send a v4 as soon as possible.
 
-On 05/07/18 10:43, AKASHI Takahiro wrote:
-> On Wed, Jul 04, 2018 at 08:49:32PM +0200, Ard Biesheuvel wrote:
->> On 4 July 2018 at 19:06, Will Deacon <will.deacon@arm.com> wrote:
->>> On Tue, Jun 19, 2018 at 03:44:23PM +0900, AKASHI Takahiro wrote:
->>>> Since arm_enter_runtime_services() was modified to always create a virtual
->>>> mapping of UEFI memory map in the previous patch, it is now renamed to
->>>> efi_enter_virtual_mode() and called earlier before acpi_load_tables()
->>>> in acpi_early_init().
->>>>
->>>> This will allow us to use UEFI memory map in acpi_os_ioremap() to create
->>>> mappings of ACPI tables using memory attributes described in UEFI memory
->>>> map.
+Thanks for your comment,
 
->>> Hmm, this is ugly as hell. Is there nothing else we can piggy-back off?
->>> It's also fairly jarring that, on x86, efi_enter_virtual_mode() is called
->>> a few lines later, *after* acpi_early_init() has been called.
+Alex
 
->> Currently, there is a gap where we have already torn down the early
->> mapping and haven't created the definitive mapping of the UEFI memory
->> map. There are other reasons why this is an issue, and I recently
->> proposed [0] myself to address one of them
-
->> Akashi-san, could you please confirm whether the patch below would be
->> sufficient for you? Apologies for going back and forth on this, but I
->> agree with Will that we should try to avoid warts like the one above
->> in generic code.
+On 07/05/2018 10:22 AM, Christophe Leroy wrote:
+>
+>
+> On 07/05/2018 05:16 AM, Alexandre Ghiti wrote:
+>> arm, arm64, mips, parisc, sh, x86 architectures use the
+>> same version of hugetlb_free_pgd_range, so move this generic
+>> implementation into asm-generic/hugetlb.h.
 >>
->> [0] https://marc.info/?l=linux-efi&m=152930773507524&w=2
-> 
-> I think that this patch will also work.
-> Please drop my patch#2 and #3 if you want to pick up my patchset, Will.
-
-Patch 2 is what changes arm_enable_runtime_services() to map the efi memory map
-before bailing out due to efi=noruntime.
-
-Without it, 'efi=noruntime' means no-acpi-tables.
-
-
-Thanks,
-
-James
+>> Signed-off-by: Alexandre Ghiti <alex@ghiti.fr>
+>
+> Build failure on mpc885_ads_defconfig
+>
+> ? CC????? arch/powerpc/kernel/setup-common.o
+> In file included from arch/powerpc/kernel/setup-common.c:37:
+> ./include/linux/hugetlb.h:191:65: error: expected identifier or '(' 
+> before '{' token
+> ?#define hugetlb_free_pgd_range(tlb, addr, end, floor, ceiling) 
+> ({BUG(); 0; })
+> ???????????????????????????????????????????????????????????????? ^
+> ./include/asm-generic/hugetlb.h:44:20: note: in expansion of macro 
+> 'hugetlb_free_pgd_range'
+> ?static inline void hugetlb_free_pgd_range(struct mmu_gather *tlb,
+> ??????????????????? ^~~~~~~~~~~~~~~~~~~~~~
+>
+> see below
+>
+>> ---
+>> ? arch/arm/include/asm/hugetlb.h???? | 12 ++----------
+>> ? arch/arm64/include/asm/hugetlb.h?? | 10 ----------
+>> ? arch/ia64/include/asm/hugetlb.h??? |? 5 +++--
+>> ? arch/mips/include/asm/hugetlb.h??? | 13 ++-----------
+>> ? arch/parisc/include/asm/hugetlb.h? | 12 ++----------
+>> ? arch/powerpc/include/asm/hugetlb.h |? 4 +++-
+>> ? arch/sh/include/asm/hugetlb.h????? | 12 ++----------
+>> ? arch/sparc/include/asm/hugetlb.h?? |? 4 +++-
+>> ? arch/x86/include/asm/hugetlb.h???? | 11 ++---------
+>> ? include/asm-generic/hugetlb.h????? | 11 +++++++++++
+>> ? 10 files changed, 30 insertions(+), 64 deletions(-)
+>>
+>
+> [snip]
+>
+>> diff --git a/arch/powerpc/include/asm/hugetlb.h 
+>> b/arch/powerpc/include/asm/hugetlb.h
+>> index 3225eb6402cc..de46ee16b615 100644
+>> --- a/arch/powerpc/include/asm/hugetlb.h
+>> +++ b/arch/powerpc/include/asm/hugetlb.h
+>> @@ -4,7 +4,6 @@
+>> ? ? #ifdef CONFIG_HUGETLB_PAGE
+>> ? #include <asm/page.h>
+>> -#include <asm-generic/hugetlb.h>
+>> ? ? extern struct kmem_cache *hugepte_cache;
+>> ? @@ -113,6 +112,7 @@ static inline void flush_hugetlb_page(struct 
+>> vm_area_struct *vma,
+>> ? void flush_hugetlb_page(struct vm_area_struct *vma, unsigned long 
+>> vmaddr);
+>> ? #endif
+>> ? +#define __HAVE_ARCH_HUGETLB_FREE_PGD_RANGE
+>> ? void hugetlb_free_pgd_range(struct mmu_gather *tlb, unsigned long 
+>> addr,
+>> ????????????????? unsigned long end, unsigned long floor,
+>> ????????????????? unsigned long ceiling);
+>> @@ -193,4 +193,6 @@ static inline pte_t *hugepte_offset(hugepd_t hpd, 
+>> unsigned long addr,
+>> ? }
+>> ? #endif /* CONFIG_HUGETLB_PAGE */
+>> ? +#include <asm-generic/hugetlb.h>
+>> +
+>
+> That include was previously inside #ifdef CONFIG_HUGETLB_PAGE.
+> Why put it outside ?
+>
+> Christophe
+>
