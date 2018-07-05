@@ -1,127 +1,87 @@
-From: frieder.schrempf@exceet.de (Frieder Schrempf)
-Date: Thu,  5 Jul 2018 13:15:03 +0200
-Subject: [PATCH v2 07/12] arm64: dts: Reflect change of FSL QSPI driver and
- remove unused properties
-In-Reply-To: <1530789310-16254-1-git-send-email-frieder.schrempf@exceet.de>
-References: <1530789310-16254-1-git-send-email-frieder.schrempf@exceet.de>
-Message-ID: <1530789310-16254-8-git-send-email-frieder.schrempf@exceet.de>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Thu,  5 Jul 2018 13:37:13 +0200
+Subject: [PATCH] ARM64: dts: meson-axg: add the audio clock controller
+Message-ID: <20180705113713.15267-1-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The FSL QSPI driver was moved to the SPI framework and it now
-acts as a SPI controller. Therefore the subnodes need to set
-spi-[rx/tx]-bus-width = <4>, so quad mode is used just as before.
+Add the audio clock controller which is part of the audio bus
+This controller takes 8 input plls, and the usual clock gate, from the
+main clock controller. It provides for the all the devices of the audio
+subsystem, such as tdms, spdif, pdm, etc.
 
-Also the properties 'num-cs' and 'bus-num' were never read by the
-driver and can be removed.
-
-The property 'fsl,qspi-has-second-chip' is not needed anymore
-and will be removed after the old driver was disabled to avoid
-breaking fsl-ls1046a-rdb.dts.
-
-Signed-off-by: Frieder Schrempf <frieder.schrempf@exceet.de>
+Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
 ---
- arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts  | 3 ++-
- arch/arm64/boot/dts/freescale/fsl-ls1046a-qds.dts  | 4 ++--
- arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts  | 6 ++++--
- arch/arm64/boot/dts/freescale/fsl-ls208xa-qds.dtsi | 4 ++++
- 4 files changed, 12 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts b/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
-index 6341281..31e7b31 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
-@@ -170,7 +170,6 @@
- };
+Kevin,
+
+Please note that this change depends on the axg audio clock bindings [0].
+It will be part of our PR to clock in this cycle.
+
+As usual, I've prepared a topic branch with the DT changes for you.
+Please, let me know when you need a tag on it.
+
+Cheers
+Jerome
+
+[0]: https://lkml.kernel.org/r/20180522163457.13834-6-jbrunet at baylibre.com
+
+arch/arm64/boot/dts/amlogic/meson-axg.dtsi | 36 ++++++++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+index aa1a42407466..56d334be9f85 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+@@ -6,6 +6,7 @@
+ #include <dt-bindings/gpio/gpio.h>
+ #include <dt-bindings/interrupt-controller/irq.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
++#include <dt-bindings/clock/axg-audio-clkc.h>
+ #include <dt-bindings/clock/axg-clkc.h>
+ #include <dt-bindings/clock/axg-aoclkc.h>
+ #include <dt-bindings/gpio/meson-axg-gpio.h>
+@@ -155,6 +156,41 @@
+ 			};
+ 		};
  
- &qspi {
--	bus-num = <0>;
- 	status = "okay";
- 
- 	qflash0: s25fl128s at 0 {
-@@ -178,6 +177,8 @@
- 		#address-cells = <1>;
- 		#size-cells = <1>;
- 		spi-max-frequency = <20000000>;
-+		spi-rx-bus-width = <4>;
-+		spi-tx-bus-width = <4>;
- 		reg = <0>;
- 	};
- };
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a-qds.dts b/arch/arm64/boot/dts/freescale/fsl-ls1046a-qds.dts
-index 434383b..dc10105 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1046a-qds.dts
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a-qds.dts
-@@ -198,8 +198,6 @@
- };
- 
- &qspi {
--	num-cs = <2>;
--	bus-num = <0>;
- 	status = "okay";
- 
- 	qflash0: s25fl128s at 0 {
-@@ -207,6 +205,8 @@
- 		#address-cells = <1>;
- 		#size-cells = <1>;
- 		spi-max-frequency = <20000000>;
-+		spi-rx-bus-width = <4>;
-+		spi-tx-bus-width = <4>;
- 		reg = <0>;
- 	};
- };
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts
-index 5dc2782..1848c33 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts
-@@ -136,8 +136,6 @@
- };
- 
- &qspi {
--	num-cs = <2>;
--	bus-num = <0>;
- 	status = "okay";
- 
- 	qflash0: s25fs512s at 0 {
-@@ -145,6 +143,8 @@
- 		#address-cells = <1>;
- 		#size-cells = <1>;
- 		spi-max-frequency = <20000000>;
-+		spi-rx-bus-width = <4>;
-+		spi-tx-bus-width = <4>;
- 		reg = <0>;
- 	};
- 
-@@ -153,6 +153,8 @@
- 		#address-cells = <1>;
- 		#size-cells = <1>;
- 		spi-max-frequency = <20000000>;
-+		spi-rx-bus-width = <4>;
-+		spi-tx-bus-width = <4>;
- 		reg = <1>;
- 	};
- };
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls208xa-qds.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls208xa-qds.dtsi
-index 1de6188..fc62ed9 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls208xa-qds.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls208xa-qds.dtsi
-@@ -170,6 +170,8 @@
- 		#size-cells = <1>;
- 		compatible = "st,m25p80";
- 		spi-max-frequency = <20000000>;
-+		spi-rx-bus-width = <4>;
-+		spi-tx-bus-width = <4>;
- 		reg = <0>;
- 	};
- 	flash2: s25fl256s1 at 2 {
-@@ -177,6 +179,8 @@
- 		#size-cells = <1>;
- 		compatible = "st,m25p80";
- 		spi-max-frequency = <20000000>;
-+		spi-rx-bus-width = <4>;
-+		spi-tx-bus-width = <4>;
- 		reg = <2>;
- 	};
- };
++		audio: bus at ff642000 {
++			compatible = "simple-bus";
++			reg = <0x0 0xff642000 0x0 0x2000>;
++			#address-cells = <2>;
++			#size-cells = <2>;
++			ranges = <0x0 0x0 0x0 0xff642000 0x0 0x2000>;
++
++			clkc_audio: clock-controller at 0 {
++				compatible = "amlogic,axg-audio-clkc";
++				reg = <0x0 0x0 0x0 0xb4>;
++				#clock-cells = <1>;
++
++				clocks = <&clkc CLKID_AUDIO>,
++					 <&clkc CLKID_MPLL0>,
++					 <&clkc CLKID_MPLL1>,
++					 <&clkc CLKID_MPLL2>,
++					 <&clkc CLKID_MPLL3>,
++					 <&clkc CLKID_HIFI_PLL>,
++					 <&clkc CLKID_FCLK_DIV3>,
++					 <&clkc CLKID_FCLK_DIV4>,
++					 <&clkc CLKID_GP0_PLL>;
++				clock-names = "pclk",
++					      "mst_in0",
++					      "mst_in1",
++					      "mst_in2",
++					      "mst_in3",
++					      "mst_in4",
++					      "mst_in5",
++					      "mst_in6",
++					      "mst_in7";
++
++				resets = <&reset RESET_AUDIO>;
++			};
++		};
++
+ 		cbus: bus at ffd00000 {
+ 			compatible = "simple-bus";
+ 			reg = <0x0 0xffd00000 0x0 0x25000>;
 -- 
-2.7.4
+2.14.4
