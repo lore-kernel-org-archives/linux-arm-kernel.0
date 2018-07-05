@@ -1,197 +1,187 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Thu, 05 Jul 2018 13:10:34 +0200
-Subject: Self-detected stall on CPU when using SD card
-In-Reply-To: <AM0PR04MB42118B1DC96FFF0143DEB84680400@AM0PR04MB4211.eurprd04.prod.outlook.com>
-References: <037cbd3560a68bad0cea92f453c1b819@agner.ch>
- <0f262b04fab61ec75b7e368a8f4968aa@agner.ch>
- <aaa1f8ec2668ce0c654b6225a7d8737c@agner.ch>
- <AM0PR04MB42118B1DC96FFF0143DEB84680400@AM0PR04MB4211.eurprd04.prod.outlook.com>
-Message-ID: <0ba425d59b0739272cf871722441f69c@agner.ch>
+From: alex@ghiti.fr (Alexandre Ghiti)
+Date: Thu,  5 Jul 2018 11:07:08 +0000
+Subject: [PATCH v4 03/11] hugetlb: Introduce generic version of set_huge_pte_at
+In-Reply-To: <20180705110716.3919-1-alex@ghiti.fr>
+References: <20180705110716.3919-1-alex@ghiti.fr>
+Message-ID: <20180705110716.3919-4-alex@ghiti.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05.07.2018 05:13, A.s. Dong wrote:
->> -----Original Message-----
->> From: Stefan Agner [mailto:stefan at agner.ch]
->> Sent: Tuesday, July 3, 2018 9:13 PM
->> To: adrian.hunter at intel.com; A.s. Dong <aisheng.dong@nxp.com>; Fabio
->> Estevam <fabio.estevam@nxp.com>
->> Cc: linux-mmc at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
->> mmc-owner at vger.kernel.org
->> Subject: Re: Self-detected stall on CPU when using SD card
->>
->> Dong Aisheng,
->>
->> Maybe you can shed some light on the issue below?
->>
-> 
-> I tried on MX6Q SDB board but did not reproduce it with a SD card
-> plugged into Slot2 with 4.18-rc1.
-> Any difference we need to care?
-> 
->>
->> On 26.06.2018 16:45, Stefan Agner wrote:
->> > On 26.06.2018 12:53, Stefan Agner wrote:
->> >> Hi,
->> >>
->> >> On our Colibri iMX6 (arch/arm/boot/dts/imx6qdl-colibri.dtsi) we
->> >> experience the following stack trace when a SD card is plugged in:
->> >>
->> >
->> > [...]
->> >
->> >> [<c08396f4>] (esdhc_pltfm_set_clock) from [<c083622c>]
->> >> (sdhci_set_ios+0xd8/0x584)
->> >>  r10:ffffe000 r9:c1105900 r8:00004097 r7:d818f2e8 r6:d818f480
->> >> r5:d818f2e8
->> >>  r4:d818f000
->> >> [<c0836154>] (sdhci_set_ios) from [<c0836070>]
->> >> (sdhci_runtime_resume_host+0xa0/0x184)
->> >>  r9:c1105900 r8:00004097 r7:d818f2e8 r6:d818f648 r5:d818f000
->> >> r4:d818f480
->> >
->> > [...]
->> >
->> >>
->> >> It used to work in v4.9, so I started a git bisect. It pointed me to
->> >> this commit:
->> >>
->> >> Commit d1e4f74f911d ("mmc: sdhci: Do not use spin lock in set_ios
->> >> paths").
->> >>
->> >> Reverting the commit on-top of v4.18-rc1 seems to fix the issue too.
->> >>
->> >> Any idea?
->> >
->> > I figured out that the same platform had a GPIO Key which triggered
->> > all the time. This seems to exacerbate the MMC issue such that it
->> > triggers on very boot, about rootfs mount time.
->> >
-> 
-> That's a bit strange.... Why that GPIO key triggers all the time?
-> 
+arm, ia64, mips, powerpc, sh, x86 architectures use the
+same version of set_huge_pte_at, so move this generic
+implementation into asm-generic/hugetlb.h.
 
-This was a bug in our device tree: we configured a 100k pull-up where
-there is a 100k pull-down externally... The level was always around 1.6V
-and caused thousands of interrupts during boot up.
+Signed-off-by: Alexandre Ghiti <alex@ghiti.fr>
+---
+ arch/arm/include/asm/hugetlb-3level.h | 6 ------
+ arch/arm64/include/asm/hugetlb.h      | 1 +
+ arch/ia64/include/asm/hugetlb.h       | 6 ------
+ arch/mips/include/asm/hugetlb.h       | 6 ------
+ arch/parisc/include/asm/hugetlb.h     | 1 +
+ arch/powerpc/include/asm/hugetlb.h    | 6 ------
+ arch/sh/include/asm/hugetlb.h         | 6 ------
+ arch/sparc/include/asm/hugetlb.h      | 1 +
+ arch/x86/include/asm/hugetlb.h        | 6 ------
+ include/asm-generic/hugetlb.h         | 8 +++++++-
+ 10 files changed, 10 insertions(+), 37 deletions(-)
 
-The stack trace really suggests that there are simply to many interrupts
-happening on the GPIO key and stalling the CPU. Of course, at this point
-I could have stopped and just do the device tree fix.
-
-But the question was just nagging me: Why does disabling interrupts
-during esdhc_pltfm_set_clock fixes the issue too?? There must be
-something particular with esdhc_pltfm_set_clock.
-
-
-After digging some hours I finally found the issue, and it is somewhat
-mind blowing:
-
-The SD card clock and the GPIO key pins happen to be routed right next
-to each other! Without SD card the GPIO key stays at a stable level and
-does not cause interrupts. However, when the SD card clock next to the
-GPIO key is enabled it reliably generates interrupts due to cross talk!
-
-But the SD card clock is enabled even outside of esdhc_pltfm_set_clock.
-If just cross talk is the problem then disabling interrupts during clock
-change esdhc_pltfm_set_clock should make no real difference...
-
-It turns out, that in the i.MX 6 case the driver clears ESDHC_CLOCK_MASK
-which generates 200MHz on the SD card clk pin for a short period of
-time! This exacerbated cross talk just enough to cause a complete stall!
-
-When interrupts are disabled during that short phase, cross talk does
-not do any harm.... And it seems that with 50MHz (which is the rate on
-function exit) cross talk does not appear/doe not cause enough
-interrupts to stall the CPU completely...
-
-
-Anyway, we probably don't want the card to be clocked at 200MHz for that
-short time. Fixing this is rather trivial, just make sure that we
-disable card clock before changing rate:
-
---- a/drivers/mmc/host/sdhci-esdhc-imx.c
-+++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-@@ -708,14 +708,14 @@ static inline void esdhc_pltfm_set_clock(struct
-sdhci_host *host,
-        int div = 1;
-        u32 temp, val;
+diff --git a/arch/arm/include/asm/hugetlb-3level.h b/arch/arm/include/asm/hugetlb-3level.h
+index d4014fbe5ea3..398fb06e8207 100644
+--- a/arch/arm/include/asm/hugetlb-3level.h
++++ b/arch/arm/include/asm/hugetlb-3level.h
+@@ -37,12 +37,6 @@ static inline pte_t huge_ptep_get(pte_t *ptep)
+ 	return retval;
+ }
  
-+       if (esdhc_is_usdhc(imx_data)) {
-+               val = readl(host->ioaddr + ESDHC_VENDOR_SPEC);
-+               writel(val & ~ESDHC_VENDOR_SPEC_FRC_SDCLK_ON,
-+                               host->ioaddr + ESDHC_VENDOR_SPEC);
-+       }
-+
-        if (clock == 0) {
-                host->mmc->actual_clock = 0;
+-static inline void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
+-				   pte_t *ptep, pte_t pte)
+-{
+-	set_pte_at(mm, addr, ptep, pte);
+-}
 -
--               if (esdhc_is_usdhc(imx_data)) {
--                       val = readl(host->ioaddr + ESDHC_VENDOR_SPEC);
--                       writel(val & ~ESDHC_VENDOR_SPEC_FRC_SDCLK_ON,
--                                       host->ioaddr +
-ESDHC_VENDOR_SPEC);
--               }
-                return;
-        }
+ static inline void huge_ptep_clear_flush(struct vm_area_struct *vma,
+ 					 unsigned long addr, pte_t *ptep)
+ {
+diff --git a/arch/arm64/include/asm/hugetlb.h b/arch/arm64/include/asm/hugetlb.h
+index 4af1a800a900..874661a1dff1 100644
+--- a/arch/arm64/include/asm/hugetlb.h
++++ b/arch/arm64/include/asm/hugetlb.h
+@@ -60,6 +60,7 @@ static inline void arch_clear_hugepage_flags(struct page *page)
+ extern pte_t arch_make_huge_pte(pte_t entry, struct vm_area_struct *vma,
+ 				struct page *page, int writable);
+ #define arch_make_huge_pte arch_make_huge_pte
++#define __HAVE_ARCH_HUGE_SET_HUGE_PTE_AT
+ extern void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
+ 			    pte_t *ptep, pte_t pte);
+ extern int huge_ptep_set_access_flags(struct vm_area_struct *vma,
+diff --git a/arch/ia64/include/asm/hugetlb.h b/arch/ia64/include/asm/hugetlb.h
+index afe9fa4d969b..a235d6f60fb3 100644
+--- a/arch/ia64/include/asm/hugetlb.h
++++ b/arch/ia64/include/asm/hugetlb.h
+@@ -20,12 +20,6 @@ static inline int is_hugepage_only_range(struct mm_struct *mm,
+ 		REGION_NUMBER((addr)+(len)-1) == RGN_HPAGE);
+ }
  
-
-With that clocks get disabled before we clear the divider registers
-further down. I will send a patch for this.
-
---
-Stefan
-
-
->> > This change seems to fix the issue as well, not sure though whether
->> > this is a proper fix:
->> >
->> > --- a/drivers/mmc/host/sdhci-esdhc-imx.c
->> > +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
->> > @@ -697,6 +697,7 @@ static inline void esdhc_pltfm_set_clock(struct
->> > sdhci_host *host,
->> >         int ddr_pre_div = imx_data->is_ddr ? 2 : 1;
->> >         int pre_div = 1;
->> >         int div = 1;
->> > +       unsigned long flags;
->> >         u32 temp, val;
->> >
->> >         if (clock == 0) {
->> > @@ -724,6 +725,7 @@ static inline void esdhc_pltfm_set_clock(struct
->> > sdhci_host *host,
->> >                         pre_div = 2;
->> >         }
->> >
->> > +       spin_lock_irqsave(&host->lock, flags);
->> >         temp = sdhci_readl(host, ESDHC_SYSTEM_CONTROL);
->> >         temp &= ~(ESDHC_CLOCK_IPGEN | ESDHC_CLOCK_HCKEN |
->> > ESDHC_CLOCK_PEREN
->> >                 | ESDHC_CLOCK_MASK);
->> > @@ -754,6 +756,7 @@ static inline void esdhc_pltfm_set_clock(struct
->> > sdhci_host *host,
->> >                 writel(val | ESDHC_VENDOR_SPEC_FRC_SDCLK_ON,
->> >                 host->ioaddr + ESDHC_VENDOR_SPEC);
->> >         }
->> > +       spin_unlock_irqrestore(&host->lock, flags);
->>
->> The bits ESDHC_CLOCK_IPGEN, ESDHC_CLOCK_HCKEN,
->> ESDHC_CLOCK_PEREN which are cleared and written in that section are
->> actually mentioned as "Reserved. Always write as 1." in the reference
->> manual...
->>
-> 
-> That's for legacy platforms like MX5. No side affect on MX6&7 as we know.
-> So keep it now. Is the issue related to that?
-> 
-> Regards
-> Dong Aisheng
-> 
->> --
->> Stefan
->>
->> >
->> >         mdelay(1);
->> >  }
->> >
->> > --
->> > Stefan
+-static inline void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
+-				   pte_t *ptep, pte_t pte)
+-{
+-	set_pte_at(mm, addr, ptep, pte);
+-}
+-
+ static inline pte_t huge_ptep_get_and_clear(struct mm_struct *mm,
+ 					    unsigned long addr, pte_t *ptep)
+ {
+diff --git a/arch/mips/include/asm/hugetlb.h b/arch/mips/include/asm/hugetlb.h
+index 53764050243e..8ea439041d5d 100644
+--- a/arch/mips/include/asm/hugetlb.h
++++ b/arch/mips/include/asm/hugetlb.h
+@@ -36,12 +36,6 @@ static inline int prepare_hugepage_range(struct file *file,
+ 	return 0;
+ }
+ 
+-static inline void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
+-				   pte_t *ptep, pte_t pte)
+-{
+-	set_pte_at(mm, addr, ptep, pte);
+-}
+-
+ static inline pte_t huge_ptep_get_and_clear(struct mm_struct *mm,
+ 					    unsigned long addr, pte_t *ptep)
+ {
+diff --git a/arch/parisc/include/asm/hugetlb.h b/arch/parisc/include/asm/hugetlb.h
+index 28c23b68d38d..77c8adbac7c3 100644
+--- a/arch/parisc/include/asm/hugetlb.h
++++ b/arch/parisc/include/asm/hugetlb.h
+@@ -4,6 +4,7 @@
+ 
+ #include <asm/page.h>
+ 
++#define __HAVE_ARCH_HUGE_SET_HUGE_PTE_AT
+ void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
+ 		     pte_t *ptep, pte_t pte);
+ 
+diff --git a/arch/powerpc/include/asm/hugetlb.h b/arch/powerpc/include/asm/hugetlb.h
+index a7d5c739df9b..0794b53439d4 100644
+--- a/arch/powerpc/include/asm/hugetlb.h
++++ b/arch/powerpc/include/asm/hugetlb.h
+@@ -132,12 +132,6 @@ static inline int prepare_hugepage_range(struct file *file,
+ 	return 0;
+ }
+ 
+-static inline void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
+-				   pte_t *ptep, pte_t pte)
+-{
+-	set_pte_at(mm, addr, ptep, pte);
+-}
+-
+ static inline pte_t huge_ptep_get_and_clear(struct mm_struct *mm,
+ 					    unsigned long addr, pte_t *ptep)
+ {
+diff --git a/arch/sh/include/asm/hugetlb.h b/arch/sh/include/asm/hugetlb.h
+index f6a51b609409..bc552e37c1c9 100644
+--- a/arch/sh/include/asm/hugetlb.h
++++ b/arch/sh/include/asm/hugetlb.h
+@@ -25,12 +25,6 @@ static inline int prepare_hugepage_range(struct file *file,
+ 	return 0;
+ }
+ 
+-static inline void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
+-				   pte_t *ptep, pte_t pte)
+-{
+-	set_pte_at(mm, addr, ptep, pte);
+-}
+-
+ static inline pte_t huge_ptep_get_and_clear(struct mm_struct *mm,
+ 					    unsigned long addr, pte_t *ptep)
+ {
+diff --git a/arch/sparc/include/asm/hugetlb.h b/arch/sparc/include/asm/hugetlb.h
+index 59d89b52ccb7..16b0c53ea6c9 100644
+--- a/arch/sparc/include/asm/hugetlb.h
++++ b/arch/sparc/include/asm/hugetlb.h
+@@ -12,6 +12,7 @@ struct pud_huge_patch_entry {
+ extern struct pud_huge_patch_entry __pud_huge_patch, __pud_huge_patch_end;
+ #endif
+ 
++#define __HAVE_ARCH_HUGE_SET_HUGE_PTE_AT
+ void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
+ 		     pte_t *ptep, pte_t pte);
+ 
+diff --git a/arch/x86/include/asm/hugetlb.h b/arch/x86/include/asm/hugetlb.h
+index 996ce8e15365..554d5614b375 100644
+--- a/arch/x86/include/asm/hugetlb.h
++++ b/arch/x86/include/asm/hugetlb.h
+@@ -27,12 +27,6 @@ static inline int prepare_hugepage_range(struct file *file,
+ 	return 0;
+ }
+ 
+-static inline void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
+-				   pte_t *ptep, pte_t pte)
+-{
+-	set_pte_at(mm, addr, ptep, pte);
+-}
+-
+ static inline pte_t huge_ptep_get_and_clear(struct mm_struct *mm,
+ 					    unsigned long addr, pte_t *ptep)
+ {
+diff --git a/include/asm-generic/hugetlb.h b/include/asm-generic/hugetlb.h
+index c697ca9dda18..ee010b756246 100644
+--- a/include/asm-generic/hugetlb.h
++++ b/include/asm-generic/hugetlb.h
+@@ -47,8 +47,14 @@ static inline void hugetlb_free_pgd_range(struct mmu_gather *tlb,
+ {
+ 	free_pgd_range(tlb, addr, end, floor, ceiling);
+ }
++#endif
+ 
+-
++#ifndef __HAVE_ARCH_HUGE_SET_HUGE_PTE_AT
++static inline void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
++		pte_t *ptep, pte_t pte)
++{
++	set_pte_at(mm, addr, ptep, pte);
++}
+ #endif
+ 
+ #endif /* _ASM_GENERIC_HUGETLB_H */
+-- 
+2.16.2
