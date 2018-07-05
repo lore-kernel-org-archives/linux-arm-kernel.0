@@ -1,84 +1,61 @@
-From: yixun.lan@amlogic.com (Yixun Lan)
-Date: Thu, 5 Jul 2018 10:52:12 +0800
-Subject: [PATCH 0/3] pinctrl: meson-g12a: add pinctrl driver support
-In-Reply-To: <78da7e13-e80b-d714-86d0-7c5f6fc0d9f5@baylibre.com>
-References: <20180704224511.29350-1-yixun.lan@amlogic.com>
- <78da7e13-e80b-d714-86d0-7c5f6fc0d9f5@baylibre.com>
-Message-ID: <886462fa-1833-a99a-a2fa-5b7dd58341fd@amlogic.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu,  5 Jul 2018 11:11:01 +0800
+Subject: [PATCH v2 0/5] arm64: allwinner: h6: Enable AXP805 PMIC on Pine H64
+Message-ID: <20180705031106.344-1-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HI Neil
+Hi everyone,
 
-On 07/04/18 22:57, Neil Armstrong wrote:
-> Hi Yixun,
-> 
-> On 05/07/2018 00:45, Yixun Lan wrote:
->> This patch series try to add pinctrl driver support for
->> the Meson-G12A SoC.
-> 
-> Thanks for submitting these patches.
-> 
-> Can you explicit this patchset with more details on the G12A SoC family ?
-> It's relationship with AXG and the differences in term of pinmuxing with the other SoC families ?
-> 
-I thought this was already discussed while we doing pinctrl driver for
-Meson-AXG SoC.
+This series enables the AXP805 PMIC found on the Pine64 Pine H64 board.
+The AXP805 seems to be identical to the AXP806 when comparing datasheets.
+The Pine H64 uses the PMIC in stand-alone or "self-working" mode, using
+the I2C interface. Neither features are currently supported. This series
+adds support for them, and then adds the PMIC to the device tree.
 
-Anyway, here it is:
+Changes since v1:
 
-Starting from Meson-AXG SoC, the pinctrl controller block using 4
-continues bit to specific pin mux function, while comparing to old
-generation SoC which kind of using various length bits for the pin mux
-definition. The new design would greatly simplify the software model..
+  - Mentioned "self-working mode" in device tree commit message
+  - Shortened one line mfd cell into just one line
+  - Dropped unrelated pinctrl change
+  - Collected tags from Rob, Icenowy and Lee
 
-for detail example, one 32bit register can describe 8 pins, and each of
-them has 0-7 value to set, start from value 0 to 7.
+Patch 1 adds a new device tree property to describe the self-working mode
+for the AXP806.
 
-partition the register into 8 parts:
-bit[3:0]
-bit[7:4]
-bit[11:8]
-bit[15:12]
-bit[19:16]
-bit[23:20]
-bit[27:24]
-bit[31:28]
+Patch 2 adds support for the newly added property to the driver.
 
+Patch 3 adds support for the using AXP806 with I2C.
 
-for each value:
-value == 0, means the pin is GPIO
-value = {1, 2, ... 7 } is one of specific PIN function
+Patch 4 converts raw clock/reset indices for the H6 R_CCU currently found
+in the device tree to macros defined as part of the device tree bindings.
 
-I could put this info into cover-letter or commit message?
+Patch 5 adds the PMIC and its regulators to the Pine H64 device tree.
 
-> Why is there a GPIOE bank within the AO controller ?
-> 
+First three patches should go in through Lee's mfd tree. We'll take the
+other two through the sunxi tree.
 
-It actually sit in the AO domain, although it's sounds strange from the
-naming..
+Please have a look.
 
-I'm not sure if it's good idea to append a AO suffix? since the
-documentation just use the plain GPIOE
+Regards
+ChenYu
 
-> Thanks,
-> Neil
-> 
->>
->> Yixun Lan (3):
->>   documentation: Add compatibles for Amlogic Meson G12A pin controllers
->>   dt-bindings: pinctrl: meson-g12a: document pin name
->>   pinctrl: meson-g12a: add pinctrl driver support
->>
->>  .../bindings/pinctrl/meson,pinctrl.txt        |    2 +
->>  drivers/pinctrl/meson/Kconfig                 |    6 +
->>  drivers/pinctrl/meson/Makefile                |    1 +
->>  drivers/pinctrl/meson/pinctrl-meson-g12a.c    | 1432 +++++++++++++++++
->>  include/dt-bindings/gpio/meson-g12a-gpio.h    |  114 ++
->>  5 files changed, 1555 insertions(+)
->>  create mode 100644 drivers/pinctrl/meson/pinctrl-meson-g12a.c
->>  create mode 100644 include/dt-bindings/gpio/meson-g12a-gpio.h
->>
-> 
-> .
-> 
+Chen-Yu Tsai (4):
+  dt-bindings: mfd: axp20x: Add "self-working" mode for AXP806
+  mfd: axp20x: Add self-working mode support for AXP806
+  mfd: axp20x: Support AXP806 in I2C mode
+  arm64: dts: allwinner: h6: Use macros for R_CCU clock and reset
+    indices
+
+Icenowy Zheng (1):
+  arm64: dts: allwinner: h6: enable AXP805 PMIC on Pine H64
+
+ .../devicetree/bindings/mfd/axp20x.txt        |   7 +-
+ .../boot/dts/allwinner/sun50i-h6-pine-h64.dts | 109 ++++++++++++++++++
+ arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi  |   8 +-
+ drivers/mfd/axp20x-i2c.c                      |   2 +
+ drivers/mfd/axp20x.c                          |  30 ++++-
+ 5 files changed, 148 insertions(+), 8 deletions(-)
+
+-- 
+2.18.0
