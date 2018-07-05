@@ -1,48 +1,68 @@
-From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Thu, 5 Jul 2018 22:09:27 +0300
-Subject: [PATCH 2/3] ARM: dts: imx31: add device tree description of basic
- controllers
-In-Reply-To: <CAOMZO5AW6QryKAjcG_kE011G1anLD=-EaJFhAaWzaqbf3aKNUQ@mail.gmail.com>
-References: <20180703192934.6080-1-vz@mleia.com>
- <20180703192934.6080-3-vz@mleia.com>
- <CAOMZO5AW6QryKAjcG_kE011G1anLD=-EaJFhAaWzaqbf3aKNUQ@mail.gmail.com>
-Message-ID: <430434fe-da1d-ffd9-0b54-a0c7d63c6284@mleia.com>
+From: labbott@redhat.com (Laura Abbott)
+Date: Thu, 5 Jul 2018 12:20:27 -0700
+Subject: [PATCHv5 1/4] kbuild: Add build salt to the kernel and modules
+In-Reply-To: <CAK7LNAS7XBwDidNaLKC1wD+G30AyAvTHG5GN=UAiP5zz1EO8JA@mail.gmail.com>
+References: <20180703233430.14416-1-labbott@redhat.com>
+ <20180703233430.14416-2-labbott@redhat.com>
+ <CAK7LNAS7XBwDidNaLKC1wD+G30AyAvTHG5GN=UAiP5zz1EO8JA@mail.gmail.com>
+Message-ID: <5e3ce0f4-0c4b-e0aa-2b21-9bf4b5bce9e2@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
-
-On 07/05/2018 04:01 AM, Fabio Estevam wrote:
-> On Tue, Jul 3, 2018 at 4:29 PM, Vladimir Zapolskiy <vz@mleia.com> wrote:
->> The change adds a number of basic peripherals found on i.MX31 SoC:
->> * GPIO controllers,
->> * I2C master controllers,
->> * SPI master controllers,
->> * ATA controller,
->> * SDHC controllers,
->> * RTC, watchdog and PWM contollers,
->> * SDMA,
->> * IRAM,
->> * NAND and WEIM controllers on EMI.
->>
->> The added controller devices were tested on Freescale i.MX31 powered
->> LogicPD Lite SoM and baseboard.
->>
->> DMA functionality was tested on SDHC and SPI controllers so far,
->> thus dmas properties are added to those device nodes only.
->>
->> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+On 07/03/2018 08:59 PM, Masahiro Yamada wrote:
+> Hi.
 > 
-> Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+> Thanks for the update.
+> 
+> 
+> 2018-07-04 8:34 GMT+09:00 Laura Abbott <labbott@redhat.com>:
+>>
+>> The build id generated from --build-id can be generated in several different
+>> ways, with the default being the sha1 on the output of the linked file. For
+>> distributions, it can be useful to make sure this ID is unique, even if the
+>> actual file contents don't change. The easiest way to do this is to insert
+>> a section with some data.
+>>
+>> Add an ELF note to both the kernel and module which contains some data based
+>> off of a config option.
+>>
+>> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+>> Signed-off-by: Laura Abbott <labbott@redhat.com>
+>> ---
+>> v5: I used S-o-b here since the majority of the code was written
+>> already.
+> 
+> 
+> I think Suggested-by is good enough.
+> S-o-b is appended as a patch is passed from people to people.
+> 
+> Anyway, this looks good except one bike-shed.
+> 
+>> Please feel free to change the tag if you think it's not
+>> appropriate. I also tweaked this to take an ascii string instead of just
+>> a hex value since this makes things much easier on the distribution
+>> side.
+>> ---
+> 
+> 
+>> diff --git a/init/Kconfig b/init/Kconfig
+>> index 041f3a022122..8de789f40db9 100644
+>> --- a/init/Kconfig
+>> +++ b/init/Kconfig
+>> @@ -107,6 +107,15 @@ config LOCALVERSION_AUTO
+>>
+>>            which is done within the script "scripts/setlocalversion".)
+>>
+>> +config BUILD_SALT
+>> +       string "Build ID Salt"
+>> +       default "Linux"
+> 
+> 
+> How about empty string ""
+> for default?
+> 
 
-thank you for review, please note that I've just sent v2 with a couple
-of minor fixes as a reply to v1 2/3, I hope that I didn't introduce
-a mess to the series.
+Sure, seems to work fine.
 
-And again I hope that a number of missing SoC specific compatibles
-could be added to the documentation later on, at the moment generic
-variants are good enough to run the corresponding drivers.
-
---
-Best wishes,
-Vladimir
+Thanks,
+Laura
