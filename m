@@ -1,84 +1,28 @@
-From: luto@kernel.org (Andy Lutomirski)
-Date: Thu, 5 Jul 2018 14:46:35 -0700
-Subject: [PATCHv5 2/4] x86: Add build salt to the vDSO
-In-Reply-To: <2abd8138-0f62-79a5-5a2c-8e08aee171b8@redhat.com>
-References: <20180703233430.14416-1-labbott@redhat.com>
- <20180703233430.14416-3-labbott@redhat.com>
- <CALCETrVZi2WYbBSifaNV4wajj52PyG-w7z9DekfJvSuZAKi1nA@mail.gmail.com>
- <2abd8138-0f62-79a5-5a2c-8e08aee171b8@redhat.com>
-Message-ID: <CALCETrUdxS5JGJMKjBGWhaLM8yqzW+MjVcmF4QgczQQfFFOk3w@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 5 Jul 2018 15:00:06 -0700
+Subject: [GIT PULL] omap fixes for v4.18-rc cycle
+In-Reply-To: <pull-1530780550-652944@atomide.com>
+References: <pull-1530780550-652944@atomide.com>
+Message-ID: <CAOesGMgk2n8kH+x7dFY_Z3d7tazMskKxALZbFF=BDK1FbOMVWQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sure.
+On Thu, Jul 5, 2018 at 1:50 AM, Tony Lindgren <tony@atomide.com> wrote:
+> From: "Tony Lindgren" <tony@atomide.com>
+>
+> The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
+>
+>   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+>
+> are available in the Git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.18/fixes-signed
+>
+> for you to fetch changes up to 0144eb204cdcdf09a76794b4a294291388e739bc:
+>
+>   ARM: dts: omap3: Fix am3517 mdio and emac clock references (2018-07-03 00:39:09 -0700)
 
-On Thu, Jul 5, 2018 at 12:08 PM, Laura Abbott <labbott@redhat.com> wrote:
-> On 07/05/2018 08:58 AM, Andy Lutomirski wrote:
->>
->> On Tue, Jul 3, 2018 at 4:34 PM, Laura Abbott <labbott@redhat.com> wrote:
->>>
->>>
->>> The vDSO needs to have a unique build id in a similar manner
->>> to the kernel and modules. Use the build salt macro.
->>>
->>
->> Looks good to me.  I have no idea whose tree these would go through.
->>
->
-> I was intending this to go through kbuild tree. Can I take this
-> as an Ack?
->
->
->>> Signed-off-by: Laura Abbott <labbott@redhat.com>
->>> ---
->>> v5: Switched to using the single line BUILD_SALT macro
->>> ---
->>>   arch/x86/entry/vdso/vdso-note.S   | 3 +++
->>>   arch/x86/entry/vdso/vdso32/note.S | 3 +++
->>>   2 files changed, 6 insertions(+)
->>>
->>> diff --git a/arch/x86/entry/vdso/vdso-note.S
->>> b/arch/x86/entry/vdso/vdso-note.S
->>> index 79a071e4357e..79423170118f 100644
->>> --- a/arch/x86/entry/vdso/vdso-note.S
->>> +++ b/arch/x86/entry/vdso/vdso-note.S
->>> @@ -3,6 +3,7 @@
->>>    * Here we can supply some information useful to userland.
->>>    */
->>>
->>> +#include <linux/build-salt.h>
->>>   #include <linux/uts.h>
->>>   #include <linux/version.h>
->>>   #include <linux/elfnote.h>
->>> @@ -10,3 +11,5 @@
->>>   ELFNOTE_START(Linux, 0, "a")
->>>          .long LINUX_VERSION_CODE
->>>   ELFNOTE_END
->>> +
->>> +BUILD_SALT
->>> diff --git a/arch/x86/entry/vdso/vdso32/note.S
->>> b/arch/x86/entry/vdso/vdso32/note.S
->>> index 9fd51f206314..e78047d119f6 100644
->>> --- a/arch/x86/entry/vdso/vdso32/note.S
->>> +++ b/arch/x86/entry/vdso/vdso32/note.S
->>> @@ -4,6 +4,7 @@
->>>    * Here we can supply some information useful to userland.
->>>    */
->>>
->>> +#include <linux/build-salt.h>
->>>   #include <linux/version.h>
->>>   #include <linux/elfnote.h>
->>>
->>> @@ -14,6 +15,8 @@ ELFNOTE_START(Linux, 0, "a")
->>>          .long LINUX_VERSION_CODE
->>>   ELFNOTE_END
->>>
->>> +BUILD_SALT
->>> +
->>>   #ifdef CONFIG_XEN
->>>   /*
->>>    * Add a special note telling glibc's dynamic linker a fake hardware
->>> --
->>> 2.17.1
->>>
->
+Merged, thanks!
+
+
+-Olof
