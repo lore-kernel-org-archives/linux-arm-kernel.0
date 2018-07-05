@@ -1,37 +1,120 @@
-From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Thu,  5 Jul 2018 18:04:33 +0200
-Subject: [PATCH v3 19/23] dt-bindings: thermal: armada: add reference to new
- bindings
-In-Reply-To: <20180705160437.12325-1-miquel.raynal@bootlin.com>
-References: <20180705160437.12325-1-miquel.raynal@bootlin.com>
-Message-ID: <20180705160437.12325-20-miquel.raynal@bootlin.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 5 Jul 2018 17:23:57 +0100
+Subject: [PATCH 2/3] PCI: mvebu: Convert to use pci_host_bridge directly
+In-Reply-To: <20180629091007.31069-3-thomas.petazzoni@bootlin.com>
+References: <20180629091007.31069-1-thomas.petazzoni@bootlin.com>
+ <20180629091007.31069-3-thomas.petazzoni@bootlin.com>
+Message-ID: <20180705162357.GB13716@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-New bindings (with the syscon and the overheat interrupt) are available
-for AP806 and CP110 compatibles. Add a reference to these files from the
-original documentation.
+On Fri, Jun 29, 2018 at 11:10:06AM +0200, Thomas Petazzoni wrote:
 
-Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
----
- Documentation/devicetree/bindings/thermal/armada-thermal.txt | 5 +++++
- 1 file changed, 5 insertions(+)
+[...]
 
-diff --git a/Documentation/devicetree/bindings/thermal/armada-thermal.txt b/Documentation/devicetree/bindings/thermal/armada-thermal.txt
-index e0d013a2e66d..f3b441100890 100644
---- a/Documentation/devicetree/bindings/thermal/armada-thermal.txt
-+++ b/Documentation/devicetree/bindings/thermal/armada-thermal.txt
-@@ -10,6 +10,11 @@ Required properties:
-     * marvell,armada-ap806-thermal
-     * marvell,armada-cp110-thermal
- 
-+Note: these bindings are deprecated for AP806/CP110 and should instead
-+follow the rules described in:
-+Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt
-+Documentation/devicetree/bindings/arm/marvell/cp110-system-controller.txt
-+
- - reg: Device's register space.
-   Two entries are expected, see the examples below. The first one points
-   to the status register (4B). The second one points to the control
--- 
-2.14.1
+> +	pcie->mem.name = "PCI MEM";
+> +	pci_add_resource_offset(&pcie->resources, &pcie->mem, 0);
+
+Nit: pci_add_resource() would do.
+
+> +
+> +	/* Get the PCIe IO aperture */
+>  	mvebu_mbus_get_pcie_io_aperture(&pcie->io);
+>  
+>  	if (resource_size(&pcie->io) != 0) {
+> @@ -1055,12 +1016,42 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
+>  	} else
+>  		pcie->realio = pcie->io;
+>  
+> -	/* Get the bus range */
+> -	ret = of_pci_parse_bus_range(np, &pcie->busn);
+> -	if (ret) {
+> -		dev_err(dev, "failed to parse bus-range property: %d\n", ret);
+> +	pcie->realio.name = "PCI I/O";
+> +
+> +	if (resource_size(&pcie->realio) != 0)
+> +		pci_add_resource_offset(&pcie->resources, &pcie->realio, 0);
+
+Ditto.
+
+> +
+> +	ret = devm_request_pci_bus_resources(dev, &pcie->resources);
+> +	if (ret)
+> +		return 0;
+> +
+> +	ret = pci_remap_iospace(&pcie->realio, pcie->realio.start);
+> +	if (ret)
+> +		return ret;
+> +
+> +	return 0;
+> +}
+> +
+> +static int mvebu_pcie_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	struct mvebu_pcie *pcie;
+> +	struct pci_host_bridge *bridge;
+> +	struct device_node *np = dev->of_node;
+> +	struct device_node *child;
+> +	int num, i, ret;
+> +
+> +	bridge = devm_pci_alloc_host_bridge(dev, sizeof(struct mvebu_pcie));
+> +	if (!bridge)
+> +		return -ENOMEM;
+> +
+> +	pcie = pci_host_bridge_priv(bridge);
+> +	pcie->pdev = pdev;
+> +	platform_set_drvdata(pdev, pcie);
+> +
+> +	ret = mvebu_pcie_parse_request_resources(pcie);
+> +	if (ret)
+>  		return ret;
+> -	}
+>  
+>  	num = of_get_available_child_count(np);
+>  
+> @@ -1104,18 +1095,24 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
+>  			continue;
+>  		}
+>  
+> +		mvebu_pcie_setup_hw(port);
+>  		mvebu_pcie_set_local_dev_nr(port, 1);
+>  		mvebu_pci_sw_bridge_init(port);
+>  	}
+>  
+>  	pcie->nports = i;
+>  
+> -	for (i = 0; i < (IO_SPACE_LIMIT - SZ_64K); i += SZ_64K)
+> -		pci_ioremap_io(i, pcie->io.start + i);
+
+Mmmm..I think that arch/arm let the mach override the mapping attributes
+for MVEBU (for some platforms) so replacing this with
+pci_remap_iospace() may trigger a regression, we need to investigate.
+
+Also, I do not know why the loop above does not pay attention to the
+real IO space resource size, whether that's on purpose or just a left
+over.
+
+Lorenzo
+
+> -
+> -	mvebu_pcie_enable(pcie);
+> -
+> -	return 0;
+> +	list_splice_init(&pcie->resources, &bridge->windows);
+> +	bridge->dev.parent = dev;
+> +	bridge->sysdata = pcie;
+> +	bridge->busnr = 0;
+> +	bridge->ops = &mvebu_pcie_ops;
+> +	bridge->map_irq = of_irq_parse_and_map_pci;
+> +	bridge->swizzle_irq = pci_common_swizzle;
+> +	bridge->align_resource = mvebu_pcie_align_resource;
+> +	bridge->msi = pcie->msi;
+> +
+> +	return pci_host_probe(bridge);
+>  }
+>  
+>  static const struct of_device_id mvebu_pcie_of_match_table[] = {
+> -- 
+> 2.14.4
+> 
