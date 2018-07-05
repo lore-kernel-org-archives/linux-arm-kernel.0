@@ -1,63 +1,36 @@
-From: arnaud.ferraris.external@sigfox.com (Arnaud Ferraris)
-Date: Thu, 5 Jul 2018 17:04:39 +0200
-Subject: [PATCH] arm64: dts: marvell: a3700: reserve ATF memory
-In-Reply-To: <87bmbl21fj.fsf@bootlin.com>
-References: <1530801041-6909-1-git-send-email-arnaud.ferraris.external@sigfox.com>
- <87bmbl21fj.fsf@bootlin.com>
-Message-ID: <a5e3843b-6400-f1e6-d675-f44b9954aabc@sigfox.com>
+From: ezequiel@collabora.com (Ezequiel Garcia)
+Date: Thu,  5 Jul 2018 12:08:16 -0300
+Subject: [PATCH v3 0/2] arm64: rockchip: support RK3399 Ficus board
+Message-ID: <20180705150818.29931-1-ezequiel@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gregory,
+Here's the third spin for the RK3399 Ficus support.
 
-On 05/07/2018 16:37, Gregory CLEMENT wrote:
+Changes from v2:
+ * Dropped rk3399.dtsi changes and rebased on top of Randy's patch.
+ * Removed double empty line.
+ * Coalesced schematics comment
 
-> A similar patch[1] was applied last week in mvebu/dt64 and should be in
-> linux-next.
+Changes from v1:
+ * Dropoed USB support as it's not working.
+ * Added schematics.
+ * Splitted rk3399.dtsi from new ficus.dts file.
+ * Added new vendor.
+ * Cleaned regulators syntax and stlye.
 
-My bad, I forgot to check linux-next.
+Series based on: 600b359d2b98 ("arm64: dts: rockchip: add some common pin-settings to rk3399").
 
-Thanks,
+Ezequiel Garcia (2):
+  dt-bindings: Add vendor prefix for Vamrs Ltd.
+  arm64: dts: rockchip: add 96boards RK3399 Ficus board
 
-Arnaud
+ .../devicetree/bindings/arm/rockchip.txt      |   5 +
+ .../devicetree/bindings/vendor-prefixes.txt   |   1 +
+ arch/arm64/boot/dts/rockchip/Makefile         |   1 +
+ arch/arm64/boot/dts/rockchip/rk3399-ficus.dts | 514 ++++++++++++++++++
+ 4 files changed, 521 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/rockchip/rk3399-ficus.dts
 
-> But keep in mind that U-Boot is supposed to update the reg value to
-> match your configuration.
->
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2018-June/587408.html
->
-> Thanks,
->
-> Gregory
->
->> Signed-off-by: Arnaud Ferraris <arnaud.ferraris.external@sigfox.com>
->> ---
->>   arch/arm64/boot/dts/marvell/armada-37xx.dtsi | 11 +++++++++++
->>   1 file changed, 11 insertions(+)
->>
->> diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
->> index 3353252..2110e7d 100644
->> --- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
->> +++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
->> @@ -34,6 +34,17 @@
->>   		};
->>   	};
->>   
->> +	reserved-memory {
->> +		#address-cells = <2>;
->> +		#size-cells = <2>;
->> +		ranges;
->> +
->> +		arm-trusted-firmware at 4000000 {
->> +			no-map;
->> +			reg = <0x0 0x04000000 0x0 0x01000000>;
->> +		};
->> +	};
->> +
->>   	psci {
->>   		compatible = "arm,psci-0.2";
->>   		method = "smc";
->> -- 
->> 2.7.4
->>
->
+-- 
+2.18.0.rc2
