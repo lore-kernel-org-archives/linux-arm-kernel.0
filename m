@@ -1,197 +1,61 @@
-From: Ben.Whitten@lairdtech.com (Ben Whitten)
-Date: Thu, 5 Jul 2018 08:43:27 +0000
-Subject: [RFC net-next 15/15] net: lora: Add Semtech SX1301
-In-Reply-To: <8d514feb-41c7-8ec4-ace2-94e627187a0b@suse.de>
-References: <20180701110804.32415-1-afaerber@suse.de>
- <20180701110804.32415-16-afaerber@suse.de>
- <20180702161258.GA18744@sirena.org.uk>
- <4e06cc72-2092-70f3-c801-bf6e4c3cbec2@suse.de>
- <BY1PR02MB111481D94EB0D68AD5FCA689E7430@BY1PR02MB1114.namprd02.prod.outlook.com>
- <8d514feb-41c7-8ec4-ace2-94e627187a0b@suse.de>
-Message-ID: <BY1PR02MB111404D586D88AB2F93FDA03E7400@BY1PR02MB1114.namprd02.prod.outlook.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 5 Jul 2018 10:44:21 +0200
+Subject: [PATCH 2/2] arm64: dts: hi6220: Add all CPUs in cooling maps
+In-Reply-To: <fd741a8140809406ce86c479bbf6f03319490a64.1530766981.git.viresh.kumar@linaro.org>
+References: <cover.1530766981.git.viresh.kumar@linaro.org>
+ <fd741a8140809406ce86c479bbf6f03319490a64.1530766981.git.viresh.kumar@linaro.org>
+Message-ID: <b3d817e6-f694-0a63-afce-a8ec9c78aace@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Subject: Re: [RFC net-next 15/15] net: lora: Add Semtech SX1301
+On 05/07/2018 07:09, Viresh Kumar wrote:
+> Each CPU can (and does) participate in cooling down the system but the
+> DT only captures the CPU0 in the cooling maps. Things work by chance as
+> under normal circumstances its the CPU0 which is used by the operating
+> systems to probe the cooling devices. But as soon as that ordering
+> changes and any other CPU is used to bring up the cooling device, we
+> will start seeing errors.
 > 
-> Hi Ben,
+> On the other hand, the hardware is partially defined in DT in these
+> cases and we must do a better job by capturing all devices.
 > 
-> Am 02.07.2018 um 22:43 schrieb Ben Whitten:
-> >> 2) This SPI device is in turn exposing the two SPI masters that you
-> >> already found below, and I didn't see a sane way to split that code out
-> >> into drivers/spi/, so it's in drivers/net/lora/ here - has there been
-> >> any precedence either way?
-> >
-> > In my work in progress driver I just register one controller for the sx1301
-> with two chip selects and use the chip select information to choose the
-> correct radio to send to, this is based on the DT reg information. No need to
-> register two separate masters.
+> Add all devices (CPUs here) in the cooling maps which are also affected
+> by the trip point.
 > 
-> I had considered that and discarded it. The SX1301 has not just two CS
-> registers though but also two pairs of addr, data registers. That speaks
-> for two masters with a single chip-select each, unless I'm
-> misunderstanding the meaning of the registers.
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-Based on Marks suggestion I am experimenting with using the SX1301 to expose a regmap_bus that the underlying SX1257 can attach to, so the radio has a core component, a SPI component for direct connection and this concentrator connection component. 
+Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-> >> Am 02.07.2018 um 18:12 schrieb Mark Brown:
-> >>> On Sun, Jul 01, 2018 at 01:08:04PM +0200, Andreas F?rber wrote:
-> >>>
-> >>>> +static void sx1301_radio_spi_set_cs(struct spi_device *spi, bool
-> enable)
-> >>>> +{
-> >>>> +	int ret;
-> >>>> +
-> >>>> +	dev_dbg(&spi->dev, "setting SPI CS to %s\n", enable ? "1" : "0");
-> >>>> +
-> >>>> +	if (enable)
-> >>>> +		return;
-> >>>> +
-> >>>> +	ret = sx1301_radio_set_cs(spi->controller, enable);
-> >>>> +	if (ret)
-> >>>> +		dev_warn(&spi->dev, "failed to write CS (%d)\n", ret);
-> >>>> +}
-> >>>
-> >>> So we never disable chip select?
-> >>
-> >> Not here, I instead did that in transfer_one below.
-> >>
-> >> Unfortunately there seems to be no documentation, only reference
-> code:
-> >>
-> >> https://github.com/Lora-
-> >> net/lora_gateway/blob/master/libloragw/src/loragw_radio.c#L121
-> >> https://github.com/Lora-
-> >> net/lora_gateway/blob/master/libloragw/src/loragw_radio.c#L165
-> >>
-> >> It sets CS to 0 before writing to address and data registers, then
-> >> immediately sets CS to 1 and back to 0 before reading or ending the
-> >> write transaction. I've tried to force the same behavior in this driver.
-> >> My guess was that CS is high-active during the short 1-0 cycle, because
-> >> if it's low-active during the register writes then why the heck is it
-> >> set to 0 again in the end instead of keeping at 1... confusing.
-> >>
-> >> Maybe the Semtech folks CC'ed can comment how these registers work?
-> >>
-> >>>> +	if (tx_buf) {
-> >>>> +		ret = sx1301_write(ssx->parent, ssx->regs +
-> >> REG_RADIO_X_ADDR, tx_buf ? tx_buf[0] : 0);
-> >>>
-> >>> This looks confused.  We're in an if (tx_buf) block but there's a use of
-> >>> the ternery operator that appears to be checking if we have a tx_buf?
-> >>
-> >> Yeah, as mentioned this RFC is not ready for merging - checkpatch.pl
-> >> will complain about lines too long, and TODOs are sprinkled all over or
-> >> not even mentioned. It's a Proof of Concept that a net_device could work
-> >> for a wide range of spi and serdev based drivers, and on top this device
-> >> has more than one channel, which may influence network-level design
-> >> discussions.
-> >>
-> >> That said, I'll happily drop the second check. Thanks for spotting!
-> >>
-> >>>> +		if (ret) {
-> >>>> +			dev_err(&spi->dev, "SPI radio address write
-> >> failed\n");
-> >>>> +			return ret;
-> >>>> +		}
-> >>>> +
-> >>>> +		ret = sx1301_write(ssx->parent, ssx->regs +
-> >> REG_RADIO_X_DATA, (tx_buf && xfr->len >= 2) ? tx_buf[1] : 0);
-> >>>> +		if (ret) {
-> >>>> +			dev_err(&spi->dev, "SPI radio data write failed\n");
-> >>>> +			return ret;
-> >>>> +		}
-> >>>
-> >>> This looks awfully like you're coming in at the wrong abstraction layer
-> >>> and the hardware actually implements a register abstraction rather than
-> >>> a SPI one so you should be using regmap as the abstraction.
-> >>
-> >> I don't understand. Ben has suggested using regmap for the SPI _device_
-> >> that we're talking to, which may be a good idea. But this SX1301 device
-> >> in turn has two SPI _masters_ talking to an SX125x slave each. I don't
-> >> see how using regmap instead of my wrappers avoids this spi_controller?
-> >> The whole point of this spi_controller is to abstract and separate the
-> >> SX1255 vs. SX1257 vs. whatever-radio-attached into a separate driver,
-> >> instead of mixing it into the SX1301 driver - to me that looks cleaner
-> >> and more extensible. It also has the side-effect that we could configure
-> >> the two radios via DT (frequencies, clk output, etc.).
-> >
-> > You want an SPI controller in the SX1301 as the down stream radios are SPI
-> and could be attached directly to a host SPI bus, makes sense to have one
-> radio driver and talk through the SX1301.
-> > But you should use the regmap to access the SX1301 master controller
-> registers.
-> > Example I use with one SPI master and some clock info:
-> > eg:
-> > 	sx1301: sx1301 at 0 {
+> ---
+>  arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 9 ++++++++-
+>  1 file changed, 8 insertions(+), 1 deletion(-)
 > 
-> Node names should not repeat the chipset, that goes into compatible.
+> diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+> index 247024df714f..919d36b91bf3 100644
+> --- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+> +++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+> @@ -886,7 +886,14 @@
+>  				cooling-maps {
+>  					map0 {
+>  						trip = <&target>;
+> -						cooling-device = <&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
+> +						cooling-device = <&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>,
+> +								 <&cpu1 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>,
+> +								 <&cpu2 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>,
+> +								 <&cpu3 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>,
+> +								 <&cpu4 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>,
+> +								 <&cpu5 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>,
+> +								 <&cpu6 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>,
+> +								 <&cpu7 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
+>  					};
+>  				};
+>  			};
 > 
-> lora-concentrator at 0?
-> 
-Sure
 
-> > 		compatible = "semtech,sx1301";
-> > 		reg = <0>;
-> > 		#address-cells = <1>;
-> > 		#size-cells = <0>;
-> 
-> I would still find it cleaner to have (a) sub-node(s) for the radios.
-How do you mean?
 
-> > 		spi-max-frequency = <8000000>;
-> 
-> Datasheet says 10 MHz, why 8 MHz?
-> 
-> > 		gpios-reset = <&pioA 26 GPIO_ACTIVE_HIGH>;
-> 
-> reset-gpios?
-Agreed, this seems more common.
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-> > 		clocks = <&radio1 0>, <&clkhs 0>;
-> > 		clock-names = "clk32m", "clkhs";
-> >
-> > 		radio0: sx1257 at 0 {
-> 
-> lora at 0?
-> 
-> > 			compatible = "semtech,sx125x";
-> 
-> No wildcards in bindings please, use concrete "semtech,sx1257".
-Sure
-
-> > 			reg = <0>;
-> > 			spi-max-frequency = <8000000>;
-> 
-> Datasheet says 10 ns - I reported to Semtech that it should probably say
-> 10 MHz, too.
-> 
-> > 			tx;
-> 
-> Might we configure that on the sx1301 instead?
-
-Well the ability for a radio to TX is a radio property really. It depends on the board which chain has the PAs on. I don?t think that its appropriate to configure this at the concentrator, it can instead discover this from the radios.
-
-> > 			clocks = <&tcxo 0>;
-> > 			clock-names = "tcxo";
-> > 		};
-> >
-> > 		radio1: sx1257 at 1 {
-> > 			compatible = "semtech,sx125x";
-> > 			reg = <1>;
-> > 			spi-max-frequency = <8000000>;
-> > 			#clock-cells = <0>;
-> > 			clocks = <&tcxo 0>;
-> > 			clock-names = "tcxo";
-> > 			clock-output-names = "clk32m";
-> > 		};
-> > };
-> [snip]
-> 
-> Regards,
-> Andreas
-> 
-> --
-> SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-> GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-> HRB 21284 (AG N?rnberg)
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
