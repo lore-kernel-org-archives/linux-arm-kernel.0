@@ -1,50 +1,70 @@
-From: thor.thayer@linux.intel.com (thor.thayer at linux.intel.com)
-Date: Thu,  5 Jul 2018 17:18:34 -0500
-Subject: [v4.14-stable] arm64: dts: stratix10: Fix SPI IRQ for Stratix10
-Message-ID: <1530829114-16889-1-git-send-email-thor.thayer@linux.intel.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 6 Jul 2018 00:26:16 +0200
+Subject: [PATCH v2 2/4] efi/arm: map UEFI memory map even w/o runtime
+ services enabled
+In-Reply-To: <20180619064424.6642-3-takahiro.akashi@linaro.org>
+References: <20180619064424.6642-1-takahiro.akashi@linaro.org>
+ <20180619064424.6642-3-takahiro.akashi@linaro.org>
+Message-ID: <CAKv+Gu8m6DafSohjodBe324=UdubrPRLxGVGfTqOxhJ7FYK5Bg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thor Thayer <thor.thayer@linux.intel.com>
+On 19 June 2018 at 08:44, AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
+> Under the current implementation, UEFI memory map will be mapped and made
+> available in virtual mappings only if runtime services are enabled.
+> But in a later patch, we want to use UEFI memory map in acpi_os_ioremap()
+> to create mappings of ACPI tables using memory attributes described in
+> UEFI memory map.
+>
+> So, as a first step, arm_enter_runtime_services() will be modified
+> so that UEFI memory map will be always accessible.
+>
+> See a relevant commit:
+>     arm64: acpi: fix alignment fault in accessing ACPI tables
+>
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-Fix the SPI interrupt numbers for Stratix10.
+Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-This is a backport for stable 4.9.x and 4.14.x branches.
-(original includes other changes that are not relevant
-to this branch):
+This may be taken via the arm64 tree.
 
-[backport 'commit 889d15090420 ("arm64: dts: stratix10:
-    fix SPI settings")']
-
-Cc: <stable@vger.kernel.org>  # 4.9.x
-Cc: <stable@vger.kernel.org>  # 4.14.x
-Fixes: 78cd6a9d8e154 ("arm64: dts: Add base stratix 10 dtsi")
-Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
----
- arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
-index 57f75453ee93..5db972c0492f 100644
---- a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
-+++ b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
-@@ -230,7 +230,7 @@
- 			#address-cells = <1>;
- 			#size-cells = <0>;
- 			reg = <0xffda4000 0x1000>;
--			interrupts = <0 101 4>;
-+			interrupts = <0 99 4>;
- 			num-cs = <4>;
- 			status = "disabled";
- 		};
-@@ -240,7 +240,7 @@
- 			#address-cells = <1>;
- 			#size-cells = <0>;
- 			reg = <0xffda5000 0x1000>;
--			interrupts = <0 102 4>;
-+			interrupts = <0 100 4>;
- 			num-cs = <4>;
- 			status = "disabled";
- 		};
--- 
-2.7.4
+> ---
+>  drivers/firmware/efi/arm-runtime.c | 14 +++++++-------
+>  1 file changed, 7 insertions(+), 7 deletions(-)
+>
+> diff --git a/drivers/firmware/efi/arm-runtime.c b/drivers/firmware/efi/arm-runtime.c
+> index 5889cbea60b8..30ac5c82051e 100644
+> --- a/drivers/firmware/efi/arm-runtime.c
+> +++ b/drivers/firmware/efi/arm-runtime.c
+> @@ -115,6 +115,13 @@ static int __init arm_enable_runtime_services(void)
+>                 return 0;
+>         }
+>
+> +       mapsize = efi.memmap.desc_size * efi.memmap.nr_map;
+> +
+> +       if (efi_memmap_init_late(efi.memmap.phys_map, mapsize)) {
+> +               pr_err("Failed to remap EFI memory map\n");
+> +               return 0;
+> +       }
+> +
+>         if (efi_runtime_disabled()) {
+>                 pr_info("EFI runtime services will be disabled.\n");
+>                 return 0;
+> @@ -127,13 +134,6 @@ static int __init arm_enable_runtime_services(void)
+>
+>         pr_info("Remapping and enabling EFI services.\n");
+>
+> -       mapsize = efi.memmap.desc_size * efi.memmap.nr_map;
+> -
+> -       if (efi_memmap_init_late(efi.memmap.phys_map, mapsize)) {
+> -               pr_err("Failed to remap EFI memory map\n");
+> -               return -ENOMEM;
+> -       }
+> -
+>         if (!efi_virtmap_init()) {
+>                 pr_err("UEFI virtual mapping missing or invalid -- runtime services will not be available\n");
+>                 return -ENOMEM;
+> --
+> 2.17.0
+>
