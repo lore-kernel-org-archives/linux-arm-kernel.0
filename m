@@ -1,199 +1,64 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Thu, 05 Jul 2018 17:29:31 +0200
-Subject: [PATCH v2] soc: imx: gpc: Turn PU domain on/off in sleep on 6qp
-In-Reply-To: <72f3e615f4df69ee6d802efbd1e1e52692c8e134.1530803324.git.leonard.crestez@nxp.com>
-References: <72f3e615f4df69ee6d802efbd1e1e52692c8e134.1530803324.git.leonard.crestez@nxp.com>
-Message-ID: <1530804571.15725.4.camel@pengutronix.de>
+From: james.morse@arm.com (James Morse)
+Date: Thu, 5 Jul 2018 16:42:51 +0100
+Subject: [PATCH v5 00/20] APEI in_nmi() rework and arm64 SDEI wire-up
+In-Reply-To: <4409985.sv3PbRGN0l@aspire.rjw.lan>
+References: <20180626170116.25825-1-james.morse@arm.com>
+ <4409985.sv3PbRGN0l@aspire.rjw.lan>
+Message-ID: <1246af75-eaf4-e306-2276-65859be053e6@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, den 05.07.2018, 18:12 +0300 schrieb Leonard Crestez:
-> On imx6qp power gating on the PU domain is disabled because of errata
-> ERR009619. However power gating during suspend/resume can still be
-> performed.
-> 
-> Enable this by implementing SLEEP_PM_OPS in imx_pgc_power_domain_driver.
-> 
-> > Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
+Hi guys,
 
-This looks much better than the previous version.
+On 05/07/18 10:50, Rafael J. Wysocki wrote:
+> On Tuesday, June 26, 2018 7:00:56 PM CEST James Morse wrote:
+>> The aim of this series is to wire arm64's SDEI into APEI.
+>>
+>> On arm64 we have three APEI notifications that are NMI-like, and
+>> in the unlikely event that all three are supported by a platform,
+>> they can interrupt each other.
+>> The GHES driver shouldn't have to deal with this, so this series aims
+>> to make it re-entrant.
+>>
+>> To do that, we refactor the estatus queue to allow multiple notifications
+>> to use it, then convert NOTIFY_SEA to always be described as NMI-like,
+>> and to use the estatus queue.
+>>
+>> From here we push the locking and fixmap choices out to the notification
+>> functions, and remove the use of per-ghes estatus and flags. This removes
+>> the in_nmi() 'timebomb' in ghes_copy_tofrom_phys().
+>>
+>> Things get sticky when an NMI notification needs to know how big the
+>> CPER records might be, before reading it. This series splits
+>> ghes_estatus_read() to let us peek at the buffer. A side effect of this
+>> is the 20byte header will get read twice. (how does it work today? it
+>> reads the records into a per-ghes worst-case sized buffer, allocates
+>> the correct size and copies the records. in_nmi() use of this per-ghes
+>> buffer needs eliminating).
+>>
+>> One alternative was to trust firmware's 'max raw data length' and use
+>> that to allocate 'enough' memory. We don't use this value today, so its
+>> probably wrong on some sytem somewhere.
+>>
+>> Since v4 patches 5,8-15 are new, otherwise changes are noted in the patch.
 
-> ---
-> ?drivers/soc/imx/gpc.c | 72 ++++++++++++++++++++++++++++++++++---------
-> ?1 file changed, 57 insertions(+), 15 deletions(-)
-> 
-> Changes since v1: Implement SLEEP_PM_OPS instead of calling from
-> platform-level suspend code, as suggested by Lucas.
-> 
-> I'm not sure if doing interesting things in the pm_ops for PM providers
-> is recommended. Is correct ordering guaranteed in such a case???Any
-> VPU/GPU suspend code must execute before imx_pgc_suspend or it might try
-> to access registers in a region which is powered off.
-> 
-> Perhaps ordering needs to be guaranteed by implementing device_attach
-> and adding explicit device links to pgc platform_device?
+> Tony, I need your help with reviewing the APEI-related material here.
+> Can you please have a look at this series and let me know if there are
+> any concerns regarding it?
 
-Yes, I think we need device links between the users of the power
-domains and the PGC devices. Since this is one of the use-cases for
-which device links were conceived I would guess that implementing this
-should be fairly straight-forward.
+Thanks.
 
-> Link to v1: https://lkml.org/lkml/2018/7/2/370
-> 
-> diff --git a/drivers/soc/imx/gpc.c b/drivers/soc/imx/gpc.c
-> index b4acdfd3cffd..96d9e882d583 100644
-> --- a/drivers/soc/imx/gpc.c
-> +++ b/drivers/soc/imx/gpc.c
-> @@ -54,19 +54,16 @@ static inline struct imx_pm_domain *
-> ?to_imx_pm_domain(struct generic_pm_domain *genpd)
-> ?{
-> > ?	return container_of(genpd, struct imx_pm_domain, base);
-> ?}
-> ?
-> -static int imx6_pm_domain_power_off(struct generic_pm_domain *genpd)
-> +static void _imx6_pm_domain_power_off(struct generic_pm_domain *genpd)
-> ?{
-> > ?	struct imx_pm_domain *pd = to_imx_pm_domain(genpd);
-> > ?	int iso, iso2sw;
-> > ?	u32 val;
-> ?
-> > -	if (pd->flags & PGC_DOMAIN_FLAG_NO_PD)
-> > -		return -EBUSY;
-> -
-> > ?	/* Read ISO and ISO2SW power down delays */
-> > ?	regmap_read(pd->regmap, pd->reg_offs + GPC_PGC_PUPSCR_OFFS, &val);
-> > ?	iso = val & 0x3f;
-> > ?	iso2sw = (val >> 8) & 0x3f;
-> ?
-> @@ -78,32 +75,33 @@ static int imx6_pm_domain_power_off(struct generic_pm_domain *genpd)
-> > ?	val = BIT(pd->cntr_pdn_bit);
-> > ?	regmap_update_bits(pd->regmap, GPC_CNTR, val, val);
-> ?
-> > ?	/* Wait ISO + ISO2SW IPG clock cycles */
-> > ?	udelay(DIV_ROUND_UP(iso + iso2sw, pd->ipg_rate_mhz));
-> +}
-> +
-> +static int imx6_pm_domain_power_off(struct generic_pm_domain *genpd)
-> +{
-> > +	struct imx_pm_domain *pd = to_imx_pm_domain(genpd);
-> +
-> > +	if (pd->flags & PGC_DOMAIN_FLAG_NO_PD)
-> > +		return -EBUSY;
-> +
-> > +	_imx6_pm_domain_power_off(genpd);
-> ?
-> > ?	if (pd->supply)
-> ?		regulator_disable(pd->supply);
+I think the only context from earlier versions is where Borislav spotted some
+issues with the ghes_proc() call at probe time and NMI-like notifications.
 
-If possible the regulator should also be disabled in the system suspend
-path, as this might reduce power consumption some more. But then this
-might have issues with suspend ordering of the regulator.
+>From https://www.spinics.net/lists/arm-kernel/msg653332.html :
+| Which means, that this code is not really reentrant and if should be
+| fixed to be callable from different contexts, then it should use private
+| buffers and be careful about locking.
 
-As I don't want to send you down the rabbit hole too much with adding
-ordering to this stuff, I won't object to this going in as-is. If this
-is in fact due to a ordering limitation I would like to see this
-documented in a code comment.
+... the patches for which have bloated this series.
 
-Regards,
-Lucas
 
-> ?
-> > ?	return 0;
-> ?}
-> ?
-> -static int imx6_pm_domain_power_on(struct generic_pm_domain *genpd)
-> +static void _imx6_pm_domain_power_on(struct generic_pm_domain *genpd)
-> ?{
-> > ?	struct imx_pm_domain *pd = to_imx_pm_domain(genpd);
-> > -	int i, ret, sw, sw2iso;
-> > +	int i, sw, sw2iso;
-> > ?	u32 val;
-> ?
-> > -	if (pd->supply) {
-> > -		ret = regulator_enable(pd->supply);
-> > -		if (ret) {
-> > -			pr_err("%s: failed to enable regulator: %d\n",
-> > -			???????__func__, ret);
-> > -			return ret;
-> > -		}
-> > -	}
-> -
-> > ?	/* Enable reset clocks for all devices in the domain */
-> > ?	for (i = 0; i < pd->num_clks; i++)
-> > ?		clk_prepare_enable(pd->clk[i]);
-> ?
-> > ?	/* Gate off domain when powered down */
-> @@ -123,10 +121,27 @@ static int imx6_pm_domain_power_on(struct generic_pm_domain *genpd)
-> > ?	udelay(DIV_ROUND_UP(sw + sw2iso, pd->ipg_rate_mhz));
-> ?
-> > ?	/* Disable reset clocks for all devices in the domain */
-> > ?	for (i = 0; i < pd->num_clks; i++)
-> > ?		clk_disable_unprepare(pd->clk[i]);
-> +}
-> +
-> +static int imx6_pm_domain_power_on(struct generic_pm_domain *genpd)
-> +{
-> > +	struct imx_pm_domain *pd = to_imx_pm_domain(genpd);
-> > +	int ret;
-> +
-> > +	if (pd->supply) {
-> > +		ret = regulator_enable(pd->supply);
-> > +		if (ret) {
-> > +			pr_err("%s: failed to enable regulator: %d\n",
-> > +			???????__func__, ret);
-> > +			return ret;
-> > +		}
-> > +	}
-> +
-> > +	_imx6_pm_domain_power_on(genpd);
-> ?
-> > ?	return 0;
-> ?}
-> ?
-> ?static int imx_pgc_get_clocks(struct device *dev, struct imx_pm_domain *domain)
-> @@ -227,18 +242,45 @@ static int imx_pgc_power_domain_remove(struct platform_device *pdev)
-> > ?	}
-> ?
-> > ?	return 0;
-> ?}
-> ?
-> +static int imx_pgc_suspend(struct device *dev)
-> +{
-> > +	struct platform_device *pdev = to_platform_device(dev);
-> > +	struct imx_pm_domain *pd = pdev->dev.platform_data;
-> +
-> > +	if (pd->flags & PGC_DOMAIN_FLAG_NO_PD)
-> > +		_imx6_pm_domain_power_off(&pd->base);
-> +
-> > +	return 0;
-> +}
-> +
-> +static int imx_pgc_resume(struct device *dev)
-> +{
-> > +	struct platform_device *pdev = to_platform_device(dev);
-> > +	struct imx_pm_domain *pd = pdev->dev.platform_data;
-> +
-> > +	if (pd->flags & PGC_DOMAIN_FLAG_NO_PD)
-> > +		_imx6_pm_domain_power_on(&pd->base);
-> +
-> > +	return 0;
-> +}
-> +
-> +static const struct dev_pm_ops imx_pgc_pm_ops = {
-> > +	SET_SYSTEM_SLEEP_PM_OPS(imx_pgc_suspend, imx_pgc_resume)
-> +};
-> +
-> ?static const struct platform_device_id imx_pgc_power_domain_id[] = {
-> > ?	{ "imx-pgc-power-domain"},
-> > ?	{ },
-> ?};
-> ?
-> ?static struct platform_driver imx_pgc_power_domain_driver = {
-> > ?	.driver = {
-> > ?		.name = "imx-pgc-pd",
-> > +		.pm = &imx_pgc_pm_ops,
-> > ?	},
-> > ?	.probe = imx_pgc_power_domain_probe,
-> > ?	.remove = imx_pgc_power_domain_remove,
-> > ?	.id_table = imx_pgc_power_domain_id,
-> ?};
+Thanks,
+
+James
