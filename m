@@ -1,178 +1,122 @@
-From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Thu,  5 Jul 2018 18:12:43 +0300
-Subject: [PATCH v2] soc: imx: gpc: Turn PU domain on/off in sleep on 6qp
-Message-ID: <72f3e615f4df69ee6d802efbd1e1e52692c8e134.1530803324.git.leonard.crestez@nxp.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 5 Jul 2018 17:17:46 +0200
+Subject: [PATCH 01/19] mmc: mmci: regroup and define dma operations
+In-Reply-To: <1528809280-31116-2-git-send-email-ludovic.Barre@st.com>
+References: <1528809280-31116-1-git-send-email-ludovic.Barre@st.com>
+ <1528809280-31116-2-git-send-email-ludovic.Barre@st.com>
+Message-ID: <CAPDyKFpt5HUeUqaoS9icDodM+r64jB9vQ=zTecO0tuBv=TtOXg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On imx6qp power gating on the PU domain is disabled because of errata
-ERR009619. However power gating during suspend/resume can still be
-performed.
+On 12 June 2018 at 15:14, Ludovic Barre <ludovic.Barre@st.com> wrote:
+> From: Ludovic Barre <ludovic.barre@st.com>
+>
+> Prepare mmci driver to manage dma interface by new property.
+> This patch defines and regroups dma operations for mmci drivers.
+> mmci_dma_XX prototypes are added to call member of mmci_dma_ops
+> if not null. Based on legacy need, a mmci dma interface has been
+> defined with:
+> -mmci_dma_setup
+> -mmci_dma_release
+> -mmci_dma_pre_req
+> -mmci_dma_start
+> -mmci_dma_finalize
+> -mmci_dma_post_req
+> -mmci_dma_error
+> -mmci_dma_get_next_data
 
-Enable this by implementing SLEEP_PM_OPS in imx_pgc_power_domain_driver.
+As I suggested for one of the other patches, I would rather turn core
+mmci functions into library functions, which can be either invoked
+from variant callbacks or assigned directly to them.
 
-Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
+In other words, I would leave the functions that you move in this
+patch to stay in mmci.c. Although some needs to be re-factored and we
+also needs to make some of them available to be called from another
+file, hence the functions needs to be shared via mmci.h rather than
+being declared static.
 
----
- drivers/soc/imx/gpc.c | 72 ++++++++++++++++++++++++++++++++++---------
- 1 file changed, 57 insertions(+), 15 deletions(-)
+Let me take a concrete example on how I would move forward, hopefully
+that explains it a bit better. Please see below.
 
-Changes since v1: Implement SLEEP_PM_OPS instead of calling from
-platform-level suspend code, as suggested by Lucas.
+[...]
 
-I'm not sure if doing interesting things in the pm_ops for PM providers
-is recommended. Is correct ordering guaranteed in such a case?  Any
-VPU/GPU suspend code must execute before imx_pgc_suspend or it might try
-to access registers in a region which is powered off.
+> -/*
+> - * All the DMA operation mode stuff goes inside this ifdef.
+> - * This assumes that you have a generic DMA device interface,
+> - * no custom DMA interfaces are supported.
+> - */
+> -#ifdef CONFIG_DMA_ENGINE
+> -static void mmci_dma_setup(struct mmci_host *host)
+> -{
+> -       const char *rxname, *txname;
+> -       struct variant_data *variant = host->variant;
+> -
+> -       host->dma_rx_channel = dma_request_slave_channel(mmc_dev(host->mmc), "rx");
+> -       host->dma_tx_channel = dma_request_slave_channel(mmc_dev(host->mmc), "tx");
+> -
+> -       /* initialize pre request cookie */
+> -       host->next_data.cookie = 1;
+> -
+> -       /*
+> -        * If only an RX channel is specified, the driver will
+> -        * attempt to use it bidirectionally, however if it is
+> -        * is specified but cannot be located, DMA will be disabled.
+> -        */
+> -       if (host->dma_rx_channel && !host->dma_tx_channel)
+> -               host->dma_tx_channel = host->dma_rx_channel;
+> -
+> -       if (host->dma_rx_channel)
+> -               rxname = dma_chan_name(host->dma_rx_channel);
+> -       else
+> -               rxname = "none";
+> -
+> -       if (host->dma_tx_channel)
+> -               txname = dma_chan_name(host->dma_tx_channel);
+> -       else
+> -               txname = "none";
+> -
+> -       dev_info(mmc_dev(host->mmc), "DMA channels RX %s, TX %s\n",
+> -                rxname, txname);
+> -
+> -       /*
+> -        * Limit the maximum segment size in any SG entry according to
+> -        * the parameters of the DMA engine device.
+> -        */
+> -       if (host->dma_tx_channel) {
+> -               struct device *dev = host->dma_tx_channel->device->dev;
+> -               unsigned int max_seg_size = dma_get_max_seg_size(dev);
+> -
+> -               if (max_seg_size < host->mmc->max_seg_size)
+> -                       host->mmc->max_seg_size = max_seg_size;
+> -       }
+> -       if (host->dma_rx_channel) {
+> -               struct device *dev = host->dma_rx_channel->device->dev;
+> -               unsigned int max_seg_size = dma_get_max_seg_size(dev);
+> -
+> -               if (max_seg_size < host->mmc->max_seg_size)
+> -                       host->mmc->max_seg_size = max_seg_size;
+> -       }
 
-Perhaps ordering needs to be guaranteed by implementing device_attach
-and adding explicit device links to pgc platform_device?
+Everything above shall be left as generic library function,
+mmci_dma_setup() and I would share it via mmci.h and thus change it
+from being static.
 
-Link to v1: https://lkml.org/lkml/2018/7/2/370
+> -
+> -       if (variant->qcom_dml && host->dma_rx_channel && host->dma_tx_channel)
+> -               if (dml_hw_init(host, host->mmc->parent->of_node))
+> -                       variant->qcom_dml = false;
 
-diff --git a/drivers/soc/imx/gpc.c b/drivers/soc/imx/gpc.c
-index b4acdfd3cffd..96d9e882d583 100644
---- a/drivers/soc/imx/gpc.c
-+++ b/drivers/soc/imx/gpc.c
-@@ -54,19 +54,16 @@ static inline struct imx_pm_domain *
- to_imx_pm_domain(struct generic_pm_domain *genpd)
- {
- 	return container_of(genpd, struct imx_pm_domain, base);
- }
- 
--static int imx6_pm_domain_power_off(struct generic_pm_domain *genpd)
-+static void _imx6_pm_domain_power_off(struct generic_pm_domain *genpd)
- {
- 	struct imx_pm_domain *pd = to_imx_pm_domain(genpd);
- 	int iso, iso2sw;
- 	u32 val;
- 
--	if (pd->flags & PGC_DOMAIN_FLAG_NO_PD)
--		return -EBUSY;
--
- 	/* Read ISO and ISO2SW power down delays */
- 	regmap_read(pd->regmap, pd->reg_offs + GPC_PGC_PUPSCR_OFFS, &val);
- 	iso = val & 0x3f;
- 	iso2sw = (val >> 8) & 0x3f;
- 
-@@ -78,32 +75,33 @@ static int imx6_pm_domain_power_off(struct generic_pm_domain *genpd)
- 	val = BIT(pd->cntr_pdn_bit);
- 	regmap_update_bits(pd->regmap, GPC_CNTR, val, val);
- 
- 	/* Wait ISO + ISO2SW IPG clock cycles */
- 	udelay(DIV_ROUND_UP(iso + iso2sw, pd->ipg_rate_mhz));
-+}
-+
-+static int imx6_pm_domain_power_off(struct generic_pm_domain *genpd)
-+{
-+	struct imx_pm_domain *pd = to_imx_pm_domain(genpd);
-+
-+	if (pd->flags & PGC_DOMAIN_FLAG_NO_PD)
-+		return -EBUSY;
-+
-+	_imx6_pm_domain_power_off(genpd);
- 
- 	if (pd->supply)
- 		regulator_disable(pd->supply);
- 
- 	return 0;
- }
- 
--static int imx6_pm_domain_power_on(struct generic_pm_domain *genpd)
-+static void _imx6_pm_domain_power_on(struct generic_pm_domain *genpd)
- {
- 	struct imx_pm_domain *pd = to_imx_pm_domain(genpd);
--	int i, ret, sw, sw2iso;
-+	int i, sw, sw2iso;
- 	u32 val;
- 
--	if (pd->supply) {
--		ret = regulator_enable(pd->supply);
--		if (ret) {
--			pr_err("%s: failed to enable regulator: %d\n",
--			       __func__, ret);
--			return ret;
--		}
--	}
--
- 	/* Enable reset clocks for all devices in the domain */
- 	for (i = 0; i < pd->num_clks; i++)
- 		clk_prepare_enable(pd->clk[i]);
- 
- 	/* Gate off domain when powered down */
-@@ -123,10 +121,27 @@ static int imx6_pm_domain_power_on(struct generic_pm_domain *genpd)
- 	udelay(DIV_ROUND_UP(sw + sw2iso, pd->ipg_rate_mhz));
- 
- 	/* Disable reset clocks for all devices in the domain */
- 	for (i = 0; i < pd->num_clks; i++)
- 		clk_disable_unprepare(pd->clk[i]);
-+}
-+
-+static int imx6_pm_domain_power_on(struct generic_pm_domain *genpd)
-+{
-+	struct imx_pm_domain *pd = to_imx_pm_domain(genpd);
-+	int ret;
-+
-+	if (pd->supply) {
-+		ret = regulator_enable(pd->supply);
-+		if (ret) {
-+			pr_err("%s: failed to enable regulator: %d\n",
-+			       __func__, ret);
-+			return ret;
-+		}
-+	}
-+
-+	_imx6_pm_domain_power_on(genpd);
- 
- 	return 0;
- }
- 
- static int imx_pgc_get_clocks(struct device *dev, struct imx_pm_domain *domain)
-@@ -227,18 +242,45 @@ static int imx_pgc_power_domain_remove(struct platform_device *pdev)
- 	}
- 
- 	return 0;
- }
- 
-+static int imx_pgc_suspend(struct device *dev)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct imx_pm_domain *pd = pdev->dev.platform_data;
-+
-+	if (pd->flags & PGC_DOMAIN_FLAG_NO_PD)
-+		_imx6_pm_domain_power_off(&pd->base);
-+
-+	return 0;
-+}
-+
-+static int imx_pgc_resume(struct device *dev)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct imx_pm_domain *pd = pdev->dev.platform_data;
-+
-+	if (pd->flags & PGC_DOMAIN_FLAG_NO_PD)
-+		_imx6_pm_domain_power_on(&pd->base);
-+
-+	return 0;
-+}
-+
-+static const struct dev_pm_ops imx_pgc_pm_ops = {
-+	SET_SYSTEM_SLEEP_PM_OPS(imx_pgc_suspend, imx_pgc_resume)
-+};
-+
- static const struct platform_device_id imx_pgc_power_domain_id[] = {
- 	{ "imx-pgc-power-domain"},
- 	{ },
- };
- 
- static struct platform_driver imx_pgc_power_domain_driver = {
- 	.driver = {
- 		.name = "imx-pgc-pd",
-+		.pm = &imx_pgc_pm_ops,
- 	},
- 	.probe = imx_pgc_power_domain_probe,
- 	.remove = imx_pgc_power_domain_remove,
- 	.id_table = imx_pgc_power_domain_id,
- };
--- 
-2.17.1
+This piece of code, should be made specific to the qcom variant and
+managed though a "mmci_host_ops" callback. The corresponding code in
+that callback would then start by invoking mmci_dma_setup(), before it
+continues with the qcom specific operations.
+
+For legacy variants, the corresponding callback would be set directly
+to mmci_dma_setup() and called through the callback from mmci.c when
+needed. There is no need to have a separate file for DMA for the
+legacy variants, I think.
+
+[...]
+
+Kind regards
+Uffe
