@@ -1,67 +1,129 @@
-From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Thu, 5 Jul 2018 12:05:28 +0200
-Subject: [PATCH v2 18/23] dt-bindings: thermal: armada: add reference to
- new bindings
-In-Reply-To: <20180703213011.GA13190@rob-hp-laptop>
-References: <20180625151239.20976-1-miquel.raynal@bootlin.com>
- <20180625151239.20976-19-miquel.raynal@bootlin.com>
- <20180703213011.GA13190@rob-hp-laptop>
-Message-ID: <20180705120528.4b923e16@xps13>
+From: takahiro.akashi@linaro.org (takahiro.akashi at linaro.org)
+Date: Thu, 5 Jul 2018 19:13:27 +0900
+Subject: panic kexec broken on ARM64?
+In-Reply-To: <23306e9e-fec6-298d-af2d-018f63b06ab1@arm.com>
+References: <20180605100151.7fd54381@ezekiel.suse.cz>
+ <8028219f-0d14-eafd-86b7-359ee927bcd3@arm.com>
+ <5e539510-01b7-ebc5-778e-b49a5261f9bc@i2se.com>
+ <2865150f-ebca-4c6b-fc4b-93bfab5f0e91@arm.com>
+ <86lgbm96dq.wl-marc.zyngier@arm.com>
+ <20180703070106.GV23681@linaro.org>
+ <86601wzn3h.wl-marc.zyngier@arm.com>
+ <20180704084123.GC28220@linaro.org>
+ <23306e9e-fec6-298d-af2d-018f63b06ab1@arm.com>
+Message-ID: <20180705101326.GM28220@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
-
-Rob Herring <robh@kernel.org> wrote on Tue, 3 Jul 2018 15:30:11 -0600:
-
-> On Mon, Jun 25, 2018 at 05:12:34PM +0200, Miquel Raynal wrote:
-> > New bindings (with the syscon and the overheat interrupt) are available  
-> 
-> What interrupt? It's not in your new binding.
-> 
-> > for AP806 and CP110 compatibles. Add a reference to these files from the
-> > original documentation.
+On Wed, Jul 04, 2018 at 10:02:24AM +0100, Marc Zyngier wrote:
+> On 04/07/18 09:41, takahiro.akashi at linaro.org wrote:
+> > On Tue, Jul 03, 2018 at 09:58:44AM +0100, Marc Zyngier wrote:
+> >> On 03/07/18 08:01, takahiro.akashi at linaro.org wrote:
+> >>> Marc, James,
+> >>>
+> >>> I'd like to re-ignite the discussion.
+> >>>
+> >>> On Sun, Jun 10, 2018 at 01:24:17PM +0100, Marc Zyngier wrote:
+> >>>> On Wed, 06 Jun 2018 12:37:02 +0100,
+> >>>> James Morse wrote:
+> >>>>>
+> >>>>> Hi Stefan,
+> >>>>>
+> >>>>> On 06/06/18 08:02, Stefan Wahren wrote:
+> >>>>>> Am 05.06.2018 um 19:46 schrieb James Morse:
+> >>>>>>> On 05/06/18 09:01, Petr Tesarik wrote:
+> >>>>>>>> I attached a hardware debugger and found
+> >>>>>>>> out that all CPU cores were stopped except one which was stuck in the
+> >>>>>>>> idle thread. It seems that irq_set_irqchip_state() may sleep, which is
+> >>>>>>>> definitely not safe after a kernel panic.
+> >>>>>
+> >>>>>>> I don't know much about irqchip stuff, but __irq_get_desc_lock() takes a
+> >>>>>>> raw_spin_lock(), and calls gic_irq_get_irqchip_state() which is just poking
+> >>>>>>> around in mmio registers, this should all be safe unless you re-entered the same
+> >>>>>>> code.
+> >>>>>
+> >>>>>>>> If I'm right, then this is broken in general, but I have only ever seen
+> >>>>>>>> it on RPi 3 Model B+ (even RPi3 Model B works fine), so the issue may
+> >>>>>>>> be more subtle.
+> >>>>>
+> >>>>>>> Is there a hardware difference around the interrupt controller on these?
+> >>>>>
+> >>>>>> No, but the RPi 3 B has a different USB network chip on board (smsc95xx, Fast
+> >>>>>> ethernet) instead of lan78xx (Gigabit ethernet).
+> >>>>>
+> >>>>> Bingo: its the lan78xx driver that is sleeping from the irqchip
+> >>>>> callbacks; The smsc95xx driver doesn't have a struct irq_chip, which
+> >>>>> is why the RPi-3-B doesn't do this.
+> >>>>>
+> >>>>> It may be valid for kdump to only teardown the 'root irqdomain' (if
+> >>>>> that even means anything). I assume these secondary irqchip's would
+> >>>>> have a summary-interrupt that goes to another irqchip. But I can't
+> >>>>> see a way to tell them apart..,
+> >>>>
+> >>>> There is none. A cascaded irqchip is just like a root irqchip, just
+> >>>> that its output line is connected to another irqchip. But we have no
+> >>>> easy way to identify the parent. Also, this particular driver looks
+> >>>> quite creative (it reinvents the wheel for chained interrupts -- see
+> >>>> intr_complete and lan78xx_status), meaning that even if we could have
+> >>>> a magic way of identify a chained irqchip, we'd miss that one. Broken.
+> >>>>
+> >>>>> I think we need to wait until after the merge window for Marc's
+> >>>>> wisdom on this!
+> >>>>
+> >>>> Overall, I can't think of an easy fix. We have a few options, but none
+> >>>> of them involve a centralised change:
+> >>>>
+> >>>> 1) We provide a reset infrastructure for irqchips, with an opt-in
+> >>>>    mechanism. This involves changing the way we teardown irqs at
+> >>>>    crash-time, and we'd then need some notion of reset ordering (think
+> >>>>    of the layered ITS and GICv3, for example).
+> >>>
+> >>> Does this mean that all the irqchips have to be implemented with reset?
+> >>
+> >> No. Only those that want to be reset at kexec time.
 > > 
-> > Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
-> > ---
-> >  Documentation/devicetree/bindings/thermal/armada-thermal.txt | 5 +++++
-> >  1 file changed, 5 insertions(+)
+> > I don't get the point yet. Who should have reset interface?
+> > What is the criteria?
+> 
+> The criteria is "this irqchip requires a reset to be safely used in the
+> secondary kernel". This is a judgement call from the person writing the
+> driver.
+
+This doesn't tell me anything more than "do it if you need it."
+So let me ask you in other words.
+Does gic driver need to provide a reset function?
+Whether yes or no, why do you think so?
+
+> 
 > > 
-> > diff --git a/Documentation/devicetree/bindings/thermal/armada-thermal.txt b/Documentation/devicetree/bindings/thermal/armada-thermal.txt
-> > index e0d013a2e66d..f3b441100890 100644
-> > --- a/Documentation/devicetree/bindings/thermal/armada-thermal.txt
-> > +++ b/Documentation/devicetree/bindings/thermal/armada-thermal.txt
-> > @@ -10,6 +10,11 @@ Required properties:
-> >      * marvell,armada-ap806-thermal
-> >      * marvell,armada-cp110-thermal  
+> >>>>
+> >>>> 2) We provide a way to identify interrupts that are ultimately backed
+> >>>>    by a root controller, which implies walking down the hierarchy for
+> >>>
+> >>> To be clear, from bottom to top (or root), right?
+> >>
+> >> I'm not sure I understand your question. The idea is to walk the
+> >> irq_data chain, until we hit a root irqchip. If we do hit one, we
+> >> deactivate/eoi/disable this interrupt. If we don't, we do nothing.
+> > 
+> > I thought that we would traverse the (chained irq) hierarchy from
+> > bottom to top and call deactivate or others in that order.
+> > Am I wrong here?
 > 
-> Really you should not be using the same compatible for both. Now you 
-> have 2 drivers matching to same compatibles.
+> You *cannot* traverse a hierarchy through a chained irq. At that stage,
+> irq_data->parent_data is NULL.
+
+What do you mean by "at that stage?"
+In your patch, "genirq: Add predicate for irq served by root irqchip,"
+irq_irqchip_is_root() dereferences its parent_data.
+
+-Takahiro AKASHI
+
+> The only thing you can do is to iterate
+> over all the interrupts and deactivate those that are directly on the
+> root interrupt controller. This will have the effect of stopping the
+> interrupts that are behind a chained controller.
 > 
-> Can't you make this a child of the syscon without breaking the binding?
-
-We are talking about only 1 driver here, so I'm not sure how I should
-understand your last sentence. Do you want me to add a second
-compatible (for the same piece of hardware) for thermal node declared
-as a child of the syscon?
-
-I could handle this situation in the driver by creating the missing
-regmap in case we are using the old compatible. If this is the solution
-you prefer, how should I name the new compatibles ?
-
-> 
-> >  
-> > +Note: these bindings are deprecated for AP806/CP110 and should instead
-> > +follow the rules described in:
-> > +Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt
-> > +Documentation/devicetree/bindings/arm/marvell/cp110-system-controller.txt
-> > +
-> >  - reg: Device's register space.
-> >    Two entries are expected, see the examples below. The first one points
-> >    to the status register (4B). The second one points to the control
-> > -- 
-> > 2.14.1
-> >   
-
-Thanks,
-Miqu?l
+> 	M.
+> -- 
+> Jazz is not dead. It just smells funny...
