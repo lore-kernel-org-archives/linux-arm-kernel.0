@@ -1,122 +1,73 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Thu, 5 Jul 2018 03:13:50 +0000
-Subject: Self-detected stall on CPU when using SD card
-In-Reply-To: <aaa1f8ec2668ce0c654b6225a7d8737c@agner.ch>
-References: <037cbd3560a68bad0cea92f453c1b819@agner.ch>
- <0f262b04fab61ec75b7e368a8f4968aa@agner.ch>
- <aaa1f8ec2668ce0c654b6225a7d8737c@agner.ch>
-Message-ID: <AM0PR04MB42118B1DC96FFF0143DEB84680400@AM0PR04MB4211.eurprd04.prod.outlook.com>
+From: vivek.gautam@codeaurora.org (Vivek Gautam)
+Date: Thu, 5 Jul 2018 09:58:16 +0530
+Subject: [PATCH 2/2] device core: Add flag to autoremove device link on
+ supplier unbind
+In-Reply-To: <CAJZ5v0jb2075fcabZDxPpE+7Bo=NpcFm7kEY5QfO-ZbcfGkDyw@mail.gmail.com>
+References: <20180627125056.12851-1-vivek.gautam@codeaurora.org>
+ <20180627125056.12851-2-vivek.gautam@codeaurora.org>
+ <5b2d17e8-2224-512c-e01c-212828ecf74b@codeaurora.org>
+ <2991909.NMIP74eIIJ@aspire.rjw.lan>
+ <52724c9d-4650-9095-fb68-c4dff21a48f6@codeaurora.org>
+ <CAJZ5v0jb2075fcabZDxPpE+7Bo=NpcFm7kEY5QfO-ZbcfGkDyw@mail.gmail.com>
+Message-ID: <1c0f5cb8-4805-4200-406f-0725122b524f@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Stefan Agner [mailto:stefan at agner.ch]
-> Sent: Tuesday, July 3, 2018 9:13 PM
-> To: adrian.hunter at intel.com; A.s. Dong <aisheng.dong@nxp.com>; Fabio
-> Estevam <fabio.estevam@nxp.com>
-> Cc: linux-mmc at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
-> mmc-owner at vger.kernel.org
-> Subject: Re: Self-detected stall on CPU when using SD card
-> 
-> Dong Aisheng,
-> 
-> Maybe you can shed some light on the issue below?
-> 
 
-I tried on MX6Q SDB board but did not reproduce it with a SD card
-plugged into Slot2 with 4.18-rc1.
-Any difference we need to care?
 
-> 
-> On 26.06.2018 16:45, Stefan Agner wrote:
-> > On 26.06.2018 12:53, Stefan Agner wrote:
-> >> Hi,
-> >>
-> >> On our Colibri iMX6 (arch/arm/boot/dts/imx6qdl-colibri.dtsi) we
-> >> experience the following stack trace when a SD card is plugged in:
-> >>
-> >
-> > [...]
-> >
-> >> [<c08396f4>] (esdhc_pltfm_set_clock) from [<c083622c>]
-> >> (sdhci_set_ios+0xd8/0x584)
-> >>  r10:ffffe000 r9:c1105900 r8:00004097 r7:d818f2e8 r6:d818f480
-> >> r5:d818f2e8
-> >>  r4:d818f000
-> >> [<c0836154>] (sdhci_set_ios) from [<c0836070>]
-> >> (sdhci_runtime_resume_host+0xa0/0x184)
-> >>  r9:c1105900 r8:00004097 r7:d818f2e8 r6:d818f648 r5:d818f000
-> >> r4:d818f480
-> >
-> > [...]
-> >
-> >>
-> >> It used to work in v4.9, so I started a git bisect. It pointed me to
-> >> this commit:
-> >>
-> >> Commit d1e4f74f911d ("mmc: sdhci: Do not use spin lock in set_ios
-> >> paths").
-> >>
-> >> Reverting the commit on-top of v4.18-rc1 seems to fix the issue too.
-> >>
-> >> Any idea?
-> >
-> > I figured out that the same platform had a GPIO Key which triggered
-> > all the time. This seems to exacerbate the MMC issue such that it
-> > triggers on very boot, about rootfs mount time.
-> >
+On 7/5/2018 4:49 AM, Rafael J. Wysocki wrote:
+> On Wed, Jul 4, 2018 at 8:09 PM, Vivek Gautam
+> <vivek.gautam@codeaurora.org> wrote:
+>>
+>> On 7/4/2018 4:14 PM, Rafael J. Wysocki wrote:
+>>> On Wednesday, July 4, 2018 9:16:20 AM CEST Vivek Gautam wrote:
+>>>> Adding Ulf and Marek.
+>>>>
+>>>> On 6/27/2018 6:20 PM, Vivek Gautam wrote:
+>>>>> Add a flag to autoremove the device links on supplier driver
+>>>>> unbind. This obviates the need to explicitly delete the link
+>>>>> in the remove path.
+>>>>> We remove these links only when the supplier's link to its
+>>>>> consumers has gone to DL_STATE_SUPPLIER_UNBIND state.
+>>>>>
+>>>>> Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
+>>>>> Suggested-by: Lukas Wunner <lukas@wunner.de>
+>>>>> Cc: Jonathan Corbet <corbet@lwn.net>
+>>>>> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>>>>> Cc: Robin Murphy <robin.murphy@arm.com>
+>>>>> Cc: linux-doc at vger.kernel.org
+>>>>> Cc: linux-arm-kernel at lists.infradead.org
+>>>>> Cc: linux-pm at vger.kernel.org
+>>>>> Cc: linux-arm-msm at vger.kernel.org
+>>>>> ---
+>>>> Hi Rafael, et al.
+>>>>
+>>>> Gentle ping.
+>>>> Do you have comments on this series. I would really like to conclude
+>>>> these
+>>>> device link additions sooner, and get things moving on the long awaited
+>>>> arm-smmu clock/runtime support series.
+>>>>
+>>>> Thanks again for reviewing these patches.
+>>> They are fine by me.
+>>>
+>>> I can queue them up for 4.19 if no one has objections (Greg in
+>>> particular).
+>>
+>> Hi Rafael,
+>>
+>> I will resubmit these 2 patches as part of the arm-smmu series, as one
+>> of the patch in the series depends on addition of
+>> DL_FLAG_AUTOREMOVE_SUPPLIER.
+>> So these 2 patches and arm-smmu series should go together.
+>> Can you please consider givnig your Ack?
+> I would prefer to apply them myself to be honest and put them on an
+> public git branch for you to pull from.
 
-That's a bit strange.... Why that GPIO key triggers all the time?
+Sure. Fine with me. I will base the smmu patches on your branch.
 
-> > This change seems to fix the issue as well, not sure though whether
-> > this is a proper fix:
-> >
-> > --- a/drivers/mmc/host/sdhci-esdhc-imx.c
-> > +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-> > @@ -697,6 +697,7 @@ static inline void esdhc_pltfm_set_clock(struct
-> > sdhci_host *host,
-> >         int ddr_pre_div = imx_data->is_ddr ? 2 : 1;
-> >         int pre_div = 1;
-> >         int div = 1;
-> > +       unsigned long flags;
-> >         u32 temp, val;
-> >
-> >         if (clock == 0) {
-> > @@ -724,6 +725,7 @@ static inline void esdhc_pltfm_set_clock(struct
-> > sdhci_host *host,
-> >                         pre_div = 2;
-> >         }
-> >
-> > +       spin_lock_irqsave(&host->lock, flags);
-> >         temp = sdhci_readl(host, ESDHC_SYSTEM_CONTROL);
-> >         temp &= ~(ESDHC_CLOCK_IPGEN | ESDHC_CLOCK_HCKEN |
-> > ESDHC_CLOCK_PEREN
-> >                 | ESDHC_CLOCK_MASK);
-> > @@ -754,6 +756,7 @@ static inline void esdhc_pltfm_set_clock(struct
-> > sdhci_host *host,
-> >                 writel(val | ESDHC_VENDOR_SPEC_FRC_SDCLK_ON,
-> >                 host->ioaddr + ESDHC_VENDOR_SPEC);
-> >         }
-> > +       spin_unlock_irqrestore(&host->lock, flags);
-> 
-> The bits ESDHC_CLOCK_IPGEN, ESDHC_CLOCK_HCKEN,
-> ESDHC_CLOCK_PEREN which are cleared and written in that section are
-> actually mentioned as "Reserved. Always write as 1." in the reference
-> manual...
-> 
-
-That's for legacy platforms like MX5. No side affect on MX6&7 as we know.
-So keep it now. Is the issue related to that?
-
-Regards
-Dong Aisheng
-
-> --
-> Stefan
-> 
-> >
-> >         mdelay(1);
-> >  }
-> >
-> > --
-> > Stefan
+Thanks
+Vivek
+>
+> Thanks,
+> Rafael
