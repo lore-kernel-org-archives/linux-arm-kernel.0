@@ -1,44 +1,88 @@
 From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Thu,  5 Jul 2018 12:27:25 +0200
-Subject: [PATCH 0/8] mtd: rawnand: Bunch of cleanup
-Message-ID: <20180705102733.29673-1-boris.brezillon@bootlin.com>
+Date: Thu,  5 Jul 2018 12:27:30 +0200
+Subject: [PATCH 5/8] mtd: rawnand: Rename nand_default_bbt() into
+ nand_create_bbt()
+In-Reply-To: <20180705102733.29673-1-boris.brezillon@bootlin.com>
+References: <20180705102733.29673-1-boris.brezillon@bootlin.com>
+Message-ID: <20180705102733.29673-6-boris.brezillon@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Rename nand_default_bbt() into nand_create_bbt() and pass it a nand_chip
+object to prepare removal of the chip->scan_bbt() hook.
 
-These are just random cleanups that I did while working on the raw NAND
-API sanitization (see here [1] for a preview of the upcoming changes).
+We add a temporary nand_default_bbt() wrapper which will be dropped
+after the removal of ->scan_bbt().
 
-Regards,
+Signed-off-by: Boris Brezillon <boris.brezillon@bootlin.com>
+---
+ drivers/mtd/nand/raw/nand_base.c |  5 +++++
+ drivers/mtd/nand/raw/nand_bbt.c  | 10 +++++-----
+ include/linux/mtd/rawnand.h      |  2 +-
+ 3 files changed, 11 insertions(+), 6 deletions(-)
 
-Boris
-
-[1]https://github.com/bbrezillon/linux-0day/commits/nand/api-cleanup
-
-Boris Brezillon (8):
-  mtd: rawnand: Kill cafe_nand_bug()
-  mtd: rawnand: Remove nand_do_read() prototype from rawnand.h
-  mtd: rawnand: Remove forward declaration of mtd_info
-  mtd: rawnand: Remove forward declaration of device_node
-  mtd: rawnand: Rename nand_default_bbt() into nand_create_bbt()
-  mtd: rawnand: Kill the chip->scan_bbt() hook
-  mtd: rawnand: orion_nand: Kill orion_nand_data.dev_ready()
-  mtd: rawnand: plat_nand: Kill pdata->ctrl.{hwcontrol,read_byte}()
-
- arch/arm/mach-pxa/balloon3.c                 |  1 -
- arch/arm/mach-pxa/em-x270.c                  |  1 -
- drivers/mtd/nand/raw/cafe_nand.c             |  8 --------
- drivers/mtd/nand/raw/diskonchip.c            |  4 ++--
- drivers/mtd/nand/raw/gpmi-nand/gpmi-nand.c   |  2 +-
- drivers/mtd/nand/raw/nand_base.c             |  4 +---
- drivers/mtd/nand/raw/nand_bbt.c              | 10 +++++-----
- drivers/mtd/nand/raw/nandsim.c               |  2 +-
- drivers/mtd/nand/raw/orion_nand.c            |  3 ---
- drivers/mtd/nand/raw/plat_nand.c             |  2 --
- include/linux/mtd/rawnand.h                  | 12 ++----------
- include/linux/platform_data/mtd-orion_nand.h |  1 -
- 12 files changed, 12 insertions(+), 38 deletions(-)
-
+diff --git a/drivers/mtd/nand/raw/nand_base.c b/drivers/mtd/nand/raw/nand_base.c
+index faac82b1e058..0476e13d47b1 100644
+--- a/drivers/mtd/nand/raw/nand_base.c
++++ b/drivers/mtd/nand/raw/nand_base.c
+@@ -4924,6 +4924,11 @@ static void nand_shutdown(struct mtd_info *mtd)
+ 	nand_get_device(mtd, FL_PM_SUSPENDED);
+ }
+ 
++static int nand_default_bbt(struct mtd_info *mtd)
++{
++	return nand_create_bbt(mtd_to_nand(mtd));
++}
++
+ /* Set default functions */
+ static void nand_set_defaults(struct nand_chip *chip)
+ {
+diff --git a/drivers/mtd/nand/raw/nand_bbt.c b/drivers/mtd/nand/raw/nand_bbt.c
+index d9f4ceff2568..39db352f8757 100644
+--- a/drivers/mtd/nand/raw/nand_bbt.c
++++ b/drivers/mtd/nand/raw/nand_bbt.c
+@@ -1349,15 +1349,14 @@ static int nand_create_badblock_pattern(struct nand_chip *this)
+ }
+ 
+ /**
+- * nand_default_bbt - [NAND Interface] Select a default bad block table for the device
+- * @mtd: MTD device structure
++ * nand_create_bbt - [NAND Interface] Select a default bad block table for the device
++ * @this: NAND chip object
+  *
+  * This function selects the default bad block table support for the device and
+  * calls the nand_scan_bbt function.
+  */
+-int nand_default_bbt(struct mtd_info *mtd)
++int nand_create_bbt(struct nand_chip *this)
+ {
+-	struct nand_chip *this = mtd_to_nand(mtd);
+ 	int ret;
+ 
+ 	/* Is a flash based bad block table requested? */
+@@ -1383,8 +1382,9 @@ int nand_default_bbt(struct mtd_info *mtd)
+ 			return ret;
+ 	}
+ 
+-	return nand_scan_bbt(mtd, this->badblock_pattern);
++	return nand_scan_bbt(nand_to_mtd(this), this->badblock_pattern);
+ }
++EXPORT_SYMBOL(nand_create_bbt);
+ 
+ /**
+  * nand_isreserved_bbt - [NAND Interface] Check if a block is reserved
+diff --git a/include/linux/mtd/rawnand.h b/include/linux/mtd/rawnand.h
+index 83ab6779144e..186f9fb1e7eb 100644
+--- a/include/linux/mtd/rawnand.h
++++ b/include/linux/mtd/rawnand.h
+@@ -1538,7 +1538,7 @@ extern const struct nand_manufacturer_ops micron_nand_manuf_ops;
+ extern const struct nand_manufacturer_ops amd_nand_manuf_ops;
+ extern const struct nand_manufacturer_ops macronix_nand_manuf_ops;
+ 
+-int nand_default_bbt(struct mtd_info *mtd);
++int nand_create_bbt(struct nand_chip *chip);
+ int nand_markbad_bbt(struct mtd_info *mtd, loff_t offs);
+ int nand_isreserved_bbt(struct mtd_info *mtd, loff_t offs);
+ int nand_isbad_bbt(struct mtd_info *mtd, loff_t offs, int allowbbt);
 -- 
 2.14.1
