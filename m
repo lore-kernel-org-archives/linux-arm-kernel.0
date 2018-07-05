@@ -1,140 +1,131 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Thu, 5 Jul 2018 10:04:20 +0200
-Subject: [PATCH] drm/sun4i: Implement zpos for DE2
-In-Reply-To: <10555591.O1hNBsOQsL@jernej-laptop>
-References: <20180627164514.4777-1-jernej.skrabec@siol.net>
- <8012754.crdjCMeE0H@jernej-laptop>
- <20180629071746.ohdhg6mgj6knyijp@flea>
- <10555591.O1hNBsOQsL@jernej-laptop>
-Message-ID: <20180705080420.tlwcz7ly5l6xc5rl@flea>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 5 Jul 2018 09:19:24 +0100
+Subject: [PATCH v3 09/17] irqchip/irq-mvebu-icu: support ICU subnodes
+In-Reply-To: <20180704171622.2df87519@xps13>
+References: <20180622151432.1566-1-miquel.raynal@bootlin.com>
+ <20180622151432.1566-10-miquel.raynal@bootlin.com>
+ <61ff2e4f-55b6-cf70-5f04-32cd197c35f8@arm.com>
+ <20180704110917.65557d0a@xps13>
+ <f4d1d42c-98b9-a485-0baf-2248114f8c8a@arm.com>
+ <20180704171622.2df87519@xps13>
+Message-ID: <1caaca86-aafc-c006-f2df-e42daf9f866b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 29, 2018 at 08:59:03PM +0200, Jernej ?krabec wrote:
-> Dne petek, 29. junij 2018 ob 09:17:46 CEST je Maxime Ripard napisal(a):
-> > On Wed, Jun 27, 2018 at 10:58:28PM +0200, Jernej ?krabec wrote:
-> > > Dne sreda, 27. junij 2018 ob 20:25:00 CEST je Maxime Ripard napisal(a):
-> > > > Hi!
-> > > > 
-> > > > On Wed, Jun 27, 2018 at 06:45:14PM +0200, Jernej Skrabec wrote:
-> > > > > Initial implementation of DE2 planes only supported fixed zpos.
-> > > > > 
-> > > > > Expand implementation with configurable zpos property.
-> > > > > 
-> > > > > Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
-> > > > 
-> > > > Thanks for that work. I guess you should expand a bit on the exact
-> > > > setup you're doing here.
-> > > 
-> > > OK.
-> > > 
-> > > > Are the pipes working the same way on the DE2 than on DE1, ie does the
-> > > > pipe blending applies before the alpha blending, and therefore you
-> > > > need to make sure that there's not two planes with alpha going to the
-> > > > same pipe?
-> > > 
-> > > I'm not familiar with DE1 and I'm not sure what the problem is.
-> > 
-> > The alpha blending is happening after the pipe blending. So you
-> > basically have a two-stage blending, the first one between the planes
-> > assigned to a pipe, only taking the plane priority into account, and
-> > using the highest priority plane's pixel in overlapping area. And
-> > then, you have alpha blending between the two pipes.
-> > 
-> > But that means that if you have two planes with alpha assigned to the
-> > same pipe, it's not going to work since the value and alpha of the
-> > lowest priority plane is going to be dropped in favor of the highest
-> > priority, instead of having transparency.
+On 04/07/18 16:16, Miquel Raynal wrote:
+> Hi Marc,
 > 
-> This sounds familiar. Each channel contains 4 overlays. Those overlays have 
-> fixed order, cannot be scaled and only blending supported is premultiply. This 
-> is the first step HW does. I guess this is the thing similar to DE1 plane 
-> blending.
+> Marc Zyngier <marc.zyngier@arm.com> wrote on Wed, 4 Jul 2018 13:43:58
+> +0100:
 > 
-> After that, HW scaling is done on channel level (if it is enabled). Then 
-> channels are mapped (reordered) to pipes according to route register and at 
-> the end, alpha blending is done between pipes.
+>> On 04/07/18 10:09, Miquel Raynal wrote:
+>>> Hi Marc,
+>>>
+>>> Marc Zyngier <marc.zyngier@arm.com> wrote on Thu, 28 Jun 2018 13:45:09
+>>> +0100:
+>>>   
+>>>> On 22/06/18 16:14, Miquel Raynal wrote:  
+>>>>> The ICU can handle several type of interrupt, each of them being handled
+>>>>> differently on AP side. On CP side, the ICU should be able to make the
+>>>>> distinction between each interrupt group by pointing to the right parent.
+>>>>>
+>>>>> This is done through the introduction of new bindings, presenting the ICU
+>>>>> node as the parent of multiple ICU sub-nodes, each of them being an
+>>>>> interrupt type with a different interrupt parent. ICU interrupt 'clients'
+>>>>> now directly point to the right sub-node, avoiding the need for the extra
+>>>>> ICU_GRP_* parameter.
+>>>>>
+>>>>> ICU subnodes are probed automatically with devm_platform_populate(). If
+>>>>> the node as no child, the probe function for NSRs will still be called
+>>>>> 'manually' in order to preserve backward compatibility with DT using the
+>>>>> old binding.
+>>>>>
+>>>>> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+>>>>> ---
+>>>>>  drivers/irqchip/irq-mvebu-icu.c | 88 ++++++++++++++++++++++++++++++++++-------
+>>>>>  1 file changed, 74 insertions(+), 14 deletions(-)
+>>>>>
+>>>>> diff --git a/drivers/irqchip/irq-mvebu-icu.c b/drivers/irqchip/irq-mvebu-icu.c
+>>>>> index 24d45186eb6b..f7c2ede9c222 100644
+>>>>> --- a/drivers/irqchip/irq-mvebu-icu.c
+>>>>> +++ b/drivers/irqchip/irq-mvebu-icu.c
+>>>>> @@ -43,6 +43,7 @@ struct mvebu_icu {
+>>>>>  	struct regmap *regmap;
+>>>>>  	struct device *dev;
+>>>>>  	atomic_t initialized;
+>>>>> +	bool legacy_bindings;
+>>>>>  };
+>>>>>  
+>>>>>  struct mvebu_icu_irq_data {
+>>>>> @@ -51,6 +52,30 @@ struct mvebu_icu_irq_data {
+>>>>>  	unsigned int type;
+>>>>>  };
+>>>>>  
+>>>>> +static struct mvebu_icu *mvebu_icu_dev_get_drvdata(struct platform_device *pdev)
+>>>>> +{
+>>>>> +	struct mvebu_icu *icu;
+>>>>> +
+>>>>> +	/*
+>>>>> +	 * Device data being populated means we should be using legacy bindings.
+>>>>> +	 * Using the _parent_ device data means we should be using new bindings.
+>>>>> +	 */
+>>>>> +	icu = dev_get_drvdata(&pdev->dev);
+>>>>> +	if (icu) {
+>>>>> +		if (!icu->legacy_bindings)
+>>>>> +			return ERR_PTR(-EINVAL);
+>>>>> +	} else {
+>>>>> +		icu = dev_get_drvdata(pdev->dev.parent);
+>>>>> +		if (!icu)
+>>>>> +			return ERR_PTR(-ENODEV);
+>>>>> +
+>>>>> +		if (icu->legacy_bindings)
+>>>>> +			return ERR_PTR(-EINVAL);
+>>>>> +	}    
+>>>>
+>>>> Doesn't this make legacy_bindings completely redundant? Either the
+>>>> pointer is !NULL in the device, and this is using a legacy binging, or
+>>>> it is stored in the parent, and this is a new binding. You could even
+>>>> have a helper for that:
+>>>>
+>>>> static bool is_legacy(struct platform_device *pdev)
+>>>> {
+>>>> 	return !dev_get_drvdata(&pdev->dev);
+>>>> }
+>>>>
+>>>> The driver really doesn't need to be defending against itself, if
+>>>> anything, and it would save you quite a bit of error handling in the
+>>>> callers of this function.  
+>>>
+>>> I simplified the sanity checks but I had to keep an icu->is_legacy
+>>> boolean because the above function would not have worked, for instance,
+>>> in the *_translate() hook. As this hook does not receive a struct
+>>> device * (or platform_device) as parameter, I tried to use icu->dev
+>>> instead. This cannot work as it always points to the device having the
+>>> driver data attached.  
+>>
+>> You could still have the pdev as part of the domain host_data, right?
+>> Isn't that just a matter of having a pointer to the pdev as part of the
+>> icu data structure?
 > 
-> As you can see, overlays don't fit in DRM concept. They have relative position 
-> to channel zpos setting and scalling can't be done on them, with only 
-> premultipy supported. Because of those limitations, only one overlay is used 
-> in one channel. With this restriction, everything else falls pretty nicely 
-> into DRM concept.
+> There is already a 'struct device *dev' pointer in the ICU data
+> structure. This pointer is set to "&pdev->dev" in the main probe
+> function.
+> 
+> Legacy: dev is the unique ICU device, the driver data is attached to it.
+> Now: dev is the 'host' ICU device that is the parent of two other
+> devices, ICU NSR controller and SEI NSR controller. The driver data is
+> also attached to this device.
+> 
+> So in both situations checking dev_get_drvdata(icu->dev) would return a
+> valid pointer.
+> 
+> Does this answer your question?
 
-I guess you could expose them as planes, but you'd need to improve the
-current atomic_check to make sure that all these constraints are
-met. That's definitely a topic for another patch serie though.
+I think I need to see the full picture again. Post the updated series,
+and we'll see what we can do.
 
-> > > However, there is an issue in DE2 when alpha blending multiple planes if
-> > > bottom-most plane doesn't cover all screen. In this case alpha blending
-> > > produce weird result on screen. Fortunately, there is elegant solution.
-> > > Black opaque fill color is enabled for pipe 0 (always at the bottom),
-> > > which covers any "undefined region" and that makes alpha blending happy
-> > > again.
-> > > 
-> > > Alternatively, blending modes between planes could be tweaked or
-> > > disabled, but I found aforementioned solution is much simpler and
-> > > you set it only once.
-> > 
-> > Yeah, we had a similar behaviour as well, if the lowest plane has a
-> > some alpha (!= 0xff), the pixel value is completely dropped. We worked
-> > around this by preventing any plane with alpha at the lowest position,
-> > but it might be a good idea to check if the background color set to
-> > black fixes it. I remember that we were indeed seeing the background
-> > color, but I don't think I tried setting it to black and seeing what
-> > happens.
-> > 
-> 
-> I tested both corner cases I could think of and all seems to be fine. These 
-> are:
-> 1. Having bottom-most plane only partialy covered. This caused issues with 
-> alpha blending. Solution is to set opaque black fill color to bottom-most 
-> pipe. In this case, previously undefined region doesn't have undefined pixel 
-> data and blending is correct.
-> 2. Bottom-most plane has alpha values <0xff. This doesn't cause any issue@
-> all. I suspect that the reason for that is background color set to black.
+Thanks,
 
-Ok, that's good.
-
-> > > > Also, you seem to use the pipe and channels indifferently now, why is
-> > > > that?
-> > > 
-> > > Why do you think so?
-> > 
-> > Your driver used to use the channel id, and is now replaced by the
-> > zpos assigned (for example in SUN8I_MIXER_BLEND_PIPE_CTL_EN)
-> 
-> zpos represents pipe number, so that is correct thing to do.
-> 
-> I think I know what bothers you. Patch shows only part of the changed 
-> functions. Please take a look at final functions. sun8i_vi_layer_enable() and 
-> sun8i_vi_layer_update_coord() still work (mostly) based on channel id.
-> 
-> For example, sun8i_vi_layer_update_coord() function sets almost all of the 
-> registers based on channel id. Only output size after scaling is set based on 
-> pipe (zpos) id.
-> 
-> More precisely, zpos has to be used for reading/writing pipe settings in 
-> global mixer registers (prefixed with SUN8I_MIXER_BLEND_). Channel id has to 
-> be used when reading/writing channel registers (prefixed with 
-> SUN8I_MIXER_CHAN_UI_ or SUN8I_MIXER_CHAN_VI_).
-> 
-> Before the patch, channel id was actually the same as zpos id and because of 
-> that channel id was used for pipes too.
-
-Ok. It's the kind of explanation that definitely belongs in the commit log :)
-
-Thanks!
-Maxime
-
+	M.
 -- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180705/f8018ec1/attachment.sig>
+Jazz is not dead. It just smells funny...
