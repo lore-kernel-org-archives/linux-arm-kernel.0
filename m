@@ -1,61 +1,44 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu,  5 Jul 2018 11:11:01 +0800
-Subject: [PATCH v2 0/5] arm64: allwinner: h6: Enable AXP805 PMIC on Pine H64
-Message-ID: <20180705031106.344-1-wens@csie.org>
+Date: Thu,  5 Jul 2018 11:11:04 +0800
+Subject: [PATCH v2 3/5] mfd: axp20x: Support AXP806 in I2C mode
+In-Reply-To: <20180705031106.344-1-wens@csie.org>
+References: <20180705031106.344-1-wens@csie.org>
+Message-ID: <20180705031106.344-4-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+The Pine64 H64 board uses an AXP806 PMIC in I2C and self-working mode.
+The H64 SoC does not have the usual RSB controller.
 
-This series enables the AXP805 PMIC found on the Pine64 Pine H64 board.
-The AXP805 seems to be identical to the AXP806 when comparing datasheets.
-The Pine H64 uses the PMIC in stand-alone or "self-working" mode, using
-the I2C interface. Neither features are currently supported. This series
-adds support for them, and then adds the PMIC to the device tree.
+This patch adds AXP806 to the list of devices supported in I2C mode.
+In theory, all RSB-based PMICs can also be used in I2C mode.
 
-Changes since v1:
+Reviewed-by: Icenowy Zheng <icenowy@aosc.io>
+Tested-by: Icenowy Zheng <icenowy@aosc.io>
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ drivers/mfd/axp20x-i2c.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-  - Mentioned "self-working mode" in device tree commit message
-  - Shortened one line mfd cell into just one line
-  - Dropped unrelated pinctrl change
-  - Collected tags from Rob, Icenowy and Lee
-
-Patch 1 adds a new device tree property to describe the self-working mode
-for the AXP806.
-
-Patch 2 adds support for the newly added property to the driver.
-
-Patch 3 adds support for the using AXP806 with I2C.
-
-Patch 4 converts raw clock/reset indices for the H6 R_CCU currently found
-in the device tree to macros defined as part of the device tree bindings.
-
-Patch 5 adds the PMIC and its regulators to the Pine H64 device tree.
-
-First three patches should go in through Lee's mfd tree. We'll take the
-other two through the sunxi tree.
-
-Please have a look.
-
-Regards
-ChenYu
-
-Chen-Yu Tsai (4):
-  dt-bindings: mfd: axp20x: Add "self-working" mode for AXP806
-  mfd: axp20x: Add self-working mode support for AXP806
-  mfd: axp20x: Support AXP806 in I2C mode
-  arm64: dts: allwinner: h6: Use macros for R_CCU clock and reset
-    indices
-
-Icenowy Zheng (1):
-  arm64: dts: allwinner: h6: enable AXP805 PMIC on Pine H64
-
- .../devicetree/bindings/mfd/axp20x.txt        |   7 +-
- .../boot/dts/allwinner/sun50i-h6-pine-h64.dts | 109 ++++++++++++++++++
- arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi  |   8 +-
- drivers/mfd/axp20x-i2c.c                      |   2 +
- drivers/mfd/axp20x.c                          |  30 ++++-
- 5 files changed, 148 insertions(+), 8 deletions(-)
-
+diff --git a/drivers/mfd/axp20x-i2c.c b/drivers/mfd/axp20x-i2c.c
+index d35a5fe6c950..a7b7c5423ea5 100644
+--- a/drivers/mfd/axp20x-i2c.c
++++ b/drivers/mfd/axp20x-i2c.c
+@@ -65,6 +65,7 @@ static const struct of_device_id axp20x_i2c_of_match[] = {
+ 	{ .compatible = "x-powers,axp202", .data = (void *)AXP202_ID },
+ 	{ .compatible = "x-powers,axp209", .data = (void *)AXP209_ID },
+ 	{ .compatible = "x-powers,axp221", .data = (void *)AXP221_ID },
++	{ .compatible = "x-powers,axp806", .data = (void *)AXP806_ID },
+ 	{ },
+ };
+ MODULE_DEVICE_TABLE(of, axp20x_i2c_of_match);
+@@ -74,6 +75,7 @@ static const struct i2c_device_id axp20x_i2c_id[] = {
+ 	{ "axp202", 0 },
+ 	{ "axp209", 0 },
+ 	{ "axp221", 0 },
++	{ "axp806", 0 },
+ 	{ },
+ };
+ MODULE_DEVICE_TABLE(i2c, axp20x_i2c_id);
 -- 
 2.18.0
