@@ -1,62 +1,121 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu,  5 Jul 2018 15:16:47 +0100
-Subject: [PATCHv2 0/7] arm64: PSR <-> SPSR_ELx mapping fixes
-Message-ID: <20180705141654.8714-1-mark.rutland@arm.com>
+Date: Thu,  5 Jul 2018 15:16:48 +0100
+Subject: [PATCHv2 1/7] arm64: add PSR_AA32_* definitions
+In-Reply-To: <20180705141654.8714-1-mark.rutland@arm.com>
+References: <20180705141654.8714-1-mark.rutland@arm.com>
+Message-ID: <20180705141654.8714-2-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SPSR_ELx format has diverged from the AArch32-native SPSR format since the
-addition of DIT. Thus, we need to map between the two for certain compat
-operations.
+The AArch32 CPSR/SPSR format is *almost* identical to the AArch64
+SPSR_ELx format for exceptions taken from AArch32, but the two have
+diverged with the addition of DIT, and we need to treat the two as
+logically distinct.
 
-Also, when we added support for DIT, we forgot to account for this in
-valid_user_regs(), causing PSTATE.DIT to be cleared upon sigreturn.
+This patch adds new definitions for the SPSR_ELx format for exceptions
+taken from AArch32, with a consistent PSR_AA32_ prefix. The existing
+COMPAT_PSR_ definitions will be used for the PSR format as seen from
+AArch32.
 
-These patches (based on v4.18-rc2) fix those issues, cleaning up the COMPAT_PSR
-definitions to try to avoid confusiong in future.
+Definitions of DIT are provided for both, and inline functions are
+provided to map between the two formats. Note that for SPSR_ELx, the
+(RES0) J bit has been re-allocated as the DIT bit.
 
-The COMPAT_PSR_ definitions are now used for the AArch32-native SPR format
-(i.e. they are the compat userspace view), with PSR_AA32_ definitions used for
-the AArch64 view of the PSR for AArch32 tasks.
+Once users of the COMPAT_PSR definitions have been migrated over to the
+PSR_AA32 definitions, the (majority of) the former will be removed, so
+no efforts is made to avoid duplication until then.
 
-Since v1 [1]:
-* Fix compat_restore_sigframe() pstate mangling
-* Fix dangling reference to COMPAT_PSR_T_BIT
-* Move static inlines into #ifndef __ASSEMBLY__ block
-* Accumulate acks
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Christoffer Dall <christoffer.dall@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Suzuki Poulose <suzuki.poulose@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/include/asm/ptrace.h | 57 ++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 56 insertions(+), 1 deletion(-)
 
-Will, I've verified that each patch in this series builds fine (building with
-defconfig), and works fine on my Juno board. Sorry again for the mess with v1.
-
-Thanks,
-Mark.
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2018-June/586136.html
-
-Mark Rutland (7):
-  arm64: add PSR_AA32_* definitions
-  arm64: don't zero DIT on signal return
-  arm64: compat: map SPSR_ELx<->PSR for signals
-  arm64: ptrace: map SPSR_ELx<->PSR for compat tasks
-  arm64: use PSR_AA32 definitions
-  kvm/arm: use PSR_AA32 definitions
-  arm64: remove unused COMPAT_PSR definitions
-
- arch/arm/include/asm/kvm_emulate.h       | 14 +++---
- arch/arm64/include/asm/kvm_emulate.h     | 10 ++--
- arch/arm64/include/asm/processor.h       |  6 +--
- arch/arm64/include/asm/ptrace.h          | 79 +++++++++++++++++++++-----------
- arch/arm64/kernel/armv8_deprecated.c     | 24 +++++-----
- arch/arm64/kernel/cpufeature.c           |  2 +-
- arch/arm64/kernel/process.c              | 20 ++++----
- arch/arm64/kernel/ptrace.c               | 34 ++++++++------
- arch/arm64/kernel/signal32.c             | 18 +++++---
- arch/arm64/kvm/guest.c                   | 14 +++---
- arch/arm64/kvm/hyp/vgic-v2-cpuif-proxy.c |  2 +-
- arch/arm64/kvm/regmap.c                  | 22 ++++-----
- arch/arm64/kvm/reset.c                   |  4 +-
- virt/kvm/arm/aarch32.c                   | 20 ++++----
- 14 files changed, 153 insertions(+), 116 deletions(-)
-
+diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
+index 6069d66e0bc2..1b2a253de6a1 100644
+--- a/arch/arm64/include/asm/ptrace.h
++++ b/arch/arm64/include/asm/ptrace.h
+@@ -35,7 +35,37 @@
+ #define COMPAT_PTRACE_GETHBPREGS	29
+ #define COMPAT_PTRACE_SETHBPREGS	30
+ 
+-/* AArch32 CPSR bits */
++/* SPSR_ELx bits for exceptions taken from AArch32 */
++#define PSR_AA32_MODE_MASK	0x0000001f
++#define PSR_AA32_MODE_USR	0x00000010
++#define PSR_AA32_MODE_FIQ	0x00000011
++#define PSR_AA32_MODE_IRQ	0x00000012
++#define PSR_AA32_MODE_SVC	0x00000013
++#define PSR_AA32_MODE_ABT	0x00000017
++#define PSR_AA32_MODE_HYP	0x0000001a
++#define PSR_AA32_MODE_UND	0x0000001b
++#define PSR_AA32_MODE_SYS	0x0000001f
++#define PSR_AA32_T_BIT		0x00000020
++#define PSR_AA32_F_BIT		0x00000040
++#define PSR_AA32_I_BIT		0x00000080
++#define PSR_AA32_A_BIT		0x00000100
++#define PSR_AA32_E_BIT		0x00000200
++#define PSR_AA32_DIT_BIT	0x01000000
++#define PSR_AA32_Q_BIT		0x08000000
++#define PSR_AA32_V_BIT		0x10000000
++#define PSR_AA32_C_BIT		0x20000000
++#define PSR_AA32_Z_BIT		0x40000000
++#define PSR_AA32_N_BIT		0x80000000
++#define PSR_AA32_IT_MASK	0x0600fc00	/* If-Then execution state mask */
++#define PSR_AA32_GE_MASK	0x000f0000
++
++#ifdef CONFIG_CPU_BIG_ENDIAN
++#define PSR_AA32_ENDSTATE	PSR_AA32_E_BIT
++#else
++#define PSR_AA32_ENDSTATE	0
++#endif
++
++/* AArch32 CPSR bits, as seen in AArch32 */
+ #define COMPAT_PSR_MODE_MASK	0x0000001f
+ #define COMPAT_PSR_MODE_USR	0x00000010
+ #define COMPAT_PSR_MODE_FIQ	0x00000011
+@@ -50,6 +80,7 @@
+ #define COMPAT_PSR_I_BIT	0x00000080
+ #define COMPAT_PSR_A_BIT	0x00000100
+ #define COMPAT_PSR_E_BIT	0x00000200
++#define COMPAT_PSR_DIT_BIT	0x00200000
+ #define COMPAT_PSR_J_BIT	0x01000000
+ #define COMPAT_PSR_Q_BIT	0x08000000
+ #define COMPAT_PSR_V_BIT	0x10000000
+@@ -111,6 +142,30 @@
+ #define compat_sp_fiq	regs[29]
+ #define compat_lr_fiq	regs[30]
+ 
++static inline unsigned long compat_psr_to_pstate(const unsigned long psr)
++{
++	unsigned long pstate;
++
++	pstate = psr & ~COMPAT_PSR_DIT_BIT;
++
++	if (psr & COMPAT_PSR_DIT_BIT)
++		pstate |= PSR_AA32_DIT_BIT;
++
++	return pstate;
++}
++
++static inline unsigned long pstate_to_compat_psr(const unsigned long pstate)
++{
++	unsigned long psr;
++
++	psr = pstate & ~PSR_AA32_DIT_BIT;
++
++	if (pstate & PSR_AA32_DIT_BIT)
++		psr |= COMPAT_PSR_DIT_BIT;
++
++	return psr;
++}
++
+ /*
+  * This struct defines the way the registers are stored on the stack during an
+  * exception. Note that sizeof(struct pt_regs) has to be a multiple of 16 (for
 -- 
 2.11.0
