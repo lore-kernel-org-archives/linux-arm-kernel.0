@@ -1,89 +1,135 @@
 From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Thu,  5 Jul 2018 15:08:45 +0100
-Subject: [PATCH v4 2/7] KVM: arm/arm64: Introduce helpers to manupulate page
- table entries
+Date: Thu,  5 Jul 2018 15:08:49 +0100
+Subject: [PATCH v4 6/7] KVM: arm64: Update age handlers to support PUD
+ hugepages
 In-Reply-To: <20180705140850.5801-1-punit.agrawal@arm.com>
 References: <20180705140850.5801-1-punit.agrawal@arm.com>
-Message-ID: <20180705140850.5801-3-punit.agrawal@arm.com>
+Message-ID: <20180705140850.5801-7-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce helpers to abstract architectural handling of the conversion
-of pfn to page table entries and marking a PMD page table entry as a
-block entry.
+In preparation for creating larger hugepages at Stage 2, add support
+to the age handling notifiers for PUD hugepages when encountered.
 
-The helpers are introduced in preparation for supporting PUD hugepages
-at stage 2 - which are supported on arm64 but do not exist on arm.
+Provide trivial helpers for arm32 to allow sharing code.
 
 Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-Acked-by: Christoffer Dall <christoffer.dall@arm.com>
+Cc: Christoffer Dall <christoffer.dall@arm.com>
 Cc: Marc Zyngier <marc.zyngier@arm.com>
 Cc: Russell King <linux@armlinux.org.uk>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/include/asm/kvm_mmu.h   | 5 +++++
- arch/arm64/include/asm/kvm_mmu.h | 5 +++++
- virt/kvm/arm/mmu.c               | 8 +++++---
- 3 files changed, 15 insertions(+), 3 deletions(-)
+ arch/arm/include/asm/kvm_mmu.h   |  6 ++++++
+ arch/arm64/include/asm/kvm_mmu.h |  5 +++++
+ arch/arm64/include/asm/pgtable.h |  1 +
+ virt/kvm/arm/mmu.c               | 29 +++++++++++++++++++++++++----
+ 4 files changed, 37 insertions(+), 4 deletions(-)
 
 diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index 8553d68b7c8a..d095c2d0b284 100644
+index a4298d429efc..8e1e8aee229e 100644
 --- a/arch/arm/include/asm/kvm_mmu.h
 +++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -75,6 +75,11 @@ phys_addr_t kvm_get_idmap_vector(void);
- int kvm_mmu_init(void);
- void kvm_clear_hyp_idmap(void);
+@@ -110,6 +110,12 @@ static inline pud_t kvm_s2pud_mkyoung(pud_t pud)
+ 	return pud;
+ }
  
-+#define kvm_pfn_pte(pfn, prot)	pfn_pte(pfn, prot)
-+#define kvm_pfn_pmd(pfn, prot)	pfn_pmd(pfn, prot)
-+
-+#define kvm_pmd_mkhuge(pmd)	pmd_mkhuge(pmd)
++static inline bool kvm_s2pud_young(pud_t pud)
++{
++	BUG();
++	return false;
++}
 +
  static inline void kvm_set_pmd(pmd_t *pmd, pmd_t new_pmd)
  {
  	*pmd = new_pmd;
 diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index fb9a7127bb75..689def9bb9d5 100644
+index 4d2780c588b0..c542052fb199 100644
 --- a/arch/arm64/include/asm/kvm_mmu.h
 +++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -172,6 +172,11 @@ void kvm_clear_hyp_idmap(void);
- #define	kvm_set_pte(ptep, pte)		set_pte(ptep, pte)
- #define	kvm_set_pmd(pmdp, pmd)		set_pmd(pmdp, pmd)
+@@ -261,6 +261,11 @@ static inline pud_t kvm_s2pud_mkyoung(pud_t pud)
+ 	return pud_mkyoung(pud);
+ }
  
-+#define kvm_pfn_pte(pfn, prot)		pfn_pte(pfn, prot)
-+#define kvm_pfn_pmd(pfn, prot)		pfn_pmd(pfn, prot)
++static inline bool kvm_s2pud_young(pud_t pud)
++{
++	return pud_young(pud);
++}
 +
-+#define kvm_pmd_mkhuge(pmd)		pmd_mkhuge(pmd)
-+
- static inline pte_t kvm_s2pte_mkwrite(pte_t pte)
+ static inline bool kvm_page_empty(void *ptr)
  {
- 	pte_val(pte) |= PTE_S2_RDWR;
+ 	struct page *ptr_page = virt_to_page(ptr);
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+index a64a5c35beb1..4d9476e420d9 100644
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -385,6 +385,7 @@ static inline int pmd_protnone(pmd_t pmd)
+ #define pfn_pmd(pfn,prot)	__pmd(__phys_to_pmd_val((phys_addr_t)(pfn) << PAGE_SHIFT) | pgprot_val(prot))
+ #define mk_pmd(page,prot)	pfn_pmd(page_to_pfn(page),prot)
+ 
++#define pud_young(pud)		pte_young(pud_pte(pud))
+ #define pud_mkyoung(pud)	pte_pud(pte_mkyoung(pud_pte(pud)))
+ #define pud_write(pud)		pte_write(pud_pte(pud))
+ 
 diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-index dd14cc36c51c..040cd0bce5e1 100644
+index 94a91bcdd152..0c04c64e858c 100644
 --- a/virt/kvm/arm/mmu.c
 +++ b/virt/kvm/arm/mmu.c
-@@ -1557,8 +1557,10 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 		invalidate_icache_guest_page(pfn, vma_pagesize);
+@@ -1141,6 +1141,11 @@ static int stage2_pmdp_test_and_clear_young(pmd_t *pmd)
+ 	return stage2_ptep_test_and_clear_young((pte_t *)pmd);
+ }
  
- 	if (hugetlb && vma_pagesize == PMD_SIZE) {
--		pmd_t new_pmd = pfn_pmd(pfn, mem_type);
--		new_pmd = pmd_mkhuge(new_pmd);
-+		pmd_t new_pmd = kvm_pfn_pmd(pfn, mem_type);
++static int stage2_pudp_test_and_clear_young(pud_t *pud)
++{
++	return stage2_ptep_test_and_clear_young((pte_t *)pud);
++}
 +
-+		new_pmd = kvm_pmd_mkhuge(new_pmd);
+ /**
+  * kvm_phys_addr_ioremap - map a device range to guest IPA
+  *
+@@ -1860,11 +1865,19 @@ void kvm_set_spte_hva(struct kvm *kvm, unsigned long hva, pte_t pte)
+ 
+ static int kvm_age_hva_handler(struct kvm *kvm, gpa_t gpa, u64 size, void *data)
+ {
++	pud_t *pud;
+ 	pmd_t *pmd;
+ 	pte_t *pte;
+ 
+-	WARN_ON(size != PAGE_SIZE && size != PMD_SIZE);
+-	pmd = stage2_get_pmd(kvm, NULL, gpa);
++	WARN_ON(size != PAGE_SIZE && size != PMD_SIZE && size != PUD_SIZE);
++	pud = stage2_get_pud(kvm, NULL, gpa);
++	if (!pud || pud_none(*pud))	/* Nothing there */
++		return 0;
 +
- 		if (writable)
- 			new_pmd = kvm_s2pmd_mkwrite(new_pmd);
++	if (pud_huge(*pud))		/* HugeTLB */
++		return stage2_pudp_test_and_clear_young(pud);
++
++	pmd = stage2_pmd_offset(pud, gpa);
+ 	if (!pmd || pmd_none(*pmd))	/* Nothing there */
+ 		return 0;
  
-@@ -1567,7 +1569,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+@@ -1880,11 +1893,19 @@ static int kvm_age_hva_handler(struct kvm *kvm, gpa_t gpa, u64 size, void *data)
  
- 		ret = stage2_set_pmd_huge(kvm, memcache, fault_ipa, &new_pmd);
- 	} else {
--		pte_t new_pte = pfn_pte(pfn, mem_type);
-+		pte_t new_pte = kvm_pfn_pte(pfn, mem_type);
+ static int kvm_test_age_hva_handler(struct kvm *kvm, gpa_t gpa, u64 size, void *data)
+ {
++	pud_t *pud;
+ 	pmd_t *pmd;
+ 	pte_t *pte;
  
- 		if (writable) {
- 			new_pte = kvm_s2pte_mkwrite(new_pte);
+-	WARN_ON(size != PAGE_SIZE && size != PMD_SIZE);
+-	pmd = stage2_get_pmd(kvm, NULL, gpa);
++	WARN_ON(size != PAGE_SIZE && size != PMD_SIZE && size != PUD_SIZE);
++	pud = stage2_get_pud(kvm, NULL, gpa);
++	if (!pud || pud_none(*pud))	/* Nothing there */
++		return 0;
++
++	if (pud_huge(*pud))		/* HugeTLB */
++		return kvm_s2pud_young(*pud);
++
++	pmd = stage2_pmd_offset(pud, gpa);
+ 	if (!pmd || pmd_none(*pmd))	/* Nothing there */
+ 		return 0;
+ 
 -- 
 2.17.1
