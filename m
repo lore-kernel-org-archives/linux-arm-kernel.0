@@ -1,107 +1,52 @@
-From: ssuloev@orpaltech.com (Sergey Suloev)
-Date: Sat, 7 Jul 2018 00:33:53 +0300
-Subject: [PATCH 09/10] arm64: dts: allwinner: a64: NanoPi-A64: Add
- Wifi/Bluetooth chip
-In-Reply-To: <09552e8c-6e82-fcfb-be98-adfb5e4fadaa@arm.com>
-References: <20180706085210.17952-1-andre.przywara@arm.com>
- <20180706085210.17952-10-andre.przywara@arm.com>
- <8cee909b-c0ce-5faf-09e0-7d6625284f55@orpaltech.com>
- <09552e8c-6e82-fcfb-be98-adfb5e4fadaa@arm.com>
-Message-ID: <a79762d7-8485-c6cb-f3eb-50fd2d170356@orpaltech.com>
+From: daniel@zonque.org (Daniel Mack)
+Date: Sat, 7 Jul 2018 00:08:47 +0200
+Subject: [PATCH] ARM: pxa: irq: fix handling of ICMR registers in
+ suspend/resume
+In-Reply-To: <87zhz4f40g.fsf@belgarion.home>
+References: <20180706201500.2000-1-daniel@zonque.org>
+ <87zhz4f40g.fsf@belgarion.home>
+Message-ID: <5dc561d0-794a-f8b9-f00d-267dc0d2f354@zonque.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/06/2018 05:49 PM, Andre Przywara wrote:
-> Hi,
->
-> On 06/07/18 15:23, Sergey Suloev wrote:
->> On 07/06/2018 11:52 AM, Andre Przywara wrote:
->>> The NanoPi-A64 has an on-board WiFi/Bluetooth combo chip, connected
->>> to the usual MMC1 and UART1. The power is provided by the always-on
->>> VCC_SYS_3.3V, but it uses pin L2 to enable the regulator.
->>>
->>> Add the respective nodes to the DT to make it usable.
->>>
->>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->>> ---
->>>  ? .../boot/dts/allwinner/sun50i-a64-nanopi-a64.dts?? | 33
->>> ++++++++++++++++++++++
->>>  ? 1 file changed, 33 insertions(+)
->>>
->>> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
->>> b/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
->>> index 0439cff685d6..bb3ba7709dee 100644
->>> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
->>> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
->>> @@ -53,11 +53,18 @@
->>>  ????? aliases {
->>>  ????????? ethernet0 = &emac;
->>>  ????????? serial0 = &uart0;
->>> +??????? serial1 = &uart1;
->>>  ????? };
->>>  ? ????? chosen {
->>>  ????????? stdout-path = "serial0:115200n8";
->>>  ????? };
->>> +
->>> +??????? wifi_pwrseq: wifi_pwrseq {
->>> +??????????????? compatible = "mmc-pwrseq-simple";
->>> +??????????????? reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* PL2 */
->>> +??????? };
->>> +
->>>  ? };
->>>  ? ? &ehci0 {
->>> @@ -105,6 +112,25 @@
->>>  ????? status = "okay";
->>>  ? };
->>>  ? +&mmc1 {
->>> +??? pinctrl-names = "default";
->>> +??? pinctrl-0 = <&mmc1_pins>;
->>> +??? vmmc-supply = <&reg_dcdc1>;
->>> +??? vqmmc-supply = <&reg_dldo4>;
->>> +??? mmc-pwrseq = <&wifi_pwrseq>;
->>> +??? bus-width = <4>;
->>> +??? non-removable;
->>> +??? status = "okay";
->>> +
->>> +??? brcmf: wifi at 1 {
->>> +??????? reg = <1>;
->>> +??????? compatible = "brcm,bcm4329-fmac";
->>> +??????? interrupt-parent = <&r_pio>;
->>> +??????? interrupts = <0 3 IRQ_TYPE_LEVEL_LOW>; /* PL3 */
->>> +??????? interrupt-names = "host-wake";
->>> +??? };
->>> +};
->>> +
->> NanoPi A64 has rtl8189 Ethernet chip.
-> Good point, thanks for mentioning it (though I guess you mean WiFi chip).
-> Do you have the board? Do you have WiFi working?
->  From a very brief look over the tree I don't see any explicit driver for
-> an SDIO based 8189 variant, but other boards claiming to have a 8189
-> seem to just not provide a compatible at all. Does that actually work?
-> It would be great if you could share some insight here!
->
-> Thanks!
-> Andre.
->
->>>  ? &ohci0 {
->>>  ????? status = "okay";
->>>  ? };
->>> @@ -229,6 +255,13 @@
->>>  ????? status = "okay";
->>>  ? };
->>>  ? +/* Connected to the Bluetooth UART, with hardware handshake pins */
->>> +&uart1 {
->>> +??? pinctrl-names = "default";
->>> +??? pinctrl-0 = <&uart1_pins>, <&uart1_rts_cts_pins>;
->>> +??? status = "okay";
->>> +};
->>> +
->>>  ? &usbphy {
->>>  ????? status = "okay";
->>>  ? };
->>
->>
-yes, I meant WiFi of course.
 
-I am using the following driver 
-https://github.com/jwrdegoede/rtl8189ES_linux.git, branch master
+
+On 07/06/2018 11:28 PM, Robert Jarzmik wrote:
+> Daniel Mack <daniel@zonque.org> writes:
+> 
+>> PXA3xx platforms have 56 interrupts that are stored in two ICMR
+>> registers. The code in pxa_irq_suspend() and pxa_irq_resume() however
+>> does a simple division by 32 which only leads to one register being
+>> saved at suspend and restored at resume time. The NAND interrupt
+>> setting, for instance, is lost.
+>>
+>> Fix this by using DIV_ROUND_UP() instead.
+>>
+>> Signed-off-by: Daniel Mack <daniel@zonque.org>
+>> ---
+>>  arch/arm/mach-pxa/irq.c | 4 ++--
+>>  1 file changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-pxa/irq.c b/arch/arm/mach-pxa/irq.c
+>> index 9c10248fadcc..4e8c2116808e 100644
+>> --- a/arch/arm/mach-pxa/irq.c
+>> +++ b/arch/arm/mach-pxa/irq.c
+>> @@ -185,7 +185,7 @@ static int pxa_irq_suspend(void)
+>>  {
+>>  	int i;
+>>  
+>> -	for (i = 0; i < pxa_internal_irq_nr / 32; i++) {
+>> +	for (i = 0; i < DIV_ROUND_UP(pxa_internal_irq_nr, 32); i++) {
+> Okay, I get it.  Still, something tells me saved_icmr deserves some love too,
+> even if the result in the end won't change, it's just for corectness sake.
+> 
+> Of course, while at it I wonder if we couldn't have :
+>  - pxa_init_irq_common()
+>  - a kmalloc_array() or similar for saved_icmr[] and saved_ipr[]
+> That could be in this patch or another one ...
+
+I'd rather do it in a separate patch then and leave this one as-is.
+
+
+Thanks,
+Daniel
