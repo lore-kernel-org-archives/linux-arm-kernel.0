@@ -1,38 +1,36 @@
 From: labbott@redhat.com (Laura Abbott)
-Date: Thu,  5 Jul 2018 17:49:39 -0700
-Subject: [PATCHv6 3/4] powerpc: Add build salt to the vDSO
+Date: Thu,  5 Jul 2018 17:49:40 -0700
+Subject: [PATCHv6 4/4] arm64: Add build salt to the vDSO
 In-Reply-To: <20180706004940.32587-1-labbott@redhat.com>
 References: <20180706004940.32587-1-labbott@redhat.com>
-Message-ID: <20180706004940.32587-4-labbott@redhat.com>
+Message-ID: <20180706004940.32587-5-labbott@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The vDSO needs to have a unique build id in a similar manner
 to the kernel and modules. Use the build salt macro.
 
+Acked-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Laura Abbott <labbott@redhat.com>
 ---
-v6: Remove semi-colon
+v6: Remove the semi-colon, Ack from Will
 ---
- arch/powerpc/kernel/vdso32/note.S | 3 +++
+ arch/arm64/kernel/vdso/note.S | 3 +++
  1 file changed, 3 insertions(+)
 
-diff --git a/arch/powerpc/kernel/vdso32/note.S b/arch/powerpc/kernel/vdso32/note.S
-index d4b5be4f3d5f..227a7327399e 100644
---- a/arch/powerpc/kernel/vdso32/note.S
-+++ b/arch/powerpc/kernel/vdso32/note.S
-@@ -5,6 +5,7 @@
- 
+diff --git a/arch/arm64/kernel/vdso/note.S b/arch/arm64/kernel/vdso/note.S
+index b82c85e5d972..e20483b104d9 100644
+--- a/arch/arm64/kernel/vdso/note.S
++++ b/arch/arm64/kernel/vdso/note.S
+@@ -22,7 +22,10 @@
  #include <linux/uts.h>
  #include <linux/version.h>
+ #include <linux/elfnote.h>
 +#include <linux/build-salt.h>
  
- #define ASM_ELF_NOTE_BEGIN(name, flags, vendor, type)			      \
- 	.section name, flags;						      \
-@@ -23,3 +24,5 @@
- 	ASM_ELF_NOTE_BEGIN(".note.kernel-version", "a", UTS_SYSNAME, 0)
+ ELFNOTE_START(Linux, 0, "a")
  	.long LINUX_VERSION_CODE
- 	ASM_ELF_NOTE_END
+ ELFNOTE_END
 +
 +BUILD_SALT
 -- 
