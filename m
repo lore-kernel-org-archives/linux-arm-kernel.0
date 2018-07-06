@@ -1,54 +1,46 @@
-From: hejianet@gmail.com (Jia He)
-Date: Fri,  6 Jul 2018 17:01:15 +0800
-Subject: [RESEND PATCH v10 6/6] mm: page_alloc: reduce unnecessary binary
- search in early_pfn_valid()
-In-Reply-To: <1530867675-9018-1-git-send-email-hejianet@gmail.com>
-References: <1530867675-9018-1-git-send-email-hejianet@gmail.com>
-Message-ID: <1530867675-9018-7-git-send-email-hejianet@gmail.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Fri, 06 Jul 2018 17:03:57 +0800
+Subject: [PATCH 08/10] arm64: dts: allwinner: a64: NanoPi-A64: Fix PortE
+ voltage
+In-Reply-To: <20180706085210.17952-9-andre.przywara@arm.com>
+References: <20180706085210.17952-1-andre.przywara@arm.com>
+ <20180706085210.17952-9-andre.przywara@arm.com>
+Message-ID: <F0738E28-2523-41EF-94AE-049C6C436F55@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit b92df1de5d28 ("mm: page_alloc: skip over regions of invalid pfns
-where possible") optimized the loop in memmap_init_zone(). But there is
-still some room for improvement. E.g. in early_pfn_valid(), if pfn and
-pfn+1 are in the same memblock region, we can record the last returned
-memblock region index and check whether pfn++ is still in the same
-region.
 
-Currently it only improve the performance on arm/arm64 and will have no
-impact on other arches.
 
-For the performance improvement, after this set, I can see the time
-overhead of memmap_init() is reduced from 27956us to 13537us in my
-armv8a server(QDF2400 with 96G memory, pagesize 64k).
+? 2018?7?6? GMT+08:00 ??4:52:08, Andre Przywara <andre.przywara@arm.com> ??:
+>VCC-PE is driven the AXP's ALDO1 regulator, and is connected to the I2C
+>pins on the RPi2 header. One would expect 3.3 V there, so enable this
+>regulator and set it to this voltage.
 
-Signed-off-by: Jia He <jia.he@hxt-semitech.com>
----
- include/linux/mmzone.h | 9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
+However, 3.3V will break the DVP camera (although not yet
+supported).
 
-diff --git a/include/linux/mmzone.h b/include/linux/mmzone.h
-index 57cdc42..83b1d11 100644
---- a/include/linux/mmzone.h
-+++ b/include/linux/mmzone.h
-@@ -1267,11 +1267,16 @@ static inline int pfn_present(unsigned long pfn)
- #define pfn_to_nid(pfn)		(0)
- #endif
- 
--#define early_pfn_valid(pfn)	pfn_valid(pfn)
- #ifdef CONFIG_HAVE_MEMBLOCK_PFN_VALID
- extern ulong memblock_next_valid_pfn(ulong pfn);
- #define next_valid_pfn(pfn)	memblock_next_valid_pfn(pfn)
--#endif
-+
-+extern int pfn_valid_region(ulong pfn);
-+#define early_pfn_valid(pfn)	pfn_valid_region(pfn)
-+#else
-+#define early_pfn_valid(pfn)	pfn_valid(pfn)
-+#endif /*CONFIG_HAVE_ARCH_PFN_VALID*/
-+
- void sparse_init(void);
- #else
- #define sparse_init()	do {} while (0)
--- 
-1.8.3.1
+>
+>Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>---
+> arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts | 7 +++++++
+> 1 file changed, 7 insertions(+)
+>
+>diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
+>b/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
+>index bd35a093e6cd..0439cff685d6 100644
+>--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
+>+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
+>@@ -126,6 +126,13 @@
+> 
+> #include "axp803.dtsi"
+> 
+>+&reg_aldo1 {
+>+	regulator-always-on;
+>+	regulator-min-microvolt = <3300000>;
+>+	regulator-max-microvolt = <3300000>;
+>+	regulator-name = "vcc-pe";
+>+};
+>+
+> &reg_aldo2 {
+> 	regulator-always-on;
+> 	regulator-min-microvolt = <1800000>;
