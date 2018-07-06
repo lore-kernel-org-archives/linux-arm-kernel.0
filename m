@@ -1,46 +1,25 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Fri, 06 Jul 2018 10:21:25 +0100
-Subject: [RFC PATCH 04/16] KVM: arm64: Add missing #include of
- <linux/bitmap.h> to kvm_host.h
-In-Reply-To: <1529593060-542-5-git-send-email-Dave.Martin@arm.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Fri, 6 Jul 2018 10:23:13 +0100
+Subject: [RFC PATCH 00/16] KVM: arm64: Initial support for SVE guests
+In-Reply-To: <87d0w090vv.fsf@linaro.org>
 References: <1529593060-542-1-git-send-email-Dave.Martin@arm.com>
- <1529593060-542-5-git-send-email-Dave.Martin@arm.com>
-Message-ID: <87a7r490tm.fsf@linaro.org>
+ <87h8lc93jc.fsf@linaro.org> <20180706090534.GD26019@e103592.cambridge.arm.com>
+ <87d0w090vv.fsf@linaro.org>
+Message-ID: <CAFEAcA8NQFvHzgCvCQBmq7us4PvqSFK2Le=pMiz5dE4D3WGXdQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 6 July 2018 at 10:20, Alex Benn?e <alex.bennee@linaro.org> wrote:
+> For the most part in QEMU with KVM we just treat the list of registers
+> we get from the OS as an opaque blob of things we save to memory and
+> pass back.
 
-Dave Martin <Dave.Martin@arm.com> writes:
+This is specifically not the case for the SVE registers -- we
+will need extra code to handle them. (The current code only
+allows for the possibility of 64-bit registers, so if we'd
+allowed the kernel to hand it the larger SVE registers it would
+just have fallen over. This is why QEMU needs to specifically
+enable SVE via the VCPU_INIT call.)
 
-> kvm_host.h uses DECLARE_BITMAP() to declare the features member of
-> struct vcpu_arch, but the corresponding #include for this is
-> missing.
->
-> This patch adds a suitable #include for <linux/bitmap.h>.  Although
-> the header builds without it today, this should help to avoid
-> future surprises.
->
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-
-Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
-
-> ---
->  arch/arm64/include/asm/kvm_host.h | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> index fe8777b..92d6e88 100644
-> --- a/arch/arm64/include/asm/kvm_host.h
-> +++ b/arch/arm64/include/asm/kvm_host.h
-> @@ -22,6 +22,7 @@
->  #ifndef __ARM64_KVM_HOST_H__
->  #define __ARM64_KVM_HOST_H__
->
-> +#include <linux/bitmap.h>
->  #include <linux/types.h>
->  #include <linux/kvm_types.h>
->  #include <asm/cpufeature.h>
-
-
---
-Alex Benn?e
+thanks
+-- PMM
