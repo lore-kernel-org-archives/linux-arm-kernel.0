@@ -1,46 +1,71 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Fri, 06 Jul 2018 17:03:57 +0800
-Subject: [PATCH 08/10] arm64: dts: allwinner: a64: NanoPi-A64: Fix PortE
- voltage
-In-Reply-To: <20180706085210.17952-9-andre.przywara@arm.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri, 6 Jul 2018 10:05:32 +0100
+Subject: [linux-sunxi] [PATCH 03/10] arm64: dts: allwinner: a64:
+ Olinuxino: fix DRAM voltage
+In-Reply-To: <859578FF-AB96-4B51-8E7E-2F144E35C47A@aosc.io>
 References: <20180706085210.17952-1-andre.przywara@arm.com>
- <20180706085210.17952-9-andre.przywara@arm.com>
-Message-ID: <F0738E28-2523-41EF-94AE-049C6C436F55@aosc.io>
+ <20180706085210.17952-4-andre.przywara@arm.com>
+ <859578FF-AB96-4B51-8E7E-2F144E35C47A@aosc.io>
+Message-ID: <bdf35591-82ad-7f4e-f900-7ecc532bc54e@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-
-? 2018?7?6? GMT+08:00 ??4:52:08, Andre Przywara <andre.przywara@arm.com> ??:
->VCC-PE is driven the AXP's ALDO1 regulator, and is connected to the I2C
->pins on the RPi2 header. One would expect 3.3 V there, so enable this
->regulator and set it to this voltage.
-
-However, 3.3V will break the DVP camera (although not yet
-supported).
-
->
->Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->---
-> arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts | 7 +++++++
-> 1 file changed, 7 insertions(+)
->
->diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
->b/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
->index bd35a093e6cd..0439cff685d6 100644
->--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
->+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
->@@ -126,6 +126,13 @@
+On 06/07/18 09:55, Icenowy Zheng wrote:
 > 
-> #include "axp803.dtsi"
 > 
->+&reg_aldo1 {
->+	regulator-always-on;
->+	regulator-min-microvolt = <3300000>;
->+	regulator-max-microvolt = <3300000>;
->+	regulator-name = "vcc-pe";
->+};
->+
-> &reg_aldo2 {
-> 	regulator-always-on;
-> 	regulator-min-microvolt = <1800000>;
+> ? 2018?7?6? GMT+08:00 ??4:52:03, Andre Przywara <andre.przywara@arm.com> ??:
+>> The Olinuxino board uses DDR3L chips which are supposed to be driven
+>> with 1.35V. The reset default of the AXP is properly set to 1.36V.
+>>
+>> While technically the chips can also run at 1.5 volts, changing the
+>> voltage on the fly while booting Linux is asking for trouble. Also
+>> running at a lower voltage saves power.
+>>
+>> So fix the DCDC5 value to match the actual board design.
+>>
+>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>> ---
+>> arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts | 10 ++++++----
+>> 1 file changed, 6 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts
+>> b/arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts
+>> index 3f531393eaee..f945c70f3a80 100644
+>> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts
+>> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts
+>> @@ -140,12 +140,14 @@
+>> 	regulator-name = "vdd-cpux";
+>> };
+>>
+>> -/* DCDC3 is polyphased with DCDC2 */
+>> -
+>> +/*
+>> + * DCDC3 is polyphased with DCDC2 to supply the DDR3L DRAM chips.
+>> + * 1.36V is the closest to the nominal 1.35V that the PMIC can drive.
+> 
+> The comment is a mess. DCDC2+3 is for CPU, and 5 is for DRAM.
+
+Aargh, true. I was misled by that lonely comment.
+
+> Personally I suggest to use two comment blocks, one sit at
+> where dcdc3 should appear, and the second before dcdc5.
+
+Yeah, sounds like the right thing to do.
+
+Thanks for having a look!
+
+Cheers,
+Andre.
+
+>> + */
+>> &reg_dcdc5 {
+>> 	regulator-always-on;
+>> -	regulator-min-microvolt = <1500000>;
+>> -	regulator-max-microvolt = <1500000>;
+>> +	regulator-min-microvolt = <1360000>;
+>> +	regulator-max-microvolt = <1360000>;
+>> 	regulator-name = "vcc-ddr3";
+>> };
+>>
