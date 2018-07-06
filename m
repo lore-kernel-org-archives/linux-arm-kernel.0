@@ -1,97 +1,46 @@
-From: nipun.gupta@nxp.com (Nipun Gupta)
-Date: Fri, 6 Jul 2018 12:18:49 +0000
-Subject: [PATCH 7/7 v5] arm64: dts: ls208xa: comply with the iommu map
- binding for fsl_mc
-In-Reply-To: <88626adc-6f5b-86df-88a0-620d258f8053@arm.com>
-References: <1526824191-7000-1-git-send-email-nipun.gupta@nxp.com>
- <1526824191-7000-8-git-send-email-nipun.gupta@nxp.com>
- <88626adc-6f5b-86df-88a0-620d258f8053@arm.com>
-Message-ID: <HE1PR0401MB2425F914BA7A9DDCB3D76AEDE6470@HE1PR0401MB2425.eurprd04.prod.outlook.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 6 Jul 2018 13:21:46 +0100
+Subject: [PATCH 1/2] PCI: aardvark: Size bridges before resources
+ allocation
+In-Reply-To: <20180706134245.3a554b27@windsurf>
+References: <20180629091620.31503-1-thomas.petazzoni@bootlin.com>
+ <20180629091620.31503-2-thomas.petazzoni@bootlin.com>
+ <20180705141522.GA13716@red-moon>
+ <20180705161909.2a7a6030@windsurf>
+ <20180706110130.GA14439@red-moon>
+ <20180706134245.3a554b27@windsurf>
+Message-ID: <20180706122146.GA14795@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-> -----Original Message-----
-> From: Robin Murphy [mailto:robin.murphy at arm.com]
-> Sent: Tuesday, July 3, 2018 10:06 PM
-> To: Nipun Gupta <nipun.gupta@nxp.com>; will.deacon at arm.com;
-> robh+dt at kernel.org; robh at kernel.org; mark.rutland at arm.com;
-> catalin.marinas at arm.com; gregkh at linuxfoundation.org; Laurentiu Tudor
-> <laurentiu.tudor@nxp.com>; bhelgaas at google.com
-> Cc: hch at lst.de; joro at 8bytes.org; m.szyprowski at samsung.com;
-> shawnguo at kernel.org; frowand.list at gmail.com; iommu at lists.linux-
-> foundation.org; linux-kernel at vger.kernel.org; devicetree at vger.kernel.org;
-> linux-arm-kernel at lists.infradead.org; linuxppc-dev at lists.ozlabs.org; linux-
-> pci at vger.kernel.org; Bharat Bhushan <bharat.bhushan@nxp.com>;
-> stuyoder at gmail.com; Leo Li <leoyang.li@nxp.com>
-> Subject: Re: [PATCH 7/7 v5] arm64: dts: ls208xa: comply with the iommu map
-> binding for fsl_mc
+On Fri, Jul 06, 2018 at 01:42:45PM +0200, Thomas Petazzoni wrote:
+> Hello,
 > 
-> On 20/05/18 14:49, Nipun Gupta wrote:
-> > fsl-mc bus support the new iommu-map property. Comply to this binding
-> > for fsl_mc bus.
-> >
-> > Signed-off-by: Nipun Gupta <nipun.gupta@nxp.com>
-> > Reviewed-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
-> > ---
-> >   arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi | 6 +++++-
-> >   1 file changed, 5 insertions(+), 1 deletion(-)
-> >
-> > diff --git a/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
-> b/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
-> > index 137ef4d..6010505 100644
-> > --- a/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
-> > +++ b/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
-> > @@ -184,6 +184,7 @@
-> >   		#address-cells = <2>;
-> >   		#size-cells = <2>;
-> >   		ranges;
-> > +		dma-ranges = <0x0 0x0 0x0 0x0 0x10000 0x00000000>;
-> >
-> >   		clockgen: clocking at 1300000 {
-> >   			compatible = "fsl,ls2080a-clockgen";
-> > @@ -357,6 +358,8 @@
-> >   			reg = <0x00000008 0x0c000000 0 0x40>,	 /* MC portal
-> base */
-> >   			      <0x00000000 0x08340000 0 0x40000>; /* MC
-> control reg */
-> >   			msi-parent = <&its>;
-> > +			iommu-map = <0 &smmu 0 0>;	/* This is fixed-up by
-> u-boot */
-> > +			dma-coherent;
-> >   			#address-cells = <3>;
-> >   			#size-cells = <1>;
-> >
-> > @@ -460,6 +463,8 @@
-> >   			compatible = "arm,mmu-500";
-> >   			reg = <0 0x5000000 0 0x800000>;
-> >   			#global-interrupts = <12>;
-> > +			#iommu-cells = <1>;
-> > +			stream-match-mask = <0x7C00>;
-> >   			interrupts = <0 13 4>, /* global secure fault */
-> >   				     <0 14 4>, /* combined secure interrupt */
-> >   				     <0 15 4>, /* global non-secure fault */
-> > @@ -502,7 +507,6 @@
-> >   				     <0 204 4>, <0 205 4>,
-> >   				     <0 206 4>, <0 207 4>,
-> >   				     <0 208 4>, <0 209 4>;
-> > -			mmu-masters = <&fsl_mc 0x300 0>;
+> On Fri, 6 Jul 2018 12:01:30 +0100, Lorenzo Pieralisi wrote:
 > 
-> Since we're in here, is the SMMU itself also coherent? If it is, you
-> probably want to say so and avoid the overhead of pointlessly cleaning
-> cache lines on every page table update.
-
-Yes, dma-coherent property is also required here. I missed it somehow.
-Thanks for pointing this.
-
-Regards,
-Nipun
-
+> > > It is a serious bug, but it is not a regression. I.e whatever is fixed
+> > > by this patch never worked. So if you take a conservative view on
+> > > pushing patches to stable and only want to fix regressions, this one
+> > > doesn't qualify. However, if you take a more open approach and say you
+> > > want to fix obvious bugs/issues even in older stable kernels, then
+> > > indeed this patch qualifies.
+> > > 
+> > > If you are within the kernel developers with this more open approach to
+> > > sending patches to stable, then you can add:
+> > > 
+> > > Fixes: 8c39d710363c1 ("PCI: aardvark: Add Aardvark PCI host controller driver")
+> > > Cc: <stable@vger.kernel.org>
+> > > 
+> > > when applying the patch. Unless of course you want me to resend the
+> > > patch series with this added. Just let met know what you prefer.  
+> > 
+> > It is up to you, I think it qualifies for stable kernels so I would
+> > send it but it is your choice, please let me know.
 > 
-> Robin.
-> 
-> >   		};
-> >
-> >   		dspi: dspi at 2100000 {
-> >
+> It's OK for me to have it in stable kernels. The fix is pretty obvious,
+> so you can add the Fixes/Cc tags when applying. Unless of course you
+> want me to resend an updated version.
+
+Applied to pci/aardvark for v4.19, thanks.
+
+Lorenzo
