@@ -1,72 +1,42 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Fri, 06 Jul 2018 09:22:47 +0100
-Subject: [RFC PATCH 00/16] KVM: arm64: Initial support for SVE guests
-In-Reply-To: <1529593060-542-1-git-send-email-Dave.Martin@arm.com>
-References: <1529593060-542-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <87h8lc93jc.fsf@linaro.org>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Fri,  6 Jul 2018 10:32:48 +0200
+Subject: [PATCH v5 3/4] dt-bindings: display: amlogic: DT fix
+ s/resets-names/reset-names/
+In-Reply-To: <20180706083249.25399-1-geert+renesas@glider.be>
+References: <20180706083249.25399-1-geert+renesas@glider.be>
+Message-ID: <20180706083249.25399-4-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Fixes: 8cceda5349377e30 ("dt-bindings: Add bindings for the Amlogic Meson dw-hdmi extension")
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Acked-by: Rob Herring <robh@kernel.org>
+Acked-by: Neil Armstrong <narmstrong@baylibre.com>
+---
+v5:
+  - Add Acked-by,
 
-Dave Martin <Dave.Martin@arm.com> writes:
+v4:
+  - Add Acked-by,
 
-<snip>
->
-> This series is somewhat tested on Arm Juno r0 and the Arm Fast Model
-> (with/without SVE support).  arch/arm builds, but I've not booted
-> it -- only some trivial refactoring in this series affects arch/arm.
+v3:
+  - New.
+---
+ .../devicetree/bindings/display/amlogic,meson-dw-hdmi.txt       | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Now that QEMU linux-user SVE support is pretty much complete we've also
-got preliminary patches for system emulation mode. However we currently
-don't have VHE implemented so I guess we need to do that first before we
-can test under QEMU.
-
->
-> Cheers
-> ---Dave
->
->
-> [1] [PATCH v2 0/4] KVM: arm64: FPSIMD/SVE fixes for 4.17 [sic]
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2018-June/584281.html
->
-> Dave Martin (16):
->   arm64: fpsimd: Always set TIF_FOREIGN_FPSTATE on task state flush
->   KVM: arm64: Delete orphaned declaration for __fpsimd_enabled()
->   KVM: arm64: Refactor kvm_arm_num_regs() for easier maintenance
->   KVM: arm64: Add missing #include of <linux/bitmap.h> to kvm_host.h
->   KVM: arm: Add arch init/uninit hooks
->   arm64/sve: Determine virtualisation-friendly vector lengths
->   arm64/sve: Enable SVE state tracking for non-task contexts
->   KVM: arm64: Support dynamically hideable system registers
->   KVM: arm64: Allow ID registers to by dynamically read-as-zero
->   KVM: arm64: Add a vcpu flag to control SVE visibility for the guest
->   KVM: arm64/sve: System register context switch and access support
->   KVM: arm64/sve: Context switch the SVE registers
->   KVM: Allow 2048-bit register access via KVM_{GET,SET}_ONE_REG
->   KVM: arm64/sve: Add SVE support to register access ioctl interface
->   KVM: arm64: Enumerate SVE register indices for KVM_GET_REG_LIST
->   KVM: arm64/sve: Report and enable SVE API extensions for userspace
->
->  arch/arm/include/asm/kvm_host.h   |   4 +-
->  arch/arm64/include/asm/fpsimd.h   |   4 +-
->  arch/arm64/include/asm/kvm_host.h |  18 ++-
->  arch/arm64/include/asm/kvm_hyp.h  |   1 -
->  arch/arm64/include/asm/sysreg.h   |   3 +
->  arch/arm64/include/uapi/asm/kvm.h |  11 ++
->  arch/arm64/kernel/cpufeature.c    |   2 +-
->  arch/arm64/kernel/fpsimd.c        | 131 +++++++++++++---
->  arch/arm64/kernel/signal.c        |   5 -
->  arch/arm64/kvm/fpsimd.c           |   7 +-
->  arch/arm64/kvm/guest.c            | 321 +++++++++++++++++++++++++++++++++++---
->  arch/arm64/kvm/hyp/switch.c       |  43 +++--
->  arch/arm64/kvm/hyp/sysreg-sr.c    |   5 +
->  arch/arm64/kvm/reset.c            |  14 ++
->  arch/arm64/kvm/sys_regs.c         |  73 ++++++---
->  arch/arm64/kvm/sys_regs.h         |  22 +++
->  include/uapi/linux/kvm.h          |   1 +
->  virt/kvm/arm/arm.c                |  13 +-
->  18 files changed, 587 insertions(+), 91 deletions(-)
-
-
---
-Alex Benn?e
+diff --git a/Documentation/devicetree/bindings/display/amlogic,meson-dw-hdmi.txt b/Documentation/devicetree/bindings/display/amlogic,meson-dw-hdmi.txt
+index bf4a18047309a5f8..d8f6268849f43621 100644
+--- a/Documentation/devicetree/bindings/display/amlogic,meson-dw-hdmi.txt
++++ b/Documentation/devicetree/bindings/display/amlogic,meson-dw-hdmi.txt
+@@ -43,7 +43,7 @@ Required properties:
+   and the Amlogic Meson venci clocks as described in
+   Documentation/devicetree/bindings/clock/clock-bindings.txt,
+   the clocks are soc specific, the clock-names should be "iahb", "isfr", "venci"
+-- resets, resets-names: must have the phandles to the HDMI apb, glue and phy
++- resets, reset-names: must have the phandles to the HDMI apb, glue and phy
+   resets as described in :
+   Documentation/devicetree/bindings/reset/reset.txt,
+   the reset-names should be "hdmitx_apb", "hdmitx", "hdmitx_phy"
+-- 
+2.17.1
