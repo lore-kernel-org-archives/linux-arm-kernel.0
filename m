@@ -1,13 +1,13 @@
 From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
-Date: Fri,  6 Jul 2018 14:16:27 -0700
+Date: Fri,  6 Jul 2018 14:16:28 -0700
 Subject: No subject
 In-Reply-To: <1530911788-7033-1-git-send-email-santosh.shilimkar@oracle.com>
 References: <1530911788-7033-1-git-send-email-santosh.shilimkar@oracle.com>
-Message-ID: <1530911788-7033-2-git-send-email-santosh.shilimkar@oracle.com>
+Message-ID: <1530911788-7033-3-git-send-email-santosh.shilimkar@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Subject: [GIT PULL 2/3] ARM: Keystone config update for v4.19
+Subject: [GIT PULL 3/3] SOC: Driver updates for v4.19
 
 The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
 
@@ -15,24 +15,31 @@ The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone_config_for_4.19
+  git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/soc_drivers_for_4.19
 
-for you to fetch changes up to 60e9343b355118e903a155135f0511918d69e3ac:
+for you to fetch changes up to 990c10091db318c7eb7e8935c86b6f7c01585015:
 
-  ARM: configs: keystone: Enable CONFIG_MMC_SDHCI_OMAP (2018-06-29 15:57:53 -0700)
-
-----------------------------------------------------------------
-ARM: Keystone config updates for 4.19
-
- - Enable MMC support
- - Enable Micrel and DP83867 phys
+  soc: ti: wkup_m3_ipc: mark PM functions as __maybe_unused (2018-07-06 09:47:51 -0700)
 
 ----------------------------------------------------------------
-Kishon Vijay Abraham I (1):
-      ARM: configs: keystone: Enable CONFIG_MMC_SDHCI_OMAP
+Keystone SOC driver update for 4.19
 
-Murali Karicheri (1):
-      ARM: keystone: k2g: enable micrel and dp83867 phys
+ -  Add suspend/resume functionality to TI EMIF SRAM driver
+ -  Add wakeup M3 RTC self refresh support
+ -  Fix for the PM runtime ifdefs
 
- arch/arm/configs/keystone_defconfig | 5 +++++
- 1 file changed, 5 insertions(+)
+----------------------------------------------------------------
+Arnd Bergmann (1):
+      soc: ti: wkup_m3_ipc: mark PM functions as __maybe_unused
+
+Dave Gerlach (2):
+      memory: ti-emif-sram: Add resume function to recopy sram code
+      soc: ti: wkup_m3_ipc: Add wkup_m3_request_wake_src
+
+Keerthy (1):
+      soc: ti: wkup_m3_ipc: Add rtc_only with ddr in self refresh mode support
+
+ drivers/memory/ti-emif-pm.c  | 33 +++++++++++++++++++
+ drivers/soc/ti/wkup_m3_ipc.c | 76 ++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/wkup_m3_ipc.h  |  9 ++++++
+ 3 files changed, 118 insertions(+)
