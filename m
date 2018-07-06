@@ -1,35 +1,52 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Fri,  6 Jul 2018 19:51:01 +0200
-Subject: [PATCH 05/17] drm/sun4i: tcon: Release node when traversing of graph
+Date: Fri,  6 Jul 2018 19:51:04 +0200
+Subject: [PATCH 08/17] ARM: dts: sun8i: r40: Add mixer ids to TCON TOP
 In-Reply-To: <20180706175113.26698-1-jernej.skrabec@siol.net>
 References: <20180706175113.26698-1-jernej.skrabec@siol.net>
-Message-ID: <20180706175113.26698-6-jernej.skrabec@siol.net>
+Message-ID: <20180706175113.26698-9-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Function sun4i_tcon_find_engine_traverse() doesn't release node if it
-needs to traverse of graph deeper than 1 level.
+Mixer has to have a way to read its id, if needed.
 
-Fix this by calling of_node_put().
-
-Fixes: 49836b11fe71 ("drm/sun4i: tcon: Generalize engine search algorithm")
+Add them in R40 DT.
 
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/gpu/drm/sun4i/sun4i_tcon.c | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/sun8i-r40.dtsi | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-index aacc841d3dc6..3fb084f802e2 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-@@ -811,6 +811,7 @@ sun4i_tcon_find_engine_traverse(struct sun4i_drv *drv,
- 	 * remote output id. If this for some reason can't be done, 0
- 	 * is used as input port id.
- 	 */
-+	of_node_put(port);
- 	port = of_graph_get_remote_port(ep);
- 	if (!of_property_read_u32(port, "reg", &reg) && reg > 0)
- 		reg -= 1;
+diff --git a/arch/arm/boot/dts/sun8i-r40.dtsi b/arch/arm/boot/dts/sun8i-r40.dtsi
+index 2afb079a3776..1dd088d82773 100644
+--- a/arch/arm/boot/dts/sun8i-r40.dtsi
++++ b/arch/arm/boot/dts/sun8i-r40.dtsi
+@@ -576,9 +576,12 @@
+ 				#size-cells = <0>;
+ 
+ 				tcon_top_mixer0_in: port at 0 {
++					#address-cells = <1>;
++					#size-cells = <0>;
+ 					reg = <0>;
+ 
+-					tcon_top_mixer0_in_mixer0: endpoint {
++					tcon_top_mixer0_in_mixer0: endpoint at 0 {
++						reg = <0>;
+ 						remote-endpoint = <&mixer0_out_tcon_top>;
+ 					};
+ 				};
+@@ -606,9 +609,12 @@
+ 				};
+ 
+ 				tcon_top_mixer1_in: port at 2 {
++					#address-cells = <1>;
++					#size-cells = <0>;
+ 					reg = <2>;
+ 
+-					tcon_top_mixer1_in_mixer1: endpoint {
++					tcon_top_mixer1_in_mixer1: endpoint at 1 {
++						reg = <1>;
+ 						remote-endpoint = <&mixer1_out_tcon_top>;
+ 					};
+ 				};
 -- 
 2.18.0
