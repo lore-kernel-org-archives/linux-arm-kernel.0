@@ -1,7 +1,7 @@
 From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Fri,  6 Jul 2018 15:03:55 +0200
-Subject: [PATCH] media: stm32: dcmi: replace "%p" with "%pK"
-Message-ID: <20180706130355.22100-1-benjamin.gaignard@st.com>
+Date: Fri,  6 Jul 2018 15:05:25 +0200
+Subject: [PATCH] mtd: stm32-quadspi: replace "%p" with "%pK"
+Message-ID: <20180706130525.22223-1-benjamin.gaignard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -10,21 +10,39 @@ Use "%pK" instead.
 
 Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
 ---
- drivers/media/platform/stm32/stm32-dcmi.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/mtd/spi-nor/stm32-quadspi.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/media/platform/stm32/stm32-dcmi.c b/drivers/media/platform/stm32/stm32-dcmi.c
-index 2e1933d872ee..fe90672cf16f 100644
---- a/drivers/media/platform/stm32/stm32-dcmi.c
-+++ b/drivers/media/platform/stm32/stm32-dcmi.c
-@@ -1753,7 +1753,7 @@ static int dcmi_probe(struct platform_device *pdev)
+diff --git a/drivers/mtd/spi-nor/stm32-quadspi.c b/drivers/mtd/spi-nor/stm32-quadspi.c
+index 72553506a00b..13e9fc961d3b 100644
+--- a/drivers/mtd/spi-nor/stm32-quadspi.c
++++ b/drivers/mtd/spi-nor/stm32-quadspi.c
+@@ -355,7 +355,7 @@ static int stm32_qspi_read_reg(struct spi_nor *nor,
+ 	struct device *dev = flash->qspi->dev;
+ 	struct stm32_qspi_cmd cmd;
  
- 	ret = clk_prepare(mclk);
- 	if (ret) {
--		dev_err(&pdev->dev, "Unable to prepare mclk %p\n", mclk);
-+		dev_err(&pdev->dev, "Unable to prepare mclk %pK\n", mclk);
- 		goto err_dma_release;
- 	}
+-	dev_dbg(dev, "read_reg: cmd:%#.2x buf:%p len:%#x\n", opcode, buf, len);
++	dev_dbg(dev, "read_reg: cmd:%#.2x buf:%pK len:%#x\n", opcode, buf, len);
  
+ 	memset(&cmd, 0, sizeof(cmd));
+ 	cmd.opcode = opcode;
+@@ -376,7 +376,7 @@ static int stm32_qspi_write_reg(struct spi_nor *nor, u8 opcode,
+ 	struct device *dev = flash->qspi->dev;
+ 	struct stm32_qspi_cmd cmd;
+ 
+-	dev_dbg(dev, "write_reg: cmd:%#.2x buf:%p len:%#x\n", opcode, buf, len);
++	dev_dbg(dev, "write_reg: cmd:%#.2x buf:%pK len:%#x\n", opcode, buf, len);
+ 
+ 	memset(&cmd, 0, sizeof(cmd));
+ 	cmd.opcode = opcode;
+@@ -398,7 +398,7 @@ static ssize_t stm32_qspi_read(struct spi_nor *nor, loff_t from, size_t len,
+ 	struct stm32_qspi_cmd cmd;
+ 	int err;
+ 
+-	dev_dbg(qspi->dev, "read(%#.2x): buf:%p from:%#.8x len:%#zx\n",
++	dev_dbg(qspi->dev, "read(%#.2x): buf:%pK from:%#.8x len:%#zx\n",
+ 		nor->read_opcode, buf, (u32)from, len);
+ 
+ 	memset(&cmd, 0, sizeof(cmd));
 -- 
 2.15.0
