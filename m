@@ -1,40 +1,41 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri,  6 Jul 2018 14:48:47 +0200
-Subject: [PATCH] ARM: module: fix modsign build error
-Message-ID: <20180706124900.3294525-1-arnd@arndb.de>
+Date: Fri,  6 Jul 2018 14:54:48 +0200
+Subject: [PATCH] ARM: imx: fix i.MX6SLL build
+Message-ID: <20180706125523.3480661-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The asm/module.h header file can not be included standalone, which
-breaks the module signing code after a recent change:
+The i.MX6SLL cpuidle support reuses the i.MX6SX implementation, but
+the Makefile accidentally enables the i.MX6SL one as well, which
+then fails with a link error unless the kernel also enables the
+the i.MX6SL clock driver:
 
-In file included from kernel/module-internal.h:13,
-                 from kernel/module_signing.c:17:
-arch/arm/include/asm/module.h:37:27: error: 'struct module' declared inside parameter list will not be visible outside of this definition or declaration [-Werror]
- u32 get_module_plt(struct module *mod, unsigned long loc, Elf32_Addr val);
+arch/arm/mach-imx/cpuidle-imx6sl.o: In function `imx6sl_enter_wait':
+cpuidle-imx6sl.c:(.text+0x24): undefined reference to `imx6sl_set_wait_clk'
 
-This adds a forward declaration of struct module to make it all work.
+This changes the two lines that were just modified again, hopefully
+getting every case right this time.
 
-Fixes: f314dfea16a0 ("modsign: log module name in the event of an error")
+Fixes: e7fa1fb39b11 ("ARM: imx: add cpu idle support for i.MX6SLL")
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
-I guess it would be useful if Jessica can pick this change up
-in her tree that introduced the warning.
----
- arch/arm/include/asm/module.h | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/mach-imx/Makefile | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/include/asm/module.h b/arch/arm/include/asm/module.h
-index 89ad0596033a..9e81b7c498d8 100644
---- a/arch/arm/include/asm/module.h
-+++ b/arch/arm/include/asm/module.h
-@@ -34,6 +34,7 @@ struct mod_arch_specific {
- #endif
- };
- 
-+struct module;
- u32 get_module_plt(struct module *mod, unsigned long loc, Elf32_Addr val);
- 
- /*
+diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+index 146ebf97b7eb..bae179af21f6 100644
+--- a/arch/arm/mach-imx/Makefile
++++ b/arch/arm/mach-imx/Makefile
+@@ -25,8 +25,8 @@ obj-$(CONFIG_MXC_DEBUG_BOARD) += 3ds_debugboard.o
+ ifeq ($(CONFIG_CPU_IDLE),y)
+ obj-$(CONFIG_SOC_IMX5) += cpuidle-imx5.o
+ obj-$(CONFIG_SOC_IMX6Q) += cpuidle-imx6q.o
+-obj-$(CONFIG_SOC_IMX6SL) += cpuidle-imx6sl.o cpuidle-imx6sx.o
+-obj-$(CONFIG_SOC_IMX6SLL) += cpuidle-imx6sl.o cpuidle-imx6sx.o
++obj-$(CONFIG_SOC_IMX6SL) += cpuidle-imx6sl.o
++obj-$(CONFIG_SOC_IMX6SLL) += cpuidle-imx6sx.o
+ obj-$(CONFIG_SOC_IMX6SX) += cpuidle-imx6sx.o
+ obj-$(CONFIG_SOC_IMX6UL) += cpuidle-imx6sx.o
+ endif
 -- 
 2.9.0
