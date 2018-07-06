@@ -1,46 +1,105 @@
-From: guodong.xu@linaro.org (Guodong Xu)
-Date: Fri,  6 Jul 2018 11:55:21 +0800
-Subject: [PATCH v2 4/4] k3dma: delete axi_config
-In-Reply-To: <20180706035521.13736-1-guodong.xu@linaro.org>
-References: <20180706035521.13736-1-guodong.xu@linaro.org>
-Message-ID: <20180706035521.13736-5-guodong.xu@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 6 Jul 2018 06:45:11 +0100
+Subject: [PATCH] checkpatch: Add exceptions for dsb keyword usage
+In-Reply-To: <f3ce3ca8741f774b63e8a67a278384747b1de522.camel@perches.com>
+References: <1530814776-16988-1-git-send-email-pheragu@codeaurora.org>
+ <f3ce3ca8741f774b63e8a67a278384747b1de522.camel@perches.com>
+Message-ID: <20180706054510.puli24y6i6ylghxt@salmiak>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Li Yu <liyu65@hisilicon.com>
+On Thu, Jul 05, 2018 at 02:14:28PM -0700, Joe Perches wrote:
+> On Thu, 2018-07-05 at 11:19 -0700, Prakruthi Deepak Heragu wrote:
+> > mb() API can relpace the dsb() API in the kernel code. So, dsb() usage
+> > is discouraged. However, there are exceptions when dsb is used in a
+> > variable or a function name. Exceptions are when 'dsb' is prefixed with
+> > class [-_>*\.] and/or suffixed with class [-_\.;].
 
-Axi_config controls whether DMA resources can be accessed in non-secure
-mode, such as linux kernel. The setting is actually done in
-bootloader stage.
+This is a really confusing way of describing the match behaviour, and doesn't
+explain why this is a big problem.
 
-This patch removes axi_config from k3dma driver.
+In C it's either:
 
-Signed-off-by: Li Yu <liyu65@hisilicon.com>
-Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
----
- drivers/dma/k3dma.c | 3 ---
- 1 file changed, 3 deletions(-)
+	dsb()
+	dsb(scope)	// e.g. dsb(ish)
 
-diff --git a/drivers/dma/k3dma.c b/drivers/dma/k3dma.c
-index 33efb541acb2..4542e703ec85 100644
---- a/drivers/dma/k3dma.c
-+++ b/drivers/dma/k3dma.c
-@@ -52,8 +52,6 @@
- #define CX_SRC			0x814
- #define CX_DST			0x818
- #define CX_CFG			0x81c
--#define AXI_CFG			0x820
--#define AXI_CFG_DEFAULT		0x201201
- 
- #define CX_LLI_CHAIN_EN		0x2
- #define CX_CFG_EN		0x1
-@@ -158,7 +156,6 @@ static void k3_dma_set_desc(struct k3_dma_phy *phy, struct k3_desc_hw *hw)
- 	writel_relaxed(hw->count, phy->base + CX_CNT0);
- 	writel_relaxed(hw->saddr, phy->base + CX_SRC);
- 	writel_relaxed(hw->daddr, phy->base + CX_DST);
--	writel_relaxed(AXI_CFG_DEFAULT, phy->base + AXI_CFG);
- 	writel_relaxed(hw->config, phy->base + CX_CFG);
- }
- 
--- 
-2.17.1
+... where scope is [a-z]*.
+
+... which can be matched as something like 'dsb([a-z]*)' if necessary.
+
+> []
+> > diff --git a/scripts/checkpatch.pl b/scripts/checkpatch.pl
+> []
+> > @@ -5372,6 +5372,12 @@ sub process {
+> >  			     "Avoid line continuations in quoted strings\n" . $herecurr);
+> >  		}
+> >  
+> > +# dsb is too ARMish, and should usually be mb.
+> > +        if ($line =~ /[^-_>*\.]\bdsb\b[^-_\.;]/) {
+> > +            WARN("ARM_BARRIER",
+> > +                 "Use of dsb is discouranged: prefer mb.\n" .
+> > +                 $herecurr);
+> > +		}
+> 
+> This patch is whitespace damaged with a spelling error.
+> 
+> Also, if this is reasonable test, and I don't know
+> that it is, it should be cc'd to the linux-arm list
+> linux-arm-kernel at lists.infradead.org
+> 
+> Also, I suggest 2 tests, one for .S files and
+> another for .[ch] files, and this be made specific
+> to arch/arm... files
+> 
+> Something like:
+> 
+> 	if ($realfile =~ @^arch/arm@ &&
+> 	    ($realfile =~ /\.S$/ && $line =~ /\bdsb\b/) ||
+> 	    ($realfile =~ /\.[ch]$/ && $line =~ /\bdsb\s*\(/)) {
+> 		WARN("ARM_DSB",
+> 		     "Prefer mb over dsb as an ARM memory barrier\n" . $herecurr);
+> 	}
+> 
+> ARM people, is this reasonable?
+
+I don't think this is a big deal today. 
+
+For code under arch/{arm,arm64}, it's perfectly reasonable to use dsb.
+
+For code *ouside* of arch/{arm,arm64}, there are a number of cases where we
+want to use dsb(), e.g. when dealing with architectural drivers that require
+special barriers, or for common code shared across arm and arm64.
+
+It doesn't look like this is a big problem today, anyhow:
+
+[mark at salmiak:~/src/linux]% git grep -w 'dsb(.*)' -- ^arch          
+drivers/irqchip/irq-armada-370-xp.c:    dsb();
+drivers/irqchip/irq-gic-v3-its.c:               dsb(ishst);
+drivers/irqchip/irq-gic-v3-its.c:               dsb(ishst);
+drivers/irqchip/irq-gic-v3-its.c:       dsb(sy);
+drivers/irqchip/irq-gic-v3-its.c:               dsb(sy);
+drivers/irqchip/irq-gic-v3-its.c:       dsb(sy);
+drivers/mtd/nand/raw/cmx270_nand.c:     dsb();
+drivers/mtd/nand/raw/cmx270_nand.c:     dsb();
+drivers/mtd/nand/raw/cmx270_nand.c:     dsb();
+drivers/mtd/nand/raw/cmx270_nand.c:     dsb();
+drivers/mtd/nand/raw/cmx270_nand.c:     dsb();
+drivers/perf/arm_spe_pmu.c:     dsb(nsh);
+drivers/perf/arm_spe_pmu.c:     dsb(nsh);
+drivers/power/reset/arm-versatile-reboot.c:     dsb();
+drivers/soc/rockchip/pm_domains.c:      dsb(sy);
+drivers/soc/rockchip/pm_domains.c:      dsb(sy);
+drivers/staging/mt7621-mmc/sd.c:        //dsb(); /* --- by chhung */
+drivers/staging/mt7621-mmc/sd.c:        //dsb(); /* --- by chhung */
+drivers/staging/vc04_services/interface/vchiq_arm/vchiq.h:#define dsb(a)
+drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c:     dsb(sy);         /* data barrier operation */
+drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.c:         dsb(sy);
+drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.h: do { debug_ptr[DEBUG_ ## d] = __LINE__; dsb(sy); } while (0)
+drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.h: do { debug_ptr[DEBUG_ ## d] = (v); dsb(sy); } while (0)
+drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.h: do { debug_ptr[DEBUG_ ## d]++; dsb(sy); } while (0)
+virt/kvm/arm/hyp/vgic-v3-sr.c:                  dsb(sy);
+virt/kvm/arm/hyp/vgic-v3-sr.c:                  dsb(sy);
+virt/kvm/arm/hyp/vgic-v3-sr.c:                  dsb(sy);
+
+Thanks,
+Mark.
