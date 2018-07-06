@@ -1,37 +1,39 @@
-From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Fri, 06 Jul 2018 15:58:49 +0100
-Subject: [PATCH 1/6] drm/i2c: tda998x: find the drm_device via the
- drm_connector
-In-Reply-To: <20180706145748.GA17271@n2100.armlinux.org.uk>
-References: <20180706145748.GA17271@n2100.armlinux.org.uk>
-Message-ID: <E1fbSC9-00076U-8U@rmk-PC.armlinux.org.uk>
+From: martin@lucina.net (Martin Lucina)
+Date: Fri, 6 Jul 2018 17:04:01 +0200
+Subject: [PATCH 05/10] arm64: dts: allwinner: a64: Olinuxino: enable USB
+In-Reply-To: <20180706085210.17952-6-andre.przywara@arm.com>
+References: <20180706085210.17952-1-andre.przywara@arm.com>
+ <20180706085210.17952-6-andre.przywara@arm.com>
+Message-ID: <20180706150401.mhqse677vdqtxdzy@nodbug.lucina.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Peter Rosin <peda@axentia.se>
+On Friday, 06.07.2018 at?09:52, Andre Przywara wrote:
+> The Olinuxino has two USB socket:
+> USB0 is connected to a micro B socket. As it has the ID pin wired, we
+> describe it as a proper OTG socket, which switches between host and
+> device automatically.
+> USB1 is connected to a normal USB A socket. PG9 enables the power line,
+> so add the required regulator as well.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
 
-This prepares for being a drm_bridge which will not register the
-encoder. That makes the connector the better choice.
+This is not sufficient. Booting with this change results in the following
+in dmesg:
 
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Signed-off-by: Peter Rosin <peda@axentia.se>
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
----
- drivers/gpu/drm/i2c/tda998x_drv.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+musb-sunxi 1c19000.usb: Invalid or missing 'dr_mode' property
+musb-sunxi: probe of 1c19000.usb failed with error -22
+[...]
+usb0-vbus: disabling
 
-diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
-index eb9916bd84a4..4061e293e671 100644
---- a/drivers/gpu/drm/i2c/tda998x_drv.c
-+++ b/drivers/gpu/drm/i2c/tda998x_drv.c
-@@ -753,7 +753,7 @@ static void tda998x_detect_work(struct work_struct *work)
- {
- 	struct tda998x_priv *priv =
- 		container_of(work, struct tda998x_priv, detect_work);
--	struct drm_device *dev = priv->encoder.dev;
-+	struct drm_device *dev = priv->connector.dev;
- 
- 	if (dev)
- 		drm_kms_helper_hotplug_event(dev);
--- 
-2.7.4
+... and neither of the USB ports work.
+
+Adding
+
+    dr_mode = "host";
+
+to the &usb_otg node fixes this -- the above messages go away and both
+ports work as expected.
+
+-mato
