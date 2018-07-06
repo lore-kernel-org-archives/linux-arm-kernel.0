@@ -1,92 +1,322 @@
-From: sebastian.reichel@collabora.co.uk (Sebastian Reichel)
-Date: Fri, 6 Jul 2018 16:33:16 +0200
-Subject: [PATCH v2] power: vexpress: fix corruption in notifier
- registration
-In-Reply-To: <1529337272-11799-1-git-send-email-sudeep.holla@arm.com>
-References: <1529322007-4637-1-git-send-email-sudeep.holla@arm.com>
- <1529337272-11799-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <20180706143316.s3ai5jpbhqjmbrmc@earth.universe>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Fri, 06 Jul 2018 15:36:04 +0100
+Subject: [PATCH v4 4/7] KVM: arm64: Support PUD hugepage in
+ stage2_is_exec()
+In-Reply-To: <442d0f4b-cb23-9788-1ebd-b14c89c52c45@arm.com> (Suzuki
+ K. Poulose's message of "Thu, 5 Jul 2018 17:48:37 +0100")
+References: <20180705140850.5801-1-punit.agrawal@arm.com>
+ <20180705140850.5801-5-punit.agrawal@arm.com>
+ <442d0f4b-cb23-9788-1ebd-b14c89c52c45@arm.com>
+Message-ID: <87fu0wqvmz.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Suzuki K Poulose <Suzuki.Poulose@arm.com> writes:
 
-On Mon, Jun 18, 2018 at 04:54:32PM +0100, Sudeep Holla wrote:
-> Vexpress platforms provide two different restart handlers: SYS_REBOOT
-> that restart the entire system, while DB_RESET only restarts the
-> daughter board containing the CPU. DB_RESET is overridden by SYS_REBOOT
-> if it exists.
-> 
-> notifier_chain_register used in register_restart_handler by design
-> relies on notifiers to be registered once only, however vexpress restart
-> notifier can get registered twice. When this happen it corrupts list
-> of notifiers, as result some notifiers can be not called on proper
-> event, traverse on list can be cycled forever, and second unregister
-> can access already freed memory.
-> 
-> So far, since this was the only restart handler in the system, no issue
-> was observed even if the same notifier was registered twice. However
-> commit 6c5c0d48b686 ("watchdog: sp805: add restart handler") added
-> support for SP805 restart handlers and since the system under test
-> contains two vexpress restart and two SP805 watchdog instances, it was
-> observed that during the boot traversing the restart handler list looped
-> forever as there's a cycle in that list resulting in boot hang.
-> 
-> This patch fixes the issues by ensuring that the notifier is installed
-> only once.
-> 
-> Cc: Sebastian Reichel <sre@kernel.org>
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> ---
+> Hi Punit,
+>
+> On 05/07/18 15:08, Punit Agrawal wrote:
+>> In preparation for creating PUD hugepages at stage 2, add support for
+>> detecting execute permissions on PUD page table entries. Faults due to
+>> lack of execute permissions on page table entries is used to perform
+>> i-cache invalidation on first execute.
+>>
+>> Provide trivial implementations of arm32 helpers to allow sharing of
+>> code.
+>>
+>> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+>> Cc: Christoffer Dall <christoffer.dall@arm.com>
+>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>> Cc: Russell King <linux@armlinux.org.uk>
+>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> ---
+>>   arch/arm/include/asm/kvm_mmu.h         |  6 ++++++
+>>   arch/arm64/include/asm/kvm_mmu.h       |  5 +++++
+>>   arch/arm64/include/asm/pgtable-hwdef.h |  2 ++
+>>   virt/kvm/arm/mmu.c                     | 10 +++++++++-
+>>   4 files changed, 22 insertions(+), 1 deletion(-)
+>>
 
-Thanks, added Fixes: tag and queued to power-supply-fixes.
+[...]
 
--- Sebastian
+>> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+>> index db04b18218c1..ccdea0edabb3 100644
+>> --- a/virt/kvm/arm/mmu.c
+>> +++ b/virt/kvm/arm/mmu.c
+>> @@ -1040,10 +1040,18 @@ static int stage2_set_pmd_huge(struct kvm *kvm, struct kvm_mmu_memory_cache
+>>     static bool stage2_is_exec(struct kvm *kvm, phys_addr_t addr)
+>>   {
+>> +	pud_t *pudp;
+>>   	pmd_t *pmdp;
+>>   	pte_t *ptep;
+>>   -	pmdp = stage2_get_pmd(kvm, NULL, addr);
+>> +	pudp = stage2_get_pud(kvm, NULL, addr);
+>> +	if (!pudp || pud_none(*pudp) || !pud_present(*pudp))
+>> +		return false;
+>> +
+>> +	if (pud_huge(*pudp))
+>> +		return kvm_s2pud_exec(pudp);
+>> +
+>> +	pmdp = stage2_pmd_offset(pudp, addr);
+>>   	if (!pmdp || pmd_none(*pmdp) || !pmd_present(*pmdp))
+>>   		return false;
+>
+> I am wondering if we need a slightly better way to deal with this
+> kind of operation. We seem to duplicate the above operation (here and
+> in the following patches), i.e, finding the "leaf entry" for a given
+> address and follow the checks one level up at a time.
 
->  drivers/power/reset/vexpress-poweroff.c | 12 ++++++++----
->  1 file changed, 8 insertions(+), 4 deletions(-)
-> 
-> v1->v2:
-> 	- Updated changelog wordings as suggested by Lorenzo
-> 	- Dropped unnecessary error variable initialisation on stack
-> 
-> diff --git a/drivers/power/reset/vexpress-poweroff.c b/drivers/power/reset/vexpress-poweroff.c
-> index 102f95a09460..e9e749f87517 100644
-> --- a/drivers/power/reset/vexpress-poweroff.c
-> +++ b/drivers/power/reset/vexpress-poweroff.c
-> @@ -35,6 +35,7 @@ static void vexpress_reset_do(struct device *dev, const char *what)
->  }
-> 
->  static struct device *vexpress_power_off_device;
-> +static atomic_t vexpress_restart_nb_refcnt = ATOMIC_INIT(0);
-> 
->  static void vexpress_power_off(void)
->  {
-> @@ -99,10 +100,13 @@ static int _vexpress_register_restart_handler(struct device *dev)
->  	int err;
-> 
->  	vexpress_restart_device = dev;
-> -	err = register_restart_handler(&vexpress_restart_nb);
-> -	if (err) {
-> -		dev_err(dev, "cannot register restart handler (err=%d)\n", err);
-> -		return err;
-> +	if (atomic_inc_return(&vexpress_restart_nb_refcnt) == 1) {
-> +		err = register_restart_handler(&vexpress_restart_nb);
-> +		if (err) {
-> +			dev_err(dev, "cannot register restart handler (err=%d)\n", err);
-> +			atomic_dec(&vexpress_restart_nb_refcnt);
-> +			return err;
-> +		}
->  	}
->  	device_create_file(dev, &dev_attr_active);
-> 
-> --
-> 2.7.4
-> 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180706/b5e8423f/attachment-0001.sig>
+We definitely need a better way to walk the page tables - for stage 2
+but also stage 1 and hugetlbfs. As things stands, there is a lot of
+repetitive pattern with small differences at some levels (hugepage
+and/or THP, p*d_none(), p*d_present(), ...)
+
+> So instead of doing, stage2_get_pud() and walking down everywhere this
+> is needed, how about adding :
+>
+> /* Returns true if the leaf entry is found and updates the relevant pointer */
+> found = stage2_get_leaf_entry(kvm, NULL, addr, &pudp, &pmdp, &ptep)
+>
+> which could set the appropriate entry and we could check the result
+> here.
+
+I prototyped with the above approach but found that it could not be used
+in all places due to the specific semantics of the walk. Also, then we
+end up with the following pattern.
+
+    if (pudp) {
+            ...
+    } else if (pmdp) {
+            ...
+    } else {
+            ...
+    }
+
+At the end of the conversion, the resulting code is the same size as
+well (see diff below for changes).
+
+Another idea might be to build a page table walker passing in callbacks
+- but this makes more sense if we have unified modifiers for the
+levels. I think this is something we should explore but would like to do
+outside the context of this series.
+
+Hope thats ok.
+
+Thanks for having a look,
+Punit
+
+-- >8 --
+diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+index eddb74a7fac3..ea5c99f6dfab 100644
+--- a/virt/kvm/arm/mmu.c
++++ b/virt/kvm/arm/mmu.c
+@@ -1077,31 +1077,56 @@ static int stage2_set_pud_huge(struct kvm *kvm, struct kvm_mmu_memory_cache *cac
+ 	return 0;
+ }
+ 
+-static bool stage2_is_exec(struct kvm *kvm, phys_addr_t addr)
++static bool stage2_get_leaf_entry(struct kvm *kvm, phys_addr_t addr, pud_t **pudp,
++				  pmd_t **pmdp, pte_t **ptep)
+ {
+-	pud_t *pudp;
+-	pmd_t *pmdp;
+-	pte_t *ptep;
++	pud_t *lpudp;
++	pmd_t *lpmdp;
++	pte_t *lptep;
+ 
+-	pudp = stage2_get_pud(kvm, NULL, addr);
+-	if (!pudp || pud_none(*pudp) || !pud_present(*pudp))
++	lpudp = stage2_get_pud(kvm, NULL, addr);
++	if (!lpudp || pud_none(*lpudp) || !pud_present(*lpudp))
+ 		return false;
+ 
+-	if (pud_huge(*pudp))
+-		return kvm_s2pud_exec(pudp);
++	if (pud_huge(*lpudp)) {
++		*pudp = lpudp;
++		return true;
++	}
+ 
+-	pmdp = stage2_pmd_offset(pudp, addr);
+-	if (!pmdp || pmd_none(*pmdp) || !pmd_present(*pmdp))
++	lpmdp = stage2_pmd_offset(lpudp, addr);
++	if (!lpmdp || pmd_none(*lpmdp) || !pmd_present(*lpmdp))
+ 		return false;
+ 
+-	if (pmd_thp_or_huge(*pmdp))
+-		return kvm_s2pmd_exec(pmdp);
++	if (pmd_thp_or_huge(*lpmdp)) {
++		*pmdp = lpmdp;
++		return true;
++	}
+ 
+-	ptep = pte_offset_kernel(pmdp, addr);
+-	if (!ptep || pte_none(*ptep) || !pte_present(*ptep))
++	lptep = pte_offset_kernel(lpmdp, addr);
++	if (!lptep || pte_none(*lptep) || !pte_present(*lptep))
+ 		return false;
+ 
+-	return kvm_s2pte_exec(ptep);
++	*ptep = lptep;
++	return true;
++}
++
++static bool stage2_is_exec(struct kvm *kvm, phys_addr_t addr)
++{
++	pud_t *pudp = NULL;
++	pmd_t *pmdp = NULL;
++	pte_t *ptep = NULL;
++	bool found;
++
++	found = stage2_get_leaf_entry(kvm, addr, &pudp, &pmdp, &ptep);
++	if (!found)
++		return false;
++
++	if (pudp)
++		return kvm_s2pud_exec(pudp);
++	else if (pmdp)
++		return kvm_s2pmd_exec(pmdp);
++	else
++		return kvm_s2pte_exec(ptep);
+ }
+ 
+ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
+@@ -1681,45 +1706,36 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+  */
+ static void handle_access_fault(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa)
+ {
+-	pud_t *pud;
+-	pmd_t *pmd;
+-	pte_t *pte;
++	pud_t *pud = NULL;
++	pmd_t *pmd = NULL;
++	pte_t *pte = NULL;
+ 	kvm_pfn_t pfn;
+-	bool pfn_valid = false;
++	bool found, pfn_valid = false;
+ 
+ 	trace_kvm_access_fault(fault_ipa);
+ 
+ 	spin_lock(&vcpu->kvm->mmu_lock);
+ 
+-	pud = stage2_get_pud(vcpu->kvm, NULL, fault_ipa);
+-	if (!pud || pud_none(*pud))
+-		goto out;		/* Nothing there */
++	found = stage2_get_leaf_entry(kvm, fault_ipa, &pud, &pmd, &pte);
++	if (!found)
++		goto out;
+ 
+-	if (pud_huge(*pud)) {		/* HugeTLB */
++	if (pud) {		/* HugeTLB */
+ 		*pud = kvm_s2pud_mkyoung(*pud);
+ 		pfn = kvm_pud_pfn(*pud);
+ 		pfn_valid = true;
+ 		goto out;
+-	}
+-
+-	pmd = stage2_pmd_offset(pud, fault_ipa);
+-	if (!pmd || pmd_none(*pmd))	/* Nothing there */
+-		goto out;
+-
+-	if (pmd_thp_or_huge(*pmd)) {	/* THP, HugeTLB */
++	} else 	if (pmd) {	/* THP, HugeTLB */
+ 		*pmd = pmd_mkyoung(*pmd);
+ 		pfn = pmd_pfn(*pmd);
+ 		pfn_valid = true;
+ 		goto out;
++	} else {
++		*pte = pte_mkyoung(*pte);	/* Just a page... */
++		pfn = pte_pfn(*pte);
++		pfn_valid = true;
+ 	}
+ 
+-	pte = pte_offset_kernel(pmd, fault_ipa);
+-	if (pte_none(*pte))		/* Nothing there either */
+-		goto out;
+-
+-	*pte = pte_mkyoung(*pte);	/* Just a page... */
+-	pfn = pte_pfn(*pte);
+-	pfn_valid = true;
+ out:
+ 	spin_unlock(&vcpu->kvm->mmu_lock);
+ 	if (pfn_valid)
+@@ -1932,58 +1948,42 @@ void kvm_set_spte_hva(struct kvm *kvm, unsigned long hva, pte_t pte)
+ 
+ static int kvm_age_hva_handler(struct kvm *kvm, gpa_t gpa, u64 size, void *data)
+ {
+-	pud_t *pud;
+-	pmd_t *pmd;
+-	pte_t *pte;
++	pud_t *pud = NULL;
++	pmd_t *pmd = NULL;
++	pte_t *pte = NULL;
++	bool found;
+ 
+ 	WARN_ON(size != PAGE_SIZE && size != PMD_SIZE && size != PUD_SIZE);
+-	pud = stage2_get_pud(kvm, NULL, gpa);
+-	if (!pud || pud_none(*pud))	/* Nothing there */
++	found = stage2_get_leaf_entry(kvm, gpa, &pud, &pmd, &pte);
++	if (!found)
+ 		return 0;
+ 
+-	if (pud_huge(*pud))		/* HugeTLB */
++	if (pud)
+ 		return stage2_pudp_test_and_clear_young(pud);
+-
+-	pmd = stage2_pmd_offset(pud, gpa);
+-	if (!pmd || pmd_none(*pmd))	/* Nothing there */
+-		return 0;
+-
+-	if (pmd_thp_or_huge(*pmd))	/* THP, HugeTLB */
++	else if (pmd)
+ 		return stage2_pmdp_test_and_clear_young(pmd);
+-
+-	pte = pte_offset_kernel(pmd, gpa);
+-	if (pte_none(*pte))
+-		return 0;
+-
+-	return stage2_ptep_test_and_clear_young(pte);
++	else
++		return stage2_ptep_test_and_clear_young(pte);
+ }
+ 
+ static int kvm_test_age_hva_handler(struct kvm *kvm, gpa_t gpa, u64 size, void *data)
+ {
+-	pud_t *pud;
+-	pmd_t *pmd;
+-	pte_t *pte;
++	pud_t *pud = NULL;
++	pmd_t *pmd = NULL;
++	pte_t *pte = NULL;
++	bool found;
+ 
+ 	WARN_ON(size != PAGE_SIZE && size != PMD_SIZE && size != PUD_SIZE);
+-	pud = stage2_get_pud(kvm, NULL, gpa);
+-	if (!pud || pud_none(*pud))	/* Nothing there */
++	found = stage2_get_leaf_entry(kvm, gpa, &pud, &pmd, &pte);
++	if (!found)
+ 		return 0;
+ 
+-	if (pud_huge(*pud))		/* HugeTLB */
++	if (pud)
+ 		return kvm_s2pud_young(*pud);
+-
+-	pmd = stage2_pmd_offset(pud, gpa);
+-	if (!pmd || pmd_none(*pmd))	/* Nothing there */
+-		return 0;
+-
+-	if (pmd_thp_or_huge(*pmd))		/* THP, HugeTLB */
++	else if (pmd)
+ 		return pmd_young(*pmd);
+-
+-	pte = pte_offset_kernel(pmd, gpa);
+-	if (!pte_none(*pte))		/* Just a page... */
++	else
+ 		return pte_young(*pte);
+-
+-	return 0;
+ }
+ 
+ int kvm_age_hva(struct kvm *kvm, unsigned long start, unsigned long end)
