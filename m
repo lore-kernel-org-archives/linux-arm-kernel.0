@@ -1,67 +1,65 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 6 Jul 2018 09:56:23 +0200
-Subject: [PATCH 5/5] ARM: shmobile: defconfig: Set CONFIG_LOCALVERSION
-In-Reply-To: <20180705155513.ooppf45agiebi732@verge.net.au>
-References: <20180704114333.27584-1-geert+renesas@glider.be>
- <20180704114333.27584-6-geert+renesas@glider.be>
- <20180705155513.ooppf45agiebi732@verge.net.au>
-Message-ID: <CAMuHMdUFz8M08r76Ly=iAaGPsg-JaFaZz3Vb+bgn=a1ZNe-=Wg@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 6 Jul 2018 09:59:15 +0200
+Subject: [PATCH] arm64: hikey960: update idle-states
+In-Reply-To: <1530860246-29072-1-git-send-email-vincent.guittot@linaro.org>
+References: <1530860246-29072-1-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <722aed2b-673b-7f17-2337-a7b3442dca56@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+On 06/07/2018 08:57, Vincent Guittot wrote:
+> Update entry/exit latency and residency time of hikey960 to use more
+> realistic figures based on unitary tests done on the platform.
+> 
+> The complete results (in us) :
+>                   big cluster
+>                   cluster  CPU
+> max entry latency     800  400
+> max exit latency     2900  550
+> residency  903Mhz    5000 1500
+> residency 2363Mhz       0 1500
+> 
+>                   little cluster
+>                   cluster  CPU
+> max entry latency     500  400
+> max exit latency     1600  650
+> residency  533Mhz    8000 4500
+> residency 1844Mhz       0 1500
+> 
+> We can see that the residency time depends of the running OPP which is not
+> handled for now. Then we also have to take into account the constraint of
+> a residency time shorter than the tick to get full advantage of idle loop
+> reordering(tick is stopped if idle duration is higher than tick period).
+> Finally the selected residency value are :
+>                  big cluster
+>                   cluster  CPU
+> residency            3700 1500
+> 
+>                   little cluster
+>                   cluster  CPU
+> residency            3500 1500
+> 
+> A simple test with a task waking up every 11,111ms shows improvement:
+> - 5% a lowest OPP
+> - 22% at highest OPP
+> 
+> The period has been chosen:
+> - to be shorter than old cluster residency time and longer than new
+> residency time od cluster off C-state
+> - to prevent any sync with tick (4ms) when running tests that can add
+> some variances between tests
+> 
+> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+> ---
 
-On Thu, Jul 5, 2018 at 5:55 PM Simon Horman <horms@verge.net.au> wrote:
-> On Wed, Jul 04, 2018 at 01:43:33PM +0200, Geert Uytterhoeven wrote:
-> > This allows to derive the kernel flavor from the kernel version at
-> > runtime.
->
-> For my edification could you expand on what this is used for?
+Great! Thanks for fixing the values.
 
-With this, the kernel version (as printed during boot, and returned by
-e.g. "uname -r") will be something like
+Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-    4.18.0-rc3-shmobile-02146-gd2f8e14acc47b8ea
-
-instead of
-
-    dmesg-4.18.0-rc3
-
-which makes it easy to differentiate them from
-
-    4.18.0-rc3-koelsch-02146-gd2f8e14acc47b8ea
-    4.17.0-rc1-rcar2-initrd-00547-g19c9f87b5c449c23-dirty
-
-which are built from my personal configs for Koelsch resp. R-Car Gen2
-with initrd.
-
-> > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-
-> > --- a/arch/arm/configs/shmobile_defconfig
-> > +++ b/arch/arm/configs/shmobile_defconfig
-> > @@ -1,3 +1,4 @@
-> > +CONFIG_LOCALVERSION="-shmobile"
-
-We already have
-
-    CONFIG_LOCALVERSION="-arm64-renesas"
-
-in arch/arm64/configs/renesas_defconfig, to differentiate kernels built
-from that config with kernels built from arm64 defconfig (which set it to
-"-arm64" in my local tree).
-
-All of this makes it easy to keep e.g. a collection of boot logs using
-"dmesg > dmesg-$(uname -r)", and compare them.
-
-Thanks!
-
-Gr{oetje,eeting}s,
-
-                        Geert
 
 -- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
