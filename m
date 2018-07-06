@@ -1,79 +1,44 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Fri, 06 Jul 2018 18:18:33 +0200
-Subject: [PATCH 2/2] ARM: imx51: Configure M4IF to avoid visual artifacts
-In-Reply-To: <1530720842-28281-2-git-send-email-festevam@gmail.com>
-References: <1530720842-28281-1-git-send-email-festevam@gmail.com>
- <1530720842-28281-2-git-send-email-festevam@gmail.com>
-Message-ID: <1530893913.15725.14.camel@pengutronix.de>
+From: nkela@cisco.com (Nikunj Kela (nkela))
+Date: Fri, 6 Jul 2018 16:35:16 +0000
+Subject: [PATCH] arm64: add ARM64-specific support for flatmem
+In-Reply-To: <20180706160049.GA27483@arm.com>
+References: <20180706155627.23937-1-nkela@cisco.com>
+ <20180706160049.GA27483@arm.com>
+Message-ID: <86D2343D-83C6-4E96-83A5-55C617EF7687@cisco.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, den 04.07.2018, 13:14 -0300 schrieb Fabio Estevam:
-> From: Fabio Estevam <fabio.estevam@nxp.com>
-> 
-> Configure the M4IF registers as per the vendor bootloader
-> to avoid visual artifacts during video playback.
-> 
-> This way we don't need to rely on the bootloader configuration for
-> optimal IPU/VPU bus priorities.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+Will modify the patch to remove ARM64. Every other architecture kept def_bool y for it so I followed the same for ARM64 too. 
 
-Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
+Thanks,
+-Nikunj
 
-> ---
-> ?arch/arm/mach-imx/mach-imx51.c | 29 ++++++++++++++++++++++++++++-
-> ?1 file changed, 28 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-imx/mach-imx51.c b/arch/arm/mach-imx/mach-
-> imx51.c
-> index 3835b6a..37ffdfa 100644
-> --- a/arch/arm/mach-imx/mach-imx51.c
-> +++ b/arch/arm/mach-imx/mach-imx51.c
-> @@ -12,6 +12,7 @@
-> ?
-> ?#include <linux/io.h>
-> ?#include <linux/irq.h>
-> +#include <linux/of_address.h>
-> ?#include <linux/of_irq.h>
-> ?#include <linux/of_platform.h>
-> ?#include <asm/mach/arch.h>
-> @@ -48,11 +49,37 @@ static void __init imx51_ipu_mipi_setup(void)
-> ?	iounmap(hsc_addr);
-> ?}
-> ?
-> +static void __init imx51_m4if_setup(void)
-> +{
-> +	void __iomem *m4if_base;
-> +	struct device_node *np;
-> +
-> +	np = of_find_compatible_node(NULL, NULL, "fsl,imx51-m4if");
-> +	if (!np)
-> +		return;
-> +
-> +	m4if_base = of_iomap(np, 0);
-> +	if (!m4if_base) {
-> +		pr_err("Unable to map M4IF registers\n");
-> +		return;
-> +	}
-> +
-> +	/*
-> +	?* Configure VPU and IPU with higher priorities
-> +	?* in order to avoid artifacts during video playback
-> +	?*/
-> +	writel_relaxed(0x00000203, m4if_base + 0x40);
-> +	writel_relaxed(0x00000000, m4if_base + 0x44);
-> +	writel_relaxed(0x00120125, m4if_base + 0x9c);
-> +	writel_relaxed(0x001901A3, m4if_base + 0x48);
-> +	iounmap(m4if_base);
-> +}
-> +
-> ?static void __init imx51_dt_init(void)
-> ?{
-> ?	imx51_ipu_mipi_setup();
-> ?	imx_src_init();
-> -
-> +	imx51_m4if_setup();
-> ?	imx_aips_allow_unprivileged_access("fsl,imx51-aipstz");
-> ?}
-> ?
+On 7/6/18, 9:00 AM, "Will Deacon" <will.deacon@arm.com> wrote:
+
+    Please write a commit message for your patch.
+    
+    On Fri, Jul 06, 2018 at 08:56:27AM -0700, Nikunj Kela wrote:
+    > Cc: xe-kernel at external.cisco.com
+    > Cc: Nikunj Kela <nkela@cisco.com>
+    > Signed-off-by: Nikunj Kela <nkela@cisco.com>
+    > ---
+    >  arch/arm64/Kconfig | 4 ++++
+    >  1 file changed, 4 insertions(+)
+    > 
+    > diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+    > index 42c090c..5e791f0 100644
+    > --- a/arch/arm64/Kconfig
+    > +++ b/arch/arm64/Kconfig
+    > @@ -775,6 +775,10 @@ config ARCH_SPARSEMEM_DEFAULT
+    >  config ARCH_SELECT_MEMORY_MODEL
+    >  	def_bool ARCH_SPARSEMEM_ENABLE
+    >  
+    > +config ARCH_FLATMEM_ENABLE
+    > +	def_bool y
+    > +	depends on ARM64 && !NUMA
+    
+    We don't need ARM64 here. I'm also not sure about the def_bool y, this seems
+    like a pretty niche thing to enable.
+    
+    Will
+    
