@@ -1,39 +1,39 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Fri, 6 Jul 2018 15:51:07 +0200
-Subject: [PATCH] media: stm32: dcmi: replace "%p" with "%pK"
-In-Reply-To: <20180706130355.22100-1-benjamin.gaignard@st.com>
-References: <20180706130355.22100-1-benjamin.gaignard@st.com>
-Message-ID: <64b2a2ea-2da9-c40d-eae4-6375079771e7@xs4all.nl>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri,  6 Jul 2018 15:58:10 +0200
+Subject: [PATCH] [RESEND] usb/gadget: aspeed-vhub: add USB_LIBCOMPOSITE
+ dependency
+Message-ID: <20180706135840.908258-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/07/18 15:03, Benjamin Gaignard wrote:
-> The format specifier "%p" can leak kernel addresses.
-> Use "%pK" instead.
+Without that option, we run into a link failure:
 
-This patch no longer applies. AFAICT it is obsolete after some code reorg.
+drivers/usb/gadget/udc/aspeed-vhub/hub.o: In function `ast_vhub_std_hub_request':
+hub.c:(.text+0x5b0): undefined reference to `usb_gadget_get_string'
 
-Regards,
+Fixes: 7ecca2a4080c ("usb/gadget: Add driver for Aspeed SoC virtual hub")
+Acked-by: Felipe Balbi <felipe.balbi@linux.intel.com>
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+Greg, as discussed in https://patchwork.kernel.org/patch/10427921/,
+please apply this as a bugfix for 4.18.
 
-	Hans
+     Arnd
+---
+ drivers/usb/gadget/udc/aspeed-vhub/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-> 
-> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
-> ---
->  drivers/media/platform/stm32/stm32-dcmi.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/media/platform/stm32/stm32-dcmi.c b/drivers/media/platform/stm32/stm32-dcmi.c
-> index 2e1933d872ee..fe90672cf16f 100644
-> --- a/drivers/media/platform/stm32/stm32-dcmi.c
-> +++ b/drivers/media/platform/stm32/stm32-dcmi.c
-> @@ -1753,7 +1753,7 @@ static int dcmi_probe(struct platform_device *pdev)
->  
->  	ret = clk_prepare(mclk);
->  	if (ret) {
-> -		dev_err(&pdev->dev, "Unable to prepare mclk %p\n", mclk);
-> +		dev_err(&pdev->dev, "Unable to prepare mclk %pK\n", mclk);
->  		goto err_dma_release;
->  	}
->  
-> 
+diff --git a/drivers/usb/gadget/udc/aspeed-vhub/Kconfig b/drivers/usb/gadget/udc/aspeed-vhub/Kconfig
+index f0cdf89b8503..83ba8a2eb6af 100644
+--- a/drivers/usb/gadget/udc/aspeed-vhub/Kconfig
++++ b/drivers/usb/gadget/udc/aspeed-vhub/Kconfig
+@@ -2,6 +2,7 @@
+ config USB_ASPEED_VHUB
+ 	tristate "Aspeed vHub UDC driver"
+ 	depends on ARCH_ASPEED || COMPILE_TEST
++	depends on USB_LIBCOMPOSITE
+ 	help
+ 	  USB peripheral controller for the Aspeed AST2500 family
+ 	  SoCs supporting the "vHub" functionality and USB2.0
+-- 
+2.9.0
