@@ -1,47 +1,37 @@
-From: kim.phillips@arm.com (Kim Phillips)
-Date: Fri, 6 Jul 2018 18:38:44 -0500
-Subject: [PATCH v2 0/7] perf: Add ioctl for PMU driver configuration
-In-Reply-To: <1530828827-11604-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1530828827-11604-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <20180706183844.9de52f1d45e1775b51790e8e@arm.com>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Fri, 06 Jul 2018 16:44:44 -0700
+Subject: [PATCH 1/2] clk: mvebu: armada-37xx-periph: Fix switching CPU
+ rate from 300Mhz to 1.2GHz
+In-Reply-To: <87tvpl4pql.fsf@bootlin.com>
+References: <20180619123446.694-1-gregory.clement@bootlin.com>
+ <20180619123446.694-2-gregory.clement@bootlin.com>
+ <87tvpl4pql.fsf@bootlin.com>
+Message-ID: <153092068418.143105.5823916627333449732@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu,  5 Jul 2018 16:13:40 -0600
-Mathieu Poirier <mathieu.poirier@linaro.org> wrote:
+Quoting Gregory CLEMENT (2018-06-29 07:44:02)
+> Hi,
+>  
+>  On mar., juin 19 2018, Gregory CLEMENT <gregory.clement@bootlin.com> wrote:
+> 
+> > Switching the CPU from the L2 or L3 frequencies (300 and 200 Mhz
+> > respectively) to L0 frequency (1.2 Ghz) requires a significant amount
+> > of time to let VDD stabilize to the appropriate voltage. This amount of
+> > time is large enough that it cannot be covered by the hardware
+> > countdown register. Due to this, the CPU might start operating at L0
+> > before the voltage is stabilized, leading to CPU stalls.
+> >
+> > To work around this problem, we prevent switching directly from the
+> > L2/L3 frequencies to the L0 frequency, and instead switch to the L1
+> > frequency in-between. The sequence therefore becomes:
+> >
+> > 1. First switch from L2/L3(200/300MHz) to L1(600MHZ)
+> > 2. Sleep 20ms for stabling VDD voltage
+> > 3. Then switch from L1(600MHZ) to L0(1200Mhz).
+> 
+> Do you have any comment on this fix?
+> 
 
-> This set adds the capability to communiate event specific configuration
-> to the PMU kernel driver using an ioctl().  The functionatlity is made
-> generic enough for anyone to use but is targeted at the identification
-> of CoreSight sinks when operating in CPU-wide trace scenarios.
-
-With this series, a --per-thread -less invocation looks like it
-succeeds (instead of giving a "failed to mmap with 12 (Cannot allocate
-memory)" error):
-
-# perf record -e /cs_etm/@20010000.etf/ sleep 1
-[ perf record: Woken up 3 times to write data ]
-Warning:
-AUX data lost 2 times out of 3!
-
-[ perf record: Captured and wrote 0.182 MB perf.data ]
-# 
-
-but now perf report - built with libopencsd - is unable to process the
-perf.data file:
-
-# perf report --stdio 
-0x3a0 [0x60]: failed to process type: 1
-Error:
-failed to process sample
-# To display the perf.data header info, please use --header/--header-only options.
-#
-
-Also, a "record -a" invocation also acts like it's working, but Juno
-has a hardware limitation where it can't record all cpus concurrently,
-right?  So, shouldn't record commands that exceed the h/w's
-capabilities error out instead?
-
-Thanks,
-
-Kim
+Looks good. Is it crashing right now? I can throw it into clk-fixes if
+it's fixing pain.
