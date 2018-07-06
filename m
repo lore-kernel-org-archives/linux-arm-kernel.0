@@ -1,64 +1,67 @@
-From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Fri, 6 Jul 2018 09:49:04 +0200
-Subject: [PATCH v2 18/23] dt-bindings: thermal: armada: add reference to
- new bindings
-In-Reply-To: <CAL_JsqL9h4RExZtm5cER-5kNvMpDzH-4MwcmY7VOLXB9-uEYYA@mail.gmail.com>
-References: <20180625151239.20976-1-miquel.raynal@bootlin.com>
- <20180625151239.20976-19-miquel.raynal@bootlin.com>
- <20180703213011.GA13190@rob-hp-laptop>
- <20180705120528.4b923e16@xps13>
- <CAL_JsqL9h4RExZtm5cER-5kNvMpDzH-4MwcmY7VOLXB9-uEYYA@mail.gmail.com>
-Message-ID: <20180706094904.22275b10@xps13>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 6 Jul 2018 09:56:23 +0200
+Subject: [PATCH 5/5] ARM: shmobile: defconfig: Set CONFIG_LOCALVERSION
+In-Reply-To: <20180705155513.ooppf45agiebi732@verge.net.au>
+References: <20180704114333.27584-1-geert+renesas@glider.be>
+ <20180704114333.27584-6-geert+renesas@glider.be>
+ <20180705155513.ooppf45agiebi732@verge.net.au>
+Message-ID: <CAMuHMdUFz8M08r76Ly=iAaGPsg-JaFaZz3Vb+bgn=a1ZNe-=Wg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Hi Simon,
 
-[...]
+On Thu, Jul 5, 2018 at 5:55 PM Simon Horman <horms@verge.net.au> wrote:
+> On Wed, Jul 04, 2018 at 01:43:33PM +0200, Geert Uytterhoeven wrote:
+> > This allows to derive the kernel flavor from the kernel version at
+> > runtime.
+>
+> For my edification could you expand on what this is used for?
 
-> > > > for AP806 and CP110 compatibles. Add a reference to these files from the
-> > > > original documentation.
-> > > >
-> > > > Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
-> > > > ---
-> > > >  Documentation/devicetree/bindings/thermal/armada-thermal.txt | 5 +++++
-> > > >  1 file changed, 5 insertions(+)
-> > > >
-> > > > diff --git a/Documentation/devicetree/bindings/thermal/armada-thermal.txt b/Documentation/devicetree/bindings/thermal/armada-thermal.txt
-> > > > index e0d013a2e66d..f3b441100890 100644
-> > > > --- a/Documentation/devicetree/bindings/thermal/armada-thermal.txt
-> > > > +++ b/Documentation/devicetree/bindings/thermal/armada-thermal.txt
-> > > > @@ -10,6 +10,11 @@ Required properties:
-> > > >      * marvell,armada-ap806-thermal
-> > > >      * marvell,armada-cp110-thermal  
-> > >
-> > > Really you should not be using the same compatible for both. Now you
-> > > have 2 drivers matching to same compatibles.
-> > >
-> > > Can't you make this a child of the syscon without breaking the binding?  
-> >
-> > We are talking about only 1 driver here, so I'm not sure how I should
-> > understand your last sentence. Do you want me to add a second
-> > compatible (for the same piece of hardware) for thermal node declared
-> > as a child of the syscon?  
-> 
-> I don't know what I'm suggesting. Your changes look like they break
-> compatibility to me.
+With this, the kernel version (as printed during boot, and returned by
+e.g. "uname -r") will be something like
 
-There is code in the driver to handle the legacy non-syscon-ish thermal
-node ("armada_thermal_probe_legacy()"). An old DT with a new kernel
-would work fine.
+    4.18.0-rc3-shmobile-02146-gd2f8e14acc47b8ea
 
-> What happens if you use this new binding without any kernel change?
+instead of
 
-I suppose you mean "during the merge window"? In this case the driver
-of the thermal IP will not probe (and spawn an error in the dmesg) with
-ap806/cp110 IPs. As the support is pretty new for them, this is maybe
-not a huge issue. Also, before the DT changes adding thermal zones,
-just retrieving the temperature might be pretty useless. However, it
-is always possible to merge the driver changes in 4.19 and the DT
-changes in 4.20.
+    dmesg-4.18.0-rc3
 
+which makes it easy to differentiate them from
 
-Thanks,
-Miqu?l
+    4.18.0-rc3-koelsch-02146-gd2f8e14acc47b8ea
+    4.17.0-rc1-rcar2-initrd-00547-g19c9f87b5c449c23-dirty
+
+which are built from my personal configs for Koelsch resp. R-Car Gen2
+with initrd.
+
+> > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+
+> > --- a/arch/arm/configs/shmobile_defconfig
+> > +++ b/arch/arm/configs/shmobile_defconfig
+> > @@ -1,3 +1,4 @@
+> > +CONFIG_LOCALVERSION="-shmobile"
+
+We already have
+
+    CONFIG_LOCALVERSION="-arm64-renesas"
+
+in arch/arm64/configs/renesas_defconfig, to differentiate kernels built
+from that config with kernels built from arm64 defconfig (which set it to
+"-arm64" in my local tree).
+
+All of this makes it easy to keep e.g. a collection of boot logs using
+"dmesg > dmesg-$(uname -r)", and compare them.
+
+Thanks!
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+-- 
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
