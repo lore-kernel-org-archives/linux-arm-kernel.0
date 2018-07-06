@@ -1,45 +1,92 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri,  6 Jul 2018 16:28:28 +0200
-Subject: [PATCH] [RESEND] drm/sun4i: link in front-end code if needed
-Message-ID: <20180706142847.2032381-1-arnd@arndb.de>
+From: sebastian.reichel@collabora.co.uk (Sebastian Reichel)
+Date: Fri, 6 Jul 2018 16:33:16 +0200
+Subject: [PATCH v2] power: vexpress: fix corruption in notifier
+ registration
+In-Reply-To: <1529337272-11799-1-git-send-email-sudeep.holla@arm.com>
+References: <1529322007-4637-1-git-send-email-sudeep.holla@arm.com>
+ <1529337272-11799-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <20180706143316.s3ai5jpbhqjmbrmc@earth.universe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the base sun4i DRM driver is built-in but the back-end is
-a loadable module, we run into a link error:
+Hi,
 
-drivers/gpu/drm/sun4i/sun4i_drv.o: In function `sun4i_drv_probe':
-sun4i_drv.c:(.text+0x60c): undefined reference to `sun4i_frontend_of_table'
+On Mon, Jun 18, 2018 at 04:54:32PM +0100, Sudeep Holla wrote:
+> Vexpress platforms provide two different restart handlers: SYS_REBOOT
+> that restart the entire system, while DB_RESET only restarts the
+> daughter board containing the CPU. DB_RESET is overridden by SYS_REBOOT
+> if it exists.
+> 
+> notifier_chain_register used in register_restart_handler by design
+> relies on notifiers to be registered once only, however vexpress restart
+> notifier can get registered twice. When this happen it corrupts list
+> of notifiers, as result some notifiers can be not called on proper
+> event, traverse on list can be cycled forever, and second unregister
+> can access already freed memory.
+> 
+> So far, since this was the only restart handler in the system, no issue
+> was observed even if the same notifier was registered twice. However
+> commit 6c5c0d48b686 ("watchdog: sp805: add restart handler") added
+> support for SP805 restart handlers and since the system under test
+> contains two vexpress restart and two SP805 watchdog instances, it was
+> observed that during the boot traversing the restart handler list looped
+> forever as there's a cycle in that list resulting in boot hang.
+> 
+> This patch fixes the issues by ensuring that the notifier is installed
+> only once.
+> 
+> Cc: Sebastian Reichel <sre@kernel.org>
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> ---
 
-The dependency is a bit tricky, the best workaround I have come up
-with is to use a Makefile hack to to interpret both
-CONFIG_DRM_SUN4I_BACKEND=m and CONFIG_DRM_SUN4I_BACKEND=y
-as a directive to build the front-end the same way as the main module.
+Thanks, added Fixes: tag and queued to power-supply-fixes.
 
-Fixes: dd0421f47505 ("drm/sun4i: Add a driver for the display frontend")
-Link: https://lore.kernel.org/lkml/20180301091908.zcptz3ezqr2c6ly5 at flea/
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
-I stumbled over this one again when I sent a related patch.
----
- drivers/gpu/drm/sun4i/Makefile | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+-- Sebastian
 
-diff --git a/drivers/gpu/drm/sun4i/Makefile b/drivers/gpu/drm/sun4i/Makefile
-index 3daed14941ca..11de3cd52dae 100644
---- a/drivers/gpu/drm/sun4i/Makefile
-+++ b/drivers/gpu/drm/sun4i/Makefile
-@@ -32,7 +32,10 @@ obj-$(CONFIG_DRM_SUN4I)		+= sun4i-tcon.o
- obj-$(CONFIG_DRM_SUN4I)		+= sun4i_tv.o
- obj-$(CONFIG_DRM_SUN4I)		+= sun6i_drc.o
- 
--obj-$(CONFIG_DRM_SUN4I_BACKEND)	+= sun4i-backend.o sun4i-frontend.o
-+obj-$(CONFIG_DRM_SUN4I_BACKEND)	+= sun4i-backend.o
-+ifdef CONFIG_DRM_SUN4I_BACKEND
-+obj-$(CONFIG_DRM_SUN4I)		+= sun4i-frontend.o
-+endif
- obj-$(CONFIG_DRM_SUN4I_HDMI)	+= sun4i-drm-hdmi.o
- obj-$(CONFIG_DRM_SUN6I_DSI)	+= sun6i-dsi.o
- obj-$(CONFIG_DRM_SUN8I_DW_HDMI)	+= sun8i-drm-hdmi.o
--- 
-2.9.0
+>  drivers/power/reset/vexpress-poweroff.c | 12 ++++++++----
+>  1 file changed, 8 insertions(+), 4 deletions(-)
+> 
+> v1->v2:
+> 	- Updated changelog wordings as suggested by Lorenzo
+> 	- Dropped unnecessary error variable initialisation on stack
+> 
+> diff --git a/drivers/power/reset/vexpress-poweroff.c b/drivers/power/reset/vexpress-poweroff.c
+> index 102f95a09460..e9e749f87517 100644
+> --- a/drivers/power/reset/vexpress-poweroff.c
+> +++ b/drivers/power/reset/vexpress-poweroff.c
+> @@ -35,6 +35,7 @@ static void vexpress_reset_do(struct device *dev, const char *what)
+>  }
+> 
+>  static struct device *vexpress_power_off_device;
+> +static atomic_t vexpress_restart_nb_refcnt = ATOMIC_INIT(0);
+> 
+>  static void vexpress_power_off(void)
+>  {
+> @@ -99,10 +100,13 @@ static int _vexpress_register_restart_handler(struct device *dev)
+>  	int err;
+> 
+>  	vexpress_restart_device = dev;
+> -	err = register_restart_handler(&vexpress_restart_nb);
+> -	if (err) {
+> -		dev_err(dev, "cannot register restart handler (err=%d)\n", err);
+> -		return err;
+> +	if (atomic_inc_return(&vexpress_restart_nb_refcnt) == 1) {
+> +		err = register_restart_handler(&vexpress_restart_nb);
+> +		if (err) {
+> +			dev_err(dev, "cannot register restart handler (err=%d)\n", err);
+> +			atomic_dec(&vexpress_restart_nb_refcnt);
+> +			return err;
+> +		}
+>  	}
+>  	device_create_file(dev, &dev_attr_active);
+> 
+> --
+> 2.7.4
+> 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180706/b5e8423f/attachment-0001.sig>
