@@ -1,93 +1,34 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Fri, 06 Jul 2018 17:04:46 +0800
-Subject: [PATCH 09/10] arm64: dts: allwinner: a64: NanoPi-A64: Add
- Wifi/Bluetooth chip
-In-Reply-To: <20180706085210.17952-10-andre.przywara@arm.com>
-References: <20180706085210.17952-1-andre.przywara@arm.com>
- <20180706085210.17952-10-andre.przywara@arm.com>
-Message-ID: <3C9E4C21-0DE0-41C6-927C-960A0C33DA5A@aosc.io>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 6 Jul 2018 10:05:36 +0100
+Subject: [RFC PATCH 00/16] KVM: arm64: Initial support for SVE guests
+In-Reply-To: <87h8lc93jc.fsf@linaro.org>
+References: <1529593060-542-1-git-send-email-Dave.Martin@arm.com>
+ <87h8lc93jc.fsf@linaro.org>
+Message-ID: <20180706090534.GD26019@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-? 2018?7?6? GMT+08:00 ??4:52:09, Andre Przywara <andre.przywara@arm.com> ??:
->The NanoPi-A64 has an on-board WiFi/Bluetooth combo chip, connected
->to the usual MMC1 and UART1. The power is provided by the always-on
->VCC_SYS_3.3V, but it uses pin L2 to enable the regulator.
->
->Add the respective nodes to the DT to make it usable.
->
->Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->---
->.../boot/dts/allwinner/sun50i-a64-nanopi-a64.dts   | 33
->++++++++++++++++++++++
-> 1 file changed, 33 insertions(+)
->
->diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
->b/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
->index 0439cff685d6..bb3ba7709dee 100644
->--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
->+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
->@@ -53,11 +53,18 @@
-> 	aliases {
-> 		ethernet0 = &emac;
-> 		serial0 = &uart0;
->+		serial1 = &uart1;
-> 	};
+On Fri, Jul 06, 2018 at 09:22:47AM +0100, Alex Benn?e wrote:
 > 
-> 	chosen {
-> 		stdout-path = "serial0:115200n8";
-> 	};
->+
->+        wifi_pwrseq: wifi_pwrseq {
->+                compatible = "mmc-pwrseq-simple";
->+                reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* PL2 */
->+        };
->+
-> };
+> Dave Martin <Dave.Martin@arm.com> writes:
 > 
-> &ehci0 {
->@@ -105,6 +112,25 @@
-> 	status = "okay";
-> };
+> <snip>
+> >
+> > This series is somewhat tested on Arm Juno r0 and the Arm Fast Model
+> > (with/without SVE support).  arch/arm builds, but I've not booted
+> > it -- only some trivial refactoring in this series affects arch/arm.
 > 
->+&mmc1 {
->+	pinctrl-names = "default";
->+	pinctrl-0 = <&mmc1_pins>;
->+	vmmc-supply = <&reg_dcdc1>;
->+	vqmmc-supply = <&reg_dldo4>;
->+	mmc-pwrseq = <&wifi_pwrseq>;
->+	bus-width = <4>;
->+	non-removable;
->+	status = "okay";
->+
->+	brcmf: wifi at 1 {
->+		reg = <1>;
->+		compatible = "brcm,bcm4329-fmac";
->+		interrupt-parent = <&r_pio>;
->+		interrupts = <0 3 IRQ_TYPE_LEVEL_LOW>; /* PL3 */
->+		interrupt-names = "host-wake";
->+	};
->+};
->+
-> &ohci0 {
-> 	status = "okay";
-> };
->@@ -229,6 +255,13 @@
-> 	status = "okay";
-> };
-> 
->+/* Connected to the Bluetooth UART, with hardware handshake pins */
->+&uart1 {
->+	pinctrl-names = "default";
->+	pinctrl-0 = <&uart1_pins>, <&uart1_rts_cts_pins>;
->+	status = "okay";
+> Now that QEMU linux-user SVE support is pretty much complete we've also
+> got preliminary patches for system emulation mode. However we currently
+> don't have VHE implemented so I guess we need to do that first before we
+> can test under QEMU.
 
-Do you consider to enable serdev driver for it?
+Qemu can use this as a KVM client without invasive changes, right?
 
->+};
->+
-> &usbphy {
-> 	status = "okay";
-> };
+For kvmtool, it's just a question of checking/setting a feature flag
+in KVM_ARM_PREFERRED_TARGET and KVM_ARM_VCPU_INIT, and (eventually)
+doing at ioctl() to set the set of permitted vector lengths (not yet,
+this will come in a follow-up series).
+
+Cheers
+---Dave
