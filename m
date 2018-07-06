@@ -1,109 +1,50 @@
-From: joe@perches.com (Joe Perches)
-Date: Thu, 05 Jul 2018 22:52:52 -0700
-Subject: [PATCH] checkpatch: Add exceptions for dsb keyword usage
-In-Reply-To: <20180706054510.puli24y6i6ylghxt@salmiak>
-References: <1530814776-16988-1-git-send-email-pheragu@codeaurora.org>
- <f3ce3ca8741f774b63e8a67a278384747b1de522.camel@perches.com>
- <20180706054510.puli24y6i6ylghxt@salmiak>
-Message-ID: <ebc3e5cafdf2a11a08940357c91b8ce64e7d3200.camel@perches.com>
+From: luaraneda@gmail.com (Luis Araneda)
+Date: Fri,  6 Jul 2018 02:01:55 -0400
+Subject: [PATCH v2 0/3] arm: dts: zynq: improvements and cleanup
+Message-ID: <20180706060158.24155-1-luaraneda@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2018-07-06 at 06:45 +0100, Mark Rutland wrote:
-> On Thu, Jul 05, 2018 at 02:14:28PM -0700, Joe Perches wrote:
-> > On Thu, 2018-07-05 at 11:19 -0700, Prakruthi Deepak Heragu wrote:
-> > > mb() API can relpace the dsb() API in the kernel code. So, dsb() usage
-> > > is discouraged. However, there are exceptions when dsb is used in a
-> > > variable or a function name. Exceptions are when 'dsb' is prefixed with
-> > > class [-_>*\.] and/or suffixed with class [-_\.;].
-> 
-> This is a really confusing way of describing the match behaviour, and doesn't
-> explain why this is a big problem.
-> 
-> In C it's either:
-> 
-> 	dsb()
-> 	dsb(scope)	// e.g. dsb(ish)
-> 
-> ... where scope is [a-z]*.
-> 
-> ... which can be matched as something like 'dsb([a-z]*)' if necessary.
-> 
-> > []
-> > > diff --git a/scripts/checkpatch.pl b/scripts/checkpatch.pl
-> > 
-> > []
-> > > @@ -5372,6 +5372,12 @@ sub process {
-> > >  			     "Avoid line continuations in quoted strings\n" . $herecurr);
-> > >  		}
-> > >  
-> > > +# dsb is too ARMish, and should usually be mb.
-> > > +        if ($line =~ /[^-_>*\.]\bdsb\b[^-_\.;]/) {
-> > > +            WARN("ARM_BARRIER",
-> > > +                 "Use of dsb is discouranged: prefer mb.\n" .
-> > > +                 $herecurr);
-> > > +		}
-> > 
-> > This patch is whitespace damaged with a spelling error.
-> > 
-> > Also, if this is reasonable test, and I don't know
-> > that it is, it should be cc'd to the linux-arm list
-> > linux-arm-kernel at lists.infradead.org
-> > 
-> > Also, I suggest 2 tests, one for .S files and
-> > another for .[ch] files, and this be made specific
-> > to arch/arm... files
-> > 
-> > Something like:
-> > 
-> > 	if ($realfile =~ @^arch/arm@ &&
-> > 	    ($realfile =~ /\.S$/ && $line =~ /\bdsb\b/) ||
-> > 	    ($realfile =~ /\.[ch]$/ && $line =~ /\bdsb\s*\(/)) {
-> > 		WARN("ARM_DSB",
-> > 		     "Prefer mb over dsb as an ARM memory barrier\n" . $herecurr);
-> > 	}
-> > 
-> > ARM people, is this reasonable?
-> 
-> I don't think this is a big deal today. 
-> 
-> For code under arch/{arm,arm64}, it's perfectly reasonable to use dsb.
-> 
-> For code *ouside* of arch/{arm,arm64}, there are a number of cases where we
-> want to use dsb(), e.g. when dealing with architectural drivers that require
-> special barriers, or for common code shared across arm and arm64.
-> 
-> It doesn't look like this is a big problem today, anyhow:
-> 
-> [mark at salmiak:~/src/linux]% git grep -w 'dsb(.*)' -- ^arch          
-> drivers/irqchip/irq-armada-370-xp.c:    dsb();
-> drivers/irqchip/irq-gic-v3-its.c:               dsb(ishst);
-> drivers/irqchip/irq-gic-v3-its.c:               dsb(ishst);
-> drivers/irqchip/irq-gic-v3-its.c:       dsb(sy);
-> drivers/irqchip/irq-gic-v3-its.c:               dsb(sy);
-> drivers/irqchip/irq-gic-v3-its.c:       dsb(sy);
-> drivers/mtd/nand/raw/cmx270_nand.c:     dsb();
-> drivers/mtd/nand/raw/cmx270_nand.c:     dsb();
-> drivers/mtd/nand/raw/cmx270_nand.c:     dsb();
-> drivers/mtd/nand/raw/cmx270_nand.c:     dsb();
-> drivers/mtd/nand/raw/cmx270_nand.c:     dsb();
-> drivers/perf/arm_spe_pmu.c:     dsb(nsh);
-> drivers/perf/arm_spe_pmu.c:     dsb(nsh);
-> drivers/power/reset/arm-versatile-reboot.c:     dsb();
-> drivers/soc/rockchip/pm_domains.c:      dsb(sy);
-> drivers/soc/rockchip/pm_domains.c:      dsb(sy);
-> drivers/staging/mt7621-mmc/sd.c:        //dsb(); /* --- by chhung */
-> drivers/staging/mt7621-mmc/sd.c:        //dsb(); /* --- by chhung */
-> drivers/staging/vc04_services/interface/vchiq_arm/vchiq.h:#define dsb(a)
-> drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c:     dsb(sy);         /* data barrier operation */
-> drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.c:         dsb(sy);
-> drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.h: do { debug_ptr[DEBUG_ ## d] = __LINE__; dsb(sy); } while (0)
-> drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.h: do { debug_ptr[DEBUG_ ## d] = (v); dsb(sy); } while (0)
-> drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.h: do { debug_ptr[DEBUG_ ## d]++; dsb(sy); } while (0)
-> virt/kvm/arm/hyp/vgic-v3-sr.c:                  dsb(sy);
-> virt/kvm/arm/hyp/vgic-v3-sr.c:                  dsb(sy);
-> virt/kvm/arm/hyp/vgic-v3-sr.c:                  dsb(sy);
+This series attempts to standardize device naming and improve
+its information for better identification
 
-Thanks Mark.
+The values of the "compatible" and "model" device-tree properties
+are corrected for some devices, adding complementary information
+when necessary
 
-So it seems this shouldn't be applied.
+Changes since v1 (RFC):
+- Add values to compatible property instead of replacing them
+- Don't remove "internal" word from Xilinx boards on dt-bindings
+- Migrate content of adapteva dt-binding file into Xilinx's
+- Sort additional compatible strings alphabetically
+  by manufacturer
+- Dropped patch that renamed the zedboard development board
+  (no apparent benefit)
+- Dropped the patch that removed the "zynq" value from the
+  compatible strings (breaks the ABI)
+
+Luis Araneda (3):
+  arm: dts: zynq: Set correct manufacturer for ZedBoard and MicroZed
+    boards
+  dt-bindings: xilinx: Add missing zynq boards and sort entries
+  arm: dts: zynq: correct and improve the model property of dt files
+
+ .../devicetree/bindings/arm/adapteva.txt      |  7 -----
+ .../devicetree/bindings/arm/xilinx.txt        | 30 +++++++++++++++----
+ arch/arm/boot/dts/zynq-cc108.dts              |  2 +-
+ arch/arm/boot/dts/zynq-microzed.dts           |  4 +--
+ arch/arm/boot/dts/zynq-parallella.dts         |  2 +-
+ arch/arm/boot/dts/zynq-zc702.dts              |  2 +-
+ arch/arm/boot/dts/zynq-zc706.dts              |  2 +-
+ arch/arm/boot/dts/zynq-zc770-xm010.dts        |  2 +-
+ arch/arm/boot/dts/zynq-zc770-xm011.dts        |  2 +-
+ arch/arm/boot/dts/zynq-zc770-xm012.dts        |  2 +-
+ arch/arm/boot/dts/zynq-zc770-xm013.dts        |  2 +-
+ arch/arm/boot/dts/zynq-zed.dts                |  4 +--
+ arch/arm/boot/dts/zynq-zybo-z7.dts            |  2 +-
+ arch/arm/boot/dts/zynq-zybo.dts               |  2 +-
+ 14 files changed, 39 insertions(+), 26 deletions(-)
+ delete mode 100644 Documentation/devicetree/bindings/arm/adapteva.txt
+
+-- 
+2.18.0
