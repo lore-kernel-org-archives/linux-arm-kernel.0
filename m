@@ -1,18 +1,21 @@
 From: sboyd@kernel.org (Stephen Boyd)
-Date: Fri, 06 Jul 2018 13:58:46 -0700
-Subject: [PATCH 1/2] clk: imx6sll: add GPIO LPCGs
-In-Reply-To: <1529649154-5724-1-git-send-email-Anson.Huang@nxp.com>
-References: <1529649154-5724-1-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <153091072630.143105.2849049240391576710@swboyd.mtv.corp.google.com>
+Date: Fri, 06 Jul 2018 14:04:41 -0700
+Subject: [PATCH] clk: imx51-imx53: Annotate critical clocks as
+ CLK_IS_CRITICAL
+In-Reply-To: <1530712163-16130-1-git-send-email-festevam@gmail.com>
+References: <1530712163-16130-1-git-send-email-festevam@gmail.com>
+Message-ID: <153091108141.143105.12717931012017305757@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Anson Huang (2018-06-21 23:32:33)
-> According to Reference Manual Rev.0, 06/2017,
-> there are GPIO LPCGs defined in CCM CCGRs,
-> add them into clock tree.
+Quoting Fabio Estevam (2018-07-04 06:49:23)
+> From: Fabio Estevam <fabio.estevam@nxp.com>
 > 
-> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+> Instead of explicitly enabling critical clocks via clk_prepare_enable(),
+> let's use the standard CLK_IS_CRITICAL flag instead, which makes the code
+> a bit shorter.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 > ---
 
 Applied to clk-next
