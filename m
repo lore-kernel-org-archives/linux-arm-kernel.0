@@ -1,224 +1,348 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 5 Jul 2018 17:41:24 -0600
-Subject: [PATCH v3 2/2] arm64: dts: rockchip: add 96boards RK3399 Ficus
- board
-In-Reply-To: <20180705150818.29931-3-ezequiel@collabora.com>
-References: <20180705150818.29931-1-ezequiel@collabora.com>
- <20180705150818.29931-3-ezequiel@collabora.com>
-Message-ID: <20180705234124.GA32051@rob-hp-laptop>
+From: mchehab+samsung@kernel.org (Mauro Carvalho Chehab)
+Date: Thu, 5 Jul 2018 21:27:23 -0300
+Subject: [PATCH v3] media: dvb-frontends: add Socionext SC1501A ISDB-S/T
+ demodulator driver
+In-Reply-To: <000501d41423$265013a0$72f03ae0$@socionext.com>
+References: <20180621031748.21703-1-suzuki.katsuhiro@socionext.com>
+ <20180704135657.3fd607cb@coco.lan>
+ <000401d41403$b33db490$19b91db0$@socionext.com>
+ <20180704234244.32d20f6b@coco.lan>
+ <000501d41423$265013a0$72f03ae0$@socionext.com>
+Message-ID: <20180705212723.2856f064@coco.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 05, 2018 at 12:08:18PM -0300, Ezequiel Garcia wrote:
-> The RK3399 Ficus board is an Enterprise Edition board
-> manufactured by Vamrs Ltd., based on the Rockchip RK3399 SoC.
+Em Thu, 5 Jul 2018 14:43:49 +0900
+"Katsuhiro Suzuki" <suzuki.katsuhiro@socionext.com> escreveu:
+
+> Hi Mauro,
 > 
-> The board exposes a bunch of nice peripherals, including
-> SATA, HDMI, MIPI CSI, Ethernet, WiFi, and PCIe.
+> Thank you very much! Great works.
+> Your patches works fine with my driver (modified max/min frequencies).
+
+Sent a new version of it to the Mailing List.
+
 > 
-> Signed-off-by: Ezequiel Garcia <ezequiel@collabora.com>
-> ---
->  .../devicetree/bindings/arm/rockchip.txt      |   5 +
->  arch/arm64/boot/dts/rockchip/Makefile         |   1 +
->  arch/arm64/boot/dts/rockchip/rk3399-ficus.dts | 514 ++++++++++++++++++
->  3 files changed, 520 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/rockchip/rk3399-ficus.dts
+> Tested-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
+
+Thanks for testing. I did an update of the patchset at:
+
+	https://git.linuxtv.org/mchehab/experimental.git/log/?h=dvb_freq_hz_v2 
+
+and added a third patch to it.
+
+
+Could you please test it again using the latest version of dvb-fe-tool
+from its git tree:
+
+	https://git.linuxtv.org/v4l-utils.git/
+
+After compiling/installing, please call it like:
+
+	$ dvb-fe-tool -d isdbt
+	$ dvb-fe-tool 
+	$ dvb-fe-tool -d isdbs
+	$ dvb-fe-tool 
+
+When called without arguments, it will show the frequency range as
+reported by FE_GET_INFO (and used internally by the Kernel), e. g.
+it will display something like:
+
+    $ dvb-fe-tool
+    Device DiBcom 8000 ISDB-T (/dev/dvb/adapter0/frontend0) capabilities:
+         CAN_FEC_1_2
+         CAN_FEC_2_3
+         CAN_FEC_3_4
+         CAN_FEC_5_6
+         CAN_FEC_7_8
+         CAN_FEC_AUTO
+         CAN_GUARD_INTERVAL_AUTO
+         CAN_HIERARCHY_AUTO
+         CAN_INVERSION_AUTO
+         CAN_QAM_16
+         CAN_QAM_64
+         CAN_QAM_AUTO
+         CAN_QPSK
+         CAN_RECOVER
+         CAN_TRANSMISSION_MODE_AUTO
+    DVB API Version 5.11, Current v5 delivery system: ISDBT
+    Supported delivery system: 
+        [ISDBT]
+    Frequency range for the current standard: 
+    From:            45.0 MHz
+    To:               860 MHz
+    Step:            62.5 kHz
+
+
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/rockchip.txt b/Documentation/devicetree/bindings/arm/rockchip.txt
-> index 1c1d62d03c4f..d46c5d43e27f 100644
-> --- a/Documentation/devicetree/bindings/arm/rockchip.txt
-> +++ b/Documentation/devicetree/bindings/arm/rockchip.txt
-> @@ -1,5 +1,10 @@
->  Rockchip platforms device tree bindings
->  ---------------------------------------
-> +
-> +- 96boards RK3399 Ficus (ROCK960 Enterprise Edition)
-> +    Required root node properties:
-> +      - compatible = "vamrs,ficus", "rockchip,rk3399";
-> +
->  - Amarula Vyasa RK3288 board
->      Required root node properties:
->        - compatible = "amarula,vyasa-rk3288", "rockchip,rk3288";
-> diff --git a/arch/arm64/boot/dts/rockchip/Makefile b/arch/arm64/boot/dts/rockchip/Makefile
-> index 48a83f882947..2811fb701f12 100644
-> --- a/arch/arm64/boot/dts/rockchip/Makefile
-> +++ b/arch/arm64/boot/dts/rockchip/Makefile
-> @@ -9,6 +9,7 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-orion-r68-meta.dtb
->  dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-px5-evb.dtb
->  dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-r88.dtb
->  dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-evb.dtb
-> +dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-ficus.dtb
->  dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-firefly.dtb
->  dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-gru-kevin.dtb
->  dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-puma-haikou.dtb
-> diff --git a/arch/arm64/boot/dts/rockchip/rk3399-ficus.dts b/arch/arm64/boot/dts/rockchip/rk3399-ficus.dts
-> new file mode 100644
-> index 000000000000..b17b831df90e
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/rockchip/rk3399-ficus.dts
-> @@ -0,0 +1,514 @@
-> +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-> +/*
-> + * Copyright (c) 2018 Collabora Ltd.
-> + * Copyright (c) 2018 Fuzhou Rockchip Electronics Co., Ltd.
-> + *
-> + * Schematics available at https://dl.vamrs.com/products/ficus/docs/hw
-> + */
-> +
-> +/dts-v1/;
-> +#include "rk3399.dtsi"
-> +#include "rk3399-opp.dtsi"
-> +
-> +/ {
-> +	model = "96boards RK3399 Ficus";
-> +	compatible = "vamrs,ficus", "rockchip,rk3399";
-> +
-> +	chosen {
-> +		stdout-path = "serial2:1500000n8";
-> +	};
-> +
-> +	clkin_gmac: external-gmac-clock {
-> +		compatible = "fixed-clock";
-> +		clock-frequency = <125000000>;
-> +		clock-output-names = "clkin_gmac";
-> +		#clock-cells = <0>;
-> +	};
-> +
-> +	vcc1v8_s0: vcc1v8-s0 {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "vcc1v8_s0";
-> +		regulator-min-microvolt = <1800000>;
-> +		regulator-max-microvolt = <1800000>;
-> +		regulator-always-on;
-> +	};
-> +
-> +	vcc_sys: vcc-sys {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "vcc_sys";
-> +		regulator-min-microvolt = <5000000>;
-> +		regulator-max-microvolt = <5000000>;
-> +		regulator-always-on;
-> +	};
-> +
-> +	vcc3v3_sys: vcc3v3-sys {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "vcc3v3_sys";
-> +		regulator-min-microvolt = <3300000>;
-> +		regulator-max-microvolt = <3300000>;
-> +		regulator-always-on;
-> +		vin-supply = <&vcc_sys>;
-> +	};
-> +
-> +	vcc3v3_pcie: vcc3v3-pcie-regulator {
-> +		compatible = "regulator-fixed";
-> +		enable-active-high;
-> +		gpio = <&gpio1 24 GPIO_ACTIVE_HIGH>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pcie_drv>;
-> +		regulator-boot-on;
-> +		regulator-name = "vcc3v3_pcie";
-> +		vin-supply = <&vcc3v3_sys>;
-> +	};
-> +
-> +	vdd_log: vdd-log {
-> +		compatible = "pwm-regulator";
-> +		pwms = <&pwm2 0 25000 0>;
-> +		regulator-name = "vdd_log";
-> +		regulator-min-microvolt = <800000>;
-> +		regulator-max-microvolt = <1400000>;
-> +		regulator-always-on;
-> +		regulator-boot-on;
-> +
-> +		/* for rockchip boot on */
-> +		rockchip,pwm_id= <2>;
-> +		rockchip,pwm_voltage = <900000>;
-> +
-> +		vin-supply = <&vcc_sys>;
-> +	};
-> +
-> +};
-> +
-> +&cpu_l0 {
-> +	cpu-supply = <&vdd_cpu_l>;
-> +};
-> +
-> +&cpu_l1 {
-> +	cpu-supply = <&vdd_cpu_l>;
-> +};
-> +
-> +&cpu_l2 {
-> +	cpu-supply = <&vdd_cpu_l>;
-> +};
-> +
-> +&cpu_l3 {
-> +	cpu-supply = <&vdd_cpu_l>;
-> +};
-> +
-> +&cpu_b0 {
-> +	cpu-supply = <&vdd_cpu_b>;
-> +};
-> +
-> +&cpu_b1 {
-> +	cpu-supply = <&vdd_cpu_b>;
-> +};
-> +
-> +&emmc_phy {
-> +	status = "okay";
-> +};
-> +
-> +&gmac {
-> +	assigned-clocks = <&cru SCLK_RMII_SRC>;
-> +	assigned-clock-parents = <&clkin_gmac>;
-> +	clock_in_out = "input";
-> +	phy-supply = <&vcc3v3_sys>;
-> +	phy-mode = "rgmii";
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&rgmii_pins>;
-> +	snps,reset-gpio = <&gpio3 RK_PB7 GPIO_ACTIVE_LOW>;
-> +	snps,reset-active-low;
-> +	snps,reset-delays-us = <0 10000 50000>;
-> +	tx_delay = <0x28>;
-> +	rx_delay = <0x11>;
-> +	status = "okay";
-> +};
-> +
-> +&hdmi {
-> +	ddc-i2c-bus = <&i2c3>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&hdmi_cec>;
-> +	status = "okay";
-> +};
-> +
-> +&i2c0 {
-> +	clock-frequency = <400000>;
-> +	i2c-scl-rising-time-ns = <168>;
-> +	i2c-scl-falling-time-ns = <4>;
-> +	status = "okay";
-> +
-> +	vdd_cpu_b: syr827 at 40 {
+> 
+> And I have one question in the below.
+> 
+> 
+> > -----Original Message-----
+> > From: Mauro Carvalho Chehab <mchehab+samsung@kernel.org>
+> > Sent: Thursday, July 5, 2018 11:43 AM
+> > To: Suzuki, Katsuhiro/?? ?? <suzuki.katsuhiro@socionext.com>
+> > Cc: linux-media at vger.kernel.org; Masami Hiramatsu <masami.hiramatsu@linaro.org>;
+> > Jassi Brar <jaswinder.singh@linaro.org>; linux-arm-kernel at lists.infradead.org;
+> > linux-kernel at vger.kernel.org
+> > Subject: Re: [PATCH v3] media: dvb-frontends: add Socionext SC1501A ISDB-S/T
+> > demodulator driver
+> > 
+> > Em Thu, 5 Jul 2018 10:58:42 +0900
+> > "Katsuhiro Suzuki" <suzuki.katsuhiro@socionext.com> escreveu:
+> >   
+> > > Hi Mauro,
+> > >  
+> > > > -----Original Message-----
+> > > > From: Mauro Carvalho Chehab <mchehab+samsung@kernel.org>
+> > > > Sent: Thursday, July 5, 2018 1:58 AM
+> > > > To: Suzuki, Katsuhiro/?? ?? <suzuki.katsuhiro@socionext.com>
+> > > > Cc: linux-media at vger.kernel.org; Masami Hiramatsu  
+> > > <masami.hiramatsu@linaro.org>;  
+> > > > Jassi Brar <jaswinder.singh@linaro.org>;  
+> > linux-arm-kernel at lists.infradead.org;  
+> > > > linux-kernel at vger.kernel.org
+> > > > Subject: Re: [PATCH v3] media: dvb-frontends: add Socionext SC1501A ISDB-S/T
+> > > > demodulator driver
+> > > >
+> > > > Hi Katsuhiro-san,
+> > > >
+> > > > Em Thu, 21 Jun 2018 12:17:48 +0900
+> > > > Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com> escreveu:
+> > > >  
+> > > > > This patch adds a frontend driver for the Socionext SC1501A series
+> > > > > and Socionext MN88443x ISDB-S/T demodulators.  
+> > > >
+> > > > Sorry for taking so long to review it. We're missing a sub-maintainer
+> > > > for DVB, with would otherwise speed up reviews of DVB patches.  
+> > >
+> > > No problem, thank you for reviewing! I appreciate it.
+> > >
+> > >  
+> > > > >
+> > > > > The maximum and minimum frequency of Socionext SC1501A comes from
+> > > > > ISDB-S and ISDB-T so frequency range is the following:
+> > > > >   - ISDB-S (BS/CS110 IF frequency in kHz, Local freq 10.678GHz)
+> > > > >     - Min: BS-1: 1032000 => 1032.23MHz
+> > > > >     - Max: ND24: 2701000 => 2070.25MHz
+> > > > >   - ISDB-T (in Hz)
+> > > > >     - Min: ch13: 470000000 => 470.357857MHz
+> > > > >     - Max: ch62: 770000000 => 769.927857MHz  
+> > > >
+> > > > There is actually an error on that part of the driver. Right now,
+> > > > the DVB core expects Satellite frequencies (DVB-S, ISDB-S, ...)
+> > > > in kHz. For all other delivery systems, it is in Hz.
+> > > >
+> > > > It is this way due to historic reasons. While it won't be hard to
+> > > > change the core, that would require to touch all Satellite drivers.
+> > > >
+> > > > As there are very few frontend drivers that accept both Satellite
+> > > > and Terrestrial standards, what we do, instead, is to setup
+> > > > two frontends. See, for example, drivers/media/dvb-frontends/helene.c.
+> > > >  
+> > >
+> > > Thank you for describing it. I understand our device is rare case, and
+> > > the reason why Helene has Terrestrial and Satellite structures.
+> > >
+> > > I'm using MN884434 device that has 2 cores. I want to setup DVB adapter
+> > > devices (/dev/dvb/adapter0/*) for our frontend system as the following:
+> > >
+> > >   - adapter0: for core 0, ISDB-T, ISDB-S
+> > >   - adapter1: for core 1, ISDB-T, ISDB-S  
+> > 
+> > Yeah, that is what it was supposed to work, if the core was ready for it.
+> >   
+> > > But it seems one DVB adapter device support only ISDB-T or only ISDB-S
+> > > if I divide structures. So I define the adapters as the following:
+> > >
+> > >   - adapter0: for core 0, ISDB-T
+> > >   - adapter1: for core 0, ISDB-S
+> > >   - adapter2: for core 1, ISDB-T
+> > >   - adapter3: for core 1, ISDB-S
+> > >
+> > > Is this correct?  
+> > 
+> > That's the way the current driver with uses helene does.
+> >   
+> > >
+> > >  
+> > > > ...  
+> > > > > +static const struct dvb_frontend_ops sc1501a_ops = {
+> > > > > +	.delsys = { SYS_ISDBS, SYS_ISDBT },
+> > > > > +	.info = {
+> > > > > +		.name          = "Socionext SC1501A",
+> > > > > +		.frequency_min = 1032000,
+> > > > > +		.frequency_max = 770000000,
+> > > > > +		.caps = FE_CAN_INVERSION_AUTO | FE_CAN_FEC_AUTO |
+> > > > > +			FE_CAN_QAM_AUTO | FE_CAN_TRANSMISSION_MODE_AUTO |
+> > > > > +			FE_CAN_GUARD_INTERVAL_AUTO | FE_CAN_HIERARCHY_AUTO,
+> > > > > +	},
+> > > > > +
+> > > > > +	.sleep                   = sc1501a_sleep,
+> > > > > +	.set_frontend            = sc1501a_set_frontend,
+> > > > > +	.get_tune_settings       = sc1501a_get_tune_settings,
+> > > > > +	.read_status             = sc1501a_read_status,
+> > > > > +};  
+> > > >
+> > > > In other words, you'll need to declare two structs here, one for ISDB-T
+> > > > and another one for ISDB-S.
+> > > >  
+> > >
+> > > OK, I'm going to divide this structure for Terrestrial and Satellite. And
+> > > add attach functions same as Helene driver.
+> > >
+> > > I'll send v4 patch.  
+> > 
+> > I ended by writing two patches that should be solving the issues
+> > inside the core. With them[1], it will work the way you want.
+> > 
+> > There is a catch: you'll need to convert Helene to have a single
+> > entry and be sure that the driver that currently uses it (netup_unidvb)
+> > will keep working. I guess I have one such hardware here for testing.
+> > 
+> > [1] after tested/reviewed - I didn't test them yet. Feel free to test.
+> >   
+> 
+> Thank you!!
+> 
+> I try to fix '[PATCH v4] media: helene: add I2C device probe function' 
+> patch but I have a question...
+> 
+> My idea is adding new dvb_tuner_ops structure and I2C probe function for 
+> supporting multiple systems. Current drivers (netup) continue to use 
+> helene_attach_t() and helene_attach_s(), so no need to change netup.
+> It's conservative but prevent the degrade, I think.
 
-regulator at 40
+Works for me.
 
-> +		compatible = "silergy,syr827";
-> +		reg = <0x40>;
-> +		fcs,suspend-voltage-selector = <1>;
+> 
+> Newer added struct dvb_frontend_internal_info has one pair of max/min 
+> frequency. What is the best way to declare the frequency range for
+> multiple systems?
+> 
+> For example, Helene uses these info for only Ter or Sat freq ranges:
+> 
+> 		.name = "Sony HELENE Ter tuner",
+> 		.frequency_min_hz  =    1 * MHz,
+> 		.frequency_max_hz  = 1200 * MHz,
+> 		.frequency_step_hz =   25 * kHz,
+> 
+> 		.name = "Sony HELENE Sat tuner",
+> 		.frequency_min_hz  =  500 * MHz,
+> 		.frequency_max_hz  = 2500 * MHz,
+> 		.frequency_step_hz =    1 * MHz,
+> 
+> Is this better to add new info for both system?
+> 
+> 		.name = "Sony HELENE Sat/Ter tuner",
+> 		.frequency_min_hz  =    1 * MHz,
+> 		.frequency_max_hz  = 2500 * MHz,
+> 		.frequency_step_hz =   25 * kHz, // Is this correct...?
 
-Strange to have a different vendor for this property...
+That is indeed a very good question, and maybe a reason why we
+may need other approaches.
 
-Otherwise,
+See, if the tuner is capable of tuning from 1 MHz to 2500 MHz,
+the frequency range should be ok. It would aget_frontend_algoctually be pretty cool
+to use a tuner with such wide range for SDR, if the hardware supports
+raw I/Q collect :-D
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+The frequency step is a different issue. If the tuner driver uses
+DVBFE_ALGO_SW (e. g. if ops.get_frontend_algo() returns it, or if
+this function is not defined), then the step will be used to adjust
+the zigzag interactions. If it is too small, the tuning will lose
+channels if the signal is not strong.
 
-> +		regulator-name = "vdd_cpu_b";
-> +		regulator-min-microvolt = <712500>;
-> +		regulator-max-microvolt = <1500000>;
-> +		regulator-ramp-delay = <1000>;
-> +		regulator-always-on;
-> +		regulator-boot-on;
-> +		vin-supply = <&vcc_sys>;
-> +		status = "okay";
-> +
-> +		regulator-state-mem {
-> +			regulator-off-in-suspend;
-> +		};
-> +	};
+In the specific case of helene, it doesn't have a get_frontend_algo,
+so it will use the step frequency.
+
+I'm not sure how to solve this issue. Maybe Abylay may shed a light
+here, if helene does sigzag in hardware or not.
+
+If it does in hardware, you could add a get_frontend_algo() routine
+at helene driver and return DVBFE_ALGO_HW. The tuning zigzag software
+algorithm in the Kernel will stop, as it will rely at the hardware.
+
+Please notice that, if the hardware doesn't do zigzag itself, this
+will make it lose channels. On the other hand, if the hardware does
+have sigzag, changing to DVBFE_ALGO_HW will speedup tuning, as the
+Kernel won't try to do sigzag itself.
+
+> 
+> 
+> > So, please look at the two patches I sent today to the mailing list.
+> > 
+> > (not sure why, they're taking a long time to arrive there - perhaps
+> > vger has some issues).
+> > 
+> > I added them on this tree:
+> > 	https://git.linuxtv.org/mchehab/experimental.git/log/?h=dvb_freq_hz
+> > 
+> > it is the last two patches there:
+> > 	-
+> > https://git.linuxtv.org/mchehab/experimental.git/commit/?h=dvb_freq_hz&id=b3d63
+> > a8f038d136b26692bc3a14554960e767f4a
+> > 	-
+> > https://git.linuxtv.org/mchehab/experimental.git/commit/?h=dvb_freq_hz&id=2a369
+> > e8faf3b277baff4026371f298e95c84fbb2
+> > 
+> > I'm not sure if all applications will do the right thing, though, as
+> > it will depend  if they query the capabilities before or after switching
+> > to a different delivery system. If it get caps before and store them
+> > in Hz, apps will work, but tests are required.
+> >   
+> 
+> Ah, indeed. You mean,
+> 
+>   - Application want to tune Terrestrial system
+>   - Driver is in Satellite system
+>   - Application query max/min frequency
+>   - DVB API returns max/min frequency in 'kHz'
+>   - Some application will get something wrong
+>     (ex. app specific range check)
+
+Yes. I guess, however, that most apps won't do range checks themselves,
+but this has yet to be checked.
+
+> Unfortunately, I don't know applications that do such scenario.
+> My test application does not query max/min range...
+> 
+> 
+> > >
+> > >  
+> > > > Yeah, I know that this sucks. If you are in the mood of touching the
+> > > > DVB core, I'm willing to consider a patch that would fix this, provided
+> > > > that it won't break backward compatibility with other drivers (or would
+> > > > convert the other satellite drivers to use the new way).
+> > > >
+> > > > Thanks,
+> > > > Mauro  
+> > >
+> > > Hmm, I don't know the details of DVB core, I try to investigate it.
+> > >
+> > >
+> > > Regards,
+> > > --
+> > > Katsuhiro Suzuki
+> > >
+> > >
+> > >  
+> > 
+> > 
+> > 
+> > Thanks,
+> > Mauro  
+> 
+> 
+> Regards,
+> --
+> Katsuhiro Suzuki
+> 
+> 
+> 
+
+
+
+Thanks,
+Mauro
