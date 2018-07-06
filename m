@@ -1,46 +1,67 @@
-From: faiz_abbas@ti.com (Faiz Abbas)
-Date: Fri, 6 Jul 2018 18:05:15 +0530
-Subject: [PATCH v4 4/6] bus: ti-sysc: Add support for software reset
-In-Reply-To: <20180706103541.GC112168@atomide.com>
-References: <20180705142319.19583-1-faiz_abbas@ti.com>
- <20180705142319.19583-5-faiz_abbas@ti.com>
- <20180705154758.GA112168@atomide.com>
- <cf8652a1-019c-d423-9b44-0d62006734f8@ti.com>
- <20180706103541.GC112168@atomide.com>
-Message-ID: <46b0d881-e6ba-f314-e995-2848ab9fc429@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri,  6 Jul 2018 14:36:42 +0200
+Subject: [PATCH] soc: ti: wkup_m3_ipc: mark PM functions as __maybe_unused
+Message-ID: <20180706123651.2792927-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Everyone gets these #ifdefs wrong, leading to another warning here:
 
-On Friday 06 July 2018 04:05 PM, Tony Lindgren wrote:
-> * Faiz Abbas <faiz_abbas@ti.com> [180706 10:05]:
->> Hi,
->>
->> On Thursday 05 July 2018 09:17 PM, Tony Lindgren wrote:
->>> * Faiz Abbas <faiz_abbas@ti.com> [180705 14:24]:
->>>> +static int sysc_reset(struct sysc *ddata)
->>>> +{
->>>> +	int offset = ddata->offsets[SYSC_SYSCONFIG];
->>>> +	int val = sysc_read(ddata, offset);
->>>
->>> Can you please just warn and return early for now if no
->>> syss_mask is specified? Otherwise we'll have mysterious
->>> errors if somebody leaves out "ti,hwmods" for module types
->>> we do not yet support reset for.
->>
->> RESET write to sysconfig can still happen even if there's no syss_mask
->> right? Not all modules need to poll on reset status.
-> 
-> It can but we currently don't have anything similar to
-> srst_udelay like we have in _ocp_softreset(). And we don't
-> currently have suport for sysc reset done bit.
-> 
-> So we want to warn and return error except in the known
-> working case for now.
-> 
+drivers/soc/ti/wkup_m3_ipc.c:547:12: error: 'wkup_m3_ipc_resume' defined but not used [-Werror=unused-function]
+ static int wkup_m3_ipc_resume(struct device *dev)
+drivers/soc/ti/wkup_m3_ipc.c:539:12: error: 'wkup_m3_ipc_suspend' defined but not used [-Werror=unused-function]
+ static int wkup_m3_ipc_suspend(struct device *dev)
 
-Ok.
+The easiest way to get it right is to remove all the #ifdefs and
+let the compiler drop the unused functions silently after we
+mark them as __maybe_unused.
 
-Thanks,
-Faiz
+Fixes: 7a872b6fb7fd ("soc: ti: wkup_m3_ipc: Add rtc_only with ddr in self refresh mode support")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/soc/ti/wkup_m3_ipc.c | 8 ++------
+ 1 file changed, 2 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/soc/ti/wkup_m3_ipc.c b/drivers/soc/ti/wkup_m3_ipc.c
+index 6840688236b9..f5cb8c0af09f 100644
+--- a/drivers/soc/ti/wkup_m3_ipc.c
++++ b/drivers/soc/ti/wkup_m3_ipc.c
+@@ -535,8 +535,7 @@ static int wkup_m3_ipc_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-#ifdef CONFIG_PM
+-static int wkup_m3_ipc_suspend(struct device *dev)
++static int __maybe_unused wkup_m3_ipc_suspend(struct device *dev)
+ {
+ 	/*
+ 	 * Nothing needs to be done on suspend even with rtc_only flag set
+@@ -544,7 +543,7 @@ static int wkup_m3_ipc_suspend(struct device *dev)
+ 	return 0;
+ }
+ 
+-static int wkup_m3_ipc_resume(struct device *dev)
++static int __maybe_unused wkup_m3_ipc_resume(struct device *dev)
+ {
+ 	if (m3_ipc_state->is_rtc_only) {
+ 		rproc_shutdown(m3_ipc_state->rproc);
+@@ -559,7 +558,6 @@ static int wkup_m3_ipc_resume(struct device *dev)
+ static const struct dev_pm_ops wkup_m3_ipc_pm_ops = {
+ 	SET_SYSTEM_SLEEP_PM_OPS(wkup_m3_ipc_suspend, wkup_m3_ipc_resume)
+ };
+-#endif
+ 
+ static const struct of_device_id wkup_m3_ipc_of_match[] = {
+ 	{ .compatible = "ti,am3352-wkup-m3-ipc", },
+@@ -574,9 +572,7 @@ static struct platform_driver wkup_m3_ipc_driver = {
+ 	.driver = {
+ 		.name = "wkup_m3_ipc",
+ 		.of_match_table = wkup_m3_ipc_of_match,
+-#ifdef CONFIG_PM
+ 		.pm = &wkup_m3_ipc_pm_ops,
+-#endif
+ 	},
+ };
+ 
+-- 
+2.9.0
