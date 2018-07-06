@@ -1,234 +1,342 @@
-From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Fri,  6 Jul 2018 19:46:33 +0300
-Subject: [PATCH v3] soc: imx: gpc: Turn PU domain on/off in sleep on 6qp
-Message-ID: <ab0c7997bdb0caf6fe7e842315bb9565c2cb059d.1530895248.git.leonard.crestez@nxp.com>
+From: jernej.skrabec@siol.net (Jernej Skrabec)
+Date: Fri,  6 Jul 2018 18:47:32 +0200
+Subject: [PATCH v2] drm/sun4i: Implement zpos for DE2
+Message-ID: <20180706164732.24166-1-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On imx6qp power gating on the PU domain is disabled because of errata
-ERR009619. However power gating during suspend/resume can still be
-performed.
+Initial implementation of DE2 planes only supported fixed zpos.
 
-Enable this by implementing SLEEP_PM_OPS in imx_pgc_power_domain_driver.
+Expand implementation with configurable zpos property.
 
-In order to ensure correct ordering add device links from devices inside
-the PU domain to the pgc platform_device.
+Implementation background:
+Channel in DE2 driver represents one DRM plane, whereas pipe is just
+mapped channel to known Z position. Pipe 0 will always be at the bottom,
+pipe 1 just above pipe 0 and so on. If, for example, channel 1 is mapped
+at pipe 0 and channel 0 at pipe 1, whatever is on channel 0 will appear
+on top.
 
-Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
+Before this commit, channel id was used for addressing channel related
+registers (prefixed with SUN8I_MIXER_CHAN_UI_ or SUN8I_MIXER_CHAN_VI_)
+and pipe registers (prefixed with SUN8I_MIXER_BLEND_). Additionally,
+register SUN8I_MIXER_BLEND_ROUTE, which takes care for mapping channels
+to pipes had fixed value. It mapped channel 0 to pipe 0, 1 to 1 and so
+on. Consequence of all that was fixed Z order of planes.
 
+With this commit, pipe registers are using zpos property as index and
+channel related registers still use channel id as index. Pipe mapping
+register is now set dynamically too and pipe enable register is rebuild
+every time to make sure only active pipes are enabled.
+
+Testing was done to confirm that there is no issues if bottom plane
+contains pixels with alpha value < 0xff and if it doesn't whole screen.
+
+Tested-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/soc/imx/gpc.c | 88 +++++++++++++++++++++++++++++++++++--------
- 1 file changed, 73 insertions(+), 15 deletions(-)
+Patch is based on linux-next (next-20180706).
 
-Link to v2: https://lkml.org/lkml/2018/7/5/564
+Changes from v1:
+- added tested-by tag
+- expand commit message with detailed explanation
 
-Changes since v2: Add device links on attach
+ drivers/gpu/drm/sun4i/sun8i_mixer.c    | 15 +++++++--
+ drivers/gpu/drm/sun4i/sun8i_mixer.h    |  4 +++
+ drivers/gpu/drm/sun4i/sun8i_ui_layer.c | 45 ++++++++++++++++----------
+ drivers/gpu/drm/sun4i/sun8i_vi_layer.c | 45 ++++++++++++++++----------
+ 4 files changed, 72 insertions(+), 37 deletions(-)
 
-The NXP kernel has been turning the PU domain off in sleep on 6qp for
-many releases so this behavior went through multiple QA cycles and is
-known to work. Further small improvements in power usage could be
-obtained by also shutting off the PU LDO regulator but that's not as
-well-validated.
-
-diff --git a/drivers/soc/imx/gpc.c b/drivers/soc/imx/gpc.c
-index 32f0748fd067..b96d8dc9626d 100644
---- a/drivers/soc/imx/gpc.c
-+++ b/drivers/soc/imx/gpc.c
-@@ -54,19 +54,16 @@ static inline struct imx_pm_domain *
- to_imx_pm_domain(struct generic_pm_domain *genpd)
- {
- 	return container_of(genpd, struct imx_pm_domain, base);
+diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.c b/drivers/gpu/drm/sun4i/sun8i_mixer.c
+index ee8febb25903..0747a9a69654 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_mixer.c
++++ b/drivers/gpu/drm/sun4i/sun8i_mixer.c
+@@ -260,6 +260,17 @@ const struct de2_fmt_info *sun8i_mixer_format_info(u32 format)
+ 	return NULL;
  }
  
--static int imx6_pm_domain_power_off(struct generic_pm_domain *genpd)
-+static void _imx6_pm_domain_power_off(struct generic_pm_domain *genpd)
- {
- 	struct imx_pm_domain *pd = to_imx_pm_domain(genpd);
- 	int iso, iso2sw;
- 	u32 val;
- 
--	if (pd->flags & PGC_DOMAIN_FLAG_NO_PD)
--		return -EBUSY;
--
- 	/* Read ISO and ISO2SW power down delays */
- 	regmap_read(pd->regmap, pd->reg_offs + GPC_PGC_PUPSCR_OFFS, &val);
- 	iso = val & 0x3f;
- 	iso2sw = (val >> 8) & 0x3f;
- 
-@@ -78,32 +75,33 @@ static int imx6_pm_domain_power_off(struct generic_pm_domain *genpd)
- 	val = BIT(pd->cntr_pdn_bit);
- 	regmap_update_bits(pd->regmap, GPC_CNTR, val, val);
- 
- 	/* Wait ISO + ISO2SW IPG clock cycles */
- 	udelay(DIV_ROUND_UP(iso + iso2sw, pd->ipg_rate_mhz));
++static void sun8i_mixer_atomic_begin(struct sunxi_engine *engine,
++				     struct drm_crtc_state *old_state)
++{
++	/*
++	 * Disable all pipes at the beginning. They will be enabled
++	 * again if needed in plane update callback.
++	 */
++	regmap_update_bits(engine->regs, SUN8I_MIXER_BLEND_PIPE_CTL,
++			   SUN8I_MIXER_BLEND_PIPE_CTL_EN_MSK, 0);
 +}
 +
-+static int imx6_pm_domain_power_off(struct generic_pm_domain *genpd)
-+{
-+	struct imx_pm_domain *pd = to_imx_pm_domain(genpd);
-+
-+	if (pd->flags & PGC_DOMAIN_FLAG_NO_PD)
-+		return -EBUSY;
-+
-+	_imx6_pm_domain_power_off(genpd);
- 
- 	if (pd->supply)
- 		regulator_disable(pd->supply);
- 
- 	return 0;
+ static void sun8i_mixer_commit(struct sunxi_engine *engine)
+ {
+ 	DRM_DEBUG_DRIVER("Committing changes\n");
+@@ -311,6 +322,7 @@ static struct drm_plane **sun8i_layers_init(struct drm_device *drm,
  }
  
--static int imx6_pm_domain_power_on(struct generic_pm_domain *genpd)
-+static void _imx6_pm_domain_power_on(struct generic_pm_domain *genpd)
+ static const struct sunxi_engine_ops sun8i_engine_ops = {
++	.atomic_begin	= sun8i_mixer_atomic_begin,
+ 	.commit		= sun8i_mixer_commit,
+ 	.layers_init	= sun8i_layers_init,
+ };
+@@ -432,9 +444,6 @@ static int sun8i_mixer_bind(struct device *dev, struct device *master,
+ 	regmap_write(mixer->engine.regs, SUN8I_MIXER_BLEND_ATTR_FCOLOR(0),
+ 		     SUN8I_MIXER_BLEND_COLOR_BLACK);
+ 
+-	/* Fixed zpos for now */
+-	regmap_write(mixer->engine.regs, SUN8I_MIXER_BLEND_ROUTE, 0x43210);
+-
+ 	plane_cnt = mixer->cfg->vi_num + mixer->cfg->ui_num;
+ 	for (i = 0; i < plane_cnt; i++)
+ 		regmap_write(mixer->engine.regs, SUN8I_MIXER_BLEND_MODE(i),
+diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.h b/drivers/gpu/drm/sun4i/sun8i_mixer.h
+index f34e70c42adf..406c42e752d7 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_mixer.h
++++ b/drivers/gpu/drm/sun4i/sun8i_mixer.h
+@@ -44,6 +44,7 @@
+ #define SUN8I_MIXER_BLEND_CK_MIN(x)		(0x10e0 + 0x04 * (x))
+ #define SUN8I_MIXER_BLEND_OUTCTL		0x10fc
+ 
++#define SUN8I_MIXER_BLEND_PIPE_CTL_EN_MSK	GENMASK(12, 8)
+ #define SUN8I_MIXER_BLEND_PIPE_CTL_EN(pipe)	BIT(8 + pipe)
+ #define SUN8I_MIXER_BLEND_PIPE_CTL_FC_EN(pipe)	BIT(pipe)
+ /* colors are always in AARRGGBB format */
+@@ -51,6 +52,9 @@
+ /* The following numbers are some still unknown magic numbers */
+ #define SUN8I_MIXER_BLEND_MODE_DEF		0x03010301
+ 
++#define SUN8I_MIXER_BLEND_ROUTE_PIPE_MSK(n)	(0xf << ((n) << 2))
++#define SUN8I_MIXER_BLEND_ROUTE_PIPE_SHIFT(n)	((n) << 2)
++
+ #define SUN8I_MIXER_BLEND_OUTCTL_INTERLACED	BIT(1)
+ 
+ #define SUN8I_MIXER_FBFMT_ARGB8888	0
+diff --git a/drivers/gpu/drm/sun4i/sun8i_ui_layer.c b/drivers/gpu/drm/sun4i/sun8i_ui_layer.c
+index 9a540330cb79..518e1921f47e 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_ui_layer.c
++++ b/drivers/gpu/drm/sun4i/sun8i_ui_layer.c
+@@ -27,7 +27,7 @@
+ #include "sun8i_ui_scaler.h"
+ 
+ static void sun8i_ui_layer_enable(struct sun8i_mixer *mixer, int channel,
+-				  int overlay, bool enable)
++				  int overlay, bool enable, unsigned int zpos)
  {
- 	struct imx_pm_domain *pd = to_imx_pm_domain(genpd);
--	int i, ret, sw, sw2iso;
-+	int i, sw, sw2iso;
  	u32 val;
  
--	if (pd->supply) {
--		ret = regulator_enable(pd->supply);
--		if (ret) {
--			pr_err("%s: failed to enable regulator: %d\n",
--			       __func__, ret);
--			return ret;
--		}
--	}
--
- 	/* Enable reset clocks for all devices in the domain */
- 	for (i = 0; i < pd->num_clks; i++)
- 		clk_prepare_enable(pd->clk[i]);
+@@ -43,18 +43,24 @@ static void sun8i_ui_layer_enable(struct sun8i_mixer *mixer, int channel,
+ 			   SUN8I_MIXER_CHAN_UI_LAYER_ATTR(channel, overlay),
+ 			   SUN8I_MIXER_CHAN_UI_LAYER_ATTR_EN, val);
  
- 	/* Gate off domain when powered down */
-@@ -123,10 +121,39 @@ static int imx6_pm_domain_power_on(struct generic_pm_domain *genpd)
- 	udelay(DIV_ROUND_UP(sw + sw2iso, pd->ipg_rate_mhz));
+-	if (enable)
+-		val = SUN8I_MIXER_BLEND_PIPE_CTL_EN(channel);
+-	else
+-		val = 0;
++	if (enable) {
++		val = SUN8I_MIXER_BLEND_PIPE_CTL_EN(zpos);
  
- 	/* Disable reset clocks for all devices in the domain */
- 	for (i = 0; i < pd->num_clks; i++)
- 		clk_disable_unprepare(pd->clk[i]);
-+}
+-	regmap_update_bits(mixer->engine.regs,
+-			   SUN8I_MIXER_BLEND_PIPE_CTL,
+-			   SUN8I_MIXER_BLEND_PIPE_CTL_EN(channel), val);
++		regmap_update_bits(mixer->engine.regs,
++				   SUN8I_MIXER_BLEND_PIPE_CTL, val, val);
 +
-+static int imx6_pm_domain_power_on(struct generic_pm_domain *genpd)
-+{
-+	struct imx_pm_domain *pd = to_imx_pm_domain(genpd);
-+	int ret;
++		val = channel << SUN8I_MIXER_BLEND_ROUTE_PIPE_SHIFT(zpos);
 +
-+	if (pd->supply) {
-+		ret = regulator_enable(pd->supply);
-+		if (ret) {
-+			pr_err("%s: failed to enable regulator: %d\n",
-+			       __func__, ret);
-+			return ret;
-+		}
++		regmap_update_bits(mixer->engine.regs,
++				   SUN8I_MIXER_BLEND_ROUTE,
++				   SUN8I_MIXER_BLEND_ROUTE_PIPE_MSK(zpos),
++				   val);
 +	}
-+
-+	_imx6_pm_domain_power_on(genpd);
-+
-+	return 0;
-+}
-+
-+static int imx6_pm_domain_attach_dev(
-+               struct generic_pm_domain *genpd,
-+               struct device *dev)
-+{
-+	struct imx_pm_domain *pd = to_imx_pm_domain(genpd);
-+
-+	if (pd->flags & PGC_DOMAIN_FLAG_NO_PD)
-+		device_link_add(dev, genpd->dev.parent, DL_FLAG_AUTOREMOVE);
- 
- 	return 0;
  }
  
- static int imx_pgc_get_clocks(struct device *dev, struct imx_pm_domain *domain)
-@@ -198,10 +225,11 @@ static int imx_pgc_power_domain_probe(struct platform_device *pdev)
- 	if (IS_ENABLED(CONFIG_PM_GENERIC_DOMAINS)) {
- 		pm_genpd_init(&domain->base, NULL, false);
- 		ret = of_genpd_add_provider_simple(dev->of_node, &domain->base);
- 		if (ret)
- 			goto genpd_err;
-+		domain->base.dev.parent = dev;
- 	}
- 
- 	device_link_add(dev, dev->parent, DL_FLAG_AUTOREMOVE);
+ static int sun8i_ui_layer_update_coord(struct sun8i_mixer *mixer, int channel,
+-				       int overlay, struct drm_plane *plane)
++				       int overlay, struct drm_plane *plane,
++				       unsigned int zpos)
+ {
+ 	struct drm_plane_state *state = plane->state;
+ 	u32 src_w, src_h, dst_w, dst_h;
+@@ -137,10 +143,10 @@ static int sun8i_ui_layer_update_coord(struct sun8i_mixer *mixer, int channel,
+ 			 state->dst.x1, state->dst.y1);
+ 	DRM_DEBUG_DRIVER("Layer destination size W: %d H: %d\n", dst_w, dst_h);
+ 	regmap_write(mixer->engine.regs,
+-		     SUN8I_MIXER_BLEND_ATTR_COORD(channel),
++		     SUN8I_MIXER_BLEND_ATTR_COORD(zpos),
+ 		     SUN8I_MIXER_COORD(state->dst.x1, state->dst.y1));
+ 	regmap_write(mixer->engine.regs,
+-		     SUN8I_MIXER_BLEND_ATTR_INSIZE(channel),
++		     SUN8I_MIXER_BLEND_ATTR_INSIZE(zpos),
+ 		     outsize);
  
  	return 0;
-@@ -224,18 +252,45 @@ static int imx_pgc_power_domain_remove(struct platform_device *pdev)
- 	}
+@@ -238,28 +244,30 @@ static void sun8i_ui_layer_atomic_disable(struct drm_plane *plane,
+ 	struct sun8i_ui_layer *layer = plane_to_sun8i_ui_layer(plane);
+ 	struct sun8i_mixer *mixer = layer->mixer;
  
- 	return 0;
+-	sun8i_ui_layer_enable(mixer, layer->channel, layer->overlay, false);
++	sun8i_ui_layer_enable(mixer, layer->channel, layer->overlay, false, 0);
  }
  
-+static int imx_pgc_suspend(struct device *dev)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct imx_pm_domain *pd = pdev->dev.platform_data;
-+
-+	if (pd->flags & PGC_DOMAIN_FLAG_NO_PD)
-+		_imx6_pm_domain_power_off(&pd->base);
-+
-+	return 0;
-+}
-+
-+static int imx_pgc_resume(struct device *dev)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct imx_pm_domain *pd = pdev->dev.platform_data;
-+
-+	if (pd->flags & PGC_DOMAIN_FLAG_NO_PD)
-+		_imx6_pm_domain_power_on(&pd->base);
-+
-+	return 0;
-+}
-+
-+static const struct dev_pm_ops imx_pgc_pm_ops = {
-+	SET_SYSTEM_SLEEP_PM_OPS(imx_pgc_suspend, imx_pgc_resume)
-+};
-+
- static const struct platform_device_id imx_pgc_power_domain_id[] = {
- 	{ "imx-pgc-power-domain"},
- 	{ },
- };
+ static void sun8i_ui_layer_atomic_update(struct drm_plane *plane,
+ 					 struct drm_plane_state *old_state)
+ {
+ 	struct sun8i_ui_layer *layer = plane_to_sun8i_ui_layer(plane);
++	unsigned int zpos = plane->state->normalized_zpos;
+ 	struct sun8i_mixer *mixer = layer->mixer;
  
- static struct platform_driver imx_pgc_power_domain_driver = {
- 	.driver = {
- 		.name = "imx-pgc-pd",
-+		.pm = &imx_pgc_pm_ops,
- 	},
- 	.probe = imx_pgc_power_domain_probe,
- 	.remove = imx_pgc_power_domain_remove,
- 	.id_table = imx_pgc_power_domain_id,
- };
-@@ -259,28 +314,31 @@ static struct imx_pm_domain imx_gpc_domains[] = {
- 	}, {
- 		.base = {
- 			.name = "PU",
- 			.power_off = imx6_pm_domain_power_off,
- 			.power_on = imx6_pm_domain_power_on,
-+			.attach_dev = imx6_pm_domain_attach_dev,
- 			.states = &imx6_pm_domain_pu_state,
- 			.state_count = 1,
- 		},
- 		.reg_offs = 0x260,
- 		.cntr_pdn_bit = 0,
- 	}, {
- 		.base = {
- 			.name = "DISPLAY",
- 			.power_off = imx6_pm_domain_power_off,
- 			.power_on = imx6_pm_domain_power_on,
-+			.attach_dev = imx6_pm_domain_attach_dev,
- 		},
- 		.reg_offs = 0x240,
- 		.cntr_pdn_bit = 4,
- 	}, {
- 		.base = {
- 			.name = "PCI",
- 			.power_off = imx6_pm_domain_power_off,
- 			.power_on = imx6_pm_domain_power_on,
-+			.attach_dev = imx6_pm_domain_attach_dev,
- 		},
- 		.reg_offs = 0x200,
- 		.cntr_pdn_bit = 6,
- 	},
- };
+ 	if (!plane->state->visible) {
+ 		sun8i_ui_layer_enable(mixer, layer->channel,
+-				      layer->overlay, false);
++				      layer->overlay, false, 0);
+ 		return;
+ 	}
+ 
+ 	sun8i_ui_layer_update_coord(mixer, layer->channel,
+-				    layer->overlay, plane);
++				    layer->overlay, plane, zpos);
+ 	sun8i_ui_layer_update_formats(mixer, layer->channel,
+ 				      layer->overlay, plane);
+ 	sun8i_ui_layer_update_buffer(mixer, layer->channel,
+ 				     layer->overlay, plane);
+-	sun8i_ui_layer_enable(mixer, layer->channel, layer->overlay, true);
++	sun8i_ui_layer_enable(mixer, layer->channel, layer->overlay,
++			      true, zpos);
+ }
+ 
+ static struct drm_plane_helper_funcs sun8i_ui_layer_helper_funcs = {
+@@ -307,6 +315,7 @@ struct sun8i_ui_layer *sun8i_ui_layer_init_one(struct drm_device *drm,
+ 	enum drm_plane_type type = DRM_PLANE_TYPE_OVERLAY;
+ 	int channel = mixer->cfg->vi_num + index;
+ 	struct sun8i_ui_layer *layer;
++	unsigned int plane_cnt;
+ 	int ret;
+ 
+ 	layer = devm_kzalloc(drm->dev, sizeof(*layer), GFP_KERNEL);
+@@ -327,8 +336,10 @@ struct sun8i_ui_layer *sun8i_ui_layer_init_one(struct drm_device *drm,
+ 		return ERR_PTR(ret);
+ 	}
+ 
+-	/* fixed zpos for now */
+-	ret = drm_plane_create_zpos_immutable_property(&layer->plane, channel);
++	plane_cnt = mixer->cfg->ui_num + mixer->cfg->vi_num;
++
++	ret = drm_plane_create_zpos_property(&layer->plane, channel,
++					     0, plane_cnt - 1);
+ 	if (ret) {
+ 		dev_err(drm->dev, "Couldn't add zpos property\n");
+ 		return ERR_PTR(ret);
+diff --git a/drivers/gpu/drm/sun4i/sun8i_vi_layer.c b/drivers/gpu/drm/sun4i/sun8i_vi_layer.c
+index 5877f8ef5895..17e0d00cfd8a 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_vi_layer.c
++++ b/drivers/gpu/drm/sun4i/sun8i_vi_layer.c
+@@ -21,7 +21,7 @@
+ #include "sun8i_vi_scaler.h"
+ 
+ static void sun8i_vi_layer_enable(struct sun8i_mixer *mixer, int channel,
+-				  int overlay, bool enable)
++				  int overlay, bool enable, unsigned int zpos)
+ {
+ 	u32 val;
+ 
+@@ -37,18 +37,24 @@ static void sun8i_vi_layer_enable(struct sun8i_mixer *mixer, int channel,
+ 			   SUN8I_MIXER_CHAN_VI_LAYER_ATTR(channel, overlay),
+ 			   SUN8I_MIXER_CHAN_VI_LAYER_ATTR_EN, val);
+ 
+-	if (enable)
+-		val = SUN8I_MIXER_BLEND_PIPE_CTL_EN(channel);
+-	else
+-		val = 0;
++	if (enable) {
++		val = SUN8I_MIXER_BLEND_PIPE_CTL_EN(zpos);
+ 
+-	regmap_update_bits(mixer->engine.regs,
+-			   SUN8I_MIXER_BLEND_PIPE_CTL,
+-			   SUN8I_MIXER_BLEND_PIPE_CTL_EN(channel), val);
++		regmap_update_bits(mixer->engine.regs,
++				   SUN8I_MIXER_BLEND_PIPE_CTL, val, val);
++
++		val = channel << SUN8I_MIXER_BLEND_ROUTE_PIPE_SHIFT(zpos);
++
++		regmap_update_bits(mixer->engine.regs,
++				   SUN8I_MIXER_BLEND_ROUTE,
++				   SUN8I_MIXER_BLEND_ROUTE_PIPE_MSK(zpos),
++				   val);
++	}
+ }
+ 
+ static int sun8i_vi_layer_update_coord(struct sun8i_mixer *mixer, int channel,
+-				       int overlay, struct drm_plane *plane)
++				       int overlay, struct drm_plane *plane,
++				       unsigned int zpos)
+ {
+ 	struct drm_plane_state *state = plane->state;
+ 	const struct drm_format_info *format = state->fb->format;
+@@ -130,10 +136,10 @@ static int sun8i_vi_layer_update_coord(struct sun8i_mixer *mixer, int channel,
+ 			 state->dst.x1, state->dst.y1);
+ 	DRM_DEBUG_DRIVER("Layer destination size W: %d H: %d\n", dst_w, dst_h);
+ 	regmap_write(mixer->engine.regs,
+-		     SUN8I_MIXER_BLEND_ATTR_COORD(channel),
++		     SUN8I_MIXER_BLEND_ATTR_COORD(zpos),
+ 		     SUN8I_MIXER_COORD(state->dst.x1, state->dst.y1));
+ 	regmap_write(mixer->engine.regs,
+-		     SUN8I_MIXER_BLEND_ATTR_INSIZE(channel),
++		     SUN8I_MIXER_BLEND_ATTR_INSIZE(zpos),
+ 		     outsize);
+ 
+ 	return 0;
+@@ -266,28 +272,30 @@ static void sun8i_vi_layer_atomic_disable(struct drm_plane *plane,
+ 	struct sun8i_vi_layer *layer = plane_to_sun8i_vi_layer(plane);
+ 	struct sun8i_mixer *mixer = layer->mixer;
+ 
+-	sun8i_vi_layer_enable(mixer, layer->channel, layer->overlay, false);
++	sun8i_vi_layer_enable(mixer, layer->channel, layer->overlay, false, 0);
+ }
+ 
+ static void sun8i_vi_layer_atomic_update(struct drm_plane *plane,
+ 					 struct drm_plane_state *old_state)
+ {
+ 	struct sun8i_vi_layer *layer = plane_to_sun8i_vi_layer(plane);
++	unsigned int zpos = plane->state->normalized_zpos;
+ 	struct sun8i_mixer *mixer = layer->mixer;
+ 
+ 	if (!plane->state->visible) {
+ 		sun8i_vi_layer_enable(mixer, layer->channel,
+-				      layer->overlay, false);
++				      layer->overlay, false, 0);
+ 		return;
+ 	}
+ 
+ 	sun8i_vi_layer_update_coord(mixer, layer->channel,
+-				    layer->overlay, plane);
++				    layer->overlay, plane, zpos);
+ 	sun8i_vi_layer_update_formats(mixer, layer->channel,
+ 				      layer->overlay, plane);
+ 	sun8i_vi_layer_update_buffer(mixer, layer->channel,
+ 				     layer->overlay, plane);
+-	sun8i_vi_layer_enable(mixer, layer->channel, layer->overlay, true);
++	sun8i_vi_layer_enable(mixer, layer->channel, layer->overlay,
++			      true, zpos);
+ }
+ 
+ static struct drm_plane_helper_funcs sun8i_vi_layer_helper_funcs = {
+@@ -351,6 +359,7 @@ struct sun8i_vi_layer *sun8i_vi_layer_init_one(struct drm_device *drm,
+ 					       int index)
+ {
+ 	struct sun8i_vi_layer *layer;
++	unsigned int plane_cnt;
+ 	int ret;
+ 
+ 	layer = devm_kzalloc(drm->dev, sizeof(*layer), GFP_KERNEL);
+@@ -368,8 +377,10 @@ struct sun8i_vi_layer *sun8i_vi_layer_init_one(struct drm_device *drm,
+ 		return ERR_PTR(ret);
+ 	}
+ 
+-	/* fixed zpos for now */
+-	ret = drm_plane_create_zpos_immutable_property(&layer->plane, index);
++	plane_cnt = mixer->cfg->ui_num + mixer->cfg->vi_num;
++
++	ret = drm_plane_create_zpos_property(&layer->plane, index,
++					     0, plane_cnt - 1);
+ 	if (ret) {
+ 		dev_err(drm->dev, "Couldn't add zpos property\n");
+ 		return ERR_PTR(ret);
 -- 
-2.17.1
+2.18.0
