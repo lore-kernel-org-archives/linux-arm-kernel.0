@@ -1,182 +1,99 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Fri,  6 Jul 2018 08:57:26 +0200
-Subject: [PATCH] arm64: hikey960: update idle-states
-Message-ID: <1530860246-29072-1-git-send-email-vincent.guittot@linaro.org>
+From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
+Date: Fri, 6 Jul 2018 09:13:14 +0200
+Subject: [PATCH 2/3] PCI: mvebu: Convert to use pci_host_bridge directly
+In-Reply-To: <20180705162357.GB13716@red-moon>
+References: <20180629091007.31069-1-thomas.petazzoni@bootlin.com>
+ <20180629091007.31069-3-thomas.petazzoni@bootlin.com>
+ <20180705162357.GB13716@red-moon>
+Message-ID: <20180706091314.2f221c4b@windsurf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update entry/exit latency and residency time of hikey960 to use more
-realistic figures based on unitary tests done on the platform.
+Hello Lorenzo,
 
-The complete results (in us) :
-                  big cluster
-                  cluster  CPU
-max entry latency     800  400
-max exit latency     2900  550
-residency  903Mhz    5000 1500
-residency 2363Mhz       0 1500
+Thanks for your review and feedback!
 
-                  little cluster
-                  cluster  CPU
-max entry latency     500  400
-max exit latency     1600  650
-residency  533Mhz    8000 4500
-residency 1844Mhz       0 1500
+On Thu, 5 Jul 2018 17:23:57 +0100, Lorenzo Pieralisi wrote:
+> On Fri, Jun 29, 2018 at 11:10:06AM +0200, Thomas Petazzoni wrote:
+> 
+> [...]
+> 
+> > +	pcie->mem.name = "PCI MEM";
+> > +	pci_add_resource_offset(&pcie->resources, &pcie->mem, 0);  
+> 
+> Nit: pci_add_resource() would do.
 
-We can see that the residency time depends of the running OPP which is not
-handled for now. Then we also have to take into account the constraint of
-a residency time shorter than the tick to get full advantage of idle loop
-reordering(tick is stopped if idle duration is higher than tick period).
-Finally the selected residency value are :
-                 big cluster
-                  cluster  CPU
-residency            3700 1500
+Actually on this one, I wasn't sure of my conversion. The original
+(i.e current) code is:
 
-                  little cluster
-                  cluster  CPU
-residency            3500 1500
-
-A simple test with a task waking up every 11,111ms shows improvement:
-- 5% a lowest OPP
-- 22% at highest OPP
-
-The period has been chosen:
-- to be shorter than old cluster residency time and longer than new
-residency time od cluster off C-state
-- to prevent any sync with tick (4ms) when running tests that can add
-some variances between tests
-
-Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
----
- arch/arm64/boot/dts/hisilicon/hi3660.dtsi | 45 ++++++++++++++++++-------------
- 1 file changed, 27 insertions(+), 18 deletions(-)
-
-diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-index 421d454..890d23e 100644
---- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-@@ -61,7 +61,7 @@
- 			reg = <0x0 0x0>;
- 			enable-method = "psci";
- 			next-level-cache = <&A53_L2>;
--			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP_0>;
-+			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
- 			capacity-dmips-mhz = <592>;
- 			clocks = <&stub_clock HI3660_CLK_STUB_CLUSTER0>;
- 			operating-points-v2 = <&cluster0_opp>;
-@@ -75,7 +75,7 @@
- 			reg = <0x0 0x1>;
- 			enable-method = "psci";
- 			next-level-cache = <&A53_L2>;
--			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP_0>;
-+			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
- 			capacity-dmips-mhz = <592>;
- 			clocks = <&stub_clock HI3660_CLK_STUB_CLUSTER0>;
- 			operating-points-v2 = <&cluster0_opp>;
-@@ -87,7 +87,7 @@
- 			reg = <0x0 0x2>;
- 			enable-method = "psci";
- 			next-level-cache = <&A53_L2>;
--			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP_0>;
-+			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
- 			capacity-dmips-mhz = <592>;
- 			clocks = <&stub_clock HI3660_CLK_STUB_CLUSTER0>;
- 			operating-points-v2 = <&cluster0_opp>;
-@@ -99,7 +99,7 @@
- 			reg = <0x0 0x3>;
- 			enable-method = "psci";
- 			next-level-cache = <&A53_L2>;
--			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP_0>;
-+			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
- 			capacity-dmips-mhz = <592>;
- 			clocks = <&stub_clock HI3660_CLK_STUB_CLUSTER0>;
- 			operating-points-v2 = <&cluster0_opp>;
-@@ -111,7 +111,7 @@
- 			reg = <0x0 0x100>;
- 			enable-method = "psci";
- 			next-level-cache = <&A73_L2>;
--			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP_1>;
-+			cpu-idle-states = <&CPU_SLEEP_1 &CLUSTER_SLEEP_1>;
- 			capacity-dmips-mhz = <1024>;
- 			clocks = <&stub_clock HI3660_CLK_STUB_CLUSTER1>;
- 			operating-points-v2 = <&cluster1_opp>;
-@@ -125,7 +125,7 @@
- 			reg = <0x0 0x101>;
- 			enable-method = "psci";
- 			next-level-cache = <&A73_L2>;
--			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP_1>;
-+			cpu-idle-states = <&CPU_SLEEP_1 &CLUSTER_SLEEP_1>;
- 			capacity-dmips-mhz = <1024>;
- 			clocks = <&stub_clock HI3660_CLK_STUB_CLUSTER1>;
- 			operating-points-v2 = <&cluster1_opp>;
-@@ -137,7 +137,7 @@
- 			reg = <0x0 0x102>;
- 			enable-method = "psci";
- 			next-level-cache = <&A73_L2>;
--			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP_1>;
-+			cpu-idle-states = <&CPU_SLEEP_1 &CLUSTER_SLEEP_1>;
- 			capacity-dmips-mhz = <1024>;
- 			clocks = <&stub_clock HI3660_CLK_STUB_CLUSTER1>;
- 			operating-points-v2 = <&cluster1_opp>;
-@@ -149,7 +149,7 @@
- 			reg = <0x0 0x103>;
- 			enable-method = "psci";
- 			next-level-cache = <&A73_L2>;
--			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP_1>;
-+			cpu-idle-states = <&CPU_SLEEP_1 &CLUSTER_SLEEP_1>;
- 			capacity-dmips-mhz = <1024>;
- 			clocks = <&stub_clock HI3660_CLK_STUB_CLUSTER1>;
- 			operating-points-v2 = <&cluster1_opp>;
-@@ -158,31 +158,40 @@
- 		idle-states {
- 			entry-method = "psci";
- 
--			CPU_SLEEP: cpu-sleep {
-+			CPU_SLEEP_0: cpu-sleep-0 {
- 				compatible = "arm,idle-state";
- 				local-timer-stop;
- 				arm,psci-suspend-param = <0x0010000>;
--				entry-latency-us = <40>;
--				exit-latency-us = <70>;
--				min-residency-us = <3000>;
-+				entry-latency-us = <400>;
-+				exit-latency-us = <650>;
-+				min-residency-us = <1500>;
- 			};
+-	if (resource_size(&pcie->realio) != 0)
+-		pci_add_resource_offset(&sys->resources, &pcie->realio,
+-					sys->io_offset);
 -
- 			CLUSTER_SLEEP_0: cluster-sleep-0 {
- 				compatible = "arm,idle-state";
- 				local-timer-stop;
- 				arm,psci-suspend-param = <0x1010000>;
- 				entry-latency-us = <500>;
--				exit-latency-us = <5000>;
--				min-residency-us = <20000>;
-+				exit-latency-us = <1600>;
-+				min-residency-us = <3500>;
-+			};
-+
-+
-+			CPU_SLEEP_1: cpu-sleep-1 {
-+				compatible = "arm,idle-state";
-+				local-timer-stop;
-+				arm,psci-suspend-param = <0x0010000>;
-+				entry-latency-us = <400>;
-+				exit-latency-us = <550>;
-+				min-residency-us = <1500>;
- 			};
- 
- 			CLUSTER_SLEEP_1: cluster-sleep-1 {
- 				compatible = "arm,idle-state";
- 				local-timer-stop;
- 				arm,psci-suspend-param = <0x1010000>;
--				entry-latency-us = <1000>;
--				exit-latency-us = <5000>;
--				min-residency-us = <20000>;
-+				entry-latency-us = <800>;
-+				exit-latency-us = <2900>;
-+				min-residency-us = <3500>;
- 			};
- 		};
- 
+-	pci_add_resource_offset(&sys->resources, &pcie->mem, sys->mem_offset);
+-	pci_add_resource(&sys->resources, &pcie->busn);
+
+I'm not sure what sys->io_offset and sys->mem_offset are. I dumped
+them, they are both zero, and reading the ARM PCI code, I couldn't see
+how they would be different than zero.
+
+Is my understanding correct ?
+
+> >  	pcie->nports = i;
+> >  
+> > -	for (i = 0; i < (IO_SPACE_LIMIT - SZ_64K); i += SZ_64K)
+> > -		pci_ioremap_io(i, pcie->io.start + i);  
+> 
+> Mmmm..I think that arch/arm let the mach override the mapping attributes
+> for MVEBU (for some platforms) so replacing this with
+> pci_remap_iospace() may trigger a regression, we need to investigate.
+
+Ah, that's a *very* good point. We do override the mapping attributes
+on Armada 370/XP, in
+https://elixir.bootlin.com/linux/latest/source/arch/arm/mach-mvebu/coherency.c#L177.
+
+What is your preference ? We stick to pci_ioremap_io(), or we do
+something to extend pci_remap_iospace() to cover this situation ?
+
+In general, I like the current trend of having PCI be more like other
+bus subsystems, where the code really is located in drivers/pci/, and
+not spread across architectures in various arch/<foo>/ folders.
+
+> Also, I do not know why the loop above does not pay attention to the
+> real IO space resource size, whether that's on purpose or just a left
+> over.
+
+This code was added by me in commit
+31e45ec3a4e73dcbeb51e03ab559812ba3e82cc2, which explains the rationale
+behind this change. Since we're doing this at probe time, we have no
+idea how much I/O space each PCI endpoint will require, and the Device
+Tree binding for this PCI controller doesn't give the size of the I/O
+space for each PCI port.
+
+On this Marvell platforms, there are two indirections between the
+virtual addresses and the actual access to the device:
+
+  virtual address  -->  physical address  --> "MBus address"
+                 ^^^^^^^                 ^^^^^^
+                   MMU                  MBus windows
+
+The pci_ioremap_io() configures the MMU, of course. But this is not
+sufficient for the I/O space of a particular device to be accessible: a
+MBus window has to be created. And those MBus window have a minimal
+size of 64 KB anyway.
+
+Therefore, calling pci_ioremap_io() with an hardcoded 64 KB is not a
+big deal. It consumes a few more PTEs indeed, but that's about it: the
+IO space will anyway be backed by a 64 KB MBus window, even if the PCI
+endpoint actually uses less of that.
+
+Does that make sense ? I suggest you have a look at the DT binding for
+pci-mvebu to understand a bit more the whole thing.
+
+Best regards,
+
+Thomas
 -- 
-2.7.4
+Thomas Petazzoni, CTO, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
