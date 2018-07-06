@@ -1,573 +1,113 @@
-From: ezequiel@collabora.com (Ezequiel Garcia)
-Date: Fri,  6 Jul 2018 12:08:18 -0300
-Subject: [PATCH v4 2/2] arm64: dts: rockchip: add 96boards RK3399 Ficus board
-In-Reply-To: <20180706150818.5631-1-ezequiel@collabora.com>
-References: <20180706150818.5631-1-ezequiel@collabora.com>
-Message-ID: <20180706150818.5631-3-ezequiel@collabora.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 6 Jul 2018 16:09:35 +0100
+Subject: [PATCH v3 15/20] kvm: arm/arm64: Allow tuning the physical
+ address size for VM
+In-Reply-To: <fe9f5aa5-b283-07e0-5f0e-e97d96b780e7@arm.com>
+References: <1530270944-11351-1-git-send-email-suzuki.poulose@arm.com>
+ <1530270944-11351-16-git-send-email-suzuki.poulose@arm.com>
+ <20180704155104.GN4828@arm.com>
+ <12d1832a-1a13-7dd4-662b-addf58400789@arm.com>
+ <fe9f5aa5-b283-07e0-5f0e-e97d96b780e7@arm.com>
+Message-ID: <9f1af26e-2913-2b0b-1352-63160096f78f@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The RK3399 Ficus board is an Enterprise Edition board
-manufactured by Vamrs Ltd., based on the Rockchip RK3399 SoC.
+On 06/07/18 14:49, Suzuki K Poulose wrote:
+> On 04/07/18 23:03, Suzuki K Poulose wrote:
+>> On 07/04/2018 04:51 PM, Will Deacon wrote:
+>>> Hi Suzuki,
+>>>
+>>> On Fri, Jun 29, 2018 at 12:15:35PM +0100, Suzuki K Poulose wrote:
+>>>> Allow specifying the physical address size for a new VM via
+>>>> the kvm_type argument for KVM_CREATE_VM ioctl. This allows
+>>>> us to finalise the stage2 page table format as early as possible
+>>>> and hence perform the right checks on the memory slots without
+>>>> complication. The size is encoded as Log2(PA_Size) in the bits[7:0]
+>>>> of the type field and can encode more information in the future if
+>>>> required. The IPA size is still capped at 40bits.
+>>>>
+>>>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>>>> Cc: Christoffer Dall <cdall@kernel.org>
+>>>> Cc: Peter Maydel <peter.maydell@linaro.org>
+>>>> Cc: Paolo Bonzini <pbonzini@redhat.com>
+>>>> Cc: Radim Kr?m?? <rkrcmar@redhat.com>
+>>>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>>>> ---
+>>>> ? arch/arm/include/asm/kvm_mmu.h?? |? 2 ++
+>>>> ? arch/arm64/include/asm/kvm_arm.h | 10 +++-------
+>>>> ? arch/arm64/include/asm/kvm_mmu.h |? 2 ++
+>>>> ? include/uapi/linux/kvm.h???????? | 10 ++++++++++
+>>>> ? virt/kvm/arm/arm.c?????????????? | 24 ++++++++++++++++++++++--
+>>>> ? 5 files changed, 39 insertions(+), 9 deletions(-)
+>>>
+>>> [...]
+>>>
+>>>> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+>>>> index 4df9bb6..fa4cab0 100644
+>>>> --- a/include/uapi/linux/kvm.h
+>>>> +++ b/include/uapi/linux/kvm.h
+>>>> @@ -751,6 +751,16 @@ struct kvm_ppc_resize_hpt {
+>>>> ? #define KVM_S390_SIE_PAGE_OFFSET 1
+>>>> ? /*
+>>>> + * On arm/arm64, machine type can be used to request the physical
+>>>> + * address size for the VM. Bits [7-0] have been reserved for the
+>>>> + * PA size shift (i.e, log2(PA_Size)). For backward compatibility,
+>>>> + * value 0 implies the default IPA size, which is 40bits.
+>>>> + */
+>>>> +#define KVM_VM_TYPE_ARM_PHYS_SHIFT_MASK??? 0xff
+>>>> +#define KVM_VM_TYPE_ARM_PHYS_SHIFT(x)??????? \
+>>>> +??? ((x) & KVM_VM_TYPE_ARM_PHYS_SHIFT_MASK)
+>>>
+>>> This seems like you're allocating quite a lot of bits in a non-extensible
+>>> interface to a fairly esoteric parameter. Would it be better to add another
+>>> ioctl, or condense the number of sizes you support instead?
+>>
+>> As I explained in the other thread, we need the size as soon as the VM
+>> is created. The major challenge is keeping the backward compatibility by
+>> mapping 0 to 40bits. I will give it a thought.
+> 
+> Here is one option. We could re-use the {V}TCR_ELx.{I}PS field format, which
+> occupies 3 bits and has the following definitions. (ID_AA64MMFR0_EL1:PARange
+> also has the field definitions, except that the field is 4bits wide, but
+> only 3bits are used)
+> 
+> 000 32 bits, 4GB.
+> 001 36 bits, 64GB.
+> 010 40 bits, 1TB.
+> 011 42 bits, 4TB.
+> 100 44 bits, 16TB.
+> 101 48 bits, 256TB.
+> 110 52 bits, 4PB
+> 
+> But we need to map 0 => 40bits IPA to make our ABI backward compatible. So
+> we could use the additional one bit to indicate that IPA size is requested
+> in the 3 bits.
+> 
+> i.e,
+> 
+> machine_type:
+> 
+> Bit [2:0]	- Requested IPA size. Values follow VTCR_EL2.PS format.
+> 
+> Bit [3]		- 1 => IPA Size bits (Bits[2:0]) requested.
+> 		0 => Not requested
+> 
+> The only minor down side is restricting to the predefined values above,
+> which is not a real issue for a VM.
+> 
+> Thoughts ?
 
-The board exposes a bunch of nice peripherals, including
-SATA, HDMI, MIPI CSI, Ethernet, WiFi, and PCIe.
+I'd be very wary of using that 4th bit to do something that is not in
+the architecture. We have only a single value left to be used (0b111),
+and then your scheme clashes with the architecture definition.
 
-Signed-off-by: Ezequiel Garcia <ezequiel@collabora.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
----
- .../devicetree/bindings/arm/rockchip.txt      |   5 +
- arch/arm64/boot/dts/rockchip/Makefile         |   1 +
- arch/arm64/boot/dts/rockchip/rk3399-ficus.dts | 514 ++++++++++++++++++
- 3 files changed, 520 insertions(+)
- create mode 100644 arch/arm64/boot/dts/rockchip/rk3399-ficus.dts
+I'd rather encode things in a way that is independent from the
+architecture, and be done with it. You can map 0 to 40bits, and we have
+the ability to express all values the architecture has (just in a
+different order).
 
-diff --git a/Documentation/devicetree/bindings/arm/rockchip.txt b/Documentation/devicetree/bindings/arm/rockchip.txt
-index 1c1d62d03c4f..d46c5d43e27f 100644
---- a/Documentation/devicetree/bindings/arm/rockchip.txt
-+++ b/Documentation/devicetree/bindings/arm/rockchip.txt
-@@ -1,5 +1,10 @@
- Rockchip platforms device tree bindings
- ---------------------------------------
-+
-+- 96boards RK3399 Ficus (ROCK960 Enterprise Edition)
-+    Required root node properties:
-+      - compatible = "vamrs,ficus", "rockchip,rk3399";
-+
- - Amarula Vyasa RK3288 board
-     Required root node properties:
-       - compatible = "amarula,vyasa-rk3288", "rockchip,rk3288";
-diff --git a/arch/arm64/boot/dts/rockchip/Makefile b/arch/arm64/boot/dts/rockchip/Makefile
-index 48a83f882947..2811fb701f12 100644
---- a/arch/arm64/boot/dts/rockchip/Makefile
-+++ b/arch/arm64/boot/dts/rockchip/Makefile
-@@ -9,6 +9,7 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-orion-r68-meta.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-px5-evb.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-r88.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-evb.dtb
-+dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-ficus.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-firefly.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-gru-kevin.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-puma-haikou.dtb
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-ficus.dts b/arch/arm64/boot/dts/rockchip/rk3399-ficus.dts
-new file mode 100644
-index 000000000000..0d14183dd4a9
---- /dev/null
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-ficus.dts
-@@ -0,0 +1,514 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+/*
-+ * Copyright (c) 2018 Collabora Ltd.
-+ * Copyright (c) 2018 Fuzhou Rockchip Electronics Co., Ltd.
-+ *
-+ * Schematics available at https://dl.vamrs.com/products/ficus/docs/hw
-+ */
-+
-+/dts-v1/;
-+#include "rk3399.dtsi"
-+#include "rk3399-opp.dtsi"
-+
-+/ {
-+	model = "96boards RK3399 Ficus";
-+	compatible = "vamrs,ficus", "rockchip,rk3399";
-+
-+	chosen {
-+		stdout-path = "serial2:1500000n8";
-+	};
-+
-+	clkin_gmac: external-gmac-clock {
-+		compatible = "fixed-clock";
-+		clock-frequency = <125000000>;
-+		clock-output-names = "clkin_gmac";
-+		#clock-cells = <0>;
-+	};
-+
-+	vcc1v8_s0: vcc1v8-s0 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vcc1v8_s0";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <1800000>;
-+		regulator-always-on;
-+	};
-+
-+	vcc_sys: vcc-sys {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vcc_sys";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-always-on;
-+	};
-+
-+	vcc3v3_sys: vcc3v3-sys {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vcc3v3_sys";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-always-on;
-+		vin-supply = <&vcc_sys>;
-+	};
-+
-+	vcc3v3_pcie: vcc3v3-pcie-regulator {
-+		compatible = "regulator-fixed";
-+		enable-active-high;
-+		gpio = <&gpio1 24 GPIO_ACTIVE_HIGH>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pcie_drv>;
-+		regulator-boot-on;
-+		regulator-name = "vcc3v3_pcie";
-+		vin-supply = <&vcc3v3_sys>;
-+	};
-+
-+	vdd_log: vdd-log {
-+		compatible = "pwm-regulator";
-+		pwms = <&pwm2 0 25000 0>;
-+		regulator-name = "vdd_log";
-+		regulator-min-microvolt = <800000>;
-+		regulator-max-microvolt = <1400000>;
-+		regulator-always-on;
-+		regulator-boot-on;
-+
-+		/* for rockchip boot on */
-+		rockchip,pwm_id= <2>;
-+		rockchip,pwm_voltage = <900000>;
-+
-+		vin-supply = <&vcc_sys>;
-+	};
-+
-+};
-+
-+&cpu_l0 {
-+	cpu-supply = <&vdd_cpu_l>;
-+};
-+
-+&cpu_l1 {
-+	cpu-supply = <&vdd_cpu_l>;
-+};
-+
-+&cpu_l2 {
-+	cpu-supply = <&vdd_cpu_l>;
-+};
-+
-+&cpu_l3 {
-+	cpu-supply = <&vdd_cpu_l>;
-+};
-+
-+&cpu_b0 {
-+	cpu-supply = <&vdd_cpu_b>;
-+};
-+
-+&cpu_b1 {
-+	cpu-supply = <&vdd_cpu_b>;
-+};
-+
-+&emmc_phy {
-+	status = "okay";
-+};
-+
-+&gmac {
-+	assigned-clocks = <&cru SCLK_RMII_SRC>;
-+	assigned-clock-parents = <&clkin_gmac>;
-+	clock_in_out = "input";
-+	phy-supply = <&vcc3v3_sys>;
-+	phy-mode = "rgmii";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&rgmii_pins>;
-+	snps,reset-gpio = <&gpio3 RK_PB7 GPIO_ACTIVE_LOW>;
-+	snps,reset-active-low;
-+	snps,reset-delays-us = <0 10000 50000>;
-+	tx_delay = <0x28>;
-+	rx_delay = <0x11>;
-+	status = "okay";
-+};
-+
-+&hdmi {
-+	ddc-i2c-bus = <&i2c3>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&hdmi_cec>;
-+	status = "okay";
-+};
-+
-+&i2c0 {
-+	clock-frequency = <400000>;
-+	i2c-scl-rising-time-ns = <168>;
-+	i2c-scl-falling-time-ns = <4>;
-+	status = "okay";
-+
-+	vdd_cpu_b: regulator at 40 {
-+		compatible = "silergy,syr827";
-+		reg = <0x40>;
-+		fcs,suspend-voltage-selector = <1>;
-+		regulator-name = "vdd_cpu_b";
-+		regulator-min-microvolt = <712500>;
-+		regulator-max-microvolt = <1500000>;
-+		regulator-ramp-delay = <1000>;
-+		regulator-always-on;
-+		regulator-boot-on;
-+		vin-supply = <&vcc_sys>;
-+		status = "okay";
-+
-+		regulator-state-mem {
-+			regulator-off-in-suspend;
-+		};
-+	};
-+
-+	vdd_gpu: regulator at 41 {
-+		compatible = "silergy,syr828";
-+		reg = <0x41>;
-+		fcs,suspend-voltage-selector = <1>;
-+		regulator-name = "vdd_gpu";
-+		regulator-min-microvolt = <712500>;
-+		regulator-max-microvolt = <1500000>;
-+		regulator-ramp-delay = <1000>;
-+		regulator-always-on;
-+		regulator-boot-on;
-+		vin-supply = <&vcc_sys>;
-+		regulator-state-mem {
-+			regulator-off-in-suspend;
-+		};
-+	};
-+
-+	rk808: pmic at 1b {
-+		compatible = "rockchip,rk808";
-+		reg = <0x1b>;
-+		interrupt-parent = <&gpio1>;
-+		interrupts = <21 IRQ_TYPE_LEVEL_LOW>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pmic_int_l>;
-+		rockchip,system-power-controller;
-+		wakeup-source;
-+		#clock-cells = <1>;
-+		clock-output-names = "xin32k", "rk808-clkout2";
-+
-+		vcc1-supply = <&vcc_sys>;
-+		vcc2-supply = <&vcc_sys>;
-+		vcc3-supply = <&vcc_sys>;
-+		vcc4-supply = <&vcc_sys>;
-+		vcc6-supply = <&vcc_sys>;
-+		vcc7-supply = <&vcc_sys>;
-+		vcc8-supply = <&vcc3v3_sys>;
-+		vcc9-supply = <&vcc_sys>;
-+		vcc10-supply = <&vcc_sys>;
-+		vcc11-supply = <&vcc_sys>;
-+		vcc12-supply = <&vcc3v3_sys>;
-+		vddio-supply = <&vcc_1v8>;
-+
-+		regulators {
-+			vdd_center: DCDC_REG1 {
-+				regulator-name = "vdd_center";
-+				regulator-min-microvolt = <750000>;
-+				regulator-max-microvolt = <1350000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
-+			};
-+
-+			vdd_cpu_l: DCDC_REG2 {
-+				regulator-name = "vdd_cpu_l";
-+				regulator-min-microvolt = <750000>;
-+				regulator-max-microvolt = <1350000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
-+			};
-+
-+			vcc_ddr: DCDC_REG3 {
-+				regulator-name = "vcc_ddr";
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+				};
-+			};
-+
-+			vcc_1v8: DCDC_REG4 {
-+				regulator-name = "vcc_1v8";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <1800000>;
-+				};
-+			};
-+
-+			vcc1v8_dvp: LDO_REG1 {
-+				regulator-name = "vcc1v8_dvp";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <1800000>;
-+				};
-+			};
-+
-+			vcca1v8_hdmi: LDO_REG2 {
-+				regulator-name = "vcca1v8_hdmi";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <1800000>;
-+				};
-+			};
-+
-+			vcca_1v8: LDO_REG3 {
-+				regulator-name = "vcca_1v8";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <1800000>;
-+				};
-+			};
-+
-+			vcc_sd: LDO_REG4 {
-+				regulator-name = "vcc_sd";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <3300000>;
-+				};
-+			};
-+
-+			vcc3v0_sd: LDO_REG5 {
-+				regulator-name = "vcc3v0_sd";
-+				regulator-min-microvolt = <3000000>;
-+				regulator-max-microvolt = <3000000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <3000000>;
-+				};
-+			};
-+
-+			vcc_1v5: LDO_REG6 {
-+				regulator-name = "vcc_1v5";
-+				regulator-min-microvolt = <1500000>;
-+				regulator-max-microvolt = <1500000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <1500000>;
-+				};
-+			};
-+
-+			vcca0v9_hdmi: LDO_REG7 {
-+				regulator-name = "vcca0v9_hdmi";
-+				regulator-min-microvolt = <900000>;
-+				regulator-max-microvolt = <900000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <900000>;
-+				};
-+			};
-+
-+			vcc_3v0: LDO_REG8 {
-+				regulator-name = "vcc_3v0";
-+				regulator-min-microvolt = <3000000>;
-+				regulator-max-microvolt = <3000000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <3000000>;
-+				};
-+			};
-+
-+			vcc3v3_s3: SWITCH_REG1 {
-+				regulator-name = "vcc3v3_s3";
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+				};
-+			};
-+
-+			vcc3v3_s0: SWITCH_REG2 {
-+				regulator-name = "vcc3v3_s0";
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+				};
-+			};
-+		};
-+	};
-+};
-+
-+&i2c1 {
-+	status = "okay";
-+};
-+
-+&i2c2 {
-+	status = "okay";
-+};
-+
-+&i2c3 {
-+	status = "okay";
-+};
-+
-+&i2c4 {
-+	status = "okay";
-+};
-+
-+&io_domains {
-+	bt656-supply = <&vcc1v8_s0>; /* bt656_gpio2ab_ms */
-+	audio-supply = <&vcc1v8_s0>; /* audio_gpio3d4a_ms */
-+	sdmmc-supply = <&vcc_sd>; /* sdmmc_gpio4b_ms */
-+	gpio1830-supply = <&vcc_3v0>; /* gpio1833_gpio4cd_ms */
-+	status = "okay";
-+};
-+
-+&pcie_phy {
-+	status = "okay";
-+};
-+
-+&pcie0 {
-+	ep-gpios = <&gpio4 RK_PD4 GPIO_ACTIVE_HIGH>;
-+	num-lanes = <4>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pcie_clkreqn_cpm>;
-+	vpcie3v3-supply = <&vcc3v3_pcie>;
-+	status = "okay";
-+};
-+
-+&pmu_io_domains {
-+	pmu1830-supply = <&vcc_1v8>;
-+	status = "okay";
-+};
-+
-+&pinctrl {
-+	gmac {
-+		rgmii_sleep_pins: rgmii-sleep-pins {
-+			rockchip,pins =
-+				<3 15 RK_FUNC_GPIO &pcfg_output_low>;
-+		};
-+	};
-+
-+	sdmmc {
-+		sdmmc_bus1: sdmmc-bus1 {
-+			rockchip,pins =
-+				<4 8 RK_FUNC_1 &pcfg_pull_up_8ma>;
-+		};
-+
-+		sdmmc_bus4: sdmmc-bus4 {
-+			rockchip,pins =
-+				<4 8 RK_FUNC_1 &pcfg_pull_up_8ma>,
-+				<4 9 RK_FUNC_1 &pcfg_pull_up_8ma>,
-+				<4 10 RK_FUNC_1 &pcfg_pull_up_8ma>,
-+				<4 11 RK_FUNC_1 &pcfg_pull_up_8ma>;
-+		};
-+
-+		sdmmc_clk: sdmmc-clk {
-+			rockchip,pins =
-+				<4 12 RK_FUNC_1 &pcfg_pull_none_18ma>;
-+		};
-+
-+		sdmmc_cmd: sdmmc-cmd {
-+			rockchip,pins =
-+				<4 13 RK_FUNC_1 &pcfg_pull_up_8ma>;
-+		};
-+	};
-+
-+	pcie {
-+		pcie_drv: pcie-drv {
-+			rockchip,pins =
-+				<1 24 RK_FUNC_GPIO &pcfg_pull_none>;
-+			};
-+	};
-+
-+	pmic {
-+		pmic_int_l: pmic-int-l {
-+			rockchip,pins =
-+				<1 21 RK_FUNC_GPIO &pcfg_pull_up>;
-+		};
-+
-+		vsel1_gpio: vsel1-gpio {
-+			rockchip,pins =
-+				<1 17 RK_FUNC_GPIO &pcfg_pull_down>;
-+		};
-+
-+		vsel2_gpio: vsel2-gpio {
-+			rockchip,pins =
-+				<1 14 RK_FUNC_GPIO &pcfg_pull_down>;
-+		};
-+	};
-+};
-+
-+&pwm2 {
-+	status = "okay";
-+};
-+
-+&pwm3 {
-+	status = "okay";
-+};
-+
-+&sdhci {
-+	bus-width = <8>;
-+	mmc-hs400-1_8v;
-+	mmc-hs400-enhanced-strobe;
-+	non-removable;
-+	status = "okay";
-+};
-+
-+&sdmmc {
-+	bus-width = <4>;
-+	cap-mmc-highspeed;
-+	cap-sd-highspeed;
-+	clock-frequency = <100000000>;
-+	clock-freq-min-max = <100000 100000000>;
-+	disable-wp;
-+	sd-uhs-sdr104;
-+	vqmmc-supply = <&vcc_sd>;
-+	card-detect-delay = <800>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&sdmmc_clk &sdmmc_cmd &sdmmc_cd &sdmmc_bus4>;
-+	status = "okay";
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_xfer &uart0_cts>;
-+	status = "okay";
-+};
-+
-+&uart2 {
-+	status = "okay";
-+};
-+
-+&vopb {
-+	status = "okay";
-+};
-+
-+&vopb_mmu {
-+	status = "okay";
-+};
-+
-+&vopl {
-+	status = "okay";
-+};
-+
-+&vopl_mmu {
-+	status = "okay";
-+};
+Thanks,
+
+	M.
 -- 
-2.18.0.rc2
+Jazz is not dead. It just smells funny...
