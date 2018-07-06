@@ -1,23 +1,26 @@
 From: sboyd@kernel.org (Stephen Boyd)
-Date: Fri, 06 Jul 2018 13:47:19 -0700
-Subject: [PATCH v4 2/6] clk: ti: dra7: Add clkctrl clock data for the mcan
- clocks
-In-Reply-To: <20180705142319.19583-3-faiz_abbas@ti.com>
-References: <20180705142319.19583-1-faiz_abbas@ti.com>
- <20180705142319.19583-3-faiz_abbas@ti.com>
-Message-ID: <153091003956.143105.6661322668517577461@swboyd.mtv.corp.google.com>
+Date: Fri, 06 Jul 2018 13:52:06 -0700
+Subject: [PATCH v4 1/2] clk: pxa: export 32kHz PLL
+In-Reply-To: <87d0w2gsa5.fsf@belgarion.home>
+References: <20180627194124.26366-1-robert.jarzmik@free.fr>
+ <87d0w2gsa5.fsf@belgarion.home>
+Message-ID: <153091032623.143105.13689700534218065371@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Faiz Abbas (2018-07-05 07:23:15)
-> Add clkctrl data for the m_can clocks and register it within the
-> clkctrl driver
+Quoting Robert Jarzmik (2018-07-04 22:34:10)
+> Robert Jarzmik <robert.jarzmik@free.fr> writes:
 > 
-> Acked-by: Rob Herring <robh@kernel.org>
-> CC: Tero Kristo <t-kristo@ti.com>
-> Signed-off-by: Faiz Abbas <faiz_abbas@ti.com>
-> ---
+> > This clock is especially used by the RTC driver, so export it so that
+> > devicetree users can use it.
+> >
+> > Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+> > ---
+> > Since v2: fix missing parenthesis in clk-pxa25x.c and clk-pxa3xx.c
+> 
+> Hi Michael and Stephen,
+> 
+> Could you have a look please ?
+> 
 
-Acked-by: Stephen Boyd <sboyd@kernel.org>
-
-but Tero should ack it too.
+I'll apply patch 1, and leave patch 2 to someone else?
