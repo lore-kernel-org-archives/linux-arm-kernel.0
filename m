@@ -1,66 +1,128 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 6 Jul 2018 17:45:17 +0800
-Subject: [PATCH 08/10] arm64: dts: allwinner: a64: NanoPi-A64: Fix PortE
- voltage
-In-Reply-To: <0ecedb11-78ef-b9bd-c121-5ec024d61f9a@arm.com>
-References: <20180706085210.17952-1-andre.przywara@arm.com>
- <20180706085210.17952-9-andre.przywara@arm.com>
- <F0738E28-2523-41EF-94AE-049C6C436F55@aosc.io>
- <0ecedb11-78ef-b9bd-c121-5ec024d61f9a@arm.com>
-Message-ID: <CAGb2v64Wn6H0hw1Ws4viKbooJX-QqcQEJ0nOHsfT22j+9o48NA@mail.gmail.com>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Fri, 06 Jul 2018 11:02:20 +0100
+Subject: [RFC PATCH 05/16] KVM: arm: Add arch init/uninit hooks
+In-Reply-To: <1529593060-542-6-git-send-email-Dave.Martin@arm.com>
+References: <1529593060-542-1-git-send-email-Dave.Martin@arm.com>
+ <1529593060-542-6-git-send-email-Dave.Martin@arm.com>
+Message-ID: <877em88yxf.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 6, 2018 at 5:39 PM, Andre Przywara <andre.przywara@arm.com> wrote:
-> Hi,
->
-> On 06/07/18 10:03, Icenowy Zheng wrote:
->>
->>
->> ? 2018?7?6? GMT+08:00 ??4:52:08, Andre Przywara <andre.przywara@arm.com> ??:
->>> VCC-PE is driven the AXP's ALDO1 regulator, and is connected to the I2C
->>> pins on the RPi2 header. One would expect 3.3 V there, so enable this
->>> regulator and set it to this voltage.
->>
->> However, 3.3V will break the DVP camera (although not yet
->> supported).
->
-> Interesting, so what would the supposed voltage be here? The NanoPi-A64
-> schematic at least mentions 3.3V for the *supply* pins on that connector
-> and connects VDD_SYS_3.3V to that. Happy to put any other value for the
-> I/O here, but it would be problematic to see a different voltage on
-> those two I2C pins on the RPi2 header.
 
-AFAIK a whole bunch of cameras use 2.8V as their I/O supply voltage.
-This is probably separate from any other core or peripheral voltages
-supplied.
+Dave Martin <Dave.Martin@arm.com> writes:
 
-ChenYu
-
-> Cheers,
-> Andre.
+> In preparation for adding support for SVE in guests on arm64, hooks
+> for allocating and freeing additional per-vcpu memory are needed.
 >
->>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->>> ---
->>> arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts | 7 +++++++
->>> 1 file changed, 7 insertions(+)
->>>
->>> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
->>> b/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
->>> index bd35a093e6cd..0439cff685d6 100644
->>> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
->>> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
->>> @@ -126,6 +126,13 @@
->>>
->>> #include "axp803.dtsi"
->>>
->>> +&reg_aldo1 {
->>> +    regulator-always-on;
->>> +    regulator-min-microvolt = <3300000>;
->>> +    regulator-max-microvolt = <3300000>;
->>> +    regulator-name = "vcc-pe";
->>> +};
->>> +
->>> &reg_aldo2 {
->>>      regulator-always-on;
->>>      regulator-min-microvolt = <1800000>;
+> kvm_arch_vcpu_setup() could be used for allocation, but this
+> function is not clearly balanced by un "unsetup" function, making
+
+Isn't that a double negative there? Surely it would be balanced by a
+kvm_arch_vcpu_unsetup() or possibly better named function.
+
+> it unclear where memory allocated in this function should be freed.
+>
+> To keep things simple, this patch defines backend hooks
+> kvm_arm_arch_vcpu_{,un}unint(), and plumbs them in appropriately.
+
+Is {,un} a notation for dropping un? This might be why I'm confused. I
+would have written it as kvm_arm_arch_vcpu_[un]init() or even
+kvm_arm_arch_vcpu_[init|uninit].
+
+> The exusting kvm_arch_vcpu_init() function now calls
+
+/existing/
+
+> kvm_arm_arch_vcpu_init(), while an explicit kvm_arch_vcpu_uninit()
+> is added which current does nothing except to call
+> kvm_arm_arch_vcpu_uninit().
+
+OK I'm a little confused by this. It seems to me that KVM already has
+the provision for an init/uninit. What does the extra level on
+indirection buy you that keeping the static inline
+kvm_arm_arch_vcpu_uninit in arm/kvm_host.h and a concrete implementation
+in arm64/kvm/guest.c doesn't?
+
+>
+> The backend functions are currently defined to do nothing.
+>
+> No functional change.
+>
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> ---
+>  arch/arm/include/asm/kvm_host.h   |  4 +++-
+>  arch/arm64/include/asm/kvm_host.h |  4 +++-
+>  virt/kvm/arm/arm.c                | 13 ++++++++++++-
+>  3 files changed, 18 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+> index 1f1fe410..9b902b8 100644
+> --- a/arch/arm/include/asm/kvm_host.h
+> +++ b/arch/arm/include/asm/kvm_host.h
+> @@ -284,10 +284,12 @@ struct kvm_vcpu *kvm_mpidr_to_vcpu(struct kvm *kvm, unsigned long mpidr);
+>  static inline bool kvm_arch_check_sve_has_vhe(void) { return true; }
+>  static inline void kvm_arch_hardware_unsetup(void) {}
+>  static inline void kvm_arch_sync_events(struct kvm *kvm) {}
+> -static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
+>  static inline void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu) {}
+>  static inline void kvm_arch_vcpu_block_finish(struct kvm_vcpu *vcpu) {}
+>
+> +static inline int kvm_arm_arch_vcpu_init(struct kvm_vcpu *vcpu) { return 0; }
+> +static inline void kvm_arm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
+> +
+>  static inline void kvm_arm_init_debug(void) {}
+>  static inline void kvm_arm_setup_debug(struct kvm_vcpu *vcpu) {}
+>  static inline void kvm_arm_clear_debug(struct kvm_vcpu *vcpu) {}
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index 92d6e88..9671ddd 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -425,10 +425,12 @@ static inline bool kvm_arch_check_sve_has_vhe(void)
+>
+>  static inline void kvm_arch_hardware_unsetup(void) {}
+>  static inline void kvm_arch_sync_events(struct kvm *kvm) {}
+> -static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
+>  static inline void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu) {}
+>  static inline void kvm_arch_vcpu_block_finish(struct kvm_vcpu *vcpu) {}
+>
+> +static inline int kvm_arm_arch_vcpu_init(struct kvm_vcpu *vcpu) { return 0; }
+> +static inline void kvm_arm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
+> +
+>  void kvm_arm_init_debug(void);
+>  void kvm_arm_setup_debug(struct kvm_vcpu *vcpu);
+>  void kvm_arm_clear_debug(struct kvm_vcpu *vcpu);
+> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+> index 04e554c..66f15cc 100644
+> --- a/virt/kvm/arm/arm.c
+> +++ b/virt/kvm/arm/arm.c
+> @@ -345,6 +345,8 @@ void kvm_arch_vcpu_unblocking(struct kvm_vcpu *vcpu)
+>
+>  int kvm_arch_vcpu_init(struct kvm_vcpu *vcpu)
+>  {
+> +	int ret;
+> +
+>  	/* Force users to call KVM_ARM_VCPU_INIT */
+>  	vcpu->arch.target = -1;
+>  	bitmap_zero(vcpu->arch.features, KVM_VCPU_MAX_FEATURES);
+> @@ -354,7 +356,16 @@ int kvm_arch_vcpu_init(struct kvm_vcpu *vcpu)
+>
+>  	kvm_arm_reset_debug_ptr(vcpu);
+>
+> -	return kvm_vgic_vcpu_init(vcpu);
+> +	ret = kvm_vgic_vcpu_init(vcpu);
+> +	if (ret)
+> +		return ret;
+> +
+> +	return kvm_arm_arch_vcpu_init(vcpu);
+> +}
+> +
+> +void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu)
+> +{
+> +	kvm_arm_arch_vcpu_uninit(vcpu);
+>  }
+>
+>  void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
+
+
+--
+Alex Benn?e
