@@ -1,38 +1,38 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 6 Jul 2018 18:06:17 +0100
-Subject: [PATCH v2] arm64: add ARM64-specific support for flatmem
-In-Reply-To: <20180706170215.56116-1-nkela@cisco.com>
-References: <20180706170215.56116-1-nkela@cisco.com>
-Message-ID: <20180706170617.GB4961@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 6 Jul 2018 18:09:17 +0100
+Subject: [REGRESSION] arm32 Cubietruck defconfig does not boot anymore
+ since 4.18-rc1
+In-Reply-To: <20180706170400.GA4961@arm.com>
+References: <1879608911.1296.1530896362007.JavaMail.zimbra@efficios.com>
+ <20180706170400.GA4961@arm.com>
+Message-ID: <436511d7-34f7-e980-2a99-c2b216c6669b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 06, 2018 at 10:02:15AM -0700, Nikunj Kela wrote:
-> Flatmem is useful in reducing kernel memory usage.
-> One usecase is in kdump kernel. We are able to save
-> ~14M by moving to flatmem scheme.
+On 06/07/18 18:04, Will Deacon wrote:
+> Hi Mathieu,
 > 
-> Cc: xe-kernel at external.cisco.com
-> Cc: Nikunj Kela <nkela@cisco.com>
-> Signed-off-by: Nikunj Kela <nkela@cisco.com>
-> ---
->  arch/arm64/Kconfig | 4 ++++
->  1 file changed, 4 insertions(+)
+> On Fri, Jul 06, 2018 at 12:59:22PM -0400, Mathieu Desnoyers wrote:
+>> The 4.18-rc3 arm32 kernel defconfig fails to boot on my Cubietruck.
+>> This issue appeared with 4.18-rc1.
+>>
+>> It worked fine on 4.17.
+>>
+>> Any ideas ?
 > 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 42c090c..96ab9a7 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -775,6 +775,10 @@ config ARCH_SPARSEMEM_DEFAULT
->  config ARCH_SELECT_MEMORY_MODEL
->  	def_bool ARCH_SPARSEMEM_ENABLE
->  
-> +config ARCH_FLATMEM_ENABLE
-> +	def_bool y
-> +	depends on !NUMA
+> CC'ing linux-arm-kernel would be a good place to start :) [I've added it
+> here, as well as Maxime and Marc].
+> 
+> With the right people on cc, I suspect this is a known issue and might
+> even have a patch. (he says hopefully...)
 
-I still don't understand what this has to do with NUMA. SPARSEMEM is still
-going to be what you want on a non-NUMA system with large holes in the
-physical memory map, no?
+I have had issues as well. With this patch[1] applied, my board works
+well enough.
 
-Will
+Thanks,
+
+	M.
+
+[1] https://lkml.org/lkml/2018/7/4/73
+-- 
+Jazz is not dead. It just smells funny...
