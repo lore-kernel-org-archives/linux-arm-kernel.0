@@ -1,54 +1,109 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Fri, 6 Jul 2018 17:25:11 +0800
-Subject: [PATCH] ARM64: dts: meson-axg: add the audio clock controller
-In-Reply-To: <20180705113713.15267-1-jbrunet@baylibre.com>
-References: <20180705113713.15267-1-jbrunet@baylibre.com>
-Message-ID: <201807061625.HMohw1pJ%fengguang.wu@intel.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri, 6 Jul 2018 10:38:17 +0100
+Subject: [PATCH 09/10] arm64: dts: allwinner: a64: NanoPi-A64: Add
+ Wifi/Bluetooth chip
+In-Reply-To: <3C9E4C21-0DE0-41C6-927C-960A0C33DA5A@aosc.io>
+References: <20180706085210.17952-1-andre.przywara@arm.com>
+ <20180706085210.17952-10-andre.przywara@arm.com>
+ <3C9E4C21-0DE0-41C6-927C-960A0C33DA5A@aosc.io>
+Message-ID: <20b77c16-fb6d-f993-7878-56626e4b64b1@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jerome,
+Hi,
 
-I love your patch! Yet something to improve:
+On 06/07/18 10:04, Icenowy Zheng wrote:
+> 
+> 
+> ? 2018?7?6? GMT+08:00 ??4:52:09, Andre Przywara <andre.przywara@arm.com> ??:
+>> The NanoPi-A64 has an on-board WiFi/Bluetooth combo chip, connected
+>> to the usual MMC1 and UART1. The power is provided by the always-on
+>> VCC_SYS_3.3V, but it uses pin L2 to enable the regulator.
+>>
+>> Add the respective nodes to the DT to make it usable.
+>>
+>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>> ---
+>> .../boot/dts/allwinner/sun50i-a64-nanopi-a64.dts   | 33
+>> ++++++++++++++++++++++
+>> 1 file changed, 33 insertions(+)
+>>
+>> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
+>> b/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
+>> index 0439cff685d6..bb3ba7709dee 100644
+>> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
+>> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
+>> @@ -53,11 +53,18 @@
+>> 	aliases {
+>> 		ethernet0 = &emac;
+>> 		serial0 = &uart0;
+>> +		serial1 = &uart1;
+>> 	};
+>>
+>> 	chosen {
+>> 		stdout-path = "serial0:115200n8";
+>> 	};
+>> +
+>> +        wifi_pwrseq: wifi_pwrseq {
+>> +                compatible = "mmc-pwrseq-simple";
+>> +                reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* PL2 */
+>> +        };
+>> +
+>> };
+>>
+>> &ehci0 {
+>> @@ -105,6 +112,25 @@
+>> 	status = "okay";
+>> };
+>>
+>> +&mmc1 {
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&mmc1_pins>;
+>> +	vmmc-supply = <&reg_dcdc1>;
+>> +	vqmmc-supply = <&reg_dldo4>;
+>> +	mmc-pwrseq = <&wifi_pwrseq>;
+>> +	bus-width = <4>;
+>> +	non-removable;
+>> +	status = "okay";
+>> +
+>> +	brcmf: wifi at 1 {
+>> +		reg = <1>;
+>> +		compatible = "brcm,bcm4329-fmac";
+>> +		interrupt-parent = <&r_pio>;
+>> +		interrupts = <0 3 IRQ_TYPE_LEVEL_LOW>; /* PL3 */
+>> +		interrupt-names = "host-wake";
+>> +	};
+>> +};
+>> +
+>> &ohci0 {
+>> 	status = "okay";
+>> };
+>> @@ -229,6 +255,13 @@
+>> 	status = "okay";
+>> };
+>>
+>> +/* Connected to the Bluetooth UART, with hardware handshake pins */
+>> +&uart1 {
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&uart1_pins>, <&uart1_rts_cts_pins>;
+>> +	status = "okay";
+> 
+> Do you consider to enable serdev driver for it?
 
-[auto build test ERROR on v4.18-rc3]
-[also build test ERROR on next-20180705]
-[cannot apply to robh/for-next]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+Have you tried this before?
+I remember I hacked Bluetooth to work on a Pine64, but this was quite
+dodgy with some userland tools needed from somewhere, I am pretty sure
+this was just using /dev/ttySx (because this was ages ago, before the
+introduction of serdev, I believe).
 
-url:    https://github.com/0day-ci/linux/commits/Jerome-Brunet/ARM64-dts-meson-axg-add-the-audio-clock-controller/20180705-221904
-config: arm64-defconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        GCC_VERSION=7.2.0 make.cross ARCH=arm64 
+Basically I just wanted to mark those pins as "used", because they are
+hardwired to this Bluetooth chip.
 
-All errors (new ones prefixed by >>):
+Cheers,
+Andre.
 
-   In file included from arch/arm64/boot/dts/amlogic/meson-axg-s400.dts:8:0:
->> arch/arm64/boot/dts/amlogic/meson-axg.dtsi:9:10: fatal error: dt-bindings/clock/axg-audio-clkc.h: No such file or directory
-    #include <dt-bindings/clock/axg-audio-clkc.h>
-             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-   compilation terminated.
-
-vim +9 arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-
-   > 9	#include <dt-bindings/clock/axg-audio-clkc.h>
-    10	#include <dt-bindings/clock/axg-clkc.h>
-    11	#include <dt-bindings/clock/axg-aoclkc.h>
-    12	#include <dt-bindings/gpio/meson-axg-gpio.h>
-    13	#include <dt-bindings/reset/amlogic,meson-axg-reset.h>
-    14	
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 38747 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180706/b395c40d/attachment-0001.gz>
+>> +};
+>> +
+>> &usbphy {
+>> 	status = "okay";
+>> };
