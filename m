@@ -1,65 +1,29 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 6 Jul 2018 09:59:15 +0200
-Subject: [PATCH] arm64: hikey960: update idle-states
-In-Reply-To: <1530860246-29072-1-git-send-email-vincent.guittot@linaro.org>
-References: <1530860246-29072-1-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <722aed2b-673b-7f17-2337-a7b3442dca56@linaro.org>
+From: huibin.hong@rock-chips.com (Huibin Hong)
+Date: Fri,  6 Jul 2018 16:03:57 +0800
+Subject: [PATCH] arm64: dts: rockchip: corrected uart1 clock-names for rk3328
+Message-ID: <1530864237-14891-1-git-send-email-huibin.hong@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/07/2018 08:57, Vincent Guittot wrote:
-> Update entry/exit latency and residency time of hikey960 to use more
-> realistic figures based on unitary tests done on the platform.
-> 
-> The complete results (in us) :
->                   big cluster
->                   cluster  CPU
-> max entry latency     800  400
-> max exit latency     2900  550
-> residency  903Mhz    5000 1500
-> residency 2363Mhz       0 1500
-> 
->                   little cluster
->                   cluster  CPU
-> max entry latency     500  400
-> max exit latency     1600  650
-> residency  533Mhz    8000 4500
-> residency 1844Mhz       0 1500
-> 
-> We can see that the residency time depends of the running OPP which is not
-> handled for now. Then we also have to take into account the constraint of
-> a residency time shorter than the tick to get full advantage of idle loop
-> reordering(tick is stopped if idle duration is higher than tick period).
-> Finally the selected residency value are :
->                  big cluster
->                   cluster  CPU
-> residency            3700 1500
-> 
->                   little cluster
->                   cluster  CPU
-> residency            3500 1500
-> 
-> A simple test with a task waking up every 11,111ms shows improvement:
-> - 5% a lowest OPP
-> - 22% at highest OPP
-> 
-> The period has been chosen:
-> - to be shorter than old cluster residency time and longer than new
-> residency time od cluster off C-state
-> - to prevent any sync with tick (4ms) when running tests that can add
-> some variances between tests
-> 
-> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
-> ---
+Corrected the uart clock-names or the uart driver might fail.
 
-Great! Thanks for fixing the values.
+Signed-off-by: Huibin Hong <huibin.hong@rock-chips.com>
+---
+ arch/arm64/boot/dts/rockchip/rk3328.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-
-
+diff --git a/arch/arm64/boot/dts/rockchip/rk3328.dtsi b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
+index 2f38ff2..3f5a294 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3328.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
+@@ -297,7 +297,7 @@
+ 		reg = <0x0 0xff120000 0x0 0x100>;
+ 		interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&cru SCLK_UART1>, <&cru PCLK_UART1>;
+-		clock-names = "sclk_uart", "pclk_uart";
++		clock-names = "baudclk", "apb_pclk";
+ 		dmas = <&dmac 4>, <&dmac 5>;
+ 		dma-names = "tx", "rx";
+ 		pinctrl-names = "default";
 -- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+1.9.1
