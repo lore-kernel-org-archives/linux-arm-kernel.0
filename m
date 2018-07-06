@@ -1,24 +1,34 @@
-From: david@lechnology.com (David Lechner)
-Date: Fri, 6 Jul 2018 12:40:57 -0500
-Subject: [PATCH v3 03/13] clk: davinci: psc-dm644x: use two lookup entries
- for the aemif clock
-In-Reply-To: <20180628095748.4462-4-brgl@bgdev.pl>
-References: <20180628095748.4462-1-brgl@bgdev.pl>
- <20180628095748.4462-4-brgl@bgdev.pl>
-Message-ID: <dcebca67-3057-cf4a-937b-6a79bc4bb682@lechnology.com>
+From: nkela@cisco.com (Nikunj Kela)
+Date: Fri,  6 Jul 2018 10:47:24 -0700
+Subject: [PATCH v3] arm64: add ARM64-specific support for flatmem
+Message-ID: <20180706174724.44594-1-nkela@cisco.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/28/2018 04:57 AM, Bartosz Golaszewski wrote:
-> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> 
-> We want to be able to get the clock both from the board file by its
-> con_id and from the aemif driver by dev_id.
-> 
-> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> Reviewed-by: David Lechner <david@lechnology.com>
-> ---
+Flatmem is useful in reducing kernel memory usage.
+One usecase is in kdump kernel. We are able to save
+~14M by moving to flatmem scheme.
 
-Applied to clk-davinci-4.19.
+Cc: xe-kernel at external.cisco.com
+Cc: Nikunj Kela <nkela@cisco.com>
+Signed-off-by: Nikunj Kela <nkela@cisco.com>
+---
+ arch/arm64/Kconfig | 3 +++
+ 1 file changed, 3 insertions(+)
 
-Thanks.
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 42c090c..f5b4c49 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -775,6 +775,9 @@ config ARCH_SPARSEMEM_DEFAULT
+ config ARCH_SELECT_MEMORY_MODEL
+ 	def_bool ARCH_SPARSEMEM_ENABLE
+ 
++config ARCH_FLATMEM_ENABLE
++	def_bool y
++
+ config HAVE_ARCH_PFN_VALID
+ 	def_bool ARCH_HAS_HOLES_MEMORYMODEL || !SPARSEMEM
+ 
+-- 
+2.10.3.dirty
