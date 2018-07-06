@@ -1,50 +1,51 @@
 From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
-Date: Fri, 6 Jul 2018 14:18:31 -0700
-Subject: No subject
-In-Reply-To: <1530911788-7033-3-git-send-email-santosh.shilimkar@oracle.com>
-References: <1530911788-7033-1-git-send-email-santosh.shilimkar@oracle.com>
- <1530911788-7033-3-git-send-email-santosh.shilimkar@oracle.com>
-Message-ID: <08292ecf-ed2e-c60a-a4b6-c69be199345a@oracle.com>
+Date: Fri,  6 Jul 2018 14:25:40 -0700
+Subject: [GIT PULL 1/3] ARM: Keystone DTS update for v4.19
+Message-ID: <1530912342-4641-1-git-send-email-santosh.shilimkar@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ignore this.. Will send again with subjects fixed
+The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
 
-On 7/6/2018 2:16 PM, Santosh Shilimkar wrote:
-> Subject: [GIT PULL 3/3] SOC: Driver updates for v4.19
-> 
-> The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
-> 
->    Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
-> 
-> are available in the git repository at:
-> 
->    git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/soc_drivers_for_4.19
-> 
-> for you to fetch changes up to 990c10091db318c7eb7e8935c86b6f7c01585015:
-> 
->    soc: ti: wkup_m3_ipc: mark PM functions as __maybe_unused (2018-07-06 09:47:51 -0700)
-> 
-> ----------------------------------------------------------------
-> Keystone SOC driver update for 4.19
-> 
->   -  Add suspend/resume functionality to TI EMIF SRAM driver
->   -  Add wakeup M3 RTC self refresh support
->   -  Fix for the PM runtime ifdefs
-> 
-> ----------------------------------------------------------------
-> Arnd Bergmann (1):
->        soc: ti: wkup_m3_ipc: mark PM functions as __maybe_unused
-> 
-> Dave Gerlach (2):
->        memory: ti-emif-sram: Add resume function to recopy sram code
->        soc: ti: wkup_m3_ipc: Add wkup_m3_request_wake_src
-> 
-> Keerthy (1):
->        soc: ti: wkup_m3_ipc: Add rtc_only with ddr in self refresh mode support
-> 
->   drivers/memory/ti-emif-pm.c  | 33 +++++++++++++++++++
->   drivers/soc/ti/wkup_m3_ipc.c | 76 ++++++++++++++++++++++++++++++++++++++++++++
->   include/linux/wkup_m3_ipc.h  |  9 ++++++
->   3 files changed, 118 insertions(+)
-> 
+  Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone_dts_for_4.19
+
+for you to fetch changes up to f7e8a182a41e791cca3d7a9e25adddf2908bddde:
+
+  ARM: dts: keystone-k2g-evm: Use sdhci-omap programming model (2018-06-29 15:57:27 -0700)
+
+----------------------------------------------------------------
+ARM: Keystone DTS updates for 4.19
+
+ - K2G NIC drriver support
+ - Enbale network support for K2G ICE and EVM boards
+ - Hardware Ring driver support for k2hk, k2l and k2e socs
+ - Add MMC supply for k2g EVM
+
+----------------------------------------------------------------
+Kishon Vijay Abraham I (2):
+      ARM: dts: keystone-k2g-evm: Add "vqmmc-supply" property for mmc0/mmc1
+      ARM: dts: keystone-k2g-evm: Use sdhci-omap programming model
+
+Murali Karicheri (3):
+      ARM: dts: k2g: add dt bindings to support network driver
+      ARM: dts: keystone-k2g-evm: Enable netcp network driver
+      ARM: dts: keystone-k2g-ice: Enable netcp network driver
+
+Vitaly Andrianov (3):
+      ARM: dts: k2hk: add dts node for k2hk hw_rng driver
+      ARM: dts: k2l: add dts node for k2l hw_rng driver
+      ARM: dts: k2e: add dts node for k2e hw_rng driver
+
+ arch/arm/boot/dts/keystone-k2e-netcp.dtsi  |  20 ++++
+ arch/arm/boot/dts/keystone-k2g-evm.dts     |  63 +++++++++++++
+ arch/arm/boot/dts/keystone-k2g-ice.dts     |  59 ++++++++++++
+ arch/arm/boot/dts/keystone-k2g-netcp.dtsi  | 147 +++++++++++++++++++++++++++++
+ arch/arm/boot/dts/keystone-k2g.dtsi        |  25 +++--
+ arch/arm/boot/dts/keystone-k2hk-netcp.dtsi |  20 ++++
+ arch/arm/boot/dts/keystone-k2l-netcp.dtsi  |  20 ++++
+ 7 files changed, 346 insertions(+), 8 deletions(-)
+ create mode 100644 arch/arm/boot/dts/keystone-k2g-netcp.dtsi
