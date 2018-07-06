@@ -1,47 +1,46 @@
-From: david@lechnology.com (David Lechner)
-Date: Fri, 6 Jul 2018 12:39:21 -0500
-Subject: [PATCH v3 00/13] ARM: davinci: remove duplicate aemif support
-In-Reply-To: <e1222b3c-dfa4-4cb0-eebf-8e2550e9d674@ti.com>
-References: <20180628095748.4462-1-brgl@bgdev.pl>
- <52a274f1-283a-a14a-54f3-4b95b6605c4f@ti.com>
- <59fdc532-bb72-ffae-cfb6-a7f156c14771@lechnology.com>
- <e1222b3c-dfa4-4cb0-eebf-8e2550e9d674@ti.com>
-Message-ID: <125d73f7-7311-866f-1e9d-d3c1f9473899@lechnology.com>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Fri, 06 Jul 2018 20:39:30 +0300
+Subject: [PATCH v2 3/3] serial: 8250_dw: add fractional divisor support
+In-Reply-To: <20180705145458.7e7d9b9f@xhacker.debian>
+References: <20180704165908.4bb8b090@xhacker.debian>
+ <20180704170310.56772d77@xhacker.debian>
+ <f2733332a58e7f2d92948e2ff252581f93e5073a.camel@linux.intel.com>
+ <20180705143921.6a8aeb50@xhacker.debian>
+ <20180705145458.7e7d9b9f@xhacker.debian>
+Message-ID: <891eef6922d6ed2c69fa28241d047ae8fded7804.camel@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/04/2018 01:35 AM, Sekhar Nori wrote:
-> Hi David,
+On Thu, 2018-07-05 at 14:54 +0800, Jisheng Zhang wrote:
+> On Thu, 5 Jul 2018 14:39:21 +0800 Jisheng Zhang wrote:
 > 
-> On Monday 02 July 2018 09:02 PM, David Lechner wrote:
->> On 07/02/2018 07:28 AM, Sekhar Nori wrote:
->>> Hi David, Stephen,
->>>
->>> On Thursday 28 June 2018 03:27 PM, Bartosz Golaszewski wrote:
->>>> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->>>>
->>>> This series moves all aemif/nand users to using the ti-aemif platform
->>>> driver located in drivers/memory instead of the older API located in
->>>> mach-davinci.
->>>>
->>>> First five patches add necessary changes to the clock driver. Next
->>>> seven convert the board files to using the ti-aemif driver. Last patch
->>>> removes now dead code.
->>>
->>> How do you want to handle this series? I can apply the series and
->>> provide you an immutable branch on v4.18-rc1 with the clock patches
->>> applied if that can work.
->>
->> Sounds good to me. But I'm new to this maintainer thing, so maybe
->> there is something to consider that I haven't thought of?
+> <snip>
 > 
-> I don't think there is more to it. Ultimately there should not be two
-> commits for the same patch. Either you can apply and share the commit to
-> use or I can do that as well. I am equally fine either way.
+> > >   
+> > > > +	serial_port_out(p, UART_LCR, up->lcr | UART_LCR_DLAB);
+> > > > +	serial_dl_write(up, quot);    
+> > > 
+> > > At some point it would be a helper, I think. We can call
+> > > serial8250_do_set_divisor() here. So, perhaps we might export
+> > > it.  
+> > 
+> > serial8250_do_set_divisor will drop the frac, that's not we want ;)
+> > 
 > 
-> Regards,
-> Sekhar
+> And most importantly, serial8250_do_set_divisor() will set a wrong
+> BRD(I)
+> for fractional capable DW uarts. For example, clk = 25MHZ, baud =
+> 115200.
 > 
+> In fractional capable DW uarts, we should set BRD(I) as
+> 25000000/(16*115200) = 13
+> 
+> but serial8250_do_set_divisor() will set BRD(I) as
+> DIV_ROUND_CLOSEST(25*1000000, 16*115200)) = 14
 
-I've created a branch for-sekhar at https://github.com/dlech/linux.git
-with the clk commits.
+How come? It doesn't do any calculus (for DW 8250), it just writes few
+registers based on input.
+
+-- 
+Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Intel Finland Oy
