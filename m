@@ -1,39 +1,61 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri,  6 Jul 2018 10:32:46 +0200
-Subject: [PATCH v5 1/4] arm64: dts: lg1312: DT fix
- s/#interrupts-cells/#interrupt-cells/
-In-Reply-To: <20180706083249.25399-1-geert+renesas@glider.be>
-References: <20180706083249.25399-1-geert+renesas@glider.be>
-Message-ID: <20180706083249.25399-2-geert+renesas@glider.be>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri,  6 Jul 2018 09:52:02 +0100
+Subject: [PATCH 02/10] arm64: dts: allwinner: a64: Add Pine64-LTS device tree
+ file
+In-Reply-To: <20180706085210.17952-1-andre.przywara@arm.com>
+References: <20180706085210.17952-1-andre.przywara@arm.com>
+Message-ID: <20180706085210.17952-3-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Acked-by: Rob Herring <robh@kernel.org>
-Acked-by: Chanho Min <chanho.min@lge.com>
----
-v3:
-  - Add Acked-by,
+The Pine64-LTS is a variant of the Pine64 board, from the software
+visible side resembling a SoPine module on a baseboard, though the
+board has the SoC and DRAM integrated on one PCB.
+Due to this it basically shares the DT with the SoPine baseboard, which
+we mimic in our DT by inclucing the boardboard .dts into the new file,
+just overwriting the model name.
+Having a separate .dts for this seems useful, since we don't know yet if
+there are subtle differences between the two. Also the SoC on the LTS
+board is technically an "R18" instead of the original "A64", although as
+far as we know this is just a relabelled version of the original SoC.
 
-v2:
-  - Add Acked-by,
-  - Rebased.
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- arch/arm64/boot/dts/lg/lg1312.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/boot/dts/allwinner/Makefile                  |  1 +
+ arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-lts.dts | 13 +++++++++++++
+ 2 files changed, 14 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-lts.dts
 
-diff --git a/arch/arm64/boot/dts/lg/lg1312.dtsi b/arch/arm64/boot/dts/lg/lg1312.dtsi
-index 860c8fb10795011f..052c8a1906ae737e 100644
---- a/arch/arm64/boot/dts/lg/lg1312.dtsi
-+++ b/arch/arm64/boot/dts/lg/lg1312.dtsi
-@@ -124,7 +124,7 @@
- 	amba {
- 		#address-cells = <2>;
- 		#size-cells = <1>;
--		#interrupts-cells = <3>;
-+		#interrupt-cells = <3>;
- 
- 		compatible = "simple-bus";
- 		interrupt-parent = <&gic>;
+diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
+index 9ffa7a038791..b7034327b28b 100644
+--- a/arch/arm64/boot/dts/allwinner/Makefile
++++ b/arch/arm64/boot/dts/allwinner/Makefile
+@@ -4,6 +4,7 @@ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-bananapi-m64.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-nanopi-a64.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-olinuxino.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-orangepi-win.dtb
++dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pine64-lts.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pine64-plus.dtb sun50i-a64-pine64.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pinebook.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-sopine-baseboard.dtb
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-lts.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-lts.dts
+new file mode 100644
+index 000000000000..72d6961dc312
+--- /dev/null
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-lts.dts
+@@ -0,0 +1,13 @@
++/*
++ * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++ *
++ * Copyright (c) 2018 ARM Ltd.
++ */
++
++#include "sun50i-a64-sopine-baseboard.dts"
++
++/ {
++	model = "Pine64 LTS";
++	compatible = "pine64,pine64-lts", "allwinner,sun50i-r18",
++		     "allwinner,sun50i-a64";
++};
 -- 
-2.17.1
+2.14.4
