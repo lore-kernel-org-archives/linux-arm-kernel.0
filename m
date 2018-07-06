@@ -1,71 +1,93 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 6 Jul 2018 10:05:32 +0100
-Subject: [linux-sunxi] [PATCH 03/10] arm64: dts: allwinner: a64:
- Olinuxino: fix DRAM voltage
-In-Reply-To: <859578FF-AB96-4B51-8E7E-2F144E35C47A@aosc.io>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Fri, 06 Jul 2018 17:04:46 +0800
+Subject: [PATCH 09/10] arm64: dts: allwinner: a64: NanoPi-A64: Add
+ Wifi/Bluetooth chip
+In-Reply-To: <20180706085210.17952-10-andre.przywara@arm.com>
 References: <20180706085210.17952-1-andre.przywara@arm.com>
- <20180706085210.17952-4-andre.przywara@arm.com>
- <859578FF-AB96-4B51-8E7E-2F144E35C47A@aosc.io>
-Message-ID: <bdf35591-82ad-7f4e-f900-7ecc532bc54e@arm.com>
+ <20180706085210.17952-10-andre.przywara@arm.com>
+Message-ID: <3C9E4C21-0DE0-41C6-927C-960A0C33DA5A@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On 06/07/18 09:55, Icenowy Zheng wrote:
+
+? 2018?7?6? GMT+08:00 ??4:52:09, Andre Przywara <andre.przywara@arm.com> ??:
+>The NanoPi-A64 has an on-board WiFi/Bluetooth combo chip, connected
+>to the usual MMC1 and UART1. The power is provided by the always-on
+>VCC_SYS_3.3V, but it uses pin L2 to enable the regulator.
+>
+>Add the respective nodes to the DT to make it usable.
+>
+>Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>---
+>.../boot/dts/allwinner/sun50i-a64-nanopi-a64.dts   | 33
+>++++++++++++++++++++++
+> 1 file changed, 33 insertions(+)
+>
+>diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
+>b/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
+>index 0439cff685d6..bb3ba7709dee 100644
+>--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
+>+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
+>@@ -53,11 +53,18 @@
+> 	aliases {
+> 		ethernet0 = &emac;
+> 		serial0 = &uart0;
+>+		serial1 = &uart1;
+> 	};
 > 
+> 	chosen {
+> 		stdout-path = "serial0:115200n8";
+> 	};
+>+
+>+        wifi_pwrseq: wifi_pwrseq {
+>+                compatible = "mmc-pwrseq-simple";
+>+                reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* PL2 */
+>+        };
+>+
+> };
 > 
-> ? 2018?7?6? GMT+08:00 ??4:52:03, Andre Przywara <andre.przywara@arm.com> ??:
->> The Olinuxino board uses DDR3L chips which are supposed to be driven
->> with 1.35V. The reset default of the AXP is properly set to 1.36V.
->>
->> While technically the chips can also run at 1.5 volts, changing the
->> voltage on the fly while booting Linux is asking for trouble. Also
->> running at a lower voltage saves power.
->>
->> So fix the DCDC5 value to match the actual board design.
->>
->> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->> ---
->> arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts | 10 ++++++----
->> 1 file changed, 6 insertions(+), 4 deletions(-)
->>
->> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts
->> b/arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts
->> index 3f531393eaee..f945c70f3a80 100644
->> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts
->> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts
->> @@ -140,12 +140,14 @@
->> 	regulator-name = "vdd-cpux";
->> };
->>
->> -/* DCDC3 is polyphased with DCDC2 */
->> -
->> +/*
->> + * DCDC3 is polyphased with DCDC2 to supply the DDR3L DRAM chips.
->> + * 1.36V is the closest to the nominal 1.35V that the PMIC can drive.
+> &ehci0 {
+>@@ -105,6 +112,25 @@
+> 	status = "okay";
+> };
 > 
-> The comment is a mess. DCDC2+3 is for CPU, and 5 is for DRAM.
+>+&mmc1 {
+>+	pinctrl-names = "default";
+>+	pinctrl-0 = <&mmc1_pins>;
+>+	vmmc-supply = <&reg_dcdc1>;
+>+	vqmmc-supply = <&reg_dldo4>;
+>+	mmc-pwrseq = <&wifi_pwrseq>;
+>+	bus-width = <4>;
+>+	non-removable;
+>+	status = "okay";
+>+
+>+	brcmf: wifi at 1 {
+>+		reg = <1>;
+>+		compatible = "brcm,bcm4329-fmac";
+>+		interrupt-parent = <&r_pio>;
+>+		interrupts = <0 3 IRQ_TYPE_LEVEL_LOW>; /* PL3 */
+>+		interrupt-names = "host-wake";
+>+	};
+>+};
+>+
+> &ohci0 {
+> 	status = "okay";
+> };
+>@@ -229,6 +255,13 @@
+> 	status = "okay";
+> };
+> 
+>+/* Connected to the Bluetooth UART, with hardware handshake pins */
+>+&uart1 {
+>+	pinctrl-names = "default";
+>+	pinctrl-0 = <&uart1_pins>, <&uart1_rts_cts_pins>;
+>+	status = "okay";
 
-Aargh, true. I was misled by that lonely comment.
+Do you consider to enable serdev driver for it?
 
-> Personally I suggest to use two comment blocks, one sit at
-> where dcdc3 should appear, and the second before dcdc5.
-
-Yeah, sounds like the right thing to do.
-
-Thanks for having a look!
-
-Cheers,
-Andre.
-
->> + */
->> &reg_dcdc5 {
->> 	regulator-always-on;
->> -	regulator-min-microvolt = <1500000>;
->> -	regulator-max-microvolt = <1500000>;
->> +	regulator-min-microvolt = <1360000>;
->> +	regulator-max-microvolt = <1360000>;
->> 	regulator-name = "vcc-ddr3";
->> };
->>
+>+};
+>+
+> &usbphy {
+> 	status = "okay";
+> };
