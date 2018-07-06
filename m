@@ -1,38 +1,42 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 6 Jul 2018 18:09:17 +0100
-Subject: [REGRESSION] arm32 Cubietruck defconfig does not boot anymore
- since 4.18-rc1
-In-Reply-To: <20180706170400.GA4961@arm.com>
-References: <1879608911.1296.1530896362007.JavaMail.zimbra@efficios.com>
- <20180706170400.GA4961@arm.com>
-Message-ID: <436511d7-34f7-e980-2a99-c2b216c6669b@arm.com>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Fri, 06 Jul 2018 10:15:34 -0700
+Subject: [PATCH V2 2/2] ARM: dts: imx6ul: add GPIO clocks
+In-Reply-To: <20180701021947.GA4348@dragon>
+References: <1527990245-13619-1-git-send-email-Anson.Huang@nxp.com>
+ <1527990245-13619-2-git-send-email-Anson.Huang@nxp.com>
+ <AM3PR04MB1315D8B57E1A5D47BECBDCD3F54A0@AM3PR04MB1315.eurprd04.prod.outlook.com>
+ <20180628005217.GC22683@dragon>
+ <153029757874.143105.17774476792947607999@swboyd.mtv.corp.google.com>
+ <20180701021947.GA4348@dragon>
+Message-ID: <153089733418.143105.7025289108790540252@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/07/18 18:04, Will Deacon wrote:
-> Hi Mathieu,
+Quoting Shawn Guo (2018-06-30 19:19:49)
+> On Fri, Jun 29, 2018 at 11:39:38AM -0700, Stephen Boyd wrote:
+> > Quoting Shawn Guo (2018-06-27 17:52:18)
+> > > On Mon, Jun 25, 2018 at 03:14:39AM +0000, Anson Huang wrote:
+> > > > Gentle Ping...
+> > > 
+> > > I cannot apply this dts patch until the clock patch is landed on
+> > > mainline, because it has a dependency on new clock ID IMX6UL_CLK_GPIO1
+> > > created by clock patch.
+> > > 
+> > 
+> > Does it matter if that clk ID changes across branches? Or is everything
+> > good if it just exists as some number?
 > 
-> On Fri, Jul 06, 2018 at 12:59:22PM -0400, Mathieu Desnoyers wrote:
->> The 4.18-rc3 arm32 kernel defconfig fails to boot on my Cubietruck.
->> This issue appeared with 4.18-rc1.
->>
->> It worked fine on 4.17.
->>
->> Any ideas ?
+> We use macro IMX6UL_CLK_GPIO1 instead of hard-coded number in DTS.  So
+> it doesn't matter if IMX6UL_CLK_GPIO1 changes.
 > 
-> CC'ing linux-arm-kernel would be a good place to start :) [I've added it
-> here, as well as Maxime and Marc].
+> > The patch adding the define
+> > conflicts with another patch to fix the numbering scheme to be
+> > incremental instead of changing IMX6UL and IMX6ULL which is annoying.
+> > I'll probably make a topic branch just for the fix and merge it into
+> > clk-fixes and this branch so you can pick it up from there if you like.
 > 
-> With the right people on cc, I suspect this is a known issue and might
-> even have a patch. (he says hopefully...)
+> It will be good if you can have a topic branch.  Otherwise, we are also
+> fine to wait till the clock patches lands on mainline.
+> 
 
-I have had issues as well. With this patch[1] applied, my board works
-well enough.
-
-Thanks,
-
-	M.
-
-[1] https://lkml.org/lkml/2018/7/4/73
--- 
-Jazz is not dead. It just smells funny...
+Ok. The topic branch is out there as clk-imx-gpio-gates
