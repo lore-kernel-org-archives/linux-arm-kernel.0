@@ -1,39 +1,54 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 6 Jul 2018 17:26:40 +0200
-Subject: [PATCH] ARM: shmobile: r8a7779: hide unused
- r8a7779_platform_cpu_kill
-In-Reply-To: <20180706151528.3759312-1-arnd@arndb.de>
-References: <20180706151528.3759312-1-arnd@arndb.de>
-Message-ID: <CAMuHMdXhN_Mw-Z+71LetjX2mJar-F4m3_-FjqouHgvjqtMq4OA@mail.gmail.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri, 6 Jul 2018 16:35:38 +0100
+Subject: [PATCH 05/10] arm64: dts: allwinner: a64: Olinuxino: enable USB
+In-Reply-To: <20180706150401.mhqse677vdqtxdzy@nodbug.lucina.net>
+References: <20180706085210.17952-1-andre.przywara@arm.com>
+ <20180706085210.17952-6-andre.przywara@arm.com>
+ <20180706150401.mhqse677vdqtxdzy@nodbug.lucina.net>
+Message-ID: <548f2eb5-b457-8fcd-c043-b897a447d96c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hi,
 
-On Fri, Jul 6, 2018 at 5:15 PM Arnd Bergmann <arnd@arndb.de> wrote:
-> After the cleanup in r8a7779_smp_prepare_cpus(), the only remaining caller of
-> r8a7779_platform_cpu_kill() is in an ifdef, which leads to a build warning
-> without CONFIG_HOTPLUG_CPU:
->
-> arch/arm/mach-shmobile/smp-r8a7779.c:26:12: error: 'r8a7779_platform_cpu_kill' defined but not used [-Werror=unused-function]
->
-> This moves the function inside of that #ifdef to avoid the warning.
->
-> Fixes: 62f55ce683e3 ("ARM: shmobile: r8a7779: Stop powering down secondary CPUs during early boot")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+On 06/07/18 16:04, Martin Lucina wrote:
+> On Friday, 06.07.2018 at?09:52, Andre Przywara wrote:
+>> The Olinuxino has two USB socket:
+>> USB0 is connected to a micro B socket. As it has the ID pin wired, we
+>> describe it as a proper OTG socket, which switches between host and
+>> device automatically.
+>> USB1 is connected to a normal USB A socket. PG9 enables the power line,
+>> so add the required regulator as well.
+>>
+>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>> ---
+> 
+> This is not sufficient. Booting with this change results in the following
+> in dmesg:
+> 
+> musb-sunxi 1c19000.usb: Invalid or missing 'dr_mode' property
+> musb-sunxi: probe of 1c19000.usb failed with error -22
+> [...]
+> usb0-vbus: disabling
+> 
+> ... and neither of the USB ports work.
+> 
+> Adding
+> 
+>     dr_mode = "host";
 
-Thanks, seems like I only built the R-Car Gen2 code without
-CONFIG_HOTPLUG_CPU...
+Argh, right, I remember you mentioned this before.
+Still it should not affect the other USB port, and actually it is a
+proper OTG port, so host is not right here. So this points to some other
+oddity or incorrect description. I need to go back to the schematics and
+our previous thread.
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Cheers,
+Andre.
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
--- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> 
+> to the &usb_otg node fixes this -- the above messages go away and both
+> ports work as expected.
+> 
+> -mato
+> 
