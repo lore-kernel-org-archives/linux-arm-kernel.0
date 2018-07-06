@@ -1,53 +1,28 @@
-From: mathieu.desnoyers@efficios.com (Mathieu Desnoyers)
-Date: Fri, 6 Jul 2018 15:35:06 -0400 (EDT)
-Subject: [REGRESSION] arm32 Cubietruck defconfig does not boot anymore
- since 4.18-rc1
-In-Reply-To: <436511d7-34f7-e980-2a99-c2b216c6669b@arm.com>
-References: <1879608911.1296.1530896362007.JavaMail.zimbra@efficios.com>
- <20180706170400.GA4961@arm.com>
- <436511d7-34f7-e980-2a99-c2b216c6669b@arm.com>
-Message-ID: <1518490673.1365.1530905706162.JavaMail.zimbra@efficios.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 6 Jul 2018 21:38:40 +0200
+Subject: [PATCH] dma: stm32: replace "%p" with "%pK"
+In-Reply-To: <20180706130220.21957-1-benjamin.gaignard@st.com>
+References: <20180706130220.21957-1-benjamin.gaignard@st.com>
+Message-ID: <CAMuHMdVEOx=PLAHzGEtPmVtitsVYSc-F1TUP6DVCS=Ct7QupYw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------ On Jul 6, 2018, at 1:09 PM, Marc Zyngier marc.zyngier at arm.com wrote:
+Hi Benjamin,
 
-> On 06/07/18 18:04, Will Deacon wrote:
->> Hi Mathieu,
->> 
->> On Fri, Jul 06, 2018 at 12:59:22PM -0400, Mathieu Desnoyers wrote:
->>> The 4.18-rc3 arm32 kernel defconfig fails to boot on my Cubietruck.
->>> This issue appeared with 4.18-rc1.
->>>
->>> It worked fine on 4.17.
->>>
->>> Any ideas ?
->> 
->> CC'ing linux-arm-kernel would be a good place to start :) [I've added it
->> here, as well as Maxime and Marc].
->> 
->> With the right people on cc, I suspect this is a known issue and might
->> even have a patch. (he says hopefully...)
-> 
-> I have had issues as well. With this patch[1] applied, my board works
-> well enough.
+On Fri, Jul 6, 2018 at 3:03 PM Benjamin Gaignard
+<benjamin.gaignard@linaro.org> wrote:
+> The format specifier "%p" can leak kernel addresses.
+> Use "%pK" instead.
 
-I confirm that the patches makes it boot.
+Still? Isn't the value randomized these days?
 
-Thanks!
+Gr{oetje,eeting}s,
 
-Mathieu
-
-> 
-> Thanks,
-> 
->	M.
-> 
-> [1] https://lkml.org/lkml/2018/7/4/73
-> --
-> Jazz is not dead. It just smells funny...
+                        Geert
 
 -- 
-Mathieu Desnoyers
-EfficiOS Inc.
-http://www.efficios.com
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
