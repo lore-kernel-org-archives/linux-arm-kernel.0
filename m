@@ -1,105 +1,88 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 6 Jul 2018 15:23:03 +0100
-Subject: [PATCH v4 7/7] KVM: arm64: Add support for creating PUD hugepages
- at stage 2
-In-Reply-To: <87k1q8qwqb.fsf@e105922-lin.cambridge.arm.com>
-References: <20180705140850.5801-1-punit.agrawal@arm.com>
- <20180705140850.5801-8-punit.agrawal@arm.com>
- <51265e49-8b8f-cabb-d2c9-d776a8a4ace8@arm.com>
- <87k1q8qwqb.fsf@e105922-lin.cambridge.arm.com>
-Message-ID: <12486745-ffb7-751e-9b2b-ff4722c5fd80@arm.com>
+From: ssuloev@orpaltech.com (Sergey Suloev)
+Date: Fri, 6 Jul 2018 17:23:10 +0300
+Subject: [PATCH 09/10] arm64: dts: allwinner: a64: NanoPi-A64: Add
+ Wifi/Bluetooth chip
+In-Reply-To: <20180706085210.17952-10-andre.przywara@arm.com>
+References: <20180706085210.17952-1-andre.przywara@arm.com>
+ <20180706085210.17952-10-andre.przywara@arm.com>
+Message-ID: <8cee909b-c0ce-5faf-09e0-7d6625284f55@orpaltech.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Punit,
+On 07/06/2018 11:52 AM, Andre Przywara wrote:
+> The NanoPi-A64 has an on-board WiFi/Bluetooth combo chip, connected
+> to the usual MMC1 and UART1. The power is provided by the always-on
+> VCC_SYS_3.3V, but it uses pin L2 to enable the regulator.
+>
+> Add the respective nodes to the DT to make it usable.
+>
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+>   .../boot/dts/allwinner/sun50i-a64-nanopi-a64.dts   | 33 ++++++++++++++++++++++
+>   1 file changed, 33 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
+> index 0439cff685d6..bb3ba7709dee 100644
+> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
+> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
+> @@ -53,11 +53,18 @@
+>   	aliases {
+>   		ethernet0 = &emac;
+>   		serial0 = &uart0;
+> +		serial1 = &uart1;
+>   	};
+>   
+>   	chosen {
+>   		stdout-path = "serial0:115200n8";
+>   	};
+> +
+> +        wifi_pwrseq: wifi_pwrseq {
+> +                compatible = "mmc-pwrseq-simple";
+> +                reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* PL2 */
+> +        };
+> +
+>   };
+>   
+>   &ehci0 {
+> @@ -105,6 +112,25 @@
+>   	status = "okay";
+>   };
+>   
+> +&mmc1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&mmc1_pins>;
+> +	vmmc-supply = <&reg_dcdc1>;
+> +	vqmmc-supply = <&reg_dldo4>;
+> +	mmc-pwrseq = <&wifi_pwrseq>;
+> +	bus-width = <4>;
+> +	non-removable;
+> +	status = "okay";
+> +
+> +	brcmf: wifi at 1 {
+> +		reg = <1>;
+> +		compatible = "brcm,bcm4329-fmac";
+> +		interrupt-parent = <&r_pio>;
+> +		interrupts = <0 3 IRQ_TYPE_LEVEL_LOW>; /* PL3 */
+> +		interrupt-names = "host-wake";
+> +	};
+> +};
+> +
+>   &ohci0 {
+>   	status = "okay";
+>   };
+> @@ -229,6 +255,13 @@
+>   	status = "okay";
+>   };
+>   
+> +/* Connected to the Bluetooth UART, with hardware handshake pins */
+> +&uart1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&uart1_pins>, <&uart1_rts_cts_pins>;
+> +	status = "okay";
+> +};
+> +
+>   &usbphy {
+>   	status = "okay";
+>   };
 
-
-On 06/07/18 15:12, Punit Agrawal wrote:
-> Suzuki K Poulose <Suzuki.Poulose@arm.com> writes:
-> 
->> Hi Punit,
->>
->> On 05/07/18 15:08, Punit Agrawal wrote:
->>> KVM only supports PMD hugepages at stage 2. Now that the various page
->>> handling routines are updated, extend the stage 2 fault handling to
->>> map in PUD hugepages.
->>>
->>> Addition of PUD hugepage support enables additional page sizes (e.g.,
->>> 1G with 4K granule) which can be useful on cores that support mapping
->>> larger block sizes in the TLB entries.
->>>
->>> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
->>> Cc: Christoffer Dall <christoffer.dall@arm.com>
->>> Cc: Marc Zyngier <marc.zyngier@arm.com>
->>> Cc: Russell King <linux@armlinux.org.uk>
->>> Cc: Catalin Marinas <catalin.marinas@arm.com>
->>> Cc: Will Deacon <will.deacon@arm.com>
->>
->>> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
->>> index 0c04c64e858c..5912210e94d9 100644
->>> --- a/virt/kvm/arm/mmu.c
->>> +++ b/virt/kvm/arm/mmu.c
->>> @@ -116,6 +116,25 @@ static void stage2_dissolve_pmd(struct kvm *kvm, phys_addr_t addr, pmd_t *pmd)
->>>    	put_page(virt_to_page(pmd));
->>>    }
->>>    +/**
->>> + * stage2_dissolve_pud() - clear and flush huge PUD entry
->>> + * @kvm:	pointer to kvm structure.
->>> + * @addr:	IPA
->>> + * @pud:	pud pointer for IPA
->>> + *
->>> + * Function clears a PUD entry, flushes addr 1st and 2nd stage TLBs. Marks all
->>> + * pages in the range dirty.
->>> + */
->>> +static void stage2_dissolve_pud(struct kvm *kvm, phys_addr_t addr, pud_t *pud)
->>> +{
->>> +	if (!pud_huge(*pud))
->>> +		return;
->>> +
->>> +	pud_clear(pud);
->>
->> You need to use the stage2_ accessors here. The stage2_dissolve_pmd() uses
->> "pmd_" helpers as the PTE entries (level 3) are always guaranteed to exist.
-> 
-> I've fixed this and other uses of the PUD helpers to go via the stage2_
-> accessors.
-> 
-> I've still not quite come to terms with the lack of certain levels at
-> stage 2 vis-a-vis stage 1. I'll be more careful about this going
-> forward.
-
-I accept that it can be quite confusing. Once we get level independent types
-and table accessors this might be easier. For now, the general rule is stick
-to stage2_ accessors whenever you deal with the stage2 table. Rest should be
-left to the stage2 code to deal with it.
-
-> 
->>> @@ -1572,7 +1631,18 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->>>    	if (exec_fault)
->>>    		invalidate_icache_guest_page(pfn, vma_pagesize);
->>>    -	if (hugetlb && vma_pagesize == PMD_SIZE) {
->>> +	if (hugetlb && vma_pagesize == PUD_SIZE) {
->>
->> I think we may need to check if the stage2 indeed has 3 levels of
->> tables to use stage2 PUD. Otherwise, fall back to PTE level mapping
->> or even PMD huge pages. Also, this cannot be triggered right now,
->> as we only get PUD hugepages with 4K and we are guaranteed to have
->> at least 3 levels with 40bit IPA. May be I can take care of it in
->> the Dynamic IPA series, when we run a guest with say 32bit IPA.
->> So for now, it is worth adding a comment here.
-> 
-> Good point. I've added the following comment.
-> 
->      /*
->       * PUD level may not exist if the guest boots with two
->       * levels at Stage 2. This configuration is currently
->       * not supported due to IPA size supported by KVM.
->       *
->       * Revisit the assumptions about PUD levels when
->       * additional IPA sizes are supported by KVM.
->       */
-> 
-
-Yep, that looks fine to me.
-
-Suzuki
+NanoPi A64 has rtl8189 Ethernet chip.
