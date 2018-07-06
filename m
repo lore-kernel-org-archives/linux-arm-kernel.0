@@ -1,11 +1,12 @@
 From: nipun.gupta@nxp.com (Nipun Gupta)
-Date: Fri, 6 Jul 2018 12:10:53 +0000
-Subject: [PATCH 1/7 v5] Docs: dt: add fsl-mc iommu-map device-tree binding
-In-Reply-To: <cd70dc56-ce6a-f6ef-1362-143d9c31bb46@arm.com>
+Date: Fri, 6 Jul 2018 12:17:09 +0000
+Subject: [PATCH 5/7 v5] bus: fsl-mc: support dma configure for devices on
+ fsl-mc bus
+In-Reply-To: <b4cf1e86-0297-97ed-d10e-9b430ecb0bc7@arm.com>
 References: <1526824191-7000-1-git-send-email-nipun.gupta@nxp.com>
- <1526824191-7000-2-git-send-email-nipun.gupta@nxp.com>
- <cd70dc56-ce6a-f6ef-1362-143d9c31bb46@arm.com>
-Message-ID: <HE1PR0401MB2425F74655E5DFE4DDE38EE3E6470@HE1PR0401MB2425.eurprd04.prod.outlook.com>
+ <1526824191-7000-6-git-send-email-nipun.gupta@nxp.com>
+ <b4cf1e86-0297-97ed-d10e-9b430ecb0bc7@arm.com>
+Message-ID: <HE1PR0401MB2425626DB35517BFD4FA9E15E6470@HE1PR0401MB2425.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,7 +14,7 @@ List-Id: linux-arm-kernel.lists.infradead.org
 
 > -----Original Message-----
 > From: Robin Murphy [mailto:robin.murphy at arm.com]
-> Sent: Tuesday, July 3, 2018 8:10 PM
+> Sent: Tuesday, July 3, 2018 9:44 PM
 > To: Nipun Gupta <nipun.gupta@nxp.com>; will.deacon at arm.com;
 > robh+dt at kernel.org; robh at kernel.org; mark.rutland at arm.com;
 > catalin.marinas at arm.com; gregkh at linuxfoundation.org; Laurentiu Tudor
@@ -24,99 +25,80 @@ List-Id: linux-arm-kernel.lists.infradead.org
 > linux-arm-kernel at lists.infradead.org; linuxppc-dev at lists.ozlabs.org; linux-
 > pci at vger.kernel.org; Bharat Bhushan <bharat.bhushan@nxp.com>;
 > stuyoder at gmail.com; Leo Li <leoyang.li@nxp.com>
-> Subject: Re: [PATCH 1/7 v5] Docs: dt: add fsl-mc iommu-map device-tree
-> binding
+> Subject: Re: [PATCH 5/7 v5] bus: fsl-mc: support dma configure for devices
+> on fsl-mc bus
 > 
 > On 20/05/18 14:49, Nipun Gupta wrote:
-> > The existing IOMMU bindings cannot be used to specify the relationship
-> > between fsl-mc devices and IOMMUs. This patch adds a generic binding for
-> > mapping fsl-mc devices to IOMMUs, using iommu-map property.
-> >
+> > This patch adds support of dma configuration for devices on fsl-mc
+> > bus using 'dma_configure' callback for busses. Also, directly calling
+> > arch_setup_dma_ops is removed from the fsl-mc bus.
+> 
+> Looks like this is the final arch_setup_dma_ops offender, yay!
+> 
 > > Signed-off-by: Nipun Gupta <nipun.gupta@nxp.com>
-> > Reviewed-by: Rob Herring <robh@kernel.org>
+> > Reviewed-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 > > ---
-> >   .../devicetree/bindings/misc/fsl,qoriq-mc.txt      | 39
-> ++++++++++++++++++++++
-> >   1 file changed, 39 insertions(+)
+> >   drivers/bus/fsl-mc/fsl-mc-bus.c | 15 +++++++++++----
+> >   1 file changed, 11 insertions(+), 4 deletions(-)
 > >
-> > diff --git a/Documentation/devicetree/bindings/misc/fsl,qoriq-mc.txt
-> b/Documentation/devicetree/bindings/misc/fsl,qoriq-mc.txt
-> > index 6611a7c..8cbed4f 100644
-> > --- a/Documentation/devicetree/bindings/misc/fsl,qoriq-mc.txt
-> > +++ b/Documentation/devicetree/bindings/misc/fsl,qoriq-mc.txt
-> > @@ -9,6 +9,25 @@ blocks that can be used to create functional hardware
-> objects/devices
-> >   such as network interfaces, crypto accelerator instances, L2 switches,
-> >   etc.
+> > diff --git a/drivers/bus/fsl-mc/fsl-mc-bus.c b/drivers/bus/fsl-mc/fsl-mc-
+> bus.c
+> > index 5d8266c..fa43c7d 100644
+> > --- a/drivers/bus/fsl-mc/fsl-mc-bus.c
+> > +++ b/drivers/bus/fsl-mc/fsl-mc-bus.c
+> > @@ -127,6 +127,16 @@ static int fsl_mc_bus_uevent(struct device *dev,
+> struct kobj_uevent_env *env)
+> >   	return 0;
+> >   }
 > >
-> > +For an overview of the DPAA2 architecture and fsl-mc bus see:
-> > +drivers/staging/fsl-mc/README.txt
+> > +static int fsl_mc_dma_configure(struct device *dev)
+> > +{
+> > +	struct device *dma_dev = dev;
+> > +
+> > +	while (dev_is_fsl_mc(dma_dev))
+> > +		dma_dev = dma_dev->parent;
+> > +
+> > +	return of_dma_configure(dev, dma_dev->of_node, 0);
+> > +}
+> > +
+> >   static ssize_t modalias_show(struct device *dev, struct device_attribute
+> *attr,
+> >   			     char *buf)
+> >   {
+> > @@ -148,6 +158,7 @@ struct bus_type fsl_mc_bus_type = {
+> >   	.name = "fsl-mc",
+> >   	.match = fsl_mc_bus_match,
+> >   	.uevent = fsl_mc_bus_uevent,
+> > +	.dma_configure  = fsl_mc_dma_configure,
+> >   	.dev_groups = fsl_mc_dev_groups,
+> >   };
+> >   EXPORT_SYMBOL_GPL(fsl_mc_bus_type);
+> > @@ -633,10 +644,6 @@ int fsl_mc_device_add(struct fsl_mc_obj_desc
+> *obj_desc,
+> >   			goto error_cleanup_dev;
+> >   	}
+> >
+> > -	/* Objects are coherent, unless 'no shareability' flag set. */
+> > -	if (!(obj_desc->flags &
+> FSL_MC_OBJ_FLAG_NO_MEM_SHAREABILITY))
 > 
-> Nit: Looks like that's Documentation/networking/dpaa2/overview.rst now.
-> 
-> > +
-> > +As described in the above overview, all DPAA2 objects in a DPRC share the
-> > +same hardware "isolation context" and a 10-bit value called an ICID
-> > +(isolation context id) is expressed by the hardware to identify
-> > +the requester.
-> > +
-> > +The generic 'iommus' property is insufficient to describe the relationship
-> > +between ICIDs and IOMMUs, so an iommu-map property is used to
-> define
-> > +the set of possible ICIDs under a root DPRC and how they map to
-> > +an IOMMU.
-> > +
-> > +For generic IOMMU bindings, see
-> > +Documentation/devicetree/bindings/iommu/iommu.txt.
-> > +
-> > +For arm-smmu binding, see:
-> > +Documentation/devicetree/bindings/iommu/arm,smmu.txt.
-> > +
-> >   Required properties:
-> >
-> >       - compatible
-> > @@ -88,14 +107,34 @@ Sub-nodes:
-> >                 Value type: <phandle>
-> >                 Definition: Specifies the phandle to the PHY device node associated
-> >                             with the this dpmac.
-> > +Optional properties:
-> > +
-> > +- iommu-map: Maps an ICID to an IOMMU and associated iommu-
-> specifier
-> > +  data.
-> > +
-> > +  The property is an arbitrary number of tuples of
-> > +  (icid-base,iommu,iommu-base,length).
-> > +
-> > +  Any ICID i in the interval [icid-base, icid-base + length) is
-> > +  associated with the listed IOMMU, with the iommu-specifier
-> > +  (i - icid-base + iommu-base).
-> >
-> >   Example:
-> >
-> > +        smmu: iommu at 5000000 {
-> > +               compatible = "arm,mmu-500";
-> > +               #iommu-cells = <2>;
-> 
-> This should be 1 if stream-match-mask is present. Bad example is bad :)
+> Although it seems we do end up without any handling of this
+> "non-coherent object behind coherent MC" case, and I'm not sure how
+> easily that could be accommodated by generic code... :/ How important is
+> the quirk?
 
-Agree :). Ill update it.
+We have all the devices as coherent in our SoC's now :) So this is fine.
+We have internally discussed it.
+
+Regards,
+Nipun
 
 > 
 > Robin.
 > 
-> > +               stream-match-mask = <0x7C00>;
-> > +               ...
-> > +        };
-> > +
-> >           fsl_mc: fsl-mc at 80c000000 {
-> >                   compatible = "fsl,qoriq-mc";
-> >                   reg = <0x00000008 0x0c000000 0 0x40>,    /* MC portal base */
-> >                         <0x00000000 0x08340000 0 0x40000>; /* MC control reg */
-> >                   msi-parent = <&its>;
-> > +                /* define map for ICIDs 23-64 */
-> > +                iommu-map = <23 &smmu 23 41>;
-> >                   #address-cells = <3>;
-> >                   #size-cells = <1>;
-> >
+> > -		arch_setup_dma_ops(&mc_dev->dev, 0, 0, NULL, true);
+> > -
+> >   	/*
+> >   	 * The device-specific probe callback will get invoked by device_add()
+> >   	 */
 > >
