@@ -1,20 +1,122 @@
-From: digetx@gmail.com (Dmitry Osipenko)
-Date: Fri, 6 Jul 2018 15:01:52 +0300
-Subject: [PATCH v2 0/5] Initial support of Trusted Foundations on Tegra30
-In-Reply-To: <5c47ef70-b90e-6e81-39dd-fbcfad2b93e5@gmail.com>
-References: <20180619110027.16935-1-digetx@gmail.com>
- <d99935be-797d-4676-c186-a045a590f01b@gmail.com> <11534185.70fb5jbPr6@dimapc>
- <5c47ef70-b90e-6e81-39dd-fbcfad2b93e5@gmail.com>
-Message-ID: <7c38961f-4ad6-f4b8-7ef1-b43a07353832@gmail.com>
+From: nipun.gupta@nxp.com (Nipun Gupta)
+Date: Fri, 6 Jul 2018 12:10:53 +0000
+Subject: [PATCH 1/7 v5] Docs: dt: add fsl-mc iommu-map device-tree binding
+In-Reply-To: <cd70dc56-ce6a-f6ef-1362-143d9c31bb46@arm.com>
+References: <1526824191-7000-1-git-send-email-nipun.gupta@nxp.com>
+ <1526824191-7000-2-git-send-email-nipun.gupta@nxp.com>
+ <cd70dc56-ce6a-f6ef-1362-143d9c31bb46@arm.com>
+Message-ID: <HE1PR0401MB2425F74655E5DFE4DDE38EE3E6470@HE1PR0401MB2425.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kexec works for me on T30 with the following kernel config options on top of the
-tegra_defconfig:
 
-CONFIG_SMP=n
-CONFIG_CPU_IDLE=n
-CONFIG_TEGRA_IOMMU_SMMU=n
 
-CPU stopping isn't working correctly with the trusted foundations and it's not
-obvious what is wrong. I hope we'll fix it at some point.
+> -----Original Message-----
+> From: Robin Murphy [mailto:robin.murphy at arm.com]
+> Sent: Tuesday, July 3, 2018 8:10 PM
+> To: Nipun Gupta <nipun.gupta@nxp.com>; will.deacon at arm.com;
+> robh+dt at kernel.org; robh at kernel.org; mark.rutland at arm.com;
+> catalin.marinas at arm.com; gregkh at linuxfoundation.org; Laurentiu Tudor
+> <laurentiu.tudor@nxp.com>; bhelgaas at google.com
+> Cc: hch at lst.de; joro at 8bytes.org; m.szyprowski at samsung.com;
+> shawnguo at kernel.org; frowand.list at gmail.com; iommu at lists.linux-
+> foundation.org; linux-kernel at vger.kernel.org; devicetree at vger.kernel.org;
+> linux-arm-kernel at lists.infradead.org; linuxppc-dev at lists.ozlabs.org; linux-
+> pci at vger.kernel.org; Bharat Bhushan <bharat.bhushan@nxp.com>;
+> stuyoder at gmail.com; Leo Li <leoyang.li@nxp.com>
+> Subject: Re: [PATCH 1/7 v5] Docs: dt: add fsl-mc iommu-map device-tree
+> binding
+> 
+> On 20/05/18 14:49, Nipun Gupta wrote:
+> > The existing IOMMU bindings cannot be used to specify the relationship
+> > between fsl-mc devices and IOMMUs. This patch adds a generic binding for
+> > mapping fsl-mc devices to IOMMUs, using iommu-map property.
+> >
+> > Signed-off-by: Nipun Gupta <nipun.gupta@nxp.com>
+> > Reviewed-by: Rob Herring <robh@kernel.org>
+> > ---
+> >   .../devicetree/bindings/misc/fsl,qoriq-mc.txt      | 39
+> ++++++++++++++++++++++
+> >   1 file changed, 39 insertions(+)
+> >
+> > diff --git a/Documentation/devicetree/bindings/misc/fsl,qoriq-mc.txt
+> b/Documentation/devicetree/bindings/misc/fsl,qoriq-mc.txt
+> > index 6611a7c..8cbed4f 100644
+> > --- a/Documentation/devicetree/bindings/misc/fsl,qoriq-mc.txt
+> > +++ b/Documentation/devicetree/bindings/misc/fsl,qoriq-mc.txt
+> > @@ -9,6 +9,25 @@ blocks that can be used to create functional hardware
+> objects/devices
+> >   such as network interfaces, crypto accelerator instances, L2 switches,
+> >   etc.
+> >
+> > +For an overview of the DPAA2 architecture and fsl-mc bus see:
+> > +drivers/staging/fsl-mc/README.txt
+> 
+> Nit: Looks like that's Documentation/networking/dpaa2/overview.rst now.
+> 
+> > +
+> > +As described in the above overview, all DPAA2 objects in a DPRC share the
+> > +same hardware "isolation context" and a 10-bit value called an ICID
+> > +(isolation context id) is expressed by the hardware to identify
+> > +the requester.
+> > +
+> > +The generic 'iommus' property is insufficient to describe the relationship
+> > +between ICIDs and IOMMUs, so an iommu-map property is used to
+> define
+> > +the set of possible ICIDs under a root DPRC and how they map to
+> > +an IOMMU.
+> > +
+> > +For generic IOMMU bindings, see
+> > +Documentation/devicetree/bindings/iommu/iommu.txt.
+> > +
+> > +For arm-smmu binding, see:
+> > +Documentation/devicetree/bindings/iommu/arm,smmu.txt.
+> > +
+> >   Required properties:
+> >
+> >       - compatible
+> > @@ -88,14 +107,34 @@ Sub-nodes:
+> >                 Value type: <phandle>
+> >                 Definition: Specifies the phandle to the PHY device node associated
+> >                             with the this dpmac.
+> > +Optional properties:
+> > +
+> > +- iommu-map: Maps an ICID to an IOMMU and associated iommu-
+> specifier
+> > +  data.
+> > +
+> > +  The property is an arbitrary number of tuples of
+> > +  (icid-base,iommu,iommu-base,length).
+> > +
+> > +  Any ICID i in the interval [icid-base, icid-base + length) is
+> > +  associated with the listed IOMMU, with the iommu-specifier
+> > +  (i - icid-base + iommu-base).
+> >
+> >   Example:
+> >
+> > +        smmu: iommu at 5000000 {
+> > +               compatible = "arm,mmu-500";
+> > +               #iommu-cells = <2>;
+> 
+> This should be 1 if stream-match-mask is present. Bad example is bad :)
+
+Agree :). Ill update it.
+
+> 
+> Robin.
+> 
+> > +               stream-match-mask = <0x7C00>;
+> > +               ...
+> > +        };
+> > +
+> >           fsl_mc: fsl-mc at 80c000000 {
+> >                   compatible = "fsl,qoriq-mc";
+> >                   reg = <0x00000008 0x0c000000 0 0x40>,    /* MC portal base */
+> >                         <0x00000000 0x08340000 0 0x40000>; /* MC control reg */
+> >                   msi-parent = <&its>;
+> > +                /* define map for ICIDs 23-64 */
+> > +                iommu-map = <23 &smmu 23 41>;
+> >                   #address-cells = <3>;
+> >                   #size-cells = <1>;
+> >
+> >
