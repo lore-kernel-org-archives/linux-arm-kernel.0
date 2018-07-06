@@ -1,41 +1,63 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Fri,  6 Jul 2018 23:38:00 +0800
-Subject: [PATCH v2 4/9] arm64: allwinner: dts: h6: add USB Vbus regulator
+Date: Fri,  6 Jul 2018 23:38:01 +0800
+Subject: [PATCH v2 5/9] arm64: allwinner: dts: h6: enable USB2 on Pine H64
 In-Reply-To: <20180706153805.25842-1-icenowy@aosc.io>
 References: <20180706153805.25842-1-icenowy@aosc.io>
-Message-ID: <20180706153805.25842-5-icenowy@aosc.io>
+Message-ID: <20180706153805.25842-6-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The 5V output of the USB ports on Pine H64 is controlled via a GPIO.
+Pine H64 board has both the USB2 OTG port and the USB2 host port on H6
+SoC wired out to USB Type-A port.
 
-Add the USB Vbus regulator device tree node.
+Enable them.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
- arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ .../boot/dts/allwinner/sun50i-h6-pine-h64.dts | 27 +++++++++++++++++++
+ 1 file changed, 27 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts b/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
-index 2e97173c9204..31920d7d6666 100644
+index 31920d7d6666..104369228994 100644
 --- a/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
 +++ b/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
-@@ -39,6 +39,16 @@
- 			gpios = <&r_pio 0 7 GPIO_ACTIVE_HIGH>; /* PL7 */
- 		};
+@@ -51,6 +51,22 @@
  	};
-+
-+	reg_usb_vbus: vbus {
-+		compatible = "regulator-fixed";
-+		regulator-name = "usb-vbus";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		startup-delay-us = <100000>;
-+		gpio = <&r_pio 0 5 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+	};
  };
  
++&ehci0 {
++	status = "okay";
++};
++
++&ehci3 {
++	status = "okay";
++};
++
++&ohci0 {
++	status = "okay";
++};
++
++&ohci3 {
++	status = "okay";
++};
++
  &r_i2c {
+ 	status = "okay";
+ 
+@@ -66,3 +82,14 @@
+ 	pinctrl-0 = <&uart0_ph_pins>;
+ 	status = "okay";
+ };
++
++&usb2otg {
++	dr_mode = "host";
++	status = "okay";
++};
++
++&usb2phy {
++	usb0_vbus-supply = <&reg_usb_vbus>;
++	usb3_vbus-supply = <&reg_usb_vbus>;
++	status = "okay";
++};
 -- 
 2.17.1
