@@ -1,61 +1,50 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri,  6 Jul 2018 09:52:02 +0100
-Subject: [PATCH 02/10] arm64: dts: allwinner: a64: Add Pine64-LTS device tree
- file
-In-Reply-To: <20180706085210.17952-1-andre.przywara@arm.com>
-References: <20180706085210.17952-1-andre.przywara@arm.com>
-Message-ID: <20180706085210.17952-3-andre.przywara@arm.com>
+Date: Fri,  6 Jul 2018 09:52:00 +0100
+Subject: [PATCH 00/10] arm64: dts: allwinner: A64 boards DT updates
+Message-ID: <20180706085210.17952-1-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Pine64-LTS is a variant of the Pine64 board, from the software
-visible side resembling a SoPine module on a baseboard, though the
-board has the SoC and DRAM integrated on one PCB.
-Due to this it basically shares the DT with the SoPine baseboard, which
-we mimic in our DT by inclucing the boardboard .dts into the new file,
-just overwriting the model name.
-Having a separate .dts for this seems useful, since we don't know yet if
-there are subtle differences between the two. Also the SoC on the LTS
-board is technically an "R18" instead of the original "A64", although as
-far as we know this is just a relabelled version of the original SoC.
+When starring at some DTs while copying the kernel DTs into the U-Boot
+tree, I realised that some boards seem to get more love than others.
+Fix up some issues I found by inspection on some boards:
+Patch 1 adds L2 cache nodes, to avoid a message on the boot console.
+Patch 2 adds a separate DT file for the Pine64-LTS board, which from the
+software point of view is very much a SOPine + baseboard.
+There were reports from people with the Olinuxino board about various
+issues and missing features, so patches 3 till 5 attempt to fix these.
+The NanoPi-A64 also hasn't been updated in a while, enable the Ethernet
+and the WiFi/Bluetooth chip, and fix some voltage issues in the last 5
+patches.
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
----
- arch/arm64/boot/dts/allwinner/Makefile                  |  1 +
- arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-lts.dts | 13 +++++++++++++
- 2 files changed, 14 insertions(+)
+I don't have the Olinuxino or NanoPi-A64, so can't test these boards.
+So even though I have carefully checked the changes against the
+available schematics, I would treat the patches for those two boards
+as a "discussion base" and would love to see some testing and
+confirmation from owners of these systems.
+
+Cheers,
+Andre.
+
+Andre Przywara (10):
+  arm64: dts: allwinner: a64: Add L2 cache nodes
+  arm64: dts: allwinner: a64: Add Pine64-LTS device tree file
+  arm64: dts: allwinner: a64: Olinuxino: fix DRAM voltage
+  arm64: dts: allwinner: a64: Olinuxino: add Ethernet nodes
+  arm64: dts: allwinner: a64: Olinuxino: enable USB
+  arm64: dts: allwinner: a64: NanoPi-A64: Fix DCDC1 voltage
+  arm64: dts: allwinner: a64: NanoPi-A64: Add Ethernet
+  arm64: dts: allwinner: a64: NanoPi-A64: Fix PortE voltage
+  arm64: dts: allwinner: a64: NanoPi-A64: Add Wifi/Bluetooth chip
+  arm64: dts: allwinner: a64: NanoPi-A64: Add blue status LED
+
+ arch/arm64/boot/dts/allwinner/Makefile             |  1 +
+ .../boot/dts/allwinner/sun50i-a64-nanopi-a64.dts   | 72 +++++++++++++++++++++-
+ .../boot/dts/allwinner/sun50i-a64-olinuxino.dts    | 63 +++++++++++++++++--
+ .../boot/dts/allwinner/sun50i-a64-pine64-lts.dts   | 13 ++++
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi      |  9 +++
+ 5 files changed, 151 insertions(+), 7 deletions(-)
  create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-lts.dts
 
-diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
-index 9ffa7a038791..b7034327b28b 100644
---- a/arch/arm64/boot/dts/allwinner/Makefile
-+++ b/arch/arm64/boot/dts/allwinner/Makefile
-@@ -4,6 +4,7 @@ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-bananapi-m64.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-nanopi-a64.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-olinuxino.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-orangepi-win.dtb
-+dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pine64-lts.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pine64-plus.dtb sun50i-a64-pine64.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pinebook.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-sopine-baseboard.dtb
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-lts.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-lts.dts
-new file mode 100644
-index 000000000000..72d6961dc312
---- /dev/null
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-lts.dts
-@@ -0,0 +1,13 @@
-+/*
-+ * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+ *
-+ * Copyright (c) 2018 ARM Ltd.
-+ */
-+
-+#include "sun50i-a64-sopine-baseboard.dts"
-+
-+/ {
-+	model = "Pine64 LTS";
-+	compatible = "pine64,pine64-lts", "allwinner,sun50i-r18",
-+		     "allwinner,sun50i-a64";
-+};
 -- 
 2.14.4
