@@ -1,42 +1,65 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Fri,  6 Jul 2018 19:51:02 +0200
-Subject: [PATCH 06/17] dt-bindings: display: sun4i-drm: Add R40 TV TCON
- description
+Date: Fri,  6 Jul 2018 19:51:03 +0200
+Subject: [PATCH 07/17] drm/sun4i: DW HDMI: Release nodes if error happens
+ during CRTC search
 In-Reply-To: <20180706175113.26698-1-jernej.skrabec@siol.net>
 References: <20180706175113.26698-1-jernej.skrabec@siol.net>
-Message-ID: <20180706175113.26698-7-jernej.skrabec@siol.net>
+Message-ID: <20180706175113.26698-8-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-TCON description is expanded with R40 TV TCON compatible. It is a bit
-special, because it is connected to TCON TOP instead directly to mixer
-and it needs special handling.
+If error happens in sun8i_dw_hdmi_find_possible_crtcs(), nodes are not
+released with of_node_put() before returning.
+
+Fix that by calling of_node_put() when necessary. While on it, clean up
+the code by using of_graph_get_remote_node() which also lowers number of
+cases where error handling has to be performed.
+
+Fixes: 57e23de02f48 ("drm/sun4i: DW HDMI: Expand algorithm for possible crtcs")
 
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c | 15 +++++----------
+ 1 file changed, 5 insertions(+), 10 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-index 288b4cbc255e..7e2451396a28 100644
---- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-+++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-@@ -147,6 +147,7 @@ Required properties:
-    * allwinner,sun8i-a33-tcon
-    * allwinner,sun8i-a83t-tcon-lcd
-    * allwinner,sun8i-a83t-tcon-tv
-+   * allwinner,sun8i-r40-tcon-tv
-    * allwinner,sun8i-v3s-tcon
-    * allwinner,sun9i-a80-tcon-lcd
-    * allwinner,sun9i-a80-tcon-tv
-@@ -181,7 +182,7 @@ For TCONs with channel 0, there is one more clock required:
- For TCONs with channel 1, there is one more clock required:
-    - 'tcon-ch1': The clock driving the TCON channel 1
+diff --git a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
+index 3459b9ec56c9..21dc9ebad0b4 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
++++ b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
+@@ -53,22 +53,14 @@ static u32 sun8i_dw_hdmi_find_possible_crtcs(struct drm_device *drm,
+ 	struct device_node *port, *ep, *remote, *remote_port;
+ 	u32 crtcs = 0;
  
--When TCON support LVDS (all TCONs except TV TCON on A83T and those found
-+When TCON support LVDS (all TCONs except TV TCONs on A83T, R40 and those found
- in A13, H3, H5 and V3s SoCs), you need one more reset line:
-    - 'lvds': The reset line driving the LVDS logic
+-	port = of_graph_get_port_by_id(node, 0);
+-	if (!port)
+-		return 0;
+-
+-	ep = of_get_next_available_child(port, NULL);
+-	if (!ep)
+-		return 0;
+-
+-	remote = of_graph_get_remote_port_parent(ep);
++	remote = of_graph_get_remote_node(node, 0, -1);
+ 	if (!remote)
+ 		return 0;
+ 
+ 	if (sun8i_dw_hdmi_node_is_tcon_top(remote)) {
+ 		port = of_graph_get_port_by_id(remote, 4);
+ 		if (!port)
+-			return 0;
++			goto crtcs_exit;
+ 
+ 		for_each_child_of_node(port, ep) {
+ 			remote_port = of_graph_get_remote_port(ep);
+@@ -81,6 +73,9 @@ static u32 sun8i_dw_hdmi_find_possible_crtcs(struct drm_device *drm,
+ 		crtcs = drm_of_find_possible_crtcs(drm, node);
+ 	}
+ 
++crtcs_exit:
++	of_node_put(remote);
++
+ 	return crtcs;
+ }
  
 -- 
 2.18.0
