@@ -1,173 +1,129 @@
 From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Fri,  6 Jul 2018 15:19:47 +0200
-Subject: [PATCH net-next 4/6] net: mvneta: Allocate page for the descriptor
+Date: Fri,  6 Jul 2018 15:19:44 +0200
+Subject: [PATCH net-next 1/6] net: mvneta: remove data pointer usage from
+ device_node structure
 In-Reply-To: <20180706131949.2684-1-gregory.clement@bootlin.com>
 References: <20180706131949.2684-1-gregory.clement@bootlin.com>
-Message-ID: <20180706131949.2684-5-gregory.clement@bootlin.com>
+Message-ID: <20180706131949.2684-2-gregory.clement@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of trying to allocate the exact amount of memory for each
-descriptor use a page for each of them, it allows to simplify the
-allocation management and increase the performance of the driver.
+On year ago Rob Herring wanted to remove the data pointer from the
+device_node structure[1]. The mvneta driver seemed to be the only one
+which used (abused ?) it. However, the proposal of Rob to remove this
+pointer from the driver introduced a regression, and I tested and fixed an
+alternative way, but it was never submitted as a proper patch.
 
-Based on the work of Yelena Krivosheev <yelena@marvell.com>
+Now here it is: Instead of using the device_node structure ->data
+pointer, we store the BM private data as the driver data of the BM
+platform_device. The core mvneta code can retrieve it by doing a lookup
+on which platform_device corresponds to the BM device tree node using
+of_find_device_by_node(), and get its driver data
+
+[1]https://www.spinics.net/lists/netdev/msg445197.html
+
 Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
 ---
- drivers/net/ethernet/marvell/mvneta.c    | 66 ++++++++++--------------
- drivers/net/ethernet/marvell/mvneta_bm.h |  3 --
- 2 files changed, 26 insertions(+), 43 deletions(-)
+ drivers/net/ethernet/marvell/mvneta.c    | 18 ++++++++++++------
+ drivers/net/ethernet/marvell/mvneta_bm.c | 13 +++++++++++++
+ drivers/net/ethernet/marvell/mvneta_bm.h |  5 +++++
+ 3 files changed, 30 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-index 2c575c6732ce..12739fb60732 100644
+index 0ad2f3f7da85..26d68add184f 100644
 --- a/drivers/net/ethernet/marvell/mvneta.c
 +++ b/drivers/net/ethernet/marvell/mvneta.c
-@@ -1791,47 +1791,30 @@ static void mvneta_txq_done(struct mvneta_port *pp,
+@@ -4460,12 +4460,16 @@ static int mvneta_probe(struct platform_device *pdev)
+ 
+ 	/* Obtain access to BM resources if enabled and already initialized */
+ 	bm_node = of_parse_phandle(dn, "buffer-manager", 0);
+-	if (bm_node && bm_node->data) {
+-		pp->bm_priv = bm_node->data;
+-		err = mvneta_bm_port_init(pdev, pp);
+-		if (err < 0) {
+-			dev_info(&pdev->dev, "use SW buffer management\n");
+-			pp->bm_priv = NULL;
++	if (bm_node) {
++		pp->bm_priv = mvneta_bm_get(bm_node);
++		if (pp->bm_priv) {
++			err = mvneta_bm_port_init(pdev, pp);
++			if (err < 0) {
++				dev_info(&pdev->dev,
++					 "use SW buffer management\n");
++				mvneta_bm_put(pp->bm_priv);
++				pp->bm_priv = NULL;
++			}
+ 		}
  	}
- }
- 
--void *mvneta_frag_alloc(unsigned int frag_size)
--{
--	if (likely(frag_size <= PAGE_SIZE))
--		return netdev_alloc_frag(frag_size);
--	else
--		return kmalloc(frag_size, GFP_ATOMIC);
--}
--EXPORT_SYMBOL_GPL(mvneta_frag_alloc);
--
--void mvneta_frag_free(unsigned int frag_size, void *data)
--{
--	if (likely(frag_size <= PAGE_SIZE))
--		skb_free_frag(data);
--	else
--		kfree(data);
--}
--EXPORT_SYMBOL_GPL(mvneta_frag_free);
--
- /* Refill processing for SW buffer management */
--static int mvneta_rx_refill(struct mvneta_port *pp,
--			    struct mvneta_rx_desc *rx_desc,
--			    struct mvneta_rx_queue *rxq)
--
-+/* Allocate page per descriptor */
-+static inline int mvneta_rx_refill(struct mvneta_port *pp,
-+				   struct mvneta_rx_desc *rx_desc,
-+				   struct mvneta_rx_queue *rxq,
-+				   gfp_t gfp_mask)
- {
- 	dma_addr_t phys_addr;
--	void *data;
-+	struct page *page;
- 
--	data = mvneta_frag_alloc(pp->frag_size);
--	if (!data)
-+	page = __dev_alloc_page(gfp_mask);
-+	if (!page)
- 		return -ENOMEM;
- 
--	phys_addr = dma_map_single(pp->dev->dev.parent, data,
--				   MVNETA_RX_BUF_SIZE(pp->pkt_size),
--				   DMA_FROM_DEVICE);
-+	/* map page for use */
-+	phys_addr = dma_map_page(pp->dev->dev.parent, page, 0, PAGE_SIZE,
-+				 DMA_FROM_DEVICE);
- 	if (unlikely(dma_mapping_error(pp->dev->dev.parent, phys_addr))) {
--		mvneta_frag_free(pp->frag_size, data);
-+		__free_page(page);
- 		return -ENOMEM;
+ 	of_node_put(bm_node);
+@@ -4526,6 +4530,7 @@ static int mvneta_probe(struct platform_device *pdev)
+ 		mvneta_bm_pool_destroy(pp->bm_priv, pp->pool_long, 1 << pp->id);
+ 		mvneta_bm_pool_destroy(pp->bm_priv, pp->pool_short,
+ 				       1 << pp->id);
++		mvneta_bm_put(pp->bm_priv);
+ 	}
+ err_free_stats:
+ 	free_percpu(pp->stats);
+@@ -4563,6 +4568,7 @@ static int mvneta_remove(struct platform_device *pdev)
+ 		mvneta_bm_pool_destroy(pp->bm_priv, pp->pool_long, 1 << pp->id);
+ 		mvneta_bm_pool_destroy(pp->bm_priv, pp->pool_short,
+ 				       1 << pp->id);
++		mvneta_bm_put(pp->bm_priv);
  	}
  
- 	phys_addr += pp->rx_offset_correction;
--	mvneta_rx_desc_fill(rx_desc, phys_addr, data, rxq);
-+	mvneta_rx_desc_fill(rx_desc, phys_addr, page, rxq);
  	return 0;
+diff --git a/drivers/net/ethernet/marvell/mvneta_bm.c b/drivers/net/ethernet/marvell/mvneta_bm.c
+index 466939f8f0cf..01e3152e76c8 100644
+--- a/drivers/net/ethernet/marvell/mvneta_bm.c
++++ b/drivers/net/ethernet/marvell/mvneta_bm.c
+@@ -18,6 +18,7 @@
+ #include <linux/module.h>
+ #include <linux/netdevice.h>
+ #include <linux/of.h>
++#include <linux/of_platform.h>
+ #include <linux/platform_device.h>
+ #include <linux/skbuff.h>
+ #include <net/hwbm.h>
+@@ -392,6 +393,18 @@ static void mvneta_bm_put_sram(struct mvneta_bm *priv)
+ 		      MVNETA_BM_BPPI_SIZE);
  }
  
-@@ -1897,7 +1880,7 @@ static void mvneta_rxq_drop_pkts(struct mvneta_port *pp,
- 
- 		dma_unmap_single(pp->dev->dev.parent, rx_desc->buf_phys_addr,
- 				 MVNETA_RX_BUF_SIZE(pp->pkt_size), DMA_FROM_DEVICE);
--		mvneta_frag_free(pp->frag_size, data);
-+		__free_page(data);
- 	}
- }
- 
-@@ -1924,6 +1907,7 @@ static int mvneta_rx_swbm(struct mvneta_port *pp, int rx_todo,
- 		struct mvneta_rx_desc *rx_desc = mvneta_rxq_next_desc_get(rxq);
- 		struct sk_buff *skb;
- 		unsigned char *data;
-+		struct page *page;
- 		dma_addr_t phys_addr;
- 		u32 rx_status, frag_size;
- 		int rx_bytes, err, index;
-@@ -1932,7 +1916,10 @@ static int mvneta_rx_swbm(struct mvneta_port *pp, int rx_todo,
- 		rx_status = rx_desc->status;
- 		rx_bytes = rx_desc->data_size - (ETH_FCS_LEN + MVNETA_MH_SIZE);
- 		index = rx_desc - rxq->descs;
--		data = rxq->buf_virt_addr[index];
-+		page = (struct page *)rxq->buf_virt_addr[index];
-+		data = page_address(page);
-+		/* Prefetch header */
-+		prefetch(data);
- 		phys_addr = rx_desc->buf_phys_addr - pp->rx_offset_correction;
- 
- 		if (!mvneta_rxq_desc_is_first_last(rx_status) ||
-@@ -1975,7 +1962,7 @@ static int mvneta_rx_swbm(struct mvneta_port *pp, int rx_todo,
- 		}
- 
- 		/* Refill processing */
--		err = mvneta_rx_refill(pp, rx_desc, rxq);
-+		err = mvneta_rx_refill(pp, rx_desc, rxq, GFP_KERNEL);
- 		if (err) {
- 			netdev_err(dev, "Linux processing - Can't refill\n");
- 			rxq->refill_err++;
-@@ -2767,9 +2754,11 @@ static int mvneta_rxq_fill(struct mvneta_port *pp, struct mvneta_rx_queue *rxq,
- 
- 	for (i = 0; i < num; i++) {
- 		memset(rxq->descs + i, 0, sizeof(struct mvneta_rx_desc));
--		if (mvneta_rx_refill(pp, rxq->descs + i, rxq) != 0) {
--			netdev_err(pp->dev, "%s:rxq %d, %d of %d buffs  filled\n",
--				__func__, rxq->id, i, num);
-+		if (mvneta_rx_refill(pp, rxq->descs + i, rxq,
-+				     GFP_KERNEL) != 0) {
-+			netdev_err(pp->dev,
-+				   "%s:rxq %d, %d of %d buffs  filled\n",
-+				   __func__, rxq->id, i, num);
- 			break;
- 		}
- 	}
-@@ -3183,8 +3172,6 @@ static int mvneta_change_mtu(struct net_device *dev, int mtu)
- 		mvneta_bm_update_mtu(pp, mtu);
- 
- 	pp->pkt_size = MVNETA_RX_PKT_SIZE(dev->mtu);
--	pp->frag_size = SKB_DATA_ALIGN(MVNETA_RX_BUF_SIZE(pp->pkt_size)) +
--	                SKB_DATA_ALIGN(sizeof(struct skb_shared_info));
- 
- 	ret = mvneta_setup_rxqs(pp);
- 	if (ret) {
-@@ -3672,8 +3659,7 @@ static int mvneta_open(struct net_device *dev)
- 	int ret;
- 
- 	pp->pkt_size = MVNETA_RX_PKT_SIZE(pp->dev->mtu);
--	pp->frag_size = SKB_DATA_ALIGN(MVNETA_RX_BUF_SIZE(pp->pkt_size)) +
--	                SKB_DATA_ALIGN(sizeof(struct skb_shared_info));
-+	pp->frag_size = PAGE_SIZE;
- 
- 	ret = mvneta_setup_rxqs(pp);
- 	if (ret)
++struct mvneta_bm *mvneta_bm_get(struct device_node *node)
++{
++	struct platform_device *pdev = of_find_device_by_node(node);
++
++	return pdev ? platform_get_drvdata(pdev) : NULL;
++}
++
++void mvneta_bm_put(struct mvneta_bm *priv)
++{
++	platform_device_put(priv->pdev);
++}
++
+ static int mvneta_bm_probe(struct platform_device *pdev)
+ {
+ 	struct device_node *dn = pdev->dev.of_node;
 diff --git a/drivers/net/ethernet/marvell/mvneta_bm.h b/drivers/net/ethernet/marvell/mvneta_bm.h
-index 9358626e51ec..c8425d35c049 100644
+index a32de432800c..9358626e51ec 100644
 --- a/drivers/net/ethernet/marvell/mvneta_bm.h
 +++ b/drivers/net/ethernet/marvell/mvneta_bm.h
-@@ -130,9 +130,6 @@ struct mvneta_bm_pool {
- };
+@@ -134,6 +134,9 @@ void *mvneta_frag_alloc(unsigned int frag_size);
+ void mvneta_frag_free(unsigned int frag_size, void *data);
  
- /* Declarations and definitions */
--void *mvneta_frag_alloc(unsigned int frag_size);
--void mvneta_frag_free(unsigned int frag_size, void *data);
--
  #if IS_ENABLED(CONFIG_MVNETA_BM)
- struct mvneta_bm *mvneta_bm_get(struct device_node *node);
- void mvneta_bm_put(struct mvneta_bm *priv);
++struct mvneta_bm *mvneta_bm_get(struct device_node *node);
++void mvneta_bm_put(struct mvneta_bm *priv);
++
+ void mvneta_bm_pool_destroy(struct mvneta_bm *priv,
+ 			    struct mvneta_bm_pool *bm_pool, u8 port_map);
+ void mvneta_bm_bufs_free(struct mvneta_bm *priv, struct mvneta_bm_pool *bm_pool,
+@@ -178,5 +181,7 @@ static inline void mvneta_bm_pool_put_bp(struct mvneta_bm *priv,
+ static inline u32 mvneta_bm_pool_get_bp(struct mvneta_bm *priv,
+ 					struct mvneta_bm_pool *bm_pool)
+ { return 0; }
++struct mvneta_bm *mvneta_bm_get(struct device_node *node) { return NULL; }
++void mvneta_bm_put(struct mvneta_bm *priv) {}
+ #endif /* CONFIG_MVNETA_BM */
+ #endif
 -- 
 2.17.1
