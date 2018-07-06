@@ -1,61 +1,90 @@
-From: hejianet@gmail.com (Jia He)
-Date: Fri,  6 Jul 2018 17:01:14 +0800
-Subject: [RESEND PATCH v10 5/6] mm/memblock: introduce pfn_valid_region()
-In-Reply-To: <1530867675-9018-1-git-send-email-hejianet@gmail.com>
-References: <1530867675-9018-1-git-send-email-hejianet@gmail.com>
-Message-ID: <1530867675-9018-6-git-send-email-hejianet@gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 6 Jul 2018 10:53:22 +0200
+Subject: [PATCH/RFC] ARM: dts: r8a7791: Move enable-method to CPU nodes
+In-Reply-To: <CAMuHMdV2VwoD3Le=T4-+Ek2E9tL+hmiR0r4cXxG9EH4GXV-uTw@mail.gmail.com>
+References: <1526995765-29693-1-git-send-email-geert+renesas@glider.be>
+ <20180523083746.f4nkz4uhjwfgw7yz@verge.net.au>
+ <CAMuHMdV2VwoD3Le=T4-+Ek2E9tL+hmiR0r4cXxG9EH4GXV-uTw@mail.gmail.com>
+Message-ID: <CAMuHMdV8McM-V5zME1DKE0nsdtVLU25mk9QQCNwNL74V9c2Cag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jia He <jia.he@hxt-semitech.com>
+On Wed, May 23, 2018 at 10:50 AM Geert Uytterhoeven
+<geert@linux-m68k.org> wrote:
+> On Wed, May 23, 2018 at 10:37 AM, Simon Horman <horms@verge.net.au> wrote:
+> > On Tue, May 22, 2018 at 03:29:25PM +0200, Geert Uytterhoeven wrote:
+> >> According to Documentation/devicetree/bindings/arm/cpus.txt, the
+> >> "enable-method" property should be a property of the individual CPU
+> >> nodes, not of the parent "cpus" node.  However, on R-Car M2-W (and on
+> >> several other arm32 SoCs), the property is tied to the "cpus" node
+> >> instead.
+> >>
+> >> Secondary CPU bringup and CPU hot (un)plug work regardless, as
+> >> arm_dt_init_cpu_maps() falls back to looking in the "cpus" node.
+> >>
+> >> The cpuidle code does not have such a fallback, so it does not detect
+> >> the enable-method.  Note that cpuidle does not support the
+> >> "renesas,apmu" enable-method yet, so for now this does not make any
+> >> difference.
+> >
+> > Is the implication that if we keep the current binding for cpu nodes
+> > then at some point we will need to update the cpuidle binding?
+>
+> If we keep the current binding for cpu nodes, we indeed have to update
+> (common) Documentation/devicetree/bindings/arm/cpus.txt.
+>
+> In addition, if we want to add renesas,apmu-based cpuidle support later,
+> we will have to update the common cpuidle code to look in /cpus, too.
 
-Commit b92df1de5d28 ("mm: page_alloc: skip over regions of invalid pfns
-where possible") optimized the loop in memmap_init_zone(). But there is
-still some room for improvement.
-E.g. in early_pfn_valid(), we can record the last returned memblock region.
-If current pfn and last pfn are in the same memory region, we needn't do
-the unnecessary binary searches because memblock_is_nomap is the same
-result for whole memory region.
+Any comments from the DT/ARM people?
+Thanks!
 
-Signed-off-by: Jia He <jia.he@hxt-semitech.com>
----
- mm/memblock.c | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+> >> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> >> ---
+> >> Arm64 and powerpc do not have such a fallback, but SH has, like arm32.
+> >>
+> >> This is marked RFC, as the alternative is to update the DT bindings to
+> >> keep the status quo.
+> >> ---
+> >>  arch/arm/boot/dts/r8a7791.dtsi | 3 ++-
+> >>  1 file changed, 2 insertions(+), 1 deletion(-)
+> >>
+> >> diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+> >> index d568bd22d6cbd855..b214cb8f52e47109 100644
+> >> --- a/arch/arm/boot/dts/r8a7791.dtsi
+> >> +++ b/arch/arm/boot/dts/r8a7791.dtsi
+> >> @@ -71,7 +71,6 @@
+> >>       cpus {
+> >>               #address-cells = <1>;
+> >>               #size-cells = <0>;
+> >> -             enable-method = "renesas,apmu";
+> >>
+> >>               cpu0: cpu at 0 {
+> >>                       device_type = "cpu";
+> >> @@ -83,6 +82,7 @@
+> >>                       clock-latency = <300000>; /* 300 us */
+> >>                       power-domains = <&sysc R8A7791_PD_CA15_CPU0>;
+> >>                       next-level-cache = <&L2_CA15>;
+> >> +                     enable-method = "renesas,apmu";
+> >>
+> >>                       /* kHz - uV - OPPs unknown yet */
+> >>                       operating-points = <1500000 1000000>,
+> >> @@ -101,6 +101,7 @@
+> >>                       clocks = <&cpg CPG_CORE R8A7791_CLK_Z>;
+> >>                       power-domains = <&sysc R8A7791_PD_CA15_CPU1>;
+> >>                       next-level-cache = <&L2_CA15>;
+> >> +                     enable-method = "renesas,apmu";
+> >>               };
+> >>
+> >>               L2_CA15: cache-controller-0 {
 
-diff --git a/mm/memblock.c b/mm/memblock.c
-index c783b1a..274bd9f 100644
---- a/mm/memblock.c
-+++ b/mm/memblock.c
-@@ -1188,6 +1188,30 @@ ulong __init_memblock memblock_next_valid_pfn(ulong pfn)
- 	return PHYS_PFN(regions[early_region_idx].base);
- }
- EXPORT_SYMBOL(memblock_next_valid_pfn);
-+
-+int pfn_valid_region(ulong pfn)
-+{
-+	ulong start_pfn, end_pfn;
-+	struct memblock_type *type = &memblock.memory;
-+	struct memblock_region *regions = type->regions;
-+
-+	if (early_region_idx != -1) {
-+		start_pfn = PFN_DOWN(regions[early_region_idx].base);
-+		end_pfn = PFN_DOWN(regions[early_region_idx].base +
-+					regions[early_region_idx].size);
-+
-+		if (pfn >= start_pfn && pfn < end_pfn)
-+			return !memblock_is_nomap(
-+					&regions[early_region_idx]);
-+	}
-+
-+	early_region_idx = memblock_search_pfn_regions(pfn);
-+	if (early_region_idx == -1)
-+		return false;
-+
-+	return !memblock_is_nomap(&regions[early_region_idx]);
-+}
-+EXPORT_SYMBOL(pfn_valid_region);
- #endif /*CONFIG_HAVE_MEMBLOCK_PFN_VALID*/
- 
- static phys_addr_t __init memblock_alloc_range_nid(phys_addr_t size,
+Gr{oetje,eeting}s,
+
+                        Geert
+
 -- 
-1.8.3.1
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
