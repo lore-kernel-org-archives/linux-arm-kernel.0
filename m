@@ -1,207 +1,47 @@
-From: mchehab+samsung@kernel.org (Mauro Carvalho Chehab)
-Date: Fri, 6 Jul 2018 08:16:03 -0300
-Subject: [PATCH v3] media: dvb-frontends: add Socionext SC1501A ISDB-S/T
- demodulator driver
-In-Reply-To: <001f01d414ef$27145450$753cfcf0$@socionext.com>
-References: <20180621031748.21703-1-suzuki.katsuhiro@socionext.com>
- <20180704135657.3fd607cb@coco.lan>
- <000401d41403$b33db490$19b91db0$@socionext.com>
- <20180704234244.32d20f6b@coco.lan>
- <000501d41423$265013a0$72f03ae0$@socionext.com>
- <20180705212723.2856f064@coco.lan>
- <001f01d414ef$27145450$753cfcf0$@socionext.com>
-Message-ID: <20180706081603.2d8451c9@coco.lan>
+From: nipun.gupta@nxp.com (Nipun Gupta)
+Date: Fri, 6 Jul 2018 11:18:55 +0000
+Subject: [PATCH 0/7 v5] Support for fsl-mc bus and its devices in SMMU
+In-Reply-To: <20180706111327.7gkerhkk6udfeirr@8bytes.org>
+References: <1526824191-7000-1-git-send-email-nipun.gupta@nxp.com>
+ <HE1PR0401MB24250CEFBC0B7CC919C4388AE6760@HE1PR0401MB2425.eurprd04.prod.outlook.com>
+ <20180706111327.7gkerhkk6udfeirr@8bytes.org>
+Message-ID: <HE1PR0401MB24256CD990DAE3A343EF3A8AE6470@HE1PR0401MB2425.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Fri, 6 Jul 2018 15:04:08 +0900
-"Katsuhiro Suzuki" <suzuki.katsuhiro@socionext.com> escreveu:
 
-> Here is the log of dvb-fe-tool on my environment.
+Thanks Joro,
+
+I will be sending it by mid of next week.
+
+Regards,
+Nipun
+
+> -----Original Message-----
+> From: joro at 8bytes.org [mailto:joro at 8bytes.org]
+> Sent: Friday, July 6, 2018 4:43 PM
+> To: Nipun Gupta <nipun.gupta@nxp.com>
+> Cc: robin.murphy at arm.com; will.deacon at arm.com;
+> gregkh at linuxfoundation.org; hch at lst.de; m.szyprowski at samsung.com;
+> shawnguo at kernel.org; frowand.list at gmail.com; iommu at lists.linux-
+> foundation.org; linux-kernel at vger.kernel.org; devicetree at vger.kernel.org;
+> linux-arm-kernel at lists.infradead.org; linuxppc-dev at lists.ozlabs.org; linux-
+> pci at vger.kernel.org; Bharat Bhushan <bharat.bhushan@nxp.com>;
+> stuyoder at gmail.com; Leo Li <leoyang.li@nxp.com>
+> Subject: Re: [PATCH 0/7 v5] Support for fsl-mc bus and its devices in SMMU
 > 
-> --------------------
-> # ./utils/dvb/.libs/dvb-fe-tool -d isdbs
-> Changing delivery system to: ISDBS
-> ERROR    FE_SET_VOLTAGE: Unknown error 524
-
-Hmm... ENOTSUPP. Doesn't the device supposed to be able to power on the
-LNBf?
-
-Anyway, I changed the error print message to be clearer, displaying 
-instead:
-
-  ERROR    FE_SET_VOLTAGE: driver doesn't support it!
-
+> Hi Nipun,
 > 
-> # ./utils/dvb/.libs/dvb-fe-tool
-> Device Socionext SC1501A (/dev/dvb/adapter0/frontend0) capabilities:
->      CAN_FEC_AUTO
->      CAN_GUARD_INTERVAL_AUTO
->      CAN_HIERARCHY_AUTO
->      CAN_INVERSION_AUTO
->      CAN_QAM_AUTO
->      CAN_TRANSMISSION_MODE_AUTO
-> DVB API Version 5.11, Current v5 delivery system: ISDBS
-> Supported delivery systems:
->     [ISDBS]
->      ISDBT
-> Frequency range for the current standard:
-> From:             470 MHz
-> To:              2.07 GHz
-> Step:            25.0 kHz
-> Symbol rate ranges for the current standard:
-> From:                 0Bauds
-> To:                   0Bauds
-
-That seems a driver issue. The ISDB-S ops.info should be
-filling both symbol_rate_min and symbol_rate_max.
-
-I suspect that both should be filled with 28860000.
-
-The dvb_frontend.c core might hardcode it, but, IMHO,
-it is better to keep those information inside the 
-tuner/frontend ops.info.
-
-> SEC: set voltage to OFF
-> ERROR    FE_SET_VOLTAGE: Operation not permitted
+> On Thu, Jun 21, 2018 at 03:59:27AM +0000, Nipun Gupta wrote:
+> > Will this patch-set be taken for the next kernel release (and via which tree)?
 > 
+> I can take this through IOMMU tree if nobody objects. Please work out
+> the last remaining comment on patch 7 with Robin and then re-send with
+> all Acks and Reviewed-by: tags included.
 > 
-> # ./utils/dvb/.libs/dvb-fe-tool -d isdbt
-> Changing delivery system to: ISDBT
-> ERROR    FE_SET_VOLTAGE: Unknown error 524
+> Oh, and please use 'iommu/of:' prefix instead of 'iommu: of:' and follow
+> that sheme for the other patches/prefixes as well.
 > 
-> # ./utils/dvb/.libs/dvb-fe-tool
-> Device Socionext SC1501A (/dev/dvb/adapter0/frontend0) capabilities:
->      CAN_FEC_AUTO
->      CAN_GUARD_INTERVAL_AUTO
->      CAN_HIERARCHY_AUTO
->      CAN_INVERSION_AUTO
->      CAN_QAM_AUTO
->      CAN_TRANSMISSION_MODE_AUTO
-> DVB API Version 5.11, Current v5 delivery system: ISDBT
-> Supported delivery systems:
->      ISDBS
->     [ISDBT]
-> Frequency range for the current standard:
-> From:             470 MHz
-> To:              2.07 GHz
-> Step:            25.0 kHz
-
-The rest looks OK for me.
-
-> > > For example, Helene uses these info for only Ter or Sat freq ranges:
-> > >
-> > > 		.name = "Sony HELENE Ter tuner",
-> > > 		.frequency_min_hz  =    1 * MHz,
-> > > 		.frequency_max_hz  = 1200 * MHz,
-> > > 		.frequency_step_hz =   25 * kHz,
-> > >
-> > > 		.name = "Sony HELENE Sat tuner",
-> > > 		.frequency_min_hz  =  500 * MHz,
-> > > 		.frequency_max_hz  = 2500 * MHz,
-> > > 		.frequency_step_hz =    1 * MHz,
-> > >
-> > > Is this better to add new info for both system?
-> > >
-> > > 		.name = "Sony HELENE Sat/Ter tuner",
-> > > 		.frequency_min_hz  =    1 * MHz,
-> > > 		.frequency_max_hz  = 2500 * MHz,
-> > > 		.frequency_step_hz =   25 * kHz, // Is this correct...?  
-> > 
-> > That is indeed a very good question, and maybe a reason why we
-> > may need other approaches.
-> > 
-> > See, if the tuner is capable of tuning from 1 MHz to 2500 MHz,
-> > the frequency range should be ok. It would aget_frontend_algoctually be pretty cool
-> > to use a tuner with such wide range for SDR, if the hardware supports
-> > raw I/Q collect :-D
-> > 
-> > The frequency step is a different issue. If the tuner driver uses
-> > DVBFE_ALGO_SW (e. g. if ops.get_frontend_algo() returns it, or if
-> > this function is not defined), then the step will be used to adjust
-> > the zigzag interactions. If it is too small, the tuning will lose
-> > channels if the signal is not strong.
-> >   
+> Thanks,
 > 
-> Thank you for describing. It's difficult problem...
-
-I double-checked the implementation. We don't need to worry about
-zigzag, provided that the ISDB-S implementation at the core is correct.
-
-For satellite/cable standards, the zigzag logic takes the symbol
-rate into account, and not the stepsize:
-
-                case SYS_DVBS:
-                case SYS_DVBS2:
-                case SYS_ISDBS:
-                case SYS_TURBO:
-                case SYS_DVBC_ANNEX_A:
-                case SYS_DVBC_ANNEX_C:
-                        fepriv->min_delay = HZ / 20;
-                        fepriv->step_size = c->symbol_rate / 16000;
-                        fepriv->max_drift = c->symbol_rate / 2000;
-                        break;
-
-For terrestrial standards, it uses the stepsize:
-
-                case SYS_DVBT:
-                case SYS_DVBT2:
-                case SYS_ISDBT:
-                case SYS_DTMB:
-                        fepriv->min_delay = HZ / 20;
-                        fepriv->step_size = dvb_frontend_get_stepsize(fe) * 2;
-                        fepriv->max_drift = (dvb_frontend_get_stepsize(fe) * 2) + 1;
-                        break;
-
-So, having a value of 25 kHz there won't affect the zigzag algorithm
-for ISDB-S, as it will be used only for ISDB-T.
-
-> > In the specific case of helene, it doesn't have a get_frontend_algo,
-> > so it will use the step frequency.
-> > 
-> > I'm not sure how to solve this issue. Maybe Abylay may shed a light
-> > here, if helene does sigzag in hardware or not.
-> >   
-> 
-> As far as I know, Helene does not have automatic scan mechanism in 
-> hardware.
-
-Ok, so the driver is doing the right thing here.
-
-> > If it does in hardware, you could add a get_frontend_algo() routine
-> > at helene driver and return DVBFE_ALGO_HW. The tuning zigzag software
-> > algorithm in the Kernel will stop, as it will rely at the hardware.
-> > 
-> > Please notice that, if the hardware doesn't do zigzag itself, this
-> > will make it lose channels. On the other hand, if the hardware does
-> > have sigzag, changing to DVBFE_ALGO_HW will speedup tuning, as the
-> > Kernel won't try to do sigzag itself.
-> >   
-> 
-> ISDB-T uses 6MHz bandwidth per channel (in Japan), ISDB-S for 
-> BS/CS110 uses 38.36MHz bandwidth. Maybe 1MHz zigzag step is large for 
-> ISDB-T system and 25kHz is small for ISDB-S system.
-
-Yeah, but, after double-checking the logic, for ISDB-S, it will
-use:
-
-	c->symbol_rate = 28860000;
-	c->rolloff = ROLLOFF_35;
-	c->bandwidth_hz = c->symbol_rate / 100 * 135;
-
-That would actually set the ISDB-S channel separation to 38.961 MHz.
-
-By setting symbol_rate like that, the zigzag for ISDB-S will
-be defined by:
-
-       fepriv->step_size = c->symbol_rate / 16000; /* 38.961MHz / 16000 = .002435 - e. g. steps of ~25 kHz */
-       fepriv->max_drift = c->symbol_rate / 2000;  /* 38.961MHz / 2000 = .0194805 - e. g. max drift of ~195 kHz */
-
-Funny enough, it will be using about 25 kHz as step size for ISDB-S.
-
-I have no idea if the ISDB-S standard defines the zigzag logic,
-but I would be expecting a higher value for it. So, perhaps
-the ISDB-S zigzag could be optimized.
-
-Thanks,
-Mauro
+> 	Joerg
