@@ -1,25 +1,25 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 6 Jul 2018 10:29:00 -0700
-Subject: [PATCH] MAINTAINERS: arm64: Remove boot/dts/ directory from arm64
- entry
-In-Reply-To: <1530879736-7650-1-git-send-email-will.deacon@arm.com>
-References: <1530879736-7650-1-git-send-email-will.deacon@arm.com>
-Message-ID: <CAOesGMhV5aKDaNrP50eDei7t4TSKpR1B7TCnH_rynzvsODOHCQ@mail.gmail.com>
+From: mathieu.desnoyers@efficios.com (Mathieu Desnoyers)
+Date: Fri, 6 Jul 2018 13:30:04 -0400 (EDT)
+Subject: arm32: Missing __get_user for u64 user type
+Message-ID: <208280844.1302.1530898204811.JavaMail.zimbra@efficios.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I have a batch going in today, I can add it there if you want, or:
+Hi,
 
+The restartable sequence code needs a __get_user for u64 types.
+arm32. Although a get_user() is implemented, the architecture
+lacks support for 8 bytes __get_user().
 
-On Fri, Jul 6, 2018 at 5:22 AM, Will Deacon <will.deacon@arm.com> wrote:
-> The arm-soc tree does a good job handling .dts files, so exclude them
-> from the ARM64 entry in MAINTAINERS.
->
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+Do you guys recommend extending __get_user_err() to do two
+__get_user_asm_word() to read it through a temporary union,
+or do you have other approaches in mind ?
 
-Acked-by: Olof Johansson <olof@lixom.net>
+Thanks,
 
+Mathieu
 
-
--Olof
+-- 
+Mathieu Desnoyers
+EfficiOS Inc.
+http://www.efficios.com
