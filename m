@@ -1,65 +1,35 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Fri,  6 Jul 2018 19:51:03 +0200
-Subject: [PATCH 07/17] drm/sun4i: DW HDMI: Release nodes if error happens
- during CRTC search
+Date: Fri,  6 Jul 2018 19:51:01 +0200
+Subject: [PATCH 05/17] drm/sun4i: tcon: Release node when traversing of graph
 In-Reply-To: <20180706175113.26698-1-jernej.skrabec@siol.net>
 References: <20180706175113.26698-1-jernej.skrabec@siol.net>
-Message-ID: <20180706175113.26698-8-jernej.skrabec@siol.net>
+Message-ID: <20180706175113.26698-6-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If error happens in sun8i_dw_hdmi_find_possible_crtcs(), nodes are not
-released with of_node_put() before returning.
+Function sun4i_tcon_find_engine_traverse() doesn't release node if it
+needs to traverse of graph deeper than 1 level.
 
-Fix that by calling of_node_put() when necessary. While on it, clean up
-the code by using of_graph_get_remote_node() which also lowers number of
-cases where error handling has to be performed.
+Fix this by calling of_node_put().
 
-Fixes: 57e23de02f48 ("drm/sun4i: DW HDMI: Expand algorithm for possible crtcs")
+Fixes: 49836b11fe71 ("drm/sun4i: tcon: Generalize engine search algorithm")
 
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c | 15 +++++----------
- 1 file changed, 5 insertions(+), 10 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_tcon.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
-index 3459b9ec56c9..21dc9ebad0b4 100644
---- a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
-+++ b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
-@@ -53,22 +53,14 @@ static u32 sun8i_dw_hdmi_find_possible_crtcs(struct drm_device *drm,
- 	struct device_node *port, *ep, *remote, *remote_port;
- 	u32 crtcs = 0;
- 
--	port = of_graph_get_port_by_id(node, 0);
--	if (!port)
--		return 0;
--
--	ep = of_get_next_available_child(port, NULL);
--	if (!ep)
--		return 0;
--
--	remote = of_graph_get_remote_port_parent(ep);
-+	remote = of_graph_get_remote_node(node, 0, -1);
- 	if (!remote)
- 		return 0;
- 
- 	if (sun8i_dw_hdmi_node_is_tcon_top(remote)) {
- 		port = of_graph_get_port_by_id(remote, 4);
- 		if (!port)
--			return 0;
-+			goto crtcs_exit;
- 
- 		for_each_child_of_node(port, ep) {
- 			remote_port = of_graph_get_remote_port(ep);
-@@ -81,6 +73,9 @@ static u32 sun8i_dw_hdmi_find_possible_crtcs(struct drm_device *drm,
- 		crtcs = drm_of_find_possible_crtcs(drm, node);
- 	}
- 
-+crtcs_exit:
-+	of_node_put(remote);
-+
- 	return crtcs;
- }
- 
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+index aacc841d3dc6..3fb084f802e2 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+@@ -811,6 +811,7 @@ sun4i_tcon_find_engine_traverse(struct sun4i_drv *drv,
+ 	 * remote output id. If this for some reason can't be done, 0
+ 	 * is used as input port id.
+ 	 */
++	of_node_put(port);
+ 	port = of_graph_get_remote_port(ep);
+ 	if (!of_property_read_u32(port, "reg", &reg) && reg > 0)
+ 		reg -= 1;
 -- 
 2.18.0
