@@ -1,84 +1,45 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Fri,  6 Jul 2018 19:51:08 +0200
-Subject: [PATCH 12/17] drm/sun4i: tcon: Add support for R40 TCON
+Date: Fri,  6 Jul 2018 19:51:09 +0200
+Subject: [PATCH 13/17] ARM: dts: sun8i: r40: Remove fallback compatible for
+ TCON TV
 In-Reply-To: <20180706175113.26698-1-jernej.skrabec@siol.net>
 References: <20180706175113.26698-1-jernej.skrabec@siol.net>
-Message-ID: <20180706175113.26698-13-jernej.skrabec@siol.net>
+Message-ID: <20180706175113.26698-14-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-R40 TV TCON is basically the same as on A83T. However, it needs special
-handling, because it has to set up TCON TOP muxes at runtime.
+While registers between A83T and R40 TV TCON are the same, R40 TCON TV
+driver has to set additional muxes in TCON TOP. Because of that, remove
+fallback A83T TCON TV compatible.
 
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/gpu/drm/sun4i/sun4i_tcon.c | 40 ++++++++++++++++++++++++++++++
- 1 file changed, 40 insertions(+)
+ arch/arm/boot/dts/sun8i-r40.dtsi | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-index 44ec3a3d4d64..5676b7faaca0 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-@@ -1291,6 +1291,40 @@ static int sun6i_tcon_set_mux(struct sun4i_tcon *tcon,
- 	return 0;
- }
+diff --git a/arch/arm/boot/dts/sun8i-r40.dtsi b/arch/arm/boot/dts/sun8i-r40.dtsi
+index 1dd088d82773..6b4fe8eeee99 100644
+--- a/arch/arm/boot/dts/sun8i-r40.dtsi
++++ b/arch/arm/boot/dts/sun8i-r40.dtsi
+@@ -666,8 +666,7 @@
+ 		};
  
-+static int sun8i_r40_tcon_tv_set_mux(struct sun4i_tcon *tcon,
-+				     const struct drm_encoder *encoder)
-+{
-+	struct device_node *port, *remote;
-+	struct platform_device *pdev;
-+	int id, ret;
-+
-+	/* find TCON TOP platform device and TCON id */
-+
-+	port = of_graph_get_port_by_id(tcon->dev->of_node, 0);
-+	if (!port)
-+		return -EINVAL;
-+
-+	id = sun4i_tcon_of_get_id_from_port(port);
-+	of_node_put(port);
-+
-+	remote = of_graph_get_remote_node(tcon->dev->of_node, 0, -1);
-+	if (!remote)
-+		return -EINVAL;
-+
-+	pdev = of_find_device_by_node(remote);
-+	of_node_put(remote);
-+	if (!pdev)
-+		return -EINVAL;
-+
-+	if (encoder->encoder_type == DRM_MODE_ENCODER_TMDS) {
-+		ret = sun8i_tcon_top_set_hdmi_src(&pdev->dev, id);
-+		if (ret)
-+			return ret;
-+	}
-+
-+	return sun8i_tcon_top_de_config(&pdev->dev, tcon->id, id);
-+}
-+
- static const struct sun4i_tcon_quirks sun4i_a10_quirks = {
- 	.has_channel_0		= true,
- 	.has_channel_1		= true,
-@@ -1338,6 +1372,11 @@ static const struct sun4i_tcon_quirks sun8i_a83t_tv_quirks = {
- 	.has_channel_1		= true,
- };
+ 		tcon_tv0: lcd-controller at 1c73000 {
+-			compatible = "allwinner,sun8i-r40-tcon-tv",
+-				     "allwinner,sun8i-a83t-tcon-tv";
++			compatible = "allwinner,sun8i-r40-tcon-tv";
+ 			reg = <0x01c73000 0x1000>;
+ 			interrupts = <GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&ccu CLK_BUS_TCON_TV0>, <&tcon_top 0>;
+@@ -690,8 +689,7 @@
+ 		};
  
-+static const struct sun4i_tcon_quirks sun8i_r40_tv_quirks = {
-+	.has_channel_1		= true,
-+	.set_mux		= sun8i_r40_tcon_tv_set_mux,
-+};
-+
- static const struct sun4i_tcon_quirks sun8i_v3s_quirks = {
- 	.has_channel_0		= true,
- };
-@@ -1362,6 +1401,7 @@ const struct of_device_id sun4i_tcon_of_table[] = {
- 	{ .compatible = "allwinner,sun8i-a33-tcon", .data = &sun8i_a33_quirks },
- 	{ .compatible = "allwinner,sun8i-a83t-tcon-lcd", .data = &sun8i_a83t_lcd_quirks },
- 	{ .compatible = "allwinner,sun8i-a83t-tcon-tv", .data = &sun8i_a83t_tv_quirks },
-+	{ .compatible = "allwinner,sun8i-r40-tcon-tv", .data = &sun8i_r40_tv_quirks },
- 	{ .compatible = "allwinner,sun8i-v3s-tcon", .data = &sun8i_v3s_quirks },
- 	{ .compatible = "allwinner,sun9i-a80-tcon-lcd", .data = &sun9i_a80_tcon_lcd_quirks },
- 	{ .compatible = "allwinner,sun9i-a80-tcon-tv", .data = &sun9i_a80_tcon_tv_quirks },
+ 		tcon_tv1: lcd-controller at 1c74000 {
+-			compatible = "allwinner,sun8i-r40-tcon-tv",
+-				     "allwinner,sun8i-a83t-tcon-tv";
++			compatible = "allwinner,sun8i-r40-tcon-tv";
+ 			reg = <0x01c74000 0x1000>;
+ 			interrupts = <GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&ccu CLK_BUS_TCON_TV1>, <&tcon_top 1>;
 -- 
 2.18.0
