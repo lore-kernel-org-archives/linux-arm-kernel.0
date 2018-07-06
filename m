@@ -1,42 +1,38 @@
-From: david@lechnology.com (David Lechner)
-Date: Fri, 6 Jul 2018 12:02:41 -0500
-Subject: [PATCH] ARM: dts: da850: Add power-domains to CPPI 4.1 node
-In-Reply-To: <20180704094432.5424-1-nsekhar@ti.com>
-References: <20180704094432.5424-1-nsekhar@ti.com>
-Message-ID: <e0fc938e-36f9-655f-4d4a-910527a2cc08@lechnology.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 6 Jul 2018 18:06:17 +0100
+Subject: [PATCH v2] arm64: add ARM64-specific support for flatmem
+In-Reply-To: <20180706170215.56116-1-nkela@cisco.com>
+References: <20180706170215.56116-1-nkela@cisco.com>
+Message-ID: <20180706170617.GB4961@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/04/2018 04:44 AM, Sekhar Nori wrote:
-> This adds the power-domains property to CPPI 4.1 node.
+On Fri, Jul 06, 2018 at 10:02:15AM -0700, Nikunj Kela wrote:
+> Flatmem is useful in reducing kernel memory usage.
+> One usecase is in kdump kernel. We are able to save
+> ~14M by moving to flatmem scheme.
 > 
-> The CPPI 4.1 DMA driver uses pm_runtime to manage the clocks,
-> so it needs this property in order to find and enable the clock
-> properly.
-> 
-> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+> Cc: xe-kernel at external.cisco.com
+> Cc: Nikunj Kela <nkela@cisco.com>
+> Signed-off-by: Nikunj Kela <nkela@cisco.com>
 > ---
-> Applies for v4.19/dt branch of my tree.
+>  arch/arm64/Kconfig | 4 ++++
+>  1 file changed, 4 insertions(+)
 > 
->   arch/arm/boot/dts/da850.dtsi | 1 +
->   1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-> index 9e05a5a709c0..07f215e7e5b8 100644
-> --- a/arch/arm/boot/dts/da850.dtsi
-> +++ b/arch/arm/boot/dts/da850.dtsi
-> @@ -637,6 +637,7 @@
->   				interrupts = <58>;
->   				#dma-cells = <2>;
->   				#dma-channels = <4>;
-> +				power-domains = <&psc1 1>;
->   				status = "okay";
->   			};
->   		};
-> 
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 42c090c..96ab9a7 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -775,6 +775,10 @@ config ARCH_SPARSEMEM_DEFAULT
+>  config ARCH_SELECT_MEMORY_MODEL
+>  	def_bool ARCH_SPARSEMEM_ENABLE
+>  
+> +config ARCH_FLATMEM_ENABLE
+> +	def_bool y
+> +	depends on !NUMA
 
-Reviewed-by: David Lechner <david@lechnology.com>
+I still don't understand what this has to do with NUMA. SPARSEMEM is still
+going to be what you want on a non-NUMA system with large holes in the
+physical memory map, no?
 
-
-Although this has me wondering if we can now remove the clock-ranges
-property in the parent node.
+Will
