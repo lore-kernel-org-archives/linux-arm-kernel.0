@@ -1,192 +1,47 @@
-From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Fri, 06 Jul 2018 20:37:09 +0300
-Subject: [PATCH v2 3/3] serial: 8250_dw: add fractional divisor support
-In-Reply-To: <20180705143921.6a8aeb50@xhacker.debian>
-References: <20180704165908.4bb8b090@xhacker.debian>
- <20180704170310.56772d77@xhacker.debian>
- <f2733332a58e7f2d92948e2ff252581f93e5073a.camel@linux.intel.com>
- <20180705143921.6a8aeb50@xhacker.debian>
-Message-ID: <66eff871bc97f24e7fbcc2494df1bb6fdd98d8da.camel@linux.intel.com>
+From: david@lechnology.com (David Lechner)
+Date: Fri, 6 Jul 2018 12:39:21 -0500
+Subject: [PATCH v3 00/13] ARM: davinci: remove duplicate aemif support
+In-Reply-To: <e1222b3c-dfa4-4cb0-eebf-8e2550e9d674@ti.com>
+References: <20180628095748.4462-1-brgl@bgdev.pl>
+ <52a274f1-283a-a14a-54f3-4b95b6605c4f@ti.com>
+ <59fdc532-bb72-ffae-cfb6-a7f156c14771@lechnology.com>
+ <e1222b3c-dfa4-4cb0-eebf-8e2550e9d674@ti.com>
+Message-ID: <125d73f7-7311-866f-1e9d-d3c1f9473899@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2018-07-05 at 14:39 +0800, Jisheng Zhang wrote:
-> > On Wed, 2018-07-04 at 17:03 +0800, Jisheng Zhang wrote:
-
-My comments below.
-
-> > > For Synopsys DesignWare 8250 uart which version >= 4.00a, there's
-> > > a
-> > > valid divisor latch fraction register. The fractional divisor
-> > > width is
-> > > 4bits ~ 6bits.  
-> > 
-> > I have read 4.00a spec a bit and didn't find this limitation.
-> > The fractional divider can fit up to 32 bits.
+On 07/04/2018 01:35 AM, Sekhar Nori wrote:
+> Hi David,
 > 
-> the limitation isn't put in the register description, but in the
-> description
-> about fractional divisor width configure parameters. Searching
-> DLF_SIZE will
-> find it.
-
-Found, thanks.
-
-> From another side, 32bits fractional div is a waste, for example,
-> let's
-> assume the fract divisor = 0.9, 
-> if fractional width is 4 bits, DLF reg will be set to UP(0.9*2^4) =
-> 15, the
-> real frac divisor =  15/2^4 = 0.93;
-> if fractional width is 32 bits, DLF reg will be set to UP(0.9*2^32) =
-> 3865470567
-> the real frac divisor = 3865470567/2^32 = 0.90;
-
-So, your example shows that 32-bit gives better value. Where is
-contradiction?
-
-> > I would test this a bit later.
-
-It reads back 0 on our hardware with 3.xx version of IP.
-  
-> > > +	unsigned int		dlf_size:3;  
-> > 
-> > These bit fields (besides the fact you need 5) more or less for
-> > software
-> > quirk flags. In your case I would rather keep a u32 value of DFL
-> > mask as
-> > done for msr slightly above in this structure.
+> On Monday 02 July 2018 09:02 PM, David Lechner wrote:
+>> On 07/02/2018 07:28 AM, Sekhar Nori wrote:
+>>> Hi David, Stephen,
+>>>
+>>> On Thursday 28 June 2018 03:27 PM, Bartosz Golaszewski wrote:
+>>>> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>>>>
+>>>> This series moves all aemif/nand users to using the ti-aemif platform
+>>>> driver located in drivers/memory instead of the older API located in
+>>>> mach-davinci.
+>>>>
+>>>> First five patches add necessary changes to the clock driver. Next
+>>>> seven convert the board files to using the ti-aemif driver. Last patch
+>>>> removes now dead code.
+>>>
+>>> How do you want to handle this series? I can apply the series and
+>>> provide you an immutable branch on v4.18-rc1 with the clock patches
+>>> applied if that can work.
+>>
+>> Sounds good to me. But I'm new to this maintainer thing, so maybe
+>> there is something to consider that I haven't thought of?
 > 
-> OK. When setting the frac div, we use DLF size rather than mask, so
-> could
-> I only calculate the DLF size once then use an u8 value to hold the
-> calculated DLF size rather than calculating every time?
-
-Let's see below.
-
-> > > +	quot = DIV_ROUND_CLOSEST(p->uartclk << (d->dlf_size - 4),
-> > > baud);  
-> > 
-> > If we have clock rate like 100MHz and 10 bits of fractional divider
-> > it
-> > would give an integer overflow.
+> I don't think there is more to it. Ultimately there should not be two
+> commits for the same patch. Either you can apply and share the commit to
+> use or I can do that as well. I am equally fine either way.
 > 
-> This depends on the fraction divider width. If it's only 4~6 bits,
-> then we are fine.
-
-True.
-
-> > 
-> > 4 here is a magic. Needs to be commented / described better.
+> Regards,
+> Sekhar
 > 
-> Yes. divisor = clk/(16*baud) = BRD(I) + BRD(F)
-> "I" means integer, "F" means fractional
-> 
-> 2^dlf_size*clk/(16*baud) = 2^dlf_size*(BRD(I) + BRD(F))
-> 
-> clk*2^(dlf_size - 4)/baud = 2^dlf_size*((BRD(I) + BRD(F))
-> 
-> the left part is "DIV_ROUND_CLOSEST(p->uartclk << (d->dlf_size - 4),
-> baud)",
-> let's assume it equals quot.
-> 
-> then, BRD(I) = quot / 2^dlf_size = quot >> dlf_size, this is where
-> "quot >> d->dlf_size" below from.
-> 
-> BRD(F) = quot & dlf_mask = quot & (~0U >> (32 - dlf_size))
 
-Yes, I understand from where it comes. It's a hard coded value of PS all
-over the serial code.
-
-And better use the same idiom as in other code, i.e. * 16 or / 16
-depends on context.
-
-> > > +	*frac = quot & (~0U >> (32 - d->dlf_size));
-> > > +  
-> > 
-> > Operating on dfl_mask is simple as
-> > 
-> > u64 quot = p->uartclk * (p->dfl_mask + 1);
-> 
-> Since the dlf_mask is always 2^n - 1, 
-> clk * (p->dlf_mask + 1) = clk << p->dlf_size, but the later
-> is simpler
-> 
-> > 
-> > *frac = div64_u64(quot, baud * 16 * (p->dfl_mask + 1);
-> > return quot;
-> 
-> quot = DIV_ROUND_CLOSEST(p->uartclk << (d->dlf_size - 4), baud)
-> *frac = quot & (~0U >> (32 - d->dlf_size))
-> return quot >> d->dlf_size;
-> 
-> vs.
-> 
-> quot = p->uartclk * (p->dfl_mask + 1);
-> *frac = div64_u64(quot, baud * 16 * (p->dfl_mask + 1);
-> return quot;
-> 
-> shift vs mul.
-> 
-> If the dlf width is only 4~6 bits, the first calculation can avoid
-> 64bit div. I prefer the first calculation.
-
-OK, taking that into consideration and looking at the code snippets
-again I would to
- - keep two values
-
-// mask we get for free because it's needed in intermediate calculus
-//
-and it doesn't overflow u8 (4-6 bits by spec)
-u8 dlf_mask;
-u8 dlf_size;
-
- - implement function like below
-
-unsigned int quot;
-
-/* Consider maximum possible DLF_SIZE, i.e. 6 bits */
-quot = DIV_ROUND_CLOSEST(p->uartclk * 4, baud);
-
-*frac = (quot >> (6 - dlf_size)) & dlf_mask;
-return quot >> dlf_size;
-
-Would you agree it looks slightly less complicated?
-
-> > > +	serial_port_out(p, UART_LCR, up->lcr | UART_LCR_DLAB);
-> > > +	serial_dl_write(up, quot);  
-
-(1)
-
-> > 
-> > At some point it would be a helper, I think. We can call
-> > serial8250_do_set_divisor() here. So, perhaps we might export it.
-> 
-> serial8250_do_set_divisor will drop the frac, that's not we want ;)
-
-Can you check again? What I see is that for DW 8250 the
-_do_set_divisor() would be an equivalent to the two lines, i.e. (1).
-
-And basically at the end it should become just those two lines when the
-rest will implement their custom set_divisor().
-
-> > This should use some helpers. I'll prepare a patch soon and send it
-> > here, you may include it in your series.
-> 
-> Nice. Thanks.
-
-Sent.
-
-> > > +		d->dlf_size = fls(reg);  
-> > 
-> > Just save value itself as dfl_mask.
-> 
-> we use the dlf size during calculation, so it's better to hold the
-> dlf_size
-> instead.
-
-See above.
-
--- 
-Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-Intel Finland Oy
+I've created a branch for-sekhar at https://github.com/dlech/linux.git
+with the clk commits.
