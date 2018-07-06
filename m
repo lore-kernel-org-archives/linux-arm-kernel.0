@@ -1,322 +1,80 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Fri, 06 Jul 2018 15:36:04 +0100
-Subject: [PATCH v4 4/7] KVM: arm64: Support PUD hugepage in
- stage2_is_exec()
-In-Reply-To: <442d0f4b-cb23-9788-1ebd-b14c89c52c45@arm.com> (Suzuki
- K. Poulose's message of "Thu, 5 Jul 2018 17:48:37 +0100")
-References: <20180705140850.5801-1-punit.agrawal@arm.com>
- <20180705140850.5801-5-punit.agrawal@arm.com>
- <442d0f4b-cb23-9788-1ebd-b14c89c52c45@arm.com>
-Message-ID: <87fu0wqvmz.fsf@e105922-lin.cambridge.arm.com>
+From: james.morse@arm.com (James Morse)
+Date: Fri, 6 Jul 2018 15:41:07 +0100
+Subject: [PATCH v3 3/5] arm64/mm: Create initial page tables in init_pg_dir
+In-Reply-To: <3977afaa-63ae-e390-7660-4d25146140b8@arm.com>
+References: <20180702111659.25570-1-yaojun8558363@gmail.com>
+ <20180702111659.25570-4-yaojun8558363@gmail.com>
+ <3977afaa-63ae-e390-7660-4d25146140b8@arm.com>
+Message-ID: <41a18121-c91d-f9ec-87c3-8dba7931b517@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Suzuki K Poulose <Suzuki.Poulose@arm.com> writes:
+Hi Jun,
 
-> Hi Punit,
->
-> On 05/07/18 15:08, Punit Agrawal wrote:
->> In preparation for creating PUD hugepages at stage 2, add support for
->> detecting execute permissions on PUD page table entries. Faults due to
->> lack of execute permissions on page table entries is used to perform
->> i-cache invalidation on first execute.
+On 06/07/18 09:58, James Morse wrote:
+> The series so far fails to boot from me. This is because the kaslr code tries to
+> read the kaslr-seed from the DT, via the fixmap. To do this, it needs the fixmap
+> tables installed, which early_fixmap_init() does.
+> 
+> early_fixmap_init() calls pgd_offset_k(), which assumes init_mm.pgd is in use,
+> so we hit a BUG_ON() when trying to setup the fixmap because we added the tables
+> to the wrong page tables.
+> 
+> If you enable 'CONFIG_RANDOMIZE_BASE', even without EFI you should see the same
+> thing happen.
+> 
+> 
+> I think we should move this hunk:
+>> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+>> index 30ad2f085d1f..b065c08d4008 100644
+>> --- a/arch/arm64/kernel/setup.c
+>> +++ b/arch/arm64/kernel/setup.c
+>> @@ -249,6 +249,7 @@ void __init setup_arch(char **cmdline_p)
+>>  	init_mm.end_code   = (unsigned long) _etext;
+>>  	init_mm.end_data   = (unsigned long) _edata;
+>>  	init_mm.brk	   = (unsigned long) _end;
+>> +	init_mm.pgd	   = init_pg_dir;
 >>
->> Provide trivial implementations of arm32 helpers to allow sharing of
->> code.
+>>  	*cmdline_p = boot_command_line;
 >>
->> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
->> Cc: Christoffer Dall <christoffer.dall@arm.com>
->> Cc: Marc Zyngier <marc.zyngier@arm.com>
->> Cc: Russell King <linux@armlinux.org.uk>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> ---
->>   arch/arm/include/asm/kvm_mmu.h         |  6 ++++++
->>   arch/arm64/include/asm/kvm_mmu.h       |  5 +++++
->>   arch/arm64/include/asm/pgtable-hwdef.h |  2 ++
->>   virt/kvm/arm/mmu.c                     | 10 +++++++++-
->>   4 files changed, 22 insertions(+), 1 deletion(-)
->>
+> 
+> into early_fixmap_init(), which is the first thing setup_arch() calls.
+> Something like [0] fixes it.
+> 
+> This looks to be the only thing that goes near init_mm.pgd before paging_init().
 
-[...]
+I missed one: head.S has a call to kasan_early_init() before start_kernel(),
+this goes messing with the page tables, and calls pgd_offset_k(), which pulls in
+swapper_pg_dir. This one is enabled by CONFIG_KASAN.
 
->> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
->> index db04b18218c1..ccdea0edabb3 100644
->> --- a/virt/kvm/arm/mmu.c
->> +++ b/virt/kvm/arm/mmu.c
->> @@ -1040,10 +1040,18 @@ static int stage2_set_pmd_huge(struct kvm *kvm, struct kvm_mmu_memory_cache
->>     static bool stage2_is_exec(struct kvm *kvm, phys_addr_t addr)
->>   {
->> +	pud_t *pudp;
->>   	pmd_t *pmdp;
->>   	pte_t *ptep;
->>   -	pmdp = stage2_get_pmd(kvm, NULL, addr);
->> +	pudp = stage2_get_pud(kvm, NULL, addr);
->> +	if (!pudp || pud_none(*pudp) || !pud_present(*pudp))
->> +		return false;
->> +
->> +	if (pud_huge(*pudp))
->> +		return kvm_s2pud_exec(pudp);
->> +
->> +	pmdp = stage2_pmd_offset(pudp, addr);
->>   	if (!pmdp || pmd_none(*pmdp) || !pmd_present(*pmdp))
->>   		return false;
->
-> I am wondering if we need a slightly better way to deal with this
-> kind of operation. We seem to duplicate the above operation (here and
-> in the following patches), i.e, finding the "leaf entry" for a given
-> address and follow the checks one level up at a time.
+Something like that same hunk [0] in kasan_early_init() fixes it. This is still
+within arch/arm64, so I still think we should get away without some #ifdeffery
+to override the core-code's initial setup of swapper_pg_dir...
 
-We definitely need a better way to walk the page tables - for stage 2
-but also stage 1 and hugetlbfs. As things stands, there is a lot of
-repetitive pattern with small differences at some levels (hugepage
-and/or THP, p*d_none(), p*d_present(), ...)
+Thanks,
 
-> So instead of doing, stage2_get_pud() and walking down everywhere this
-> is needed, how about adding :
->
-> /* Returns true if the leaf entry is found and updates the relevant pointer */
-> found = stage2_get_leaf_entry(kvm, NULL, addr, &pudp, &pmdp, &ptep)
->
-> which could set the appropriate entry and we could check the result
-> here.
+James
 
-I prototyped with the above approach but found that it could not be used
-in all places due to the specific semantics of the walk. Also, then we
-end up with the following pattern.
 
-    if (pudp) {
-            ...
-    } else if (pmdp) {
-            ...
-    } else {
-            ...
-    }
-
-At the end of the conversion, the resulting code is the same size as
-well (see diff below for changes).
-
-Another idea might be to build a page table walker passing in callbacks
-- but this makes more sense if we have unified modifiers for the
-levels. I think this is something we should explore but would like to do
-outside the context of this series.
-
-Hope thats ok.
-
-Thanks for having a look,
-Punit
-
--- >8 --
-diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-index eddb74a7fac3..ea5c99f6dfab 100644
---- a/virt/kvm/arm/mmu.c
-+++ b/virt/kvm/arm/mmu.c
-@@ -1077,31 +1077,56 @@ static int stage2_set_pud_huge(struct kvm *kvm, struct kvm_mmu_memory_cache *cac
- 	return 0;
- }
- 
--static bool stage2_is_exec(struct kvm *kvm, phys_addr_t addr)
-+static bool stage2_get_leaf_entry(struct kvm *kvm, phys_addr_t addr, pud_t **pudp,
-+				  pmd_t **pmdp, pte_t **ptep)
- {
--	pud_t *pudp;
--	pmd_t *pmdp;
--	pte_t *ptep;
-+	pud_t *lpudp;
-+	pmd_t *lpmdp;
-+	pte_t *lptep;
- 
--	pudp = stage2_get_pud(kvm, NULL, addr);
--	if (!pudp || pud_none(*pudp) || !pud_present(*pudp))
-+	lpudp = stage2_get_pud(kvm, NULL, addr);
-+	if (!lpudp || pud_none(*lpudp) || !pud_present(*lpudp))
- 		return false;
- 
--	if (pud_huge(*pudp))
--		return kvm_s2pud_exec(pudp);
-+	if (pud_huge(*lpudp)) {
-+		*pudp = lpudp;
-+		return true;
-+	}
- 
--	pmdp = stage2_pmd_offset(pudp, addr);
--	if (!pmdp || pmd_none(*pmdp) || !pmd_present(*pmdp))
-+	lpmdp = stage2_pmd_offset(lpudp, addr);
-+	if (!lpmdp || pmd_none(*lpmdp) || !pmd_present(*lpmdp))
- 		return false;
- 
--	if (pmd_thp_or_huge(*pmdp))
--		return kvm_s2pmd_exec(pmdp);
-+	if (pmd_thp_or_huge(*lpmdp)) {
-+		*pmdp = lpmdp;
-+		return true;
-+	}
- 
--	ptep = pte_offset_kernel(pmdp, addr);
--	if (!ptep || pte_none(*ptep) || !pte_present(*ptep))
-+	lptep = pte_offset_kernel(lpmdp, addr);
-+	if (!lptep || pte_none(*lptep) || !pte_present(*lptep))
- 		return false;
- 
--	return kvm_s2pte_exec(ptep);
-+	*ptep = lptep;
-+	return true;
-+}
-+
-+static bool stage2_is_exec(struct kvm *kvm, phys_addr_t addr)
-+{
-+	pud_t *pudp = NULL;
-+	pmd_t *pmdp = NULL;
-+	pte_t *ptep = NULL;
-+	bool found;
-+
-+	found = stage2_get_leaf_entry(kvm, addr, &pudp, &pmdp, &ptep);
-+	if (!found)
-+		return false;
-+
-+	if (pudp)
-+		return kvm_s2pud_exec(pudp);
-+	else if (pmdp)
-+		return kvm_s2pmd_exec(pmdp);
-+	else
-+		return kvm_s2pte_exec(ptep);
- }
- 
- static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
-@@ -1681,45 +1706,36 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
-  */
- static void handle_access_fault(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa)
- {
--	pud_t *pud;
--	pmd_t *pmd;
--	pte_t *pte;
-+	pud_t *pud = NULL;
-+	pmd_t *pmd = NULL;
-+	pte_t *pte = NULL;
- 	kvm_pfn_t pfn;
--	bool pfn_valid = false;
-+	bool found, pfn_valid = false;
- 
- 	trace_kvm_access_fault(fault_ipa);
- 
- 	spin_lock(&vcpu->kvm->mmu_lock);
- 
--	pud = stage2_get_pud(vcpu->kvm, NULL, fault_ipa);
--	if (!pud || pud_none(*pud))
--		goto out;		/* Nothing there */
-+	found = stage2_get_leaf_entry(kvm, fault_ipa, &pud, &pmd, &pte);
-+	if (!found)
-+		goto out;
- 
--	if (pud_huge(*pud)) {		/* HugeTLB */
-+	if (pud) {		/* HugeTLB */
- 		*pud = kvm_s2pud_mkyoung(*pud);
- 		pfn = kvm_pud_pfn(*pud);
- 		pfn_valid = true;
- 		goto out;
--	}
--
--	pmd = stage2_pmd_offset(pud, fault_ipa);
--	if (!pmd || pmd_none(*pmd))	/* Nothing there */
--		goto out;
--
--	if (pmd_thp_or_huge(*pmd)) {	/* THP, HugeTLB */
-+	} else 	if (pmd) {	/* THP, HugeTLB */
- 		*pmd = pmd_mkyoung(*pmd);
- 		pfn = pmd_pfn(*pmd);
- 		pfn_valid = true;
- 		goto out;
-+	} else {
-+		*pte = pte_mkyoung(*pte);	/* Just a page... */
-+		pfn = pte_pfn(*pte);
-+		pfn_valid = true;
- 	}
- 
--	pte = pte_offset_kernel(pmd, fault_ipa);
--	if (pte_none(*pte))		/* Nothing there either */
--		goto out;
--
--	*pte = pte_mkyoung(*pte);	/* Just a page... */
--	pfn = pte_pfn(*pte);
--	pfn_valid = true;
- out:
- 	spin_unlock(&vcpu->kvm->mmu_lock);
- 	if (pfn_valid)
-@@ -1932,58 +1948,42 @@ void kvm_set_spte_hva(struct kvm *kvm, unsigned long hva, pte_t pte)
- 
- static int kvm_age_hva_handler(struct kvm *kvm, gpa_t gpa, u64 size, void *data)
- {
--	pud_t *pud;
--	pmd_t *pmd;
--	pte_t *pte;
-+	pud_t *pud = NULL;
-+	pmd_t *pmd = NULL;
-+	pte_t *pte = NULL;
-+	bool found;
- 
- 	WARN_ON(size != PAGE_SIZE && size != PMD_SIZE && size != PUD_SIZE);
--	pud = stage2_get_pud(kvm, NULL, gpa);
--	if (!pud || pud_none(*pud))	/* Nothing there */
-+	found = stage2_get_leaf_entry(kvm, gpa, &pud, &pmd, &pte);
-+	if (!found)
- 		return 0;
- 
--	if (pud_huge(*pud))		/* HugeTLB */
-+	if (pud)
- 		return stage2_pudp_test_and_clear_young(pud);
--
--	pmd = stage2_pmd_offset(pud, gpa);
--	if (!pmd || pmd_none(*pmd))	/* Nothing there */
--		return 0;
--
--	if (pmd_thp_or_huge(*pmd))	/* THP, HugeTLB */
-+	else if (pmd)
- 		return stage2_pmdp_test_and_clear_young(pmd);
--
--	pte = pte_offset_kernel(pmd, gpa);
--	if (pte_none(*pte))
--		return 0;
--
--	return stage2_ptep_test_and_clear_young(pte);
-+	else
-+		return stage2_ptep_test_and_clear_young(pte);
- }
- 
- static int kvm_test_age_hva_handler(struct kvm *kvm, gpa_t gpa, u64 size, void *data)
- {
--	pud_t *pud;
--	pmd_t *pmd;
--	pte_t *pte;
-+	pud_t *pud = NULL;
-+	pmd_t *pmd = NULL;
-+	pte_t *pte = NULL;
-+	bool found;
- 
- 	WARN_ON(size != PAGE_SIZE && size != PMD_SIZE && size != PUD_SIZE);
--	pud = stage2_get_pud(kvm, NULL, gpa);
--	if (!pud || pud_none(*pud))	/* Nothing there */
-+	found = stage2_get_leaf_entry(kvm, gpa, &pud, &pmd, &pte);
-+	if (!found)
- 		return 0;
- 
--	if (pud_huge(*pud))		/* HugeTLB */
-+	if (pud)
- 		return kvm_s2pud_young(*pud);
--
--	pmd = stage2_pmd_offset(pud, gpa);
--	if (!pmd || pmd_none(*pmd))	/* Nothing there */
--		return 0;
--
--	if (pmd_thp_or_huge(*pmd))		/* THP, HugeTLB */
-+	else if (pmd)
- 		return pmd_young(*pmd);
--
--	pte = pte_offset_kernel(pmd, gpa);
--	if (!pte_none(*pte))		/* Just a page... */
-+	else
- 		return pte_young(*pte);
--
--	return 0;
- }
- 
- int kvm_age_hva(struct kvm *kvm, unsigned long start, unsigned long end)
+> [0] make sure fixmap tables go in the init page tables
+> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> index 117d080639b3..e097c78a66f8 100644
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -770,6 +771,13 @@ void __init early_fixmap_init(void)
+>         pmd_t *pmdp;
+>         unsigned long addr = FIXADDR_START;
+> 
+> +       /*
+> +        * During early setup we use init_pg_dir, update init_mm so its
+> +        * implicit use by pgd_offset_k() gets the live page tables.
+> +        * swapper_pg_dir is restored by paging_init().
+> +        */
+> +       init_mm.pgd = init_pg_dir;
+> +
+>         pgdp = pgd_offset_k(addr);
+>         pgd = READ_ONCE(*pgdp);
+>         if (CONFIG_PGTABLE_LEVELS > 3 &&
+> 
+> 
+> 
