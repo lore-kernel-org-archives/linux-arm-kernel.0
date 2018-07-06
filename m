@@ -1,52 +1,82 @@
-From: daniel@zonque.org (Daniel Mack)
-Date: Sat, 7 Jul 2018 00:08:47 +0200
-Subject: [PATCH] ARM: pxa: irq: fix handling of ICMR registers in
- suspend/resume
-In-Reply-To: <87zhz4f40g.fsf@belgarion.home>
-References: <20180706201500.2000-1-daniel@zonque.org>
- <87zhz4f40g.fsf@belgarion.home>
-Message-ID: <5dc561d0-794a-f8b9-f00d-267dc0d2f354@zonque.org>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Fri, 6 Jul 2018 15:37:09 -0700
+Subject: [RESEND PATCH v10 2/6] mm: page_alloc: remain
+ memblock_next_valid_pfn() on arm/arm64
+In-Reply-To: <1530867675-9018-3-git-send-email-hejianet@gmail.com>
+References: <1530867675-9018-1-git-send-email-hejianet@gmail.com>
+ <1530867675-9018-3-git-send-email-hejianet@gmail.com>
+Message-ID: <20180706153709.6bcc76b0245f239f1d1dcc8a@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri,  6 Jul 2018 17:01:11 +0800 Jia He <hejianet@gmail.com> wrote:
 
-
-On 07/06/2018 11:28 PM, Robert Jarzmik wrote:
-> Daniel Mack <daniel@zonque.org> writes:
+> From: Jia He <jia.he@hxt-semitech.com>
 > 
->> PXA3xx platforms have 56 interrupts that are stored in two ICMR
->> registers. The code in pxa_irq_suspend() and pxa_irq_resume() however
->> does a simple division by 32 which only leads to one register being
->> saved at suspend and restored at resume time. The NAND interrupt
->> setting, for instance, is lost.
->>
->> Fix this by using DIV_ROUND_UP() instead.
->>
->> Signed-off-by: Daniel Mack <daniel@zonque.org>
->> ---
->>  arch/arm/mach-pxa/irq.c | 4 ++--
->>  1 file changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/mach-pxa/irq.c b/arch/arm/mach-pxa/irq.c
->> index 9c10248fadcc..4e8c2116808e 100644
->> --- a/arch/arm/mach-pxa/irq.c
->> +++ b/arch/arm/mach-pxa/irq.c
->> @@ -185,7 +185,7 @@ static int pxa_irq_suspend(void)
->>  {
->>  	int i;
->>  
->> -	for (i = 0; i < pxa_internal_irq_nr / 32; i++) {
->> +	for (i = 0; i < DIV_ROUND_UP(pxa_internal_irq_nr, 32); i++) {
-> Okay, I get it.  Still, something tells me saved_icmr deserves some love too,
-> even if the result in the end won't change, it's just for corectness sake.
+> Commit b92df1de5d28 ("mm: page_alloc: skip over regions of invalid pfns
+> where possible") optimized the loop in memmap_init_zone(). But it causes
+> possible panic bug. So Daniel Vacek reverted it later.
 > 
-> Of course, while at it I wonder if we couldn't have :
->  - pxa_init_irq_common()
->  - a kmalloc_array() or similar for saved_icmr[] and saved_ipr[]
-> That could be in this patch or another one ...
+> But as suggested by Daniel Vacek, it is fine to using memblock to skip
+> gaps and finding next valid frame with CONFIG_HAVE_ARCH_PFN_VALID.
+> Daniel said:
+> "On arm and arm64, memblock is used by default. But generic version of
+> pfn_valid() is based on mem sections and memblock_next_valid_pfn() does
+> not always return the next valid one but skips more resulting in some
+> valid frames to be skipped (as if they were invalid). And that's why
+> kernel was eventually crashing on some !arm machines."
+> 
+> About the performance consideration:
+> As said by James in b92df1de5,
+> "I have tested this patch on a virtual model of a Samurai CPU
+> with a sparse memory map.  The kernel boot time drops from 109 to
+> 62 seconds."
+> 
+> Thus it would be better if we remain memblock_next_valid_pfn on arm/arm64.
+> 
 
-I'd rather do it in a separate patch then and leave this one as-is.
+We're making a bit of a mess here.  mmzone.h:
+
+...
+#ifndef CONFIG_HAVE_ARCH_PFN_VALID
+...
+#define next_valid_pfn(pfn)	(pfn + 1)
+#endif
+...
+#ifdef CONFIG_HAVE_MEMBLOCK_PFN_VALID
+#define next_valid_pfn(pfn)	memblock_next_valid_pfn(pfn)
+...
+#else
+...
+#ifndef next_valid_pfn
+#define next_valid_pfn(pfn)	(pfn + 1)
+#endif
+
+I guess it works OK, since CONFIG_HAVE_MEMBLOCK_PFN_VALID depends on
+CONFIG_HAVE_ARCH_PFN_VALID.  But it could all do with some cleanup and
+modernization.
+
+- Perhaps memblock_next_valid_pfn() should just be called
+  pfn_valid().  So the header file's responsibility is to provide
+  pfn_valid() and next_valid_pfn().
+
+- CONFIG_HAVE_ARCH_PFN_VALID should go away.  The current way of
+  doing such thnigs is for the arch (or some Kconfig combination) to
+  define pfn_valid() and next_valid_pfn() in some fashion and to then
+  ensure that one of them is #defined to something, to indicate that
+  both of these have been set up.  Or something like that.
 
 
-Thanks,
-Daniel
+Secondly, in memmap_init_zone()
+
+> -		if (!early_pfn_valid(pfn))
+> +		if (!early_pfn_valid(pfn)) {
+> +			pfn = next_valid_pfn(pfn) - 1;
+> 			continue;
+> +		}
+> +
+
+This is weird-looking.  next_valid_pfn(pfn) is usually (pfn+1) so it's
+a no-op.  Sometimes we're calling memblock_next_valid_pfn() and then
+backing up one, presumably because the `for' loop ends in `pfn++'.  Or
+something.  Can this please be fully commented or cleaned up?
