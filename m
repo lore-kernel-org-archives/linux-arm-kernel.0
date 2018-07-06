@@ -1,342 +1,82 @@
-From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Fri,  6 Jul 2018 18:47:32 +0200
-Subject: [PATCH v2] drm/sun4i: Implement zpos for DE2
-Message-ID: <20180706164732.24166-1-jernej.skrabec@siol.net>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Fri, 6 Jul 2018 17:49:34 +0100
+Subject: [PATCH 1/3 v3] ARM: dts: Modernize the Vexpress PL111 integration
+In-Reply-To: <20180628133648.6765-1-linus.walleij@linaro.org>
+References: <20180628133648.6765-1-linus.walleij@linaro.org>
+Message-ID: <d9dae965-90e4-14f5-e933-17404e1837e1@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Initial implementation of DE2 planes only supported fixed zpos.
 
-Expand implementation with configurable zpos property.
 
-Implementation background:
-Channel in DE2 driver represents one DRM plane, whereas pipe is just
-mapped channel to known Z position. Pipe 0 will always be at the bottom,
-pipe 1 just above pipe 0 and so on. If, for example, channel 1 is mapped
-at pipe 0 and channel 0 at pipe 1, whatever is on channel 0 will appear
-on top.
+On 28/06/18 14:36, Linus Walleij wrote:
+> The Versatile Express was submitted with the actual display
+> bridges unconnected (but defined in the device tree) and
+> mock "panels" encoded in the device tree node of the PL111
+> controller.
+> 
+> This doesn't even remotely describe the actual Versatile
+> Express hardware. Exploit the SiI9022 bridge by connecting
+> the PL111 pads to it, making it use EDID or fallback values
+> to drive the monitor.
+> 
+> The  also has to use the reserved memory through the
+> CMA pool rather than by open coding a memory region and
+> remapping it explicitly in the driver. To achieve this,
+> a reserved-memory node must exist in the root of the
+> device tree, so we need to pull that out of the
+> motherboard .dtsi include files, and push it into each
+> top-level device tree instead.
+> 
+> We do the same manouver for all the Versatile Express
+> boards, taking into account the different location of the
+> video RAM depending on which chip select is used on
+> each platform.
+> 
+> This plays nicely with the new PL111 DRM driver and
+> follows the standard ways of assigning bridges and
+> memory pools for graphics.
+> 
+> Cc: Sudeep Holla <sudeep.holla@arm.com>
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Liviu Dudau <liviu.dudau@arm.com>
+> Cc: Mali DP Maintainers <malidp@foss.arm.com>
+> Cc: Robin Murphy <robin.murphy@arm.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ChangeLog v2->v3:
+> - Add some reg = <0>; to the ports to make the DTC happy.
+> - Add reserved memory node to
+>   arch/arm64/boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts
+>   as well.
+> ChangeLog v1->v2:
+> - Fix up the memory address for the -rs1 tiles to 0x18000000
+> - Drop a bunch of extraneous reg props from the DVI adapter
+> ---
+>  arch/arm/boot/dts/vexpress-v2m-rs1.dtsi       | 45 ++++++------------
+>  arch/arm/boot/dts/vexpress-v2m.dtsi           | 46 ++++++-------------
+>  arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts   | 14 ++++++
+>  arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts    | 14 ++++++
+>  arch/arm/boot/dts/vexpress-v2p-ca5s.dts       | 14 ++++++
+>  arch/arm/boot/dts/vexpress-v2p-ca9.dts        | 41 +++++++----------
+>  arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts    | 14 ++++++
 
-Before this commit, channel id was used for addressing channel related
-registers (prefixed with SUN8I_MIXER_CHAN_UI_ or SUN8I_MIXER_CHAN_VI_)
-and pipe registers (prefixed with SUN8I_MIXER_BLEND_). Additionally,
-register SUN8I_MIXER_BLEND_ROUTE, which takes care for mapping channels
-to pipes had fixed value. It mapped channel 0 to pipe 0, 1 to 1 and so
-on. Consequence of all that was fixed Z order of planes.
+Still fails to build above DTS.
 
-With this commit, pipe registers are using zpos property as index and
-channel related registers still use channel id as index. Pipe mapping
-register is now set dynamically too and pipe enable register is rebuild
-every time to make sure only active pipes are enabled.
+>  .../boot/dts/arm/rtsm_ve-motherboard.dtsi     | 37 ++-------------
+>  .../boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts | 14 ++++++
+>  9 files changed, 121 insertions(+), 118 deletions(-)
+> 
 
-Testing was done to confirm that there is no issues if bottom plane
-contains pixels with alpha value < 0xff and if it doesn't whole screen.
+Also I am getting lots of new warnings.
 
-Tested-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
----
-Patch is based on linux-next (next-20180706).
+I tried applying these patches and saw above 2 issues, not looked
+at the errors yet, just thought will give you heads up.
 
-Changes from v1:
-- added tested-by tag
-- expand commit message with detailed explanation
+--
+Regards,
+Sudeep
 
- drivers/gpu/drm/sun4i/sun8i_mixer.c    | 15 +++++++--
- drivers/gpu/drm/sun4i/sun8i_mixer.h    |  4 +++
- drivers/gpu/drm/sun4i/sun8i_ui_layer.c | 45 ++++++++++++++++----------
- drivers/gpu/drm/sun4i/sun8i_vi_layer.c | 45 ++++++++++++++++----------
- 4 files changed, 72 insertions(+), 37 deletions(-)
-
-diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.c b/drivers/gpu/drm/sun4i/sun8i_mixer.c
-index ee8febb25903..0747a9a69654 100644
---- a/drivers/gpu/drm/sun4i/sun8i_mixer.c
-+++ b/drivers/gpu/drm/sun4i/sun8i_mixer.c
-@@ -260,6 +260,17 @@ const struct de2_fmt_info *sun8i_mixer_format_info(u32 format)
- 	return NULL;
- }
- 
-+static void sun8i_mixer_atomic_begin(struct sunxi_engine *engine,
-+				     struct drm_crtc_state *old_state)
-+{
-+	/*
-+	 * Disable all pipes at the beginning. They will be enabled
-+	 * again if needed in plane update callback.
-+	 */
-+	regmap_update_bits(engine->regs, SUN8I_MIXER_BLEND_PIPE_CTL,
-+			   SUN8I_MIXER_BLEND_PIPE_CTL_EN_MSK, 0);
-+}
-+
- static void sun8i_mixer_commit(struct sunxi_engine *engine)
- {
- 	DRM_DEBUG_DRIVER("Committing changes\n");
-@@ -311,6 +322,7 @@ static struct drm_plane **sun8i_layers_init(struct drm_device *drm,
- }
- 
- static const struct sunxi_engine_ops sun8i_engine_ops = {
-+	.atomic_begin	= sun8i_mixer_atomic_begin,
- 	.commit		= sun8i_mixer_commit,
- 	.layers_init	= sun8i_layers_init,
- };
-@@ -432,9 +444,6 @@ static int sun8i_mixer_bind(struct device *dev, struct device *master,
- 	regmap_write(mixer->engine.regs, SUN8I_MIXER_BLEND_ATTR_FCOLOR(0),
- 		     SUN8I_MIXER_BLEND_COLOR_BLACK);
- 
--	/* Fixed zpos for now */
--	regmap_write(mixer->engine.regs, SUN8I_MIXER_BLEND_ROUTE, 0x43210);
--
- 	plane_cnt = mixer->cfg->vi_num + mixer->cfg->ui_num;
- 	for (i = 0; i < plane_cnt; i++)
- 		regmap_write(mixer->engine.regs, SUN8I_MIXER_BLEND_MODE(i),
-diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.h b/drivers/gpu/drm/sun4i/sun8i_mixer.h
-index f34e70c42adf..406c42e752d7 100644
---- a/drivers/gpu/drm/sun4i/sun8i_mixer.h
-+++ b/drivers/gpu/drm/sun4i/sun8i_mixer.h
-@@ -44,6 +44,7 @@
- #define SUN8I_MIXER_BLEND_CK_MIN(x)		(0x10e0 + 0x04 * (x))
- #define SUN8I_MIXER_BLEND_OUTCTL		0x10fc
- 
-+#define SUN8I_MIXER_BLEND_PIPE_CTL_EN_MSK	GENMASK(12, 8)
- #define SUN8I_MIXER_BLEND_PIPE_CTL_EN(pipe)	BIT(8 + pipe)
- #define SUN8I_MIXER_BLEND_PIPE_CTL_FC_EN(pipe)	BIT(pipe)
- /* colors are always in AARRGGBB format */
-@@ -51,6 +52,9 @@
- /* The following numbers are some still unknown magic numbers */
- #define SUN8I_MIXER_BLEND_MODE_DEF		0x03010301
- 
-+#define SUN8I_MIXER_BLEND_ROUTE_PIPE_MSK(n)	(0xf << ((n) << 2))
-+#define SUN8I_MIXER_BLEND_ROUTE_PIPE_SHIFT(n)	((n) << 2)
-+
- #define SUN8I_MIXER_BLEND_OUTCTL_INTERLACED	BIT(1)
- 
- #define SUN8I_MIXER_FBFMT_ARGB8888	0
-diff --git a/drivers/gpu/drm/sun4i/sun8i_ui_layer.c b/drivers/gpu/drm/sun4i/sun8i_ui_layer.c
-index 9a540330cb79..518e1921f47e 100644
---- a/drivers/gpu/drm/sun4i/sun8i_ui_layer.c
-+++ b/drivers/gpu/drm/sun4i/sun8i_ui_layer.c
-@@ -27,7 +27,7 @@
- #include "sun8i_ui_scaler.h"
- 
- static void sun8i_ui_layer_enable(struct sun8i_mixer *mixer, int channel,
--				  int overlay, bool enable)
-+				  int overlay, bool enable, unsigned int zpos)
- {
- 	u32 val;
- 
-@@ -43,18 +43,24 @@ static void sun8i_ui_layer_enable(struct sun8i_mixer *mixer, int channel,
- 			   SUN8I_MIXER_CHAN_UI_LAYER_ATTR(channel, overlay),
- 			   SUN8I_MIXER_CHAN_UI_LAYER_ATTR_EN, val);
- 
--	if (enable)
--		val = SUN8I_MIXER_BLEND_PIPE_CTL_EN(channel);
--	else
--		val = 0;
-+	if (enable) {
-+		val = SUN8I_MIXER_BLEND_PIPE_CTL_EN(zpos);
- 
--	regmap_update_bits(mixer->engine.regs,
--			   SUN8I_MIXER_BLEND_PIPE_CTL,
--			   SUN8I_MIXER_BLEND_PIPE_CTL_EN(channel), val);
-+		regmap_update_bits(mixer->engine.regs,
-+				   SUN8I_MIXER_BLEND_PIPE_CTL, val, val);
-+
-+		val = channel << SUN8I_MIXER_BLEND_ROUTE_PIPE_SHIFT(zpos);
-+
-+		regmap_update_bits(mixer->engine.regs,
-+				   SUN8I_MIXER_BLEND_ROUTE,
-+				   SUN8I_MIXER_BLEND_ROUTE_PIPE_MSK(zpos),
-+				   val);
-+	}
- }
- 
- static int sun8i_ui_layer_update_coord(struct sun8i_mixer *mixer, int channel,
--				       int overlay, struct drm_plane *plane)
-+				       int overlay, struct drm_plane *plane,
-+				       unsigned int zpos)
- {
- 	struct drm_plane_state *state = plane->state;
- 	u32 src_w, src_h, dst_w, dst_h;
-@@ -137,10 +143,10 @@ static int sun8i_ui_layer_update_coord(struct sun8i_mixer *mixer, int channel,
- 			 state->dst.x1, state->dst.y1);
- 	DRM_DEBUG_DRIVER("Layer destination size W: %d H: %d\n", dst_w, dst_h);
- 	regmap_write(mixer->engine.regs,
--		     SUN8I_MIXER_BLEND_ATTR_COORD(channel),
-+		     SUN8I_MIXER_BLEND_ATTR_COORD(zpos),
- 		     SUN8I_MIXER_COORD(state->dst.x1, state->dst.y1));
- 	regmap_write(mixer->engine.regs,
--		     SUN8I_MIXER_BLEND_ATTR_INSIZE(channel),
-+		     SUN8I_MIXER_BLEND_ATTR_INSIZE(zpos),
- 		     outsize);
- 
- 	return 0;
-@@ -238,28 +244,30 @@ static void sun8i_ui_layer_atomic_disable(struct drm_plane *plane,
- 	struct sun8i_ui_layer *layer = plane_to_sun8i_ui_layer(plane);
- 	struct sun8i_mixer *mixer = layer->mixer;
- 
--	sun8i_ui_layer_enable(mixer, layer->channel, layer->overlay, false);
-+	sun8i_ui_layer_enable(mixer, layer->channel, layer->overlay, false, 0);
- }
- 
- static void sun8i_ui_layer_atomic_update(struct drm_plane *plane,
- 					 struct drm_plane_state *old_state)
- {
- 	struct sun8i_ui_layer *layer = plane_to_sun8i_ui_layer(plane);
-+	unsigned int zpos = plane->state->normalized_zpos;
- 	struct sun8i_mixer *mixer = layer->mixer;
- 
- 	if (!plane->state->visible) {
- 		sun8i_ui_layer_enable(mixer, layer->channel,
--				      layer->overlay, false);
-+				      layer->overlay, false, 0);
- 		return;
- 	}
- 
- 	sun8i_ui_layer_update_coord(mixer, layer->channel,
--				    layer->overlay, plane);
-+				    layer->overlay, plane, zpos);
- 	sun8i_ui_layer_update_formats(mixer, layer->channel,
- 				      layer->overlay, plane);
- 	sun8i_ui_layer_update_buffer(mixer, layer->channel,
- 				     layer->overlay, plane);
--	sun8i_ui_layer_enable(mixer, layer->channel, layer->overlay, true);
-+	sun8i_ui_layer_enable(mixer, layer->channel, layer->overlay,
-+			      true, zpos);
- }
- 
- static struct drm_plane_helper_funcs sun8i_ui_layer_helper_funcs = {
-@@ -307,6 +315,7 @@ struct sun8i_ui_layer *sun8i_ui_layer_init_one(struct drm_device *drm,
- 	enum drm_plane_type type = DRM_PLANE_TYPE_OVERLAY;
- 	int channel = mixer->cfg->vi_num + index;
- 	struct sun8i_ui_layer *layer;
-+	unsigned int plane_cnt;
- 	int ret;
- 
- 	layer = devm_kzalloc(drm->dev, sizeof(*layer), GFP_KERNEL);
-@@ -327,8 +336,10 @@ struct sun8i_ui_layer *sun8i_ui_layer_init_one(struct drm_device *drm,
- 		return ERR_PTR(ret);
- 	}
- 
--	/* fixed zpos for now */
--	ret = drm_plane_create_zpos_immutable_property(&layer->plane, channel);
-+	plane_cnt = mixer->cfg->ui_num + mixer->cfg->vi_num;
-+
-+	ret = drm_plane_create_zpos_property(&layer->plane, channel,
-+					     0, plane_cnt - 1);
- 	if (ret) {
- 		dev_err(drm->dev, "Couldn't add zpos property\n");
- 		return ERR_PTR(ret);
-diff --git a/drivers/gpu/drm/sun4i/sun8i_vi_layer.c b/drivers/gpu/drm/sun4i/sun8i_vi_layer.c
-index 5877f8ef5895..17e0d00cfd8a 100644
---- a/drivers/gpu/drm/sun4i/sun8i_vi_layer.c
-+++ b/drivers/gpu/drm/sun4i/sun8i_vi_layer.c
-@@ -21,7 +21,7 @@
- #include "sun8i_vi_scaler.h"
- 
- static void sun8i_vi_layer_enable(struct sun8i_mixer *mixer, int channel,
--				  int overlay, bool enable)
-+				  int overlay, bool enable, unsigned int zpos)
- {
- 	u32 val;
- 
-@@ -37,18 +37,24 @@ static void sun8i_vi_layer_enable(struct sun8i_mixer *mixer, int channel,
- 			   SUN8I_MIXER_CHAN_VI_LAYER_ATTR(channel, overlay),
- 			   SUN8I_MIXER_CHAN_VI_LAYER_ATTR_EN, val);
- 
--	if (enable)
--		val = SUN8I_MIXER_BLEND_PIPE_CTL_EN(channel);
--	else
--		val = 0;
-+	if (enable) {
-+		val = SUN8I_MIXER_BLEND_PIPE_CTL_EN(zpos);
- 
--	regmap_update_bits(mixer->engine.regs,
--			   SUN8I_MIXER_BLEND_PIPE_CTL,
--			   SUN8I_MIXER_BLEND_PIPE_CTL_EN(channel), val);
-+		regmap_update_bits(mixer->engine.regs,
-+				   SUN8I_MIXER_BLEND_PIPE_CTL, val, val);
-+
-+		val = channel << SUN8I_MIXER_BLEND_ROUTE_PIPE_SHIFT(zpos);
-+
-+		regmap_update_bits(mixer->engine.regs,
-+				   SUN8I_MIXER_BLEND_ROUTE,
-+				   SUN8I_MIXER_BLEND_ROUTE_PIPE_MSK(zpos),
-+				   val);
-+	}
- }
- 
- static int sun8i_vi_layer_update_coord(struct sun8i_mixer *mixer, int channel,
--				       int overlay, struct drm_plane *plane)
-+				       int overlay, struct drm_plane *plane,
-+				       unsigned int zpos)
- {
- 	struct drm_plane_state *state = plane->state;
- 	const struct drm_format_info *format = state->fb->format;
-@@ -130,10 +136,10 @@ static int sun8i_vi_layer_update_coord(struct sun8i_mixer *mixer, int channel,
- 			 state->dst.x1, state->dst.y1);
- 	DRM_DEBUG_DRIVER("Layer destination size W: %d H: %d\n", dst_w, dst_h);
- 	regmap_write(mixer->engine.regs,
--		     SUN8I_MIXER_BLEND_ATTR_COORD(channel),
-+		     SUN8I_MIXER_BLEND_ATTR_COORD(zpos),
- 		     SUN8I_MIXER_COORD(state->dst.x1, state->dst.y1));
- 	regmap_write(mixer->engine.regs,
--		     SUN8I_MIXER_BLEND_ATTR_INSIZE(channel),
-+		     SUN8I_MIXER_BLEND_ATTR_INSIZE(zpos),
- 		     outsize);
- 
- 	return 0;
-@@ -266,28 +272,30 @@ static void sun8i_vi_layer_atomic_disable(struct drm_plane *plane,
- 	struct sun8i_vi_layer *layer = plane_to_sun8i_vi_layer(plane);
- 	struct sun8i_mixer *mixer = layer->mixer;
- 
--	sun8i_vi_layer_enable(mixer, layer->channel, layer->overlay, false);
-+	sun8i_vi_layer_enable(mixer, layer->channel, layer->overlay, false, 0);
- }
- 
- static void sun8i_vi_layer_atomic_update(struct drm_plane *plane,
- 					 struct drm_plane_state *old_state)
- {
- 	struct sun8i_vi_layer *layer = plane_to_sun8i_vi_layer(plane);
-+	unsigned int zpos = plane->state->normalized_zpos;
- 	struct sun8i_mixer *mixer = layer->mixer;
- 
- 	if (!plane->state->visible) {
- 		sun8i_vi_layer_enable(mixer, layer->channel,
--				      layer->overlay, false);
-+				      layer->overlay, false, 0);
- 		return;
- 	}
- 
- 	sun8i_vi_layer_update_coord(mixer, layer->channel,
--				    layer->overlay, plane);
-+				    layer->overlay, plane, zpos);
- 	sun8i_vi_layer_update_formats(mixer, layer->channel,
- 				      layer->overlay, plane);
- 	sun8i_vi_layer_update_buffer(mixer, layer->channel,
- 				     layer->overlay, plane);
--	sun8i_vi_layer_enable(mixer, layer->channel, layer->overlay, true);
-+	sun8i_vi_layer_enable(mixer, layer->channel, layer->overlay,
-+			      true, zpos);
- }
- 
- static struct drm_plane_helper_funcs sun8i_vi_layer_helper_funcs = {
-@@ -351,6 +359,7 @@ struct sun8i_vi_layer *sun8i_vi_layer_init_one(struct drm_device *drm,
- 					       int index)
- {
- 	struct sun8i_vi_layer *layer;
-+	unsigned int plane_cnt;
- 	int ret;
- 
- 	layer = devm_kzalloc(drm->dev, sizeof(*layer), GFP_KERNEL);
-@@ -368,8 +377,10 @@ struct sun8i_vi_layer *sun8i_vi_layer_init_one(struct drm_device *drm,
- 		return ERR_PTR(ret);
- 	}
- 
--	/* fixed zpos for now */
--	ret = drm_plane_create_zpos_immutable_property(&layer->plane, index);
-+	plane_cnt = mixer->cfg->ui_num + mixer->cfg->vi_num;
-+
-+	ret = drm_plane_create_zpos_property(&layer->plane, index,
-+					     0, plane_cnt - 1);
- 	if (ret) {
- 		dev_err(drm->dev, "Couldn't add zpos property\n");
- 		return ERR_PTR(ret);
 -- 
-2.18.0
+Regards,
+Sudeep
