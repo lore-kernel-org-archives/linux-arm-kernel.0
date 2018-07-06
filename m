@@ -1,29 +1,72 @@
-From: huibin.hong@rock-chips.com (Huibin Hong)
-Date: Fri,  6 Jul 2018 16:03:57 +0800
-Subject: [PATCH] arm64: dts: rockchip: corrected uart1 clock-names for rk3328
-Message-ID: <1530864237-14891-1-git-send-email-huibin.hong@rock-chips.com>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Fri, 06 Jul 2018 09:22:47 +0100
+Subject: [RFC PATCH 00/16] KVM: arm64: Initial support for SVE guests
+In-Reply-To: <1529593060-542-1-git-send-email-Dave.Martin@arm.com>
+References: <1529593060-542-1-git-send-email-Dave.Martin@arm.com>
+Message-ID: <87h8lc93jc.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Corrected the uart clock-names or the uart driver might fail.
 
-Signed-off-by: Huibin Hong <huibin.hong@rock-chips.com>
----
- arch/arm64/boot/dts/rockchip/rk3328.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Dave Martin <Dave.Martin@arm.com> writes:
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3328.dtsi b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
-index 2f38ff2..3f5a294 100644
---- a/arch/arm64/boot/dts/rockchip/rk3328.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
-@@ -297,7 +297,7 @@
- 		reg = <0x0 0xff120000 0x0 0x100>;
- 		interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&cru SCLK_UART1>, <&cru PCLK_UART1>;
--		clock-names = "sclk_uart", "pclk_uart";
-+		clock-names = "baudclk", "apb_pclk";
- 		dmas = <&dmac 4>, <&dmac 5>;
- 		dma-names = "tx", "rx";
- 		pinctrl-names = "default";
--- 
-1.9.1
+<snip>
+>
+> This series is somewhat tested on Arm Juno r0 and the Arm Fast Model
+> (with/without SVE support).  arch/arm builds, but I've not booted
+> it -- only some trivial refactoring in this series affects arch/arm.
+
+Now that QEMU linux-user SVE support is pretty much complete we've also
+got preliminary patches for system emulation mode. However we currently
+don't have VHE implemented so I guess we need to do that first before we
+can test under QEMU.
+
+>
+> Cheers
+> ---Dave
+>
+>
+> [1] [PATCH v2 0/4] KVM: arm64: FPSIMD/SVE fixes for 4.17 [sic]
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2018-June/584281.html
+>
+> Dave Martin (16):
+>   arm64: fpsimd: Always set TIF_FOREIGN_FPSTATE on task state flush
+>   KVM: arm64: Delete orphaned declaration for __fpsimd_enabled()
+>   KVM: arm64: Refactor kvm_arm_num_regs() for easier maintenance
+>   KVM: arm64: Add missing #include of <linux/bitmap.h> to kvm_host.h
+>   KVM: arm: Add arch init/uninit hooks
+>   arm64/sve: Determine virtualisation-friendly vector lengths
+>   arm64/sve: Enable SVE state tracking for non-task contexts
+>   KVM: arm64: Support dynamically hideable system registers
+>   KVM: arm64: Allow ID registers to by dynamically read-as-zero
+>   KVM: arm64: Add a vcpu flag to control SVE visibility for the guest
+>   KVM: arm64/sve: System register context switch and access support
+>   KVM: arm64/sve: Context switch the SVE registers
+>   KVM: Allow 2048-bit register access via KVM_{GET,SET}_ONE_REG
+>   KVM: arm64/sve: Add SVE support to register access ioctl interface
+>   KVM: arm64: Enumerate SVE register indices for KVM_GET_REG_LIST
+>   KVM: arm64/sve: Report and enable SVE API extensions for userspace
+>
+>  arch/arm/include/asm/kvm_host.h   |   4 +-
+>  arch/arm64/include/asm/fpsimd.h   |   4 +-
+>  arch/arm64/include/asm/kvm_host.h |  18 ++-
+>  arch/arm64/include/asm/kvm_hyp.h  |   1 -
+>  arch/arm64/include/asm/sysreg.h   |   3 +
+>  arch/arm64/include/uapi/asm/kvm.h |  11 ++
+>  arch/arm64/kernel/cpufeature.c    |   2 +-
+>  arch/arm64/kernel/fpsimd.c        | 131 +++++++++++++---
+>  arch/arm64/kernel/signal.c        |   5 -
+>  arch/arm64/kvm/fpsimd.c           |   7 +-
+>  arch/arm64/kvm/guest.c            | 321 +++++++++++++++++++++++++++++++++++---
+>  arch/arm64/kvm/hyp/switch.c       |  43 +++--
+>  arch/arm64/kvm/hyp/sysreg-sr.c    |   5 +
+>  arch/arm64/kvm/reset.c            |  14 ++
+>  arch/arm64/kvm/sys_regs.c         |  73 ++++++---
+>  arch/arm64/kvm/sys_regs.h         |  22 +++
+>  include/uapi/linux/kvm.h          |   1 +
+>  virt/kvm/arm/arm.c                |  13 +-
+>  18 files changed, 587 insertions(+), 91 deletions(-)
+
+
+--
+Alex Benn?e
