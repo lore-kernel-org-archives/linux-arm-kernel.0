@@ -1,48 +1,20 @@
-From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
-Date: Fri, 6 Jul 2018 13:42:45 +0200
-Subject: [PATCH 1/2] PCI: aardvark: Size bridges before resources
- allocation
-In-Reply-To: <20180706110130.GA14439@red-moon>
-References: <20180629091620.31503-1-thomas.petazzoni@bootlin.com>
- <20180629091620.31503-2-thomas.petazzoni@bootlin.com>
- <20180705141522.GA13716@red-moon>
- <20180705161909.2a7a6030@windsurf>
- <20180706110130.GA14439@red-moon>
-Message-ID: <20180706134245.3a554b27@windsurf>
+From: digetx@gmail.com (Dmitry Osipenko)
+Date: Fri, 6 Jul 2018 15:01:52 +0300
+Subject: [PATCH v2 0/5] Initial support of Trusted Foundations on Tegra30
+In-Reply-To: <5c47ef70-b90e-6e81-39dd-fbcfad2b93e5@gmail.com>
+References: <20180619110027.16935-1-digetx@gmail.com>
+ <d99935be-797d-4676-c186-a045a590f01b@gmail.com> <11534185.70fb5jbPr6@dimapc>
+ <5c47ef70-b90e-6e81-39dd-fbcfad2b93e5@gmail.com>
+Message-ID: <7c38961f-4ad6-f4b8-7ef1-b43a07353832@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Kexec works for me on T30 with the following kernel config options on top of the
+tegra_defconfig:
 
-On Fri, 6 Jul 2018 12:01:30 +0100, Lorenzo Pieralisi wrote:
+CONFIG_SMP=n
+CONFIG_CPU_IDLE=n
+CONFIG_TEGRA_IOMMU_SMMU=n
 
-> > It is a serious bug, but it is not a regression. I.e whatever is fixed
-> > by this patch never worked. So if you take a conservative view on
-> > pushing patches to stable and only want to fix regressions, this one
-> > doesn't qualify. However, if you take a more open approach and say you
-> > want to fix obvious bugs/issues even in older stable kernels, then
-> > indeed this patch qualifies.
-> > 
-> > If you are within the kernel developers with this more open approach to
-> > sending patches to stable, then you can add:
-> > 
-> > Fixes: 8c39d710363c1 ("PCI: aardvark: Add Aardvark PCI host controller driver")
-> > Cc: <stable@vger.kernel.org>
-> > 
-> > when applying the patch. Unless of course you want me to resend the
-> > patch series with this added. Just let met know what you prefer.  
-> 
-> It is up to you, I think it qualifies for stable kernels so I would
-> send it but it is your choice, please let me know.
-
-It's OK for me to have it in stable kernels. The fix is pretty obvious,
-so you can add the Fixes/Cc tags when applying. Unless of course you
-want me to resend an updated version.
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+CPU stopping isn't working correctly with the trusted foundations and it's not
+obvious what is wrong. I hope we'll fix it at some point.
