@@ -1,88 +1,45 @@
-From: ssuloev@orpaltech.com (Sergey Suloev)
-Date: Fri, 6 Jul 2018 17:23:10 +0300
-Subject: [PATCH 09/10] arm64: dts: allwinner: a64: NanoPi-A64: Add
- Wifi/Bluetooth chip
-In-Reply-To: <20180706085210.17952-10-andre.przywara@arm.com>
-References: <20180706085210.17952-1-andre.przywara@arm.com>
- <20180706085210.17952-10-andre.przywara@arm.com>
-Message-ID: <8cee909b-c0ce-5faf-09e0-7d6625284f55@orpaltech.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri,  6 Jul 2018 16:28:28 +0200
+Subject: [PATCH] [RESEND] drm/sun4i: link in front-end code if needed
+Message-ID: <20180706142847.2032381-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/06/2018 11:52 AM, Andre Przywara wrote:
-> The NanoPi-A64 has an on-board WiFi/Bluetooth combo chip, connected
-> to the usual MMC1 and UART1. The power is provided by the always-on
-> VCC_SYS_3.3V, but it uses pin L2 to enable the regulator.
->
-> Add the respective nodes to the DT to make it usable.
->
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
->   .../boot/dts/allwinner/sun50i-a64-nanopi-a64.dts   | 33 ++++++++++++++++++++++
->   1 file changed, 33 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
-> index 0439cff685d6..bb3ba7709dee 100644
-> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
-> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
-> @@ -53,11 +53,18 @@
->   	aliases {
->   		ethernet0 = &emac;
->   		serial0 = &uart0;
-> +		serial1 = &uart1;
->   	};
->   
->   	chosen {
->   		stdout-path = "serial0:115200n8";
->   	};
-> +
-> +        wifi_pwrseq: wifi_pwrseq {
-> +                compatible = "mmc-pwrseq-simple";
-> +                reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* PL2 */
-> +        };
-> +
->   };
->   
->   &ehci0 {
-> @@ -105,6 +112,25 @@
->   	status = "okay";
->   };
->   
-> +&mmc1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&mmc1_pins>;
-> +	vmmc-supply = <&reg_dcdc1>;
-> +	vqmmc-supply = <&reg_dldo4>;
-> +	mmc-pwrseq = <&wifi_pwrseq>;
-> +	bus-width = <4>;
-> +	non-removable;
-> +	status = "okay";
-> +
-> +	brcmf: wifi at 1 {
-> +		reg = <1>;
-> +		compatible = "brcm,bcm4329-fmac";
-> +		interrupt-parent = <&r_pio>;
-> +		interrupts = <0 3 IRQ_TYPE_LEVEL_LOW>; /* PL3 */
-> +		interrupt-names = "host-wake";
-> +	};
-> +};
-> +
->   &ohci0 {
->   	status = "okay";
->   };
-> @@ -229,6 +255,13 @@
->   	status = "okay";
->   };
->   
-> +/* Connected to the Bluetooth UART, with hardware handshake pins */
-> +&uart1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&uart1_pins>, <&uart1_rts_cts_pins>;
-> +	status = "okay";
-> +};
-> +
->   &usbphy {
->   	status = "okay";
->   };
+When the base sun4i DRM driver is built-in but the back-end is
+a loadable module, we run into a link error:
 
-NanoPi A64 has rtl8189 Ethernet chip.
+drivers/gpu/drm/sun4i/sun4i_drv.o: In function `sun4i_drv_probe':
+sun4i_drv.c:(.text+0x60c): undefined reference to `sun4i_frontend_of_table'
+
+The dependency is a bit tricky, the best workaround I have come up
+with is to use a Makefile hack to to interpret both
+CONFIG_DRM_SUN4I_BACKEND=m and CONFIG_DRM_SUN4I_BACKEND=y
+as a directive to build the front-end the same way as the main module.
+
+Fixes: dd0421f47505 ("drm/sun4i: Add a driver for the display frontend")
+Link: https://lore.kernel.org/lkml/20180301091908.zcptz3ezqr2c6ly5 at flea/
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+I stumbled over this one again when I sent a related patch.
+---
+ drivers/gpu/drm/sun4i/Makefile | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/sun4i/Makefile b/drivers/gpu/drm/sun4i/Makefile
+index 3daed14941ca..11de3cd52dae 100644
+--- a/drivers/gpu/drm/sun4i/Makefile
++++ b/drivers/gpu/drm/sun4i/Makefile
+@@ -32,7 +32,10 @@ obj-$(CONFIG_DRM_SUN4I)		+= sun4i-tcon.o
+ obj-$(CONFIG_DRM_SUN4I)		+= sun4i_tv.o
+ obj-$(CONFIG_DRM_SUN4I)		+= sun6i_drc.o
+ 
+-obj-$(CONFIG_DRM_SUN4I_BACKEND)	+= sun4i-backend.o sun4i-frontend.o
++obj-$(CONFIG_DRM_SUN4I_BACKEND)	+= sun4i-backend.o
++ifdef CONFIG_DRM_SUN4I_BACKEND
++obj-$(CONFIG_DRM_SUN4I)		+= sun4i-frontend.o
++endif
+ obj-$(CONFIG_DRM_SUN4I_HDMI)	+= sun4i-drm-hdmi.o
+ obj-$(CONFIG_DRM_SUN6I_DSI)	+= sun6i-dsi.o
+ obj-$(CONFIG_DRM_SUN8I_DW_HDMI)	+= sun8i-drm-hdmi.o
+-- 
+2.9.0
