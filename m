@@ -1,19 +1,25 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri,  6 Jul 2018 12:02:42 +0100
-Subject: [PATCH v3 1/7] arm64: topology: refactor reset_cpu_topology to add
- support for removing topology
+Date: Fri,  6 Jul 2018 12:02:45 +0100
+Subject: [PATCH v3 4/7] arm64: topology: restrict updating siblings_masks to
+ online cpus only
 In-Reply-To: <1530874968-5960-1-git-send-email-sudeep.holla@arm.com>
 References: <1530874968-5960-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1530874968-5960-2-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1530874968-5960-5-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently reset_cpu_topology clears all the CPU topology information
-and resets to default values. However we may need to just clear the
-information when we hotplug out the CPU. In preparation to add the
-support the same, let's refactor reset_cpu_topology to just reset
-the information and move clearing out the topology information to
-clear_cpu_topology.
+It's incorrect to iterate over all the possible CPUs to update the
+sibling masks when any CPU is hotplugged in. In case the topology
+siblings masks of the CPU is removed when is it hotplugged out, we
+end up updating those masks when one of it's sibling is powered up
+again. This will provide inconsistent view.
+
+Further, since the CPU calling update_sibling_masks is yet to be set
+online, there's no need to compare itself with each online CPU when
+updating the siblings masks.
+
+This patch restricts updation of sibling masks only for CPUs that are
+already online. It also the drops the unnecessary cpuid check.
 
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
@@ -21,47 +27,37 @@ Tested-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
 Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
 Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 ---
- arch/arm64/kernel/topology.c | 21 ++++++++++++++-------
- 1 file changed, 14 insertions(+), 7 deletions(-)
+ arch/arm64/kernel/topology.c | 8 +++-----
+ 1 file changed, 3 insertions(+), 5 deletions(-)
 
 diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
-index f845a8617812..b64733c5ea28 100644
+index cb81df545359..1a3f8ab455d0 100644
 --- a/arch/arm64/kernel/topology.c
 +++ b/arch/arm64/kernel/topology.c
-@@ -293,6 +293,19 @@ void store_cpu_topology(unsigned int cpuid)
- 	update_siblings_masks(cpuid);
- }
+@@ -231,7 +231,7 @@ static void update_siblings_masks(unsigned int cpuid)
+ 	int cpu;
  
-+static void clear_cpu_topology(int cpu)
-+{
-+	struct cpu_topology *cpu_topo = &cpu_topology[cpu];
-+
-+	cpumask_clear(&cpu_topo->llc_siblings);
-+	cpumask_set_cpu(cpu, &cpu_topo->llc_siblings);
-+
-+	cpumask_clear(&cpu_topo->core_sibling);
-+	cpumask_set_cpu(cpu, &cpu_topo->core_sibling);
-+	cpumask_clear(&cpu_topo->thread_sibling);
-+	cpumask_set_cpu(cpu, &cpu_topo->thread_sibling);
-+}
-+
- static void __init reset_cpu_topology(void)
- {
- 	unsigned int cpu;
-@@ -303,15 +316,9 @@ static void __init reset_cpu_topology(void)
- 		cpu_topo->thread_id = -1;
- 		cpu_topo->core_id = 0;
- 		cpu_topo->package_id = -1;
--
- 		cpu_topo->llc_id = -1;
--		cpumask_clear(&cpu_topo->llc_siblings);
--		cpumask_set_cpu(cpu, &cpu_topo->llc_siblings);
+ 	/* update core and thread sibling masks */
+-	for_each_possible_cpu(cpu) {
++	for_each_online_cpu(cpu) {
+ 		cpu_topo = &cpu_topology[cpu];
  
--		cpumask_clear(&cpu_topo->core_sibling);
--		cpumask_set_cpu(cpu, &cpu_topo->core_sibling);
--		cpumask_clear(&cpu_topo->thread_sibling);
--		cpumask_set_cpu(cpu, &cpu_topo->thread_sibling);
-+		clear_cpu_topology(cpu);
+ 		if (cpuid_topo->llc_id == cpu_topo->llc_id) {
+@@ -243,15 +243,13 @@ static void update_siblings_masks(unsigned int cpuid)
+ 			continue;
+ 
+ 		cpumask_set_cpu(cpuid, &cpu_topo->core_sibling);
+-		if (cpu != cpuid)
+-			cpumask_set_cpu(cpu, &cpuid_topo->core_sibling);
++		cpumask_set_cpu(cpu, &cpuid_topo->core_sibling);
+ 
+ 		if (cpuid_topo->core_id != cpu_topo->core_id)
+ 			continue;
+ 
+ 		cpumask_set_cpu(cpuid, &cpu_topo->thread_sibling);
+-		if (cpu != cpuid)
+-			cpumask_set_cpu(cpu, &cpuid_topo->thread_sibling);
++		cpumask_set_cpu(cpu, &cpuid_topo->thread_sibling);
  	}
  }
  
