@@ -1,56 +1,24 @@
-From: richard@nod.at (Richard Weinberger)
-Date: Fri, 06 Jul 2018 16:44:44 +0200
-Subject: [PATCH] mtd: stm32-quadspi: replace "%p" with "%pK"
-In-Reply-To: <20180706130525.22223-1-benjamin.gaignard@st.com>
-References: <20180706130525.22223-1-benjamin.gaignard@st.com>
-Message-ID: <32602293.7BQn8HeLUA@blindfold>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Fri, 06 Jul 2018 16:46:40 +0200
+Subject: [PATCH 0/2] Add support for S805X based P241 Reference Design
+ board
+In-Reply-To: <1530784243-20823-1-git-send-email-narmstrong@baylibre.com>
+References: <1530784243-20823-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1530888400.3023.10.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 6. Juli 2018, 15:05:25 CEST schrieb Benjamin Gaignard:
-> The format specifier "%p" can leak kernel addresses.
-> Use "%pK" instead.
-
-Does %pK really make sense for dev_dbg()?
-When the driver is being debugged "leaking" is on purpose. :)
-
-Thanks,
-//richard
- 
-> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
-> ---
->  drivers/mtd/spi-nor/stm32-quadspi.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
+On Thu, 2018-07-05 at 11:50 +0200, Neil Armstrong wrote:
+> Neil Armstrong (2):
+>   dt-bindings: amlogic: Add support for GXL S805X and the P241 board
+>   ARM64: dts: add S805X based P241 board
 > 
-> diff --git a/drivers/mtd/spi-nor/stm32-quadspi.c b/drivers/mtd/spi-nor/stm32-quadspi.c
-> index 72553506a00b..13e9fc961d3b 100644
-> --- a/drivers/mtd/spi-nor/stm32-quadspi.c
-> +++ b/drivers/mtd/spi-nor/stm32-quadspi.c
-> @@ -355,7 +355,7 @@ static int stm32_qspi_read_reg(struct spi_nor *nor,
->  	struct device *dev = flash->qspi->dev;
->  	struct stm32_qspi_cmd cmd;
->  
-> -	dev_dbg(dev, "read_reg: cmd:%#.2x buf:%p len:%#x\n", opcode, buf, len);
-> +	dev_dbg(dev, "read_reg: cmd:%#.2x buf:%pK len:%#x\n", opcode, buf, len);
->  
->  	memset(&cmd, 0, sizeof(cmd));
->  	cmd.opcode = opcode;
-> @@ -376,7 +376,7 @@ static int stm32_qspi_write_reg(struct spi_nor *nor, u8 opcode,
->  	struct device *dev = flash->qspi->dev;
->  	struct stm32_qspi_cmd cmd;
->  
-> -	dev_dbg(dev, "write_reg: cmd:%#.2x buf:%p len:%#x\n", opcode, buf, len);
-> +	dev_dbg(dev, "write_reg: cmd:%#.2x buf:%pK len:%#x\n", opcode, buf, len);
->  
->  	memset(&cmd, 0, sizeof(cmd));
->  	cmd.opcode = opcode;
-> @@ -398,7 +398,7 @@ static ssize_t stm32_qspi_read(struct spi_nor *nor, loff_t from, size_t len,
->  	struct stm32_qspi_cmd cmd;
->  	int err;
->  
-> -	dev_dbg(qspi->dev, "read(%#.2x): buf:%p from:%#.8x len:%#zx\n",
-> +	dev_dbg(qspi->dev, "read(%#.2x): buf:%pK from:%#.8x len:%#zx\n",
->  		nor->read_opcode, buf, (u32)from, len);
->  
->  	memset(&cmd, 0, sizeof(cmd));
-> 
+>  Documentation/devicetree/bindings/arm/amlogic.txt  |   6 +
+>  arch/arm64/boot/dts/amlogic/Makefile               |   1 +
+>  .../boot/dts/amlogic/meson-gxl-s805x-p241.dts      | 218 +++++++++++++++++++++
+>  3 files changed, 225 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl-s805x-p241.dts
+
+Looks good to me
+
+Acked-by: Jerome Brunet <jbrunet@baylibre.com>
