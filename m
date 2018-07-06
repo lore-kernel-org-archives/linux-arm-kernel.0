@@ -1,57 +1,127 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri,  6 Jul 2018 12:02:41 +0100
-Subject: [PATCH v3 0/7] arm64: numa/topology/smp: update the cpumasks for CPU
- hotplug
-Message-ID: <1530874968-5960-1-git-send-email-sudeep.holla@arm.com>
+Date: Fri,  6 Jul 2018 12:02:43 +0100
+Subject: [PATCH v3 2/7] arm64: numa: separate out updates to percpu nodeid and
+ NUMA node cpumap
+In-Reply-To: <1530874968-5960-1-git-send-email-sudeep.holla@arm.com>
+References: <1530874968-5960-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1530874968-5960-3-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Currently numa_clear_node removes both cpu information from the NUMA
+node cpumap as well as the NUMA node id from the cpu. Similarly
+numa_store_cpu_info updates both percpu nodeid and NUMA cpumap.
 
-Commit 37c3ec2d810f ("arm64: topology: divorce MC scheduling domain from core_siblings")
-was reported to cause some hotplug and system suspend regressions when
-it was merged. On investigation, it was found that unlike x86/PPC,
-arm64 doesn't update the cpu and numa masks on CPU hotplug. That's
-somewhat expected from the scheduler.
+However we need to retain the numa node id for the cpu and only remove
+the cpu information from the numa node cpumap during CPU hotplug out.
+The same can be extended for hotplugging in the CPU.
 
-Since these changes were bit invasive as a solution to the above
-mentioned regression, as small change was temporarily applied as a fix.
-This series updates the cpu and numa masks on CPU hotplug and reverts
-that temporary fix.
+This patch separates out numa_{add,remove}_cpu from numa_clear_node and
+numa_store_cpu_info.
 
-It would be good to get this tested(CPU hotplug - few and all CPUs in
-a socket) on multi-socket/NUMA systems from Cavium and Huawei/Hisilicon.
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Reviewed-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+Tested-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
+Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+---
+ arch/arm64/include/asm/numa.h |  4 ++++
+ arch/arm64/kernel/smp.c       |  2 ++
+ arch/arm64/mm/numa.c          | 29 +++++++++++++++++++++--------
+ 3 files changed, 27 insertions(+), 8 deletions(-)
 
-Regards,
-Sudeep
-
-v2->v3:
-	- Removed confusing boolean reset argument and inlined reset
-	  part in reset_cpu_topology
-	- Moved cpu_llc_shared_mask to asm/topology.h along with other
-	  similar macros and renamed it topology_llc_cpumask
-	- Use NUMA_NO_NODE instead of checking for any -ve integer
-
-v1->v2:
-	- Rebased on v4.18-rc1 and hence do revert of the temporary fix
-	  that was merged for v4.18
-	- Removed one of the wrong use of possible_mask
-
-Sudeep Holla (7):
-  arm64: topology: refactor reset_cpu_topology to add support for removing topology
-  arm64: numa: separate out updates to percpu nodeid and NUMA node cpumap
-  arm64: topology: add support to remove cpu topology sibling masks
-  arm64: topology: restrict updating siblings_masks to online cpus only
-  arm64: smp: remove cpu and numa topology information when hotplugging out CPU
-  arm64: topology: rename llc_siblings to align with other struct members
-  arm64: topology: re-introduce numa mask check for scheduler MC selection
-
- arch/arm64/include/asm/numa.h     |  4 +++
- arch/arm64/include/asm/topology.h |  4 ++-
- arch/arm64/kernel/smp.c           |  5 ++++
- arch/arm64/kernel/topology.c      | 58 +++++++++++++++++++++++++++------------
- arch/arm64/mm/numa.c              | 29 ++++++++++++++------
- 5 files changed, 74 insertions(+), 26 deletions(-)
-
---
+diff --git a/arch/arm64/include/asm/numa.h b/arch/arm64/include/asm/numa.h
+index 01bc46d5b43a..626ad01e83bf 100644
+--- a/arch/arm64/include/asm/numa.h
++++ b/arch/arm64/include/asm/numa.h
+@@ -35,10 +35,14 @@ void __init numa_set_distance(int from, int to, int distance);
+ void __init numa_free_distance(void);
+ void __init early_map_cpu_to_node(unsigned int cpu, int nid);
+ void numa_store_cpu_info(unsigned int cpu);
++void numa_add_cpu(unsigned int cpu);
++void numa_remove_cpu(unsigned int cpu);
+ 
+ #else	/* CONFIG_NUMA */
+ 
+ static inline void numa_store_cpu_info(unsigned int cpu) { }
++static inline void numa_add_cpu(unsigned int cpu) { }
++static inline void numa_remove_cpu(unsigned int cpu) { }
+ static inline void arm64_numa_init(void) { }
+ static inline void early_map_cpu_to_node(unsigned int cpu, int nid) { }
+ 
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index 2faa9863d2e5..2a315f32fad3 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -225,6 +225,7 @@ asmlinkage notrace void secondary_start_kernel(void)
+ 	notify_cpu_starting(cpu);
+ 
+ 	store_cpu_topology(cpu);
++	numa_add_cpu(cpu);
+ 
+ 	/*
+ 	 * OK, now it's safe to let the boot CPU continue.  Wait for
+@@ -679,6 +680,7 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
+ 	this_cpu = smp_processor_id();
+ 	store_cpu_topology(this_cpu);
+ 	numa_store_cpu_info(this_cpu);
++	numa_add_cpu(this_cpu);
+ 
+ 	/*
+ 	 * If UP is mandated by "nosmp" (which implies "maxcpus=0"), don't set
+diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
+index dad128ba98bf..146c04ceaa51 100644
+--- a/arch/arm64/mm/numa.c
++++ b/arch/arm64/mm/numa.c
+@@ -70,19 +70,32 @@ EXPORT_SYMBOL(cpumask_of_node);
+ 
+ #endif
+ 
+-static void map_cpu_to_node(unsigned int cpu, int nid)
++static void numa_update_cpu(unsigned int cpu, bool remove)
+ {
+-	set_cpu_numa_node(cpu, nid);
+-	if (nid >= 0)
++	int nid = cpu_to_node(cpu);
++
++	if (nid == NUMA_NO_NODE)
++		return;
++
++	if (remove)
++		cpumask_clear_cpu(cpu, node_to_cpumask_map[nid]);
++	else
+ 		cpumask_set_cpu(cpu, node_to_cpumask_map[nid]);
+ }
+ 
+-void numa_clear_node(unsigned int cpu)
++void numa_add_cpu(unsigned int cpu)
+ {
+-	int nid = cpu_to_node(cpu);
++	numa_update_cpu(cpu, false);
++}
+ 
+-	if (nid >= 0)
+-		cpumask_clear_cpu(cpu, node_to_cpumask_map[nid]);
++void numa_remove_cpu(unsigned int cpu)
++{
++	numa_update_cpu(cpu, true);
++}
++
++void numa_clear_node(unsigned int cpu)
++{
++	numa_remove_cpu(cpu);
+ 	set_cpu_numa_node(cpu, NUMA_NO_NODE);
+ }
+ 
+@@ -116,7 +129,7 @@ static void __init setup_node_to_cpumask_map(void)
+  */
+ void numa_store_cpu_info(unsigned int cpu)
+ {
+-	map_cpu_to_node(cpu, cpu_to_node_map[cpu]);
++	set_cpu_numa_node(cpu, cpu_to_node_map[cpu]);
+ }
+ 
+ void __init early_map_cpu_to_node(unsigned int cpu, int nid)
+-- 
 2.7.4
