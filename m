@@ -1,35 +1,40 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Sat, 7 Jul 2018 12:33:54 +0200
-Subject: [PATCH v4 5/5] dt-bindings: samsung: Document bindings for
- SGH-T959P board
-In-Reply-To: <1530958183-10956-6-git-send-email-pawel.mikolaj.chmiel@gmail.com>
-References: <1530958183-10956-1-git-send-email-pawel.mikolaj.chmiel@gmail.com>
- <1530958183-10956-6-git-send-email-pawel.mikolaj.chmiel@gmail.com>
-Message-ID: <20180707103354.tyqenmmj2ry7l7ko@kozik-lap>
+From: lkp@intel.com (kbuild test robot)
+Date: Sat, 7 Jul 2018 18:36:16 +0800
+Subject: [rockchip:v4.19-armsoc/dts64 7/11] Error:
+ arch/arm64/boot/dts/rockchip/rk3399-gru-chromebook.dtsi:263.1-7 Label or
+ path sound not found
+Message-ID: <201807071814.GP4WAby3%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 07, 2018 at 12:09:43PM +0200, Pawe? Chmiel wrote:
-> From: Jonathan Bakker <xc-racer2@live.ca>
-> 
-> Document the binding for Samsung Galaxy S Fascinate 4G (SGH-T959P).
-> 
-> Signed-off-by: Jonathan Bakker <xc-racer2@live.ca>
-> Signed-off-by: Pawe? Chmiel <pawel.mikolaj.chmiel@gmail.com>
-> Acked-by: Rob Herring <robh@kernel.org>
-> --
-> Changes from v2:
->   - Added Acked-by
-> 
-> Changes from v1:
->   - Added missing commit msg.
-> --
-> ---
->  Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt | 1 +
->  1 file changed, 1 insertion(+)
-> 
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git v4.19-armsoc/dts64
+head:   70c7ee25836e3d90f6b9b728db35ad3ff8f64c2d
+commit: eedeeb7b76ccd4a5a546c924c0dcf93d560670fd [7/11] arm64: dts: rockchip: move Chromebook-specific Gru-parts to a separate file
+config: arm64-defconfig (attached as .config)
+compiler: aarch64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout eedeeb7b76ccd4a5a546c924c0dcf93d560670fd
+        # save the attached .config to linux build tree
+        GCC_VERSION=7.2.0 make.cross ARCH=arm64 
 
-Thanks, applied.
+Note: the rockchip/v4.19-armsoc/dts64 HEAD 70c7ee25836e3d90f6b9b728db35ad3ff8f64c2d builds fine.
+      It only hurts bisectibility.
 
-Best regards,
-Krzysztof
+All errors (new ones prefixed by >>):
+
+>> Error: arch/arm64/boot/dts/rockchip/rk3399-gru-chromebook.dtsi:263.1-7 Label or path sound not found
+>> Error: arch/arm64/boot/dts/rockchip/rk3399-gru-chromebook.dtsi:355.1-6 Label or path wifi not found
+   FATAL ERROR: Syntax error parsing input tree
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 38743 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180707/b5f3c0d6/attachment-0001.gz>
