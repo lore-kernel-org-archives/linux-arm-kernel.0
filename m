@@ -1,37 +1,91 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Fri, 06 Jul 2018 16:44:44 -0700
-Subject: [PATCH 1/2] clk: mvebu: armada-37xx-periph: Fix switching CPU
- rate from 300Mhz to 1.2GHz
-In-Reply-To: <87tvpl4pql.fsf@bootlin.com>
-References: <20180619123446.694-1-gregory.clement@bootlin.com>
- <20180619123446.694-2-gregory.clement@bootlin.com>
- <87tvpl4pql.fsf@bootlin.com>
-Message-ID: <153092068418.143105.5823916627333449732@swboyd.mtv.corp.google.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Fri, 6 Jul 2018 17:30:49 -0700
+Subject: [RESEND PATCH v2 3/9] asm-generic: Move some macros from
+ linux/bitops.h to a new bits.h file
+In-Reply-To: <1529412794-17720-4-git-send-email-will.deacon@arm.com>
+References: <1529412794-17720-1-git-send-email-will.deacon@arm.com>
+ <1529412794-17720-4-git-send-email-will.deacon@arm.com>
+Message-ID: <20180706173049.e28171504c745934a280dee8@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Gregory CLEMENT (2018-06-29 07:44:02)
-> Hi,
->  
->  On mar., juin 19 2018, Gregory CLEMENT <gregory.clement@bootlin.com> wrote:
-> 
-> > Switching the CPU from the L2 or L3 frequencies (300 and 200 Mhz
-> > respectively) to L0 frequency (1.2 Ghz) requires a significant amount
-> > of time to let VDD stabilize to the appropriate voltage. This amount of
-> > time is large enough that it cannot be covered by the hardware
-> > countdown register. Due to this, the CPU might start operating at L0
-> > before the voltage is stabilized, leading to CPU stalls.
-> >
-> > To work around this problem, we prevent switching directly from the
-> > L2/L3 frequencies to the L0 frequency, and instead switch to the L1
-> > frequency in-between. The sequence therefore becomes:
-> >
-> > 1. First switch from L2/L3(200/300MHz) to L1(600MHZ)
-> > 2. Sleep 20ms for stabling VDD voltage
-> > 3. Then switch from L1(600MHZ) to L0(1200Mhz).
-> 
-> Do you have any comment on this fix?
-> 
+On Tue, 19 Jun 2018 13:53:08 +0100 Will Deacon <will.deacon@arm.com> wrote:
 
-Looks good. Is it crashing right now? I can throw it into clk-fixes if
-it's fixing pain.
+> In preparation for implementing the asm-generic atomic bitops in terms
+> of atomic_long_*, we need to prevent asm/atomic.h implementations from
+> pulling in linux/bitops.h. A common reason for this include is for the
+> BITS_PER_BYTE definition, so move this and some other BIT() and masking
+> macros into a new header file, linux/bits.h
+> 
+> --- a/include/linux/bitops.h
+> +++ b/include/linux/bitops.h
+> @@ -2,29 +2,9 @@
+>  #ifndef _LINUX_BITOPS_H
+>  #define _LINUX_BITOPS_H
+>  #include <asm/types.h>
+> +#include <linux/bits.h>
+>  
+> -#ifdef	__KERNEL__
+> -#define BIT(nr)			(1UL << (nr))
+> -#define BIT_ULL(nr)		(1ULL << (nr))
+> -#define BIT_MASK(nr)		(1UL << ((nr) % BITS_PER_LONG))
+> -#define BIT_WORD(nr)		((nr) / BITS_PER_LONG)
+> -#define BIT_ULL_MASK(nr)	(1ULL << ((nr) % BITS_PER_LONG_LONG))
+> -#define BIT_ULL_WORD(nr)	((nr) / BITS_PER_LONG_LONG)
+> -#define BITS_PER_BYTE		8
+>  #define BITS_TO_LONGS(nr)	DIV_ROUND_UP(nr, BITS_PER_BYTE * sizeof(long))
+> -#endif
+
+Why does it leave BITS_TO_LONGS() in place?
+
+That becomes unfortunate with Chris's patch, so I'm moving
+BITS_TO_LONGS() into bits.h.
+
+
+From: Chris Wilson <chris@chris-wilson.co.uk>
+Subject: include/linux/bitops.h: introduce BITS_PER_TYPE
+
+net_dim.h has a rather useful extension to BITS_PER_BYTE to compute the
+number of bits in a type (BITS_PER_BYTE * sizeof(T)), so promote the macro
+to bitops.h, alongside BITS_PER_BYTE, for wider usage.
+
+Link: http://lkml.kernel.org/r/20180706094458.14116-1-chris at chris-wilson.co.uk
+Signed-off-by: Chris Wilson <chris@chris-wilson.co.uk>
+Reviewed-by: Jani Nikula <jani.nikula@intel.com>
+Cc: Randy Dunlap <rdunlap@infradead.org>
+Cc: Andy Gospodarek <gospo@broadcom.com>
+Cc: David S. Miller <davem@davemloft.net>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Ingo Molnar <mingo@kernel.org>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+---
+
+ include/linux/bitops.h  |    3 ++-
+ include/linux/net_dim.h |    1 -
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff -puN include/linux/bitops.h~bitops-introduce-bits_per_type include/linux/bitops.h
+--- a/include/linux/bitops.h~bitops-introduce-bits_per_type
++++ a/include/linux/bitops.h
+@@ -11,7 +11,8 @@
+ #define BIT_ULL_MASK(nr)	(1ULL << ((nr) % BITS_PER_LONG_LONG))
+ #define BIT_ULL_WORD(nr)	((nr) / BITS_PER_LONG_LONG)
+ #define BITS_PER_BYTE		8
+-#define BITS_TO_LONGS(nr)	DIV_ROUND_UP(nr, BITS_PER_BYTE * sizeof(long))
++#define BITS_PER_TYPE(type) (sizeof(type) * BITS_PER_BYTE)
++#define BITS_TO_LONGS(nr)	DIV_ROUND_UP(nr, BITS_PER_TYPE(long))
+ #endif
+ 
+ /*
+diff -puN include/linux/net_dim.h~bitops-introduce-bits_per_type include/linux/net_dim.h
+--- a/include/linux/net_dim.h~bitops-introduce-bits_per_type
++++ a/include/linux/net_dim.h
+@@ -363,7 +363,6 @@ static inline void net_dim_sample(u16 ev
+ }
+ 
+ #define NET_DIM_NEVENTS 64
+-#define BITS_PER_TYPE(type) (sizeof(type) * BITS_PER_BYTE)
+ #define BIT_GAP(bits, end, start) ((((end) - (start)) + BIT_ULL(bits)) & (BIT_ULL(bits) - 1))
+ 
+ static inline void net_dim_calc_stats(struct net_dim_sample *start,
+_
