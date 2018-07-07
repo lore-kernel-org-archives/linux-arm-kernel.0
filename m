@@ -1,45 +1,70 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Sat, 7 Jul 2018 11:02:01 +0100
-Subject: [GIT PULL] arm64 fixes for 4.18-rc4
-Message-ID: <20180707100159.bs52kdpykof4wumz@armageddon.cambridge.arm.com>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Sat, 7 Jul 2018 12:08:19 +0200
+Subject: [PATCH v2] mtd: atmel-quadspi: add suspend/resume hooks
+In-Reply-To: <20180704085711.GI14626@piout.net>
+References: <1528101993-4772-1-git-send-email-claudiu.beznea@microchip.com>
+ <d2264ba9-78db-a3e8-fe4d-5c04f241468c@microchip.com>
+ <20180704085711.GI14626@piout.net>
+Message-ID: <20180707120819.5b1f412f@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Wed, 4 Jul 2018 10:57:11 +0200
+Alexandre Belloni <alexandre.belloni@bootlin.com> wrote:
 
-Please pull the arm64 patches below. Thanks.
+> On 04/07/2018 11:42:25+0300, Tudor Ambarus wrote:
+> > Hi, Claudiu,
+> > 
+> > On 06/04/2018 11:46 AM, Claudiu Beznea wrote:  
+> > > Implement suspend/resume hooks.
+> > > 
+> > > Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
 
-The following changes since commit 021c91791a5e7e85c567452f1be3e4c2c6cb6063:
+Applied.
 
-  Linux 4.18-rc3 (2018-07-01 16:04:53 -0700)
+Thanks,
 
-are available in the git repository at:
+Boris
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-fixes
-
-for you to fetch changes up to 1a381d4a0a9a0f999a13faaba22bf6b3fc80dcb9:
-
-  arm64: remove no-op -p linker flag (2018-07-05 19:12:48 +0100)
-
-----------------------------------------------------------------
-arm64 LDFLAGS clean-up:
-
-- use aarch64elf instead of aarch64linux
-- move endianness options to LDFLAGS instead from LD
-- remove no-op '-p' linker flag
-
-----------------------------------------------------------------
-Greg Hackmann (1):
-      arm64: remove no-op -p linker flag
-
-Masahiro Yamada (1):
-      arm64: add endianness option to LDFLAGS instead of LD
-
-Paul Kocialkowski (1):
-      arm64: Use aarch64elf and aarch64elfb emulation mode variants
-
- arch/arm64/Makefile | 8 +++-----
- 1 file changed, 3 insertions(+), 5 deletions(-)
-
--- 
-Catalin
+> > > ---
+> > > 
+> > > Changes in v2:
+> > > - use __maybe_unused instead of #ifdef CONFIG_PM_SLEEP
+> > > 
+> > >  drivers/mtd/spi-nor/atmel-quadspi.c | 21 +++++++++++++++++++++
+> > >  1 file changed, 21 insertions(+)
+> > > 
+> > > diff --git a/drivers/mtd/spi-nor/atmel-quadspi.c b/drivers/mtd/spi-nor/atmel-quadspi.c
+> > > index 6c5708bacad8..ceaaef47f02e 100644
+> > > --- a/drivers/mtd/spi-nor/atmel-quadspi.c
+> > > +++ b/drivers/mtd/spi-nor/atmel-quadspi.c
+> > > @@ -737,6 +737,26 @@ static int atmel_qspi_remove(struct platform_device *pdev)
+> > >  	return 0;
+> > >  }
+> > >  
+> > > +static int __maybe_unused atmel_qspi_suspend(struct device *dev)
+> > > +{
+> > > +	struct atmel_qspi *aq = dev_get_drvdata(dev);
+> > > +
+> > > +	clk_disable_unprepare(aq->clk);
+> > > +
+> > > +	return 0;
+> > > +}
+> > > +
+> > > +static int __maybe_unused atmel_qspi_resume(struct device *dev)
+> > > +{
+> > > +	struct atmel_qspi *aq = dev_get_drvdata(dev);
+> > > +
+> > > +	clk_prepare_enable(aq->clk);  
+> > 
+> > You missed to verify the return value of clk_prepare_enable. Otherwise looks  
+> 
+> Which will never fail, there is no point in checking it.
+> 
+> > good. I've also looked over the test with suspending while copying on a ubifs
+> > mounted on QSPI NOR, looks good too.
+> > 
+> > After checking the return value, please add:
+> > Reviewed-by: Tudor Ambarus <tudor.ambarus@microchip.com>
+> >   
+> 
