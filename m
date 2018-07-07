@@ -1,45 +1,45 @@
-From: jun.gao@mediatek.com (Jun Gao)
-Date: Sat, 7 Jul 2018 17:29:53 +0800
-Subject: [PATCH v2 1/3] i2c: mediatek: Register i2c adapter driver earlier
-In-Reply-To: <1530955795-17714-1-git-send-email-jun.gao@mediatek.com>
-References: <1530955795-17714-1-git-send-email-jun.gao@mediatek.com>
-Message-ID: <1530955795-17714-2-git-send-email-jun.gao@mediatek.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Sat, 7 Jul 2018 11:02:01 +0100
+Subject: [GIT PULL] arm64 fixes for 4.18-rc4
+Message-ID: <20180707100159.bs52kdpykof4wumz@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jun Gao <jun.gao@mediatek.com>
+Hi Linus,
 
-As i2c adapter, i2c slave devices will depend on it. In order not to
-block the initializations of i2c slave devices, register i2c adapter
-driver at appropriate time.
+Please pull the arm64 patches below. Thanks.
 
-Signed-off-by: Jun Gao <jun.gao@mediatek.com>
----
- drivers/i2c/busses/i2c-mt65xx.c | 12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
+The following changes since commit 021c91791a5e7e85c567452f1be3e4c2c6cb6063:
 
-diff --git a/drivers/i2c/busses/i2c-mt65xx.c b/drivers/i2c/busses/i2c-mt65xx.c
-index 1e57f58..806e8b90 100644
---- a/drivers/i2c/busses/i2c-mt65xx.c
-+++ b/drivers/i2c/busses/i2c-mt65xx.c
-@@ -888,7 +888,17 @@ static int mtk_i2c_resume(struct device *dev)
- 	},
- };
- 
--module_platform_driver(mtk_i2c_driver);
-+static int __init mtk_i2c_adap_init(void)
-+{
-+	return platform_driver_register(&mtk_i2c_driver);
-+}
-+subsys_initcall(mtk_i2c_adap_init);
-+
-+static void __exit mtk_i2c_adap_exit(void)
-+{
-+	platform_driver_unregister(&mtk_i2c_driver);
-+}
-+module_exit(mtk_i2c_adap_exit);
- 
- MODULE_LICENSE("GPL v2");
- MODULE_DESCRIPTION("MediaTek I2C Bus Driver");
+  Linux 4.18-rc3 (2018-07-01 16:04:53 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-fixes
+
+for you to fetch changes up to 1a381d4a0a9a0f999a13faaba22bf6b3fc80dcb9:
+
+  arm64: remove no-op -p linker flag (2018-07-05 19:12:48 +0100)
+
+----------------------------------------------------------------
+arm64 LDFLAGS clean-up:
+
+- use aarch64elf instead of aarch64linux
+- move endianness options to LDFLAGS instead from LD
+- remove no-op '-p' linker flag
+
+----------------------------------------------------------------
+Greg Hackmann (1):
+      arm64: remove no-op -p linker flag
+
+Masahiro Yamada (1):
+      arm64: add endianness option to LDFLAGS instead of LD
+
+Paul Kocialkowski (1):
+      arm64: Use aarch64elf and aarch64elfb emulation mode variants
+
+ arch/arm64/Makefile | 8 +++-----
+ 1 file changed, 3 insertions(+), 5 deletions(-)
+
 -- 
-1.8.1.1
+Catalin
