@@ -1,142 +1,45 @@
 From: jun.gao@mediatek.com (Jun Gao)
-Date: Sat, 7 Jul 2018 17:29:55 +0800
-Subject: [PATCH v2 3/3] i2c: mediatek: Use DMA safe buffers for i2c
- transactions
+Date: Sat, 7 Jul 2018 17:29:53 +0800
+Subject: [PATCH v2 1/3] i2c: mediatek: Register i2c adapter driver earlier
 In-Reply-To: <1530955795-17714-1-git-send-email-jun.gao@mediatek.com>
 References: <1530955795-17714-1-git-send-email-jun.gao@mediatek.com>
-Message-ID: <1530955795-17714-4-git-send-email-jun.gao@mediatek.com>
+Message-ID: <1530955795-17714-2-git-send-email-jun.gao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jun Gao <jun.gao@mediatek.com>
 
-DMA mode will always be used in i2c transactions, try to allocate
-a DMA safe buffer if the buf of struct i2c_msg used is not DMA safe.
+As i2c adapter, i2c slave devices will depend on it. In order not to
+block the initializations of i2c slave devices, register i2c adapter
+driver at appropriate time.
 
 Signed-off-by: Jun Gao <jun.gao@mediatek.com>
 ---
- drivers/i2c/busses/i2c-mt65xx.c | 62 ++++++++++++++++++++++++++++++++++++-----
- 1 file changed, 55 insertions(+), 7 deletions(-)
+ drivers/i2c/busses/i2c-mt65xx.c | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/i2c/busses/i2c-mt65xx.c b/drivers/i2c/busses/i2c-mt65xx.c
-index 806e8b90..c92cae7 100644
+index 1e57f58..806e8b90 100644
 --- a/drivers/i2c/busses/i2c-mt65xx.c
 +++ b/drivers/i2c/busses/i2c-mt65xx.c
-@@ -441,6 +441,8 @@ static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
- 	u16 control_reg;
- 	u16 restart_flag = 0;
- 	u32 reg_4g_mode;
-+	u8 *dma_rd_buf = NULL;
-+	u8 *dma_wr_buf = NULL;
- 	dma_addr_t rpaddr = 0;
- 	dma_addr_t wpaddr = 0;
- 	int ret;
-@@ -500,10 +502,18 @@ static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
- 	if (i2c->op == I2C_MASTER_RD) {
- 		writel(I2C_DMA_INT_FLAG_NONE, i2c->pdmabase + OFFSET_INT_FLAG);
- 		writel(I2C_DMA_CON_RX, i2c->pdmabase + OFFSET_CON);
--		rpaddr = dma_map_single(i2c->dev, msgs->buf,
-+
-+		dma_rd_buf = i2c_get_dma_safe_msg_buf(msgs, 0);
-+		if (!dma_rd_buf)
-+			return -ENOMEM;
-+
-+		rpaddr = dma_map_single(i2c->dev, dma_rd_buf,
- 					msgs->len, DMA_FROM_DEVICE);
--		if (dma_mapping_error(i2c->dev, rpaddr))
-+		if (dma_mapping_error(i2c->dev, rpaddr)) {
-+			i2c_free_dma_safe_msg_buf(msgs, dma_rd_buf);
-+
- 			return -ENOMEM;
-+		}
+@@ -888,7 +888,17 @@ static int mtk_i2c_resume(struct device *dev)
+ 	},
+ };
  
- 		if (i2c->dev_comp->support_33bits) {
- 			reg_4g_mode = mtk_i2c_set_4g_mode(rpaddr);
-@@ -515,10 +525,18 @@ static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
- 	} else if (i2c->op == I2C_MASTER_WR) {
- 		writel(I2C_DMA_INT_FLAG_NONE, i2c->pdmabase + OFFSET_INT_FLAG);
- 		writel(I2C_DMA_CON_TX, i2c->pdmabase + OFFSET_CON);
--		wpaddr = dma_map_single(i2c->dev, msgs->buf,
+-module_platform_driver(mtk_i2c_driver);
++static int __init mtk_i2c_adap_init(void)
++{
++	return platform_driver_register(&mtk_i2c_driver);
++}
++subsys_initcall(mtk_i2c_adap_init);
 +
-+		dma_wr_buf = i2c_get_dma_safe_msg_buf(msgs, 0);
-+		if (!dma_wr_buf)
-+			return -ENOMEM;
-+
-+		wpaddr = dma_map_single(i2c->dev, dma_wr_buf,
- 					msgs->len, DMA_TO_DEVICE);
--		if (dma_mapping_error(i2c->dev, wpaddr))
-+		if (dma_mapping_error(i2c->dev, wpaddr)) {
-+			i2c_free_dma_safe_msg_buf(msgs, dma_wr_buf);
-+
- 			return -ENOMEM;
-+		}
++static void __exit mtk_i2c_adap_exit(void)
++{
++	platform_driver_unregister(&mtk_i2c_driver);
++}
++module_exit(mtk_i2c_adap_exit);
  
- 		if (i2c->dev_comp->support_33bits) {
- 			reg_4g_mode = mtk_i2c_set_4g_mode(wpaddr);
-@@ -530,16 +548,39 @@ static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
- 	} else {
- 		writel(I2C_DMA_CLR_FLAG, i2c->pdmabase + OFFSET_INT_FLAG);
- 		writel(I2C_DMA_CLR_FLAG, i2c->pdmabase + OFFSET_CON);
--		wpaddr = dma_map_single(i2c->dev, msgs->buf,
-+
-+		dma_wr_buf = i2c_get_dma_safe_msg_buf(msgs, 0);
-+		if (!dma_wr_buf)
-+			return -ENOMEM;
-+
-+		wpaddr = dma_map_single(i2c->dev, dma_wr_buf,
- 					msgs->len, DMA_TO_DEVICE);
--		if (dma_mapping_error(i2c->dev, wpaddr))
-+		if (dma_mapping_error(i2c->dev, wpaddr)) {
-+			i2c_free_dma_safe_msg_buf(msgs, dma_wr_buf);
-+
- 			return -ENOMEM;
--		rpaddr = dma_map_single(i2c->dev, (msgs + 1)->buf,
-+		}
-+
-+		dma_rd_buf = i2c_get_dma_safe_msg_buf((msgs + 1), 0);
-+		if (!dma_rd_buf) {
-+			dma_unmap_single(i2c->dev, wpaddr,
-+					 msgs->len, DMA_TO_DEVICE);
-+
-+			i2c_free_dma_safe_msg_buf(msgs, dma_wr_buf);
-+
-+			return -ENOMEM;
-+		}
-+
-+		rpaddr = dma_map_single(i2c->dev, dma_rd_buf,
- 					(msgs + 1)->len,
- 					DMA_FROM_DEVICE);
- 		if (dma_mapping_error(i2c->dev, rpaddr)) {
- 			dma_unmap_single(i2c->dev, wpaddr,
- 					 msgs->len, DMA_TO_DEVICE);
-+
-+			i2c_free_dma_safe_msg_buf(msgs, dma_wr_buf);
-+			i2c_free_dma_safe_msg_buf((msgs + 1), dma_rd_buf);
-+
- 			return -ENOMEM;
- 		}
- 
-@@ -578,14 +619,21 @@ static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
- 	if (i2c->op == I2C_MASTER_WR) {
- 		dma_unmap_single(i2c->dev, wpaddr,
- 				 msgs->len, DMA_TO_DEVICE);
-+
-+		i2c_release_dma_safe_msg_buf(msgs, dma_wr_buf);
- 	} else if (i2c->op == I2C_MASTER_RD) {
- 		dma_unmap_single(i2c->dev, rpaddr,
- 				 msgs->len, DMA_FROM_DEVICE);
-+
-+		i2c_release_dma_safe_msg_buf(msgs, dma_rd_buf);
- 	} else {
- 		dma_unmap_single(i2c->dev, wpaddr, msgs->len,
- 				 DMA_TO_DEVICE);
- 		dma_unmap_single(i2c->dev, rpaddr, (msgs + 1)->len,
- 				 DMA_FROM_DEVICE);
-+
-+		i2c_release_dma_safe_msg_buf(msgs, dma_wr_buf);
-+		i2c_release_dma_safe_msg_buf((msgs + 1), dma_rd_buf);
- 	}
- 
- 	if (ret == 0) {
+ MODULE_LICENSE("GPL v2");
+ MODULE_DESCRIPTION("MediaTek I2C Bus Driver");
 -- 
 1.8.1.1
