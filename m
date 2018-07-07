@@ -1,55 +1,48 @@
 From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Sat, 7 Jul 2018 17:58:11 +0200
-Subject: [PATCH v3 1/6] driver core: allow stopping deferred probe after
- init
-In-Reply-To: <20180628204344.13973-2-robh@kernel.org>
-References: <20180628204344.13973-1-robh@kernel.org>
- <20180628204344.13973-2-robh@kernel.org>
-Message-ID: <20180707155811.GA26377@kroah.com>
+Date: Sat, 7 Jul 2018 17:59:21 +0200
+Subject: [PATCH v2] driver core: add a debugfs entry to show deferred
+ devices
+In-Reply-To: <20180627220656.19298-1-javierm@redhat.com>
+References: <20180627220656.19298-1-javierm@redhat.com>
+Message-ID: <20180707155921.GA26504@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 28, 2018 at 02:43:39PM -0600, Rob Herring wrote:
-> Deferred probe will currently wait forever on dependent devices to probe,
-> but sometimes a driver will never exist. It's also not always critical for
-> a driver to exist. Platforms can rely on default configuration from the
-> bootloader or reset defaults for things such as pinctrl and power domains.
-> This is often the case with initial platform support until various drivers
-> get enabled. There's at least 2 scenarios where deferred probe can render
-> a platform broken. Both involve using a DT which has more devices and
-> dependencies than the kernel supports. The 1st case is a driver may be
-> disabled in the kernel config. The 2nd case is the kernel version may
-> simply not have the dependent driver. This can happen if using a newer DT
-> (provided by firmware perhaps) with a stable kernel version. Deferred
-> probe issues can be difficult to debug especially if the console has
-> dependencies or userspace fails to boot to a shell.
+On Thu, Jun 28, 2018 at 12:06:56AM +0200, Javier Martinez Canillas wrote:
+> With Device Trees (DT), the dependencies of the devices are defined in the
+> DT, then the drivers parse that information to lookup the needed resources
+> that have as dependencies.
 > 
-> There are also cases like IOMMUs where only built-in drivers are
-> supported, so deferring probe after initcalls is not needed. The IOMMU
-> subsystem implemented its own mechanism to handle this using OF_DECLARE
-> linker sections.
+> Since drivers and devices are registered in a non-deterministic way, it is
+> possible that a device that is a dependency has not been registered yet by
+> the time that is looked up.
 > 
-> This commit adds makes ending deferred probe conditional on initcalls
-> being completed or a debug timeout. Subsystems or drivers may opt-in by
-> calling driver_deferred_probe_check_init_done() instead of
-> unconditionally returning -EPROBE_DEFER. They may use additional
-> information from DT or kernel's config to decide whether to continue to
-> defer probe or not.
+> In this case the driver that requires this dependency cannot probe and has
+> to defer it. So the driver core adds it to a list of deferred devices that
+> is iterated again every time that a new driver is probed successfully.
 > 
-> The timeout mechanism is intended for debug purposes and WARNs loudly.
-> The remaining deferred probe pending list will also be dumped after the
-> timeout. Not that this timeout won't work for the console which needs
-> to be enabled before userspace starts. However, if the console's
-> dependencies are resolved, then the kernel log will be printed (as
-> opposed to no output).
+> For debugging purposes it may be useful to know what are the devices whose
+> probe function was deferred. Add a debugfs entry showing that information.
 > 
-> Cc: Alexander Graf <agraf@suse.de>
-> Signed-off-by: Rob Herring <robh@kernel.org>
+>   $ cat /sys/kernel/debug/devices_deferred
+>   48070000.i2c:twl at 48:bci
+>   musb-hdrc.0.auto
+>   omapdrm.0
+> 
+> This information could be obtained partially by enabling debugging, but it
+> means that the kernel log has to be parsed and the probe deferral balanced
+> with the successes. This can be error probe and has to be done in a ad-hoc
+> manner by everyone who needs to debug these kind of issues.
+> 
+> Since the information is already known by the kernel, just show it to make
+> it easier to debug.
+> 
+> Signed-off-by: Javier Martinez Canillas <javierm@redhat.com>
+> Reviewed-by: Mark Brown <broonie@kernel.org>
 
-I wanted to apply this series, but this patch failed to apply to my
-driver-core tree :(
+This doesn't apply to my tree anymore :(
 
-Can you rebase it and resend?
+Can you rebase and resend?
 
 thanks,
 
