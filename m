@@ -1,47 +1,29 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Sat, 07 Jul 2018 11:47:07 +1000
-Subject: [PATCH] [RESEND] usb/gadget: aspeed-vhub: add USB_LIBCOMPOSITE
- dependency
-In-Reply-To: <20180706135840.908258-1-arnd@arndb.de>
-References: <20180706135840.908258-1-arnd@arndb.de>
-Message-ID: <05d4a75389d4143bcb53a730ad2e9ceddc99ceb3.camel@kernel.crashing.org>
+From: davem@davemloft.net (David Miller)
+Date: Sat, 07 Jul 2018 11:09:00 +0900 (KST)
+Subject: [PATCH net-next 3/6] net: mvneta: discriminate error cause for
+ missed packet
+In-Reply-To: <20180706131949.2684-4-gregory.clement@bootlin.com>
+References: <20180706131949.2684-1-gregory.clement@bootlin.com>
+ <20180706131949.2684-4-gregory.clement@bootlin.com>
+Message-ID: <20180707.110900.1021780626656230934.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2018-07-06 at 15:58 +0200, Arnd Bergmann wrote:
-> Without that option, we run into a link failure:
-> 
-> drivers/usb/gadget/udc/aspeed-vhub/hub.o: In function `ast_vhub_std_hub_request':
-> hub.c:(.text+0x5b0): undefined reference to `usb_gadget_get_string'
-> 
-> Fixes: 7ecca2a4080c ("usb/gadget: Add driver for Aspeed SoC virtual hub")
-> Acked-by: Felipe Balbi <felipe.balbi@linux.intel.com>
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
-> Greg, as discussed in https://patchwork.kernel.org/patch/10427921/,
-> please apply this as a bugfix for 4.18.
+From: Gregory CLEMENT <gregory.clement@bootlin.com>
+Date: Fri,  6 Jul 2018 15:19:46 +0200
 
-Which I acked too though on second thoughts, shouldn't the driver
-select USB_LIBCOMPOSITE ? No biggie, either way and that patch
-can/should go in, we can change things later if we change our mind.
+> @@ -609,6 +606,10 @@ struct mvneta_rx_queue {
+>  
+>  	/* Index of the next RX DMA descriptor to process */
+>  	int next_desc_to_proc;
+> +
+> +	/* error counters */
+> +	u32 skb_alloc_err;
+> +	u32 refill_err;
+>  };
 
-Cheers,
-Ben.
+These counters aren't exported anywhere, making them not so useful.
 
->      Arnd
-> ---
->  drivers/usb/gadget/udc/aspeed-vhub/Kconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/drivers/usb/gadget/udc/aspeed-vhub/Kconfig b/drivers/usb/gadget/udc/aspeed-vhub/Kconfig
-> index f0cdf89b8503..83ba8a2eb6af 100644
-> --- a/drivers/usb/gadget/udc/aspeed-vhub/Kconfig
-> +++ b/drivers/usb/gadget/udc/aspeed-vhub/Kconfig
-> @@ -2,6 +2,7 @@
->  config USB_ASPEED_VHUB
->  	tristate "Aspeed vHub UDC driver"
->  	depends on ARCH_ASPEED || COMPILE_TEST
-> +	depends on USB_LIBCOMPOSITE
->  	help
->  	  USB peripheral controller for the Aspeed AST2500 family
->  	  SoCs supporting the "vHub" functionality and USB2.0
+Either remove this stuff or add them to the driver's ethtool state.
+
+Thank you.
