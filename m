@@ -1,30 +1,45 @@
-From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Sat, 7 Jul 2018 13:29:18 +0200
-Subject: [PATCH] sound: stm32: replace "%p" with "%pK"
-In-Reply-To: <s5hpo00quk4.wl-tiwai@suse.de>
-References: <20180706130703.22352-1-benjamin.gaignard@st.com>
- <s5hpo00quk4.wl-tiwai@suse.de>
-Message-ID: <CA+M3ks7QL6t+HLHAiW3T8hDFDNyR494y4dM20jc8YXJ7-Xbd_g@mail.gmail.com>
+From: simon@lineageos.org (Simon Shields)
+Date: Sun,  8 Jul 2018 00:45:22 +1000
+Subject: [PATCH] ARM: dts: exynos: add max77693 irq configuration for midas
+Message-ID: <20180707144527.6662-1-simon@lineageos.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-07-06 16:59 GMT+02:00 Takashi Iwai <tiwai@suse.de>:
-> On Fri, 06 Jul 2018 15:07:03 +0200,
-> Benjamin Gaignard wrote:
->>
->> The format specifier "%p" can leak kernel addresses.
->> Use "%pK" instead.
->>
->> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
->
-> The code change itself is OK (apart from the subject prefix to be
-> "ASoC").  But do we really want to patch manually every single place
-> like this?  There are thousands of files using '%p'.
+Currently, we assume that the bootloader has correctly configured
+the interrupt pin for max77693. This might not actually be the case -
+so it's better to configure it explicitly.
 
-I have limited myself to the few remaining %p in STM32 architecture.
+Signed-off-by: Simon Shields <simon@lineageos.org>
+---
+ arch/arm/boot/dts/exynos4412-midas.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
->
->
-> thanks,
->
-> Takashi
+diff --git a/arch/arm/boot/dts/exynos4412-midas.dtsi b/arch/arm/boot/dts/exynos4412-midas.dtsi
+index f35176a35a15..30760bf2eb71 100644
+--- a/arch/arm/boot/dts/exynos4412-midas.dtsi
++++ b/arch/arm/boot/dts/exynos4412-midas.dtsi
+@@ -156,6 +156,8 @@
+ 			compatible = "maxim,max77693";
+ 			interrupt-parent = <&gpx1>;
+ 			interrupts = <5 IRQ_TYPE_EDGE_FALLING>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&max77693_irq>;
+ 			reg = <0x66>;
+ 
+ 			regulators {
+@@ -1117,6 +1119,13 @@
+ 		samsung,pin-pud = <EXYNOS_PIN_PULL_DOWN>;
+ 	};
+ 
++	max77693_irq: max77693-irq {
++		samsung,pins = "gpx1-5";
++		samsung,pin-function = <EXYNOS_PIN_FUNC_INPUT>;
++		samsung,pin-pud = <EXYNOS_PIN_PULL_NONE>;
++		samsung,pin-drv = <EXYNOS4_PIN_DRV_LV1>;
++	};
++
+ 	sleep1: sleep-states {
+ 		PIN_SLP(gpk0-0, PREV, NONE);
+ 		PIN_SLP(gpk0-1, PREV, NONE);
+-- 
+2.18.0
