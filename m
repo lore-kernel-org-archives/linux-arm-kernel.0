@@ -1,45 +1,64 @@
-From: simon@lineageos.org (Simon Shields)
-Date: Sun,  8 Jul 2018 00:45:22 +1000
-Subject: [PATCH] ARM: dts: exynos: add max77693 irq configuration for midas
-Message-ID: <20180707144527.6662-1-simon@lineageos.org>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Sat, 7 Jul 2018 16:58:14 +0200
+Subject: [PATCH net-next 5/6] net: mvneta: Verify hardware checksum only
+ when offload checksum feature is set
+In-Reply-To: <20180706131949.2684-6-gregory.clement@bootlin.com>
+References: <20180706131949.2684-1-gregory.clement@bootlin.com>
+ <20180706131949.2684-6-gregory.clement@bootlin.com>
+Message-ID: <CAPv3WKc-h3pJ+OjpLS24=QjiTHKUEZ4ODC57CZ-fr-eoa1DDdg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, we assume that the bootloader has correctly configured
-the interrupt pin for max77693. This might not actually be the case -
-so it's better to configure it explicitly.
+HI Gregory,
 
-Signed-off-by: Simon Shields <simon@lineageos.org>
----
- arch/arm/boot/dts/exynos4412-midas.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
+2018-07-06 15:19 GMT+02:00 Gregory CLEMENT <gregory.clement@bootlin.com>:
+>
+> From: Yelena Krivosheev <yelena@marvell.com>
+>
+> If the checksum offload feature is not set, then there is no point to
+> check the status of the hardware.
+>
+> [gregory: extract from a larger patch]
+> Signed-off-by: Yelena Krivosheev <yelena@marvell.com>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
+> ---
+>  drivers/net/ethernet/marvell/mvneta.c | 12 +++++++-----
+>  1 file changed, 7 insertions(+), 5 deletions(-)
+>
+> diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
+> index 12739fb60732..8fc4be238083 100644
+> --- a/drivers/net/ethernet/marvell/mvneta.c
+> +++ b/drivers/net/ethernet/marvell/mvneta.c
+> @@ -1716,11 +1716,13 @@ static void mvneta_rx_error(struct mvneta_port *pp,
+>  static void mvneta_rx_csum(struct mvneta_port *pp, u32 status,
+>                            struct sk_buff *skb)
+>  {
+> -       if ((status & MVNETA_RXD_L3_IP4) &&
+> -           (status & MVNETA_RXD_L4_CSUM_OK)) {
+> -               skb->csum = 0;
+> -               skb->ip_summed = CHECKSUM_UNNECESSARY;
+> -               return;
+> +       if (pp->dev->features & NETIF_F_RXCSUM) {
+> +               if ((status & MVNETA_RXD_L3_IP4) &&
+> +                   (status & MVNETA_RXD_L4_CSUM_OK)) {
 
-diff --git a/arch/arm/boot/dts/exynos4412-midas.dtsi b/arch/arm/boot/dts/exynos4412-midas.dtsi
-index f35176a35a15..30760bf2eb71 100644
---- a/arch/arm/boot/dts/exynos4412-midas.dtsi
-+++ b/arch/arm/boot/dts/exynos4412-midas.dtsi
-@@ -156,6 +156,8 @@
- 			compatible = "maxim,max77693";
- 			interrupt-parent = <&gpx1>;
- 			interrupts = <5 IRQ_TYPE_EDGE_FALLING>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&max77693_irq>;
- 			reg = <0x66>;
- 
- 			regulators {
-@@ -1117,6 +1119,13 @@
- 		samsung,pin-pud = <EXYNOS_PIN_PULL_DOWN>;
- 	};
- 
-+	max77693_irq: max77693-irq {
-+		samsung,pins = "gpx1-5";
-+		samsung,pin-function = <EXYNOS_PIN_FUNC_INPUT>;
-+		samsung,pin-pud = <EXYNOS_PIN_PULL_NONE>;
-+		samsung,pin-drv = <EXYNOS4_PIN_DRV_LV1>;
-+	};
-+
- 	sleep1: sleep-states {
- 		PIN_SLP(gpk0-0, PREV, NONE);
- 		PIN_SLP(gpk0-1, PREV, NONE);
--- 
-2.18.0
+Small nit - wouldn't it be nicer to check conditions in a single 'if':
+
+       if ((pp->dev->features & NETIF_F_RXCSUM) &&
+           (status & MVNETA_RXD_L3_IP4) &&
+           (status & MVNETA_RXD_L4_CSUM_OK)) {
+?
+
+Best regards,
+Marcin
+
+> +                       skb->csum = 0;
+> +                       skb->ip_summed = CHECKSUM_UNNECESSARY;
+> +                       return;
+> +               }
+>         }
+>
+>         skb->ip_summed = CHECKSUM_NONE;
+> --
+> 2.17.1
+>
