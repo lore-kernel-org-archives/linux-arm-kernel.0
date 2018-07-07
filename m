@@ -1,49 +1,117 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Sat, 7 Jul 2018 17:59:21 +0200
-Subject: [PATCH v2] driver core: add a debugfs entry to show deferred
- devices
-In-Reply-To: <20180627220656.19298-1-javierm@redhat.com>
-References: <20180627220656.19298-1-javierm@redhat.com>
-Message-ID: <20180707155921.GA26504@kroah.com>
+From: mirq-linux@rere.qmqm.pl (=?iso-8859-2?Q?Micha=B3_Miros=B3aw?=)
+Date: Sat, 7 Jul 2018 18:14:09 +0200
+Subject: [PATCH net-next 1/5 v2] net: gemini: Look up L3 maxlen from table
+In-Reply-To: <20180704183324.10605-1-linus.walleij@linaro.org>
+References: <20180704183324.10605-1-linus.walleij@linaro.org>
+Message-ID: <20180707161409.GB6424@qmqm.qmqm.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 28, 2018 at 12:06:56AM +0200, Javier Martinez Canillas wrote:
-> With Device Trees (DT), the dependencies of the devices are defined in the
-> DT, then the drivers parse that information to lookup the needed resources
-> that have as dependencies.
-> 
-> Since drivers and devices are registered in a non-deterministic way, it is
-> possible that a device that is a dependency has not been registered yet by
-> the time that is looked up.
-> 
-> In this case the driver that requires this dependency cannot probe and has
-> to defer it. So the driver core adds it to a list of deferred devices that
-> is iterated again every time that a new driver is probed successfully.
-> 
-> For debugging purposes it may be useful to know what are the devices whose
-> probe function was deferred. Add a debugfs entry showing that information.
-> 
->   $ cat /sys/kernel/debug/devices_deferred
->   48070000.i2c:twl at 48:bci
->   musb-hdrc.0.auto
->   omapdrm.0
-> 
-> This information could be obtained partially by enabling debugging, but it
-> means that the kernel log has to be parsed and the probe deferral balanced
-> with the successes. This can be error probe and has to be done in a ad-hoc
-> manner by everyone who needs to debug these kind of issues.
-> 
-> Since the information is already known by the kernel, just show it to make
-> it easier to debug.
-> 
-> Signed-off-by: Javier Martinez Canillas <javierm@redhat.com>
-> Reviewed-by: Mark Brown <broonie@kernel.org>
+On Wed, Jul 04, 2018 at 08:33:20PM +0200, Linus Walleij wrote:
+> The code to calculate the hardware register enumerator
+> for the maximum L3 length isn't entirely simple to read.
+> Use the existing defines and rewrite the function into a
+> table look-up.
 
-This doesn't apply to my tree anymore :(
+A matter of habit. ;-)
+I think that if you just renamed 'n' to 'best_index' and avoided
+reusing 'max_l3_len' (as you already did) the idea could be made
+more obvious without expading the code to twice the lines.
 
-Can you rebase and resend?
+The max_len[] array in the original code documents how the HW reacts
+to a specific setting.
 
-thanks,
+Acked-by: Micha? Miros?aw <mirq-linux@rere.qmqm.pl>
 
-greg k-h
+Best Regards,
+Micha? Miros?aw
+
+> 
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ChangeLog v1->v2:
+> - No changes, just resending with the rest.
+> ---
+>  drivers/net/ethernet/cortina/gemini.c | 61 ++++++++++++++++++++-------
+>  1 file changed, 46 insertions(+), 15 deletions(-)
+> 
+> diff --git a/drivers/net/ethernet/cortina/gemini.c b/drivers/net/ethernet/cortina/gemini.c
+> index 6d7404f66f84..8fc31723f700 100644
+> --- a/drivers/net/ethernet/cortina/gemini.c
+> +++ b/drivers/net/ethernet/cortina/gemini.c
+> @@ -401,26 +401,57 @@ static int gmac_setup_phy(struct net_device *netdev)
+>  	return 0;
+>  }
+>  
+> -static int gmac_pick_rx_max_len(int max_l3_len)
+> -{
+> -	/* index = CONFIG_MAXLEN_XXX values */
+> -	static const int max_len[8] = {
+> -		1536, 1518, 1522, 1542,
+> -		9212, 10236, 1518, 1518
+> -	};
+> -	int i, n = 5;
+> +/* The maximum frame length is not logically enumerated in the
+> + * hardware, so we do a table lookup to find the applicable max
+> + * frame length.
+> + */
+> +struct gmac_max_framelen {
+> +	unsigned int max_l3_len;
+> +	u8 val;
+> +};
+>  
+> -	max_l3_len += ETH_HLEN + VLAN_HLEN;
+> +static const struct gmac_max_framelen gmac_maxlens[] = {
+> +	{
+> +		.max_l3_len = 1518,
+> +		.val = CONFIG0_MAXLEN_1518,
+> +	},
+> +	{
+> +		.max_l3_len = 1522,
+> +		.val = CONFIG0_MAXLEN_1522,
+> +	},
+> +	{
+> +		.max_l3_len = 1536,
+> +		.val = CONFIG0_MAXLEN_1536,
+> +	},
+> +	{
+> +		.max_l3_len = 1542,
+> +		.val = CONFIG0_MAXLEN_1542,
+> +	},
+> +	{
+> +		.max_l3_len = 9212,
+> +		.val = CONFIG0_MAXLEN_9k,
+> +	},
+> +	{
+> +		.max_l3_len = 10236,
+> +		.val = CONFIG0_MAXLEN_10k,
+> +	},
+> +};
+> +
+> +static int gmac_pick_rx_max_len(unsigned int max_l3_len)
+> +{
+> +	const struct gmac_max_framelen *maxlen;
+> +	int maxtot;
+> +	int i;
+>  
+> -	if (max_l3_len > max_len[n])
+> -		return -1;
+> +	maxtot = max_l3_len + ETH_HLEN + VLAN_HLEN;
+>  
+> -	for (i = 0; i < 5; i++) {
+> -		if (max_len[i] >= max_l3_len && max_len[i] < max_len[n])
+> -			n = i;
+> +	for (i = 0; i < ARRAY_SIZE(gmac_maxlens); i++) {
+> +		maxlen = &gmac_maxlens[i];
+> +		if (maxtot <= maxlen->max_l3_len)
+> +			return maxlen->val;
+>  	}
+>  
+> -	return n;
+> +	return -1;
+>  }
+>  
+>  static int gmac_init(struct net_device *netdev)
+> -- 
+> 2.17.1
+> 
