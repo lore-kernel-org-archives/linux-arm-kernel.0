@@ -1,30 +1,27 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Sat, 7 Jul 2018 10:55:27 +0200
-Subject: [PATCH v3 8/9] ARM: dts: exynos5250: add DSI node
-In-Reply-To: <1529396370-18761-9-git-send-email-m.purski@samsung.com>
-References: <1529396370-18761-1-git-send-email-m.purski@samsung.com>
- <CGME20180619082003eucas1p1ee69166282872a3c031caf08cb550269@eucas1p1.samsung.com>
- <1529396370-18761-9-git-send-email-m.purski@samsung.com>
-Message-ID: <20180707085527.vdnbqy5digndxc7i@kozik-lap>
+From: jun.gao@mediatek.com (Jun Gao)
+Date: Sat, 7 Jul 2018 17:29:52 +0800
+Subject: [PATCH v2 0/3] Register i2c adapter driver earlier and use DMA safe
+ buffers
+Message-ID: <1530955795-17714-1-git-send-email-jun.gao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 19, 2018 at 10:19:29AM +0200, Maciej Purski wrote:
-> From: Andrzej Hajda <a.hajda@samsung.com>
-> 
-> The patch adds common part of DSI node for Exynos5250 platforms
-> and a required mipi-phy node.
-> 
-> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
-> Signed-off-by: Maciej Purski <m.purski@samsung.com>
-> ---
->  arch/arm/boot/dts/exynos5250.dtsi | 21 +++++++++++++++++++++
->  1 file changed, 21 insertions(+)
->
+This patch series based on v4.18-rc1, include i2c adapter driver register time
+modification, DMA safe buffer free function and DMA safe buffers used for i2c
+transactions.
 
-I see that bindings got Rob's ack but kbuild complained about driver
-changes so I guess you are going resend everything? I'll wait with
-applying these for v4.
+changes since v1:
+- Add the initializations for DMA safe buffer pointers
 
-Best regards,
-Krzysztof
+Jun Gao (3):
+  i2c: mediatek: Register i2c adapter driver earlier
+  i2c: Add helper to ease DMA handling
+  i2c: mediatek: Use DMA safe buffers for i2c transactions
+
+ drivers/i2c/busses/i2c-mt65xx.c | 74 ++++++++++++++++++++++++++++++++++++-----
+ drivers/i2c/i2c-core-base.c     | 14 ++++++++
+ include/linux/i2c.h             |  1 +
+ 3 files changed, 81 insertions(+), 8 deletions(-)
+
+--
+1.8.1.1
