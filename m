@@ -1,43 +1,36 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Sat, 7 Jul 2018 12:33:34 +0200
-Subject: [PATCH v4 3/5] ARM: dts: s5pv210: Add initial DTS for SGH-T959P
- phone
-In-Reply-To: <1530958183-10956-4-git-send-email-pawel.mikolaj.chmiel@gmail.com>
+Date: Sat, 7 Jul 2018 12:33:45 +0200
+Subject: [PATCH v4 4/5] dt-bindings: samsung: Document bindings for
+ Samsung aries boards
+In-Reply-To: <1530958183-10956-5-git-send-email-pawel.mikolaj.chmiel@gmail.com>
 References: <1530958183-10956-1-git-send-email-pawel.mikolaj.chmiel@gmail.com>
- <1530958183-10956-4-git-send-email-pawel.mikolaj.chmiel@gmail.com>
-Message-ID: <20180707103334.rnvgdnfxvoogudrg@kozik-lap>
+ <1530958183-10956-5-git-send-email-pawel.mikolaj.chmiel@gmail.com>
+Message-ID: <20180707103345.vzx2x3sqmfcet3fw@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 07, 2018 at 12:09:41PM +0200, Pawe? Chmiel wrote:
-> From: Jonathan Bakker <xc-racer2@live.ca>
+On Sat, Jul 07, 2018 at 12:09:42PM +0200, Pawe? Chmiel wrote:
+> Document the binding for Samsung Galaxy S (i9000) phone
+> and whole Samsung Aries devices family (based on S5PV210).
 > 
-> This DTS file have initial support Samsung SGH-T959P phone,
-> also known as Samsung Galaxy S 4G or fascinate4g.
-> It belongs to Samsung Aries devices family.
-> Initial version have support for:
-> - sdcard
-> - max8998 pmic and rtc
-> - max17040 fuel gauge
-> - gpio keys
-> - fimd (no panel driver yet)
-> - usb (peripherial mode)
-> - wifi
+> Also because this is first not Exynos-based devices, document this information
+> at beginning of file.
 > 
-> Signed-off-by: Jonathan Bakker <xc-racer2@live.ca>
 > Signed-off-by: Pawe? Chmiel <pawel.mikolaj.chmiel@gmail.com>
-> ---
+> Reviewed-by: Rob Herring <robh@kernel.org>
+> --
+> Changes from v2:
+>   - Squashed with patch which was documenting existence
+>     of non Exynos-based boards
+>   - Added reviewed-by
 > 
 > Changes from v1:
->   - Added missing commit msg
->   - Removed duplicated and unneeded headers
->   - Added stdout-path
->   - Added information why we hardcode bootargs
+>   - Added missing commit msg.
+> --
 > ---
-> ---
->  arch/arm/boot/dts/Makefile                |  1 +
->  arch/arm/boot/dts/s5pv210-fascinate4g.dts | 45 +++++++++++++++++++++++++++++++
->  2 files changed, 46 insertions(+)
+>  Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt | 4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
+> 
 
 Thanks, applied.
 
