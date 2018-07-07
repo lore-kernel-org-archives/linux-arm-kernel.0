@@ -1,45 +1,30 @@
 From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Sat, 7 Jul 2018 13:28:01 +0200
-Subject: [PATCH] dma: stm32: replace "%p" with "%pK"
-In-Reply-To: <CAMuHMdVEOx=PLAHzGEtPmVtitsVYSc-F1TUP6DVCS=Ct7QupYw@mail.gmail.com>
-References: <20180706130220.21957-1-benjamin.gaignard@st.com>
- <CAMuHMdVEOx=PLAHzGEtPmVtitsVYSc-F1TUP6DVCS=Ct7QupYw@mail.gmail.com>
-Message-ID: <CA+M3ks7URGgxKfjkB9H2vi0qH-SvMZd1SfK4KZGPbF81+xJR9g@mail.gmail.com>
+Date: Sat, 7 Jul 2018 13:29:18 +0200
+Subject: [PATCH] sound: stm32: replace "%p" with "%pK"
+In-Reply-To: <s5hpo00quk4.wl-tiwai@suse.de>
+References: <20180706130703.22352-1-benjamin.gaignard@st.com>
+ <s5hpo00quk4.wl-tiwai@suse.de>
+Message-ID: <CA+M3ks7QL6t+HLHAiW3T8hDFDNyR494y4dM20jc8YXJ7-Xbd_g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-07-06 21:38 GMT+02:00 Geert Uytterhoeven <geert@linux-m68k.org>:
-> Hi Benjamin,
->
-> On Fri, Jul 6, 2018 at 3:03 PM Benjamin Gaignard
-> <benjamin.gaignard@linaro.org> wrote:
+2018-07-06 16:59 GMT+02:00 Takashi Iwai <tiwai@suse.de>:
+> On Fri, 06 Jul 2018 15:07:03 +0200,
+> Benjamin Gaignard wrote:
+>>
 >> The format specifier "%p" can leak kernel addresses.
 >> Use "%pK" instead.
+>>
+>> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
 >
-> Still? Isn't the value randomized these days?
+> The code change itself is OK (apart from the subject prefix to be
+> "ASoC").  But do we really want to patch manually every single place
+> like this?  There are thousands of files using '%p'.
 
-%p give an hashed value, with %pK you can use a sysctl to get the real
-value if you are root
+I have limited myself to the few remaining %p in STM32 architecture.
 
 >
-> Gr{oetje,eeting}s,
 >
->                         Geert
+> thanks,
 >
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
->
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
->                                 -- Linus Torvalds
-
-
-
--- 
-Benjamin Gaignard
-
-Graphic Study Group
-
-Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro: Facebook | Twitter | Blog
+> Takashi
