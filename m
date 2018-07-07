@@ -1,117 +1,43 @@
-From: mirq-linux@rere.qmqm.pl (=?iso-8859-2?Q?Micha=B3_Miros=B3aw?=)
-Date: Sat, 7 Jul 2018 18:14:09 +0200
-Subject: [PATCH net-next 1/5 v2] net: gemini: Look up L3 maxlen from table
-In-Reply-To: <20180704183324.10605-1-linus.walleij@linaro.org>
-References: <20180704183324.10605-1-linus.walleij@linaro.org>
-Message-ID: <20180707161409.GB6424@qmqm.qmqm.pl>
+From: lkp@intel.com (kbuild test robot)
+Date: Sun, 8 Jul 2018 00:52:41 +0800
+Subject: [PATCH] ARM: imx: fix i.MX6SLL build
+In-Reply-To: <20180706125523.3480661-1-arnd@arndb.de>
+References: <20180706125523.3480661-1-arnd@arndb.de>
+Message-ID: <201807080053.KhEzoodh%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 04, 2018 at 08:33:20PM +0200, Linus Walleij wrote:
-> The code to calculate the hardware register enumerator
-> for the maximum L3 length isn't entirely simple to read.
-> Use the existing defines and rewrite the function into a
-> table look-up.
+Hi Arnd,
 
-A matter of habit. ;-)
-I think that if you just renamed 'n' to 'best_index' and avoided
-reusing 'max_l3_len' (as you already did) the idea could be made
-more obvious without expading the code to twice the lines.
+I love your patch! Yet something to improve:
 
-The max_len[] array in the original code documents how the HW reacts
-to a specific setting.
+[auto build test ERROR on shawnguo/for-next]
+[also build test ERROR on next-20180706]
+[cannot apply to v4.18-rc3]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Acked-by: Micha? Miros?aw <mirq-linux@rere.qmqm.pl>
+url:    https://github.com/0day-ci/linux/commits/Arnd-Bergmann/ARM-imx-fix-i-MX6SLL-build/20180707-012834
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git for-next
+config: arm-arm67 (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        GCC_VERSION=7.2.0 make.cross ARCH=arm 
 
-Best Regards,
-Micha? Miros?aw
+All errors (new ones prefixed by >>):
 
-> 
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> ChangeLog v1->v2:
-> - No changes, just resending with the rest.
-> ---
->  drivers/net/ethernet/cortina/gemini.c | 61 ++++++++++++++++++++-------
->  1 file changed, 46 insertions(+), 15 deletions(-)
-> 
-> diff --git a/drivers/net/ethernet/cortina/gemini.c b/drivers/net/ethernet/cortina/gemini.c
-> index 6d7404f66f84..8fc31723f700 100644
-> --- a/drivers/net/ethernet/cortina/gemini.c
-> +++ b/drivers/net/ethernet/cortina/gemini.c
-> @@ -401,26 +401,57 @@ static int gmac_setup_phy(struct net_device *netdev)
->  	return 0;
->  }
->  
-> -static int gmac_pick_rx_max_len(int max_l3_len)
-> -{
-> -	/* index = CONFIG_MAXLEN_XXX values */
-> -	static const int max_len[8] = {
-> -		1536, 1518, 1522, 1542,
-> -		9212, 10236, 1518, 1518
-> -	};
-> -	int i, n = 5;
-> +/* The maximum frame length is not logically enumerated in the
-> + * hardware, so we do a table lookup to find the applicable max
-> + * frame length.
-> + */
-> +struct gmac_max_framelen {
-> +	unsigned int max_l3_len;
-> +	u8 val;
-> +};
->  
-> -	max_l3_len += ETH_HLEN + VLAN_HLEN;
-> +static const struct gmac_max_framelen gmac_maxlens[] = {
-> +	{
-> +		.max_l3_len = 1518,
-> +		.val = CONFIG0_MAXLEN_1518,
-> +	},
-> +	{
-> +		.max_l3_len = 1522,
-> +		.val = CONFIG0_MAXLEN_1522,
-> +	},
-> +	{
-> +		.max_l3_len = 1536,
-> +		.val = CONFIG0_MAXLEN_1536,
-> +	},
-> +	{
-> +		.max_l3_len = 1542,
-> +		.val = CONFIG0_MAXLEN_1542,
-> +	},
-> +	{
-> +		.max_l3_len = 9212,
-> +		.val = CONFIG0_MAXLEN_9k,
-> +	},
-> +	{
-> +		.max_l3_len = 10236,
-> +		.val = CONFIG0_MAXLEN_10k,
-> +	},
-> +};
-> +
-> +static int gmac_pick_rx_max_len(unsigned int max_l3_len)
-> +{
-> +	const struct gmac_max_framelen *maxlen;
-> +	int maxtot;
-> +	int i;
->  
-> -	if (max_l3_len > max_len[n])
-> -		return -1;
-> +	maxtot = max_l3_len + ETH_HLEN + VLAN_HLEN;
->  
-> -	for (i = 0; i < 5; i++) {
-> -		if (max_len[i] >= max_l3_len && max_len[i] < max_len[n])
-> -			n = i;
-> +	for (i = 0; i < ARRAY_SIZE(gmac_maxlens); i++) {
-> +		maxlen = &gmac_maxlens[i];
-> +		if (maxtot <= maxlen->max_l3_len)
-> +			return maxlen->val;
->  	}
->  
-> -	return n;
-> +	return -1;
->  }
->  
->  static int gmac_init(struct net_device *netdev)
-> -- 
-> 2.17.1
-> 
+   arch/arm/mach-imx/mach-imx6sl.o: In function `imx6sl_init_late':
+>> mach-imx6sl.c:(.init.text+0x2c): undefined reference to `imx6sx_cpuidle_init'
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 31187 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180708/9dff84aa/attachment-0001.gz>
