@@ -1,43 +1,76 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sun, 8 Jul 2018 00:52:41 +0800
-Subject: [PATCH] ARM: imx: fix i.MX6SLL build
-In-Reply-To: <20180706125523.3480661-1-arnd@arndb.de>
-References: <20180706125523.3480661-1-arnd@arndb.de>
-Message-ID: <201807080053.KhEzoodh%fengguang.wu@intel.com>
+From: simon@lineageos.org (Simon Shields)
+Date: Sun, 8 Jul 2018 03:08:48 +1000
+Subject: [PATCH] ARM: dts: exynos: add max77693 irq configuration for midas
+In-Reply-To: <CAJKOXPfUav7URsCDHFzMbtBiw5id+szVj_VtGJ-iu5ymmgWoXw@mail.gmail.com>
+References: <20180707144527.6662-1-simon@lineageos.org>
+ <CAJKOXPfUav7URsCDHFzMbtBiw5id+szVj_VtGJ-iu5ymmgWoXw@mail.gmail.com>
+Message-ID: <20180707170848.GA29870@lineageos.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Sat, Jul 07, 2018 at 05:34:08PM +0200, Krzysztof Kozlowski wrote:
+> On 7 July 2018 at 16:45, Simon Shields <simon@lineageos.org> wrote:
+> > Currently, we assume that the bootloader has correctly configured
+> > the interrupt pin for max77693. This might not actually be the case -
+> > so it's better to configure it explicitly.
+> >
+> > Signed-off-by: Simon Shields <simon@lineageos.org>
+> > ---
+> >  arch/arm/boot/dts/exynos4412-midas.dtsi | 9 +++++++++
+> >  1 file changed, 9 insertions(+)
+> >
+> > diff --git a/arch/arm/boot/dts/exynos4412-midas.dtsi b/arch/arm/boot/dts/exynos4412-midas.dtsi
+> > index f35176a35a15..30760bf2eb71 100644
+> > --- a/arch/arm/boot/dts/exynos4412-midas.dtsi
+> > +++ b/arch/arm/boot/dts/exynos4412-midas.dtsi
+> > @@ -156,6 +156,8 @@
+> >                         compatible = "maxim,max77693";
+> >                         interrupt-parent = <&gpx1>;
+> >                         interrupts = <5 IRQ_TYPE_EDGE_FALLING>;
+> > +                       pinctrl-names = "default";
+> > +                       pinctrl-0 = <&max77693_irq>;
+> >                         reg = <0x66>;
+> >
+> >                         regulators {
+> > @@ -1117,6 +1119,13 @@
+> >                 samsung,pin-pud = <EXYNOS_PIN_PULL_DOWN>;
+> >         };
+> >
+> > +       max77693_irq: max77693-irq {
+> > +               samsung,pins = "gpx1-5";
+> > +               samsung,pin-function = <EXYNOS_PIN_FUNC_INPUT>;
+> > +               samsung,pin-pud = <EXYNOS_PIN_PULL_NONE>;
+> > +               samsung,pin-drv = <EXYNOS4_PIN_DRV_LV1>;
+> > +       };
+> > +
+> 
+> Please put it before hdmi-hpd (gpx3-7).
 
-I love your patch! Yet something to improve:
+OK.
 
-[auto build test ERROR on shawnguo/for-next]
-[also build test ERROR on next-20180706]
-[cannot apply to v4.18-rc3]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+> What about the interrupt for max77693 fuel gauge? 
+> Maybe another patch for it as well?
 
-url:    https://github.com/0day-ci/linux/commits/Arnd-Bergmann/ARM-imx-fix-i-MX6SLL-build/20180707-012834
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git for-next
-config: arm-arm67 (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        GCC_VERSION=7.2.0 make.cross ARCH=arm 
+Yes - in fact, it looks like most interrupt pins are configured by the
+vendor kernel to have PULL_NONE, something which (as far as i can tell)
+mainline doesn't do.
 
-All errors (new ones prefixed by >>):
+Maybe I should just prepare a series (or a single patch) which fixes all of them?
+Or would you prefer I added the (remaining) eint configurations to
+exynos4412-pinctrl.dtsi, and then used those?
 
-   arch/arm/mach-imx/mach-imx6sl.o: In function `imx6sl_init_late':
->> mach-imx6sl.c:(.init.text+0x2c): undefined reference to `imx6sx_cpuidle_init'
+> 
+> Best regards,
+> Krzysztof
+> 
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 31187 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180708/9dff84aa/attachment-0001.gz>
+Cheers,
+Simon
+
+> 
+> >         sleep1: sleep-states {
+> >                 PIN_SLP(gpk0-0, PREV, NONE);
+> >                 PIN_SLP(gpk0-1, PREV, NONE);
+> > --
+> > 2.18.0
+> >
