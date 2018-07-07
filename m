@@ -1,57 +1,75 @@
-From: yandong77520@gmail.com (Yandong.Zhao)
-Date: Sat,  7 Jul 2018 12:02:51 +0800
-Subject: [PATCH] arm64: neon: Do not access kernel_neon_busy with preemption
- enabled
-Message-ID: <1530936171-16169-1-git-send-email-yandong77520@gmail.com>
+From: pranith.foss@gmail.com (Pranith Kumar)
+Date: Fri, 6 Jul 2018 22:52:12 -0700
+Subject: [PATCH v6 2/2] ThunderX2: Add Cavium ThunderX2 SoC UNCORE PMU
+ driver
+In-Reply-To: <20180621063338.20093-3-ganapatrao.kulkarni@cavium.com>
+References: <20180621063338.20093-1-ganapatrao.kulkarni@cavium.com>
+ <20180621063338.20093-3-ganapatrao.kulkarni@cavium.com>
+Message-ID: <CADYwmhHdTuK-z4GcGCYypYo2dvvPj7udihPcMmTkHTSU2fOWWw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yandong Zhao <yandong77520@gmail.com>
+Hi Ganapatrao,
 
-Dear, Dave
-Thank you very much for reading my email. I have a question and
-I hope toget your reply.
-It is a bug to not close the preemption when executing
-raw_cpu_read(kernel_neon_busy) in the function may_use_simd()!
-We encountered a ?sysdump? problem on Kernel 4.14 code because
-the program entered BUG_ON() in the function kernel_neon_begin().
-Our analysis concludes that the process is migrating while executing
-raw_cpu_read(kernel_neon_busy).
 
-Signed-off-by: Yandong Zhao <yandong77520@gmail.com>
----
- arch/arm64/include/asm/simd.h | 17 +++++------------
- 1 file changed, 5 insertions(+), 12 deletions(-)
+On Wed, Jun 20, 2018 at 11:33 PM, Ganapatrao Kulkarni
+<ganapatrao.kulkarni@cavium.com> wrote:
 
-diff --git a/arch/arm64/include/asm/simd.h b/arch/arm64/include/asm/simd.h
-index fa8b3fe..0d91084 100644
---- a/arch/arm64/include/asm/simd.h
-+++ b/arch/arm64/include/asm/simd.h
-@@ -29,20 +29,13 @@
- static __must_check inline bool may_use_simd(void)
- {
- 	/*
--	 * The raw_cpu_read() is racy if called with preemption enabled.
--	 * This is not a bug: kernel_neon_busy is only set when
--	 * preemption is disabled, so we cannot migrate to another CPU
--	 * while it is set, nor can we migrate to a CPU where it is set.
--	 * So, if we find it clear on some CPU then we're guaranteed to
--	 * find it clear on any CPU we could migrate to.
--	 *
--	 * If we are in between kernel_neon_begin()...kernel_neon_end(),
--	 * the flag will be set, but preemption is also disabled, so we
--	 * can't migrate to another CPU and spuriously see it become
--	 * false.
-+	 * Operations for contexts where we do not want to do any checks for
-+	 * preemptions.  Unless strictly necessary, always use this_cpu_*()
-+	 * instead. Because of the kernel_neon_busy here we have to make sure
-+	 * that it is the current cpu.
- 	 */
- 	return !in_irq() && !irqs_disabled() && !in_nmi() &&
--		!raw_cpu_read(kernel_neon_busy);
-+		!this_cpu_read(kernel_neon_busy);
- }
- 
- #else /* ! CONFIG_KERNEL_MODE_NEON */
--- 
-1.9.1
+> +
+> +enum thunderx2_uncore_l3_events {
+> +       L3_EVENT_NONE,
+> +       L3_EVENT_NBU_CANCEL,
+> +       L3_EVENT_DIB_RETRY,
+> +       L3_EVENT_DOB_RETRY,
+> +       L3_EVENT_DIB_CREDIT_RETRY,
+> +       L3_EVENT_DOB_CREDIT_RETRY,
+> +       L3_EVENT_FORCE_RETRY,
+> +       L3_EVENT_IDX_CONFLICT_RETRY,
+> +       L3_EVENT_EVICT_CONFLICT_RETRY,
+> +       L3_EVENT_BANK_CONFLICT_RETRY,
+> +       L3_EVENT_FILL_ENTRY_RETRY,
+> +       L3_EVENT_EVICT_NOT_READY_RETRY,
+> +       L3_EVENT_L3_RETRY,
+> +       L3_EVENT_READ_REQ,
+> +       L3_EVENT_WRITE_BACK_REQ,
+> +       L3_EVENT_INVALIDATE_NWRITE_REQ,
+> +       L3_EVENT_INV_REQ,
+> +       L3_EVENT_SELF_REQ,
+> +       L3_EVENT_REQ,
+> +       L3_EVENT_EVICT_REQ,
+> +       L3_EVENT_INVALIDATE_NWRITE_HIT,
+> +       L3_EVENT_INVALIDATE_HIT,
+> +       L3_EVENT_SELF_HIT,
+> +       L3_EVENT_READ_HIT,
+> +       L3_EVENT_MAX,
+> +};
+> +
+> +enum thunderx2_uncore_dmc_events {
+> +       DMC_EVENT_NONE,
+> +       DMC_EVENT_COUNT_CYCLES,
+> +       DMC_EVENT_RES2,
+> +       DMC_EVENT_RES3,
+> +       DMC_EVENT_RES4,
+> +       DMC_EVENT_RES5,
+> +       DMC_EVENT_RES6,
+> +       DMC_EVENT_RES7,
+> +       DMC_EVENT_RES8,
+> +       DMC_EVENT_READ_64B_TXNS,
+> +       DMC_EVENT_READ_BELOW_64B_TXNS,
+> +       DMC_EVENT_WRITE_TXNS,
+> +       DMC_EVENT_TXN_CYCLES,
+> +       DMC_EVENT_DATA_TRANSFERS,
+> +       DMC_EVENT_CANCELLED_READ_TXNS,
+> +       DMC_EVENT_CONSUMED_READ_TXNS,
+> +       DMC_EVENT_MAX,
+> +};
+
+Can you please provide a link to where these counters are documented?
+It is not clear what each counter does especially for the L3C events.
+
+Also, what counter do you need to use to get L3 hit/miss ratio? I
+think this is the most useful counter related to L3.
+
+Thanks,
+--
+Pranith
