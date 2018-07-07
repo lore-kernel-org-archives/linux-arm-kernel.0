@@ -1,24 +1,19 @@
 From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Sat, 7 Jul 2018 12:08:19 +0200
-Subject: [PATCH v2] mtd: atmel-quadspi: add suspend/resume hooks
-In-Reply-To: <20180704085711.GI14626@piout.net>
-References: <1528101993-4772-1-git-send-email-claudiu.beznea@microchip.com>
- <d2264ba9-78db-a3e8-fe4d-5c04f241468c@microchip.com>
- <20180704085711.GI14626@piout.net>
-Message-ID: <20180707120819.5b1f412f@bbrezillon>
+Date: Sat, 7 Jul 2018 12:09:02 +0200
+Subject: [PATCH] mtd: stm32-quadspi: replace "%p" with "%pK"
+In-Reply-To: <20180706130525.22223-1-benjamin.gaignard@st.com>
+References: <20180706130525.22223-1-benjamin.gaignard@st.com>
+Message-ID: <20180707120902.0ae0b881@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 4 Jul 2018 10:57:11 +0200
-Alexandre Belloni <alexandre.belloni@bootlin.com> wrote:
+On Fri,  6 Jul 2018 15:05:25 +0200
+Benjamin Gaignard <benjamin.gaignard@linaro.org> wrote:
 
-> On 04/07/2018 11:42:25+0300, Tudor Ambarus wrote:
-> > Hi, Claudiu,
-> > 
-> > On 06/04/2018 11:46 AM, Claudiu Beznea wrote:  
-> > > Implement suspend/resume hooks.
-> > > 
-> > > Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
+> The format specifier "%p" can leak kernel addresses.
+> Use "%pK" instead.
+> 
+> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
 
 Applied.
 
@@ -26,45 +21,38 @@ Thanks,
 
 Boris
 
-> > > ---
-> > > 
-> > > Changes in v2:
-> > > - use __maybe_unused instead of #ifdef CONFIG_PM_SLEEP
-> > > 
-> > >  drivers/mtd/spi-nor/atmel-quadspi.c | 21 +++++++++++++++++++++
-> > >  1 file changed, 21 insertions(+)
-> > > 
-> > > diff --git a/drivers/mtd/spi-nor/atmel-quadspi.c b/drivers/mtd/spi-nor/atmel-quadspi.c
-> > > index 6c5708bacad8..ceaaef47f02e 100644
-> > > --- a/drivers/mtd/spi-nor/atmel-quadspi.c
-> > > +++ b/drivers/mtd/spi-nor/atmel-quadspi.c
-> > > @@ -737,6 +737,26 @@ static int atmel_qspi_remove(struct platform_device *pdev)
-> > >  	return 0;
-> > >  }
-> > >  
-> > > +static int __maybe_unused atmel_qspi_suspend(struct device *dev)
-> > > +{
-> > > +	struct atmel_qspi *aq = dev_get_drvdata(dev);
-> > > +
-> > > +	clk_disable_unprepare(aq->clk);
-> > > +
-> > > +	return 0;
-> > > +}
-> > > +
-> > > +static int __maybe_unused atmel_qspi_resume(struct device *dev)
-> > > +{
-> > > +	struct atmel_qspi *aq = dev_get_drvdata(dev);
-> > > +
-> > > +	clk_prepare_enable(aq->clk);  
-> > 
-> > You missed to verify the return value of clk_prepare_enable. Otherwise looks  
+> ---
+>  drivers/mtd/spi-nor/stm32-quadspi.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
 > 
-> Which will never fail, there is no point in checking it.
-> 
-> > good. I've also looked over the test with suspending while copying on a ubifs
-> > mounted on QSPI NOR, looks good too.
-> > 
-> > After checking the return value, please add:
-> > Reviewed-by: Tudor Ambarus <tudor.ambarus@microchip.com>
-> >   
-> 
+> diff --git a/drivers/mtd/spi-nor/stm32-quadspi.c b/drivers/mtd/spi-nor/stm32-quadspi.c
+> index 72553506a00b..13e9fc961d3b 100644
+> --- a/drivers/mtd/spi-nor/stm32-quadspi.c
+> +++ b/drivers/mtd/spi-nor/stm32-quadspi.c
+> @@ -355,7 +355,7 @@ static int stm32_qspi_read_reg(struct spi_nor *nor,
+>  	struct device *dev = flash->qspi->dev;
+>  	struct stm32_qspi_cmd cmd;
+>  
+> -	dev_dbg(dev, "read_reg: cmd:%#.2x buf:%p len:%#x\n", opcode, buf, len);
+> +	dev_dbg(dev, "read_reg: cmd:%#.2x buf:%pK len:%#x\n", opcode, buf, len);
+>  
+>  	memset(&cmd, 0, sizeof(cmd));
+>  	cmd.opcode = opcode;
+> @@ -376,7 +376,7 @@ static int stm32_qspi_write_reg(struct spi_nor *nor, u8 opcode,
+>  	struct device *dev = flash->qspi->dev;
+>  	struct stm32_qspi_cmd cmd;
+>  
+> -	dev_dbg(dev, "write_reg: cmd:%#.2x buf:%p len:%#x\n", opcode, buf, len);
+> +	dev_dbg(dev, "write_reg: cmd:%#.2x buf:%pK len:%#x\n", opcode, buf, len);
+>  
+>  	memset(&cmd, 0, sizeof(cmd));
+>  	cmd.opcode = opcode;
+> @@ -398,7 +398,7 @@ static ssize_t stm32_qspi_read(struct spi_nor *nor, loff_t from, size_t len,
+>  	struct stm32_qspi_cmd cmd;
+>  	int err;
+>  
+> -	dev_dbg(qspi->dev, "read(%#.2x): buf:%p from:%#.8x len:%#zx\n",
+> +	dev_dbg(qspi->dev, "read(%#.2x): buf:%pK from:%#.8x len:%#zx\n",
+>  		nor->read_opcode, buf, (u32)from, len);
+>  
+>  	memset(&cmd, 0, sizeof(cmd));
