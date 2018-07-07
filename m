@@ -1,38 +1,45 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sat, 7 Jul 2018 18:45:12 +0800
-Subject: [PATCH net-next 1/6] net: mvneta: remove data pointer usage from
- device_node structure
-In-Reply-To: <20180706131949.2684-2-gregory.clement@bootlin.com>
-References: <20180706131949.2684-2-gregory.clement@bootlin.com>
-Message-ID: <201807071855.daaJfGJb%fengguang.wu@intel.com>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Sat, 7 Jul 2018 13:28:01 +0200
+Subject: [PATCH] dma: stm32: replace "%p" with "%pK"
+In-Reply-To: <CAMuHMdVEOx=PLAHzGEtPmVtitsVYSc-F1TUP6DVCS=Ct7QupYw@mail.gmail.com>
+References: <20180706130220.21957-1-benjamin.gaignard@st.com>
+ <CAMuHMdVEOx=PLAHzGEtPmVtitsVYSc-F1TUP6DVCS=Ct7QupYw@mail.gmail.com>
+Message-ID: <CA+M3ks7URGgxKfjkB9H2vi0qH-SvMZd1SfK4KZGPbF81+xJR9g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gregory,
+2018-07-06 21:38 GMT+02:00 Geert Uytterhoeven <geert@linux-m68k.org>:
+> Hi Benjamin,
+>
+> On Fri, Jul 6, 2018 at 3:03 PM Benjamin Gaignard
+> <benjamin.gaignard@linaro.org> wrote:
+>> The format specifier "%p" can leak kernel addresses.
+>> Use "%pK" instead.
+>
+> Still? Isn't the value randomized these days?
 
-I love your patch! Yet something to improve:
+%p give an hashed value, with %pK you can use a sysctl to get the real
+value if you are root
 
-[auto build test ERROR on net-next/master]
+>
+> Gr{oetje,eeting}s,
+>
+>                         Geert
+>
+> --
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+>
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+>                                 -- Linus Torvalds
 
-url:    https://github.com/0day-ci/linux/commits/Gregory-CLEMENT/Few-improvements-on-mvneta/20180707-034934
-config: i386-allmodconfig (attached as .config)
-compiler: gcc-7 (Debian 7.3.0-16) 7.3.0
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=i386 
 
-All errors (new ones prefixed by >>):
 
->> ERROR: "mvneta_bm_get" [drivers/net/ethernet/marvell/mvneta.ko] undefined!
->> ERROR: "mvneta_bm_put" [drivers/net/ethernet/marvell/mvneta.ko] undefined!
+-- 
+Benjamin Gaignard
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 64043 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180707/726b1cd2/attachment-0001.gz>
+Graphic Study Group
+
+Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro: Facebook | Twitter | Blog
