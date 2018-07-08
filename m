@@ -1,198 +1,53 @@
-From: leo.yan@linaro.org (leo.yan at linaro.org)
-Date: Sun, 8 Jul 2018 22:01:57 +0800
-Subject: [PATCH] arm64: hikey960: update idle-states
-In-Reply-To: <1530860246-29072-1-git-send-email-vincent.guittot@linaro.org>
-References: <1530860246-29072-1-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <20180708140157.GA28878@leoy-ThinkPad-X240s>
+From: aisheng.dong@nxp.com (Dong Aisheng)
+Date: Sun,  8 Jul 2018 22:56:52 +0800
+Subject: [PATCH V4 0/5] soc: imx: add scu firmware api support
+Message-ID: <1531061817-1980-1-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vincent,
+Unlike the former i.MX Architectures, the new generation i.MX8 SoCs
+(e.g. MX8QXP and MX8QM) contain a system controller which runs on a
+dedicated Cortex-M core to provide power, clock, Pad, and resource
+management. Communication between the host processor running
+an OS and the system controller happens through a SCU protocol.
+This patchset adds the SCU APIs which is implemented based on MU
+and will be used by different system components.
 
-On Fri, Jul 06, 2018 at 08:57:26AM +0200, Vincent Guittot wrote:
-> Update entry/exit latency and residency time of hikey960 to use more
-> realistic figures based on unitary tests done on the platform.
-> 
-> The complete results (in us) :
->                   big cluster
->                   cluster  CPU
-> max entry latency     800  400
-> max exit latency     2900  550
-> residency  903Mhz    5000 1500
-> residency 2363Mhz       0 1500
-> 
->                   little cluster
->                   cluster  CPU
-> max entry latency     500  400
-> max exit latency     1600  650
-> residency  533Mhz    8000 4500
-> residency 1844Mhz       0 1500
-> 
-> We can see that the residency time depends of the running OPP which is not
-> handled for now. Then we also have to take into account the constraint of
-> a residency time shorter than the tick to get full advantage of idle loop
-> reordering(tick is stopped if idle duration is higher than tick period).
-> Finally the selected residency value are :
->                  big cluster
->                   cluster  CPU
-> residency            3700 1500
-> 
->                   little cluster
->                   cluster  CPU
-> residency            3500 1500
-> 
-> A simple test with a task waking up every 11,111ms shows improvement:
+It mainly consists of below parts:
+1) MU mailbox driver
+1) Implementation of the IPC functions based on MUs (client side).
 
-Should s/11,111ms/11.111ms ?
+Dong Aisheng (5):
+  dt-bindings: mailbox: allow mbox-cells to be equal to 0
+  dt-bindings: arm: fsl: add mu binding doc
+  mailbox: imx: add imx mu support
+  dt-bindings: arm: fsl: add scu binding doc
+  soc: imx: add SC firmware IPC and APIs
 
-> - 5% a lowest OPP
-> - 22% at highest OPP
-> 
-> The period has been chosen:
-> - to be shorter than old cluster residency time and longer than new
-> residency time od cluster off C-state
+ .../devicetree/bindings/arm/freescale/fsl,scu.txt  |  65 ++
+ .../devicetree/bindings/mailbox/fsl,mu.txt         |  34 +
+ .../devicetree/bindings/mailbox/mailbox.txt        |   3 +-
+ drivers/mailbox/Kconfig                            |   8 +
+ drivers/mailbox/Makefile                           |   2 +
+ drivers/mailbox/imx-mu.c                           | 341 +++++++++
+ drivers/soc/imx/Kconfig                            |   4 +
+ drivers/soc/imx/Makefile                           |   1 +
+ drivers/soc/imx/sc/Makefile                        |   2 +
+ drivers/soc/imx/sc/main/ipc.c                      | 185 +++++
+ drivers/soc/imx/sc/main/rpc.h                      |  79 +++
+ include/soc/imx/sc/ipc.h                           |  45 ++
+ include/soc/imx/sc/scfw.h                          |  24 +
+ include/soc/imx/sc/types.h                         | 764 +++++++++++++++++++++
+ 14 files changed, 1555 insertions(+), 2 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
+ create mode 100644 Documentation/devicetree/bindings/mailbox/fsl,mu.txt
+ create mode 100644 drivers/mailbox/imx-mu.c
+ create mode 100644 drivers/soc/imx/sc/Makefile
+ create mode 100644 drivers/soc/imx/sc/main/ipc.c
+ create mode 100644 drivers/soc/imx/sc/main/rpc.h
+ create mode 100644 include/soc/imx/sc/ipc.h
+ create mode 100644 include/soc/imx/sc/scfw.h
+ create mode 100644 include/soc/imx/sc/types.h
 
-Should s/od/of/ ?
-
-Except these two minor typos, the patch is very good improvement.
-
-Reviewed-by: Leo Yan <leo.yan@linaro.org>
-
-> - to prevent any sync with tick (4ms) when running tests that can add
-> some variances between tests
-> 
-> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
-> ---
->  arch/arm64/boot/dts/hisilicon/hi3660.dtsi | 45 ++++++++++++++++++-------------
->  1 file changed, 27 insertions(+), 18 deletions(-)
-> 
-> diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-> index 421d454..890d23e 100644
-> --- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-> +++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-> @@ -61,7 +61,7 @@
->  			reg = <0x0 0x0>;
->  			enable-method = "psci";
->  			next-level-cache = <&A53_L2>;
-> -			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP_0>;
-> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
->  			capacity-dmips-mhz = <592>;
->  			clocks = <&stub_clock HI3660_CLK_STUB_CLUSTER0>;
->  			operating-points-v2 = <&cluster0_opp>;
-> @@ -75,7 +75,7 @@
->  			reg = <0x0 0x1>;
->  			enable-method = "psci";
->  			next-level-cache = <&A53_L2>;
-> -			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP_0>;
-> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
->  			capacity-dmips-mhz = <592>;
->  			clocks = <&stub_clock HI3660_CLK_STUB_CLUSTER0>;
->  			operating-points-v2 = <&cluster0_opp>;
-> @@ -87,7 +87,7 @@
->  			reg = <0x0 0x2>;
->  			enable-method = "psci";
->  			next-level-cache = <&A53_L2>;
-> -			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP_0>;
-> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
->  			capacity-dmips-mhz = <592>;
->  			clocks = <&stub_clock HI3660_CLK_STUB_CLUSTER0>;
->  			operating-points-v2 = <&cluster0_opp>;
-> @@ -99,7 +99,7 @@
->  			reg = <0x0 0x3>;
->  			enable-method = "psci";
->  			next-level-cache = <&A53_L2>;
-> -			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP_0>;
-> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
->  			capacity-dmips-mhz = <592>;
->  			clocks = <&stub_clock HI3660_CLK_STUB_CLUSTER0>;
->  			operating-points-v2 = <&cluster0_opp>;
-> @@ -111,7 +111,7 @@
->  			reg = <0x0 0x100>;
->  			enable-method = "psci";
->  			next-level-cache = <&A73_L2>;
-> -			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP_1>;
-> +			cpu-idle-states = <&CPU_SLEEP_1 &CLUSTER_SLEEP_1>;
->  			capacity-dmips-mhz = <1024>;
->  			clocks = <&stub_clock HI3660_CLK_STUB_CLUSTER1>;
->  			operating-points-v2 = <&cluster1_opp>;
-> @@ -125,7 +125,7 @@
->  			reg = <0x0 0x101>;
->  			enable-method = "psci";
->  			next-level-cache = <&A73_L2>;
-> -			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP_1>;
-> +			cpu-idle-states = <&CPU_SLEEP_1 &CLUSTER_SLEEP_1>;
->  			capacity-dmips-mhz = <1024>;
->  			clocks = <&stub_clock HI3660_CLK_STUB_CLUSTER1>;
->  			operating-points-v2 = <&cluster1_opp>;
-> @@ -137,7 +137,7 @@
->  			reg = <0x0 0x102>;
->  			enable-method = "psci";
->  			next-level-cache = <&A73_L2>;
-> -			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP_1>;
-> +			cpu-idle-states = <&CPU_SLEEP_1 &CLUSTER_SLEEP_1>;
->  			capacity-dmips-mhz = <1024>;
->  			clocks = <&stub_clock HI3660_CLK_STUB_CLUSTER1>;
->  			operating-points-v2 = <&cluster1_opp>;
-> @@ -149,7 +149,7 @@
->  			reg = <0x0 0x103>;
->  			enable-method = "psci";
->  			next-level-cache = <&A73_L2>;
-> -			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP_1>;
-> +			cpu-idle-states = <&CPU_SLEEP_1 &CLUSTER_SLEEP_1>;
->  			capacity-dmips-mhz = <1024>;
->  			clocks = <&stub_clock HI3660_CLK_STUB_CLUSTER1>;
->  			operating-points-v2 = <&cluster1_opp>;
-> @@ -158,31 +158,40 @@
->  		idle-states {
->  			entry-method = "psci";
->  
-> -			CPU_SLEEP: cpu-sleep {
-> +			CPU_SLEEP_0: cpu-sleep-0 {
->  				compatible = "arm,idle-state";
->  				local-timer-stop;
->  				arm,psci-suspend-param = <0x0010000>;
-> -				entry-latency-us = <40>;
-> -				exit-latency-us = <70>;
-> -				min-residency-us = <3000>;
-> +				entry-latency-us = <400>;
-> +				exit-latency-us = <650>;
-> +				min-residency-us = <1500>;
->  			};
-> -
->  			CLUSTER_SLEEP_0: cluster-sleep-0 {
->  				compatible = "arm,idle-state";
->  				local-timer-stop;
->  				arm,psci-suspend-param = <0x1010000>;
->  				entry-latency-us = <500>;
-> -				exit-latency-us = <5000>;
-> -				min-residency-us = <20000>;
-> +				exit-latency-us = <1600>;
-> +				min-residency-us = <3500>;
-> +			};
-> +
-> +
-> +			CPU_SLEEP_1: cpu-sleep-1 {
-> +				compatible = "arm,idle-state";
-> +				local-timer-stop;
-> +				arm,psci-suspend-param = <0x0010000>;
-> +				entry-latency-us = <400>;
-> +				exit-latency-us = <550>;
-> +				min-residency-us = <1500>;
->  			};
->  
->  			CLUSTER_SLEEP_1: cluster-sleep-1 {
->  				compatible = "arm,idle-state";
->  				local-timer-stop;
->  				arm,psci-suspend-param = <0x1010000>;
-> -				entry-latency-us = <1000>;
-> -				exit-latency-us = <5000>;
-> -				min-residency-us = <20000>;
-> +				entry-latency-us = <800>;
-> +				exit-latency-us = <2900>;
-> +				min-residency-us = <3500>;
->  			};
->  		};
->  
-> -- 
-> 2.7.4
-> 
+-- 
+2.7.4
