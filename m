@@ -1,40 +1,52 @@
-From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Sun, 8 Jul 2018 23:58:17 +0200
-Subject: [PATCH 0/8] mtd: rawnand: Bunch of cleanup
-In-Reply-To: <20180705102733.29673-1-boris.brezillon@bootlin.com>
-References: <20180705102733.29673-1-boris.brezillon@bootlin.com>
-Message-ID: <20180708235817.3a06abad@xps13>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Mon, 9 Jul 2018 07:12:37 +0900
+Subject: [PATCHv6 0/4] Salted build ids via ELF notes
+In-Reply-To: <20180706004940.32587-1-labbott@redhat.com>
+References: <20180706004940.32587-1-labbott@redhat.com>
+Message-ID: <CAK7LNASo7pnL32dFqdxmKqCLkBsJwGOaTHXX=rVjpi2-Y=t0Aw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+2018-07-06 9:49 GMT+09:00 Laura Abbott <labbott@redhat.com>:
+> Hi,
+>
+> This is v6 of the series to allow unique build ids. v6 is mostly minor
+> fixups and Acks for this to go through the kbuild tree.
 
-Boris Brezillon <boris.brezillon@bootlin.com> wrote on Thu,  5 Jul 2018
-12:27:25 +0200:
 
-> Hello,
-> 
-> These are just random cleanups that I did while working on the raw NAND
-> API sanitization (see here [1] for a preview of the upcoming changes).
-> 
-> Regards,
-> 
-> Boris
-> 
-> [1]https://github.com/bbrezillon/linux-0day/commits/nand/api-cleanup
-> 
-> Boris Brezillon (8):
->   mtd: rawnand: Kill cafe_nand_bug()
->   mtd: rawnand: Remove nand_do_read() prototype from rawnand.h
->   mtd: rawnand: Remove forward declaration of mtd_info
->   mtd: rawnand: Remove forward declaration of device_node
->   mtd: rawnand: Rename nand_default_bbt() into nand_create_bbt()
->   mtd: rawnand: Kill the chip->scan_bbt() hook
->   mtd: rawnand: orion_nand: Kill orion_nand_data.dev_ready()
->   mtd: rawnand: plat_nand: Kill pdata->ctrl.{hwcontrol,read_byte}()
-> 
+Applied to linux-kbuild. Thanks!
 
-Series applied to nand/next,
 
-Thanks,
-Miqu?l
+> Thanks,
+> Laura
+>
+> Laura Abbott (4):
+>   kbuild: Add build salt to the kernel and modules
+>   x86: Add build salt to the vDSO
+>   powerpc: Add build salt to the vDSO
+>   arm64: Add build salt to the vDSO
+>
+>  arch/arm64/kernel/vdso/note.S     |  3 +++
+>  arch/powerpc/kernel/vdso32/note.S |  3 +++
+>  arch/x86/entry/vdso/vdso-note.S   |  3 +++
+>  arch/x86/entry/vdso/vdso32/note.S |  3 +++
+>  include/linux/build-salt.h        | 20 ++++++++++++++++++++
+>  init/Kconfig                      |  9 +++++++++
+>  init/version.c                    |  3 +++
+>  scripts/mod/modpost.c             |  3 +++
+>  8 files changed, 47 insertions(+)
+>  create mode 100644 include/linux/build-salt.h
+>
+> --
+> 2.17.1
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kbuild" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
