@@ -1,45 +1,79 @@
 From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Sun,  8 Jul 2018 22:56:53 +0800
-Subject: [PATCH V4 1/5] dt-bindings: mailbox: allow mbox-cells to be equal to 0
+Date: Sun,  8 Jul 2018 22:56:54 +0800
+Subject: [PATCH V4 2/5] dt-bindings: arm: fsl: add mu binding doc
 In-Reply-To: <1531061817-1980-1-git-send-email-aisheng.dong@nxp.com>
 References: <1531061817-1980-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1531061817-1980-2-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1531061817-1980-3-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mailbox devices may have only one channel which means the mbox-cells
-at least 1 does not make sense for this type devices. Let's remove
-that limitation to allow the mbox-cells to be equal to 0.
+The Messaging Unit module enables two processors within
+the SoC to communicate and coordinate by passing messages
+(e.g. data, status and control) through the MU interface.
 
+Cc: Shawn Guo <shawnguo@kernel.org>
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: Fabio Estevam <fabio.estevam@nxp.com>
+Cc: Rob Herring <robh+dt@kernel.org>
 Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Sudeep Holla <sudeep.holla@arm.com>
 Cc: devicetree at vger.kernel.org
-Cc: linux-kernel at vger.kernel.org
-Reviewed-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 ---
-ChangeLog:
- * New patch introduced in v3 series
- * Actually there're already users in kernel with mbox-cells set to 0.
-   See:
-   arch/arm/boot/dts/bcm283x.dtsi:145: #mbox-cells = <0>;
+v3->v4:
+ * move into Documentation/devicetree/bindings/mailbox/fsl,mu.txt
+v2->v3:
+ * change to mailbox binding
+   Currently mbox-cells has to be 0 for SCU MU.
+   Generic MU Mailbox support binding could be extended later.
+v1->v2:
+ * typo fixes
+ * remove status property
+ * remove imx6&7 compatible string which may be added later for
+   the generic mailbox binding
 ---
- Documentation/devicetree/bindings/mailbox/mailbox.txt | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ .../devicetree/bindings/mailbox/fsl,mu.txt         | 34 ++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mailbox/fsl,mu.txt
 
-diff --git a/Documentation/devicetree/bindings/mailbox/mailbox.txt b/Documentation/devicetree/bindings/mailbox/mailbox.txt
-index af8ecee..c2fcd05 100644
---- a/Documentation/devicetree/bindings/mailbox/mailbox.txt
-+++ b/Documentation/devicetree/bindings/mailbox/mailbox.txt
-@@ -6,8 +6,7 @@ assign appropriate mailbox channel to client drivers.
- * Mailbox Controller
- 
- Required property:
--- #mbox-cells: Must be at least 1. Number of cells in a mailbox
--		specifier.
-+- #mbox-cells: Number of cells in a mailbox specifier.
- 
- Example:
- 	mailbox: mailbox {
+diff --git a/Documentation/devicetree/bindings/mailbox/fsl,mu.txt b/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
+new file mode 100644
+index 0000000..90e4905
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
+@@ -0,0 +1,34 @@
++NXP i.MX Messaging Unit (MU)
++--------------------------------------------------------------------
++
++The Messaging Unit module enables two processors within the SoC to
++communicate and coordinate by passing messages (e.g. data, status
++and control) through the MU interface. The MU also provides the ability
++for one processor to signal the other processor using interrupts.
++
++Because the MU manages the messaging between processors, the MU uses
++different clocks (from each side of the different peripheral buses).
++Therefore, the MU must synchronize the accesses from one side to the
++other. The MU accomplishes synchronization using two sets of matching
++registers (Processor A-facing, Processor B-facing).
++
++Messaging Unit Device Node:
++=============================
++
++Required properties:
++-------------------
++- compatible :	should be "fsl,<chip>-mu", the supported chips include
++		imx8qxp, imx8qm.
++- reg :		Should contain the registers location and length
++- interrupts :	Interrupt number. The interrupt specifier format depends
++		on the interrupt controller parent.
++- #mbox-cells:  Must be 0. Number of cells in a mailbox
++
++Examples:
++--------
++lsio_mu0: mailbox at 5d1b0000 {
++	compatible = "fsl,imx8qxp-mu";
++	reg = <0x0 0x5d1b0000 0x0 0x10000>;
++	interrupts = <GIC_SPI 176 IRQ_TYPE_LEVEL_HIGH>;
++	#mbox-cells = <0>;
++};
 -- 
 2.7.4
