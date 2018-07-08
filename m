@@ -1,52 +1,45 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon, 9 Jul 2018 07:12:37 +0900
-Subject: [PATCHv6 0/4] Salted build ids via ELF notes
-In-Reply-To: <20180706004940.32587-1-labbott@redhat.com>
-References: <20180706004940.32587-1-labbott@redhat.com>
-Message-ID: <CAK7LNASo7pnL32dFqdxmKqCLkBsJwGOaTHXX=rVjpi2-Y=t0Aw@mail.gmail.com>
+From: santosh.shilimkar@oracle.com (santosh.shilimkar at oracle.com)
+Date: Sun, 8 Jul 2018 15:34:48 -0700
+Subject: [GIT PULL 2/3] ARM: Keystone config update for v4.19
+In-Reply-To: <20180708161232.23erjlj4fqqc2ici@localhost>
+References: <1530912342-4641-1-git-send-email-santosh.shilimkar@oracle.com>
+ <1530912342-4641-2-git-send-email-santosh.shilimkar@oracle.com>
+ <20180708161232.23erjlj4fqqc2ici@localhost>
+Message-ID: <824e102a-7044-968c-0d34-841299267014@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-07-06 9:49 GMT+09:00 Laura Abbott <labbott@redhat.com>:
-> Hi,
->
-> This is v6 of the series to allow unique build ids. v6 is mostly minor
-> fixups and Acks for this to go through the kbuild tree.
+On 7/8/18 9:12 AM, Olof Johansson wrote:
+> On Fri, Jul 06, 2018 at 02:25:41PM -0700, Santosh Shilimkar wrote:
+>> The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
+>>
+>>    Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+>>
+>> are available in the git repository at:
+>>
+>>    git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone_config_for_4.19
+>>
+>> for you to fetch changes up to 60e9343b355118e903a155135f0511918d69e3ac:
+>>
+>>    ARM: configs: keystone: Enable CONFIG_MMC_SDHCI_OMAP (2018-06-29 15:57:53 -0700)
+>>
+>> ----------------------------------------------------------------
+>> ARM: Keystone config updates for 4.19
+>>
+>>   - Enable MMC support
+>>   - Enable Micrel and DP83867 phys
+>>
+>> ----------------------------------------------------------------
+>> Kishon Vijay Abraham I (1):
+>>        ARM: configs: keystone: Enable CONFIG_MMC_SDHCI_OMAP
+>>
+>> Murali Karicheri (1):
+>>        ARM: keystone: k2g: enable micrel and dp83867 phys
+> 
+> Merged, but if you look at the git log --oneline of arch/arm/configs you'll see
+> that we try to use "ARM: keystone_defconfig: <...>" as the prefix style.
+> 
+Thanks Olof. Will keep that one in future.
 
-
-Applied to linux-kbuild. Thanks!
-
-
-> Thanks,
-> Laura
->
-> Laura Abbott (4):
->   kbuild: Add build salt to the kernel and modules
->   x86: Add build salt to the vDSO
->   powerpc: Add build salt to the vDSO
->   arm64: Add build salt to the vDSO
->
->  arch/arm64/kernel/vdso/note.S     |  3 +++
->  arch/powerpc/kernel/vdso32/note.S |  3 +++
->  arch/x86/entry/vdso/vdso-note.S   |  3 +++
->  arch/x86/entry/vdso/vdso32/note.S |  3 +++
->  include/linux/build-salt.h        | 20 ++++++++++++++++++++
->  init/Kconfig                      |  9 +++++++++
->  init/version.c                    |  3 +++
->  scripts/mod/modpost.c             |  3 +++
->  8 files changed, 47 insertions(+)
->  create mode 100644 include/linux/build-salt.h
->
-> --
-> 2.17.1
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kbuild" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
-
-
--- 
-Best Regards
-Masahiro Yamada
+Regards,
+Santosh
