@@ -1,100 +1,67 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Sun, 8 Jul 2018 14:46:42 +0200
-Subject: [PATCH v2 2/3] i2c: Add helper to ease DMA handling
-In-Reply-To: <eb0a3e62-3efb-3862-3da5-bdf2952a146c@axentia.se>
-References: <1530955795-17714-1-git-send-email-jun.gao@mediatek.com>
- <1530955795-17714-3-git-send-email-jun.gao@mediatek.com>
- <eb0a3e62-3efb-3862-3da5-bdf2952a146c@axentia.se>
-Message-ID: <b95b8d38-5b0d-7517-f7d9-bea1c7f1408d@axentia.se>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Sun, 8 Jul 2018 15:19:50 +0200
+Subject: [PATCH v2] driver core: add a debugfs entry to show deferred
+ devices
+In-Reply-To: <bd34c19a-e673-4ce4-e57a-14cc275ab020@redhat.com>
+References: <20180627220656.19298-1-javierm@redhat.com>
+ <20180707155921.GA26504@kroah.com>
+ <bd34c19a-e673-4ce4-e57a-14cc275ab020@redhat.com>
+Message-ID: <20180708131950.GA25366@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-07-08 13:58, Peter Rosin wrote:
-> On 2018-07-07 11:29, Jun Gao wrote:
->> From: Jun Gao <jun.gao@mediatek.com>
->>
->> This function is needed by i2c_get_dma_safe_msg_buf() potentially.
->> It is used to free DMA safe buffer when DMA operation fails.
->>
->> Signed-off-by: Jun Gao <jun.gao@mediatek.com>
->> ---
->>  drivers/i2c/i2c-core-base.c | 14 ++++++++++++++
->>  include/linux/i2c.h         |  1 +
->>  2 files changed, 15 insertions(+)
->>
->> diff --git a/drivers/i2c/i2c-core-base.c b/drivers/i2c/i2c-core-base.c
->> index 31d16ad..2b518ea 100644
->> --- a/drivers/i2c/i2c-core-base.c
->> +++ b/drivers/i2c/i2c-core-base.c
->> @@ -2288,6 +2288,20 @@ void i2c_release_dma_safe_msg_buf(struct i2c_msg *msg, u8 *buf)
->>  }
->>  EXPORT_SYMBOL_GPL(i2c_release_dma_safe_msg_buf);
->>  
->> +/**
->> + * i2c_free_dma_safe_msg_buf - free DMA safe buffer
->> + * @msg: the message related to DMA safe buffer
->> + * @buf: the buffer obtained from i2c_get_dma_safe_msg_buf(). May be NULL.
->> + */
->> +void i2c_free_dma_safe_msg_buf(struct i2c_msg *msg, u8 *buf)
->> +{
->> +	if (!buf || buf == msg->buf)
->> +		return;
->> +
->> +	kfree(buf);
+On Sun, Jul 08, 2018 at 02:31:49AM +0200, Javier Martinez Canillas wrote:
+> Hi Greg,
 > 
-> Considering that the i2c-core-smbus.c file does the following for its
-> DMA safe buffers...
+> On 07/07/2018 05:59 PM, Greg Kroah-Hartman wrote:
+> > On Thu, Jun 28, 2018 at 12:06:56AM +0200, Javier Martinez Canillas wrote:
+> >> With Device Trees (DT), the dependencies of the devices are defined in the
+> >> DT, then the drivers parse that information to lookup the needed resources
+> >> that have as dependencies.
+> >>
+> >> Since drivers and devices are registered in a non-deterministic way, it is
+> >> possible that a device that is a dependency has not been registered yet by
+> >> the time that is looked up.
+> >>
+> >> In this case the driver that requires this dependency cannot probe and has
+> >> to defer it. So the driver core adds it to a list of deferred devices that
+> >> is iterated again every time that a new driver is probed successfully.
+> >>
+> >> For debugging purposes it may be useful to know what are the devices whose
+> >> probe function was deferred. Add a debugfs entry showing that information.
+> >>
+> >>   $ cat /sys/kernel/debug/devices_deferred
+> >>   48070000.i2c:twl at 48:bci
+> >>   musb-hdrc.0.auto
+> >>   omapdrm.0
+> >>
+> >> This information could be obtained partially by enabling debugging, but it
+> >> means that the kernel log has to be parsed and the probe deferral balanced
+> >> with the successes. This can be error probe and has to be done in a ad-hoc
+> >> manner by everyone who needs to debug these kind of issues.
+> >>
+> >> Since the information is already known by the kernel, just show it to make
+> >> it easier to debug.
+> >>
+> >> Signed-off-by: Javier Martinez Canillas <javierm@redhat.com>
+> >> Reviewed-by: Mark Brown <broonie@kernel.org>
+> > 
+> > This doesn't apply to my tree anymore :(
+> >
 > 
-> static void i2c_smbus_try_get_dmabuf(struct i2c_msg *msg, u8 init_val)
-> {
-> 	bool is_read = msg->flags & I2C_M_RD;
-> 	unsigned char *dma_buf;
+> I see, I made sure that it applied on top of linux-next.
+>  
+> > Can you rebase and resend?
+> >
 > 
-> 	dma_buf = kzalloc(I2C_SMBUS_BLOCK_MAX + (is_read ? 2 : 3), GFP_KERNEL);
-> 	if (!dma_buf)
-> 		return;
+> I guess you want me to rebase on top of your driver-core-next branch. I think
+> that linux-next should pull that branch instead of the driver-core-linus one:
 > 
-> 	msg->buf = dma_buf;
-> 	msg->flags |= I2C_M_DMA_SAFE;
-> 
-> 	if (init_val)
-> 		msg->buf[0] = init_val;
-> }
-> 
-> ...I do not think your variant of i2c_release_dma_safe_msg_buf is
-> appropriate for the i2c-core-base.c file. It's simply not possible to have
-> central knowledge of the rules for when to free the buffer, and encoding one
-> set of rules is only confusing (when there are more than one set of rules).
-> I suggest that you make your variant driver specific.
+> https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/tree/Next/Trees#n29
 
-Ignore me. Your i2c_free_dma_safe_msg_buf is of course compatible with
-the existing i2c_smbus_try_get_dmabuf. Sorry for the noise.
+Both are in linux-next, it just takes a day or so for the
+driver-core-next branch to get merged in.
 
-Cheers,
-Peter
+thanks,
 
-( However, the naming of these two functions are not really consistent... )
-
-> Cheers,
-> Peter
-> 
->> +}
->> +EXPORT_SYMBOL_GPL(i2c_free_dma_safe_msg_buf);
->> +
->>  MODULE_AUTHOR("Simon G. Vogl <simon@tk.uni-linz.ac.at>");
->>  MODULE_DESCRIPTION("I2C-Bus main module");
->>  MODULE_LICENSE("GPL");
->> diff --git a/include/linux/i2c.h b/include/linux/i2c.h
->> index 254cd34..6d62f93 100644
->> --- a/include/linux/i2c.h
->> +++ b/include/linux/i2c.h
->> @@ -860,6 +860,7 @@ static inline u8 i2c_8bit_addr_from_msg(const struct i2c_msg *msg)
->>  
->>  u8 *i2c_get_dma_safe_msg_buf(struct i2c_msg *msg, unsigned int threshold);
->>  void i2c_release_dma_safe_msg_buf(struct i2c_msg *msg, u8 *buf);
->> +void i2c_free_dma_safe_msg_buf(struct i2c_msg *msg, u8 *buf);
->>  
->>  int i2c_handle_smbus_host_notify(struct i2c_adapter *adap, unsigned short addr);
->>  /**
->>
-> 
+greg k-h
