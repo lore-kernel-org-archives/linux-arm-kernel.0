@@ -1,104 +1,89 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Sun, 08 Jul 2018 11:14:20 +0200
-Subject: 4.18rc3 TX2 boot failure with "ACPICA: AML parser: attempt to
- continue loading table after error"
-In-Reply-To: <c49a3666-7d23-6a05-703c-1273d79a00cd@arm.com>
-References: <c49a3666-7d23-6a05-703c-1273d79a00cd@arm.com>
-Message-ID: <6074707.jx9F3QFrWC@aspire.rjw.lan>
+From: peda@axentia.se (Peter Rosin)
+Date: Sun, 8 Jul 2018 13:58:01 +0200
+Subject: [PATCH v2 2/3] i2c: Add helper to ease DMA handling
+In-Reply-To: <1530955795-17714-3-git-send-email-jun.gao@mediatek.com>
+References: <1530955795-17714-1-git-send-email-jun.gao@mediatek.com>
+ <1530955795-17714-3-git-send-email-jun.gao@mediatek.com>
+Message-ID: <eb0a3e62-3efb-3862-3da5-bdf2952a146c@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, July 2, 2018 11:41:42 PM CEST Jeremy Linton wrote:
-> Hi,
+On 2018-07-07 11:29, Jun Gao wrote:
+> From: Jun Gao <jun.gao@mediatek.com>
 > 
-> I'm experiencing two problems with commit 5088814a6e931 which is 
-> "ACPICA: AML parser: attempt to continue loading table after error"
+> This function is needed by i2c_get_dma_safe_msg_buf() potentially.
+> It is used to free DMA safe buffer when DMA operation fails.
 > 
-> The first is this boot failure on a thunderX2:
+> Signed-off-by: Jun Gao <jun.gao@mediatek.com>
+> ---
+>  drivers/i2c/i2c-core-base.c | 14 ++++++++++++++
+>  include/linux/i2c.h         |  1 +
+>  2 files changed, 15 insertions(+)
 > 
-> [   10.770098] ACPI Error: Ignore error and continue table load 
-> (20180531/psobject-604)
->      [   10.777926] Unable to handle kernel NULL pointer dereference at 
-> virtual address 0000000000000000
->      [   10.786809] Mem abort info:
->      [   10.789623]   ESR = 0x96000004
->      [   10.792702]   Exception class = DABT (current EL), IL = 32 bits
->      [   10.798682]   SET = 0, FnV = 0
->      [   10.801760]   EA = 0, S1PTW = 0
->      [   10.804925] Data abort info:
->      [   10.807827]   ISV = 0, ISS = 0x00000004
->      [   10.811698]   CM = 0, WnR = 0
->      [   10.814689] [0000000000000000] user address but active_mm is swapper
->      [   10.821108] Internal error: Oops: 96000004 [#1] SMP
->      [   10.826032] Modules linked in:
->      [   10.829113] CPU: 30 PID: 1 Comm: swapper/0 Not tainted 
-> 4.18.0-rc3PPTT4k+ #53
->      [   10.836234] Hardware name: Default string Cavium 
-> ThunderX2/Default string, BIOS L50_5.13_1.0.0 05/16/2018
->      [   10.845905] pstate: 00400009 (nzcv daif +PAN -UAO)
->      [   10.850746] pc : acpi_ps_peek_opcode+0x1c/0x40
->      [   10.855231] lr : acpi_ps_create_op+0x54/0x278
->      [   10.859627] sp : ffff000009a8ba30
->      [   10.862969] x29: ffff000009a8ba30 x28: 0000000054445353
->      [   10.868334] x27: 0000000000004008 x26: 0000000000000000
->      [   10.873698] x25: ffff000009767f23 x24: ffff000008d59000
->      [   10.879063] x23: ffff802672799030 x22: ffff000009a8bb28
->      [   10.884427] x21: 0000000000000000 x20: ffff000008d59000
->      [   10.889791] x19: ffff802672799030 x18: ffffffffffffffff
->      [   10.895155] x17: 0000000000000013 x16: 0000000000000000
->      [   10.900519] x15: ffff000008d59708 x14: 2d7463656a626f73
->      [   10.905883] x13: 702f313335303831 x12: 3032282064616f6c
->      [   10.911246] x11: 20656c6261742065 x10: 756e69746e6f6320
->      [   10.916610] x9 : 0000000000000058 x8 : ffff000008570998
->      [   10.921974] x7 : 203a726f72724520 x6 : 0000000000000334
->      [   10.927338] x5 : 0000000000000012 x4 : 0000000000000000
->      [   10.932701] x3 : 0000000000000000 x2 : ffff000009a8bb28
->      [   10.938065] x1 : 0000000000000000 x0 : ffff000008505790
->      [   10.943430] Process swapper/0 (pid: 1, stack limit = 
-> 0x(____ptrval____))
->      [   10.950199] Call trace:
->      [   10.952663]  acpi_ps_peek_opcode+0x1c/0x40
->      [   10.956797]  acpi_ps_create_op+0x54/0x278
->      [   10.960842]  acpi_ps_parse_loop+0x1b4/0x6c8
->      [   10.965063]  acpi_ps_parse_aml+0xe0/0x2b4
->      [   10.969108]  acpi_ps_execute_table+0xa0/0x104
->      [   10.973505]  acpi_ns_execute_table+0x120/0x194
->      [   10.977989]  acpi_ns_parse_table+0x34/0x68
->      [   10.982122]  acpi_ns_load_table+0x4c/0xbc
->      [   10.986169]  acpi_tb_load_namespace+0x1d4/0x240
->      [   10.990744]  acpi_load_tables+0x50/0xbc
->      [   10.994614]  acpi_init+0xb8/0x374
->      [   10.997959]  do_one_initcall+0x54/0x208
->      [   11.001829]  kernel_init_freeable+0x224/0x300
->      [   11.006229]  kernel_init+0x18/0x118
->      [   11.009747]  ret_from_fork+0x10/0x18
->      [   11.013354] Code: aa0003f3 aa1e03e0 d503201f f9400661 (39400020)
->      [   11.019535] ---[ end trace 2bd8068593cf8acc ]---
->      [   11.024195] Kernel panic - not syncing: Fatal exception
->      [   11.029488] SMP: stopping secondary CPUs
->      [   11.033480] ---[ end Kernel panic - not syncing: Fatal exception 
-> ]---
-> 
-> Which does appear to be the result of some bad data in the table, but it 
-> was working with 4.17, and reverting this commit solves the problem.
+> diff --git a/drivers/i2c/i2c-core-base.c b/drivers/i2c/i2c-core-base.c
+> index 31d16ad..2b518ea 100644
+> --- a/drivers/i2c/i2c-core-base.c
+> +++ b/drivers/i2c/i2c-core-base.c
+> @@ -2288,6 +2288,20 @@ void i2c_release_dma_safe_msg_buf(struct i2c_msg *msg, u8 *buf)
+>  }
+>  EXPORT_SYMBOL_GPL(i2c_release_dma_safe_msg_buf);
+>  
+> +/**
+> + * i2c_free_dma_safe_msg_buf - free DMA safe buffer
+> + * @msg: the message related to DMA safe buffer
+> + * @buf: the buffer obtained from i2c_get_dma_safe_msg_buf(). May be NULL.
+> + */
+> +void i2c_free_dma_safe_msg_buf(struct i2c_msg *msg, u8 *buf)
+> +{
+> +	if (!buf || buf == msg->buf)
+> +		return;
+> +
+> +	kfree(buf);
 
-Does the patch below make any difference?
+Considering that the i2c-core-smbus.c file does the following for its
+DMA safe buffers...
 
----
- drivers/acpi/acpica/psobject.c |    3 +++
- 1 file changed, 3 insertions(+)
+static void i2c_smbus_try_get_dmabuf(struct i2c_msg *msg, u8 init_val)
+{
+	bool is_read = msg->flags & I2C_M_RD;
+	unsigned char *dma_buf;
 
-Index: linux-pm/drivers/acpi/acpica/psobject.c
-===================================================================
---- linux-pm.orig/drivers/acpi/acpica/psobject.c
-+++ linux-pm/drivers/acpi/acpica/psobject.c
-@@ -39,6 +39,9 @@ static acpi_status acpi_ps_get_aml_opcod
- 	ACPI_FUNCTION_TRACE_PTR(ps_get_aml_opcode, walk_state);
- 
- 	walk_state->aml = walk_state->parser_state.aml;
-+	if (!walk_state->aml)
-+		return AE_CTRL_PARSE_CONTINUE;
-+
- 	walk_state->opcode = acpi_ps_peek_opcode(&(walk_state->parser_state));
- 
- 	/*
+	dma_buf = kzalloc(I2C_SMBUS_BLOCK_MAX + (is_read ? 2 : 3), GFP_KERNEL);
+	if (!dma_buf)
+		return;
+
+	msg->buf = dma_buf;
+	msg->flags |= I2C_M_DMA_SAFE;
+
+	if (init_val)
+		msg->buf[0] = init_val;
+}
+
+...I do not think your variant of i2c_release_dma_safe_msg_buf is
+appropriate for the i2c-core-base.c file. It's simply not possible to have
+central knowledge of the rules for when to free the buffer, and encoding one
+set of rules is only confusing (when there are more than one set of rules).
+I suggest that you make your variant driver specific.
+
+Cheers,
+Peter
+
+> +}
+> +EXPORT_SYMBOL_GPL(i2c_free_dma_safe_msg_buf);
+> +
+>  MODULE_AUTHOR("Simon G. Vogl <simon@tk.uni-linz.ac.at>");
+>  MODULE_DESCRIPTION("I2C-Bus main module");
+>  MODULE_LICENSE("GPL");
+> diff --git a/include/linux/i2c.h b/include/linux/i2c.h
+> index 254cd34..6d62f93 100644
+> --- a/include/linux/i2c.h
+> +++ b/include/linux/i2c.h
+> @@ -860,6 +860,7 @@ static inline u8 i2c_8bit_addr_from_msg(const struct i2c_msg *msg)
+>  
+>  u8 *i2c_get_dma_safe_msg_buf(struct i2c_msg *msg, unsigned int threshold);
+>  void i2c_release_dma_safe_msg_buf(struct i2c_msg *msg, u8 *buf);
+> +void i2c_free_dma_safe_msg_buf(struct i2c_msg *msg, u8 *buf);
+>  
+>  int i2c_handle_smbus_host_notify(struct i2c_adapter *adap, unsigned short addr);
+>  /**
+> 
