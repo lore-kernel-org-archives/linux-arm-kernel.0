@@ -1,67 +1,92 @@
 From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Sun, 8 Jul 2018 15:19:50 +0200
-Subject: [PATCH v2] driver core: add a debugfs entry to show deferred
+Date: Sun, 8 Jul 2018 15:21:07 +0200
+Subject: [PATCH v3] driver core: add a debugfs entry to show deferred
  devices
-In-Reply-To: <bd34c19a-e673-4ce4-e57a-14cc275ab020@redhat.com>
-References: <20180627220656.19298-1-javierm@redhat.com>
- <20180707155921.GA26504@kroah.com>
- <bd34c19a-e673-4ce4-e57a-14cc275ab020@redhat.com>
-Message-ID: <20180708131950.GA25366@kroah.com>
+In-Reply-To: <20180708003256.15655-1-javierm@redhat.com>
+References: <20180708003256.15655-1-javierm@redhat.com>
+Message-ID: <20180708132107.GA25491@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 08, 2018 at 02:31:49AM +0200, Javier Martinez Canillas wrote:
-> Hi Greg,
+On Sun, Jul 08, 2018 at 02:32:56AM +0200, Javier Martinez Canillas wrote:
+> With Device Trees (DT), the dependencies of the devices are defined in the
+> DT, then the drivers parse that information to lookup the needed resources
+> that have as dependencies.
 > 
-> On 07/07/2018 05:59 PM, Greg Kroah-Hartman wrote:
-> > On Thu, Jun 28, 2018 at 12:06:56AM +0200, Javier Martinez Canillas wrote:
-> >> With Device Trees (DT), the dependencies of the devices are defined in the
-> >> DT, then the drivers parse that information to lookup the needed resources
-> >> that have as dependencies.
-> >>
-> >> Since drivers and devices are registered in a non-deterministic way, it is
-> >> possible that a device that is a dependency has not been registered yet by
-> >> the time that is looked up.
-> >>
-> >> In this case the driver that requires this dependency cannot probe and has
-> >> to defer it. So the driver core adds it to a list of deferred devices that
-> >> is iterated again every time that a new driver is probed successfully.
-> >>
-> >> For debugging purposes it may be useful to know what are the devices whose
-> >> probe function was deferred. Add a debugfs entry showing that information.
-> >>
-> >>   $ cat /sys/kernel/debug/devices_deferred
-> >>   48070000.i2c:twl at 48:bci
-> >>   musb-hdrc.0.auto
-> >>   omapdrm.0
-> >>
-> >> This information could be obtained partially by enabling debugging, but it
-> >> means that the kernel log has to be parsed and the probe deferral balanced
-> >> with the successes. This can be error probe and has to be done in a ad-hoc
-> >> manner by everyone who needs to debug these kind of issues.
-> >>
-> >> Since the information is already known by the kernel, just show it to make
-> >> it easier to debug.
-> >>
-> >> Signed-off-by: Javier Martinez Canillas <javierm@redhat.com>
-> >> Reviewed-by: Mark Brown <broonie@kernel.org>
-> > 
-> > This doesn't apply to my tree anymore :(
-> >
+> Since drivers and devices are registered in a non-deterministic way, it is
+> possible that a device that is a dependency has not been registered yet by
+> the time that is looked up.
 > 
-> I see, I made sure that it applied on top of linux-next.
+> In this case the driver that requires this dependency cannot probe and has
+> to defer it. So the driver core adds it to a list of deferred devices that
+> is iterated again every time that a new driver is probed successfully.
+> 
+> For debugging purposes it may be useful to know what are the devices whose
+> probe function was deferred. Add a debugfs entry showing that information.
+> 
+>   $ cat /sys/kernel/debug/devices_deferred
+>   48070000.i2c:twl at 48:bci
+>   musb-hdrc.0.auto
+>   omapdrm.0
+> 
+> This information could be obtained partially by enabling debugging, but it
+> means that the kernel log has to be parsed and the probe deferral balanced
+> with the successes. This can be error probe and has to be done in a ad-hoc
+> manner by everyone who needs to debug these kind of issues.
+> 
+> Since the information is already known by the kernel, just show it to make
+> it easier to debug.
+> 
+> Signed-off-by: Javier Martinez Canillas <javierm@redhat.com>
+> Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
+> Reviewed-by: Mark Brown <broonie@kernel.org>
+> 
+> ---
+> 
+> Changes since RFC v1:
+> - Remove unneeded ret variable from deferred_devs_show()
+> 
+> Changes since RFC v2:
+> - Use DEFINE_SHOW_ATTRIBUTE() macro.
+> - Don't propagate debugfs_create_file() error.
+> - Remove IS_ENABLED(CONFIG_DEBUG_FS) guards.
+> - Drop RFC prefix.
+> 
+> Changes since v1:
+> - Better explain in the commit message why this patch is useful.
+> - Rename deferred_devices entry to devices_deferred.
+> - Add an exit function and remove the debugfs entry.
+> 
+> Changes since v2:
+> - Add Andy Shevchenko and Mark Brown Reviewed-by tag.
+> - Rebase on top of Greg's driver-core-next branch.
+> 
+> 
+>  drivers/base/dd.c | 30 ++++++++++++++++++++++++++++++
+>  1 file changed, 30 insertions(+)
+> 
+> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
+> index 6ea9c5cece7..140f534ee9c 100644
+> --- a/drivers/base/dd.c
+> +++ b/drivers/base/dd.c
+> @@ -16,6 +16,7 @@
+>   * Copyright (c) 2007-2009 Novell Inc.
+>   */
 >  
-> > Can you rebase and resend?
-> >
-> 
-> I guess you want me to rebase on top of your driver-core-next branch. I think
-> that linux-next should pull that branch instead of the driver-core-linus one:
-> 
-> https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/tree/Next/Trees#n29
+> +#include <linux/debugfs.h>
+>  #include <linux/device.h>
+>  #include <linux/delay.h>
+>  #include <linux/dma-mapping.h>
+> @@ -53,6 +54,8 @@ static DEFINE_MUTEX(deferred_probe_mutex);
+>  static LIST_HEAD(deferred_probe_pending_list);
+>  static LIST_HEAD(deferred_probe_active_list);
+>  static atomic_t deferred_trigger_count = ATOMIC_INIT(0);
+> +static struct dentry *deferred_devices;
+> +static bool initcalls_done;
 
-Both are in linux-next, it just takes a day or so for the
-driver-core-next branch to get merged in.
+Wait, why add this variable?  No one uses it that I can see in this
+patch, doesn't it create a build warning?
 
-thanks,
+You did test-build this, right?
 
 greg k-h
