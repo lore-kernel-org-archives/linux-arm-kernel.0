@@ -1,151 +1,69 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sun, 8 Jul 2018 21:37:21 +0200
-Subject: droid 4 in v4.18-rc: grep -r adasfasd /sys/ oopses
-In-Reply-To: <20180708174939.GA10002@amd>
-References: <20180708174939.GA10002@amd>
-Message-ID: <20180708193720.GA13262@amd>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun, 8 Jul 2018 21:53:39 +0200
+Subject: [PATCH 3/3] ARM: dts: Add devicetree for Storlink/Storm SL93512R
+In-Reply-To: <20180705223730.GQ23469@lunn.ch>
+References: <20180704191759.12577-1-linus.walleij@linaro.org>
+ <20180704191759.12577-3-linus.walleij@linaro.org>
+ <20180704205627.GF23469@lunn.ch>
+ <CACRpkdbgoVjCaTE3xg1Q_-UKG3cdVdDdNFW4j1UOA9bX0o-wpQ@mail.gmail.com>
+ <20180705223730.GQ23469@lunn.ch>
+Message-ID: <CACRpkdao_cEBJ9XkMfvOa3Z394K5z0HQEE=-rN-UXqiRp2iUkw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On Fri, Jul 6, 2018 at 12:37 AM Andrew Lunn <andrew@lunn.ch> wrote:
 
-> grep in /sys produces a nasty oops:
-> 
-> I guess next step is trying to find out which file that is..
+> arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
+>
+> &eth0 {
+>         phy-mode = "rgmii-id";
+>         status = "okay";
+>
+>         fixed-link {
+>                 speed = <1000>;
+>                 full-duplex;
+>         };
+> };
+>
+> phy-mode is O.K, since you need to set RGMII.
 
-Let me see...
+OK hm maybe we should have "link-mode" as an alternative
+as it makes it less stressful syntactically...
 
-openat(6, "suspend",
-O_RDONLY|O_NOCTTY|O_NONBLOCK|O_LARGEFILE|O_NOFOLLOW) = 4
-fstat64(4, {st_mode=S_IFREG|0644, st_size=0, ...}) = 0
-read(4, 0x4d2000, 32768)                = -1 EINVAL (Invalid argument)
-write(2, "grep: ", 6grep: )                   = 6
-write(2, "/sys/kernel/debug/pm_debug/cefus"...,
-47/sys/kernel/debug/pm_debug/cefuse_pwrdm/suspend) = 47
-write(2, ": Invalid argument", 18: Invalid argument)      = 18
-write(2, "\n", 1
-)                       = 1
-close(4)                                = 0
-close(6)                                = 0
-openat(5, "time", O_RDONLY|O_NOCTTY|O_NONBLOCK|O_LARGEFILE|O_NOFOLLOW)
-= 4
-fstat64(4, {st_mode=S_IFREG|0444, st_size=0, ...}) = 0
-read(4, "cefuse_pwrdm (OFF),OFF:641441757"..., 32768) = 849
-read(4, "", 28672)                      = 0
-close(4)                                = 0
-openat(5, "count",
-O_RDONLY|O_NOCTTY|O_NONBLOCK|O_LARGEFILE|O_NOFOLLOW) = 4
-Connection to usb closed by remote host.
-Connection to usb closed.
-pavel at half:~$
+> phy-handle should not be used, since the fixed-link takes its
+> place. But it could be your MAC driver has problems, does not
+> correctly support fixed link, and has phy-handle as being mandatory,
+> when it should not be.
+>
+> Which MAC driver is this?
 
-Ok, so it seems to be:
+This is
+drivers/net/ethernet/cortina/gemini.c
 
-user at devuan:~$ cat /sys/kernel/debug/pm_debug/count
-(oops).
+My own driver code so the errors are likely mine...
 
-The file seems to be world-readable.
+the callback trail is usually:
 
-user at devuan:~$ ls -al /sys/kernel/debug/pm_debug/count
--r--r--r-- 1 root root 0 Jan  1  1970 /sys/kernel/debug/pm_debug/count
+gemini_ethernet_port_probe() or
+.ndo_open() -> gmac_open()
+I guess that is normal as net_device_ops doesn't have any
+.adjust_link() callback or so.
 
-But on PC, that file does not exist.
+then:
 
-Any ideas?
-								Pavel
+if (!netdev->phydev)
+     gmac_setup_phy(netdev);
 
+gmac_setup_phy()
+of_phy_get_and_connect(netdev,
+                                     dev->of_node,
+                                     gmac_speed_set);
+gmac_speed_set()
 
-> [69642.787567] power_supply battery: driver failed to report `power_now' property: -22
-> [69645.052368] cpcap-usb-phy cpcap-usb-phy.0: connected to USB host
-> [69660.053009] Unhandled fault: imprecise external abort (0x1406) at 0x0044d038
-> [69660.053039] ------------[ cut here ]------------
-> [69660.053070] WARNING: CPU: 0 PID: 23862 at drivers/bus/omap_l3_noc.c:147 l3_interrupt_handler+0x23c/0x380
-> [69660.060150] pgd = 228114b5
-> [69660.064788] 44000000.ocp:L3 Custom Error: MASTER MPU TARGET L4PER2 (Read): Data Access in User mode during Functional access
-> [69660.074279] [0044d038] *pgd=be500831
-> [69660.076995] Modules linked in:
-> [69660.094940] CPU: 0 PID: 23862 Comm: bash Tainted: G        W         4.18.0-rc3-88788-g528947b #758
-> [69660.094940] Internal error: : 1406 [#1] SMP ARM
-> [69660.108581] Hardware name: Generic OMAP4 (Flattened Device Tree)
-> [69660.114624] [<c010f6cc>] (unwind_backtrace) from [<c010ba50>] (show_stack+0x10/0x14)
-> [69660.122436] [<c010ba50>] (show_stack) from [<c086d8cc>] (dump_stack+0x8c/0xac)
-> [69660.129699] [<c086d8cc>] (dump_stack) from [<c012d364>] (__warn+0xe8/0x114)
-> [69660.136718] [<c012d364>] (__warn) from [<c012d458>] (warn_slowpath_fmt+0x38/0x48)
-> [69660.144256] [<c012d458>] (warn_slowpath_fmt) from [<c03a0bdc>] (l3_interrupt_handler+0x23c/0x380)
-> [69660.153167] [<c03a0bdc>] (l3_interrupt_handler) from [<c0176ccc>] (__handle_irq_event_percpu+0x58/0x140)
-> [69660.162719] [<c0176ccc>] (__handle_irq_event_percpu) from [<c0176dd0>] (handle_irq_event_percpu+0x1c/0x58)
-> [69660.172424] [<c0176dd0>] (handle_irq_event_percpu) from [<c0176e44>] (handle_irq_event+0x38/0x5c)
-> [69660.181335] [<c0176e44>] (handle_irq_event) from [<c017a56c>] (handle_fasteoi_irq+0x94/0x124)
-> [69660.189910] [<c017a56c>] (handle_fasteoi_irq) from [<c0176550>] (generic_handle_irq+0x18/0x28)
-> [69660.198577] [<c0176550>] (generic_handle_irq) from [<c017664c>] (__handle_domain_irq+0x54/0xb4)
-> [69660.207336] [<c017664c>] (__handle_domain_irq) from [<c039fa2c>] (gic_handle_irq+0x4c/0xa0)
-> [69660.215728] [<c039fa2c>] (gic_handle_irq) from [<c0101a2c>] (__irq_svc+0x6c/0x90)
-> [69660.223236] Exception stack(0xecb67d40 to 0xecb67d88)
-> [69660.228332] 7d40: ef7b4a64 00000000 00000001 effdeabc effdeaa0 00000004 00000000 00000000
-> [69660.236541] 7d60: ef7b4a64 20070013 00000006 ef7b4a74 c0e62bd8 ecb67d90 c01c844c c01c813c
-> [69660.244750] 7d80: 60070013 ffffffff
-> [69660.248291] [<c0101a2c>] (__irq_svc) from [<c01c813c>] (release_pages+0x64/0x2fc)
-> [69660.255798] [<c01c813c>] (release_pages) from [<c01c844c>] (pagevec_lru_move_fn+0x78/0x94)
-> [69660.264129] [<c01c844c>] (pagevec_lru_move_fn) from [<c01c94d4>] (lru_add_drain_cpu+0xc4/0xf0)
-> [69660.272796] [<c01c94d4>] (lru_add_drain_cpu) from [<c01c970c>] (lru_add_drain+0x18/0x1c)
-> [69660.280914] [<c01c970c>] (lru_add_drain) from [<c01e7da4>] (exit_mmap+0x78/0x164)
-> [69660.288452] [<c01e7da4>] (exit_mmap) from [<c012aa68>] (mmput+0x44/0xf0)
-> [69660.295196] [<c012aa68>] (mmput) from [<c020a044>] (flush_old_exec+0x304/0x62c)
-> [69660.302551] [<c020a044>] (flush_old_exec) from [<c0250658>] (load_elf_binary+0x2b4/0x13ac)
-> [69660.310882] [<c0250658>] (load_elf_binary) from [<c0209c18>] (search_binary_handler+0x84/0x1ac)
-> [69660.319641] [<c0209c18>] (search_binary_handler) from [<c020ae24>] (__do_execve_file+0x508/0x684)
-> [69660.328552] [<c020ae24>] (__do_execve_file) from [<c020b000>] (do_execve+0x30/0x38)
-> [69660.336242] [<c020b000>] (do_execve) from [<c0101000>] (ret_fast_syscall+0x0/0x54)
-> [69660.343872] Exception stack(0xecb67fa8 to 0xecb67ff0)
-> [69660.348937] 7fa0:                   000d0000 000d0000 0010c8c8 0010e888 000f8008 e5d25300
-> [69660.357147] 7fc0: 000d0000 000d0000 0010c8c8 0000000b 0010c8c8 0010e888 000f8008 b6fc6ce8
-> [69660.365386] 7fe0: b6ed1711 bed367cc 0003c469 b6ed1716
-> [69660.370452] ---[ end trace 03c17ec6355a559d ]---
-> [69680.043853] Modules linked in:
-> [69680.046936] CPU: 1 PID: 23819 Comm: grep Tainted: G        W         4.18.0-rc3-88788-g528947b #758
-> [69680.056030] Hardware name: Generic OMAP4 (Flattened Device Tree)
-> [69680.062103] PC is at seq_printf+0x4/0x30
-> [69680.066040] LR is at __dregs_dump+0x5c/0x98
-> [69680.070251] pc : [<c0226898>]    lr : [<c0120ca0>]    psr: a0000013
-> [69680.076538] sp : ecb07e6c  ip : c0ae3a58  fp : 00000001
-> [69680.081787] r10: 00000001  r9 : ecb02100  r8 : ecb020d0
-> [69680.087036] r7 : ecb07f80  r6 : ecb020d0  r5 : 00000000  r4 : c0e10b54
-> [69680.093597] r3 : 48005020  r2 : 00000000  r1 : c0ae3a2c  r0 : ecb020d0
-> [69680.100158] Flags: NzCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment none
-> [69680.107330] Control: 10c5387d  Table: acb3804a  DAC: 00000051
-> [69680.113128] Process grep (pid: 23819, stack limit = 0x5ef1c469)
-> [69680.119079] Stack: (0xecb07e6c to 0xecb08000)
-> [69680.123443] 7e60:                            c0ae3a2c 00000000 48005020 fa005020 c0ae3a58
-> [69680.131683] 7e80: ecb020d0 00008000 eca30b00 c0120d24 ecb07ea0 c0226e74 00440000 00000000
-> [69680.139892] 7ea0: 00000000 00000000 00000000 00000000 00000000 eca30b00 ee00b5f0 00000000
-> [69680.148101] 7ec0: ecb07f80 00008000 ecb06000 00440000 0043a0c8 c031a668 ecb07f80 ecc15400
-> [69680.156341] 7ee0: 00440000 eca30b00 ecb07f80 00008000 00440000 c0203e24 00000000 00000000
-> [69680.164550] 7f00: 000000c5 c0101204 00000001 eca30b08 00000000 00000000 00000000 00000000
-> [69680.172790] 7f20: 00000001 ee03f1c0 eca30b08 00020000 eca30b00 ecb07f80 ecb06000 00440000
-> [69680.180999] 7f40: 0043a0c8 00008000 eca30b00 00440000 00000000 ecb07f80 00440000 c0203fb0
-> [69680.189208] 7f60: 2160ec00 c0887b68 00000000 00000000 eca30b00 eca30b00 00008000 c0204448
-> [69680.197448] 7f80: 00000000 00000000 00000000 00008000 7fffe000 00440000 00000003 c0101204
-> [69680.205657] 7fa0: 00000003 c0101000 00008000 7fffe000 00000004 00440000 00008000 00008000
-> [69680.213897] 7fc0: 00008000 7fffe000 00440000 00000003 00000004 0043a0c8 00000004 0043a0c8
-> [69680.222106] 7fe0: 00000000 be90013c 00421175 b6eafa76 20000030 00000004 00000000 00000000
-> [69680.230346] [<c0226898>] (seq_printf) from [<48005020>] (0x48005020)
-> [69680.236724] Code: 3584000c 2584100c e8bd8038 e92d000e (e52de004) 
-> [69680.242858] ---[ end trace 03c17ec6355a559e ]---
-> [69680.259582] cpcap_adc cpcap_adc.0: error reading ADC: -512
-> [69680.265258] cpcap_battery cpcap_battery.0: cpcap_charger_battery_temperature failed: -512
-> [69680.265258] power_supply battery: driver failed to report `voltage_now' property: -512
-> [69680.287841] cpcap-usb-phy cpcap-usb-phy.0: connected to USB host
-> 
+As long as a "phydev" is carrying over the
+fixed link info it should be fine I think, this just
+sets up the RGMII speed in this case, but it doesn't
+get opened or something.
 
-
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180708/2b6a729f/attachment.sig>
+Yours,
+Linus Walleij
