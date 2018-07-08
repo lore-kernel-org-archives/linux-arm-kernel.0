@@ -1,54 +1,39 @@
-From: yandong77520@gmail.com (Yandong.Zhao)
-Date: Sun,  8 Jul 2018 12:19:21 +0800
-Subject: [PATCH] arm64: neon: This is a bug
-Message-ID: <1531023561-24195-1-git-send-email-yandong77520@gmail.com>
+From: hofrat@osadl.org (Nicholas Mc Guire)
+Date: Sun,  8 Jul 2018 10:32:54 +0200
+Subject: [PATCH] ARM: imx: flag failure of of_iomap
+Message-ID: <1531038774-24657-1-git-send-email-hofrat@osadl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yandong Zhao <yandong77520@gmail.com>
+ imx_set_aips is assuming that the address returned from of_iomap is
+valid which it probably is in the normal case - as the call site
+is void error propagation is not possible but never the less at least
+a WARN_ON() seems warranted here.
 
-Dear, Dave.Martin
-
-This is a bug that calls may_use_busy() when preemption is enabled.
-
-We encountered a ?sysdump? problem on Kernel 4.14 code, calling
-may_use_simd() in the function kernel_neon_begin() return null.
-Our analysis concludes that the thread is migrating while executing
-raw_cpu_read(kernel_neon_busy).
-
-Signed-off-by: Yandong Zhao <yandong77520@gmail.com>
+Signed-off-by: Nicholas Mc Guire <hofrat@osadl.org>
+Fixes: commit e57e4ab5fc2e ("ARM: i.MX: allow disabling supervisor protect via DT")
 ---
- arch/arm64/include/asm/simd.h | 17 +++++------------
- 1 file changed, 4 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm64/include/asm/simd.h b/arch/arm64/include/asm/simd.h
-index fa8b3fe..0d91084 100644
---- a/arch/arm64/include/asm/simd.h
-+++ b/arch/arm64/include/asm/simd.h
-@@ -29,20 +29,12 @@
- static __must_check inline bool may_use_simd(void)
- {
- 	/*
--	 * The raw_cpu_read() is racy if called with preemption enabled.
--	 * This is not a bug: kernel_neon_busy is only set when
--	 * preemption is disabled, so we cannot migrate to another CPU
--	 * while it is set, nor can we migrate to a CPU where it is set.
--	 * So, if we find it clear on some CPU then we're guaranteed to
--	 * find it clear on any CPU we could migrate to.
--	 *
--	 * If we are in between kernel_neon_begin()...kernel_neon_end(),
--	 * the flag will be set, but preemption is also disabled, so we
--	 * can't migrate to another CPU and spuriously see it become
--	 * false.
-+	 * Operations for contexts where we do not want to do any checks for
-+	 * preemptions.  Unless strictly necessary, always use this_cpu_*()
-+	 * instead. The 'kernel_neon_busy' here must be the current cpu.
- 	 */
- 	return !in_irq() && !irqs_disabled() && !in_nmi() &&
--		!raw_cpu_read(kernel_neon_busy);
-+		!this_cpu_read(kernel_neon_busy);
- }
+Problem found by experimental coccinelle script
+
+Patch was compiletested with: multi_v7_defconfig
+
+Patch is against 4.18-rc3 (localversion-next is next-20180706)
+
+ arch/arm/mach-imx/cpu.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/mach-imx/cpu.c b/arch/arm/mach-imx/cpu.c
+index 32969f3..c6b1bf9 100644
+--- a/arch/arm/mach-imx/cpu.c
++++ b/arch/arm/mach-imx/cpu.c
+@@ -68,6 +68,7 @@ void __init imx_aips_allow_unprivileged_access(
  
- #else /* ! CONFIG_KERNEL_MODE_NEON */
+ 	for_each_compatible_node(np, NULL, compat) {
+ 		aips_base_addr = of_iomap(np, 0);
++		WARN_ON(!aips_base_addr);
+ 		imx_set_aips(aips_base_addr);
+ 	}
+ }
 -- 
-1.9.1
+2.1.4
