@@ -1,114 +1,45 @@
-From: mathieu.desnoyers@efficios.com (Mathieu Desnoyers)
-Date: Sun,  8 Jul 2018 17:03:26 -0400
-Subject: [PATCH for 4.18 2/6] rseq: use get_user/put_user rather than
- __get_user/__put_user
-In-Reply-To: <20180708210330.27324-1-mathieu.desnoyers@efficios.com>
-References: <20180708210330.27324-1-mathieu.desnoyers@efficios.com>
-Message-ID: <20180708210330.27324-3-mathieu.desnoyers@efficios.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Sun, 8 Jul 2018 23:15:22 +0200
+Subject: [PATCH] arm64: hikey960: update idle-states
+In-Reply-To: <20180708140157.GA28878@leoy-ThinkPad-X240s>
+References: <1530860246-29072-1-git-send-email-vincent.guittot@linaro.org>
+ <20180708140157.GA28878@leoy-ThinkPad-X240s>
+Message-ID: <948f033f-aef2-4d6c-170d-a1ff2113f258@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation to use __u64 for the rseq_cs pointer field, 32-bit
-architectures need to read this 64-bit value located in user-space
-addresses.
+Hi Leo,
 
-__get_user is used to read this value, given that its access check has
-already been performed with access_ok() on rseq registration.
 
-arm does not implement 8-byte __get_user. Rather than trying to
-improve __get_user on ARM, use get_user/put_user across rseq instead.
+On 08/07/2018 16:01, leo.yan at linaro.org wrote:
 
-If those end up showing up in benchmarks, the proper approach would be to
-use user_access_begin() / unsafe_get/put_user() / user_access_end()
-anyway.
+[ ... ]
 
-Signed-off-by: Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
-CC: Thomas Gleixner <tglx@linutronix.de>
-Cc: Joel Fernandes <joelaf@google.com>
-Cc: Peter Zijlstra <peterz@infradead.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Dave Watson <davejwatson@fb.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Andi Kleen <andi@firstfloor.org>
-Cc: "H . Peter Anvin" <hpa@zytor.com>
-Cc: Chris Lameter <cl@linux.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Andrew Hunter <ahh@google.com>
-Cc: Michael Kerrisk <mtk.manpages@gmail.com>
-Cc: "Paul E . McKenney" <paulmck@linux.vnet.ibm.com>
-Cc: Paul Turner <pjt@google.com>
-Cc: Boqun Feng <boqun.feng@gmail.com>
-Cc: Josh Triplett <josh@joshtriplett.org>
-Cc: Steven Rostedt <rostedt@goodmis.org>
-Cc: Ben Maurer <bmaurer@fb.com>
-Cc: linux-api at vger.kernel.org
-CC: linux-arm-kernel at lists.infradead.org
-Cc: Andy Lutomirski <luto@amacapital.net>
-Cc: Andrew Morton <akpm@linux-foundation.org>
-Cc: Linus Torvalds <torvalds@linux-foundation.org>
----
- kernel/rseq.c | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+>> A simple test with a task waking up every 11,111ms shows improvement:
+> 
+> Should s/11,111ms/11.111ms ?
 
-diff --git a/kernel/rseq.c b/kernel/rseq.c
-index 16b38c5342f9..2c8463acb50d 100644
---- a/kernel/rseq.c
-+++ b/kernel/rseq.c
-@@ -85,9 +85,9 @@ static int rseq_update_cpu_id(struct task_struct *t)
- {
- 	u32 cpu_id = raw_smp_processor_id();
- 
--	if (__put_user(cpu_id, &t->rseq->cpu_id_start))
-+	if (put_user(cpu_id, &t->rseq->cpu_id_start))
- 		return -EFAULT;
--	if (__put_user(cpu_id, &t->rseq->cpu_id))
-+	if (put_user(cpu_id, &t->rseq->cpu_id))
- 		return -EFAULT;
- 	trace_rseq_update(t);
- 	return 0;
-@@ -100,14 +100,14 @@ static int rseq_reset_rseq_cpu_id(struct task_struct *t)
- 	/*
- 	 * Reset cpu_id_start to its initial state (0).
- 	 */
--	if (__put_user(cpu_id_start, &t->rseq->cpu_id_start))
-+	if (put_user(cpu_id_start, &t->rseq->cpu_id_start))
- 		return -EFAULT;
- 	/*
- 	 * Reset cpu_id to RSEQ_CPU_ID_UNINITIALIZED, so any user coming
- 	 * in after unregistration can figure out that rseq needs to be
- 	 * registered again.
- 	 */
--	if (__put_user(cpu_id, &t->rseq->cpu_id))
-+	if (put_user(cpu_id, &t->rseq->cpu_id))
- 		return -EFAULT;
- 	return 0;
- }
-@@ -120,7 +120,7 @@ static int rseq_get_rseq_cs(struct task_struct *t, struct rseq_cs *rseq_cs)
- 	u32 sig;
- 	int ret;
- 
--	ret = __get_user(ptr, &t->rseq->rseq_cs);
-+	ret = get_user(ptr, &t->rseq->rseq_cs);
- 	if (ret)
- 		return ret;
- 	if (!ptr) {
-@@ -163,7 +163,7 @@ static int rseq_need_restart(struct task_struct *t, u32 cs_flags)
- 	int ret;
- 
- 	/* Get thread flags. */
--	ret = __get_user(flags, &t->rseq->flags);
-+	ret = get_user(flags, &t->rseq->flags);
- 	if (ret)
- 		return ret;
- 
-@@ -203,7 +203,7 @@ static int clear_rseq_cs(struct task_struct *t)
- 	 *
- 	 * Set rseq_cs to NULL with single-copy atomicity.
- 	 */
--	return __put_user(0UL, &t->rseq->rseq_cs);
-+	return put_user(0UL, &t->rseq->rseq_cs);
- }
- 
- /*
+Actually the French notation is ',' for decimal :)
+
+English and French are inverted.
+
+For example one million is noted:
+
+French  : 1.000.000 (or 1 000 000)
+English : 1,000,000
+
+And one milli is noted:
+
+French  : 0,001
+English : 0.001
+
+:)
+
+  -- Daniel
+
 -- 
-2.11.0
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
