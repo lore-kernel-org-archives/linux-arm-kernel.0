@@ -1,38 +1,69 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Sat,  7 Jul 2018 23:16:56 +0200
-Subject: [PATCH] arm: perf: prevent unbind/bind via sysfs
-Message-ID: <20180707211656.2920-1-stefan@agner.ch>
+From: javierm@redhat.com (Javier Martinez Canillas)
+Date: Sun, 8 Jul 2018 02:31:49 +0200
+Subject: [PATCH v2] driver core: add a debugfs entry to show deferred
+ devices
+In-Reply-To: <20180707155921.GA26504@kroah.com>
+References: <20180627220656.19298-1-javierm@redhat.com>
+ <20180707155921.GA26504@kroah.com>
+Message-ID: <bd34c19a-e673-4ce4-e57a-14cc275ab020@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Unbinding and rebinding the ARM PMU driver via sysfs leads to a
-warning followed by more errors:
-  WARNING: CPU: 0 PID: 217 at kernel/irq/chip.c:1034 irq_modify_status+0x150/0x16c
-  ..
-  genirq: Flags mismatch irq 19. 00010c04 (arm-pmu) vs. 00010c04 (arm-pmu)
-  hw perfevents: unable to request IRQ19 for ARM PMU counters
-  hw perfevents: /pmu: failed to register PMU devices!
-  armv7-pmu: probe of pmu failed with error -16
+Hi Greg,
 
-The driver is clearly not designed to be removed. Disable bind/
-unbind for this driver.
+On 07/07/2018 05:59 PM, Greg Kroah-Hartman wrote:
+> On Thu, Jun 28, 2018 at 12:06:56AM +0200, Javier Martinez Canillas wrote:
+>> With Device Trees (DT), the dependencies of the devices are defined in the
+>> DT, then the drivers parse that information to lookup the needed resources
+>> that have as dependencies.
+>>
+>> Since drivers and devices are registered in a non-deterministic way, it is
+>> possible that a device that is a dependency has not been registered yet by
+>> the time that is looked up.
+>>
+>> In this case the driver that requires this dependency cannot probe and has
+>> to defer it. So the driver core adds it to a list of deferred devices that
+>> is iterated again every time that a new driver is probed successfully.
+>>
+>> For debugging purposes it may be useful to know what are the devices whose
+>> probe function was deferred. Add a debugfs entry showing that information.
+>>
+>>   $ cat /sys/kernel/debug/devices_deferred
+>>   48070000.i2c:twl at 48:bci
+>>   musb-hdrc.0.auto
+>>   omapdrm.0
+>>
+>> This information could be obtained partially by enabling debugging, but it
+>> means that the kernel log has to be parsed and the probe deferral balanced
+>> with the successes. This can be error probe and has to be done in a ad-hoc
+>> manner by everyone who needs to debug these kind of issues.
+>>
+>> Since the information is already known by the kernel, just show it to make
+>> it easier to debug.
+>>
+>> Signed-off-by: Javier Martinez Canillas <javierm@redhat.com>
+>> Reviewed-by: Mark Brown <broonie@kernel.org>
+> 
+> This doesn't apply to my tree anymore :(
+>
 
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
- arch/arm/kernel/perf_event_v7.c | 1 +
- 1 file changed, 1 insertion(+)
+I see, I made sure that it applied on top of linux-next.
+ 
+> Can you rebase and resend?
+>
 
-diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
-index 57f01e059f39..5a5116794440 100644
---- a/arch/arm/kernel/perf_event_v7.c
-+++ b/arch/arm/kernel/perf_event_v7.c
-@@ -2030,6 +2030,7 @@ static struct platform_driver armv7_pmu_driver = {
- 	.driver		= {
- 		.name	= "armv7-pmu",
- 		.of_match_table = armv7_pmu_of_device_ids,
-+		.suppress_bind_attrs = true,
- 	},
- 	.probe		= armv7_pmu_device_probe,
- };
+I guess you want me to rebase on top of your driver-core-next branch. I think
+that linux-next should pull that branch instead of the driver-core-linus one:
+
+https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/tree/Next/Trees#n29
+
+> thanks,
+> 
+> greg k-h
+> 
+
+Best regards,
 -- 
-2.18.0
+Javier Martinez Canillas
+Software Engineer - Desktop Hardware Enablement
+Red Hat
