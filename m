@@ -1,60 +1,40 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 9 Jul 2018 09:42:40 +0100
-Subject: [PATCH v2 6/6] KVM: arm/arm64: vgic: Allow configuration of
- interrupt groups
-In-Reply-To: <1530697100-22419-7-git-send-email-christoffer.dall@arm.com>
-References: <1530697100-22419-1-git-send-email-christoffer.dall@arm.com>
- <1530697100-22419-7-git-send-email-christoffer.dall@arm.com>
-Message-ID: <7f875ead-d3cb-1fec-bc84-56e64526e6a7@arm.com>
+From: hofrat@osadl.org (Nicholas Mc Guire)
+Date: Mon,  9 Jul 2018 10:42:44 +0200
+Subject: [PATCH] microblaze: warn if of_iomap() failed
+Message-ID: <1531125764-25816-1-git-send-email-hofrat@osadl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/07/18 10:38, Christoffer Dall wrote:
-> Implement the required MMIO accessors for GICv2 and GICv3 for the
-> IGROUPR distributor and redistributor registers.
-> 
-> This can allow guests to change behavior compared to running on previous
-> versions of KVM, but only to align with the architecture and hardware
-> implementations.
-> 
-> This also allows userspace to configure the groups for interrupts.  Note
-> that this potentially results in GICv2 guests not receiving interrupts
-> after migration if migrating from an older kernel that exposes GICv2
-> interrupts as group 1.
-> 
-> Cc: Andrew Jones <drjones@redhat.com>
-> Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
-> ---
-> I implemented (but stashed) a version of this which predicated the
-> behavior based on the value of GICD_IIDR revision field, falling back to
-> ignoring writes and resetting GICv2 groups to 0 if the guest wrote a
-> revision less than 2.  However, current QEMU implementations simply
-> don't write the GICD_IIDR, so this doesn't help at all without changing
-> QEMU anyhow.
-> 
-> The only actual fix I can see here to work around the problem in the
-> kernel is to require an opt-in to allow restoring groups from userspace,
-> but that's a lot of logic to support cross-kernel version migration.
-> 
-> Question: Do we expect that cross-kernel version migration is a critical
-> feature that people really expect to work, and do we actually have
-> examples of catering to this in the kernel elsewhere?  (Also, how would
-> then that relate to the whole 'adding a new sysreg breaks migration'
-> situation?)
+of_iomap() can return NULL. The function is void thus error propagation
+is not possible but at least a WARN_ON() seems warranted here as a silent
+failure might lead to a hard to understand system state.
 
-I don't really get why QEMU doesn't try to restore GICD_IIDR, while it
-is definitely trying to restore RO sysregs (and that's how we detect
-incompatibilities).
+Signed-off-by: Nicholas Mc Guire <hofrat@osadl.org>
+---
 
-I think we should at least give userspace a chance to do the right
-thing. If it doesn't, well, too bad.
+Problem located with experimental coccinelle script
 
-How bad is that "writable GICD_IIDR" patch? Because at this stage, and
-in the absence of any comment, I'm close to just pick that series and
-merge it for 4.19.
+Probably this should be a BUG_ON() as this is such a low level fault that
+continuing operations probably makes little sense.
 
-Thanks,
+Patch was compiletested with: mmu_defconfig (implies CONFIG_PCI_XILINX=y)
 
-	M.
+Patch is against 4.18-rc3 (localversion-next is next-20180709)
+
+ arch/microblaze/pci/xilinx_pci.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/microblaze/pci/xilinx_pci.c b/arch/microblaze/pci/xilinx_pci.c
+index 14c7da5f..7fa72ff 100644
+--- a/arch/microblaze/pci/xilinx_pci.c
++++ b/arch/microblaze/pci/xilinx_pci.c
+@@ -157,6 +157,7 @@ void __init xilinx_pci_init(void)
+ 
+ 	/* Set the max bus number to 255, and bus/subbus no's to 0 */
+ 	pci_reg = of_iomap(pci_node, 0);
++	WARN_ON(!pci_reg);
+ 	out_be32(pci_reg + XPLB_PCI_BUS, 0x000000ff);
+ 	iounmap(pci_reg);
+ 
 -- 
-Jazz is not dead. It just smells funny...
+2.1.4
