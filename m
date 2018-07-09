@@ -1,36 +1,53 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon,  9 Jul 2018 09:41:51 -0600
-Subject: [PATCH v4 4/6] iommu: Stop deferring probe at end of initcalls
-In-Reply-To: <20180709154153.15742-1-robh@kernel.org>
-References: <20180709154153.15742-1-robh@kernel.org>
-Message-ID: <20180709154153.15742-5-robh@kernel.org>
+Date: Mon,  9 Jul 2018 09:41:47 -0600
+Subject: [PATCH v4 0/6] Make deferring probe forever optional
+Message-ID: <20180709154153.15742-1-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The IOMMU subsystem has its own mechanism to not defer probe if driver
-support is missing. Now that the driver core supports stopping deferring
-probe if drivers aren't built-in (and probed), use the driver core
-support so the IOMMU specific support can be removed.
+This series came out of a discussion on the ARM boot-architecture
+list[1] about DT forwards and backwards compatibility issues. There are
+issues with newer DTs breaking on older, stable kernels. Some of these
+are difficult to solve, but cases of optional devices not having
+kernel support should be solvable.
 
-Acked-by: Joerg Roedel <jroedel@suse.de>
-Cc: iommu at lists.linux-foundation.org
-Signed-off-by: Rob Herring <robh@kernel.org>
----
- drivers/iommu/of_iommu.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+I tested this on a RPi3 B with the pinctrl driver forced off. With this
+change, the MMC/SD and UART drivers can function without the pinctrl
+driver. I left the dts change out this time.
 
-diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
-index 5c36a8b7656a..78ddf47dd67a 100644
---- a/drivers/iommu/of_iommu.c
-+++ b/drivers/iommu/of_iommu.c
-@@ -133,7 +133,7 @@ static int of_iommu_xlate(struct device *dev,
- 	 * a proper probe-ordering dependency mechanism in future.
- 	 */
- 	if (!ops)
--		return -EPROBE_DEFER;
-+		return driver_deferred_probe_check_state(dev);
- 
- 	return ops->of_xlate(dev, iommu_spec);
- }
--- 
+v2 and v3 of this series can be found here[2][3].
+
+Rob
+
+[1] https://lists.linaro.org/pipermail/boot-architecture/2018-April/000466.html
+[2] https://lore.kernel.org/patchwork/project/lkml/list/?series=347413
+[3] https://lore.kernel.org/patchwork/project/lkml/list/?series=357344
+
+Rob Herring (6):
+  driver core: allow stopping deferred probe after init
+  dt-bindings: pinctrl: add a 'pinctrl-use-default' property
+  pinctrl: Support stopping deferred probe after initcalls
+  iommu: Stop deferring probe at end of initcalls
+  iommu: Remove IOMMU_OF_DECLARE
+  PM / Domains: Stop deferring probe at the end of initcall
+
+ .../admin-guide/kernel-parameters.txt         |  9 +++
+ .../bindings/pinctrl/pinctrl-bindings.txt     |  6 ++
+ drivers/base/dd.c                             | 59 +++++++++++++++++++
+ drivers/base/power/domain.c                   |  2 +-
+ drivers/iommu/arm-smmu-v3.c                   |  2 -
+ drivers/iommu/arm-smmu.c                      |  7 ---
+ drivers/iommu/exynos-iommu.c                  |  2 -
+ drivers/iommu/ipmmu-vmsa.c                    |  3 -
+ drivers/iommu/msm_iommu.c                     |  2 -
+ drivers/iommu/of_iommu.c                      | 21 +------
+ drivers/iommu/qcom_iommu.c                    |  2 -
+ drivers/iommu/rockchip-iommu.c                |  2 -
+ drivers/pinctrl/devicetree.c                  | 15 +++--
+ include/asm-generic/vmlinux.lds.h             |  2 -
+ include/linux/device.h                        |  2 +
+ include/linux/of_iommu.h                      |  4 --
+ 16 files changed, 90 insertions(+), 50 deletions(-)
+
+--
 2.17.1
