@@ -1,9 +1,7 @@
 From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Mon,  9 Jul 2018 15:38:28 +0100
+Date: Mon,  9 Jul 2018 15:38:27 +0100
 Subject: [PATCH v5 0/7] KVM: Support PUD hugepages at stage 2
-In-Reply-To: <20180709143835.28971-1-punit.agrawal@arm.com>
-References: <20180709143835.28971-1-punit.agrawal@arm.com>
-Message-ID: <20180709143835.28971-2-punit.agrawal@arm.com>
+Message-ID: <20180709143835.28971-1-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -31,7 +29,6 @@ Thanks,
 Punit
 
 v4 -> v5:
-
 * Patch 1 - Drop helper stage2_should_exec() and refactor the
   condition to decide if a page table entry should be marked
   executable
@@ -41,7 +38,6 @@ v4 -> v5:
   helpers directly
 * Patch 7 - Add a note to update the PUD hugepage support when number
   of levels of stage 2 tables differs from stage 1
-
 
 v3 -> v4:
 * Patch 1 and 7 - Don't put down hugepages pte if logging is enabled
@@ -60,7 +56,6 @@ v1 -> v2:
 
 [0] https://www.spinics.net/lists/arm-kernel/msg663562.html
 [1] https://www.spinics.net/lists/kvm/msg171065.html
-
 
 Punit Agrawal (7):
   KVM: arm/arm64: Share common code in user_mem_abort()
