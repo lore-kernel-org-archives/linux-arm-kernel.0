@@ -1,136 +1,327 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 9 Jul 2018 14:43:44 +0100
-Subject: [linux-sunxi] Re: [PATCH 05/10] arm64: dts: allwinner: a64:
- Olinuxino: enable USB
-In-Reply-To: <20180709115426.6r42bxqcypxvikep@nodbug.lucina.net>
-References: <20180706085210.17952-1-andre.przywara@arm.com>
- <20180706085210.17952-6-andre.przywara@arm.com>
- <20180706150401.mhqse677vdqtxdzy@nodbug.lucina.net>
- <548f2eb5-b457-8fcd-c043-b897a447d96c@arm.com>
- <52713A44-E2BB-4388-A98F-D49AA3B6EAC3@aosc.io>
- <4b4d1662-4266-593c-79a9-39eea8fb668c@arm.com>
- <373C4D2E-E2CF-4AE9-9AC4-69AD4AF95AF4@aosc.io>
- <5b9a0818-b28e-76de-17b9-721c0950b64b@arm.com>
- <20180709101509.pg2p5kompy35hc3k@nodbug.lucina.net>
- <1d2c3a9f-ec57-ebd2-a8d1-fcd7a84e0e91@arm.com>
- <20180709115426.6r42bxqcypxvikep@nodbug.lucina.net>
-Message-ID: <ff9389d1-c476-d5cf-8c4a-e0eae84e3642@arm.com>
+From: mchehab+samsung@kernel.org (Mauro Carvalho Chehab)
+Date: Mon, 9 Jul 2018 10:59:38 -0300
+Subject: [PATCH v3] media: dvb-frontends: add Socionext SC1501A ISDB-S/T
+ demodulator driver
+In-Reply-To: <002c01d41729$2ff6fa00$8fe4ee00$@socionext.com>
+References: <20180621031748.21703-1-suzuki.katsuhiro@socionext.com>
+ <20180704135657.3fd607cb@coco.lan>
+ <000401d41403$b33db490$19b91db0$@socionext.com>
+ <20180704234244.32d20f6b@coco.lan>
+ <000501d41423$265013a0$72f03ae0$@socionext.com>
+ <20180705212723.2856f064@coco.lan>
+ <001f01d414ef$27145450$753cfcf0$@socionext.com>
+ <20180706081603.2d8451c9@coco.lan>
+ <002c01d41729$2ff6fa00$8fe4ee00$@socionext.com>
+Message-ID: <20180709105938.3d2f8391@coco.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Em Mon, 9 Jul 2018 11:04:36 +0900
+"Katsuhiro Suzuki" <suzuki.katsuhiro@socionext.com> escreveu:
 
-(sorry for keeping you busy ...)
-
-On 09/07/18 12:54, Martin Lucina wrote:
-> Hi,
+> Hello Mauro,
 > 
-> On Monday, 09.07.2018 at?12:30, Andre Przywara wrote:
->>>>> You wrongly bound the regulator to USB0, not USB1.
->>>>
->>>> Oh dear ...
->>>>
->>>>> USB0 regulator should be AXP's drivevbus if it's OTG in generic
->>>>> design based on AW reference.
->>>>
->>>> Yes, it is.
->>>> So, like this?
->>>>
->>>> --------------
->>>> 	reg_usb0_vbus: usb0-vbus { ....
->>>> 		(unchanged)
->>>> 	};
->>>> };
->>>> ....
->>>> &reg_drivevbus {
->>>> 	regulator-name = "usb0-vbus";
->>>> 	status = "okay";
->>>> };
->>>>
->>>> &usb_otg {
->>>> 	dr_mode = "otg";
->>>> 	status = "okay";
->>>> };
->>>>
->>>> &usbphy {
->>>> 	usb0_id_det-gpios = <&pio 7 9 GPIO_ACTIVE_HIGH>; /* PH9 */
->>>> 	usb0_vbus-supply = <&reg_drivevbus>;
->>>> 	usb1_vbus-supply = <&reg_usb0_vbus>;
->>>> };
->>>> --------------
->>>>
->>>> Martin, can you please give this a try? (It's PH9, not PH6 as in the
->>>> original patch).
->>>
->>> I presume you mean all the above changes. This does not work, I see no USB
->>> busses apart from the kernel's internal ones:
->>
->> Bummer!
->>
->> I just saw that I forgot: 'status = "okay";' in the usbphy node. Can you
->> add this and recheck?
->>
->>> Bus 002 Device 001: ID 1d6b:0001 Linux Foundation 1.1 root hub
->>> Bus 001 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
->>>
->>> and dmesg mentions "usb0-vbus: disabling", but no other complaints I can
->>> see.
->>>
->>> For completeness, with your original patch, I have the following "lsusb"
->>> output (but non-working both ports):
->>>
->>> Bus 004 Device 001: ID 1d6b:0001 Linux Foundation 1.1 root hub
->>> Bus 003 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
->>> Bus 002 Device 001: ID 1d6b:0001 Linux Foundation 1.1 root hub
->>> Bus 001 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
->>>
->>> With the addition of "dr_mode = "host"", I have the following (and working
->>> ports):
->>
->> Well, yes, but as Icenowy pointed out, dr_mode = "host" and the original
->> patch are wrong and just happen to work by chance:
->> Adding dr_mode makes the OTG part work, which now *didn't disable* the
->> usb0_vbus-supply, which actually drives USB1. The actual USB0 supply was
->> not touched (because Linux didn't know about it in the first place). So
->> both ports happened to work.
->>
->> Can you please try using the .dts I attached?
+> > -----Original Message-----
+> > From: linux-media-owner at vger.kernel.org <linux-media-owner@vger.kernel.org> On
+> > Behalf Of Mauro Carvalho Chehab
+> > Sent: Friday, July 6, 2018 8:16 PM
+> > To: Suzuki, Katsuhiro/?? ?? <suzuki.katsuhiro@socionext.com>
+> > Cc: linux-media at vger.kernel.org; Masami Hiramatsu  
+> <masami.hiramatsu@linaro.org>;
+> > Jassi Brar <jaswinder.singh@linaro.org>; linux-arm-kernel at lists.infradead.org;
+> > linux-kernel at vger.kernel.org; Abylay Ospan <aospan@netup.ru>
+> > Subject: Re: [PATCH v3] media: dvb-frontends: add Socionext SC1501A ISDB-S/T
+> > demodulator driver
+> > 
+> > Em Fri, 6 Jul 2018 15:04:08 +0900
+> > "Katsuhiro Suzuki" <suzuki.katsuhiro@socionext.com> escreveu:
+> >   
+> > > Here is the log of dvb-fe-tool on my environment.
+> > >
+> > > --------------------
+> > > # ./utils/dvb/.libs/dvb-fe-tool -d isdbs
+> > > Changing delivery system to: ISDBS
+> > > ERROR    FE_SET_VOLTAGE: Unknown error 524  
+> > 
+> > Hmm... ENOTSUPP. Doesn't the device supposed to be able to power on the
+> > LNBf?  
 > 
-> The .dts you attached does not compile, you've added a "&simplefb_hdmi"
-> node, did you mean something else?
+> Ah, maybe it's not implemented yet in Helene driver.
 
-Ah, right, sorry about that. That was against sunxi/dt64-for-4.19 (as
-the whole series was). So the base .dtsi is different.
-Attaching the .dtb this time ...
+That depends on how the hardware works. On some hardware, the
+LNBf power supply and control is at the demod; on others, it is 
+supported by a separate chipset. See, for example, isl642.c for
+an example of such external hardware.
 
-Do you have fixed regulator support in your kernel?
-CONFIG_REGULATOR_FIXED_VOLTAGE=y or fixed.ko as a module.
+I don't know much about ISDB-S, but, as far as what was
+implemented on v4l-utils dvb-sat.c for Japan 110BS/CS LNBf,
+the LNBf voltage is not used to switch the polarity.
 
-> ...if I remove that node, then I get:
+So, the control here is simpler than on DVB-S/S2, as the only
+control is either to send 18V to power on the LNBf/Dish, or
+zero in order to save power.
+
 > 
-> [    0.289065] sun4i-usb-phy 1c19400.phy: Couldn't request ID GPIO
-> ...
-> [    1.554921] sun4i-usb-phy 1c19400.phy: Couldn't get regulator usb0_vbus... Deferring probe
-> ...
-> [    1.659943] sun4i-usb-phy 1c19400.phy: Couldn't get regulator usb0_vbus... Deferring probe
 > 
-> and no USB.
+> > 
+> > Anyway, I changed the error print message to be clearer, displaying
+> > instead:
+> > 
+> >   ERROR    FE_SET_VOLTAGE: driver doesn't support it!
+> >   
 > 
-> (guessing) Did you mean to add a &usb1_vbus?
+> It's nice for users. Thanks!
+> 
+> 
+> > >
+> > > # ./utils/dvb/.libs/dvb-fe-tool
+> > > Device Socionext SC1501A (/dev/dvb/adapter0/frontend0) capabilities:
+> > >      CAN_FEC_AUTO
+> > >      CAN_GUARD_INTERVAL_AUTO
+> > >      CAN_HIERARCHY_AUTO
+> > >      CAN_INVERSION_AUTO
+> > >      CAN_QAM_AUTO
+> > >      CAN_TRANSMISSION_MODE_AUTO
+> > > DVB API Version 5.11, Current v5 delivery system: ISDBS
+> > > Supported delivery systems:
+> > >     [ISDBS]
+> > >      ISDBT
+> > > Frequency range for the current standard:
+> > > From:             470 MHz
+> > > To:              2.07 GHz
+> > > Step:            25.0 kHz
+> > > Symbol rate ranges for the current standard:
+> > > From:                 0Bauds
+> > > To:                   0Bauds  
+> > 
+> > That seems a driver issue. The ISDB-S ops.info should be
+> > filling both symbol_rate_min and symbol_rate_max.
+> > 
+> > I suspect that both should be filled with 28860000.
+> > 
+> > The dvb_frontend.c core might hardcode it, but, IMHO,
+> > it is better to keep those information inside the
+> > tuner/frontend ops.info.
+> >   
+> 
+> Indeed, thank you for reviewing. I fixed my driver. It seems works fine.
+> 
+> ----
+> # utils/dvb/.libs/dvb-fe-tool -a 0
+> Device Socionext SC1501A (/dev/dvb/adapter0/frontend0) capabilities:
+>      CAN_FEC_AUTO
+>      CAN_GUARD_INTERVAL_AUTO
+>      CAN_HIERARCHY_AUTO
+>      CAN_INVERSION_AUTO
+>      CAN_QAM_AUTO
+>      CAN_TRANSMISSION_MODE_AUTO
+> DVB API Version 5.11, Current v5 delivery system: ISDBS
+> Supported delivery systems:
+>     [ISDBS]
+>      ISDBT
+> Frequency range for the current standard:
+> From:             470 MHz
+> To:              2.07 GHz
+> Step:            25.0 kHz
+> Symbol rate ranges for the current standard:
+> From:            28.9 MBauds
+> To:              28.9 MBauds
+> SEC: set voltage to OFF
+> ERROR    FE_SET_VOLTAGE: Operation not permitted
+> ----
 
-Well, this regulator name should indeed read usb1_vbus now. But this is
-mostly about the name. Changed this anyway in the attached .dtb.
+That sounds ok.
 
-But this failure in getting the GPIO looks suspicious. Do you have uart1
-enabled, by any chance? As its CTS pin is on PG9.
+> 
+> 
+> > > SEC: set voltage to OFF
+> > > ERROR    FE_SET_VOLTAGE: Operation not permitted
+> > >
+> > >
+> > > # ./utils/dvb/.libs/dvb-fe-tool -d isdbt
+> > > Changing delivery system to: ISDBT
+> > > ERROR    FE_SET_VOLTAGE: Unknown error 524
+> > >
+> > > # ./utils/dvb/.libs/dvb-fe-tool
+> > > Device Socionext SC1501A (/dev/dvb/adapter0/frontend0) capabilities:
+> > >      CAN_FEC_AUTO
+> > >      CAN_GUARD_INTERVAL_AUTO
+> > >      CAN_HIERARCHY_AUTO
+> > >      CAN_INVERSION_AUTO
+> > >      CAN_QAM_AUTO
+> > >      CAN_TRANSMISSION_MODE_AUTO
+> > > DVB API Version 5.11, Current v5 delivery system: ISDBT
+> > > Supported delivery systems:
+> > >      ISDBS
+> > >     [ISDBT]
+> > > Frequency range for the current standard:
+> > > From:             470 MHz
+> > > To:              2.07 GHz
+> > > Step:            25.0 kHz  
+> > 
+> > The rest looks OK for me.
+> >   
+> > > > > For example, Helene uses these info for only Ter or Sat freq ranges:
+> > > > >
+> > > > > 		.name = "Sony HELENE Ter tuner",
+> > > > > 		.frequency_min_hz  =    1 * MHz,
+> > > > > 		.frequency_max_hz  = 1200 * MHz,
+> > > > > 		.frequency_step_hz =   25 * kHz,
+> > > > >
+> > > > > 		.name = "Sony HELENE Sat tuner",
+> > > > > 		.frequency_min_hz  =  500 * MHz,
+> > > > > 		.frequency_max_hz  = 2500 * MHz,
+> > > > > 		.frequency_step_hz =    1 * MHz,
+> > > > >
+> > > > > Is this better to add new info for both system?
+> > > > >
+> > > > > 		.name = "Sony HELENE Sat/Ter tuner",
+> > > > > 		.frequency_min_hz  =    1 * MHz,
+> > > > > 		.frequency_max_hz  = 2500 * MHz,
+> > > > > 		.frequency_step_hz =   25 * kHz, // Is this correct...?  
+> > > >
+> > > > That is indeed a very good question, and maybe a reason why we
+> > > > may need other approaches.
+> > > >
+> > > > See, if the tuner is capable of tuning from 1 MHz to 2500 MHz,
+> > > > the frequency range should be ok. It would aget_frontend_algoctually be  
+> pretty
+> > cool  
+> > > > to use a tuner with such wide range for SDR, if the hardware supports
+> > > > raw I/Q collect :-D
+> > > >
+> > > > The frequency step is a different issue. If the tuner driver uses
+> > > > DVBFE_ALGO_SW (e. g. if ops.get_frontend_algo() returns it, or if
+> > > > this function is not defined), then the step will be used to adjust
+> > > > the zigzag interactions. If it is too small, the tuning will lose
+> > > > channels if the signal is not strong.
+> > > >  
+> > >
+> > > Thank you for describing. It's difficult problem...  
+> > 
+> > I double-checked the implementation. We don't need to worry about
+> > zigzag, provided that the ISDB-S implementation at the core is correct.
+> > 
+> > For satellite/cable standards, the zigzag logic takes the symbol
+> > rate into account, and not the stepsize:
+> > 
+> >                 case SYS_DVBS:
+> >                 case SYS_DVBS2:
+> >                 case SYS_ISDBS:
+> >                 case SYS_TURBO:
+> >                 case SYS_DVBC_ANNEX_A:
+> >                 case SYS_DVBC_ANNEX_C:
+> >                         fepriv->min_delay = HZ / 20;
+> >                         fepriv->step_size = c->symbol_rate / 16000;
+> >                         fepriv->max_drift = c->symbol_rate / 2000;
+> >                         break;
+> > 
+> > For terrestrial standards, it uses the stepsize:
+> > 
+> >                 case SYS_DVBT:
+> >                 case SYS_DVBT2:
+> >                 case SYS_ISDBT:
+> >                 case SYS_DTMB:
+> >                         fepriv->min_delay = HZ / 20;
+> >                         fepriv->step_size = dvb_frontend_get_stepsize(fe) * 2;
+> >                         fepriv->max_drift = (dvb_frontend_get_stepsize(fe) * 2)  
+> +
+> > 1;
+> >                         break;
+> > 
+> > So, having a value of 25 kHz there won't affect the zigzag algorithm
+> > for ISDB-S, as it will be used only for ISDB-T.
+> >   
+> 
+> Thank you for checking and describing. I checked it too.
+> 
+> Default value is fine as you said, and we can use get_tune_settings() 
+> callback if we face the problem or need different settings for each 
+> delivery systems in the future.
+> 
+>         /* get frontend-specific tuning settings */
+>         memset(&fetunesettings, 0, sizeof(struct dvb_frontend_tune_settings));
+>         if (fe->ops.get_tune_settings && (fe->ops.get_tune_settings(fe,
+> &fetunesettings) == 0)) {
+>                 fepriv->min_delay = (fetunesettings.min_delay_ms * HZ) / 1000;
+>                 fepriv->max_drift = fetunesettings.max_drift;
+>                 fepriv->step_size = fetunesettings.step_size;
+>         } else {
+>                 /* default values */
+>                 ...
 
-Cheers,
-Andre.
+Sure. 
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: sun50i-a64-olinuxino.dtb
-Type: application/octet-stream
-Size: 16607 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180709/56662a54/attachment-0001.obj>
+> 
+> 
+> > > > In the specific case of helene, it doesn't have a get_frontend_algo,
+> > > > so it will use the step frequency.
+> > > >
+> > > > I'm not sure how to solve this issue. Maybe Abylay may shed a light
+> > > > here, if helene does sigzag in hardware or not.
+> > > >  
+> > >
+> > > As far as I know, Helene does not have automatic scan mechanism in
+> > > hardware.  
+> > 
+> > Ok, so the driver is doing the right thing here.
+> >   
+> > > > If it does in hardware, you could add a get_frontend_algo() routine
+> > > > at helene driver and return DVBFE_ALGO_HW. The tuning zigzag software
+> > > > algorithm in the Kernel will stop, as it will rely at the hardware.
+> > > >
+> > > > Please notice that, if the hardware doesn't do zigzag itself, this
+> > > > will make it lose channels. On the other hand, if the hardware does
+> > > > have sigzag, changing to DVBFE_ALGO_HW will speedup tuning, as the
+> > > > Kernel won't try to do sigzag itself.
+> > > >  
+> > >
+> > > ISDB-T uses 6MHz bandwidth per channel (in Japan), ISDB-S for
+> > > BS/CS110 uses 38.36MHz bandwidth. Maybe 1MHz zigzag step is large for
+> > > ISDB-T system and 25kHz is small for ISDB-S system.  
+> > 
+> > Yeah, but, after double-checking the logic, for ISDB-S, it will
+> > use:
+> > 
+> > 	c->symbol_rate = 28860000;
+> > 	c->rolloff = ROLLOFF_35;
+> > 	c->bandwidth_hz = c->symbol_rate / 100 * 135;
+> > 
+> > That would actually set the ISDB-S channel separation to 38.961 MHz.
+> > 
+> > By setting symbol_rate like that, the zigzag for ISDB-S will
+> > be defined by:
+> > 
+> >        fepriv->step_size = c->symbol_rate / 16000; /* 38.961MHz / 16000 =  
+> .002435
+> > - e. g. steps of ~25 kHz */
+> >        fepriv->max_drift = c->symbol_rate / 2000;  /* 38.961MHz / 2000 =  
+> .0194805
+> > - e. g. max drift of ~195 kHz */
+> > 
+> > Funny enough, it will be using about 25 kHz as step size for ISDB-S.
+> > 
+> > I have no idea if the ISDB-S standard defines the zigzag logic,
+> > but I would be expecting a higher value for it. So, perhaps
+> > the ISDB-S zigzag could be optimized.
+> > 
+> > Thanks,
+> > Mauro  
+> 
+> Hmm, interesting. I don't know zigzag for ISDB-S too, sorry...
+> 
+> Anyway, I don't worry about that. I said in above, we can use 
+> get_tune_settings() for fine tuning.
+> 
+> 
+> Regards,
+> --
+> Katsuhiro Suzuki
+> 
+> 
+> 
+
+
+
+Thanks,
+Mauro
