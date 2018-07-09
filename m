@@ -1,183 +1,218 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon,  9 Jul 2018 09:41:48 -0600
-Subject: [PATCH v4 1/6] driver core: allow stopping deferred probe after init
+Date: Mon,  9 Jul 2018 09:41:52 -0600
+Subject: [PATCH v4 5/6] iommu: Remove IOMMU_OF_DECLARE
 In-Reply-To: <20180709154153.15742-1-robh@kernel.org>
 References: <20180709154153.15742-1-robh@kernel.org>
-Message-ID: <20180709154153.15742-2-robh@kernel.org>
+Message-ID: <20180709154153.15742-6-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Deferred probe will currently wait forever on dependent devices to probe,
-but sometimes a driver will never exist. It's also not always critical for
-a driver to exist. Platforms can rely on default configuration from the
-bootloader or reset defaults for things such as pinctrl and power domains.
-This is often the case with initial platform support until various drivers
-get enabled. There's at least 2 scenarios where deferred probe can render
-a platform broken. Both involve using a DT which has more devices and
-dependencies than the kernel supports. The 1st case is a driver may be
-disabled in the kernel config. The 2nd case is the kernel version may
-simply not have the dependent driver. This can happen if using a newer DT
-(provided by firmware perhaps) with a stable kernel version. Deferred
-probe issues can be difficult to debug especially if the console has
-dependencies or userspace fails to boot to a shell.
+Now that we use the driver core to stop deferred probe for missing
+drivers, IOMMU_OF_DECLARE can be removed.
 
-There are also cases like IOMMUs where only built-in drivers are
-supported, so deferring probe after initcalls is not needed. The IOMMU
-subsystem implemented its own mechanism to handle this using OF_DECLARE
-linker sections.
+This is slightly less optimal than having a list of built-in drivers in
+that we'll now defer probe twice before giving up. This shouldn't have a
+significant impact on boot times as past discussions about deferred
+probe have given no evidence of deferred probe having a substantial
+impact.
 
-This commit adds makes ending deferred probe conditional on initcalls
-being completed or a debug timeout. Subsystems or drivers may opt-in by
-calling driver_deferred_probe_check_init_done() instead of
-unconditionally returning -EPROBE_DEFER. They may use additional
-information from DT or kernel's config to decide whether to continue to
-defer probe or not.
-
-The timeout mechanism is intended for debug purposes and WARNs loudly.
-The remaining deferred probe pending list will also be dumped after the
-timeout. Not that this timeout won't work for the console which needs
-to be enabled before userspace starts. However, if the console's
-dependencies are resolved, then the kernel log will be printed (as
-opposed to no output).
-
-Cc: Alexander Graf <agraf@suse.de>
+Cc: Robin Murphy <robin.murphy@arm.com>
+Cc: Kukjin Kim <kgene@kernel.org>
+Cc: Krzysztof Kozlowski <krzk@kernel.org>
+Cc: Rob Clark <robdclark@gmail.com>
+Cc: Heiko Stuebner <heiko@sntech.de>
+Cc: Frank Rowand <frowand.list@gmail.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: iommu at lists.linux-foundation.org
+Cc: linux-samsung-soc at vger.kernel.org
+Cc: linux-arm-msm at vger.kernel.org
+Cc: linux-rockchip at lists.infradead.org
+Cc: devicetree at vger.kernel.org
+Acked-by: Will Deacon <will.deacon@arm.com>
+Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Acked-by: Joerg Roedel <jroedel@suse.de>
 Signed-off-by: Rob Herring <robh@kernel.org>
 ---
-v4:
-- Rebase on driver-core-next
-- Only allow base 10 for timeout
+ drivers/iommu/arm-smmu-v3.c       |  2 --
+ drivers/iommu/arm-smmu.c          |  7 -------
+ drivers/iommu/exynos-iommu.c      |  2 --
+ drivers/iommu/ipmmu-vmsa.c        |  3 ---
+ drivers/iommu/msm_iommu.c         |  2 --
+ drivers/iommu/of_iommu.c          | 19 +------------------
+ drivers/iommu/qcom_iommu.c        |  2 --
+ drivers/iommu/rockchip-iommu.c    |  2 --
+ include/asm-generic/vmlinux.lds.h |  2 --
+ include/linux/of_iommu.h          |  4 ----
+ 10 files changed, 1 insertion(+), 44 deletions(-)
 
-v3:
-- Merged with timeout patch.
-- Clarify that deferred_probe_timeout is a debug option.
-- Drop the 'optional' param. The only user was pinctrl, so it has to handle
-  that functionality.
-- Rename function to driver_deferred_probe_check_state
-- Added kerneldoc for driver_deferred_probe_check_state
-- Print a 1 line warning if stopping deferred probe after initcalls and a
-  WARN on timeout.
-
- .../admin-guide/kernel-parameters.txt         |  9 +++
- drivers/base/dd.c                             | 59 +++++++++++++++++++
- include/linux/device.h                        |  2 +
- 3 files changed, 70 insertions(+)
-
-diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
-index efc7aa7a0670..e83ef4648ea4 100644
---- a/Documentation/admin-guide/kernel-parameters.txt
-+++ b/Documentation/admin-guide/kernel-parameters.txt
-@@ -804,6 +804,15 @@
- 			Defaults to the default architecture's huge page size
- 			if not specified.
-
-+	deferred_probe_timeout=
-+			[KNL] Debugging option to set a timeout in seconds for
-+			deferred probe to give up waiting on dependencies to
-+			probe. Only specific dependencies (subsystems or
-+			drivers) that have opted in will be ignored. A timeout of 0
-+			will timeout at the end of initcalls. This option will also
-+			dump out devices still on the deferred probe list after
-+			retrying.
-+
- 	dhash_entries=	[KNL]
- 			Set number of hash buckets for dentry cache.
-
-diff --git a/drivers/base/dd.c b/drivers/base/dd.c
-index e85705e84407..fb62f1be40d3 100644
---- a/drivers/base/dd.c
-+++ b/drivers/base/dd.c
-@@ -55,6 +55,7 @@ static LIST_HEAD(deferred_probe_pending_list);
- static LIST_HEAD(deferred_probe_active_list);
- static atomic_t deferred_trigger_count = ATOMIC_INIT(0);
- static struct dentry *deferred_devices;
-+static bool initcalls_done;
-
- /*
-  * In some cases, like suspend to RAM or hibernation, It might be reasonable
-@@ -219,6 +220,51 @@ static int deferred_devs_show(struct seq_file *s, void *data)
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index 1d647104bccc..22bdabd3d8e0 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -2915,8 +2915,6 @@ static struct platform_driver arm_smmu_driver = {
+ };
+ module_platform_driver(arm_smmu_driver);
+ 
+-IOMMU_OF_DECLARE(arm_smmuv3, "arm,smmu-v3");
+-
+ MODULE_DESCRIPTION("IOMMU API for ARM architected SMMUv3 implementations");
+ MODULE_AUTHOR("Will Deacon <will.deacon@arm.com>");
+ MODULE_LICENSE("GPL v2");
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index f7a96bcf94a6..c73cfce1ccc0 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -2211,13 +2211,6 @@ static struct platform_driver arm_smmu_driver = {
+ };
+ module_platform_driver(arm_smmu_driver);
+ 
+-IOMMU_OF_DECLARE(arm_smmuv1, "arm,smmu-v1");
+-IOMMU_OF_DECLARE(arm_smmuv2, "arm,smmu-v2");
+-IOMMU_OF_DECLARE(arm_mmu400, "arm,mmu-400");
+-IOMMU_OF_DECLARE(arm_mmu401, "arm,mmu-401");
+-IOMMU_OF_DECLARE(arm_mmu500, "arm,mmu-500");
+-IOMMU_OF_DECLARE(cavium_smmuv2, "cavium,smmu-v2");
+-
+ MODULE_DESCRIPTION("IOMMU API for ARM architected SMMU implementations");
+ MODULE_AUTHOR("Will Deacon <will.deacon@arm.com>");
+ MODULE_LICENSE("GPL v2");
+diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
+index 85879cfec52f..b128cb4372d3 100644
+--- a/drivers/iommu/exynos-iommu.c
++++ b/drivers/iommu/exynos-iommu.c
+@@ -1390,5 +1390,3 @@ static int __init exynos_iommu_init(void)
+ 	return ret;
  }
- DEFINE_SHOW_ATTRIBUTE(deferred_devs);
-
-+static int deferred_probe_timeout = -1;
-+static int __init deferred_probe_timeout_setup(char *str)
-+{
-+	deferred_probe_timeout = simple_strtol(str, NULL, 10);
-+	return 1;
-+}
-+__setup("deferred_probe_timeout=", deferred_probe_timeout_setup);
-+
-+/**
-+ * driver_deferred_probe_check_state() - Check deferred probe state
-+ * @dev: device to check
-+ *
-+ * Returns -ENODEV if init is done and all built-in drivers have had a chance
-+ * to probe (i.e. initcalls are done), -ETIMEDOUT if deferred probe debug
-+ * timeout has expired, or -EPROBE_DEFER if none of those conditions are met.
-+ *
-+ * Drivers or subsystems can opt-in to calling this function instead of directly
-+ * returning -EPROBE_DEFER.
-+ */
-+int driver_deferred_probe_check_state(struct device *dev)
-+{
-+	if (initcalls_done) {
-+		if (!deferred_probe_timeout) {
-+			dev_WARN(dev, "deferred probe timeout, ignoring dependency");
-+			return -ETIMEDOUT;
-+		}
-+		dev_warn(dev, "ignoring dependency for device, assuming no driver");
-+		return -ENODEV;
-+	}
-+	return -EPROBE_DEFER;
-+}
-+
-+static void deferred_probe_timeout_work_func(struct work_struct *work)
-+{
-+	struct device_private *private, *p;
-+
-+	deferred_probe_timeout = 0;
-+	driver_deferred_probe_trigger();
-+	flush_work(&deferred_probe_work);
-+
-+	list_for_each_entry_safe(private, p, &deferred_probe_pending_list, deferred_probe)
-+		dev_info(private->device, "deferred probe pending");
-+}
-+static DECLARE_DELAYED_WORK(deferred_probe_timeout_work, deferred_probe_timeout_work_func);
-+
+ core_initcall(exynos_iommu_init);
+-
+-IOMMU_OF_DECLARE(exynos_iommu_of, "samsung,exynos-sysmmu");
+diff --git a/drivers/iommu/ipmmu-vmsa.c b/drivers/iommu/ipmmu-vmsa.c
+index 40ae6e87cb88..f026aa16d5f1 100644
+--- a/drivers/iommu/ipmmu-vmsa.c
++++ b/drivers/iommu/ipmmu-vmsa.c
+@@ -1108,9 +1108,6 @@ static void __exit ipmmu_exit(void)
+ subsys_initcall(ipmmu_init);
+ module_exit(ipmmu_exit);
+ 
+-IOMMU_OF_DECLARE(ipmmu_vmsa_iommu_of, "renesas,ipmmu-vmsa");
+-IOMMU_OF_DECLARE(ipmmu_r8a7795_iommu_of, "renesas,ipmmu-r8a7795");
+-
+ MODULE_DESCRIPTION("IOMMU API for Renesas VMSA-compatible IPMMU");
+ MODULE_AUTHOR("Laurent Pinchart <laurent.pinchart@ideasonboard.com>");
+ MODULE_LICENSE("GPL v2");
+diff --git a/drivers/iommu/msm_iommu.c b/drivers/iommu/msm_iommu.c
+index 0d3350463a3f..27377742600d 100644
+--- a/drivers/iommu/msm_iommu.c
++++ b/drivers/iommu/msm_iommu.c
+@@ -877,7 +877,5 @@ static void __exit msm_iommu_driver_exit(void)
+ subsys_initcall(msm_iommu_driver_init);
+ module_exit(msm_iommu_driver_exit);
+ 
+-IOMMU_OF_DECLARE(msm_iommu_of, "qcom,apq8064-iommu");
+-
+ MODULE_LICENSE("GPL v2");
+ MODULE_AUTHOR("Stepan Moskovchenko <stepanm@codeaurora.org>");
+diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+index 78ddf47dd67a..f7787e757244 100644
+--- a/drivers/iommu/of_iommu.c
++++ b/drivers/iommu/of_iommu.c
+@@ -27,9 +27,6 @@
+ 
+ #define NO_IOMMU	1
+ 
+-static const struct of_device_id __iommu_of_table_sentinel
+-	__used __section(__iommu_of_table_end);
+-
  /**
-  * deferred_probe_initcall() - Enable probing of deferred devices
+  * of_get_dma_window - Parse *dma-window property and returns 0 if found.
   *
-@@ -235,6 +281,19 @@ static int deferred_probe_initcall(void)
- 	driver_deferred_probe_trigger();
- 	/* Sort as many dependencies as possible before exiting initcalls */
- 	flush_work(&deferred_probe_work);
-+	initcalls_done = true;
-+
-+	/*
-+	 * Trigger deferred probe again, this time we won't defer anything
-+	 * that is optional
-+	 */
-+	driver_deferred_probe_trigger();
-+	flush_work(&deferred_probe_work);
-+
-+	if (deferred_probe_timeout > 0) {
-+		schedule_delayed_work(&deferred_probe_timeout_work,
-+			deferred_probe_timeout * HZ);
-+	}
- 	return 0;
+@@ -98,19 +95,6 @@ int of_get_dma_window(struct device_node *dn, const char *prefix, int index,
  }
- late_initcall(deferred_probe_initcall);
-diff --git a/include/linux/device.h b/include/linux/device.h
-index 575c5a35ece5..d2acc78d279b 100644
---- a/include/linux/device.h
-+++ b/include/linux/device.h
-@@ -339,6 +339,8 @@ struct device *driver_find_device(struct device_driver *drv,
- 				  struct device *start, void *data,
- 				  int (*match)(struct device *dev, void *data));
-
-+int driver_deferred_probe_check_state(struct device *dev);
-+
- /**
-  * struct subsys_interface - interfaces to device functions
-  * @name:       name of the device function
---
+ EXPORT_SYMBOL_GPL(of_get_dma_window);
+ 
+-static bool of_iommu_driver_present(struct device_node *np)
+-{
+-	/*
+-	 * If the IOMMU still isn't ready by the time we reach init, assume
+-	 * it never will be. We don't want to defer indefinitely, nor attempt
+-	 * to dereference __iommu_of_table after it's been freed.
+-	 */
+-	if (system_state >= SYSTEM_RUNNING)
+-		return false;
+-
+-	return of_match_node(&__iommu_of_table, np);
+-}
+-
+ static int of_iommu_xlate(struct device *dev,
+ 			  struct of_phandle_args *iommu_spec)
+ {
+@@ -120,8 +104,7 @@ static int of_iommu_xlate(struct device *dev,
+ 
+ 	ops = iommu_ops_from_fwnode(fwnode);
+ 	if ((ops && !ops->of_xlate) ||
+-	    !of_device_is_available(iommu_spec->np) ||
+-	    (!ops && !of_iommu_driver_present(iommu_spec->np)))
++	    !of_device_is_available(iommu_spec->np))
+ 		return NO_IOMMU;
+ 
+ 	err = iommu_fwspec_init(dev, &iommu_spec->np->fwnode, ops);
+diff --git a/drivers/iommu/qcom_iommu.c b/drivers/iommu/qcom_iommu.c
+index fe88a4880d3a..b48aee82d14b 100644
+--- a/drivers/iommu/qcom_iommu.c
++++ b/drivers/iommu/qcom_iommu.c
+@@ -945,7 +945,5 @@ static void __exit qcom_iommu_exit(void)
+ module_init(qcom_iommu_init);
+ module_exit(qcom_iommu_exit);
+ 
+-IOMMU_OF_DECLARE(qcom_iommu_dev, "qcom,msm-iommu-v1");
+-
+ MODULE_DESCRIPTION("IOMMU API for QCOM IOMMU v1 implementations");
+ MODULE_LICENSE("GPL v2");
+diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
+index 054cd2c8e9c8..de8d3bf91b23 100644
+--- a/drivers/iommu/rockchip-iommu.c
++++ b/drivers/iommu/rockchip-iommu.c
+@@ -1284,8 +1284,6 @@ static int __init rk_iommu_init(void)
+ }
+ subsys_initcall(rk_iommu_init);
+ 
+-IOMMU_OF_DECLARE(rk_iommu_of, "rockchip,iommu");
+-
+ MODULE_DESCRIPTION("IOMMU API for Rockchip");
+ MODULE_AUTHOR("Simon Xue <xxm@rock-chips.com> and Daniel Kurtz <djkurtz@chromium.org>");
+ MODULE_ALIAS("platform:rockchip-iommu");
+diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
+index e373e2e10f6a..f173b5f30dbe 100644
+--- a/include/asm-generic/vmlinux.lds.h
++++ b/include/asm-generic/vmlinux.lds.h
+@@ -218,7 +218,6 @@
+ #define TIMER_OF_TABLES()	OF_TABLE(CONFIG_TIMER_OF, timer)
+ #define IRQCHIP_OF_MATCH_TABLE() OF_TABLE(CONFIG_IRQCHIP, irqchip)
+ #define CLK_OF_TABLES()		OF_TABLE(CONFIG_COMMON_CLK, clk)
+-#define IOMMU_OF_TABLES()	OF_TABLE(CONFIG_OF_IOMMU, iommu)
+ #define RESERVEDMEM_OF_TABLES()	OF_TABLE(CONFIG_OF_RESERVED_MEM, reservedmem)
+ #define CPU_METHOD_OF_TABLES()	OF_TABLE(CONFIG_SMP, cpu_method)
+ #define CPUIDLE_METHOD_OF_TABLES() OF_TABLE(CONFIG_CPU_IDLE, cpuidle_method)
+@@ -601,7 +600,6 @@
+ 	CLK_OF_TABLES()							\
+ 	RESERVEDMEM_OF_TABLES()						\
+ 	TIMER_OF_TABLES()						\
+-	IOMMU_OF_TABLES()						\
+ 	CPU_METHOD_OF_TABLES()						\
+ 	CPUIDLE_METHOD_OF_TABLES()					\
+ 	KERNEL_DTB()							\
+diff --git a/include/linux/of_iommu.h b/include/linux/of_iommu.h
+index 4fa654e4b5a9..f3d40dd7bb66 100644
+--- a/include/linux/of_iommu.h
++++ b/include/linux/of_iommu.h
+@@ -32,8 +32,4 @@ static inline const struct iommu_ops *of_iommu_configure(struct device *dev,
+ 
+ #endif	/* CONFIG_OF_IOMMU */
+ 
+-extern struct of_device_id __iommu_of_table;
+-
+-#define IOMMU_OF_DECLARE(name, compat)	OF_DECLARE_1(iommu, name, compat, NULL)
+-
+ #endif /* __OF_IOMMU_H */
+-- 
 2.17.1
