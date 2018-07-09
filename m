@@ -1,179 +1,295 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Mon,  9 Jul 2018 09:07:50 +0900
-Subject: [PATCH v3 3/3] arm64: acpi: fix alignment fault in accessing ACPI
-In-Reply-To: <20180709000750.22172-1-takahiro.akashi@linaro.org>
-References: <20180709000750.22172-1-takahiro.akashi@linaro.org>
-Message-ID: <20180709000750.22172-4-takahiro.akashi@linaro.org>
+From: suzuki.katsuhiro@socionext.com (Katsuhiro Suzuki)
+Date: Mon, 9 Jul 2018 11:04:36 +0900
+Subject: [PATCH v3] media: dvb-frontends: add Socionext SC1501A ISDB-S/T
+ demodulator driver
+In-Reply-To: <20180706081603.2d8451c9@coco.lan>
+References: <20180621031748.21703-1-suzuki.katsuhiro@socionext.com>
+ <20180704135657.3fd607cb@coco.lan>
+ <000401d41403$b33db490$19b91db0$@socionext.com>
+ <20180704234244.32d20f6b@coco.lan>
+ <000501d41423$265013a0$72f03ae0$@socionext.com>
+ <20180705212723.2856f064@coco.lan>
+ <001f01d414ef$27145450$753cfcf0$@socionext.com>
+ <20180706081603.2d8451c9@coco.lan>
+Message-ID: <002c01d41729$2ff6fa00$8fe4ee00$@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a fix against the issue that crash dump kernel may hang up
-during booting, which can happen on any ACPI-based system with "ACPI
-Reclaim Memory."
+Hello Mauro,
 
-(kernel messages after panic kicked off kdump)
-	   (snip...)
-	Bye!
-	   (snip...)
-	ACPI: Core revision 20170728
-	pud=000000002e7d0003, *pmd=000000002e7c0003, *pte=00e8000039710707
-	Internal error: Oops: 96000021 [#1] SMP
-	Modules linked in:
-	CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.14.0-rc6 #1
-	task: ffff000008d05180 task.stack: ffff000008cc0000
-	PC is at acpi_ns_lookup+0x25c/0x3c0
-	LR is at acpi_ds_load1_begin_op+0xa4/0x294
-	   (snip...)
-	Process swapper/0 (pid: 0, stack limit = 0xffff000008cc0000)
-	Call trace:
-	   (snip...)
-	[<ffff0000084a6764>] acpi_ns_lookup+0x25c/0x3c0
-	[<ffff00000849b4f8>] acpi_ds_load1_begin_op+0xa4/0x294
-	[<ffff0000084ad4ac>] acpi_ps_build_named_op+0xc4/0x198
-	[<ffff0000084ad6cc>] acpi_ps_create_op+0x14c/0x270
-	[<ffff0000084acfa8>] acpi_ps_parse_loop+0x188/0x5c8
-	[<ffff0000084ae048>] acpi_ps_parse_aml+0xb0/0x2b8
-	[<ffff0000084a8e10>] acpi_ns_one_complete_parse+0x144/0x184
-	[<ffff0000084a8e98>] acpi_ns_parse_table+0x48/0x68
-	[<ffff0000084a82cc>] acpi_ns_load_table+0x4c/0xdc
-	[<ffff0000084b32f8>] acpi_tb_load_namespace+0xe4/0x264
-	[<ffff000008baf9b4>] acpi_load_tables+0x48/0xc0
-	[<ffff000008badc20>] acpi_early_init+0x9c/0xd0
-	[<ffff000008b70d50>] start_kernel+0x3b4/0x43c
-	Code: b9008fb9 2a000318 36380054 32190318 (b94002c0)
-	---[ end trace c46ed37f9651c58e ]---
-	Kernel panic - not syncing: Fatal exception
-	Rebooting in 10 seconds..
+> -----Original Message-----
+> From: linux-media-owner at vger.kernel.org <linux-media-owner@vger.kernel.org> On
+> Behalf Of Mauro Carvalho Chehab
+> Sent: Friday, July 6, 2018 8:16 PM
+> To: Suzuki, Katsuhiro/?? ?? <suzuki.katsuhiro@socionext.com>
+> Cc: linux-media at vger.kernel.org; Masami Hiramatsu
+<masami.hiramatsu@linaro.org>;
+> Jassi Brar <jaswinder.singh@linaro.org>; linux-arm-kernel at lists.infradead.org;
+> linux-kernel at vger.kernel.org; Abylay Ospan <aospan@netup.ru>
+> Subject: Re: [PATCH v3] media: dvb-frontends: add Socionext SC1501A ISDB-S/T
+> demodulator driver
+> 
+> Em Fri, 6 Jul 2018 15:04:08 +0900
+> "Katsuhiro Suzuki" <suzuki.katsuhiro@socionext.com> escreveu:
+> 
+> > Here is the log of dvb-fe-tool on my environment.
+> >
+> > --------------------
+> > # ./utils/dvb/.libs/dvb-fe-tool -d isdbs
+> > Changing delivery system to: ISDBS
+> > ERROR    FE_SET_VOLTAGE: Unknown error 524
+> 
+> Hmm... ENOTSUPP. Doesn't the device supposed to be able to power on the
+> LNBf?
 
-(diagnosis)
-* This fault is a data abort, alignment fault (ESR=0x96000021)
-  during reading out ACPI table.
-* Initial ACPI tables are normally stored in system ram and marked as
-  "ACPI Reclaim memory" by the firmware.
-* After the commit f56ab9a5b73c ("efi/arm: Don't mark ACPI reclaim
-  memory as MEMBLOCK_NOMAP"), those regions are differently handled
-  as they are "memblock-reserved", without NOMAP bit.
-* So they are now excluded from device tree's "usable-memory-range"
-  which kexec-tools determines based on a current view of /proc/iomem.
-* When crash dump kernel boots up, it tries to accesses ACPI tables by
-  mapping them with ioremap(), not ioremap_cache(), in acpi_os_ioremap()
-  since they are no longer part of mapped system ram.
-* Given that ACPI accessor/helper functions are compiled in without
-  unaligned access support (ACPI_MISALIGNMENT_NOT_SUPPORTED),
-  any unaligned access to ACPI tables can cause a fatal panic.
+Ah, maybe it's not implemented yet in Helene driver.
 
-With this patch, acpi_os_ioremap() always honors memory attribute
-information provided by the firmware (EFI) and retaining cacheability
-allows the kernel safe access to ACPI tables.
 
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-Reviewed-by: James Morse <james.morse@arm.com>
-Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Reported-by and Tested-by: Bhupesh Sharma <bhsharma@redhat.com>
----
- arch/arm64/include/asm/acpi.h | 23 ++++++++++++++++-------
- arch/arm64/kernel/acpi.c      | 11 +++--------
- 2 files changed, 19 insertions(+), 15 deletions(-)
+> 
+> Anyway, I changed the error print message to be clearer, displaying
+> instead:
+> 
+>   ERROR    FE_SET_VOLTAGE: driver doesn't support it!
+> 
 
-diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
-index 0db62a4cbce2..68bc18cb2b85 100644
---- a/arch/arm64/include/asm/acpi.h
-+++ b/arch/arm64/include/asm/acpi.h
-@@ -12,10 +12,12 @@
- #ifndef _ASM_ACPI_H
- #define _ASM_ACPI_H
- 
-+#include <linux/efi.h>
- #include <linux/memblock.h>
- #include <linux/psci.h>
- 
- #include <asm/cputype.h>
-+#include <asm/io.h>
- #include <asm/smp_plat.h>
- #include <asm/tlbflush.h>
- 
-@@ -29,18 +31,22 @@
- 
- /* Basic configuration for ACPI */
- #ifdef	CONFIG_ACPI
-+pgprot_t __acpi_get_mem_attribute(phys_addr_t addr);
+It's nice for users. Thanks!
+
+
+> >
+> > # ./utils/dvb/.libs/dvb-fe-tool
+> > Device Socionext SC1501A (/dev/dvb/adapter0/frontend0) capabilities:
+> >      CAN_FEC_AUTO
+> >      CAN_GUARD_INTERVAL_AUTO
+> >      CAN_HIERARCHY_AUTO
+> >      CAN_INVERSION_AUTO
+> >      CAN_QAM_AUTO
+> >      CAN_TRANSMISSION_MODE_AUTO
+> > DVB API Version 5.11, Current v5 delivery system: ISDBS
+> > Supported delivery systems:
+> >     [ISDBS]
+> >      ISDBT
+> > Frequency range for the current standard:
+> > From:             470 MHz
+> > To:              2.07 GHz
+> > Step:            25.0 kHz
+> > Symbol rate ranges for the current standard:
+> > From:                 0Bauds
+> > To:                   0Bauds
+> 
+> That seems a driver issue. The ISDB-S ops.info should be
+> filling both symbol_rate_min and symbol_rate_max.
+> 
+> I suspect that both should be filled with 28860000.
+> 
+> The dvb_frontend.c core might hardcode it, but, IMHO,
+> it is better to keep those information inside the
+> tuner/frontend ops.info.
+> 
+
+Indeed, thank you for reviewing. I fixed my driver. It seems works fine.
+
+----
+# utils/dvb/.libs/dvb-fe-tool -a 0
+Device Socionext SC1501A (/dev/dvb/adapter0/frontend0) capabilities:
+     CAN_FEC_AUTO
+     CAN_GUARD_INTERVAL_AUTO
+     CAN_HIERARCHY_AUTO
+     CAN_INVERSION_AUTO
+     CAN_QAM_AUTO
+     CAN_TRANSMISSION_MODE_AUTO
+DVB API Version 5.11, Current v5 delivery system: ISDBS
+Supported delivery systems:
+    [ISDBS]
+     ISDBT
+Frequency range for the current standard:
+From:             470 MHz
+To:              2.07 GHz
+Step:            25.0 kHz
+Symbol rate ranges for the current standard:
+From:            28.9 MBauds
+To:              28.9 MBauds
+SEC: set voltage to OFF
+ERROR    FE_SET_VOLTAGE: Operation not permitted
+----
+
+
+> > SEC: set voltage to OFF
+> > ERROR    FE_SET_VOLTAGE: Operation not permitted
+> >
+> >
+> > # ./utils/dvb/.libs/dvb-fe-tool -d isdbt
+> > Changing delivery system to: ISDBT
+> > ERROR    FE_SET_VOLTAGE: Unknown error 524
+> >
+> > # ./utils/dvb/.libs/dvb-fe-tool
+> > Device Socionext SC1501A (/dev/dvb/adapter0/frontend0) capabilities:
+> >      CAN_FEC_AUTO
+> >      CAN_GUARD_INTERVAL_AUTO
+> >      CAN_HIERARCHY_AUTO
+> >      CAN_INVERSION_AUTO
+> >      CAN_QAM_AUTO
+> >      CAN_TRANSMISSION_MODE_AUTO
+> > DVB API Version 5.11, Current v5 delivery system: ISDBT
+> > Supported delivery systems:
+> >      ISDBS
+> >     [ISDBT]
+> > Frequency range for the current standard:
+> > From:             470 MHz
+> > To:              2.07 GHz
+> > Step:            25.0 kHz
+> 
+> The rest looks OK for me.
+> 
+> > > > For example, Helene uses these info for only Ter or Sat freq ranges:
+> > > >
+> > > > 		.name = "Sony HELENE Ter tuner",
+> > > > 		.frequency_min_hz  =    1 * MHz,
+> > > > 		.frequency_max_hz  = 1200 * MHz,
+> > > > 		.frequency_step_hz =   25 * kHz,
+> > > >
+> > > > 		.name = "Sony HELENE Sat tuner",
+> > > > 		.frequency_min_hz  =  500 * MHz,
+> > > > 		.frequency_max_hz  = 2500 * MHz,
+> > > > 		.frequency_step_hz =    1 * MHz,
+> > > >
+> > > > Is this better to add new info for both system?
+> > > >
+> > > > 		.name = "Sony HELENE Sat/Ter tuner",
+> > > > 		.frequency_min_hz  =    1 * MHz,
+> > > > 		.frequency_max_hz  = 2500 * MHz,
+> > > > 		.frequency_step_hz =   25 * kHz, // Is this correct...?
+> > >
+> > > That is indeed a very good question, and maybe a reason why we
+> > > may need other approaches.
+> > >
+> > > See, if the tuner is capable of tuning from 1 MHz to 2500 MHz,
+> > > the frequency range should be ok. It would aget_frontend_algoctually be
+pretty
+> cool
+> > > to use a tuner with such wide range for SDR, if the hardware supports
+> > > raw I/Q collect :-D
+> > >
+> > > The frequency step is a different issue. If the tuner driver uses
+> > > DVBFE_ALGO_SW (e. g. if ops.get_frontend_algo() returns it, or if
+> > > this function is not defined), then the step will be used to adjust
+> > > the zigzag interactions. If it is too small, the tuning will lose
+> > > channels if the signal is not strong.
+> > >
+> >
+> > Thank you for describing. It's difficult problem...
+> 
+> I double-checked the implementation. We don't need to worry about
+> zigzag, provided that the ISDB-S implementation at the core is correct.
+> 
+> For satellite/cable standards, the zigzag logic takes the symbol
+> rate into account, and not the stepsize:
+> 
+>                 case SYS_DVBS:
+>                 case SYS_DVBS2:
+>                 case SYS_ISDBS:
+>                 case SYS_TURBO:
+>                 case SYS_DVBC_ANNEX_A:
+>                 case SYS_DVBC_ANNEX_C:
+>                         fepriv->min_delay = HZ / 20;
+>                         fepriv->step_size = c->symbol_rate / 16000;
+>                         fepriv->max_drift = c->symbol_rate / 2000;
+>                         break;
+> 
+> For terrestrial standards, it uses the stepsize:
+> 
+>                 case SYS_DVBT:
+>                 case SYS_DVBT2:
+>                 case SYS_ISDBT:
+>                 case SYS_DTMB:
+>                         fepriv->min_delay = HZ / 20;
+>                         fepriv->step_size = dvb_frontend_get_stepsize(fe) * 2;
+>                         fepriv->max_drift = (dvb_frontend_get_stepsize(fe) * 2)
 +
- /* ACPI table mapping after acpi_permanent_mmap is set */
- static inline void __iomem *acpi_os_ioremap(acpi_physical_address phys,
- 					    acpi_size size)
- {
-+	/* For normal memory we already have a cacheable mapping. */
-+	if (memblock_is_map_memory(phys))
-+		return (void __iomem *)__phys_to_virt(phys);
-+
- 	/*
--	 * EFI's reserve_regions() call adds memory with the WB attribute
--	 * to memblock via early_init_dt_add_memory_arch().
-+	 * We should still honor the memory's attribute here because
-+	 * crash dump kernel possibly excludes some ACPI (reclaim)
-+	 * regions from memblock list.
- 	 */
--	if (!memblock_is_memory(phys))
--		return ioremap(phys, size);
--
--	return ioremap_cache(phys, size);
-+	return __ioremap(phys, size, __acpi_get_mem_attribute(phys));
- }
- #define acpi_os_ioremap acpi_os_ioremap
- 
-@@ -129,7 +135,10 @@ static inline const char *acpi_get_enable_method(int cpu)
-  * for compatibility.
-  */
- #define acpi_disable_cmcff 1
--pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr);
-+static inline pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr)
-+{
-+	return __acpi_get_mem_attribute(addr);
-+}
- #endif /* CONFIG_ACPI_APEI */
- 
- #ifdef CONFIG_ACPI_NUMA
-diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-index 7b09487ff8fb..ed46dc188b22 100644
---- a/arch/arm64/kernel/acpi.c
-+++ b/arch/arm64/kernel/acpi.c
-@@ -18,6 +18,7 @@
- #include <linux/acpi.h>
- #include <linux/bootmem.h>
- #include <linux/cpumask.h>
-+#include <linux/efi.h>
- #include <linux/efi-bgrt.h>
- #include <linux/init.h>
- #include <linux/irq.h>
-@@ -29,13 +30,9 @@
- 
- #include <asm/cputype.h>
- #include <asm/cpu_ops.h>
-+#include <asm/pgtable.h>
- #include <asm/smp_plat.h>
- 
--#ifdef CONFIG_ACPI_APEI
--# include <linux/efi.h>
--# include <asm/pgtable.h>
--#endif
--
- int acpi_noirq = 1;		/* skip ACPI IRQ initialization */
- int acpi_disabled = 1;
- EXPORT_SYMBOL(acpi_disabled);
-@@ -239,8 +236,7 @@ void __init acpi_boot_table_init(void)
- 	}
- }
- 
--#ifdef CONFIG_ACPI_APEI
--pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr)
-+pgprot_t __acpi_get_mem_attribute(phys_addr_t addr)
- {
- 	/*
- 	 * According to "Table 8 Map: EFI memory types to AArch64 memory
-@@ -261,4 +257,3 @@ pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr)
- 		return __pgprot(PROT_NORMAL_NC);
- 	return __pgprot(PROT_DEVICE_nGnRnE);
- }
--#endif
--- 
-2.17.0
+> 1;
+>                         break;
+> 
+> So, having a value of 25 kHz there won't affect the zigzag algorithm
+> for ISDB-S, as it will be used only for ISDB-T.
+> 
+
+Thank you for checking and describing. I checked it too.
+
+Default value is fine as you said, and we can use get_tune_settings() 
+callback if we face the problem or need different settings for each 
+delivery systems in the future.
+
+        /* get frontend-specific tuning settings */
+        memset(&fetunesettings, 0, sizeof(struct dvb_frontend_tune_settings));
+        if (fe->ops.get_tune_settings && (fe->ops.get_tune_settings(fe,
+&fetunesettings) == 0)) {
+                fepriv->min_delay = (fetunesettings.min_delay_ms * HZ) / 1000;
+                fepriv->max_drift = fetunesettings.max_drift;
+                fepriv->step_size = fetunesettings.step_size;
+        } else {
+                /* default values */
+                ...
+
+
+> > > In the specific case of helene, it doesn't have a get_frontend_algo,
+> > > so it will use the step frequency.
+> > >
+> > > I'm not sure how to solve this issue. Maybe Abylay may shed a light
+> > > here, if helene does sigzag in hardware or not.
+> > >
+> >
+> > As far as I know, Helene does not have automatic scan mechanism in
+> > hardware.
+> 
+> Ok, so the driver is doing the right thing here.
+> 
+> > > If it does in hardware, you could add a get_frontend_algo() routine
+> > > at helene driver and return DVBFE_ALGO_HW. The tuning zigzag software
+> > > algorithm in the Kernel will stop, as it will rely at the hardware.
+> > >
+> > > Please notice that, if the hardware doesn't do zigzag itself, this
+> > > will make it lose channels. On the other hand, if the hardware does
+> > > have sigzag, changing to DVBFE_ALGO_HW will speedup tuning, as the
+> > > Kernel won't try to do sigzag itself.
+> > >
+> >
+> > ISDB-T uses 6MHz bandwidth per channel (in Japan), ISDB-S for
+> > BS/CS110 uses 38.36MHz bandwidth. Maybe 1MHz zigzag step is large for
+> > ISDB-T system and 25kHz is small for ISDB-S system.
+> 
+> Yeah, but, after double-checking the logic, for ISDB-S, it will
+> use:
+> 
+> 	c->symbol_rate = 28860000;
+> 	c->rolloff = ROLLOFF_35;
+> 	c->bandwidth_hz = c->symbol_rate / 100 * 135;
+> 
+> That would actually set the ISDB-S channel separation to 38.961 MHz.
+> 
+> By setting symbol_rate like that, the zigzag for ISDB-S will
+> be defined by:
+> 
+>        fepriv->step_size = c->symbol_rate / 16000; /* 38.961MHz / 16000 =
+.002435
+> - e. g. steps of ~25 kHz */
+>        fepriv->max_drift = c->symbol_rate / 2000;  /* 38.961MHz / 2000 =
+.0194805
+> - e. g. max drift of ~195 kHz */
+> 
+> Funny enough, it will be using about 25 kHz as step size for ISDB-S.
+> 
+> I have no idea if the ISDB-S standard defines the zigzag logic,
+> but I would be expecting a higher value for it. So, perhaps
+> the ISDB-S zigzag could be optimized.
+> 
+> Thanks,
+> Mauro
+
+Hmm, interesting. I don't know zigzag for ISDB-S too, sorry...
+
+Anyway, I don't worry about that. I said in above, we can use 
+get_tune_settings() for fine tuning.
+
+
+Regards,
+--
+Katsuhiro Suzuki
