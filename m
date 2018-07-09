@@ -1,38 +1,57 @@
-From: codrin.ciubotariu@microchip.com (Codrin Ciubotariu)
-Date: Mon, 9 Jul 2018 18:55:01 +0300
-Subject: [PATCH v5 2/5] clk: at91: add I2S clock mux driver
-In-Reply-To: <153090076533.143105.11588903392800697432@swboyd.mtv.corp.google.com>
-References: <20180618141239.10892-1-codrin.ciubotariu@microchip.com>
- <20180618141239.10892-3-codrin.ciubotariu@microchip.com>
- <153090076533.143105.11588903392800697432@swboyd.mtv.corp.google.com>
-Message-ID: <b7a379b3-0cfe-7a8e-fa13-3d152beb5e32@microchip.com>
+From: sean.wang@mediatek.com (sean.wang at mediatek.com)
+Date: Mon, 9 Jul 2018 23:57:00 +0800
+Subject: [PATCH v5 4/7] Bluetooth: Add new quirk for non-persistent setup
+ settings
+In-Reply-To: <cover.1531150733.git.sean.wang@mediatek.com>
+References: <cover.1531150733.git.sean.wang@mediatek.com>
+Message-ID: <4b188c8a508340598dda233f6d49a16c9ac8784e.1531150733.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06.07.2018 21:12, Stephen Boyd wrote:
-> Quoting Codrin Ciubotariu (2018-06-18 07:12:36)
->> This driver is a simple muxing driver that controls the
->> I2S's clock input by using syscon/regmap to change the parent.
->> The available inputs can be peripheral clock and generated clock.
->>
->> Signed-off-by: Codrin Ciubotariu <codrin.ciubotariu@microchip.com>
->> ---
-> 
-> Applied to clk-next
-> 
-> But I had to fix:
-> 
-> WARNING: Missing or malformed SPDX-License-Identifier tag in line 1
-> #56: FILE: drivers/clk/at91/clk-i2s-mux.c:1:
-> +/* SPDX-License-Identifier: GPL-2.0 */
-> 
-> so I did. Please run checkpatch next time.
-> 
+From: Sean Wang <sean.wang@mediatek.com>
 
-Sorry about that. I did run checkpatch, but I saw some files that 
-commented the License-Identifier the same way I did. Didn't notice back 
-then that were only the headers...
-Thank you for applying my patches.
+Add a new quirk HCI_QUIRK_NON_PERSISTENT_SETUP allowing that a quirk that
+runs setup() after every open() and not just after the first open().
 
-Best regards,
-Codrin
+Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+---
+ include/net/bluetooth/hci.h | 9 +++++++++
+ net/bluetooth/hci_core.c    | 3 ++-
+ 2 files changed, 11 insertions(+), 1 deletion(-)
+
+diff --git a/include/net/bluetooth/hci.h b/include/net/bluetooth/hci.h
+index 73e48be..d3ec5b2a8 100644
+--- a/include/net/bluetooth/hci.h
++++ b/include/net/bluetooth/hci.h
+@@ -183,6 +183,15 @@ enum {
+ 	 * during the hdev->setup vendor callback.
+ 	 */
+ 	HCI_QUIRK_NON_PERSISTENT_DIAG,
++
++	/* When this quirk is set, setup() would be run after every
++	 * open() and not just after the first open().
++	 *
++	 * This quirk can be set before hci_register_dev is called or
++	 * during the hdev->setup vendor callback.
++	 *
++	 */
++	HCI_QUIRK_NON_PERSISTENT_SETUP,
+ };
+ 
+ /* HCI device flags */
+diff --git a/net/bluetooth/hci_core.c b/net/bluetooth/hci_core.c
+index f5c21004..0111280 100644
+--- a/net/bluetooth/hci_core.c
++++ b/net/bluetooth/hci_core.c
+@@ -1396,7 +1396,8 @@ static int hci_dev_do_open(struct hci_dev *hdev)
+ 	atomic_set(&hdev->cmd_cnt, 1);
+ 	set_bit(HCI_INIT, &hdev->flags);
+ 
+-	if (hci_dev_test_flag(hdev, HCI_SETUP)) {
++	if (hci_dev_test_flag(hdev, HCI_SETUP) ||
++	    test_bit(HCI_QUIRK_NON_PERSISTENT_SETUP, &hdev->quirks)) {
+ 		hci_sock_dev_event(hdev, HCI_DEV_SETUP);
+ 
+ 		if (hdev->setup)
+-- 
+2.7.4
