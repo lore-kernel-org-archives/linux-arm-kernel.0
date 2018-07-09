@@ -1,43 +1,87 @@
-From: leo.yan@linaro.org (leo.yan at linaro.org)
-Date: Mon, 9 Jul 2018 07:26:17 +0800
-Subject: [PATCH] arm64: hikey960: update idle-states
-In-Reply-To: <948f033f-aef2-4d6c-170d-a1ff2113f258@linaro.org>
-References: <1530860246-29072-1-git-send-email-vincent.guittot@linaro.org>
- <20180708140157.GA28878@leoy-ThinkPad-X240s>
- <948f033f-aef2-4d6c-170d-a1ff2113f258@linaro.org>
-Message-ID: <20180708232617.GA21469@leoy-ThinkPad-X240s>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Mon,  9 Jul 2018 09:07:47 +0900
+Subject: [PATCH v3 0/3] arm64: kexec,
+ kdump: fix boot failures on acpi-only system
+Message-ID: <20180709000750.22172-1-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 08, 2018 at 11:15:22PM +0200, Daniel Lezcano wrote:
-> Hi Leo,
-> 
-> 
-> On 08/07/2018 16:01, leo.yan at linaro.org wrote:
-> 
-> [ ... ]
-> 
-> >> A simple test with a task waking up every 11,111ms shows improvement:
-> > 
-> > Should s/11,111ms/11.111ms ?
-> 
-> Actually the French notation is ',' for decimal :)
-> 
-> English and French are inverted.
-> 
-> For example one million is noted:
-> 
-> French  : 1.000.000 (or 1 000 000)
-> English : 1,000,000
-> 
-> And one milli is noted:
-> 
-> French  : 0,001
-> English : 0.001
-> 
-> :)
+This patch series is a set of bug fixes to address kexec/kdump
+failures which are sometimes observed on ACPI-only system and reported
+in LAK-ML before.
 
-Ah, interesting.  Thanks for explaination, Daniel. :)
+In short, the phenomena are:
+1. kexec'ed kernel can fail to boot because some ACPI table is corrupted
+   by a new kernel (or other data) being loaded into System RAM. Currently
+   kexec may possibly allocate space ignoring such "reserved" regions.
+   We will see no messages after "Bye!"
 
-Thanks,
-Leo Yan
+2. crash dump (kdump) kernel can fail to boot and get into panic due to
+   an alignment fault when accessing ACPI tables. This can happen because
+   those tables are not always properly aligned while they are mapped
+   non-cacheable (ioremap'ed) as they are not recognized as part of System
+   RAM under the current implementation.
+
+After discussing several possibilities to address those issues,
+the agreed approach, in my understanding, is
+* to add resource entries for every "reserved", i.e. memblock_reserve(),
+  regions to /proc/iomem.
+  (NOMAP regions, also marked as "reserved," remains at top-level for
+  backward compatibility. User-space can tell the difference between
+  reserved-system-ram and reserved-address-space.)
+* For case (1), user space (kexec-tools) should rule out such regions
+  in searching for free space for loaded data.
+* For case (2), the kernel should access ACPI tables by mapping
+  them with appropriate memory attributes described in UEFI memory map.
+  (This means that it doesn't require any changes in /proc/iomem, and
+  hence user space.)
+
+Please find past discussions about /proc/iomem in [1].
+--- more words from James ---
+Our attempts to fix this just in the kernel reached a dead end, because Kdump
+needs to include reserved-system-ram, whereas kexec has to avoid it. User-space
+needs to be able to tell reserved-system-ram and reserved-address-space apart.
+Hence we need to expose that information, and pick it up in user-space.
+
+Patched-kernel and unpatch-user-space will work the same way it does today, as
+the additional reserved regions are ignored by user-space.
+
+Unpatched-kernel and patched-user-space will also work the same way it does
+today as the additional reserved regions are missing.
+--->8---
+
+Patch#1 addresses kexec case, for which you are also required to update
+user space. See necessary patches in [2]. If you want to review Patch#1,
+please also take a look at and review [2].
+
+Patch#2 and #3 addresses kdump case. Ard's patch [4] needs to be applied
+preliminarily.
+
+
+Changes in v3 (2018, July 9, 2018)
+* drop the v2's patch#3, preferring [4]
+
+Changes in v2 (2018, June 19, 2018)
+* re-organise v1's patch#2 and #3 into v2's #2, #3 and #4
+  not to break bisect
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2018-March/565980.html
+[2] https://git.linaro.org/people/takahiro.akashi/kexec-tools.git arm64/resv_mem
+[3] http://lists.infradead.org/pipermail/linux-arm-kernel/2018-April/573655.html
+[4] https://marc.info/?l=linux-efi&m=152930773507524&w=2
+
+AKASHI Takahiro (2):
+  efi/arm: map UEFI memory map even w/o runtime services enabled
+  arm64: acpi: fix alignment fault in accessing ACPI
+
+James Morse (1):
+  arm64: export memblock_reserve()d regions via /proc/iomem
+
+ arch/arm64/include/asm/acpi.h      | 23 ++++++++++++------
+ arch/arm64/kernel/acpi.c           | 11 +++------
+ arch/arm64/kernel/setup.c          | 38 ++++++++++++++++++++++++++++++
+ drivers/firmware/efi/arm-runtime.c | 14 +++++------
+ 4 files changed, 64 insertions(+), 22 deletions(-)
+
+-- 
+2.17.0
