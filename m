@@ -1,148 +1,247 @@
-From: martin@lucina.net (Martin Lucina)
-Date: Mon, 9 Jul 2018 12:15:09 +0200
-Subject: [linux-sunxi] Re: [PATCH 05/10] arm64: dts: allwinner: a64:
- Olinuxino: enable USB
-In-Reply-To: <5b9a0818-b28e-76de-17b9-721c0950b64b@arm.com>
-References: <20180706085210.17952-1-andre.przywara@arm.com>
- <20180706085210.17952-6-andre.przywara@arm.com>
- <20180706150401.mhqse677vdqtxdzy@nodbug.lucina.net>
- <548f2eb5-b457-8fcd-c043-b897a447d96c@arm.com>
- <52713A44-E2BB-4388-A98F-D49AA3B6EAC3@aosc.io>
- <4b4d1662-4266-593c-79a9-39eea8fb668c@arm.com>
- <373C4D2E-E2CF-4AE9-9AC4-69AD4AF95AF4@aosc.io>
- <5b9a0818-b28e-76de-17b9-721c0950b64b@arm.com>
-Message-ID: <20180709101509.pg2p5kompy35hc3k@nodbug.lucina.net>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Mon, 9 Jul 2018 12:20:53 +0200
+Subject: [PATCH v4 1/1] arm64: dts: mediatek: add mt6765 support
+In-Reply-To: <1531116302-29921-2-git-send-email-mars.cheng@mediatek.com>
+References: <1531116302-29921-1-git-send-email-mars.cheng@mediatek.com>
+ <1531116302-29921-2-git-send-email-mars.cheng@mediatek.com>
+Message-ID: <7fb13f45-4e33-6efc-467b-c7256a40cbc9@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On Friday, 06.07.2018 at?17:17, Andre Przywara wrote:
-> Hi,
+
+On 09/07/18 08:05, Mars Cheng wrote:
+> This adds basic chip support for MT6765 SoC.
 > 
-> On 06/07/18 16:50, Icenowy Zheng wrote:
-> > 
-> > 
-> > ? 2018?7?6? GMT+08:00 ??11:46:08, Andre Przywara <andre.przywara@arm.com> ??:
-> >> Hi,
-> >>
-> >> On 06/07/18 16:36, Icenowy Zheng wrote:
-> >>>
-> >>>
-> >>> ? 2018?7?6? GMT+08:00 ??11:35:38, Andre Przywara
-> >> <andre.przywara@arm.com> ??:
-> >>>> Hi,
-> >>>>
-> >>>> On 06/07/18 16:04, Martin Lucina wrote:
-> >>>>> On Friday, 06.07.2018 at?09:52, Andre Przywara wrote:
-> >>>>>> The Olinuxino has two USB socket:
-> >>>>>> USB0 is connected to a micro B socket. As it has the ID pin wired,
-> >>>> we
-> >>>>>> describe it as a proper OTG socket, which switches between host
-> >> and
-> >>>>>> device automatically.
-> >>>>>> USB1 is connected to a normal USB A socket. PG9 enables the power
-> >>>> line,
-> >>>>>> so add the required regulator as well.
-> >>>>>>
-> >>>>>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> >>>>>> ---
-> >>>>>
-> >>>>> This is not sufficient. Booting with this change results in the
-> >>>> following
-> >>>>> in dmesg:
-> >>>>>
-> >>>>> musb-sunxi 1c19000.usb: Invalid or missing 'dr_mode' property
-> >>>>> musb-sunxi: probe of 1c19000.usb failed with error -22
-> >>>>> [...]
-> >>>>> usb0-vbus: disabling
-> >>>>>
-> >>>>> ... and neither of the USB ports work.
-> >>>>>
-> >>>>> Adding
-> >>>>>
-> >>>>>     dr_mode = "host";
-> >>>>
-> >>>> Argh, right, I remember you mentioned this before.
-> >>>> Still it should not affect the other USB port, and actually it is a
-> >>>> proper OTG port, so host is not right here. So this points to some
-> >>>> other
-> >>>> oddity or incorrect description. I need to go back to the schematics
-> >>>> and
-> >>>> our previous thread.
-> >>>
-> >>> OTG needs dr_mode = "otg"; and a ID pin.
-> >>
-> >> Yes, and we have the ID pin in the usbphy node.
-> >> Martin, can you please check if dr_mode = "otg"; works for you?
-> >>
-> >> Icenowy: still, how does it affect USB1? I mean, even if MUSB does not
-> >> initialise, it should leave the other host controller working? Is that
-> >> related to them sharing the usbphy? And this one gives up and tears
-> >> *everything* down, including the power for USB1?
-> > 
-> > You wrongly bound the regulator to USB0, not USB1.
+> Signed-off-by: Mars Cheng <mars.cheng@mediatek.com>
+> ---
+>  arch/arm64/boot/dts/mediatek/Makefile       |    1 +
+>  arch/arm64/boot/dts/mediatek/mt6765-evb.dts |   33 ++++++
+>  arch/arm64/boot/dts/mediatek/mt6765.dtsi    |  156 +++++++++++++++++++++++++++
+>  3 files changed, 190 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/mediatek/mt6765-evb.dts
+>  create mode 100644 arch/arm64/boot/dts/mediatek/mt6765.dtsi
 > 
-> Oh dear ...
+> diff --git a/arch/arm64/boot/dts/mediatek/Makefile b/arch/arm64/boot/dts/mediatek/Makefile
+> index ac17f60..7506b0d 100644
+> --- a/arch/arm64/boot/dts/mediatek/Makefile
+> +++ b/arch/arm64/boot/dts/mediatek/Makefile
+> @@ -1,6 +1,7 @@
+>  # SPDX-License-Identifier: GPL-2.0
+>  dtb-$(CONFIG_ARCH_MEDIATEK) += mt2712-evb.dtb
+>  dtb-$(CONFIG_ARCH_MEDIATEK) += mt6755-evb.dtb
+> +dtb-$(CONFIG_ARCH_MEDIATEK) += mt6765-evb.dtb
+>  dtb-$(CONFIG_ARCH_MEDIATEK) += mt6795-evb.dtb
+>  dtb-$(CONFIG_ARCH_MEDIATEK) += mt6797-evb.dtb
+>  dtb-$(CONFIG_ARCH_MEDIATEK) += mt7622-rfb1.dtb
+
+As you can see, we have a long list of SoCs which are poorly supported.
+I'm not very keen to just add another SoC which supports booting into a ramdisk
+using the serial console. Do you have a roadmap adding mainline support for this
+SoC?
+
+Regards,
+Matthias
+
+> diff --git a/arch/arm64/boot/dts/mediatek/mt6765-evb.dts b/arch/arm64/boot/dts/mediatek/mt6765-evb.dts
+> new file mode 100644
+> index 0000000..36dddff2
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/mediatek/mt6765-evb.dts
+> @@ -0,0 +1,33 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * dts file for Mediatek MT6765
+> + *
+> + * (C) Copyright 2018. Mediatek, Inc.
+> + *
+> + * Mars Cheng <mars.cheng@mediatek.com>
+> + */
+> +
+> +/dts-v1/;
+> +#include "mt6765.dtsi"
+> +
+> +/ {
+> +	model = "MediaTek MT6765 EVB";
+> +	compatible = "mediatek,mt6765-evb", "mediatek,mt6765";
+> +
+> +	aliases {
+> +		serial0 = &uart0;
+> +	};
+> +
+> +	memory at 40000000 {
+> +		device_type = "memory";
+> +		reg = <0 0x40000000 0 0x1e800000>;
+> +	};
+> +
+> +	chosen {
+> +		stdout-path = "serial0:921600n8";
+> +	};
+> +};
+> +
+> +&uart0 {
+> +	status = "okay";
+> +};
+> diff --git a/arch/arm64/boot/dts/mediatek/mt6765.dtsi b/arch/arm64/boot/dts/mediatek/mt6765.dtsi
+> new file mode 100644
+> index 0000000..cc365b1
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/mediatek/mt6765.dtsi
+> @@ -0,0 +1,156 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * dts file for Mediatek MT6765
+> + *
+> + * (C) Copyright 2018. Mediatek, Inc.
+> + *
+> + * Mars Cheng <mars.cheng@mediatek.com>
+> + */
+> +
+> +#include <dt-bindings/interrupt-controller/irq.h>
+> +#include <dt-bindings/interrupt-controller/arm-gic.h>
+> +
+> +/ {
+> +	compatible = "mediatek,mt6765";
+> +	interrupt-parent = <&sysirq>;
+> +	#address-cells = <2>;
+> +	#size-cells = <2>;
+> +
+> +	psci {
+> +		compatible = "arm,psci-0.2";
+> +		method = "smc";
+> +	};
+> +
+> +	cpus {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		cpu at 0 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a53";
+> +			enable-method = "psci";
+> +			reg = <0x000>;
+> +		};
+> +
+> +		cpu at 1 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a53";
+> +			enable-method = "psci";
+> +			reg = <0x001>;
+> +		};
+> +
+> +		cpu at 2 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a53";
+> +			enable-method = "psci";
+> +			reg = <0x002>;
+> +		};
+> +
+> +		cpu at 3 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a53";
+> +			enable-method = "psci";
+> +			reg = <0x003>;
+> +		};
+> +
+> +		cpu at 100 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a53";
+> +			enable-method = "psci";
+> +			reg = <0x100>;
+> +		};
+> +
+> +		cpu at 101 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a53";
+> +			enable-method = "psci";
+> +			reg = <0x101>;
+> +		};
+> +
+> +		cpu at 102 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a53";
+> +			enable-method = "psci";
+> +			reg = <0x102>;
+> +		};
+> +
+> +		cpu at 103 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a53";
+> +			enable-method = "psci";
+> +			reg = <0x103>;
+> +		};
+> +	};
+> +
+> +	baud_clk: dummy26m {
+> +		compatible = "fixed-clock";
+> +		clock-frequency = <26000000>;
+> +		#clock-cells = <0>;
+> +	};
+> +
+> +	sys_clk: dummyclk {
+> +		compatible = "fixed-clock";
+> +		clock-frequency = <26000000>;
+> +		#clock-cells = <0>;
+> +	};
+> +
+> +	timer {
+> +		compatible = "arm,armv8-timer";
+> +		interrupt-parent = <&gic>;
+> +		interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_LOW>,
+> +			     <GIC_PPI 14 IRQ_TYPE_LEVEL_LOW>,
+> +			     <GIC_PPI 11 IRQ_TYPE_LEVEL_LOW>,
+> +			     <GIC_PPI 10 IRQ_TYPE_LEVEL_LOW>;
+> +	};
+> +
+> +	soc {
+> +		#address-cells = <2>;
+> +		#size-cells = <2>;
+> +		compatible = "simple-bus";
+> +		ranges;
+> +
+> +		gic: interrupt-controller at c000000 {
+> +			compatible = "arm,gic-v3";
+> +			#interrupt-cells = <3>;
+> +			#address-cells = <2>;
+> +			#size-cells = <2>;
+> +			interrupt-parent = <&gic>;
+> +			interrupt-controller;
+> +			reg = <0 0x0c000000 0 0x40000>,  /* GICD */
+> +			      <0 0x0c100000 0 0x200000>, /* GICR */
+> +			      <0 0x0c400000 0 0x2000>,   /* GICC */
+> +			      <0 0x0c410000 0 0x2000>,   /* GICH */
+> +			      <0 0x0c420000 0 0x20000>;  /* GICV */
+> +			interrupts = <GIC_PPI 9 IRQ_TYPE_LEVEL_HIGH>;
+> +		};
+> +
+> +		sysirq: interrupt-controller at 10200a80 {
+> +			compatible = "mediatek,mt6765-sysirq",
+> +				     "mediatek,mt6577-sysirq";
+> +			interrupt-controller;
+> +			#interrupt-cells = <3>;
+> +			interrupt-parent = <&gic>;
+> +			reg = <0 0x10200a80 0 0x50>;
+> +		};
+> +
+> +		uart0: serial at 11002000 {
+> +			compatible = "mediatek,mt6765-uart",
+> +				     "mediatek,mt6577-uart";
+> +			reg = <0 0x11002000 0 0x400>;
+> +			interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_LOW>;
+> +			clocks = <&baud_clk>, <&sys_clk>;
+> +			clock-names = "baud", "bus";
+> +			status = "disabled";
+> +		};
+> +
+> +		uart1: serial at 11003000 {
+> +			compatible = "mediatek,mt6765-uart",
+> +				     "mediatek,mt6577-uart";
+> +			reg = <0 0x11003000 0 0x400>;
+> +			interrupts = <GIC_SPI 92 IRQ_TYPE_LEVEL_LOW>;
+> +			clocks = <&baud_clk>, <&sys_clk>;
+> +			clock-names = "baud", "bus";
+> +			status = "disabled";
+> +		};
+> +	}; /* end of soc */
+> +};
 > 
-> > USB0 regulator should be AXP's drivevbus if it's OTG in generic
-> > design based on AW reference.
-> 
-> Yes, it is.
-> So, like this?
-> 
-> --------------
-> 	reg_usb0_vbus: usb0-vbus { ....
-> 		(unchanged)
-> 	};
-> };
-> ....
-> &reg_drivevbus {
-> 	regulator-name = "usb0-vbus";
-> 	status = "okay";
-> };
-> 
-> &usb_otg {
-> 	dr_mode = "otg";
-> 	status = "okay";
-> };
-> 
-> &usbphy {
-> 	usb0_id_det-gpios = <&pio 7 9 GPIO_ACTIVE_HIGH>; /* PH9 */
-> 	usb0_vbus-supply = <&reg_drivevbus>;
-> 	usb1_vbus-supply = <&reg_usb0_vbus>;
-> };
-> --------------
-> 
-> Martin, can you please give this a try? (It's PH9, not PH6 as in the
-> original patch).
-
-I presume you mean all the above changes. This does not work, I see no USB
-busses apart from the kernel's internal ones:
-
-Bus 002 Device 001: ID 1d6b:0001 Linux Foundation 1.1 root hub
-Bus 001 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
-
-and dmesg mentions "usb0-vbus: disabling", but no other complaints I can
-see.
-
-For completeness, with your original patch, I have the following "lsusb"
-output (but non-working both ports):
-
-Bus 004 Device 001: ID 1d6b:0001 Linux Foundation 1.1 root hub
-Bus 003 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
-Bus 002 Device 001: ID 1d6b:0001 Linux Foundation 1.1 root hub
-Bus 001 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
-
-With the addition of "dr_mode = "host"", I have the following (and working
-ports):
-
-Bus 004 Device 001: ID 1d6b:0001 Linux Foundation 1.1 root hub
-Bus 003 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
-Bus 002 Device 001: ID 1d6b:0001 Linux Foundation 1.1 root hub
-Bus 001 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
-Bus 005 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
-
-Cheers,
-
-Martin
