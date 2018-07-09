@@ -1,65 +1,40 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon,  9 Jul 2018 09:52:32 +0200
-Subject: [PATCH 3/3 v4] ARM: defconfig: Enable the PL111 DRM driver on vexpress
-In-Reply-To: <20180709075232.30678-1-linus.walleij@linaro.org>
-References: <20180709075232.30678-1-linus.walleij@linaro.org>
-Message-ID: <20180709075232.30678-3-linus.walleij@linaro.org>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Mon, 9 Jul 2018 10:07:24 +0200
+Subject: [PATCH] drm/sun4i: fix build failure with CONFIG_DRM_SUN8I_MIXER=m
+In-Reply-To: <20180706124628.3192421-1-arnd@arndb.de>
+References: <20180706124628.3192421-1-arnd@arndb.de>
+Message-ID: <20180709080724.3ekqb45fsjubvhcm@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This updates the Versatile defconfig to use the new P111 DRM
-driver that is merged in the DRM subsystem.
+On Fri, Jul 06, 2018 at 02:45:53PM +0200, Arnd Bergmann wrote:
+> Having DRM_SUN4I built-in but DRM_SUN8I_MIXER as a loadable module results in
+> a link error, as we try to access a symbol from the sun8i_tcon_top.ko module:
+> 
+> ERROR: "sun8i_tcon_top_of_table" [drivers/gpu/drm/sun4i/sun8i-drm-hdmi.ko] undefined!
+> ERROR: "sun8i_tcon_top_of_table" [drivers/gpu/drm/sun4i/sun4i-drm.ko] undefined!
+> 
+> This solves the problem by making DRM_SUN8I_MIXER a 'bool' symbol, building
+> the sun8i_tcon_top module the same way as the core sun4i-drm module whenever
+> DRM_SUN8I_MIXER is enabled, or not building it at all otherwise.
+> 
+> Alternatively, we could always build sun8i_tcon_top.ko along with sun4-drm.ko
+> and detach it from the mixer module, I could not tell which way is more
+> appropriate here.
 
-We deactivate the old CLCD driver and activate the Pl111 DRM
-driver and the SiI9022 HDMI bridge.
+If that's easily doable, then yeah, that would be the preferred option
+I guess. Jernej? Chen-Yu? Any opinion on this?
 
-We activate DMA memory allocation using CMA so that the special
-graphics memory for the on-board CLCD can be used.
+Maxime
 
-Cc: Sudeep Holla <sudeep.holla@arm.com>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ChangeLog v3->v4:
-- Resending.
-ChangeLog v1->v3:
-- Rebased
----
- arch/arm/configs/vexpress_defconfig | 12 ++++++++----
- 1 file changed, 8 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/configs/vexpress_defconfig b/arch/arm/configs/vexpress_defconfig
-index 226fe4bfb487..392ed3b3613c 100644
---- a/arch/arm/configs/vexpress_defconfig
-+++ b/arch/arm/configs/vexpress_defconfig
-@@ -48,6 +48,7 @@ CONFIG_NET_9P=y
- CONFIG_NET_9P_VIRTIO=y
- CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
- CONFIG_DEVTMPFS=y
-+CONFIG_DMA_CMA=y
- CONFIG_MTD=y
- CONFIG_MTD_CMDLINE_PARTS=y
- CONFIG_MTD_BLOCK=y
-@@ -78,13 +79,16 @@ CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
- CONFIG_VIRTIO_CONSOLE=y
- CONFIG_HW_RANDOM=y
- CONFIG_HW_RANDOM_VIRTIO=y
--CONFIG_I2C=y
- CONFIG_I2C_VERSATILE=y
- CONFIG_SENSORS_VEXPRESS=y
- CONFIG_REGULATOR_VEXPRESS=y
--CONFIG_FB=y
--CONFIG_FB_ARMCLCD=y
--CONFIG_FRAMEBUFFER_CONSOLE=y
-+CONFIG_DRM=y
-+CONFIG_DRM_PANEL_SIMPLE=y
-+CONFIG_DRM_SII902X=y
-+CONFIG_DRM_PL111=y
-+CONFIG_FB_MODE_HELPERS=y
-+CONFIG_BACKLIGHT_LCD_SUPPORT=y
-+CONFIG_BACKLIGHT_CLASS_DEVICE=y
- CONFIG_LOGO=y
- # CONFIG_LOGO_LINUX_MONO is not set
- # CONFIG_LOGO_LINUX_VGA16 is not set
 -- 
-2.17.0
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180709/1dbcfbfc/attachment.sig>
