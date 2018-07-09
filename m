@@ -1,18 +1,16 @@
 From: amit.kucheria@linaro.org (Amit Kucheria)
-Date: Mon, 9 Jul 2018 16:56:51 +0530
+Date: Mon, 9 Jul 2018 16:57:29 +0530
 Subject: [PATCH v4 6/6] arm64: dts: sdm845: Add tsens nodes
-In-Reply-To: <20180703214822.GD129942@google.com>
+In-Reply-To: <153089827550.143105.2506072427444330254@swboyd.mtv.corp.google.com>
 References: <cover.1530533998.git.amit.kucheria@linaro.org>
  <a52b77ad84867774a0659f51ccb79b17ba7638ab.1530533998.git.amit.kucheria@linaro.org>
- <20180703214822.GD129942@google.com>
-Message-ID: <CAHLCerMZw8mftQb8iRc5+RqGGjf26ebwynPfORz0hAPxp05YfA@mail.gmail.com>
+ <153089827550.143105.2506072427444330254@swboyd.mtv.corp.google.com>
+Message-ID: <CAHLCerMDxhFkoK_yXznOi-ZnDskiD0-xtqEb9Pz5MRFTdbx1ew@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 4, 2018 at 3:18 AM, Matthias Kaehlcke <mka@chromium.org> wrote:
-> Hi,
->
-> On Mon, Jul 02, 2018 at 06:14:09PM +0530, Amit Kucheria wrote:
+On Fri, Jul 6, 2018 at 11:01 PM, Stephen Boyd <swboyd@chromium.org> wrote:
+> Quoting Amit Kucheria (2018-07-02 05:44:09)
 >> SDM845 has two tsens blocks, one with 13 sensors and the other with 8
 >> sensors.
 >>
@@ -26,46 +24,29 @@ On Wed, Jul 4, 2018 at 3:18 AM, Matthias Kaehlcke <mka@chromium.org> wrote:
 >> --- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
 >> +++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
 >> @@ -221,6 +221,22 @@
->>                       #interrupt-cells = <2>;
->>               };
+>>                         #interrupt-cells = <2>;
+>>                 };
 >>
->> +             tsens0: tsens at c222000 {
->> +                     compatible = "qcom,tsens-v2.4.0", "qcom,tsens-v2";
->> +                     reg = <0xc263000 0x1ff>, /* TM */
->> +                           <0xc222000 0x1ff>; /* SROT */
->> +                     #qcom,sensors = <13>;
->> +                     #thermal-sensor-cells = <1>;
->> +             };
+>> +               tsens0: tsens at c222000 {
+>
+> These unit addresses should match the first reg property, not the second
+> one.
+
+Fixed in v5. Thanks.
+
+>> +                       compatible = "qcom,tsens-v2.4.0", "qcom,tsens-v2";
+>> +                       reg = <0xc263000 0x1ff>, /* TM */
+>> +                             <0xc222000 0x1ff>; /* SROT */
+>> +                       #qcom,sensors = <13>;
+>> +                       #thermal-sensor-cells = <1>;
+>> +               };
 >> +
->> +             tsens1: tsens at c223000 {
->> +                     compatible = "qcom,tsens-v2.4.0", "qcom,tsens-v2";
->> +                     reg = <0xc265000 0x1ff>, /* TM */
->> +                           <0xc223000 0x1ff>; /* SROT */
->> +                     #qcom,sensors = <8>;
->> +                     #thermal-sensor-cells = <1>;
->> +             };
->> +
->>               spmi_bus: spmi at c440000 {
->>                       compatible = "qcom,spmi-pmic-arb";
->>                       reg = <0xc440000 0x1100>,
->
-> I tested this series on an SDM845 board. Temperatures can be read from
-> the tsens0 sensors, however for tsens1 sensors I get:
->
-> cat temp
-> cat: temp: No data available
->
-> TRDY_READY_BIT set when reading TRDY_OFFSET in get_temp_tsens_v2().
-> Unfortunately I currently have no documentation of the registers or the
-> thermal sensors in general and couldn't investigate further.
->
-> Any idea what could be the problem?
-
-Strangely enough, I'm seeing this now after rebuilding my integration
-branch to test some other bits.
-
-I've sent another version with this patch removed while I investigate
-this. Could you check if you're able to read all 8 sensors with v5?
-
-Regards,
-Amit
+>> +               tsens1: tsens at c223000 {
+>> +                       compatible = "qcom,tsens-v2.4.0", "qcom,tsens-v2";
+>> +                       reg = <0xc265000 0x1ff>, /* TM */
+>> +                             <0xc223000 0x1ff>; /* SROT */
+>> +                       #qcom,sensors = <8>;
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
