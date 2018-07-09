@@ -1,57 +1,40 @@
 From: clabbe@baylibre.com (Corentin Labbe)
-Date: Mon,  9 Jul 2018 15:20:58 +0000
-Subject: [PATCH v2 4/4] ARM: dts: sun8i: sun8i-r40-bananapi-m2-ultra: enable
- AHCI
+Date: Mon,  9 Jul 2018 15:20:57 +0000
+Subject: [PATCH v2 3/4] ARM: dts: sun8i: r40: add sata node
 In-Reply-To: <1531149658-27030-1-git-send-email-clabbe@baylibre.com>
 References: <1531149658-27030-1-git-send-email-clabbe@baylibre.com>
-Message-ID: <1531149658-27030-5-git-send-email-clabbe@baylibre.com>
+Message-ID: <1531149658-27030-4-git-send-email-clabbe@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enable the AHCI controller.
-Since this controller need two regulator, this patch add them.
+R40 have a sata controller which is the same as A20.
+This patch adds a DT node for it.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 Signed-off-by: Corentin Labbe <clabbe@baylibre.com>
 ---
- arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+ arch/arm/boot/dts/sun8i-r40.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts b/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
-index 4f3d583183dc..ceb38739f1d8 100644
---- a/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
-+++ b/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
-@@ -105,6 +105,12 @@
- 	};
- };
+diff --git a/arch/arm/boot/dts/sun8i-r40.dtsi b/arch/arm/boot/dts/sun8i-r40.dtsi
+index e366b76b47ce..df5b90faca59 100644
+--- a/arch/arm/boot/dts/sun8i-r40.dtsi
++++ b/arch/arm/boot/dts/sun8i-r40.dtsi
+@@ -551,6 +551,15 @@
+ 			#size-cells = <0>;
+ 		};
  
-+&ahci {
-+	vdd1v2-supply = <&reg_dldo4>;
-+	vdd2v5-supply = <&reg_eldo3>;
-+	status = "okay";
-+};
++		ahci: sata at 1c18000 {
++			compatible = "allwinner,sun8i-r40-ahci";
++			reg = <0x01c18000 0x1000>;
++			interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_SATA>, <&ccu CLK_SATA>;
++			resets = <&ccu RST_BUS_SATA>;
++			status = "disabled";
++		};
 +
- &de {
- 	status = "okay";
- };
-@@ -251,6 +257,18 @@
- 	regulator-name = "vcc-wifi";
- };
- 
-+&reg_dldo4 {
-+	regulator-min-microvolt = <2500000>;
-+	regulator-max-microvolt = <2500000>;
-+	regulator-name = "vdd2v5-sata";
-+};
-+
-+&reg_eldo3 {
-+	regulator-min-microvolt = <1200000>;
-+	regulator-max-microvolt = <1200000>;
-+	regulator-name = "vdd1v2-sata";
-+};
-+
- &tcon_top_hdmi_in_tcon_tv0 {
- 	remote-endpoint = <&tcon_tv0_out_tcon_top>;
- };
+ 		gmac: ethernet at 1c50000 {
+ 			compatible = "allwinner,sun8i-r40-gmac";
+ 			syscon = <&ccu>;
 -- 
 2.16.4
