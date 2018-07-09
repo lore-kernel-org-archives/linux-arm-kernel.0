@@ -1,18 +1,69 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Mon, 09 Jul 2018 07:58:42 -0700
-Subject: [PATCH 3/3] clk: meson-g12a: Add EE Clock controller driver
-In-Reply-To: <1531134767-29927-4-git-send-email-jian.hu@amlogic.com>
-References: <1531134767-29927-1-git-send-email-jian.hu@amlogic.com>
- <1531134767-29927-4-git-send-email-jian.hu@amlogic.com>
-Message-ID: <153114832204.143105.10370402875563713577@swboyd.mtv.corp.google.com>
+From: leonard.crestez@nxp.com (Leonard Crestez)
+Date: Mon, 9 Jul 2018 14:59:33 +0000
+Subject: [PATCH 2/2] PCI: imx: Initial imx7d pm support
+In-Reply-To: <1530607328.22468.102.camel@pengutronix.de>
+References: <cover.1527621510.git.leonard.crestez@nxp.com>
+ <a6176c8bcfbca08ce4e93e304bdcd48c4600f8e2.1527621510.git.leonard.crestez@nxp.com>
+ <1528468422.26356.20.camel@pengutronix.de>
+ <02207512447db4585a4e879e2a059ba223d57dbe.camel@nxp.com>
+ <1530607328.22468.102.camel@pengutronix.de>
+Message-ID: <e36fac6f4907288c58a7dfa112541e73de957d46.camel@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Jian Hu (2018-07-09 04:12:47)
-> Add a Clock driver for the Everyting-Else part
-
-Everything instead of Everyting?
-
-> of the Amlogic Meson-G12A SoC.
+On Tue, 2018-07-03 at 10:42 +0200, Lucas Stach wrote:
+> Am Montag, den 02.07.2018, 17:18 +0000 schrieb Leonard Crestez:
+> > On Fri, 2018-06-08 at 16:33 +0200, Lucas Stach wrote:
+> > > Am Dienstag, den 29.05.2018, 22:39 +0300 schrieb Leonard Crestez:
+> > > > On imx7d the phy is turned off in suspend and must be reset on resume.
+> > > > Right now lspci -v fails after a suspend/resume cycle, fix this by
+> > > > adding minimal suspend/resume code from the nxp vendor tree.
+> > > > 
+> > > > This is currently only enabled for imx7 but the same sequence can be
+> > > > applied to other imx pcie variants.
+> > > > +#ifdef CONFIG_PM_SLEEP
+> > 
+> > Another issue that should be discussed here is that on 6sx and 7d the
+> > gpc PCIE power domain is not defined correctly: the PCIE block is in
+> > the DISPMIX domain on both SOCs and it is only PCIE_PHY which has a
+> > separate power domain.
+> > 
+> > This matters: enabling power-gating for displays will break pcie if
+> > this relationship is not taken into account. Here are some options:
+> > 
+> > 1) Make &pd_pcie a child of &pd_disp by hacking into gpc probe
+> > functions and calling pm_genpd_add_subdomain. Not very nice.
+> > 
+> > 2) Support nesting PGCs in GPC code? Lots of code and still an
+> > incorrect representation of hardware.
+> > 
+> > 3) Set power-domains = <&pd_disp> and enable runtime PM on &pd_pcie?
+> > 
+> > 4) Add separate devices for the pcie-phy. These would be mostly empty
+> > but still different, for example on imx6sx the PHY is not even
+> > accessible on the bus but only though PCIE registers.
 > 
-> Signed-off-by: Jian Hu <jian.hu@amlogic.com>
+> 5) Take a look at the linux-pm list. ;) The power domain framework has
+> just gained support for multiple power domains per device. I think that
+>  is the right solution for this, as like you mentioned the PHY isn't
+> really a separate block on i.MX6, but part of the PCIe controller
+> device.
+
+Yes, I noticed that earlier but not that it was merged recently. It is
+a better solution.
+
+Unfortunately the multiple power-domain code seems to require devices
+to explicitly fetch references to the power domains and manipulate
+them. As far as I can tell this means that every device using multiple
+power domains has to be modified to do so. In this particular case it
+would be useful to just have all power domains turned on before probe,
+just like when a single power-domain is specified:
+
+    power-domains = <&pd_pci>, <&pd_disp>;
+
+But this issue is not strictly related to imx7d pci hanging on
+suspend/resume, it can be dealt with later.
+
+--
+Regards,
+Leonard
