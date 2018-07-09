@@ -1,88 +1,61 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 9 Jul 2018 15:23:08 -0300
-Subject: [PATCH v2 2/2] ARM: imx51: Configure M4IF to avoid visual
- artifacts
-In-Reply-To: <1531160355-12384-3-git-send-email-festevam@gmail.com>
-References: <1531160355-12384-1-git-send-email-festevam@gmail.com>
- <1531160355-12384-3-git-send-email-festevam@gmail.com>
-Message-ID: <CAOMZO5BibegcNaY0a78_m3Rd8=TuCx+NTL7jX_h1TL20rRb7hA@mail.gmail.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Mon, 9 Jul 2018 11:24:01 -0700
+Subject: [PATCH 1/2] Revert "tick: Prefer a lower rating device only if
+ it's CPU local device"
+In-Reply-To: <1531151136-18297-1-git-send-email-sudeep.holla@arm.com>
+References: <1531151136-18297-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <CAOi56cWaeh+c9+OgpxdjTarnRdaKrNFC=ddBPT2j9v1rHT8EOg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+On Mon, Jul 9, 2018 at 8:45 AM Sudeep Holla <sudeep.holla@arm.com> wrote:
+>
+> This reverts commit 1332a90558013ae4242e3dd7934bdcdeafb06c0d.
+>
+> The original issue was not because of incorrect checking of cpumask for
+> both new and old tick device. It was incorrectly analysed was due to the
+> misunderstanding of the comment and misinterpretation of the return
+> value from tick_check_preferred. The main issue is with the clockevent
+> driver that sets the cpumask to cpu_all_mask instead of cpu_possible_mask.
+>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 
-Subject here should be [PATCH v2 3/3], sorry.
+Tested-by: Kevin Hilman <khilman@baylibre.com>
 
-On Mon, Jul 9, 2018 at 3:19 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> From: Fabio Estevam <fabio.estevam@nxp.com>
->
-> Configure the M4IF registers as per the vendor bootloader
-> to avoid visual artifacts during video playback.
->
-> This way we don't need to rely on the bootloader configuration for
-> optimal IPU/VPU bus priorities.
->
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
-> Tested-by: Sergey Lapin <sergey.lapin@cogentembedded.com>
-> Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
+And verified to fix a regression on the 32-bit ARM platform mesion8b-odroidc1.
+
+Thanks,
+
+Kevin
+
+
 > ---
-> Changes since v1:
-> - None
+>  kernel/time/tick-common.c | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
 >
->  arch/arm/mach-imx/mach-imx51.c | 29 ++++++++++++++++++++++++++++-
->  1 file changed, 28 insertions(+), 1 deletion(-)
+> Hi Thomas,
 >
-> diff --git a/arch/arm/mach-imx/mach-imx51.c b/arch/arm/mach-imx/mach-imx51.c
-> index 3835b6a..37ffdfa 100644
-> --- a/arch/arm/mach-imx/mach-imx51.c
-> +++ b/arch/arm/mach-imx/mach-imx51.c
-> @@ -12,6 +12,7 @@
+> As mentioned in the other thread, this needs to be reverted. Sorry for
+> the misunderstanding the original issue and producing wrong fix.
 >
->  #include <linux/io.h>
->  #include <linux/irq.h>
-> +#include <linux/of_address.h>
->  #include <linux/of_irq.h>
->  #include <linux/of_platform.h>
->  #include <asm/mach/arch.h>
-> @@ -48,11 +49,37 @@ static void __init imx51_ipu_mipi_setup(void)
->         iounmap(hsc_addr);
+> Regards,
+> Sudeep
+>
+> diff --git a/kernel/time/tick-common.c b/kernel/time/tick-common.c
+> index b7005dd21ec1..14de3727b18e 100644
+> --- a/kernel/time/tick-common.c
+> +++ b/kernel/time/tick-common.c
+> @@ -277,8 +277,7 @@ static bool tick_check_preferred(struct clock_event_device *curdev,
+>          */
+>         return !curdev ||
+>                 newdev->rating > curdev->rating ||
+> -              (!cpumask_equal(curdev->cpumask, newdev->cpumask) &&
+> -               !tick_check_percpu(curdev, newdev, smp_processor_id()));
+> +              !cpumask_equal(curdev->cpumask, newdev->cpumask);
 >  }
 >
-> +static void __init imx51_m4if_setup(void)
-> +{
-> +       void __iomem *m4if_base;
-> +       struct device_node *np;
-> +
-> +       np = of_find_compatible_node(NULL, NULL, "fsl,imx51-m4if");
-> +       if (!np)
-> +               return;
-> +
-> +       m4if_base = of_iomap(np, 0);
-> +       if (!m4if_base) {
-> +               pr_err("Unable to map M4IF registers\n");
-> +               return;
-> +       }
-> +
-> +       /*
-> +        * Configure VPU and IPU with higher priorities
-> +        * in order to avoid artifacts during video playback
-> +        */
-> +       writel_relaxed(0x00000203, m4if_base + 0x40);
-> +       writel_relaxed(0x00000000, m4if_base + 0x44);
-> +       writel_relaxed(0x00120125, m4if_base + 0x9c);
-> +       writel_relaxed(0x001901A3, m4if_base + 0x48);
-> +       iounmap(m4if_base);
-> +}
-> +
->  static void __init imx51_dt_init(void)
->  {
->         imx51_ipu_mipi_setup();
->         imx_src_init();
-> -
-> +       imx51_m4if_setup();
->         imx_aips_allow_unprivileged_access("fsl,imx51-aipstz");
->  }
->
+>  /*
 > --
 > 2.7.4
 >
