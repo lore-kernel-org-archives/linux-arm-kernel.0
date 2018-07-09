@@ -1,7 +1,9 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon,  9 Jul 2018 08:30:30 -0700
-Subject: [GIT PULL 1/6] Broadcom defconfig changes for 4.19
-Message-ID: <20180709153035.6376-1-f.fainelli@gmail.com>
+Date: Mon,  9 Jul 2018 08:30:35 -0700
+Subject: [GIT PULL 6/6] Broadcom soc changes for 4.19
+In-Reply-To: <20180709153035.6376-1-f.fainelli@gmail.com>
+References: <20180709153035.6376-1-f.fainelli@gmail.com>
+Message-ID: <20180709153035.6376-6-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,27 +13,24 @@ The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
 
 are available in the git repository at:
 
-  https://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.19/defconfig
+  https://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.19/soc
 
-for you to fetch changes up to b0ba9fad81e419f85829c2a6925110d9714dd708:
+for you to fetch changes up to f3f49e42c119f6fc7cd06ddae495915cf9f65654:
 
-  Merge tag 'bcm2835-defconfig-next-2018-07-03' into defconfig/next (2018-07-09 05:23:16 -0700)
-
-----------------------------------------------------------------
-This pull request contains Broadcom ARM-based SoCs defconfig updates
-for 4.19, please pull the following:
-
-- Stefan enables the Raspberry Pi voltage sensor driver (HWMON) in both
-  multi_v7_defconfig and bcm2835_defconfig
+  ARM: debug: fix BCM2836 order entry (2018-06-18 09:30:14 -0700)
 
 ----------------------------------------------------------------
-Florian Fainelli (1):
-      Merge tag 'bcm2835-defconfig-next-2018-07-03' into defconfig/next
+This pull request contains Broadcom ARM-based SoCs platform changes for
+4.19, please pull the following:
 
-Stefan Wahren (2):
-      ARM: bcm2835_defconfig: Enable RPi voltage sensor
-      ARM: multi_v7_defconfig: Enable RPi voltage sensor
+- Clement re-orders the UART debug entries to be in ascending order and
+  he also adds the iProc UART3 debug address since that is a common
+  location for iProc based designs.
 
- arch/arm/configs/bcm2835_defconfig  | 2 +-
- arch/arm/configs/multi_v7_defconfig | 1 +
- 2 files changed, 2 insertions(+), 1 deletion(-)
+----------------------------------------------------------------
+Cl?ment Peron (2):
+      ARM: debug: Add iProc UART3 debug addresses
+      ARM: debug: fix BCM2836 order entry
+
+ arch/arm/Kconfig.debug | 14 ++++++++++++--
+ 1 file changed, 12 insertions(+), 2 deletions(-)
