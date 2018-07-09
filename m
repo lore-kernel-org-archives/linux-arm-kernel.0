@@ -1,88 +1,90 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 9 Jul 2018 16:52:01 +0100
-Subject: [PATCH v4 1/6] driver core: allow stopping deferred probe after
- init
-In-Reply-To: <20180709154153.15742-2-robh@kernel.org>
-References: <20180709154153.15742-1-robh@kernel.org>
- <20180709154153.15742-2-robh@kernel.org>
-Message-ID: <20180709155201.GG17271@n2100.armlinux.org.uk>
+From: keescook@chromium.org (Kees Cook)
+Date: Mon, 9 Jul 2018 08:53:40 -0700
+Subject: [PATCH] KVM: arm64: vgic-its: Remove VLA usage
+In-Reply-To: <f213e03a-66a6-0c07-7bb8-2061b9c24731@arm.com>
+References: <20180629184618.GA37364@beast>
+ <19f9ddb1-6009-850c-1949-3a8cdacdd2fc@redhat.com>
+ <CAGXu5jJcqMX7HjvgqcR37jnuN48PtyHd+VVmfcQH6YfXXSpO_g@mail.gmail.com>
+ <f213e03a-66a6-0c07-7bb8-2061b9c24731@arm.com>
+Message-ID: <CAGXu5jLXQ2ZQ8mCfcKC6F7DMzbvP7MvArcacouVaX=WS9=7LPQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 09, 2018 at 09:41:48AM -0600, Rob Herring wrote:
-> Deferred probe will currently wait forever on dependent devices to probe,
-> but sometimes a driver will never exist. It's also not always critical for
-> a driver to exist. Platforms can rely on default configuration from the
-> bootloader or reset defaults for things such as pinctrl and power domains.
-> This is often the case with initial platform support until various drivers
-> get enabled. There's at least 2 scenarios where deferred probe can render
-> a platform broken. Both involve using a DT which has more devices and
-> dependencies than the kernel supports. The 1st case is a driver may be
-> disabled in the kernel config. The 2nd case is the kernel version may
-> simply not have the dependent driver. This can happen if using a newer DT
-> (provided by firmware perhaps) with a stable kernel version. Deferred
-> probe issues can be difficult to debug especially if the console has
-> dependencies or userspace fails to boot to a shell.
-> 
-> There are also cases like IOMMUs where only built-in drivers are
-> supported, so deferring probe after initcalls is not needed. The IOMMU
-> subsystem implemented its own mechanism to handle this using OF_DECLARE
-> linker sections.
-> 
-> This commit adds makes ending deferred probe conditional on initcalls
-> being completed or a debug timeout. Subsystems or drivers may opt-in by
-> calling driver_deferred_probe_check_init_done() instead of
-> unconditionally returning -EPROBE_DEFER. They may use additional
-> information from DT or kernel's config to decide whether to continue to
-> defer probe or not.
-> 
-> The timeout mechanism is intended for debug purposes and WARNs loudly.
-> The remaining deferred probe pending list will also be dumped after the
-> timeout. Not that this timeout won't work for the console which needs
-> to be enabled before userspace starts. However, if the console's
-> dependencies are resolved, then the kernel log will be printed (as
-> opposed to no output).
+On Mon, Jul 9, 2018 at 3:47 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> Hi kees,
+>
+> On 02/07/18 18:15, Kees Cook wrote:
+>> On Mon, Jul 2, 2018 at 12:36 AM, Auger Eric <eric.auger@redhat.com> wrote:
+>>> Hi Kees,
+>>>
+>>> On 06/29/2018 08:46 PM, Kees Cook wrote:
+>>>> In the quest to remove all stack VLA usage from the kernel[1], this
+>>>> switches to using a maximum size and adds sanity checks. Additionally
+>>>> cleans up some of the int-vs-u32 usage and adds additional bounds checking.
+>>>> As it currently stands, this will always be 8 bytes until the ABI changes.
+>>>>
+>>>> [1] https://lkml.kernel.org/r/CA+55aFzCG-zNmZwX4A2FQpadafLfEzK6CC=qPXydAacU1RqZWA at mail.gmail.com
+>>>>
+>>>> Cc: Christoffer Dall <christoffer.dall@arm.com>
+>>>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>>>> Cc: Eric Auger <eric.auger@redhat.com>
+>>>> Cc: Andre Przywara <andre.przywara@arm.com>
+>>>> Cc: linux-arm-kernel at lists.infradead.org
+>>>> Cc: kvmarm at lists.cs.columbia.edu
+>>>> Signed-off-by: Kees Cook <keescook@chromium.org>
+>>>> ---
+>>>>  virt/kvm/arm/vgic/vgic-its.c | 19 +++++++++++++++----
+>>>>  1 file changed, 15 insertions(+), 4 deletions(-)
+>>>>
+>>>> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+>>>> index 4ed79c939fb4..3143fc047fcf 100644
+>>>> --- a/virt/kvm/arm/vgic/vgic-its.c
+>>>> +++ b/virt/kvm/arm/vgic/vgic-its.c
+>>>> @@ -168,8 +168,14 @@ struct vgic_its_abi {
+>>>>       int (*commit)(struct vgic_its *its);
+>>>>  };
+>>>>
+>>>> +#define ABI_0_ESZ    8
+>>>> +#define ESZ_MAX              ABI_0_ESZ
+>>>> +
+>>>>  static const struct vgic_its_abi its_table_abi_versions[] = {
+>>>> -     [0] = {.cte_esz = 8, .dte_esz = 8, .ite_esz = 8,
+>>>> +     [0] = {
+>>>> +      .cte_esz = ABI_0_ESZ,
+>>>> +      .dte_esz = ABI_0_ESZ,
+>>>> +      .ite_esz = ABI_0_ESZ,
+>>>>        .save_tables = vgic_its_save_tables_v0,
+>>>>        .restore_tables = vgic_its_restore_tables_v0,
+>>>>        .commit = vgic_its_commit_v0,
+>>>> @@ -180,10 +186,12 @@ static const struct vgic_its_abi its_table_abi_versions[] = {
+>>>>
+>>>>  inline const struct vgic_its_abi *vgic_its_get_abi(struct vgic_its *its)
+>>>>  {
+>>>> +     if (WARN_ON(its->abi_rev >= NR_ITS_ABIS))
+>>>> +             return NULL;
+>>>>       return &its_table_abi_versions[its->abi_rev];
+>>>>  }
+>>>>
+>>>> -int vgic_its_set_abi(struct vgic_its *its, int rev)
+>>>> +static int vgic_its_set_abi(struct vgic_its *its, u32 rev)
+>>>>  {
+>>> if vgic_its_get_abi is likely to return NULL, don't we need to check abi
+>>> != NULL in all call sites.
+>>
+>> My thinking was that since it should never happen, a WARN_ON would be
+>> sufficient. But I can drop all these changes if you want. I just
+>> wanted to see the VLA removed. :)
+>
+> Are you going to respin this patch limiting it to just the VLA changes?
+> I'm actively queuing stuff for the next merge window, and it'd be good
+> to get that one in.
+>
+> Alternatively, I can drop the WARN_ONs myself. Just let me know.
 
-So what happens if we have a set of modules which use deferred probing
-in order to work?
+If you can just drop them that would be best, thanks!
 
-For example, with sound stuff built as modules, and auto-loaded in
-parallel by udev, the modules get added in a random order.  The
-modules have non-udev obvious dependencies between them (resource
-dependencies) which result in deferred probing being necessary to
-bring the device up.
-
-Eg,
-
-snd_soc_kirkwood_spdif module declares the ASoC card.
-snd_soc_spdif_tx is a codec as a loadable module.
-snd_soc_kirkwood is the CPU digital audio interface module.
-
-What I commonly see is this module load order:
-
-snd_soc_kirkwood_spdif, then snd_soc_kirkwood and then snd_soc_spdif_tx.
-
-This results at boot in:
-
-kirkwood-spdif-audio audio-subsystem: ASoC: CPU DAI kirkwood-fe not registered
-kirkwood-spdif-audio audio-subsystem: ASoC: CPU DAI kirkwood-fe not registered
-kirkwood-spdif-audio audio-subsystem: ASoC: CPU DAI kirkwood-fe not registered
-kirkwood-spdif-audio audio-subsystem: ASoC: CPU DAI kirkwood-fe not registered
-kirkwood-spdif-audio audio-subsystem: ASoC: CPU DAI kirkwood-fe not registered
-kirkwood-spdif-audio audio-subsystem: ASoC: CODEC DAI dit-hifi not registered
-kirkwood-spdif-audio audio-subsystem: ASoC: CODEC DAI dit-hifi not registered
-kirkwood-spdif-audio audio-subsystem: snd-soc-dummy-dai <-> kirkwood-fe mapping ok
-kirkwood-spdif-audio audio-subsystem: multicodec <-> kirkwood-spdif mapping ok
-
-at boot, where most of these are deferred probe attempts.
-
-So, disabling deferred probing after all the kernel-internal initcalls
-are run is wrong.  You can have deferred probing required due to
-external modules, and this can kick in at any time (think about
-hot-pluggable hardware with a driver that's somehow componentised,
-like an audio device...)
+-Kees
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
-According to speedtest.net: 13Mbps down 490kbps up
+Kees Cook
+Pixel Security
