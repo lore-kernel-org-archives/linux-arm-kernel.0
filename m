@@ -1,40 +1,109 @@
-From: clabbe@baylibre.com (Corentin Labbe)
-Date: Mon,  9 Jul 2018 19:51:54 +0000
-Subject: [PATCH] ARM: dts: sun8i: sun8i-a83t-bananapi-m3: enhance vcc-pd to
- 3.3v
-Message-ID: <1531165914-29760-1-git-send-email-clabbe@baylibre.com>
+From: mathieu.desnoyers@efficios.com (Mathieu Desnoyers)
+Date: Mon,  9 Jul 2018 15:51:51 -0400
+Subject: [PATCH for 4.18 2/6] rseq: use get_user/put_user rather than
+ __get_user/__put_user
+In-Reply-To: <20180709195155.7654-1-mathieu.desnoyers@efficios.com>
+References: <20180709195155.7654-1-mathieu.desnoyers@efficios.com>
+Message-ID: <20180709195155.7654-3-mathieu.desnoyers@efficios.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since commit d7c5f6863550 ("ARM: dts: sun8i: a83t: bananapi-m3: Add AXP813 regulator nodes")
-my BPIM3 no longer works at gigabit speed.
+__get_user()/__put_user() is used to read values for address ranges that
+were already checked with access_ok() on rseq registration.
 
-With the default setting, dldo3 is regulated at 2.9v which seems
-sufficient for the PHy but d7c5f6863550 drop it to 2.5 which is insufficient.
-Note that this behaviour is random for all BPIM3 (some works with 2.5, some not)
+It has been recognized that __get_user/__put_user are optimizing the
+wrong thing. Replace them by get_user/put_user across rseq instead.
 
-Finnaly, someone from bananapi confirmed that this regulator must be set to 3.3
+If those end up showing up in benchmarks, the proper approach would be to
+use user_access_begin() / unsafe_{get,put}_user() / user_access_end()
+anyway.
 
-Fixes: d7c5f6863550 ("ARM: dts: sun8i: a83t: bananapi-m3: Add AXP813 regulator nodes")
-Signed-off-by: Corentin Labbe <clabbe@baylibre.com>
+Signed-off-by: Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+CC: Thomas Gleixner <tglx@linutronix.de>
+Cc: Joel Fernandes <joelaf@google.com>
+Cc: Peter Zijlstra <peterz@infradead.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Dave Watson <davejwatson@fb.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Andi Kleen <andi@firstfloor.org>
+Cc: "H . Peter Anvin" <hpa@zytor.com>
+Cc: Chris Lameter <cl@linux.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Michael Kerrisk <mtk.manpages@gmail.com>
+Cc: "Paul E . McKenney" <paulmck@linux.vnet.ibm.com>
+Cc: Paul Turner <pjt@google.com>
+Cc: Boqun Feng <boqun.feng@gmail.com>
+Cc: Josh Triplett <josh@joshtriplett.org>
+Cc: Steven Rostedt <rostedt@goodmis.org>
+Cc: Ben Maurer <bmaurer@fb.com>
+Cc: linux-api at vger.kernel.org
+CC: linux-arm-kernel at lists.infradead.org
+Cc: Andy Lutomirski <luto@amacapital.net>
+Cc: Andrew Morton <akpm@linux-foundation.org>
+Cc: Linus Torvalds <torvalds@linux-foundation.org>
 ---
- arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ kernel/rseq.c | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts b/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
-index c7ce4158d6c8..f250b20af493 100644
---- a/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
-+++ b/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
-@@ -309,8 +309,8 @@
+diff --git a/kernel/rseq.c b/kernel/rseq.c
+index 16b38c5342f9..2c8463acb50d 100644
+--- a/kernel/rseq.c
++++ b/kernel/rseq.c
+@@ -85,9 +85,9 @@ static int rseq_update_cpu_id(struct task_struct *t)
+ {
+ 	u32 cpu_id = raw_smp_processor_id();
  
- &reg_dldo3 {
- 	regulator-always-on;
--	regulator-min-microvolt = <2500000>;
--	regulator-max-microvolt = <2500000>;
-+	regulator-min-microvolt = <3300000>;
-+	regulator-max-microvolt = <3300000>;
- 	regulator-name = "vcc-pd";
- };
+-	if (__put_user(cpu_id, &t->rseq->cpu_id_start))
++	if (put_user(cpu_id, &t->rseq->cpu_id_start))
+ 		return -EFAULT;
+-	if (__put_user(cpu_id, &t->rseq->cpu_id))
++	if (put_user(cpu_id, &t->rseq->cpu_id))
+ 		return -EFAULT;
+ 	trace_rseq_update(t);
+ 	return 0;
+@@ -100,14 +100,14 @@ static int rseq_reset_rseq_cpu_id(struct task_struct *t)
+ 	/*
+ 	 * Reset cpu_id_start to its initial state (0).
+ 	 */
+-	if (__put_user(cpu_id_start, &t->rseq->cpu_id_start))
++	if (put_user(cpu_id_start, &t->rseq->cpu_id_start))
+ 		return -EFAULT;
+ 	/*
+ 	 * Reset cpu_id to RSEQ_CPU_ID_UNINITIALIZED, so any user coming
+ 	 * in after unregistration can figure out that rseq needs to be
+ 	 * registered again.
+ 	 */
+-	if (__put_user(cpu_id, &t->rseq->cpu_id))
++	if (put_user(cpu_id, &t->rseq->cpu_id))
+ 		return -EFAULT;
+ 	return 0;
+ }
+@@ -120,7 +120,7 @@ static int rseq_get_rseq_cs(struct task_struct *t, struct rseq_cs *rseq_cs)
+ 	u32 sig;
+ 	int ret;
  
+-	ret = __get_user(ptr, &t->rseq->rseq_cs);
++	ret = get_user(ptr, &t->rseq->rseq_cs);
+ 	if (ret)
+ 		return ret;
+ 	if (!ptr) {
+@@ -163,7 +163,7 @@ static int rseq_need_restart(struct task_struct *t, u32 cs_flags)
+ 	int ret;
+ 
+ 	/* Get thread flags. */
+-	ret = __get_user(flags, &t->rseq->flags);
++	ret = get_user(flags, &t->rseq->flags);
+ 	if (ret)
+ 		return ret;
+ 
+@@ -203,7 +203,7 @@ static int clear_rseq_cs(struct task_struct *t)
+ 	 *
+ 	 * Set rseq_cs to NULL with single-copy atomicity.
+ 	 */
+-	return __put_user(0UL, &t->rseq->rseq_cs);
++	return put_user(0UL, &t->rseq->rseq_cs);
+ }
+ 
+ /*
 -- 
-2.16.4
+2.11.0
