@@ -1,64 +1,39 @@
 From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Mon, 9 Jul 2018 23:56:57 +0800
-Subject: [PATCH v5 1/7] dt-bindings: net: bluetooth: Add mediatek-bluetooth
+Date: Mon, 9 Jul 2018 23:57:03 +0800
+Subject: [PATCH v5 7/7] MAINTAINERS: add an entry for MediaTek Bluetooth driver
 In-Reply-To: <cover.1531150733.git.sean.wang@mediatek.com>
 References: <cover.1531150733.git.sean.wang@mediatek.com>
-Message-ID: <d8a5b34513cf2187a2b23a513feaa358d719bc14.1531150733.git.sean.wang@mediatek.com>
+Message-ID: <12d1a2d1e533266e242f5912d8649908dceb231b.1531150733.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sean Wang <sean.wang@mediatek.com>
 
-Add binding document for a SoC built-in device using MediaTek protocol.
-Which could be found on MT7622 SoC or other similar MediaTek SoCs.
+Add an entry for the MediaTek Bluetooth driver.
 
 Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
 ---
- .../devicetree/bindings/net/mediatek-bluetooth.txt | 35 ++++++++++++++++++++++
- 1 file changed, 35 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/net/mediatek-bluetooth.txt
+ MAINTAINERS | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/net/mediatek-bluetooth.txt b/Documentation/devicetree/bindings/net/mediatek-bluetooth.txt
-new file mode 100644
-index 0000000..1335429
---- /dev/null
-+++ b/Documentation/devicetree/bindings/net/mediatek-bluetooth.txt
-@@ -0,0 +1,35 @@
-+MediaTek SoC built-in Bluetooth Devices
-+==================================
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 2ad887b..c3d5c2e 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -9044,6 +9044,14 @@ F:	include/uapi/linux/meye.h
+ F:	include/uapi/linux/ivtv*
+ F:	include/uapi/linux/uvcvideo.h
+ 
++MEDIATEK BLUETOOTH DRIVER
++M:	Sean Wang <sean.wang@mediatek.com>
++L:	linux-bluetooth at vger.kernel.org
++L:	linux-mediatek at lists.infradead.org (moderated for non-subscribers)
++S:	Maintained
++F:	Documentation/devicetree/bindings/net/mediatek-bluetooth.txt
++F:	drivers/bluetooth/btmtkuart.c
 +
-+This device is a serial attached device to BTIF device and thus it must be a
-+child node of the serial node with BTIF. The dt-bindings details for BTIF
-+device can be known via Documentation/devicetree/bindings/serial/8250.txt.
-+
-+Required properties:
-+
-+- compatible:	Must be one of
-+		  "mediatek,mt7622-bluetooth"": for MT7622 SoC
-+- clocks:	Should be the clock specifiers corresponding to the entry in
-+		clock-names property.
-+- clock-names:	Should contain "ref" entries.
-+- power-domains: Phandle to the power domain that the device is part of
-+
-+Example:
-+
-+	btif: serial at 1100c000 {
-+		compatible = "mediatek,mt7622-btif",
-+			     "mediatek,mtk-btif";
-+		reg = <0 0x1100c000 0 0x1000>;
-+		interrupts = <GIC_SPI 90 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&pericfg CLK_PERI_BTIF_PD>;
-+		clock-names = "main";
-+		reg-shift = <2>;
-+		reg-io-width = <4>;
-+
-+		bluetooth {
-+			compatible = "mediatek,mt7622-bluetooth";
-+			power-domains = <&scpsys MT7622_POWER_DOMAIN_WB>;
-+			clocks = <&clk25m>;
-+			clock-names = "ref";
-+		};
-+	};
+ MEDIATEK CIR DRIVER
+ M:	Sean Wang <sean.wang@mediatek.com>
+ S:	Maintained
 -- 
 2.7.4
