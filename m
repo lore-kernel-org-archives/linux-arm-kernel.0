@@ -1,160 +1,155 @@
-From: mathieu.desnoyers@efficios.com (Mathieu Desnoyers)
-Date: Mon, 9 Jul 2018 13:28:47 -0400 (EDT)
-Subject: [PATCH for 4.18 2/6] rseq: use get_user/put_user rather than
- __get_user/__put_user
-In-Reply-To: <20180708210330.27324-3-mathieu.desnoyers@efficios.com>
-References: <20180708210330.27324-1-mathieu.desnoyers@efficios.com>
- <20180708210330.27324-3-mathieu.desnoyers@efficios.com>
-Message-ID: <854203778.2272.1531157327328.JavaMail.zimbra@efficios.com>
+From: labbott@redhat.com (Laura Abbott)
+Date: Mon, 9 Jul 2018 10:27:31 -0700
+Subject: [PATCH 1/2] mm/cma: remove unsupported gfp_mask parameter from
+ cma_alloc()
+In-Reply-To: <20180709122019eucas1p2340da484acfcc932537e6014f4fd2c29~-sqTPJKij2939229392eucas1p2j@eucas1p2.samsung.com>
+References: <20180709121956.20200-1-m.szyprowski@samsung.com>
+ <CGME20180709122019eucas1p2340da484acfcc932537e6014f4fd2c29@eucas1p2.samsung.com>
+ <20180709122019eucas1p2340da484acfcc932537e6014f4fd2c29~-sqTPJKij2939229392eucas1p2j@eucas1p2.samsung.com>
+Message-ID: <32c180a0-271a-3d8f-0402-87b76484cea6@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------ On Jul 8, 2018, at 5:03 PM, Mathieu Desnoyers mathieu.desnoyers at efficios.com wrote:
-
-> In preparation to use __u64 for the rseq_cs pointer field, 32-bit
-> architectures need to read this 64-bit value located in user-space
-> addresses.
+On 07/09/2018 05:19 AM, Marek Szyprowski wrote:
+> cma_alloc() function doesn't really support gfp flags other than
+> __GFP_NOWARN, so convert gfp_mask parameter to boolean no_warn parameter.
 > 
-> __get_user is used to read this value, given that its access check has
-> already been performed with access_ok() on rseq registration.
+> This will help to avoid giving false feeling that this function supports
+> standard gfp flags and callers can pass __GFP_ZERO to get zeroed buffer,
+> what has already been an issue: see commit dd65a941f6ba ("arm64:
+> dma-mapping: clear buffers allocated with FORCE_CONTIGUOUS flag").
 > 
-> arm does not implement 8-byte __get_user. Rather than trying to
-> improve __get_user on ARM, use get_user/put_user across rseq instead.
-> 
-> If those end up showing up in benchmarks, the proper approach would be to
-> use user_access_begin() / unsafe_get/put_user() / user_access_end()
-> anyway.
 
-So, another twist to this story: ppc32 does not implement u64 get_user().
+For Ion,
 
-I am tempted to ditch this patch (leaving the __get_user()/__put_user as is
-for 32-bit accesses), and simply use __copy_from_user()/__copy_to_user() to
-load/store the rseq_cs pointer. Considering that we don't need to load/store
-the rseq_cs field with single-copy atomicity from the kernel anymore, it
-should be fine.
+Acked-by: Laura Abbott <labbott@redhat.com>
 
-Any objection ?
-
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/rseq/linux-rseq.git rseq/dev
-head:   a100323919af0c11a150a9ba58c3f8ac986ea42d
-commit: 23d0f99d280fa97ebcf8b915157468f457bc6e11 [4/21] rseq: uapi: declare rseq_cs field as union, update includes
-config: powerpc-ppc6xx_defconfig (attached as .config)
-compiler: powerpc-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout 23d0f99d280fa97ebcf8b915157468f457bc6e11
-        # save the attached .config to linux build tree
-        GCC_VERSION=7.2.0 make.cross ARCH=powerpc
-
-All errors (new ones prefixed by >>):
-
-   kernel/rseq.o: In function `__rseq_handle_notify_resume':
->> (.text+0x648): undefined reference to `__get_user_bad'
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
-
-Thanks,
-
-Mathieu
-
-> 
-> Signed-off-by: Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
-> CC: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Joel Fernandes <joelaf@google.com>
-> Cc: Peter Zijlstra <peterz@infradead.org>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Dave Watson <davejwatson@fb.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Andi Kleen <andi@firstfloor.org>
-> Cc: "H . Peter Anvin" <hpa@zytor.com>
-> Cc: Chris Lameter <cl@linux.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Andrew Hunter <ahh@google.com>
-> Cc: Michael Kerrisk <mtk.manpages@gmail.com>
-> Cc: "Paul E . McKenney" <paulmck@linux.vnet.ibm.com>
-> Cc: Paul Turner <pjt@google.com>
-> Cc: Boqun Feng <boqun.feng@gmail.com>
-> Cc: Josh Triplett <josh@joshtriplett.org>
-> Cc: Steven Rostedt <rostedt@goodmis.org>
-> Cc: Ben Maurer <bmaurer@fb.com>
-> Cc: linux-api at vger.kernel.org
-> CC: linux-arm-kernel at lists.infradead.org
-> Cc: Andy Lutomirski <luto@amacapital.net>
-> Cc: Andrew Morton <akpm@linux-foundation.org>
-> Cc: Linus Torvalds <torvalds@linux-foundation.org>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 > ---
-> kernel/rseq.c | 14 +++++++-------
-> 1 file changed, 7 insertions(+), 7 deletions(-)
+>   arch/powerpc/kvm/book3s_hv_builtin.c       | 2 +-
+>   drivers/s390/char/vmcp.c                   | 2 +-
+>   drivers/staging/android/ion/ion_cma_heap.c | 2 +-
+>   include/linux/cma.h                        | 2 +-
+>   kernel/dma/contiguous.c                    | 3 ++-
+>   mm/cma.c                                   | 8 ++++----
+>   mm/cma_debug.c                             | 2 +-
+>   7 files changed, 11 insertions(+), 10 deletions(-)
 > 
-> diff --git a/kernel/rseq.c b/kernel/rseq.c
-> index 16b38c5342f9..2c8463acb50d 100644
-> --- a/kernel/rseq.c
-> +++ b/kernel/rseq.c
-> @@ -85,9 +85,9 @@ static int rseq_update_cpu_id(struct task_struct *t)
-> {
-> 	u32 cpu_id = raw_smp_processor_id();
+> diff --git a/arch/powerpc/kvm/book3s_hv_builtin.c b/arch/powerpc/kvm/book3s_hv_builtin.c
+> index d4a3f4da409b..fc6bb9630a9c 100644
+> --- a/arch/powerpc/kvm/book3s_hv_builtin.c
+> +++ b/arch/powerpc/kvm/book3s_hv_builtin.c
+> @@ -77,7 +77,7 @@ struct page *kvm_alloc_hpt_cma(unsigned long nr_pages)
+>   	VM_BUG_ON(order_base_2(nr_pages) < KVM_CMA_CHUNK_ORDER - PAGE_SHIFT);
+>   
+>   	return cma_alloc(kvm_cma, nr_pages, order_base_2(HPT_ALIGN_PAGES),
+> -			 GFP_KERNEL);
+> +			 false);
+>   }
+>   EXPORT_SYMBOL_GPL(kvm_alloc_hpt_cma);
+>   
+> diff --git a/drivers/s390/char/vmcp.c b/drivers/s390/char/vmcp.c
+> index 948ce82a7725..0fa1b6b1491a 100644
+> --- a/drivers/s390/char/vmcp.c
+> +++ b/drivers/s390/char/vmcp.c
+> @@ -68,7 +68,7 @@ static void vmcp_response_alloc(struct vmcp_session *session)
+>   	 * anymore the system won't work anyway.
+>   	 */
+>   	if (order > 2)
+> -		page = cma_alloc(vmcp_cma, nr_pages, 0, GFP_KERNEL);
+> +		page = cma_alloc(vmcp_cma, nr_pages, 0, false);
+>   	if (page) {
+>   		session->response = (char *)page_to_phys(page);
+>   		session->cma_alloc = 1;
+> diff --git a/drivers/staging/android/ion/ion_cma_heap.c b/drivers/staging/android/ion/ion_cma_heap.c
+> index 49718c96bf9e..3fafd013d80a 100644
+> --- a/drivers/staging/android/ion/ion_cma_heap.c
+> +++ b/drivers/staging/android/ion/ion_cma_heap.c
+> @@ -39,7 +39,7 @@ static int ion_cma_allocate(struct ion_heap *heap, struct ion_buffer *buffer,
+>   	if (align > CONFIG_CMA_ALIGNMENT)
+>   		align = CONFIG_CMA_ALIGNMENT;
+>   
+> -	pages = cma_alloc(cma_heap->cma, nr_pages, align, GFP_KERNEL);
+> +	pages = cma_alloc(cma_heap->cma, nr_pages, align, false);
+>   	if (!pages)
+>   		return -ENOMEM;
+>   
+> diff --git a/include/linux/cma.h b/include/linux/cma.h
+> index bf90f0bb42bd..190184b5ff32 100644
+> --- a/include/linux/cma.h
+> +++ b/include/linux/cma.h
+> @@ -33,7 +33,7 @@ extern int cma_init_reserved_mem(phys_addr_t base, phys_addr_t size,
+>   					const char *name,
+>   					struct cma **res_cma);
+>   extern struct page *cma_alloc(struct cma *cma, size_t count, unsigned int align,
+> -			      gfp_t gfp_mask);
+> +			      bool no_warn);
+>   extern bool cma_release(struct cma *cma, const struct page *pages, unsigned int count);
+>   
+>   extern int cma_for_each_area(int (*it)(struct cma *cma, void *data), void *data);
+> diff --git a/kernel/dma/contiguous.c b/kernel/dma/contiguous.c
+> index d987dcd1bd56..19ea5d70150c 100644
+> --- a/kernel/dma/contiguous.c
+> +++ b/kernel/dma/contiguous.c
+> @@ -191,7 +191,8 @@ struct page *dma_alloc_from_contiguous(struct device *dev, size_t count,
+>   	if (align > CONFIG_CMA_ALIGNMENT)
+>   		align = CONFIG_CMA_ALIGNMENT;
+>   
+> -	return cma_alloc(dev_get_cma_area(dev), count, align, gfp_mask);
+> +	return cma_alloc(dev_get_cma_area(dev), count, align,
+> +			 gfp_mask & __GFP_NOWARN);
+>   }
+>   
+>   /**
+> diff --git a/mm/cma.c b/mm/cma.c
+> index 5809bbe360d7..4cb76121a3ab 100644
+> --- a/mm/cma.c
+> +++ b/mm/cma.c
+> @@ -395,13 +395,13 @@ static inline void cma_debug_show_areas(struct cma *cma) { }
+>    * @cma:   Contiguous memory region for which the allocation is performed.
+>    * @count: Requested number of pages.
+>    * @align: Requested alignment of pages (in PAGE_SIZE order).
+> - * @gfp_mask:  GFP mask to use during compaction
+> + * @no_warn: Avoid printing message about failed allocation
+>    *
+>    * This function allocates part of contiguous memory on specific
+>    * contiguous memory area.
+>    */
+>   struct page *cma_alloc(struct cma *cma, size_t count, unsigned int align,
+> -		       gfp_t gfp_mask)
+> +		       bool no_warn)
+>   {
+>   	unsigned long mask, offset;
+>   	unsigned long pfn = -1;
+> @@ -447,7 +447,7 @@ struct page *cma_alloc(struct cma *cma, size_t count, unsigned int align,
+>   		pfn = cma->base_pfn + (bitmap_no << cma->order_per_bit);
+>   		mutex_lock(&cma_mutex);
+>   		ret = alloc_contig_range(pfn, pfn + count, MIGRATE_CMA,
+> -					 gfp_mask);
+> +				     GFP_KERNEL | (no_warn ? __GFP_NOWARN : 0));
+>   		mutex_unlock(&cma_mutex);
+>   		if (ret == 0) {
+>   			page = pfn_to_page(pfn);
+> @@ -466,7 +466,7 @@ struct page *cma_alloc(struct cma *cma, size_t count, unsigned int align,
+>   
+>   	trace_cma_alloc(pfn, page, count, align);
+>   
+> -	if (ret && !(gfp_mask & __GFP_NOWARN)) {
+> +	if (ret && !no_warn) {
+>   		pr_err("%s: alloc failed, req-size: %zu pages, ret: %d\n",
+>   			__func__, count, ret);
+>   		cma_debug_show_areas(cma);
+> diff --git a/mm/cma_debug.c b/mm/cma_debug.c
+> index f23467291cfb..ad6723e9d110 100644
+> --- a/mm/cma_debug.c
+> +++ b/mm/cma_debug.c
+> @@ -139,7 +139,7 @@ static int cma_alloc_mem(struct cma *cma, int count)
+>   	if (!mem)
+>   		return -ENOMEM;
+>   
+> -	p = cma_alloc(cma, count, 0, GFP_KERNEL);
+> +	p = cma_alloc(cma, count, 0, false);
+>   	if (!p) {
+>   		kfree(mem);
+>   		return -ENOMEM;
 > 
-> -	if (__put_user(cpu_id, &t->rseq->cpu_id_start))
-> +	if (put_user(cpu_id, &t->rseq->cpu_id_start))
-> 		return -EFAULT;
-> -	if (__put_user(cpu_id, &t->rseq->cpu_id))
-> +	if (put_user(cpu_id, &t->rseq->cpu_id))
-> 		return -EFAULT;
-> 	trace_rseq_update(t);
-> 	return 0;
-> @@ -100,14 +100,14 @@ static int rseq_reset_rseq_cpu_id(struct task_struct *t)
-> 	/*
-> 	 * Reset cpu_id_start to its initial state (0).
-> 	 */
-> -	if (__put_user(cpu_id_start, &t->rseq->cpu_id_start))
-> +	if (put_user(cpu_id_start, &t->rseq->cpu_id_start))
-> 		return -EFAULT;
-> 	/*
-> 	 * Reset cpu_id to RSEQ_CPU_ID_UNINITIALIZED, so any user coming
-> 	 * in after unregistration can figure out that rseq needs to be
-> 	 * registered again.
-> 	 */
-> -	if (__put_user(cpu_id, &t->rseq->cpu_id))
-> +	if (put_user(cpu_id, &t->rseq->cpu_id))
-> 		return -EFAULT;
-> 	return 0;
-> }
-> @@ -120,7 +120,7 @@ static int rseq_get_rseq_cs(struct task_struct *t, struct
-> rseq_cs *rseq_cs)
-> 	u32 sig;
-> 	int ret;
-> 
-> -	ret = __get_user(ptr, &t->rseq->rseq_cs);
-> +	ret = get_user(ptr, &t->rseq->rseq_cs);
-> 	if (ret)
-> 		return ret;
-> 	if (!ptr) {
-> @@ -163,7 +163,7 @@ static int rseq_need_restart(struct task_struct *t, u32
-> cs_flags)
-> 	int ret;
-> 
-> 	/* Get thread flags. */
-> -	ret = __get_user(flags, &t->rseq->flags);
-> +	ret = get_user(flags, &t->rseq->flags);
-> 	if (ret)
-> 		return ret;
-> 
-> @@ -203,7 +203,7 @@ static int clear_rseq_cs(struct task_struct *t)
-> 	 *
-> 	 * Set rseq_cs to NULL with single-copy atomicity.
-> 	 */
-> -	return __put_user(0UL, &t->rseq->rseq_cs);
-> +	return put_user(0UL, &t->rseq->rseq_cs);
-> }
-> 
-> /*
-> --
-> 2.11.0
-
--- 
-Mathieu Desnoyers
-EfficiOS Inc.
-http://www.efficios.com
