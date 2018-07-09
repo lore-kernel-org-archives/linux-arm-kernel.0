@@ -1,62 +1,112 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Mon, 9 Jul 2018 15:10:06 -0700
-Subject: [RESEND PATCH v2 3/9] asm-generic: Move some macros from
- linux/bitops.h to a new bits.h file
-In-Reply-To: <20180709113250.GA26377@arm.com>
-References: <1529412794-17720-1-git-send-email-will.deacon@arm.com>
- <1529412794-17720-4-git-send-email-will.deacon@arm.com>
- <20180706173049.e28171504c745934a280dee8@linux-foundation.org>
- <20180709113250.GA26377@arm.com>
-Message-ID: <20180709151006.370112d321c8f3df06bf231b@linux-foundation.org>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Tue, 10 Jul 2018 00:13:29 +0200
+Subject: [PATCH 2/3] dt-bindings: clk: meson-g12a: Add G12A EE Clock
+ Bindings
+In-Reply-To: <1531134767-29927-3-git-send-email-jian.hu@amlogic.com>
+References: <1531134767-29927-1-git-send-email-jian.hu@amlogic.com>
+ <1531134767-29927-3-git-send-email-jian.hu@amlogic.com>
+Message-ID: <CAFBinCB6LS=PT1cw-j-LZ+vWo-RFe81qVZ6uLeGfWKtKfHz7ag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 9 Jul 2018 12:32:51 +0100 Will Deacon <will.deacon@arm.com> wrote:
+On Mon, Jul 9, 2018 at 1:13 PM Jian Hu <jian.hu@amlogic.com> wrote:
+>
+> Add dt-bindings headers for the Meson-G12A's Everything-Else
+> part clock controller.
+I wonder if this should be folded into patch #1 along with an update
+to Documentation/devicetree/bindings/clock/amlogic,gxbb-clkc.txt so
+it's clear which header has to be used for G12A
 
-> Hi Andrew,
-> 
-> On Fri, Jul 06, 2018 at 05:30:49PM -0700, Andrew Morton wrote:
-> > On Tue, 19 Jun 2018 13:53:08 +0100 Will Deacon <will.deacon@arm.com> wrote:
-> > 
-> > > In preparation for implementing the asm-generic atomic bitops in terms
-> > > of atomic_long_*, we need to prevent asm/atomic.h implementations from
-> > > pulling in linux/bitops.h. A common reason for this include is for the
-> > > BITS_PER_BYTE definition, so move this and some other BIT() and masking
-> > > macros into a new header file, linux/bits.h
-> > > 
-> > > --- a/include/linux/bitops.h
-> > > +++ b/include/linux/bitops.h
-> > > @@ -2,29 +2,9 @@
-> > >  #ifndef _LINUX_BITOPS_H
-> > >  #define _LINUX_BITOPS_H
-> > >  #include <asm/types.h>
-> > > +#include <linux/bits.h>
-> > >  
-> > > -#ifdef	__KERNEL__
-> > > -#define BIT(nr)			(1UL << (nr))
-> > > -#define BIT_ULL(nr)		(1ULL << (nr))
-> > > -#define BIT_MASK(nr)		(1UL << ((nr) % BITS_PER_LONG))
-> > > -#define BIT_WORD(nr)		((nr) / BITS_PER_LONG)
-> > > -#define BIT_ULL_MASK(nr)	(1ULL << ((nr) % BITS_PER_LONG_LONG))
-> > > -#define BIT_ULL_WORD(nr)	((nr) / BITS_PER_LONG_LONG)
-> > > -#define BITS_PER_BYTE		8
-> > >  #define BITS_TO_LONGS(nr)	DIV_ROUND_UP(nr, BITS_PER_BYTE * sizeof(long))
-> > > -#endif
-> > 
-> > Why does it leave BITS_TO_LONGS() in place?
-> > 
-> > That becomes unfortunate with Chris's patch, so I'm moving
-> > BITS_TO_LONGS() into bits.h.
-> 
-> The reason I avoided that was because it would pull in the dreaded
-> kernel.h for DIV_ROUND_UP, and then we're back to circular include hell :(
-> 
+>
+> Signed-off-by: Jian Hu <jian.hu@amlogic.com>
+> ---
+>  include/dt-bindings/clock/g12a-clkc.h | 93 +++++++++++++++++++++++++++++++++++
+>  1 file changed, 93 insertions(+)
+>  create mode 100644 include/dt-bindings/clock/g12a-clkc.h
+>
+> diff --git a/include/dt-bindings/clock/g12a-clkc.h b/include/dt-bindings/clock/g12a-clkc.h
+> new file mode 100644
+> index 0000000..1473225
+> --- /dev/null
+> +++ b/include/dt-bindings/clock/g12a-clkc.h
+> @@ -0,0 +1,93 @@
+> +/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
+> +/*
+> + * Meson-G12A clock tree IDs
+> + *
+> + * Copyright (c) 2018 Amlogic, Inc. All rights reserved.
+> + */
+> +
+> +#ifndef __G12A_CLKC_H
+> +#define __G12A_CLKC_H
+> +
+> +#define CLKID_SYS_PLL                          0
+> +#define CLKID_FIXED_PLL                                1
+> +#define CLKID_FCLK_DIV2                                2
+> +#define CLKID_FCLK_DIV3                                3
+> +#define CLKID_FCLK_DIV4                                4
+> +#define CLKID_FCLK_DIV5                                5
+> +#define CLKID_FCLK_DIV7                                6
+> +#define CLKID_GP0_PLL                          7
+> +#define CLKID_CLK81                                    10
+> +#define CLKID_MPLL0                                    11
+> +#define CLKID_MPLL1                                    12
+> +#define CLKID_MPLL2                                    13
+> +#define CLKID_MPLL3                                    14
+> +#define CLKID_DDR                                      15
+> +#define CLKID_DOS                                      16
+> +#define CLKID_AUDIO_LOCKER                     17
+> +#define CLKID_MIPI_DSI_HOST                    18
+> +#define CLKID_ETH_PHY                          19
+> +#define CLKID_ISA                                      20
+> +#define CLKID_PL301                                    21
+> +#define CLKID_PERIPHS                          22
+> +#define CLKID_SPICC0                           23
+> +#define CLKID_I2C                                      24
+> +#define CLKID_SANA                                     25
+> +#define CLKID_SD                                       26
+> +#define CLKID_RNG0                                     27
+> +#define CLKID_UART0                                    28
+> +#define CLKID_SPICC1                           29
+> +#define CLKID_HIU_IFACE                                30
+> +#define CLKID_MIPI_DSI_PHY                     31
+> +#define CLKID_ASSIST_MISC                      32
+> +#define CLKID_SD_EMMC_A                                33
+> +#define CLKID_SD_EMMC_B                                34
+> +#define CLKID_SD_EMMC_C                                35
+> +#define CLKID_AUDIO_CODEC                      36
+> +#define CLKID_AUDIO                                    37
+> +#define CLKID_ETH                                      38
+> +#define CLKID_DEMUX                                    39
+> +#define CLKID_AUDIO_IFIFO                      40
+> +#define CLKID_ADC                                      41
+> +#define CLKID_UART1                                    42
+> +#define CLKID_G2D                                      43
+> +#define CLKID_RESET                                    44
+> +#define CLKID_PCIE_COMB                                45
+> +#define CLKID_PARSER                           46
+> +#define CLKID_USB                                      47
+> +#define CLKID_PCIE_PHY                         48
+> +#define CLKID_AHB_ARB0                         49
+> +#define CLKID_AHB_DATA_BUS                     50
+> +#define CLKID_AHB_CTRL_BUS                     51
+> +#define CLKID_HTX_HDCP22                       52
+> +#define CLKID_HTX_PCLK                         53
+> +#define CLKID_BT656                                    54
+> +#define CLKID_USB1_DDR_BRIDGE          55
+> +#define CLKID_MMC_PCLK                         56
+> +#define CLKID_UART2                                    57
+> +#define CLKID_VPU_INTR                         58
+> +#define CLKID_GIC                                      59
+> +#define CLKID_SD_EMMC_B_CLK0           60
+> +#define CLKID_SD_EMMC_C_CLK0           61
+> +#define CLKID_HIFI_PLL                         71
+> +
+is this empty line here on purpose? a comment would be great if
+there's a reason behind it (there's already a gap in the numbering
+between CLKID_GP0_PLL and CLKID_CLK81, but there's no empty line there
+- either way is fine, please just keep it consistent)
 
-Well we should comment that so every reader doesn't wonder what I
-wondered.
 
-Refactoring works well.  I suppose DIV_ROUND_UP and friends await a new
-<arithmacros.h>.
-
-Also, all these macros no longer `#ifdef __KERNEL__' protection, which
-wasn't mentioned in the changelog.  Deliberate?
+Regards
+Martin
