@@ -1,29 +1,47 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 9 Jul 2018 03:50:36 -0700
-Subject: [PATCH v2] Add DT support for Octavo Systems OSD3358-SM-RED
- based on TI AM335x
-In-Reply-To: <20180709104641.GB99251@atomide.com>
-References: <20180706200051.1115-1-neeraj.dantu@octavosystems.com>
- <20180709104641.GB99251@atomide.com>
-Message-ID: <20180709105036.GC99251@atomide.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 9 Jul 2018 11:51:37 +0100
+Subject: [PATCH] KVM: arm/arm64: Fix vgic init race
+In-Reply-To: <1530653175-11999-1-git-send-email-christoffer.dall@arm.com>
+References: <1530653175-11999-1-git-send-email-christoffer.dall@arm.com>
+Message-ID: <edb65498-080b-f492-d841-024968ab4f8b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [180709 10:49]:
-> * Neeraj Dantu <dantuguf14105@gmail.com> [180706 13:04]:
-> > OSD3358-SM-RED is a dev board for OSD335x System-in-Package(SiP) devices from
-> > Octavo Systems.
+On 03/07/18 22:26, Christoffer Dall wrote:
+> The vgic_init function can race with kvm_arch_vcpu_create() which does
+> not hold kvm_lock() and we therefore have no synchronization primitives
+> to ensure we're doing the right thing.
 > 
-> Applying into omap-for-v4.19/dt thanks.
+> As the user is trying to initialize or run the VM while at the same time
+> creating more VCPUs, we just have to refuse to initialize the VGIC in
+> this case rather than silently failing with a broken VCPU.
+> 
+> Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
+> ---
+>  virt/kvm/arm/vgic/vgic-init.c | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
+> index 9406eaf..c0c0b88 100644
+> --- a/virt/kvm/arm/vgic/vgic-init.c
+> +++ b/virt/kvm/arm/vgic/vgic-init.c
+> @@ -286,6 +286,10 @@ int vgic_init(struct kvm *kvm)
+>  	if (vgic_initialized(kvm))
+>  		return 0;
+>  
+> +	/* Are we also in the middle of creating a VCPU? */
+> +	if (kvm->created_vcpus != atomic_read(&kvm->online_vcpus))
+> +		return -EBUSY;
+> +
+>  	/* freeze the number of spis */
+>  	if (!dist->nr_spis)
+>  		dist->nr_spis = VGIC_NR_IRQS_LEGACY - VGIC_NR_PRIVATE_IRQS;
+> 
 
-Hmm dropping patch as it fails to build with make dtbs:
-
-Error: arch/arm/boot/dts/am335x-osd3358-sm-red.dts:146.20-21 syntax error
-FATAL ERROR: Unable to parse input tree
-
-Can you please check against current Linux next and make sure it
-builds and boots and then repost one more time?
+Applied to queue.
 
 Thanks,
 
-Tony
+	M.
+-- 
+Jazz is not dead. It just smells funny...
