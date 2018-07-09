@@ -1,38 +1,36 @@
-From: amit.kucheria@linaro.org (Amit Kucheria)
-Date: Mon, 9 Jul 2018 17:00:46 +0530
-Subject: [PATCH v4 0/6] thermal: tsens: Refactoring for TSENSv2 IP
-In-Reply-To: <20180702175357.GA28713@localhost.localdomain>
-References: <cover.1530533998.git.amit.kucheria@linaro.org>
- <20180702175357.GA28713@localhost.localdomain>
-Message-ID: <CAHLCerM1t-xO-zpYn3twb14VMGoC3+Pyv8LHuzYt7NVJWF0n4w@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 9 Jul 2018 13:32:01 +0200
+Subject: [PATCH v2 0/2] mmc: add SDHCI OF Synopsys DWC MSHC dirver
+In-Reply-To: <20180706151930.78b3024b@xhacker.debian>
+References: <20180706151930.78b3024b@xhacker.debian>
+Message-ID: <CAPDyKFp09ch9X0dxC33RBNf4yLzJ439ZCV7sqCiGM300KO48xA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 2, 2018 at 11:23 PM, Eduardo Valentin <edubezval@gmail.com> wrote:
-> On Mon, Jul 02, 2018 at 06:14:03PM +0530, Amit Kucheria wrote:
->> This series is a mixed bag:
->> - Some code moves to allow code sharing between various v2.x.y versions of
->>   the TSENS IP,
->> - new qcom,tsens-v2.4.0 DT property for SDM845 and a generic qcom,tsens-v2
->>   property as a fallback compatible for all v2.x.y platforms,
->> - new platform support (sdm845)
->> - a cleanup patch and
->> - a DT change to have a common way to deal with the SROT and TM registers
->>   despite slightly different features across the IP family and different
->>   register offsets.
->>
->> Rob mentioned offline that we should expose the full version string of the
->> TSENS IP (x.y.z) and have a fallback compatible. I hope patch 4 does what
->> you were looking for.
+On 6 July 2018 at 09:19, Jisheng Zhang <Jisheng.Zhang@synaptics.com> wrote:
+> Add support for Synopsys SDHCI compatible DesignWare Cores Mobile
+> Storage Host Controller which can support eMMC/SD/SDIO.
 >
-> Applied patches 1, 3, and 4. Patch 5 needs a description. Patches 2 and
-> 6 go via your arch tree.
+> Since v1:
+>   - move the dt bindings into a separate patch
+>
+> Jisheng Zhang (2):
+>   dt: bindings: Add bindings for SDHCI Synopsys DWC MSHC
+>   mmc: sdhci-of-dwcmshc: add SDHCI OF Synopsys DWC MSHC dirver
+>
+>  .../bindings/mmc/sdhci-of-dwcmshc.txt         |  20 +++
+>  drivers/mmc/host/Kconfig                      |  11 ++
+>  drivers/mmc/host/Makefile                     |   1 +
+>  drivers/mmc/host/sdhci-of-dwcmshc.c           | 116 ++++++++++++++++++
+>  4 files changed, 148 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mmc/sdhci-of-dwcmshc.txt
+>  create mode 100644 drivers/mmc/host/sdhci-of-dwcmshc.c
+>
+> --
+> 2.18.0
+>
 
-Hi Eduardo,
+Thanks, applied for next!
 
-I've sent v5 for this series. It fixes a breakage for old DTs with new
-code. Also, Rob decided he was happier with the earlier single
-fallback binding. Please consider applying the new series.
-
-Regards,
-Amit
+Kind regards
+Uffe
