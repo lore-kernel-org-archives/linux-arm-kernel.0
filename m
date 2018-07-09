@@ -1,57 +1,79 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon, 9 Jul 2018 14:17:54 +0200
-Subject: [PATCH v2] firmware/psci: add support for SYSTEM_RESET2
-In-Reply-To: <1525257003-8608-1-git-send-email-sudeep.holla@arm.com>
-References: <1525186288-536-1-git-send-email-sudeep.holla@arm.com>
- <1525257003-8608-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <34a420e1-9d2a-b838-dce2-71de408043da@xilinx.com>
+From: yandong77520@gmail.com (Yandong.Zhao)
+Date: Mon,  9 Jul 2018 20:19:43 +0800
+Subject: [PATCH] arm64: neon: Add preemption protection for kernel_neon_busy
+Message-ID: <1531138783-21418-1-git-send-email-yandong77520@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sudeep,
+From: Yandong Zhao <yandong77520@gmail.com>
 
-On 2.5.2018 12:30, Sudeep Holla wrote:
-> PSCI v1.1 introduced SYSTEM_RESET2 to allow both architectural resets
-> where the semantics are described by the PSCI specification itself as
-> well as vendor-specific resets. Currently only system warm reset
-> semantics is defined as part of architectural resets by the specification.
-> 
-> This patch implements support for SYSTEM_RESET2 by making using of
-> reboot_mode passed by the reboot infrastructure in the kernel.
-> 
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> ---
->  drivers/firmware/psci.c   | 21 +++++++++++++++++++++
->  include/uapi/linux/psci.h |  2 ++
->  2 files changed, 23 insertions(+)
-> 
-> v1->v2:
-> 	- Added mising static anotation to psci_system_reset2_supported
-> 	- Added missing ')' in the comment
-> 
-> diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-> index c80ec1d03274..91748725534e 100644
-> --- a/drivers/firmware/psci.c
-> +++ b/drivers/firmware/psci.c
-> @@ -88,6 +88,7 @@ static u32 psci_function_id[PSCI_FN_MAX];
->  				PSCI_1_0_EXT_POWER_STATE_TYPE_MASK)
-> 
->  static u32 psci_cpu_suspend_feature;
-> +static bool psci_system_reset2_supported;
-> 
->  static inline bool psci_has_ext_power_state(void)
->  {
-> @@ -253,6 +254,15 @@ static int get_set_conduit_method(struct device_node *np)
-> 
->  static void psci_sys_reset(enum reboot_mode reboot_mode, const char *cmd)
->  {
-> +	if ((reboot_mode == REBOOT_WARM || reboot_mode == REBOOT_SOFT) &&
+Dear Dave,
 
-I am curious about this reboot_mode setup. I have grepped the kernel and
-reboot_mode is setup via kernel parameters at boot time.
-Shouldn't user decide what reboot type wants to do?
+The scenario for this bug is:
+The A process is sched out when the CPU0 executes the function
+raw_cpu_read(kernel_neon_busy) and just gets the address of
+kernel_neon_busy without reading.
+The B process starts running kernel_neon_begin() on CPU0, and the variable
+kernel_neon_busy on CPU0 becomes true. At this time, the A process is
+executed on CPU1 and the kernel_neon_busy value is CPU0 (true),so BUG_ON()!
 
-Thanks,
-Michal
+crash64> kernel_neon_busy
+PER-CPU DATA TYPE:
+  bool kernel_neon_busy;
+PER-CPU ADDRESSES:
+  [0]: ffffffc07fee30a0
+  [1]: ffffffc07fef90a0
+  [2]: ffffffc07ff0f0a0
+  [3]: ffffffc07ff250a0
+
+          CPU0                                       CPU1
+           |                                          |
+A task have get addr ffffffc07fee30a0                 |
+      and sched out                                   |
+           |                                          |
+B task kernel_neon_begin()                            |
+	[ffffffc07fee30a0]=1                              |
+           |                                          |
+           |                               A task sched in and read
+		   |                            [ffffffc07fee30a0]==1,so BUG_ON.
+           |                                          |
+B task kernel_neon_end()                              |
+ [ffffffc07fee30a0]=0                                 |
+           |                                          |
+
+Signed-off-by: Yandong Zhao <yandong77520@gmail.com>
+---
+ arch/arm64/include/asm/simd.h | 16 ++++------------
+ 1 file changed, 4 insertions(+), 12 deletions(-)
+
+diff --git a/arch/arm64/include/asm/simd.h b/arch/arm64/include/asm/simd.h
+index fa8b3fe..6580dcd 100644
+--- a/arch/arm64/include/asm/simd.h
++++ b/arch/arm64/include/asm/simd.h
+@@ -29,20 +29,12 @@
+ static __must_check inline bool may_use_simd(void)
+ {
+ 	/*
+-	 * The raw_cpu_read() is racy if called with preemption enabled.
+-	 * This is not a bug: kernel_neon_busy is only set when
+-	 * preemption is disabled, so we cannot migrate to another CPU
+-	 * while it is set, nor can we migrate to a CPU where it is set.
+-	 * So, if we find it clear on some CPU then we're guaranteed to
+-	 * find it clear on any CPU we could migrate to.
+-	 *
+-	 * If we are in between kernel_neon_begin()...kernel_neon_end(),
+-	 * the flag will be set, but preemption is also disabled, so we
+-	 * can't migrate to another CPU and spuriously see it become
+-	 * false.
++	 * Operations for contexts where we do not want to do any checks for
++	 * preemptions.  Unless strictly necessary, always use this_cpu_*()
++	 * instead.
+ 	 */
+ 	return !in_irq() && !irqs_disabled() && !in_nmi() &&
+-		!raw_cpu_read(kernel_neon_busy);
++		!this_cpu_read(kernel_neon_busy);
+ }
+ 
+ #else /* ! CONFIG_KERNEL_MODE_NEON */
+-- 
+1.9.1
