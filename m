@@ -1,123 +1,91 @@
-From: Okaya@kernel.org (Sinan Kaya)
-Date: Mon, 9 Jul 2018 08:48:44 -0600
-Subject: [PATCH V5 3/3] PCI: Mask and unmask hotplug interrupts during
- reset
-In-Reply-To: <20180708171418.GA11476@wunner.de>
-References: <CAK9iUCM=zWexWow9TwkRfO186Hwr5WyGy0NHZF1vtXn3wbbZGQ@mail.gmail.com>
- <12fc8de5-ff03-cb00-52cb-25a43c71d03a@codeaurora.org>
- <20180708171418.GA11476@wunner.de>
-Message-ID: <CAK9iUCMcic5mzGiT20KNxgwPo6AuajHFsoj7GOjSht5SwrQevg@mail.gmail.com>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Mon, 09 Jul 2018 15:49:44 +0100
+Subject: [PATCH v5 0/7] KVM: Support PUD hugepages at stage 2
+In-Reply-To: <20180709143835.28971-2-punit.agrawal@arm.com> (Punit Agrawal's
+ message of "Mon, 9 Jul 2018 15:38:28 +0100")
+References: <20180709143835.28971-1-punit.agrawal@arm.com>
+ <20180709143835.28971-2-punit.agrawal@arm.com>
+Message-ID: <871sccqx9z.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/8/18, Lukas Wunner <lukas@wunner.de> wrote:
-> On Tue, Jul 03, 2018 at 11:43:26AM -0400, Sinan Kaya wrote:
->> On 7/3/2018 10:34 AM, Lukas Wunner wrote:
->> > We've already got the ->reset_slot callback in struct hotplug_slot_ops,
->> > I'm wondering if we really need additional ones for this use case.
->>
->> As I have informed you before on my previous reply, the pdev->slot is
->> only valid for children objects such as endpoints not for a bridge when
->> using pciehp.
->>
->> The pointer is NULL for the host bridge itself.
+Please ignore this cover letter.
+
+Apologies for the duplicate cover-letter and a somewhat funky threading
+(I blame emacs unsaved buffer).
+
+The patches appear to be intact so don't let the threading get in the
+way of review.
+
+Punit Agrawal <punit.agrawal@arm.com> writes:
+
+> This series is an update to the PUD hugepage support previously posted
+> at [0]. This patchset adds support for PUD hugepages at stage
+> 2. This feature is useful on cores that have support for large sized
+> TLB mappings (e.g., 1GB for 4K granule).
 >
-> Right, sorry, I had misremembered how this works.  So essentially the
-> pointer is only set for the devices "in" the slot, but not for the bridge
-> "to" that slot.  If the slot isn't occupied, *no* pci_dev points the
-> struct pci_slot.  Seems counter-intuitive to be honest.
-
-That is true. There is a bit of history here. Back in pci days, you
-would have each PCI device number as a hotplug slot. There would be
-multiple slots under a bridge. There is a one to many relationship.
-
+> The biggest change in this version is to replace repeated instances of
+> walking the page tables to get to a leaf-entry with a function to
+> return the appropriate entry. This was suggested by Suzuki and should
+> help reduce the amount of churn resulting from future changes. It also
+> address other feedback on the previous version.
 >
-> Thanks for the explanation of the various reset codepaths, I'm afraid my
-> understanding of that portion of the PCI core is limited.
+> Support is added to code that is shared between arm and arm64. Dummy
+> helpers for arm are provided as the port does not support PUD hugepage
+> sizes.
 >
-> Browsing through drivers/pci/pci.c, I notice pci_dev_lock() and
-> pci_dev_save_and_disable(), both are called from reset codepaths and
-> apparently seek to stop access to the device during reset.  I'm wondering
-> why DPC and AER remove devices in order to avoid accesses to them during
-> reset, instead of utilizing these two functions?
-
-This was the behavior until 4.18. Since 4.18 all devices are being
-removed and reenumerated following a fatal error condition.
-
->
-> My guess is that a lot of the reset code is historically grown and
-> could be simplified and made more consistent, but that requires digging
-> into the code and getting a complete picture.  I've sort of done that
-> for pciehp, I think I'm now intimately familiar with 90% of it,
-> so I'll be happy to review patches for it and answer questions,
-> but I'm pretty much stumped when it comes to reset code in the PCI core.
->
-> I treated the ->reset_slot() callback as one possible entry point into
-> pciehp and asked myself if it's properly serialized with the rest of the
-> driver and whether driver ->probe and ->remove is ordered such that
-> the driver is always properly initialized when the entry point might be
-> taken.  I did not look too closely at the codepaths actually leading to
-> invocation of the ->reset_slot() callback.
->
-
-Sure, this path gets called from vfio today and possibly via a reset
-file in sysfs. A bunch of things need to fail before hitting slot
-reset path.
-
-However, vfio is a direct caller if hotplug is supported.
-
->
->> I was curious if we could use a single work queue for all pcie portdrv
->> services. This would also eliminate the need for locks that Lukas is
->> adding.
->>
->> If hotplug starts first,  hotplug code would run to completion before AER
->> and DPC service starts recovery.
->>
->> If DPC/AER starts first, my patch would mask the hotplug interrupts.
->>
->> My solution doesn't help if link down interrupt is observed before the
->> AER
->> or DPC services.
->
-> If pciehp gets an interrupt quicker than dpc/aer, it will (at least with
-> my patches) remove all devices, check if the presence bit is set,
-
-Yup.
-
-> and
-> if so, try to bring the slot up again.
-
-Hotplug driver should only observe a link down interrupt. Link would
-come up in response to a secondary bus reset initiated by the AER
-driver.
-
-Can you point me to the code that would bring up the link in hp code?
-Maybe, I am missing something.
-
-> My (limited) understanding is
-> that the link will stay down until dpc/aer react.
-> pciehp_check_link_status()
-> will wait 1 sec for the link, wait another 100 msec, then poll the vendor
-> register for 1 sec before giving up.  So if dpc/aer are locked out for this
-> long, they will only be able to reset the slot after 2100 msec.
->
-> I've had a brief look at the PCIe r4.0 base spec and could not find
-> anything about how pciehp and dpc/aer should coordinate.  Maybe that's
-> an oversight, or the PCISIG just leaves this to the OS.
->
->
->> Another possibility is to add synchronization logic between these threads
->> obviously.
->
-> Maybe call pci_channel_offline() in the poll loops of pcie_wait_for_link()
-> and pci_bus_check_dev() to avoid waiting for the link if an error needs to
-> be acted upon first?
-
-Let me think about this.
-
+> The patches have been tested on an A57 based system. The patchset is
+> based on v4.18-rc4. The are a few conflicts with the support for 52
+> bit IPA[1] due to change in number of parameters for
+> stage2_pmd_offset().
 >
 > Thanks,
+> Punit
 >
-> Lukas
+> v4 -> v5:
 >
+> * Patch 1 - Drop helper stage2_should_exec() and refactor the
+>   condition to decide if a page table entry should be marked
+>   executable
+> * Patch 4-6 - Introduce stage2_get_leaf_entry() and use it in this and
+>   latter patches
+> * Patch 7 - Use stage 2 accessors instead of using the page table
+>   helpers directly
+> * Patch 7 - Add a note to update the PUD hugepage support when number
+>   of levels of stage 2 tables differs from stage 1
+>
+>
+> v3 -> v4:
+> * Patch 1 and 7 - Don't put down hugepages pte if logging is enabled
+> * Patch 4-5 - Add PUD hugepage support for exec and access faults
+> * Patch 6 - PUD hugepage support for aging page table entries
+>
+> v2 -> v3:
+> * Update vma_pagesize directly if THP [1/4]. Previsouly this was done
+>   indirectly via hugetlb
+> * Added review tag [4/4]
+>
+> v1 -> v2:
+> * Create helper to check if the page should have exec permission [1/4]
+> * Fix broken condition to detect THP hugepage [1/4]
+> * Fix in-correct hunk resulting from a rebase [4/4]
+>
+> [0] https://www.spinics.net/lists/arm-kernel/msg663562.html
+> [1] https://www.spinics.net/lists/kvm/msg171065.html
+>
+>
+> Punit Agrawal (7):
+>   KVM: arm/arm64: Share common code in user_mem_abort()
+>   KVM: arm/arm64: Introduce helpers to manupulate page table entries
+>   KVM: arm64: Support dirty page tracking for PUD hugepages
+>   KVM: arm64: Support PUD hugepage in stage2_is_exec()
+>   KVM: arm64: Support handling access faults for PUD hugepages
+>   KVM: arm64: Update age handlers to support PUD hugepages
+>   KVM: arm64: Add support for creating PUD hugepages at stage 2
+>
+>  arch/arm/include/asm/kvm_mmu.h         |  60 +++++
+>  arch/arm64/include/asm/kvm_mmu.h       |  47 ++++
+>  arch/arm64/include/asm/pgtable-hwdef.h |   4 +
+>  arch/arm64/include/asm/pgtable.h       |   9 +
+>  virt/kvm/arm/mmu.c                     | 289 ++++++++++++++++++-------
+>  5 files changed, 330 insertions(+), 79 deletions(-)
