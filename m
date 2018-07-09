@@ -1,59 +1,51 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 9 Jul 2018 17:43:14 +0100
-Subject: [PATCH v4 1/1] arm64: dts: mediatek: add mt6765 support
-In-Reply-To: <7fb13f45-4e33-6efc-467b-c7256a40cbc9@gmail.com>
-References: <1531116302-29921-1-git-send-email-mars.cheng@mediatek.com>
- <1531116302-29921-2-git-send-email-mars.cheng@mediatek.com>
- <7fb13f45-4e33-6efc-467b-c7256a40cbc9@gmail.com>
-Message-ID: <d439eb7d-6365-7a0a-2969-1ddecc51defc@arm.com>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Mon, 09 Jul 2018 09:44:34 -0700
+Subject: [PATCH 1/2] clk: mvebu: armada-37xx-periph: Fix switching CPU
+ rate from 300Mhz to 1.2GHz
+In-Reply-To: <87va9oct5k.fsf@bootlin.com>
+References: <20180619123446.694-1-gregory.clement@bootlin.com>
+ <20180619123446.694-2-gregory.clement@bootlin.com>
+ <87tvpl4pql.fsf@bootlin.com>
+ <153092068418.143105.5823916627333449732@swboyd.mtv.corp.google.com>
+ <87va9oct5k.fsf@bootlin.com>
+Message-ID: <153115467464.143105.10844577294634998251@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/07/18 11:20, Matthias Brugger wrote:
+Quoting Gregory CLEMENT (2018-07-09 08:42:31)
+> Hi Stephen,
+>  
+>  On ven., juil. 06 2018, Stephen Boyd <sboyd@kernel.org> wrote:
 > 
+> > Quoting Gregory CLEMENT (2018-06-29 07:44:02)
+> >> Hi,
+> >>  
+> >>  On mar., juin 19 2018, Gregory CLEMENT <gregory.clement@bootlin.com> wrote:
+> >> 
+> >> > Switching the CPU from the L2 or L3 frequencies (300 and 200 Mhz
+> >> > respectively) to L0 frequency (1.2 Ghz) requires a significant amount
+> >> > of time to let VDD stabilize to the appropriate voltage. This amount of
+> >> > time is large enough that it cannot be covered by the hardware
+> >> > countdown register. Due to this, the CPU might start operating at L0
+> >> > before the voltage is stabilized, leading to CPU stalls.
+> >> >
+> >> > To work around this problem, we prevent switching directly from the
+> >> > L2/L3 frequencies to the L0 frequency, and instead switch to the L1
+> >> > frequency in-between. The sequence therefore becomes:
+> >> >
+> >> > 1. First switch from L2/L3(200/300MHz) to L1(600MHZ)
+> >> > 2. Sleep 20ms for stabling VDD voltage
+> >> > 3. Then switch from L1(600MHZ) to L0(1200Mhz).
+> >> 
+> >> Do you have any comment on this fix?
+> >> 
+> >
+> > Looks good. Is it crashing right now? I can throw it into clk-fixes if
+> > it's fixing pain.
 > 
-> On 09/07/18 08:05, Mars Cheng wrote:
->> This adds basic chip support for MT6765 SoC.
->>
->> Signed-off-by: Mars Cheng <mars.cheng@mediatek.com>
->> ---
->>  arch/arm64/boot/dts/mediatek/Makefile       |    1 +
->>  arch/arm64/boot/dts/mediatek/mt6765-evb.dts |   33 ++++++
->>  arch/arm64/boot/dts/mediatek/mt6765.dtsi    |  156 +++++++++++++++++++++++++++
->>  3 files changed, 190 insertions(+)
->>  create mode 100644 arch/arm64/boot/dts/mediatek/mt6765-evb.dts
->>  create mode 100644 arch/arm64/boot/dts/mediatek/mt6765.dtsi
->>
->> diff --git a/arch/arm64/boot/dts/mediatek/Makefile b/arch/arm64/boot/dts/mediatek/Makefile
->> index ac17f60..7506b0d 100644
->> --- a/arch/arm64/boot/dts/mediatek/Makefile
->> +++ b/arch/arm64/boot/dts/mediatek/Makefile
->> @@ -1,6 +1,7 @@
->>  # SPDX-License-Identifier: GPL-2.0
->>  dtb-$(CONFIG_ARCH_MEDIATEK) += mt2712-evb.dtb
->>  dtb-$(CONFIG_ARCH_MEDIATEK) += mt6755-evb.dtb
->> +dtb-$(CONFIG_ARCH_MEDIATEK) += mt6765-evb.dtb
->>  dtb-$(CONFIG_ARCH_MEDIATEK) += mt6795-evb.dtb
->>  dtb-$(CONFIG_ARCH_MEDIATEK) += mt6797-evb.dtb
->>  dtb-$(CONFIG_ARCH_MEDIATEK) += mt7622-rfb1.dtb
+> Yes for the SoC capable to run at 1200Mhz it crashes. At the time the
+> initial support was provided, my SoC version only ran at 1000MHz, so the
+> problem was not noticed.
 > 
-> As you can see, we have a long list of SoCs which are poorly supported.
-> I'm not very keen to just add another SoC which supports booting into a ramdisk
-> using the serial console. Do you have a roadmap adding mainline support for this
-> SoC?
 
-Yes, that's a valid concern.
-
-mt6755 and mt6795 are in a similar state, the latter after three years.
-I'm all for supporting new SoCs, but this feels looks a box-ticking
-exercise ("hey, look, our SoC is supported in mainline") which doesn't
-help anyone.
-
-My Ack still stands, but I'd definitely like to see some more complete
-support before this patch goes in.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Ok. Applied to clk-fixes.
