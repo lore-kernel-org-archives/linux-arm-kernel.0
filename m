@@ -1,248 +1,63 @@
-From: j-keerthy@ti.com (Keerthy)
-Date: Mon, 9 Jul 2018 13:03:17 +0530
-Subject: [PATCH v2 2/2] ARM: OMAP2+: sleep33/43xx: Add RTC-Mode support
-In-Reply-To: <1531121597-19150-1-git-send-email-j-keerthy@ti.com>
-References: <1531121597-19150-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <1531121597-19150-2-git-send-email-j-keerthy@ti.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 9 Jul 2018 09:43:03 +0200
+Subject: Build regressions/improvements in v4.18-rc4
+In-Reply-To: <20180709073454.12509-1-geert@linux-m68k.org>
+References: <20180709073454.12509-1-geert@linux-m68k.org>
+Message-ID: <CAMuHMdUKxMYyqMDnBdeee_L2CKA0Jo=Z=Hs9mirMVYcfKF_WxQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for RTC mode to low level suspend code. This includes
-providing the rtc base address for the assembly code to configuring the
-PMIC_PWR_EN line late in suspend to enter RTC+DDR mode.
+On Mon, Jul 9, 2018 at 9:37 AM Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+> JFYI, when comparing v4.18-rc4[1] to v4.18-rc3[3], the summaries are:
+>   - build errors: +17/-0
 
-Note: This patch also fold in left out space parameter for
-am33xx_emif_sram_table and am43xx_emif_sram_table
+  + error: "__sync_icache_dcache" [drivers/xen/xen-privcmd.ko]
+undefined!:  => N/A
 
-Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
-Signed-off-by: Keerthy <j-keerthy@ti.com>
----
+arm64-allmodconfig (__sync_icache_dcache() needs an EXPORT_SYMBOL_GPL?)
 
-Changes in v2:
+  + error: /opt/cross/kisskb/korg/gcc-8.1.0-nolibc/nds32le-linux/bin/nds32le-linux-ld:
+direct-io.c: undefined reference to `__ashldi3':  => .text+0x1858)
+  + error: /opt/cross/kisskb/korg/gcc-8.1.0-nolibc/nds32le-linux/bin/nds32le-linux-ld:
+mballoc.c: undefined reference to `__ashrdi3':  => .text+0x1bc2)
+  + error: /opt/cross/kisskb/korg/gcc-8.1.0-nolibc/nds32le-linux/bin/nds32le-linux-ld:
+mmio.c: undefined reference to `__lshrdi3':  => .init.text+0x60)
+  + error: /opt/cross/kisskb/korg/gcc-8.1.0-nolibc/nds32le-linux/bin/nds32le-linux-ld:
+super.c: undefined reference to `__ashrdi3':  => .text+0x6504)
+  + error: /opt/cross/kisskb/korg/gcc-8.1.0-nolibc/nds32le-linux/bin/nds32le-linux-ld:
+tcp_ipv4.c: undefined reference to `__ashldi3':  => .text+0x25ac)
+  + error: /opt/cross/kisskb/korg/gcc-8.1.0-nolibc/nds32le-linux/bin/nds32le-linux-ld:
+timekeeping.c: undefined reference to `__ashldi3':  =>
+.init.text+0x1ac)
+  + error: /opt/cross/kisskb/korg/gcc-8.1.0-nolibc/nds32le-linux/bin/nds32le-linux-ld:
+timekeeping.c: undefined reference to `__lshrdi3':  =>
+.init.text+0x1f0), .init.text+0x1ec)
+  + error: direct-io.c: undefined reference to `__ashldi3':  =>
+.text+0x16a0), .text+0x16a4), .text+0x185c)
+  + error: mballoc.c: undefined reference to `__ashldi3':  =>
+.text+0x1c46), .text+0x1c70), .text+0x1c4a), .text+0x1c6c)
+  + error: mballoc.c: undefined reference to `__ashrdi3':  =>
+.text+0x1c0e), .text+0x1c12), .text+0x1bbe)
+  + error: mmio.c: undefined reference to `__lshrdi3':  => .init.text+0x5c)
+  + error: super.c: undefined reference to `__ashldi3':  =>
+.text+0x7fe0), .text+0x7fe4)
+  + error: super.c: undefined reference to `__ashrdi3':  => .text+0x6500)
+  + error: super.c: undefined reference to `__lshrdi3':  =>
+.text+0x7e38), .text+0x7e34)
+  + error: tcp_ipv4.c: undefined reference to `__ashldi3':  => .text+0x25a8)
+  + error: timekeeping.c: undefined reference to `__ashldi3':  =>
+.init.text+0x1a8)
 
-  * Swapped the bit definitons from patch 2 to 1
+  nds32le/nds32-defconfig (patch available)
 
- arch/arm/mach-omap2/pm-asm-offsets.c |  2 ++
- arch/arm/mach-omap2/pm33xx-core.c    | 10 +++++++
- arch/arm/mach-omap2/sleep33xx.S      |  5 ++--
- arch/arm/mach-omap2/sleep43xx.S      | 54 ++++++++++++++++++++++++++++++++++--
- drivers/soc/ti/pm33xx.c              |  1 +
- include/linux/platform_data/pm33xx.h |  3 ++
- 6 files changed, 71 insertions(+), 4 deletions(-)
+> [1] http://kisskb.ellerman.id.au/kisskb/head/1e4b044d22517cae7047c99038abb444423243ca/ (232 out of 244 configs)
+> [3] http://kisskb.ellerman.id.au/kisskb/head/021c91791a5e7e85c567452f1be3e4c2c6cb6063/ (231 out of 244 configs)Gr{oetje,eeting}s,
 
-diff --git a/arch/arm/mach-omap2/pm-asm-offsets.c b/arch/arm/mach-omap2/pm-asm-offsets.c
-index b9846b1..d202306 100644
---- a/arch/arm/mach-omap2/pm-asm-offsets.c
-+++ b/arch/arm/mach-omap2/pm-asm-offsets.c
-@@ -27,6 +27,8 @@ int main(void)
- 	       offsetof(struct am33xx_pm_ro_sram_data, amx3_pm_sram_data_virt));
- 	DEFINE(AMX3_PM_RO_SRAM_DATA_PHYS_OFFSET,
- 	       offsetof(struct am33xx_pm_ro_sram_data, amx3_pm_sram_data_phys));
-+	DEFINE(AMX3_PM_RTC_BASE_VIRT_OFFSET,
-+	       offsetof(struct am33xx_pm_ro_sram_data, rtc_base_virt));
- 	DEFINE(AMX3_PM_RO_SRAM_DATA_SIZE,
- 	       sizeof(struct am33xx_pm_ro_sram_data));
- 
-diff --git a/arch/arm/mach-omap2/pm33xx-core.c b/arch/arm/mach-omap2/pm33xx-core.c
-index e363b97..f4971e4 100644
---- a/arch/arm/mach-omap2/pm33xx-core.c
-+++ b/arch/arm/mach-omap2/pm33xx-core.c
-@@ -26,6 +26,7 @@
- static struct powerdomain *cefuse_pwrdm, *gfx_pwrdm, *per_pwrdm, *mpu_pwrdm;
- static struct clockdomain *gfx_l4ls_clkdm;
- static void __iomem *scu_base;
-+static struct omap_hwmod *rtc_oh;
- 
- static int __init am43xx_map_scu(void)
- {
-@@ -153,16 +154,25 @@ static struct am33xx_pm_sram_addr *amx3_get_sram_addrs(void)
- 		return NULL;
- }
- 
-+void __iomem *am43xx_get_rtc_base_addr(void)
-+{
-+	rtc_oh = omap_hwmod_lookup("rtc");
-+
-+	return omap_hwmod_get_mpu_rt_va(rtc_oh);
-+}
-+
- static struct am33xx_pm_platform_data am33xx_ops = {
- 	.init = am33xx_suspend_init,
- 	.soc_suspend = am33xx_suspend,
- 	.get_sram_addrs = amx3_get_sram_addrs,
-+	.get_rtc_base_addr = am43xx_get_rtc_base_addr,
- };
- 
- static struct am33xx_pm_platform_data am43xx_ops = {
- 	.init = am43xx_suspend_init,
- 	.soc_suspend = am43xx_suspend,
- 	.get_sram_addrs = amx3_get_sram_addrs,
-+	.get_rtc_base_addr = am43xx_get_rtc_base_addr,
- };
- 
- static struct am33xx_pm_platform_data *am33xx_pm_get_pdata(void)
-diff --git a/arch/arm/mach-omap2/sleep33xx.S b/arch/arm/mach-omap2/sleep33xx.S
-index 8d0d53b..47a8164 100644
---- a/arch/arm/mach-omap2/sleep33xx.S
-+++ b/arch/arm/mach-omap2/sleep33xx.S
-@@ -228,8 +228,6 @@ ENDPROC(am33xx_resume_from_deep_sleep)
-  * Local variables
-  */
- 	.align
--resume_addr:
--	.word	cpu_resume - PAGE_OFFSET + 0x80000000
- kernel_flush:
- 	.word   v7_flush_dcache_all
- virt_mpu_clkctrl:
-@@ -252,6 +250,9 @@ ENTRY(am33xx_pm_sram)
- 	.word am33xx_emif_sram_table
- 	.word am33xx_pm_ro_sram_data
- 
-+resume_addr:
-+.word  cpu_resume - PAGE_OFFSET + 0x80000000
-+
- .align 3
- ENTRY(am33xx_pm_ro_sram_data)
- 	.space AMX3_PM_RO_SRAM_DATA_SIZE
-diff --git a/arch/arm/mach-omap2/sleep43xx.S b/arch/arm/mach-omap2/sleep43xx.S
-index cd7e95f..5b9343b 100644
---- a/arch/arm/mach-omap2/sleep43xx.S
-+++ b/arch/arm/mach-omap2/sleep43xx.S
-@@ -48,6 +48,13 @@
- 					AM43XX_CM_PER_EMIF_CLKCTRL_OFFSET)
- #define AM43XX_PRM_EMIF_CTRL_OFFSET			0x0030
- 
-+#define RTC_SECONDS_REG					0x0
-+#define RTC_PMIC_REG					0x98
-+#define RTC_PMIC_POWER_EN				BIT(16)
-+#define RTC_PMIC_EXT_WAKEUP_STS				BIT(12)
-+#define RTC_PMIC_EXT_WAKEUP_POL				BIT(4)
-+#define RTC_PMIC_EXT_WAKEUP_EN				BIT(0)
-+
- 	.arm
- 	.align 3
- 
-@@ -147,6 +154,20 @@ sync:
- 	ldr	r4, [r2, #AMX3_PM_WFI_FLAGS_OFFSET]
- 
- cache_skip_flush:
-+	/*
-+	 * If we are trying to enter RTC+DDR mode we must perform
-+	 * a read from the rtc address space to ensure translation
-+	 * presence in the TLB to avoid page table walk after DDR
-+	 * is unavailable.
-+	 */
-+	tst	r4, #WFI_FLAG_RTC_ONLY
-+	beq	skip_rtc_va_refresh
-+
-+	adr	r3, am43xx_pm_ro_sram_data
-+	ldr	r1, [r3, #AMX3_PM_RTC_BASE_VIRT_OFFSET]
-+	ldr	r0, [r1]
-+
-+skip_rtc_va_refresh:
- 	/* Check if we want self refresh */
- 	tst	r4, #WFI_FLAG_SELF_REFRESH
- 	beq	emif_skip_enter_sr
-@@ -182,6 +203,34 @@ wait_emif_disable:
- 	bne	wait_emif_disable
- 
- emif_skip_disable:
-+	tst	r4, #WFI_FLAG_RTC_ONLY
-+	beq	skip_rtc_only
-+
-+	adr	r3, am43xx_pm_ro_sram_data
-+	ldr	r1, [r3, #AMX3_PM_RTC_BASE_VIRT_OFFSET]
-+
-+	ldr	r0, [r1, #RTC_PMIC_REG]
-+	orr	r0, r0, #RTC_PMIC_POWER_EN
-+	orr	r0, r0, #RTC_PMIC_EXT_WAKEUP_STS
-+	orr	r0, r0, #RTC_PMIC_EXT_WAKEUP_EN
-+	orr	r0, r0, #RTC_PMIC_EXT_WAKEUP_POL
-+	str	r0, [r1, #RTC_PMIC_REG]
-+	ldr	r0, [r1, #RTC_PMIC_REG]
-+	/* Wait for 2 seconds to lose power */
-+	mov	r3, #2
-+	ldr	r2, [r1, #RTC_SECONDS_REG]
-+rtc_loop:
-+	ldr	r0, [r1, #RTC_SECONDS_REG]
-+	cmp	r0, r2
-+	beq	rtc_loop
-+	mov	r2, r0
-+	subs	r3, r3, #1
-+	bne	rtc_loop
-+
-+	b	re_enable_emif
-+
-+skip_rtc_only:
-+
- 	tst	r4, #WFI_FLAG_WAKE_M3
- 	beq	wkup_m3_skip
- 
-@@ -247,6 +296,7 @@ wkup_m3_skip:
- 	mov	r2, #AM33XX_CM_CLKCTRL_MODULEMODE_ENABLE
- 	str	r2, [r1]
- 
-+re_enable_emif:
- 	/* Re-enable EMIF */
- 	ldr	r1, am43xx_virt_emif_clkctrl
- 	mov	r2, #AM33XX_CM_CLKCTRL_MODULEMODE_ENABLE
-@@ -381,8 +431,6 @@ ENDPROC(am43xx_resume_from_deep_sleep)
-  * Local variables
-  */
- 	.align
--resume_addr:
--	.word	cpu_resume - PAGE_OFFSET + 0x80000000
- kernel_flush:
- 	.word   v7_flush_dcache_all
- ddr_start:
-@@ -429,6 +477,8 @@ ENTRY(am43xx_pm_sram)
- 	.word am43xx_emif_sram_table
- 	.word am43xx_pm_ro_sram_data
- 
-+resume_addr:
-+	.word   cpu_resume - PAGE_OFFSET + 0x80000000
- .align 3
- 
- ENTRY(am43xx_pm_ro_sram_data)
-diff --git a/drivers/soc/ti/pm33xx.c b/drivers/soc/ti/pm33xx.c
-index 0011c8f..d0dab32 100644
---- a/drivers/soc/ti/pm33xx.c
-+++ b/drivers/soc/ti/pm33xx.c
-@@ -229,6 +229,7 @@ static int am33xx_push_sram_idle(void)
- 	ro_sram_data.amx3_pm_sram_data_virt = ocmcram_location_data;
- 	ro_sram_data.amx3_pm_sram_data_phys =
- 		gen_pool_virt_to_phys(sram_pool_data, ocmcram_location_data);
-+	ro_sram_data.rtc_base_virt = pm_ops->get_rtc_base_addr();
- 
- 	/* Save physical address to calculate resume offset during pm init */
- 	am33xx_do_wfi_sram_phys = gen_pool_virt_to_phys(sram_pool,
-diff --git a/include/linux/platform_data/pm33xx.h b/include/linux/platform_data/pm33xx.h
-index d231265..fbf5ed7 100644
---- a/include/linux/platform_data/pm33xx.h
-+++ b/include/linux/platform_data/pm33xx.h
-@@ -42,6 +42,7 @@ struct am33xx_pm_sram_addr {
- 	unsigned long *resume_offset;
- 	unsigned long *emif_sram_table;
- 	unsigned long *ro_sram_data;
-+	unsigned long resume_address;
- };
- 
- struct am33xx_pm_platform_data {
-@@ -49,6 +50,7 @@ struct am33xx_pm_platform_data {
- 	int	(*soc_suspend)(unsigned int state, int (*fn)(unsigned long),
- 			       unsigned long args);
- 	struct  am33xx_pm_sram_addr *(*get_sram_addrs)(void);
-+	void __iomem *(*get_rtc_base_addr)(void);
- };
- 
- struct am33xx_pm_sram_data {
-@@ -60,6 +62,7 @@ struct am33xx_pm_sram_data {
- struct am33xx_pm_ro_sram_data {
- 	u32 amx3_pm_sram_data_virt;
- 	u32 amx3_pm_sram_data_phys;
-+	void __iomem *rtc_base_virt;
- } __packed __aligned(8);
- 
- #endif /* __ASSEMBLER__ */
--- 
-1.9.1
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
