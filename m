@@ -1,399 +1,1693 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 9 Jul 2018 10:49:50 +0530
-Subject: [PATCH 2/4] phy: socionext: add USB3 PHY driver for UniPhier SoC
-In-Reply-To: <1530261541-23104-3-git-send-email-hayashi.kunihiko@socionext.com>
-References: <1530261541-23104-1-git-send-email-hayashi.kunihiko@socionext.com>
- <1530261541-23104-3-git-send-email-hayashi.kunihiko@socionext.com>
-Message-ID: <4b436a46-9046-25ad-ee6d-ad2cdb16e2ca@ti.com>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Sun, 08 Jul 2018 22:26:56 -0700
+Subject: [PATCH v9 10/10] drivers: clk: Add ZynqMP clock driver
+In-Reply-To: <1529516435-7315-11-git-send-email-jollys@xilinx.com>
+References: <1529516435-7315-1-git-send-email-jollys@xilinx.com>
+ <1529516435-7315-11-git-send-email-jollys@xilinx.com>
+Message-ID: <153111401693.143105.16925315512459949259@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Quoting Jolly Shah (2018-06-20 10:40:35)
+> diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+> index 98ce9fc..a2ebcf7 100644
+> --- a/drivers/clk/Kconfig
+> +++ b/drivers/clk/Kconfig
+> @@ -252,6 +252,7 @@ source "drivers/clk/sprd/Kconfig"
+>  source "drivers/clk/sunxi-ng/Kconfig"
+>  source "drivers/clk/tegra/Kconfig"
+>  source "drivers/clk/ti/Kconfig"
+> +source "drivers/clk/zynqmp/Kconfig"
+>  source "drivers/clk/uniphier/Kconfig"
 
-On Friday 29 June 2018 02:08 PM, Kunihiko Hayashi wrote:
-> Add a driver for PHY interface built into USB3 controller
-> implemented in UniPhier SoCs.
-> This driver supports High-Speed PHY and Super-Speed PHY.
-> 
-> Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
-> Signed-off-by: Motoya Tanigawa <tanigawa.motoya@socionext.com>
-> Signed-off-by: Masami Hiramatsu <masami.hiramatsu@linaro.org>
-> ---
->  drivers/phy/Kconfig                         |   1 +
->  drivers/phy/Makefile                        |   1 +
->  drivers/phy/socionext/Kconfig               |  12 +
->  drivers/phy/socionext/Makefile              |   6 +
->  drivers/phy/socionext/phy-uniphier-usb3hs.c | 422 ++++++++++++++++++++++++++++
->  drivers/phy/socionext/phy-uniphier-usb3ss.c | 369 ++++++++++++++++++++++++
->  6 files changed, 811 insertions(+)
->  create mode 100644 drivers/phy/socionext/Kconfig
->  create mode 100644 drivers/phy/socionext/Makefile
->  create mode 100644 drivers/phy/socionext/phy-uniphier-usb3hs.c
->  create mode 100644 drivers/phy/socionext/phy-uniphier-usb3ss.c
-> 
-> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
-> index 5c8d452..b752589 100644
-> --- a/drivers/phy/Kconfig
-> +++ b/drivers/phy/Kconfig
-> @@ -53,6 +53,7 @@ source "drivers/phy/ralink/Kconfig"
->  source "drivers/phy/renesas/Kconfig"
->  source "drivers/phy/rockchip/Kconfig"
->  source "drivers/phy/samsung/Kconfig"
-> +source "drivers/phy/socionext/Kconfig"
->  source "drivers/phy/st/Kconfig"
->  source "drivers/phy/tegra/Kconfig"
->  source "drivers/phy/ti/Kconfig"
-> diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
-> index 84e3bd9..5539cde 100644
-> --- a/drivers/phy/Makefile
-> +++ b/drivers/phy/Makefile
-> @@ -21,5 +21,6 @@ obj-y					+= broadcom/	\
->  					   qualcomm/	\
->  					   ralink/	\
->  					   samsung/	\
-> +					   socionext/	\
->  					   st/		\
->  					   ti/
-> diff --git a/drivers/phy/socionext/Kconfig b/drivers/phy/socionext/Kconfig
+z comes after u, this is wrong.
+
+>  
+>  endmenu
+> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+> index 71ec41e..b6ac0d2 100644
+> --- a/drivers/clk/Makefile
+> +++ b/drivers/clk/Makefile
+> @@ -100,3 +100,4 @@ obj-$(CONFIG_X86)                   += x86/
+>  endif
+>  obj-$(CONFIG_ARCH_ZX)                  += zte/
+>  obj-$(CONFIG_ARCH_ZYNQ)                        += zynq/
+> +obj-$(CONFIG_COMMON_CLK_ZYNQMP)         += zynqmp/
+> diff --git a/drivers/clk/zynqmp/Kconfig b/drivers/clk/zynqmp/Kconfig
 > new file mode 100644
-> index 0000000..4a172fc
+> index 0000000..0f8986c
 > --- /dev/null
-> +++ b/drivers/phy/socionext/Kconfig
-> @@ -0,0 +1,12 @@
-> +#
-> +# PHY drivers for Socionext platforms.
-> +#
+> +++ b/drivers/clk/zynqmp/Kconfig
+> @@ -0,0 +1,11 @@
+> +# SPDX-License-Identifier: GPL-2.0
 > +
-> +config PHY_UNIPHIER_USB3
-> +	tristate "UniPhier USB3 PHY driver"
-> +	depends on ARCH_UNIPHIER || COMPILE_TEST
-> +	depends on OF && HAS_IOMEM
-> +	select GENERIC_PHY
-> +	help
-> +	  Enable this to support USB PHY implemented in USB3 controller
-> +	  on UniPhier SoCs. This controller supports USB3.0 and lower speed.
-> diff --git a/drivers/phy/socionext/Makefile b/drivers/phy/socionext/Makefile
+> +config COMMON_CLK_ZYNQMP
+> +       bool "Support for Xilinx ZynqMP Ultrascale+ clock controllers"
+> +       depends on OF
+
+What relies on OF that isn't stubbed out when OF=n? 
+
+> +       depends on ARCH_ZYNQMP || COMPILE_TEST
+> +       depends on ZYNQMP_FIRMWARE
+> +       help
+> +         Support for the Zynqmp Ultrascale clock controller.
+> +         It has a dependency on the PMU firmware.
+> +         Say Y if you want to include clock support.
+> diff --git a/drivers/clk/zynqmp/clk-gate-zynqmp.c b/drivers/clk/zynqmp/clk-gate-zynqmp.c
 > new file mode 100644
-> index 0000000..dfa5cec
+> index 0000000..b927eb1
 > --- /dev/null
-> +++ b/drivers/phy/socionext/Makefile
-> @@ -0,0 +1,6 @@
-> +# SPDX-identifier: GPL-2.0
-> +#
-> +# Makefile for the phy drivers.
-> +#
-> +
-> +obj-$(CONFIG_PHY_UNIPHIER_USB3)	+= phy-uniphier-usb3hs.o phy-uniphier-usb3ss.o
-> diff --git a/drivers/phy/socionext/phy-uniphier-usb3hs.c b/drivers/phy/socionext/phy-uniphier-usb3hs.c
-> new file mode 100644
-> index 0000000..cea8983
-> --- /dev/null
-> +++ b/drivers/phy/socionext/phy-uniphier-usb3hs.c
-> @@ -0,0 +1,422 @@
+> +++ b/drivers/clk/zynqmp/clk-gate-zynqmp.c
+> @@ -0,0 +1,146 @@
 > +// SPDX-License-Identifier: GPL-2.0
 > +/*
-> + * phy-uniphier-usb3hs.c - HS-PHY driver for Socionext UniPhier USB3 controller
-> + * Copyright 2015-2018 Socionext Inc.
-> + * Author:
-> + *	Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
-> + * Contributors:
-> + *      Motoya Tanigawa <tanigawa.motoya@socionext.com>
-> + *      Masami Hiramatsu <masami.hiramatsu@linaro.org>
+> + * Zynq UltraScale+ MPSoC clock controller
+> + *
+> + *  Copyright (C) 2016-2018 Xilinx
+> + *
+> + * Gated clock implementation
+> + */
+> +
+> +#include <linux/clk-provider.h>
+> +#include <linux/slab.h>
+> +#include "clk-zynqmp.h"
+> +
+> +/**
+> + * struct clk_gate - gating clock
+> + * @hw:                handle between common and hardware-specific interfaces
+> + * @flags:     hardware-specific flags
+> + * @clk_id:    Id of clock
+> + */
+> +struct zynqmp_clk_gate {
+> +       struct clk_hw hw;
+> +       u8 flags;
+> +       u32 clk_id;
+> +};
+> +
+> +#define to_zynqmp_clk_gate(_hw) container_of(_hw, struct zynqmp_clk_gate, hw)
+> +
+> +/**
+> + * zynqmp_clk_gate_enable() - Enable clock
+> + * @hw:                handle between common and hardware-specific interfaces
+> + *
+> + * Return: 0 on success else error code
+> + */
+> +static int zynqmp_clk_gate_enable(struct clk_hw *hw)
+> +{
+> +       struct zynqmp_clk_gate *gate = to_zynqmp_clk_gate(hw);
+> +       const char *clk_name = clk_hw_get_name(hw);
+> +       u32 clk_id = gate->clk_id;
+> +       int ret;
+> +       const struct zynqmp_eemi_ops *eemi_ops = zynqmp_pm_get_eemi_ops();
+> +
+> +       ret = eemi_ops->clock_enable(clk_id);
+> +
+> +       if (ret)
+> +               pr_warn_once("%s() clock enabled failed for %s, ret = %d\n",
+> +                            __func__, clk_name, ret);
+> +
+> +       return ret;
+> +}
+> +
+> +/*
+> + * zynqmp_clk_gate_disable() - Disable clock
+> + * @hw:                handle between common and hardware-specific interfaces
+> + */
+> +static void zynqmp_clk_gate_disable(struct clk_hw *hw)
+> +{
+> +       struct zynqmp_clk_gate *gate = to_zynqmp_clk_gate(hw);
+> +       const char *clk_name = clk_hw_get_name(hw);
+> +       u32 clk_id = gate->clk_id;
+> +       int ret;
+> +       const struct zynqmp_eemi_ops *eemi_ops = zynqmp_pm_get_eemi_ops();
+> +
+> +       ret = eemi_ops->clock_disable(clk_id);
+> +
+> +       if (ret)
+> +               pr_warn_once("%s() clock disable failed for %s, ret = %d\n",
+> +                            __func__, clk_name, ret);
+> +}
+> +
+> +/**
+> + * zynqmp_clk_gate_is_enable() - Check clock state
+> + * @hw:                handle between common and hardware-specific interfaces
+> + *
+> + * Return: 1 if enabled, 0 if disabled else error code
+> + */
+> +static int zynqmp_clk_gate_is_enabled(struct clk_hw *hw)
+> +{
+> +       struct zynqmp_clk_gate *gate = to_zynqmp_clk_gate(hw);
+> +       const char *clk_name = clk_hw_get_name(hw);
+> +       u32 clk_id = gate->clk_id;
+> +       int state, ret;
+> +       const struct zynqmp_eemi_ops *eemi_ops = zynqmp_pm_get_eemi_ops();
+> +
+> +       ret = eemi_ops->clock_getstate(clk_id, &state);
+> +       if (ret) {
+> +               pr_warn_once("%s() clock get state failed for %s, ret = %d\n",
+> +                            __func__, clk_name, ret);
+> +               return -EIO;
+> +       }
+> +
+> +       return state ? 1 : 0;
+> +}
+> +
+> +const struct clk_ops zynqmp_clk_gate_ops = {
+
+static?
+
+> +       .enable = zynqmp_clk_gate_enable,
+> +       .disable = zynqmp_clk_gate_disable,
+> +       .is_enabled = zynqmp_clk_gate_is_enabled,
+> +};
+> +EXPORT_SYMBOL_GPL(zynqmp_clk_gate_ops);
+> +
+
+Or why is it exported?
+
+> +/**
+> + * zynqmp_clk_register_gate() - register a gate clock with the clock framework
+> + * @dev:               device that is registering this clock
+> + * @name:              name of this clock
+> + * @clk_id:            Id of this clock
+> + * @parent:            name of this clock's parent
+> + * @flags:             framework-specific flags for this clock
+> + * @clk_gate_flags:    gate-specific flags for this clock
+> + *
+> + * Return: clock hardware of the registered clock gate
+> + */
+> +struct clk_hw *zynqmp_clk_register_gate(struct device *dev, const char *name,
+> +                                       u32 clk_id, const char *parent,
+> +                                       unsigned long flags,
+> +                                       u8 clk_gate_flags)
+> +{
+> +       struct zynqmp_clk_gate *gate;
+> +       struct clk_hw *hw;
+> +       int ret;
+> +       struct clk_init_data init;
+> +
+> +       /* allocate the gate */
+> +       gate = kzalloc(sizeof(*gate), GFP_KERNEL);
+> +       if (!gate)
+> +               return ERR_PTR(-ENOMEM);
+> +
+> +       init.name = name;
+> +       init.ops = &zynqmp_clk_gate_ops;
+> +       init.flags = flags;
+> +       init.parent_names = &parent;
+> +       init.num_parents = 1;
+> +
+> +       /* struct clk_gate assignments */
+> +       gate->flags = clk_gate_flags;
+> +       gate->hw.init = &init;
+> +       gate->clk_id = clk_id;
+> +
+> +       hw = &gate->hw;
+> +       ret = clk_hw_register(dev, hw);
+
+But dev is always NULL? Seems to be a lot of copy/paste going on.
+
+> +       if (ret) {
+> +               kfree(gate);
+> +               hw = ERR_PTR(ret);
+> +       }
+> +
+> +       return hw;
+> +}
+> diff --git a/drivers/clk/zynqmp/clk-mux-zynqmp.c b/drivers/clk/zynqmp/clk-mux-zynqmp.c
+> new file mode 100644
+> index 0000000..a0b452d
+> --- /dev/null
+> +++ b/drivers/clk/zynqmp/clk-mux-zynqmp.c
+> @@ -0,0 +1,150 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * Zynq UltraScale+ MPSoC mux
+> + *
+> + *  Copyright (C) 2016-2018 Xilinx
+> + */
+> +
+> +#include <linux/clk-provider.h>
+> +#include <linux/slab.h>
+> +#include "clk-zynqmp.h"
+> +
+> +/*
+> + * DOC: basic adjustable multiplexer clock that cannot gate
+> + *
+> + * Traits of this clock:
+> + * prepare - clk_prepare only ensures that parents are prepared
+> + * enable - clk_enable only ensures that parents are enabled
+> + * rate - rate is only affected by parent switching.  No clk_set_rate support
+> + * parent - parent is adjustable through clk_set_parent
+> + */
+> +
+> +/**
+> + * struct zynqmp_clk_mux - multiplexer clock
+> + *
+> + * @hw:                handle between common and hardware-specific interfaces
+> + * @flags:     hardware-specific flags
+> + * @clk_id:    Id of clock
+> + */
+> +struct zynqmp_clk_mux {
+> +       struct clk_hw hw;
+> +       u8 flags;
+> +       u32 clk_id;
+> +};
+> +
+> +#define to_zynqmp_clk_mux(_hw) container_of(_hw, struct zynqmp_clk_mux, hw)
+> +
+> +/**
+> + * zynqmp_clk_mux_get_parent() - Get parent of clock
+> + * @hw:                handle between common and hardware-specific interfaces
+> + *
+> + * Return: Parent index
+> + */
+> +static u8 zynqmp_clk_mux_get_parent(struct clk_hw *hw)
+> +{
+> +       struct zynqmp_clk_mux *mux = to_zynqmp_clk_mux(hw);
+> +       const char *clk_name = clk_hw_get_name(hw);
+> +       u32 clk_id = mux->clk_id;
+> +       u32 val;
+> +       int ret;
+> +       const struct zynqmp_eemi_ops *eemi_ops = zynqmp_pm_get_eemi_ops();
+> +
+> +       ret = eemi_ops->clock_getparent(clk_id, &val);
+> +
+> +       if (ret)
+> +               pr_warn_once("%s() getparent failed for clock: %s, ret = %d\n",
+> +                            __func__, clk_name, ret);
+> +
+> +       return val;
+> +}
+> +
+> +/**
+> + * zynqmp_clk_mux_set_parent() - Set parent of clock
+> + * @hw:                handle between common and hardware-specific interfaces
+> + * @index:     Parent index
+> + *
+> + * Return: Returns status, either success or error+reason
+> + */
+> +static int zynqmp_clk_mux_set_parent(struct clk_hw *hw, u8 index)
+> +{
+> +       struct zynqmp_clk_mux *mux = to_zynqmp_clk_mux(hw);
+> +       const char *clk_name = clk_hw_get_name(hw);
+> +       u32 clk_id = mux->clk_id;
+> +       int ret;
+> +       const struct zynqmp_eemi_ops *eemi_ops = zynqmp_pm_get_eemi_ops();
+> +
+> +       ret = eemi_ops->clock_setparent(clk_id, index);
+> +
+> +       if (ret)
+> +               pr_warn_once("%s() set parent failed for clock: %s, ret = %d\n",
+> +                            __func__, clk_name, ret);
+> +
+> +       return ret;
+> +}
+> +
+> +const struct clk_ops zynqmp_clk_mux_ops = {
+
+static?
+
+> +       .get_parent = zynqmp_clk_mux_get_parent,
+> +       .set_parent = zynqmp_clk_mux_set_parent,
+> +       .determine_rate = __clk_mux_determine_rate,
+> +};
+> +EXPORT_SYMBOL_GPL(zynqmp_clk_mux_ops);
+
+Or why is it exported?
+
+> +
+> +const struct clk_ops zynqmp_clk_mux_ro_ops = {
+> +       .get_parent = zynqmp_clk_mux_get_parent,
+> +};
+> +EXPORT_SYMBOL_GPL(zynqmp_clk_mux_ro_ops);
+
+Same.
+
+> +
+> +/**
+> + * zynqmp_clk_register_mux() - register a mux table with the clock
+> + *                            framework
+> + * @dev:               device that is registering this clock
+> + * @name:              name of this clock
+> + * @clk_id:            Id of this clock
+> + * @parents:           name of this clock's parents
+> + * @num_parents:       number of parents
+> + * @flags:             framework-specific flags for this clock
+> + * @clk_mux_flags:     mux-specific flags for this clock
+> + *
+> + * Return: clock hardware of the registered clock mux
+> + */
+> +struct clk_hw *zynqmp_clk_register_mux(struct device *dev, const char *name,
+> +                                      u32 clk_id,
+> +                                      const char * const *parents,
+> +                                      u8 num_parents,
+> +                                      unsigned long flags,
+> +                                      u8 clk_mux_flags)
+> +{
+> +       struct zynqmp_clk_mux *mux;
+> +       struct clk_hw *hw;
+> +       struct clk_init_data init;
+> +       int ret;
+> +
+> +       /* allocate the mux */
+
+Obvious comment, remove.
+
+> +       mux = kzalloc(sizeof(*mux), GFP_KERNEL);
+> +       if (!mux)
+> +               return ERR_PTR(-ENOMEM);
+> +
+> +       init.name = name;
+> +       if (clk_mux_flags & CLK_MUX_READ_ONLY)
+> +               init.ops = &zynqmp_clk_mux_ro_ops;
+> +       else
+> +               init.ops = &zynqmp_clk_mux_ops;
+> +       init.flags = flags;
+> +       init.parent_names = parents;
+> +       init.num_parents = num_parents;
+> +
+> +       /* struct clk_mux assignments */
+
+Obvious comment, remove.
+
+> +       mux->flags = clk_mux_flags;
+> +       mux->hw.init = &init;
+> +       mux->clk_id = clk_id;
+> +
+> +       hw = &mux->hw;
+> +       ret = clk_hw_register(dev, hw);
+> +       if (ret) {
+> +               kfree(hw);
+> +               hw = ERR_PTR(ret);
+> +       }
+> +
+> +       return hw;
+> +}
+> +EXPORT_SYMBOL_GPL(zynqmp_clk_register_mux);
+> diff --git a/drivers/clk/zynqmp/clkc.c b/drivers/clk/zynqmp/clkc.c
+> new file mode 100644
+> index 0000000..a315fc2
+> --- /dev/null
+> +++ b/drivers/clk/zynqmp/clkc.c
+> @@ -0,0 +1,737 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * Zynq UltraScale+ MPSoC clock controller
+> + *
+> + *  Copyright (C) 2016-2018 Xilinx
+> + *
+> + * Based on drivers/clk/zynq/clkc.c
 > + */
 > +
 > +#include <linux/bitfield.h>
-> +#include <linux/bitops.h>
 > +#include <linux/clk.h>
-> +#include <linux/io.h>
-> +#include <linux/mfd/syscon.h>
-> +#include <linux/module.h>
-> +#include <linux/nvmem-consumer.h>
-> +#include <linux/of.h>
-> +#include <linux/of_platform.h>
-> +#include <linux/phy/phy.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/reset.h>
+> +#include <linux/clk-provider.h>
 > +#include <linux/slab.h>
+> +#include <linux/string.h>
 > +
-> +#define HSPHY_CFG0		0x0
-> +#define HSPHY_CFG0_HS_I_MASK	GENMASK(31, 28)
-> +#define HSPHY_CFG0_HSDISC_MASK	GENMASK(27, 26)
-> +#define HSPHY_CFG0_SWING_MASK	GENMASK(17, 16)
-> +#define HSPHY_CFG0_SEL_T_MASK	GENMASK(15, 12)
-> +#define HSPHY_CFG0_RTERM_MASK	GENMASK(7, 6)
-> +#define HSPHY_CFG0_TRIMMASK	(HSPHY_CFG0_HS_I_MASK \
-> +				 | HSPHY_CFG0_SEL_T_MASK \
-> +				 | HSPHY_CFG0_RTERM_MASK)
+> +#include "clk-zynqmp.h"
 > +
-> +#define HSPHY_CFG1		0x4
-> +#define HSPHY_CFG1_DAT_EN	BIT(29)
-> +#define HSPHY_CFG1_ADR_EN	BIT(28)
-> +#define HSPHY_CFG1_ADR_MASK	GENMASK(27, 16)
-> +#define HSPHY_CFG1_DAT_MASK	GENMASK(23, 16)
+> +#define MAX_PARENT                     100
+> +#define MAX_NODES                      6
+> +#define MAX_NAME_LEN                   50
+> +#define MAX_CLOCK                      300
 > +
-> +#define MAX_CLKS	3
-> +#define MAX_RSTS	2
-> +#define MAX_PHY_PARAMS	1
+> +#define CLK_INIT_ENABLE_SHIFT          1
+> +#define CLK_TYPE_SHIFT                 2
 > +
-> +struct uniphier_u3hsphy_param {
-> +	u32 addr;
-> +	u32 mask;
-> +	u32 val;
+> +#define PM_API_PAYLOAD_LEN             3
+> +
+> +#define NA_PARENT                      0xFFFFFFFF
+> +#define DUMMY_PARENT                   0xFFFFFFFE
+> +
+> +#define CLK_TYPE_FIELD_LEN             4
+> +#define CLK_TOPOLOGY_NODE_OFFSET       16
+> +#define NODES_PER_RESP                 3
+> +
+> +#define CLK_TYPE_FIELD_MASK            0xF
+> +#define CLK_FLAG_FIELD_MASK            GENMASK(21, 8)
+> +#define CLK_TYPE_FLAG_FIELD_MASK       GENMASK(31, 24)
+> +
+> +#define CLK_PARENTS_ID_LEN             16
+> +#define CLK_PARENTS_ID_MASK            0xFFFF
+> +
+> +/* Flags for parents */
+> +#define PARENT_CLK_SELF                        0
+> +#define PARENT_CLK_NODE1               1
+> +#define PARENT_CLK_NODE2               2
+> +#define PARENT_CLK_NODE3               3
+> +#define PARENT_CLK_NODE4               4
+> +#define PARENT_CLK_EXTERNAL            5
+> +
+> +#define END_OF_CLK_NAME                        "END_OF_CLK"
+> +#define RESERVED_CLK_NAME              ""
+> +
+> +#define CLK_VALID_MASK                 0x1
+> +#define CLK_INIT_ENABLE_MASK           (0x1 << CLK_INIT_ENABLE_SHIFT)
+> +
+> +enum clk_type {
+> +       CLK_TYPE_OUTPUT,
+> +       CLK_TYPE_EXTERNAL,
 > +};
+> +
+> +/**
+> + * struct clock_parent - Structure for parent of clock
 
-I'd like to avoid configure the PHY this way, since it's impossible to know
-which register is being configured.
-> +
-> +struct uniphier_u3hsphy_trim_param {
-> +	unsigned int rterm;
-> +	unsigned int sel_t;
-> +	unsigned int hs_i;
-> +};
-> +
-> +#define trim_param_is_valid(p)	((p)->rterm || (p)->sel_t || (p)->hs_i)
-> +
-> +struct uniphier_u3hsphy_priv {
-> +	struct device *dev;
-> +	void __iomem *base;
-> +	int nclks;
-> +	struct clk *clk[MAX_CLKS], *clk_phy, *clk_phy_ext;
-> +	int nrsts;
-> +	struct reset_control *rst[MAX_RSTS], *rst_phy;
-> +	const struct uniphier_u3hsphy_soc_data *data;
-> +};
-> +
-> +struct uniphier_u3hsphy_soc_data {
-> +	const char *clock_names[MAX_CLKS];
-> +	const char *reset_names[MAX_RSTS];
-> +	int nparams;
-> +	const struct uniphier_u3hsphy_param param[MAX_PHY_PARAMS];
-> +	u32 config0;
-> +	u32 config1;
-> +	void (*trim_func)(struct uniphier_u3hsphy_priv *priv, u32 *pconfig,
-> +			  struct uniphier_u3hsphy_trim_param *pt);
-> +};
-> +
-> +static void uniphier_u3hsphy_trim_ld20(struct uniphier_u3hsphy_priv *priv,
-> +				       u32 *pconfig,
-> +				       struct uniphier_u3hsphy_trim_param *pt)
-> +{
-> +	*pconfig &= ~HSPHY_CFG0_RTERM_MASK;
-> +	*pconfig |= FIELD_PREP(HSPHY_CFG0_RTERM_MASK, pt->rterm);
-> +
-> +	*pconfig &= ~HSPHY_CFG0_SEL_T_MASK;
-> +	*pconfig |= FIELD_PREP(HSPHY_CFG0_SEL_T_MASK, pt->sel_t);
-> +
-> +	*pconfig &= ~HSPHY_CFG0_HS_I_MASK;
-> +	*pconfig |= FIELD_PREP(HSPHY_CFG0_HS_I_MASK,  pt->hs_i);
-> +}
-> +
-> +static int uniphier_u3hsphy_get_nvparam(struct uniphier_u3hsphy_priv *priv,
-> +					const char *name, unsigned int *val)
-> +{
-> +	struct nvmem_cell *cell;
-> +	u8 *buf;
-> +
-> +	cell = devm_nvmem_cell_get(priv->dev, name);
-> +	if (IS_ERR(cell))
-> +		return PTR_ERR(cell);
-> +
-> +	buf = nvmem_cell_read(cell, NULL);
-> +	if (IS_ERR(buf))
-> +		return PTR_ERR(buf);
-> +
-> +	*val = *buf;
-> +
-> +	kfree(buf);
-> +
-> +	return 0;
-> +}
-> +
-> +static int uniphier_u3hsphy_get_nvparams(struct uniphier_u3hsphy_priv *priv,
-> +					 struct uniphier_u3hsphy_trim_param *pt)
-> +{
-> +	int ret;
-> +
-> +	ret = uniphier_u3hsphy_get_nvparam(priv, "rterm", &pt->rterm);
-> +	if (ret)
-> +		return ret;
-> +
-> +	ret = uniphier_u3hsphy_get_nvparam(priv, "sel_t", &pt->sel_t);
-> +	if (ret)
-> +		return ret;
-> +
-> +	ret = uniphier_u3hsphy_get_nvparam(priv, "hs_i", &pt->hs_i);
-> +	if (ret)
-> +		return ret;
-> +
-> +	return 0;
-> +}
-> +
-> +static int uniphier_u3hsphy_update_config(struct uniphier_u3hsphy_priv *priv,
-> +					  u32 *pconfig)
-> +{
-> +	struct uniphier_u3hsphy_trim_param trim;
-> +	int ret, trimmed = 0;
-> +
-> +	if (priv->data->trim_func) {
-> +		ret = uniphier_u3hsphy_get_nvparams(priv, &trim);
-> +		if (ret == -EPROBE_DEFER)
-> +			return ret;
-> +
-> +		/*
-> +		 * call trim_func only when trimming parameters that aren't
-> +		 * all-zero can be acquired. All-zero parameters mean nothing
-> +		 * has been written to nvmem.
-> +		 */
-> +		if (!ret && trim_param_is_valid(&trim)) {
-> +			priv->data->trim_func(priv, pconfig, &trim);
-> +			trimmed = 1;
-> +		} else {
-> +			dev_dbg(priv->dev, "can't get parameter from nvmem\n");
-> +		}
-> +	}
-> +
-> +	/* use default parameters without trimming values */
-> +	if (!trimmed) {
-> +		*pconfig &= ~HSPHY_CFG0_HSDISC_MASK;
-> +		*pconfig |= FIELD_PREP(HSPHY_CFG0_HSDISC_MASK, 3);
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static void uniphier_u3hsphy_set_param(struct uniphier_u3hsphy_priv *priv,
-> +				       const struct uniphier_u3hsphy_param *p)
-> +{
-> +	u32 val;
-> +
-> +	val = readl(priv->base + HSPHY_CFG1);
-> +	val &= ~HSPHY_CFG1_ADR_MASK;
-> +	val |= FIELD_PREP(HSPHY_CFG1_ADR_MASK, p->addr) | HSPHY_CFG1_ADR_EN;
-> +	writel(val, priv->base + HSPHY_CFG1);
-> +
-> +	val = readl(priv->base + HSPHY_CFG1);
-> +	val &= ~HSPHY_CFG1_ADR_EN;
-> +	writel(val, priv->base + HSPHY_CFG1);
-> +
-> +	val = readl(priv->base + HSPHY_CFG1);
-> +	val &= ~FIELD_PREP(HSPHY_CFG1_DAT_MASK, p->mask);
-> +	val |=  FIELD_PREP(HSPHY_CFG1_DAT_MASK, p->val) | HSPHY_CFG1_DAT_EN;
-> +	writel(val, priv->base + HSPHY_CFG1);
-> +
-> +	val = readl(priv->base + HSPHY_CFG1);
-> +	val &= ~HSPHY_CFG1_DAT_EN;
-> +	writel(val, priv->base + HSPHY_CFG1);
-> +}
-> +
-> +static int uniphier_u3hsphy_init(struct phy *phy)
-> +{
-> +	struct uniphier_u3hsphy_priv *priv = phy_get_drvdata(phy);
-> +	u32 config0, config1;
-> +	int i, ret;
-> +
-> +	ret = clk_prepare_enable(priv->clk_phy_ext);
-> +	if (ret)
-> +		return ret;
-> +
-> +	ret = clk_prepare_enable(priv->clk_phy);
-> +	if (ret)
-> +		goto out_clk_ext_disable;
-> +
-> +	ret = reset_control_deassert(priv->rst_phy);
-> +	if (ret)
-> +		goto out_clk_disable;
-> +
-> +	if (!priv->data->config0 && !priv->data->config1)
-> +		return 0;
-> +
-> +	config0 = priv->data->config0;
-> +	config1 = priv->data->config1;
-> +
-> +	ret = uniphier_u3hsphy_update_config(priv, &config0);
-> +	if (ret)
-> +		goto out_rst_assert;
-> +
-> +	writel(config0, priv->base + HSPHY_CFG0);
-> +	writel(config1, priv->base + HSPHY_CFG1);
-> +
-> +	for (i = 0; i < priv->data->nparams; i++)
-> +		uniphier_u3hsphy_set_param(priv, &priv->data->param[i]);
-> +
-> +	return 0;
-> +
-> +out_rst_assert:
-> +	reset_control_assert(priv->rst_phy);
-> +out_clk_disable:
-> +	clk_disable_unprepare(priv->clk_phy);
-> +out_clk_ext_disable:
-> +	clk_disable_unprepare(priv->clk_phy_ext);
-> +
-> +	return ret;
-> +}
-> +
-> +static int uniphier_u3hsphy_exit(struct phy *phy)
-> +{
-> +	struct uniphier_u3hsphy_priv *priv = phy_get_drvdata(phy);
-> +
-> +	reset_control_assert(priv->rst_phy);
-> +	clk_disable_unprepare(priv->clk_phy);
-> +	clk_disable_unprepare(priv->clk_phy_ext);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct phy_ops uniphier_u3hsphy_ops = {
-> +	.init           = uniphier_u3hsphy_init,
-> +	.exit           = uniphier_u3hsphy_exit,
-> +	.owner          = THIS_MODULE,
-> +};
-> +
-> +static int uniphier_u3hsphy_probe(struct platform_device *pdev)
-> +{
-> +	struct device *dev = &pdev->dev;
-> +	struct uniphier_u3hsphy_priv *priv;
-> +	struct phy_provider *phy_provider;
-> +	struct resource *res;
-> +	struct phy *phy;
-> +	struct clk *clk;
-> +	struct reset_control *rst;
-> +	const char *name;
-> +	int i, ret, nc, nr;
-> +
-> +	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
-> +	if (!priv)
-> +		return -ENOMEM;
-> +
-> +	priv->dev = dev;
-> +	priv->data = of_device_get_match_data(dev);
-> +	if (WARN_ON(!priv->data ||
-> +		    priv->data->nparams > MAX_PHY_PARAMS))
-> +		return -EINVAL;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	priv->base = devm_ioremap_resource(dev, res);
-> +	if (IS_ERR(priv->base))
-> +		return PTR_ERR(priv->base);
-> +
-> +	for (i = 0; i < MAX_CLKS; i++) {
-> +		name = priv->data->clock_names[i];
-> +		if (!name)
-> +			break;
-> +		clk = devm_clk_get(dev, name);
-> +		/* "phy-ext" is optional */
-> +		if (!strcmp(name, "phy-ext")) {
-> +			if (PTR_ERR(clk) == -ENOENT)
-> +				clk = NULL;
-> +			priv->clk_phy_ext = clk;
-> +		} else if (!strcmp(name, "phy")) {
-> +			priv->clk_phy = clk;
-> +		} else {
-> +			priv->clk[priv->nclks++] = clk;
+Please remove 'structure' from all these kernel docs on structures. It's
+redundant.
 
-Only "link" clock will be here? Do we need an array for this?
+> + * @name:      Parent name
+> + * @id:                Parent clock ID
+> + * @flag:      Parent flags
+> + */
+> +struct clock_parent {
+> +       char name[MAX_NAME_LEN];
+> +       int id;
+> +       u32 flag;
+> +};
+> +
+> +/**
+> + * struct clock_topology - Structure for topology of clock
+> + * @type:      Type of topology
+> + * @flag:      Topology flags
+> + * @type_flag: Topology type specific flag
+> + */
+> +struct clock_topology {
+> +       u32 type;
+> +       u32 flag;
+> +       u32 type_flag;
+> +};
+> +
+> +/**
+> + * struct zynqmp_clock - Structure for clock
+> + * @clk_name:          Clock name
+> + * @valid:             Validity flag of clock
+> + * @init_enable:       init_enable flag of clock
 
-I think the above can be replaced with 3 separate clk_get calls instead of
-storing clock names in uniphier_u3hsphy_soc_data.
+This doesn't describe what it means though.
 
-Thanks
-Kishon
+> + * @type:              Clock type (Output/External)
+> + * @node:              Clock tolology nodes
+
+topology?
+
+> + * @num_nodes:         Number of nodes present in topology
+> + * @parent:            structure of parent of clock
+
+Why isn't structure capitalized?
+
+> + * @num_parents:       Number of parents of clock
+> + */
+> +struct zynqmp_clock {
+> +       char clk_name[MAX_NAME_LEN];
+> +       u32 valid;
+> +       u32 init_enable;
+> +       enum clk_type type;
+> +       struct clock_topology node[MAX_NODES];
+> +       u32 num_nodes;
+> +       struct clock_parent parent[MAX_PARENT];
+> +       u32 num_parents;
+> +};
+> +
+> +static const char clk_type_postfix[][10] = {
+> +       [TYPE_INVALID] = "",
+> +       [TYPE_MUX] = "_mux",
+> +       [TYPE_GATE] = "",
+> +       [TYPE_DIV1] = "_div1",
+> +       [TYPE_DIV2] = "_div2",
+> +       [TYPE_FIXEDFACTOR] = "_ff",
+> +       [TYPE_PLL] = ""
+> +};
+> +
+> +static struct zynqmp_clock clock[MAX_CLOCK];
+
+Can this be allocated at runtime instead of wasting a bunch of space in
+the Image?
+
+> +static struct clk_hw_onecell_data *zynqmp_data;
+> +static unsigned int clock_max_idx;
+> +static const struct zynqmp_eemi_ops *eemi_ops;
+> +
+> +/**
+> + * zynqmp_is_valid_clock() - Check whether clock is valid or not
+> + * @clk_id:    Clock index
+> + * @valid:     1: if clock is valid
+> + *             0: invalid clock
+> + *
+> + * Return: 0 on success else error code
+
+Why not return < 0 on error, 0 if invalid, and 1 if valid? Then we can
+get rid of the u32 pointer that just leads to more confusion.
+
+> + */
+> +static int zynqmp_is_valid_clock(u32 clk_id, u32 *valid)
+> +{
+> +       if (clk_id > clock_max_idx)
+> +               return -ENODEV;
+> +
+> +       *valid = clock[clk_id].valid;
+> +
+> +       return *valid ? 0 : -EINVAL;
+> +}
+> +
+> +/**
+> + * zynqmp_get_clock_name() - Get name of clock from Clock index
+> + * @clk_id:    Clock index
+> + * @clk_name:  Name of clock
+> + *
+> + * Return: 0 on success else error code
+> + */
+> +static int zynqmp_get_clock_name(u32 clk_id, char *clk_name)
+> +{
+> +       int ret;
+> +       u32 valid;
+> +
+> +       ret = zynqmp_is_valid_clock(clk_id, &valid);
+> +       if (!ret && valid) {
+> +               strncpy(clk_name, clock[clk_id].clk_name, MAX_NAME_LEN);
+> +               return ret;
+> +       } else {
+> +               return ret;
+> +       }
+
+Just return ret for else statements with return ret inside them.
+
+> +}
+> +
+> +/**
+> + * zynqmp_get_clock_type() - Get type of clock
+> + * @clk_id:    Clock index
+> + * @type:      Clock type: CLK_TYPE_OUTPUT or CLK_TYPE_EXTERNAL
+> + *
+> + * Return: 0 on success else error code
+> + */
+> +static int zynqmp_get_clock_type(u32 clk_id, u32 *type)
+> +{
+> +       int ret;
+> +       u32 valid;
+> +
+> +       ret = zynqmp_is_valid_clock(clk_id, &valid);
+> +       if (!ret && valid) {
+> +               *type = clock[clk_id].type;
+> +               return ret;
+> +       } else {
+> +               return ret;
+> +       }
+
+Again.
+
+> +}
+> +
+> +/**
+> + * zynqmp_pm_clock_get_name() - Get the name of clock for given id
+> + * @clock_id:  ID of the clock to be queried
+> + * @name:      Name of given clock
+> + *
+> + * This function is used to get name of clock specified by given
+> + * clock ID.
+> + *
+> + * Return: Returns 0, in case of error name would be 0
+
+say '@name' to indicate name means an argument.
+
+> + */
+> +static int zynqmp_pm_clock_get_name(u32 clock_id, char *name)
+> +{
+> +       struct zynqmp_pm_query_data qdata = {0};
+> +       u32 ret_payload[PAYLOAD_ARG_CNT];
+> +
+> +       qdata.qid = PM_QID_CLOCK_GET_NAME;
+> +       qdata.arg1 = clock_id;
+> +
+> +       eemi_ops->query_data(qdata, ret_payload);
+> +       memcpy(name, ret_payload, CLK_GET_NAME_RESP_LEN);
+> +
+> +       return 0;
+> +}
+> +
+> +/**
+> + * zynqmp_pm_clock_get_topology() - Get the topology of clock for given id
+> + * @clock_id:  ID of the clock to be queried
+> + * @index:     Node index of clock topology
+> + * @topology:  Buffer to store nodes in topology and flags
+> + *
+> + * This function is used to get topology information for the clock
+> + * specified by given clock ID.
+> + *
+> + * This API will return 3 node of topology with a single response. To get
+> + * other nodes, master should call same API in loop with new
+> + * index till error is returned. E.g First call should have
+> + * index 0 which will return nodes 0,1 and 2. Next call, index
+> + * should be 3 which will return nodes 3,4 and 5 and so on.
+> + *
+> + * Return: Returns status, either success or error+reason
+
+What is 'status'? 0 for everything's OK?
+
+> + */
+> +static int zynqmp_pm_clock_get_topology(u32 clock_id, u32 index, u32 *topology)
+> +{
+> +       struct zynqmp_pm_query_data qdata = {0};
+> +       u32 ret_payload[PAYLOAD_ARG_CNT];
+> +       int ret;
+> +
+> +       qdata.qid = PM_QID_CLOCK_GET_TOPOLOGY;
+> +       qdata.arg1 = clock_id;
+> +       qdata.arg2 = index;
+> +
+> +       ret = eemi_ops->query_data(qdata, ret_payload);
+> +       memcpy(topology, &ret_payload[1], CLK_GET_TOPOLOGY_RESP_WORDS * 4);
+> +
+> +       return ret;
+> +}
+> +
+> +/**
+> + * zynqmp_pm_clock_get_fixedfactor_params() - Get clock's fixed factor params
+> + * @clock_id:  Clock ID
+> + * @mul:       Multiplication value
+> + * @div:       Divisor value
+> + *
+> + * This function is used to get fixed factor parameters for the fixed
+> + * clock. This API is applicable only for the fixed clock.
+> + *
+> + * Return: Returns status, either success or error+reason
+> + */
+> +static int zynqmp_pm_clock_get_fixedfactor_params(u32 clock_id,
+> +                                                 u32 *mul,
+> +                                                 u32 *div)
+> +{
+> +       struct zynqmp_pm_query_data qdata = {0};
+> +       u32 ret_payload[PAYLOAD_ARG_CNT];
+> +       int ret;
+> +
+> +       qdata.qid = PM_QID_CLOCK_GET_FIXEDFACTOR_PARAMS;
+> +       qdata.arg1 = clock_id;
+> +
+> +       ret = eemi_ops->query_data(qdata, ret_payload);
+> +       *mul = ret_payload[1];
+> +       *div = ret_payload[2];
+> +
+> +       return ret;
+> +}
+> +
+> +/**
+> + * zynqmp_pm_clock_get_parents() - Get the first 3 parents of clock for given id
+> + * @clock_id:  Clock ID
+> + * @index:     Parent index
+> + * @parents:   3 parents of the given clock
+> + *
+> + * This function is used to get 3 parents for the clock specified by
+> + * given clock ID.
+> + *
+> + * This API will return 3 parents with a single response. To get
+> + * other parents, master should call same API in loop with new
+> + * parent index till error is returned. E.g First call should have
+> + * index 0 which will return parents 0,1 and 2. Next call, index
+> + * should be 3 which will return parent 3,4 and 5 and so on.
+> + *
+> + * Return: Returns status, either success or error+reason
+> + */
+> +static int zynqmp_pm_clock_get_parents(u32 clock_id, u32 index, u32 *parents)
+> +{
+> +       struct zynqmp_pm_query_data qdata = {0};
+> +       u32 ret_payload[PAYLOAD_ARG_CNT];
+
+What's the endianness of this payload? Is it little endian? Or do the
+eemi_ops convert to CPU native endianness?
+
+> +       int ret;
+> +
+> +       qdata.qid = PM_QID_CLOCK_GET_PARENTS;
+> +       qdata.arg1 = clock_id;
+> +       qdata.arg2 = index;
+> +
+> +       ret = eemi_ops->query_data(qdata, ret_payload);
+> +       memcpy(parents, &ret_payload[1], CLK_GET_PARENTS_RESP_WORDS * 4);
+> +
+> +       return ret;
+> +}
+> +
+> +/**
+> + * zynqmp_pm_clock_get_attributes() - Get the attributes of clock for given id
+> + * @clock_id:  Clock ID
+> + * @attr:      Clock attributes
+> + *
+> + * This function is used to get clock's attributes(e.g. valid, clock type, etc).
+> + *
+> + * Return: Returns status, either success or error+reason
+> + */
+> +static int zynqmp_pm_clock_get_attributes(u32 clock_id, u32 *attr)
+> +{
+> +       struct zynqmp_pm_query_data qdata = {0};
+> +       u32 ret_payload[PAYLOAD_ARG_CNT];
+> +       int ret;
+> +
+> +       qdata.qid = PM_QID_CLOCK_GET_ATTRIBUTES;
+> +       qdata.arg1 = clock_id;
+> +
+> +       ret = eemi_ops->query_data(qdata, ret_payload);
+> +       memcpy(attr, &ret_payload[1], CLK_GET_ATTR_RESP_WORDS * 4);
+> +
+> +       return ret;
+> +}
+> +
+> +/**
+> + * zynqmp_clock_get_topology() - Get topology of clock from firmware using
+> + *                              PM_API
+> + * @clk_id:            Clock index
+> + * @clk_topology:      Structure of clock topology
+> + * @num_nodes:         number of nodes
+> + *
+> + * Return: Returns status, either success or error+reason
+> + */
+> +static int zynqmp_clock_get_topology(u32 clk_id,
+> +                                    struct clock_topology *clk_topology,
+> +                                    u32 *num_nodes)
+> +{
+> +       int j, k = 0, ret;
+> +       u32 pm_resp[PM_API_PAYLOAD_LEN] = {0};
+> +
+> +       *num_nodes = 0;
+> +       for (j = 0; j <= MAX_NODES; j += 3) {
+> +               ret = zynqmp_pm_clock_get_topology(clk_id, j, pm_resp);
+> +               if (ret)
+> +                       return ret;
+> +               for (k = 0; k < PM_API_PAYLOAD_LEN; k++) {
+> +                       if (!(pm_resp[k] & CLK_TYPE_FIELD_MASK))
+> +                               return 0;
+> +                       clk_topology[*num_nodes].type = pm_resp[k] &
+> +                                                       CLK_TYPE_FIELD_MASK;
+
+When this line splitting happens it's a sign to make another subroutine.
+
+> +                       clk_topology[*num_nodes].flag =
+> +                                       FIELD_GET(CLK_FLAG_FIELD_MASK,
+> +                                                 pm_resp[k]);
+> +                       clk_topology[*num_nodes].type_flag =
+> +                               FIELD_GET(CLK_TYPE_FLAG_FIELD_MASK,
+> +                                         pm_resp[k]);
+> +                       (*num_nodes)++;
+> +               }
+> +       }
+> +       return 0;
+> +}
+> +
+> +/**
+> + * zynqmp_clock_get_parents() - Get parents info from firmware using PM_API
+> + * @clk_id:            Clock index
+> + * @parents:           Structure of parent information
+> + * @num_parents:       Total number of parents
+> + *
+> + * Return: Returns status, either success or error+reason
+> + */
+> +static int zynqmp_clock_get_parents(u32 clk_id, struct clock_parent *parents,
+> +                                   u32 *num_parents)
+> +{
+> +       int j = 0, k, ret, total_parents = 0;
+> +       u32 pm_resp[PM_API_PAYLOAD_LEN] = {0};
+> +       struct clock_parent *parent;
+> +
+> +       do {
+> +               /* Get parents from firmware */
+> +               ret = zynqmp_pm_clock_get_parents(clk_id, j, pm_resp);
+> +               if (ret)
+> +                       return ret;
+> +
+> +               for (k = 0; k < PM_API_PAYLOAD_LEN; k++) {
+> +                       if (pm_resp[k] == NA_PARENT) {
+> +                               *num_parents = total_parents;
+> +                               return 0;
+> +                       }
+> +
+> +                       parent = &parents[k + j];
+> +                       parent->id = pm_resp[k] & CLK_PARENTS_ID_MASK;
+> +                       if (pm_resp[k] == DUMMY_PARENT) {
+> +                               strcpy(parent->name, "dummy_name");
+> +                               parent->flag = 0;
+> +                       } else {
+> +                               parent->flag = pm_resp[k] >>
+> +                                                       CLK_PARENTS_ID_LEN;
+
+Same comment. Function is too indented and long.
+
+> +                               if (zynqmp_get_clock_name(parent->id,
+> +                                                         parent->name))
+> +                                       continue;
+> +                       }
+> +                       total_parents++;
+> +               }
+> +               j += PM_API_PAYLOAD_LEN;
+> +       } while (total_parents <= MAX_PARENT);
+> +       return 0;
+> +}
+> +
+> +/**
+> + * zynqmp_get_parent_list() - Create list of parents name
+> + * @np:                        Device node
+> + * @clk_id:            Clock index
+> + * @parent_list:       List of parent's name
+> + * @num_parents:       Total number of parents
+> + *
+> + * Return: Returns status, either success or error+reason
+> + */
+> +static int zynqmp_get_parent_list(struct device_node *np, u32 clk_id,
+> +                                 const char **parent_list, u32 *num_parents)
+> +{
+> +       int i = 0, ret;
+> +       u32 total_parents = clock[clk_id].num_parents;
+> +       struct clock_topology *clk_nodes;
+> +       struct clock_parent *parents;
+> +
+> +       clk_nodes = clock[clk_id].node;
+> +       parents = clock[clk_id].parent;
+> +
+> +       for (i = 0; i < total_parents; i++) {
+> +               if (!parents[i].flag) {
+> +                       parent_list[i] = parents[i].name;
+> +               } else if (parents[i].flag == PARENT_CLK_EXTERNAL) {
+> +                       ret = of_property_match_string(np, "clock-names",
+> +                                                      parents[i].name);
+> +                       if (ret < 0)
+> +                               strcpy(parents[i].name, "dummy_name");
+> +                       parent_list[i] = parents[i].name;
+> +               } else {
+> +                       strcat(parents[i].name,
+> +                              clk_type_postfix[clk_nodes[parents[i].flag - 1].
+> +                              type]);
+> +                       parent_list[i] = parents[i].name;
+> +               }
+> +       }
+> +
+> +       *num_parents = total_parents;
+> +       return 0;
+> +}
+> +
+> +/**
+> + * zynqmp_register_clk_topology() - Register clock topology
+> + * @clk_id:            Clock index
+> + * @clk_name:          Clock Name
+> + * @num_parents:       Total number of parents
+> + * @parent_names:      List of parents name
+> + *
+> + * Return: Returns either clock hardware or error+reason
+> + */
+> +static struct clk_hw *zynqmp_register_clk_topology(int clk_id, char *clk_name,
+> +                                                  int num_parents,
+> +                                                  const char **parent_names)
+> +{
+> +       int j, ret;
+> +       u32 num_nodes, mult, div;
+> +       char *clk_out = NULL;
+> +       struct clock_topology *nodes;
+> +       struct clk_hw *hw = NULL;
+> +
+> +       nodes = clock[clk_id].node;
+> +       num_nodes = clock[clk_id].num_nodes;
+> +
+> +       for (j = 0; j < num_nodes; j++) {
+> +               /*
+> +                * Clock name received from firmware is output clock name.
+> +                * Intermediate clock names are postfixed with type of clock.
+> +                */
+> +               if (j != (num_nodes - 1)) {
+> +                       clk_out = kasprintf(GFP_KERNEL, "%s%s", clk_name,
+> +                                           clk_type_postfix[nodes[j].type]);
+> +               } else {
+> +                       clk_out = kasprintf(GFP_KERNEL, "%s", clk_name);
+> +               }
+> +
+> +               switch (nodes[j].type) {
+
+Make this switchcase a function of its own.
+
+> +               case TYPE_MUX:
+> +                       hw = zynqmp_clk_register_mux(NULL, clk_out,
+> +                                                    clk_id, parent_names,
+> +                                                    num_parents,
+> +                                                    nodes[j].flag,
+> +                                                    nodes[j].type_flag);
+
+Why not pass &nodes to all these registration functions? And then also
+pass dev, clk_out, and clk_id each time? Then the switch statement could
+practically become an array of function pointers that you call with the
+same arguments based on the type.
+
+> +                       break;
+> +               case TYPE_PLL:
+> +                       hw = zynqmp_clk_register_pll(NULL, clk_out, clk_id,
+> +                                                    parent_names[0],
+> +                                                    nodes[j].flag);
+> +                       break;
+> +               case TYPE_FIXEDFACTOR:
+> +                       ret = zynqmp_pm_clock_get_fixedfactor_params(clk_id,
+> +                                                                    &mult,
+> +                                                                    &div);
+
+And this could be folded into that function for the fixedfactor clks.
+
+> +                       hw = clk_hw_register_fixed_factor(NULL, clk_out,
+> +                                                         parent_names[0],
+> +                                                         nodes[j].flag, mult,
+> +                                                         div);
+> +                       break;
+> +               case TYPE_DIV1:
+> +               case TYPE_DIV2:
+> +                       hw = zynqmp_clk_register_divider(NULL, clk_out, clk_id,
+> +                                                        nodes[j].type,
+> +                                                        parent_names[0],
+> +                                                        nodes[j].flag,
+> +                                                        nodes[j].type_flag);
+> +                       break;
+> +               case TYPE_GATE:
+> +
+> +                       hw = zynqmp_clk_register_gate(NULL, clk_out, clk_id,
+> +                                                     parent_names[0],
+> +                                                     nodes[j].flag,
+> +                                                     nodes[j].type_flag);
+> +                       break;
+> +               default:
+> +                       pr_err("%s() Unknown topology for %s\n",
+> +                              __func__, clk_out);
+> +                       break;
+> +               }
+> +               if (IS_ERR(hw))
+> +                       pr_warn_once("%s() %s register fail with %ld\n",
+> +                                    __func__, clk_name, PTR_ERR(hw));
+> +
+> +               parent_names[0] = clk_out;
+> +       }
+> +       kfree(clk_out);
+> +       return hw;
+> +}
+> +
+> +/**
+> + * zynqmp_register_clocks() - Register clocks
+> + * @np:                Device node
+> + *
+> + * Return: 0 on success else error code
+> + */
+> +static int zynqmp_register_clocks(struct device_node *np)
+> +{
+> +       int ret;
+> +       u32 i, total_parents = 0, type = 0;
+> +       const char *parent_names[MAX_PARENT];
+> +
+> +       for (i = 0; i < clock_max_idx; i++) {
+> +               char clk_name[MAX_NAME_LEN];
+> +
+> +               /* get clock name, continue to next clock if name not found */
+> +               if (zynqmp_get_clock_name(i, clk_name))
+> +                       continue;
+> +
+> +               /* Check if clock is valid and output clock.
+> +                * Do not regiter invalid or external clock.
+
+s/regiter/register/
+
+> +                */
+> +               ret = zynqmp_get_clock_type(i, &type);
+> +               if (ret || type != CLK_TYPE_OUTPUT)
+> +                       continue;
+> +
+> +               /* Get parents of clock*/
+> +               if (zynqmp_get_parent_list(np, i, parent_names,
+> +                                          &total_parents)) {
+> +                       WARN_ONCE(1, "No parents found for %s\n",
+> +                                 clock[i].clk_name);
+> +                       continue;
+> +               }
+> +
+> +               zynqmp_data->hws[i] =
+> +                       zynqmp_register_clk_topology(i, clk_name,
+> +                                                    total_parents,
+> +                                                    parent_names);
+> +       }
+> +
+> +       for (i = 0; i < clock_max_idx; i++) {
+> +               if (IS_ERR(zynqmp_data->hws[i])) {
+> +                       pr_err("Zynq Ultrascale+ MPSoC clk %s: register failed with %ld\n",
+> +                              clock[i].clk_name, PTR_ERR(zynqmp_data->hws[i]));
+> +                       WARN_ON(1);
+> +               }
+> +       }
+> +       return 0;
+> +}
+> +
+> +/**
+> + * zynqmp_get_clock_info() - Get clock information from firmware using PM_API
+> + */
+> +static void zynqmp_get_clock_info(void)
+> +{
+> +       int i, ret;
+> +       u32 attr, type = 0;
+> +
+> +       memset(clock, 0, sizeof(clock));
+> +       for (i = 0; i < MAX_CLOCK; i++) {
+> +               zynqmp_pm_clock_get_name(i, clock[i].clk_name);
+> +               if (!strcmp(clock[i].clk_name, END_OF_CLK_NAME)) {
+> +                       clock_max_idx = i;
+> +                       break;
+> +               } else if (!strcmp(clock[i].clk_name, RESERVED_CLK_NAME)) {
+> +                       continue;
+> +               }
+> +
+> +               ret = zynqmp_pm_clock_get_attributes(i, &attr);
+> +               if (ret)
+> +                       continue;
+> +
+> +               clock[i].valid = attr & CLK_VALID_MASK;
+> +               clock[i].init_enable = !!(attr & CLK_INIT_ENABLE_MASK);
+> +               clock[i].type = attr >> CLK_TYPE_SHIFT ? CLK_TYPE_EXTERNAL :
+> +                                                       CLK_TYPE_OUTPUT;
+> +       }
+> +
+> +       /* Get topology of all clock */
+> +       for (i = 0; i < clock_max_idx; i++) {
+> +               ret = zynqmp_get_clock_type(i, &type);
+> +               if (ret || type != CLK_TYPE_OUTPUT)
+> +                       continue;
+> +
+> +               ret = zynqmp_clock_get_topology(i, clock[i].node,
+> +                                               &clock[i].num_nodes);
+> +               if (ret)
+> +                       continue;
+> +
+> +               ret = zynqmp_clock_get_parents(i, clock[i].parent,
+> +                                              &clock[i].num_parents);
+> +               if (ret)
+> +                       continue;
+> +       }
+> +}
+> +
+> +/**
+> + * zynqmp_validate_eemi_ops() - Validate eemi ops
+> + *
+> + * Return: 0 on success else error code
+> + */
+> +static inline int zynqmp_validate_eemi_ops(void)
+> +{
+> +       eemi_ops = zynqmp_pm_get_eemi_ops();
+> +       if (!eemi_ops || !eemi_ops->query_data ||
+> +           !eemi_ops->clock_setdivider ||
+> +           !eemi_ops->clock_getdivider ||
+> +           !eemi_ops->clock_setparent ||
+> +           !eemi_ops->clock_getparent ||
+> +           !eemi_ops->clock_getstate ||
+> +           !eemi_ops->clock_disable ||
+> +           !eemi_ops->clock_enable ||
+> +           !eemi_ops->ioctl)
+> +               return -ENXIO;
+> +
+> +       return 0;
+
+Is this function really necessary? Firmware sometimes won't implement
+the ops or something? Why is the driver probing in DT then?
+
+> +}
+> +
+> +/**
+> + * zynqmp_clk_setup() - Setup the clock framework and register clocks
+> + * @np:                Device node
+> + *
+> + * Return: 0 on success else error code
+> + */
+> +static int __init zynqmp_clk_setup(struct device_node *np)
+> +{
+> +       int idx;
+> +
+> +       idx = of_property_match_string(np, "clock-names", "pss_ref_clk");
+> +       if (idx < 0) {
+> +               pr_err("pss_ref_clk not provided\n");
+> +               return -ENOENT;
+> +       }
+> +       idx = of_property_match_string(np, "clock-names", "video_clk");
+> +       if (idx < 0) {
+> +               pr_err("video_clk not provided\n");
+> +               return -ENOENT;
+> +       }
+> +       idx = of_property_match_string(np, "clock-names", "pss_alt_ref_clk");
+> +       if (idx < 0) {
+> +               pr_err("pss_alt_ref_clk not provided\n");
+> +               return -ENOENT;
+> +       }
+> +       idx = of_property_match_string(np, "clock-names", "aux_ref_clk");
+> +       if (idx < 0) {
+> +               pr_err("aux_ref_clk not provided\n");
+> +               return -ENOENT;
+> +       }
+> +       idx = of_property_match_string(np, "clock-names", "gt_crx_ref_clk");
+> +       if (idx < 0) {
+> +               pr_err("aux_ref_clk not provided\n");
+> +               return -ENOENT;
+> +       }
+
+Seems like a lot of checking for things that could be checked statically
+by some DT checker? Remove this unless it's doing something useful.
+
+> +
+> +       zynqmp_data = kzalloc(sizeof(*zynqmp_data) + sizeof(*zynqmp_data) *
+> +                                               MAX_CLOCK, GFP_KERNEL);
+> +       if (!zynqmp_data)
+> +               return -ENOMEM;
+> +
+> +       zynqmp_get_clock_info();
+> +       zynqmp_register_clocks(np);
+> +
+> +       zynqmp_data->num = clock_max_idx;
+> +       of_clk_add_hw_provider(np, of_clk_hw_onecell_get, zynqmp_data);
+> +
+> +       return 0;
+> +}
+> +
+> +/**
+> + * zynqmp_clock_init() - Initialize zynqmp clocks
+> + *
+> + * Return: 0 on success else error code
+> + */
+> +static int __init zynqmp_clock_init(void)
+> +{
+> +       int ret;
+> +       struct device_node *np;
+> +
+> +       np = of_find_compatible_node(NULL, NULL, "xlnx,zynqmp");
+> +       if (!np)
+> +               return -ENOENT;
+> +       of_node_put(np);
+> +
+> +       np = of_find_compatible_node(NULL, NULL, "xlnx,zynqmp-clk");
+
+Why can't this be a platform device driver?
+
+> +       if (!np) {
+> +               pr_err("%s: clk node not found\n", __func__);
+> +               return -ENOENT;
+> +       }
+> +
+> +       ret = zynqmp_validate_eemi_ops();
+> +       if (ret) {
+> +               pr_err("%s: eemi ops validation fail\n", __func__);
+> +               of_node_put(np);
+> +               return ret;
+> +       }
+> +
+> +       ret = zynqmp_clk_setup(np);
+> +       of_node_put(np);
+> +
+> +       return ret;
+> +}
+> +arch_initcall(zynqmp_clock_init);
+> diff --git a/drivers/clk/zynqmp/divider.c b/drivers/clk/zynqmp/divider.c
+> new file mode 100644
+> index 0000000..ef3e2e9
+> --- /dev/null
+> +++ b/drivers/clk/zynqmp/divider.c
+> @@ -0,0 +1,219 @@
+[...]
+> +
+> +/**
+> + * struct zynqmp_clk_divider - adjustable divider clock
+> + * @hw:                handle between common and hardware-specific interfaces
+> + * @flags:     Hardware specific flags
+> + * @clk_id:    Id of clock
+> + * @div_type:  divisor type (TYPE_DIV1 or TYPE_DIV2)
+> + */
+> +struct zynqmp_clk_divider {
+> +       struct clk_hw hw;
+> +       u8 flags;
+> +       u32 clk_id;
+> +       u32 div_type;
+> +};
+> +
+> +static int zynqmp_divider_get_val(unsigned long parent_rate, unsigned long rate)
+> +{
+> +       return DIV_ROUND_CLOSEST(parent_rate, rate);
+
+This is used once, why not just put it inline at the call site instead?
+
+> +}
+> +
+> +/**
+> + * zynqmp_clk_divider_recalc_rate() - Recalc rate of divider clock
+> + * @hw:                        handle between common and hardware-specific interfaces
+> + * @parent_rate:       rate of parent clock
+> + *
+> + * Return: Returns status, either success or error+reason
+> + */
+> +static unsigned long zynqmp_clk_divider_recalc_rate(struct clk_hw *hw,
+> +                                                   unsigned long parent_rate)
+> +{
+> +       struct zynqmp_clk_divider *divider = to_zynqmp_clk_divider(hw);
+> +       const char *clk_name = clk_hw_get_name(hw);
+> +       u32 clk_id = divider->clk_id;
+> +       u32 div_type = divider->div_type;
+> +       u32 div, value;
+> +       int ret;
+> +       const struct zynqmp_eemi_ops *eemi_ops = zynqmp_pm_get_eemi_ops();
+> +
+> +       ret = eemi_ops->clock_getdivider(clk_id, &div);
+> +
+> +       if (ret)
+> +               pr_warn_once("%s() get divider failed for %s, ret = %d\n",
+> +                            __func__, clk_name, ret);
+> +
+> +       if (div_type == TYPE_DIV1)
+> +               value = div & 0xFFFF;
+> +       else
+> +               value = (div >> 16) & 0xFFFF;
+
+div is u32, so masking with 16 bits after shifting it right by 16 does
+nothing.
+
+> +
+> +       return DIV_ROUND_UP_ULL(parent_rate, value);
+> +}
+> +
+> +/**
+> + * zynqmp_clk_divider_round_rate() - Round rate of divider clock
+> + * @hw:                        handle between common and hardware-specific interfaces
+> + * @rate:              rate of clock to be set
+> + * @prate:             rate of parent clock
+> + *
+> + * Return: Returns status, either success or error+reason
+> + */
+> +static long zynqmp_clk_divider_round_rate(struct clk_hw *hw,
+> +                                         unsigned long rate,
+> +                                         unsigned long *prate)
+> +{
+> +       struct zynqmp_clk_divider *divider = to_zynqmp_clk_divider(hw);
+> +       const char *clk_name = clk_hw_get_name(hw);
+> +       u32 clk_id = divider->clk_id;
+> +       u32 div_type = divider->div_type;
+> +       u32 bestdiv;
+> +       int ret;
+> +       const struct zynqmp_eemi_ops *eemi_ops = zynqmp_pm_get_eemi_ops();
+> +
+> +       /* if read only, just return current value */
+> +       if (divider->flags & CLK_DIVIDER_READ_ONLY) {
+> +               ret = eemi_ops->clock_getdivider(clk_id, &bestdiv);
+> +
+> +               if (ret)
+> +                       pr_warn_once("%s() get divider failed for %s, ret = %d\n",
+> +                                    __func__, clk_name, ret);
+> +               if (div_type == TYPE_DIV1)
+> +                       bestdiv = bestdiv & 0xFFFF;
+> +               else
+> +                       bestdiv  = (bestdiv >> 16) & 0xFFFF;
+> +
+> +               return DIV_ROUND_UP_ULL((u64)*prate, bestdiv);
+> +       }
+> +
+> +       bestdiv = zynqmp_divider_get_val(*prate, rate);
+> +
+> +       if ((clk_hw_get_flags(hw) & CLK_SET_RATE_PARENT) &&
+> +           (clk_hw_get_flags(hw) & CLK_FRAC))
+
+We don't stuff implementation specific clk flags into the
+clk_core::flags variable, so don't expect CLK_FRAC to come out of there
+and be testable here.
+
+> +               bestdiv = rate % *prate ? 1 : bestdiv;
+> +       *prate = rate * bestdiv;
+> +
+> +       return rate;
+> +}
+> +
+[...]
+> diff --git a/drivers/clk/zynqmp/pll.c b/drivers/clk/zynqmp/pll.c
+> new file mode 100644
+> index 0000000..1782829
+> --- /dev/null
+> +++ b/drivers/clk/zynqmp/pll.c
+> @@ -0,0 +1,345 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * Zynq UltraScale+ MPSoC PLL driver
+> + *
+> + *  Copyright (C) 2016-2018 Xilinx
+> + */
+> +
+> +#include <linux/clk.h>
+> +#include <linux/clk-provider.h>
+> +#include <linux/slab.h>
+> +#include "clk-zynqmp.h"
+> +
+> +/**
+> + * struct zynqmp_pll - Structure for PLL clock
+> + * @hw:                Handle between common and hardware-specific interfaces
+> + * @clk_id:    PLL clock ID
+> + */
+> +struct zynqmp_pll {
+> +       struct clk_hw hw;
+> +       u32 clk_id;
+> +};
+> +
+> +#define to_zynqmp_pll(_hw)     container_of(_hw, struct zynqmp_pll, hw)
+> +
+> +#define PLL_FBDIV_MIN  25
+> +#define PLL_FBDIV_MAX  125
+> +
+> +#define PS_PLL_VCO_MIN 1500000000
+> +#define PS_PLL_VCO_MAX 3000000000UL
+> +
+> +enum pll_mode {
+> +       PLL_MODE_INT,
+> +       PLL_MODE_FRAC,
+> +};
+> +
+> +#define FRAC_OFFSET 0x8
+> +#define PLLFCFG_FRAC_EN        BIT(31)
+> +#define FRAC_DIV  BIT(16)  /* 2^16 */
+> +
+> +/**
+> + * zynqmp_pll_get_mode() - Get mode of PLL
+> + * @hw:                Handle between common and hardware-specific interfaces
+> + *
+> + * Return: Mode of PLL
+> + */
+> +static inline enum pll_mode zynqmp_pll_get_mode(struct clk_hw *hw)
+> +{
+> +       struct zynqmp_pll *clk = to_zynqmp_pll(hw);
+> +       u32 clk_id = clk->clk_id;
+> +       const char *clk_name = clk_hw_get_name(hw);
+> +       u32 ret_payload[PAYLOAD_ARG_CNT];
+> +       int ret;
+> +       const struct zynqmp_eemi_ops *eemi_ops = zynqmp_pm_get_eemi_ops();
+> +
+> +       ret = eemi_ops->ioctl(0, IOCTL_GET_PLL_FRAC_MODE, clk_id, 0,
+> +                             ret_payload);
+> +       if (ret)
+> +               pr_warn_once("%s() PLL get frac mode failed for %s, ret = %d\n",
+> +                            __func__, clk_name, ret);
+> +
+> +       return ret_payload[1];
+> +}
+> +
+> +/**
+> + * zynqmp_pll_set_mode() - Set the PLL mode
+> + * @hw:                Handle between common and hardware-specific interfaces
+> + * @on:                Flag to determine the mode
+> + */
+> +static inline void zynqmp_pll_set_mode(struct clk_hw *hw, bool on)
+> +{
+> +       struct zynqmp_pll *clk = to_zynqmp_pll(hw);
+> +       u32 clk_id = clk->clk_id;
+> +       const char *clk_name = clk_hw_get_name(hw);
+> +       int ret;
+> +       u32 mode;
+> +       const struct zynqmp_eemi_ops *eemi_ops = zynqmp_pm_get_eemi_ops();
+> +
+> +       if (on)
+> +               mode = PLL_MODE_FRAC;
+> +       else
+> +               mode = PLL_MODE_INT;
+> +
+> +       ret = eemi_ops->ioctl(0, IOCTL_SET_PLL_FRAC_MODE, clk_id, mode, NULL);
+> +       if (ret)
+> +               pr_warn_once("%s() PLL set frac mode failed for %s, ret = %d\n",
+> +                            __func__, clk_name, ret);
+> +}
+> +
+> +/**
+> + * zynqmp_pll_round_rate() - Round a clock frequency
+> + * @hw:                Handle between common and hardware-specific interfaces
+> + * @rate:      Desired clock frequency
+> + * @prate:     Clock frequency of parent clock
+> + *
+> + * Return: Frequency closest to @rate the hardware can generate
+> + */
+> +static long zynqmp_pll_round_rate(struct clk_hw *hw, unsigned long rate,
+> +                                 unsigned long *prate)
+> +{
+> +       u32 fbdiv;
+> +       long rate_div, f;
+> +
+> +       /* Enable the fractional mode if needed */
+> +       rate_div = (rate * FRAC_DIV) / *prate;
+> +       f = rate_div % FRAC_DIV;
+> +       zynqmp_pll_set_mode(hw, !!f);
+> +
+> +       if (zynqmp_pll_get_mode(hw) == PLL_MODE_FRAC) {
+> +               if (rate > PS_PLL_VCO_MAX) {
+> +                       fbdiv = rate / PS_PLL_VCO_MAX;
+> +                       rate = rate / (fbdiv + 1);
+> +               }
+> +               if (rate < PS_PLL_VCO_MIN) {
+> +                       fbdiv = DIV_ROUND_UP(PS_PLL_VCO_MIN, rate);
+> +                       rate = rate * fbdiv;
+> +               }
+> +               return rate;
+> +       }
+> +
+> +       fbdiv = DIV_ROUND_CLOSEST(rate, *prate);
+> +       fbdiv = clamp_t(u32, fbdiv, PLL_FBDIV_MIN, PLL_FBDIV_MAX);
+> +       return *prate * fbdiv;
+> +}
+> +
+> +/**
+> + * zynqmp_pll_recalc_rate() - Recalculate clock frequency
+> + * @hw:                        Handle between common and hardware-specific interfaces
+> + * @parent_rate:       Clock frequency of parent clock
+> + *
+> + * Return: Current clock frequency
+> + */
+> +static unsigned long zynqmp_pll_recalc_rate(struct clk_hw *hw,
+> +                                           unsigned long parent_rate)
+> +{
+> +       struct zynqmp_pll *clk = to_zynqmp_pll(hw);
+> +       u32 clk_id = clk->clk_id;
+> +       const char *clk_name = clk_hw_get_name(hw);
+> +       u32 fbdiv, data;
+> +       unsigned long rate, frac;
+> +       u32 ret_payload[PAYLOAD_ARG_CNT];
+> +       int ret;
+> +       const struct zynqmp_eemi_ops *eemi_ops = zynqmp_pm_get_eemi_ops();
+> +
+> +       /*
+> +        * makes probably sense to redundantly save fbdiv in the struct
+> +        * zynqmp_pll to save the IO access.
+
+Is this a TODO? Doesn't make sense to me because caching things for
+recalc rate is painful to get right. Please remove this comment.
+
+> +        */
+> +       ret = eemi_ops->clock_getdivider(clk_id, &fbdiv);
+> +       if (ret)
+> +               pr_warn_once("%s() get divider failed for %s, ret = %d\n",
+> +                            __func__, clk_name, ret);
+> +
+> +       rate =  parent_rate * fbdiv;
+> +       if (zynqmp_pll_get_mode(hw) == PLL_MODE_FRAC) {
+> +               eemi_ops->ioctl(0, IOCTL_GET_PLL_FRAC_DATA, clk_id, 0,
+> +                               ret_payload);
+> +               data = ret_payload[1];
+> +               frac = (parent_rate * data) / FRAC_DIV;
+> +               rate = rate + frac;
+> +       }
+> +
+> +       return rate;
+> +}
+> +
+> +/**
+> + * zynqmp_pll_set_rate() - Set rate of PLL
+> + * @hw:                        Handle between common and hardware-specific interfaces
+> + * @rate:              Frequency of clock to be set
+> + * @parent_rate:       Clock frequency of parent clock
+> + *
+> + * Set PLL divider to set desired rate.
+> + *
+> + * Returns:            rate which is set on success else error code
+> + */
+> +static int zynqmp_pll_set_rate(struct clk_hw *hw, unsigned long rate,
+> +                              unsigned long parent_rate)
+> +{
+> +       struct zynqmp_pll *clk = to_zynqmp_pll(hw);
+> +       u32 clk_id = clk->clk_id;
+> +       const char *clk_name = clk_hw_get_name(hw);
+> +       u32 fbdiv, data;
+> +       long rate_div, frac, m, f;
+> +       int ret;
+> +       const struct zynqmp_eemi_ops *eemi_ops = zynqmp_pm_get_eemi_ops();
+> +
+> +       if (zynqmp_pll_get_mode(hw) == PLL_MODE_FRAC) {
+> +               rate_div = ((rate * FRAC_DIV) / parent_rate);
+
+Too many parenthesis.
+
+> +               m = rate_div / FRAC_DIV;
+> +               f = rate_div % FRAC_DIV;
+> +               m = clamp_t(u32, m, (PLL_FBDIV_MIN), (PLL_FBDIV_MAX));
+> +               rate = parent_rate * m;
+> +               frac = (parent_rate * f) / FRAC_DIV;
+> +
+> +               ret = eemi_ops->clock_setdivider(clk_id, m);
+> +               if (ret)
+> +                       pr_warn_once("%s() set divider failed for %s, ret = %d\n",
+> +                                    __func__, clk_name, ret);
+> +
+> +               data = (FRAC_DIV * f) / FRAC_DIV;
+
+Feels like there must be some macro for this idiom but I failed to find
+it. round_something()?
+
+> +               eemi_ops->ioctl(0, IOCTL_SET_PLL_FRAC_DATA, clk_id, data, NULL);
+> +
+> +               return rate + frac;
+> +       }
+> +
+> +       fbdiv = DIV_ROUND_CLOSEST(rate, parent_rate);
+> +       fbdiv = clamp_t(u32, fbdiv, PLL_FBDIV_MIN, PLL_FBDIV_MAX);
+> +       ret = eemi_ops->clock_setdivider(clk_id, fbdiv);
+> +       if (ret)
+> +               pr_warn_once("%s() set divider failed for %s, ret = %d\n",
+> +                            __func__, clk_name, ret);
+> +
+> +       return parent_rate * fbdiv;
+> +}
+> +
+> +/**
+> + * zynqmp_pll_is_enabled() - Check if a clock is enabled
+> + * @hw:                Handle between common and hardware-specific interfaces
+> + *
+> + * Return: 1 if the clock is enabled, 0 otherwise
+> + */
+> +static int zynqmp_pll_is_enabled(struct clk_hw *hw)
+> +{
+> +       struct zynqmp_pll *clk = to_zynqmp_pll(hw);
+> +       const char *clk_name = clk_hw_get_name(hw);
+> +       u32 clk_id = clk->clk_id;
+> +       unsigned int state;
+> +       int ret;
+> +       const struct zynqmp_eemi_ops *eemi_ops = zynqmp_pm_get_eemi_ops();
+> +
+> +       ret = eemi_ops->clock_getstate(clk_id, &state);
+> +       if (ret) {
+> +               pr_warn_once("%s() clock get state failed for %s, ret = %d\n",
+> +                            __func__, clk_name, ret);
+> +               return -EIO;
+> +       }
+> +
+> +       return state ? 1 : 0;
+> +}
+> +
+> +/**
+> + * zynqmp_pll_enable() - Enable clock
+> + * @hw:                Handle between common and hardware-specific interfaces
+> + *
+> + * Return: 0 on success else error code
+> + */
+> +static int zynqmp_pll_enable(struct clk_hw *hw)
+> +{
+> +       struct zynqmp_pll *clk = to_zynqmp_pll(hw);
+> +       const char *clk_name = clk_hw_get_name(hw);
+> +       u32 clk_id = clk->clk_id;
+> +       int ret;
+> +       const struct zynqmp_eemi_ops *eemi_ops = zynqmp_pm_get_eemi_ops();
+> +
+> +       if (zynqmp_pll_is_enabled(hw))
+> +               return 0;
+> +
+> +       pr_info("PLL: enable\n");
+
+No.
+
+> +
+> +       ret = eemi_ops->clock_enable(clk_id);
+> +       if (ret)
+> +               pr_warn_once("%s() clock enable failed for %s, ret = %d\n",
+> +                            __func__, clk_name, ret);
+> +
+> +       return ret;
+> +}
+> +
+> +/**
+> + * zynqmp_pll_disable() - Disable clock
+> + * @hw:                Handle between common and hardware-specific interfaces
+> + */
+> +static void zynqmp_pll_disable(struct clk_hw *hw)
+> +{
+> +       struct zynqmp_pll *clk = to_zynqmp_pll(hw);
+> +       const char *clk_name = clk_hw_get_name(hw);
+> +       u32 clk_id = clk->clk_id;
+> +       int ret;
+> +       const struct zynqmp_eemi_ops *eemi_ops = zynqmp_pm_get_eemi_ops();
+> +
+> +       if (!zynqmp_pll_is_enabled(hw))
+> +               return;
+> +
+> +       pr_info("PLL: shutdown\n");
+
+No.
+
+> +
+> +       ret = eemi_ops->clock_disable(clk_id);
+> +       if (ret)
+> +               pr_warn_once("%s() clock disable failed for %s, ret = %d\n",
+> +                            __func__, clk_name, ret);
+> +}
+> +
+> +static const struct clk_ops zynqmp_pll_ops = {
+> +       .enable = zynqmp_pll_enable,
+> +       .disable = zynqmp_pll_disable,
+> +       .is_enabled = zynqmp_pll_is_enabled,
+> +       .round_rate = zynqmp_pll_round_rate,
+> +       .recalc_rate = zynqmp_pll_recalc_rate,
+> +       .set_rate = zynqmp_pll_set_rate,
+> +};
+> +
+> +/**
+> + * zynqmp_clk_register_pll() - Register PLL with the clock framework
+> + * @dev:       Device pointer
+> + * @name:      PLL name
+> + * @clk_id:    Clock ID
+> + * @parent:    Parent clock name
+> + * @flag:      PLL flgas
+> + *
+> + * Return: clock hardware to the registered clock
+> + */
+> +struct clk_hw *zynqmp_clk_register_pll(struct device *dev, const char *name,
+> +                                      u32 clk_id,
+> +                                      const char *parent,
+> +                                      unsigned long flag)
+> +{
+> +       struct zynqmp_pll *pll;
+> +       struct clk_hw *hw;
+> +       struct clk_init_data init;
+> +       int ret;
+> +
+> +       init.name = name;
+> +       init.ops = &zynqmp_pll_ops;
+> +       init.flags = flag;
+> +       init.parent_names = &parent;
+> +       init.num_parents = 1;
+> +
+> +       pll = kmalloc(sizeof(*pll), GFP_KERNEL);
+
+Why kmalloc instead of kzalloc?
+
+> +       if (!pll)
+> +               return ERR_PTR(-ENOMEM);
+> +
+> +       /* Populate the struct */
+
+Yes. That's a useless comment.
+
+> +       pll->hw.init = &init;
+> +       pll->clk_id = clk_id;
+> +
+> +       hw = &pll->hw;
+> +       ret = clk_hw_register(dev, hw);
+> +       if (ret) {
+> +               kfree(pll);
+> +               return ERR_PTR(ret);
+> +       }
+> +
+> +       clk_hw_set_rate_range(hw, PS_PLL_VCO_MIN, PS_PLL_VCO_MAX);
+
+Why is this necessary?
+
+> +       if (ret < 0)
+> +               pr_err("%s:ERROR clk_set_rate_range failed %d\n", name, ret);
+> +
+> +       return hw;
+> +}
