@@ -1,40 +1,57 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon,  9 Jul 2018 09:41:49 -0600
-Subject: [PATCH v4 2/6] dt-bindings: pinctrl: add a 'pinctrl-use-default'
- property
-In-Reply-To: <20180709154153.15742-1-robh@kernel.org>
-References: <20180709154153.15742-1-robh@kernel.org>
-Message-ID: <20180709154153.15742-3-robh@kernel.org>
+From: gregory.clement@bootlin.com (Gregory CLEMENT)
+Date: Mon, 09 Jul 2018 17:42:31 +0200
+Subject: [PATCH 1/2] clk: mvebu: armada-37xx-periph: Fix switching CPU
+ rate from 300Mhz to 1.2GHz
+In-Reply-To: <153092068418.143105.5823916627333449732@swboyd.mtv.corp.google.com>
+ (Stephen Boyd's message of "Fri, 06 Jul 2018 16:44:44 -0700")
+References: <20180619123446.694-1-gregory.clement@bootlin.com>
+ <20180619123446.694-2-gregory.clement@bootlin.com>
+ <87tvpl4pql.fsf@bootlin.com>
+ <153092068418.143105.5823916627333449732@swboyd.mtv.corp.google.com>
+Message-ID: <87va9oct5k.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pin setup may be optional in some cases such as the reset default works
-or the pin setup is done by the bootloader. In these cases, it is optional
-for the OS to support managing the pin controller and pin setup. In order
-to support this scenario, add a property 'pinctrl-use-default' to indicate
-that the pin configuration is optional.
-
-Signed-off-by: Rob Herring <robh@kernel.org>
----
- .../devicetree/bindings/pinctrl/pinctrl-bindings.txt        | 6 ++++++
- 1 file changed, 6 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
-index ad9bbbba36e9..cef2b5855d60 100644
---- a/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
-@@ -103,6 +103,12 @@ Optional properties:
- #pinctrl-cells:	Number of pin control cells in addition to the index within the
- 		pin controller device instance
+Hi Stephen,
  
-+pinctrl-use-default: Boolean. Indicates that the OS can use the boot default
-+		pin configuration. This allows using an OS that does not have a
-+		driver for the pin controller. This property can be set either
-+		globally for the pin controller or in child nodes for individual
-+		pin group control.
-+
- Pin controller devices should contain the pin configuration nodes that client
- devices reference.
- 
+ On ven., juil. 06 2018, Stephen Boyd <sboyd@kernel.org> wrote:
+
+> Quoting Gregory CLEMENT (2018-06-29 07:44:02)
+>> Hi,
+>>  
+>>  On mar., juin 19 2018, Gregory CLEMENT <gregory.clement@bootlin.com> wrote:
+>> 
+>> > Switching the CPU from the L2 or L3 frequencies (300 and 200 Mhz
+>> > respectively) to L0 frequency (1.2 Ghz) requires a significant amount
+>> > of time to let VDD stabilize to the appropriate voltage. This amount of
+>> > time is large enough that it cannot be covered by the hardware
+>> > countdown register. Due to this, the CPU might start operating at L0
+>> > before the voltage is stabilized, leading to CPU stalls.
+>> >
+>> > To work around this problem, we prevent switching directly from the
+>> > L2/L3 frequencies to the L0 frequency, and instead switch to the L1
+>> > frequency in-between. The sequence therefore becomes:
+>> >
+>> > 1. First switch from L2/L3(200/300MHz) to L1(600MHZ)
+>> > 2. Sleep 20ms for stabling VDD voltage
+>> > 3. Then switch from L1(600MHZ) to L0(1200Mhz).
+>> 
+>> Do you have any comment on this fix?
+>> 
+>
+> Looks good. Is it crashing right now? I can throw it into clk-fixes if
+> it's fixing pain.
+
+Yes for the SoC capable to run at 1200Mhz it crashes. At the time the
+initial support was provided, my SoC version only ran at 1000MHz, so the
+problem was not noticed.
+
+Thanks,
+
+Gregory
+
+
 -- 
-2.17.1
+Gregory Clement, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+http://bootlin.com
