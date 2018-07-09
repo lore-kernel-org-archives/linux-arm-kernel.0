@@ -1,53 +1,42 @@
-From: amit.kucheria@linaro.org (Amit Kucheria)
-Date: Mon, 9 Jul 2018 17:07:51 +0530
-Subject: [PATCH v5 7/7] arm64: dts: sdm845: Add tsens nodes
-In-Reply-To: <742cf44d162523a66bb4ce60e15449dfbf88800a.1531133612.git.amit.kucheria@linaro.org>
-References: <cover.1531133611.git.amit.kucheria@linaro.org>
- <742cf44d162523a66bb4ce60e15449dfbf88800a.1531133612.git.amit.kucheria@linaro.org>
-Message-ID: <CAHLCerMsVwrkeK+dVpqapM5EXcYuGxrFE8FdNL4r6NJoWW5awg@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 9 Jul 2018 13:38:38 +0200
+Subject: [PATCH 0/3] PM / Domains: Enable name based lookup at attach
+In-Reply-To: <12075152.c01WRJ509Y@aspire.rjw.lan>
+References: <20180629110432.5179-1-ulf.hansson@linaro.org>
+ <20180702070806.tuzzh6mu65lrq4xq@vireshk-i7>
+ <12075152.c01WRJ509Y@aspire.rjw.lan>
+Message-ID: <CAPDyKFq=EPkvu0MjOtkjCNzrgZj0kaJTxXDt21=YR==T+H8ePQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 9, 2018 at 4:57 PM, Amit Kucheria <amit.kucheria@linaro.org> wrote:
-> SDM845 has two tsens blocks, one with 13 sensors and the other with 8
-> sensors. It uses version 2 of the TSENS IP, so use the fallback property to
-> allow more common code.
+On 9 July 2018 at 12:06, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> On Monday, July 2, 2018 9:08:06 AM CEST Viresh Kumar wrote:
+>> On 29-06-18, 13:04, Ulf Hansson wrote:
+>> > Recently we added support to manage multiple PM domains per device. Consumer
+>> > drivers were provided an API, dev_pm_domain_attach_by_id() to associate its
+>> > device with one of its PM domain, by using an index.
+>> >
+>> > Let's extend this to allow the association to be done using a name based
+>> > lookup, which follows the similar concept as for other resource types, such as
+>> > clocks for example.
+>> >
+>> > Ulf Hansson (3):
+>> >   PM / Domains: dt: Add a power-domain-names property
+>> >   PM / Domains: Introduce option to attach a device by name to genpd
+>> >   PM / Domains: Introduce dev_pm_domain_attach_by_name()
+>>
+>> Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
+>>
+>>
 >
-> Signed-off-by: Amit Kucheria <amit.kucheria@linaro.org>
-> ---
->  arch/arm64/boot/dts/qcom/sdm845.dtsi | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
+> Do we need Rob to ACK the binding change?
 >
-> diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-> index cdaabeb..d97ee00 100644
-> --- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
-> +++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-> @@ -221,6 +221,22 @@
->                         #interrupt-cells = <2>;
->                 };
->
-> +               tsens0: tsens at c222000 {
 
-Oops, sending out v6 to fix this.
+Normally, yes, however, the change to binding is trivial and the
+concept of using a names property isn't something new. I would be
+highly surprised if he would object.
 
-> +                       compatible = "qcom,sdm845-tsens", "qcom,tsens-v2";
-> +                       reg = <0xc263000 0x1ff>, /* TM */
-> +                             <0xc222000 0x1ff>; /* SROT */
-> +                       #qcom,sensors = <13>;
-> +                       #thermal-sensor-cells = <1>;
-> +               };
-> +
-> +               tsens1: tsens at c223000 {
-> +                       compatible = "qcom,sdm845-tsens", "qcom,tsens-v2";
-> +                       reg = <0xc265000 0x1ff>, /* TM */
-> +                             <0xc223000 0x1ff>; /* SROT */
-> +                       #qcom,sensors = <8>;
-> +                       #thermal-sensor-cells = <1>;
-> +               };
-> +
->                 spmi_bus: spmi at c440000 {
->                         compatible = "qcom,spmi-pmic-arb";
->                         reg = <0xc440000 0x1100>,
-> --
-> 2.7.4
->
+I say apply it.
+
+Kind regards
+Uffe
