@@ -1,42 +1,52 @@
-From: dinguyen@kernel.org (Dinh Nguyen)
-Date: Mon,  9 Jul 2018 17:41:03 -0500
-Subject: [PATCH 2/2] ARM: dts: socfpga: update NAND clocking for c5/a5
-In-Reply-To: <1531176063-30140-1-git-send-email-dinguyen@kernel.org>
-References: <1531176063-30140-1-git-send-email-dinguyen@kernel.org>
-Message-ID: <1531176063-30140-2-git-send-email-dinguyen@kernel.org>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Mon, 09 Jul 2018 15:48:30 -0700
+Subject: [PATCH 0/2] Add support for S805X based P241 Reference Design
+ board
+In-Reply-To: <1530784243-20823-1-git-send-email-narmstrong@baylibre.com> (Neil
+ Armstrong's message of "Thu, 5 Jul 2018 11:50:41 +0200")
+References: <1530784243-20823-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <7hfu0sm3ep.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The nand_x_clk is derived from the nand_clk. Also, update the NAND dts property
-with the correct clocks property.
+Neil Armstrong <narmstrong@baylibre.com> writes:
 
-Signed-off-by: Dinh Nguyen <dinguyen@kernel.org>
----
- arch/arm/boot/dts/socfpga.dtsi | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+> The Amlogic P241 board is the Reference Design board for the S805X
+> variant of the Amlogic Meson GXL SoC family.
+>
+> The S805X is a variant of the Amlogic Meson GXL SoC family with the
+> following physical limitations :
+> - No SDCard interface
+> - No GPIOCLK pins
+> - No USB OTG ID pin (but Gadget feature can stil be forced)
+> - No 5V regulator
+> - Reduced ADC inputs (only ADC0 and ADC1)
+> - GPIODV_26, GPIOAO_3, GPIOAO_4, GPIOAO_5, GPIOAO_6, GPIOX_14,
+>   GPIOX_15, GPIOH_3 are no more exposed on the package
+>
+> Amlogic exposes the following SW limitations :
+> - HDMI max resolution should be 1080p60, VPU clock should be downgraded
+> - Video Decoding should be limited to 1080p60, VDEC clock should be downgraded
+> - CPU speed should be limited by SCPI OPP table to 1.2GHz
+> - DRAM interface is limited to DDR4 16bit up to 1GiB
+>
+> The P241 board has the following features :
+> - 1GiB DDR4 Memory
+> - HDMI Connector with CEC
+> - A/V jack with Stereo Audio and CVBS
+> - 10/100 Ethernet
+> - 2x USB2.0 Type-A
+> - On-board WiFi SDIO Module
+> - On-board eMMC storage
+> - Infraread Received
+> - Factory Reset button
+> - UART connector
 
-diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-index b38f8c2..ae432b9 100644
---- a/arch/arm/boot/dts/socfpga.dtsi
-+++ b/arch/arm/boot/dts/socfpga.dtsi
-@@ -486,7 +486,7 @@
- 					nand_clk: nand_clk {
- 						#clock-cells = <0>;
- 						compatible = "altr,socfpga-gate-clk";
--						clocks = <&f2s_periph_ref_clk>, <&main_nand_sdmmc_clk>, <&per_nand_mmc_clk>;
-+						clocks = <&nand_x_clk>;
- 						clk-gate = <0xa0 10>;
- 						fixed-divider = <4>;
- 					};
-@@ -754,7 +754,8 @@
- 			reg-names = "nand_data", "denali_reg";
- 			interrupts = <0x0 0x90 0x4>;
- 			dma-mask = <0xffffffff>;
--			clocks = <&nand_x_clk>;
-+			clocks = <&nand_clk>, <&nand_x_clk>;
-+			clock-names = "nand", "nand_x";
- 			status = "disabled";
- 		};
- 
--- 
-2.7.4
+Applied to v4.19/dt64.
+
+The cover letter didn't say, but I assume this was at least boot tested
+on a p241 board?
+
+Thanks,
+
+Kevin
