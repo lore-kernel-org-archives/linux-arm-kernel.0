@@ -1,131 +1,164 @@
-From: hejianet@gmail.com (Jia He)
-Date: Mon, 9 Jul 2018 11:30:58 +0800
-Subject: [RESEND PATCH v10 2/6] mm: page_alloc: remain
- memblock_next_valid_pfn() on arm/arm64
-In-Reply-To: <20180706153709.6bcc76b0245f239f1d1dcc8a@linux-foundation.org>
-References: <1530867675-9018-1-git-send-email-hejianet@gmail.com>
- <1530867675-9018-3-git-send-email-hejianet@gmail.com>
- <20180706153709.6bcc76b0245f239f1d1dcc8a@linux-foundation.org>
-Message-ID: <4895a92f-f4c2-b200-3c7c-4fe8c4596f32@gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 9 Jul 2018 10:01:24 +0530
+Subject: [PATCH v2 7/9] phy: allwinner: add phy driver for USB3 PHY on
+ Allwinner H6 SoC
+In-Reply-To: <20180706153805.25842-8-icenowy@aosc.io>
+References: <20180706153805.25842-1-icenowy@aosc.io>
+ <20180706153805.25842-8-icenowy@aosc.io>
+Message-ID: <438f1123-a619-61d0-36cd-d65c1430435a@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andew
-Thanks for the comments
+Hi,
 
-On 7/7/2018 6:37 AM, Andrew Morton Wrote:
-> On Fri,  6 Jul 2018 17:01:11 +0800 Jia He <hejianet@gmail.com> wrote:
+On Friday 06 July 2018 09:08 PM, Icenowy Zheng wrote:
+> Allwinner H6 SoC contains a USB3 PHY (with USB2 DP/DM lines also
+> controlled).
 > 
->> From: Jia He <jia.he@hxt-semitech.com>
->>
->> Commit b92df1de5d28 ("mm: page_alloc: skip over regions of invalid pfns
->> where possible") optimized the loop in memmap_init_zone(). But it causes
->> possible panic bug. So Daniel Vacek reverted it later.
->>
->> But as suggested by Daniel Vacek, it is fine to using memblock to skip
->> gaps and finding next valid frame with CONFIG_HAVE_ARCH_PFN_VALID.
->> Daniel said:
->> "On arm and arm64, memblock is used by default. But generic version of
->> pfn_valid() is based on mem sections and memblock_next_valid_pfn() does
->> not always return the next valid one but skips more resulting in some
->> valid frames to be skipped (as if they were invalid). And that's why
->> kernel was eventually crashing on some !arm machines."
->>
->> About the performance consideration:
->> As said by James in b92df1de5,
->> "I have tested this patch on a virtual model of a Samurai CPU
->> with a sparse memory map.  The kernel boot time drops from 109 to
->> 62 seconds."
->>
->> Thus it would be better if we remain memblock_next_valid_pfn on arm/arm64.
->>
+> Add a driver for it.
 > 
-> We're making a bit of a mess here.  mmzone.h:
+> The register operations in this driver is mainly extracted from the BSP
+> USB3 driver.
 > 
-> ...
-> #ifndef CONFIG_HAVE_ARCH_PFN_VALID
-> ...
-> #define next_valid_pfn(pfn)	(pfn + 1)
-
-Yes, ^ this line can be removed.
-
-> #endif
-> ...
-> #ifdef CONFIG_HAVE_MEMBLOCK_PFN_VALID
-> #define next_valid_pfn(pfn)	memblock_next_valid_pfn(pfn)
-> ...
-> #else
-> ...
-> #ifndef next_valid_pfn
-> #define next_valid_pfn(pfn)	(pfn + 1)
-> #endif
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> ---
+> Changes in v2:
+> - Splitted out the DT binding.
 > 
-> I guess it works OK, since CONFIG_HAVE_MEMBLOCK_PFN_VALID depends on
-> CONFIG_HAVE_ARCH_PFN_VALID.  But it could all do with some cleanup and
-> modernization.
+>  drivers/phy/allwinner/Kconfig           |  13 ++
+>  drivers/phy/allwinner/Makefile          |   1 +
+>  drivers/phy/allwinner/phy-sun50i-usb3.c | 194 ++++++++++++++++++++++++
+>  3 files changed, 208 insertions(+)
+>  create mode 100644 drivers/phy/allwinner/phy-sun50i-usb3.c
 > 
-> - Perhaps memblock_next_valid_pfn() should just be called
->   pfn_valid().  So the header file's responsibility is to provide
->   pfn_valid() and next_valid_pfn().
-> 
-> - CONFIG_HAVE_ARCH_PFN_VALID should go away.  The current way of
->   doing such thnigs is for the arch (or some Kconfig combination) to
->   define pfn_valid() and next_valid_pfn() in some fashion and to then
->   ensure that one of them is #defined to something, to indicate that
->   both of these have been set up.  Or something like that.
+> diff --git a/drivers/phy/allwinner/Kconfig b/drivers/phy/allwinner/Kconfig
+> index cdc1e745ba47..cf373bcee034 100644
+> --- a/drivers/phy/allwinner/Kconfig
+> +++ b/drivers/phy/allwinner/Kconfig
+> @@ -29,3 +29,16 @@ config PHY_SUN9I_USB
+>  	  sun9i SoCs.
+>  
+>  	  This driver controls each individual USB 2 host PHY.
+> +
+> +config PHY_SUN50I_USB3
+> +	tristate "Allwinner sun50i SoC USB3 PHY driver"
+> +	depends on ARCH_SUNXI && HAS_IOMEM && OF
+> +	depends on RESET_CONTROLLER
+> +	depends on USB_SUPPORT
+> +	select USB_COMMON
 
-This is what I did in Patch v2, please see [1]. But Daniel opposed it [2]
+Doesn't look like this driver depends on USB_SUPPORT.
+> +	select GENERIC_PHY
+> +	help
+> +	  Enable this to support the USB3.0-capable transceiver that is
+> +	  part of some Allwinner sun50i SoCs.
+> +
+> +	  This driver controls each individual USB 2+3 host PHY combo.
+> diff --git a/drivers/phy/allwinner/Makefile b/drivers/phy/allwinner/Makefile
+> index 8605529c01a1..a8d01e9073c2 100644
+> --- a/drivers/phy/allwinner/Makefile
+> +++ b/drivers/phy/allwinner/Makefile
+> @@ -1,2 +1,3 @@
+>  obj-$(CONFIG_PHY_SUN4I_USB)		+= phy-sun4i-usb.o
+>  obj-$(CONFIG_PHY_SUN9I_USB)		+= phy-sun9i-usb.o
+> +obj-$(CONFIG_PHY_SUN50I_USB3)		+= phy-sun50i-usb3.o
+> diff --git a/drivers/phy/allwinner/phy-sun50i-usb3.c b/drivers/phy/allwinner/phy-sun50i-usb3.c
+> new file mode 100644
+> index 000000000000..226c99c2d664
+> --- /dev/null
+> +++ b/drivers/phy/allwinner/phy-sun50i-usb3.c
+> @@ -0,0 +1,194 @@
+> +// SPDX-License-Identifier: GPL-2.0+
+> +/*
+> + * Allwinner sun50i(H6) USB 3.0 phy driver
+> + *
+> + * Copyright (C) 2017 Icenowy Zheng <icenowy@aosc.io>
+> + *
+> + * Based on phy-sun9i-usb.c, which is:
+> + *
+> + * Copyright (C) 2014-2015 Chen-Yu Tsai <wens@csie.org>
+> + *
+> + * Based on code from Allwinner BSP, which is:
+> + *
+> + * Copyright (c) 2010-2015 Allwinner Technology Co., Ltd.
 
-As he said:
-Now, if any other architecture defines CONFIG_HAVE_ARCH_PFN_VALID and
-implements it's own version of pfn_valid(), there is no guarantee that
-it will be based on memblock data or somehow equivalent to the arm
-implementation, right?
-I think it make sense, so I introduced the new config
-CONFIG_HAVE_MEMBLOCK_PFN_VALID instead of using CONFIG_HAVE_ARCH_PFN_VALID
-how about you ? :-)
+Does the BSP also use GPL license?
+> + */
+> +
+> +#include <linux/clk.h>
+> +#include <linux/err.h>
+> +#include <linux/io.h>
+> +#include <linux/module.h>
+> +#include <linux/phy/phy.h>
+> +#include <linux/usb/of.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/reset.h>
+> +
+> +/* Interface Status and Control Registers */
+> +#define SUNXI_ISCR			0x00
+> +#define SUNXI_PIPE_CLOCK_CONTROL	0x14
+> +#define SUNXI_PHY_TUNE_LOW		0x18
+> +#define SUNXI_PHY_TUNE_HIGH		0x1c
+> +#define SUNXI_PHY_EXTERNAL_CONTROL	0x20
+> +
+> +/* USB2.0 Interface Status and Control Register */
+> +#define SUNXI_ISCR_FORCE_VBUS		(3 << 12)
+> +
+> +/* PIPE Clock Control Register */
+> +#define SUNXI_PCC_PIPE_CLK_OPEN		(1 << 6)
+> +
+> +/* PHY External Control Register */
+> +#define SUNXI_PEC_EXTERN_VBUS		(3 << 1)
+> +#define SUNXI_PEC_SSC_EN		(1 << 24)
+> +#define SUNXI_PEC_REF_SSP_EN		(1 << 26)
+> +
+> +/* PHY Tune High Register */
+> +#define SUNXI_TX_DEEMPH_3P5DB(n)	((n) << 19)
+> +#define SUNXI_TX_DEEMPH_3P5DB_MASK	GENMASK(24, 19)
+> +#define SUNXI_TX_DEEMPH_6DB(n)		((n) << 13)
+> +#define SUNXI_TX_DEEMPH_6GB_MASK	GENMASK(18, 13)
+> +#define SUNXI_TX_SWING_FULL(n)		((n) << 6)
+> +#define SUNXI_TX_SWING_FULL_MASK	GENMASK(12, 6)
+> +#define SUNXI_LOS_BIAS(n)		((n) << 3)
+> +#define SUNXI_LOS_BIAS_MASK		GENMASK(5, 3)
+> +#define SUNXI_TXVBOOSTLVL(n)		((n) << 0)
+> +#define SUNXI_TXVBOOSTLVL_MASK		GENMASK(0, 2)
+> +
+> +struct sun50i_usb3_phy {
+> +	struct phy *phy;
+> +	void __iomem *regs;
+> +	struct reset_control *reset;
+> +	struct clk *clk;
+> +};
+> +
+> +static void sun50i_usb3_phy_open(struct sun50i_usb3_phy *phy)
+> +{
+> +	u32 val;
+> +
+> +	val = readl(phy->regs + SUNXI_PHY_EXTERNAL_CONTROL);
+> +	val |= SUNXI_PEC_EXTERN_VBUS;
+> +	val |= SUNXI_PEC_SSC_EN | SUNXI_PEC_REF_SSP_EN;
+> +	writel(val, phy->regs + SUNXI_PHY_EXTERNAL_CONTROL);
+> +
+> +	val = readl(phy->regs + SUNXI_PIPE_CLOCK_CONTROL);
+> +	val |= SUNXI_PCC_PIPE_CLK_OPEN;
+> +	writel(val, phy->regs + SUNXI_PIPE_CLOCK_CONTROL);
+> +
+> +	val = readl(phy->regs + SUNXI_ISCR);
+> +	val |= SUNXI_ISCR_FORCE_VBUS;
+> +	writel(val, phy->regs + SUNXI_ISCR);
+> +
+> +	/*
+> +	 * All the magic numbers written to the PHY_TUNE_{LOW_HIGH}
+> +	 * registers are directly taken from the BSP USB3 driver from
+> +	 * Allwiner.
 
-[1] https://lkml.org/lkml/2018/3/24/71
-[2] https://lkml.org/lkml/2018/3/28/231
+%s/Allwiner/Allwinner/
+> +	 */
+> +	writel(0x0047fc87, phy->regs + SUNXI_PHY_TUNE_LOW);
 
-> 
-> 
-> Secondly, in memmap_init_zone()
-> 
->> -		if (!early_pfn_valid(pfn))
->> +		if (!early_pfn_valid(pfn)) {
->> +			pfn = next_valid_pfn(pfn) - 1;
->> 			continue;
->> +		}
->> +
-> 
-> This is weird-looking.  next_valid_pfn(pfn) is usually (pfn+1) so it's
-> a no-op.  Sometimes we're calling memblock_next_valid_pfn() and then
-> backing up one, presumably because the `for' loop ends in `pfn++'.  Or
-> something.  Can this please be fully commented or cleaned up?
-To clean it up, maybe below is not acceptable for you and other experts ?
-		if (!early_pfn_valid(pfn)) {
-#ifndef XXX
-			continue;
-		}
-#else
-		pfn = next_valid_pfn(pfn) - 1;
-			continue;
-		}
-#endif
+PHY_TUNE_LOW should also configure individual parameters like how you've done
+below for PHY_TUNE_HIGH.
 
-Another way which was suggested by Ard Biesheuvel
-something like:
-	for (pfn = start_pfn; pfn < end_pfn; pfn = next_valid_pfn(pfn))
-	...
-But it might have impact on memmap_init_zone loop.
-
-E.g. context != MEMMAP_EARLY, pfn will not be checked by early_pfn_valid, thus
-it will change the mem hotplug logic.
-
-Sure, as you suggested, I can give more comments in all the cases of different
-configs/arches for this line.
-
--- 
-Cheers,
-Jia
+Thanks
+Kishon
