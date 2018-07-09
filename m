@@ -1,32 +1,48 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 9 Jul 2018 12:32:58 +0200
-Subject: [PATCH] mm: cma: honor __GFP_ZERO flag in cma_alloc()
-In-Reply-To: <20180702133016.GA16909@infradead.org>
-References: <CGME20180613085851eucas1p20337d050face8ff8ea87674e16a9ccd2@eucas1p2.samsung.com>
- <20180613085851eucas1p20337d050face8ff8ea87674e16a9ccd2~3rI_9nj8b0455904559eucas1p2C@eucas1p2.samsung.com>
- <20180613122359.GA8695@bombadil.infradead.org>
- <20180613124001eucas1p2422f7916367ce19fecd40d6131990383~3uKFrT3ML1977219772eucas1p2G@eucas1p2.samsung.com>
- <20180613125546.GB32016@infradead.org>
- <20180613133913.GD20315@dhcp22.suse.cz>
- <20180702132335eucas1p1323fbf51cd5e82a59939d72097acee04~9kAizDyji0466904669eucas1p1w@eucas1p1.samsung.com>
- <20180702133016.GA16909@infradead.org>
-Message-ID: <20180709103259eucas1p1fc03f1da5e8964f903d09c5573923c10~-rMmDLdF-0476504765eucas1p12@eucas1p1.samsung.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 9 Jul 2018 03:33:05 -0700
+Subject: droid 4 in v4.18-rc: grep -r adasfasd /sys/ oopses
+In-Reply-To: <20180708193720.GA13262@amd>
+References: <20180708174939.GA10002@amd>
+ <20180708193720.GA13262@amd>
+Message-ID: <20180709103305.GF112168@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoph,
+* Pavel Machek <pavel@ucw.cz> [180708 19:40]:
+> Ok, so it seems to be:
+> 
+> user at devuan:~$ cat /sys/kernel/debug/pm_debug/count
+> (oops).
+> 
+> The file seems to be world-readable.
+> 
+> user at devuan:~$ ls -al /sys/kernel/debug/pm_debug/count
+> -r--r--r-- 1 root root 0 Jan  1  1970 /sys/kernel/debug/pm_debug/count
+> 
+> But on PC, that file does not exist.
+> 
+> Any ideas?
 
-On 2018-07-02 15:30, Christoph Hellwig wrote:
-> On Mon, Jul 02, 2018 at 03:23:34PM +0200, Marek Szyprowski wrote:
->> What about clearing the allocated buffer? Should it be another bool
->> parameter,
->> done unconditionally or moved to the callers?
-> Please keep it in the callers.  I plan to push it up even higher
-> from the current callers short to midterm.
+I'm not seeing this as tested with omap2plus_defconfig and
+not seeing any unclocked module interrupts here.. Can you
+see if the script below produces something for you?
 
-Okay, I will post a patch with this approach then.
+I had to filter out some trace pipes as they seem to hang.
 
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+Regards,
+
+Tony
+
+8< -----
+#!/bin/sh
+
+files=$(find /sys -type f)
+
+for file in ${files}; do
+        if echo ${file} | grep -e trace_pipe -e stats; then
+                echo "Skipping ${file}.."
+                continue
+        fi
+        echo "Grepping in ${file}.."
+        grep asdf ${file}
+done
