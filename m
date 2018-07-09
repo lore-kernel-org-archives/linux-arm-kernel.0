@@ -1,247 +1,122 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 9 Jul 2018 12:20:53 +0200
-Subject: [PATCH v4 1/1] arm64: dts: mediatek: add mt6765 support
-In-Reply-To: <1531116302-29921-2-git-send-email-mars.cheng@mediatek.com>
-References: <1531116302-29921-1-git-send-email-mars.cheng@mediatek.com>
- <1531116302-29921-2-git-send-email-mars.cheng@mediatek.com>
-Message-ID: <7fb13f45-4e33-6efc-467b-c7256a40cbc9@gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Mon, 9 Jul 2018 11:27:46 +0100
+Subject: [PATCH] arm64: neon: Do not access kernel_neon_busy with
+ preemption enabled
+In-Reply-To: <1530936171-16169-1-git-send-email-yandong77520@gmail.com>
+References: <1530936171-16169-1-git-send-email-yandong77520@gmail.com>
+Message-ID: <20180709102724.GA9486@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 09/07/18 08:05, Mars Cheng wrote:
-> This adds basic chip support for MT6765 SoC.
+On Sat, Jul 07, 2018 at 12:02:51PM +0800, Yandong.Zhao wrote:
+> From: Yandong Zhao <yandong77520@gmail.com>
 > 
-> Signed-off-by: Mars Cheng <mars.cheng@mediatek.com>
+> Dear, Dave
+> Thank you very much for reading my email. I have a question and
+> I hope toget your reply.
+> It is a bug to not close the preemption when executing
+> raw_cpu_read(kernel_neon_busy) in the function may_use_simd()!
+> We encountered a ?sysdump? problem on Kernel 4.14 code because
+> the program entered BUG_ON() in the function kernel_neon_begin().
+> Our analysis concludes that the process is migrating while executing
+> raw_cpu_read(kernel_neon_busy).
+
+Can you include a backtrace, please?
+
+Also, do you have any significant patches applies on top of v4.14?  Is
+your configuration different from defconfig?
+
+> 
+> Signed-off-by: Yandong Zhao <yandong77520@gmail.com>
 > ---
->  arch/arm64/boot/dts/mediatek/Makefile       |    1 +
->  arch/arm64/boot/dts/mediatek/mt6765-evb.dts |   33 ++++++
->  arch/arm64/boot/dts/mediatek/mt6765.dtsi    |  156 +++++++++++++++++++++++++++
->  3 files changed, 190 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/mediatek/mt6765-evb.dts
->  create mode 100644 arch/arm64/boot/dts/mediatek/mt6765.dtsi
+>  arch/arm64/include/asm/simd.h | 17 +++++------------
+>  1 file changed, 5 insertions(+), 12 deletions(-)
 > 
-> diff --git a/arch/arm64/boot/dts/mediatek/Makefile b/arch/arm64/boot/dts/mediatek/Makefile
-> index ac17f60..7506b0d 100644
-> --- a/arch/arm64/boot/dts/mediatek/Makefile
-> +++ b/arch/arm64/boot/dts/mediatek/Makefile
-> @@ -1,6 +1,7 @@
->  # SPDX-License-Identifier: GPL-2.0
->  dtb-$(CONFIG_ARCH_MEDIATEK) += mt2712-evb.dtb
->  dtb-$(CONFIG_ARCH_MEDIATEK) += mt6755-evb.dtb
-> +dtb-$(CONFIG_ARCH_MEDIATEK) += mt6765-evb.dtb
->  dtb-$(CONFIG_ARCH_MEDIATEK) += mt6795-evb.dtb
->  dtb-$(CONFIG_ARCH_MEDIATEK) += mt6797-evb.dtb
->  dtb-$(CONFIG_ARCH_MEDIATEK) += mt7622-rfb1.dtb
+> diff --git a/arch/arm64/include/asm/simd.h b/arch/arm64/include/asm/simd.h
+> index fa8b3fe..0d91084 100644
+> --- a/arch/arm64/include/asm/simd.h
+> +++ b/arch/arm64/include/asm/simd.h
+> @@ -29,20 +29,13 @@
+>  static __must_check inline bool may_use_simd(void)
+>  {
+>  	/*
+> -	 * The raw_cpu_read() is racy if called with preemption enabled.
+> -	 * This is not a bug: kernel_neon_busy is only set when
+> -	 * preemption is disabled, so we cannot migrate to another CPU
+> -	 * while it is set, nor can we migrate to a CPU where it is set.
+> -	 * So, if we find it clear on some CPU then we're guaranteed to
+> -	 * find it clear on any CPU we could migrate to.
+> -	 *
+> -	 * If we are in between kernel_neon_begin()...kernel_neon_end(),
+> -	 * the flag will be set, but preemption is also disabled, so we
+> -	 * can't migrate to another CPU and spuriously see it become
+> -	 * false.
+> +	 * Operations for contexts where we do not want to do any checks for
+> +	 * preemptions.  Unless strictly necessary, always use this_cpu_*()
+> +	 * instead. Because of the kernel_neon_busy here we have to make sure
+> +	 * that it is the current cpu.
+>  	 */
+>  	return !in_irq() && !irqs_disabled() && !in_nmi() &&
+> -		!raw_cpu_read(kernel_neon_busy);
+> +		!this_cpu_read(kernel_neon_busy);
 
-As you can see, we have a long list of SoCs which are poorly supported.
-I'm not very keen to just add another SoC which supports booting into a ramdisk
-using the serial console. Do you have a roadmap adding mainline support for this
-SoC?
+This doesn't really make sense by itself: this function is required to
+work in preemptible contexts, so in some situations there is no way to
+be sure which cpu's kernel_neon_busy flag is read.
 
-Regards,
-Matthias
+The original comment attempts to explain why this doesn't matter, and
+why raw_cpu_read() is valid.  Can you explain why this is wrong?
 
-> diff --git a/arch/arm64/boot/dts/mediatek/mt6765-evb.dts b/arch/arm64/boot/dts/mediatek/mt6765-evb.dts
-> new file mode 100644
-> index 0000000..36dddff2
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/mediatek/mt6765-evb.dts
-> @@ -0,0 +1,33 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +/*
-> + * dts file for Mediatek MT6765
-> + *
-> + * (C) Copyright 2018. Mediatek, Inc.
-> + *
-> + * Mars Cheng <mars.cheng@mediatek.com>
-> + */
-> +
-> +/dts-v1/;
-> +#include "mt6765.dtsi"
-> +
-> +/ {
-> +	model = "MediaTek MT6765 EVB";
-> +	compatible = "mediatek,mt6765-evb", "mediatek,mt6765";
-> +
-> +	aliases {
-> +		serial0 = &uart0;
-> +	};
-> +
-> +	memory at 40000000 {
-> +		device_type = "memory";
-> +		reg = <0 0x40000000 0 0x1e800000>;
-> +	};
-> +
-> +	chosen {
-> +		stdout-path = "serial0:921600n8";
-> +	};
-> +};
-> +
-> +&uart0 {
-> +	status = "okay";
-> +};
-> diff --git a/arch/arm64/boot/dts/mediatek/mt6765.dtsi b/arch/arm64/boot/dts/mediatek/mt6765.dtsi
-> new file mode 100644
-> index 0000000..cc365b1
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/mediatek/mt6765.dtsi
-> @@ -0,0 +1,156 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +/*
-> + * dts file for Mediatek MT6765
-> + *
-> + * (C) Copyright 2018. Mediatek, Inc.
-> + *
-> + * Mars Cheng <mars.cheng@mediatek.com>
-> + */
-> +
-> +#include <dt-bindings/interrupt-controller/irq.h>
-> +#include <dt-bindings/interrupt-controller/arm-gic.h>
-> +
-> +/ {
-> +	compatible = "mediatek,mt6765";
-> +	interrupt-parent = <&sysirq>;
-> +	#address-cells = <2>;
-> +	#size-cells = <2>;
-> +
-> +	psci {
-> +		compatible = "arm,psci-0.2";
-> +		method = "smc";
-> +	};
-> +
-> +	cpus {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		cpu at 0 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a53";
-> +			enable-method = "psci";
-> +			reg = <0x000>;
-> +		};
-> +
-> +		cpu at 1 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a53";
-> +			enable-method = "psci";
-> +			reg = <0x001>;
-> +		};
-> +
-> +		cpu at 2 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a53";
-> +			enable-method = "psci";
-> +			reg = <0x002>;
-> +		};
-> +
-> +		cpu at 3 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a53";
-> +			enable-method = "psci";
-> +			reg = <0x003>;
-> +		};
-> +
-> +		cpu at 100 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a53";
-> +			enable-method = "psci";
-> +			reg = <0x100>;
-> +		};
-> +
-> +		cpu at 101 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a53";
-> +			enable-method = "psci";
-> +			reg = <0x101>;
-> +		};
-> +
-> +		cpu at 102 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a53";
-> +			enable-method = "psci";
-> +			reg = <0x102>;
-> +		};
-> +
-> +		cpu at 103 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a53";
-> +			enable-method = "psci";
-> +			reg = <0x103>;
-> +		};
-> +	};
-> +
-> +	baud_clk: dummy26m {
-> +		compatible = "fixed-clock";
-> +		clock-frequency = <26000000>;
-> +		#clock-cells = <0>;
-> +	};
-> +
-> +	sys_clk: dummyclk {
-> +		compatible = "fixed-clock";
-> +		clock-frequency = <26000000>;
-> +		#clock-cells = <0>;
-> +	};
-> +
-> +	timer {
-> +		compatible = "arm,armv8-timer";
-> +		interrupt-parent = <&gic>;
-> +		interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_LOW>,
-> +			     <GIC_PPI 14 IRQ_TYPE_LEVEL_LOW>,
-> +			     <GIC_PPI 11 IRQ_TYPE_LEVEL_LOW>,
-> +			     <GIC_PPI 10 IRQ_TYPE_LEVEL_LOW>;
-> +	};
-> +
-> +	soc {
-> +		#address-cells = <2>;
-> +		#size-cells = <2>;
-> +		compatible = "simple-bus";
-> +		ranges;
-> +
-> +		gic: interrupt-controller at c000000 {
-> +			compatible = "arm,gic-v3";
-> +			#interrupt-cells = <3>;
-> +			#address-cells = <2>;
-> +			#size-cells = <2>;
-> +			interrupt-parent = <&gic>;
-> +			interrupt-controller;
-> +			reg = <0 0x0c000000 0 0x40000>,  /* GICD */
-> +			      <0 0x0c100000 0 0x200000>, /* GICR */
-> +			      <0 0x0c400000 0 0x2000>,   /* GICC */
-> +			      <0 0x0c410000 0 0x2000>,   /* GICH */
-> +			      <0 0x0c420000 0 0x20000>;  /* GICV */
-> +			interrupts = <GIC_PPI 9 IRQ_TYPE_LEVEL_HIGH>;
-> +		};
-> +
-> +		sysirq: interrupt-controller at 10200a80 {
-> +			compatible = "mediatek,mt6765-sysirq",
-> +				     "mediatek,mt6577-sysirq";
-> +			interrupt-controller;
-> +			#interrupt-cells = <3>;
-> +			interrupt-parent = <&gic>;
-> +			reg = <0 0x10200a80 0 0x50>;
-> +		};
-> +
-> +		uart0: serial at 11002000 {
-> +			compatible = "mediatek,mt6765-uart",
-> +				     "mediatek,mt6577-uart";
-> +			reg = <0 0x11002000 0 0x400>;
-> +			interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_LOW>;
-> +			clocks = <&baud_clk>, <&sys_clk>;
-> +			clock-names = "baud", "bus";
-> +			status = "disabled";
-> +		};
-> +
-> +		uart1: serial at 11003000 {
-> +			compatible = "mediatek,mt6765-uart",
-> +				     "mediatek,mt6577-uart";
-> +			reg = <0 0x11003000 0 0x400>;
-> +			interrupts = <GIC_SPI 92 IRQ_TYPE_LEVEL_LOW>;
-> +			clocks = <&baud_clk>, <&sys_clk>;
-> +			clock-names = "baud", "bus";
-> +			status = "disabled";
-> +		};
-> +	}; /* end of soc */
-> +};
-> 
+
+The BUG_ON() in kernel_neon_begin() is there for the purpose of
+detecting invalid uses of kernel_neon_begin() -- i.e., one
+kernel_neon_begin() nested inside another, or kernel_neon_begin() called
+from hardirq or nmi context.
+
+Are you sure kernel_neon_begin() is not being used wrongly somewhere?
+
+If kernel_neon_begin() is being used wrongly, the following hack may
+help to identify where the problem is:
+
+Cheers
+---Dave
+
+--8<--
+
+diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+index 8afc518..e6cabf6 100644
+--- a/arch/arm64/kernel/fpsimd.c
++++ b/arch/arm64/kernel/fpsimd.c
+@@ -1165,6 +1165,7 @@ void fpsimd_flush_cpu_state(void)
+ 
+ DEFINE_PER_CPU(bool, kernel_neon_busy);
+ EXPORT_PER_CPU_SYMBOL(kernel_neon_busy);
++static DEFINE_PER_CPU(void *, kernel_neon_caller);
+ 
+ /*
+  * Kernel-side NEON support functions
+@@ -1188,11 +1189,23 @@ void kernel_neon_begin(void)
+ 	if (WARN_ON(!system_supports_fpsimd()))
+ 		return;
+ 
+-	BUG_ON(!may_use_simd());
++	preempt_disable();
++	if (!may_use_simd()) {
++		if (in_irq() || irqs_disabled() || in_nmi())
++			pr_err("fpsimd: kernel_neon_begin() from hardirq/nmi context\n");
++
++		if (this_cpu_read(kernel_neon_busy))
++			pr_err("fpsimd: kernel_neon_begin() already called by %pF\n",
++			       this_cpu_read(kernel_neon_caller));
++
++		BUG();
++	}
++	preempt_enable();
+ 
+ 	local_bh_disable();
+ 
+ 	__this_cpu_write(kernel_neon_busy, true);
++	__this_cpu_write(kernel_neon_caller, (void *)_RET_IP_);
+ 
+ 	/* Save unsaved fpsimd state, if any: */
+ 	fpsimd_save();
