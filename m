@@ -1,57 +1,66 @@
-From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Mon, 09 Jul 2018 17:42:31 +0200
-Subject: [PATCH 1/2] clk: mvebu: armada-37xx-periph: Fix switching CPU
- rate from 300Mhz to 1.2GHz
-In-Reply-To: <153092068418.143105.5823916627333449732@swboyd.mtv.corp.google.com>
- (Stephen Boyd's message of "Fri, 06 Jul 2018 16:44:44 -0700")
-References: <20180619123446.694-1-gregory.clement@bootlin.com>
- <20180619123446.694-2-gregory.clement@bootlin.com>
- <87tvpl4pql.fsf@bootlin.com>
- <153092068418.143105.5823916627333449732@swboyd.mtv.corp.google.com>
-Message-ID: <87va9oct5k.fsf@bootlin.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Mon, 09 Jul 2018 23:44:20 +0800
+Subject: [PATCH v2 0/4] sun8i: r40: add AHCI
+In-Reply-To: <1531149658-27030-1-git-send-email-clabbe@baylibre.com>
+References: <1531149658-27030-1-git-send-email-clabbe@baylibre.com>
+Message-ID: <EF718AB4-DD07-4D67-BE2E-1B9EBA5EB25F@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
- 
- On ven., juil. 06 2018, Stephen Boyd <sboyd@kernel.org> wrote:
 
-> Quoting Gregory CLEMENT (2018-06-29 07:44:02)
->> Hi,
->>  
->>  On mar., juin 19 2018, Gregory CLEMENT <gregory.clement@bootlin.com> wrote:
->> 
->> > Switching the CPU from the L2 or L3 frequencies (300 and 200 Mhz
->> > respectively) to L0 frequency (1.2 Ghz) requires a significant amount
->> > of time to let VDD stabilize to the appropriate voltage. This amount of
->> > time is large enough that it cannot be covered by the hardware
->> > countdown register. Due to this, the CPU might start operating at L0
->> > before the voltage is stabilized, leading to CPU stalls.
->> >
->> > To work around this problem, we prevent switching directly from the
->> > L2/L3 frequencies to the L0 frequency, and instead switch to the L1
->> > frequency in-between. The sequence therefore becomes:
->> >
->> > 1. First switch from L2/L3(200/300MHz) to L1(600MHZ)
->> > 2. Sleep 20ms for stabling VDD voltage
->> > 3. Then switch from L1(600MHZ) to L0(1200Mhz).
->> 
->> Do you have any comment on this fix?
->> 
+
+? 2018?7?9? GMT+08:00 ??11:20:54, Corentin Labbe <clabbe@baylibre.com> ??:
+>Hello
 >
-> Looks good. Is it crashing right now? I can throw it into clk-fixes if
-> it's fixing pain.
+>With Moeicenowy's agreement, I have take leadership ot this patchset.
+>
+>There are no really changes appart renaming struct quirck to variant.
+>
+>Since the last serie is really old, I will answer comment here.
+>The two regulator (1.2 and 2.5V) are not for the PHY since:
+>- nothing in the schematic said that they are for the PHY, they seems
+>  only for controller
+>- all other AHCI driver use 5V for the target/PHY (vs 1.2/2.5 which
+>  cannot be used for target)
 
-Yes for the SoC capable to run at 1200Mhz it crashes. At the time the
-initial support was provided, my SoC version only ran at 1000MHz, so the
-problem was not noticed.
+Target is not equal to PHY. Target means the supply
+of the disk, which can be usually 5v (for 2.5" HDD) or
+12v (3.5" HDD).
 
-Thanks,
+By reading Wikipedia articles  about SATA and LVDS, I assume
+2.5V is for PHY and 1.2V is for internal digital logic (VDD-SYS
+is commonly 1.2V on 40nm Allwinner SoCs; 2.5V VDD can be
+used to efficiently deliver ~1.2V LVDS.)
 
-Gregory
+P.S. VDD-SATA and VDD25-SATA also exist on A20, and by checking
+Banana Pi M1 (the original Banana Pi) schematics, VDD-SATA
+is connected to common VDD-SYS (called INTVDD on the
+schematics) and VDD25-SATA is connected to an always-on
+fixed LDO, maybe due to the lack of power outputs on AXP209.
 
-
--- 
-Gregory Clement, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-http://bootlin.com
+>
+>Furthermore, the AHCI binding support only one regulator per PHY, so
+>using the "target" regulator is out of question for registring this two
+>non-phy regulator.
+>
+>I hope this answer all comments done on last version.
+>
+>Regards
+>
+>Corentin Labbe (3):
+>  ata: ahci_sunxi: add support for R40 SATA controller
+>  ARM: dts: sun8i: r40: add sata node
+>  ARM: dts: sun8i: sun8i-r40-bananapi-m2-ultra: enable AHCI
+>
+>Icenowy Zheng (1):
+>  dt-bindings: add binding for Allwinner R40 SATA AHCI controller
+>
+> .../devicetree/bindings/ata/ahci-platform.txt      |   1 -
+> .../bindings/ata/allwinner,sun4i-a10-ahci.txt      |  40 +++++++
+> arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts  |  18 +++
+> arch/arm/boot/dts/sun8i-r40.dtsi                   |   9 ++
+>drivers/ata/ahci_sunxi.c                           | 124
+>++++++++++++++++++++-
+> 5 files changed, 188 insertions(+), 4 deletions(-)
+>create mode 100644
+>Documentation/devicetree/bindings/ata/allwinner,sun4i-a10-ahci.txt
