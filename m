@@ -1,76 +1,65 @@
-From: amit.kucheria@linaro.org (Amit Kucheria)
-Date: Mon, 9 Jul 2018 21:34:55 +0530
-Subject: [PATCH v4 6/6] arm64: dts: sdm845: Add tsens nodes
-In-Reply-To: <20180709160131.GM129942@google.com>
-References: <cover.1530533998.git.amit.kucheria@linaro.org>
- <a52b77ad84867774a0659f51ccb79b17ba7638ab.1530533998.git.amit.kucheria@linaro.org>
- <20180703214822.GD129942@google.com>
- <CAHLCerMZw8mftQb8iRc5+RqGGjf26ebwynPfORz0hAPxp05YfA@mail.gmail.com>
- <20180709160131.GM129942@google.com>
-Message-ID: <CAHLCerP0z-G+YqXOe8VYSTVPfSYiR+yywskijiD7y0Lz=2AQQQ@mail.gmail.com>
+From: mathieu.desnoyers@efficios.com (Mathieu Desnoyers)
+Date: Mon, 9 Jul 2018 12:06:22 -0400 (EDT)
+Subject: [PATCH v2 0/3] Support rseq on arm64
+In-Reply-To: <1531145985-3747-1-git-send-email-will.deacon@arm.com>
+References: <1531145985-3747-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1957291037.1983.1531152382750.JavaMail.zimbra@efficios.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 9, 2018 at 9:31 PM, Matthias Kaehlcke <mka@chromium.org> wrote:
-> On Mon, Jul 09, 2018 at 04:56:51PM +0530, Amit Kucheria wrote:
->> On Wed, Jul 4, 2018 at 3:18 AM, Matthias Kaehlcke <mka@chromium.org> wrote:
->> > Hi,
->> >
->> > On Mon, Jul 02, 2018 at 06:14:09PM +0530, Amit Kucheria wrote:
->> >> SDM845 has two tsens blocks, one with 13 sensors and the other with 8
->> >> sensors.
->> >>
->> >> Signed-off-by: Amit Kucheria <amit.kucheria@linaro.org>
->> >> ---
->> >>  arch/arm64/boot/dts/qcom/sdm845.dtsi | 16 ++++++++++++++++
->> >>  1 file changed, 16 insertions(+)
->> >>
->> >> diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
->> >> index cdaabeb..edf8505 100644
->> >> --- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
->> >> +++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
->> >> @@ -221,6 +221,22 @@
->> >>                       #interrupt-cells = <2>;
->> >>               };
->> >>
->> >> +             tsens0: tsens at c222000 {
->> >> +                     compatible = "qcom,tsens-v2.4.0", "qcom,tsens-v2";
->> >> +                     reg = <0xc263000 0x1ff>, /* TM */
->> >> +                           <0xc222000 0x1ff>; /* SROT */
->> >> +                     #qcom,sensors = <13>;
->> >> +                     #thermal-sensor-cells = <1>;
->> >> +             };
->> >> +
->> >> +             tsens1: tsens at c223000 {
->> >> +                     compatible = "qcom,tsens-v2.4.0", "qcom,tsens-v2";
->> >> +                     reg = <0xc265000 0x1ff>, /* TM */
->> >> +                           <0xc223000 0x1ff>; /* SROT */
->> >> +                     #qcom,sensors = <8>;
->> >> +                     #thermal-sensor-cells = <1>;
->> >> +             };
->> >> +
->> >>               spmi_bus: spmi at c440000 {
->> >>                       compatible = "qcom,spmi-pmic-arb";
->> >>                       reg = <0xc440000 0x1100>,
->> >
->> > I tested this series on an SDM845 board. Temperatures can be read from
->> > the tsens0 sensors, however for tsens1 sensors I get:
->> >
->> > cat temp
->> > cat: temp: No data available
->> >
->> > TRDY_READY_BIT set when reading TRDY_OFFSET in get_temp_tsens_v2().
->> > Unfortunately I currently have no documentation of the registers or the
->> > thermal sensors in general and couldn't investigate further.
->> >
->> > Any idea what could be the problem?
->>
->> Strangely enough, I'm seeing this now after rebuilding my integration
->> branch to test some other bits.
->>
->> I've sent another version with this patch removed while I investigate
->> this. Could you check if you're able to read all 8 sensors with v5?
->
-> With v6 all sensors can be read, thanks!
+----- On Jul 9, 2018, at 10:19 AM, Will Deacon will.deacon at arm.com wrote:
 
-Great! Would it be OK to add your Tested-by tag?
+> Hello,
+> 
+> This is version two of the patches previously posted here:
+> 
+> http://lkml.kernel.org/r/1529949285-11013-1-git-send-email-will.deacon at arm.com
+> 
+> Changes since v1 include:
+> 
+>  * Move abort handler in-line to avoid possibility of it being
+>    out-of-range for conditional branch instructions
+> 
+> I've tested both native and compat (little-endian only) with the selftests
+> and they pass successfully on my Seattle box.
+
+For the whole series:
+
+Acked-by: Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+
+Thanks!
+
+Mathieu
+
+> 
+> Thanks,
+> 
+> Will
+> 
+> --->8
+> 
+> Will Deacon (3):
+>  arm64: rseq: Implement backend rseq calls and select HAVE_RSEQ
+>  asm-generic: unistd.h: Wire up sys_rseq
+>  rseq/selftests: Add support for arm64
+> 
+> arch/arm64/Kconfig                        |   1 +
+> arch/arm64/include/asm/unistd.h           |   2 +-
+> arch/arm64/include/asm/unistd32.h         |   2 +
+> arch/arm64/kernel/entry.S                 |   2 +
+> arch/arm64/kernel/ptrace.c                |   2 +
+> arch/arm64/kernel/signal.c                |   3 +
+> include/uapi/asm-generic/unistd.h         |   4 +-
+> tools/testing/selftests/rseq/param_test.c |  20 +
+> tools/testing/selftests/rseq/rseq-arm64.h | 594 ++++++++++++++++++++++++++++++
+> tools/testing/selftests/rseq/rseq.h       |   2 +
+> 10 files changed, 630 insertions(+), 2 deletions(-)
+> create mode 100644 tools/testing/selftests/rseq/rseq-arm64.h
+> 
+> --
+> 2.1.4
+
+-- 
+Mathieu Desnoyers
+EfficiOS Inc.
+http://www.efficios.com
