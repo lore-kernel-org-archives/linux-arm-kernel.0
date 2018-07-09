@@ -1,75 +1,149 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Mon,  9 Jul 2018 17:48:43 +0200
-Subject: [PATCH 3/8] ARM: dts: imx6qdl-apalis/-colibri: prevent 1.8V modes
+Date: Mon,  9 Jul 2018 17:48:46 +0200
+Subject: [PATCH 6/8] ARM: dts: imx6qdl-apalis/-colibri: fix on-module
+ regulators
 In-Reply-To: <20180709154848.5401-1-stefan@agner.ch>
 References: <20180709154848.5401-1-stefan@agner.ch>
-Message-ID: <20180709154848.5401-3-stefan@agner.ch>
+Message-ID: <20180709154848.5401-6-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use no-1-8-v device tree property to indicate that the board does
-not support 1.8V signaling. The property voltage-ranges seems not
-appropriate in our case since we do not have level shifters in
-place.
+Remove the 2.5V regulator, it does not exist. There is 3.3V and
+3.3V_AUDIO provided to the module through the edge connector,
+model those as fixed regulators like we use to do in other
+Colibri device trees. The SGTL5000 uses 3.3V_AUDIO as VDDA. Note
+that the driver derives the analog ground voltage (VAG) from this
+supply. The new value should allow higher output swings before
+clipping occurs. Refer to the SGTL5000 datasheet for details.
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- arch/arm/boot/dts/imx6qdl-apalis.dtsi  | 6 +++---
- arch/arm/boot/dts/imx6qdl-colibri.dtsi | 4 ++--
- 2 files changed, 5 insertions(+), 5 deletions(-)
+ arch/arm/boot/dts/imx6qdl-apalis.dtsi  | 22 +++++++++++-----------
+ arch/arm/boot/dts/imx6qdl-colibri.dtsi | 20 ++++++++++----------
+ 2 files changed, 21 insertions(+), 21 deletions(-)
 
 diff --git a/arch/arm/boot/dts/imx6qdl-apalis.dtsi b/arch/arm/boot/dts/imx6qdl-apalis.dtsi
-index 64fbee61de44..55bcea245df6 100644
+index 2f711fffa06e..6813f4326807 100644
 --- a/arch/arm/boot/dts/imx6qdl-apalis.dtsi
 +++ b/arch/arm/boot/dts/imx6qdl-apalis.dtsi
-@@ -457,7 +457,7 @@
+@@ -61,17 +61,17 @@
+ 		status = "disabled";
+ 	};
+ 
+-	reg_2p5v: regulator-2p5v {
++	reg_module_3v3: regulator-module-3v3 {
+ 		compatible = "regulator-fixed";
+-		regulator-name = "2P5V";
+-		regulator-min-microvolt = <2500000>;
+-		regulator-max-microvolt = <2500000>;
++		regulator-name = "+V3.3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
+ 		regulator-always-on;
+ 	};
+ 
+-	reg_3p3v: regulator-3p3v {
++	reg_module_3v3_audio: regulator-module-3v3-audio {
+ 		compatible = "regulator-fixed";
+-		regulator-name = "3P3V";
++		regulator-name = "+V3.3_AUDIO";
+ 		regulator-min-microvolt = <3300000>;
+ 		regulator-max-microvolt = <3300000>;
+ 		regulator-always-on;
+@@ -314,8 +314,8 @@
+ 		compatible = "fsl,sgtl5000";
+ 		reg = <0x0a>;
+ 		clocks = <&clks IMX6QDL_CLK_CKO>;
+-		VDDA-supply = <&reg_2p5v>;
+-		VDDIO-supply = <&reg_3p3v>;
++		VDDA-supply = <&reg_module_3v3_audio>;
++		VDDIO-supply = <&reg_module_3v3>;
+ 	};
+ 
+ 	/* STMPE811 touch screen controller */
+@@ -447,7 +447,7 @@
+ &usdhc1 {
+ 	pinctrl-names = "default";
  	pinctrl-0 = <&pinctrl_usdhc1_4bit &pinctrl_usdhc1_8bit>;
- 	vqmmc-supply = <&reg_3p3v>;
+-	vqmmc-supply = <&reg_3p3v>;
++	vqmmc-supply = <&reg_module_3v3>;
  	bus-width = <8>;
--	voltage-ranges = <3300 3300>;
-+	no-1-8-v;
- 	status = "disabled";
- };
- 
-@@ -467,7 +467,7 @@
+ 	disable-wp;
+ 	no-1-8-v;
+@@ -458,7 +458,7 @@
+ &usdhc2 {
+ 	pinctrl-names = "default";
  	pinctrl-0 = <&pinctrl_usdhc2>;
- 	vqmmc-supply = <&reg_3p3v>;
+-	vqmmc-supply = <&reg_3p3v>;
++	vqmmc-supply = <&reg_module_3v3>;
  	bus-width = <4>;
--	voltage-ranges = <3300 3300>;
-+	no-1-8-v;
- 	status = "disabled";
- };
- 
-@@ -477,7 +477,7 @@
+ 	disable-wp;
+ 	no-1-8-v;
+@@ -469,7 +469,7 @@
+ &usdhc3 {
+ 	pinctrl-names = "default";
  	pinctrl-0 = <&pinctrl_usdhc3>;
- 	vqmmc-supply = <&reg_3p3v>;
+-	vqmmc-supply = <&reg_3p3v>;
++	vqmmc-supply = <&reg_module_3v3>;
  	bus-width = <8>;
--	voltage-ranges = <3300 3300>;
-+	no-1-8-v;
+ 	no-1-8-v;
  	non-removable;
- 	status = "okay";
- };
 diff --git a/arch/arm/boot/dts/imx6qdl-colibri.dtsi b/arch/arm/boot/dts/imx6qdl-colibri.dtsi
-index 6e937ca20869..bb44829dacbe 100644
+index 1a147cb0bed0..9a3bac5be5e2 100644
 --- a/arch/arm/boot/dts/imx6qdl-colibri.dtsi
 +++ b/arch/arm/boot/dts/imx6qdl-colibri.dtsi
-@@ -389,7 +389,7 @@
- 	cd-gpios = <&gpio2 5 GPIO_ACTIVE_LOW>; /* MMCD */
- 	vqmmc-supply = <&reg_3p3v>;
- 	bus-width = <4>;
--	voltage-ranges = <3300 3300>;
-+	no-1-8-v;
- 	status = "disabled";
- };
+@@ -56,17 +56,17 @@
+ 		status = "disabled";
+ 	};
  
-@@ -399,7 +399,7 @@
+-	reg_2p5v: regulator-2p5v {
++	reg_module_3v3: regulator-module-3v3 {
+ 		compatible = "regulator-fixed";
+-		regulator-name = "2P5V";
+-		regulator-min-microvolt = <2500000>;
+-		regulator-max-microvolt = <2500000>;
++		regulator-name = "+V3.3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
+ 		regulator-always-on;
+ 	};
+ 
+-	reg_3p3v: regulator-3p3v {
++	reg_module_3v3_audio: regulator-module-3v3-audio {
+ 		compatible = "regulator-fixed";
+-		regulator-name = "3P3V";
++		regulator-name = "+V3.3_AUDIO";
+ 		regulator-min-microvolt = <3300000>;
+ 		regulator-max-microvolt = <3300000>;
+ 		regulator-always-on;
+@@ -244,8 +244,8 @@
+ 		compatible = "fsl,sgtl5000";
+ 		reg = <0x0a>;
+ 		clocks = <&clks IMX6QDL_CLK_CKO>;
+-		VDDA-supply = <&reg_2p5v>;
+-		VDDIO-supply = <&reg_3p3v>;
++		VDDA-supply = <&reg_module_3v3_audio>;
++		VDDIO-supply = <&reg_module_3v3>;
+ 		lrclk-strength = <3>;
+ 	};
+ 
+@@ -380,7 +380,7 @@
+ 	pinctrl-0 = <&pinctrl_usdhc1 &pinctrl_mmc_cd>;
+ 	cd-gpios = <&gpio2 5 GPIO_ACTIVE_LOW>; /* MMCD */
+ 	disable-wp;
+-	vqmmc-supply = <&reg_3p3v>;
++	vqmmc-supply = <&reg_module_3v3>;
+ 	bus-width = <4>;
+ 	no-1-8-v;
+ 	status = "disabled";
+@@ -390,7 +390,7 @@
+ &usdhc3 {
+ 	pinctrl-names = "default";
  	pinctrl-0 = <&pinctrl_usdhc3>;
- 	vqmmc-supply = <&reg_3p3v>;
+-	vqmmc-supply = <&reg_3p3v>;
++	vqmmc-supply = <&reg_module_3v3>;
  	bus-width = <8>;
--	voltage-ranges = <3300 3300>;
-+	no-1-8-v;
+ 	no-1-8-v;
  	non-removable;
- 	status = "okay";
- };
 -- 
 2.18.0
