@@ -1,281 +1,123 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Mon,  9 Jul 2018 15:41:24 +0100
-Subject: [PATCH v5 7/7] KVM: arm64: Add support for creating PUD hugepages at
- stage 2
-In-Reply-To: <20180709144124.29164-1-punit.agrawal@arm.com>
-References: <20180709143835.28971-1-punit.agrawal@arm.com>
- <20180709144124.29164-1-punit.agrawal@arm.com>
-Message-ID: <20180709144124.29164-7-punit.agrawal@arm.com>
+From: Okaya@kernel.org (Sinan Kaya)
+Date: Mon, 9 Jul 2018 08:48:44 -0600
+Subject: [PATCH V5 3/3] PCI: Mask and unmask hotplug interrupts during
+ reset
+In-Reply-To: <20180708171418.GA11476@wunner.de>
+References: <CAK9iUCM=zWexWow9TwkRfO186Hwr5WyGy0NHZF1vtXn3wbbZGQ@mail.gmail.com>
+ <12fc8de5-ff03-cb00-52cb-25a43c71d03a@codeaurora.org>
+ <20180708171418.GA11476@wunner.de>
+Message-ID: <CAK9iUCMcic5mzGiT20KNxgwPo6AuajHFsoj7GOjSht5SwrQevg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-KVM only supports PMD hugepages at stage 2. Now that the various page
-handling routines are updated, extend the stage 2 fault handling to
-map in PUD hugepages.
+On 7/8/18, Lukas Wunner <lukas@wunner.de> wrote:
+> On Tue, Jul 03, 2018 at 11:43:26AM -0400, Sinan Kaya wrote:
+>> On 7/3/2018 10:34 AM, Lukas Wunner wrote:
+>> > We've already got the ->reset_slot callback in struct hotplug_slot_ops,
+>> > I'm wondering if we really need additional ones for this use case.
+>>
+>> As I have informed you before on my previous reply, the pdev->slot is
+>> only valid for children objects such as endpoints not for a bridge when
+>> using pciehp.
+>>
+>> The pointer is NULL for the host bridge itself.
+>
+> Right, sorry, I had misremembered how this works.  So essentially the
+> pointer is only set for the devices "in" the slot, but not for the bridge
+> "to" that slot.  If the slot isn't occupied, *no* pci_dev points the
+> struct pci_slot.  Seems counter-intuitive to be honest.
 
-Addition of PUD hugepage support enables additional page sizes (e.g.,
-1G with 4K granule) which can be useful on cores that support mapping
-larger block sizes in the TLB entries.
+That is true. There is a bit of history here. Back in pci days, you
+would have each PCI device number as a hotplug slot. There would be
+multiple slots under a bridge. There is a one to many relationship.
 
-Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-Cc: Christoffer Dall <christoffer.dall@arm.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Russell King <linux@armlinux.org.uk>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm/include/asm/kvm_mmu.h         | 19 +++++++
- arch/arm64/include/asm/kvm_mmu.h       | 15 +++++
- arch/arm64/include/asm/pgtable-hwdef.h |  2 +
- arch/arm64/include/asm/pgtable.h       |  2 +
- virt/kvm/arm/mmu.c                     | 78 ++++++++++++++++++++++++--
- 5 files changed, 112 insertions(+), 4 deletions(-)
+>
+> Thanks for the explanation of the various reset codepaths, I'm afraid my
+> understanding of that portion of the PCI core is limited.
+>
+> Browsing through drivers/pci/pci.c, I notice pci_dev_lock() and
+> pci_dev_save_and_disable(), both are called from reset codepaths and
+> apparently seek to stop access to the device during reset.  I'm wondering
+> why DPC and AER remove devices in order to avoid accesses to them during
+> reset, instead of utilizing these two functions?
 
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index 8e1e8aee229e..787baf9ec994 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -77,10 +77,13 @@ void kvm_clear_hyp_idmap(void);
- 
- #define kvm_pfn_pte(pfn, prot)	pfn_pte(pfn, prot)
- #define kvm_pfn_pmd(pfn, prot)	pfn_pmd(pfn, prot)
-+#define kvm_pfn_pud(pfn, prot)	(__pud(0))
- 
- #define kvm_pud_pfn(pud)	(((pud_val(pud) & PUD_MASK) & PHYS_MASK) >> PAGE_SHIFT)
- 
- #define kvm_pmd_mkhuge(pmd)	pmd_mkhuge(pmd)
-+/* No support for pud hugepages */
-+#define kvm_pud_mkhuge(pud)	(pud)
- 
- /*
-  * The following kvm_*pud*() functionas are provided strictly to allow
-@@ -97,6 +100,22 @@ static inline bool kvm_s2pud_readonly(pud_t *pud)
- 	return false;
- }
- 
-+static inline void kvm_set_pud(pud_t *pud, pud_t new_pud)
-+{
-+	BUG();
-+}
-+
-+static inline pud_t kvm_s2pud_mkwrite(pud_t pud)
-+{
-+	BUG();
-+	return pud;
-+}
-+
-+static inline pud_t kvm_s2pud_mkexec(pud_t pud)
-+{
-+	BUG();
-+	return pud;
-+}
- 
- static inline bool kvm_s2pud_exec(pud_t *pud)
- {
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index c542052fb199..dd8a23159463 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -171,13 +171,16 @@ void kvm_clear_hyp_idmap(void);
- 
- #define	kvm_set_pte(ptep, pte)		set_pte(ptep, pte)
- #define	kvm_set_pmd(pmdp, pmd)		set_pmd(pmdp, pmd)
-+#define kvm_set_pud(pudp, pud)		set_pud(pudp, pud)
- 
- #define kvm_pfn_pte(pfn, prot)		pfn_pte(pfn, prot)
- #define kvm_pfn_pmd(pfn, prot)		pfn_pmd(pfn, prot)
-+#define kvm_pfn_pud(pfn, prot)		pfn_pud(pfn, prot)
- 
- #define kvm_pud_pfn(pud)		pud_pfn(pud)
- 
- #define kvm_pmd_mkhuge(pmd)		pmd_mkhuge(pmd)
-+#define kvm_pud_mkhuge(pud)		pud_mkhuge(pud)
- 
- static inline pte_t kvm_s2pte_mkwrite(pte_t pte)
- {
-@@ -191,6 +194,12 @@ static inline pmd_t kvm_s2pmd_mkwrite(pmd_t pmd)
- 	return pmd;
- }
- 
-+static inline pud_t kvm_s2pud_mkwrite(pud_t pud)
-+{
-+	pud_val(pud) |= PUD_S2_RDWR;
-+	return pud;
-+}
-+
- static inline pte_t kvm_s2pte_mkexec(pte_t pte)
- {
- 	pte_val(pte) &= ~PTE_S2_XN;
-@@ -203,6 +212,12 @@ static inline pmd_t kvm_s2pmd_mkexec(pmd_t pmd)
- 	return pmd;
- }
- 
-+static inline pud_t kvm_s2pud_mkexec(pud_t pud)
-+{
-+	pud_val(pud) &= ~PUD_S2_XN;
-+	return pud;
-+}
-+
- static inline void kvm_set_s2pte_readonly(pte_t *ptep)
- {
- 	pteval_t old_pteval, pteval;
-diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
-index 10ae592b78b8..e327665e94d1 100644
---- a/arch/arm64/include/asm/pgtable-hwdef.h
-+++ b/arch/arm64/include/asm/pgtable-hwdef.h
-@@ -193,6 +193,8 @@
- #define PMD_S2_RDWR		(_AT(pmdval_t, 3) << 6)   /* HAP[2:1] */
- #define PMD_S2_XN		(_AT(pmdval_t, 2) << 53)  /* XN[1:0] */
- 
-+#define PUD_S2_RDONLY		(_AT(pudval_t, 1) << 6)   /* HAP[2:1] */
-+#define PUD_S2_RDWR		(_AT(pudval_t, 3) << 6)   /* HAP[2:1] */
- #define PUD_S2_XN		(_AT(pudval_t, 2) << 53)  /* XN[1:0] */
- 
- /*
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index 4d9476e420d9..0afc34f94ff5 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -389,6 +389,8 @@ static inline int pmd_protnone(pmd_t pmd)
- #define pud_mkyoung(pud)	pte_pud(pte_mkyoung(pud_pte(pud)))
- #define pud_write(pud)		pte_write(pud_pte(pud))
- 
-+#define pud_mkhuge(pud)		(__pud(pud_val(pud) & ~PUD_TABLE_BIT))
-+
- #define __pud_to_phys(pud)	__pte_to_phys(pud_pte(pud))
- #define __phys_to_pud_val(phys)	__phys_to_pte_val(phys)
- #define pud_pfn(pud)		((__pud_to_phys(pud) & PUD_MASK) >> PAGE_SHIFT)
-diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-index a6d3ac9d7c7a..d8e2497e5353 100644
---- a/virt/kvm/arm/mmu.c
-+++ b/virt/kvm/arm/mmu.c
-@@ -116,6 +116,25 @@ static void stage2_dissolve_pmd(struct kvm *kvm, phys_addr_t addr, pmd_t *pmd)
- 	put_page(virt_to_page(pmd));
- }
- 
-+/**
-+ * stage2_dissolve_pud() - clear and flush huge PUD entry
-+ * @kvm:	pointer to kvm structure.
-+ * @addr:	IPA
-+ * @pud:	pud pointer for IPA
-+ *
-+ * Function clears a PUD entry, flushes addr 1st and 2nd stage TLBs. Marks all
-+ * pages in the range dirty.
-+ */
-+static void stage2_dissolve_pud(struct kvm *kvm, phys_addr_t addr, pud_t *pudp)
-+{
-+	if (!stage2_pud_huge(*pudp))
-+		return;
-+
-+	stage2_pud_clear(pudp);
-+	kvm_tlb_flush_vmid_ipa(kvm, addr);
-+	put_page(virt_to_page(pudp));
-+}
-+
- static int mmu_topup_memory_cache(struct kvm_mmu_memory_cache *cache,
- 				  int min, int max)
- {
-@@ -993,7 +1012,7 @@ static pmd_t *stage2_get_pmd(struct kvm *kvm, struct kvm_mmu_memory_cache *cache
- 	pmd_t *pmd;
- 
- 	pud = stage2_get_pud(kvm, cache, addr);
--	if (!pud)
-+	if (!pud || stage2_pud_huge(*pud))
- 		return NULL;
- 
- 	if (stage2_pud_none(*pud)) {
-@@ -1038,6 +1057,26 @@ static int stage2_set_pmd_huge(struct kvm *kvm, struct kvm_mmu_memory_cache
- 	return 0;
- }
- 
-+static int stage2_set_pud_huge(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
-+			       phys_addr_t addr, const pud_t *new_pudp)
-+{
-+	pud_t *pudp, old_pud;
-+
-+	pudp = stage2_get_pud(kvm, cache, addr);
-+	VM_BUG_ON(!pudp);
-+
-+	old_pud = *pudp;
-+	if (stage2_pud_present(old_pud)) {
-+		stage2_pud_clear(pudp);
-+		kvm_tlb_flush_vmid_ipa(kvm, addr);
-+	} else {
-+		get_page(virt_to_page(pudp));
-+	}
-+
-+	kvm_set_pud(pudp, *new_pudp);
-+	return 0;
-+}
-+
- /*
-  * stage2_get_leaf_entry - walk the stage2 VM page tables and return
-  * true if a valid and present leaf-entry is found. A pointer to the
-@@ -1100,6 +1139,7 @@ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
- 			  phys_addr_t addr, const pte_t *new_pte,
- 			  unsigned long flags)
- {
-+	pud_t *pud;
- 	pmd_t *pmd;
- 	pte_t *pte, old_pte;
- 	bool iomap = flags & KVM_S2PTE_FLAG_IS_IOMAP;
-@@ -1108,6 +1148,22 @@ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
- 	VM_BUG_ON(logging_active && !cache);
- 
- 	/* Create stage-2 page table mapping - Levels 0 and 1 */
-+	pud = stage2_get_pud(kvm, cache, addr);
-+	if (!pud) {
-+		/*
-+		 * Ignore calls from kvm_set_spte_hva for unallocated
-+		 * address ranges.
-+		 */
-+		return 0;
-+	}
-+
-+	/*
-+	 * While dirty page logging - dissolve huge PUD, then continue
-+	 * on to allocate page.
-+	 */
-+	if (logging_active)
-+		stage2_dissolve_pud(kvm, addr, pud);
-+
- 	pmd = stage2_get_pmd(kvm, cache, addr);
- 	if (!pmd) {
- 		/*
-@@ -1500,9 +1556,12 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 	}
- 
- 	vma_pagesize = vma_kernel_pagesize(vma);
--	if (vma_pagesize == PMD_SIZE && !logging_active) {
-+	if ((vma_pagesize == PMD_SIZE || vma_pagesize == PUD_SIZE) &&
-+	    !logging_active) {
-+		struct hstate *h = hstate_vma(vma);
-+
- 		hugetlb = true;
--		gfn = (fault_ipa & PMD_MASK) >> PAGE_SHIFT;
-+		gfn = (fault_ipa & huge_page_mask(h)) >> PAGE_SHIFT;
- 	} else {
- 		/*
- 		 * Pages belonging to memslots that don't have the same
-@@ -1600,7 +1659,18 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 	needs_exec = exec_fault ||
- 		(fault_status == FSC_PERM && stage2_is_exec(kvm, fault_ipa));
- 
--	if (hugetlb && vma_pagesize == PMD_SIZE) {
-+	if (hugetlb && vma_pagesize == PUD_SIZE) {
-+		pud_t new_pud = kvm_pfn_pud(pfn, mem_type);
-+
-+		new_pud = kvm_pud_mkhuge(new_pud);
-+		if (writable)
-+			new_pud = kvm_s2pud_mkwrite(new_pud);
-+
-+		if (needs_exec)
-+			new_pud = kvm_s2pud_mkexec(new_pud);
-+
-+		ret = stage2_set_pud_huge(kvm, memcache, fault_ipa, &new_pud);
-+	} else if (hugetlb && vma_pagesize == PMD_SIZE) {
- 		pmd_t new_pmd = kvm_pfn_pmd(pfn, mem_type);
- 
- 		new_pmd = kvm_pmd_mkhuge(new_pmd);
--- 
-2.17.1
+This was the behavior until 4.18. Since 4.18 all devices are being
+removed and reenumerated following a fatal error condition.
+
+>
+> My guess is that a lot of the reset code is historically grown and
+> could be simplified and made more consistent, but that requires digging
+> into the code and getting a complete picture.  I've sort of done that
+> for pciehp, I think I'm now intimately familiar with 90% of it,
+> so I'll be happy to review patches for it and answer questions,
+> but I'm pretty much stumped when it comes to reset code in the PCI core.
+>
+> I treated the ->reset_slot() callback as one possible entry point into
+> pciehp and asked myself if it's properly serialized with the rest of the
+> driver and whether driver ->probe and ->remove is ordered such that
+> the driver is always properly initialized when the entry point might be
+> taken.  I did not look too closely at the codepaths actually leading to
+> invocation of the ->reset_slot() callback.
+>
+
+Sure, this path gets called from vfio today and possibly via a reset
+file in sysfs. A bunch of things need to fail before hitting slot
+reset path.
+
+However, vfio is a direct caller if hotplug is supported.
+
+>
+>> I was curious if we could use a single work queue for all pcie portdrv
+>> services. This would also eliminate the need for locks that Lukas is
+>> adding.
+>>
+>> If hotplug starts first,  hotplug code would run to completion before AER
+>> and DPC service starts recovery.
+>>
+>> If DPC/AER starts first, my patch would mask the hotplug interrupts.
+>>
+>> My solution doesn't help if link down interrupt is observed before the
+>> AER
+>> or DPC services.
+>
+> If pciehp gets an interrupt quicker than dpc/aer, it will (at least with
+> my patches) remove all devices, check if the presence bit is set,
+
+Yup.
+
+> and
+> if so, try to bring the slot up again.
+
+Hotplug driver should only observe a link down interrupt. Link would
+come up in response to a secondary bus reset initiated by the AER
+driver.
+
+Can you point me to the code that would bring up the link in hp code?
+Maybe, I am missing something.
+
+> My (limited) understanding is
+> that the link will stay down until dpc/aer react.
+> pciehp_check_link_status()
+> will wait 1 sec for the link, wait another 100 msec, then poll the vendor
+> register for 1 sec before giving up.  So if dpc/aer are locked out for this
+> long, they will only be able to reset the slot after 2100 msec.
+>
+> I've had a brief look at the PCIe r4.0 base spec and could not find
+> anything about how pciehp and dpc/aer should coordinate.  Maybe that's
+> an oversight, or the PCISIG just leaves this to the OS.
+>
+>
+>> Another possibility is to add synchronization logic between these threads
+>> obviously.
+>
+> Maybe call pci_channel_offline() in the poll loops of pcie_wait_for_link()
+> and pci_bus_check_dev() to avoid waiting for the link if an error needs to
+> be acted upon first?
+
+Let me think about this.
+
+>
+> Thanks,
+>
+> Lukas
+>
