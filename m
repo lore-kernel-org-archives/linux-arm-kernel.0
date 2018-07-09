@@ -1,124 +1,60 @@
-From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
-Date: Mon, 9 Jul 2018 16:32:41 +0800
-Subject: [PATCH v3 3/3] serial: 8250_dw: add fractional divisor support
-In-Reply-To: <20180709162315.7f53eb9a@xhacker.debian>
-References: <20180709160942.11a74f7a@xhacker.debian>
- <20180709162315.7f53eb9a@xhacker.debian>
-Message-ID: <20180709163241.4d4ee343@xhacker.debian>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 9 Jul 2018 09:42:40 +0100
+Subject: [PATCH v2 6/6] KVM: arm/arm64: vgic: Allow configuration of
+ interrupt groups
+In-Reply-To: <1530697100-22419-7-git-send-email-christoffer.dall@arm.com>
+References: <1530697100-22419-1-git-send-email-christoffer.dall@arm.com>
+ <1530697100-22419-7-git-send-email-christoffer.dall@arm.com>
+Message-ID: <7f875ead-d3cb-1fec-bc84-56e64526e6a7@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andy,
-
-On Mon, 9 Jul 2018 16:23:15 +0800 Jisheng Zhang wrote:
-
-> For Synopsys DesignWare 8250 uart which version >= 4.00a, there's a
-> valid divisor latch fraction register. The fractional divisor width is
-> 4bits ~ 6bits.
+On 04/07/18 10:38, Christoffer Dall wrote:
+> Implement the required MMIO accessors for GICv2 and GICv3 for the
+> IGROUPR distributor and redistributor registers.
 > 
-> Now the preparation is done, it's easy to add the feature support.
-> This patch firstly tries to get the fractional divisor width during
-> probe, then setups dw specific get_divisor() and set_divisor() hook.
+> This can allow guests to change behavior compared to running on previous
+> versions of KVM, but only to align with the architecture and hardware
+> implementations.
 > 
-> Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
+> This also allows userspace to configure the groups for interrupts.  Note
+> that this potentially results in GICv2 guests not receiving interrupts
+> after migration if migrating from an older kernel that exposes GICv2
+> interrupts as group 1.
+> 
+> Cc: Andrew Jones <drjones@redhat.com>
+> Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
 > ---
->  drivers/tty/serial/8250/8250_dw.c | 45 +++++++++++++++++++++++++++++++
->  1 file changed, 45 insertions(+)
+> I implemented (but stashed) a version of this which predicated the
+> behavior based on the value of GICD_IIDR revision field, falling back to
+> ignoring writes and resetting GICv2 groups to 0 if the guest wrote a
+> revision less than 2.  However, current QEMU implementations simply
+> don't write the GICD_IIDR, so this doesn't help at all without changing
+> QEMU anyhow.
 > 
-> diff --git a/drivers/tty/serial/8250/8250_dw.c b/drivers/tty/serial/8250/8250_dw.c
-> index fa8a00e8c9c6..e90c3d229f00 100644
-> --- a/drivers/tty/serial/8250/8250_dw.c
-> +++ b/drivers/tty/serial/8250/8250_dw.c
-> @@ -31,6 +31,7 @@
->  
->  /* Offsets for the DesignWare specific registers */
->  #define DW_UART_USR	0x1f /* UART Status Register */
-> +#define DW_UART_DLF	0xc0 /* Divisor Latch Fraction Register */
->  #define DW_UART_CPR	0xf4 /* Component Parameter Register */
->  #define DW_UART_UCV	0xf8 /* UART Component Version */
->  
-> @@ -55,6 +56,7 @@
->  
->  struct dw8250_data {
->  	u8			usr_reg;
-> +	u8			dlf_size;
->  	int			line;
->  	int			msr_mask_on;
->  	int			msr_mask_off;
-> @@ -366,6 +368,37 @@ static bool dw8250_idma_filter(struct dma_chan *chan, void *param)
->  	return param == chan->device->dev->parent;
->  }
->  
-> +/*
-> + * divisor = clk / (16 * baud) = div(I) + div(F)
-> + * "I" means integer, "F" means fractional
-> + *
-> + * 2^dlf_size * clk / (16 * baud) = 2^dlf_size * (div(I) + div(F))
-> + * so, (clk << (dlf_siz - 4)) / baud = (div(I) + div(F)) << dlf_size
-> + *
-> + * let quot = DIV_ROUND_CLOSEST(clk << (dlf_size - 4), baud), we get
-> + * div(I) = quot >> dlf_size
-> + * div(F) = quot & dlf_mask, where dlf_mask = GENMASK(dlf_size - 1, 0)
-> + */
-> +static unsigned int dw8250_get_divisor(struct uart_port *p,
-> +				       unsigned int baud,
-> +				       unsigned int *frac)
-> +{
-> +	unsigned int quot;
-> +	struct dw8250_data *d = p->private_data;
-> +
-> +	quot = DIV_ROUND_CLOSEST(p->uartclk << (d->dlf_size - 4), baud);
-> +	*frac = quot & GENMASK(d->dlf_size - 1, 0);
-> +
-> +	return quot >> d->dlf_size;
+> The only actual fix I can see here to work around the problem in the
+> kernel is to require an opt-in to allow restoring groups from userspace,
+> but that's a lot of logic to support cross-kernel version migration.
+> 
+> Question: Do we expect that cross-kernel version migration is a critical
+> feature that people really expect to work, and do we actually have
+> examples of catering to this in the kernel elsewhere?  (Also, how would
+> then that relate to the whole 'adding a new sysreg breaks migration'
+> situation?)
 
-After more consideration, I sent out this version for the following two
-points:
+I don't really get why QEMU doesn't try to restore GICD_IIDR, while it
+is definitely trying to restore RO sysregs (and that's how we detect
+incompatibilities).
 
-1. the max frac divisor width is 6bits now, but we dunno whether future IP
-extends it or not. This patch version can still support > 6bits width except
-the overflow concern. But fixing overflow(if there is) is as simple as using\
-the DIV_ROUND_CLOSEST_ULL macro.
+I think we should at least give userspace a chance to do the right
+thing. If it doesn't, well, too bad.
 
-2. this version makes use of well implemented GENMASK to get the dlf_mask,
-the micro is well understood, I think. so the code is simplified as well.
+How bad is that "writable GICD_IIDR" patch? Because at this stage, and
+in the absence of any comment, I'm close to just pick that series and
+merge it for 4.19.
 
-3. the magic "4" is explained in the comments, I hope it could help the
-code.
+Thanks,
 
-what do you think?
-
-Thanks in advance,
-Jisheng
-
-> +}
-> +
-> +static void dw8250_set_divisor(struct uart_port *p, unsigned int baud,
-> +			       unsigned int quot, unsigned int quot_frac)
-> +{
-> +	dw8250_writel_ext(p, DW_UART_DLF, quot_frac);
-> +	serial8250_do_set_divisor(p, baud, quot, quot_frac);
-> +}
-> +
->  static void dw8250_quirks(struct uart_port *p, struct dw8250_data *data)
->  {
->  	if (p->dev->of_node) {
-> @@ -426,6 +459,18 @@ static void dw8250_setup_port(struct uart_port *p)
->  	dev_dbg(p->dev, "Designware UART version %c.%c%c\n",
->  		(reg >> 24) & 0xff, (reg >> 16) & 0xff, (reg >> 8) & 0xff);
->  
-> +	dw8250_writel_ext(p, DW_UART_DLF, ~0U);
-> +	reg = dw8250_readl_ext(p, DW_UART_DLF);
-> +	dw8250_writel_ext(p, DW_UART_DLF, 0);
-> +
-> +	if (reg) {
-> +		struct dw8250_data *d = p->private_data;
-> +
-> +		d->dlf_size = fls(reg);
-> +		p->get_divisor = dw8250_get_divisor;
-> +		p->set_divisor = dw8250_set_divisor;
-> +	}
-> +
->  	reg = dw8250_readl_ext(p, DW_UART_CPR);
->  	if (!reg)
->  		return;
+	M.
+-- 
+Jazz is not dead. It just smells funny...
