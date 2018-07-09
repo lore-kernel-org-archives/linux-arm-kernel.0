@@ -1,58 +1,124 @@
 From: georgi.djakov@linaro.org (Georgi Djakov)
-Date: Mon,  9 Jul 2018 18:50:58 +0300
-Subject: [PATCH v6 2/8] dt-bindings: Introduce interconnect provider bindings
+Date: Mon,  9 Jul 2018 18:50:59 +0300
+Subject: [PATCH v6 3/8] interconnect: Add debugfs support
 In-Reply-To: <20180709155104.25528-1-georgi.djakov@linaro.org>
 References: <20180709155104.25528-1-georgi.djakov@linaro.org>
-Message-ID: <20180709155104.25528-3-georgi.djakov@linaro.org>
+Message-ID: <20180709155104.25528-4-georgi.djakov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This binding is intended to represent the interconnect hardware present
-in some of the modern SoCs. Currently it consists only of a binding for
-the interconnect hardware devices (provider).
+Add a functionality to provide information about the current constraints
+per each node and provider.
 
 Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
 ---
- .../bindings/interconnect/interconnect.txt    | 33 +++++++++++++++++++
- 1 file changed, 33 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/interconnect/interconnect.txt
+ drivers/interconnect/core.c | 78 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 78 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/interconnect/interconnect.txt b/Documentation/devicetree/bindings/interconnect/interconnect.txt
-new file mode 100644
-index 000000000000..6e2b2971b094
---- /dev/null
-+++ b/Documentation/devicetree/bindings/interconnect/interconnect.txt
-@@ -0,0 +1,33 @@
-+Interconnect Provider Device Tree Bindings
-+=========================================
+diff --git a/drivers/interconnect/core.c b/drivers/interconnect/core.c
+index 63707c3c3d48..3f5001f51bb7 100644
+--- a/drivers/interconnect/core.c
++++ b/drivers/interconnect/core.c
+@@ -6,6 +6,7 @@
+  * Author: Georgi Djakov <georgi.djakov@linaro.org>
+  */
+ 
++#include <linux/debugfs.h>
+ #include <linux/device.h>
+ #include <linux/idr.h>
+ #include <linux/init.h>
+@@ -15,10 +16,12 @@
+ #include <linux/module.h>
+ #include <linux/mutex.h>
+ #include <linux/slab.h>
++#include <linux/uaccess.h>
+ 
+ static DEFINE_IDR(icc_idr);
+ static LIST_HEAD(icc_provider_list);
+ static DEFINE_MUTEX(icc_lock);
++static struct dentry *icc_debugfs_dir;
+ 
+ /**
+  * struct icc_req - constraints that are attached to each node
+@@ -47,6 +50,81 @@ struct icc_path {
+ 	struct icc_req reqs[];
+ };
+ 
++#ifdef CONFIG_DEBUG_FS
 +
-+The purpose of this document is to define a common set of generic interconnect
-+providers/consumers properties.
++static void icc_summary_show_one(struct seq_file *s, struct icc_node *n)
++{
++	if (!n)
++		return;
 +
++	seq_printf(s, "%-30s %12d %12d\n",
++		   n->name, n->avg_bw, n->peak_bw);
++}
 +
-+= interconnect providers =
++static int icc_summary_show(struct seq_file *s, void *data)
++{
++	struct icc_provider *provider;
 +
-+The interconnect provider binding is intended to represent the interconnect
-+controllers in the system. Each provider registers a set of interconnect
-+nodes, which expose the interconnect related capabilities of the interconnect
-+to consumer drivers. These capabilities can be throughput, latency, priority
-+etc. The consumer drivers set constraints on interconnect path (or endpoints)
-+depending on the use case. Interconnect providers can also be interconnect
-+consumers, such as in the case where two network-on-chip fabrics interface
-+directly
++	seq_puts(s, " node                                   avg         peak\n");
++	seq_puts(s, "--------------------------------------------------------\n");
 +
-+Required properties:
-+- compatible : contains the interconnect provider compatible string
-+- #interconnect-cells : number of cells in a interconnect specifier needed to
-+			encode the interconnect node id
++	mutex_lock(&icc_lock);
 +
-+Example:
++	list_for_each_entry(provider, &icc_provider_list, provider_list) {
++		struct icc_node *n;
 +
-+		snoc: snoc at 580000 {
-+			compatible = "qcom,msm8916-snoc";
-+			#interconnect-cells = <1>;
-+			reg = <0x580000 0x14000>;
-+			clock-names = "bus_clk", "bus_a_clk";
-+			clocks = <&rpmcc RPM_SMD_SNOC_CLK>,
-+				 <&rpmcc RPM_SMD_SNOC_A_CLK>;
-+		};
++		list_for_each_entry(n, &provider->nodes, node_list) {
++			struct icc_req *r;
++
++			icc_summary_show_one(s, n);
++			hlist_for_each_entry(r, &n->req_list, req_node) {
++				if (!r->dev)
++					continue;
++
++				seq_printf(s, "    %-26s %12d %12d\n",
++					   dev_name(r->dev), r->avg_bw,
++					   r->peak_bw);
++			}
++		}
++	}
++
++	mutex_unlock(&icc_lock);
++
++	return 0;
++}
++
++static int icc_summary_open(struct inode *inode, struct file *file)
++{
++	return single_open(file, icc_summary_show, inode->i_private);
++}
++
++static const struct file_operations icc_summary_fops = {
++	.open		= icc_summary_open,
++	.read		= seq_read,
++	.llseek		= seq_lseek,
++	.release	= single_release,
++};
++
++static int __init icc_debugfs_init(void)
++{
++	struct dentry *file;
++
++	icc_debugfs_dir = debugfs_create_dir("interconnect", NULL);
++	if (!icc_debugfs_dir) {
++		pr_err("interconnect: error creating debugfs directory\n");
++		return -ENODEV;
++	}
++
++	file = debugfs_create_file("interconnect_summary", 0444,
++				   icc_debugfs_dir, NULL, &icc_summary_fops);
++	if (!file)
++		return -ENODEV;
++
++	return 0;
++}
++late_initcall(icc_debugfs_init);
++#endif
++
+ static struct icc_node *node_find(const int id)
+ {
+ 	return idr_find(&icc_idr, id);
