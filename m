@@ -1,65 +1,87 @@
-From: mathieu.desnoyers@efficios.com (Mathieu Desnoyers)
-Date: Mon, 9 Jul 2018 12:06:22 -0400 (EDT)
-Subject: [PATCH v2 0/3] Support rseq on arm64
-In-Reply-To: <1531145985-3747-1-git-send-email-will.deacon@arm.com>
-References: <1531145985-3747-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1957291037.1983.1531152382750.JavaMail.zimbra@efficios.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon,  9 Jul 2018 18:05:55 +0200
+Subject: [PATCH] [v2] drm/sun4i: fix build failure with
+ CONFIG_DRM_SUN8I_MIXER=m
+Message-ID: <20180709160615.2686055-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------ On Jul 9, 2018, at 10:19 AM, Will Deacon will.deacon at arm.com wrote:
+Having DRM_SUN4I built-in but DRM_SUN8I_MIXER as a loadable module results in
+a link error, as we try to access a symbol from the sun8i_tcon_top.ko module:
 
-> Hello,
-> 
-> This is version two of the patches previously posted here:
-> 
-> http://lkml.kernel.org/r/1529949285-11013-1-git-send-email-will.deacon at arm.com
-> 
-> Changes since v1 include:
-> 
->  * Move abort handler in-line to avoid possibility of it being
->    out-of-range for conditional branch instructions
-> 
-> I've tested both native and compat (little-endian only) with the selftests
-> and they pass successfully on my Seattle box.
+ERROR: "sun8i_tcon_top_of_table" [drivers/gpu/drm/sun4i/sun8i-drm-hdmi.ko] undefined!
+ERROR: "sun8i_tcon_top_of_table" [drivers/gpu/drm/sun4i/sun4i-drm.ko] undefined!
 
-For the whole series:
+This solves the problem by adding a silent symbol for the tcon_top module,
+building it as a separate module in exactly the cases that we need it,
+but in a way that it is reachable by the other modules.
 
-Acked-by: Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+Fixes: 57e23de02f48 ("drm/sun4i: DW HDMI: Expand algorithm for possible crtcs")
+Fixes: ef0cf6441fbb ("drm/sun4i: Add support for traversing graph with TCON TOP")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+v2: link the tcon top module separately instead of into the mixer
+---
+ drivers/gpu/drm/sun4i/Kconfig         | 7 +++++++
+ drivers/gpu/drm/sun4i/Makefile        | 3 ++-
+ drivers/gpu/drm/sun4i/sun4i_drv.c     | 3 ++-
+ drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c | 3 ++-
+ 4 files changed, 13 insertions(+), 3 deletions(-)
 
-Thanks!
-
-Mathieu
-
-> 
-> Thanks,
-> 
-> Will
-> 
-> --->8
-> 
-> Will Deacon (3):
->  arm64: rseq: Implement backend rseq calls and select HAVE_RSEQ
->  asm-generic: unistd.h: Wire up sys_rseq
->  rseq/selftests: Add support for arm64
-> 
-> arch/arm64/Kconfig                        |   1 +
-> arch/arm64/include/asm/unistd.h           |   2 +-
-> arch/arm64/include/asm/unistd32.h         |   2 +
-> arch/arm64/kernel/entry.S                 |   2 +
-> arch/arm64/kernel/ptrace.c                |   2 +
-> arch/arm64/kernel/signal.c                |   3 +
-> include/uapi/asm-generic/unistd.h         |   4 +-
-> tools/testing/selftests/rseq/param_test.c |  20 +
-> tools/testing/selftests/rseq/rseq-arm64.h | 594 ++++++++++++++++++++++++++++++
-> tools/testing/selftests/rseq/rseq.h       |   2 +
-> 10 files changed, 630 insertions(+), 2 deletions(-)
-> create mode 100644 tools/testing/selftests/rseq/rseq-arm64.h
-> 
-> --
-> 2.1.4
-
+diff --git a/drivers/gpu/drm/sun4i/Kconfig b/drivers/gpu/drm/sun4i/Kconfig
+index 156a865c3e6d..c2c042287c19 100644
+--- a/drivers/gpu/drm/sun4i/Kconfig
++++ b/drivers/gpu/drm/sun4i/Kconfig
+@@ -68,4 +68,11 @@ config DRM_SUN8I_MIXER
+ 	  graphics mixture and feed graphics to TCON, If M is
+ 	  selected the module will be called sun8i-mixer.
+ 
++config DRM_SUN8I_TCON_TOP
++	tristate
++	default DRM_SUN4I if DRM_SUN8I_MIXER!=n
++	help
++	  TCON TOP is responsible for configuring display pipeline for
++	  HTMI, TVE and LCD.
++
+ endif
+diff --git a/drivers/gpu/drm/sun4i/Makefile b/drivers/gpu/drm/sun4i/Makefile
+index cd27d02c94e2..0eb38ac8e86e 100644
+--- a/drivers/gpu/drm/sun4i/Makefile
++++ b/drivers/gpu/drm/sun4i/Makefile
+@@ -39,4 +39,5 @@ endif
+ obj-$(CONFIG_DRM_SUN4I_HDMI)	+= sun4i-drm-hdmi.o
+ obj-$(CONFIG_DRM_SUN6I_DSI)	+= sun6i-dsi.o
+ obj-$(CONFIG_DRM_SUN8I_DW_HDMI)	+= sun8i-drm-hdmi.o
+-obj-$(CONFIG_DRM_SUN8I_MIXER)	+= sun8i-mixer.o sun8i_tcon_top.o
++obj-$(CONFIG_DRM_SUN8I_MIXER)	+= sun8i-mixer.o
++obj-$(CONFIG_DRM_SUN8I_TCON_TOP) += sun8i_tcon_top.o
+diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
+index 6ddf4eaccb40..495d0fc41297 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_drv.c
++++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
+@@ -216,7 +216,8 @@ static bool sun4i_drv_node_is_tcon_with_ch0(struct device_node *node)
+ 
+ static bool sun4i_drv_node_is_tcon_top(struct device_node *node)
+ {
+-	return !!of_match_node(sun8i_tcon_top_of_table, node);
++	return IS_ENABLED(CONFIG_DRM_SUN8I_TCON_TOP) &&
++		!!of_match_node(sun8i_tcon_top_of_table, node);
+ }
+ 
+ static int compare_of(struct device *dev, void *data)
+diff --git a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
+index 3459b9ec56c9..3704d95874c2 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
++++ b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
+@@ -44,7 +44,8 @@ sun8i_dw_hdmi_mode_valid(struct drm_connector *connector,
+ 
+ static bool sun8i_dw_hdmi_node_is_tcon_top(struct device_node *node)
+ {
+-	return !!of_match_node(sun8i_tcon_top_of_table, node);
++	return IS_ENABLED(CONFIG_DRM_SUN8I_TCON_TOP) &&
++		!!of_match_node(sun8i_tcon_top_of_table, node);
+ }
+ 
+ static u32 sun8i_dw_hdmi_find_possible_crtcs(struct drm_device *drm,
 -- 
-Mathieu Desnoyers
-EfficiOS Inc.
-http://www.efficios.com
+2.9.0
