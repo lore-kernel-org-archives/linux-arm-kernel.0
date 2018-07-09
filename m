@@ -1,85 +1,35 @@
-From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Mon,  9 Jul 2018 15:23:02 +0300
-Subject: [PATCH v2 2/2] ARM: dts: imx6sl: Convert gpc to new bindings
-In-Reply-To: <cover.1531138446.git.leonard.crestez@nxp.com>
-References: <cover.1531138446.git.leonard.crestez@nxp.com>
-Message-ID: <e4a8935644895fad4d01b927a3476b271b604fc5.1531138446.git.leonard.crestez@nxp.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 9 Jul 2018 05:25:03 -0700
+Subject: [GIT PULL 2/4] bcm2835-drivers-next-2018-07-03
+In-Reply-To: <20180703200511.2725-2-eric@anholt.net>
+References: <20180703200511.2725-1-eric@anholt.net>
+ <20180703200511.2725-2-eric@anholt.net>
+Message-ID: <02301f0e-1700-c4a7-0ce8-2f74fdf45808@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With old bindings imx_gpc_onecell_data always sets num_domains to 2 so
-the DISPMIX domain can't actually be referenced. The pd is still defined
-and pm core shuts it down as "unused" so display can't work.
 
-Fix this by converting to new gpc bindings by adding pgc nodes and
-referencing the newly-defined &pu_disp domain from &lcdif.
 
-Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
----
- arch/arm/boot/dts/imx6sl.dtsi | 36 +++++++++++++++++++++++++++++++----
- 1 file changed, 32 insertions(+), 4 deletions(-)
+On 07/03/2018 01:05 PM, Eric Anholt wrote:
+> The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
+> 
+>   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+> 
+> are available in the Git repository at:
+> 
+>   git://github.com/anholt/linux tags/bcm2835-drivers-next-2018-07-03
+> 
+> for you to fetch changes up to 5bfdc1097654eb31bcf2d10421ed769ef3b161c6:
+> 
+>   firmware: raspberrypi: Remove VLA usage (2018-07-03 12:56:12 -0700)
+> 
+> ----------------------------------------------------------------
+> This pull request brings in the new HWMON driver for getting
+> under-voltage detection from the Raspberry Pi firmware, and a change
+> from Kees to remove another instance of VLA stack usage.
+> 
+> ----------------------------------------------------------------
 
-diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-index 994e48dc1df0..3aaa8d5d4804 100644
---- a/arch/arm/boot/dts/imx6sl.dtsi
-+++ b/arch/arm/boot/dts/imx6sl.dtsi
-@@ -678,14 +678,41 @@
- 				reg = <0x020dc000 0x4000>;
- 				interrupt-controller;
- 				#interrupt-cells = <3>;
- 				interrupts = <0 89 IRQ_TYPE_LEVEL_HIGH>;
- 				interrupt-parent = <&intc>;
--				pu-supply = <&reg_pu>;
--				clocks = <&clks IMX6SL_CLK_GPU2D_OVG>,
--					 <&clks IMX6SL_CLK_GPU2D_PODF>;
--				#power-domain-cells = <1>;
-+				clocks = <&clks IMX6SL_CLK_IPG>;
-+				clock-names = "ipg";
-+
-+				pgc {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+
-+					power-domain at 0 {
-+						reg = <0>;
-+						#power-domain-cells = <0>;
-+					};
-+
-+					pd_pu: power-domain at 1 {
-+						reg = <1>;
-+						#power-domain-cells = <0>;
-+						power-supply = <&reg_pu>;
-+						clocks = <&clks IMX6SL_CLK_GPU2D_OVG>,
-+						         <&clks IMX6SL_CLK_GPU2D_PODF>;
-+					};
-+
-+					pd_disp: power-domain at 2 {
-+						reg = <2>;
-+						#power-domain-cells = <0>;
-+						clocks = <&clks IMX6SL_CLK_IPG>,
-+							 <&clks IMX6SL_CLK_LCDIF_AXI>,
-+							 <&clks IMX6SL_CLK_LCDIF_PIX>,
-+							 <&clks IMX6SL_CLK_EPDC_AXI>,
-+							 <&clks IMX6SL_CLK_EPDC_PIX>,
-+							 <&clks IMX6SL_CLK_PXP_AXI>;
-+					};
-+				};
- 			};
- 
- 			gpr: iomuxc-gpr at 20e0000 {
- 				compatible = "fsl,imx6sl-iomuxc-gpr",
- 					     "fsl,imx6q-iomuxc-gpr", "syscon";
-@@ -736,10 +763,11 @@
- 				clocks = <&clks IMX6SL_CLK_LCDIF_PIX>,
- 					 <&clks IMX6SL_CLK_LCDIF_AXI>,
- 					 <&clks IMX6SL_CLK_DUMMY>;
- 				clock-names = "pix", "axi", "disp_axi";
- 				status = "disabled";
-+				power-domains = <&pd_disp>;
- 			};
- 
- 			dcp: dcp at 20fc000 {
- 				compatible = "fsl,imx6sl-dcp", "fsl,imx28-dcp";
- 				reg = <0x020fc000 0x4000>;
+Merged, thanks Eric!
 -- 
-2.17.1
+Florian
