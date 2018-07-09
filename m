@@ -1,62 +1,51 @@
-From: james.morse@arm.com (James Morse)
-Date: Mon, 9 Jul 2018 12:03:13 +0100
-Subject: [PATCH v10 03/14] powerpc, kexec_file: factor out memblock-based
- arch_kexec_walk_mem()
-In-Reply-To: <20180709054953.GR28220@linaro.org>
-References: <20180623022058.10935-1-takahiro.akashi@linaro.org>
- <20180623022058.10935-4-takahiro.akashi@linaro.org>
- <8a59db79-6379-550b-b20e-01036626904e@arm.com>
- <20180709054953.GR28220@linaro.org>
-Message-ID: <68e7d558-91bf-a6f4-3e59-b93d5db0d77b@arm.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 9 Jul 2018 13:09:05 +0200
+Subject: droid 4 in v4.18-rc: grep -r adasfasd /sys/ oopses
+In-Reply-To: <20180709103305.GF112168@atomide.com>
+References: <20180708174939.GA10002@amd> <20180708193720.GA13262@amd>
+ <20180709103305.GF112168@atomide.com>
+Message-ID: <20180709110905.GA11785@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Akashi,
-
-On 09/07/18 06:49, AKASHI Takahiro wrote:
-> On Tue, Jul 03, 2018 at 05:36:24PM +0100, James Morse wrote:
->> On 23/06/18 03:20, AKASHI Takahiro wrote:
->>> Memblock list is another source for usable system memory layout.
->>> A merged new arch_kexec_walk_mem() will walk through either io resource
->>> list or memblock list depending on CONFIG_ARCH_DISCARD_MEMBLOCK so that
->>> arm64, in addition to powerpc, will be able to utilize this generic
->>> function for kexec_file.
->>
->>> diff --git a/arch/powerpc/kernel/machine_kexec_file_64.c b/arch/powerpc/kernel/machine_kexec_file_64.c
->>> index 0bd23dc789a4..3d4be91786ce 100644
->>> --- a/arch/powerpc/kernel/machine_kexec_file_64.c
->>> +++ b/arch/powerpc/kernel/machine_kexec_file_64.c
-
->>> diff --git a/kernel/kexec_file.c b/kernel/kexec_file.c
->>> index 63c7ce1c0c3e..563acd1c9a61 100644
->>> --- a/kernel/kexec_file.c
->>> +++ b/kernel/kexec_file.c
->>> @@ -16,6 +16,7 @@
->>>  #include <linux/file.h>
->>>  #include <linux/slab.h>
->>>  #include <linux/kexec.h>
->>> +#include <linux/memblock.h>
->>>  #include <linux/mutex.h>
->>>  #include <linux/list.h>
->>>  #include <linux/fs.h>
->>> @@ -501,6 +502,53 @@ static int locate_mem_hole_callback(struct resource *res, void *arg)
->>>  	return locate_mem_hole_bottom_up(start, end, kbuf);
->>>  }
->>>  
->>> +#if defined(CONFIG_HAVE_MEMBLOCK) && !defined(CONFIG_ARCH_DISCARD_MEMBLOCK)
->>
->> The only caller is also guarded by these same ifdefs. Can't we remove this and
->> rely on the compilers dead-code elimination to remove this function when its not
->> needed?
+On Mon 2018-07-09 03:33:05, Tony Lindgren wrote:
+> * Pavel Machek <pavel@ucw.cz> [180708 19:40]:
+> > Ok, so it seems to be:
+> > 
+> > user at devuan:~$ cat /sys/kernel/debug/pm_debug/count
+> > (oops).
+> > 
+> > The file seems to be world-readable.
+> > 
+> > user at devuan:~$ ls -al /sys/kernel/debug/pm_debug/count
+> > -r--r--r-- 1 root root 0 Jan  1  1970 /sys/kernel/debug/pm_debug/count
+> > 
+> > But on PC, that file does not exist.
+> > 
+> > Any ideas?
 > 
-> I don't think we can remove this #ifdef.
-> "for_each_free_mem_range[_reverse]()" is defined under CONFIG_HAVE_MEMBLOCK
-> in memblock.h. If some architecture wants to support KEXEC_FILE but
-> doesn't have HAVE_MEMBLOCK, compiling kexec_file.c will fail.
+> I'm not seeing this as tested with omap2plus_defconfig and
+> not seeing any unclocked module interrupts here.. Can you
+> see if the script below produces something for you?
+> 
+> I had to filter out some trace pipes as they seem to hang.
 
-Ah, I'd missed this, turns out memblock isn't ubiquitous!
+Do you have /sys/kernel/debug mounted?
 
+I did, and /sys/kernel/debug/pm_debug/count seems to be a
+problem. (And no, it is probably not world-readable on your normal
+systems, sorry about that).
 
-Thanks,
-
-James
+I can still run the script :-).
+								Pavel
+								
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180709/6daebcfd/attachment.sig>
