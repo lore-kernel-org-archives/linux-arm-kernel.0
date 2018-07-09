@@ -1,64 +1,40 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 9 Jul 2018 13:21:03 -0600
-Subject: [PATCH v2 0/7] perf: Add ioctl for PMU driver configuration
-In-Reply-To: <20180706183844.9de52f1d45e1775b51790e8e@arm.com>
-References: <1530828827-11604-1-git-send-email-mathieu.poirier@linaro.org>
- <20180706183844.9de52f1d45e1775b51790e8e@arm.com>
-Message-ID: <CANLsYkxJHhZE8VpS_S7ep2KnTNY725DPLKbZFfC_ZDdzaVkoZQ@mail.gmail.com>
+From: clabbe@baylibre.com (Corentin Labbe)
+Date: Mon,  9 Jul 2018 19:51:54 +0000
+Subject: [PATCH] ARM: dts: sun8i: sun8i-a83t-bananapi-m3: enhance vcc-pd to
+ 3.3v
+Message-ID: <1531165914-29760-1-git-send-email-clabbe@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 6 Jul 2018 at 17:38, Kim Phillips <kim.phillips@arm.com> wrote:
->
-> On Thu,  5 Jul 2018 16:13:40 -0600
-> Mathieu Poirier <mathieu.poirier@linaro.org> wrote:
->
-> > This set adds the capability to communiate event specific configuration
-> > to the PMU kernel driver using an ioctl().  The functionatlity is made
-> > generic enough for anyone to use but is targeted at the identification
-> > of CoreSight sinks when operating in CPU-wide trace scenarios.
->
-> With this series, a --per-thread -less invocation looks like it
-> succeeds (instead of giving a "failed to mmap with 12 (Cannot allocate
-> memory)" error):
->
-> # perf record -e /cs_etm/@20010000.etf/ sleep 1
-> [ perf record: Woken up 3 times to write data ]
-> Warning:
-> AUX data lost 2 times out of 3!
->
-> [ perf record: Captured and wrote 0.182 MB perf.data ]
-> #
->
-> but now perf report - built with libopencsd - is unable to process the
-> perf.data file:
->
-> # perf report --stdio
-> 0x3a0 [0x60]: failed to process type: 1
-> Error:
-> failed to process sample
-> # To display the perf.data header info, please use --header/--header-only options.
-> #
+Since commit d7c5f6863550 ("ARM: dts: sun8i: a83t: bananapi-m3: Add AXP813 regulator nodes")
+my BPIM3 no longer works at gigabit speed.
 
-Right, that's expected since the perf tools patches for CPU-wide trace
-scenarios haven't been merged yet.  The real problem is, as you
-pointed above, that this patchset should still report an error as full
-functionality isn't merged yet.  I will fix that.
+With the default setting, dldo3 is regulated at 2.9v which seems
+sufficient for the PHy but d7c5f6863550 drop it to 2.5 which is insufficient.
+Note that this behaviour is random for all BPIM3 (some works with 2.5, some not)
 
->
-> Also, a "record -a" invocation also acts like it's working, but Juno
-> has a hardware limitation where it can't record all cpus concurrently,
-> right?  So, shouldn't record commands that exceed the h/w's
-> capabilities error out instead?
+Finnaly, someone from bananapi confirmed that this regulator must be set to 3.3
 
-To be clear there is no hardware limitation preventing "record -a" to
-work properly, just SW.  This patchset is the first step in addressing
-the situation.
+Fixes: d7c5f6863550 ("ARM: dts: sun8i: a83t: bananapi-m3: Add AXP813 regulator nodes")
+Signed-off-by: Corentin Labbe <clabbe@baylibre.com>
+---
+ arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Thanks,
-Mathieu
-
->
-> Thanks,
->
-> Kim
+diff --git a/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts b/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
+index c7ce4158d6c8..f250b20af493 100644
+--- a/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
++++ b/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
+@@ -309,8 +309,8 @@
+ 
+ &reg_dldo3 {
+ 	regulator-always-on;
+-	regulator-min-microvolt = <2500000>;
+-	regulator-max-microvolt = <2500000>;
++	regulator-min-microvolt = <3300000>;
++	regulator-max-microvolt = <3300000>;
+ 	regulator-name = "vcc-pd";
+ };
+ 
+-- 
+2.16.4
