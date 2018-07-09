@@ -1,47 +1,57 @@
-From: amit.kucheria@linaro.org (Amit Kucheria)
-Date: Mon,  9 Jul 2018 17:13:29 +0530
-Subject: [PATCH v6 7/7] arm64: dts: sdm845: Add tsens nodes
-In-Reply-To: <cover.1531135999.git.amit.kucheria@linaro.org>
-References: <cover.1531135999.git.amit.kucheria@linaro.org>
-Message-ID: <65c39c405076627bd43ec94c211c6998191b9f16.1531136000.git.amit.kucheria@linaro.org>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Mon, 9 Jul 2018 14:17:54 +0200
+Subject: [PATCH v2] firmware/psci: add support for SYSTEM_RESET2
+In-Reply-To: <1525257003-8608-1-git-send-email-sudeep.holla@arm.com>
+References: <1525186288-536-1-git-send-email-sudeep.holla@arm.com>
+ <1525257003-8608-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <34a420e1-9d2a-b838-dce2-71de408043da@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SDM845 has two tsens blocks, one with 13 sensors and the other with 8
-sensors. It uses version 2 of the TSENS IP, so use the fallback property to
-allow more common code.
+Hi Sudeep,
 
-Signed-off-by: Amit Kucheria <amit.kucheria@linaro.org>
----
- arch/arm64/boot/dts/qcom/sdm845.dtsi | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+On 2.5.2018 12:30, Sudeep Holla wrote:
+> PSCI v1.1 introduced SYSTEM_RESET2 to allow both architectural resets
+> where the semantics are described by the PSCI specification itself as
+> well as vendor-specific resets. Currently only system warm reset
+> semantics is defined as part of architectural resets by the specification.
+> 
+> This patch implements support for SYSTEM_RESET2 by making using of
+> reboot_mode passed by the reboot infrastructure in the kernel.
+> 
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> ---
+>  drivers/firmware/psci.c   | 21 +++++++++++++++++++++
+>  include/uapi/linux/psci.h |  2 ++
+>  2 files changed, 23 insertions(+)
+> 
+> v1->v2:
+> 	- Added mising static anotation to psci_system_reset2_supported
+> 	- Added missing ')' in the comment
+> 
+> diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+> index c80ec1d03274..91748725534e 100644
+> --- a/drivers/firmware/psci.c
+> +++ b/drivers/firmware/psci.c
+> @@ -88,6 +88,7 @@ static u32 psci_function_id[PSCI_FN_MAX];
+>  				PSCI_1_0_EXT_POWER_STATE_TYPE_MASK)
+> 
+>  static u32 psci_cpu_suspend_feature;
+> +static bool psci_system_reset2_supported;
+> 
+>  static inline bool psci_has_ext_power_state(void)
+>  {
+> @@ -253,6 +254,15 @@ static int get_set_conduit_method(struct device_node *np)
+> 
+>  static void psci_sys_reset(enum reboot_mode reboot_mode, const char *cmd)
+>  {
+> +	if ((reboot_mode == REBOOT_WARM || reboot_mode == REBOOT_SOFT) &&
 
-diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-index cdaabeb..ba2899c 100644
---- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
-+++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-@@ -221,6 +221,22 @@
- 			#interrupt-cells = <2>;
- 		};
- 
-+		tsens0: tsens at c263000 {
-+			compatible = "qcom,sdm845-tsens", "qcom,tsens-v2";
-+			reg = <0xc263000 0x1ff>, /* TM */
-+			      <0xc222000 0x1ff>; /* SROT */
-+			#qcom,sensors = <13>;
-+			#thermal-sensor-cells = <1>;
-+		};
-+
-+		tsens1: tsens at c265000 {
-+			compatible = "qcom,sdm845-tsens", "qcom,tsens-v2";
-+			reg = <0xc265000 0x1ff>, /* TM */
-+			      <0xc223000 0x1ff>; /* SROT */
-+			#qcom,sensors = <8>;
-+			#thermal-sensor-cells = <1>;
-+		};
-+
- 		spmi_bus: spmi at c440000 {
- 			compatible = "qcom,spmi-pmic-arb";
- 			reg = <0xc440000 0x1100>,
--- 
-2.7.4
+I am curious about this reboot_mode setup. I have grepped the kernel and
+reboot_mode is setup via kernel parameters at boot time.
+Shouldn't user decide what reboot type wants to do?
+
+Thanks,
+Michal
