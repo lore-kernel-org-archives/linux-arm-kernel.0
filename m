@@ -1,16 +1,32 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 9 Jul 2018 09:47:38 -0300
-Subject: [PATCH v2 1/4] clk: imx7d: add IMX7D_MU_ROOT_CLK
-In-Reply-To: <20180615095107.24610-2-o.rempel@pengutronix.de>
-References: <20180615095107.24610-1-o.rempel@pengutronix.de>
- <20180615095107.24610-2-o.rempel@pengutronix.de>
-Message-ID: <CAOMZO5CngXA-t9=2dczwxqV53Bdjh=9S8vgVEw96_COw4eiK4A@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 9 Jul 2018 14:58:40 +0200
+Subject: [PATCH] ARM: shmobile: r8a7779: hide unused
+ r8a7779_platform_cpu_kill
+In-Reply-To: <CAMuHMdXhN_Mw-Z+71LetjX2mJar-F4m3_-FjqouHgvjqtMq4OA@mail.gmail.com>
+References: <20180706151528.3759312-1-arnd@arndb.de>
+ <CAMuHMdXhN_Mw-Z+71LetjX2mJar-F4m3_-FjqouHgvjqtMq4OA@mail.gmail.com>
+Message-ID: <20180709125839.havdrfvk4hs4h76v@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 15, 2018 at 6:51 AM, Oleksij Rempel <o.rempel@pengutronix.de> wrote:
-> This clock is needed for iMX mailbox driver
->
-> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
+On Fri, Jul 06, 2018 at 05:26:40PM +0200, Geert Uytterhoeven wrote:
+> Hi Arnd,
+> 
+> On Fri, Jul 6, 2018 at 5:15 PM Arnd Bergmann <arnd@arndb.de> wrote:
+> > After the cleanup in r8a7779_smp_prepare_cpus(), the only remaining caller of
+> > r8a7779_platform_cpu_kill() is in an ifdef, which leads to a build warning
+> > without CONFIG_HOTPLUG_CPU:
+> >
+> > arch/arm/mach-shmobile/smp-r8a7779.c:26:12: error: 'r8a7779_platform_cpu_kill' defined but not used [-Werror=unused-function]
+> >
+> > This moves the function inside of that #ifdef to avoid the warning.
+> >
+> > Fixes: 62f55ce683e3 ("ARM: shmobile: r8a7779: Stop powering down secondary CPUs during early boot")
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> 
+> Thanks, seems like I only built the R-Car Gen2 code without
+> CONFIG_HOTPLUG_CPU...
+> 
+> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+Thanks, applied.
