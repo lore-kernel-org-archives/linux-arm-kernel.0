@@ -1,63 +1,55 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Mon,  9 Jul 2018 17:48:41 +0200
-Subject: [PATCH 1/8] ARM: dts: imx6q-apalis: add chosen node
-Message-ID: <20180709154848.5401-1-stefan@agner.ch>
+Date: Mon,  9 Jul 2018 17:48:44 +0200
+Subject: [PATCH 4/8] ARM: dts: imx6qdl-apalis/-colibri: disable read-only
+ switch
+In-Reply-To: <20180709154848.5401-1-stefan@agner.ch>
+References: <20180709154848.5401-1-stefan@agner.ch>
+Message-ID: <20180709154848.5401-4-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Apalis UART1 as default serial console.
+Use the disable-wp to indicate that Apalis and Colibri iMX6 do not
+make use of the native write-protect signal available on the i.MX 6
+SoCs. This prevents warnings:
+  mmc0: host does not support reading read-only switch, assuming write-enable
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- arch/arm/boot/dts/imx6q-apalis-eval.dts       | 4 ++++
- arch/arm/boot/dts/imx6q-apalis-ixora-v1.1.dts | 4 ++++
- arch/arm/boot/dts/imx6q-apalis-ixora.dts      | 4 ++++
- 3 files changed, 12 insertions(+)
+ arch/arm/boot/dts/imx6qdl-apalis.dtsi  | 2 ++
+ arch/arm/boot/dts/imx6qdl-colibri.dtsi | 1 +
+ 2 files changed, 3 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx6q-apalis-eval.dts b/arch/arm/boot/dts/imx6q-apalis-eval.dts
-index aa0e631f3c0a..621d9709effa 100644
---- a/arch/arm/boot/dts/imx6q-apalis-eval.dts
-+++ b/arch/arm/boot/dts/imx6q-apalis-eval.dts
-@@ -62,6 +62,10 @@
- 		rtc1 = &snvs_rtc;
- 	};
- 
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
- 	gpio-keys {
- 		compatible = "gpio-keys";
- 		pinctrl-names = "default";
-diff --git a/arch/arm/boot/dts/imx6q-apalis-ixora-v1.1.dts b/arch/arm/boot/dts/imx6q-apalis-ixora-v1.1.dts
-index e8dccf552122..4e1c8feaef82 100644
---- a/arch/arm/boot/dts/imx6q-apalis-ixora-v1.1.dts
-+++ b/arch/arm/boot/dts/imx6q-apalis-ixora-v1.1.dts
-@@ -63,6 +63,10 @@
- 		rtc1 = &snvs_rtc;
- 	};
- 
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
- 	gpio-keys {
- 		compatible = "gpio-keys";
- 		pinctrl-names = "default";
-diff --git a/arch/arm/boot/dts/imx6q-apalis-ixora.dts b/arch/arm/boot/dts/imx6q-apalis-ixora.dts
-index 6831dfd24cc1..469e3d0e2827 100644
---- a/arch/arm/boot/dts/imx6q-apalis-ixora.dts
-+++ b/arch/arm/boot/dts/imx6q-apalis-ixora.dts
-@@ -62,6 +62,10 @@
- 		rtc1 = &snvs_rtc;
- 	};
- 
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
- 	gpio-keys {
- 		compatible = "gpio-keys";
- 		pinctrl-names = "default";
+diff --git a/arch/arm/boot/dts/imx6qdl-apalis.dtsi b/arch/arm/boot/dts/imx6qdl-apalis.dtsi
+index 55bcea245df6..f9bacc9ff2b6 100644
+--- a/arch/arm/boot/dts/imx6qdl-apalis.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-apalis.dtsi
+@@ -457,6 +457,7 @@
+ 	pinctrl-0 = <&pinctrl_usdhc1_4bit &pinctrl_usdhc1_8bit>;
+ 	vqmmc-supply = <&reg_3p3v>;
+ 	bus-width = <8>;
++	disable-wp;
+ 	no-1-8-v;
+ 	status = "disabled";
+ };
+@@ -467,6 +468,7 @@
+ 	pinctrl-0 = <&pinctrl_usdhc2>;
+ 	vqmmc-supply = <&reg_3p3v>;
+ 	bus-width = <4>;
++	disable-wp;
+ 	no-1-8-v;
+ 	status = "disabled";
+ };
+diff --git a/arch/arm/boot/dts/imx6qdl-colibri.dtsi b/arch/arm/boot/dts/imx6qdl-colibri.dtsi
+index bb44829dacbe..8ae17fdf6cf6 100644
+--- a/arch/arm/boot/dts/imx6qdl-colibri.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-colibri.dtsi
+@@ -387,6 +387,7 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_usdhc1 &pinctrl_mmc_cd>;
+ 	cd-gpios = <&gpio2 5 GPIO_ACTIVE_LOW>; /* MMCD */
++	disable-wp;
+ 	vqmmc-supply = <&reg_3p3v>;
+ 	bus-width = <4>;
+ 	no-1-8-v;
 -- 
 2.18.0
