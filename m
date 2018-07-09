@@ -1,43 +1,82 @@
-From: jacopo+renesas@jmondi.org (Jacopo Mondi)
-Date: Mon,  9 Jul 2018 16:19:21 +0200
-Subject: [PATCH v5 6/6] media: rcar-vin: Handle data-enable polarity
-In-Reply-To: <1531145962-1540-1-git-send-email-jacopo+renesas@jmondi.org>
-References: <1531145962-1540-1-git-send-email-jacopo+renesas@jmondi.org>
-Message-ID: <1531145962-1540-7-git-send-email-jacopo+renesas@jmondi.org>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Mon,  9 Jul 2018 15:38:28 +0100
+Subject: [PATCH v5 0/7] KVM: Support PUD hugepages at stage 2
+In-Reply-To: <20180709143835.28971-1-punit.agrawal@arm.com>
+References: <20180709143835.28971-1-punit.agrawal@arm.com>
+Message-ID: <20180709143835.28971-2-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Handle data-enable signal polarity. If the polarity is not specifically
-requested to be active low, use the active high default.
+This series is an update to the PUD hugepage support previously posted
+at [0]. This patchset adds support for PUD hugepages at stage
+2. This feature is useful on cores that have support for large sized
+TLB mappings (e.g., 1GB for 4K granule).
 
-Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
-Acked-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
----
- drivers/media/platform/rcar-vin/rcar-dma.c | 5 +++++
- 1 file changed, 5 insertions(+)
+The biggest change in this version is to replace repeated instances of
+walking the page tables to get to a leaf-entry with a function to
+return the appropriate entry. This was suggested by Suzuki and should
+help reduce the amount of churn resulting from future changes. It also
+address other feedback on the previous version.
 
-diff --git a/drivers/media/platform/rcar-vin/rcar-dma.c b/drivers/media/platform/rcar-vin/rcar-dma.c
-index 1de5981..9146f63 100644
---- a/drivers/media/platform/rcar-vin/rcar-dma.c
-+++ b/drivers/media/platform/rcar-vin/rcar-dma.c
-@@ -123,6 +123,7 @@
- /* Video n Data Mode Register 2 bits */
- #define VNDMR2_VPS		(1 << 30)
- #define VNDMR2_HPS		(1 << 29)
-+#define VNDMR2_CES		(1 << 28)
- #define VNDMR2_FTEV		(1 << 17)
- #define VNDMR2_VLV(n)		((n & 0xf) << 12)
- 
-@@ -698,6 +699,10 @@ static int rvin_setup(struct rvin_dev *vin)
- 		/* Vsync Signal Polarity Select */
- 		if (!(vin->parallel->mbus_flags & V4L2_MBUS_VSYNC_ACTIVE_LOW))
- 			dmr2 |= VNDMR2_VPS;
-+
-+		/* Data Enable Polarity Select */
-+		if (vin->parallel->mbus_flags & V4L2_MBUS_DATA_ENABLE_LOW)
-+			dmr2 |= VNDMR2_CES;
- 	}
- 
- 	/*
+Support is added to code that is shared between arm and arm64. Dummy
+helpers for arm are provided as the port does not support PUD hugepage
+sizes.
+
+The patches have been tested on an A57 based system. The patchset is
+based on v4.18-rc4. The are a few conflicts with the support for 52
+bit IPA[1] due to change in number of parameters for
+stage2_pmd_offset().
+
+Thanks,
+Punit
+
+v4 -> v5:
+
+* Patch 1 - Drop helper stage2_should_exec() and refactor the
+  condition to decide if a page table entry should be marked
+  executable
+* Patch 4-6 - Introduce stage2_get_leaf_entry() and use it in this and
+  latter patches
+* Patch 7 - Use stage 2 accessors instead of using the page table
+  helpers directly
+* Patch 7 - Add a note to update the PUD hugepage support when number
+  of levels of stage 2 tables differs from stage 1
+
+
+v3 -> v4:
+* Patch 1 and 7 - Don't put down hugepages pte if logging is enabled
+* Patch 4-5 - Add PUD hugepage support for exec and access faults
+* Patch 6 - PUD hugepage support for aging page table entries
+
+v2 -> v3:
+* Update vma_pagesize directly if THP [1/4]. Previsouly this was done
+  indirectly via hugetlb
+* Added review tag [4/4]
+
+v1 -> v2:
+* Create helper to check if the page should have exec permission [1/4]
+* Fix broken condition to detect THP hugepage [1/4]
+* Fix in-correct hunk resulting from a rebase [4/4]
+
+[0] https://www.spinics.net/lists/arm-kernel/msg663562.html
+[1] https://www.spinics.net/lists/kvm/msg171065.html
+
+
+Punit Agrawal (7):
+  KVM: arm/arm64: Share common code in user_mem_abort()
+  KVM: arm/arm64: Introduce helpers to manupulate page table entries
+  KVM: arm64: Support dirty page tracking for PUD hugepages
+  KVM: arm64: Support PUD hugepage in stage2_is_exec()
+  KVM: arm64: Support handling access faults for PUD hugepages
+  KVM: arm64: Update age handlers to support PUD hugepages
+  KVM: arm64: Add support for creating PUD hugepages at stage 2
+
+ arch/arm/include/asm/kvm_mmu.h         |  60 +++++
+ arch/arm64/include/asm/kvm_mmu.h       |  47 ++++
+ arch/arm64/include/asm/pgtable-hwdef.h |   4 +
+ arch/arm64/include/asm/pgtable.h       |   9 +
+ virt/kvm/arm/mmu.c                     | 289 ++++++++++++++++++-------
+ 5 files changed, 330 insertions(+), 79 deletions(-)
+
 -- 
-2.7.4
+2.17.1
