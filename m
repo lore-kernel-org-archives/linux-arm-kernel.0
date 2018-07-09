@@ -1,48 +1,48 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 9 Jul 2018 03:33:05 -0700
-Subject: droid 4 in v4.18-rc: grep -r adasfasd /sys/ oopses
-In-Reply-To: <20180708193720.GA13262@amd>
-References: <20180708174939.GA10002@amd>
- <20180708193720.GA13262@amd>
-Message-ID: <20180709103305.GF112168@atomide.com>
+From: vkoul@kernel.org (Vinod)
+Date: Mon, 9 Jul 2018 16:04:38 +0530
+Subject: [PATCH v2 1/4] dt-bindings: k3dma: add optional property
+ hisilicon,dma-min-chan
+In-Reply-To: <20180706035521.13736-2-guodong.xu@linaro.org>
+References: <20180706035521.13736-1-guodong.xu@linaro.org>
+ <20180706035521.13736-2-guodong.xu@linaro.org>
+Message-ID: <20180709103438.GC22377@vkoul-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Pavel Machek <pavel@ucw.cz> [180708 19:40]:
-> Ok, so it seems to be:
+On 06-07-18, 11:55, Guodong Xu wrote:
+> From: Li Yu <liyu65@hisilicon.com>
 > 
-> user at devuan:~$ cat /sys/kernel/debug/pm_debug/count
-> (oops).
+> Add optional property hisilicon,dma-min-chan for k3dma.
 > 
-> The file seems to be world-readable.
+> Signed-off-by: Li Yu <liyu65@hisilicon.com>
+> Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
+> ---
+>  Documentation/devicetree/bindings/dma/k3dma.txt | 6 ++++++
+>  1 file changed, 6 insertions(+)
 > 
-> user at devuan:~$ ls -al /sys/kernel/debug/pm_debug/count
-> -r--r--r-- 1 root root 0 Jan  1  1970 /sys/kernel/debug/pm_debug/count
-> 
-> But on PC, that file does not exist.
-> 
-> Any ideas?
+> diff --git a/Documentation/devicetree/bindings/dma/k3dma.txt b/Documentation/devicetree/bindings/dma/k3dma.txt
+> index 4945aeac4dc4..f34202a80f3c 100644
+> --- a/Documentation/devicetree/bindings/dma/k3dma.txt
+> +++ b/Documentation/devicetree/bindings/dma/k3dma.txt
+> @@ -12,6 +12,11 @@ Required properties:
+>  		have specific request line
+>  - clocks: clock required
+>  
+> +Optional properties:
+> +- hisilicon,dma-min-chan: the minimum DMA channel number which is usable
+> +		Default value is 0, but in some platform it is
+> +		configured 1, like in hi3660 platform
+> +
+>  Example:
+>  
+>  Controller:
+> @@ -21,6 +26,7 @@ Controller:
+>  			#dma-cells = <1>;
+>  			dma-channels = <16>;
+>  			dma-requests = <27>;
+> +			hisilicon,dma-min-chan = <1>;
 
-I'm not seeing this as tested with omap2plus_defconfig and
-not seeing any unclocked module interrupts here.. Can you
-see if the script below produces something for you?
+Am still expecting this to be a mask
 
-I had to filter out some trace pipes as they seem to hang.
-
-Regards,
-
-Tony
-
-8< -----
-#!/bin/sh
-
-files=$(find /sys -type f)
-
-for file in ${files}; do
-        if echo ${file} | grep -e trace_pipe -e stats; then
-                echo "Skipping ${file}.."
-                continue
-        fi
-        echo "Grepping in ${file}.."
-        grep asdf ${file}
-done
+-- 
+~Vinod
