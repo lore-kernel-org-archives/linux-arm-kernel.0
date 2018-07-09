@@ -1,95 +1,76 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 9 Jul 2018 14:21:50 +0100
-Subject: [PATCH v2] firmware/psci: add support for SYSTEM_RESET2
-In-Reply-To: <0fce3ee6-873e-154f-b61e-546d9da338df@xilinx.com>
-References: <1525186288-536-1-git-send-email-sudeep.holla@arm.com>
- <1525257003-8608-1-git-send-email-sudeep.holla@arm.com>
- <34a420e1-9d2a-b838-dce2-71de408043da@xilinx.com>
- <3e7235c7-d2c2-29f6-6bec-ae21cb841731@arm.com>
- <0fce3ee6-873e-154f-b61e-546d9da338df@xilinx.com>
-Message-ID: <8b08583c-121f-347a-700a-17b5d7784309@arm.com>
+From: codrin.ciubotariu@microchip.com (Codrin Ciubotariu)
+Date: Mon, 9 Jul 2018 16:29:43 +0300
+Subject: [PATCH v5 4/5] ARM: dts: at91: sama5d2: add nodes for I2S
+ controllers
+In-Reply-To: <20180706193923.GC16084@piout.net>
+References: <20180618141239.10892-1-codrin.ciubotariu@microchip.com>
+ <20180618141239.10892-5-codrin.ciubotariu@microchip.com>
+ <20180706193923.GC16084@piout.net>
+Message-ID: <e056ed7d-521d-54ab-2e5d-0f5259a09ec6@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 09/07/18 14:13, Michal Simek wrote:
-> On 9.7.2018 14:36, Sudeep Holla wrote:
+On 06.07.2018 22:39, Alexandre Belloni wrote:
+> Hi Codrin,
+> 
+> On 18/06/2018 17:12:38+0300, Codrin Ciubotariu wrote:
+>> From: Cyrille Pitchen <cyrille.pitchen@atmel.com>
 >>
+>> This patch adds DT nodes for I2S0 and I2S1. It also adds an alias for
+>> each I2S node.
 >>
->> On 09/07/18 13:17, Michal Simek wrote:
->>> Hi Sudeep,
->>>
->>> On 2.5.2018 12:30, Sudeep Holla wrote:
->>>> PSCI v1.1 introduced SYSTEM_RESET2 to allow both architectural resets
->>>> where the semantics are described by the PSCI specification itself as
->>>> well as vendor-specific resets. Currently only system warm reset
->>>> semantics is defined as part of architectural resets by the specification.
->>>>
->>>> This patch implements support for SYSTEM_RESET2 by making using of
->>>> reboot_mode passed by the reboot infrastructure in the kernel.
->>>>
->>>> Cc: Mark Rutland <mark.rutland@arm.com>
->>>> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->>>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
->>>> ---
->>>>  drivers/firmware/psci.c   | 21 +++++++++++++++++++++
->>>>  include/uapi/linux/psci.h |  2 ++
->>>>  2 files changed, 23 insertions(+)
->>>>
->>>> v1->v2:
->>>> 	- Added mising static anotation to psci_system_reset2_supported
->>>> 	- Added missing ')' in the comment
->>>>
->>>> diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
->>>> index c80ec1d03274..91748725534e 100644
->>>> --- a/drivers/firmware/psci.c
->>>> +++ b/drivers/firmware/psci.c
->>>> @@ -88,6 +88,7 @@ static u32 psci_function_id[PSCI_FN_MAX];
->>>>  				PSCI_1_0_EXT_POWER_STATE_TYPE_MASK)
->>>>
->>>>  static u32 psci_cpu_suspend_feature;
->>>> +static bool psci_system_reset2_supported;
->>>>
->>>>  static inline bool psci_has_ext_power_state(void)
->>>>  {
->>>> @@ -253,6 +254,15 @@ static int get_set_conduit_method(struct device_node *np)
->>>>
->>>>  static void psci_sys_reset(enum reboot_mode reboot_mode, const char *cmd)
->>>>  {
->>>> +	if ((reboot_mode == REBOOT_WARM || reboot_mode == REBOOT_SOFT) &&
->>>
->>> I am curious about this reboot_mode setup. I have grepped the kernel and
->>> reboot_mode is setup via kernel parameters at boot time.
->>> Shouldn't user decide what reboot type wants to do?
->>>
+>> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+>> [codrin.ciubotariu at microchip.com: added phandle to new mux clock]
+>> Signed-off-by: Codrin Ciubotariu <codrin.ciubotariu@microchip.com>
+>> ---
 >>
->> I have almost forgotten how I tested this. IIRC and looking quickly @
->> kernel/reboot.c and __setup(reboot=,...), I recall passing reboot=w
->> while testing this.
+>> The bindings for the I2S node are applied to broonie/sound.git .
+>>
+>> Changes in v5:
+>> 	- the previous name was:
+>> 	  [PATCH v4 6/7] ARM: dts: at91: sama5d2: add nodes for I2S controllers
+>>
+>>   arch/arm/boot/dts/sama5d2.dtsi | 34 ++++++++++++++++++++++++++++++++++
+>>   1 file changed, 34 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
+>> index eeb6afa1cda7..eca73ce40bc5 100644
+>> --- a/arch/arm/boot/dts/sama5d2.dtsi
+>> +++ b/arch/arm/boot/dts/sama5d2.dtsi
+>> @@ -58,6 +58,8 @@
+>>   		serial1 = &uart3;
+>>   		tcb0 = &tcb0;
+>>   		tcb1 = &tcb1;
+>> +		i2s0 = &i2s0;
+>> +		i2s1 = &i2s1;
+>>   	};
+>>   
+>>   	cpus {
+>> @@ -1313,6 +1315,22 @@
+>>   				clocks = <&clk32k>;
+>>   			};
+>>   
+>> +			i2s0: i2s at f8050000 {
+>> +				compatible = "atmel,sama5d2-i2s";
+>> +				reg = <0xf8050000 0x100>;
+>> +				interrupts = <54 IRQ_TYPE_LEVEL_HIGH 7>;
+>> +				dmas = <&dma0
+>> +					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
+>> +					 AT91_XDMAC_DT_PERID(31))>,
+>> +				       <&dma0
+>> +					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
+>> +					 AT91_XDMAC_DT_PERID(32))>;
+>> +				dma-names = "tx", "rx";
+>> +				clocks = <&i2s0_clk>, <&i2s0_gclk>, <&audio_pll_pmc>, <&i2s0muxck>;
+>> +				clock-names = "pclk", "gclk", "aclk", "muxclk";
+>> +				status = "disabled";
+>> +			};
+>> +
 > 
-> I would expect that too. It means static setting at boot time.
-> 
->> We can do something like what efi_reboot, but not
->> sure if we need that yet if users need too decide after boot.
-> 
-> 
-> I am checking with colleague about all xilinx use cases but I would be
-> surprised if static configuration at run time is enough.
-> 
-> Also not quite sure about mixing reboot_warm and reboot_soft cases
-> together. They shouldn't be the same.
-> 
-> Based on psci 1.0 spec there are more options especially for bit[31]
-> which should be likely setup via DT(no experience with EFI) with names
-> and codes which should be passed to firmware but still the same issue
-> remains how to setup reboot type.
-> 
+> Can you resend the DTS patches after removing the unnecessary clocks?
 
-I think with efi_reboot, if user execute the command "reboot warm", it
-will set REBOOT_WARM. I was thinking something similar for psci too. I
-can drop REBOOT_SOFT if that's not correct.
+I will. Should I also make the "muxclk" clock an assigned clock to 
+assign its parent ?
 
--- 
-Regards,
-Sudeep
+Thanks and best regards,
+Codrin
