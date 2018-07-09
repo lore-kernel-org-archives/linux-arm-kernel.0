@@ -1,47 +1,33 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon,  9 Jul 2018 15:19:42 +0100
-Subject: [PATCH v2 0/3] Support rseq on arm64
-Message-ID: <1531145985-3747-1-git-send-email-will.deacon@arm.com>
+From: jacopo+renesas@jmondi.org (Jacopo Mondi)
+Date: Mon,  9 Jul 2018 16:19:20 +0200
+Subject: [PATCH v5 5/6] dt-bindings: media: rcar-vin: Add 'data-enable-active'
+In-Reply-To: <1531145962-1540-1-git-send-email-jacopo+renesas@jmondi.org>
+References: <1531145962-1540-1-git-send-email-jacopo+renesas@jmondi.org>
+Message-ID: <1531145962-1540-6-git-send-email-jacopo+renesas@jmondi.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Describe optional endpoint property 'data-enable-active' for R-Car VIN.
 
-This is version two of the patches previously posted here:
+Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+Reviewed-by: Rob Herring <robh@kernel.org>
+Reviewed-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se
+---
+ Documentation/devicetree/bindings/media/rcar_vin.txt | 2 ++
+ 1 file changed, 2 insertions(+)
 
-http://lkml.kernel.org/r/1529949285-11013-1-git-send-email-will.deacon at arm.com
-
-Changes since v1 include:
-
-  * Move abort handler in-line to avoid possibility of it being
-    out-of-range for conditional branch instructions
-
-I've tested both native and compat (little-endian only) with the selftests
-and they pass successfully on my Seattle box.
-
-Thanks,
-
-Will
-
---->8
-
-Will Deacon (3):
-  arm64: rseq: Implement backend rseq calls and select HAVE_RSEQ
-  asm-generic: unistd.h: Wire up sys_rseq
-  rseq/selftests: Add support for arm64
-
- arch/arm64/Kconfig                        |   1 +
- arch/arm64/include/asm/unistd.h           |   2 +-
- arch/arm64/include/asm/unistd32.h         |   2 +
- arch/arm64/kernel/entry.S                 |   2 +
- arch/arm64/kernel/ptrace.c                |   2 +
- arch/arm64/kernel/signal.c                |   3 +
- include/uapi/asm-generic/unistd.h         |   4 +-
- tools/testing/selftests/rseq/param_test.c |  20 +
- tools/testing/selftests/rseq/rseq-arm64.h | 594 ++++++++++++++++++++++++++++++
- tools/testing/selftests/rseq/rseq.h       |   2 +
- 10 files changed, 630 insertions(+), 2 deletions(-)
- create mode 100644 tools/testing/selftests/rseq/rseq-arm64.h
-
+diff --git a/Documentation/devicetree/bindings/media/rcar_vin.txt b/Documentation/devicetree/bindings/media/rcar_vin.txt
+index b410863..2f42005 100644
+--- a/Documentation/devicetree/bindings/media/rcar_vin.txt
++++ b/Documentation/devicetree/bindings/media/rcar_vin.txt
+@@ -55,6 +55,8 @@ The per-board settings Gen2 platforms:
+       the SoC type and selected input image format.
+       Valid values are: 8, 10, 12, 16, 24 and 32.
+     - data-shift: see [1] for description. Valid values are 0 and 8.
++    - data-enable-active: polarity of CLKENB signal, see [1] for
++      description. Default is active high.
+ 
+ The per-board settings Gen3 platforms:
+ 
 -- 
-2.1.4
+2.7.4
