@@ -1,105 +1,71 @@
-From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Mon, 09 Jul 2018 14:25:33 +0300
-Subject: droid 4 in v4.18-rc: grep -r adasfasd /sys/ oopses
-In-Reply-To: <20180709104943.GA5212@amd>
-References: <20180708174939.GA10002@amd> <20180708193720.GA13262@amd>
- <20180709102852.GA20580@amd> <20180709104943.GA5212@amd>
-Message-ID: <79db809d74dcbe84b7ed3001dd7c82649227783a.camel@linux.intel.com>
+From: amit.kucheria@linaro.org (Amit Kucheria)
+Date: Mon, 9 Jul 2018 16:56:51 +0530
+Subject: [PATCH v4 6/6] arm64: dts: sdm845: Add tsens nodes
+In-Reply-To: <20180703214822.GD129942@google.com>
+References: <cover.1530533998.git.amit.kucheria@linaro.org>
+ <a52b77ad84867774a0659f51ccb79b17ba7638ab.1530533998.git.amit.kucheria@linaro.org>
+ <20180703214822.GD129942@google.com>
+Message-ID: <CAHLCerMZw8mftQb8iRc5+RqGGjf26ebwynPfORz0hAPxp05YfA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2018-07-09 at 12:49 +0200, Pavel Machek wrote:
-> Hi!
-> 
-> > > > grep in /sys produces a nasty oops:
-> > > > 
-> > > > I guess next step is trying to find out which file that is..
-> > > 
-> > > Let me see...
-> > > 
-> > > openat(6, "suspend",
-> > > O_RDONLY|O_NOCTTY|O_NONBLOCK|O_LARGEFILE|O_NOFOLLOW) = 4
-> > > fstat64(4, {st_mode=S_IFREG|0644, st_size=0, ...}) = 0
-> > > read(4, 0x4d2000, 32768)                = -1 EINVAL (Invalid
-> > > argument)
-> > > write(2, "grep: ", 6grep: )                   = 6
-> > > write(2, "/sys/kernel/debug/pm_debug/cefus"...,
-> > > 47/sys/kernel/debug/pm_debug/cefuse_pwrdm/suspend) = 47
-> > > write(2, ": Invalid argument", 18: Invalid argument)      = 18
-> > > write(2, "\n", 1
-> > > )                       = 1
-> > > close(4)                                = 0
-> > > close(6)                                = 0
-> > > openat(5, "time",
-> > > O_RDONLY|O_NOCTTY|O_NONBLOCK|O_LARGEFILE|O_NOFOLLOW)
-> > > = 4
-> > > fstat64(4, {st_mode=S_IFREG|0444, st_size=0, ...}) = 0
-> > > read(4, "cefuse_pwrdm (OFF),OFF:641441757"..., 32768) = 849
-> > > read(4, "", 28672)                      = 0
-> > > close(4)                                = 0
-> > > openat(5, "count",
-> > > O_RDONLY|O_NOCTTY|O_NONBLOCK|O_LARGEFILE|O_NOFOLLOW) = 4
-> > > Connection to usb closed by remote host.
-> > > Connection to usb closed.
-> > > pavel at half:~$
-> > > 
-> > > Ok, so it seems to be:
-> > > 
-> > > user at devuan:~$ cat /sys/kernel/debug/pm_debug/count
-> > > (oops).
-> > > 
-> > > The file seems to be world-readable.
-> > > 
-> > > user at devuan:~$ ls -al /sys/kernel/debug/pm_debug/count
-> > > -r--r--r-- 1 root root 0 Jan  1  1970
-> > > /sys/kernel/debug/pm_debug/count
-> > > 
-> > > But on PC, that file does not exist.
-> > 
-> > Ok, it is easier to reproduce like this:
-> > 
-> > sudo mount /dev/zero -t debugfs /sys/kernel/debug/
-> > sudo cat /sys/kernel/debug/pm_debug/count
-> > 
-> > I tried adding debugging like this:
-> 
-> Confused.
-> 
-> 
-> >  	seq_printf(s, "%s->%s (%d)\n", clkdm->name, clkdm-
-> > >pwrdm.ptr->name,
-> >  		   clkdm->usecount);
-> 
-> I replaced seq_prinf with printk, and it still crashes, after
-> producing reasonable output.
-> 
+On Wed, Jul 4, 2018 at 3:18 AM, Matthias Kaehlcke <mka@chromium.org> wrote:
+> Hi,
+>
+> On Mon, Jul 02, 2018 at 06:14:09PM +0530, Amit Kucheria wrote:
+>> SDM845 has two tsens blocks, one with 13 sensors and the other with 8
+>> sensors.
+>>
+>> Signed-off-by: Amit Kucheria <amit.kucheria@linaro.org>
+>> ---
+>>  arch/arm64/boot/dts/qcom/sdm845.dtsi | 16 ++++++++++++++++
+>>  1 file changed, 16 insertions(+)
+>>
+>> diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+>> index cdaabeb..edf8505 100644
+>> --- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
+>> +++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+>> @@ -221,6 +221,22 @@
+>>                       #interrupt-cells = <2>;
+>>               };
+>>
+>> +             tsens0: tsens at c222000 {
+>> +                     compatible = "qcom,tsens-v2.4.0", "qcom,tsens-v2";
+>> +                     reg = <0xc263000 0x1ff>, /* TM */
+>> +                           <0xc222000 0x1ff>; /* SROT */
+>> +                     #qcom,sensors = <13>;
+>> +                     #thermal-sensor-cells = <1>;
+>> +             };
+>> +
+>> +             tsens1: tsens at c223000 {
+>> +                     compatible = "qcom,tsens-v2.4.0", "qcom,tsens-v2";
+>> +                     reg = <0xc265000 0x1ff>, /* TM */
+>> +                           <0xc223000 0x1ff>; /* SROT */
+>> +                     #qcom,sensors = <8>;
+>> +                     #thermal-sensor-cells = <1>;
+>> +             };
+>> +
+>>               spmi_bus: spmi at c440000 {
+>>                       compatible = "qcom,spmi-pmic-arb";
+>>                       reg = <0xc440000 0x1100>,
+>
+> I tested this series on an SDM845 board. Temperatures can be read from
+> the tsens0 sensors, however for tsens1 sensors I get:
+>
+> cat temp
+> cat: temp: No data available
+>
+> TRDY_READY_BIT set when reading TRDY_OFFSET in get_temp_tsens_v2().
+> Unfortunately I currently have no documentation of the registers or the
+> thermal sensors in general and couldn't investigate further.
+>
+> Any idea what could be the problem?
 
-You need to add printk to the show function as well. It might be last
-item in the list which is problematic (or one after cefuse CLK domain.
+Strangely enough, I'm seeing this now after rebuilding my integration
+branch to test some other bits.
 
-> [   74.852508] cmp...
-> [   74.855773] printf...
-> [   74.859313] l4_cfg_clkdm->core_pwrdm (0)
-> [   74.864532] done...
-> [   74.867889] cmp...
-> [   74.871154] printf...
-> [   74.874694] l4_cefuse_clkdm->cefuse_pwrdm (0)
-> [   74.880340] done...
-> [   74.883728] ------------[ cut here ]------------
-> [   74.889709] WARNING: CPU: 0 PID: 2127 at
-> drivers/bus/omap_l3_noc.c:147 l3_interrupt_handler+0x23c/0x380
-> [   74.900695] 44000000.ocp:L3 Custom Error: MASTER MPU TARGET L4PER2
-> (Read): Data Access in User mode during Functional access
-> [   74.915222] Modules linked in:
-> [   74.919982] CPU: 0 PID: 2127 Comm: cat Not tainted
-> 4.18.0-rc4-88970-gf075a2c-dirty #763
-> [   74.929870] Hardware name: Generic OMAP4 (Flattened Device Tree)
-> [   74.937805] [<c010f6cc>] (unwind_backtrace) from [<c010ba50>]
-> (show_stack+0x10/0x14)
-> 
-> 									
-> Pavel
+I've sent another version with this patch removed while I investigate
+this. Could you check if you're able to read all 8 sensors with v5?
 
--- 
-Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-Intel Finland Oy
+Regards,
+Amit
