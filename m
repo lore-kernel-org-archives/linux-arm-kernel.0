@@ -1,30 +1,38 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Mon, 9 Jul 2018 23:49:10 +0200
-Subject: Vibrations on Droid 4?
-In-Reply-To: <20180709081534.GA6799@amd>
-References: <20180709081534.GA6799@amd>
-Message-ID: <20180709214910.tes6u4ivxomd3aja@earth.universe>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Mon, 09 Jul 2018 14:53:13 -0700
+Subject: [PATCH RESEND] ARM64: dts: meson-axg: add the audio clock
+ controller
+In-Reply-To: <20180706144305.30116-1-jbrunet@baylibre.com> (Jerome Brunet's
+ message of "Fri, 6 Jul 2018 16:43:05 +0200")
+References: <20180706144305.30116-1-jbrunet@baylibre.com>
+Message-ID: <7h7em4nkja.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Jerome Brunet <jbrunet@baylibre.com> writes:
 
-On Mon, Jul 09, 2018 at 10:15:35AM +0200, Pavel Machek wrote:
-> Do you have vibrations on d4 working?
-> I believe I have required drivers enabled, but no luck:
-> 
-> user at devuan:/sys/bus/platform/drivers$ ls pwm-vibrator/
-> bind  uevent  unbind
-> user at devuan:/sys/bus/platform/drivers$ ls omap-dmtimer-pwm/
-> bind  uevent  unbind
+> Add the audio clock controller which is part of the audio bus
+> This controller takes 8 input plls, and the usual clock gate, from the
+> main clock controller. It provides the clocs for the all the devices of
+> the audio subsystem, such as tdms, spdif, pdm, etc.
+>
+> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+> ---
+>
+> Resend to fix typo reported by Martin in the commit description.
+> (Thx Martin !)
+>
+> Kevin,
+>
+> Please note that this change depends on the axg audio clock bindings [0].
+>
+> It explains the problem reported by kbuild robot
+> It will be part of our PR to clock in this cycle.
+>
+> As usual, I've prepared a topic branch with the DT changes for you.
+> Please, let me know when you need a tag on it.
 
-Have you checked probe deferrals?
+Unless you're expecting some more dependencies for the v4.19 cycle,
+please tag it now, then I will queue it up.
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180709/503b6d6a/attachment.sig>
+Kevin
