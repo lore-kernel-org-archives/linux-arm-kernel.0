@@ -1,51 +1,19 @@
 From: sboyd@kernel.org (Stephen Boyd)
-Date: Mon, 09 Jul 2018 09:44:34 -0700
-Subject: [PATCH 1/2] clk: mvebu: armada-37xx-periph: Fix switching CPU
- rate from 300Mhz to 1.2GHz
-In-Reply-To: <87va9oct5k.fsf@bootlin.com>
+Date: Mon, 09 Jul 2018 09:45:01 -0700
+Subject: [PATCH 2/2] clk: mvebu: armada-37xx-periph: switch to SPDX license
+ identifier
+In-Reply-To: <20180619123446.694-3-gregory.clement@bootlin.com>
 References: <20180619123446.694-1-gregory.clement@bootlin.com>
- <20180619123446.694-2-gregory.clement@bootlin.com>
- <87tvpl4pql.fsf@bootlin.com>
- <153092068418.143105.5823916627333449732@swboyd.mtv.corp.google.com>
- <87va9oct5k.fsf@bootlin.com>
-Message-ID: <153115467464.143105.10844577294634998251@swboyd.mtv.corp.google.com>
+ <20180619123446.694-3-gregory.clement@bootlin.com>
+Message-ID: <153115470127.143105.3624204545204931586@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Gregory CLEMENT (2018-07-09 08:42:31)
-> Hi Stephen,
->  
->  On ven., juil. 06 2018, Stephen Boyd <sboyd@kernel.org> wrote:
+Quoting Gregory CLEMENT (2018-06-19 05:34:46)
+> Adopt the SPDX license identifier headers to ease license compliance
+> management.
 > 
-> > Quoting Gregory CLEMENT (2018-06-29 07:44:02)
-> >> Hi,
-> >>  
-> >>  On mar., juin 19 2018, Gregory CLEMENT <gregory.clement@bootlin.com> wrote:
-> >> 
-> >> > Switching the CPU from the L2 or L3 frequencies (300 and 200 Mhz
-> >> > respectively) to L0 frequency (1.2 Ghz) requires a significant amount
-> >> > of time to let VDD stabilize to the appropriate voltage. This amount of
-> >> > time is large enough that it cannot be covered by the hardware
-> >> > countdown register. Due to this, the CPU might start operating at L0
-> >> > before the voltage is stabilized, leading to CPU stalls.
-> >> >
-> >> > To work around this problem, we prevent switching directly from the
-> >> > L2/L3 frequencies to the L0 frequency, and instead switch to the L1
-> >> > frequency in-between. The sequence therefore becomes:
-> >> >
-> >> > 1. First switch from L2/L3(200/300MHz) to L1(600MHZ)
-> >> > 2. Sleep 20ms for stabling VDD voltage
-> >> > 3. Then switch from L1(600MHZ) to L0(1200Mhz).
-> >> 
-> >> Do you have any comment on this fix?
-> >> 
-> >
-> > Looks good. Is it crashing right now? I can throw it into clk-fixes if
-> > it's fixing pain.
-> 
-> Yes for the SoC capable to run at 1200Mhz it crashes. At the time the
-> initial support was provided, my SoC version only ran at 1000MHz, so the
-> problem was not noticed.
-> 
+> Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
+> ---
 
-Ok. Applied to clk-fixes.
+Applied to clk-next
