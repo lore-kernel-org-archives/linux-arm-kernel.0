@@ -1,25 +1,35 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Mon, 09 Jul 2018 14:46:07 -0700
-Subject: [PATCH 0/3] ARM64: dts: meson-axg: first round of daughter card
- updates
-In-Reply-To: <20180628095054.13433-1-jbrunet@baylibre.com> (Jerome Brunet's
- message of "Thu, 28 Jun 2018 11:50:51 +0200")
-References: <20180628095054.13433-1-jbrunet@baylibre.com>
-Message-ID: <7hsh4snkv4.fsf@baylibre.com>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Mon, 9 Jul 2018 23:46:20 +0200
+Subject: [PATCH 1/2] Revert "tick: Prefer a lower rating device only if
+ it's CPU local device"
+In-Reply-To: <CAOi56cWaeh+c9+OgpxdjTarnRdaKrNFC=ddBPT2j9v1rHT8EOg@mail.gmail.com>
+References: <1531151136-18297-1-git-send-email-sudeep.holla@arm.com>
+ <CAOi56cWaeh+c9+OgpxdjTarnRdaKrNFC=ddBPT2j9v1rHT8EOg@mail.gmail.com>
+Message-ID: <CAFBinCA6gZ9fw0yGvs_FWuGoZG-d2CL2R5qYp3_u1T=Atn8tgA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jerome Brunet <jbrunet@baylibre.com> writes:
-
-> This patchset adds a speaker amplifier and some leds present on daughter
-> cards which are connected to the s400 board.
+On Mon, Jul 9, 2018 at 8:24 PM Kevin Hilman <khilman@baylibre.com> wrote:
 >
-> Kevin, please note that the bindings documentation update for the tas5707
-> has been queued for next in Mark Brown's ASoC tree. Not having it won't
-> break anything but you may get checkpatch warning.
+> On Mon, Jul 9, 2018 at 8:45 AM Sudeep Holla <sudeep.holla@arm.com> wrote:
+> >
+> > This reverts commit 1332a90558013ae4242e3dd7934bdcdeafb06c0d.
+> >
+> > The original issue was not because of incorrect checking of cpumask for
+> > both new and old tick device. It was incorrectly analysed was due to the
+> > misunderstanding of the comment and misinterpretation of the return
+> > value from tick_check_preferred. The main issue is with the clockevent
+> > driver that sets the cpumask to cpu_all_mask instead of cpu_possible_mask.
+> >
+> > Cc: Thomas Gleixner <tglx@linutronix.de>
+> > Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+>
+> Tested-by: Kevin Hilman <khilman@baylibre.com>
+Tested-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
 
-Thanks for the warning.
+> And verified to fix a regression on the 32-bit ARM platform mesion8b-odroidc1.
+I also tested it on Meson8b as well as Meson8m2
 
-Series applied to v4.19/dt64,
 
-Kevin
+Regards
+Martin
