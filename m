@@ -1,122 +1,161 @@
-From: Dave.Martin@arm.com (Dave P Martin)
-Date: Mon, 9 Jul 2018 14:03:59 +0100
-Subject: [PATCH] arm64: neon: Do not access kernel_neon_busy with
- preemption enabled
-In-Reply-To: <CAAMpZHV7wxofLa1AWEKcuGSa5bwzcfCRy=+zyB2-tw5m5NueVQ@mail.gmail.com>
-References: <1530936171-16169-1-git-send-email-yandong77520@gmail.com>
- <20180709102724.GA9486@e103592.cambridge.arm.com>
- <CAAMpZHV7wxofLa1AWEKcuGSa5bwzcfCRy=+zyB2-tw5m5NueVQ@mail.gmail.com>
-Message-ID: <20180709130358.GD22740@e103592.cambridge.arm.com>
+From: mhocko@kernel.org (Michal Hocko)
+Date: Mon, 9 Jul 2018 15:09:31 +0200
+Subject: [PATCH 1/2] mm/cma: remove unsupported gfp_mask parameter from
+ cma_alloc()
+In-Reply-To: <20180709122019eucas1p2340da484acfcc932537e6014f4fd2c29~-sqTPJKij2939229392eucas1p2j@eucas1p2.samsung.com>
+References: <20180709121956.20200-1-m.szyprowski@samsung.com>
+ <CGME20180709122019eucas1p2340da484acfcc932537e6014f4fd2c29@eucas1p2.samsung.com>
+ <20180709122019eucas1p2340da484acfcc932537e6014f4fd2c29~-sqTPJKij2939229392eucas1p2j@eucas1p2.samsung.com>
+Message-ID: <20180709130931.GL22049@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 09, 2018 at 01:08:03PM +0100, Yandong Zhao wrote:
-> Hi Dave,
->
-> The scenario for this bug is:
-> The A process is sched out when the CPU0 executes the function raw_cpu_read(kernel_neon_busy) and just gets the address of kernel_neon_busy without reading.
-> The B process starts running kernel_neon_begin() on CPU0, and the variable kernel_neon_busy on CPU0 becomes true. At this time, the A process is executed on CPU1 and the kernel_neon_busy value is CPU0 (true), so BUG_ON()!!!
->
-> crash64> kernel_neon_busy
-> PER-CPU DATA TYPE:
->   bool kernel_neon_busy;
-> PER-CPU ADDRESSES:
->   [0]: ffffffc07fee30a0
->   [1]: ffffffc07fef90a0
->   [2]: ffffffc07ff0f0a0
->   [3]: ffffffc07ff250a0
->
->          CPU0                                                                CPU1
->            |                                                                          |
-> A task have get addr ffffffc07fee30a0                                |
->     then sched out                                                            |
->            |                                                                          |
->     B task kernel_neon_begin() [ffffffc07fee30a0]=1             |
->            |                                                                          |
->            |                                         A task sched in and read [ffffffc07fee30a0]==1,so BUG_ON.
->            |                                                                          |
->     B task kernel_neon_end() [ffffffc07fee30a0]=0               |
+On Mon 09-07-18 14:19:55, Marek Szyprowski wrote:
+> cma_alloc() function doesn't really support gfp flags other than
+> __GFP_NOWARN, so convert gfp_mask parameter to boolean no_warn parameter.
+> 
+> This will help to avoid giving false feeling that this function supports
+> standard gfp flags and callers can pass __GFP_ZERO to get zeroed buffer,
+> what has already been an issue: see commit dd65a941f6ba ("arm64:
+> dma-mapping: clear buffers allocated with FORCE_CONTIGUOUS flag").
+> 
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 
-Ah, OK.  Because raw_cpu_read() read is preemptible, we can read a value
-for kernel_neon_busy that effectively belongs to another task.
+Thanks! This makes perfect sense to me. If there is a real need for the
+gfp_mask then we should start by defining the semantic first.
 
-That was a dumb mistake on my part -- thanks for investingating it.
+Acked-by: Michal Hocko <mhocko@suse.com>
 
-> 2018-07-09 18:27 GMT+08:00 Dave Martin <Dave.Martin at arm.com<mailto:Dave.Martin@arm.com>>:
-> On Sat, Jul 07, 2018 at 12:02:51PM +0800, Yandong.Zhao wrote:
-> > From: Yandong Zhao <yandong77520 at gmail.com<mailto:yandong77520@gmail.com>>
-> >
-> > Dear, Dave
-> > Thank you very much for reading my email. I have a question and
-> > I hope toget your reply.
-> > It is a bug to not close the preemption when executing
-> > raw_cpu_read(kernel_neon_busy) in the function may_use_simd()!
-> > We encountered a ?sysdump? problem on Kernel 4.14 code because
-> > the program entered BUG_ON() in the function kernel_neon_begin().
-> > Our analysis concludes that the process is migrating while executing
-> > raw_cpu_read(kernel_neon_busy).
->
-> Can you include a backtrace, please?
->
-> Also, do you have any significant patches applies on top of v4.14?  Is
-> your configuration different from defconfig?
->
-> >
-> > Signed-off-by: Yandong Zhao <yandong77520 at gmail.com<mailto:yandong77520@gmail.com>>
-> > ---
-> >  arch/arm64/include/asm/simd.h | 17 +++++------------
-> >  1 file changed, 5 insertions(+), 12 deletions(-)
-> >
-> > diff --git a/arch/arm64/include/asm/simd.h b/arch/arm64/include/asm/simd.h
-> > index fa8b3fe..0d91084 100644
-> > --- a/arch/arm64/include/asm/simd.h
-> > +++ b/arch/arm64/include/asm/simd.h
-> > @@ -29,20 +29,13 @@
-> >  static __must_check inline bool may_use_simd(void)
-> >  {
-> >       /*
-> > -      * The raw_cpu_read() is racy if called with preemption enabled.
-> > -      * This is not a bug: kernel_neon_busy is only set when
-> > -      * preemption is disabled, so we cannot migrate to another CPU
-> > -      * while it is set, nor can we migrate to a CPU where it is set.
-> > -      * So, if we find it clear on some CPU then we're guaranteed to
-> > -      * find it clear on any CPU we could migrate to.
-> > -      *
-> > -      * If we are in between kernel_neon_begin()...kernel_neon_end(),
-> > -      * the flag will be set, but preemption is also disabled, so we
-> > -      * can't migrate to another CPU and spuriously see it become
-> > -      * false.
+> ---
+>  arch/powerpc/kvm/book3s_hv_builtin.c       | 2 +-
+>  drivers/s390/char/vmcp.c                   | 2 +-
+>  drivers/staging/android/ion/ion_cma_heap.c | 2 +-
+>  include/linux/cma.h                        | 2 +-
+>  kernel/dma/contiguous.c                    | 3 ++-
+>  mm/cma.c                                   | 8 ++++----
+>  mm/cma_debug.c                             | 2 +-
+>  7 files changed, 11 insertions(+), 10 deletions(-)
+> 
+> diff --git a/arch/powerpc/kvm/book3s_hv_builtin.c b/arch/powerpc/kvm/book3s_hv_builtin.c
+> index d4a3f4da409b..fc6bb9630a9c 100644
+> --- a/arch/powerpc/kvm/book3s_hv_builtin.c
+> +++ b/arch/powerpc/kvm/book3s_hv_builtin.c
+> @@ -77,7 +77,7 @@ struct page *kvm_alloc_hpt_cma(unsigned long nr_pages)
+>  	VM_BUG_ON(order_base_2(nr_pages) < KVM_CMA_CHUNK_ORDER - PAGE_SHIFT);
+>  
+>  	return cma_alloc(kvm_cma, nr_pages, order_base_2(HPT_ALIGN_PAGES),
+> -			 GFP_KERNEL);
+> +			 false);
+>  }
+>  EXPORT_SYMBOL_GPL(kvm_alloc_hpt_cma);
+>  
+> diff --git a/drivers/s390/char/vmcp.c b/drivers/s390/char/vmcp.c
+> index 948ce82a7725..0fa1b6b1491a 100644
+> --- a/drivers/s390/char/vmcp.c
+> +++ b/drivers/s390/char/vmcp.c
+> @@ -68,7 +68,7 @@ static void vmcp_response_alloc(struct vmcp_session *session)
+>  	 * anymore the system won't work anyway.
+>  	 */
+>  	if (order > 2)
+> -		page = cma_alloc(vmcp_cma, nr_pages, 0, GFP_KERNEL);
+> +		page = cma_alloc(vmcp_cma, nr_pages, 0, false);
+>  	if (page) {
+>  		session->response = (char *)page_to_phys(page);
+>  		session->cma_alloc = 1;
+> diff --git a/drivers/staging/android/ion/ion_cma_heap.c b/drivers/staging/android/ion/ion_cma_heap.c
+> index 49718c96bf9e..3fafd013d80a 100644
+> --- a/drivers/staging/android/ion/ion_cma_heap.c
+> +++ b/drivers/staging/android/ion/ion_cma_heap.c
+> @@ -39,7 +39,7 @@ static int ion_cma_allocate(struct ion_heap *heap, struct ion_buffer *buffer,
+>  	if (align > CONFIG_CMA_ALIGNMENT)
+>  		align = CONFIG_CMA_ALIGNMENT;
+>  
+> -	pages = cma_alloc(cma_heap->cma, nr_pages, align, GFP_KERNEL);
+> +	pages = cma_alloc(cma_heap->cma, nr_pages, align, false);
+>  	if (!pages)
+>  		return -ENOMEM;
+>  
+> diff --git a/include/linux/cma.h b/include/linux/cma.h
+> index bf90f0bb42bd..190184b5ff32 100644
+> --- a/include/linux/cma.h
+> +++ b/include/linux/cma.h
+> @@ -33,7 +33,7 @@ extern int cma_init_reserved_mem(phys_addr_t base, phys_addr_t size,
+>  					const char *name,
+>  					struct cma **res_cma);
+>  extern struct page *cma_alloc(struct cma *cma, size_t count, unsigned int align,
+> -			      gfp_t gfp_mask);
+> +			      bool no_warn);
+>  extern bool cma_release(struct cma *cma, const struct page *pages, unsigned int count);
+>  
+>  extern int cma_for_each_area(int (*it)(struct cma *cma, void *data), void *data);
+> diff --git a/kernel/dma/contiguous.c b/kernel/dma/contiguous.c
+> index d987dcd1bd56..19ea5d70150c 100644
+> --- a/kernel/dma/contiguous.c
+> +++ b/kernel/dma/contiguous.c
+> @@ -191,7 +191,8 @@ struct page *dma_alloc_from_contiguous(struct device *dev, size_t count,
+>  	if (align > CONFIG_CMA_ALIGNMENT)
+>  		align = CONFIG_CMA_ALIGNMENT;
+>  
+> -	return cma_alloc(dev_get_cma_area(dev), count, align, gfp_mask);
+> +	return cma_alloc(dev_get_cma_area(dev), count, align,
+> +			 gfp_mask & __GFP_NOWARN);
+>  }
+>  
+>  /**
+> diff --git a/mm/cma.c b/mm/cma.c
+> index 5809bbe360d7..4cb76121a3ab 100644
+> --- a/mm/cma.c
+> +++ b/mm/cma.c
+> @@ -395,13 +395,13 @@ static inline void cma_debug_show_areas(struct cma *cma) { }
+>   * @cma:   Contiguous memory region for which the allocation is performed.
+>   * @count: Requested number of pages.
+>   * @align: Requested alignment of pages (in PAGE_SIZE order).
+> - * @gfp_mask:  GFP mask to use during compaction
+> + * @no_warn: Avoid printing message about failed allocation
+>   *
+>   * This function allocates part of contiguous memory on specific
+>   * contiguous memory area.
+>   */
+>  struct page *cma_alloc(struct cma *cma, size_t count, unsigned int align,
+> -		       gfp_t gfp_mask)
+> +		       bool no_warn)
+>  {
+>  	unsigned long mask, offset;
+>  	unsigned long pfn = -1;
+> @@ -447,7 +447,7 @@ struct page *cma_alloc(struct cma *cma, size_t count, unsigned int align,
+>  		pfn = cma->base_pfn + (bitmap_no << cma->order_per_bit);
+>  		mutex_lock(&cma_mutex);
+>  		ret = alloc_contig_range(pfn, pfn + count, MIGRATE_CMA,
+> -					 gfp_mask);
+> +				     GFP_KERNEL | (no_warn ? __GFP_NOWARN : 0));
+>  		mutex_unlock(&cma_mutex);
+>  		if (ret == 0) {
+>  			page = pfn_to_page(pfn);
+> @@ -466,7 +466,7 @@ struct page *cma_alloc(struct cma *cma, size_t count, unsigned int align,
+>  
+>  	trace_cma_alloc(pfn, page, count, align)>  
+> -	if (ret && !(gfp_mask & __GFP_NOWARN)) {
+> +	if (ret && !no_warn) {
+>  		pr_err("%s: alloc failed, req-size: %zu pages, ret: %d\n",
+>  			__func__, count, ret);
+>  		cma_debug_show_areas(cma);
+> diff --git a/mm/cma_debug.c b/mm/cma_debug.c
+> index f23467291cfb..ad6723e9d110 100644
+> --- a/mm/cma_debug.c
+> +++ b/mm/cma_debug.c
+> @@ -139,7 +139,7 @@ static int cma_alloc_mem(struct cma *cma, int count)
+>  	if (!mem)
+>  		return -ENOMEM;
+>  
+> -	p = cma_alloc(cma, count, 0, GFP_KERNEL);
+> +	p = cma_alloc(cma, count, 0, false);
+>  	if (!p) {
+>  		kfree(mem);
+>  		return -ENOMEM;
+> -- 
+> 2.17.1
+> 
 
-Please keep the above comment: it remains important to explain why
-the return value from may_use_simd() remains valid even if the
-task migrates to another cpu.
-
-The first sentence should be reworded to clarify the nature of
-the race, something like:
-
-"The this_cpu_read() call is racy if called with preemption enabled,
-since the task my subsequently migrate to another CPU.  This is not
-a bug: [...]"
-
-> > +      * Operations for contexts where we do not want to do any checks for
-> > +      * preemptions.  Unless strictly necessary, always use this_cpu_*()
-> > +      * instead. Because of the kernel_neon_busy here we have to make sure
-> > +      * that it is the current cpu.
-
-Your comment should be moved to the commit message, since it
-just explains what was fixed.
-
-> >        */
-> >       return !in_irq() && !irqs_disabled() && !in_nmi() &&
-> > -             !raw_cpu_read(kernel_neon_busy);
-> > +             !this_cpu_read(kernel_neon_busy);
-
-This adds overhead, but I don't see a way around it.
-
-
-Can you post an updated version with an amended commit message and
-a suitable Fixes: tag?
-
-Cheers
----Dave
-IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+-- 
+Michal Hocko
+SUSE Labs
