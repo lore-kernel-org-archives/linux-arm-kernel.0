@@ -1,99 +1,48 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon, 9 Jul 2018 10:18:36 +0200
-Subject: [PATCH v2 2/3] dt-bindings: xilinx: Add missing zynq boards and
- sort entries
-In-Reply-To: <20180706060158.24155-3-luaraneda@gmail.com>
-References: <20180706060158.24155-1-luaraneda@gmail.com>
- <20180706060158.24155-3-luaraneda@gmail.com>
-Message-ID: <1088d908-eaa1-78a8-f1a5-1a7d82eb5afb@xilinx.com>
+From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
+Date: Mon, 9 Jul 2018 16:18:18 +0800
+Subject: [PATCH v3 0/3] serial: 8250_dw: add fractional divisor support
+Message-ID: <20180709160942.11a74f7a@xhacker.debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6.7.2018 08:01, Luis Araneda wrote:
-> The bindings were missing when adding the device-tree files
-> 
-> Also, improve description of existing boards, sort them
-> alphabetically by manufacturer, and migrate the contents
-> of adapteva dt dindigns into Xilinx's
-> 
-> Signed-off-by: Luis Araneda <luaraneda@gmail.com>
-> ---
-> 
-> Changes since v1 (RFC):
-> - Don't remove "internal" word from Xilinx boards on dt-bindings
-> - Migrate content of adapteva dt-binding file into Xilinx's
-> - Sort additional compatible strings alphabetically
->   by manufacturer
-> 
->  .../devicetree/bindings/arm/adapteva.txt      |  7 -----
->  .../devicetree/bindings/arm/xilinx.txt        | 30 +++++++++++++++----
->  2 files changed, 25 insertions(+), 12 deletions(-)
->  delete mode 100644 Documentation/devicetree/bindings/arm/adapteva.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/adapteva.txt b/Documentation/devicetree/bindings/arm/adapteva.txt
-> deleted file mode 100644
-> index 1d8af9e36065..000000000000
-> --- a/Documentation/devicetree/bindings/arm/adapteva.txt
-> +++ /dev/null
-> @@ -1,7 +0,0 @@
-> -Adapteva Platforms Device Tree Bindings
-> ----------------------------------------
-> -
-> -Parallella board
-> -
-> -Required root node properties:
-> -    - compatible = "adapteva,parallella";
-> diff --git a/Documentation/devicetree/bindings/arm/xilinx.txt b/Documentation/devicetree/bindings/arm/xilinx.txt
-> index b9043bc35c14..26fe5ecc4332 100644
-> --- a/Documentation/devicetree/bindings/arm/xilinx.txt
-> +++ b/Documentation/devicetree/bindings/arm/xilinx.txt
-> @@ -8,18 +8,38 @@ Required root node properties:
->  
->  Additional compatible strings:
->  
-> -- Xilinx internal board cc108
-> +- Adapteva Parallella board
-> +  "adapteva,parallella"
-> +
-> +- Avnet MicroZed board
-> +  "avnet,zynq-microzed"
-> +  "xlnx,zynq-microzed"
-> +
-> +- Avnet ZedBoard board
-> +  "avnet,zynq-zed"
-> +  "xlnx,zynq-zed"
-> +
-> +- Digilent Zybo board
-> +  "digilent,zynq-zybo"
-> +
-> +- Digilent Zybo Z7 board
-> +  "digilent,zynq-zybo-z7"
-> +
-> +- Xilinx CC108 internal board
->    "xlnx,zynq-cc108"
->  
-> -- Xilinx internal board zc770 with different FMC cards
-> +- Xilinx ZC702 internal board
-> +  "xlnx,zynq-zc702"
-> +
-> +- Xilinx ZC706 internal board
-> +  "xlnx,zynq-zc706"
-> +
-> +- Xilinx ZC770 internal board, with different FMC cards
->    "xlnx,zynq-zc770-xm010"
->    "xlnx,zynq-zc770-xm011"
->    "xlnx,zynq-zc770-xm012"
->    "xlnx,zynq-zc770-xm013"
->  
-> -- Digilent Zybo Z7 board
-> -  "digilent,zynq-zybo-z7"
-> -
->  ---------------------------------------------------------------
->  
->  Xilinx Zynq UltraScale+ MPSoC Platforms Device Tree Bindings
-> 
+For Synopsys DesignWare 8250 uart which version >= 4.00a, there's a
+valid divisor latch fraction register. The fractional divisor width is
+4bits ~ 6bits.
 
-Please do it with more patches. There are 3 changes in one patch.
+patch1 introduces necessary hooks to 8250 core.
+patch2 exports serial8250_do_set_divisor()
+patch3 implements the fractional divisor support for Synopsys DW 8250.
 
-Thanks,
-Michal
+Since v2:
+ - rebase to tty-next branch, since I need one patch from Andy which
+   is in tty-next
+ - drop the patch "serial: 8250: let serial8250_get_divisor() get
+   uart_port * as param" since it's in tty-next now.
+ - add a new patch to export serial8250_do_set_divisor(), and reuse it
+   to complete dw8250_set_divisor().
+ - remove DW 8250 version check, since the DLF register always exists
+   and if fractional divisor isn't supported, the register read as 0
+ - add comments to explain how dw8250_get_divisor() get quot and frac.
+ - the frac calcuation is simplified with well implemented GENMASK
+ - Add Andy's Reviewed-by tag to patch1.
+
+Since v1:
+ - add an extra patch to let serial8250_get_divisor() get uart_port *
+   as param
+ - take Andy's suggestions to "integrates hooks in the same way like
+   it's done for the rest of 8250 ones". Many thanks to Andy.
+
+Jisheng Zhang (3):
+  serial: 8250: introduce get_divisor() and set_divisor() hook
+  serial: 8250: export serial8250_do_set_divisor()
+  serial: 8250_dw: add fractional divisor support
+
+ drivers/tty/serial/8250/8250_core.c |  4 +++
+ drivers/tty/serial/8250/8250_dw.c   | 45 +++++++++++++++++++++++++++++
+ drivers/tty/serial/8250/8250_port.c | 30 +++++++++++++++----
+ include/linux/serial_8250.h         |  3 ++
+ include/linux/serial_core.h         |  7 +++++
+ 5 files changed, 84 insertions(+), 5 deletions(-)
+
+-- 
+2.18.0
