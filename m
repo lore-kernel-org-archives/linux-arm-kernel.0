@@ -1,91 +1,62 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Mon, 09 Jul 2018 15:49:44 +0100
-Subject: [PATCH v5 0/7] KVM: Support PUD hugepages at stage 2
-In-Reply-To: <20180709143835.28971-2-punit.agrawal@arm.com> (Punit Agrawal's
- message of "Mon, 9 Jul 2018 15:38:28 +0100")
-References: <20180709143835.28971-1-punit.agrawal@arm.com>
- <20180709143835.28971-2-punit.agrawal@arm.com>
-Message-ID: <871sccqx9z.fsf@e105922-lin.cambridge.arm.com>
+From: martin@lucina.net (Martin Lucina)
+Date: Mon, 9 Jul 2018 16:49:46 +0200
+Subject: [linux-sunxi] Re: [PATCH 05/10] arm64: dts: allwinner: a64:
+ Olinuxino: enable USB
+In-Reply-To: <ff9389d1-c476-d5cf-8c4a-e0eae84e3642@arm.com>
+References: <20180706150401.mhqse677vdqtxdzy@nodbug.lucina.net>
+ <548f2eb5-b457-8fcd-c043-b897a447d96c@arm.com>
+ <52713A44-E2BB-4388-A98F-D49AA3B6EAC3@aosc.io>
+ <4b4d1662-4266-593c-79a9-39eea8fb668c@arm.com>
+ <373C4D2E-E2CF-4AE9-9AC4-69AD4AF95AF4@aosc.io>
+ <5b9a0818-b28e-76de-17b9-721c0950b64b@arm.com>
+ <20180709101509.pg2p5kompy35hc3k@nodbug.lucina.net>
+ <1d2c3a9f-ec57-ebd2-a8d1-fcd7a84e0e91@arm.com>
+ <20180709115426.6r42bxqcypxvikep@nodbug.lucina.net>
+ <ff9389d1-c476-d5cf-8c4a-e0eae84e3642@arm.com>
+Message-ID: <20180709144946.qgiucndzd5rvjrpn@nodbug.lucina.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Please ignore this cover letter.
+Hi,
 
-Apologies for the duplicate cover-letter and a somewhat funky threading
-(I blame emacs unsaved buffer).
+On Monday, 09.07.2018 at?14:43, Andre Przywara wrote:
+> >> Can you please try using the .dts I attached?
+> > 
+> > The .dts you attached does not compile, you've added a "&simplefb_hdmi"
+> > node, did you mean something else?
+> 
+> Ah, right, sorry about that. That was against sunxi/dt64-for-4.19 (as
+> the whole series was). So the base .dtsi is different.
+> Attaching the .dtb this time ...
 
-The patches appear to be intact so don't let the threading get in the
-way of review.
+Ah, where exactly is that tree? I'm still testing with Linus' v4.18-rc2,
+which is probably wrong. Booting with that dtb gives me the same result re
+USB.
 
-Punit Agrawal <punit.agrawal@arm.com> writes:
+> Do you have fixed regulator support in your kernel?
+> CONFIG_REGULATOR_FIXED_VOLTAGE=y or fixed.ko as a module.
 
-> This series is an update to the PUD hugepage support previously posted
-> at [0]. This patchset adds support for PUD hugepages at stage
-> 2. This feature is useful on cores that have support for large sized
-> TLB mappings (e.g., 1GB for 4K granule).
->
-> The biggest change in this version is to replace repeated instances of
-> walking the page tables to get to a leaf-entry with a function to
-> return the appropriate entry. This was suggested by Suzuki and should
-> help reduce the amount of churn resulting from future changes. It also
-> address other feedback on the previous version.
->
-> Support is added to code that is shared between arm and arm64. Dummy
-> helpers for arm are provided as the port does not support PUD hugepage
-> sizes.
->
-> The patches have been tested on an A57 based system. The patchset is
-> based on v4.18-rc4. The are a few conflicts with the support for 52
-> bit IPA[1] due to change in number of parameters for
-> stage2_pmd_offset().
->
-> Thanks,
-> Punit
->
-> v4 -> v5:
->
-> * Patch 1 - Drop helper stage2_should_exec() and refactor the
->   condition to decide if a page table entry should be marked
->   executable
-> * Patch 4-6 - Introduce stage2_get_leaf_entry() and use it in this and
->   latter patches
-> * Patch 7 - Use stage 2 accessors instead of using the page table
->   helpers directly
-> * Patch 7 - Add a note to update the PUD hugepage support when number
->   of levels of stage 2 tables differs from stage 1
->
->
-> v3 -> v4:
-> * Patch 1 and 7 - Don't put down hugepages pte if logging is enabled
-> * Patch 4-5 - Add PUD hugepage support for exec and access faults
-> * Patch 6 - PUD hugepage support for aging page table entries
->
-> v2 -> v3:
-> * Update vma_pagesize directly if THP [1/4]. Previsouly this was done
->   indirectly via hugetlb
-> * Added review tag [4/4]
->
-> v1 -> v2:
-> * Create helper to check if the page should have exec permission [1/4]
-> * Fix broken condition to detect THP hugepage [1/4]
-> * Fix in-correct hunk resulting from a rebase [4/4]
->
-> [0] https://www.spinics.net/lists/arm-kernel/msg663562.html
-> [1] https://www.spinics.net/lists/kvm/msg171065.html
->
->
-> Punit Agrawal (7):
->   KVM: arm/arm64: Share common code in user_mem_abort()
->   KVM: arm/arm64: Introduce helpers to manupulate page table entries
->   KVM: arm64: Support dirty page tracking for PUD hugepages
->   KVM: arm64: Support PUD hugepage in stage2_is_exec()
->   KVM: arm64: Support handling access faults for PUD hugepages
->   KVM: arm64: Update age handlers to support PUD hugepages
->   KVM: arm64: Add support for creating PUD hugepages at stage 2
->
->  arch/arm/include/asm/kvm_mmu.h         |  60 +++++
->  arch/arm64/include/asm/kvm_mmu.h       |  47 ++++
->  arch/arm64/include/asm/pgtable-hwdef.h |   4 +
->  arch/arm64/include/asm/pgtable.h       |   9 +
->  virt/kvm/arm/mmu.c                     | 289 ++++++++++++++++++-------
->  5 files changed, 330 insertions(+), 79 deletions(-)
+Yes.
+
+> > ...if I remove that node, then I get:
+> > 
+> > [    0.289065] sun4i-usb-phy 1c19400.phy: Couldn't request ID GPIO
+> > ...
+> > [    1.554921] sun4i-usb-phy 1c19400.phy: Couldn't get regulator usb0_vbus... Deferring probe
+> > ...
+> > [    1.659943] sun4i-usb-phy 1c19400.phy: Couldn't get regulator usb0_vbus... Deferring probe
+> > 
+> > and no USB.
+> > 
+> > (guessing) Did you mean to add a &usb1_vbus?
+> 
+> Well, this regulator name should indeed read usb1_vbus now. But this is
+> mostly about the name. Changed this anyway in the attached .dtb.
+> 
+> But this failure in getting the GPIO looks suspicious. Do you have uart1
+> enabled, by any chance? As its CTS pin is on PG9.
+
+Not that I know of, and looking at the schematic there's no way I can get
+at that pin to test?
+
+Martin
