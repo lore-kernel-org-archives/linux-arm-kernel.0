@@ -1,190 +1,399 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Mon, 09 Jul 2018 12:40:24 +0800
-Subject: [linux-sunxi] Re: [PATCH v2 7/9] phy: allwinner: add phy driver
- for USB3 PHY on Allwinner H6 SoC
-In-Reply-To: <438f1123-a619-61d0-36cd-d65c1430435a@ti.com>
-References: <20180706153805.25842-1-icenowy@aosc.io>
- <20180706153805.25842-8-icenowy@aosc.io>
- <438f1123-a619-61d0-36cd-d65c1430435a@ti.com>
-Message-ID: <cf6e38ca8a70784a79818a32fa93fc03aed6d4c7.camel@aosc.io>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 9 Jul 2018 10:49:50 +0530
+Subject: [PATCH 2/4] phy: socionext: add USB3 PHY driver for UniPhier SoC
+In-Reply-To: <1530261541-23104-3-git-send-email-hayashi.kunihiko@socionext.com>
+References: <1530261541-23104-1-git-send-email-hayashi.kunihiko@socionext.com>
+ <1530261541-23104-3-git-send-email-hayashi.kunihiko@socionext.com>
+Message-ID: <4b436a46-9046-25ad-ee6d-ad2cdb16e2ca@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2018-07-09?? 10:01 +0530?'Kishon Vijay Abraham I' via linux-sunxi???
-> Hi,
-> 
-> On Friday 06 July 2018 09:08 PM, Icenowy Zheng wrote:
-> > Allwinner H6 SoC contains a USB3 PHY (with USB2 DP/DM lines also
-> > controlled).
-> > 
-> > Add a driver for it.
-> > 
-> > The register operations in this driver is mainly extracted from the
-> > BSP
-> > USB3 driver.
-> > 
-> > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> > ---
-> > Changes in v2:
-> > - Splitted out the DT binding.
-> > 
-> >  drivers/phy/allwinner/Kconfig           |  13 ++
-> >  drivers/phy/allwinner/Makefile          |   1 +
-> >  drivers/phy/allwinner/phy-sun50i-usb3.c | 194
-> > ++++++++++++++++++++++++
-> >  3 files changed, 208 insertions(+)
-> >  create mode 100644 drivers/phy/allwinner/phy-sun50i-usb3.c
-> > 
-> > diff --git a/drivers/phy/allwinner/Kconfig
-> > b/drivers/phy/allwinner/Kconfig
-> > index cdc1e745ba47..cf373bcee034 100644
-> > --- a/drivers/phy/allwinner/Kconfig
-> > +++ b/drivers/phy/allwinner/Kconfig
-> > @@ -29,3 +29,16 @@ config PHY_SUN9I_USB
-> >  	  sun9i SoCs.
-> >  
-> >  	  This driver controls each individual USB 2 host PHY.
-> > +
-> > +config PHY_SUN50I_USB3
-> > +	tristate "Allwinner sun50i SoC USB3 PHY driver"
-> > +	depends on ARCH_SUNXI && HAS_IOMEM && OF
-> > +	depends on RESET_CONTROLLER
-> > +	depends on USB_SUPPORT
-> > +	select USB_COMMON
-> 
-> Doesn't look like this driver depends on USB_SUPPORT.
+Hi,
 
-Yes, it doesn't depend on USB_SUPPORT; however, it's a USB PHY.
-
-> > +	select GENERIC_PHY
-> > +	help
-> > +	  Enable this to support the USB3.0-capable transceiver
-> > that is
-> > +	  part of some Allwinner sun50i SoCs.
-> > +
-> > +	  This driver controls each individual USB 2+3 host PHY
-> > combo.
-> > diff --git a/drivers/phy/allwinner/Makefile
-> > b/drivers/phy/allwinner/Makefile
-> > index 8605529c01a1..a8d01e9073c2 100644
-> > --- a/drivers/phy/allwinner/Makefile
-> > +++ b/drivers/phy/allwinner/Makefile
-> > @@ -1,2 +1,3 @@
-> >  obj-$(CONFIG_PHY_SUN4I_USB)		+= phy-sun4i-usb.o
-> >  obj-$(CONFIG_PHY_SUN9I_USB)		+= phy-sun9i-usb.o
-> > +obj-$(CONFIG_PHY_SUN50I_USB3)		+= phy-sun50i-usb3.o
-> > diff --git a/drivers/phy/allwinner/phy-sun50i-usb3.c
-> > b/drivers/phy/allwinner/phy-sun50i-usb3.c
-> > new file mode 100644
-> > index 000000000000..226c99c2d664
-> > --- /dev/null
-> > +++ b/drivers/phy/allwinner/phy-sun50i-usb3.c
-> > @@ -0,0 +1,194 @@
-> > +// SPDX-License-Identifier: GPL-2.0+
-> > +/*
-> > + * Allwinner sun50i(H6) USB 3.0 phy driver
-> > + *
-> > + * Copyright (C) 2017 Icenowy Zheng <icenowy@aosc.io>
-> > + *
-> > + * Based on phy-sun9i-usb.c, which is:
-> > + *
-> > + * Copyright (C) 2014-2015 Chen-Yu Tsai <wens@csie.org>
-> > + *
-> > + * Based on code from Allwinner BSP, which is:
-> > + *
-> > + * Copyright (c) 2010-2015 Allwinner Technology Co., Ltd.
+On Friday 29 June 2018 02:08 PM, Kunihiko Hayashi wrote:
+> Add a driver for PHY interface built into USB3 controller
+> implemented in UniPhier SoCs.
+> This driver supports High-Speed PHY and Super-Speed PHY.
 > 
-> Does the BSP also use GPL license?
-
-See [1].
-
-[1] https://github.com/Allwinner-Homlet/H6-BSP4.9-linux/blob/master/dri
-vers/usb/host/xhci_sunxi.c
-
-> > + */
-> > +
-> > +#include <linux/clk.h>
-> > +#include <linux/err.h>
-> > +#include <linux/io.h>
-> > +#include <linux/module.h>
-> > +#include <linux/phy/phy.h>
-> > +#include <linux/usb/of.h>
-> > +#include <linux/platform_device.h>
-> > +#include <linux/reset.h>
-> > +
-> > +/* Interface Status and Control Registers */
-> > +#define SUNXI_ISCR			0x00
-> > +#define SUNXI_PIPE_CLOCK_CONTROL	0x14
-> > +#define SUNXI_PHY_TUNE_LOW		0x18
-> > +#define SUNXI_PHY_TUNE_HIGH		0x1c
-> > +#define SUNXI_PHY_EXTERNAL_CONTROL	0x20
-> > +
-> > +/* USB2.0 Interface Status and Control Register */
-> > +#define SUNXI_ISCR_FORCE_VBUS		(3 << 12)
-> > +
-> > +/* PIPE Clock Control Register */
-> > +#define SUNXI_PCC_PIPE_CLK_OPEN		(1 << 6)
-> > +
-> > +/* PHY External Control Register */
-> > +#define SUNXI_PEC_EXTERN_VBUS		(3 << 1)
-> > +#define SUNXI_PEC_SSC_EN		(1 << 24)
-> > +#define SUNXI_PEC_REF_SSP_EN		(1 << 26)
-> > +
-> > +/* PHY Tune High Register */
-> > +#define SUNXI_TX_DEEMPH_3P5DB(n)	((n) << 19)
-> > +#define SUNXI_TX_DEEMPH_3P5DB_MASK	GENMASK(24, 19)
-> > +#define SUNXI_TX_DEEMPH_6DB(n)		((n) << 13)
-> > +#define SUNXI_TX_DEEMPH_6GB_MASK	GENMASK(18, 13)
-> > +#define SUNXI_TX_SWING_FULL(n)		((n) << 6)
-> > +#define SUNXI_TX_SWING_FULL_MASK	GENMASK(12, 6)
-> > +#define SUNXI_LOS_BIAS(n)		((n) << 3)
-> > +#define SUNXI_LOS_BIAS_MASK		GENMASK(5, 3)
-> > +#define SUNXI_TXVBOOSTLVL(n)		((n) << 0)
-> > +#define SUNXI_TXVBOOSTLVL_MASK		GENMASK(0, 2)
-> > +
-> > +struct sun50i_usb3_phy {
-> > +	struct phy *phy;
-> > +	void __iomem *regs;
-> > +	struct reset_control *reset;
-> > +	struct clk *clk;
-> > +};
-> > +
-> > +static void sun50i_usb3_phy_open(struct sun50i_usb3_phy *phy)
-> > +{
-> > +	u32 val;
-> > +
-> > +	val = readl(phy->regs + SUNXI_PHY_EXTERNAL_CONTROL);
-> > +	val |= SUNXI_PEC_EXTERN_VBUS;
-> > +	val |= SUNXI_PEC_SSC_EN | SUNXI_PEC_REF_SSP_EN;
-> > +	writel(val, phy->regs + SUNXI_PHY_EXTERNAL_CONTROL);
-> > +
-> > +	val = readl(phy->regs + SUNXI_PIPE_CLOCK_CONTROL);
-> > +	val |= SUNXI_PCC_PIPE_CLK_OPEN;
-> > +	writel(val, phy->regs + SUNXI_PIPE_CLOCK_CONTROL);
-> > +
-> > +	val = readl(phy->regs + SUNXI_ISCR);
-> > +	val |= SUNXI_ISCR_FORCE_VBUS;
-> > +	writel(val, phy->regs + SUNXI_ISCR);
-> > +
-> > +	/*
-> > +	 * All the magic numbers written to the
-> > PHY_TUNE_{LOW_HIGH}
-> > +	 * registers are directly taken from the BSP USB3 driver
-> > from
-> > +	 * Allwiner.
+> Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+> Signed-off-by: Motoya Tanigawa <tanigawa.motoya@socionext.com>
+> Signed-off-by: Masami Hiramatsu <masami.hiramatsu@linaro.org>
+> ---
+>  drivers/phy/Kconfig                         |   1 +
+>  drivers/phy/Makefile                        |   1 +
+>  drivers/phy/socionext/Kconfig               |  12 +
+>  drivers/phy/socionext/Makefile              |   6 +
+>  drivers/phy/socionext/phy-uniphier-usb3hs.c | 422 ++++++++++++++++++++++++++++
+>  drivers/phy/socionext/phy-uniphier-usb3ss.c | 369 ++++++++++++++++++++++++
+>  6 files changed, 811 insertions(+)
+>  create mode 100644 drivers/phy/socionext/Kconfig
+>  create mode 100644 drivers/phy/socionext/Makefile
+>  create mode 100644 drivers/phy/socionext/phy-uniphier-usb3hs.c
+>  create mode 100644 drivers/phy/socionext/phy-uniphier-usb3ss.c
 > 
-> %s/Allwiner/Allwinner/
-> > +	 */
-> > +	writel(0x0047fc87, phy->regs + SUNXI_PHY_TUNE_LOW);
-> 
-> PHY_TUNE_LOW should also configure individual parameters like how
-> you've done
-> below for PHY_TUNE_HIGH.
+> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+> index 5c8d452..b752589 100644
+> --- a/drivers/phy/Kconfig
+> +++ b/drivers/phy/Kconfig
+> @@ -53,6 +53,7 @@ source "drivers/phy/ralink/Kconfig"
+>  source "drivers/phy/renesas/Kconfig"
+>  source "drivers/phy/rockchip/Kconfig"
+>  source "drivers/phy/samsung/Kconfig"
+> +source "drivers/phy/socionext/Kconfig"
+>  source "drivers/phy/st/Kconfig"
+>  source "drivers/phy/tegra/Kconfig"
+>  source "drivers/phy/ti/Kconfig"
+> diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
+> index 84e3bd9..5539cde 100644
+> --- a/drivers/phy/Makefile
+> +++ b/drivers/phy/Makefile
+> @@ -21,5 +21,6 @@ obj-y					+= broadcom/	\
+>  					   qualcomm/	\
+>  					   ralink/	\
+>  					   samsung/	\
+> +					   socionext/	\
+>  					   st/		\
+>  					   ti/
+> diff --git a/drivers/phy/socionext/Kconfig b/drivers/phy/socionext/Kconfig
+> new file mode 100644
+> index 0000000..4a172fc
+> --- /dev/null
+> +++ b/drivers/phy/socionext/Kconfig
+> @@ -0,0 +1,12 @@
+> +#
+> +# PHY drivers for Socionext platforms.
+> +#
+> +
+> +config PHY_UNIPHIER_USB3
+> +	tristate "UniPhier USB3 PHY driver"
+> +	depends on ARCH_UNIPHIER || COMPILE_TEST
+> +	depends on OF && HAS_IOMEM
+> +	select GENERIC_PHY
+> +	help
+> +	  Enable this to support USB PHY implemented in USB3 controller
+> +	  on UniPhier SoCs. This controller supports USB3.0 and lower speed.
+> diff --git a/drivers/phy/socionext/Makefile b/drivers/phy/socionext/Makefile
+> new file mode 100644
+> index 0000000..dfa5cec
+> --- /dev/null
+> +++ b/drivers/phy/socionext/Makefile
+> @@ -0,0 +1,6 @@
+> +# SPDX-identifier: GPL-2.0
+> +#
+> +# Makefile for the phy drivers.
+> +#
+> +
+> +obj-$(CONFIG_PHY_UNIPHIER_USB3)	+= phy-uniphier-usb3hs.o phy-uniphier-usb3ss.o
+> diff --git a/drivers/phy/socionext/phy-uniphier-usb3hs.c b/drivers/phy/socionext/phy-uniphier-usb3hs.c
+> new file mode 100644
+> index 0000000..cea8983
+> --- /dev/null
+> +++ b/drivers/phy/socionext/phy-uniphier-usb3hs.c
+> @@ -0,0 +1,422 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * phy-uniphier-usb3hs.c - HS-PHY driver for Socionext UniPhier USB3 controller
+> + * Copyright 2015-2018 Socionext Inc.
+> + * Author:
+> + *	Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+> + * Contributors:
+> + *      Motoya Tanigawa <tanigawa.motoya@socionext.com>
+> + *      Masami Hiramatsu <masami.hiramatsu@linaro.org>
+> + */
+> +
+> +#include <linux/bitfield.h>
+> +#include <linux/bitops.h>
+> +#include <linux/clk.h>
+> +#include <linux/io.h>
+> +#include <linux/mfd/syscon.h>
+> +#include <linux/module.h>
+> +#include <linux/nvmem-consumer.h>
+> +#include <linux/of.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/phy/phy.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/reset.h>
+> +#include <linux/slab.h>
+> +
+> +#define HSPHY_CFG0		0x0
+> +#define HSPHY_CFG0_HS_I_MASK	GENMASK(31, 28)
+> +#define HSPHY_CFG0_HSDISC_MASK	GENMASK(27, 26)
+> +#define HSPHY_CFG0_SWING_MASK	GENMASK(17, 16)
+> +#define HSPHY_CFG0_SEL_T_MASK	GENMASK(15, 12)
+> +#define HSPHY_CFG0_RTERM_MASK	GENMASK(7, 6)
+> +#define HSPHY_CFG0_TRIMMASK	(HSPHY_CFG0_HS_I_MASK \
+> +				 | HSPHY_CFG0_SEL_T_MASK \
+> +				 | HSPHY_CFG0_RTERM_MASK)
+> +
+> +#define HSPHY_CFG1		0x4
+> +#define HSPHY_CFG1_DAT_EN	BIT(29)
+> +#define HSPHY_CFG1_ADR_EN	BIT(28)
+> +#define HSPHY_CFG1_ADR_MASK	GENMASK(27, 16)
+> +#define HSPHY_CFG1_DAT_MASK	GENMASK(23, 16)
+> +
+> +#define MAX_CLKS	3
+> +#define MAX_RSTS	2
+> +#define MAX_PHY_PARAMS	1
+> +
+> +struct uniphier_u3hsphy_param {
+> +	u32 addr;
+> +	u32 mask;
+> +	u32 val;
+> +};
 
-Sorry the BSP doesn't contain any macros on it, only a comment says "It
-is set 0x0047fc87 on bare-metal."
+I'd like to avoid configure the PHY this way, since it's impossible to know
+which register is being configured.
+> +
+> +struct uniphier_u3hsphy_trim_param {
+> +	unsigned int rterm;
+> +	unsigned int sel_t;
+> +	unsigned int hs_i;
+> +};
+> +
+> +#define trim_param_is_valid(p)	((p)->rterm || (p)->sel_t || (p)->hs_i)
+> +
+> +struct uniphier_u3hsphy_priv {
+> +	struct device *dev;
+> +	void __iomem *base;
+> +	int nclks;
+> +	struct clk *clk[MAX_CLKS], *clk_phy, *clk_phy_ext;
+> +	int nrsts;
+> +	struct reset_control *rst[MAX_RSTS], *rst_phy;
+> +	const struct uniphier_u3hsphy_soc_data *data;
+> +};
+> +
+> +struct uniphier_u3hsphy_soc_data {
+> +	const char *clock_names[MAX_CLKS];
+> +	const char *reset_names[MAX_RSTS];
+> +	int nparams;
+> +	const struct uniphier_u3hsphy_param param[MAX_PHY_PARAMS];
+> +	u32 config0;
+> +	u32 config1;
+> +	void (*trim_func)(struct uniphier_u3hsphy_priv *priv, u32 *pconfig,
+> +			  struct uniphier_u3hsphy_trim_param *pt);
+> +};
+> +
+> +static void uniphier_u3hsphy_trim_ld20(struct uniphier_u3hsphy_priv *priv,
+> +				       u32 *pconfig,
+> +				       struct uniphier_u3hsphy_trim_param *pt)
+> +{
+> +	*pconfig &= ~HSPHY_CFG0_RTERM_MASK;
+> +	*pconfig |= FIELD_PREP(HSPHY_CFG0_RTERM_MASK, pt->rterm);
+> +
+> +	*pconfig &= ~HSPHY_CFG0_SEL_T_MASK;
+> +	*pconfig |= FIELD_PREP(HSPHY_CFG0_SEL_T_MASK, pt->sel_t);
+> +
+> +	*pconfig &= ~HSPHY_CFG0_HS_I_MASK;
+> +	*pconfig |= FIELD_PREP(HSPHY_CFG0_HS_I_MASK,  pt->hs_i);
+> +}
+> +
+> +static int uniphier_u3hsphy_get_nvparam(struct uniphier_u3hsphy_priv *priv,
+> +					const char *name, unsigned int *val)
+> +{
+> +	struct nvmem_cell *cell;
+> +	u8 *buf;
+> +
+> +	cell = devm_nvmem_cell_get(priv->dev, name);
+> +	if (IS_ERR(cell))
+> +		return PTR_ERR(cell);
+> +
+> +	buf = nvmem_cell_read(cell, NULL);
+> +	if (IS_ERR(buf))
+> +		return PTR_ERR(buf);
+> +
+> +	*val = *buf;
+> +
+> +	kfree(buf);
+> +
+> +	return 0;
+> +}
+> +
+> +static int uniphier_u3hsphy_get_nvparams(struct uniphier_u3hsphy_priv *priv,
+> +					 struct uniphier_u3hsphy_trim_param *pt)
+> +{
+> +	int ret;
+> +
+> +	ret = uniphier_u3hsphy_get_nvparam(priv, "rterm", &pt->rterm);
+> +	if (ret)
+> +		return ret;
+> +
+> +	ret = uniphier_u3hsphy_get_nvparam(priv, "sel_t", &pt->sel_t);
+> +	if (ret)
+> +		return ret;
+> +
+> +	ret = uniphier_u3hsphy_get_nvparam(priv, "hs_i", &pt->hs_i);
+> +	if (ret)
+> +		return ret;
+> +
+> +	return 0;
+> +}
+> +
+> +static int uniphier_u3hsphy_update_config(struct uniphier_u3hsphy_priv *priv,
+> +					  u32 *pconfig)
+> +{
+> +	struct uniphier_u3hsphy_trim_param trim;
+> +	int ret, trimmed = 0;
+> +
+> +	if (priv->data->trim_func) {
+> +		ret = uniphier_u3hsphy_get_nvparams(priv, &trim);
+> +		if (ret == -EPROBE_DEFER)
+> +			return ret;
+> +
+> +		/*
+> +		 * call trim_func only when trimming parameters that aren't
+> +		 * all-zero can be acquired. All-zero parameters mean nothing
+> +		 * has been written to nvmem.
+> +		 */
+> +		if (!ret && trim_param_is_valid(&trim)) {
+> +			priv->data->trim_func(priv, pconfig, &trim);
+> +			trimmed = 1;
+> +		} else {
+> +			dev_dbg(priv->dev, "can't get parameter from nvmem\n");
+> +		}
+> +	}
+> +
+> +	/* use default parameters without trimming values */
+> +	if (!trimmed) {
+> +		*pconfig &= ~HSPHY_CFG0_HSDISC_MASK;
+> +		*pconfig |= FIELD_PREP(HSPHY_CFG0_HSDISC_MASK, 3);
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static void uniphier_u3hsphy_set_param(struct uniphier_u3hsphy_priv *priv,
+> +				       const struct uniphier_u3hsphy_param *p)
+> +{
+> +	u32 val;
+> +
+> +	val = readl(priv->base + HSPHY_CFG1);
+> +	val &= ~HSPHY_CFG1_ADR_MASK;
+> +	val |= FIELD_PREP(HSPHY_CFG1_ADR_MASK, p->addr) | HSPHY_CFG1_ADR_EN;
+> +	writel(val, priv->base + HSPHY_CFG1);
+> +
+> +	val = readl(priv->base + HSPHY_CFG1);
+> +	val &= ~HSPHY_CFG1_ADR_EN;
+> +	writel(val, priv->base + HSPHY_CFG1);
+> +
+> +	val = readl(priv->base + HSPHY_CFG1);
+> +	val &= ~FIELD_PREP(HSPHY_CFG1_DAT_MASK, p->mask);
+> +	val |=  FIELD_PREP(HSPHY_CFG1_DAT_MASK, p->val) | HSPHY_CFG1_DAT_EN;
+> +	writel(val, priv->base + HSPHY_CFG1);
+> +
+> +	val = readl(priv->base + HSPHY_CFG1);
+> +	val &= ~HSPHY_CFG1_DAT_EN;
+> +	writel(val, priv->base + HSPHY_CFG1);
+> +}
+> +
+> +static int uniphier_u3hsphy_init(struct phy *phy)
+> +{
+> +	struct uniphier_u3hsphy_priv *priv = phy_get_drvdata(phy);
+> +	u32 config0, config1;
+> +	int i, ret;
+> +
+> +	ret = clk_prepare_enable(priv->clk_phy_ext);
+> +	if (ret)
+> +		return ret;
+> +
+> +	ret = clk_prepare_enable(priv->clk_phy);
+> +	if (ret)
+> +		goto out_clk_ext_disable;
+> +
+> +	ret = reset_control_deassert(priv->rst_phy);
+> +	if (ret)
+> +		goto out_clk_disable;
+> +
+> +	if (!priv->data->config0 && !priv->data->config1)
+> +		return 0;
+> +
+> +	config0 = priv->data->config0;
+> +	config1 = priv->data->config1;
+> +
+> +	ret = uniphier_u3hsphy_update_config(priv, &config0);
+> +	if (ret)
+> +		goto out_rst_assert;
+> +
+> +	writel(config0, priv->base + HSPHY_CFG0);
+> +	writel(config1, priv->base + HSPHY_CFG1);
+> +
+> +	for (i = 0; i < priv->data->nparams; i++)
+> +		uniphier_u3hsphy_set_param(priv, &priv->data->param[i]);
+> +
+> +	return 0;
+> +
+> +out_rst_assert:
+> +	reset_control_assert(priv->rst_phy);
+> +out_clk_disable:
+> +	clk_disable_unprepare(priv->clk_phy);
+> +out_clk_ext_disable:
+> +	clk_disable_unprepare(priv->clk_phy_ext);
+> +
+> +	return ret;
+> +}
+> +
+> +static int uniphier_u3hsphy_exit(struct phy *phy)
+> +{
+> +	struct uniphier_u3hsphy_priv *priv = phy_get_drvdata(phy);
+> +
+> +	reset_control_assert(priv->rst_phy);
+> +	clk_disable_unprepare(priv->clk_phy);
+> +	clk_disable_unprepare(priv->clk_phy_ext);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct phy_ops uniphier_u3hsphy_ops = {
+> +	.init           = uniphier_u3hsphy_init,
+> +	.exit           = uniphier_u3hsphy_exit,
+> +	.owner          = THIS_MODULE,
+> +};
+> +
+> +static int uniphier_u3hsphy_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	struct uniphier_u3hsphy_priv *priv;
+> +	struct phy_provider *phy_provider;
+> +	struct resource *res;
+> +	struct phy *phy;
+> +	struct clk *clk;
+> +	struct reset_control *rst;
+> +	const char *name;
+> +	int i, ret, nc, nr;
+> +
+> +	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
+> +	if (!priv)
+> +		return -ENOMEM;
+> +
+> +	priv->dev = dev;
+> +	priv->data = of_device_get_match_data(dev);
+> +	if (WARN_ON(!priv->data ||
+> +		    priv->data->nparams > MAX_PHY_PARAMS))
+> +		return -EINVAL;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	priv->base = devm_ioremap_resource(dev, res);
+> +	if (IS_ERR(priv->base))
+> +		return PTR_ERR(priv->base);
+> +
+> +	for (i = 0; i < MAX_CLKS; i++) {
+> +		name = priv->data->clock_names[i];
+> +		if (!name)
+> +			break;
+> +		clk = devm_clk_get(dev, name);
+> +		/* "phy-ext" is optional */
+> +		if (!strcmp(name, "phy-ext")) {
+> +			if (PTR_ERR(clk) == -ENOENT)
+> +				clk = NULL;
+> +			priv->clk_phy_ext = clk;
+> +		} else if (!strcmp(name, "phy")) {
+> +			priv->clk_phy = clk;
+> +		} else {
+> +			priv->clk[priv->nclks++] = clk;
 
-> 
-> Thanks
-> Kishon
-> 
+Only "link" clock will be here? Do we need an array for this?
+
+I think the above can be replaced with 3 separate clk_get calls instead of
+storing clock names in uniphier_u3hsphy_soc_data.
+
+Thanks
+Kishon
