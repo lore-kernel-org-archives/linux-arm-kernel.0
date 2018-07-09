@@ -1,35 +1,31 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Mon, 9 Jul 2018 23:46:20 +0200
-Subject: [PATCH 1/2] Revert "tick: Prefer a lower rating device only if
- it's CPU local device"
-In-Reply-To: <CAOi56cWaeh+c9+OgpxdjTarnRdaKrNFC=ddBPT2j9v1rHT8EOg@mail.gmail.com>
-References: <1531151136-18297-1-git-send-email-sudeep.holla@arm.com>
- <CAOi56cWaeh+c9+OgpxdjTarnRdaKrNFC=ddBPT2j9v1rHT8EOg@mail.gmail.com>
-Message-ID: <CAFBinCA6gZ9fw0yGvs_FWuGoZG-d2CL2R5qYp3_u1T=Atn8tgA@mail.gmail.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Mon, 09 Jul 2018 14:47:31 -0700
+Subject: [PATCH v2] ARM64: dts: meson-axg: add saradc support
+In-Reply-To: <20180702222515.13924-1-yixun.lan@amlogic.com> (Yixun Lan's
+ message of "Mon, 2 Jul 2018 22:25:15 +0000")
+References: <20180702222515.13924-1-yixun.lan@amlogic.com>
+Message-ID: <7hmuv0nkss.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 9, 2018 at 8:24 PM Kevin Hilman <khilman@baylibre.com> wrote:
+Yixun Lan <yixun.lan@amlogic.com> writes:
+
+> From: Xingyu Chen <xingyu.chen@amlogic.com>
 >
-> On Mon, Jul 9, 2018 at 8:45 AM Sudeep Holla <sudeep.holla@arm.com> wrote:
-> >
-> > This reverts commit 1332a90558013ae4242e3dd7934bdcdeafb06c0d.
-> >
-> > The original issue was not because of incorrect checking of cpumask for
-> > both new and old tick device. It was incorrectly analysed was due to the
-> > misunderstanding of the comment and misinterpretation of the return
-> > value from tick_check_preferred. The main issue is with the clockevent
-> > driver that sets the cpumask to cpu_all_mask instead of cpu_possible_mask.
-> >
-> > Cc: Thomas Gleixner <tglx@linutronix.de>
-> > Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> Add the DT info for SAR ADC of the Amlogic's Meson-AXG SoC.
 >
-> Tested-by: Kevin Hilman <khilman@baylibre.com>
-Tested-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+> Signed-off-by: Xingyu Chen <xingyu.chen@amlogic.com>
+> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+> ---
+> Hi kevin
+>   I just re-send this patch which rebased to your khilman/v4.18/integ branch
+>   Thanks
+> Yixun
+>
+> nothing changed since patch v1 [1]:
 
-> And verified to fix a regression on the 32-bit ARM platform mesion8b-odroidc1.
-I also tested it on Meson8b as well as Meson8m2
+Applied to v4.19/dt64,
 
+Thanks,
 
-Regards
-Martin
+Kevin
