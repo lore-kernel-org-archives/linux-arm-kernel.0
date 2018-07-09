@@ -1,179 +1,108 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Tue, 10 Jul 2018 08:42:29 +0900
-Subject: [PATCH v3.1 4/4] arm64: acpi: fix alignment fault in accessing ACPI
-In-Reply-To: <20180709234229.20181-1-takahiro.akashi@linaro.org>
-References: <20180709234229.20181-1-takahiro.akashi@linaro.org>
-Message-ID: <20180709234229.20181-5-takahiro.akashi@linaro.org>
+From: collinsd@codeaurora.org (David Collins)
+Date: Mon, 9 Jul 2018 16:44:14 -0700
+Subject: [PATCH v8 2/2] regulator: add QCOM RPMh regulator driver
+In-Reply-To: <20180702102853.GI18211@sirena.org.uk>
+References: <cover.1529712888.git.collinsd@codeaurora.org>
+ <35c4ea70cdf5caba560fb6f40e866ee8bc456d93.1529712888.git.collinsd@codeaurora.org>
+ <20180702102853.GI18211@sirena.org.uk>
+Message-ID: <9bbfb628-018d-2d89-257b-9cc4e716cb46@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a fix against the issue that crash dump kernel may hang up
-during booting, which can happen on any ACPI-based system with "ACPI
-Reclaim Memory."
+Hello Mark,
 
-(kernel messages after panic kicked off kdump)
-	   (snip...)
-	Bye!
-	   (snip...)
-	ACPI: Core revision 20170728
-	pud=000000002e7d0003, *pmd=000000002e7c0003, *pte=00e8000039710707
-	Internal error: Oops: 96000021 [#1] SMP
-	Modules linked in:
-	CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.14.0-rc6 #1
-	task: ffff000008d05180 task.stack: ffff000008cc0000
-	PC is at acpi_ns_lookup+0x25c/0x3c0
-	LR is at acpi_ds_load1_begin_op+0xa4/0x294
-	   (snip...)
-	Process swapper/0 (pid: 0, stack limit = 0xffff000008cc0000)
-	Call trace:
-	   (snip...)
-	[<ffff0000084a6764>] acpi_ns_lookup+0x25c/0x3c0
-	[<ffff00000849b4f8>] acpi_ds_load1_begin_op+0xa4/0x294
-	[<ffff0000084ad4ac>] acpi_ps_build_named_op+0xc4/0x198
-	[<ffff0000084ad6cc>] acpi_ps_create_op+0x14c/0x270
-	[<ffff0000084acfa8>] acpi_ps_parse_loop+0x188/0x5c8
-	[<ffff0000084ae048>] acpi_ps_parse_aml+0xb0/0x2b8
-	[<ffff0000084a8e10>] acpi_ns_one_complete_parse+0x144/0x184
-	[<ffff0000084a8e98>] acpi_ns_parse_table+0x48/0x68
-	[<ffff0000084a82cc>] acpi_ns_load_table+0x4c/0xdc
-	[<ffff0000084b32f8>] acpi_tb_load_namespace+0xe4/0x264
-	[<ffff000008baf9b4>] acpi_load_tables+0x48/0xc0
-	[<ffff000008badc20>] acpi_early_init+0x9c/0xd0
-	[<ffff000008b70d50>] start_kernel+0x3b4/0x43c
-	Code: b9008fb9 2a000318 36380054 32190318 (b94002c0)
-	---[ end trace c46ed37f9651c58e ]---
-	Kernel panic - not syncing: Fatal exception
-	Rebooting in 10 seconds..
+On 07/02/2018 03:28 AM, Mark Brown wrote:
+> On Fri, Jun 22, 2018 at 05:46:14PM -0700, David Collins wrote:
+> 
+>> --- /dev/null
+>> +++ b/drivers/regulator/qcom-rpmh-regulator.c
+>> @@ -0,0 +1,746 @@
+>> +// SPDX-License-Identifier: GPL-2.0
+>> +/* Copyright (c) 2018, The Linux Foundation. All rights reserved. */
+>> +
+> 
+> Please make the entire header block C++ so it looks intentional.
 
-(diagnosis)
-* This fault is a data abort, alignment fault (ESR=0x96000021)
-  during reading out ACPI table.
-* Initial ACPI tables are normally stored in system ram and marked as
-  "ACPI Reclaim memory" by the firmware.
-* After the commit f56ab9a5b73c ("efi/arm: Don't mark ACPI reclaim
-  memory as MEMBLOCK_NOMAP"), those regions are differently handled
-  as they are "memblock-reserved", without NOMAP bit.
-* So they are now excluded from device tree's "usable-memory-range"
-  which kexec-tools determines based on a current view of /proc/iomem.
-* When crash dump kernel boots up, it tries to accesses ACPI tables by
-  mapping them with ioremap(), not ioremap_cache(), in acpi_os_ioremap()
-  since they are no longer part of mapped system ram.
-* Given that ACPI accessor/helper functions are compiled in without
-  unaligned access support (ACPI_MISALIGNMENT_NOT_SUPPORTED),
-  any unaligned access to ACPI tables can cause a fatal panic.
+Sure, I'll change this.
 
-With this patch, acpi_os_ioremap() always honors memory attribute
-information provided by the firmware (EFI) and retaining cacheability
-allows the kernel safe access to ACPI tables.
+I was trying to follow the guideline that kernel C source files should use
+C style comments while at the same time following the SPDX guideline that
+C++ style comments are needed for the SPDX line in C source files [1].
 
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-Reviewed-by: James Morse <james.morse@arm.com>
-Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Reported-by and Tested-by: Bhupesh Sharma <bhsharma@redhat.com>
----
- arch/arm64/include/asm/acpi.h | 23 ++++++++++++++++-------
- arch/arm64/kernel/acpi.c      | 11 +++--------
- 2 files changed, 19 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
-index 0db62a4cbce2..68bc18cb2b85 100644
---- a/arch/arm64/include/asm/acpi.h
-+++ b/arch/arm64/include/asm/acpi.h
-@@ -12,10 +12,12 @@
- #ifndef _ASM_ACPI_H
- #define _ASM_ACPI_H
- 
-+#include <linux/efi.h>
- #include <linux/memblock.h>
- #include <linux/psci.h>
- 
- #include <asm/cputype.h>
-+#include <asm/io.h>
- #include <asm/smp_plat.h>
- #include <asm/tlbflush.h>
- 
-@@ -29,18 +31,22 @@
- 
- /* Basic configuration for ACPI */
- #ifdef	CONFIG_ACPI
-+pgprot_t __acpi_get_mem_attribute(phys_addr_t addr);
-+
- /* ACPI table mapping after acpi_permanent_mmap is set */
- static inline void __iomem *acpi_os_ioremap(acpi_physical_address phys,
- 					    acpi_size size)
- {
-+	/* For normal memory we already have a cacheable mapping. */
-+	if (memblock_is_map_memory(phys))
-+		return (void __iomem *)__phys_to_virt(phys);
-+
- 	/*
--	 * EFI's reserve_regions() call adds memory with the WB attribute
--	 * to memblock via early_init_dt_add_memory_arch().
-+	 * We should still honor the memory's attribute here because
-+	 * crash dump kernel possibly excludes some ACPI (reclaim)
-+	 * regions from memblock list.
- 	 */
--	if (!memblock_is_memory(phys))
--		return ioremap(phys, size);
--
--	return ioremap_cache(phys, size);
-+	return __ioremap(phys, size, __acpi_get_mem_attribute(phys));
- }
- #define acpi_os_ioremap acpi_os_ioremap
- 
-@@ -129,7 +135,10 @@ static inline const char *acpi_get_enable_method(int cpu)
-  * for compatibility.
-  */
- #define acpi_disable_cmcff 1
--pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr);
-+static inline pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr)
-+{
-+	return __acpi_get_mem_attribute(addr);
-+}
- #endif /* CONFIG_ACPI_APEI */
- 
- #ifdef CONFIG_ACPI_NUMA
-diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-index 7b09487ff8fb..ed46dc188b22 100644
---- a/arch/arm64/kernel/acpi.c
-+++ b/arch/arm64/kernel/acpi.c
-@@ -18,6 +18,7 @@
- #include <linux/acpi.h>
- #include <linux/bootmem.h>
- #include <linux/cpumask.h>
-+#include <linux/efi.h>
- #include <linux/efi-bgrt.h>
- #include <linux/init.h>
- #include <linux/irq.h>
-@@ -29,13 +30,9 @@
- 
- #include <asm/cputype.h>
- #include <asm/cpu_ops.h>
-+#include <asm/pgtable.h>
- #include <asm/smp_plat.h>
- 
--#ifdef CONFIG_ACPI_APEI
--# include <linux/efi.h>
--# include <asm/pgtable.h>
--#endif
--
- int acpi_noirq = 1;		/* skip ACPI IRQ initialization */
- int acpi_disabled = 1;
- EXPORT_SYMBOL(acpi_disabled);
-@@ -239,8 +236,7 @@ void __init acpi_boot_table_init(void)
- 	}
- }
- 
--#ifdef CONFIG_ACPI_APEI
--pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr)
-+pgprot_t __acpi_get_mem_attribute(phys_addr_t addr)
- {
- 	/*
- 	 * According to "Table 8 Map: EFI memory types to AArch64 memory
-@@ -261,4 +257,3 @@ pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr)
- 		return __pgprot(PROT_NORMAL_NC);
- 	return __pgprot(PROT_DEVICE_nGnRnE);
- }
--#endif
+>> +	cmd.data = bypassed ? PMIC4_BOB_MODE_PASS : pmic_mode;
+> 
+> Please just write normal if statements, the ternery operator isn't
+> really helping legibility.
+
+I'll change this.
+
+
+>> +static const int pmic_mode_map_pmic4_ldo[REGULATOR_MODE_STANDBY + 1] = {
+>> +	[REGULATOR_MODE_INVALID] = -EINVAL,
+>> +	[REGULATOR_MODE_STANDBY] = PMIC4_LDO_MODE_RETENTION,
+>> +	[REGULATOR_MODE_IDLE]    = PMIC4_LDO_MODE_LPM,
+>> +	[REGULATOR_MODE_NORMAL]  = -EINVAL,
+>> +	[REGULATOR_MODE_FAST]    = PMIC4_LDO_MODE_HPM,
+>> +};
+> 
+> This mapping is really weird, I'd expect one of the modes to correspond
+> to the normal operating mode of the regulator.  
+
+My thinking here was to have a consistent mapping for consumers to use
+between REGULATOR_MODE_* and physical regulator modes for both LDO and
+SMPS type regulators:
+
+REGULATOR_MODE_STANDBY --> Retention (if supported)
+REGULATOR_MODE_IDLE    --> Low power mode (if supported)
+                           LPM for LDO and PFM for SMPS
+REGULATOR_MODE_NORMAL  --> Auto HW switching between low and high power
+                           mode (if supported)
+REGULATOR_MODE_FAST    --> High power mode
+                           HPM for LDO and PWM for SMPS
+
+This allows a consumer to request NORMAL in typical use cases and FAST in
+use cases that require low voltage ripple.  If NORMAL is not supported,
+then it automatically gets upgraded to FAST by the regulator framework.
+
+I could change it so that REGULATOR_MODE_NORMAL maps to LDO HPM mode.
+However, doing so would make it so that REGULATOR_MODE_FAST requests would
+fail for LDOs.  Thus, consumers would need to know if their supply is an
+LDO or an SMPS (which seems undesirable).
+
+Would it be acceptable to have both NORMAL and FAST map to LDO HPM?
+
+
+>> +static unsigned int rpmh_regulator_pmic4_ldo_of_map_mode(unsigned int mode)
+>> +{
+>> +	static const unsigned int of_mode_map[RPMH_REGULATOR_MODE_COUNT] = {
+>> +		[RPMH_REGULATOR_MODE_RET]  = REGULATOR_MODE_STANDBY,
+>> +		[RPMH_REGULATOR_MODE_LPM]  = REGULATOR_MODE_IDLE,
+>> +		[RPMH_REGULATOR_MODE_AUTO] = REGULATOR_MODE_INVALID,
+>> +		[RPMH_REGULATOR_MODE_HPM]  = REGULATOR_MODE_FAST,
+>> +	};
+> 
+> Same here, based on that it looks like auto mode is a good map for
+> normal.
+
+LDO type regulators physically do not support AUTO mode.  That is why I
+specified REGULATOR_MODE_INVALID in the mapping.
+
+
+>> +	if (mode >= RPMH_REGULATOR_MODE_COUNT)
+>> +		return -EINVAL;
+> 
+> Why not use ARRAY_SIZE?
+
+I'll change this.
+
+
+Thanks,
+David
+
+[1]:
+https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/process/license-rules.rst?h=v4.18-rc4#n74
+
 -- 
-2.17.0
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
