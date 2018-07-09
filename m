@@ -1,52 +1,92 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Mon, 09 Jul 2018 15:48:30 -0700
-Subject: [PATCH 0/2] Add support for S805X based P241 Reference Design
- board
-In-Reply-To: <1530784243-20823-1-git-send-email-narmstrong@baylibre.com> (Neil
- Armstrong's message of "Thu, 5 Jul 2018 11:50:41 +0200")
-References: <1530784243-20823-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <7hfu0sm3ep.fsf@baylibre.com>
+From: christoffer.dall@arm.com (Christoffer Dall)
+Date: Mon, 9 Jul 2018 15:48:36 -0700
+Subject: [PATCH v2 6/6] KVM: arm/arm64: vgic: Allow configuration of
+ interrupt groups
+In-Reply-To: <7f875ead-d3cb-1fec-bc84-56e64526e6a7@arm.com>
+References: <1530697100-22419-1-git-send-email-christoffer.dall@arm.com>
+ <1530697100-22419-7-git-send-email-christoffer.dall@arm.com>
+ <7f875ead-d3cb-1fec-bc84-56e64526e6a7@arm.com>
+Message-ID: <20180709224836.GA26579@u002843.usa.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Neil Armstrong <narmstrong@baylibre.com> writes:
+On Mon, Jul 09, 2018 at 09:42:40AM +0100, Marc Zyngier wrote:
+> On 04/07/18 10:38, Christoffer Dall wrote:
+> > Implement the required MMIO accessors for GICv2 and GICv3 for the
+> > IGROUPR distributor and redistributor registers.
+> > 
+> > This can allow guests to change behavior compared to running on previous
+> > versions of KVM, but only to align with the architecture and hardware
+> > implementations.
+> > 
+> > This also allows userspace to configure the groups for interrupts.  Note
+> > that this potentially results in GICv2 guests not receiving interrupts
+> > after migration if migrating from an older kernel that exposes GICv2
+> > interrupts as group 1.
+> > 
+> > Cc: Andrew Jones <drjones@redhat.com>
+> > Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
+> > ---
+> > I implemented (but stashed) a version of this which predicated the
+> > behavior based on the value of GICD_IIDR revision field, falling back to
+> > ignoring writes and resetting GICv2 groups to 0 if the guest wrote a
+> > revision less than 2.  However, current QEMU implementations simply
+> > don't write the GICD_IIDR, so this doesn't help at all without changing
+> > QEMU anyhow.
+> > 
+> > The only actual fix I can see here to work around the problem in the
+> > kernel is to require an opt-in to allow restoring groups from userspace,
+> > but that's a lot of logic to support cross-kernel version migration.
+> > 
+> > Question: Do we expect that cross-kernel version migration is a critical
+> > feature that people really expect to work, and do we actually have
+> > examples of catering to this in the kernel elsewhere?  (Also, how would
+> > then that relate to the whole 'adding a new sysreg breaks migration'
+> > situation?)
+> 
+> I don't really get why QEMU doesn't try to restore GICD_IIDR, while it
+> is definitely trying to restore RO sysregs (and that's how we detect
+> incompatibilities).
+> 
+> I think we should at least give userspace a chance to do the right
+> thing. If it doesn't, well, too bad.
 
-> The Amlogic P241 board is the Reference Design board for the S805X
-> variant of the Amlogic Meson GXL SoC family.
->
-> The S805X is a variant of the Amlogic Meson GXL SoC family with the
-> following physical limitations :
-> - No SDCard interface
-> - No GPIOCLK pins
-> - No USB OTG ID pin (but Gadget feature can stil be forced)
-> - No 5V regulator
-> - Reduced ADC inputs (only ADC0 and ADC1)
-> - GPIODV_26, GPIOAO_3, GPIOAO_4, GPIOAO_5, GPIOAO_6, GPIOX_14,
->   GPIOX_15, GPIOH_3 are no more exposed on the package
->
-> Amlogic exposes the following SW limitations :
-> - HDMI max resolution should be 1080p60, VPU clock should be downgraded
-> - Video Decoding should be limited to 1080p60, VDEC clock should be downgraded
-> - CPU speed should be limited by SCPI OPP table to 1.2GHz
-> - DRAM interface is limited to DDR4 16bit up to 1GiB
->
-> The P241 board has the following features :
-> - 1GiB DDR4 Memory
-> - HDMI Connector with CEC
-> - A/V jack with Stereo Audio and CVBS
-> - 10/100 Ethernet
-> - 2x USB2.0 Type-A
-> - On-board WiFi SDIO Module
-> - On-board eMMC storage
-> - Infraread Received
-> - Factory Reset button
-> - UART connector
+This series should give userspace an option to adjust its behavior.
 
-Applied to v4.19/dt64.
+My main concern is that this version of the series results in the worst
+kind of migration failures, where the guest simply doesn't run on the
+destination side with no warnings or error messages returned to the
+user..
 
-The cover letter didn't say, but I assume this was at least boot tested
-on a p241 board?
+We could add logic to return an error code if trying to write a
+different revision than what the kernel has (similar to the invariant
+sysregs), so that a simple fix to QEMU to save restore the GICD_IIDR
+register at least results in an error being returned to userspace.
+
+However, as QEMU doesn't do anything useful here today (not blaming
+anyone, I wrote the apparently broken GIC save/restore code for QEMU
+myself), we could also argue that QEMU might as well just fix things up
+if it detects a different IIDR.
+
+> 
+> How bad is that "writable GICD_IIDR" patch? Because at this stage, and
+> in the absence of any comment, I'm close to just pick that series and
+> merge it for 4.19.
+> 
+
+My guess is that a patch to "save/restore GICD_IIDR" is simple enough,
+but requires additional logic in the kernel that returns an error if the
+GICD_IIDR don't match on write.
+
+A patch which changes the groups and bumps the IIDR in userspace is
+probably more complex.
+
+Sounds like I should add the GICD_IIDR checking patch.  Thoughts?
+
+What I would really like to know is whether this is really an issue or
+not.  Do people who run products based on KVM, such as RHEV, have any
+expectations about cross-kernel version migration?
+
 
 Thanks,
-
-Kevin
+-Christoffer
