@@ -1,58 +1,63 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Mon,  9 Jul 2018 17:48:45 +0200
-Subject: [PATCH 5/8] ARM: dts: imx6qdl-apalis/-colibri: remove 1.8V regulator
-In-Reply-To: <20180709154848.5401-1-stefan@agner.ch>
-References: <20180709154848.5401-1-stefan@agner.ch>
-Message-ID: <20180709154848.5401-5-stefan@agner.ch>
+Date: Mon,  9 Jul 2018 17:48:41 +0200
+Subject: [PATCH 1/8] ARM: dts: imx6q-apalis: add chosen node
+Message-ID: <20180709154848.5401-1-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The fixed 1.8V regulator is not used, and there is in fact no
-fixed 1.8V regulator on the module. Remove it.
+Add Apalis UART1 as default serial console.
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- arch/arm/boot/dts/imx6qdl-apalis.dtsi  | 8 --------
- arch/arm/boot/dts/imx6qdl-colibri.dtsi | 8 --------
- 2 files changed, 16 deletions(-)
+ arch/arm/boot/dts/imx6q-apalis-eval.dts       | 4 ++++
+ arch/arm/boot/dts/imx6q-apalis-ixora-v1.1.dts | 4 ++++
+ arch/arm/boot/dts/imx6q-apalis-ixora.dts      | 4 ++++
+ 3 files changed, 12 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx6qdl-apalis.dtsi b/arch/arm/boot/dts/imx6qdl-apalis.dtsi
-index f9bacc9ff2b6..2f711fffa06e 100644
---- a/arch/arm/boot/dts/imx6qdl-apalis.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-apalis.dtsi
-@@ -61,14 +61,6 @@
- 		status = "disabled";
+diff --git a/arch/arm/boot/dts/imx6q-apalis-eval.dts b/arch/arm/boot/dts/imx6q-apalis-eval.dts
+index aa0e631f3c0a..621d9709effa 100644
+--- a/arch/arm/boot/dts/imx6q-apalis-eval.dts
++++ b/arch/arm/boot/dts/imx6q-apalis-eval.dts
+@@ -62,6 +62,10 @@
+ 		rtc1 = &snvs_rtc;
  	};
  
--	reg_1p8v: regulator-1p8v {
--		compatible = "regulator-fixed";
--		regulator-name = "1P8V";
--		regulator-min-microvolt = <1800000>;
--		regulator-max-microvolt = <1800000>;
--		regulator-always-on;
--	};
--
- 	reg_2p5v: regulator-2p5v {
- 		compatible = "regulator-fixed";
- 		regulator-name = "2P5V";
-diff --git a/arch/arm/boot/dts/imx6qdl-colibri.dtsi b/arch/arm/boot/dts/imx6qdl-colibri.dtsi
-index 8ae17fdf6cf6..1a147cb0bed0 100644
---- a/arch/arm/boot/dts/imx6qdl-colibri.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-colibri.dtsi
-@@ -56,14 +56,6 @@
- 		status = "disabled";
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
+ 	gpio-keys {
+ 		compatible = "gpio-keys";
+ 		pinctrl-names = "default";
+diff --git a/arch/arm/boot/dts/imx6q-apalis-ixora-v1.1.dts b/arch/arm/boot/dts/imx6q-apalis-ixora-v1.1.dts
+index e8dccf552122..4e1c8feaef82 100644
+--- a/arch/arm/boot/dts/imx6q-apalis-ixora-v1.1.dts
++++ b/arch/arm/boot/dts/imx6q-apalis-ixora-v1.1.dts
+@@ -63,6 +63,10 @@
+ 		rtc1 = &snvs_rtc;
  	};
  
--	reg_1p8v: regulator-1p8v {
--		compatible = "regulator-fixed";
--		regulator-name = "1P8V";
--		regulator-min-microvolt = <1800000>;
--		regulator-max-microvolt = <1800000>;
--		regulator-always-on;
--	};
--
- 	reg_2p5v: regulator-2p5v {
- 		compatible = "regulator-fixed";
- 		regulator-name = "2P5V";
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
+ 	gpio-keys {
+ 		compatible = "gpio-keys";
+ 		pinctrl-names = "default";
+diff --git a/arch/arm/boot/dts/imx6q-apalis-ixora.dts b/arch/arm/boot/dts/imx6q-apalis-ixora.dts
+index 6831dfd24cc1..469e3d0e2827 100644
+--- a/arch/arm/boot/dts/imx6q-apalis-ixora.dts
++++ b/arch/arm/boot/dts/imx6q-apalis-ixora.dts
+@@ -62,6 +62,10 @@
+ 		rtc1 = &snvs_rtc;
+ 	};
+ 
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
+ 	gpio-keys {
+ 		compatible = "gpio-keys";
+ 		pinctrl-names = "default";
 -- 
 2.18.0
