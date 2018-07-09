@@ -1,48 +1,42 @@
-From: amit.kucheria@linaro.org (Amit Kucheria)
-Date: Mon,  9 Jul 2018 17:13:25 +0530
-Subject: [PATCH v6 3/7] dt: qcom: 8996: thermal: Move to DT initialisation
-In-Reply-To: <cover.1531135999.git.amit.kucheria@linaro.org>
-References: <cover.1531135999.git.amit.kucheria@linaro.org>
-Message-ID: <ee06e59ae84a9b9013480c58bd4678e44d201a42.1531135999.git.amit.kucheria@linaro.org>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 9 Jul 2018 12:43:04 +0100
+Subject: [PATCH v2] Add DT support for Octavo Systems OSD3358-SM-RED
+ based on TI AM335x
+In-Reply-To: <20180706200051.1115-1-neeraj.dantu@octavosystems.com>
+References: <20180706200051.1115-1-neeraj.dantu@octavosystems.com>
+Message-ID: <20180709114304.GE6920@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We also split up the regmap address space into two, one for the TM
-registers, the other for the SROT registers. This was required to deal with
-different address offsets for the TM and SROT registers across different
-SoC families.
+On Fri, Jul 06, 2018 at 08:00:51PM +0000, Neeraj Dantu wrote:
+> +&lcdc {
+> +	status = "okay";
+> +
+> +	/* If you want to get 24 bit RGB and 16 BGR mode instead of
+> +	 * current 16 bit RGB and 24 BGR modes, set the propety
+> +	 * below to "crossed" and uncomment the video-ports -property
+> +	 * in tda19988 node.
+> +	 */
+> +	blue-and-red-wiring = "straight";
+...
+> +&i2c0 {
+> +	tda19988: tda19988 {
 
-Since tsens-common.c/init_common() currently only registers one address
-space, the order is important (TM before SROT). This is OK since the code
-doesn't really use the SROT functionality yet.
+This should not be "tda19988" as the node name - DT requires generic
+names, like "hdmi-encoder".
 
-Signed-off-by: Amit Kucheria <amit.kucheria@linaro.org>
----
- arch/arm64/boot/dts/qcom/msm8996.dtsi | 12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
+...
+> +		/* Convert 24bit BGR to RGB, e.g. cross red and blue wiring */
+> +		/* video-ports = <0x234501>; */
 
-diff --git a/arch/arm64/boot/dts/qcom/msm8996.dtsi b/arch/arm64/boot/dts/qcom/msm8996.dtsi
-index 8c7f9ca..6c8a857 100644
---- a/arch/arm64/boot/dts/qcom/msm8996.dtsi
-+++ b/arch/arm64/boot/dts/qcom/msm8996.dtsi
-@@ -461,7 +461,17 @@
- 
- 		tsens0: thermal-sensor at 4a8000 {
- 			compatible = "qcom,msm8996-tsens";
--			reg = <0x4a8000 0x2000>;
-+			reg = <0x4a9000 0x1000>, /* TM */
-+			      <0x4a8000 0x1000>; /* SROT */
-+			#qcom,sensors = <13>;
-+			#thermal-sensor-cells = <1>;
-+		};
-+
-+		tsens1: thermal-sensor at 4ac000 {
-+			compatible = "qcom,msm8996-tsens";
-+			reg = <0x4ad000 0x1000>, /* TM */
-+			      <0x4ac000 0x1000>; /* SROT */
-+			#qcom,sensors = <8>;
- 			#thermal-sensor-cells = <1>;
- 		};
- 
+Please explain more what's going on here.
+
+Can you set 24-bit RGB mode with the above configuration - presumably
+the colours will come out wrong?
+
+Exactly what is the wiring between the lcdc and tda998x?
+
 -- 
-2.7.4
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
+According to speedtest.net: 13Mbps down 490kbps up
