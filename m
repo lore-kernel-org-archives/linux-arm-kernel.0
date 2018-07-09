@@ -1,62 +1,70 @@
-From: martin@lucina.net (Martin Lucina)
-Date: Mon, 9 Jul 2018 16:49:46 +0200
-Subject: [linux-sunxi] Re: [PATCH 05/10] arm64: dts: allwinner: a64:
- Olinuxino: enable USB
-In-Reply-To: <ff9389d1-c476-d5cf-8c4a-e0eae84e3642@arm.com>
-References: <20180706150401.mhqse677vdqtxdzy@nodbug.lucina.net>
- <548f2eb5-b457-8fcd-c043-b897a447d96c@arm.com>
- <52713A44-E2BB-4388-A98F-D49AA3B6EAC3@aosc.io>
- <4b4d1662-4266-593c-79a9-39eea8fb668c@arm.com>
- <373C4D2E-E2CF-4AE9-9AC4-69AD4AF95AF4@aosc.io>
- <5b9a0818-b28e-76de-17b9-721c0950b64b@arm.com>
- <20180709101509.pg2p5kompy35hc3k@nodbug.lucina.net>
- <1d2c3a9f-ec57-ebd2-a8d1-fcd7a84e0e91@arm.com>
- <20180709115426.6r42bxqcypxvikep@nodbug.lucina.net>
- <ff9389d1-c476-d5cf-8c4a-e0eae84e3642@arm.com>
-Message-ID: <20180709144946.qgiucndzd5rvjrpn@nodbug.lucina.net>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 9 Jul 2018 15:53:50 +0100
+Subject: [RFC PATCH 1/2] dma-mapping: Clean up dma_set_*mask() hooks
+In-Reply-To: <20180708150708.GA14418@lst.de>
+References: <55ac9550c311f056dcfeed9b2c8265375f17b155.1530726467.git.robin.murphy@arm.com>
+ <20180705193738.GB28905@lst.de>
+ <33175bb1-d198-a9fd-ff37-e8c4132f47f8@arm.com>
+ <20180708150708.GA14418@lst.de>
+Message-ID: <3ce04634-a467-ec6b-7b90-6cd916d9b532@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Monday, 09.07.2018 at?14:43, Andre Przywara wrote:
-> >> Can you please try using the .dts I attached?
-> > 
-> > The .dts you attached does not compile, you've added a "&simplefb_hdmi"
-> > node, did you mean something else?
+On 08/07/18 16:07, Christoph Hellwig wrote:
+> On Fri, Jul 06, 2018 at 03:20:34PM +0100, Robin Murphy wrote:
+>>> What are you trying to do?  I really don't want to see more users of
+>>> the hooks as they are are a horribly bad idea.
+>>
+>> I really need to fix the ongoing problem we have where, due to funky
+>> integrations, devices suffer some downstream addressing limit (described by
+>> DT dma-ranges or ACPI IORT/_DMA) which we carefully set up in
+>> dma_configure(), but then just gets lost when the driver probes and
+>> innocently calls dma_set_mask() with something wider. I think it's
+>> effectively the generalised case of the VIA 32-bit quirk, if I understand
+>> that one correctly.
 > 
-> Ah, right, sorry about that. That was against sunxi/dt64-for-4.19 (as
-> the whole series was). So the base .dtsi is different.
-> Attaching the .dtb this time ...
-
-Ah, where exactly is that tree? I'm still testing with Linus' v4.18-rc2,
-which is probably wrong. Booting with that dtb gives me the same result re
-USB.
-
-> Do you have fixed regulator support in your kernel?
-> CONFIG_REGULATOR_FIXED_VOLTAGE=y or fixed.ko as a module.
-
-Yes.
-
-> > ...if I remove that node, then I get:
-> > 
-> > [    0.289065] sun4i-usb-phy 1c19400.phy: Couldn't request ID GPIO
-> > ...
-> > [    1.554921] sun4i-usb-phy 1c19400.phy: Couldn't get regulator usb0_vbus... Deferring probe
-> > ...
-> > [    1.659943] sun4i-usb-phy 1c19400.phy: Couldn't get regulator usb0_vbus... Deferring probe
-> > 
-> > and no USB.
-> > 
-> > (guessing) Did you mean to add a &usb1_vbus?
+> I'd much rather fix this in generic code.  How funky are your limitations?
+> In fact when I did the 32-bit quirk (which will also be used by a Xiling
+> PCIe root port usable on a lot of architectures) I did initially consider
+> adding a bus_dma_mask or similar to struct device, but opted for the
+> most simple implementation for now.  I'd be happy to chanfe this.
 > 
-> Well, this regulator name should indeed read usb1_vbus now. But this is
-> mostly about the name. Changed this anyway in the attached .dtb.
+> Especially these days where busses and IP blocks are generally not tied
+> to a specific cpu instruction set I really believe that having any
+> more architecture code than absolutely required is a bad idea.
+
+Oh, for sure, the generic fix would be the longer-term goal, this was 
+just an expedient compromise because I want to get *something* landed 
+for 4.19. Since in practice this is predominantly affecting arm64, doing 
+the arch-specific fix to appease affected customers then working to 
+generalise it afterwards seemed to carry the lowest risk.
+
+That said, I think I can see a relatively safe and clean alternative 
+approach based on converting dma_32bit_limit to a mask, so I'll spin 
+some patches around that idea ASAP to continue the discussion.
+
+>> The approach that seemed to me to be safest is largely based on the one
+>> proposed in a thread from ages ago[1]; namely to make dma_configure()
+>> better at distinguishing firmware-specified masks from bus defaults,
+>> capture the firmware mask in dev->archdata during arch_setup_dma_ops(),
+>> then use the custom set_mask routines to ensure any subsequent updates
+>> never exceed that. It doesn't seem possible to make this work robustly
+>> without storing *some* additional per-device data, and for that archdata is
+>> a lesser evil than struct device itself. Plus even though it's not actually
+>> an arch-specific issue it feels like there's such a risk of breaking other
+>> platforms that I'm reticent to even try handling it entirely in generic
+>> code.
 > 
-> But this failure in getting the GPIO looks suspicious. Do you have uart1
-> enabled, by any chance? As its CTS pin is on PG9.
+> My plan for a few merge windows from now is that dma_mask and
+> coherent_mask are 100% in device control and dma_set_mask will never
+> fail.  It will be up to the dma ops to make sure things are addressible.
 
-Not that I know of, and looking at the schematic there's no way I can get
-at that pin to test?
+It's entirely possible to plug an old PCI soundcard via a bridge adapter 
+into a modern board where the card's 24-bit DMA mask reaches nothing but 
+the SoC's boot flash, and no IOMMU is available (e.g. some of the 
+smaller NXP Layercape stuff); I still think there should be an error in 
+such rare cases when DMA is utterly impossible, but otherwise I agree it 
+would be much nicer for drivers to just provide their preferred mask and 
+let the ops massage it as necessary.
 
-Martin
+Robin.
