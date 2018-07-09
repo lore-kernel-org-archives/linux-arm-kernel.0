@@ -1,33 +1,62 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 10 Jul 2018 00:09:11 +0200 (CEST)
-Subject: [PATCH 2/2] clocksource: arm_arch_timer: set arch_mem_timer
- cpumask to cpu_possible_mask
-In-Reply-To: <1531151136-18297-2-git-send-email-sudeep.holla@arm.com>
-References: <1531151136-18297-1-git-send-email-sudeep.holla@arm.com>
- <1531151136-18297-2-git-send-email-sudeep.holla@arm.com>
-Message-ID: <alpine.DEB.2.21.1807100008100.1590@nanos.tec.linutronix.de>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Mon, 9 Jul 2018 15:10:06 -0700
+Subject: [RESEND PATCH v2 3/9] asm-generic: Move some macros from
+ linux/bitops.h to a new bits.h file
+In-Reply-To: <20180709113250.GA26377@arm.com>
+References: <1529412794-17720-1-git-send-email-will.deacon@arm.com>
+ <1529412794-17720-4-git-send-email-will.deacon@arm.com>
+ <20180706173049.e28171504c745934a280dee8@linux-foundation.org>
+ <20180709113250.GA26377@arm.com>
+Message-ID: <20180709151006.370112d321c8f3df06bf231b@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 9 Jul 2018, Sudeep Holla wrote:
+On Mon, 9 Jul 2018 12:32:51 +0100 Will Deacon <will.deacon@arm.com> wrote:
 
-> Currently, arch_mem_timer cpumask is set to cpu_all_mask which should be
-> fine. However, cpu_possible_mask is more accurate and if there are other
-> clockevent source in the system which are set to cpu_possible_mask, then
-> having cpu_all_mask may result in issue.
+> Hi Andrew,
 > 
-> E.g. on a platform with arm,sp804 timer with rating 300 and
-> cpu_possible_mask and this arch_mem_timer timer with rating 400 and
-> cpu_all_mask, tick_check_preferred may choose both preferred as the
-> cpumasks are not equal though they must be.
+> On Fri, Jul 06, 2018 at 05:30:49PM -0700, Andrew Morton wrote:
+> > On Tue, 19 Jun 2018 13:53:08 +0100 Will Deacon <will.deacon@arm.com> wrote:
+> > 
+> > > In preparation for implementing the asm-generic atomic bitops in terms
+> > > of atomic_long_*, we need to prevent asm/atomic.h implementations from
+> > > pulling in linux/bitops.h. A common reason for this include is for the
+> > > BITS_PER_BYTE definition, so move this and some other BIT() and masking
+> > > macros into a new header file, linux/bits.h
+> > > 
+> > > --- a/include/linux/bitops.h
+> > > +++ b/include/linux/bitops.h
+> > > @@ -2,29 +2,9 @@
+> > >  #ifndef _LINUX_BITOPS_H
+> > >  #define _LINUX_BITOPS_H
+> > >  #include <asm/types.h>
+> > > +#include <linux/bits.h>
+> > >  
+> > > -#ifdef	__KERNEL__
+> > > -#define BIT(nr)			(1UL << (nr))
+> > > -#define BIT_ULL(nr)		(1ULL << (nr))
+> > > -#define BIT_MASK(nr)		(1UL << ((nr) % BITS_PER_LONG))
+> > > -#define BIT_WORD(nr)		((nr) / BITS_PER_LONG)
+> > > -#define BIT_ULL_MASK(nr)	(1ULL << ((nr) % BITS_PER_LONG_LONG))
+> > > -#define BIT_ULL_WORD(nr)	((nr) / BITS_PER_LONG_LONG)
+> > > -#define BITS_PER_BYTE		8
+> > >  #define BITS_TO_LONGS(nr)	DIV_ROUND_UP(nr, BITS_PER_BYTE * sizeof(long))
+> > > -#endif
+> > 
+> > Why does it leave BITS_TO_LONGS() in place?
+> > 
+> > That becomes unfortunate with Chris's patch, so I'm moving
+> > BITS_TO_LONGS() into bits.h.
 > 
-> This issue was root caused incorrectly initially and a fix was merged as
-> commit 1332a9055801 ("tick: Prefer a lower rating device only if it's CPU
-> local device").
+> The reason I avoided that was because it would pull in the dreaded
+> kernel.h for DIV_ROUND_UP, and then we're back to circular include hell :(
+> 
 
-To avoid that in the future we really should fix the decision logic to mask
-out the non possible CPUs from the supplied masks.
+Well we should comment that so every reader doesn't wonder what I
+wondered.
 
-Thanks,
+Refactoring works well.  I suppose DIV_ROUND_UP and friends await a new
+<arithmacros.h>.
 
-	tgkx
+Also, all these macros no longer `#ifdef __KERNEL__' protection, which
+wasn't mentioned in the changelog.  Deliberate?
