@@ -1,10 +1,10 @@
 From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 9 Jul 2018 13:09:05 +0200
+Date: Mon, 9 Jul 2018 13:10:37 +0200
 Subject: droid 4 in v4.18-rc: grep -r adasfasd /sys/ oopses
 In-Reply-To: <20180709103305.GF112168@atomide.com>
 References: <20180708174939.GA10002@amd> <20180708193720.GA13262@amd>
  <20180709103305.GF112168@atomide.com>
-Message-ID: <20180709110905.GA11785@amd>
+Message-ID: <20180709111036.GB11785@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -30,13 +30,13 @@ On Mon 2018-07-09 03:33:05, Tony Lindgren wrote:
 > 
 > I had to filter out some trace pipes as they seem to hang.
 
-Do you have /sys/kernel/debug mounted?
+After some more debugging:
 
-I did, and /sys/kernel/debug/pm_debug/count seems to be a
-problem. (And no, it is probably not world-readable on your normal
-systems, sorry about that).
++       printk("3...\n");
+        cm_per_dump(s);
++       printk("4...\n");
 
-I can still run the script :-).
+cm_per_dump seems to be the problem.
 								Pavel
 								
 -- 
@@ -48,4 +48,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 181 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180709/6daebcfd/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180709/3cbd8614/attachment.sig>
