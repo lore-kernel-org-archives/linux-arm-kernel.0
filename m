@@ -1,79 +1,88 @@
-From: roy.pledge@nxp.com (Roy Pledge)
-Date: Mon, 9 Jul 2018 15:23:40 +0000
-Subject: [PATCH 1/2] staging:fsl-mc: Move DPIO from staging to
- drivers/soc/fsl
-References: <20180705194113.16256-1-roy.pledge@nxp.com>
- <20180705194113.16256-2-roy.pledge@nxp.com>
- <119c6fc6-a32d-45a5-96ea-f6e9959b1e74@nxp.com>
-Message-ID: <VI1PR04MB44942CF2B2E5BA1C6CE8D17786440@VI1PR04MB4494.eurprd04.prod.outlook.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Mon, 9 Jul 2018 16:27:21 +0100
+Subject: [linux-sunxi] Re: [PATCH 05/10] arm64: dts: allwinner: a64:
+ Olinuxino: enable USB
+In-Reply-To: <20180709144946.qgiucndzd5rvjrpn@nodbug.lucina.net>
+References: <20180706150401.mhqse677vdqtxdzy@nodbug.lucina.net>
+ <548f2eb5-b457-8fcd-c043-b897a447d96c@arm.com>
+ <52713A44-E2BB-4388-A98F-D49AA3B6EAC3@aosc.io>
+ <4b4d1662-4266-593c-79a9-39eea8fb668c@arm.com>
+ <373C4D2E-E2CF-4AE9-9AC4-69AD4AF95AF4@aosc.io>
+ <5b9a0818-b28e-76de-17b9-721c0950b64b@arm.com>
+ <20180709101509.pg2p5kompy35hc3k@nodbug.lucina.net>
+ <1d2c3a9f-ec57-ebd2-a8d1-fcd7a84e0e91@arm.com>
+ <20180709115426.6r42bxqcypxvikep@nodbug.lucina.net>
+ <ff9389d1-c476-d5cf-8c4a-e0eae84e3642@arm.com>
+ <20180709144946.qgiucndzd5rvjrpn@nodbug.lucina.net>
+Message-ID: <473372e4-96df-348e-d64d-f991f23506bc@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/9/2018 6:37 AM, Laurentiu Tudor wrote:
-> Hi Roy,
->
-> Couple of comments inline.
->
-> On 05.07.2018 22:41, Roy Pledge wrote:
->> Move the NXP DPIO (Datapath I/O Driver) out of the
->> drivers/staging directory and into the drivers/soc/fsl directory.
->>
->> The DPIO driver enables access to Queue and Buffer Manager (QBMAN)
->> hardware on NXP DPAA2 devices. This is a prerequisite to moving the
->> DPAA2 Ethernet driver out of staging.
->>
->> Signed-off-by: Roy Pledge <roy.pledge@nxp.com>
->> ---
->>   MAINTAINERS                                                    |  2 +-
->>   drivers/crypto/caam/sg_sw_qm2.h                                |  2 +-
->>   drivers/crypto/caam/sg_sw_sec4.h                               |  2 +-
->>   drivers/soc/fsl/Kconfig                                        | 10 ++++++++++
->>   drivers/soc/fsl/Makefile                                       |  1 +
->>   drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/Makefile          |  0
->>   drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio-cmd.h        |  0
->>   drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio-driver.c     |  2 +-
->>   drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio-driver.txt   |  0
-> Maybe this should be converted to .rst and go in the already existing
-> Documentation/networking/dpaa2/?
+Hi,
 
-I can look into converting this to RST but I'm not sure it belongs in
-the networking documentation folder since
-it will be used by other non networking drivers in the near future -
-compress/decompress for example.
->
->>   drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio-service.c    |  2 +-
->>   drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio.c            |  0
->>   drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio.h            |  0
->>   drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/qbman-portal.c    |  2 +-
->>   drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/qbman-portal.h    |  2 +-
->>   drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h                 |  4 ++--
->>   drivers/staging/fsl-mc/bus/Kconfig                             |  9 ---------
->>   drivers/staging/fsl-mc/bus/Makefile                            |  2 --
->>   {drivers/staging/fsl-mc/include => include/soc/fsl}/dpaa2-fd.h |  0
->>   .../staging/fsl-mc/include => include/soc/fsl}/dpaa2-global.h  |  0
->>   {drivers/staging/fsl-mc/include => include/soc/fsl}/dpaa2-io.h |  0
->>   20 files changed, 20 insertions(+), 20 deletions(-)
->>   rename drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/Makefile (100%)
->>   rename drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio-cmd.h (100%)
->>   rename drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio-driver.c (99%)
->>   rename drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio-driver.txt (100%)
->>   rename drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio-service.c (99%)
->>   rename drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio.c (100%)
->>   rename drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio.h (100%)
->>   rename drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/qbman-portal.c (99%)
->>   rename drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/qbman-portal.h (99%)
->>   rename {drivers/staging/fsl-mc/include => include/soc/fsl}/dpaa2-fd.h (100%)
->>   rename {drivers/staging/fsl-mc/include => include/soc/fsl}/dpaa2-global.h (100%)
->>   rename {drivers/staging/fsl-mc/include => include/soc/fsl}/dpaa2-io.h (100%)
-> I received feedback in the past on mc-bus that a driver should limit to 
-> only one public header and one private one. Would it make sense to do 
-> the same for dpio too?
-Looking at this the dpaa-2global.h file should probably be integrated
-into the dpaa2-io.h file. 
-The dpaaa2-fd.h can be used by devices that don't need to used DPIO -
-the definition of a frame descriptor
-isn't DPIO specific so I would argue it should be kept in a seperate file.
- 
->
-> ---
-> Best Regards, Laurentiu
+On 09/07/18 15:49, Martin Lucina wrote:
+> Hi,
+> 
+> On Monday, 09.07.2018 at?14:43, Andre Przywara wrote:
+>>>> Can you please try using the .dts I attached?
+>>>
+>>> The .dts you attached does not compile, you've added a "&simplefb_hdmi"
+>>> node, did you mean something else?
+>>
+>> Ah, right, sorry about that. That was against sunxi/dt64-for-4.19 (as
+>> the whole series was). So the base .dtsi is different.
+>> Attaching the .dtb this time ...
+> 
+> Ah, where exactly is that tree? I'm still testing with Linus' v4.18-rc2,
+> which is probably wrong. Booting with that dtb gives me the same result re
+> USB.
+
+The base is the sunxi repo on kernel.org:
+https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git/log/?h=sunxi/dt64-for-4.19
+
+I updated my working branch for a v2 here:
+https://github.com/apritzel/linux/commits/a64-dt-update-v2
+You might want to use that for experiments.
+
+>> Do you have fixed regulator support in your kernel?
+>> CONFIG_REGULATOR_FIXED_VOLTAGE=y or fixed.ko as a module.
+> 
+> Yes.
+> 
+>>> ...if I remove that node, then I get:
+>>>
+>>> [    0.289065] sun4i-usb-phy 1c19400.phy: Couldn't request ID GPIO
+>>> ...
+>>> [    1.554921] sun4i-usb-phy 1c19400.phy: Couldn't get regulator usb0_vbus... Deferring probe
+>>> ...
+>>> [    1.659943] sun4i-usb-phy 1c19400.phy: Couldn't get regulator usb0_vbus... Deferring probe
+>>>
+>>> and no USB.
+>>>
+>>> (guessing) Did you mean to add a &usb1_vbus?
+>>
+>> Well, this regulator name should indeed read usb1_vbus now. But this is
+>> mostly about the name. Changed this anyway in the attached .dtb.
+>>
+>> But this failure in getting the GPIO looks suspicious. Do you have uart1
+>> enabled, by any chance? As its CTS pin is on PG9.
+> 
+> Not that I know of, and looking at the schematic there's no way I can get
+> at that pin to test?
+
+The problem is not that pin on the board, but the pinctrl's impression
+of it. PG9 is RTS for UART1 (and not CTS as I wrote above). UART1 is
+connected to the Bluetooth part of the RTL WiFi chip, although only CTS
+is used (in addition to RX and TX). So the current DT does not do this,
+but technically we would need to enable UART1, since this is hardwired.
+If you now use the uart1_rts_cts_pins pinmux node for that, you will
+loose PG9 to the UART and the regulator couldn't claim it. But I guess
+your DT doesn't do this? At least the version I am looking at does not.
+
+Can you please try the DT from my repo mentioned above, and then post
+the full kernel log somewhere? Maybe there is some other issue?
+
+Thanks for staying on this!
+
+Cheers,
+Andre.
