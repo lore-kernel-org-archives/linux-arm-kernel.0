@@ -1,72 +1,71 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 09 Jul 2018 12:27:36 +0100
-Subject: Applied "ASoC: pxa: make SND_PXA_SOC_SSP depend on PLAT_PXA" to the
- asoc tree
-In-Reply-To: <20180706133104.129049-1-arnd@arndb.de>
-Message-ID: <E1fcUKO-0006Am-GV@debutante>
+From: amit.kucheria@linaro.org (Amit Kucheria)
+Date: Mon,  9 Jul 2018 16:57:33 +0530
+Subject: [PATCH v5 0/7] thermal: tsens: Refactoring for TSENSv2 IP
+Message-ID: <cover.1531133611.git.amit.kucheria@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+This series is a mixed bag:
+- Some code moves to allow code sharing between different SoCs with v2 of
+  the TSENS IP,
+- a generic qcom,tsens-v2 property as a fallback compatible for all v2.x.y
+  platforms,
+- new platform support (sdm845)
+- a cleanup patch and
+- a DT change to have a common way to deal with the SROT and TM registers
+  despite slightly different features across the IP family and different
+  register offsets.
 
-   ASoC: pxa: make SND_PXA_SOC_SSP depend on PLAT_PXA
+Changes since v4:
+- Revert back to a single fallback bindind qcom,tsens-v2 as per Rob's
+  suggestion.
+- Rework how old (unsplit SROT and TM address space) DTs are handled by
+  needing a 0x1000 offset but still sharing common code in tsens-v2.c
+- Remove the patch to added TRDY checks while we investigate Matthias'
+  reports
+- Fix unit addressses for the two tsens blocks as per Stephen's comment.
 
-has been applied to the asoc tree at
+Changes since v3:
+- Introduce qcom,tsens-v2.4.0 property and make qcom,tsens-v2 a
+  fallback, compatible property.
+- Rename ops_v2 to ops_generic_v2
 
-   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+Changes since v2:
 
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
+- Based on review, moved tsens-8996.c to tsens-v2.c and changed
+  corresponding function names, struct names to allow for generic tsensv2
+  platforms
+- All v2 platforms will now only need to use the qcom,tsen-v2
+  property
+- Added a DT patch to initialize tsens driver on sdm845, now that
+  4.18-rc1 will contain an sdm845.dtsi
 
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
+Changes since v1:
+- Move get_temp() from tsens-8996 to tsens-common and rename
+- Change 8996 DT entry to allow init_common() to work across
+  sdm845 and 8996 due to different offsets
 
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
+Amit Kucheria (7):
+  thermal: tsens: Get rid of unused fields in structure
+  thermal: tsens: Add support to split up register address space into
+    two
+  dt: qcom: 8996: thermal: Move to DT initialisation
+  thermal: tsens: Rename tsens-8996 to tsens-v2 for reuse
+  thermal: tsens: Add generic support for TSENS v2 IP
+  dt: thermal: tsens: Document the fallback DT property for v2 of TSENS
+    IP
+  arm64: dts: sdm845: Add tsens nodes
 
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
+ .../devicetree/bindings/thermal/qcom-tsens.txt     | 25 +++++++++++++----
+ arch/arm64/boot/dts/qcom/msm8996.dtsi              | 12 +++++++-
+ arch/arm64/boot/dts/qcom/sdm845.dtsi               | 16 +++++++++++
+ drivers/thermal/qcom/Makefile                      |  2 +-
+ drivers/thermal/qcom/tsens-common.c                | 11 ++++++++
+ drivers/thermal/qcom/{tsens-8996.c => tsens-v2.c}  | 32 ++++++++++------------
+ drivers/thermal/qcom/tsens.c                       |  3 ++
+ drivers/thermal/qcom/tsens.h                       |  8 ++++--
+ 8 files changed, 81 insertions(+), 28 deletions(-)
+ rename drivers/thermal/qcom/{tsens-8996.c => tsens-v2.c} (64%)
 
-Thanks,
-Mark
-
->From 9d1310daedae494874fe36a995172e64b06e29a4 Mon Sep 17 00:00:00 2001
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Fri, 6 Jul 2018 15:30:48 +0200
-Subject: [PATCH] ASoC: pxa: make SND_PXA_SOC_SSP depend on PLAT_PXA
-
-For the moment, we can't enable CONFIG_SND_PXA_SOC_SSP unless we are
-building for ARM PXA or MMP:
-
-WARNING: unmet direct dependencies detected for PXA_SSP
-  Depends on [n]: PLAT_PXA [=n]
-  Selected by [y]:
-  - SND_PXA_SOC_SSP [=y] && SOUND [=y] && !UML && SND [=y] && SND_SOC [=y]
-
-This adds an explicit dependency for it.
-
-Fixes: 0a94cf345740 ("ASoC: pxa: make SND_PXA2XX_SOC_I2S selectable")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- sound/soc/pxa/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/sound/soc/pxa/Kconfig b/sound/soc/pxa/Kconfig
-index 2fc02c227f69..776e148b0aa2 100644
---- a/sound/soc/pxa/Kconfig
-+++ b/sound/soc/pxa/Kconfig
-@@ -34,6 +34,7 @@ config SND_PXA2XX_SOC_I2S
- 
- config SND_PXA_SOC_SSP
- 	tristate "Soc Audio via PXA2xx/PXA3xx SSP ports"
-+	depends on PLAT_PXA
- 	select PXA_SSP
- 	select SND_PXA2XX_LIB
- 
 -- 
-2.18.0.rc2
+2.7.4
