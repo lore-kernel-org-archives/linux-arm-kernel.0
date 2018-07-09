@@ -1,81 +1,105 @@
-From: vincent.whitchurch@axis.com (Vincent Whitchurch)
-Date: Mon,  9 Jul 2018 13:24:44 +0200
-Subject: [PATCH] ARM: Fix Thumb-2 syscall return for binutils 2.29+
-Message-ID: <20180709112444.8508-1-vincent.whitchurch@axis.com>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Mon, 09 Jul 2018 14:25:33 +0300
+Subject: droid 4 in v4.18-rc: grep -r adasfasd /sys/ oopses
+In-Reply-To: <20180709104943.GA5212@amd>
+References: <20180708174939.GA10002@amd> <20180708193720.GA13262@amd>
+ <20180709102852.GA20580@amd> <20180709104943.GA5212@amd>
+Message-ID: <79db809d74dcbe84b7ed3001dd7c82649227783a.camel@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When building the kernel as Thumb-2 with binutils 2.29 or newer, if the
-assembler has seen the .type directive (via ENDPROC()) for a symbol, it
-automatically handles the setting of the lowest bit when the symbol is
-used with ADR.  The badr macro on the other hand handles this lowest bit
-manually.  This leads to a jump to a wrong address in the wrong state
-in the syscall return path:
+On Mon, 2018-07-09 at 12:49 +0200, Pavel Machek wrote:
+> Hi!
+> 
+> > > > grep in /sys produces a nasty oops:
+> > > > 
+> > > > I guess next step is trying to find out which file that is..
+> > > 
+> > > Let me see...
+> > > 
+> > > openat(6, "suspend",
+> > > O_RDONLY|O_NOCTTY|O_NONBLOCK|O_LARGEFILE|O_NOFOLLOW) = 4
+> > > fstat64(4, {st_mode=S_IFREG|0644, st_size=0, ...}) = 0
+> > > read(4, 0x4d2000, 32768)                = -1 EINVAL (Invalid
+> > > argument)
+> > > write(2, "grep: ", 6grep: )                   = 6
+> > > write(2, "/sys/kernel/debug/pm_debug/cefus"...,
+> > > 47/sys/kernel/debug/pm_debug/cefuse_pwrdm/suspend) = 47
+> > > write(2, ": Invalid argument", 18: Invalid argument)      = 18
+> > > write(2, "\n", 1
+> > > )                       = 1
+> > > close(4)                                = 0
+> > > close(6)                                = 0
+> > > openat(5, "time",
+> > > O_RDONLY|O_NOCTTY|O_NONBLOCK|O_LARGEFILE|O_NOFOLLOW)
+> > > = 4
+> > > fstat64(4, {st_mode=S_IFREG|0444, st_size=0, ...}) = 0
+> > > read(4, "cefuse_pwrdm (OFF),OFF:641441757"..., 32768) = 849
+> > > read(4, "", 28672)                      = 0
+> > > close(4)                                = 0
+> > > openat(5, "count",
+> > > O_RDONLY|O_NOCTTY|O_NONBLOCK|O_LARGEFILE|O_NOFOLLOW) = 4
+> > > Connection to usb closed by remote host.
+> > > Connection to usb closed.
+> > > pavel at half:~$
+> > > 
+> > > Ok, so it seems to be:
+> > > 
+> > > user at devuan:~$ cat /sys/kernel/debug/pm_debug/count
+> > > (oops).
+> > > 
+> > > The file seems to be world-readable.
+> > > 
+> > > user at devuan:~$ ls -al /sys/kernel/debug/pm_debug/count
+> > > -r--r--r-- 1 root root 0 Jan  1  1970
+> > > /sys/kernel/debug/pm_debug/count
+> > > 
+> > > But on PC, that file does not exist.
+> > 
+> > Ok, it is easier to reproduce like this:
+> > 
+> > sudo mount /dev/zero -t debugfs /sys/kernel/debug/
+> > sudo cat /sys/kernel/debug/pm_debug/count
+> > 
+> > I tried adding debugging like this:
+> 
+> Confused.
+> 
+> 
+> >  	seq_printf(s, "%s->%s (%d)\n", clkdm->name, clkdm-
+> > >pwrdm.ptr->name,
+> >  		   clkdm->usecount);
+> 
+> I replaced seq_prinf with printk, and it still crashes, after
+> producing reasonable output.
+> 
 
- Internal error: Oops - undefined instruction: 0 [#2] SMP THUMB2
- Modules linked in:
- CPU: 0 PID: 652 Comm: modprobe Tainted: G      D           4.18.0-rc3+ #8
- PC is at ret_fast_syscall+0x4/0x62
- LR is at sys_brk+0x109/0x128
- pc : [<80101004>]    lr : [<801c8a35>]    psr: 60000013
- Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment none
- Control: 50c5387d  Table: 9e82006a  DAC: 00000051
- Process modprobe (pid: 652, stack limit = 0x(ptrval))
+You need to add printk to the show function as well. It might be last
+item in the list which is problematic (or one after cefuse CLK domain.
 
- 80101000 <ret_fast_syscall>:
- 80101000:       b672            cpsid   i
- 80101002:       f8d9 2008       ldr.w   r2, [r9, #8]
- 80101006:       f1b2 4ffe       cmp.w   r2, #2130706432 ; 0x7f000000
+> [   74.852508] cmp...
+> [   74.855773] printf...
+> [   74.859313] l4_cfg_clkdm->core_pwrdm (0)
+> [   74.864532] done...
+> [   74.867889] cmp...
+> [   74.871154] printf...
+> [   74.874694] l4_cefuse_clkdm->cefuse_pwrdm (0)
+> [   74.880340] done...
+> [   74.883728] ------------[ cut here ]------------
+> [   74.889709] WARNING: CPU: 0 PID: 2127 at
+> drivers/bus/omap_l3_noc.c:147 l3_interrupt_handler+0x23c/0x380
+> [   74.900695] 44000000.ocp:L3 Custom Error: MASTER MPU TARGET L4PER2
+> (Read): Data Access in User mode during Functional access
+> [   74.915222] Modules linked in:
+> [   74.919982] CPU: 0 PID: 2127 Comm: cat Not tainted
+> 4.18.0-rc4-88970-gf075a2c-dirty #763
+> [   74.929870] Hardware name: Generic OMAP4 (Flattened Device Tree)
+> [   74.937805] [<c010f6cc>] (unwind_backtrace) from [<c010ba50>]
+> (show_stack+0x10/0x14)
+> 
+> 									
+> Pavel
 
- 80101184 <local_restart>:
- 80101184:       f8d9 a000       ldr.w   sl, [r9]
- 80101188:       e92d 0030       stmdb   sp!, {r4, r5}
- 8010118c:       f01a 0ff0       tst.w   sl, #240        ; 0xf0
- 80101190:       d117            bne.n   801011c2 <__sys_trace>
- 80101192:       46ba            mov     sl, r7
- 80101194:       f5ba 7fc8       cmp.w   sl, #400        ; 0x190
- 80101198:       bf28            it      cs
- 8010119a:       f04f 0a00       movcs.w sl, #0
- 8010119e:       f3af 8014       nop.w   {20}
- 801011a2:       f2af 1ea2       subw    lr, pc, #418    ; 0x1a2
-
-To fix this, add a new symbol name which doesn't have ENDPROC used on it
-and use that with badr.  We can't remove the badr usage since that would
-would cause breakage with older binutils.
-
-Signed-off-by: Vincent Whitchurch <vincent.whitchurch@axis.com>
----
- arch/arm/kernel/entry-common.S | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-index 106a1466518d..746565a876dc 100644
---- a/arch/arm/kernel/entry-common.S
-+++ b/arch/arm/kernel/entry-common.S
-@@ -48,6 +48,7 @@ saved_pc	.req	lr
-  * from those features make this path too inefficient.
-  */
- ret_fast_syscall:
-+__ret_fast_syscall:
-  UNWIND(.fnstart	)
-  UNWIND(.cantunwind	)
- 	disable_irq_notrace			@ disable interrupts
-@@ -78,6 +79,7 @@ fast_work_pending:
-  * call.
-  */
- ret_fast_syscall:
-+__ret_fast_syscall:
-  UNWIND(.fnstart	)
-  UNWIND(.cantunwind	)
- 	str	r0, [sp, #S_R0 + S_OFF]!	@ save returned r0
-@@ -255,7 +257,7 @@ local_restart:
- 	tst	r10, #_TIF_SYSCALL_WORK		@ are we tracing syscalls?
- 	bne	__sys_trace
- 
--	invoke_syscall tbl, scno, r10, ret_fast_syscall
-+	invoke_syscall tbl, scno, r10, __ret_fast_syscall
- 
- 	add	r1, sp, #S_OFF
- 2:	cmp	scno, #(__ARM_NR_BASE - __NR_SYSCALL_BASE)
 -- 
-2.11.0
+Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Intel Finland Oy
