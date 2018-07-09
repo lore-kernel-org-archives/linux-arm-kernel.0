@@ -1,113 +1,55 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 9 Jul 2018 12:28:52 +0200
-Subject: droid 4 in v4.18-rc: grep -r adasfasd /sys/ oopses
-In-Reply-To: <20180708193720.GA13262@amd>
-References: <20180708174939.GA10002@amd>
- <20180708193720.GA13262@amd>
-Message-ID: <20180709102852.GA20580@amd>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 9 Jul 2018 12:31:57 +0200
+Subject: [PATCH] mm: cma: honor __GFP_ZERO flag in cma_alloc()
+In-Reply-To: <20180702133247.GT19043@dhcp22.suse.cz>
+References: <CGME20180613085851eucas1p20337d050face8ff8ea87674e16a9ccd2@eucas1p2.samsung.com>
+ <20180613085851eucas1p20337d050face8ff8ea87674e16a9ccd2~3rI_9nj8b0455904559eucas1p2C@eucas1p2.samsung.com>
+ <20180613122359.GA8695@bombadil.infradead.org>
+ <20180613124001eucas1p2422f7916367ce19fecd40d6131990383~3uKFrT3ML1977219772eucas1p2G@eucas1p2.samsung.com>
+ <20180613125546.GB32016@infradead.org>
+ <20180613133913.GD20315@dhcp22.suse.cz>
+ <20180702132335eucas1p1323fbf51cd5e82a59939d72097acee04~9kAizDyji0466904669eucas1p1w@eucas1p1.samsung.com>
+ <20180702133247.GT19043@dhcp22.suse.cz>
+Message-ID: <20180709103159eucas1p1e72d940f6c947769ff7b55cd5bfb4b61~-rLtaSiDM3047830478eucas1p14@eucas1p1.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Hi Michal,
 
-> > grep in /sys produces a nasty oops:
-> > 
-> > I guess next step is trying to find out which file that is..
-> 
-> Let me see...
-> 
-> openat(6, "suspend",
-> O_RDONLY|O_NOCTTY|O_NONBLOCK|O_LARGEFILE|O_NOFOLLOW) = 4
-> fstat64(4, {st_mode=S_IFREG|0644, st_size=0, ...}) = 0
-> read(4, 0x4d2000, 32768)                = -1 EINVAL (Invalid argument)
-> write(2, "grep: ", 6grep: )                   = 6
-> write(2, "/sys/kernel/debug/pm_debug/cefus"...,
-> 47/sys/kernel/debug/pm_debug/cefuse_pwrdm/suspend) = 47
-> write(2, ": Invalid argument", 18: Invalid argument)      = 18
-> write(2, "\n", 1
-> )                       = 1
-> close(4)                                = 0
-> close(6)                                = 0
-> openat(5, "time", O_RDONLY|O_NOCTTY|O_NONBLOCK|O_LARGEFILE|O_NOFOLLOW)
-> = 4
-> fstat64(4, {st_mode=S_IFREG|0444, st_size=0, ...}) = 0
-> read(4, "cefuse_pwrdm (OFF),OFF:641441757"..., 32768) = 849
-> read(4, "", 28672)                      = 0
-> close(4)                                = 0
-> openat(5, "count",
-> O_RDONLY|O_NOCTTY|O_NONBLOCK|O_LARGEFILE|O_NOFOLLOW) = 4
-> Connection to usb closed by remote host.
-> Connection to usb closed.
-> pavel at half:~$
-> 
-> Ok, so it seems to be:
-> 
-> user at devuan:~$ cat /sys/kernel/debug/pm_debug/count
-> (oops).
-> 
-> The file seems to be world-readable.
-> 
-> user at devuan:~$ ls -al /sys/kernel/debug/pm_debug/count
-> -r--r--r-- 1 root root 0 Jan  1  1970 /sys/kernel/debug/pm_debug/count
-> 
-> But on PC, that file does not exist.
+On 2018-07-02 15:32, Michal Hocko wrote:
+> On Mon 02-07-18 15:23:34, Marek Szyprowski wrote:
+>> On 2018-06-13 15:39, Michal Hocko wrote:
+>>> On Wed 13-06-18 05:55:46, Christoph Hellwig wrote:
+>>>> On Wed, Jun 13, 2018 at 02:40:00PM +0200, Marek Szyprowski wrote:
+>>>>> It is not only the matter of the spinlocks. GFP_ATOMIC is not supported
+>>>>> by the
+>>>>> memory compaction code, which is used in alloc_contig_range(). Right, this
+>>>>> should be also noted in the documentation.
+>>>> Documentation is good, asserts are better.  The code should reject any
+>>>> flag not explicitly supported, or even better have its own flags type
+>>>> with the few actually supported flags.
+>>> Agreed. Is the cma allocator used for anything other than GFP_KERNEL
+>>> btw.? If not then, shouldn't we simply drop the gfp argument altogether
+>>> rather than give users a false hope for differen gfp modes that are not
+>>> really supported and grow broken code?
+>> Nope, all cma_alloc() callers are expected to use it with GFP_KERNEL gfp
+>> mask.
+>> The only flag which is now checked is __GFP_NOWARN. I can change the
+>> function
+>> signature of cma_alloc to:
+>> struct page *cma_alloc(struct cma *cma, size_t count, unsigned int
+>> align, bool no_warn);
+> Are there any __GFP_NOWARN users? I have quickly hit the indirection
+> trap and searching for alloc callback didn't tell me really much.
 
-Ok, it is easier to reproduce like this:
+They might be via dma_alloc_from_contiguous() and dma_alloc_*() path.
 
-sudo mount /dev/zero -t debugfs /sys/kernel/debug/
-sudo cat /sys/kernel/debug/pm_debug/count
+>> What about clearing the allocated buffer? Should it be another bool
+>> parameter, done unconditionally or moved to the callers?
+> That really depends on callers. I have no idea what they actually ask
+> for.
 
-I tried adding debugging like this:
-
-diff --git a/arch/arm/mach-omap2/pm-debug.c b/arch/arm/mach-omap2/pm-debug.c
-index cba72de..ed98da8 100644
---- a/arch/arm/mach-omap2/pm-debug.c
-+++ b/arch/arm/mach-omap2/pm-debug.c
-@@ -78,14 +78,17 @@ static int clkdm_dbg_show_counter(struct clockdomain *clkdm, void *user)
- {
- 	struct seq_file *s = (struct seq_file *)user;
- 
-+	printk("cmp...\n");
- 	if (strcmp(clkdm->name, "emu_clkdm") == 0 ||
- 		strcmp(clkdm->name, "wkup_clkdm") == 0 ||
- 		strncmp(clkdm->name, "dpll", 4) == 0)
- 		return 0;
- 
-+	printk("printf...\n");	
- 	seq_printf(s, "%s->%s (%d)\n", clkdm->name, clkdm->pwrdm.ptr->name,
- 		   clkdm->usecount);
- 
-+	printk("done...\n");	
- 	return 0;
- }
- 
-But it seems to crash outside show_counter function:
-
-[  100.345062] cpcap-usb-phy cpcap-usb-phy.0: connected to USB host
-[  102.049743] cmp...
-[  102.051910] printf...
-[  102.054351] done...
-[  102.056579] cmp...
-[  102.058685] printf...
-...
-[  102.319427] printf...
-[  102.323211] done...
-[  102.326843] ------------[ cut here ]------------
-[  102.333190] WARNING: CPU: 0 PID: 2360 at
-drivers/bus/omap_l3_noc.c:147 l3_int
-errupt_handler+0x23c/0x380
-[  102.344696] 44000000.ocp:L3 Custom Error: MASTER MPU TARGET L4PER2
-(Read): Da
-ta Access in User mode during Functional access
-
-								Pavel
+Best regards
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180709/37a98c8b/attachment.sig>
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
