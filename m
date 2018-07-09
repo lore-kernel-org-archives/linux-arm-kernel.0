@@ -1,171 +1,81 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 9 Jul 2018 12:23:26 +0100
-Subject: [PATCH v3 15/20] kvm: arm/arm64: Allow tuning the physical
- address size for VM
-In-Reply-To: <f3463d0a-c6a3-c34d-acb3-13c99fc61c5a@arm.com>
-References: <1530270944-11351-1-git-send-email-suzuki.poulose@arm.com>
- <1530270944-11351-16-git-send-email-suzuki.poulose@arm.com>
- <20180704155104.GN4828@arm.com>
- <12d1832a-1a13-7dd4-662b-addf58400789@arm.com>
- <fe9f5aa5-b283-07e0-5f0e-e97d96b780e7@arm.com>
- <9f1af26e-2913-2b0b-1352-63160096f78f@arm.com>
- <f3463d0a-c6a3-c34d-acb3-13c99fc61c5a@arm.com>
-Message-ID: <20180709112326.GD9486@e103592.cambridge.arm.com>
+From: vincent.whitchurch@axis.com (Vincent Whitchurch)
+Date: Mon,  9 Jul 2018 13:24:44 +0200
+Subject: [PATCH] ARM: Fix Thumb-2 syscall return for binutils 2.29+
+Message-ID: <20180709112444.8508-1-vincent.whitchurch@axis.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 06, 2018 at 05:39:00PM +0100, Suzuki K Poulose wrote:
-> On 07/06/2018 04:09 PM, Marc Zyngier wrote:
-> >On 06/07/18 14:49, Suzuki K Poulose wrote:
-> >>On 04/07/18 23:03, Suzuki K Poulose wrote:
-> >>>On 07/04/2018 04:51 PM, Will Deacon wrote:
-> >>>>Hi Suzuki,
-> >>>>
-> >>>>On Fri, Jun 29, 2018 at 12:15:35PM +0100, Suzuki K Poulose wrote:
-> >>>>>Allow specifying the physical address size for a new VM via
-> >>>>>the kvm_type argument for KVM_CREATE_VM ioctl. This allows
-> >>>>>us to finalise the stage2 page table format as early as possible
-> >>>>>and hence perform the right checks on the memory slots without
-> >>>>>complication. The size is encoded as Log2(PA_Size) in the bits[7:0]
-> >>>>>of the type field and can encode more information in the future if
-> >>>>>required. The IPA size is still capped at 40bits.
-> >>>>>
-> >>>>>Cc: Marc Zyngier <marc.zyngier@arm.com>
-> >>>>>Cc: Christoffer Dall <cdall@kernel.org>
-> >>>>>Cc: Peter Maydel <peter.maydell@linaro.org>
-> >>>>>Cc: Paolo Bonzini <pbonzini@redhat.com>
-> >>>>>Cc: Radim Kr?m?? <rkrcmar@redhat.com>
-> >>>>>Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> >>>>>---
-> >>>>> ? arch/arm/include/asm/kvm_mmu.h?? |? 2 ++
-> >>>>> ? arch/arm64/include/asm/kvm_arm.h | 10 +++-------
-> >>>>> ? arch/arm64/include/asm/kvm_mmu.h |? 2 ++
-> >>>>> ? include/uapi/linux/kvm.h???????? | 10 ++++++++++
-> >>>>> ? virt/kvm/arm/arm.c?????????????? | 24 ++++++++++++++++++++++--
-> >>>>> ? 5 files changed, 39 insertions(+), 9 deletions(-)
-> >>>>
-> >>>>[...]
-> >>>>
-> >>>>>diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
-> >>>>>index 4df9bb6..fa4cab0 100644
-> >>>>>--- a/include/uapi/linux/kvm.h
-> >>>>>+++ b/include/uapi/linux/kvm.h
-> >>>>>@@ -751,6 +751,16 @@ struct kvm_ppc_resize_hpt {
-> >>>>> ? #define KVM_S390_SIE_PAGE_OFFSET 1
-> >>>>> ? /*
-> >>>>>+ * On arm/arm64, machine type can be used to request the physical
-> >>>>>+ * address size for the VM. Bits [7-0] have been reserved for the
-> >>>>>+ * PA size shift (i.e, log2(PA_Size)). For backward compatibility,
-> >>>>>+ * value 0 implies the default IPA size, which is 40bits.
-> >>>>>+ */
-> >>>>>+#define KVM_VM_TYPE_ARM_PHYS_SHIFT_MASK??? 0xff
-> >>>>>+#define KVM_VM_TYPE_ARM_PHYS_SHIFT(x)??????? \
-> >>>>>+??? ((x) & KVM_VM_TYPE_ARM_PHYS_SHIFT_MASK)
-> >>>>
-> >>>>This seems like you're allocating quite a lot of bits in a non-extensible
-> >>>>interface to a fairly esoteric parameter. Would it be better to add another
-> >>>>ioctl, or condense the number of sizes you support instead?
-> >>>
-> >>>As I explained in the other thread, we need the size as soon as the VM
-> >>>is created. The major challenge is keeping the backward compatibility by
-> >>>mapping 0 to 40bits. I will give it a thought.
-> >>
-> >>Here is one option. We could re-use the {V}TCR_ELx.{I}PS field format, which
-> >>occupies 3 bits and has the following definitions. (ID_AA64MMFR0_EL1:PARange
-> >>also has the field definitions, except that the field is 4bits wide, but
-> >>only 3bits are used)
-> >>
-> >>000 32 bits, 4GB.
-> >>001 36 bits, 64GB.
-> >>010 40 bits, 1TB.
-> >>011 42 bits, 4TB.
-> >>100 44 bits, 16TB.
-> >>101 48 bits, 256TB.
-> >>110 52 bits, 4PB
-> >>
-> >>But we need to map 0 => 40bits IPA to make our ABI backward compatible. So
-> >>we could use the additional one bit to indicate that IPA size is requested
-> >>in the 3 bits.
-> >>
-> >>i.e,
-> >>
-> >>machine_type:
-> >>
-> >>Bit [2:0]	- Requested IPA size. Values follow VTCR_EL2.PS format.
-> >>
-> >>Bit [3]		- 1 => IPA Size bits (Bits[2:0]) requested.
-> >>		0 => Not requested
-> >>
-> >>The only minor down side is restricting to the predefined values above,
-> >>which is not a real issue for a VM.
-> >>
-> >>Thoughts ?
-> >
-> >I'd be very wary of using that 4th bit to do something that is not in
-> >the architecture. We have only a single value left to be used (0b111),
-> >and then your scheme clashes with the architecture definition.
-> 
-> I agree. However, if we ever go beyond the 3bits in PARange, we have an
-> issue with {V}TCR counter part. But lets not take that chance.
-> 
-> >
-> >I'd rather encode things in a way that is independent from the
-> >architecture, and be done with it. You can map 0 to 40bits, and we have
-> >the ability to express all values the architecture has (just in a
-> >different order).
-> 
-> The other option I can think of is encoding a signed number which is the
-> difference of the IPA from 40. But that would need 5 bits if we were to
-> encode it as it is. And if we want to squeeze it in 4bit, we could store
-> half the difference (limiting the IPA limit to even numbers).
-> 
-> i.e IPA = 40 + 2 * sign_extend(bits[3:0);
+When building the kernel as Thumb-2 with binutils 2.29 or newer, if the
+assembler has seen the .type directive (via ENDPROC()) for a symbol, it
+automatically handles the setting of the lowest bit when the symbol is
+used with ADR.  The badr macro on the other hand handles this lowest bit
+manually.  This leads to a jump to a wrong address in the wrong state
+in the syscall return path:
 
-I came across similar issues when trying to work out how to enable
-SVE for KVM.  In the end I reduced this to a per-vcpu feature, but
-it means that there is no global opt-in for the SVE-specific KVM
-API extensions:
+ Internal error: Oops - undefined instruction: 0 [#2] SMP THUMB2
+ Modules linked in:
+ CPU: 0 PID: 652 Comm: modprobe Tainted: G      D           4.18.0-rc3+ #8
+ PC is at ret_fast_syscall+0x4/0x62
+ LR is at sys_brk+0x109/0x128
+ pc : [<80101004>]    lr : [<801c8a35>]    psr: 60000013
+ Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment none
+ Control: 50c5387d  Table: 9e82006a  DAC: 00000051
+ Process modprobe (pid: 652, stack limit = 0x(ptrval))
 
-That's a bit gross, because SVE may require a change to the way
-vcpus are initialised.  The set of supported SVE vector lengths needs
-to be set somehow before the vcpu is set running, but it's tricky do
-do that without a new ioctl -- which would mean that if SVE is enabled
-for a vcpu then the vcpu is not considered runnable until the new
-magic ioctl is called.
+ 80101000 <ret_fast_syscall>:
+ 80101000:       b672            cpsid   i
+ 80101002:       f8d9 2008       ldr.w   r2, [r9, #8]
+ 80101006:       f1b2 4ffe       cmp.w   r2, #2130706432 ; 0x7f000000
 
-Opting into that semantic change globally at VM creation time might
-be preferable.  On the SVE side, this is still very much subject to
-review/change.
+ 80101184 <local_restart>:
+ 80101184:       f8d9 a000       ldr.w   sl, [r9]
+ 80101188:       e92d 0030       stmdb   sp!, {r4, r5}
+ 8010118c:       f01a 0ff0       tst.w   sl, #240        ; 0xf0
+ 80101190:       d117            bne.n   801011c2 <__sys_trace>
+ 80101192:       46ba            mov     sl, r7
+ 80101194:       f5ba 7fc8       cmp.w   sl, #400        ; 0x190
+ 80101198:       bf28            it      cs
+ 8010119a:       f04f 0a00       movcs.w sl, #0
+ 8010119e:       f3af 8014       nop.w   {20}
+ 801011a2:       f2af 1ea2       subw    lr, pc, #418    ; 0x1a2
 
+To fix this, add a new symbol name which doesn't have ENDPROC used on it
+and use that with badr.  We can't remove the badr usage since that would
+would cause breakage with older binutils.
 
-Here:
+Signed-off-by: Vincent Whitchurch <vincent.whitchurch@axis.com>
+---
+ arch/arm/kernel/entry-common.S | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-The KVM_CREATE_VM init argument seems undefined by the KVM core code and
-is available for arches to abuse in creative ways.  x86 and arm have
-nothing here and reject non-zero values with -EINVAL; s390 treats it as
-a bitmask, and defines a sincle feature-like bit here; powerpc treats it
-as an enumeration of VM types.
-
-If we want to be extensible, we could
-
- a) Pass a pointer in type, and come up with some extensible VM parameter
-    struct for it to point to (which then wouldn't need a cryptic
-    compressed encoding), or
-
- b) Introduce a new "KVM_CREATE_VM2" variant that either takes such
-    an argument, or mandates a parameter negotiation phase involving
-    additional ioctls before marking the VM as ready for vcpu and
-    device creation.
-
-(a) feels like an easy backwards-compatible approach, but cannot be
-readily adopted by other arches (maybe not an issue).
-
-(b) might be considered overengineered, so it would need a bit of
-thought.
-
-Wedging arguments into a few bits in the type argument feels awkward,
-and may be regretted later if we run out of bits, or something can't be
-represented in the chosen encoding.
-
-Cheers
----Dave
+diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+index 106a1466518d..746565a876dc 100644
+--- a/arch/arm/kernel/entry-common.S
++++ b/arch/arm/kernel/entry-common.S
+@@ -48,6 +48,7 @@ saved_pc	.req	lr
+  * from those features make this path too inefficient.
+  */
+ ret_fast_syscall:
++__ret_fast_syscall:
+  UNWIND(.fnstart	)
+  UNWIND(.cantunwind	)
+ 	disable_irq_notrace			@ disable interrupts
+@@ -78,6 +79,7 @@ fast_work_pending:
+  * call.
+  */
+ ret_fast_syscall:
++__ret_fast_syscall:
+  UNWIND(.fnstart	)
+  UNWIND(.cantunwind	)
+ 	str	r0, [sp, #S_R0 + S_OFF]!	@ save returned r0
+@@ -255,7 +257,7 @@ local_restart:
+ 	tst	r10, #_TIF_SYSCALL_WORK		@ are we tracing syscalls?
+ 	bne	__sys_trace
+ 
+-	invoke_syscall tbl, scno, r10, ret_fast_syscall
++	invoke_syscall tbl, scno, r10, __ret_fast_syscall
+ 
+ 	add	r1, sp, #S_OFF
+ 2:	cmp	scno, #(__ARM_NR_BASE - __NR_SYSCALL_BASE)
+-- 
+2.11.0
