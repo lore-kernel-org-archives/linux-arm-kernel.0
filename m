@@ -1,66 +1,55 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Mon, 09 Jul 2018 23:44:20 +0800
-Subject: [PATCH v2 0/4] sun8i: r40: add AHCI
-In-Reply-To: <1531149658-27030-1-git-send-email-clabbe@baylibre.com>
-References: <1531149658-27030-1-git-send-email-clabbe@baylibre.com>
-Message-ID: <EF718AB4-DD07-4D67-BE2E-1B9EBA5EB25F@aosc.io>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon,  9 Jul 2018 16:45:36 +0100
+Subject: [PATCH 2/2] clocksource: arm_arch_timer: set arch_mem_timer cpumask
+ to cpu_possible_mask
+In-Reply-To: <1531151136-18297-1-git-send-email-sudeep.holla@arm.com>
+References: <1531151136-18297-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1531151136-18297-2-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Currently, arch_mem_timer cpumask is set to cpu_all_mask which should be
+fine. However, cpu_possible_mask is more accurate and if there are other
+clockevent source in the system which are set to cpu_possible_mask, then
+having cpu_all_mask may result in issue.
 
+E.g. on a platform with arm,sp804 timer with rating 300 and
+cpu_possible_mask and this arch_mem_timer timer with rating 400 and
+cpu_all_mask, tick_check_preferred may choose both preferred as the
+cpumasks are not equal though they must be.
 
-? 2018?7?9? GMT+08:00 ??11:20:54, Corentin Labbe <clabbe@baylibre.com> ??:
->Hello
->
->With Moeicenowy's agreement, I have take leadership ot this patchset.
->
->There are no really changes appart renaming struct quirck to variant.
->
->Since the last serie is really old, I will answer comment here.
->The two regulator (1.2 and 2.5V) are not for the PHY since:
->- nothing in the schematic said that they are for the PHY, they seems
->  only for controller
->- all other AHCI driver use 5V for the target/PHY (vs 1.2/2.5 which
->  cannot be used for target)
+This issue was root caused incorrectly initially and a fix was merged as
+commit 1332a9055801 ("tick: Prefer a lower rating device only if it's CPU
+local device").
 
-Target is not equal to PHY. Target means the supply
-of the disk, which can be usually 5v (for 2.5" HDD) or
-12v (3.5" HDD).
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+---
+ drivers/clocksource/arm_arch_timer.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-By reading Wikipedia articles  about SATA and LVDS, I assume
-2.5V is for PHY and 1.2V is for internal digital logic (VDD-SYS
-is commonly 1.2V on 40nm Allwinner SoCs; 2.5V VDD can be
-used to efficiently deliver ~1.2V LVDS.)
+Hi,
 
-P.S. VDD-SATA and VDD25-SATA also exist on A20, and by checking
-Banana Pi M1 (the original Banana Pi) schematics, VDD-SATA
-is connected to common VDD-SYS (called INTVDD on the
-schematics) and VDD25-SATA is connected to an always-on
-fixed LDO, maybe due to the lack of power outputs on AXP209.
+There are few more drivers that set cpu_all_mask, should they also be
+changed ? It should be fine as long as it's not compared against
+someother non per-CPU timer with shorter cpumask.
 
->
->Furthermore, the AHCI binding support only one regulator per PHY, so
->using the "target" regulator is out of question for registring this two
->non-phy regulator.
->
->I hope this answer all comments done on last version.
->
->Regards
->
->Corentin Labbe (3):
->  ata: ahci_sunxi: add support for R40 SATA controller
->  ARM: dts: sun8i: r40: add sata node
->  ARM: dts: sun8i: sun8i-r40-bananapi-m2-ultra: enable AHCI
->
->Icenowy Zheng (1):
->  dt-bindings: add binding for Allwinner R40 SATA AHCI controller
->
-> .../devicetree/bindings/ata/ahci-platform.txt      |   1 -
-> .../bindings/ata/allwinner,sun4i-a10-ahci.txt      |  40 +++++++
-> arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts  |  18 +++
-> arch/arm/boot/dts/sun8i-r40.dtsi                   |   9 ++
->drivers/ata/ahci_sunxi.c                           | 124
->++++++++++++++++++++-
-> 5 files changed, 188 insertions(+), 4 deletions(-)
->create mode 100644
->Documentation/devicetree/bindings/ata/allwinner,sun4i-a10-ahci.txt
+Regards,
+Sudeep
+
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index 57cb2f00fc07..d8c7f5750cdb 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -735,7 +735,7 @@ static void __arch_timer_setup(unsigned type,
+ 		clk->features |= CLOCK_EVT_FEAT_DYNIRQ;
+ 		clk->name = "arch_mem_timer";
+ 		clk->rating = 400;
+-		clk->cpumask = cpu_all_mask;
++		clk->cpumask = cpu_possible_mask;
+ 		if (arch_timer_mem_use_virtual) {
+ 			clk->set_state_shutdown = arch_timer_shutdown_virt_mem;
+ 			clk->set_state_oneshot_stopped = arch_timer_shutdown_virt_mem;
+--
+2.7.4
