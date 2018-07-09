@@ -1,107 +1,116 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 9 Jul 2018 16:58:48 +0800
-Subject: [PATCH] drm/sun4i: fix build failure with CONFIG_DRM_SUN8I_MIXER=m
-In-Reply-To: <20180709080724.3ekqb45fsjubvhcm@flea>
-References: <20180706124628.3192421-1-arnd@arndb.de>
- <20180709080724.3ekqb45fsjubvhcm@flea>
-Message-ID: <CAGb2v64HmXRK19-ahv624F8mpNCt21ri3AaVEiB+Gw9GsVeb=Q@mail.gmail.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Mon, 9 Jul 2018 18:01:34 +0900
+Subject: [PATCH v10 13/14] arm64: kexec_file: add kernel signature
+ verification support
+In-Reply-To: <ff77f2d9-82c6-8fbb-3696-e1fcfd61c333@arm.com>
+References: <20180623022058.10935-1-takahiro.akashi@linaro.org>
+ <20180623022058.10935-14-takahiro.akashi@linaro.org>
+ <ff77f2d9-82c6-8fbb-3696-e1fcfd61c333@arm.com>
+Message-ID: <20180709090133.GU28220@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 9, 2018 at 4:07 PM, Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> On Fri, Jul 06, 2018 at 02:45:53PM +0200, Arnd Bergmann wrote:
->> Having DRM_SUN4I built-in but DRM_SUN8I_MIXER as a loadable module results in
->> a link error, as we try to access a symbol from the sun8i_tcon_top.ko module:
->>
->> ERROR: "sun8i_tcon_top_of_table" [drivers/gpu/drm/sun4i/sun8i-drm-hdmi.ko] undefined!
->> ERROR: "sun8i_tcon_top_of_table" [drivers/gpu/drm/sun4i/sun4i-drm.ko] undefined!
->>
->> This solves the problem by making DRM_SUN8I_MIXER a 'bool' symbol, building
->> the sun8i_tcon_top module the same way as the core sun4i-drm module whenever
->> DRM_SUN8I_MIXER is enabled, or not building it at all otherwise.
->>
->> Alternatively, we could always build sun8i_tcon_top.ko along with sun4-drm.ko
->> and detach it from the mixer module, I could not tell which way is more
->> appropriate here.
->
-> If that's easily doable, then yeah, that would be the preferred option
-> I guess. Jernej? Chen-Yu? Any opinion on this?
+On Tue, Jul 03, 2018 at 06:47:38PM +0100, James Morse wrote:
+> Hi Akashi,
+> 
+> On 23/06/18 03:20, AKASHI Takahiro wrote:
+> > With this patch, kernel verification can be done without IMA security
+> > subsystem enabled. Turn on CONFIG_KEXEC_VERIFY_SIG instead.
+> > 
+> > On x86, a signature is embedded into a PE file (Microsoft's format) header
+> > of binary. Since arm64's "Image" can also be seen as a PE file as far as
+> > CONFIG_EFI is enabled, we adopt this format for kernel signing.
+> > 
+> > You can create a signed kernel image with:
+> >     $ sbsign --key ${KEY} --cert ${CERT} Image
+> 
+> > diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> > index f68318f61c85..5133c22a01ab 100644
+> > --- a/arch/arm64/Kconfig
+> > +++ b/arch/arm64/Kconfig
+> > @@ -845,6 +845,30 @@ config KEXEC_FILE
+> >  	  for kernel and initramfs as opposed to list of segments as
+> >  	  accepted by previous system call.
+> >  
+> > +config KEXEC_VERIFY_SIG
+> > +	bool "Verify kernel signature during kexec_file_load() syscall"
+> > +	depends on KEXEC_FILE
+> > +	help
+> > +	  Select this option to verify a signature with loaded kernel
+> > +	  image. If configured, any attempt of loading a image without
+> > +	  valid signature will fail.
+> > +
+> > +	  In addition to that option, you need to enable signature
+> > +	  verification for the corresponding kernel image type being
+> > +	  loaded in order for this to work.
+> > +
+> > +config KEXEC_IMAGE_VERIFY_SIG
+> > +	bool "Enable Image signature verification support"
+> > +	default y
+> > +	depends on KEXEC_VERIFY_SIG
+> > +	depends on EFI && SIGNED_PE_FILE_VERIFICATION
+> > +	help
+> > +	  Enable Image signature verification support.
+> > +
+> > +comment "Image signature verification is missing yet"
+> > +	depends on KEXEC_VERIFY_SIG
+> > +	depends on !EFI || !SIGNED_PE_FILE_VERIFICATION
+> 
+> 
+> This comment thing is a good idea, but its also a bit confusing... it took me
+> quite a while to work out what was missing. Could we phrase it something like:
+> "Support for PE file signature verification disabled!"
 
-Yeah, that definitely works for me. Having TCON TOP being part of the core
-sun4i-drm makes more sense. The TCON code will likely call into it later on
-when Jernej adds the encoder muxing code.
+OK.
 
-I wonder if we shouldn't just build the whole display engine code, excluding
-downstream encoders (HDMI, DSI, TV) into one module. That would also fix the
-issue that DRM_SUN4I_BACKEND has to be built-in if DRM_SUN4I is built-in.
-That might be overkill though, given that one day we should be able to get
-rid of the frontend check.
+> This tells us its about PE files, and its probably a missing config option
+> somewhere, not some code that hasn't been written yet. (which was my first
+> assumption!).
+> 
+> KEXEC_VERIFY_SIG presumably turns on just the IMA verification, which verifies
+> the Image, but not in the same way as KEXEC_IMAGE_VERIFY_SIG.... (if I've
+> understood it properly)
 
-Here's a list of the size of various parts of this driver, built for ARMv7:
+I'm afraid that I'm not clear at the cover letter.
+Those two mechanisms, IMA verification and kexec-specific verification,
+are totally different. The former is relatively new as well as generic,
+and doesn't even require KEXEC_VERIFY_SIG at all as all the stuff is done
+under IMA framework (via security hooks) with extended file attributes.
 
-Common stuff:
-   text    data     bss     dec     hex filename
-   5021     344       0    5365    14f5 drivers/gpu/drm/sun4i/sun4i_drv.o
-   1058       0       0    1058     422 drivers/gpu/drm/sun4i/sun4i_layer.o
-    192       4       0     196      c4
-drivers/gpu/drm/sun4i/sun4i_framebuffer.o
-   1704       0       0    1704     6a8 drivers/gpu/drm/sun4i/sun4i_crtc.o
-   1221       0       0    1221     4c5 drivers/gpu/drm/sun4i/sun4i_dotclock.o
-   1192      28       0    1220     4c4 drivers/gpu/drm/sun4i/sun4i_lvds.o
-   1583      92       0    1675     68b drivers/gpu/drm/sun4i/sun4i_rgb.o
-  10088     248       0   10336    2860 drivers/gpu/drm/sun4i/sun4i_tcon.o
-   1690     104       0    1794     702 drivers/gpu/drm/sun4i/sun6i_drc.o
-  23749     820       0   24569    5ff9 (TOTALS)
+On the other hand, KEXEC_VERIFY_SIG is just an option that turns on
+verification check in a kexec-specific (and more importantly arch-specific
+and file-format-specific) manner through 'kexec_file_ops->verify interface.'
 
-DE 1.0:
-   text    data     bss     dec     hex filename
-   3596     248       0    3844     f04 drivers/gpu/drm/sun4i/sun4i_frontend.o
-   8735     248       0    8983    2317 drivers/gpu/drm/sun4i/sun4i_backend.o
-  12331     496       0   12827    321b (TOTALS)
+> Is there any reason to have these as separate enables?
 
-DE 2.0:
-   text    data     bss     dec     hex filename
-   4040     248       0    4288    10c0 drivers/gpu/drm/sun4i/sun8i_mixer.o
-   2620      28       0    2648     a58 drivers/gpu/drm/sun4i/sun8i_ui_layer.o
-   1500       0       0    1500     5dc drivers/gpu/drm/sun4i/sun8i_ui_scaler.o
-   2780      28       0    2808     af8 drivers/gpu/drm/sun4i/sun8i_vi_layer.o
-  12612       0       0   12612    3144 drivers/gpu/drm/sun4i/sun8i_vi_scaler.o
-    367       0       0     367     16f drivers/gpu/drm/sun4i/sun8i_csc.o
-  23919     304       0   24223    5e9f (TOTALS)
+If you are talking about KEXEC_VERIFY_SIG and KEXEC_IMAGE_VERIFY_SIG,
+it is a leftover when "vmlinux" image was also supported in my
+old versions of kexec_file patch set.
+But please note that x86 also retains two separate configuration options,
+KEXEC_VERIFY_SIG and KEXEC_BZIMAGE_VERIFY_SIG.
+I simply followed that.
 
-TCON TOP:
-   text    data     bss     dec     hex filename
-   2623     104       0    2727     aa7 drivers/gpu/drm/sun4i/sun8i_tcon_top.o
-   2623     104       0    2727     aa7 (TOTALS)
+> Couldn't we 'select SIGNED_PE_FILE_VERIFICATION if EFI' in KEXEC_VERIFY_SIG?
 
-DE 1.0 HDMI:
-   text    data     bss     dec     hex filename
-    913       0       0     913     391
-drivers/gpu/drm/sun4i/sun4i_hdmi_ddc_clk.o
-   5543     104       0    5647    160f drivers/gpu/drm/sun4i/sun4i_hdmi_enc.o
-   2583       0       0    2583     a17 drivers/gpu/drm/sun4i/sun4i_hdmi_i2c.o
-   1326       0       0    1326     52e
-drivers/gpu/drm/sun4i/sun4i_hdmi_tmds_clk.o
-  10365     104       0   10469    28e5 (TOTALS)
+I didn't "select" SIGNED_PE_FILE_VERIFICATION here following
+"kbuild/kconfig-language.txt" which suggests, "use select only for
+non-visible symbols (no prompts anywhere)."
 
-MIPI DSI:
-   text    data     bss     dec     hex filename
-   1990     144       0    2134     856 drivers/gpu/drm/sun4i/sun6i_mipi_dphy.o
-   5921     132       0    6053    17a5 drivers/gpu/drm/sun4i/sun6i_mipi_dsi.o
-   7911     276       0    8187    1ffb (TOTALS)
+> This would mean there is one option to verify signatures, instead of two...
+> (does it really depend on EFI?)
 
-DW HDMI:
-   text    data     bss     dec     hex filename
-   1774     104       0    1878     756 drivers/gpu/drm/sun4i/sun8i_dw_hdmi.o
-   1189       0       0    1189     4a5
-drivers/gpu/drm/sun4i/sun8i_hdmi_phy_clk.o
-   4877     144       0    5021    139d drivers/gpu/drm/sun4i/sun8i_hdmi_phy.o
-   7840     248       0    8088    1f98 (TOTALS)
+Strictly speaking, SIGNED_PE_FILE_VERIFICATION depends on the fact
+that a binary file is in PE format, which means that EFI is enabled
+on arm64.
+It is possible to support KEXEC_VERIFY_SIG for non-PE binaries, but
+in that case, we will have to invent a new (arm64-specific) way of
+verification.
+(For instance, we might want to add a kexec-specific ELF segment to vmlinux.)
 
-So it seems better to keep various parts as separate modules.
+Thanks,
+-Takahiro AKASHI
 
-The "data" column makes me wonder if we've constify-ed all possible data
-structures yet.
-
-Regards
-ChenYu
+> 
+> Thanks,
+> 
+> James
