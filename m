@@ -1,40 +1,58 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 9 Jul 2018 19:16:32 +0200
-Subject: [PATCH v2 1/4] drm/panel: simple: Add support for Rocktech
- RK070ER9427 LCD panel
-In-Reply-To: <20180607134648.2902-1-jagan@amarulasolutions.com>
-References: <20180607134648.2902-1-jagan@amarulasolutions.com>
-Message-ID: <20180709171632.GG26651@ulmo>
+From: mathieu.desnoyers@efficios.com (Mathieu Desnoyers)
+Date: Mon, 9 Jul 2018 13:17:54 -0400 (EDT)
+Subject: [PATCH v2 0/3] Support rseq on arm64
+In-Reply-To: <20180709165307.GB4689@arm.com>
+References: <1531145985-3747-1-git-send-email-will.deacon@arm.com>
+ <1957291037.1983.1531152382750.JavaMail.zimbra@efficios.com>
+ <20180709165307.GB4689@arm.com>
+Message-ID: <1187011512.2158.1531156674389.JavaMail.zimbra@efficios.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 07, 2018 at 07:16:48PM +0530, Jagan Teki wrote:
-> This adds support for the Rocktech Display Ltd. RK070ER9427
-> 800(RGB)x480 TFT LCD panel, which can be supported by the
-> simple panel driver.
-> 
-> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> Reviewed-by: Rob Herring <robh@kernel.org>
-> ---
-> Changes for v2:
-> - collect Rob r-w-b tag
-> 
->  .../display/panel/rocktech,rk070er9427.txt         | 25 ++++++++++++++++
->  drivers/gpu/drm/panel/panel-simple.c               | 33 ++++++++++++++++++++++
->  2 files changed, 58 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/display/panel/rocktech,rk070er9427.txt
+----- On Jul 9, 2018, at 12:53 PM, Will Deacon will.deacon at arm.com wrote:
 
-checkpatch warns about the rocktech vendor prefix not being documented.
-Can you send a patch which adds it to
+> On Mon, Jul 09, 2018 at 12:06:22PM -0400, Mathieu Desnoyers wrote:
+>> ----- On Jul 9, 2018, at 10:19 AM, Will Deacon will.deacon at arm.com wrote:
+>> 
+>> > Hello,
+>> > 
+>> > This is version two of the patches previously posted here:
+>> > 
+>> > http://lkml.kernel.org/r/1529949285-11013-1-git-send-email-will.deacon at arm.com
+>> > 
+>> > Changes since v1 include:
+>> > 
+>> >  * Move abort handler in-line to avoid possibility of it being
+>> >    out-of-range for conditional branch instructions
+>> > 
+>> > I've tested both native and compat (little-endian only) with the selftests
+>> > and they pass successfully on my Seattle box.
+>> 
+>> For the whole series:
+>> 
+>> Acked-by: Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+> 
+> Thanks, Mathieu! Are you ok with me taking this via the arm64 tree for
+> 4.19 once I have an Ack for the asm-generic change, or would you rather
+> this went via somewhere else?
 
-	Documentation/devicetree/bindings/vendor-prefixes.txt
+Adding Thomas Gleixner in CC. He has been picking up the rseq bits for
+4.18. I've noticed it was rather easier to gather rseq stuff through a
+single tree (less chances of confusion).
+
+Also, support for additional architectures (e.g. MIPS) was added to rseq
+after rc1. Is it too late to merge arm64 support targeting 4.18 ?
 
 Thanks,
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180709/b788ae73/attachment.sig>
+
+Mathieu
+
+> 
+> Cheers,
+> 
+> Will
+
+-- 
+Mathieu Desnoyers
+EfficiOS Inc.
+http://www.efficios.com
