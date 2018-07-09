@@ -1,149 +1,109 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Mon,  9 Jul 2018 17:48:46 +0200
-Subject: [PATCH 6/8] ARM: dts: imx6qdl-apalis/-colibri: fix on-module
- regulators
+Date: Mon,  9 Jul 2018 17:48:48 +0200
+Subject: [PATCH 8/8] ARM: dts: imx6qdl-apalis/-colibri: remove unused pinctrl
+ groups
 In-Reply-To: <20180709154848.5401-1-stefan@agner.ch>
 References: <20180709154848.5401-1-stefan@agner.ch>
-Message-ID: <20180709154848.5401-6-stefan@agner.ch>
+Message-ID: <20180709154848.5401-8-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the 2.5V regulator, it does not exist. There is 3.3V and
-3.3V_AUDIO provided to the module through the edge connector,
-model those as fixed regulators like we use to do in other
-Colibri device trees. The SGTL5000 uses 3.3V_AUDIO as VDDA. Note
-that the driver derives the analog ground voltage (VAG) from this
-supply. The new value should allow higher output swings before
-clipping occurs. Refer to the SGTL5000 datasheet for details.
+100/200MHz states for USDHC3 are not required since the SoC
+does not support modes faster than DDR52 for the on board eMMC.
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- arch/arm/boot/dts/imx6qdl-apalis.dtsi  | 22 +++++++++++-----------
- arch/arm/boot/dts/imx6qdl-colibri.dtsi | 20 ++++++++++----------
- 2 files changed, 21 insertions(+), 21 deletions(-)
+ arch/arm/boot/dts/imx6qdl-apalis.dtsi  | 34 --------------------------
+ arch/arm/boot/dts/imx6qdl-colibri.dtsi | 34 --------------------------
+ 2 files changed, 68 deletions(-)
 
 diff --git a/arch/arm/boot/dts/imx6qdl-apalis.dtsi b/arch/arm/boot/dts/imx6qdl-apalis.dtsi
-index 2f711fffa06e..6813f4326807 100644
+index 8c04f42fdb71..05f07ea3e8c8 100644
 --- a/arch/arm/boot/dts/imx6qdl-apalis.dtsi
 +++ b/arch/arm/boot/dts/imx6qdl-apalis.dtsi
-@@ -61,17 +61,17 @@
- 		status = "disabled";
+@@ -947,38 +947,4 @@
+ 			MX6QDL_PAD_SD3_RST__SD3_RESET  0x17059
+ 		>;
  	};
- 
--	reg_2p5v: regulator-2p5v {
-+	reg_module_3v3: regulator-module-3v3 {
- 		compatible = "regulator-fixed";
--		regulator-name = "2P5V";
--		regulator-min-microvolt = <2500000>;
--		regulator-max-microvolt = <2500000>;
-+		regulator-name = "+V3.3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
- 		regulator-always-on;
- 	};
- 
--	reg_3p3v: regulator-3p3v {
-+	reg_module_3v3_audio: regulator-module-3v3-audio {
- 		compatible = "regulator-fixed";
--		regulator-name = "3P3V";
-+		regulator-name = "+V3.3_AUDIO";
- 		regulator-min-microvolt = <3300000>;
- 		regulator-max-microvolt = <3300000>;
- 		regulator-always-on;
-@@ -314,8 +314,8 @@
- 		compatible = "fsl,sgtl5000";
- 		reg = <0x0a>;
- 		clocks = <&clks IMX6QDL_CLK_CKO>;
--		VDDA-supply = <&reg_2p5v>;
--		VDDIO-supply = <&reg_3p3v>;
-+		VDDA-supply = <&reg_module_3v3_audio>;
-+		VDDIO-supply = <&reg_module_3v3>;
- 	};
- 
- 	/* STMPE811 touch screen controller */
-@@ -447,7 +447,7 @@
- &usdhc1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_usdhc1_4bit &pinctrl_usdhc1_8bit>;
--	vqmmc-supply = <&reg_3p3v>;
-+	vqmmc-supply = <&reg_module_3v3>;
- 	bus-width = <8>;
- 	disable-wp;
- 	no-1-8-v;
-@@ -458,7 +458,7 @@
- &usdhc2 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_usdhc2>;
--	vqmmc-supply = <&reg_3p3v>;
-+	vqmmc-supply = <&reg_module_3v3>;
- 	bus-width = <4>;
- 	disable-wp;
- 	no-1-8-v;
-@@ -469,7 +469,7 @@
- &usdhc3 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_usdhc3>;
--	vqmmc-supply = <&reg_3p3v>;
-+	vqmmc-supply = <&reg_module_3v3>;
- 	bus-width = <8>;
- 	no-1-8-v;
- 	non-removable;
+-
+-	pinctrl_usdhc3_100mhz: usdhc3100mhzgrp {
+-		fsl,pins = <
+-			MX6QDL_PAD_SD3_CMD__SD3_CMD    0x170b9
+-			MX6QDL_PAD_SD3_CLK__SD3_CLK    0x100b9
+-			MX6QDL_PAD_SD3_DAT0__SD3_DATA0 0x170b9
+-			MX6QDL_PAD_SD3_DAT1__SD3_DATA1 0x170b9
+-			MX6QDL_PAD_SD3_DAT2__SD3_DATA2 0x170b9
+-			MX6QDL_PAD_SD3_DAT3__SD3_DATA3 0x170b9
+-			MX6QDL_PAD_SD3_DAT4__SD3_DATA4 0x170b9
+-			MX6QDL_PAD_SD3_DAT5__SD3_DATA5 0x170b9
+-			MX6QDL_PAD_SD3_DAT6__SD3_DATA6 0x170b9
+-			MX6QDL_PAD_SD3_DAT7__SD3_DATA7 0x170b9
+-			/* eMMC reset */
+-			MX6QDL_PAD_SD3_RST__SD3_RESET  0x170b9
+-		>;
+-	};
+-
+-	pinctrl_usdhc3_200mhz: usdhc3200mhzgrp {
+-		fsl,pins = <
+-			MX6QDL_PAD_SD3_CMD__SD3_CMD    0x170f9
+-			MX6QDL_PAD_SD3_CLK__SD3_CLK    0x100f9
+-			MX6QDL_PAD_SD3_DAT0__SD3_DATA0 0x170f9
+-			MX6QDL_PAD_SD3_DAT1__SD3_DATA1 0x170f9
+-			MX6QDL_PAD_SD3_DAT2__SD3_DATA2 0x170f9
+-			MX6QDL_PAD_SD3_DAT3__SD3_DATA3 0x170f9
+-			MX6QDL_PAD_SD3_DAT4__SD3_DATA4 0x170f9
+-			MX6QDL_PAD_SD3_DAT5__SD3_DATA5 0x170f9
+-			MX6QDL_PAD_SD3_DAT6__SD3_DATA6 0x170f9
+-			MX6QDL_PAD_SD3_DAT7__SD3_DATA7 0x170f9
+-			/* eMMC reset */
+-			MX6QDL_PAD_SD3_RST__SD3_RESET  0x170f9
+-		>;
+-	};
+ };
 diff --git a/arch/arm/boot/dts/imx6qdl-colibri.dtsi b/arch/arm/boot/dts/imx6qdl-colibri.dtsi
-index 1a147cb0bed0..9a3bac5be5e2 100644
+index 6821ea511051..87e15e7cb32b 100644
 --- a/arch/arm/boot/dts/imx6qdl-colibri.dtsi
 +++ b/arch/arm/boot/dts/imx6qdl-colibri.dtsi
-@@ -56,17 +56,17 @@
- 		status = "disabled";
+@@ -692,40 +692,6 @@
+ 		>;
  	};
  
--	reg_2p5v: regulator-2p5v {
-+	reg_module_3v3: regulator-module-3v3 {
- 		compatible = "regulator-fixed";
--		regulator-name = "2P5V";
--		regulator-min-microvolt = <2500000>;
--		regulator-max-microvolt = <2500000>;
-+		regulator-name = "+V3.3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
- 		regulator-always-on;
- 	};
- 
--	reg_3p3v: regulator-3p3v {
-+	reg_module_3v3_audio: regulator-module-3v3-audio {
- 		compatible = "regulator-fixed";
--		regulator-name = "3P3V";
-+		regulator-name = "+V3.3_AUDIO";
- 		regulator-min-microvolt = <3300000>;
- 		regulator-max-microvolt = <3300000>;
- 		regulator-always-on;
-@@ -244,8 +244,8 @@
- 		compatible = "fsl,sgtl5000";
- 		reg = <0x0a>;
- 		clocks = <&clks IMX6QDL_CLK_CKO>;
--		VDDA-supply = <&reg_2p5v>;
--		VDDIO-supply = <&reg_3p3v>;
-+		VDDA-supply = <&reg_module_3v3_audio>;
-+		VDDIO-supply = <&reg_module_3v3>;
- 		lrclk-strength = <3>;
- 	};
- 
-@@ -380,7 +380,7 @@
- 	pinctrl-0 = <&pinctrl_usdhc1 &pinctrl_mmc_cd>;
- 	cd-gpios = <&gpio2 5 GPIO_ACTIVE_LOW>; /* MMCD */
- 	disable-wp;
--	vqmmc-supply = <&reg_3p3v>;
-+	vqmmc-supply = <&reg_module_3v3>;
- 	bus-width = <4>;
- 	no-1-8-v;
- 	status = "disabled";
-@@ -390,7 +390,7 @@
- &usdhc3 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_usdhc3>;
--	vqmmc-supply = <&reg_3p3v>;
-+	vqmmc-supply = <&reg_module_3v3>;
- 	bus-width = <8>;
- 	no-1-8-v;
- 	non-removable;
+-	pinctrl_usdhc3_100mhz: usdhc3100mhzgrp {
+-		fsl,pins = <
+-			MX6QDL_PAD_SD3_CMD__SD3_CMD	0x170b9
+-			MX6QDL_PAD_SD3_CLK__SD3_CLK	0x100b9
+-			MX6QDL_PAD_SD3_DAT0__SD3_DATA0	0x170b9
+-			MX6QDL_PAD_SD3_DAT1__SD3_DATA1	0x170b9
+-			MX6QDL_PAD_SD3_DAT2__SD3_DATA2	0x170b9
+-			MX6QDL_PAD_SD3_DAT3__SD3_DATA3	0x170b9
+-			MX6QDL_PAD_SD3_DAT4__SD3_DATA4	0x170b9
+-			MX6QDL_PAD_SD3_DAT5__SD3_DATA5	0x170b9
+-			MX6QDL_PAD_SD3_DAT6__SD3_DATA6	0x170b9
+-			MX6QDL_PAD_SD3_DAT7__SD3_DATA7	0x170b9
+-			/* eMMC reset */
+-			MX6QDL_PAD_SD3_RST__SD3_RESET	0x170b9
+-		>;
+-	};
+-
+-	pinctrl_usdhc3_200mhz: usdhc3200mhzgrp {
+-		fsl,pins = <
+-			MX6QDL_PAD_SD3_CMD__SD3_CMD	0x170f9
+-			MX6QDL_PAD_SD3_CLK__SD3_CLK	0x100f9
+-			MX6QDL_PAD_SD3_DAT0__SD3_DATA0	0x170f9
+-			MX6QDL_PAD_SD3_DAT1__SD3_DATA1	0x170f9
+-			MX6QDL_PAD_SD3_DAT2__SD3_DATA2	0x170f9
+-			MX6QDL_PAD_SD3_DAT3__SD3_DATA3	0x170f9
+-			MX6QDL_PAD_SD3_DAT4__SD3_DATA4	0x170f9
+-			MX6QDL_PAD_SD3_DAT5__SD3_DATA5	0x170f9
+-			MX6QDL_PAD_SD3_DAT6__SD3_DATA6	0x170f9
+-			MX6QDL_PAD_SD3_DAT7__SD3_DATA7	0x170f9
+-			/* eMMC reset */
+-			MX6QDL_PAD_SD3_RST__SD3_RESET	0x170f9
+-		>;
+-	};
+-
+ 	pinctrl_weim_cs0: weimcs0grp {
+ 		fsl,pins = <
+ 			/* nEXT_CS0 */
 -- 
 2.18.0
