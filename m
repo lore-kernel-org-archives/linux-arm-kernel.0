@@ -1,258 +1,204 @@
-From: jens.wiklander@linaro.org (Jens Wiklander)
-Date: Mon,  9 Jul 2018 08:15:49 +0200
-Subject: [RESEND PATCH] tee: add kernel internal client interface
-Message-ID: <20180709061549.24382-1-jens.wiklander@linaro.org>
+From: o.rempel@pengutronix.de (Oleksij Rempel)
+Date: Mon, 9 Jul 2018 08:20:22 +0200
+Subject: Clarifying dma_wmb behavior in presence of non-coherent masters
+ and outer caches
+In-Reply-To: <20180706122610.GA6993@arm.com>
+References: <1530275290.22468.69.camel@pengutronix.de>
+ <20180629142539.GH17271@n2100.armlinux.org.uk>
+ <20180629162248.GB20010@arm.com>
+ <20180629164801.GJ17271@n2100.armlinux.org.uk>
+ <20180629174321.GA20909@arm.com> <1530539366.22468.89.camel@pengutronix.de>
+ <20180702174552.GD23687@arm.com> <20180706122610.GA6993@arm.com>
+Message-ID: <72f67412-a011-6552-03be-6730a9302ebb@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds a kernel internal TEE client interface to be used by other drivers.
+Hi Will,
 
-Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
----
- drivers/tee/tee_core.c  | 113 +++++++++++++++++++++++++++++++++++++---
- include/linux/tee_drv.h |  73 ++++++++++++++++++++++++++
- 2 files changed, 179 insertions(+), 7 deletions(-)
+On 06.07.2018 14:26, Will Deacon wrote:
+> Hi Lucas,
+> 
+> On Mon, Jul 02, 2018 at 06:45:52PM +0100, Will Deacon wrote:
+>> On Mon, Jul 02, 2018 at 03:49:26PM +0200, Lucas Stach wrote:
+>>> Also the section "External caches", "Before AMBA4 ACE" seems to suggest
+>>> that the barriers aren't fully propagated to the PL310 write-caches and
+>>> master ports. I'm unsure if this is just an artifact of the mentioned
+>>> MMIO access, so handling of normal vs. device memory transactions in
+>>> the PL310.
+>>
+>> I'll check with the hardware folks about the PL310, but I don't see how
+>> you could propagate barriers over AXI3 anyway because I don't think this
+>> stuff existed back then.
+> 
+> Damn. As I feared, you can't propagate the barrier to the PL310, so the
+> A9 is unable to enforce ordering beyond the responses it gets back. The
+> PL310 will then re-order normal memory accesses (including non-cacheable)
+> in its store buffer, so we do actually need a bloody CACHE SYNC here.
+> 
+> Patch below. Does it help?
 
-diff --git a/drivers/tee/tee_core.c b/drivers/tee/tee_core.c
-index dd46b758852a..7b2bb4c50058 100644
---- a/drivers/tee/tee_core.c
-+++ b/drivers/tee/tee_core.c
-@@ -38,15 +38,13 @@ static DEFINE_SPINLOCK(driver_lock);
- static struct class *tee_class;
- static dev_t tee_devt;
- 
--static int tee_open(struct inode *inode, struct file *filp)
-+static struct tee_context *teedev_open(struct tee_device *teedev)
- {
- 	int rc;
--	struct tee_device *teedev;
- 	struct tee_context *ctx;
- 
--	teedev = container_of(inode->i_cdev, struct tee_device, cdev);
- 	if (!tee_device_get(teedev))
--		return -EINVAL;
-+		return ERR_PTR(-EINVAL);
- 
- 	ctx = kzalloc(sizeof(*ctx), GFP_KERNEL);
- 	if (!ctx) {
-@@ -57,16 +55,16 @@ static int tee_open(struct inode *inode, struct file *filp)
- 	kref_init(&ctx->refcount);
- 	ctx->teedev = teedev;
- 	INIT_LIST_HEAD(&ctx->list_shm);
--	filp->private_data = ctx;
- 	rc = teedev->desc->ops->open(ctx);
- 	if (rc)
- 		goto err;
- 
--	return 0;
-+	return ctx;
- err:
- 	kfree(ctx);
- 	tee_device_put(teedev);
--	return rc;
-+	return ERR_PTR(rc);
-+
- }
- 
- void teedev_ctx_get(struct tee_context *ctx)
-@@ -100,6 +98,18 @@ static void teedev_close_context(struct tee_context *ctx)
- 	teedev_ctx_put(ctx);
- }
- 
-+static int tee_open(struct inode *inode, struct file *filp)
-+{
-+	struct tee_context *ctx;
-+
-+	ctx = teedev_open(container_of(inode->i_cdev, struct tee_device, cdev));
-+	if (IS_ERR(ctx))
-+		return PTR_ERR(ctx);
-+
-+	filp->private_data = ctx;
-+	return 0;
-+}
-+
- static int tee_release(struct inode *inode, struct file *filp)
- {
- 	teedev_close_context(filp->private_data);
-@@ -928,6 +938,95 @@ void *tee_get_drvdata(struct tee_device *teedev)
- }
- EXPORT_SYMBOL_GPL(tee_get_drvdata);
- 
-+struct match_dev_data {
-+	struct tee_ioctl_version_data *vers;
-+	const void *data;
-+	int (*match)(struct tee_ioctl_version_data *, const void *);
-+};
-+
-+static int match_dev(struct device *dev, const void *data)
-+{
-+	const struct match_dev_data *match_data = data;
-+	struct tee_device *teedev = container_of(dev, struct tee_device, dev);
-+
-+	teedev->desc->ops->get_version(teedev, match_data->vers);
-+	return match_data->match(match_data->vers, match_data->data);
-+}
-+
-+struct tee_context *
-+tee_client_open_context(struct tee_context *start,
-+			int (*match)(struct tee_ioctl_version_data *,
-+				     const void *),
-+			const void *data, struct tee_ioctl_version_data *vers)
-+{
-+	struct device *dev = NULL;
-+	struct device *put_dev = NULL;
-+	struct tee_context *ctx = NULL;
-+	struct tee_ioctl_version_data v;
-+	struct match_dev_data match_data = { vers ? vers : &v, data, match };
-+
-+	if (start)
-+		dev = &start->teedev->dev;
-+
-+	do {
-+		dev = class_find_device(tee_class, dev, &match_data, match_dev);
-+		if (!dev) {
-+			ctx = ERR_PTR(-ENOENT);
-+			break;
-+		}
-+
-+		put_device(put_dev);
-+		put_dev = dev;
-+
-+		ctx = teedev_open(container_of(dev, struct tee_device, dev));
-+	} while (IS_ERR(ctx) && PTR_ERR(ctx) != -ENOMEM);
-+
-+	put_device(put_dev);
-+	return ctx;
-+}
-+EXPORT_SYMBOL_GPL(tee_client_open_context);
-+
-+void tee_client_close_context(struct tee_context *ctx)
-+{
-+	teedev_close_context(ctx);
-+}
-+EXPORT_SYMBOL_GPL(tee_client_close_context);
-+
-+void tee_client_get_version(struct tee_context *ctx,
-+			    struct tee_ioctl_version_data *vers)
-+{
-+	ctx->teedev->desc->ops->get_version(ctx->teedev, vers);
-+}
-+EXPORT_SYMBOL_GPL(tee_client_get_version);
-+
-+int tee_client_open_session(struct tee_context *ctx,
-+			    struct tee_ioctl_open_session_arg *arg,
-+			    struct tee_param *param)
-+{
-+	if (!ctx->teedev->desc->ops->open_session)
-+		return -EINVAL;
-+	return ctx->teedev->desc->ops->open_session(ctx, arg, param);
-+}
-+EXPORT_SYMBOL_GPL(tee_client_open_session);
-+
-+int tee_client_close_session(struct tee_context *ctx, u32 session)
-+{
-+	if (!ctx->teedev->desc->ops->close_session)
-+		return -EINVAL;
-+	return ctx->teedev->desc->ops->close_session(ctx, session);
-+}
-+EXPORT_SYMBOL_GPL(tee_client_close_session);
-+
-+int tee_client_invoke_func(struct tee_context *ctx,
-+			   struct tee_ioctl_invoke_arg *arg,
-+			   struct tee_param *param)
-+{
-+	if (!ctx->teedev->desc->ops->invoke_func)
-+		return -EINVAL;
-+	return ctx->teedev->desc->ops->invoke_func(ctx, arg, param);
-+}
-+EXPORT_SYMBOL_GPL(tee_client_invoke_func);
-+
- static int __init tee_init(void)
- {
- 	int rc;
-diff --git a/include/linux/tee_drv.h b/include/linux/tee_drv.h
-index a2b3dfcee0b5..6cfe05893a76 100644
---- a/include/linux/tee_drv.h
-+++ b/include/linux/tee_drv.h
-@@ -453,6 +453,79 @@ static inline int tee_shm_get_id(struct tee_shm *shm)
-  */
- struct tee_shm *tee_shm_get_from_id(struct tee_context *ctx, int id);
- 
-+/**
-+ * tee_client_open_context() - Open a TEE context
-+ * @start:	if not NULL, continue search after this context
-+ * @match:	function to check TEE device
-+ * @data:	data for match function
-+ * @vers:	if not NULL, version data of TEE device of the context returned
-+ *
-+ * This function does an operation similar to open("/dev/teeX") in user space.
-+ * A returned context must be released with tee_client_close_context().
-+ *
-+ * Returns a TEE context of the first TEE device matched by the match()
-+ * callback or an ERR_PTR.
-+ */
-+struct tee_context *
-+tee_client_open_context(struct tee_context *start,
-+			int (*match)(struct tee_ioctl_version_data *,
-+				     const void *),
-+			const void *data, struct tee_ioctl_version_data *vers);
-+
-+/**
-+ * tee_client_close_context() - Close a TEE context
-+ * @ctx:	TEE context to close
-+ *
-+ * Note that all sessions previously opened with this context will be
-+ * closed when this function is called.
-+ */
-+void tee_client_close_context(struct tee_context *ctx);
-+
-+/**
-+ * tee_client_get_version() - Query version of TEE
-+ * @ctx:	TEE context to TEE to query
-+ * @vers:	Pointer to version data
-+ */
-+void tee_client_get_version(struct tee_context *ctx,
-+			    struct tee_ioctl_version_data *vers);
-+
-+/**
-+ * tee_client_open_session() - Open a session to a Trusted Application
-+ * @ctx:	TEE context
-+ * @arg:	Open session arguments, see description of
-+ *		struct tee_ioctl_open_session_arg
-+ * @param:	Parameters passed to the Trusted Application
-+ *
-+ * Returns < 0 on error else see @arg->ret for result. If @arg->ret
-+ * is TEEC_SUCCESS the session identifier is available in @arg->session.
-+ */
-+int tee_client_open_session(struct tee_context *ctx,
-+			    struct tee_ioctl_open_session_arg *arg,
-+			    struct tee_param *param);
-+
-+/**
-+ * tee_client_close_session() - Close a session to a Trusted Application
-+ * @ctx:	TEE Context
-+ * @session:	Session id
-+ *
-+ * Return < 0 on error else 0, regardless the session will not be
-+ * valid after this function has returned.
-+ */
-+int tee_client_close_session(struct tee_context *ctx, u32 session);
-+
-+/**
-+ * tee_client_invoke_func() - Invoke a function in a Trusted Application
-+ * @ctx:	TEE Context
-+ * @arg:	Invoke arguments, see description of
-+ *		struct tee_ioctl_invoke_arg
-+ * @param:	Parameters passed to the Trusted Application
-+ *
-+ * Returns < 0 on error else see @arg->ret for result.
-+ */
-+int tee_client_invoke_func(struct tee_context *ctx,
-+			   struct tee_ioctl_invoke_arg *arg,
-+			   struct tee_param *param);
-+
- static inline bool tee_param_is_memref(struct tee_param *param)
- {
- 	switch (param->attr & TEE_IOCTL_PARAM_ATTR_TYPE_MASK) {
--- 
-2.17.1
+Suddenly no.
+Is it possible that I run in to this issue:
+764369: Data or Unified Cache Line Maintenance by MVA Fails on
+Inner-Shareable Memory
+"...
+Note that even when all three components of the workaround are in place,
+this erratum might still occur. However, this occurrence would require
+some extremely rare and complex timing conditions, so that the
+probability of reaching the point of failure is extremely low. This low
+probability, along with the fact that this erratum requires an uncommon
+software scenario, explains why this workaround is likely to be a
+reliable practical solution for most systems.
+To ARM's knowledge, no failure has been observed in any system when all
+three components of this workaround have been implemented.
+For critical systems that cannot cope with the extremely low failure
+risks associated with the above workaround, a second workaround is
+possible which involves changing the mapping of the data being accessed
+so that it is in a non-cacheable area. This ensures that the written
+data remains uncached, which means it is always visible to non-coherent
+agents in the system, or to the instruction side in the case of
+self-modifying code, without any need for cache maintenance operation."
+
+
+> Will
+> 
+> --->8
+> 
+> From 5a2769b45e94b212d21bc44f5940ed5f3bde5cc2 Mon Sep 17 00:00:00 2001
+> From: Will Deacon <will.deacon@arm.com>
+> Date: Wed, 4 Jul 2018 10:56:22 +0100
+> Subject: [PATCH] ARM: barrier: Kick outer-cache and SoC fabric in dma_wmb()
+> 
+> Prior to AMBA4-ACE, the AXI bus protocol had no support for barrier
+> transactions or shareability domains and was therefore unable to enforce
+> ordering between memory accesses either side of a barrier instruction,
+> requiring the CPU to handle all of the ordering itself.
+> 
+> Unfortunately, IP such as the venerable PL310 will re-order stores to
+> Normal memory inside its store-buffer, meaning that accesses to a coherent
+> DMA buffer (i.e. one allocated by dma_alloc_coherent()) can be observed
+> out-of-order by a non-coherent DMA engine unless the PL310 is kicked with
+> a CACHE_SYNC command between buffering the accesses. Whilst this is already
+> the case for mb() and wmb(), dma_wmb() just expands to a DMB OSHST, leading
+> to sequences such as:
+> 
+> 	STR	Rdata, [Rbuf, #DATA_OFFSET]
+> 	DMB	OSHST
+> 	STR	Rvalid, [Rbuf, #VALID_OFFSET]
+> 
+> being reordered such that the DMA device sees the write of valid but not
+> the write of data.
+> 
+> This patch ensures that the SoC fabric and the outer-cache are kicked
+> by dma_wmb() if they are able to buffer transactions outside of the CPU
+> but before the Point of Coherency.
+> 
+> Reported-by: Lucas Stach <l.stach@pengutronix.de>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm/include/asm/barrier.h    | 14 ++++++++++----
+>  arch/arm/include/asm/outercache.h |  6 ++++++
+>  arch/arm/mm/flush.c               | 24 +++++++++++++++++++++++-
+>  3 files changed, 39 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/barrier.h b/arch/arm/include/asm/barrier.h
+> index 69772e742a0a..e31833f72b69 100644
+> --- a/arch/arm/include/asm/barrier.h
+> +++ b/arch/arm/include/asm/barrier.h
+> @@ -53,17 +53,23 @@
+>  #ifdef CONFIG_ARM_HEAVY_MB
+>  extern void (*soc_mb)(void);
+>  extern void arm_heavy_mb(void);
+> -#define __arm_heavy_mb(x...) do { dsb(x); arm_heavy_mb(); } while (0)
+> +extern void arm_heavy_wmb(void);
+> +extern void arm_heavy_dma_wmb(void);
+> +#define __arm_heavy_mb()	arm_heavy_mb()
+> +#define __arm_heavy_wmb()	arm_heavy_wmb()
+> +#define __arm_heavy_dma_wmb()	arm_heavy_dma_wmb()
+>  #else
+> -#define __arm_heavy_mb(x...) dsb(x)
+> +#define __arm_heavy_mb()	dsb()
+> +#define __arm_heavy_wmb()	dsb(st)
+> +#define __arm_heavy_dma_wmb()	dmb(oshst)
+>  #endif
+>  
+>  #if defined(CONFIG_ARM_DMA_MEM_BUFFERABLE) || defined(CONFIG_SMP)
+>  #define mb()		__arm_heavy_mb()
+>  #define rmb()		dsb()
+> -#define wmb()		__arm_heavy_mb(st)
+> +#define wmb()		__arm_heavy_wmb()
+>  #define dma_rmb()	dmb(osh)
+> -#define dma_wmb()	dmb(oshst)
+> +#define dma_wmb()	__arm_heavy_dma_wmb()
+>  #else
+>  #define mb()		barrier()
+>  #define rmb()		barrier()
+> diff --git a/arch/arm/include/asm/outercache.h b/arch/arm/include/asm/outercache.h
+> index c2bf24f40177..e744efe6e2a7 100644
+> --- a/arch/arm/include/asm/outercache.h
+> +++ b/arch/arm/include/asm/outercache.h
+> @@ -43,6 +43,12 @@ struct outer_cache_fns {
+>  
+>  extern struct outer_cache_fns outer_cache;
+>  
+> +#ifdef CONFIG_OUTER_CACHE_SYNC
+> +static inline bool outer_cache_has_sync(void) { return outer_cache.sync; }
+> +#else
+> +static inline bool outer_cache_has_sync(void) { return 0; }
+> +#endif
+> +
+>  #ifdef CONFIG_OUTER_CACHE
+>  /**
+>   * outer_inv_range - invalidate range of outer cache lines
+> diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
+> index 58469623b015..1252689362d8 100644
+> --- a/arch/arm/mm/flush.c
+> +++ b/arch/arm/mm/flush.c
+> @@ -24,7 +24,7 @@
+>  #ifdef CONFIG_ARM_HEAVY_MB
+>  void (*soc_mb)(void);
+>  
+> -void arm_heavy_mb(void)
+> +static void __arm_heavy_sync(void)
+>  {
+>  #ifdef CONFIG_OUTER_CACHE_SYNC
+>  	if (outer_cache.sync)
+> @@ -33,7 +33,29 @@ void arm_heavy_mb(void)
+>  	if (soc_mb)
+>  		soc_mb();
+>  }
+> +
+> +void arm_heavy_mb(void)
+> +{
+> +	dsb();
+> +	__arm_heavy_sync();
+> +}
+>  EXPORT_SYMBOL(arm_heavy_mb);
+> +
+> +void arm_heavy_wmb(void)
+> +{
+> +	dsb(st);
+> +	__arm_heavy_sync();
+> +}
+> +EXPORT_SYMBOL(arm_heavy_wmb);
+> +
+> +void arm_heavy_dma_wmb(void)
+> +{
+> +	if (outer_cache_has_sync() || soc_mb)
+> +		arm_heavy_wmb();
+> +	else
+> +		dmb(oshst);
+> +}
+> +EXPORT_SYMBOL(arm_heavy_dma_wmb);
+>  #endif
+>  
+>  #ifdef CONFIG_CPU_CACHE_VIPT
+> 
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180709/ba850d25/attachment.sig>
