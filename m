@@ -1,127 +1,42 @@
-From: georgi.djakov@linaro.org (Georgi Djakov)
-Date: Mon,  9 Jul 2018 18:51:04 +0300
-Subject: [PATCH v6 8/8] interconnect: Allow endpoints translation via DT
-In-Reply-To: <20180709155104.25528-1-georgi.djakov@linaro.org>
-References: <20180709155104.25528-1-georgi.djakov@linaro.org>
-Message-ID: <20180709155104.25528-9-georgi.djakov@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon,  9 Jul 2018 17:51:17 +0200
+Subject: [PATCH] ARM: imx: call imx6sx_cpuidle_init() conditionally for 6sll
+Message-ID: <20180709155130.2126597-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we support only platform data for specifying the interconnect
-endpoints. As now the endpoints are hard-coded into the consumer driver
-this may lead to complications when a single driver is used by multiple
-SoCs, which may have different interconnect topology.
-To avoid cluttering the consumer drivers, introduce a translation function
-to help us get the board specific interconnect data from device-tree.
+The imx6sl platform has two different cpuidle implementations,
+and fails to link if we only want one of the two:
 
-Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
+arch/arm/mach-imx/mach-imx6sl.o: In function `imx6sl_init_late':
+mach-imx6sl.c:(.init.text+0x12): undefined reference to `imx6sx_cpuidle_init'
+
+This makes the call into reference conditional on the configuration.
+
+Fixes: e7fa1fb39b11 ("ARM: imx: add cpu idle support for i.MX6SLL")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/interconnect/core.c  | 62 ++++++++++++++++++++++++++++++++++++
- include/linux/interconnect.h |  7 ++++
- 2 files changed, 69 insertions(+)
+I had already sent a related patch earlier, but missed this second
+problem then.
+---
+ arch/arm/mach-imx/mach-imx6sl.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/interconnect/core.c b/drivers/interconnect/core.c
-index 3f5001f51bb7..5817f081f6cf 100644
---- a/drivers/interconnect/core.c
-+++ b/drivers/interconnect/core.c
-@@ -16,6 +16,7 @@
- #include <linux/module.h>
- #include <linux/mutex.h>
- #include <linux/slab.h>
-+#include <linux/of.h>
- #include <linux/uaccess.h>
+diff --git a/arch/arm/mach-imx/mach-imx6sl.c b/arch/arm/mach-imx/mach-imx6sl.c
+index 183540e0838b..99be4225297a 100644
+--- a/arch/arm/mach-imx/mach-imx6sl.c
++++ b/arch/arm/mach-imx/mach-imx6sl.c
+@@ -42,9 +42,9 @@ static void __init imx6sl_init_late(void)
+ 	if (IS_ENABLED(CONFIG_ARM_IMX6Q_CPUFREQ))
+ 		platform_device_register_simple("imx6q-cpufreq", -1, NULL, 0);
  
- static DEFINE_IDR(icc_idr);
-@@ -294,6 +295,67 @@ static int apply_constraints(struct icc_path *path)
- 	return ret;
+-	if (cpu_is_imx6sl())
++	if (IS_ENABLED(CONFIG_SOC_IMX6SL) && cpu_is_imx6sl())
+ 		imx6sl_cpuidle_init();
+-	else
++	else if (IS_ENABLED(CONFIG_SOC_IMX6SLL))
+ 		imx6sx_cpuidle_init();
  }
  
-+struct icc_path *of_icc_get(struct device *dev, const char *name)
-+{
-+	struct device_node *np = NULL;
-+	struct of_phandle_args src_args, dst_args;
-+	u32 src_id, dst_id;
-+	int idx = 0;
-+	int ret;
-+
-+	if (!dev || !dev->of_node)
-+		return ERR_PTR(-ENODEV);
-+
-+	np = dev->of_node;
-+
-+	/*
-+	 * When the consumer DT node do not have "interconnects" property
-+	 * return a NULL path to skip setting constraints.
-+	 */
-+	if (!of_find_property(np, "interconnects", NULL))
-+		return NULL;
-+
-+	/*
-+	 * We use a combination of phandle and specifier for endpoint. For now
-+	 * lets support only global ids and extend this is the future if needed
-+	 * without breaking DT compatibility.
-+	 */
-+	if (name) {
-+		idx = of_property_match_string(np, "interconnect-names", name);
-+		if (idx < 0)
-+			return ERR_PTR(idx);
-+	}
-+
-+	ret = of_parse_phandle_with_args(np, "interconnects",
-+					 "#interconnect-cells", idx * 2,
-+					 &src_args);
-+	if (ret)
-+		return ERR_PTR(ret);
-+
-+	of_node_put(src_args.np);
-+
-+	if (!src_args.args_count || src_args.args_count > 1)
-+		return ERR_PTR(-EINVAL);
-+
-+	src_id = src_args.args[0];
-+
-+	ret = of_parse_phandle_with_args(np, "interconnects",
-+					 "#interconnect-cells", idx * 2 + 1,
-+					 &dst_args);
-+	if (ret)
-+		return ERR_PTR(ret);
-+
-+	of_node_put(dst_args.np);
-+
-+	if (!dst_args.args_count || dst_args.args_count > 1)
-+		return ERR_PTR(-EINVAL);
-+
-+	dst_id = dst_args.args[0];
-+
-+	return icc_get(dev, src_id, dst_id);
-+}
-+EXPORT_SYMBOL_GPL(of_icc_get);
-+
- /**
-  * icc_set() - set constraints on an interconnect path between two endpoints
-  * @path: reference to the path returned by icc_get()
-diff --git a/include/linux/interconnect.h b/include/linux/interconnect.h
-index 593215371fd6..ae6744da9bc2 100644
---- a/include/linux/interconnect.h
-+++ b/include/linux/interconnect.h
-@@ -17,6 +17,7 @@ struct device;
- 
- struct icc_path *icc_get(struct device *dev, const int src_id,
- 			 const int dst_id);
-+struct icc_path *of_icc_get(struct device *dev, const char *name);
- void icc_put(struct icc_path *path);
- int icc_set(struct icc_path *path, u32 avg_bw, u32 peak_bw);
- 
-@@ -28,6 +29,12 @@ static inline struct icc_path *icc_get(struct device *dev, const int src_id,
- 	return NULL;
- }
- 
-+static inline struct icc_path *of_icc_get(struct device *dev,
-+					  const char *name)
-+{
-+	return NULL;
-+}
-+
- static inline void icc_put(struct icc_path *path)
- {
- }
+-- 
+2.9.0
