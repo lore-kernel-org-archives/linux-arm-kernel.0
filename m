@@ -1,66 +1,52 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon,  9 Jul 2018 08:30:34 -0700
-Subject: [GIT PULL 5/6] Broadcom drivers changes for 4.19
-In-Reply-To: <20180709153035.6376-1-f.fainelli@gmail.com>
-References: <20180709153035.6376-1-f.fainelli@gmail.com>
-Message-ID: <20180709153035.6376-5-f.fainelli@gmail.com>
+From: alexander.stein@systec-electronic.com (Alexander Stein)
+Date: Mon, 09 Jul 2018 17:31:24 +0200
+Subject: [PATCH] gpio: aspeed: fix compile testing warning
+In-Reply-To: <20180709145612.4166409-1-arnd@arndb.de>
+References: <20180709145612.4166409-1-arnd@arndb.de>
+Message-ID: <3652696.6JvIze6Ubc@ws-140106>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
+On Monday, July 9, 2018, 4:56:03 PM CEST Arnd Bergmann wrote:
+> Gcc cannot always see that BUG_ON(1) is guaranteed to not
+> return, so we get a warning message in some configurations:
+> 
+> drivers/gpio/gpio-aspeed.c: In function 'bank_reg':
+> drivers/gpio/gpio-aspeed.c:244:1: error: control reaches end of non-void
+> function [-Werror=return-type]
+> 
+> Using a plain BUG() is easier here and avoids the problem.
+> 
+> Fixes: 44ddf559d579 ("gpio: aspeed: Rework register type accessors")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  drivers/gpio/gpio-aspeed.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/gpio/gpio-aspeed.c b/drivers/gpio/gpio-aspeed.c
+> index 1e00f4045f9d..2342e154029b 100644
+> --- a/drivers/gpio/gpio-aspeed.c
+> +++ b/drivers/gpio/gpio-aspeed.c
+> @@ -240,7 +240,7 @@ static inline void __iomem *bank_reg(struct aspeed_gpio
+> *gpio, case reg_cmdsrc1:
+>  		return gpio->base + bank->cmdsrc_regs + GPIO_CMDSRC_1;
+>  	}
+> -	BUG_ON(1);
+> +	BUG();
+>  }
+> 
+>  #define GPIO_BANK(x)	((x) >> 5)
 
-  Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+Is the semantic of BUG() (and BUG_ON as well) to never return? If so, then 
+just an idea: Is it possible to add some macro magic in BUG_ON(x) to fail 
+compiling if x is compile-constant? Giving a hint the passed condition always 
+fails, which indicates a problem, at least to me.
+>From a short search I found this in drivers/gpu/vga/vgaarb.c L630-633:
+>	if (vgadev_find(pdev) != NULL) {
+>		BUG_ON(1);
+>		goto fail;
+>	}
+You can't fail with a BUG_ON(1) and try to do some error handling after that.
 
-are available in the git repository at:
-
-  https://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.19/drivers
-
-for you to fetch changes up to 25ee284c21a8d950af463d4235995eeecc5fc70b:
-
-  Merge tag 'bcm2835-drivers-next-2018-07-03' into drivers/next (2018-07-09 05:22:16 -0700)
-
-----------------------------------------------------------------
-This pull request contains Broadcom ARM/ARM64/MIPS SoCs drivers changes
-for 4.19, please pull the following:
-
-- Doug updates the low-level suspend/resume code for ARM SoCs to support
-  the latest rev B3.0 memory controllers found on newer chips with an
-  appropriate match structure to perform the correct entry sequencing
-
-- Florian updates the Device Tree binding document for these memory
-  controllers to list all possible compatible strings that exist given
-   the supported memory controllers.
-
-- Stefan adds the GET_THROTTLED firmware property value that is required
-  for the Rasperry Pi voltage monitoring driver and updates the
-  Raspberry Pi firmware driver accordingly to register such a device using
-  the HWMON subsystem. Finally he adds support for reporting under
-  voltage conditions using a specialized HWMON driver.
-
-----------------------------------------------------------------
-Doug Berger (1):
-      soc: bcm: brcmstb: pm: Add support for newer rev B3.0 controllers
-
-Florian Fainelli (2):
-      soc: bcm: brcmstb: Add missing DDR MEMC compatible strings
-      Merge tag 'bcm2835-drivers-next-2018-07-03' into drivers/next
-
-Kees Cook (1):
-      firmware: raspberrypi: Remove VLA usage
-
-Stefan Wahren (3):
-      ARM: bcm2835: Add GET_THROTTLED firmware property
-      hwmon: Add support for RPi voltage sensor
-      firmware: raspberrypi: Register hwmon driver
-
- .../devicetree/bindings/arm/bcm/brcm,brcmstb.txt   |   4 +
- Documentation/hwmon/raspberrypi-hwmon              |  22 +++
- drivers/firmware/raspberrypi.c                     |  29 +++-
- drivers/hwmon/Kconfig                              |  10 ++
- drivers/hwmon/Makefile                             |   1 +
- drivers/hwmon/raspberrypi-hwmon.c                  | 166 +++++++++++++++++++++
- drivers/soc/bcm/brcmstb/pm/pm-arm.c                |  16 ++
- include/soc/bcm2835/raspberrypi-firmware.h         |   1 +
- 8 files changed, 247 insertions(+), 2 deletions(-)
- create mode 100644 Documentation/hwmon/raspberrypi-hwmon
- create mode 100644 drivers/hwmon/raspberrypi-hwmon.c
+Best regards,
+Alexander
