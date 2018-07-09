@@ -1,48 +1,69 @@
-From: vkoul@kernel.org (Vinod)
-Date: Mon, 9 Jul 2018 16:04:38 +0530
-Subject: [PATCH v2 1/4] dt-bindings: k3dma: add optional property
- hisilicon,dma-min-chan
-In-Reply-To: <20180706035521.13736-2-guodong.xu@linaro.org>
-References: <20180706035521.13736-1-guodong.xu@linaro.org>
- <20180706035521.13736-2-guodong.xu@linaro.org>
-Message-ID: <20180709103438.GC22377@vkoul-mobl>
+From: laurentiu.tudor@nxp.com (Laurentiu Tudor)
+Date: Mon, 9 Jul 2018 10:37:41 +0000
+Subject: [PATCH 1/2] staging:fsl-mc: Move DPIO from staging to
+ drivers/soc/fsl
+In-Reply-To: <20180705194113.16256-2-roy.pledge@nxp.com>
+References: <20180705194113.16256-1-roy.pledge@nxp.com>
+ <20180705194113.16256-2-roy.pledge@nxp.com>
+Message-ID: <119c6fc6-a32d-45a5-96ea-f6e9959b1e74@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06-07-18, 11:55, Guodong Xu wrote:
-> From: Li Yu <liyu65@hisilicon.com>
+Hi Roy,
+
+Couple of comments inline.
+
+On 05.07.2018 22:41, Roy Pledge wrote:
+> Move the NXP DPIO (Datapath I/O Driver) out of the
+> drivers/staging directory and into the drivers/soc/fsl directory.
 > 
-> Add optional property hisilicon,dma-min-chan for k3dma.
+> The DPIO driver enables access to Queue and Buffer Manager (QBMAN)
+> hardware on NXP DPAA2 devices. This is a prerequisite to moving the
+> DPAA2 Ethernet driver out of staging.
 > 
-> Signed-off-by: Li Yu <liyu65@hisilicon.com>
-> Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
+> Signed-off-by: Roy Pledge <roy.pledge@nxp.com>
 > ---
->  Documentation/devicetree/bindings/dma/k3dma.txt | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/dma/k3dma.txt b/Documentation/devicetree/bindings/dma/k3dma.txt
-> index 4945aeac4dc4..f34202a80f3c 100644
-> --- a/Documentation/devicetree/bindings/dma/k3dma.txt
-> +++ b/Documentation/devicetree/bindings/dma/k3dma.txt
-> @@ -12,6 +12,11 @@ Required properties:
->  		have specific request line
->  - clocks: clock required
->  
-> +Optional properties:
-> +- hisilicon,dma-min-chan: the minimum DMA channel number which is usable
-> +		Default value is 0, but in some platform it is
-> +		configured 1, like in hi3660 platform
-> +
->  Example:
->  
->  Controller:
-> @@ -21,6 +26,7 @@ Controller:
->  			#dma-cells = <1>;
->  			dma-channels = <16>;
->  			dma-requests = <27>;
-> +			hisilicon,dma-min-chan = <1>;
+>   MAINTAINERS                                                    |  2 +-
+>   drivers/crypto/caam/sg_sw_qm2.h                                |  2 +-
+>   drivers/crypto/caam/sg_sw_sec4.h                               |  2 +-
+>   drivers/soc/fsl/Kconfig                                        | 10 ++++++++++
+>   drivers/soc/fsl/Makefile                                       |  1 +
+>   drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/Makefile          |  0
+>   drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio-cmd.h        |  0
+>   drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio-driver.c     |  2 +-
+>   drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio-driver.txt   |  0
 
-Am still expecting this to be a mask
+Maybe this should be converted to .rst and go in the already existing
+Documentation/networking/dpaa2/?
 
--- 
-~Vinod
+>   drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio-service.c    |  2 +-
+>   drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio.c            |  0
+>   drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio.h            |  0
+>   drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/qbman-portal.c    |  2 +-
+>   drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/qbman-portal.h    |  2 +-
+>   drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h                 |  4 ++--
+>   drivers/staging/fsl-mc/bus/Kconfig                             |  9 ---------
+>   drivers/staging/fsl-mc/bus/Makefile                            |  2 --
+>   {drivers/staging/fsl-mc/include => include/soc/fsl}/dpaa2-fd.h |  0
+>   .../staging/fsl-mc/include => include/soc/fsl}/dpaa2-global.h  |  0
+>   {drivers/staging/fsl-mc/include => include/soc/fsl}/dpaa2-io.h |  0
+>   20 files changed, 20 insertions(+), 20 deletions(-)
+>   rename drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/Makefile (100%)
+>   rename drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio-cmd.h (100%)
+>   rename drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio-driver.c (99%)
+>   rename drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio-driver.txt (100%)
+>   rename drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio-service.c (99%)
+>   rename drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio.c (100%)
+>   rename drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio.h (100%)
+>   rename drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/qbman-portal.c (99%)
+>   rename drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/qbman-portal.h (99%)
+>   rename {drivers/staging/fsl-mc/include => include/soc/fsl}/dpaa2-fd.h (100%)
+>   rename {drivers/staging/fsl-mc/include => include/soc/fsl}/dpaa2-global.h (100%)
+>   rename {drivers/staging/fsl-mc/include => include/soc/fsl}/dpaa2-io.h (100%)
+
+I received feedback in the past on mc-bus that a driver should limit to 
+only one public header and one private one. Would it make sense to do 
+the same for dpio too?
+
+---
+Best Regards, Laurentiu
