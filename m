@@ -1,86 +1,101 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 9 Jul 2018 11:47:44 +0100
-Subject: [PATCH] KVM: arm64: vgic-its: Remove VLA usage
-In-Reply-To: <CAGXu5jJcqMX7HjvgqcR37jnuN48PtyHd+VVmfcQH6YfXXSpO_g@mail.gmail.com>
-References: <20180629184618.GA37364@beast>
- <19f9ddb1-6009-850c-1949-3a8cdacdd2fc@redhat.com>
- <CAGXu5jJcqMX7HjvgqcR37jnuN48PtyHd+VVmfcQH6YfXXSpO_g@mail.gmail.com>
-Message-ID: <f213e03a-66a6-0c07-7bb8-2061b9c24731@arm.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 9 Jul 2018 12:49:43 +0200
+Subject: droid 4 in v4.18-rc: grep -r adasfasd /sys/ oopses
+In-Reply-To: <20180709102852.GA20580@amd>
+References: <20180708174939.GA10002@amd> <20180708193720.GA13262@amd>
+ <20180709102852.GA20580@amd>
+Message-ID: <20180709104943.GA5212@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi kees,
+Hi!
 
-On 02/07/18 18:15, Kees Cook wrote:
-> On Mon, Jul 2, 2018 at 12:36 AM, Auger Eric <eric.auger@redhat.com> wrote:
->> Hi Kees,
->>
->> On 06/29/2018 08:46 PM, Kees Cook wrote:
->>> In the quest to remove all stack VLA usage from the kernel[1], this
->>> switches to using a maximum size and adds sanity checks. Additionally
->>> cleans up some of the int-vs-u32 usage and adds additional bounds checking.
->>> As it currently stands, this will always be 8 bytes until the ABI changes.
->>>
->>> [1] https://lkml.kernel.org/r/CA+55aFzCG-zNmZwX4A2FQpadafLfEzK6CC=qPXydAacU1RqZWA at mail.gmail.com
->>>
->>> Cc: Christoffer Dall <christoffer.dall@arm.com>
->>> Cc: Marc Zyngier <marc.zyngier@arm.com>
->>> Cc: Eric Auger <eric.auger@redhat.com>
->>> Cc: Andre Przywara <andre.przywara@arm.com>
->>> Cc: linux-arm-kernel at lists.infradead.org
->>> Cc: kvmarm at lists.cs.columbia.edu
->>> Signed-off-by: Kees Cook <keescook@chromium.org>
->>> ---
->>>  virt/kvm/arm/vgic/vgic-its.c | 19 +++++++++++++++----
->>>  1 file changed, 15 insertions(+), 4 deletions(-)
->>>
->>> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
->>> index 4ed79c939fb4..3143fc047fcf 100644
->>> --- a/virt/kvm/arm/vgic/vgic-its.c
->>> +++ b/virt/kvm/arm/vgic/vgic-its.c
->>> @@ -168,8 +168,14 @@ struct vgic_its_abi {
->>>       int (*commit)(struct vgic_its *its);
->>>  };
->>>
->>> +#define ABI_0_ESZ    8
->>> +#define ESZ_MAX              ABI_0_ESZ
->>> +
->>>  static const struct vgic_its_abi its_table_abi_versions[] = {
->>> -     [0] = {.cte_esz = 8, .dte_esz = 8, .ite_esz = 8,
->>> +     [0] = {
->>> +      .cte_esz = ABI_0_ESZ,
->>> +      .dte_esz = ABI_0_ESZ,
->>> +      .ite_esz = ABI_0_ESZ,
->>>        .save_tables = vgic_its_save_tables_v0,
->>>        .restore_tables = vgic_its_restore_tables_v0,
->>>        .commit = vgic_its_commit_v0,
->>> @@ -180,10 +186,12 @@ static const struct vgic_its_abi its_table_abi_versions[] = {
->>>
->>>  inline const struct vgic_its_abi *vgic_its_get_abi(struct vgic_its *its)
->>>  {
->>> +     if (WARN_ON(its->abi_rev >= NR_ITS_ABIS))
->>> +             return NULL;
->>>       return &its_table_abi_versions[its->abi_rev];
->>>  }
->>>
->>> -int vgic_its_set_abi(struct vgic_its *its, int rev)
->>> +static int vgic_its_set_abi(struct vgic_its *its, u32 rev)
->>>  {
->> if vgic_its_get_abi is likely to return NULL, don't we need to check abi
->> != NULL in all call sites.
+> > > grep in /sys produces a nasty oops:
+> > > 
+> > > I guess next step is trying to find out which file that is..
+> > 
+> > Let me see...
+> > 
+> > openat(6, "suspend",
+> > O_RDONLY|O_NOCTTY|O_NONBLOCK|O_LARGEFILE|O_NOFOLLOW) = 4
+> > fstat64(4, {st_mode=S_IFREG|0644, st_size=0, ...}) = 0
+> > read(4, 0x4d2000, 32768)                = -1 EINVAL (Invalid argument)
+> > write(2, "grep: ", 6grep: )                   = 6
+> > write(2, "/sys/kernel/debug/pm_debug/cefus"...,
+> > 47/sys/kernel/debug/pm_debug/cefuse_pwrdm/suspend) = 47
+> > write(2, ": Invalid argument", 18: Invalid argument)      = 18
+> > write(2, "\n", 1
+> > )                       = 1
+> > close(4)                                = 0
+> > close(6)                                = 0
+> > openat(5, "time", O_RDONLY|O_NOCTTY|O_NONBLOCK|O_LARGEFILE|O_NOFOLLOW)
+> > = 4
+> > fstat64(4, {st_mode=S_IFREG|0444, st_size=0, ...}) = 0
+> > read(4, "cefuse_pwrdm (OFF),OFF:641441757"..., 32768) = 849
+> > read(4, "", 28672)                      = 0
+> > close(4)                                = 0
+> > openat(5, "count",
+> > O_RDONLY|O_NOCTTY|O_NONBLOCK|O_LARGEFILE|O_NOFOLLOW) = 4
+> > Connection to usb closed by remote host.
+> > Connection to usb closed.
+> > pavel at half:~$
+> > 
+> > Ok, so it seems to be:
+> > 
+> > user at devuan:~$ cat /sys/kernel/debug/pm_debug/count
+> > (oops).
+> > 
+> > The file seems to be world-readable.
+> > 
+> > user at devuan:~$ ls -al /sys/kernel/debug/pm_debug/count
+> > -r--r--r-- 1 root root 0 Jan  1  1970 /sys/kernel/debug/pm_debug/count
+> > 
+> > But on PC, that file does not exist.
 > 
-> My thinking was that since it should never happen, a WARN_ON would be
-> sufficient. But I can drop all these changes if you want. I just
-> wanted to see the VLA removed. :)
+> Ok, it is easier to reproduce like this:
+> 
+> sudo mount /dev/zero -t debugfs /sys/kernel/debug/
+> sudo cat /sys/kernel/debug/pm_debug/count
+> 
+> I tried adding debugging like this:
 
-Are you going to respin this patch limiting it to just the VLA changes?
-I'm actively queuing stuff for the next merge window, and it'd be good
-to get that one in.
+Confused.
 
-Alternatively, I can drop the WARN_ONs myself. Just let me know.
 
-Thanks,
+>  	seq_printf(s, "%s->%s (%d)\n", clkdm->name, clkdm->pwrdm.ptr->name,
+>  		   clkdm->usecount);
 
-	M.
+I replaced seq_prinf with printk, and it still crashes, after
+producing reasonable output.
+
+[   74.852508] cmp...
+[   74.855773] printf...
+[   74.859313] l4_cfg_clkdm->core_pwrdm (0)
+[   74.864532] done...
+[   74.867889] cmp...
+[   74.871154] printf...
+[   74.874694] l4_cefuse_clkdm->cefuse_pwrdm (0)
+[   74.880340] done...
+[   74.883728] ------------[ cut here ]------------
+[   74.889709] WARNING: CPU: 0 PID: 2127 at
+drivers/bus/omap_l3_noc.c:147 l3_interrupt_handler+0x23c/0x380
+[   74.900695] 44000000.ocp:L3 Custom Error: MASTER MPU TARGET L4PER2
+(Read): Data Access in User mode during Functional access
+[   74.915222] Modules linked in:
+[   74.919982] CPU: 0 PID: 2127 Comm: cat Not tainted
+4.18.0-rc4-88970-gf075a2c-dirty #763
+[   74.929870] Hardware name: Generic OMAP4 (Flattened Device Tree)
+[   74.937805] [<c010f6cc>] (unwind_backtrace) from [<c010ba50>]
+(show_stack+0x10/0x14)
+
+									Pavel
 -- 
-Jazz is not dead. It just smells funny...
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180709/5bced3c0/attachment.sig>
