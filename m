@@ -1,36 +1,52 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 9 Jul 2018 05:20:13 -0700
-Subject: [GIT PULL 1/4] bcm2835-dt-next-2018-07-03
-In-Reply-To: <20180703200511.2725-1-eric@anholt.net>
-References: <20180703200511.2725-1-eric@anholt.net>
-Message-ID: <74756307-2c22-e7de-386f-fb819ba8e3ed@gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon,  9 Jul 2018 14:19:54 +0200
+Subject: [PATCH 0/2] CMA: remove unsupported gfp mask parameter
+References: <CGME20180709122018eucas1p277147b1e6385d552b5a8930d0a8ba91c@eucas1p2.samsung.com>
+Message-ID: <20180709122018eucas1p277147b1e6385d552b5a8930d0a8ba91c~-sqSan6292733527335eucas1p2-@eucas1p2.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Dear All,
+
+The CMA related functions cma_alloc() and dma_alloc_from_contiguous()
+have gfp mask parameter, but sadly they only support __GFP_NOWARN flag.
+This gave their users a misleading feeling that any standard memory
+allocation flags are supported, what resulted in the security issue when
+caller have set __GFP_ZERO flag and expected the buffer to be cleared.
+
+This patchset changes gfp_mask parameter to a simple boolean no_warn
+argument, which covers all the underlaying code supports.
+
+This patchset is a result of the following discussion:
+https://patchwork.kernel.org/patch/10461919/
+
+Best regards
+Marek Szyprowski
+Samsung R&D Institute Poland
 
 
-On 07/03/2018 01:05 PM, Eric Anholt wrote:
-> Hi Florian,
-> 
-> The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
-> 
->   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
-> 
-> are available in the Git repository at:
-> 
->   git://github.com/anholt/linux tags/bcm2835-dt-next-2018-07-03
-> 
-> for you to fetch changes up to 7503668f7287a359f234cd000f4ca8572e40677b:
-> 
->   ARM: dts: bcm283x: Add Transposer block (2018-07-02 12:46:20 -0700)
-> 
-> ----------------------------------------------------------------
-> This pull request brings in a board DT for the Raspberry Pi Compute
-> Module and its I/O board, the Pi3's PMU node, and the display's
-> transposer block.
-> 
-> ----------------------------------------------------------------
+Patch summary:
 
-Merged, thanks Eric!
+Marek Szyprowski (2):
+  mm/cma: remove unsupported gfp_mask parameter from cma_alloc()
+  dma: remove unsupported gfp_mask parameter from
+    dma_alloc_from_contiguous()
+
+ arch/arm/mm/dma-mapping.c                  | 5 +++--
+ arch/arm64/mm/dma-mapping.c                | 4 ++--
+ arch/powerpc/kvm/book3s_hv_builtin.c       | 2 +-
+ arch/xtensa/kernel/pci-dma.c               | 2 +-
+ drivers/iommu/amd_iommu.c                  | 2 +-
+ drivers/iommu/intel-iommu.c                | 3 ++-
+ drivers/s390/char/vmcp.c                   | 2 +-
+ drivers/staging/android/ion/ion_cma_heap.c | 2 +-
+ include/linux/cma.h                        | 2 +-
+ include/linux/dma-contiguous.h             | 4 ++--
+ kernel/dma/contiguous.c                    | 6 +++---
+ kernel/dma/direct.c                        | 3 ++-
+ mm/cma.c                                   | 8 ++++----
+ mm/cma_debug.c                             | 2 +-
+ 14 files changed, 25 insertions(+), 22 deletions(-)
+
 -- 
-Florian
+2.17.1
