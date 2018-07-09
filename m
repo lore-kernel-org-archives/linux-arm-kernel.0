@@ -1,69 +1,161 @@
-From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Mon, 9 Jul 2018 14:59:33 +0000
-Subject: [PATCH 2/2] PCI: imx: Initial imx7d pm support
-In-Reply-To: <1530607328.22468.102.camel@pengutronix.de>
-References: <cover.1527621510.git.leonard.crestez@nxp.com>
- <a6176c8bcfbca08ce4e93e304bdcd48c4600f8e2.1527621510.git.leonard.crestez@nxp.com>
- <1528468422.26356.20.camel@pengutronix.de>
- <02207512447db4585a4e879e2a059ba223d57dbe.camel@nxp.com>
- <1530607328.22468.102.camel@pengutronix.de>
-Message-ID: <e36fac6f4907288c58a7dfa112541e73de957d46.camel@nxp.com>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Mon,  9 Jul 2018 15:41:22 +0100
+Subject: [PATCH v5 5/7] KVM: arm64: Support handling access faults for PUD
+ hugepages
+In-Reply-To: <20180709144124.29164-1-punit.agrawal@arm.com>
+References: <20180709143835.28971-1-punit.agrawal@arm.com>
+ <20180709144124.29164-1-punit.agrawal@arm.com>
+Message-ID: <20180709144124.29164-5-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2018-07-03 at 10:42 +0200, Lucas Stach wrote:
-> Am Montag, den 02.07.2018, 17:18 +0000 schrieb Leonard Crestez:
-> > On Fri, 2018-06-08 at 16:33 +0200, Lucas Stach wrote:
-> > > Am Dienstag, den 29.05.2018, 22:39 +0300 schrieb Leonard Crestez:
-> > > > On imx7d the phy is turned off in suspend and must be reset on resume.
-> > > > Right now lspci -v fails after a suspend/resume cycle, fix this by
-> > > > adding minimal suspend/resume code from the nxp vendor tree.
-> > > > 
-> > > > This is currently only enabled for imx7 but the same sequence can be
-> > > > applied to other imx pcie variants.
-> > > > +#ifdef CONFIG_PM_SLEEP
-> > 
-> > Another issue that should be discussed here is that on 6sx and 7d the
-> > gpc PCIE power domain is not defined correctly: the PCIE block is in
-> > the DISPMIX domain on both SOCs and it is only PCIE_PHY which has a
-> > separate power domain.
-> > 
-> > This matters: enabling power-gating for displays will break pcie if
-> > this relationship is not taken into account. Here are some options:
-> > 
-> > 1) Make &pd_pcie a child of &pd_disp by hacking into gpc probe
-> > functions and calling pm_genpd_add_subdomain. Not very nice.
-> > 
-> > 2) Support nesting PGCs in GPC code? Lots of code and still an
-> > incorrect representation of hardware.
-> > 
-> > 3) Set power-domains = <&pd_disp> and enable runtime PM on &pd_pcie?
-> > 
-> > 4) Add separate devices for the pcie-phy. These would be mostly empty
-> > but still different, for example on imx6sx the PHY is not even
-> > accessible on the bus but only though PCIE registers.
-> 
-> 5) Take a look at the linux-pm list. ;) The power domain framework has
-> just gained support for multiple power domains per device. I think that
->  is the right solution for this, as like you mentioned the PHY isn't
-> really a separate block on i.MX6, but part of the PCIe controller
-> device.
+In preparation for creating larger hugepages at Stage 2, extend the
+access fault handling at Stage 2 to support PUD hugepages when
+encountered.
 
-Yes, I noticed that earlier but not that it was merged recently. It is
-a better solution.
+Provide trivial helpers for arm32 to allow sharing of code.
 
-Unfortunately the multiple power-domain code seems to require devices
-to explicitly fetch references to the power domains and manipulate
-them. As far as I can tell this means that every device using multiple
-power domains has to be modified to do so. In this particular case it
-would be useful to just have all power domains turned on before probe,
-just like when a single power-domain is specified:
+Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+Cc: Christoffer Dall <christoffer.dall@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/include/asm/kvm_mmu.h   |  8 ++++++++
+ arch/arm64/include/asm/kvm_mmu.h |  7 +++++++
+ arch/arm64/include/asm/pgtable.h |  6 ++++++
+ virt/kvm/arm/mmu.c               | 29 ++++++++++++++++-------------
+ 4 files changed, 37 insertions(+), 13 deletions(-)
 
-    power-domains = <&pd_pci>, <&pd_disp>;
-
-But this issue is not strictly related to imx7d pci hanging on
-suspend/resume, it can be dealt with later.
-
---
-Regards,
-Leonard
+diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+index d05c8986e495..a4298d429efc 100644
+--- a/arch/arm/include/asm/kvm_mmu.h
++++ b/arch/arm/include/asm/kvm_mmu.h
+@@ -78,6 +78,8 @@ void kvm_clear_hyp_idmap(void);
+ #define kvm_pfn_pte(pfn, prot)	pfn_pte(pfn, prot)
+ #define kvm_pfn_pmd(pfn, prot)	pfn_pmd(pfn, prot)
+ 
++#define kvm_pud_pfn(pud)	(((pud_val(pud) & PUD_MASK) & PHYS_MASK) >> PAGE_SHIFT)
++
+ #define kvm_pmd_mkhuge(pmd)	pmd_mkhuge(pmd)
+ 
+ /*
+@@ -102,6 +104,12 @@ static inline bool kvm_s2pud_exec(pud_t *pud)
+ 	return false;
+ }
+ 
++static inline pud_t kvm_s2pud_mkyoung(pud_t pud)
++{
++	BUG();
++	return pud;
++}
++
+ static inline void kvm_set_pmd(pmd_t *pmd, pmd_t new_pmd)
+ {
+ 	*pmd = new_pmd;
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index 15bc1be8f82f..4d2780c588b0 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -175,6 +175,8 @@ void kvm_clear_hyp_idmap(void);
+ #define kvm_pfn_pte(pfn, prot)		pfn_pte(pfn, prot)
+ #define kvm_pfn_pmd(pfn, prot)		pfn_pmd(pfn, prot)
+ 
++#define kvm_pud_pfn(pud)		pud_pfn(pud)
++
+ #define kvm_pmd_mkhuge(pmd)		pmd_mkhuge(pmd)
+ 
+ static inline pte_t kvm_s2pte_mkwrite(pte_t pte)
+@@ -254,6 +256,11 @@ static inline bool kvm_s2pud_exec(pud_t *pudp)
+ 	return !(READ_ONCE(pud_val(*pudp)) & PUD_S2_XN);
+ }
+ 
++static inline pud_t kvm_s2pud_mkyoung(pud_t pud)
++{
++	return pud_mkyoung(pud);
++}
++
+ static inline bool kvm_page_empty(void *ptr)
+ {
+ 	struct page *ptr_page = virt_to_page(ptr);
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+index 1bdeca8918a6..a64a5c35beb1 100644
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -314,6 +314,11 @@ static inline pte_t pud_pte(pud_t pud)
+ 	return __pte(pud_val(pud));
+ }
+ 
++static inline pud_t pte_pud(pte_t pte)
++{
++	return __pud(pte_val(pte));
++}
++
+ static inline pmd_t pud_pmd(pud_t pud)
+ {
+ 	return __pmd(pud_val(pud));
+@@ -380,6 +385,7 @@ static inline int pmd_protnone(pmd_t pmd)
+ #define pfn_pmd(pfn,prot)	__pmd(__phys_to_pmd_val((phys_addr_t)(pfn) << PAGE_SHIFT) | pgprot_val(prot))
+ #define mk_pmd(page,prot)	pfn_pmd(page_to_pfn(page),prot)
+ 
++#define pud_mkyoung(pud)	pte_pud(pte_mkyoung(pud_pte(pud)))
+ #define pud_write(pud)		pte_write(pud_pte(pud))
+ 
+ #define __pud_to_phys(pud)	__pte_to_phys(pud_pte(pud))
+diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+index e73909a31e02..d2c705e31584 100644
+--- a/virt/kvm/arm/mmu.c
++++ b/virt/kvm/arm/mmu.c
+@@ -1637,33 +1637,36 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+  */
+ static void handle_access_fault(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa)
+ {
+-	pmd_t *pmd;
+-	pte_t *pte;
++	pud_t *pud = NULL;
++	pmd_t *pmd = NULL;
++	pte_t *pte = NULL;
+ 	kvm_pfn_t pfn;
+-	bool pfn_valid = false;
++	bool found, pfn_valid = false;
+ 
+ 	trace_kvm_access_fault(fault_ipa);
+ 
+ 	spin_lock(&vcpu->kvm->mmu_lock);
+ 
+-	pmd = stage2_get_pmd(vcpu->kvm, NULL, fault_ipa);
+-	if (!pmd || pmd_none(*pmd))	/* Nothing there */
++	found = stage2_get_leaf_entry(vcpu->kvm, fault_ipa, &pud, &pmd, &pte);
++	if (!found)
+ 		goto out;
+ 
+-	if (pmd_thp_or_huge(*pmd)) {	/* THP, HugeTLB */
++	if (pud) {		/* HugeTLB */
++		*pud = kvm_s2pud_mkyoung(*pud);
++		pfn = kvm_pud_pfn(*pud);
++		pfn_valid = true;
++		goto out;
++	} else 	if (pmd) {	/* THP, HugeTLB */
+ 		*pmd = pmd_mkyoung(*pmd);
+ 		pfn = pmd_pfn(*pmd);
+ 		pfn_valid = true;
+ 		goto out;
++	} else {
++		*pte = pte_mkyoung(*pte);	/* Just a page... */
++		pfn = pte_pfn(*pte);
++		pfn_valid = true;
+ 	}
+ 
+-	pte = pte_offset_kernel(pmd, fault_ipa);
+-	if (pte_none(*pte))		/* Nothing there either */
+-		goto out;
+-
+-	*pte = pte_mkyoung(*pte);	/* Just a page... */
+-	pfn = pte_pfn(*pte);
+-	pfn_valid = true;
+ out:
+ 	spin_unlock(&vcpu->kvm->mmu_lock);
+ 	if (pfn_valid)
+-- 
+2.17.1
