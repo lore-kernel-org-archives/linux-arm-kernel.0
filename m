@@ -1,69 +1,302 @@
-From: laurentiu.tudor@nxp.com (Laurentiu Tudor)
-Date: Mon, 9 Jul 2018 10:37:41 +0000
-Subject: [PATCH 1/2] staging:fsl-mc: Move DPIO from staging to
- drivers/soc/fsl
-In-Reply-To: <20180705194113.16256-2-roy.pledge@nxp.com>
-References: <20180705194113.16256-1-roy.pledge@nxp.com>
- <20180705194113.16256-2-roy.pledge@nxp.com>
-Message-ID: <119c6fc6-a32d-45a5-96ea-f6e9959b1e74@nxp.com>
+From: MNARANI@xilinx.com (Manish Narani)
+Date: Mon, 9 Jul 2018 10:38:46 +0000
+Subject: [RFC PATCH 3/3] sdhci: arasan: Add support to read Tap Delay
+ values from DT
+References: <1528373500-24663-1-git-send-email-manish.narani@xilinx.com>
+ <1528373500-24663-3-git-send-email-manish.narani@xilinx.com>
+ <SN6PR02MB49595D9202DDF98DA16C495CC17D0@SN6PR02MB4959.namprd02.prod.outlook.com>
+ <6d3b2f29-fe8d-b084-3e1f-631cf20796b9@intel.com>
+Message-ID: <SN6PR02MB4959387B3272ECC07C76632DC1440@SN6PR02MB4959.namprd02.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Roy,
+Ping
 
-Couple of comments inline.
-
-On 05.07.2018 22:41, Roy Pledge wrote:
-> Move the NXP DPIO (Datapath I/O Driver) out of the
-> drivers/staging directory and into the drivers/soc/fsl directory.
+> -----Original Message-----
+> From: Manish Narani
+> Sent: Thursday, June 21, 2018 6:25 PM
+> To: Adrian Hunter <adrian.hunter@intel.com>; robh+dt at kernel.org;
+> catalin.marinas at arm.com; will.deacon at arm.com; mdf at kernel.org;
+> stefan.krsmanovic at aggios.com; linux-arm-kernel at lists.infradead.org; linux-
+> kernel at vger.kernel.org; linux-mmc at vger.kernel.org;
+> devicetree at vger.kernel.org; Michal Simek <michals@xilinx.com>;
+> ulf.hansson at linaro.org
+> Cc: Srinivas Goud <sgoud@xilinx.com>; Anirudha Sarangi
+> <anirudh@xilinx.com>
+> Subject: RE: [RFC PATCH 3/3] sdhci: arasan: Add support to read Tap Delay
+> values from DT
 > 
-> The DPIO driver enables access to Queue and Buffer Manager (QBMAN)
-> hardware on NXP DPAA2 devices. This is a prerequisite to moving the
-> DPAA2 Ethernet driver out of staging.
+> Hi Adrian,
 > 
-> Signed-off-by: Roy Pledge <roy.pledge@nxp.com>
-> ---
->   MAINTAINERS                                                    |  2 +-
->   drivers/crypto/caam/sg_sw_qm2.h                                |  2 +-
->   drivers/crypto/caam/sg_sw_sec4.h                               |  2 +-
->   drivers/soc/fsl/Kconfig                                        | 10 ++++++++++
->   drivers/soc/fsl/Makefile                                       |  1 +
->   drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/Makefile          |  0
->   drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio-cmd.h        |  0
->   drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio-driver.c     |  2 +-
->   drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio-driver.txt   |  0
-
-Maybe this should be converted to .rst and go in the already existing
-Documentation/networking/dpaa2/?
-
->   drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio-service.c    |  2 +-
->   drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio.c            |  0
->   drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio.h            |  0
->   drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/qbman-portal.c    |  2 +-
->   drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/qbman-portal.h    |  2 +-
->   drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h                 |  4 ++--
->   drivers/staging/fsl-mc/bus/Kconfig                             |  9 ---------
->   drivers/staging/fsl-mc/bus/Makefile                            |  2 --
->   {drivers/staging/fsl-mc/include => include/soc/fsl}/dpaa2-fd.h |  0
->   .../staging/fsl-mc/include => include/soc/fsl}/dpaa2-global.h  |  0
->   {drivers/staging/fsl-mc/include => include/soc/fsl}/dpaa2-io.h |  0
->   20 files changed, 20 insertions(+), 20 deletions(-)
->   rename drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/Makefile (100%)
->   rename drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio-cmd.h (100%)
->   rename drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio-driver.c (99%)
->   rename drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio-driver.txt (100%)
->   rename drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio-service.c (99%)
->   rename drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio.c (100%)
->   rename drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio.h (100%)
->   rename drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/qbman-portal.c (99%)
->   rename drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/qbman-portal.h (99%)
->   rename {drivers/staging/fsl-mc/include => include/soc/fsl}/dpaa2-fd.h (100%)
->   rename {drivers/staging/fsl-mc/include => include/soc/fsl}/dpaa2-global.h (100%)
->   rename {drivers/staging/fsl-mc/include => include/soc/fsl}/dpaa2-io.h (100%)
-
-I received feedback in the past on mc-bus that a driver should limit to 
-only one public header and one private one. Would it make sense to do 
-the same for dpio too?
-
----
-Best Regards, Laurentiu
+> > -----Original Message-----
+> > From: Adrian Hunter [mailto:adrian.hunter at intel.com]
+> > Sent: Tuesday, June 19, 2018 5:08 PM
+> > To: Manish Narani <MNARANI@xilinx.com>; robh+dt at kernel.org;
+> > catalin.marinas at arm.com; will.deacon at arm.com; mdf at kernel.org;
+> > stefan.krsmanovic at aggios.com; linux-arm-kernel at lists.infradead.org;
+> > linux- kernel at vger.kernel.org; linux-mmc at vger.kernel.org;
+> > devicetree at vger.kernel.org; Michal Simek <michals@xilinx.com>;
+> > ulf.hansson at linaro.org
+> > Cc: Srinivas Goud <sgoud@xilinx.com>; Anirudha Sarangi
+> > <anirudh@xilinx.com>
+> > Subject: Re: [RFC PATCH 3/3] sdhci: arasan: Add support to read Tap
+> > Delay values from DT
+> >
+> > On 14/06/18 08:38, Manish Narani wrote:
+> > > Ping for RFC
+> >
+> > What is eemi?  Why aren't there patches for that?
+> Eemi(Extensible Energy Management Interface) is a power management
+> interface for ZynqMP core. The patches for the same are already in process of
+> mainlining.
+> https://lkml.org/lkml/2018/6/20/823
+> 
+> Thanks,
+> Manish
+> >
+> > >
+> > >> -----Original Message-----
+> > >> From: Manish Narani [mailto:manish.narani at xilinx.com]
+> > >> Sent: Thursday, June 7, 2018 5:42 PM
+> > >> To: robh+dt at kernel.org; mark.rutland at arm.com;
+> > >> catalin.marinas at arm.com; will.deacon at arm.com; mdf at kernel.org;
+> > >> stefan.krsmanovic at aggios.com; linux-arm-kernel at lists.infradead.org;
+> > >> linux-kernel at vger.kernel.org; linux- mmc at vger.kernel.org;
+> > >> devicetree at vger.kernel.org; adrian.hunter at intel.com;
+> > >> michal.simek at xilinx.com; ulf.hansson at linaro.org
+> > >> Cc: Manish Narani <MNARANI@xilinx.com>
+> > >> Subject: [RFC PATCH 3/3] sdhci: arasan: Add support to read Tap
+> > >> Delay values from DT
+> > >>
+> > >> This patch adds support for reading Tap Delay values from Device
+> > >> Tree and write them via eemi calls. The macros containing these tap
+> > >> delay values are removed from the driver.
+> > >>
+> > >> Signed-off-by: Manish Narani <manish.narani@xilinx.com>
+> > >> ---
+> > >>  drivers/mmc/host/sdhci-of-arasan.c | 131
+> > >> +++++++++++++++++++++++++++++++++++++
+> > >>  1 file changed, 131 insertions(+)
+> > >>
+> > >> diff --git a/drivers/mmc/host/sdhci-of-arasan.c
+> > >> b/drivers/mmc/host/sdhci- of-arasan.c index e3332a5..fc0fd01 100644
+> > >> --- a/drivers/mmc/host/sdhci-of-arasan.c
+> > >> +++ b/drivers/mmc/host/sdhci-of-arasan.c
+> > >> @@ -36,6 +36,8 @@
+> > >>
+> > >>  #define PHY_CLK_TOO_SLOW_HZ		400000
+> > >>
+> > >> +#define MMC_BANK2		0x2
+> > >> +
+> > >>  /*
+> > >>   * On some SoCs the syscon area has a feature where the upper 16-bits of
+> > >>   * each 32-bit register act as a write mask for the lower 16-bits.
+> > >> This allows @@ -90,6 +92,10 @@ struct sdhci_arasan_data {
+> > >>  	struct sdhci_host *host;
+> > >>  	struct clk	*clk_ahb;
+> > >>  	struct phy	*phy;
+> > >> +	u32 mio_bank;
+> > >> +	u32 device_id;
+> > >> +	u32 itapdly[MMC_TIMING_MMC_HS400 + 1];
+> > >> +	u32 otapdly[MMC_TIMING_MMC_HS400 + 1];
+> > >>  	bool		is_phy_on;
+> > >>
+> > >>  	bool		has_cqe;
+> > >> @@ -160,11 +166,36 @@ static int sdhci_arasan_syscon_write(struct
+> > >> sdhci_host *host,
+> > >>  	return ret;
+> > >>  }
+> > >>
+> > >> +/**
+> > >> + * arasan_zynqmp_set_tap_delay - Program the tap delays.
+> > >> + * @deviceid:		Unique Id of device
+> > >> + * @itap_delay:		Input Tap Delay
+> > >> + * @oitap_delay:	Output Tap Delay
+> > >> + */
+> > >> +static void arasan_zynqmp_set_tap_delay(u8 deviceid, u8
+> > >> +itap_delay,
+> > >> +u8
+> > >> +otap_delay) {
+> > >> +	const struct zynqmp_eemi_ops *eemi_ops =
+> > >> zynqmp_pm_get_eemi_ops();
+> > >> +	u32 node_id = (deviceid == 0) ? NODE_SD_0 : NODE_SD_1;
+> > >> +
+> > >> +	if (!eemi_ops || !eemi_ops->ioctl)
+> > >> +		return;
+> > >> +
+> > >> +	if (itap_delay)
+> > >> +		eemi_ops->ioctl(node_id, IOCTL_SET_SD_TAPDELAY,
+> > >> +				PM_TAPDELAY_INPUT, itap_delay, NULL);
+> > >> +
+> > >> +	if (otap_delay)
+> > >> +		eemi_ops->ioctl(node_id, IOCTL_SET_SD_TAPDELAY,
+> > >> +				PM_TAPDELAY_OUTPUT, otap_delay, NULL);
+> > >> }
+> > >> +
+> > >>  static void sdhci_arasan_set_clock(struct sdhci_host *host,
+> > >> unsigned int
+> > >> clock)  {
+> > >>  	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> > >>  	struct sdhci_arasan_data *sdhci_arasan =
+> > >> sdhci_pltfm_priv(pltfm_host);
+> > >>  	bool ctrl_phy = false;
+> > >> +	u8 itap_delay;
+> > >> +	u8 otap_delay;
+> > >>
+> > >>  	if (!IS_ERR(sdhci_arasan->phy)) {
+> > >>  		if (!sdhci_arasan->is_phy_on && clock <=
+> > >> PHY_CLK_TOO_SLOW_HZ) { @@ -200,6 +231,16 @@ static void
+> > >> sdhci_arasan_set_clock(struct sdhci_host *host, unsigned int clock)
+> > >>  		}
+> > >>  	}
+> > >>
+> > >> +	if (host->version >= SDHCI_SPEC_300) {
+> > >> +		if ((host->timing != MMC_TIMING_LEGACY) &&
+> > >> +			(host->timing != MMC_TIMING_UHS_SDR12)) {
+> > >> +			itap_delay = sdhci_arasan->itapdly[host->timing];
+> > >> +			otap_delay = sdhci_arasan->otapdly[host->timing];
+> > >> +			arasan_zynqmp_set_tap_delay(sdhci_arasan-
+> > >>> device_id,
+> > >> +						    itap_delay, otap_delay);
+> > >> +		}
+> > >> +	}
+> > >> +
+> > >>  	if (ctrl_phy && sdhci_arasan->is_phy_on) {
+> > >>  		phy_power_off(sdhci_arasan->phy);
+> > >>  		sdhci_arasan->is_phy_on = false; @@ -456,6 +497,7 @@ static
+> > >> const struct of_device_id sdhci_arasan_of_match[] = {
+> > >>  	{ .compatible = "arasan,sdhci-8.9a" },
+> > >>  	{ .compatible = "arasan,sdhci-5.1" },
+> > >>  	{ .compatible = "arasan,sdhci-4.9a" },
+> > >> +	{ .compatible = "xlnx,zynqmp-8.9a" },
+> > >>
+> > >>  	{ /* sentinel */ }
+> > >>  };
+> > >> @@ -641,6 +683,74 @@ static void
+> > >> sdhci_arasan_unregister_sdclk(struct
+> > >> device *dev)
+> > >>  	of_clk_del_provider(dev->of_node);
+> > >>  }
+> > >>
+> > >> +/**
+> > >> + * arasan_zynqmp_dt_parse_tap_delays - Read Tap Delay values from
+> > >> +DT
+> > >> + *
+> > >> + * Called at initialization to parse the values of Tap Delays.
+> > >> + *
+> > >> + * @dev:		Pointer to our struct device.
+> > >> + */
+> > >> +static void arasan_zynqmp_dt_parse_tap_delays(struct device *dev) {
+> > >> +	struct platform_device *pdev = to_platform_device(dev);
+> > >> +	struct sdhci_host *host = platform_get_drvdata(pdev);
+> > >> +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> > >> +	struct sdhci_arasan_data *sdhci_arasan =
+> > >> sdhci_pltfm_priv(pltfm_host);
+> > >> +	struct device_node *np = dev->of_node;
+> > >> +
+> > >> +	of_property_read_u32(np, "xlnx,itap_delay_sd_hsd",
+> > >> +			     &sdhci_arasan->itapdly[MMC_TIMING_SD_HS]);
+> > >> +	of_property_read_u32(np, "xlnx,otap_delay_sd_hsd",
+> > >> +			     &sdhci_arasan->otapdly[MMC_TIMING_SD_HS]);
+> > >> +	of_property_read_u32(np, "xlnx,itap_delay_sdr25",
+> > >> +			     &sdhci_arasan-
+> > >>> itapdly[MMC_TIMING_UHS_SDR25]);
+> > >> +	of_property_read_u32(np, "xlnx,otap_delay_sdr25",
+> > >> +			     &sdhci_arasan-
+> > >>> otapdly[MMC_TIMING_UHS_SDR25]);
+> > >> +	of_property_read_u32(np, "xlnx,itap_delay_sdr50",
+> > >> +			     &sdhci_arasan-
+> > >>> itapdly[MMC_TIMING_UHS_SDR50]);
+> > >> +	of_property_read_u32(np, "xlnx,otap_delay_sdr50",
+> > >> +			     &sdhci_arasan-
+> > >>> otapdly[MMC_TIMING_UHS_SDR50]);
+> > >> +	of_property_read_u32(np, "xlnx,itap_delay_sd_ddr50",
+> > >> +			     &sdhci_arasan-
+> > >>> itapdly[MMC_TIMING_UHS_DDR50]);
+> > >> +	of_property_read_u32(np, "xlnx,otap_delay_sd_ddr50",
+> > >> +			     &sdhci_arasan-
+> > >>> otapdly[MMC_TIMING_UHS_DDR50]);
+> > >> +	of_property_read_u32(np, "xlnx,itap_delay_mmc_hsd",
+> > >> +			     &sdhci_arasan-
+> > >>> itapdly[MMC_TIMING_MMC_HS]);
+> > >> +	of_property_read_u32(np, "xlnx,otap_delay_mmc_hsd",
+> > >> +			     &sdhci_arasan-
+> > >>> otapdly[MMC_TIMING_MMC_HS]);
+> > >> +	of_property_read_u32(np, "xlnx,itap_delay_mmc_ddr50",
+> > >> +			     &sdhci_arasan-
+> > >>> itapdly[MMC_TIMING_MMC_DDR52]);
+> > >> +	of_property_read_u32(np, "xlnx,otap_delay_mmc_ddr50",
+> > >> +			     &sdhci_arasan-
+> > >>> otapdly[MMC_TIMING_MMC_DDR52]);
+> > >> +	if (sdhci_arasan->mio_bank == MMC_BANK2) {
+> > >> +		of_property_read_u32(np,
+> > >> +				     "xlnx,itap_delay_sdr104_b2",
+> > >> +				&sdhci_arasan-
+> > >>> itapdly[MMC_TIMING_UHS_SDR104]);
+> > >> +		of_property_read_u32(np,
+> > >> +				     "xlnx,otap_delay_sdr104_b2",
+> > >> +				&sdhci_arasan-
+> > >>> otapdly[MMC_TIMING_UHS_SDR104]);
+> > >> +		of_property_read_u32(np,
+> > >> +				     "xlnx,itap_delay_mmc_hs200_b2",
+> > >> +				&sdhci_arasan-
+> > >>> itapdly[MMC_TIMING_MMC_HS200]);
+> > >> +		of_property_read_u32(np,
+> > >> +				     "xlnx,otap_delay_mmc_hs200_b2",
+> > >> +				&sdhci_arasan-
+> > >>> otapdly[MMC_TIMING_MMC_HS200]);
+> > >> +	} else {
+> > >> +		of_property_read_u32(np,
+> > >> +				     "xlnx,itap_delay_sdr104_b0",
+> > >> +				&sdhci_arasan-
+> > >>> itapdly[MMC_TIMING_UHS_SDR104]);
+> > >> +		of_property_read_u32(np,
+> > >> +				     "xlnx,otap_delay_sdr104_b0",
+> > >> +				&sdhci_arasan-
+> > >>> otapdly[MMC_TIMING_UHS_SDR104]);
+> > >> +		of_property_read_u32(np,
+> > >> +				     "xlnx,itap_delay_mmc_hs200_b0",
+> > >> +				&sdhci_arasan-
+> > >>> itapdly[MMC_TIMING_MMC_HS200]);
+> > >> +		of_property_read_u32(np,
+> > >> +				     "xlnx,otap_delay_mmc_hs200_b0",
+> > >> +				&sdhci_arasan-
+> > >>> otapdly[MMC_TIMING_MMC_HS200]);
+> > >> +	}
+> > >> +}
+> > >> +
+> > >>  static int sdhci_arasan_add_host(struct sdhci_arasan_data *sdhci_arasan)
+> {
+> > >>  	struct sdhci_host *host = sdhci_arasan->host; @@ -776,6 +886,27
+> > >> @@ static int sdhci_arasan_probe(struct platform_device *pdev)
+> > >>  		goto unreg_clk;
+> > >>  	}
+> > >>
+> > >> +	if (of_device_is_compatible(pdev->dev.of_node,
+> > >> +				    "xlnx,zynqmp-8.9a")) {
+> > >> +		ret = of_property_read_u32(pdev->dev.of_node,
+> > >> +					   "xlnx,mio_bank",
+> > >> +					   &sdhci_arasan->mio_bank);
+> > >> +		if (ret < 0) {
+> > >> +			dev_err(&pdev->dev,
+> > >> +				"\"xlnx,mio_bank \" property is missing.\n");
+> > >> +			goto clk_disable_all;
+> > >> +		}
+> > >> +		ret = of_property_read_u32(pdev->dev.of_node,
+> > >> +					   "xlnx,device_id",
+> > >> +					   &sdhci_arasan->device_id);
+> > >> +		if (ret < 0) {
+> > >> +			dev_err(&pdev->dev,
+> > >> +				"\"xlnx,device_id \" property is missing.\n");
+> > >> +			goto clk_disable_all;
+> > >> +		}
+> > >> +		arasan_zynqmp_dt_parse_tap_delays(&pdev->dev);
+> > >> +	}
+> > >> +
+> > >>  	sdhci_arasan->phy = ERR_PTR(-ENODEV);
+> > >>  	if (of_device_is_compatible(pdev->dev.of_node,
+> > >>  				    "arasan,sdhci-5.1")) {
+> > >> --
+> > >> 2.7.4
+> > >
+> > >
