@@ -1,55 +1,63 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Mon,  9 Jul 2018 17:48:44 +0200
-Subject: [PATCH 4/8] ARM: dts: imx6qdl-apalis/-colibri: disable read-only
- switch
+Date: Mon,  9 Jul 2018 17:48:42 +0200
+Subject: [PATCH 2/8] ARM: dts: imx6q-apalis-eval: add carrier board 3.3V supply
 In-Reply-To: <20180709154848.5401-1-stefan@agner.ch>
 References: <20180709154848.5401-1-stefan@agner.ch>
-Message-ID: <20180709154848.5401-4-stefan@agner.ch>
+Message-ID: <20180709154848.5401-2-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the disable-wp to indicate that Apalis and Colibri iMX6 do not
-make use of the native write-protect signal available on the i.MX 6
-SoCs. This prevents warnings:
-  mmc0: host does not support reading read-only switch, assuming write-enable
+Add the 3.3V main supply on the carrier board. Currently as a fixed
+supply since not all consumer are modeled yet. This gets also rid of
+some missing supply warnings.
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- arch/arm/boot/dts/imx6qdl-apalis.dtsi  | 2 ++
- arch/arm/boot/dts/imx6qdl-colibri.dtsi | 1 +
- 2 files changed, 3 insertions(+)
+ arch/arm/boot/dts/imx6q-apalis-eval.dts | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx6qdl-apalis.dtsi b/arch/arm/boot/dts/imx6qdl-apalis.dtsi
-index 55bcea245df6..f9bacc9ff2b6 100644
---- a/arch/arm/boot/dts/imx6qdl-apalis.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-apalis.dtsi
-@@ -457,6 +457,7 @@
- 	pinctrl-0 = <&pinctrl_usdhc1_4bit &pinctrl_usdhc1_8bit>;
- 	vqmmc-supply = <&reg_3p3v>;
- 	bus-width = <8>;
-+	disable-wp;
- 	no-1-8-v;
- 	status = "disabled";
+diff --git a/arch/arm/boot/dts/imx6q-apalis-eval.dts b/arch/arm/boot/dts/imx6q-apalis-eval.dts
+index 621d9709effa..707ac9a46115 100644
+--- a/arch/arm/boot/dts/imx6q-apalis-eval.dts
++++ b/arch/arm/boot/dts/imx6q-apalis-eval.dts
+@@ -113,6 +113,7 @@
+ 		 */
+ 		compatible = "edt,et057090dhu";
+ 		backlight = <&backlight>;
++		power-supply = <&reg_3v3_sw>;
+ 
+ 		port {
+ 			lcd_panel_in: endpoint {
+@@ -131,19 +132,30 @@
+ 		enable-active-high;
+ 		status = "okay";
+ 	};
++
++	reg_3v3_sw: regulator-3v3-sw {
++		compatible = "regulator-fixed";
++		regulator-name = "3.3V_SW";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-always-on;
++	};
  };
-@@ -467,6 +468,7 @@
- 	pinctrl-0 = <&pinctrl_usdhc2>;
- 	vqmmc-supply = <&reg_3p3v>;
- 	bus-width = <4>;
-+	disable-wp;
- 	no-1-8-v;
- 	status = "disabled";
+ 
+ &backlight {
+ 	brightness-levels = <0 127 191 223 239 247 251 255>;
+ 	default-brightness-level = <1>;
++	power-supply = <&reg_3v3_sw>;
+ 	status = "okay";
  };
-diff --git a/arch/arm/boot/dts/imx6qdl-colibri.dtsi b/arch/arm/boot/dts/imx6qdl-colibri.dtsi
-index bb44829dacbe..8ae17fdf6cf6 100644
---- a/arch/arm/boot/dts/imx6qdl-colibri.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-colibri.dtsi
-@@ -387,6 +387,7 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_usdhc1 &pinctrl_mmc_cd>;
- 	cd-gpios = <&gpio2 5 GPIO_ACTIVE_LOW>; /* MMCD */
-+	disable-wp;
- 	vqmmc-supply = <&reg_3p3v>;
- 	bus-width = <4>;
- 	no-1-8-v;
+ 
+ &can1 {
++	xceiver-supply = <&reg_3v3_sw>;
+ 	status = "okay";
+ };
+ 
+ &can2 {
++	xceiver-supply = <&reg_3v3_sw>;
+ 	status = "okay";
+ };
+ 
 -- 
 2.18.0
