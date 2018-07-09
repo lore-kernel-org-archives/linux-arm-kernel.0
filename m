@@ -1,28 +1,30 @@
 From: jian.hu@amlogic.com (Jian Hu)
-Date: Mon, 9 Jul 2018 19:12:44 +0800
-Subject: [PATCH 0/3] clk: meson-g12a: Add EE clock controller driver
-Message-ID: <1531134767-29927-1-git-send-email-jian.hu@amlogic.com>
+Date: Mon, 9 Jul 2018 19:12:45 +0800
+Subject: [PATCH 1/3] dt-bindings: clk: g12a: New binding for Meson-G12A SoC
+In-Reply-To: <1531134767-29927-1-git-send-email-jian.hu@amlogic.com>
+References: <1531134767-29927-1-git-send-email-jian.hu@amlogic.com>
+Message-ID: <1531134767-29927-2-git-send-email-jian.hu@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a Clock driver for the Everyting-Else part of
-the Amlogic Meson-G12A SoC.
+Add new binding for Meson-G12A SoC Everything-Else part
 
-Jian Hu (3):
-  dt-bindings: clk: g12a: New binding for Meson-G12A SoC
-  dt-bindings: clk: meson-g12a: Add G12A EE Clock Bindings
-  clk: meson-g12a: Add EE Clock controller driver
+Signed-off-by: Jian Hu <jian.hu@amlogic.com>
+---
+ Documentation/devicetree/bindings/clock/amlogic,gxbb-clkc.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
- .../bindings/clock/amlogic,gxbb-clkc.txt           |   1 +
- drivers/clk/meson/Kconfig                          |  10 +
- drivers/clk/meson/Makefile                         |   1 +
- drivers/clk/meson/g12a.c                           | 992 +++++++++++++++++++++
- drivers/clk/meson/g12a.h                           | 123 +++
- include/dt-bindings/clock/g12a-clkc.h              |  93 ++
- 6 files changed, 1220 insertions(+)
- create mode 100644 drivers/clk/meson/g12a.c
- create mode 100644 drivers/clk/meson/g12a.h
- create mode 100644 include/dt-bindings/clock/g12a-clkc.h
-
+diff --git a/Documentation/devicetree/bindings/clock/amlogic,gxbb-clkc.txt b/Documentation/devicetree/bindings/clock/amlogic,gxbb-clkc.txt
+index e950599..0833006 100644
+--- a/Documentation/devicetree/bindings/clock/amlogic,gxbb-clkc.txt
++++ b/Documentation/devicetree/bindings/clock/amlogic,gxbb-clkc.txt
+@@ -9,6 +9,7 @@ Required Properties:
+ 		"amlogic,gxbb-clkc" for GXBB SoC,
+ 		"amlogic,gxl-clkc" for GXL and GXM SoC,
+ 		"amlogic,axg-clkc" for AXG SoC.
++		"amlogic,g12a-clkc" for G12A SoC.
+ 
+ - #clock-cells: should be 1.
+ 
 -- 
 1.9.1
