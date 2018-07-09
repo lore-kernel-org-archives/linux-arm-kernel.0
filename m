@@ -1,209 +1,173 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  9 Jul 2018 12:20:31 +0100
-Subject: [PATCH] KVM: arm/arm64: vgic-debug: Show LPI status
-Message-ID: <20180709112031.20217-1-marc.zyngier@arm.com>
+From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
+Date: Mon, 09 Jul 2018 20:23:19 +0900
+Subject: [PATCH 2/4] phy: socionext: add USB3 PHY driver for UniPhier SoC
+In-Reply-To: <4b436a46-9046-25ad-ee6d-ad2cdb16e2ca@ti.com>
+References: <1530261541-23104-3-git-send-email-hayashi.kunihiko@socionext.com>
+ <4b436a46-9046-25ad-ee6d-ad2cdb16e2ca@ti.com>
+Message-ID: <20180709202319.1091.4A936039@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The vgic debugfs file only knows about SGI/PPI/SPI interrupts, and
-completely ignores LPIs. Let's fix that.
+Hi Kishon,
+Thank you for your comments.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+On Mon, 9 Jul 2018 10:49:50 +0530 <kishon@ti.com> wrote:
+
+> Hi,
+> 
+> On Friday 29 June 2018 02:08 PM, Kunihiko Hayashi wrote:
+> > Add a driver for PHY interface built into USB3 controller
+> > implemented in UniPhier SoCs.
+> > This driver supports High-Speed PHY and Super-Speed PHY.
+> > 
+> > Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+> > Signed-off-by: Motoya Tanigawa <tanigawa.motoya@socionext.com>
+> > Signed-off-by: Masami Hiramatsu <masami.hiramatsu@linaro.org>
+> > ---
+> >  drivers/phy/Kconfig                         |   1 +
+> >  drivers/phy/Makefile                        |   1 +
+> >  drivers/phy/socionext/Kconfig               |  12 +
+> >  drivers/phy/socionext/Makefile              |   6 +
+> >  drivers/phy/socionext/phy-uniphier-usb3hs.c | 422 ++++++++++++++++++++++++++++
+> >  drivers/phy/socionext/phy-uniphier-usb3ss.c | 369 ++++++++++++++++++++++++
+> >  6 files changed, 811 insertions(+)
+> >  create mode 100644 drivers/phy/socionext/Kconfig
+> >  create mode 100644 drivers/phy/socionext/Makefile
+> >  create mode 100644 drivers/phy/socionext/phy-uniphier-usb3hs.c
+> >  create mode 100644 drivers/phy/socionext/phy-uniphier-usb3ss.c
+
+(snip...)
+
+> > --- /dev/null
+> > +++ b/drivers/phy/socionext/phy-uniphier-usb3hs.c
+> > @@ -0,0 +1,422 @@
+> > +// SPDX-License-Identifier: GPL-2.0
+> > +/*
+> > + * phy-uniphier-usb3hs.c - HS-PHY driver for Socionext UniPhier USB3 controller
+> > + * Copyright 2015-2018 Socionext Inc.
+> > + * Author:
+> > + *	Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+> > + * Contributors:
+> > + *      Motoya Tanigawa <tanigawa.motoya@socionext.com>
+> > + *      Masami Hiramatsu <masami.hiramatsu@linaro.org>
+> > + */
+> > +
+> > +#include <linux/bitfield.h>
+> > +#include <linux/bitops.h>
+> > +#include <linux/clk.h>
+> > +#include <linux/io.h>
+> > +#include <linux/mfd/syscon.h>
+> > +#include <linux/module.h>
+> > +#include <linux/nvmem-consumer.h>
+> > +#include <linux/of.h>
+> > +#include <linux/of_platform.h>
+> > +#include <linux/phy/phy.h>
+> > +#include <linux/platform_device.h>
+> > +#include <linux/reset.h>
+> > +#include <linux/slab.h>
+> > +
+> > +#define HSPHY_CFG0		0x0
+> > +#define HSPHY_CFG0_HS_I_MASK	GENMASK(31, 28)
+> > +#define HSPHY_CFG0_HSDISC_MASK	GENMASK(27, 26)
+> > +#define HSPHY_CFG0_SWING_MASK	GENMASK(17, 16)
+> > +#define HSPHY_CFG0_SEL_T_MASK	GENMASK(15, 12)
+> > +#define HSPHY_CFG0_RTERM_MASK	GENMASK(7, 6)
+> > +#define HSPHY_CFG0_TRIMMASK	(HSPHY_CFG0_HS_I_MASK \
+> > +				 | HSPHY_CFG0_SEL_T_MASK \
+> > +				 | HSPHY_CFG0_RTERM_MASK)
+> > +
+> > +#define HSPHY_CFG1		0x4
+> > +#define HSPHY_CFG1_DAT_EN	BIT(29)
+> > +#define HSPHY_CFG1_ADR_EN	BIT(28)
+> > +#define HSPHY_CFG1_ADR_MASK	GENMASK(27, 16)
+> > +#define HSPHY_CFG1_DAT_MASK	GENMASK(23, 16)
+> > +
+> > +#define MAX_CLKS	3
+> > +#define MAX_RSTS	2
+> > +#define MAX_PHY_PARAMS	1
+> > +
+> > +struct uniphier_u3hsphy_param {
+> > +	u32 addr;
+> > +	u32 mask;
+> > +	u32 val;
+> > +};
+> 
+> I'd like to avoid configure the PHY this way, since it's impossible to know
+> which register is being configured.
+
+I see. 
+In order to know which register is set, I'll add definitions for address
+and mask.
+And I think the driver might have functions for each SoC to configure
+the registers instead of uniphier_u3hsphy_param.
+
+Furthermore, I'll omit the register values that are already set
+at power on if the configurations are not affected.
+
+
+> > +
+> > +struct uniphier_u3hsphy_trim_param {
+> > +	unsigned int rterm;
+> > +	unsigned int sel_t;
+> > +	unsigned int hs_i;
+> > +};
+> > +
+> > +#define trim_param_is_valid(p)	((p)->rterm || (p)->sel_t || (p)->hs_i)
+
+(snip...)
+
+> > +static int uniphier_u3hsphy_probe(struct platform_device *pdev)
+> > +{
+> > +	struct device *dev = &pdev->dev;
+> > +	struct uniphier_u3hsphy_priv *priv;
+> > +	struct phy_provider *phy_provider;
+> > +	struct resource *res;
+> > +	struct phy *phy;
+> > +	struct clk *clk;
+> > +	struct reset_control *rst;
+> > +	const char *name;
+> > +	int i, ret, nc, nr;
+> > +
+> > +	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
+> > +	if (!priv)
+> > +		return -ENOMEM;
+> > +
+> > +	priv->dev = dev;
+> > +	priv->data = of_device_get_match_data(dev);
+> > +	if (WARN_ON(!priv->data ||
+> > +		    priv->data->nparams > MAX_PHY_PARAMS))
+> > +		return -EINVAL;
+> > +
+> > +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > +	priv->base = devm_ioremap_resource(dev, res);
+> > +	if (IS_ERR(priv->base))
+> > +		return PTR_ERR(priv->base);
+> > +
+> > +	for (i = 0; i < MAX_CLKS; i++) {
+> > +		name = priv->data->clock_names[i];
+> > +		if (!name)
+> > +			break;
+> > +		clk = devm_clk_get(dev, name);
+> > +		/* "phy-ext" is optional */
+> > +		if (!strcmp(name, "phy-ext")) {
+> > +			if (PTR_ERR(clk) == -ENOENT)
+> > +				clk = NULL;
+> > +			priv->clk_phy_ext = clk;
+> > +		} else if (!strcmp(name, "phy")) {
+> > +			priv->clk_phy = clk;
+> > +		} else {
+> > +			priv->clk[priv->nclks++] = clk;
+> 
+> Only "link" clock will be here? Do we need an array for this?
+> 
+> I think the above can be replaced with 3 separate clk_get calls instead of
+> storing clock names in uniphier_u3hsphy_soc_data.
+
+Indeed, in case of HS, we don't need such an array.
+I'll rewrite it.
+
+Thank you,
+
 ---
-I've had this patch in my tree for almost 4 months now, and it has been
-useful at least once. Thoughts?
-
- virt/kvm/arm/vgic/vgic-debug.c | 42 ++++++++++++++++++++++++++--------
- virt/kvm/arm/vgic/vgic-its.c   | 12 +++++-----
- virt/kvm/arm/vgic/vgic.h       |  1 +
- 3 files changed, 39 insertions(+), 16 deletions(-)
-
-diff --git a/virt/kvm/arm/vgic/vgic-debug.c b/virt/kvm/arm/vgic/vgic-debug.c
-index d3a403f63010..07aa900bac56 100644
---- a/virt/kvm/arm/vgic/vgic-debug.c
-+++ b/virt/kvm/arm/vgic/vgic-debug.c
-@@ -36,9 +36,12 @@
- struct vgic_state_iter {
- 	int nr_cpus;
- 	int nr_spis;
-+	int nr_lpis;
- 	int dist_id;
- 	int vcpu_id;
- 	int intid;
-+	int lpi_idx;
-+	u32 *lpi_array;
- };
- 
- static void iter_next(struct vgic_state_iter *iter)
-@@ -52,6 +55,12 @@ static void iter_next(struct vgic_state_iter *iter)
- 	if (iter->intid == VGIC_NR_PRIVATE_IRQS &&
- 	    ++iter->vcpu_id < iter->nr_cpus)
- 		iter->intid = 0;
-+
-+	if (iter->intid >= (iter->nr_spis + VGIC_NR_PRIVATE_IRQS)) {
-+		if (iter->lpi_idx < iter->nr_lpis)
-+			iter->intid = iter->lpi_array[iter->lpi_idx];
-+		iter->lpi_idx++;
-+	}
- }
- 
- static void iter_init(struct kvm *kvm, struct vgic_state_iter *iter,
-@@ -63,6 +72,11 @@ static void iter_init(struct kvm *kvm, struct vgic_state_iter *iter,
- 
- 	iter->nr_cpus = nr_cpus;
- 	iter->nr_spis = kvm->arch.vgic.nr_spis;
-+	if (kvm->arch.vgic.vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3) {
-+		iter->nr_lpis = vgic_copy_lpi_list(kvm, NULL, &iter->lpi_array);
-+		if (iter->nr_lpis < 0)
-+			iter->nr_lpis = 0;
-+	}
- 
- 	/* Fast forward to the right position if needed */
- 	while (pos--)
-@@ -73,7 +87,8 @@ static bool end_of_vgic(struct vgic_state_iter *iter)
- {
- 	return iter->dist_id > 0 &&
- 		iter->vcpu_id == iter->nr_cpus &&
--		(iter->intid - VGIC_NR_PRIVATE_IRQS) == iter->nr_spis;
-+		iter->intid >= (iter->nr_spis + VGIC_NR_PRIVATE_IRQS) &&
-+		iter->lpi_idx > iter->nr_lpis;
- }
- 
- static void *vgic_debug_start(struct seq_file *s, loff_t *pos)
-@@ -130,6 +145,7 @@ static void vgic_debug_stop(struct seq_file *s, void *v)
- 
- 	mutex_lock(&kvm->lock);
- 	iter = kvm->arch.vgic.iter;
-+	kfree(iter->lpi_array);
- 	kfree(iter);
- 	kvm->arch.vgic.iter = NULL;
- 	mutex_unlock(&kvm->lock);
-@@ -137,12 +153,14 @@ static void vgic_debug_stop(struct seq_file *s, void *v)
- 
- static void print_dist_state(struct seq_file *s, struct vgic_dist *dist)
- {
-+	bool v3 = dist->vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3;
-+
- 	seq_printf(s, "Distributor\n");
- 	seq_printf(s, "===========\n");
--	seq_printf(s, "vgic_model:\t%s\n",
--		   (dist->vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3) ?
--		   "GICv3" : "GICv2");
-+	seq_printf(s, "vgic_model:\t%s\n", v3 ? "GICv3" : "GICv2");
- 	seq_printf(s, "nr_spis:\t%d\n", dist->nr_spis);
-+	if (v3)
-+		seq_printf(s, "nr_lpis:\t%d\n", dist->lpi_list_count);
- 	seq_printf(s, "enabled:\t%d\n", dist->enabled);
- 	seq_printf(s, "\n");
- 
-@@ -175,8 +193,10 @@ static void print_irq_state(struct seq_file *s, struct vgic_irq *irq,
- 		type = "SGI";
- 	else if (irq->intid < VGIC_NR_PRIVATE_IRQS)
- 		type = "PPI";
--	else
-+	else if (irq->intid < VGIC_MAX_SPI)
- 		type = "SPI";
-+	else
-+		type = "LPI";
- 
- 	if (irq->intid ==0 || irq->intid == VGIC_NR_PRIVATE_IRQS)
- 		print_header(s, irq, vcpu);
-@@ -204,7 +224,6 @@ static void print_irq_state(struct seq_file *s, struct vgic_irq *irq,
- 			irq->source,
- 			irq->priority,
- 			(irq->vcpu) ? irq->vcpu->vcpu_id : -1);
--
- }
- 
- static int vgic_debug_show(struct seq_file *s, void *v)
-@@ -223,17 +242,20 @@ static int vgic_debug_show(struct seq_file *s, void *v)
- 	if (!kvm->arch.vgic.initialized)
- 		return 0;
- 
--	if (iter->vcpu_id < iter->nr_cpus) {
-+	if (iter->vcpu_id < iter->nr_cpus)
- 		vcpu = kvm_get_vcpu(kvm, iter->vcpu_id);
--		irq = &vcpu->arch.vgic_cpu.private_irqs[iter->intid];
--	} else {
--		irq = &kvm->arch.vgic.spis[iter->intid - VGIC_NR_PRIVATE_IRQS];
-+
-+	irq = vgic_get_irq(kvm, vcpu, iter->intid);
-+	if (!irq) {
-+		seq_printf(s, "       LPI %4d freed\n", iter->intid);
-+		return 0;
- 	}
- 
- 	spin_lock_irqsave(&irq->irq_lock, flags);
- 	print_irq_state(s, irq, vcpu);
- 	spin_unlock_irqrestore(&irq->irq_lock, flags);
- 
-+	vgic_put_irq(kvm, irq);
- 	return 0;
- }
- 
-diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index 92840c06fcd7..d23e365dfc40 100644
---- a/virt/kvm/arm/vgic/vgic-its.c
-+++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -313,9 +313,9 @@ static int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
-  * enumerate those LPIs without holding any lock.
-  * Returns their number and puts the kmalloc'ed array into intid_ptr.
-  */
--static int vgic_copy_lpi_list(struct kvm_vcpu *vcpu, u32 **intid_ptr)
-+int vgic_copy_lpi_list(struct kvm *kvm, struct kvm_vcpu *vcpu, u32 **intid_ptr)
- {
--	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-+	struct vgic_dist *dist = &kvm->arch.vgic;
- 	struct vgic_irq *irq;
- 	unsigned long flags;
- 	u32 *intids;
-@@ -338,7 +338,7 @@ static int vgic_copy_lpi_list(struct kvm_vcpu *vcpu, u32 **intid_ptr)
- 		if (i == irq_count)
- 			break;
- 		/* We don't need to "get" the IRQ, as we hold the list lock. */
--		if (irq->target_vcpu != vcpu)
-+		if (vcpu && irq->target_vcpu != vcpu)
- 			continue;
- 		intids[i++] = irq->intid;
- 	}
-@@ -430,7 +430,7 @@ static int its_sync_lpi_pending_table(struct kvm_vcpu *vcpu)
- 	unsigned long flags;
- 	u8 pendmask;
- 
--	nr_irqs = vgic_copy_lpi_list(vcpu, &intids);
-+	nr_irqs = vgic_copy_lpi_list(vcpu->kvm, vcpu, &intids);
- 	if (nr_irqs < 0)
- 		return nr_irqs;
- 
-@@ -1155,7 +1155,7 @@ static int vgic_its_cmd_handle_invall(struct kvm *kvm, struct vgic_its *its,
- 
- 	vcpu = kvm_get_vcpu(kvm, collection->target_addr);
- 
--	irq_count = vgic_copy_lpi_list(vcpu, &intids);
-+	irq_count = vgic_copy_lpi_list(kvm, vcpu, &intids);
- 	if (irq_count < 0)
- 		return irq_count;
- 
-@@ -1203,7 +1203,7 @@ static int vgic_its_cmd_handle_movall(struct kvm *kvm, struct vgic_its *its,
- 	vcpu1 = kvm_get_vcpu(kvm, target1_addr);
- 	vcpu2 = kvm_get_vcpu(kvm, target2_addr);
- 
--	irq_count = vgic_copy_lpi_list(vcpu1, &intids);
-+	irq_count = vgic_copy_lpi_list(kvm, vcpu1, &intids);
- 	if (irq_count < 0)
- 		return irq_count;
- 
-diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index ead00b2072b2..ed9d9d9e2fc5 100644
---- a/virt/kvm/arm/vgic/vgic.h
-+++ b/virt/kvm/arm/vgic/vgic.h
-@@ -305,6 +305,7 @@ static inline bool vgic_dist_overlap(struct kvm *kvm, gpa_t base, size_t size)
- 		(base < d->vgic_dist_base + KVM_VGIC_V3_DIST_SIZE);
- }
- 
-+int vgic_copy_lpi_list(struct kvm *kvm, struct kvm_vcpu *vcpu, u32 **intid_ptr);
- int vgic_its_resolve_lpi(struct kvm *kvm, struct vgic_its *its,
- 			 u32 devid, u32 eventid, struct vgic_irq **irq);
- struct vgic_its *vgic_msi_to_its(struct kvm *kvm, struct kvm_msi *msi);
--- 
-2.18.0
+Best Regards,
+Kunihiko Hayashi
