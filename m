@@ -1,124 +1,59 @@
-From: georgi.djakov@linaro.org (Georgi Djakov)
-Date: Mon,  9 Jul 2018 18:50:59 +0300
-Subject: [PATCH v6 3/8] interconnect: Add debugfs support
-In-Reply-To: <20180709155104.25528-1-georgi.djakov@linaro.org>
-References: <20180709155104.25528-1-georgi.djakov@linaro.org>
-Message-ID: <20180709155104.25528-4-georgi.djakov@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 9 Jul 2018 17:43:14 +0100
+Subject: [PATCH v4 1/1] arm64: dts: mediatek: add mt6765 support
+In-Reply-To: <7fb13f45-4e33-6efc-467b-c7256a40cbc9@gmail.com>
+References: <1531116302-29921-1-git-send-email-mars.cheng@mediatek.com>
+ <1531116302-29921-2-git-send-email-mars.cheng@mediatek.com>
+ <7fb13f45-4e33-6efc-467b-c7256a40cbc9@gmail.com>
+Message-ID: <d439eb7d-6365-7a0a-2969-1ddecc51defc@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a functionality to provide information about the current constraints
-per each node and provider.
+On 09/07/18 11:20, Matthias Brugger wrote:
+> 
+> 
+> On 09/07/18 08:05, Mars Cheng wrote:
+>> This adds basic chip support for MT6765 SoC.
+>>
+>> Signed-off-by: Mars Cheng <mars.cheng@mediatek.com>
+>> ---
+>>  arch/arm64/boot/dts/mediatek/Makefile       |    1 +
+>>  arch/arm64/boot/dts/mediatek/mt6765-evb.dts |   33 ++++++
+>>  arch/arm64/boot/dts/mediatek/mt6765.dtsi    |  156 +++++++++++++++++++++++++++
+>>  3 files changed, 190 insertions(+)
+>>  create mode 100644 arch/arm64/boot/dts/mediatek/mt6765-evb.dts
+>>  create mode 100644 arch/arm64/boot/dts/mediatek/mt6765.dtsi
+>>
+>> diff --git a/arch/arm64/boot/dts/mediatek/Makefile b/arch/arm64/boot/dts/mediatek/Makefile
+>> index ac17f60..7506b0d 100644
+>> --- a/arch/arm64/boot/dts/mediatek/Makefile
+>> +++ b/arch/arm64/boot/dts/mediatek/Makefile
+>> @@ -1,6 +1,7 @@
+>>  # SPDX-License-Identifier: GPL-2.0
+>>  dtb-$(CONFIG_ARCH_MEDIATEK) += mt2712-evb.dtb
+>>  dtb-$(CONFIG_ARCH_MEDIATEK) += mt6755-evb.dtb
+>> +dtb-$(CONFIG_ARCH_MEDIATEK) += mt6765-evb.dtb
+>>  dtb-$(CONFIG_ARCH_MEDIATEK) += mt6795-evb.dtb
+>>  dtb-$(CONFIG_ARCH_MEDIATEK) += mt6797-evb.dtb
+>>  dtb-$(CONFIG_ARCH_MEDIATEK) += mt7622-rfb1.dtb
+> 
+> As you can see, we have a long list of SoCs which are poorly supported.
+> I'm not very keen to just add another SoC which supports booting into a ramdisk
+> using the serial console. Do you have a roadmap adding mainline support for this
+> SoC?
 
-Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
----
- drivers/interconnect/core.c | 78 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 78 insertions(+)
+Yes, that's a valid concern.
 
-diff --git a/drivers/interconnect/core.c b/drivers/interconnect/core.c
-index 63707c3c3d48..3f5001f51bb7 100644
---- a/drivers/interconnect/core.c
-+++ b/drivers/interconnect/core.c
-@@ -6,6 +6,7 @@
-  * Author: Georgi Djakov <georgi.djakov@linaro.org>
-  */
- 
-+#include <linux/debugfs.h>
- #include <linux/device.h>
- #include <linux/idr.h>
- #include <linux/init.h>
-@@ -15,10 +16,12 @@
- #include <linux/module.h>
- #include <linux/mutex.h>
- #include <linux/slab.h>
-+#include <linux/uaccess.h>
- 
- static DEFINE_IDR(icc_idr);
- static LIST_HEAD(icc_provider_list);
- static DEFINE_MUTEX(icc_lock);
-+static struct dentry *icc_debugfs_dir;
- 
- /**
-  * struct icc_req - constraints that are attached to each node
-@@ -47,6 +50,81 @@ struct icc_path {
- 	struct icc_req reqs[];
- };
- 
-+#ifdef CONFIG_DEBUG_FS
-+
-+static void icc_summary_show_one(struct seq_file *s, struct icc_node *n)
-+{
-+	if (!n)
-+		return;
-+
-+	seq_printf(s, "%-30s %12d %12d\n",
-+		   n->name, n->avg_bw, n->peak_bw);
-+}
-+
-+static int icc_summary_show(struct seq_file *s, void *data)
-+{
-+	struct icc_provider *provider;
-+
-+	seq_puts(s, " node                                   avg         peak\n");
-+	seq_puts(s, "--------------------------------------------------------\n");
-+
-+	mutex_lock(&icc_lock);
-+
-+	list_for_each_entry(provider, &icc_provider_list, provider_list) {
-+		struct icc_node *n;
-+
-+		list_for_each_entry(n, &provider->nodes, node_list) {
-+			struct icc_req *r;
-+
-+			icc_summary_show_one(s, n);
-+			hlist_for_each_entry(r, &n->req_list, req_node) {
-+				if (!r->dev)
-+					continue;
-+
-+				seq_printf(s, "    %-26s %12d %12d\n",
-+					   dev_name(r->dev), r->avg_bw,
-+					   r->peak_bw);
-+			}
-+		}
-+	}
-+
-+	mutex_unlock(&icc_lock);
-+
-+	return 0;
-+}
-+
-+static int icc_summary_open(struct inode *inode, struct file *file)
-+{
-+	return single_open(file, icc_summary_show, inode->i_private);
-+}
-+
-+static const struct file_operations icc_summary_fops = {
-+	.open		= icc_summary_open,
-+	.read		= seq_read,
-+	.llseek		= seq_lseek,
-+	.release	= single_release,
-+};
-+
-+static int __init icc_debugfs_init(void)
-+{
-+	struct dentry *file;
-+
-+	icc_debugfs_dir = debugfs_create_dir("interconnect", NULL);
-+	if (!icc_debugfs_dir) {
-+		pr_err("interconnect: error creating debugfs directory\n");
-+		return -ENODEV;
-+	}
-+
-+	file = debugfs_create_file("interconnect_summary", 0444,
-+				   icc_debugfs_dir, NULL, &icc_summary_fops);
-+	if (!file)
-+		return -ENODEV;
-+
-+	return 0;
-+}
-+late_initcall(icc_debugfs_init);
-+#endif
-+
- static struct icc_node *node_find(const int id)
- {
- 	return idr_find(&icc_idr, id);
+mt6755 and mt6795 are in a similar state, the latter after three years.
+I'm all for supporting new SoCs, but this feels looks a box-ticking
+exercise ("hey, look, our SoC is supported in mainline") which doesn't
+help anyone.
+
+My Ack still stands, but I'd definitely like to see some more complete
+support before this patch goes in.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
