@@ -1,184 +1,156 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Tue, 10 Jul 2018 18:56:09 +0200
-Subject: 4.18rc3 TX2 boot failure with "ACPICA: AML parser: attempt to
- continue loading table after error"
-In-Reply-To: <dc4c68bb-089c-6c99-31df-e8d3587b6029@arm.com>
-References: <c49a3666-7d23-6a05-703c-1273d79a00cd@arm.com>
- <2264016.O8iB3BUh2s@aspire.rjw.lan>
- <dc4c68bb-089c-6c99-31df-e8d3587b6029@arm.com>
-Message-ID: <24702482.jSiYyYTB4u@aspire.rjw.lan>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 10 Jul 2018 18:03:30 +0100
+Subject: [PATCH v3 15/20] kvm: arm/arm64: Allow tuning the physical
+ address size for VM
+In-Reply-To: <377420ce-97a8-4359-6224-273d91f37247@arm.com>
+References: <1530270944-11351-16-git-send-email-suzuki.poulose@arm.com>
+ <20180704155104.GN4828@arm.com>
+ <12d1832a-1a13-7dd4-662b-addf58400789@arm.com>
+ <fe9f5aa5-b283-07e0-5f0e-e97d96b780e7@arm.com>
+ <9f1af26e-2913-2b0b-1352-63160096f78f@arm.com>
+ <f3463d0a-c6a3-c34d-acb3-13c99fc61c5a@arm.com>
+ <20180709112326.GD9486@e103592.cambridge.arm.com>
+ <17f8d585-3489-ab6f-6ee1-4d8d337dcf9c@arm.com>
+ <20180709133750.GE9486@e103592.cambridge.arm.com>
+ <377420ce-97a8-4359-6224-273d91f37247@arm.com>
+Message-ID: <20180710170330.GJ9486@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, July 10, 2018 5:04:21 PM CEST Jeremy Linton wrote:
-> Hi,
+On Tue, Jul 10, 2018 at 05:38:39PM +0100, Suzuki K Poulose wrote:
+> On 09/07/18 14:37, Dave Martin wrote:
+> >On Mon, Jul 09, 2018 at 01:29:42PM +0100, Marc Zyngier wrote:
+> >>On 09/07/18 12:23, Dave Martin wrote:
+
+[...]
+
+> >>>Wedging arguments into a few bits in the type argument feels awkward,
+> >>>and may be regretted later if we run out of bits, or something can't be
+> >>>represented in the chosen encoding.
+> >>
+> >>I think that's a pretty convincing argument for a "better" CREATE_VM,
+> >>one that would have a clearly defined, structured (and potentially
+> >>extensible) argument.
+> >>
+> >>I've quickly hacked the following:
+> >>
+> >>diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+> >>index b6270a3b38e9..3e76214034c2 100644
+> >>--- a/include/uapi/linux/kvm.h
+> >>+++ b/include/uapi/linux/kvm.h
+> >>@@ -735,6 +735,20 @@ struct kvm_ppc_resize_hpt {
+> >>  	__u32 pad;
+> >>  };
+> >>
+> >>+struct kvm_create_vm2 {
+> >>+	__u64	version;	/* Or maybe not */
+> >>+	union {
+> >>+		struct {
+> >>+#define KVM_ARM_SVE_CAPABLE	(1 << 0)
+> >>+#define KVM_ARM_SELECT_IPA	{1 << 1)
+> >>+			__u64	capabilities;
+> >>+			__u16	sve_vlen;
+> >>+			__u8	ipa_size;
+> >>+		} arm64;
+> >>+		__u64	dummy[15];
+> >>+	};
+> >>+};
+> >>+
+> >>  #define KVMIO 0xAE
+> >>
+> >>  /* machine type bits, to be used as argument to KVM_CREATE_VM */
+> >>
+> >>Other architectures could fill in their own bits if they need to.
+> >>
+> >>Thoughts?
+> >
+> >This kind of thing should work, but it may still get messy when we
+> >add additional fields.
 > 
-> On 07/10/2018 06:25 AM, Rafael J. Wysocki wrote:
-> > On Tuesday, July 10, 2018 1:13:17 PM CEST Rafael J. Wysocki wrote:
-> >> On Tuesday, July 10, 2018 5:44:05 AM CEST Jeremy Linton wrote:
-> >>> Hi,
-> >>>
-> >>> On 07/09/2018 04:28 PM, Rafael J. Wysocki wrote:
-> >>>> On Mon, Jul 9, 2018 at 10:45 PM, Jeremy Linton <jeremy.linton@arm.com> wrote:
-> >>>>> Hi,
-> >>>>>
-> >>>>> First thanks for the patch..
-> >>>>>
-> >>>>> On 07/08/2018 04:14 AM, Rafael J. Wysocki wrote:
-> >>>>>>
-> >>>>>> On Monday, July 2, 2018 11:41:42 PM CEST Jeremy Linton wrote:
-> >>>>>>>
-> >>>>>>> Hi,
-> >>>>>>>
-> >>>>>>> I'm experiencing two problems with commit 5088814a6e931 which is
-> >>>>>>> "ACPICA: AML parser: attempt to continue loading table after error"
-> >>>>>>>
-> >>>>>>> The first is this boot failure on a thunderX2:
-> >>>>>>>
-> >>>>>>> [   10.770098] ACPI Error: Ignore error and continue table load
-> >>>>>
-> >>>>>
-> >>>>> [trimming]
-> >>>>>
-> >>>>>>> ]---
-> >>>>>>>
-> >>>>>>> Which does appear to be the result of some bad data in the table, but it
-> >>>>>>> was working with 4.17, and reverting this commit solves the problem.
-> >>>>>>
-> >>>>>>
-> >>>>>> Does the patch below make any difference?
-> >>>>>>
-> >>>>>> ---
-> >>>>>>     drivers/acpi/acpica/psobject.c |    3 +++
-> >>>>>>     1 file changed, 3 insertions(+)
-> >>>>>>
-> >>>>>> Index: linux-pm/drivers/acpi/acpica/psobject.c
-> >>>>>> ===================================================================
-> >>>>>> --- linux-pm.orig/drivers/acpi/acpica/psobject.c
-> >>>>>> +++ linux-pm/drivers/acpi/acpica/psobject.c
-> >>>>>> @@ -39,6 +39,9 @@ static acpi_status acpi_ps_get_aml_opcod
-> >>>>>>           ACPI_FUNCTION_TRACE_PTR(ps_get_aml_opcode, walk_state);
-> >>>>>>           walk_state->aml = walk_state->parser_state.aml;
-> >>>>>> +       if (!walk_state->aml)
-> >>>>>> +               return AE_CTRL_PARSE_CONTINUE;
-> >>>>>> +
-> >>>>>
-> >>>>>
-> >>>>> Well this seems to avoid the crash, but now it hangs right after on the
-> >>>>> "Ignore error and continue table load" message.
-> >>>>
-> >>>> Well, maybe we should just abort in that case.
-> >>>>
-> >>>> I'm wondering what happens if you replace the return statement in the
-> >>>> patch above with
-> >>>>
-> >>>> return_ACPI_STATUS(AE_AML_BAD_OPCODE)
-> >>>
-> >>> Yes, that is where I went when I applied the patch but I used
-> >>> AE_CTRL_TERMINATE, which terminates the loop in acpi_ps_parse_loop() and
-> >>> that appears to successfully finish/terminate the initial parsing pass.
-> >>> But, it then crashes in acpi_ns_lookup called via the
-> >>> acpi_walk_resources sequences that goes through ut_evalute_object() due
-> >>> to the path/scope_info->scope.node being ACPI_ROOT_OBJECT (-1) and
-> >>> bypassing the null check. Adding a ACPI_ROOT_OBJECT check as well as the
-> >>> null checks in acpi_ns_lookup results in a successful boot. Tracking
-> >>> down how the terminate (or whatever) is leaving the info->prefix_node
-> >>> (in acpi_ns_evaluate) set to ROOT_OBJECT instead of null, is something I
-> >>> don't yet understand.
-> >>>
-> >>> Anyway, I tried Using BAD_OPCODE rather than TERMINATE and it seems to
-> >>> have the same basic result as PARSE_CONTINUE.
-> >>
-> >> OK, thanks!
-> >>
-> >> I evidently didn't look deep enough.
-> >>
-> >> Can you please check the patch below?
-> >>
-> >> I'm not sure if we can pass this broken state to
-> >> acpi_ps_complete_final_op(), so it may be necessary to return
-> >> an error directly when aml_op_start is NULL.
-> >>
-> >> ---
-> >>   drivers/acpi/acpica/psloop.c |    3 +++
-> >>   1 file changed, 3 insertions(+)
-> >>
-> >> Index: linux-pm/drivers/acpi/acpica/psloop.c
-> >> ===================================================================
-> >> --- linux-pm.orig/drivers/acpi/acpica/psloop.c
-> >> +++ linux-pm/drivers/acpi/acpica/psloop.c
-> >> @@ -493,6 +493,9 @@ acpi_status acpi_ps_parse_loop(struct ac
-> >>   		ASL_CV_CAPTURE_COMMENTS(walk_state);
-> >>   
-> >>   		aml_op_start = parser_state->aml;
-> >> +		if (!aml_op_start)
-> >> +			break;
-> >> +
-> >>   		if (!op) {
-> >>   			status =
-> >>   			    acpi_ps_create_op(walk_state, aml_op_start, &op);
-> >>
-> >> --
-> > 
-> > So maybe something like this:
-> > 
-> > ---
-> >   drivers/acpi/acpica/psloop.c |    3 +++
-> >   1 file changed, 3 insertions(+)
-> > 
-> > Index: linux-pm/drivers/acpi/acpica/psloop.c
-> > ===================================================================
-> > --- linux-pm.orig/drivers/acpi/acpica/psloop.c
-> > +++ linux-pm/drivers/acpi/acpica/psloop.c
-> > @@ -494,6 +494,9 @@ acpi_status acpi_ps_parse_loop(struct ac
-> >   
-> >   		aml_op_start = parser_state->aml;
-> >   		if (!op) {
-> > +			if (!aml_op_start)
-> > +				return_ACPI_STATUS(AE_AML_INTERNAL);
-> > +
-> >   			status =
-> >   			    acpi_ps_create_op(walk_state, aml_op_start, &op);
-> >   			if (ACPI_FAILURE(status)) {
-> > 
-> > 
 > 
-> This gets rid of the infinite loop, but its still has the problem with 
-> acpi_ns_lookup crashing due to -1 in the scope.node.
+> Marc, Dave,
+> 
+> I like Dave's approach. Some comments below.
+> 
+> >
+> >It we want this to work cross-arch, would it make sense to go
+> >for a more generic approach, say
+> >
+> >struct kvm_create_vm_attr_any {
+> >         __u32   type;
+> >};
+> >
+> >#define KVM_CREATE_VM_ATTR_ARCH_CAPABILITIES 1
+> >struct kvm_create_vm_attr_arch_capabilities {
+> >         __u32   type;
+> >         __u16   size; /* support future expansion of capabilities[] */
+> >         __u16   reserved;
+> >         __u64   capabilities[1];
+> >};
+> 
+> We also need to advertise which attributes are supported by the host,
+> so that the user can tune the available ones. That would make a bit mask
+> like the above trickier, unless we return the supported values back
+> in the argument ptr for the "probe" call. And this scheme in general
+> can be useful for passing back a non-boolean result specific to the
+> attribute, without having a per-attribute ioctl. (e.g, maximum limit
+> for IPA).
 
-OK, so do you mean that something like the patch below is needed for the
-system to boot?
+Maybe, but this could quickly become bloated.  (My approach already
+feels a bit bloated...)
 
----
- drivers/acpi/acpica/nsaccess.c |    3 ++-
- drivers/acpi/acpica/psloop.c   |    3 +++
- 2 files changed, 5 insertions(+), 1 deletion(-)
+I'm not sure that arbitrarily complex negotiation will really be
+needed, but userspace might want to change its mind if setting a
+particular propertiy fails.
 
-Index: linux-pm/drivers/acpi/acpica/psloop.c
-===================================================================
---- linux-pm.orig/drivers/acpi/acpica/psloop.c
-+++ linux-pm/drivers/acpi/acpica/psloop.c
-@@ -494,6 +494,9 @@ acpi_status acpi_ps_parse_loop(struct ac
- 
- 		aml_op_start = parser_state->aml;
- 		if (!op) {
-+			if (!aml_op_start)
-+				return_ACPI_STATUS(AE_AML_INTERNAL);
-+
- 			status =
- 			    acpi_ps_create_op(walk_state, aml_op_start, &op);
- 			if (ACPI_FAILURE(status)) {
-Index: linux-pm/drivers/acpi/acpica/nsaccess.c
-===================================================================
---- linux-pm.orig/drivers/acpi/acpica/nsaccess.c
-+++ linux-pm/drivers/acpi/acpica/nsaccess.c
-@@ -286,7 +286,8 @@ acpi_ns_lookup(union acpi_generic_state
- 
- 	/* Get the prefix scope. A null scope means use the root scope */
- 
--	if ((!scope_info) || (!scope_info->scope.node)) {
-+	if ((!scope_info) || (!scope_info->scope.node) ||
-+	    (scope_info->scope.node == ACPI_ROOT_OBJECT)) {
- 		ACPI_DEBUG_PRINT((ACPI_DB_NAMES,
- 				  "Null scope prefix, using root node (%p)\n",
- 				  acpi_gbl_root_node));
+An alternative might be to have a bunch of per-VM ioctls to configure
+different things, like x86 has.  There's at least precedent for that.
+For arm, we currently only have a few.  That allows for easy extension,
+at the cost of adding ioctls.
+
+There may be some ioctls we can reuse, like KVM_ENABLE_CAP for per-
+vm capability flags.
+
+
+[...]
+
+> >union kvm_create_vm_attr {
+> >         struct kvm_create_vm_attr_any;
+> >         struct kvm_create_vm_attr_arch_capabilities;
+> >         struct kvm_create_vm_attr_arm64_physaddr_size;
+> >         /* ... */
+> >};
+> 
+> nit: Could we simply do s/kvm_create_vm_attr/kvm_vm_attr/ everywhere ?
+> While I agree that the kvm_create_vm_attr makes it implicit that the attributes
+> are valid only "create" ioctl, the lack of an ioctl to set the VM attribute
+> should be sufficient to indicate the same.
+
+I just randomly came up with some names.  The precise naming scheme
+isn't that important, so long as it unlikely to result in name
+collisions and so long as it's reasonablu clear (or compiler-checkable,
+or preferably both) which things can be used where.
+
+I wouldn't have a problem with something a bit terser.
+
+> 
+> >
+> >struct kvm_create_vm2 {
+> >         __u32   version;        /* harmless, even if not useful */
+> >         __u16   nr_attrs;       /* or could just terminate attrs with a
+> >                                    NULL entry */
+> >         union kvm_create_vm_attr __user *__user *attrs;
+> >};
+> >
+> >
+> >This is quite flexible, but obviously a bit heavy.
+> >
+> >However, if we're adding a new interface due to lack of extensibility,
+> >it may be worth going for something that's freely extensible.
+> 
+> True. I could hack something up along the lines above and send it here.
+
+Sure, but best to keep it fairly rough for now.
+
+Cheers
+---Dave
