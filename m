@@ -1,98 +1,66 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 10 Jul 2018 14:47:25 -0500
-Subject: [PATCH V2] ARM: DRA7/OMAP5: Enable ACTLR[0] (Enable invalidates of
- BTB) for secondary cores
-Message-ID: <20180710194725.20339-1-nm@ti.com>
+From: ezequiel@collabora.com (Ezequiel Garcia)
+Date: Tue, 10 Jul 2018 16:57:34 -0300
+Subject: [PATCH v5 18/22] media: platform: Add Sunxi-Cedrus VPU decoder
+ driver
+In-Reply-To: <20180710080114.31469-19-paul.kocialkowski@bootlin.com>
+References: <20180710080114.31469-1-paul.kocialkowski@bootlin.com>
+ <20180710080114.31469-19-paul.kocialkowski@bootlin.com>
+Message-ID: <e31090c371ae7f7999b0aa983a20f33451cc89fb.camel@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Call secure services to enable ACTLR[0] (Enable invalidates of BTB with
-ICIALLU) when branch hardening is enabled for kernel.
+Hey Paul,
 
-On GP devices OMAP5/DRA7, there is no possibility to update secure
-side since "secure world" is ROM and there are no override mechanisms
-possible. On HS devices, appropriate PPA should do the workarounds as
-well.
+My comments on v4 of course apply here as well.
 
-However, the configuration is only done for secondary core, since it is
-expected that firmware/bootloader will have enabled the required
-configuration for the primary boot core (note: bootloaders typically
-will NOT enable secondary processors, since it has no need to do so).
+One other thing...
 
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
+On Tue, 2018-07-10 at 10:01 +0200, Paul Kocialkowski wrote:
+> This introduces the Sunxi-Cedrus VPU driver that supports the VPU
+> found
+> in Allwinner SoCs, also known as Video Engine. It is implemented
+> through
+> a v4l2 m2m decoder device and a media device (used for media
+> requests).
+> So far, it only supports MPEG2 decoding.
+> 
+> Since this VPU is stateless, synchronization with media requests is
+> required in order to ensure consistency between frame headers that
+> contain metadata about the frame to process and the raw slice data
+> that
+> is used to generate the frame.
+> 
+> This driver was made possible thanks to the long-standing effort
+> carried out by the linux-sunxi community in the interest of reverse
+> engineering, documenting and implementing support for Allwinner VPU.
+> 
+> Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+> 
+[..]
+> +
+> +static irqreturn_t cedrus_bh(int irq, void *data)
+> +{
+> +	struct cedrus_dev *dev = data;
+> +	struct cedrus_ctx *ctx;
+> +
+> +	ctx = v4l2_m2m_get_curr_priv(dev->m2m_dev);
+> +	if (!ctx) {
+> +		v4l2_err(&dev->v4l2_dev,
+> +			 "Instance released before the end of
+> transaction\n");
+> +		return IRQ_HANDLED;
+> +	}
+> +
+> +	v4l2_m2m_job_finish(ctx->dev->m2m_dev, ctx->fh.m2m_ctx);
+> +
 
-NOTE: For U-boot based platforms, please make sure you are on v2018.07 at least.
+I don't like the fact that v4l2_m2m_job_finish calls .device_run
+reentrantly. Let me try to make v4l2_m2m_job_finish() safe to be called
+in atomic context, so hopefully drivers can just call it in the top-
+half.
 
-Linux kernel will complain if the workaround are not activated.
+You are returning the buffers in the top-half, so this is just a matter
+or better design, not a performance improvement.
 
-Changes since V1:
-* review comments update for commit message, added incode documentation +
-  renamed function to better indicate this is for secondary core.
-
-V1: https://patchwork.kernel.org/patch/10461275/
-
- arch/arm/mach-omap2/omap-smp.c | 41 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 41 insertions(+)
-
-diff --git a/arch/arm/mach-omap2/omap-smp.c b/arch/arm/mach-omap2/omap-smp.c
-index 69df3620eca5..1c73694c871a 100644
---- a/arch/arm/mach-omap2/omap-smp.c
-+++ b/arch/arm/mach-omap2/omap-smp.c
-@@ -109,6 +109,45 @@ void omap5_erratum_workaround_801819(void)
- static inline void omap5_erratum_workaround_801819(void) { }
- #endif
- 
-+#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
-+/*
-+ * Configure ACR and enable ACTLR[0] (Enable invalidates of BTB with
-+ * ICIALLU) to activate the workaround for secondary Core.
-+ * NOTE: it is assumed that the primary core's configuration is done
-+ * by the boot loader (kernel will detect a misconfiguration and complain
-+ * if this is not done).
-+ *
-+ * In General Purpose(GP) devices, ACR bit settings can only be done
-+ * by ROM code in "secure world" using the smc call and there is no
-+ * option to update the "firmware" on such devices. This also works for
-+ * High security(HS) devices, as a backup option in case the
-+ * "update" is not done in the "security firmware".
-+ */
-+static void omap5_secondary_harden_predictor(void)
-+{
-+	u32 acr, acr_mask;
-+
-+	asm volatile ("mrc p15, 0, %0, c1, c0, 1" : "=r" (acr));
-+
-+	/*
-+	 * ACTLR[0] (Enable invalidates of BTB with ICIALLU)
-+	 */
-+	acr_mask = BIT(0);
-+
-+	/* Do we already have it done.. if yes, skip expensive smc */
-+	if ((acr & acr_mask) == acr_mask)
-+		return;
-+
-+	acr |= acr_mask;
-+	omap_smc1(OMAP5_DRA7_MON_SET_ACR_INDEX, acr);
-+
-+	pr_debug("%s: ARM ACR setup for CVE_2017_5715 applied on CPU%d\n",
-+		 __func__, smp_processor_id());
-+}
-+#else
-+static inline void omap5_secondary_harden_predictor(void) { }
-+#endif
-+
- static void omap4_secondary_init(unsigned int cpu)
- {
- 	/*
-@@ -131,6 +170,8 @@ static void omap4_secondary_init(unsigned int cpu)
- 		set_cntfreq();
- 		/* Configure ACR to disable streaming WA for 801819 */
- 		omap5_erratum_workaround_801819();
-+		/* Enable ACR to allow for ICUALLU workaround */
-+		omap5_secondary_harden_predictor();
- 	}
- 
- 	/*
--- 
-2.15.1
+Thanks,
+Eze
