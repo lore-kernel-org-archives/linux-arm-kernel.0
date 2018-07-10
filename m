@@ -1,38 +1,67 @@
-From: fabio.estevam@nxp.com (Fabio Estevam)
-Date: Tue, 10 Jul 2018 10:47:32 -0300
-Subject: [PATCH v2 2/6] ARM: dts: imx51: Add PMU support
-In-Reply-To: <1531230456-27717-1-git-send-email-fabio.estevam@nxp.com>
-References: <1531230456-27717-1-git-send-email-fabio.estevam@nxp.com>
-Message-ID: <1531230456-27717-2-git-send-email-fabio.estevam@nxp.com>
+From: mathieu.desnoyers@efficios.com (Mathieu Desnoyers)
+Date: Tue, 10 Jul 2018 09:48:35 -0400 (EDT)
+Subject: [PATCH for 4.18 2/6] rseq: use get_user/put_user rather than
+ __get_user/__put_user
+In-Reply-To: <87tvp7mx8j.fsf@concordia.ellerman.id.au>
+References: <20180708210330.27324-1-mathieu.desnoyers@efficios.com>
+ <20180708210330.27324-3-mathieu.desnoyers@efficios.com>
+ <854203778.2272.1531157327328.JavaMail.zimbra@efficios.com>
+ <87tvp7mx8j.fsf@concordia.ellerman.id.au>
+Message-ID: <1050939005.3002.1531230515472.JavaMail.zimbra@efficios.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add PMU support in the device tree.
+----- On Jul 10, 2018, at 2:16 AM, Michael Ellerman mpe at ellerman.id.au wrote:
 
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
----
-Changes since v1:
-- Newly introduced in this series.
+> Mathieu Desnoyers <mathieu.desnoyers@efficios.com> writes:
+>> ----- On Jul 8, 2018, at 5:03 PM, Mathieu Desnoyers
+>> mathieu.desnoyers at efficios.com wrote:
+>>
+>>> In preparation to use __u64 for the rseq_cs pointer field, 32-bit
+>>> architectures need to read this 64-bit value located in user-space
+>>> addresses.
+>>> 
+>>> __get_user is used to read this value, given that its access check has
+>>> already been performed with access_ok() on rseq registration.
+>>> 
+>>> arm does not implement 8-byte __get_user. Rather than trying to
+>>> improve __get_user on ARM, use get_user/put_user across rseq instead.
+>>> 
+>>> If those end up showing up in benchmarks, the proper approach would be to
+>>> use user_access_begin() / unsafe_get/put_user() / user_access_end()
+>>> anyway.
+>>
+>> So, another twist to this story: ppc32 does not implement u64 get_user().
+> 
+> Or __get_user() for that matter.
+> 
+> But we should just fix it.
+> 
+> We have the asm to do it, it's just the fact that __gu_val is unsigned
+> long causes the size > sizeof(x) check here to fail:
+> 
+> #define __get_user_size(x, ptr, size, retval)			\
+> do {								\
+>	retval = 0;						\
+>	__chk_user_ptr(ptr);					\
+>	if (size > sizeof(x))					\
+>		(x) = __get_user_bad();				\
+> 
+> 
+> 
+> We seem to be able to fix that with the __inttype() trick that x86 uses.
+> 
+> That's probably not 4.18 material though. But if you want to go with
+> copy_from_user() for now you could then switch to get_user() for 4.19.
 
- arch/arm/boot/dts/imx51.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+I agree. Let's use copy_from_user() for 4.18. Once get_user() ends up supporting
+u64 on ppc32 for 4.19, rseq will happily move back to it.
 
-diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
-index 66e4187..113ddbc 100644
---- a/arch/arm/boot/dts/imx51.dtsi
-+++ b/arch/arm/boot/dts/imx51.dtsi
-@@ -93,6 +93,12 @@
- 		};
- 	};
- 
-+	pmu: pmu {
-+		compatible = "arm,cortex-a8-pmu";
-+		interrupt-parent = <&tzic>;
-+		interrupts = <77>;
-+	};
-+
- 	usbphy0: usbphy0 {
- 		compatible = "usb-nop-xceiv";
- 		clocks = <&clks IMX5_CLK_USB_PHY_GATE>;
+Thanks,
+
+Mathieu
+
 -- 
-2.7.4
+Mathieu Desnoyers
+EfficiOS Inc.
+http://www.efficios.com
