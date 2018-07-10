@@ -1,89 +1,63 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Tue, 10 Jul 2018 09:24:32 +0200
-Subject: [PATCH] ARM: ftrace: Only set kernel memory back to read-only
- after boot
-In-Reply-To: <7aa5a479aa484775f492dc5251bcf5c9@agner.ch>
-References: <20180621124710.453ee0ae@gandalf.local.home>
- <7aa5a479aa484775f492dc5251bcf5c9@agner.ch>
-Message-ID: <c15a7eaba14073149a04d9aa649b10f9@agner.ch>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 10 Jul 2018 09:25:58 +0200
+Subject: [PATCH] MAINTAINERS: arm64: Remove boot/dts/ directory from arm64
+ entry
+In-Reply-To: <1530879736-7650-1-git-send-email-will.deacon@arm.com>
+References: <1530879736-7650-1-git-send-email-will.deacon@arm.com>
+Message-ID: <CAMuHMdUqRXde5DNgK6ih+ivuwY9HFbcWwbx_x3q5PmFcrGi0pQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04.07.2018 13:30, Stefan Agner wrote:
-> On 21.06.2018 18:47, Steven Rostedt wrote:
->> From: Steven Rostedt (VMware) <rostedt@goodmis.org>
->>
->> Dynamic ftrace requires modifying the code segments that are usually
->> set to read-only. To do this, a per arch function is called both before
->> and after the ftrace modifications are performed. The "before" function
->> will set kernel code text to read-write to allow for ftrace to make the
->> modifications, and the "after" function will set the kernel code text
->> back to "read-only" to keep the kernel code text protected.
->>
->> The issue happens when dynamic ftrace is tested at boot up. The test is
->> done before the kernel code text has been set to read-only. But the
->> "before" and "after" calls are still performed. The "after" call will
->> change the kernel code text to read-only prematurely, and other boot
->> code that expects this code to be read-write will fail.
->>
->> The solution is to add a variable that is set when the kernel code text
->> is expected to be converted to read-only, and make the ftrace "before"
->> and "after" calls do nothing if that variable is not yet set. This is
->> similar to the x86 solution from commit 162396309745 ("ftrace, x86:
->> make kernel text writable only for conversions").
->>
->> Reported-by: Stefan Agner <stefan@agner.ch>
->> Tested-by: Stefan Agner <stefan@agner.ch>
->> Link: http://lkml.kernel.org/r/20180620212906.24b7b66e at vmware.local.home
->> Signed-off-by: Steven Rostedt (VMware) <rostedt@goodmis.org>
->> ---
->> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
->> index c186474422f3..0cc8e04295a4 100644
->> --- a/arch/arm/mm/init.c
->> +++ b/arch/arm/mm/init.c
-> 
-> I guess this can be seen as reviewed?
-> 
-> Patches touching core ARM port usually go through Russels patch tracker.
-> 
-> You have to submit the patch here:
-> http://www.armlinux.org.uk/developer/patches/
-> 
+Hi Will,
 
-FWIW, I added this patch to the patch tracker, its patch ID is 8780/1.
+On Fri, Jul 6, 2018 at 2:22 PM Will Deacon <will.deacon@arm.com> wrote:
+> The arm-soc tree does a good job handling .dts files, so exclude them
+> from the ARM64 entry in MAINTAINERS.
+>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
---
-Stefan
+Thanks for your patch!
 
-> 
-> 
->> @@ -736,20 +736,29 @@ static int __mark_rodata_ro(void *unused)
->>  	return 0;
->>  }
->>
->> +static int kernel_set_to_readonly __read_mostly;
->> +
->>  void mark_rodata_ro(void)
->>  {
->> +	kernel_set_to_readonly = 1;
->>  	stop_machine(__mark_rodata_ro, NULL, NULL);
->>  	debug_checkwx();
->>  }
->>
->>  void set_kernel_text_rw(void)
->>  {
->> +	if (!kernel_set_to_readonly)
->> +		return;
->> +
->>  	set_section_perms(ro_perms, ARRAY_SIZE(ro_perms), false,
->>  				current->active_mm);
->>  }
->>
->>  void set_kernel_text_ro(void)
->>  {
->> +	if (!kernel_set_to_readonly)
->> +		return;
->> +
->>  	set_section_perms(ro_perms, ARRAY_SIZE(ro_perms), true,
->>  				current->active_mm);
->>  }
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -2264,6 +2264,7 @@ L:        linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+>  T:     git git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git
+>  S:     Maintained
+>  F:     arch/arm64/
+> +X:     arch/arm64/boot/dts/
+>  F:     Documentation/arm64/
+
+Please note that this does not cause checkpatch to point to the arm-soc
+tree, but does drop the reference to linux-arm-kernel, which may not
+be intentional?
+
+--- scripts/get_maintainer.pl -f arch/arm64/boot/dts old 2018-07-10
+09:21:51.595392363 +0200
++++ scripts/get_maintainer.pl -f arch/arm64/boot/dts new 2018-07-10
+09:22:14.671368341 +0200
+@@ -1,7 +1,4 @@
+ Rob Herring <robh+dt@kernel.org> (maintainer:OPEN FIRMWARE AND
+FLATTENED DEVICE TREE BINDINGS)
+ Mark Rutland <mark.rutland@arm.com> (maintainer:OPEN FIRMWARE AND
+FLATTENED DEVICE TREE BINDINGS)
+-Catalin Marinas <catalin.marinas@arm.com> (maintainer:ARM64 PORT
+(AARCH64 ARCHITECTURE))
+-Will Deacon <will.deacon@arm.com> (maintainer:ARM64 PORT (AARCH64
+ARCHITECTURE))
+ devicetree at vger.kernel.org (open list:OPEN FIRMWARE AND FLATTENED
+DEVICE TREE BINDINGS)
+-linux-arm-kernel at lists.infradead.org (moderated list:ARM64 PORT
+(AARCH64 ARCHITECTURE))
+ linux-kernel at vger.kernel.org (open list)
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+-- 
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
