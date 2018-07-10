@@ -1,35 +1,102 @@
-From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Tue, 10 Jul 2018 11:24:14 +0100
-Subject: [PATCH 1/3] drm/armada: fix compare_of() for LCD controllers
-In-Reply-To: <20180710102344.GH17271@n2100.armlinux.org.uk>
-References: <20180710102344.GH17271@n2100.armlinux.org.uk>
-Message-ID: <E1fcpoc-0003Yt-07@rmk-PC.armlinux.org.uk>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 10 Jul 2018 12:26:12 +0200
+Subject: [PATCH 2/2] PCI: imx: Initial imx7d pm support
+In-Reply-To: <e36fac6f4907288c58a7dfa112541e73de957d46.camel@nxp.com>
+References: <cover.1527621510.git.leonard.crestez@nxp.com>
+ <a6176c8bcfbca08ce4e93e304bdcd48c4600f8e2.1527621510.git.leonard.crestez@nxp.com>
+ <1528468422.26356.20.camel@pengutronix.de>
+ <02207512447db4585a4e879e2a059ba223d57dbe.camel@nxp.com>
+ <1530607328.22468.102.camel@pengutronix.de>
+ <e36fac6f4907288c58a7dfa112541e73de957d46.camel@nxp.com>
+Message-ID: <CAPDyKFqdJ72ad4Ljz95TFxuNs_T1npSzBU7VCqFLExpC+2DW6Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DT node passed for LCD controllers is the "port" node within the
-parent device.  Detect this and compare the parent node.
+On 9 July 2018 at 16:59, Leonard Crestez <leonard.crestez@nxp.com> wrote:
+> On Tue, 2018-07-03 at 10:42 +0200, Lucas Stach wrote:
+>> Am Montag, den 02.07.2018, 17:18 +0000 schrieb Leonard Crestez:
+>> > On Fri, 2018-06-08 at 16:33 +0200, Lucas Stach wrote:
+>> > > Am Dienstag, den 29.05.2018, 22:39 +0300 schrieb Leonard Crestez:
+>> > > > On imx7d the phy is turned off in suspend and must be reset on resume.
+>> > > > Right now lspci -v fails after a suspend/resume cycle, fix this by
+>> > > > adding minimal suspend/resume code from the nxp vendor tree.
+>> > > >
+>> > > > This is currently only enabled for imx7 but the same sequence can be
+>> > > > applied to other imx pcie variants.
+>> > > > +#ifdef CONFIG_PM_SLEEP
+>> >
+>> > Another issue that should be discussed here is that on 6sx and 7d the
+>> > gpc PCIE power domain is not defined correctly: the PCIE block is in
+>> > the DISPMIX domain on both SOCs and it is only PCIE_PHY which has a
+>> > separate power domain.
+>> >
+>> > This matters: enabling power-gating for displays will break pcie if
+>> > this relationship is not taken into account. Here are some options:
+>> >
+>> > 1) Make &pd_pcie a child of &pd_disp by hacking into gpc probe
+>> > functions and calling pm_genpd_add_subdomain. Not very nice.
+>> >
+>> > 2) Support nesting PGCs in GPC code? Lots of code and still an
+>> > incorrect representation of hardware.
+>> >
+>> > 3) Set power-domains = <&pd_disp> and enable runtime PM on &pd_pcie?
+>> >
+>> > 4) Add separate devices for the pcie-phy. These would be mostly empty
+>> > but still different, for example on imx6sx the PHY is not even
+>> > accessible on the bus but only though PCIE registers.
+>>
+>> 5) Take a look at the linux-pm list. ;) The power domain framework has
+>> just gained support for multiple power domains per device. I think that
+>>  is the right solution for this, as like you mentioned the PHY isn't
+>> really a separate block on i.MX6, but part of the PCIe controller
+>> device.
 
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
----
- drivers/gpu/drm/armada/armada_drv.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+Yep, it sounds like the PCIe controller device is partitioned across
+multiple PM domains.
 
-diff --git a/drivers/gpu/drm/armada/armada_drv.c b/drivers/gpu/drm/armada/armada_drv.c
-index d1705d298a39..217f0590fd61 100644
---- a/drivers/gpu/drm/armada/armada_drv.c
-+++ b/drivers/gpu/drm/armada/armada_drv.c
-@@ -205,7 +205,10 @@ static void armada_drm_unbind(struct device *dev)
- 
- static int compare_of(struct device *dev, void *data)
- {
--	return dev->of_node == data;
-+	struct device_node *np = data;
-+	if (of_node_cmp(np->name, "port") == 0)
-+		np = np->parent;
-+	return dev->of_node == np;
- }
- 
- static int compare_dev_name(struct device *dev, void *data)
--- 
-2.7.4
+>
+> Yes, I noticed that earlier but not that it was merged recently. It is
+> a better solution.
+>
+> Unfortunately the multiple power-domain code seems to require devices
+> to explicitly fetch references to the power domains and manipulate
+> them.
+
+Actually, it's the other way around.
+
+You need only one device to attach the PM domains. However, in genpd,
+one device will be created per PM domain and its that device you get
+back to operate upon.
+
+Typically the returned device(s) should be linked with the "master"
+device, device_link_add().
+
+> As far as I can tell this means that every device using multiple
+> power domains has to be modified to do so. In this particular case it
+> would be useful to just have all power domains turned on before probe,
+> just like when a single power-domain is specified:
+
+I you need them to be powered on, just use the corresponding device
+links flags when you create the link during probe.
+
+Something along the lines of this:
+
+device_link_add(dev, genpd_dev0, DL_FLAG_STATELESS |
+DL_FLAG_PM_RUNTIME | DL_FLAG_RPM_ACTIVE);
+
+>
+>     power-domains = <&pd_pci>, <&pd_disp>;
+>
+> But this issue is not strictly related to imx7d pci hanging on
+> suspend/resume, it can be dealt with later.
+
+Maybe not, I don't have the complete picture.
+
+However, you do get the opportunity to use the genpd infrastructure,
+which calls the ->power_on|off() callbacks of the PM domain during
+suspend/resume. And by using the dev_link_add(), you can make sure
+that the PM domain gets powered on/off in the order as the
+corresponding supplier device.
+
+Kind regards
+Uffe
