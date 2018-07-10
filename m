@@ -1,40 +1,62 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Tue, 10 Jul 2018 17:30:09 +0200
-Subject: [PATCH 2/2] staging: mt7621-gpio: remove driver
-In-Reply-To: <20180710151915.2282622-2-arnd@arndb.de>
-References: <20180710151915.2282622-1-arnd@arndb.de>
- <20180710151915.2282622-2-arnd@arndb.de>
-Message-ID: <20180710153009.GA11605@kroah.com>
+From: vkoul@kernel.org (Vinod)
+Date: Tue, 10 Jul 2018 21:01:04 +0530
+Subject: [PATCH v1 2/4] dmaengine: imx-sdma: add check_bd_buswidth() to
+ kill the dulicated code
+In-Reply-To: <1531239793-11781-3-git-send-email-yibin.gong@nxp.com>
+References: <1531239793-11781-1-git-send-email-yibin.gong@nxp.com>
+ <1531239793-11781-3-git-send-email-yibin.gong@nxp.com>
+Message-ID: <20180710153104.GF3219@vkoul-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 10, 2018 at 05:18:48PM +0200, Arnd Bergmann wrote:
-> The gpio-mt7621 driver has graduated out of staging and got accepted
-> into the gpio tree. Since they both use the same Kconfig symbol,
-> we could run into conflicts, e.g. I got this failure when the staging
-> driver got enabled with the other one being unavailable but using the
-> same Kconfig symbol:
-> 
-> drivers/gpio/gpio-mt7621.c: In function 'mediatek_gpio_bank_probe':
-> drivers/gpio/gpio-mt7621.c:228:10: error: 'struct gpio_chip' has no member named 'of_node'
->   rg->chip.of_node = node;
->           ^
-> drivers/gpio/gpio-mt7621.c:243:10: error: 'struct gpio_chip' has no member named 'of_gpio_n_cells'
->   rg->chip.of_gpio_n_cells = 2;
->           ^
-> drivers/gpio/gpio-mt7621.c:244:10: error: 'struct gpio_chip' has no member named 'of_xlate'
->   rg->chip.of_xlate = mediatek_gpio_xlate;
-> 
-> It would be trivial to rename the Kconfig symbol to avoid that problem,
-> but there is also seems to be little value in keeping the staging driver
-> around now.
-> 
-> Fixes: 4ba9c3afda41 ("gpio: mt7621: Add a driver for MT7621")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+On 11-07-18, 00:23, Robin Gong wrote:
+> Add check_bd_buswidth() to minimize the code size.
 
-This is already removed in my staging-next tree and will be in the next
-linux-next.
+this looks mostly fine and I think this should be first patch..
 
-thanks,
+> 
+> Signed-off-by: Robin Gong <yibin.gong@nxp.com>
+> ---
+>  drivers/dma/imx-sdma.c | 64 +++++++++++++++++++++++---------------------------
+>  1 file changed, 29 insertions(+), 35 deletions(-)
+> 
+> diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
+> index 27ccabf..ed2267d 100644
+> --- a/drivers/dma/imx-sdma.c
+> +++ b/drivers/dma/imx-sdma.c
+> @@ -1326,6 +1326,33 @@ static struct sdma_desc *sdma_transfer_init(struct sdma_channel *sdmac,
+>  	return NULL;
+>  }
+>  
+> +static int check_bd_buswidth(struct sdma_buffer_descriptor *bd,
+> +			     struct sdma_channel *sdmac, int count,
+> +			     dma_addr_t dma_dst, dma_addr_t dma_src)
+> +{
+> +	int ret = 0;
+> +
+> +	switch (sdmac->word_size) {
+> +	case DMA_SLAVE_BUSWIDTH_4_BYTES:
+> +		bd->mode.command = 0;
+> +		if ((count | dma_dst | dma_src) & 3)
+> +			ret = -EINVAL;
+> +		break;
 
-greg k-h
+empty line after each break please
+
+> +	case DMA_SLAVE_BUSWIDTH_2_BYTES:
+> +		bd->mode.command = 2;
+> +		if ((count | dma_dst | dma_src) & 1)
+> +			ret = -EINVAL;
+> +		break;
+> +	case DMA_SLAVE_BUSWIDTH_1_BYTE:
+> +		 bd->mode.command = 1;
+> +		break;
+> +	default:
+> +		return -EINVAL;
+> +	}
+> +
+> +	return ret;
+> +}
+> +
+-- 
+~Vinod
