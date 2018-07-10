@@ -1,46 +1,84 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 10 Jul 2018 15:53:26 +0200
-Subject: droid 4: no sound in the morning
-In-Reply-To: <20180710105910.GA4442@amd>
-References: <20180710105910.GA4442@amd>
-Message-ID: <20180710135325.GA23878@amd>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Tue, 10 Jul 2018 16:56:28 +0300
+Subject: [PATCH v4 2/3] serial: 8250: export serial8250_do_set_divisor()
+In-Reply-To: <20180710111327.072584c0@xhacker.debian>
+References: <20180710110942.5b0a016e@xhacker.debian>
+ <20180710111327.072584c0@xhacker.debian>
+Message-ID: <ee2443ab6b413e9d7f0148e8916b0bd0d4924375.camel@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 2018-07-10 12:59:10, Pavel Machek wrote:
-> Hi!
+On Tue, 2018-07-10 at 11:13 +0800, Jisheng Zhang wrote:
+> Some drivers could call serial8250_do_set_divisor() to complete its
+> own set_divisor routine. Export this symbol for code reusing.
 > 
-> I attempted to use droid 4 as an alarm clock, but got no sound in the
-> morning.
-> 
-> Log said:
-> 
-> [78798.682830] omap-mcbsp 40124000.mcbsp: CLKS: could not
-> clk_set_parent() to prcm_fck
-> [78803.561767] omap-mcbsp 40126000.mcbsp: CLKS: could not
-> clk_set_parent() to prcm_fck
-> 
-> Could it be related? Everything ok after reboot, v4.18-rc4.
-> 
-> Does anyone else see that? Any ideas?
 
-Ok, so I see that
+I dunno Greg's preferences here, but it could be merged with patch 1.
 
-[ 1775.896270] Charging, 4350000 uV, 532000 uA
-[ 1778.700286] omap-mcbsp 40124000.mcbsp: CLKS: could not
-clk_set_parent() to prcm_fck
-[ 1778.898468] Charging, 4350000 uV, 532000 uA
+In any case,
 
-...even when audio still works. So possibly not related.
+Reviewed-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
 
-									Pavel
+for this part.
+
+> Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
+> ---
+>  drivers/tty/serial/8250/8250_port.c | 5 +++--
+>  include/linux/serial_8250.h         | 3 +++
+>  2 files changed, 6 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/tty/serial/8250/8250_port.c
+> b/drivers/tty/serial/8250/8250_port.c
+> index ce0dc17f18ee..945f8dc2d50f 100644
+> --- a/drivers/tty/serial/8250/8250_port.c
+> +++ b/drivers/tty/serial/8250/8250_port.c
+> @@ -2580,8 +2580,8 @@ static unsigned char
+> serial8250_compute_lcr(struct uart_8250_port *up,
+>  	return cval;
+>  }
+>  
+> -static void serial8250_do_set_divisor(struct uart_port *port,
+> unsigned int baud,
+> -			    unsigned int quot, unsigned int
+> quot_frac)
+> +void serial8250_do_set_divisor(struct uart_port *port, unsigned int
+> baud,
+> +			       unsigned int quot, unsigned int
+> quot_frac)
+>  {
+>  	struct uart_8250_port *up = up_to_u8250p(port);
+>  
+> @@ -2612,6 +2612,7 @@ static void serial8250_do_set_divisor(struct
+> uart_port *port, unsigned int baud,
+>  		serial_port_out(port, 0x2, quot_frac);
+>  	}
+>  }
+> +EXPORT_SYMBOL_GPL(serial8250_do_set_divisor);
+>  
+>  static void serial8250_set_divisor(struct uart_port *port, unsigned
+> int baud,
+>  				   unsigned int quot, unsigned int
+> quot_frac)
+> diff --git a/include/linux/serial_8250.h b/include/linux/serial_8250.h
+> index 76b9db71e489..18e21427bce4 100644
+> --- a/include/linux/serial_8250.h
+> +++ b/include/linux/serial_8250.h
+> @@ -160,6 +160,9 @@ extern void serial8250_do_shutdown(struct
+> uart_port *port);
+>  extern void serial8250_do_pm(struct uart_port *port, unsigned int
+> state,
+>  			     unsigned int oldstate);
+>  extern void serial8250_do_set_mctrl(struct uart_port *port, unsigned
+> int mctrl);
+> +extern void serial8250_do_set_divisor(struct uart_port *port,
+> unsigned int baud,
+> +				      unsigned int quot,
+> +				      unsigned int quot_frac);
+>  extern int fsl8250_handle_irq(struct uart_port *port);
+>  int serial8250_handle_irq(struct uart_port *port, unsigned int iir);
+>  unsigned char serial8250_rx_chars(struct uart_8250_port *up, unsigned
+> char lsr);
+
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180710/2d0cea09/attachment.sig>
+Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Intel Finland Oy
