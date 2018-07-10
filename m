@@ -1,39 +1,53 @@
-From: john@phrozen.org (John Crispin)
-Date: Tue, 10 Jul 2018 07:59:24 +0200
-Subject: [PATCH 2/2] dt-bindings: arm: mediatek: cleanup MT7623N reference
- boards
-In-Reply-To: <99c1fce76e7ec4984c232bc0bdbd0fadbb86b0dc.1531199139.git.ryder.lee@mediatek.com>
-References: <34e4c13bd1deeb8e090a74b4e7e9192512b3eff0.1531199139.git.ryder.lee@mediatek.com>
- <99c1fce76e7ec4984c232bc0bdbd0fadbb86b0dc.1531199139.git.ryder.lee@mediatek.com>
-Message-ID: <194425ed-4ba8-094e-5b54-17ca74847b5f@phrozen.org>
+From: mpe@ellerman.id.au (Michael Ellerman)
+Date: Tue, 10 Jul 2018 16:16:28 +1000
+Subject: [PATCH for 4.18 2/6] rseq: use get_user/put_user rather than
+ __get_user/__put_user
+In-Reply-To: <854203778.2272.1531157327328.JavaMail.zimbra@efficios.com>
+References: <20180708210330.27324-1-mathieu.desnoyers@efficios.com>
+ <20180708210330.27324-3-mathieu.desnoyers@efficios.com>
+ <854203778.2272.1531157327328.JavaMail.zimbra@efficios.com>
+Message-ID: <87tvp7mx8j.fsf@concordia.ellerman.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Mathieu Desnoyers <mathieu.desnoyers@efficios.com> writes:
+> ----- On Jul 8, 2018, at 5:03 PM, Mathieu Desnoyers mathieu.desnoyers at efficios.com wrote:
+>
+>> In preparation to use __u64 for the rseq_cs pointer field, 32-bit
+>> architectures need to read this 64-bit value located in user-space
+>> addresses.
+>> 
+>> __get_user is used to read this value, given that its access check has
+>> already been performed with access_ok() on rseq registration.
+>> 
+>> arm does not implement 8-byte __get_user. Rather than trying to
+>> improve __get_user on ARM, use get_user/put_user across rseq instead.
+>> 
+>> If those end up showing up in benchmarks, the proper approach would be to
+>> use user_access_begin() / unsafe_get/put_user() / user_access_end()
+>> anyway.
+>
+> So, another twist to this story: ppc32 does not implement u64 get_user().
+
+Or __get_user() for that matter.
+
+But we should just fix it.
+
+We have the asm to do it, it's just the fact that __gu_val is unsigned
+long causes the size > sizeof(x) check here to fail:
+
+#define __get_user_size(x, ptr, size, retval)			\
+do {								\
+	retval = 0;						\
+	__chk_user_ptr(ptr);					\
+	if (size > sizeof(x))					\
+		(x) = __get_user_bad();				\
 
 
-On 10/07/18 07:09, Ryder Lee wrote:
-> Cleanup binding document to get rid of unsupported reference boards
-> for MT7623N.
->
-> Cc: John Crispin <john@phrozen.org>
-> Cc: Sean Wang <sean.wang@mediatek.com>
-> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
-Acked-by: John Crispin <john@phrozen.org>
-> ---
->   Documentation/devicetree/bindings/arm/mediatek.txt | 3 ---
->   1 file changed, 3 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/arm/mediatek.txt b/Documentation/devicetree/bindings/arm/mediatek.txt
-> index 7d21ab3..c07ddf4 100644
-> --- a/Documentation/devicetree/bindings/arm/mediatek.txt
-> +++ b/Documentation/devicetree/bindings/arm/mediatek.txt
-> @@ -59,9 +59,6 @@ Supported boards:
->   - Reference board for MT7623n with eMMC:
->       Required root node properties:
->         - compatible = "mediatek,mt7623n-rfb-emmc", "mediatek,mt7623";
-> -- Reference  board for MT7623n with NAND:
-> -    Required root node properties:
-> -      - compatible = "mediatek,mt7623n-rfb-nand", "mediatek,mt7623";
->   - Bananapi BPI-R2 board:
->         - compatible = "bananapi,bpi-r2", "mediatek,mt7623";
->   - MTK mt8127 tablet moose EVB:
+
+We seem to be able to fix that with the __inttype() trick that x86 uses.
+
+That's probably not 4.18 material though. But if you want to go with
+copy_from_user() for now you could then switch to get_user() for 4.19.
+
+cheers
