@@ -1,77 +1,43 @@
-From: cphealy@gmail.com (Chris Healy)
-Date: Tue, 10 Jul 2018 08:47:28 -0700
-Subject: [PATCH] ARM: dts: imx: Add ZII SCU2 Mezz board
-In-Reply-To: <20180707024902.439-1-andrew.smirnov@gmail.com>
-References: <20180707024902.439-1-andrew.smirnov@gmail.com>
-Message-ID: <CAFXsbZqgc7B-YE-aFgT=Qz20u+JRvvfdQFgh77Zv-+w62GA7XA@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 10 Jul 2018 17:49:26 +0200
+Subject: [PATCH v3 3/8] mailbox: Add transmit done by blocking option
+In-Reply-To: <20180702114033.15654-4-mperttunen@nvidia.com>
+References: <20180702114033.15654-1-mperttunen@nvidia.com>
+ <20180702114033.15654-4-mperttunen@nvidia.com>
+Message-ID: <20180710154926.GB8492@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Successfully tested on an SCU2 Mezz board.
-
-Tested-by: Chris Healy <cphealy@gmail.com>
-
-On Fri, Jul 6, 2018 at 7:49 PM, Andrey Smirnov <andrew.smirnov@gmail.com> wrote:
-> Add support for the Zodiac Inflight Innovations SCU2 Mezz
-> board (i.MX51-based).
->
-> Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> Cc: Nikita Yushchenko <nikita.yoush@cogentembedded.com>
-> Cc: Lucas Stach <l.stach@pengutronix.de>
-> Cc: cphealy at gmail.com
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: devicetree at vger.kernel.org
-> Cc: linux-kernel at vger.kernel.org
-> Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
-> Signed-off-by: Andrey Gusakov <andrey.gusakov@cogentembedded.com>
-> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+On Mon, Jul 02, 2018 at 02:40:28PM +0300, Mikko Perttunen wrote:
+> Add a new TXDONE option, TXDONE_BY_BLOCK. With this option, the
+> send_data function of the mailbox driver is expected to block until
+> the message has been sent. The new option is used with the Tegra
+> Combined UART driver to minimize unnecessary overhead when transmitting
+> data.
+> 
+> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
 > ---
->
-> Shawn:
->
-> This is a spin-off of SCU2 Mezz board support originally found in [v0]
-> as per out off-list (Fabio, Chris, Nikita, myself) to add support for
-> ZII hardware fist and worry about factoring out commonalites later.
->
-> Original submission was done by Andrey Gusakov, but he is too busy on
-> other projects, so the honors of submitting this were delegated to me.
->
-> NOTE: RAVE SP ("zii,rave-sp-mezz") node is technically supported by
-> upstream, but it needs some fixes from [rave-sp-fixes] to work
-> correctly. If you want me to drop that node until [rave-sp-fixes] is
-> merged, let me know.
->
-> Changes since [v0]:
->
->  - Patch converted to be a standalone file not dependent on any
->    ZII-specific .dtsi
->
->  - Added RAVE SP node with all the children that are currently
->    supported by upstream
->
->  - Droppped ecspi2 node. That node didn't have any child devices in
->    [v0] because none of the chips connected to that bus are supported
->    upstream. This node can be added later once anything attached to it
->    has upstream drivers.
->
->  - Dropped i2c_gpio. That bus was originally added for RAVE SP related
->    prototyping and is unused in actual product.
->
->  - Various newline fixes pointed out in [v0]
->
->  - Most of then nodes should be sorted alphabetically (I might have
->    missed some)
->
->  - Collected Reviewed-by from Fabio (Fabio, I assumed you won't mind,
->    but let me know if you want me to drop it)
->
-> [v0] lkml.kernel.org/r/1529603100-31958-4-git-send-email-andrey.gusakov at cogentembedded.com
-> [rave-sp-fixes] lkml.kernel.org/r/20180707024108.32373-1-andrew.smirnov at gmail.com
->
->  arch/arm/boot/dts/Makefile                |   3 +-
->  arch/arm/boot/dts/imx51-zii-scu2-mezz.dts | 448 ++++++++++++++++++++++
->  2 files changed, 450 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm/boot/dts/imx51-zii-scu2-mezz.dts
+>  drivers/mailbox/mailbox.c | 30 +++++++++++++++++++++---------
+>  drivers/mailbox/mailbox.h |  1 +
+>  2 files changed, 22 insertions(+), 9 deletions(-)
+
+Jassi,
+
+any comments on this patch and 4/8 and 5/8? Greg's already said that
+he'd be fine if I take the serial driver (patch 6/8) through the Tegra
+tree to resolve the dependencies. If you're okay with the three mailbox
+patches I can pick them up as well with your Acked-by.
+
+Otherwise, if you'd prefer to take these through the mailbox tree, let
+me know and I'll wait until sometime after v4.19-rc1 before I send out
+pull requests for the DT changes.
+
+Thanks,
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180710/b0ca31a4/attachment.sig>
