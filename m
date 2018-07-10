@@ -1,7 +1,7 @@
 From: yibin.gong@nxp.com (Robin Gong)
-Date: Wed, 11 Jul 2018 00:21:45 +0800
+Date: Wed, 11 Jul 2018 00:23:09 +0800
 Subject: [PATCH v1 0/4] add memcpy support for sdma
-Message-ID: <1531239709-11693-1-git-send-email-yibin.gong@nxp.com>
+Message-ID: <1531239793-11781-1-git-send-email-yibin.gong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
