@@ -1,117 +1,130 @@
-From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Tue, 10 Jul 2018 13:18:00 +0000
-Subject: [PATCH v2 1/2] soc: imx: gpc: Disable 6sl display power gating
- for ERR006287
-In-Reply-To: <CAPDyKFoELWSiZ4cfOByziPQzqW7Tx3m29qKu9uCKPHO1gXO4YA@mail.gmail.com>
-References: <cover.1531138446.git.leonard.crestez@nxp.com>
- <a00303c5672b332d1d363b78926903187169b8cc.1531138446.git.leonard.crestez@nxp.com>
- <CAPDyKFoELWSiZ4cfOByziPQzqW7Tx3m29qKu9uCKPHO1gXO4YA@mail.gmail.com>
-Message-ID: <8aba202031bb222d9d78f8ac272757c930aff0c5.camel@nxp.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Tue, 10 Jul 2018 21:20:00 +0800
+Subject: [stericsson:ux500-mcde 3/3] drivers/gpu/drm/mcde/mcde_dsi.c:394:4:
+ warning: format '%x' expects argument of type 'unsigned int', but argument 8
+ has type 'size_t {aka long unsigned int}'
+Message-ID: <201807102158.prmRvN5B%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2018-07-10 at 00:33 +0200, Ulf Hansson wrote:
-> On 9 July 2018 at 14:23, Leonard Crestez <leonard.crestez@nxp.com>
-> wrote:
-> > The imx6sl chip errata document describes ERR006287 like this:
-> > 
-> > """
-> > Upon resuming from power gating, the modules in the display power
-> > domain
-> > (eLCDIF, EPDC, PXP and SPDC) might fail to perform register reads
-> > correctly.
-> > 
-> > When the modules listed above are used, do not use power gating on
-> > the
-> > display power domain.
-> > """
-> > 
-> > Link: https://emea01.safelinks.protection.outlook.com/?url=https%3A
-> > %2F%2Fwww.nxp.com%2Fdocs%2Fen%2Ferrata%2FIMX6SLCE.pdf%23page%3D62&a
-> > mp;data=02%7C01%7Cleonard.crestez%40nxp.com%7Cdbc5b00a97c548c470320
-> > 8d5e5ebfb24%7C686ea1d3bc2b4c6fa92cd99c5c301635%7C0%7C1%7C6366677240
-> > 50833256&amp;sdata=VgYIGGTYQ0ChR%2FCEBSZJ1D1JyfJRDi96YHa%2Byt4Qr5s%
-> > 3D&amp;reserved=0
-> > 
-> > Handle this in linux in the same way as imx6qp ERR009619: make the
-> > DISP
-> > domain return -EBUSY on power_off.
-> > 
-> > Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
-> > ---
-> >  drivers/soc/imx/gpc.c | 10 ++++++++++
-> >  1 file changed, 10 insertions(+)
-> > 
-> > diff --git a/drivers/soc/imx/gpc.c b/drivers/soc/imx/gpc.c
-> > index 526f2d02dc78..6b726dada560 100644
-> > --- a/drivers/soc/imx/gpc.c
-> > +++ b/drivers/soc/imx/gpc.c
-> > @@ -339,30 +339,35 @@ static struct imx_pm_domain imx_gpc_domains[]
-> > = {
-> >  };
-> > 
-> >  struct imx_gpc_dt_data {
-> >         int num_domains;
-> >         bool err009619_present;
-> > +       bool err006287_present;
-> >  };
-> > 
-> >  static const struct imx_gpc_dt_data imx6q_dt_data = {
-> >         .num_domains = 2,
-> >         .err009619_present = false,
-> > +       .err006287_present = false,
-> >  };
-> > 
-> >  static const struct imx_gpc_dt_data imx6qp_dt_data = {
-> >         .num_domains = 2,
-> >         .err009619_present = true,
-> > +       .err006287_present = false,
-> >  };
-> > 
-> >  static const struct imx_gpc_dt_data imx6sl_dt_data = {
-> >         .num_domains = 3,
-> >         .err009619_present = false,
-> > +       .err006287_present = true,
-> >  };
-> > 
-> >  static const struct imx_gpc_dt_data imx6sx_dt_data = {
-> >         .num_domains = 4,
-> >         .err009619_present = false,
-> > +       .err006287_present = false,
-> >  };
-> > 
-> >  static const struct of_device_id imx_gpc_dt_ids[] = {
-> >         { .compatible = "fsl,imx6q-gpc", .data = &imx6q_dt_data },
-> >         { .compatible = "fsl,imx6qp-gpc", .data = &imx6qp_dt_data
-> > },
-> > @@ -467,10 +472,15 @@ static int imx_gpc_probe(struct
-> > platform_device *pdev)
-> >         /* Disable PU power down in normal operation if ERR009619
-> > is present */
-> >         if (of_id_data->err009619_present)
-> >                 imx_gpc_domains[GPC_PGC_DOMAIN_PU].flags |=
-> >                                 PGC_DOMAIN_FLAG_NO_PD;
-> > 
-> > +       /* Disable DISP power down in normal operation if ERR006287
-> > is present */
-> > +       if (of_id_data->err006287_present)
-> > +               imx_gpc_domains[GPC_PGC_DOMAIN_DISPLAY].flags |=
-> > +                               PGC_DOMAIN_FLAG_NO_PD;
-> > +
-> 
-> This looks like a use-case for an always powered on PM domain?
-> 
-> If that's the case, GENPD_FLAG_ALWAYS_ON does the trick, but more
-> efficient as it enables genpd to take a few shortcuts when trying to
-> power of a PM domain.
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git ux500-mcde
+head:   ee7f210157e9d5a082751c1c1a556864d3e47892
+commit: ee7f210157e9d5a082751c1c1a556864d3e47892 [3/3] MCDE hack
+config: sparc64-allyesconfig (attached as .config)
+compiler: sparc64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout ee7f210157e9d5a082751c1c1a556864d3e47892
+        # save the attached .config to linux build tree
+        GCC_VERSION=7.2.0 make.cross ARCH=sparc64 
 
-GENPD_FLAG_ALWAYS_ON would be a reasonable here.
+All warnings (new ones prefixed by >>):
 
-I searched but I've been unable to find a good reference for scenarios
-where power gating DISP on 6sl is still supported. I think it should be
-safe to turn off in suspend but this is only based based on old commits
-from the imx internal tree.
+   drivers/gpu/drm/mcde/mcde_dsi.c: In function 'mcde_dsi_host_detach':
+   drivers/gpu/drm/mcde/mcde_dsi.c:371:19: warning: unused variable 'd' [-Wunused-variable]
+     struct mcde_dsi *d = host_to_mcde_dsi(host);
+                      ^
+   In file included from include/linux/platform_device.h:14:0,
+                    from drivers/gpu/drm/mcde/mcde_dsi.c:2:
+   drivers/gpu/drm/mcde/mcde_dsi.c: In function 'mcde_dsi_host_transfer':
+>> drivers/gpu/drm/mcde/mcde_dsi.c:394:4: warning: format '%x' expects argument of type 'unsigned int', but argument 8 has type 'size_t {aka long unsigned int}' [-Wformat=]
+       "message to channel %d: %02x,%02x,%02x,%02x %02x bytes\n",
+       ^
+   drivers/gpu/drm/mcde/mcde_dsi.c:397:4:
+       4 + packet.payload_length);
+       ~~~~~~~~~~~~
+   include/linux/device.h:1395:51: note: in definition of macro 'dev_info'
+    #define dev_info(dev, fmt, arg...) _dev_info(dev, fmt, ##arg)
+                                                      ^~~
 
-Right now displays on imx6sl don't work at all because nothing is
-inside the DISP and it gets powered off. Fixing this in the safest and
-most uncontroversial way would be worthwhile, yes?
+vim +394 drivers/gpu/drm/mcde/mcde_dsi.c
+
+   367	
+   368	static int mcde_dsi_host_detach(struct mipi_dsi_host *host,
+   369					struct mipi_dsi_device *mdsi)
+   370	{
+ > 371		struct mcde_dsi *d = host_to_mcde_dsi(host);
+   372	
+   373		return 0;
+   374	}
+   375	
+   376	static ssize_t mcde_dsi_host_transfer(struct mipi_dsi_host *host,
+   377					      const struct mipi_dsi_msg *msg)
+   378	{
+   379		struct mcde_dsi *d = host_to_mcde_dsi(host);
+   380		struct mipi_dsi_packet packet;
+   381		const u32 loop_delay_us = 10; /* us */
+   382		const u8 *header, *data;
+   383		u32 loop_counter;
+   384		u32 val;
+   385		int ret;
+   386	
+   387		ret = mipi_dsi_create_packet(&packet, msg);
+   388		if (ret < 0)
+   389			return ret;
+   390	
+   391		header = packet.header;
+   392		data = packet.payload;
+   393		dev_info(d->dev,
+ > 394			 "message to channel %d: %02x,%02x,%02x,%02x %02x bytes\n",
+   395			 msg->channel,
+   396			 header[0], header[1], header[2], header[3],
+   397			 4 + packet.payload_length);
+   398	
+   399		if (packet.payload_length) {
+   400			dev_err(d->dev,
+   401				"dunno how to write more than 4 bytes yet\n");
+   402			return -EIO;
+   403		}
+   404	
+   405		val = DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_NAT_WRITE;
+   406		if (packet.payload_length > 2)
+   407			val |= DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_LONGNOTSHORT;
+   408		val |= 0 << DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_ID_SHIFT;
+   409		val |= packet.payload_length
+   410			<< DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_SIZE_SHIFT;
+   411		val |= DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_LP_EN;
+   412	        val |= msg->type << DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_HEAD_SHIFT;
+   413		writel(val, d->regs + DSI_DIRECT_CMD_MAIN_SETTINGS);
+   414	
+   415		writel(header[0], d->regs + DSI_DIRECT_CMD_WRDAT0);
+   416		writel(header[1], d->regs + DSI_DIRECT_CMD_WRDAT1);
+   417		writel(header[2], d->regs + DSI_DIRECT_CMD_WRDAT2);
+   418		writel(header[3], d->regs + DSI_DIRECT_CMD_WRDAT3);
+   419	
+   420		writel(~0, d->regs + DSI_DIRECT_CMD_STS_CLR);
+   421		writel(~0, d->regs + DSI_CMD_MODE_STS_CLR);
+   422		/* Send command */
+   423		writel(1, d->regs + DSI_DIRECT_CMD_SEND);
+   424	
+   425		loop_counter = 1000 * 1000 / loop_delay_us;
+   426		while (!(readl(d->regs + DSI_DIRECT_CMD_STS) &
+   427			 DSI_DIRECT_CMD_STS_WRITE_COMPLETED)
+   428		       && --loop_counter)
+   429			usleep_range(loop_delay_us, (loop_delay_us * 3) / 2);
+   430	
+   431		if (!loop_counter) {
+   432	                dev_err(d->dev, "DSI write timeout!\n");
+   433	                return -ETIME;
+   434	        } else {
+   435	                dev_vdbg(d->dev, "DSI Write OK\n");
+   436	        }
+   437	
+   438		writel(~0, d->regs + DSI_DIRECT_CMD_STS_CLR);
+   439		writel(~0, d->regs + DSI_CMD_MODE_STS_CLR);
+   440	
+   441		return 4 + packet.payload_length;
+   442	}
+   443	
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 54403 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180710/08f6fcc2/attachment-0001.gz>
