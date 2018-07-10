@@ -1,146 +1,56 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Tue, 10 Jul 2018 10:04:21 -0500
-Subject: 4.18rc3 TX2 boot failure with "ACPICA: AML parser: attempt to
- continue loading table after error"
-In-Reply-To: <2264016.O8iB3BUh2s@aspire.rjw.lan>
-References: <c49a3666-7d23-6a05-703c-1273d79a00cd@arm.com>
- <218e4339-477d-eb0d-6007-764c8e24229f@arm.com>
- <3574827.zOC4apc8e1@aspire.rjw.lan> <2264016.O8iB3BUh2s@aspire.rjw.lan>
-Message-ID: <dc4c68bb-089c-6c99-31df-e8d3587b6029@arm.com>
+From: hch@lst.de (Christoph Hellwig)
+Date: Tue, 10 Jul 2018 17:08:24 +0200
+Subject: [RFC PATCH 2/2] dma-mapping: Clean up dma_get_required_mask()
+ hooks
+In-Reply-To: <3b8a23b6-6015-3e8e-07f0-b75920a1e264@arm.com>
+References: <55ac9550c311f056dcfeed9b2c8265375f17b155.1530726467.git.robin.murphy@arm.com>
+ <08256121f325ceed7f6b88c1a5d3cf949698787d.1530726467.git.robin.murphy@arm.com>
+ <20180710113908.GB32688@lst.de>
+ <3b8a23b6-6015-3e8e-07f0-b75920a1e264@arm.com>
+Message-ID: <20180710150824.GA12274@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Jul 10, 2018 at 01:29:20PM +0100, Robin Murphy wrote:
+>> What I've done is to:
+>>
+>>   1) provide the get_required_mask unconditionally in struct dma_map_ops
+>>   2) default to what is the current dma_get_required_mask implementation
+>>      if nothing else is specified.
+>
+> Yeah, there's already 17 pointers in dma_map_ops of which about half are 
+> optional, so these awkward #ifdefs to save one more probably aren't worth 
+> the inconsistency they bring. It feels like this guy mostly goes 
+> hand-in-hand with dma_supported, so ack to giving it the same look and 
+> feel.
 
-On 07/10/2018 06:25 AM, Rafael J. Wysocki wrote:
-> On Tuesday, July 10, 2018 1:13:17 PM CEST Rafael J. Wysocki wrote:
->> On Tuesday, July 10, 2018 5:44:05 AM CEST Jeremy Linton wrote:
->>> Hi,
->>>
->>> On 07/09/2018 04:28 PM, Rafael J. Wysocki wrote:
->>>> On Mon, Jul 9, 2018 at 10:45 PM, Jeremy Linton <jeremy.linton@arm.com> wrote:
->>>>> Hi,
->>>>>
->>>>> First thanks for the patch..
->>>>>
->>>>> On 07/08/2018 04:14 AM, Rafael J. Wysocki wrote:
->>>>>>
->>>>>> On Monday, July 2, 2018 11:41:42 PM CEST Jeremy Linton wrote:
->>>>>>>
->>>>>>> Hi,
->>>>>>>
->>>>>>> I'm experiencing two problems with commit 5088814a6e931 which is
->>>>>>> "ACPICA: AML parser: attempt to continue loading table after error"
->>>>>>>
->>>>>>> The first is this boot failure on a thunderX2:
->>>>>>>
->>>>>>> [   10.770098] ACPI Error: Ignore error and continue table load
->>>>>
->>>>>
->>>>> [trimming]
->>>>>
->>>>>>> ]---
->>>>>>>
->>>>>>> Which does appear to be the result of some bad data in the table, but it
->>>>>>> was working with 4.17, and reverting this commit solves the problem.
->>>>>>
->>>>>>
->>>>>> Does the patch below make any difference?
->>>>>>
->>>>>> ---
->>>>>>     drivers/acpi/acpica/psobject.c |    3 +++
->>>>>>     1 file changed, 3 insertions(+)
->>>>>>
->>>>>> Index: linux-pm/drivers/acpi/acpica/psobject.c
->>>>>> ===================================================================
->>>>>> --- linux-pm.orig/drivers/acpi/acpica/psobject.c
->>>>>> +++ linux-pm/drivers/acpi/acpica/psobject.c
->>>>>> @@ -39,6 +39,9 @@ static acpi_status acpi_ps_get_aml_opcod
->>>>>>           ACPI_FUNCTION_TRACE_PTR(ps_get_aml_opcode, walk_state);
->>>>>>           walk_state->aml = walk_state->parser_state.aml;
->>>>>> +       if (!walk_state->aml)
->>>>>> +               return AE_CTRL_PARSE_CONTINUE;
->>>>>> +
->>>>>
->>>>>
->>>>> Well this seems to avoid the crash, but now it hangs right after on the
->>>>> "Ignore error and continue table load" message.
->>>>
->>>> Well, maybe we should just abort in that case.
->>>>
->>>> I'm wondering what happens if you replace the return statement in the
->>>> patch above with
->>>>
->>>> return_ACPI_STATUS(AE_AML_BAD_OPCODE)
->>>
->>> Yes, that is where I went when I applied the patch but I used
->>> AE_CTRL_TERMINATE, which terminates the loop in acpi_ps_parse_loop() and
->>> that appears to successfully finish/terminate the initial parsing pass.
->>> But, it then crashes in acpi_ns_lookup called via the
->>> acpi_walk_resources sequences that goes through ut_evalute_object() due
->>> to the path/scope_info->scope.node being ACPI_ROOT_OBJECT (-1) and
->>> bypassing the null check. Adding a ACPI_ROOT_OBJECT check as well as the
->>> null checks in acpi_ns_lookup results in a successful boot. Tracking
->>> down how the terminate (or whatever) is leaving the info->prefix_node
->>> (in acpi_ns_evaluate) set to ROOT_OBJECT instead of null, is something I
->>> don't yet understand.
->>>
->>> Anyway, I tried Using BAD_OPCODE rather than TERMINATE and it seems to
->>> have the same basic result as PARSE_CONTINUE.
->>
->> OK, thanks!
->>
->> I evidently didn't look deep enough.
->>
->> Can you please check the patch below?
->>
->> I'm not sure if we can pass this broken state to
->> acpi_ps_complete_final_op(), so it may be necessary to return
->> an error directly when aml_op_start is NULL.
->>
->> ---
->>   drivers/acpi/acpica/psloop.c |    3 +++
->>   1 file changed, 3 insertions(+)
->>
->> Index: linux-pm/drivers/acpi/acpica/psloop.c
->> ===================================================================
->> --- linux-pm.orig/drivers/acpi/acpica/psloop.c
->> +++ linux-pm/drivers/acpi/acpica/psloop.c
->> @@ -493,6 +493,9 @@ acpi_status acpi_ps_parse_loop(struct ac
->>   		ASL_CV_CAPTURE_COMMENTS(walk_state);
->>   
->>   		aml_op_start = parser_state->aml;
->> +		if (!aml_op_start)
->> +			break;
->> +
->>   		if (!op) {
->>   			status =
->>   			    acpi_ps_create_op(walk_state, aml_op_start, &op);
->>
->> --
-> 
-> So maybe something like this:
-> 
-> ---
->   drivers/acpi/acpica/psloop.c |    3 +++
->   1 file changed, 3 insertions(+)
-> 
-> Index: linux-pm/drivers/acpi/acpica/psloop.c
-> ===================================================================
-> --- linux-pm.orig/drivers/acpi/acpica/psloop.c
-> +++ linux-pm/drivers/acpi/acpica/psloop.c
-> @@ -494,6 +494,9 @@ acpi_status acpi_ps_parse_loop(struct ac
->   
->   		aml_op_start = parser_state->aml;
->   		if (!op) {
-> +			if (!aml_op_start)
-> +				return_ACPI_STATUS(AE_AML_INTERNAL);
-> +
->   			status =
->   			    acpi_ps_create_op(walk_state, aml_op_start, &op);
->   			if (ACPI_FAILURE(status)) {
-> 
-> 
+This whole area needs a major refactoring - we currentl have three
+different APIs to deal with addressability: dma_get_required_mask,
+dma_capable/dma_set_mask and dma_capable from dma-direct.h, and there
+is plenty of unexplainable mismatches between them.
 
-This gets rid of the infinite loop, but its still has the problem with 
-acpi_ns_lookup crashing due to -1 in the scope.node.
+Sorting this out has been on my TODO list, but I think it can only
+effectively be done once the direct mapping implementations are
+reasonably consolidated.
+
+>> What I still had on my todo list but not done yet:
+>>
+>>   3) go through all instances and check if the current default
+>>      makes sense, at it based on direct addressability.  For most
+>>      iommu instances it seems like we should just return a 64-bit mask.
+>
+> That's reasonable, although in many cases we should know the effective 
+> IOMMU input address size which would be even neater.
+
+Sure.  Maybe I just need to steps 1 and 2 and let maintainers fill
+in.
+
+>>   4) figure out how to take the dma offsets into account for it
+>
+> AFAICS it might boil down to simply:
+>
+> 	mask = roundup_pow_of_two(phys_to_dma(dev, PFN_PHYS(max_pfn))) - 1;
+
+That looks way to sensible.  Which reminds me that I need to research
+the history behind the low_totalram/high_totalram magic in
+dma_get_required_mask.
