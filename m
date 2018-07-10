@@ -1,22 +1,136 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 10 Jul 2018 23:23:38 +0800
-Subject: [PATCH 05/17] drm/sun4i: tcon: Release node when traversing of
- graph
-In-Reply-To: <20180706175113.26698-6-jernej.skrabec@siol.net>
-References: <20180706175113.26698-1-jernej.skrabec@siol.net>
- <20180706175113.26698-6-jernej.skrabec@siol.net>
-Message-ID: <CAGb2v660yji16F_EyoezyZrAJaC9_MWF3giCfGXVcL3RJ6c5fw@mail.gmail.com>
+From: james.morse@arm.com (James Morse)
+Date: Tue, 10 Jul 2018 16:25:03 +0100
+Subject: [PATCH v10 08/14] arm64: kexec_file: load initrd and device-tree
+In-Reply-To: <20180710073719.GW28220@linaro.org>
+References: <20180623022058.10935-1-takahiro.akashi@linaro.org>
+ <20180623022058.10935-9-takahiro.akashi@linaro.org>
+ <1e401f4e-6176-990d-476c-31ae3f28f26c@arm.com>
+ <20180710073719.GW28220@linaro.org>
+Message-ID: <27eda5b7-f9ad-2918-c302-3669d4b72fd0@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 7, 2018 at 1:51 AM, Jernej Skrabec <jernej.skrabec@siol.net> wrote:
-> Function sun4i_tcon_find_engine_traverse() doesn't release node if it
-> needs to traverse of graph deeper than 1 level.
->
-> Fix this by calling of_node_put().
->
-> Fixes: 49836b11fe71 ("drm/sun4i: tcon: Generalize engine search algorithm")
->
-> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+Hi Akashi,
 
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+On 10/07/18 08:37, AKASHI Takahiro wrote:
+> On Tue, Jul 03, 2018 at 05:32:09PM +0100, James Morse wrote:
+>> On 23/06/18 03:20, AKASHI Takahiro wrote:
+>>> load_other_segments() is expected to allocate and place all the necessary
+>>> memory segments other than kernel, including initrd and device-tree
+>>> blob (and elf core header for crash).
+>>> While most of the code was borrowed from kexec-tools' counterpart,
+>>> users may not be allowed to specify dtb explicitly, instead, the dtb
+>>> presented by the original boot loader is reused.
+>>>
+>>> arch_kimage_kernel_post_load_cleanup() is responsible for freeing arm64-
+>>> specific data allocated in load_other_segments().
+
+>>> diff --git a/arch/arm64/kernel/machine_kexec_file.c b/arch/arm64/kernel/machine_kexec_file.c
+>>> index c38a8048ed00..7115c4f915dc 100644
+>>> --- a/arch/arm64/kernel/machine_kexec_file.c
+>>> +++ b/arch/arm64/kernel/machine_kexec_file.c
+>>
+>>> +static int setup_dtb(struct kimage *image,
+>>> +		unsigned long initrd_load_addr, unsigned long initrd_len,
+>>> +		char *cmdline, unsigned long cmdline_len,
+>>> +		char **dtb_buf, size_t *dtb_buf_len)
+>>> +{
+
+[..]
+
+>>> +	/* add bootargs */
+>>> +	if (cmdline) {
+>>> +		ret = fdt_setprop(buf, nodeoffset, "bootargs",
+>>> +						cmdline, cmdline_len + 1);
+>>> +		if (ret)
+>>> +			goto out_err;
+>>> +	}
+>>
+>> So (cmdline_len == 0) from user-space means keep the old cmdline. Sounds
+>> sensible. Is this documented anywhere?
+
+> To be a bit surprise, --append (and --cmdline) option belongs to arch-
+> specific options in terms of implementation. Apparently, a standard man page
+> of kexec(8) say little about it, in particular, for device-tree-based system.
+> 
+> As far as arm64 is concerned, the fact is a bit complicated.
+> User space kexec accepts --append as well as --reuse-cmdline, and
+> along with yet another --dtb option, a resulting command line for new
+> kernel (or bootargs in new dtb) would look to be:
+> 
+> 	--append=A | --reuse-cmdline |     --dtb
+> 		   |                 |   n    |    y(bootargs=B)
+> 
+> 	    n            n               S(*1)      B(*2)
+> 	    n            y               S          S(*3)
+> 	    y            n               A          A
+> 	    y            y              S+A        S+A(*4)
+> 
+>       where S: the cmdline parameters of the running system
+> 		 (equal to bootargs in system's dtb)
+
+(I'm afraid I don't understand this table, but the text below helps...)
+
+
+> You are talking about case(1) above.
+> 
+> Given that we can have an explicit option, --reuse-cmdline, the cmdline
+> in (1) should be NULL. Meanwhile, we specify --dtb here, which means
+> that we want to re-use system's dtb, implying that we also want to
+> reuse a cmdline parameter. (This can be arguable, though)
+
+Sounds like this is all user-space's problem!
+
+
+> So I would say that we have both reasons to go for and go against.
+> 
+> # Likewise,
+> # I wonder why the cmdnline would not be B or A+B, respectively,
+> in case of (3) and (4). But it's a different issue.
+> 
+>> powerpc does the opposite, it deletes the bootargs in this case. Are we happy
+>> making his a per-arch thing?
+> 
+> My compromise solution is:
+> a.to maintain compatibility with powerpc at system call level, 
+
+This sounds like the right thing to do.
+
+
+>   that is,
+>   replacing bootargs in new dtb if user explicitly specifies cmdline
+>   argument, otherwise nullifying bootargs,
+> b.yet maintain compatibility with arm64's kexec behavior at command line
+>   interface level. If neither --append nor --dtb is not specified,
+>   user space kexec will reuse the system's command line whether or not
+>   --reuse-cmdline is used.
+
+(a and b aren't options this time: you're proposing to do a-and-b)
+
+
+> (Do you follow me?)
+
+I think so:
+The syscall will behave the same as powerpc meaning the kernel will never re-use
+the existing cmdline in the dtb, even if that means (trying to) boot without one.
+
+If user-space wants to re-use the command line, it should read /proc/cmdline and
+feed the string back into the kernel.
+
+
+> So kexec and kexec_file on arm64 will still behave in exactly the same way,
+> but differently from ppc at command level for now.
+
+> The point is that, if we might want or need to change this behavior
+> (at any time in the future), we would only have to modify user space kexec.
+> Kernel semantics will never break.
+> 
+> (b) requires additional small modification on kexec-tools, but kexec_file
+> support is yet to be upstreamed anyway.
+
+Makes sense!
+
+
+Thanks,
+
+James
