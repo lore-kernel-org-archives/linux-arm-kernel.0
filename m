@@ -1,50 +1,65 @@
-From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Tue, 10 Jul 2018 15:14:02 +0100
-Subject: [PATCH 4/6] ARM: use __inttype() in get_user()
-In-Reply-To: <20180710141322.GL17271@n2100.armlinux.org.uk>
-References: <20180710141322.GL17271@n2100.armlinux.org.uk>
-Message-ID: <E1fctP0-0005vF-Iu@rmk-PC.armlinux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 10 Jul 2018 15:16:37 +0100
+Subject: [PATCH v3] arm64: add ARM64-specific support for flatmem
+In-Reply-To: <CAK8P3a2ss5tYve6xL7eE50ev3zVPOHzN5QtroWYmTih0F3sQYQ@mail.gmail.com>
+References: <20180706174724.44594-1-nkela@cisco.com>
+ <CAK8P3a0Op6DudVf--n4u_qimcvJf19OkbdzGm6ak=nB44oZEGQ@mail.gmail.com>
+ <20180710130650.GD31318@arm.com>
+ <CAK8P3a2ss5tYve6xL7eE50ev3zVPOHzN5QtroWYmTih0F3sQYQ@mail.gmail.com>
+Message-ID: <20180710141637.GB9022@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Borrow the x86 implementation of __inttype() to use in get_user() to
-select an integer type suitable to temporarily hold the result value.
-This is necessary to avoid propagating the volatile nature of the
-result argument, which can cause the following warning:
+On Tue, Jul 10, 2018 at 03:25:14PM +0200, Arnd Bergmann wrote:
+> On Tue, Jul 10, 2018 at 3:06 PM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Tue, Jul 10, 2018 at 02:55:41PM +0200, Arnd Bergmann wrote:
+> >> On Fri, Jul 6, 2018 at 7:47 PM, Nikunj Kela <nkela@cisco.com> wrote:
+> >> > Flatmem is useful in reducing kernel memory usage.
+> >> > One usecase is in kdump kernel. We are able to save
+> >> > ~14M by moving to flatmem scheme.
+> >> >
+> >> > Cc: xe-kernel at external.cisco.com
+> >> > Cc: Nikunj Kela <nkela@cisco.com>
+> >> > Signed-off-by: Nikunj Kela <nkela@cisco.com>
+> >> > ---
+> >> >  arch/arm64/Kconfig | 3 +++
+> >> >  1 file changed, 3 insertions(+)
+> >> >
+> >> > diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> >> > index 42c090c..f5b4c49 100644
+> >> > --- a/arch/arm64/Kconfig
+> >> > +++ b/arch/arm64/Kconfig
+> >> > @@ -775,6 +775,9 @@ config ARCH_SPARSEMEM_DEFAULT
+> >> >  config ARCH_SELECT_MEMORY_MODEL
+> >> >         def_bool ARCH_SPARSEMEM_ENABLE
+> >> >
+> >> > +config ARCH_FLATMEM_ENABLE
+> >> > +       def_bool y
+> >> > +
+> >> >  config HAVE_ARCH_PFN_VALID
+> >> >         def_bool ARCH_HAS_HOLES_MEMORYMODEL || !SPARSEMEM
+> >> >
+> >>
+> >> I'm getting hundreds of errors in randconfig builds with this:
+> >
+> > Damn, I was worried something like this might happen. Sorry!
+> >
+> > Does randconfig also fuzz CONFIG_EXPERT? We only added ARCH_FLATMEM_ENABLE
+> > so that people can hand-configure crashkernels to make them small; there will
+> > be plenty of situations where it's just going to cause more problems than it
+> > solves, so I'd be happy hiding it behind EXPERT if it helps.
+> 
+> Yes, randconfig also tests EXPERT and COMPILE_TEST configurations, though I
+> don't test the !COMPILE_TEST ones myself, so you can also hide options from
+> me by making them 'depends on !COMPILE_TEST'.
+> 
+> > Otherwise we can probably through a 'def_bool !NUMA' at it.
+> 
+> Yes, I was going to send a patch with that next after testing it some more.
+> So far it's holding up. This is also what some other architectures have, so
+> it's probably safe.
 
-lib/iov_iter.c:413:5: warning: optimization may eliminate reads and/or writes to register variables [-Wvolatile-register-var]
+Ok, let's go with that then. If I don't see a patch from you in a day or
+two, I'll write one myself :)
 
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
----
- arch/arm/include/asm/uaccess.h | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/include/asm/uaccess.h b/arch/arm/include/asm/uaccess.h
-index 0bf2347495f1..29fa6f3ea25a 100644
---- a/arch/arm/include/asm/uaccess.h
-+++ b/arch/arm/include/asm/uaccess.h
-@@ -85,6 +85,13 @@ static inline void set_fs(mm_segment_t fs)
- 	flag; })
- 
- /*
-+ * This is a type: either unsigned long, if the argument fits into
-+ * that type, or otherwise unsigned long long.
-+ */
-+#define __inttype(x) \
-+	__typeof__(__builtin_choose_expr(sizeof(x) > sizeof(0UL), 0ULL, 0UL))
-+
-+/*
-  * Single-value transfer routines.  They automatically use the right
-  * size if we just have the right pointer type.  Note that the functions
-  * which read from user space (*get_*) need to take care not to leak
-@@ -153,7 +160,7 @@ extern int __get_user_64t_4(void *);
- 	({								\
- 		unsigned long __limit = current_thread_info()->addr_limit - 1; \
- 		register const typeof(*(p)) __user *__p asm("r0") = (p);\
--		register typeof(x) __r2 asm("r2");			\
-+		register __inttype(x) __r2 asm("r2");			\
- 		register unsigned long __l asm("r1") = __limit;		\
- 		register int __e asm("r0");				\
- 		unsigned int __ua_flags = uaccess_save_and_enable();	\
--- 
-2.7.4
+Will
