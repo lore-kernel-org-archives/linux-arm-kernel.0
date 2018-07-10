@@ -1,116 +1,65 @@
-From: evgreen@chromium.org (Evan Green)
-Date: Tue, 10 Jul 2018 15:34:23 -0700
-Subject: [PATCH v6 4/8] interconnect: qcom: Add RPM communication
-In-Reply-To: <20180709155104.25528-5-georgi.djakov@linaro.org>
-References: <20180709155104.25528-1-georgi.djakov@linaro.org>
- <20180709155104.25528-5-georgi.djakov@linaro.org>
-Message-ID: <CAE=gft6pPcxfYqEcb-yQpf7S6CDTZNavhqYaKi37962U78qO3Q@mail.gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 10 Jul 2018 15:55:40 -0700
+Subject: [PATCH 2/3] arm64: dts: qcom: sdm845-mtp: Add RPMh VRM/XOB
+ regulators
+In-Reply-To: <0d334051-2ba5-075d-df8c-affe3e617e8d@codeaurora.org>
+References: <20180710220202.116404-1-dianders@chromium.org>
+ <20180710220202.116404-3-dianders@chromium.org>
+ <0d334051-2ba5-075d-df8c-affe3e617e8d@codeaurora.org>
+Message-ID: <CAD=FV=X5oVYYyZvTNZjvpY+Vss4TzpZwCzSsup0AJOcfAVhkzA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 9, 2018 at 8:51 AM Georgi Djakov <georgi.djakov@linaro.org> wrote:
+Hi
+
+On Tue, Jul 10, 2018 at 3:32 PM, David Collins <collinsd@codeaurora.org> wrote:
+> Hello Doug,
 >
-> On some Qualcomm SoCs, there is a remote processor, which controls some of
-> the Network-On-Chip interconnect resources. Other CPUs express their needs
-> by communicating with this processor. Add a driver to handle communication
-> with this remote processor.
+> On 07/10/2018 03:02 PM, Douglas Anderson wrote:
+> ...
+>> +             vdd-s1-supply = <&vph_pwr>;
+>> +             vdd-s2-supply = <&vph_pwr>;
+>> +             vdd-s3-supply = <&vph_pwr>;
+>> +             vdd-s4-supply = <&vph_pwr>;
+>> +             vdd-s5-supply = <&vph_pwr>;
+>> +             vdd-s6-supply = <&vph_pwr>;
+>> +             vdd-s7-supply = <&vph_pwr>;
+>> +             vdd-s8-supply = <&vph_pwr>;
+>> +             vdd-s9-supply = <&vph_pwr>;
+>> +             vdd-s10-supply = <&vph_pwr>;
+>> +             vdd-s11-supply = <&vph_pwr>;
+>> +             vdd-s12-supply = <&vph_pwr>;
+>> +             vdd-s13-supply = <&vph_pwr>;
+>> +             vdd-l1-l27-supply = <&vreg_s7a_1p025>;
+>> +             vdd-l2-l8-l17-supply = <&vreg_s3a_1p35>;
+>> +             vdd-l3-l11-supply = <&vreg_s7a_1p025>;
+>> +             vdd-l4-l5-supply = <&vreg_s7a_1p025>;
+>> +             vdd-l6-supply = <&vph_pwr>;
+>> +             vdd-l7-l12-l14-l15-supply = <&vreg_s5a_2p04>;
+>> +             vdd-l9-supply = <&vreg_bob>;
+>> +             vdd-l10-l23-l25-supply = <&vreg_bob>;
+>> +             vdd-l13-l19-l21-supply = <&vreg_bob>;
+>> +             vdd-l16-l28-supply = <&vreg_bob>;
+>> +             vdd-l18-l22-supply = <&vreg_bob>;
+>> +             vdd-l20-l24-supply = <&vreg_bob>;
+>> +             vdd-l26-supply = <&vreg_s3a_1p35>;
+>> +             vin-lvs-1-2-supply = <&vreg_s4a_1p8>;
 >
-> Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
-> ---
->  .../bindings/interconnect/qcom-smd.txt        | 32 +++++++
->  drivers/interconnect/qcom/Kconfig             | 11 +++
->  drivers/interconnect/qcom/Makefile            |  2 +
->  drivers/interconnect/qcom/smd-rpm.c           | 91 +++++++++++++++++++
->  drivers/interconnect/qcom/smd-rpm.h           | 15 +++
->  5 files changed, 151 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/interconnect/qcom-smd.txt
->  create mode 100644 drivers/interconnect/qcom/Kconfig
->  create mode 100644 drivers/interconnect/qcom/Makefile
->  create mode 100644 drivers/interconnect/qcom/smd-rpm.c
->  create mode 100644 drivers/interconnect/qcom/smd-rpm.h
->
-> diff --git a/Documentation/devicetree/bindings/interconnect/qcom-smd.txt b/Documentation/devicetree/bindings/interconnect/qcom-smd.txt
-> new file mode 100644
-> index 000000000000..88a5aeb50935
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/interconnect/qcom-smd.txt
-> @@ -0,0 +1,32 @@
-> +Qualcomm SMD-RPM interconnect driver binding
-> +------------------------------------------------
-> +The RPM (Resource Power Manager) is a dedicated hardware engine
-> +for managing the shared SoC resources in order to keep the lowest
-> +power profile. It communicates with other hardware subsystems via
-> +the shared memory driver (SMD) back-end and accepts requests for
-> +various resources.
-> +
-> +Required properties :
-> +- compatible : shall contain only one of the following:
-> +                       "qcom,interconnect-smd-rpm"
-> +
-> +Example:
-> +       smd {
-> +               compatible = "qcom,smd";
-> +
-> +               rpm {
-> +                       interrupts = <0 168 1>;
-> +                       qcom,ipc = <&apcs 8 0>;
-> +                       qcom,smd-edge = <15>;
-> +
-> +                       rpm_requests {
-> +                               compatible = "qcom,rpm-msm8916";
-> +                               qcom,smd-channels = "rpm_requests";
-> +
-> +                               interconnect-smd-rpm {
-> +                                       compatible = "qcom,interconnect-smd-rpm";
-> +                               };
-> +
-> +                       };
-> +               };
-> +       };
-> diff --git a/drivers/interconnect/qcom/Kconfig b/drivers/interconnect/qcom/Kconfig
-> new file mode 100644
-> index 000000000000..b0c2ff928d88
-> --- /dev/null
-> +++ b/drivers/interconnect/qcom/Kconfig
-> @@ -0,0 +1,11 @@
-> +config INTERCONNECT_QCOM
-> +       bool "Qualcomm Network-on-Chip interconnect drivers"
-> +       depends on INTERCONNECT
-> +       depends on ARCH_QCOM || COMPILE_TEST
-> +
-> +config INTERCONNECT_QCOM_SMD_RPM
-> +       tristate "Qualcomm SMD RPM interconnect driver"
-> +       depends on INTERCONNECT_QCOM
+> I would suggest not specifying any of these regulator parent supplies in
+> device tree.  RPMh will be enforcing all regulator parent-child
+> dependencies.  Therefore, handling the dependencies in Linux is redundant.
+>  It will result in additional RPMh requests as well as more time spent in
+> regulator framework calls.  Overall, it will lead to slightly lower
+> performance.  Note that while specifying the parent supplies results in
+> less efficient runtime behavior, it is not technically wrong so you could
+> keep them in place if you prefer.
 
-Should this also depend on CONFIG_QCOM_SMD_RPM, since it uses
-qcom_rpm_smd_write?
+Interesting.  ...so RPMh will automatically turn on parent regulators
+when their children are enabled (assuming that the parent regulator is
+also RPMh controlled)?
 
-> +       help
-> +         This is a driver for communicating interconnect related configuration
-> +         details with a remote processor (RPM) on Qualcomm platforms.
-...
-> diff --git a/drivers/interconnect/qcom/smd-rpm.h b/drivers/interconnect/qcom/smd-rpm.h
-> new file mode 100644
-> index 000000000000..c33b91a3dd51
-> --- /dev/null
-> +++ b/drivers/interconnect/qcom/smd-rpm.h
-> @@ -0,0 +1,15 @@
-> +/* SPDX-License-Identifier: GPL-2.0 */
-> +/*
-> + * Copyright (c) 2018, Linaro Ltd.
-> + * Author: Georgi Djakov <georgi.djakov@linaro.org>
-> + */
-> +
-> +#ifndef __DRIVERS_INTERCONNECT_QCOM_RPM_H
-> +#define __DRIVERS_INTERCONNECT_QCOM_RPM_H
+Personally I'd still prefer to see Linux managing its own state and
+relying less on RPMh-automatic stuff, but I'd defer to Bjorn / Andy
+(or others) to override me.
 
-Nit: this still doesn't quite match, it would need an _SMD like:
-__DRIVERS_INTERCONNECT_QCOM_SMD_RPM_H
-
-> +
-> +#include <linux/soc/qcom/smd-rpm.h>
-> +
-> +bool qcom_icc_rpm_smd_available(void);
-> +int qcom_icc_rpm_smd_send(int ctx, int rsc_type, int id, u32 val);
-> +
-> +#endif
+-Doug
