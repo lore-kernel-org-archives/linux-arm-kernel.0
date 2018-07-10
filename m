@@ -1,105 +1,89 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 10 Jul 2018 09:33:50 +0100
-Subject: [PATCH v2 6/6] KVM: arm/arm64: vgic: Allow configuration of
- interrupt groups
-In-Reply-To: <20180709224836.GA26579@u002843.usa.arm.com>
-References: <1530697100-22419-1-git-send-email-christoffer.dall@arm.com>
- <1530697100-22419-7-git-send-email-christoffer.dall@arm.com>
- <7f875ead-d3cb-1fec-bc84-56e64526e6a7@arm.com>
- <20180709224836.GA26579@u002843.usa.arm.com>
-Message-ID: <51bb02d7-61d8-41bc-33e2-342364f659b5@arm.com>
+From: sean@mess.org (Sean Young)
+Date: Tue, 10 Jul 2018 09:36:37 +0100
+Subject: [RESEND PATCH v5 0/6] IR support for A83T
+In-Reply-To: <85ddc129-d0f8-6299-dca0-81f79f3d04a9@gmail.com>
+References: <20180213122952.8420-1-embed3d@gmail.com>
+ <85ddc129-d0f8-6299-dca0-81f79f3d04a9@gmail.com>
+Message-ID: <20180710083637.6s36rfbi2old5uxo@gofer.mess.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/07/18 23:48, Christoffer Dall wrote:
-> On Mon, Jul 09, 2018 at 09:42:40AM +0100, Marc Zyngier wrote:
->> On 04/07/18 10:38, Christoffer Dall wrote:
->>> Implement the required MMIO accessors for GICv2 and GICv3 for the
->>> IGROUPR distributor and redistributor registers.
->>>
->>> This can allow guests to change behavior compared to running on previous
->>> versions of KVM, but only to align with the architecture and hardware
->>> implementations.
->>>
->>> This also allows userspace to configure the groups for interrupts.  Note
->>> that this potentially results in GICv2 guests not receiving interrupts
->>> after migration if migrating from an older kernel that exposes GICv2
->>> interrupts as group 1.
->>>
->>> Cc: Andrew Jones <drjones@redhat.com>
->>> Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
->>> ---
->>> I implemented (but stashed) a version of this which predicated the
->>> behavior based on the value of GICD_IIDR revision field, falling back to
->>> ignoring writes and resetting GICv2 groups to 0 if the guest wrote a
->>> revision less than 2.  However, current QEMU implementations simply
->>> don't write the GICD_IIDR, so this doesn't help at all without changing
->>> QEMU anyhow.
->>>
->>> The only actual fix I can see here to work around the problem in the
->>> kernel is to require an opt-in to allow restoring groups from userspace,
->>> but that's a lot of logic to support cross-kernel version migration.
->>>
->>> Question: Do we expect that cross-kernel version migration is a critical
->>> feature that people really expect to work, and do we actually have
->>> examples of catering to this in the kernel elsewhere?  (Also, how would
->>> then that relate to the whole 'adding a new sysreg breaks migration'
->>> situation?)
->>
->> I don't really get why QEMU doesn't try to restore GICD_IIDR, while it
->> is definitely trying to restore RO sysregs (and that's how we detect
->> incompatibilities).
->>
->> I think we should at least give userspace a chance to do the right
->> thing. If it doesn't, well, too bad.
+On Fri, Mar 02, 2018 at 01:11:34PM +0100, Philipp Rossak wrote:
 > 
-> This series should give userspace an option to adjust its behavior.
 > 
-> My main concern is that this version of the series results in the worst
-> kind of migration failures, where the guest simply doesn't run on the
-> destination side with no warnings or error messages returned to the
-> user..
+> On 13.02.2018 13:29, Philipp Rossak wrote:
+> > This patch series adds support for the sunxi A83T ir module and enhances
+> > the sunxi-ir driver. Right now the base clock frequency for the ir driver
+> > is a hard coded define and is set to 8 MHz.
+> > This works for the most common ir receivers. On the Sinovoip Bananapi M3
+> > the ir receiver needs, a 3 MHz base clock frequency to work without
+> > problems with this driver.
+> > 
+> > This patch series adds support for an optinal property that makes it able
+> > to override the default base clock frequency and enables the ir interface
+> > on the a83t and the Bananapi M3.
+> > 
+> > changes since v4:
+> > * rename cir pin from cir_pins to r_cir_pin
+> > * drop unit-adress from r_cir_pin
+> > * add a83t compatible to the cir node
+> > * move muxing options to dtsi
+> > * rename cir label and reorder it in the bananpim3.dts file
+> > 
+> > changes since v3:
+> > * collecting all acks & reviewd by
+> > * fixed typos
+> > 
+> > changes since v2:
+> > * reorder cir pin (alphabetical)
+> > * fix typo in documentation
+> > 
+> > changes since v1:
+> > * fix typos, reword Documentation
+> > * initialize 'b_clk_freq' to 'SUNXI_IR_BASE_CLK' & remove if statement
+> > * change dev_info() to dev_dbg()
+> > * change naming to cir* in dts/dtsi
+> > * Added acked Ackedi-by to related patch
+> > * use whole memory block instead of registers needed + fix for h3/h5
+> > 
+> > changes since rfc:
+> > * The property is now optinal. If the property is not available in
+> >    the dtb the driver uses the default base clock frequency.
+> > * the driver prints out the the selected base clock frequency.
+> > * changed devicetree property from base-clk-frequency to clock-frequency
+> > 
+> > Regards,
+> > Philipp
+> > 
+> > Philipp Rossak (6):
+> >    media: rc: update sunxi-ir driver to get base clock frequency from
+> >      devicetree
+> >    media: dt: bindings: Update binding documentation for sunxi IR
+> >      controller
+> >    arm: dts: sun8i: a83t: Add the cir pin for the A83T
+> >    arm: dts: sun8i: a83t: Add support for the cir interface
+> >    arm: dts: sun8i: a83t: bananapi-m3: Enable IR controller
+> >    arm: dts: sun8i: h3-h5: ir register size should be the whole memory
+> >      block
+> > 
+> >   Documentation/devicetree/bindings/media/sunxi-ir.txt |  3 +++
+> >   arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts         |  5 +++++
+> >   arch/arm/boot/dts/sun8i-a83t.dtsi                    | 18 ++++++++++++++++++
+> >   arch/arm/boot/dts/sunxi-h3-h5.dtsi                   |  2 +-
+> >   drivers/media/rc/sunxi-cir.c                         | 19 +++++++++++--------
+> >   5 files changed, 38 insertions(+), 9 deletions(-)
+> > 
+> 
+> I talked yesterday with Maxime about this patch series. And he told me if
+> the first to patches got merged, he will apply the dts patches to the sunxi
+> tree.
+> 
+> Sean, can you merge the first two patches through the rc-core?
 
-I agree, which is why I'm suggesting we make IIDR writeable. And yes, it
-still requires userspace to be fixed to actually write IIDR.
+So I merged the first two patches, but the rest never made it upstream.
 
-> 
-> We could add logic to return an error code if trying to write a
-> different revision than what the kernel has (similar to the invariant
-> sysregs), so that a simple fix to QEMU to save restore the GICD_IIDR
-> register at least results in an error being returned to userspace.
-> 
-> However, as QEMU doesn't do anything useful here today (not blaming
-> anyone, I wrote the apparently broken GIC save/restore code for QEMU
-> myself), we could also argue that QEMU might as well just fix things up
-> if it detects a different IIDR.
-> 
->>
->> How bad is that "writable GICD_IIDR" patch? Because at this stage, and
->> in the absence of any comment, I'm close to just pick that series and
->> merge it for 4.19.
->>
-> 
-> My guess is that a patch to "save/restore GICD_IIDR" is simple enough,
-> but requires additional logic in the kernel that returns an error if the
-> GICD_IIDR don't match on write.
-> 
-> A patch which changes the groups and bumps the IIDR in userspace is
-> probably more complex.
-> 
-> Sounds like I should add the GICD_IIDR checking patch.  Thoughts?
-
-I'm quite keen on that. It makes the userspace change trivial, aligns it
-somehow on the sysreg and ITS ABI behaviours.
-
-> What I would really like to know is whether this is really an issue or
-> not.  Do people who run products based on KVM, such as RHEV, have any
-> expectations about cross-kernel version migration?
-
-I'd like to know as well.
+Should they be resubmitted?
 
 Thanks,
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Sean
