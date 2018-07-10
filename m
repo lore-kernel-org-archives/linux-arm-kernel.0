@@ -1,20 +1,63 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 10 Jul 2018 11:01:22 -0300
-Subject: [PATCH 1/3] ARM: dts: imx53: Add 'ARM platform' node
-In-Reply-To: <20180628032158.GG22683@dragon>
-References: <1529329939-14117-1-git-send-email-festevam@gmail.com>
- <20180628013530.GE22683@dragon>
- <CAOMZO5CQCTdJC5NOzFGXeHwqkeJmrw9ui0oJ_h=7vFnP5ThUcg@mail.gmail.com>
- <20180628032158.GG22683@dragon>
-Message-ID: <CAOMZO5CJofsdkgKYS4exu1ncQWGoR8shnPE1HU7WnNgnSbqzog@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 10 Jul 2018 15:00:34 +0100
+Subject: [PATCH] coresight: tpiu: Fix disabling timeouts
+Message-ID: <9f296d734cef2d34ad2e2a5d93a1e56c5c8b1df9.1531231150.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+Probing the TPIU driver under UBSan triggers an out-of-bounds shift
+warning in coresight_timeout():
 
-On Thu, Jun 28, 2018 at 12:21 AM, Shawn Guo <shawnguo@kernel.org> wrote:
+...
+[    5.677530] UBSAN: Undefined behaviour in drivers/hwtracing/coresight/coresight.c:929:16
+[    5.685542] shift exponent 64 is too large for 64-bit type 'long unsigned int'
+...
 
-> Isn't 'ARM platform' something ARM core specific rather than i.MX?
+On closer inspection things are exponentially out of whack because we're
+passing a bitmask where a bit number should be. Amusingly, it seems that
+both calls will find their expected values by sheer luck and appear to
+succeed: 1 << FFCR_FON_MAN ends up at bit 64 which whilst undefined
+evaluates as zero in practice, while 1 << FFSR_FT_STOPPED finds bit 2
+(TCPresent) which apparently is usually tied high.
 
-i.MX51 Reference Manual names this region as 'tigerp', so I sent a v2
-referring to this term and also added dt-bindings.
+Following the examples of other drivers, define separate FOO and FOO_BIT
+macros for masks vs. indices, and put things right.
+
+CC: Robert Walker <robert.walker@arm.com>
+CC: Mike Leach <mike.leach@linaro.org>
+CC: Mathieu Poirier <mathieu.poirier@linaro.org>
+Fixes: 11595db8e17f ("coresight: Fix disabling of CoreSight TPIU")
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
+ drivers/hwtracing/coresight/coresight-tpiu.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/hwtracing/coresight/coresight-tpiu.c b/drivers/hwtracing/coresight/coresight-tpiu.c
+index 01b7457fe8fc..459ef930d98c 100644
+--- a/drivers/hwtracing/coresight/coresight-tpiu.c
++++ b/drivers/hwtracing/coresight/coresight-tpiu.c
+@@ -40,8 +40,9 @@
+ 
+ /** register definition **/
+ /* FFSR - 0x300 */
+-#define FFSR_FT_STOPPED		BIT(1)
++#define FFSR_FT_STOPPED_BIT	1
+ /* FFCR - 0x304 */
++#define FFCR_FON_MAN_BIT	6
+ #define FFCR_FON_MAN		BIT(6)
+ #define FFCR_STOP_FI		BIT(12)
+ 
+@@ -86,9 +87,9 @@ static void tpiu_disable_hw(struct tpiu_drvdata *drvdata)
+ 	/* Generate manual flush */
+ 	writel_relaxed(FFCR_STOP_FI | FFCR_FON_MAN, drvdata->base + TPIU_FFCR);
+ 	/* Wait for flush to complete */
+-	coresight_timeout(drvdata->base, TPIU_FFCR, FFCR_FON_MAN, 0);
++	coresight_timeout(drvdata->base, TPIU_FFCR, FFCR_FON_MAN_BIT, 0);
+ 	/* Wait for formatter to stop */
+-	coresight_timeout(drvdata->base, TPIU_FFSR, FFSR_FT_STOPPED, 1);
++	coresight_timeout(drvdata->base, TPIU_FFSR, FFSR_FT_STOPPED_BIT, 1);
+ 
+ 	CS_LOCK(drvdata->base);
+ }
+-- 
+2.17.1.dirty
