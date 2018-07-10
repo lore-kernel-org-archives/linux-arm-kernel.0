@@ -1,124 +1,112 @@
-From: christoffer.dall@arm.com (Christoffer Dall)
-Date: Tue, 10 Jul 2018 08:27:27 -0700
-Subject: [PATCH v2 6/6] KVM: arm/arm64: vgic: Allow configuration of
- interrupt groups
-In-Reply-To: <20180710103223.GE2656@work-vm>
-References: <1530697100-22419-1-git-send-email-christoffer.dall@arm.com>
- <1530697100-22419-7-git-send-email-christoffer.dall@arm.com>
- <7f875ead-d3cb-1fec-bc84-56e64526e6a7@arm.com>
- <20180709224836.GA26579@u002843.usa.arm.com>
- <f07199bf-9e31-25ad-72d9-27192c27fccd@redhat.com>
- <20180710103223.GE2656@work-vm>
-Message-ID: <20180710152727.GA8890@u002843.usa.arm.com>
+From: vkoul@kernel.org (Vinod)
+Date: Tue, 10 Jul 2018 20:59:12 +0530
+Subject: [PATCH v1 1/4] dmaengine: imx-sdma: add memcpy interface
+In-Reply-To: <1531239793-11781-2-git-send-email-yibin.gong@nxp.com>
+References: <1531239793-11781-1-git-send-email-yibin.gong@nxp.com>
+ <1531239793-11781-2-git-send-email-yibin.gong@nxp.com>
+Message-ID: <20180710152912.GE3219@vkoul-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 10, 2018 at 11:32:24AM +0100, Dr. David Alan Gilbert wrote:
-> * Auger Eric (eric.auger at redhat.com) wrote:
-> > Hi,
-> > 
-> > On 07/10/2018 12:48 AM, Christoffer Dall wrote:
-> > > On Mon, Jul 09, 2018 at 09:42:40AM +0100, Marc Zyngier wrote:
-> > >> On 04/07/18 10:38, Christoffer Dall wrote:
-> > >>> Implement the required MMIO accessors for GICv2 and GICv3 for the
-> > >>> IGROUPR distributor and redistributor registers.
-> > >>>
-> > >>> This can allow guests to change behavior compared to running on previous
-> > >>> versions of KVM, but only to align with the architecture and hardware
-> > >>> implementations.
-> > >>>
-> > >>> This also allows userspace to configure the groups for interrupts.  Note
-> > >>> that this potentially results in GICv2 guests not receiving interrupts
-> > >>> after migration if migrating from an older kernel that exposes GICv2
-> > >>> interrupts as group 1.
-> > >>>
-> > >>> Cc: Andrew Jones <drjones@redhat.com>
-> > >>> Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
-> > >>> ---
-> > >>> I implemented (but stashed) a version of this which predicated the
-> > >>> behavior based on the value of GICD_IIDR revision field, falling back to
-> > >>> ignoring writes and resetting GICv2 groups to 0 if the guest wrote a
-> > >>> revision less than 2.  However, current QEMU implementations simply
-> > >>> don't write the GICD_IIDR, so this doesn't help at all without changing
-> > >>> QEMU anyhow.
-> > >>>
-> > >>> The only actual fix I can see here to work around the problem in the
-> > >>> kernel is to require an opt-in to allow restoring groups from userspace,
-> > >>> but that's a lot of logic to support cross-kernel version migration.
-> > >>>
-> > >>> Question: Do we expect that cross-kernel version migration is a critical
-> > >>> feature that people really expect to work, and do we actually have
-> > >>> examples of catering to this in the kernel elsewhere?  (Also, how would
-> > >>> then that relate to the whole 'adding a new sysreg breaks migration'
-> > >>> situation?)
-> > >>
-> > >> I don't really get why QEMU doesn't try to restore GICD_IIDR, while it
-> > >> is definitely trying to restore RO sysregs (and that's how we detect
-> > >> incompatibilities).
-> > >>
-> > >> I think we should at least give userspace a chance to do the right
-> > >> thing. If it doesn't, well, too bad.
-> > > 
-> > > This series should give userspace an option to adjust its behavior.
-> > > 
-> > > My main concern is that this version of the series results in the worst
-> > > kind of migration failures, where the guest simply doesn't run on the
-> > > destination side with no warnings or error messages returned to the
-> > > user..
-> > 
-> > Adding Dave in the loop to comment about general user perspective.
-> 
-> Without understanding the details of the GIC, but I have to agree that
-> a failure without error where the guest is hung is one of the worst
-> cases - when a user comes to you saying that their VM hangs after
-> migration with no diagnostics, then you know you're in for some nasty
-> debug!
-> 
-> On other architectures we definitely provide this level of compatibility
-> between kernels, libraries, qemu and everything in between - it's not
-> easy, and we do screwup from time to time; but it's still what we try
-> and get right.
+Hi Robin,
 
-That's good to know.
+On 11-07-18, 00:23, Robin Gong wrote:
+> Add MEMCPY support, meanwhile, add SDMA_BD_MAX_CNT instead
+> of '0xffff'.
 
-> 
-> So ideally you'd make this switchable and wire it into a versioned
-> machine type in QEMU, so that only virt-3.0 VMs would use this (and
-> they'd somehow know they needed the new kernel to do it).
-> 
-> If that's not possible then you could add a subsection to the GIC migration
-> data if you can detect at migration time that this feature is being
-> used, and make the destination check for the feature/kernel.
-> Migrating to an older qemu would fail since it wouldn't know about the
-> new subsection.  This should at least get a clear failure.
-> 
-> For a user, this still gets messy if they do something like start
-> upgrading some of the hosts in an openstack cluster, which they often
-> do incrementally; so you'll suddenly get the situation of a VM that
-> was started on a host with a newer kernel being migrated to an older one
-> and stuff breaks.
-> 
+latter part should be its own patch. Never mix things
 
-I think we should ask userspace to opt-in to the new behavior and fix
-userspace to save/restore the IIDR while we're at it.
+> +static struct dma_async_tx_descriptor *sdma_prep_memcpy(
+> +		struct dma_chan *chan, dma_addr_t dma_dst,
+> +		dma_addr_t dma_src, size_t len, unsigned long flags)
+> +{
+> +	struct sdma_channel *sdmac = to_sdma_chan(chan);
+> +	struct sdma_engine *sdma = sdmac->sdma;
+> +	int channel = sdmac->channel;
+> +	size_t count;
+> +	int i = 0, param;
+> +	struct sdma_buffer_descriptor *bd;
+> +	struct sdma_desc *desc;
+> +
+> +	if (!chan || !len)
+> +		return NULL;
+> +
+> +	dev_dbg(sdma->dev, "memcpy: %pad->%pad, len=%zu, channel=%d.\n",
+> +		&dma_src, &dma_dst, len, channel);
+> +
+> +	desc = sdma_transfer_init(sdmac, DMA_MEM_TO_MEM, len / SDMA_BD_MAX_CNT
+> +					+ 1);
 
-Unless someone objects, I'll try to come up with a v3 that asks
-userspace to confirm it wants writable groups.  Ideally I'd like for
-this to happen automatically if userspace writes an IIDR with revision 2
-and above, but that may result in either
+this looks quite odd to read consider:
 
-  (1) imposing ordering on the restore sequence from userspace;
-      userspace must write IIDR before IGROUPR if it wants non-default
-      groups,
-  (2) terrible sequence of locking and resetting everything if IIDR
-      hasn't been written before time of first executing a VCPU, or
-  (3) an additional bookkeeping flag in the critical path for GICv2
-      which ignores the group unless userspace wrote IIDR.
+        esc = sdma_transfer_init(sdmac, DMA_MEM_TO_MEM,
+                                 len / SDMA_BD_MAX_CNT + 1);
 
-Out of the three, I think (3) is the least desirable because it
-precludes the guest from programming its own groups.  I'll have a look
-at how (2) looks, because it hides everything, and finally we can fall
-back to (1) and document it clearly.
+> +	if (!desc)
+> +		goto err_out;
+> +
+> +	do {
+> +		count = min_t(size_t, len, SDMA_BD_MAX_CNT);
+> +		bd = &desc->bd[i];
+> +		bd->buffer_addr = dma_src;
+> +		bd->ext_buffer_addr = dma_dst;
+> +		bd->mode.count = count;
+> +		desc->chn_count += count;
+> +
+> +		switch (sdmac->word_size) {
+> +		case DMA_SLAVE_BUSWIDTH_4_BYTES:
 
-Thanks,
-Christoffer
+This looks wrong, we are in memcpy, there is no SLAVE so no SLAVE
+widths..
+
+>  static struct dma_async_tx_descriptor *sdma_prep_slave_sg(
+>  		struct dma_chan *chan, struct scatterlist *sgl,
+>  		unsigned int sg_len, enum dma_transfer_direction direction,
+> @@ -1344,9 +1431,9 @@ static struct dma_async_tx_descriptor *sdma_prep_slave_sg(
+>  
+>  		count = sg_dma_len(sg);
+>  
+> -		if (count > 0xffff) {
+> +		if (count > SDMA_BD_MAX_CNT) {
+>  			dev_err(sdma->dev, "SDMA channel %d: maximum bytes for sg entry exceeded: %d > %d\n",
+> -					channel, count, 0xffff);
+> +					channel, count, SDMA_BD_MAX_CNT);
+
+these changes dont belong to this patch
+
+> @@ -1486,6 +1573,8 @@ static int sdma_config(struct dma_chan *chan,
+>  		sdmac->watermark_level |= (dmaengine_cfg->dst_maxburst << 16) &
+>  			SDMA_WATERMARK_LEVEL_HWML;
+>  		sdmac->word_size = dmaengine_cfg->dst_addr_width;
+> +	} else if (dmaengine_cfg->direction == DMA_MEM_TO_MEM) {
+> +		sdmac->word_size = dmaengine_cfg->dst_addr_width;
+
+same here too, we are in .device_config which deals with slave. Not
+memcpy!
+
+>  	} else {
+>  		sdmac->per_address = dmaengine_cfg->dst_addr;
+>  		sdmac->watermark_level = dmaengine_cfg->dst_maxburst *
+> @@ -1902,6 +1991,7 @@ static int sdma_probe(struct platform_device *pdev)
+>  
+>  	dma_cap_set(DMA_SLAVE, sdma->dma_device.cap_mask);
+>  	dma_cap_set(DMA_CYCLIC, sdma->dma_device.cap_mask);
+> +	dma_cap_set(DMA_MEMCPY, sdma->dma_device.cap_mask);
+>  
+>  	INIT_LIST_HEAD(&sdma->dma_device.channels);
+>  	/* Initialize channel parameters */
+> @@ -1968,9 +2058,11 @@ static int sdma_probe(struct platform_device *pdev)
+>  	sdma->dma_device.dst_addr_widths = SDMA_DMA_BUSWIDTHS;
+>  	sdma->dma_device.directions = SDMA_DMA_DIRECTIONS;
+>  	sdma->dma_device.residue_granularity = DMA_RESIDUE_GRANULARITY_SEGMENT;
+> +	sdma->dma_device.device_prep_dma_memcpy = sdma_prep_memcpy;
+>  	sdma->dma_device.device_issue_pending = sdma_issue_pending;
+>  	sdma->dma_device.dev->dma_parms = &sdma->dma_parms;
+> -	dma_set_max_seg_size(sdma->dma_device.dev, 65535);
+> +	sdma->dma_device.copy_align = DMAENGINE_ALIGN_4_BYTES;
+> +	dma_set_max_seg_size(sdma->dma_device.dev, SDMA_BD_MAX_CNT);
+
+this line should not be part of this patch
+
+-- 
+~Vinod
