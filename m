@@ -1,56 +1,24 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 10 Jul 2018 09:04:55 +0200
-Subject: [GIT PULL] Renesas ARM64 Based SoC DT Updates for v4.19
-In-Reply-To: <CAOesGMhZD0VS+NbZhgJOqhpP5A5X_pXVfUdkUnGmqLbnagJZaA@mail.gmail.com>
-References: <cover.1529933747.git.horms+renesas@verge.net.au>
- <CAOesGMhZD0VS+NbZhgJOqhpP5A5X_pXVfUdkUnGmqLbnagJZaA@mail.gmail.com>
-Message-ID: <20180710070450.kpahx5kgtqtcdua2@verge.net.au>
+From: js1304@gmail.com (Joonsoo Kim)
+Date: Tue, 10 Jul 2018 16:19:32 +0900
+Subject: [PATCH 1/2] mm/cma: remove unsupported gfp_mask parameter from
+ cma_alloc()
+In-Reply-To: <20180709122019eucas1p2340da484acfcc932537e6014f4fd2c29~-sqTPJKij2939229392eucas1p2j@eucas1p2.samsung.com>
+References: <CGME20180709122019eucas1p2340da484acfcc932537e6014f4fd2c29@eucas1p2.samsung.com>
+ <20180709121956.20200-1-m.szyprowski@samsung.com>
+ <20180709122019eucas1p2340da484acfcc932537e6014f4fd2c29~-sqTPJKij2939229392eucas1p2j@eucas1p2.samsung.com>
+Message-ID: <CAAmzW4PPNYhUj_MeZox+ddq8MjXqnJs_AJ3xkayf710udD1pSg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 02, 2018 at 10:09:41AM -0700, Olof Johansson wrote:
-> On Mon, Jun 25, 2018 at 7:03 AM, Simon Horman
-> <horms+renesas@verge.net.au> wrote:
-> > Hi Olof, Hi Kevin, Hi Arnd,
-> >
-> > Please consider these Renesas ARM64 based SoC DT updates for v4.19.
-> >
-> >
-> > The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
-> >
-> >   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
-> >
-> > are available in the git repository at:
-> >
-> >   https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm64-dt-for-v4.19
-> >
-> > for you to fetch changes up to 6b284a81307848b4331453b02cf7a33c09719d4b:
-> >
-> >   arm64: dts: renesas: r8a77995: Add MSIOF device nodes (2018-06-25 15:30:39 +0200)
-> 
-> Thanks, merged into next/dt.
-> 
-> I think you can still collapse some commits a bit further, for example
-> when a large number of devices are added to a new SoC, you don't need
-> a commit per device (i.e. the r8a77980 series).
-> 
-> It's not a problem if it's just a few, but like last merge window when
-> it really added to a lot of small trivial patches it's adding noise to
-> someone looking at changelogs -- it's harder to get a feel for what
-> new things are going in on a larger scope. Keep in mind that you, as
-> maintainer, should feel free to squash together patches when you apply
-> them if it makes sense -- just make sure you retain authorship and
-> credits/COO.
+Hello, Marek.
 
-Thanks Olof,
+2018-07-09 21:19 GMT+09:00 Marek Szyprowski <m.szyprowski@samsung.com>:
+> cma_alloc() function doesn't really support gfp flags other than
+> __GFP_NOWARN, so convert gfp_mask parameter to boolean no_warn parameter.
 
-as I think you can see we have adjusted things somewhat in the light of
-the feedback you provided during the v4.18 development cycle. And we'll
-continue to do so.
+Although gfp_mask isn't used in cma_alloc() except no_warn, it can be used
+in alloc_contig_range(). For example, if passed gfp mask has no __GFP_FS,
+compaction(isolation) would work differently. Do you have considered
+such a case?
 
-In the case of enabling various devices for the r8a77980 I do take your
-point with regards to squashing patches. Although I believe that in this
-case the patches came in over time, which makes them a little less obvious
-candidates for squashing than would be the case if they came in all at
-once. Nonetheless, I'll continue to work with the team to streamline our
-processes and make the pull requests as easy to digest as possible.
+Thanks.
