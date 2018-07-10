@@ -1,33 +1,50 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 10 Jul 2018 14:05:04 +0200
-Subject: [PATCH v4 0/5] Initial support for Samsung Galaxy S and Galaxy S
- 4G
-In-Reply-To: <1530958183-10956-1-git-send-email-pawel.mikolaj.chmiel@gmail.com>
-References: <1530958183-10956-1-git-send-email-pawel.mikolaj.chmiel@gmail.com>
-Message-ID: <20180710120504.GB6884@amd>
+From: lkp@intel.com (kbuild test robot)
+Date: Tue, 10 Jul 2018 20:06:50 +0800
+Subject: [PATCH 1/2] clk: imx: add ocram_s clock for i.mx6sx
+In-Reply-To: <1531211979-2179-1-git-send-email-Anson.Huang@nxp.com>
+References: <1531211979-2179-1-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <201807101933.aFKUdqqV%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Hi Anson,
 
-> This patch series adds support for Samsung Galaxy S and Galaxy S 4G.
-> Both are commercial phone based on Aries family.
+Thank you for the patch! Perhaps something to improve:
 
-Thanks for doing this. What kind of userspace are your running?
+[auto build test WARNING on shawnguo/for-next]
+[also build test WARNING on v4.18-rc4 next-20180709]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-(I do have N900 here running Debian and PostmarketOS, and Droid 4
-running Maemo Leste)
+url:    https://github.com/0day-ci/linux/commits/Anson-Huang/clk-imx-add-ocram_s-clock-for-i-mx6sx/20180710-171526
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git for-next
+config: arm-omap2plus_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        GCC_VERSION=7.2.0 make.cross ARCH=arm 
 
-Best regards,
-							Pavel
-							
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+All warnings (new ones prefixed by >>):
+
+   In file included from arch/arm/boot/dts/imx6sx.dtsi:5:0,
+                    from arch/arm/boot/dts/imx6sx-nitrogen6sx.dts:44:
+>> scripts/dtc/include-prefixes/dt-bindings/clock/imx6sx-clock.h:282:0: warning: "IMX6SX_CLK_OCRAM_S" redefined
+    #define IMX6SX_CLK_OCRAM_S  269
+    
+   scripts/dtc/include-prefixes/dt-bindings/clock/imx6sx-clock.h:170:0: note: this is the location of the previous definition
+    #define IMX6SX_CLK_OCRAM_S  157
+    
+
+vim +/IMX6SX_CLK_OCRAM_S +282 scripts/dtc/include-prefixes/dt-bindings/clock/imx6sx-clock.h
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180710/42efe1e3/attachment.sig>
+Name: .config.gz
+Type: application/gzip
+Size: 33963 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180710/68736bd2/attachment-0001.gz>
