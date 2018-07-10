@@ -1,57 +1,28 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Tue, 10 Jul 2018 18:11:23 +0200
-Subject: Vibrations on Droid 4?
-In-Reply-To: <20180710133040.GA4391@amd>
-References: <20180709081534.GA6799@amd>
- <20180709214910.tes6u4ivxomd3aja@earth.universe>
- <20180709220211.GA7760@amd>
- <20180710101147.lyu65ro4czvrs2da@earth.universe>
- <20180710133040.GA4391@amd>
-Message-ID: <20180710161123.azym6sbboriuj4yc@earth.universe>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 11 Jul 2018 00:12:45 +0800
+Subject: [PATCH 11/17] drm/sun4i: tcon: Add another way for matching
+ mixers with tcon
+In-Reply-To: <20180706175113.26698-12-jernej.skrabec@siol.net>
+References: <20180706175113.26698-1-jernej.skrabec@siol.net>
+ <20180706175113.26698-12-jernej.skrabec@siol.net>
+Message-ID: <CAGb2v64-hz6=6H1HhJJogaK8TTtsG4x1LXkA5QX_b3J0pKOAEQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sat, Jul 7, 2018 at 1:51 AM, Jernej Skrabec <jernej.skrabec@siol.net> wrote:
+> Till now, new way of matching engines with TCONs was reading their
+> respective ids and match them by those ids. However, with introduction
+> of TCON TOP, that might not be so straightforward anymore.
+> - there might be more TCONs that engines (mixers)
+> - TCON ids might have non-consecutive ids
+>
+> Workaround that by matching mixer id with TCON index from TCON list.
+>
+> For example, R40 has 2 mixers and 4 TCONs. Board designer can choose
+> 2 outputs, which are connected to any of those 4 TCONs. As long as there
+> are only 2 TCONs enabled in DT, using index in list as alternative id,
+> will allow to match them with mixer 0 and 1.
+>
+> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 
-On Tue, Jul 10, 2018 at 03:30:40PM +0200, Pavel Machek wrote:
-> On Tue 2018-07-10 12:11:47, Sebastian Reichel wrote:
-> > On Tue, Jul 10, 2018 at 12:02:11AM +0200, Pavel Machek wrote:
-> > > > > Do you have vibrations on d4 working?
-> > > > > I believe I have required drivers enabled, but no luck:
-> > > > > 
-> > > > > user at devuan:/sys/bus/platform/drivers$ ls pwm-vibrator/
-> > > > > bind  uevent  unbind
-> > > > > user at devuan:/sys/bus/platform/drivers$ ls omap-dmtimer-pwm/
-> > > > > bind  uevent  unbind
-> > > > 
-> > > > Have you checked probe deferrals?
-> > > 
-> > > Not really. Is there easier way to do that than adding printks in the
-> > > probe function? (I can go through dmesg tommorow).
-> > 
-> > Option 1: https://lkml.org/lkml/2018/7/8/63
-> 
-> I tried this methodq, and no luck.
-> 
-> static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
-> 
-> does not seem to be called.
-> 
-> Its parent is gpio at 4805d000 , and that one seems to be present.
-> 
-> user at devuan:/sys/bus/platform/devices$ ls 4805d000.gpio
-> driver				       driver_override  gpio
-> gpiochip5  modalias  of_node  power  subsystem  uevent
-
-Sorry, something went wrong with merging this. The parent
-of ti,omap-dmtimer-pwm and pwm-vibrator should be / and
-not gpio6.
-
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180710/bbe8562f/attachment.sig>
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
