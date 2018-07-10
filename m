@@ -1,82 +1,62 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Tue, 10 Jul 2018 11:24:24 +0100
-Subject: [PATCH 3/3] ARM: dts: cubox: add LCD controller and TDA998x
- configuration
-In-Reply-To: <20180710102344.GH17271@n2100.armlinux.org.uk>
-References: <20180710102344.GH17271@n2100.armlinux.org.uk>
-Message-ID: <E1fcpom-0003ZI-FL@rmk-PC.armlinux.org.uk>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 10 Jul 2018 11:29:05 +0100
+Subject: [PATCH 2/2] clocksource: arm_arch_timer: set arch_mem_timer
+ cpumask to cpu_possible_mask
+In-Reply-To: <alpine.DEB.2.21.1807100008100.1590@nanos.tec.linutronix.de>
+References: <1531151136-18297-1-git-send-email-sudeep.holla@arm.com>
+ <1531151136-18297-2-git-send-email-sudeep.holla@arm.com>
+ <alpine.DEB.2.21.1807100008100.1590@nanos.tec.linutronix.de>
+Message-ID: <b98e0d87-3d9a-9b0c-23c4-7b289cc79a97@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT configuration for the HDMI display output on the Dove Cubox.
-This adds support for the LCD0 controller which is connected to a
-TDA19988 HDMI encoder.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/boot/dts/dove-cubox.dts | 43 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 43 insertions(+)
 
-diff --git a/arch/arm/boot/dts/dove-cubox.dts b/arch/arm/boot/dts/dove-cubox.dts
-index 580e3cbcfbf7..f6dd56f63d09 100644
---- a/arch/arm/boot/dts/dove-cubox.dts
-+++ b/arch/arm/boot/dts/dove-cubox.dts
-@@ -67,6 +67,25 @@
- 	gpu-subsystem {
- 		status = "okay";
- 	};
-+
-+	reserved-memory {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+
-+		display_reserved: framebuffer {
-+			compatible = "marvell,dove-framebuffer";
-+			size = <0x02000000>;
-+			alignment = <0x02000000>;
-+			no-map;
-+		};
-+	};
-+
-+	display-subsystem {
-+		compatible = "marvell,dove-display-subsystem";
-+		memory-region = <&display_reserved>;
-+		ports = <&lcd0_port>;
-+	};
- };
- 
- &uart0 { status = "okay"; };
-@@ -117,6 +136,30 @@
- 			silabs,pll-master;
- 		};
- 	};
-+
-+	tda998x: hdmi-encoder {
-+		compatible = "nxp,tda998x";
-+		reg = <0x70>;
-+		video-ports = <0x234501>;
-+		interrupts-extended = <&gpio0 27 IRQ_TYPE_LEVEL_LOW>;
-+
-+		port {
-+			tda998x_video: endpoint {
-+				remote-endpoint = <&lcd0_rgb>;
-+			};
-+		};
-+	};
-+};
-+
-+&lcd0 {
-+	status = "okay";
-+	clocks = <&si5351 0>;
-+	clock-names = "ext_ref_clk1";
-+	lcd0_port: port {
-+		lcd0_rgb: endpoint {
-+			remote-endpoint = <&tda998x_video>;
-+		};
-+	};
- };
- 
- &sdio0 {
+On 09/07/18 23:09, Thomas Gleixner wrote:
+> On Mon, 9 Jul 2018, Sudeep Holla wrote:
+> 
+>> Currently, arch_mem_timer cpumask is set to cpu_all_mask which should be
+>> fine. However, cpu_possible_mask is more accurate and if there are other
+>> clockevent source in the system which are set to cpu_possible_mask, then
+>> having cpu_all_mask may result in issue.
+>>
+>> E.g. on a platform with arm,sp804 timer with rating 300 and
+>> cpu_possible_mask and this arch_mem_timer timer with rating 400 and
+>> cpu_all_mask, tick_check_preferred may choose both preferred as the
+>> cpumasks are not equal though they must be.
+>>
+>> This issue was root caused incorrectly initially and a fix was merged as
+>> commit 1332a9055801 ("tick: Prefer a lower rating device only if it's CPU
+>> local device").
+> 
+> To avoid that in the future we really should fix the decision logic to mask
+> out the non possible CPUs from the supplied masks.
+
+Sure, I can do that. But do you want that as a fix for v4.18 ?
+
+I think we may need this check at another place in tick_setup_device
+
+213         /*
+214          * When the device is not per cpu, pin the interrupt to the
+215          * current cpu:
+216          */
+217         if (!cpumask_equal(newdev->cpumask, cpumask))
+218                 irq_set_affinity(newdev->irq, cpumask);
+
+Does it make sense trim dev->cpumask when registering the clockevents
+device itself instead of adding check at place where this cpumask
+can be used ? So that any future user of those masks need not have to
+take care of that.
+
+Also only few ARM clocksource drivers use cpu_all_mask which could be
+result of copy-paste, we can even fix them too.
+
+arm_arch_timer.c:	clk->cpumask = cpu_all_mask;
+tegra20_timer.c:	tegra_clockevent.cpumask = cpu_all_mask;
+timer-atcpit100.c:	.cpumask = cpu_all_mask,
+timer-keystone.c:	event_dev->cpumask = cpu_all_mask;
+zevio-timer.c:		timer->clkevt.cpumask	= cpu_all_mask;
+
 -- 
-2.7.4
+Regards,
+Sudeep
