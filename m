@@ -1,32 +1,40 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 10 Jul 2018 18:17:18 +0100
-Subject: [RFC PATCH 3/4] of/device: Set bus DMA mask as appropriate
+Date: Tue, 10 Jul 2018 18:17:19 +0100
+Subject: [RFC PATCH 4/4] iommu/dma: Respect bus DMA limit for IOVAs
 In-Reply-To: <cover.1531239284.git.robin.murphy@arm.com>
 References: <cover.1531239284.git.robin.murphy@arm.com>
-Message-ID: <346c004b599fb77a2006a4eeb992b30feb06fce5.1531239284.git.robin.murphy@arm.com>
+Message-ID: <2c0d7437ee7ccdd58da25faa283bd3c3148b961b.1531239284.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When an explicit DMA limit is described by firmware, we need to remember
-it regardless of how drivers might subsequently update their devices'
-masks. The new bus_dma_mask field does that.
+Take the new bus limit into account (when present) for IOVA allocations,
+to accommodate those SoCs which integrate off-the-shelf IP blocks with
+narrower interconnects such that the link between a device output and an
+IOMMU input can truncate DMA addresses to even fewer bits than the
+native size of either block's interface would imply.
+
+Eventually it might make sense for the DMA core to apply this constraint
+up-front in dma_set_mask() and friends, but for now this seems like the
+least risky approach.
 
 Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
- drivers/of/device.c | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/iommu/dma-iommu.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/drivers/of/device.c b/drivers/of/device.c
-index 33d85511d790..0d39633e8545 100644
---- a/drivers/of/device.c
-+++ b/drivers/of/device.c
-@@ -149,6 +149,7 @@ int of_dma_configure(struct device *dev, struct device_node *np, bool force_dma)
- 	 * set by the driver.
- 	 */
- 	mask = DMA_BIT_MASK(ilog2(dma_addr + size - 1) + 1);
-+	dev->bus_dma_mask = mask;
- 	dev->coherent_dma_mask &= mask;
- 	*dev->dma_mask &= mask;
+diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
+index ddcbbdb5d658..511ff9a1d6d9 100644
+--- a/drivers/iommu/dma-iommu.c
++++ b/drivers/iommu/dma-iommu.c
+@@ -367,6 +367,9 @@ static dma_addr_t iommu_dma_alloc_iova(struct iommu_domain *domain,
+ 	if (iova_len < (1 << (IOVA_RANGE_CACHE_MAX_SIZE - 1)))
+ 		iova_len = roundup_pow_of_two(iova_len);
+ 
++	if (dev->bus_dma_mask)
++		dma_limit &= dev->bus_dma_mask;
++
+ 	if (domain->geometry.force_aperture)
+ 		dma_limit = min(dma_limit, domain->geometry.aperture_end);
  
 -- 
 2.17.1.dirty
