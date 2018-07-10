@@ -1,59 +1,28 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 10 Jul 2018 19:01:22 +0100
-Subject: [PATCH 1/2] arm64: fix possible spectre-v1 write in
- ptrace_hbp_set_event()
-In-Reply-To: <20180710180123.56461-1-mark.rutland@arm.com>
-References: <20180710180123.56461-1-mark.rutland@arm.com>
-Message-ID: <20180710180123.56461-2-mark.rutland@arm.com>
+From: hch@lst.de (Christoph Hellwig)
+Date: Tue, 10 Jul 2018 20:04:33 +0200
+Subject: [RFC PATCH 1/4] dma-mapping: Generalise dma_32bit_limit flag
+In-Reply-To: <a85a5fe22fced65b2960251fc6e8d8f1e68f828a.1531239284.git.robin.murphy@arm.com>
+References: <cover.1531239284.git.robin.murphy@arm.com>
+ <a85a5fe22fced65b2960251fc6e8d8f1e68f828a.1531239284.git.robin.murphy@arm.com>
+Message-ID: <20180710180433.GB26285@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It's possible for userspace to control idx. Sanitize idx when using it
-as an array index, to inhibit the potential spectre-v1 write gadget.
+On Tue, Jul 10, 2018 at 06:17:16PM +0100, Robin Murphy wrote:
+> diff --git a/kernel/dma/direct.c b/kernel/dma/direct.c
+> index 8be8106270c2..95e185347e34 100644
+> --- a/kernel/dma/direct.c
+> +++ b/kernel/dma/direct.c
+> @@ -183,7 +183,7 @@ int dma_direct_supported(struct device *dev, u64 mask)
+>  	 * Various PCI/PCIe bridges have broken support for > 32bit DMA even
+>  	 * if the device itself might support it.
+>  	 */
+> -	if (dev->dma_32bit_limit && mask > DMA_BIT_MASK(32))
+> +	if (dev->bus_dma_mask && mask > dev->bus_dma_mask)
+>  		return 0;
 
-Found by smatch.
+The comment above this check needs an updated (or just be removed).
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/kernel/ptrace.c | 19 +++++++++++--------
- 1 file changed, 11 insertions(+), 8 deletions(-)
-
-diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-index 5c338ce5a7fa..db5440339ab3 100644
---- a/arch/arm64/kernel/ptrace.c
-+++ b/arch/arm64/kernel/ptrace.c
-@@ -277,19 +277,22 @@ static int ptrace_hbp_set_event(unsigned int note_type,
- 
- 	switch (note_type) {
- 	case NT_ARM_HW_BREAK:
--		if (idx < ARM_MAX_BRP) {
--			tsk->thread.debug.hbp_break[idx] = bp;
--			err = 0;
--		}
-+		if (idx >= ARM_MAX_BRP)
-+			goto out;
-+		idx = array_index_nospec(idx, ARM_MAX_BRP);
-+		tsk->thread.debug.hbp_break[idx] = bp;
-+		err = 0;
- 		break;
- 	case NT_ARM_HW_WATCH:
--		if (idx < ARM_MAX_WRP) {
--			tsk->thread.debug.hbp_watch[idx] = bp;
--			err = 0;
--		}
-+		if (idx >= ARM_MAX_WRP)
-+			goto out;
-+		idx = array_index_nospec(idx, ARM_MAX_WRP);
-+		tsk->thread.debug.hbp_watch[idx] = bp;
-+		err = 0;
- 		break;
- 	}
- 
-+out:
- 	return err;
- }
- 
--- 
-2.11.0
+Also we still have a few architectures not using dma-direct. I guess
+most were doing fine without such limits anyway, but at least arm
+will probably need an equivalent check.
