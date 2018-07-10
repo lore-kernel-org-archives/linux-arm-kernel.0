@@ -1,54 +1,27 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 10 Jul 2018 10:05:43 +0200
-Subject: [PATCH v3] soc: imx: gpc: Turn PU domain on/off in sleep on 6qp
-In-Reply-To: <CAPDyKFqb6eZ2SYG612yqiNisv7UV1q3UHYfZfemmvv9Q4w=Png@mail.gmail.com>
-References: <ab0c7997bdb0caf6fe7e842315bb9565c2cb059d.1530895248.git.leonard.crestez@nxp.com>
- <CAPDyKFqb6eZ2SYG612yqiNisv7UV1q3UHYfZfemmvv9Q4w=Png@mail.gmail.com>
-Message-ID: <1531209943.3163.31.camel@pengutronix.de>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 10 Jul 2018 10:07:17 +0200
+Subject: [PATCH v5 02/22] fixup! v4l2-ctrls: add
+ v4l2_ctrl_request_hdl_find/put/ctrl_find functions
+In-Reply-To: <20180710080114.31469-3-paul.kocialkowski@bootlin.com>
+References: <20180710080114.31469-1-paul.kocialkowski@bootlin.com>
+ <20180710080114.31469-3-paul.kocialkowski@bootlin.com>
+Message-ID: <CAMuHMdVgJuK5G0+szV0BAWDBybxWV0iDWE5kZKuTdgNiGjpnEg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, den 10.07.2018, 00:27 +0200 schrieb Ulf Hansson:
-> > On 6 July 2018 at 18:46, Leonard Crestez <leonard.crestez@nxp.com> wrote:
-> > On imx6qp power gating on the PU domain is disabled because of errata
-> > ERR009619. However power gating during suspend/resume can still be
-> > performed.
-> 
-> Sounds a bit hand wavy. Exactly why can it be done during system suspend/resume?
+On Tue, Jul 10, 2018 at 10:02 AM Paul Kocialkowski
+<paul.kocialkowski@bootlin.com> wrote:
+> [PATCH v5 02/22] fixup! v4l2-ctrls: add v4l2_ctrl_request_hdl_find/put/ctrl_find functions
 
-Power gating?this domain in normal operation may introduce a glitch in
-unrelated modules, potentially disturbing a running display scanout.
-This is not a concern when the whole system enters suspend state, so
-it's safe to do in this case.
+git rebase -i ;-)
 
-Regards,
-Lucas
+Gr{oetje,eeting}s,
 
-> > 
-> > Enable this by implementing SLEEP_PM_OPS in imx_pgc_power_domain_driver.
-> > 
-> > In order to ensure correct ordering add device links from devices inside
-> > the PU domain to the pgc platform_device.
-> 
-> In genpd, the PM domain gets powered off after all device's
-> corresponding ->suspend_noirq() callback has been invoked - and it
-> also considers if there are some wakeup settings enabled, possibly
-> avoiding to do the power off.
-> 
-> It sound like the imx's power domain driver ->power_off|on() callback
-> should deal with this, to make get a consistent behavior. I understand
-> that you currently can't tell under what circumstances the
-> ->power_off|on() callbacks are being invoked, that may need some
-> changes in genpd.
-> 
-> Currently we have a flag, GENPD_FLAG_ALWAYS_ON which makes genpd to
-> always prevent power off. Perhaps we should add a new flag
-> "GENPD_FLAG_RUNTIME_ON", which makes genpd to call the
-> ->power_on|off() callbacks, but only during system wide PM.
-> 
-> Thoughts?
+                        Geert
 
-Yes, this might work for this case.
+-- 
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-Regards,
-Lucas
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
