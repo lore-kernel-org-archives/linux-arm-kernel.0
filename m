@@ -1,73 +1,89 @@
-From: mathieu.desnoyers@efficios.com (Mathieu Desnoyers)
-Date: Tue, 10 Jul 2018 10:51:13 -0400 (EDT)
-Subject: [PATCH v2 0/3] Support rseq on arm64
-In-Reply-To: <20180710144907.GD9022@arm.com>
-References: <1531145985-3747-1-git-send-email-will.deacon@arm.com>
- <1957291037.1983.1531152382750.JavaMail.zimbra@efficios.com>
- <20180709165307.GB4689@arm.com>
- <1187011512.2158.1531156674389.JavaMail.zimbra@efficios.com>
- <20180710144907.GD9022@arm.com>
-Message-ID: <745627929.3050.1531234273058.JavaMail.zimbra@efficios.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Tue, 10 Jul 2018 16:01:35 +0100
+Subject: [PATCH v5 0/7] arm64: perf: Support for chained counters
+In-Reply-To: <20180710143105.GC9022@arm.com>
+References: <1531213084-27417-1-git-send-email-suzuki.poulose@arm.com>
+ <20180710143105.GC9022@arm.com>
+Message-ID: <50b0107c-b01d-956a-bd85-d588bf9869ee@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------ On Jul 10, 2018, at 10:49 AM, Will Deacon will.deacon at arm.com wrote:
-
-> On Mon, Jul 09, 2018 at 01:17:54PM -0400, Mathieu Desnoyers wrote:
->> ----- On Jul 9, 2018, at 12:53 PM, Will Deacon will.deacon at arm.com wrote:
->> 
->> > On Mon, Jul 09, 2018 at 12:06:22PM -0400, Mathieu Desnoyers wrote:
->> >> ----- On Jul 9, 2018, at 10:19 AM, Will Deacon will.deacon at arm.com wrote:
->> >> 
->> >> > Hello,
->> >> > 
->> >> > This is version two of the patches previously posted here:
->> >> > 
->> >> > http://lkml.kernel.org/r/1529949285-11013-1-git-send-email-will.deacon at arm.com
->> >> > 
->> >> > Changes since v1 include:
->> >> > 
->> >> >  * Move abort handler in-line to avoid possibility of it being
->> >> >    out-of-range for conditional branch instructions
->> >> > 
->> >> > I've tested both native and compat (little-endian only) with the selftests
->> >> > and they pass successfully on my Seattle box.
->> >> 
->> >> For the whole series:
->> >> 
->> >> Acked-by: Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
->> > 
->> > Thanks, Mathieu! Are you ok with me taking this via the arm64 tree for
->> > 4.19 once I have an Ack for the asm-generic change, or would you rather
->> > this went via somewhere else?
->> 
->> Adding Thomas Gleixner in CC. He has been picking up the rseq bits for
->> 4.18. I've noticed it was rather easier to gather rseq stuff through a
->> single tree (less chances of confusion).
+On 07/10/2018 03:31 PM, Will Deacon wrote:
+> Hi Suzuki,
 > 
-> Whilst I can see that making some sense for the selftests (particularly
-> if the ABI is liable to further changes before 4.18 is released), I'd
-> prefer to take the arm64 bits via the arm64 tree, as they will conflict
-> with some ongoing work to rewrite the syscall entry path in C which I
-> plan to queue in the next week (pending final testing results).
-
-Considering this, indeed going through the arm64 tree seems like the right
-approach.
-
+> On Tue, Jul 10, 2018 at 09:57:57AM +0100, Suzuki K Poulose wrote:
+>> This series adds support for counting PMU events using 64bit counters
+>> for arm64 PMU.
+>>
+>> The Arm v8 PMUv3 supports combining two adjacent 32bit counters
+>> (low even and hig odd counters) to count a given "event" in 64bit mode.
+>> This series adds the support for 64bit events in the core arm_pmu driver
+>> infrastructure and adds the support for armv8 64bit kernel PMU to use
+>> chained counters to count in 64bit mode. For CPU cycles, we use the cycle
+>> counter in 64bit mode, only when requested. If the cycle counter is not
+>> available, we fall back to chaining the counters.
+>>
+>> Tested on Juno, Fast models. Applies on 4.18-rc4
 > 
->> Also, support for additional architectures (e.g. MIPS) was added to rseq
->> after rc1. Is it too late to merge arm64 support targeting 4.18 ?
-> 
-> Personally, I don't see the rush, but I won't stop anybody who wants to
-> try steam-rollering them into mainline ;)
+> Thanks, this looks pretty good to me. How far did you get with the perf
+> fuzzer?
 
-There is indeed no rush. 4.19 it is then.
+Hi Will,
 
-Thanks!
+I ran perf_fuzzer on Juno and the fuzzer hung with RCU stalls.
+However, this was reproducible without the series. I am yet to
+investigate the RCU stall.
 
-Mathieu
+Log below (from 4.18-rc3, without the series).
 
--- 
-Mathieu Desnoyers
-EfficiOS Inc.
-http://www.efficios.com
+[445885.968489] perf_fuzzer     R  running task        0 11468   4397 
+0x00000003
+[445885.975568] Call trace:
+[445885.978084]  ret_from_fork+0x0/0x1c
+[445963.841606] INFO: rcu_preempt self-detected stall on CPU
+[445963.845814] INFO: rcu_preempt detected stalls on CPUs/tasks:
+[445963.846957] 	2-....: (1 GPs behind) idle=376/1/4611686018427387908 
+softirq=57145/57145 fqs=54519307
+[445963.852649] 	
+[445963.861784] 	2-....: (1 GPs behind) idle=376/1/4611686018427387908 
+softirq=57145/57145 fqs=54519307
+[445963.861787]  (t=109254007 jiffies g=61092 c=61091 q=1517144)
+[445963.878244] 	
+[445963.878245] Task dump for CPU 2:
+[445963.878250] perf_fuzzer     R
+[445963.879897] (detected by 0, t=109254007 jiffies, g=61092, c=61091, 
+q=1517144)
+[445963.883167]   running task        0 11468   4397 0x00000003
+[445963.898932] Call trace:
+[445963.901439]  dump_backtrace+0x0/0x1e0
+[445963.905149]  show_stack+0x24/0x30
+[445963.908516]  sched_show_task+0x220/0x2c0
+[445963.912484]  dump_cpu_task+0x48/0x58
+[445963.916109]  rcu_dump_cpu_stacks+0xa0/0xe0
+[445963.920250]  rcu_check_callbacks+0xa40/0xc20
+[445963.924564]  update_process_times+0x34/0x60
+[445963.928791]  tick_sched_handle.isra.5+0x44/0x68
+[445963.933361]  tick_sched_timer+0x50/0xa0
+[445963.937244]  __hrtimer_run_queues+0x19c/0x6d0
+[445963.941644]  hrtimer_interrupt+0xec/0x248
+[445963.945699]  arch_timer_handler_phys+0x3c/0x50
+[445963.950184]  handle_percpu_devid_irq+0xcc/0x4a0
+[445963.954754]  generic_handle_irq+0x34/0x50
+[445963.958808]  __handle_domain_irq+0x68/0xc0
+[445963.962948]  gic_handle_irq+0x60/0xb8
+[445963.966657]  el1_irq+0xb4/0x130
+[445963.969851]  __do_softirq+0xcc/0x5c4
+[445963.973475]  irq_exit+0x12c/0x138
+[445963.976841]  __handle_domain_irq+0x6c/0xc0
+[445963.980981]  gic_handle_irq+0x60/0xb8
+[445963.984691]  el0_irq_naked+0x50/0x5c
+[445963.988316] Task dump for CPU 2:
+[445963.991601] perf_fuzzer     R  running task        0 11468   4397 
+0x00000003
+[445963.998679] Call trace:
+[445964.001194]  ret_from_fork+0x0/0x1c
+root at localhost:~# uname -a
+Linux localhost.localdomain 4.18.0-rc3 #117 SMP PREEMPT Thu Jul 5 
+11:47:12 BST 2018 aarch64 aarch64 aarch64 GNU/Linux
+
+Suzuki
