@@ -1,84 +1,236 @@
 From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
-Date: Tue, 10 Jul 2018 10:14:16 +0900
-Subject: [PATCH v2 1/2] dt-bindings: reset: uniphier: add USB3 core reset
- support
+Date: Tue, 10 Jul 2018 10:14:17 +0900
+Subject: [PATCH v2 2/2] reset: uniphier: add USB3 core reset control
 In-Reply-To: <1531185257-16444-1-git-send-email-hayashi.kunihiko@socionext.com>
 References: <1531185257-16444-1-git-send-email-hayashi.kunihiko@socionext.com>
-Message-ID: <1531185257-16444-2-git-send-email-hayashi.kunihiko@socionext.com>
+Message-ID: <1531185257-16444-3-git-send-email-hayashi.kunihiko@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT bindings for reset control of USB3 core implemented in UniPhier SoCs.
-The reset control belongs to USB3 glue layer.
+Add a reset line to enable USB3 core implemented in UniPhier SoCs.
+
+This reuses only the reset operations in reset-simple, because
+the reset-simple doesn't handle any SoC-dependent clocks and resets.
+This reset line is included in the USB3 glue layer, and it's necessary
+to enable clocks and deassert resets of the layer before using this
+reset line.
 
 Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
 ---
- .../devicetree/bindings/reset/uniphier-reset.txt   | 56 ++++++++++++++++++++++
- 1 file changed, 56 insertions(+)
+ drivers/reset/Kconfig               |  10 +++
+ drivers/reset/Makefile              |   1 +
+ drivers/reset/reset-uniphier-usb3.c | 171 ++++++++++++++++++++++++++++++++++++
+ 3 files changed, 182 insertions(+)
+ create mode 100644 drivers/reset/reset-uniphier-usb3.c
 
-diff --git a/Documentation/devicetree/bindings/reset/uniphier-reset.txt b/Documentation/devicetree/bindings/reset/uniphier-reset.txt
-index 93efed6..101743d 100644
---- a/Documentation/devicetree/bindings/reset/uniphier-reset.txt
-+++ b/Documentation/devicetree/bindings/reset/uniphier-reset.txt
-@@ -118,3 +118,59 @@ Example:
+diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
+index c0b292b..6b45067 100644
+--- a/drivers/reset/Kconfig
++++ b/drivers/reset/Kconfig
+@@ -138,6 +138,16 @@ config RESET_UNIPHIER
+ 	  Say Y if you want to control reset signals provided by System Control
+ 	  block, Media I/O block, Peripheral Block.
  
- 		other nodes ...
- 	};
++config RESET_UNIPHIER_USB3
++	tristate "USB3 reset driver for UniPhier SoCs"
++	depends on (ARCH_UNIPHIER || COMPILE_TEST) && OF
++	default ARCH_UNIPHIER
++	select RESET_SIMPLE
++	help
++	  Support for the USB3 core reset on UniPhier SoCs.
++	  Say Y if you want to control reset signals provided by
++	  USB3 glue layer.
 +
+ config RESET_ZYNQ
+ 	bool "ZYNQ Reset Driver" if COMPILE_TEST
+ 	default ARCH_ZYNQ
+diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
+index c1261dc..2638ac4 100644
+--- a/drivers/reset/Makefile
++++ b/drivers/reset/Makefile
+@@ -20,5 +20,6 @@ obj-$(CONFIG_RESET_SUNXI) += reset-sunxi.o
+ obj-$(CONFIG_RESET_TI_SCI) += reset-ti-sci.o
+ obj-$(CONFIG_RESET_TI_SYSCON) += reset-ti-syscon.o
+ obj-$(CONFIG_RESET_UNIPHIER) += reset-uniphier.o
++obj-$(CONFIG_RESET_UNIPHIER_USB3) += reset-uniphier-usb3.o
+ obj-$(CONFIG_RESET_ZYNQ) += reset-zynq.o
+ 
+diff --git a/drivers/reset/reset-uniphier-usb3.c b/drivers/reset/reset-uniphier-usb3.c
+new file mode 100644
+index 0000000..ffa1b19
+--- /dev/null
++++ b/drivers/reset/reset-uniphier-usb3.c
+@@ -0,0 +1,171 @@
++// SPDX-License-Identifier: GPL-2.0
++//
++// reset-uniphier-usb3.c - USB3 reset driver for UniPhier
++// Copyright 2018 Socionext Inc.
++// Author: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
 +
-+USB3 core reset
-+---------------
++#include <linux/clk.h>
++#include <linux/module.h>
++#include <linux/of_device.h>
++#include <linux/platform_device.h>
++#include <linux/reset.h>
 +
-+USB3 core reset belongs to USB3 glue layer. Before using the core reset,
-+it is necessary to control the clocks and resets to enable this layer.
-+These clocks and resets should be described in each property.
++#include "reset-simple.h"
 +
-+Required properties:
-+- compatible: Should be
-+    "socionext,uniphier-pro4-usb3-reset" - for Pro4 SoC
-+    "socionext,uniphier-pxs2-usb3-reset" - for PXs2 SoC
-+    "socionext,uniphier-ld20-usb3-reset" - for LD20 SoC
-+    "socionext,uniphier-pxs3-usb3-reset" - for PXs3 SoC
-+- #reset-cells: Should be 1.
-+- reg: Specifies offset and length of the register set for the device.
-+- clocks: A list of phandles to the clock gate for USB3 glue layer.
-+	According to the clock-names, appropriate clocks are required.
-+- clock-names: Should contain
-+    "gio", "link" - for Pro4 SoC
-+    "link"        - for others
-+- resets: A list of phandles to the reset control for USB3 glue layer.
-+	According to the reset-names, appropriate resets are required.
-+- reset-names: Should contain
-+    "gio", "link" - for Pro4 SoC
-+    "link"        - for others
++#define MAX_CLKS	2
++#define MAX_RSTS	2
 +
-+Example:
++struct uniphier_usb3_reset_soc_data {
++	int nclks;
++	const char * const *clock_names;
++	int nrsts;
++	const char * const *reset_names;
++};
 +
-+	usb-glue at 65b00000 {
-+		compatible = "socionext,uniphier-ld20-dwc3-glue",
-+			     "simple-mfd";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges = <0 0x65b00000 0x400>;
++struct uniphier_usb3_reset_priv {
++	struct clk_bulk_data clk[MAX_CLKS];
++	struct reset_control *rst[MAX_RSTS];
++	struct reset_simple_data rdata;
++	const struct uniphier_usb3_reset_soc_data *data;
++};
 +
-+		usb_rst: reset at 0 {
-+			compatible = "socionext,uniphier-ld20-usb3-reset";
-+			reg = <0x0 0x4>;
-+			#reset-cells = <1>;
-+			clock-names = "link";
-+			clocks = <&sys_clk 14>;
-+			reset-names = "link";
-+			resets = <&sys_rst 14>;
-+		};
++static int uniphier_usb3_reset_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct uniphier_usb3_reset_priv *priv;
++	struct resource *res;
++	resource_size_t size;
++	const char *name;
++	int i, ret, nr;
 +
-+		regulator {
-+			...
-+		};
++	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
++	if (!priv)
++		return -ENOMEM;
 +
-+		phy {
-+			...
-+		};
-+		...
-+	};
++	priv->data = of_device_get_match_data(dev);
++	if (WARN_ON(!priv->data || priv->data->nclks > MAX_CLKS ||
++		    priv->data->nrsts > MAX_RSTS))
++		return -EINVAL;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	size = resource_size(res);
++	priv->rdata.membase = devm_ioremap_resource(dev, res);
++	if (IS_ERR(priv->rdata.membase))
++		return PTR_ERR(priv->rdata.membase);
++
++	for (i = 0; i < priv->data->nclks; i++)
++		priv->clk[i].id = priv->data->clock_names[i];
++	ret = devm_clk_bulk_get(dev, priv->data->nclks, priv->clk);
++	if (ret)
++		return ret;
++
++	for (i = 0; i < priv->data->nrsts; i++) {
++		name = priv->data->reset_names[i];
++		priv->rst[i] = devm_reset_control_get_shared(dev, name);
++		if (IS_ERR(priv->rst[i]))
++			return PTR_ERR(priv->rst[i]);
++	}
++
++	ret = clk_bulk_prepare_enable(priv->data->nclks, priv->clk);
++	if (ret)
++		return ret;
++
++	for (nr = 0; nr < priv->data->nrsts; nr++) {
++		ret = reset_control_deassert(priv->rst[nr]);
++		if (ret)
++			goto out_rst_assert;
++	}
++
++	spin_lock_init(&priv->rdata.lock);
++	priv->rdata.rcdev.owner = THIS_MODULE;
++	priv->rdata.rcdev.nr_resets = size * BITS_PER_BYTE;
++	priv->rdata.rcdev.ops = &reset_simple_ops;
++	priv->rdata.rcdev.of_node = dev->of_node;
++	priv->rdata.active_low = true;
++
++	platform_set_drvdata(pdev, priv);
++
++	ret = devm_reset_controller_register(dev, &priv->rdata.rcdev);
++	if (ret)
++		goto out_rst_assert;
++
++	return 0;
++
++out_rst_assert:
++	while (nr--)
++		reset_control_assert(priv->rst[nr]);
++
++	clk_bulk_disable_unprepare(priv->data->nclks, priv->clk);
++
++	return ret;
++}
++
++static int uniphier_usb3_reset_remove(struct platform_device *pdev)
++{
++	struct uniphier_usb3_reset_priv *priv = platform_get_drvdata(pdev);
++	int i;
++
++	for (i = 0; i < priv->data->nrsts; i++)
++		reset_control_assert(priv->rst[i]);
++
++	clk_bulk_disable_unprepare(priv->data->nclks, priv->clk);
++
++	return 0;
++}
++
++static const char * const uniphier_pro4_clock_reset_names[] = {
++	"gio", "link",
++};
++
++static const struct uniphier_usb3_reset_soc_data uniphier_pro4_data = {
++	.nclks = ARRAY_SIZE(uniphier_pro4_clock_reset_names),
++	.clock_names = uniphier_pro4_clock_reset_names,
++	.nrsts = ARRAY_SIZE(uniphier_pro4_clock_reset_names),
++	.reset_names = uniphier_pro4_clock_reset_names,
++};
++
++static const char * const uniphier_pxs2_clock_reset_names[] = {
++	"link",
++};
++
++static const struct uniphier_usb3_reset_soc_data uniphier_pxs2_data = {
++	.nclks = ARRAY_SIZE(uniphier_pxs2_clock_reset_names),
++	.clock_names = uniphier_pxs2_clock_reset_names,
++	.nrsts = ARRAY_SIZE(uniphier_pxs2_clock_reset_names),
++	.reset_names = uniphier_pxs2_clock_reset_names,
++};
++
++static const struct of_device_id uniphier_usb3_reset_match[] = {
++	{
++		.compatible = "socionext,uniphier-pro4-usb3-reset",
++		.data = &uniphier_pro4_data,
++	},
++	{
++		.compatible = "socionext,uniphier-pxs2-usb3-reset",
++		.data = &uniphier_pxs2_data,
++	},
++	{
++		.compatible = "socionext,uniphier-ld20-usb3-reset",
++		.data = &uniphier_pxs2_data,
++	},
++	{
++		.compatible = "socionext,uniphier-pxs3-usb3-reset",
++		.data = &uniphier_pxs2_data,
++	},
++	{ /* Sentinel */ }
++};
++MODULE_DEVICE_TABLE(of, uniphier_usb3_reset_match);
++
++static struct platform_driver uniphier_usb3_reset_driver = {
++	.probe = uniphier_usb3_reset_probe,
++	.remove = uniphier_usb3_reset_remove,
++	.driver = {
++		.name = "uniphier-usb3-reset",
++		.of_match_table = uniphier_usb3_reset_match,
++	},
++};
++module_platform_driver(uniphier_usb3_reset_driver);
++
++MODULE_AUTHOR("Kunihiko Hayashi <hayashi.kunihiko@socionext.com>");
++MODULE_DESCRIPTION("UniPhier USB3 Reset Driver");
++MODULE_LICENSE("GPL");
 -- 
 2.7.4
