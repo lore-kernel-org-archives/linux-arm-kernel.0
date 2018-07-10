@@ -1,32 +1,37 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Tue, 10 Jul 2018 22:34:55 +0200
-Subject: [PATCH v2 02/18] drm/sun4i: Add R40 display engine compatible
+Date: Tue, 10 Jul 2018 22:34:56 +0200
+Subject: [PATCH v2 03/18] ARM: dts: sun8i: r40: Remove fallback display engine
+ compatible
 In-Reply-To: <20180710203511.18454-1-jernej.skrabec@siol.net>
 References: <20180710203511.18454-1-jernej.skrabec@siol.net>
-Message-ID: <20180710203511.18454-3-jernej.skrabec@siol.net>
+Message-ID: <20180710203511.18454-4-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-R40 has versatile display pipeline. It supports two simultanious outputs
-on various outputs (TVE, VGA, HDMI, MIPI DSI, LCD).
+R40 has pretty unique display pipeline. Because of that, H3 display
+engine compatible fallback should be removed.
+
+Fixes: 05a43a262d03 ("ARM: dts: sun8i: r40: Add HDMI pipeline")
 
 Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/gpu/drm/sun4i/sun4i_drv.c | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/sun8i-r40.dtsi | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
-index 6ddf4eaccb40..a15feb807393 100644
---- a/drivers/gpu/drm/sun4i/sun4i_drv.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
-@@ -417,6 +417,7 @@ static const struct of_device_id sun4i_drv_of_table[] = {
- 	{ .compatible = "allwinner,sun8i-a33-display-engine" },
- 	{ .compatible = "allwinner,sun8i-a83t-display-engine" },
- 	{ .compatible = "allwinner,sun8i-h3-display-engine" },
-+	{ .compatible = "allwinner,sun8i-r40-display-engine" },
- 	{ .compatible = "allwinner,sun8i-v3s-display-engine" },
- 	{ .compatible = "allwinner,sun9i-a80-display-engine" },
- 	{ }
+diff --git a/arch/arm/boot/dts/sun8i-r40.dtsi b/arch/arm/boot/dts/sun8i-r40.dtsi
+index c95a59aac48f..2afb079a3776 100644
+--- a/arch/arm/boot/dts/sun8i-r40.dtsi
++++ b/arch/arm/boot/dts/sun8i-r40.dtsi
+@@ -102,8 +102,7 @@
+ 	};
+ 
+ 	de: display-engine {
+-		compatible = "allwinner,sun8i-r40-display-engine",
+-			     "allwinner,sun8i-h3-display-engine";
++		compatible = "allwinner,sun8i-r40-display-engine";
+ 		allwinner,pipelines = <&mixer0>, <&mixer1>;
+ 		status = "disabled";
+ 	};
 -- 
 2.18.0
