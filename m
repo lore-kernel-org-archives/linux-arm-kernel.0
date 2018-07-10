@@ -1,62 +1,33 @@
-From: yixun.lan@amlogic.com (Yixun Lan)
-Date: Tue, 10 Jul 2018 17:19:32 +0800
-Subject: [PATCH 0/3] pinctrl: meson-g12a: add pinctrl driver support
-In-Reply-To: <CAFBinCAVSGTWFzW6nikbnC+K9n5KRYjun9bnEp7YsKbGRHJorg@mail.gmail.com>
-References: <20180704224511.29350-1-yixun.lan@amlogic.com>
- <CACRpkdauMRnLpfiARG-BWkuJfArri68e9BYx56SCUxJaYWsYYA@mail.gmail.com>
- <CAFBinCAVSGTWFzW6nikbnC+K9n5KRYjun9bnEp7YsKbGRHJorg@mail.gmail.com>
-Message-ID: <eafc9b41-597e-fa0f-5e30-95ce0b75f6fd@amlogic.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Tue, 10 Jul 2018 11:23:10 +0200
+Subject: [PATCH v5 20/22] ARM: dts: sun7i-a20: Add Video Engine and
+ reserved memory nodes
+In-Reply-To: <20180710080114.31469-21-paul.kocialkowski@bootlin.com>
+References: <20180710080114.31469-1-paul.kocialkowski@bootlin.com>
+ <20180710080114.31469-21-paul.kocialkowski@bootlin.com>
+Message-ID: <20180710092310.2hzoc7shmfykr3n5@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HI Martin
+On Tue, Jul 10, 2018 at 10:01:12AM +0200, Paul Kocialkowski wrote:
+> +		vpu: video-codec at 1c0e000 {
+> +			compatible = "allwinner,sun7i-a20-video-engine";
+> +			reg = <0x01c0e000 0x1000>;
+> +
 
-On 07/10/18 06:07, Martin Blumenstingl wrote:
-> Hi Linus,
-> 
-> On Mon, Jul 9, 2018 at 3:35 PM Linus Walleij <linus.walleij@linaro.org> wrote:
->>
->> On Wed, Jul 4, 2018 at 4:48 PM Yixun Lan <yixun.lan@amlogic.com> wrote:
->>>
->>> This patch series try to add pinctrl driver support for
->>> the Meson-G12A SoC.
->>>
->>>
->>> Yixun Lan (3):
->>>   documentation: Add compatibles for Amlogic Meson G12A pin controllers
->>>   dt-bindings: pinctrl: meson-g12a: document pin name
->>>   pinctrl: meson-g12a: add pinctrl driver support
->>
->> Overall this looks good to me, could we get some review or ACKs
->> from Beniamino, Martin and/or Carlo as an indication that everything
->> seems all right before I apply the series?
-> I do not have any documentation for this hardware (I'm not even sure
-> if this is the successor to AXG/"the Audio SoCs" or rather a successor
-> of GXL or GXM/"the OTT/STB SoCs" - I assume it's their new OTT/STB
-> SoCs since G12A is mentioned here and it seems to have a GPU: [0])
-> 
-yes, it's more like a new generation of OTT/STB SoCs..
+The issue is here with all your patches, but you should drop the node
+label and the extra new line.
 
-> I will try to have a look in the next few days and see if I can spot
-> anything obvious
+Maxime
 
-generally the pinctrl IP hasn't changed, so only pinctrl data need to be
-updated (the pin mux IP is same as AXG SoC which already explain in
-another thread).
-
-> not sure if Neil or Kevin have access to the documentation, so it'd be
-> great if they could give feedback as well
-> 
-we are preparing documention to baylibre guys..
-
-I think there is not many boards available in the public?
-
-> 
-> Regards
-> Martin
-> 
-> 
-> [0] http://openlinux.amlogic.com:8000/download/doc/Linux_BSP_Kernel4.9_Buildroot_OpenLinux_Release_Notes_V20180330.pdf
-> 
-> .
-> 
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180710/889d9f7c/attachment.sig>
