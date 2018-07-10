@@ -1,95 +1,54 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 10 Jul 2018 18:17:16 +0100
-Subject: [RFC PATCH 1/4] dma-mapping: Generalise dma_32bit_limit flag
-In-Reply-To: <cover.1531239284.git.robin.murphy@arm.com>
-References: <cover.1531239284.git.robin.murphy@arm.com>
-Message-ID: <a85a5fe22fced65b2960251fc6e8d8f1e68f828a.1531239284.git.robin.murphy@arm.com>
+Date: Tue, 10 Jul 2018 18:17:15 +0100
+Subject: [RFC PATCH 0/4] Stop losing firmware-set DMA masks
+Message-ID: <cover.1531239284.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Whilst the notion of an upstream DMA restriction is most commonly seen
-via PCI host bridges saddled with a 32-bit native interface, a more
-general version of the same issue can exist on complex SoCs where a bus
-or point-to-point interconnect link carries fewer address bits between a
-device and a downstream component (often an IOMMU) than both blocks
-nominally support. In order to properly deal with this, first grow the
-dma_32bit_limit flag into an arbitrary mask.
+Whilst the common firmware code invoked by dma_configure() initialises
+devices' DMA masks according to limitations described by the respective
+properties ("dma-ranges" for OF and _DMA/IORT for ACPI), the nature of
+the dma_set_mask() API leads to that information getting lost when
+well-behaved drivers probe and set a 64-bit mask, since in general
+there's no way to tell the difference between a firmware-described mask
+(which should be respected) and whatever default may have come from the
+bus code (which should be replaced outright). This can break DMA on
+systems with certain IOMMU topologies (e.g. [1]) where the IOMMU driver
+only knows its maximum supported address size, not how many of those
+address bits might actually be wired up between any of its input
+interfaces and the associated DMA master devices. Similarly, some PCIe
+root complexes only have a 32-bit native interface on their host bridge,
+which leads to the same DMA-address-truncation problem in systems with a
+larger physical memory map and RAM above 4GB (e.g. [2]).
 
-To minimise the impact on existing code, we'll only consider this new
-mask valid if set. That makes sense anyway, since cases where DMA is not
-wired up at all would be better handled by not giving the device valid
-ops in the first place.
+These patches attempt to deal with this in the simplest way possible by
+generalising the specific quirk for 32-bit bridges into an arbitrary
+mask which can then also be plumbed into the firmware code. In the
+interest of being minimally invasive, I've only included a point fix
+for the IOMMU issue as seen on arm64 - there may be further tweaks
+needed in DMA ops to catch all possible incarnations of this problem,
+but this initial RFC is mostly about the impact beyond the dma-mapping
+subsystem itself.
 
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
+Robin.
+
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2018-May/580804.html
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-December/474443.html
+
+Robin Murphy (4):
+  dma-mapping: Generalise dma_32bit_limit flag
+  ACPI/IORT: Set bus DMA mask as appropriate
+  of/device: Set bus DMA mask as appropriate
+  iommu/dma: Respect bus DMA limit for IOVAs
+
  arch/x86/kernel/pci-dma.c | 2 +-
+ drivers/acpi/arm64/iort.c | 1 +
+ drivers/iommu/dma-iommu.c | 3 +++
+ drivers/of/device.c       | 1 +
  include/linux/device.h    | 6 +++---
  kernel/dma/direct.c       | 2 +-
- 3 files changed, 5 insertions(+), 5 deletions(-)
+ 6 files changed, 10 insertions(+), 5 deletions(-)
 
-diff --git a/arch/x86/kernel/pci-dma.c b/arch/x86/kernel/pci-dma.c
-index ab5d9dd668d2..0b60f2a9dace 100644
---- a/arch/x86/kernel/pci-dma.c
-+++ b/arch/x86/kernel/pci-dma.c
-@@ -175,7 +175,7 @@ rootfs_initcall(pci_iommu_init);
- 
- static int via_no_dac_cb(struct pci_dev *pdev, void *data)
- {
--	pdev->dev.dma_32bit_limit = true;
-+	pdev->dev_dma_mask = DMA_BIT_MASK(32);
- 	return 0;
- }
- 
-diff --git a/include/linux/device.h b/include/linux/device.h
-index 055a69dbcd18..6d3b000be57e 100644
---- a/include/linux/device.h
-+++ b/include/linux/device.h
-@@ -886,6 +886,8 @@ struct dev_links_info {
-  * @coherent_dma_mask: Like dma_mask, but for alloc_coherent mapping as not all
-  * 		hardware supports 64-bit addresses for consistent allocations
-  * 		such descriptors.
-+ * @bus_dma_mask: Mask of an upstream bridge or bus which imposes a smaller DMA
-+ *		limit than the device itself supports.
-  * @dma_pfn_offset: offset of DMA memory range relatively of RAM
-  * @dma_parms:	A low level driver may set these to teach IOMMU code about
-  * 		segment limitations.
-@@ -912,8 +914,6 @@ struct dev_links_info {
-  * @offline:	Set after successful invocation of bus type's .offline().
-  * @of_node_reused: Set if the device-tree node is shared with an ancestor
-  *              device.
-- * @dma_32bit_limit: bridge limited to 32bit DMA even if the device itself
-- *		indicates support for a higher limit in the dma_mask field.
-  *
-  * At the lowest level, every device in a Linux system is represented by an
-  * instance of struct device. The device structure contains the information
-@@ -967,6 +967,7 @@ struct device {
- 					     not all hardware supports
- 					     64 bit addresses for consistent
- 					     allocations such descriptors. */
-+	u64		bus_dma_mask;	/* upstream dma_mask constraint */
- 	unsigned long	dma_pfn_offset;
- 
- 	struct device_dma_parameters *dma_parms;
-@@ -1002,7 +1003,6 @@ struct device {
- 	bool			offline_disabled:1;
- 	bool			offline:1;
- 	bool			of_node_reused:1;
--	bool			dma_32bit_limit:1;
- };
- 
- static inline struct device *kobj_to_dev(struct kobject *kobj)
-diff --git a/kernel/dma/direct.c b/kernel/dma/direct.c
-index 8be8106270c2..95e185347e34 100644
---- a/kernel/dma/direct.c
-+++ b/kernel/dma/direct.c
-@@ -183,7 +183,7 @@ int dma_direct_supported(struct device *dev, u64 mask)
- 	 * Various PCI/PCIe bridges have broken support for > 32bit DMA even
- 	 * if the device itself might support it.
- 	 */
--	if (dev->dma_32bit_limit && mask > DMA_BIT_MASK(32))
-+	if (dev->bus_dma_mask && mask > dev->bus_dma_mask)
- 		return 0;
- 	return 1;
- }
 -- 
 2.17.1.dirty
