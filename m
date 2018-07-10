@@ -1,45 +1,47 @@
 From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 10 Jul 2018 09:59:52 +0200
-Subject: [PATCH v2 1/3] dt-bindings: freescale: Add bindings for the
- M4IF module
-In-Reply-To: <1531160355-12384-1-git-send-email-festevam@gmail.com>
+Date: Tue, 10 Jul 2018 10:01:45 +0200
+Subject: [PATCH v2 2/3] ARM: dts: imx51: Add M4IF support
+In-Reply-To: <1531160355-12384-2-git-send-email-festevam@gmail.com>
 References: <1531160355-12384-1-git-send-email-festevam@gmail.com>
-Message-ID: <1531209592.3163.28.camel@pengutronix.de>
+ <1531160355-12384-2-git-send-email-festevam@gmail.com>
+Message-ID: <1531209705.3163.29.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Am Montag, den 09.07.2018, 15:19 -0300 schrieb Fabio Estevam:
-> > From: Fabio Estevam <fabio.estevam@nxp.com>
+> From: Fabio Estevam <fabio.estevam@nxp.com>
 > 
-> Add bindings for the M4IF module present on i.MX51.
+> As per the i.MX51 Reference Manual the M4IF register region
+> starts at 0x83fd8000 and has a 4kB address range.
+> 
+> Add support for it.
 > 
 > Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+> Tested-by: Sergey Lapin <sergey.lapin@cogentembedded.com>
 
 Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
 
 > ---
 > Changes since v1:
-> - Newly introduced in this series (Lucas)
+> - None
 > 
-> ?Documentation/devicetree/bindings/arm/freescale/m4if.txt | 12 ++++++++++++
-> ?1 file changed, 12 insertions(+)
-> ?create mode 100644 Documentation/devicetree/bindings/arm/freescale/m4if.txt
+> ?arch/arm/boot/dts/imx51.dtsi | 5 +++++
+> ?1 file changed, 5 insertions(+)
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/freescale/m4if.txt b/Documentation/devicetree/bindings/arm/freescale/m4if.txt
-> new file mode 100644
-> index 0000000..93bd7b8
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/freescale/m4if.txt
-> @@ -0,0 +1,12 @@
-> +* Freescale Multi Master Multi Memory Interface (M4IF) module
+> diff --git a/arch/arm/boot/dts/imx51.dtsi
+> b/arch/arm/boot/dts/imx51.dtsi
+> index 66e4187..b417c39 100644
+> --- a/arch/arm/boot/dts/imx51.dtsi
+> +++ b/arch/arm/boot/dts/imx51.dtsi
+> @@ -531,6 +531,11 @@
+> ?				status = "disabled";
+> ?			};
+> ?
+> +			m4if: m4if at 83fd8000 {
+> +				compatible = "fsl,imx51-m4if";
+> +				reg = <0x83fd8000 0x1000>;
+> +			};
 > +
-> +Required properties:
-> +- compatible : Should be "fsl,imx51-m4if"
-> +- reg : Address and length of the register set for the device
-> +
-> +Example:
-> +
-> > +m4if: m4if at 83fd8000 {
-> > +	compatible = "fsl,imx51-m4if";
-> > +	reg = <0x83fd8000 0x1000>;
-> +};
+> ?			weim: weim at 83fda000 {
+> ?				#address-cells = <2>;
+> ?				#size-cells = <1>;
