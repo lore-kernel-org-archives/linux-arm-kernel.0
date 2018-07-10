@@ -1,118 +1,71 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Tue, 10 Jul 2018 11:12:19 +0200
-Subject: [PATCH v2 6/6] KVM: arm/arm64: vgic: Allow configuration of
- interrupt groups
-In-Reply-To: <51bb02d7-61d8-41bc-33e2-342364f659b5@arm.com>
-References: <1530697100-22419-1-git-send-email-christoffer.dall@arm.com>
- <1530697100-22419-7-git-send-email-christoffer.dall@arm.com>
- <7f875ead-d3cb-1fec-bc84-56e64526e6a7@arm.com>
- <20180709224836.GA26579@u002843.usa.arm.com>
- <51bb02d7-61d8-41bc-33e2-342364f659b5@arm.com>
-Message-ID: <01925c40-7087-9b52-c59d-2a85005de642@redhat.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 10 Jul 2018 10:13:39 +0100
+Subject: [PATCH] arm64: fix infinite stacktrace
+In-Reply-To: <alpine.LRH.2.02.1807092300520.24277@file01.intranet.prod.int.rdu2.redhat.com>
+References: <alpine.LRH.2.02.1806141457200.4243@file01.intranet.prod.int.rdu2.redhat.com>
+ <20180615115823.2oq5d7amzwlliczg@lakrids.cambridge.arm.com>
+ <20180627164150.GB8729@arm.com>
+ <20180628164900.GB26019@e103592.cambridge.arm.com>
+ <alpine.LRH.2.02.1807092300520.24277@file01.intranet.prod.int.rdu2.redhat.com>
+Message-ID: <20180710091338.GA29791@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer, Marc,
+On Mon, Jul 09, 2018 at 11:04:33PM -0400, Mikulas Patocka wrote:
+> On Thu, 28 Jun 2018, Dave Martin wrote:
+> > Alternatively, if someone wants to pick up my patch and take it forward,
+> > I'm happy to comment.
+> > 
+> > Cheers
+> > ---Dave
+> 
+> Or - what about this patch? It doesn't guarantee that infinite loop won't 
+> happen, but it at least catches the most obvious loop on the same address.
+> 
+> 
+> From: Mikulas Patocka <mpatocka@redhat.com>
+> Subject: [PATCH] arm64: fix infinite stacktrace
+> 
+> I've got this infinite stacktrace when debugging another problem:
+> [  908.795225] INFO: rcu_preempt detected stalls on CPUs/tasks:
+> [  908.796176]  1-...!: (1 GPs behind) idle=952/1/4611686018427387904 softirq=1462/1462 fqs=355
+> [  908.797692]  2-...!: (1 GPs behind) idle=f42/1/4611686018427387904 softirq=1550/1551 fqs=355
+> [  908.799189]  (detected by 0, t=2109 jiffies, g=130, c=129, q=235)
+> [  908.800284] Task dump for CPU 1:
+> [  908.800871] kworker/1:1     R  running task        0    32      2 0x00000022
+> [  908.802127] Workqueue: writecache-writeabck writecache_writeback [dm_writecache]
+> [  908.820285] Call trace:
+> [  908.824785]  __switch_to+0x68/0x90
+> [  908.837661]  0xfffffe00603afd90
+> [  908.844119]  0xfffffe00603afd90
+> [  908.850091]  0xfffffe00603afd90
+> [  908.854285]  0xfffffe00603afd90
+> [  908.863538]  0xfffffe00603afd90
+> [  908.865523]  0xfffffe00603afd90
+> 
+> The machine just locked up and kept on printing the same line over and
+> over again. This patch fixes it.
+> 
+> Signed-off-by: Mikulas Patocka <mpatocka@redhat.com>
+> Cc: stable at vger.kernel.org
+> 
+> ---
+>  arch/arm64/kernel/stacktrace.c |    3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> Index: linux-2.6/arch/arm64/kernel/stacktrace.c
+> ===================================================================
+> --- linux-2.6.orig/arch/arm64/kernel/stacktrace.c	2018-07-10 05:01:56.990000000 +0200
+> +++ linux-2.6/arch/arm64/kernel/stacktrace.c	2018-07-10 05:02:51.650000000 +0200
+> @@ -56,6 +56,9 @@ int notrace unwind_frame(struct task_str
+>  	frame->fp = READ_ONCE_NOCHECK(*(unsigned long *)(fp));
+>  	frame->pc = READ_ONCE_NOCHECK(*(unsigned long *)(fp + 8));
+>  
+> +	if (frame->fp == fp)
+> +		return -EINVAL;
 
-On 07/10/2018 10:33 AM, Marc Zyngier wrote:
-> On 09/07/18 23:48, Christoffer Dall wrote:
->> On Mon, Jul 09, 2018 at 09:42:40AM +0100, Marc Zyngier wrote:
->>> On 04/07/18 10:38, Christoffer Dall wrote:
->>>> Implement the required MMIO accessors for GICv2 and GICv3 for the
->>>> IGROUPR distributor and redistributor registers.
->>>>
->>>> This can allow guests to change behavior compared to running on previous
->>>> versions of KVM, but only to align with the architecture and hardware
->>>> implementations.
->>>>
->>>> This also allows userspace to configure the groups for interrupts.  Note
->>>> that this potentially results in GICv2 guests not receiving interrupts
->>>> after migration if migrating from an older kernel that exposes GICv2
->>>> interrupts as group 1.
->>>>
->>>> Cc: Andrew Jones <drjones@redhat.com>
->>>> Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
->>>> ---
->>>> I implemented (but stashed) a version of this which predicated the
->>>> behavior based on the value of GICD_IIDR revision field, falling back to
->>>> ignoring writes and resetting GICv2 groups to 0 if the guest wrote a
->>>> revision less than 2.  However, current QEMU implementations simply
->>>> don't write the GICD_IIDR, so this doesn't help at all without changing
->>>> QEMU anyhow.
->>>>
->>>> The only actual fix I can see here to work around the problem in the
->>>> kernel is to require an opt-in to allow restoring groups from userspace,
->>>> but that's a lot of logic to support cross-kernel version migration.
->>>>
->>>> Question: Do we expect that cross-kernel version migration is a critical
->>>> feature that people really expect to work, and do we actually have
->>>> examples of catering to this in the kernel elsewhere?  (Also, how would
->>>> then that relate to the whole 'adding a new sysreg breaks migration'
->>>> situation?)
->>>
->>> I don't really get why QEMU doesn't try to restore GICD_IIDR, while it
->>> is definitely trying to restore RO sysregs (and that's how we detect
->>> incompatibilities).
->>>
->>> I think we should at least give userspace a chance to do the right
->>> thing. If it doesn't, well, too bad.
->>
->> This series should give userspace an option to adjust its behavior.
->>
->> My main concern is that this version of the series results in the worst
->> kind of migration failures, where the guest simply doesn't run on the
->> destination side with no warnings or error messages returned to the
->> user..
-> 
-> I agree, which is why I'm suggesting we make IIDR writeable. And yes, it
-> still requires userspace to be fixed to actually write IIDR.
-> 
->>
->> We could add logic to return an error code if trying to write a
->> different revision than what the kernel has (similar to the invariant
->> sysregs), so that a simple fix to QEMU to save restore the GICD_IIDR
->> register at least results in an error being returned to userspace.
->>
->> However, as QEMU doesn't do anything useful here today (not blaming
->> anyone, I wrote the apparently broken GIC save/restore code for QEMU
->> myself), we could also argue that QEMU might as well just fix things up
->> if it detects a different IIDR.
->>
->>>
->>> How bad is that "writable GICD_IIDR" patch? Because at this stage, and
->>> in the absence of any comment, I'm close to just pick that series and
->>> merge it for 4.19.
->>>
->>
->> My guess is that a patch to "save/restore GICD_IIDR" is simple enough,
->> but requires additional logic in the kernel that returns an error if the
->> GICD_IIDR don't match on write.
->>
->> A patch which changes the groups and bumps the IIDR in userspace is
->> probably more complex.
->>
->> Sounds like I should add the GICD_IIDR checking patch.  Thoughts?
-> 
-> I'm quite keen on that. It makes the userspace change trivial, aligns it
-> somehow on the sysreg and ITS ABI behaviours.
-> 
->> What I would really like to know is whether this is really an issue or
->> not.  Do people who run products based on KVM, such as RHEV, have any
->> expectations about cross-kernel version migration?
-> 
-> I'd like to know as well.
+I've already queued your previous patch using '<=' (it's in -next). If you
+want to change it, please send patches on top of the arm64 for-next/core
+branch.
 
-Sorry I did not have time to review the series properly. My
-understanding is we generally care about migration between different
-kernels. For the ITS, we made the IIDR writable too to manage the ABI
-version properly. See ab01c6bdacc43c41c6b326889f4358f5afc38bf9. But
-maybe I missed the crux of the matter.
-
-Thanks
-
-Eric
-> 
-> Thanks,
-> 
-> 	M.
-> 
+Will
