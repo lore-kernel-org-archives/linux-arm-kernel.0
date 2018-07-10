@@ -1,80 +1,48 @@
 From: yibin.gong@nxp.com (Robin Gong)
-Date: Wed, 11 Jul 2018 00:23:12 +0800
-Subject: [PATCH v1 3/4] dmaengine: imx-sdma: support dmatest
+Date: Wed, 11 Jul 2018 00:23:13 +0800
+Subject: [PATCH v1 4/4] ARM: configs: imx_v6_v7_defconfig: add DMATEST support
 In-Reply-To: <1531239793-11781-1-git-send-email-yibin.gong@nxp.com>
 References: <1531239793-11781-1-git-send-email-yibin.gong@nxp.com>
-Message-ID: <1531239793-11781-4-git-send-email-yibin.gong@nxp.com>
+Message-ID: <1531239793-11781-5-git-send-email-yibin.gong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-dmatest(memcpy) will never call dmaengine_slave_config before prep,
-so jobs in dmaengine_slave_config need to be moved into somewhere
-before device_prep_dma_memcpy. Besides, dmatest never setup chan
-->private as other common case like uart/audio/spi will always setup
-chan->private. Here check it to judge if it's dmatest case and do
-jobs in slave_config.
+Add DMATEST support and remove invalid options, such as
+CONFIG_BT_HCIUART_H4 is default enabled and CONFIG_SND_SOC_IMX_WM8962
+is out of date and not appear in any config file.
 
 Signed-off-by: Robin Gong <yibin.gong@nxp.com>
 ---
- drivers/dma/imx-sdma.c | 37 ++++++++++++++++++++++++++++---------
- 1 file changed, 28 insertions(+), 9 deletions(-)
+ arch/arm/configs/imx_v6_v7_defconfig | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
-index ed2267d..48f3749 100644
---- a/drivers/dma/imx-sdma.c
-+++ b/drivers/dma/imx-sdma.c
-@@ -1222,10 +1222,36 @@ static int sdma_alloc_chan_resources(struct dma_chan *chan)
- {
- 	struct sdma_channel *sdmac = to_sdma_chan(chan);
- 	struct imx_dma_data *data = chan->private;
-+	struct imx_dma_data default_data;
- 	int prio, ret;
- 
--	if (!data)
--		return -EINVAL;
-+	ret = clk_enable(sdmac->sdma->clk_ipg);
-+	if (ret)
-+		return ret;
-+	ret = clk_enable(sdmac->sdma->clk_ahb);
-+	if (ret)
-+		goto disable_clk_ipg;
-+	/*
-+	 * dmatest(memcpy) will never call dmaengine_slave_config before prep,
-+	 * so jobs in dmaengine_slave_config need to be moved into somewhere
-+	 * before device_prep_dma_memcpy. Besides, dmatest never setup chan
-+	 * ->private as other common cases like uart/audio/spi will setup
-+	 * chan->private always. Here check it to judge if it's dmatest case
-+	 * and do jobs in slave_config.
-+	 */
-+	if (!data) {
-+		dev_warn(sdmac->sdma->dev, "dmatest is running?\n");
-+		sdmac->word_size  =  sdmac->sdma->dma_device.copy_align;
-+		default_data.priority = 2;
-+		default_data.peripheral_type = IMX_DMATYPE_MEMORY;
-+		default_data.dma_request = 0;
-+		default_data.dma_request2 = 0;
-+		data = &default_data;
-+
-+		sdma_config_ownership(sdmac, false, true, false);
-+		sdma_get_pc(sdmac, IMX_DMATYPE_MEMORY);
-+		sdma_load_context(sdmac);
-+	}
- 
- 	switch (data->priority) {
- 	case DMA_PRIO_HIGH:
-@@ -1244,13 +1270,6 @@ static int sdma_alloc_chan_resources(struct dma_chan *chan)
- 	sdmac->event_id0 = data->dma_request;
- 	sdmac->event_id1 = data->dma_request2;
- 
--	ret = clk_enable(sdmac->sdma->clk_ipg);
--	if (ret)
--		return ret;
--	ret = clk_enable(sdmac->sdma->clk_ahb);
--	if (ret)
--		goto disable_clk_ipg;
--
- 	ret = sdma_set_channel_priority(sdmac, prio);
- 	if (ret)
- 		goto disable_clk_ahb;
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index e381d05..f28d4d9 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -81,7 +81,6 @@ CONFIG_CAN=y
+ CONFIG_CAN_FLEXCAN=y
+ CONFIG_BT=y
+ CONFIG_BT_HCIUART=y
+-CONFIG_BT_HCIUART_H4=y
+ CONFIG_BT_HCIUART_LL=y
+ CONFIG_CFG80211=y
+ CONFIG_CFG80211_WEXT=y
+@@ -282,7 +281,6 @@ CONFIG_SND_SOC_FSL_ASRC=y
+ CONFIG_SND_IMX_SOC=y
+ CONFIG_SND_SOC_PHYCORE_AC97=y
+ CONFIG_SND_SOC_EUKREA_TLV320=y
+-CONFIG_SND_SOC_IMX_WM8962=y
+ CONFIG_SND_SOC_IMX_ES8328=y
+ CONFIG_SND_SOC_IMX_SGTL5000=y
+ CONFIG_SND_SOC_IMX_SPDIF=y
+@@ -371,6 +369,7 @@ CONFIG_DMADEVICES=y
+ CONFIG_FSL_EDMA=y
+ CONFIG_IMX_SDMA=y
+ CONFIG_MXS_DMA=y
++CONFIG_DMATEST=m
+ CONFIG_STAGING=y
+ CONFIG_STAGING_MEDIA=y
+ CONFIG_VIDEO_IMX_MEDIA=y
 -- 
 2.7.4
