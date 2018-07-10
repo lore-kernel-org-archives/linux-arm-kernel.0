@@ -1,59 +1,68 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 10 Jul 2018 15:30:40 +0200
-Subject: Vibrations on Droid 4?
-In-Reply-To: <20180710101147.lyu65ro4czvrs2da@earth.universe>
-References: <20180709081534.GA6799@amd>
- <20180709214910.tes6u4ivxomd3aja@earth.universe>
- <20180709220211.GA7760@amd>
- <20180710101147.lyu65ro4czvrs2da@earth.universe>
-Message-ID: <20180710133040.GA4391@amd>
+From: dinguyen@kernel.org (Dinh Nguyen)
+Date: Tue, 10 Jul 2018 08:35:10 -0500
+Subject: [PATCH 1/2] ARM: dts: arria10: update NAND clocking
+In-Reply-To: <CAK7LNARAVSK5VY=_RfO2PXJCAnXJN3sXoAY=ijSwVojeo=c66w@mail.gmail.com>
+References: <1531176063-30140-1-git-send-email-dinguyen@kernel.org>
+ <CAK7LNARAVSK5VY=_RfO2PXJCAnXJN3sXoAY=ijSwVojeo=c66w@mail.gmail.com>
+Message-ID: <b33d18b2-1956-50a4-9a3f-6d2a0abd4b81@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 2018-07-10 12:11:47, Sebastian Reichel wrote:
-> Hi,
+
+
+On 07/09/2018 08:31 PM, Masahiro Yamada wrote:
+> 2018-07-10 7:41 GMT+09:00 Dinh Nguyen <dinguyen@kernel.org>:
+>> The NAND IP needs 2 clocks(nand_x_clk and nand_clk). This patch adds a
+>> nand_x_clk, which is derived from the nand_clk, but has a fixed divider
+>> of 4.
+>>
+>> Update the NAND node to use the additional clock.
+>>
+>> Signed-off-by: Dinh Nguyen <dinguyen@kernel.org>
+>> ---
+>>  arch/arm/boot/dts/socfpga_arria10.dtsi | 13 +++++++++++--
+>>  1 file changed, 11 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/socfpga_arria10.dtsi b/arch/arm/boot/dts/socfpga_arria10.dtsi
+>> index a4dcb68..558b5ea 100644
+>> --- a/arch/arm/boot/dts/socfpga_arria10.dtsi
+>> +++ b/arch/arm/boot/dts/socfpga_arria10.dtsi
+>> @@ -377,13 +377,21 @@
+>>                                                 clk-gate = <0xC8 11>;
+>>                                         };
+>>
+>> -                                       nand_clk: nand_clk {
+>> +                                       nand_x_clk: nand_x_clk {
+>>                                                 #clock-cells = <0>;
+>>                                                 compatible = "altr,socfpga-a10-gate-clk";
+>>                                                 clocks = <&l4_mp_clk>;
+>>                                                 clk-gate = <0xC8 10>;
+>>                                         };
+>>
+>> +                                       nand_clk: nand_clk {
+>> +                                               #clock-cells = <0>;
+>> +                                               compatible = "altr,socfpga-a10-gate-clk";
+>> +                                               clocks = <&nand_x_clk>;
+>> +                                               fixed-divider = <4>;
+>> +                                               clk-gate = <0xC8 10>;
+>> +                                       };
+>> +
+>>                                         spi_m_clk: spi_m_clk {
+>>                                                 #clock-cells = <0>;
+>>                                                 compatible = "altr,socfpga-a10-gate-clk";
+>> @@ -650,7 +658,8 @@
+>>                         reg-names = "nand_data", "denali_reg";
+>>                         interrupts = <0 99 4>;
+>>                         dma-mask = <0xffffffff>;
+>> -                       clocks = <&nand_clk>;
+>> +                       clocks = <&nand_clk>, <&nand_x_clk>;
+>> +                       clock-names = "nand", "nand_x";
 > 
-> On Tue, Jul 10, 2018 at 12:02:11AM +0200, Pavel Machek wrote:
-> > Hi!
-> > 
-> > > > Do you have vibrations on d4 working?
-> > > > I believe I have required drivers enabled, but no luck:
-> > > > 
-> > > > user at devuan:/sys/bus/platform/drivers$ ls pwm-vibrator/
-> > > > bind  uevent  unbind
-> > > > user at devuan:/sys/bus/platform/drivers$ ls omap-dmtimer-pwm/
-> > > > bind  uevent  unbind
-> > > 
-> > > Have you checked probe deferrals?
-> > 
-> > Not really. Is there easier way to do that than adding printks in the
-> > probe function? (I can go through dmesg tommorow).
 > 
-> Option 1: https://lkml.org/lkml/2018/7/8/63
+> Doesn't SOCFPGA really need the ECC clock?
+> 
 
-I tried this methodq, and no luck.
+I don't see any mentions of an ECC clock in any of the SoCFPGA
+documentation for the NAND IP.
 
-static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
-
-does not seem to be called.
-
-Its parent is gpio at 4805d000 , and that one seems to be present.
-
-user at devuan:/sys/bus/platform/devices$ ls 4805d000.gpio
-driver				       driver_override  gpio
-gpiochip5  modalias  of_node  power  subsystem  uevent
-
-So I'm now confused.
-
-Best regards,
-								Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180710/834d56de/attachment.sig>
+Dinh
