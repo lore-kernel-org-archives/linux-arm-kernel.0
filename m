@@ -1,71 +1,38 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 10 Jul 2018 10:13:39 +0100
-Subject: [PATCH] arm64: fix infinite stacktrace
-In-Reply-To: <alpine.LRH.2.02.1807092300520.24277@file01.intranet.prod.int.rdu2.redhat.com>
-References: <alpine.LRH.2.02.1806141457200.4243@file01.intranet.prod.int.rdu2.redhat.com>
- <20180615115823.2oq5d7amzwlliczg@lakrids.cambridge.arm.com>
- <20180627164150.GB8729@arm.com>
- <20180628164900.GB26019@e103592.cambridge.arm.com>
- <alpine.LRH.2.02.1807092300520.24277@file01.intranet.prod.int.rdu2.redhat.com>
-Message-ID: <20180710091338.GA29791@arm.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Tue, 10 Jul 2018 10:17:24 +0100
+Subject: [PATCH v2 6/6] KVM: arm/arm64: vgic: Allow configuration of
+ interrupt groups
+In-Reply-To: <01925c40-7087-9b52-c59d-2a85005de642@redhat.com>
+References: <1530697100-22419-1-git-send-email-christoffer.dall@arm.com>
+ <1530697100-22419-7-git-send-email-christoffer.dall@arm.com>
+ <7f875ead-d3cb-1fec-bc84-56e64526e6a7@arm.com>
+ <20180709224836.GA26579@u002843.usa.arm.com>
+ <51bb02d7-61d8-41bc-33e2-342364f659b5@arm.com>
+ <01925c40-7087-9b52-c59d-2a85005de642@redhat.com>
+Message-ID: <CAFEAcA_UFkHi=tMcLQXjODewuU9d01Kuv4cT2STjyF3YwhH5Pw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 09, 2018 at 11:04:33PM -0400, Mikulas Patocka wrote:
-> On Thu, 28 Jun 2018, Dave Martin wrote:
-> > Alternatively, if someone wants to pick up my patch and take it forward,
-> > I'm happy to comment.
-> > 
-> > Cheers
-> > ---Dave
-> 
-> Or - what about this patch? It doesn't guarantee that infinite loop won't 
-> happen, but it at least catches the most obvious loop on the same address.
-> 
-> 
-> From: Mikulas Patocka <mpatocka@redhat.com>
-> Subject: [PATCH] arm64: fix infinite stacktrace
-> 
-> I've got this infinite stacktrace when debugging another problem:
-> [  908.795225] INFO: rcu_preempt detected stalls on CPUs/tasks:
-> [  908.796176]  1-...!: (1 GPs behind) idle=952/1/4611686018427387904 softirq=1462/1462 fqs=355
-> [  908.797692]  2-...!: (1 GPs behind) idle=f42/1/4611686018427387904 softirq=1550/1551 fqs=355
-> [  908.799189]  (detected by 0, t=2109 jiffies, g=130, c=129, q=235)
-> [  908.800284] Task dump for CPU 1:
-> [  908.800871] kworker/1:1     R  running task        0    32      2 0x00000022
-> [  908.802127] Workqueue: writecache-writeabck writecache_writeback [dm_writecache]
-> [  908.820285] Call trace:
-> [  908.824785]  __switch_to+0x68/0x90
-> [  908.837661]  0xfffffe00603afd90
-> [  908.844119]  0xfffffe00603afd90
-> [  908.850091]  0xfffffe00603afd90
-> [  908.854285]  0xfffffe00603afd90
-> [  908.863538]  0xfffffe00603afd90
-> [  908.865523]  0xfffffe00603afd90
-> 
-> The machine just locked up and kept on printing the same line over and
-> over again. This patch fixes it.
-> 
-> Signed-off-by: Mikulas Patocka <mpatocka@redhat.com>
-> Cc: stable at vger.kernel.org
-> 
-> ---
->  arch/arm64/kernel/stacktrace.c |    3 +++
->  1 file changed, 3 insertions(+)
-> 
-> Index: linux-2.6/arch/arm64/kernel/stacktrace.c
-> ===================================================================
-> --- linux-2.6.orig/arch/arm64/kernel/stacktrace.c	2018-07-10 05:01:56.990000000 +0200
-> +++ linux-2.6/arch/arm64/kernel/stacktrace.c	2018-07-10 05:02:51.650000000 +0200
-> @@ -56,6 +56,9 @@ int notrace unwind_frame(struct task_str
->  	frame->fp = READ_ONCE_NOCHECK(*(unsigned long *)(fp));
->  	frame->pc = READ_ONCE_NOCHECK(*(unsigned long *)(fp + 8));
->  
-> +	if (frame->fp == fp)
-> +		return -EINVAL;
+On 10 July 2018 at 10:12, Auger Eric <eric.auger@redhat.com> wrote:
+> Hi Christoffer, Marc,
+>
+> On 07/10/2018 10:33 AM, Marc Zyngier wrote:
+>> On 09/07/18 23:48, Christoffer Dall wrote:
+>>> What I would really like to know is whether this is really an issue or
+>>> not.  Do people who run products based on KVM, such as RHEV, have any
+>>> expectations about cross-kernel version migration?
+>>
+>> I'd like to know as well.
+>
+> Sorry I did not have time to review the series properly. My
+> understanding is we generally care about migration between different
+> kernels. For the ITS, we made the IIDR writable too to manage the ABI
+> version properly. See ab01c6bdacc43c41c6b326889f4358f5afc38bf9. But
+> maybe I missed the crux of the matter.
 
-I've already queued your previous patch using '<=' (it's in -next). If you
-want to change it, please send patches on top of the arm64 for-next/core
-branch.
+I think the question is whether we're doing this because
+we think hypothetical users care, or because we know actual
+real in-production users really care...
 
-Will
+thanks
+-- PMM
