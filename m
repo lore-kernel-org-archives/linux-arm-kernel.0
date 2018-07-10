@@ -1,62 +1,32 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Tue, 10 Jul 2018 22:34:53 +0200
-Subject: [PATCH v2 00/18] Allwinner R40 HDMI refactoring
-Message-ID: <20180710203511.18454-1-jernej.skrabec@siol.net>
+Date: Tue, 10 Jul 2018 22:34:55 +0200
+Subject: [PATCH v2 02/18] drm/sun4i: Add R40 display engine compatible
+In-Reply-To: <20180710203511.18454-1-jernej.skrabec@siol.net>
+References: <20180710203511.18454-1-jernej.skrabec@siol.net>
+Message-ID: <20180710203511.18454-3-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series fixes several issues found in R40 HDMI patch series after
-it was applied. Conversation can be found here:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2018-June/586011.html
+R40 has versatile display pipeline. It supports two simultanious outputs
+on various outputs (TVE, VGA, HDMI, MIPI DSI, LCD).
 
-Patches are based on latest linux-next (next-20180710) and are ordered
-in such way that they don't break R40 HDMI at any time. Because of that
-I suggest that whole series goes through drm-misc to preserve that order.
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+---
+ drivers/gpu/drm/sun4i/sun4i_drv.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-I also tested those patches on H3 to make sure it doesn't break other
-platforms. However, it would be nice to test for regressions also on
-older SoCs (with DE1).
-
-Best regards,
-Jernej
-
-Changes from v1:
-- added Review-by and Acked-by tags
-- added a patch which reorders mixer includes alphabetically
-- reworked function which finds mixer id
-- dropped register initialization in TCON TOP
-- reworded some commit messages
-
-Jernej Skrabec (18):
-  dt-bindings: display: sun4i-drm: Add R40 display engine compatible
-  drm/sun4i: Add R40 display engine compatible
-  ARM: dts: sun8i: r40: Remove fallback display engine compatible
-  drm/sun4i: tcon-top: Cleanup clock handling
-  drm/sun4i: tcon: Release node when traversing of graph
-  dt-bindings: display: sun4i-drm: Add R40 TV TCON description
-  drm/sun4i: DW HDMI: Release nodes if error happens during CRTC search
-  ARM: dts: sun8i: r40: Add mixer ids to TCON TOP
-  drm/sun4i: mixer: Order includes alphabetically
-  drm/sun4i: mixer: Read id from DT
-  drm/sun4i: tcon-top: Add helpers for mux switching
-  drm/sun4i: tcon: Add another way for matching mixers with tcon
-  drm/sun4i: tcon: Add support for R40 TCON
-  ARM: dts: sun8i: r40: Remove fallback compatible for TCON TV
-  ARM: dts: sun8i: r40: Add missing TCON-TOP - TCON connections
-  ARM: dts: sun8i: r40: Disable TCONs by default.
-  drm/sun4i: tcon-top: Remove mux configuration at probe time
-  dt-bindings: display: sun4i-drm: Fix order of DW HDMI PHY compatibles
-
- .../bindings/display/sunxi/sun4i-drm.txt      |   6 +-
- .../boot/dts/sun8i-r40-bananapi-m2-ultra.dts  |  20 +-
- arch/arm/boot/dts/sun8i-r40.dtsi              |  65 ++++++-
- drivers/gpu/drm/sun4i/sun4i_drv.c             |   1 +
- drivers/gpu/drm/sun4i/sun4i_tcon.c            |  92 ++++++++-
- drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c         |  15 +-
- drivers/gpu/drm/sun4i/sun8i_mixer.c           |  42 ++++-
- drivers/gpu/drm/sun4i/sun8i_tcon_top.c        | 178 ++++++++----------
- drivers/gpu/drm/sun4i/sun8i_tcon_top.h        |   4 +
- 9 files changed, 278 insertions(+), 145 deletions(-)
-
+diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
+index 6ddf4eaccb40..a15feb807393 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_drv.c
++++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
+@@ -417,6 +417,7 @@ static const struct of_device_id sun4i_drv_of_table[] = {
+ 	{ .compatible = "allwinner,sun8i-a33-display-engine" },
+ 	{ .compatible = "allwinner,sun8i-a83t-display-engine" },
+ 	{ .compatible = "allwinner,sun8i-h3-display-engine" },
++	{ .compatible = "allwinner,sun8i-r40-display-engine" },
+ 	{ .compatible = "allwinner,sun8i-v3s-display-engine" },
+ 	{ .compatible = "allwinner,sun9i-a80-display-engine" },
+ 	{ }
 -- 
 2.18.0
