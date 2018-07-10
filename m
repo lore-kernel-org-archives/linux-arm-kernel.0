@@ -1,41 +1,43 @@
 From: fabio.estevam@nxp.com (Fabio Estevam)
-Date: Tue, 10 Jul 2018 10:47:33 -0300
-Subject: [PATCH v2 3/6] ARM: dts: imx51: Add tigerp support
+Date: Tue, 10 Jul 2018 10:47:35 -0300
+Subject: [PATCH v2 5/6] ARM: dts: imx53: Add a label for the PMU node
 In-Reply-To: <1531230456-27717-1-git-send-email-fabio.estevam@nxp.com>
 References: <1531230456-27717-1-git-send-email-fabio.estevam@nxp.com>
-Message-ID: <1531230456-27717-3-git-send-email-fabio.estevam@nxp.com>
+Message-ID: <1531230456-27717-5-git-send-email-fabio.estevam@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As per the i.MX51 Reference Manual add an entry for the
-'tigerp' region in the device tree.
+Add a label for the PMU node so that the board dts may be able to
+pass the 'secure-reg-access' property like this:
 
-This is needed for accessing the ARM_GPC register to set the
-DBGEN bit, so that the debug clocks can be turned on.
+&pmu {
+	secure-reg-access;
+};
+
+This also makes it consistent with the PMU node in imx6qdl.dtsi
 
 Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+Reviewed-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
+Tested-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
 ---
 Changes since v1:
-- Newly introduced in this series.
+- None
 
- arch/arm/boot/dts/imx51.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/boot/dts/imx53.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
-index 113ddbc..da9d4ce 100644
---- a/arch/arm/boot/dts/imx51.dtsi
-+++ b/arch/arm/boot/dts/imx51.dtsi
-@@ -451,6 +451,11 @@
- 				clocks = <&clks IMX5_CLK_IIM_GATE>;
- 			};
+diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+index 3fd553c..6386185 100644
+--- a/arch/arm/boot/dts/imx53.dtsi
++++ b/arch/arm/boot/dts/imx53.dtsi
+@@ -113,7 +113,7 @@
+ 		};
+ 	};
  
-+			tigerp: tigerp at 83fa0000 {
-+				compatible = "fsl,imx51-tigerp";
-+				reg = <0x83fa0000 0x28>;
-+			};
-+
- 			owire: owire at 83fa4000 {
- 				compatible = "fsl,imx51-owire", "fsl,imx21-owire";
- 				reg = <0x83fa4000 0x4000>;
+-	pmu {
++	pmu: pmu {
+ 		compatible = "arm,cortex-a8-pmu";
+ 		interrupt-parent = <&tzic>;
+ 		interrupts = <77>;
 -- 
 2.7.4
