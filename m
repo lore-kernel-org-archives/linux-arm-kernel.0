@@ -1,79 +1,54 @@
 From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Tue, 10 Jul 2018 10:01:08 +0200
-Subject: [PATCH v5 16/22] media: v4l: Add definition for Allwinner's
- MB32-tiled NV12 format
+Date: Tue, 10 Jul 2018 10:01:06 +0200
+Subject: [PATCH v5 14/22] ARM: sun8i-h3: Add SRAM controller node and C1 SRAM
+ region
 In-Reply-To: <20180710080114.31469-1-paul.kocialkowski@bootlin.com>
 References: <20180710080114.31469-1-paul.kocialkowski@bootlin.com>
-Message-ID: <20180710080114.31469-17-paul.kocialkowski@bootlin.com>
+Message-ID: <20180710080114.31469-15-paul.kocialkowski@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This introduces support for Allwinner's MB32-tiled NV12 format, where
-each plane is divided into macroblocks of 32x32 pixels. Hence, the size
-of each plane has to be aligned to 32 bytes. The pixels inside each
-macroblock are coded as they would be if the macroblock was a single
-plane, line after line.
-
-The MB32-tiled NV12 format is used by the video engine on Allwinner
-platforms: it is the default format for decoded frames (and the only one
-available in the oldest supported platforms).
+This adds a SRAM controller node for the H3, with support for the C1
+SRAM region that is shared between the Video Engine and the CPU.
 
 Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 ---
- Documentation/media/uapi/v4l/pixfmt-reserved.rst | 15 ++++++++++++++-
- drivers/media/v4l2-core/v4l2-ioctl.c             |  1 +
- include/uapi/linux/videodev2.h                   |  1 +
- 3 files changed, 16 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/sun8i-h3.dtsi | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
-diff --git a/Documentation/media/uapi/v4l/pixfmt-reserved.rst b/Documentation/media/uapi/v4l/pixfmt-reserved.rst
-index 38af1472a4b4..9a68b6a787bf 100644
---- a/Documentation/media/uapi/v4l/pixfmt-reserved.rst
-+++ b/Documentation/media/uapi/v4l/pixfmt-reserved.rst
-@@ -243,7 +243,20 @@ please make a proposal on the linux-media mailing list.
- 	It is an opaque intermediate format and the MDP hardware must be
- 	used to convert ``V4L2_PIX_FMT_MT21C`` to ``V4L2_PIX_FMT_NV12M``,
- 	``V4L2_PIX_FMT_YUV420M`` or ``V4L2_PIX_FMT_YVU420``.
--
-+    * .. _V4L2-PIX-FMT-MB32-NV12:
+diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
+index 41d57c76f290..c93f6be40533 100644
+--- a/arch/arm/boot/dts/sun8i-h3.dtsi
++++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+@@ -111,6 +111,29 @@
+ 	};
+ 
+ 	soc {
++		system-control at 1c00000 {
++			compatible = "allwinner,sun8i-h3-system-control",
++				     "allwinner,sun4i-a10-system-control";
++			reg = <0x01c00000 0x30>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges;
 +
-+      - ``V4L2_PIX_FMT_MB32_NV12``
-+      - 'MN12'
-+      - Two-planar NV12-based format used by the Allwinner video engine
-+        hardware, with 32x32 tiles for the luminance plane and 32x64 tiles
-+        for the chrominance plane. Each tile is a linear pixel data
-+        representation within its own bounds. Each tile follows the previous
-+        one linearly (as in, from left to right, top to bottom).
++			sram_c: sram at 1d00000 {
++				compatible = "mmio-sram";
++				reg = <0x01d00000 0x80000>;
++				#address-cells = <1>;
++				#size-cells = <1>;
++				ranges = <0 0x01d00000 0x80000>;
 +
-+        The frame dimensions are aligned to match an integer number of
-+        tiles, resulting in 32-aligned resolutions for the luminance plane
-+        and 16-aligned resolutions for the chrominance plane (with 2x2
-+        subsampling).
- 
- .. tabularcolumns:: |p{6.6cm}|p{2.2cm}|p{8.7cm}|
- 
-diff --git a/drivers/media/v4l2-core/v4l2-ioctl.c b/drivers/media/v4l2-core/v4l2-ioctl.c
-index 68e914b83a03..7e1c200de10d 100644
---- a/drivers/media/v4l2-core/v4l2-ioctl.c
-+++ b/drivers/media/v4l2-core/v4l2-ioctl.c
-@@ -1331,6 +1331,7 @@ static void v4l_fill_fmtdesc(struct v4l2_fmtdesc *fmt)
- 		case V4L2_PIX_FMT_SE401:	descr = "GSPCA SE401"; break;
- 		case V4L2_PIX_FMT_S5C_UYVY_JPG:	descr = "S5C73MX interleaved UYVY/JPEG"; break;
- 		case V4L2_PIX_FMT_MT21C:	descr = "Mediatek Compressed Format"; break;
-+		case V4L2_PIX_FMT_MB32_NV12:	descr = "Allwinner tiled NV12 format"; break;
- 		default:
- 			WARN(1, "Unknown pixelformat 0x%08x\n", fmt->pixelformat);
- 			if (fmt->description[0])
-diff --git a/include/uapi/linux/videodev2.h b/include/uapi/linux/videodev2.h
-index bbfe95e3fba8..35bc9304a762 100644
---- a/include/uapi/linux/videodev2.h
-+++ b/include/uapi/linux/videodev2.h
-@@ -670,6 +670,7 @@ struct v4l2_pix_format {
- #define V4L2_PIX_FMT_Z16      v4l2_fourcc('Z', '1', '6', ' ') /* Depth data 16-bit */
- #define V4L2_PIX_FMT_MT21C    v4l2_fourcc('M', 'T', '2', '1') /* Mediatek compressed block mode  */
- #define V4L2_PIX_FMT_INZI     v4l2_fourcc('I', 'N', 'Z', 'I') /* Intel Planar Greyscale 10-bit and Depth 16-bit */
-+#define V4L2_PIX_FMT_MB32_NV12 v4l2_fourcc('M', 'N', '1', '2') /* Allwinner tiled NV12 format */
- 
- /* 10bit raw bayer packed, 32 bytes for every 25 pixels, last LSB 6 bits unused */
- #define V4L2_PIX_FMT_IPU3_SBGGR10	v4l2_fourcc('i', 'p', '3', 'b') /* IPU3 packed 10-bit BGGR bayer */
++				ve_sram: sram-section at 0 {
++					compatible = "allwinner,sun8i-h3-sram-c1",
++						     "allwinner,sun4i-a10-sram-c1";
++					reg = <0x000000 0x80000>;
++				};
++			};
++		};
++
+ 		mali: gpu at 1c40000 {
+ 			compatible = "allwinner,sun8i-h3-mali", "arm,mali-400";
+ 			reg = <0x01c40000 0x10000>;
 -- 
 2.17.1
