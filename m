@@ -1,85 +1,38 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Tue, 10 Jul 2018 22:35:06 +0200
-Subject: [PATCH v2 13/18] drm/sun4i: tcon: Add support for R40 TCON
+Date: Tue, 10 Jul 2018 22:35:11 +0200
+Subject: [PATCH v2 18/18] dt-bindings: display: sun4i-drm: Fix order of DW
+ HDMI PHY compatibles
 In-Reply-To: <20180710203511.18454-1-jernej.skrabec@siol.net>
 References: <20180710203511.18454-1-jernej.skrabec@siol.net>
-Message-ID: <20180710203511.18454-14-jernej.skrabec@siol.net>
+Message-ID: <20180710203511.18454-19-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-R40 TV TCON is basically the same as on A83T. However, it needs special
-handling, because it has to set up TCON TOP muxes at runtime.
+They are currently sorted alphabetically. However, they should be sorted
+by release date of the family and then alphabetically.
+
+Fixes: 03c35dbf73e0 ("dt-bindings: display: sun4i-drm: Add description of A64 HDMI PHY")
 
 Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/gpu/drm/sun4i/sun4i_tcon.c | 40 ++++++++++++++++++++++++++++++
- 1 file changed, 40 insertions(+)
+ Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-index 44ec3a3d4d64..5676b7faaca0 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-@@ -1291,6 +1291,40 @@ static int sun6i_tcon_set_mux(struct sun4i_tcon *tcon,
- 	return 0;
- }
+diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+index 7e2451396a28..f8773ecb7525 100644
+--- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
++++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+@@ -101,9 +101,9 @@ DWC HDMI PHY
  
-+static int sun8i_r40_tcon_tv_set_mux(struct sun4i_tcon *tcon,
-+				     const struct drm_encoder *encoder)
-+{
-+	struct device_node *port, *remote;
-+	struct platform_device *pdev;
-+	int id, ret;
-+
-+	/* find TCON TOP platform device and TCON id */
-+
-+	port = of_graph_get_port_by_id(tcon->dev->of_node, 0);
-+	if (!port)
-+		return -EINVAL;
-+
-+	id = sun4i_tcon_of_get_id_from_port(port);
-+	of_node_put(port);
-+
-+	remote = of_graph_get_remote_node(tcon->dev->of_node, 0, -1);
-+	if (!remote)
-+		return -EINVAL;
-+
-+	pdev = of_find_device_by_node(remote);
-+	of_node_put(remote);
-+	if (!pdev)
-+		return -EINVAL;
-+
-+	if (encoder->encoder_type == DRM_MODE_ENCODER_TMDS) {
-+		ret = sun8i_tcon_top_set_hdmi_src(&pdev->dev, id);
-+		if (ret)
-+			return ret;
-+	}
-+
-+	return sun8i_tcon_top_de_config(&pdev->dev, tcon->id, id);
-+}
-+
- static const struct sun4i_tcon_quirks sun4i_a10_quirks = {
- 	.has_channel_0		= true,
- 	.has_channel_1		= true,
-@@ -1338,6 +1372,11 @@ static const struct sun4i_tcon_quirks sun8i_a83t_tv_quirks = {
- 	.has_channel_1		= true,
- };
- 
-+static const struct sun4i_tcon_quirks sun8i_r40_tv_quirks = {
-+	.has_channel_1		= true,
-+	.set_mux		= sun8i_r40_tcon_tv_set_mux,
-+};
-+
- static const struct sun4i_tcon_quirks sun8i_v3s_quirks = {
- 	.has_channel_0		= true,
- };
-@@ -1362,6 +1401,7 @@ const struct of_device_id sun4i_tcon_of_table[] = {
- 	{ .compatible = "allwinner,sun8i-a33-tcon", .data = &sun8i_a33_quirks },
- 	{ .compatible = "allwinner,sun8i-a83t-tcon-lcd", .data = &sun8i_a83t_lcd_quirks },
- 	{ .compatible = "allwinner,sun8i-a83t-tcon-tv", .data = &sun8i_a83t_tv_quirks },
-+	{ .compatible = "allwinner,sun8i-r40-tcon-tv", .data = &sun8i_r40_tv_quirks },
- 	{ .compatible = "allwinner,sun8i-v3s-tcon", .data = &sun8i_v3s_quirks },
- 	{ .compatible = "allwinner,sun9i-a80-tcon-lcd", .data = &sun9i_a80_tcon_lcd_quirks },
- 	{ .compatible = "allwinner,sun9i-a80-tcon-tv", .data = &sun9i_a80_tcon_tv_quirks },
+ Required properties:
+   - compatible: value must be one of:
+-    * allwinner,sun50i-a64-hdmi-phy
+     * allwinner,sun8i-a83t-hdmi-phy
+     * allwinner,sun8i-h3-hdmi-phy
++    * allwinner,sun50i-a64-hdmi-phy
+   - reg: base address and size of memory-mapped region
+   - clocks: phandles to the clocks feeding the HDMI PHY
+     * bus: the HDMI PHY interface clock
 -- 
 2.18.0
