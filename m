@@ -1,73 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 10 Jul 2018 14:55:41 +0200
-Subject: [PATCH v3] arm64: add ARM64-specific support for flatmem
-In-Reply-To: <20180706174724.44594-1-nkela@cisco.com>
-References: <20180706174724.44594-1-nkela@cisco.com>
-Message-ID: <CAK8P3a0Op6DudVf--n4u_qimcvJf19OkbdzGm6ak=nB44oZEGQ@mail.gmail.com>
+From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
+Date: Tue, 10 Jul 2018 14:58:48 +0200
+Subject: [PATCH] usb: dwc3: rockchip: Fix PHY documentation links.
+Message-ID: <20180710125848.15915-1-enric.balletbo@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 6, 2018 at 7:47 PM, Nikunj Kela <nkela@cisco.com> wrote:
-> Flatmem is useful in reducing kernel memory usage.
-> One usecase is in kdump kernel. We are able to save
-> ~14M by moving to flatmem scheme.
->
-> Cc: xe-kernel at external.cisco.com
-> Cc: Nikunj Kela <nkela@cisco.com>
-> Signed-off-by: Nikunj Kela <nkela@cisco.com>
-> ---
->  arch/arm64/Kconfig | 3 +++
->  1 file changed, 3 insertions(+)
->
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 42c090c..f5b4c49 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -775,6 +775,9 @@ config ARCH_SPARSEMEM_DEFAULT
->  config ARCH_SELECT_MEMORY_MODEL
->         def_bool ARCH_SPARSEMEM_ENABLE
->
-> +config ARCH_FLATMEM_ENABLE
-> +       def_bool y
-> +
->  config HAVE_ARCH_PFN_VALID
->         def_bool ARCH_HAS_HOLES_MEMORYMODEL || !SPARSEMEM
->
+Commit 34962fb8070c ("docs: Fix more broken references") replaced the
+broken reference to rockchip,dwc3-usb-phy.txt binding for the Qualcomm
+DWC3 binding (qcom-dwc3-usb-phy.txt). That's wrong, so replace that
+reference for the correct ones.
 
-I'm getting hundreds of errors in randconfig builds with this:
+Fixes: 34962fb8070c ("docs: Fix more broken references")
+Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+---
 
+ Documentation/devicetree/bindings/usb/rockchip,dwc3.txt | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-+ /home/arnd/cross/x86_64/gcc-8.1.0-nolibc/aarch64-linux/bin/aarch64-linux-ld
--EB -maarch64elfb --no-undefined -X -pie -shared -Bsymbolic
---no-apply-dynamic-relocs --build-id -o .tmp_vmlinux1 -T
-./arch/arm64/kernel/vmlinux.lds --whole-archive built-in.a
---no-whole-archive --start-group arch/arm64/lib/lib.a lib/lib.a
---end-group
-init/do_mounts.o: In function `mount_block_root':
-do_mounts.c:(.init.text+0x1e8): undefined reference to `mem_map'
-/home/arnd/cross/x86_64/gcc-8.1.0-nolibc/aarch64-linux/bin/aarch64-linux-ld:
-init/do_mounts.o: relocation R_AARCH64_ADR_PREL_PG_HI21 against symbol
-`mem_map' which may bind externally can not be used when making a
-shared object; recompile with -fPIC
-do_mounts.c:(.init.text+0x1e8): dangerous relocation: unsupported relocation
-do_mounts.c:(.init.text+0x1f4): undefined reference to `mem_map'
-arch/arm64/kernel/vdso.o: In function `vdso_init':
-vdso.c:(.init.text+0xb4): undefined reference to `mem_map'
-/home/arnd/cross/x86_64/gcc-8.1.0-nolibc/aarch64-linux/bin/aarch64-linux-ld:
-arch/arm64/kernel/vdso.o: relocation R_AARCH64_ADR_PREL_PG_HI21
-against symbol `mem_map' which may bind externally can not be used
-when making a shared object; recompile with -fPIC
-vdso.c:(.init.text+0xb4): dangerous relocation: unsupported relocation
-vdso.c:(.init.text+0xbc): undefined reference to `mem_map'
-vdso.c:(.init.text+0xec): undefined reference to `mem_map'
-arch/arm64/kernel/insn.o:insn.c:(.text+0x2ec): more undefined
-references to `mem_map' follow
-/home/arnd/cross/x86_64/gcc-8.1.0-nolibc/aarch64-linux/bin/aarch64-linux-ld:
-arch/arm64/kernel/insn.o: relocation R_AARCH64_ADR_PREL_PG_HI21
-against symbol `mem_map' which may bind externally can not be used
-when making a shared object; recompile with -fPIC
-
-The problem seems to be that CONFIG_NUMA is enabled in my
-build, so mem_map[] is not defined anywhere.
-
-     Arnd
+diff --git a/Documentation/devicetree/bindings/usb/rockchip,dwc3.txt b/Documentation/devicetree/bindings/usb/rockchip,dwc3.txt
+index 252a05c5d976..c8c4b00ecb94 100644
+--- a/Documentation/devicetree/bindings/usb/rockchip,dwc3.txt
++++ b/Documentation/devicetree/bindings/usb/rockchip,dwc3.txt
+@@ -16,7 +16,8 @@ A child node must exist to represent the core DWC3 IP block. The name of
+ the node is not important. The content of the node is defined in dwc3.txt.
+ 
+ Phy documentation is provided in the following places:
+-Documentation/devicetree/bindings/phy/qcom-dwc3-usb-phy.txt
++Documentation/devicetree/bindings/phy/phy-rockchip-inno-usb2.txt - USB2.0 PHY
++Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt     - Type-C PHY
+ 
+ Example device nodes:
+ 
+-- 
+2.18.0
