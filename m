@@ -1,50 +1,49 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Tue, 10 Jul 2018 10:17:55 +0200
-Subject: [PATCH v5 02/22] fixup! v4l2-ctrls: add
- v4l2_ctrl_request_hdl_find/put/ctrl_find functions
-In-Reply-To: <5adf8a6aa70fd6f7f4326ccb068b66d6221d8d8b.camel@bootlin.com>
+From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
+Date: Tue, 10 Jul 2018 10:01:03 +0200
+Subject: [PATCH v5 11/22] ARM: sun5i: Add support for the C1 SRAM region with
+ the SRAM controller
+In-Reply-To: <20180710080114.31469-1-paul.kocialkowski@bootlin.com>
 References: <20180710080114.31469-1-paul.kocialkowski@bootlin.com>
- <20180710080114.31469-3-paul.kocialkowski@bootlin.com>
- <CAMuHMdVgJuK5G0+szV0BAWDBybxWV0iDWE5kZKuTdgNiGjpnEg@mail.gmail.com>
- <5adf8a6aa70fd6f7f4326ccb068b66d6221d8d8b.camel@bootlin.com>
-Message-ID: <eb5fb671-4589-e0cf-5385-84a5cc912905@xs4all.nl>
+Message-ID: <20180710080114.31469-12-paul.kocialkowski@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/07/18 10:13, Paul Kocialkowski wrote:
-> Hi,
-> 
-> On Tue, 2018-07-10 at 10:07 +0200, Geert Uytterhoeven wrote:
->> On Tue, Jul 10, 2018 at 10:02 AM Paul Kocialkowski
->> <paul.kocialkowski@bootlin.com> wrote:
->>> [PATCH v5 02/22] fixup! v4l2-ctrls: add v4l2_ctrl_request_hdl_find/put/ctrl_find functions
->>
->> git rebase -i ;-)
-> 
-> Although I should have mentionned it (and did not), this is totally
-> intentional! The first patch (from Hans Verkuil) requires said fixup to
-> work properly. I didn't want to squash that change into the commit to
-> make the diff obvious.
+From: Maxime Ripard <maxime.ripard@bootlin.com>
 
-Just squash the two for the next version you post.
+This adds support for the C1 SRAM region (to be used with the SRAM
+controller driver) for sun5i-based platforms. The region is shared
+between the Video Engine and the CPU.
 
-> Ultimately, this framework patch is not really part of the series but is
-> one of its underlying requirements, that should be merged separately (as
-> part of the requests API series).
+Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+---
+ arch/arm/boot/dts/sun5i.dtsi | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-There is a good chance that this patch will go in via your series anyway
-since it is not needed by vivid or vim2m.
-
-Regards,
-
-	Hans
-
-> 
-> I hope this clears up some of the confusion about this patch :)
-> 
-> Cheers!
-> 
->> Gr{oetje,eeting}s,
->>
->>                         Geert
->>
+diff --git a/arch/arm/boot/dts/sun5i.dtsi b/arch/arm/boot/dts/sun5i.dtsi
+index 68711954c293..51dcefc76c12 100644
+--- a/arch/arm/boot/dts/sun5i.dtsi
++++ b/arch/arm/boot/dts/sun5i.dtsi
+@@ -137,6 +137,20 @@
+ 				status = "disabled";
+ 			};
+ 
++			sram_c: sram at 1d00000 {
++				compatible = "mmio-sram";
++				reg = <0x01d00000 0x80000>;
++				#address-cells = <1>;
++				#size-cells = <1>;
++				ranges = <0 0x01d00000 0x80000>;
++
++				ve_sram: sram-section at 0 {
++					compatible = "allwinner,sun5i-a13-sram-c1",
++						     "allwinner,sun4i-a10-sram-c1";
++					reg = <0x000000 0x80000>;
++				};
++			};
++
+ 			sram_d: sram at 10000 {
+ 				compatible = "mmio-sram";
+ 				reg = <0x00010000 0x1000>;
+-- 
+2.17.1
