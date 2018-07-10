@@ -1,72 +1,62 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 10 Jul 2018 14:21:40 +0200 (CEST)
-Subject: [PATCH 2/2] clocksource: arm_arch_timer: set arch_mem_timer
- cpumask to cpu_possible_mask
-In-Reply-To: <b98e0d87-3d9a-9b0c-23c4-7b289cc79a97@arm.com>
-References: <1531151136-18297-1-git-send-email-sudeep.holla@arm.com>
- <1531151136-18297-2-git-send-email-sudeep.holla@arm.com>
- <alpine.DEB.2.21.1807100008100.1590@nanos.tec.linutronix.de>
- <b98e0d87-3d9a-9b0c-23c4-7b289cc79a97@arm.com>
-Message-ID: <alpine.DEB.2.21.1807101419130.4356@nanos.tec.linutronix.de>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 10 Jul 2018 13:29:20 +0100
+Subject: [RFC PATCH 2/2] dma-mapping: Clean up dma_get_required_mask()
+ hooks
+In-Reply-To: <20180710113908.GB32688@lst.de>
+References: <55ac9550c311f056dcfeed9b2c8265375f17b155.1530726467.git.robin.murphy@arm.com>
+ <08256121f325ceed7f6b88c1a5d3cf949698787d.1530726467.git.robin.murphy@arm.com>
+ <20180710113908.GB32688@lst.de>
+Message-ID: <3b8a23b6-6015-3e8e-07f0-b75920a1e264@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 10 Jul 2018, Sudeep Holla wrote:
-
+On 10/07/18 12:39, Christoph Hellwig wrote:
+> On Wed, Jul 04, 2018 at 06:50:12PM +0100, Robin Murphy wrote:
+>> As for the other mask-related hooks, standardise the arch override into
+>> a Kconfig option, and also pull the generic implementation into the DMA
+>> mapping code rather than having it hide away in the platform bus code.
 > 
+> I compared this a bit to what I had around against an older kernel,
+> and I think we should probably go with something more like the
+> version I had, which I can dust off again.
 > 
-> On 09/07/18 23:09, Thomas Gleixner wrote:
-> > On Mon, 9 Jul 2018, Sudeep Holla wrote:
-> > 
-> >> Currently, arch_mem_timer cpumask is set to cpu_all_mask which should be
-> >> fine. However, cpu_possible_mask is more accurate and if there are other
-> >> clockevent source in the system which are set to cpu_possible_mask, then
-> >> having cpu_all_mask may result in issue.
-> >>
-> >> E.g. on a platform with arm,sp804 timer with rating 300 and
-> >> cpu_possible_mask and this arch_mem_timer timer with rating 400 and
-> >> cpu_all_mask, tick_check_preferred may choose both preferred as the
-> >> cpumasks are not equal though they must be.
-> >>
-> >> This issue was root caused incorrectly initially and a fix was merged as
-> >> commit 1332a9055801 ("tick: Prefer a lower rating device only if it's CPU
-> >> local device").
-> > 
-> > To avoid that in the future we really should fix the decision logic to mask
-> > out the non possible CPUs from the supplied masks.
+> What I've done is to:
 > 
-> Sure, I can do that. But do you want that as a fix for v4.18 ?
+>   1) provide the get_required_mask unconditionally in struct dma_map_ops
+>   2) default to what is the current dma_get_required_mask implementation
+>      if nothing else is specified.
 
-No, that's for 4.19
+Yeah, there's already 17 pointers in dma_map_ops of which about half are 
+optional, so these awkward #ifdefs to save one more probably aren't 
+worth the inconsistency they bring. It feels like this guy mostly goes 
+hand-in-hand with dma_supported, so ack to giving it the same look and feel.
 
-> I think we may need this check at another place in tick_setup_device
+> What I still had on my todo list but not done yet:
 > 
-> 213         /*
-> 214          * When the device is not per cpu, pin the interrupt to the
-> 215          * current cpu:
-> 216          */
-> 217         if (!cpumask_equal(newdev->cpumask, cpumask))
-> 218                 irq_set_affinity(newdev->irq, cpumask);
+>   3) go through all instances and check if the current default
+>      makes sense, at it based on direct addressability.  For most
+>      iommu instances it seems like we should just return a 64-bit mask.
+
+That's reasonable, although in many cases we should know the effective 
+IOMMU input address size which would be even neater.
+
+>   4) figure out how to take the dma offsets into account for it
+
+AFAICS it might boil down to simply:
+
+	mask = roundup_pow_of_two(phys_to_dma(dev, PFN_PHYS(max_pfn))) - 1;
+
+>   5) move the function to the dma-direct code, as that is where it
+>      belongs
+>   5) figure out if there is a better name for the method, as with
+>      swiotlb & co it isn't really the required mask, but more something
+>      like the optimal mask
+>   6) document the whole thing..
+>   7) sort out the powerpc indirection mess.
 > 
-> Does it make sense trim dev->cpumask when registering the clockevents
-> device itself instead of adding check at place where this cpumask
-> can be used ? So that any future user of those masks need not have to
-> take care of that.
+> Do you agree with that general plan?  If so I can dust off my old
+> patch.
 
-The problem is you cannot trim it because cpu_all_mask is global and const.
+Sounds good; in the meantime I'll happily drop these two.
 
-> Also only few ARM clocksource drivers use cpu_all_mask which could be
-> result of copy-paste, we can even fix them too.
-> 
-> arm_arch_timer.c:	clk->cpumask = cpu_all_mask;
-> tegra20_timer.c:	tegra_clockevent.cpumask = cpu_all_mask;
-> timer-atcpit100.c:	.cpumask = cpu_all_mask,
-> timer-keystone.c:	event_dev->cpumask = cpu_all_mask;
-> zevio-timer.c:		timer->clkevt.cpumask	= cpu_all_mask;
-
-Yes, that makes sense. What we could do is warn, when cpu_all_mask is set
-at registration time and replace the pointer with cpu_possible_mask.
-
-Thanks,
-
-	tglx
+Robin.
