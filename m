@@ -1,41 +1,43 @@
 From: fabio.estevam@nxp.com (Fabio Estevam)
-Date: Tue, 10 Jul 2018 13:08:45 -0300
-Subject: [PATCH v3 4/6] ARM: dts: imx53: Add tigerp support
+Date: Tue, 10 Jul 2018 13:08:46 -0300
+Subject: [PATCH v3 5/6] ARM: dts: imx53: Add a label for the PMU node
 In-Reply-To: <1531238927-19579-1-git-send-email-fabio.estevam@nxp.com>
 References: <1531238927-19579-1-git-send-email-fabio.estevam@nxp.com>
-Message-ID: <1531238927-19579-4-git-send-email-fabio.estevam@nxp.com>
+Message-ID: <1531238927-19579-5-git-send-email-fabio.estevam@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As per the i.MX53 Reference Manual add an entry for the
-'tigerp' region in the device tree.
+Add a label for the PMU node so that the board dts may be able to
+pass the 'secure-reg-access' property like this:
 
-This is needed for accessing the ARM_GPC register to set the
-DBGEN bit, so that the debug clocks can be turned on.
+&pmu {
+	secure-reg-access;
+};
+
+This also makes it consistent with the PMU node in imx6qdl.dtsi
 
 Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+Reviewed-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
+Tested-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
 ---
 Changes since v2:
 - None
 
- arch/arm/boot/dts/imx53.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/boot/dts/imx53.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-index 1a7a7bb..3fd553c 100644
+index 3fd553c..6386185 100644
 --- a/arch/arm/boot/dts/imx53.dtsi
 +++ b/arch/arm/boot/dts/imx53.dtsi
-@@ -672,6 +672,11 @@
- 				status = "disabled";
- 			};
+@@ -113,7 +113,7 @@
+ 		};
+ 	};
  
-+			tigerp: tigerp at 63fa0000 {
-+				compatible = "fsl,imx53-tigerp", "fsl,imx51-tigerp";
-+				reg = <0x63fa0000 0x28>;
-+			};
-+
- 			owire: owire at 63fa4000 {
- 				compatible = "fsl,imx53-owire", "fsl,imx21-owire";
- 				reg = <0x63fa4000 0x4000>;
+-	pmu {
++	pmu: pmu {
+ 		compatible = "arm,cortex-a8-pmu";
+ 		interrupt-parent = <&tzic>;
+ 		interrupts = <77>;
 -- 
 2.7.4
