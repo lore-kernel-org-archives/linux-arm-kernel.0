@@ -1,103 +1,118 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Tue, 10 Jul 2018 11:06:36 +0200
-Subject: [PATCH 1/3] drm: mxsfb: Change driver.name to mxsfb-drm
-In-Reply-To: <6995fa4b-47a9-887b-5e4f-4284ca6a2c79@gmail.com>
-References: <cover.1529091248.git.leonard.crestez@nxp.com>
- <47ea7572011735b68a8a70f0e11bdf00cb2fd86a.1529091248.git.leonard.crestez@nxp.com>
- <CAOMZO5B8i0gN+rCq-yPrd112NkwJWTxYCtsLVeLhD1JLRuX6EQ@mail.gmail.com>
- <07be6d9a85b6be655fc2b084be81d8bf9715b57a.camel@nxp.com>
- <638457fd-85da-8fec-d146-517c43f71813@denx.de>
- <b3fa74c5110b45e5992920485749869ab1f7ebce.camel@nxp.com>
- <6995fa4b-47a9-887b-5e4f-4284ca6a2c79@gmail.com>
-Message-ID: <fd22085f646d97f66cff5b7f22785500@agner.ch>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Tue, 10 Jul 2018 11:12:19 +0200
+Subject: [PATCH v2 6/6] KVM: arm/arm64: vgic: Allow configuration of
+ interrupt groups
+In-Reply-To: <51bb02d7-61d8-41bc-33e2-342364f659b5@arm.com>
+References: <1530697100-22419-1-git-send-email-christoffer.dall@arm.com>
+ <1530697100-22419-7-git-send-email-christoffer.dall@arm.com>
+ <7f875ead-d3cb-1fec-bc84-56e64526e6a7@arm.com>
+ <20180709224836.GA26579@u002843.usa.arm.com>
+ <51bb02d7-61d8-41bc-33e2-342364f659b5@arm.com>
+Message-ID: <01925c40-7087-9b52-c59d-2a85005de642@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16.06.2018 01:32, Marek Vasut wrote:
-> On 06/16/2018 12:42 AM, Leonard Crestez wrote:
->> On Fri, 2018-06-15 at 23:36 +0200, Marek Vasut wrote:
->>> On 06/15/2018 10:58 PM, Leonard Crestez wrote:
->>>> On Fri, 2018-06-15 at 16:47 -0300, Fabio Estevam wrote:
->>>>> On Fri, Jun 15, 2018 at 4:43 PM, Leonard Crestez
->>>>> <leonard.crestez@nxp.com> wrote:
->>
->>>>>> The FBDEV driver uses the same name and both can't be registered at the
->>>>>> same time. Fix this by renaming the drm driver to mxsfb-drm
->>>>>
->>>>> Stefan sent the same patch a few days ago:
+Hi Christoffer, Marc,
+
+On 07/10/2018 10:33 AM, Marc Zyngier wrote:
+> On 09/07/18 23:48, Christoffer Dall wrote:
+>> On Mon, Jul 09, 2018 at 09:42:40AM +0100, Marc Zyngier wrote:
+>>> On 04/07/18 10:38, Christoffer Dall wrote:
+>>>> Implement the required MMIO accessors for GICv2 and GICv3 for the
+>>>> IGROUPR distributor and redistributor registers.
 >>>>
->>>> In that thread there is a proposal for removing the old fbdev/mxsfb
->>>> driver entirely.
+>>>> This can allow guests to change behavior compared to running on previous
+>>>> versions of KVM, but only to align with the architecture and hardware
+>>>> implementations.
 >>>>
->>>> That would break old DTBs, isn't this generally considered bad? Also,
->>>> are we sure the removal of fbdev/mxsfb wouldn't lose any features?
+>>>> This also allows userspace to configure the groups for interrupts.  Note
+>>>> that this potentially results in GICv2 guests not receiving interrupts
+>>>> after migration if migrating from an older kernel that exposes GICv2
+>>>> interrupts as group 1.
 >>>>
->>>> What my series does is make both drivers work with the same kernel
->>>> image and turns the choice into a board-level dtb decision. Supporting
->>>> everything at once seems desirable to me and it allows for a very
->>>> smooth upgrade path.
+>>>> Cc: Andrew Jones <drjones@redhat.com>
+>>>> Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
+>>>> ---
+>>>> I implemented (but stashed) a version of this which predicated the
+>>>> behavior based on the value of GICD_IIDR revision field, falling back to
+>>>> ignoring writes and resetting GICv2 groups to 0 if the guest wrote a
+>>>> revision less than 2.  However, current QEMU implementations simply
+>>>> don't write the GICD_IIDR, so this doesn't help at all without changing
+>>>> QEMU anyhow.
+>>>>
+>>>> The only actual fix I can see here to work around the problem in the
+>>>> kernel is to require an opt-in to allow restoring groups from userspace,
+>>>> but that's a lot of logic to support cross-kernel version migration.
+>>>>
+>>>> Question: Do we expect that cross-kernel version migration is a critical
+>>>> feature that people really expect to work, and do we actually have
+>>>> examples of catering to this in the kernel elsewhere?  (Also, how would
+>>>> then that relate to the whole 'adding a new sysreg breaks migration'
+>>>> situation?)
 >>>
->>> Having two drivers in the kernel with different set of bugs is always bad.
+>>> I don't really get why QEMU doesn't try to restore GICD_IIDR, while it
+>>> is definitely trying to restore RO sysregs (and that's how we detect
+>>> incompatibilities).
 >>>
->>>> The old driver could be removed later, after all users are converted.
->>>
->>> Both drivers were in for long enough already. And let's be realistic,
->>> how many MX23/MX28 users of old DTs with new kernels are there who
->>> cannot update the DT as well ?
+>>> I think we should at least give userspace a chance to do the right
+>>> thing. If it doesn't, well, too bad.
 >>
->> Grepping for "display =" in arch/arm/boot/dts/imx* I see that old
->> bindings are also used by 3rd-party boards for imx6/7:
->>  * imx6sx-nitrogen6sx
->>  * imx6ul-geam
->>  * imx6ul-isiot
->>  * imx6ul-opos6uldev
->>  * imx6ul-pico-hobbit
->>  * imx6ul-tx6ul
->>  * imx7d-nitrogen7
-> 
-> Er, yes, a handful of boards which could be updated :)
-> 
->> Converting everything might be quite a bit of work, and explicitly
->> supporting old bindings is also work.
-> 
-> Does adding support for old bindings justify the effort invested ? I
-> doubt so, it only adds more code to maintain.
-> 
->> It is very confusing that there is a whole set of displays for imx6/7
->> which are supported by upstream but only with a non-default config.
->> While it is extremely common in the embedded field to have custom
->> configs the default one in the kernel should try to "just work".
+>> This series should give userspace an option to adjust its behavior.
 >>
->> Couldn't this patch series be considered a bugfix? It was also
->> surprisingly small.
+>> My main concern is that this version of the series results in the worst
+>> kind of migration failures, where the guest simply doesn't run on the
+>> destination side with no warnings or error messages returned to the
+>> user..
 > 
-> I think it's just a workaround which allows you to postpone the real
-> fix, and I don't like that.
+> I agree, which is why I'm suggesting we make IIDR writeable. And yes, it
+> still requires userspace to be fixed to actually write IIDR.
+> 
+>>
+>> We could add logic to return an error code if trying to write a
+>> different revision than what the kernel has (similar to the invariant
+>> sysregs), so that a simple fix to QEMU to save restore the GICD_IIDR
+>> register at least results in an error being returned to userspace.
+>>
+>> However, as QEMU doesn't do anything useful here today (not blaming
+>> anyone, I wrote the apparently broken GIC save/restore code for QEMU
+>> myself), we could also argue that QEMU might as well just fix things up
+>> if it detects a different IIDR.
+>>
+>>>
+>>> How bad is that "writable GICD_IIDR" patch? Because at this stage, and
+>>> in the absence of any comment, I'm close to just pick that series and
+>>> merge it for 4.19.
+>>>
+>>
+>> My guess is that a patch to "save/restore GICD_IIDR" is simple enough,
+>> but requires additional logic in the kernel that returns an error if the
+>> GICD_IIDR don't match on write.
+>>
+>> A patch which changes the groups and bumps the IIDR in userspace is
+>> probably more complex.
+>>
+>> Sounds like I should add the GICD_IIDR checking patch.  Thoughts?
+> 
+> I'm quite keen on that. It makes the userspace change trivial, aligns it
+> somehow on the sysreg and ITS ABI behaviours.
+> 
+>> What I would really like to know is whether this is really an issue or
+>> not.  Do people who run products based on KVM, such as RHEV, have any
+>> expectations about cross-kernel version migration?
+> 
+> I'd like to know as well.
 
-This is one of the situation where states quo is kinda the worst
-situation.
+Sorry I did not have time to review the series properly. My
+understanding is we generally care about migration between different
+kernels. For the ITS, we made the IIDR writable too to manage the ABI
+version properly. See ab01c6bdacc43c41c6b326889f4358f5afc38bf9. But
+maybe I missed the crux of the matter.
 
-Currently imx_v6_v7_defconfig and mxs_defconfig actually still uses
-CONFIG_FB_MXS.
+Thanks
 
-I understand that you'd rather prefer to move forward. I suggest we do
-it in steps.
-
-In 4.19:
-
-- Change DRM driver.name to mxsfb-drm so we avoid conflicts for now
-- Remove CONFIG_FB_MXS from imx_v6_v7_defconfig/mxs_defconfig now, and
-only enable CONFIG_DRM_MXSFB=y
-- Add (deprecated) to CONFIG_FB_MXS
-
-In 4.19/4.20:
-- Fix the above device trees
-
-In 4.20/4.21:
-- Remove FB_MXS
-
-Does that sound reasonable? If yes, I can send the patch set to do step
-1.
-
---
-Stefan
+Eric
+> 
+> Thanks,
+> 
+> 	M.
+> 
