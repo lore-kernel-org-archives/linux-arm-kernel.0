@@ -1,66 +1,38 @@
-From: ezequiel@collabora.com (Ezequiel Garcia)
-Date: Tue, 10 Jul 2018 16:57:34 -0300
-Subject: [PATCH v5 18/22] media: platform: Add Sunxi-Cedrus VPU decoder
- driver
-In-Reply-To: <20180710080114.31469-19-paul.kocialkowski@bootlin.com>
-References: <20180710080114.31469-1-paul.kocialkowski@bootlin.com>
- <20180710080114.31469-19-paul.kocialkowski@bootlin.com>
-Message-ID: <e31090c371ae7f7999b0aa983a20f33451cc89fb.camel@collabora.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 10 Jul 2018 22:21:53 +0200 (CEST)
+Subject: [PATCH 2/2] clocksource: arm_arch_timer: set arch_mem_timer
+ cpumask to cpu_possible_mask
+In-Reply-To: <a8979e78-9844-160a-a758-631505924bbd@arm.com>
+References: <1531151136-18297-1-git-send-email-sudeep.holla@arm.com>
+ <1531151136-18297-2-git-send-email-sudeep.holla@arm.com>
+ <alpine.DEB.2.21.1807100008100.1590@nanos.tec.linutronix.de>
+ <b98e0d87-3d9a-9b0c-23c4-7b289cc79a97@arm.com>
+ <alpine.DEB.2.21.1807101419130.4356@nanos.tec.linutronix.de>
+ <a8979e78-9844-160a-a758-631505924bbd@arm.com>
+Message-ID: <alpine.DEB.2.21.1807102220320.1588@nanos.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Paul,
+On Tue, 10 Jul 2018, Sudeep Holla wrote:
+> On 10/07/18 13:21, Thomas Gleixner wrote:
+> >> Also only few ARM clocksource drivers use cpu_all_mask which could be
+> >> result of copy-paste, we can even fix them too.
+> >>
+> >> arm_arch_timer.c:	clk->cpumask = cpu_all_mask;
+> >> tegra20_timer.c:	tegra_clockevent.cpumask = cpu_all_mask;
+> >> timer-atcpit100.c:	.cpumask = cpu_all_mask,
+> >> timer-keystone.c:	event_dev->cpumask = cpu_all_mask;
+> >> zevio-timer.c:		timer->clkevt.cpumask	= cpu_all_mask;
+> > 
+> > Yes, that makes sense. What we could do is warn, when cpu_all_mask is set
+> > at registration time and replace the pointer with cpu_possible_mask.
+> > 
+> I like this approach than having to bitwise and with cpu_possible_mask
+> at all the necessary place. I will cook up a patch.
 
-My comments on v4 of course apply here as well.
-
-One other thing...
-
-On Tue, 2018-07-10 at 10:01 +0200, Paul Kocialkowski wrote:
-> This introduces the Sunxi-Cedrus VPU driver that supports the VPU
-> found
-> in Allwinner SoCs, also known as Video Engine. It is implemented
-> through
-> a v4l2 m2m decoder device and a media device (used for media
-> requests).
-> So far, it only supports MPEG2 decoding.
-> 
-> Since this VPU is stateless, synchronization with media requests is
-> required in order to ensure consistency between frame headers that
-> contain metadata about the frame to process and the raw slice data
-> that
-> is used to generate the frame.
-> 
-> This driver was made possible thanks to the long-standing effort
-> carried out by the linux-sunxi community in the interest of reverse
-> engineering, documenting and implementing support for Allwinner VPU.
-> 
-> Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-> 
-[..]
-> +
-> +static irqreturn_t cedrus_bh(int irq, void *data)
-> +{
-> +	struct cedrus_dev *dev = data;
-> +	struct cedrus_ctx *ctx;
-> +
-> +	ctx = v4l2_m2m_get_curr_priv(dev->m2m_dev);
-> +	if (!ctx) {
-> +		v4l2_err(&dev->v4l2_dev,
-> +			 "Instance released before the end of
-> transaction\n");
-> +		return IRQ_HANDLED;
-> +	}
-> +
-> +	v4l2_m2m_job_finish(ctx->dev->m2m_dev, ctx->fh.m2m_ctx);
-> +
-
-I don't like the fact that v4l2_m2m_job_finish calls .device_run
-reentrantly. Let me try to make v4l2_m2m_job_finish() safe to be called
-in atomic context, so hopefully drivers can just call it in the top-
-half.
-
-You are returning the buffers in the top-half, so this is just a matter
-or better design, not a performance improvement.
+Appreciated. I'm inclined to take it for 4.18 even. Please send it along
+with the fixes for the above obvious failure spots.
 
 Thanks,
-Eze
+
+	tglx
