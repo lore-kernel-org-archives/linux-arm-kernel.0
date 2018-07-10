@@ -1,78 +1,67 @@
-From: vkoul@kernel.org (Vinod)
-Date: Tue, 10 Jul 2018 21:03:26 +0530
-Subject: [PATCH v1 3/4] dmaengine: imx-sdma: support dmatest
-In-Reply-To: <1531239793-11781-4-git-send-email-yibin.gong@nxp.com>
-References: <1531239793-11781-1-git-send-email-yibin.gong@nxp.com>
- <1531239793-11781-4-git-send-email-yibin.gong@nxp.com>
-Message-ID: <20180710153326.GG3219@vkoul-mobl>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 10 Jul 2018 23:35:54 +0800
+Subject: [PATCH 08/17] ARM: dts: sun8i: r40: Add mixer ids to TCON TOP
+In-Reply-To: <20180706175113.26698-9-jernej.skrabec@siol.net>
+References: <20180706175113.26698-1-jernej.skrabec@siol.net>
+ <20180706175113.26698-9-jernej.skrabec@siol.net>
+Message-ID: <CAGb2v65YsW+SiP6_sV9Hd6eQE6ZF0+Lm6CWfNdmwpgMEHBTDgQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11-07-18, 00:23, Robin Gong wrote:
-> dmatest(memcpy) will never call dmaengine_slave_config before prep,
+On Sat, Jul 7, 2018 at 1:51 AM, Jernej Skrabec <jernej.skrabec@siol.net> wrote:
+> Mixer has to have a way to read its id, if needed.
 
-and that should have been a hint to you that you should not expect that
+You should mention that this is required by the device tree binding sun4i-drm,
+in the second paragraph of the first section:
 
-> so jobs in dmaengine_slave_config need to be moved into somewhere
-> before device_prep_dma_memcpy. Besides, dmatest never setup chan
-> ->private as other common case like uart/audio/spi will always setup
-> chan->private. Here check it to judge if it's dmatest case and do
-> jobs in slave_config.
+    For all connections between components up to the TCONs in the display
+    pipeline, when there are multiple components of the same type at the
+    same depth, the local endpoint ID must be the same as the remote
+    component's index.
 
-and you should not do anything for dmatest. Supporting it means memcpy
-implementation is not correct :)
+You might also want to update the diagram for TCON TOP in the binding doc.
 
-> 
-> Signed-off-by: Robin Gong <yibin.gong@nxp.com>
+ChenYu
+
+> Add them in R40 DT.
+>
+> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 > ---
->  drivers/dma/imx-sdma.c | 37 ++++++++++++++++++++++++++++---------
->  1 file changed, 28 insertions(+), 9 deletions(-)
-> 
-> diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
-> index ed2267d..48f3749 100644
-> --- a/drivers/dma/imx-sdma.c
-> +++ b/drivers/dma/imx-sdma.c
-> @@ -1222,10 +1222,36 @@ static int sdma_alloc_chan_resources(struct dma_chan *chan)
->  {
->  	struct sdma_channel *sdmac = to_sdma_chan(chan);
->  	struct imx_dma_data *data = chan->private;
-> +	struct imx_dma_data default_data;
->  	int prio, ret;
->  
-> -	if (!data)
-> -		return -EINVAL;
-> +	ret = clk_enable(sdmac->sdma->clk_ipg);
-> +	if (ret)
-> +		return ret;
-> +	ret = clk_enable(sdmac->sdma->clk_ahb);
-> +	if (ret)
-> +		goto disable_clk_ipg;
-> +	/*
-> +	 * dmatest(memcpy) will never call dmaengine_slave_config before prep,
-> +	 * so jobs in dmaengine_slave_config need to be moved into somewhere
-> +	 * before device_prep_dma_memcpy. Besides, dmatest never setup chan
-> +	 * ->private as other common cases like uart/audio/spi will setup
-> +	 * chan->private always. Here check it to judge if it's dmatest case
-> +	 * and do jobs in slave_config.
-> +	 */
-> +	if (!data) {
-> +		dev_warn(sdmac->sdma->dev, "dmatest is running?\n");
-
-why is that a warning!
-
-> +		sdmac->word_size  =  sdmac->sdma->dma_device.copy_align;
-> +		default_data.priority = 2;
-> +		default_data.peripheral_type = IMX_DMATYPE_MEMORY;
-> +		default_data.dma_request = 0;
-> +		default_data.dma_request2 = 0;
-> +		data = &default_data;
-> +
-> +		sdma_config_ownership(sdmac, false, true, false);
-> +		sdma_get_pc(sdmac, IMX_DMATYPE_MEMORY);
-> +		sdma_load_context(sdmac);
-> +	}
-
-this needs to be default for memcpy
-
--- 
-~Vinod
+>  arch/arm/boot/dts/sun8i-r40.dtsi | 10 ++++++++--
+>  1 file changed, 8 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/sun8i-r40.dtsi b/arch/arm/boot/dts/sun8i-r40.dtsi
+> index 2afb079a3776..1dd088d82773 100644
+> --- a/arch/arm/boot/dts/sun8i-r40.dtsi
+> +++ b/arch/arm/boot/dts/sun8i-r40.dtsi
+> @@ -576,9 +576,12 @@
+>                                 #size-cells = <0>;
+>
+>                                 tcon_top_mixer0_in: port at 0 {
+> +                                       #address-cells = <1>;
+> +                                       #size-cells = <0>;
+>                                         reg = <0>;
+>
+> -                                       tcon_top_mixer0_in_mixer0: endpoint {
+> +                                       tcon_top_mixer0_in_mixer0: endpoint at 0 {
+> +                                               reg = <0>;
+>                                                 remote-endpoint = <&mixer0_out_tcon_top>;
+>                                         };
+>                                 };
+> @@ -606,9 +609,12 @@
+>                                 };
+>
+>                                 tcon_top_mixer1_in: port at 2 {
+> +                                       #address-cells = <1>;
+> +                                       #size-cells = <0>;
+>                                         reg = <2>;
+>
+> -                                       tcon_top_mixer1_in_mixer1: endpoint {
+> +                                       tcon_top_mixer1_in_mixer1: endpoint at 1 {
+> +                                               reg = <1>;
+>                                                 remote-endpoint = <&mixer1_out_tcon_top>;
+>                                         };
+>                                 };
+> --
+> 2.18.0
+>
