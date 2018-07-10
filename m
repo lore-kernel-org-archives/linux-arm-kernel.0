@@ -1,56 +1,20 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 10 Jul 2018 15:49:30 +0530
-Subject: [PATCH v3 00/13] ARM: davinci: remove duplicate aemif support
-In-Reply-To: <125d73f7-7311-866f-1e9d-d3c1f9473899@lechnology.com>
-References: <20180628095748.4462-1-brgl@bgdev.pl>
- <52a274f1-283a-a14a-54f3-4b95b6605c4f@ti.com>
- <59fdc532-bb72-ffae-cfb6-a7f156c14771@lechnology.com>
- <e1222b3c-dfa4-4cb0-eebf-8e2550e9d674@ti.com>
- <125d73f7-7311-866f-1e9d-d3c1f9473899@lechnology.com>
-Message-ID: <92e41afc-cf3a-e713-11d5-247b8d6e3a64@ti.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 10 Jul 2018 11:23:44 +0100
+Subject: [PATCH 0/3] Finish Armada DRM DT support
+Message-ID: <20180710102344.GH17271@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 06 July 2018 11:09 PM, David Lechner wrote:
-> On 07/04/2018 01:35 AM, Sekhar Nori wrote:
->> Hi David,
->>
->> On Monday 02 July 2018 09:02 PM, David Lechner wrote:
->>> On 07/02/2018 07:28 AM, Sekhar Nori wrote:
->>>> Hi David, Stephen,
->>>>
->>>> On Thursday 28 June 2018 03:27 PM, Bartosz Golaszewski wrote:
->>>>> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->>>>>
->>>>> This series moves all aemif/nand users to using the ti-aemif platform
->>>>> driver located in drivers/memory instead of the older API located in
->>>>> mach-davinci.
->>>>>
->>>>> First five patches add necessary changes to the clock driver. Next
->>>>> seven convert the board files to using the ti-aemif driver. Last patch
->>>>> removes now dead code.
->>>>
->>>> How do you want to handle this series? I can apply the series and
->>>> provide you an immutable branch on v4.18-rc1 with the clock patches
->>>> applied if that can work.
->>>
->>> Sounds good to me. But I'm new to this maintainer thing, so maybe
->>> there is something to consider that I haven't thought of?
->>
->> I don't think there is more to it. Ultimately there should not be two
->> commits for the same patch. Either you can apply and share the commit to
->> use or I can do that as well. I am equally fine either way.
->>
->> Regards,
->> Sekhar
->>
-> 
-> I've created a branch for-sekhar at https://github.com/dlech/linux.git
-> with the clk commits.
+Finish Armada DRM support for DT, finally allowing mainline kernels to
+use this driver unimpeded.
 
-Thanks. I merged commit f917ff75ac55b6d829c9d1142e83913064565d5b (top of
-that branch) to my v4.19/soc branch. Please do let Stephen and Mike know
-about this then when you send your stuff for v4.19.
+ arch/arm/boot/dts/dove-cubox.dts     | 43 +++++++++++++++++++++++++++++++
+ drivers/gpu/drm/armada/Makefile      |  3 +++
+ drivers/gpu/drm/armada/armada_drv.c  | 29 ++++++++++++++++++---
+ drivers/gpu/drm/armada/armada_rmem.c | 49 ++++++++++++++++++++++++++++++++++++
+ 4 files changed, 121 insertions(+), 3 deletions(-)
 
-Thanks,
-Sekhar
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
+According to speedtest.net: 13Mbps down 490kbps up
