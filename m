@@ -1,31 +1,77 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 10 Jul 2018 23:32:09 +0200
-Subject: [PATCH v2 2/3] asm-generic: unistd.h: Wire up sys_rseq
-In-Reply-To: <20180710175337.GD10177@arm.com>
-References: <1531145985-3747-1-git-send-email-will.deacon@arm.com>
- <1531145985-3747-3-git-send-email-will.deacon@arm.com>
- <20180710175337.GD10177@arm.com>
-Message-ID: <CAK8P3a2oz0o+gi4W7OhU-2_55Kfk35MuHzhv+CgGAEWtWKF=0Q@mail.gmail.com>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Tue, 10 Jul 2018 16:51:50 -0500
+Subject: [PATCH v3 0/7] arm64: numa/topology/smp: update the cpumasks for
+ CPU hotplug
+In-Reply-To: <1530874968-5960-1-git-send-email-sudeep.holla@arm.com>
+References: <1530874968-5960-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <a1e306a3-5b9f-1e7b-fd39-9af884bdcc9b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 10, 2018 at 7:53 PM, Will Deacon <will.deacon@arm.com> wrote:
-> Hi Arnd,
->
-> On Mon, Jul 09, 2018 at 03:19:44PM +0100, Will Deacon wrote:
->> The new rseq call arrived in 4.18-rc1, so provide it in the asm-generic
->> unistd.h for architectures such as arm64.
->>
->> Cc: Arnd Bergmann <arnd@arndb.de>
->> Signed-off-by: Will Deacon <will.deacon@arm.com>
->> ---
->>  include/uapi/asm-generic/unistd.h | 4 +++-
->>  1 file changed, 3 insertions(+), 1 deletion(-)
->
-> Please can you Ack this, so I can take it the arm64 tree?
+Hi,
 
-I just checked again that this syscall is compatible with
-compat mode on all architectures that need it, so the
-addition is safe.
+On 07/06/2018 06:02 AM, Sudeep Holla wrote:
+> Hi,
+> 
+> Commit 37c3ec2d810f ("arm64: topology: divorce MC scheduling domain from core_siblings")
+> was reported to cause some hotplug and system suspend regressions when
+> it was merged. On investigation, it was found that unlike x86/PPC,
+> arm64 doesn't update the cpu and numa masks on CPU hotplug. That's
+> somewhat expected from the scheduler.
+> 
+> Since these changes were bit invasive as a solution to the above
+> mentioned regression, as small change was temporarily applied as a fix.
+> This series updates the cpu and numa masks on CPU hotplug and reverts
+> that temporary fix.
+> 
+> It would be good to get this tested(CPU hotplug - few and all CPUs in
+> a socket) on multi-socket/NUMA systems from Cavium and Huawei/Hisilicon.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+It looks good, and I tested it in ACPI/PPTT mode with a single socket 
+thunderX2, booting with maxcpus and online/offlineing cores. No problems 
+found. I did a similar set of tests with a juno, as well as with a 
+kernel compiled with CONFIG_NUMA off on the juno, a configuration that 
+previously had problems.
+
+
+Reviewed-by: Jeremy Linton <jeremy.linton@arm.com>
+Tested-by: Jeremy Linton <jeremy.linton@arm.com>
+
+Thanks,
+
+
+> 
+> Regards,
+> Sudeep
+> 
+> v2->v3:
+> 	- Removed confusing boolean reset argument and inlined reset
+> 	  part in reset_cpu_topology
+> 	- Moved cpu_llc_shared_mask to asm/topology.h along with other
+> 	  similar macros and renamed it topology_llc_cpumask
+> 	- Use NUMA_NO_NODE instead of checking for any -ve integer
+> 
+> v1->v2:
+> 	- Rebased on v4.18-rc1 and hence do revert of the temporary fix
+> 	  that was merged for v4.18
+> 	- Removed one of the wrong use of possible_mask
+> 
+> Sudeep Holla (7):
+>    arm64: topology: refactor reset_cpu_topology to add support for removing topology
+>    arm64: numa: separate out updates to percpu nodeid and NUMA node cpumap
+>    arm64: topology: add support to remove cpu topology sibling masks
+>    arm64: topology: restrict updating siblings_masks to online cpus only
+>    arm64: smp: remove cpu and numa topology information when hotplugging out CPU
+>    arm64: topology: rename llc_siblings to align with other struct members
+>    arm64: topology: re-introduce numa mask check for scheduler MC selection
+> 
+>   arch/arm64/include/asm/numa.h     |  4 +++
+>   arch/arm64/include/asm/topology.h |  4 ++-
+>   arch/arm64/kernel/smp.c           |  5 ++++
+>   arch/arm64/kernel/topology.c      | 58 +++++++++++++++++++++++++++------------
+>   arch/arm64/mm/numa.c              | 29 ++++++++++++++------
+>   5 files changed, 74 insertions(+), 26 deletions(-)
+> 
+> --
+> 2.7.4
+> 
