@@ -1,36 +1,39 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue, 10 Jul 2018 15:44:57 +0200
-Subject: [PATCH] media: platform: meson-ao-cec: make busy TX warning silent
-Message-ID: <1531230297-30921-1-git-send-email-narmstrong@baylibre.com>
+From: fabio.estevam@nxp.com (Fabio Estevam)
+Date: Tue, 10 Jul 2018 10:47:31 -0300
+Subject: [PATCH v2 1/6] dt-bindings: freescale: Add bindings for the tigerp
+ module
+Message-ID: <1531230456-27717-1-git-send-email-fabio.estevam@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Switch to dev_dbg for the busy TX message to avoid having a flood of:
-[  228.064570] meson-ao-cec c8100100.cec: meson_ao_cec_transmit: busy TX: aborting
-[  230.368489] meson-ao-cec c8100100.cec: meson_ao_cec_transmit: busy TX: aborting
-[  234.208655] meson-ao-cec c8100100.cec: meson_ao_cec_transmit: busy TX: aborting
-[  236.512558] meson-ao-cec c8100100.cec: meson_ao_cec_transmit: busy TX: aborting
+Add bindings for the tigerp module present on i.MX51.
 
-This message is only a debug hint and not an error.
-
-Fixes: 7ec2c0f72cb1 ("media: platform: Add Amlogic Meson AO CEC Controller driver")
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 ---
- drivers/media/platform/meson/ao-cec.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Changes since v1:
+- Newly introduced in this series.
 
-diff --git a/drivers/media/platform/meson/ao-cec.c b/drivers/media/platform/meson/ao-cec.c
-index 8040a62..cd4be38 100644
---- a/drivers/media/platform/meson/ao-cec.c
-+++ b/drivers/media/platform/meson/ao-cec.c
-@@ -524,7 +524,7 @@ static int meson_ao_cec_transmit(struct cec_adapter *adap, u8 attempts,
- 		return ret;
- 
- 	if (reg == TX_BUSY) {
--		dev_err(&ao_cec->pdev->dev, "%s: busy TX: aborting\n",
-+		dev_dbg(&ao_cec->pdev->dev, "%s: busy TX: aborting\n",
- 			__func__);
- 		meson_ao_cec_write(ao_cec, CEC_TX_MSG_CMD, TX_ABORT, &ret);
- 	}
+ Documentation/devicetree/bindings/arm/freescale/tigerp.txt | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/freescale/tigerp.txt
+
+diff --git a/Documentation/devicetree/bindings/arm/freescale/tigerp.txt b/Documentation/devicetree/bindings/arm/freescale/tigerp.txt
+new file mode 100644
+index 0000000..19e2aad
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/freescale/tigerp.txt
+@@ -0,0 +1,12 @@
++* Freescale Tigerp platform module
++
++Required properties:
++- compatible : Should be "fsl,imx51-tigerp"
++- reg : Address and length of the register set for the device
++
++Example:
++
++tigerp: tigerp at 83fa0000 {
++	compatible = "fsl,imx51-tigerp";
++	reg = <0x83fa0000 0x28>;
++};
 -- 
 2.7.4
