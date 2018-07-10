@@ -1,97 +1,105 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 10 Jul 2018 10:31:39 +0200
-Subject: [RFC PATCH 3/3] sdhci: arasan: Add support to read Tap Delay
- values from DT
-In-Reply-To: <1528373500-24663-3-git-send-email-manish.narani@xilinx.com>
-References: <1528373500-24663-1-git-send-email-manish.narani@xilinx.com>
- <1528373500-24663-3-git-send-email-manish.narani@xilinx.com>
-Message-ID: <CAPDyKFoGJOE-h4rLqzMO=wzNjkfcuU_oQ3NLK5=OQfSMj3dDHg@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 10 Jul 2018 09:33:50 +0100
+Subject: [PATCH v2 6/6] KVM: arm/arm64: vgic: Allow configuration of
+ interrupt groups
+In-Reply-To: <20180709224836.GA26579@u002843.usa.arm.com>
+References: <1530697100-22419-1-git-send-email-christoffer.dall@arm.com>
+ <1530697100-22419-7-git-send-email-christoffer.dall@arm.com>
+ <7f875ead-d3cb-1fec-bc84-56e64526e6a7@arm.com>
+ <20180709224836.GA26579@u002843.usa.arm.com>
+Message-ID: <51bb02d7-61d8-41bc-33e2-342364f659b5@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 June 2018 at 14:11, Manish Narani <manish.narani@xilinx.com> wrote:
-> This patch adds support for reading Tap Delay values from Device Tree
-> and write them via eemi calls. The macros containing these tap delay
-> values are removed from the driver.
->
-> Signed-off-by: Manish Narani <manish.narani@xilinx.com>
-> ---
->  drivers/mmc/host/sdhci-of-arasan.c | 131 +++++++++++++++++++++++++++++++++++++
->  1 file changed, 131 insertions(+)
->
-> diff --git a/drivers/mmc/host/sdhci-of-arasan.c b/drivers/mmc/host/sdhci-of-arasan.c
-> index e3332a5..fc0fd01 100644
-> --- a/drivers/mmc/host/sdhci-of-arasan.c
-> +++ b/drivers/mmc/host/sdhci-of-arasan.c
-> @@ -36,6 +36,8 @@
->
->  #define PHY_CLK_TOO_SLOW_HZ            400000
->
-> +#define MMC_BANK2              0x2
-> +
->  /*
->   * On some SoCs the syscon area has a feature where the upper 16-bits of
->   * each 32-bit register act as a write mask for the lower 16-bits.  This allows
-> @@ -90,6 +92,10 @@ struct sdhci_arasan_data {
->         struct sdhci_host *host;
->         struct clk      *clk_ahb;
->         struct phy      *phy;
-> +       u32 mio_bank;
-> +       u32 device_id;
-> +       u32 itapdly[MMC_TIMING_MMC_HS400 + 1];
-> +       u32 otapdly[MMC_TIMING_MMC_HS400 + 1];
->         bool            is_phy_on;
->
->         bool            has_cqe;
-> @@ -160,11 +166,36 @@ static int sdhci_arasan_syscon_write(struct sdhci_host *host,
->         return ret;
->  }
->
-> +/**
-> + * arasan_zynqmp_set_tap_delay - Program the tap delays.
-> + * @deviceid:          Unique Id of device
-> + * @itap_delay:                Input Tap Delay
-> + * @oitap_delay:       Output Tap Delay
-> + */
-> +static void arasan_zynqmp_set_tap_delay(u8 deviceid, u8 itap_delay, u8 otap_delay)
-> +{
-> +       const struct zynqmp_eemi_ops *eemi_ops = zynqmp_pm_get_eemi_ops();
+On 09/07/18 23:48, Christoffer Dall wrote:
+> On Mon, Jul 09, 2018 at 09:42:40AM +0100, Marc Zyngier wrote:
+>> On 04/07/18 10:38, Christoffer Dall wrote:
+>>> Implement the required MMIO accessors for GICv2 and GICv3 for the
+>>> IGROUPR distributor and redistributor registers.
+>>>
+>>> This can allow guests to change behavior compared to running on previous
+>>> versions of KVM, but only to align with the architecture and hardware
+>>> implementations.
+>>>
+>>> This also allows userspace to configure the groups for interrupts.  Note
+>>> that this potentially results in GICv2 guests not receiving interrupts
+>>> after migration if migrating from an older kernel that exposes GICv2
+>>> interrupts as group 1.
+>>>
+>>> Cc: Andrew Jones <drjones@redhat.com>
+>>> Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
+>>> ---
+>>> I implemented (but stashed) a version of this which predicated the
+>>> behavior based on the value of GICD_IIDR revision field, falling back to
+>>> ignoring writes and resetting GICv2 groups to 0 if the guest wrote a
+>>> revision less than 2.  However, current QEMU implementations simply
+>>> don't write the GICD_IIDR, so this doesn't help at all without changing
+>>> QEMU anyhow.
+>>>
+>>> The only actual fix I can see here to work around the problem in the
+>>> kernel is to require an opt-in to allow restoring groups from userspace,
+>>> but that's a lot of logic to support cross-kernel version migration.
+>>>
+>>> Question: Do we expect that cross-kernel version migration is a critical
+>>> feature that people really expect to work, and do we actually have
+>>> examples of catering to this in the kernel elsewhere?  (Also, how would
+>>> then that relate to the whole 'adding a new sysreg breaks migration'
+>>> situation?)
+>>
+>> I don't really get why QEMU doesn't try to restore GICD_IIDR, while it
+>> is definitely trying to restore RO sysregs (and that's how we detect
+>> incompatibilities).
+>>
+>> I think we should at least give userspace a chance to do the right
+>> thing. If it doesn't, well, too bad.
+> 
+> This series should give userspace an option to adjust its behavior.
+> 
+> My main concern is that this version of the series results in the worst
+> kind of migration failures, where the guest simply doesn't run on the
+> destination side with no warnings or error messages returned to the
+> user..
 
-No thanks!
+I agree, which is why I'm suggesting we make IIDR writeable. And yes, it
+still requires userspace to be fixed to actually write IIDR.
 
-Isn't there a more generic framework we can use to change the tap
-values, rather than calling SoC specific functions from the driver?
+> 
+> We could add logic to return an error code if trying to write a
+> different revision than what the kernel has (similar to the invariant
+> sysregs), so that a simple fix to QEMU to save restore the GICD_IIDR
+> register at least results in an error being returned to userspace.
+> 
+> However, as QEMU doesn't do anything useful here today (not blaming
+> anyone, I wrote the apparently broken GIC save/restore code for QEMU
+> myself), we could also argue that QEMU might as well just fix things up
+> if it detects a different IIDR.
+> 
+>>
+>> How bad is that "writable GICD_IIDR" patch? Because at this stage, and
+>> in the absence of any comment, I'm close to just pick that series and
+>> merge it for 4.19.
+>>
+> 
+> My guess is that a patch to "save/restore GICD_IIDR" is simple enough,
+> but requires additional logic in the kernel that returns an error if the
+> GICD_IIDR don't match on write.
+> 
+> A patch which changes the groups and bumps the IIDR in userspace is
+> probably more complex.
+> 
+> Sounds like I should add the GICD_IIDR checking patch.  Thoughts?
 
-BTW, what is a tap value, more exactly?
+I'm quite keen on that. It makes the userspace change trivial, aligns it
+somehow on the sysreg and ITS ABI behaviours.
 
-What does changing a tap value mean and where does the property belong, really?
+> What I would really like to know is whether this is really an issue or
+> not.  Do people who run products based on KVM, such as RHEV, have any
+> expectations about cross-kernel version migration?
 
-Of course this doesn't even compile, as you have a dependency to
-another series. Next time, please clarify that in a cover-letter
-(maybe you did, but I can't find it).
+I'd like to know as well.
 
-> +       u32 node_id = (deviceid == 0) ? NODE_SD_0 : NODE_SD_1;
-> +
-> +       if (!eemi_ops || !eemi_ops->ioctl)
-> +               return;
-> +
-> +       if (itap_delay)
-> +               eemi_ops->ioctl(node_id, IOCTL_SET_SD_TAPDELAY,
-> +                               PM_TAPDELAY_INPUT, itap_delay, NULL);
-> +
-> +       if (otap_delay)
-> +               eemi_ops->ioctl(node_id, IOCTL_SET_SD_TAPDELAY,
-> +                               PM_TAPDELAY_OUTPUT, otap_delay, NULL);
-> +}
+Thanks,
 
-Another overall comment for the series.
-
-I would recommend to change the order of the patches in the series.
-Let the DT doc change come first, next the driver change and finally
-the change to the DTS file(s). This makes it easier to follow and
-review.
-
-[...]
-
-Kind regards
-Uffe
+	M.
+-- 
+Jazz is not dead. It just smells funny...
