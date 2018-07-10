@@ -1,89 +1,39 @@
-From: sean@mess.org (Sean Young)
-Date: Tue, 10 Jul 2018 09:36:37 +0100
-Subject: [RESEND PATCH v5 0/6] IR support for A83T
-In-Reply-To: <85ddc129-d0f8-6299-dca0-81f79f3d04a9@gmail.com>
-References: <20180213122952.8420-1-embed3d@gmail.com>
- <85ddc129-d0f8-6299-dca0-81f79f3d04a9@gmail.com>
-Message-ID: <20180710083637.6s36rfbi2old5uxo@gofer.mess.org>
+From: yixun.lan@amlogic.com (Yixun Lan)
+Date: Tue, 10 Jul 2018 16:36:55 +0000
+Subject: [PATCH v2 0/3] clk: meson: add a sub EMMC clock controller support
+Message-ID: <20180710163658.6175-1-yixun.lan@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 02, 2018 at 01:11:34PM +0100, Philipp Rossak wrote:
-> 
-> 
-> On 13.02.2018 13:29, Philipp Rossak wrote:
-> > This patch series adds support for the sunxi A83T ir module and enhances
-> > the sunxi-ir driver. Right now the base clock frequency for the ir driver
-> > is a hard coded define and is set to 8 MHz.
-> > This works for the most common ir receivers. On the Sinovoip Bananapi M3
-> > the ir receiver needs, a 3 MHz base clock frequency to work without
-> > problems with this driver.
-> > 
-> > This patch series adds support for an optinal property that makes it able
-> > to override the default base clock frequency and enables the ir interface
-> > on the a83t and the Bananapi M3.
-> > 
-> > changes since v4:
-> > * rename cir pin from cir_pins to r_cir_pin
-> > * drop unit-adress from r_cir_pin
-> > * add a83t compatible to the cir node
-> > * move muxing options to dtsi
-> > * rename cir label and reorder it in the bananpim3.dts file
-> > 
-> > changes since v3:
-> > * collecting all acks & reviewd by
-> > * fixed typos
-> > 
-> > changes since v2:
-> > * reorder cir pin (alphabetical)
-> > * fix typo in documentation
-> > 
-> > changes since v1:
-> > * fix typos, reword Documentation
-> > * initialize 'b_clk_freq' to 'SUNXI_IR_BASE_CLK' & remove if statement
-> > * change dev_info() to dev_dbg()
-> > * change naming to cir* in dts/dtsi
-> > * Added acked Ackedi-by to related patch
-> > * use whole memory block instead of registers needed + fix for h3/h5
-> > 
-> > changes since rfc:
-> > * The property is now optinal. If the property is not available in
-> >    the dtb the driver uses the default base clock frequency.
-> > * the driver prints out the the selected base clock frequency.
-> > * changed devicetree property from base-clk-frequency to clock-frequency
-> > 
-> > Regards,
-> > Philipp
-> > 
-> > Philipp Rossak (6):
-> >    media: rc: update sunxi-ir driver to get base clock frequency from
-> >      devicetree
-> >    media: dt: bindings: Update binding documentation for sunxi IR
-> >      controller
-> >    arm: dts: sun8i: a83t: Add the cir pin for the A83T
-> >    arm: dts: sun8i: a83t: Add support for the cir interface
-> >    arm: dts: sun8i: a83t: bananapi-m3: Enable IR controller
-> >    arm: dts: sun8i: h3-h5: ir register size should be the whole memory
-> >      block
-> > 
-> >   Documentation/devicetree/bindings/media/sunxi-ir.txt |  3 +++
-> >   arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts         |  5 +++++
-> >   arch/arm/boot/dts/sun8i-a83t.dtsi                    | 18 ++++++++++++++++++
-> >   arch/arm/boot/dts/sunxi-h3-h5.dtsi                   |  2 +-
-> >   drivers/media/rc/sunxi-cir.c                         | 19 +++++++++++--------
-> >   5 files changed, 38 insertions(+), 9 deletions(-)
-> > 
-> 
-> I talked yesterday with Maxime about this patch series. And he told me if
-> the first to patches got merged, he will apply the dts patches to the sunxi
-> tree.
-> 
-> Sean, can you merge the first two patches through the rc-core?
+This driver will add a MMC clock controller driver support.
+The original idea about adding a clock controller is during the
+discussion in the NAND driver mainline effort[1].
 
-So I merged the first two patches, but the rest never made it upstream.
+I've tested this in the S400 board (AXG platform) by using NAND driver.
 
-Should they be resubmitted?
+Changes since v1 [2]:
+ - implement phase clock
+ - update compatible name
+ - adjust file name
+ - divider probe() into small functions, and re-use them
 
-Thanks,
+[1] https://lkml.kernel.org/r/20180628090034.0637a062 at xps13
+[2] https://lkml.kernel.org/r/20180703145716.31860-1-yixun.lan at amlogic.com
 
-Sean
+Yixun Lan (3):
+  clk: meson: add DT documentation for emmc clock controller
+  clk: meson: add sub MMC clock dt-bindings IDs
+  clk: meson: add sub MMC clock controller driver
+
+ .../bindings/clock/amlogic,mmc-clkc.txt       |  31 ++
+ drivers/clk/meson/Kconfig                     |   9 +
+ drivers/clk/meson/Makefile                    |   1 +
+ drivers/clk/meson/mmc-clkc.c                  | 419 ++++++++++++++++++
+ .../clock/amlogic,meson-mmc-clkc.h            |  16 +
+ 5 files changed, 476 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/amlogic,mmc-clkc.txt
+ create mode 100644 drivers/clk/meson/mmc-clkc.c
+ create mode 100644 include/dt-bindings/clock/amlogic,meson-mmc-clkc.h
+
+-- 
+2.18.0
