@@ -1,54 +1,73 @@
-From: collinsd@codeaurora.org (David Collins)
-Date: Tue, 10 Jul 2018 15:32:11 -0700
-Subject: [PATCH 2/3] arm64: dts: qcom: sdm845-mtp: Add RPMh VRM/XOB
- regulators
-In-Reply-To: <20180710220202.116404-3-dianders@chromium.org>
-References: <20180710220202.116404-1-dianders@chromium.org>
- <20180710220202.116404-3-dianders@chromium.org>
-Message-ID: <0d334051-2ba5-075d-df8c-affe3e617e8d@codeaurora.org>
+From: evgreen@chromium.org (Evan Green)
+Date: Tue, 10 Jul 2018 15:34:39 -0700
+Subject: [PATCH v6 6/8] interconnect: qcom: Add msm8916 interconnect
+ provider driver
+In-Reply-To: <20180709155104.25528-7-georgi.djakov@linaro.org>
+References: <20180709155104.25528-1-georgi.djakov@linaro.org>
+ <20180709155104.25528-7-georgi.djakov@linaro.org>
+Message-ID: <CAE=gft4YR27-ZyR5GXVxbiRbGycw=ydHu182LfwaLD=M+a8CNw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Doug,
+On Mon, Jul 9, 2018 at 8:51 AM Georgi Djakov <georgi.djakov@linaro.org> wrote:
+>
+> Add driver for the Qualcomm interconnect buses found in msm8916 based
+> platforms.
+>
+> Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
+> ---
+>  drivers/interconnect/Kconfig        |   5 +
+>  drivers/interconnect/Makefile       |   1 +
+>  drivers/interconnect/qcom/Kconfig   |  10 +
+>  drivers/interconnect/qcom/Makefile  |   2 +
+>  drivers/interconnect/qcom/msm8916.c | 499 ++++++++++++++++++++++++++++
+>  5 files changed, 517 insertions(+)
+>  create mode 100644 drivers/interconnect/qcom/msm8916.c
+>
+> diff --git a/drivers/interconnect/Kconfig b/drivers/interconnect/Kconfig
+> index a261c7d41deb..07a8276fa35a 100644
+> --- a/drivers/interconnect/Kconfig
+> +++ b/drivers/interconnect/Kconfig
+> @@ -8,3 +8,8 @@ menuconfig INTERCONNECT
+>
+>           If unsure, say no.
+>
+> +if INTERCONNECT
+> +
+> +source "drivers/interconnect/qcom/Kconfig"
+> +
+> +endif
+> diff --git a/drivers/interconnect/Makefile b/drivers/interconnect/Makefile
+> index 97fca2e09d24..7944cbca0527 100644
+> --- a/drivers/interconnect/Makefile
+> +++ b/drivers/interconnect/Makefile
+> @@ -1,2 +1,3 @@
+>  # SPDX-License-Identifier: GPL-2.0
+>  obj-$(CONFIG_INTERCONNECT)             += core.o
+> +obj-$(CONFIG_INTERCONNECT_QCOM)                += qcom/
+> diff --git a/drivers/interconnect/qcom/Kconfig b/drivers/interconnect/qcom/Kconfig
+> index b0c2ff928d88..a87afdef1bf7 100644
+> --- a/drivers/interconnect/qcom/Kconfig
+> +++ b/drivers/interconnect/qcom/Kconfig
+> @@ -2,6 +2,8 @@ config INTERCONNECT_QCOM
+>         bool "Qualcomm Network-on-Chip interconnect drivers"
+>         depends on INTERCONNECT
+>         depends on ARCH_QCOM || COMPILE_TEST
+> +       help
+> +         Support for Qualcomm's Network-on-Chip interconnect hardware.
+>
+>  config INTERCONNECT_QCOM_SMD_RPM
+>         tristate "Qualcomm SMD RPM interconnect driver"
+> @@ -9,3 +11,11 @@ config INTERCONNECT_QCOM_SMD_RPM
+>         help
+>           This is a driver for communicating interconnect related configuration
+>           details with a remote processor (RPM) on Qualcomm platforms.
+> +
+> +config INTERCONNECT_QCOM_MSM8916
+> +       tristate "Qualcomm MSM8916 interconnect driver"
+> +       depends on INTERCONNECT_QCOM
+> +       select INTERCONNECT_QCOM_SMD_RPM
 
-On 07/10/2018 03:02 PM, Douglas Anderson wrote:
-...
-> +		vdd-s1-supply = <&vph_pwr>;
-> +		vdd-s2-supply = <&vph_pwr>;
-> +		vdd-s3-supply = <&vph_pwr>;
-> +		vdd-s4-supply = <&vph_pwr>;
-> +		vdd-s5-supply = <&vph_pwr>;
-> +		vdd-s6-supply = <&vph_pwr>;
-> +		vdd-s7-supply = <&vph_pwr>;
-> +		vdd-s8-supply = <&vph_pwr>;
-> +		vdd-s9-supply = <&vph_pwr>;
-> +		vdd-s10-supply = <&vph_pwr>;
-> +		vdd-s11-supply = <&vph_pwr>;
-> +		vdd-s12-supply = <&vph_pwr>;
-> +		vdd-s13-supply = <&vph_pwr>;
-> +		vdd-l1-l27-supply = <&vreg_s7a_1p025>;
-> +		vdd-l2-l8-l17-supply = <&vreg_s3a_1p35>;
-> +		vdd-l3-l11-supply = <&vreg_s7a_1p025>;
-> +		vdd-l4-l5-supply = <&vreg_s7a_1p025>;
-> +		vdd-l6-supply = <&vph_pwr>;
-> +		vdd-l7-l12-l14-l15-supply = <&vreg_s5a_2p04>;
-> +		vdd-l9-supply = <&vreg_bob>;
-> +		vdd-l10-l23-l25-supply = <&vreg_bob>;
-> +		vdd-l13-l19-l21-supply = <&vreg_bob>;
-> +		vdd-l16-l28-supply = <&vreg_bob>;
-> +		vdd-l18-l22-supply = <&vreg_bob>;
-> +		vdd-l20-l24-supply = <&vreg_bob>;
-> +		vdd-l26-supply = <&vreg_s3a_1p35>;
-> +		vin-lvs-1-2-supply = <&vreg_s4a_1p8>;
-
-I would suggest not specifying any of these regulator parent supplies in
-device tree.  RPMh will be enforcing all regulator parent-child
-dependencies.  Therefore, handling the dependencies in Linux is redundant.
- It will result in additional RPMh requests as well as more time spent in
-regulator framework calls.  Overall, it will lead to slightly lower
-performance.  Note that while specifying the parent supplies results in
-less efficient runtime behavior, it is not technically wrong so you could
-keep them in place if you prefer.
-
-Take care,
-David
+I'm not a kconfig expert, maybe someone else could chime in. I have
+this impression that folks don't like select. Is there a way to do
+this with depends instead? If I'm way off here, ignore me.
