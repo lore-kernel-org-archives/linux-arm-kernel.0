@@ -1,52 +1,60 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 10 Jul 2018 18:44:51 +0100
-Subject: [PATCH v2 2/2] regulator: uniphier: add regulator driver for
- UniPhier SoC
-In-Reply-To: <1531186037-16630-3-git-send-email-hayashi.kunihiko@socionext.com>
-References: <1531186037-16630-1-git-send-email-hayashi.kunihiko@socionext.com>
- <1531186037-16630-3-git-send-email-hayashi.kunihiko@socionext.com>
-Message-ID: <20180710174451.GE8104@sirena.org.uk>
+From: collinsd@codeaurora.org (David Collins)
+Date: Tue, 10 Jul 2018 10:45:57 -0700
+Subject: [PATCH 3/3] arm64: dts: qcom: pm8998: Add thermal zone
+In-Reply-To: <20180629235417.GY129942@google.com>
+References: <20180628210915.160893-1-mka@chromium.org>
+ <20180628210915.160893-3-mka@chromium.org>
+ <CAD=FV=Wo4wc_QZYr0a2_Ge=B6T4RNJDnOyxAd8r6sT4iZJjCKg@mail.gmail.com>
+ <20180629185102.GV129942@google.com>
+ <3b5054bb-76e4-a06f-54bb-e6ea7bbbcc69@codeaurora.org>
+ <20180629235417.GY129942@google.com>
+Message-ID: <8144dd3c-6138-7f16-ec17-d75e84fcfb34@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 10, 2018 at 10:27:17AM +0900, Kunihiko Hayashi wrote:
+Hello Matthias,
 
-> +static int uniphier_regulator_enable(struct regulator_dev *rdev)
-> +{
-> +	struct uniphier_regulator_priv *priv = rdev_get_drvdata(rdev);
-> +
-> +	return regmap_update_bits(priv->regmap, rdev->desc->enable_reg,
-> +				  rdev->desc->enable_mask,
-> +				  rdev->desc->enable_val);
-> +}
+On 06/29/2018 04:54 PM, Matthias Kaehlcke wrote:
+> On Fri, Jun 29, 2018 at 02:29:55PM -0700, David Collins wrote:
+...
+>> The PMIC TEMP_ALARM hardware peripheral will perform an automatic partial
+>> PMIC shutdown upon hitting over-temperature stage 2 (125 C).  This turns
+>> off peripherals within the PMIC that are expected to draw significant
+>> current.  The set of peripherals included varies between PMICs.  This
+>> partial shutdown will occur simultaneously with the triggering of an
+>> interrupt to the APPS processor that informs the qcom-spmi-temp-alarm
+>> driver that an over-temperature threshold has been crossed.
+>>
+>> The TEMP_ALARM peripheral will perform an automatic full PMIC shutdown
+>> upon hitting over-temperature stage 3 (145 C).  Software won't receive an
+>> interrupt in this case because all power is cut.
+> 
+> This information is very useful, thanks David!
+> 
+> The (partial) hardware shutdown seems like a good measure of last
+> resort, however I suppose we prefer Linux to initiate a shutdown
+> before losing part of the peripherals (drivers might not be happy
+> about this and probably not revover even when the temperature goes
+> down again) or reach a full PMIC shutdown.
+> 
+> Please let me know if there are reasons to prefer to go the hardware
+> limits, it's also an option for device makers to overwrite these
+> settings if they want different behavior.
 
-This is just regulator_enable_regmap() isn't it?  Same for disable,
-unless I'm missing something (which is possible).
+Disabling stage 3 automatic full PMIC shutdown at 145 C is definitely a
+bad idea.  This exists as a last resort in order to save the hardware and
+ensure end user safety in case of excessive temperature even if software
+is locked up.
 
-> +static int uniphier_regulator_is_enabled(struct regulator_dev *rdev)
-> +{
-> +	struct uniphier_regulator_priv *priv = rdev_get_drvdata(rdev);
-> +	unsigned int val;
-> +	int ret = -EINVAL;
-> +
-> +	regmap_read(priv->regmap, rdev->desc->enable_reg, &val);
-> +	val &= rdev->desc->enable_mask;
-> +
-> +	if (val == rdev->desc->enable_val)
-> +		ret = 1;
-> +	else if (val == rdev->desc->disable_val)
-> +		ret = 0;
-> +
-> +	return ret;
-> +}
+Disabling stage 2 automatic partial PMIC shutdown at 125 C is not
+recommended as the PMIC is already outside of reasonable operating
+conditions and needs to take corrective action quickly.  However, doing so
+may be acceptable if software is taking action to shut down the system
+immediately upon receiving the stage 2 over-temperature interrupt.
 
-This isn't *quite* regulator_is_enabled_regmap() as it explicitly checks
-if the disable value is set and errors otherwise which would be a good
-fix for that.  Could you do a patch for that?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180710/99184ecf/attachment.sig>
+Take care,
+David
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
