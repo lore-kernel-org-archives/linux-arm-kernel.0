@@ -1,63 +1,53 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 10 Jul 2018 15:00:34 +0100
-Subject: [PATCH] coresight: tpiu: Fix disabling timeouts
-Message-ID: <9f296d734cef2d34ad2e2a5d93a1e56c5c8b1df9.1531231150.git.robin.murphy@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 10 Jul 2018 15:02:13 +0100
+Subject: next/master boot: 173 boots: 4 failed, 136 passed with 32
+ offline, 1 untried/unknown (next-20180710)
+In-Reply-To: <5b44b87b.1c69fb81.97804.0122@mx.google.com>
+References: <5b44b87b.1c69fb81.97804.0122@mx.google.com>
+Message-ID: <20180710140213.GB8104@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Probing the TPIU driver under UBSan triggers an out-of-bounds shift
-warning in coresight_timeout():
+On Tue, Jul 10, 2018 at 06:45:31AM -0700, kernelci.org bot wrote:
 
-...
-[    5.677530] UBSAN: Undefined behaviour in drivers/hwtracing/coresight/coresight.c:929:16
-[    5.685542] shift exponent 64 is too large for 64-bit type 'long unsigned int'
-...
+Today's linux-next fails to boot on mt7622-rfb1 with defconfig and
+defconfig+RANDOMIZE_BASE:
 
-On closer inspection things are exponentially out of whack because we're
-passing a bitmask where a bit number should be. Amusingly, it seems that
-both calls will find their expected values by sheer luck and appear to
-succeed: 1 << FFCR_FON_MAN ends up at bit 64 which whilst undefined
-evaluates as zero in practice, while 1 << FFSR_FT_STOPPED finds bit 2
-(TCPresent) which apparently is usually tied high.
+> arm64:
 
-Following the examples of other drivers, define separate FOO and FOO_BIT
-macros for masks vs. indices, and put things right.
+>     defconfig:
+>         mt7622-rfb1:
+>             lab-baylibre-seattle: new failure (last pass: next-20180709)
 
-CC: Robert Walker <robert.walker@arm.com>
-CC: Mike Leach <mike.leach@linaro.org>
-CC: Mathieu Poirier <mathieu.poirier@linaro.org>
-Fixes: 11595db8e17f ("coresight: Fix disabling of CoreSight TPIU")
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
- drivers/hwtracing/coresight/coresight-tpiu.c | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+>     defconfig+CONFIG_RANDOMIZE_BASE=y:
+>         mt7622-rfb1:
+>             lab-baylibre-seattle: new failure (last pass: next-20180709)
 
-diff --git a/drivers/hwtracing/coresight/coresight-tpiu.c b/drivers/hwtracing/coresight/coresight-tpiu.c
-index 01b7457fe8fc..459ef930d98c 100644
---- a/drivers/hwtracing/coresight/coresight-tpiu.c
-+++ b/drivers/hwtracing/coresight/coresight-tpiu.c
-@@ -40,8 +40,9 @@
- 
- /** register definition **/
- /* FFSR - 0x300 */
--#define FFSR_FT_STOPPED		BIT(1)
-+#define FFSR_FT_STOPPED_BIT	1
- /* FFCR - 0x304 */
-+#define FFCR_FON_MAN_BIT	6
- #define FFCR_FON_MAN		BIT(6)
- #define FFCR_STOP_FI		BIT(12)
- 
-@@ -86,9 +87,9 @@ static void tpiu_disable_hw(struct tpiu_drvdata *drvdata)
- 	/* Generate manual flush */
- 	writel_relaxed(FFCR_STOP_FI | FFCR_FON_MAN, drvdata->base + TPIU_FFCR);
- 	/* Wait for flush to complete */
--	coresight_timeout(drvdata->base, TPIU_FFCR, FFCR_FON_MAN, 0);
-+	coresight_timeout(drvdata->base, TPIU_FFCR, FFCR_FON_MAN_BIT, 0);
- 	/* Wait for formatter to stop */
--	coresight_timeout(drvdata->base, TPIU_FFSR, FFSR_FT_STOPPED, 1);
-+	coresight_timeout(drvdata->base, TPIU_FFSR, FFSR_FT_STOPPED_BIT, 1);
- 
- 	CS_LOCK(drvdata->base);
- }
--- 
-2.17.1.dirty
+I'm not 100% sure if this is a lab failure or an early boot failure:
+
+| Starting kernel ...
+
+| [ATF][    34.233534]save kernel info
+| [ATF][    34.236565]Kernel_EL2
+| [ATF][    34.239322]Kernel is 64Bit
+| [ATF][    34.242509]pc=0x40080000, r0=0x5cf48000, r1=0x0
+| INFO:    BL3-1: Preparing for EL3 exit to normal world, Kernel
+| INFO:    BL3-1: Next image address = 0x40080000
+| INFO:    BL3-1: Next image spsr = 0x3c9
+| [ATF][    34.260778]el3_exit
+| ~$off
+| # PYBOOT: Exception: kernel: ERROR: did not start booting.
+
+It only seems to affect this platform, other arm64 platforms seem fine.
+More details at:
+
+   https://kernelci.org/boot/id/5b44981a59b5141e5996baa1/
+
+for the defconfig case, symptoms seem similar with RANDOMIZE_BASE.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180710/d8650215/attachment.sig>
