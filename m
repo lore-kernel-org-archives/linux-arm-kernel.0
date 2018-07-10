@@ -1,74 +1,45 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Tue, 10 Jul 2018 13:37:05 +0100
-Subject: [PATCH net-next 12/13] ARM: net: bpf: always use odd/even register
- pair
+Date: Tue, 10 Jul 2018 13:36:55 +0100
+Subject: [PATCH net-next 10/13] ARM: net: bpf: avoid reloading 'index'
 In-Reply-To: <20180710123340.GK17271@n2100.armlinux.org.uk>
 References: <20180710123340.GK17271@n2100.armlinux.org.uk>
-Message-ID: <E1fcrtB-0005Va-8S@rmk-PC.armlinux.org.uk>
+Message-ID: <E1fcrt1-0005VM-1a@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Always use an odd/even register pair for our 64-bit registers, so that
-we're able to use the double-word load/store instructions in the future.
+Avoid reloading 'index' after we have validated it - it remains in
+tmp2[1] up to the point that we begin the code to index the pointer
+array, so with a little rearrangement of the registers, we can use
+the already loaded value.
 
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- arch/arm/net/bpf_jit_32.c | 28 ++++++++++++++--------------
- 1 file changed, 14 insertions(+), 14 deletions(-)
+ arch/arm/net/bpf_jit_32.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/net/bpf_jit_32.c b/arch/arm/net/bpf_jit_32.c
-index 926e81c15505..ca6534cabfa9 100644
+index a375eb33ac69..8264cac1322c 100644
 --- a/arch/arm/net/bpf_jit_32.c
 +++ b/arch/arm/net/bpf_jit_32.c
-@@ -47,27 +47,27 @@
-  * The callee saved registers depends on whether frame pointers are enabled.
-  * With frame pointers (to be compliant with the ABI):
-  *
-- *                                high
-- * original ARM_SP =>     +------------------+ \
-- *                        |        pc        | |
-- * current ARM_FP =>      +------------------+ } callee saved registers
-- *                        |r4-r8,r10,fp,ip,lr| |
-- *                        +------------------+ /
-- *                                low
-+ *                              high
-+ * original ARM_SP =>     +--------------+ \
-+ *                        |      pc      | |
-+ * current ARM_FP =>      +--------------+ } callee saved registers
-+ *                        |r4-r9,fp,ip,lr| |
-+ *                        +--------------+ /
-+ *                              low
-  *
-  * Without frame pointers:
-  *
-- *                                high
-- * original ARM_SP =>     +------------------+
-- *                        | r4-r8,r10,fp,lr  | callee saved registers
-- * current ARM_FP =>      +------------------+
-- *                                low
-+ *                              high
-+ * original ARM_SP =>     +--------------+
-+ *                        |  r4-r9,fp,lr | callee saved registers
-+ * current ARM_FP =>      +--------------+
-+ *                              low
-  *
-  * When popping registers off the stack at the end of a BPF function, we
-  * reference them via the current ARM_FP register.
-  */
- #define CALLEE_MASK	(1 << ARM_R4 | 1 << ARM_R5 | 1 << ARM_R6 | \
--			 1 << ARM_R7 | 1 << ARM_R8 | 1 << ARM_R10 | \
-+			 1 << ARM_R7 | 1 << ARM_R8 | 1 << ARM_R9 | \
- 			 1 << ARM_FP)
- #define CALLEE_PUSH_MASK (CALLEE_MASK | 1 << ARM_LR)
- #define CALLEE_POP_MASK  (CALLEE_MASK | 1 << ARM_PC)
-@@ -157,7 +157,7 @@ static const s8 bpf2a32[][2] = {
- 	 * for constant blindings and others.
+@@ -1024,6 +1024,8 @@ static int emit_bpf_tail_call(struct jit_ctx *ctx)
+ 	emit(ARM_CMP_R(r_index, tmp[1]), ctx);
+ 	_emit(ARM_COND_CS, ARM_B(jmp_offset), ctx);
+ 
++	/* tmp2[1] = index */
++
+ 	/* if (tail_call_cnt > MAX_TAIL_CALL_CNT)
+ 	 *	goto out;
+ 	 * tail_call_cnt++;
+@@ -1044,9 +1046,8 @@ static int emit_bpf_tail_call(struct jit_ctx *ctx)
  	 */
- 	[TMP_REG_1] = {ARM_R7, ARM_R6},
--	[TMP_REG_2] = {ARM_R10, ARM_R8},
-+	[TMP_REG_2] = {ARM_R9, ARM_R8},
- 	/* Tail call count. Stored on stack scratch space. */
- 	[TCALL_CNT] = {STACK_OFFSET(BPF_TC_HI), STACK_OFFSET(BPF_TC_LO)},
- 	/* temporary register for blinding constants.
+ 	BUILD_BUG_ON(offsetof(struct bpf_array, ptrs) > ARM_ALU_IMM);
+ 	off = offsetof(struct bpf_array, ptrs);
+-	r_array = arm_bpf_get_reg32(r2[1], tmp2[1], ctx);
++	r_array = arm_bpf_get_reg32(r2[1], tmp2[0], ctx);
+ 	emit(ARM_ADD_I(tmp[1], r_array, off), ctx);
+-	r_index = arm_bpf_get_reg32(r3[1], tmp2[1], ctx);
+ 	emit(ARM_LDR_R_SI(tmp[1], tmp[1], r_index, SRTYPE_ASL, 2), ctx);
+ 	emit(ARM_CMP_I(tmp[1], 0), ctx);
+ 	_emit(ARM_COND_EQ, ARM_B(jmp_offset), ctx);
 -- 
 2.7.4
