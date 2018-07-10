@@ -1,33 +1,72 @@
-From: pawel.mikolaj.chmiel@gmail.com (=?utf-8?B?UGF3ZcWC?= Chmiel)
-Date: Tue, 10 Jul 2018 14:18:39 +0200
-Subject: [PATCH v4 0/5] Initial support for Samsung Galaxy S and Galaxy S
- 4G
-In-Reply-To: <20180710120504.GB6884@amd>
-References: <1530958183-10956-1-git-send-email-pawel.mikolaj.chmiel@gmail.com>
- <20180710120504.GB6884@amd>
-Message-ID: <5549799.hqpipYcP1I@acerlaptop>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 10 Jul 2018 14:21:40 +0200 (CEST)
+Subject: [PATCH 2/2] clocksource: arm_arch_timer: set arch_mem_timer
+ cpumask to cpu_possible_mask
+In-Reply-To: <b98e0d87-3d9a-9b0c-23c4-7b289cc79a97@arm.com>
+References: <1531151136-18297-1-git-send-email-sudeep.holla@arm.com>
+ <1531151136-18297-2-git-send-email-sudeep.holla@arm.com>
+ <alpine.DEB.2.21.1807100008100.1590@nanos.tec.linutronix.de>
+ <b98e0d87-3d9a-9b0c-23c4-7b289cc79a97@arm.com>
+Message-ID: <alpine.DEB.2.21.1807101419130.4356@nanos.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, July 10, 2018 2:05:04 PM CEST Pavel Machek wrote:
-> Hi!
-> 
-> > This patch series adds support for Samsung Galaxy S and Galaxy S 4G.
-> > Both are commercial phone based on Aries family.
-> 
-> Thanks for doing this. What kind of userspace are your running?
-> 
-> (I do have N900 here running Debian and PostmarketOS, and Droid 4
-> running Maemo Leste)
-
-Currently i'm running arch linux arm (but wanted to try PostmarketOS also).
-
-If anyone is interested/wanted to help:
-https://github.com/PabloPL/linux -> all kernel development is done here (there are more working things than in this patchset)
-https://github.com/xc-racer99/u-boot-galaxys4g -> here is initlal port of uboot for aries family. It can be flashed as kernel (more details in wiki)
+On Tue, 10 Jul 2018, Sudeep Holla wrote:
 
 > 
-> Best regards,
-> 							Pavel
-> 							
 > 
+> On 09/07/18 23:09, Thomas Gleixner wrote:
+> > On Mon, 9 Jul 2018, Sudeep Holla wrote:
+> > 
+> >> Currently, arch_mem_timer cpumask is set to cpu_all_mask which should be
+> >> fine. However, cpu_possible_mask is more accurate and if there are other
+> >> clockevent source in the system which are set to cpu_possible_mask, then
+> >> having cpu_all_mask may result in issue.
+> >>
+> >> E.g. on a platform with arm,sp804 timer with rating 300 and
+> >> cpu_possible_mask and this arch_mem_timer timer with rating 400 and
+> >> cpu_all_mask, tick_check_preferred may choose both preferred as the
+> >> cpumasks are not equal though they must be.
+> >>
+> >> This issue was root caused incorrectly initially and a fix was merged as
+> >> commit 1332a9055801 ("tick: Prefer a lower rating device only if it's CPU
+> >> local device").
+> > 
+> > To avoid that in the future we really should fix the decision logic to mask
+> > out the non possible CPUs from the supplied masks.
+> 
+> Sure, I can do that. But do you want that as a fix for v4.18 ?
+
+No, that's for 4.19
+
+> I think we may need this check at another place in tick_setup_device
+> 
+> 213         /*
+> 214          * When the device is not per cpu, pin the interrupt to the
+> 215          * current cpu:
+> 216          */
+> 217         if (!cpumask_equal(newdev->cpumask, cpumask))
+> 218                 irq_set_affinity(newdev->irq, cpumask);
+> 
+> Does it make sense trim dev->cpumask when registering the clockevents
+> device itself instead of adding check at place where this cpumask
+> can be used ? So that any future user of those masks need not have to
+> take care of that.
+
+The problem is you cannot trim it because cpu_all_mask is global and const.
+
+> Also only few ARM clocksource drivers use cpu_all_mask which could be
+> result of copy-paste, we can even fix them too.
+> 
+> arm_arch_timer.c:	clk->cpumask = cpu_all_mask;
+> tegra20_timer.c:	tegra_clockevent.cpumask = cpu_all_mask;
+> timer-atcpit100.c:	.cpumask = cpu_all_mask,
+> timer-keystone.c:	event_dev->cpumask = cpu_all_mask;
+> zevio-timer.c:		timer->clkevt.cpumask	= cpu_all_mask;
+
+Yes, that makes sense. What we could do is warn, when cpu_all_mask is set
+at registration time and replace the pointer with cpu_possible_mask.
+
+Thanks,
+
+	tglx
