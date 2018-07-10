@@ -1,151 +1,146 @@
-From: sebastian.reichel@collabora.co.uk (Sebastian Reichel)
-Date: Tue, 10 Jul 2018 17:04:19 +0200
-Subject: [PATCH v2 6/6] ARM: mx5: Set the DBGEN bit in ARM_GPC register
-In-Reply-To: <1531230456-27717-6-git-send-email-fabio.estevam@nxp.com>
-References: <1531230456-27717-1-git-send-email-fabio.estevam@nxp.com>
- <1531230456-27717-6-git-send-email-fabio.estevam@nxp.com>
-Message-ID: <20180710150419.4sir7fy3uz2ke4jm@earth.universe>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Tue, 10 Jul 2018 10:04:21 -0500
+Subject: 4.18rc3 TX2 boot failure with "ACPICA: AML parser: attempt to
+ continue loading table after error"
+In-Reply-To: <2264016.O8iB3BUh2s@aspire.rjw.lan>
+References: <c49a3666-7d23-6a05-703c-1273d79a00cd@arm.com>
+ <218e4339-477d-eb0d-6007-764c8e24229f@arm.com>
+ <3574827.zOC4apc8e1@aspire.rjw.lan> <2264016.O8iB3BUh2s@aspire.rjw.lan>
+Message-ID: <dc4c68bb-089c-6c99-31df-e8d3587b6029@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Tue, Jul 10, 2018 at 10:47:36AM -0300, Fabio Estevam wrote:
-> On i.MX51/i.MX53 it is necessary to set the DBGEN bit in 
-> ARM_GPC register in order to turn on the debug clocks.
+On 07/10/2018 06:25 AM, Rafael J. Wysocki wrote:
+> On Tuesday, July 10, 2018 1:13:17 PM CEST Rafael J. Wysocki wrote:
+>> On Tuesday, July 10, 2018 5:44:05 AM CEST Jeremy Linton wrote:
+>>> Hi,
+>>>
+>>> On 07/09/2018 04:28 PM, Rafael J. Wysocki wrote:
+>>>> On Mon, Jul 9, 2018 at 10:45 PM, Jeremy Linton <jeremy.linton@arm.com> wrote:
+>>>>> Hi,
+>>>>>
+>>>>> First thanks for the patch..
+>>>>>
+>>>>> On 07/08/2018 04:14 AM, Rafael J. Wysocki wrote:
+>>>>>>
+>>>>>> On Monday, July 2, 2018 11:41:42 PM CEST Jeremy Linton wrote:
+>>>>>>>
+>>>>>>> Hi,
+>>>>>>>
+>>>>>>> I'm experiencing two problems with commit 5088814a6e931 which is
+>>>>>>> "ACPICA: AML parser: attempt to continue loading table after error"
+>>>>>>>
+>>>>>>> The first is this boot failure on a thunderX2:
+>>>>>>>
+>>>>>>> [   10.770098] ACPI Error: Ignore error and continue table load
+>>>>>
+>>>>>
+>>>>> [trimming]
+>>>>>
+>>>>>>> ]---
+>>>>>>>
+>>>>>>> Which does appear to be the result of some bad data in the table, but it
+>>>>>>> was working with 4.17, and reverting this commit solves the problem.
+>>>>>>
+>>>>>>
+>>>>>> Does the patch below make any difference?
+>>>>>>
+>>>>>> ---
+>>>>>>     drivers/acpi/acpica/psobject.c |    3 +++
+>>>>>>     1 file changed, 3 insertions(+)
+>>>>>>
+>>>>>> Index: linux-pm/drivers/acpi/acpica/psobject.c
+>>>>>> ===================================================================
+>>>>>> --- linux-pm.orig/drivers/acpi/acpica/psobject.c
+>>>>>> +++ linux-pm/drivers/acpi/acpica/psobject.c
+>>>>>> @@ -39,6 +39,9 @@ static acpi_status acpi_ps_get_aml_opcod
+>>>>>>           ACPI_FUNCTION_TRACE_PTR(ps_get_aml_opcode, walk_state);
+>>>>>>           walk_state->aml = walk_state->parser_state.aml;
+>>>>>> +       if (!walk_state->aml)
+>>>>>> +               return AE_CTRL_PARSE_CONTINUE;
+>>>>>> +
+>>>>>
+>>>>>
+>>>>> Well this seems to avoid the crash, but now it hangs right after on the
+>>>>> "Ignore error and continue table load" message.
+>>>>
+>>>> Well, maybe we should just abort in that case.
+>>>>
+>>>> I'm wondering what happens if you replace the return statement in the
+>>>> patch above with
+>>>>
+>>>> return_ACPI_STATUS(AE_AML_BAD_OPCODE)
+>>>
+>>> Yes, that is where I went when I applied the patch but I used
+>>> AE_CTRL_TERMINATE, which terminates the loop in acpi_ps_parse_loop() and
+>>> that appears to successfully finish/terminate the initial parsing pass.
+>>> But, it then crashes in acpi_ns_lookup called via the
+>>> acpi_walk_resources sequences that goes through ut_evalute_object() due
+>>> to the path/scope_info->scope.node being ACPI_ROOT_OBJECT (-1) and
+>>> bypassing the null check. Adding a ACPI_ROOT_OBJECT check as well as the
+>>> null checks in acpi_ns_lookup results in a successful boot. Tracking
+>>> down how the terminate (or whatever) is leaving the info->prefix_node
+>>> (in acpi_ns_evaluate) set to ROOT_OBJECT instead of null, is something I
+>>> don't yet understand.
+>>>
+>>> Anyway, I tried Using BAD_OPCODE rather than TERMINATE and it seems to
+>>> have the same basic result as PARSE_CONTINUE.
+>>
+>> OK, thanks!
+>>
+>> I evidently didn't look deep enough.
+>>
+>> Can you please check the patch below?
+>>
+>> I'm not sure if we can pass this broken state to
+>> acpi_ps_complete_final_op(), so it may be necessary to return
+>> an error directly when aml_op_start is NULL.
+>>
+>> ---
+>>   drivers/acpi/acpica/psloop.c |    3 +++
+>>   1 file changed, 3 insertions(+)
+>>
+>> Index: linux-pm/drivers/acpi/acpica/psloop.c
+>> ===================================================================
+>> --- linux-pm.orig/drivers/acpi/acpica/psloop.c
+>> +++ linux-pm/drivers/acpi/acpica/psloop.c
+>> @@ -493,6 +493,9 @@ acpi_status acpi_ps_parse_loop(struct ac
+>>   		ASL_CV_CAPTURE_COMMENTS(walk_state);
+>>   
+>>   		aml_op_start = parser_state->aml;
+>> +		if (!aml_op_start)
+>> +			break;
+>> +
+>>   		if (!op) {
+>>   			status =
+>>   			    acpi_ps_create_op(walk_state, aml_op_start, &op);
+>>
+>> --
 > 
-> The DBGEN bit of ARM_GPC register has the following description
-> in the i.MX53 Reference Manual:
+> So maybe something like this:
 > 
-> "This allows the user to manually activate clocks within the debug
-> system. This register bit directly controls the platform's dbgen_out
-> output signal which connects to the DAP_SYS to enable all debug clocks.
-> Once enabled, the clocks cannot be disabled except by asserting the
-> disable_trace input of the DAP_SYS."
-> 
-> Based on a previous patch from Sebastian Reichel.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 > ---
-> Changes since v1:
-> - Annonate __init in mx5_pmu_init()
-> - Unmap tigerp_base after use
-> - Also touch mx51
+>   drivers/acpi/acpica/psloop.c |    3 +++
+>   1 file changed, 3 insertions(+)
 > 
->  arch/arm/mach-imx/common.h     |  1 +
->  arch/arm/mach-imx/cpu-imx5.c   | 38 ++++++++++++++++++++++++++++++++++++++
->  arch/arm/mach-imx/mach-imx51.c |  2 +-
->  arch/arm/mach-imx/mach-imx53.c |  2 +-
->  4 files changed, 41 insertions(+), 2 deletions(-)
+> Index: linux-pm/drivers/acpi/acpica/psloop.c
+> ===================================================================
+> --- linux-pm.orig/drivers/acpi/acpica/psloop.c
+> +++ linux-pm/drivers/acpi/acpica/psloop.c
+> @@ -494,6 +494,9 @@ acpi_status acpi_ps_parse_loop(struct ac
+>   
+>   		aml_op_start = parser_state->aml;
+>   		if (!op) {
+> +			if (!aml_op_start)
+> +				return_ACPI_STATUS(AE_AML_INTERNAL);
+> +
+>   			status =
+>   			    acpi_ps_create_op(walk_state, aml_op_start, &op);
+>   			if (ACPI_FAILURE(status)) {
 > 
-> diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
-> index 93225db7..423dd76 100644
-> --- a/arch/arm/mach-imx/common.h
-> +++ b/arch/arm/mach-imx/common.h
-> @@ -62,6 +62,7 @@ void imx_gpc_set_arm_power_up_timing(u32 sw2iso, u32 sw);
->  void imx_gpc_set_arm_power_down_timing(u32 sw2iso, u32 sw);
->  void imx25_pm_init(void);
->  void imx27_pm_init(void);
-> +void imx5_pmu_init(void);
->  
->  enum mxc_cpu_pwr_mode {
->  	WAIT_CLOCKED,		/* wfi only */
-> diff --git a/arch/arm/mach-imx/cpu-imx5.c b/arch/arm/mach-imx/cpu-imx5.c
-> index 4f2d1c7..d093017 100644
-> --- a/arch/arm/mach-imx/cpu-imx5.c
-> +++ b/arch/arm/mach-imx/cpu-imx5.c
-> @@ -117,3 +117,41 @@ int mx53_revision(void)
->  	return mx5_cpu_rev;
->  }
->  EXPORT_SYMBOL(mx53_revision);
-> +
-> +#define ARM_GPC		0x4
-> +#define DBGEN		BIT(16)
-> +
-> +/*
-> + * This enables the DBGEN bit in ARM_GPC register, which is
-> + * required for accessing some performance counter features.
-> + * Technically it is only required while perf is used, but to
-> + * keep the source code simple we just enable it all the time
-> + * when the kernel configuration allows using the feature.
-> + */
-> +void __init imx5_pmu_init(void)
-> +{
-> +	void __iomem *tigerp_base;
-> +	struct device_node *np;
-> +	u32 gpc;
-> +
-> +	if (!IS_ENABLED(CONFIG_ARM_PMU))
-> +		return;
-> +
-> +	np = of_find_compatible_node(NULL, NULL, "arm,cortex-a8-pmu");
-> +	if (!np)
-> +		return;
-> +
-
-This should also check for "secure-reg-access" property in the
-PMU node. Without that property the DBGEN is not required.
-AFAICT. Also:
-
-of_node_put(np);
-
-> +	np = of_find_compatible_node(NULL, NULL, "fsl,imx51-tigerp");
-> +	if (!np)
-> +		return;
-> +
-> +	tigerp_base = of_iomap(np, 0);
-> +	if (!tigerp_base)
-> +		return;
-
-goto exit;
-
-> +
-> +	gpc = readl_relaxed(tigerp_base + ARM_GPC);
-> +	gpc |= DBGEN;
-> +	writel_relaxed(gpc, tigerp_base + ARM_GPC);
-> +	iounmap(tigerp_base);
-
-exit:
-of_node_put(np);
-
-> +
-> +}
-
--- Sebastian
-
-> diff --git a/arch/arm/mach-imx/mach-imx51.c b/arch/arm/mach-imx/mach-imx51.c
-> index 3835b6a..8838fba 100644
-> --- a/arch/arm/mach-imx/mach-imx51.c
-> +++ b/arch/arm/mach-imx/mach-imx51.c
-> @@ -52,7 +52,7 @@ static void __init imx51_dt_init(void)
->  {
->  	imx51_ipu_mipi_setup();
->  	imx_src_init();
-> -
-> +	imx5_pmu_init();
->  	imx_aips_allow_unprivileged_access("fsl,imx51-aipstz");
->  }
->  
-> diff --git a/arch/arm/mach-imx/mach-imx53.c b/arch/arm/mach-imx/mach-imx53.c
-> index 07c2e8d..5ec7100 100644
-> --- a/arch/arm/mach-imx/mach-imx53.c
-> +++ b/arch/arm/mach-imx/mach-imx53.c
-> @@ -31,7 +31,7 @@ static void __init imx53_init_early(void)
->  static void __init imx53_dt_init(void)
->  {
->  	imx_src_init();
-> -
-> +	imx5_pmu_init();
->  	imx_aips_allow_unprivileged_access("fsl,imx53-aipstz");
->  }
->  
-> -- 
-> 2.7.4
 > 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180710/d7190457/attachment.sig>
+
+This gets rid of the infinite loop, but its still has the problem with 
+acpi_ns_lookup crashing due to -1 in the scope.node.
