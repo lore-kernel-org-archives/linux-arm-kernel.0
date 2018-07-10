@@ -1,156 +1,95 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 10 Jul 2018 18:03:30 +0100
-Subject: [PATCH v3 15/20] kvm: arm/arm64: Allow tuning the physical
- address size for VM
-In-Reply-To: <377420ce-97a8-4359-6224-273d91f37247@arm.com>
-References: <1530270944-11351-16-git-send-email-suzuki.poulose@arm.com>
- <20180704155104.GN4828@arm.com>
- <12d1832a-1a13-7dd4-662b-addf58400789@arm.com>
- <fe9f5aa5-b283-07e0-5f0e-e97d96b780e7@arm.com>
- <9f1af26e-2913-2b0b-1352-63160096f78f@arm.com>
- <f3463d0a-c6a3-c34d-acb3-13c99fc61c5a@arm.com>
- <20180709112326.GD9486@e103592.cambridge.arm.com>
- <17f8d585-3489-ab6f-6ee1-4d8d337dcf9c@arm.com>
- <20180709133750.GE9486@e103592.cambridge.arm.com>
- <377420ce-97a8-4359-6224-273d91f37247@arm.com>
-Message-ID: <20180710170330.GJ9486@e103592.cambridge.arm.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 10 Jul 2018 10:03:33 -0700
+Subject: [PATCH net-next 13/13] ARM: net: bpf: use double-word load/stores
+ where available
+In-Reply-To: <E1fcrtG-0005Vh-DK@rmk-PC.armlinux.org.uk>
+References: <20180710123340.GK17271@n2100.armlinux.org.uk>
+ <E1fcrtG-0005Vh-DK@rmk-PC.armlinux.org.uk>
+Message-ID: <CAOesGMio4JTzAPQ3Bkx8LxhkhJStzOGC6t2U8aC6m4TiBtaunQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 10, 2018 at 05:38:39PM +0100, Suzuki K Poulose wrote:
-> On 09/07/18 14:37, Dave Martin wrote:
-> >On Mon, Jul 09, 2018 at 01:29:42PM +0100, Marc Zyngier wrote:
-> >>On 09/07/18 12:23, Dave Martin wrote:
+Hi Russell,
 
-[...]
-
-> >>>Wedging arguments into a few bits in the type argument feels awkward,
-> >>>and may be regretted later if we run out of bits, or something can't be
-> >>>represented in the chosen encoding.
-> >>
-> >>I think that's a pretty convincing argument for a "better" CREATE_VM,
-> >>one that would have a clearly defined, structured (and potentially
-> >>extensible) argument.
-> >>
-> >>I've quickly hacked the following:
-> >>
-> >>diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
-> >>index b6270a3b38e9..3e76214034c2 100644
-> >>--- a/include/uapi/linux/kvm.h
-> >>+++ b/include/uapi/linux/kvm.h
-> >>@@ -735,6 +735,20 @@ struct kvm_ppc_resize_hpt {
-> >>  	__u32 pad;
-> >>  };
-> >>
-> >>+struct kvm_create_vm2 {
-> >>+	__u64	version;	/* Or maybe not */
-> >>+	union {
-> >>+		struct {
-> >>+#define KVM_ARM_SVE_CAPABLE	(1 << 0)
-> >>+#define KVM_ARM_SELECT_IPA	{1 << 1)
-> >>+			__u64	capabilities;
-> >>+			__u16	sve_vlen;
-> >>+			__u8	ipa_size;
-> >>+		} arm64;
-> >>+		__u64	dummy[15];
-> >>+	};
-> >>+};
-> >>+
-> >>  #define KVMIO 0xAE
-> >>
-> >>  /* machine type bits, to be used as argument to KVM_CREATE_VM */
-> >>
-> >>Other architectures could fill in their own bits if they need to.
-> >>
-> >>Thoughts?
-> >
-> >This kind of thing should work, but it may still get messy when we
-> >add additional fields.
-> 
-> 
-> Marc, Dave,
-> 
-> I like Dave's approach. Some comments below.
-> 
-> >
-> >It we want this to work cross-arch, would it make sense to go
-> >for a more generic approach, say
-> >
-> >struct kvm_create_vm_attr_any {
-> >         __u32   type;
-> >};
-> >
-> >#define KVM_CREATE_VM_ATTR_ARCH_CAPABILITIES 1
-> >struct kvm_create_vm_attr_arch_capabilities {
-> >         __u32   type;
-> >         __u16   size; /* support future expansion of capabilities[] */
-> >         __u16   reserved;
-> >         __u64   capabilities[1];
-> >};
-> 
-> We also need to advertise which attributes are supported by the host,
-> so that the user can tune the available ones. That would make a bit mask
-> like the above trickier, unless we return the supported values back
-> in the argument ptr for the "probe" call. And this scheme in general
-> can be useful for passing back a non-boolean result specific to the
-> attribute, without having a per-attribute ioctl. (e.g, maximum limit
-> for IPA).
-
-Maybe, but this could quickly become bloated.  (My approach already
-feels a bit bloated...)
-
-I'm not sure that arbitrarily complex negotiation will really be
-needed, but userspace might want to change its mind if setting a
-particular propertiy fails.
-
-An alternative might be to have a bunch of per-VM ioctls to configure
-different things, like x86 has.  There's at least precedent for that.
-For arm, we currently only have a few.  That allows for easy extension,
-at the cost of adding ioctls.
-
-There may be some ioctls we can reuse, like KVM_ENABLE_CAP for per-
-vm capability flags.
+On Tue, Jul 10, 2018 at 5:37 AM, Russell King
+<rmk+kernel@armlinux.org.uk> wrote:
+> Use double-word load and stores where support for this instruction is
+> supported by the CPU architecture.
+>
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> ---
+>  arch/arm/net/bpf_jit_32.c | 55 ++++++++++++++++++++++++++++++++++++-----------
+>  arch/arm/net/bpf_jit_32.h |  2 ++
+>  2 files changed, 45 insertions(+), 12 deletions(-)
+>
+> diff --git a/arch/arm/net/bpf_jit_32.c b/arch/arm/net/bpf_jit_32.c
+> index ca6534cabfa9..7e1d1635c65b 100644
+> --- a/arch/arm/net/bpf_jit_32.c
+> +++ b/arch/arm/net/bpf_jit_32.c
+> @@ -485,10 +489,16 @@ static const s8 *arm_bpf_get_reg64(const s8 *reg, const s8 *tmp,
+>                                    struct jit_ctx *ctx)
+>  {
+>         if (is_stacked(reg[1])) {
+> -               emit(ARM_LDR_I(tmp[1], ARM_FP, EBPF_SCRATCH_TO_ARM_FP(reg[1])),
+> -                    ctx);
+> -               emit(ARM_LDR_I(tmp[0], ARM_FP, EBPF_SCRATCH_TO_ARM_FP(reg[0])),
+> -                    ctx);
+> +               if (__LINUX_ARM_ARCH__ >= 6 ||
+> +                   ctx->cpu_architecture >= CPU_ARCH_ARMv5TE) {
+> +                       emit(ARM_LDRD_I(tmp[1], ARM_FP,
+> +                                       EBPF_SCRATCH_TO_ARM_FP(reg[1])), ctx);
+> +               } else {
+> +                       emit(ARM_LDR_I(tmp[1], ARM_FP,
+> +                                      EBPF_SCRATCH_TO_ARM_FP(reg[1])), ctx);
+> +                       emit(ARM_LDR_I(tmp[0], ARM_FP,
+> +                                      EBPF_SCRATCH_TO_ARM_FP(reg[0])), ctx);
+> +               }
+>                 reg = tmp;
+>         }
+>         return reg;
+> @@ -510,10 +520,16 @@ static void arm_bpf_put_reg64(const s8 *reg, const s8 *src,
+>                               struct jit_ctx *ctx)
+>  {
+>         if (is_stacked(reg[1])) {
+> -               emit(ARM_STR_I(src[1], ARM_FP, EBPF_SCRATCH_TO_ARM_FP(reg[1])),
+> -                    ctx);
+> -               emit(ARM_STR_I(src[0], ARM_FP, EBPF_SCRATCH_TO_ARM_FP(reg[0])),
+> -                    ctx);
+> +               if (__LINUX_ARM_ARCH__ >= 6 ||
+> +                   ctx->cpu_architecture >= CPU_ARCH_ARMv5TE) {
+> +                       emit(ARM_STRD_I(src[1], ARM_FP,
+> +                                      EBPF_SCRATCH_TO_ARM_FP(reg[1])), ctx);
+> +               } else {
+> +                       emit(ARM_STR_I(src[1], ARM_FP,
+> +                                      EBPF_SCRATCH_TO_ARM_FP(reg[1])), ctx);
+> +                       emit(ARM_STR_I(src[0], ARM_FP,
+> +                                      EBPF_SCRATCH_TO_ARM_FP(reg[0])), ctx);
+> +               }
+>         } else {
+>                 if (reg[1] != src[1])
+>                         emit(ARM_MOV_R(reg[1], src[1]), ctx);
+> @@ -663,13 +679,27 @@ static inline void emit_a32_mov_r(const s8 dst, const s8 src,
+>  static inline void emit_a32_mov_r64(const bool is64, const s8 dst[],
+>                                   const s8 src[],
+>                                   struct jit_ctx *ctx) {
+> -       emit_a32_mov_r(dst_lo, src_lo, ctx);
+> -       if (is64) {
+> +       if (!is64) {
+> +               emit_a32_mov_r(dst_lo, src_lo, ctx);
+> +               /* Zero out high 4 bytes */
+> +               emit_a32_mov_i(dst_hi, 0, ctx);
+> +       } else if (__LINUX_ARM_ARCH__ < 6 &&
+> +                  ctx->cpu_architecture < CPU_ARCH_ARMv5) {
+>                 /* complete 8 byte move */
+> +               emit_a32_mov_r(dst_lo, src_lo, ctx);
+>                 emit_a32_mov_r(dst_hi, src_hi, ctx);
 
 
-[...]
+Tiny nit: Looks like you compare for >= ARMv5TE above and <ARMv5 here.
 
-> >union kvm_create_vm_attr {
-> >         struct kvm_create_vm_attr_any;
-> >         struct kvm_create_vm_attr_arch_capabilities;
-> >         struct kvm_create_vm_attr_arm64_physaddr_size;
-> >         /* ... */
-> >};
-> 
-> nit: Could we simply do s/kvm_create_vm_attr/kvm_vm_attr/ everywhere ?
-> While I agree that the kvm_create_vm_attr makes it implicit that the attributes
-> are valid only "create" ioctl, the lack of an ioctl to set the VM attribute
-> should be sufficient to indicate the same.
+I'm not aware of any vanilla v5 implementations (all I can find are
+v5TE or <=v4T), so it doesn't seem like something actually causing
+problems. Mostly pointing it out for consistency's sake.
 
-I just randomly came up with some names.  The precise naming scheme
-isn't that important, so long as it unlikely to result in name
-collisions and so long as it's reasonablu clear (or compiler-checkable,
-or preferably both) which things can be used where.
 
-I wouldn't have a problem with something a bit terser.
-
-> 
-> >
-> >struct kvm_create_vm2 {
-> >         __u32   version;        /* harmless, even if not useful */
-> >         __u16   nr_attrs;       /* or could just terminate attrs with a
-> >                                    NULL entry */
-> >         union kvm_create_vm_attr __user *__user *attrs;
-> >};
-> >
-> >
-> >This is quite flexible, but obviously a bit heavy.
-> >
-> >However, if we're adding a new interface due to lack of extensibility,
-> >it may be worth going for something that's freely extensible.
-> 
-> True. I could hack something up along the lines above and send it here.
-
-Sure, but best to keep it fairly rough for now.
-
-Cheers
----Dave
+-Olof
