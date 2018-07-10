@@ -1,25 +1,27 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 10 Jul 2018 22:02:39 +0800
-Subject: [PATCH v5 03/22] dt-bindings: sram: sunxi: Introduce new A10
- binding for system-control
-In-Reply-To: <20180710080114.31469-4-paul.kocialkowski@bootlin.com>
-References: <20180710080114.31469-1-paul.kocialkowski@bootlin.com>
- <20180710080114.31469-4-paul.kocialkowski@bootlin.com>
-Message-ID: <CAGb2v661JHS7r=6LE1em18owSUwk8VXbAGCAVez7=2u5P2R4Jg@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 10 Jul 2018 15:13:22 +0100
+Subject: [PATCH 0/6] Further spectre variant 1 mitigations
+Message-ID: <20180710141322.GL17271@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 10, 2018 at 4:00 PM, Paul Kocialkowski
-<paul.kocialkowski@bootlin.com> wrote:
-> Following-up on the introduction of a new binding for the A64, this
-> introduces a system-control binding for the A10 as a replacement of
-> the sram-controller binding.
->
-> This change is motivated by consistency with the Allwinner literature,
-> that mentions system control over SRAM controller. Moreover, the system
-> control block is sometimes used for more than SRAM (e.g. for muxing
-> related to the ethernet PHY).
->
-> Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+Hi,
 
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+This series applies the mitigations for Spectre variant 1 to 32-bit
+ARM user accessors.  This series slightly larger by the need to
+offset the additional overhead introduced by these checks in various
+paths, particularly the signal handling path.
+
+ arch/arm/include/asm/assembler.h   |  4 +++
+ arch/arm/include/asm/thread_info.h |  2 +-
+ arch/arm/include/asm/uaccess.h     | 26 ++++++++++++-----
+ arch/arm/kernel/signal.c           | 58 +++++++++++++++++++-------------------
+ arch/arm/kernel/sys_oabi-compat.c  |  8 ++++--
+ arch/arm/lib/copy_from_user.S      |  7 +++++
+ arch/arm/vfp/vfpmodule.c           | 16 +++++------
+ 7 files changed, 72 insertions(+), 49 deletions(-)
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
+According to speedtest.net: 13Mbps down 490kbps up
