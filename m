@@ -1,38 +1,62 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Tue, 10 Jul 2018 10:17:24 +0100
-Subject: [PATCH v2 6/6] KVM: arm/arm64: vgic: Allow configuration of
- interrupt groups
-In-Reply-To: <01925c40-7087-9b52-c59d-2a85005de642@redhat.com>
-References: <1530697100-22419-1-git-send-email-christoffer.dall@arm.com>
- <1530697100-22419-7-git-send-email-christoffer.dall@arm.com>
- <7f875ead-d3cb-1fec-bc84-56e64526e6a7@arm.com>
- <20180709224836.GA26579@u002843.usa.arm.com>
- <51bb02d7-61d8-41bc-33e2-342364f659b5@arm.com>
- <01925c40-7087-9b52-c59d-2a85005de642@redhat.com>
-Message-ID: <CAFEAcA_UFkHi=tMcLQXjODewuU9d01Kuv4cT2STjyF3YwhH5Pw@mail.gmail.com>
+From: yixun.lan@amlogic.com (Yixun Lan)
+Date: Tue, 10 Jul 2018 17:19:32 +0800
+Subject: [PATCH 0/3] pinctrl: meson-g12a: add pinctrl driver support
+In-Reply-To: <CAFBinCAVSGTWFzW6nikbnC+K9n5KRYjun9bnEp7YsKbGRHJorg@mail.gmail.com>
+References: <20180704224511.29350-1-yixun.lan@amlogic.com>
+ <CACRpkdauMRnLpfiARG-BWkuJfArri68e9BYx56SCUxJaYWsYYA@mail.gmail.com>
+ <CAFBinCAVSGTWFzW6nikbnC+K9n5KRYjun9bnEp7YsKbGRHJorg@mail.gmail.com>
+Message-ID: <eafc9b41-597e-fa0f-5e30-95ce0b75f6fd@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 July 2018 at 10:12, Auger Eric <eric.auger@redhat.com> wrote:
-> Hi Christoffer, Marc,
->
-> On 07/10/2018 10:33 AM, Marc Zyngier wrote:
->> On 09/07/18 23:48, Christoffer Dall wrote:
->>> What I would really like to know is whether this is really an issue or
->>> not.  Do people who run products based on KVM, such as RHEV, have any
->>> expectations about cross-kernel version migration?
+HI Martin
+
+On 07/10/18 06:07, Martin Blumenstingl wrote:
+> Hi Linus,
+> 
+> On Mon, Jul 9, 2018 at 3:35 PM Linus Walleij <linus.walleij@linaro.org> wrote:
 >>
->> I'd like to know as well.
->
-> Sorry I did not have time to review the series properly. My
-> understanding is we generally care about migration between different
-> kernels. For the ITS, we made the IIDR writable too to manage the ABI
-> version properly. See ab01c6bdacc43c41c6b326889f4358f5afc38bf9. But
-> maybe I missed the crux of the matter.
+>> On Wed, Jul 4, 2018 at 4:48 PM Yixun Lan <yixun.lan@amlogic.com> wrote:
+>>>
+>>> This patch series try to add pinctrl driver support for
+>>> the Meson-G12A SoC.
+>>>
+>>>
+>>> Yixun Lan (3):
+>>>   documentation: Add compatibles for Amlogic Meson G12A pin controllers
+>>>   dt-bindings: pinctrl: meson-g12a: document pin name
+>>>   pinctrl: meson-g12a: add pinctrl driver support
+>>
+>> Overall this looks good to me, could we get some review or ACKs
+>> from Beniamino, Martin and/or Carlo as an indication that everything
+>> seems all right before I apply the series?
+> I do not have any documentation for this hardware (I'm not even sure
+> if this is the successor to AXG/"the Audio SoCs" or rather a successor
+> of GXL or GXM/"the OTT/STB SoCs" - I assume it's their new OTT/STB
+> SoCs since G12A is mentioned here and it seems to have a GPU: [0])
+> 
+yes, it's more like a new generation of OTT/STB SoCs..
 
-I think the question is whether we're doing this because
-we think hypothetical users care, or because we know actual
-real in-production users really care...
+> I will try to have a look in the next few days and see if I can spot
+> anything obvious
 
-thanks
--- PMM
+generally the pinctrl IP hasn't changed, so only pinctrl data need to be
+updated (the pin mux IP is same as AXG SoC which already explain in
+another thread).
+
+> not sure if Neil or Kevin have access to the documentation, so it'd be
+> great if they could give feedback as well
+> 
+we are preparing documention to baylibre guys..
+
+I think there is not many boards available in the public?
+
+> 
+> Regards
+> Martin
+> 
+> 
+> [0] http://openlinux.amlogic.com:8000/download/doc/Linux_BSP_Kernel4.9_Buildroot_OpenLinux_Release_Notes_V20180330.pdf
+> 
+> .
+> 
