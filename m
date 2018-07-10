@@ -1,39 +1,38 @@
 From: fabio.estevam@nxp.com (Fabio Estevam)
-Date: Tue, 10 Jul 2018 13:08:42 -0300
-Subject: [PATCH v3 1/6] dt-bindings: freescale: Add bindings for the tigerp
- module
-Message-ID: <1531238927-19579-1-git-send-email-fabio.estevam@nxp.com>
+Date: Tue, 10 Jul 2018 13:08:43 -0300
+Subject: [PATCH v3 2/6] ARM: dts: imx51: Add PMU support
+In-Reply-To: <1531238927-19579-1-git-send-email-fabio.estevam@nxp.com>
+References: <1531238927-19579-1-git-send-email-fabio.estevam@nxp.com>
+Message-ID: <1531238927-19579-2-git-send-email-fabio.estevam@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add bindings for the tigerp module present on i.MX51.
+Add PMU support in the device tree.
 
 Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 ---
 Changes since v2:
 - None
 
- Documentation/devicetree/bindings/arm/freescale/tigerp.txt | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/freescale/tigerp.txt
+ arch/arm/boot/dts/imx51.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/freescale/tigerp.txt b/Documentation/devicetree/bindings/arm/freescale/tigerp.txt
-new file mode 100644
-index 0000000..19e2aad
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/freescale/tigerp.txt
-@@ -0,0 +1,12 @@
-+* Freescale Tigerp platform module
+diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
+index 66e4187..113ddbc 100644
+--- a/arch/arm/boot/dts/imx51.dtsi
++++ b/arch/arm/boot/dts/imx51.dtsi
+@@ -93,6 +93,12 @@
+ 		};
+ 	};
+ 
++	pmu: pmu {
++		compatible = "arm,cortex-a8-pmu";
++		interrupt-parent = <&tzic>;
++		interrupts = <77>;
++	};
 +
-+Required properties:
-+- compatible : Should be "fsl,imx51-tigerp"
-+- reg : Address and length of the register set for the device
-+
-+Example:
-+
-+tigerp: tigerp at 83fa0000 {
-+	compatible = "fsl,imx51-tigerp";
-+	reg = <0x83fa0000 0x28>;
-+};
+ 	usbphy0: usbphy0 {
+ 		compatible = "usb-nop-xceiv";
+ 		clocks = <&clks IMX5_CLK_USB_PHY_GATE>;
 -- 
 2.7.4
