@@ -1,183 +1,36 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 10 Jul 2018 11:37:24 +0100
-Subject: [PATCHv4 11/19] arm64: don't reload GPRs after apply_ssbd
-In-Reply-To: <20180709142159.tsxgwhjm3qziymym@lakrids.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 10 Jul 2018 11:39:02 +0100
+Subject: [PATCHv4 00/19] arm64: invoke syscalls with pt_regs
+In-Reply-To: <20180702110415.10465-1-mark.rutland@arm.com>
 References: <20180702110415.10465-1-mark.rutland@arm.com>
- <20180702110415.10465-12-mark.rutland@arm.com>
- <20180706163844.GB27483@arm.com>
- <20180709142159.tsxgwhjm3qziymym@lakrids.cambridge.arm.com>
-Message-ID: <20180710103722.GH9486@e103592.cambridge.arm.com>
+Message-ID: <20180710103901.GA31318@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 09, 2018 at 03:21:59PM +0100, Mark Rutland wrote:
-> On Fri, Jul 06, 2018 at 05:38:45PM +0100, Will Deacon wrote:
-> > On Mon, Jul 02, 2018 at 12:04:07PM +0100, Mark Rutland wrote:
-> > > Now that all of the syscall logic works on the saved pt_regs, apply_ssbd
-> > > can safely corrupt x0-x3 in the entry paths, and we no longer need to
-> > > restore them. So let's remove the logic doing so.
-> > > 
-> > > With that logic gone, we can fold the branch target into the macro, so
-> > > that callers need not deal with this. GAS provides \@, which provides a
-> > > unique value per macro invocation, which we can use to create a unique
-> > > label.
-> > > 
-> > > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> > > Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> > > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> > > Cc: Will Deacon <will.deacon@arm.com>
-> > > ---
-> > >  arch/arm64/kernel/entry.S | 20 +++++++-------------
-> > >  1 file changed, 7 insertions(+), 13 deletions(-)
-> > > 
-> > > diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> > > index c41b84d06644..728bc7cc5bbb 100644
-> > > --- a/arch/arm64/kernel/entry.S
-> > > +++ b/arch/arm64/kernel/entry.S
-> > > @@ -130,20 +130,21 @@ alternative_else_nop_endif
-> > >  
-> > >  	// This macro corrupts x0-x3. It is the caller's duty
-> > >  	// to save/restore them if required.
-> > > -	.macro	apply_ssbd, state, targ, tmp1, tmp2
-> > > +	.macro	apply_ssbd, state, tmp1, tmp2
-> > >  #ifdef CONFIG_ARM64_SSBD
-> > >  alternative_cb	arm64_enable_wa2_handling
-> > > -	b	\targ
-> > > +	b	skip_apply_ssbd\@
-> > >  alternative_cb_end
-> > >  	ldr_this_cpu	\tmp2, arm64_ssbd_callback_required, \tmp1
-> > > -	cbz	\tmp2, \targ
-> > > +	cbz	\tmp2, skip_apply_ssbd\@
-> > >  	ldr	\tmp2, [tsk, #TSK_TI_FLAGS]
-> > > -	tbnz	\tmp2, #TIF_SSBD, \targ
-> > > +	tbnz	\tmp2, #TIF_SSBD, skip_apply_ssbd\@
-> > 
-> > Talking to Dave, he makes a good point that this is pretty fragile if a
-> > macro expansion within the macro itself uses \@, since this would result
-> > in an unexpected label update and everything would go wrong.
+On Mon, Jul 02, 2018 at 12:03:56PM +0100, Mark Rutland wrote:
+> This series reworks arm64's syscall handling to minimize the propagation
+> of user-controlled register values into speculated code paths. As with
+> x86 [1], a wrapper is generated for each syscall, which extracts the
+> argument from a struct pt_regs. During kernel entry from userspace,
+> registers are zeroed.
 > 
-> I don't believe that's a problem; \@ is handled as-if it's a named
-> argument to the macro, and is not incremented within the scope of a
-> single macro expansion.
+> The arm64 kernel code directly invokes some syscalls which the x86 code
+> doesn't, so I've added ksys_* wrappers for these, following the x86
+> example. The rest of the series is arm64-specific.
+> 
+> I've pushed the series out to my arm64/syscall-regs branch [2] on
+> kernel.org.
 
-From
-https://sourceware.org/git/?p=binutils-gdb.git;a=blob;f=gas/macro.c
-https://sourceware.org/git/?p=binutils-gdb.git;a=blob;f=gas/read.c
+One thing I noticed with this series applied is that our sys_call_table
+declarations all get a bit muddled:
 
-it looks like the \@ counter (macro_number) is only incremented at the
-end expansion of a whole macro body before gas reads the expansion
-output (including recursive macro expansions).
+arm64/kernel/sys.c:		void * const sys_call_table[]
+arm64/kernel/sys32.c:		void * const compat_sys_call_table[]
+arm64/kernel/syscall.c:		extern syscall_fn_t sys_call_table[];
+				extern syscall_fn_t compat_sys_call_table[];
+arm64/include/asm/syscall.h:	extern const void *sys_call_table[];
 
-So, your conclusion looks right for gas today.  The code implementing
-this looks crufty enough to be pretty old.
+Can we tidy this up so that syscall.h provides a declaration using
+syscall_fn_t, allowing us to drop the additional externs?
 
-Can you throw a bug into https://sourceware.org/bugzilla/ to get this
-properly documented?  The current wording is ambiguous.  It would be
-nice to get gas properly committed to behaving this way.
-
-
-For the kernel, I suggest using a .L prefix so that the generated
-symbols don't bloat the vmlinux symbol table (similar to numbered local
-labels) -- unless you really want the symbols retained.
-
-Having a common prefix for all "unique" assembler symbols may help us
-to avoid namespace collisions, say
-
-.L__asm__foo_\@
-.L__asm__bar_\@
-
-etc.
-
-Cheers
----Dave
-
-> 
-> e.g. if I assemble:
-> 
-> ----
-> .macro nop_macro
-> .endm
-> 
-> .macro a n
->         a_pre_\n\()_\@:
->         .quad   0
->         a_post_\n\()_\@:
->         .quad   0
-> .endm
-> 
-> .macro b n
->         b_pre_\n\()_\@:
->         .quad   0
-> 
->         a \n
-> 
->         b_post_\n\()_\@:
->         .quad   0
-> .endm
-> 
-> .macro c n
->         c_pre_\n\()_\@:
->         .quad   0
-> 
->         b \n
-> 
->         c_post_\n\()_\@:
->         .quad   0
-> .endm
-> 
-> .data
-> 
->         a 0
-> 
->         b 1
-> 
->         c 2
-> ----
-> 
-> ... then objdump -D gives me:
-> 
-> ----
-> Disassembly of section .data:
-> 
-> 0000000000000000 <a_pre_0_0>:
->         ...
-> 
-> 0000000000000008 <a_post_0_0>:
->         ...
-> 
-> 0000000000000010 <b_pre_1_1>:
->         ...
-> 
-> 0000000000000018 <a_pre_1_2>:
->         ...
-> 
-> 0000000000000020 <a_post_1_2>:
->         ...
-> 
-> 0000000000000028 <b_post_1_1>:
->         ...
-> 
-> 0000000000000030 <c_pre_2_3>:
->         ...
-> 
-> 0000000000000038 <b_pre_2_4>:
->         ...
-> 
-> 0000000000000040 <a_pre_2_5>:
->         ...
-> 
-> 0000000000000048 <a_post_2_5>:
->         ...
-> 
-> 0000000000000050 <b_post_2_4>:
->         ...
-> 
-> 0000000000000058 <c_post_2_3>:
->         ...
-> 
-> ----
-> 
-> ... where things are obviously nesting just fine.
-> 
-> Thanks,
-> Mark.
+Will
