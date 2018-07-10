@@ -1,67 +1,77 @@
-From: mathieu.desnoyers@efficios.com (Mathieu Desnoyers)
-Date: Tue, 10 Jul 2018 09:48:35 -0400 (EDT)
-Subject: [PATCH for 4.18 2/6] rseq: use get_user/put_user rather than
- __get_user/__put_user
-In-Reply-To: <87tvp7mx8j.fsf@concordia.ellerman.id.au>
-References: <20180708210330.27324-1-mathieu.desnoyers@efficios.com>
- <20180708210330.27324-3-mathieu.desnoyers@efficios.com>
- <854203778.2272.1531157327328.JavaMail.zimbra@efficios.com>
- <87tvp7mx8j.fsf@concordia.ellerman.id.au>
-Message-ID: <1050939005.3002.1531230515472.JavaMail.zimbra@efficios.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Tue, 10 Jul 2018 15:49:48 +0200
+Subject: [PATCH v3 RESEND 1/2] dt-bindings: add binding for Rockchip hdmi phy
+ using an Innosilicon IP
+Message-ID: <20180710134949.25203-1-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------ On Jul 10, 2018, at 2:16 AM, Michael Ellerman mpe at ellerman.id.au wrote:
+From: Zheng Yang <zhengyang@rock-chips.com>
 
-> Mathieu Desnoyers <mathieu.desnoyers@efficios.com> writes:
->> ----- On Jul 8, 2018, at 5:03 PM, Mathieu Desnoyers
->> mathieu.desnoyers at efficios.com wrote:
->>
->>> In preparation to use __u64 for the rseq_cs pointer field, 32-bit
->>> architectures need to read this 64-bit value located in user-space
->>> addresses.
->>> 
->>> __get_user is used to read this value, given that its access check has
->>> already been performed with access_ok() on rseq registration.
->>> 
->>> arm does not implement 8-byte __get_user. Rather than trying to
->>> improve __get_user on ARM, use get_user/put_user across rseq instead.
->>> 
->>> If those end up showing up in benchmarks, the proper approach would be to
->>> use user_access_begin() / unsafe_get/put_user() / user_access_end()
->>> anyway.
->>
->> So, another twist to this story: ppc32 does not implement u64 get_user().
-> 
-> Or __get_user() for that matter.
-> 
-> But we should just fix it.
-> 
-> We have the asm to do it, it's just the fact that __gu_val is unsigned
-> long causes the size > sizeof(x) check here to fail:
-> 
-> #define __get_user_size(x, ptr, size, retval)			\
-> do {								\
->	retval = 0;						\
->	__chk_user_ptr(ptr);					\
->	if (size > sizeof(x))					\
->		(x) = __get_user_bad();				\
-> 
-> 
-> 
-> We seem to be able to fix that with the __inttype() trick that x86 uses.
-> 
-> That's probably not 4.18 material though. But if you want to go with
-> copy_from_user() for now you could then switch to get_user() for 4.19.
+The phy is used so far in two Rockchip socs the rk3228 and the rk3328.
 
-I agree. Let's use copy_from_user() for 4.18. Once get_user() ends up supporting
-u64 on ppc32 for 4.19, rseq will happily move back to it.
+Signed-off-by: Zheng Yang <zhengyang@rock-chips.com>
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+Reviewed-by: Rob Herring <robh@kernel.org>
+---
+This is an unmodified resend of the hdmiphy driver sent
+originally on 2018-05-14.
 
-Thanks,
+changes in v3:
+- describe both refclks supplied to the phy block
 
-Mathieu
+ .../bindings/phy/phy-rockchip-inno-hdmi.txt   | 43 +++++++++++++++++++
+ 1 file changed, 43 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/phy-rockchip-inno-hdmi.txt
 
+diff --git a/Documentation/devicetree/bindings/phy/phy-rockchip-inno-hdmi.txt b/Documentation/devicetree/bindings/phy/phy-rockchip-inno-hdmi.txt
+new file mode 100644
+index 000000000000..710cccd5ee56
+--- /dev/null
++++ b/Documentation/devicetree/bindings/phy/phy-rockchip-inno-hdmi.txt
+@@ -0,0 +1,43 @@
++ROCKCHIP HDMI PHY WITH INNO IP BLOCK
++
++Required properties:
++ - compatible : should be one of the listed compatibles:
++	* "rockchip,rk3228-hdmi-phy",
++	* "rockchip,rk3328-hdmi-phy";
++ - reg : Address and length of the hdmi phy control register set
++ - clocks : phandle + clock specifier for the phy clocks
++ - clock-names : string, clock name, must contain "sysclk" for system
++	  control and register configuration, "refoclk" for crystal-
++	  oscillator reference PLL clock input and "refpclk" for pclk-
++	  based refeference PLL clock input.
++ - #clock-cells: should be 0.
++ - clock-output-names : shall be the name for the output clock.
++ - interrupts : phandle + interrupt specified for the hdmiphy interrupt
++ - #phy-cells : must be 0. See ./phy-bindings.txt for details.
++
++Optional properties for rk3328-hdmi-phy:
++ - nvmem-cells = phandle + nvmem specifier for the cpu-version efuse
++ - nvmem-cell-names : "cpu-version" to read the chip version, required
++	  for adjustment to some frequency settings
++
++Example:
++	hdmi_phy: hdmi-phy at 12030000 {
++		compatible = "rockchip,rk3228-hdmi-phy";
++		reg = <0x12030000 0x10000>;
++		#phy-cells = <0>;
++		clocks = <&cru PCLK_HDMI_PHY>, <&xin24m>, <&cru DCLK_HDMIPHY>;
++		clock-names = "sysclk", "refoclk", "refpclk";
++		#clock-cells = <0>;
++		clock-output-names = "hdmi_phy";
++		status = "disabled";
++	};
++
++Then the PHY can be used in other nodes such as:
++
++	hdmi: hdmi at 200a0000 {
++		compatible = "rockchip,rk3228-dw-hdmi";
++		...
++		phys = <&hdmi_phy>;
++		phy-names = "hdmi";
++		...
++	};
 -- 
-Mathieu Desnoyers
-EfficiOS Inc.
-http://www.efficios.com
+2.17.0
