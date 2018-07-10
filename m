@@ -1,36 +1,110 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 10 Jul 2018 11:39:02 +0100
-Subject: [PATCHv4 00/19] arm64: invoke syscalls with pt_regs
-In-Reply-To: <20180702110415.10465-1-mark.rutland@arm.com>
-References: <20180702110415.10465-1-mark.rutland@arm.com>
-Message-ID: <20180710103901.GA31318@arm.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Tue, 10 Jul 2018 12:52:32 +0200
+Subject: [PATCH v4 1/1] arm64: dts: mediatek: add mt6765 support
+In-Reply-To: <1531177443.7777.18.camel@mtkswgap22>
+References: <1531116302-29921-1-git-send-email-mars.cheng@mediatek.com>
+ <1531116302-29921-2-git-send-email-mars.cheng@mediatek.com>
+ <7fb13f45-4e33-6efc-467b-c7256a40cbc9@gmail.com>
+ <d439eb7d-6365-7a0a-2969-1ddecc51defc@arm.com>
+ <1531177443.7777.18.camel@mtkswgap22>
+Message-ID: <7a3becb3-510b-5763-5b66-5e14ebf7c974@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 02, 2018 at 12:03:56PM +0100, Mark Rutland wrote:
-> This series reworks arm64's syscall handling to minimize the propagation
-> of user-controlled register values into speculated code paths. As with
-> x86 [1], a wrapper is generated for each syscall, which extracts the
-> argument from a struct pt_regs. During kernel entry from userspace,
-> registers are zeroed.
+
+
+On 10/07/18 01:04, Mars Cheng wrote:
+> Hi Matthias/Marc
 > 
-> The arm64 kernel code directly invokes some syscalls which the x86 code
-> doesn't, so I've added ksys_* wrappers for these, following the x86
-> example. The rest of the series is arm64-specific.
+> On Mon, 2018-07-09 at 17:43 +0100, Marc Zyngier wrote:
+>> On 09/07/18 11:20, Matthias Brugger wrote:
+>>>
+>>>
+>>> On 09/07/18 08:05, Mars Cheng wrote:
+>>>> This adds basic chip support for MT6765 SoC.
+>>>>
+>>>> Signed-off-by: Mars Cheng <mars.cheng@mediatek.com>
+>>>> ---
+>>>>  arch/arm64/boot/dts/mediatek/Makefile       |    1 +
+>>>>  arch/arm64/boot/dts/mediatek/mt6765-evb.dts |   33 ++++++
+>>>>  arch/arm64/boot/dts/mediatek/mt6765.dtsi    |  156 +++++++++++++++++++++++++++
+>>>>  3 files changed, 190 insertions(+)
+>>>>  create mode 100644 arch/arm64/boot/dts/mediatek/mt6765-evb.dts
+>>>>  create mode 100644 arch/arm64/boot/dts/mediatek/mt6765.dtsi
+>>>>
+>>>> diff --git a/arch/arm64/boot/dts/mediatek/Makefile b/arch/arm64/boot/dts/mediatek/Makefile
+>>>> index ac17f60..7506b0d 100644
+>>>> --- a/arch/arm64/boot/dts/mediatek/Makefile
+>>>> +++ b/arch/arm64/boot/dts/mediatek/Makefile
+>>>> @@ -1,6 +1,7 @@
+>>>>  # SPDX-License-Identifier: GPL-2.0
+>>>>  dtb-$(CONFIG_ARCH_MEDIATEK) += mt2712-evb.dtb
+>>>>  dtb-$(CONFIG_ARCH_MEDIATEK) += mt6755-evb.dtb
+>>>> +dtb-$(CONFIG_ARCH_MEDIATEK) += mt6765-evb.dtb
+>>>>  dtb-$(CONFIG_ARCH_MEDIATEK) += mt6795-evb.dtb
+>>>>  dtb-$(CONFIG_ARCH_MEDIATEK) += mt6797-evb.dtb
+>>>>  dtb-$(CONFIG_ARCH_MEDIATEK) += mt7622-rfb1.dtb
+>>>
+>>> As you can see, we have a long list of SoCs which are poorly supported.
+>>> I'm not very keen to just add another SoC which supports booting into a ramdisk
+>>> using the serial console. Do you have a roadmap adding mainline support for this
+>>> SoC?
+>>
+>> Yes, that's a valid concern.
+>>
+>> mt6755 and mt6795 are in a similar state, the latter after three years.
+>> I'm all for supporting new SoCs, but this feels looks a box-ticking
+>> exercise ("hey, look, our SoC is supported in mainline") which doesn't
+>> help anyone.
+>>
+>> My Ack still stands, but I'd definitely like to see some more complete
+>> support before this patch goes in.
+>>
+>> Thanks,
+>>
+>> 	M.
 > 
-> I've pushed the series out to my arm64/syscall-regs branch [2] on
-> kernel.org.
+> Yes, we do arrange more resources to do upstream task for mt6765,
+> clk/pinctrl drivers are almost ready to submit. systimer is under
+> reviewing (v9).
+> http://lists.infradead.org/pipermail/linux-mediatek/2018-July/013989.html
+> 
+> other drivers including
+> pmic/pwrap/i2c/rtc/kpd/spi/wdt/cqdma/auxadc/pwm/cmdq/disp. We have
+> dedicated owners to handle them and will cowork tightly with members to
+> make sure things happen in the following weeks.
+> 
 
-One thing I noticed with this series applied is that our sys_call_table
-declarations all get a bit muddled:
+Ok, so let's wait until pinctrl driver is submitted. I'd prefer if you could add
+the clk driver to this series. This way we can get rid of the dummy clocks in
+the device tree.
 
-arm64/kernel/sys.c:		void * const sys_call_table[]
-arm64/kernel/sys32.c:		void * const compat_sys_call_table[]
-arm64/kernel/syscall.c:		extern syscall_fn_t sys_call_table[];
-				extern syscall_fn_t compat_sys_call_table[];
-arm64/include/asm/syscall.h:	extern const void *sys_call_table[];
+> For previous chips, we did have no enough support after shell. It is due
+> to fast pace of smartphone SoC and other resource issues. We also know
+> that is no excuse so that we already confirmed owners and their
+> schedules for mt6765.
+> 
+> If there is any suggestion, please let us know.
+> 
 
-Can we tidy this up so that syscall.h provides a declaration using
-syscall_fn_t, allowing us to drop the additional externs?
+I know that smartphone SoC is a fast paced business. Never the less I'm
+convinced that the basic building blocks won't change much from one version to
+another. And that mainline support for the previous version of your SoC will
+help you to get your new drivers faster upstream.
 
-Will
+For me the best example is the mt7622 which got to a reasonable upstream support
+quite fast, thanks to a good foundation of mt7623 in mainline. I'd love to see
+that happen on the smartphone SoCs as well.
+
+Not to mention that upstream support will help you internally when you have to
+rebase your BSP code-base to a new kernel version.
+
+That said I think it is good news that you have already defined owner for the
+different devices and hope to see submissions for them in the near future :)
+As a suggestion I would say that upstream submission takes time and effort and
+it will help your engineers if they can allocate some time to do so. But that's
+most probably a management decision and all engineers know that management bases
+it's decision on some hard-to-understandable abbreviations like EBITDA etc. ;)
+
+Best regards,
+Matthias
