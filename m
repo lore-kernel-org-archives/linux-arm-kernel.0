@@ -1,61 +1,46 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Tue, 10 Jul 2018 15:50:33 +0200
-Subject: [v4.14-stable] arm64: dts: stratix10: Fix SPI IRQ for Stratix10
-In-Reply-To: <1530829114-16889-1-git-send-email-thor.thayer@linux.intel.com>
-References: <1530829114-16889-1-git-send-email-thor.thayer@linux.intel.com>
-Message-ID: <20180710135033.GC1123@kroah.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 10 Jul 2018 15:53:26 +0200
+Subject: droid 4: no sound in the morning
+In-Reply-To: <20180710105910.GA4442@amd>
+References: <20180710105910.GA4442@amd>
+Message-ID: <20180710135325.GA23878@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 05, 2018 at 05:18:34PM -0500, thor.thayer at linux.intel.com wrote:
-> From: Thor Thayer <thor.thayer@linux.intel.com>
+On Tue 2018-07-10 12:59:10, Pavel Machek wrote:
+> Hi!
 > 
-> Fix the SPI interrupt numbers for Stratix10.
+> I attempted to use droid 4 as an alarm clock, but got no sound in the
+> morning.
 > 
-> This is a backport for stable 4.9.x and 4.14.x branches.
-> (original includes other changes that are not relevant
-> to this branch):
+> Log said:
 > 
-> [backport 'commit 889d15090420 ("arm64: dts: stratix10:
->     fix SPI settings")']
+> [78798.682830] omap-mcbsp 40124000.mcbsp: CLKS: could not
+> clk_set_parent() to prcm_fck
+> [78803.561767] omap-mcbsp 40126000.mcbsp: CLKS: could not
+> clk_set_parent() to prcm_fck
 > 
-> Cc: <stable@vger.kernel.org>  # 4.9.x
-> Cc: <stable@vger.kernel.org>  # 4.14.x
-> Fixes: 78cd6a9d8e154 ("arm64: dts: Add base stratix 10 dtsi")
-> Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
-> ---
->  arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+> Could it be related? Everything ok after reboot, v4.18-rc4.
 > 
-> diff --git a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
-> index 57f75453ee93..5db972c0492f 100644
-> --- a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
-> +++ b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
-> @@ -230,7 +230,7 @@
->  			#address-cells = <1>;
->  			#size-cells = <0>;
->  			reg = <0xffda4000 0x1000>;
-> -			interrupts = <0 101 4>;
-> +			interrupts = <0 99 4>;
->  			num-cs = <4>;
->  			status = "disabled";
->  		};
-> @@ -240,7 +240,7 @@
->  			#address-cells = <1>;
->  			#size-cells = <0>;
->  			reg = <0xffda5000 0x1000>;
-> -			interrupts = <0 102 4>;
-> +			interrupts = <0 100 4>;
->  			num-cs = <4>;
->  			status = "disabled";
->  		};
-> -- 
-> 2.7.4
+> Does anyone else see that? Any ideas?
 
-This patch does not apply at all to 4.14.y :(
+Ok, so I see that
 
-Please fix up and resend.  Same for 4.9.
+[ 1775.896270] Charging, 4350000 uV, 532000 uA
+[ 1778.700286] omap-mcbsp 40124000.mcbsp: CLKS: could not
+clk_set_parent() to prcm_fck
+[ 1778.898468] Charging, 4350000 uV, 532000 uA
 
-thanks,
+...even when audio still works. So possibly not related.
 
-greg k-h
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180710/2d0cea09/attachment.sig>
