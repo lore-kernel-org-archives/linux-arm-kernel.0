@@ -1,19 +1,44 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 10 Jul 2018 15:03:14 +0200
-Subject: [PATCH] usb: dwc3: rockchip: Fix PHY documentation links.
-In-Reply-To: <20180710125848.15915-1-enric.balletbo@collabora.com>
-References: <20180710125848.15915-1-enric.balletbo@collabora.com>
-Message-ID: <1651148.X0ZVfyzq5n@phil>
+From: clabbe@baylibre.com (LABBE Corentin)
+Date: Tue, 10 Jul 2018 15:05:17 +0200
+Subject: [PATCH v2 0/4] sun8i: r40: add AHCI
+In-Reply-To: <EF718AB4-DD07-4D67-BE2E-1B9EBA5EB25F@aosc.io>
+References: <1531149658-27030-1-git-send-email-clabbe@baylibre.com>
+ <EF718AB4-DD07-4D67-BE2E-1B9EBA5EB25F@aosc.io>
+Message-ID: <20180710130517.GA27236@Red>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 10. Juli 2018, 14:58:48 CEST schrieb Enric Balletbo i Serra:
-> Commit 34962fb8070c ("docs: Fix more broken references") replaced the
-> broken reference to rockchip,dwc3-usb-phy.txt binding for the Qualcomm
-> DWC3 binding (qcom-dwc3-usb-phy.txt). That's wrong, so replace that
-> reference for the correct ones.
+On Mon, Jul 09, 2018 at 11:44:20PM +0800, Icenowy Zheng wrote:
 > 
-> Fixes: 34962fb8070c ("docs: Fix more broken references")
-> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+> 
+> ? 2018?7?9? GMT+08:00 ??11:20:54, Corentin Labbe <clabbe@baylibre.com> ??:
+> >Hello
+> >
+> >With Moeicenowy's agreement, I have take leadership ot this patchset.
+> >
+> >There are no really changes appart renaming struct quirck to variant.
+> >
+> >Since the last serie is really old, I will answer comment here.
+> >The two regulator (1.2 and 2.5V) are not for the PHY since:
+> >- nothing in the schematic said that they are for the PHY, they seems
+> >  only for controller
+> >- all other AHCI driver use 5V for the target/PHY (vs 1.2/2.5 which
+> >  cannot be used for target)
+> 
+> Target is not equal to PHY. Target means the supply
+> of the disk, which can be usually 5v (for 2.5" HDD) or
+> 12v (3.5" HDD).
+> 
+> By reading Wikipedia articles  about SATA and LVDS, I assume
+> 2.5V is for PHY and 1.2V is for internal digital logic (VDD-SYS
+> is commonly 1.2V on 40nm Allwinner SoCs; 2.5V VDD can be
+> used to efficiently deliver ~1.2V LVDS.)
+> 
+> P.S. VDD-SATA and VDD25-SATA also exist on A20, and by checking
+> Banana Pi M1 (the original Banana Pi) schematics, VDD-SATA
+> is connected to common VDD-SYS (called INTVDD on the
+> schematics) and VDD25-SATA is connected to an always-on
+> fixed LDO, maybe due to the lack of power outputs on AXP209.
+> 
 
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+So we still need to add a regulator on the controller and add an optionnal "phy" regulator for AHCI port.
