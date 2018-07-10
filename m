@@ -1,62 +1,82 @@
 From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Tue, 10 Jul 2018 10:00:57 +0200
-Subject: [PATCH v5 05/22] dt-bindings: sram: sunxi: Populate valid sections
- compatibles
+Date: Tue, 10 Jul 2018 10:01:09 +0200
+Subject: [PATCH v5 17/22] dt-bindings: media: Document bindings for the
+ Sunxi-Cedrus VPU driver
 In-Reply-To: <20180710080114.31469-1-paul.kocialkowski@bootlin.com>
 References: <20180710080114.31469-1-paul.kocialkowski@bootlin.com>
-Message-ID: <20180710080114.31469-6-paul.kocialkowski@bootlin.com>
+Message-ID: <20180710080114.31469-18-paul.kocialkowski@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a list of valid SRAM sections compatibles for the A13, A20,
-A23 and H3 platforms. Per-platform compatibles are introduced for the
-SRAM sections of these platforms, with the A10 compatibles also listed
-as valid when applicable.
-
-In particular, compatibles for the C1 SRAM section are introduced.
+This adds a device-tree binding document that specifies the properties
+used by the Sunxi-Cedurs VPU driver, as well as examples.
 
 Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
 ---
- .../devicetree/bindings/sram/sunxi-sram.txt   | 25 +++++++++++++++++++
- 1 file changed, 25 insertions(+)
+ .../bindings/media/sunxi-cedrus.txt           | 54 +++++++++++++++++++
+ 1 file changed, 54 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/media/sunxi-cedrus.txt
 
-diff --git a/Documentation/devicetree/bindings/sram/sunxi-sram.txt b/Documentation/devicetree/bindings/sram/sunxi-sram.txt
-index 156a02ab6b54..07c53c5214a0 100644
---- a/Documentation/devicetree/bindings/sram/sunxi-sram.txt
-+++ b/Documentation/devicetree/bindings/sram/sunxi-sram.txt
-@@ -32,8 +32,33 @@ once again the representation described in the mmio-sram binding.
- 
- The valid sections compatible for A10 are:
-     - allwinner,sun4i-a10-sram-a3-a4
-+    - allwinner,sun4i-a10-sram-c1
-     - allwinner,sun4i-a10-sram-d
- 
-+The valid sections compatible for A13 are:
-+    - allwinner,sun5i-a13-sram-a3-a4
-+    - allwinner,sun4i-a10-sram-a3-a4
-+    - allwinner,sun5i-a13-sram-c1
-+    - allwinner,sun4i-a10-sram-c1
-+    - allwinner,sun5i-a13-sram-d
-+    - allwinner,sun4i-a10-sram-d
+diff --git a/Documentation/devicetree/bindings/media/sunxi-cedrus.txt b/Documentation/devicetree/bindings/media/sunxi-cedrus.txt
+new file mode 100644
+index 000000000000..a089a0c1ff05
+--- /dev/null
++++ b/Documentation/devicetree/bindings/media/sunxi-cedrus.txt
+@@ -0,0 +1,54 @@
++Device-tree bindings for the VPU found in Allwinner SoCs, referred to as the
++Video Engine (VE) in Allwinner literature.
 +
-+The valid sections compatible for A20 are:
-+    - allwinner,sun7i-a20-sram-a3-a4
-+    - allwinner,sun4i-a10-sram-a3-a4
-+    - allwinner,sun7i-a20-sram-c1
-+    - allwinner,sun4i-a10-sram-c1
-+    - allwinner,sun7i-a20-sram-d
-+    - allwinner,sun4i-a10-sram-d
++The VPU can only access the first 256 MiB of DRAM, that are DMA-mapped starting
++from the DRAM base. This requires specific memory allocation and handling.
 +
-+The valid sections compatible for A23/A33 are:
-+    - allwinner,sun8i-a23-sram-c1
-+    - allwinner,sun4i-a10-sram-c1
++Required properties:
++- compatible		: must be one of the following compatibles:
++			- "allwinner,sun4i-a10-video-engine"
++			- "allwinner,sun5i-a13-video-engine"
++			- "allwinner,sun7i-a20-video-engine"
++			- "allwinner,sun8i-a33-video-engine"
++			- "allwinner,sun8i-h3-video-engine"
++- reg			: register base and length of VE;
++- clocks		: list of clock specifiers, corresponding to entries in
++			  the clock-names property;
++- clock-names		: should contain "ahb", "mod" and "ram" entries;
++- resets		: phandle for reset;
++- interrupts		: VE interrupt number;
++- allwinner,sram	: SRAM region to use with the VE.
 +
-+The valid sections compatible for H3 are:
-+    - allwinner,sun8i-h3-sram-c1
-+    - allwinner,sun4i-a10-sram-c1
++Optional properties:
++- memory-region		: CMA pool to use for buffers allocation instead of the
++			  default CMA pool.
 +
- The valid sections compatible for A64 are:
-     - allwinner,sun50i-a64-sram-c
- 
++Example:
++
++reserved-memory {
++	#address-cells = <1>;
++	#size-cells = <1>;
++	ranges;
++
++	/* Address must be kept in the lower 256 MiBs of DRAM for VE. */
++	cma_pool: cma at 4a000000 {
++		compatible = "shared-dma-pool";
++		size = <0x6000000>;
++		alloc-ranges = <0x4a000000 0x6000000>;
++		reusable;
++		linux,cma-default;
++	};
++};
++
++video-codec at 1c0e000 {
++	compatible = "allwinner,sun7i-a20-video-engine";
++	reg = <0x01c0e000 0x1000>;
++
++	clocks = <&ccu CLK_AHB_VE>, <&ccu CLK_VE>,
++		 <&ccu CLK_DRAM_VE>;
++	clock-names = "ahb", "mod", "ram";
++
++	resets = <&ccu RST_VE>;
++	interrupts = <GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>;
++	allwinner,sram = <&ve_sram 1>;
++};
 -- 
 2.17.1
