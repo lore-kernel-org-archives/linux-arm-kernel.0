@@ -1,311 +1,75 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 10 Jul 2018 17:38:39 +0100
-Subject: [PATCH v3 15/20] kvm: arm/arm64: Allow tuning the physical
- address size for VM
-In-Reply-To: <20180709133750.GE9486@e103592.cambridge.arm.com>
-References: <1530270944-11351-1-git-send-email-suzuki.poulose@arm.com>
- <1530270944-11351-16-git-send-email-suzuki.poulose@arm.com>
- <20180704155104.GN4828@arm.com>
- <12d1832a-1a13-7dd4-662b-addf58400789@arm.com>
- <fe9f5aa5-b283-07e0-5f0e-e97d96b780e7@arm.com>
- <9f1af26e-2913-2b0b-1352-63160096f78f@arm.com>
- <f3463d0a-c6a3-c34d-acb3-13c99fc61c5a@arm.com>
- <20180709112326.GD9486@e103592.cambridge.arm.com>
- <17f8d585-3489-ab6f-6ee1-4d8d337dcf9c@arm.com>
- <20180709133750.GE9486@e103592.cambridge.arm.com>
-Message-ID: <377420ce-97a8-4359-6224-273d91f37247@arm.com>
+From: james.morse@arm.com (James Morse)
+Date: Tue, 10 Jul 2018 17:49:50 +0100
+Subject: [PATCH v7 2/4] arm64: KVM: export the capability to set guest SError
+ syndrome
+In-Reply-To: <20180710164952.23736-1-james.morse@arm.com>
+References: <20180710164952.23736-1-james.morse@arm.com>
+Message-ID: <20180710164952.23736-3-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/07/18 14:37, Dave Martin wrote:
-> On Mon, Jul 09, 2018 at 01:29:42PM +0100, Marc Zyngier wrote:
->> On 09/07/18 12:23, Dave Martin wrote:
->>> On Fri, Jul 06, 2018 at 05:39:00PM +0100, Suzuki K Poulose wrote:
->>>> On 07/06/2018 04:09 PM, Marc Zyngier wrote:
->>>>> On 06/07/18 14:49, Suzuki K Poulose wrote:
->>>>>> On 04/07/18 23:03, Suzuki K Poulose wrote:
->>>>>>> On 07/04/2018 04:51 PM, Will Deacon wrote:
->>>>>>>> Hi Suzuki,
->>>>>>>>
->>>>>>>> On Fri, Jun 29, 2018 at 12:15:35PM +0100, Suzuki K Poulose wrote:
->>>>>>>>> Allow specifying the physical address size for a new VM via
->>>>>>>>> the kvm_type argument for KVM_CREATE_VM ioctl. This allows
->>>>>>>>> us to finalise the stage2 page table format as early as possible
->>>>>>>>> and hence perform the right checks on the memory slots without
->>>>>>>>> complication. The size is encoded as Log2(PA_Size) in the bits[7:0]
->>>>>>>>> of the type field and can encode more information in the future if
->>>>>>>>> required. The IPA size is still capped at 40bits.
->>>>>>>>>
->>>>>>>>> Cc: Marc Zyngier <marc.zyngier@arm.com>
->>>>>>>>> Cc: Christoffer Dall <cdall@kernel.org>
->>>>>>>>> Cc: Peter Maydel <peter.maydell@linaro.org>
->>>>>>>>> Cc: Paolo Bonzini <pbonzini@redhat.com>
->>>>>>>>> Cc: Radim Kr?m?? <rkrcmar@redhat.com>
->>>>>>>>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->>>>>>>>> ---
->>>>>>>>>  ? arch/arm/include/asm/kvm_mmu.h?? |? 2 ++
->>>>>>>>>  ? arch/arm64/include/asm/kvm_arm.h | 10 +++-------
->>>>>>>>>  ? arch/arm64/include/asm/kvm_mmu.h |? 2 ++
->>>>>>>>>  ? include/uapi/linux/kvm.h???????? | 10 ++++++++++
->>>>>>>>>  ? virt/kvm/arm/arm.c?????????????? | 24 ++++++++++++++++++++++--
->>>>>>>>>  ? 5 files changed, 39 insertions(+), 9 deletions(-)
->>>>>>>>
->>>>>>>> [...]
->>>>>>>>
->>>>>>>>> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
->>>>>>>>> index 4df9bb6..fa4cab0 100644
->>>>>>>>> --- a/include/uapi/linux/kvm.h
->>>>>>>>> +++ b/include/uapi/linux/kvm.h
->>>>>>>>> @@ -751,6 +751,16 @@ struct kvm_ppc_resize_hpt {
->>>>>>>>>  ? #define KVM_S390_SIE_PAGE_OFFSET 1
->>>>>>>>>  ? /*
->>>>>>>>> + * On arm/arm64, machine type can be used to request the physical
->>>>>>>>> + * address size for the VM. Bits [7-0] have been reserved for the
->>>>>>>>> + * PA size shift (i.e, log2(PA_Size)). For backward compatibility,
->>>>>>>>> + * value 0 implies the default IPA size, which is 40bits.
->>>>>>>>> + */
->>>>>>>>> +#define KVM_VM_TYPE_ARM_PHYS_SHIFT_MASK??? 0xff
->>>>>>>>> +#define KVM_VM_TYPE_ARM_PHYS_SHIFT(x)??????? \
->>>>>>>>> +??? ((x) & KVM_VM_TYPE_ARM_PHYS_SHIFT_MASK)
->>>>>>>>
->>>>>>>> This seems like you're allocating quite a lot of bits in a non-extensible
->>>>>>>> interface to a fairly esoteric parameter. Would it be better to add another
->>>>>>>> ioctl, or condense the number of sizes you support instead?
->>>>>>>
->>>>>>> As I explained in the other thread, we need the size as soon as the VM
->>>>>>> is created. The major challenge is keeping the backward compatibility by
->>>>>>> mapping 0 to 40bits. I will give it a thought.
->>>>>>
->>>>>> Here is one option. We could re-use the {V}TCR_ELx.{I}PS field format, which
->>>>>> occupies 3 bits and has the following definitions. (ID_AA64MMFR0_EL1:PARange
->>>>>> also has the field definitions, except that the field is 4bits wide, but
->>>>>> only 3bits are used)
->>>>>>
->>>>>> 000 32 bits, 4GB.
->>>>>> 001 36 bits, 64GB.
->>>>>> 010 40 bits, 1TB.
->>>>>> 011 42 bits, 4TB.
->>>>>> 100 44 bits, 16TB.
->>>>>> 101 48 bits, 256TB.
->>>>>> 110 52 bits, 4PB
->>>>>>
->>>>>> But we need to map 0 => 40bits IPA to make our ABI backward compatible. So
->>>>>> we could use the additional one bit to indicate that IPA size is requested
->>>>>> in the 3 bits.
->>>>>>
->>>>>> i.e,
->>>>>>
->>>>>> machine_type:
->>>>>>
->>>>>> Bit [2:0]	- Requested IPA size. Values follow VTCR_EL2.PS format.
->>>>>>
->>>>>> Bit [3]		- 1 => IPA Size bits (Bits[2:0]) requested.
->>>>>> 		0 => Not requested
->>>>>>
->>>>>> The only minor down side is restricting to the predefined values above,
->>>>>> which is not a real issue for a VM.
->>>>>>
->>>>>> Thoughts ?
->>>>>
->>>>> I'd be very wary of using that 4th bit to do something that is not in
->>>>> the architecture. We have only a single value left to be used (0b111),
->>>>> and then your scheme clashes with the architecture definition.
->>>>
->>>> I agree. However, if we ever go beyond the 3bits in PARange, we have an
->>>> issue with {V}TCR counter part. But lets not take that chance.
->>>>
->>>>>
->>>>> I'd rather encode things in a way that is independent from the
->>>>> architecture, and be done with it. You can map 0 to 40bits, and we have
->>>>> the ability to express all values the architecture has (just in a
->>>>> different order).
->>>>
->>>> The other option I can think of is encoding a signed number which is the
->>>> difference of the IPA from 40. But that would need 5 bits if we were to
->>>> encode it as it is. And if we want to squeeze it in 4bit, we could store
->>>> half the difference (limiting the IPA limit to even numbers).
->>>>
->>>> i.e IPA = 40 + 2 * sign_extend(bits[3:0);
->>>
->>> I came across similar issues when trying to work out how to enable
->>> SVE for KVM.  In the end I reduced this to a per-vcpu feature, but
->>> it means that there is no global opt-in for the SVE-specific KVM
->>> API extensions:
->>>
->>> That's a bit gross, because SVE may require a change to the way
->>> vcpus are initialised.  The set of supported SVE vector lengths needs
->>> to be set somehow before the vcpu is set running, but it's tricky do
->>> do that without a new ioctl -- which would mean that if SVE is enabled
->>> for a vcpu then the vcpu is not considered runnable until the new
->>> magic ioctl is called.
->>>
->>> Opting into that semantic change globally at VM creation time might
->>> be preferable.  On the SVE side, this is still very much subject to
->>> review/change.
->>>
->>>
->>> Here:
->>>
->>> The KVM_CREATE_VM init argument seems undefined by the KVM core code and
->>> is available for arches to abuse in creative ways.  x86 and arm have
->>> nothing here and reject non-zero values with -EINVAL; s390 treats it as
->>> a bitmask, and defines a sincle feature-like bit here; powerpc treats it
->>> as an enumeration of VM types.
->>>
->>> If we want to be extensible, we could
->>>
->>>   a) Pass a pointer in type, and come up with some extensible VM parameter
->>>      struct for it to point to (which then wouldn't need a cryptic
->>>      compressed encoding), or
->>>
->>>   b) Introduce a new "KVM_CREATE_VM2" variant that either takes such
->>>      an argument, or mandates a parameter negotiation phase involving
->>>      additional ioctls before marking the VM as ready for vcpu and
->>>      device creation.
->>>
->>> (a) feels like an easy backwards-compatible approach, but cannot be
->>> readily adopted by other arches (maybe not an issue).
->>>
->>> (b) might be considered overengineered, so it would need a bit of
->>> thought.
->>>
->>> Wedging arguments into a few bits in the type argument feels awkward,
->>> and may be regretted later if we run out of bits, or something can't be
->>> represented in the chosen encoding.
->>
->> I think that's a pretty convincing argument for a "better" CREATE_VM,
->> one that would have a clearly defined, structured (and potentially
->> extensible) argument.
->>
->> I've quickly hacked the following:
->>
->> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
->> index b6270a3b38e9..3e76214034c2 100644
->> --- a/include/uapi/linux/kvm.h
->> +++ b/include/uapi/linux/kvm.h
->> @@ -735,6 +735,20 @@ struct kvm_ppc_resize_hpt {
->>   	__u32 pad;
->>   };
->>
->> +struct kvm_create_vm2 {
->> +	__u64	version;	/* Or maybe not */
->> +	union {
->> +		struct {
->> +#define KVM_ARM_SVE_CAPABLE	(1 << 0)
->> +#define KVM_ARM_SELECT_IPA	{1 << 1)
->> +			__u64	capabilities;
->> +			__u16	sve_vlen;
->> +			__u8	ipa_size;
->> +		} arm64;
->> +		__u64	dummy[15];
->> +	};
->> +};
->> +
->>   #define KVMIO 0xAE
->>
->>   /* machine type bits, to be used as argument to KVM_CREATE_VM */
->>
->> Other architectures could fill in their own bits if they need to.
->>
->> Thoughts?
-> 
-> This kind of thing should work, but it may still get messy when we
-> add additional fields.
+From: Dongjiu Geng <gengdongjiu@huawei.com>
 
+For the arm64 RAS Extension, user space can inject a virtual-SError
+with specified ESR. So user space needs to know whether KVM support
+to inject such SError, this interface adds this query for this capability.
 
-Marc, Dave,
+KVM will check whether system support RAS Extension, if supported, KVM
+returns true to user space, otherwise returns false.
 
-I like Dave's approach. Some comments below.
+Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
+Reviewed-by: James Morse <james.morse@arm.com>
+Signed-off-by: James Morse <james.morse@arm.com>
+---
+ Documentation/virtual/kvm/api.txt | 11 +++++++++++
+ arch/arm64/kvm/reset.c            |  3 +++
+ include/uapi/linux/kvm.h          |  1 +
+ 3 files changed, 15 insertions(+)
 
-> 
-> It we want this to work cross-arch, would it make sense to go
-> for a more generic approach, say
-> 
-> struct kvm_create_vm_attr_any {
->          __u32   type;
-> };
-> 
-> #define KVM_CREATE_VM_ATTR_ARCH_CAPABILITIES 1
-> struct kvm_create_vm_attr_arch_capabilities {
->          __u32   type;
->          __u16   size; /* support future expansion of capabilities[] */
->          __u16   reserved;
->          __u64   capabilities[1];
-> };
-
-We also need to advertise which attributes are supported by the host,
-so that the user can tune the available ones. That would make a bit mask
-like the above trickier, unless we return the supported values back
-in the argument ptr for the "probe" call. And this scheme in general
-can be useful for passing back a non-boolean result specific to the
-attribute, without having a per-attribute ioctl. (e.g, maximum limit
-for IPA).
-
-> 
-> #define KVM_CREATE_VM_ATTR_ARM64_PHYSADDR_SIZE 2
-> struct kvm_create_vm_attr_arm64_physaddr_size {
->          __u32   type;
->          __u32   physaddr_bits;
-> };
-> 
-> /* ... */
-> 
-> union kvm_create_vm_attr {
->          struct kvm_create_vm_attr_any;
->          struct kvm_create_vm_attr_arch_capabilities;
->          struct kvm_create_vm_attr_arm64_physaddr_size;
->          /* ... */
-> };
-
-nit: Could we simply do s/kvm_create_vm_attr/kvm_vm_attr/ everywhere ?
-While I agree that the kvm_create_vm_attr makes it implicit that the attributes
-are valid only "create" ioctl, the lack of an ioctl to set the VM attribute
-should be sufficient to indicate the same.
-
-> 
-> struct kvm_create_vm2 {
->          __u32   version;        /* harmless, even if not useful */
->          __u16   nr_attrs;       /* or could just terminate attrs with a
->                                     NULL entry */
->          union kvm_create_vm_attr __user *__user *attrs;
-> };
-> 
-> 
-> This is quite flexible, but obviously a bit heavy.
-> 
-> However, if we're adding a new interface due to lack of extensibility,
-> it may be worth going for something that's freely extensible.
-
-True. I could hack something up along the lines above and send it here.
-
-> 
-> 
-> Userspace might call this as
-> 
-> 	struct kvm_create_vm_attr_arch_capabilities vm_arch_caps = {
-> 		.type = KVM_CREATE_VM_ATTR_ARCH_CAPABILITIES,
-> 		.size = 64,
-> 		.capabilities[0] = KVM_CREATE_VM_ARM64_VCPU_NEEDS_SET_SVE_VLS,
-> 	};
-> 
-> 	struct kvm_create_vm_attr_arch_arm64_physaddr_size = {
-> 		.type = KVM_CREATE_VM_ATTR_ARM64_PHYSADDR_SIZE,
-> 		.physaddr_bits = 52,
-> 	};
-> 
-> 	union kvm_create_vm_attr **vmattrs[] = {
-> 		&vm_arch_caps,
-> 		&vm_arm64_physaddr_size,
-> 		NULL, /* maybe */
-> 	};
-> 
-> 	struct kvm_create_vm2 vm;
-> 
-> 	vm.version = 0;
-> 	vm.nr_attrs = 2; /* maybe */
-> 	vm.attrs = vmattrs;
-> 
-> 	ioctl(..., KVM_CREATE_VM2, &vm);
-
-Thanks
-Suzuki
+diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+index e3940f8715a5..480fa64eb52a 100644
+--- a/Documentation/virtual/kvm/api.txt
++++ b/Documentation/virtual/kvm/api.txt
+@@ -4643,3 +4643,14 @@ This capability indicates that KVM supports paravirtualized Hyper-V TLB Flush
+ hypercalls:
+ HvFlushVirtualAddressSpace, HvFlushVirtualAddressSpaceEx,
+ HvFlushVirtualAddressList, HvFlushVirtualAddressListEx.
++
++8.19 KVM_CAP_ARM_SET_SERROR_ESR
++
++Architectures: arm, arm64
++
++This capability indicates that userspace can specify the syndrome value reported
++to the guest OS when guest takes a virtual SError interrupt exception.
++If KVM has this capability, userspace can only specify the ISS field for the ESR
++syndrome, it can not specify the EC field which is not under control by KVM.
++If this virtual SError is taken to EL1 using AArch64, this value will be reported
++in ISS filed of ESR_EL1.
+diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+index a3db01a28062..067c6ba969bd 100644
+--- a/arch/arm64/kvm/reset.c
++++ b/arch/arm64/kvm/reset.c
+@@ -77,6 +77,9 @@ int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
+ 	case KVM_CAP_ARM_PMU_V3:
+ 		r = kvm_arm_support_pmu_v3();
+ 		break;
++	case KVM_CAP_ARM_INJECT_SERROR_ESR:
++		r = cpus_have_const_cap(ARM64_HAS_RAS_EXTN);
++		break;
+ 	case KVM_CAP_SET_GUEST_DEBUG:
+ 	case KVM_CAP_VCPU_ATTRIBUTES:
+ 	case KVM_CAP_VCPU_EVENTS:
+diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+index b6270a3b38e9..a7d9bc4e4068 100644
+--- a/include/uapi/linux/kvm.h
++++ b/include/uapi/linux/kvm.h
+@@ -949,6 +949,7 @@ struct kvm_ppc_resize_hpt {
+ #define KVM_CAP_GET_MSR_FEATURES 153
+ #define KVM_CAP_HYPERV_EVENTFD 154
+ #define KVM_CAP_HYPERV_TLBFLUSH 155
++#define KVM_CAP_ARM_INJECT_SERROR_ESR 156
+ 
+ #ifdef KVM_CAP_IRQ_ROUTING
+ 
+-- 
+2.18.0
