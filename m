@@ -1,24 +1,89 @@
-From: js1304@gmail.com (Joonsoo Kim)
-Date: Tue, 10 Jul 2018 16:19:32 +0900
-Subject: [PATCH 1/2] mm/cma: remove unsupported gfp_mask parameter from
- cma_alloc()
-In-Reply-To: <20180709122019eucas1p2340da484acfcc932537e6014f4fd2c29~-sqTPJKij2939229392eucas1p2j@eucas1p2.samsung.com>
-References: <CGME20180709122019eucas1p2340da484acfcc932537e6014f4fd2c29@eucas1p2.samsung.com>
- <20180709121956.20200-1-m.szyprowski@samsung.com>
- <20180709122019eucas1p2340da484acfcc932537e6014f4fd2c29~-sqTPJKij2939229392eucas1p2j@eucas1p2.samsung.com>
-Message-ID: <CAAmzW4PPNYhUj_MeZox+ddq8MjXqnJs_AJ3xkayf710udD1pSg@mail.gmail.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Tue, 10 Jul 2018 09:24:32 +0200
+Subject: [PATCH] ARM: ftrace: Only set kernel memory back to read-only
+ after boot
+In-Reply-To: <7aa5a479aa484775f492dc5251bcf5c9@agner.ch>
+References: <20180621124710.453ee0ae@gandalf.local.home>
+ <7aa5a479aa484775f492dc5251bcf5c9@agner.ch>
+Message-ID: <c15a7eaba14073149a04d9aa649b10f9@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello, Marek.
+On 04.07.2018 13:30, Stefan Agner wrote:
+> On 21.06.2018 18:47, Steven Rostedt wrote:
+>> From: Steven Rostedt (VMware) <rostedt@goodmis.org>
+>>
+>> Dynamic ftrace requires modifying the code segments that are usually
+>> set to read-only. To do this, a per arch function is called both before
+>> and after the ftrace modifications are performed. The "before" function
+>> will set kernel code text to read-write to allow for ftrace to make the
+>> modifications, and the "after" function will set the kernel code text
+>> back to "read-only" to keep the kernel code text protected.
+>>
+>> The issue happens when dynamic ftrace is tested at boot up. The test is
+>> done before the kernel code text has been set to read-only. But the
+>> "before" and "after" calls are still performed. The "after" call will
+>> change the kernel code text to read-only prematurely, and other boot
+>> code that expects this code to be read-write will fail.
+>>
+>> The solution is to add a variable that is set when the kernel code text
+>> is expected to be converted to read-only, and make the ftrace "before"
+>> and "after" calls do nothing if that variable is not yet set. This is
+>> similar to the x86 solution from commit 162396309745 ("ftrace, x86:
+>> make kernel text writable only for conversions").
+>>
+>> Reported-by: Stefan Agner <stefan@agner.ch>
+>> Tested-by: Stefan Agner <stefan@agner.ch>
+>> Link: http://lkml.kernel.org/r/20180620212906.24b7b66e at vmware.local.home
+>> Signed-off-by: Steven Rostedt (VMware) <rostedt@goodmis.org>
+>> ---
+>> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+>> index c186474422f3..0cc8e04295a4 100644
+>> --- a/arch/arm/mm/init.c
+>> +++ b/arch/arm/mm/init.c
+> 
+> I guess this can be seen as reviewed?
+> 
+> Patches touching core ARM port usually go through Russels patch tracker.
+> 
+> You have to submit the patch here:
+> http://www.armlinux.org.uk/developer/patches/
+> 
 
-2018-07-09 21:19 GMT+09:00 Marek Szyprowski <m.szyprowski@samsung.com>:
-> cma_alloc() function doesn't really support gfp flags other than
-> __GFP_NOWARN, so convert gfp_mask parameter to boolean no_warn parameter.
+FWIW, I added this patch to the patch tracker, its patch ID is 8780/1.
 
-Although gfp_mask isn't used in cma_alloc() except no_warn, it can be used
-in alloc_contig_range(). For example, if passed gfp mask has no __GFP_FS,
-compaction(isolation) would work differently. Do you have considered
-such a case?
+--
+Stefan
 
-Thanks.
+> 
+> 
+>> @@ -736,20 +736,29 @@ static int __mark_rodata_ro(void *unused)
+>>  	return 0;
+>>  }
+>>
+>> +static int kernel_set_to_readonly __read_mostly;
+>> +
+>>  void mark_rodata_ro(void)
+>>  {
+>> +	kernel_set_to_readonly = 1;
+>>  	stop_machine(__mark_rodata_ro, NULL, NULL);
+>>  	debug_checkwx();
+>>  }
+>>
+>>  void set_kernel_text_rw(void)
+>>  {
+>> +	if (!kernel_set_to_readonly)
+>> +		return;
+>> +
+>>  	set_section_perms(ro_perms, ARRAY_SIZE(ro_perms), false,
+>>  				current->active_mm);
+>>  }
+>>
+>>  void set_kernel_text_ro(void)
+>>  {
+>> +	if (!kernel_set_to_readonly)
+>> +		return;
+>> +
+>>  	set_section_perms(ro_perms, ARRAY_SIZE(ro_perms), true,
+>>  				current->active_mm);
+>>  }
