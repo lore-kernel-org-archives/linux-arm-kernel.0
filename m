@@ -1,89 +1,62 @@
-From: contact@paulk.fr (Paul Kocialkowski)
-Date: Tue, 10 Jul 2018 11:30:39 +0200
-Subject: [PATCH] Revert "arm64: Use aarch64elf and aarch64elfb emulation
- mode variants"
-In-Reply-To: <20180710090125.GA28924@arm.com>
-References: <20180709200956.31158-1-labbott@redhat.com>
- <20180710090125.GA28924@arm.com>
-Message-ID: <fcd8d97b6714d787297f1b362558e7a68855a1da.camel@paulk.fr>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 10 Jul 2018 11:34:09 +0200
+Subject: [PATCH v3] soc: imx: gpc: Turn PU domain on/off in sleep on 6qp
+In-Reply-To: <1531209943.3163.31.camel@pengutronix.de>
+References: <ab0c7997bdb0caf6fe7e842315bb9565c2cb059d.1530895248.git.leonard.crestez@nxp.com>
+ <CAPDyKFqb6eZ2SYG612yqiNisv7UV1q3UHYfZfemmvv9Q4w=Png@mail.gmail.com>
+ <1531209943.3163.31.camel@pengutronix.de>
+Message-ID: <CAPDyKFrd=jvYfCgtUD6ocEYLHhm1r73SpKB-c7syT3FmwWtaHw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 10 July 2018 at 10:05, Lucas Stach <l.stach@pengutronix.de> wrote:
+> Am Dienstag, den 10.07.2018, 00:27 +0200 schrieb Ulf Hansson:
+>> > On 6 July 2018 at 18:46, Leonard Crestez <leonard.crestez@nxp.com> wrote:
+>> > On imx6qp power gating on the PU domain is disabled because of errata
+>> > ERR009619. However power gating during suspend/resume can still be
+>> > performed.
+>>
+>> Sounds a bit hand wavy. Exactly why can it be done during system suspend/resume?
+>
+> Power gating this domain in normal operation may introduce a glitch in
+> unrelated modules, potentially disturbing a running display scanout.
+> This is not a concern when the whole system enters suspend state, so
+> it's safe to do in this case.
 
-On Tue, 2018-07-10 at 10:01 +0100, Will Deacon wrote:
-> Thanks, Laura.
-> 
-> I'll take this as a fix, and add a comment to the Makefile to justify
-> why we need the linux target.
+Makes sense. Could we please fold this information into the commit
+message to make this clear!?
 
-So this comes down to either breaking fedora/debian toolchains (that
-don't support elf emulation mode) or breaking bare-metal toolchains
-(that don't support linux emulation mode).
+>
+> Regards,
+> Lucas
+>
+>> >
+>> > Enable this by implementing SLEEP_PM_OPS in imx_pgc_power_domain_driver.
+>> >
+>> > In order to ensure correct ordering add device links from devices inside
+>> > the PU domain to the pgc platform_device.
+>>
+>> In genpd, the PM domain gets powered off after all device's
+>> corresponding ->suspend_noirq() callback has been invoked - and it
+>> also considers if there are some wakeup settings enabled, possibly
+>> avoiding to do the power off.
+>>
+>> It sound like the imx's power domain driver ->power_off|on() callback
+>> should deal with this, to make get a consistent behavior. I understand
+>> that you currently can't tell under what circumstances the
+>> ->power_off|on() callbacks are being invoked, that may need some
+>> changes in genpd.
+>>
+>> Currently we have a flag, GENPD_FLAG_ALWAYS_ON which makes genpd to
+>> always prevent power off. Perhaps we should add a new flag
+>> "GENPD_FLAG_RUNTIME_ON", which makes genpd to call the
+>> ->power_on|off() callbacks, but only during system wide PM.
+>>
+>> Thoughts?
+>
+> Yes, this might work for this case.
 
-Since Linux is a bare-metal project that does not technically require
-the linux target (who said using "Linux" for all things is confusing?),
-I think it should aim for the elf target in the long term.
+Alright. I can help to implement, if you want. Just tell.
 
-But well, breaking Linux build in common distros isn't good either, so I
-guess it makes sense to revert this while distros toolchains are being
-fixed. Hopefully, it won't take too long.
-
-What do you think?
-
-Cheers,
-
-Paul
-
-> Will
-> 
-> On Mon, Jul 09, 2018 at 01:09:56PM -0700, Laura Abbott wrote:
-> > This reverts commit 38fc4248677552ce35efc09902fdcb06b61d7ef9.
-> > 
-> > This breaks compilation with Fedora gcc-8 tool chains:
-> > 
-> >   CHK     include/generated/compile.h
-> >   LD [M]  arch/arm64/crypto/sha512-ce.o
-> > aarch64-linux-gnu-ld: cannot open linker script file ldscripts/aarch64elf.xr: No such file or directory
-> > make[1]: *** [scripts/Makefile.build:530: arch/arm64/crypto/sha512-ce.o] Error 1
-> > make: *** [Makefile:1029: arch/arm64/crypto] Error 2
-> > 
-> > Fixes: 38fc42486775 ("arm64: Use aarch64elf and aarch64elfb emulation mode variants")
-> > Signed-off-by: Laura Abbott <labbott@redhat.com>
-> > ---
-> > A bit rushed and I'm still debugging but I wanted to send this out
-> > before anyone else gets hit since it is -rc4. Seeing this on both native
-> > and cross compiles.
-> > ---
-> >  arch/arm64/Makefile | 4 ++--
-> >  1 file changed, 2 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-> > index 7976d2d242fa..f476d52ad8d6 100644
-> > --- a/arch/arm64/Makefile
-> > +++ b/arch/arm64/Makefile
-> > @@ -60,13 +60,13 @@ ifeq ($(CONFIG_CPU_BIG_ENDIAN), y)
-> >  KBUILD_CPPFLAGS	+= -mbig-endian
-> >  CHECKFLAGS	+= -D__AARCH64EB__
-> >  AS		+= -EB
-> > -LDFLAGS		+= -EB -maarch64elfb
-> > +LDFLAGS		+= -EB -maarch64linuxb
-> >  UTS_MACHINE	:= aarch64_be
-> >  else
-> >  KBUILD_CPPFLAGS	+= -mlittle-endian
-> >  CHECKFLAGS	+= -D__AARCH64EL__
-> >  AS		+= -EL
-> > -LDFLAGS		+= -EL -maarch64elf
-> > +LDFLAGS		+= -EL -maarch64linux
-> >  UTS_MACHINE	:= aarch64
-> >  endif
-> >  
-> > -- 
-> > 2.17.1
-> > 
--- 
-Developer of free digital technology and hardware support.
-
-Website: https://www.paulk.fr/
-Coding blog: https://code.paulk.fr/
-Git repositories: https://git.paulk.fr/ https://git.code.paulk.fr/
+Kind regards
+Uffe
