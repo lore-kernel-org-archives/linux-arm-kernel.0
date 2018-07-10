@@ -1,27 +1,77 @@
-From: pranith.foss@gmail.com (Pranith Kumar)
-Date: Tue, 10 Jul 2018 11:38:32 -0700
-Subject: [PATCH v6 0/2] Add ThunderX2 SoC Performance Monitoring Unit
- driver
-In-Reply-To: <CAKTKpr7wMiJL3NCHp-BkqNFPTDPAB7BxTvbvJagwYY97JCwqHQ@mail.gmail.com>
-References: <20180621063338.20093-1-ganapatrao.kulkarni@cavium.com>
- <CAKTKpr5bNdo2oXb=Vsm4QytHN1Aw=n_oP7kJHV6yLHuKL-Udkg@mail.gmail.com>
- <CAKTKpr7wMiJL3NCHp-BkqNFPTDPAB7BxTvbvJagwYY97JCwqHQ@mail.gmail.com>
-Message-ID: <CADYwmhGNtEbDBj8r-WMGfWJMWzkA_2Gc2hU8rsBYNs0OTuD+CA@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 10 Jul 2018 20:39:16 +0200
+Subject: [PATCH v3.1 2/4] efi/arm: preserve early mapping of UEFI memory
+ map longer for BGRT
+In-Reply-To: <93c42065-bece-a4c7-ed99-5e98f91315a6@arm.com>
+References: <20180709234229.20181-1-takahiro.akashi@linaro.org>
+ <20180709234229.20181-3-takahiro.akashi@linaro.org>
+ <93c42065-bece-a4c7-ed99-5e98f91315a6@arm.com>
+Message-ID: <CAKv+Gu_fajf3_P0wKpdV34Ungu=fn0=WG1U_MSQ9WF_2GFRfDA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 10, 2018 at 4:56 AM, Ganapatrao Kulkarni <gklkml16@gmail.com> wrote:
-> On Wed, Jul 4, 2018 at 3:44 PM, Ganapatrao Kulkarni <gklkml16@gmail.com> wrote:
->> Hi Mark,
+On 10 July 2018 at 19:57, James Morse <james.morse@arm.com> wrote:
+> Hi Ard,
+>
+> On 10/07/18 00:42, AKASHI Takahiro wrote:
+>> From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 >>
->> can you please review this patch?
+>> The BGRT code validates the contents of the table against the UEFI
+>> memory map, and so it expects it to be mapped when the code runs.
+>>
+>> On ARM, this is currently not the case, since we tear down the early
+>> mapping after efi_init() completes, and only create the permanent
+>> mapping in arm_enable_runtime_services(), which executes as an early
+>> initcall, but still leaves a window where the UEFI memory map is not
+>> mapped.
+>>
+>> So move the call to efi_memmap_unmap() from efi_init() to
+>> arm_enable_runtime_services().
 >
-> any comments on this patch series?
+> I don't have a machine that generates a BGRT, but I can see that efi_mem_type()
+> call in efi_bgrt_init() would cause the same problems we have with kexec and acpi.
 >
 
-I had some comments on the second patch here:
-https://www.spinics.net/lists/arm-kernel/msg664025.html
+I'm not sure I follow. The BGRT table only contains natively aligned
+fields, so the alignment faults should not occur when accessing this
+table after kexec. The issue addressed by this patch is that
+efi_mem_type() bails when called while EFI_MEMMAP is cleared.
 
-Thanks,
---
-Pranith
+>
+>> diff --git a/drivers/firmware/efi/arm-init.c b/drivers/firmware/efi/arm-init.c
+>> index b5214c143fee..388a929baf95 100644
+>> --- a/drivers/firmware/efi/arm-init.c
+>> +++ b/drivers/firmware/efi/arm-init.c
+>> @@ -259,7 +259,6 @@ void __init efi_init(void)
+>>
+>>       reserve_regions();
+>>       efi_esrt_init();
+>> -     efi_memmap_unmap();
+>>
+>>       memblock_reserve(params.mmap & PAGE_MASK,
+>>                        PAGE_ALIGN(params.mmap_size +
+>> diff --git a/drivers/firmware/efi/arm-runtime.c b/drivers/firmware/efi/arm-runtime.c
+>> index 5889cbea60b8..59a8c0ec94d5 100644
+>> --- a/drivers/firmware/efi/arm-runtime.c
+>> +++ b/drivers/firmware/efi/arm-runtime.c
+>> @@ -115,6 +115,8 @@ static int __init arm_enable_runtime_services(void)
+>>               return 0;
+>>       }
+>>
+>> +     efi_memmap_unmap();
+>
+> This can get called twice if uefi_init() fails after setting the EFI_BOOT flag,
+> but this can only happen if the system table signature is wrong, (or we're out
+> of memory really early).
+>
+
+I guess we should check the EFI_MEMMAP attribute here as well then.
+
+> I think this is harmless as we end up passing NULL to early_memunmap() which
+> WARN()s and returns as its outside the fixmap range. Its just more noise on
+> systems with a corrupt efi system table.
+>
+> Acked-by: James Morse <james.morse@arm.com>
+>
+
+Thanks James
