@@ -1,48 +1,86 @@
-From: yibin.gong@nxp.com (Robin Gong)
-Date: Wed, 11 Jul 2018 00:23:13 +0800
-Subject: [PATCH v1 4/4] ARM: configs: imx_v6_v7_defconfig: add DMATEST support
-In-Reply-To: <1531239793-11781-1-git-send-email-yibin.gong@nxp.com>
-References: <1531239793-11781-1-git-send-email-yibin.gong@nxp.com>
-Message-ID: <1531239793-11781-5-git-send-email-yibin.gong@nxp.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 10 Jul 2018 09:26:24 +0100
+Subject: [PATCH v2] Add DT support for Octavo Systems OSD3358-SM-RED
+ based on TI AM335x
+In-Reply-To: <CADO55X8_tbz-O8AuHwqCGnV0g2oDiGHzAug6g3PFqRth5U2H=w@mail.gmail.com>
+References: <20180706200051.1115-1-neeraj.dantu@octavosystems.com>
+ <20180709114304.GE6920@n2100.armlinux.org.uk>
+ <CADO55X8_tbz-O8AuHwqCGnV0g2oDiGHzAug6g3PFqRth5U2H=w@mail.gmail.com>
+Message-ID: <20180710082624.GA16036@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DMATEST support and remove invalid options, such as
-CONFIG_BT_HCIUART_H4 is default enabled and CONFIG_SND_SOC_IMX_WM8962
-is out of date and not appear in any config file.
+On Mon, Jul 09, 2018 at 02:45:17PM -0500, Neeraj Kumar Reddy Dantu wrote:
+>  > This should not be "tda19988" as the node name - DT requires generic
+> > names, like "hdmi-encoder".
+> 
+> Thanks.Will fix in v3
+> 
+> > Can you set 24-bit RGB mode with the above configuration - presumably
+> > the colours will come out wrong?
+> > Exactly what is the wiring between the lcdc and tda998x?
+> 
+> You can set mapping for lcd interface between pins with video-ports. See
+> TDA19988 datasheet, Table 4:
+> https://media.digikey.com/pdf/Data%20Sheets/NXP%20PDFs/TDA19988_DS_21_july_2011.pdf
+> .
+> The property is optional and not used in the board. DT bindings:
+> https://www.kernel.org/doc/Documentation/devicetree/bindings/display/bridge/tda998x.txt
+> 
+> This board uses 15 pin RGB565 interface.
 
-Signed-off-by: Robin Gong <yibin.gong@nxp.com>
----
- arch/arm/configs/imx_v6_v7_defconfig | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+As maintainer of the TDA998x driver, I know what the TDA998x is
+capable of, I already have the datasheets, and I know the binding
+document.
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index e381d05..f28d4d9 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -81,7 +81,6 @@ CONFIG_CAN=y
- CONFIG_CAN_FLEXCAN=y
- CONFIG_BT=y
- CONFIG_BT_HCIUART=y
--CONFIG_BT_HCIUART_H4=y
- CONFIG_BT_HCIUART_LL=y
- CONFIG_CFG80211=y
- CONFIG_CFG80211_WEXT=y
-@@ -282,7 +281,6 @@ CONFIG_SND_SOC_FSL_ASRC=y
- CONFIG_SND_IMX_SOC=y
- CONFIG_SND_SOC_PHYCORE_AC97=y
- CONFIG_SND_SOC_EUKREA_TLV320=y
--CONFIG_SND_SOC_IMX_WM8962=y
- CONFIG_SND_SOC_IMX_ES8328=y
- CONFIG_SND_SOC_IMX_SGTL5000=y
- CONFIG_SND_SOC_IMX_SPDIF=y
-@@ -371,6 +369,7 @@ CONFIG_DMADEVICES=y
- CONFIG_FSL_EDMA=y
- CONFIG_IMX_SDMA=y
- CONFIG_MXS_DMA=y
-+CONFIG_DMATEST=m
- CONFIG_STAGING=y
- CONFIG_STAGING_MEDIA=y
- CONFIG_VIDEO_IMX_MEDIA=y
+What I'm asking about is about the specifics of your board's
+implementation and why you've written what you have in your DT
+file.  You haven't answered my specific questions either.
+
+> 
+> Regards,
+> Neeraj
+> 
+> On Mon, Jul 9, 2018 at 6:43 AM Russell King - ARM Linux <
+> linux at armlinux.org.uk> wrote:
+> 
+> > On Fri, Jul 06, 2018 at 08:00:51PM +0000, Neeraj Dantu wrote:
+> > > +&lcdc {
+> > > +     status = "okay";
+> > > +
+> > > +     /* If you want to get 24 bit RGB and 16 BGR mode instead of
+> > > +      * current 16 bit RGB and 24 BGR modes, set the propety
+> > > +      * below to "crossed" and uncomment the video-ports -property
+> > > +      * in tda19988 node.
+> > > +      */
+> > > +     blue-and-red-wiring = "straight";
+> > ...
+> > > +&i2c0 {
+> > > +     tda19988: tda19988 {
+> >
+> > This should not be "tda19988" as the node name - DT requires generic
+> > names, like "hdmi-encoder".
+> >
+> > ...
+> > > +             /* Convert 24bit BGR to RGB, e.g. cross red and blue
+> > wiring */
+> > > +             /* video-ports = <0x234501>; */
+> >
+> > Please explain more what's going on here.
+> >
+> > Can you set 24-bit RGB mode with the above configuration - presumably
+> > the colours will come out wrong?
+> >
+> > Exactly what is the wiring between the lcdc and tda998x?
+> >
+> > --
+> > RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+> > FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps
+> > up
+> > According to speedtest.net: 13Mbps down 490kbps up
+> >
+
 -- 
-2.7.4
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
+According to speedtest.net: 13Mbps down 490kbps up
