@@ -1,39 +1,56 @@
-From: sean.wang@mediatek.com (Sean Wang)
-Date: Tue, 10 Jul 2018 14:38:31 +0800
-Subject: [PATCH 2/2] dt-bindings: arm: mediatek: cleanup MT7623N
- reference boards
-In-Reply-To: <99c1fce76e7ec4984c232bc0bdbd0fadbb86b0dc.1531199139.git.ryder.lee@mediatek.com>
-References: <34e4c13bd1deeb8e090a74b4e7e9192512b3eff0.1531199139.git.ryder.lee@mediatek.com>
- <99c1fce76e7ec4984c232bc0bdbd0fadbb86b0dc.1531199139.git.ryder.lee@mediatek.com>
-Message-ID: <1531204711.26214.1.camel@mtkswgap22>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 10 Jul 2018 09:04:55 +0200
+Subject: [GIT PULL] Renesas ARM64 Based SoC DT Updates for v4.19
+In-Reply-To: <CAOesGMhZD0VS+NbZhgJOqhpP5A5X_pXVfUdkUnGmqLbnagJZaA@mail.gmail.com>
+References: <cover.1529933747.git.horms+renesas@verge.net.au>
+ <CAOesGMhZD0VS+NbZhgJOqhpP5A5X_pXVfUdkUnGmqLbnagJZaA@mail.gmail.com>
+Message-ID: <20180710070450.kpahx5kgtqtcdua2@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2018-07-10 at 13:09 +0800, Ryder Lee wrote:
-> Cleanup binding document to get rid of unsupported reference boards
-> for MT7623N.
+On Mon, Jul 02, 2018 at 10:09:41AM -0700, Olof Johansson wrote:
+> On Mon, Jun 25, 2018 at 7:03 AM, Simon Horman
+> <horms+renesas@verge.net.au> wrote:
+> > Hi Olof, Hi Kevin, Hi Arnd,
+> >
+> > Please consider these Renesas ARM64 based SoC DT updates for v4.19.
+> >
+> >
+> > The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
+> >
+> >   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+> >
+> > are available in the git repository at:
+> >
+> >   https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm64-dt-for-v4.19
+> >
+> > for you to fetch changes up to 6b284a81307848b4331453b02cf7a33c09719d4b:
+> >
+> >   arm64: dts: renesas: r8a77995: Add MSIOF device nodes (2018-06-25 15:30:39 +0200)
 > 
-> Cc: John Crispin <john@phrozen.org>
-> Cc: Sean Wang <sean.wang@mediatek.com>
-> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
-> ---
->  Documentation/devicetree/bindings/arm/mediatek.txt | 3 ---
->  1 file changed, 3 deletions(-)
+> Thanks, merged into next/dt.
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/mediatek.txt b/Documentation/devicetree/bindings/arm/mediatek.txt
-> index 7d21ab3..c07ddf4 100644
-> --- a/Documentation/devicetree/bindings/arm/mediatek.txt
-> +++ b/Documentation/devicetree/bindings/arm/mediatek.txt
-> @@ -59,9 +59,6 @@ Supported boards:
->  - Reference board for MT7623n with eMMC:
->      Required root node properties:
->        - compatible = "mediatek,mt7623n-rfb-emmc", "mediatek,mt7623";
-> -- Reference  board for MT7623n with NAND:
-> -    Required root node properties:
-> -      - compatible = "mediatek,mt7623n-rfb-nand", "mediatek,mt7623";
+> I think you can still collapse some commits a bit further, for example
+> when a large number of devices are added to a new SoC, you don't need
+> a commit per device (i.e. the r8a77980 series).
+> 
+> It's not a problem if it's just a few, but like last merge window when
+> it really added to a lot of small trivial patches it's adding noise to
+> someone looking at changelogs -- it's harder to get a feel for what
+> new things are going in on a larger scope. Keep in mind that you, as
+> maintainer, should feel free to squash together patches when you apply
+> them if it makes sense -- just make sure you retain authorship and
+> credits/COO.
 
-Acked-by: Sean Wang <sean.wang@mediatek.com>
+Thanks Olof,
 
->  - Bananapi BPI-R2 board:
->        - compatible = "bananapi,bpi-r2", "mediatek,mt7623";
->  - MTK mt8127 tablet moose EVB:
+as I think you can see we have adjusted things somewhat in the light of
+the feedback you provided during the v4.18 development cycle. And we'll
+continue to do so.
+
+In the case of enabling various devices for the r8a77980 I do take your
+point with regards to squashing patches. Although I believe that in this
+case the patches came in over time, which makes them a little less obvious
+candidates for squashing than would be the case if they came in all at
+once. Nonetheless, I'll continue to work with the team to streamline our
+processes and make the pull requests as easy to digest as possible.
