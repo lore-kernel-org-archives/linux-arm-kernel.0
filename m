@@ -1,112 +1,56 @@
-From: marex@denx.de (Marek Vasut)
-Date: Tue, 10 Jul 2018 11:11:17 +0200
-Subject: [PATCH 1/3] drm: mxsfb: Change driver.name to mxsfb-drm
-In-Reply-To: <fd22085f646d97f66cff5b7f22785500@agner.ch>
-References: <cover.1529091248.git.leonard.crestez@nxp.com>
- <47ea7572011735b68a8a70f0e11bdf00cb2fd86a.1529091248.git.leonard.crestez@nxp.com>
- <CAOMZO5B8i0gN+rCq-yPrd112NkwJWTxYCtsLVeLhD1JLRuX6EQ@mail.gmail.com>
- <07be6d9a85b6be655fc2b084be81d8bf9715b57a.camel@nxp.com>
- <638457fd-85da-8fec-d146-517c43f71813@denx.de>
- <b3fa74c5110b45e5992920485749869ab1f7ebce.camel@nxp.com>
- <6995fa4b-47a9-887b-5e4f-4284ca6a2c79@gmail.com>
- <fd22085f646d97f66cff5b7f22785500@agner.ch>
-Message-ID: <6fdba55b-0be6-9e28-d87a-43d876a1fd09@denx.de>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 10 Jul 2018 15:49:30 +0530
+Subject: [PATCH v3 00/13] ARM: davinci: remove duplicate aemif support
+In-Reply-To: <125d73f7-7311-866f-1e9d-d3c1f9473899@lechnology.com>
+References: <20180628095748.4462-1-brgl@bgdev.pl>
+ <52a274f1-283a-a14a-54f3-4b95b6605c4f@ti.com>
+ <59fdc532-bb72-ffae-cfb6-a7f156c14771@lechnology.com>
+ <e1222b3c-dfa4-4cb0-eebf-8e2550e9d674@ti.com>
+ <125d73f7-7311-866f-1e9d-d3c1f9473899@lechnology.com>
+Message-ID: <92e41afc-cf3a-e713-11d5-247b8d6e3a64@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/10/2018 11:06 AM, Stefan Agner wrote:
-> On 16.06.2018 01:32, Marek Vasut wrote:
->> On 06/16/2018 12:42 AM, Leonard Crestez wrote:
->>> On Fri, 2018-06-15 at 23:36 +0200, Marek Vasut wrote:
->>>> On 06/15/2018 10:58 PM, Leonard Crestez wrote:
->>>>> On Fri, 2018-06-15 at 16:47 -0300, Fabio Estevam wrote:
->>>>>> On Fri, Jun 15, 2018 at 4:43 PM, Leonard Crestez
->>>>>> <leonard.crestez@nxp.com> wrote:
->>>
->>>>>>> The FBDEV driver uses the same name and both can't be registered at the
->>>>>>> same time. Fix this by renaming the drm driver to mxsfb-drm
->>>>>>
->>>>>> Stefan sent the same patch a few days ago:
->>>>>
->>>>> In that thread there is a proposal for removing the old fbdev/mxsfb
->>>>> driver entirely.
->>>>>
->>>>> That would break old DTBs, isn't this generally considered bad? Also,
->>>>> are we sure the removal of fbdev/mxsfb wouldn't lose any features?
->>>>>
->>>>> What my series does is make both drivers work with the same kernel
->>>>> image and turns the choice into a board-level dtb decision. Supporting
->>>>> everything at once seems desirable to me and it allows for a very
->>>>> smooth upgrade path.
+On Friday 06 July 2018 11:09 PM, David Lechner wrote:
+> On 07/04/2018 01:35 AM, Sekhar Nori wrote:
+>> Hi David,
+>>
+>> On Monday 02 July 2018 09:02 PM, David Lechner wrote:
+>>> On 07/02/2018 07:28 AM, Sekhar Nori wrote:
+>>>> Hi David, Stephen,
 >>>>
->>>> Having two drivers in the kernel with different set of bugs is always bad.
+>>>> On Thursday 28 June 2018 03:27 PM, Bartosz Golaszewski wrote:
+>>>>> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>>>>>
+>>>>> This series moves all aemif/nand users to using the ti-aemif platform
+>>>>> driver located in drivers/memory instead of the older API located in
+>>>>> mach-davinci.
+>>>>>
+>>>>> First five patches add necessary changes to the clock driver. Next
+>>>>> seven convert the board files to using the ti-aemif driver. Last patch
+>>>>> removes now dead code.
 >>>>
->>>>> The old driver could be removed later, after all users are converted.
->>>>
->>>> Both drivers were in for long enough already. And let's be realistic,
->>>> how many MX23/MX28 users of old DTs with new kernels are there who
->>>> cannot update the DT as well ?
+>>>> How do you want to handle this series? I can apply the series and
+>>>> provide you an immutable branch on v4.18-rc1 with the clock patches
+>>>> applied if that can work.
 >>>
->>> Grepping for "display =" in arch/arm/boot/dts/imx* I see that old
->>> bindings are also used by 3rd-party boards for imx6/7:
->>>  * imx6sx-nitrogen6sx
->>>  * imx6ul-geam
->>>  * imx6ul-isiot
->>>  * imx6ul-opos6uldev
->>>  * imx6ul-pico-hobbit
->>>  * imx6ul-tx6ul
->>>  * imx7d-nitrogen7
+>>> Sounds good to me. But I'm new to this maintainer thing, so maybe
+>>> there is something to consider that I haven't thought of?
 >>
->> Er, yes, a handful of boards which could be updated :)
+>> I don't think there is more to it. Ultimately there should not be two
+>> commits for the same patch. Either you can apply and share the commit to
+>> use or I can do that as well. I am equally fine either way.
 >>
->>> Converting everything might be quite a bit of work, and explicitly
->>> supporting old bindings is also work.
+>> Regards,
+>> Sekhar
 >>
->> Does adding support for old bindings justify the effort invested ? I
->> doubt so, it only adds more code to maintain.
->>
->>> It is very confusing that there is a whole set of displays for imx6/7
->>> which are supported by upstream but only with a non-default config.
->>> While it is extremely common in the embedded field to have custom
->>> configs the default one in the kernel should try to "just work".
->>>
->>> Couldn't this patch series be considered a bugfix? It was also
->>> surprisingly small.
->>
->> I think it's just a workaround which allows you to postpone the real
->> fix, and I don't like that.
 > 
-> This is one of the situation where states quo is kinda the worst
-> situation.
-> 
-> Currently imx_v6_v7_defconfig and mxs_defconfig actually still uses
-> CONFIG_FB_MXS.
-> 
-> I understand that you'd rather prefer to move forward. I suggest we do
-> it in steps.
-> 
-> In 4.19:
-> 
-> - Change DRM driver.name to mxsfb-drm so we avoid conflicts for now
+> I've created a branch for-sekhar at https://github.com/dlech/linux.git
+> with the clk commits.
 
-But this will break mesa if it depends on mxsfb name for ie. etnaviv
-binding.
+Thanks. I merged commit f917ff75ac55b6d829c9d1142e83913064565d5b (top of
+that branch) to my v4.19/soc branch. Please do let Stephen and Mike know
+about this then when you send your stuff for v4.19.
 
-> - Remove CONFIG_FB_MXS from imx_v6_v7_defconfig/mxs_defconfig now, and
-> only enable CONFIG_DRM_MXSFB=y
-> - Add (deprecated) to CONFIG_FB_MXS
-> 
-> In 4.19/4.20:
-> - Fix the above device trees
-> 
-> In 4.20/4.21:
-> - Remove FB_MXS
-> 
-> Does that sound reasonable? If yes, I can send the patch set to do step
-> 1.
-
-Can you fix the DTs for 4.19 too ?
-
--- 
-Best regards,
-Marek Vasut
+Thanks,
+Sekhar
