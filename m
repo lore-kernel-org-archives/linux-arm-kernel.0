@@ -1,77 +1,67 @@
-From: collinsd@codeaurora.org (David Collins)
-Date: Tue, 10 Jul 2018 16:01:35 -0700
-Subject: [PATCH 2/3] arm64: dts: qcom: sdm845-mtp: Add RPMh VRM/XOB
- regulators
-In-Reply-To: <CAD=FV=X5oVYYyZvTNZjvpY+Vss4TzpZwCzSsup0AJOcfAVhkzA@mail.gmail.com>
-References: <20180710220202.116404-1-dianders@chromium.org>
- <20180710220202.116404-3-dianders@chromium.org>
- <0d334051-2ba5-075d-df8c-affe3e617e8d@codeaurora.org>
- <CAD=FV=X5oVYYyZvTNZjvpY+Vss4TzpZwCzSsup0AJOcfAVhkzA@mail.gmail.com>
-Message-ID: <05f5afbf-61cd-77e8-3a02-1166d1c1ad4f@codeaurora.org>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 11 Jul 2018 00:17:05 +0100
+Subject: [PATCH v2] Add DT support for Octavo Systems OSD3358-SM-RED
+ based on TI AM335x
+In-Reply-To: <CADO55X_wCd1o9Tfze08fJixsUuA2y7EDDQ3hRwy2bR1nktgx1A@mail.gmail.com>
+References: <20180706200051.1115-1-neeraj.dantu@octavosystems.com>
+ <20180709114304.GE6920@n2100.armlinux.org.uk>
+ <CADO55X8_tbz-O8AuHwqCGnV0g2oDiGHzAug6g3PFqRth5U2H=w@mail.gmail.com>
+ <20180710082624.GA16036@n2100.armlinux.org.uk>
+ <CADO55X_wCd1o9Tfze08fJixsUuA2y7EDDQ3hRwy2bR1nktgx1A@mail.gmail.com>
+Message-ID: <20180710231705.GG6920@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 07/10/2018 03:55 PM, Doug Anderson wrote:
-> On Tue, Jul 10, 2018 at 3:32 PM, David Collins <collinsd@codeaurora.org> wrote:
->> On 07/10/2018 03:02 PM, Douglas Anderson wrote:
->> ...
->>> +             vdd-s1-supply = <&vph_pwr>;
->>> +             vdd-s2-supply = <&vph_pwr>;
->>> +             vdd-s3-supply = <&vph_pwr>;
->>> +             vdd-s4-supply = <&vph_pwr>;
->>> +             vdd-s5-supply = <&vph_pwr>;
->>> +             vdd-s6-supply = <&vph_pwr>;
->>> +             vdd-s7-supply = <&vph_pwr>;
->>> +             vdd-s8-supply = <&vph_pwr>;
->>> +             vdd-s9-supply = <&vph_pwr>;
->>> +             vdd-s10-supply = <&vph_pwr>;
->>> +             vdd-s11-supply = <&vph_pwr>;
->>> +             vdd-s12-supply = <&vph_pwr>;
->>> +             vdd-s13-supply = <&vph_pwr>;
->>> +             vdd-l1-l27-supply = <&vreg_s7a_1p025>;
->>> +             vdd-l2-l8-l17-supply = <&vreg_s3a_1p35>;
->>> +             vdd-l3-l11-supply = <&vreg_s7a_1p025>;
->>> +             vdd-l4-l5-supply = <&vreg_s7a_1p025>;
->>> +             vdd-l6-supply = <&vph_pwr>;
->>> +             vdd-l7-l12-l14-l15-supply = <&vreg_s5a_2p04>;
->>> +             vdd-l9-supply = <&vreg_bob>;
->>> +             vdd-l10-l23-l25-supply = <&vreg_bob>;
->>> +             vdd-l13-l19-l21-supply = <&vreg_bob>;
->>> +             vdd-l16-l28-supply = <&vreg_bob>;
->>> +             vdd-l18-l22-supply = <&vreg_bob>;
->>> +             vdd-l20-l24-supply = <&vreg_bob>;
->>> +             vdd-l26-supply = <&vreg_s3a_1p35>;
->>> +             vin-lvs-1-2-supply = <&vreg_s4a_1p8>;
->>
->> I would suggest not specifying any of these regulator parent supplies in
->> device tree.  RPMh will be enforcing all regulator parent-child
->> dependencies.  Therefore, handling the dependencies in Linux is redundant.
->>  It will result in additional RPMh requests as well as more time spent in
->> regulator framework calls.  Overall, it will lead to slightly lower
->> performance.  Note that while specifying the parent supplies results in
->> less efficient runtime behavior, it is not technically wrong so you could
->> keep them in place if you prefer.
+On Tue, Jul 10, 2018 at 03:54:19PM -0500, Neeraj Kumar Reddy Dantu wrote:
+> > As maintainer of the TDA998x driver, I know what the TDA998x is
+> > capable of, I already have the datasheets, and I know the binding
+> > document.
 > 
-> Interesting.  ...so RPMh will automatically turn on parent regulators
-> when their children are enabled (assuming that the parent regulator is
-> also RPMh controlled)?
+> > What I'm asking about is about the specifics of your board's
+> > implementation and why you've written what you have in your DT
+> > file.  You haven't answered my specific questions either.
+> I am sorry I was unclear. My apologies.
+> 
+> Here is the wiring between LCD controller and the framer:
+> 
+> LCD[11:15] ====> VPA[3:7]
+> LCD[5:10]   ====> VPB[2:7]
+> LCD[0:4]     ====> VPC[3:7]
+> Here is the schematic:
+> https://octavosystems.com/docs/osd3358-sm-red-schematics-pdf/
+> And yes, the colors will come out wrong for the 24 bit for the
+> configuration set. See "blue-and-red-wiring" in tilcdc bindings:
+> https://www.kernel.org/doc/Documentation/devicetree/bindings/display/tilcdc/tilcdc.txt
+> AM335x errata providing wiring info for 24 bit mode:
+> http://www.ti.com/lit/er/sprz360i/sprz360i.pdf
+> 
+> We used the same interface design as the BeagleBone Black:
+> https://github.com/torvalds/linux/blob/master/arch/arm/boot/dts/am335x-boneblack-common.dtsi
+> 
+> Hope this is helpful.
 
-Yes, exactly.  RPMh also ensures that the voltage of a parent regulator is
-sufficient to meet minimum headroom voltage requirements of all
-subregulated child regulators.
+Thanks, that explains the situation.  It would be nice to state that
+this weirdness is due to an errata in the comment about it.
 
+However, if DRM had the ability to communicate the bus format between
+the LCD controller and the encoder/bridge, then we could do a lot more
+to correct this problem, such as:
 
-> Personally I'd still prefer to see Linux managing its own state and
-> relying less on RPMh-automatic stuff, but I'd defer to Bjorn / Andy
-> (or others) to override me.
+- dynamically configuring the TDA998x's input to automatically remap
+  the input pins.
 
-Ok
+- configure the TDA998x's colour space converter to correctly scale
+  the RGB565 input for the missing LSB bits when we know that we are
+  supplied with an RGB565 input signal.
 
-Take care,
-David
+The last point doesn't give you RGB888 or BGR888, but would at least
+mean that white would be white and not a very light grey with a green
+tinge.
+
+It's seems odd that tilcdc supports 8bpc in the framebuffer, but the
+hardware has no way to produce 8bpc on the device's outputs.
 
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
+According to speedtest.net: 13Mbps down 490kbps up
