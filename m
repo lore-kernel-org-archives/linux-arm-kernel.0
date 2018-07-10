@@ -1,45 +1,75 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 10 Jul 2018 19:15:59 +0100
-Subject: [PATCH v10 5/6] spi: at91-usart: add driver for at91-usart as spi
-In-Reply-To: <20180625172230.29686-6-radu.pirea@microchip.com>
-References: <20180625172230.29686-1-radu.pirea@microchip.com>
- <20180625172230.29686-6-radu.pirea@microchip.com>
-Message-ID: <20180710181559.GG8104@sirena.org.uk>
+From: Okaya@kernel.org (Sinan Kaya)
+Date: Tue, 10 Jul 2018 14:30:11 -0400
+Subject: [PATCH V5 3/3] PCI: Mask and unmask hotplug interrupts during
+ reset
+In-Reply-To: <20180709160008.GA1490@wunner.de>
+References: <CAK9iUCM=zWexWow9TwkRfO186Hwr5WyGy0NHZF1vtXn3wbbZGQ@mail.gmail.com>
+ <12fc8de5-ff03-cb00-52cb-25a43c71d03a@codeaurora.org>
+ <20180708171418.GA11476@wunner.de>
+ <CAK9iUCMcic5mzGiT20KNxgwPo6AuajHFsoj7GOjSht5SwrQevg@mail.gmail.com>
+ <20180709160008.GA1490@wunner.de>
+Message-ID: <CAK9iUCMMVR114msKiMHu7ik0VK8T5j=LAYAKsEkdnocTqkdMjQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 25, 2018 at 08:22:29PM +0300, Radu Pirea wrote:
+On Mon, Jul 9, 2018 at 12:00 PM, Lukas Wunner <lukas@wunner.de> wrote:
+>
+> On Mon, Jul 09, 2018 at 08:48:44AM -0600, Sinan Kaya wrote:
+> > On 7/8/18, Lukas Wunner <lukas@wunner.de> wrote:
+> > > On Tue, Jul 03, 2018 at 11:43:26AM -0400, Sinan Kaya wrote:
+> > > > My solution doesn't help if link down interrupt is observed before the
+> > > > AER
+> > > > or DPC services.
+> > >
+> > > If pciehp gets an interrupt quicker than dpc/aer, it will (at least with
+> > > my patches) remove all devices, check if the presence bit is set,
+> > > and if so, try to bring the slot up again.
+> >
+> > Hotplug driver should only observe a link down interrupt. Link would
+> > come up in response to a secondary bus reset initiated by the AER
+> > driver.
+>
+> PCIe hotplug doesn't have separate Link Down and Link Up interrupts,
+> there is only a Link State *Changed* event.
+>
+> > Can you point me to the code that would bring up the link in hp code?
+>
+> I was referring to the situation with my recently posted pciehp patches
+> applied, in particular patch [21/32] ("PCI: pciehp: Become resilient to
+> missed events"):
+> https://patchwork.ozlabs.org/patch/930389/
+>
+> When I get a presence or link changed event, I turn the slot off.  That
+> includes removing all devices in the slot.  Because even if the slot is
+> still occupied or link is up, there was definitely a change and the safe
+> behavior is to assume that the card in the slot is now a different one
+> than before.
+>
 
-This is mostly good, just a couple of small things:
+We do have a bit of mess unfortunately. Error handling and hotplug drivers
+do not play nicely with each other.
 
-> +config SPI_AT91_USART
-> +	tristate "Atmel USART Controller SPI driver"
-> +	depends on HAS_DMA
-> +	depends on (ARCH_AT91 || COMPILE_TEST)
-> +	select MFD_AT91_USART
+When hotplug driver observes a link down, we are not checking if the
+link down happened because user really wanted to remove a card or
+if it was because it was originated by an error handling service such
+as AER/DPC.
 
-Why is this selecting rather than depending on the MFD like we normally
-do?
+I'm thinking that we could potentially check if a hotplug event is pending
+at the entrance of fatal error handling. If it is pending, we could poll until
+the status bit clears. That should flush the link down event.
 
-> @@ -0,0 +1,432 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +/*
-> + * Driver for AT91 USART Controllers as SPI
-> + *
-> + * Copyright (C) 2018 Microchip Technology Inc.
-> + * Author: Radu Pirea <radu.pirea@microchip.com>
-> + */
+Even then, link down indication of hotplug seem to turn off slot power
+and LED.
 
-Please use C++ comments for the whole block so it looks a bit more
-intentional.
+If AER/DPC service runs after the hotplug driver, link won't come back
+up as the power to the slot is turned off.
 
-Otherwise 
+I'd like to hear about Bjorn's opinion before we throw something else
+into this problem.
 
-Reviwed-by: Mark Brown <broonie@kernel.org>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180710/8d6520d9/attachment.sig>
+> Afterwards, I check if the slot is occupied or link is up.  If either
+> of those conditions is true, I try to bring the slot up again.
+>
+> Thanks,
+>
+> Lukas
