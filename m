@@ -1,120 +1,29 @@
-From: dantuguf14105@gmail.com (Neeraj Kumar Reddy Dantu)
-Date: Tue, 10 Jul 2018 15:54:19 -0500
-Subject: [PATCH v2] Add DT support for Octavo Systems OSD3358-SM-RED based
- on TI AM335x
-In-Reply-To: <20180710082624.GA16036@n2100.armlinux.org.uk>
-References: <20180706200051.1115-1-neeraj.dantu@octavosystems.com>
- <20180709114304.GE6920@n2100.armlinux.org.uk>
- <CADO55X8_tbz-O8AuHwqCGnV0g2oDiGHzAug6g3PFqRth5U2H=w@mail.gmail.com>
- <20180710082624.GA16036@n2100.armlinux.org.uk>
-Message-ID: <CADO55X_wCd1o9Tfze08fJixsUuA2y7EDDQ3hRwy2bR1nktgx1A@mail.gmail.com>
+From: ray.jui@broadcom.com (Ray Jui)
+Date: Tue, 10 Jul 2018 14:25:29 -0700
+Subject: [PATCH 0/2] Stingray Smart NIC DT support
+Message-ID: <1531257931-11591-1-git-send-email-ray.jui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> As maintainer of the TDA998x driver, I know what the TDA998x is
-> capable of, I already have the datasheets, and I know the binding
-> document.
+This patch series adds DT support for Stingray smart NIC boards
 
-> What I'm asking about is about the specifics of your board's
-> implementation and why you've written what you have in your DT
-> file.  You haven't answered my specific questions either.
-I am sorry I was unclear. My apologies.
+This patch series is based off v4.18-rc3 and is available on GIHUB:
+repo: https://github.com/Broadcom/arm64-linux.git
+branch: sr-smartnic-dt-v1
 
-Here is the wiring between LCD controller and the framer:
+Ray Jui (1):
+  arm64: dts: stingray: add PAXC support
 
-LCD[11:15] ====> VPA[3:7]
-LCD[5:10]   ====> VPB[2:7]
-LCD[0:4]     ====> VPC[3:7]
-Here is the schematic:
-https://octavosystems.com/docs/osd3358-sm-red-schematics-pdf/
-And yes, the colors will come out wrong for the 24 bit for the
-configuration set. See "blue-and-red-wiring" in tilcdc bindings:
-https://www.kernel.org/doc/Documentation/devicetree/bindings/display/tilcdc/tilcdc.txt
-AM335x errata providing wiring info for 24 bit mode:
-http://www.ti.com/lit/er/sprz360i/sprz360i.pdf
+Vladimir Olovyannikov (1):
+  arm64: dts: stingray: add bcm958802a802x dts
 
-We used the same interface design as the BeagleBone Black:
-https://github.com/torvalds/linux/blob/master/arch/arm/boot/dts/am335x-boneblack-common.dtsi
+ arch/arm64/boot/dts/broadcom/stingray/Makefile     |  2 +
+ .../boot/dts/broadcom/stingray/bcm958802a802x.dts  | 26 +++++++++++
+ .../boot/dts/broadcom/stingray/stingray-pcie.dtsi  | 54 ++++++++++++++++++++++
+ .../arm64/boot/dts/broadcom/stingray/stingray.dtsi | 11 +++++
+ 4 files changed, 93 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/broadcom/stingray/bcm958802a802x.dts
+ create mode 100644 arch/arm64/boot/dts/broadcom/stingray/stingray-pcie.dtsi
 
-Hope this is helpful.
-
-Thanks,
-Neeraj
-
-On Tue, Jul 10, 2018 at 3:26 AM Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
->
-> On Mon, Jul 09, 2018 at 02:45:17PM -0500, Neeraj Kumar Reddy Dantu wrote:
-> >  > This should not be "tda19988" as the node name - DT requires generic
-> > > names, like "hdmi-encoder".
-> >
-> > Thanks.Will fix in v3
-> >
-> > > Can you set 24-bit RGB mode with the above configuration - presumably
-> > > the colours will come out wrong?
-> > > Exactly what is the wiring between the lcdc and tda998x?
-> >
-> > You can set mapping for lcd interface between pins with video-ports. See
-> > TDA19988 datasheet, Table 4:
-> > https://media.digikey.com/pdf/Data%20Sheets/NXP%20PDFs/TDA19988_DS_21_july_2011.pdf
-> > .
-> > The property is optional and not used in the board. DT bindings:
-> > https://www.kernel.org/doc/Documentation/devicetree/bindings/display/bridge/tda998x.txt
-> >
-> > This board uses 15 pin RGB565 interface.
->
-> As maintainer of the TDA998x driver, I know what the TDA998x is
-> capable of, I already have the datasheets, and I know the binding
-> document.
->
-> What I'm asking about is about the specifics of your board's
-> implementation and why you've written what you have in your DT
-> file.  You haven't answered my specific questions either.
->
-> >
-> > Regards,
-> > Neeraj
-> >
-> > On Mon, Jul 9, 2018 at 6:43 AM Russell King - ARM Linux <
-> > linux at armlinux.org.uk> wrote:
-> >
-> > > On Fri, Jul 06, 2018 at 08:00:51PM +0000, Neeraj Dantu wrote:
-> > > > +&lcdc {
-> > > > +     status = "okay";
-> > > > +
-> > > > +     /* If you want to get 24 bit RGB and 16 BGR mode instead of
-> > > > +      * current 16 bit RGB and 24 BGR modes, set the propety
-> > > > +      * below to "crossed" and uncomment the video-ports -property
-> > > > +      * in tda19988 node.
-> > > > +      */
-> > > > +     blue-and-red-wiring = "straight";
-> > > ...
-> > > > +&i2c0 {
-> > > > +     tda19988: tda19988 {
-> > >
-> > > This should not be "tda19988" as the node name - DT requires generic
-> > > names, like "hdmi-encoder".
-> > >
-> > > ...
-> > > > +             /* Convert 24bit BGR to RGB, e.g. cross red and blue
-> > > wiring */
-> > > > +             /* video-ports = <0x234501>; */
-> > >
-> > > Please explain more what's going on here.
-> > >
-> > > Can you set 24-bit RGB mode with the above configuration - presumably
-> > > the colours will come out wrong?
-> > >
-> > > Exactly what is the wiring between the lcdc and tda998x?
-> > >
-> > > --
-> > > RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> > > FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps
-> > > up
-> > > According to speedtest.net: 13Mbps down 490kbps up
-> > >
->
-> --
-> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
-> According to speedtest.net: 13Mbps down 490kbps up
+-- 
+2.1.4
