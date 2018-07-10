@@ -1,123 +1,85 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Tue, 10 Jul 2018 22:35:10 +0200
-Subject: [PATCH v2 17/18] drm/sun4i: tcon-top: Remove mux configuration at
- probe time
+Date: Tue, 10 Jul 2018 22:35:06 +0200
+Subject: [PATCH v2 13/18] drm/sun4i: tcon: Add support for R40 TCON
 In-Reply-To: <20180710203511.18454-1-jernej.skrabec@siol.net>
 References: <20180710203511.18454-1-jernej.skrabec@siol.net>
-Message-ID: <20180710203511.18454-18-jernej.skrabec@siol.net>
+Message-ID: <20180710203511.18454-14-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that R40 TCON migrated to runtime mux configuration, old code can be
-removed.
+R40 TV TCON is basically the same as on A83T. However, it needs special
+handling, because it has to set up TCON TOP muxes at runtime.
 
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/gpu/drm/sun4i/sun8i_tcon_top.c | 76 +-------------------------
- 1 file changed, 1 insertion(+), 75 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_tcon.c | 40 ++++++++++++++++++++++++++++++
+ 1 file changed, 40 insertions(+)
 
-diff --git a/drivers/gpu/drm/sun4i/sun8i_tcon_top.c b/drivers/gpu/drm/sun4i/sun8i_tcon_top.c
-index c09b15b64192..b7cf0f0f6583 100644
---- a/drivers/gpu/drm/sun4i/sun8i_tcon_top.c
-+++ b/drivers/gpu/drm/sun4i/sun8i_tcon_top.c
-@@ -87,34 +87,6 @@ int sun8i_tcon_top_de_config(struct device *dev, int mixer, int tcon)
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+index 44ec3a3d4d64..5676b7faaca0 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+@@ -1291,6 +1291,40 @@ static int sun6i_tcon_set_mux(struct sun4i_tcon *tcon,
+ 	return 0;
  }
- EXPORT_SYMBOL(sun8i_tcon_top_de_config);
  
--static int sun8i_tcon_top_get_connected_ep_id(struct device_node *node,
--					      int port_id)
--{
--	struct device_node *ep, *remote, *port;
--	struct of_endpoint endpoint;
--
--	port = of_graph_get_port_by_id(node, port_id);
--	if (!port)
--		return -ENOENT;
--
--	for_each_available_child_of_node(port, ep) {
--		remote = of_graph_get_remote_port_parent(ep);
--		if (!remote)
--			continue;
--
--		if (of_device_is_available(remote)) {
--			of_graph_parse_endpoint(ep, &endpoint);
--
--			of_node_put(remote);
--
--			return endpoint.id;
--		}
--
--		of_node_put(remote);
--	}
--
--	return -ENOENT;
--}
++static int sun8i_r40_tcon_tv_set_mux(struct sun4i_tcon *tcon,
++				     const struct drm_encoder *encoder)
++{
++	struct device_node *port, *remote;
++	struct platform_device *pdev;
++	int id, ret;
++
++	/* find TCON TOP platform device and TCON id */
++
++	port = of_graph_get_port_by_id(tcon->dev->of_node, 0);
++	if (!port)
++		return -EINVAL;
++
++	id = sun4i_tcon_of_get_id_from_port(port);
++	of_node_put(port);
++
++	remote = of_graph_get_remote_node(tcon->dev->of_node, 0, -1);
++	if (!remote)
++		return -EINVAL;
++
++	pdev = of_find_device_by_node(remote);
++	of_node_put(remote);
++	if (!pdev)
++		return -EINVAL;
++
++	if (encoder->encoder_type == DRM_MODE_ENCODER_TMDS) {
++		ret = sun8i_tcon_top_set_hdmi_src(&pdev->dev, id);
++		if (ret)
++			return ret;
++	}
++
++	return sun8i_tcon_top_de_config(&pdev->dev, tcon->id, id);
++}
++
+ static const struct sun4i_tcon_quirks sun4i_a10_quirks = {
+ 	.has_channel_0		= true,
+ 	.has_channel_1		= true,
+@@ -1338,6 +1372,11 @@ static const struct sun4i_tcon_quirks sun8i_a83t_tv_quirks = {
+ 	.has_channel_1		= true,
+ };
  
- static struct clk_hw *sun8i_tcon_top_register_gate(struct device *dev,
- 						   const char *parent,
-@@ -149,11 +121,9 @@ static int sun8i_tcon_top_bind(struct device *dev, struct device *master,
- 	struct platform_device *pdev = to_platform_device(dev);
- 	struct clk_hw_onecell_data *clk_data;
- 	struct sun8i_tcon_top *tcon_top;
--	bool mixer0_unused = false;
- 	struct resource *res;
- 	void __iomem *regs;
--	int ret, i, id;
--	u32 val;
-+	int ret, i;
- 
- 	tcon_top = devm_kzalloc(dev, sizeof(*tcon_top), GFP_KERNEL);
- 	if (!tcon_top)
-@@ -198,50 +168,6 @@ static int sun8i_tcon_top_bind(struct device *dev, struct device *master,
- 		goto err_assert_reset;
- 	}
- 
--	val = 0;
--
--	/* check if HDMI mux output is connected */
--	if (sun8i_tcon_top_get_connected_ep_id(dev->of_node, 5) >= 0) {
--		/* find HDMI input endpoint id, if it is connected at all*/
--		id = sun8i_tcon_top_get_connected_ep_id(dev->of_node, 4);
--		if (id >= 0)
--			val = FIELD_PREP(TCON_TOP_HDMI_SRC_MSK, id + 1);
--		else
--			DRM_DEBUG_DRIVER("TCON TOP HDMI input is not connected\n");
--	} else {
--		DRM_DEBUG_DRIVER("TCON TOP HDMI output is not connected\n");
--	}
--
--	writel(val, regs + TCON_TOP_GATE_SRC_REG);
--
--	val = 0;
--
--	/* process mixer0 mux output */
--	id = sun8i_tcon_top_get_connected_ep_id(dev->of_node, 1);
--	if (id >= 0) {
--		val = FIELD_PREP(TCON_TOP_PORT_DE0_MSK, id);
--	} else {
--		DRM_DEBUG_DRIVER("TCON TOP mixer0 output is not connected\n");
--		mixer0_unused = true;
--	}
--
--	/* process mixer1 mux output */
--	id = sun8i_tcon_top_get_connected_ep_id(dev->of_node, 3);
--	if (id >= 0) {
--		val |= FIELD_PREP(TCON_TOP_PORT_DE1_MSK, id);
--
--		/*
--		 * mixer0 mux has priority over mixer1 mux. We have to
--		 * make sure mixer0 doesn't overtake TCON from mixer1.
--		 */
--		if (mixer0_unused && id == 0)
--			val |= FIELD_PREP(TCON_TOP_PORT_DE0_MSK, 1);
--	} else {
--		DRM_DEBUG_DRIVER("TCON TOP mixer1 output is not connected\n");
--	}
--
--	writel(val, regs + TCON_TOP_PORT_SEL_REG);
--
- 	/*
- 	 * TCON TOP has two muxes, which select parent clock for each TCON TV
- 	 * channel clock. Parent could be either TCON TV or TVE clock. For now
++static const struct sun4i_tcon_quirks sun8i_r40_tv_quirks = {
++	.has_channel_1		= true,
++	.set_mux		= sun8i_r40_tcon_tv_set_mux,
++};
++
+ static const struct sun4i_tcon_quirks sun8i_v3s_quirks = {
+ 	.has_channel_0		= true,
+ };
+@@ -1362,6 +1401,7 @@ const struct of_device_id sun4i_tcon_of_table[] = {
+ 	{ .compatible = "allwinner,sun8i-a33-tcon", .data = &sun8i_a33_quirks },
+ 	{ .compatible = "allwinner,sun8i-a83t-tcon-lcd", .data = &sun8i_a83t_lcd_quirks },
+ 	{ .compatible = "allwinner,sun8i-a83t-tcon-tv", .data = &sun8i_a83t_tv_quirks },
++	{ .compatible = "allwinner,sun8i-r40-tcon-tv", .data = &sun8i_r40_tv_quirks },
+ 	{ .compatible = "allwinner,sun8i-v3s-tcon", .data = &sun8i_v3s_quirks },
+ 	{ .compatible = "allwinner,sun9i-a80-tcon-lcd", .data = &sun9i_a80_tcon_lcd_quirks },
+ 	{ .compatible = "allwinner,sun9i-a80-tcon-tv", .data = &sun9i_a80_tcon_tv_quirks },
 -- 
 2.18.0
