@@ -1,38 +1,43 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 10 Jul 2018 22:21:53 +0200 (CEST)
-Subject: [PATCH 2/2] clocksource: arm_arch_timer: set arch_mem_timer
- cpumask to cpu_possible_mask
-In-Reply-To: <a8979e78-9844-160a-a758-631505924bbd@arm.com>
-References: <1531151136-18297-1-git-send-email-sudeep.holla@arm.com>
- <1531151136-18297-2-git-send-email-sudeep.holla@arm.com>
- <alpine.DEB.2.21.1807100008100.1590@nanos.tec.linutronix.de>
- <b98e0d87-3d9a-9b0c-23c4-7b289cc79a97@arm.com>
- <alpine.DEB.2.21.1807101419130.4356@nanos.tec.linutronix.de>
- <a8979e78-9844-160a-a758-631505924bbd@arm.com>
-Message-ID: <alpine.DEB.2.21.1807102220320.1588@nanos.tec.linutronix.de>
+From: jernej.skrabec@siol.net (Jernej Skrabec)
+Date: Tue, 10 Jul 2018 22:34:54 +0200
+Subject: [PATCH v2 01/18] dt-bindings: display: sun4i-drm: Add R40 display
+ engine compatible
+In-Reply-To: <20180710203511.18454-1-jernej.skrabec@siol.net>
+References: <20180710203511.18454-1-jernej.skrabec@siol.net>
+Message-ID: <20180710203511.18454-2-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 10 Jul 2018, Sudeep Holla wrote:
-> On 10/07/18 13:21, Thomas Gleixner wrote:
-> >> Also only few ARM clocksource drivers use cpu_all_mask which could be
-> >> result of copy-paste, we can even fix them too.
-> >>
-> >> arm_arch_timer.c:	clk->cpumask = cpu_all_mask;
-> >> tegra20_timer.c:	tegra_clockevent.cpumask = cpu_all_mask;
-> >> timer-atcpit100.c:	.cpumask = cpu_all_mask,
-> >> timer-keystone.c:	event_dev->cpumask = cpu_all_mask;
-> >> zevio-timer.c:		timer->clkevt.cpumask	= cpu_all_mask;
-> > 
-> > Yes, that makes sense. What we could do is warn, when cpu_all_mask is set
-> > at registration time and replace the pointer with cpu_possible_mask.
-> > 
-> I like this approach than having to bitwise and with cpu_possible_mask
-> at all the necessary place. I will cook up a patch.
+R40 has pretty unique display pipeline. It supports two outputs at the
+same time.
 
-Appreciated. I'm inclined to take it for 4.18 even. Please send it along
-with the fixes for the above obvious failure spots.
+Possible outputs:
+- 1x HDMI,
+- 2x TV output
+- 1x VGA,
+- 1x MIPI DSI and
+- 2x LCD outputs
 
-Thanks,
+That is the biggest number of possible outputs from all Allwinner SoC.
+Because of that, add new compatible for it.
 
-	tglx
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+---
+ Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+index 5a9319ad8861..288b4cbc255e 100644
+--- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
++++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+@@ -399,6 +399,7 @@ Required properties:
+     * allwinner,sun8i-a33-display-engine
+     * allwinner,sun8i-a83t-display-engine
+     * allwinner,sun8i-h3-display-engine
++    * allwinner,sun8i-r40-display-engine
+     * allwinner,sun8i-v3s-display-engine
+     * allwinner,sun9i-a80-display-engine
+ 
+-- 
+2.18.0
