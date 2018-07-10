@@ -1,53 +1,23 @@
-From: mpe@ellerman.id.au (Michael Ellerman)
-Date: Tue, 10 Jul 2018 16:16:28 +1000
-Subject: [PATCH for 4.18 2/6] rseq: use get_user/put_user rather than
- __get_user/__put_user
-In-Reply-To: <854203778.2272.1531157327328.JavaMail.zimbra@efficios.com>
-References: <20180708210330.27324-1-mathieu.desnoyers@efficios.com>
- <20180708210330.27324-3-mathieu.desnoyers@efficios.com>
- <854203778.2272.1531157327328.JavaMail.zimbra@efficios.com>
-Message-ID: <87tvp7mx8j.fsf@concordia.ellerman.id.au>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 9 Jul 2018 23:17:43 -0700
+Subject: [PATCH v2 1/2] ARM: OMAP2+: sleep33/43xx: Make sleep actions
+ configurable
+In-Reply-To: <1531121597-19150-1-git-send-email-j-keerthy@ti.com>
+References: <1531121597-19150-1-git-send-email-j-keerthy@ti.com>
+Message-ID: <20180710061743.GH99251@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mathieu Desnoyers <mathieu.desnoyers@efficios.com> writes:
-> ----- On Jul 8, 2018, at 5:03 PM, Mathieu Desnoyers mathieu.desnoyers at efficios.com wrote:
->
->> In preparation to use __u64 for the rseq_cs pointer field, 32-bit
->> architectures need to read this 64-bit value located in user-space
->> addresses.
->> 
->> __get_user is used to read this value, given that its access check has
->> already been performed with access_ok() on rseq registration.
->> 
->> arm does not implement 8-byte __get_user. Rather than trying to
->> improve __get_user on ARM, use get_user/put_user across rseq instead.
->> 
->> If those end up showing up in benchmarks, the proper approach would be to
->> use user_access_begin() / unsafe_get/put_user() / user_access_end()
->> anyway.
->
-> So, another twist to this story: ppc32 does not implement u64 get_user().
+* Keerthy <j-keerthy@ti.com> [180709 00:36]:
+> From: Dave Gerlach <d-gerlach@ti.com>
+> 
+> Add an argument to the sleep33xx and sleep43xx code to allow us to set
+> flags to determine which portions of the code get called in order to use
+> the same code for multiple power saving modes. This patch allows us to
+> decide whether or not we flush and disable caches, save EMIF context,
+> put the memory into self refresh and disable the EMIF, and/or invoke
+> the wkup_m3 when entering into WFI.
 
-Or __get_user() for that matter.
+Thanks applying both into omap-for-v4.19/soc.
 
-But we should just fix it.
-
-We have the asm to do it, it's just the fact that __gu_val is unsigned
-long causes the size > sizeof(x) check here to fail:
-
-#define __get_user_size(x, ptr, size, retval)			\
-do {								\
-	retval = 0;						\
-	__chk_user_ptr(ptr);					\
-	if (size > sizeof(x))					\
-		(x) = __get_user_bad();				\
-
-
-
-We seem to be able to fix that with the __inttype() trick that x86 uses.
-
-That's probably not 4.18 material though. But if you want to go with
-copy_from_user() for now you could then switch to get_user() for 4.19.
-
-cheers
+Tony
