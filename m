@@ -1,101 +1,85 @@
-From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
-Date: Tue, 10 Jul 2018 11:15:16 +0800
-Subject: [PATCH v4 3/3] serial: 8250_dw: add fractional divisor support
-In-Reply-To: <20180710110942.5b0a016e@xhacker.debian>
-References: <20180710110942.5b0a016e@xhacker.debian>
-Message-ID: <20180710111516.13b8c570@xhacker.debian>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Mon, 9 Jul 2018 22:44:05 -0500
+Subject: 4.18rc3 TX2 boot failure with "ACPICA: AML parser: attempt to
+ continue loading table after error"
+In-Reply-To: <CAJZ5v0gcr2JjgTe6VwtJxw3yY+ZiPOZpQyjR0FokPM+RzDXJpg@mail.gmail.com>
+References: <c49a3666-7d23-6a05-703c-1273d79a00cd@arm.com>
+ <6074707.jx9F3QFrWC@aspire.rjw.lan>
+ <f89404f9-fd54-cc2b-4fbe-f1feba4e5364@arm.com>
+ <CAJZ5v0gcr2JjgTe6VwtJxw3yY+ZiPOZpQyjR0FokPM+RzDXJpg@mail.gmail.com>
+Message-ID: <218e4339-477d-eb0d-6007-764c8e24229f@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For Synopsys DesignWare 8250 uart which version >= 4.00a, there's a
-valid divisor latch fraction register. The fractional divisor width is
-4bits ~ 6bits.
+Hi,
 
-Now the preparation is done, it's easy to add the feature support.
-This patch firstly tries to get the fractional divisor width during
-probe, then setups dw specific get_divisor() and set_divisor() hook.
+On 07/09/2018 04:28 PM, Rafael J. Wysocki wrote:
+> On Mon, Jul 9, 2018 at 10:45 PM, Jeremy Linton <jeremy.linton@arm.com> wrote:
+>> Hi,
+>>
+>> First thanks for the patch..
+>>
+>> On 07/08/2018 04:14 AM, Rafael J. Wysocki wrote:
+>>>
+>>> On Monday, July 2, 2018 11:41:42 PM CEST Jeremy Linton wrote:
+>>>>
+>>>> Hi,
+>>>>
+>>>> I'm experiencing two problems with commit 5088814a6e931 which is
+>>>> "ACPICA: AML parser: attempt to continue loading table after error"
+>>>>
+>>>> The first is this boot failure on a thunderX2:
+>>>>
+>>>> [   10.770098] ACPI Error: Ignore error and continue table load
+>>
+>>
+>> [trimming]
+>>
+>>>> ]---
+>>>>
+>>>> Which does appear to be the result of some bad data in the table, but it
+>>>> was working with 4.17, and reverting this commit solves the problem.
+>>>
+>>>
+>>> Does the patch below make any difference?
+>>>
+>>> ---
+>>>    drivers/acpi/acpica/psobject.c |    3 +++
+>>>    1 file changed, 3 insertions(+)
+>>>
+>>> Index: linux-pm/drivers/acpi/acpica/psobject.c
+>>> ===================================================================
+>>> --- linux-pm.orig/drivers/acpi/acpica/psobject.c
+>>> +++ linux-pm/drivers/acpi/acpica/psobject.c
+>>> @@ -39,6 +39,9 @@ static acpi_status acpi_ps_get_aml_opcod
+>>>          ACPI_FUNCTION_TRACE_PTR(ps_get_aml_opcode, walk_state);
+>>>          walk_state->aml = walk_state->parser_state.aml;
+>>> +       if (!walk_state->aml)
+>>> +               return AE_CTRL_PARSE_CONTINUE;
+>>> +
+>>
+>>
+>> Well this seems to avoid the crash, but now it hangs right after on the
+>> "Ignore error and continue table load" message.
+> 
+> Well, maybe we should just abort in that case.
+> 
+> I'm wondering what happens if you replace the return statement in the
+> patch above with
+> 
+> return_ACPI_STATUS(AE_AML_BAD_OPCODE)
 
-Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
----
- drivers/tty/serial/8250/8250_dw.c | 45 +++++++++++++++++++++++++++++++
- 1 file changed, 45 insertions(+)
+Yes, that is where I went when I applied the patch but I used 
+AE_CTRL_TERMINATE, which terminates the loop in acpi_ps_parse_loop() and 
+that appears to successfully finish/terminate the initial parsing pass. 
+But, it then crashes in acpi_ns_lookup called via the 
+acpi_walk_resources sequences that goes through ut_evalute_object() due 
+to the path/scope_info->scope.node being ACPI_ROOT_OBJECT (-1) and 
+bypassing the null check. Adding a ACPI_ROOT_OBJECT check as well as the 
+null checks in acpi_ns_lookup results in a successful boot. Tracking 
+down how the terminate (or whatever) is leaving the info->prefix_node 
+(in acpi_ns_evaluate) set to ROOT_OBJECT instead of null, is something I 
+don't yet understand.
 
-diff --git a/drivers/tty/serial/8250/8250_dw.c b/drivers/tty/serial/8250/8250_dw.c
-index fa8a00e8c9c6..ad08d7a3b93b 100644
---- a/drivers/tty/serial/8250/8250_dw.c
-+++ b/drivers/tty/serial/8250/8250_dw.c
-@@ -31,6 +31,7 @@
- 
- /* Offsets for the DesignWare specific registers */
- #define DW_UART_USR	0x1f /* UART Status Register */
-+#define DW_UART_DLF	0xc0 /* Divisor Latch Fraction Register */
- #define DW_UART_CPR	0xf4 /* Component Parameter Register */
- #define DW_UART_UCV	0xf8 /* UART Component Version */
- 
-@@ -55,6 +56,7 @@
- 
- struct dw8250_data {
- 	u8			usr_reg;
-+	u8			dlf_size;
- 	int			line;
- 	int			msr_mask_on;
- 	int			msr_mask_off;
-@@ -366,6 +368,37 @@ static bool dw8250_idma_filter(struct dma_chan *chan, void *param)
- 	return param == chan->device->dev->parent;
- }
- 
-+/*
-+ * divisor = div(I) + div(F)
-+ * "I" means integer, "F" means fractional
-+ * quot = div(I) = clk / (16 * baud)
-+ * frac = div(F) * 2^dlf_size
-+ *
-+ * let rem = clk % (16 * baud)
-+ * we have: div(F) * (16 * baud) = rem
-+ * so frac = 2^dlf_size * rem / (16 * baud) = (rem << dlf_size) / (16 * baud)
-+ */
-+static unsigned int dw8250_get_divisor(struct uart_port *p,
-+				       unsigned int baud,
-+				       unsigned int *frac)
-+{
-+	unsigned int quot, rem;
-+	struct dw8250_data *d = p->private_data;
-+
-+	quot = p->uartclk / (16 * baud);
-+	rem = p->uartclk % (16 * baud);
-+	*frac = DIV_ROUND_CLOSEST(rem << d->dlf_size, 16 * baud);
-+
-+	return quot;
-+}
-+
-+static void dw8250_set_divisor(struct uart_port *p, unsigned int baud,
-+			       unsigned int quot, unsigned int quot_frac)
-+{
-+	dw8250_writel_ext(p, DW_UART_DLF, quot_frac);
-+	serial8250_do_set_divisor(p, baud, quot, quot_frac);
-+}
-+
- static void dw8250_quirks(struct uart_port *p, struct dw8250_data *data)
- {
- 	if (p->dev->of_node) {
-@@ -426,6 +459,18 @@ static void dw8250_setup_port(struct uart_port *p)
- 	dev_dbg(p->dev, "Designware UART version %c.%c%c\n",
- 		(reg >> 24) & 0xff, (reg >> 16) & 0xff, (reg >> 8) & 0xff);
- 
-+	dw8250_writel_ext(p, DW_UART_DLF, ~0U);
-+	reg = dw8250_readl_ext(p, DW_UART_DLF);
-+	dw8250_writel_ext(p, DW_UART_DLF, 0);
-+
-+	if (reg) {
-+		struct dw8250_data *d = p->private_data;
-+
-+		d->dlf_size = fls(reg);
-+		p->get_divisor = dw8250_get_divisor;
-+		p->set_divisor = dw8250_set_divisor;
-+	}
-+
- 	reg = dw8250_readl_ext(p, DW_UART_CPR);
- 	if (!reg)
- 		return;
--- 
-2.18.0
+Anyway, I tried Using BAD_OPCODE rather than TERMINATE and it seems to 
+have the same basic result as PARSE_CONTINUE.
