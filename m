@@ -1,29 +1,41 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Wed, 11 Jul 2018 00:24:35 +0800
-Subject: [RFC PATCH stericsson] mcde_component_drivers[] can be static
-In-Reply-To: <201807110005.U4U4ySBV%fengguang.wu@intel.com>
-References: <201807110005.U4U4ySBV%fengguang.wu@intel.com>
-Message-ID: <20180710162435.GA163985@lkp-ib04>
+From: fabio.estevam@nxp.com (Fabio Estevam)
+Date: Tue, 10 Jul 2018 13:31:45 -0300
+Subject: [PATCH v4 3/6] ARM: dts: imx51: Add tigerp support
+In-Reply-To: <1531240308-24798-1-git-send-email-fabio.estevam@nxp.com>
+References: <1531240308-24798-1-git-send-email-fabio.estevam@nxp.com>
+Message-ID: <1531240308-24798-3-git-send-email-fabio.estevam@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+As per the i.MX51 Reference Manual add an entry for the
+'tigerp' region in the device tree.
 
-Fixes: ee7f210157e9 ("MCDE hack")
-Signed-off-by: kbuild test robot <fengguang.wu@intel.com>
+This is needed for accessing the ARM_GPC register to set the
+DBGEN bit, so that the debug clocks can be turned on.
+
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 ---
- mcde_drv.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Changes since v3:
+- None
 
-diff --git a/drivers/gpu/drm/mcde/mcde_drv.c b/drivers/gpu/drm/mcde/mcde_drv.c
-index df46a36..6cfa8db 100644
---- a/drivers/gpu/drm/mcde/mcde_drv.c
-+++ b/drivers/gpu/drm/mcde/mcde_drv.c
-@@ -240,7 +240,7 @@ static const struct component_master_ops mcde_drm_comp_ops = {
- 	.unbind = mcde_drm_unbind,
- };
+ arch/arm/boot/dts/imx51.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
+index 113ddbc..da9d4ce 100644
+--- a/arch/arm/boot/dts/imx51.dtsi
++++ b/arch/arm/boot/dts/imx51.dtsi
+@@ -451,6 +451,11 @@
+ 				clocks = <&clks IMX5_CLK_IIM_GATE>;
+ 			};
  
--struct platform_driver *const mcde_component_drivers[] = {
-+static struct platform_driver *const mcde_component_drivers[] = {
- 	&mcde_dsi_driver,
- };
- 
++			tigerp: tigerp at 83fa0000 {
++				compatible = "fsl,imx51-tigerp";
++				reg = <0x83fa0000 0x28>;
++			};
++
+ 			owire: owire at 83fa4000 {
+ 				compatible = "fsl,imx51-owire", "fsl,imx21-owire";
+ 				reg = <0x83fa4000 0x4000>;
+-- 
+2.7.4
