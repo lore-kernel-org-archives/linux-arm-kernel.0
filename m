@@ -1,105 +1,54 @@
-From: dianders@chromium.org (Douglas Anderson)
-Date: Tue, 10 Jul 2018 15:02:02 -0700
-Subject: [PATCH 3/3] arm64: dts: qcom: sdm845-mtp: Add nodes for USB
-In-Reply-To: <20180710220202.116404-1-dianders@chromium.org>
+From: collinsd@codeaurora.org (David Collins)
+Date: Tue, 10 Jul 2018 15:32:11 -0700
+Subject: [PATCH 2/3] arm64: dts: qcom: sdm845-mtp: Add RPMh VRM/XOB
+ regulators
+In-Reply-To: <20180710220202.116404-3-dianders@chromium.org>
 References: <20180710220202.116404-1-dianders@chromium.org>
-Message-ID: <20180710220202.116404-4-dianders@chromium.org>
+ <20180710220202.116404-3-dianders@chromium.org>
+Message-ID: <0d334051-2ba5-075d-df8c-affe3e617e8d@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Set the various nodes to "okay" and hook up the regulators.
+Hello Doug,
 
-NOTE: For now the main USB port (the one that goes out the Type C
-connector) is forced to host.  Eventually someone will need to get the
-Type C detection hooked up and get this all integrated with the
-PMI8998 PMIC.  The reason for forcing to "host" in the meantime is
-that this will leave us with one "host" and one "peripheral" port.
+On 07/10/2018 03:02 PM, Douglas Anderson wrote:
+...
+> +		vdd-s1-supply = <&vph_pwr>;
+> +		vdd-s2-supply = <&vph_pwr>;
+> +		vdd-s3-supply = <&vph_pwr>;
+> +		vdd-s4-supply = <&vph_pwr>;
+> +		vdd-s5-supply = <&vph_pwr>;
+> +		vdd-s6-supply = <&vph_pwr>;
+> +		vdd-s7-supply = <&vph_pwr>;
+> +		vdd-s8-supply = <&vph_pwr>;
+> +		vdd-s9-supply = <&vph_pwr>;
+> +		vdd-s10-supply = <&vph_pwr>;
+> +		vdd-s11-supply = <&vph_pwr>;
+> +		vdd-s12-supply = <&vph_pwr>;
+> +		vdd-s13-supply = <&vph_pwr>;
+> +		vdd-l1-l27-supply = <&vreg_s7a_1p025>;
+> +		vdd-l2-l8-l17-supply = <&vreg_s3a_1p35>;
+> +		vdd-l3-l11-supply = <&vreg_s7a_1p025>;
+> +		vdd-l4-l5-supply = <&vreg_s7a_1p025>;
+> +		vdd-l6-supply = <&vph_pwr>;
+> +		vdd-l7-l12-l14-l15-supply = <&vreg_s5a_2p04>;
+> +		vdd-l9-supply = <&vreg_bob>;
+> +		vdd-l10-l23-l25-supply = <&vreg_bob>;
+> +		vdd-l13-l19-l21-supply = <&vreg_bob>;
+> +		vdd-l16-l28-supply = <&vreg_bob>;
+> +		vdd-l18-l22-supply = <&vreg_bob>;
+> +		vdd-l20-l24-supply = <&vreg_bob>;
+> +		vdd-l26-supply = <&vreg_s3a_1p35>;
+> +		vin-lvs-1-2-supply = <&vreg_s4a_1p8>;
 
-In order for host mode this to work, we assume that the bootloader
-left things configured enough for us.  Apparently the magic for that
-is is to do these writes on pmi8998:
-- pm_comm_write_byte(2, 0x1153, 0x2C, 0);
-- pm_comm_write_byte(2, 0x1152, 0x07, 0);
-- pm_comm_write_byte(2, 0x1140, 0x00, 0);
-- pm_comm_write_byte(2, 0x1140, 0x01, 0);
+I would suggest not specifying any of these regulator parent supplies in
+device tree.  RPMh will be enforcing all regulator parent-child
+dependencies.  Therefore, handling the dependencies in Linux is redundant.
+ It will result in additional RPMh requests as well as more time spent in
+regulator framework calls.  Overall, it will lead to slightly lower
+performance.  Note that while specifying the parent supplies results in
+less efficient runtime behavior, it is not technically wrong so you could
+keep them in place if you prefer.
 
-Signed-off-by: Douglas Anderson <dianders@chromium.org>
----
-
- arch/arm64/boot/dts/qcom/sdm845-mtp.dts | 61 +++++++++++++++++++++++++
- 1 file changed, 61 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/qcom/sdm845-mtp.dts b/arch/arm64/boot/dts/qcom/sdm845-mtp.dts
-index 1db4b9735e70..4e14f5f5c2f7 100644
---- a/arch/arm64/boot/dts/qcom/sdm845-mtp.dts
-+++ b/arch/arm64/boot/dts/qcom/sdm845-mtp.dts
-@@ -481,6 +481,67 @@
- 	status = "okay";
- };
- 
-+&usb_1 {
-+	status = "okay";
-+};
-+
-+&usb_1_dwc3 {
-+	/* Until we have Type C hooked up we'll force this as host. */
-+	dr_mode = "host";
-+};
-+
-+&usb_1_hsphy {
-+	status = "okay";
-+
-+	vdd-supply = <&vdda_usb1_ss_core>;
-+	vdda-pll-supply = <&vdda_qusb_hs0_1p8>;
-+	vdda-phy-dpdm-supply = <&vdda_qusb_hs0_3p1>;
-+
-+	qcom,imp-res-offset-value = <8>;
-+	qcom,hstx-trim-value = <QUSB2_V2_HSTX_TRIM_21_6_MA>;
-+	qcom,preemphasis-level = <QUSB2_V2_PREEMPHASIS_5_PERCENT>;
-+	qcom,preemphasis-width = <QUSB2_V2_PREEMPHASIS_WIDTH_HALF_BIT>;
-+};
-+
-+&usb_1_qmpphy {
-+	status = "okay";
-+
-+	vdda-phy-supply = <&vdda_usb1_ss_1p2>;
-+	vdda-pll-supply = <&vdda_usb1_ss_core>;
-+};
-+
-+&usb_2 {
-+	status = "okay";
-+};
-+
-+&usb_2_dwc3 {
-+	/*
-+	 * Though the USB block on SDM845 can support host, there's no vbus
-+	 * signal for this port on MTP.  Thus (unless you have a non-compliant
-+	 * hub that works without vbus) the only sensible thing is to force
-+	 * peripheral mode.
-+	 */
-+	dr_mode = "peripheral";
-+};
-+
-+&usb_2_hsphy {
-+	status = "okay";
-+
-+	vdd-supply = <&vdda_usb2_ss_core>;
-+	vdda-pll-supply = <&vdda_qusb_hs0_1p8>;
-+	vdda-phy-dpdm-supply = <&vdda_qusb_hs0_3p1>;
-+
-+	qcom,imp-res-offset-value = <8>;
-+	qcom,hstx-trim-value = <QUSB2_V2_HSTX_TRIM_22_8_MA>;
-+};
-+
-+&usb_2_qmpphy {
-+	status = "okay";
-+
-+	vdda-phy-supply = <&vdda_usb2_ss_1p2>;
-+	vdda-pll-supply = <&vdda_usb2_ss_core>;
-+};
-+
- /* PINCTRL - additions to nodes defined in sdm845.dtsi */
- 
- &qup_i2c10_default {
--- 
-2.18.0.203.gfac676dfb9-goog
+Take care,
+David
