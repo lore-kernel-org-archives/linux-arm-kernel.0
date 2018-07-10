@@ -1,162 +1,123 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Tue, 10 Jul 2018 22:35:08 +0200
-Subject: [PATCH v2 15/18] ARM: dts: sun8i: r40: Add missing TCON-TOP - TCON
- connections
+Date: Tue, 10 Jul 2018 22:35:10 +0200
+Subject: [PATCH v2 17/18] drm/sun4i: tcon-top: Remove mux configuration at
+ probe time
 In-Reply-To: <20180710203511.18454-1-jernej.skrabec@siol.net>
 References: <20180710203511.18454-1-jernej.skrabec@siol.net>
-Message-ID: <20180710203511.18454-16-jernej.skrabec@siol.net>
+Message-ID: <20180710203511.18454-18-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current R40 is missing some graph connections between TCON TOP and
-TCONs.
+Now that R40 TCON migrated to runtime mux configuration, old code can be
+removed.
 
-Add them.
-
-Fixes: 05a43a262d03 ("ARM: dts: sun8i: r40: Add HDMI pipeline")
-
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- .../boot/dts/sun8i-r40-bananapi-m2-ultra.dts  | 20 ---------
- arch/arm/boot/dts/sun8i-r40.dtsi              | 44 +++++++++++++++++++
- 2 files changed, 44 insertions(+), 20 deletions(-)
+ drivers/gpu/drm/sun4i/sun8i_tcon_top.c | 76 +-------------------------
+ 1 file changed, 1 insertion(+), 75 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts b/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
-index 4f3d583183dc..737cf01b1acd 100644
---- a/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
-+++ b/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
-@@ -251,26 +251,6 @@
- 	regulator-name = "vcc-wifi";
- };
+diff --git a/drivers/gpu/drm/sun4i/sun8i_tcon_top.c b/drivers/gpu/drm/sun4i/sun8i_tcon_top.c
+index c09b15b64192..b7cf0f0f6583 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_tcon_top.c
++++ b/drivers/gpu/drm/sun4i/sun8i_tcon_top.c
+@@ -87,34 +87,6 @@ int sun8i_tcon_top_de_config(struct device *dev, int mixer, int tcon)
+ }
+ EXPORT_SYMBOL(sun8i_tcon_top_de_config);
  
--&tcon_top_hdmi_in_tcon_tv0 {
--	remote-endpoint = <&tcon_tv0_out_tcon_top>;
--};
+-static int sun8i_tcon_top_get_connected_ep_id(struct device_node *node,
+-					      int port_id)
+-{
+-	struct device_node *ep, *remote, *port;
+-	struct of_endpoint endpoint;
 -
--&tcon_top_mixer0_out_tcon_tv0 {
--	remote-endpoint = <&tcon_tv0_in_tcon_top>;
--};
+-	port = of_graph_get_port_by_id(node, port_id);
+-	if (!port)
+-		return -ENOENT;
 -
--&tcon_tv0_in {
--	tcon_tv0_in_tcon_top: endpoint {
--		remote-endpoint = <&tcon_top_mixer0_out_tcon_tv0>;
--	};
--};
+-	for_each_available_child_of_node(port, ep) {
+-		remote = of_graph_get_remote_port_parent(ep);
+-		if (!remote)
+-			continue;
 -
--&tcon_tv0_out {
--	tcon_tv0_out_tcon_top: endpoint {
--		remote-endpoint = <&tcon_top_hdmi_in_tcon_tv0>;
--	};
--};
+-		if (of_device_is_available(remote)) {
+-			of_graph_parse_endpoint(ep, &endpoint);
 -
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_pb_pins>;
-diff --git a/arch/arm/boot/dts/sun8i-r40.dtsi b/arch/arm/boot/dts/sun8i-r40.dtsi
-index 6b4fe8eeee99..e5c7e4804384 100644
---- a/arch/arm/boot/dts/sun8i-r40.dtsi
-+++ b/arch/arm/boot/dts/sun8i-r40.dtsi
-@@ -601,10 +601,12 @@
+-			of_node_put(remote);
+-
+-			return endpoint.id;
+-		}
+-
+-		of_node_put(remote);
+-	}
+-
+-	return -ENOENT;
+-}
  
- 					tcon_top_mixer0_out_tcon_tv0: endpoint at 2 {
- 						reg = <2>;
-+						remote-endpoint = <&tcon_tv0_in_tcon_top_mixer0>;
- 					};
+ static struct clk_hw *sun8i_tcon_top_register_gate(struct device *dev,
+ 						   const char *parent,
+@@ -149,11 +121,9 @@ static int sun8i_tcon_top_bind(struct device *dev, struct device *master,
+ 	struct platform_device *pdev = to_platform_device(dev);
+ 	struct clk_hw_onecell_data *clk_data;
+ 	struct sun8i_tcon_top *tcon_top;
+-	bool mixer0_unused = false;
+ 	struct resource *res;
+ 	void __iomem *regs;
+-	int ret, i, id;
+-	u32 val;
++	int ret, i;
  
- 					tcon_top_mixer0_out_tcon_tv1: endpoint at 3 {
- 						reg = <3>;
-+						remote-endpoint = <&tcon_tv1_in_tcon_top_mixer0>;
- 					};
- 				};
+ 	tcon_top = devm_kzalloc(dev, sizeof(*tcon_top), GFP_KERNEL);
+ 	if (!tcon_top)
+@@ -198,50 +168,6 @@ static int sun8i_tcon_top_bind(struct device *dev, struct device *master,
+ 		goto err_assert_reset;
+ 	}
  
-@@ -634,10 +636,12 @@
- 
- 					tcon_top_mixer1_out_tcon_tv0: endpoint at 2 {
- 						reg = <2>;
-+						remote-endpoint = <&tcon_tv0_in_tcon_top_mixer1>;
- 					};
- 
- 					tcon_top_mixer1_out_tcon_tv1: endpoint at 3 {
- 						reg = <3>;
-+						remote-endpoint = <&tcon_tv1_in_tcon_top_mixer1>;
- 					};
- 				};
- 
-@@ -648,10 +652,12 @@
- 
- 					tcon_top_hdmi_in_tcon_tv0: endpoint at 0 {
- 						reg = <0>;
-+						remote-endpoint = <&tcon_tv0_out_tcon_top>;
- 					};
- 
- 					tcon_top_hdmi_in_tcon_tv1: endpoint at 1 {
- 						reg = <1>;
-+						remote-endpoint = <&tcon_tv1_out_tcon_top>;
- 					};
- 				};
- 
-@@ -679,11 +685,30 @@
- 				#size-cells = <0>;
- 
- 				tcon_tv0_in: port at 0 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
- 					reg = <0>;
-+
-+					tcon_tv0_in_tcon_top_mixer0: endpoint at 0 {
-+						reg = <0>;
-+						remote-endpoint = <&tcon_top_mixer0_out_tcon_tv0>;
-+					};
-+
-+					tcon_tv0_in_tcon_top_mixer1: endpoint at 1 {
-+						reg = <1>;
-+						remote-endpoint = <&tcon_top_mixer1_out_tcon_tv0>;
-+					};
- 				};
- 
- 				tcon_tv0_out: port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
- 					reg = <1>;
-+
-+					tcon_tv0_out_tcon_top: endpoint at 1 {
-+						reg = <1>;
-+						remote-endpoint = <&tcon_top_hdmi_in_tcon_tv0>;
-+					};
- 				};
- 			};
- 		};
-@@ -702,11 +727,30 @@
- 				#size-cells = <0>;
- 
- 				tcon_tv1_in: port at 0 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
- 					reg = <0>;
-+
-+					tcon_tv1_in_tcon_top_mixer0: endpoint at 0 {
-+						reg = <0>;
-+						remote-endpoint = <&tcon_top_mixer0_out_tcon_tv1>;
-+					};
-+
-+					tcon_tv1_in_tcon_top_mixer1: endpoint at 1 {
-+						reg = <1>;
-+						remote-endpoint = <&tcon_top_mixer1_out_tcon_tv1>;
-+					};
- 				};
- 
- 				tcon_tv1_out: port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
- 					reg = <1>;
-+
-+					tcon_tv1_out_tcon_top: endpoint at 1 {
-+						reg = <1>;
-+						remote-endpoint = <&tcon_top_hdmi_in_tcon_tv1>;
-+					};
- 				};
- 			};
- 		};
+-	val = 0;
+-
+-	/* check if HDMI mux output is connected */
+-	if (sun8i_tcon_top_get_connected_ep_id(dev->of_node, 5) >= 0) {
+-		/* find HDMI input endpoint id, if it is connected at all*/
+-		id = sun8i_tcon_top_get_connected_ep_id(dev->of_node, 4);
+-		if (id >= 0)
+-			val = FIELD_PREP(TCON_TOP_HDMI_SRC_MSK, id + 1);
+-		else
+-			DRM_DEBUG_DRIVER("TCON TOP HDMI input is not connected\n");
+-	} else {
+-		DRM_DEBUG_DRIVER("TCON TOP HDMI output is not connected\n");
+-	}
+-
+-	writel(val, regs + TCON_TOP_GATE_SRC_REG);
+-
+-	val = 0;
+-
+-	/* process mixer0 mux output */
+-	id = sun8i_tcon_top_get_connected_ep_id(dev->of_node, 1);
+-	if (id >= 0) {
+-		val = FIELD_PREP(TCON_TOP_PORT_DE0_MSK, id);
+-	} else {
+-		DRM_DEBUG_DRIVER("TCON TOP mixer0 output is not connected\n");
+-		mixer0_unused = true;
+-	}
+-
+-	/* process mixer1 mux output */
+-	id = sun8i_tcon_top_get_connected_ep_id(dev->of_node, 3);
+-	if (id >= 0) {
+-		val |= FIELD_PREP(TCON_TOP_PORT_DE1_MSK, id);
+-
+-		/*
+-		 * mixer0 mux has priority over mixer1 mux. We have to
+-		 * make sure mixer0 doesn't overtake TCON from mixer1.
+-		 */
+-		if (mixer0_unused && id == 0)
+-			val |= FIELD_PREP(TCON_TOP_PORT_DE0_MSK, 1);
+-	} else {
+-		DRM_DEBUG_DRIVER("TCON TOP mixer1 output is not connected\n");
+-	}
+-
+-	writel(val, regs + TCON_TOP_PORT_SEL_REG);
+-
+ 	/*
+ 	 * TCON TOP has two muxes, which select parent clock for each TCON TV
+ 	 * channel clock. Parent could be either TCON TV or TVE clock. For now
 -- 
 2.18.0
