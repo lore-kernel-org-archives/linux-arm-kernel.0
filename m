@@ -1,53 +1,25 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 10 Jul 2018 15:02:13 +0100
-Subject: next/master boot: 173 boots: 4 failed, 136 passed with 32
- offline, 1 untried/unknown (next-20180710)
-In-Reply-To: <5b44b87b.1c69fb81.97804.0122@mx.google.com>
-References: <5b44b87b.1c69fb81.97804.0122@mx.google.com>
-Message-ID: <20180710140213.GB8104@sirena.org.uk>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 10 Jul 2018 22:02:39 +0800
+Subject: [PATCH v5 03/22] dt-bindings: sram: sunxi: Introduce new A10
+ binding for system-control
+In-Reply-To: <20180710080114.31469-4-paul.kocialkowski@bootlin.com>
+References: <20180710080114.31469-1-paul.kocialkowski@bootlin.com>
+ <20180710080114.31469-4-paul.kocialkowski@bootlin.com>
+Message-ID: <CAGb2v661JHS7r=6LE1em18owSUwk8VXbAGCAVez7=2u5P2R4Jg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 10, 2018 at 06:45:31AM -0700, kernelci.org bot wrote:
+On Tue, Jul 10, 2018 at 4:00 PM, Paul Kocialkowski
+<paul.kocialkowski@bootlin.com> wrote:
+> Following-up on the introduction of a new binding for the A64, this
+> introduces a system-control binding for the A10 as a replacement of
+> the sram-controller binding.
+>
+> This change is motivated by consistency with the Allwinner literature,
+> that mentions system control over SRAM controller. Moreover, the system
+> control block is sometimes used for more than SRAM (e.g. for muxing
+> related to the ethernet PHY).
+>
+> Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 
-Today's linux-next fails to boot on mt7622-rfb1 with defconfig and
-defconfig+RANDOMIZE_BASE:
-
-> arm64:
-
->     defconfig:
->         mt7622-rfb1:
->             lab-baylibre-seattle: new failure (last pass: next-20180709)
-
->     defconfig+CONFIG_RANDOMIZE_BASE=y:
->         mt7622-rfb1:
->             lab-baylibre-seattle: new failure (last pass: next-20180709)
-
-I'm not 100% sure if this is a lab failure or an early boot failure:
-
-| Starting kernel ...
-
-| [ATF][    34.233534]save kernel info
-| [ATF][    34.236565]Kernel_EL2
-| [ATF][    34.239322]Kernel is 64Bit
-| [ATF][    34.242509]pc=0x40080000, r0=0x5cf48000, r1=0x0
-| INFO:    BL3-1: Preparing for EL3 exit to normal world, Kernel
-| INFO:    BL3-1: Next image address = 0x40080000
-| INFO:    BL3-1: Next image spsr = 0x3c9
-| [ATF][    34.260778]el3_exit
-| ~$off
-| # PYBOOT: Exception: kernel: ERROR: did not start booting.
-
-It only seems to affect this platform, other arm64 platforms seem fine.
-More details at:
-
-   https://kernelci.org/boot/id/5b44981a59b5141e5996baa1/
-
-for the defconfig case, symptoms seem similar with RANDOMIZE_BASE.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180710/d8650215/attachment.sig>
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
