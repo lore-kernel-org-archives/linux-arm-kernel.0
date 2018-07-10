@@ -1,68 +1,116 @@
 From: evgreen@chromium.org (Evan Green)
-Date: Tue, 10 Jul 2018 15:34:51 -0700
-Subject: [PATCH v6 7/8] dt-bindings: Introduce interconnect consumers
- bindings
-In-Reply-To: <20180709155104.25528-8-georgi.djakov@linaro.org>
+Date: Tue, 10 Jul 2018 15:34:23 -0700
+Subject: [PATCH v6 4/8] interconnect: qcom: Add RPM communication
+In-Reply-To: <20180709155104.25528-5-georgi.djakov@linaro.org>
 References: <20180709155104.25528-1-georgi.djakov@linaro.org>
- <20180709155104.25528-8-georgi.djakov@linaro.org>
-Message-ID: <CAE=gft7tDYB172LTMuS4JPPaTFasT22zLBx4XjpYne2PNNz+kQ@mail.gmail.com>
+ <20180709155104.25528-5-georgi.djakov@linaro.org>
+Message-ID: <CAE=gft6pPcxfYqEcb-yQpf7S6CDTZNavhqYaKi37962U78qO3Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Mon, Jul 9, 2018 at 8:51 AM Georgi Djakov <georgi.djakov@linaro.org> wrote:
 >
-> Add documentation for the interconnect consumer bindings, that will allow
-> to link a device node (consumer) to its interconnect controller hardware.
->
-> Tha aim is to enable drivers to request a framework API to configure an
-> interconnect path by providing their struct device pointer and a name.
+> On some Qualcomm SoCs, there is a remote processor, which controls some of
+> the Network-On-Chip interconnect resources. Other CPUs express their needs
+> by communicating with this processor. Add a driver to handle communication
+> with this remote processor.
 >
 > Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
 > ---
->  .../bindings/interconnect/interconnect.txt    | 27 +++++++++++++++++++
->  1 file changed, 27 insertions(+)
+>  .../bindings/interconnect/qcom-smd.txt        | 32 +++++++
+>  drivers/interconnect/qcom/Kconfig             | 11 +++
+>  drivers/interconnect/qcom/Makefile            |  2 +
+>  drivers/interconnect/qcom/smd-rpm.c           | 91 +++++++++++++++++++
+>  drivers/interconnect/qcom/smd-rpm.h           | 15 +++
+>  5 files changed, 151 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/interconnect/qcom-smd.txt
+>  create mode 100644 drivers/interconnect/qcom/Kconfig
+>  create mode 100644 drivers/interconnect/qcom/Makefile
+>  create mode 100644 drivers/interconnect/qcom/smd-rpm.c
+>  create mode 100644 drivers/interconnect/qcom/smd-rpm.h
 >
-> diff --git a/Documentation/devicetree/bindings/interconnect/interconnect.txt b/Documentation/devicetree/bindings/interconnect/interconnect.txt
-> index 6e2b2971b094..0ad65dccbe8b 100644
-> --- a/Documentation/devicetree/bindings/interconnect/interconnect.txt
-> +++ b/Documentation/devicetree/bindings/interconnect/interconnect.txt
-> @@ -31,3 +31,30 @@ Example:
->                         clocks = <&rpmcc RPM_SMD_SNOC_CLK>,
->                                  <&rpmcc RPM_SMD_SNOC_A_CLK>;
->                 };
+> diff --git a/Documentation/devicetree/bindings/interconnect/qcom-smd.txt b/Documentation/devicetree/bindings/interconnect/qcom-smd.txt
+> new file mode 100644
+> index 000000000000..88a5aeb50935
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/interconnect/qcom-smd.txt
+> @@ -0,0 +1,32 @@
+> +Qualcomm SMD-RPM interconnect driver binding
+> +------------------------------------------------
+> +The RPM (Resource Power Manager) is a dedicated hardware engine
+> +for managing the shared SoC resources in order to keep the lowest
+> +power profile. It communicates with other hardware subsystems via
+> +the shared memory driver (SMD) back-end and accepts requests for
+> +various resources.
 > +
-> +
-> += interconnect consumers =
-> +
-> +The interconnect consumers are device nodes which consume the interconnect
-> +path(s) provided by the interconnect provider. There can be multiple
-
-I wonder if this sentence could be more descriptive. Maybe something like:
-
-The interconnect consumers are device nodes which dynamically express
-their bandwidth requirements along interconnect paths they are
-connected to.
-
-...or choose a better one if this one's a mouthful.
-
-> +interconnect providers on a SoC and the consumer may consume multiple paths
-> +from different providers depending on use case and the components it has to
-> +interact with.
-> +
-> +Required properties:
-> +interconnects : Pairs of phandles and interconnect provider specifier to denote
-> +               the edge source and destination ports of the interconnect path.
-> +
-> +Optional properties:
-> +interconnect-names : List of interconnect path name strings sorted in the same
-> +                    order as the interconnects property. Consumers drivers will use
-> +                    interconnect-names to match interconnect paths with interconnect
-> +                    specifiers.
+> +Required properties :
+> +- compatible : shall contain only one of the following:
+> +                       "qcom,interconnect-smd-rpm"
 > +
 > +Example:
+> +       smd {
+> +               compatible = "qcom,smd";
 > +
-> +       sdhci at 7864000 {
-> +               ...
-> +               interconnects = <&pnoc MASTER_SDCC_1 &bimc SLAVE_EBI_CH0>;
-> +               interconnect-names = "ddr";
+> +               rpm {
+> +                       interrupts = <0 168 1>;
+> +                       qcom,ipc = <&apcs 8 0>;
+> +                       qcom,smd-edge = <15>;
+> +
+> +                       rpm_requests {
+> +                               compatible = "qcom,rpm-msm8916";
+> +                               qcom,smd-channels = "rpm_requests";
+> +
+> +                               interconnect-smd-rpm {
+> +                                       compatible = "qcom,interconnect-smd-rpm";
+> +                               };
+> +
+> +                       };
+> +               };
 > +       };
+> diff --git a/drivers/interconnect/qcom/Kconfig b/drivers/interconnect/qcom/Kconfig
+> new file mode 100644
+> index 000000000000..b0c2ff928d88
+> --- /dev/null
+> +++ b/drivers/interconnect/qcom/Kconfig
+> @@ -0,0 +1,11 @@
+> +config INTERCONNECT_QCOM
+> +       bool "Qualcomm Network-on-Chip interconnect drivers"
+> +       depends on INTERCONNECT
+> +       depends on ARCH_QCOM || COMPILE_TEST
+> +
+> +config INTERCONNECT_QCOM_SMD_RPM
+> +       tristate "Qualcomm SMD RPM interconnect driver"
+> +       depends on INTERCONNECT_QCOM
+
+Should this also depend on CONFIG_QCOM_SMD_RPM, since it uses
+qcom_rpm_smd_write?
+
+> +       help
+> +         This is a driver for communicating interconnect related configuration
+> +         details with a remote processor (RPM) on Qualcomm platforms.
+...
+> diff --git a/drivers/interconnect/qcom/smd-rpm.h b/drivers/interconnect/qcom/smd-rpm.h
+> new file mode 100644
+> index 000000000000..c33b91a3dd51
+> --- /dev/null
+> +++ b/drivers/interconnect/qcom/smd-rpm.h
+> @@ -0,0 +1,15 @@
+> +/* SPDX-License-Identifier: GPL-2.0 */
+> +/*
+> + * Copyright (c) 2018, Linaro Ltd.
+> + * Author: Georgi Djakov <georgi.djakov@linaro.org>
+> + */
+> +
+> +#ifndef __DRIVERS_INTERCONNECT_QCOM_RPM_H
+> +#define __DRIVERS_INTERCONNECT_QCOM_RPM_H
+
+Nit: this still doesn't quite match, it would need an _SMD like:
+__DRIVERS_INTERCONNECT_QCOM_SMD_RPM_H
+
+> +
+> +#include <linux/soc/qcom/smd-rpm.h>
+> +
+> +bool qcom_icc_rpm_smd_available(void);
+> +int qcom_icc_rpm_smd_send(int ctx, int rsc_type, int id, u32 val);
+> +
+> +#endif
