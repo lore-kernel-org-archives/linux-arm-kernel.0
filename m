@@ -1,27 +1,62 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 10 Jul 2018 10:07:17 +0200
-Subject: [PATCH v5 02/22] fixup! v4l2-ctrls: add
- v4l2_ctrl_request_hdl_find/put/ctrl_find functions
-In-Reply-To: <20180710080114.31469-3-paul.kocialkowski@bootlin.com>
+From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
+Date: Tue, 10 Jul 2018 10:00:57 +0200
+Subject: [PATCH v5 05/22] dt-bindings: sram: sunxi: Populate valid sections
+ compatibles
+In-Reply-To: <20180710080114.31469-1-paul.kocialkowski@bootlin.com>
 References: <20180710080114.31469-1-paul.kocialkowski@bootlin.com>
- <20180710080114.31469-3-paul.kocialkowski@bootlin.com>
-Message-ID: <CAMuHMdVgJuK5G0+szV0BAWDBybxWV0iDWE5kZKuTdgNiGjpnEg@mail.gmail.com>
+Message-ID: <20180710080114.31469-6-paul.kocialkowski@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 10, 2018 at 10:02 AM Paul Kocialkowski
-<paul.kocialkowski@bootlin.com> wrote:
-> [PATCH v5 02/22] fixup! v4l2-ctrls: add v4l2_ctrl_request_hdl_find/put/ctrl_find functions
+This adds a list of valid SRAM sections compatibles for the A13, A20,
+A23 and H3 platforms. Per-platform compatibles are introduced for the
+SRAM sections of these platforms, with the A10 compatibles also listed
+as valid when applicable.
 
-git rebase -i ;-)
+In particular, compatibles for the C1 SRAM section are introduced.
 
-Gr{oetje,eeting}s,
+Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+---
+ .../devicetree/bindings/sram/sunxi-sram.txt   | 25 +++++++++++++++++++
+ 1 file changed, 25 insertions(+)
 
-                        Geert
-
+diff --git a/Documentation/devicetree/bindings/sram/sunxi-sram.txt b/Documentation/devicetree/bindings/sram/sunxi-sram.txt
+index 156a02ab6b54..07c53c5214a0 100644
+--- a/Documentation/devicetree/bindings/sram/sunxi-sram.txt
++++ b/Documentation/devicetree/bindings/sram/sunxi-sram.txt
+@@ -32,8 +32,33 @@ once again the representation described in the mmio-sram binding.
+ 
+ The valid sections compatible for A10 are:
+     - allwinner,sun4i-a10-sram-a3-a4
++    - allwinner,sun4i-a10-sram-c1
+     - allwinner,sun4i-a10-sram-d
+ 
++The valid sections compatible for A13 are:
++    - allwinner,sun5i-a13-sram-a3-a4
++    - allwinner,sun4i-a10-sram-a3-a4
++    - allwinner,sun5i-a13-sram-c1
++    - allwinner,sun4i-a10-sram-c1
++    - allwinner,sun5i-a13-sram-d
++    - allwinner,sun4i-a10-sram-d
++
++The valid sections compatible for A20 are:
++    - allwinner,sun7i-a20-sram-a3-a4
++    - allwinner,sun4i-a10-sram-a3-a4
++    - allwinner,sun7i-a20-sram-c1
++    - allwinner,sun4i-a10-sram-c1
++    - allwinner,sun7i-a20-sram-d
++    - allwinner,sun4i-a10-sram-d
++
++The valid sections compatible for A23/A33 are:
++    - allwinner,sun8i-a23-sram-c1
++    - allwinner,sun4i-a10-sram-c1
++
++The valid sections compatible for H3 are:
++    - allwinner,sun8i-h3-sram-c1
++    - allwinner,sun4i-a10-sram-c1
++
+ The valid sections compatible for A64 are:
+     - allwinner,sun50i-a64-sram-c
+ 
 -- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+2.17.1
