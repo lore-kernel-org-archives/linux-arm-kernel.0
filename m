@@ -1,38 +1,60 @@
-From: oleg@redhat.com (Oleg Nesterov)
-Date: Tue, 10 Jul 2018 17:25:27 +0200
-Subject: [PATCH v5 06/10] Uprobes: Support SDT markers having reference
- count (semaphore)
-In-Reply-To: <f5a39a88-c21e-4606-a04d-11b5f32016b8@linux.ibm.com>
-References: <20180628052209.13056-1-ravi.bangoria@linux.ibm.com>
- <20180628052209.13056-7-ravi.bangoria@linux.ibm.com>
- <20180701210935.GA14404@redhat.com>
- <0c543791-f3b7-5a4b-f002-e1c76bb430c0@linux.ibm.com>
- <20180702180156.GA31400@redhat.com>
- <f19e3801-d56a-4e34-0acc-1040a071cf91@linux.ibm.com>
- <20180703163645.GA23144@redhat.com>
- <20180703172543.GC23144@redhat.com>
- <f5a39a88-c21e-4606-a04d-11b5f32016b8@linux.ibm.com>
-Message-ID: <20180710152527.GA3616@redhat.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 10 Jul 2018 17:37:26 +0200
+Subject: [PATCH v7 0/5] Reintroduce i.MX EPIT Timer
+In-Reply-To: <CAJiuCcc-eGRr_RT01dNfhQso5PbXfWy+YZS4PHHcL=_yhA-3Sw@mail.gmail.com>
+References: <20180611155001.3506-1-peron.clem@gmail.com>
+ <CAJiuCcf3g2fzrR2_4mthjwKRcyZ8KVPX+EZ5_Uifh2E6TkzusQ@mail.gmail.com>
+ <52591c2d-e9df-7078-7cdf-0fd8d06c9ee0@linaro.org>
+ <CAJiuCcc-eGRr_RT01dNfhQso5PbXfWy+YZS4PHHcL=_yhA-3Sw@mail.gmail.com>
+Message-ID: <c9db3848-378f-8e1e-c194-53d878894716@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ravi,
+On 10/07/2018 17:22, Cl?ment P?ron wrote:
+> Hi Daniel,
+> 
+> On Tue, 10 Jul 2018 at 17:12, Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
+>>
+>> On 10/07/2018 16:55, Cl?ment P?ron wrote:
+>>> Hi,
+>>>
+>>> Is there still some remark against merging this ?
+>>
+>> How do you want this to be merged ?
+>>
+>> Shall I take the two patches related to the timer ? Or Ack them ?
+> 
+> I'm not an expert on how submitting patches works, it's the first
+> driver I submit.
 
-On 07/04, Ravi Bangoria wrote:
->
-> > Now I understand what did you mean by "for each consumer". So if we move this logic
-> > into install/remove_breakpoint as I tried to suggest, we will also need another error
-> > code for the case when verify_opcode() returns false.
->
-> Ok so if we can use verify_opcode() inside install_breakpoint(), we can probably
-> move implementation logic in install/remove_breakpoint(). Let me explore that more.
+Ok, so usually this is what happens when there is a set of changes:
 
-No, sorry for confusion, I meant another thing... But please forget. If we rely on
-verify_opcode() I no longer think it would be more clean to move this logic into
-install/remove_breakpoint.
+ 1.  they all touch the same subsystem (eg. drivers/clocksource), you
+just send all the patches to the maintainer(s) + mailing list + related
+people
 
-However, I still think it would be better to avoid uprobe exporting and modifying
-set_swbp/set_orig_insn. May be we can simply kill both set_swbp() and set_orig_insn(),
-I'll re-check...
+ 2. they touch different subsystems:
 
-Oleg.
+   2.1) the changes are not connected (not related together), you have
+to split in smaller parts and send the patches to the right subsystem
+maintainer (so falling back to 1.)
+
+   2.2) the changes are connected:
+
+      2.2.1) Ask all the different subsystem maintainers to acknowledge
+the changes and submit the patches to arm-soc@
+
+      2.2.2) Ask each maintainer to take their part if the changes are
+connected but not interdependent (patches individually won't break the
+system)
+
+
+You are in the 2.2) situation. My question is do you want 2.2.1) or 2.2.2) ?
+
+
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
