@@ -1,39 +1,49 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 10 Jul 2018 22:57:23 +0100
-Subject: [PATCH net-next 01/13] ARM: net: bpf: enumerate the JIT scratch
- stack layout
-In-Reply-To: <41b5fc68-e15f-56f9-c55b-4f6deb61c54c@iogearbox.net>
-References: <20180710123340.GK17271@n2100.armlinux.org.uk>
- <E1fcrsG-0005UK-Un@rmk-PC.armlinux.org.uk>
- <41b5fc68-e15f-56f9-c55b-4f6deb61c54c@iogearbox.net>
-Message-ID: <20180710215723.GN17271@n2100.armlinux.org.uk>
+From: dianders@chromium.org (Douglas Anderson)
+Date: Tue, 10 Jul 2018 15:01:59 -0700
+Subject: [PATCH 0/3] arm64: dts: sdm845: Add RPMh-regulators and usb
+Message-ID: <20180710220202.116404-1-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 10, 2018 at 08:30:04PM +0200, Daniel Borkmann wrote:
-> Hi Russell,
-> 
-> thanks a lot for your work on the arm32 JIT!
-> 
-> On 07/10/2018 02:36 PM, Russell King wrote:
-> > Enumerate the contents of the JIT scratch stack layout used for storing
-> > some of the JITs 64-bit registers, tail call counter and AX register.
-> > 
-> > XXX: what about the skb_copy_bits buffer - this appears to overlap with
-> > the first word of the JITs accessible stack.
-> 
-> Could you elaborate on that case? Unless I'm missing something there should
-> be no use of the skb_copy_bits buffer anymore (aka former SKB_BUFFER at
-> STACK_VAR(SCRATCH_SIZE) offset), but aside from that it's not supposed to
-> overlap either.
 
-Probably an old comment - these were originally developed back in
-January timeframe when there was the SKB_BUFFER stuff, but that was
-removed during the 4.18 merge window.  I'll kill the comment.
+This series adds device tree nodes for the RPMh regulators and USB.  These
+patches are based on patches in various downstream kernels from Manu Gautam
+and David Collins.
 
-Thanks.
+This series was tested on SDM845-MTP (with no-AC firmware) atop Andy Gross's
+current "for-next" branch with some patches picked from list:
+
+1. clk: qcom: clk-rpmh: Add QCOM RPMh clock driver
+   https://patchwork.kernel.org/patch/10388151/
+2. regulator: add QCOM RPMh regulator driver
+   https://patchwork.kernel.org/patch/10483369/
+3. nvmem: Don't let a NULL cell_id for nvmem_cell_get() crash us
+   https://patchwork.kernel.org/patch/10401993/
+
+I also needed a few patches that haven't yet posted to-list to keep things
+from crashing at boot (these patches weren't needed when using Coreboot as
+the BIOS):
+
+1. arm64: dts: sdm845: Enable smmu support
+   https://chromium.googlesource.com/chromiumos/third_party/kernel/+/8046f638b4
+2. HACK: iommu/arm-smmu: make a mismatch in CBs and CB interrupts non-fatal
+   https://chromium.googlesource.com/chromiumos/third_party/kernel/+/8c0b634f48
+
+Given the above caveats these three patches are probably not quite ready for
+landing, but I wanted to at least get them out there to start the review
+process.
+
+
+Douglas Anderson (2):
+  arm64: dts: qcom: sdm845-mtp: Add RPMh VRM/XOB regulators
+  arm64: dts: qcom: sdm845-mtp: Add nodes for USB
+
+Manu Gautam (1):
+  arm64: dts: qcom: sdm845: Add USB-related nodes
+
+ arch/arm64/boot/dts/qcom/sdm845-mtp.dts | 507 ++++++++++++++++++++++++
+ arch/arm64/boot/dts/qcom/sdm845.dtsi    | 189 +++++++++
+ 2 files changed, 696 insertions(+)
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
-According to speedtest.net: 13Mbps down 490kbps up
+2.18.0.203.gfac676dfb9-goog
