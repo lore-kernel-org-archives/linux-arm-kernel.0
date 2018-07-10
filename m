@@ -1,33 +1,45 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 10 Jul 2018 19:11:38 +0100
-Subject: [RFC PATCH 0/4] Stop losing firmware-set DMA masks
-In-Reply-To: <20180710180232.GA26285@lst.de>
-References: <cover.1531239284.git.robin.murphy@arm.com>
- <20180710180232.GA26285@lst.de>
-Message-ID: <89365af4-19fa-1dc2-27d0-37e9145134af@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 10 Jul 2018 19:01:23 +0100
+Subject: [PATCH 2/2] KVM: arm/arm64: vgic: fix possible spectre-v1 write in
+ vgic_mmio_write_apr()
+In-Reply-To: <20180710180123.56461-1-mark.rutland@arm.com>
+References: <20180710180123.56461-1-mark.rutland@arm.com>
+Message-ID: <20180710180123.56461-3-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/07/18 19:02, Christoph Hellwig wrote:
->> These patches attempt to deal with this in the simplest way possible by
->> generalising the specific quirk for 32-bit bridges into an arbitrary
->> mask which can then also be plumbed into the firmware code. In the
->> interest of being minimally invasive, I've only included a point fix
->> for the IOMMU issue as seen on arm64 - there may be further tweaks
->> needed in DMA ops to catch all possible incarnations of this problem,
->> but this initial RFC is mostly about the impact beyond the dma-mapping
->> subsystem itself.
-> 
-> Thanks, this looks very nice to me.
-> 
-> In fact it probably solves the RISC-V/Xiling problem as well if we can
-> just add the dma-ranges property to the device tree for the affected
-> systems.  Palmer, do you know how easily the DT could be updated for
-> that case?
+It's possible for userspace to control n. Sanitize n when using it as an
+array index, to inhibit the potential spectre-v1 write gadget.
 
-That would indeed be nice, but beware that the way PCI devices are 
-bodged through of_dma_configure() only actually works for dma-coherent 
-and is busted WRT parsing dma-ranges correctly. Fixing that is my next 
-step after getting these basics done ;)
+Note that while it appears that n must be bound to the interval [0,3]
+due to the way it is extracted from addr, we cannot guarantee that
+compiler transformations (and/or future refactoring) will ensure this is
+the case, and given this is a slow path it's better to always perform
+the masking.
 
-Robin.
+Found by smatch.
+
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Christoffer Dall <christoffer.dall@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: kvmarm at lists.cs.columbia.edu
+---
+ virt/kvm/arm/vgic/vgic-mmio-v2.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+index ffc587bf4742..64e571cc02df 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
++++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+@@ -352,6 +352,9 @@ static void vgic_mmio_write_apr(struct kvm_vcpu *vcpu,
+ 
+ 		if (n > vgic_v3_max_apr_idx(vcpu))
+ 			return;
++
++		n = array_index_nospec(n, 4);
++
+ 		/* GICv3 only uses ICH_AP1Rn for memory mapped (GICv2) guests */
+ 		vgicv3->vgic_ap1r[n] = val;
+ 	}
+-- 
+2.11.0
