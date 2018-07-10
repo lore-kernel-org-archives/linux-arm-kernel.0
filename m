@@ -1,36 +1,62 @@
-From: Anson.Huang@nxp.com (Anson Huang)
-Date: Tue, 10 Jul 2018 16:39:39 +0800
-Subject: [PATCH 2/2] ARM: dts: imx6sx: add ocram_s support
-In-Reply-To: <1531211979-2179-1-git-send-email-Anson.Huang@nxp.com>
-References: <1531211979-2179-1-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <1531211979-2179-2-git-send-email-Anson.Huang@nxp.com>
+From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
+Date: Tue, 10 Jul 2018 10:01:01 +0200
+Subject: [PATCH v5 09/22] ARM: dts: sun5i: Use most-qualified system control
+ compatibles
+In-Reply-To: <20180710080114.31469-1-paul.kocialkowski@bootlin.com>
+References: <20180710080114.31469-1-paul.kocialkowski@bootlin.com>
+Message-ID: <20180710080114.31469-10-paul.kocialkowski@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-i.MX6SX has a 16KB always-on ocram bank called
-ocram_s, enable it as another mmio sram.
+This switches the sun5i dtsi to use the most qualified compatibles for
+the system-control block (previously named SRAM controller) as well as
+the SRAM blocks. The sun4i-a10 compatibles are kept since these hardware
+blocks are backward-compatible.
 
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+The phandle for system control is also updated to reflect the fact that
+the controller described is really about system control rather than SRAM
+control.
+
+Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 ---
- arch/arm/boot/dts/imx6sx.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/boot/dts/sun5i.dtsi | 11 +++++++----
+ 1 file changed, 7 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
-index 596763c..9923739 100644
---- a/arch/arm/boot/dts/imx6sx.dtsi
-+++ b/arch/arm/boot/dts/imx6sx.dtsi
-@@ -172,6 +172,12 @@
- 			clocks = <&clks IMX6SX_CLK_OCRAM>;
- 		};
+diff --git a/arch/arm/boot/dts/sun5i.dtsi b/arch/arm/boot/dts/sun5i.dtsi
+index 07f2248ed5f8..68711954c293 100644
+--- a/arch/arm/boot/dts/sun5i.dtsi
++++ b/arch/arm/boot/dts/sun5i.dtsi
+@@ -114,8 +114,9 @@
+ 		#size-cells = <1>;
+ 		ranges;
  
-+		ocram_s: sram at 8f8000 {
-+			compatible = "mmio-sram";
-+			reg = <0x008f8000 0x4000>;
-+			clocks = <&clks IMX6SX_CLK_OCRAM_S>;
-+		};
-+
- 		L2: l2-cache at a02000 {
- 			compatible = "arm,pl310-cache";
- 			reg = <0x00a02000 0x1000>;
+-		sram-controller at 1c00000 {
+-			compatible = "allwinner,sun4i-a10-sram-controller";
++		system-control at 1c00000 {
++			compatible = "allwinner,sun5i-a13-system-control",
++				     "allwinner,sun4i-a10-system-control";
+ 			reg = <0x01c00000 0x30>;
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
+@@ -130,7 +131,8 @@
+ 			};
+ 
+ 			emac_sram: sram-section at 8000 {
+-				compatible = "allwinner,sun4i-a10-sram-a3-a4";
++				compatible = "allwinner,sun5i-a13-sram-a3-a4",
++					     "allwinner,sun4i-a10-sram-a3-a4";
+ 				reg = <0x8000 0x4000>;
+ 				status = "disabled";
+ 			};
+@@ -143,7 +145,8 @@
+ 				ranges = <0 0x00010000 0x1000>;
+ 
+ 				otg_sram: sram-section at 0 {
+-					compatible = "allwinner,sun4i-a10-sram-d";
++					compatible = "allwinner,sun5i-a13-sram-d",
++						     "allwinner,sun4i-a10-sram-d";
+ 					reg = <0x0000 0x1000>;
+ 					status = "disabled";
+ 				};
 -- 
-2.7.4
+2.17.1
