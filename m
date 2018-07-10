@@ -1,77 +1,53 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 10 Jul 2018 22:47:07 +0800
-Subject: [PATCH v5 05/22] dt-bindings: sram: sunxi: Populate valid
- sections compatibles
-In-Reply-To: <20180710080114.31469-6-paul.kocialkowski@bootlin.com>
-References: <20180710080114.31469-1-paul.kocialkowski@bootlin.com>
- <20180710080114.31469-6-paul.kocialkowski@bootlin.com>
-Message-ID: <CAGb2v64Na1Mq0=-z5Haq=sgggRPHNHVZ-6fFczxb3EESAzZ=XA@mail.gmail.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Tue, 10 Jul 2018 17:51:42 +0200
+Subject: [PATCH 3/3] clk: meson-g12a: Add EE Clock controller driver
+In-Reply-To: <cb832db4-ad2c-09c1-86ae-e7f9c05cd872@amlogic.com>
+References: <1531134767-29927-1-git-send-email-jian.hu@amlogic.com>
+ <1531134767-29927-4-git-send-email-jian.hu@amlogic.com>
+ <CAFBinCBB9N_p6S_-dfiV=zDCf-RYnA3C-ir6oNLC7JAfdOqqiw@mail.gmail.com>
+ <ec49c089-bccf-9aac-5d0f-43bc27770ad9@amlogic.com>
+ <1531216472.2708.71.camel@baylibre.com>
+ <cb832db4-ad2c-09c1-86ae-e7f9c05cd872@amlogic.com>
+Message-ID: <1531237902.2708.76.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 10, 2018 at 4:00 PM, Paul Kocialkowski
-<paul.kocialkowski@bootlin.com> wrote:
-> This adds a list of valid SRAM sections compatibles for the A13, A20,
-> A23 and H3 platforms. Per-platform compatibles are introduced for the
-> SRAM sections of these platforms, with the A10 compatibles also listed
-> as valid when applicable.
->
-> In particular, compatibles for the C1 SRAM section are introduced.
+On Tue, 2018-07-10 at 20:59 +0800, Yixun Lan wrote:
+> > > > > +static const struct of_device_id clkc_match_table[] = {
+> > > > > +       { .compatible = "amlogic,g12a-clkc" },
+> > > > 
+> > > > I wonder if that should be "amlogic,meson-g12a-clkc" (I know that AXG
+> > > > and GXBB/GXL/GXM omit the "meson-" prefix, but I am not sure if that's
+> > > > correct - I'll CC Rob Herring on the dt-bindings patch)
+> > > > 
+> > > 
+> > > we're fine with either way, since the g12a is recently new added SoC.
+> > > 
+> > > but I guess those old compatibles which already exist won't be changed,
+> > > as it will break the DT
+> > 
+> > Yes, I doubt we are going to change the compatibles. With or without the meson
+> > prefix, I suppose it going to stay that way.
+> > 
+> > It is worth thinking about it for new drivers though.
+> > We already have the "amlogic,", so do we really to prefix even more with "meson-
+> > "
+> > 
+> > Also, if we were really strict about that scheme, should meson8b compatible be
+> > 
+> > "amlogic,meson-meson8b-foo-bar" ... the SoC is meson8b, not just 8b after all ?
+> > 
+> > For the particular case of the clock controller, I don't care very much, as long
+> > as the compatible is coherent with documentation.
+> > 
+> > I might have a preference for the current compatible ... just for consistency
+> > with the other clock controllers.
+> > 
+> 
+> do you imply that we should just stick to 'amlogic,g12a-clkc'?
+> 
+> it sound good to me, at least it's shorter than 'amlogic,meson-g12a-clkc'..
 
-You should probably mention that this is not an exhaustive list. In
-particular, the C2 and C3 (sun5i) mappings are still missing.
-
->
-> Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-> ---
->  .../devicetree/bindings/sram/sunxi-sram.txt   | 25 +++++++++++++++++++
->  1 file changed, 25 insertions(+)
->
-> diff --git a/Documentation/devicetree/bindings/sram/sunxi-sram.txt b/Documentation/devicetree/bindings/sram/sunxi-sram.txt
-> index 156a02ab6b54..07c53c5214a0 100644
-> --- a/Documentation/devicetree/bindings/sram/sunxi-sram.txt
-> +++ b/Documentation/devicetree/bindings/sram/sunxi-sram.txt
-> @@ -32,8 +32,33 @@ once again the representation described in the mmio-sram binding.
->
->  The valid sections compatible for A10 are:
->      - allwinner,sun4i-a10-sram-a3-a4
-> +    - allwinner,sun4i-a10-sram-c1
->      - allwinner,sun4i-a10-sram-d
->
-> +The valid sections compatible for A13 are:
-> +    - allwinner,sun5i-a13-sram-a3-a4
-> +    - allwinner,sun4i-a10-sram-a3-a4
-> +    - allwinner,sun5i-a13-sram-c1
-> +    - allwinner,sun4i-a10-sram-c1
-> +    - allwinner,sun5i-a13-sram-d
-> +    - allwinner,sun4i-a10-sram-d
-> +
-> +The valid sections compatible for A20 are:
-> +    - allwinner,sun7i-a20-sram-a3-a4
-> +    - allwinner,sun4i-a10-sram-a3-a4
-> +    - allwinner,sun7i-a20-sram-c1
-> +    - allwinner,sun4i-a10-sram-c1
-> +    - allwinner,sun7i-a20-sram-d
-> +    - allwinner,sun4i-a10-sram-d
-> +
-> +The valid sections compatible for A23/A33 are:
-> +    - allwinner,sun8i-a23-sram-c1
-> +    - allwinner,sun4i-a10-sram-c1
-> +
-> +The valid sections compatible for H3 are:
-> +    - allwinner,sun8i-h3-sram-c1
-> +    - allwinner,sun4i-a10-sram-c1
-
-I'm not quite sure why we want to list these... I think it makes more sense
-to just have the SoC specific compatible. They are tied to the controls
-after all. Maybe Rob has a different opinion?
-
-ChenYu
-
-> +
->  The valid sections compatible for A64 are:
->      - allwinner,sun50i-a64-sram-c
->
-> --
-> 2.17.1
->
+I did not imply anything.
+Martin raised a valid point. I'm merely giving my opinion on the matter and I'm
+interested to get others view on this.
