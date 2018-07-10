@@ -1,45 +1,36 @@
 From: Anson.Huang@nxp.com (Anson Huang)
-Date: Tue, 10 Jul 2018 16:39:38 +0800
-Subject: [PATCH 1/2] clk: imx: add ocram_s clock for i.mx6sx
-Message-ID: <1531211979-2179-1-git-send-email-Anson.Huang@nxp.com>
+Date: Tue, 10 Jul 2018 16:39:39 +0800
+Subject: [PATCH 2/2] ARM: dts: imx6sx: add ocram_s support
+In-Reply-To: <1531211979-2179-1-git-send-email-Anson.Huang@nxp.com>
+References: <1531211979-2179-1-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <1531211979-2179-2-git-send-email-Anson.Huang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 i.MX6SX has a 16KB always-on ocram bank called
-ocram_s, and its clock gate in CCM CCGR1 CG14
-needs to be enabled before access, add it to
-clock tree.
+ocram_s, enable it as another mmio sram.
 
 Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
 ---
- drivers/clk/imx/clk-imx6sx.c             | 1 +
- include/dt-bindings/clock/imx6sx-clock.h | 3 ++-
- 2 files changed, 3 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/imx6sx.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/drivers/clk/imx/clk-imx6sx.c b/drivers/clk/imx/clk-imx6sx.c
-index 10c771b..691db26 100644
---- a/drivers/clk/imx/clk-imx6sx.c
-+++ b/drivers/clk/imx/clk-imx6sx.c
-@@ -411,6 +411,7 @@ static void __init imx6sx_clocks_init(struct device_node *ccm_node)
- 	clks[IMX6SX_CLK_GPT_BUS]      = imx_clk_gate2("gpt_bus",       "perclk",            base + 0x6c, 20);
- 	clks[IMX6SX_CLK_GPT_SERIAL]   = imx_clk_gate2("gpt_serial",    "perclk",            base + 0x6c, 22);
- 	clks[IMX6SX_CLK_GPU]          = imx_clk_gate2("gpu",           "gpu_core_podf",     base + 0x6c, 26);
-+	clks[IMX6SX_CLK_OCRAM_S]      = imx_clk_gate2("ocram_s",       "ahb",               base + 0x6c, 28);
- 	clks[IMX6SX_CLK_CANFD]        = imx_clk_gate2("canfd",         "can_podf",          base + 0x6c, 30);
+diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
+index 596763c..9923739 100644
+--- a/arch/arm/boot/dts/imx6sx.dtsi
++++ b/arch/arm/boot/dts/imx6sx.dtsi
+@@ -172,6 +172,12 @@
+ 			clocks = <&clks IMX6SX_CLK_OCRAM>;
+ 		};
  
- 	/* CCGR2 */
-diff --git a/include/dt-bindings/clock/imx6sx-clock.h b/include/dt-bindings/clock/imx6sx-clock.h
-index cd2d6c5..c1ccff8 100644
---- a/include/dt-bindings/clock/imx6sx-clock.h
-+++ b/include/dt-bindings/clock/imx6sx-clock.h
-@@ -279,6 +279,7 @@
- #define IMX6SX_CLK_LVDS2_OUT		266
- #define IMX6SX_CLK_LVDS2_IN		267
- #define IMX6SX_CLK_ANACLK2		268
--#define IMX6SX_CLK_CLK_END		269
-+#define IMX6SX_CLK_OCRAM_S		269
-+#define IMX6SX_CLK_CLK_END		270
- 
- #endif /* __DT_BINDINGS_CLOCK_IMX6SX_H */
++		ocram_s: sram at 8f8000 {
++			compatible = "mmio-sram";
++			reg = <0x008f8000 0x4000>;
++			clocks = <&clks IMX6SX_CLK_OCRAM_S>;
++		};
++
+ 		L2: l2-cache at a02000 {
+ 			compatible = "arm,pl310-cache";
+ 			reg = <0x00a02000 0x1000>;
 -- 
 2.7.4
