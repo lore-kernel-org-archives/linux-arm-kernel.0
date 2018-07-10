@@ -1,67 +1,127 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 11 Jul 2018 00:17:05 +0100
-Subject: [PATCH v2] Add DT support for Octavo Systems OSD3358-SM-RED
- based on TI AM335x
-In-Reply-To: <CADO55X_wCd1o9Tfze08fJixsUuA2y7EDDQ3hRwy2bR1nktgx1A@mail.gmail.com>
-References: <20180706200051.1115-1-neeraj.dantu@octavosystems.com>
- <20180709114304.GE6920@n2100.armlinux.org.uk>
- <CADO55X8_tbz-O8AuHwqCGnV0g2oDiGHzAug6g3PFqRth5U2H=w@mail.gmail.com>
- <20180710082624.GA16036@n2100.armlinux.org.uk>
- <CADO55X_wCd1o9Tfze08fJixsUuA2y7EDDQ3hRwy2bR1nktgx1A@mail.gmail.com>
-Message-ID: <20180710231705.GG6920@n2100.armlinux.org.uk>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 11 Jul 2018 07:20:07 +0800
+Subject: [PATCH v2 04/18] drm/sun4i: tcon-top: Cleanup clock handling
+In-Reply-To: <20180710203511.18454-5-jernej.skrabec@siol.net>
+References: <20180710203511.18454-5-jernej.skrabec@siol.net>
+Message-ID: <201807110632.6k3QA7Vs%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 10, 2018 at 03:54:19PM -0500, Neeraj Kumar Reddy Dantu wrote:
-> > As maintainer of the TDA998x driver, I know what the TDA998x is
-> > capable of, I already have the datasheets, and I know the binding
-> > document.
-> 
-> > What I'm asking about is about the specifics of your board's
-> > implementation and why you've written what you have in your DT
-> > file.  You haven't answered my specific questions either.
-> I am sorry I was unclear. My apologies.
-> 
-> Here is the wiring between LCD controller and the framer:
-> 
-> LCD[11:15] ====> VPA[3:7]
-> LCD[5:10]   ====> VPB[2:7]
-> LCD[0:4]     ====> VPC[3:7]
-> Here is the schematic:
-> https://octavosystems.com/docs/osd3358-sm-red-schematics-pdf/
-> And yes, the colors will come out wrong for the 24 bit for the
-> configuration set. See "blue-and-red-wiring" in tilcdc bindings:
-> https://www.kernel.org/doc/Documentation/devicetree/bindings/display/tilcdc/tilcdc.txt
-> AM335x errata providing wiring info for 24 bit mode:
-> http://www.ti.com/lit/er/sprz360i/sprz360i.pdf
-> 
-> We used the same interface design as the BeagleBone Black:
-> https://github.com/torvalds/linux/blob/master/arch/arm/boot/dts/am335x-boneblack-common.dtsi
-> 
-> Hope this is helpful.
+Hi Jernej,
 
-Thanks, that explains the situation.  It would be nice to state that
-this weirdness is due to an errata in the comment about it.
+Thank you for the patch! Perhaps something to improve:
 
-However, if DRM had the ability to communicate the bus format between
-the LCD controller and the encoder/bridge, then we could do a lot more
-to correct this problem, such as:
+[auto build test WARNING on next-20180710]
+[cannot apply to sunxi/sunxi/for-next drm/drm-next robh/for-next v4.18-rc4 v4.18-rc3 v4.18-rc2 v4.18-rc4]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-- dynamically configuring the TDA998x's input to automatically remap
-  the input pins.
+url:    https://github.com/0day-ci/linux/commits/Jernej-Skrabec/Allwinner-R40-HDMI-refactoring/20180711-043932
+config: arm64-allyesconfig (attached as .config)
+compiler: aarch64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        GCC_VERSION=7.2.0 make.cross ARCH=arm64 
 
-- configure the TDA998x's colour space converter to correctly scale
-  the RGB565 input for the missing LSB bits when we know that we are
-  supplied with an RGB565 input signal.
+All warnings (new ones prefixed by >>):
 
-The last point doesn't give you RGB888 or BGR888, but would at least
-mean that white would be white and not a very light grey with a green
-tinge.
+   In file included from include/linux/kernel.h:10:0,
+                    from include/linux/list.h:9,
+                    from include/linux/agp_backend.h:33,
+                    from include/drm/drmP.h:35,
+                    from drivers/gpu//drm/sun4i/sun8i_tcon_top.c:4:
+   drivers/gpu//drm/sun4i/sun8i_tcon_top.c: In function 'sun8i_tcon_top_register_gate':
+   include/linux/err.h:22:49: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
+    #define IS_ERR_VALUE(x) unlikely((unsigned long)(void *)(x) >= (unsigned long)-MAX_ERRNO)
+                                                    ^
+   include/linux/compiler.h:77:42: note: in definition of macro 'unlikely'
+    # define unlikely(x) __builtin_expect(!!(x), 0)
+                                             ^
+>> drivers/gpu//drm/sun4i/sun8i_tcon_top.c:56:6: note: in expansion of macro 'IS_ERR_VALUE'
+     if (IS_ERR_VALUE(index))
+         ^~~~~~~~~~~~
 
-It's seems odd that tilcdc supports 8bpc in the framebuffer, but the
-hardware has no way to produce 8bpc on the device's outputs.
+vim +/IS_ERR_VALUE +56 drivers/gpu//drm/sun4i/sun8i_tcon_top.c
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
-According to speedtest.net: 13Mbps down 490kbps up
+     3	
+   > 4	#include <drm/drmP.h>
+     5	
+     6	#include <dt-bindings/clock/sun8i-tcon-top.h>
+     7	
+     8	#include <linux/bitfield.h>
+     9	#include <linux/component.h>
+    10	#include <linux/device.h>
+    11	#include <linux/module.h>
+    12	#include <linux/of_graph.h>
+    13	#include <linux/platform_device.h>
+    14	
+    15	#include "sun8i_tcon_top.h"
+    16	
+    17	static int sun8i_tcon_top_get_connected_ep_id(struct device_node *node,
+    18						      int port_id)
+    19	{
+    20		struct device_node *ep, *remote, *port;
+    21		struct of_endpoint endpoint;
+    22	
+    23		port = of_graph_get_port_by_id(node, port_id);
+    24		if (!port)
+    25			return -ENOENT;
+    26	
+    27		for_each_available_child_of_node(port, ep) {
+    28			remote = of_graph_get_remote_port_parent(ep);
+    29			if (!remote)
+    30				continue;
+    31	
+    32			if (of_device_is_available(remote)) {
+    33				of_graph_parse_endpoint(ep, &endpoint);
+    34	
+    35				of_node_put(remote);
+    36	
+    37				return endpoint.id;
+    38			}
+    39	
+    40			of_node_put(remote);
+    41		}
+    42	
+    43		return -ENOENT;
+    44	}
+    45	
+    46	static struct clk_hw *sun8i_tcon_top_register_gate(struct device *dev,
+    47							   const char *parent,
+    48							   void __iomem *regs,
+    49							   spinlock_t *lock,
+    50							   u8 bit, int name_index)
+    51	{
+    52		const char *clk_name, *parent_name;
+    53		int ret, index;
+    54	
+    55		index = of_property_match_string(dev->of_node, "clock-names", parent);
+  > 56		if (IS_ERR_VALUE(index))
+    57			return ERR_PTR(index);
+    58	
+    59		parent_name = of_clk_get_parent_name(dev->of_node, index);
+    60	
+    61		ret = of_property_read_string_index(dev->of_node,
+    62						    "clock-output-names", name_index,
+    63						    &clk_name);
+    64		if (ret)
+    65			return ERR_PTR(ret);
+    66	
+    67		return clk_hw_register_gate(dev, clk_name, parent_name,
+    68					    CLK_SET_RATE_PARENT,
+    69					    regs + TCON_TOP_GATE_SRC_REG,
+    70					    bit, 0, lock);
+    71	};
+    72	
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 60979 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180711/38cef2a0/attachment-0001.gz>
