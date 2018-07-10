@@ -1,58 +1,74 @@
-From: ilia.lin@gmail.com (Ilia Lin)
-Date: Tue, 10 Jul 2018 15:43:57 +0300
-Subject: [PATCH v11 2/2] dt: qcom: Add qcom-cpufreq-kryo driver
- configuration
-In-Reply-To: <20180710092900.GA26718@centauri.lan>
-References: <1527081091-13389-1-git-send-email-ilialin@codeaurora.org>
- <1527081091-13389-3-git-send-email-ilialin@codeaurora.org>
- <20180710092900.GA26718@centauri.lan>
-Message-ID: <CA+5LGR36xwVWKytv=NGaeS+S7L3ryFgpWWz_dgqH3SHi9XCqaw@mail.gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 10 Jul 2018 14:36:49 +0200
+Subject: [PATCH v4] driver core: add a debugfs entry to show deferred
+ devices
+In-Reply-To: <20180710100152.bb562zgbv7yimb7r@earth.universe>
+References: <20180708133459.24883-1-javierm@redhat.com>
+ <20180710100152.bb562zgbv7yimb7r@earth.universe>
+Message-ID: <20180710123648.GA4227@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Niklas,
+Hi!
 
-The frequency list in the DT is correct, but the initial frequency for
-the CPUs 0,1 is configured by the XBL, while the CPUs 2,3 stay at XO
-rate. Both rates are unlisted in the DT and that's OK.
+> > With Device Trees (DT), the dependencies of the devices are defined in the
+> > DT, then the drivers parse that information to lookup the needed resources
+> > that have as dependencies.
+> > 
+> > Since drivers and devices are registered in a non-deterministic way, it is
+> > possible that a device that is a dependency has not been registered yet by
+> > the time that is looked up.
+> > 
+> > In this case the driver that requires this dependency cannot probe and has
+> > to defer it. So the driver core adds it to a list of deferred devices that
+> > is iterated again every time that a new driver is probed successfully.
+> > 
+> > For debugging purposes it may be useful to know what are the devices whose
+> > probe function was deferred. Add a debugfs entry showing that information.
+> > 
+> >   $ cat /sys/kernel/debug/devices_deferred
+> >   48070000.i2c:twl at 48:bci
+> >   musb-hdrc.0.auto
+> >   omapdrm.0
+> > 
+> > This information could be obtained partially by enabling debugging, but it
+> > means that the kernel log has to be parsed and the probe deferral balanced
+> > with the successes. This can be error probe and has to be done in a ad-hoc
+> > manner by everyone who needs to debug these kind of issues.
+> > 
+> > Since the information is already known by the kernel, just show it to make
+> > it easier to debug.
+> > 
+> > Signed-off-by: Javier Martinez Canillas <javierm@redhat.com>
+> > Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
+> > Reviewed-by: Mark Brown <broonie@kernel.org>
+> 
+> Reviewed-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
 
-BR,
-Ilia Lin
+Thanks for doing this.
 
-On Tue, Jul 10, 2018 at 12:29 PM Niklas Cassel <niklas.cassel@linaro.org> wrote:
->
-> On Wed, May 23, 2018 at 04:11:31PM +0300, Ilia Lin wrote:
-> > 1. Add NVMEM node for the speedbin
-> > 2. Add definitions for all possible MSM8996 CPU OPPs.
-> > The qcom-cpufreq-kryo driver will select the appropriate subset.
-> >
-> > Signed-off-by: Ilia Lin <ilialin@codeaurora.org>
-> > Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-> > ---
-> >  arch/arm64/boot/dts/qcom/apq8096-db820c.dts |   2 +-
-> >  arch/arm64/boot/dts/qcom/msm8996.dtsi       | 281 ++++++++++++++++++++++++++--
-> >  2 files changed, 270 insertions(+), 13 deletions(-)
-> >
->
-> Hello Ilia, Viresh
->
->
-> I tried this patch series (together with you cpu clock driver).
->
-> The first problem is that the driver fails to create debugfs entries.
->
-> The second problem appears to be that it runs on unlisted frequency.
-> Is this simply because of missing entries in the opp table?
->
-> [    4.538513] cpu cpu1: opp_list_debug_create_link: Failed to create link
-> [    4.538567] cpu cpu1: _add_opp_dev: Failed to register opp debugfs (-12)
-> [    4.544514] cpufreq: cpufreq_online: CPU0: Running at unlisted freq: 614400 KHz
-> [    4.551441] cpufreq: cpufreq_online: CPU0: Unlisted initial frequency changed to: 652800 KHz
-> [    4.563219] cpu cpu3: opp_list_debug_create_link: Failed to create link
-> [    4.566937] cpu cpu3: _add_opp_dev: Failed to register opp debugfs (-12)
-> [    4.573489] cpufreq: cpufreq_online: CPU2: Running at unlisted freq: 19200 KHz
-> [    4.580368] cpufreq: cpufreq_online: CPU2: Unlisted initial frequency changed to: 307200 KHz
->
->
-> Kind regards,
-> Niklas
+Note that it rejects on current -rc4, but solution is trivial.
+
+Tested-by: Pavel Machek <pavel@ucw.cz>
+
+Unfortunately, it does not help with pwm problem on Droid4, as nothing
+is deffered:
+
+user at devuan:/sys/bus/platform/drivers$ cat
+/sys/kernel/debug/devices_deferred
+user at devuan:/sys/bus/platform/drivers$
+
+									Pavel
+
+
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180710/8cb18740/attachment.sig>
