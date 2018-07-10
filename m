@@ -1,87 +1,66 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 10 Jul 2018 14:06:50 +0100
-Subject: [PATCH v3] arm64: add ARM64-specific support for flatmem
-In-Reply-To: <CAK8P3a0Op6DudVf--n4u_qimcvJf19OkbdzGm6ak=nB44oZEGQ@mail.gmail.com>
-References: <20180706174724.44594-1-nkela@cisco.com>
- <CAK8P3a0Op6DudVf--n4u_qimcvJf19OkbdzGm6ak=nB44oZEGQ@mail.gmail.com>
-Message-ID: <20180710130650.GD31318@arm.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 10 Jul 2018 14:11:20 +0100
+Subject: [PATCH] arm64: neon: Fix function may_use_simd() return error
+ status
+In-Reply-To: <1531189300-26216-1-git-send-email-yandong77520@gmail.com>
+References: <1531189300-26216-1-git-send-email-yandong77520@gmail.com>
+Message-ID: <20180710131119.GI9486@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-On Tue, Jul 10, 2018 at 02:55:41PM +0200, Arnd Bergmann wrote:
-> On Fri, Jul 6, 2018 at 7:47 PM, Nikunj Kela <nkela@cisco.com> wrote:
-> > Flatmem is useful in reducing kernel memory usage.
-> > One usecase is in kdump kernel. We are able to save
-> > ~14M by moving to flatmem scheme.
-> >
-> > Cc: xe-kernel at external.cisco.com
-> > Cc: Nikunj Kela <nkela@cisco.com>
-> > Signed-off-by: Nikunj Kela <nkela@cisco.com>
-> > ---
-> >  arch/arm64/Kconfig | 3 +++
-> >  1 file changed, 3 insertions(+)
-> >
-> > diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> > index 42c090c..f5b4c49 100644
-> > --- a/arch/arm64/Kconfig
-> > +++ b/arch/arm64/Kconfig
-> > @@ -775,6 +775,9 @@ config ARCH_SPARSEMEM_DEFAULT
-> >  config ARCH_SELECT_MEMORY_MODEL
-> >         def_bool ARCH_SPARSEMEM_ENABLE
-> >
-> > +config ARCH_FLATMEM_ENABLE
-> > +       def_bool y
-> > +
-> >  config HAVE_ARCH_PFN_VALID
-> >         def_bool ARCH_HAS_HOLES_MEMORYMODEL || !SPARSEMEM
-> >
+On Tue, Jul 10, 2018 at 10:21:40AM +0800, Yandong.Zhao wrote:
+> From: Yandong Zhao <yandong77520@gmail.com>
 > 
-> I'm getting hundreds of errors in randconfig builds with this:
+> Operations for contexts where we do not want to do any checks for
+> preemptions.  Unless strictly necessary, always use this_cpu_read()
+> instead.  Because of the kernel_neon_busy here we have to make sure
+> that it is the current cpu.
 
-Damn, I was worried something like this might happen. Sorry!
+I find this wording a bit confusing.
 
-Does randconfig also fuzz CONFIG_EXPERT? We only added ARCH_FLATMEM_ENABLE
-so that people can hand-configure crashkernels to make them small; there will
-be plenty of situations where it's just going to cause more problems than it
-solves, so I'd be happy hiding it behind EXPERT if it helps.
+Does the following make look OK to you?
 
-Otherwise we can probably through a 'def_bool !NUMA' at it.
+--8<--
 
-Will
+It does not matter if the caller of may_use_simd() migrates to
+another cpu after the call, but it is still important that the
+kernel_neon_busy percpu instance that is read matches the cpu the
+task is running on@the time of the read.
 
-> + /home/arnd/cross/x86_64/gcc-8.1.0-nolibc/aarch64-linux/bin/aarch64-linux-ld
-> -EB -maarch64elfb --no-undefined -X -pie -shared -Bsymbolic
-> --no-apply-dynamic-relocs --build-id -o .tmp_vmlinux1 -T
-> ./arch/arm64/kernel/vmlinux.lds --whole-archive built-in.a
-> --no-whole-archive --start-group arch/arm64/lib/lib.a lib/lib.a
-> --end-group
-> init/do_mounts.o: In function `mount_block_root':
-> do_mounts.c:(.init.text+0x1e8): undefined reference to `mem_map'
-> /home/arnd/cross/x86_64/gcc-8.1.0-nolibc/aarch64-linux/bin/aarch64-linux-ld:
-> init/do_mounts.o: relocation R_AARCH64_ADR_PREL_PG_HI21 against symbol
-> `mem_map' which may bind externally can not be used when making a
-> shared object; recompile with -fPIC
-> do_mounts.c:(.init.text+0x1e8): dangerous relocation: unsupported relocation
-> do_mounts.c:(.init.text+0x1f4): undefined reference to `mem_map'
-> arch/arm64/kernel/vdso.o: In function `vdso_init':
-> vdso.c:(.init.text+0xb4): undefined reference to `mem_map'
-> /home/arnd/cross/x86_64/gcc-8.1.0-nolibc/aarch64-linux/bin/aarch64-linux-ld:
-> arch/arm64/kernel/vdso.o: relocation R_AARCH64_ADR_PREL_PG_HI21
-> against symbol `mem_map' which may bind externally can not be used
-> when making a shared object; recompile with -fPIC
-> vdso.c:(.init.text+0xb4): dangerous relocation: unsupported relocation
-> vdso.c:(.init.text+0xbc): undefined reference to `mem_map'
-> vdso.c:(.init.text+0xec): undefined reference to `mem_map'
-> arch/arm64/kernel/insn.o:insn.c:(.text+0x2ec): more undefined
-> references to `mem_map' follow
-> /home/arnd/cross/x86_64/gcc-8.1.0-nolibc/aarch64-linux/bin/aarch64-linux-ld:
-> arch/arm64/kernel/insn.o: relocation R_AARCH64_ADR_PREL_PG_HI21
-> against symbol `mem_map' which may bind externally can not be used
-> when making a shared object; recompile with -fPIC
+This means that raw_cpu_read() is not sufficient.  kernel_neon_busy
+may appear true if the caller migrates during the execution of
+raw_cpu_read() and the next task to be scheduled in on the initial
+cpu calls kernel_neon_begin().
+
+This patch replaces raw_cpu_read() with this_cpu_read() to protect
+against this race.
+
+-->8--
+
 > 
-> The problem seems to be that CONFIG_NUMA is enabled in my
-> build, so mem_map[] is not defined anywhere.
+> Signed-off-by: Yandong Zhao <yandong77520@gmail.com>
+> ---
+>  arch/arm64/include/asm/simd.h | 5 +++--
+>  1 file changed, 3 insertions(+), 2 deletions(-)
 > 
->      Arnd
+> diff --git a/arch/arm64/include/asm/simd.h b/arch/arm64/include/asm/simd.h
+> index fa8b3fe..8b97f8b 100644
+> --- a/arch/arm64/include/asm/simd.h
+> +++ b/arch/arm64/include/asm/simd.h
+> @@ -29,7 +29,8 @@
+>  static __must_check inline bool may_use_simd(void)
+>  {
+>  	/*
+> -	 * The raw_cpu_read() is racy if called with preemption enabled.
+> +	 * The this_cpu_read() is racy if called with preemption enabled,
+> +	 * since the task my subsequently migrate to another CPU.
+
+"my" -> "may"
+
+(apologies if I was responsible for that typo)
+
+
+[...]
+
+Cheers
+---Dave
