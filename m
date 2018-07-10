@@ -1,42 +1,103 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Tue, 10 Jul 2018 16:38:26 +0100
-Subject: [PATCH v2 6/6] KVM: arm/arm64: vgic: Allow configuration of
- interrupt groups
-In-Reply-To: <20180710152727.GA8890@u002843.usa.arm.com>
-References: <1530697100-22419-1-git-send-email-christoffer.dall@arm.com>
- <1530697100-22419-7-git-send-email-christoffer.dall@arm.com>
- <7f875ead-d3cb-1fec-bc84-56e64526e6a7@arm.com>
- <20180709224836.GA26579@u002843.usa.arm.com>
- <f07199bf-9e31-25ad-72d9-27192c27fccd@redhat.com>
- <20180710103223.GE2656@work-vm>
- <20180710152727.GA8890@u002843.usa.arm.com>
-Message-ID: <CAFEAcA9rKb=c3XFN-9a2xjrr3q=AVQ7hA2_dEsG_JGhYuuAn8Q@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 10 Jul 2018 23:40:14 +0800
+Subject: [PATCH 09/17] drm/sun4i: mixer: Read id from DT
+In-Reply-To: <20180706175113.26698-10-jernej.skrabec@siol.net>
+References: <20180706175113.26698-1-jernej.skrabec@siol.net>
+ <20180706175113.26698-10-jernej.skrabec@siol.net>
+Message-ID: <CAGb2v64zBrzpqV9pvJPeaxbpLai8Ky0gTcwbSPv0m-vS-2JXKg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 July 2018 at 16:27, Christoffer Dall <christoffer.dall@arm.com> wrote:
-> Unless someone objects, I'll try to come up with a v3 that asks
-> userspace to confirm it wants writable groups.  Ideally I'd like for
-> this to happen automatically if userspace writes an IIDR with revision 2
-> and above, but that may result in either
+On Sat, Jul 7, 2018 at 1:51 AM, Jernej Skrabec <jernej.skrabec@siol.net> wrote:
+> Currently, TCON supports 2 ways to match TCON with engine (mixer in this
+> case). Old way is to just traverse of graph backwards and compare node
+> pointer. New way is to match TCON and engine by their respective ids.
+> All SoCs with DE2 enabled till now used the old way, which means mixer
+> id was never used and thus never implemented.
 >
->   (1) imposing ordering on the restore sequence from userspace;
->       userspace must write IIDR before IGROUPR if it wants non-default
->       groups,
->   (2) terrible sequence of locking and resetting everything if IIDR
->       hasn't been written before time of first executing a VCPU, or
->   (3) an additional bookkeeping flag in the critical path for GICv2
->       which ignores the group unless userspace wrote IIDR.
+> However, for R40, only the new way will be used. To prepare for that,
+> implemend fetching mixer id from DT.
 >
-> Out of the three, I think (3) is the least desirable because it
-> precludes the guest from programming its own groups.  I'll have a look
-> at how (2) looks, because it hides everything, and finally we can fall
-> back to (1) and document it clearly.
+> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+> ---
+>  drivers/gpu/drm/sun4i/sun8i_mixer.c | 35 +++++++++++++++++++++++++++--
+>  1 file changed, 33 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.c b/drivers/gpu/drm/sun4i/sun8i_mixer.c
+> index ee8febb25903..11221f96746d 100644
+> --- a/drivers/gpu/drm/sun4i/sun8i_mixer.c
+> +++ b/drivers/gpu/drm/sun4i/sun8i_mixer.c
+> @@ -23,6 +23,7 @@
+>  #include <linux/dma-mapping.h>
+>  #include <linux/reset.h>
+>  #include <linux/of_device.h>
+> +#include <linux/of_graph.h>
 
-There are already some ordering restrictions on the restore
-sequence for the GICv3, I think (eg there's a comment in QEMU
-about having to restore GICR_PROPBASER/PENDBASER before GICR_CTLR),
-so (1) isn't the end of the world...
+These should be alphabetically ordered.
 
-thanks
--- PMM
+>
+>  #include "sun4i_drv.h"
+>  #include "sun8i_mixer.h"
+> @@ -322,6 +323,37 @@ static struct regmap_config sun8i_mixer_regmap_config = {
+>         .max_register   = 0xbfffc, /* guessed */
+>  };
+>
+> +static int sun8i_mixer_of_get_id(struct device_node *node)
+> +{
+> +       struct device_node *port, *ep;
+> +       int ret = -EINVAL;
+> +
+> +       /* output is port 1 */
+> +       port = of_graph_get_port_by_id(node, 1);
+> +       if (!port)
+> +               return -EINVAL;
+> +
+> +       /* try finding an upstream endpoint */
+
+You mean downstream.
+
+> +       for_each_available_child_of_node(port, ep) {
+> +               struct device_node *remote;
+> +               u32 reg;
+> +
+> +               remote = of_graph_get_remote_endpoint(ep);
+> +               if (!remote)
+> +                       continue;
+> +
+> +               ret = of_property_read_u32(remote, "reg", &reg);
+> +               if (ret)
+> +                       continue;
+
+This is somewhat redundant, given the current code structure will loop
+over all available child nodes. What you want is probably an early
+termination condition instead, i.e. if (!ret).
+
+Also, remember to call of_node_put on the remote node.
+
+ChenYu
+
+> +
+> +               ret = reg;
+> +       }
+> +
+> +       of_node_put(port);
+> +
+> +       return ret;
+> +}
+> +
+>  static int sun8i_mixer_bind(struct device *dev, struct device *master,
+>                               void *data)
+>  {
+> @@ -353,8 +385,7 @@ static int sun8i_mixer_bind(struct device *dev, struct device *master,
+>         dev_set_drvdata(dev, mixer);
+>         mixer->engine.ops = &sun8i_engine_ops;
+>         mixer->engine.node = dev->of_node;
+> -       /* The ID of the mixer currently doesn't matter */
+> -       mixer->engine.id = -1;
+> +       mixer->engine.id = sun8i_mixer_of_get_id(dev->of_node);
+>
+>         mixer->cfg = of_device_get_match_data(dev);
+>         if (!mixer->cfg)
+> --
+> 2.18.0
+>
