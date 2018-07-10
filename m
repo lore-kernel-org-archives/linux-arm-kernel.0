@@ -1,77 +1,39 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Tue, 10 Jul 2018 16:51:50 -0500
-Subject: [PATCH v3 0/7] arm64: numa/topology/smp: update the cpumasks for
- CPU hotplug
-In-Reply-To: <1530874968-5960-1-git-send-email-sudeep.holla@arm.com>
-References: <1530874968-5960-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <a1e306a3-5b9f-1e7b-fd39-9af884bdcc9b@arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 10 Jul 2018 22:57:23 +0100
+Subject: [PATCH net-next 01/13] ARM: net: bpf: enumerate the JIT scratch
+ stack layout
+In-Reply-To: <41b5fc68-e15f-56f9-c55b-4f6deb61c54c@iogearbox.net>
+References: <20180710123340.GK17271@n2100.armlinux.org.uk>
+ <E1fcrsG-0005UK-Un@rmk-PC.armlinux.org.uk>
+ <41b5fc68-e15f-56f9-c55b-4f6deb61c54c@iogearbox.net>
+Message-ID: <20180710215723.GN17271@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Jul 10, 2018 at 08:30:04PM +0200, Daniel Borkmann wrote:
+> Hi Russell,
+> 
+> thanks a lot for your work on the arm32 JIT!
+> 
+> On 07/10/2018 02:36 PM, Russell King wrote:
+> > Enumerate the contents of the JIT scratch stack layout used for storing
+> > some of the JITs 64-bit registers, tail call counter and AX register.
+> > 
+> > XXX: what about the skb_copy_bits buffer - this appears to overlap with
+> > the first word of the JITs accessible stack.
+> 
+> Could you elaborate on that case? Unless I'm missing something there should
+> be no use of the skb_copy_bits buffer anymore (aka former SKB_BUFFER at
+> STACK_VAR(SCRATCH_SIZE) offset), but aside from that it's not supposed to
+> overlap either.
 
-On 07/06/2018 06:02 AM, Sudeep Holla wrote:
-> Hi,
-> 
-> Commit 37c3ec2d810f ("arm64: topology: divorce MC scheduling domain from core_siblings")
-> was reported to cause some hotplug and system suspend regressions when
-> it was merged. On investigation, it was found that unlike x86/PPC,
-> arm64 doesn't update the cpu and numa masks on CPU hotplug. That's
-> somewhat expected from the scheduler.
-> 
-> Since these changes were bit invasive as a solution to the above
-> mentioned regression, as small change was temporarily applied as a fix.
-> This series updates the cpu and numa masks on CPU hotplug and reverts
-> that temporary fix.
-> 
-> It would be good to get this tested(CPU hotplug - few and all CPUs in
-> a socket) on multi-socket/NUMA systems from Cavium and Huawei/Hisilicon.
+Probably an old comment - these were originally developed back in
+January timeframe when there was the SKB_BUFFER stuff, but that was
+removed during the 4.18 merge window.  I'll kill the comment.
 
-It looks good, and I tested it in ACPI/PPTT mode with a single socket 
-thunderX2, booting with maxcpus and online/offlineing cores. No problems 
-found. I did a similar set of tests with a juno, as well as with a 
-kernel compiled with CONFIG_NUMA off on the juno, a configuration that 
-previously had problems.
+Thanks.
 
-
-Reviewed-by: Jeremy Linton <jeremy.linton@arm.com>
-Tested-by: Jeremy Linton <jeremy.linton@arm.com>
-
-Thanks,
-
-
-> 
-> Regards,
-> Sudeep
-> 
-> v2->v3:
-> 	- Removed confusing boolean reset argument and inlined reset
-> 	  part in reset_cpu_topology
-> 	- Moved cpu_llc_shared_mask to asm/topology.h along with other
-> 	  similar macros and renamed it topology_llc_cpumask
-> 	- Use NUMA_NO_NODE instead of checking for any -ve integer
-> 
-> v1->v2:
-> 	- Rebased on v4.18-rc1 and hence do revert of the temporary fix
-> 	  that was merged for v4.18
-> 	- Removed one of the wrong use of possible_mask
-> 
-> Sudeep Holla (7):
->    arm64: topology: refactor reset_cpu_topology to add support for removing topology
->    arm64: numa: separate out updates to percpu nodeid and NUMA node cpumap
->    arm64: topology: add support to remove cpu topology sibling masks
->    arm64: topology: restrict updating siblings_masks to online cpus only
->    arm64: smp: remove cpu and numa topology information when hotplugging out CPU
->    arm64: topology: rename llc_siblings to align with other struct members
->    arm64: topology: re-introduce numa mask check for scheduler MC selection
-> 
->   arch/arm64/include/asm/numa.h     |  4 +++
->   arch/arm64/include/asm/topology.h |  4 ++-
->   arch/arm64/kernel/smp.c           |  5 ++++
->   arch/arm64/kernel/topology.c      | 58 +++++++++++++++++++++++++++------------
->   arch/arm64/mm/numa.c              | 29 ++++++++++++++------
->   5 files changed, 74 insertions(+), 26 deletions(-)
-> 
-> --
-> 2.7.4
-> 
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
+According to speedtest.net: 13Mbps down 490kbps up
