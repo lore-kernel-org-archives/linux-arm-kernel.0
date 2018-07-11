@@ -1,58 +1,28 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Wed, 11 Jul 2018 09:25:55 -0400
-Subject: [PATCH RT] arm64: fpsimd: use a local_lock() in addition to
- local_bh_disable()
-In-Reply-To: <20180522173333.aawadhkcekzvrswp@linutronix.de>
-References: <20180517124006.ohygrrpg7z2moqqt@linutronix.de>
- <20180522131004.3012953c@gandalf.local.home>
- <20180522172115.fpqguqlsq6bavtxy@linutronix.de>
- <20180522132429.6f1dcf92@gandalf.local.home>
- <20180522173333.aawadhkcekzvrswp@linutronix.de>
-Message-ID: <20180711092555.268adf7f@gandalf.local.home>
+From: ludovic.desroches@microchip.com (Ludovic Desroches)
+Date: Wed, 11 Jul 2018 15:16:35 +0200
+Subject: [PATCH 0/3] add ISO7816 support
+Message-ID: <20180711131638.12622-1-ludovic.desroches@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 22 May 2018 19:33:33 +0200
-Sebastian Andrzej Siewior <bigeasy@linutronix.de> wrote:
+Hi,
 
-> On 2018-05-22 13:24:29 [-0400], Steven Rostedt wrote:
-> > On Tue, 22 May 2018 19:21:16 +0200
-> > Sebastian Andrzej Siewior <bigeasy@linutronix.de> wrote:
-> >   
-> > > On 2018-05-22 13:10:04 [-0400], Steven Rostedt wrote:  
-> > > > On Thu, 17 May 2018 14:40:06 +0200
-> > > > Sebastian Andrzej Siewior <bigeasy@linutronix.de> wrote:
-> > > >     
-> > > > > +static DEFINE_LOCAL_IRQ_LOCK(fpsimd_lock);
-> > > > >  /*
-> > > > >   * Update current's FPSIMD/SVE registers from thread_struct.
-> > > > >   *
-> > > > > @@ -594,6 +595,7 @@ int sve_set_vector_length(struct task_struct *task,
-> > > > >  	 * non-SVE thread.
-> > > > >  	 */
-> > > > >  	if (task == current) {
-> > > > > +		local_lock(fpsimd_lock);
-> > > > >  		local_bh_disable();    
-> > > > 
-> > > > I'm surprised that we don't have a "local_lock_bh()"?    
-> > > 
-> > > right. Like the last time when we introduced a global lock with no
-> > > locking context? 
-> > >   
-> > 
-> > I meant, we could have local_lock_bh(fpsimd_lock); that would turn into
-> > a local_bh_disable() when !PREEMPT_RT.  
-> 
-> Oh that part. That could be possible I guess. I need to look into the
-> second part which disables preemption while the FPU is taken.
->
+This set of patches adds support for the ISO7816 standard. The USART devices in
+Microchip SoCs have an ISO7816 mode. It allows to let the USART managing
+the CLK and I/O signals of a smart card.
 
-Did you decide to create a local_lock_bh(lock) function? I don't see it.
+Nicolas Ferre (3):
+  tty/serial_core: add ISO7816 infrastructure
+  tty/serial: atmel: add ISO7816 support
+  tty/serial: atmel: manage shutdown in case of RS485 or ISO7816 mode
 
-And should this be backported to 4.14-rt too? You state you saw this in
-4.16-rt, but did you start doing something different then, or did the
-kernel change?
+ drivers/tty/serial/atmel_serial.c | 179 +++++++++++++++++++++++++++++++++++---
+ drivers/tty/serial/atmel_serial.h |   3 +-
+ drivers/tty/serial/serial_core.c  |  49 +++++++++++
+ include/linux/serial_core.h       |   3 +
+ include/uapi/asm-generic/ioctls.h |   2 +
+ include/uapi/linux/serial.h       |  17 ++++
+ 6 files changed, 241 insertions(+), 12 deletions(-)
 
-Thanks!
-
--- Steve
+-- 
+2.12.2
