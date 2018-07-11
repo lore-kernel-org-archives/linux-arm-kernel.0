@@ -1,47 +1,61 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Wed, 11 Jul 2018 10:46:56 +0200
-Subject: [PATCH v5 04/22] dt-bindings: sram: sunxi: Add A13, A20, A23 and
- H3 dedicated bindings
-In-Reply-To: <CAGb2v65MO9xmKQz5LuydwqwvVB-_bbM=FeqbsRwJbh-5km9XCQ@mail.gmail.com>
-References: <20180710080114.31469-1-paul.kocialkowski@bootlin.com>
- <20180710080114.31469-5-paul.kocialkowski@bootlin.com>
- <CAGb2v65MO9xmKQz5LuydwqwvVB-_bbM=FeqbsRwJbh-5km9XCQ@mail.gmail.com>
-Message-ID: <20180711084656.4y3m7maiszewzgsz@flea>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Wed, 11 Jul 2018 16:41:54 +0900
+Subject: [PATCH v11 06/15] arm64: add image head flag definitions
+In-Reply-To: <20180711074203.3019-1-takahiro.akashi@linaro.org>
+References: <20180711074203.3019-1-takahiro.akashi@linaro.org>
+Message-ID: <20180711074203.3019-7-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 10, 2018 at 10:36:19PM +0800, Chen-Yu Tsai wrote:
-> On Tue, Jul 10, 2018 at 4:00 PM, Paul Kocialkowski
-> <paul.kocialkowski@bootlin.com> wrote:
-> > This introduces dedicated bindings for the system control blocks found
-> > on the A13, A20, A23 and H3 sunxi platforms.
-> >
-> > Since the controllers on the A33 are the very same as those on the A23,
-> > no specific compatible is introduced for it.
-> >
-> > These bindings are introduced to allow reflecting the differences that
-> > exist between these controllers, that may become significant to driver
-> > implementations.
-> >
-> > Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-> 
-> Not sure if there's a difference between A10 and A20, if you don't count
-> the NMI that we have a separate node for. But anyway,
-> 
-> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+Those image head's flags will be used later by kexec_file loader.
 
-I've applied it, adding the A10 fallback compatible for the A20.
+Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Acked-by: James Morse <james.morse@arm.com>
+---
+ arch/arm64/include/asm/boot.h | 15 +++++++++++++++
+ arch/arm64/kernel/head.S      |  2 +-
+ 2 files changed, 16 insertions(+), 1 deletion(-)
 
-Maxime
-
+diff --git a/arch/arm64/include/asm/boot.h b/arch/arm64/include/asm/boot.h
+index 355e552a9175..0bab7eed3012 100644
+--- a/arch/arm64/include/asm/boot.h
++++ b/arch/arm64/include/asm/boot.h
+@@ -5,6 +5,21 @@
+ 
+ #include <asm/sizes.h>
+ 
++#define ARM64_MAGIC		"ARM\x64"
++
++#define HEAD_FLAG_BE_SHIFT		0
++#define HEAD_FLAG_PAGE_SIZE_SHIFT	1
++#define HEAD_FLAG_BE_MASK		0x1
++#define HEAD_FLAG_PAGE_SIZE_MASK	0x3
++
++#define HEAD_FLAG_BE			1
++#define HEAD_FLAG_PAGE_SIZE_4K		1
++#define HEAD_FLAG_PAGE_SIZE_16K		2
++#define HEAD_FLAG_PAGE_SIZE_64K		3
++
++#define head_flag_field(flags, field) \
++		(((flags) >> field##_SHIFT) & field##_MASK)
++
+ /*
+  * arm64 requires the DTB to be 8 byte aligned and
+  * not exceed 2MB in size.
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index b0853069702f..8cbac6232ed1 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -91,7 +91,7 @@ _head:
+ 	.quad	0				// reserved
+ 	.quad	0				// reserved
+ 	.quad	0				// reserved
+-	.ascii	"ARM\x64"			// Magic number
++	.ascii	ARM64_MAGIC			// Magic number
+ #ifdef CONFIG_EFI
+ 	.long	pe_header - _head		// Offset to the PE header.
+ 
 -- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180711/ada2e66a/attachment.sig>
+2.17.0
