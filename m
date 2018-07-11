@@ -1,44 +1,45 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Wed, 11 Jul 2018 11:25:07 +0200
-Subject: [PATCH 1/2] soc: sunxi: Add the A13,
- A23 and H3 system control compatibles
-Message-ID: <20180711092508.18751-1-maxime.ripard@bootlin.com>
+Date: Wed, 11 Jul 2018 11:25:08 +0200
+Subject: [PATCH 2/2] ARM: dts: sun5i: Fix the SRAM A3-A4 declaration
+In-Reply-To: <20180711092508.18751-1-maxime.ripard@bootlin.com>
+References: <20180711092508.18751-1-maxime.ripard@bootlin.com>
+Message-ID: <20180711092508.18751-2-maxime.ripard@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A13, A23 and H3 have variations of the system controls, in part due to
-the SRAM that are available (and can be mapped) in the SoC.
+According to the system control bindings, the A3-A4 SRAM node should be
+a child node of the SRAM it belongs to. However, it was introduced at the
+same level, therefore breaking the binding. Fix this.
 
-In order to make it future proof, let's add compatibles for these SoCs in
-the driver.
-
+Fixes: 85870196258f ("ARM: sun5i: a13: Merge common controllers into the common DTSI")
 Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
 ---
- drivers/soc/sunxi/sunxi_sram.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ arch/arm/boot/dts/sun5i.dtsi | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/soc/sunxi/sunxi_sram.c b/drivers/soc/sunxi/sunxi_sram.c
-index b19fa2cc67c2..b4b0f3480bd3 100644
---- a/drivers/soc/sunxi/sunxi_sram.c
-+++ b/drivers/soc/sunxi/sunxi_sram.c
-@@ -369,6 +369,18 @@ static const struct of_device_id sunxi_sram_dt_match[] = {
- 		.compatible = "allwinner,sun4i-a10-system-control",
- 		.data = &sun4i_a10_sramc_variant,
- 	},
-+	{
-+		.compatible = "allwinner,sun5i-a13-system-control",
-+		.data = &sun4i_a10_sramc_variant,
-+	},
-+	{
-+		.compatible = "allwinner,sun8i-a23-system-control",
-+		.data = &sun4i_a10_sramc_variant,
-+	},
-+	{
-+		.compatible = "allwinner,sun8i-h3-system-control",
-+		.data = &sun4i_a10_sramc_variant,
-+	},
- 	{
- 		.compatible = "allwinner,sun50i-a64-sram-controller",
- 		.data = &sun50i_a64_sramc_variant,
+diff --git a/arch/arm/boot/dts/sun5i.dtsi b/arch/arm/boot/dts/sun5i.dtsi
+index 4a089a64c2c7..e7a786a677d5 100644
+--- a/arch/arm/boot/dts/sun5i.dtsi
++++ b/arch/arm/boot/dts/sun5i.dtsi
+@@ -127,13 +127,13 @@
+ 				#address-cells = <1>;
+ 				#size-cells = <1>;
+ 				ranges = <0 0x00000000 0xc000>;
+-			};
+ 
+-			emac_sram: sram-section at 8000 {
+-				compatible = "allwinner,sun5i-a13-sram-a3-a4",
+-					     "allwinner,sun4i-a10-sram-a3-a4";
+-				reg = <0x8000 0x4000>;
+-				status = "disabled";
++				emac_sram: sram-section at 8000 {
++					compatible = "allwinner,sun5i-a13-sram-a3-a4",
++						     "allwinner,sun4i-a10-sram-a3-a4";
++					reg = <0x8000 0x4000>;
++					status = "disabled";
++				};
+ 			};
+ 
+ 			sram_c: sram at 1d00000 {
 -- 
 2.17.1
