@@ -1,50 +1,38 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Wed, 11 Jul 2018 16:42:03 +0900
-Subject: [PATCH v11 15/15] arm64: kexec_file: add kaslr support
-In-Reply-To: <20180711074203.3019-1-takahiro.akashi@linaro.org>
-References: <20180711074203.3019-1-takahiro.akashi@linaro.org>
-Message-ID: <20180711074203.3019-16-takahiro.akashi@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 11 Jul 2018 08:45:11 +0100
+Subject: [PATCH v7 1/4] arm/arm64: KVM: Add KVM_GET/SET_VCPU_EVENTS
+In-Reply-To: <b0eb95f3-7905-8aab-f816-529c17f07e04@huawei.com>
+References: <20180710164952.23736-1-james.morse@arm.com>
+ <20180710164952.23736-2-james.morse@arm.com>
+ <b0eb95f3-7905-8aab-f816-529c17f07e04@huawei.com>
+Message-ID: <1cbb0f3f-1bc4-5205-d28c-1843d09a702e@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding "kaslr-seed" to dtb enables triggering kaslr, or kernel virtual
-address randomization, at secondary kernel boot. We always do this as
-it will have no harm on kaslr-incapable kernel.
+On 11/07/18 07:48, gengdongjiu wrote:
+> Hi, James,
+> 
+> [...]
+>> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+>> index d10944e619d3..e3940f8715a5 100644
+>> --- a/Documentation/virtual/kvm/api.txt
+>> +++ b/Documentation/virtual/kvm/api.txt
+>> @@ -835,11 +835,13 @@ struct kvm_clock_data {
+>>  
+>>  Capability: KVM_CAP_VCPU_EVENTS
+>>  Extended by: KVM_CAP_INTR_SHADOW
+>> -Architectures: x86
+>> -Type: vm ioctl
+>> +Architectures: x86, arm64
+> 
+>    In my previous patch, I only add the arm64 support, now you add patches to support arm32 platform,
+>    so you can add "ARM" to the Architectures, for example: "Architectures: x86, ARM, arm64"
 
-We don't have any "switch" to turn off this feature directly, but still
-can suppress it by passing "nokaslr" as a kernel boot argument.
+That should be the job of the last patch, shouldn't it? At this point in
+the series, there is no 32bit support whatsoever.
 
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/kernel/machine_kexec_file.c | 7 +++++++
- 1 file changed, 7 insertions(+)
+Thanks,
 
-diff --git a/arch/arm64/kernel/machine_kexec_file.c b/arch/arm64/kernel/machine_kexec_file.c
-index 261564df7210..99d771afe88e 100644
---- a/arch/arm64/kernel/machine_kexec_file.c
-+++ b/arch/arm64/kernel/machine_kexec_file.c
-@@ -16,6 +16,7 @@
- #include <linux/libfdt.h>
- #include <linux/memblock.h>
- #include <linux/of_fdt.h>
-+#include <linux/random.h>
- #include <linux/slab.h>
- #include <linux/types.h>
- #include <linux/vmalloc.h>
-@@ -161,6 +162,12 @@ static int setup_dtb(struct kimage *image,
- 		}
- 	}
- 
-+	/* add kaslr-seed */
-+	get_random_bytes(&value, sizeof(value));
-+	ret = fdt_setprop(buf, nodeoffset, "kaslr-seed", &value, sizeof(value));
-+	if (ret)
-+		goto out_err;
-+
- 	/* trim a buffer */
- 	fdt_pack(buf);
- 	*dtb_buf = buf;
+	M.
 -- 
-2.17.0
+Jazz is not dead. It just smells funny...
