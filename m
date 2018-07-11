@@ -1,169 +1,103 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Wed, 11 Jul 2018 11:27:01 +0000
-Subject: [PATCH V4 5/5] soc: imx: add SC firmware IPC and APIs
-In-Reply-To: <20180711103159.jxmgksxawjmiukaf@pengutronix.de>
-References: <1531061817-1980-1-git-send-email-aisheng.dong@nxp.com>
- <1531061817-1980-6-git-send-email-aisheng.dong@nxp.com>
- <20180710144454.lmz62g76xu7ieohr@pengutronix.de>
- <AM0PR04MB421186AD7C08E94CADFDD394805A0@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <20180711103159.jxmgksxawjmiukaf@pengutronix.de>
-Message-ID: <AM0PR04MB421185C501B3B910A194232F805A0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+From: jernej.skrabec@siol.net (Jernej Skrabec)
+Date: Wed, 11 Jul 2018 13:27:06 +0200
+Subject: [PATCH v3] drm/sun4i: mixer: Read id from DT
+Message-ID: <20180711112706.30222-1-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Sascha Hauer [mailto:s.hauer at pengutronix.de]
-> Sent: Wednesday, July 11, 2018 6:32 PM
-> To: A.s. Dong <aisheng.dong@nxp.com>
-> Cc: linux-arm-kernel at lists.infradead.org; dongas86 at gmail.com; dl-linux-imx
-> <linux-imx@nxp.com>; kernel at pengutronix.de; Fabio Estevam
-> <fabio.estevam@nxp.com>; shawnguo at kernel.org
-> Subject: Re: [PATCH V4 5/5] soc: imx: add SC firmware IPC and APIs
-> 
-> On Wed, Jul 11, 2018 at 09:18:06AM +0000, A.s. Dong wrote:
-> > > -----Original Message-----
-> > > From: Sascha Hauer [mailto:s.hauer at pengutronix.de]
-> > > Sent: Tuesday, July 10, 2018 10:45 PM
-> > > To: A.s. Dong <aisheng.dong@nxp.com>
-> > > Cc: linux-arm-kernel at lists.infradead.org; dongas86 at gmail.com;
-> > > dl-linux-imx <linux-imx@nxp.com>; kernel at pengutronix.de; Fabio
-> > > Estevam <fabio.estevam@nxp.com>; shawnguo at kernel.org
-> > > Subject: Re: [PATCH V4 5/5] soc: imx: add SC firmware IPC and APIs
-> > >
-> > > Hi,
-> > >
-> > > Thank you for removing the majority of this patch. It really helps
-> readability.
-> > >
-> > > On Sun, Jul 08, 2018 at 10:56:57PM +0800, Dong Aisheng wrote:
-> > > > +/* Initialization of the MU code. */ static int
-> > > > +imx_sc_probe(struct platform_device *pdev) {
-> > > > +	struct device *dev = &pdev->dev;
-> > > > +	int ret;
-> > > > +
-> > > > +	ret = sc_ipc_open(&scu_ipc_handle, dev);
-> > > > +	if (ret)
-> > > > +		return ret;
-> > > > +
-> > > > +	pr_info("NXP i.MX SCU Initialized\n");
-> > > > +
-> > > > +	return devm_of_platform_populate(dev); }
-> > >
-> > > I see that you have turned the SCU code into a driver and I really
-> > > welcome that. Now when you have a driver a global scu_ipc_handle is
-> > > no longer necessary. You can call platform_set_drvdata(pdev,
-> > > sc_ipc); and can get that from the child devices using
-> > > dev_get_drvdata(pdev->dev.parent) like for example most mfd devices
-> do.
-> > >
-> >
-> > It looks like a good idea.
-> > One question: That means that the SCU users much have a node under
-> SCU
-> > node and have struct device point, it seems ok for all normal devices like clk,
-> pinctrl, pd.
-> > But I found some special device like soc device which does not have
-> > node and struct device, but also use SCU. How to treat for those devices?
-> Possible anymore of them?
-> 
-> Not sure. What kind of device is it? I'm sure we'll find a solution so maybe ask
-> again once we are there?
-> 
+Currently, TCON supports 2 ways to match TCON with engine (mixer in this
+case). Old way is to just traverse of graph backwards and compare node
+pointer. New way is to match TCON and engine by their respective ids.
+All SoCs with DE2 enabled till now used the old way, which means mixer
+id was never used and thus never implemented.
 
-See:
-include/linux/sys_soc.h
-arch/arm/mach-imx/cpu.c: imx_soc_device_init().
-struct soc_device_attribute {
-        const char *machine;
-        const char *family;
-        const char *revision;   
-        const char *soc_id;
-        const void *data;
-};
+However, for R40, only the new way will be used. To prepare for that,
+implement mixer id fetching from DT.
 
-And I found there's also SC services used by other normal devices
-Which is not under SCU node. So I wonder dev_get_drvdata(parent)
-may not work for them quite well.
+Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+---
+Hi all,
 
-> > > This can be embedded into structs that the consumers (like clock driver)
-> use.
-> > >
-> >
-> > Did you mean something like below (similar as TI does):
-> >
-> > struct sc_rpc_msg {
-> >         uint8_t ver;
-> >         uint8_t size;
-> >         uint8_t svc;
-> >         uint8_t func;
-> > };
-> >
-> > // we need have two structures for each type SCU request and response
-> > struct imx_sc_msg_req_get_clock_rate {
-> >         struct sc_rpc_msg hdr;
-> >         u16 resource;
-> >         u8 clk;
-> > } __packed;
-> >
-> > struct imx_sc_msg_resp_get_clock_rate {
-> >         struct sc_rpc_msg hdr;
-> >         u32 rate;
-> > } __packed;
-> >
-> > sc_err_t sc_pm_get_clock_rate(sc_ipc_t ipc, sc_rsrc_t resource,
-> >                               sc_pm_clk_t clk, sc_pm_clock_rate_t
-> > *rate) {
-> >         struct imx_sc_msg_req_get_clock_rate *msg;
-> >         struct imx_sc_msg_resp_get_clock_rate *resp;
-> >         struct sc_rpc_msg *hdr = &msg->hdr;
-> >         uint8_t result;
-> >         int ret;
-> >
-> >         hdr->ver = SC_RPC_VERSION;
-> >         hdr->svc = (uint8_t)SC_RPC_SVC_PM;
-> >         hdr->func = (uint8_t)PM_FUNC_GET_CLOCK_RATE;
-> >         hdr->size = 2;
-> >
-> >         msg->resource = resource;
-> >         msg->clk = clk;
-> >
-> >         ret = sc_call_rpc(ipc, &msg, false);
-> >         if (ret)
-> >                 return SC_ERR_FAIL;
-> >
-> >         resp = (struct imx_sc_msg_resp_get_clock_rate *)msg;
-> >         if (rate != NULL)
-> >                 *rate = resp->rate;
-> >
-> >         result = resp->hdr.func;
-> >         return (sc_err_t)result;
-> > }
-> >
-> > Are you okay with this?
-> 
-> Yes, that's what I meant. Put this function into the clock driver directly rather
-> than in the SCU code and we are done.
-> 
+since all other patches were already applied, I'm sending this without
+cover letter. Change from previous version is that I added comment why
+there is no error handling when reading mixer id.
 
-It seems those are procotol services,  both arm scpi and ti sci
-Implemented them in scu driver.
-drivers/firmware/ti_sci.c
-drivers/firmware/arm_scpi.c
-You do want to implement in each induvial client drivers?
+ drivers/gpu/drm/sun4i/sun8i_mixer.c | 49 +++++++++++++++++++++++++++--
+ 1 file changed, 47 insertions(+), 2 deletions(-)
 
-Regards
-Dong Aisheng
-
-> Sascha
-> 
-> 
-> --
-> Pengutronix e.K.                           |                             |
-> Industrial Linux Solutions                 |
-> https://emea01.safelinks.protection.outlook.com/?url=http%3A%2F%2Fww
-> w.pengutronix.de%2F&amp;data=02%7C01%7Caisheng.dong%40nxp.com%7
-> C4d1cdc88f66c4c6e8b2c08d5e7198a09%7C686ea1d3bc2b4c6fa92cd99c5c3016
-> 35%7C0%7C0%7C636669019236875606&amp;sdata=lpP6lpObOOKajQFz9mTai
-> BbqLklnoLbWGrMzPxhrjpU%3D&amp;reserved=0  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.c b/drivers/gpu/drm/sun4i/sun8i_mixer.c
+index aa81b9838ae8..da34fc394902 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_mixer.c
++++ b/drivers/gpu/drm/sun4i/sun8i_mixer.c
+@@ -22,6 +22,7 @@
+ #include <linux/component.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/of_device.h>
++#include <linux/of_graph.h>
+ #include <linux/reset.h>
+ 
+ #include "sun4i_drv.h"
+@@ -322,6 +323,42 @@ static struct regmap_config sun8i_mixer_regmap_config = {
+ 	.max_register	= 0xbfffc, /* guessed */
+ };
+ 
++static int sun8i_mixer_of_get_id(struct device_node *node)
++{
++	struct device_node *port, *ep;
++	int ret = -EINVAL;
++
++	/* output is port 1 */
++	port = of_graph_get_port_by_id(node, 1);
++	if (!port)
++		return -EINVAL;
++
++	/* try to find downstream endpoint */
++	for_each_available_child_of_node(port, ep) {
++		struct device_node *remote;
++		u32 reg;
++
++		remote = of_graph_get_remote_endpoint(ep);
++		if (!remote)
++			continue;
++
++		ret = of_property_read_u32(remote, "reg", &reg);
++		if (!ret) {
++			of_node_put(remote);
++			of_node_put(ep);
++			of_node_put(port);
++
++			return reg;
++		}
++
++		of_node_put(remote);
++	}
++
++	of_node_put(port);
++
++	return ret;
++}
++
+ static int sun8i_mixer_bind(struct device *dev, struct device *master,
+ 			      void *data)
+ {
+@@ -353,8 +390,16 @@ static int sun8i_mixer_bind(struct device *dev, struct device *master,
+ 	dev_set_drvdata(dev, mixer);
+ 	mixer->engine.ops = &sun8i_engine_ops;
+ 	mixer->engine.node = dev->of_node;
+-	/* The ID of the mixer currently doesn't matter */
+-	mixer->engine.id = -1;
++
++	/*
++	 * While this function can fail, we shouldn't do anything
++	 * if this happens. Some early DE2 DT entries don't provide
++	 * mixer id but work nevertheless because matching between
++	 * TCON and mixer is done by comparing node pointers (old
++	 * way) instead comparing ids. If this function fails and
++	 * id is needed, it will fail during id matching anyway.
++	 */
++	mixer->engine.id = sun8i_mixer_of_get_id(dev->of_node);
+ 
+ 	mixer->cfg = of_device_get_match_data(dev);
+ 	if (!mixer->cfg)
+-- 
+2.18.0
