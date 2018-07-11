@@ -1,44 +1,29 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 11 Jul 2018 11:43:52 +0200
-Subject: [PATCH 0/3] PM / Domains: Enable name based lookup at attach
-In-Reply-To: <CAPDyKFq=EPkvu0MjOtkjCNzrgZj0kaJTxXDt21=YR==T+H8ePQ@mail.gmail.com>
-References: <20180629110432.5179-1-ulf.hansson@linaro.org>
- <12075152.c01WRJ509Y@aspire.rjw.lan>
- <CAPDyKFq=EPkvu0MjOtkjCNzrgZj0kaJTxXDt21=YR==T+H8ePQ@mail.gmail.com>
-Message-ID: <34035286.gLvmaz061p@aspire.rjw.lan>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Wed, 11 Jul 2018 10:45:05 +0100
+Subject: [PATCH RFC 2/3] nvmem: add driver for Raspberry Pi OTP
+In-Reply-To: <1520602328-28972-3-git-send-email-stefan.wahren@i2se.com>
+References: <1520602328-28972-1-git-send-email-stefan.wahren@i2se.com>
+ <1520602328-28972-3-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <7c1f6ee8-9572-463f-ccc8-3d12ffccb8f5@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, July 9, 2018 1:38:38 PM CEST Ulf Hansson wrote:
-> On 9 July 2018 at 12:06, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> > On Monday, July 2, 2018 9:08:06 AM CEST Viresh Kumar wrote:
-> >> On 29-06-18, 13:04, Ulf Hansson wrote:
-> >> > Recently we added support to manage multiple PM domains per device. Consumer
-> >> > drivers were provided an API, dev_pm_domain_attach_by_id() to associate its
-> >> > device with one of its PM domain, by using an index.
-> >> >
-> >> > Let's extend this to allow the association to be done using a name based
-> >> > lookup, which follows the similar concept as for other resource types, such as
-> >> > clocks for example.
-> >> >
-> >> > Ulf Hansson (3):
-> >> >   PM / Domains: dt: Add a power-domain-names property
-> >> >   PM / Domains: Introduce option to attach a device by name to genpd
-> >> >   PM / Domains: Introduce dev_pm_domain_attach_by_name()
-> >>
-> >> Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
-> >>
-> >>
-> >
-> > Do we need Rob to ACK the binding change?
-> >
-> 
-> Normally, yes, however, the change to binding is trivial and the
-> concept of using a names property isn't something new. I would be
-> highly surprised if he would object.
-> 
-> I say apply it.
+Hi Stefan,
 
-OK, applied along with the other two.
+On 09/03/18 13:32, Stefan Wahren wrote:
+> This patch brings read-only support for the Raspberry Pi Customer OTP.
+> The driver accesses the OTP via the mailbox property interface
+> provided by the VPU firmware.
+> 
+> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+> ---
+>   drivers/nvmem/Kconfig           |  10 +++
+>   drivers/nvmem/Makefile          |   2 +
+>   drivers/nvmem/raspberrypi-otp.c | 138 ++++++++++++++++++++++++++++++++++++++++
+>   3 files changed, 150 insertions(+)
+>   create mode 100644 drivers/nvmem/raspberrypi-otp.c
 
-Thanks!
+Looks there are some pending trivial comments, are you planning to 
+resend this?
+
+--srini
