@@ -1,29 +1,27 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Wed, 11 Jul 2018 10:30:36 +0200
-Subject: [PATCH v2 00/18] Allwinner R40 HDMI refactoring
-In-Reply-To: <20180710203511.18454-1-jernej.skrabec@siol.net>
-References: <20180710203511.18454-1-jernej.skrabec@siol.net>
-Message-ID: <20180711083036.7attjq4hm5ay5gmn@flea>
+Date: Wed, 11 Jul 2018 10:34:38 +0200
+Subject: [PATCH v5 03/22] dt-bindings: sram: sunxi: Introduce new A10
+ binding for system-control
+In-Reply-To: <20180710080114.31469-4-paul.kocialkowski@bootlin.com>
+References: <20180710080114.31469-1-paul.kocialkowski@bootlin.com>
+ <20180710080114.31469-4-paul.kocialkowski@bootlin.com>
+Message-ID: <20180711083438.o2nwi3czsm2ku6p6@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 10, 2018 at 10:34:53PM +0200, Jernej Skrabec wrote:
-> This series fixes several issues found in R40 HDMI patch series after
-> it was applied. Conversation can be found here:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2018-June/586011.html
+On Tue, Jul 10, 2018 at 10:00:55AM +0200, Paul Kocialkowski wrote:
+> Following-up on the introduction of a new binding for the A64, this
+> introduces a system-control binding for the A10 as a replacement of
+> the sram-controller binding.
 > 
-> Patches are based on latest linux-next (next-20180710) and are ordered
-> in such way that they don't break R40 HDMI at any time. Because of that
-> I suggest that whole series goes through drm-misc to preserve that order.
+> This change is motivated by consistency with the Allwinner literature,
+> that mentions system control over SRAM controller. Moreover, the system
+> control block is sometimes used for more than SRAM (e.g. for muxing
+> related to the ethernet PHY).
 > 
-> I also tested those patches on H3 to make sure it doesn't break other
-> platforms. However, it would be nice to test for regressions also on
-> older SoCs (with DE1).
-> 
-> Best regards,
-> Jernej
+> Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 
-Applied all patches but the patch 10, thanks!
+Applied, thanks!
 Maxime
 
 -- 
@@ -36,4 +34,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180711/b874f59d/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180711/c4ebea48/attachment.sig>
