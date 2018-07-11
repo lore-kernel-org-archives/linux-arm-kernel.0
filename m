@@ -1,58 +1,103 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 11 Jul 2018 10:12:06 -0600
-Subject: [PATCH v2 1/2] dt: bindings: Add bindings for SDHCI Synopsys DWC
- MSHC
-In-Reply-To: <20180706152047.0b0a4944@xhacker.debian>
-References: <20180706151930.78b3024b@xhacker.debian>
- <20180706152047.0b0a4944@xhacker.debian>
-Message-ID: <20180711161206.GA1558@rob-hp-laptop>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Wed, 11 Jul 2018 17:13:54 +0100
+Subject: [PATCH v5 7/7] KVM: arm64: Add support for creating PUD hugepages
+ at stage 2
+In-Reply-To: <87zhyxoize.fsf@e105922-lin.cambridge.arm.com>
+References: <20180709143835.28971-1-punit.agrawal@arm.com>
+ <20180709144124.29164-1-punit.agrawal@arm.com>
+ <20180709144124.29164-7-punit.agrawal@arm.com>
+ <bbc3f286-be5b-d0dc-2037-54d5b995a0a5@arm.com>
+ <87zhyxoize.fsf@e105922-lin.cambridge.arm.com>
+Message-ID: <fe8b92a1-2584-61ab-39e2-4d3247f92c7c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 06, 2018 at 03:20:47PM +0800, Jisheng Zhang wrote:
-> Synopsys SDHCI compatible DesignWare Cores Mobile Storage Host
-> Controller can support eMMC/SD/SDIO. Add the bindings.
+On 11/07/18 17:05, Punit Agrawal wrote:
+> Suzuki K Poulose <Suzuki.Poulose@arm.com> writes:
 > 
-> Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
-> ---
->  .../bindings/mmc/sdhci-of-dwcmshc.txt         | 20 +++++++++++++++++++
->  1 file changed, 20 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mmc/sdhci-of-dwcmshc.txt
+>> On 09/07/18 15:41, Punit Agrawal wrote:
+>>> KVM only supports PMD hugepages at stage 2. Now that the various page
+>>> handling routines are updated, extend the stage 2 fault handling to
+>>> map in PUD hugepages.
+>>>
+>>> Addition of PUD hugepage support enables additional page sizes (e.g.,
+>>> 1G with 4K granule) which can be useful on cores that support mapping
+>>> larger block sizes in the TLB entries.
+>>>
+>>> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+>>> Cc: Christoffer Dall <christoffer.dall@arm.com>
+>>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>>> Cc: Russell King <linux@armlinux.org.uk>
+>>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>>> Cc: Will Deacon <will.deacon@arm.com>
+>>> ---
+>>>    arch/arm/include/asm/kvm_mmu.h         | 19 +++++++
+>>>    arch/arm64/include/asm/kvm_mmu.h       | 15 +++++
+>>>    arch/arm64/include/asm/pgtable-hwdef.h |  2 +
+>>>    arch/arm64/include/asm/pgtable.h       |  2 +
+>>>    virt/kvm/arm/mmu.c                     | 78 ++++++++++++++++++++++++--
+>>>    5 files changed, 112 insertions(+), 4 deletions(-)
+>>>
 > 
-> diff --git a/Documentation/devicetree/bindings/mmc/sdhci-of-dwcmshc.txt b/Documentation/devicetree/bindings/mmc/sdhci-of-dwcmshc.txt
-> new file mode 100644
-> index 000000000000..ee4253b33be2
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mmc/sdhci-of-dwcmshc.txt
-> @@ -0,0 +1,20 @@
-> +* Synopsys DesignWare Cores Mobile Storage Host Controller
-> +
-> +Required properties:
-> +- compatible: should be one of the following:
-> +    "snps,dwcmshc-sdhci"
+> [...]
+> 
+>>> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+>>> index a6d3ac9d7c7a..d8e2497e5353 100644
+>>> --- a/virt/kvm/arm/mmu.c
+>>> +++ b/virt/kvm/arm/mmu.c
+> 
+> [...]
+> 
+>>> @@ -1100,6 +1139,7 @@ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
+>>>    			  phys_addr_t addr, const pte_t *new_pte,
+>>>    			  unsigned long flags)
+>>>    {
+>>> +	pud_t *pud;
+>>>    	pmd_t *pmd;
+>>>    	pte_t *pte, old_pte;
+>>>    	bool iomap = flags & KVM_S2PTE_FLAG_IS_IOMAP;
+>>> @@ -1108,6 +1148,22 @@ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
+>>>    	VM_BUG_ON(logging_active && !cache);
+>>>      	/* Create stage-2 page table mapping - Levels 0 and 1 */
+>>> +	pud = stage2_get_pud(kvm, cache, addr);
+>>> +	if (!pud) {
+>>> +		/*
+>>> +		 * Ignore calls from kvm_set_spte_hva for unallocated
+>>> +		 * address ranges.
+>>> +		 */
+>>> +		return 0;
+>>> +	}
+>>> +
+>>> +	/*
+>>> +	 * While dirty page logging - dissolve huge PUD, then continue
+>>> +	 * on to allocate page.
+>>
+>> Punit,
+>>
+>> We don't seem to allocate a page here for the PUD entry, in case if it is dissolved
+>> or empty (i.e, stage2_pud_none(*pud) is true.).
+> 
+> I was trying to avoid duplicating the PUD allocation by reusing the
+> functionality in stage2_get_pmd().
+> 
+> Does the below updated comment help?
+> 
+> 	/*
+> 	 * While dirty page logging - dissolve huge PUD, it'll be
+> 	 * allocated in stage2_get_pmd().
+> 	 */
+> 
+> The other option is to duplicate the stage2_pud_none() case from
+> stage2_get_pmd() here.
 
-Needs to note that there must also be an SoC specific compatible.
+I think the explicit check for stage2_pud_none() suits better here.
+That would make it explicit that we are tearing down the entries
+from top to bottom. Also, we may be able to short cut for case
+where we know we just allocated a PUD page and hence we need another
+PMD level page.
 
-> +- reg: offset and length of the register set for the device.
-> +- interrupts: a single interrupt specifier.
-> +- clocks: Array of clocks required for SDHCI; requires at least one for
-> +    core clock.
-> +- clock-names: Array of names corresponding to clocks property; shall be
-> +    "core" for core clock and "bus" for optional bus clock.
-> +
-> +Example:
-> +	sdhci2: sdhci at aa0000 {
-> +		compatible = "snps,dwcmshc-sdhci";
-> +		reg = <0xaa0000 0x1000>;
-> +		interrupts = <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&emmcclk>;
-> +		bus-width = <8>;
-> +	}
-> -- 
-> 2.18.0
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Also, you are missing the comment about the assumption that stage2 PUD
+level always exist with 4k fixed IPA.
+
+Cheers
+Suzuki
