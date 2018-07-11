@@ -1,112 +1,66 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed, 11 Jul 2018 13:40:32 -0600
-Subject: [PATCH 22/25] dts: bindings: Document device tree binding for CATU
-In-Reply-To: <1531338035-11729-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1531338035-11729-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1531338035-11729-23-git-send-email-mathieu.poirier@linaro.org>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 11 Jul 2018 14:04:50 -0600
+Subject: [RFC PATCH v2 1/4] dt-bindings: misc: Add bindings for misc. BMC
+ control fields
+In-Reply-To: <20180711053122.30773-2-andrew@aj.id.au>
+References: <20180711053122.30773-1-andrew@aj.id.au>
+ <20180711053122.30773-2-andrew@aj.id.au>
+Message-ID: <20180711200450.GB17291@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Suzuki K Poulose <suzuki.poulose@arm.com>
+On Wed, Jul 11, 2018 at 03:01:19PM +0930, Andrew Jeffery wrote:
+> Baseboard Management Controllers (BMCs) are embedded SoCs that exist to
+> provide remote management of (primarily) server platforms. BMCs are
+> often tightly coupled to the platform in terms of behaviour and provide
+> many hardware features integral to booting and running the host system.
+> 
+> Some of these hardware features are simple, for example scratch
+> registers provided by the BMC that are exposed to both the host and the
+> BMC. In other cases there's a single bit switch to enable or disable
+> some of the provided functionality.
+> 
+> The documentation defines bindings for fields in registers that do not
+> integrate well into other driver models yet must be described to allow
+> the BMC kernel to assume control of these features.
 
-Document CATU device-tree bindings. CATU augments the TMC-ETR
-by providing an improved Scatter Gather mechanism for streaming
-trace data to non-contiguous system RAM pages.
+So we'll get a new binding when that happens? That will break 
+compatibility.
 
-Cc: devicetree at vger.kernel.org
-Cc: frowand.list at gmail.com
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-Reviewed-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
----
- .../devicetree/bindings/arm/coresight.txt          | 53 ++++++++++++++++++++++
- 1 file changed, 53 insertions(+)
+> 
+> Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
+> ---
+> 
+> Since RFC v1:
+> 
+> * Add a commit message
+> * Minor changes to documented labels
+> 
+>  .../bindings/misc/bmc-misc-ctrl.txt           | 252 ++++++++++++++++++
+>  MAINTAINERS                                   |   6 +
+>  2 files changed, 258 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/misc/bmc-misc-ctrl.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/misc/bmc-misc-ctrl.txt b/Documentation/devicetree/bindings/misc/bmc-misc-ctrl.txt
+> new file mode 100644
+> index 000000000000..2c869fcc7ef2
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/misc/bmc-misc-ctrl.txt
+> @@ -0,0 +1,252 @@
+> +BMC Miscellaneous Control Interfaces
+> +====================================
+> +
+> +Baseboard Management Controllers (BMCs) often have an array of hardware
+> +features that need to be described but are awkward to sensibly expose.
+> +
+> +This bindings document provides a generic mechanism for describing such
+> +features, covering read-only (RO), read-modify-write (RMW) and
+> +write-1-set/write-1-clear (W1SC) semantics.
 
-diff --git a/Documentation/devicetree/bindings/arm/coresight.txt b/Documentation/devicetree/bindings/arm/coresight.txt
-index 9aa30a156b57..5d1ad09bafb4 100644
---- a/Documentation/devicetree/bindings/arm/coresight.txt
-+++ b/Documentation/devicetree/bindings/arm/coresight.txt
-@@ -39,6 +39,8 @@ its hardware characteristcs.
- 
- 		- System Trace Macrocell:
- 			"arm,coresight-stm", "arm,primecell"; [1]
-+		- Coresight Address Translation Unit (CATU)
-+			"arm,coresight-catu", "arm,primecell";
- 
- 	* reg: physical base address and length of the register
- 	  set(s) of the component.
-@@ -90,6 +92,10 @@ its hardware characteristcs.
- 	* arm,scatter-gather: boolean. Indicates that the TMC-ETR can safely
- 	  use the SG mode on this system.
- 
-+* Optional property for CATU :
-+	* interrupts : Exactly one SPI may be listed for reporting the address
-+	  error
-+
- Example:
- 
- 1. Sinks
-@@ -121,6 +127,35 @@ Example:
- 		};
- 	};
- 
-+	etr at 20070000 {
-+		compatible = "arm,coresight-tmc", "arm,primecell";
-+		reg = <0 0x20070000 0 0x1000>;
-+
-+		clocks = <&oscclk6a>;
-+		clock-names = "apb_pclk";
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			/* input port */
-+			port at 0 {
-+				reg =  <0>;
-+				etr_in_port: endpoint {
-+					slave-mode;
-+					remote-endpoint = <&replicator2_out_port0>;
-+				};
-+			};
-+
-+			/* CATU link represented by output port */
-+			port at 1 {
-+				reg = <1>;
-+				etr_out_port: endpoint {
-+					remote-endpoint = <&catu_in_port>;
-+				};
-+			};
-+		};
-+	};
-+
- 2. Links
- 	replicator {
- 		/* non-configurable replicators don't show up on the
-@@ -250,5 +285,23 @@ Example:
- 		};
- 	};
- 
-+5. CATU
-+
-+	catu at 207e0000 {
-+		compatible = "arm,coresight-catu", "arm,primecell";
-+		reg = <0 0x207e0000 0 0x1000>;
-+
-+		clocks = <&oscclk6a>;
-+		clock-names = "apb_pclk";
-+
-+		interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
-+		port {
-+			catu_in_port: endpoint {
-+				slave-mode;
-+				remote-endpoint = <&etr_out_port>;
-+			};
-+		};
-+	};
-+
- [1]. There is currently two version of STM: STM32 and STM500.  Both
- have the same HW interface and as such don't need an explicit binding name.
--- 
-2.7.4
+If we wanted a generic mechanism for single register bits/fields in DT, 
+we'd have one already. A node per register bit doesn't scale.
+
+Maybe this should be modelled using GPIO binding? There's a line there 
+too as whether the signals are "general purpose" or not.
+
+Rob
