@@ -1,184 +1,221 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Wed, 11 Jul 2018 16:41:51 +0900
-Subject: [PATCH v11 03/15] powerpc,
- kexec_file: factor out memblock-based arch_kexec_walk_mem()
+Date: Wed, 11 Jul 2018 16:41:58 +0900
+Subject: [PATCH v11 10/15] arm64: kexec_file: allow for loading Image-format
+ kernel
 In-Reply-To: <20180711074203.3019-1-takahiro.akashi@linaro.org>
 References: <20180711074203.3019-1-takahiro.akashi@linaro.org>
-Message-ID: <20180711074203.3019-4-takahiro.akashi@linaro.org>
+Message-ID: <20180711074203.3019-11-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Memblock list is another source for usable system memory layout.
-So powerpc's arch_kexec_walk_mem() is moved to kexec_file.c so that
-other memblock-based architectures, particularly arm64, can also utilise
-it. A moved function is now renamed to kexec_walk_memblock() and merged
-into the existing arch_kexec_walk_mem() for general use, either resource
-list or memblock list.
+This patch provides kexec_file_ops for "Image"-format kernel. In this
+implementation, a binary is always loaded with a fixed offset identified
+in text_offset field of its header.
 
-A consequent function will not work for kdump with memblock list, but
-this will be fixed in the next patch.
+Regarding signature verification for trusted boot, this patch doesn't
+contains CONFIG_KEXEC_VERIFY_SIG support, which is to be added later
+in this series, but file-attribute-based verification is still a viable
+option by enabling IMA security subsystem.
+
+You can sign(label) a to-be-kexec'ed kernel image on target file system
+with:
+    $ evmctl ima_sign --key /path/to/private_key.pem Image
+
+On live system, you must have IMA enforced with, at least, the following
+security policy:
+    "appraise func=KEXEC_KERNEL_CHECK appraise_type=imasig"
+
+See more details about IMA here:
+    https://sourceforge.net/p/linux-ima/wiki/Home/
 
 Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-Cc: "Eric W. Biederman" <ebiederm@xmission.com>
-Cc: Dave Young <dyoung@redhat.com>
-Cc: Vivek Goyal <vgoyal@redhat.com>
-Cc: Baoquan He <bhe@redhat.com>
-Acked-by: James Morse <james.morse@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/powerpc/kernel/machine_kexec_file_64.c | 54 ---------------------
- kernel/kexec_file.c                         | 54 +++++++++++++++++++++
- 2 files changed, 54 insertions(+), 54 deletions(-)
+ arch/arm64/include/asm/kexec.h         |  28 +++++++
+ arch/arm64/kernel/Makefile             |   2 +-
+ arch/arm64/kernel/kexec_image.c        | 108 +++++++++++++++++++++++++
+ arch/arm64/kernel/machine_kexec_file.c |   1 +
+ 4 files changed, 138 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm64/kernel/kexec_image.c
 
-diff --git a/arch/powerpc/kernel/machine_kexec_file_64.c b/arch/powerpc/kernel/machine_kexec_file_64.c
-index 0bd23dc789a4..5357b09902c5 100644
---- a/arch/powerpc/kernel/machine_kexec_file_64.c
-+++ b/arch/powerpc/kernel/machine_kexec_file_64.c
-@@ -24,7 +24,6 @@
+diff --git a/arch/arm64/include/asm/kexec.h b/arch/arm64/include/asm/kexec.h
+index 01bbf6cebf12..69333694e3e2 100644
+--- a/arch/arm64/include/asm/kexec.h
++++ b/arch/arm64/include/asm/kexec.h
+@@ -101,6 +101,34 @@ struct kimage_arch {
+ 	void *dtb_buf;
+ };
  
- #include <linux/slab.h>
- #include <linux/kexec.h>
--#include <linux/memblock.h>
- #include <linux/of_fdt.h>
- #include <linux/libfdt.h>
- #include <asm/ima.h>
-@@ -46,59 +45,6 @@ int arch_kexec_kernel_image_probe(struct kimage *image, void *buf,
- 	return kexec_image_probe_default(image, buf, buf_len);
- }
- 
--/**
-- * arch_kexec_walk_mem - call func(data) for each unreserved memory block
-- * @kbuf:	Context info for the search. Also passed to @func.
-- * @func:	Function to call for each memory block.
-- *
-- * This function is used by kexec_add_buffer and kexec_locate_mem_hole
-- * to find unreserved memory to load kexec segments into.
-- *
-- * Return: The memory walk will stop when func returns a non-zero value
-- * and that value will be returned. If all free regions are visited without
-- * func returning non-zero, then zero will be returned.
-- */
--int arch_kexec_walk_mem(struct kexec_buf *kbuf,
--			int (*func)(struct resource *, void *))
--{
--	int ret = 0;
--	u64 i;
--	phys_addr_t mstart, mend;
--	struct resource res = { };
--
--	if (kbuf->top_down) {
--		for_each_free_mem_range_reverse(i, NUMA_NO_NODE, 0,
--						&mstart, &mend, NULL) {
--			/*
--			 * In memblock, end points to the first byte after the
--			 * range while in kexec, end points to the last byte
--			 * in the range.
--			 */
--			res.start = mstart;
--			res.end = mend - 1;
--			ret = func(&res, kbuf);
--			if (ret)
--				break;
--		}
--	} else {
--		for_each_free_mem_range(i, NUMA_NO_NODE, 0, &mstart, &mend,
--					NULL) {
--			/*
--			 * In memblock, end points to the first byte after the
--			 * range while in kexec, end points to the last byte
--			 * in the range.
--			 */
--			res.start = mstart;
--			res.end = mend - 1;
--			ret = func(&res, kbuf);
--			if (ret)
--				break;
--		}
--	}
--
--	return ret;
--}
--
- /**
-  * setup_purgatory - initialize the purgatory's global variables
-  * @image:		kexec image.
-diff --git a/kernel/kexec_file.c b/kernel/kexec_file.c
-index 63c7ce1c0c3e..b088324fb3ad 100644
---- a/kernel/kexec_file.c
-+++ b/kernel/kexec_file.c
-@@ -16,6 +16,7 @@
- #include <linux/file.h>
- #include <linux/slab.h>
- #include <linux/kexec.h>
-+#include <linux/memblock.h>
- #include <linux/mutex.h>
- #include <linux/list.h>
- #include <linux/fs.h>
-@@ -501,6 +502,55 @@ static int locate_mem_hole_callback(struct resource *res, void *arg)
- 	return locate_mem_hole_bottom_up(start, end, kbuf);
- }
- 
-+#if defined(CONFIG_HAVE_MEMBLOCK) && !defined(CONFIG_ARCH_DISCARD_MEMBLOCK)
-+static int kexec_walk_memblock(struct kexec_buf *kbuf,
-+			       int (*func)(struct resource *, void *))
-+{
-+	int ret = 0;
-+	u64 i;
-+	phys_addr_t mstart, mend;
-+	struct resource res = { };
++/**
++ * struct arm64_image_header - arm64 kernel image header
++ * See Documentation/arm64/booting.txt for details
++ *
++ * @mz_magic: DOS header magic number ('MZ', optional)
++ * @code1: Instruction (branch to stext)
++ * @text_offset: Image load offset
++ * @image_size: Effective image size
++ * @flags: Bit-field flags
++ * @reserved: Reserved
++ * @magic: Magic number
++ * @pe_header: Offset to PE COFF header (optional)
++ **/
 +
-+	if (kbuf->top_down) {
-+		for_each_free_mem_range_reverse(i, NUMA_NO_NODE, 0,
-+						&mstart, &mend, NULL) {
-+			/*
-+			 * In memblock, end points to the first byte after the
-+			 * range while in kexec, end points to the last byte
-+			 * in the range.
-+			 */
-+			res.start = mstart;
-+			res.end = mend - 1;
-+			ret = func(&res, kbuf);
-+			if (ret)
-+				break;
-+		}
-+	} else {
-+		for_each_free_mem_range(i, NUMA_NO_NODE, 0, &mstart, &mend,
-+					NULL) {
-+			/*
-+			 * In memblock, end points to the first byte after the
-+			 * range while in kexec, end points to the last byte
-+			 * in the range.
-+			 */
-+			res.start = mstart;
-+			res.end = mend - 1;
-+			ret = func(&res, kbuf);
-+			if (ret)
-+				break;
-+		}
-+	}
++struct arm64_image_header {
++	__le16 mz_magic; /* also code0 */
++	__le16 pad;
++	__le32 code1;
++	__le64 text_offset;
++	__le64 image_size;
++	__le64 flags;
++	__le64 reserved[3];
++	__le32 magic;
++	__le32 pe_header;
++};
 +
-+	return ret;
-+}
-+#else
-+static int kexec_walk_memblock(struct kexec_buf *kbuf,
-+			       int (*func)(struct resource *, void *))
++extern const struct kexec_file_ops kexec_image_ops;
++
+ struct kimage;
+ 
+ extern int load_other_segments(struct kimage *image,
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index 06281e1ad7ed..a9cc7752f276 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -50,7 +50,7 @@ arm64-obj-$(CONFIG_RANDOMIZE_BASE)	+= kaslr.o
+ arm64-obj-$(CONFIG_HIBERNATION)		+= hibernate.o hibernate-asm.o
+ arm64-obj-$(CONFIG_KEXEC_CORE)		+= machine_kexec.o relocate_kernel.o	\
+ 					   cpu-reset.o
+-arm64-obj-$(CONFIG_KEXEC_FILE)		+= machine_kexec_file.o
++arm64-obj-$(CONFIG_KEXEC_FILE)		+= machine_kexec_file.o kexec_image.o
+ arm64-obj-$(CONFIG_ARM64_RELOC_TEST)	+= arm64-reloc-test.o
+ arm64-reloc-test-y := reloc_test_core.o reloc_test_syms.o
+ arm64-obj-$(CONFIG_CRASH_DUMP)		+= crash_dump.o
+diff --git a/arch/arm64/kernel/kexec_image.c b/arch/arm64/kernel/kexec_image.c
+new file mode 100644
+index 000000000000..a47cf9bc699e
+--- /dev/null
++++ b/arch/arm64/kernel/kexec_image.c
+@@ -0,0 +1,108 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Kexec image loader
++
++ * Copyright (C) 2018 Linaro Limited
++ * Author: AKASHI Takahiro <takahiro.akashi@linaro.org>
++ */
++
++#define pr_fmt(fmt)	"kexec_file(Image): " fmt
++
++#include <linux/err.h>
++#include <linux/errno.h>
++#include <linux/kernel.h>
++#include <linux/kexec.h>
++#include <linux/string.h>
++#include <asm/boot.h>
++#include <asm/byteorder.h>
++#include <asm/cpufeature.h>
++#include <asm/memory.h>
++
++static int image_probe(const char *kernel_buf, unsigned long kernel_len)
 +{
++	const struct arm64_image_header *h;
++
++	h = (const struct arm64_image_header *)(kernel_buf);
++
++	if (!h || (kernel_len < sizeof(*h)) ||
++			!memcmp(&h->magic, ARM64_MAGIC, sizeof(ARM64_MAGIC)))
++		return -EINVAL;
++
 +	return 0;
 +}
-+#endif
 +
- /**
-  * arch_kexec_walk_mem - call func(data) on free memory regions
-  * @kbuf:	Context info for the search. Also passed to @func.
-@@ -513,6 +563,10 @@ static int locate_mem_hole_callback(struct resource *res, void *arg)
- int __weak arch_kexec_walk_mem(struct kexec_buf *kbuf,
- 			       int (*func)(struct resource *, void *))
- {
-+	if (IS_ENABLED(CONFIG_HAVE_MEMBLOCK) &&
-+			!IS_ENABLED(CONFIG_ARCH_DISCARD_MEMBLOCK))
-+		return kexec_walk_memblock(kbuf, func);
++static void *image_load(struct kimage *image,
++				char *kernel, unsigned long kernel_len,
++				char *initrd, unsigned long initrd_len,
++				char *cmdline, unsigned long cmdline_len)
++{
++	struct arm64_image_header *h;
++	u64 flags, value;
++	struct kexec_buf kbuf;
++	unsigned long text_offset;
++	struct kexec_segment *kernel_segment;
++	int ret;
 +
- 	if (kbuf->image->type == KEXEC_TYPE_CRASH)
- 		return walk_iomem_res_desc(crashk_res.desc,
- 					   IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY,
++	/* Don't support old kernel */
++	h = (struct arm64_image_header *)kernel;
++	if (!h->text_offset)
++		return ERR_PTR(-EINVAL);
++
++	/* Check cpu features */
++	flags = le64_to_cpu(h->flags);
++	value = head_flag_field(flags, HEAD_FLAG_BE);
++	if (((value == HEAD_FLAG_BE) && !IS_ENABLED(CONFIG_CPU_BIG_ENDIAN)) ||
++	    ((value != HEAD_FLAG_BE) && IS_ENABLED(CONFIG_CPU_BIG_ENDIAN)))
++		if (!system_supports_mixed_endian())
++			return ERR_PTR(-EINVAL);
++
++	value = head_flag_field(flags, HEAD_FLAG_PAGE_SIZE);
++	if (((value == HEAD_FLAG_PAGE_SIZE_4K) &&
++			!system_supports_4kb_granule()) ||
++	    ((value == HEAD_FLAG_PAGE_SIZE_64K) &&
++			!system_supports_64kb_granule()) ||
++	    ((value == HEAD_FLAG_PAGE_SIZE_16K) &&
++			!system_supports_16kb_granule()))
++		return ERR_PTR(-EINVAL);
++
++	/* Load the kernel */
++	kbuf.image = image;
++	kbuf.buf_min = 0;
++	kbuf.buf_max = ULONG_MAX;
++	kbuf.top_down = false;
++
++	kbuf.buffer = kernel;
++	kbuf.bufsz = kernel_len;
++	kbuf.memsz = le64_to_cpu(h->image_size);
++	text_offset = le64_to_cpu(h->text_offset);
++	kbuf.buf_align = SZ_2M;
++
++	/* Adjust kernel segment with TEXT_OFFSET */
++	kbuf.memsz += text_offset;
++
++	ret = kexec_add_buffer(&kbuf);
++	if (ret)
++		goto out;
++
++	kernel_segment = &image->segment[image->nr_segments - 1];
++	kernel_segment->mem += text_offset;
++	kernel_segment->memsz -= text_offset;
++	image->start = kernel_segment->mem;
++
++	pr_debug("Loaded kernel at 0x%lx bufsz=0x%lx memsz=0x%lx\n",
++				kernel_segment->mem, kbuf.bufsz,
++				kernel_segment->memsz);
++
++	/* Load additional data */
++	ret = load_other_segments(image,
++				kernel_segment->mem, kernel_segment->memsz,
++				initrd, initrd_len, cmdline, cmdline_len);
++
++out:
++	return ERR_PTR(ret);
++}
++
++const struct kexec_file_ops kexec_image_ops = {
++	.probe = image_probe,
++	.load = image_load,
++};
+diff --git a/arch/arm64/kernel/machine_kexec_file.c b/arch/arm64/kernel/machine_kexec_file.c
+index ca00681c25c6..a0b44fe18b95 100644
+--- a/arch/arm64/kernel/machine_kexec_file.c
++++ b/arch/arm64/kernel/machine_kexec_file.c
+@@ -20,6 +20,7 @@
+ #include <asm/byteorder.h>
+ 
+ const struct kexec_file_ops * const kexec_file_loaders[] = {
++	&kexec_image_ops,
+ 	NULL
+ };
+ 
 -- 
 2.17.0
