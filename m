@@ -1,113 +1,122 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Wed, 11 Jul 2018 12:26:55 +0200
-Subject: v4.18-rc2 on droid4: screen turns red
-In-Reply-To: <20180630131812.GA549@amd>
-References: <20180630131812.GA549@amd>
-Message-ID: <20180711102655.GA6864@amd>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 11 Jul 2018 12:31:59 +0200
+Subject: [PATCH V4 5/5] soc: imx: add SC firmware IPC and APIs
+In-Reply-To: <AM0PR04MB421186AD7C08E94CADFDD394805A0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+References: <1531061817-1980-1-git-send-email-aisheng.dong@nxp.com>
+ <1531061817-1980-6-git-send-email-aisheng.dong@nxp.com>
+ <20180710144454.lmz62g76xu7ieohr@pengutronix.de>
+ <AM0PR04MB421186AD7C08E94CADFDD394805A0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+Message-ID: <20180711103159.jxmgksxawjmiukaf@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On Wed, Jul 11, 2018 at 09:18:06AM +0000, A.s. Dong wrote:
+> > -----Original Message-----
+> > From: Sascha Hauer [mailto:s.hauer at pengutronix.de]
+> > Sent: Tuesday, July 10, 2018 10:45 PM
+> > To: A.s. Dong <aisheng.dong@nxp.com>
+> > Cc: linux-arm-kernel at lists.infradead.org; dongas86 at gmail.com; dl-linux-imx
+> > <linux-imx@nxp.com>; kernel at pengutronix.de; Fabio Estevam
+> > <fabio.estevam@nxp.com>; shawnguo at kernel.org
+> > Subject: Re: [PATCH V4 5/5] soc: imx: add SC firmware IPC and APIs
+> > 
+> > Hi,
+> > 
+> > Thank you for removing the majority of this patch. It really helps readability.
+> > 
+> > On Sun, Jul 08, 2018 at 10:56:57PM +0800, Dong Aisheng wrote:
+> > > +/* Initialization of the MU code. */
+> > > +static int imx_sc_probe(struct platform_device *pdev) {
+> > > +	struct device *dev = &pdev->dev;
+> > > +	int ret;
+> > > +
+> > > +	ret = sc_ipc_open(&scu_ipc_handle, dev);
+> > > +	if (ret)
+> > > +		return ret;
+> > > +
+> > > +	pr_info("NXP i.MX SCU Initialized\n");
+> > > +
+> > > +	return devm_of_platform_populate(dev); }
+> > 
+> > I see that you have turned the SCU code into a driver and I really welcome
+> > that. Now when you have a driver a global scu_ipc_handle is no longer
+> > necessary. You can call platform_set_drvdata(pdev, sc_ipc); and can get that
+> > from the child devices using
+> > dev_get_drvdata(pdev->dev.parent) like for example most mfd devices do.
+> > 
+> 
+> It looks like a good idea.
+> One question: That means that the SCU users much have a node under SCU node
+> and have struct device point, it seems ok for all normal devices like clk, pinctrl, pd.
+> But I found some special device like soc device which does not have node and struct
+> device, but also use SCU. How to treat for those devices? Possible anymore of them?
 
-> After longer inactivity, attempt to wake up the screen results in
-> screen being completely red. Not too useful. I can still connect over
-> ssh.
+Not sure. What kind of device is it? I'm sure we'll find a solution so
+maybe ask again once we are there?
 
-Still there in -rc4 :-(. But happens only once in a few days for me...
+> > This can be embedded into structs that the consumers (like clock driver) use.
+> > 
+> 
+> Did you mean something like below (similar as TI does):
+> 
+> struct sc_rpc_msg {
+>         uint8_t ver;
+>         uint8_t size; 
+>         uint8_t svc;
+>         uint8_t func; 
+> };
+> 
+> // we need have two structures for each type SCU request and response       
+> struct imx_sc_msg_req_get_clock_rate {
+>         struct sc_rpc_msg hdr;
+>         u16 resource;
+>         u8 clk;
+> } __packed;
+> 
+> struct imx_sc_msg_resp_get_clock_rate {
+>         struct sc_rpc_msg hdr;
+>         u32 rate;
+> } __packed;
+> 
+> sc_err_t sc_pm_get_clock_rate(sc_ipc_t ipc, sc_rsrc_t resource,
+>                               sc_pm_clk_t clk, sc_pm_clock_rate_t *rate)
+> {
+>         struct imx_sc_msg_req_get_clock_rate *msg;
+>         struct imx_sc_msg_resp_get_clock_rate *resp;
+>         struct sc_rpc_msg *hdr = &msg->hdr;
+>         uint8_t result;
+>         int ret;
+> 
+>         hdr->ver = SC_RPC_VERSION;
+>         hdr->svc = (uint8_t)SC_RPC_SVC_PM;
+>         hdr->func = (uint8_t)PM_FUNC_GET_CLOCK_RATE;
+>         hdr->size = 2;
+> 
+>         msg->resource = resource;
+>         msg->clk = clk;
+> 
+>         ret = sc_call_rpc(ipc, &msg, false);
+>         if (ret)
+>                 return SC_ERR_FAIL;
+> 
+>         resp = (struct imx_sc_msg_resp_get_clock_rate *)msg;
+>         if (rate != NULL)
+>                 *rate = resp->rate;
+> 
+>         result = resp->hdr.func;
+>         return (sc_err_t)result;
+> }
+> 
+> Are you okay with this?
 
-When X is shut down, text console works ok.
-      	       	    	     	     	       	    	Pavel
-> 
-> This happens all the time:
-> 
-> Jun 30 11:34:08 devuan kernel: [  143.605499] ------------[ cut here
-> ]------------
-> Jun 30 11:34:08 devuan kernel: [  143.610168] WARNING: CPU: 1 PID:
-> 2220 at drivers/gpu/drm/omapdrm/
-> dss/hdmi4.c:667 hdmi_audio_stop+0x5c/0x68
-> Jun 30 11:34:08 devuan kernel: [  143.619873] Modules linked in:
-> Jun 30 11:34:08 devuan kernel: [  143.622955] CPU: 1 PID: 2220 Comm:
-> pulseaudio Not tainted 4.18.0-
-> rc2-88315-g3452793-dirty #756
-> Jun 30 11:34:08 devuan kernel: [  143.631591] Hardware name: Generic
-> OMAP4 (Flattened Device Tree)
-> Jun 30 11:34:08 devuan kernel: [  143.637634] [<c010f6cc>]
-> (unwind_backtrace) from [<c010ba50>] (sh
-> ow_stack+0x10/0x14)
-> Jun 30 11:34:08 devuan kernel: [  143.645446] [<c010ba50>]
-> (show_stack) from [<c086d7ec>] (dump_sta
-> ck+0x8c/0xac)
-> Jun 30 11:34:08 devuan kernel: [  143.652740] [<c086d7ec>]
-> (dump_stack) from [<c012d364>] (__warn+0
-> xe8/0x114)
-> Jun 30 11:34:08 devuan kernel: [  143.659729] [<c012d364>] (__warn)
-> from [<c012d3cc>] (warn_slowpath_null+0x3c/0x48)
-> Jun 30 11:34:08 devuan kernel: [  143.667358] [<c012d3cc>]
-> (warn_slowpath_null) from [<c047b7dc>] (hdmi_audio_stop+0x5c/0x68)
-> Jun 30 11:34:08 devuan kernel: [  143.675750] [<c047b7dc>]
-> (hdmi_audio_stop) from [<c06a9824>] (hdmi_dai_trigger+0x6c/0x88)
-> Jun 30 11:34:08 devuan kernel: [  143.683990] [<c06a9824>]
-> (hdmi_dai_trigger) from [<c06990d0>] (soc_pcm_trigger+0xf0/0x130)
-> Jun 30 11:34:08 devuan kernel: [  143.692291] [<c06990d0>]
-> (soc_pcm_trigger) from [<c067a9f4>] (snd_pcm_do_stop+0x54/0x58)
-> Jun 30 11:34:08 devuan kernel: [  143.700439] [<c067a9f4>]
-> (snd_pcm_do_stop) from [<c067a7a4>] (snd_pcm_action_single+0x38/0x78)
-> Jun 30 11:34:08 devuan kernel: [  143.709075] [<c067a7a4>]
-> (snd_pcm_action_single) from [<c067c468>] (snd_pcm_drop+0x48/0x94)
-> Jun 30 11:34:08 devuan kernel: [  143.717468] [<c067c468>]
-> (snd_pcm_drop) from [<c067d508>] (snd_pcm_ioctl+0x870/0x1180)
-> Jun 30 11:34:08 devuan kernel: [  143.725433] [<c067d508>]
-> (snd_pcm_ioctl) from [<c0215944>] (do_vfs_ioctl+0x80/0x960)
-> Jun 30 11:34:08 devuan kernel: [  143.733215] [<c0215944>]
-> (do_vfs_ioctl) from [<c0216280>] (ksys_ioctl+0x5c/0x80)
-> Jun 30 11:34:08 devuan kernel: [  143.740661] [<c0216280>]
-> (ksys_ioctl) from [<c0101000>] (ret_fast_syscall+0x0/0x54)
-> Jun 30 11:34:08 devuan kernel: [  143.748352] Exception
-> stack(0xeb8fffa8 to 0xeb8ffff0)
-> Jun 30 11:34:08 devuan kernel: [  143.753448] ffa0:
-> 005129b0 b1971394 00000015 00004143 00000000 00512960
-> 
-> 
-> This is probably unrelated:
-> 
-> [13215.125732] cpcap-usb-phy cpcap-usb-phy.0: connected to USB host
-> [13245.205535] cpcap-usb-phy cpcap-usb-phy.0: connected to USB host
-> [13252.969940] power_supply battery: driver failed to report
-> `power_now' property: -22
-> [13275.285369] cpcap-usb-phy cpcap-usb-phy.0: connected to USB host
-> [13291.993652] Charging, 4350000 uV, 532000 uA
-> [13292.001708] Charging, 4350000 uV, 532000 uA
-> [13305.364837] cpcap-usb-phy cpcap-usb-phy.0: connected to USB host
-> [13335.445037] cpcap-usb-phy cpcap-usb-phy.0: connected to USB host
-> [13365.524291] cpcap-usb-phy cpcap-usb-phy.0: connected to USB host
-> [13372.940093] power_supply battery: driver failed to report
-> `power_now' property: -22
-> [13383.554412] g_ether gadget: packet filter 0e
-> [13383.558715] g_ether gadget: ecm req21.43 v000e i0000 l0
-> [13383.580261] g_ether gadget: notify connect true
-> [13383.612243] g_ether gadget: notify speed 425984000
-> [13387.213256] cpcap_adc cpcap_adc.0: error reading ADC: -110
-> [13387.218780] cpcap_battery cpcap_battery.0:
-> cpcap_battery_get_voltage failed: -110
-> [13387.523254] cpcap_adc cpcap_adc.0: error reading ADC: -110
-> [13387.528778] cpcap_battery cpcap_battery.0:
-> cpcap_battery_get_current failed: -110
-> 
-> Ideas welcome.
-> 
-> Best regards,
-> 							Pavel
-> 
+Yes, that's what I meant. Put this function into the clock driver
+directly rather than in the SCU code and we are done.
 
+Sascha
 
 
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180711/e133154b/attachment.sig>
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
