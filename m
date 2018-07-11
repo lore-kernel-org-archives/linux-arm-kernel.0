@@ -1,21 +1,51 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 11 Jul 2018 13:37:30 -0600
-Subject: [PATCH v2 1/2] dt-bindings: reset: uniphier: add USB3 core reset
- support
-In-Reply-To: <1531185257-16444-2-git-send-email-hayashi.kunihiko@socionext.com>
-References: <1531185257-16444-1-git-send-email-hayashi.kunihiko@socionext.com>
- <1531185257-16444-2-git-send-email-hayashi.kunihiko@socionext.com>
-Message-ID: <20180711193730.GA31593@rob-hp-laptop>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Wed, 11 Jul 2018 13:40:13 -0600
+Subject: [PATCH 03/25] coresight: Remove function coresight_vpid_to_pid()
+In-Reply-To: <1531338035-11729-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1531338035-11729-1-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1531338035-11729-4-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 10, 2018 at 10:14:16AM +0900, Kunihiko Hayashi wrote:
-> Add DT bindings for reset control of USB3 core implemented in UniPhier SoCs.
-> The reset control belongs to USB3 glue layer.
-> 
-> Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
-> ---
->  .../devicetree/bindings/reset/uniphier-reset.txt   | 56 ++++++++++++++++++++++
->  1 file changed, 56 insertions(+)
+Now that we prevent users from using contextID tracing when PID namespaces
+are involved there is no client for function coresight_vpid_to_pid().  As
+such simply remove it.
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+Reviewed-by: Kim Phillips <kim.phillips@arm.com>
+Acked-by: "Eric W. Biederman" <ebiederm@xmission.com>
+---
+ include/linux/coresight.h | 20 --------------------
+ 1 file changed, 20 deletions(-)
+
+diff --git a/include/linux/coresight.h b/include/linux/coresight.h
+index c265e0468414..e5421b83e4e6 100644
+--- a/include/linux/coresight.h
++++ b/include/linux/coresight.h
+@@ -267,24 +267,4 @@ static inline struct coresight_platform_data *of_get_coresight_platform_data(
+ 	struct device *dev, const struct device_node *node) { return NULL; }
+ #endif
+ 
+-#ifdef CONFIG_PID_NS
+-static inline unsigned long
+-coresight_vpid_to_pid(unsigned long vpid)
+-{
+-	struct task_struct *task = NULL;
+-	unsigned long pid = 0;
+-
+-	rcu_read_lock();
+-	task = find_task_by_vpid(vpid);
+-	if (task)
+-		pid = task_pid_nr(task);
+-	rcu_read_unlock();
+-
+-	return pid;
+-}
+-#else
+-static inline unsigned long
+-coresight_vpid_to_pid(unsigned long vpid) { return vpid; }
+-#endif
+-
+ #endif
+-- 
+2.7.4
