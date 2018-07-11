@@ -1,70 +1,74 @@
-From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
-Date: Wed, 11 Jul 2018 09:54:44 -0700
-Subject: [PATCH] i2c: aspeed: Fix initial values of master and slave state
-In-Reply-To: <CAFd5g45=SkyLWRy=DnYOZCXcmHkrbTdOSBi=n=kUgyvRPoU8Mg@mail.gmail.com>
-References: <20180702212028.30824-1-jae.hyun.yoo@linux.intel.com>
- <CAFd5g45=SkyLWRy=DnYOZCXcmHkrbTdOSBi=n=kUgyvRPoU8Mg@mail.gmail.com>
-Message-ID: <37586a32-852c-9b18-cb01-a7448072527c@linux.intel.com>
+From: ray.jui@broadcom.com (Ray Jui)
+Date: Wed, 11 Jul 2018 09:56:13 -0700
+Subject: [PATCH -next] pinctrl: nsp: fix potential NULL dereference in
+ nsp_pinmux_probe()
+In-Reply-To: <7b4361a5-f757-179c-57b6-44359801baad@broadcom.com>
+References: <1531312461-134547-1-git-send-email-weiyongjun1@huawei.com>
+ <7b4361a5-f757-179c-57b6-44359801baad@broadcom.com>
+Message-ID: <0bd31938-7bf4-134c-18e7-cdcd12b6b370@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/10/2018 10:47 PM, Brendan Higgins wrote:
-> On Mon, Jul 2, 2018 at 2:20 PM Jae Hyun Yoo
-> <jae.hyun.yoo@linux.intel.com> wrote:
+
+
+On 7/11/2018 9:48 AM, Ray Jui wrote:
+> 
+> 
+> On 7/11/2018 5:34 AM, Wei Yongjun wrote:
+>> platform_get_resource() may fail and return NULL, so we should
+>> better check it's return value to avoid a NULL pointer dereference
+>> a bit later in the code.
 >>
->> This patch changes the order of enum aspeed_i2c_master_state and
->> enum aspeed_i2c_slave_state defines to make their initial value to
->> ASPEED_I2C_MASTER_INACTIVE and ASPEED_I2C_SLAVE_STOP respectively.
->> In case of multi-master use, if a slave data comes ahead of the
->> first master xfer, master_state starts from an invalid state so
->> this change fixes the issue.
+>> This is detected by Coccinelle semantic patch.
 >>
->> Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
+>> @@
+>> expression pdev, res, n, t, e, e1, e2;
+>> @@
+>>
+>> res = platform_get_resource(pdev, t, n);
+>> + if (!res)
+>> +?? return -EINVAL;
+>> ... when != res == NULL
+>> e = devm_ioremap_nocache(e1, res->start, e2);
+
+I forgot to mention this in my previous reply. Given that this is a fix 
+for a potential NULL pointer dereference and then a kernel crash in the 
+case when 'platform_get_resource' returns NULL, can you please add the 
+Fixes tag so this fix is picked by all LTS kernels under maintenance?
+
+Thanks,
+
+Ray
+
+>>
+>> Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
 >> ---
->>   drivers/i2c/busses/i2c-aspeed.c | 4 ++--
->>   1 file changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/i2c/busses/i2c-aspeed.c b/drivers/i2c/busses/i2c-aspeed.c
->> index 60e4d0e939a3..2714c7fbe7c9 100644
->> --- a/drivers/i2c/busses/i2c-aspeed.c
->> +++ b/drivers/i2c/busses/i2c-aspeed.c
->> @@ -111,22 +111,22 @@
->>   #define ASPEED_I2CD_DEV_ADDR_MASK                      GENMASK(6, 0)
->>
->>   enum aspeed_i2c_master_state {
->> +       ASPEED_I2C_MASTER_INACTIVE,
->>          ASPEED_I2C_MASTER_START,
->>          ASPEED_I2C_MASTER_TX_FIRST,
->>          ASPEED_I2C_MASTER_TX,
->>          ASPEED_I2C_MASTER_RX_FIRST,
->>          ASPEED_I2C_MASTER_RX,
->>          ASPEED_I2C_MASTER_STOP,
->> -       ASPEED_I2C_MASTER_INACTIVE,
->>   };
->>
->>   enum aspeed_i2c_slave_state {
->> +       ASPEED_I2C_SLAVE_STOP,
->>          ASPEED_I2C_SLAVE_START,
->>          ASPEED_I2C_SLAVE_READ_REQUESTED,
->>          ASPEED_I2C_SLAVE_READ_PROCESSED,
->>          ASPEED_I2C_SLAVE_WRITE_REQUESTED,
->>          ASPEED_I2C_SLAVE_WRITE_RECEIVED,
->> -       ASPEED_I2C_SLAVE_STOP,
->>   };
->>
->>   struct aspeed_i2c_bus {
->> --
->> 2.17.1
->>
 > 
-> Reviewed-by: Brendan Higgins <brendanhiggins@google.com>
+> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
 > 
-> Thanks!
+> Change looks good to me, although the check could have been avoided if 
+> 'devm_ioremap_resource' is used on the next line instead of 
+> 'devm_ioremap_nocache', where validation of resource pointer is done.
 > 
-> BTW, sorry for the delay, just got back from vacation. I will review
-> the rest tomorrow.
-> 
+> But there's probably a reason why 'devm_ioremap_nocache' was used in 
+> this code here.
+>
 
-Thanks a lot for the review!
-
-Jae
+>> ? drivers/pinctrl/bcm/pinctrl-nsp-mux.c | 2 ++
+>> ? 1 file changed, 2 insertions(+)
+>>
+>> diff --git a/drivers/pinctrl/bcm/pinctrl-nsp-mux.c 
+>> b/drivers/pinctrl/bcm/pinctrl-nsp-mux.c
+>> index 5cd8166..87618a4 100644
+>> --- a/drivers/pinctrl/bcm/pinctrl-nsp-mux.c
+>> +++ b/drivers/pinctrl/bcm/pinctrl-nsp-mux.c
+>> @@ -577,6 +577,8 @@ static int nsp_pinmux_probe(struct platform_device 
+>> *pdev)
+>> ????????? return PTR_ERR(pinctrl->base0);
+>> ????? res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+>> +??? if (!res)
+>> +??????? return -EINVAL;
+>> ????? pinctrl->base1 = devm_ioremap_nocache(&pdev->dev, res->start,
+>> ??????????????????????????? resource_size(res));
+>> ????? if (!pinctrl->base1) {
+>>
