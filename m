@@ -1,7 +1,9 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 11 Jul 2018 06:19:04 -0700
-Subject: [GIT PULL 1/5] omap1 soc changes for v4.19
-Message-ID: <pull-1531314878-371161@atomide.com>
+Date: Wed, 11 Jul 2018 06:19:06 -0700
+Subject: [GIT PULL 3/5] ti-sysc driver changes for omaps for v4.19
+In-Reply-To: <pull-1531314878-371161@atomide.com>
+References: <pull-1531314878-371161@atomide.com>
+Message-ID: <pull-1531314878-371161@atomide.com-3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,54 +15,34 @@ The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
 
 are available in the Git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.19/omap1-v2-signed
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.19/ti-sysc-v2-signed
 
-for you to fetch changes up to d08605a64e67944eaecfb0e6340f633e01376951:
+for you to fetch changes up to 596e7955692b5d8b042fca500b7a83c25dfcf936:
 
-  ARM: OMAP1: ams-delta: move late devices back to init_machine (2018-07-02 23:07:54 -0700)
-
-----------------------------------------------------------------
-SoC updates for omap1 for v4.19 merge window
-
-Mostly a series by Janusz Krzysztofik to clean up the
-GPIO and input handling for ams-delta. Because of the
-platform data changes, we decided that it's best to
-merge the related input changes also via the arm-soc
-tree so Dmitry Torokhov has acked the input changes.
-
-Also included is a change to constify gpio_leds from
-Arvind Yadav.
+  bus: ti-sysc: Add support for software reset (2018-07-09 22:31:38 -0700)
 
 ----------------------------------------------------------------
-Arvind Yadav (1):
-      ARM: OMAP1: constify gpio_led
+ti-sysc driver changes for v4.19 merge window
 
-Janusz Krzysztofik (13):
-      ARM: OMAP1: ams-delta: refactor late_init()
-      ARM: OMAP1: ams-delta: assign LED GPIO numbers from descriptors
-      ARM: OMAP1: ams-delta: drop GPIO lookup table for serio device
-      Input: ams_delta_serio: convert to platform driver
-      Input: ams_delta_serio: use private structure
-      Input: ams_delta_serio: Replace power GPIO with regulator
-      ARM: OMAP1: ams-delta: Hog "keybrd_dataout" GPIO pin
-      ARM: OMAP1: ams-delta FIQ: don't use static GPIO numbers
-      ARM: OMAP1: ams-delta FIQ: Keep serio input GPIOs requested
-      ARM: OMAP1: Get rid of <mach/ams-delta-fiq.h>
-      Input: ams_delta_serio: use IRQ resource
-      Input: ams_delta_serio: Get FIQ buffer from platform_data
-      ARM: OMAP1: ams-delta: move late devices back to init_machine
+These changes add support for mcan controller found
+on dra7 to probe it with only dts changes with no
+need for legacy hwmod platform data. As it depends
+on the related clock change, the clock change is
+included here and acked by Stephen Boyd.
 
- MAINTAINERS                                        |   1 +
- arch/arm/mach-omap1/ams-delta-fiq-handler.S        |   5 +-
- arch/arm/mach-omap1/ams-delta-fiq.c                | 113 ++++++--
- arch/arm/mach-omap1/ams-delta-fiq.h                |  42 +++
- arch/arm/mach-omap1/board-ams-delta.c              | 301 +++++++++++++++++----
- arch/arm/mach-omap1/board-h2.c                     |   2 +-
- arch/arm/mach-omap1/board-h3.c                     |   2 +-
- arch/arm/mach-omap1/board-htcherald.c              |   2 +-
- arch/arm/mach-omap1/board-osk.c                    |   4 +-
- drivers/input/serio/ams_delta_serio.c              | 198 +++++++-------
- .../linux/platform_data}/ams-delta-fiq.h           |  31 +--
- 11 files changed, 494 insertions(+), 207 deletions(-)
- create mode 100644 arch/arm/mach-omap1/ams-delta-fiq.h
- rename {arch/arm/mach-omap1/include/mach => include/linux/platform_data}/ams-delta-fiq.h (68%)
+----------------------------------------------------------------
+Faiz Abbas (3):
+      clk: ti: dra7: Add clkctrl clock data for the mcan clocks
+      bus: ti-sysc: Add support for using ti-sysc for MCAN on dra76x
+      bus: ti-sysc: Add support for software reset
+
+Kees Cook (1):
+      bus: ti-sysc: Use 2-factor allocator arguments
+
+ Documentation/devicetree/bindings/bus/ti-sysc.txt |  1 +
+ drivers/bus/ti-sysc.c                             | 72 +++++++++++++++++++++--
+ drivers/clk/ti/clk-7xx.c                          |  1 +
+ include/dt-bindings/bus/ti-sysc.h                 |  2 +
+ include/dt-bindings/clock/dra7.h                  |  1 +
+ include/linux/platform_data/ti-sysc.h             |  1 +
+ 6 files changed, 74 insertions(+), 4 deletions(-)
