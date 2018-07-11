@@ -1,535 +1,122 @@
-From: andrew@aj.id.au (Andrew Jeffery)
-Date: Wed, 11 Jul 2018 15:01:21 +0930
-Subject: [RFC PATCH v2 3/4] misc: Add bmc-misc-ctrl
-In-Reply-To: <20180711053122.30773-1-andrew@aj.id.au>
-References: <20180711053122.30773-1-andrew@aj.id.au>
-Message-ID: <20180711053122.30773-4-andrew@aj.id.au>
+From: yibin.gong@nxp.com (Robin Gong)
+Date: Wed, 11 Jul 2018 05:34:19 +0000
+Subject: [PATCH v1 1/4] dmaengine: imx-sdma: add memcpy interface
+In-Reply-To: <20180710152912.GE3219@vkoul-mobl>
+References: <1531239793-11781-1-git-send-email-yibin.gong@nxp.com>
+ <1531239793-11781-2-git-send-email-yibin.gong@nxp.com>
+ <20180710152912.GE3219@vkoul-mobl>
+Message-ID: <DB6PR04MB32234F1EE6F457E0D8D12385895A0@DB6PR04MB3223.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The bmc-misc-ctrl platform driver stitches together the associated
-devicetree bindings and the sysfs-devices-platform-field ABI to expose
-fields described in the devicetree to userspace via sysfs.
-
-While the userspace interface does not provide an abstraction over the
-hardware, it does provide some improvements over devmem:
-
-1. Removal of read-modify-write races, as register access is atomic
-2. Reduced foot-gun, as only the defined field is accessible
-3. Improved discoverability, as the fields are named
-
-Userspace is expected to use its own means to discover fields of
-interest in /sys/devices/platform, either via udev events or search.
-
-Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
----
-
-Since RFC v1:
-
-* Fix issues pointed out by Greg
-* Drop the device class
-
- MAINTAINERS                  |   1 +
- drivers/misc/Kconfig         |  11 +
- drivers/misc/Makefile        |   1 +
- drivers/misc/bmc-misc-ctrl.c | 446 +++++++++++++++++++++++++++++++++++
- 4 files changed, 459 insertions(+)
- create mode 100644 drivers/misc/bmc-misc-ctrl.c
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index d167f0340c11..c29136614cb8 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -2742,6 +2742,7 @@ L:	openbmc at lists.ozlabs.org (moderated for non-subscribers)
- S:	Supported
- F:	Documentation/devicetree/bindings/misc/bmc-misc-ctrl.txt
- F:	Documentation/ABI/testing/sysfs-devices-platform-field
-+F:	drivers/misc/bmc-misc-ctrl.c
- 
- BPF (Safe dynamic programs and tools)
- M:	Alexei Starovoitov <ast@kernel.org>
-diff --git a/drivers/misc/Kconfig b/drivers/misc/Kconfig
-index 3726eacdf65d..914f8d37645d 100644
---- a/drivers/misc/Kconfig
-+++ b/drivers/misc/Kconfig
-@@ -513,6 +513,17 @@ config MISC_RTSX
- 	tristate
- 	default MISC_RTSX_PCI || MISC_RTSX_USB
- 
-+config BMC_MISC_CTRL
-+	tristate "Miscellaneous BMC Control Interfaces"
-+	depends on REGMAP && MFD_SYSCON
-+	help
-+	  Say yes to expose scratch registers used to communicate between the
-+	  host and BMC along with other miscellaneous control interfaces
-+	  provided by BMC SoCs.
-+
-+	  Attributes for controlling the fields are exposed in sysfs according
-+	  to the sysfs-devices-platform-field ABI.
-+
- source "drivers/misc/c2port/Kconfig"
- source "drivers/misc/eeprom/Kconfig"
- source "drivers/misc/cb710/Kconfig"
-diff --git a/drivers/misc/Makefile b/drivers/misc/Makefile
-index af22bbc3d00c..4fb2fac7a486 100644
---- a/drivers/misc/Makefile
-+++ b/drivers/misc/Makefile
-@@ -58,3 +58,4 @@ obj-$(CONFIG_ASPEED_LPC_SNOOP)	+= aspeed-lpc-snoop.o
- obj-$(CONFIG_PCI_ENDPOINT_TEST)	+= pci_endpoint_test.o
- obj-$(CONFIG_OCXL)		+= ocxl/
- obj-$(CONFIG_MISC_RTSX)		+= cardreader/
-+obj-$(CONFIG_BMC_MISC_CTRL)     += bmc-misc-ctrl.o
-diff --git a/drivers/misc/bmc-misc-ctrl.c b/drivers/misc/bmc-misc-ctrl.c
-new file mode 100644
-index 000000000000..93e1412f7087
---- /dev/null
-+++ b/drivers/misc/bmc-misc-ctrl.c
-@@ -0,0 +1,446 @@
-+// SPDX-License-Identifier: GPL-2.0+
-+// Copyright 2018 IBM Corp.
-+
-+#include <linux/bitops.h>
-+#include <linux/device.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+#include <linux/regmap.h>
-+
-+struct bmc_misc_label {
-+	const char *label;
-+	struct device_attribute label_attr;
-+};
-+
-+struct bmc_misc_field {
-+	u32 shift;
-+	u32 mask;
-+	struct device_attribute mask_attr;
-+};
-+
-+struct bmc_misc_type {
-+	const char *type;
-+	struct device_attribute type_attr;
-+};
-+
-+struct bmc_misc_rw {
-+	struct regmap *map;
-+
-+	struct bmc_misc_field field;
-+	struct bmc_misc_label label;
-+	struct bmc_misc_type type;
-+
-+	u32 value;
-+	struct device_attribute value_attr;
-+
-+	struct attribute_group attr_grp;
-+	struct attribute *attrs[5];
-+};
-+
-+struct bmc_misc_sc {
-+	struct regmap *map;
-+
-+	struct bmc_misc_field field;
-+	struct bmc_misc_label label;
-+	struct bmc_misc_type type;
-+
-+	u32 read;
-+	u32 set;
-+	u32 clear;
-+
-+	struct device_attribute read_attr;
-+	struct device_attribute set_attr;
-+	struct device_attribute clear_attr;
-+
-+	struct attribute_group attr_grp;
-+	struct attribute *attrs[7];
-+};
-+
-+static ssize_t bmc_misc_label_show(struct device *dev,
-+				   struct device_attribute *attr, char *buf)
-+{
-+	struct bmc_misc_label *priv;
-+
-+	priv = container_of(attr, struct bmc_misc_label, label_attr);
-+
-+	return sprintf(buf, "%s\n", priv->label);
-+}
-+
-+static int bmc_misc_label_init(struct device_node *node,
-+			       struct bmc_misc_label *priv)
-+{
-+	int rc;
-+
-+	rc = of_property_read_string(node, "label", &priv->label);
-+	if (rc < 0)
-+		return rc;
-+
-+	sysfs_attr_init(&priv->label_attr.attr);
-+	priv->label_attr.attr.name = "label";
-+	priv->label_attr.attr.mode = 0440;
-+	priv->label_attr.show = bmc_misc_label_show;
-+
-+	return 0;
-+}
-+
-+static ssize_t bmc_misc_mask_show(struct device *dev,
-+				  struct device_attribute *attr, char *buf)
-+{
-+	struct bmc_misc_field *priv;
-+
-+	priv = container_of(attr, struct bmc_misc_field, mask_attr);
-+
-+	return sprintf(buf, "0x%x\n", priv->mask >> priv->shift);
-+}
-+
-+static int bmc_misc_field_init(struct device_node *node,
-+			       struct bmc_misc_field *priv)
-+{
-+	int rc;
-+
-+	rc = of_property_read_u32(node, "mask", &priv->mask);
-+	if (rc < 0)
-+		return rc;
-+
-+	priv->shift = __ffs(priv->mask);
-+
-+	sysfs_attr_init(&priv->mask_attr.attr);
-+	priv->mask_attr.attr.name = "mask";
-+	priv->mask_attr.attr.mode = 0440;
-+	priv->mask_attr.show = bmc_misc_mask_show;
-+
-+	return 0;
-+}
-+
-+static ssize_t bmc_misc_type_show(struct device *dev,
-+				  struct device_attribute *attr, char *buf)
-+{
-+	struct bmc_misc_type *priv;
-+
-+	priv = container_of(attr, struct bmc_misc_type, type_attr);
-+
-+	return sprintf(buf, "%s\n", priv->type);
-+}
-+
-+static int bmc_misc_type_init(struct device_node *node,
-+			      struct bmc_misc_type *priv)
-+{
-+	bool ro, w1sc;
-+
-+	ro = of_property_read_bool(node, "read-only");
-+	w1sc = of_property_read_bool(node, "set-clear");
-+
-+	if (ro && !w1sc)
-+		priv->type = "ro";
-+	else if (!ro && w1sc)
-+		priv->type = "w1sc";
-+	else if (!ro && !w1sc)
-+		priv->type = "rw";
-+	else
-+		return -EINVAL;
-+
-+	sysfs_attr_init(&priv->type_attr.attr);
-+	priv->type_attr.attr.name = "type";
-+	priv->type_attr.attr.mode = 0440;
-+	priv->type_attr.show = bmc_misc_type_show;
-+
-+	return 0;
-+}
-+
-+static ssize_t bmc_misc_rw_show(struct device *dev,
-+				 struct device_attribute *attr, char *buf)
-+{
-+	struct bmc_misc_rw *rw;
-+	unsigned int val;
-+	int rc;
-+
-+	rw = container_of(attr, struct bmc_misc_rw, value_attr);
-+	rc = regmap_read(rw->map, rw->value, &val);
-+	if (rc)
-+		return rc;
-+
-+	val = (val & rw->field.mask) >> rw->field.shift;
-+
-+	return sprintf(buf, "%u\n", val);
-+}
-+
-+static ssize_t bmc_misc_rw_store(struct device *dev,
-+				  struct device_attribute *attr,
-+				  const char *buf, size_t count)
-+{
-+	struct bmc_misc_rw *rw;
-+	long val;
-+	int rc;
-+
-+	rc = kstrtol(buf, 0, &val);
-+	if (rc)
-+		return rc;
-+
-+	rw = container_of(attr, struct bmc_misc_rw, value_attr);
-+	val <<= rw->field.shift;
-+	if (val & ~rw->field.mask)
-+		return -EINVAL;
-+	rc = regmap_update_bits(rw->map, rw->value, rw->field.mask,
-+				val);
-+
-+	return rc < 0 ? rc : count;
-+}
-+
-+static int bmc_misc_rw_init(struct platform_device *pdev)
-+{
-+	struct device_node *node;
-+	struct bmc_misc_rw *priv;
-+	u32 val;
-+	int rc;
-+
-+	node = pdev->dev.of_node;
-+
-+	priv = devm_kmalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
-+	if (!priv)
-+		return -ENOMEM;
-+
-+	priv->map = syscon_node_to_regmap(pdev->dev.parent->of_node);
-+
-+	rc = of_property_read_u32(node, "offset", &priv->value);
-+	if (rc < 0)
-+		return rc;
-+
-+	rc = bmc_misc_label_init(node, &priv->label);
-+	if (rc < 0)
-+		return rc;
-+
-+	rc = bmc_misc_field_init(node, &priv->field);
-+	if (rc < 0)
-+		return rc;
-+
-+	rc = bmc_misc_type_init(node, &priv->type);
-+	if (rc < 0)
-+		return rc;
-+
-+	if (!of_property_read_u32(node, "default-value", &val)) {
-+		val <<= priv->field.shift;
-+		if (val & ~priv->field.mask)
-+			return -EINVAL;
-+		val &= priv->field.mask;
-+		regmap_update_bits(priv->map, priv->value, priv->field.mask,
-+				   val);
-+	}
-+
-+	sysfs_attr_init(&priv->value_attr.attr);
-+	priv->value_attr.attr.name = "value";
-+	priv->value_attr.attr.mode = 0440;
-+	if (!of_property_read_bool(node, "read-only"))
-+		priv->value_attr.attr.mode |= 0220;
-+	priv->value_attr.show = bmc_misc_rw_show;
-+	priv->value_attr.store = bmc_misc_rw_store;
-+
-+	priv->attrs[0] = &priv->label.label_attr.attr;
-+	priv->attrs[1] = &priv->field.mask_attr.attr;
-+	priv->attrs[2] = &priv->type.type_attr.attr;
-+	priv->attrs[3] = &priv->value_attr.attr;
-+	priv->attrs[4] = NULL;
-+
-+	memset(&priv->attr_grp, 0, sizeof(priv->attr_grp));
-+	priv->attr_grp.name = priv->label.label;
-+	priv->attr_grp.attrs = priv->attrs;
-+
-+
-+	rc = sysfs_create_group(&pdev->dev.kobj, &priv->attr_grp);
-+	if (rc < 0)
-+		return rc;
-+
-+	platform_set_drvdata(pdev, priv);
-+
-+	dev_info(&pdev->dev, "%s field %s\n", priv->type.type,
-+		 priv->label.label);
-+
-+	return 0;
-+}
-+
-+static ssize_t bmc_misc_sc_read_show(struct device *dev,
-+				     struct device_attribute *attr, char *buf)
-+{
-+	struct bmc_misc_sc *priv;
-+	unsigned int val;
-+	int rc;
-+
-+	priv = container_of(attr, struct bmc_misc_sc, read_attr);
-+	rc = regmap_read(priv->map, priv->read, &val);
-+	if (rc)
-+		return rc;
-+
-+	val = (val & priv->field.mask) >> priv->field.shift;
-+
-+	return sprintf(buf, "%u\n", val);
-+}
-+
-+static ssize_t bmc_misc_sc_set_store(struct device *dev,
-+				     struct device_attribute *attr,
-+				     const char *buf, size_t count)
-+{
-+	struct bmc_misc_sc *priv;
-+	long val;
-+	int rc;
-+
-+	rc = kstrtol(buf, 0, &val);
-+	if (rc)
-+		return rc;
-+
-+	priv = container_of(attr, struct bmc_misc_sc, set_attr);
-+	val <<= priv->field.shift;
-+	if (val & ~priv->field.mask)
-+		return -EINVAL;
-+	val &= priv->field.mask;
-+	rc = regmap_write(priv->map, priv->set, val);
-+
-+	return rc < 0 ? rc : count;
-+}
-+
-+static ssize_t bmc_misc_sc_clear_store(struct device *dev,
-+				       struct device_attribute *attr,
-+				       const char *buf, size_t count)
-+{
-+	struct bmc_misc_sc *priv;
-+	long val;
-+	int rc;
-+
-+	rc = kstrtol(buf, 0, &val);
-+	if (rc)
-+		return rc;
-+
-+	priv = container_of(attr, struct bmc_misc_sc, clear_attr);
-+	val <<= priv->field.shift;
-+	if (val & ~priv->field.mask)
-+		return -EINVAL;
-+	val &= priv->field.mask;
-+	rc = regmap_write(priv->map, priv->clear, val);
-+
-+	return rc < 0 ? rc : count;
-+}
-+
-+static int bmc_misc_sc_init(struct platform_device *pdev)
-+{
-+	struct device_node *node;
-+	struct bmc_misc_sc *priv;
-+	int rc;
-+
-+	node = pdev->dev.of_node;
-+
-+	priv = devm_kmalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
-+	if (!priv)
-+		return -ENOMEM;
-+
-+	priv->map = syscon_node_to_regmap(pdev->dev.parent->of_node);
-+
-+	rc = of_property_read_u32_array(node, "offset", &priv->read, 3);
-+	if (rc < 0)
-+		return rc;
-+
-+	rc = bmc_misc_label_init(node, &priv->label);
-+	if (rc < 0)
-+		return rc;
-+
-+	rc = bmc_misc_field_init(node, &priv->field);
-+	if (rc < 0)
-+		return rc;
-+
-+	rc = bmc_misc_type_init(node, &priv->type);
-+	if (rc < 0)
-+		return rc;
-+
-+	if (of_property_read_bool(node, "default-set"))
-+		regmap_write(priv->map, priv->set, priv->field.mask);
-+	else if (of_property_read_bool(node, "default-clear"))
-+		regmap_write(priv->map, priv->clear, priv->field.mask);
-+
-+	sysfs_attr_init(&priv->read_attr.attr);
-+	priv->read_attr.attr.name = "value";
-+	priv->read_attr.attr.mode = 0440;
-+	priv->read_attr.show = bmc_misc_sc_read_show;
-+
-+	sysfs_attr_init(&priv->set_attr.attr);
-+	priv->set_attr.attr.name = "set";
-+	priv->set_attr.attr.mode = 0220;
-+	priv->set_attr.store = bmc_misc_sc_set_store;
-+
-+	sysfs_attr_init(&priv->clear_attr.attr);
-+	priv->clear_attr.attr.name = "clear";
-+	priv->clear_attr.attr.mode = 0220;
-+	priv->clear_attr.store = bmc_misc_sc_clear_store;
-+
-+	priv->attrs[0] = &priv->label.label_attr.attr;
-+	priv->attrs[1] = &priv->field.mask_attr.attr;
-+	priv->attrs[2] = &priv->type.type_attr.attr;
-+	priv->attrs[3] = &priv->read_attr.attr;
-+	priv->attrs[4] = &priv->set_attr.attr;
-+	priv->attrs[5] = &priv->clear_attr.attr;
-+	priv->attrs[6] = NULL;
-+
-+	memset(&priv->attr_grp, 0, sizeof(priv->attr_grp));
-+	priv->attr_grp.name = priv->label.label;
-+	priv->attr_grp.attrs = priv->attrs;
-+
-+	rc = sysfs_create_group(&pdev->dev.kobj, &priv->attr_grp);
-+	if (rc < 0)
-+		return rc;
-+
-+	platform_set_drvdata(pdev, priv);
-+
-+	dev_info(&pdev->dev, "%s field %s\n", priv->type.type,
-+		 priv->label.label);
-+
-+	return 0;
-+}
-+
-+static int bmc_misc_probe(struct platform_device *pdev)
-+{
-+	if (of_property_read_bool(pdev->dev.of_node, "set-clear"))
-+		return bmc_misc_sc_init(pdev);
-+
-+	return bmc_misc_rw_init(pdev);
-+}
-+
-+static void bmc_misc_sc_del(struct platform_device *pdev)
-+{
-+	struct bmc_misc_sc *priv = platform_get_drvdata(pdev);
-+
-+	sysfs_remove_group(&pdev->dev.kobj, &priv->attr_grp);
-+}
-+
-+static void bmc_misc_rw_del(struct platform_device *pdev)
-+{
-+	struct bmc_misc_rw *priv = platform_get_drvdata(pdev);
-+
-+	sysfs_remove_group(&pdev->dev.kobj, &priv->attr_grp);
-+}
-+
-+static int bmc_misc_remove(struct platform_device *pdev)
-+{
-+	if (of_property_read_bool(pdev->dev.of_node, "set-clear"))
-+		bmc_misc_sc_del(pdev);
-+	else
-+		bmc_misc_rw_del(pdev);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id bmc_misc_ctrl_match[] = {
-+	{ .compatible = "bmc-misc-ctrl", },
-+	{ },
-+};
-+
-+static struct platform_driver bmc_misc_ctrl = {
-+	.driver = {
-+		.name		=  "bmc-misc-ctrl",
-+		.of_match_table = bmc_misc_ctrl_match,
-+	},
-+	.probe = bmc_misc_probe,
-+	.remove = bmc_misc_remove,
-+};
-+
-+module_platform_driver(bmc_misc_ctrl);
-+
-+MODULE_LICENSE("GPL");
-+MODULE_AUTHOR("Andrew Jeffery <andrew@aj.id.au>");
--- 
-2.17.1
+> Hi Robin,
+> 
+> On 11-07-18, 00:23, Robin Gong wrote:
+> > Add MEMCPY support, meanwhile, add SDMA_BD_MAX_CNT instead of
+> > '0xffff'.
+> 
+> latter part should be its own patch. Never mix things
+Okay, I will split it even for this minor change.
+> 
+> > +static struct dma_async_tx_descriptor *sdma_prep_memcpy(
+> > +		struct dma_chan *chan, dma_addr_t dma_dst,
+> > +		dma_addr_t dma_src, size_t len, unsigned long flags) {
+> > +	struct sdma_channel *sdmac = to_sdma_chan(chan);
+> > +	struct sdma_engine *sdma = sdmac->sdma;
+> > +	int channel = sdmac->channel;
+> > +	size_t count;
+> > +	int i = 0, param;
+> > +	struct sdma_buffer_descriptor *bd;
+> > +	struct sdma_desc *desc;
+> > +
+> > +	if (!chan || !len)
+> > +		return NULL;
+> > +
+> > +	dev_dbg(sdma->dev, "memcpy: %pad->%pad, len=%zu, channel=%d.\n",
+> > +		&dma_src, &dma_dst, len, channel);
+> > +
+> > +	desc = sdma_transfer_init(sdmac, DMA_MEM_TO_MEM, len /
+> SDMA_BD_MAX_CNT
+> > +					+ 1);
+> 
+> this looks quite odd to read consider:
+> 
+>         esc = sdma_transfer_init(sdmac, DMA_MEM_TO_MEM,
+>                                  len / SDMA_BD_MAX_CNT + 1);
+> 
+Okay, will fix on v2.
+> > +	if (!desc)
+> > +		goto err_out;
+> > +
+> > +	do {
+> > +		count = min_t(size_t, len, SDMA_BD_MAX_CNT);
+> > +		bd = &desc->bd[i];
+> > +		bd->buffer_addr = dma_src;
+> > +		bd->ext_buffer_addr = dma_dst;
+> > +		bd->mode.count = count;
+> > +		desc->chn_count += count;
+> > +
+> > +		switch (sdmac->word_size) {
+> > +		case DMA_SLAVE_BUSWIDTH_4_BYTES:
+> 
+> This looks wrong, we are in memcpy, there is no SLAVE so no SLAVE widths..
+> 
+Okay, will remove check bus width.
+> >  static struct dma_async_tx_descriptor *sdma_prep_slave_sg(
+> >  		struct dma_chan *chan, struct scatterlist *sgl,
+> >  		unsigned int sg_len, enum dma_transfer_direction direction, @@
+> > -1344,9 +1431,9 @@ static struct dma_async_tx_descriptor
+> > *sdma_prep_slave_sg(
+> >
+> >  		count = sg_dma_len(sg);
+> >
+> > -		if (count > 0xffff) {
+> > +		if (count > SDMA_BD_MAX_CNT) {
+> >  			dev_err(sdma->dev, "SDMA channel %d: maximum bytes for sg
+> entry exceeded: %d > %d\n",
+> > -					channel, count, 0xffff);
+> > +					channel, count, SDMA_BD_MAX_CNT);
+> 
+> these changes dont belong to this patch
+Will split in v2.
+> 
+> > @@ -1486,6 +1573,8 @@ static int sdma_config(struct dma_chan *chan,
+> >  		sdmac->watermark_level |= (dmaengine_cfg->dst_maxburst << 16)
+> &
+> >  			SDMA_WATERMARK_LEVEL_HWML;
+> >  		sdmac->word_size = dmaengine_cfg->dst_addr_width;
+> > +	} else if (dmaengine_cfg->direction == DMA_MEM_TO_MEM) {
+> > +		sdmac->word_size = dmaengine_cfg->dst_addr_width;
+> 
+> same here too, we are in .device_config which deals with slave. Not memcpy!
+Will remove it.
+> 
+> >  	} else {
+> >  		sdmac->per_address = dmaengine_cfg->dst_addr;
+> >  		sdmac->watermark_level = dmaengine_cfg->dst_maxburst * @@
+> -1902,6
+> > +1991,7 @@ static int sdma_probe(struct platform_device *pdev)
+> >
+> >  	dma_cap_set(DMA_SLAVE, sdma->dma_device.cap_mask);
+> >  	dma_cap_set(DMA_CYCLIC, sdma->dma_device.cap_mask);
+> > +	dma_cap_set(DMA_MEMCPY, sdma->dma_device.cap_mask);
+> >
+> >  	INIT_LIST_HEAD(&sdma->dma_device.channels);
+> >  	/* Initialize channel parameters */
+> > @@ -1968,9 +2058,11 @@ static int sdma_probe(struct platform_device
+> *pdev)
+> >  	sdma->dma_device.dst_addr_widths = SDMA_DMA_BUSWIDTHS;
+> >  	sdma->dma_device.directions = SDMA_DMA_DIRECTIONS;
+> >  	sdma->dma_device.residue_granularity =
+> > DMA_RESIDUE_GRANULARITY_SEGMENT;
+> > +	sdma->dma_device.device_prep_dma_memcpy = sdma_prep_memcpy;
+> >  	sdma->dma_device.device_issue_pending = sdma_issue_pending;
+> >  	sdma->dma_device.dev->dma_parms = &sdma->dma_parms;
+> > -	dma_set_max_seg_size(sdma->dma_device.dev, 65535);
+> > +	sdma->dma_device.copy_align = DMAENGINE_ALIGN_4_BYTES;
+> > +	dma_set_max_seg_size(sdma->dma_device.dev, SDMA_BD_MAX_CNT);
+> 
+> this line should not be part of this patch
+> 
+> --
+> ~Vinod
