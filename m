@@ -1,63 +1,47 @@
-From: brendanhiggins@google.com (Brendan Higgins)
-Date: Tue, 10 Jul 2018 22:47:28 -0700
-Subject: [PATCH] i2c: aspeed: Fix initial values of master and slave state
-In-Reply-To: <20180702212028.30824-1-jae.hyun.yoo@linux.intel.com>
-References: <20180702212028.30824-1-jae.hyun.yoo@linux.intel.com>
-Message-ID: <CAFd5g45=SkyLWRy=DnYOZCXcmHkrbTdOSBi=n=kUgyvRPoU8Mg@mail.gmail.com>
+From: joel@jms.id.au (Joel Stanley)
+Date: Wed, 11 Jul 2018 15:53:52 +1000
+Subject: [PATCH] clk: aspeed: Support HPLL strapping on ast2400
+In-Reply-To: <153089970720.143105.7005759760140367907@swboyd.mtv.corp.google.com>
+References: <20180628231540.26633-1-joel@jms.id.au>
+ <153089970720.143105.7005759760140367907@swboyd.mtv.corp.google.com>
+Message-ID: <CACPK8XfxKhT_ywpo3vqXSEaSPGdM+uhkgpn1R+EP9Z3spxAzXg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 2, 2018 at 2:20 PM Jae Hyun Yoo
-<jae.hyun.yoo@linux.intel.com> wrote:
+Hi Stephen,
+
+On 7 July 2018 at 03:55, Stephen Boyd <sboyd@kernel.org> wrote:
+> Quoting Joel Stanley (2018-06-28 16:15:40)
+>> The HPLL can be configured through a register (SCU24), however some
+>> platforms chose to configure it through the strapping settings and do
+>> not use the register. This was not noticed as the logic for bit 18 in
+>> SCU24 was confused: set means programmed, but the driver read it as set
+>> means strapped.
+>>
+>> This gives us the correct HPLL value on Palmetto systems, from which
+>> most of the peripheral clocks are generated.
+>>
+>> Fixes: 5eda5d79e4be ("clk: Add clock driver for ASPEED BMC SoCs")
+>> Cc: stable at vger.kernel.org # v4.15
+>> Reviewed-by: C?dric Le Goater <clg@kaod.org>
+>> Signed-off-by: Joel Stanley <joel@jms.id.au>
+>> ---
 >
-> This patch changes the order of enum aspeed_i2c_master_state and
-> enum aspeed_i2c_slave_state defines to make their initial value to
-> ASPEED_I2C_MASTER_INACTIVE and ASPEED_I2C_SLAVE_STOP respectively.
-> In case of multi-master use, if a slave data comes ahead of the
-> first master xfer, master_state starts from an invalid state so
-> this change fixes the issue.
->
-> Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
-> ---
->  drivers/i2c/busses/i2c-aspeed.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/i2c/busses/i2c-aspeed.c b/drivers/i2c/busses/i2c-aspeed.c
-> index 60e4d0e939a3..2714c7fbe7c9 100644
-> --- a/drivers/i2c/busses/i2c-aspeed.c
-> +++ b/drivers/i2c/busses/i2c-aspeed.c
-> @@ -111,22 +111,22 @@
->  #define ASPEED_I2CD_DEV_ADDR_MASK                      GENMASK(6, 0)
->
->  enum aspeed_i2c_master_state {
-> +       ASPEED_I2C_MASTER_INACTIVE,
->         ASPEED_I2C_MASTER_START,
->         ASPEED_I2C_MASTER_TX_FIRST,
->         ASPEED_I2C_MASTER_TX,
->         ASPEED_I2C_MASTER_RX_FIRST,
->         ASPEED_I2C_MASTER_RX,
->         ASPEED_I2C_MASTER_STOP,
-> -       ASPEED_I2C_MASTER_INACTIVE,
->  };
->
->  enum aspeed_i2c_slave_state {
-> +       ASPEED_I2C_SLAVE_STOP,
->         ASPEED_I2C_SLAVE_START,
->         ASPEED_I2C_SLAVE_READ_REQUESTED,
->         ASPEED_I2C_SLAVE_READ_PROCESSED,
->         ASPEED_I2C_SLAVE_WRITE_REQUESTED,
->         ASPEED_I2C_SLAVE_WRITE_RECEIVED,
-> -       ASPEED_I2C_SLAVE_STOP,
->  };
->
->  struct aspeed_i2c_bus {
-> --
-> 2.17.1
+> Do you want this merged for -rc5? It sounds like on some systems this is
+> a problem, but I don't know if these systems are supposed to work yet or
+> not, so priority of this fix is not easy for me to understand.
 >
 
-Reviewed-by: Brendan Higgins <brendanhiggins@google.com>
+Sure, some more background:
 
-Thanks!
+We did not notice this until we attempted to use the clock for the mtd
+driver. However, this clock is used for the kernel clocksource, so eg.
+sleep 1 takes two seconds to complete. This affects all of the systems
+I have access to.
 
-BTW, sorry for the delay, just got back from vacation. I will review
-the rest tomorrow.
+I suggest we merge for4.18, and keep the cc: stable so it can be
+backported to the stable trees.
+
+Cheers,
+
+Joel
