@@ -1,68 +1,39 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Wed, 11 Jul 2018 21:22:32 +0800
-Subject: [PATCH 1/2] ARM: sun8i: h3: enable HDMI output on Banana Pi M2 Zero
-In-Reply-To: <20180711132233.42301-1-icenowy@aosc.io>
-References: <20180711132233.42301-1-icenowy@aosc.io>
-Message-ID: <20180711132233.42301-2-icenowy@aosc.io>
+From: ludovic.desroches@microchip.com (Ludovic Desroches)
+Date: Wed, 11 Jul 2018 15:26:23 +0200
+Subject: [PATCH 3/3] tty/serial: atmel: manage shutdown in case of RS485 or
+ ISO7816 mode
+In-Reply-To: <20180711131638.12622-1-ludovic.desroches@microchip.com>
+References: <20180711131638.12622-1-ludovic.desroches@microchip.com>
+Message-ID: <20180711132623.13227-1-ludovic.desroches@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Banana Pi M2 Zero board has a miniHDMI port connected to the HDMI
-controller of Allwinner H3 SoC.
+From: Nicolas Ferre <nicolas.ferre@microchip.com>
 
-Enable the HDMI output in Banana Pi M2 Zero device tree.
+In atmel_shutdown() we call atmel_stop_rx() and atmel_stop_tx() functions.
+Prevent the rx restart that is implemented in RS485 or ISO7816 modes when
+calling atmel_stop_tx() by using the atomic information tasklet_shutdown
+that is already in place for this purpose.
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
 ---
- .../dts/sun8i-h2-plus-bananapi-m2-zero.dts    | 25 +++++++++++++++++++
- 1 file changed, 25 insertions(+)
+ drivers/tty/serial/atmel_serial.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/sun8i-h2-plus-bananapi-m2-zero.dts b/arch/arm/boot/dts/sun8i-h2-plus-bananapi-m2-zero.dts
-index 7d01f9322658..eb61dcf32797 100644
---- a/arch/arm/boot/dts/sun8i-h2-plus-bananapi-m2-zero.dts
-+++ b/arch/arm/boot/dts/sun8i-h2-plus-bananapi-m2-zero.dts
-@@ -26,6 +26,17 @@
- 		stdout-path = "serial0:115200n8";
- 	};
+diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+index 0118b219f3a8..e4f877e1f3c6 100644
+--- a/drivers/tty/serial/atmel_serial.c
++++ b/drivers/tty/serial/atmel_serial.c
+@@ -617,7 +617,9 @@ static void atmel_stop_tx(struct uart_port *port)
+ 	if (((port->rs485.flags & SER_RS485_ENABLED) &&
+ 	     !(port->rs485.flags & SER_RS485_RX_DURING_TX)) ||
+ 	    port->iso7816.flags & SER_ISO7816_ENABLED)
+-		atmel_start_rx(port);
++		if (!atomic_read(&atmel_port->tasklet_shutdown))
++			atmel_start_rx(port);
++
+ }
  
-+	hdmi-connector {
-+		compatible = "hdmi-connector";
-+		type = "c";
-+
-+		port {
-+			hdmi_con_in: endpoint {
-+				remote-endpoint = <&hdmi_out_con>;
-+			};
-+		};
-+	};
-+
- 	leds {
- 		compatible = "gpio-leds";
- 		pinctrl-names = "default";
-@@ -55,10 +66,24 @@
- 	};
- };
- 
-+&de {
-+	status = "okay";
-+};
-+
- &ehci0 {
- 	status = "okay";
- };
- 
-+&hdmi {
-+	status = "okay";
-+};
-+
-+&hdmi_out {
-+	hdmi_out_con: endpoint {
-+		remote-endpoint = <&hdmi_con_in>;
-+	};
-+};
-+
- &mmc0 {
- 	vmmc-supply = <&reg_vcc3v3>;
- 	bus-width = <4>;
+ /*
 -- 
-2.17.1
+2.12.2
