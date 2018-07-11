@@ -1,128 +1,43 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 11 Jul 2018 10:05:50 +0100
-Subject: [PATCH v3 15/20] kvm: arm/arm64: Allow tuning the physical
- address size for VM
-In-Reply-To: <20180710170330.GJ9486@e103592.cambridge.arm.com>
-References: <1530270944-11351-16-git-send-email-suzuki.poulose@arm.com>
- <20180704155104.GN4828@arm.com>
- <12d1832a-1a13-7dd4-662b-addf58400789@arm.com>
- <fe9f5aa5-b283-07e0-5f0e-e97d96b780e7@arm.com>
- <9f1af26e-2913-2b0b-1352-63160096f78f@arm.com>
- <f3463d0a-c6a3-c34d-acb3-13c99fc61c5a@arm.com>
- <20180709112326.GD9486@e103592.cambridge.arm.com>
- <17f8d585-3489-ab6f-6ee1-4d8d337dcf9c@arm.com>
- <20180709133750.GE9486@e103592.cambridge.arm.com>
- <377420ce-97a8-4359-6224-273d91f37247@arm.com>
- <20180710170330.GJ9486@e103592.cambridge.arm.com>
-Message-ID: <0d9d48fc-f913-9f05-afbe-83299c470611@arm.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Wed, 11 Jul 2018 11:08:42 +0200
+Subject: [PATCH v5 11/22] ARM: sun5i: Add support for the C1 SRAM region
+ with the SRAM controller
+In-Reply-To: <CAGb2v65swXpLwAo3M9X=MJeVmUrjT=FPFZxp=eCzMrfopqHKjA@mail.gmail.com>
+References: <20180710080114.31469-1-paul.kocialkowski@bootlin.com>
+ <20180710080114.31469-12-paul.kocialkowski@bootlin.com>
+ <CAGb2v65swXpLwAo3M9X=MJeVmUrjT=FPFZxp=eCzMrfopqHKjA@mail.gmail.com>
+Message-ID: <20180711090842.q3q3lvnuwj52nnjx@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/07/18 18:03, Dave Martin wrote:
-> On Tue, Jul 10, 2018 at 05:38:39PM +0100, Suzuki K Poulose wrote:
->> On 09/07/18 14:37, Dave Martin wrote:
->>> On Mon, Jul 09, 2018 at 01:29:42PM +0100, Marc Zyngier wrote:
->>>> On 09/07/18 12:23, Dave Martin wrote:
+On Tue, Jul 10, 2018 at 10:56:23PM +0800, Chen-Yu Tsai wrote:
+> On Tue, Jul 10, 2018 at 4:01 PM, Paul Kocialkowski
+> <paul.kocialkowski@bootlin.com> wrote:
+> > From: Maxime Ripard <maxime.ripard@bootlin.com>
+> >
+> > This adds support for the C1 SRAM region (to be used with the SRAM
+> > controller driver) for sun5i-based platforms. The region is shared
+> > between the Video Engine and the CPU.
+> >
+> > Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+> > Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 > 
-> [...]
+> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 > 
->>>>> Wedging arguments into a few bits in the type argument feels awkward,
->>>>> and may be regretted later if we run out of bits, or something can't be
->>>>> represented in the chosen encoding.
->>>>
->>>> I think that's a pretty convincing argument for a "better" CREATE_VM,
->>>> one that would have a clearly defined, structured (and potentially
->>>> extensible) argument.
->>>>
->>>> I've quickly hacked the following:
->>>>
->>>> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
->>>> index b6270a3b38e9..3e76214034c2 100644
->>>> --- a/include/uapi/linux/kvm.h
->>>> +++ b/include/uapi/linux/kvm.h
->>>> @@ -735,6 +735,20 @@ struct kvm_ppc_resize_hpt {
->>>>   	__u32 pad;
->>>>   };
->>>>
->>>> +struct kvm_create_vm2 {
->>>> +	__u64	version;	/* Or maybe not */
->>>> +	union {
->>>> +		struct {
->>>> +#define KVM_ARM_SVE_CAPABLE	(1 << 0)
->>>> +#define KVM_ARM_SELECT_IPA	{1 << 1)
->>>> +			__u64	capabilities;
->>>> +			__u16	sve_vlen;
->>>> +			__u8	ipa_size;
->>>> +		} arm64;
->>>> +		__u64	dummy[15];
->>>> +	};
->>>> +};
->>>> +
->>>>   #define KVMIO 0xAE
->>>>
->>>>   /* machine type bits, to be used as argument to KVM_CREATE_VM */
->>>>
->>>> Other architectures could fill in their own bits if they need to.
->>>>
->>>> Thoughts?
->>>
->>> This kind of thing should work, but it may still get messy when we
->>> add additional fields.
->>
->>
->> Marc, Dave,
->>
->> I like Dave's approach. Some comments below.
->>
->>>
->>> It we want this to work cross-arch, would it make sense to go
->>> for a more generic approach, say
->>>
->>> struct kvm_create_vm_attr_any {
->>>          __u32   type;
->>> };
->>>
->>> #define KVM_CREATE_VM_ATTR_ARCH_CAPABILITIES 1
->>> struct kvm_create_vm_attr_arch_capabilities {
->>>          __u32   type;
->>>          __u16   size; /* support future expansion of capabilities[] */
->>>          __u16   reserved;
->>>          __u64   capabilities[1];
->>> };
->>
->> We also need to advertise which attributes are supported by the host,
->> so that the user can tune the available ones. That would make a bit mask
->> like the above trickier, unless we return the supported values back
->> in the argument ptr for the "probe" call. And this scheme in general
->> can be useful for passing back a non-boolean result specific to the
->> attribute, without having a per-attribute ioctl. (e.g, maximum limit
->> for IPA).
-> 
-> Maybe, but this could quickly become bloated.  (My approach already
-> feels a bit bloated...)
-> 
-> I'm not sure that arbitrarily complex negotiation will really be
-> needed, but userspace might want to change its mind if setting a
-> particular propertiy fails.
-> 
-> An alternative might be to have a bunch of per-VM ioctls to configure
-> different things, like x86 has.  There's at least precedent for that.
-> For arm, we currently only have a few.  That allows for easy extension,
-> at the cost of adding ioctls.
+> But again, see discussion about SRAM compatibles.
 
-As you know, one of the major problems with the per-VM ioctls is
-the ordering of different operations and tracking to make sure that
-the userspace follows the expected order. e.g, the first approach for
-IPA series was based on this and it made things complex enough to drop
-it.
+I've fixed the SRAM C size (which is 0xd0000 and not 0x80000) and
+applied, thanks!
+Maxime
 
-> 
-> There may be some ioctls we can reuse, like KVM_ENABLE_CAP for per-
-> vm capability flags.
-
-May be we could switch to KVM_VM_CAPS and pass a list of capabilities
-to be enabled at creation time ? The kvm_enable_cap can pass in additional
-arguments for each cap. That way we don't have to rely on a new set of
-attributes and probing becomes straight forward.
-
-Suzuki
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180711/d585deb3/attachment.sig>
