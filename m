@@ -1,127 +1,121 @@
-From: s.hauer@pengutronix.de (s.hauer at pengutronix.de)
-Date: Wed, 11 Jul 2018 08:53:38 +0200
-Subject: [PATCH v1 3/4] dmaengine: imx-sdma: support dmatest
-In-Reply-To: <DB6PR04MB3223F93E1566A97857FD2FF4895A0@DB6PR04MB3223.eurprd04.prod.outlook.com>
+From: yibin.gong@nxp.com (Robin Gong)
+Date: Wed, 11 Jul 2018 06:56:18 +0000
+Subject: [PATCH v1 1/4] dmaengine: imx-sdma: add memcpy interface
+In-Reply-To: <20180711062434.x6waumlh6wtfmvzy@pengutronix.de>
 References: <1531239793-11781-1-git-send-email-yibin.gong@nxp.com>
- <1531239793-11781-4-git-send-email-yibin.gong@nxp.com>
- <20180710153326.GG3219@vkoul-mobl>
- <DB6PR04MB3223F93E1566A97857FD2FF4895A0@DB6PR04MB3223.eurprd04.prod.outlook.com>
-Message-ID: <20180711065338.3ka4yibxkawgo4fd@pengutronix.de>
+ <1531239793-11781-2-git-send-email-yibin.gong@nxp.com>
+ <20180711062434.x6waumlh6wtfmvzy@pengutronix.de>
+Message-ID: <DB6PR04MB3223B22099D9C7A079608409895A0@DB6PR04MB3223.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 11, 2018 at 06:37:02AM +0000, Robin Gong wrote:
+
+> -----Original Message-----
+> From: Sascha Hauer [mailto:s.hauer at pengutronix.de]
+> Sent: 2018?7?11? 14:25
+> To: Robin Gong <yibin.gong@nxp.com>
+> Cc: vkoul at kernel.org; dan.j.williams at intel.com; shawnguo at kernel.org; Fabio
+> Estevam <fabio.estevam@nxp.com>; linux at armlinux.org.uk;
+> linux-arm-kernel at lists.infradead.org; kernel at pengutronix.de;
+> dmaengine at vger.kernel.org; linux-kernel at vger.kernel.org; dl-linux-imx
+> <linux-imx@nxp.com>
+> Subject: Re: [PATCH v1 1/4] dmaengine: imx-sdma: add memcpy interface
 > 
-> > -----Original Message-----
-> > From: Vinod [mailto:vkoul at kernel.org]
-> > Sent: 2018?7?10? 23:33
-> > To: Robin Gong <yibin.gong@nxp.com>
-> > Cc: dan.j.williams at intel.com; shawnguo at kernel.org;
-> > s.hauer at pengutronix.de; Fabio Estevam <fabio.estevam@nxp.com>;
-> > linux at armlinux.org.uk; linux-arm-kernel at lists.infradead.org;
-> > kernel at pengutronix.de; dmaengine at vger.kernel.org;
-> > linux-kernel at vger.kernel.org; dl-linux-imx <linux-imx@nxp.com>
-> > Subject: Re: [PATCH v1 3/4] dmaengine: imx-sdma: support dmatest
-> > 
-> > On 11-07-18, 00:23, Robin Gong wrote:
-> > > dmatest(memcpy) will never call dmaengine_slave_config before prep,
-> > 
-> > and that should have been a hint to you that you should not expect that
-> > 
-> > > so jobs in dmaengine_slave_config need to be moved into somewhere
-> > > before device_prep_dma_memcpy. Besides, dmatest never setup chan
-> > > ->private as other common case like uart/audio/spi will always setup
-> > > chan->private. Here check it to judge if it's dmatest case and do
-> > > jobs in slave_config.
-> > 
-> > and you should not do anything for dmatest. Supporting it means memcpy
-> > implementation is not correct :)
-> Okay, I will any word about dmatest here since memcpy assume no calling
-> slave_config.
-> > 
-> > >
-> > > Signed-off-by: Robin Gong <yibin.gong@nxp.com>
-> > > ---
-> > >  drivers/dma/imx-sdma.c | 37 ++++++++++++++++++++++++++++---------
-> > >  1 file changed, 28 insertions(+), 9 deletions(-)
-> > >
-> > > diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c index
-> > > ed2267d..48f3749 100644
-> > > --- a/drivers/dma/imx-sdma.c
-> > > +++ b/drivers/dma/imx-sdma.c
-> > > @@ -1222,10 +1222,36 @@ static int sdma_alloc_chan_resources(struct
-> > > dma_chan *chan)  {
-> > >  	struct sdma_channel *sdmac = to_sdma_chan(chan);
-> > >  	struct imx_dma_data *data = chan->private;
-> > > +	struct imx_dma_data default_data;
-> > >  	int prio, ret;
-> > >
-> > > -	if (!data)
-> > > -		return -EINVAL;
-> > > +	ret = clk_enable(sdmac->sdma->clk_ipg);
-> > > +	if (ret)
-> > > +		return ret;
-> > > +	ret = clk_enable(sdmac->sdma->clk_ahb);
-> > > +	if (ret)
-> > > +		goto disable_clk_ipg;
-> > > +	/*
-> > > +	 * dmatest(memcpy) will never call dmaengine_slave_config before prep,
-> > > +	 * so jobs in dmaengine_slave_config need to be moved into somewhere
-> > > +	 * before device_prep_dma_memcpy. Besides, dmatest never setup chan
-> > > +	 * ->private as other common cases like uart/audio/spi will setup
-> > > +	 * chan->private always. Here check it to judge if it's dmatest case
-> > > +	 * and do jobs in slave_config.
-> > > +	 */
-> > > +	if (!data) {
-> > > +		dev_warn(sdmac->sdma->dev, "dmatest is running?\n");
-> > 
-> > why is that a warning!
-> Current SDMA driver assume filter function to set chan->private with specific data 
-> (struct imx_dma_data dma_data)like below (sound/soc/fsl/fsl_asrc_dma.c):
-> static bool filter(struct dma_chan *chan, void *param)
-> {
->         if (!imx_dma_is_general_purpose(chan))
->                 return false;
->         chan->private = param;
->         return true;
-> }
+> On Wed, Jul 11, 2018 at 12:23:10AM +0800, Robin Gong wrote:
+> > Add MEMCPY support, meanwhile, add SDMA_BD_MAX_CNT instead of
+> > '0xffff'.
+> >
+> > Signed-off-by: Robin Gong <yibin.gong@nxp.com>
+> > ---
+> > +static struct dma_async_tx_descriptor *sdma_prep_memcpy(
+> > +		struct dma_chan *chan, dma_addr_t dma_dst,
+> > +		dma_addr_t dma_src, size_t len, unsigned long flags) {
+> > +	struct sdma_channel *sdmac = to_sdma_chan(chan);
+> > +	struct sdma_engine *sdma = sdmac->sdma;
+> > +	int channel = sdmac->channel;
+> > +	size_t count;
+> > +	int i = 0, param;
+> > +	struct sdma_buffer_descriptor *bd;
+> > +	struct sdma_desc *desc;
+> > +
+> > +	if (!chan || !len)
+> > +		return NULL;
+> > +
+> > +	dev_dbg(sdma->dev, "memcpy: %pad->%pad, len=%zu, channel=%d.\n",
+> > +		&dma_src, &dma_dst, len, channel);
+> > +
+> > +	desc = sdma_transfer_init(sdmac, DMA_MEM_TO_MEM, len /
+> SDMA_BD_MAX_CNT
+> > +					+ 1);
+> > +	if (!desc)
+> > +		goto err_out;
+> > +
+> > +	do {
+> > +		count = min_t(size_t, len, SDMA_BD_MAX_CNT);
 > 
-> But in memcpy case, at lease dmatest case, no chan->private set in its filter function.
-> So here take dmatest a special case and do some prepare jobs for memcpy. But if the
-> Upper device driver call dma_request_channel() with their specific filter without
-> 'chan->private' setting in the future. The warning message is a useful hint to them to
-> Add 'chan->private' in filter function.  Or doc it somewhere?
-
-Instead of doing heuristics to guess whether we are doing memcpy you
-could instead make memcpy the default when slave_config is not called,
-i.e. drop the if (!data) check completely.
-
-> > 
-> > > +		sdmac->word_size  =  sdmac->sdma->dma_device.copy_align;
-> > > +		default_data.priority = 2;
-> > > +		default_data.peripheral_type = IMX_DMATYPE_MEMORY;
-> > > +		default_data.dma_request = 0;
-> > > +		default_data.dma_request2 = 0;
-> > > +		data = &default_data;
-> > > +
-> > > +		sdma_config_ownership(sdmac, false, true, false);
-> > > +		sdma_get_pc(sdmac, IMX_DMATYPE_MEMORY);
-> > > +		sdma_load_context(sdmac);
-> > > +	}
-> > 
-> > this needs to be default for memcpy
-
-The problem seems to be that we do not know whether we are doing memcpy
-or not. Normally we get the information how a channel is to be
-configured in dma_device->device_config, but this function is not called
-in the memcpy case.
-
-An alternative might also be to do the setup in dma_device->device_prep_dma_memcpy.
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> When len is bigger than 0xffff you initialize count to 0xffff...
+In this case, the data will be split into several bds, for example,
+If the total count is 0x10000, two bd used then. One is for 0xffff,
+Another is for the last 1
+> 
+> > +		bd = &desc->bd[i];
+> > +		bd->buffer_addr = dma_src;
+> > +		bd->ext_buffer_addr = dma_dst;
+> > +		bd->mode.count = count;
+> > +		desc->chn_count += count;
+> > +
+> > +		switch (sdmac->word_size) {
+> > +		case DMA_SLAVE_BUSWIDTH_4_BYTES:
+> > +			bd->mode.command = 0;
+> > +			if ((count | dma_src | dma_dst) & 3)
+> > +				goto err_bd_out;
+> > +			break;
+> 
+> ...In which case you bail out here with an error.
+In case dma_src/dma_dst is not align with bus width.
+But I'll remove such bus width in v2 as Vinod comments.
+> 
+> Please make sure bigger transfers are working.
+> 
+> > +		case DMA_SLAVE_BUSWIDTH_2_BYTES:
+> > +			bd->mode.command = 2;
+> > +			if ((count | dma_src | dma_dst) & 1)
+> > +				goto err_bd_out;
+> > +			break;
+> > +		case DMA_SLAVE_BUSWIDTH_1_BYTE:
+> > +			bd->mode.command = 1;
+> > +			break;
+> > +		default:
+> > +			goto err_bd_out;
+> > +		}
+> > +
+> > +		dma_src += count;
+> > +		dma_dst += count;
+> > +		len -= count;
+> > +		i++;
+> > +
+> > +		param = BD_DONE | BD_EXTD | BD_CONT;
+> 
+> Probably better readable if you drop BD_CONT here and do a
+> 
+> 	if (len) {
+> 		param |= BD_CONT;
+> 	} else  {
+> 		...
+> 	}
+Okay. Will improve it.
+> 
+> Sascha
+> 
+> --
+> Pengutronix e.K.                           |
+> |
+> Industrial Linux Solutions                 |
+> https://emea01.safelinks.protection.outlook.com/?url=http%3A%2F%2Fwww.
+> pengutronix.de%2F&amp;data=02%7C01%7Cyibin.gong%40nxp.com%7C0aa96
+> 135702b4414dbe708d5e6f709fe%7C686ea1d3bc2b4c6fa92cd99c5c301635%7C
+> 0%7C0%7C636668871060103585&amp;sdata=k2h0RIWlujaCs8ioduJsnJAfGW0
+> ZS7uzlHMMtjpQ%2Fw4%3D&amp;reserved=0  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:
+> +49-5121-206917-5555 |
