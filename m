@@ -1,227 +1,144 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Wed, 11 Jul 2018 10:37:05 +0000
-Subject: [PATCH V4 3/5] mailbox: imx: add imx mu support
-In-Reply-To: <20180711075456.npwfpm6mtpkx7k76@pengutronix.de>
-References: <1531061817-1980-1-git-send-email-aisheng.dong@nxp.com>
- <1531061817-1980-4-git-send-email-aisheng.dong@nxp.com>
- <20180710141940.oed3kwhbplnykl36@pengutronix.de>
- <AM0PR04MB42113391A6EA741E2767C74B805A0@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <20180711075456.npwfpm6mtpkx7k76@pengutronix.de>
-Message-ID: <AM0PR04MB42119DAE987CDF871CA8CFC6805A0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 11 Jul 2018 11:38:21 +0100
+Subject: [PATCH v3 15/20] kvm: arm/arm64: Allow tuning the physical
+ address size for VM
+In-Reply-To: <0d9d48fc-f913-9f05-afbe-83299c470611@arm.com>
+References: <12d1832a-1a13-7dd4-662b-addf58400789@arm.com>
+ <fe9f5aa5-b283-07e0-5f0e-e97d96b780e7@arm.com>
+ <9f1af26e-2913-2b0b-1352-63160096f78f@arm.com>
+ <f3463d0a-c6a3-c34d-acb3-13c99fc61c5a@arm.com>
+ <20180709112326.GD9486@e103592.cambridge.arm.com>
+ <17f8d585-3489-ab6f-6ee1-4d8d337dcf9c@arm.com>
+ <20180709133750.GE9486@e103592.cambridge.arm.com>
+ <377420ce-97a8-4359-6224-273d91f37247@arm.com>
+ <20180710170330.GJ9486@e103592.cambridge.arm.com>
+ <0d9d48fc-f913-9f05-afbe-83299c470611@arm.com>
+Message-ID: <20180711103819.GK9486@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Sascha Hauer [mailto:s.hauer at pengutronix.de]
-> Sent: Wednesday, July 11, 2018 3:55 PM
-> To: A.s. Dong <aisheng.dong@nxp.com>
-> Cc: linux-arm-kernel at lists.infradead.org; dongas86 at gmail.com; Jassi Brar
-> <jassisinghbrar@gmail.com>; linux-kernel at vger.kernel.org; Oleksij Rempel
-> <o.rempel@pengutronix.de>; dl-linux-imx <linux-imx@nxp.com>;
-> kernel at pengutronix.de; Fabio Estevam <fabio.estevam@nxp.com>;
-> shawnguo at kernel.org
-> Subject: Re: [PATCH V4 3/5] mailbox: imx: add imx mu support
+On Wed, Jul 11, 2018 at 10:05:50AM +0100, Suzuki K Poulose wrote:
+> On 10/07/18 18:03, Dave Martin wrote:
+> >On Tue, Jul 10, 2018 at 05:38:39PM +0100, Suzuki K Poulose wrote:
+> >>On 09/07/18 14:37, Dave Martin wrote:
+> >>>On Mon, Jul 09, 2018 at 01:29:42PM +0100, Marc Zyngier wrote:
+> >>>>On 09/07/18 12:23, Dave Martin wrote:
+> >
+> >[...]
+> >
+> >>>>>Wedging arguments into a few bits in the type argument feels awkward,
+> >>>>>and may be regretted later if we run out of bits, or something can't be
+> >>>>>represented in the chosen encoding.
+> >>>>
+> >>>>I think that's a pretty convincing argument for a "better" CREATE_VM,
+> >>>>one that would have a clearly defined, structured (and potentially
+> >>>>extensible) argument.
+> >>>>
+> >>>>I've quickly hacked the following:
+> >>>>
+> >>>>diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+> >>>>index b6270a3b38e9..3e76214034c2 100644
+> >>>>--- a/include/uapi/linux/kvm.h
+> >>>>+++ b/include/uapi/linux/kvm.h
+> >>>>@@ -735,6 +735,20 @@ struct kvm_ppc_resize_hpt {
+> >>>>  	__u32 pad;
+> >>>>  };
+> >>>>
+> >>>>+struct kvm_create_vm2 {
+> >>>>+	__u64	version;	/* Or maybe not */
+> >>>>+	union {
+> >>>>+		struct {
+> >>>>+#define KVM_ARM_SVE_CAPABLE	(1 << 0)
+> >>>>+#define KVM_ARM_SELECT_IPA	{1 << 1)
+> >>>>+			__u64	capabilities;
+> >>>>+			__u16	sve_vlen;
+> >>>>+			__u8	ipa_size;
+> >>>>+		} arm64;
+> >>>>+		__u64	dummy[15];
+> >>>>+	};
+> >>>>+};
+> >>>>+
+> >>>>  #define KVMIO 0xAE
+> >>>>
+> >>>>  /* machine type bits, to be used as argument to KVM_CREATE_VM */
+> >>>>
+> >>>>Other architectures could fill in their own bits if they need to.
+> >>>>
+> >>>>Thoughts?
+> >>>
+> >>>This kind of thing should work, but it may still get messy when we
+> >>>add additional fields.
+> >>
+> >>
+> >>Marc, Dave,
+> >>
+> >>I like Dave's approach. Some comments below.
+> >>
+> >>>
+> >>>It we want this to work cross-arch, would it make sense to go
+> >>>for a more generic approach, say
+> >>>
+> >>>struct kvm_create_vm_attr_any {
+> >>>         __u32   type;
+> >>>};
+> >>>
+> >>>#define KVM_CREATE_VM_ATTR_ARCH_CAPABILITIES 1
+> >>>struct kvm_create_vm_attr_arch_capabilities {
+> >>>         __u32   type;
+> >>>         __u16   size; /* support future expansion of capabilities[] */
+> >>>         __u16   reserved;
+> >>>         __u64   capabilities[1];
+> >>>};
+> >>
+> >>We also need to advertise which attributes are supported by the host,
+> >>so that the user can tune the available ones. That would make a bit mask
+> >>like the above trickier, unless we return the supported values back
+> >>in the argument ptr for the "probe" call. And this scheme in general
+> >>can be useful for passing back a non-boolean result specific to the
+> >>attribute, without having a per-attribute ioctl. (e.g, maximum limit
+> >>for IPA).
+> >
+> >Maybe, but this could quickly become bloated.  (My approach already
+> >feels a bit bloated...)
+> >
+> >I'm not sure that arbitrarily complex negotiation will really be
+> >needed, but userspace might want to change its mind if setting a
+> >particular propertiy fails.
+> >
+> >An alternative might be to have a bunch of per-VM ioctls to configure
+> >different things, like x86 has.  There's at least precedent for that.
+> >For arm, we currently only have a few.  That allows for easy extension,
+> >at the cost of adding ioctls.
 > 
-> On Wed, Jul 11, 2018 at 07:29:38AM +0000, A.s. Dong wrote:
-> > Hi Sascha,
-> >
-> > > -----Original Message-----
-> > > From: Sascha Hauer [mailto:s.hauer at pengutronix.de]
-> > > Sent: Tuesday, July 10, 2018 10:20 PM
-> > > To: A.s. Dong <aisheng.dong@nxp.com>
-> > > Cc: linux-arm-kernel at lists.infradead.org; dongas86 at gmail.com; Jassi
-> > > Brar <jassisinghbrar@gmail.com>; linux-kernel at vger.kernel.org;
-> > > Oleksij Rempel <o.rempel@pengutronix.de>; dl-linux-imx
-> > > <linux-imx@nxp.com>; kernel at pengutronix.de; Fabio Estevam
-> > > <fabio.estevam@nxp.com>; shawnguo at kernel.org
-> > > Subject: Re: [PATCH V4 3/5] mailbox: imx: add imx mu support
-> > >
-> > > Hi,
-> > >
-> > > On Sun, Jul 08, 2018 at 10:56:55PM +0800, Dong Aisheng wrote:
-> > > > This is used for i.MX multi core communication.
-> > > > e.g. A core to SCU firmware(M core) on MX8.
-> > > >
-> > > > Tx is using polling mode while Rx is interrupt driven and schedule
-> > > > a hrtimer to receive remain words if have more than
-> > > > 4 words.
-> > >
-> > > You told us that using interrupts is not possible due to miserable
-> > > performance, we then provided you a way with which you could poll.
-> > > Why are you using interrupts now?
-> > >
-> >
-> > Because mailbox framework does not support sync rx now, I think we do
-> > not need to wait for that feature done first as it's independent and
-> > separate features of framework.
-> 
-> You can wait forever for this feature, nobody will add it for you. It's up to you
-> to add support for that feature. Who else should add this feature if not you?
-> And when will you add that feature if not now when you actually need it?
-> It is common practice that you adjust the frameworks to your needs rather
-> than working around them.
-> 
+> As you know, one of the major problems with the per-VM ioctls is
+> the ordering of different operations and tracking to make sure that
+> the userspace follows the expected order. e.g, the first approach for
+> IPA series was based on this and it made things complex enough to drop
+> it.
 
-I'm willing to add it. Just because you said Jassi already had the idea on how to
-Implement it and does not add much complexity. So I just want to see his patches.
-But if he did not work on it, I can also help on it.
+I'm aware of that, but if we are adding a new KVM_CREATE_VM, we could
+perhaps give it different semantics: i.e., we create a half-created VM
+that only accepts configuration ioctls and a "finish creation" ioctl
+that finalises everything before you're allowed to create devices,
+vcpus etc.
 
-Another reason is i did not observe regression as before, so it looks like the irq
-is an applicable way currently and not must use polling at this point as that's
-an independent new feature of framework. So irq mode is the quickest way
-to demo the mbox using  as we already had experience before.
+This is the sort of thing I was moving torwards for SVE (but for
+vcpus there).
 
-> >
-> > So for now, we're just using the common way in kernel as arm scpi and ti sci.
-> > When framework supports it, we can easily switch to it.
-> >
-> > I optimized the performance a bit by removing the unnecessary memcopy
-> > between tx/tx messages. The test result of booting time shows there's
-> > no obvious regressions. I'm not sure whether it's due to we're booting
-> > a minimum system or the extra cost is very minor to be noticed due to
-> > not too much cmds sent during booting.
-> 
-> Your boot time argument seems to be a very weak one. unnecessary
-> memcpys of a few bytes only take a fraction of the time interrupt latencies
-> introduce.
-> 
-
-Yes, interrupt latency may be the major part.
-
-> > (Copy Peng to comments more as he tried and reported that performance
-> > drop with vendor tree)
-> >
-> > From the time measurement of sc_call_rpc, we can see that most rpc
-> > command In polling mode can finish within 10us and very rare ones over
-> 20us.
-> > If switched to irq mode, those 10us cmds will change to about 20us.
-> >
-> > But the overall booting time did not increase much. Maybe the irq mode
-> > also saves some CPU MIPS to execute other works in parallel?
-> >
-> > > We also suggested a way how the SCU mode could be integrated into
-> > > the generic MU support driver Oleksij posted and now you send a
-> > > driver which uses the same name as Oleksijs driver, but it only and
-> > > exclusively works in SCU mode. This doesn't bring us forward.
-> > >
-> >
-> > Can Oleksij's patch be implemented against this one?
-> > As I remember you said we've still not determined whether Oleksij's
-> > approach is the most suitable way and it's still under discussion.
-> > (Actually TI's approach looks better which is more simiar as SCU way?)
-> >
-> > Furthermore, from this patch, you will notice that Oleksij's patch
-> > almost did not work for SCU at all. I have to totally rewrite one for SCU.
-> 
-> You are kidding. You have to rewrite it because you didn't follow my
-> suggestion to implement polling in the mailbox framework.
-> 
-
-As I said, I did not observe regression when switch to irq way.
-And irq way is the common mbox approach in kernel. So i just use
-it to quickly demo the mbox using which we already implemented.
-It's simple!
-
-But I got your meaning that we must switch to polling mode
-now, because we want to sync with M4, right?
-
-> > So I did not write against his patch as it does not help.
-> > And Oleksij's patch is quite simple while the SCU one is much
-> > complicated than his one. So we probably better get SCU done first.
-> >
-> > > We suggested a binding that allows coexisting of the SCU mode and
-> > > the generic mode of the MU by putting the mode information into the
-> > > second mbox-cell. Why don't you use this?
-> > >
-> >
-> > You mean this?
-> > +#define IMX_MU_CHANNEL0		0
-> > +#define IMX_MU_CHANNEL1		1
-> > +#define IMX_MU_CHANNEL2		2
-> > +#define IMX_MU_CHANNEL3		3
-> > +#define IMX_MU_CHANNEL_IMX8_SCU 4
-> 
-> Yes.
-> 
-> >
-> > It's hard for me to believe it's correct and it's over abstract to HW.
-> > So I thought using mbox-cells to distinguish seems to be better.
-> 
-> The MU has four rx registers, four tx registers and four interrupts.
-> What else should this be than four channels? The number of channels the
-> MU has is obviously defined by the software running at the other end of the
-> MU. Yes, the SCU makes one channel from it, in other cases it's four channels.
->
-
-I'm not against 4 four channels. Just feel SCU using is strange because
-SCU is using it as one channel from HW point of view. Not four.
-And make them into four channels for M4 also lose the HW capability to send
-Up to 4 words at one time. That's also an issue. 
-(I guess we're assuming no actual users of multi words sending, right?)
-
-So using mbox-cells to distinguish seems more reasonable.
-e.g.
-For one channel case: (communicate with SCU)
-Mbox-cells = <0>;
-
-Client_node {
-	....
-	Mbox =<&lsio_mu0>;
-}
-
-For 4 channel case: (communicate with M4)
-Mbox-cells = <1>;
-
-Client_node {
-	....
-	mbox =<&mu0 1>;
-}
-
-Anything wrong with it?
-
-It seems more reflect the real HW and will not introduce confusion.
+I'm not saying we should drop the existing KVM_CREATE_VM2 ideas,
+but that we should take a step back if it starts to accrue complexity.
 
 > >
-> > > I don't think it's necessary to rewrite Oleksijs driver, instead it
-> > > should rather be extended with the code I already provided as an
-> > > example. With that we could make both of us happy since we can both
-> > > have a suitable driver and even share most of the MU code.
-> >
-> > As I said above, I even can't reuse 90%+ code of Oleksijs driver. So I
-> > can't see the meaning to demo the code on top of this driver. We can
-> > review the SCU implementation directly with this driver which is more easy.
-> > Then we can decide how to merge them together.
+> >There may be some ioctls we can reuse, like KVM_ENABLE_CAP for per-
+> >vm capability flags.
 > 
-> You can only not share the code because the mailbox framework does not
-> support polling. And yes, I even provided some code which implements SCU
-> mode ontop of Oleksijs driver.
-> 
-> Honestly, what I expect from you is no rocket science and we would already
-> be there if we didn't spend our time discussing this.
-> 
+> May be we could switch to KVM_VM_CAPS and pass a list of capabilities
+> to be enabled at creation time ? The kvm_enable_cap can pass in additional
+> arguments for each cap. That way we don't have to rely on a new set of
+> attributes and probing becomes straight forward.
 
-I actually spent a lot time on it to switch to mbox to demo the using step by step,
-and try to merge them with M4 users later. Although I don't think it's quite worthy
-to do that, but I still do it Just because I respect you guys.
+That's a possibility.  I guess we'd need to understand how exactly x86
+uses this.
 
->From our point of view, we just tried to be more careful about the change request
-as we have more information than outside.
-
-I also don't want to stop at this point. So I will try to add sync polling in mailbox
-Framework and switch to it now.
-
-Regards
-Dong Aisheng
-
-> Sascha
-> 
-> --
-> Pengutronix e.K.                           |                             |
-> Industrial Linux Solutions                 |
-> https://emea01.safelinks.protection.outlook.com/?url=http%3A%2F%2Fww
-> w.pengutronix.de%2F&amp;data=02%7C01%7Caisheng.dong%40nxp.com%7
-> Cb49570c607cf4057563d08d5e7039a70%7C686ea1d3bc2b4c6fa92cd99c5c3016
-> 35%7C0%7C0%7C636668925017826212&amp;sdata=UT5AhUX%2FV7mCtUit0
-> 1KSgJtf%2FdmOmmDMVz8EVebBaVk%3D&amp;reserved=0  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Cheers
+---Dave
