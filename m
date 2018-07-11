@@ -1,161 +1,201 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed, 11 Jul 2018 13:40:12 -0600
-Subject: [PATCH 02/25] coresight: etm4x: Don't use contextID with PID
- namespaces
+Date: Wed, 11 Jul 2018 13:40:18 -0600
+Subject: [PATCH 08/25] coresight: Add helper for inserting synchronization
+ packets
 In-Reply-To: <1531338035-11729-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1531338035-11729-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1531338035-11729-3-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1531338035-11729-9-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As with ETM3x, the ETM4x tracers can trigger trace acquisition based on
-contextID value, something that isn't useful when PID namespaces are
-enabled.  Indeed the PID value of a process has a different representation
-in the kernel and the PID namespace, making the feature confusing and
-potentially leaking internal kernel information.
+From: Suzuki K Poulose <suzuki.poulose@arm.com>
 
-As such simply return an error when the feature is being used from a
-PID namespace other than the default one.
+Right now we open code filling the trace buffer with synchronization
+packets when the circular buffer wraps around in different drivers.
+Move this to a common place. While at it, clean up the barrier_pkt
+array to strip off the trailing '\0'.
 
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Cc: Mike Leach <mike.leach@linaro.org>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-Reviewed-by: Kim Phillips <kim.phillips@arm.com>
-Acked-by: "Eric W. Biederman" <ebiederm@xmission.com>
 ---
- .../hwtracing/coresight/coresight-etm4x-sysfs.c    | 47 +++++++++++++++++-----
- drivers/hwtracing/coresight/coresight-etm4x.h      |  3 --
- 2 files changed, 38 insertions(+), 12 deletions(-)
+ drivers/hwtracing/coresight/coresight-etb10.c   | 12 ++++-------
+ drivers/hwtracing/coresight/coresight-priv.h    | 10 ++++++++-
+ drivers/hwtracing/coresight/coresight-tmc-etf.c | 27 ++++++++-----------------
+ drivers/hwtracing/coresight/coresight-tmc-etr.c | 13 +-----------
+ drivers/hwtracing/coresight/coresight.c         |  3 +--
+ 5 files changed, 23 insertions(+), 42 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-etm4x-sysfs.c b/drivers/hwtracing/coresight/coresight-etm4x-sysfs.c
-index 4eb8da785ce0..a0365e23678e 100644
---- a/drivers/hwtracing/coresight/coresight-etm4x-sysfs.c
-+++ b/drivers/hwtracing/coresight/coresight-etm4x-sysfs.c
-@@ -4,6 +4,7 @@
-  * Author: Mathieu Poirier <mathieu.poirier@linaro.org>
-  */
+diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
+index 320d29df17e1..306119eaf16a 100644
+--- a/drivers/hwtracing/coresight/coresight-etb10.c
++++ b/drivers/hwtracing/coresight/coresight-etb10.c
+@@ -195,7 +195,6 @@ static void etb_dump_hw(struct etb_drvdata *drvdata)
+ 	bool lost = false;
+ 	int i;
+ 	u8 *buf_ptr;
+-	const u32 *barrier;
+ 	u32 read_data, depth;
+ 	u32 read_ptr, write_ptr;
+ 	u32 frame_off, frame_endoff;
+@@ -226,19 +225,16 @@ static void etb_dump_hw(struct etb_drvdata *drvdata)
  
-+#include <linux/pid_namespace.h>
- #include <linux/pm_runtime.h>
- #include <linux/sysfs.h>
- #include "coresight-etm4x.h"
-@@ -250,10 +251,8 @@ static ssize_t reset_store(struct device *dev,
+ 	depth = drvdata->buffer_depth;
+ 	buf_ptr = drvdata->buf;
+-	barrier = barrier_pkt;
+ 	for (i = 0; i < depth; i++) {
+ 		read_data = readl_relaxed(drvdata->base +
+ 					  ETB_RAM_READ_DATA_REG);
+-		if (lost && *barrier) {
+-			read_data = *barrier;
+-			barrier++;
+-		}
+-
+ 		*(u32 *)buf_ptr = read_data;
+ 		buf_ptr += 4;
  	}
  
- 	config->ctxid_idx = 0x0;
--	for (i = 0; i < drvdata->numcidc; i++) {
-+	for (i = 0; i < drvdata->numcidc; i++)
- 		config->ctxid_pid[i] = 0x0;
--		config->ctxid_vpid[i] = 0x0;
--	}
- 
- 	config->ctxid_mask0 = 0x0;
- 	config->ctxid_mask1 = 0x0;
-@@ -1637,9 +1636,16 @@ static ssize_t ctxid_pid_show(struct device *dev,
- 	struct etmv4_drvdata *drvdata = dev_get_drvdata(dev->parent);
- 	struct etmv4_config *config = &drvdata->config;
- 
-+	/*
-+	 * Don't use contextID tracing if coming from a PID namespace.  See
-+	 * comment in ctxid_pid_store().
-+	 */
-+	if (task_active_pid_ns(current) != &init_pid_ns)
-+		return -EINVAL;
++	if (lost)
++		coresight_insert_barrier_packet(drvdata->buf);
 +
- 	spin_lock(&drvdata->spinlock);
- 	idx = config->ctxid_idx;
--	val = (unsigned long)config->ctxid_vpid[idx];
-+	val = (unsigned long)config->ctxid_pid[idx];
- 	spin_unlock(&drvdata->spinlock);
- 	return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
- }
-@@ -1649,26 +1655,35 @@ static ssize_t ctxid_pid_store(struct device *dev,
- 			       const char *buf, size_t size)
+ 	if (frame_off) {
+ 		buf_ptr -= (frame_endoff * 4);
+ 		for (i = 0; i < frame_endoff; i++) {
+@@ -447,7 +443,7 @@ static void etb_update_buffer(struct coresight_device *csdev,
+ 		buf_ptr = buf->data_pages[cur] + offset;
+ 		read_data = readl_relaxed(drvdata->base +
+ 					  ETB_RAM_READ_DATA_REG);
+-		if (lost && *barrier) {
++		if (lost && i < CORESIGHT_BARRIER_PKT_SIZE) {
+ 			read_data = *barrier;
+ 			barrier++;
+ 		}
+diff --git a/drivers/hwtracing/coresight/coresight-priv.h b/drivers/hwtracing/coresight/coresight-priv.h
+index 0e5a74dae6a6..1a6cf3589866 100644
+--- a/drivers/hwtracing/coresight/coresight-priv.h
++++ b/drivers/hwtracing/coresight/coresight-priv.h
+@@ -57,7 +57,8 @@ static DEVICE_ATTR_RO(name)
+ #define coresight_simple_reg64(type, name, lo_off, hi_off)		\
+ 	__coresight_simple_func(type, NULL, name, lo_off, hi_off)
+ 
+-extern const u32 barrier_pkt[5];
++extern const u32 barrier_pkt[4];
++#define CORESIGHT_BARRIER_PKT_SIZE (sizeof(barrier_pkt))
+ 
+ enum etm_addr_type {
+ 	ETM_ADDR_TYPE_NONE,
+@@ -91,6 +92,13 @@ struct cs_buffers {
+ 	void			**data_pages;
+ };
+ 
++static inline void coresight_insert_barrier_packet(void *buf)
++{
++	if (buf)
++		memcpy(buf, barrier_pkt, CORESIGHT_BARRIER_PKT_SIZE);
++}
++
++
+ static inline void CS_LOCK(void __iomem *addr)
  {
- 	u8 idx;
--	unsigned long vpid, pid;
-+	unsigned long pid;
- 	struct etmv4_drvdata *drvdata = dev_get_drvdata(dev->parent);
- 	struct etmv4_config *config = &drvdata->config;
+ 	do {
+diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+index 73160cd0e0d1..0549249f4b39 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
++++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+@@ -32,39 +32,28 @@ static void tmc_etb_enable_hw(struct tmc_drvdata *drvdata)
  
- 	/*
-+	 * When contextID tracing is enabled the tracers will insert the
-+	 * value found in the contextID register in the trace stream.  But if
-+	 * a process is in a namespace the PID of that process as seen from the
-+	 * namespace won't be what the kernel sees, something that makes the
-+	 * feature confusing and can potentially leak kernel only information.
-+	 * As such refuse to use the feature if @current is not in the initial
-+	 * PID namespace.
-+	 */
-+	if (task_active_pid_ns(current) != &init_pid_ns)
-+		return -EINVAL;
-+
-+	/*
- 	 * only implemented when ctxid tracing is enabled, i.e. at least one
- 	 * ctxid comparator is implemented and ctxid is greater than 0 bits
- 	 * in length
- 	 */
- 	if (!drvdata->ctxid_size || !drvdata->numcidc)
- 		return -EINVAL;
--	if (kstrtoul(buf, 16, &vpid))
-+	if (kstrtoul(buf, 16, &pid))
- 		return -EINVAL;
+ static void tmc_etb_dump_hw(struct tmc_drvdata *drvdata)
+ {
+-	bool lost = false;
+ 	char *bufp;
+-	const u32 *barrier;
+-	u32 read_data, status;
++	u32 read_data, lost;
+ 	int i;
  
--	pid = coresight_vpid_to_pid(vpid);
+-	/*
+-	 * Get a hold of the status register and see if a wrap around
+-	 * has occurred.
+-	 */
+-	status = readl_relaxed(drvdata->base + TMC_STS);
+-	if (status & TMC_STS_FULL)
+-		lost = true;
 -
- 	spin_lock(&drvdata->spinlock);
- 	idx = config->ctxid_idx;
- 	config->ctxid_pid[idx] = (u64)pid;
--	config->ctxid_vpid[idx] = (u64)vpid;
- 	spin_unlock(&drvdata->spinlock);
- 	return size;
++	/* Check if the buffer wrapped around. */
++	lost = readl_relaxed(drvdata->base + TMC_STS) & TMC_STS_FULL;
+ 	bufp = drvdata->buf;
+ 	drvdata->len = 0;
+-	barrier = barrier_pkt;
+ 	while (1) {
+ 		for (i = 0; i < drvdata->memwidth; i++) {
+ 			read_data = readl_relaxed(drvdata->base + TMC_RRD);
+ 			if (read_data == 0xFFFFFFFF)
+-				return;
+-
+-			if (lost && *barrier) {
+-				read_data = *barrier;
+-				barrier++;
+-			}
+-
++				goto done;
+ 			memcpy(bufp, &read_data, 4);
+ 			bufp += 4;
+ 			drvdata->len += 4;
+ 		}
+ 	}
++done:
++	if (lost)
++		coresight_insert_barrier_packet(drvdata->buf);
++	return;
  }
-@@ -1682,6 +1697,13 @@ static ssize_t ctxid_masks_show(struct device *dev,
- 	struct etmv4_drvdata *drvdata = dev_get_drvdata(dev->parent);
- 	struct etmv4_config *config = &drvdata->config;
  
-+	/*
-+	 * Don't use contextID tracing if coming from a PID namespace.  See
-+	 * comment in ctxid_pid_store().
-+	 */
-+	if (task_active_pid_ns(current) != &init_pid_ns)
-+		return -EINVAL;
-+
- 	spin_lock(&drvdata->spinlock);
- 	val1 = config->ctxid_mask0;
- 	val2 = config->ctxid_mask1;
-@@ -1699,6 +1721,13 @@ static ssize_t ctxid_masks_store(struct device *dev,
- 	struct etmv4_config *config = &drvdata->config;
+ static void tmc_etb_disable_hw(struct tmc_drvdata *drvdata)
+diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+index 18c9a184d31a..04206ff7a67c 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
++++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+@@ -91,9 +91,7 @@ ssize_t tmc_etr_get_sysfs_trace(struct tmc_drvdata *drvdata,
  
- 	/*
-+	 * Don't use contextID tracing if coming from a PID namespace.  See
-+	 * comment in ctxid_pid_store().
-+	 */
-+	if (task_active_pid_ns(current) != &init_pid_ns)
-+		return -EINVAL;
-+
-+	/*
- 	 * only implemented when ctxid tracing is enabled, i.e. at least one
- 	 * ctxid comparator is implemented and ctxid is greater than 0 bits
- 	 * in length
-diff --git a/drivers/hwtracing/coresight/coresight-etm4x.h b/drivers/hwtracing/coresight/coresight-etm4x.h
-index b7c4a6f6c6b9..52786e9d8926 100644
---- a/drivers/hwtracing/coresight/coresight-etm4x.h
-+++ b/drivers/hwtracing/coresight/coresight-etm4x.h
-@@ -230,8 +230,6 @@
-  * @addr_type:	Current status of the comparator register.
-  * @ctxid_idx:	Context ID index selector.
-  * @ctxid_pid:	Value of the context ID comparator.
-- * @ctxid_vpid:	Virtual PID seen by users if PID namespace is enabled, otherwise
-- *		the same value of ctxid_pid.
-  * @ctxid_mask0:Context ID comparator mask for comparator 0-3.
-  * @ctxid_mask1:Context ID comparator mask for comparator 4-7.
-  * @vmid_idx:	VM ID index selector.
-@@ -274,7 +272,6 @@ struct etmv4_config {
- 	u8				addr_type[ETM_MAX_SINGLE_ADDR_CMP];
- 	u8				ctxid_idx;
- 	u64				ctxid_pid[ETMv4_MAX_CTXID_CMP];
--	u64				ctxid_vpid[ETMv4_MAX_CTXID_CMP];
- 	u32				ctxid_mask0;
- 	u32				ctxid_mask1;
- 	u8				vmid_idx;
+ static void tmc_etr_dump_hw(struct tmc_drvdata *drvdata)
+ {
+-	const u32 *barrier;
+ 	u32 val;
+-	u32 *temp;
+ 	u64 rwp;
+ 
+ 	rwp = tmc_read_rwp(drvdata);
+@@ -106,16 +104,7 @@ static void tmc_etr_dump_hw(struct tmc_drvdata *drvdata)
+ 	if (val & TMC_STS_FULL) {
+ 		drvdata->buf = drvdata->vaddr + rwp - drvdata->paddr;
+ 		drvdata->len = drvdata->size;
+-
+-		barrier = barrier_pkt;
+-		temp = (u32 *)drvdata->buf;
+-
+-		while (*barrier) {
+-			*temp = *barrier;
+-			temp++;
+-			barrier++;
+-		}
+-
++		coresight_insert_barrier_packet(drvdata->buf);
+ 	} else {
+ 		drvdata->buf = drvdata->vaddr;
+ 		drvdata->len = rwp - drvdata->paddr;
+diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
+index 29e834aab539..4969b329511c 100644
+--- a/drivers/hwtracing/coresight/coresight.c
++++ b/drivers/hwtracing/coresight/coresight.c
+@@ -51,8 +51,7 @@ static struct list_head *stm_path;
+  * beginning of the data collected in a buffer.  That way the decoder knows that
+  * it needs to look for another sync sequence.
+  */
+-const u32 barrier_pkt[5] = {0x7fffffff, 0x7fffffff,
+-			    0x7fffffff, 0x7fffffff, 0x0};
++const u32 barrier_pkt[4] = {0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff};
+ 
+ static int coresight_id_match(struct device *dev, void *data)
+ {
 -- 
 2.7.4
