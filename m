@@ -1,51 +1,68 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 11 Jul 2018 13:45:46 -0600
-Subject: [PATCH v2 2/3] clk: meson: add sub MMC clock dt-bindings IDs
-In-Reply-To: <20180710163658.6175-3-yixun.lan@amlogic.com>
-References: <20180710163658.6175-1-yixun.lan@amlogic.com>
- <20180710163658.6175-3-yixun.lan@amlogic.com>
-Message-ID: <20180711194546.GA7090@rob-hp-laptop>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Wed, 11 Jul 2018 13:40:35 -0600
+Subject: [PATCH 25/25] coresight: tpiu: Fix disabling timeouts
+In-Reply-To: <1531338035-11729-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1531338035-11729-1-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1531338035-11729-26-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 10, 2018 at 04:36:57PM +0000, Yixun Lan wrote:
-> Add two clock bindings IDs which provided by the MMC clock controller,
-> These two clocks will be used by MMC or NAND driver.
+From: Robin Murphy <robin.murphy@arm.com>
 
-I count 3 ids.
+Probing the TPIU driver under UBSan triggers an out-of-bounds shift
+warning in coresight_timeout():
 
-> 
-> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
-> ---
->  .../dt-bindings/clock/amlogic,meson-mmc-clkc.h   | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
->  create mode 100644 include/dt-bindings/clock/amlogic,meson-mmc-clkc.h
+...
+[    5.677530] UBSAN: Undefined behaviour in drivers/hwtracing/coresight/coresight.c:929:16
+[    5.685542] shift exponent 64 is too large for 64-bit type 'long unsigned int'
+...
 
-This can go with the binding patch.
+On closer inspection things are exponentially out of whack because we're
+passing a bitmask where a bit number should be. Amusingly, it seems that
+both calls will find their expected values by sheer luck and appear to
+succeed: 1 << FFCR_FON_MAN ends up at bit 64 which whilst undefined
+evaluates as zero in practice, while 1 << FFSR_FT_STOPPED finds bit 2
+(TCPresent) which apparently is usually tied high.
 
-> 
-> diff --git a/include/dt-bindings/clock/amlogic,meson-mmc-clkc.h b/include/dt-bindings/clock/amlogic,meson-mmc-clkc.h
-> new file mode 100644
-> index 000000000000..2ae988ebc3ae
-> --- /dev/null
-> +++ b/include/dt-bindings/clock/amlogic,meson-mmc-clkc.h
-> @@ -0,0 +1,16 @@
-> +/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
-> +/*
-> + * Meson MMC sub clock tree IDs
-> + *
-> + * Copyright (c) 2018 Amlogic, Inc. All rights reserved.
-> + * Author: Yixun Lan <yixun.lan@amlogic.com>
-> + */
-> +
-> +#ifndef __MMC_CLKC_H
-> +#define __MMC_CLKC_H
-> +
-> +#define CLKID_MMC_DIV				1
-> +#define CLKID_MMC_PHASE_TX			3
-> +#define CLKID_MMC_PHASE_RX			4
-> +
-> +#endif
-> -- 
-> 2.18.0
-> 
+Following the examples of other drivers, define separate FOO and FOO_BIT
+macros for masks vs. indices, and put things right.
+
+CC: Robert Walker <robert.walker@arm.com>
+CC: Mike Leach <mike.leach@linaro.org>
+CC: Mathieu Poirier <mathieu.poirier@linaro.org>
+Fixes: 11595db8e17f ("coresight: Fix disabling of CoreSight TPIU")
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+---
+ drivers/hwtracing/coresight/coresight-tpiu.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/hwtracing/coresight/coresight-tpiu.c b/drivers/hwtracing/coresight/coresight-tpiu.c
+index 01b7457fe8fc..459ef930d98c 100644
+--- a/drivers/hwtracing/coresight/coresight-tpiu.c
++++ b/drivers/hwtracing/coresight/coresight-tpiu.c
+@@ -40,8 +40,9 @@
+ 
+ /** register definition **/
+ /* FFSR - 0x300 */
+-#define FFSR_FT_STOPPED		BIT(1)
++#define FFSR_FT_STOPPED_BIT	1
+ /* FFCR - 0x304 */
++#define FFCR_FON_MAN_BIT	6
+ #define FFCR_FON_MAN		BIT(6)
+ #define FFCR_STOP_FI		BIT(12)
+ 
+@@ -86,9 +87,9 @@ static void tpiu_disable_hw(struct tpiu_drvdata *drvdata)
+ 	/* Generate manual flush */
+ 	writel_relaxed(FFCR_STOP_FI | FFCR_FON_MAN, drvdata->base + TPIU_FFCR);
+ 	/* Wait for flush to complete */
+-	coresight_timeout(drvdata->base, TPIU_FFCR, FFCR_FON_MAN, 0);
++	coresight_timeout(drvdata->base, TPIU_FFCR, FFCR_FON_MAN_BIT, 0);
+ 	/* Wait for formatter to stop */
+-	coresight_timeout(drvdata->base, TPIU_FFSR, FFSR_FT_STOPPED, 1);
++	coresight_timeout(drvdata->base, TPIU_FFSR, FFSR_FT_STOPPED_BIT, 1);
+ 
+ 	CS_LOCK(drvdata->base);
+ }
+-- 
+2.7.4
