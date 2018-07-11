@@ -1,37 +1,97 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Wed, 11 Jul 2018 10:24:34 +0200
-Subject: [PATCH] ARM: dts: sun8i: sun8i-a83t-bananapi-m3: enhance vcc-pd
- to 3.3v
-In-Reply-To: <1531165914-29760-1-git-send-email-clabbe@baylibre.com>
-References: <1531165914-29760-1-git-send-email-clabbe@baylibre.com>
-Message-ID: <20180711082434.euhakdczf56p3fia@flea>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 11 Jul 2018 10:25:50 +0200
+Subject: Vibrations on Droid 4?
+In-Reply-To: <20180710161123.azym6sbboriuj4yc@earth.universe>
+References: <20180709081534.GA6799@amd>
+ <20180709214910.tes6u4ivxomd3aja@earth.universe>
+ <20180709220211.GA7760@amd>
+ <20180710101147.lyu65ro4czvrs2da@earth.universe>
+ <20180710133040.GA4391@amd>
+ <20180710161123.azym6sbboriuj4yc@earth.universe>
+Message-ID: <20180711082550.GB21225@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 09, 2018 at 07:51:54PM +0000, Corentin Labbe wrote:
-> Since commit d7c5f6863550 ("ARM: dts: sun8i: a83t: bananapi-m3: Add AXP813 regulator nodes")
-> my BPIM3 no longer works at gigabit speed.
+On Tue 2018-07-10 18:11:23, Sebastian Reichel wrote:
+> Hi,
 > 
-> With the default setting, dldo3 is regulated at 2.9v which seems
-> sufficient for the PHy but d7c5f6863550 drop it to 2.5 which is insufficient.
-> Note that this behaviour is random for all BPIM3 (some works with 2.5, some not)
+> On Tue, Jul 10, 2018 at 03:30:40PM +0200, Pavel Machek wrote:
+> > On Tue 2018-07-10 12:11:47, Sebastian Reichel wrote:
+> > > On Tue, Jul 10, 2018 at 12:02:11AM +0200, Pavel Machek wrote:
+> > > > > > Do you have vibrations on d4 working?
+> > > > > > I believe I have required drivers enabled, but no luck:
+> > > > > > 
+> > > > > > user at devuan:/sys/bus/platform/drivers$ ls pwm-vibrator/
+> > > > > > bind  uevent  unbind
+> > > > > > user at devuan:/sys/bus/platform/drivers$ ls omap-dmtimer-pwm/
+> > > > > > bind  uevent  unbind
+> > > > > 
+> > > > > Have you checked probe deferrals?
+> > > > 
+> > > > Not really. Is there easier way to do that than adding printks in the
+> > > > probe function? (I can go through dmesg tommorow).
+> > > 
+> > > Option 1: https://lkml.org/lkml/2018/7/8/63
+> > 
+> > I tried this methodq, and no luck.
+> > 
+> > static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
+> > 
+> > does not seem to be called.
+> > 
+> > Its parent is gpio at 4805d000 , and that one seems to be present.
+> > 
+> > user at devuan:/sys/bus/platform/devices$ ls 4805d000.gpio
+> > driver				       driver_override  gpio
+> > gpiochip5  modalias  of_node  power  subsystem  uevent
 > 
-> Finnaly, someone from bananapi confirmed that this regulator must be set to 3.3
-> 
-> Fixes: d7c5f6863550 ("ARM: dts: sun8i: a83t: bananapi-m3: Add AXP813 regulator nodes")
-> Signed-off-by: Corentin Labbe <clabbe@baylibre.com>
+> Sorry, something went wrong with merging this. The parent
+> of ti,omap-dmtimer-pwm and pwm-vibrator should be / and
+> not gpio6.
 
-Applied, thanks!
-Maxime
+There's still something wrong with pinctrl... I guess.
+									Pavel
+
+[    0.973907] phy-mapphone-mdm6600 usb-phy at 1: could not find pctldev for node /ocp/l4 at 4a000000/sc
+m at 100000/pinmux at 40/pinmux_usb_mdm6600_pins, deferring probe
+[    0.990295] pinctrl-single 4a100040.pinmux: 203 pins, size 406
+[    0.996643] pinctrl-single 4a31e040.pinmux: 28 pins, size 56
+[    1.003234] pinctrl-single 4a31e040.pinmux: mux offset out of range: 0x18e (0x38)
+[    1.010986] pinctrl-single 4a31e040.pinmux: could not add functions for pinmux_vibrator_directi
+on_pin 398x
+[    1.020996] dmtimer_probe
+[    1.023712] dmtimer_probe: have timer
+[    1.027526] omap-dmtimer-pwm dmtimer-pwm-8: dmtimer pdata structure NULL
+[    1.034484] pinctrl-single 4a31e040.pinmux: mux offset out of range: 0x190 (0x38)
+[    1.042175] pinctrl-single 4a31e040.pinmux: could not add functions for pinmux_vibrator_enable_pin 400x
+[    1.051910] dmtimer_probe
+[    1.054626] dmtimer_probe: have timer
+[    1.058441] omap-dmtimer-pwm dmtimer-pwm-9: dmtimer pdata structure NULL
+[    1.068725] Serial: 8250/16550 driver, 4 ports, IRQ sharing enabled
+[   70.264739] cpcap-usb-phy cpcap-usb-phy.0: connected to USB host
+[   80.093811] omap-dmtimer-pwm dmtimer-pwm-9: requested duty cycle: 3750057 ns, period: 10000000 ns
+[   80.102996] omap-dmtimer-pwm dmtimer-pwm-9: clk rate: 26000000Hz
+[   80.109252] omap-dmtimer-pwm dmtimer-pwm-9: effective duty cycle: 3750038 ns, period: 10000000 ns
+[   80.118530] omap-dmtimer-pwm dmtimer-pwm-9: load value: 0xfffc0860 (-260000), match value: 0xfffd853c (-162500)
+[   80.129089] omap-dmtimer-pwm dmtimer-pwm-8: requested duty cycle: 10000000 ns, period: 10000000 ns
+[   80.138336] omap-dmtimer-pwm dmtimer-pwm-8: clk rate: 26000000Hz
+[   80.144561] omap-dmtimer-pwm dmtimer-pwm-8: duty cycle 10000000 ns is too long for period 10000000 ns at clock rate 26000000 Hz
+[   80.156433] omap-dmtimer-pwm dmtimer-pwm-8: using maximum of 1 clock cycle less than period
+[   80.165069] omap-dmtimer-pwm dmtimer-pwm-8: effective duty cycle: 9999962 ns, period: 10000000 ns
+[   80.174621] omap-dmtimer-pwm dmtimer-pwm-8: load value: 0xfffc0860 (-260000), match value: 0xfffffffe (-2)
+[  100.344970] cpcap-usb-phy cpcap-usb-phy.0: connected to USB host
+
+
+
+
 
 -- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180711/85b79419/attachment.sig>
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180711/60b07166/attachment.sig>
