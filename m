@@ -1,123 +1,66 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 11 Jul 2018 14:16:56 +0100
-Subject: [PATCH v5 5/7] KVM: arm64: Support handling access faults for PUD
- hugepages
-In-Reply-To: <20180709144124.29164-5-punit.agrawal@arm.com>
-References: <20180709143835.28971-1-punit.agrawal@arm.com>
- <20180709144124.29164-1-punit.agrawal@arm.com>
- <20180709144124.29164-5-punit.agrawal@arm.com>
-Message-ID: <be9492ce-271c-e87f-e934-a6bb3a5ac119@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 11 Jul 2018 06:19:04 -0700
+Subject: [GIT PULL 1/5] omap1 soc changes for v4.19
+Message-ID: <pull-1531314878-371161@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/07/18 15:41, Punit Agrawal wrote:
-> In preparation for creating larger hugepages at Stage 2, extend the
-> access fault handling at Stage 2 to support PUD hugepages when
-> encountered.
-> 
-> Provide trivial helpers for arm32 to allow sharing of code.
-> 
-> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-> Cc: Christoffer Dall <christoffer.dall@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Russell King <linux@armlinux.org.uk>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
->   arch/arm/include/asm/kvm_mmu.h   |  8 ++++++++
->   arch/arm64/include/asm/kvm_mmu.h |  7 +++++++
->   arch/arm64/include/asm/pgtable.h |  6 ++++++
->   virt/kvm/arm/mmu.c               | 29 ++++++++++++++++-------------
->   4 files changed, 37 insertions(+), 13 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-> index d05c8986e495..a4298d429efc 100644
-> --- a/arch/arm/include/asm/kvm_mmu.h
-> +++ b/arch/arm/include/asm/kvm_mmu.h
-> @@ -78,6 +78,8 @@ void kvm_clear_hyp_idmap(void);
->   #define kvm_pfn_pte(pfn, prot)	pfn_pte(pfn, prot)
->   #define kvm_pfn_pmd(pfn, prot)	pfn_pmd(pfn, prot)
->   
-> +#define kvm_pud_pfn(pud)	(((pud_val(pud) & PUD_MASK) & PHYS_MASK) >> PAGE_SHIFT)
+From: "Tony Lindgren" <tony@atomide.com>
 
-Since we don't have PUD in arm32, it would be good to trigger a BUG()
-instead of silently doing something wrong.
+The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
 
-> @@ -102,6 +104,12 @@ static inline bool kvm_s2pud_exec(pud_t *pud)
->   	return false;
->   }
->   
-> +static inline pud_t kvm_s2pud_mkyoung(pud_t pud)
-> +{
-> +	BUG();
-> +	return pud;
-> +}
-> +
+  Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
 
-Like this. ^
+are available in the Git repository at:
 
-> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-> index e73909a31e02..d2c705e31584 100644
-> --- a/virt/kvm/arm/mmu.c
-> +++ b/virt/kvm/arm/mmu.c
-> @@ -1637,33 +1637,36 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->    */
->   static void handle_access_fault(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa)
->   {
-> -	pmd_t *pmd;
-> -	pte_t *pte;
-> +	pud_t *pud = NULL;
-> +	pmd_t *pmd = NULL;
-> +	pte_t *pte = NULL;
->   	kvm_pfn_t pfn;
-> -	bool pfn_valid = false;
-> +	bool found, pfn_valid = false;
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.19/omap1-v2-signed
 
-nit: You could use pfn_valid instead of a new "found" variable.
+for you to fetch changes up to d08605a64e67944eaecfb0e6340f633e01376951:
 
->   
->   	trace_kvm_access_fault(fault_ipa);
->   
->   	spin_lock(&vcpu->kvm->mmu_lock);
->   
-> -	pmd = stage2_get_pmd(vcpu->kvm, NULL, fault_ipa);
-> -	if (!pmd || pmd_none(*pmd))	/* Nothing there */
-> +	found = stage2_get_leaf_entry(vcpu->kvm, fault_ipa, &pud, &pmd, &pte);
-> +	if (!found)
->   		goto out;
->   
-> -	if (pmd_thp_or_huge(*pmd)) {	/* THP, HugeTLB */
-> +	if (pud) {		/* HugeTLB */
-> +		*pud = kvm_s2pud_mkyoung(*pud);
-> +		pfn = kvm_pud_pfn(*pud);
-> +		pfn_valid = true;
-> +		goto out;
+  ARM: OMAP1: ams-delta: move late devices back to init_machine (2018-07-02 23:07:54 -0700)
 
-You don't need these goto's and the out lable anymore.
+----------------------------------------------------------------
+SoC updates for omap1 for v4.19 merge window
 
-> +	} else 	if (pmd) {	/* THP, HugeTLB */
->   		*pmd = pmd_mkyoung(*pmd);
->   		pfn = pmd_pfn(*pmd);
->   		pfn_valid = true;
->   		goto out;
-> +	} else {
-> +		*pte = pte_mkyoung(*pte);	/* Just a page... */
-> +		pfn = pte_pfn(*pte);
-> +		pfn_valid = true;
->   	}
->   
-> -	pte = pte_offset_kernel(pmd, fault_ipa);
-> -	if (pte_none(*pte))		/* Nothing there either */
-> -		goto out;
-> -
-> -	*pte = pte_mkyoung(*pte);	/* Just a page... */
-> -	pfn = pte_pfn(*pte);
-> -	pfn_valid = true;
->   out:
->   	spin_unlock(&vcpu->kvm->mmu_lock);
->   	if (pfn_valid)
-> 
+Mostly a series by Janusz Krzysztofik to clean up the
+GPIO and input handling for ams-delta. Because of the
+platform data changes, we decided that it's best to
+merge the related input changes also via the arm-soc
+tree so Dmitry Torokhov has acked the input changes.
 
-Otherwise look good to me.
+Also included is a change to constify gpio_leds from
+Arvind Yadav.
 
-Suzuki
+----------------------------------------------------------------
+Arvind Yadav (1):
+      ARM: OMAP1: constify gpio_led
+
+Janusz Krzysztofik (13):
+      ARM: OMAP1: ams-delta: refactor late_init()
+      ARM: OMAP1: ams-delta: assign LED GPIO numbers from descriptors
+      ARM: OMAP1: ams-delta: drop GPIO lookup table for serio device
+      Input: ams_delta_serio: convert to platform driver
+      Input: ams_delta_serio: use private structure
+      Input: ams_delta_serio: Replace power GPIO with regulator
+      ARM: OMAP1: ams-delta: Hog "keybrd_dataout" GPIO pin
+      ARM: OMAP1: ams-delta FIQ: don't use static GPIO numbers
+      ARM: OMAP1: ams-delta FIQ: Keep serio input GPIOs requested
+      ARM: OMAP1: Get rid of <mach/ams-delta-fiq.h>
+      Input: ams_delta_serio: use IRQ resource
+      Input: ams_delta_serio: Get FIQ buffer from platform_data
+      ARM: OMAP1: ams-delta: move late devices back to init_machine
+
+ MAINTAINERS                                        |   1 +
+ arch/arm/mach-omap1/ams-delta-fiq-handler.S        |   5 +-
+ arch/arm/mach-omap1/ams-delta-fiq.c                | 113 ++++++--
+ arch/arm/mach-omap1/ams-delta-fiq.h                |  42 +++
+ arch/arm/mach-omap1/board-ams-delta.c              | 301 +++++++++++++++++----
+ arch/arm/mach-omap1/board-h2.c                     |   2 +-
+ arch/arm/mach-omap1/board-h3.c                     |   2 +-
+ arch/arm/mach-omap1/board-htcherald.c              |   2 +-
+ arch/arm/mach-omap1/board-osk.c                    |   4 +-
+ drivers/input/serio/ams_delta_serio.c              | 198 +++++++-------
+ .../linux/platform_data}/ams-delta-fiq.h           |  31 +--
+ 11 files changed, 494 insertions(+), 207 deletions(-)
+ create mode 100644 arch/arm/mach-omap1/ams-delta-fiq.h
+ rename {arch/arm/mach-omap1/include/mach => include/linux/platform_data}/ams-delta-fiq.h (68%)
