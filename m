@@ -1,119 +1,150 @@
-From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Wed, 11 Jul 2018 08:15:02 +0530
-Subject: [PATCH v4 0/6] Add Actions Semiconductor Owl S900 I2C support
-In-Reply-To: <20180701172305.15663-1-manivannan.sadhasivam@linaro.org>
-References: <20180701172305.15663-1-manivannan.sadhasivam@linaro.org>
-Message-ID: <20180711024502.GA4739@Mani-XPS-13-9360>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Wed, 11 Jul 2018 11:49:33 +0900
+Subject: [PATCH v10 08/14] arm64: kexec_file: load initrd and device-tree
+In-Reply-To: <27eda5b7-f9ad-2918-c302-3669d4b72fd0@arm.com>
+References: <20180623022058.10935-1-takahiro.akashi@linaro.org>
+ <20180623022058.10935-9-takahiro.akashi@linaro.org>
+ <1e401f4e-6176-990d-476c-31ae3f28f26c@arm.com>
+ <20180710073719.GW28220@linaro.org>
+ <27eda5b7-f9ad-2918-c302-3669d4b72fd0@arm.com>
+Message-ID: <20180711024932.GX28220@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 01, 2018 at 10:52:59PM +0530, Manivannan Sadhasivam wrote:
-> This patchset adds I2C controller support for Actions Semiconductor S900 SoC.
-> This driver has been structured in a way such that there will be only
-> one controller driver for the whole Owl family series (S500, S700 and
-> S900 SoCs).
+On Tue, Jul 10, 2018 at 04:25:03PM +0100, James Morse wrote:
+> Hi Akashi,
 > 
-> There are 6 I2C controllers with separate memory mapped register space.
-> The I2C controller can handle atmost two messages concatenated by a
-> repeated start via its internal address feature. Hence the driver
-> uses this feature for messages of length greater than 1. In those cases,
-> the first message of the combined message should be a `write` with maximum
-> message length 6 and the second message's maximum length should be 240 bytes.
+> On 10/07/18 08:37, AKASHI Takahiro wrote:
+> > On Tue, Jul 03, 2018 at 05:32:09PM +0100, James Morse wrote:
+> >> On 23/06/18 03:20, AKASHI Takahiro wrote:
+> >>> load_other_segments() is expected to allocate and place all the necessary
+> >>> memory segments other than kernel, including initrd and device-tree
+> >>> blob (and elf core header for crash).
+> >>> While most of the code was borrowed from kexec-tools' counterpart,
+> >>> users may not be allowed to specify dtb explicitly, instead, the dtb
+> >>> presented by the original boot loader is reused.
+> >>>
+> >>> arch_kimage_kernel_post_load_cleanup() is responsible for freeing arm64-
+> >>> specific data allocated in load_other_segments().
 > 
-> As far as the bus speed is concerned, this driver only supports
-> Standard (100KHz) and High speed (400KHz) for now.
+> >>> diff --git a/arch/arm64/kernel/machine_kexec_file.c b/arch/arm64/kernel/machine_kexec_file.c
+> >>> index c38a8048ed00..7115c4f915dc 100644
+> >>> --- a/arch/arm64/kernel/machine_kexec_file.c
+> >>> +++ b/arch/arm64/kernel/machine_kexec_file.c
+> >>
+> >>> +static int setup_dtb(struct kimage *image,
+> >>> +		unsigned long initrd_load_addr, unsigned long initrd_len,
+> >>> +		char *cmdline, unsigned long cmdline_len,
+> >>> +		char **dtb_buf, size_t *dtb_buf_len)
+> >>> +{
 > 
-> The pinctrl definitions are only available for I2C0, I2C1 and I2C2.
-> With the mux option available only for I2C0.
+> [..]
 > 
-> For Bubblegum-96 board utilizing the S900 SoC, only I2C1 and I2C2 which
-> are exposed on the Low speed expansion connector are enabled.
+> >>> +	/* add bootargs */
+> >>> +	if (cmdline) {
+> >>> +		ret = fdt_setprop(buf, nodeoffset, "bootargs",
+> >>> +						cmdline, cmdline_len + 1);
+> >>> +		if (ret)
+> >>> +			goto out_err;
+> >>> +	}
+> >>
+> >> So (cmdline_len == 0) from user-space means keep the old cmdline. Sounds
+> >> sensible. Is this documented anywhere?
 > 
-> This series depends on the pinctrl patch [1] is still not merged by the
-> platform maintainer Andreas but it has been reviewed by the pinctrl maintainer
-> Linus Walleij. For the reference, I have queued up all reviewed dts patches
-> in my tree [2] from which Andreas is picking them for 4.19.
+> > To be a bit surprise, --append (and --cmdline) option belongs to arch-
+> > specific options in terms of implementation. Apparently, a standard man page
+> > of kexec(8) say little about it, in particular, for device-tree-based system.
+> > 
+> > As far as arm64 is concerned, the fact is a bit complicated.
+> > User space kexec accepts --append as well as --reuse-cmdline, and
+> > along with yet another --dtb option, a resulting command line for new
+> > kernel (or bootargs in new dtb) would look to be:
+> > 
+> > 	--append=A | --reuse-cmdline |     --dtb
+> > 		   |                 |   n    |    y(bootargs=B)
+> > 
+> > 	    n            n               S(*1)      B(*2)
+> > 	    n            y               S          S(*3)
+> > 	    y            n               A          A
+> > 	    y            y              S+A        S+A(*4)
+> > 
+> >       where S: the cmdline parameters of the running system
+> > 		 (equal to bootargs in system's dtb)
 > 
-> For this series, since the dts patches will go through the ARM SoC tree,
-> Andreas will pick it up once it is reviewed.
+> (I'm afraid I don't understand this table, but the text below helps...)
+
+(Really? I believed that it was obvious.)
+
+> 
+> > You are talking about case(1) above.
+> > 
+> > Given that we can have an explicit option, --reuse-cmdline, the cmdline
+> > in (1) should be NULL. Meanwhile, we specify --dtb here, which means
+> > that we want to re-use system's dtb, implying that we also want to
+> > reuse a cmdline parameter. (This can be arguable, though)
+> 
+> Sounds like this is all user-space's problem!
+
+I dare not say it's a bug :)
+
+> 
+> > So I would say that we have both reasons to go for and go against.
+> > 
+> > # Likewise,
+> > # I wonder why the cmdnline would not be B or A+B, respectively,
+> > in case of (3) and (4). But it's a different issue.
+> > 
+> >> powerpc does the opposite, it deletes the bootargs in this case. Are we happy
+> >> making his a per-arch thing?
+> > 
+> > My compromise solution is:
+> > a.to maintain compatibility with powerpc at system call level, 
+> 
+> This sounds like the right thing to do.
+> 
+> 
+> >   that is,
+> >   replacing bootargs in new dtb if user explicitly specifies cmdline
+> >   argument, otherwise nullifying bootargs,
+> > b.yet maintain compatibility with arm64's kexec behavior at command line
+> >   interface level. If neither --append nor --dtb is not specified,
+> >   user space kexec will reuse the system's command line whether or not
+> >   --reuse-cmdline is used.
+> 
+> (a and b aren't options this time: you're proposing to do a-and-b)
+
+Yes.
+
+> 
+> > (Do you follow me?)
+> 
+> I think so:
+> The syscall will behave the same as powerpc meaning the kernel will never re-use
+> the existing cmdline in the dtb, even if that means (trying to) boot without one.
+> 
+> If user-space wants to re-use the command line, it should read /proc/cmdline and
+> feed the string back into the kernel.
+
+Thank you for rephrasing.
+
+> 
+> > So kexec and kexec_file on arm64 will still behave in exactly the same way,
+> > but differently from ppc at command level for now.
+> 
+> > The point is that, if we might want or need to change this behavior
+> > (at any time in the future), we would only have to modify user space kexec.
+> > Kernel semantics will never break.
+> > 
+> > (b) requires additional small modification on kexec-tools, but kexec_file
+> > support is yet to be upstreamed anyway.
+> 
+> Makes sense!
+
+The next version will go with this approach.
+
+-Takahiro AKASHI
+
 > 
 > Thanks,
-> Mani
 > 
-> [1] https://patchwork.kernel.org/patch/10322937/
-> [2] https://git.linaro.org/people/manivannan.sadhasivam/linux.git/log/?h=s900-for-next
-> 
-
-Hi Andy, Peter,
-
-Just a gentle ping on this v4!
-
-Thanks,
-Mani
-
-> Changes in v4:
-> 
-> As per Andy and Peter review:
-> 
-> * Used spinlock for accessing most of the register access (only parts
->   involved sleep/long-busy-wait has been excluded)
-> * Removed returning 0 and added -ENXIO if the msg_ptr not equals to
->   message length
-> * Added DIV_ROUND_UP for setting clock frequency
-> * Changed one non-atomic mdelay instance to usleep_range
-> * Moved pinctrl definition patch before dts patch
-> * Fixed the driver to support only 100KHz and 400KHz frequencies
-> 
-> Changes in v3:
-> 
-> As per Peter, Andy and Andreas review:
-> 
-> * Removed owl_i2c_reset function from interrupt handler since it
->   involves the use of delays.
-> * Fixed the return path in owl_i2c_master_xfer and added a note
-> * Changed "base" parameter to "reg" in owl_i2c_update_reg for better
->   understandability
-> * Ordered the includes in alphabetical order
-> * Small changes to defines and added comma at the end of struct members
-> * Removed rendundant 0 assignment in owl_i2c_master_xfer
-> * Changed all OWL naming convention to Owl and also changed Actions Semi
->   naming to Actions Semiconductor
-> 
-> Changes in v2:
-> 
-> As per Andy's review:
-> * Modified infinite loops to fixed number of retries
-> * Used i2c_8bit_addr_from_msg for constructing the slave address
-> * Removed unnecessary parenthesis around defines
-> * Modified certain dev_warn to dev_dbg
-> * Modified the error handling to more generic pattern
-> 
-> * Fixed the return value in owl_i2c_master_xfer
-> * Added MAINTAINERS patch for I2C driver and its binding
-> 
-> Manivannan Sadhasivam (6):
->   dt-bindings: i2c: Add binding for Actions Semiconductor Owl I2C
->     controller
->   arm64: dts: actions: Add pinctrl definition for S900 I2C controller
->   arm64: dts: actions: Add Actions Semiconductor S900 I2C controller
->     nodes
->   arm64: dts: actions: Enable I2C1 and I2C2 in Bubblegum-96 board
->   i2c: Add Actions Semiconductor Owl family S900 I2C driver
->   MAINTAINERS: Add entry for Actions Semiconductor Owl I2C driver
-> 
->  .../devicetree/bindings/i2c/i2c-owl.txt       |  27 +
->  MAINTAINERS                                   |   2 +
->  .../dts/actions/s900-bubblegum-96-pins.dtsi   |  29 +
->  .../boot/dts/actions/s900-bubblegum-96.dts    |  11 +
->  arch/arm64/boot/dts/actions/s900.dtsi         |  60 +++
->  drivers/i2c/busses/Kconfig                    |   7 +
->  drivers/i2c/busses/Makefile                   |   1 +
->  drivers/i2c/busses/i2c-owl.c                  | 504 ++++++++++++++++++
->  8 files changed, 641 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/i2c/i2c-owl.txt
->  create mode 100644 arch/arm64/boot/dts/actions/s900-bubblegum-96-pins.dtsi
->  create mode 100644 drivers/i2c/busses/i2c-owl.c
-> 
-> -- 
-> 2.17.1
-> 
+> James
