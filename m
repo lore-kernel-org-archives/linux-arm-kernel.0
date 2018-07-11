@@ -1,143 +1,133 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 11 Jul 2018 21:47:18 +0200
-Subject: [PATCH 1/3 v3] ARM: dts: Add WAN ethernet port to the SQ201
-Message-ID: <20180711194720.25266-1-linus.walleij@linaro.org>
+Date: Wed, 11 Jul 2018 21:47:19 +0200
+Subject: [PATCH 2/3 v3] ARM: dts: Att Vitesse G5e switch to the Gemini SQ201
+In-Reply-To: <20180711194720.25266-1-linus.walleij@linaro.org>
+References: <20180711194720.25266-1-linus.walleij@linaro.org>
+Message-ID: <20180711194720.25266-2-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This sets up the ethernet interface and PHY for the
-WAN ethernet port which uses a Marvell PHY.
+This adds the Vitesse G5e ethernet switch to the Square
+One Itian SQ201 router device tree.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
 ChangeLog v2->v3:
-- No changes, just resending.
+- Use a fixed link for the ethernet port to the Vitesse
+  DSA router chip.
 ChangeLog v1->v2:
-- Rename wrongly named "ethernet-phy" to "mdio"
-- Drop device_type from the ethernet phy
+- Drop unrelated roofs mount point change.
 ---
- arch/arm/boot/dts/gemini-sq201.dts | 85 ++++++++++++++++++++++++++++++
- 1 file changed, 85 insertions(+)
+ arch/arm/boot/dts/gemini-sq201.dts | 76 +++++++++++++++++++++++++++++-
+ 1 file changed, 75 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm/boot/dts/gemini-sq201.dts b/arch/arm/boot/dts/gemini-sq201.dts
-index 7658e212e6d2..cc693e64faaf 100644
+index cc693e64faaf..c7a0788ef8c1 100644
 --- a/arch/arm/boot/dts/gemini-sq201.dts
 +++ b/arch/arm/boot/dts/gemini-sq201.dts
-@@ -55,6 +55,21 @@
+@@ -70,6 +70,61 @@
  		};
  	};
  
-+	mdio0: ethernet-phy {
-+		compatible = "virtual,mdio-gpio";
-+		/* Uses MDC and MDIO */
-+		gpios = <&gpio0 22 GPIO_ACTIVE_HIGH>, /* MDC */
-+			<&gpio0 21 GPIO_ACTIVE_HIGH>; /* MDIO */
++	spi {
++		compatible = "spi-gpio";
 +		#address-cells = <1>;
 +		#size-cells = <0>;
++		/* Check pin collisions */
++		gpio-sck = <&gpio1 28 GPIO_ACTIVE_HIGH>;
++		gpio-miso = <&gpio1 30 GPIO_ACTIVE_HIGH>;
++		gpio-mosi = <&gpio1 29 GPIO_ACTIVE_HIGH>;
++		cs-gpios = <&gpio1 31 GPIO_ACTIVE_HIGH>;
++		num-chipselects = <1>;
 +
-+		/* This is a Marvell 88E1111 ethernet transciever */
-+		phy0: ethernet-phy at 1 {
-+			reg = <1>;
-+			device_type = "ethernet-phy";
++		switch at 0 {
++			compatible = "vitesse,vsc7395";
++			reg = <0>;
++			/* Specified for 2.5 MHz or below */
++			spi-max-frequency = <2500000>;
++			gpio-controller;
++			#gpio-cells = <2>;
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				port at 0 {
++					reg = <0>;
++					label = "lan1";
++				};
++				port at 1 {
++					reg = <1>;
++					label = "lan2";
++				};
++				port at 2 {
++					reg = <2>;
++					label = "lan3";
++				};
++				port at 3 {
++					reg = <3>;
++					label = "lan4";
++				};
++				vsc: port at 6 {
++					reg = <6>;
++					label = "cpu";
++					ethernet = <&gmac1>;
++					phy-mode = "rgmii";
++					fixed-link {
++						speed = <1000>;
++						full-duplex;
++						pause;
++					};
++				};
++			};
 +		};
 +	};
++
 +
  	soc {
  		flash at 30000000 {
  			/*
-@@ -108,6 +123,7 @@
- 				/*
- 				 * gpio0fgrp cover line 18 used by reset button
- 				 * gpio0ggrp cover line 20 used by info LED
-+				 * gpio0hgrp cover line 21, 22 used by MDIO for Marvell PHY
- 				 * gpio0kgrp cover line 31 used by USB LED
- 				 */
- 				gpio0_default_pins: pinctrl-gpio0 {
-@@ -115,9 +131,66 @@
- 						function = "gpio0";
- 						groups = "gpio0fgrp",
- 						"gpio0ggrp",
-+						"gpio0hgrp",
+@@ -135,6 +190,15 @@
  						"gpio0kgrp";
  					};
  				};
-+				pinctrl-gmii {
++				/*
++				 * gpio0kgrp cover line 31 used by USB LED
++				 */
++				gpio1_default_pins: pinctrl-gpio1 {
 +					mux {
-+						function = "gmii";
-+						groups = "gmii_gmac0_grp", "gmii_gmac1_grp";
++						function = "gpio1";
++						groups = "gpio1dgrp";
 +					};
-+					/* Settings come from memory dump in PLATO */
-+					conf0 {
-+						pins = "V8 GMAC0 RXDV";
-+						skew-delay = <0>;
-+					};
-+					conf1 {
-+						pins = "Y7 GMAC0 RXC";
-+						skew-delay = <15>;
-+					};
-+					conf2 {
-+						pins = "T8 GMAC0 TXEN";
-+						skew-delay = <7>;
-+					};
-+					conf3 {
-+						pins = "U8 GMAC0 TXC";
-+						skew-delay = <10>;
-+					};
-+					conf4 {
-+						pins = "T10 GMAC1 RXDV";
-+						skew-delay = <7>;
-+					};
-+					conf5 {
-+						pins = "Y11 GMAC1 RXC";
-+						skew-delay = <8>;
-+					};
-+					conf6 {
-+						pins = "W11 GMAC1 TXEN";
-+						skew-delay = <7>;
-+					};
-+					conf7 {
-+						pins = "V11 GMAC1 TXC";
-+						skew-delay = <5>;
-+					};
-+					conf8 {
-+						/* The data lines all have default skew */
-+						pins = "W8 GMAC0 RXD0", "V9 GMAC0 RXD1",
-+						       "Y8 GMAC0 RXD2", "U9 GMAC0 RXD3",
-+						       "T7 GMAC0 TXD0", "U6 GMAC0 TXD1",
-+						       "V7 GMAC0 TXD2", "U7 GMAC0 TXD3",
-+						       "Y12 GMAC1 RXD0", "V12 GMAC1 RXD1",
-+						       "T11 GMAC1 RXD2", "W12 GMAC1 RXD3",
-+						       "U10 GMAC1 TXD0", "Y10 GMAC1 TXD1",
-+						       "W10 GMAC1 TXD2", "T9 GMAC1 TXD3";
-+						skew-delay = <7>;
-+					};
-+					/* Set up drive strength on GMAC0 and GMAC1 to 16 mA */
-+					conf9 {
-+						groups = "gmii_gmac0_grp", "gmii_gmac1_grp";
-+						drive-strength = <16>;
-+					};
++				};
+ 				pinctrl-gmii {
+ 					mux {
+ 						function = "gmii";
+@@ -205,6 +269,11 @@
+ 			pinctrl-0 = <&gpio0_default_pins>;
+ 		};
+ 
++		gpio1: gpio at 4e000000 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&gpio1_default_pins>;
++		};
++
+ 		pci at 50000000 {
+ 			status = "okay";
+ 			interrupt-map-mask = <0xf800 0 0 7>;
+@@ -235,7 +304,12 @@
+ 				phy-handle = <&phy0>;
+ 			};
+ 			ethernet-port at 1 {
+-				/* Used for the Vitesse G5 chip, add later */
++				phy-mode = "rgmii";
++				fixed-link {
++					speed = <1000>;
++					full-duplex;
++					pause;
 +				};
  			};
  		};
  
-@@ -154,6 +227,18 @@
- 				<0x6000 0 0 4 &pci_intc 2>;
- 		};
- 
-+		ethernet at 60000000 {
-+			status = "okay";
-+
-+			ethernet-port at 0 {
-+				phy-mode = "rgmii";
-+				phy-handle = <&phy0>;
-+			};
-+			ethernet-port at 1 {
-+				/* Used for the Vitesse G5 chip, add later */
-+			};
-+		};
-+
- 		ata at 63000000 {
- 			status = "okay";
- 		};
 -- 
 2.17.1
