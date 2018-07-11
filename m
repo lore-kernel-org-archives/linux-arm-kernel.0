@@ -1,50 +1,41 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Wed, 11 Jul 2018 16:26:49 +0200
-Subject: [PATCH] ARM: defconfig: Set CONFIG_LOCALVERSION in multi v4t/v5/v7
- defconfigs
-Message-ID: <20180711142649.4556-1-geert+renesas@glider.be>
+From: rob.herring@linaro.org (Rob Herring)
+Date: Wed, 11 Jul 2018 08:40:30 -0600
+Subject: [RFC PATCH 0/4] Stop losing firmware-set DMA masks
+In-Reply-To: <cover.1531239284.git.robin.murphy@arm.com>
+References: <cover.1531239284.git.robin.murphy@arm.com>
+Message-ID: <CABGGisxVqLMu3TUpbJGWnUFgzUor-8tdyV8KJeU0YT7y=BHrAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This allows to derive the kernel flavor from the kernel version at
-runtime.
+On Tue, Jul 10, 2018 at 12:43 PM Robin Murphy <robin.murphy@arm.com> wrote:
+>
+> Whilst the common firmware code invoked by dma_configure() initialises
+> devices' DMA masks according to limitations described by the respective
+> properties ("dma-ranges" for OF and _DMA/IORT for ACPI), the nature of
+> the dma_set_mask() API leads to that information getting lost when
+> well-behaved drivers probe and set a 64-bit mask, since in general
+> there's no way to tell the difference between a firmware-described mask
+> (which should be respected) and whatever default may have come from the
+> bus code (which should be replaced outright). This can break DMA on
+> systems with certain IOMMU topologies (e.g. [1]) where the IOMMU driver
+> only knows its maximum supported address size, not how many of those
+> address bits might actually be wired up between any of its input
+> interfaces and the associated DMA master devices. Similarly, some PCIe
+> root complexes only have a 32-bit native interface on their host bridge,
+> which leads to the same DMA-address-truncation problem in systems with a
+> larger physical memory map and RAM above 4GB (e.g. [2]).
+>
+> These patches attempt to deal with this in the simplest way possible by
+> generalising the specific quirk for 32-bit bridges into an arbitrary
+> mask which can then also be plumbed into the firmware code. In the
+> interest of being minimally invasive, I've only included a point fix
+> for the IOMMU issue as seen on arm64 - there may be further tweaks
+> needed in DMA ops to catch all possible incarnations of this problem,
+> but this initial RFC is mostly about the impact beyond the dma-mapping
+> subsystem itself.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
-v2:
-  - Handle "new" multi_v4t_defconfig.
----
- arch/arm/configs/multi_v4t_defconfig | 1 +
- arch/arm/configs/multi_v5_defconfig  | 1 +
- arch/arm/configs/multi_v7_defconfig  | 1 +
- 3 files changed, 3 insertions(+)
+Couldn't you set and use the device's parent's dma_mask instead. At
+least for DT, we should always have a parent device representing the
+bus. That would avoid further bloating of struct device.
 
-diff --git a/arch/arm/configs/multi_v4t_defconfig b/arch/arm/configs/multi_v4t_defconfig
-index 9a6390c172d6b676..9bbb76e8260611df 100644
---- a/arch/arm/configs/multi_v4t_defconfig
-+++ b/arch/arm/configs/multi_v4t_defconfig
-@@ -1,3 +1,4 @@
-+CONFIG_LOCALVERSION="-multi_v4t"
- CONFIG_KERNEL_LZMA=y
- CONFIG_SYSVIPC=y
- CONFIG_LOG_BUF_SHIFT=14
-diff --git a/arch/arm/configs/multi_v5_defconfig b/arch/arm/configs/multi_v5_defconfig
-index 7c41bee284630d14..5797c8b40c763b55 100644
---- a/arch/arm/configs/multi_v5_defconfig
-+++ b/arch/arm/configs/multi_v5_defconfig
-@@ -1,3 +1,4 @@
-+CONFIG_LOCALVERSION="-multi_v5"
- CONFIG_SYSVIPC=y
- CONFIG_FHANDLE=y
- CONFIG_NO_HZ=y
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 4c71fcb03bccfb8d..155d1eb10c6580fe 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -1,3 +1,4 @@
-+CONFIG_LOCALVERSION="-multi_v7"
- CONFIG_SYSVIPC=y
- CONFIG_NO_HZ=y
- CONFIG_HIGH_RES_TIMERS=y
--- 
-2.17.1
+Rob
