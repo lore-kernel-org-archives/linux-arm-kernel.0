@@ -1,87 +1,96 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Wed, 11 Jul 2018 14:17:31 +0200
-Subject: [PATCH v3 2/2] ARM: dts: imx6sl: Convert gpc to new bindings
-In-Reply-To: <849ea1c3434c87316f15953089633854e01938d6.1531310547.git.leonard.crestez@nxp.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 11 Jul 2018 14:19:48 +0200
+Subject: [PATCH v3 1/2] soc: imx: gpc: Disable 6sl display power gating
+ for ERR006287
+In-Reply-To: <d694bc32feb1c9638485700ba53cd6e51bea495c.1531310547.git.leonard.crestez@nxp.com>
 References: <cover.1531310547.git.leonard.crestez@nxp.com>
- <849ea1c3434c87316f15953089633854e01938d6.1531310547.git.leonard.crestez@nxp.com>
-Message-ID: <1531311451.3163.48.camel@pengutronix.de>
+ <d694bc32feb1c9638485700ba53cd6e51bea495c.1531310547.git.leonard.crestez@nxp.com>
+Message-ID: <CAPDyKFp6MGXGsa1ToDm86mnxsj1nYqb0pA2ySN242YK3Epp5Fg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, den 11.07.2018, 15:11 +0300 schrieb Leonard Crestez:
-> With old bindings imx_gpc_onecell_data always sets num_domains to 2 so
-> the DISPMIX domain can't actually be referenced. The pd is still defined
-> and pm core shuts it down as "unused" so display can't work.
-> 
-> Fix this by converting to new gpc bindings by adding pgc nodes and
-> referencing the newly-defined &pu_disp domain from &lcdif.
-> 
+On 11 July 2018 at 14:11, Leonard Crestez <leonard.crestez@nxp.com> wrote:
+> The imx6sl chip errata document describes ERR006287 like this:
+>
+>> Upon resuming from power gating, the modules in the display power domain
+> (eLCDIF, EPDC, PXP and SPDC) might fail to perform register reads
+> correctly.
+>
+>> When the modules listed above are used, do not use power gating on the
+> display power domain.
+>
+> Link: https://www.nxp.com/docs/en/errata/IMX6SLCE.pdf#page=62
+>
+> Handle this in the safest possible way by keeping the DISP domain
+> always-on.
+>
 > Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
 
-Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
+Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+
+Kind regards
+Uffe
 
 > ---
-> ?arch/arm/boot/dts/imx6sl.dtsi | 35 +++++++++++++++++++++++++++++++----
-> ?1 file changed, 31 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-> index 102c575a6025..49a56b4fd393 100644
-> --- a/arch/arm/boot/dts/imx6sl.dtsi
-> +++ b/arch/arm/boot/dts/imx6sl.dtsi
-> @@ -698,14 +698,40 @@
-> > ?				reg = <0x020dc000 0x4000>;
-> > ?				interrupt-controller;
-> > ?				#interrupt-cells = <3>;
-> > ?				interrupts = <0 89 IRQ_TYPE_LEVEL_HIGH>;
-> > ?				interrupt-parent = <&intc>;
-> > -				pu-supply = <&reg_pu>;
-> > -				clocks = <&clks IMX6SL_CLK_GPU2D_OVG>,
-> > -					?<&clks IMX6SL_CLK_GPU2D_PODF>;
-> > -				#power-domain-cells = <1>;
-> > +				clocks = <&clks IMX6SL_CLK_IPG>;
-> > +				clock-names = "ipg";
+>  drivers/soc/imx/gpc.c | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
+>
+> diff --git a/drivers/soc/imx/gpc.c b/drivers/soc/imx/gpc.c
+> index 526f2d02dc78..f7960f773019 100644
+> --- a/drivers/soc/imx/gpc.c
+> +++ b/drivers/soc/imx/gpc.c
+> @@ -339,30 +339,35 @@ static struct imx_pm_domain imx_gpc_domains[] = {
+>  };
+>
+>  struct imx_gpc_dt_data {
+>         int num_domains;
+>         bool err009619_present;
+> +       bool err006287_present;
+>  };
+>
+>  static const struct imx_gpc_dt_data imx6q_dt_data = {
+>         .num_domains = 2,
+>         .err009619_present = false,
+> +       .err006287_present = false,
+>  };
+>
+>  static const struct imx_gpc_dt_data imx6qp_dt_data = {
+>         .num_domains = 2,
+>         .err009619_present = true,
+> +       .err006287_present = false,
+>  };
+>
+>  static const struct imx_gpc_dt_data imx6sl_dt_data = {
+>         .num_domains = 3,
+>         .err009619_present = false,
+> +       .err006287_present = true,
+>  };
+>
+>  static const struct imx_gpc_dt_data imx6sx_dt_data = {
+>         .num_domains = 4,
+>         .err009619_present = false,
+> +       .err006287_present = false,
+>  };
+>
+>  static const struct of_device_id imx_gpc_dt_ids[] = {
+>         { .compatible = "fsl,imx6q-gpc", .data = &imx6q_dt_data },
+>         { .compatible = "fsl,imx6qp-gpc", .data = &imx6qp_dt_data },
+> @@ -467,10 +472,15 @@ static int imx_gpc_probe(struct platform_device *pdev)
+>         /* Disable PU power down in normal operation if ERR009619 is present */
+>         if (of_id_data->err009619_present)
+>                 imx_gpc_domains[GPC_PGC_DOMAIN_PU].flags |=
+>                                 PGC_DOMAIN_FLAG_NO_PD;
+>
+> +       /* Keep DISP always on if ERR006287 is present */
+> +       if (of_id_data->err006287_present)
+> +               imx_gpc_domains[GPC_PGC_DOMAIN_DISPLAY].base.flags |=
+> +                               GENPD_FLAG_ALWAYS_ON;
 > +
-> > +				pgc {
-> > +					#address-cells = <1>;
-> > +					#size-cells = <0>;
-> +
-> > +					power-domain at 0 {
-> > +						reg = <0>;
-> > +						#power-domain-cells = <0>;
-> > +					};
-> +
-> > > +					pd_pu: power-domain at 1 {
-> > +						reg = <1>;
-> > +						#power-domain-cells = <0>;
-> > +						power-supply = <&reg_pu>;
-> > +						clocks = <&clks IMX6SL_CLK_GPU2D_OVG>,
-> > +						?????????<&clks IMX6SL_CLK_GPU2D_PODF>;
-> > +					};
-> +
-> > > +					pd_disp: power-domain at 2 {
-> > +						reg = <2>;
-> > +						#power-domain-cells = <0>;
-> > +						clocks = <&clks IMX6SL_CLK_LCDIF_AXI>,
-> > +							?<&clks IMX6SL_CLK_LCDIF_PIX>,
-> > +							?<&clks IMX6SL_CLK_EPDC_AXI>,
-> > +							?<&clks IMX6SL_CLK_EPDC_PIX>,
-> > +							?<&clks IMX6SL_CLK_PXP_AXI>;
-> > +					};
-> > +				};
-> > ?			};
-> ?
-> > > ?			gpr: iomuxc-gpr at 20e0000 {
-> > ?				compatible = "fsl,imx6sl-iomuxc-gpr",
-> > ?					?????"fsl,imx6q-iomuxc-gpr", "syscon";
-> @@ -756,10 +782,11 @@
-> > ?				clocks = <&clks IMX6SL_CLK_LCDIF_PIX>,
-> > ?					?<&clks IMX6SL_CLK_LCDIF_AXI>,
-> > ?					?<&clks IMX6SL_CLK_DUMMY>;
-> > ?				clock-names = "pix", "axi", "disp_axi";
-> > ?				status = "disabled";
-> > +				power-domains = <&pd_disp>;
-> > ?			};
-> ?
-> > > ?			dcp: dcp at 20fc000 {
-> > ?				compatible = "fsl,imx6sl-dcp", "fsl,imx28-dcp";
-> > ?				reg = <0x020fc000 0x4000>;
+>         if (!pgc_node) {
+>                 ret = imx_gpc_old_dt_init(&pdev->dev, regmap,
+>                                           of_id_data->num_domains);
+>                 if (ret)
+>                         return ret;
+> --
+> 2.17.1
+>
