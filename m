@@ -1,66 +1,69 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 11 Jul 2018 10:13:56 -0600
-Subject: [PATCH v2 6/9] dt-bindings: phy: add binding for Allwinner USB3
- PHY
-In-Reply-To: <20180706153805.25842-7-icenowy@aosc.io>
-References: <20180706153805.25842-1-icenowy@aosc.io>
- <20180706153805.25842-7-icenowy@aosc.io>
-Message-ID: <20180711161356.GA4685@rob-hp-laptop>
+From: alexandre.belloni@bootlin.com (Alexandre Belloni)
+Date: Wed, 11 Jul 2018 18:14:43 +0200
+Subject: [PATCH] ARM: at91: remove unnecessary
+ of_platform_default_populate calls
+In-Reply-To: <CAL_JsqLfnSOgOMdaJU3Q4h5_PGnNgd4rx+vKXdFVZnNEo6+JZA@mail.gmail.com>
+References: <20180619214020.18608-1-robh@kernel.org>
+ <CAL_JsqLfnSOgOMdaJU3Q4h5_PGnNgd4rx+vKXdFVZnNEo6+JZA@mail.gmail.com>
+Message-ID: <20180711161443.GY16084@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 06, 2018 at 11:38:02PM +0800, Icenowy Zheng wrote:
-> The new Allwinner H6 SoC contains a USB3 PHY that is wired to the
-> external USB3 pins of the SoC.
-> 
-> Add a device tree binding for the PHY.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> ---
-> Splitted from the PHY driver patch in v1.
-> 
->  .../bindings/phy/sun50i-usb3-phy.txt          | 24 +++++++++++++++++++
->  1 file changed, 24 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/phy/sun50i-usb3-phy.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/phy/sun50i-usb3-phy.txt b/Documentation/devicetree/bindings/phy/sun50i-usb3-phy.txt
-> new file mode 100644
-> index 000000000000..912d55f9f69d
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/phy/sun50i-usb3-phy.txt
-> @@ -0,0 +1,24 @@
-> +Allwinner sun50i USB3 PHY
-> +-----------------------
-> +
-> +Required properties:
-> +- compatible : should be one of
-> +  * allwinner,sun60i-h6-usb3-phy
-> +- reg : a list of offset + length pairs
-> +- #phy-cells : from the generic phy bindings, must be 0
-> +- clocks : phandle + clock specifier for the phy clock
-> +- resets : phandle + reset specifier for the phy reset
-> +
-> +Optional Properties:
-> +- phy-supply : from the generic phy bindings, a phandle to a regulator that
-> +	       provides power to VBUS.
+Hi,
 
-Power to the phy or Vbus? If the latter only, then this property should 
-be elsewhere (like a connector node).
-
-> +
-> +Example:
-> +	usb3phy: phy at 5210000 {
-> +		compatible = "allwinner,sun50i-h6-usb3-phy";
-> +		reg = <0x5210000 0x10000>;
-> +		clocks = <&ccu CLK_USB_PHY1>;
-> +		resets = <&ccu RST_USB_PHY1>;
-> +		#phy-cells = <0>;
-> +		status = "disabled";
-> +	};
-> -- 
-> 2.17.1
+On 09/07/2018 09:50:47-0600, Rob Herring wrote:
+> On Tue, Jun 19, 2018 at 3:40 PM Rob Herring <robh@kernel.org> wrote:
+> >
+> > The DT core will call of_platform_default_populate, so it is not
+> > necessary for machine specific code to call it unless there are custom
+> > match entries, auxdata or parent device. Neither of those apply here, so
+> > remove the call.
+> >
+> > Cc: Nicolas Ferre <nicolas.ferre@microchip.com>
+> > Cc: Alexandre Belloni <alexandre.belloni@bootlin.com>
+> > Cc: linux-arm-kernel at lists.infradead.org
+> > Signed-off-by: Rob Herring <robh@kernel.org>
+> > ---
+> >  arch/arm/mach-at91/at91rm9200.c | 5 -----
+> >  arch/arm/mach-at91/at91sam9.c   | 5 -----
+> >  arch/arm/mach-at91/sama5.c      | 5 -----
+> >  3 files changed, 15 deletions(-)
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Ping?
+> 
+
+This breaks the platform in two different ways:
+ - PM is not working anymore because of the missing SRAM node
+ - the pinctrl driver fails to probe and so many drivers are
+   deferring the probe forever
+
+Relevant messages (once the earlycon crap is removed to let earlyprintk
+do its job):
+
+at91_pm_sram_init: failed to find sram device!
+AT91: PM not supported, due to no SRAM allocated
+
+pinctrl-at91 ahb:apb:pinctrl at fc06a000: you need to specify at least one gpio-controller
+pinctrl-at91: probe of ahb:apb:pinctrl at fc06a000 failed with error -22
+gpio-at91 fc06a000.gpio: at address (ptrval)
+gpio-at91 fc06b000.gpio: at address (ptrval)
+gpio-at91 fc06c000.gpio: at address (ptrval)
+gpio-at91 fc068000.gpio: at address (ptrval)
+gpio-at91 fc06d000.gpio: at address (ptrval)
+
+at91_i2c f8014000.i2c: could not find pctldev for node /ahb/apb/pinctrl at fc06a000/i2c0/i2c0-0, deferring probe
+atmel_usart f8004000.serial: could not find pctldev for node /ahb/apb/pinctrl at fc06a000/uart0/uart0-0, deferring probe
+atmel_usart fc00c000.serial: could not find pctldev for node /ahb/apb/pinctrl at fc06a000/usart3/usart3-0, deferring probe
+atmel_usart fc010000.serial: could not find pctldev for node /ahb/apb/pinctrl at fc06a000/usart4/usart4-0, deferring probe
+atmel_spi f8010000.spi: could not find pctldev for node /ahb/apb/pinctrl at fc06a000/spi0/spi0-0, deferring probe
+atmel_spi fc018000.spi: could not find pctldev for node /ahb/apb/pinctrl at fc06a000/spi1/spi1-0, deferring probe
+macb f8020000.ethernet: could not find pctldev for node /ahb/apb/pinctrl at fc06a000/macb0/macb0_rmii-0, deferring probe
+atmel_mci fc000000.mmc: could not find pctldev for node /ahb/apb/pinctrl at fc06a000/mmc1/mmc1_clk_cmd_dat0, deferring probe
+at91_adc fc034000.adc: could not find pctldev for node /ahb/apb/pinctrl at fc06a000/adc0/adc0_ad0, deferring probe
+gpio-keys gpio_keys: could not find pctldev for node /ahb/apb/pinctrl at fc06a000/board/key_gpio_0, deferring probe
+
+
+-- 
+Alexandre Belloni, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
