@@ -1,48 +1,58 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 11 Jul 2018 14:56:46 +0100
-Subject: [PATCHv5 11/21] arm64: don't restore GPRs when context tracking
-In-Reply-To: <20180711135656.20670-1-mark.rutland@arm.com>
-References: <20180711135656.20670-1-mark.rutland@arm.com>
-Message-ID: <20180711135656.20670-12-mark.rutland@arm.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Wed, 11 Jul 2018 09:25:55 -0400
+Subject: [PATCH RT] arm64: fpsimd: use a local_lock() in addition to
+ local_bh_disable()
+In-Reply-To: <20180522173333.aawadhkcekzvrswp@linutronix.de>
+References: <20180517124006.ohygrrpg7z2moqqt@linutronix.de>
+ <20180522131004.3012953c@gandalf.local.home>
+ <20180522172115.fpqguqlsq6bavtxy@linutronix.de>
+ <20180522132429.6f1dcf92@gandalf.local.home>
+ <20180522173333.aawadhkcekzvrswp@linutronix.de>
+Message-ID: <20180711092555.268adf7f@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that syscalls are invoked with pt_regs, we no longer need to ensure
-that the argument regsiters are live in the entry assembly, and it's
-fine to not restore them after context_tracking_user_exit() has
-corrupted them.
+On Tue, 22 May 2018 19:33:33 +0200
+Sebastian Andrzej Siewior <bigeasy@linutronix.de> wrote:
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/kernel/entry.S | 12 +-----------
- 1 file changed, 1 insertion(+), 11 deletions(-)
+> On 2018-05-22 13:24:29 [-0400], Steven Rostedt wrote:
+> > On Tue, 22 May 2018 19:21:16 +0200
+> > Sebastian Andrzej Siewior <bigeasy@linutronix.de> wrote:
+> >   
+> > > On 2018-05-22 13:10:04 [-0400], Steven Rostedt wrote:  
+> > > > On Thu, 17 May 2018 14:40:06 +0200
+> > > > Sebastian Andrzej Siewior <bigeasy@linutronix.de> wrote:
+> > > >     
+> > > > > +static DEFINE_LOCAL_IRQ_LOCK(fpsimd_lock);
+> > > > >  /*
+> > > > >   * Update current's FPSIMD/SVE registers from thread_struct.
+> > > > >   *
+> > > > > @@ -594,6 +595,7 @@ int sve_set_vector_length(struct task_struct *task,
+> > > > >  	 * non-SVE thread.
+> > > > >  	 */
+> > > > >  	if (task == current) {
+> > > > > +		local_lock(fpsimd_lock);
+> > > > >  		local_bh_disable();    
+> > > > 
+> > > > I'm surprised that we don't have a "local_lock_bh()"?    
+> > > 
+> > > right. Like the last time when we introduced a global lock with no
+> > > locking context? 
+> > >   
+> > 
+> > I meant, we could have local_lock_bh(fpsimd_lock); that would turn into
+> > a local_bh_disable() when !PREEMPT_RT.  
+> 
+> Oh that part. That could be possible I guess. I need to look into the
+> second part which disables preemption while the FPU is taken.
+>
 
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 156c4e3fd1a4..c41b84d06644 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -41,19 +41,9 @@
-  * Context tracking subsystem.  Used to instrument transitions
-  * between user and kernel mode.
-  */
--	.macro ct_user_exit, syscall = 0
-+	.macro ct_user_exit
- #ifdef CONFIG_CONTEXT_TRACKING
- 	bl	context_tracking_user_exit
--	.if \syscall == 1
--	/*
--	 * Save/restore needed during syscalls.  Restore syscall arguments from
--	 * the values already saved on stack during kernel_entry.
--	 */
--	ldp	x0, x1, [sp]
--	ldp	x2, x3, [sp, #S_X2]
--	ldp	x4, x5, [sp, #S_X4]
--	ldp	x6, x7, [sp, #S_X6]
--	.endif
- #endif
- 	.endm
- 
--- 
-2.11.0
+Did you decide to create a local_lock_bh(lock) function? I don't see it.
+
+And should this be backported to 4.14-rt too? You state you saw this in
+4.16-rt, but did you start doing something different then, or did the
+kernel change?
+
+Thanks!
+
+-- Steve
