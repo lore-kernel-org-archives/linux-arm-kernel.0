@@ -1,58 +1,39 @@
-From: jian.hu@amlogic.com (Jian Hu)
-Date: Wed, 11 Jul 2018 16:10:18 +0800
-Subject: [PATCH 1/3] dt-bindings: clk: g12a: New binding for Meson-G12A SoC
-In-Reply-To: <CAFBinCBJp1xzo-CNW1HU-Odhrug31yQ7c3khB+XwvsNXp5-gTA@mail.gmail.com>
-References: <1531134767-29927-1-git-send-email-jian.hu@amlogic.com>
- <1531134767-29927-2-git-send-email-jian.hu@amlogic.com>
- <CAFBinCBJp1xzo-CNW1HU-Odhrug31yQ7c3khB+XwvsNXp5-gTA@mail.gmail.com>
-Message-ID: <024e6d89-b60d-ba85-4d62-c3358e2cab6c@amlogic.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Wed, 11 Jul 2018 10:15:48 +0200
+Subject: [PATCH] [v2] drm/sun4i: fix build failure with
+ CONFIG_DRM_SUN8I_MIXER=m
+In-Reply-To: <20180709160615.2686055-1-arnd@arndb.de>
+References: <20180709160615.2686055-1-arnd@arndb.de>
+Message-ID: <20180711081548.nq2jekqt726aqmr2@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Jul 09, 2018 at 06:05:55PM +0200, Arnd Bergmann wrote:
+> Having DRM_SUN4I built-in but DRM_SUN8I_MIXER as a loadable module results in
+> a link error, as we try to access a symbol from the sun8i_tcon_top.ko module:
+> 
+> ERROR: "sun8i_tcon_top_of_table" [drivers/gpu/drm/sun4i/sun8i-drm-hdmi.ko] undefined!
+> ERROR: "sun8i_tcon_top_of_table" [drivers/gpu/drm/sun4i/sun4i-drm.ko] undefined!
+> 
+> This solves the problem by adding a silent symbol for the tcon_top module,
+> building it as a separate module in exactly the cases that we need it,
+> but in a way that it is reachable by the other modules.
+> 
+> Fixes: 57e23de02f48 ("drm/sun4i: DW HDMI: Expand algorithm for possible crtcs")
+> Fixes: ef0cf6441fbb ("drm/sun4i: Add support for traversing graph with TCON TOP")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
+Applied, thanks!
+Maxime
 
-On 2018/7/10 5:57, Martin Blumenstingl wrote:
-> adding Rob Herring so it doesn't get lost on the devicetree mailing list
-> 
-> On Mon, Jul 9, 2018 at 1:13 PM Jian Hu <jian.hu@amlogic.com> wrote:
->>
->> Add new binding for Meson-G12A SoC Everything-Else part
->>
->> Signed-off-by: Jian Hu <jian.hu@amlogic.com>
->> ---
->>   Documentation/devicetree/bindings/clock/amlogic,gxbb-clkc.txt | 1 +
->>   1 file changed, 1 insertion(+)
->>
->> diff --git a/Documentation/devicetree/bindings/clock/amlogic,gxbb-clkc.txt b/Documentation/devicetree/bindings/clock/amlogic,gxbb-clkc.txt
->> index e950599..0833006 100644
->> --- a/Documentation/devicetree/bindings/clock/amlogic,gxbb-clkc.txt
->> +++ b/Documentation/devicetree/bindings/clock/amlogic,gxbb-clkc.txt
->> @@ -9,6 +9,7 @@ Required Properties:
->>                  "amlogic,gxbb-clkc" for GXBB SoC,
->>                  "amlogic,gxl-clkc" for GXL and GXM SoC,
->>                  "amlogic,axg-clkc" for AXG SoC.
->> +               "amlogic,g12a-clkc" for G12A SoC.
-> should this be "amlogic,meson-g12a-clkc" instead?
-> that would make it consistent with virtually all other bindings which
-> use the schema "amlogic,meson<chip>-<ip-block>" (where chip is 8, 8b,
-> 8m2, -gxbb, -gxl, ...)
-> 
-> see also: $ grep -R "amlogic," Documentation/devicetree/bindings/
-> 
-Which type should we choose,have a discussion?
-.compatible = "amlogic,g12a-clkc or
-.compatible = "amlogic,meson-g12a-clkc
->>
->>   - #clock-cells: should be 1.
->>
->> --
->> 1.9.1
->>
->>
->> _______________________________________________
->> linux-amlogic mailing list
->> linux-amlogic at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-amlogic
-> 
-> .
-> 
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180711/b62674b8/attachment.sig>
