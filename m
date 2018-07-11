@@ -1,42 +1,31 @@
 From: weiyongjun1@huawei.com (Wei Yongjun)
-Date: Wed, 11 Jul 2018 13:17:38 +0000
-Subject: [PATCH -next] misc: vexpress: Fix potential NULL dereference in
- vexpress_syscfg_probe()
-Message-ID: <1531315058-183762-1-git-send-email-weiyongjun1@huawei.com>
+Date: Wed, 11 Jul 2018 13:22:47 +0000
+Subject: [PATCH -next] drm/sun4i: DW HDMI: Make symbol
+ sun8i_dw_hdmi_pltfm_driver static
+Message-ID: <1531315367-190647-1-git-send-email-weiyongjun1@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-platform_get_resource() may fail and return NULL, so we should
-better check it's return value to avoid a NULL pointer dereference
-a bit later in the code.
+Fixes the following sparse warning:
 
-This is detected by Coccinelle semantic patch.
-
-@@
-expression pdev, res, n, t, e, e1, e2;
-@@
-
-res = platform_get_resource(pdev, t, n);
-+ if (!res)
-+   return -EINVAL;
-... when != res == NULL
-e = devm_ioremap(e1, res->start, e2);
+drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c:228:24: warning:
+ symbol 'sun8i_dw_hdmi_pltfm_driver' was not declared. Should it be static?
 
 Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
 ---
- drivers/misc/vexpress-syscfg.c | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/misc/vexpress-syscfg.c b/drivers/misc/vexpress-syscfg.c
-index 9eea30f..2d72c93 100644
---- a/drivers/misc/vexpress-syscfg.c
-+++ b/drivers/misc/vexpress-syscfg.c
-@@ -259,6 +259,8 @@ static int vexpress_syscfg_probe(struct platform_device *pdev)
- 	INIT_LIST_HEAD(&syscfg->funcs);
+diff --git a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
+index 3459b9e..281c42a 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
++++ b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
+@@ -225,7 +225,7 @@ static int sun8i_dw_hdmi_remove(struct platform_device *pdev)
+ };
+ MODULE_DEVICE_TABLE(of, sun8i_dw_hdmi_dt_ids);
  
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!res)
-+		return -EINVAL;
- 	if (!devm_request_mem_region(&pdev->dev, res->start,
- 			resource_size(res), pdev->name))
- 		return -EBUSY;
+-struct platform_driver sun8i_dw_hdmi_pltfm_driver = {
++static struct platform_driver sun8i_dw_hdmi_pltfm_driver = {
+ 	.probe  = sun8i_dw_hdmi_probe,
+ 	.remove = sun8i_dw_hdmi_remove,
+ 	.driver = {
