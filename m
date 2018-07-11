@@ -1,57 +1,125 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Wed, 11 Jul 2018 09:41:15 -0700
-Subject: [PATCH v6 7/7] arm64: dts: sdm845: Add tsens nodes
-In-Reply-To: <65c39c405076627bd43ec94c211c6998191b9f16.1531136000.git.amit.kucheria@linaro.org>
-References: <cover.1531135999.git.amit.kucheria@linaro.org>
- <65c39c405076627bd43ec94c211c6998191b9f16.1531136000.git.amit.kucheria@linaro.org>
-Message-ID: <20180711164115.GE545@tuxbook-pro>
+From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
+Date: Wed, 11 Jul 2018 09:53:45 -0700
+Subject: [PATCH] i2c: aspeed: Add newline characters into message
+ printings.
+In-Reply-To: <CAFd5g443wTQJ+0hrprOV949Sr_nRnBGpNo3Wd01xFN4GW4K2Ng@mail.gmail.com>
+References: <20180702211359.30585-1-jae.hyun.yoo@linux.intel.com>
+ <CAFd5g443wTQJ+0hrprOV949Sr_nRnBGpNo3Wd01xFN4GW4K2Ng@mail.gmail.com>
+Message-ID: <2d2f2b2b-394a-506f-c870-33520335250b@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 09 Jul 04:43 PDT 2018, Amit Kucheria wrote:
-
-> SDM845 has two tsens blocks, one with 13 sensors and the other with 8
-> sensors. It uses version 2 of the TSENS IP, so use the fallback property to
-> allow more common code.
+On 7/10/2018 10:42 PM, Brendan Higgins wrote:
+> On Mon, Jul 2, 2018 at 2:14 PM Jae Hyun Yoo
+> <jae.hyun.yoo@linux.intel.com> wrote:
+>>
+>> There are some log printing without a newline character. This
+>> patch adds the missing newline characters.
+>>
+>> Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
+>> ---
+>>   drivers/i2c/busses/i2c-aspeed.c | 18 +++++++++---------
+>>   1 file changed, 9 insertions(+), 9 deletions(-)
+>>
+>> diff --git a/drivers/i2c/busses/i2c-aspeed.c b/drivers/i2c/busses/i2c-aspeed.c
+>> index 60e4d0e939a3..e3007c1c4ac5 100644
+>> --- a/drivers/i2c/busses/i2c-aspeed.c
+>> +++ b/drivers/i2c/busses/i2c-aspeed.c
+>> @@ -407,7 +407,7 @@ static bool aspeed_i2c_master_irq(struct aspeed_i2c_bus *bus)
+>>           */
+>>          ret = aspeed_i2c_is_irq_error(irq_status);
+>>          if (ret < 0) {
+>> -               dev_dbg(bus->dev, "received error interrupt: 0x%08x",
+>> +               dev_dbg(bus->dev, "received error interrupt: 0x%08x\n",
+>>                          irq_status);
+>>                  bus->cmd_err = ret;
+>>                  bus->master_state = ASPEED_I2C_MASTER_INACTIVE;
+>> @@ -416,7 +416,7 @@ static bool aspeed_i2c_master_irq(struct aspeed_i2c_bus *bus)
+>>
+>>          /* We are in an invalid state; reset bus to a known state. */
+>>          if (!bus->msgs) {
+>> -               dev_err(bus->dev, "bus in unknown state");
+>> +               dev_err(bus->dev, "bus in unknown state\n");
+>>                  bus->cmd_err = -EIO;
+>>                  if (bus->master_state != ASPEED_I2C_MASTER_STOP)
+>>                          aspeed_i2c_do_stop(bus);
+>> @@ -431,7 +431,7 @@ static bool aspeed_i2c_master_irq(struct aspeed_i2c_bus *bus)
+>>           */
+>>          if (bus->master_state == ASPEED_I2C_MASTER_START) {
+>>                  if (unlikely(!(irq_status & ASPEED_I2CD_INTR_TX_ACK))) {
+>> -                       pr_devel("no slave present at %02x", msg->addr);
+>> +                       pr_devel("no slave present at %02x\n", msg->addr);
 > 
-> Signed-off-by: Amit Kucheria <amit.kucheria@linaro.org>
-
-Reviewed-by: Bjorn Andersson <bjorn.andersson@linaro.org>
-
-Regards,
-Bjorn
-
-> ---
->  arch/arm64/boot/dts/qcom/sdm845.dtsi | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
+> Unless something changed in the last couple versions of the kernel, this is the
+> only line that actually changes anything. dev_* inserts a newline for every
+> call.
 > 
-> diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-> index cdaabeb..ba2899c 100644
-> --- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
-> +++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-> @@ -221,6 +221,22 @@
->  			#interrupt-cells = <2>;
->  		};
->  
-> +		tsens0: tsens at c263000 {
-> +			compatible = "qcom,sdm845-tsens", "qcom,tsens-v2";
-> +			reg = <0xc263000 0x1ff>, /* TM */
-> +			      <0xc222000 0x1ff>; /* SROT */
-> +			#qcom,sensors = <13>;
-> +			#thermal-sensor-cells = <1>;
-> +		};
-> +
-> +		tsens1: tsens at c265000 {
-> +			compatible = "qcom,sdm845-tsens", "qcom,tsens-v2";
-> +			reg = <0xc265000 0x1ff>, /* TM */
-> +			      <0xc223000 0x1ff>; /* SROT */
-> +			#qcom,sensors = <8>;
-> +			#thermal-sensor-cells = <1>;
-> +		};
-> +
->  		spmi_bus: spmi at c440000 {
->  			compatible = "qcom,spmi-pmic-arb";
->  			reg = <0xc440000 0x1100>,
-> -- 
-> 2.7.4
+> Admittedly, the rest of the file is pretty inconsistent, so if you really want
+> to make all these changes, I don't feel super strongly about it.
+> 
+
+Agreed. Will drop this patch.
+
+Thanks,
+
+Jae
+
+>>                          status_ack |= ASPEED_I2CD_INTR_TX_NAK;
+>>                          bus->cmd_err = -ENXIO;
+>>                          aspeed_i2c_do_stop(bus);
+>> @@ -451,11 +451,11 @@ static bool aspeed_i2c_master_irq(struct aspeed_i2c_bus *bus)
+>>          switch (bus->master_state) {
+>>          case ASPEED_I2C_MASTER_TX:
+>>                  if (unlikely(irq_status & ASPEED_I2CD_INTR_TX_NAK)) {
+>> -                       dev_dbg(bus->dev, "slave NACKed TX");
+>> +                       dev_dbg(bus->dev, "slave NACKed TX\n");
+>>                          status_ack |= ASPEED_I2CD_INTR_TX_NAK;
+>>                          goto error_and_stop;
+>>                  } else if (unlikely(!(irq_status & ASPEED_I2CD_INTR_TX_ACK))) {
+>> -                       dev_err(bus->dev, "slave failed to ACK TX");
+>> +                       dev_err(bus->dev, "slave failed to ACK TX\n");
+>>                          goto error_and_stop;
+>>                  }
+>>                  status_ack |= ASPEED_I2CD_INTR_TX_ACK;
+>> @@ -478,7 +478,7 @@ static bool aspeed_i2c_master_irq(struct aspeed_i2c_bus *bus)
+>>                  /* fallthrough intended */
+>>          case ASPEED_I2C_MASTER_RX:
+>>                  if (unlikely(!(irq_status & ASPEED_I2CD_INTR_RX_DONE))) {
+>> -                       dev_err(bus->dev, "master failed to RX");
+>> +                       dev_err(bus->dev, "master failed to RX\n");
+>>                          goto error_and_stop;
+>>                  }
+>>                  status_ack |= ASPEED_I2CD_INTR_RX_DONE;
+>> @@ -509,7 +509,7 @@ static bool aspeed_i2c_master_irq(struct aspeed_i2c_bus *bus)
+>>                  goto out_no_complete;
+>>          case ASPEED_I2C_MASTER_STOP:
+>>                  if (unlikely(!(irq_status & ASPEED_I2CD_INTR_NORMAL_STOP))) {
+>> -                       dev_err(bus->dev, "master failed to STOP");
+>> +                       dev_err(bus->dev, "master failed to STOP\n");
+>>                          bus->cmd_err = -EIO;
+>>                          /* Do not STOP as we have already tried. */
+>>                  } else {
+>> @@ -520,7 +520,7 @@ static bool aspeed_i2c_master_irq(struct aspeed_i2c_bus *bus)
+>>                  goto out_complete;
+>>          case ASPEED_I2C_MASTER_INACTIVE:
+>>                  dev_err(bus->dev,
+>> -                       "master received interrupt 0x%08x, but is inactive",
+>> +                       "master received interrupt 0x%08x, but is inactive\n",
+>>                          irq_status);
+>>                  bus->cmd_err = -EIO;
+>>                  /* Do not STOP as we should be inactive. */
+>> @@ -851,7 +851,7 @@ static int aspeed_i2c_probe_bus(struct platform_device *pdev)
+>>          bus->rst = devm_reset_control_get_shared(&pdev->dev, NULL);
+>>          if (IS_ERR(bus->rst)) {
+>>                  dev_err(&pdev->dev,
+>> -                       "missing or invalid reset controller device tree entry");
+>> +                       "missing or invalid reset controller device tree entry\n");
+>>                  return PTR_ERR(bus->rst);
+>>          }
+>>          reset_control_deassert(bus->rst);
+>> --
+>> 2.17.1
+>>
+> 
+> Reviewed-by: Brendan Higgins <brendanhiggins@google.com>
 > 
