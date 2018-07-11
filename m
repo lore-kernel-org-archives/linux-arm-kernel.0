@@ -1,29 +1,38 @@
-From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Wed, 11 Jul 2018 14:31:03 +0300
-Subject: [PATCH v5 3/3] serial: 8250_dw: add fractional divisor support
-In-Reply-To: <20180711151111.6f417020@xhacker.debian>
-References: <20180710110942.5b0a016e@xhacker.debian>
- <20180710111516.13b8c570@xhacker.debian>
- <20180711151111.6f417020@xhacker.debian>
-Message-ID: <2b363dc2f8ddd6fe52ba6f7c461b4dd55cfb8bce.camel@linux.intel.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 11 Jul 2018 13:36:03 +0200
+Subject: [PATCH 1/3] clocksource: drivers: set clockevent device cpumask
+ to cpu_possible_mask
+In-Reply-To: <1531308264-24220-1-git-send-email-sudeep.holla@arm.com>
+References: <1531308264-24220-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <2009eeb1-e925-fe5c-ac4a-9f3e41945127@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2018-07-11 at 15:11 +0800, Jisheng Zhang wrote:
-> For Synopsys DesignWare 8250 uart which version >= 4.00a, there's a
-> valid divisor latch fraction register. The fractional divisor width is
-> 4bits ~ 6bits.
+On 11/07/2018 13:24, Sudeep Holla wrote:
+> Currently, quite a few clockevent devices have cpumask set to
+> cpu_all_mask which should be fine. However, cpu_possible_mask is more
+> accurate and if there are any other clockevent devices in the system
+> which have cpumask set to cpu_possible_mask, then having cpu_all_mask
+> may result in issues (mostly boot hang with forever loops in
+> clockevents_notify_released).
 > 
-> Now the preparation is done, it's easy to add the feature support.
-> This patch firstly tries to get the fractional divisor width during
-> probe, then setups dw specific get_divisor() and set_divisor() hook.
+> So, lets replace all the clockevent device cpu_all_mask to
+> cpu_possible_mask in order to prevent above mentioned possible issue.
 > 
+> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Thierry Reding <thierry.reding@gmail.com>
+> Cc: Jonathan Hunter <jonathanh@nvidia.com>
+> Cc: Santosh Shilimkar <ssantosh@kernel.org>
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> ---
 
-You would need to resend entire series as v6.
-Don't forget to add given tags.
+Applied, thanks for the fix.
 
-But, wait a bit, I would like to check the algo (thanks for C program!).
 
 -- 
-Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-Intel Finland Oy
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
