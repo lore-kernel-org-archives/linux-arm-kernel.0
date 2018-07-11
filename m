@@ -1,78 +1,43 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Wed, 11 Jul 2018 15:45:43 +0800
-Subject: [PATCH v2 4/6] perf cs-etm: Support dummy address value for
- CS_ETM_TRACE_ON packet
-In-Reply-To: <1531295145-596-1-git-send-email-leo.yan@linaro.org>
-References: <1531295145-596-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <1531295145-596-5-git-send-email-leo.yan@linaro.org>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Wed, 11 Jul 2018 16:42:01 +0900
+Subject: [PATCH v11 13/15] include: pe.h: remove message[] from mz header
+ definition
+In-Reply-To: <20180711074203.3019-1-takahiro.akashi@linaro.org>
+References: <20180711074203.3019-1-takahiro.akashi@linaro.org>
+Message-ID: <20180711074203.3019-14-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For CS_ETM_TRACE_ON packet, its fields 'packet->start_addr' and
-'packet->end_addr' equal to 0xdeadbeefdeadbeefUL which are emitted in
-the decoder layer as dummy value, but the dummy value is pointless for
-branch sample when we use 'perf script' command to check program flow.
+message[] field won't be part of the definition of mz header.
 
-This patch is a preparation to support CS_ETM_TRACE_ON packet for
-branch sample, it converts the dummy address value to zero for more
-readable; this is accomplished by cs_etm__last_executed_instr() and
-cs_etm__first_executed_instr().  The later one is a new function
-introduced by this patch.
+This change is crucial for enabling kexec_file_load on arm64 because
+arm64's "Image" binary, as in PE format, doesn't have any data for it and
+accordingly the following check in pefile_parse_binary() will fail:
 
-Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-Signed-off-by: Leo Yan <leo.yan@linaro.org>
+	chkaddr(cursor, mz->peaddr, sizeof(*pe));
+
+Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: David Howells <dhowells@redhat.com>
+Cc: Vivek Goyal <vgoyal@redhat.com>
+Cc: Herbert Xu <herbert@gondor.apana.org.au>
+Cc: David S. Miller <davem@davemloft.net>
 ---
- tools/perf/util/cs-etm.c | 17 +++++++++++++++--
- 1 file changed, 15 insertions(+), 2 deletions(-)
+ include/linux/pe.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/tools/perf/util/cs-etm.c b/tools/perf/util/cs-etm.c
-index ae7c9c88..976db84 100644
---- a/tools/perf/util/cs-etm.c
-+++ b/tools/perf/util/cs-etm.c
-@@ -494,6 +494,10 @@ static inline void cs_etm__reset_last_branch_rb(struct cs_etm_queue *etmq)
+diff --git a/include/linux/pe.h b/include/linux/pe.h
+index 143ce75be5f0..3482b18a48b5 100644
+--- a/include/linux/pe.h
++++ b/include/linux/pe.h
+@@ -166,7 +166,7 @@ struct mz_hdr {
+ 	uint16_t oem_info;	/* oem specific */
+ 	uint16_t reserved1[10];	/* reserved */
+ 	uint32_t peaddr;	/* address of pe header */
+-	char     message[64];	/* message to print */
++	char     message[];	/* message to print */
+ };
  
- static inline u64 cs_etm__last_executed_instr(struct cs_etm_packet *packet)
- {
-+	/* Returns 0 for the CS_ETM_TRACE_ON packet */
-+	if (packet->sample_type == CS_ETM_TRACE_ON)
-+		return 0;
-+
- 	/*
- 	 * The packet records the execution range with an exclusive end address
- 	 *
-@@ -505,6 +509,15 @@ static inline u64 cs_etm__last_executed_instr(struct cs_etm_packet *packet)
- 	return packet->end_addr - A64_INSTR_SIZE;
- }
- 
-+static inline u64 cs_etm__first_executed_instr(struct cs_etm_packet *packet)
-+{
-+	/* Returns 0 for the CS_ETM_TRACE_ON packet */
-+	if (packet->sample_type == CS_ETM_TRACE_ON)
-+		return 0;
-+
-+	return packet->start_addr;
-+}
-+
- static inline u64 cs_etm__instr_count(const struct cs_etm_packet *packet)
- {
- 	/*
-@@ -546,7 +559,7 @@ static void cs_etm__update_last_branch_rb(struct cs_etm_queue *etmq)
- 
- 	be       = &bs->entries[etmq->last_branch_pos];
- 	be->from = cs_etm__last_executed_instr(etmq->prev_packet);
--	be->to	 = etmq->packet->start_addr;
-+	be->to	 = cs_etm__first_executed_instr(etmq->packet);
- 	/* No support for mispredict */
- 	be->flags.mispred = 0;
- 	be->flags.predicted = 1;
-@@ -701,7 +714,7 @@ static int cs_etm__synth_branch_sample(struct cs_etm_queue *etmq)
- 	sample.ip = cs_etm__last_executed_instr(etmq->prev_packet);
- 	sample.pid = etmq->pid;
- 	sample.tid = etmq->tid;
--	sample.addr = etmq->packet->start_addr;
-+	sample.addr = cs_etm__first_executed_instr(etmq->packet);
- 	sample.id = etmq->etm->branches_id;
- 	sample.stream_id = etmq->etm->branches_id;
- 	sample.period = 1;
+ struct mz_reloc {
 -- 
-2.7.4
+2.17.0
