@@ -1,67 +1,48 @@
-From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Thu, 12 Jul 2018 00:32:38 +0800
-Subject: [RFC PATCH v6 1/2] dt-bindings: arm: fsl: add mu binding doc
-In-Reply-To: <1531326759-20556-1-git-send-email-aisheng.dong@nxp.com>
-References: <1531326759-20556-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1531326759-20556-2-git-send-email-aisheng.dong@nxp.com>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Wed, 11 Jul 2018 09:34:49 -0700
+Subject: [PATCH] clk: aspeed: Support HPLL strapping on ast2400
+In-Reply-To: <CACPK8XfxKhT_ywpo3vqXSEaSPGdM+uhkgpn1R+EP9Z3spxAzXg@mail.gmail.com>
+References: <20180628231540.26633-1-joel@jms.id.au>
+ <153089970720.143105.7005759760140367907@swboyd.mtv.corp.google.com>
+ <CACPK8XfxKhT_ywpo3vqXSEaSPGdM+uhkgpn1R+EP9Z3spxAzXg@mail.gmail.com>
+Message-ID: <153132688979.143105.557909972230566711@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Messaging Unit module enables two processors within
-the SoC to communicate and coordinate by passing messages
-(e.g. data, status and control) through the MU interface.
+Quoting Joel Stanley (2018-07-10 22:53:52)
+> Hi Stephen,
+> 
+> On 7 July 2018 at 03:55, Stephen Boyd <sboyd@kernel.org> wrote:
+> > Quoting Joel Stanley (2018-06-28 16:15:40)
+> >> The HPLL can be configured through a register (SCU24), however some
+> >> platforms chose to configure it through the strapping settings and do
+> >> not use the register. This was not noticed as the logic for bit 18 in
+> >> SCU24 was confused: set means programmed, but the driver read it as set
+> >> means strapped.
+> >>
+> >> This gives us the correct HPLL value on Palmetto systems, from which
+> >> most of the peripheral clocks are generated.
+> >>
+> >> Fixes: 5eda5d79e4be ("clk: Add clock driver for ASPEED BMC SoCs")
+> >> Cc: stable at vger.kernel.org # v4.15
+> >> Reviewed-by: C?dric Le Goater <clg@kaod.org>
+> >> Signed-off-by: Joel Stanley <joel@jms.id.au>
+> >> ---
+> >
+> > Do you want this merged for -rc5? It sounds like on some systems this is
+> > a problem, but I don't know if these systems are supposed to work yet or
+> > not, so priority of this fix is not easy for me to understand.
+> >
+> 
+> Sure, some more background:
+> 
+> We did not notice this until we attempted to use the clock for the mtd
+> driver. However, this clock is used for the kernel clocksource, so eg.
+> sleep 1 takes two seconds to complete. This affects all of the systems
+> I have access to.
+> 
+> I suggest we merge for4.18, and keep the cc: stable so it can be
+> backported to the stable trees.
+> 
 
-Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: Fabio Estevam <fabio.estevam@nxp.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: devicetree at vger.kernel.org
-Reviewed-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
----
- .../devicetree/bindings/mailbox/fsl,mu.txt         | 34 ++++++++++++++++++++++
- 1 file changed, 34 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mailbox/fsl,mu.txt
-
-diff --git a/Documentation/devicetree/bindings/mailbox/fsl,mu.txt b/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
-new file mode 100644
-index 0000000..90e4905
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
-@@ -0,0 +1,34 @@
-+NXP i.MX Messaging Unit (MU)
-+--------------------------------------------------------------------
-+
-+The Messaging Unit module enables two processors within the SoC to
-+communicate and coordinate by passing messages (e.g. data, status
-+and control) through the MU interface. The MU also provides the ability
-+for one processor to signal the other processor using interrupts.
-+
-+Because the MU manages the messaging between processors, the MU uses
-+different clocks (from each side of the different peripheral buses).
-+Therefore, the MU must synchronize the accesses from one side to the
-+other. The MU accomplishes synchronization using two sets of matching
-+registers (Processor A-facing, Processor B-facing).
-+
-+Messaging Unit Device Node:
-+=============================
-+
-+Required properties:
-+-------------------
-+- compatible :	should be "fsl,<chip>-mu", the supported chips include
-+		imx8qxp, imx8qm.
-+- reg :		Should contain the registers location and length
-+- interrupts :	Interrupt number. The interrupt specifier format depends
-+		on the interrupt controller parent.
-+- #mbox-cells:  Must be 0. Number of cells in a mailbox
-+
-+Examples:
-+--------
-+lsio_mu0: mailbox at 5d1b0000 {
-+	compatible = "fsl,imx8qxp-mu";
-+	reg = <0x0 0x5d1b0000 0x0 0x10000>;
-+	interrupts = <GIC_SPI 176 IRQ_TYPE_LEVEL_HIGH>;
-+	#mbox-cells = <0>;
-+};
--- 
-2.7.4
+Ok. Thanks! Applied to clk-fixes.
