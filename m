@@ -1,74 +1,46 @@
-From: ray.jui@broadcom.com (Ray Jui)
-Date: Wed, 11 Jul 2018 09:56:13 -0700
-Subject: [PATCH -next] pinctrl: nsp: fix potential NULL dereference in
- nsp_pinmux_probe()
-In-Reply-To: <7b4361a5-f757-179c-57b6-44359801baad@broadcom.com>
-References: <1531312461-134547-1-git-send-email-weiyongjun1@huawei.com>
- <7b4361a5-f757-179c-57b6-44359801baad@broadcom.com>
-Message-ID: <0bd31938-7bf4-134c-18e7-cdcd12b6b370@broadcom.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 11 Jul 2018 17:56:40 +0100
+Subject: [RFC PATCH 1/4] dma-mapping: Generalise dma_32bit_limit flag
+In-Reply-To: <20180710180433.GB26285@lst.de>
+References: <cover.1531239284.git.robin.murphy@arm.com>
+ <a85a5fe22fced65b2960251fc6e8d8f1e68f828a.1531239284.git.robin.murphy@arm.com>
+ <20180710180433.GB26285@lst.de>
+Message-ID: <868cead9-88a7-e58d-3452-a78e19be5f47@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 7/11/2018 9:48 AM, Ray Jui wrote:
+On 10/07/18 19:04, Christoph Hellwig wrote:
+> On Tue, Jul 10, 2018 at 06:17:16PM +0100, Robin Murphy wrote:
+>> diff --git a/kernel/dma/direct.c b/kernel/dma/direct.c
+>> index 8be8106270c2..95e185347e34 100644
+>> --- a/kernel/dma/direct.c
+>> +++ b/kernel/dma/direct.c
+>> @@ -183,7 +183,7 @@ int dma_direct_supported(struct device *dev, u64 mask)
+>>   	 * Various PCI/PCIe bridges have broken support for > 32bit DMA even
+>>   	 * if the device itself might support it.
+>>   	 */
+>> -	if (dev->dma_32bit_limit && mask > DMA_BIT_MASK(32))
+>> +	if (dev->bus_dma_mask && mask > dev->bus_dma_mask)
+>>   		return 0;
 > 
-> 
-> On 7/11/2018 5:34 AM, Wei Yongjun wrote:
->> platform_get_resource() may fail and return NULL, so we should
->> better check it's return value to avoid a NULL pointer dereference
->> a bit later in the code.
->>
->> This is detected by Coccinelle semantic patch.
->>
->> @@
->> expression pdev, res, n, t, e, e1, e2;
->> @@
->>
->> res = platform_get_resource(pdev, t, n);
->> + if (!res)
->> +?? return -EINVAL;
->> ... when != res == NULL
->> e = devm_ioremap_nocache(e1, res->start, e2);
+> The comment above this check needs an updated (or just be removed).
 
-I forgot to mention this in my previous reply. Given that this is a fix 
-for a potential NULL pointer dereference and then a kernel crash in the 
-case when 'platform_get_resource' returns NULL, can you please add the 
-Fixes tag so this fix is picked by all LTS kernels under maintenance?
+Right, I'll give it a tweak. I could also do with actually getting the 
+field name correct in via_no_dac_cb()...
 
-Thanks,
+> Also we still have a few architectures not using dma-direct. I guess
+> most were doing fine without such limits anyway, but at least arm
+> will probably need an equivalent check.
 
-Ray
+Indeed, once we've found an approach that everyone's happy with we can 
+have a more thorough audit of exactly where else it needs to be applied. 
+FWIW I'm not aware of any 32-bit Arm systems affected by this*, but if 
+they do exist then at least there's no risk of regression since they've 
+always been busted.
 
->>
->> Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
->> ---
-> 
-> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
-> 
-> Change looks good to me, although the check could have been avoided if 
-> 'devm_ioremap_resource' is used on the next line instead of 
-> 'devm_ioremap_nocache', where validation of resource pointer is done.
-> 
-> But there's probably a reason why 'devm_ioremap_nocache' was used in 
-> this code here.
->
+Robin.
 
->> ? drivers/pinctrl/bcm/pinctrl-nsp-mux.c | 2 ++
->> ? 1 file changed, 2 insertions(+)
->>
->> diff --git a/drivers/pinctrl/bcm/pinctrl-nsp-mux.c 
->> b/drivers/pinctrl/bcm/pinctrl-nsp-mux.c
->> index 5cd8166..87618a4 100644
->> --- a/drivers/pinctrl/bcm/pinctrl-nsp-mux.c
->> +++ b/drivers/pinctrl/bcm/pinctrl-nsp-mux.c
->> @@ -577,6 +577,8 @@ static int nsp_pinmux_probe(struct platform_device 
->> *pdev)
->> ????????? return PTR_ERR(pinctrl->base0);
->> ????? res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
->> +??? if (!res)
->> +??????? return -EINVAL;
->> ????? pinctrl->base1 = devm_ioremap_nocache(&pdev->dev, res->start,
->> ??????????????????????????? resource_size(res));
->> ????? if (!pinctrl->base1) {
->>
+
+* Not counting the somewhat-similar StrongArm DMA controller bug where 
+one bit in the *middle* of the mask is unusable. Let's keep that 
+confined to the Arm dmabounce code and never speak of it...
