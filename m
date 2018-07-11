@@ -1,42 +1,47 @@
-From: weiyongjun1@huawei.com (Wei Yongjun)
-Date: Wed, 11 Jul 2018 12:34:21 +0000
-Subject: [PATCH -next] pinctrl: nsp: fix potential NULL dereference in
- nsp_pinmux_probe()
-Message-ID: <1531312461-134547-1-git-send-email-weiyongjun1@huawei.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Wed, 11 Jul 2018 14:29:46 +0200
+Subject: [PATCH v3 1/2] soc: imx: gpc: Disable 6sl display power gating
+ for ERR006287
+In-Reply-To: <1cc67fd7d1214f93f7ace6f0c2a46303f79a828e.camel@nxp.com>
+References: <cover.1531310547.git.leonard.crestez@nxp.com>
+ <d694bc32feb1c9638485700ba53cd6e51bea495c.1531310547.git.leonard.crestez@nxp.com>
+ <1531311392.3163.47.camel@pengutronix.de>
+ <1cc67fd7d1214f93f7ace6f0c2a46303f79a828e.camel@nxp.com>
+Message-ID: <1531312186.3163.52.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-platform_get_resource() may fail and return NULL, so we should
-better check it's return value to avoid a NULL pointer dereference
-a bit later in the code.
+Am Mittwoch, den 11.07.2018, 15:21 +0300 schrieb Leonard Crestez:
+> On Wed, 2018-07-11 at 14:16 +0200, Lucas Stach wrote:
+> > Am Mittwoch, den 11.07.2018, 15:11 +0300 schrieb Leonard Crestez:
+> > > Handle this in the safest possible way by keeping the DISP domain
+> > > always-on.
+> > > 
+> > > Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
+> > 
+> > Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
+> > 
+> > Can you send a follow on patch to switch the i.MX6QP errata
+> > workaround
+> > to use GENPD_FLAG_ALWAYS_ON and remove the -EBUSY stuff in the
+> > power
+> > down path?
+> 
+> Sure.
+> 
+> I was thinking of converting it to a new GENPD_FLAG which allows
+> power_off in suspend (as suggested by Ulf) but switching to
+> GENPD_FLAG_ALWAYS_ON in order to simplify the code could be done
+> first.
 
-This is detected by Coccinelle semantic patch.
+Sure, if you are going to work on this I'm fine with converting it over
+to this without first going for GENPD_FLAG_ALWAYS_ON. Just wanted to
+make sure that things are consistent.
 
-@@
-expression pdev, res, n, t, e, e1, e2;
-@@
+> The -EBUSY stuff is not very harmful.
 
-res = platform_get_resource(pdev, t, n);
-+ if (!res)
-+   return -EINVAL;
-... when != res == NULL
-e = devm_ioremap_nocache(e1, res->start, e2);
+It's dead code once the appropriate flags have been added to the
+domain, so should be removed.
 
-Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
----
- drivers/pinctrl/bcm/pinctrl-nsp-mux.c | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/drivers/pinctrl/bcm/pinctrl-nsp-mux.c b/drivers/pinctrl/bcm/pinctrl-nsp-mux.c
-index 5cd8166..87618a4 100644
---- a/drivers/pinctrl/bcm/pinctrl-nsp-mux.c
-+++ b/drivers/pinctrl/bcm/pinctrl-nsp-mux.c
-@@ -577,6 +577,8 @@ static int nsp_pinmux_probe(struct platform_device *pdev)
- 		return PTR_ERR(pinctrl->base0);
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-+	if (!res)
-+		return -EINVAL;
- 	pinctrl->base1 = devm_ioremap_nocache(&pdev->dev, res->start,
- 					      resource_size(res));
- 	if (!pinctrl->base1) {
+Regards,
+Lucas
