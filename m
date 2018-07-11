@@ -1,26 +1,23 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed, 11 Jul 2018 09:51:53 -0600
-Subject: [PATCH v2] dt-bindings: marvell: Add documentation for the
- Armada 3700 AVS binding
-In-Reply-To: <20180704132524.23640-1-gregory.clement@bootlin.com>
-References: <20180704132524.23640-1-gregory.clement@bootlin.com>
-Message-ID: <20180711155153.GA13702@rob-hp-laptop>
+Date: Wed, 11 Jul 2018 09:25:28 -0600
+Subject: [PATCH v4 1/6] dt-bindings: freescale: Add bindings for the
+ tigerp module
+In-Reply-To: <1531240308-24798-1-git-send-email-fabio.estevam@nxp.com>
+References: <1531240308-24798-1-git-send-email-fabio.estevam@nxp.com>
+Message-ID: <20180711152528.GA8439@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 04, 2018 at 03:25:24PM +0200, Gregory CLEMENT wrote:
-> Extend the documentation of the Armada 37xx SoC with the Adaptive Voltage
-> Scaling (AVS) registers.
+On Tue, Jul 10, 2018 at 01:31:43PM -0300, Fabio Estevam wrote:
+> Add bindings for the tigerp module present on i.MX51.
 > 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 > ---
-> Changelog:
-> v1 -> v2:
->  - Add Acked-by: from Viresh Kumar
->  - Add the dt mailing list in copy
+> Changes since v3:
+> - None
 > 
->  .../bindings/arm/marvell/armada-37xx.txt         | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
+>  Documentation/devicetree/bindings/arm/freescale/tigerp.txt | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/freescale/tigerp.txt
 
 Reviewed-by: Rob Herring <robh@kernel.org>
