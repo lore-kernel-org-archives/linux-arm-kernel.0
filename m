@@ -1,31 +1,20 @@
-From: weiyongjun1@huawei.com (Wei Yongjun)
-Date: Wed, 11 Jul 2018 13:22:47 +0000
-Subject: [PATCH -next] drm/sun4i: DW HDMI: Make symbol
- sun8i_dw_hdmi_pltfm_driver static
-Message-ID: <1531315367-190647-1-git-send-email-weiyongjun1@huawei.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Wed, 11 Jul 2018 21:14:32 +0800
+Subject: [PATCH V2 2/2] ARM: dts: imx6sx: add ocram_s support
+In-Reply-To: <1531270739-3075-2-git-send-email-Anson.Huang@nxp.com>
+References: <1531270739-3075-1-git-send-email-Anson.Huang@nxp.com>
+ <1531270739-3075-2-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <20180711131431.GJ6959@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fixes the following sparse warning:
+On Wed, Jul 11, 2018 at 08:58:59AM +0800, Anson Huang wrote:
+> i.MX6SX has a 16KB always-on ocram bank called
+> ocram_s, enable it as another mmio sram.
+> 
+> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
 
-drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c:228:24: warning:
- symbol 'sun8i_dw_hdmi_pltfm_driver' was not declared. Should it be static?
+Since the clock ID has already been defined before, this dts patch can
+be applied independently to clock driver one.
 
-Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
----
- drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
-index 3459b9e..281c42a 100644
---- a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
-+++ b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
-@@ -225,7 +225,7 @@ static int sun8i_dw_hdmi_remove(struct platform_device *pdev)
- };
- MODULE_DEVICE_TABLE(of, sun8i_dw_hdmi_dt_ids);
- 
--struct platform_driver sun8i_dw_hdmi_pltfm_driver = {
-+static struct platform_driver sun8i_dw_hdmi_pltfm_driver = {
- 	.probe  = sun8i_dw_hdmi_probe,
- 	.remove = sun8i_dw_hdmi_remove,
- 	.driver = {
+Applied, thanks.
