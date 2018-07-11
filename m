@@ -1,73 +1,46 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 11 Jul 2018 14:38:59 +0200
-Subject: [PATCH 05/19] mmc: mmci: allow to overwrite clock/power procedure
- to specific variant
-In-Reply-To: <973d98c5-b5c7-d1c4-1b20-b6a77500adc3@st.com>
-References: <1528809280-31116-1-git-send-email-ludovic.Barre@st.com>
- <1528809280-31116-6-git-send-email-ludovic.Barre@st.com>
- <CAPDyKFpwVMX9LoC_abHm09UNhLse8MJBUpCCHkR8NnK7fOU5Yg@mail.gmail.com>
- <973d98c5-b5c7-d1c4-1b20-b6a77500adc3@st.com>
-Message-ID: <CAPDyKFpUbHR4qfm3fDbRi=_=5oyqN9mhubySQ6a-N7msR5uU8w@mail.gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 11 Jul 2018 13:58:25 +0100
+Subject: [PATCH] arm64: neon: Fix function may_use_simd() return error
+ status
+In-Reply-To: <20180711120519.GC15725@arm.com>
+References: <1531307188-12032-1-git-send-email-yandong77520@gmail.com>
+ <20180711120519.GC15725@arm.com>
+Message-ID: <20180711125825.GM9486@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
+On Wed, Jul 11, 2018 at 01:05:19PM +0100, Will Deacon wrote:
+> On Wed, Jul 11, 2018 at 07:06:28PM +0800, Yandong.Zhao wrote:
+> > From: Yandong Zhao <yandong77520@gmail.com>
+> > 
+> > It does not matter if the caller of may_use_simd() migrates to
+> > another cpu after the call, but it is still important that the
+> > kernel_neon_busy percpu instance that is read matches the cpu the
+> > task is running on at the time of the read.
+> > 
+> > This means that raw_cpu_read() is not sufficient.  kernel_neon_busy
+> > may appear true if the caller migrates during the execution of
+> > raw_cpu_read() and the next task to be scheduled in on the initial
+> > cpu calls kernel_neon_begin().
+> > 
+> > This patch replaces raw_cpu_read() with this_cpu_read() to protect
+> > against this race.
+> > 
+> > Fixes: cb84d11e1625 ("arm64: neon: Remove support for nested or hardirq kernel-mode NEON")
+> > Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+> > Signed-off-by: Yandong Zhao <yandong77520@gmail.com>
+> > ---
+> >  arch/arm64/include/asm/simd.h | 5 +++--
+> >  1 file changed, 3 insertions(+), 2 deletions(-)
+> 
+> Does this need to go to stable?
 
->> 2) The clock register will be written to before the regulator
->> operations have been done. Not sure if that works fine!?
->
->
-> you are right, it's probably better if the clock is done after power.
-> do you agree if I change the order?
+It should, yes, so we should probably add
 
-If the new ST variant can cope with the existing order in the current
-code, then let's stick to that to avoid breaking legacy variants.
+Cc: stable at vger.kernel.org
 
->
->>
->> An overall comment, I think we should create a mmci_host_ops structure
->> and put the needed callbacks in there (kept to a minimum of course),
->> rather than putting them as a part of the variant struct. More
->> importantly, also the legacy mmci variants should get a mmci_host_ops
->> structure assigned during probe.
->>
->> The point is, I think it makes the code above (and future wise) more
->> flexible. It should also allow us to better share functions between
->> the variants. In principle, I expect that we end up with a bunch of
->> "library" mmci functions that can be invoked from variant's
->> mmci_host_ops (if not assigned directly).
->
->
-> After "Linaro connect" we have exchanged some emails (subject: "STM32MP1
-> SDMMC driver review") and the start point was
-> "Goal is not to redesign mmci.c like sdhci.c."
-> This it's why I'm surprise by "library" and "mmci_host_ops"
-> and comment of patch 01.
 
-Sometimes it's easier to look at patches/code, instead of giving
-qualified guesses what is the best solution. Try something, realize
-what is better, then try again...
+Are you OK to pick that up?
 
-The point is, we need callbacks to cope with the variants as we can't
-have quirks for everything, and you are demonstrating that in $subject
-patch.
-
-Since this is the case, then I think it's better to make it more
-flexible, already from the beginning and thus put the callbacks in a
-new mmci host ops structure instead.
-
->
-> So, it's not clear for me on where we wish to go.
-> Could you clarify the way, if it's with a mmci_ops like sdhci_ops?
-
-Yep, something along those lines. However, we don't want to introduce
-unnecessary callbacks and complexity. We should strive towards sharing
-common functionality through library functions in mmci.c, rather than
-having callbacks for every single difference.
-
-Does it makes sense?
-
-[...]
-
-Kind regards
-Uffe
+Cheers
+---Dave
