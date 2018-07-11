@@ -1,141 +1,146 @@
-From: gengdongjiu@huawei.com (gengdongjiu)
-Date: Wed, 11 Jul 2018 15:16:21 +0800
-Subject: [PATCH v7 3/4] KVM: arm64: Share the parts of get/set events
- useful to 32bit
-In-Reply-To: <20180710164952.23736-4-james.morse@arm.com>
-References: <20180710164952.23736-1-james.morse@arm.com>
- <20180710164952.23736-4-james.morse@arm.com>
-Message-ID: <b392c9e1-d0e4-9674-a223-351b381db76c@huawei.com>
+From: vkoul@kernel.org (Vinod)
+Date: Wed, 11 Jul 2018 12:49:05 +0530
+Subject: [PATCH v1 3/4] dmaengine: imx-sdma: support dmatest
+In-Reply-To: <20180711065338.3ka4yibxkawgo4fd@pengutronix.de>
+References: <1531239793-11781-1-git-send-email-yibin.gong@nxp.com>
+ <1531239793-11781-4-git-send-email-yibin.gong@nxp.com>
+ <20180710153326.GG3219@vkoul-mobl>
+ <DB6PR04MB3223F93E1566A97857FD2FF4895A0@DB6PR04MB3223.eurprd04.prod.outlook.com>
+ <20180711065338.3ka4yibxkawgo4fd@pengutronix.de>
+Message-ID: <20180711071905.GN3219@vkoul-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi James,
+On 11-07-18, 08:53, s.hauer at pengutronix.de wrote:
+> On Wed, Jul 11, 2018 at 06:37:02AM +0000, Robin Gong wrote:
+> > 
+> > > -----Original Message-----
+> > > From: Vinod [mailto:vkoul at kernel.org]
+> > > Sent: 2018?7?10? 23:33
+> > > To: Robin Gong <yibin.gong@nxp.com>
+> > > Cc: dan.j.williams at intel.com; shawnguo at kernel.org;
+> > > s.hauer at pengutronix.de; Fabio Estevam <fabio.estevam@nxp.com>;
+> > > linux at armlinux.org.uk; linux-arm-kernel at lists.infradead.org;
+> > > kernel at pengutronix.de; dmaengine at vger.kernel.org;
+> > > linux-kernel at vger.kernel.org; dl-linux-imx <linux-imx@nxp.com>
+> > > Subject: Re: [PATCH v1 3/4] dmaengine: imx-sdma: support dmatest
+> > > 
+> > > On 11-07-18, 00:23, Robin Gong wrote:
+> > > > dmatest(memcpy) will never call dmaengine_slave_config before prep,
+> > > 
+> > > and that should have been a hint to you that you should not expect that
+> > > 
+> > > > so jobs in dmaengine_slave_config need to be moved into somewhere
+> > > > before device_prep_dma_memcpy. Besides, dmatest never setup chan
+> > > > ->private as other common case like uart/audio/spi will always setup
+> > > > chan->private. Here check it to judge if it's dmatest case and do
+> > > > jobs in slave_config.
+> > > 
+> > > and you should not do anything for dmatest. Supporting it means memcpy
+> > > implementation is not correct :)
+> > Okay, I will any word about dmatest here since memcpy assume no calling
+> > slave_config.
+> > > 
+> > > >
+> > > > Signed-off-by: Robin Gong <yibin.gong@nxp.com>
+> > > > ---
+> > > >  drivers/dma/imx-sdma.c | 37 ++++++++++++++++++++++++++++---------
+> > > >  1 file changed, 28 insertions(+), 9 deletions(-)
+> > > >
+> > > > diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c index
+> > > > ed2267d..48f3749 100644
+> > > > --- a/drivers/dma/imx-sdma.c
+> > > > +++ b/drivers/dma/imx-sdma.c
+> > > > @@ -1222,10 +1222,36 @@ static int sdma_alloc_chan_resources(struct
+> > > > dma_chan *chan)  {
+> > > >  	struct sdma_channel *sdmac = to_sdma_chan(chan);
+> > > >  	struct imx_dma_data *data = chan->private;
+> > > > +	struct imx_dma_data default_data;
+> > > >  	int prio, ret;
+> > > >
+> > > > -	if (!data)
+> > > > -		return -EINVAL;
+> > > > +	ret = clk_enable(sdmac->sdma->clk_ipg);
+> > > > +	if (ret)
+> > > > +		return ret;
+> > > > +	ret = clk_enable(sdmac->sdma->clk_ahb);
+> > > > +	if (ret)
+> > > > +		goto disable_clk_ipg;
+> > > > +	/*
+> > > > +	 * dmatest(memcpy) will never call dmaengine_slave_config before prep,
+> > > > +	 * so jobs in dmaengine_slave_config need to be moved into somewhere
+> > > > +	 * before device_prep_dma_memcpy. Besides, dmatest never setup chan
+> > > > +	 * ->private as other common cases like uart/audio/spi will setup
+> > > > +	 * chan->private always. Here check it to judge if it's dmatest case
+> > > > +	 * and do jobs in slave_config.
+> > > > +	 */
+> > > > +	if (!data) {
+> > > > +		dev_warn(sdmac->sdma->dev, "dmatest is running?\n");
+> > > 
+> > > why is that a warning!
+> > Current SDMA driver assume filter function to set chan->private with specific data 
+> > (struct imx_dma_data dma_data)like below (sound/soc/fsl/fsl_asrc_dma.c):
+> > static bool filter(struct dma_chan *chan, void *param)
+> > {
+> >         if (!imx_dma_is_general_purpose(chan))
+> >                 return false;
+> >         chan->private = param;
+> >         return true;
+> > }
+> > 
+> > But in memcpy case, at lease dmatest case, no chan->private set in its filter function.
+> > So here take dmatest a special case and do some prepare jobs for memcpy. But if the
+> > Upper device driver call dma_request_channel() with their specific filter without
+> > 'chan->private' setting in the future. The warning message is a useful hint to them to
+> > Add 'chan->private' in filter function.  Or doc it somewhere?
+> 
+> Instead of doing heuristics to guess whether we are doing memcpy you
+> could instead make memcpy the default when slave_config is not called,
+> i.e. drop the if (!data) check completely.
+> 
+> > > 
+> > > > +		sdmac->word_size  =  sdmac->sdma->dma_device.copy_align;
+> > > > +		default_data.priority = 2;
+> > > > +		default_data.peripheral_type = IMX_DMATYPE_MEMORY;
+> > > > +		default_data.dma_request = 0;
+> > > > +		default_data.dma_request2 = 0;
+> > > > +		data = &default_data;
+> > > > +
+> > > > +		sdma_config_ownership(sdmac, false, true, false);
+> > > > +		sdma_get_pc(sdmac, IMX_DMATYPE_MEMORY);
+> > > > +		sdma_load_context(sdmac);
+> > > > +	}
+> > > 
+> > > this needs to be default for memcpy
+> 
+> The problem seems to be that we do not know whether we are doing memcpy
+> or not. Normally we get the information how a channel is to be
+> configured in dma_device->device_config, but this function is not called
+> in the memcpy case.
 
-On 2018/7/11 0:49, James Morse wrote:
-> The get/set events helpers to do some work to check reserved
-> and padding fields are zero. This is useful on 32bit too.
-> 
-> Move this code into virt/kvm/arm/arm.c, and give the arch
-> code some underscores.
-> 
-> This is temporarily hidden behind __KVM_HAVE_VCPU_EVENTS until
-> 32bit is wired up.
-> 
-> Signed-off-by: James Morse <james.morse@arm.com>
-> CC: Dongjiu Geng <gengdongjiu@huawei.com>
-> ---
->  arch/arm64/include/asm/kvm_host.h |  8 ++++----
->  arch/arm64/kvm/guest.c            | 21 ++++-----------------
->  virt/kvm/arm/arm.c                | 28 ++++++++++++++++++++++++++++
->  3 files changed, 36 insertions(+), 21 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> index 45a384b0a78a..66d09b44ebd8 100644
-> --- a/arch/arm64/include/asm/kvm_host.h
-> +++ b/arch/arm64/include/asm/kvm_host.h
-> @@ -350,11 +350,11 @@ unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu);
->  int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *indices);
->  int kvm_arm_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg);
->  int kvm_arm_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg);
-> -int kvm_arm_vcpu_get_events(struct kvm_vcpu *vcpu,
-> -			    struct kvm_vcpu_events *events);
-> +int __kvm_arm_vcpu_get_events(struct kvm_vcpu *vcpu,
-> +			      struct kvm_vcpu_events *events);
->  
-> -int kvm_arm_vcpu_set_events(struct kvm_vcpu *vcpu,
-> -			    struct kvm_vcpu_events *events);
-> +int __kvm_arm_vcpu_set_events(struct kvm_vcpu *vcpu,
-> +			      struct kvm_vcpu_events *events);
->  
->  #define KVM_ARCH_WANT_MMU_NOTIFIER
->  int kvm_unmap_hva(struct kvm *kvm, unsigned long hva);
-> diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
-> index dd05be96d981..725c7545e91a 100644
-> --- a/arch/arm64/kvm/guest.c
-> +++ b/arch/arm64/kvm/guest.c
-> @@ -289,11 +289,9 @@ int kvm_arch_vcpu_ioctl_set_sregs(struct kvm_vcpu *vcpu,
->  	return -EINVAL;
->  }
->  
-> -int kvm_arm_vcpu_get_events(struct kvm_vcpu *vcpu,
-> -			struct kvm_vcpu_events *events)
-> +int __kvm_arm_vcpu_get_events(struct kvm_vcpu *vcpu,
-> +			      struct kvm_vcpu_events *events)
->  {
-> -	memset(events, 0, sizeof(*events));
-> -
->  	events->exception.serror_pending = !!(vcpu->arch.hcr_el2 & HCR_VSE);
->  	events->exception.serror_has_esr = cpus_have_const_cap(ARM64_HAS_RAS_EXTN);
->  
-> @@ -303,23 +301,12 @@ int kvm_arm_vcpu_get_events(struct kvm_vcpu *vcpu,
->  	return 0;
->  }
->  
-> -int kvm_arm_vcpu_set_events(struct kvm_vcpu *vcpu,
-> -			struct kvm_vcpu_events *events)
-> +int __kvm_arm_vcpu_set_events(struct kvm_vcpu *vcpu,
-> +			      struct kvm_vcpu_events *events)
->  {
-> -	int i;
->  	bool serror_pending = events->exception.serror_pending;
->  	bool has_esr = events->exception.serror_has_esr;
->  
-> -	/* check whether the reserved field is zero */
-> -	for (i = 0; i < ARRAY_SIZE(events->reserved); i++)
-> -		if (events->reserved[i])
-> -			return -EINVAL;
-> -
-> -	/* check whether the pad field is zero */
-> -	for (i = 0; i < ARRAY_SIZE(events->exception.pad); i++)
-> -		if (events->exception.pad[i])
-> -			return -EINVAL;
-> -
->  	if (serror_pending && has_esr) {
->  		if (!cpus_have_const_cap(ARM64_HAS_RAS_EXTN))
->  			return -EINVAL;
-> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-> index a94eab71e5c7..f70d24e1751d 100644
-> --- a/virt/kvm/arm/arm.c
-> +++ b/virt/kvm/arm/arm.c
-> @@ -1044,6 +1044,34 @@ static int kvm_arm_vcpu_has_attr(struct kvm_vcpu *vcpu,
->  	return ret;
->  }
->  
-> +#ifdef __KVM_HAVE_VCPU_EVENTS	/* temporary: until 32bit is wired up */
-> +static int kvm_arm_vcpu_get_events(struct kvm_vcpu *vcpu,
-> +				   struct kvm_vcpu_events *events)
-> +{
-> +	memset(events, 0, sizeof(*events));
-> +
-> +	return __kvm_arm_vcpu_get_events(vcpu, events);
-> +}
-> +
-> +static int kvm_arm_vcpu_set_events(struct kvm_vcpu *vcpu,
-> +				   struct kvm_vcpu_events *events)
-> +{
-> +	int i;
-> +
-> +	/* check whether the reserved field is zero */
-> +	for (i = 0; i < ARRAY_SIZE(events->reserved); i++)
-> +		if (events->reserved[i])
-> +			return -EINVAL;
-> +
-> +	/* check whether the pad field is zero */
-> +	for (i = 0; i < ARRAY_SIZE(events->exception.pad); i++)
-> +		if (events->exception.pad[i])
-> +			return -EINVAL;
-> +
-> +	return __kvm_arm_vcpu_set_events(vcpu, events);
-> +}
-> +#endif /* __KVM_HAVE_VCPU_EVENTS */
-In [PATCH v7 4/4] KVM: arm: Add 32bit get/set events support, I see you remove "__KVM_HAVE_VCPU_EVENTS" in kvm_arch_vcpu_ioctl()
-but here it adds, it looks like strange.
-so maybe it is better keep it in both place, or remove them both.
+Not really true, device_config only provides parameters to be
+configured for next slave transaction
 
->From the comments /* temporary: until 32bit is wired up */, do you forget to remove the __KVM_HAVE_VCPU_EVENTS	after wiring up the 32bit?
+> An alternative might also be to do the setup in dma_device->device_prep_dma_memcpy.
 
-> +
->  long kvm_arch_vcpu_ioctl(struct file *filp,
->  			 unsigned int ioctl, unsigned long arg)
->  {
-> 
+Precisely, see how other drivers do this
+
+Let's roll back a bit and foresee why is this required.
+
+In case of memcpy, you need to tell DMA to do transfer from src to dstn
+and size. Additional parameters like buswidth etc should be derived for
+maximum throughput (after all we are dma, people want it to be done
+fastest)
+
+Now for slave, you are interfacing with a peripheral and don't know how
+that is setup. So you need to match the parameters, otherwise you get
+overflow or underflow and hence need for device_config
+
+Please do not derive additional notions from these, please do not assume
+anything else, unless provided in documentation :)
+
+In doubt, just ask!
+
+HTH
+-- 
+~Vinod
