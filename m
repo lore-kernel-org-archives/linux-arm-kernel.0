@@ -1,22 +1,43 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 11 Jul 2018 21:55:31 +0800
-Subject: [linux-sunxi] [PATCH v3] drm/sun4i: mixer: Read id from DT
-In-Reply-To: <20180711112706.30222-1-jernej.skrabec@siol.net>
-References: <20180711112706.30222-1-jernej.skrabec@siol.net>
-Message-ID: <CAGb2v67ShNTqYAKXRWwhKxzcyVw512bVmNrr-Kv-oDdVq+=yEQ@mail.gmail.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 11 Jul 2018 14:42:34 +0100
+Subject: [PATCH 1/3] clocksource: drivers: set clockevent device cpumask
+ to cpu_possible_mask
+In-Reply-To: <2009eeb1-e925-fe5c-ac4a-9f3e41945127@linaro.org>
+References: <1531308264-24220-1-git-send-email-sudeep.holla@arm.com>
+ <2009eeb1-e925-fe5c-ac4a-9f3e41945127@linaro.org>
+Message-ID: <229f0ac1-16b5-3fcf-3d0d-60ad59ea40f8@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 11, 2018 at 7:27 PM, Jernej Skrabec <jernej.skrabec@siol.net> wrote:
-> Currently, TCON supports 2 ways to match TCON with engine (mixer in this
-> case). Old way is to just traverse of graph backwards and compare node
-> pointer. New way is to match TCON and engine by their respective ids.
-> All SoCs with DE2 enabled till now used the old way, which means mixer
-> id was never used and thus never implemented.
->
-> However, for R40, only the new way will be used. To prepare for that,
-> implement mixer id fetching from DT.
->
-> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+Hi Daniel,
 
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+On 11/07/18 12:36, Daniel Lezcano wrote:
+> On 11/07/2018 13:24, Sudeep Holla wrote:
+>> Currently, quite a few clockevent devices have cpumask set to
+>> cpu_all_mask which should be fine. However, cpu_possible_mask is more
+>> accurate and if there are any other clockevent devices in the system
+>> which have cpumask set to cpu_possible_mask, then having cpu_all_mask
+>> may result in issues (mostly boot hang with forever loops in
+>> clockevents_notify_released).
+>>
+>> So, lets replace all the clockevent device cpu_all_mask to
+>> cpu_possible_mask in order to prevent above mentioned possible issue.
+>>
+>> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+>> Cc: Thomas Gleixner <tglx@linutronix.de>
+>> Cc: Thierry Reding <thierry.reding@gmail.com>
+>> Cc: Jonathan Hunter <jonathanh@nvidia.com>
+>> Cc: Santosh Shilimkar <ssantosh@kernel.org>
+>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+>> ---
+> 
+> Applied, thanks for the fix.
+> 
+
+Thomas was planning to take this, see [1]
+-- 
+Regards,
+Sudeep
+
+[1]
+https://lore.kernel.org/lkml/alpine.DEB.2.21.1807102220320.1588 at nanos.tec.linutronix.de/
