@@ -1,84 +1,180 @@
-From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Wed, 11 Jul 2018 15:11:17 +0300
-Subject: [PATCH v3 2/2] ARM: dts: imx6sl: Convert gpc to new bindings
-In-Reply-To: <cover.1531310547.git.leonard.crestez@nxp.com>
-References: <cover.1531310547.git.leonard.crestez@nxp.com>
-Message-ID: <849ea1c3434c87316f15953089633854e01938d6.1531310547.git.leonard.crestez@nxp.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 11 Jul 2018 14:16:00 +0200
+Subject: [PATCH 01/19] mmc: mmci: regroup and define dma operations
+In-Reply-To: <d93e6886-1dee-7915-459f-466a54d0c242@st.com>
+References: <1528809280-31116-1-git-send-email-ludovic.Barre@st.com>
+ <1528809280-31116-2-git-send-email-ludovic.Barre@st.com>
+ <CAPDyKFpt5HUeUqaoS9icDodM+r64jB9vQ=zTecO0tuBv=TtOXg@mail.gmail.com>
+ <d93e6886-1dee-7915-459f-466a54d0c242@st.com>
+Message-ID: <CAPDyKFo0q5Yps1whPmaUQJAV3tXx91WPmxtMF_ov43qP=djQfg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With old bindings imx_gpc_onecell_data always sets num_domains to 2 so
-the DISPMIX domain can't actually be referenced. The pd is still defined
-and pm core shuts it down as "unused" so display can't work.
+On 11 July 2018 at 11:41, Ludovic BARRE <ludovic.barre@st.com> wrote:
+>
+>
+> On 07/05/2018 05:17 PM, Ulf Hansson wrote:
+>>
+>> On 12 June 2018 at 15:14, Ludovic Barre <ludovic.Barre@st.com> wrote:
+>>>
+>>> From: Ludovic Barre <ludovic.barre@st.com>
+>>>
+>>> Prepare mmci driver to manage dma interface by new property.
+>>> This patch defines and regroups dma operations for mmci drivers.
+>>> mmci_dma_XX prototypes are added to call member of mmci_dma_ops
+>>> if not null. Based on legacy need, a mmci dma interface has been
+>>> defined with:
+>>> -mmci_dma_setup
+>>> -mmci_dma_release
+>>> -mmci_dma_pre_req
+>>> -mmci_dma_start
+>>> -mmci_dma_finalize
+>>> -mmci_dma_post_req
+>>> -mmci_dma_error
+>>> -mmci_dma_get_next_data
+>>
+>>
+>> As I suggested for one of the other patches, I would rather turn core
+>> mmci functions into library functions, which can be either invoked
+>> from variant callbacks or assigned directly to them.
+>>
+>> In other words, I would leave the functions that you move in this
+>> patch to stay in mmci.c. Although some needs to be re-factored and we
+>> also needs to make some of them available to be called from another
+>> file, hence the functions needs to be shared via mmci.h rather than
+>> being declared static.
+>
+>
+> In previous exchange mail "STM32MP1 SDMMC driver review"
+> we are said:
+>
+>>>> -dma variant ? should fit in Qualcomm implementation, reuse (rename)
+>>>> mmci_qcom_dml.c file and integrate ST dma in.
 
-Fix this by converting to new gpc bindings by adding pgc nodes and
-referencing the newly-defined &pu_disp domain from &lcdif.
+Apologize if I may have lead you in a wrong direction, that was not my intent.
 
-Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
----
- arch/arm/boot/dts/imx6sl.dtsi | 35 +++++++++++++++++++++++++++++++----
- 1 file changed, 31 insertions(+), 4 deletions(-)
+However, by looking at $subject patch, your seems to be unnecessarily
+shuffling code around. I would like to avoid that.
 
-diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-index 102c575a6025..49a56b4fd393 100644
---- a/arch/arm/boot/dts/imx6sl.dtsi
-+++ b/arch/arm/boot/dts/imx6sl.dtsi
-@@ -698,14 +698,40 @@
- 				reg = <0x020dc000 0x4000>;
- 				interrupt-controller;
- 				#interrupt-cells = <3>;
- 				interrupts = <0 89 IRQ_TYPE_LEVEL_HIGH>;
- 				interrupt-parent = <&intc>;
--				pu-supply = <&reg_pu>;
--				clocks = <&clks IMX6SL_CLK_GPU2D_OVG>,
--					 <&clks IMX6SL_CLK_GPU2D_PODF>;
--				#power-domain-cells = <1>;
-+				clocks = <&clks IMX6SL_CLK_IPG>;
-+				clock-names = "ipg";
-+
-+				pgc {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+
-+					power-domain at 0 {
-+						reg = <0>;
-+						#power-domain-cells = <0>;
-+					};
-+
-+					pd_pu: power-domain at 1 {
-+						reg = <1>;
-+						#power-domain-cells = <0>;
-+						power-supply = <&reg_pu>;
-+						clocks = <&clks IMX6SL_CLK_GPU2D_OVG>,
-+						         <&clks IMX6SL_CLK_GPU2D_PODF>;
-+					};
-+
-+					pd_disp: power-domain at 2 {
-+						reg = <2>;
-+						#power-domain-cells = <0>;
-+						clocks = <&clks IMX6SL_CLK_LCDIF_AXI>,
-+							 <&clks IMX6SL_CLK_LCDIF_PIX>,
-+							 <&clks IMX6SL_CLK_EPDC_AXI>,
-+							 <&clks IMX6SL_CLK_EPDC_PIX>,
-+							 <&clks IMX6SL_CLK_PXP_AXI>;
-+					};
-+				};
- 			};
- 
- 			gpr: iomuxc-gpr at 20e0000 {
- 				compatible = "fsl,imx6sl-iomuxc-gpr",
- 					     "fsl,imx6q-iomuxc-gpr", "syscon";
-@@ -756,10 +782,11 @@
- 				clocks = <&clks IMX6SL_CLK_LCDIF_PIX>,
- 					 <&clks IMX6SL_CLK_LCDIF_AXI>,
- 					 <&clks IMX6SL_CLK_DUMMY>;
- 				clock-names = "pix", "axi", "disp_axi";
- 				status = "disabled";
-+				power-domains = <&pd_disp>;
- 			};
- 
- 			dcp: dcp at 20fc000 {
- 				compatible = "fsl,imx6sl-dcp", "fsl,imx28-dcp";
- 				reg = <0x020fc000 0x4000>;
--- 
-2.17.1
+>>>
+>>> stm32 sdmmc has an internal dma, no need to use dmaengine API;
+>>> So some modifications in mmci (pre/post request, mmci_dma_xx). perhaps
+>>> should be done with an ops or not.
+>>
+>>Yes.
+>>
+>>The Qualcomm variant is also using an internal DMA, hence I thought
+>>there may be something we could re-use, or at least have some new
+>>common ops for.
+>
+> It's not crystal clear for me.
+> Do you always agree with a dma ops which allow to address different
+> DMA transfer:
+> -with dmaengine API
+> -sdmmc idma, without dmaengine API
+> -...
+
+If we can use a mmci ops callback to manage the variant differences,
+that would be perfect. That combined with making the existing DMA
+functions in mmci.c converted to "library" functions, which the mmci
+ops callbacks can call, in order to re-use code.
+
+When that isn't really suitable, we may need to add a "quirk" instead,
+which would be specific for that particular variant. Along the lines
+of what we already do for variant specifics inside mmci.c.
+
+I think we have to decide on case by case basis, what fits best.
+
+Hope this makes a better explanation. If not, please tell, and I can
+take an initial stab and post a patch to show you with code how I mean
+to move forward.
+
+>
+>
+>>
+>> Let me take a concrete example on how I would move forward, hopefully
+>> that explains it a bit better. Please see below.
+>>
+>> [...]
+>>
+>>> -/*
+>>> - * All the DMA operation mode stuff goes inside this ifdef.
+>>> - * This assumes that you have a generic DMA device interface,
+>>> - * no custom DMA interfaces are supported.
+>>> - */
+>>> -#ifdef CONFIG_DMA_ENGINE
+>>> -static void mmci_dma_setup(struct mmci_host *host)
+>>> -{
+>>> -       const char *rxname, *txname;
+>>> -       struct variant_data *variant = host->variant;
+>>> -
+>>> -       host->dma_rx_channel =
+>>> dma_request_slave_channel(mmc_dev(host->mmc), "rx");
+>>> -       host->dma_tx_channel =
+>>> dma_request_slave_channel(mmc_dev(host->mmc), "tx");
+>>> -
+>>> -       /* initialize pre request cookie */
+>>> -       host->next_data.cookie = 1;
+>>> -
+>>> -       /*
+>>> -        * If only an RX channel is specified, the driver will
+>>> -        * attempt to use it bidirectionally, however if it is
+>>> -        * is specified but cannot be located, DMA will be disabled.
+>>> -        */
+>>> -       if (host->dma_rx_channel && !host->dma_tx_channel)
+>>> -               host->dma_tx_channel = host->dma_rx_channel;
+>>> -
+>>> -       if (host->dma_rx_channel)
+>>> -               rxname = dma_chan_name(host->dma_rx_channel);
+>>> -       else
+>>> -               rxname = "none";
+>>> -
+>>> -       if (host->dma_tx_channel)
+>>> -               txname = dma_chan_name(host->dma_tx_channel);
+>>> -       else
+>>> -               txname = "none";
+>>> -
+>>> -       dev_info(mmc_dev(host->mmc), "DMA channels RX %s, TX %s\n",
+>>> -                rxname, txname);
+>>> -
+>>> -       /*
+>>> -        * Limit the maximum segment size in any SG entry according to
+>>> -        * the parameters of the DMA engine device.
+>>> -        */
+>>> -       if (host->dma_tx_channel) {
+>>> -               struct device *dev = host->dma_tx_channel->device->dev;
+>>> -               unsigned int max_seg_size = dma_get_max_seg_size(dev);
+>>> -
+>>> -               if (max_seg_size < host->mmc->max_seg_size)
+>>> -                       host->mmc->max_seg_size = max_seg_size;
+>>> -       }
+>>> -       if (host->dma_rx_channel) {
+>>> -               struct device *dev = host->dma_rx_channel->device->dev;
+>>> -               unsigned int max_seg_size = dma_get_max_seg_size(dev);
+>>> -
+>>> -               if (max_seg_size < host->mmc->max_seg_size)
+>>> -                       host->mmc->max_seg_size = max_seg_size;
+>>> -       }
+>>
+>>
+>> Everything above shall be left as generic library function,
+>> mmci_dma_setup() and I would share it via mmci.h and thus change it
+>> from being static.
+>>
+>
+> each interfaces mmci_dma_XXX have very different needs depending
+> dma_ops (legacy, sdmmc idma)
+
+Right. This was just one example.
+
+If I understand, what you are suggesting is to make all of them being
+variant specific callbacks, so I assume that would solve the problems.
+Just to be clear, I have no problem with that.
+
+Although, that doesn't mean we can't re-use existing dma functions in
+mmci.c, when that makes sense.
+
+[...]
+
+Kind regards
+Uffe
