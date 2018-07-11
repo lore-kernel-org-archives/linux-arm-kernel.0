@@ -1,47 +1,95 @@
-From: joel@jms.id.au (Joel Stanley)
-Date: Wed, 11 Jul 2018 15:53:52 +1000
-Subject: [PATCH] clk: aspeed: Support HPLL strapping on ast2400
-In-Reply-To: <153089970720.143105.7005759760140367907@swboyd.mtv.corp.google.com>
-References: <20180628231540.26633-1-joel@jms.id.au>
- <153089970720.143105.7005759760140367907@swboyd.mtv.corp.google.com>
-Message-ID: <CACPK8XfxKhT_ywpo3vqXSEaSPGdM+uhkgpn1R+EP9Z3spxAzXg@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 11 Jul 2018 08:24:34 +0200
+Subject: [PATCH v1 1/4] dmaengine: imx-sdma: add memcpy interface
+In-Reply-To: <1531239793-11781-2-git-send-email-yibin.gong@nxp.com>
+References: <1531239793-11781-1-git-send-email-yibin.gong@nxp.com>
+ <1531239793-11781-2-git-send-email-yibin.gong@nxp.com>
+Message-ID: <20180711062434.x6waumlh6wtfmvzy@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+On Wed, Jul 11, 2018 at 12:23:10AM +0800, Robin Gong wrote:
+> Add MEMCPY support, meanwhile, add SDMA_BD_MAX_CNT instead
+> of '0xffff'.
+> 
+> Signed-off-by: Robin Gong <yibin.gong@nxp.com>
+> ---
+> +static struct dma_async_tx_descriptor *sdma_prep_memcpy(
+> +		struct dma_chan *chan, dma_addr_t dma_dst,
+> +		dma_addr_t dma_src, size_t len, unsigned long flags)
+> +{
+> +	struct sdma_channel *sdmac = to_sdma_chan(chan);
+> +	struct sdma_engine *sdma = sdmac->sdma;
+> +	int channel = sdmac->channel;
+> +	size_t count;
+> +	int i = 0, param;
+> +	struct sdma_buffer_descriptor *bd;
+> +	struct sdma_desc *desc;
+> +
+> +	if (!chan || !len)
+> +		return NULL;
+> +
+> +	dev_dbg(sdma->dev, "memcpy: %pad->%pad, len=%zu, channel=%d.\n",
+> +		&dma_src, &dma_dst, len, channel);
+> +
+> +	desc = sdma_transfer_init(sdmac, DMA_MEM_TO_MEM, len / SDMA_BD_MAX_CNT
+> +					+ 1);
+> +	if (!desc)
+> +		goto err_out;
+> +
+> +	do {
+> +		count = min_t(size_t, len, SDMA_BD_MAX_CNT);
 
-On 7 July 2018 at 03:55, Stephen Boyd <sboyd@kernel.org> wrote:
-> Quoting Joel Stanley (2018-06-28 16:15:40)
->> The HPLL can be configured through a register (SCU24), however some
->> platforms chose to configure it through the strapping settings and do
->> not use the register. This was not noticed as the logic for bit 18 in
->> SCU24 was confused: set means programmed, but the driver read it as set
->> means strapped.
->>
->> This gives us the correct HPLL value on Palmetto systems, from which
->> most of the peripheral clocks are generated.
->>
->> Fixes: 5eda5d79e4be ("clk: Add clock driver for ASPEED BMC SoCs")
->> Cc: stable at vger.kernel.org # v4.15
->> Reviewed-by: C?dric Le Goater <clg@kaod.org>
->> Signed-off-by: Joel Stanley <joel@jms.id.au>
->> ---
->
-> Do you want this merged for -rc5? It sounds like on some systems this is
-> a problem, but I don't know if these systems are supposed to work yet or
-> not, so priority of this fix is not easy for me to understand.
->
+When len is bigger than 0xffff you initialize count to 0xffff...
 
-Sure, some more background:
+> +		bd = &desc->bd[i];
+> +		bd->buffer_addr = dma_src;
+> +		bd->ext_buffer_addr = dma_dst;
+> +		bd->mode.count = count;
+> +		desc->chn_count += count;
+> +
+> +		switch (sdmac->word_size) {
+> +		case DMA_SLAVE_BUSWIDTH_4_BYTES:
+> +			bd->mode.command = 0;
+> +			if ((count | dma_src | dma_dst) & 3)
+> +				goto err_bd_out;
+> +			break;
 
-We did not notice this until we attempted to use the clock for the mtd
-driver. However, this clock is used for the kernel clocksource, so eg.
-sleep 1 takes two seconds to complete. This affects all of the systems
-I have access to.
+...In which case you bail out here with an error.
 
-I suggest we merge for4.18, and keep the cc: stable so it can be
-backported to the stable trees.
+Please make sure bigger transfers are working.
 
-Cheers,
+> +		case DMA_SLAVE_BUSWIDTH_2_BYTES:
+> +			bd->mode.command = 2;
+> +			if ((count | dma_src | dma_dst) & 1)
+> +				goto err_bd_out;
+> +			break;
+> +		case DMA_SLAVE_BUSWIDTH_1_BYTE:
+> +			bd->mode.command = 1;
+> +			break;
+> +		default:
+> +			goto err_bd_out;
+> +		}
+> +
+> +		dma_src += count;
+> +		dma_dst += count;
+> +		len -= count;
+> +		i++;
+> +
+> +		param = BD_DONE | BD_EXTD | BD_CONT;
 
-Joel
+Probably better readable if you drop BD_CONT here and do a
+
+	if (len) {
+		param |= BD_CONT;
+	} else  {
+		...
+	}
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
