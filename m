@@ -1,180 +1,99 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 11 Jul 2018 14:16:00 +0200
-Subject: [PATCH 01/19] mmc: mmci: regroup and define dma operations
-In-Reply-To: <d93e6886-1dee-7915-459f-466a54d0c242@st.com>
-References: <1528809280-31116-1-git-send-email-ludovic.Barre@st.com>
- <1528809280-31116-2-git-send-email-ludovic.Barre@st.com>
- <CAPDyKFpt5HUeUqaoS9icDodM+r64jB9vQ=zTecO0tuBv=TtOXg@mail.gmail.com>
- <d93e6886-1dee-7915-459f-466a54d0c242@st.com>
-Message-ID: <CAPDyKFo0q5Yps1whPmaUQJAV3tXx91WPmxtMF_ov43qP=djQfg@mail.gmail.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Wed, 11 Jul 2018 14:16:32 +0200
+Subject: [PATCH v3 1/2] soc: imx: gpc: Disable 6sl display power gating
+ for ERR006287
+In-Reply-To: <d694bc32feb1c9638485700ba53cd6e51bea495c.1531310547.git.leonard.crestez@nxp.com>
+References: <cover.1531310547.git.leonard.crestez@nxp.com>
+ <d694bc32feb1c9638485700ba53cd6e51bea495c.1531310547.git.leonard.crestez@nxp.com>
+Message-ID: <1531311392.3163.47.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 July 2018 at 11:41, Ludovic BARRE <ludovic.barre@st.com> wrote:
->
->
-> On 07/05/2018 05:17 PM, Ulf Hansson wrote:
->>
->> On 12 June 2018 at 15:14, Ludovic Barre <ludovic.Barre@st.com> wrote:
->>>
->>> From: Ludovic Barre <ludovic.barre@st.com>
->>>
->>> Prepare mmci driver to manage dma interface by new property.
->>> This patch defines and regroups dma operations for mmci drivers.
->>> mmci_dma_XX prototypes are added to call member of mmci_dma_ops
->>> if not null. Based on legacy need, a mmci dma interface has been
->>> defined with:
->>> -mmci_dma_setup
->>> -mmci_dma_release
->>> -mmci_dma_pre_req
->>> -mmci_dma_start
->>> -mmci_dma_finalize
->>> -mmci_dma_post_req
->>> -mmci_dma_error
->>> -mmci_dma_get_next_data
->>
->>
->> As I suggested for one of the other patches, I would rather turn core
->> mmci functions into library functions, which can be either invoked
->> from variant callbacks or assigned directly to them.
->>
->> In other words, I would leave the functions that you move in this
->> patch to stay in mmci.c. Although some needs to be re-factored and we
->> also needs to make some of them available to be called from another
->> file, hence the functions needs to be shared via mmci.h rather than
->> being declared static.
->
->
-> In previous exchange mail "STM32MP1 SDMMC driver review"
-> we are said:
->
->>>> -dma variant ? should fit in Qualcomm implementation, reuse (rename)
->>>> mmci_qcom_dml.c file and integrate ST dma in.
+Am Mittwoch, den 11.07.2018, 15:11 +0300 schrieb Leonard Crestez:
+> The imx6sl chip errata document describes ERR006287 like this:
+> 
+> > Upon resuming from power gating, the modules in the display power domain
+> 
+> (eLCDIF, EPDC, PXP and SPDC) might fail to perform register reads
+> correctly.
+> 
+> > When the modules listed above are used, do not use power gating on the
+> 
+> display power domain.
+> 
+> Link: https://www.nxp.com/docs/en/errata/IMX6SLCE.pdf#page=62
+> 
+> Handle this in the safest possible way by keeping the DISP domain
+> always-on.
+> 
+> Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
 
-Apologize if I may have lead you in a wrong direction, that was not my intent.
+Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
 
-However, by looking at $subject patch, your seems to be unnecessarily
-shuffling code around. I would like to avoid that.
+Can you send a follow on patch to switch the i.MX6QP errata workaround
+to use GENPD_FLAG_ALWAYS_ON and remove the -EBUSY stuff in the power
+down path?
 
->>>
->>> stm32 sdmmc has an internal dma, no need to use dmaengine API;
->>> So some modifications in mmci (pre/post request, mmci_dma_xx). perhaps
->>> should be done with an ops or not.
->>
->>Yes.
->>
->>The Qualcomm variant is also using an internal DMA, hence I thought
->>there may be something we could re-use, or at least have some new
->>common ops for.
->
-> It's not crystal clear for me.
-> Do you always agree with a dma ops which allow to address different
-> DMA transfer:
-> -with dmaengine API
-> -sdmmc idma, without dmaengine API
-> -...
+Regards,
+Lucas
 
-If we can use a mmci ops callback to manage the variant differences,
-that would be perfect. That combined with making the existing DMA
-functions in mmci.c converted to "library" functions, which the mmci
-ops callbacks can call, in order to re-use code.
-
-When that isn't really suitable, we may need to add a "quirk" instead,
-which would be specific for that particular variant. Along the lines
-of what we already do for variant specifics inside mmci.c.
-
-I think we have to decide on case by case basis, what fits best.
-
-Hope this makes a better explanation. If not, please tell, and I can
-take an initial stab and post a patch to show you with code how I mean
-to move forward.
-
->
->
->>
->> Let me take a concrete example on how I would move forward, hopefully
->> that explains it a bit better. Please see below.
->>
->> [...]
->>
->>> -/*
->>> - * All the DMA operation mode stuff goes inside this ifdef.
->>> - * This assumes that you have a generic DMA device interface,
->>> - * no custom DMA interfaces are supported.
->>> - */
->>> -#ifdef CONFIG_DMA_ENGINE
->>> -static void mmci_dma_setup(struct mmci_host *host)
->>> -{
->>> -       const char *rxname, *txname;
->>> -       struct variant_data *variant = host->variant;
->>> -
->>> -       host->dma_rx_channel =
->>> dma_request_slave_channel(mmc_dev(host->mmc), "rx");
->>> -       host->dma_tx_channel =
->>> dma_request_slave_channel(mmc_dev(host->mmc), "tx");
->>> -
->>> -       /* initialize pre request cookie */
->>> -       host->next_data.cookie = 1;
->>> -
->>> -       /*
->>> -        * If only an RX channel is specified, the driver will
->>> -        * attempt to use it bidirectionally, however if it is
->>> -        * is specified but cannot be located, DMA will be disabled.
->>> -        */
->>> -       if (host->dma_rx_channel && !host->dma_tx_channel)
->>> -               host->dma_tx_channel = host->dma_rx_channel;
->>> -
->>> -       if (host->dma_rx_channel)
->>> -               rxname = dma_chan_name(host->dma_rx_channel);
->>> -       else
->>> -               rxname = "none";
->>> -
->>> -       if (host->dma_tx_channel)
->>> -               txname = dma_chan_name(host->dma_tx_channel);
->>> -       else
->>> -               txname = "none";
->>> -
->>> -       dev_info(mmc_dev(host->mmc), "DMA channels RX %s, TX %s\n",
->>> -                rxname, txname);
->>> -
->>> -       /*
->>> -        * Limit the maximum segment size in any SG entry according to
->>> -        * the parameters of the DMA engine device.
->>> -        */
->>> -       if (host->dma_tx_channel) {
->>> -               struct device *dev = host->dma_tx_channel->device->dev;
->>> -               unsigned int max_seg_size = dma_get_max_seg_size(dev);
->>> -
->>> -               if (max_seg_size < host->mmc->max_seg_size)
->>> -                       host->mmc->max_seg_size = max_seg_size;
->>> -       }
->>> -       if (host->dma_rx_channel) {
->>> -               struct device *dev = host->dma_rx_channel->device->dev;
->>> -               unsigned int max_seg_size = dma_get_max_seg_size(dev);
->>> -
->>> -               if (max_seg_size < host->mmc->max_seg_size)
->>> -                       host->mmc->max_seg_size = max_seg_size;
->>> -       }
->>
->>
->> Everything above shall be left as generic library function,
->> mmci_dma_setup() and I would share it via mmci.h and thus change it
->> from being static.
->>
->
-> each interfaces mmci_dma_XXX have very different needs depending
-> dma_ops (legacy, sdmmc idma)
-
-Right. This was just one example.
-
-If I understand, what you are suggesting is to make all of them being
-variant specific callbacks, so I assume that would solve the problems.
-Just to be clear, I have no problem with that.
-
-Although, that doesn't mean we can't re-use existing dma functions in
-mmci.c, when that makes sense.
-
-[...]
-
-Kind regards
-Uffe
+> ---
+> ?drivers/soc/imx/gpc.c | 10 ++++++++++
+> ?1 file changed, 10 insertions(+)
+> 
+> diff --git a/drivers/soc/imx/gpc.c b/drivers/soc/imx/gpc.c
+> index 526f2d02dc78..f7960f773019 100644
+> --- a/drivers/soc/imx/gpc.c
+> +++ b/drivers/soc/imx/gpc.c
+> @@ -339,30 +339,35 @@ static struct imx_pm_domain imx_gpc_domains[] = {
+> ?};
+> ?
+> ?struct imx_gpc_dt_data {
+> > ?	int num_domains;
+> > ?	bool err009619_present;
+> > +	bool err006287_present;
+> ?};
+> ?
+> ?static const struct imx_gpc_dt_data imx6q_dt_data = {
+> > ?	.num_domains = 2,
+> > ?	.err009619_present = false,
+> > +	.err006287_present = false,
+> ?};
+> ?
+> ?static const struct imx_gpc_dt_data imx6qp_dt_data = {
+> > ?	.num_domains = 2,
+> > ?	.err009619_present = true,
+> > +	.err006287_present = false,
+> ?};
+> ?
+> ?static const struct imx_gpc_dt_data imx6sl_dt_data = {
+> > ?	.num_domains = 3,
+> > ?	.err009619_present = false,
+> > +	.err006287_present = true,
+> ?};
+> ?
+> ?static const struct imx_gpc_dt_data imx6sx_dt_data = {
+> > ?	.num_domains = 4,
+> > ?	.err009619_present = false,
+> > +	.err006287_present = false,
+> ?};
+> ?
+> ?static const struct of_device_id imx_gpc_dt_ids[] = {
+> > ?	{ .compatible = "fsl,imx6q-gpc", .data = &imx6q_dt_data },
+> > ?	{ .compatible = "fsl,imx6qp-gpc", .data = &imx6qp_dt_data },
+> @@ -467,10 +472,15 @@ static int imx_gpc_probe(struct platform_device *pdev)
+> > ?	/* Disable PU power down in normal operation if ERR009619 is present */
+> > ?	if (of_id_data->err009619_present)
+> > ?		imx_gpc_domains[GPC_PGC_DOMAIN_PU].flags |=
+> > ?				PGC_DOMAIN_FLAG_NO_PD;
+> ?
+> > +	/* Keep DISP always on if ERR006287 is present */
+> > +	if (of_id_data->err006287_present)
+> > +		imx_gpc_domains[GPC_PGC_DOMAIN_DISPLAY].base.flags |=
+> > +				GENPD_FLAG_ALWAYS_ON;
+> +
+> > ?	if (!pgc_node) {
+> > ?		ret = imx_gpc_old_dt_init(&pdev->dev, regmap,
+> > ?					??of_id_data->num_domains);
+> > ?		if (ret)
+> > ?			return ret;
