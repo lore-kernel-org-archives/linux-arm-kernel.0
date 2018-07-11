@@ -1,121 +1,25 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Wed, 11 Jul 2018 17:19:06 +0100
-Subject: [PATCH v5 7/7] KVM: arm64: Add support for creating PUD hugepages
- at stage 2
-In-Reply-To: <fe8b92a1-2584-61ab-39e2-4d3247f92c7c@arm.com> (Suzuki
- K. Poulose's message of "Wed, 11 Jul 2018 17:13:54 +0100")
-References: <20180709143835.28971-1-punit.agrawal@arm.com>
- <20180709144124.29164-1-punit.agrawal@arm.com>
- <20180709144124.29164-7-punit.agrawal@arm.com>
- <bbc3f286-be5b-d0dc-2037-54d5b995a0a5@arm.com>
- <87zhyxoize.fsf@e105922-lin.cambridge.arm.com>
- <fe8b92a1-2584-61ab-39e2-4d3247f92c7c@arm.com>
-Message-ID: <87lgahoidh.fsf@e105922-lin.cambridge.arm.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 11 Jul 2018 13:21:09 -0300
+Subject: [PATCH 2/3] ARM: dts: imx31: add device tree description of basic
+ controllers
+In-Reply-To: <430434fe-da1d-ffd9-0b54-a0c7d63c6284@mleia.com>
+References: <20180703192934.6080-1-vz@mleia.com>
+ <20180703192934.6080-3-vz@mleia.com>
+ <CAOMZO5AW6QryKAjcG_kE011G1anLD=-EaJFhAaWzaqbf3aKNUQ@mail.gmail.com>
+ <430434fe-da1d-ffd9-0b54-a0c7d63c6284@mleia.com>
+Message-ID: <CAOMZO5BTNu4HeSvy953arpfBe_0yUe0XChiPwK+42VaMB9AwCg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Suzuki K Poulose <Suzuki.Poulose@arm.com> writes:
+Hi Vladimir,
 
-> On 11/07/18 17:05, Punit Agrawal wrote:
->> Suzuki K Poulose <Suzuki.Poulose@arm.com> writes:
->>
->>> On 09/07/18 15:41, Punit Agrawal wrote:
->>>> KVM only supports PMD hugepages at stage 2. Now that the various page
->>>> handling routines are updated, extend the stage 2 fault handling to
->>>> map in PUD hugepages.
->>>>
->>>> Addition of PUD hugepage support enables additional page sizes (e.g.,
->>>> 1G with 4K granule) which can be useful on cores that support mapping
->>>> larger block sizes in the TLB entries.
->>>>
->>>> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
->>>> Cc: Christoffer Dall <christoffer.dall@arm.com>
->>>> Cc: Marc Zyngier <marc.zyngier@arm.com>
->>>> Cc: Russell King <linux@armlinux.org.uk>
->>>> Cc: Catalin Marinas <catalin.marinas@arm.com>
->>>> Cc: Will Deacon <will.deacon@arm.com>
->>>> ---
->>>>    arch/arm/include/asm/kvm_mmu.h         | 19 +++++++
->>>>    arch/arm64/include/asm/kvm_mmu.h       | 15 +++++
->>>>    arch/arm64/include/asm/pgtable-hwdef.h |  2 +
->>>>    arch/arm64/include/asm/pgtable.h       |  2 +
->>>>    virt/kvm/arm/mmu.c                     | 78 ++++++++++++++++++++++++--
->>>>    5 files changed, 112 insertions(+), 4 deletions(-)
->>>>
->>
->> [...]
->>
->>>> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
->>>> index a6d3ac9d7c7a..d8e2497e5353 100644
->>>> --- a/virt/kvm/arm/mmu.c
->>>> +++ b/virt/kvm/arm/mmu.c
->>
->> [...]
->>
->>>> @@ -1100,6 +1139,7 @@ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
->>>>    			  phys_addr_t addr, const pte_t *new_pte,
->>>>    			  unsigned long flags)
->>>>    {
->>>> +	pud_t *pud;
->>>>    	pmd_t *pmd;
->>>>    	pte_t *pte, old_pte;
->>>>    	bool iomap = flags & KVM_S2PTE_FLAG_IS_IOMAP;
->>>> @@ -1108,6 +1148,22 @@ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
->>>>    	VM_BUG_ON(logging_active && !cache);
->>>>      	/* Create stage-2 page table mapping - Levels 0 and 1 */
->>>> +	pud = stage2_get_pud(kvm, cache, addr);
->>>> +	if (!pud) {
->>>> +		/*
->>>> +		 * Ignore calls from kvm_set_spte_hva for unallocated
->>>> +		 * address ranges.
->>>> +		 */
->>>> +		return 0;
->>>> +	}
->>>> +
->>>> +	/*
->>>> +	 * While dirty page logging - dissolve huge PUD, then continue
->>>> +	 * on to allocate page.
->>>
->>> Punit,
->>>
->>> We don't seem to allocate a page here for the PUD entry, in case if it is dissolved
->>> or empty (i.e, stage2_pud_none(*pud) is true.).
->>
->> I was trying to avoid duplicating the PUD allocation by reusing the
->> functionality in stage2_get_pmd().
->>
->> Does the below updated comment help?
->>
->> 	/*
->> 	 * While dirty page logging - dissolve huge PUD, it'll be
->> 	 * allocated in stage2_get_pmd().
->> 	 */
->>
->> The other option is to duplicate the stage2_pud_none() case from
->> stage2_get_pmd() here.
->
-> I think the explicit check for stage2_pud_none() suits better here.
-> That would make it explicit that we are tearing down the entries
-> from top to bottom. Also, we may be able to short cut for case
-> where we know we just allocated a PUD page and hence we need another
-> PMD level page.
+On Thu, Jul 5, 2018 at 4:09 PM, Vladimir Zapolskiy <vz@mleia.com> wrote:
 
-Ok, I'll add the PUD allocation code here.
+> thank you for review, please note that I've just sent v2 with a couple
+> of minor fixes as a reply to v1 2/3, I hope that I didn't introduce
+> a mess to the series.
 
->
-> Also, you are missing the comment about the assumption that stage2 PUD
-> level always exist with 4k fixed IPA.
+It seems that Shawn has already applied the first version of your
+series, so please send any changes as incremental patches.
 
-Hmm... I'm quite sure I wrote a comment to that effect but can't find it
-now. I'll include it in the next version.
-
-Thanks,
-Punit
-
->
-> Cheers
-> Suzuki
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
+Thanks
