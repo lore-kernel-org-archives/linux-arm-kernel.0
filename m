@@ -1,52 +1,43 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 11 Jul 2018 10:09:27 -0600
-Subject: [PATCH v2 1/4] dt-bindings: k3dma: add optional property
- hisilicon,dma-min-chan
-In-Reply-To: <20180709103438.GC22377@vkoul-mobl>
-References: <20180706035521.13736-1-guodong.xu@linaro.org>
- <20180706035521.13736-2-guodong.xu@linaro.org>
- <20180709103438.GC22377@vkoul-mobl>
-Message-ID: <20180711160927.GA31359@rob-hp-laptop>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Wed, 11 Jul 2018 17:10:51 +0100
+Subject: [PATCH v5 2/7] KVM: arm/arm64: Introduce helpers to manupulate
+ page table entries
+In-Reply-To: <691fcde0-b0a2-d258-ac99-49c6c4794247@arm.com> (Suzuki
+ K. Poulose's message of "Wed, 11 Jul 2018 14:00:48 +0100")
+References: <20180709143835.28971-1-punit.agrawal@arm.com>
+ <20180709144124.29164-1-punit.agrawal@arm.com>
+ <20180709144124.29164-2-punit.agrawal@arm.com>
+ <691fcde0-b0a2-d258-ac99-49c6c4794247@arm.com>
+Message-ID: <87va9loir8.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 09, 2018 at 04:04:38PM +0530, Vinod wrote:
-> On 06-07-18, 11:55, Guodong Xu wrote:
-> > From: Li Yu <liyu65@hisilicon.com>
-> > 
-> > Add optional property hisilicon,dma-min-chan for k3dma.
-> > 
-> > Signed-off-by: Li Yu <liyu65@hisilicon.com>
-> > Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
-> > ---
-> >  Documentation/devicetree/bindings/dma/k3dma.txt | 6 ++++++
-> >  1 file changed, 6 insertions(+)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/dma/k3dma.txt b/Documentation/devicetree/bindings/dma/k3dma.txt
-> > index 4945aeac4dc4..f34202a80f3c 100644
-> > --- a/Documentation/devicetree/bindings/dma/k3dma.txt
-> > +++ b/Documentation/devicetree/bindings/dma/k3dma.txt
-> > @@ -12,6 +12,11 @@ Required properties:
-> >  		have specific request line
-> >  - clocks: clock required
-> >  
-> > +Optional properties:
-> > +- hisilicon,dma-min-chan: the minimum DMA channel number which is usable
-> > +		Default value is 0, but in some platform it is
-> > +		configured 1, like in hi3660 platform
-> > +
-> >  Example:
-> >  
-> >  Controller:
-> > @@ -21,6 +26,7 @@ Controller:
-> >  			#dma-cells = <1>;
-> >  			dma-channels = <16>;
-> >  			dma-requests = <27>;
-> > +			hisilicon,dma-min-chan = <1>;
-> 
-> Am still expecting this to be a mask
+Suzuki K Poulose <Suzuki.Poulose@arm.com> writes:
 
-If so calling it 'min' doesn't make sense. And a mask should have 'mask' 
-in the name.
+> On 09/07/18 15:41, Punit Agrawal wrote:
+>> Introduce helpers to abstract architectural handling of the conversion
+>> of pfn to page table entries and marking a PMD page table entry as a
+>> block entry.
+>>
+>> The helpers are introduced in preparation for supporting PUD hugepages
+>> at stage 2 - which are supported on arm64 but do not exist on arm.
+>>
+>> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+>> Acked-by: Christoffer Dall <christoffer.dall@arm.com>
+>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>> Cc: Russell King <linux@armlinux.org.uk>
+>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> ---
+>
+> Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 
-Rob
+Other than the query on Patch 7 I've incorporated all your suggestions
+locally.
+
+Thanks a lot for reviewing the patches.
+
+Punit
+
+ps: Just noticed the typo (manupulate) in the subject. I've fixed it up
+locally.
