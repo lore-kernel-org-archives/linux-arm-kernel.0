@@ -1,18 +1,53 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 11 Jul 2018 10:56:34 +0800
-Subject: [PATCH v2 09/18] drm/sun4i: mixer: Order includes alphabetically
-In-Reply-To: <20180710203511.18454-10-jernej.skrabec@siol.net>
-References: <20180710203511.18454-1-jernej.skrabec@siol.net>
- <20180710203511.18454-10-jernej.skrabec@siol.net>
-Message-ID: <CAGb2v671bqg2+kAZg=ibczAhCYDh39g8RX2bfKr+biDY7xCdfg@mail.gmail.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 11 Jul 2018 10:57:49 +0800
+Subject: [PATCH 2/3] arm64: dts: qcom: sdm845-mtp: Add RPMh VRM/XOB
+ regulators
+In-Reply-To: <20180710220202.116404-3-dianders@chromium.org>
+References: <20180710220202.116404-3-dianders@chromium.org>
+Message-ID: <201807111036.SIfJRngf%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 11, 2018 at 4:35 AM, Jernej Skrabec <jernej.skrabec@siol.net> wrote:
-> Includes are not alphabetically ordered.
->
-> Reorder them.
->
-> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+Hi Douglas,
 
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+Thank you for the patch! Yet something to improve:
+
+[auto build test ERROR on agross/for-next]
+[also build test ERROR on next-20180710]
+[cannot apply to v4.18-rc4]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+
+url:    https://github.com/0day-ci/linux/commits/Douglas-Anderson/arm64-dts-sdm845-Add-RPMh-regulators-and-usb/20180711-061052
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git for-next
+config: arm64-allyesconfig (attached as .config)
+compiler: aarch64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        GCC_VERSION=7.2.0 make.cross ARCH=arm64 
+
+All errors (new ones prefixed by >>):
+
+>> arch/arm64/boot/dts/qcom/sdm845-mtp.dts:10:10: fatal error: dt-bindings/regulator/qcom,rpmh-regulator.h: No such file or directory
+    #include <dt-bindings/regulator/qcom,rpmh-regulator.h>
+             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   compilation terminated.
+
+vim +10 arch/arm64/boot/dts/qcom/sdm845-mtp.dts
+
+     9	
+  > 10	#include <dt-bindings/regulator/qcom,rpmh-regulator.h>
+    11	#include "sdm845.dtsi"
+    12	
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 60562 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180711/e6c22582/attachment-0001.gz>
