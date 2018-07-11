@@ -1,54 +1,81 @@
-From: ludovic.desroches@microchip.com (Ludovic Desroches)
-Date: Wed, 11 Jul 2018 16:10:04 +0200
-Subject: [PATCH -next] pinctrl: at91-pio4: remove redundant return value
- check of platform_get_resource()
-In-Reply-To: <20180711130349.GP16084@piout.net>
-References: <1531312447-134423-1-git-send-email-weiyongjun1@huawei.com>
- <20180711130349.GP16084@piout.net>
-Message-ID: <20180711141004.cuzmomutxofw7blb@M43218.corp.atmel.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 11 Jul 2018 22:15:41 +0800
+Subject: [linux-sunxi] [PATCH 2/2] ARM: sun8i: h3: add SY8113B regulator
+ on Banana Pi M2 Zero board
+In-Reply-To: <20180711134450.43148-1-icenowy@aosc.io>
+References: <20180711134450.43148-1-icenowy@aosc.io>
+Message-ID: <CAGb2v65C=gQtkNUX4pV5wudWUPf3hLNnGuxgB48xq=d7nH9qxA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 11, 2018 at 03:03:49PM +0200, Alexandre Belloni wrote:
-> On 11/07/2018 12:34:07+0000, Wei Yongjun wrote:
-> > Remove unneeded error handling on the result of a call
-> > to platform_get_resource() when the value is passed to
-> > devm_ioremap_resource().
-> > 
-> > Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
-> 
-> I'm not sure it is worth the effort but
+Hi,
 
-I have the same feeling. If it's the trend:
-Acked-by: Ludovic Desroches <ludovic.desroches@microchip.com>
+On Wed, Jul 11, 2018 at 9:44 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
+> Banana Pi M2 Zero board has a SY8113B regulator, which is controlled via
+> GPIO and capable of outputing 1.1V when the PL1 GPIO is set to output 0
+> or 1.1V when the PL6 GPIO is set to input or output 1, and the output is
+> the power supply of the ARM cores in H3 SoC.
+>
+> Add the device tree node of this regulator and set the cpu's cpu-supply
+> property to it.
+>
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> ---
+>  .../dts/sun8i-h2-plus-bananapi-m2-zero.dts    | 21 +++++++++++++++++++
+>  1 file changed, 21 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/sun8i-h2-plus-bananapi-m2-zero.dts b/arch/arm/boot/dts/sun8i-h2-plus-bananapi-m2-zero.dts
+> index eb61dcf32797..abc8dc750f4b 100644
+> --- a/arch/arm/boot/dts/sun8i-h2-plus-bananapi-m2-zero.dts
+> +++ b/arch/arm/boot/dts/sun8i-h2-plus-bananapi-m2-zero.dts
+> @@ -59,6 +59,23 @@
+>                 };
+>         };
+>
+> +       reg_vdd_cpux: vdd-cpux-regulator {
+> +               compatible = "regulator-gpio";
+> +               regulator-name = "vdd-cpux";
+> +               regulator-type = "voltage";
+> +               regulator-boot-on;
+> +               regulator-always-on;
+> +               regulator-min-microvolt = <1100000>;
+> +               regulator-max-microvolt = <1300000>;
+> +               regulator-ramp-delay = <50>; /* 4ms */
+> +
+> +               gpios = <&r_pio 0 1 GPIO_ACTIVE_HIGH>; /* PL1 */
+> +               enable-active-high;
+> +               gpios-states = <0x1>;
+> +               states = <1100000 0x0
 
-> 
-> Reviewed-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
-> 
-> > ---
-> >  drivers/pinctrl/pinctrl-at91-pio4.c | 4 ----
-> >  1 file changed, 4 deletions(-)
-> > 
-> > diff --git a/drivers/pinctrl/pinctrl-at91-pio4.c b/drivers/pinctrl/pinctrl-at91-pio4.c
-> > index 8f06197..ef7ab20 100644
-> > --- a/drivers/pinctrl/pinctrl-at91-pio4.c
-> > +++ b/drivers/pinctrl/pinctrl-at91-pio4.c
-> > @@ -971,10 +971,6 @@ static int atmel_pinctrl_probe(struct platform_device *pdev)
-> >  	atmel_pioctrl->npins = atmel_pioctrl->nbanks * ATMEL_PIO_NPINS_PER_BANK;
-> >  
-> >  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> > -	if (!res) {
-> > -		dev_err(dev, "unable to get atmel pinctrl resource\n");
-> > -		return -EINVAL;
-> > -	}
-> >  	atmel_pioctrl->reg_base = devm_ioremap_resource(dev, res);
-> >  	if (IS_ERR(atmel_pioctrl->reg_base))
-> >  		return -EINVAL;
-> > 
-> > 
-> > 
-> 
-> -- 
-> Alexandre Belloni, Bootlin (formerly Free Electrons)
-> Embedded Linux and Kernel engineering
-> https://bootlin.com
+So looking@the schematics with the resistor values, this calculates
+to roughly 1.108475 (0.6 * (1 + 10 / 11.8)) ...
+
+> +                         1300000 0x1>;
+
+and this to 1.308475.
+
+ChenYu
+
+> +       };
+> +
+>         wifi_pwrseq: wifi_pwrseq {
+>                 compatible = "mmc-pwrseq-simple";
+>                 pinctrl-names = "default";
+> @@ -66,6 +83,10 @@
+>         };
+>  };
+>
+> +&cpu0 {
+> +       cpu-supply = <&reg_vdd_cpux>;
+> +};
+> +
+>  &de {
+>         status = "okay";
+>  };
+> --
+> 2.17.1
+>
+> --
+> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
