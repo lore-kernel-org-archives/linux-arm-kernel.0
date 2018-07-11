@@ -1,75 +1,62 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed, 11 Jul 2018 13:40:14 -0600
-Subject: [PATCH 04/25] coresight: ETM: Add support for Arm Cortex-A73 and
- Cortex-A35
+Date: Wed, 11 Jul 2018 13:40:17 -0600
+Subject: [PATCH 07/25] coresight: tmc-etr: Disallow perf mode
 In-Reply-To: <1531338035-11729-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1531338035-11729-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1531338035-11729-5-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1531338035-11729-8-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Suzuki K Poulose <suzuki.poulose@arm.com>
 
-Add ETM PIDs of the Arm cortex-A CPUs to the white list of ETMs.
-While at it add a helper macro to make it easier to add the new
-entries.
+We don't support ETR in perf mode yet. So, don't
+even try to enable the hardware, even by mistake.
 
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-etm4x.c | 31 ++++++++++++---------------
- 1 file changed, 14 insertions(+), 17 deletions(-)
+ drivers/hwtracing/coresight/coresight-tmc-etr.c | 28 ++-----------------------
+ 1 file changed, 2 insertions(+), 26 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
-index 9bc04c50d45b..1d94ebec027b 100644
---- a/drivers/hwtracing/coresight/coresight-etm4x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm4x.c
-@@ -1027,7 +1027,8 @@ static int etm4_probe(struct amba_device *adev, const struct amba_id *id)
- 	}
+diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+index 1de05c9a01c8..18c9a184d31a 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
++++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+@@ -211,32 +211,8 @@ static int tmc_enable_etr_sink_sysfs(struct coresight_device *csdev)
  
- 	pm_runtime_put(&adev->dev);
--	dev_info(dev, "%s initialized\n", (char *)id->data);
-+	dev_info(dev, "CPU%d: ETM v%d.%d initialized\n",
-+		 drvdata->cpu, drvdata->arch >> 4, drvdata->arch & 0xf);
- 
- 	if (boot_enable) {
- 		coresight_enable(drvdata->csdev);
-@@ -1045,23 +1046,19 @@ static int etm4_probe(struct amba_device *adev, const struct amba_id *id)
- 	return ret;
+ static int tmc_enable_etr_sink_perf(struct coresight_device *csdev)
+ {
+-	int ret = 0;
+-	unsigned long flags;
+-	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+-
+-	spin_lock_irqsave(&drvdata->spinlock, flags);
+-	if (drvdata->reading) {
+-		ret = -EINVAL;
+-		goto out;
+-	}
+-
+-	/*
+-	 * In Perf mode there can be only one writer per sink.  There
+-	 * is also no need to continue if the ETR is already operated
+-	 * from sysFS.
+-	 */
+-	if (drvdata->mode != CS_MODE_DISABLED) {
+-		ret = -EINVAL;
+-		goto out;
+-	}
+-
+-	drvdata->mode = CS_MODE_PERF;
+-	tmc_etr_enable_hw(drvdata);
+-out:
+-	spin_unlock_irqrestore(&drvdata->spinlock, flags);
+-
+-	return ret;
++	/* We don't support perf mode yet ! */
++	return -EINVAL;
  }
  
-+#define ETM4x_AMBA_ID(pid)			\
-+	{					\
-+		.id	= pid,			\
-+		.mask	= 0x000fffff,		\
-+	}
-+
- static const struct amba_id etm4_ids[] = {
--	{       /* ETM 4.0 - Cortex-A53  */
--		.id	= 0x000bb95d,
--		.mask	= 0x000fffff,
--		.data	= "ETM 4.0",
--	},
--	{       /* ETM 4.0 - Cortex-A57 */
--		.id	= 0x000bb95e,
--		.mask	= 0x000fffff,
--		.data	= "ETM 4.0",
--	},
--	{       /* ETM 4.0 - A72, Maia, HiSilicon */
--		.id = 0x000bb95a,
--		.mask = 0x000fffff,
--		.data = "ETM 4.0",
--	},
--	{ 0, 0},
-+	ETM4x_AMBA_ID(0x000bb95d),		/* Cortex-A53 */
-+	ETM4x_AMBA_ID(0x000bb95e),		/* Cortex-A57 */
-+	ETM4x_AMBA_ID(0x000bb95a),		/* Cortex-A72 */
-+	ETM4x_AMBA_ID(0x000bb959),		/* Cortex-A73 */
-+	ETM4x_AMBA_ID(0x000bb9da),		/* Cortex-A35 */
-+	{},
- };
- 
- static struct amba_driver etm4x_driver = {
+ static int tmc_enable_etr_sink(struct coresight_device *csdev, u32 mode)
 -- 
 2.7.4
