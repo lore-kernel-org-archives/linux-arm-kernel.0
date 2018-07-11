@@ -1,54 +1,83 @@
-From: yandong77520@gmail.com (Yandong.Zhao)
-Date: Wed, 11 Jul 2018 19:06:28 +0800
-Subject: [PATCH] arm64: neon: Fix function may_use_simd() return error status
-Message-ID: <1531307188-12032-1-git-send-email-yandong77520@gmail.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Wed, 11 Jul 2018 13:12:30 +0200
+Subject: [PATCH v10 2/2] media: V3s: Add support for Allwinner CSI.
+In-Reply-To: <20180705154802.03604f156709be11892b19c0@magewell.com>
+References: <1525417745-37964-1-git-send-email-yong.deng@magewell.com>
+ <20180626110821.wkal6fcnoncsze6y@valkosipuli.retiisi.org.uk>
+ <20180705154802.03604f156709be11892b19c0@magewell.com>
+Message-ID: <20180711111230.gpv7ww2nhaha5hou@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yandong Zhao <yandong77520@gmail.com>
+Hi Sakari,
 
-It does not matter if the caller of may_use_simd() migrates to
-another cpu after the call, but it is still important that the
-kernel_neon_busy percpu instance that is read matches the cpu the
-task is running on at the time of the read.
+On Thu, Jul 05, 2018 at 03:48:02PM +0800, Yong wrote:
+> > > +
+> > > +/* -----------------------------------------------------------------------------
+> > > + * Media Operations
+> > > + */
+> > > +static int sun6i_video_formats_init(struct sun6i_video *video,
+> > > +				    const struct media_pad *remote)
+> > > +{
+> > > +	struct v4l2_subdev_mbus_code_enum mbus_code = { 0 };
+> > > +	struct sun6i_csi *csi = video->csi;
+> > > +	struct v4l2_format format;
+> > > +	struct v4l2_subdev *subdev;
+> > > +	u32 pad;
+> > > +	const u32 *pixformats;
+> > > +	int pixformat_count = 0;
+> > > +	u32 subdev_codes[32]; /* subdev format codes, 32 should be enough */
+> > > +	int codes_count = 0;
+> > > +	int num_fmts = 0;
+> > > +	int i, j;
+> > > +
+> > > +	pad = remote->index;
+> > > +	subdev = media_entity_to_v4l2_subdev(remote->entity);
+> > > +	if (subdev == NULL)
+> > > +		return -ENXIO;
+> > > +
+> > > +	/* Get supported pixformats of CSI */
+> > > +	pixformat_count = sun6i_csi_get_supported_pixformats(csi, &pixformats);
+> > > +	if (pixformat_count <= 0)
+> > > +		return -ENXIO;
+> > > +
+> > > +	/* Get subdev formats codes */
+> > > +	mbus_code.pad = pad;
+> > > +	mbus_code.which = V4L2_SUBDEV_FORMAT_ACTIVE;
+> > > +	while (!v4l2_subdev_call(subdev, pad, enum_mbus_code, NULL,
+> > > +				 &mbus_code)) {
+> > 
+> > The formats supported by the external sub-device may depend on horizontal
+> > and vertical flipping. You shouldn't assume any particular configuration
+> > here: instead, bridge drivers generally just need to make sure the formats
+> > match in link validation when streaming is started. At least the CSI-2
+> > receiver driver and the DMA engine driver (video device) should check the
+> > configuration is valid. See e.g. the IPU3 driver:
+> > drivers/media/pci/intel/ipu3/ipu3-cio2.c .
+> 
+> Can mbus_code be added dynamically ?
+> The code here only enum the mbus code and get the possible supported
+> pairs of pixformat and mbus by SoC. Not try to check if the formats
+> (width height ...) is valid or not. The formats validation will be 
+> in link validation when streaming is started as per your advise. 
 
-This means that raw_cpu_read() is not sufficient.  kernel_neon_busy
-may appear true if the caller migrates during the execution of
-raw_cpu_read() and the next task to be scheduled in on the initial
-cpu calls kernel_neon_begin().
+Can you reply to this so that Yong has a chance to resubmit his serie
+before the 4.19 merge window starts?
 
-This patch replaces raw_cpu_read() with this_cpu_read() to protect
-against this race.
+Or alternatively, is this something we can fix later on, once it's
+merged?
 
-Fixes: cb84d11e1625 ("arm64: neon: Remove support for nested or hardirq kernel-mode NEON")
-Reviewed-by: Dave Martin <Dave.Martin@arm.com>
-Signed-off-by: Yandong Zhao <yandong77520@gmail.com>
----
- arch/arm64/include/asm/simd.h | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+Thanks!
+Maxime
 
-diff --git a/arch/arm64/include/asm/simd.h b/arch/arm64/include/asm/simd.h
-index fa8b3fe..784a8c2 100644
---- a/arch/arm64/include/asm/simd.h
-+++ b/arch/arm64/include/asm/simd.h
-@@ -29,7 +29,8 @@
- static __must_check inline bool may_use_simd(void)
- {
- 	/*
--	 * The raw_cpu_read() is racy if called with preemption enabled.
-+	 * The this_cpu_read() is racy if called with preemption enabled,
-+	 * since the task may subsequently migrate to another CPU.
- 	 * This is not a bug: kernel_neon_busy is only set when
- 	 * preemption is disabled, so we cannot migrate to another CPU
- 	 * while it is set, nor can we migrate to a CPU where it is set.
-@@ -42,7 +43,7 @@ static __must_check inline bool may_use_simd(void)
- 	 * false.
- 	 */
- 	return !in_irq() && !irqs_disabled() && !in_nmi() &&
--		!raw_cpu_read(kernel_neon_busy);
-+		!this_cpu_read(kernel_neon_busy);
- }
- 
- #else /* ! CONFIG_KERNEL_MODE_NEON */
 -- 
-1.9.1
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180711/705b024f/attachment.sig>
