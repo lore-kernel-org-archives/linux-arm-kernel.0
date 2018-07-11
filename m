@@ -1,29 +1,26 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 11 Jul 2018 14:00:48 +0100
-Subject: [PATCH v5 2/7] KVM: arm/arm64: Introduce helpers to manupulate
- page table entries
-In-Reply-To: <20180709144124.29164-2-punit.agrawal@arm.com>
-References: <20180709143835.28971-1-punit.agrawal@arm.com>
- <20180709144124.29164-1-punit.agrawal@arm.com>
- <20180709144124.29164-2-punit.agrawal@arm.com>
-Message-ID: <691fcde0-b0a2-d258-ac99-49c6c4794247@arm.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Wed, 11 Jul 2018 21:05:44 +0800
+Subject: [PATCH] ARM: imx: call imx6sx_cpuidle_init() conditionally for
+ 6sll
+In-Reply-To: <20180709155130.2126597-1-arnd@arndb.de>
+References: <20180709155130.2126597-1-arnd@arndb.de>
+Message-ID: <20180711130543.GI6959@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/07/18 15:41, Punit Agrawal wrote:
-> Introduce helpers to abstract architectural handling of the conversion
-> of pfn to page table entries and marking a PMD page table entry as a
-> block entry.
+On Mon, Jul 09, 2018 at 05:51:17PM +0200, Arnd Bergmann wrote:
+> The imx6sl platform has two different cpuidle implementations,
+> and fails to link if we only want one of the two:
 > 
-> The helpers are introduced in preparation for supporting PUD hugepages
-> at stage 2 - which are supported on arm64 but do not exist on arm.
+> arch/arm/mach-imx/mach-imx6sl.o: In function `imx6sl_init_late':
+> mach-imx6sl.c:(.init.text+0x12): undefined reference to `imx6sx_cpuidle_init'
 > 
-> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-> Acked-by: Christoffer Dall <christoffer.dall@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Russell King <linux@armlinux.org.uk>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
+> This makes the call into reference conditional on the configuration.
+> 
+> Fixes: e7fa1fb39b11 ("ARM: imx: add cpu idle support for i.MX6SLL")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 > ---
+> I had already sent a related patch earlier, but missed this second
+> problem then.
 
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Applied both, thanks.
