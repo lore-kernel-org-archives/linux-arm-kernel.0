@@ -1,40 +1,57 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 11 Jul 2018 17:49:02 +0100
-Subject: [PATCH V4 0/5] soc: imx: add scu firmware api support
-In-Reply-To: <1531061817-1980-1-git-send-email-aisheng.dong@nxp.com>
-References: <1531061817-1980-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <24505e51-3a5d-4f34-7ba6-262e118d070e@arm.com>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Wed, 11 Jul 2018 09:41:15 -0700
+Subject: [PATCH v6 7/7] arm64: dts: sdm845: Add tsens nodes
+In-Reply-To: <65c39c405076627bd43ec94c211c6998191b9f16.1531136000.git.amit.kucheria@linaro.org>
+References: <cover.1531135999.git.amit.kucheria@linaro.org>
+ <65c39c405076627bd43ec94c211c6998191b9f16.1531136000.git.amit.kucheria@linaro.org>
+Message-ID: <20180711164115.GE545@tuxbook-pro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon 09 Jul 04:43 PDT 2018, Amit Kucheria wrote:
 
-
-On 08/07/18 15:56, Dong Aisheng wrote:
-> Unlike the former i.MX Architectures, the new generation i.MX8 SoCs
-> (e.g. MX8QXP and MX8QM) contain a system controller which runs on a
-> dedicated Cortex-M core to provide power, clock, Pad, and resource
-> management. Communication between the host processor running
-> an OS and the system controller happens through a SCU protocol.
-> This patchset adds the SCU APIs which is implemented based on MU
-> and will be used by different system components.
+> SDM845 has two tsens blocks, one with 13 sensors and the other with 8
+> sensors. It uses version 2 of the TSENS IP, so use the fallback property to
+> allow more common code.
 > 
-> It mainly consists of below parts:
-> 1) MU mailbox driver
-> 1) Implementation of the IPC functions based on MUs (client side).
-> 
-> 
+> Signed-off-by: Amit Kucheria <amit.kucheria@linaro.org>
 
-I do understand the firmware might be already released for the current
-generation of platforms, but instead of adding to the fragmentation, it
-would be good to migrated to ARM SCMI for future platforms.
+Reviewed-by: Bjorn Andersson <bjorn.andersson@linaro.org>
 
-This system controller communication protocol is already so fragmented
-(we have TI SCI, QCOM RPM, Nvidia Tegra BPMP, ARM SCPI and so on..
-and now this i.MX specific one added to that), the main intention of ARM
-SCMI is to stop that. The idea is for any Power Control System
-Architecture(PCSA) compliant systems or any similar systems, SCMI should
-be the standard communication protocol.
-
--- 
 Regards,
-Sudeep
+Bjorn
+
+> ---
+>  arch/arm64/boot/dts/qcom/sdm845.dtsi | 16 ++++++++++++++++
+>  1 file changed, 16 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+> index cdaabeb..ba2899c 100644
+> --- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
+> +++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+> @@ -221,6 +221,22 @@
+>  			#interrupt-cells = <2>;
+>  		};
+>  
+> +		tsens0: tsens at c263000 {
+> +			compatible = "qcom,sdm845-tsens", "qcom,tsens-v2";
+> +			reg = <0xc263000 0x1ff>, /* TM */
+> +			      <0xc222000 0x1ff>; /* SROT */
+> +			#qcom,sensors = <13>;
+> +			#thermal-sensor-cells = <1>;
+> +		};
+> +
+> +		tsens1: tsens at c265000 {
+> +			compatible = "qcom,sdm845-tsens", "qcom,tsens-v2";
+> +			reg = <0xc265000 0x1ff>, /* TM */
+> +			      <0xc223000 0x1ff>; /* SROT */
+> +			#qcom,sensors = <8>;
+> +			#thermal-sensor-cells = <1>;
+> +		};
+> +
+>  		spmi_bus: spmi at c440000 {
+>  			compatible = "qcom,spmi-pmic-arb";
+>  			reg = <0xc440000 0x1100>,
+> -- 
+> 2.7.4
+> 
