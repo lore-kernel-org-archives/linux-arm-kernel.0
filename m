@@ -1,49 +1,89 @@
-From: mhocko@kernel.org (Michal Hocko)
-Date: Wed, 11 Jul 2018 10:54:07 +0200
-Subject: [PATCH 1/2] mm/cma: remove unsupported gfp_mask parameter from
- cma_alloc()
-In-Reply-To: <CAAmzW4P1m_T77DfQzDD6ysGaOF46++-0gwRaOajmo6ef=VYp=A@mail.gmail.com>
-References: <CGME20180709122019eucas1p2340da484acfcc932537e6014f4fd2c29@eucas1p2.samsung.com>
- <20180709121956.20200-1-m.szyprowski@samsung.com>
- <20180709122019eucas1p2340da484acfcc932537e6014f4fd2c29~-sqTPJKij2939229392eucas1p2j@eucas1p2.samsung.com>
- <CAAmzW4PPNYhUj_MeZox+ddq8MjXqnJs_AJ3xkayf710udD1pSg@mail.gmail.com>
- <20180710095056.GE14284@dhcp22.suse.cz>
- <CAAmzW4P1m_T77DfQzDD6ysGaOF46++-0gwRaOajmo6ef=VYp=A@mail.gmail.com>
-Message-ID: <20180711085407.GB20050@dhcp22.suse.cz>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Wed, 11 Jul 2018 10:55:17 +0200
+Subject: [PATCH v5 05/22] dt-bindings: sram: sunxi: Populate valid
+ sections compatibles
+In-Reply-To: <CAGb2v64Na1Mq0=-z5Haq=sgggRPHNHVZ-6fFczxb3EESAzZ=XA@mail.gmail.com>
+References: <20180710080114.31469-1-paul.kocialkowski@bootlin.com>
+ <20180710080114.31469-6-paul.kocialkowski@bootlin.com>
+ <CAGb2v64Na1Mq0=-z5Haq=sgggRPHNHVZ-6fFczxb3EESAzZ=XA@mail.gmail.com>
+Message-ID: <20180711085517.myjn5ttiwqiolobz@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 11-07-18 16:35:28, Joonsoo Kim wrote:
-> 2018-07-10 18:50 GMT+09:00 Michal Hocko <mhocko@kernel.org>:
-> > On Tue 10-07-18 16:19:32, Joonsoo Kim wrote:
-> >> Hello, Marek.
-> >>
-> >> 2018-07-09 21:19 GMT+09:00 Marek Szyprowski <m.szyprowski@samsung.com>:
-> >> > cma_alloc() function doesn't really support gfp flags other than
-> >> > __GFP_NOWARN, so convert gfp_mask parameter to boolean no_warn parameter.
-> >>
-> >> Although gfp_mask isn't used in cma_alloc() except no_warn, it can be used
-> >> in alloc_contig_range(). For example, if passed gfp mask has no __GFP_FS,
-> >> compaction(isolation) would work differently. Do you have considered
-> >> such a case?
+On Tue, Jul 10, 2018 at 10:47:07PM +0800, Chen-Yu Tsai wrote:
+> On Tue, Jul 10, 2018 at 4:00 PM, Paul Kocialkowski
+> <paul.kocialkowski@bootlin.com> wrote:
+> > This adds a list of valid SRAM sections compatibles for the A13, A20,
+> > A23 and H3 platforms. Per-platform compatibles are introduced for the
+> > SRAM sections of these platforms, with the A10 compatibles also listed
+> > as valid when applicable.
 > >
-> > Does any of cma_alloc users actually care about GFP_NO{FS,IO}?
+> > In particular, compatibles for the C1 SRAM section are introduced.
 > 
-> I don't know. My guess is that cma_alloc() is used for DMA allocation so
-> block device would use it, too. If fs/block subsystem initiates the
-> request for the device,
-> it would be possible that cma_alloc() is called with such a flag.
-> Again, I don't know
-> much about those subsystem so I would be wrong.
+> You should probably mention that this is not an exhaustive list. In
+> particular, the C2 and C3 (sun5i) mappings are still missing.
+> 
+> >
+> > Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+> > ---
+> >  .../devicetree/bindings/sram/sunxi-sram.txt   | 25 +++++++++++++++++++
+> >  1 file changed, 25 insertions(+)
+> >
+> > diff --git a/Documentation/devicetree/bindings/sram/sunxi-sram.txt b/Documentation/devicetree/bindings/sram/sunxi-sram.txt
+> > index 156a02ab6b54..07c53c5214a0 100644
+> > --- a/Documentation/devicetree/bindings/sram/sunxi-sram.txt
+> > +++ b/Documentation/devicetree/bindings/sram/sunxi-sram.txt
+> > @@ -32,8 +32,33 @@ once again the representation described in the mmio-sram binding.
+> >
+> >  The valid sections compatible for A10 are:
+> >      - allwinner,sun4i-a10-sram-a3-a4
+> > +    - allwinner,sun4i-a10-sram-c1
+> >      - allwinner,sun4i-a10-sram-d
+> >
+> > +The valid sections compatible for A13 are:
+> > +    - allwinner,sun5i-a13-sram-a3-a4
+> > +    - allwinner,sun4i-a10-sram-a3-a4
+> > +    - allwinner,sun5i-a13-sram-c1
+> > +    - allwinner,sun4i-a10-sram-c1
+> > +    - allwinner,sun5i-a13-sram-d
+> > +    - allwinner,sun4i-a10-sram-d
+> > +
+> > +The valid sections compatible for A20 are:
+> > +    - allwinner,sun7i-a20-sram-a3-a4
+> > +    - allwinner,sun4i-a10-sram-a3-a4
+> > +    - allwinner,sun7i-a20-sram-c1
+> > +    - allwinner,sun4i-a10-sram-c1
+> > +    - allwinner,sun7i-a20-sram-d
+> > +    - allwinner,sun4i-a10-sram-d
+> > +
+> > +The valid sections compatible for A23/A33 are:
+> > +    - allwinner,sun8i-a23-sram-c1
+> > +    - allwinner,sun4i-a10-sram-c1
+> > +
+> > +The valid sections compatible for H3 are:
+> > +    - allwinner,sun8i-h3-sram-c1
+> > +    - allwinner,sun4i-a10-sram-c1
+> 
+> I'm not quite sure why we want to list these... I think it makes more sense
+> to just have the SoC specific compatible. They are tied to the controls
+> after all. Maybe Rob has a different opinion?
 
-The patch converts existing users and none of them really tries to use
-anything other than GFP_KERNEL [|__GFP_NOWARN] so this doesn't seem to
-be the case. Should there be a new user requiring more restricted
-gfp_mask we should carefuly re-evaluate and think how to support it.
+We had that discussion not so long ago, and the outcome was to list
+the SoC specific and the fallback compatibles on the same line. I've
+amended the patch to do so and applied.
 
-Until then I would simply stick with the proposed approach because my
-experience tells me that a wrong gfp mask usage is way too easy so the
-simpler the api is the less likely we will see an abuse.
+(and added the mention of the C2 and C3 SRAMs as you suggested)
+
+Maxime
+
 -- 
-Michal Hocko
-SUSE Labs
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180711/0a5663df/attachment-0001.sig>
