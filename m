@@ -1,106 +1,50 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Wed, 11 Jul 2018 16:42:02 +0900
-Subject: [PATCH v11 14/15] arm64: kexec_file: add kernel signature
- verification support
+Date: Wed, 11 Jul 2018 16:42:03 +0900
+Subject: [PATCH v11 15/15] arm64: kexec_file: add kaslr support
 In-Reply-To: <20180711074203.3019-1-takahiro.akashi@linaro.org>
 References: <20180711074203.3019-1-takahiro.akashi@linaro.org>
-Message-ID: <20180711074203.3019-15-takahiro.akashi@linaro.org>
+Message-ID: <20180711074203.3019-16-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With this patch, kernel verification can be done without IMA security
-subsystem enabled. Turn on CONFIG_KEXEC_VERIFY_SIG instead.
+Adding "kaslr-seed" to dtb enables triggering kaslr, or kernel virtual
+address randomization, at secondary kernel boot. We always do this as
+it will have no harm on kaslr-incapable kernel.
 
-On x86, a signature is embedded into a PE file (Microsoft's format) header
-of binary. Since arm64's "Image" can also be seen as a PE file as far as
-CONFIG_EFI is enabled, we adopt this format for kernel signing.
-
-You can create a signed kernel image with:
-    $ sbsign --key ${KEY} --cert ${CERT} Image
+We don't have any "switch" to turn off this feature directly, but still
+can suppress it by passing "nokaslr" as a kernel boot argument.
 
 Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/Kconfig              | 24 ++++++++++++++++++++++++
- arch/arm64/kernel/kexec_image.c | 15 +++++++++++++++
- 2 files changed, 39 insertions(+)
+ arch/arm64/kernel/machine_kexec_file.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index a9a3a5583c8b..1445eb2fc833 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -844,6 +844,30 @@ config KEXEC_FILE
- 	  for kernel and initramfs as opposed to list of segments as
- 	  accepted by previous system call.
+diff --git a/arch/arm64/kernel/machine_kexec_file.c b/arch/arm64/kernel/machine_kexec_file.c
+index 261564df7210..99d771afe88e 100644
+--- a/arch/arm64/kernel/machine_kexec_file.c
++++ b/arch/arm64/kernel/machine_kexec_file.c
+@@ -16,6 +16,7 @@
+ #include <linux/libfdt.h>
+ #include <linux/memblock.h>
+ #include <linux/of_fdt.h>
++#include <linux/random.h>
+ #include <linux/slab.h>
+ #include <linux/types.h>
+ #include <linux/vmalloc.h>
+@@ -161,6 +162,12 @@ static int setup_dtb(struct kimage *image,
+ 		}
+ 	}
  
-+config KEXEC_VERIFY_SIG
-+	bool "Verify kernel signature during kexec_file_load() syscall"
-+	depends on KEXEC_FILE
-+	help
-+	  Select this option to verify a signature with loaded kernel
-+	  image. If configured, any attempt of loading a image without
-+	  valid signature will fail.
++	/* add kaslr-seed */
++	get_random_bytes(&value, sizeof(value));
++	ret = fdt_setprop(buf, nodeoffset, "kaslr-seed", &value, sizeof(value));
++	if (ret)
++		goto out_err;
 +
-+	  In addition to that option, you need to enable signature
-+	  verification for the corresponding kernel image type being
-+	  loaded in order for this to work.
-+
-+config KEXEC_IMAGE_VERIFY_SIG
-+	bool "Enable Image signature verification support"
-+	default y
-+	depends on KEXEC_VERIFY_SIG
-+	depends on EFI && SIGNED_PE_FILE_VERIFICATION
-+	help
-+	  Enable Image signature verification support.
-+
-+comment "Support for PE file signature verification disabled"
-+	depends on KEXEC_VERIFY_SIG
-+	depends on !EFI || !SIGNED_PE_FILE_VERIFICATION
-+
- config CRASH_DUMP
- 	bool "Build kdump crash kernel"
- 	help
-diff --git a/arch/arm64/kernel/kexec_image.c b/arch/arm64/kernel/kexec_image.c
-index df1e341d3a28..bb0a95add197 100644
---- a/arch/arm64/kernel/kexec_image.c
-+++ b/arch/arm64/kernel/kexec_image.c
-@@ -13,6 +13,7 @@
- #include <linux/kernel.h>
- #include <linux/kexec.h>
- #include <linux/string.h>
-+#include <linux/verification.h>
- #include <asm/boot.h>
- #include <asm/byteorder.h>
- #include <asm/cpufeature.h>
-@@ -28,6 +29,9 @@ static int image_probe(const char *kernel_buf, unsigned long kernel_len)
- 			!memcmp(&h->magic, ARM64_MAGIC, sizeof(ARM64_MAGIC)))
- 		return -EINVAL;
- 
-+	pr_debug("PE format: %s\n",
-+			memcmp(&h->mz_magic, "MZ", 2) ?  "no" : "yes");
-+
- 	return 0;
- }
- 
-@@ -107,7 +111,18 @@ static void *image_load(struct kimage *image,
- 	return ERR_PTR(ret);
- }
- 
-+#ifdef CONFIG_KEXEC_IMAGE_VERIFY_SIG
-+static int image_verify_sig(const char *kernel, unsigned long kernel_len)
-+{
-+	return verify_pefile_signature(kernel, kernel_len, NULL,
-+				       VERIFYING_KEXEC_PE_SIGNATURE);
-+}
-+#endif
-+
- const struct kexec_file_ops kexec_image_ops = {
- 	.probe = image_probe,
- 	.load = image_load,
-+#ifdef CONFIG_KEXEC_IMAGE_VERIFY_SIG
-+	.verify_sig = image_verify_sig,
-+#endif
- };
+ 	/* trim a buffer */
+ 	fdt_pack(buf);
+ 	*dtb_buf = buf;
 -- 
 2.17.0
