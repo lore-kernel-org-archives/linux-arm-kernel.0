@@ -1,54 +1,54 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 11 Jul 2018 17:03:33 +0100
-Subject: [RFC PATCH 0/4] Stop losing firmware-set DMA masks
-In-Reply-To: <CABGGisxVqLMu3TUpbJGWnUFgzUor-8tdyV8KJeU0YT7y=BHrAQ@mail.gmail.com>
-References: <cover.1531239284.git.robin.murphy@arm.com>
- <CABGGisxVqLMu3TUpbJGWnUFgzUor-8tdyV8KJeU0YT7y=BHrAQ@mail.gmail.com>
-Message-ID: <9a54d956-927e-68f7-5c3b-af7cd0616dc2@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 11 Jul 2018 17:07:38 +0100
+Subject: [PATCH] arm64: neon: Fix function may_use_simd() return error
+ status
+In-Reply-To: <20180711160315.GD18477@arm.com>
+References: <1531271399-1768-1-git-send-email-yandong77520@gmail.com>
+ <CAKv+Gu-PLsWZLPM-OfXHLGKs7PojRB4jFsyp+X_5OW6ryi7gRQ@mail.gmail.com>
+ <20180711154758.4k2phfrzl2r5m34o@lakrids.cambridge.arm.com>
+ <20180711160315.GD18477@arm.com>
+Message-ID: <20180711160738.okzpxenezq52etol@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/07/18 15:40, Rob Herring wrote:
-> On Tue, Jul 10, 2018 at 12:43 PM Robin Murphy <robin.murphy@arm.com> wrote:
->>
->> Whilst the common firmware code invoked by dma_configure() initialises
->> devices' DMA masks according to limitations described by the respective
->> properties ("dma-ranges" for OF and _DMA/IORT for ACPI), the nature of
->> the dma_set_mask() API leads to that information getting lost when
->> well-behaved drivers probe and set a 64-bit mask, since in general
->> there's no way to tell the difference between a firmware-described mask
->> (which should be respected) and whatever default may have come from the
->> bus code (which should be replaced outright). This can break DMA on
->> systems with certain IOMMU topologies (e.g. [1]) where the IOMMU driver
->> only knows its maximum supported address size, not how many of those
->> address bits might actually be wired up between any of its input
->> interfaces and the associated DMA master devices. Similarly, some PCIe
->> root complexes only have a 32-bit native interface on their host bridge,
->> which leads to the same DMA-address-truncation problem in systems with a
->> larger physical memory map and RAM above 4GB (e.g. [2]).
->>
->> These patches attempt to deal with this in the simplest way possible by
->> generalising the specific quirk for 32-bit bridges into an arbitrary
->> mask which can then also be plumbed into the firmware code. In the
->> interest of being minimally invasive, I've only included a point fix
->> for the IOMMU issue as seen on arm64 - there may be further tweaks
->> needed in DMA ops to catch all possible incarnations of this problem,
->> but this initial RFC is mostly about the impact beyond the dma-mapping
->> subsystem itself.
+On Wed, Jul 11, 2018 at 05:03:15PM +0100, Will Deacon wrote:
+> On Wed, Jul 11, 2018 at 04:47:58PM +0100, Mark Rutland wrote:
+> > On Wed, Jul 11, 2018 at 09:20:03AM +0200, Ard Biesheuvel wrote:
+> > > On 11 July 2018 at 03:09, Yandong.Zhao <yandong77520@gmail.com> wrote:
+> > > > diff --git a/arch/arm64/include/asm/simd.h b/arch/arm64/include/asm/simd.h
+> > > > index fa8b3fe..784a8c2 100644
+> > > > --- a/arch/arm64/include/asm/simd.h
+> > > > +++ b/arch/arm64/include/asm/simd.h
+> > > > @@ -29,7 +29,8 @@
+> > > >  static __must_check inline bool may_use_simd(void)
+> > > >  {
+> > > >         /*
+> > > > -        * The raw_cpu_read() is racy if called with preemption enabled.
+> > > > +        * The this_cpu_read() is racy if called with preemption enabled,
+> > > > +        * since the task may subsequently migrate to another CPU.
+> > > >          * This is not a bug: kernel_neon_busy is only set when
+> > > >          * preemption is disabled, so we cannot migrate to another CPU
+> > > >          * while it is set, nor can we migrate to a CPU where it is set.
+> > 
+> > It would be nice if we could clarify the "is racy" part here.
+> > 
+> > How about:
+> > 
+> > 	/*
+> > 	 * kernel_neon_busy is only set while preemption is disabled,
+> > 	 * and is clear whenever preemption is enabled. Since
+> > 	 * this_cpu_read() is atomic w.r.t. preemption, kernel_neon_busy
+> > 	 * cannot change under our feet -- if it's set we cannot be
+> > 	 * migrated, and if it's clear we cannot be migrated to a CPU
+> > 	 * where it is set.
+> > 	 */
+> > 
+> > With that:
+> > 
+> > Reviewed-by: Mark Rutland <mark.rutland@arm..com>
 > 
-> Couldn't you set and use the device's parent's dma_mask instead. At
-> least for DT, we should always have a parent device representing the
-> bus. That would avoid further bloating of struct device.
+> Thanks. Applied with the updated comment and your tag..
 
-But then if the parent device did have a non-trivial driver which calls 
-dma_set_mask(), we'd be back at square 1 :/
+Cheer!
 
-More realistically, I don't think that's viable for ACPI, at least with 
-IORT, since the memory address size limit belongs to the endpoint 
-itself, thus two devices with the same nominal parent in the Linux 
-device model could still have different limits (where in DT you'd have 
-to have to insert intermediate simple-bus nodes to model the same 
-topology with dma-ranges). Plus either way it seems somewhat fragile for 
-PCI where the host bridge may be some distance up the hierarchy.
-
-Robin.
+Mar.
