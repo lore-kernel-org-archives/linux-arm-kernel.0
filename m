@@ -1,85 +1,169 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 11 Jul 2018 12:24:22 +0100
-Subject: [PATCH 1/3] clocksource: drivers: set clockevent device cpumask to
- cpu_possible_mask
-Message-ID: <1531308264-24220-1-git-send-email-sudeep.holla@arm.com>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Wed, 11 Jul 2018 11:27:01 +0000
+Subject: [PATCH V4 5/5] soc: imx: add SC firmware IPC and APIs
+In-Reply-To: <20180711103159.jxmgksxawjmiukaf@pengutronix.de>
+References: <1531061817-1980-1-git-send-email-aisheng.dong@nxp.com>
+ <1531061817-1980-6-git-send-email-aisheng.dong@nxp.com>
+ <20180710144454.lmz62g76xu7ieohr@pengutronix.de>
+ <AM0PR04MB421186AD7C08E94CADFDD394805A0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <20180711103159.jxmgksxawjmiukaf@pengutronix.de>
+Message-ID: <AM0PR04MB421185C501B3B910A194232F805A0@AM0PR04MB4211.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, quite a few clockevent devices have cpumask set to
-cpu_all_mask which should be fine. However, cpu_possible_mask is more
-accurate and if there are any other clockevent devices in the system
-which have cpumask set to cpu_possible_mask, then having cpu_all_mask
-may result in issues (mostly boot hang with forever loops in
-clockevents_notify_released).
+> -----Original Message-----
+> From: Sascha Hauer [mailto:s.hauer at pengutronix.de]
+> Sent: Wednesday, July 11, 2018 6:32 PM
+> To: A.s. Dong <aisheng.dong@nxp.com>
+> Cc: linux-arm-kernel at lists.infradead.org; dongas86 at gmail.com; dl-linux-imx
+> <linux-imx@nxp.com>; kernel at pengutronix.de; Fabio Estevam
+> <fabio.estevam@nxp.com>; shawnguo at kernel.org
+> Subject: Re: [PATCH V4 5/5] soc: imx: add SC firmware IPC and APIs
+> 
+> On Wed, Jul 11, 2018 at 09:18:06AM +0000, A.s. Dong wrote:
+> > > -----Original Message-----
+> > > From: Sascha Hauer [mailto:s.hauer at pengutronix.de]
+> > > Sent: Tuesday, July 10, 2018 10:45 PM
+> > > To: A.s. Dong <aisheng.dong@nxp.com>
+> > > Cc: linux-arm-kernel at lists.infradead.org; dongas86 at gmail.com;
+> > > dl-linux-imx <linux-imx@nxp.com>; kernel at pengutronix.de; Fabio
+> > > Estevam <fabio.estevam@nxp.com>; shawnguo at kernel.org
+> > > Subject: Re: [PATCH V4 5/5] soc: imx: add SC firmware IPC and APIs
+> > >
+> > > Hi,
+> > >
+> > > Thank you for removing the majority of this patch. It really helps
+> readability.
+> > >
+> > > On Sun, Jul 08, 2018 at 10:56:57PM +0800, Dong Aisheng wrote:
+> > > > +/* Initialization of the MU code. */ static int
+> > > > +imx_sc_probe(struct platform_device *pdev) {
+> > > > +	struct device *dev = &pdev->dev;
+> > > > +	int ret;
+> > > > +
+> > > > +	ret = sc_ipc_open(&scu_ipc_handle, dev);
+> > > > +	if (ret)
+> > > > +		return ret;
+> > > > +
+> > > > +	pr_info("NXP i.MX SCU Initialized\n");
+> > > > +
+> > > > +	return devm_of_platform_populate(dev); }
+> > >
+> > > I see that you have turned the SCU code into a driver and I really
+> > > welcome that. Now when you have a driver a global scu_ipc_handle is
+> > > no longer necessary. You can call platform_set_drvdata(pdev,
+> > > sc_ipc); and can get that from the child devices using
+> > > dev_get_drvdata(pdev->dev.parent) like for example most mfd devices
+> do.
+> > >
+> >
+> > It looks like a good idea.
+> > One question: That means that the SCU users much have a node under
+> SCU
+> > node and have struct device point, it seems ok for all normal devices like clk,
+> pinctrl, pd.
+> > But I found some special device like soc device which does not have
+> > node and struct device, but also use SCU. How to treat for those devices?
+> Possible anymore of them?
+> 
+> Not sure. What kind of device is it? I'm sure we'll find a solution so maybe ask
+> again once we are there?
+> 
 
-So, lets replace all the clockevent device cpu_all_mask to
-cpu_possible_mask in order to prevent above mentioned possible issue.
+See:
+include/linux/sys_soc.h
+arch/arm/mach-imx/cpu.c: imx_soc_device_init().
+struct soc_device_attribute {
+        const char *machine;
+        const char *family;
+        const char *revision;   
+        const char *soc_id;
+        const void *data;
+};
 
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Thierry Reding <thierry.reding@gmail.com>
-Cc: Jonathan Hunter <jonathanh@nvidia.com>
-Cc: Santosh Shilimkar <ssantosh@kernel.org>
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
----
- drivers/clocksource/tegra20_timer.c   | 2 +-
- drivers/clocksource/timer-atcpit100.c | 2 +-
- drivers/clocksource/timer-keystone.c  | 2 +-
- drivers/clocksource/zevio-timer.c     | 2 +-
- 4 files changed, 4 insertions(+), 4 deletions(-)
+And I found there's also SC services used by other normal devices
+Which is not under SCU node. So I wonder dev_get_drvdata(parent)
+may not work for them quite well.
 
-diff --git a/drivers/clocksource/tegra20_timer.c b/drivers/clocksource/tegra20_timer.c
-index c337a8100a7b..dabf0a103567 100644
---- a/drivers/clocksource/tegra20_timer.c
-+++ b/drivers/clocksource/tegra20_timer.c
-@@ -230,7 +230,7 @@ static int __init tegra20_init_timer(struct device_node *np)
- 		return ret;
- 	}
+> > > This can be embedded into structs that the consumers (like clock driver)
+> use.
+> > >
+> >
+> > Did you mean something like below (similar as TI does):
+> >
+> > struct sc_rpc_msg {
+> >         uint8_t ver;
+> >         uint8_t size;
+> >         uint8_t svc;
+> >         uint8_t func;
+> > };
+> >
+> > // we need have two structures for each type SCU request and response
+> > struct imx_sc_msg_req_get_clock_rate {
+> >         struct sc_rpc_msg hdr;
+> >         u16 resource;
+> >         u8 clk;
+> > } __packed;
+> >
+> > struct imx_sc_msg_resp_get_clock_rate {
+> >         struct sc_rpc_msg hdr;
+> >         u32 rate;
+> > } __packed;
+> >
+> > sc_err_t sc_pm_get_clock_rate(sc_ipc_t ipc, sc_rsrc_t resource,
+> >                               sc_pm_clk_t clk, sc_pm_clock_rate_t
+> > *rate) {
+> >         struct imx_sc_msg_req_get_clock_rate *msg;
+> >         struct imx_sc_msg_resp_get_clock_rate *resp;
+> >         struct sc_rpc_msg *hdr = &msg->hdr;
+> >         uint8_t result;
+> >         int ret;
+> >
+> >         hdr->ver = SC_RPC_VERSION;
+> >         hdr->svc = (uint8_t)SC_RPC_SVC_PM;
+> >         hdr->func = (uint8_t)PM_FUNC_GET_CLOCK_RATE;
+> >         hdr->size = 2;
+> >
+> >         msg->resource = resource;
+> >         msg->clk = clk;
+> >
+> >         ret = sc_call_rpc(ipc, &msg, false);
+> >         if (ret)
+> >                 return SC_ERR_FAIL;
+> >
+> >         resp = (struct imx_sc_msg_resp_get_clock_rate *)msg;
+> >         if (rate != NULL)
+> >                 *rate = resp->rate;
+> >
+> >         result = resp->hdr.func;
+> >         return (sc_err_t)result;
+> > }
+> >
+> > Are you okay with this?
+> 
+> Yes, that's what I meant. Put this function into the clock driver directly rather
+> than in the SCU code and we are done.
+> 
 
--	tegra_clockevent.cpumask = cpu_all_mask;
-+	tegra_clockevent.cpumask = cpu_possible_mask;
- 	tegra_clockevent.irq = tegra_timer_irq.irq;
- 	clockevents_config_and_register(&tegra_clockevent, 1000000,
- 					0x1, 0x1fffffff);
-diff --git a/drivers/clocksource/timer-atcpit100.c b/drivers/clocksource/timer-atcpit100.c
-index 5e23d7b4a722..b4bd2f5b801d 100644
---- a/drivers/clocksource/timer-atcpit100.c
-+++ b/drivers/clocksource/timer-atcpit100.c
-@@ -185,7 +185,7 @@ static struct timer_of to = {
- 		.set_state_oneshot = atcpit100_clkevt_set_oneshot,
- 		.tick_resume = atcpit100_clkevt_shutdown,
- 		.set_next_event = atcpit100_clkevt_next_event,
--		.cpumask = cpu_all_mask,
-+		.cpumask = cpu_possible_mask,
- 	},
+It seems those are procotol services,  both arm scpi and ti sci
+Implemented them in scu driver.
+drivers/firmware/ti_sci.c
+drivers/firmware/arm_scpi.c
+You do want to implement in each induvial client drivers?
 
- 	.of_irq = {
-diff --git a/drivers/clocksource/timer-keystone.c b/drivers/clocksource/timer-keystone.c
-index 0eee03250cfc..f5b2eda30bf3 100644
---- a/drivers/clocksource/timer-keystone.c
-+++ b/drivers/clocksource/timer-keystone.c
-@@ -211,7 +211,7 @@ static int __init keystone_timer_init(struct device_node *np)
- 	event_dev->set_state_shutdown = keystone_shutdown;
- 	event_dev->set_state_periodic = keystone_set_periodic;
- 	event_dev->set_state_oneshot = keystone_shutdown;
--	event_dev->cpumask = cpu_all_mask;
-+	event_dev->cpumask = cpu_possible_mask;
- 	event_dev->owner = THIS_MODULE;
- 	event_dev->name = TIMER_NAME;
- 	event_dev->irq = irq;
-diff --git a/drivers/clocksource/zevio-timer.c b/drivers/clocksource/zevio-timer.c
-index a6a0338eea77..f74689334f7c 100644
---- a/drivers/clocksource/zevio-timer.c
-+++ b/drivers/clocksource/zevio-timer.c
-@@ -162,7 +162,7 @@ static int __init zevio_timer_add(struct device_node *node)
- 		timer->clkevt.set_state_oneshot = zevio_timer_set_oneshot;
- 		timer->clkevt.tick_resume	= zevio_timer_set_oneshot;
- 		timer->clkevt.rating		= 200;
--		timer->clkevt.cpumask		= cpu_all_mask;
-+		timer->clkevt.cpumask		= cpu_possible_mask;
- 		timer->clkevt.features		= CLOCK_EVT_FEAT_ONESHOT;
- 		timer->clkevt.irq		= irqnr;
+Regards
+Dong Aisheng
 
---
-2.7.4
+> Sascha
+> 
+> 
+> --
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 |
+> https://emea01.safelinks.protection.outlook.com/?url=http%3A%2F%2Fww
+> w.pengutronix.de%2F&amp;data=02%7C01%7Caisheng.dong%40nxp.com%7
+> C4d1cdc88f66c4c6e8b2c08d5e7198a09%7C686ea1d3bc2b4c6fa92cd99c5c3016
+> 35%7C0%7C0%7C636669019236875606&amp;sdata=lpP6lpObOOKajQFz9mTai
+> BbqLklnoLbWGrMzPxhrjpU%3D&amp;reserved=0  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
