@@ -1,48 +1,39 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 11 Jul 2018 16:28:28 +0800
-Subject: [PATCH V2 2/2] ARM: dts: imx6ul: add GPIO clocks
-In-Reply-To: <153089733418.143105.7025289108790540252@swboyd.mtv.corp.google.com>
-References: <1527990245-13619-1-git-send-email-Anson.Huang@nxp.com>
- <1527990245-13619-2-git-send-email-Anson.Huang@nxp.com>
- <AM3PR04MB1315D8B57E1A5D47BECBDCD3F54A0@AM3PR04MB1315.eurprd04.prod.outlook.com>
- <20180628005217.GC22683@dragon>
- <153029757874.143105.17774476792947607999@swboyd.mtv.corp.google.com>
- <20180701021947.GA4348@dragon>
- <153089733418.143105.7025289108790540252@swboyd.mtv.corp.google.com>
-Message-ID: <20180711082827.GA6959@dragon>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Wed, 11 Jul 2018 10:30:36 +0200
+Subject: [PATCH v2 00/18] Allwinner R40 HDMI refactoring
+In-Reply-To: <20180710203511.18454-1-jernej.skrabec@siol.net>
+References: <20180710203511.18454-1-jernej.skrabec@siol.net>
+Message-ID: <20180711083036.7attjq4hm5ay5gmn@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 06, 2018 at 10:15:34AM -0700, Stephen Boyd wrote:
-> Quoting Shawn Guo (2018-06-30 19:19:49)
-> > On Fri, Jun 29, 2018 at 11:39:38AM -0700, Stephen Boyd wrote:
-> > > Quoting Shawn Guo (2018-06-27 17:52:18)
-> > > > On Mon, Jun 25, 2018 at 03:14:39AM +0000, Anson Huang wrote:
-> > > > > Gentle Ping...
-> > > > 
-> > > > I cannot apply this dts patch until the clock patch is landed on
-> > > > mainline, because it has a dependency on new clock ID IMX6UL_CLK_GPIO1
-> > > > created by clock patch.
-> > > > 
-> > > 
-> > > Does it matter if that clk ID changes across branches? Or is everything
-> > > good if it just exists as some number?
-> > 
-> > We use macro IMX6UL_CLK_GPIO1 instead of hard-coded number in DTS.  So
-> > it doesn't matter if IMX6UL_CLK_GPIO1 changes.
-> > 
-> > > The patch adding the define
-> > > conflicts with another patch to fix the numbering scheme to be
-> > > incremental instead of changing IMX6UL and IMX6ULL which is annoying.
-> > > I'll probably make a topic branch just for the fix and merge it into
-> > > clk-fixes and this branch so you can pick it up from there if you like.
-> > 
-> > It will be good if you can have a topic branch.  Otherwise, we are also
-> > fine to wait till the clock patches lands on mainline.
-> > 
+On Tue, Jul 10, 2018 at 10:34:53PM +0200, Jernej Skrabec wrote:
+> This series fixes several issues found in R40 HDMI patch series after
+> it was applied. Conversation can be found here:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2018-June/586011.html
 > 
-> Ok. The topic branch is out there as clk-imx-gpio-gates
+> Patches are based on latest linux-next (next-20180710) and are ordered
+> in such way that they don't break R40 HDMI at any time. Because of that
+> I suggest that whole series goes through drm-misc to preserve that order.
+> 
+> I also tested those patches on H3 to make sure it doesn't break other
+> platforms. However, it would be nice to test for regressions also on
+> older SoCs (with DE1).
+> 
+> Best regards,
+> Jernej
 
-Thanks.  I applied dts patch now.
+Applied all patches but the patch 10, thanks!
+Maxime
 
-Shawn
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180711/b874f59d/attachment.sig>
