@@ -1,73 +1,44 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 11 Jul 2018 10:43:26 +0100
-Subject: [RESEND PATCH v2 3/9] asm-generic: Move some macros from
- linux/bitops.h to a new bits.h file
-In-Reply-To: <20180709151006.370112d321c8f3df06bf231b@linux-foundation.org>
-References: <1529412794-17720-1-git-send-email-will.deacon@arm.com>
- <1529412794-17720-4-git-send-email-will.deacon@arm.com>
- <20180706173049.e28171504c745934a280dee8@linux-foundation.org>
- <20180709113250.GA26377@arm.com>
- <20180709151006.370112d321c8f3df06bf231b@linux-foundation.org>
-Message-ID: <20180711094326.GB13963@arm.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Wed, 11 Jul 2018 11:43:52 +0200
+Subject: [PATCH 0/3] PM / Domains: Enable name based lookup at attach
+In-Reply-To: <CAPDyKFq=EPkvu0MjOtkjCNzrgZj0kaJTxXDt21=YR==T+H8ePQ@mail.gmail.com>
+References: <20180629110432.5179-1-ulf.hansson@linaro.org>
+ <12075152.c01WRJ509Y@aspire.rjw.lan>
+ <CAPDyKFq=EPkvu0MjOtkjCNzrgZj0kaJTxXDt21=YR==T+H8ePQ@mail.gmail.com>
+Message-ID: <34035286.gLvmaz061p@aspire.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi again, Andrew,
-
-On Mon, Jul 09, 2018 at 03:10:06PM -0700, Andrew Morton wrote:
-> On Mon, 9 Jul 2018 12:32:51 +0100 Will Deacon <will.deacon@arm.com> wrote:
-> > On Fri, Jul 06, 2018 at 05:30:49PM -0700, Andrew Morton wrote:
-> > > On Tue, 19 Jun 2018 13:53:08 +0100 Will Deacon <will.deacon@arm.com> wrote:
-> > > 
-> > > > In preparation for implementing the asm-generic atomic bitops in terms
-> > > > of atomic_long_*, we need to prevent asm/atomic.h implementations from
-> > > > pulling in linux/bitops.h. A common reason for this include is for the
-> > > > BITS_PER_BYTE definition, so move this and some other BIT() and masking
-> > > > macros into a new header file, linux/bits.h
-> > > > 
-> > > > --- a/include/linux/bitops.h
-> > > > +++ b/include/linux/bitops.h
-> > > > @@ -2,29 +2,9 @@
-> > > >  #ifndef _LINUX_BITOPS_H
-> > > >  #define _LINUX_BITOPS_H
-> > > >  #include <asm/types.h>
-> > > > +#include <linux/bits.h>
-> > > >  
-> > > > -#ifdef	__KERNEL__
-> > > > -#define BIT(nr)			(1UL << (nr))
-> > > > -#define BIT_ULL(nr)		(1ULL << (nr))
-> > > > -#define BIT_MASK(nr)		(1UL << ((nr) % BITS_PER_LONG))
-> > > > -#define BIT_WORD(nr)		((nr) / BITS_PER_LONG)
-> > > > -#define BIT_ULL_MASK(nr)	(1ULL << ((nr) % BITS_PER_LONG_LONG))
-> > > > -#define BIT_ULL_WORD(nr)	((nr) / BITS_PER_LONG_LONG)
-> > > > -#define BITS_PER_BYTE		8
-> > > >  #define BITS_TO_LONGS(nr)	DIV_ROUND_UP(nr, BITS_PER_BYTE * sizeof(long))
-> > > > -#endif
-> > > 
-> > > Why does it leave BITS_TO_LONGS() in place?
-> > > 
-> > > That becomes unfortunate with Chris's patch, so I'm moving
-> > > BITS_TO_LONGS() into bits.h.
-> > 
-> > The reason I avoided that was because it would pull in the dreaded
-> > kernel.h for DIV_ROUND_UP, and then we're back to circular include hell :(
-> > 
+On Monday, July 9, 2018 1:38:38 PM CEST Ulf Hansson wrote:
+> On 9 July 2018 at 12:06, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> > On Monday, July 2, 2018 9:08:06 AM CEST Viresh Kumar wrote:
+> >> On 29-06-18, 13:04, Ulf Hansson wrote:
+> >> > Recently we added support to manage multiple PM domains per device. Consumer
+> >> > drivers were provided an API, dev_pm_domain_attach_by_id() to associate its
+> >> > device with one of its PM domain, by using an index.
+> >> >
+> >> > Let's extend this to allow the association to be done using a name based
+> >> > lookup, which follows the similar concept as for other resource types, such as
+> >> > clocks for example.
+> >> >
+> >> > Ulf Hansson (3):
+> >> >   PM / Domains: dt: Add a power-domain-names property
+> >> >   PM / Domains: Introduce option to attach a device by name to genpd
+> >> >   PM / Domains: Introduce dev_pm_domain_attach_by_name()
+> >>
+> >> Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
+> >>
+> >>
+> >
+> > Do we need Rob to ACK the binding change?
+> >
 > 
-> Well we should comment that so every reader doesn't wonder what I
-> wondered.
+> Normally, yes, however, the change to binding is trivial and the
+> concept of using a names property isn't something new. I would be
+> highly surprised if he would object.
 > 
-> Refactoring works well.  I suppose DIV_ROUND_UP and friends await a new
-> <arithmacros.h>.
+> I say apply it.
 
-Yes; pulling apart kernel.h would certainly help solve some of the fragility
-here.
+OK, applied along with the other two.
 
-> Also, all these macros no longer `#ifdef __KERNEL__' protection, which
-> wasn't mentioned in the changelog.  Deliberate?
-
-Yes, these aren't under uapi/ so I dropped the guards now that they're not
-needed (my understanding is that they're only there because of the way the
-uapi split was originally scripted). I can also confirm that the generated
-user headers match exactly with and without my changes.
-
-Will
+Thanks!
