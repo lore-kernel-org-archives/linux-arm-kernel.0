@@ -1,55 +1,73 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 11 Jul 2018 11:47:20 +0100
-Subject: [PATCHv4 00/19] arm64: invoke syscalls with pt_regs
-In-Reply-To: <20180710103901.GA31318@arm.com>
-References: <20180702110415.10465-1-mark.rutland@arm.com>
- <20180710103901.GA31318@arm.com>
-Message-ID: <20180711104720.3h65gkbsphaugqht@lakrids.cambridge.arm.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 11 Jul 2018 11:55:23 +0100
+Subject: [PATCH] arm64: neon: Fix function may_use_simd() return error
+ status
+In-Reply-To: <1531271399-1768-1-git-send-email-yandong77520@gmail.com>
+References: <1531271399-1768-1-git-send-email-yandong77520@gmail.com>
+Message-ID: <20180711105523.GL9486@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 10, 2018 at 11:39:02AM +0100, Will Deacon wrote:
-> On Mon, Jul 02, 2018 at 12:03:56PM +0100, Mark Rutland wrote:
-> > This series reworks arm64's syscall handling to minimize the propagation
-> > of user-controlled register values into speculated code paths. As with
-> > x86 [1], a wrapper is generated for each syscall, which extracts the
-> > argument from a struct pt_regs. During kernel entry from userspace,
-> > registers are zeroed.
-> > 
-> > The arm64 kernel code directly invokes some syscalls which the x86 code
-> > doesn't, so I've added ksys_* wrappers for these, following the x86
-> > example. The rest of the series is arm64-specific.
-> > 
-> > I've pushed the series out to my arm64/syscall-regs branch [2] on
-> > kernel.org.
+On Wed, Jul 11, 2018 at 09:09:59AM +0800, Yandong.Zhao wrote:
+> From: Yandong Zhao <yandong77520@gmail.com>
 > 
-> One thing I noticed with this series applied is that our sys_call_table
-> declarations all get a bit muddled:
+> It does not matter if the caller of may_use_simd() migrates to
+> another cpu after the call, but it is still important that the
+> kernel_neon_busy percpu instance that is read matches the cpu the
+> task is running on at the time of the read.
 > 
-> arm64/kernel/sys.c:		void * const sys_call_table[]
-> arm64/kernel/sys32.c:		void * const compat_sys_call_table[]
-> arm64/kernel/syscall.c:		extern syscall_fn_t sys_call_table[];
-> 				extern syscall_fn_t compat_sys_call_table[];
-> arm64/include/asm/syscall.h:	extern const void *sys_call_table[];
+> This means that raw_cpu_read() is not sufficient.  kernel_neon_busy
+> may appear true if the caller migrates during the execution of
+> raw_cpu_read() and the next task to be scheduled in on the initial
+> cpu calls kernel_neon_begin().
 > 
-> Can we tidy this up so that syscall.h provides a declaration using
-> syscall_fn_t, allowing us to drop the additional externs?
+> This patch replaces raw_cpu_read() with this_cpu_read() to protect
+> against this race.
+> 
+> Signed-off-by: Yandong Zhao <yandong77520@gmail.com>
 
-Sure; done.
+Looks ok to me.  You can add the following tags:
 
-As a result, I've had to fold a few more consts into function prototypes
-in subsequent patches, but that's probably a good thing.
+Fixes: cb84d11e1625 ("arm64: neon: Remove support for nested or hardirq kernel-mode NEON")
+Reviewed-by: Dave Martin <Dave.Martin@arm.com>
 
-This also makes me realise that once the generation of the table address
-is converted to C, we can drop the alignment on the tables. That was
-solely to simplify the asm invoking the syscall, allowing it to generate
-the address with an adrp. The C code never relied on this, since the
-alignment was not in the declaration of the tables.
 
-I've spun an additional patch for that, too.
+Cheers
+---Dave
 
-I've pushed hte result out to my arm64/syscall-regs branch. I guess I'll
-post a v5 once that's seen some testing.
 
-Thanks,
-Mark.
+> ---
+>  arch/arm64/include/asm/simd.h | 5 +++--
+>  1 file changed, 3 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/simd.h b/arch/arm64/include/asm/simd.h
+> index fa8b3fe..784a8c2 100644
+> --- a/arch/arm64/include/asm/simd.h
+> +++ b/arch/arm64/include/asm/simd.h
+> @@ -29,7 +29,8 @@
+>  static __must_check inline bool may_use_simd(void)
+>  {
+>  	/*
+> -	 * The raw_cpu_read() is racy if called with preemption enabled.
+> +	 * The this_cpu_read() is racy if called with preemption enabled,
+> +	 * since the task may subsequently migrate to another CPU.
+>  	 * This is not a bug: kernel_neon_busy is only set when
+>  	 * preemption is disabled, so we cannot migrate to another CPU
+>  	 * while it is set, nor can we migrate to a CPU where it is set.
+> @@ -42,7 +43,7 @@ static __must_check inline bool may_use_simd(void)
+>  	 * false.
+>  	 */
+>  	return !in_irq() && !irqs_disabled() && !in_nmi() &&
+> -		!raw_cpu_read(kernel_neon_busy);
+> +		!this_cpu_read(kernel_neon_busy);
+>  }
+>  
+>  #else /* ! CONFIG_KERNEL_MODE_NEON */
+> -- 
+> 1.9.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
