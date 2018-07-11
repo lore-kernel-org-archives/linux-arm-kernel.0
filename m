@@ -1,153 +1,314 @@
 From: andrew@aj.id.au (Andrew Jeffery)
-Date: Wed, 11 Jul 2018 15:01:20 +0930
-Subject: [RFC PATCH v2 2/4] Documentation: ABI: Add
- sysfs-devices-platform-field to testing
+Date: Wed, 11 Jul 2018 15:01:19 +0930
+Subject: [RFC PATCH v2 1/4] dt-bindings: misc: Add bindings for misc. BMC
+ control fields
 In-Reply-To: <20180711053122.30773-1-andrew@aj.id.au>
 References: <20180711053122.30773-1-andrew@aj.id.au>
-Message-ID: <20180711053122.30773-3-andrew@aj.id.au>
+Message-ID: <20180711053122.30773-2-andrew@aj.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Fields" expose control of hardware directly to userspace where
-appropriate. Examples of expected use are single bit switches or other
-small masks of registers where the range of values is entirely policy
-driven and the field is not part of a larger, coherent design.
+Baseboard Management Controllers (BMCs) are embedded SoCs that exist to
+provide remote management of (primarily) server platforms. BMCs are
+often tightly coupled to the platform in terms of behaviour and provide
+many hardware features integral to booting and running the host system.
 
-These fields can be from read-only, read-write or
-write-1-set/write-1-clear register sets.
+Some of these hardware features are simple, for example scratch
+registers provided by the BMC that are exposed to both the host and the
+BMC. In other cases there's a single bit switch to enable or disable
+some of the provided functionality.
 
-Using fields to control the behaviour of hardware local to the kernel
-exposing them is likely incorrect. The use-case motivating the fields
-feature is for Baseboard Management Controllers (BMCs) to expose policy
-controls for booting and running their host systems.
+The documentation defines bindings for fields in registers that do not
+integrate well into other driver models yet must be described to allow
+the BMC kernel to assume control of these features.
 
 Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
 ---
 
 Since RFC v1:
 
-* Describe a 'type' attribute that determines the behaviour of the remaining
-  attributes
-* Rework paths to point through /sys/devices/platform
-* Add a description to the commit message
+* Add a commit message
+* Minor changes to documented labels
 
- .../ABI/testing/sysfs-devices-platform-field  | 95 +++++++++++++++++++
- MAINTAINERS                                   |  1 +
- 2 files changed, 96 insertions(+)
- create mode 100644 Documentation/ABI/testing/sysfs-devices-platform-field
+ .../bindings/misc/bmc-misc-ctrl.txt           | 252 ++++++++++++++++++
+ MAINTAINERS                                   |   6 +
+ 2 files changed, 258 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/misc/bmc-misc-ctrl.txt
 
-diff --git a/Documentation/ABI/testing/sysfs-devices-platform-field b/Documentation/ABI/testing/sysfs-devices-platform-field
+diff --git a/Documentation/devicetree/bindings/misc/bmc-misc-ctrl.txt b/Documentation/devicetree/bindings/misc/bmc-misc-ctrl.txt
 new file mode 100644
-index 000000000000..216481d8bc99
+index 000000000000..2c869fcc7ef2
 --- /dev/null
-+++ b/Documentation/ABI/testing/sysfs-devices-platform-field
-@@ -0,0 +1,95 @@
-+This document defines the sysfs attributes provided by the bmc-misc-ctrl
-+driver. See Documentation/devicetree/bindings/misc/bmc-misc-ctrl.txt for
-+exhaustive list of field definitions.
++++ b/Documentation/devicetree/bindings/misc/bmc-misc-ctrl.txt
+@@ -0,0 +1,252 @@
++BMC Miscellaneous Control Interfaces
++====================================
 +
-+What:		/sys/devices/platform/.../<field>/<label>/label
-+Date:		July, 2018
-+KernelVersion:	v4.19
-+Contact:	openbmc at lists.ozlabs.org
-+Description:
-+		An RO attribute providing the name of the field of interest.
-+		Corresponds to the value of <label> in the path
-+Users:		openbmc at lists.ozlabs.org
++Baseboard Management Controllers (BMCs) often have an array of hardware
++features that need to be described but are awkward to sensibly expose.
 +
-+What:		/sys/devices/platform/.../<field>/<label>/type
-+Date:		July, 2018
-+KernelVersion:	v4.19
-+Contact:	openbmc at lists.ozlabs.org
-+Description:
-+		An RO attribute describing the type of the field. The type
-+		takes one of three values:
++This bindings document provides a generic mechanism for describing such
++features, covering read-only (RO), read-modify-write (RMW) and
++write-1-set/write-1-clear (W1SC) semantics.
 +
-+		'ro':	The field is read-only. The 'value' attribute will be
-+			read-only and neither 'set' nor 'clear' attributes will
-+			be present.
-+		'rw':	The field is read-write. The 'value' attribute will be
-+			both readable and writable and neither 'set' nor
-+			'clear' attributes will be present. Values written to
-+			the 'value' attribute will be atomically updated.
-+		'w1sc':	The field uses write-1-{set,clear} semantics. The
-+			'value' attribute will be read-only, and both 'set' and
-+			'clear' attributes will be present to manipulate
-+			'value'. 'set' and 'clear' will both be write-only.
-+Users:		openbmc at lists.ozlabs.org
++All uses of bmc-misc-ctrl must be documented under Valid Uses below.
 +
-+What:		/sys/devices/platform/.../<field>/<label>/mask
-+Date:		July, 2018
-+KernelVersion:	v4.19
-+Contact:	openbmc at lists.ozlabs.org
-+Description:
-+		An RO attribute providing the mask applied to the value
-+		read/written from the 'value' attribute.
-+Users:		openbmc at lists.ozlabs.org
++The bindings are similar in nature to register-bit-led.
 +
-+What:		/sys/devices/platform/.../<field>/<label>/value
-+Date:		July, 2018
-+KernelVersion:	v4.19
-+Contact:	openbmc at lists.ozlabs.org
-+Description:
-+		The value of the field of interest.
++Required Properties
++-------------------
 +
-+		If the field is exposed from a read-modify-write register this
-+		attribute will be RW, where writes will set the field to the
-+		value written. Writing values that exceed the width of the
-+		field will return an error.
++compatible: 	Must be "bmc-misc-ctrl"
++offset:		A one or three cell property describing the registers
++		associated with the field.
 +
-+		If the field is exposed from a write-1-set/write-1-clear
-+		register this attribute will be RO, and the attributes 'set'
-+		and 'clear' will be present as write-only.
-+Users:		openbmc at lists.ozlabs.org
++		If the optional property 'set-clear' is not present then the
++		node describes a register with read-modify-write semantics. The
++		offset property has one cell describing the register of
++		interest.
 +
-+What:		/sys/devices/platform/.../<field>/<label>/set
-+Users:		openbmc at lists.ozlabs.org
-+Date:		July, 2018
-+KernelVersion:	v4.19
-+Contact:	openbmc at lists.ozlabs.org
-+Description:
-+		A WO attribute that when written will set bits in the backing
-+		register corresponding to set bits in the value written.
-+		Register bits corresponding to cleared bits in the written
-+		value will remain unchanged.
++		If the optional property 'set-clear' is present then the node
++		describes a register set that together implement read,
++		write-1-set and write-1-clear semantics. The offset property
++		must be three cells, the first is the address of the register
++		to read from, the second the write-1-set register and the third
++		write-1-clear.
 +
-+		This attribute is exposed when the field is identified as being
-+		composed of write-1-set and write-1-clear registers.
++mask: 		A mask whose set bits represent the bits of the field.
++label:		The name of the field
 +
-+		Writing values that exceed the width of the mask value will
-+		return an error.
-+Users:		openbmc at lists.ozlabs.org
++Optional Properties
++-------------------
 +
-+What:		/sys/devices/platform/.../<field>/<label>/clear
-+Users:		openbmc at lists.ozlabs.org
-+Date:		July, 2018
-+KernelVersion:	v4.19
-+Contact:	openbmc at lists.ozlabs.org
-+Description:
-+		A WO attribute that when written will clear bits in the backing
-+		register corresponding to set bits in the value written.
-+		Register bits corresponding to cleared bits in the written
-+		value will remain unchanged.
++read-only:	Define a read-only field (RMW/W1SC irrelevant).
++set-clear:	Define whether the field exists in a RMW or W1SC register set
++default-value:	Single cell applicable to RMW. The field will be updated to the
++		cell's value.
++default-set:	For W1SC, set all bits in the field
++default-clear:	For W1SC, clear all bits in the field
 +
-+		This attribute is exposed when the field is identified as being
-+		composed of write-1-set and write-1-clear registers.
++Valid Uses
++----------
 +
-+		Writing values that exceed the width of the mask value will
-+		return an error.
-+Users:		openbmc at lists.ozlabs.org
++Description:	Control bit for switching the video display DAC mux between
++		host VGA and BMC CRT mode
++Machines:	aspeed,ast2500
++Parent:		compatible = "aspeed,ast2500-scu", "syscon", "simple-mfd";
++Node:
++		field at 2c.16 {
++			compatible = "bmc-misc-ctrl";
++			offset = <0x2c>;
++			mask = <0x00030000>;
++			label = "dac-mux";
++		};
++
++Description:	Host VGA scratch registers
++Machines:	aspeed,ast2500
++Parent:		compatible = "aspeed,ast2500-scu", "syscon", "simple-mfd";
++Node:
++		field at 50.0 {
++			compatible = "bmc-misc-ctrl";
++			offset = <0x50>;
++			mask = <0xffffffff>;
++			label = "vga0";
++			read-only;
++		};
++
++		field at 54.0 {
++			compatible = "bmc-misc-ctrl";
++			offset = <0x54>;
++			mask = <0xffffffff>;
++			label = "vga1";
++			read-only;
++		};
++
++		field at 58.0 {
++			compatible = "bmc-misc-ctrl";
++			offset = <0x58>;
++			mask = <0xffffffff>;
++			label = "vga2";
++			read-only;
++		};
++
++		field at 5c.0 {
++			compatible = "bmc-misc-ctrl";
++			offset = <0x5c>;
++			mask = <0xffffffff>;
++			label = "vga3";
++			read-only;
++		};
++
++		field at 60.0 {
++			compatible = "bmc-misc-ctrl";
++			offset = <0x60>;
++			mask = <0xffffffff>;
++			label = "vga4";
++			read-only;
++		};
++
++		field at 64.0 {
++			compatible = "bmc-misc-ctrl";
++			offset = <0x64>;
++			mask = <0xffffffff>;
++			label = "vga5";
++			read-only;
++		};
++
++		field at 68.0 {
++			compatible = "bmc-misc-ctrl";
++			offset = <0x68>;
++			mask = <0xffffffff>;
++			label = "vga6";
++			read-only;
++		};
++
++		field at 6c.0 {
++			compatible = "bmc-misc-ctrl";
++			offset = <0x6c>;
++			mask = <0xffffffff>;
++			label = "vga7";
++			read-only;
++		};
++
++Description:	Super I/O device scratch registers for host/BMC communication
++Machines:	aspeed,ast2500
++Parent:		compatible = "aspeed,ast2500-lpc-host", "simple-mfd", "syscon";
++		field at f0.24 {
++			compatible = "bmc-misc-ctrl";
++			offset = <0xf0 24 8>;
++			mask = <0xff000000>;
++			label = "sio2b";
++		};
++
++		field at f0.16 {
++			compatible = "bmc-misc-ctrl";
++			offset = <0xf0>;
++			mask = <0x00ff0000>;
++			label = "sio2a";
++		};
++
++		field at f0.8 {
++			compatible = "bmc-misc-ctrl";
++			offset = <0xf0>;
++			mask = <0x0000ff00>;
++			bit-shift = <8>;
++			label = "sio29";
++		};
++
++		field at f0.0 {
++			compatible = "bmc-misc-ctrl";
++			offset = <0xf0>;
++			mask = <0x000000ff>;
++			label = "sio28";
++		};
++
++		field at f4.24 {
++			compatible = "bmc-misc-ctrl";
++			offset = <0xf4>;
++			mask = <0xff000000>;
++			label = "sio2f";
++		};
++
++		field at f4.16 {
++			compatible = "bmc-misc-ctrl";
++			offset = <0xf4>;
++			mask = <0x00ff0000>;
++			label = "sio2e";
++		};
++
++		field at f4.8 {
++			compatible = "bmc-misc-ctrl";
++			offset = <0xf4>;
++			mask = <0x0000ff00>;
++			label = "sio2d";
++		};
++
++		field at f4.0 {
++			compatible = "bmc-misc-ctrl";
++			offset = <0xf4>;
++			mask = <0x000000ff>;
++			label = "sio2c";
++		};
++
++		field at f8.24 {
++			compatible = "bmc-misc-ctrl";
++			offset = <0xf8>;
++			mask = <0xff000000>;
++			read-only;
++			label = "sio23";
++		};
++
++		field at f8.16 {
++			compatible = "bmc-misc-ctrl";
++			offset = <0xf8>;
++			mask = <0x00ff0000>;
++			read-only;
++			label = "sio22";
++		};
++
++		field at f8.8 {
++			compatible = "bmc-misc-ctrl";
++			offset = <0xf8>;
++			mask = <0x0000ff00>;
++			read-only;
++			label = "sio21";
++		};
++
++		field at f8.0 {
++			compatible = "bmc-misc-ctrl";
++			offset = <0xf8>;
++			mask = <0x000000ff>;
++			read-only;
++			label = "sio20";
++		};
++
++		field at fc.24 {
++			compatible = "bmc-misc-ctrl";
++			offset = <0xfc>;
++			mask = <0xff000000>;
++			read-only;
++			label = "sio27";
++		};
++
++		field at fc.16 {
++			compatible = "bmc-misc-ctrl";
++			offset = <0xfc>;
++			mask = <0x00ff0000>;
++			read-only;
++			label = "sio26";
++		};
++
++		field at fc.8 {
++			compatible = "bmc-misc-ctrl";
++			offset = <0xfc>;
++			mask = <0x0000ff00>;
++			read-only;
++			label = "sio25";
++		};
++
++		field at fc.0 {
++			compatible = "bmc-misc-ctrl";
++			offset = <0xfc>;
++			mask = <0x000000ff>;
++			read-only;
++			label = "sio24";
++		};
 diff --git a/MAINTAINERS b/MAINTAINERS
-index fa2033a522f2..d167f0340c11 100644
+index 07d1576fc766..fa2033a522f2 100644
 --- a/MAINTAINERS
 +++ b/MAINTAINERS
-@@ -2741,6 +2741,7 @@ R:	Andrew Jeffery <andrew@aj.id.au>
- L:	openbmc at lists.ozlabs.org (moderated for non-subscribers)
- S:	Supported
- F:	Documentation/devicetree/bindings/misc/bmc-misc-ctrl.txt
-+F:	Documentation/ABI/testing/sysfs-devices-platform-field
+@@ -2736,6 +2736,12 @@ S:	Supported
+ F:	drivers/net/bonding/
+ F:	include/uapi/linux/if_bonding.h
  
++BMC MISCELLANEOUS CONTROL FIELDS
++R:	Andrew Jeffery <andrew@aj.id.au>
++L:	openbmc at lists.ozlabs.org (moderated for non-subscribers)
++S:	Supported
++F:	Documentation/devicetree/bindings/misc/bmc-misc-ctrl.txt
++
  BPF (Safe dynamic programs and tools)
  M:	Alexei Starovoitov <ast@kernel.org>
+ M:	Daniel Borkmann <daniel@iogearbox.net>
 -- 
 2.17.1
