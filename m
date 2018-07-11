@@ -1,100 +1,63 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Wed, 11 Jul 2018 22:18:44 +0800
-Subject: [linux-sunxi] [PATCH 2/2] ARM: sun8i: h3: add SY8113B regulator
- on Banana Pi M2 Zero board
-In-Reply-To: <CAGb2v65C=gQtkNUX4pV5wudWUPf3hLNnGuxgB48xq=d7nH9qxA@mail.gmail.com>
-References: <20180711134450.43148-1-icenowy@aosc.io>
- <CAGb2v65C=gQtkNUX4pV5wudWUPf3hLNnGuxgB48xq=d7nH9qxA@mail.gmail.com>
-Message-ID: <9C53E8F0-C5F9-4730-AD72-1E6FA8793E4A@aosc.io>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 11 Jul 2018 14:56:53 +0100
+Subject: [PATCHv5 18/21] arm64: use {COMPAT,}SYSCALL_DEFINE0 for sigreturn
+In-Reply-To: <20180711135656.20670-1-mark.rutland@arm.com>
+References: <20180711135656.20670-1-mark.rutland@arm.com>
+Message-ID: <20180711135656.20670-19-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+We don't currently annotate our various sigreturn functions as syscalls,
+as we need to do to use pt_regs syscall wrappers.
 
+Let's mark them as real syscalls.
 
-? 2018?7?11? GMT+08:00 ??10:15:41, Chen-Yu Tsai <wens@csie.org> ??:
->Hi,
->
->On Wed, Jul 11, 2018 at 9:44 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
->> Banana Pi M2 Zero board has a SY8113B regulator, which is controlled
->via
->> GPIO and capable of outputing 1.1V when the PL1 GPIO is set to output
->0
->> or 1.1V when the PL6 GPIO is set to input or output 1, and the output
->is
->> the power supply of the ARM cores in H3 SoC.
->>
->> Add the device tree node of this regulator and set the cpu's
->cpu-supply
->> property to it.
->>
->> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
->> ---
->>  .../dts/sun8i-h2-plus-bananapi-m2-zero.dts    | 21
->+++++++++++++++++++
->>  1 file changed, 21 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/sun8i-h2-plus-bananapi-m2-zero.dts
->b/arch/arm/boot/dts/sun8i-h2-plus-bananapi-m2-zero.dts
->> index eb61dcf32797..abc8dc750f4b 100644
->> --- a/arch/arm/boot/dts/sun8i-h2-plus-bananapi-m2-zero.dts
->> +++ b/arch/arm/boot/dts/sun8i-h2-plus-bananapi-m2-zero.dts
->> @@ -59,6 +59,23 @@
->>                 };
->>         };
->>
->> +       reg_vdd_cpux: vdd-cpux-regulator {
->> +               compatible = "regulator-gpio";
->> +               regulator-name = "vdd-cpux";
->> +               regulator-type = "voltage";
->> +               regulator-boot-on;
->> +               regulator-always-on;
->> +               regulator-min-microvolt = <1100000>;
->> +               regulator-max-microvolt = <1300000>;
->> +               regulator-ramp-delay = <50>; /* 4ms */
->> +
->> +               gpios = <&r_pio 0 1 GPIO_ACTIVE_HIGH>; /* PL1 */
->> +               enable-active-high;
->> +               gpios-states = <0x1>;
->> +               states = <1100000 0x0
->
->So looking at the schematics with the resistor values, this calculates
->to roughly 1.108475 (0.6 * (1 + 10 / 11.8)) ...
->
->> +                         1300000 0x1>;
->
->and this to 1.308475.
+For compat_sys_sigreturn and compat_sys_rt_sigreturn, this changes the
+return type from int to long, matching the prototypes in sys32.c.
 
-But I think it cannot reach such accuracy, because of the
-error of component values and the error of the power voltage.
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Reviewed-by: Dominik Brodowski <linux@dominikbrodowski.net>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/kernel/signal.c   | 2 +-
+ arch/arm64/kernel/signal32.c | 4 ++--
+ 2 files changed, 3 insertions(+), 3 deletions(-)
 
-In addition, set it to a too accurate value may break the
-common opp table.
-
->
->ChenYu
->
->> +       };
->> +
->>         wifi_pwrseq: wifi_pwrseq {
->>                 compatible = "mmc-pwrseq-simple";
->>                 pinctrl-names = "default";
->> @@ -66,6 +83,10 @@
->>         };
->>  };
->>
->> +&cpu0 {
->> +       cpu-supply = <&reg_vdd_cpux>;
->> +};
->> +
->>  &de {
->>         status = "okay";
->>  };
->> --
->> 2.17.1
->>
->> --
->> You received this message because you are subscribed to the Google
->Groups "linux-sunxi" group.
->> To unsubscribe from this group and stop receiving emails from it,
->send an email to linux-sunxi+unsubscribe at googlegroups.com.
->> For more options, visit https://groups.google.com/d/optout.
+diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+index f03e664f773f..f8b0ba50e55e 100644
+--- a/arch/arm64/kernel/signal.c
++++ b/arch/arm64/kernel/signal.c
+@@ -539,7 +539,7 @@ static int restore_sigframe(struct pt_regs *regs,
+ 	return err;
+ }
+ 
+-asmlinkage long sys_rt_sigreturn(void)
++SYSCALL_DEFINE0(rt_sigreturn)
+ {
+ 	struct pt_regs *regs = current_pt_regs();
+ 	struct rt_sigframe __user *frame;
+diff --git a/arch/arm64/kernel/signal32.c b/arch/arm64/kernel/signal32.c
+index cb10588a7cb2..1948566dcccf 100644
+--- a/arch/arm64/kernel/signal32.c
++++ b/arch/arm64/kernel/signal32.c
+@@ -282,7 +282,7 @@ static int compat_restore_sigframe(struct pt_regs *regs,
+ 	return err;
+ }
+ 
+-asmlinkage int compat_sys_sigreturn(void)
++COMPAT_SYSCALL_DEFINE0(sigreturn)
+ {
+ 	struct pt_regs *regs = current_pt_regs();
+ 	struct compat_sigframe __user *frame;
+@@ -313,7 +313,7 @@ asmlinkage int compat_sys_sigreturn(void)
+ 	return 0;
+ }
+ 
+-asmlinkage int compat_sys_rt_sigreturn(void)
++COMPAT_SYSCALL_DEFINE0(rt_sigreturn)
+ {
+ 	struct pt_regs *regs = current_pt_regs();
+ 	struct compat_rt_sigframe __user *frame;
+-- 
+2.11.0
