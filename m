@@ -1,41 +1,68 @@
-From: joe@perches.com (Joe Perches)
-Date: Wed, 11 Jul 2018 10:10:03 -0700
-Subject: [PATCH] i2c: aspeed: Add newline characters into message
- printings.
-In-Reply-To: <2d2f2b2b-394a-506f-c870-33520335250b@linux.intel.com>
-References: <20180702211359.30585-1-jae.hyun.yoo@linux.intel.com>
- <CAFd5g443wTQJ+0hrprOV949Sr_nRnBGpNo3Wd01xFN4GW4K2Ng@mail.gmail.com>
- <2d2f2b2b-394a-506f-c870-33520335250b@linux.intel.com>
-Message-ID: <c13fc12e859f7bdb300f08ad805cdf6d7ec09f52.camel@perches.com>
+From: ray.jui@broadcom.com (Ray Jui)
+Date: Wed, 11 Jul 2018 10:11:38 -0700
+Subject: [PATCH -next] pinctrl: nsp: fix potential NULL dereference in
+ nsp_pinmux_probe()
+In-Reply-To: <6c133df2-7dc7-d58b-297a-c27b87e7edd3@arm.com>
+References: <1531312461-134547-1-git-send-email-weiyongjun1@huawei.com>
+ <7b4361a5-f757-179c-57b6-44359801baad@broadcom.com>
+ <6c133df2-7dc7-d58b-297a-c27b87e7edd3@arm.com>
+Message-ID: <c0163341-1445-76e2-644f-22cab0735f82@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2018-07-11 at 09:53 -0700, Jae Hyun Yoo wrote:
-> On 7/10/2018 10:42 PM, Brendan Higgins wrote:
-> > On Mon, Jul 2, 2018 at 2:14 PM Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com> wrote:
-> > > There are some log printing without a newline character. This
-> > > patch adds the missing newline characters.
-[]
-> > > diff --git a/drivers/i2c/busses/i2c-aspeed.c b/drivers/i2c/busses/i2c-aspeed.c
-[]
-> > > @@ -431,7 +431,7 @@ static bool aspeed_i2c_master_irq(struct aspeed_i2c_bus *bus)
-> > >           */
-> > >          if (bus->master_state == ASPEED_I2C_MASTER_START) {
-> > >                  if (unlikely(!(irq_status & ASPEED_I2CD_INTR_TX_ACK))) {
-> > > -                       pr_devel("no slave present at %02x", msg->addr);
-> > > +                       pr_devel("no slave present at %02x\n", msg->addr);
-> > 
-> > Unless something changed in the last couple versions of the kernel, this is the
-> > only line that actually changes anything. dev_* inserts a newline for every
-> > call.
 
-Not true.
 
-Any printk without KERN_CONT inserts a newline
-if the last character
-emitted is not a newline.
+On 7/11/2018 10:01 AM, Sudeep Holla wrote:
+> 
+> 
+> On 11/07/18 17:48, Ray Jui wrote:
+>>
+>>
+>> On 7/11/2018 5:34 AM, Wei Yongjun wrote:
+>>> platform_get_resource() may fail and return NULL, so we should
+>>> better check it's return value to avoid a NULL pointer dereference
+>>> a bit later in the code.
+>>>
+>>> This is detected by Coccinelle semantic patch.
+>>>
+>>> @@
+>>> expression pdev, res, n, t, e, e1, e2;
+>>> @@
+>>>
+>>> res = platform_get_resource(pdev, t, n);
+>>> + if (!res)
+>>> +?? return -EINVAL;
+>>> ... when != res == NULL
+>>> e = devm_ioremap_nocache(e1, res->start, e2);
+>>>
+>>> Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
+>>> ---
+>>
+>> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+>>
+>> Change looks good to me, although the check could have been avoided if
+>> 'devm_ioremap_resource' is used on the next line instead of
+>> 'devm_ioremap_nocache', where validation of resource pointer is done.
+>>
+>> But there's probably a reason why 'devm_ioremap_nocache' was used in
+>> this code here.
+>>
+> 
+> I am not sure about that. Both ARM and ARM64 has same definition as
+> ioremp. However, arch/arm/include/asm/io.h do mention:
+> "ioremap_nocache() is the same as ioremap() as there are too many device
+> 
+>   drivers using this for device registers, and documentation which tells
+> 
+>   people to use it for such for this to be any different."
+> 
+> You could technically use devm_ioremap_resource if you want.
+> 
 
-dev_<level> uses can also be followed by pr_cont.
+I did not mean the difference on _nocache, which I'm aware it's the same 
+on ARM/ARM64 based platforms.
 
-So this patch does reduce the possibility of
-interleaved messages from multiple processes.
+I meant there's a reason why xxx_resource was not used, which is most 
+likely due to some resource conflict with another driver on NSP.
+
+Ray
