@@ -1,165 +1,57 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Wed, 11 Jul 2018 16:05:40 +0100
-Subject: [PATCH v5 4/7] KVM: arm64: Support PUD hugepage in
- stage2_is_exec()
-In-Reply-To: <ccf6c6a1-9df7-25a7-67c9-3b323486b3e5@arm.com> (Suzuki
- K. Poulose's message of "Wed, 11 Jul 2018 14:41:29 +0100")
-References: <20180709143835.28971-1-punit.agrawal@arm.com>
- <20180709144124.29164-1-punit.agrawal@arm.com>
- <20180709144124.29164-4-punit.agrawal@arm.com>
- <ccf6c6a1-9df7-25a7-67c9-3b323486b3e5@arm.com>
-Message-ID: <87a7qxq0cb.fsf@e105922-lin.cambridge.arm.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 11 Jul 2018 12:09:15 -0300
+Subject: next/master boot: 184 boots: 13 failed, 171 passed (next-20180711)
+In-Reply-To: <20180711145253.GA9651@sirena.org.uk>
+References: <5b45f6df.1c69fb81.86409.6375@mx.google.com>
+ <20180711145253.GA9651@sirena.org.uk>
+Message-ID: <CAOMZO5B+LBwAEewEoCn=TojQuZ=qMt+4a8n+tiG9cfnzAta_9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Suzuki K Poulose <Suzuki.Poulose@arm.com> writes:
+Hi Mark,
 
-> On 09/07/18 15:41, Punit Agrawal wrote:
->> In preparation for creating PUD hugepages at stage 2, add support for
->> detecting execute permissions on PUD page table entries. Faults due to
->> lack of execute permissions on page table entries is used to perform
->> i-cache invalidation on first execute.
->>
->> Provide trivial implementations of arm32 helpers to allow sharing of
->> code.
->>
->> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
->> Cc: Christoffer Dall <christoffer.dall@arm.com>
->> Cc: Marc Zyngier <marc.zyngier@arm.com>
->> Cc: Russell King <linux@armlinux.org.uk>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> ---
->>   arch/arm/include/asm/kvm_mmu.h         |  6 ++++
->>   arch/arm64/include/asm/kvm_mmu.h       |  5 +++
->>   arch/arm64/include/asm/pgtable-hwdef.h |  2 ++
->>   virt/kvm/arm/mmu.c                     | 49 +++++++++++++++++++++++---
->>   4 files changed, 57 insertions(+), 5 deletions(-)
->>
->> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
->> index c23722f75d5c..d05c8986e495 100644
->> --- a/arch/arm/include/asm/kvm_mmu.h
->> +++ b/arch/arm/include/asm/kvm_mmu.h
->> @@ -96,6 +96,12 @@ static inline bool kvm_s2pud_readonly(pud_t *pud)
->>   }
->>     +static inline bool kvm_s2pud_exec(pud_t *pud)
->> +{
->> +	BUG();
->> +	return false;
->> +}
->> +
->>   static inline void kvm_set_pmd(pmd_t *pmd, pmd_t new_pmd)
->>   {
->>   	*pmd = new_pmd;
->> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
->> index 84051930ddfe..15bc1be8f82f 100644
->> --- a/arch/arm64/include/asm/kvm_mmu.h
->> +++ b/arch/arm64/include/asm/kvm_mmu.h
->> @@ -249,6 +249,11 @@ static inline bool kvm_s2pud_readonly(pud_t *pudp)
->>   	return kvm_s2pte_readonly((pte_t *)pudp);
->>   }
->>   +static inline bool kvm_s2pud_exec(pud_t *pudp)
->> +{
->> +	return !(READ_ONCE(pud_val(*pudp)) & PUD_S2_XN);
->> +}
->> +
->>   static inline bool kvm_page_empty(void *ptr)
->>   {
->>   	struct page *ptr_page = virt_to_page(ptr);
->> diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
->> index fd208eac9f2a..10ae592b78b8 100644
->> --- a/arch/arm64/include/asm/pgtable-hwdef.h
->> +++ b/arch/arm64/include/asm/pgtable-hwdef.h
->> @@ -193,6 +193,8 @@
->>   #define PMD_S2_RDWR		(_AT(pmdval_t, 3) << 6)   /* HAP[2:1] */
->>   #define PMD_S2_XN		(_AT(pmdval_t, 2) << 53)  /* XN[1:0] */
->>   +#define PUD_S2_XN		(_AT(pudval_t, 2) << 53)  /* XN[1:0]
->> */
->> +
->>   /*
->>    * Memory Attribute override for Stage-2 (MemAttr[3:0])
->>    */
->> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
->> index ed8f8271c389..e73909a31e02 100644
->> --- a/virt/kvm/arm/mmu.c
->> +++ b/virt/kvm/arm/mmu.c
->> @@ -1038,23 +1038,62 @@ static int stage2_set_pmd_huge(struct kvm *kvm, struct kvm_mmu_memory_cache
->>   	return 0;
->>   }
->>   -static bool stage2_is_exec(struct kvm *kvm, phys_addr_t addr)
->> +/*
->> + * stage2_get_leaf_entry - walk the stage2 VM page tables and return
->> + * true if a valid and present leaf-entry is found. A pointer to the
->> + * leaf-entry is returned in the appropriate level variable - pudpp,
->> + * pmdpp, ptepp.
->> + */
->> +static bool stage2_get_leaf_entry(struct kvm *kvm, phys_addr_t addr,
->> +				  pud_t **pudpp, pmd_t **pmdpp, pte_t **ptepp)
->>   {
->> +	pud_t *pudp;
->>   	pmd_t *pmdp;
->>   	pte_t *ptep;
+On Wed, Jul 11, 2018 at 11:52 AM, Mark Brown <broonie@kernel.org> wrote:
+> On Wed, Jul 11, 2018 at 05:23:59AM -0700, kernelci.org bot wrote:
 >
-> nit: As mentioned in the other thread, you may initialize the reference
-> pointers to NULL to make sure we start clean and avoid the initialization
-> everywhere this is called.
-
-I took the approach to not touch the pointers unless they are being
-assigned a valid pointer. I'll initialise the incoming pointers (p*dpp)
-before proceeding with the table walk.
-
-Thanks,
-Punit
-
+> Today's -next fails to boot on the Wandboards but only the i.MX
+> defconfg:
 >
->>   -	pmdp = stage2_get_pmd(kvm, NULL, addr);
->> +	pudp = stage2_get_pud(kvm, NULL, addr);
->> +	if (!pudp || pud_none(*pudp) || !pud_present(*pudp))
->> +		return false;
->> +
->> +	if (pud_huge(*pudp)) {
->> +		*pudpp = pudp;
->> +		return true;
->> +	}
->> +
->> +	pmdp = stage2_pmd_offset(pudp, addr);
->>   	if (!pmdp || pmd_none(*pmdp) || !pmd_present(*pmdp))
->>   		return false;
->>   -	if (pmd_thp_or_huge(*pmdp))
->> -		return kvm_s2pmd_exec(pmdp);
->> +	if (pmd_thp_or_huge(*pmdp)) {
->> +		*pmdpp = pmdp;
->> +		return true;
->> +	}
->>     	ptep = pte_offset_kernel(pmdp, addr);
->>   	if (!ptep || pte_none(*ptep) || !pte_present(*ptep))
->>   		return false;
->>   -	return kvm_s2pte_exec(ptep);
->> +	*ptepp = ptep;
->> +	return true;
->> +}
->> +
->> +static bool stage2_is_exec(struct kvm *kvm, phys_addr_t addr)
->> +{
->> +	pud_t *pudp = NULL;
->> +	pmd_t *pmdp = NULL;
->> +	pte_t *ptep = NULL;
->> +	bool found;
->> +
->> +	found = stage2_get_leaf_entry(kvm, addr, &pudp, &pmdp, &ptep);
->> +	if (!found)
->> +		return false;
->> +
->> +	if (pudp)
->> +		return kvm_s2pud_exec(pudp);
->> +	else if (pmdp)
->> +		return kvm_s2pmd_exec(pmdp);
->> +	else
->> +		return kvm_s2pte_exec(ptep);
->>   }
+>>     imx_v6_v7_defconfig:
+>>         imx6dl-wandboard_dual:
+>>             lab-baylibre-seattle: new failure (last pass: next-20180710)
+>>         imx6dl-wandboard_solo:
+>>             lab-baylibre-seattle: new failure (last pass: next-20180710)
+>>         imx6q-wandboard:
+>>             lab-baylibre-seattle: new failure (last pass: next-20180710)
 >
-> Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
+> multi_v7_defconfig is fine, there are some failures on other platforms
+> but not i.MX.  The failures happen at a very similar point but the
+> precise oops varies (one was an illegal instruction):
+>
+> | [    2.208738] caam 2100000.caam: job rings = 2, qi = 0
+> | [    2.227429] caam algorithms registered in /proc/crypto
+> | [    2.235409] Bad mode in data abort handler detected
+> | [    2.235433] caam_jr 2101000.jr0: job ring error: irqstate: 00000103
+> | [    2.240321] Internal error: Oops - bad mode: 0 [#1] SMP ARM
+> | [    2.252163] Modules linked in:
+>
+> Full log and more details for the base wandboard at:
+>
+>     https://kernelci.org/boot/id/5b45cf3b59b514f35b96ba95/
+
+This is caused by the following commit in linux-next:
+
+commit f9b6e485fa ("crypto: caam: cleanup CONFIG_64BIT ifdefs when
+using io{read|write}64")
+
+I have already reported this issue on a linux-next tree from last week
+and Stephen said he was going to drop such commit:
+https://patchwork.kernel.org/patch/10507333/
+
+but it reappeared today's linux-next.
+
+Stephen, Andrew
+
+Could you please drop it?
+
+Thanks
