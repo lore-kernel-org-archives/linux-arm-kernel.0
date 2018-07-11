@@ -1,69 +1,216 @@
-From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Wed, 11 Jul 2018 18:14:43 +0200
-Subject: [PATCH] ARM: at91: remove unnecessary
- of_platform_default_populate calls
-In-Reply-To: <CAL_JsqLfnSOgOMdaJU3Q4h5_PGnNgd4rx+vKXdFVZnNEo6+JZA@mail.gmail.com>
-References: <20180619214020.18608-1-robh@kernel.org>
- <CAL_JsqLfnSOgOMdaJU3Q4h5_PGnNgd4rx+vKXdFVZnNEo6+JZA@mail.gmail.com>
-Message-ID: <20180711161443.GY16084@piout.net>
+From: james.morse@arm.com (James Morse)
+Date: Wed, 11 Jul 2018 17:15:18 +0100
+Subject: [PATCH v3 5/5] arm64/mm: Move {idmap_pg_dir, swapper_pg_dir} to
+ .rodata section
+In-Reply-To: <20180702111659.25570-6-yaojun8558363@gmail.com>
+References: <20180702111659.25570-1-yaojun8558363@gmail.com>
+ <20180702111659.25570-6-yaojun8558363@gmail.com>
+Message-ID: <daaef987-6fff-3720-9881-97fe06b2ee88@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Yun,
 
-On 09/07/2018 09:50:47-0600, Rob Herring wrote:
-> On Tue, Jun 19, 2018 at 3:40 PM Rob Herring <robh@kernel.org> wrote:
-> >
-> > The DT core will call of_platform_default_populate, so it is not
-> > necessary for machine specific code to call it unless there are custom
-> > match entries, auxdata or parent device. Neither of those apply here, so
-> > remove the call.
-> >
-> > Cc: Nicolas Ferre <nicolas.ferre@microchip.com>
-> > Cc: Alexandre Belloni <alexandre.belloni@bootlin.com>
-> > Cc: linux-arm-kernel at lists.infradead.org
-> > Signed-off-by: Rob Herring <robh@kernel.org>
-> > ---
-> >  arch/arm/mach-at91/at91rm9200.c | 5 -----
-> >  arch/arm/mach-at91/at91sam9.c   | 5 -----
-> >  arch/arm/mach-at91/sama5.c      | 5 -----
-> >  3 files changed, 15 deletions(-)
-> 
-> Ping?
-> 
+On 02/07/18 12:16, Jun Yao wrote:
+> Move {idmap_pg_dir, swapper_pg_dir} to .rodata section and
 
-This breaks the platform in two different ways:
- - PM is not working anymore because of the missing SRAM node
- - the pinctrl driver fails to probe and so many drivers are
-   deferring the probe forever
+> populate swapper_pg_dir by fixmap.
 
-Relevant messages (once the earlycon crap is removed to let earlyprintk
-do its job):
-
-at91_pm_sram_init: failed to find sram device!
-AT91: PM not supported, due to no SRAM allocated
-
-pinctrl-at91 ahb:apb:pinctrl at fc06a000: you need to specify at least one gpio-controller
-pinctrl-at91: probe of ahb:apb:pinctrl at fc06a000 failed with error -22
-gpio-at91 fc06a000.gpio: at address (ptrval)
-gpio-at91 fc06b000.gpio: at address (ptrval)
-gpio-at91 fc06c000.gpio: at address (ptrval)
-gpio-at91 fc068000.gpio: at address (ptrval)
-gpio-at91 fc06d000.gpio: at address (ptrval)
-
-at91_i2c f8014000.i2c: could not find pctldev for node /ahb/apb/pinctrl at fc06a000/i2c0/i2c0-0, deferring probe
-atmel_usart f8004000.serial: could not find pctldev for node /ahb/apb/pinctrl at fc06a000/uart0/uart0-0, deferring probe
-atmel_usart fc00c000.serial: could not find pctldev for node /ahb/apb/pinctrl at fc06a000/usart3/usart3-0, deferring probe
-atmel_usart fc010000.serial: could not find pctldev for node /ahb/apb/pinctrl at fc06a000/usart4/usart4-0, deferring probe
-atmel_spi f8010000.spi: could not find pctldev for node /ahb/apb/pinctrl at fc06a000/spi0/spi0-0, deferring probe
-atmel_spi fc018000.spi: could not find pctldev for node /ahb/apb/pinctrl at fc06a000/spi1/spi1-0, deferring probe
-macb f8020000.ethernet: could not find pctldev for node /ahb/apb/pinctrl at fc06a000/macb0/macb0_rmii-0, deferring probe
-atmel_mci fc000000.mmc: could not find pctldev for node /ahb/apb/pinctrl at fc06a000/mmc1/mmc1_clk_cmd_dat0, deferring probe
-at91_adc fc034000.adc: could not find pctldev for node /ahb/apb/pinctrl at fc06a000/adc0/adc0_ad0, deferring probe
-gpio-keys gpio_keys: could not find pctldev for node /ahb/apb/pinctrl at fc06a000/board/key_gpio_0, deferring probe
+(any chance you could split the fixmap bits into a separate patch so that the
+rodata move comes last? This will make review and bisecting any problems easier.)
 
 
--- 
-Alexandre Belloni, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+> diff --git a/arch/arm64/include/asm/pgalloc.h b/arch/arm64/include/asm/pgalloc.h
+> index 2e05bcd944c8..a0ce7d0f81c5 100644
+> --- a/arch/arm64/include/asm/pgalloc.h
+> +++ b/arch/arm64/include/asm/pgalloc.h
+> @@ -29,6 +29,23 @@
+>  #define PGALLOC_GFP	(GFP_KERNEL | __GFP_ZERO)
+>  #define PGD_SIZE	(PTRS_PER_PGD * sizeof(pgd_t))
+>  
+> +static inline int in_swapper_dir(void *addr)
+> +{
+> +	if ((unsigned long)addr >= (unsigned long)swapper_pg_dir &&
+> +		(unsigned long)addr < (unsigned long)swapper_pg_end) {
+> +		return 1;
+> +	}
+> +	return 0;
+> +}
+
+Making this a bool and returning the condition feels more natural.
+
+We know swapper_pg_dir and swapper_pg_end are both page aligned, if we can tell
+the compiler, it can generate better code. Something like:
+| return ((long)addr & PAGE_MASK) == ((long)swapper_pg_dir & PAGE_MASK);
+
+(if you agree its the same)
+
+
+> +static inline void *swapper_mirror_addr(void *start, void *addr)
+> +{
+> +	unsigned long offset;
+> +
+> +	offset = (unsigned long)addr - (unsigned long)swapper_pg_dir;
+> +	return start + offset;
+> +}
+
+I think you've re-invented __set_fixmap_offset, ...
+
+
+>  #if CONFIG_PGTABLE_LEVELS > 2
+>  
+>  static inline pmd_t *pmd_alloc_one(struct mm_struct *mm, unsigned long addr)
+> @@ -49,6 +66,17 @@ static inline void __pud_populate(pud_t *pudp, phys_addr_t pmdp, pudval_t prot)
+>  
+>  static inline void pud_populate(struct mm_struct *mm, pud_t *pudp, pmd_t *pmdp)
+>  {
+> +#ifdef __PAGETABLE_PUD_FOLDED
+> +	if ((mm == &init_mm) && in_swapper_dir(pudp)) {
+> +		pud_t *pud;
+
+> +		pud = pud_set_fixmap(__pa_symbol(swapper_pg_dir));
+> +		pud = (pud_t *)swapper_mirror_addr(pud, pudp);
+
+This is calculating the corresponding pudp in the fixmap mapping of swapper.
+If you give pud_set_fixmap() the physical address of the original pudp it will
+calculate this for you.
+
+I think this could fold down to something like:
+|	pud_t *fixmap_pudp = pud_set_fixmap(__kimg_to_phys((long)pudp));
+
+(please check I've dug through all that properly!)
+
+
+On a wider issue: these p?d_populate() helpers only put table entries down,
+these are used by vmalloc(). Unfortunately ioremap() will try to add block
+mappings if it can, which don't use this helper. (bits and pieces for testing
+this in [0]). Systems with nvdimms probably do this all the time...
+
+We could add the same in_swapper_dir() tests and fixmap operations to
+p?d_set_huge(), but it may be worth pushing them down to set_p?d(), which is
+where all these paths join up. This would also cover pgd_clear(), which is
+called via p?d_none_or_clear_bad().
+
+
+I think we should do something about concurrent calls. Today that ~should work,
+providing they aren't modifying the same locations, but with these changes both
+CPUs would try and clear_fixmap()/tlbi the range from underneath each other.
+
+The p?d_alloc() helpers take the mm lock around the p?d_populate() calls, but it
+doesn't look like there is any other lock for the ioremap work calling
+p?d_set_huge(), so we will need one of our own, especially for
+p?d_none_or_clear_bad().
+
+
+> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+> index 3b408f21fe2e..b479d1b997c2 100644
+> --- a/arch/arm64/include/asm/pgtable.h
+> +++ b/arch/arm64/include/asm/pgtable.h
+> @@ -475,6 +475,9 @@ static inline phys_addr_t pmd_page_paddr(pmd_t pmd)
+>   */
+>  #define mk_pte(page,prot)	pfn_pte(page_to_pfn(page),prot)
+>  
+> +#define pmd_set_fixmap(addr)		((pmd_t *)set_fixmap_offset(FIX_PMD, addr))
+> +#define pmd_clear_fixmap()		clear_fixmap(FIX_PMD)
+> +
+
+Ooer, we shouldn't need to move these around. If they're wrong, it should be the
+subject of a separate patch, but its more likely we're using the wrong ones...
+
+
+> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+> index d69e11ad92e3..beff018bf0f9 100644
+> --- a/arch/arm64/kernel/vmlinux.lds.S
+> +++ b/arch/arm64/kernel/vmlinux.lds.S
+> @@ -223,21 +223,25 @@ SECTIONS
+>  	BSS_SECTION(0, 0, 0)
+>  
+>  	. = ALIGN(PAGE_SIZE);
+> -	idmap_pg_dir = .;
+> -	. += IDMAP_DIR_SIZE;
+> +
+> +	.rodata : {
+
+Now I'm confused. I thought this named section was output by RO_DATA() further
+up, just before __init_begin, which mark_rodata_ro() uses as its end marker.
+I thought named sections had to be unique.
+
+Are we expecting the linker to realise we want it to move this stuff up there,
+and not move the read-only contents down here, outside the markers. (maybe the
+linker always takes the first definition?)
+
+Can we move these to sit near INIT_DIR/INIT_PG_TABLES as a macro, which we then
+put after NOTES? (something like KERNEL_PG_TABLES?)
+
+
+Thanks!
+
+James
+
+
+
+[0] abuse kdump to give us a 1G naturally aligned block of memory that is
+missing from the linear map. We can memremap() this, and get a top-level block
+entry on !4-level systems. Do this late enough  Add 'crashdump=1G' to your cmdline
+----------------------%<----------------------
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index 325cfb3b858a..081d4e216067 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -20,6 +20,7 @@
+ #include <linux/kernel.h>
+ #include <linux/export.h>
+ #include <linux/errno.h>
++#include <linux/io.h>
+ #include <linux/swap.h>
+ #include <linux/init.h>
+ #include <linux/bootmem.h>
+@@ -104,7 +105,7 @@ static void __init reserve_crashkernel(void)
+        if (crash_base == 0) {
+                /* Current arm64 boot protocol requires 2MB alignment */
+                crash_base = memblock_find_in_range(0, ARCH_LOW_ADDRESS_LIMIT,
+-                               crash_size, SZ_2M);
++                               crash_size, SZ_1G);
+                if (crash_base == 0) {
+                        pr_warn("cannot allocate crashkernel (size:0x%llx)\n",
+                                crash_size);
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 955b40efcc0c..f8cca5adb0c8 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -485,12 +485,22 @@ static void __init map_mem(pgd_t *pgdp)
+                __map_memblock(pgdp, crashk_res.start, crashk_res.end + 1,
+                               PAGE_KERNEL,
+                               NO_BLOCK_MAPPINGS | NO_CONT_MAPPINGS);
+-               memblock_clear_nomap(crashk_res.start,
+-                                    resource_size(&crashk_res));
+        }
+ #endif
+ }
+
++#ifdef CONFIG_KEXEC_CORE
++static void hack__remap_kdump_region(void)
++{
++       size_t size = crashk_res.end - crashk_res.start;
++
++       if (!crashk_res.end)
++               return;
++
++       memremap((unsigned long)crashk_res.start, size, MEMREMAP_WB);
++}
++#endif
++ void mark_rodata_ro(void)
+ {
+        unsigned long section_size;
+@@ -504,6 +514,10 @@ void mark_rodata_ro(void)
+                            section_size, PAGE_KERNEL_RO);
+
+        debug_checkwx();
++
++#ifdef CONFIG_KEXEC_CORE
++       hack__remap_kdump_region();
++#endif
+ }
+
+ static void __init map_kernel_segment(pgd_t *pgdp, void *va_start, void *va_end,
+----------------------%<----------------------
