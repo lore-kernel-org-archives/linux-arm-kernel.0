@@ -1,182 +1,31 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Wed, 11 Jul 2018 10:34:46 +0200
-Subject: [PATCH v2] arm64: hikey960: update idle-states
-Message-ID: <1531298086-8375-1-git-send-email-vincent.guittot@linaro.org>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Wed, 11 Jul 2018 10:35:08 +0200
+Subject: [PATCH v5 06/22] soc: sunxi: sram: Add dt match for the A10
+ system-control compatible
+In-Reply-To: <20180710080114.31469-7-paul.kocialkowski@bootlin.com>
+References: <20180710080114.31469-1-paul.kocialkowski@bootlin.com>
+ <20180710080114.31469-7-paul.kocialkowski@bootlin.com>
+Message-ID: <20180711083508.je6qfwzabera2lxm@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update entry/exit latency and residency time of hikey960 to use more
-realistic figures based on unitary tests done on the platform.
+On Tue, Jul 10, 2018 at 10:00:58AM +0200, Paul Kocialkowski wrote:
+> This binds the new A10 system-control compatible to the associated
+> driver, with the same driver data as the previous compatible.
+> 
+> Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 
-The complete results (in us) :
-                  big cluster
-                  cluster  CPU
-max entry latency     800  400
-max exit latency     2900  550
-residency  903Mhz    5000 1500
-residency 2363Mhz       0 1500
+Applied, thanks!
+Maxime
 
-                  little cluster
-                  cluster  CPU
-max entry latency     500  400
-max exit latency     1600  650
-residency  533Mhz    8000 4500
-residency 1844Mhz       0 1500
-
-We can see that the residency time depends of the running OPP which is not
-handled for now. Then we also have to take into account the constraint of
-a residency time shorter than the tick to get full advantage of idle loop
-reordering(tick is stopped if idle duration is higher than tick period).
-Finally the selected residency value are :
-                 big cluster
-                  cluster  CPU
-residency            3700 1500
-
-                  little cluster
-                  cluster  CPU
-residency            3500 1500
-
-A simple test with a task waking up every 11.111ms shows improvement:
-- 5% a lowest OPP
-- 22% at highest OPP
-
-The period has been chosen:
-- to be shorter than old cluster residency time and longer than new
-residency time of cluster off C-state
-- to prevent any sync with tick (4ms) when running tests that can add
-some variances between tests
-
-Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
----
- arch/arm64/boot/dts/hisilicon/hi3660.dtsi | 45 ++++++++++++++++++-------------
- 1 file changed, 27 insertions(+), 18 deletions(-)
-
-diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-index 421d454..890d23e 100644
---- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-@@ -61,7 +61,7 @@
- 			reg = <0x0 0x0>;
- 			enable-method = "psci";
- 			next-level-cache = <&A53_L2>;
--			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP_0>;
-+			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
- 			capacity-dmips-mhz = <592>;
- 			clocks = <&stub_clock HI3660_CLK_STUB_CLUSTER0>;
- 			operating-points-v2 = <&cluster0_opp>;
-@@ -75,7 +75,7 @@
- 			reg = <0x0 0x1>;
- 			enable-method = "psci";
- 			next-level-cache = <&A53_L2>;
--			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP_0>;
-+			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
- 			capacity-dmips-mhz = <592>;
- 			clocks = <&stub_clock HI3660_CLK_STUB_CLUSTER0>;
- 			operating-points-v2 = <&cluster0_opp>;
-@@ -87,7 +87,7 @@
- 			reg = <0x0 0x2>;
- 			enable-method = "psci";
- 			next-level-cache = <&A53_L2>;
--			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP_0>;
-+			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
- 			capacity-dmips-mhz = <592>;
- 			clocks = <&stub_clock HI3660_CLK_STUB_CLUSTER0>;
- 			operating-points-v2 = <&cluster0_opp>;
-@@ -99,7 +99,7 @@
- 			reg = <0x0 0x3>;
- 			enable-method = "psci";
- 			next-level-cache = <&A53_L2>;
--			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP_0>;
-+			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
- 			capacity-dmips-mhz = <592>;
- 			clocks = <&stub_clock HI3660_CLK_STUB_CLUSTER0>;
- 			operating-points-v2 = <&cluster0_opp>;
-@@ -111,7 +111,7 @@
- 			reg = <0x0 0x100>;
- 			enable-method = "psci";
- 			next-level-cache = <&A73_L2>;
--			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP_1>;
-+			cpu-idle-states = <&CPU_SLEEP_1 &CLUSTER_SLEEP_1>;
- 			capacity-dmips-mhz = <1024>;
- 			clocks = <&stub_clock HI3660_CLK_STUB_CLUSTER1>;
- 			operating-points-v2 = <&cluster1_opp>;
-@@ -125,7 +125,7 @@
- 			reg = <0x0 0x101>;
- 			enable-method = "psci";
- 			next-level-cache = <&A73_L2>;
--			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP_1>;
-+			cpu-idle-states = <&CPU_SLEEP_1 &CLUSTER_SLEEP_1>;
- 			capacity-dmips-mhz = <1024>;
- 			clocks = <&stub_clock HI3660_CLK_STUB_CLUSTER1>;
- 			operating-points-v2 = <&cluster1_opp>;
-@@ -137,7 +137,7 @@
- 			reg = <0x0 0x102>;
- 			enable-method = "psci";
- 			next-level-cache = <&A73_L2>;
--			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP_1>;
-+			cpu-idle-states = <&CPU_SLEEP_1 &CLUSTER_SLEEP_1>;
- 			capacity-dmips-mhz = <1024>;
- 			clocks = <&stub_clock HI3660_CLK_STUB_CLUSTER1>;
- 			operating-points-v2 = <&cluster1_opp>;
-@@ -149,7 +149,7 @@
- 			reg = <0x0 0x103>;
- 			enable-method = "psci";
- 			next-level-cache = <&A73_L2>;
--			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP_1>;
-+			cpu-idle-states = <&CPU_SLEEP_1 &CLUSTER_SLEEP_1>;
- 			capacity-dmips-mhz = <1024>;
- 			clocks = <&stub_clock HI3660_CLK_STUB_CLUSTER1>;
- 			operating-points-v2 = <&cluster1_opp>;
-@@ -158,31 +158,40 @@
- 		idle-states {
- 			entry-method = "psci";
- 
--			CPU_SLEEP: cpu-sleep {
-+			CPU_SLEEP_0: cpu-sleep-0 {
- 				compatible = "arm,idle-state";
- 				local-timer-stop;
- 				arm,psci-suspend-param = <0x0010000>;
--				entry-latency-us = <40>;
--				exit-latency-us = <70>;
--				min-residency-us = <3000>;
-+				entry-latency-us = <400>;
-+				exit-latency-us = <650>;
-+				min-residency-us = <1500>;
- 			};
--
- 			CLUSTER_SLEEP_0: cluster-sleep-0 {
- 				compatible = "arm,idle-state";
- 				local-timer-stop;
- 				arm,psci-suspend-param = <0x1010000>;
- 				entry-latency-us = <500>;
--				exit-latency-us = <5000>;
--				min-residency-us = <20000>;
-+				exit-latency-us = <1600>;
-+				min-residency-us = <3500>;
-+			};
-+
-+
-+			CPU_SLEEP_1: cpu-sleep-1 {
-+				compatible = "arm,idle-state";
-+				local-timer-stop;
-+				arm,psci-suspend-param = <0x0010000>;
-+				entry-latency-us = <400>;
-+				exit-latency-us = <550>;
-+				min-residency-us = <1500>;
- 			};
- 
- 			CLUSTER_SLEEP_1: cluster-sleep-1 {
- 				compatible = "arm,idle-state";
- 				local-timer-stop;
- 				arm,psci-suspend-param = <0x1010000>;
--				entry-latency-us = <1000>;
--				exit-latency-us = <5000>;
--				min-residency-us = <20000>;
-+				entry-latency-us = <800>;
-+				exit-latency-us = <2900>;
-+				min-residency-us = <3500>;
- 			};
- 		};
- 
 -- 
-2.7.4
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180711/221fb320/attachment-0001.sig>
