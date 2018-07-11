@@ -1,24 +1,43 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 11 Jul 2018 06:39:37 -0700
-Subject: v4.18-rc2 on droid4: screen turns red
-In-Reply-To: <8EB5195E-E329-4001-8C1C-185D25FE6AD3@gmx.net>
-References: <20180630131812.GA549@amd> <20180711102655.GA6864@amd>
- <8EB5195E-E329-4001-8C1C-185D25FE6AD3@gmx.net>
-Message-ID: <20180711133937.GN99251@atomide.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 11 Jul 2018 14:56:54 +0100
+Subject: [PATCHv5 19/21] arm64: use SYSCALL_DEFINE6() for mmap
+In-Reply-To: <20180711135656.20670-1-mark.rutland@arm.com>
+References: <20180711135656.20670-1-mark.rutland@arm.com>
+Message-ID: <20180711135656.20670-20-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Marcel Partap (unterwegs) <mpartap@gmx.net> [180711 11:02]:
-> If I get my spare droid4 to boot again I'll send it to Prague so you can compare & see if it is somewhat deterministic ; )
+We don't currently annotate our mmap implementation as a syscall, as we
+need to do to use pt_regs syscall wrappers.
 
-I don't think I'm seeing this, I'm currently on
-4.18.0-rc3-next-20180709 plus the LCD and audio
-patches and whatever random patches I'm working
-on in general.
+Let's mark it as a real syscall.
 
-Maybe it's some xserver related issue if console
-works?
+There should be no functional change as a result of this patch.
 
-Regards,
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Reviewed-by: Dominik Brodowski <linux@dominikbrodowski.net>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/kernel/sys.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-Tony
+diff --git a/arch/arm64/kernel/sys.c b/arch/arm64/kernel/sys.c
+index f4e02f6aceb8..f249d9735f4c 100644
+--- a/arch/arm64/kernel/sys.c
++++ b/arch/arm64/kernel/sys.c
+@@ -29,9 +29,9 @@
+ #include <asm/cpufeature.h>
+ #include <asm/syscall.h>
+ 
+-asmlinkage long sys_mmap(unsigned long addr, unsigned long len,
+-			 unsigned long prot, unsigned long flags,
+-			 unsigned long fd, off_t off)
++SYSCALL_DEFINE6(mmap, unsigned long, addr, unsigned long, len,
++		unsigned long, prot, unsigned long, flags,
++		unsigned long, fd, off_t, off)
+ {
+ 	if (offset_in_page(off) != 0)
+ 		return -EINVAL;
+-- 
+2.11.0
