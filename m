@@ -1,508 +1,305 @@
-From: ludovic.barre@st.com (Ludovic BARRE)
-Date: Wed, 11 Jul 2018 17:19:11 +0200
-Subject: [PATCH 02/19] mmc: mmci: merge qcom dml feature into mmci dma
-In-Reply-To: <CAPDyKFqOOvbNc79hdWhdS4pxkYrh48At-BLuGmX0jDMER3Akdw@mail.gmail.com>
-References: <1528809280-31116-1-git-send-email-ludovic.Barre@st.com>
- <1528809280-31116-3-git-send-email-ludovic.Barre@st.com>
- <CAPDyKFqOOvbNc79hdWhdS4pxkYrh48At-BLuGmX0jDMER3Akdw@mail.gmail.com>
-Message-ID: <c09e8f7a-3bf7-abb3-b49c-011ae29f8d67@st.com>
+From: Ben.Whitten@lairdtech.com (Ben Whitten)
+Date: Wed, 11 Jul 2018 15:21:22 +0000
+Subject: [RFC net-next 00/15] net: A socket API for LoRa
+In-Reply-To: <20180701110804.32415-1-afaerber@suse.de>
+References: <20180701110804.32415-1-afaerber@suse.de>
+Message-ID: <BY1PR02MB11147C7443AB9623D6B65798E75A0@BY1PR02MB1114.namprd02.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+> Subject: [RFC net-next 00/15] net: A socket API for LoRa
+> 
+> Hello,
+> 
+> LoRa is a long-range, low-power wireless technology by
+> Semtech.
+> Unlike other LPWAN technologies, users don't need to rely
+> on infrastructure
+> providers and SIM cards and expensive subscription plans,
+> they can set up
+> their own gateways. Modules, adapters and evaluation
+> boards are available
+> from a large number of vendors.
+> 
+> Many vendors also make available Open Source software
+> examples on GitHub.
+> But when taking a closer look, many of them combine
+> licenses in ways that are
+> not redistributable. My reports have remained without
+> response or solution.
+> 
+> https://github.com/ernstdevreede/lmic_pi/issues/2
+> https://github.com/Snootlab/lmic_chisterapi/issues/2
+> https://github.com/Snootlab/lora_chisterapi/issues/2
+> 
+> Another issue was that most such projects around the
+> Raspberry Pi make use of
+> spidev to communicate with the Semtech chipsets from
+> userspace. The Linux spi
+> maintainers have chosen to greet any such users of spidev
+> with a friendly
+> WARN_ON(), preferring in-kernel spi drivers and white-
+> listing individual
+> devices only.
+> 
+> https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/lin
+> ux.git/tree/drivers/spi/spidev.c?h=v4.17#n722
+> https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/lin
+> ux.git/tree/drivers/spi/spidev.c?h=v4.17#n667
+> 
+> Also I don't quite see the point in having userspace probe
+> what SPI devices
+> are connected to a generic spidev driver when we have an
+> easy Device Tree
+> hardware description on arm/arm64 that could give us that
+> info.
+> 
+> I raised the topic during Q&A of a FOSDEM 2017 talk (cut off
+> at the end
+> of the video) but unfortunately found no one to collaborate
+> on this.
+> 
+> https://archive.fosdem.org/2017/schedule/event/lorawan/
+> 
+> Instead of porting from wiringPi to a differently licensed
+> GPIO library
+> and dealing with seemingly unmaintained LoRaWAN code
+> dumps, I started a
+> spi kernel driver for SX1276 back in 2016. But obviously a
+> kernel driver
+> isn't too helpful without a userspace API to send and receive
+> packets.
+> 
+> This patchset, updated from 2017 and extended, is
+> implementing kernel drivers
+> for various LoRa chipsets and modules. As API I'm proposing
+> a PF_LORA socket
+> implementation. Why? LoRa uses data packets with headers
+> and checksums
+> and differing MTUs and multiple protocols layered on top of
+> it. Apart from
+> simple headers for addressing used by RadioHead library
+> and IMST's LoRa P2P
+> protocol, the main use case (not implemented in this
+> patchset) is expected
+> to be LoRaWAN. And LoRaWAN has competing proprietary
+> protocols, such as
+> Link Labs' Symphony Link or GlobalSat M.O.S.T. or
+> RadioShuttle, that might
+> at some point want to adopt a standard API for their
+> implementations, too.
+> 
+> Ready-made LoRa hardware modules come in three flavors,
+> a) with SPI access to the underlying Semtech chipsets,
+> needing a software
+>    implementation of e.g. LoRaWAN protocol stack (i.e., a
+> soft MAC),
+> b) with a custom, often UART based interface and a pre-
+> certified LoRaWAN
+>    protocol stack already integrated (i.e., hard/full MAC), and
+> c) with a microcontroller that serves not only for the
+> protocol stack but
+>    also as application processor, not offering a ready-made
+> interface.
+> 
+> This patchset focuses on option a). An SX1276 based
+> LoRaWAN stack appeared
+> to be the project of Jian-Hong Pan and is not included here.
+> This patchset also includes drivers for b), from text based AT
+> commands to
+> a binary SLIP based HCI protocol.
+> Hardware examples for c) are Murata CMWX1ZZABZ-078
+> and RAK813.
+> 
+> This patchset is clearly not ready for merging, but is being
+> submitted for
+> discussion, as requested by Jiri, in particular of the design
+> choices:
+> 
+> 1) PF_LORA/AF_LORA and associated identifiers are
+> proposed to represent
+>    this technology. While for an SX1276 - case a) above - it
+> might work to
+>    layer LoRaWAN as a protocol option for PF_LORA and add
+> LoRaWAN address
+>    fields to the union in my sockaddr_lora, how would that
+> work for devices
+>    that only support LoRaWAN but not pure LoRa? Do we
+> need both AF_LORA and
+>    AF_LORAWAN, or just a separate ETH_P_LORAWAN or
+> ARPHRD_LORAWAN?
+> 
+> 2) PF_LORA is used with SOCK_DGRAM here. The
+> assumption is that RAW mode
+>    would be DGRAM plus preamble plus optional checksum.
+> 
+> 3) Only the transmit path is partially implemented already.
+> The assumption
+>    is that the devices should go into receive mode by default
+> and only
+>    interrupt that when asked to transmit.
+> 
+> 4) Some hardware settings need to be supplied externally,
+> such as the radio
+>    frequency for some modules, but many others can be
+> runtime-configured,
+>    such as Spreading Factor, Bandwidth, Sync Word, or which
+> antenna to use.
+>    What settings should be implemented as socket option vs.
+> netlink layer
+>    vs. ioctl vs. sysfs? What are the criteria to apply?
+> 
+> 5) Many of the modules support multiple modes, such as
+> LoRa, LoRaWAN and FSK.
+>    Lacking a LoRaWAN implementation, I am currently
+> switching them into LoRa
+>    mode at probe time wherever possible. How do we deal
+> with that properly?
+> 
+>   a) Is there any precedence from the Wifi world for
+> dynamically selecting
+>      between our own trusted Open Source implementation
+> vs. hardware/firmware
+>      accelerated and/or certified implementations?
+> 
+>   b) Would a proof of concept for FSK (non-LoRa) modes be
+> required for
+>      merging any LoRa driver for chipsets that support both?
+> Or is there any
+>      facility or design guidelines that would allow us to focus
+> on LoRa and
+>      LoRaWAN and leave non-LoRa radio modes to later
+> contributors?
 
+Down the line I think we should also plan for a CRDA style regdb somewhere in the path for raw LoRa transceivers operating as softMAC, much like with WiFi.
+LoRa radios used in Gateway devices are typically relatively high power (capable of 27dBm) and operate in bands with certain restrictions, eg the EU has keep out areas within 868MHz for alarms and SRD devices must abide by certain duty cycle restrictions, there are also maximum powers to consider for sub-bands. (ETSI EN 300 220-2 V3.2.1, Bands K, L, M, N, P, Q)
+The certified AT style modules will (should) already have this regulatory data baked in so it only applied to situations where we drive the transceivers directly, but it wouldn't hurt to check that the frequency being asked to transmit on doesn't spill into a restricted band.
 
-On 07/05/2018 05:26 PM, Ulf Hansson wrote:
-> On 12 June 2018 at 15:14, Ludovic Barre <ludovic.Barre@st.com> wrote:
->> From: Ludovic Barre <ludovic.barre@st.com>
->>
->> This patch integrates qcom dml feature into mmci_dma file.
->> Qualcomm Data Mover lite/local is already a variant of mmci dmaengine.
->>
->> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
->> ---
->>   drivers/mmc/host/Makefile        |   1 -
->>   drivers/mmc/host/mmci.c          |   1 -
->>   drivers/mmc/host/mmci.h          |  35 ++++++++
->>   drivers/mmc/host/mmci_dma.c      | 135 ++++++++++++++++++++++++++++-
->>   drivers/mmc/host/mmci_qcom_dml.c | 177 ---------------------------------------
->>   drivers/mmc/host/mmci_qcom_dml.h |  31 -------
->>   6 files changed, 169 insertions(+), 211 deletions(-)
->>   delete mode 100644 drivers/mmc/host/mmci_qcom_dml.c
->>   delete mode 100644 drivers/mmc/host/mmci_qcom_dml.h
+> As evident by the many questions, this is my first deep dive
+> into the Linux
+> net subsystem. It's also my first experiments with the new
+> serdev subsystem,
+> so in particular the receive paths will need some review and
+> optimizations.
 > 
-> No, this is not the way to go. Instead I I think there are two options.
+> This patchset was developed and tested mainly as KMP,
+> originally at
+> https://github.com/afaerber/lora-modules. It was recently
+> transformed into a
+> linux-next based tree, still mostly tested on our openSUSE
+> Tumbleweed kernel
+> with a differing AF_LORA value below current AF_MAX limit.
 > 
-> 1) Keep mmci_qcom_dml.c|h and thus add new files for the stm32 dma variant.
+> Some corresponding Device Tree Overlays have been
+> collected here:
+> https://github.com/afaerber/dt-overlays
 > 
-> 2) Start by renaming mmci_qcom_dml.* to mmc_dma.* and then in the next
-> step add the code for stm32 dma into the renamed files.
+> Only European models for 868 MHz and 433 MHz could be
+> tested when available.
+> Thanks to all companies and people that have supported
+> this project so far.
 > 
-> I guess if there is some overlap in functionality, 2) may be best as
-> it could easier avoid open coding. However, I am fine with whatever
-> option and I expect that you knows what is best.
-
-After patch 01 & 05 comments:
-I will try to define a mmci_ops which contain some functions pointer
-called by mmci.c (core).
-A variant defines its mmci_ops.
-where do you define the specific function:
--in a single file, mmci-ops.c or other (for the name, I'm not inspirated)
--or in specific file for each variant mmci-qcom.c or mmci-stm32.c
-
-following the comment (above), I think we define a single file?
-
+> Have a lot of fun!
 > 
-> Kind regards
-> Uffe
+> Cheers,
+> Andreas
 > 
->>
->> diff --git a/drivers/mmc/host/Makefile b/drivers/mmc/host/Makefile
->> index daecaa98..608a020 100644
->> --- a/drivers/mmc/host/Makefile
->> +++ b/drivers/mmc/host/Makefile
->> @@ -5,7 +5,6 @@
->>
->>   obj-$(CONFIG_MMC_ARMMMCI) += armmmci.o
->>   armmmci-y := mmci.o mmci_dma.o
->> -armmmci-$(CONFIG_MMC_QCOM_DML) += mmci_qcom_dml.o
->>   obj-$(CONFIG_MMC_PXA)          += pxamci.o
->>   obj-$(CONFIG_MMC_MXC)          += mxcmmc.o
->>   obj-$(CONFIG_MMC_MXS)          += mxs-mmc.o
->> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
->> index 8868be0..7a15afd 100644
->> --- a/drivers/mmc/host/mmci.c
->> +++ b/drivers/mmc/host/mmci.c
->> @@ -43,7 +43,6 @@
->>
->>   #include "mmci.h"
->>   #include "mmci_dma.h"
->> -#include "mmci_qcom_dml.h"
->>
->>   #define DRIVER_NAME "mmci-pl18x"
->>
->> diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
->> index a73bb98..f7cba35 100644
->> --- a/drivers/mmc/host/mmci.h
->> +++ b/drivers/mmc/host/mmci.h
->> @@ -194,6 +194,41 @@
->>
->>   #define MMCI_PINCTRL_STATE_OPENDRAIN "opendrain"
->>
->> +/* QCOM DML Registers */
->> +#define DML_CONFIG                     0x00
->> +#define PRODUCER_CRCI_MSK              GENMASK(1, 0)
->> +#define PRODUCER_CRCI_DISABLE          0
->> +#define PRODUCER_CRCI_X_SEL            BIT(0)
->> +#define PRODUCER_CRCI_Y_SEL            BIT(1)
->> +#define CONSUMER_CRCI_MSK              GENMASK(3, 2)
->> +#define CONSUMER_CRCI_DISABLE          0
->> +#define CONSUMER_CRCI_X_SEL            BIT(2)
->> +#define CONSUMER_CRCI_Y_SEL            BIT(3)
->> +#define PRODUCER_TRANS_END_EN          BIT(4)
->> +#define BYPASS                         BIT(16)
->> +#define DIRECT_MODE                    BIT(17)
->> +#define INFINITE_CONS_TRANS            BIT(18)
->> +
->> +#define DML_SW_RESET                   0x08
->> +#define DML_PRODUCER_START             0x0c
->> +#define DML_CONSUMER_START             0x10
->> +#define DML_PRODUCER_PIPE_LOGICAL_SIZE 0x14
->> +#define DML_CONSUMER_PIPE_LOGICAL_SIZE 0x18
->> +#define DML_PIPE_ID                    0x1c
->> +#define PRODUCER_PIPE_ID_SHFT          0
->> +#define PRODUCER_PIPE_ID_MSK           GENMASK(4, 0)
->> +#define CONSUMER_PIPE_ID_SHFT          16
->> +#define CONSUMER_PIPE_ID_MSK           GENMASK(20, 16)
->> +
->> +#define DML_PRODUCER_BAM_BLOCK_SIZE    0x24
->> +#define DML_PRODUCER_BAM_TRANS_SIZE    0x28
->> +
->> +/* other definitions */
->> +#define PRODUCER_PIPE_LOGICAL_SIZE     4096
->> +#define CONSUMER_PIPE_LOGICAL_SIZE     4096
->> +
->> +#define DML_OFFSET                     0x800
->> +
->>   struct clk;
->>   struct dma_chan;
->>
->> diff --git a/drivers/mmc/host/mmci_dma.c b/drivers/mmc/host/mmci_dma.c
->> index 98a542d..dd7dae5 100644
->> --- a/drivers/mmc/host/mmci_dma.c
->> +++ b/drivers/mmc/host/mmci_dma.c
->> @@ -8,11 +8,11 @@
->>   #include <linux/dmaengine.h>
->>   #include <linux/mmc/host.h>
->>   #include <linux/mmc/card.h>
->> +#include <linux/of.h>
->>   #include <linux/scatterlist.h>
->>
->>   #include "mmci.h"
->>   #include "mmci_dma.h"
->> -#include "mmci_qcom_dml.h"
->>
->>   int mmci_dma_setup(struct mmci_host *host)
->>   {
->> @@ -101,6 +101,139 @@ struct dmaengine_priv {
->>
->>   #define dma_inprogress(dmae) ((dmae)->dma_in_progress)
->>
->> +#ifdef CONFIG_MMC_QCOM_DML
->> +void dml_start_xfer(struct mmci_host *host, struct mmc_data *data)
->> +{
->> +       u32 config;
->> +       void __iomem *base = host->base + DML_OFFSET;
->> +
->> +       if (data->flags & MMC_DATA_READ) {
->> +               /* Read operation: configure DML for producer operation */
->> +               /* Set producer CRCI-x and disable consumer CRCI */
->> +               config = readl_relaxed(base + DML_CONFIG);
->> +               config = (config & ~PRODUCER_CRCI_MSK) | PRODUCER_CRCI_X_SEL;
->> +               config = (config & ~CONSUMER_CRCI_MSK) | CONSUMER_CRCI_DISABLE;
->> +               writel_relaxed(config, base + DML_CONFIG);
->> +
->> +               /* Set the Producer BAM block size */
->> +               writel_relaxed(data->blksz, base + DML_PRODUCER_BAM_BLOCK_SIZE);
->> +
->> +               /* Set Producer BAM Transaction size */
->> +               writel_relaxed(data->blocks * data->blksz,
->> +                              base + DML_PRODUCER_BAM_TRANS_SIZE);
->> +               /* Set Producer Transaction End bit */
->> +               config = readl_relaxed(base + DML_CONFIG);
->> +               config |= PRODUCER_TRANS_END_EN;
->> +               writel_relaxed(config, base + DML_CONFIG);
->> +               /* Trigger producer */
->> +               writel_relaxed(1, base + DML_PRODUCER_START);
->> +       } else {
->> +               /* Write operation: configure DML for consumer operation */
->> +               /* Set consumer CRCI-x and disable producer CRCI*/
->> +               config = readl_relaxed(base + DML_CONFIG);
->> +               config = (config & ~CONSUMER_CRCI_MSK) | CONSUMER_CRCI_X_SEL;
->> +               config = (config & ~PRODUCER_CRCI_MSK) | PRODUCER_CRCI_DISABLE;
->> +               writel_relaxed(config, base + DML_CONFIG);
->> +               /* Clear Producer Transaction End bit */
->> +               config = readl_relaxed(base + DML_CONFIG);
->> +               config &= ~PRODUCER_TRANS_END_EN;
->> +               writel_relaxed(config, base + DML_CONFIG);
->> +               /* Trigger consumer */
->> +               writel_relaxed(1, base + DML_CONSUMER_START);
->> +       }
->> +
->> +       /* make sure the dml is configured before dma is triggered */
->> +       wmb();
->> +}
->> +
->> +static int of_get_dml_pipe_index(struct device_node *np, const char *name)
->> +{
->> +       int index;
->> +       struct of_phandle_args dma_spec;
->> +
->> +       index = of_property_match_string(np, "dma-names", name);
->> +
->> +       if (index < 0)
->> +               return -ENODEV;
->> +
->> +       if (of_parse_phandle_with_args(np, "dmas", "#dma-cells", index,
->> +                                      &dma_spec))
->> +               return -ENODEV;
->> +
->> +       if (dma_spec.args_count)
->> +               return dma_spec.args[0];
->> +
->> +       return -ENODEV;
->> +}
->> +
->> +/* Initialize the dml hardware connected to SD Card controller */
->> +int dml_hw_init(struct mmci_host *host, struct device_node *np)
->> +{
->> +       u32 config;
->> +       void __iomem *base;
->> +       int consumer_id, producer_id;
->> +
->> +       consumer_id = of_get_dml_pipe_index(np, "tx");
->> +       producer_id = of_get_dml_pipe_index(np, "rx");
->> +
->> +       if (producer_id < 0 || consumer_id < 0)
->> +               return -ENODEV;
->> +
->> +       base = host->base + DML_OFFSET;
->> +
->> +       /* Reset the DML block */
->> +       writel_relaxed(1, base + DML_SW_RESET);
->> +
->> +       /* Disable the producer and consumer CRCI */
->> +       config = (PRODUCER_CRCI_DISABLE | CONSUMER_CRCI_DISABLE);
->> +       /*
->> +        * Disable the bypass mode. Bypass mode will only be used
->> +        * if data transfer is to happen in PIO mode and don't
->> +        * want the BAM interface to connect with SDCC-DML.
->> +        */
->> +       config &= ~BYPASS;
->> +       /*
->> +        * Disable direct mode as we don't DML to MASTER the AHB bus.
->> +        * BAM connected with DML should MASTER the AHB bus.
->> +        */
->> +       config &= ~DIRECT_MODE;
->> +       /*
->> +        * Disable infinite mode transfer as we won't be doing any
->> +        * infinite size data transfers. All data transfer will be
->> +        * of finite data size.
->> +        */
->> +       config &= ~INFINITE_CONS_TRANS;
->> +       writel_relaxed(config, base + DML_CONFIG);
->> +
->> +       /*
->> +        * Initialize the logical BAM pipe size for producer
->> +        * and consumer.
->> +        */
->> +       writel_relaxed(PRODUCER_PIPE_LOGICAL_SIZE,
->> +                      base + DML_PRODUCER_PIPE_LOGICAL_SIZE);
->> +       writel_relaxed(CONSUMER_PIPE_LOGICAL_SIZE,
->> +                      base + DML_CONSUMER_PIPE_LOGICAL_SIZE);
->> +
->> +       /* Initialize Producer/consumer pipe id */
->> +       writel_relaxed(producer_id | (consumer_id << CONSUMER_PIPE_ID_SHFT),
->> +                      base + DML_PIPE_ID);
->> +
->> +       /* Make sure dml initialization is finished */
->> +       mb();
->> +
->> +       return 0;
->> +}
->> +#else
->> +static inline int dml_hw_init(struct mmci_host *host, struct device_node *np)
->> +{
->> +       return -EINVAL;
->> +}
->> +
->> +static inline void dml_start_xfer(struct mmci_host *host, struct mmc_data *data)
->> +{
->> +}
->> +#endif /* CONFIG_MMC_QCOM_DML */
->> +
->>   static int dmaengine_setup(struct mmci_host *host)
->>   {
->>          const char *rxname, *txname;
->> diff --git a/drivers/mmc/host/mmci_qcom_dml.c b/drivers/mmc/host/mmci_qcom_dml.c
->> deleted file mode 100644
->> index 00750c9..0000000
->> --- a/drivers/mmc/host/mmci_qcom_dml.c
->> +++ /dev/null
->> @@ -1,177 +0,0 @@
->> -/*
->> - *
->> - * Copyright (c) 2011, The Linux Foundation. All rights reserved.
->> - *
->> - * This program is free software; you can redistribute it and/or modify
->> - * it under the terms of the GNU General Public License version 2 and
->> - * only version 2 as published by the Free Software Foundation.
->> - *
->> - * This program is distributed in the hope that it will be useful,
->> - * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> - * GNU General Public License for more details.
->> - *
->> - */
->> -#include <linux/of.h>
->> -#include <linux/of_dma.h>
->> -#include <linux/bitops.h>
->> -#include <linux/mmc/host.h>
->> -#include <linux/mmc/card.h>
->> -#include "mmci.h"
->> -
->> -/* Registers */
->> -#define DML_CONFIG                     0x00
->> -#define PRODUCER_CRCI_MSK              GENMASK(1, 0)
->> -#define PRODUCER_CRCI_DISABLE          0
->> -#define PRODUCER_CRCI_X_SEL            BIT(0)
->> -#define PRODUCER_CRCI_Y_SEL            BIT(1)
->> -#define CONSUMER_CRCI_MSK              GENMASK(3, 2)
->> -#define CONSUMER_CRCI_DISABLE          0
->> -#define CONSUMER_CRCI_X_SEL            BIT(2)
->> -#define CONSUMER_CRCI_Y_SEL            BIT(3)
->> -#define PRODUCER_TRANS_END_EN          BIT(4)
->> -#define BYPASS                         BIT(16)
->> -#define DIRECT_MODE                    BIT(17)
->> -#define INFINITE_CONS_TRANS            BIT(18)
->> -
->> -#define DML_SW_RESET                   0x08
->> -#define DML_PRODUCER_START             0x0c
->> -#define DML_CONSUMER_START             0x10
->> -#define DML_PRODUCER_PIPE_LOGICAL_SIZE 0x14
->> -#define DML_CONSUMER_PIPE_LOGICAL_SIZE 0x18
->> -#define DML_PIPE_ID                    0x1c
->> -#define PRODUCER_PIPE_ID_SHFT          0
->> -#define PRODUCER_PIPE_ID_MSK           GENMASK(4, 0)
->> -#define CONSUMER_PIPE_ID_SHFT          16
->> -#define CONSUMER_PIPE_ID_MSK           GENMASK(20, 16)
->> -
->> -#define DML_PRODUCER_BAM_BLOCK_SIZE    0x24
->> -#define DML_PRODUCER_BAM_TRANS_SIZE    0x28
->> -
->> -/* other definitions */
->> -#define PRODUCER_PIPE_LOGICAL_SIZE     4096
->> -#define CONSUMER_PIPE_LOGICAL_SIZE     4096
->> -
->> -#define DML_OFFSET                     0x800
->> -
->> -void dml_start_xfer(struct mmci_host *host, struct mmc_data *data)
->> -{
->> -       u32 config;
->> -       void __iomem *base = host->base + DML_OFFSET;
->> -
->> -       if (data->flags & MMC_DATA_READ) {
->> -               /* Read operation: configure DML for producer operation */
->> -               /* Set producer CRCI-x and disable consumer CRCI */
->> -               config = readl_relaxed(base + DML_CONFIG);
->> -               config = (config & ~PRODUCER_CRCI_MSK) | PRODUCER_CRCI_X_SEL;
->> -               config = (config & ~CONSUMER_CRCI_MSK) | CONSUMER_CRCI_DISABLE;
->> -               writel_relaxed(config, base + DML_CONFIG);
->> -
->> -               /* Set the Producer BAM block size */
->> -               writel_relaxed(data->blksz, base + DML_PRODUCER_BAM_BLOCK_SIZE);
->> -
->> -               /* Set Producer BAM Transaction size */
->> -               writel_relaxed(data->blocks * data->blksz,
->> -                              base + DML_PRODUCER_BAM_TRANS_SIZE);
->> -               /* Set Producer Transaction End bit */
->> -               config = readl_relaxed(base + DML_CONFIG);
->> -               config |= PRODUCER_TRANS_END_EN;
->> -               writel_relaxed(config, base + DML_CONFIG);
->> -               /* Trigger producer */
->> -               writel_relaxed(1, base + DML_PRODUCER_START);
->> -       } else {
->> -               /* Write operation: configure DML for consumer operation */
->> -               /* Set consumer CRCI-x and disable producer CRCI*/
->> -               config = readl_relaxed(base + DML_CONFIG);
->> -               config = (config & ~CONSUMER_CRCI_MSK) | CONSUMER_CRCI_X_SEL;
->> -               config = (config & ~PRODUCER_CRCI_MSK) | PRODUCER_CRCI_DISABLE;
->> -               writel_relaxed(config, base + DML_CONFIG);
->> -               /* Clear Producer Transaction End bit */
->> -               config = readl_relaxed(base + DML_CONFIG);
->> -               config &= ~PRODUCER_TRANS_END_EN;
->> -               writel_relaxed(config, base + DML_CONFIG);
->> -               /* Trigger consumer */
->> -               writel_relaxed(1, base + DML_CONSUMER_START);
->> -       }
->> -
->> -       /* make sure the dml is configured before dma is triggered */
->> -       wmb();
->> -}
->> -
->> -static int of_get_dml_pipe_index(struct device_node *np, const char *name)
->> -{
->> -       int index;
->> -       struct of_phandle_args  dma_spec;
->> -
->> -       index = of_property_match_string(np, "dma-names", name);
->> -
->> -       if (index < 0)
->> -               return -ENODEV;
->> -
->> -       if (of_parse_phandle_with_args(np, "dmas", "#dma-cells", index,
->> -                                      &dma_spec))
->> -               return -ENODEV;
->> -
->> -       if (dma_spec.args_count)
->> -               return dma_spec.args[0];
->> -
->> -       return -ENODEV;
->> -}
->> -
->> -/* Initialize the dml hardware connected to SD Card controller */
->> -int dml_hw_init(struct mmci_host *host, struct device_node *np)
->> -{
->> -       u32 config;
->> -       void __iomem *base;
->> -       int consumer_id, producer_id;
->> -
->> -       consumer_id = of_get_dml_pipe_index(np, "tx");
->> -       producer_id = of_get_dml_pipe_index(np, "rx");
->> -
->> -       if (producer_id < 0 || consumer_id < 0)
->> -               return -ENODEV;
->> -
->> -       base = host->base + DML_OFFSET;
->> -
->> -       /* Reset the DML block */
->> -       writel_relaxed(1, base + DML_SW_RESET);
->> -
->> -       /* Disable the producer and consumer CRCI */
->> -       config = (PRODUCER_CRCI_DISABLE | CONSUMER_CRCI_DISABLE);
->> -       /*
->> -        * Disable the bypass mode. Bypass mode will only be used
->> -        * if data transfer is to happen in PIO mode and don't
->> -        * want the BAM interface to connect with SDCC-DML.
->> -        */
->> -       config &= ~BYPASS;
->> -       /*
->> -        * Disable direct mode as we don't DML to MASTER the AHB bus.
->> -        * BAM connected with DML should MASTER the AHB bus.
->> -        */
->> -       config &= ~DIRECT_MODE;
->> -       /*
->> -        * Disable infinite mode transfer as we won't be doing any
->> -        * infinite size data transfers. All data transfer will be
->> -        * of finite data size.
->> -        */
->> -       config &= ~INFINITE_CONS_TRANS;
->> -       writel_relaxed(config, base + DML_CONFIG);
->> -
->> -       /*
->> -        * Initialize the logical BAM pipe size for producer
->> -        * and consumer.
->> -        */
->> -       writel_relaxed(PRODUCER_PIPE_LOGICAL_SIZE,
->> -                      base + DML_PRODUCER_PIPE_LOGICAL_SIZE);
->> -       writel_relaxed(CONSUMER_PIPE_LOGICAL_SIZE,
->> -                      base + DML_CONSUMER_PIPE_LOGICAL_SIZE);
->> -
->> -       /* Initialize Producer/consumer pipe id */
->> -       writel_relaxed(producer_id | (consumer_id << CONSUMER_PIPE_ID_SHFT),
->> -                      base + DML_PIPE_ID);
->> -
->> -       /* Make sure dml initialization is finished */
->> -       mb();
->> -
->> -       return 0;
->> -}
->> diff --git a/drivers/mmc/host/mmci_qcom_dml.h b/drivers/mmc/host/mmci_qcom_dml.h
->> deleted file mode 100644
->> index 6e405d0..0000000
->> --- a/drivers/mmc/host/mmci_qcom_dml.h
->> +++ /dev/null
->> @@ -1,31 +0,0 @@
->> -/*
->> - *
->> - * Copyright (c) 2011, The Linux Foundation. All rights reserved.
->> - *
->> - * This program is free software; you can redistribute it and/or modify
->> - * it under the terms of the GNU General Public License version 2 and
->> - * only version 2 as published by the Free Software Foundation.
->> - *
->> - * This program is distributed in the hope that it will be useful,
->> - * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> - * GNU General Public License for more details.
->> - *
->> - */
->> -#ifndef __MMC_QCOM_DML_H__
->> -#define __MMC_QCOM_DML_H__
->> -
->> -#ifdef CONFIG_MMC_QCOM_DML
->> -int dml_hw_init(struct mmci_host *host, struct device_node *np);
->> -void dml_start_xfer(struct mmci_host *host, struct mmc_data *data);
->> -#else
->> -static inline int dml_hw_init(struct mmci_host *host, struct device_node *np)
->> -{
->> -       return -ENOSYS;
->> -}
->> -static inline void dml_start_xfer(struct mmci_host *host, struct mmc_data *data)
->> -{
->> -}
->> -#endif /* CONFIG_MMC_QCOM_DML */
->> -
->> -#endif /* __MMC_QCOM_DML_H__ */
->> --
->> 2.7.4
->>
+> Cc: Jian-Hong Pan <starnight@g.ncu.edu.tw>
+> Cc: Jiri Pirko <jiri@resnulli.us>
+> Cc: Marcel Holtmann <marcel@holtmann.org>
+> Cc: "David S. Miller" <davem@davemloft.net>
+> Cc: Matthias Brugger <mbrugger@suse.com>
+> Cc: Konstantin B?hm <konstantin.boehm@ancud.de>
+> Cc: Jan Jongboom <jan.jongboom@arm.com>
+> Cc: Janus Piwek <jpiwek@arroweurope.com>
+> Cc: Michael R?der <michael.roeder@avnet.eu>
+> Cc: Dollar Chen (???) <dollar.chen@wtmec.com>
+> Cc: Ken Yu (??) <ken.yu@rakwireless.com>
+> Cc: Jon Ortego <Jon.Ortego@imst.de>
+> Cc: contact at snootlab.com
+> Cc: Ben Whitten <ben.whitten@lairdtech.com>
+> Cc: Brian Ray <brian.ray@link-labs.com>
+> Cc: lora at globalsat.com.tw
+> Cc: lora at radioshuttle.de
+> Cc: Alexander Graf <agraf@suse.de>
+> Cc: Michal Kube?ek <mkubecek@suse.cz>
+> Cc: Rob Herring <robh@kernel.org>
+> Cc: devicetree at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: Steve deRosier <derosier@gmail.com>
+> Cc: Mark Brown <broonie@kernel.org>
+> Cc: linux-spi at vger.kernel.org
+> 
+> Andreas F?rber (15):
+>   net: Reserve protocol numbers for LoRa
+>   net: lora: Define sockaddr_lora
+>   net: lora: Add protocol numbers
+>   net: Add lora subsystem
+>   HACK: net: lora: Deal with .poll_mask in 4.18-rc2
+>   net: lora: Prepare for device drivers
+>   net: lora: Add Semtech SX1276
+>   net: lora: sx1276: Add debugfs
+>   net: lora: Prepare EUI helpers
+>   net: lora: Add Microchip RN2483
+>   net: lora: Add IMST WiMOD
+>   net: lora: Add USI WM-SG-SM-42
+>   net: lora: Prepare RAK RAK811
+>   net: lora: Prepare Semtech SX1257
+>   net: lora: Add Semtech SX1301
+> 
+>  drivers/net/Makefile                |   1 +
+>  drivers/net/lora/Kconfig            |  72 ++++
+>  drivers/net/lora/Makefile           |  32 ++
+>  drivers/net/lora/dev.c              | 125 ++++++
+>  drivers/net/lora/rak811.c           | 219 +++++++++++
+>  drivers/net/lora/rn2483.c           | 344 +++++++++++++++++
+>  drivers/net/lora/rn2483.h           |  40 ++
+>  drivers/net/lora/rn2483_cmd.c       | 130 +++++++
+>  drivers/net/lora/sx1257.c           |  96 +++++
+>  drivers/net/lora/sx1276.c           | 740
+> ++++++++++++++++++++++++++++++++++++
+>  drivers/net/lora/sx1301.c           | 446
+> ++++++++++++++++++++++
+>  drivers/net/lora/usi.c              | 411
+> ++++++++++++++++++++
+>  drivers/net/lora/wimod.c            | 597
+> +++++++++++++++++++++++++++++
+>  include/linux/lora/dev.h            |  44 +++
+>  include/linux/lora/skb.h            |  29 ++
+>  include/linux/socket.h              |   4 +-
+>  include/uapi/linux/if_arp.h         |   1 +
+>  include/uapi/linux/if_ether.h       |   1 +
+>  include/uapi/linux/lora.h           |  24 ++
+>  net/Kconfig                         |   1 +
+>  net/Makefile                        |   1 +
+>  net/lora/Kconfig                    |  15 +
+>  net/lora/Makefile                   |   8 +
+>  net/lora/af_lora.c                  | 152 ++++++++
+>  net/lora/af_lora.h                  |  13 +
+>  net/lora/dgram.c                    | 297 +++++++++++++++
+>  security/selinux/hooks.c            |   4 +-
+>  security/selinux/include/classmap.h |   4 +-
+>  28 files changed, 3848 insertions(+), 3 deletions(-)
+>  create mode 100644 drivers/net/lora/Kconfig
+>  create mode 100644 drivers/net/lora/Makefile
+>  create mode 100644 drivers/net/lora/dev.c
+>  create mode 100644 drivers/net/lora/rak811.c
+>  create mode 100644 drivers/net/lora/rn2483.c
+>  create mode 100644 drivers/net/lora/rn2483.h
+>  create mode 100644 drivers/net/lora/rn2483_cmd.c
+>  create mode 100644 drivers/net/lora/sx1257.c
+>  create mode 100644 drivers/net/lora/sx1276.c
+>  create mode 100644 drivers/net/lora/sx1301.c
+>  create mode 100644 drivers/net/lora/usi.c
+>  create mode 100644 drivers/net/lora/wimod.c
+>  create mode 100644 include/linux/lora/dev.h
+>  create mode 100644 include/linux/lora/skb.h
+>  create mode 100644 include/uapi/linux/lora.h
+>  create mode 100644 net/lora/Kconfig
+>  create mode 100644 net/lora/Makefile
+>  create mode 100644 net/lora/af_lora.c
+>  create mode 100644 net/lora/af_lora.h
+>  create mode 100644 net/lora/dgram.c
+> 
+> --
+> 2.16.4
