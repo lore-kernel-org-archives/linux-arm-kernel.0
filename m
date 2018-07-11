@@ -1,133 +1,122 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Wed, 11 Jul 2018 16:41:53 +0900
-Subject: [PATCH v11 05/15] of/fdt: add helper functions for handling properties
-In-Reply-To: <20180711074203.3019-1-takahiro.akashi@linaro.org>
-References: <20180711074203.3019-1-takahiro.akashi@linaro.org>
-Message-ID: <20180711074203.3019-6-takahiro.akashi@linaro.org>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 11 Jul 2018 10:02:18 +0200
+Subject: Vibrations on Droid 4?
+In-Reply-To: <20180710161123.azym6sbboriuj4yc@earth.universe>
+References: <20180709081534.GA6799@amd>
+ <20180709214910.tes6u4ivxomd3aja@earth.universe>
+ <20180709220211.GA7760@amd>
+ <20180710101147.lyu65ro4czvrs2da@earth.universe>
+ <20180710133040.GA4391@amd>
+ <20180710161123.azym6sbboriuj4yc@earth.universe>
+Message-ID: <20180711080218.GA21225@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These functions will be used later to handle kexec-specific properties
-in arm64's kexec_file implementation.
+Hi!
 
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Frank Rowand <frowand.list@gmail.com>
----
- drivers/of/fdt.c       | 62 ++++++++++++++++++++++++++++++++++++++++--
- include/linux/of_fdt.h | 10 +++++--
- 2 files changed, 68 insertions(+), 4 deletions(-)
+> > Its parent is gpio at 4805d000 , and that one seems to be present.
+> > 
+> > user at devuan:/sys/bus/platform/devices$ ls 4805d000.gpio
+> > driver				       driver_override  gpio
+> > gpiochip5  modalias  of_node  power  subsystem  uevent
+> 
+> Sorry, something went wrong with merging this. The parent
+> of ti,omap-dmtimer-pwm and pwm-vibrator should be / and
+> not gpio6.
 
-diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
-index 6da20b9688f7..f7c9d69ce86c 100644
---- a/drivers/of/fdt.c
-+++ b/drivers/of/fdt.c
-@@ -25,6 +25,7 @@
- #include <linux/debugfs.h>
- #include <linux/serial_core.h>
- #include <linux/sysfs.h>
-+#include <linux/types.h>
+Ok, got it to probe... after dts fix and adding EPROBE_DEFFER to
+driver.
+
+Still can't get it to actually vibrate. 
+
+user at devuan:/sys/bus/platform/drivers/pwm-vibrator/vibrator$ sudo fftest /dev/input/event3
+Force feedback test program.
+HOLD FIRMLY YOUR WHEEL OR JOYSTICK TO PREVENT DAMAGES
+
+Device /dev/input/event3 opened
+Features:
+  * Absolute axes: 
+    [00 00 00 00 00 00 00 00 ]
+  * Relative axes: 
+    [00 00 ]
+  * Force feedback effects types: Periodic, Rumble, Gain, 
+    Force feedback periodic effects: Square, Triangle, Sine, 
+    [00 00 00 00 00 00 00 00 00 00 03 07 01 00 00 00 ]
+  * Number of simultaneous effects: 16
+
+Setting master gain to 75% ... OK
+Uploading effect #0 (Periodic sinusoidal) ... OK (id 0)
+Uploading effect #1 (Constant) ... Error: Invalid argument
+Uploading effect #2 (Spring) ... Error: Invalid argument
+Uploading effect #3 (Damper) ... Error: Invalid argument
+Uploading effect #4 (Strong rumble, with heavy motor) ... OK (id 1)
+Uploading effect #5 (Weak rumble, with light motor) ... OK (id 2)
+Enter effect number, -1 to exit
+5
+Now Playing: Weak Rumble
+Enter effect number, -1 to exit
+
+0
+Now Playing: Sine vibration
+Enter effect number, -1 to exit
+5
+Now Playing: Weak Rumble
+Enter effect number, -1 to exit
+^C
+
+
+
+diff --git a/arch/arm/boot/dts/omap4-droid4-xt894.dts b/arch/arm/boot/dts/omap4-droid4-xt894.dts
+index 45305e8..c27fc87 100644
+--- a/arch/arm/boot/dts/omap4-droid4-xt894.dts
++++ b/arch/arm/boot/dts/omap4-droid4-xt894.dts
+@@ -159,13 +159,7 @@
  
- #include <asm/setup.h>  /* for COMMAND_LINE_SIZE */
- #include <asm/page.h>
-@@ -537,8 +538,8 @@ void *of_fdt_unflatten_tree(const unsigned long *blob,
- EXPORT_SYMBOL_GPL(of_fdt_unflatten_tree);
+ 		dais = <&mcbsp2_port>, <&mcbsp3_port>;
+ 	};
+-};
+-
+-&dss {
+-	status = "okay";
+-};
  
- /* Everything below here references initial_boot_params directly. */
--int __initdata dt_root_addr_cells;
--int __initdata dt_root_size_cells;
-+int dt_root_addr_cells;
-+int dt_root_size_cells;
+-&gpio6 {
+ 	pwm8: dmtimer-pwm-8 {
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&vibrator_direction_pin>;
+@@ -192,7 +186,10 @@
+ 		pwm-names = "enable", "direction";
+ 		direction-duty-cycle-ns = <10000000>;
+ 	};
++};
  
- void *initial_boot_params;
++&dss {
++	status = "okay";
+ };
  
-@@ -1330,3 +1331,60 @@ late_initcall(of_fdt_raw_init);
- #endif
+ &dsi1 {
+diff --git a/drivers/pwm/pwm-omap-dmtimer.c b/drivers/pwm/pwm-omap-dmtimer.c
+index 665da3c..debeb70 100644
+--- a/drivers/pwm/pwm-omap-dmtimer.c
++++ b/drivers/pwm/pwm-omap-dmtimer.c
+@@ -265,7 +271,7 @@ static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
+ 	timer_pdata = dev_get_platdata(&timer_pdev->dev);
+ 	if (!timer_pdata) {
+ 		dev_err(&pdev->dev, "dmtimer pdata structure NULL\n");
+-		ret = -EINVAL;
++		ret = -EPROBE_DEFER;
+ 		goto put;
+ 	}
  
- #endif /* CONFIG_OF_EARLY_FLATTREE */
-+
-+bool of_fdt_cells_size_fitted(u64 base, u64 size)
-+{
-+	/* if *_cells >= 2, cells can hold 64-bit values anyway */
-+	if ((dt_root_addr_cells == 1) && (base > U32_MAX))
-+		return false;
-+
-+	if ((dt_root_size_cells == 1) && (size > U32_MAX))
-+		return false;
-+
-+	return true;
-+}
-+
-+size_t of_fdt_reg_cells_size(void)
-+{
-+	return (dt_root_addr_cells + dt_root_size_cells) * sizeof(u32);
-+}
-+
-+#define FDT_ALIGN(x, a)	(((x) + (a) - 1) & ~((a) - 1))
-+#define FDT_TAGALIGN(x)	(FDT_ALIGN((x), FDT_TAGSIZE))
-+
-+int fdt_prop_len(const char *prop_name, int len)
-+{
-+	return (strlen(prop_name) + 1) +
-+		sizeof(struct fdt_property) +
-+		FDT_TAGALIGN(len);
-+}
-+
-+static void fill_property(void *buf, u64 val64, int cells)
-+{
-+	__be32 val32;
-+
-+	while (cells) {
-+		val32 = cpu_to_fdt32((val64 >> (32 * (--cells))) & U32_MAX);
-+		memcpy(buf, &val32, sizeof(val32));
-+		buf += sizeof(val32);
-+	}
-+}
-+
-+int fdt_setprop_reg(void *fdt, int nodeoffset, const char *name,
-+						u64 addr, u64 size)
-+{
-+	char buf[sizeof(__be32) * 2 * 2];
-+		/* assume dt_root_[addr|size]_cells <= 2 */
-+	void *prop;
-+	size_t buf_size;
-+
-+	buf_size = of_fdt_reg_cells_size();
-+	prop = buf;
-+
-+	fill_property(prop, addr, dt_root_addr_cells);
-+	prop += dt_root_addr_cells * sizeof(u32);
-+
-+	fill_property(prop, size, dt_root_size_cells);
-+
-+	return fdt_setprop(fdt, nodeoffset, name, buf, buf_size);
-+}
-diff --git a/include/linux/of_fdt.h b/include/linux/of_fdt.h
-index b9cd9ebdf9b9..9615d6142578 100644
---- a/include/linux/of_fdt.h
-+++ b/include/linux/of_fdt.h
-@@ -37,8 +37,8 @@ extern void *of_fdt_unflatten_tree(const unsigned long *blob,
- 				   struct device_node **mynodes);
- 
- /* TBD: Temporary export of fdt globals - remove when code fully merged */
--extern int __initdata dt_root_addr_cells;
--extern int __initdata dt_root_size_cells;
-+extern int dt_root_addr_cells;
-+extern int dt_root_size_cells;
- extern void *initial_boot_params;
- 
- extern char __dtb_start[];
-@@ -108,5 +108,11 @@ static inline void unflatten_device_tree(void) {}
- static inline void unflatten_and_copy_device_tree(void) {}
- #endif /* CONFIG_OF_EARLY_FLATTREE */
- 
-+bool of_fdt_cells_size_fitted(u64 base, u64 size);
-+size_t of_fdt_reg_cells_size(void);
-+int fdt_prop_len(const char *prop_name, int len);
-+int fdt_setprop_reg(void *fdt, int nodeoffset, const char *name,
-+						u64 addr, u64 size);
-+
- #endif /* __ASSEMBLY__ */
- #endif /* _LINUX_OF_FDT_H */
+
+
 -- 
-2.17.0
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180711/babf08ad/attachment.sig>
