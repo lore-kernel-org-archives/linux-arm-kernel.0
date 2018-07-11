@@ -1,48 +1,29 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Wed, 11 Jul 2018 09:34:49 -0700
-Subject: [PATCH] clk: aspeed: Support HPLL strapping on ast2400
-In-Reply-To: <CACPK8XfxKhT_ywpo3vqXSEaSPGdM+uhkgpn1R+EP9Z3spxAzXg@mail.gmail.com>
-References: <20180628231540.26633-1-joel@jms.id.au>
- <153089970720.143105.7005759760140367907@swboyd.mtv.corp.google.com>
- <CACPK8XfxKhT_ywpo3vqXSEaSPGdM+uhkgpn1R+EP9Z3spxAzXg@mail.gmail.com>
-Message-ID: <153132688979.143105.557909972230566711@swboyd.mtv.corp.google.com>
+From: aisheng.dong@nxp.com (Dong Aisheng)
+Date: Thu, 12 Jul 2018 00:32:37 +0800
+Subject: [RFC PATCH 0/2] mailbox: imx-mailbox: add SCU protocol support
+Message-ID: <1531326759-20556-1-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Joel Stanley (2018-07-10 22:53:52)
-> Hi Stephen,
-> 
-> On 7 July 2018 at 03:55, Stephen Boyd <sboyd@kernel.org> wrote:
-> > Quoting Joel Stanley (2018-06-28 16:15:40)
-> >> The HPLL can be configured through a register (SCU24), however some
-> >> platforms chose to configure it through the strapping settings and do
-> >> not use the register. This was not noticed as the logic for bit 18 in
-> >> SCU24 was confused: set means programmed, but the driver read it as set
-> >> means strapped.
-> >>
-> >> This gives us the correct HPLL value on Palmetto systems, from which
-> >> most of the peripheral clocks are generated.
-> >>
-> >> Fixes: 5eda5d79e4be ("clk: Add clock driver for ASPEED BMC SoCs")
-> >> Cc: stable at vger.kernel.org # v4.15
-> >> Reviewed-by: C?dric Le Goater <clg@kaod.org>
-> >> Signed-off-by: Joel Stanley <joel@jms.id.au>
-> >> ---
-> >
-> > Do you want this merged for -rc5? It sounds like on some systems this is
-> > a problem, but I don't know if these systems are supposed to work yet or
-> > not, so priority of this fix is not easy for me to understand.
-> >
-> 
-> Sure, some more background:
-> 
-> We did not notice this until we attempted to use the clock for the mtd
-> driver. However, this clock is used for the kernel clocksource, so eg.
-> sleep 1 takes two seconds to complete. This affects all of the systems
-> I have access to.
-> 
-> I suggest we merge for4.18, and keep the cc: stable so it can be
-> backported to the stable trees.
-> 
+This is per Sascha's reques to implemented SCU protocol support
+based on Oleksij's generic mailbox driver for communicate with M4.
 
-Ok. Thanks! Applied to clk-fixes.
+That driver is also still under review.
+https://www.spinics.net/lists/arm-kernel/msg659013.html
+
+Due to the protocol is totally different, most of code can
+not be reused for SCU. So we implement a separate mbox_chan_ops
+for SCU protocol to avoid mixing the difference.
+
+Dong Aisheng (2):
+  dt-bindings: arm: fsl: add mu binding doc
+  mailbox: imx-mailbox: add scu protocol support
+
+ .../devicetree/bindings/mailbox/fsl,mu.txt         |  34 +++
+ drivers/mailbox/Kconfig                            |   6 +-
+ drivers/mailbox/imx-mailbox.c                      | 252 ++++++++++++++++++---
+ 3 files changed, 257 insertions(+), 35 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mailbox/fsl,mu.txt
+
+-- 
+2.7.4
