@@ -1,40 +1,32 @@
 From: weiyongjun1@huawei.com (Wei Yongjun)
-Date: Wed, 11 Jul 2018 12:33:31 +0000
-Subject: [PATCH -next] pinctrl: single: Fix missing unlock on error path
-Message-ID: <1531312411-134133-1-git-send-email-weiyongjun1@huawei.com>
+Date: Wed, 11 Jul 2018 12:34:07 +0000
+Subject: [PATCH -next] pinctrl: at91-pio4: remove redundant return value check
+ of platform_get_resource()
+Message-ID: <1531312447-134423-1-git-send-email-weiyongjun1@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the missing unlock before return from function
-in the error handling case.
+Remove unneeded error handling on the result of a call
+to platform_get_resource() when the value is passed to
+devm_ioremap_resource().
 
-Fixes: 0f5972033509 ("pinctrl: single: Fix group and function selector use")
 Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
 ---
- drivers/pinctrl/pinctrl-single.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/pinctrl/pinctrl-at91-pio4.c | 4 ----
+ 1 file changed, 4 deletions(-)
 
-diff --git a/drivers/pinctrl/pinctrl-single.c b/drivers/pinctrl/pinctrl-single.c
-index 7dc680e..7ec72ff 100644
---- a/drivers/pinctrl/pinctrl-single.c
-+++ b/drivers/pinctrl/pinctrl-single.c
-@@ -1071,8 +1071,8 @@ static int pcs_parse_one_pinctrl_entry(struct pcs_device *pcs,
- 	*num_maps = 1;
- free_function:
- 	pinmux_generic_remove_function(pcs->pctl, fsel);
--	mutex_unlock(&pcs->mutex);
- free_pins:
-+	mutex_unlock(&pcs->mutex);
- 	devm_kfree(pcs->dev, pins);
+diff --git a/drivers/pinctrl/pinctrl-at91-pio4.c b/drivers/pinctrl/pinctrl-at91-pio4.c
+index 8f06197..ef7ab20 100644
+--- a/drivers/pinctrl/pinctrl-at91-pio4.c
++++ b/drivers/pinctrl/pinctrl-at91-pio4.c
+@@ -971,10 +971,6 @@ static int atmel_pinctrl_probe(struct platform_device *pdev)
+ 	atmel_pioctrl->npins = atmel_pioctrl->nbanks * ATMEL_PIO_NPINS_PER_BANK;
  
- free_vals:
-@@ -1211,8 +1211,8 @@ static int pcs_parse_bits_in_pinctrl_entry(struct pcs_device *pcs,
- 	*num_maps = 1;
- free_function:
- 	pinmux_generic_remove_function(pcs->pctl, fsel);
--	mutex_unlock(&pcs->mutex);
- free_pins:
-+	mutex_unlock(&pcs->mutex);
- 	devm_kfree(pcs->dev, pins);
- 
- free_vals:
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	if (!res) {
+-		dev_err(dev, "unable to get atmel pinctrl resource\n");
+-		return -EINVAL;
+-	}
+ 	atmel_pioctrl->reg_base = devm_ioremap_resource(dev, res);
+ 	if (IS_ERR(atmel_pioctrl->reg_base))
+ 		return -EINVAL;
