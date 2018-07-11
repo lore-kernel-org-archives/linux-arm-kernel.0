@@ -1,305 +1,107 @@
-From: Ben.Whitten@lairdtech.com (Ben Whitten)
-Date: Wed, 11 Jul 2018 15:21:22 +0000
-Subject: [RFC net-next 00/15] net: A socket API for LoRa
-In-Reply-To: <20180701110804.32415-1-afaerber@suse.de>
-References: <20180701110804.32415-1-afaerber@suse.de>
-Message-ID: <BY1PR02MB11147C7443AB9623D6B65798E75A0@BY1PR02MB1114.namprd02.prod.outlook.com>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Wed, 11 Jul 2018 17:29:30 +0200
+Subject: [PATCH 1/3] arm: Convert arm boot_lock to raw
+In-Reply-To: <20180711110037.12928-2-bigeasy@linutronix.de>
+References: <20180711110037.12928-1-bigeasy@linutronix.de>
+ <20180711110037.12928-2-bigeasy@linutronix.de>
+Message-ID: <1266f6c9-8eda-c71f-2d07-90291281c6f8@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Subject: [RFC net-next 00/15] net: A socket API for LoRa
+Am 11.07.2018 um 13:00 schrieb Sebastian Andrzej Siewior:
+> From: Frank Rowand <frank.rowand@am.sony.com>
 > 
-> Hello,
+> The arm boot_lock is used by the secondary processor startup code.  The locking
+> task is the idle thread, which has idle->sched_class == &idle_sched_class.
+> idle_sched_class->enqueue_task == NULL, so if the idle task blocks on the
+> lock, the attempt to wake it when the lock becomes available will fail:
 > 
-> LoRa is a long-range, low-power wireless technology by
-> Semtech.
-> Unlike other LPWAN technologies, users don't need to rely
-> on infrastructure
-> providers and SIM cards and expensive subscription plans,
-> they can set up
-> their own gateways. Modules, adapters and evaluation
-> boards are available
-> from a large number of vendors.
+> try_to_wake_up()
+>    ...
+>       activate_task()
+>          enqueue_task()
+>             p->sched_class->enqueue_task(rq, p, flags)
 > 
-> Many vendors also make available Open Source software
-> examples on GitHub.
-> But when taking a closer look, many of them combine
-> licenses in ways that are
-> not redistributable. My reports have remained without
-> response or solution.
+> Fix by converting boot_lock to a raw spin lock.
 > 
-> https://github.com/ernstdevreede/lmic_pi/issues/2
-> https://github.com/Snootlab/lmic_chisterapi/issues/2
-> https://github.com/Snootlab/lora_chisterapi/issues/2
+> Cc: "Andreas F?rber" <afaerber@suse.de>
+> Cc: Kukjin Kim <kgene@kernel.org>
+> Cc: Krzysztof Kozlowski <krzk@kernel.org>
+> Cc: Wei Xu <xuwei5@hisilicon.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Barry Song <baohua@kernel.org>
+> Cc: Andy Gross <andy.gross@linaro.org>
+> Cc: David Brown <david.brown@linaro.org>
+> Cc: Viresh Kumar <vireshk@kernel.org>
+> Cc: Shiraz Hashim <shiraz.linux.kernel@gmail.com>
+> Cc: Patrice Chotard <patrice.chotard@st.com>
+> Cc: Maxime Ripard <maxime.ripard@bootlin.com>
+> Cc: Chen-Yu Tsai <wens@csie.org>
+> Cc: linux-samsung-soc at vger.kernel.org
+> Cc: linux-omap at vger.kernel.org
+> Cc: linux-arm-msm at vger.kernel.org
+> Cc: linux-soc at vger.kernel.org
+> Signed-off-by: Frank Rowand <frank.rowand@am.sony.com>
+> Link: http://lkml.kernel.org/r/4E77B952.3010606 at am.sony.com
+> Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+> Tested-by: Tony Lindgren <tony@atomide.com>
+> Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
+> Tested-by: Krzysztof Kozlowski <krzk@kernel.org> [Exynos5422 Linaro PM-QA]
+> Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+> ---
+>  arch/arm/mach-actions/platsmp.c   |  6 +++---
+>  arch/arm/mach-exynos/platsmp.c    | 12 ++++++------
+>  arch/arm/mach-hisi/platmcpm.c     | 22 +++++++++++-----------
+>  arch/arm/mach-omap2/omap-smp.c    | 10 +++++-----
+>  arch/arm/mach-prima2/platsmp.c    | 10 +++++-----
+>  arch/arm/mach-qcom/platsmp.c      | 10 +++++-----
+>  arch/arm/mach-spear/platsmp.c     | 10 +++++-----
+>  arch/arm/mach-sti/platsmp.c       | 10 +++++-----
+>  arch/arm/mach-sunxi/mc_smp.c      | 20 ++++++++++----------
+>  arch/arm/plat-versatile/platsmp.c | 10 +++++-----
+>  10 files changed, 60 insertions(+), 60 deletions(-)
 > 
-> Another issue was that most such projects around the
-> Raspberry Pi make use of
-> spidev to communicate with the Semtech chipsets from
-> userspace. The Linux spi
-> maintainers have chosen to greet any such users of spidev
-> with a friendly
-> WARN_ON(), preferring in-kernel spi drivers and white-
-> listing individual
-> devices only.
-> 
-> https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/lin
-> ux.git/tree/drivers/spi/spidev.c?h=v4.17#n722
-> https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/lin
-> ux.git/tree/drivers/spi/spidev.c?h=v4.17#n667
-> 
-> Also I don't quite see the point in having userspace probe
-> what SPI devices
-> are connected to a generic spidev driver when we have an
-> easy Device Tree
-> hardware description on arm/arm64 that could give us that
-> info.
-> 
-> I raised the topic during Q&A of a FOSDEM 2017 talk (cut off
-> at the end
-> of the video) but unfortunately found no one to collaborate
-> on this.
-> 
-> https://archive.fosdem.org/2017/schedule/event/lorawan/
-> 
-> Instead of porting from wiringPi to a differently licensed
-> GPIO library
-> and dealing with seemingly unmaintained LoRaWAN code
-> dumps, I started a
-> spi kernel driver for SX1276 back in 2016. But obviously a
-> kernel driver
-> isn't too helpful without a userspace API to send and receive
-> packets.
-> 
-> This patchset, updated from 2017 and extended, is
-> implementing kernel drivers
-> for various LoRa chipsets and modules. As API I'm proposing
-> a PF_LORA socket
-> implementation. Why? LoRa uses data packets with headers
-> and checksums
-> and differing MTUs and multiple protocols layered on top of
-> it. Apart from
-> simple headers for addressing used by RadioHead library
-> and IMST's LoRa P2P
-> protocol, the main use case (not implemented in this
-> patchset) is expected
-> to be LoRaWAN. And LoRaWAN has competing proprietary
-> protocols, such as
-> Link Labs' Symphony Link or GlobalSat M.O.S.T. or
-> RadioShuttle, that might
-> at some point want to adopt a standard API for their
-> implementations, too.
-> 
-> Ready-made LoRa hardware modules come in three flavors,
-> a) with SPI access to the underlying Semtech chipsets,
-> needing a software
->    implementation of e.g. LoRaWAN protocol stack (i.e., a
-> soft MAC),
-> b) with a custom, often UART based interface and a pre-
-> certified LoRaWAN
->    protocol stack already integrated (i.e., hard/full MAC), and
-> c) with a microcontroller that serves not only for the
-> protocol stack but
->    also as application processor, not offering a ready-made
-> interface.
-> 
-> This patchset focuses on option a). An SX1276 based
-> LoRaWAN stack appeared
-> to be the project of Jian-Hong Pan and is not included here.
-> This patchset also includes drivers for b), from text based AT
-> commands to
-> a binary SLIP based HCI protocol.
-> Hardware examples for c) are Murata CMWX1ZZABZ-078
-> and RAK813.
-> 
-> This patchset is clearly not ready for merging, but is being
-> submitted for
-> discussion, as requested by Jiri, in particular of the design
-> choices:
-> 
-> 1) PF_LORA/AF_LORA and associated identifiers are
-> proposed to represent
->    this technology. While for an SX1276 - case a) above - it
-> might work to
->    layer LoRaWAN as a protocol option for PF_LORA and add
-> LoRaWAN address
->    fields to the union in my sockaddr_lora, how would that
-> work for devices
->    that only support LoRaWAN but not pure LoRa? Do we
-> need both AF_LORA and
->    AF_LORAWAN, or just a separate ETH_P_LORAWAN or
-> ARPHRD_LORAWAN?
-> 
-> 2) PF_LORA is used with SOCK_DGRAM here. The
-> assumption is that RAW mode
->    would be DGRAM plus preamble plus optional checksum.
-> 
-> 3) Only the transmit path is partially implemented already.
-> The assumption
->    is that the devices should go into receive mode by default
-> and only
->    interrupt that when asked to transmit.
-> 
-> 4) Some hardware settings need to be supplied externally,
-> such as the radio
->    frequency for some modules, but many others can be
-> runtime-configured,
->    such as Spreading Factor, Bandwidth, Sync Word, or which
-> antenna to use.
->    What settings should be implemented as socket option vs.
-> netlink layer
->    vs. ioctl vs. sysfs? What are the criteria to apply?
-> 
-> 5) Many of the modules support multiple modes, such as
-> LoRa, LoRaWAN and FSK.
->    Lacking a LoRaWAN implementation, I am currently
-> switching them into LoRa
->    mode at probe time wherever possible. How do we deal
-> with that properly?
-> 
->   a) Is there any precedence from the Wifi world for
-> dynamically selecting
->      between our own trusted Open Source implementation
-> vs. hardware/firmware
->      accelerated and/or certified implementations?
-> 
->   b) Would a proof of concept for FSK (non-LoRa) modes be
-> required for
->      merging any LoRa driver for chipsets that support both?
-> Or is there any
->      facility or design guidelines that would allow us to focus
-> on LoRa and
->      LoRaWAN and leave non-LoRa radio modes to later
-> contributors?
+> diff --git a/arch/arm/mach-actions/platsmp.c b/arch/arm/mach-actions/platsmp.c
+> index 3efaa10efc43..770079245d27 100644
+> --- a/arch/arm/mach-actions/platsmp.c
+> +++ b/arch/arm/mach-actions/platsmp.c
+> @@ -39,7 +39,7 @@ static void __iomem *sps_base_addr;
+>  static void __iomem *timer_base_addr;
+>  static int ncores;
+>  
+> -static DEFINE_SPINLOCK(boot_lock);
+> +static DEFINE_RAW_SPINLOCK(boot_lock);
+>  
+>  void owl_secondary_startup(void);
+>  
+> @@ -93,7 +93,7 @@ static int s500_smp_boot_secondary(unsigned int cpu, struct task_struct *idle)
+>  
+>  	udelay(10);
+>  
+> -	spin_lock(&boot_lock);
+> +	raw_spin_lock(&boot_lock);
+>  
+>  	smp_send_reschedule(cpu);
+>  
+> @@ -106,7 +106,7 @@ static int s500_smp_boot_secondary(unsigned int cpu, struct task_struct *idle)
+>  	writel(0, timer_base_addr + OWL_CPU1_ADDR + (cpu - 1) * 4);
+>  	writel(0, timer_base_addr + OWL_CPU1_FLAG + (cpu - 1) * 4);
+>  
+> -	spin_unlock(&boot_lock);
+> +	raw_spin_unlock(&boot_lock);
+>  
+>  	return 0;
+>  }
+[snip]
 
-Down the line I think we should also plan for a CRDA style regdb somewhere in the path for raw LoRa transceivers operating as softMAC, much like with WiFi.
-LoRa radios used in Gateway devices are typically relatively high power (capable of 27dBm) and operate in bands with certain restrictions, eg the EU has keep out areas within 868MHz for alarms and SRD devices must abide by certain duty cycle restrictions, there are also maximum powers to consider for sub-bands. (ETSI EN 300 220-2 V3.2.1, Bands K, L, M, N, P, Q)
-The certified AT style modules will (should) already have this regulatory data baked in so it only applied to situations where we drive the transceivers directly, but it wouldn't hurt to check that the frequency being asked to transmit on doesn't spill into a restricted band.
+Looks okay, so
 
-> As evident by the many questions, this is my first deep dive
-> into the Linux
-> net subsystem. It's also my first experiments with the new
-> serdev subsystem,
-> so in particular the receive paths will need some review and
-> optimizations.
-> 
-> This patchset was developed and tested mainly as KMP,
-> originally at
-> https://github.com/afaerber/lora-modules. It was recently
-> transformed into a
-> linux-next based tree, still mostly tested on our openSUSE
-> Tumbleweed kernel
-> with a differing AF_LORA value below current AF_MAX limit.
-> 
-> Some corresponding Device Tree Overlays have been
-> collected here:
-> https://github.com/afaerber/dt-overlays
-> 
-> Only European models for 868 MHz and 433 MHz could be
-> tested when available.
-> Thanks to all companies and people that have supported
-> this project so far.
-> 
-> Have a lot of fun!
-> 
-> Cheers,
-> Andreas
-> 
-> Cc: Jian-Hong Pan <starnight@g.ncu.edu.tw>
-> Cc: Jiri Pirko <jiri@resnulli.us>
-> Cc: Marcel Holtmann <marcel@holtmann.org>
-> Cc: "David S. Miller" <davem@davemloft.net>
-> Cc: Matthias Brugger <mbrugger@suse.com>
-> Cc: Konstantin B?hm <konstantin.boehm@ancud.de>
-> Cc: Jan Jongboom <jan.jongboom@arm.com>
-> Cc: Janus Piwek <jpiwek@arroweurope.com>
-> Cc: Michael R?der <michael.roeder@avnet.eu>
-> Cc: Dollar Chen (???) <dollar.chen@wtmec.com>
-> Cc: Ken Yu (??) <ken.yu@rakwireless.com>
-> Cc: Jon Ortego <Jon.Ortego@imst.de>
-> Cc: contact at snootlab.com
-> Cc: Ben Whitten <ben.whitten@lairdtech.com>
-> Cc: Brian Ray <brian.ray@link-labs.com>
-> Cc: lora at globalsat.com.tw
-> Cc: lora at radioshuttle.de
-> Cc: Alexander Graf <agraf@suse.de>
-> Cc: Michal Kube?ek <mkubecek@suse.cz>
-> Cc: Rob Herring <robh@kernel.org>
-> Cc: devicetree at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: Steve deRosier <derosier@gmail.com>
-> Cc: Mark Brown <broonie@kernel.org>
-> Cc: linux-spi at vger.kernel.org
-> 
-> Andreas F?rber (15):
->   net: Reserve protocol numbers for LoRa
->   net: lora: Define sockaddr_lora
->   net: lora: Add protocol numbers
->   net: Add lora subsystem
->   HACK: net: lora: Deal with .poll_mask in 4.18-rc2
->   net: lora: Prepare for device drivers
->   net: lora: Add Semtech SX1276
->   net: lora: sx1276: Add debugfs
->   net: lora: Prepare EUI helpers
->   net: lora: Add Microchip RN2483
->   net: lora: Add IMST WiMOD
->   net: lora: Add USI WM-SG-SM-42
->   net: lora: Prepare RAK RAK811
->   net: lora: Prepare Semtech SX1257
->   net: lora: Add Semtech SX1301
-> 
->  drivers/net/Makefile                |   1 +
->  drivers/net/lora/Kconfig            |  72 ++++
->  drivers/net/lora/Makefile           |  32 ++
->  drivers/net/lora/dev.c              | 125 ++++++
->  drivers/net/lora/rak811.c           | 219 +++++++++++
->  drivers/net/lora/rn2483.c           | 344 +++++++++++++++++
->  drivers/net/lora/rn2483.h           |  40 ++
->  drivers/net/lora/rn2483_cmd.c       | 130 +++++++
->  drivers/net/lora/sx1257.c           |  96 +++++
->  drivers/net/lora/sx1276.c           | 740
-> ++++++++++++++++++++++++++++++++++++
->  drivers/net/lora/sx1301.c           | 446
-> ++++++++++++++++++++++
->  drivers/net/lora/usi.c              | 411
-> ++++++++++++++++++++
->  drivers/net/lora/wimod.c            | 597
-> +++++++++++++++++++++++++++++
->  include/linux/lora/dev.h            |  44 +++
->  include/linux/lora/skb.h            |  29 ++
->  include/linux/socket.h              |   4 +-
->  include/uapi/linux/if_arp.h         |   1 +
->  include/uapi/linux/if_ether.h       |   1 +
->  include/uapi/linux/lora.h           |  24 ++
->  net/Kconfig                         |   1 +
->  net/Makefile                        |   1 +
->  net/lora/Kconfig                    |  15 +
->  net/lora/Makefile                   |   8 +
->  net/lora/af_lora.c                  | 152 ++++++++
->  net/lora/af_lora.h                  |  13 +
->  net/lora/dgram.c                    | 297 +++++++++++++++
->  security/selinux/hooks.c            |   4 +-
->  security/selinux/include/classmap.h |   4 +-
->  28 files changed, 3848 insertions(+), 3 deletions(-)
->  create mode 100644 drivers/net/lora/Kconfig
->  create mode 100644 drivers/net/lora/Makefile
->  create mode 100644 drivers/net/lora/dev.c
->  create mode 100644 drivers/net/lora/rak811.c
->  create mode 100644 drivers/net/lora/rn2483.c
->  create mode 100644 drivers/net/lora/rn2483.h
->  create mode 100644 drivers/net/lora/rn2483_cmd.c
->  create mode 100644 drivers/net/lora/sx1257.c
->  create mode 100644 drivers/net/lora/sx1276.c
->  create mode 100644 drivers/net/lora/sx1301.c
->  create mode 100644 drivers/net/lora/usi.c
->  create mode 100644 drivers/net/lora/wimod.c
->  create mode 100644 include/linux/lora/dev.h
->  create mode 100644 include/linux/lora/skb.h
->  create mode 100644 include/uapi/linux/lora.h
->  create mode 100644 net/lora/Kconfig
->  create mode 100644 net/lora/Makefile
->  create mode 100644 net/lora/af_lora.c
->  create mode 100644 net/lora/af_lora.h
->  create mode 100644 net/lora/dgram.c
-> 
-> --
-> 2.16.4
+Acked-by: Andreas F?rber <afaerber@suse.de> (for mach-actions)
+
+Regards,
+Andreas
+
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
