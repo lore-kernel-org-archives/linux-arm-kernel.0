@@ -1,71 +1,83 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 11 Jul 2018 13:43:46 -0600
-Subject: [PATCH v2 1/3] clk: meson: add DT documentation for emmc clock
- controller
-In-Reply-To: <20180710163658.6175-2-yixun.lan@amlogic.com>
-References: <20180710163658.6175-1-yixun.lan@amlogic.com>
- <20180710163658.6175-2-yixun.lan@amlogic.com>
-Message-ID: <20180711194346.GA32414@rob-hp-laptop>
+From: alexandre.belloni@bootlin.com (Alexandre Belloni)
+Date: Wed, 11 Jul 2018 21:41:47 +0200
+Subject: [PATCH] ARM: at91: remove unnecessary
+ of_platform_default_populate calls
+In-Reply-To: <CAL_JsqKzv4=Vpej3kbjMBkFFOpJE_KQRgYr=Svftd_xs-Bj3-g@mail.gmail.com>
+References: <20180619214020.18608-1-robh@kernel.org>
+ <CAL_JsqLfnSOgOMdaJU3Q4h5_PGnNgd4rx+vKXdFVZnNEo6+JZA@mail.gmail.com>
+ <20180711161443.GY16084@piout.net>
+ <CAL_JsqKzv4=Vpej3kbjMBkFFOpJE_KQRgYr=Svftd_xs-Bj3-g@mail.gmail.com>
+Message-ID: <20180711194147.GZ16084@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 10, 2018 at 04:36:56PM +0000, Yixun Lan wrote:
-> Document the MMC sub clock controller driver, the potential consumer
-> of this driver is MMC or NAND.
-
-So you all have decided to properly model this now?
-
+On 11/07/2018 12:13:17-0600, Rob Herring wrote:
+> On Wed, Jul 11, 2018 at 10:15 AM Alexandre Belloni
+> <alexandre.belloni@bootlin.com> wrote:
+> >
+> > Hi,
+> >
+> > On 09/07/2018 09:50:47-0600, Rob Herring wrote:
+> > > On Tue, Jun 19, 2018 at 3:40 PM Rob Herring <robh@kernel.org> wrote:
+> > > >
+> > > > The DT core will call of_platform_default_populate, so it is not
+> > > > necessary for machine specific code to call it unless there are custom
+> > > > match entries, auxdata or parent device. Neither of those apply here, so
+> > > > remove the call.
+> > > >
+> > > > Cc: Nicolas Ferre <nicolas.ferre@microchip.com>
+> > > > Cc: Alexandre Belloni <alexandre.belloni@bootlin.com>
+> > > > Cc: linux-arm-kernel at lists.infradead.org
+> > > > Signed-off-by: Rob Herring <robh@kernel.org>
+> > > > ---
+> > > >  arch/arm/mach-at91/at91rm9200.c | 5 -----
+> > > >  arch/arm/mach-at91/at91sam9.c   | 5 -----
+> > > >  arch/arm/mach-at91/sama5.c      | 5 -----
+> > > >  3 files changed, 15 deletions(-)
+> > >
+> > > Ping?
+> > >
+> >
+> > This breaks the platform in two different ways:
+> >  - PM is not working anymore because of the missing SRAM node
+> >  - the pinctrl driver fails to probe and so many drivers are
+> >    deferring the probe forever
+> >
+> > Relevant messages (once the earlycon crap is removed to let earlyprintk
+> > do its job):
+> >
+> > at91_pm_sram_init: failed to find sram device!
+> > AT91: PM not supported, due to no SRAM allocated
 > 
-> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
-> ---
->  .../bindings/clock/amlogic,mmc-clkc.txt       | 31 +++++++++++++++++++
->  1 file changed, 31 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/amlogic,mmc-clkc.txt
+> So the at91_pm_sram_init function tries to get SRAM platform device,
+> but it doesn't exist yet. Of course, that is fragile because while the
+> device may exist, it's just luck that it's driver has probed already.
+> Would using .init_late hook instead of .init_machine work for you?
 > 
-> diff --git a/Documentation/devicetree/bindings/clock/amlogic,mmc-clkc.txt b/Documentation/devicetree/bindings/clock/amlogic,mmc-clkc.txt
-> new file mode 100644
-> index 000000000000..ff6b4bf3ecf9
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/amlogic,mmc-clkc.txt
-> @@ -0,0 +1,31 @@
-> +* Amlogic MMC Sub Clock Controller Driver
-> +
-> +The Amlogic MMC clock controller generates and supplies clock to support
-> +MMC and NAND controller
-> +
-> +Required Properties:
-> +
-> +- compatible: should be:
-> +		"amlogic,meson-gx-mmc-clkc"
-> +		"amlogic,meson-axg-mmc-clkc"
-> +
-> +- #clock-cells: should be 1.
-> +- clocks: phandles to clocks corresponding to the clock-names property
-> +- clock-names: list of parent clock names
-> +	- "clkin0", "clkin1"
-> +
-> +Parent node should have the following properties :
-> +- compatible: "syscon", "simple-mfd, and "amlogic,meson-axg-mmc-clkc"
-
-You don't need "simple-mfd" and probably not syscon either. The order is 
-wrong too. Most specific first.
-
-> +- reg: base address and size of the MMC control register space.
-> +
-> +Example: Clock controller node:
-> +
-> +sd_mmc_c_clkc: clock-controller at 7000 {
-> +	compatible = "amlogic,mmc-clkc", "syscon", "simple-mfd";
-
-Doesn't match the binding...
-
-> +	reg = <0x0 0x7000 0x0 0x4>;
-> +	#clock-cells = <1>;
-> +
-> +	clock-names = "clkin0", "clkin1";
-> +	clocks = <&clkc CLKID_SD_MMC_C_CLK0>,
-> +			<&clkc CLKID_FCLK_DIV2>;
-> +};
-> -- 
-> 2.18.0
+> Ideally, couldn't much of this code be converted to a driver? It's a
+> bit strange for initcall code to have a driver dependency.
 > 
+
+.init_late seems to work after testing quickly
+
+You probably didn't see it because they still have a soc_device parent
+but Arnd wanted us to remove it so it is gone.
+
+> >
+> > pinctrl-at91 ahb:apb:pinctrl at fc06a000: you need to specify at least one gpio-controller
+> > pinctrl-at91: probe of ahb:apb:pinctrl at fc06a000 failed with error -22
+> 
+> So this one has the strange dependency that the child nodes probe
+> before the parent node. That's backwards. Probe order is probably
+> changing from link order (all the devices are created before drivers
+> register) to device creation order. I think the fix is the pinctrl
+> driver should just count the gpio child nodes rather than relying on
+> aliases (which I'm not a fan of either). I can write a patch to do
+> that.
+
+I'll let you do that.
+
+-- 
+Alexandre Belloni, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
