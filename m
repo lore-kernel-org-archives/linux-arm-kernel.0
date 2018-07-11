@@ -1,38 +1,35 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Wed, 11 Jul 2018 22:24:26 +0200
-Subject: [GIT PULL] pxa fixes for v4.18
-Message-ID: <871sc9ed1h.fsf@belgarion.home>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 11 Jul 2018 22:27:49 +0200
+Subject: [PATCH] ARM: dts: nomadik: Cut FSMC timings
+Message-ID: <20180711202749.22211-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Arnd, Kevin, Olof,
+After the work done by Thomas Petazzoni, the NAND chip timings
+can be read out from the chip instead of open coded in the
+device tree, so let's just remove the timing information.
 
-Please consider this pull request for pxa fixes for 4.18.
+Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+Hi ARM SoC folks, please apply this directly on some DTS
+branch, I do not plan to send any more Nomadik DTS updates
+this kernel cycle.
+---
+ arch/arm/boot/dts/ste-nomadik-stn8815.dtsi | 1 -
+ 1 file changed, 1 deletion(-)
 
-The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
-
-  Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
-
-are available in the git repository at:
-
-  https://github.com/rjarzmik/linux.git tags/pxa-fixes-4.18
-
-for you to fetch changes up to 0c1049dcb4ceec640d8bd797335bcbebdcab44d2:
-
-  ARM: pxa: irq: fix handling of ICMR registers in suspend/resume (2018-07-07 13:25:15 +0200)
-
-----------------------------------------------------------------
-This is the fixes set for v4.18 cycle.
-
-This is a fix for suspending all pxa3xx platforms, where high
-number interrupts are not reenabled.
-
-----------------------------------------------------------------
-Daniel Mack (1):
-      ARM: pxa: irq: fix handling of ICMR registers in suspend/resume
-
- arch/arm/mach-pxa/irq.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
+diff --git a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
+index dd9d1f08a337..b5ed312808df 100644
+--- a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
++++ b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
+@@ -662,7 +662,6 @@
+ 		reg-names = "fsmc_regs", "nand_data", "nand_addr", "nand_cmd";
+ 		clocks = <&hclksmc>;
+ 		status = "okay";
+-		timings = /bits/ 8 <0 0 0 0x10 0x0a 0>;
+ 
+ 		partition at 0 {
+ 		label = "X-Loader(NAND)";
 -- 
-Robert
+2.17.1
