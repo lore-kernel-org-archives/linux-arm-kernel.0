@@ -1,38 +1,80 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 11 Jul 2018 16:18:55 +0200
-Subject: [GIT PULL] Rockchip dts32 fix for 4.18
-Message-ID: <1776596.Q4iCTXTKyP@phil>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Wed, 11 Jul 2018 16:25:26 +0200
+Subject: Vibrations on Droid 4?
+In-Reply-To: <20180711132739.GL99251@atomide.com>
+References: <20180709081534.GA6799@amd>
+ <20180709214910.tes6u4ivxomd3aja@earth.universe>
+ <20180709220211.GA7760@amd>
+ <20180710101147.lyu65ro4czvrs2da@earth.universe>
+ <20180710133040.GA4391@amd>
+ <20180710161123.azym6sbboriuj4yc@earth.universe>
+ <20180711080218.GA21225@amd> <20180711132739.GL99251@atomide.com>
+Message-ID: <20180711142526.dto6iost57zx5t5l@earth.universe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Kevin, Olof,
+Hi,
 
-please find below a one-patch pull fixing a new warning the updated dtc
-in 4.18 found. So far no other regressions have been found in Rockchip
-parts it seems. So please pull!
+On Wed, Jul 11, 2018 at 06:27:39AM -0700, Tony Lindgren wrote:
+> * Pavel Machek <pavel@ucw.cz> [180711 08:05]:
+> > Hi!
+> > 
+> > > > Its parent is gpio at 4805d000 , and that one seems to be present.
+> > > > 
+> > > > user at devuan:/sys/bus/platform/devices$ ls 4805d000.gpio
+> > > > driver				       driver_override  gpio
+> > > > gpiochip5  modalias  of_node  power  subsystem  uevent
+> > > 
+> > > Sorry, something went wrong with merging this. The parent
+> > > of ti,omap-dmtimer-pwm and pwm-vibrator should be / and
+> > > not gpio6.
+> > 
+> > Ok, got it to probe... after dts fix and adding EPROBE_DEFFER to
+> > driver.
+> ..
+> > --- a/arch/arm/boot/dts/omap4-droid4-xt894.dts
+> > +++ b/arch/arm/boot/dts/omap4-droid4-xt894.dts
+> > @@ -159,13 +159,7 @@
+> >  
+> >  		dais = <&mcbsp2_port>, <&mcbsp3_port>;
+> >  	};
+> > -};
+> > -
+> > -&dss {
+> > -	status = "okay";
+> > -};
+> >  
+> > -&gpio6 {
+> >  	pwm8: dmtimer-pwm-8 {
+> >  		pinctrl-names = "default";
+> >  		pinctrl-0 = <&vibrator_direction_pin>;
+> > @@ -192,7 +186,10 @@
+> >  		pwm-names = "enable", "direction";
+> >  		direction-duty-cycle-ns = <10000000>;
+> >  	};
+> > +};
+> >  
+> > +&dss {
+> > +	status = "okay";
+> >  };
+> >  
+> >  &dsi1 {
+> 
+> Hmm sorry if I did a mismerge on the above. A note to
+> myself to stop applying patches that apply with fuzz,
+> that is clearly dangerous with dts files with lots
+> of similar named properties.
 
-Thanks
-Heiko
+It might also have been me doing the mismerge before
+sending the patch. Anyways, the patch from Pavel looks
+good to me. As a side-effect dss and dsi references
+come next to each other.
 
-The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
-
-  Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
-
-are available in the Git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.18-rockchip-dts32fixes-1
-
-for you to fetch changes up to cddb86833615d9550d7b3a1b65b71071784dae70:
-
-  ARM: dts: rockchip: fix graph node unit address error from dtc (2018-06-17 09:31:34 +0200)
-
-----------------------------------------------------------------
-Fix for a new warning from dtc in graph node unit addresses.
-
-----------------------------------------------------------------
-Heiko Stuebner (1):
-      ARM: dts: rockchip: fix graph node unit address error from dtc
-
- arch/arm/boot/dts/rk3288-evb.dtsi               | 2 +-
- arch/arm/boot/dts/rk3288-veyron-chromebook.dtsi | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180711/a4515595/attachment.sig>
