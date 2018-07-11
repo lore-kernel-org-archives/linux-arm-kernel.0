@@ -1,216 +1,113 @@
-From: james.morse@arm.com (James Morse)
-Date: Wed, 11 Jul 2018 17:15:18 +0100
-Subject: [PATCH v3 5/5] arm64/mm: Move {idmap_pg_dir, swapper_pg_dir} to
- .rodata section
-In-Reply-To: <20180702111659.25570-6-yaojun8558363@gmail.com>
-References: <20180702111659.25570-1-yaojun8558363@gmail.com>
- <20180702111659.25570-6-yaojun8558363@gmail.com>
-Message-ID: <daaef987-6fff-3720-9881-97fe06b2ee88@arm.com>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Wed, 11 Jul 2018 17:05:57 +0100
+Subject: [PATCH v5 7/7] KVM: arm64: Add support for creating PUD hugepages
+ at stage 2
+In-Reply-To: <bbc3f286-be5b-d0dc-2037-54d5b995a0a5@arm.com> (Suzuki
+ K. Poulose's message of "Wed, 11 Jul 2018 14:38:38 +0100")
+References: <20180709143835.28971-1-punit.agrawal@arm.com>
+ <20180709144124.29164-1-punit.agrawal@arm.com>
+ <20180709144124.29164-7-punit.agrawal@arm.com>
+ <bbc3f286-be5b-d0dc-2037-54d5b995a0a5@arm.com>
+Message-ID: <87zhyxoize.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yun,
+Suzuki K Poulose <Suzuki.Poulose@arm.com> writes:
 
-On 02/07/18 12:16, Jun Yao wrote:
-> Move {idmap_pg_dir, swapper_pg_dir} to .rodata section and
+> On 09/07/18 15:41, Punit Agrawal wrote:
+>> KVM only supports PMD hugepages at stage 2. Now that the various page
+>> handling routines are updated, extend the stage 2 fault handling to
+>> map in PUD hugepages.
+>>
+>> Addition of PUD hugepage support enables additional page sizes (e.g.,
+>> 1G with 4K granule) which can be useful on cores that support mapping
+>> larger block sizes in the TLB entries.
+>>
+>> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+>> Cc: Christoffer Dall <christoffer.dall@arm.com>
+>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>> Cc: Russell King <linux@armlinux.org.uk>
+>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> ---
+>>   arch/arm/include/asm/kvm_mmu.h         | 19 +++++++
+>>   arch/arm64/include/asm/kvm_mmu.h       | 15 +++++
+>>   arch/arm64/include/asm/pgtable-hwdef.h |  2 +
+>>   arch/arm64/include/asm/pgtable.h       |  2 +
+>>   virt/kvm/arm/mmu.c                     | 78 ++++++++++++++++++++++++--
+>>   5 files changed, 112 insertions(+), 4 deletions(-)
+>>
 
-> populate swapper_pg_dir by fixmap.
+[...]
 
-(any chance you could split the fixmap bits into a separate patch so that the
-rodata move comes last? This will make review and bisecting any problems easier.)
+>> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+>> index a6d3ac9d7c7a..d8e2497e5353 100644
+>> --- a/virt/kvm/arm/mmu.c
+>> +++ b/virt/kvm/arm/mmu.c
 
+[...]
 
-> diff --git a/arch/arm64/include/asm/pgalloc.h b/arch/arm64/include/asm/pgalloc.h
-> index 2e05bcd944c8..a0ce7d0f81c5 100644
-> --- a/arch/arm64/include/asm/pgalloc.h
-> +++ b/arch/arm64/include/asm/pgalloc.h
-> @@ -29,6 +29,23 @@
->  #define PGALLOC_GFP	(GFP_KERNEL | __GFP_ZERO)
->  #define PGD_SIZE	(PTRS_PER_PGD * sizeof(pgd_t))
->  
-> +static inline int in_swapper_dir(void *addr)
-> +{
-> +	if ((unsigned long)addr >= (unsigned long)swapper_pg_dir &&
-> +		(unsigned long)addr < (unsigned long)swapper_pg_end) {
-> +		return 1;
-> +	}
-> +	return 0;
-> +}
+>> @@ -1100,6 +1139,7 @@ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
+>>   			  phys_addr_t addr, const pte_t *new_pte,
+>>   			  unsigned long flags)
+>>   {
+>> +	pud_t *pud;
+>>   	pmd_t *pmd;
+>>   	pte_t *pte, old_pte;
+>>   	bool iomap = flags & KVM_S2PTE_FLAG_IS_IOMAP;
+>> @@ -1108,6 +1148,22 @@ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
+>>   	VM_BUG_ON(logging_active && !cache);
+>>     	/* Create stage-2 page table mapping - Levels 0 and 1 */
+>> +	pud = stage2_get_pud(kvm, cache, addr);
+>> +	if (!pud) {
+>> +		/*
+>> +		 * Ignore calls from kvm_set_spte_hva for unallocated
+>> +		 * address ranges.
+>> +		 */
+>> +		return 0;
+>> +	}
+>> +
+>> +	/*
+>> +	 * While dirty page logging - dissolve huge PUD, then continue
+>> +	 * on to allocate page.
+>
+> Punit,
+>
+> We don't seem to allocate a page here for the PUD entry, in case if it is dissolved
+> or empty (i.e, stage2_pud_none(*pud) is true.).
 
-Making this a bool and returning the condition feels more natural.
+I was trying to avoid duplicating the PUD allocation by reusing the
+functionality in stage2_get_pmd().
 
-We know swapper_pg_dir and swapper_pg_end are both page aligned, if we can tell
-the compiler, it can generate better code. Something like:
-| return ((long)addr & PAGE_MASK) == ((long)swapper_pg_dir & PAGE_MASK);
+Does the below updated comment help?
 
-(if you agree its the same)
+	/*
+	 * While dirty page logging - dissolve huge PUD, it'll be
+	 * allocated in stage2_get_pmd().
+	 */
 
+The other option is to duplicate the stage2_pud_none() case from
+stage2_get_pmd() here.
 
-> +static inline void *swapper_mirror_addr(void *start, void *addr)
-> +{
-> +	unsigned long offset;
-> +
-> +	offset = (unsigned long)addr - (unsigned long)swapper_pg_dir;
-> +	return start + offset;
-> +}
+What do you think?
 
-I think you've re-invented __set_fixmap_offset, ...
+Thanks,
+Punit
 
-
->  #if CONFIG_PGTABLE_LEVELS > 2
->  
->  static inline pmd_t *pmd_alloc_one(struct mm_struct *mm, unsigned long addr)
-> @@ -49,6 +66,17 @@ static inline void __pud_populate(pud_t *pudp, phys_addr_t pmdp, pudval_t prot)
->  
->  static inline void pud_populate(struct mm_struct *mm, pud_t *pudp, pmd_t *pmdp)
->  {
-> +#ifdef __PAGETABLE_PUD_FOLDED
-> +	if ((mm == &init_mm) && in_swapper_dir(pudp)) {
-> +		pud_t *pud;
-
-> +		pud = pud_set_fixmap(__pa_symbol(swapper_pg_dir));
-> +		pud = (pud_t *)swapper_mirror_addr(pud, pudp);
-
-This is calculating the corresponding pudp in the fixmap mapping of swapper.
-If you give pud_set_fixmap() the physical address of the original pudp it will
-calculate this for you.
-
-I think this could fold down to something like:
-|	pud_t *fixmap_pudp = pud_set_fixmap(__kimg_to_phys((long)pudp));
-
-(please check I've dug through all that properly!)
-
-
-On a wider issue: these p?d_populate() helpers only put table entries down,
-these are used by vmalloc(). Unfortunately ioremap() will try to add block
-mappings if it can, which don't use this helper. (bits and pieces for testing
-this in [0]). Systems with nvdimms probably do this all the time...
-
-We could add the same in_swapper_dir() tests and fixmap operations to
-p?d_set_huge(), but it may be worth pushing them down to set_p?d(), which is
-where all these paths join up. This would also cover pgd_clear(), which is
-called via p?d_none_or_clear_bad().
-
-
-I think we should do something about concurrent calls. Today that ~should work,
-providing they aren't modifying the same locations, but with these changes both
-CPUs would try and clear_fixmap()/tlbi the range from underneath each other.
-
-The p?d_alloc() helpers take the mm lock around the p?d_populate() calls, but it
-doesn't look like there is any other lock for the ioremap work calling
-p?d_set_huge(), so we will need one of our own, especially for
-p?d_none_or_clear_bad().
-
-
-> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-> index 3b408f21fe2e..b479d1b997c2 100644
-> --- a/arch/arm64/include/asm/pgtable.h
-> +++ b/arch/arm64/include/asm/pgtable.h
-> @@ -475,6 +475,9 @@ static inline phys_addr_t pmd_page_paddr(pmd_t pmd)
->   */
->  #define mk_pte(page,prot)	pfn_pte(page_to_pfn(page),prot)
->  
-> +#define pmd_set_fixmap(addr)		((pmd_t *)set_fixmap_offset(FIX_PMD, addr))
-> +#define pmd_clear_fixmap()		clear_fixmap(FIX_PMD)
-> +
-
-Ooer, we shouldn't need to move these around. If they're wrong, it should be the
-subject of a separate patch, but its more likely we're using the wrong ones...
-
-
-> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-> index d69e11ad92e3..beff018bf0f9 100644
-> --- a/arch/arm64/kernel/vmlinux.lds.S
-> +++ b/arch/arm64/kernel/vmlinux.lds.S
-> @@ -223,21 +223,25 @@ SECTIONS
->  	BSS_SECTION(0, 0, 0)
->  
->  	. = ALIGN(PAGE_SIZE);
-> -	idmap_pg_dir = .;
-> -	. += IDMAP_DIR_SIZE;
-> +
-> +	.rodata : {
-
-Now I'm confused. I thought this named section was output by RO_DATA() further
-up, just before __init_begin, which mark_rodata_ro() uses as its end marker.
-I thought named sections had to be unique.
-
-Are we expecting the linker to realise we want it to move this stuff up there,
-and not move the read-only contents down here, outside the markers. (maybe the
-linker always takes the first definition?)
-
-Can we move these to sit near INIT_DIR/INIT_PG_TABLES as a macro, which we then
-put after NOTES? (something like KERNEL_PG_TABLES?)
-
-
-Thanks!
-
-James
-
-
-
-[0] abuse kdump to give us a 1G naturally aligned block of memory that is
-missing from the linear map. We can memremap() this, and get a top-level block
-entry on !4-level systems. Do this late enough  Add 'crashdump=1G' to your cmdline
-----------------------%<----------------------
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 325cfb3b858a..081d4e216067 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -20,6 +20,7 @@
- #include <linux/kernel.h>
- #include <linux/export.h>
- #include <linux/errno.h>
-+#include <linux/io.h>
- #include <linux/swap.h>
- #include <linux/init.h>
- #include <linux/bootmem.h>
-@@ -104,7 +105,7 @@ static void __init reserve_crashkernel(void)
-        if (crash_base == 0) {
-                /* Current arm64 boot protocol requires 2MB alignment */
-                crash_base = memblock_find_in_range(0, ARCH_LOW_ADDRESS_LIMIT,
--                               crash_size, SZ_2M);
-+                               crash_size, SZ_1G);
-                if (crash_base == 0) {
-                        pr_warn("cannot allocate crashkernel (size:0x%llx)\n",
-                                crash_size);
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 955b40efcc0c..f8cca5adb0c8 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -485,12 +485,22 @@ static void __init map_mem(pgd_t *pgdp)
-                __map_memblock(pgdp, crashk_res.start, crashk_res.end + 1,
-                               PAGE_KERNEL,
-                               NO_BLOCK_MAPPINGS | NO_CONT_MAPPINGS);
--               memblock_clear_nomap(crashk_res.start,
--                                    resource_size(&crashk_res));
-        }
- #endif
- }
-
-+#ifdef CONFIG_KEXEC_CORE
-+static void hack__remap_kdump_region(void)
-+{
-+       size_t size = crashk_res.end - crashk_res.start;
-+
-+       if (!crashk_res.end)
-+               return;
-+
-+       memremap((unsigned long)crashk_res.start, size, MEMREMAP_WB);
-+}
-+#endif
-+ void mark_rodata_ro(void)
- {
-        unsigned long section_size;
-@@ -504,6 +514,10 @@ void mark_rodata_ro(void)
-                            section_size, PAGE_KERNEL_RO);
-
-        debug_checkwx();
-+
-+#ifdef CONFIG_KEXEC_CORE
-+       hack__remap_kdump_region();
-+#endif
- }
-
- static void __init map_kernel_segment(pgd_t *pgdp, void *va_start, void *va_end,
-----------------------%<----------------------
+>> +	 */
+>> +	if (logging_active)
+>> +		stage2_dissolve_pud(kvm, addr, pud);
+>> +
+>>   	pmd = stage2_get_pmd(kvm, cache, addr);
+>>   	if (!pmd) {
+>
+> And once you add an entry, pmd is just the matter of getting stage2_pmd_offset() from your pud.
+> No need to start again from the top-level with stage2_get_pmd().
+>
+> Cheers
+> Suzuki
+>
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
