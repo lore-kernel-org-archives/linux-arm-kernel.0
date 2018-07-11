@@ -1,53 +1,55 @@
 From: leo.yan@linaro.org (Leo Yan)
-Date: Wed, 11 Jul 2018 15:45:39 +0800
-Subject: [PATCH v2 0/6] perf cs-etm: Fix tracing packet handling and minor
- refactoring
-Message-ID: <1531295145-596-1-git-send-email-leo.yan@linaro.org>
+Date: Wed, 11 Jul 2018 15:45:40 +0800
+Subject: [PATCH v2 1/6] perf cs-etm: Introduce invalid address macro
+In-Reply-To: <1531295145-596-1-git-send-email-leo.yan@linaro.org>
+References: <1531295145-596-1-git-send-email-leo.yan@linaro.org>
+Message-ID: <1531295145-596-2-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Due the current code is missing to handle cs-etm start tracing packet
-and CS_ETM_TRACE_ON packet, we fail to generate branch sample for them.
+This patch introduces invalid address macro and uses it to replace dummy
+value '0xdeadbeefdeadbeefUL'.
 
-This patch series is to fix cs-etm tracing packet handling:
+Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+Signed-off-by: Leo Yan <leo.yan@linaro.org>
+---
+ tools/perf/util/cs-etm-decoder/cs-etm-decoder.c | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
 
-Patch 0001 is to add invalid address macro for readable coding;
-
-Patch 0002 is one minor fixing to return error code for instruction
-sample failure;
-
-Patches 0003~0006 are fixing patches for start tracing packet
-and CS_ETM_TRACE_ON packet.
-
-This patch series is applied to Linus tree on 4.18-rc4 with latest
-commit: 1e09177acae3 ("Merge tag 'mips_fixes_4.18_3' of
-git://git.kernel.org/pub/scm/linux/kernel/git/mips/linux").
-
-This patch series has been verified on Hikey620 platform with below two
-commands:
-perf script --itrace=i10000il128 -F cpu,event,ip,addr,sym -k ./vmlinux
-perf script -F cpu,event,ip,addr,sym -k ./vmlinux
-
-[1] https://git.kernel.org/pub/scm/linux/kernel/git/acme/linux.git
-
-Changes from v1:
-* Rebased on Linus mainline kernel 4.18-rc4;
-* Added Mathieu 'reviewed' tags in patches.
-
-
-Leo Yan (6):
-  perf cs-etm: Introduce invalid address macro
-  perf cs-etm: Bail out immediately for instruction sample failure
-  perf cs-etm: Fix start tracing packet handling
-  perf cs-etm: Support dummy address value for CS_ETM_TRACE_ON packet
-  perf cs-etm: Generate branch sample when receiving a CS_ETM_TRACE_ON
-    packet
-  perf cs-etm: Generate branch sample for CS_ETM_TRACE_ON packet
-
- tools/perf/util/cs-etm-decoder/cs-etm-decoder.c | 10 ++--
- tools/perf/util/cs-etm-decoder/cs-etm-decoder.h |  1 +
- tools/perf/util/cs-etm.c                        | 71 +++++++++++++++++++++----
- 3 files changed, 68 insertions(+), 14 deletions(-)
-
+diff --git a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
+index 4d5fc37..938def6 100644
+--- a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
++++ b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
+@@ -31,6 +31,8 @@
+ #endif
+ #endif
+ 
++#define CS_ETM_INVAL_ADDR	0xdeadbeefdeadbeefUL
++
+ struct cs_etm_decoder {
+ 	void *data;
+ 	void (*packet_printer)(const char *msg);
+@@ -261,8 +263,8 @@ static void cs_etm_decoder__clear_buffer(struct cs_etm_decoder *decoder)
+ 	decoder->tail = 0;
+ 	decoder->packet_count = 0;
+ 	for (i = 0; i < MAX_BUFFER; i++) {
+-		decoder->packet_buffer[i].start_addr = 0xdeadbeefdeadbeefUL;
+-		decoder->packet_buffer[i].end_addr = 0xdeadbeefdeadbeefUL;
++		decoder->packet_buffer[i].start_addr = CS_ETM_INVAL_ADDR;
++		decoder->packet_buffer[i].end_addr = CS_ETM_INVAL_ADDR;
+ 		decoder->packet_buffer[i].last_instr_taken_branch = false;
+ 		decoder->packet_buffer[i].exc = false;
+ 		decoder->packet_buffer[i].exc_ret = false;
+@@ -295,8 +297,8 @@ cs_etm_decoder__buffer_packet(struct cs_etm_decoder *decoder,
+ 	decoder->packet_buffer[et].exc = false;
+ 	decoder->packet_buffer[et].exc_ret = false;
+ 	decoder->packet_buffer[et].cpu = *((int *)inode->priv);
+-	decoder->packet_buffer[et].start_addr = 0xdeadbeefdeadbeefUL;
+-	decoder->packet_buffer[et].end_addr = 0xdeadbeefdeadbeefUL;
++	decoder->packet_buffer[et].start_addr = CS_ETM_INVAL_ADDR;
++	decoder->packet_buffer[et].end_addr = CS_ETM_INVAL_ADDR;
+ 
+ 	if (decoder->packet_count == MAX_BUFFER - 1)
+ 		return OCSD_RESP_WAIT;
 -- 
 2.7.4
