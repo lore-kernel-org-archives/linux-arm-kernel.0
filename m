@@ -1,63 +1,107 @@
-From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
-Date: Wed, 11 Jul 2018 11:31:35 +0900
-Subject: [PATCH v2 2/2] regulator: uniphier: add regulator driver for
- UniPhier SoC
-In-Reply-To: <20180710174451.GE8104@sirena.org.uk>
-References: <1531186037-16630-3-git-send-email-hayashi.kunihiko@socionext.com>
- <20180710174451.GE8104@sirena.org.uk>
-Message-ID: <20180711113134.497A.4A936039@socionext.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Wed, 11 Jul 2018 11:43:46 +0900
+Subject: [PATCH 1/2] ARM: dts: arria10: update NAND clocking
+In-Reply-To: <b33d18b2-1956-50a4-9a3f-6d2a0abd4b81@kernel.org>
+References: <1531176063-30140-1-git-send-email-dinguyen@kernel.org>
+ <CAK7LNARAVSK5VY=_RfO2PXJCAnXJN3sXoAY=ijSwVojeo=c66w@mail.gmail.com>
+ <b33d18b2-1956-50a4-9a3f-6d2a0abd4b81@kernel.org>
+Message-ID: <CAK7LNATNjPuGmzA_mS+yvVC8TpPsvQNvKedJ6emt114xGy7m3Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+2018-07-10 22:35 GMT+09:00 Dinh Nguyen <dinguyen@kernel.org>:
+>
+>
+> On 07/09/2018 08:31 PM, Masahiro Yamada wrote:
+>> 2018-07-10 7:41 GMT+09:00 Dinh Nguyen <dinguyen@kernel.org>:
+>>> The NAND IP needs 2 clocks(nand_x_clk and nand_clk). This patch adds a
+>>> nand_x_clk, which is derived from the nand_clk, but has a fixed divider
+>>> of 4.
+>>>
+>>> Update the NAND node to use the additional clock.
+>>>
+>>> Signed-off-by: Dinh Nguyen <dinguyen@kernel.org>
+>>> ---
+>>>  arch/arm/boot/dts/socfpga_arria10.dtsi | 13 +++++++++++--
+>>>  1 file changed, 11 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/arch/arm/boot/dts/socfpga_arria10.dtsi b/arch/arm/boot/dts/socfpga_arria10.dtsi
+>>> index a4dcb68..558b5ea 100644
+>>> --- a/arch/arm/boot/dts/socfpga_arria10.dtsi
+>>> +++ b/arch/arm/boot/dts/socfpga_arria10.dtsi
+>>> @@ -377,13 +377,21 @@
+>>>                                                 clk-gate = <0xC8 11>;
+>>>                                         };
+>>>
+>>> -                                       nand_clk: nand_clk {
+>>> +                                       nand_x_clk: nand_x_clk {
+>>>                                                 #clock-cells = <0>;
+>>>                                                 compatible = "altr,socfpga-a10-gate-clk";
+>>>                                                 clocks = <&l4_mp_clk>;
+>>>                                                 clk-gate = <0xC8 10>;
+>>>                                         };
+>>>
+>>> +                                       nand_clk: nand_clk {
+>>> +                                               #clock-cells = <0>;
+>>> +                                               compatible = "altr,socfpga-a10-gate-clk";
+>>> +                                               clocks = <&nand_x_clk>;
+>>> +                                               fixed-divider = <4>;
+>>> +                                               clk-gate = <0xC8 10>;
+>>> +                                       };
+>>> +
+>>>                                         spi_m_clk: spi_m_clk {
+>>>                                                 #clock-cells = <0>;
+>>>                                                 compatible = "altr,socfpga-a10-gate-clk";
+>>> @@ -650,7 +658,8 @@
+>>>                         reg-names = "nand_data", "denali_reg";
+>>>                         interrupts = <0 99 4>;
+>>>                         dma-mask = <0xffffffff>;
+>>> -                       clocks = <&nand_clk>;
+>>> +                       clocks = <&nand_clk>, <&nand_x_clk>;
+>>> +                       clock-names = "nand", "nand_x";
+>>
+>>
+>> Doesn't SOCFPGA really need the ECC clock?
+>>
+>
+> I don't see any mentions of an ECC clock in any of the SoCFPGA
+> documentation for the NAND IP.
 
-On Tue, 10 Jul 2018 18:44:51 +0100 <broonie@kernel.org> wrote:
 
-> On Tue, Jul 10, 2018 at 10:27:17AM +0900, Kunihiko Hayashi wrote:
-> 
-> > +static int uniphier_regulator_enable(struct regulator_dev *rdev)
-> > +{
-> > +	struct uniphier_regulator_priv *priv = rdev_get_drvdata(rdev);
-> > +
-> > +	return regmap_update_bits(priv->regmap, rdev->desc->enable_reg,
-> > +				  rdev->desc->enable_mask,
-> > +				  rdev->desc->enable_val);
-> > +}
-> 
-> This is just regulator_enable_regmap() isn't it?  Same for disable,
-> unless I'm missing something (which is possible).
+I'd like you to check the IP documentation
+published by Denali (or Cadence),
+not published by Altera.
 
-Exactly, it's reasonable to replace this with the helper function.
-I'll check and apply it.
+Is it available for you?
 
-> > +static int uniphier_regulator_is_enabled(struct regulator_dev *rdev)
-> > +{
-> > +	struct uniphier_regulator_priv *priv = rdev_get_drvdata(rdev);
-> > +	unsigned int val;
-> > +	int ret = -EINVAL;
-> > +
-> > +	regmap_read(priv->regmap, rdev->desc->enable_reg, &val);
-> > +	val &= rdev->desc->enable_mask;
-> > +
-> > +	if (val == rdev->desc->enable_val)
-> > +		ret = 1;
-> > +	else if (val == rdev->desc->disable_val)
-> > +		ret = 0;
-> > +
-> > +	return ret;
-> > +}
-> 
-> This isn't *quite* regulator_is_enabled_regmap() as it explicitly checks
-> if the disable value is set and errors otherwise which would be a good
-> fix for that.  Could you do a patch for that?
 
-Although I'm worried that the register have a value that is neither
-enable_val or disable_val, the "is_enabled" function returns whether
-the regulator is enabled or not, so I can apply regulator_is_enabled_regmap().
-I'll apply it in v3.
 
-Thank you,
+In my SoCs, the same clock signal (nand-clk-200m)
+is connected to clk_x and ecc_clk, like this:
 
----
-Best Regards,
-Kunihiko Hayashi
+                                         -------------
+--------------                           | DENALI IP |
+|            |                           |           |
+| clk        |---(nand-clk-50m)--------->| clk       |
+| controller |                           |           |
+|            |---(nand-clk-200m)-------->| clk_x     |
+--------------?                      |   |           |
+                                     --->| ecc_clk   |
+                                         |           |
+                                         -------------
+
+
+Some clock lines are often tied-up,
+but such low-level information does not appear in
+user documents.
+I talked to a hardware engineer to get this information.
+
+
+
+I guess the situation is similar for your case,
+but I do not have information enough to argue this.
+
+
+-- 
+Best Regards
+Masahiro Yamada
