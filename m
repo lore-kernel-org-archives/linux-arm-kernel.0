@@ -1,108 +1,132 @@
-From: yibin.gong@nxp.com (Robin Gong)
-Date: Wed, 11 Jul 2018 06:37:02 +0000
-Subject: [PATCH v1 3/4] dmaengine: imx-sdma: support dmatest
-In-Reply-To: <20180710153326.GG3219@vkoul-mobl>
-References: <1531239793-11781-1-git-send-email-yibin.gong@nxp.com>
- <1531239793-11781-4-git-send-email-yibin.gong@nxp.com>
- <20180710153326.GG3219@vkoul-mobl>
-Message-ID: <DB6PR04MB3223F93E1566A97857FD2FF4895A0@DB6PR04MB3223.eurprd04.prod.outlook.com>
+From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
+Date: Wed, 11 Jul 2018 14:41:25 +0800
+Subject: [PATCH v4 3/3] serial: 8250_dw: add fractional divisor support
+In-Reply-To: <8c5b6bbbde12b0836e1f833c86b805a817596654.camel@linux.intel.com>
+References: <20180710110942.5b0a016e@xhacker.debian>
+ <20180710111516.13b8c570@xhacker.debian>
+ <8c5b6bbbde12b0836e1f833c86b805a817596654.camel@linux.intel.com>
+Message-ID: <20180711144125.7d4e6a73@xhacker.debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Andy,
 
-> -----Original Message-----
-> From: Vinod [mailto:vkoul at kernel.org]
-> Sent: 2018?7?10? 23:33
-> To: Robin Gong <yibin.gong@nxp.com>
-> Cc: dan.j.williams at intel.com; shawnguo at kernel.org;
-> s.hauer at pengutronix.de; Fabio Estevam <fabio.estevam@nxp.com>;
-> linux at armlinux.org.uk; linux-arm-kernel at lists.infradead.org;
-> kernel at pengutronix.de; dmaengine at vger.kernel.org;
-> linux-kernel at vger.kernel.org; dl-linux-imx <linux-imx@nxp.com>
-> Subject: Re: [PATCH v1 3/4] dmaengine: imx-sdma: support dmatest
+On Tue, 10 Jul 2018 19:19:21 +0300 Andy Shevchenko wrote:
+
+> On Tue, 2018-07-10 at 11:15 +0800, Jisheng Zhang wrote:
+> > For Synopsys DesignWare 8250 uart which version >= 4.00a, there's a
+> > valid divisor latch fraction register. The fractional divisor width is
+> > 4bits ~ 6bits.
+> > 
+> > Now the preparation is done, it's easy to add the feature support.
+> > This patch firstly tries to get the fractional divisor width during
+> > probe, then setups dw specific get_divisor() and set_divisor() hook.  
 > 
-> On 11-07-18, 00:23, Robin Gong wrote:
-> > dmatest(memcpy) will never call dmaengine_slave_config before prep,
+> Thanks for an update, my comments below.
 > 
-> and that should have been a hint to you that you should not expect that
+> > +/*
+> > + * divisor = div(I) + div(F)
+> > + * "I" means integer, "F" means fractional
+> > + * quot = div(I) = clk / (16 * baud)
+> > + * frac = div(F) * 2^dlf_size
+> > + *
+> > + * let rem = clk % (16 * baud)
+> > + * we have: div(F) * (16 * baud) = rem
+> > + * so frac = 2^dlf_size * rem / (16 * baud) = (rem << dlf_size) / (16
+> > * baud)
+> > + */
+> > +static unsigned int dw8250_get_divisor(struct uart_port *p,
+> > +				       unsigned int baud,
+> > +				       unsigned int *frac)
+> > +{  
 > 
-> > so jobs in dmaengine_slave_config need to be moved into somewhere
-> > before device_prep_dma_memcpy. Besides, dmatest never setup chan
-> > ->private as other common case like uart/audio/spi will always setup
-> > chan->private. Here check it to judge if it's dmatest case and do
-> > jobs in slave_config.
+> unsigned int base_baud = baud * 16;
+
+Good point. will send a new version.
+
 > 
-> and you should not do anything for dmatest. Supporting it means memcpy
-> implementation is not correct :)
-Okay, I will any word about dmatest here since memcpy assume no calling
-slave_config.
+> > +	unsigned int quot, rem;
+> > +	struct dw8250_data *d = p->private_data;
+> > +
+> > +	quot = p->uartclk / (16 * baud);
+> > +	rem = p->uartclk % (16 * baud);
+> > +	*frac = DIV_ROUND_CLOSEST(rem << d->dlf_size, 16 * baud);
+> > +  
 > 
-> >
-> > Signed-off-by: Robin Gong <yibin.gong@nxp.com>
-> > ---
-> >  drivers/dma/imx-sdma.c | 37 ++++++++++++++++++++++++++++---------
-> >  1 file changed, 28 insertions(+), 9 deletions(-)
-> >
-> > diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c index
-> > ed2267d..48f3749 100644
-> > --- a/drivers/dma/imx-sdma.c
-> > +++ b/drivers/dma/imx-sdma.c
-> > @@ -1222,10 +1222,36 @@ static int sdma_alloc_chan_resources(struct
-> > dma_chan *chan)  {
-> >  	struct sdma_channel *sdmac = to_sdma_chan(chan);
-> >  	struct imx_dma_data *data = chan->private;
-> > +	struct imx_dma_data default_data;
-> >  	int prio, ret;
-> >
-> > -	if (!data)
-> > -		return -EINVAL;
-> > +	ret = clk_enable(sdmac->sdma->clk_ipg);
-> > +	if (ret)
-> > +		return ret;
-> > +	ret = clk_enable(sdmac->sdma->clk_ahb);
-> > +	if (ret)
-> > +		goto disable_clk_ipg;
-> > +	/*
-> > +	 * dmatest(memcpy) will never call dmaengine_slave_config before prep,
-> > +	 * so jobs in dmaengine_slave_config need to be moved into somewhere
-> > +	 * before device_prep_dma_memcpy. Besides, dmatest never setup chan
-> > +	 * ->private as other common cases like uart/audio/spi will setup
-> > +	 * chan->private always. Here check it to judge if it's dmatest case
-> > +	 * and do jobs in slave_config.
-> > +	 */
-> > +	if (!data) {
-> > +		dev_warn(sdmac->sdma->dev, "dmatest is running?\n");
+> While it looks indeed better, I would rather like to have a confirmation
+> it's working as designed.
 > 
-> why is that a warning!
-Current SDMA driver assume filter function to set chan->private with specific data 
-(struct imx_dma_data dma_data)like below (sound/soc/fsl/fsl_asrc_dma.c):
-static bool filter(struct dma_chan *chan, void *param)
+> For example, when I did some calculus, I cooked a preliminary check in
+> Python (easy and fast to prototype), for example:
+> https://gist.github.com/andy-shev/06b084488b3629898121 in Python, or
+> commit 9df461eca18f ("spi: pxa2xx: replace ugly table by approximation")
+> in the kernel.
+> 
+> Or another one here https://gist.github.com/andy-shev/8b2a73aeca2874f4cc
+> 89 and commits c1a67b48f6a5 ("serial: 8250_pci: replace switch-case by
+> formula for Intel MID"), 21947ba654a6 ("serial: 8250_pci: replace
+> switch-case by formula")
+
+My python coding skill is limited. So I wrote a simple c program to
+do the check for common clks and baudrate combination. All passed. I
+paste the code here:
+
+
+#include <stdio.h>
+#include <assert.h>
+#include <math.h>
+
+#define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
+
+#define DIV_ROUND_CLOSEST(x, divisor)(			\
+{							\
+	typeof(x) __x = x;				\
+	typeof(divisor) __d = divisor;			\
+	(((typeof(x))-1) > 0 ||				\
+	 ((typeof(divisor))-1) > 0 ||			\
+	 (((__x) > 0) == ((__d) > 0))) ?		\
+		(((__x) + ((__d) / 2)) / (__d)) :	\
+		(((__x) - ((__d) / 2)) / (__d));	\
+}							\
+)
+
+static unsigned int baud[] = {9600, 19200, 38400, 57600, 115200, 230400,
+				460800, 921600, 1843200, 3250000, 4454400,
+				576000, 1152000, 500000, 1000000, 1500000,
+				2000000, 2500000, 3000000, 3500000, 4000000};
+
+static unsigned int clk[] = {25000000, 50000000, 100000000, 133000000, 200000000};
+
+static void check(int baud, int clk, int dlf_size)
 {
-        if (!imx_dma_is_general_purpose(chan))
-                return false;
-        chan->private = param;
-        return true;
+	unsigned int rem, frac, quot;
+	unsigned int base_baud = baud * 16;
+	float div, divf;
+
+	quot = clk / base_baud;
+	rem = clk % base_baud;
+	frac = DIV_ROUND_CLOSEST(rem << dlf_size, base_baud);
+
+	div = (float)clk / base_baud;
+	divf = div - (int)div;
+	divf *= (1 << dlf_size);
+
+	assert(quot == (int)div);
+	assert(frac == (int)round(divf));
+	printf("checked %d %d %d %d %d\n", baud, clk, dlf_size, quot, frac);
 }
 
-But in memcpy case, at lease dmatest case, no chan->private set in its filter function.
-So here take dmatest a special case and do some prepare jobs for memcpy. But if the
-Upper device driver call dma_request_channel() with their specific filter without
-'chan->private' setting in the future. The warning message is a useful hint to them to
-Add 'chan->private' in filter function.  Or doc it somewhere?
-> 
-> > +		sdmac->word_size  =  sdmac->sdma->dma_device.copy_align;
-> > +		default_data.priority = 2;
-> > +		default_data.peripheral_type = IMX_DMATYPE_MEMORY;
-> > +		default_data.dma_request = 0;
-> > +		default_data.dma_request2 = 0;
-> > +		data = &default_data;
-> > +
-> > +		sdma_config_ownership(sdmac, false, true, false);
-> > +		sdma_get_pc(sdmac, IMX_DMATYPE_MEMORY);
-> > +		sdma_load_context(sdmac);
-> > +	}
-> 
-> this needs to be default for memcpy
-> 
-> --
-> ~Vinod
+int main()
+{
+	int i, j, k;
+
+	for (i = 0; i < ARRAY_SIZE(baud); i++) {
+		for (j = 0; j < ARRAY_SIZE(clk); j++) {
+			for (k = 4; k <= 6; k++) {
+				check(baud[i], clk[j], k);
+			}
+		}
+	}
+
+	return 0;
+}
