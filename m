@@ -1,97 +1,97 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Wed, 11 Jul 2018 10:25:50 +0200
-Subject: Vibrations on Droid 4?
-In-Reply-To: <20180710161123.azym6sbboriuj4yc@earth.universe>
-References: <20180709081534.GA6799@amd>
- <20180709214910.tes6u4ivxomd3aja@earth.universe>
- <20180709220211.GA7760@amd>
- <20180710101147.lyu65ro4czvrs2da@earth.universe>
- <20180710133040.GA4391@amd>
- <20180710161123.azym6sbboriuj4yc@earth.universe>
-Message-ID: <20180711082550.GB21225@amd>
+From: nicolas.ferre@microchip.com (Nicolas Ferre)
+Date: Wed, 11 Jul 2018 10:26:42 +0200
+Subject: [PATCH v10 0/6] Driver for at91 usart in spi mode
+In-Reply-To: <20180625172230.29686-1-radu.pirea@microchip.com>
+References: <20180625172230.29686-1-radu.pirea@microchip.com>
+Message-ID: <aecba39e-deba-c64b-9542-a446e074e95e@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 2018-07-10 18:11:23, Sebastian Reichel wrote:
-> Hi,
+On 25/06/2018 at 19:22, Radu Pirea wrote:
+> Hello,
 > 
-> On Tue, Jul 10, 2018 at 03:30:40PM +0200, Pavel Machek wrote:
-> > On Tue 2018-07-10 12:11:47, Sebastian Reichel wrote:
-> > > On Tue, Jul 10, 2018 at 12:02:11AM +0200, Pavel Machek wrote:
-> > > > > > Do you have vibrations on d4 working?
-> > > > > > I believe I have required drivers enabled, but no luck:
-> > > > > > 
-> > > > > > user at devuan:/sys/bus/platform/drivers$ ls pwm-vibrator/
-> > > > > > bind  uevent  unbind
-> > > > > > user at devuan:/sys/bus/platform/drivers$ ls omap-dmtimer-pwm/
-> > > > > > bind  uevent  unbind
-> > > > > 
-> > > > > Have you checked probe deferrals?
-> > > > 
-> > > > Not really. Is there easier way to do that than adding printks in the
-> > > > probe function? (I can go through dmesg tommorow).
-> > > 
-> > > Option 1: https://lkml.org/lkml/2018/7/8/63
-> > 
-> > I tried this methodq, and no luck.
-> > 
-> > static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
-> > 
-> > does not seem to be called.
-> > 
-> > Its parent is gpio at 4805d000 , and that one seems to be present.
-> > 
-> > user at devuan:/sys/bus/platform/devices$ ls 4805d000.gpio
-> > driver				       driver_override  gpio
-> > gpiochip5  modalias  of_node  power  subsystem  uevent
+> This is the second version of driver. I added a mfd driver which by
+> default probes atmel_serial driver and if in dt is specified to probe
+> the spi driver, then the spi-at91-usart driver will be probed. The
+> compatible for atmel_serial is now the compatible for at91-usart mfd
+> driver and compatilbe for atmel_serial driver was changed in order to
+> keep the bindings for serial as they are.
 > 
-> Sorry, something went wrong with merging this. The parent
-> of ti,omap-dmtimer-pwm and pwm-vibrator should be / and
-> not gpio6.
+> Changes in v10:
+> -fixed kbuild test robot warning
+> 
+> Changes in v9:
+> - minor changes
+> - rebased on top of broonie/for-4.19
+> 
+> Changes in v8:
+> - fixed passing an empty mfd cell if "atmel,usart-mode" value is invalid
+> 
+> Changes in v7:
+> - synced up  SPDIX license with module license
+> - numbering of usart modes starts from 0 insteand of 1
+> 
+> Changes in v6:
+> - removed unused compatible strings from serial and spi drivers
+> 
+> Changes in v5:
+> - fixed usage of stdout-path property with atmel_serial driver
+> 
+> Changes in v4:
+> - modified the spi driver to use cs gpio support form spi subsystem
+> - fixed dma transfers for serial driver
+> - squashed binding for spi and serial and moved them to mfd/atmel-usart.txt
+> 
+> Changes in v3:
+> - fixed spi slaves probing
+> 
+> Changes in v2:
+> - added at91-usart mfd driver
+> - modified spi-at91-usart driver to work as mfd driver child
+> - modified atmel_serial driver to work as mfd driver child
+> 
+> Changes in v1:
+> - added spi-at91-usart driver
+> 
+> 
+> Radu Pirea (6):
+>    MAINTAINERS: add at91 usart mfd driver
+>    dt-bindings: add binding for atmel-usart in SPI mode
+>    mfd: at91-usart: added mfd driver for usart
+>    MAINTAINERS: add at91 usart spi driver
+>    spi: at91-usart: add driver for at91-usart as spi
+>    tty/serial: atmel: change the driver to work under at91-usart mfd
 
-There's still something wrong with pinctrl... I guess.
-									Pavel
+For the record or if needed by the MAINTAINERS changes, you can add my:
+Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+for the whole series.
 
-[    0.973907] phy-mapphone-mdm6600 usb-phy at 1: could not find pctldev for node /ocp/l4 at 4a000000/sc
-m at 100000/pinmux at 40/pinmux_usb_mdm6600_pins, deferring probe
-[    0.990295] pinctrl-single 4a100040.pinmux: 203 pins, size 406
-[    0.996643] pinctrl-single 4a31e040.pinmux: 28 pins, size 56
-[    1.003234] pinctrl-single 4a31e040.pinmux: mux offset out of range: 0x18e (0x38)
-[    1.010986] pinctrl-single 4a31e040.pinmux: could not add functions for pinmux_vibrator_directi
-on_pin 398x
-[    1.020996] dmtimer_probe
-[    1.023712] dmtimer_probe: have timer
-[    1.027526] omap-dmtimer-pwm dmtimer-pwm-8: dmtimer pdata structure NULL
-[    1.034484] pinctrl-single 4a31e040.pinmux: mux offset out of range: 0x190 (0x38)
-[    1.042175] pinctrl-single 4a31e040.pinmux: could not add functions for pinmux_vibrator_enable_pin 400x
-[    1.051910] dmtimer_probe
-[    1.054626] dmtimer_probe: have timer
-[    1.058441] omap-dmtimer-pwm dmtimer-pwm-9: dmtimer pdata structure NULL
-[    1.068725] Serial: 8250/16550 driver, 4 ports, IRQ sharing enabled
-[   70.264739] cpcap-usb-phy cpcap-usb-phy.0: connected to USB host
-[   80.093811] omap-dmtimer-pwm dmtimer-pwm-9: requested duty cycle: 3750057 ns, period: 10000000 ns
-[   80.102996] omap-dmtimer-pwm dmtimer-pwm-9: clk rate: 26000000Hz
-[   80.109252] omap-dmtimer-pwm dmtimer-pwm-9: effective duty cycle: 3750038 ns, period: 10000000 ns
-[   80.118530] omap-dmtimer-pwm dmtimer-pwm-9: load value: 0xfffc0860 (-260000), match value: 0xfffd853c (-162500)
-[   80.129089] omap-dmtimer-pwm dmtimer-pwm-8: requested duty cycle: 10000000 ns, period: 10000000 ns
-[   80.138336] omap-dmtimer-pwm dmtimer-pwm-8: clk rate: 26000000Hz
-[   80.144561] omap-dmtimer-pwm dmtimer-pwm-8: duty cycle 10000000 ns is too long for period 10000000 ns at clock rate 26000000 Hz
-[   80.156433] omap-dmtimer-pwm dmtimer-pwm-8: using maximum of 1 clock cycle less than period
-[   80.165069] omap-dmtimer-pwm dmtimer-pwm-8: effective duty cycle: 9999962 ns, period: 10000000 ns
-[   80.174621] omap-dmtimer-pwm dmtimer-pwm-8: load value: 0xfffc0860 (-260000), match value: 0xfffffffe (-2)
-[  100.344970] cpcap-usb-phy cpcap-usb-phy.0: connected to USB host
+Once the remarks by Mark are addressed, you can certainly re-send the 
+series with all tags collected for Lee to take it, if he is okay with 
+this process, of course...
+
+Thanks, best regards,
+   Nicolas
 
 
-
+>   .../bindings/{serial => mfd}/atmel-usart.txt  |  25 +-
+>   MAINTAINERS                                   |  16 +
+>   drivers/mfd/Kconfig                           |   9 +
+>   drivers/mfd/Makefile                          |   1 +
+>   drivers/mfd/at91-usart.c                      |  71 +++
+>   drivers/spi/Kconfig                           |   9 +
+>   drivers/spi/Makefile                          |   1 +
+>   drivers/spi/spi-at91-usart.c                  | 432 ++++++++++++++++++
+>   drivers/tty/serial/Kconfig                    |   1 +
+>   drivers/tty/serial/atmel_serial.c             |  42 +-
+>   include/dt-bindings/mfd/at91-usart.h          |  17 +
+>   11 files changed, 607 insertions(+), 17 deletions(-)
+>   rename Documentation/devicetree/bindings/{serial => mfd}/atmel-usart.txt (76%)
+>   create mode 100644 drivers/mfd/at91-usart.c
+>   create mode 100644 drivers/spi/spi-at91-usart.c
+>   create mode 100644 include/dt-bindings/mfd/at91-usart.h
+> 
 
 
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180711/60b07166/attachment.sig>
+Nicolas Ferre
