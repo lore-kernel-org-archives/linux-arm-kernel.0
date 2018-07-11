@@ -1,57 +1,38 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 11 Jul 2018 22:08:34 +0200
-Subject: [PATCH 1/3 v3] ARM: dts: Add WAN ethernet port to the SQ201
-In-Reply-To: <20180711194720.25266-1-linus.walleij@linaro.org>
-References: <20180711194720.25266-1-linus.walleij@linaro.org>
-Message-ID: <20180711200834.GE21430@lunn.ch>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Wed, 11 Jul 2018 22:24:26 +0200
+Subject: [GIT PULL] pxa fixes for v4.18
+Message-ID: <871sc9ed1h.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 11, 2018 at 09:47:18PM +0200, Linus Walleij wrote:
-> This sets up the ethernet interface and PHY for the
-> WAN ethernet port which uses a Marvell PHY.
-> 
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> ChangeLog v2->v3:
-> - No changes, just resending.
-> ChangeLog v1->v2:
-> - Rename wrongly named "ethernet-phy" to "mdio"
-> - Drop device_type from the ethernet phy
-> ---
->  arch/arm/boot/dts/gemini-sq201.dts | 85 ++++++++++++++++++++++++++++++
->  1 file changed, 85 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/gemini-sq201.dts b/arch/arm/boot/dts/gemini-sq201.dts
-> index 7658e212e6d2..cc693e64faaf 100644
-> --- a/arch/arm/boot/dts/gemini-sq201.dts
-> +++ b/arch/arm/boot/dts/gemini-sq201.dts
-> @@ -55,6 +55,21 @@
->  		};
->  	};
->  
-> +	mdio0: ethernet-phy {
+Hello Arnd, Kevin, Olof,
 
-Hi Linus
+Please consider this pull request for pxa fixes for 4.18.
 
-mdio0: mdio {
+The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
 
-This is not a phy. Which is odd, because v1->v2 should of fixed this...
+  Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
 
-> +		compatible = "virtual,mdio-gpio";
-> +		/* Uses MDC and MDIO */
-> +		gpios = <&gpio0 22 GPIO_ACTIVE_HIGH>, /* MDC */
-> +			<&gpio0 21 GPIO_ACTIVE_HIGH>; /* MDIO */
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		/* This is a Marvell 88E1111 ethernet transciever */
-> +		phy0: ethernet-phy at 1 {
-> +			reg = <1>;
-> +			device_type = "ethernet-phy";
+are available in the git repository at:
 
-???
+  https://github.com/rjarzmik/linux.git tags/pxa-fixes-4.18
 
-I'm wondering if this is the correct version of these patches....
+for you to fetch changes up to 0c1049dcb4ceec640d8bd797335bcbebdcab44d2:
 
-	Andrew
+  ARM: pxa: irq: fix handling of ICMR registers in suspend/resume (2018-07-07 13:25:15 +0200)
+
+----------------------------------------------------------------
+This is the fixes set for v4.18 cycle.
+
+This is a fix for suspending all pxa3xx platforms, where high
+number interrupts are not reenabled.
+
+----------------------------------------------------------------
+Daniel Mack (1):
+      ARM: pxa: irq: fix handling of ICMR registers in suspend/resume
+
+ arch/arm/mach-pxa/irq.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+-- 
+Robert
