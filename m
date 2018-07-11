@@ -1,38 +1,49 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Wed, 11 Jul 2018 16:41:52 +0900
-Subject: [PATCH v11 04/15] kexec_file: kexec_walk_memblock() only walks a
- dedicated region at kdump
-In-Reply-To: <20180711074203.3019-1-takahiro.akashi@linaro.org>
-References: <20180711074203.3019-1-takahiro.akashi@linaro.org>
-Message-ID: <20180711074203.3019-5-takahiro.akashi@linaro.org>
+From: mhocko@kernel.org (Michal Hocko)
+Date: Wed, 11 Jul 2018 10:54:07 +0200
+Subject: [PATCH 1/2] mm/cma: remove unsupported gfp_mask parameter from
+ cma_alloc()
+In-Reply-To: <CAAmzW4P1m_T77DfQzDD6ysGaOF46++-0gwRaOajmo6ef=VYp=A@mail.gmail.com>
+References: <CGME20180709122019eucas1p2340da484acfcc932537e6014f4fd2c29@eucas1p2.samsung.com>
+ <20180709121956.20200-1-m.szyprowski@samsung.com>
+ <20180709122019eucas1p2340da484acfcc932537e6014f4fd2c29~-sqTPJKij2939229392eucas1p2j@eucas1p2.samsung.com>
+ <CAAmzW4PPNYhUj_MeZox+ddq8MjXqnJs_AJ3xkayf710udD1pSg@mail.gmail.com>
+ <20180710095056.GE14284@dhcp22.suse.cz>
+ <CAAmzW4P1m_T77DfQzDD6ysGaOF46++-0gwRaOajmo6ef=VYp=A@mail.gmail.com>
+Message-ID: <20180711085407.GB20050@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In kdump case, there exists only one dedicated memoblock region as usable
-memory (crashk_res). With this patch, kexec_walk_memblock() runs a given
-callback function on this region.
+On Wed 11-07-18 16:35:28, Joonsoo Kim wrote:
+> 2018-07-10 18:50 GMT+09:00 Michal Hocko <mhocko@kernel.org>:
+> > On Tue 10-07-18 16:19:32, Joonsoo Kim wrote:
+> >> Hello, Marek.
+> >>
+> >> 2018-07-09 21:19 GMT+09:00 Marek Szyprowski <m.szyprowski@samsung.com>:
+> >> > cma_alloc() function doesn't really support gfp flags other than
+> >> > __GFP_NOWARN, so convert gfp_mask parameter to boolean no_warn parameter.
+> >>
+> >> Although gfp_mask isn't used in cma_alloc() except no_warn, it can be used
+> >> in alloc_contig_range(). For example, if passed gfp mask has no __GFP_FS,
+> >> compaction(isolation) would work differently. Do you have considered
+> >> such a case?
+> >
+> > Does any of cma_alloc users actually care about GFP_NO{FS,IO}?
+> 
+> I don't know. My guess is that cma_alloc() is used for DMA allocation so
+> block device would use it, too. If fs/block subsystem initiates the
+> request for the device,
+> it would be possible that cma_alloc() is called with such a flag.
+> Again, I don't know
+> much about those subsystem so I would be wrong.
 
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-Cc: Dave Young <dyoung@redhat.com>
-Cc: Vivek Goyal <vgoyal@redhat.com>
-Cc: Baoquan He <bhe@redhat.com>
----
- kernel/kexec_file.c | 3 +++
- 1 file changed, 3 insertions(+)
+The patch converts existing users and none of them really tries to use
+anything other than GFP_KERNEL [|__GFP_NOWARN] so this doesn't seem to
+be the case. Should there be a new user requiring more restricted
+gfp_mask we should carefuly re-evaluate and think how to support it.
 
-diff --git a/kernel/kexec_file.c b/kernel/kexec_file.c
-index b088324fb3ad..ebf06c3e168d 100644
---- a/kernel/kexec_file.c
-+++ b/kernel/kexec_file.c
-@@ -511,6 +511,9 @@ static int kexec_walk_memblock(struct kexec_buf *kbuf,
- 	phys_addr_t mstart, mend;
- 	struct resource res = { };
- 
-+	if (kbuf->image->type == KEXEC_TYPE_CRASH)
-+		return func(&crashk_res, kbuf);
-+
- 	if (kbuf->top_down) {
- 		for_each_free_mem_range_reverse(i, NUMA_NO_NODE, 0,
- 						&mstart, &mend, NULL) {
+Until then I would simply stick with the proposed approach because my
+experience tells me that a wrong gfp mask usage is way too easy so the
+simpler the api is the less likely we will see an abuse.
 -- 
-2.17.0
+Michal Hocko
+SUSE Labs
