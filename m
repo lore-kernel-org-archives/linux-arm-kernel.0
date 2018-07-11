@@ -1,60 +1,241 @@
 From: andrew@aj.id.au (Andrew Jeffery)
-Date: Wed, 11 Jul 2018 15:01:18 +0930
-Subject: [RFC PATCH v2 0/4] sysfs interface to miscellaneous BMC controls and
- fields
-Message-ID: <20180711053122.30773-1-andrew@aj.id.au>
+Date: Wed, 11 Jul 2018 15:01:22 +0930
+Subject: [RFC PATCH v2 4/4] dts: aspeed-g5: Describe VGA,
+ SIO scratch and DAC mux fields
+In-Reply-To: <20180711053122.30773-1-andrew@aj.id.au>
+References: <20180711053122.30773-1-andrew@aj.id.au>
+Message-ID: <20180711053122.30773-5-andrew@aj.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+The AST2500 has VGA scratch registers that are read-only, SuperIO
+scratch registers that are a mix of read-only and read-write, and a
+graphics DAC mux that must be read or configured in the process of
+booting e.g. an OpenPOWER system.
 
-This series is a second stab at exposing hardware controls on Baseboard
-Management Controllers that are hard to fit into any a coherent abstraction.
+These capabilities do not really have a place in other drivers, so
+expose them as fields via bmc-misc-ctrl.
 
-The patches introduce new devicetree bindings and sysfs attributes, along with
-a platform driver to expose devicetree nodes of the former as the latter.
+Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
+---
 
-Obviously not having an abstract interface to these knobs and switches is not
-ideal, but the proposal does have some advantages over devmem:
+Since RFC v1:
 
-1. Removal of read-modify-write races, as register update is atomic
-2. Reduced foot-gun, as only the defined field is accessible
-3. Improved discoverability as the fields are named
+* Rework labels to what is documented in the bindings
+* Fix an incorrect offset property
 
-The intent is that the setup should be used as a second-last resort (over
-devmem). I'm interested in feedback on:
+ arch/arm/boot/dts/aspeed-g5.dtsi | 192 +++++++++++++++++++++++++++++++
+ 1 file changed, 192 insertions(+)
 
-a) Is this a acceptable improvement over devmem?
-b) If a), is the devicetree the best way to describe the fields?
-c) If b), is directly mapping them to a sysfs attr group managable longterm?
-
-My concern with b) and c) is that there's not a clear restriction on what
-fields can be exposed using the driver, so I've tried to compensate by
-explicitly documenting the recognised fields in the bindings.
-
-Looking for feedback on all fronts.
-
-Cheers,
-
-Andrew
-
-Andrew Jeffery (4):
-  dt-bindings: misc: Add bindings for misc. BMC control fields
-  Documentation: ABI: Add sysfs-devices-platform-field to testing
-  misc: Add bmc-misc-ctrl
-  dts: aspeed-g5: Describe VGA, SIO scratch and DAC mux fields
-
- .../ABI/testing/sysfs-devices-platform-field  |  95 ++++
- .../bindings/misc/bmc-misc-ctrl.txt           | 252 ++++++++++
- MAINTAINERS                                   |   8 +
- arch/arm/boot/dts/aspeed-g5.dtsi              | 192 ++++++++
- drivers/misc/Kconfig                          |  11 +
- drivers/misc/Makefile                         |   1 +
- drivers/misc/bmc-misc-ctrl.c                  | 446 ++++++++++++++++++
- 7 files changed, 1005 insertions(+)
- create mode 100644 Documentation/ABI/testing/sysfs-devices-platform-field
- create mode 100644 Documentation/devicetree/bindings/misc/bmc-misc-ctrl.txt
- create mode 100644 drivers/misc/bmc-misc-ctrl.c
-
+diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
+index 17f2714d18a7..c484ac637328 100644
+--- a/arch/arm/boot/dts/aspeed-g5.dtsi
++++ b/arch/arm/boot/dts/aspeed-g5.dtsi
+@@ -187,6 +187,77 @@
+ 					aspeed,external-nodes = <&gfx &lhc>;
+ 
+ 				};
++
++				field at 2c.16 {
++					compatible = "bmc-misc-ctrl";
++					offset = <0x2c>;
++					mask = <0x00030000>;
++					label = "dac-mux";
++				};
++
++				field at 50.0 {
++					compatible = "bmc-misc-ctrl";
++					offset = <0x50>;
++					mask = <0xffffffff>;
++					label = "vga0";
++					read-only;
++				};
++
++				field at 54.0 {
++					compatible = "bmc-misc-ctrl";
++					offset = <0x54>;
++					mask = <0xffffffff>;
++					label = "vga1";
++					read-only;
++				};
++
++				field at 58.0 {
++					compatible = "bmc-misc-ctrl";
++					offset = <0x58>;
++					mask = <0xffffffff>;
++					label = "vga2";
++					read-only;
++				};
++
++				field at 5c.0 {
++					compatible = "bmc-misc-ctrl";
++					offset = <0x5c>;
++					mask = <0xffffffff>;
++					label = "vga3";
++					read-only;
++				};
++
++				field at 60.0 {
++					compatible = "bmc-misc-ctrl";
++					offset = <0x60>;
++					mask = <0xffffffff>;
++					label = "vga4";
++					read-only;
++				};
++
++				field at 64.0 {
++					compatible = "bmc-misc-ctrl";
++					offset = <0x64>;
++					mask = <0xffffffff>;
++					label = "vga5";
++					read-only;
++				};
++
++				field at 68.0 {
++					compatible = "bmc-misc-ctrl";
++					offset = <0x68>;
++					mask = <0xffffffff>;
++					label = "vga6";
++					read-only;
++				};
++
++				field at 6c.0 {
++					compatible = "bmc-misc-ctrl";
++					offset = <0x6c>;
++					mask = <0xffffffff>;
++					label = "vga7";
++					read-only;
++				};
+ 			};
+ 
+ 			rng: hwrng at 1e6e2078 {
+@@ -343,6 +414,127 @@
+ 						#reset-cells = <1>;
+ 					};
+ 
++					field at f0.24 {
++						compatible = "bmc-misc-ctrl";
++						offset = <0xf0>;
++						mask = <0xff000000>;
++						label = "sio2b";
++					};
++
++					field at f0.16 {
++						compatible = "bmc-misc-ctrl";
++						offset = <0xf0>;
++						mask = <0x00ff0000>;
++						label = "sio2a";
++					};
++
++					field at f0.8 {
++						compatible = "bmc-misc-ctrl";
++						offset = <0xf0>;
++						mask = <0x0000ff00>;
++						bit-shift = <8>;
++						label = "sio29";
++					};
++
++					field at f0.0 {
++						compatible = "bmc-misc-ctrl";
++						offset = <0xf0>;
++						mask = <0x000000ff>;
++						label = "sio28";
++					};
++
++					field at f4.24 {
++						compatible = "bmc-misc-ctrl";
++						offset = <0xf4>;
++						mask = <0xff000000>;
++						label = "sio2f";
++					};
++
++					field at f4.16 {
++						compatible = "bmc-misc-ctrl";
++						offset = <0xf4>;
++						mask = <0x00ff0000>;
++						label = "sio2e";
++					};
++
++					field at f4.8 {
++						compatible = "bmc-misc-ctrl";
++						offset = <0xf4>;
++						mask = <0x0000ff00>;
++						label = "sio2d";
++					};
++
++					field at f4.0 {
++						compatible = "bmc-misc-ctrl";
++						offset = <0xf4>;
++						mask = <0x000000ff>;
++						label = "sio2c";
++					};
++
++					field at f8.24 {
++						compatible = "bmc-misc-ctrl";
++						offset = <0xf8>;
++						mask = <0xff000000>;
++						read-only;
++						label = "sio23";
++					};
++
++					field at f8.16 {
++						compatible = "bmc-misc-ctrl";
++						offset = <0xf8>;
++						mask = <0x00ff0000>;
++						read-only;
++						label = "sio22";
++					};
++
++					field at f8.8 {
++						compatible = "bmc-misc-ctrl";
++						offset = <0xf8>;
++						mask = <0x0000ff00>;
++						read-only;
++						label = "sio21";
++					};
++
++					field at f8.0 {
++						compatible = "bmc-misc-ctrl";
++						offset = <0xf8>;
++						mask = <0x000000ff>;
++						read-only;
++						label = "sio20";
++					};
++
++					field at fc.24 {
++						compatible = "bmc-misc-ctrl";
++						offset = <0xfc>;
++						mask = <0xff000000>;
++						read-only;
++						label = "sio27";
++					};
++
++					field at fc.16 {
++						compatible = "bmc-misc-ctrl";
++						offset = <0xfc>;
++						mask = <0x00ff0000>;
++						read-only;
++						label = "sio26";
++					};
++
++					field at fc.8 {
++						compatible = "bmc-misc-ctrl";
++						offset = <0xfc>;
++						mask = <0x0000ff00>;
++						read-only;
++						label = "sio25";
++					};
++
++					field at fc.0 {
++						compatible = "bmc-misc-ctrl";
++						offset = <0xfc>;
++						mask = <0x000000ff>;
++						read-only;
++						label = "sio24";
++					};
++
+ 					ibt: ibt at c0 {
+ 						compatible = "aspeed,ast2500-ibt-bmc";
+ 						reg = <0xc0 0x18>;
 -- 
 2.17.1
