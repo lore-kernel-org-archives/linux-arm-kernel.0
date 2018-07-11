@@ -1,134 +1,73 @@
-From: jian.hu@amlogic.com (Jian Hu)
-Date: Wed, 11 Jul 2018 20:53:35 +0800
-Subject: [PATCH 2/3] dt-bindings: clk: meson-g12a: Add G12A EE Clock
- Bindings
-In-Reply-To: <1531214774.2708.49.camel@baylibre.com>
-References: <1531134767-29927-1-git-send-email-jian.hu@amlogic.com>
- <1531134767-29927-3-git-send-email-jian.hu@amlogic.com>
- <CAFBinCB6LS=PT1cw-j-LZ+vWo-RFe81qVZ6uLeGfWKtKfHz7ag@mail.gmail.com>
- <1531214774.2708.49.camel@baylibre.com>
-Message-ID: <d09961d5-2674-fd8c-ee90-05dd423391f3@amlogic.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 11 Jul 2018 14:38:59 +0200
+Subject: [PATCH 05/19] mmc: mmci: allow to overwrite clock/power procedure
+ to specific variant
+In-Reply-To: <973d98c5-b5c7-d1c4-1b20-b6a77500adc3@st.com>
+References: <1528809280-31116-1-git-send-email-ludovic.Barre@st.com>
+ <1528809280-31116-6-git-send-email-ludovic.Barre@st.com>
+ <CAPDyKFpwVMX9LoC_abHm09UNhLse8MJBUpCCHkR8NnK7fOU5Yg@mail.gmail.com>
+ <973d98c5-b5c7-d1c4-1b20-b6a77500adc3@st.com>
+Message-ID: <CAPDyKFpUbHR4qfm3fDbRi=_=5oyqN9mhubySQ6a-N7msR5uU8w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+[...]
 
+>> 2) The clock register will be written to before the regulator
+>> operations have been done. Not sure if that works fine!?
+>
+>
+> you are right, it's probably better if the clock is done after power.
+> do you agree if I change the order?
 
-On 2018/7/10 17:26, Jerome Brunet wrote:
-> On Tue, 2018-07-10 at 00:13 +0200, Martin Blumenstingl wrote:
->> On Mon, Jul 9, 2018 at 1:13 PM Jian Hu <jian.hu@amlogic.com> wrote:
->>>
->>> Add dt-bindings headers for the Meson-G12A's Everything-Else
->>> part clock controller.
+If the new ST variant can cope with the existing order in the current
+code, then let's stick to that to avoid breaking legacy variants.
+
+>
 >>
->> I wonder if this should be folded into patch #1 along with an update
->> to Documentation/devicetree/bindings/clock/amlogic,gxbb-clkc.txt so
->> it's clear which header has to be used for G12A
+>> An overall comment, I think we should create a mmci_host_ops structure
+>> and put the needed callbacks in there (kept to a minimum of course),
+>> rather than putting them as a part of the variant struct. More
+>> importantly, also the legacy mmci variants should get a mmci_host_ops
+>> structure assigned during probe.
 >>
-> 
-> Yes, please squash patch 1 and 2.
-I have squashed patch 1 and 2.
-> 
->>>
->>> Signed-off-by: Jian Hu <jian.hu@amlogic.com>
->>> ---
->>>   include/dt-bindings/clock/g12a-clkc.h | 93 +++++++++++++++++++++++++++++++++++
->>>   1 file changed, 93 insertions(+)
->>>   create mode 100644 include/dt-bindings/clock/g12a-clkc.h
->>>
->>> diff --git a/include/dt-bindings/clock/g12a-clkc.h b/include/dt-bindings/clock/g12a-clkc.h
->>> new file mode 100644
->>> index 0000000..1473225
->>> --- /dev/null
->>> +++ b/include/dt-bindings/clock/g12a-clkc.h
->>> @@ -0,0 +1,93 @@
->>> +/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
->>> +/*
->>> + * Meson-G12A clock tree IDs
->>> + *
->>> + * Copyright (c) 2018 Amlogic, Inc. All rights reserved.
->>> + */
->>> +
->>> +#ifndef __G12A_CLKC_H
->>> +#define __G12A_CLKC_H
->>> +
->>> +#define CLKID_SYS_PLL                          0
->>> +#define CLKID_FIXED_PLL                                1
->>> +#define CLKID_FCLK_DIV2                                2
->>> +#define CLKID_FCLK_DIV3                                3
->>> +#define CLKID_FCLK_DIV4                                4
->>> +#define CLKID_FCLK_DIV5                                5
->>> +#define CLKID_FCLK_DIV7                                6
->>> +#define CLKID_GP0_PLL                          7
-> 
-> Please fix the alignement.
-> 
->>> +#define CLKID_CLK81                                    10
->>> +#define CLKID_MPLL0                                    11
->>> +#define CLKID_MPLL1                                    12
->>> +#define CLKID_MPLL2                                    13
->>> +#define CLKID_MPLL3                                    14
->>> +#define CLKID_DDR                                      15
->>> +#define CLKID_DOS                                      16
->>> +#define CLKID_AUDIO_LOCKER                     17
->>> +#define CLKID_MIPI_DSI_HOST                    18
->>> +#define CLKID_ETH_PHY                          19
->>> +#define CLKID_ISA                                      20
->>> +#define CLKID_PL301                                    21
->>> +#define CLKID_PERIPHS                          22
->>> +#define CLKID_SPICC0                           23
->>> +#define CLKID_I2C                                      24
->>> +#define CLKID_SANA                                     25
->>> +#define CLKID_SD                                       26
->>> +#define CLKID_RNG0                                     27
->>> +#define CLKID_UART0                                    28
->>> +#define CLKID_SPICC1                           29
->>> +#define CLKID_HIU_IFACE                                30
->>> +#define CLKID_MIPI_DSI_PHY                     31
->>> +#define CLKID_ASSIST_MISC                      32
->>> +#define CLKID_SD_EMMC_A                                33
->>> +#define CLKID_SD_EMMC_B                                34
->>> +#define CLKID_SD_EMMC_C                                35
->>> +#define CLKID_AUDIO_CODEC                      36
->>> +#define CLKID_AUDIO                                    37
->>> +#define CLKID_ETH                                      38
->>> +#define CLKID_DEMUX                                    39
->>> +#define CLKID_AUDIO_IFIFO                      40
->>> +#define CLKID_ADC                                      41
->>> +#define CLKID_UART1                                    42
->>> +#define CLKID_G2D                                      43
->>> +#define CLKID_RESET                                    44
->>> +#define CLKID_PCIE_COMB                                45
->>> +#define CLKID_PARSER                           46
->>> +#define CLKID_USB                                      47
->>> +#define CLKID_PCIE_PHY                         48
->>> +#define CLKID_AHB_ARB0                         49
->>> +#define CLKID_AHB_DATA_BUS                     50
->>> +#define CLKID_AHB_CTRL_BUS                     51
->>> +#define CLKID_HTX_HDCP22                       52
->>> +#define CLKID_HTX_PCLK                         53
->>> +#define CLKID_BT656                                    54
->>> +#define CLKID_USB1_DDR_BRIDGE          55
->>> +#define CLKID_MMC_PCLK                         56
->>> +#define CLKID_UART2                                    57
->>> +#define CLKID_VPU_INTR                         58
->>> +#define CLKID_GIC                                      59
->>> +#define CLKID_SD_EMMC_B_CLK0           60
->>> +#define CLKID_SD_EMMC_C_CLK0           61
->>> +#define CLKID_HIFI_PLL                         71
->>> +
->>
->> is this empty line here on purpose? a comment would be great if
->> there's a reason behind it (there's already a gap in the numbering
->> between CLKID_GP0_PLL and CLKID_CLK81, but there's no empty line there
->> - either way is fine, please just keep it consistent)
-> 
-> Please drop the empty line.
-> Otherwise, looks good.
-> I have dropped it ,and I will push another email later.Thanks.
->>
->>
->> Regards
->> Martin
-> 
-> .
-> 
+>> The point is, I think it makes the code above (and future wise) more
+>> flexible. It should also allow us to better share functions between
+>> the variants. In principle, I expect that we end up with a bunch of
+>> "library" mmci functions that can be invoked from variant's
+>> mmci_host_ops (if not assigned directly).
+>
+>
+> After "Linaro connect" we have exchanged some emails (subject: "STM32MP1
+> SDMMC driver review") and the start point was
+> "Goal is not to redesign mmci.c like sdhci.c."
+> This it's why I'm surprise by "library" and "mmci_host_ops"
+> and comment of patch 01.
+
+Sometimes it's easier to look at patches/code, instead of giving
+qualified guesses what is the best solution. Try something, realize
+what is better, then try again...
+
+The point is, we need callbacks to cope with the variants as we can't
+have quirks for everything, and you are demonstrating that in $subject
+patch.
+
+Since this is the case, then I think it's better to make it more
+flexible, already from the beginning and thus put the callbacks in a
+new mmci host ops structure instead.
+
+>
+> So, it's not clear for me on where we wish to go.
+> Could you clarify the way, if it's with a mmci_ops like sdhci_ops?
+
+Yep, something along those lines. However, we don't want to introduce
+unnecessary callbacks and complexity. We should strive towards sharing
+common functionality through library functions in mmci.c, rather than
+having callbacks for every single difference.
+
+Does it makes sense?
+
+[...]
+
+Kind regards
+Uffe
