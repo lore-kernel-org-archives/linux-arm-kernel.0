@@ -1,89 +1,113 @@
-From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Wed, 11 Jul 2018 10:32:07 +0100
-Subject: [PATCH net-next v2 08/14] ARM: net: bpf: imm12 constant conversion
-In-Reply-To: <20180711093033.GP17271@n2100.armlinux.org.uk>
-References: <20180711093033.GP17271@n2100.armlinux.org.uk>
-Message-ID: <E1fdBTj-0001JF-Iq@rmk-PC.armlinux.org.uk>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 11 Jul 2018 12:26:55 +0200
+Subject: v4.18-rc2 on droid4: screen turns red
+In-Reply-To: <20180630131812.GA549@amd>
+References: <20180630131812.GA549@amd>
+Message-ID: <20180711102655.GA6864@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide a version of the imm8m() function that the compiler can optimise
-when used with a constant expression.
+Hi!
 
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
----
- arch/arm/net/bpf_jit_32.c | 50 ++++++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 49 insertions(+), 1 deletion(-)
+> After longer inactivity, attempt to wake up the screen results in
+> screen being completely red. Not too useful. I can still connect over
+> ssh.
 
-diff --git a/arch/arm/net/bpf_jit_32.c b/arch/arm/net/bpf_jit_32.c
-index 753b5b2b2e3d..2cc66aa44dfe 100644
---- a/arch/arm/net/bpf_jit_32.c
-+++ b/arch/arm/net/bpf_jit_32.c
-@@ -237,9 +237,55 @@ static inline void emit(u32 inst, struct jit_ctx *ctx)
- }
- 
- /*
-+ * This is rather horrid, but necessary to convert an integer constant
-+ * to an immediate operand for the opcodes, and be able to detect at
-+ * build time whether the constant can't be converted (iow, usable in
-+ * BUILD_BUG_ON()).
-+ */
-+#define imm12val(v, s) (rol32(v, (s)) | (s) << 7)
-+#define const_imm8m(x)					\
-+	({ int r;					\
-+	   u32 v = (x);					\
-+	   if (!(v & ~0x000000ff))			\
-+		r = imm12val(v, 0);			\
-+	   else if (!(v & ~0xc000003f))			\
-+		r = imm12val(v, 2);			\
-+	   else if (!(v & ~0xf000000f))			\
-+		r = imm12val(v, 4);			\
-+	   else if (!(v & ~0xfc000003))			\
-+		r = imm12val(v, 6);			\
-+	   else if (!(v & ~0xff000000))			\
-+		r = imm12val(v, 8);			\
-+	   else if (!(v & ~0x3fc00000))			\
-+		r = imm12val(v, 10);			\
-+	   else if (!(v & ~0x0ff00000))			\
-+		r = imm12val(v, 12);			\
-+	   else if (!(v & ~0x03fc0000))			\
-+		r = imm12val(v, 14);			\
-+	   else if (!(v & ~0x00ff0000))			\
-+		r = imm12val(v, 16);			\
-+	   else if (!(v & ~0x003fc000))			\
-+		r = imm12val(v, 18);			\
-+	   else if (!(v & ~0x000ff000))			\
-+		r = imm12val(v, 20);			\
-+	   else if (!(v & ~0x0003fc00))			\
-+		r = imm12val(v, 22);			\
-+	   else if (!(v & ~0x0000ff00))			\
-+		r = imm12val(v, 24);			\
-+	   else if (!(v & ~0x00003fc0))			\
-+		r = imm12val(v, 26);			\
-+	   else if (!(v & ~0x00000ff0))			\
-+		r = imm12val(v, 28);			\
-+	   else if (!(v & ~0x000003fc))			\
-+		r = imm12val(v, 30);			\
-+	   else						\
-+		r = -1;					\
-+	   r; })
-+
-+/*
-  * Checks if immediate value can be converted to imm12(12 bits) value.
-  */
--static int16_t imm8m(u32 x)
-+static int imm8m(u32 x)
- {
- 	u32 rot;
- 
-@@ -249,6 +295,8 @@ static int16_t imm8m(u32 x)
- 	return -1;
- }
- 
-+#define imm8m(x) (__builtin_constant_p(x) ? const_imm8m(x) : imm8m(x))
-+
- static u32 arm_bpf_ldst_imm12(u32 op, u8 rt, u8 rn, s16 imm12)
- {
- 	op |= rt << 12 | rn << 16;
+Still there in -rc4 :-(. But happens only once in a few days for me...
+
+When X is shut down, text console works ok.
+      	       	    	     	     	       	    	Pavel
+> 
+> This happens all the time:
+> 
+> Jun 30 11:34:08 devuan kernel: [  143.605499] ------------[ cut here
+> ]------------
+> Jun 30 11:34:08 devuan kernel: [  143.610168] WARNING: CPU: 1 PID:
+> 2220 at drivers/gpu/drm/omapdrm/
+> dss/hdmi4.c:667 hdmi_audio_stop+0x5c/0x68
+> Jun 30 11:34:08 devuan kernel: [  143.619873] Modules linked in:
+> Jun 30 11:34:08 devuan kernel: [  143.622955] CPU: 1 PID: 2220 Comm:
+> pulseaudio Not tainted 4.18.0-
+> rc2-88315-g3452793-dirty #756
+> Jun 30 11:34:08 devuan kernel: [  143.631591] Hardware name: Generic
+> OMAP4 (Flattened Device Tree)
+> Jun 30 11:34:08 devuan kernel: [  143.637634] [<c010f6cc>]
+> (unwind_backtrace) from [<c010ba50>] (sh
+> ow_stack+0x10/0x14)
+> Jun 30 11:34:08 devuan kernel: [  143.645446] [<c010ba50>]
+> (show_stack) from [<c086d7ec>] (dump_sta
+> ck+0x8c/0xac)
+> Jun 30 11:34:08 devuan kernel: [  143.652740] [<c086d7ec>]
+> (dump_stack) from [<c012d364>] (__warn+0
+> xe8/0x114)
+> Jun 30 11:34:08 devuan kernel: [  143.659729] [<c012d364>] (__warn)
+> from [<c012d3cc>] (warn_slowpath_null+0x3c/0x48)
+> Jun 30 11:34:08 devuan kernel: [  143.667358] [<c012d3cc>]
+> (warn_slowpath_null) from [<c047b7dc>] (hdmi_audio_stop+0x5c/0x68)
+> Jun 30 11:34:08 devuan kernel: [  143.675750] [<c047b7dc>]
+> (hdmi_audio_stop) from [<c06a9824>] (hdmi_dai_trigger+0x6c/0x88)
+> Jun 30 11:34:08 devuan kernel: [  143.683990] [<c06a9824>]
+> (hdmi_dai_trigger) from [<c06990d0>] (soc_pcm_trigger+0xf0/0x130)
+> Jun 30 11:34:08 devuan kernel: [  143.692291] [<c06990d0>]
+> (soc_pcm_trigger) from [<c067a9f4>] (snd_pcm_do_stop+0x54/0x58)
+> Jun 30 11:34:08 devuan kernel: [  143.700439] [<c067a9f4>]
+> (snd_pcm_do_stop) from [<c067a7a4>] (snd_pcm_action_single+0x38/0x78)
+> Jun 30 11:34:08 devuan kernel: [  143.709075] [<c067a7a4>]
+> (snd_pcm_action_single) from [<c067c468>] (snd_pcm_drop+0x48/0x94)
+> Jun 30 11:34:08 devuan kernel: [  143.717468] [<c067c468>]
+> (snd_pcm_drop) from [<c067d508>] (snd_pcm_ioctl+0x870/0x1180)
+> Jun 30 11:34:08 devuan kernel: [  143.725433] [<c067d508>]
+> (snd_pcm_ioctl) from [<c0215944>] (do_vfs_ioctl+0x80/0x960)
+> Jun 30 11:34:08 devuan kernel: [  143.733215] [<c0215944>]
+> (do_vfs_ioctl) from [<c0216280>] (ksys_ioctl+0x5c/0x80)
+> Jun 30 11:34:08 devuan kernel: [  143.740661] [<c0216280>]
+> (ksys_ioctl) from [<c0101000>] (ret_fast_syscall+0x0/0x54)
+> Jun 30 11:34:08 devuan kernel: [  143.748352] Exception
+> stack(0xeb8fffa8 to 0xeb8ffff0)
+> Jun 30 11:34:08 devuan kernel: [  143.753448] ffa0:
+> 005129b0 b1971394 00000015 00004143 00000000 00512960
+> 
+> 
+> This is probably unrelated:
+> 
+> [13215.125732] cpcap-usb-phy cpcap-usb-phy.0: connected to USB host
+> [13245.205535] cpcap-usb-phy cpcap-usb-phy.0: connected to USB host
+> [13252.969940] power_supply battery: driver failed to report
+> `power_now' property: -22
+> [13275.285369] cpcap-usb-phy cpcap-usb-phy.0: connected to USB host
+> [13291.993652] Charging, 4350000 uV, 532000 uA
+> [13292.001708] Charging, 4350000 uV, 532000 uA
+> [13305.364837] cpcap-usb-phy cpcap-usb-phy.0: connected to USB host
+> [13335.445037] cpcap-usb-phy cpcap-usb-phy.0: connected to USB host
+> [13365.524291] cpcap-usb-phy cpcap-usb-phy.0: connected to USB host
+> [13372.940093] power_supply battery: driver failed to report
+> `power_now' property: -22
+> [13383.554412] g_ether gadget: packet filter 0e
+> [13383.558715] g_ether gadget: ecm req21.43 v000e i0000 l0
+> [13383.580261] g_ether gadget: notify connect true
+> [13383.612243] g_ether gadget: notify speed 425984000
+> [13387.213256] cpcap_adc cpcap_adc.0: error reading ADC: -110
+> [13387.218780] cpcap_battery cpcap_battery.0:
+> cpcap_battery_get_voltage failed: -110
+> [13387.523254] cpcap_adc cpcap_adc.0: error reading ADC: -110
+> [13387.528778] cpcap_battery cpcap_battery.0:
+> cpcap_battery_get_current failed: -110
+> 
+> Ideas welcome.
+> 
+> Best regards,
+> 							Pavel
+> 
+
+
+
 -- 
-2.7.4
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180711/e133154b/attachment.sig>
