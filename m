@@ -1,144 +1,77 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 11 Jul 2018 11:38:21 +0100
-Subject: [PATCH v3 15/20] kvm: arm/arm64: Allow tuning the physical
- address size for VM
-In-Reply-To: <0d9d48fc-f913-9f05-afbe-83299c470611@arm.com>
-References: <12d1832a-1a13-7dd4-662b-addf58400789@arm.com>
- <fe9f5aa5-b283-07e0-5f0e-e97d96b780e7@arm.com>
- <9f1af26e-2913-2b0b-1352-63160096f78f@arm.com>
- <f3463d0a-c6a3-c34d-acb3-13c99fc61c5a@arm.com>
- <20180709112326.GD9486@e103592.cambridge.arm.com>
- <17f8d585-3489-ab6f-6ee1-4d8d337dcf9c@arm.com>
- <20180709133750.GE9486@e103592.cambridge.arm.com>
- <377420ce-97a8-4359-6224-273d91f37247@arm.com>
- <20180710170330.GJ9486@e103592.cambridge.arm.com>
- <0d9d48fc-f913-9f05-afbe-83299c470611@arm.com>
-Message-ID: <20180711103819.GK9486@e103592.cambridge.arm.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Wed, 11 Jul 2018 16:14:10 +0530
+Subject: [PATCH V4 3/5] mailbox: imx: add imx mu support
+In-Reply-To: <AM0PR04MB42119DAE987CDF871CA8CFC6805A0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+References: <1531061817-1980-1-git-send-email-aisheng.dong@nxp.com>
+ <1531061817-1980-4-git-send-email-aisheng.dong@nxp.com>
+ <20180710141940.oed3kwhbplnykl36@pengutronix.de>
+ <AM0PR04MB42113391A6EA741E2767C74B805A0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <20180711075456.npwfpm6mtpkx7k76@pengutronix.de>
+ <AM0PR04MB42119DAE987CDF871CA8CFC6805A0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+Message-ID: <CABb+yY1kH8mr3=nazsLXrLaNWT0x6j9MizVaE+bZaHmrsKn-Wg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 11, 2018 at 10:05:50AM +0100, Suzuki K Poulose wrote:
-> On 10/07/18 18:03, Dave Martin wrote:
-> >On Tue, Jul 10, 2018 at 05:38:39PM +0100, Suzuki K Poulose wrote:
-> >>On 09/07/18 14:37, Dave Martin wrote:
-> >>>On Mon, Jul 09, 2018 at 01:29:42PM +0100, Marc Zyngier wrote:
-> >>>>On 09/07/18 12:23, Dave Martin wrote:
+On Wed, Jul 11, 2018 at 4:07 PM, A.s. Dong <aisheng.dong@nxp.com> wrote:
+>
+> > -----Original Message-----
+> > From: Sascha Hauer [mailto:s.hauer at pengutronix.de]
+> > Sent: Wednesday, July 11, 2018 3:55 PM
+> > To: A.s. Dong <aisheng.dong@nxp.com>
+> > Cc: linux-arm-kernel at lists.infradead.org; dongas86 at gmail.com; Jassi Brar
+> > <jassisinghbrar@gmail.com>; linux-kernel at vger.kernel.org; Oleksij Rempel
+> > <o.rempel@pengutronix.de>; dl-linux-imx <linux-imx@nxp.com>;
+> > kernel at pengutronix.de; Fabio Estevam <fabio.estevam@nxp.com>;
+> > shawnguo at kernel.org
+> > Subject: Re: [PATCH V4 3/5] mailbox: imx: add imx mu support
 > >
-> >[...]
+> > On Wed, Jul 11, 2018 at 07:29:38AM +0000, A.s. Dong wrote:
+> > > Hi Sascha,
+> > >
+> > > > -----Original Message-----
+> > > > From: Sascha Hauer [mailto:s.hauer at pengutronix.de]
+> > > > Sent: Tuesday, July 10, 2018 10:20 PM
+> > > > To: A.s. Dong <aisheng.dong@nxp.com>
+> > > > Cc: linux-arm-kernel at lists.infradead.org; dongas86 at gmail.com; Jassi
+> > > > Brar <jassisinghbrar@gmail.com>; linux-kernel at vger.kernel.org;
+> > > > Oleksij Rempel <o.rempel@pengutronix.de>; dl-linux-imx
+> > > > <linux-imx@nxp.com>; kernel at pengutronix.de; Fabio Estevam
+> > > > <fabio.estevam@nxp.com>; shawnguo at kernel.org
+> > > > Subject: Re: [PATCH V4 3/5] mailbox: imx: add imx mu support
+> > > >
+> > > > Hi,
+> > > >
+> > > > On Sun, Jul 08, 2018 at 10:56:55PM +0800, Dong Aisheng wrote:
+> > > > > This is used for i.MX multi core communication.
+> > > > > e.g. A core to SCU firmware(M core) on MX8.
+> > > > >
+> > > > > Tx is using polling mode while Rx is interrupt driven and schedule
+> > > > > a hrtimer to receive remain words if have more than
+> > > > > 4 words.
+> > > >
+> > > > You told us that using interrupts is not possible due to miserable
+> > > > performance, we then provided you a way with which you could poll.
+> > > > Why are you using interrupts now?
+> > > >
+> > >
+> > > Because mailbox framework does not support sync rx now, I think we do
+> > > not need to wait for that feature done first as it's independent and
+> > > separate features of framework.
 > >
-> >>>>>Wedging arguments into a few bits in the type argument feels awkward,
-> >>>>>and may be regretted later if we run out of bits, or something can't be
-> >>>>>represented in the chosen encoding.
-> >>>>
-> >>>>I think that's a pretty convincing argument for a "better" CREATE_VM,
-> >>>>one that would have a clearly defined, structured (and potentially
-> >>>>extensible) argument.
-> >>>>
-> >>>>I've quickly hacked the following:
-> >>>>
-> >>>>diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
-> >>>>index b6270a3b38e9..3e76214034c2 100644
-> >>>>--- a/include/uapi/linux/kvm.h
-> >>>>+++ b/include/uapi/linux/kvm.h
-> >>>>@@ -735,6 +735,20 @@ struct kvm_ppc_resize_hpt {
-> >>>>  	__u32 pad;
-> >>>>  };
-> >>>>
-> >>>>+struct kvm_create_vm2 {
-> >>>>+	__u64	version;	/* Or maybe not */
-> >>>>+	union {
-> >>>>+		struct {
-> >>>>+#define KVM_ARM_SVE_CAPABLE	(1 << 0)
-> >>>>+#define KVM_ARM_SELECT_IPA	{1 << 1)
-> >>>>+			__u64	capabilities;
-> >>>>+			__u16	sve_vlen;
-> >>>>+			__u8	ipa_size;
-> >>>>+		} arm64;
-> >>>>+		__u64	dummy[15];
-> >>>>+	};
-> >>>>+};
-> >>>>+
-> >>>>  #define KVMIO 0xAE
-> >>>>
-> >>>>  /* machine type bits, to be used as argument to KVM_CREATE_VM */
-> >>>>
-> >>>>Other architectures could fill in their own bits if they need to.
-> >>>>
-> >>>>Thoughts?
-> >>>
-> >>>This kind of thing should work, but it may still get messy when we
-> >>>add additional fields.
-> >>
-> >>
-> >>Marc, Dave,
-> >>
-> >>I like Dave's approach. Some comments below.
-> >>
-> >>>
-> >>>It we want this to work cross-arch, would it make sense to go
-> >>>for a more generic approach, say
-> >>>
-> >>>struct kvm_create_vm_attr_any {
-> >>>         __u32   type;
-> >>>};
-> >>>
-> >>>#define KVM_CREATE_VM_ATTR_ARCH_CAPABILITIES 1
-> >>>struct kvm_create_vm_attr_arch_capabilities {
-> >>>         __u32   type;
-> >>>         __u16   size; /* support future expansion of capabilities[] */
-> >>>         __u16   reserved;
-> >>>         __u64   capabilities[1];
-> >>>};
-> >>
-> >>We also need to advertise which attributes are supported by the host,
-> >>so that the user can tune the available ones. That would make a bit mask
-> >>like the above trickier, unless we return the supported values back
-> >>in the argument ptr for the "probe" call. And this scheme in general
-> >>can be useful for passing back a non-boolean result specific to the
-> >>attribute, without having a per-attribute ioctl. (e.g, maximum limit
-> >>for IPA).
+> > You can wait forever for this feature, nobody will add it for you. It's up to you
+> > to add support for that feature. Who else should add this feature if not you?
+> > And when will you add that feature if not now when you actually need it?
+> > It is common practice that you adjust the frameworks to your needs rather
+> > than working around them.
 > >
-> >Maybe, but this could quickly become bloated.  (My approach already
-> >feels a bit bloated...)
-> >
-> >I'm not sure that arbitrarily complex negotiation will really be
-> >needed, but userspace might want to change its mind if setting a
-> >particular propertiy fails.
-> >
-> >An alternative might be to have a bunch of per-VM ioctls to configure
-> >different things, like x86 has.  There's at least precedent for that.
-> >For arm, we currently only have a few.  That allows for easy extension,
-> >at the cost of adding ioctls.
-> 
-> As you know, one of the major problems with the per-VM ioctls is
-> the ordering of different operations and tracking to make sure that
-> the userspace follows the expected order. e.g, the first approach for
-> IPA series was based on this and it made things complex enough to drop
-> it.
+>
+> I'm willing to add it. Just because you said Jassi already had the idea on how to
+> Implement it and does not add much complexity. So I just want to see his patches.
+> But if he did not work on it, I can also help on it.
+>
+I am not much aware of the history of this conversation... but it
+seems you need to make use of mbox_chan_ops.peek_data().
 
-I'm aware of that, but if we are adding a new KVM_CREATE_VM, we could
-perhaps give it different semantics: i.e., we create a half-created VM
-that only accepts configuration ioctls and a "finish creation" ioctl
-that finalises everything before you're allowed to create devices,
-vcpus etc.
+If not that, please let me know the requirement.
 
-This is the sort of thing I was moving torwards for SVE (but for
-vcpus there).
-
-I'm not saying we should drop the existing KVM_CREATE_VM2 ideas,
-but that we should take a step back if it starts to accrue complexity.
-
-> >
-> >There may be some ioctls we can reuse, like KVM_ENABLE_CAP for per-
-> >vm capability flags.
-> 
-> May be we could switch to KVM_VM_CAPS and pass a list of capabilities
-> to be enabled at creation time ? The kvm_enable_cap can pass in additional
-> arguments for each cap. That way we don't have to rely on a new set of
-> attributes and probing becomes straight forward.
-
-That's a possibility.  I guess we'd need to understand how exactly x86
-uses this.
-
-Cheers
----Dave
+Cheers!
