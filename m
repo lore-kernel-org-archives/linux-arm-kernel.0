@@ -1,33 +1,31 @@
-From: yangyingliang@huawei.com (Yang Yingliang)
-Date: Wed, 11 Jul 2018 17:15:07 +0800
-Subject: Does the driver need check the GICD_ACTIVE or GICD_PENDING state
- before SPI affinity changing
-Message-ID: <5B45CA9B.8020602@huawei.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Wed, 11 Jul 2018 11:15:43 +0200
+Subject: [PATCH v5 14/22] ARM: sun8i-h3: Add SRAM controller node and C1
+ SRAM region
+In-Reply-To: <20180710080114.31469-15-paul.kocialkowski@bootlin.com>
+References: <20180710080114.31469-1-paul.kocialkowski@bootlin.com>
+ <20180710080114.31469-15-paul.kocialkowski@bootlin.com>
+Message-ID: <20180711091543.f36t3llqz6ptlcir@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+On Tue, Jul 10, 2018 at 10:01:06AM +0200, Paul Kocialkowski wrote:
+> This adds a SRAM controller node for the H3, with support for the C1
+> SRAM region that is shared between the Video Engine and the CPU.
+> 
+> Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 
-The following case :
+Fixed the commit prefix and the compatible and applied, thanks!
+Maxime
 
-            cpu0           cpu1                          cpu2
-           read iar
-                           set affinity to cpu2
-            dsb(sy)                                       read iar
-
-cpu0 is interrupted by a edge-SPI. After cpu0 getting INTID,
-cpu1 set SPI's affinity to another cpu(like cpu2), if the effects
-of reading ICC_IAR1_EL1 on the state of a returned INTID are
-not seeing by GIC, the SPI's state is still pending and the state
-will be migrated to cpu2, so cpu2 can also read the INTID from
-ICC_IAR1_EL1. It makes the SPI be handled twice.
-
-Does the driver need check the GICD_ACTIVE or GICD_PENDING
-state before SPI affinity changing or should hardware guarantee
-this case can't happen ?
-
-Does GIC SPEC have describe the affinity chaning flow ?
-
-
-Thanks,
-Yang
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180711/fad409af/attachment.sig>
