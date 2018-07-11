@@ -1,179 +1,123 @@
-From: yibin.gong@nxp.com (Robin Gong)
-Date: Wed, 11 Jul 2018 08:16:15 +0000
-Subject: [PATCH v1 3/4] dmaengine: imx-sdma: support dmatest
-In-Reply-To: <20180711071905.GN3219@vkoul-mobl>
-References: <1531239793-11781-1-git-send-email-yibin.gong@nxp.com>
- <1531239793-11781-4-git-send-email-yibin.gong@nxp.com>
- <20180710153326.GG3219@vkoul-mobl>
- <DB6PR04MB3223F93E1566A97857FD2FF4895A0@DB6PR04MB3223.eurprd04.prod.outlook.com>
- <20180711065338.3ka4yibxkawgo4fd@pengutronix.de>
- <20180711071905.GN3219@vkoul-mobl>
-Message-ID: <DB6PR04MB3223D27E2BCA6A235733CEA5895A0@DB6PR04MB3223.eurprd04.prod.outlook.com>
+From: jian.hu@amlogic.com (Jian Hu)
+Date: Wed, 11 Jul 2018 16:22:34 +0800
+Subject: [PATCH 2/3] dt-bindings: clk: meson-g12a: Add G12A EE Clock
+ Bindings
+In-Reply-To: <CAFBinCB6LS=PT1cw-j-LZ+vWo-RFe81qVZ6uLeGfWKtKfHz7ag@mail.gmail.com>
+References: <1531134767-29927-1-git-send-email-jian.hu@amlogic.com>
+ <1531134767-29927-3-git-send-email-jian.hu@amlogic.com>
+ <CAFBinCB6LS=PT1cw-j-LZ+vWo-RFe81qVZ6uLeGfWKtKfHz7ag@mail.gmail.com>
+Message-ID: <e4d9b2ae-45ce-59d1-3caa-b9b3f84975cf@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-> -----Original Message-----
-> From: Vinod [mailto:vkoul at kernel.org]
-> Sent: 2018?7?11? 15:19
-> To: s.hauer at pengutronix.de
-> Cc: Robin Gong <yibin.gong@nxp.com>; dan.j.williams at intel.com;
-> shawnguo at kernel.org; Fabio Estevam <fabio.estevam@nxp.com>;
-> linux at armlinux.org.uk; linux-arm-kernel at lists.infradead.org;
-> kernel at pengutronix.de; dmaengine at vger.kernel.org;
-> linux-kernel at vger.kernel.org; dl-linux-imx <linux-imx@nxp.com>
-> Subject: Re: [PATCH v1 3/4] dmaengine: imx-sdma: support dmatest
+On 2018/7/10 6:13, Martin Blumenstingl wrote:
+> On Mon, Jul 9, 2018 at 1:13 PM Jian Hu <jian.hu@amlogic.com> wrote:
+>>
+>> Add dt-bindings headers for the Meson-G12A's Everything-Else
+>> part clock controller.
+> I wonder if this should be folded into patch #1 along with an update
+> to Documentation/devicetree/bindings/clock/amlogic,gxbb-clkc.txt so
+> it's clear which header has to be used for G12A
 > 
-> On 11-07-18, 08:53, s.hauer at pengutronix.de wrote:
-> > On Wed, Jul 11, 2018 at 06:37:02AM +0000, Robin Gong wrote:
-> > >
-> > > > -----Original Message-----
-> > > > From: Vinod [mailto:vkoul at kernel.org]
-> > > > Sent: 2018?7?10? 23:33
-> > > > To: Robin Gong <yibin.gong@nxp.com>
-> > > > Cc: dan.j.williams at intel.com; shawnguo at kernel.org;
-> > > > s.hauer at pengutronix.de; Fabio Estevam <fabio.estevam@nxp.com>;
-> > > > linux at armlinux.org.uk; linux-arm-kernel at lists.infradead.org;
-> > > > kernel at pengutronix.de; dmaengine at vger.kernel.org;
-> > > > linux-kernel at vger.kernel.org; dl-linux-imx <linux-imx@nxp.com>
-> > > > Subject: Re: [PATCH v1 3/4] dmaengine: imx-sdma: support dmatest
-> > > >
-> > > > On 11-07-18, 00:23, Robin Gong wrote:
-> > > > > dmatest(memcpy) will never call dmaengine_slave_config before
-> > > > > prep,
-> > > >
-> > > > and that should have been a hint to you that you should not expect
-> > > > that
-> > > >
-> > > > > so jobs in dmaengine_slave_config need to be moved into
-> > > > > somewhere before device_prep_dma_memcpy. Besides, dmatest never
-> > > > > setup chan
-> > > > > ->private as other common case like uart/audio/spi will always
-> > > > > ->setup
-> > > > > chan->private. Here check it to judge if it's dmatest case and
-> > > > > chan->do
-> > > > > jobs in slave_config.
-> > > >
-> > > > and you should not do anything for dmatest. Supporting it means
-> > > > memcpy implementation is not correct :)
-> > > Okay, I will any word about dmatest here since memcpy assume no
-> > > calling slave_config.
-> > > >
-> > > > >
-> > > > > Signed-off-by: Robin Gong <yibin.gong@nxp.com>
-> > > > > ---
-> > > > >  drivers/dma/imx-sdma.c | 37
-> > > > > ++++++++++++++++++++++++++++---------
-> > > > >  1 file changed, 28 insertions(+), 9 deletions(-)
-> > > > >
-> > > > > diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
-> > > > > index
-> > > > > ed2267d..48f3749 100644
-> > > > > --- a/drivers/dma/imx-sdma.c
-> > > > > +++ b/drivers/dma/imx-sdma.c
-> > > > > @@ -1222,10 +1222,36 @@ static int
-> > > > > sdma_alloc_chan_resources(struct dma_chan *chan)  {
-> > > > >  	struct sdma_channel *sdmac = to_sdma_chan(chan);
-> > > > >  	struct imx_dma_data *data = chan->private;
-> > > > > +	struct imx_dma_data default_data;
-> > > > >  	int prio, ret;
-> > > > >
-> > > > > -	if (!data)
-> > > > > -		return -EINVAL;
-> > > > > +	ret = clk_enable(sdmac->sdma->clk_ipg);
-> > > > > +	if (ret)
-> > > > > +		return ret;
-> > > > > +	ret = clk_enable(sdmac->sdma->clk_ahb);
-> > > > > +	if (ret)
-> > > > > +		goto disable_clk_ipg;
-> > > > > +	/*
-> > > > > +	 * dmatest(memcpy) will never call dmaengine_slave_config before
-> prep,
-> > > > > +	 * so jobs in dmaengine_slave_config need to be moved into
-> somewhere
-> > > > > +	 * before device_prep_dma_memcpy. Besides, dmatest never setup
-> chan
-> > > > > +	 * ->private as other common cases like uart/audio/spi will setup
-> > > > > +	 * chan->private always. Here check it to judge if it's dmatest case
-> > > > > +	 * and do jobs in slave_config.
-> > > > > +	 */
-> > > > > +	if (!data) {
-> > > > > +		dev_warn(sdmac->sdma->dev, "dmatest is running?\n");
-> > > >
-> > > > why is that a warning!
-> > > Current SDMA driver assume filter function to set chan->private with
-> > > specific data (struct imx_dma_data dma_data)like below
-> (sound/soc/fsl/fsl_asrc_dma.c):
-> > > static bool filter(struct dma_chan *chan, void *param) {
-> > >         if (!imx_dma_is_general_purpose(chan))
-> > >                 return false;
-> > >         chan->private = param;
-> > >         return true;
-> > > }
-> > >
-> > > But in memcpy case, at lease dmatest case, no chan->private set in its filter
-> function.
-> > > So here take dmatest a special case and do some prepare jobs for
-> > > memcpy. But if the Upper device driver call dma_request_channel()
-> > > with their specific filter without 'chan->private' setting in the
-> > > future. The warning message is a useful hint to them to Add 'chan->private'
-> in filter function.  Or doc it somewhere?
-> >
-> > Instead of doing heuristics to guess whether we are doing memcpy you
-> > could instead make memcpy the default when slave_config is not called,
-> > i.e. drop the if (!data) check completely.
-> >
-> > > >
-> > > > > +		sdmac->word_size  =
-> sdmac->sdma->dma_device.copy_align;
-> > > > > +		default_data.priority = 2;
-> > > > > +		default_data.peripheral_type = IMX_DMATYPE_MEMORY;
-> > > > > +		default_data.dma_request = 0;
-> > > > > +		default_data.dma_request2 = 0;
-> > > > > +		data = &default_data;
-> > > > > +
-> > > > > +		sdma_config_ownership(sdmac, false, true, false);
-> > > > > +		sdma_get_pc(sdmac, IMX_DMATYPE_MEMORY);
-> > > > > +		sdma_load_context(sdmac);
-> > > > > +	}
-> > > >
-> > > > this needs to be default for memcpy
-> >
-> > The problem seems to be that we do not know whether we are doing
-> > memcpy or not. Normally we get the information how a channel is to be
-> > configured in dma_device->device_config, but this function is not
-> > called in the memcpy case.
+As your suggestions, I will squash patch 1 and 2.
+
+>>
+>> Signed-off-by: Jian Hu <jian.hu@amlogic.com>
+>> ---
+>>   include/dt-bindings/clock/g12a-clkc.h | 93 +++++++++++++++++++++++++++++++++++
+>>   1 file changed, 93 insertions(+)
+>>   create mode 100644 include/dt-bindings/clock/g12a-clkc.h
+>>
+>> diff --git a/include/dt-bindings/clock/g12a-clkc.h b/include/dt-bindings/clock/g12a-clkc.h
+>> new file mode 100644
+>> index 0000000..1473225
+>> --- /dev/null
+>> +++ b/include/dt-bindings/clock/g12a-clkc.h
+>> @@ -0,0 +1,93 @@
+>> +/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
+>> +/*
+>> + * Meson-G12A clock tree IDs
+>> + *
+>> + * Copyright (c) 2018 Amlogic, Inc. All rights reserved.
+>> + */
+>> +
+>> +#ifndef __G12A_CLKC_H
+>> +#define __G12A_CLKC_H
+>> +
+>> +#define CLKID_SYS_PLL                          0
+>> +#define CLKID_FIXED_PLL                                1
+>> +#define CLKID_FCLK_DIV2                                2
+>> +#define CLKID_FCLK_DIV3                                3
+>> +#define CLKID_FCLK_DIV4                                4
+>> +#define CLKID_FCLK_DIV5                                5
+>> +#define CLKID_FCLK_DIV7                                6
+>> +#define CLKID_GP0_PLL                          7
+>> +#define CLKID_CLK81                                    10
+>> +#define CLKID_MPLL0                                    11
+>> +#define CLKID_MPLL1                                    12
+>> +#define CLKID_MPLL2                                    13
+>> +#define CLKID_MPLL3                                    14
+>> +#define CLKID_DDR                                      15
+>> +#define CLKID_DOS                                      16
+>> +#define CLKID_AUDIO_LOCKER                     17
+>> +#define CLKID_MIPI_DSI_HOST                    18
+>> +#define CLKID_ETH_PHY                          19
+>> +#define CLKID_ISA                                      20
+>> +#define CLKID_PL301                                    21
+>> +#define CLKID_PERIPHS                          22
+>> +#define CLKID_SPICC0                           23
+>> +#define CLKID_I2C                                      24
+>> +#define CLKID_SANA                                     25
+>> +#define CLKID_SD                                       26
+>> +#define CLKID_RNG0                                     27
+>> +#define CLKID_UART0                                    28
+>> +#define CLKID_SPICC1                           29
+>> +#define CLKID_HIU_IFACE                                30
+>> +#define CLKID_MIPI_DSI_PHY                     31
+>> +#define CLKID_ASSIST_MISC                      32
+>> +#define CLKID_SD_EMMC_A                                33
+>> +#define CLKID_SD_EMMC_B                                34
+>> +#define CLKID_SD_EMMC_C                                35
+>> +#define CLKID_AUDIO_CODEC                      36
+>> +#define CLKID_AUDIO                                    37
+>> +#define CLKID_ETH                                      38
+>> +#define CLKID_DEMUX                                    39
+>> +#define CLKID_AUDIO_IFIFO                      40
+>> +#define CLKID_ADC                                      41
+>> +#define CLKID_UART1                                    42
+>> +#define CLKID_G2D                                      43
+>> +#define CLKID_RESET                                    44
+>> +#define CLKID_PCIE_COMB                                45
+>> +#define CLKID_PARSER                           46
+>> +#define CLKID_USB                                      47
+>> +#define CLKID_PCIE_PHY                         48
+>> +#define CLKID_AHB_ARB0                         49
+>> +#define CLKID_AHB_DATA_BUS                     50
+>> +#define CLKID_AHB_CTRL_BUS                     51
+>> +#define CLKID_HTX_HDCP22                       52
+>> +#define CLKID_HTX_PCLK                         53
+>> +#define CLKID_BT656                                    54
+>> +#define CLKID_USB1_DDR_BRIDGE          55
+>> +#define CLKID_MMC_PCLK                         56
+>> +#define CLKID_UART2                                    57
+>> +#define CLKID_VPU_INTR                         58
+>> +#define CLKID_GIC                                      59
+>> +#define CLKID_SD_EMMC_B_CLK0           60
+>> +#define CLKID_SD_EMMC_C_CLK0           61
+>> +#define CLKID_HIFI_PLL                         71
+>> +
+> is this empty line here on purpose? a comment would be great if
+> there's a reason behind it (there's already a gap in the numbering
+> between CLKID_GP0_PLL and CLKID_CLK81, but there's no empty line there
+> - either way is fine, please just keep it consistent)
 > 
-> Not really true, device_config only provides parameters to be configured for
-> next slave transaction
+I will drop the empty line, The gaps have define in 
+drivers/clk/meson/g12a.h file.
 > 
-> > An alternative might also be to do the setup in
-> dma_device->device_prep_dma_memcpy.
+> Regards
+> Martin
 > 
-> Precisely, see how other drivers do this
+> .
 > 
-> Let's roll back a bit and foresee why is this required.
-> 
-> In case of memcpy, you need to tell DMA to do transfer from src to dstn and
-> size. Additional parameters like buswidth etc should be derived for maximum
-> throughput (after all we are dma, people want it to be done
-> fastest)
-> 
-> Now for slave, you are interfacing with a peripheral and don't know how that is
-> setup. So you need to match the parameters, otherwise you get overflow or
-> underflow and hence need for device_config
-> 
-> Please do not derive additional notions from these, please do not assume
-> anything else, unless provided in documentation :)
-I will move such prepare jobs from slave_config to device_prep_dma_memcpy
-Instead of device_alloc_chan_resources as I did in v1, thus we have no 'chan->private'
-issue, just like drivers/dma/stm32-mdma.c. The only limitation is those prepare jobs
-(some register setting) will be done every time memcpy instead of only one time in slave_config
-or v1 case. Is that ok?
-> 
-> In doubt, just ask!
-> 
-> HTH
-> --
-> ~Vinod
