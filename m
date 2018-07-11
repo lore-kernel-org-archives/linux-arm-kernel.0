@@ -1,221 +1,95 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Wed, 11 Jul 2018 16:41:58 +0900
-Subject: [PATCH v11 10/15] arm64: kexec_file: allow for loading Image-format
- kernel
+Date: Wed, 11 Jul 2018 16:42:00 +0900
+Subject: [PATCH v11 12/15] arm64: kexec_file: invoke the kernel without
+ purgatory
 In-Reply-To: <20180711074203.3019-1-takahiro.akashi@linaro.org>
 References: <20180711074203.3019-1-takahiro.akashi@linaro.org>
-Message-ID: <20180711074203.3019-11-takahiro.akashi@linaro.org>
+Message-ID: <20180711074203.3019-13-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch provides kexec_file_ops for "Image"-format kernel. In this
-implementation, a binary is always loaded with a fixed offset identified
-in text_offset field of its header.
+On arm64, purgatory would do almost nothing. So just invoke secondary
+kernel directly by jumping into its entry code.
 
-Regarding signature verification for trusted boot, this patch doesn't
-contains CONFIG_KEXEC_VERIFY_SIG support, which is to be added later
-in this series, but file-attribute-based verification is still a viable
-option by enabling IMA security subsystem.
-
-You can sign(label) a to-be-kexec'ed kernel image on target file system
-with:
-    $ evmctl ima_sign --key /path/to/private_key.pem Image
-
-On live system, you must have IMA enforced with, at least, the following
-security policy:
-    "appraise func=KEXEC_KERNEL_CHECK appraise_type=imasig"
-
-See more details about IMA here:
-    https://sourceforge.net/p/linux-ima/wiki/Home/
+While, in this case, cpu_soft_restart() must be called with dtb address
+in the fifth argument, the behavior still stays compatible with kexec_load
+case as long as the argument is null.
 
 Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Reviewed-by: James Morse <james.morse@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/kexec.h         |  28 +++++++
- arch/arm64/kernel/Makefile             |   2 +-
- arch/arm64/kernel/kexec_image.c        | 108 +++++++++++++++++++++++++
- arch/arm64/kernel/machine_kexec_file.c |   1 +
- 4 files changed, 138 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm64/kernel/kexec_image.c
+ arch/arm64/kernel/cpu-reset.S       |  8 ++++----
+ arch/arm64/kernel/machine_kexec.c   | 12 ++++++++++--
+ arch/arm64/kernel/relocate_kernel.S |  3 ++-
+ 3 files changed, 16 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm64/include/asm/kexec.h b/arch/arm64/include/asm/kexec.h
-index 01bbf6cebf12..69333694e3e2 100644
---- a/arch/arm64/include/asm/kexec.h
-+++ b/arch/arm64/include/asm/kexec.h
-@@ -101,6 +101,34 @@ struct kimage_arch {
- 	void *dtb_buf;
- };
+diff --git a/arch/arm64/kernel/cpu-reset.S b/arch/arm64/kernel/cpu-reset.S
+index 8021b46c9743..a2be30275a73 100644
+--- a/arch/arm64/kernel/cpu-reset.S
++++ b/arch/arm64/kernel/cpu-reset.S
+@@ -22,11 +22,11 @@
+  * __cpu_soft_restart(el2_switch, entry, arg0, arg1, arg2) - Helper for
+  * cpu_soft_restart.
+  *
+- * @el2_switch: Flag to indicate a swich to EL2 is needed.
++ * @el2_switch: Flag to indicate a switch to EL2 is needed.
+  * @entry: Location to jump to for soft reset.
+- * arg0: First argument passed to @entry.
+- * arg1: Second argument passed to @entry.
+- * arg2: Third argument passed to @entry.
++ * arg0: First argument passed to @entry. (relocation list)
++ * arg1: Second argument passed to @entry.(physical kernel entry)
++ * arg2: Third argument passed to @entry. (physical dtb address)
+  *
+  * Put the CPU into the same state as it would be if it had been reset, and
+  * branch to what would be the reset vector. It must be executed with the
+diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
+index f76ea92dff91..830a5063e09d 100644
+--- a/arch/arm64/kernel/machine_kexec.c
++++ b/arch/arm64/kernel/machine_kexec.c
+@@ -205,10 +205,18 @@ void machine_kexec(struct kimage *kimage)
+ 	 * uses physical addressing to relocate the new image to its final
+ 	 * position and transfers control to the image entry point when the
+ 	 * relocation is complete.
++	 * In kexec case, kimage->start points to purgatory assuming that
++	 * kernel entry and dtb address are embedded in purgatory by
++	 * userspace (kexec-tools).
++	 * In kexec_file case, the kernel starts directly without purgatory.
+ 	 */
+-
+ 	cpu_soft_restart(kimage != kexec_crash_image,
+-		reboot_code_buffer_phys, kimage->head, kimage->start, 0);
++		reboot_code_buffer_phys, kimage->head, kimage->start,
++#ifdef CONFIG_KEXEC_FILE
++						kimage->arch.dtb_mem);
++#else
++						0);
++#endif
  
-+/**
-+ * struct arm64_image_header - arm64 kernel image header
-+ * See Documentation/arm64/booting.txt for details
-+ *
-+ * @mz_magic: DOS header magic number ('MZ', optional)
-+ * @code1: Instruction (branch to stext)
-+ * @text_offset: Image load offset
-+ * @image_size: Effective image size
-+ * @flags: Bit-field flags
-+ * @reserved: Reserved
-+ * @magic: Magic number
-+ * @pe_header: Offset to PE COFF header (optional)
-+ **/
-+
-+struct arm64_image_header {
-+	__le16 mz_magic; /* also code0 */
-+	__le16 pad;
-+	__le32 code1;
-+	__le64 text_offset;
-+	__le64 image_size;
-+	__le64 flags;
-+	__le64 reserved[3];
-+	__le32 magic;
-+	__le32 pe_header;
-+};
-+
-+extern const struct kexec_file_ops kexec_image_ops;
-+
- struct kimage;
+ 	BUG(); /* Should never get here. */
+ }
+diff --git a/arch/arm64/kernel/relocate_kernel.S b/arch/arm64/kernel/relocate_kernel.S
+index f407e422a720..95fd94209aae 100644
+--- a/arch/arm64/kernel/relocate_kernel.S
++++ b/arch/arm64/kernel/relocate_kernel.S
+@@ -32,6 +32,7 @@
+ ENTRY(arm64_relocate_new_kernel)
  
- extern int load_other_segments(struct kimage *image,
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index 06281e1ad7ed..a9cc7752f276 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -50,7 +50,7 @@ arm64-obj-$(CONFIG_RANDOMIZE_BASE)	+= kaslr.o
- arm64-obj-$(CONFIG_HIBERNATION)		+= hibernate.o hibernate-asm.o
- arm64-obj-$(CONFIG_KEXEC_CORE)		+= machine_kexec.o relocate_kernel.o	\
- 					   cpu-reset.o
--arm64-obj-$(CONFIG_KEXEC_FILE)		+= machine_kexec_file.o
-+arm64-obj-$(CONFIG_KEXEC_FILE)		+= machine_kexec_file.o kexec_image.o
- arm64-obj-$(CONFIG_ARM64_RELOC_TEST)	+= arm64-reloc-test.o
- arm64-reloc-test-y := reloc_test_core.o reloc_test_syms.o
- arm64-obj-$(CONFIG_CRASH_DUMP)		+= crash_dump.o
-diff --git a/arch/arm64/kernel/kexec_image.c b/arch/arm64/kernel/kexec_image.c
-new file mode 100644
-index 000000000000..a47cf9bc699e
---- /dev/null
-+++ b/arch/arm64/kernel/kexec_image.c
-@@ -0,0 +1,108 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * Kexec image loader
-+
-+ * Copyright (C) 2018 Linaro Limited
-+ * Author: AKASHI Takahiro <takahiro.akashi@linaro.org>
-+ */
-+
-+#define pr_fmt(fmt)	"kexec_file(Image): " fmt
-+
-+#include <linux/err.h>
-+#include <linux/errno.h>
-+#include <linux/kernel.h>
-+#include <linux/kexec.h>
-+#include <linux/string.h>
-+#include <asm/boot.h>
-+#include <asm/byteorder.h>
-+#include <asm/cpufeature.h>
-+#include <asm/memory.h>
-+
-+static int image_probe(const char *kernel_buf, unsigned long kernel_len)
-+{
-+	const struct arm64_image_header *h;
-+
-+	h = (const struct arm64_image_header *)(kernel_buf);
-+
-+	if (!h || (kernel_len < sizeof(*h)) ||
-+			!memcmp(&h->magic, ARM64_MAGIC, sizeof(ARM64_MAGIC)))
-+		return -EINVAL;
-+
-+	return 0;
-+}
-+
-+static void *image_load(struct kimage *image,
-+				char *kernel, unsigned long kernel_len,
-+				char *initrd, unsigned long initrd_len,
-+				char *cmdline, unsigned long cmdline_len)
-+{
-+	struct arm64_image_header *h;
-+	u64 flags, value;
-+	struct kexec_buf kbuf;
-+	unsigned long text_offset;
-+	struct kexec_segment *kernel_segment;
-+	int ret;
-+
-+	/* Don't support old kernel */
-+	h = (struct arm64_image_header *)kernel;
-+	if (!h->text_offset)
-+		return ERR_PTR(-EINVAL);
-+
-+	/* Check cpu features */
-+	flags = le64_to_cpu(h->flags);
-+	value = head_flag_field(flags, HEAD_FLAG_BE);
-+	if (((value == HEAD_FLAG_BE) && !IS_ENABLED(CONFIG_CPU_BIG_ENDIAN)) ||
-+	    ((value != HEAD_FLAG_BE) && IS_ENABLED(CONFIG_CPU_BIG_ENDIAN)))
-+		if (!system_supports_mixed_endian())
-+			return ERR_PTR(-EINVAL);
-+
-+	value = head_flag_field(flags, HEAD_FLAG_PAGE_SIZE);
-+	if (((value == HEAD_FLAG_PAGE_SIZE_4K) &&
-+			!system_supports_4kb_granule()) ||
-+	    ((value == HEAD_FLAG_PAGE_SIZE_64K) &&
-+			!system_supports_64kb_granule()) ||
-+	    ((value == HEAD_FLAG_PAGE_SIZE_16K) &&
-+			!system_supports_16kb_granule()))
-+		return ERR_PTR(-EINVAL);
-+
-+	/* Load the kernel */
-+	kbuf.image = image;
-+	kbuf.buf_min = 0;
-+	kbuf.buf_max = ULONG_MAX;
-+	kbuf.top_down = false;
-+
-+	kbuf.buffer = kernel;
-+	kbuf.bufsz = kernel_len;
-+	kbuf.memsz = le64_to_cpu(h->image_size);
-+	text_offset = le64_to_cpu(h->text_offset);
-+	kbuf.buf_align = SZ_2M;
-+
-+	/* Adjust kernel segment with TEXT_OFFSET */
-+	kbuf.memsz += text_offset;
-+
-+	ret = kexec_add_buffer(&kbuf);
-+	if (ret)
-+		goto out;
-+
-+	kernel_segment = &image->segment[image->nr_segments - 1];
-+	kernel_segment->mem += text_offset;
-+	kernel_segment->memsz -= text_offset;
-+	image->start = kernel_segment->mem;
-+
-+	pr_debug("Loaded kernel at 0x%lx bufsz=0x%lx memsz=0x%lx\n",
-+				kernel_segment->mem, kbuf.bufsz,
-+				kernel_segment->memsz);
-+
-+	/* Load additional data */
-+	ret = load_other_segments(image,
-+				kernel_segment->mem, kernel_segment->memsz,
-+				initrd, initrd_len, cmdline, cmdline_len);
-+
-+out:
-+	return ERR_PTR(ret);
-+}
-+
-+const struct kexec_file_ops kexec_image_ops = {
-+	.probe = image_probe,
-+	.load = image_load,
-+};
-diff --git a/arch/arm64/kernel/machine_kexec_file.c b/arch/arm64/kernel/machine_kexec_file.c
-index ca00681c25c6..a0b44fe18b95 100644
---- a/arch/arm64/kernel/machine_kexec_file.c
-+++ b/arch/arm64/kernel/machine_kexec_file.c
-@@ -20,6 +20,7 @@
- #include <asm/byteorder.h>
+ 	/* Setup the list loop variables. */
++	mov	x18, x2				/* x18 = dtb address */
+ 	mov	x17, x1				/* x17 = kimage_start */
+ 	mov	x16, x0				/* x16 = kimage_head */
+ 	raw_dcache_line_size x15, x0		/* x15 = dcache line size */
+@@ -107,7 +108,7 @@ ENTRY(arm64_relocate_new_kernel)
+ 	isb
  
- const struct kexec_file_ops * const kexec_file_loaders[] = {
-+	&kexec_image_ops,
- 	NULL
- };
- 
+ 	/* Start new image. */
+-	mov	x0, xzr
++	mov	x0, x18
+ 	mov	x1, xzr
+ 	mov	x2, xzr
+ 	mov	x3, xzr
 -- 
 2.17.0
