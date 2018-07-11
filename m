@@ -1,26 +1,42 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 11 Jul 2018 21:05:44 +0800
-Subject: [PATCH] ARM: imx: call imx6sx_cpuidle_init() conditionally for
- 6sll
-In-Reply-To: <20180709155130.2126597-1-arnd@arndb.de>
-References: <20180709155130.2126597-1-arnd@arndb.de>
-Message-ID: <20180711130543.GI6959@dragon>
+From: weiyongjun1@huawei.com (Wei Yongjun)
+Date: Wed, 11 Jul 2018 13:17:38 +0000
+Subject: [PATCH -next] misc: vexpress: Fix potential NULL dereference in
+ vexpress_syscfg_probe()
+Message-ID: <1531315058-183762-1-git-send-email-weiyongjun1@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 09, 2018 at 05:51:17PM +0200, Arnd Bergmann wrote:
-> The imx6sl platform has two different cpuidle implementations,
-> and fails to link if we only want one of the two:
-> 
-> arch/arm/mach-imx/mach-imx6sl.o: In function `imx6sl_init_late':
-> mach-imx6sl.c:(.init.text+0x12): undefined reference to `imx6sx_cpuidle_init'
-> 
-> This makes the call into reference conditional on the configuration.
-> 
-> Fixes: e7fa1fb39b11 ("ARM: imx: add cpu idle support for i.MX6SLL")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
-> I had already sent a related patch earlier, but missed this second
-> problem then.
+platform_get_resource() may fail and return NULL, so we should
+better check it's return value to avoid a NULL pointer dereference
+a bit later in the code.
 
-Applied both, thanks.
+This is detected by Coccinelle semantic patch.
+
+@@
+expression pdev, res, n, t, e, e1, e2;
+@@
+
+res = platform_get_resource(pdev, t, n);
++ if (!res)
++   return -EINVAL;
+... when != res == NULL
+e = devm_ioremap(e1, res->start, e2);
+
+Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
+---
+ drivers/misc/vexpress-syscfg.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/drivers/misc/vexpress-syscfg.c b/drivers/misc/vexpress-syscfg.c
+index 9eea30f..2d72c93 100644
+--- a/drivers/misc/vexpress-syscfg.c
++++ b/drivers/misc/vexpress-syscfg.c
+@@ -259,6 +259,8 @@ static int vexpress_syscfg_probe(struct platform_device *pdev)
+ 	INIT_LIST_HEAD(&syscfg->funcs);
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!res)
++		return -EINVAL;
+ 	if (!devm_request_mem_region(&pdev->dev, res->start,
+ 			resource_size(res), pdev->name))
+ 		return -EBUSY;
