@@ -1,25 +1,21 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed, 11 Jul 2018 13:15:13 -0600
-Subject: [PATCH v2 1/3] dt-bindings: freescale: Add bindings for the M4IF
- module
-In-Reply-To: <1531160355-12384-1-git-send-email-festevam@gmail.com>
-References: <1531160355-12384-1-git-send-email-festevam@gmail.com>
-Message-ID: <20180711191513.GA7575@rob-hp-laptop>
+Date: Wed, 11 Jul 2018 13:37:30 -0600
+Subject: [PATCH v2 1/2] dt-bindings: reset: uniphier: add USB3 core reset
+ support
+In-Reply-To: <1531185257-16444-2-git-send-email-hayashi.kunihiko@socionext.com>
+References: <1531185257-16444-1-git-send-email-hayashi.kunihiko@socionext.com>
+ <1531185257-16444-2-git-send-email-hayashi.kunihiko@socionext.com>
+Message-ID: <20180711193730.GA31593@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 09, 2018 at 03:19:13PM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@nxp.com>
+On Tue, Jul 10, 2018 at 10:14:16AM +0900, Kunihiko Hayashi wrote:
+> Add DT bindings for reset control of USB3 core implemented in UniPhier SoCs.
+> The reset control belongs to USB3 glue layer.
 > 
-> Add bindings for the M4IF module present on i.MX51.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+> Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
 > ---
-> Changes since v1:
-> - Newly introduced in this series (Lucas)
-> 
->  Documentation/devicetree/bindings/arm/freescale/m4if.txt | 12 ++++++++++++
->  1 file changed, 12 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/freescale/m4if.txt
+>  .../devicetree/bindings/reset/uniphier-reset.txt   | 56 ++++++++++++++++++++++
+>  1 file changed, 56 insertions(+)
 
 Reviewed-by: Rob Herring <robh@kernel.org>
