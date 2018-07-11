@@ -1,28 +1,19 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 11 Jul 2018 20:46:18 +0800
-Subject: [PATCH] ARM: dts: imx: Add ZII SCU2 Mezz board
-In-Reply-To: <20180707024902.439-1-andrew.smirnov@gmail.com>
-References: <20180707024902.439-1-andrew.smirnov@gmail.com>
-Message-ID: <20180711124617.GF6959@dragon>
+Date: Wed, 11 Jul 2018 20:47:55 +0800
+Subject: [PATCH] ARM: imx: flag failure of of_iomap
+In-Reply-To: <1531038774-24657-1-git-send-email-hofrat@osadl.org>
+References: <1531038774-24657-1-git-send-email-hofrat@osadl.org>
+Message-ID: <20180711124754.GG6959@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 06, 2018 at 07:49:02PM -0700, Andrey Smirnov wrote:
-> Add support for the Zodiac Inflight Innovations SCU2 Mezz
-> board (i.MX51-based).
+On Sun, Jul 08, 2018 at 10:32:54AM +0200, Nicholas Mc Guire wrote:
+>  imx_set_aips is assuming that the address returned from of_iomap is
+> valid which it probably is in the normal case - as the call site
+> is void error propagation is not possible but never the less at least
+> a WARN_ON() seems warranted here.
 > 
-> Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> Cc: Nikita Yushchenko <nikita.yoush@cogentembedded.com>
-> Cc: Lucas Stach <l.stach@pengutronix.de>
-> Cc: cphealy at gmail.com
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: devicetree at vger.kernel.org
-> Cc: linux-kernel at vger.kernel.org
-> Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
-> Signed-off-by: Andrey Gusakov <andrey.gusakov@cogentembedded.com>
-> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+> Signed-off-by: Nicholas Mc Guire <hofrat@osadl.org>
+> Fixes: commit e57e4ab5fc2e ("ARM: i.MX: allow disabling supervisor protect via DT")
 
 Applied, thanks.
