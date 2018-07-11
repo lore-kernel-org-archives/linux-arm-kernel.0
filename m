@@ -1,35 +1,61 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 11 Jul 2018 16:03:08 +0100
-Subject: next/master boot: 184 boots: 13 failed, 171 passed (next-20180711)
-In-Reply-To: <5b45f6df.1c69fb81.86409.6375@mx.google.com>
-References: <5b45f6df.1c69fb81.86409.6375@mx.google.com>
-Message-ID: <20180711150308.GB9651@sirena.org.uk>
+From: jernej.skrabec@gmail.com (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
+Date: Wed, 11 Jul 2018 17:14:19 +0200
+Subject: [linux-sunxi] Re: [PATCH 1/2] ARM: sun8i: h3: enable HDMI output
+ on Banana Pi M2 Zero
+In-Reply-To: <20180711150532.6gzm7krouriddreh@flea>
+References: <20180711132233.42301-1-icenowy@aosc.io>
+ <20180711132233.42301-2-icenowy@aosc.io>
+ <20180711150532.6gzm7krouriddreh@flea>
+Message-ID: <3039364.lZKhBVCAIj@jernej-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 11, 2018 at 05:23:59AM -0700, kernelci.org bot wrote:
+Dne sreda, 11. julij 2018 ob 17:05:32 CEST je Maxime Ripard napisal(a):
+> Hi,
+> 
+> On Wed, Jul 11, 2018 at 09:22:32PM +0800, Icenowy Zheng wrote:
+> > Banana Pi M2 Zero board has a miniHDMI port connected to the HDMI
+> > controller of Allwinner H3 SoC.
+> > 
+> > Enable the HDMI output in Banana Pi M2 Zero device tree.
+> > 
+> > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> > ---
+> > 
+> >  .../dts/sun8i-h2-plus-bananapi-m2-zero.dts    | 25 +++++++++++++++++++
+> >  1 file changed, 25 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/sun8i-h2-plus-bananapi-m2-zero.dts
+> > b/arch/arm/boot/dts/sun8i-h2-plus-bananapi-m2-zero.dts index
+> > 7d01f9322658..eb61dcf32797 100644
+> > --- a/arch/arm/boot/dts/sun8i-h2-plus-bananapi-m2-zero.dts
+> > +++ b/arch/arm/boot/dts/sun8i-h2-plus-bananapi-m2-zero.dts
+> > @@ -26,6 +26,17 @@
+> > 
+> >  		stdout-path = "serial0:115200n8";
+> >  	
+> >  	};
+> > 
+> > +	hdmi-connector {
+> > +		compatible = "hdmi-connector";
+> > +		type = "c";
+> 
+> This is not one of the connector type declared in DRM, how is it
+> exposed to the userspace?
 
-Today's -next fails to boot on a bunch of sunxi platforms  
+DT binding allows it:
 
->     sunxi_defconfig:
->         sun4i-a10-cubieboard:
->             lab-baylibre-seattle: new failure (last pass: next-20180710)
->         sun7i-a20-bananapi:
->             lab-baylibre-seattle: new failure (last pass: next-20180710)
->         sun7i-a20-cubietruck:
->             lab-baylibre-seattle: new failure (last pass: next-20180710)
+HDMI Connector
+==============
 
-multi_v7_defconfig seems fine.  It seems to get into userspace but not
-far enough to get to a prompt, the failure seems similar on all the
-platforms, full logs and other information can be found here:
+Required properties:
+- compatible: "hdmi-connector"
+- type: the HDMI connector type: "a", "b", "c", "d" or "e"
 
-    https://kernelci.org/boot/id/5b45cfd759b514f3e696ba93/
-    https://kernelci.org/boot/id/5b45cfda59b514f41a96ba8f/
-    https://kernelci.org/boot/id/5b45cfdd59b514f41796ba8e/
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180711/a9e0bae0/attachment-0001.sig>
+but DW HDMI bridge driver hardcodes it to type A. Actually, kernel has defines 
+only for type A and B.
+
+Actually, many HDMI drivers have type A hardcoded...
+
+Best regards,
+Jernej
