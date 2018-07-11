@@ -1,46 +1,28 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 11 Jul 2018 13:58:25 +0100
-Subject: [PATCH] arm64: neon: Fix function may_use_simd() return error
- status
-In-Reply-To: <20180711120519.GC15725@arm.com>
-References: <1531307188-12032-1-git-send-email-yandong77520@gmail.com>
- <20180711120519.GC15725@arm.com>
-Message-ID: <20180711125825.GM9486@e103592.cambridge.arm.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Wed, 11 Jul 2018 13:59:38 +0100
+Subject: [PATCH v5 1/7] KVM: arm/arm64: Share common code in
+ user_mem_abort()
+In-Reply-To: <20180709144124.29164-1-punit.agrawal@arm.com>
+References: <20180709143835.28971-1-punit.agrawal@arm.com>
+ <20180709144124.29164-1-punit.agrawal@arm.com>
+Message-ID: <9470f63a-6e8c-aeb6-7648-ad5fc7f24904@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 11, 2018 at 01:05:19PM +0100, Will Deacon wrote:
-> On Wed, Jul 11, 2018 at 07:06:28PM +0800, Yandong.Zhao wrote:
-> > From: Yandong Zhao <yandong77520@gmail.com>
-> > 
-> > It does not matter if the caller of may_use_simd() migrates to
-> > another cpu after the call, but it is still important that the
-> > kernel_neon_busy percpu instance that is read matches the cpu the
-> > task is running on at the time of the read.
-> > 
-> > This means that raw_cpu_read() is not sufficient.  kernel_neon_busy
-> > may appear true if the caller migrates during the execution of
-> > raw_cpu_read() and the next task to be scheduled in on the initial
-> > cpu calls kernel_neon_begin().
-> > 
-> > This patch replaces raw_cpu_read() with this_cpu_read() to protect
-> > against this race.
-> > 
-> > Fixes: cb84d11e1625 ("arm64: neon: Remove support for nested or hardirq kernel-mode NEON")
-> > Reviewed-by: Dave Martin <Dave.Martin@arm.com>
-> > Signed-off-by: Yandong Zhao <yandong77520@gmail.com>
-> > ---
-> >  arch/arm64/include/asm/simd.h | 5 +++--
-> >  1 file changed, 3 insertions(+), 2 deletions(-)
+On 09/07/18 15:41, Punit Agrawal wrote:
+> The code for operations such as marking the pfn as dirty, and
+> dcache/icache maintenance during stage 2 fault handling is duplicated
+> between normal pages and PMD hugepages.
 > 
-> Does this need to go to stable?
+> Instead of creating another copy of the operations when we introduce
+> PUD hugepages, let's share them across the different pagesizes.
+> 
+> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+> Cc: Christoffer Dall <christoffer.dall@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>   virt/kvm/arm/mmu.c | 67 ++++++++++++++++++++++++++--------------------
+>   1 file changed, 38 insertions(+), 29 deletions(-)
+> 
 
-It should, yes, so we should probably add
-
-Cc: stable at vger.kernel.org
-
-
-Are you OK to pick that up?
-
-Cheers
----Dave
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
