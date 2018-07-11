@@ -1,91 +1,80 @@
 From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Wed, 11 Jul 2018 13:00:37 +0200
-Subject: [PATCH 3/3] arm: use a raw_spin_lock in unwind
+Date: Wed, 11 Jul 2018 13:00:36 +0200
+Subject: [PATCH 2/3] arm: kprobe: replace patch_lock to raw lock
 In-Reply-To: <20180711110037.12928-1-bigeasy@linutronix.de>
 References: <20180711110037.12928-1-bigeasy@linutronix.de>
-Message-ID: <20180711110037.12928-4-bigeasy@linutronix.de>
+Message-ID: <20180711110037.12928-3-bigeasy@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mostly unwind is done with irqs enabled however SLUB may call it with
-irqs disabled while creating a new SLUB cache.
+From: Yang Shi <yang.shi@linaro.org>
 
-I had system freeze while loading a module which called
-kmem_cache_create() on init. That means SLUB's __slab_alloc() disabled
-interrupts and then
+When running kprobe on -rt kernel, the below bug is caught:
 
-->new_slab_objects()
- ->new_slab()
-  ->setup_object()
-   ->setup_object_debug()
-    ->init_tracking()
-     ->set_track()
-      ->save_stack_trace()
-       ->save_stack_trace_tsk()
-        ->walk_stackframe()
-         ->unwind_frame()
-          ->unwind_find_idx()
-           =>spin_lock_irqsave(&unwind_lock);
+BUG: sleeping function called from invalid context at kernel/locking/rtmutex.c:931
+in_atomic(): 1, irqs_disabled(): 128, pid: 14, name: migration/0
+INFO: lockdep is turned off.
+irq event stamp: 238
+hardirqs last enabled at (237): [<80b5aecc>] _raw_spin_unlock_irqrestore+0x88/0x90
+hardirqs last disabled at (238): [<80b56d88>] __schedule+0xec/0x94c
+softirqs last enabled at (0): [<80225584>] copy_process.part.5+0x30c/0x1994
+softirqs last disabled at (0): [< (null)>] (null)
+Preemption disabled at:[<802f2b98>] cpu_stopper_thread+0xc0/0x140
 
+CPU: 0 PID: 14 Comm: migration/0 Tainted: G O 4.8.3-rt2 #1
+Hardware name: Freescale LS1021A
+[<80212e7c>] (unwind_backtrace) from [<8020cd2c>] (show_stack+0x20/0x24)
+[<8020cd2c>] (show_stack) from [<80689e14>] (dump_stack+0xa0/0xcc)
+[<80689e14>] (dump_stack) from [<8025a43c>] (___might_sleep+0x1b8/0x2a4)
+[<8025a43c>] (___might_sleep) from [<80b5b324>] (rt_spin_lock+0x34/0x74)
+[<80b5b324>] (rt_spin_lock) from [<80b5c31c>] (__patch_text_real+0x70/0xe8)
+[<80b5c31c>] (__patch_text_real) from [<80b5c3ac>] (patch_text_stop_machine+0x18/0x20)
+[<80b5c3ac>] (patch_text_stop_machine) from [<802f2920>] (multi_cpu_stop+0xfc/0x134)
+[<802f2920>] (multi_cpu_stop) from [<802f2ba0>] (cpu_stopper_thread+0xc8/0x140)
+[<802f2ba0>] (cpu_stopper_thread) from [<802563a4>] (smpboot_thread_fn+0x1a4/0x354)
+[<802563a4>] (smpboot_thread_fn) from [<80251d38>] (kthread+0x104/0x11c)
+[<80251d38>] (kthread) from [<80207f70>] (ret_from_fork+0x14/0x24)
+
+Since patch_text_stop_machine() is called in stop_machine() which disables IRQ,
+sleepable lock should be not used in this atomic context, so replace patch_lock
+to raw lock.
+
+Signed-off-by: Yang Shi <yang.shi@linaro.org>
 Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 ---
- arch/arm/kernel/unwind.c | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+ arch/arm/kernel/patch.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/kernel/unwind.c b/arch/arm/kernel/unwind.c
-index 0bee233fef9a..314cfb232a63 100644
---- a/arch/arm/kernel/unwind.c
-+++ b/arch/arm/kernel/unwind.c
-@@ -93,7 +93,7 @@ extern const struct unwind_idx __start_unwind_idx[];
- static const struct unwind_idx *__origin_unwind_idx;
- extern const struct unwind_idx __stop_unwind_idx[];
+diff --git a/arch/arm/kernel/patch.c b/arch/arm/kernel/patch.c
+index a50dc00d79a2..d0a05a3bdb96 100644
+--- a/arch/arm/kernel/patch.c
++++ b/arch/arm/kernel/patch.c
+@@ -16,7 +16,7 @@ struct patch {
+ 	unsigned int insn;
+ };
  
--static DEFINE_SPINLOCK(unwind_lock);
-+static DEFINE_RAW_SPINLOCK(unwind_lock);
- static LIST_HEAD(unwind_tables);
+-static DEFINE_SPINLOCK(patch_lock);
++static DEFINE_RAW_SPINLOCK(patch_lock);
  
- /* Convert a prel31 symbol to an absolute address */
-@@ -201,7 +201,7 @@ static const struct unwind_idx *unwind_find_idx(unsigned long addr)
- 		/* module unwind tables */
- 		struct unwind_table *table;
+ static void __kprobes *patch_map(void *addr, int fixmap, unsigned long *flags)
+ 	__acquires(&patch_lock)
+@@ -33,7 +33,7 @@ static void __kprobes *patch_map(void *addr, int fixmap, unsigned long *flags)
+ 		return addr;
  
--		spin_lock_irqsave(&unwind_lock, flags);
-+		raw_spin_lock_irqsave(&unwind_lock, flags);
- 		list_for_each_entry(table, &unwind_tables, list) {
- 			if (addr >= table->begin_addr &&
- 			    addr < table->end_addr) {
-@@ -213,7 +213,7 @@ static const struct unwind_idx *unwind_find_idx(unsigned long addr)
- 				break;
- 			}
- 		}
--		spin_unlock_irqrestore(&unwind_lock, flags);
-+		raw_spin_unlock_irqrestore(&unwind_lock, flags);
- 	}
+ 	if (flags)
+-		spin_lock_irqsave(&patch_lock, *flags);
++		raw_spin_lock_irqsave(&patch_lock, *flags);
+ 	else
+ 		__acquire(&patch_lock);
  
- 	pr_debug("%s: idx = %p\n", __func__, idx);
-@@ -529,9 +529,9 @@ struct unwind_table *unwind_table_add(unsigned long start, unsigned long size,
- 	tab->begin_addr = text_addr;
- 	tab->end_addr = text_addr + text_size;
+@@ -48,7 +48,7 @@ static void __kprobes patch_unmap(int fixmap, unsigned long *flags)
+ 	clear_fixmap(fixmap);
  
--	spin_lock_irqsave(&unwind_lock, flags);
-+	raw_spin_lock_irqsave(&unwind_lock, flags);
- 	list_add_tail(&tab->list, &unwind_tables);
--	spin_unlock_irqrestore(&unwind_lock, flags);
-+	raw_spin_unlock_irqrestore(&unwind_lock, flags);
- 
- 	return tab;
- }
-@@ -543,9 +543,9 @@ void unwind_table_del(struct unwind_table *tab)
- 	if (!tab)
- 		return;
- 
--	spin_lock_irqsave(&unwind_lock, flags);
-+	raw_spin_lock_irqsave(&unwind_lock, flags);
- 	list_del(&tab->list);
--	spin_unlock_irqrestore(&unwind_lock, flags);
-+	raw_spin_unlock_irqrestore(&unwind_lock, flags);
- 
- 	kfree(tab);
+ 	if (flags)
+-		spin_unlock_irqrestore(&patch_lock, *flags);
++		raw_spin_unlock_irqrestore(&patch_lock, *flags);
+ 	else
+ 		__release(&patch_lock);
  }
 -- 
 2.18.0
