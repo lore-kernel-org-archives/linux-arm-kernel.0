@@ -1,132 +1,257 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 11 Jul 2018 06:19:07 -0700
-Subject: [GIT PULL 4/5] dts changes for omaps for v4.19
-In-Reply-To: <pull-1531314878-371161@atomide.com>
-References: <pull-1531314878-371161@atomide.com>
-Message-ID: <pull-1531314878-371161@atomide.com-4>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Wed, 11 Jul 2018 14:38:38 +0100
+Subject: [PATCH v5 7/7] KVM: arm64: Add support for creating PUD hugepages
+ at stage 2
+In-Reply-To: <20180709144124.29164-7-punit.agrawal@arm.com>
+References: <20180709143835.28971-1-punit.agrawal@arm.com>
+ <20180709144124.29164-1-punit.agrawal@arm.com>
+ <20180709144124.29164-7-punit.agrawal@arm.com>
+Message-ID: <bbc3f286-be5b-d0dc-2037-54d5b995a0a5@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Tony Lindgren" <tony@atomide.com>
+On 09/07/18 15:41, Punit Agrawal wrote:
+> KVM only supports PMD hugepages at stage 2. Now that the various page
+> handling routines are updated, extend the stage 2 fault handling to
+> map in PUD hugepages.
+> 
+> Addition of PUD hugepage support enables additional page sizes (e.g.,
+> 1G with 4K granule) which can be useful on cores that support mapping
+> larger block sizes in the TLB entries.
+> 
+> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+> Cc: Christoffer Dall <christoffer.dall@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Russell King <linux@armlinux.org.uk>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>   arch/arm/include/asm/kvm_mmu.h         | 19 +++++++
+>   arch/arm64/include/asm/kvm_mmu.h       | 15 +++++
+>   arch/arm64/include/asm/pgtable-hwdef.h |  2 +
+>   arch/arm64/include/asm/pgtable.h       |  2 +
+>   virt/kvm/arm/mmu.c                     | 78 ++++++++++++++++++++++++--
+>   5 files changed, 112 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+> index 8e1e8aee229e..787baf9ec994 100644
+> --- a/arch/arm/include/asm/kvm_mmu.h
+> +++ b/arch/arm/include/asm/kvm_mmu.h
+> @@ -77,10 +77,13 @@ void kvm_clear_hyp_idmap(void);
+>   
+>   #define kvm_pfn_pte(pfn, prot)	pfn_pte(pfn, prot)
+>   #define kvm_pfn_pmd(pfn, prot)	pfn_pmd(pfn, prot)
+> +#define kvm_pfn_pud(pfn, prot)	(__pud(0))
+>   
+>   #define kvm_pud_pfn(pud)	(((pud_val(pud) & PUD_MASK) & PHYS_MASK) >> PAGE_SHIFT)
+>   
+>   #define kvm_pmd_mkhuge(pmd)	pmd_mkhuge(pmd)
+> +/* No support for pud hugepages */
+> +#define kvm_pud_mkhuge(pud)	(pud)
+>   
+>   /*
+>    * The following kvm_*pud*() functionas are provided strictly to allow
+> @@ -97,6 +100,22 @@ static inline bool kvm_s2pud_readonly(pud_t *pud)
+>   	return false;
+>   }
+>   
+> +static inline void kvm_set_pud(pud_t *pud, pud_t new_pud)
+> +{
+> +	BUG();
+> +}
+> +
+> +static inline pud_t kvm_s2pud_mkwrite(pud_t pud)
+> +{
+> +	BUG();
+> +	return pud;
+> +}
+> +
+> +static inline pud_t kvm_s2pud_mkexec(pud_t pud)
+> +{
+> +	BUG();
+> +	return pud;
+> +}
+>   
+>   static inline bool kvm_s2pud_exec(pud_t *pud)
+>   {
+> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+> index c542052fb199..dd8a23159463 100644
+> --- a/arch/arm64/include/asm/kvm_mmu.h
+> +++ b/arch/arm64/include/asm/kvm_mmu.h
+> @@ -171,13 +171,16 @@ void kvm_clear_hyp_idmap(void);
+>   
+>   #define	kvm_set_pte(ptep, pte)		set_pte(ptep, pte)
+>   #define	kvm_set_pmd(pmdp, pmd)		set_pmd(pmdp, pmd)
+> +#define kvm_set_pud(pudp, pud)		set_pud(pudp, pud)
+>   
+>   #define kvm_pfn_pte(pfn, prot)		pfn_pte(pfn, prot)
+>   #define kvm_pfn_pmd(pfn, prot)		pfn_pmd(pfn, prot)
+> +#define kvm_pfn_pud(pfn, prot)		pfn_pud(pfn, prot)
+>   
+>   #define kvm_pud_pfn(pud)		pud_pfn(pud)
+>   
+>   #define kvm_pmd_mkhuge(pmd)		pmd_mkhuge(pmd)
+> +#define kvm_pud_mkhuge(pud)		pud_mkhuge(pud)
+>   
+>   static inline pte_t kvm_s2pte_mkwrite(pte_t pte)
+>   {
+> @@ -191,6 +194,12 @@ static inline pmd_t kvm_s2pmd_mkwrite(pmd_t pmd)
+>   	return pmd;
+>   }
+>   
+> +static inline pud_t kvm_s2pud_mkwrite(pud_t pud)
+> +{
+> +	pud_val(pud) |= PUD_S2_RDWR;
+> +	return pud;
+> +}
+> +
+>   static inline pte_t kvm_s2pte_mkexec(pte_t pte)
+>   {
+>   	pte_val(pte) &= ~PTE_S2_XN;
+> @@ -203,6 +212,12 @@ static inline pmd_t kvm_s2pmd_mkexec(pmd_t pmd)
+>   	return pmd;
+>   }
+>   
+> +static inline pud_t kvm_s2pud_mkexec(pud_t pud)
+> +{
+> +	pud_val(pud) &= ~PUD_S2_XN;
+> +	return pud;
+> +}
+> +
+>   static inline void kvm_set_s2pte_readonly(pte_t *ptep)
+>   {
+>   	pteval_t old_pteval, pteval;
+> diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
+> index 10ae592b78b8..e327665e94d1 100644
+> --- a/arch/arm64/include/asm/pgtable-hwdef.h
+> +++ b/arch/arm64/include/asm/pgtable-hwdef.h
+> @@ -193,6 +193,8 @@
+>   #define PMD_S2_RDWR		(_AT(pmdval_t, 3) << 6)   /* HAP[2:1] */
+>   #define PMD_S2_XN		(_AT(pmdval_t, 2) << 53)  /* XN[1:0] */
+>   
+> +#define PUD_S2_RDONLY		(_AT(pudval_t, 1) << 6)   /* HAP[2:1] */
+> +#define PUD_S2_RDWR		(_AT(pudval_t, 3) << 6)   /* HAP[2:1] */
+>   #define PUD_S2_XN		(_AT(pudval_t, 2) << 53)  /* XN[1:0] */
+>   
+>   /*
+> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+> index 4d9476e420d9..0afc34f94ff5 100644
+> --- a/arch/arm64/include/asm/pgtable.h
+> +++ b/arch/arm64/include/asm/pgtable.h
+> @@ -389,6 +389,8 @@ static inline int pmd_protnone(pmd_t pmd)
+>   #define pud_mkyoung(pud)	pte_pud(pte_mkyoung(pud_pte(pud)))
+>   #define pud_write(pud)		pte_write(pud_pte(pud))
+>   
+> +#define pud_mkhuge(pud)		(__pud(pud_val(pud) & ~PUD_TABLE_BIT))
+> +
+>   #define __pud_to_phys(pud)	__pte_to_phys(pud_pte(pud))
+>   #define __phys_to_pud_val(phys)	__phys_to_pte_val(phys)
+>   #define pud_pfn(pud)		((__pud_to_phys(pud) & PUD_MASK) >> PAGE_SHIFT)
+> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+> index a6d3ac9d7c7a..d8e2497e5353 100644
+> --- a/virt/kvm/arm/mmu.c
+> +++ b/virt/kvm/arm/mmu.c
+> @@ -116,6 +116,25 @@ static void stage2_dissolve_pmd(struct kvm *kvm, phys_addr_t addr, pmd_t *pmd)
+>   	put_page(virt_to_page(pmd));
+>   }
+>   
+> +/**
+> + * stage2_dissolve_pud() - clear and flush huge PUD entry
+> + * @kvm:	pointer to kvm structure.
+> + * @addr:	IPA
+> + * @pud:	pud pointer for IPA
+> + *
+> + * Function clears a PUD entry, flushes addr 1st and 2nd stage TLBs. Marks all
+> + * pages in the range dirty.
+> + */
+> +static void stage2_dissolve_pud(struct kvm *kvm, phys_addr_t addr, pud_t *pudp)
+> +{
+> +	if (!stage2_pud_huge(*pudp))
+> +		return;
+> +
+> +	stage2_pud_clear(pudp);
+> +	kvm_tlb_flush_vmid_ipa(kvm, addr);
+> +	put_page(virt_to_page(pudp));
+> +}
+> +
+>   static int mmu_topup_memory_cache(struct kvm_mmu_memory_cache *cache,
+>   				  int min, int max)
+>   {
+> @@ -993,7 +1012,7 @@ static pmd_t *stage2_get_pmd(struct kvm *kvm, struct kvm_mmu_memory_cache *cache
+>   	pmd_t *pmd;
+>   
+>   	pud = stage2_get_pud(kvm, cache, addr);
+> -	if (!pud)
+> +	if (!pud || stage2_pud_huge(*pud))
+>   		return NULL;
+>   
+>   	if (stage2_pud_none(*pud)) {
+> @@ -1038,6 +1057,26 @@ static int stage2_set_pmd_huge(struct kvm *kvm, struct kvm_mmu_memory_cache
+>   	return 0;
+>   }
+>   
+> +static int stage2_set_pud_huge(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
+> +			       phys_addr_t addr, const pud_t *new_pudp)
+> +{
+> +	pud_t *pudp, old_pud;
+> +
+> +	pudp = stage2_get_pud(kvm, cache, addr);
+> +	VM_BUG_ON(!pudp);
+> +
+> +	old_pud = *pudp;
+> +	if (stage2_pud_present(old_pud)) {
+> +		stage2_pud_clear(pudp);
+> +		kvm_tlb_flush_vmid_ipa(kvm, addr);
+> +	} else {
+> +		get_page(virt_to_page(pudp));
+> +	}
+> +
+> +	kvm_set_pud(pudp, *new_pudp);
+> +	return 0;
+> +}
+> +
+>   /*
+>    * stage2_get_leaf_entry - walk the stage2 VM page tables and return
+>    * true if a valid and present leaf-entry is found. A pointer to the
+> @@ -1100,6 +1139,7 @@ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
+>   			  phys_addr_t addr, const pte_t *new_pte,
+>   			  unsigned long flags)
+>   {
+> +	pud_t *pud;
+>   	pmd_t *pmd;
+>   	pte_t *pte, old_pte;
+>   	bool iomap = flags & KVM_S2PTE_FLAG_IS_IOMAP;
+> @@ -1108,6 +1148,22 @@ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
+>   	VM_BUG_ON(logging_active && !cache);
+>   
+>   	/* Create stage-2 page table mapping - Levels 0 and 1 */
+> +	pud = stage2_get_pud(kvm, cache, addr);
+> +	if (!pud) {
+> +		/*
+> +		 * Ignore calls from kvm_set_spte_hva for unallocated
+> +		 * address ranges.
+> +		 */
+> +		return 0;
+> +	}
+> +
+> +	/*
+> +	 * While dirty page logging - dissolve huge PUD, then continue
+> +	 * on to allocate page.
 
-The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
+Punit,
 
-  Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+We don't seem to allocate a page here for the PUD entry, in case if it is dissolved
+or empty (i.e, stage2_pud_none(*pud) is true.).
 
-are available in the Git repository at:
+> +	 */
+> +	if (logging_active)
+> +		stage2_dissolve_pud(kvm, addr, pud);
+> +
+>   	pmd = stage2_get_pmd(kvm, cache, addr);
+>   	if (!pmd) {
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.19/dt-signed-v2
+And once you add an entry, pmd is just the matter of getting stage2_pmd_offset() from your pud.
+No need to start again from the top-level with stage2_get_pmd().
 
-for you to fetch changes up to 792f98677d7f777a4f58e567b5b0578191cb986a:
-
-  Merge commit '949bdcc8a97c' into omap-for-v4.19/dt (2018-07-11 05:54:32 -0700)
-
-----------------------------------------------------------------
-dts changes for omaps for v4.19 merge window
-
-Mostly updates to configure and improve the devices
-found on various SoCs and boards:
-
-- several patches to update support for am3517-evm
-  to replace bogus fixed regulators with proper
-  regulators and configure various devices such
-  as wlan, bluetooth and usb1
-
-- add missing cooling devices for omap5 and dra7
-
-- configure dual role for usb ports for am57xx
-  and dra7
-
-- PM updates for omap4 devices to allow retention
-  idle for minimal configurations
-
-- am335x-sl50 updates for various devices
-
-- update d-can alias names to not use undescore
-
-- configure pandaboard gpio button
-
-- a non-urgent change to fix dcan node address that
-  i forgot to send a pull request for earlier
-
-----------------------------------------------------------------
-Adam Ford (4):
-      ARM: dts: am3517-evm: Remove unnessary PMIC parameters
-      ARM: dts: am3517-som: Add WL127x Wifi
-      ARM: dts: am3517-som:  Add builtin Bluetooth
-      ARM: dts: am3517-evm: Enable USB1 Host
-
-Derald D. Woods (1):
-      ARM: dts: am3517-evm: Add 'vdd_io_reg' regulator references
-
-Enric Balletbo i Serra (8):
-      ARM: dts: am335x-sl50: update backlight nodes
-      ARM: dts: am335x-sl50: use phy-phandle declarations
-      ARM: dts: am335x-sl50: add a node for the LCD controller
-      ARM: dts: am335x-sl50: set dr_mode to otg
-      ARM: dts: am335x-sl50: add support for DS1339 Real Time Clock
-      ARM: dts: am335x-sl50: use audio-graph-card for sound
-      ARM: dts: am335x-sl50: fix label names for all LEDs
-      ARM: dts: am335x-sl50: enable tsadc on SL50 board
-
-Felix Brack (1):
-      ARM: dts: am33xx: Fix syntax of alias names
-
-Kevin Hilman (1):
-      ARM: dts: dra7: fix DCAN node addresses
-
-Peter Robinson (1):
-      ARM: dts: pandaboard: add gpio user button
-
-Roger Quadros (4):
-      ARM: dts: am57xx-idk: Enable dual role for USB2 port
-      ARM: dts: dra7-evm: Add extcon to USB2 port
-      ARM: dts: dra71-evm: Add VBUS GPIO to USB1/USB2 extcon
-      ARM: dts: dra76-evm: Add VBUS GPIO to USB1/USB2 extcon
-
-Tony Lindgren (4):
-      ARM: dts: Improve omap l4per idling with wlcore edge sensitive interrupt
-      ARM: dts: Configure duovero for to allow core retention during idle
-      ARM: dts: omap4-droid4: Use software debounce for gpio-keys
-      Merge commit '949bdcc8a97c' into omap-for-v4.19/dt
-
-Viresh Kumar (2):
-      ARM: dts: dra74x: Add missing cooling device properties for CPUs
-      ARM: dts: omap5: Add missing cooling device properties for CPUs
-
- arch/arm/boot/dts/am335x-baltos.dtsi              |   2 +-
- arch/arm/boot/dts/am335x-evm.dts                  |   2 +-
- arch/arm/boot/dts/am335x-evmsk.dts                |   2 +-
- arch/arm/boot/dts/am335x-sl50.dts                 | 297 ++++++++++++++++++----
- arch/arm/boot/dts/am33xx.dtsi                     |   4 +-
- arch/arm/boot/dts/am3517-evm.dts                  |  50 +++-
- arch/arm/boot/dts/am3517-som.dtsi                 | 105 +++++++-
- arch/arm/boot/dts/am437x-gp-evm.dts               |   2 +-
- arch/arm/boot/dts/am571x-idk.dts                  |   4 -
- arch/arm/boot/dts/am572x-idk-common.dtsi          |   4 -
- arch/arm/boot/dts/am57xx-idk-common.dtsi          |   7 +-
- arch/arm/boot/dts/dra7-evm-common.dtsi            |  10 +
- arch/arm/boot/dts/dra7-evm.dts                    |   9 -
- arch/arm/boot/dts/dra7.dtsi                       |   4 +-
- arch/arm/boot/dts/dra71-evm.dts                   |   8 +
- arch/arm/boot/dts/dra72-evm-common.dtsi           |   1 +
- arch/arm/boot/dts/dra74x.dtsi                     |  10 +
- arch/arm/boot/dts/dra76-evm.dts                   |   8 +
- arch/arm/boot/dts/logicpd-som-lv.dtsi             |   2 +-
- arch/arm/boot/dts/logicpd-torpedo-37xx-devkit.dts |   2 +-
- arch/arm/boot/dts/omap3-cm-t3517.dts              |   2 +-
- arch/arm/boot/dts/omap3-cm-t3730.dts              |   2 +-
- arch/arm/boot/dts/omap3-evm-common.dtsi           |   2 +-
- arch/arm/boot/dts/omap3-igep0020-rev-f.dts        |   2 +-
- arch/arm/boot/dts/omap3-igep0030-rev-g.dts        |   2 +-
- arch/arm/boot/dts/omap3-zoom3.dts                 |   2 +-
- arch/arm/boot/dts/omap4-droid4-xt894.dts          |   7 +-
- arch/arm/boot/dts/omap4-duovero-parlor.dts        |   4 +-
- arch/arm/boot/dts/omap4-duovero.dtsi              |   1 +
- arch/arm/boot/dts/omap4-panda-common.dtsi         |  24 +-
- arch/arm/boot/dts/omap4-panda-es.dts              |  12 +
- arch/arm/boot/dts/omap4-sdp.dts                   |   2 +-
- arch/arm/boot/dts/omap4-var-som-om44-wlan.dtsi    |   2 +-
- arch/arm/boot/dts/omap5-board-common.dtsi         |   2 +-
- arch/arm/boot/dts/omap5.dtsi                      |  14 +
- 35 files changed, 512 insertions(+), 101 deletions(-)
+Cheers
+Suzuki
