@@ -1,178 +1,54 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Wed, 11 Jul 2018 12:58:39 +0000
-Subject: [PATCH V4 3/5] mailbox: imx: add imx mu support
-In-Reply-To: <CABb+yY1kH8mr3=nazsLXrLaNWT0x6j9MizVaE+bZaHmrsKn-Wg@mail.gmail.com>
-References: <1531061817-1980-1-git-send-email-aisheng.dong@nxp.com>
- <1531061817-1980-4-git-send-email-aisheng.dong@nxp.com>
- <20180710141940.oed3kwhbplnykl36@pengutronix.de>
- <AM0PR04MB42113391A6EA741E2767C74B805A0@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <20180711075456.npwfpm6mtpkx7k76@pengutronix.de>
- <AM0PR04MB42119DAE987CDF871CA8CFC6805A0@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <CABb+yY1kH8mr3=nazsLXrLaNWT0x6j9MizVaE+bZaHmrsKn-Wg@mail.gmail.com>
-Message-ID: <AM0PR04MB4211AD523CFB8DA99AB05EFC805A0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 11 Jul 2018 06:19:05 -0700
+Subject: [GIT PULL 2/5] soc changes for omaps for v4.19
+In-Reply-To: <pull-1531314878-371161@atomide.com>
+References: <pull-1531314878-371161@atomide.com>
+Message-ID: <pull-1531314878-371161@atomide.com-2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jassi,
+From: "Tony Lindgren" <tony@atomide.com>
 
-> -----Original Message-----
-> From: Jassi Brar [mailto:jassisinghbrar at gmail.com]
-> Sent: Wednesday, July 11, 2018 6:44 PM
-> To: A.s. Dong <aisheng.dong@nxp.com>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>; linux-arm-
-> kernel at lists.infradead.org; dongas86 at gmail.com; linux-
-> kernel at vger.kernel.org; Oleksij Rempel <o.rempel@pengutronix.de>; dl-
-> linux-imx <linux-imx@nxp.com>; kernel at pengutronix.de; Fabio Estevam
-> <fabio.estevam@nxp.com>; shawnguo at kernel.org
-> Subject: Re: [PATCH V4 3/5] mailbox: imx: add imx mu support
-> 
-> On Wed, Jul 11, 2018 at 4:07 PM, A.s. Dong <aisheng.dong@nxp.com> wrote:
-> >
-> > > -----Original Message-----
-> > > From: Sascha Hauer [mailto:s.hauer at pengutronix.de]
-> > > Sent: Wednesday, July 11, 2018 3:55 PM
-> > > To: A.s. Dong <aisheng.dong@nxp.com>
-> > > Cc: linux-arm-kernel at lists.infradead.org; dongas86 at gmail.com; Jassi
-> > > Brar <jassisinghbrar@gmail.com>; linux-kernel at vger.kernel.org;
-> > > Oleksij Rempel <o.rempel@pengutronix.de>; dl-linux-imx
-> > > <linux-imx@nxp.com>; kernel at pengutronix.de; Fabio Estevam
-> > > <fabio.estevam@nxp.com>; shawnguo at kernel.org
-> > > Subject: Re: [PATCH V4 3/5] mailbox: imx: add imx mu support
-> > >
-> > > On Wed, Jul 11, 2018 at 07:29:38AM +0000, A.s. Dong wrote:
-> > > > Hi Sascha,
-> > > >
-> > > > > -----Original Message-----
-> > > > > From: Sascha Hauer [mailto:s.hauer at pengutronix.de]
-> > > > > Sent: Tuesday, July 10, 2018 10:20 PM
-> > > > > To: A.s. Dong <aisheng.dong@nxp.com>
-> > > > > Cc: linux-arm-kernel at lists.infradead.org; dongas86 at gmail.com;
-> > > > > Jassi Brar <jassisinghbrar@gmail.com>;
-> > > > > linux-kernel at vger.kernel.org; Oleksij Rempel
-> > > > > <o.rempel@pengutronix.de>; dl-linux-imx <linux-imx@nxp.com>;
-> > > > > kernel at pengutronix.de; Fabio Estevam <fabio.estevam@nxp.com>;
-> > > > > shawnguo at kernel.org
-> > > > > Subject: Re: [PATCH V4 3/5] mailbox: imx: add imx mu support
-> > > > >
-> > > > > Hi,
-> > > > >
-> > > > > On Sun, Jul 08, 2018 at 10:56:55PM +0800, Dong Aisheng wrote:
-> > > > > > This is used for i.MX multi core communication.
-> > > > > > e.g. A core to SCU firmware(M core) on MX8.
-> > > > > >
-> > > > > > Tx is using polling mode while Rx is interrupt driven and
-> > > > > > schedule a hrtimer to receive remain words if have more than
-> > > > > > 4 words.
-> > > > >
-> > > > > You told us that using interrupts is not possible due to
-> > > > > miserable performance, we then provided you a way with which you
-> could poll.
-> > > > > Why are you using interrupts now?
-> > > > >
-> > > >
-> > > > Because mailbox framework does not support sync rx now, I think we
-> > > > do not need to wait for that feature done first as it's
-> > > > independent and separate features of framework.
-> > >
-> > > You can wait forever for this feature, nobody will add it for you.
-> > > It's up to you to add support for that feature. Who else should add this
-> feature if not you?
-> > > And when will you add that feature if not now when you actually need it?
-> > > It is common practice that you adjust the frameworks to your needs
-> > > rather than working around them.
-> > >
-> >
-> > I'm willing to add it. Just because you said Jassi already had the
-> > idea on how to Implement it and does not add much complexity. So I just
-> want to see his patches.
-> > But if he did not work on it, I can also help on it.
-> >
-> I am not much aware of the history of this conversation... but it seems you
-> need to make use of mbox_chan_ops.peek_data().
-> 
-> If not that, please let me know the requirement.
-> 
+The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
 
-Thanks for the suggestion.
-It looks to me may work.
+  Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
 
->From the definition, it seems it's used to pull data from remote side.
-/**
- * mbox_client_peek_data - A way for client driver to pull data
- *                      received from remote by the controller.
- * @chan: Mailbox channel assigned to this client.
- *          
- * A poke to controller driver for any received data.
- * The data is actually passed onto client via the
- * mbox_chan_received_data()
- * The call can be made from atomic context, so the controller's
- * implementation of peek_data() must not sleep.
- *
- * Return: True, if controller has, and is going to push after this,
- *          some data.
- *         False, if controller doesn't have any data to be read.
- */     
-bool mbox_client_peek_data(struct mbox_chan *chan)
-{
-        if (chan->mbox->ops->peek_data)
-                return chan->mbox->ops->peek_data(chan);
-        
-        return false;
-}       
-EXPORT_SYMBOL_GPL(mbox_client_peek_data);
-But it seems most users in kernel simply implement it as a data available
-Checking rather than receiving it.
-See:
-drivers/mailbox/ti-msgmgr.c
-drivers/mailbox/mailbox-altera.c
+are available in the Git repository at:
 
-Only bcm uses it to receive data.
-drivers/mailbox/bcm-flexrm-mailbox.c
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.19/soc-signed
 
-For our requirement, we want to implement sync receiving protocol like:
-Sc_call_rpc()
-{
-	mbox_send_message(chan, msg)
-	If (!no_resp)
-		// rx also stored in msg
-		mbox_receive_msg_in_polling(chan, msg);
-	mbox_client_txdone();
-}
+for you to fetch changes up to 8c5a916f4c8815196cc8a86b9582ca89422aac25:
 
-If using peek_data, it can be:
-Sc_call_rpc()
-{
-	mbox_send_message(chan, msg)
-	If (!no_resp)
-		// rx also stored in msg
-		Mbox_client_peek_data(chan);
-	mbox_client_txdone();
-}
+  ARM: OMAP2+: sleep33/43xx: Add RTC-Mode support (2018-07-09 23:01:34 -0700)
 
-And for mu controller driver .peek_data():
-imx_mu_peek_data(chan)
-{
-        // get first word and parse data size
-        imx_mu_receive_msg(&mu->chans, 0, mu->msg);
+----------------------------------------------------------------
+SoC updates for omaps for v4.19 merge window
 
-        raw_data = (u8 *)mu->msg;
-        size = raw_data[1];
+These changes are mostly PM related changes for am335x and
+am437x to support RTC only suspend mode. Some of the clock
+and driver related chances are still pending so it's not
+yet fully functional.
 
-        // receive rest of them 
-        for (i = 1; i < size; i++) {
-                ret = imx_mu_receive_msg(&mu->chans, i % 4, mu->msg + i);
-                if (ret)
-                        return false;
-        }
+Also included is a change for PM debug sysfs entry to use
+DEFINE_SHOW_ATTRIBUTE.
 
-        mbox_chan_received_data(&mu->chans, (void *)mu->msg);
+----------------------------------------------------------------
+Andy Shevchenko (1):
+      ARM: OMAP2+: reuse DEFINE_SHOW_ATTRIBUTE() macro
 
-        return true;
-}
-It is much specific to SCU.
-Do you think such peek_data using for sync receiving mode is ok?
+Dave Gerlach (2):
+      ARM: hwmod: RTC: Don't assume lock/unlock will be called with irq enabled
+      ARM: OMAP2+: sleep33/43xx: Make sleep actions configurable
 
-Regards
-Dong Aisheng
+Keerthy (1):
+      ARM: OMAP2+: sleep33/43xx: Add RTC-Mode support
 
-> Cheers!
+ arch/arm/mach-omap2/omap_hwmod_reset.c |  12 ++--
+ arch/arm/mach-omap2/pm-asm-offsets.c   |   2 +
+ arch/arm/mach-omap2/pm-debug.c         |  37 ++---------
+ arch/arm/mach-omap2/pm33xx-core.c      |  20 ++++--
+ arch/arm/mach-omap2/sleep33xx.S        |  52 +++++++++++++++-
+ arch/arm/mach-omap2/sleep43xx.S        | 110 +++++++++++++++++++++++++++++++--
+ drivers/soc/ti/pm33xx.c                |  16 ++++-
+ include/linux/platform_data/pm33xx.h   |  29 ++++++++-
+ 8 files changed, 229 insertions(+), 49 deletions(-)
