@@ -1,77 +1,115 @@
-From: yibin.gong@nxp.com (Robin Gong)
-Date: Wed, 11 Jul 2018 05:36:09 +0000
-Subject: [PATCH v1 2/4] dmaengine: imx-sdma: add check_bd_buswidth() to
- kill the dulicated code
-In-Reply-To: <20180710153104.GF3219@vkoul-mobl>
-References: <1531239793-11781-1-git-send-email-yibin.gong@nxp.com>
- <1531239793-11781-3-git-send-email-yibin.gong@nxp.com>
- <20180710153104.GF3219@vkoul-mobl>
-Message-ID: <DB6PR04MB3223A023C9D5CC467FC00214895A0@DB6PR04MB3223.eurprd04.prod.outlook.com>
+From: brendanhiggins@google.com (Brendan Higgins)
+Date: Tue, 10 Jul 2018 22:42:52 -0700
+Subject: [PATCH] i2c: aspeed: Add newline characters into message
+ printings.
+In-Reply-To: <20180702211359.30585-1-jae.hyun.yoo@linux.intel.com>
+References: <20180702211359.30585-1-jae.hyun.yoo@linux.intel.com>
+Message-ID: <CAFd5g443wTQJ+0hrprOV949Sr_nRnBGpNo3Wd01xFN4GW4K2Ng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Vinod [mailto:vkoul at kernel.org]
-> Sent: 2018?7?10? 23:31
-> To: Robin Gong <yibin.gong@nxp.com>
-> Cc: dan.j.williams at intel.com; shawnguo at kernel.org;
-> s.hauer at pengutronix.de; Fabio Estevam <fabio.estevam@nxp.com>;
-> linux at armlinux.org.uk; linux-arm-kernel at lists.infradead.org;
-> kernel at pengutronix.de; dmaengine at vger.kernel.org;
-> linux-kernel at vger.kernel.org; dl-linux-imx <linux-imx@nxp.com>
-> Subject: Re: [PATCH v1 2/4] dmaengine: imx-sdma: add check_bd_buswidth() to
-> kill the dulicated code
-> 
-> On 11-07-18, 00:23, Robin Gong wrote:
-> > Add check_bd_buswidth() to minimize the code size.
-> 
-> this looks mostly fine and I think this should be first patch..
-Since no need to check bus width in memcpy case, I'll remove this patch too.
-> 
-> >
-> > Signed-off-by: Robin Gong <yibin.gong@nxp.com>
-> > ---
-> >  drivers/dma/imx-sdma.c | 64
-> > +++++++++++++++++++++++---------------------------
-> >  1 file changed, 29 insertions(+), 35 deletions(-)
-> >
-> > diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c index
-> > 27ccabf..ed2267d 100644
-> > --- a/drivers/dma/imx-sdma.c
-> > +++ b/drivers/dma/imx-sdma.c
-> > @@ -1326,6 +1326,33 @@ static struct sdma_desc
-> *sdma_transfer_init(struct sdma_channel *sdmac,
-> >  	return NULL;
-> >  }
-> >
-> > +static int check_bd_buswidth(struct sdma_buffer_descriptor *bd,
-> > +			     struct sdma_channel *sdmac, int count,
-> > +			     dma_addr_t dma_dst, dma_addr_t dma_src) {
-> > +	int ret = 0;
-> > +
-> > +	switch (sdmac->word_size) {
-> > +	case DMA_SLAVE_BUSWIDTH_4_BYTES:
-> > +		bd->mode.command = 0;
-> > +		if ((count | dma_dst | dma_src) & 3)
-> > +			ret = -EINVAL;
-> > +		break;
-> 
-> empty line after each break please
-> 
-> > +	case DMA_SLAVE_BUSWIDTH_2_BYTES:
-> > +		bd->mode.command = 2;
-> > +		if ((count | dma_dst | dma_src) & 1)
-> > +			ret = -EINVAL;
-> > +		break;
-> > +	case DMA_SLAVE_BUSWIDTH_1_BYTE:
-> > +		 bd->mode.command = 1;
-> > +		break;
-> > +	default:
-> > +		return -EINVAL;
-> > +	}
-> > +
-> > +	return ret;
-> > +}
-> > +
+On Mon, Jul 2, 2018 at 2:14 PM Jae Hyun Yoo
+<jae.hyun.yoo@linux.intel.com> wrote:
+>
+> There are some log printing without a newline character. This
+> patch adds the missing newline characters.
+>
+> Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
+> ---
+>  drivers/i2c/busses/i2c-aspeed.c | 18 +++++++++---------
+>  1 file changed, 9 insertions(+), 9 deletions(-)
+>
+> diff --git a/drivers/i2c/busses/i2c-aspeed.c b/drivers/i2c/busses/i2c-aspeed.c
+> index 60e4d0e939a3..e3007c1c4ac5 100644
+> --- a/drivers/i2c/busses/i2c-aspeed.c
+> +++ b/drivers/i2c/busses/i2c-aspeed.c
+> @@ -407,7 +407,7 @@ static bool aspeed_i2c_master_irq(struct aspeed_i2c_bus *bus)
+>          */
+>         ret = aspeed_i2c_is_irq_error(irq_status);
+>         if (ret < 0) {
+> -               dev_dbg(bus->dev, "received error interrupt: 0x%08x",
+> +               dev_dbg(bus->dev, "received error interrupt: 0x%08x\n",
+>                         irq_status);
+>                 bus->cmd_err = ret;
+>                 bus->master_state = ASPEED_I2C_MASTER_INACTIVE;
+> @@ -416,7 +416,7 @@ static bool aspeed_i2c_master_irq(struct aspeed_i2c_bus *bus)
+>
+>         /* We are in an invalid state; reset bus to a known state. */
+>         if (!bus->msgs) {
+> -               dev_err(bus->dev, "bus in unknown state");
+> +               dev_err(bus->dev, "bus in unknown state\n");
+>                 bus->cmd_err = -EIO;
+>                 if (bus->master_state != ASPEED_I2C_MASTER_STOP)
+>                         aspeed_i2c_do_stop(bus);
+> @@ -431,7 +431,7 @@ static bool aspeed_i2c_master_irq(struct aspeed_i2c_bus *bus)
+>          */
+>         if (bus->master_state == ASPEED_I2C_MASTER_START) {
+>                 if (unlikely(!(irq_status & ASPEED_I2CD_INTR_TX_ACK))) {
+> -                       pr_devel("no slave present at %02x", msg->addr);
+> +                       pr_devel("no slave present at %02x\n", msg->addr);
+
+Unless something changed in the last couple versions of the kernel, this is the
+only line that actually changes anything. dev_* inserts a newline for every
+call.
+
+Admittedly, the rest of the file is pretty inconsistent, so if you really want
+to make all these changes, I don't feel super strongly about it.
+
+>                         status_ack |= ASPEED_I2CD_INTR_TX_NAK;
+>                         bus->cmd_err = -ENXIO;
+>                         aspeed_i2c_do_stop(bus);
+> @@ -451,11 +451,11 @@ static bool aspeed_i2c_master_irq(struct aspeed_i2c_bus *bus)
+>         switch (bus->master_state) {
+>         case ASPEED_I2C_MASTER_TX:
+>                 if (unlikely(irq_status & ASPEED_I2CD_INTR_TX_NAK)) {
+> -                       dev_dbg(bus->dev, "slave NACKed TX");
+> +                       dev_dbg(bus->dev, "slave NACKed TX\n");
+>                         status_ack |= ASPEED_I2CD_INTR_TX_NAK;
+>                         goto error_and_stop;
+>                 } else if (unlikely(!(irq_status & ASPEED_I2CD_INTR_TX_ACK))) {
+> -                       dev_err(bus->dev, "slave failed to ACK TX");
+> +                       dev_err(bus->dev, "slave failed to ACK TX\n");
+>                         goto error_and_stop;
+>                 }
+>                 status_ack |= ASPEED_I2CD_INTR_TX_ACK;
+> @@ -478,7 +478,7 @@ static bool aspeed_i2c_master_irq(struct aspeed_i2c_bus *bus)
+>                 /* fallthrough intended */
+>         case ASPEED_I2C_MASTER_RX:
+>                 if (unlikely(!(irq_status & ASPEED_I2CD_INTR_RX_DONE))) {
+> -                       dev_err(bus->dev, "master failed to RX");
+> +                       dev_err(bus->dev, "master failed to RX\n");
+>                         goto error_and_stop;
+>                 }
+>                 status_ack |= ASPEED_I2CD_INTR_RX_DONE;
+> @@ -509,7 +509,7 @@ static bool aspeed_i2c_master_irq(struct aspeed_i2c_bus *bus)
+>                 goto out_no_complete;
+>         case ASPEED_I2C_MASTER_STOP:
+>                 if (unlikely(!(irq_status & ASPEED_I2CD_INTR_NORMAL_STOP))) {
+> -                       dev_err(bus->dev, "master failed to STOP");
+> +                       dev_err(bus->dev, "master failed to STOP\n");
+>                         bus->cmd_err = -EIO;
+>                         /* Do not STOP as we have already tried. */
+>                 } else {
+> @@ -520,7 +520,7 @@ static bool aspeed_i2c_master_irq(struct aspeed_i2c_bus *bus)
+>                 goto out_complete;
+>         case ASPEED_I2C_MASTER_INACTIVE:
+>                 dev_err(bus->dev,
+> -                       "master received interrupt 0x%08x, but is inactive",
+> +                       "master received interrupt 0x%08x, but is inactive\n",
+>                         irq_status);
+>                 bus->cmd_err = -EIO;
+>                 /* Do not STOP as we should be inactive. */
+> @@ -851,7 +851,7 @@ static int aspeed_i2c_probe_bus(struct platform_device *pdev)
+>         bus->rst = devm_reset_control_get_shared(&pdev->dev, NULL);
+>         if (IS_ERR(bus->rst)) {
+>                 dev_err(&pdev->dev,
+> -                       "missing or invalid reset controller device tree entry");
+> +                       "missing or invalid reset controller device tree entry\n");
+>                 return PTR_ERR(bus->rst);
+>         }
+>         reset_control_deassert(bus->rst);
 > --
-> ~Vinod
+> 2.17.1
+>
+
+Reviewed-by: Brendan Higgins <brendanhiggins@google.com>
