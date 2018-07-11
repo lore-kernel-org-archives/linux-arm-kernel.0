@@ -1,129 +1,27 @@
-From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
-Date: Wed, 11 Jul 2018 21:05:14 +0900
-Subject: [PATCH 2/4] phy: socionext: add USB3 PHY driver for UniPhier SoC
-In-Reply-To: <20180709202319.1091.4A936039@socionext.com>
-References: <4b436a46-9046-25ad-ee6d-ad2cdb16e2ca@ti.com>
- <20180709202319.1091.4A936039@socionext.com>
-Message-ID: <20180711210514.BB32.4A936039@socionext.com>
+From: leonard.crestez@nxp.com (Leonard Crestez)
+Date: Wed, 11 Jul 2018 15:11:15 +0300
+Subject: [PATCH v3 0/2] Fix imx6sl display power domain
+Message-ID: <cover.1531310547.git.leonard.crestez@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 9 Jul 2018 20:23:19 +0900 <hayashi.kunihiko@socionext.com> wrote:
+Changes since v2:
+ * Don't mistakenly include IMX6SL_CLK_IPG in pd_disp
+ * Use GENPD_FLAG_ALWAYS_ON, as suggested by Ulf
 
-> Hi Kishon,
-> Thank you for your comments.
-> 
-> On Mon, 9 Jul 2018 10:49:50 +0530 <kishon@ti.com> wrote:
-> 
-> > Hi,
-> > 
-> > On Friday 29 June 2018 02:08 PM, Kunihiko Hayashi wrote:
-> > > Add a driver for PHY interface built into USB3 controller
-> > > implemented in UniPhier SoCs.
-> > > This driver supports High-Speed PHY and Super-Speed PHY.
-> > > 
-> > > Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
-> > > Signed-off-by: Motoya Tanigawa <tanigawa.motoya@socionext.com>
-> > > Signed-off-by: Masami Hiramatsu <masami.hiramatsu@linaro.org>
-> > > ---
-> > >  drivers/phy/Kconfig                         |   1 +
-> > >  drivers/phy/Makefile                        |   1 +
-> > >  drivers/phy/socionext/Kconfig               |  12 +
-> > >  drivers/phy/socionext/Makefile              |   6 +
-> > >  drivers/phy/socionext/phy-uniphier-usb3hs.c | 422 ++++++++++++++++++++++++++++
-> > >  drivers/phy/socionext/phy-uniphier-usb3ss.c | 369 ++++++++++++++++++++++++
-> > >  6 files changed, 811 insertions(+)
-> > >  create mode 100644 drivers/phy/socionext/Kconfig
-> > >  create mode 100644 drivers/phy/socionext/Makefile
-> > >  create mode 100644 drivers/phy/socionext/phy-uniphier-usb3hs.c
-> > >  create mode 100644 drivers/phy/socionext/phy-uniphier-usb3ss.c
-> 
-> (snip...)
-> 
-> > > --- /dev/null
-> > > +++ b/drivers/phy/socionext/phy-uniphier-usb3hs.c
-> > > @@ -0,0 +1,422 @@
-> > > +// SPDX-License-Identifier: GPL-2.0
-> > > +/*
-> > > + * phy-uniphier-usb3hs.c - HS-PHY driver for Socionext UniPhier USB3 controller
-> > > + * Copyright 2015-2018 Socionext Inc.
-> > > + * Author:
-> > > + *	Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
-> > > + * Contributors:
-> > > + *      Motoya Tanigawa <tanigawa.motoya@socionext.com>
-> > > + *      Masami Hiramatsu <masami.hiramatsu@linaro.org>
-> > > + */
-> > > +
-> > > +#include <linux/bitfield.h>
-> > > +#include <linux/bitops.h>
-> > > +#include <linux/clk.h>
-> > > +#include <linux/io.h>
-> > > +#include <linux/mfd/syscon.h>
-> > > +#include <linux/module.h>
-> > > +#include <linux/nvmem-consumer.h>
-> > > +#include <linux/of.h>
-> > > +#include <linux/of_platform.h>
-> > > +#include <linux/phy/phy.h>
-> > > +#include <linux/platform_device.h>
-> > > +#include <linux/reset.h>
-> > > +#include <linux/slab.h>
-> > > +
-> > > +#define HSPHY_CFG0		0x0
-> > > +#define HSPHY_CFG0_HS_I_MASK	GENMASK(31, 28)
-> > > +#define HSPHY_CFG0_HSDISC_MASK	GENMASK(27, 26)
-> > > +#define HSPHY_CFG0_SWING_MASK	GENMASK(17, 16)
-> > > +#define HSPHY_CFG0_SEL_T_MASK	GENMASK(15, 12)
-> > > +#define HSPHY_CFG0_RTERM_MASK	GENMASK(7, 6)
-> > > +#define HSPHY_CFG0_TRIMMASK	(HSPHY_CFG0_HS_I_MASK \
-> > > +				 | HSPHY_CFG0_SEL_T_MASK \
-> > > +				 | HSPHY_CFG0_RTERM_MASK)
-> > > +
-> > > +#define HSPHY_CFG1		0x4
-> > > +#define HSPHY_CFG1_DAT_EN	BIT(29)
-> > > +#define HSPHY_CFG1_ADR_EN	BIT(28)
-> > > +#define HSPHY_CFG1_ADR_MASK	GENMASK(27, 16)
-> > > +#define HSPHY_CFG1_DAT_MASK	GENMASK(23, 16)
-> > > +
-> > > +#define MAX_CLKS	3
-> > > +#define MAX_RSTS	2
-> > > +#define MAX_PHY_PARAMS	1
-> > > +
-> > > +struct uniphier_u3hsphy_param {
-> > > +	u32 addr;
-> > > +	u32 mask;
-> > > +	u32 val;
-> > > +};
-> > 
-> > I'd like to avoid configure the PHY this way, since it's impossible to know
-> > which register is being configured.
-> 
+Errata workaround could be refined later, however the power savings are
+small and it would require a lot of testing. So push the safest fix
+first to get basic hardware support.
 
-This way might be misunderstood.
-These HS-PHY and SS-PHY have "internal" registers, which are not memory-mapped.
+Link to v2: https://lkml.org/lkml/2018/7/9/447
 
-And to access these internal registers, we need to specify the number
-corresponding to the register.
+Leonard Crestez (2):
+  soc: imx: gpc: Disable 6sl display power gating for ERR006287
+  ARM: dts: imx6sl: Convert gpc to new bindings
 
-The "addr" in "uniphier_u3hsphy_param" is just the number of the register.
-The "mask" shows a bitfield of the register, that means one of PHY parameters.
-The "value" shows a parameter value to set to the bitfield.
+ arch/arm/boot/dts/imx6sl.dtsi | 35 +++++++++++++++++++++++++++++++----
+ drivers/soc/imx/gpc.c         | 10 ++++++++++
+ 2 files changed, 41 insertions(+), 4 deletions(-)
 
-
-> I see. 
-> In order to know which register is set, I'll add definitions for address
-> and mask.
-> And I think the driver might have functions for each SoC to configure
-> the registers instead of uniphier_u3hsphy_param.
-
-Then, I think it's sufficient to define a macro with a meaningful label for
-each bitfield, and PHY parameters are expressed like that.
-
-  { 10, FOO_BAR_MODE, 0x2 }, /* set 2 to FOO_BAR_MODE in register 10 */
-
-In this case, we need to shift "value" according to "mask".
-
-Thank you,
-
----
-Best Regards,
-Kunihiko Hayashi
+-- 
+2.17.1
