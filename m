@@ -1,59 +1,166 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 11 Jul 2018 18:01:07 +0100
-Subject: [PATCH -next] pinctrl: nsp: fix potential NULL dereference in
- nsp_pinmux_probe()
-In-Reply-To: <7b4361a5-f757-179c-57b6-44359801baad@broadcom.com>
-References: <1531312461-134547-1-git-send-email-weiyongjun1@huawei.com>
- <7b4361a5-f757-179c-57b6-44359801baad@broadcom.com>
-Message-ID: <6c133df2-7dc7-d58b-297a-c27b87e7edd3@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 11 Jul 2018 19:04:26 +0200
+Subject: [PATCH v2] arm64/mm: unmap the linear alias of module allocations
+Message-ID: <20180711170426.11133-1-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+When CONFIG_STRICT_KERNEL_RWX=y [which is the default on arm64], we
+take great care to ensure that the mappings of modules in the vmalloc
+space are locked down as much as possible, i.e., executable code is
+mapped read-only, read-only data is mapped read-only and non-executable,
+and read-write data is mapped non-executable as well.
 
+However, due to the way we map the linear region [aka the kernel direct
+mapping], those module regions are aliased by read-write mappings, and
+it is possible for an attacker to modify code or data that was assumed
+to be immutable in this configuration.
 
-On 11/07/18 17:48, Ray Jui wrote:
-> 
-> 
-> On 7/11/2018 5:34 AM, Wei Yongjun wrote:
->> platform_get_resource() may fail and return NULL, so we should
->> better check it's return value to avoid a NULL pointer dereference
->> a bit later in the code.
->>
->> This is detected by Coccinelle semantic patch.
->>
->> @@
->> expression pdev, res, n, t, e, e1, e2;
->> @@
->>
->> res = platform_get_resource(pdev, t, n);
->> + if (!res)
->> +?? return -EINVAL;
->> ... when != res == NULL
->> e = devm_ioremap_nocache(e1, res->start, e2);
->>
->> Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
->> ---
-> 
-> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
-> 
-> Change looks good to me, although the check could have been avoided if
-> 'devm_ioremap_resource' is used on the next line instead of
-> 'devm_ioremap_nocache', where validation of resource pointer is done.
-> 
-> But there's probably a reason why 'devm_ioremap_nocache' was used in
-> this code here.
-> 
+So let's ensure that the linear alias of module memory is remapped
+read-only upon allocation and remapped read-write when it is freed. The
+latter requires some special handling involving a workqueue due to the
+fact that it may be called in softirq context at which time calling
+find_vm_area() is unsafe.
 
-I am not sure about that. Both ARM and ARM64 has same definition as
-ioremp. However, arch/arm/include/asm/io.h do mention:
-"ioremap_nocache() is the same as ioremap() as there are too many device
+Note that this requires the entire linear region to be mapped down to
+pages, which may result in a performance regression in some hardware
+configurations.
 
- drivers using this for device registers, and documentation which tells
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+Changes since RFC/v1:
+- remap linear alias read-only rather than invalid
+- honour rodata_enabled, i.e., 'rodata=off' will disable this functionality
+- use VMA nr_pages field rather than size to obtain the number of pages to
+  remap
 
- people to use it for such for this to be any different."
+ arch/arm64/include/asm/module.h |  6 +++
+ arch/arm64/kernel/module.c      | 42 ++++++++++++++++++++
+ arch/arm64/mm/mmu.c             |  2 +-
+ arch/arm64/mm/pageattr.c        | 19 +++++++++
+ 4 files changed, 68 insertions(+), 1 deletion(-)
 
-You could technically use devm_ioremap_resource if you want.
-
+diff --git a/arch/arm64/include/asm/module.h b/arch/arm64/include/asm/module.h
+index 97d0ef12e2ff..f16f0073642b 100644
+--- a/arch/arm64/include/asm/module.h
++++ b/arch/arm64/include/asm/module.h
+@@ -91,4 +91,10 @@ static inline bool plt_entries_equal(const struct plt_entry *a,
+ 	       a->mov2 == b->mov2;
+ }
+ 
++#ifdef CONFIG_STRICT_KERNEL_RWX
++void remap_linear_module_alias(void *module_region, bool ro);
++#else
++static inline void remap_linear_module_alias(void *module_region, bool ro) {}
++#endif
++
+ #endif /* __ASM_MODULE_H */
+diff --git a/arch/arm64/kernel/module.c b/arch/arm64/kernel/module.c
+index f0f27aeefb73..2b61ca0285eb 100644
+--- a/arch/arm64/kernel/module.c
++++ b/arch/arm64/kernel/module.c
+@@ -26,10 +26,51 @@
+ #include <linux/mm.h>
+ #include <linux/moduleloader.h>
+ #include <linux/vmalloc.h>
++#include <linux/workqueue.h>
+ #include <asm/alternative.h>
+ #include <asm/insn.h>
+ #include <asm/sections.h>
+ 
++#ifdef CONFIG_STRICT_KERNEL_RWX
++
++static struct workqueue_struct *module_free_wq;
++
++static int init_workqueue(void)
++{
++	module_free_wq = alloc_ordered_workqueue("module_free_wq", 0);
++	WARN_ON(!module_free_wq);
++
++	return 0;
++}
++pure_initcall(init_workqueue);
++
++static void module_free_wq_worker(struct work_struct *work)
++{
++	remap_linear_module_alias(work, false);
++	vfree(work);
++}
++
++void module_memfree(void *module_region)
++{
++	struct work_struct *work;
++
++	if (!module_region)
++		return;
++
++	/*
++	 * At this point, module_region is a pointer to an allocation of at
++	 * least PAGE_SIZE bytes that is mapped read-write. So instead of
++	 * allocating memory for a data structure containing a work_struct
++	 * instance and a copy of the value of module_region, just reuse the
++	 * allocation directly.
++	 */
++	work = module_region;
++	INIT_WORK(work, module_free_wq_worker);
++	queue_work(module_free_wq, work);
++}
++
++#endif
++
+ void *module_alloc(unsigned long size)
+ {
+ 	gfp_t gfp_mask = GFP_KERNEL;
+@@ -65,6 +106,7 @@ void *module_alloc(unsigned long size)
+ 		return NULL;
+ 	}
+ 
++	remap_linear_module_alias(p, true);
+ 	return p;
+ }
+ 
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 493ff75670ff..5492b691aafd 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -432,7 +432,7 @@ static void __init map_mem(pgd_t *pgdp)
+ 	struct memblock_region *reg;
+ 	int flags = 0;
+ 
+-	if (debug_pagealloc_enabled())
++	if (rodata_enabled || debug_pagealloc_enabled())
+ 		flags = NO_BLOCK_MAPPINGS | NO_CONT_MAPPINGS;
+ 
+ 	/*
+diff --git a/arch/arm64/mm/pageattr.c b/arch/arm64/mm/pageattr.c
+index a56359373d8b..cc04be572660 100644
+--- a/arch/arm64/mm/pageattr.c
++++ b/arch/arm64/mm/pageattr.c
+@@ -138,6 +138,25 @@ int set_memory_valid(unsigned long addr, int numpages, int enable)
+ 					__pgprot(PTE_VALID));
+ }
+ 
++#ifdef CONFIG_STRICT_KERNEL_RWX
++void remap_linear_module_alias(void *module_region, bool ro)
++{
++	struct vm_struct *vm;
++	int i;
++
++	if (!rodata_enabled)
++		return;
++
++	vm = find_vm_area(module_region);
++	WARN_ON(!vm || !vm->pages);
++
++	for (i = 0; i < vm->nr_pages; i++)
++		__change_memory_common((u64)page_address(vm->pages[i]), PAGE_SIZE,
++				ro ? __pgprot(PTE_RDONLY) : __pgprot(PTE_WRITE),
++				ro ? __pgprot(PTE_WRITE) : __pgprot(PTE_RDONLY));
++}
++#endif
++
+ #ifdef CONFIG_DEBUG_PAGEALLOC
+ void __kernel_map_pages(struct page *page, int numpages, int enable)
+ {
 -- 
-Regards,
-Sudeep
+2.17.1
