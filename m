@@ -1,51 +1,84 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 11 Jul 2018 18:38:33 +0200
-Subject: [PATCH 1/3] clocksource: drivers: set clockevent device cpumask
- to cpu_possible_mask
-In-Reply-To: <229f0ac1-16b5-3fcf-3d0d-60ad59ea40f8@arm.com>
-References: <1531308264-24220-1-git-send-email-sudeep.holla@arm.com>
- <2009eeb1-e925-fe5c-ac4a-9f3e41945127@linaro.org>
- <229f0ac1-16b5-3fcf-3d0d-60ad59ea40f8@arm.com>
-Message-ID: <f58d0930-19fc-bb5f-960f-56aa48ced79a@linaro.org>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Thu, 12 Jul 2018 00:19:28 +0800
+Subject: [PATCH v2 6/9] dt-bindings: phy: add binding for Allwinner USB3
+ PHY
+In-Reply-To: <20180711161356.GA4685@rob-hp-laptop>
+References: <20180706153805.25842-1-icenowy@aosc.io>
+ <20180706153805.25842-7-icenowy@aosc.io>
+ <20180711161356.GA4685@rob-hp-laptop>
+Message-ID: <C01136F1-594C-4459-B9C6-6E0434855234@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/07/2018 15:42, Sudeep Holla wrote:
-> Hi Daniel,
-> 
-> On 11/07/18 12:36, Daniel Lezcano wrote:
->> On 11/07/2018 13:24, Sudeep Holla wrote:
->>> Currently, quite a few clockevent devices have cpumask set to
->>> cpu_all_mask which should be fine. However, cpu_possible_mask is more
->>> accurate and if there are any other clockevent devices in the system
->>> which have cpumask set to cpu_possible_mask, then having cpu_all_mask
->>> may result in issues (mostly boot hang with forever loops in
->>> clockevents_notify_released).
->>>
->>> So, lets replace all the clockevent device cpu_all_mask to
->>> cpu_possible_mask in order to prevent above mentioned possible issue.
->>>
->>> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
->>> Cc: Thomas Gleixner <tglx@linutronix.de>
->>> Cc: Thierry Reding <thierry.reding@gmail.com>
->>> Cc: Jonathan Hunter <jonathanh@nvidia.com>
->>> Cc: Santosh Shilimkar <ssantosh@kernel.org>
->>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
->>> ---
->>
->> Applied, thanks for the fix.
->>
-> 
-> Thomas was planning to take this, see [1]
-
-Thomas ?
-
-Do you want to take all the series ? Or shall I take this one ?
 
 
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+? 2018?7?12? GMT+08:00 ??12:13:56, Rob Herring <robh@kernel.org> ??:
+>On Fri, Jul 06, 2018 at 11:38:02PM +0800, Icenowy Zheng wrote:
+>> The new Allwinner H6 SoC contains a USB3 PHY that is wired to the
+>> external USB3 pins of the SoC.
+>> 
+>> Add a device tree binding for the PHY.
+>> 
+>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+>> ---
+>> Splitted from the PHY driver patch in v1.
+>> 
+>>  .../bindings/phy/sun50i-usb3-phy.txt          | 24
+>+++++++++++++++++++
+>>  1 file changed, 24 insertions(+)
+>>  create mode 100644
+>Documentation/devicetree/bindings/phy/sun50i-usb3-phy.txt
+>> 
+>> diff --git
+>a/Documentation/devicetree/bindings/phy/sun50i-usb3-phy.txt
+>b/Documentation/devicetree/bindings/phy/sun50i-usb3-phy.txt
+>> new file mode 100644
+>> index 000000000000..912d55f9f69d
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/phy/sun50i-usb3-phy.txt
+>> @@ -0,0 +1,24 @@
+>> +Allwinner sun50i USB3 PHY
+>> +-----------------------
+>> +
+>> +Required properties:
+>> +- compatible : should be one of
+>> +  * allwinner,sun60i-h6-usb3-phy
+>> +- reg : a list of offset + length pairs
+>> +- #phy-cells : from the generic phy bindings, must be 0
+>> +- clocks : phandle + clock specifier for the phy clock
+>> +- resets : phandle + reset specifier for the phy reset
+>> +
+>> +Optional Properties:
+>> +- phy-supply : from the generic phy bindings, a phandle to a
+>regulator that
+>> +	       provides power to VBUS.
+>
+>Power to the phy or Vbus? If the latter only, then this property should
+>
+>be elsewhere (like a connector node).
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+I don't think there's connector nodes for USB ports now.
+
+And by checking existed device trees, use phy-supply on USB
+phy is common. It's seen on Meson GXBB, RK3399 and Hi6220
+in arch/arm64/boot/dts.
+
+>
+>> +
+>> +Example:
+>> +	usb3phy: phy at 5210000 {
+>> +		compatible = "allwinner,sun50i-h6-usb3-phy";
+>> +		reg = <0x5210000 0x10000>;
+>> +		clocks = <&ccu CLK_USB_PHY1>;
+>> +		resets = <&ccu RST_USB_PHY1>;
+>> +		#phy-cells = <0>;
+>> +		status = "disabled";
+>> +	};
+>> -- 
+>> 2.17.1
+>> 
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe devicetree"
+>in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
