@@ -1,60 +1,78 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed, 11 Jul 2018 09:57:42 +0200
-Subject: [PATCH 0/2] Add support for S805X based P241 Reference Design
- board
-In-Reply-To: <7hfu0sm3ep.fsf@baylibre.com>
-References: <1530784243-20823-1-git-send-email-narmstrong@baylibre.com>
- <7hfu0sm3ep.fsf@baylibre.com>
-Message-ID: <93c53a69-abe3-731d-dcb6-45cf111ce286@baylibre.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Wed, 11 Jul 2018 15:45:43 +0800
+Subject: [PATCH v2 4/6] perf cs-etm: Support dummy address value for
+ CS_ETM_TRACE_ON packet
+In-Reply-To: <1531295145-596-1-git-send-email-leo.yan@linaro.org>
+References: <1531295145-596-1-git-send-email-leo.yan@linaro.org>
+Message-ID: <1531295145-596-5-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/07/2018 00:48, Kevin Hilman wrote:
-> Neil Armstrong <narmstrong@baylibre.com> writes:
-> 
->> The Amlogic P241 board is the Reference Design board for the S805X
->> variant of the Amlogic Meson GXL SoC family.
->>
->> The S805X is a variant of the Amlogic Meson GXL SoC family with the
->> following physical limitations :
->> - No SDCard interface
->> - No GPIOCLK pins
->> - No USB OTG ID pin (but Gadget feature can stil be forced)
->> - No 5V regulator
->> - Reduced ADC inputs (only ADC0 and ADC1)
->> - GPIODV_26, GPIOAO_3, GPIOAO_4, GPIOAO_5, GPIOAO_6, GPIOX_14,
->>   GPIOX_15, GPIOH_3 are no more exposed on the package
->>
->> Amlogic exposes the following SW limitations :
->> - HDMI max resolution should be 1080p60, VPU clock should be downgraded
->> - Video Decoding should be limited to 1080p60, VDEC clock should be downgraded
->> - CPU speed should be limited by SCPI OPP table to 1.2GHz
->> - DRAM interface is limited to DDR4 16bit up to 1GiB
->>
->> The P241 board has the following features :
->> - 1GiB DDR4 Memory
->> - HDMI Connector with CEC
->> - A/V jack with Stereo Audio and CVBS
->> - 10/100 Ethernet
->> - 2x USB2.0 Type-A
->> - On-board WiFi SDIO Module
->> - On-board eMMC storage
->> - Infraread Received
->> - Factory Reset button
->> - UART connector
-> 
-> Applied to v4.19/dt64.
-> 
-> The cover letter didn't say, but I assume this was at least boot tested
-> on a p241 board?
+For CS_ETM_TRACE_ON packet, its fields 'packet->start_addr' and
+'packet->end_addr' equal to 0xdeadbeefdeadbeefUL which are emitted in
+the decoder layer as dummy value, but the dummy value is pointless for
+branch sample when we use 'perf script' command to check program flow.
 
-Exact, it's boot tested on a p241 board.
+This patch is a preparation to support CS_ETM_TRACE_ON packet for
+branch sample, it converts the dummy address value to zero for more
+readable; this is accomplished by cs_etm__last_executed_instr() and
+cs_etm__first_executed_instr().  The later one is a new function
+introduced by this patch.
 
-Neil
+Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+Signed-off-by: Leo Yan <leo.yan@linaro.org>
+---
+ tools/perf/util/cs-etm.c | 17 +++++++++++++++--
+ 1 file changed, 15 insertions(+), 2 deletions(-)
 
-
-> 
-> Thanks,
-> 
-> Kevin
-> 
+diff --git a/tools/perf/util/cs-etm.c b/tools/perf/util/cs-etm.c
+index ae7c9c88..976db84 100644
+--- a/tools/perf/util/cs-etm.c
++++ b/tools/perf/util/cs-etm.c
+@@ -494,6 +494,10 @@ static inline void cs_etm__reset_last_branch_rb(struct cs_etm_queue *etmq)
+ 
+ static inline u64 cs_etm__last_executed_instr(struct cs_etm_packet *packet)
+ {
++	/* Returns 0 for the CS_ETM_TRACE_ON packet */
++	if (packet->sample_type == CS_ETM_TRACE_ON)
++		return 0;
++
+ 	/*
+ 	 * The packet records the execution range with an exclusive end address
+ 	 *
+@@ -505,6 +509,15 @@ static inline u64 cs_etm__last_executed_instr(struct cs_etm_packet *packet)
+ 	return packet->end_addr - A64_INSTR_SIZE;
+ }
+ 
++static inline u64 cs_etm__first_executed_instr(struct cs_etm_packet *packet)
++{
++	/* Returns 0 for the CS_ETM_TRACE_ON packet */
++	if (packet->sample_type == CS_ETM_TRACE_ON)
++		return 0;
++
++	return packet->start_addr;
++}
++
+ static inline u64 cs_etm__instr_count(const struct cs_etm_packet *packet)
+ {
+ 	/*
+@@ -546,7 +559,7 @@ static void cs_etm__update_last_branch_rb(struct cs_etm_queue *etmq)
+ 
+ 	be       = &bs->entries[etmq->last_branch_pos];
+ 	be->from = cs_etm__last_executed_instr(etmq->prev_packet);
+-	be->to	 = etmq->packet->start_addr;
++	be->to	 = cs_etm__first_executed_instr(etmq->packet);
+ 	/* No support for mispredict */
+ 	be->flags.mispred = 0;
+ 	be->flags.predicted = 1;
+@@ -701,7 +714,7 @@ static int cs_etm__synth_branch_sample(struct cs_etm_queue *etmq)
+ 	sample.ip = cs_etm__last_executed_instr(etmq->prev_packet);
+ 	sample.pid = etmq->pid;
+ 	sample.tid = etmq->tid;
+-	sample.addr = etmq->packet->start_addr;
++	sample.addr = cs_etm__first_executed_instr(etmq->packet);
+ 	sample.id = etmq->etm->branches_id;
+ 	sample.stream_id = etmq->etm->branches_id;
+ 	sample.period = 1;
+-- 
+2.7.4
