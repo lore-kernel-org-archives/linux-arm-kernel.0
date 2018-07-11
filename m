@@ -1,43 +1,58 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Wed, 11 Jul 2018 17:10:51 +0100
-Subject: [PATCH v5 2/7] KVM: arm/arm64: Introduce helpers to manupulate
- page table entries
-In-Reply-To: <691fcde0-b0a2-d258-ac99-49c6c4794247@arm.com> (Suzuki
- K. Poulose's message of "Wed, 11 Jul 2018 14:00:48 +0100")
-References: <20180709143835.28971-1-punit.agrawal@arm.com>
- <20180709144124.29164-1-punit.agrawal@arm.com>
- <20180709144124.29164-2-punit.agrawal@arm.com>
- <691fcde0-b0a2-d258-ac99-49c6c4794247@arm.com>
-Message-ID: <87va9loir8.fsf@e105922-lin.cambridge.arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 11 Jul 2018 10:12:06 -0600
+Subject: [PATCH v2 1/2] dt: bindings: Add bindings for SDHCI Synopsys DWC
+ MSHC
+In-Reply-To: <20180706152047.0b0a4944@xhacker.debian>
+References: <20180706151930.78b3024b@xhacker.debian>
+ <20180706152047.0b0a4944@xhacker.debian>
+Message-ID: <20180711161206.GA1558@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Suzuki K Poulose <Suzuki.Poulose@arm.com> writes:
+On Fri, Jul 06, 2018 at 03:20:47PM +0800, Jisheng Zhang wrote:
+> Synopsys SDHCI compatible DesignWare Cores Mobile Storage Host
+> Controller can support eMMC/SD/SDIO. Add the bindings.
+> 
+> Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
+> ---
+>  .../bindings/mmc/sdhci-of-dwcmshc.txt         | 20 +++++++++++++++++++
+>  1 file changed, 20 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mmc/sdhci-of-dwcmshc.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/mmc/sdhci-of-dwcmshc.txt b/Documentation/devicetree/bindings/mmc/sdhci-of-dwcmshc.txt
+> new file mode 100644
+> index 000000000000..ee4253b33be2
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mmc/sdhci-of-dwcmshc.txt
+> @@ -0,0 +1,20 @@
+> +* Synopsys DesignWare Cores Mobile Storage Host Controller
+> +
+> +Required properties:
+> +- compatible: should be one of the following:
+> +    "snps,dwcmshc-sdhci"
 
-> On 09/07/18 15:41, Punit Agrawal wrote:
->> Introduce helpers to abstract architectural handling of the conversion
->> of pfn to page table entries and marking a PMD page table entry as a
->> block entry.
->>
->> The helpers are introduced in preparation for supporting PUD hugepages
->> at stage 2 - which are supported on arm64 but do not exist on arm.
->>
->> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
->> Acked-by: Christoffer Dall <christoffer.dall@arm.com>
->> Cc: Marc Zyngier <marc.zyngier@arm.com>
->> Cc: Russell King <linux@armlinux.org.uk>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> ---
->
-> Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Needs to note that there must also be an SoC specific compatible.
 
-Other than the query on Patch 7 I've incorporated all your suggestions
-locally.
-
-Thanks a lot for reviewing the patches.
-
-Punit
-
-ps: Just noticed the typo (manupulate) in the subject. I've fixed it up
-locally.
+> +- reg: offset and length of the register set for the device.
+> +- interrupts: a single interrupt specifier.
+> +- clocks: Array of clocks required for SDHCI; requires at least one for
+> +    core clock.
+> +- clock-names: Array of names corresponding to clocks property; shall be
+> +    "core" for core clock and "bus" for optional bus clock.
+> +
+> +Example:
+> +	sdhci2: sdhci at aa0000 {
+> +		compatible = "snps,dwcmshc-sdhci";
+> +		reg = <0xaa0000 0x1000>;
+> +		interrupts = <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&emmcclk>;
+> +		bus-width = <8>;
+> +	}
+> -- 
+> 2.18.0
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
