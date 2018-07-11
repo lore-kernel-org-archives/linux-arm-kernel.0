@@ -1,47 +1,35 @@
-From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Wed, 11 Jul 2018 17:23:13 +0300
-Subject: [PATCH v4 3/3] serial: 8250_dw: add fractional divisor support
-In-Reply-To: <20180711144125.7d4e6a73@xhacker.debian>
-References: <20180710110942.5b0a016e@xhacker.debian>
- <20180710111516.13b8c570@xhacker.debian>
- <8c5b6bbbde12b0836e1f833c86b805a817596654.camel@linux.intel.com>
- <20180711144125.7d4e6a73@xhacker.debian>
-Message-ID: <d2ba8f992c272543d689d87006e99c3bcf343605.camel@linux.intel.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 11 Jul 2018 14:56:52 +0100
+Subject: [PATCHv5 17/21] arm64: remove in-kernel call to sys_personality()
+In-Reply-To: <20180711135656.20670-1-mark.rutland@arm.com>
+References: <20180711135656.20670-1-mark.rutland@arm.com>
+Message-ID: <20180711135656.20670-18-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2018-07-11 at 14:41 +0800, Jisheng Zhang wrote:
-> On Tue, 10 Jul 2018 19:19:21 +0300 Andy Shevchenko wrote:
+With pt_regs syscall wrappers, the calling convention for
+sys_personality() will change. Use ksys_personality(), which is
+functionally equivalent.
 
-> > > +/*
-> > > + * divisor = div(I) + div(F)
-> > > + * "I" means integer, "F" means fractional
-> > > + * quot = div(I) = clk / (16 * baud)
-> > > + * frac = div(F) * 2^dlf_size
-> > > + *
-> > > + * let rem = clk % (16 * baud)
-> > > + * we have: div(F) * (16 * baud) = rem
-> > > + * so frac = 2^dlf_size * rem / (16 * baud) = (rem << dlf_size) /
-> > > (16
-> > > * baud)
-> > > + */
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/kernel/sys.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> > > +	quot = p->uartclk / (16 * baud);
-> > > +	rem = p->uartclk % (16 * baud);
-> > > +	*frac = DIV_ROUND_CLOSEST(rem << d->dlf_size, 16 * baud
-
-> My python coding skill is limited. So I wrote a simple c program to
-> do the check for common clks and baudrate combination. All passed. I
-> paste the code here:
-> 
-
-OK, I wrote test case in Python:
-https://gist.github.com/andy-shev/5e980f1d752617ba814725248556ac19
-
-Looks good to me.
-
-Please, send v6 and assume my Reviewed-by for entire series.
-
+diff --git a/arch/arm64/kernel/sys.c b/arch/arm64/kernel/sys.c
+index df8180175515..f4e02f6aceb8 100644
+--- a/arch/arm64/kernel/sys.c
++++ b/arch/arm64/kernel/sys.c
+@@ -44,7 +44,7 @@ SYSCALL_DEFINE1(arm64_personality, unsigned int, personality)
+ 	if (personality(personality) == PER_LINUX32 &&
+ 		!system_supports_32bit_el0())
+ 		return -EINVAL;
+-	return sys_personality(personality);
++	return ksys_personality(personality);
+ }
+ 
+ /*
 -- 
-Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-Intel Finland Oy
+2.11.0
