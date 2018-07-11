@@ -1,72 +1,33 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 11 Jul 2018 11:46:33 +0200
-Subject: [PATCH 2/2] device core: Add flag to autoremove device link on
- supplier unbind
-In-Reply-To: <1c0f5cb8-4805-4200-406f-0725122b524f@codeaurora.org>
-References: <20180627125056.12851-1-vivek.gautam@codeaurora.org>
- <CAJZ5v0jb2075fcabZDxPpE+7Bo=NpcFm7kEY5QfO-ZbcfGkDyw@mail.gmail.com>
- <1c0f5cb8-4805-4200-406f-0725122b524f@codeaurora.org>
-Message-ID: <1982222.Z9Wz93BAKD@aspire.rjw.lan>
+From: ravi.bangoria@linux.ibm.com (Ravi Bangoria)
+Date: Wed, 11 Jul 2018 15:22:32 +0530
+Subject: [PATCH v5 06/10] Uprobes: Support SDT markers having reference
+ count (semaphore)
+In-Reply-To: <6e3ff60b-267a-d49d-4ebb-c4264f9c034b@linux.ibm.com>
+References: <20180628052209.13056-1-ravi.bangoria@linux.ibm.com>
+ <20180628052209.13056-7-ravi.bangoria@linux.ibm.com>
+ <20180701210935.GA14404@redhat.com>
+ <0c543791-f3b7-5a4b-f002-e1c76bb430c0@linux.ibm.com>
+ <20180702180156.GA31400@redhat.com>
+ <f19e3801-d56a-4e34-0acc-1040a071cf91@linux.ibm.com>
+ <20180703163645.GA23144@redhat.com> <20180703172543.GC23144@redhat.com>
+ <f5a39a88-c21e-4606-a04d-11b5f32016b8@linux.ibm.com>
+ <20180710152527.GA3616@redhat.com>
+ <6e3ff60b-267a-d49d-4ebb-c4264f9c034b@linux.ibm.com>
+Message-ID: <62933fa6-542c-6fc1-354c-51597d5523ef@linux.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, July 5, 2018 6:28:16 AM CEST Vivek Gautam wrote:
+Minor correction:
+
+On 07/11/2018 02:14 PM, Ravi Bangoria wrote:
 > 
-> On 7/5/2018 4:49 AM, Rafael J. Wysocki wrote:
-> > On Wed, Jul 4, 2018 at 8:09 PM, Vivek Gautam
-> > <vivek.gautam@codeaurora.org> wrote:
-> >>
-> >> On 7/4/2018 4:14 PM, Rafael J. Wysocki wrote:
-> >>> On Wednesday, July 4, 2018 9:16:20 AM CEST Vivek Gautam wrote:
-> >>>> Adding Ulf and Marek.
-> >>>>
-> >>>> On 6/27/2018 6:20 PM, Vivek Gautam wrote:
-> >>>>> Add a flag to autoremove the device links on supplier driver
-> >>>>> unbind. This obviates the need to explicitly delete the link
-> >>>>> in the remove path.
-> >>>>> We remove these links only when the supplier's link to its
-> >>>>> consumers has gone to DL_STATE_SUPPLIER_UNBIND state.
-> >>>>>
-> >>>>> Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
-> >>>>> Suggested-by: Lukas Wunner <lukas@wunner.de>
-> >>>>> Cc: Jonathan Corbet <corbet@lwn.net>
-> >>>>> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> >>>>> Cc: Robin Murphy <robin.murphy@arm.com>
-> >>>>> Cc: linux-doc at vger.kernel.org
-> >>>>> Cc: linux-arm-kernel at lists.infradead.org
-> >>>>> Cc: linux-pm at vger.kernel.org
-> >>>>> Cc: linux-arm-msm at vger.kernel.org
-> >>>>> ---
-> >>>> Hi Rafael, et al.
-> >>>>
-> >>>> Gentle ping.
-> >>>> Do you have comments on this series. I would really like to conclude
-> >>>> these
-> >>>> device link additions sooner, and get things moving on the long awaited
-> >>>> arm-smmu clock/runtime support series.
-> >>>>
-> >>>> Thanks again for reviewing these patches.
-> >>> They are fine by me.
-> >>>
-> >>> I can queue them up for 4.19 if no one has objections (Greg in
-> >>> particular).
-> >>
-> >> Hi Rafael,
-> >>
-> >> I will resubmit these 2 patches as part of the arm-smmu series, as one
-> >> of the patch in the series depends on addition of
-> >> DL_FLAG_AUTOREMOVE_SUPPLIER.
-> >> So these 2 patches and arm-smmu series should go together.
-> >> Can you please consider givnig your Ack?
-> > I would prefer to apply them myself to be honest and put them on an
-> > public git branch for you to pull from.
-> 
-> Sure. Fine with me. I will base the smmu patches on your branch.
+> Third options: How about allowing 0 as a special value for reference
+> counter?
 
-The patches have been applied and are available for pulling in the pm-core
-branch of the linux-pm.git tree:
+s/reference counter/reference counter offset/
 
-git://git.kernel.org/pub/scm/linux/kernel/git/rafael/linux-pm.git pm-core
+ I mean allow uprobe_register() and uprobe_register_refctr()
+> in parallel but do not allow two uprobe_register_refctr() with two
+> different reference counter.
 
-Thanks,
-Rafael
+Ditto.
