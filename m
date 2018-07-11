@@ -1,70 +1,40 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 11 Jul 2018 12:13:17 -0600
-Subject: [PATCH] ARM: at91: remove unnecessary of_platform_default_populate
- calls
-In-Reply-To: <20180711161443.GY16084@piout.net>
-References: <20180619214020.18608-1-robh@kernel.org>
- <CAL_JsqLfnSOgOMdaJU3Q4h5_PGnNgd4rx+vKXdFVZnNEo6+JZA@mail.gmail.com>
- <20180711161443.GY16084@piout.net>
-Message-ID: <CAL_JsqKzv4=Vpej3kbjMBkFFOpJE_KQRgYr=Svftd_xs-Bj3-g@mail.gmail.com>
+From: alexandre.belloni@bootlin.com (Alexandre Belloni)
+Date: Wed, 11 Jul 2018 20:32:39 +0200
+Subject: [PATCH] ARM: early_printk: respect keep parameter
+Message-ID: <20180711183239.21023-1-alexandre.belloni@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 11, 2018 at 10:15 AM Alexandre Belloni
-<alexandre.belloni@bootlin.com> wrote:
->
-> Hi,
->
-> On 09/07/2018 09:50:47-0600, Rob Herring wrote:
-> > On Tue, Jun 19, 2018 at 3:40 PM Rob Herring <robh@kernel.org> wrote:
-> > >
-> > > The DT core will call of_platform_default_populate, so it is not
-> > > necessary for machine specific code to call it unless there are custom
-> > > match entries, auxdata or parent device. Neither of those apply here, so
-> > > remove the call.
-> > >
-> > > Cc: Nicolas Ferre <nicolas.ferre@microchip.com>
-> > > Cc: Alexandre Belloni <alexandre.belloni@bootlin.com>
-> > > Cc: linux-arm-kernel at lists.infradead.org
-> > > Signed-off-by: Rob Herring <robh@kernel.org>
-> > > ---
-> > >  arch/arm/mach-at91/at91rm9200.c | 5 -----
-> > >  arch/arm/mach-at91/at91sam9.c   | 5 -----
-> > >  arch/arm/mach-at91/sama5.c      | 5 -----
-> > >  3 files changed, 15 deletions(-)
-> >
-> > Ping?
-> >
->
-> This breaks the platform in two different ways:
->  - PM is not working anymore because of the missing SRAM node
->  - the pinctrl driver fails to probe and so many drivers are
->    deferring the probe forever
->
-> Relevant messages (once the earlycon crap is removed to let earlyprintk
-> do its job):
->
-> at91_pm_sram_init: failed to find sram device!
-> AT91: PM not supported, due to no SRAM allocated
+Parse and use the keep parameter of earlyprintk to avoid having the kernel
+output stop with:
 
-So the at91_pm_sram_init function tries to get SRAM platform device,
-but it doesn't exist yet. Of course, that is fragile because while the
-device may exist, it's just luck that it's driver has probed already.
-Would using .init_late hook instead of .init_machine work for you?
+Console: colour dummy device 80x30
+console [tty0] enabled
+bootconsole [earlycon0] disabled
 
-Ideally, couldn't much of this code be converted to a driver? It's a
-bit strange for initcall code to have a driver dependency.
+This happens because once tty0, the virtual terminal console is registered,
+it is selected as the default console, disregarding an existing stdout-path
+DT property and the early console is shutdown before the console driver is
+probed.
 
->
-> pinctrl-at91 ahb:apb:pinctrl at fc06a000: you need to specify at least one gpio-controller
-> pinctrl-at91: probe of ahb:apb:pinctrl at fc06a000 failed with error -22
+Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
+---
+ arch/arm/kernel/early_printk.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-So this one has the strange dependency that the child nodes probe
-before the parent node. That's backwards. Probe order is probably
-changing from link order (all the devices are created before drivers
-register) to device creation order. I think the fix is the pinctrl
-driver should just count the gpio child nodes rather than relying on
-aliases (which I'm not a fan of either). I can write a patch to do
-that.
-
-Rob
+diff --git a/arch/arm/kernel/early_printk.c b/arch/arm/kernel/early_printk.c
+index 9257736ec9fa..bbb10150b11a 100644
+--- a/arch/arm/kernel/early_printk.c
++++ b/arch/arm/kernel/early_printk.c
+@@ -42,6 +42,9 @@ static struct console early_console_dev = {
+ 
+ static int __init setup_early_printk(char *buf)
+ {
++	if (buf && strstr(buf, "keep"))
++		early_console_dev.flags &= ~CON_BOOT;
++
+ 	early_console = &early_console_dev;
+ 	register_console(&early_console_dev);
+ 	return 0;
+-- 
+2.18.0
