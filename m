@@ -1,38 +1,52 @@
-From: Anson.Huang@nxp.com (Anson Huang)
-Date: Wed, 11 Jul 2018 08:58:59 +0800
-Subject: [PATCH V2 2/2] ARM: dts: imx6sx: add ocram_s support
-In-Reply-To: <1531270739-3075-1-git-send-email-Anson.Huang@nxp.com>
-References: <1531270739-3075-1-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <1531270739-3075-2-git-send-email-Anson.Huang@nxp.com>
+From: yandong77520@gmail.com (Yandong.Zhao)
+Date: Wed, 11 Jul 2018 09:09:59 +0800
+Subject: [PATCH] arm64: neon: Fix function may_use_simd() return error status
+Message-ID: <1531271399-1768-1-git-send-email-yandong77520@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-i.MX6SX has a 16KB always-on ocram bank called
-ocram_s, enable it as another mmio sram.
+From: Yandong Zhao <yandong77520@gmail.com>
 
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+It does not matter if the caller of may_use_simd() migrates to
+another cpu after the call, but it is still important that the
+kernel_neon_busy percpu instance that is read matches the cpu the
+task is running on at the time of the read.
+
+This means that raw_cpu_read() is not sufficient.  kernel_neon_busy
+may appear true if the caller migrates during the execution of
+raw_cpu_read() and the next task to be scheduled in on the initial
+cpu calls kernel_neon_begin().
+
+This patch replaces raw_cpu_read() with this_cpu_read() to protect
+against this race.
+
+Signed-off-by: Yandong Zhao <yandong77520@gmail.com>
 ---
-changes since V1:
-	resort the ocram_s and ocram node by address from low to high.
- arch/arm/boot/dts/imx6sx.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm64/include/asm/simd.h | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
-index 596763c..f4d982c 100644
---- a/arch/arm/boot/dts/imx6sx.dtsi
-+++ b/arch/arm/boot/dts/imx6sx.dtsi
-@@ -166,6 +166,12 @@
- 		interrupt-parent = <&gpc>;
- 		ranges;
+diff --git a/arch/arm64/include/asm/simd.h b/arch/arm64/include/asm/simd.h
+index fa8b3fe..784a8c2 100644
+--- a/arch/arm64/include/asm/simd.h
++++ b/arch/arm64/include/asm/simd.h
+@@ -29,7 +29,8 @@
+ static __must_check inline bool may_use_simd(void)
+ {
+ 	/*
+-	 * The raw_cpu_read() is racy if called with preemption enabled.
++	 * The this_cpu_read() is racy if called with preemption enabled,
++	 * since the task may subsequently migrate to another CPU.
+ 	 * This is not a bug: kernel_neon_busy is only set when
+ 	 * preemption is disabled, so we cannot migrate to another CPU
+ 	 * while it is set, nor can we migrate to a CPU where it is set.
+@@ -42,7 +43,7 @@ static __must_check inline bool may_use_simd(void)
+ 	 * false.
+ 	 */
+ 	return !in_irq() && !irqs_disabled() && !in_nmi() &&
+-		!raw_cpu_read(kernel_neon_busy);
++		!this_cpu_read(kernel_neon_busy);
+ }
  
-+		ocram_s: sram at 8f8000 {
-+			compatible = "mmio-sram";
-+			reg = <0x008f8000 0x4000>;
-+			clocks = <&clks IMX6SX_CLK_OCRAM_S>;
-+		};
-+
- 		ocram: sram at 900000 {
- 			compatible = "mmio-sram";
- 			reg = <0x00900000 0x20000>;
+ #else /* ! CONFIG_KERNEL_MODE_NEON */
 -- 
-2.7.4
+1.9.1
