@@ -1,68 +1,112 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed, 11 Jul 2018 13:40:35 -0600
-Subject: [PATCH 25/25] coresight: tpiu: Fix disabling timeouts
+Date: Wed, 11 Jul 2018 13:40:32 -0600
+Subject: [PATCH 22/25] dts: bindings: Document device tree binding for CATU
 In-Reply-To: <1531338035-11729-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1531338035-11729-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1531338035-11729-26-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1531338035-11729-23-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Robin Murphy <robin.murphy@arm.com>
+From: Suzuki K Poulose <suzuki.poulose@arm.com>
 
-Probing the TPIU driver under UBSan triggers an out-of-bounds shift
-warning in coresight_timeout():
+Document CATU device-tree bindings. CATU augments the TMC-ETR
+by providing an improved Scatter Gather mechanism for streaming
+trace data to non-contiguous system RAM pages.
 
-...
-[    5.677530] UBSAN: Undefined behaviour in drivers/hwtracing/coresight/coresight.c:929:16
-[    5.685542] shift exponent 64 is too large for 64-bit type 'long unsigned int'
-...
-
-On closer inspection things are exponentially out of whack because we're
-passing a bitmask where a bit number should be. Amusingly, it seems that
-both calls will find their expected values by sheer luck and appear to
-succeed: 1 << FFCR_FON_MAN ends up at bit 64 which whilst undefined
-evaluates as zero in practice, while 1 << FFSR_FT_STOPPED finds bit 2
-(TCPresent) which apparently is usually tied high.
-
-Following the examples of other drivers, define separate FOO and FOO_BIT
-macros for masks vs. indices, and put things right.
-
-CC: Robert Walker <robert.walker@arm.com>
-CC: Mike Leach <mike.leach@linaro.org>
-CC: Mathieu Poirier <mathieu.poirier@linaro.org>
-Fixes: 11595db8e17f ("coresight: Fix disabling of CoreSight TPIU")
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+Cc: devicetree at vger.kernel.org
+Cc: frowand.list at gmail.com
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Reviewed-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-tpiu.c | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+ .../devicetree/bindings/arm/coresight.txt          | 53 ++++++++++++++++++++++
+ 1 file changed, 53 insertions(+)
 
-diff --git a/drivers/hwtracing/coresight/coresight-tpiu.c b/drivers/hwtracing/coresight/coresight-tpiu.c
-index 01b7457fe8fc..459ef930d98c 100644
---- a/drivers/hwtracing/coresight/coresight-tpiu.c
-+++ b/drivers/hwtracing/coresight/coresight-tpiu.c
-@@ -40,8 +40,9 @@
+diff --git a/Documentation/devicetree/bindings/arm/coresight.txt b/Documentation/devicetree/bindings/arm/coresight.txt
+index 9aa30a156b57..5d1ad09bafb4 100644
+--- a/Documentation/devicetree/bindings/arm/coresight.txt
++++ b/Documentation/devicetree/bindings/arm/coresight.txt
+@@ -39,6 +39,8 @@ its hardware characteristcs.
  
- /** register definition **/
- /* FFSR - 0x300 */
--#define FFSR_FT_STOPPED		BIT(1)
-+#define FFSR_FT_STOPPED_BIT	1
- /* FFCR - 0x304 */
-+#define FFCR_FON_MAN_BIT	6
- #define FFCR_FON_MAN		BIT(6)
- #define FFCR_STOP_FI		BIT(12)
+ 		- System Trace Macrocell:
+ 			"arm,coresight-stm", "arm,primecell"; [1]
++		- Coresight Address Translation Unit (CATU)
++			"arm,coresight-catu", "arm,primecell";
  
-@@ -86,9 +87,9 @@ static void tpiu_disable_hw(struct tpiu_drvdata *drvdata)
- 	/* Generate manual flush */
- 	writel_relaxed(FFCR_STOP_FI | FFCR_FON_MAN, drvdata->base + TPIU_FFCR);
- 	/* Wait for flush to complete */
--	coresight_timeout(drvdata->base, TPIU_FFCR, FFCR_FON_MAN, 0);
-+	coresight_timeout(drvdata->base, TPIU_FFCR, FFCR_FON_MAN_BIT, 0);
- 	/* Wait for formatter to stop */
--	coresight_timeout(drvdata->base, TPIU_FFSR, FFSR_FT_STOPPED, 1);
-+	coresight_timeout(drvdata->base, TPIU_FFSR, FFSR_FT_STOPPED_BIT, 1);
+ 	* reg: physical base address and length of the register
+ 	  set(s) of the component.
+@@ -90,6 +92,10 @@ its hardware characteristcs.
+ 	* arm,scatter-gather: boolean. Indicates that the TMC-ETR can safely
+ 	  use the SG mode on this system.
  
- 	CS_LOCK(drvdata->base);
- }
++* Optional property for CATU :
++	* interrupts : Exactly one SPI may be listed for reporting the address
++	  error
++
+ Example:
+ 
+ 1. Sinks
+@@ -121,6 +127,35 @@ Example:
+ 		};
+ 	};
+ 
++	etr at 20070000 {
++		compatible = "arm,coresight-tmc", "arm,primecell";
++		reg = <0 0x20070000 0 0x1000>;
++
++		clocks = <&oscclk6a>;
++		clock-names = "apb_pclk";
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			/* input port */
++			port at 0 {
++				reg =  <0>;
++				etr_in_port: endpoint {
++					slave-mode;
++					remote-endpoint = <&replicator2_out_port0>;
++				};
++			};
++
++			/* CATU link represented by output port */
++			port at 1 {
++				reg = <1>;
++				etr_out_port: endpoint {
++					remote-endpoint = <&catu_in_port>;
++				};
++			};
++		};
++	};
++
+ 2. Links
+ 	replicator {
+ 		/* non-configurable replicators don't show up on the
+@@ -250,5 +285,23 @@ Example:
+ 		};
+ 	};
+ 
++5. CATU
++
++	catu at 207e0000 {
++		compatible = "arm,coresight-catu", "arm,primecell";
++		reg = <0 0x207e0000 0 0x1000>;
++
++		clocks = <&oscclk6a>;
++		clock-names = "apb_pclk";
++
++		interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
++		port {
++			catu_in_port: endpoint {
++				slave-mode;
++				remote-endpoint = <&etr_out_port>;
++			};
++		};
++	};
++
+ [1]. There is currently two version of STM: STM32 and STM500.  Both
+ have the same HW interface and as such don't need an explicit binding name.
 -- 
 2.7.4
