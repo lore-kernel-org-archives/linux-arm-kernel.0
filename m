@@ -1,157 +1,85 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 11 Jul 2018 14:41:29 +0100
-Subject: [PATCH v5 4/7] KVM: arm64: Support PUD hugepage in
- stage2_is_exec()
-In-Reply-To: <20180709144124.29164-4-punit.agrawal@arm.com>
-References: <20180709143835.28971-1-punit.agrawal@arm.com>
- <20180709144124.29164-1-punit.agrawal@arm.com>
- <20180709144124.29164-4-punit.agrawal@arm.com>
-Message-ID: <ccf6c6a1-9df7-25a7-67c9-3b323486b3e5@arm.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 11 Jul 2018 21:41:04 +0800
+Subject: [arm:zii 12/20] net/dsa/slave.c:1169:26: sparse: incorrect type in
+ initializer (different argument counts)
+Message-ID: <201807112102.RrVOqWKK%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/07/18 15:41, Punit Agrawal wrote:
-> In preparation for creating PUD hugepages at stage 2, add support for
-> detecting execute permissions on PUD page table entries. Faults due to
-> lack of execute permissions on page table entries is used to perform
-> i-cache invalidation on first execute.
-> 
-> Provide trivial implementations of arm32 helpers to allow sharing of
-> code.
-> 
-> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-> Cc: Christoffer Dall <christoffer.dall@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Russell King <linux@armlinux.org.uk>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
->   arch/arm/include/asm/kvm_mmu.h         |  6 ++++
->   arch/arm64/include/asm/kvm_mmu.h       |  5 +++
->   arch/arm64/include/asm/pgtable-hwdef.h |  2 ++
->   virt/kvm/arm/mmu.c                     | 49 +++++++++++++++++++++++---
->   4 files changed, 57 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-> index c23722f75d5c..d05c8986e495 100644
-> --- a/arch/arm/include/asm/kvm_mmu.h
-> +++ b/arch/arm/include/asm/kvm_mmu.h
-> @@ -96,6 +96,12 @@ static inline bool kvm_s2pud_readonly(pud_t *pud)
->   }
->   
->   
-> +static inline bool kvm_s2pud_exec(pud_t *pud)
-> +{
-> +	BUG();
-> +	return false;
-> +}
-> +
->   static inline void kvm_set_pmd(pmd_t *pmd, pmd_t new_pmd)
->   {
->   	*pmd = new_pmd;
-> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-> index 84051930ddfe..15bc1be8f82f 100644
-> --- a/arch/arm64/include/asm/kvm_mmu.h
-> +++ b/arch/arm64/include/asm/kvm_mmu.h
-> @@ -249,6 +249,11 @@ static inline bool kvm_s2pud_readonly(pud_t *pudp)
->   	return kvm_s2pte_readonly((pte_t *)pudp);
->   }
->   
-> +static inline bool kvm_s2pud_exec(pud_t *pudp)
-> +{
-> +	return !(READ_ONCE(pud_val(*pudp)) & PUD_S2_XN);
-> +}
-> +
->   static inline bool kvm_page_empty(void *ptr)
->   {
->   	struct page *ptr_page = virt_to_page(ptr);
-> diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
-> index fd208eac9f2a..10ae592b78b8 100644
-> --- a/arch/arm64/include/asm/pgtable-hwdef.h
-> +++ b/arch/arm64/include/asm/pgtable-hwdef.h
-> @@ -193,6 +193,8 @@
->   #define PMD_S2_RDWR		(_AT(pmdval_t, 3) << 6)   /* HAP[2:1] */
->   #define PMD_S2_XN		(_AT(pmdval_t, 2) << 53)  /* XN[1:0] */
->   
-> +#define PUD_S2_XN		(_AT(pudval_t, 2) << 53)  /* XN[1:0] */
-> +
->   /*
->    * Memory Attribute override for Stage-2 (MemAttr[3:0])
->    */
-> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-> index ed8f8271c389..e73909a31e02 100644
-> --- a/virt/kvm/arm/mmu.c
-> +++ b/virt/kvm/arm/mmu.c
-> @@ -1038,23 +1038,62 @@ static int stage2_set_pmd_huge(struct kvm *kvm, struct kvm_mmu_memory_cache
->   	return 0;
->   }
->   
-> -static bool stage2_is_exec(struct kvm *kvm, phys_addr_t addr)
-> +/*
-> + * stage2_get_leaf_entry - walk the stage2 VM page tables and return
-> + * true if a valid and present leaf-entry is found. A pointer to the
-> + * leaf-entry is returned in the appropriate level variable - pudpp,
-> + * pmdpp, ptepp.
-> + */
-> +static bool stage2_get_leaf_entry(struct kvm *kvm, phys_addr_t addr,
-> +				  pud_t **pudpp, pmd_t **pmdpp, pte_t **ptepp)
->   {
-> +	pud_t *pudp;
->   	pmd_t *pmdp;
->   	pte_t *ptep;
+tree:   git://git.armlinux.org.uk/~rmk/linux-arm.git zii
+head:   3a7146492a32222691cb4e016448b56095ca107a
+commit: 3af90831f7beab5ef80878c8ac3586d7ef6733b3 [12/20] net: dsa: Plug in PHYLINK support
+reproduce:
+        # apt-get install sparse
+        git checkout 3af90831f7beab5ef80878c8ac3586d7ef6733b3
+        make ARCH=x86_64 allmodconfig
+        make C=1 CF=-D__CHECK_ENDIAN__
 
-nit: As mentioned in the other thread, you may initialize the reference
-pointers to NULL to make sure we start clean and avoid the initialization
-everywhere this is called.
 
->   
-> -	pmdp = stage2_get_pmd(kvm, NULL, addr);
-> +	pudp = stage2_get_pud(kvm, NULL, addr);
-> +	if (!pudp || pud_none(*pudp) || !pud_present(*pudp))
-> +		return false;
-> +
-> +	if (pud_huge(*pudp)) {
-> +		*pudpp = pudp;
-> +		return true;
-> +	}
-> +
-> +	pmdp = stage2_pmd_offset(pudp, addr);
->   	if (!pmdp || pmd_none(*pmdp) || !pmd_present(*pmdp))
->   		return false;
->   
-> -	if (pmd_thp_or_huge(*pmdp))
-> -		return kvm_s2pmd_exec(pmdp);
-> +	if (pmd_thp_or_huge(*pmdp)) {
-> +		*pmdpp = pmdp;
-> +		return true;
-> +	}
->   
->   	ptep = pte_offset_kernel(pmdp, addr);
->   	if (!ptep || pte_none(*ptep) || !pte_present(*ptep))
->   		return false;
->   
-> -	return kvm_s2pte_exec(ptep);
-> +	*ptepp = ptep;
-> +	return true;
-> +}
-> +
-> +static bool stage2_is_exec(struct kvm *kvm, phys_addr_t addr)
-> +{
-> +	pud_t *pudp = NULL;
-> +	pmd_t *pmdp = NULL;
-> +	pte_t *ptep = NULL;
-> +	bool found;
-> +
-> +	found = stage2_get_leaf_entry(kvm, addr, &pudp, &pmdp, &ptep);
-> +	if (!found)
-> +		return false;
-> +
-> +	if (pudp)
-> +		return kvm_s2pud_exec(pudp);
-> +	else if (pmdp)
-> +		return kvm_s2pmd_exec(pmdp);
-> +	else
-> +		return kvm_s2pte_exec(ptep);
->   }
+sparse warnings: (new ones prefixed by >>)
 
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+   net/dsa/slave.c:434:13: sparse: incorrect type in initializer (different address spaces) @@    expected void const [noderef] <asn:3>*__vpp_verify @@    got  const [noderef] <asn:3>*__vpp_verify @@
+   net/dsa/slave.c:434:13:    expected void const [noderef] <asn:3>*__vpp_verify
+   net/dsa/slave.c:434:13:    got struct pcpu_sw_netstats *<noident>
+   net/dsa/slave.c:550:16: sparse: undefined identifier 'phylink_ethtool_get_module_info'
+   net/dsa/slave.c:558:16: sparse: undefined identifier 'phylink_ethtool_get_module_eeprom'
+   net/dsa/slave.c:593:21: sparse: incorrect type in initializer (different address spaces) @@    expected void const [noderef] <asn:3>*__vpp_verify @@    got  const [noderef] <asn:3>*__vpp_verify @@
+   net/dsa/slave.c:593:21:    expected void const [noderef] <asn:3>*__vpp_verify
+   net/dsa/slave.c:593:21:    got struct pcpu_sw_netstats *<noident>
+   net/dsa/slave.c:953:21: sparse: incorrect type in initializer (different address spaces) @@    expected void const [noderef] <asn:3>*__vpp_verify @@    got  const [noderef] <asn:3>*__vpp_verify @@
+   net/dsa/slave.c:953:21:    expected void const [noderef] <asn:3>*__vpp_verify
+   net/dsa/slave.c:953:21:    got struct pcpu_sw_netstats *<noident>
+>> net/dsa/slave.c:1169:26: sparse: incorrect type in initializer (different argument counts) @@    expected void ( *mac_link_down )( ... ) @@    got void ( *mac_link_down )( ... ) @@
+   net/dsa/slave.c:1169:26:    expected void ( *mac_link_down )( ... )
+   net/dsa/slave.c:1169:26:    got void ( *<noident> )( ... )
+>> net/dsa/slave.c:1170:24: sparse: incorrect type in initializer (incompatible argument 3 (different base types)) @@    expected void ( *mac_link_up )( ... ) @@    got void ( *mac_link_up )( ... ) @@
+   net/dsa/slave.c:1170:24:    expected void ( *mac_link_up )( ... )
+   net/dsa/slave.c:1170:24:    got void ( *<noident> )( ... )
+   net/dsa/slave.c:1332:20: sparse: incorrect type in assignment (different address spaces) @@    expected struct pcpu_sw_netstats *stats64 @@    got struct pcpu_sw_nestruct pcpu_sw_netstats *stats64 @@
+   net/dsa/slave.c:1332:20:    expected struct pcpu_sw_netstats *stats64
+   net/dsa/slave.c:1332:20:    got struct pcpu_sw_netstats [noderef] <asn:3>*pcpu_stats
+   net/dsa/slave.c:1365:22: sparse: incorrect type in argument 1 (different address spaces) @@    expected void [noderef] <asn:3>*__pdata @@    got stvoid [noderef] <asn:3>*__pdata @@
+   net/dsa/slave.c:1365:22:    expected void [noderef] <asn:3>*__pdata
+   net/dsa/slave.c:1365:22:    got struct pcpu_sw_netstats *stats64
+   net/dsa/slave.c:1382:22: sparse: incorrect type in argument 1 (different address spaces) @@    expected void [noderef] <asn:3>*__pdata @@    got stvoid [noderef] <asn:3>*__pdata @@
+   net/dsa/slave.c:1382:22:    expected void [noderef] <asn:3>*__pdata
+   net/dsa/slave.c:1382:22:    got struct pcpu_sw_netstats *stats64
+   net/dsa/slave.c:550:47: sparse: call with no type!
+   net/dsa/slave.c:558:49: sparse: call with no type!
+   net/dsa/slave.c: In function 'dsa_slave_get_module_info':
+   net/dsa/slave.c:550:9: error: implicit declaration of function 'phylink_ethtool_get_module_info'; did you mean 'phylink_ethtool_get_pauseparam'? [-Werror=implicit-function-declaration]
+     return phylink_ethtool_get_module_info(dp->pl, modinfo);
+            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            phylink_ethtool_get_pauseparam
+   net/dsa/slave.c: In function 'dsa_slave_get_module_eeprom':
+   net/dsa/slave.c:558:9: error: implicit declaration of function 'phylink_ethtool_get_module_eeprom'; did you mean 'phylink_ethtool_get_pauseparam'? [-Werror=implicit-function-declaration]
+     return phylink_ethtool_get_module_eeprom(dp->pl, ee, buf);
+            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            phylink_ethtool_get_pauseparam
+   net/dsa/slave.c: At top level:
+   net/dsa/slave.c:1169:19: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
+     .mac_link_down = dsa_slave_phylink_mac_link_down,
+                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   net/dsa/slave.c:1169:19: note: (near initialization for 'dsa_slave_phylink_mac_ops.mac_link_down')
+   net/dsa/slave.c:1170:17: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
+     .mac_link_up = dsa_slave_phylink_mac_link_up,
+                    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   net/dsa/slave.c:1170:17: note: (near initialization for 'dsa_slave_phylink_mac_ops.mac_link_up')
+   cc1: some warnings being treated as errors
+
+vim +1169 net/dsa/slave.c
+
+  1163	
+  1164	static const struct phylink_mac_ops dsa_slave_phylink_mac_ops = {
+  1165		.validate = dsa_slave_phylink_validate,
+  1166		.mac_link_state = dsa_slave_phylink_mac_link_state,
+  1167		.mac_config = dsa_slave_phylink_mac_config,
+  1168		.mac_an_restart = dsa_slave_phylink_mac_an_restart,
+> 1169		.mac_link_down = dsa_slave_phylink_mac_link_down,
+> 1170		.mac_link_up = dsa_slave_phylink_mac_link_up,
+  1171	};
+  1172	
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
