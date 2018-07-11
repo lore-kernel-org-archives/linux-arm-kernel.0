@@ -1,41 +1,88 @@
-From: rob.herring@linaro.org (Rob Herring)
-Date: Wed, 11 Jul 2018 08:40:30 -0600
-Subject: [RFC PATCH 0/4] Stop losing firmware-set DMA masks
-In-Reply-To: <cover.1531239284.git.robin.murphy@arm.com>
-References: <cover.1531239284.git.robin.murphy@arm.com>
-Message-ID: <CABGGisxVqLMu3TUpbJGWnUFgzUor-8tdyV8KJeU0YT7y=BHrAQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 11 Jul 2018 16:43:10 +0200
+Subject: [PATCH] [v3] drm/sun4i: fix build failure with
+ CONFIG_DRM_SUN8I_MIXER=m
+Message-ID: <20180711144403.1022829-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 10, 2018 at 12:43 PM Robin Murphy <robin.murphy@arm.com> wrote:
->
-> Whilst the common firmware code invoked by dma_configure() initialises
-> devices' DMA masks according to limitations described by the respective
-> properties ("dma-ranges" for OF and _DMA/IORT for ACPI), the nature of
-> the dma_set_mask() API leads to that information getting lost when
-> well-behaved drivers probe and set a 64-bit mask, since in general
-> there's no way to tell the difference between a firmware-described mask
-> (which should be respected) and whatever default may have come from the
-> bus code (which should be replaced outright). This can break DMA on
-> systems with certain IOMMU topologies (e.g. [1]) where the IOMMU driver
-> only knows its maximum supported address size, not how many of those
-> address bits might actually be wired up between any of its input
-> interfaces and the associated DMA master devices. Similarly, some PCIe
-> root complexes only have a 32-bit native interface on their host bridge,
-> which leads to the same DMA-address-truncation problem in systems with a
-> larger physical memory map and RAM above 4GB (e.g. [2]).
->
-> These patches attempt to deal with this in the simplest way possible by
-> generalising the specific quirk for 32-bit bridges into an arbitrary
-> mask which can then also be plumbed into the firmware code. In the
-> interest of being minimally invasive, I've only included a point fix
-> for the IOMMU issue as seen on arm64 - there may be further tweaks
-> needed in DMA ops to catch all possible incarnations of this problem,
-> but this initial RFC is mostly about the impact beyond the dma-mapping
-> subsystem itself.
+Having DRM_SUN4I built-in but DRM_SUN8I_MIXER as a loadable module results in
+a link error, as we try to access a symbol from the sun8i_tcon_top.ko module:
 
-Couldn't you set and use the device's parent's dma_mask instead. At
-least for DT, we should always have a parent device representing the
-bus. That would avoid further bloating of struct device.
+ERROR: "sun8i_tcon_top_of_table" [drivers/gpu/drm/sun4i/sun8i-drm-hdmi.ko] undefined!
+ERROR: "sun8i_tcon_top_of_table" [drivers/gpu/drm/sun4i/sun4i-drm.ko] undefined!
 
-Rob
+This solves the problem by adding a silent symbol for the tcon_top module,
+building it as a separate module in exactly the cases that we need it,
+but in a way that it is reachable by the other modules.
+
+Fixes: 57e23de02f48 ("drm/sun4i: DW HDMI: Expand algorithm for possible crtcs")
+Fixes: ef0cf6441fbb ("drm/sun4i: Add support for traversing graph with TCON TOP")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+v2: link the tcon top module separately instead of into the mixer
+v3: rebased on top of the latest git://anongit.freedesktop.org/drm/drm-misc for-linux-next
+---
+ drivers/gpu/drm/sun4i/Kconfig         | 7 +++++++
+ drivers/gpu/drm/sun4i/Makefile        | 3 ++-
+ drivers/gpu/drm/sun4i/sun4i_drv.c     | 3 ++-
+ drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c | 3 ++-
+ 4 files changed, 13 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/gpu/drm/sun4i/Kconfig b/drivers/gpu/drm/sun4i/Kconfig
+index 156a865c3e6d..c2c042287c19 100644
+--- a/drivers/gpu/drm/sun4i/Kconfig
++++ b/drivers/gpu/drm/sun4i/Kconfig
+@@ -68,4 +68,11 @@ config DRM_SUN8I_MIXER
+ 	  graphics mixture and feed graphics to TCON, If M is
+ 	  selected the module will be called sun8i-mixer.
+ 
++config DRM_SUN8I_TCON_TOP
++	tristate
++	default DRM_SUN4I if DRM_SUN8I_MIXER!=n
++	help
++	  TCON TOP is responsible for configuring display pipeline for
++	  HTMI, TVE and LCD.
++
+ endif
+diff --git a/drivers/gpu/drm/sun4i/Makefile b/drivers/gpu/drm/sun4i/Makefile
+index cd27d02c94e2..0eb38ac8e86e 100644
+--- a/drivers/gpu/drm/sun4i/Makefile
++++ b/drivers/gpu/drm/sun4i/Makefile
+@@ -39,4 +39,5 @@ endif
+ obj-$(CONFIG_DRM_SUN4I_HDMI)	+= sun4i-drm-hdmi.o
+ obj-$(CONFIG_DRM_SUN6I_DSI)	+= sun6i-dsi.o
+ obj-$(CONFIG_DRM_SUN8I_DW_HDMI)	+= sun8i-drm-hdmi.o
+-obj-$(CONFIG_DRM_SUN8I_MIXER)	+= sun8i-mixer.o sun8i_tcon_top.o
++obj-$(CONFIG_DRM_SUN8I_MIXER)	+= sun8i-mixer.o
++obj-$(CONFIG_DRM_SUN8I_TCON_TOP) += sun8i_tcon_top.o
+diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
+index a15feb807393..03ffbcc98dd0 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_drv.c
++++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
+@@ -216,7 +216,8 @@ static bool sun4i_drv_node_is_tcon_with_ch0(struct device_node *node)
+ 
+ static bool sun4i_drv_node_is_tcon_top(struct device_node *node)
+ {
+-	return !!of_match_node(sun8i_tcon_top_of_table, node);
++	return IS_ENABLED(CONFIG_DRM_SUN8I_TCON_TOP) &&
++		!!of_match_node(sun8i_tcon_top_of_table, node);
+ }
+ 
+ static int compare_of(struct device *dev, void *data)
+diff --git a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
+index 21dc9ebad0b4..e184cb17690b 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
++++ b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
+@@ -44,7 +44,8 @@ sun8i_dw_hdmi_mode_valid(struct drm_connector *connector,
+ 
+ static bool sun8i_dw_hdmi_node_is_tcon_top(struct device_node *node)
+ {
+-	return !!of_match_node(sun8i_tcon_top_of_table, node);
++	return IS_ENABLED(CONFIG_DRM_SUN8I_TCON_TOP) &&
++		!!of_match_node(sun8i_tcon_top_of_table, node);
+ }
+ 
+ static u32 sun8i_dw_hdmi_find_possible_crtcs(struct drm_device *drm,
+-- 
+2.9.0
