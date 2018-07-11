@@ -1,61 +1,50 @@
 From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 11 Jul 2018 11:39:23 -0700
-Subject: [PATCH v6 3/7] dt: qcom: 8996: thermal: Move to DT initialisation
-In-Reply-To: <ee06e59ae84a9b9013480c58bd4678e44d201a42.1531135999.git.amit.kucheria@linaro.org>
+Date: Wed, 11 Jul 2018 11:44:13 -0700
+Subject: [PATCH v6 7/7] arm64: dts: sdm845: Add tsens nodes
+In-Reply-To: <65c39c405076627bd43ec94c211c6998191b9f16.1531136000.git.amit.kucheria@linaro.org>
 References: <cover.1531135999.git.amit.kucheria@linaro.org>
- <ee06e59ae84a9b9013480c58bd4678e44d201a42.1531135999.git.amit.kucheria@linaro.org>
-Message-ID: <CAD=FV=X3B3wKv3jNLM8f9YvdRNkp6CNF1JmE+bMTBnR4CMvyww@mail.gmail.com>
+ <65c39c405076627bd43ec94c211c6998191b9f16.1531136000.git.amit.kucheria@linaro.org>
+Message-ID: <CAD=FV=XpfJyd8hUT45+J=EVY1Bs28Mk7m2TBJy8J=HO63n2_qw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
 On Mon, Jul 9, 2018 at 4:43 AM, Amit Kucheria <amit.kucheria@linaro.org> wrote:
-> We also split up the regmap address space into two, one for the TM
-> registers, the other for the SROT registers. This was required to deal with
-> different address offsets for the TM and SROT registers across different
-> SoC families.
-
-The splitting into two regions is actually optional and that should
-probably be mentioned in the commit message.
-
-
-> Since tsens-common.c/init_common() currently only registers one address
-> space, the order is important (TM before SROT). This is OK since the code
-> doesn't really use the SROT functionality yet.
-
-Nowhere in the commit message does this say you're also adding a 2nd
-block of thermal sensors.  It seems like you should say that
-somewhere.
-
-...and it should also be obvious in ${SUBJECT}.
-
-
+> SDM845 has two tsens blocks, one with 13 sensors and the other with 8
+> sensors. It uses version 2 of the TSENS IP, so use the fallback property to
+> allow more common code.
+>
 > Signed-off-by: Amit Kucheria <amit.kucheria@linaro.org>
 > ---
->  arch/arm64/boot/dts/qcom/msm8996.dtsi | 12 +++++++++++-
->  1 file changed, 11 insertions(+), 1 deletion(-)
+>  arch/arm64/boot/dts/qcom/sdm845.dtsi | 16 ++++++++++++++++
+>  1 file changed, 16 insertions(+)
 >
-> diff --git a/arch/arm64/boot/dts/qcom/msm8996.dtsi b/arch/arm64/boot/dts/qcom/msm8996.dtsi
-> index 8c7f9ca..6c8a857 100644
-> --- a/arch/arm64/boot/dts/qcom/msm8996.dtsi
-> +++ b/arch/arm64/boot/dts/qcom/msm8996.dtsi
-> @@ -461,7 +461,17 @@
+> diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+> index cdaabeb..ba2899c 100644
+> --- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
+> +++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+> @@ -221,6 +221,22 @@
+>                         #interrupt-cells = <2>;
+>                 };
 >
->                 tsens0: thermal-sensor at 4a8000 {
->                         compatible = "qcom,msm8996-tsens";
-> -                       reg = <0x4a8000 0x2000>;
-> +                       reg = <0x4a9000 0x1000>, /* TM */
-> +                             <0x4a8000 0x1000>; /* SROT */
+> +               tsens0: tsens at c263000 {
 
-Note that the unit address is supposed to match the first "reg"
-address, so either these should be reversed or you should update your
-node name.  AKA your node name should be this now:
+As per my comments in the bindings, nit that this should probably be
+"thermal-sensor" not "tsens", AKA:
 
-tsens0: thermal-sensor at 4a9000
+tsens0: thermal-sensor at c263000 {
 
-
+> +                       compatible = "qcom,sdm845-tsens", "qcom,tsens-v2";
+> +                       reg = <0xc263000 0x1ff>, /* TM */
+> +                             <0xc222000 0x1ff>; /* SROT */
 > +                       #qcom,sensors = <13>;
 
-As per my responses to other patches, " #qcom,sensors" is undocumented
-and doesn't appear to be read by the driver.
+As per my comment in the bindings and the code, I'm confused about the
+whole "#qcom,sensors" bit.  It's not documented and doesn't seem
+hooked up in the code either.
+
+...but if people have tested this, perhaps I'm confused.  How can
+things work if num_sensors is 0???
+
+-Doug
