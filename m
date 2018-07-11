@@ -1,69 +1,82 @@
 From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 11 Jul 2018 14:56:25 -0700
-Subject: [PATCH 3/3] arm64: dts: qcom: pm8998: Add thermal zone
-In-Reply-To: <8144dd3c-6138-7f16-ec17-d75e84fcfb34@codeaurora.org>
-References: <20180628210915.160893-1-mka@chromium.org>
- <20180628210915.160893-3-mka@chromium.org>
- <CAD=FV=Wo4wc_QZYr0a2_Ge=B6T4RNJDnOyxAd8r6sT4iZJjCKg@mail.gmail.com>
- <20180629185102.GV129942@google.com>
- <3b5054bb-76e4-a06f-54bb-e6ea7bbbcc69@codeaurora.org>
- <20180629235417.GY129942@google.com>
- <8144dd3c-6138-7f16-ec17-d75e84fcfb34@codeaurora.org>
-Message-ID: <CAD=FV=XqoRajjNcW8RyJfrcXQVDihfjAnAsN+O9g+6qDrLHfJw@mail.gmail.com>
+Date: Wed, 11 Jul 2018 15:00:55 -0700
+Subject: [PATCH v6 7/7] arm64: dts: sdm845: Add tsens nodes
+In-Reply-To: <20180711215129.GT129942@google.com>
+References: <cover.1531135999.git.amit.kucheria@linaro.org>
+ <65c39c405076627bd43ec94c211c6998191b9f16.1531136000.git.amit.kucheria@linaro.org>
+ <CAD=FV=XpfJyd8hUT45+J=EVY1Bs28Mk7m2TBJy8J=HO63n2_qw@mail.gmail.com>
+ <20180711215129.GT129942@google.com>
+Message-ID: <CAD=FV=VCxpaF1t5Q-5Vv+9VH1igWoER59OMJmXZdEj3V6fOZwQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+Hi Matthias,
 
-On Tue, Jul 10, 2018 at 10:45 AM, David Collins <collinsd@codeaurora.org> wrote:
-> Hello Matthias,
->
-> On 06/29/2018 04:54 PM, Matthias Kaehlcke wrote:
->> On Fri, Jun 29, 2018 at 02:29:55PM -0700, David Collins wrote:
-> ...
->>> The PMIC TEMP_ALARM hardware peripheral will perform an automatic partial
->>> PMIC shutdown upon hitting over-temperature stage 2 (125 C).  This turns
->>> off peripherals within the PMIC that are expected to draw significant
->>> current.  The set of peripherals included varies between PMICs.  This
->>> partial shutdown will occur simultaneously with the triggering of an
->>> interrupt to the APPS processor that informs the qcom-spmi-temp-alarm
->>> driver that an over-temperature threshold has been crossed.
->>>
->>> The TEMP_ALARM peripheral will perform an automatic full PMIC shutdown
->>> upon hitting over-temperature stage 3 (145 C).  Software won't receive an
->>> interrupt in this case because all power is cut.
+On Wed, Jul 11, 2018 at 2:51 PM, Matthias Kaehlcke <mka@chromium.org> wrote:
+> On Wed, Jul 11, 2018 at 11:44:13AM -0700, Doug Anderson wrote:
+>> Hi,
 >>
->> This information is very useful, thanks David!
+>> On Mon, Jul 9, 2018 at 4:43 AM, Amit Kucheria <amit.kucheria@linaro.org> wrote:
+>> > SDM845 has two tsens blocks, one with 13 sensors and the other with 8
+>> > sensors. It uses version 2 of the TSENS IP, so use the fallback property to
+>> > allow more common code.
+>> >
+>> > Signed-off-by: Amit Kucheria <amit.kucheria@linaro.org>
+>> > ---
+>> >  arch/arm64/boot/dts/qcom/sdm845.dtsi | 16 ++++++++++++++++
+>> >  1 file changed, 16 insertions(+)
+>> >
+>> > diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+>> > index cdaabeb..ba2899c 100644
+>> > --- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
+>> > +++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+>> > @@ -221,6 +221,22 @@
+>> >                         #interrupt-cells = <2>;
+>> >                 };
+>> >
+>> > +               tsens0: tsens at c263000 {
 >>
->> The (partial) hardware shutdown seems like a good measure of last
->> resort, however I suppose we prefer Linux to initiate a shutdown
->> before losing part of the peripherals (drivers might not be happy
->> about this and probably not revover even when the temperature goes
->> down again) or reach a full PMIC shutdown.
+>> As per my comments in the bindings, nit that this should probably be
+>> "thermal-sensor" not "tsens", AKA:
 >>
->> Please let me know if there are reasons to prefer to go the hardware
->> limits, it's also an option for device makers to overwrite these
->> settings if they want different behavior.
+>> tsens0: thermal-sensor at c263000 {
+>>
+>> > +                       compatible = "qcom,sdm845-tsens", "qcom,tsens-v2";
+>> > +                       reg = <0xc263000 0x1ff>, /* TM */
+>> > +                             <0xc222000 0x1ff>; /* SROT */
+>> > +                       #qcom,sensors = <13>;
+>>
+>> As per my comment in the bindings and the code, I'm confused about the
+>> whole "#qcom,sensors" bit.  It's not documented and doesn't seem
+>> hooked up in the code either.
+>>
+>> ...but if people have tested this, perhaps I'm confused.  How can
+>> things work if num_sensors is 0???
 >
-> Disabling stage 3 automatic full PMIC shutdown at 145 C is definitely a
-> bad idea.  This exists as a last resort in order to save the hardware and
-> ensure end user safety in case of excessive temperature even if software
-> is locked up.
+> The mystery is resolved by:
 >
-> Disabling stage 2 automatic partial PMIC shutdown at 125 C is not
-> recommended as the PMIC is already outside of reasonable operating
-> conditions and needs to take corrective action quickly.  However, doing so
-> may be acceptable if software is taking action to shut down the system
-> immediately upon receiving the stage 2 over-temperature interrupt.
+> commit 6d7c70d1cd6526dc79e3d3b3faae1c40c1681168
+> Author: Bjorn Andersson <bjorn.andersson@linaro.org>
+> Date:   Mon May 7 16:53:39 2018 -0700
+>
+>     thermal: qcom: tsens: Allow number of sensors to come from DT
+>
+>     For platforms that has multiple copies of the TSENS hardware block it's
+>     necessary to be able to specify the number of sensors per block in DeviceTree.
+>
+>     Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+>     Reviewed-by: Amit Kucheria <amit.kucheria@linaro.org>
+>     Reviewed-by: Rob Herring <robh@kernel.org>
+>     Signed-off-by: Eduardo Valentin <edubezval@gmail.com>
+>
+>
+> I bumped into this during testing ;-)
 
-Just to confirm: is it expected that at stage 2 the CPU's on the SoC
-should continue running even with partial PMIC shutdown enabled?  It
-sounded to me like partial PMIC shutdown was supposed to shut down
-high-power rails that were not essential to the task of performing an
-orderly shutdown.
-
-I think Matthias was seeing that when he reached stage 2 and partial
-PMIC shutdown happened that the system was just falling on the floor.
-...maybe we just have things configured incorrectly?
+Ah, now it makes sense to me!  Serves me right for assuming it would
+be in the same series and not checking if it was something that had
+already landed.  Thanks.  Please ignore the parts of my comments
+related to the "#qcom,sensors" property.  I guess Rob must have
+thought that the "#" in the name was fine and he's the one in charge
+not me.
 
 -Doug
