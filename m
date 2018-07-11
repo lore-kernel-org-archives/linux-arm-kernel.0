@@ -1,92 +1,111 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 11 Jul 2018 14:56:51 +0100
-Subject: [PATCHv5 16/21] kernel: add kcompat_sys_{f,}statfs64()
+Date: Wed, 11 Jul 2018 14:56:40 +0100
+Subject: [PATCHv5 05/21] arm64: move sve_user_{enable,
+ disable} to <asm/fpsimd.h>
 In-Reply-To: <20180711135656.20670-1-mark.rutland@arm.com>
 References: <20180711135656.20670-1-mark.rutland@arm.com>
-Message-ID: <20180711135656.20670-17-mark.rutland@arm.com>
+Message-ID: <20180711135656.20670-6-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Using this helper allows us to avoid the in-kernel calls to the
-compat_sys_{f,}statfs64() sycalls, as are necessary for parameter
-mangling in arm64's compat handling.
+In subsequent patches, we'll want to make use of sve_user_enable() and
+sve_user_disable() outside of kernel/fpsimd.c. Let's move these to
+<asm/fpsimd.h> where we can make use of them.
 
-Following the example of ksys_* functions, kcompat_sys_* functions are
-intended to be a drop-in replacement for their compat_sys_*
-counterparts, with the same calling convention.
+To avoid ifdeffery in sequences like:
 
-This is necessary to enable conversion of arm64's syscall handling to
-use pt_regs wrappers.
+if (system_supports_sve() && some_condition)
+	sve_user_disable();
+
+... empty stubs are provided when support for SVE is not enabled. Note
+that system_supports_sve() contains as IS_ENABLED(CONFIG_ARM64_SVE), so
+the sve_user_disable() call should be optimized away entirely when
+CONFIG_ARM64_SVE is not selected.
+
+To ensure that this is the case, the stub definitions contain a
+BUILD_BUG(), as we do for other stubs for which calls should always be
+optimized away when the relevant config option is not selected.
+
+At the same time, the include list of <asm/fpsimd.h> is sorted while
+adding <asm/sysreg.h>.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Reviewed-by: Dominik Brodowski <linux@dominikbrodowski.net>
-Cc: Al Viro <viro@zeniv.linux.org.uk>
-Cc: linux-fsdevel at vger.kernel.org
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Reviewed-by: Dave Martin <dave.martin@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
 ---
- fs/statfs.c            | 14 ++++++++++++--
- include/linux/compat.h | 11 +++++++++++
- 2 files changed, 23 insertions(+), 2 deletions(-)
+ arch/arm64/include/asm/fpsimd.h | 17 ++++++++++++++++-
+ arch/arm64/kernel/fpsimd.c      | 10 ----------
+ 2 files changed, 16 insertions(+), 11 deletions(-)
 
-diff --git a/fs/statfs.c b/fs/statfs.c
-index 5b2a24f0f263..f0216629621d 100644
---- a/fs/statfs.c
-+++ b/fs/statfs.c
-@@ -335,7 +335,7 @@ static int put_compat_statfs64(struct compat_statfs64 __user *ubuf, struct kstat
- 	return 0;
- }
+diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
+index fa92747a49c8..dd1ad3950ef5 100644
+--- a/arch/arm64/include/asm/fpsimd.h
++++ b/arch/arm64/include/asm/fpsimd.h
+@@ -16,13 +16,15 @@
+ #ifndef __ASM_FP_H
+ #define __ASM_FP_H
  
--COMPAT_SYSCALL_DEFINE3(statfs64, const char __user *, pathname, compat_size_t, sz, struct compat_statfs64 __user *, buf)
-+int kcompat_sys_statfs64(const char __user * pathname, compat_size_t sz, struct compat_statfs64 __user * buf)
- {
- 	struct kstatfs tmp;
- 	int error;
-@@ -349,7 +349,12 @@ COMPAT_SYSCALL_DEFINE3(statfs64, const char __user *, pathname, compat_size_t, s
- 	return error;
- }
+-#include <asm/ptrace.h>
+ #include <asm/errno.h>
++#include <asm/ptrace.h>
+ #include <asm/processor.h>
+ #include <asm/sigcontext.h>
++#include <asm/sysreg.h>
  
--COMPAT_SYSCALL_DEFINE3(fstatfs64, unsigned int, fd, compat_size_t, sz, struct compat_statfs64 __user *, buf)
-+COMPAT_SYSCALL_DEFINE3(statfs64, const char __user *, pathname, compat_size_t, sz, struct compat_statfs64 __user *, buf)
+ #ifndef __ASSEMBLY__
+ 
++#include <linux/build_bug.h>
+ #include <linux/cache.h>
+ #include <linux/init.h>
+ #include <linux/stddef.h>
+@@ -102,6 +104,16 @@ extern int sve_set_vector_length(struct task_struct *task,
+ extern int sve_set_current_vl(unsigned long arg);
+ extern int sve_get_current_vl(void);
+ 
++static inline void sve_user_disable(void)
 +{
-+	return kcompat_sys_statfs64(pathname, sz, buf);
++	sysreg_clear_set(cpacr_el1, CPACR_EL1_ZEN_EL0EN, 0);
 +}
 +
-+int kcompat_sys_fstatfs64(unsigned int fd, compat_size_t sz, struct compat_statfs64 __user * buf)
- {
- 	struct kstatfs tmp;
- 	int error;
-@@ -363,6 +368,11 @@ COMPAT_SYSCALL_DEFINE3(fstatfs64, unsigned int, fd, compat_size_t, sz, struct co
- 	return error;
- }
- 
-+COMPAT_SYSCALL_DEFINE3(fstatfs64, unsigned int, fd, compat_size_t, sz, struct compat_statfs64 __user *, buf)
++static inline void sve_user_enable(void)
 +{
-+	return kcompat_sys_fstatfs64(fd, sz, buf);
++	sysreg_clear_set(cpacr_el1, 0, CPACR_EL1_ZEN_EL0EN);
 +}
 +
  /*
-  * This is a copy of sys_ustat, just dealing with a structure layout.
-  * Given how simple this syscall is that apporach is more maintainable
-diff --git a/include/linux/compat.h b/include/linux/compat.h
-index c68acc47da57..43f4ed44c5d5 100644
---- a/include/linux/compat.h
-+++ b/include/linux/compat.h
-@@ -1028,6 +1028,17 @@ static inline struct compat_timeval ns_to_compat_timeval(s64 nsec)
- 	return ctv;
+  * Probing and setup functions.
+  * Calls to these functions must be serialised with one another.
+@@ -128,6 +140,9 @@ static inline int sve_get_current_vl(void)
+ 	return -EINVAL;
  }
  
-+/*
-+ * Kernel code should not call compat syscalls (i.e., compat_sys_xyzyyz())
-+ * directly.  Instead, use one of the functions which work equivalently, such
-+ * as the kcompat_sys_xyzyyz() functions prototyped below.
-+ */
++static inline void sve_user_disable(void) { BUILD_BUG(); }
++static inline void sve_user_enable(void) { BUILD_BUG(); }
 +
-+int kcompat_sys_statfs64(const char __user * pathname, compat_size_t sz,
-+		     struct compat_statfs64 __user * buf);
-+int kcompat_sys_fstatfs64(unsigned int fd, compat_size_t sz,
-+			  struct compat_statfs64 __user * buf);
-+
- #else /* !CONFIG_COMPAT */
+ static inline void sve_init_vq_map(void) { }
+ static inline void sve_update_vq_map(void) { }
+ static inline int sve_verify_vq_map(void) { return 0; }
+diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+index a98a7f96aff1..58c53bc96928 100644
+--- a/arch/arm64/kernel/fpsimd.c
++++ b/arch/arm64/kernel/fpsimd.c
+@@ -159,16 +159,6 @@ static void sve_free(struct task_struct *task)
+ 	__sve_free(task);
+ }
  
- #define is_compat_task() (0)
+-static void sve_user_disable(void)
+-{
+-	sysreg_clear_set(cpacr_el1, CPACR_EL1_ZEN_EL0EN, 0);
+-}
+-
+-static void sve_user_enable(void)
+-{
+-	sysreg_clear_set(cpacr_el1, 0, CPACR_EL1_ZEN_EL0EN);
+-}
+-
+ /*
+  * TIF_SVE controls whether a task can use SVE without trapping while
+  * in userspace, and also the way a task's FPSIMD/SVE state is stored
 -- 
 2.11.0
