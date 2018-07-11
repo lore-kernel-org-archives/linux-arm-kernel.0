@@ -1,47 +1,25 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Wed, 11 Jul 2018 14:29:46 +0200
-Subject: [PATCH v3 1/2] soc: imx: gpc: Disable 6sl display power gating
- for ERR006287
-In-Reply-To: <1cc67fd7d1214f93f7ace6f0c2a46303f79a828e.camel@nxp.com>
-References: <cover.1531310547.git.leonard.crestez@nxp.com>
- <d694bc32feb1c9638485700ba53cd6e51bea495c.1531310547.git.leonard.crestez@nxp.com>
- <1531311392.3163.47.camel@pengutronix.de>
- <1cc67fd7d1214f93f7ace6f0c2a46303f79a828e.camel@nxp.com>
-Message-ID: <1531312186.3163.52.camel@pengutronix.de>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Wed, 11 Jul 2018 20:32:29 +0800
+Subject: [PATCH] ARM: dts: imx: Remove optional 'fsl,sec-era' property
+In-Reply-To: <1530726770-814-1-git-send-email-festevam@gmail.com>
+References: <1530726770-814-1-git-send-email-festevam@gmail.com>
+Message-ID: <20180711123228.GE6959@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, den 11.07.2018, 15:21 +0300 schrieb Leonard Crestez:
-> On Wed, 2018-07-11 at 14:16 +0200, Lucas Stach wrote:
-> > Am Mittwoch, den 11.07.2018, 15:11 +0300 schrieb Leonard Crestez:
-> > > Handle this in the safest possible way by keeping the DISP domain
-> > > always-on.
-> > > 
-> > > Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
-> > 
-> > Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
-> > 
-> > Can you send a follow on patch to switch the i.MX6QP errata
-> > workaround
-> > to use GENPD_FLAG_ALWAYS_ON and remove the -EBUSY stuff in the
-> > power
-> > down path?
+On Wed, Jul 04, 2018 at 02:52:50PM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@nxp.com>
 > 
-> Sure.
+> Since commit 654f2b937b38 ("crypto: caam - allow retrieving 'era' from
+> register") the CAAM driver is capable of obtaining the era version by
+> reading the appropriate CAAM registers, so let the CAAM driver discover
+> the era version in run-time instead of hardcoding such information in the
+> device tree.
 > 
-> I was thinking of converting it to a new GENPD_FLAG which allows
-> power_off in suspend (as suggested by Ulf) but switching to
-> GENPD_FLAG_ALWAYS_ON in order to simplify the code could be done
-> first.
+> According to Documentation/devicetree/bindings/crypto/fsl-sec4.txt the
+> 'fsl,sec-era' is an optional property and this can be safely removed
+> now.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 
-Sure, if you are going to work on this I'm fine with converting it over
-to this without first going for GENPD_FLAG_ALWAYS_ON. Just wanted to
-make sure that things are consistent.
-
-> The -EBUSY stuff is not very harmful.
-
-It's dead code once the appropriate flags have been added to the
-domain, so should be removed.
-
-Regards,
-Lucas
+Applied, thanks.
