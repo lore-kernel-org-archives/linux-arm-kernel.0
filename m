@@ -1,57 +1,22 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 11 Jul 2018 14:56:48 +0100
-Subject: [PATCHv5 13/21] arm64: zero GPRs upon entry from EL0
-In-Reply-To: <20180711135656.20670-1-mark.rutland@arm.com>
-References: <20180711135656.20670-1-mark.rutland@arm.com>
-Message-ID: <20180711135656.20670-14-mark.rutland@arm.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 11 Jul 2018 21:55:31 +0800
+Subject: [linux-sunxi] [PATCH v3] drm/sun4i: mixer: Read id from DT
+In-Reply-To: <20180711112706.30222-1-jernej.skrabec@siol.net>
+References: <20180711112706.30222-1-jernej.skrabec@siol.net>
+Message-ID: <CAGb2v67ShNTqYAKXRWwhKxzcyVw512bVmNrr-Kv-oDdVq+=yEQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We can zero GPRs x0 - x29 upon entry from EL0 to make it harder for
-userspace to control values consumed by speculative gadgets.
+On Wed, Jul 11, 2018 at 7:27 PM, Jernej Skrabec <jernej.skrabec@siol.net> wrote:
+> Currently, TCON supports 2 ways to match TCON with engine (mixer in this
+> case). Old way is to just traverse of graph backwards and compare node
+> pointer. New way is to match TCON and engine by their respective ids.
+> All SoCs with DE2 enabled till now used the old way, which means mixer
+> id was never used and thus never implemented.
+>
+> However, for R40, only the new way will be used. To prepare for that,
+> implement mixer id fetching from DT.
+>
+> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 
-We don't blat x30, since this is stashed much later, and we'll blat it
-before invoking C code.
-
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/kernel/entry.S | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 22b240da949b..d1440f84668b 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -53,6 +53,12 @@
- #endif
- 	.endm
- 
-+	.macro	clear_gp_regs
-+	.irp	n,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29
-+	mov	x\n, xzr
-+	.endr
-+	.endm
-+
- /*
-  * Bad Abort numbers
-  *-----------------
-@@ -169,6 +175,7 @@ alternative_cb_end
- 	stp	x28, x29, [sp, #16 * 14]
- 
- 	.if	\el == 0
-+	clear_gp_regs
- 	mrs	x21, sp_el0
- 	ldr_this_cpu	tsk, __entry_task, x20	// Ensure MDSCR_EL1.SS is clear,
- 	ldr	x19, [tsk, #TSK_TI_FLAGS]	// since we can unmask debug
-@@ -176,7 +183,6 @@ alternative_cb_end
- 
- 	apply_ssbd 1, x22, x23
- 
--	mov	x29, xzr			// fp pointed to user-space
- 	.else
- 	add	x21, sp, #S_FRAME_SIZE
- 	get_thread_info tsk
--- 
-2.11.0
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
