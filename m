@@ -1,12 +1,91 @@
 From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Wed, 11 Jul 2018 13:00:34 +0200
-Subject: [PATCH 0/3] arm: covert a few locks to raw_spin_lock_t
-Message-ID: <20180711110037.12928-1-bigeasy@linutronix.de>
+Date: Wed, 11 Jul 2018 13:00:37 +0200
+Subject: [PATCH 3/3] arm: use a raw_spin_lock in unwind
+In-Reply-To: <20180711110037.12928-1-bigeasy@linutronix.de>
+References: <20180711110037.12928-1-bigeasy@linutronix.de>
+Message-ID: <20180711110037.12928-4-bigeasy@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a repost. The only change since the last post happend in 1/3
-were I added two additional boot_lock user.
-This raw_spin_lock_t changes were identified under PREEMP_RT.
+Mostly unwind is done with irqs enabled however SLUB may call it with
+irqs disabled while creating a new SLUB cache.
 
-Sebastian
+I had system freeze while loading a module which called
+kmem_cache_create() on init. That means SLUB's __slab_alloc() disabled
+interrupts and then
+
+->new_slab_objects()
+ ->new_slab()
+  ->setup_object()
+   ->setup_object_debug()
+    ->init_tracking()
+     ->set_track()
+      ->save_stack_trace()
+       ->save_stack_trace_tsk()
+        ->walk_stackframe()
+         ->unwind_frame()
+          ->unwind_find_idx()
+           =>spin_lock_irqsave(&unwind_lock);
+
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+---
+ arch/arm/kernel/unwind.c | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
+
+diff --git a/arch/arm/kernel/unwind.c b/arch/arm/kernel/unwind.c
+index 0bee233fef9a..314cfb232a63 100644
+--- a/arch/arm/kernel/unwind.c
++++ b/arch/arm/kernel/unwind.c
+@@ -93,7 +93,7 @@ extern const struct unwind_idx __start_unwind_idx[];
+ static const struct unwind_idx *__origin_unwind_idx;
+ extern const struct unwind_idx __stop_unwind_idx[];
+ 
+-static DEFINE_SPINLOCK(unwind_lock);
++static DEFINE_RAW_SPINLOCK(unwind_lock);
+ static LIST_HEAD(unwind_tables);
+ 
+ /* Convert a prel31 symbol to an absolute address */
+@@ -201,7 +201,7 @@ static const struct unwind_idx *unwind_find_idx(unsigned long addr)
+ 		/* module unwind tables */
+ 		struct unwind_table *table;
+ 
+-		spin_lock_irqsave(&unwind_lock, flags);
++		raw_spin_lock_irqsave(&unwind_lock, flags);
+ 		list_for_each_entry(table, &unwind_tables, list) {
+ 			if (addr >= table->begin_addr &&
+ 			    addr < table->end_addr) {
+@@ -213,7 +213,7 @@ static const struct unwind_idx *unwind_find_idx(unsigned long addr)
+ 				break;
+ 			}
+ 		}
+-		spin_unlock_irqrestore(&unwind_lock, flags);
++		raw_spin_unlock_irqrestore(&unwind_lock, flags);
+ 	}
+ 
+ 	pr_debug("%s: idx = %p\n", __func__, idx);
+@@ -529,9 +529,9 @@ struct unwind_table *unwind_table_add(unsigned long start, unsigned long size,
+ 	tab->begin_addr = text_addr;
+ 	tab->end_addr = text_addr + text_size;
+ 
+-	spin_lock_irqsave(&unwind_lock, flags);
++	raw_spin_lock_irqsave(&unwind_lock, flags);
+ 	list_add_tail(&tab->list, &unwind_tables);
+-	spin_unlock_irqrestore(&unwind_lock, flags);
++	raw_spin_unlock_irqrestore(&unwind_lock, flags);
+ 
+ 	return tab;
+ }
+@@ -543,9 +543,9 @@ void unwind_table_del(struct unwind_table *tab)
+ 	if (!tab)
+ 		return;
+ 
+-	spin_lock_irqsave(&unwind_lock, flags);
++	raw_spin_lock_irqsave(&unwind_lock, flags);
+ 	list_del(&tab->list);
+-	spin_unlock_irqrestore(&unwind_lock, flags);
++	raw_spin_unlock_irqrestore(&unwind_lock, flags);
+ 
+ 	kfree(tab);
+ }
+-- 
+2.18.0
