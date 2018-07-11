@@ -1,45 +1,47 @@
-From: jian.hu@amlogic.com (Jian Hu)
-Date: Wed, 11 Jul 2018 21:04:53 +0800
-Subject: [PATCH 1/3] dt-bindings: clk: g12a: New binding for Meson-G12A SoC
-In-Reply-To: <1531214976.2708.52.camel@baylibre.com>
-References: <1531134767-29927-1-git-send-email-jian.hu@amlogic.com>
- <1531134767-29927-2-git-send-email-jian.hu@amlogic.com>
- <1531214976.2708.52.camel@baylibre.com>
-Message-ID: <f6f387ff-271b-9b4b-5b6e-072b4e56d840@amlogic.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Wed, 11 Jul 2018 14:03:02 +0100
+Subject: [PATCH v5 3/7] KVM: arm64: Support dirty page tracking for PUD
+ hugepages
+In-Reply-To: <20180709144124.29164-3-punit.agrawal@arm.com>
+References: <20180709143835.28971-1-punit.agrawal@arm.com>
+ <20180709144124.29164-1-punit.agrawal@arm.com>
+ <20180709144124.29164-3-punit.agrawal@arm.com>
+Message-ID: <dd3ab2b5-a0c3-3847-a048-94bc6de481ff@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 09/07/18 15:41, Punit Agrawal wrote:
+> In preparation for creating PUD hugepages at stage 2, add support for
+> write protecting PUD hugepages when they are encountered. Write
+> protecting guest tables is used to track dirty pages when migrating
+> VMs.
+> 
+> Also, provide trivial implementations of required kvm_s2pud_* helpers
+> to allow sharing of code with arm32.
+> 
+> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+> Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Russell King <linux@armlinux.org.uk>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>   arch/arm/include/asm/kvm_mmu.h   | 16 ++++++++++++++++
+>   arch/arm64/include/asm/kvm_mmu.h | 10 ++++++++++
+>   virt/kvm/arm/mmu.c               | 11 +++++++----
+>   3 files changed, 33 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+> index d095c2d0b284..c23722f75d5c 100644
+> --- a/arch/arm/include/asm/kvm_mmu.h
+> +++ b/arch/arm/include/asm/kvm_mmu.h
+> @@ -80,6 +80,22 @@ void kvm_clear_hyp_idmap(void);
+>   
+>   #define kvm_pmd_mkhuge(pmd)	pmd_mkhuge(pmd)
+>   
+> +/*
+> + * The following kvm_*pud*() functionas are provided strictly to allow
 
+nit: s/functionas/functions/
 
-On 2018/7/10 17:29, Jerome Brunet wrote:
-> On Mon, 2018-07-09 at 19:12 +0800, Jian Hu wrote:
->> Add new binding for Meson-G12A SoC Everything-Else part
-> 
-> nitpick: I would prefer if the words 'clock' and 'controller' was somewhere in
-> the description.
-> 
-> Maybe "add new clock controller compatible for the EE domain of the g12a SoC" ?
-
-Patch 1 and 2 have squashed, the commit message focuse which one?
-> 
->>
->> Signed-off-by: Jian Hu <jian.hu@amlogic.com>
->> ---
->>   Documentation/devicetree/bindings/clock/amlogic,gxbb-clkc.txt | 1 +
->>   1 file changed, 1 insertion(+)
->>
->> diff --git a/Documentation/devicetree/bindings/clock/amlogic,gxbb-clkc.txt b/Documentation/devicetree/bindings/clock/amlogic,gxbb-clkc.txt
->> index e950599..0833006 100644
->> --- a/Documentation/devicetree/bindings/clock/amlogic,gxbb-clkc.txt
->> +++ b/Documentation/devicetree/bindings/clock/amlogic,gxbb-clkc.txt
->> @@ -9,6 +9,7 @@ Required Properties:
->>   		"amlogic,gxbb-clkc" for GXBB SoC,
->>   		"amlogic,gxl-clkc" for GXL and GXM SoC,
->>   		"amlogic,axg-clkc" for AXG SoC.
->> +		"amlogic,g12a-clkc" for G12A SoC.
->>   
->>   - #clock-cells: should be 1.
->>   
-> 
-> .
-> 
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
