@@ -1,78 +1,155 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 11 Jul 2018 11:41:04 +0200
-Subject: [PATCH v4 6/6] PM / Domains: Stop deferring probe at the end of
- initcall
-In-Reply-To: <CAL_Jsq+dcwZHKFGy+BGOyV+Yyz0qgmeq8zoT=DkB+c+DsXdApQ@mail.gmail.com>
-References: <20180709154153.15742-1-robh@kernel.org>
- <20180709154153.15742-7-robh@kernel.org>
- <CAPDyKFoN1=16dGKmkFp6Khgs5zx+BguOs3qOcm+rAZw=b38JVg@mail.gmail.com>
- <CAL_Jsq+dcwZHKFGy+BGOyV+Yyz0qgmeq8zoT=DkB+c+DsXdApQ@mail.gmail.com>
-Message-ID: <CAPDyKFp7qNe6Yp62GyRcfc2TBxqqexMxqQkZ-Hc3YFoy-_7ZLw@mail.gmail.com>
+From: ludovic.barre@st.com (Ludovic BARRE)
+Date: Wed, 11 Jul 2018 11:41:06 +0200
+Subject: [PATCH 01/19] mmc: mmci: regroup and define dma operations
+In-Reply-To: <CAPDyKFpt5HUeUqaoS9icDodM+r64jB9vQ=zTecO0tuBv=TtOXg@mail.gmail.com>
+References: <1528809280-31116-1-git-send-email-ludovic.Barre@st.com>
+ <1528809280-31116-2-git-send-email-ludovic.Barre@st.com>
+ <CAPDyKFpt5HUeUqaoS9icDodM+r64jB9vQ=zTecO0tuBv=TtOXg@mail.gmail.com>
+Message-ID: <d93e6886-1dee-7915-459f-466a54d0c242@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 July 2018 at 16:25, Rob Herring <robh@kernel.org> wrote:
-> On Mon, Jul 9, 2018 at 4:49 PM Ulf Hansson <ulf.hansson@linaro.org> wrote:
+
+
+On 07/05/2018 05:17 PM, Ulf Hansson wrote:
+> On 12 June 2018 at 15:14, Ludovic Barre <ludovic.Barre@st.com> wrote:
+>> From: Ludovic Barre <ludovic.barre@st.com>
 >>
->> On 9 July 2018 at 17:41, Rob Herring <robh@kernel.org> wrote:
->> > All PM domain drivers must be built-in (at least those using DT), so
->> > there is no point deferring probe after initcalls are done. Continuing
->> > to defer probe may prevent booting successfully even if managing PM
->> > domains is not required. This can happen if the user failed to enable
->> > the driver or if power-domains are added to a platform's DT, but there
->> > is not yet a driver (e.g. a new DTB with an old kernel).
->> >
->> > Call the driver core function driver_deferred_probe_check_init_done()
->> > instead of just returning -EPROBE_DEFER to stop deferring probe when
->> > initcalls are done.
->> >
->> > Acked-by: "Rafael J. Wysocki" <rjw@rjwysocki.net>
->> > Cc: Kevin Hilman <khilman@kernel.org>
->> > Cc: Ulf Hansson <ulf.hansson@linaro.org>
->> > Cc: Pavel Machek <pavel@ucw.cz>
->> > Cc: Len Brown <len.brown@intel.com>
->> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
->> > Cc: linux-pm at vger.kernel.org
->> > Signed-off-by: Rob Herring <robh@kernel.org>
->> > ---
->> > v4:
->> >  - Add Rafael's ack
->> >
->> > v3:
->> >   - Update to new function name
->> >
->> >  drivers/base/power/domain.c | 2 +-
->> >  1 file changed, 1 insertion(+), 1 deletion(-)
->> >
->> > diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
->> > index 4925af5c4cf0..8c12213875c6 100644
->> > --- a/drivers/base/power/domain.c
->> > +++ b/drivers/base/power/domain.c
->> > @@ -2253,7 +2253,7 @@ static int __genpd_dev_pm_attach(struct device *dev, struct device_node *np,
->> >                 mutex_unlock(&gpd_list_lock);
->> >                 dev_dbg(dev, "%s() failed to find PM domain: %ld\n",
->> >                         __func__, PTR_ERR(pd));
->> > -               return -EPROBE_DEFER;
->> > +               return driver_deferred_probe_check_state(dev);
->> >         }
->>
->> This isn't the only error path where -EPROBE_DEFER may be returned
->> during attach in genpd.
->
-> Yes, but I think this is the only place you can fail to get the PD
-> device from DT. The case we care about is properties exist in the DT,
-> but no driver exists.
+>> Prepare mmci driver to manage dma interface by new property.
+>> This patch defines and regroups dma operations for mmci drivers.
+>> mmci_dma_XX prototypes are added to call member of mmci_dma_ops
+>> if not null. Based on legacy need, a mmci dma interface has been
+>> defined with:
+>> -mmci_dma_setup
+>> -mmci_dma_release
+>> -mmci_dma_pre_req
+>> -mmci_dma_start
+>> -mmci_dma_finalize
+>> -mmci_dma_post_req
+>> -mmci_dma_error
+>> -mmci_dma_get_next_data
+> 
+> As I suggested for one of the other patches, I would rather turn core
+> mmci functions into library functions, which can be either invoked
+> from variant callbacks or assigned directly to them.
+> 
+> In other words, I would leave the functions that you move in this
+> patch to stay in mmci.c. Although some needs to be re-factored and we
+> also needs to make some of them available to be called from another
+> file, hence the functions needs to be shared via mmci.h rather than
+> being declared static.
 
-That's correct. Thanks for clarifying!
+In previous exchange mail "STM32MP1 SDMMC driver review"
+we are said:
 
->
-> What would cause deferring in the latter cases?
+ >>> -dma variant ? should fit in Qualcomm implementation, reuse (rename)
+ >>> mmci_qcom_dml.c file and integrate ST dma in.
+ >>
+ >> stm32 sdmmc has an internal dma, no need to use dmaengine API;
+ >> So some modifications in mmci (pre/post request, mmci_dma_xx). perhaps
+ >> should be done with an ops or not.
+ >
+ >Yes.
+ >
+ >The Qualcomm variant is also using an internal DMA, hence I thought
+ >there may be something we could re-use, or at least have some new
+ >common ops for.
 
-To power on the PM domain for example, which often is required to be
-able to probe the device.
+It's not crystal clear for me.
+Do you always agree with a dma ops which allow to address different
+DMA transfer:
+-with dmaengine API
+-sdmmc idma, without dmaengine API
+-...
 
->
-> Rob
+> 
+> Let me take a concrete example on how I would move forward, hopefully
+> that explains it a bit better. Please see below.
+> 
+> [...]
+> 
+>> -/*
+>> - * All the DMA operation mode stuff goes inside this ifdef.
+>> - * This assumes that you have a generic DMA device interface,
+>> - * no custom DMA interfaces are supported.
+>> - */
+>> -#ifdef CONFIG_DMA_ENGINE
+>> -static void mmci_dma_setup(struct mmci_host *host)
+>> -{
+>> -       const char *rxname, *txname;
+>> -       struct variant_data *variant = host->variant;
+>> -
+>> -       host->dma_rx_channel = dma_request_slave_channel(mmc_dev(host->mmc), "rx");
+>> -       host->dma_tx_channel = dma_request_slave_channel(mmc_dev(host->mmc), "tx");
+>> -
+>> -       /* initialize pre request cookie */
+>> -       host->next_data.cookie = 1;
+>> -
+>> -       /*
+>> -        * If only an RX channel is specified, the driver will
+>> -        * attempt to use it bidirectionally, however if it is
+>> -        * is specified but cannot be located, DMA will be disabled.
+>> -        */
+>> -       if (host->dma_rx_channel && !host->dma_tx_channel)
+>> -               host->dma_tx_channel = host->dma_rx_channel;
+>> -
+>> -       if (host->dma_rx_channel)
+>> -               rxname = dma_chan_name(host->dma_rx_channel);
+>> -       else
+>> -               rxname = "none";
+>> -
+>> -       if (host->dma_tx_channel)
+>> -               txname = dma_chan_name(host->dma_tx_channel);
+>> -       else
+>> -               txname = "none";
+>> -
+>> -       dev_info(mmc_dev(host->mmc), "DMA channels RX %s, TX %s\n",
+>> -                rxname, txname);
+>> -
+>> -       /*
+>> -        * Limit the maximum segment size in any SG entry according to
+>> -        * the parameters of the DMA engine device.
+>> -        */
+>> -       if (host->dma_tx_channel) {
+>> -               struct device *dev = host->dma_tx_channel->device->dev;
+>> -               unsigned int max_seg_size = dma_get_max_seg_size(dev);
+>> -
+>> -               if (max_seg_size < host->mmc->max_seg_size)
+>> -                       host->mmc->max_seg_size = max_seg_size;
+>> -       }
+>> -       if (host->dma_rx_channel) {
+>> -               struct device *dev = host->dma_rx_channel->device->dev;
+>> -               unsigned int max_seg_size = dma_get_max_seg_size(dev);
+>> -
+>> -               if (max_seg_size < host->mmc->max_seg_size)
+>> -                       host->mmc->max_seg_size = max_seg_size;
+>> -       }
+> 
+> Everything above shall be left as generic library function,
+> mmci_dma_setup() and I would share it via mmci.h and thus change it
+> from being static.
+> 
 
-Kind regards
-Uffe
+each interfaces mmci_dma_XXX have very different needs depending
+dma_ops (legacy, sdmmc idma)
+
+>> -
+>> -       if (variant->qcom_dml && host->dma_rx_channel && host->dma_tx_channel)
+>> -               if (dml_hw_init(host, host->mmc->parent->of_node))
+>> -                       variant->qcom_dml = false;
+> 
+> This piece of code, should be made specific to the qcom variant and
+> managed though a "mmci_host_ops" callback. The corresponding code in
+> that callback would then start by invoking mmci_dma_setup(), before it
+> continues with the qcom specific operations.
+> 
+> For legacy variants, the corresponding callback would be set directly
+> to mmci_dma_setup() and called through the callback from mmci.c when
+> needed. There is no need to have a separate file for DMA for the
+> legacy variants, I think.
+> 
+> [...]
+> 
+> Kind regards
+> Uffe
+> 
