@@ -1,51 +1,58 @@
 From: leo.yan@linaro.org (Leo Yan)
-Date: Wed, 11 Jul 2018 15:45:44 +0800
-Subject: [PATCH v2 5/6] perf cs-etm: Generate branch sample when receiving a
+Date: Wed, 11 Jul 2018 15:45:45 +0800
+Subject: [PATCH v2 6/6] perf cs-etm: Generate branch sample for
  CS_ETM_TRACE_ON packet
 In-Reply-To: <1531295145-596-1-git-send-email-leo.yan@linaro.org>
 References: <1531295145-596-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <1531295145-596-6-git-send-email-leo.yan@linaro.org>
+Message-ID: <1531295145-596-7-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If one CS_ETM_TRACE_ON packet is inserted, we miss to generate branch
-sample for the previous CS_ETM_RANGE packet.
-
-This patch is to generate branch sample when receiving a CS_ETM_TRACE_ON
-packet, so this can save complete info for the previous CS_ETM_RANGE
-packet just before CS_ETM_TRACE_ON packet.
+CS_ETM_TRACE_ON packet itself can give the info that there have a
+discontinuity in the trace, this patch is to add branch sample for
+CS_ETM_TRACE_ON packet if it is inserted in the middle of CS_ETM_RANGE
+packets; as result we can have hint for the trace discontinuity.
 
 Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 Signed-off-by: Leo Yan <leo.yan@linaro.org>
 ---
- tools/perf/util/cs-etm.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ tools/perf/util/cs-etm.c | 24 +++++++++++++++++-------
+ 1 file changed, 17 insertions(+), 7 deletions(-)
 
 diff --git a/tools/perf/util/cs-etm.c b/tools/perf/util/cs-etm.c
-index 976db84..d3b7942 100644
+index d3b7942..2ae6402 100644
 --- a/tools/perf/util/cs-etm.c
 +++ b/tools/perf/util/cs-etm.c
-@@ -935,6 +935,7 @@ static int cs_etm__sample(struct cs_etm_queue *etmq)
- static int cs_etm__flush(struct cs_etm_queue *etmq)
- {
- 	int err = 0;
-+	struct cs_etm_auxtrace *etm = etmq->etm;
- 	struct cs_etm_packet *tmp;
- 
- 	if (!etmq->prev_packet)
-@@ -965,6 +966,13 @@ static int cs_etm__flush(struct cs_etm_queue *etmq)
- 
+@@ -910,13 +910,23 @@ static int cs_etm__sample(struct cs_etm_queue *etmq)
+ 		etmq->period_instructions = instrs_over;
  	}
  
-+	if (etm->sample_branches &&
-+	    etmq->prev_packet->sample_type == CS_ETM_RANGE) {
-+		err = cs_etm__synth_branch_sample(etmq);
-+		if (err)
-+			return err;
-+	}
+-	if (etm->sample_branches &&
+-	    etmq->prev_packet &&
+-	    etmq->prev_packet->sample_type == CS_ETM_RANGE &&
+-	    etmq->prev_packet->last_instr_taken_branch) {
+-		ret = cs_etm__synth_branch_sample(etmq);
+-		if (ret)
+-			return ret;
++	if (etm->sample_branches && etmq->prev_packet) {
++		bool generate_sample = false;
 +
- swap_packet:
- 	if (etmq->etm->synth_opts.last_branch) {
- 		/*
++		/* Generate sample for tracing on packet */
++		if (etmq->prev_packet->sample_type == CS_ETM_TRACE_ON)
++			generate_sample = true;
++
++		/* Generate sample for branch taken packet */
++		if (etmq->prev_packet->sample_type == CS_ETM_RANGE &&
++		    etmq->prev_packet->last_instr_taken_branch)
++			generate_sample = true;
++
++		if (generate_sample) {
++			ret = cs_etm__synth_branch_sample(etmq);
++			if (ret)
++				return ret;
++		}
+ 	}
+ 
+ 	if (etm->sample_branches || etm->synth_opts.last_branch) {
 -- 
 2.7.4
