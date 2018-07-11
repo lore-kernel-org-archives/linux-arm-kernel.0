@@ -1,38 +1,53 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 11 Jul 2018 08:45:11 +0100
-Subject: [PATCH v7 1/4] arm/arm64: KVM: Add KVM_GET/SET_VCPU_EVENTS
-In-Reply-To: <b0eb95f3-7905-8aab-f816-529c17f07e04@huawei.com>
-References: <20180710164952.23736-1-james.morse@arm.com>
- <20180710164952.23736-2-james.morse@arm.com>
- <b0eb95f3-7905-8aab-f816-529c17f07e04@huawei.com>
-Message-ID: <1cbb0f3f-1bc4-5205-d28c-1843d09a702e@arm.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Wed, 11 Jul 2018 15:45:39 +0800
+Subject: [PATCH v2 0/6] perf cs-etm: Fix tracing packet handling and minor
+ refactoring
+Message-ID: <1531295145-596-1-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/07/18 07:48, gengdongjiu wrote:
-> Hi, James,
-> 
-> [...]
->> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
->> index d10944e619d3..e3940f8715a5 100644
->> --- a/Documentation/virtual/kvm/api.txt
->> +++ b/Documentation/virtual/kvm/api.txt
->> @@ -835,11 +835,13 @@ struct kvm_clock_data {
->>  
->>  Capability: KVM_CAP_VCPU_EVENTS
->>  Extended by: KVM_CAP_INTR_SHADOW
->> -Architectures: x86
->> -Type: vm ioctl
->> +Architectures: x86, arm64
-> 
->    In my previous patch, I only add the arm64 support, now you add patches to support arm32 platform,
->    so you can add "ARM" to the Architectures, for example: "Architectures: x86, ARM, arm64"
+Due the current code is missing to handle cs-etm start tracing packet
+and CS_ETM_TRACE_ON packet, we fail to generate branch sample for them.
 
-That should be the job of the last patch, shouldn't it? At this point in
-the series, there is no 32bit support whatsoever.
+This patch series is to fix cs-etm tracing packet handling:
 
-Thanks,
+Patch 0001 is to add invalid address macro for readable coding;
 
-	M.
+Patch 0002 is one minor fixing to return error code for instruction
+sample failure;
+
+Patches 0003~0006 are fixing patches for start tracing packet
+and CS_ETM_TRACE_ON packet.
+
+This patch series is applied to Linus tree on 4.18-rc4 with latest
+commit: 1e09177acae3 ("Merge tag 'mips_fixes_4.18_3' of
+git://git.kernel.org/pub/scm/linux/kernel/git/mips/linux").
+
+This patch series has been verified on Hikey620 platform with below two
+commands:
+perf script --itrace=i10000il128 -F cpu,event,ip,addr,sym -k ./vmlinux
+perf script -F cpu,event,ip,addr,sym -k ./vmlinux
+
+[1] https://git.kernel.org/pub/scm/linux/kernel/git/acme/linux.git
+
+Changes from v1:
+* Rebased on Linus mainline kernel 4.18-rc4;
+* Added Mathieu 'reviewed' tags in patches.
+
+
+Leo Yan (6):
+  perf cs-etm: Introduce invalid address macro
+  perf cs-etm: Bail out immediately for instruction sample failure
+  perf cs-etm: Fix start tracing packet handling
+  perf cs-etm: Support dummy address value for CS_ETM_TRACE_ON packet
+  perf cs-etm: Generate branch sample when receiving a CS_ETM_TRACE_ON
+    packet
+  perf cs-etm: Generate branch sample for CS_ETM_TRACE_ON packet
+
+ tools/perf/util/cs-etm-decoder/cs-etm-decoder.c | 10 ++--
+ tools/perf/util/cs-etm-decoder/cs-etm-decoder.h |  1 +
+ tools/perf/util/cs-etm.c                        | 71 +++++++++++++++++++++----
+ 3 files changed, 68 insertions(+), 14 deletions(-)
+
 -- 
-Jazz is not dead. It just smells funny...
+2.7.4
