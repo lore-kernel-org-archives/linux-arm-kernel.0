@@ -1,314 +1,484 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed, 11 Jul 2018 13:40:33 -0600
-Subject: [PATCH 23/25] coresight: catu: Add support for scatter gather tables
+Date: Wed, 11 Jul 2018 13:40:31 -0600
+Subject: [PATCH 21/25] coresight: Introduce support for Coresight Address
+ Translation Unit
 In-Reply-To: <1531338035-11729-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1531338035-11729-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1531338035-11729-24-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1531338035-11729-22-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Suzuki K Poulose <suzuki.poulose@arm.com>
 
-This patch adds the support for setting up a SG table for use
-by the CATU. We reuse the tmc_sg_table to represent the table/data
-pages, even though the table format is different.
+Add the initial support for Coresight Address Translation Unit, which
+augments the TMC in Coresight SoC-600 by providing an improved Scatter
+Gather mechanism. CATU is always connected to a single TMC-ETR and
+converts the AXI address with a translated address (from a given SG
+table with specific format). The CATU should be programmed in pass
+through mode and enabled even if the ETR doesn't use the translation
+by CATU.
 
-Similar to ETR SG table, CATU uses a 4KB page size for data buffers
-as well as page tables. All table entries are 64bit wide and have
-the following format:
+This patch provides mechanism to enable/disable the CATU always in the
+pass through mode.
 
-        63                      12      1  0
-        x-----------------------------------x
-        |        Address [63-12] | SBZ  | V |
-        x-----------------------------------x
+We reuse the existing ports mechanism to link the TMC-ETR to the
+connected CATU.
 
-	Where [V] ->	 0 - Pointer is invalid
-			 1 - Pointer is Valid
+i.e, TMC-ETR:output_port0 -> CATU:input_port0
 
-CATU uses only first half of the page for data page pointers.
-i.e, single table page will only have 256 page pointers, addressing
-upto 1MB of data. The second half of a table page contains only two
-pointers at the end of the page (i.e, pointers at index 510 and 511),
-which are used as links to the "Previous" and "Next" page tables
-respectively.
-
-The first table page has an "Invalid" previous pointer and the
-next pointer entry points to the second page table if there is one.
-Similarly the last table page has an "Invalid" next pointer to
-indicate the end of the table chain.
+Reference manual for CATU component is avilable in version r2p0 of :
+"Arm Coresight System-on-Chip SoC-600 Technical Reference Manual".
 
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-catu.c | 251 +++++++++++++++++++++++++++
- 1 file changed, 251 insertions(+)
+ drivers/hwtracing/coresight/Kconfig             |  11 ++
+ drivers/hwtracing/coresight/Makefile            |   1 +
+ drivers/hwtracing/coresight/coresight-catu.c    | 214 ++++++++++++++++++++++++
+ drivers/hwtracing/coresight/coresight-catu.h    |  84 ++++++++++
+ drivers/hwtracing/coresight/coresight-tmc-etr.c |  52 ++++++
+ include/linux/coresight.h                       |   1 +
+ 6 files changed, 363 insertions(+)
+ create mode 100644 drivers/hwtracing/coresight/coresight-catu.c
+ create mode 100644 drivers/hwtracing/coresight/coresight-catu.h
 
+diff --git a/drivers/hwtracing/coresight/Kconfig b/drivers/hwtracing/coresight/Kconfig
+index ef9cb3c164e1..ad34380cac49 100644
+--- a/drivers/hwtracing/coresight/Kconfig
++++ b/drivers/hwtracing/coresight/Kconfig
+@@ -31,6 +31,17 @@ config CORESIGHT_LINK_AND_SINK_TMC
+ 	  complies with the generic implementation of the component without
+ 	  special enhancement or added features.
+ 
++config CORESIGHT_CATU
++	bool "Coresight Address Translation Unit (CATU) driver"
++	depends on CORESIGHT_LINK_AND_SINK_TMC
++	help
++	   Enable support for the Coresight Address Translation Unit (CATU).
++	   CATU supports a scatter gather table of 4K pages, with forward/backward
++	   lookup. CATU helps TMC ETR to use a large physically non-contiguous trace
++	   buffer by translating the addresses used by ETR to the physical address
++	   by looking up the provided table. CATU can also be used in pass-through
++	   mode where the address is not translated.
++
+ config CORESIGHT_SINK_TPIU
+ 	bool "Coresight generic TPIU driver"
+ 	depends on CORESIGHT_LINKS_AND_SINKS
+diff --git a/drivers/hwtracing/coresight/Makefile b/drivers/hwtracing/coresight/Makefile
+index 61db9dd0d571..41870ded51a3 100644
+--- a/drivers/hwtracing/coresight/Makefile
++++ b/drivers/hwtracing/coresight/Makefile
+@@ -18,3 +18,4 @@ obj-$(CONFIG_CORESIGHT_SOURCE_ETM4X) += coresight-etm4x.o \
+ obj-$(CONFIG_CORESIGHT_DYNAMIC_REPLICATOR) += coresight-dynamic-replicator.o
+ obj-$(CONFIG_CORESIGHT_STM) += coresight-stm.o
+ obj-$(CONFIG_CORESIGHT_CPU_DEBUG) += coresight-cpu-debug.o
++obj-$(CONFIG_CORESIGHT_CATU) += coresight-catu.o
 diff --git a/drivers/hwtracing/coresight/coresight-catu.c b/drivers/hwtracing/coresight/coresight-catu.c
-index 9d0cb1f6f16b..559d45b6bc39 100644
---- a/drivers/hwtracing/coresight/coresight-catu.c
+new file mode 100644
+index 000000000000..9d0cb1f6f16b
+--- /dev/null
 +++ b/drivers/hwtracing/coresight/coresight-catu.c
-@@ -16,10 +16,261 @@
- 
- #include "coresight-catu.h"
+@@ -0,0 +1,214 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Copyright (C) 2018 Arm Limited. All rights reserved.
++ *
++ * Coresight Address Translation Unit support
++ *
++ * Author: Suzuki K Poulose <suzuki.poulose@arm.com>
++ */
++
++#include <linux/amba/bus.h>
++#include <linux/device.h>
++#include <linux/dma-mapping.h>
++#include <linux/io.h>
++#include <linux/kernel.h>
++#include <linux/slab.h>
++
++#include "coresight-catu.h"
++#include "coresight-priv.h"
++
++#define csdev_to_catu_drvdata(csdev)	\
++	dev_get_drvdata(csdev->dev.parent)
++
++coresight_simple_reg32(struct catu_drvdata, devid, CORESIGHT_DEVID);
++coresight_simple_reg32(struct catu_drvdata, control, CATU_CONTROL);
++coresight_simple_reg32(struct catu_drvdata, status, CATU_STATUS);
++coresight_simple_reg32(struct catu_drvdata, mode, CATU_MODE);
++coresight_simple_reg32(struct catu_drvdata, axictrl, CATU_AXICTRL);
++coresight_simple_reg32(struct catu_drvdata, irqen, CATU_IRQEN);
++coresight_simple_reg64(struct catu_drvdata, sladdr,
++		       CATU_SLADDRLO, CATU_SLADDRHI);
++coresight_simple_reg64(struct catu_drvdata, inaddr,
++		       CATU_INADDRLO, CATU_INADDRHI);
++
++static struct attribute *catu_mgmt_attrs[] = {
++	&dev_attr_devid.attr,
++	&dev_attr_control.attr,
++	&dev_attr_status.attr,
++	&dev_attr_mode.attr,
++	&dev_attr_axictrl.attr,
++	&dev_attr_irqen.attr,
++	&dev_attr_sladdr.attr,
++	&dev_attr_inaddr.attr,
++	NULL,
++};
++
++static const struct attribute_group catu_mgmt_group = {
++	.attrs = catu_mgmt_attrs,
++	.name = "mgmt",
++};
++
++static const struct attribute_group *catu_groups[] = {
++	&catu_mgmt_group,
++	NULL,
++};
++
++
++static inline int catu_wait_for_ready(struct catu_drvdata *drvdata)
++{
++	return coresight_timeout(drvdata->base,
++				 CATU_STATUS, CATU_STATUS_READY, 1);
++}
++
++static int catu_enable_hw(struct catu_drvdata *drvdata, void *__unused)
++{
++	u32 control;
++
++	if (catu_wait_for_ready(drvdata))
++		dev_warn(drvdata->dev, "Timeout while waiting for READY\n");
++
++	control = catu_read_control(drvdata);
++	if (control & BIT(CATU_CONTROL_ENABLE)) {
++		dev_warn(drvdata->dev, "CATU is already enabled\n");
++		return -EBUSY;
++	}
++
++	control |= BIT(CATU_CONTROL_ENABLE);
++	catu_write_mode(drvdata, CATU_MODE_PASS_THROUGH);
++	catu_write_control(drvdata, control);
++	dev_dbg(drvdata->dev, "Enabled in Pass through mode\n");
++	return 0;
++}
++
++static int catu_enable(struct coresight_device *csdev, void *data)
++{
++	int rc;
++	struct catu_drvdata *catu_drvdata = csdev_to_catu_drvdata(csdev);
++
++	CS_UNLOCK(catu_drvdata->base);
++	rc = catu_enable_hw(catu_drvdata, data);
++	CS_LOCK(catu_drvdata->base);
++	return rc;
++}
++
++static int catu_disable_hw(struct catu_drvdata *drvdata)
++{
++	int rc = 0;
++
++	catu_write_control(drvdata, 0);
++	if (catu_wait_for_ready(drvdata)) {
++		dev_info(drvdata->dev, "Timeout while waiting for READY\n");
++		rc = -EAGAIN;
++	}
++
++	dev_dbg(drvdata->dev, "Disabled\n");
++	return rc;
++}
++
++static int catu_disable(struct coresight_device *csdev, void *__unused)
++{
++	int rc;
++	struct catu_drvdata *catu_drvdata = csdev_to_catu_drvdata(csdev);
++
++	CS_UNLOCK(catu_drvdata->base);
++	rc = catu_disable_hw(catu_drvdata);
++	CS_LOCK(catu_drvdata->base);
++	return rc;
++}
++
++const struct coresight_ops_helper catu_helper_ops = {
++	.enable = catu_enable,
++	.disable = catu_disable,
++};
++
++const struct coresight_ops catu_ops = {
++	.helper_ops = &catu_helper_ops,
++};
++
++static int catu_probe(struct amba_device *adev, const struct amba_id *id)
++{
++	int ret = 0;
++	u32 dma_mask;
++	struct catu_drvdata *drvdata;
++	struct coresight_desc catu_desc;
++	struct coresight_platform_data *pdata = NULL;
++	struct device *dev = &adev->dev;
++	struct device_node *np = dev->of_node;
++	void __iomem *base;
++
++	if (np) {
++		pdata = of_get_coresight_platform_data(dev, np);
++		if (IS_ERR(pdata)) {
++			ret = PTR_ERR(pdata);
++			goto out;
++		}
++		dev->platform_data = pdata;
++	}
++
++	drvdata = devm_kzalloc(dev, sizeof(*drvdata), GFP_KERNEL);
++	if (!drvdata) {
++		ret = -ENOMEM;
++		goto out;
++	}
++
++	drvdata->dev = dev;
++	dev_set_drvdata(dev, drvdata);
++	base = devm_ioremap_resource(dev, &adev->res);
++	if (IS_ERR(base)) {
++		ret = PTR_ERR(base);
++		goto out;
++	}
++
++	/* Setup dma mask for the device */
++	dma_mask = readl_relaxed(base + CORESIGHT_DEVID) & 0x3f;
++	switch (dma_mask) {
++	case 32:
++	case 40:
++	case 44:
++	case 48:
++	case 52:
++	case 56:
++	case 64:
++		break;
++	default:
++		/* Default to the 40bits as supported by TMC-ETR */
++		dma_mask = 40;
++	}
++	ret = dma_set_mask_and_coherent(dev, DMA_BIT_MASK(dma_mask));
++	if (ret)
++		goto out;
++
++	drvdata->base = base;
++	catu_desc.pdata = pdata;
++	catu_desc.dev = dev;
++	catu_desc.groups = catu_groups;
++	catu_desc.type = CORESIGHT_DEV_TYPE_HELPER;
++	catu_desc.subtype.helper_subtype = CORESIGHT_DEV_SUBTYPE_HELPER_CATU;
++	catu_desc.ops = &catu_ops;
++	drvdata->csdev = coresight_register(&catu_desc);
++	if (IS_ERR(drvdata->csdev))
++		ret = PTR_ERR(drvdata->csdev);
++out:
++	pm_runtime_put(&adev->dev);
++	return ret;
++}
++
++static struct amba_id catu_ids[] = {
++	{
++		.id	= 0x000bb9ee,
++		.mask	= 0x000fffff,
++	},
++	{},
++};
++
++static struct amba_driver catu_driver = {
++	.drv = {
++		.name			= "coresight-catu",
++		.owner			= THIS_MODULE,
++		.suppress_bind_attrs	= true,
++	},
++	.probe				= catu_probe,
++	.id_table			= catu_ids,
++};
++
++builtin_amba_driver(catu_driver);
+diff --git a/drivers/hwtracing/coresight/coresight-catu.h b/drivers/hwtracing/coresight/coresight-catu.h
+new file mode 100644
+index 000000000000..4f221fccffca
+--- /dev/null
++++ b/drivers/hwtracing/coresight/coresight-catu.h
+@@ -0,0 +1,84 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++/*
++ * Copyright (C) 2018 Arm Limited. All rights reserved.
++ *
++ * Author: Suzuki K Poulose <suzuki.poulose@arm.com>
++ */
++
++#ifndef _CORESIGHT_CATU_H
++#define _CORESIGHT_CATU_H
++
++#include "coresight-priv.h"
++
++/* Register offset from base */
++#define CATU_CONTROL		0x000
++#define CATU_MODE		0x004
++#define CATU_AXICTRL		0x008
++#define CATU_IRQEN		0x00c
++#define CATU_SLADDRLO		0x020
++#define CATU_SLADDRHI		0x024
++#define CATU_INADDRLO		0x028
++#define CATU_INADDRHI		0x02c
++#define CATU_STATUS		0x100
++#define CATU_DEVARCH		0xfbc
++
++#define CATU_CONTROL_ENABLE	0
++
++#define CATU_MODE_PASS_THROUGH	0U
++#define CATU_MODE_TRANSLATE	1U
++
++#define CATU_STATUS_READY	8
++#define CATU_STATUS_ADRERR	0
++#define CATU_STATUS_AXIERR	4
++
++#define CATU_IRQEN_ON		0x1
++#define CATU_IRQEN_OFF		0x0
++
++struct catu_drvdata {
++	struct device *dev;
++	void __iomem *base;
++	struct coresight_device *csdev;
++	int irq;
++};
++
++#define CATU_REG32(name, offset)					\
++static inline u32							\
++catu_read_##name(struct catu_drvdata *drvdata)				\
++{									\
++	return coresight_read_reg_pair(drvdata->base, offset, -1);	\
++}									\
++static inline void							\
++catu_write_##name(struct catu_drvdata *drvdata, u32 val)		\
++{									\
++	coresight_write_reg_pair(drvdata->base, val, offset, -1);	\
++}
++
++#define CATU_REG_PAIR(name, lo_off, hi_off)				\
++static inline u64							\
++catu_read_##name(struct catu_drvdata *drvdata)				\
++{									\
++	return coresight_read_reg_pair(drvdata->base, lo_off, hi_off);	\
++}									\
++static inline void							\
++catu_write_##name(struct catu_drvdata *drvdata, u64 val)		\
++{									\
++	coresight_write_reg_pair(drvdata->base, val, lo_off, hi_off);	\
++}
++
++CATU_REG32(control, CATU_CONTROL);
++CATU_REG32(mode, CATU_MODE);
++CATU_REG_PAIR(sladdr, CATU_SLADDRLO, CATU_SLADDRHI)
++CATU_REG_PAIR(inaddr, CATU_INADDRLO, CATU_INADDRHI)
++
++static inline bool coresight_is_catu_device(struct coresight_device *csdev)
++{
++	if (!IS_ENABLED(CONFIG_CORESIGHT_CATU))
++		return false;
++	if (csdev->type != CORESIGHT_DEV_TYPE_HELPER)
++		return false;
++	if (csdev->subtype.helper_subtype != CORESIGHT_DEV_SUBTYPE_HELPER_CATU)
++		return false;
++	return true;
++}
++
++#endif
+diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+index 8af451230121..e37923acb725 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
++++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+@@ -9,6 +9,7 @@
+ #include <linux/iommu.h>
+ #include <linux/slab.h>
+ #include <linux/vmalloc.h>
++#include "coresight-catu.h"
  #include "coresight-priv.h"
-+#include "coresight-tmc.h"
+ #include "coresight-tmc.h"
  
- #define csdev_to_catu_drvdata(csdev)	\
- 	dev_get_drvdata(csdev->dev.parent)
+@@ -701,6 +702,48 @@ static const struct etr_buf_operations etr_sg_buf_ops = {
+ 	.get_data = tmc_etr_get_data_sg_buf,
+ };
  
-+/* Verbose output for CATU table contents */
-+#ifdef CATU_DEBUG
-+#define catu_dbg(x, ...) dev_dbg(x, __VA_ARGS__)
-+#else
-+#define catu_dbg(x, ...) do {} while (0)
-+#endif
-+
 +/*
-+ * CATU uses a page size of 4KB for page tables as well as data pages.
-+ * Each 64bit entry in the table has the following format.
++ * TMC ETR could be connected to a CATU device, which can provide address
++ * translation service. This is represented by the Output port of the TMC
++ * (ETR) connected to the input port of the CATU.
 + *
-+ *	63			12	1  0
-+ *	------------------------------------
-+ *	|	 Address [63-12] | SBZ	| V|
-+ *	------------------------------------
-+ *
-+ * Where bit[0] V indicates if the address is valid or not.
-+ * Each 4K table pages have upto 256 data page pointers, taking upto 2K
-+ * size. There are two Link pointers, pointing to the previous and next
-+ * table pages respectively at the end of the 4K page. (i.e, entry 510
-+ * and 511).
-+ *  E.g, a table of two pages could look like :
-+ *
-+ *                 Table Page 0               Table Page 1
-+ * SLADDR ===> x------------------x  x--> x-----------------x
-+ * INADDR    ->|  Page 0      | V |  |    | Page 256    | V | <- INADDR+1M
-+ *             |------------------|  |    |-----------------|
-+ * INADDR+4K ->|  Page 1      | V |  |    |                 |
-+ *             |------------------|  |    |-----------------|
-+ *             |  Page 2      | V |  |    |                 |
-+ *             |------------------|  |    |-----------------|
-+ *             |   ...        | V |  |    |    ...          |
-+ *             |------------------|  |    |-----------------|
-+ * INADDR+1020K|  Page 255    | V |  |    |   Page 511  | V |
-+ * SLADDR+2K==>|------------------|  |    |-----------------|
-+ *             |  UNUSED      |   |  |    |                 |
-+ *             |------------------|  |    |                 |
-+ *             |  UNUSED      |   |  |    |                 |
-+ *             |------------------|  |    |                 |
-+ *             |    ...       |   |  |    |                 |
-+ *             |------------------|  |    |-----------------|
-+ *             |   IGNORED    | 0 |  |    | Table Page 0| 1 |
-+ *             |------------------|  |    |-----------------|
-+ *             |  Table Page 1| 1 |--x    | IGNORED     | 0 |
-+ *             x------------------x       x-----------------x
-+ * SLADDR+4K==>
-+ *
-+ * The base input address (used by the ETR, programmed in INADDR_{LO,HI})
-+ * must be aligned to 1MB (the size addressable by a single page table).
-+ * The CATU maps INADDR{LO:HI} to the first page in the table pointed
-+ * to by SLADDR{LO:HI} and so on.
-+ *
++ * Returns	: coresight_device ptr for the CATU device if a CATU is found.
++ *		: NULL otherwise.
 + */
-+typedef u64 cate_t;
-+
-+#define CATU_PAGE_SHIFT		12
-+#define CATU_PAGE_SIZE		(1UL << CATU_PAGE_SHIFT)
-+#define CATU_PAGES_PER_SYSPAGE	(PAGE_SIZE / CATU_PAGE_SIZE)
-+
-+/* Page pointers are only allocated in the first 2K half */
-+#define CATU_PTRS_PER_PAGE	((CATU_PAGE_SIZE >> 1) / sizeof(cate_t))
-+#define CATU_PTRS_PER_SYSPAGE	(CATU_PAGES_PER_SYSPAGE * CATU_PTRS_PER_PAGE)
-+#define CATU_LINK_PREV		((CATU_PAGE_SIZE / sizeof(cate_t)) - 2)
-+#define CATU_LINK_NEXT		((CATU_PAGE_SIZE / sizeof(cate_t)) - 1)
-+
-+#define CATU_ADDR_SHIFT		12
-+#define CATU_ADDR_MASK		~(((cate_t)1 << CATU_ADDR_SHIFT) - 1)
-+#define CATU_ENTRY_VALID	((cate_t)0x1)
-+#define CATU_VALID_ENTRY(addr) \
-+	(((cate_t)(addr) & CATU_ADDR_MASK) | CATU_ENTRY_VALID)
-+#define CATU_ENTRY_ADDR(entry)	((cate_t)(entry) & ~((cate_t)CATU_ENTRY_VALID))
-+
-+/*
-+ * catu_get_table : Retrieve the table pointers for the given @offset
-+ * within the buffer. The buffer is wrapped around to a valid offset.
-+ *
-+ * Returns : The CPU virtual address for the beginning of the table
-+ * containing the data page pointer for @offset. If @daddrp is not NULL,
-+ * @daddrp points the DMA address of the beginning of the table.
-+ */
-+static inline cate_t *catu_get_table(struct tmc_sg_table *catu_table,
-+				     unsigned long offset,
-+				     dma_addr_t *daddrp)
-+{
-+	unsigned long buf_size = tmc_sg_table_buf_size(catu_table);
-+	unsigned int table_nr, pg_idx, pg_offset;
-+	struct tmc_pages *table_pages = &catu_table->table_pages;
-+	void *ptr;
-+
-+	/* Make sure offset is within the range */
-+	offset %= buf_size;
-+
-+	/*
-+	 * Each table can address 1MB and a single kernel page can
-+	 * contain "CATU_PAGES_PER_SYSPAGE" CATU tables.
-+	 */
-+	table_nr = offset >> 20;
-+	/* Find the table page where the table_nr lies in */
-+	pg_idx = table_nr / CATU_PAGES_PER_SYSPAGE;
-+	pg_offset = (table_nr % CATU_PAGES_PER_SYSPAGE) * CATU_PAGE_SIZE;
-+	if (daddrp)
-+		*daddrp = table_pages->daddrs[pg_idx] + pg_offset;
-+	ptr = page_address(table_pages->pages[pg_idx]);
-+	return (cate_t *)((unsigned long)ptr + pg_offset);
-+}
-+
-+#ifdef CATU_DEBUG
-+static void catu_dump_table(struct tmc_sg_table *catu_table)
++static inline struct coresight_device *
++tmc_etr_get_catu_device(struct tmc_drvdata *drvdata)
 +{
 +	int i;
-+	cate_t *table;
-+	unsigned long table_end, buf_size, offset = 0;
++	struct coresight_device *tmp, *etr = drvdata->csdev;
 +
-+	buf_size = tmc_sg_table_buf_size(catu_table);
-+	dev_dbg(catu_table->dev,
-+		"Dump table %p, tdaddr: %llx\n",
-+		catu_table, catu_table->table_daddr);
++	if (!IS_ENABLED(CONFIG_CORESIGHT_CATU))
++		return NULL;
 +
-+	while (offset < buf_size) {
-+		table_end = offset + SZ_1M < buf_size ?
-+			    offset + SZ_1M : buf_size;
-+		table = catu_get_table(catu_table, offset, NULL);
-+		for (i = 0; offset < table_end; i++, offset += CATU_PAGE_SIZE)
-+			dev_dbg(catu_table->dev, "%d: %llx\n", i, table[i]);
-+		dev_dbg(catu_table->dev, "Prev : %llx, Next: %llx\n",
-+			table[CATU_LINK_PREV], table[CATU_LINK_NEXT]);
-+		dev_dbg(catu_table->dev, "== End of sub-table ===");
-+	}
-+	dev_dbg(catu_table->dev, "== End of Table ===");
-+}
-+
-+#else
-+static inline void catu_dump_table(struct tmc_sg_table *catu_table)
-+{
-+}
-+#endif
-+
-+static inline cate_t catu_make_entry(dma_addr_t addr)
-+{
-+	return addr ? CATU_VALID_ENTRY(addr) : 0;
-+}
-+
-+/*
-+ * catu_populate_table : Populate the given CATU table.
-+ * The table is always populated as a circular table.
-+ * i.e, the "prev" link of the "first" table points to the "last"
-+ * table and the "next" link of the "last" table points to the
-+ * "first" table. The buffer should be made linear by calling
-+ * catu_set_table().
-+ */
-+static void
-+catu_populate_table(struct tmc_sg_table *catu_table)
-+{
-+	int i;
-+	int sys_pidx;	/* Index to current system data page */
-+	int catu_pidx;	/* Index of CATU page within the system data page */
-+	unsigned long offset, buf_size, table_end;
-+	dma_addr_t data_daddr;
-+	dma_addr_t prev_taddr, next_taddr, cur_taddr;
-+	cate_t *table_ptr, *next_table;
-+
-+	buf_size = tmc_sg_table_buf_size(catu_table);
-+	sys_pidx = catu_pidx = 0;
-+	offset = 0;
-+
-+	table_ptr = catu_get_table(catu_table, 0, &cur_taddr);
-+	prev_taddr = 0;	/* Prev link for the first table */
-+
-+	while (offset < buf_size) {
-+		/*
-+		 * The @offset is always 1M aligned here and we have an
-+		 * empty table @table_ptr to fill. Each table can address
-+		 * upto 1MB data buffer. The last table may have fewer
-+		 * entries if the buffer size is not aligned.
-+		 */
-+		table_end = (offset + SZ_1M) < buf_size ?
-+			    (offset + SZ_1M) : buf_size;
-+		for (i = 0; offset < table_end;
-+		     i++, offset += CATU_PAGE_SIZE) {
-+
-+			data_daddr = catu_table->data_pages.daddrs[sys_pidx] +
-+				     catu_pidx * CATU_PAGE_SIZE;
-+			catu_dbg(catu_table->dev,
-+				"[table %5ld:%03d] 0x%llx\n",
-+				(offset >> 20), i, data_daddr);
-+			table_ptr[i] = catu_make_entry(data_daddr);
-+			/* Move the pointers for data pages */
-+			catu_pidx = (catu_pidx + 1) % CATU_PAGES_PER_SYSPAGE;
-+			if (catu_pidx == 0)
-+				sys_pidx++;
-+		}
-+
-+		/*
-+		 * If we have finished all the valid entries, fill the rest of
-+		 * the table (i.e, last table page) with invalid entries,
-+		 * to fail the lookups.
-+		 */
-+		if (offset == buf_size) {
-+			memset(&table_ptr[i], 0,
-+			       sizeof(cate_t) * (CATU_PTRS_PER_PAGE - i));
-+			next_taddr = 0;
-+		} else {
-+			next_table = catu_get_table(catu_table,
-+						    offset, &next_taddr);
-+		}
-+
-+		table_ptr[CATU_LINK_PREV] = catu_make_entry(prev_taddr);
-+		table_ptr[CATU_LINK_NEXT] = catu_make_entry(next_taddr);
-+
-+		catu_dbg(catu_table->dev,
-+			"[table%5ld]: Cur: 0x%llx Prev: 0x%llx, Next: 0x%llx\n",
-+			(offset >> 20) - 1,  cur_taddr, prev_taddr, next_taddr);
-+
-+		/* Update the prev/next addresses */
-+		if (next_taddr) {
-+			prev_taddr = cur_taddr;
-+			cur_taddr = next_taddr;
-+			table_ptr = next_table;
-+		}
++	for (i = 0; i < etr->nr_outport; i++) {
++		tmp = etr->conns[i].child_dev;
++		if (tmp && coresight_is_catu_device(tmp))
++			return tmp;
 +	}
 +
-+	/* Sync the table for device */
-+	tmc_sg_table_sync_table(catu_table);
++	return NULL;
 +}
 +
-+static struct tmc_sg_table __maybe_unused *
-+catu_init_sg_table(struct device *catu_dev, int node,
-+		   ssize_t size, void **pages)
++static inline void tmc_etr_enable_catu(struct tmc_drvdata *drvdata)
 +{
-+	int nr_tpages;
-+	struct tmc_sg_table *catu_table;
++	struct coresight_device *catu = tmc_etr_get_catu_device(drvdata);
 +
++	if (catu && helper_ops(catu)->enable)
++		helper_ops(catu)->enable(catu, NULL);
++}
++
++static inline void tmc_etr_disable_catu(struct tmc_drvdata *drvdata)
++{
++	struct coresight_device *catu = tmc_etr_get_catu_device(drvdata);
++
++	if (catu && helper_ops(catu)->disable)
++		helper_ops(catu)->disable(catu, NULL);
++}
++
+ static const struct etr_buf_operations *etr_buf_ops[] = {
+ 	[ETR_MODE_FLAT] = &etr_flat_buf_ops,
+ 	[ETR_MODE_ETR_SG] = &etr_sg_buf_ops,
+@@ -844,6 +887,12 @@ static void tmc_etr_enable_hw(struct tmc_drvdata *drvdata)
+ 	u32 axictl, sts;
+ 	struct etr_buf *etr_buf = drvdata->etr_buf;
+ 
 +	/*
-+	 * Each table can address upto 1MB and we can have
-+	 * CATU_PAGES_PER_SYSPAGE tables in a system page.
++	 * If this ETR is connected to a CATU, enable it before we turn
++	 * this on
 +	 */
-+	nr_tpages = DIV_ROUND_UP(size, SZ_1M) / CATU_PAGES_PER_SYSPAGE;
-+	catu_table = tmc_alloc_sg_table(catu_dev, node, nr_tpages,
-+					size >> PAGE_SHIFT, pages);
-+	if (IS_ERR(catu_table))
-+		return catu_table;
++	tmc_etr_enable_catu(drvdata);
 +
-+	catu_populate_table(catu_table);
-+	dev_dbg(catu_dev,
-+		"Setup table %p, size %ldKB, %d table pages\n",
-+		catu_table, (unsigned long)size >> 10,  nr_tpages);
-+	catu_dump_table(catu_table);
-+	return catu_table;
-+}
+ 	CS_UNLOCK(drvdata->base);
+ 
+ 	/* Wait for TMCSReady bit to be set */
+@@ -952,6 +1001,9 @@ static void tmc_etr_disable_hw(struct tmc_drvdata *drvdata)
+ 	tmc_disable_hw(drvdata);
+ 
+ 	CS_LOCK(drvdata->base);
 +
- coresight_simple_reg32(struct catu_drvdata, devid, CORESIGHT_DEVID);
- coresight_simple_reg32(struct catu_drvdata, control, CATU_CONTROL);
- coresight_simple_reg32(struct catu_drvdata, status, CATU_STATUS);
++	/* Disable CATU device if this ETR is connected to one */
++	tmc_etr_disable_catu(drvdata);
+ }
+ 
+ static int tmc_enable_etr_sink_sysfs(struct coresight_device *csdev)
+diff --git a/include/linux/coresight.h b/include/linux/coresight.h
+index 3d40a2b135f1..d828a6efe0b1 100644
+--- a/include/linux/coresight.h
++++ b/include/linux/coresight.h
+@@ -65,6 +65,7 @@ enum coresight_dev_subtype_source {
+ 
+ enum coresight_dev_subtype_helper {
+ 	CORESIGHT_DEV_SUBTYPE_HELPER_NONE,
++	CORESIGHT_DEV_SUBTYPE_HELPER_CATU,
+ };
+ 
+ /**
 -- 
 2.7.4
