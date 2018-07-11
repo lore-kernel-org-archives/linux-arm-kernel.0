@@ -1,58 +1,58 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 11 Jul 2018 14:56:39 +0100
-Subject: [PATCHv5 04/21] arm64: kill change_cpacr()
+Date: Wed, 11 Jul 2018 14:56:50 +0100
+Subject: [PATCHv5 15/21] kernel: add ksys_personality()
 In-Reply-To: <20180711135656.20670-1-mark.rutland@arm.com>
 References: <20180711135656.20670-1-mark.rutland@arm.com>
-Message-ID: <20180711135656.20670-5-mark.rutland@arm.com>
+Message-ID: <20180711135656.20670-16-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have sysreg_clear_set(), we can use this instead of
-change_cpacr().
+Using this helper allows us to avoid the in-kernel call to the
+sys_personality() syscall. The ksys_ prefix denotes that this function
+is meant as a drop-in replacement for the syscall. In particular, it
+uses the same calling convention as sys_personality().
 
-Note that the order of the set and clear arguments differs between
-change_cpacr() and sysreg_clear_set(), so these are flipped as part of
-the conversion. Also, sve_user_enable() redundantly clears
-CPACR_EL1_ZEN_EL0EN before setting it; this is removed for clarity.
+Since ksys_personality is trivial, it is implemented directly in
+<linux/syscalls.h>, as we do for ksys_close() and friends.
+
+This helper is necessary to enable conversion of arm64's syscall
+handling to use pt_regs wrappers.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Reviewed-by: Dave Martin <dave.martin@arm.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Cc: James Morse <james.morse@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
+Reviewed-by: Dominik Brodowski <linux@dominikbrodowski.net>
+Cc: Al Viro <viro@zeniv.linux.org.uk>
+Cc: Christoph Hellwig <hch@infradead.org>
+Cc: Dave Martin <dave.martin@arm.com>
 ---
- arch/arm64/kernel/fpsimd.c | 13 ++-----------
- 1 file changed, 2 insertions(+), 11 deletions(-)
+ include/linux/syscalls.h | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index 84c68b14f1b2..a98a7f96aff1 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -159,23 +159,14 @@ static void sve_free(struct task_struct *task)
- 	__sve_free(task);
+diff --git a/include/linux/syscalls.h b/include/linux/syscalls.h
+index a368a68cb667..abfe12d8a9c5 100644
+--- a/include/linux/syscalls.h
++++ b/include/linux/syscalls.h
+@@ -80,6 +80,7 @@ union bpf_attr;
+ #include <linux/unistd.h>
+ #include <linux/quota.h>
+ #include <linux/key.h>
++#include <linux/personality.h>
+ #include <trace/syscall.h>
+ 
+ #ifdef CONFIG_ARCH_HAS_SYSCALL_WRAPPER
+@@ -1281,4 +1282,14 @@ static inline long ksys_truncate(const char __user *pathname, loff_t length)
+ 	return do_sys_truncate(pathname, length);
  }
  
--static void change_cpacr(u64 val, u64 mask)
--{
--	u64 cpacr = read_sysreg(CPACR_EL1);
--	u64 new = (cpacr & ~mask) | val;
--
--	if (new != cpacr)
--		write_sysreg(new, CPACR_EL1);
--}
--
- static void sve_user_disable(void)
- {
--	change_cpacr(0, CPACR_EL1_ZEN_EL0EN);
-+	sysreg_clear_set(cpacr_el1, CPACR_EL1_ZEN_EL0EN, 0);
- }
- 
- static void sve_user_enable(void)
- {
--	change_cpacr(CPACR_EL1_ZEN_EL0EN, CPACR_EL1_ZEN_EL0EN);
-+	sysreg_clear_set(cpacr_el1, 0, CPACR_EL1_ZEN_EL0EN);
- }
- 
- /*
++static inline unsigned int ksys_personality(unsigned int personality)
++{
++	unsigned int old = current->personality;
++
++	if (personality != 0xffffffff)
++		set_personality(personality);
++
++	return old;
++}
++
+ #endif
 -- 
 2.11.0
