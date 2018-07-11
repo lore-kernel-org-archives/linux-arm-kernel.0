@@ -1,43 +1,73 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 11 Jul 2018 10:43:33 +0100
-Subject: [PATCH] MAINTAINERS: arm64: Remove boot/dts/ directory from
- arm64 entry
-In-Reply-To: <CAMuHMdUqRXde5DNgK6ih+ivuwY9HFbcWwbx_x3q5PmFcrGi0pQ@mail.gmail.com>
-References: <1530879736-7650-1-git-send-email-will.deacon@arm.com>
- <CAMuHMdUqRXde5DNgK6ih+ivuwY9HFbcWwbx_x3q5PmFcrGi0pQ@mail.gmail.com>
-Message-ID: <20180711094333.GC13963@arm.com>
+Date: Wed, 11 Jul 2018 10:43:26 +0100
+Subject: [RESEND PATCH v2 3/9] asm-generic: Move some macros from
+ linux/bitops.h to a new bits.h file
+In-Reply-To: <20180709151006.370112d321c8f3df06bf231b@linux-foundation.org>
+References: <1529412794-17720-1-git-send-email-will.deacon@arm.com>
+ <1529412794-17720-4-git-send-email-will.deacon@arm.com>
+ <20180706173049.e28171504c745934a280dee8@linux-foundation.org>
+ <20180709113250.GA26377@arm.com>
+ <20180709151006.370112d321c8f3df06bf231b@linux-foundation.org>
+Message-ID: <20180711094326.GB13963@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
+Hi again, Andrew,
 
-On Tue, Jul 10, 2018 at 09:25:58AM +0200, Geert Uytterhoeven wrote:
-> On Fri, Jul 6, 2018 at 2:22 PM Will Deacon <will.deacon@arm.com> wrote:
-> > The arm-soc tree does a good job handling .dts files, so exclude them
-> > from the ARM64 entry in MAINTAINERS.
-> >
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+On Mon, Jul 09, 2018 at 03:10:06PM -0700, Andrew Morton wrote:
+> On Mon, 9 Jul 2018 12:32:51 +0100 Will Deacon <will.deacon@arm.com> wrote:
+> > On Fri, Jul 06, 2018 at 05:30:49PM -0700, Andrew Morton wrote:
+> > > On Tue, 19 Jun 2018 13:53:08 +0100 Will Deacon <will.deacon@arm.com> wrote:
+> > > 
+> > > > In preparation for implementing the asm-generic atomic bitops in terms
+> > > > of atomic_long_*, we need to prevent asm/atomic.h implementations from
+> > > > pulling in linux/bitops.h. A common reason for this include is for the
+> > > > BITS_PER_BYTE definition, so move this and some other BIT() and masking
+> > > > macros into a new header file, linux/bits.h
+> > > > 
+> > > > --- a/include/linux/bitops.h
+> > > > +++ b/include/linux/bitops.h
+> > > > @@ -2,29 +2,9 @@
+> > > >  #ifndef _LINUX_BITOPS_H
+> > > >  #define _LINUX_BITOPS_H
+> > > >  #include <asm/types.h>
+> > > > +#include <linux/bits.h>
+> > > >  
+> > > > -#ifdef	__KERNEL__
+> > > > -#define BIT(nr)			(1UL << (nr))
+> > > > -#define BIT_ULL(nr)		(1ULL << (nr))
+> > > > -#define BIT_MASK(nr)		(1UL << ((nr) % BITS_PER_LONG))
+> > > > -#define BIT_WORD(nr)		((nr) / BITS_PER_LONG)
+> > > > -#define BIT_ULL_MASK(nr)	(1ULL << ((nr) % BITS_PER_LONG_LONG))
+> > > > -#define BIT_ULL_WORD(nr)	((nr) / BITS_PER_LONG_LONG)
+> > > > -#define BITS_PER_BYTE		8
+> > > >  #define BITS_TO_LONGS(nr)	DIV_ROUND_UP(nr, BITS_PER_BYTE * sizeof(long))
+> > > > -#endif
+> > > 
+> > > Why does it leave BITS_TO_LONGS() in place?
+> > > 
+> > > That becomes unfortunate with Chris's patch, so I'm moving
+> > > BITS_TO_LONGS() into bits.h.
+> > 
+> > The reason I avoided that was because it would pull in the dreaded
+> > kernel.h for DIV_ROUND_UP, and then we're back to circular include hell :(
+> > 
 > 
-> Thanks for your patch!
+> Well we should comment that so every reader doesn't wonder what I
+> wondered.
 > 
-> > --- a/MAINTAINERS
-> > +++ b/MAINTAINERS
-> > @@ -2264,6 +2264,7 @@ L:        linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-> >  T:     git git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git
-> >  S:     Maintained
-> >  F:     arch/arm64/
-> > +X:     arch/arm64/boot/dts/
-> >  F:     Documentation/arm64/
-> 
-> Please note that this does not cause checkpatch to point to the arm-soc
-> tree, but does drop the reference to linux-arm-kernel, which may not
-> be intentional?
+> Refactoring works well.  I suppose DIV_ROUND_UP and friends await a new
+> <arithmacros.h>.
 
-I think this is ok, since all of the individual sub-directories do pick
-up the mailing list. Otherwise, somebody needs to claim responsibility
-for the top-level directory, but realistically if you're adding a new
-subdirectory there then you're going to be working with the right folks
-anyway.
+Yes; pulling apart kernel.h would certainly help solve some of the fragility
+here.
+
+> Also, all these macros no longer `#ifdef __KERNEL__' protection, which
+> wasn't mentioned in the changelog.  Deliberate?
+
+Yes, these aren't under uapi/ so I dropped the guards now that they're not
+needed (my understanding is that they're only there because of the way the
+uapi split was originally scripted). I can also confirm that the generated
+user headers match exactly with and without my changes.
 
 Will
