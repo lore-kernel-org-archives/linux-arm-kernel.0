@@ -1,59 +1,64 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 11 Jul 2018 13:27:13 +0100
-Subject: [PATCHv4 00/19] arm64: invoke syscalls with pt_regs
-In-Reply-To: <20180711104720.3h65gkbsphaugqht@lakrids.cambridge.arm.com>
-References: <20180702110415.10465-1-mark.rutland@arm.com>
- <20180710103901.GA31318@arm.com>
- <20180711104720.3h65gkbsphaugqht@lakrids.cambridge.arm.com>
-Message-ID: <20180711122648.GE15725@arm.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 11 Jul 2018 20:46:09 +0800
+Subject: [arm:zii 12/20] net/dsa/slave.c:1169:19: error: initialization from
+ incompatible pointer type
+Message-ID: <201807112004.ly2kyQ5F%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 11, 2018 at 11:47:20AM +0100, Mark Rutland wrote:
-> On Tue, Jul 10, 2018 at 11:39:02AM +0100, Will Deacon wrote:
-> > On Mon, Jul 02, 2018 at 12:03:56PM +0100, Mark Rutland wrote:
-> > > This series reworks arm64's syscall handling to minimize the propagation
-> > > of user-controlled register values into speculated code paths. As with
-> > > x86 [1], a wrapper is generated for each syscall, which extracts the
-> > > argument from a struct pt_regs. During kernel entry from userspace,
-> > > registers are zeroed.
-> > > 
-> > > The arm64 kernel code directly invokes some syscalls which the x86 code
-> > > doesn't, so I've added ksys_* wrappers for these, following the x86
-> > > example. The rest of the series is arm64-specific.
-> > > 
-> > > I've pushed the series out to my arm64/syscall-regs branch [2] on
-> > > kernel.org.
-> > 
-> > One thing I noticed with this series applied is that our sys_call_table
-> > declarations all get a bit muddled:
-> > 
-> > arm64/kernel/sys.c:		void * const sys_call_table[]
-> > arm64/kernel/sys32.c:		void * const compat_sys_call_table[]
-> > arm64/kernel/syscall.c:		extern syscall_fn_t sys_call_table[];
-> > 				extern syscall_fn_t compat_sys_call_table[];
-> > arm64/include/asm/syscall.h:	extern const void *sys_call_table[];
-> > 
-> > Can we tidy this up so that syscall.h provides a declaration using
-> > syscall_fn_t, allowing us to drop the additional externs?
-> 
-> Sure; done.
-> 
-> As a result, I've had to fold a few more consts into function prototypes
-> in subsequent patches, but that's probably a good thing.
-> 
-> This also makes me realise that once the generation of the table address
-> is converted to C, we can drop the alignment on the tables. That was
-> solely to simplify the asm invoking the syscall, allowing it to generate
-> the address with an adrp. The C code never relied on this, since the
-> alignment was not in the declaration of the tables.
-> 
-> I've spun an additional patch for that, too.
-> 
-> I've pushed hte result out to my arm64/syscall-regs branch. I guess I'll
-> post a v5 once that's seen some testing.
+tree:   git://git.armlinux.org.uk/~rmk/linux-arm.git zii
+head:   3a7146492a32222691cb4e016448b56095ca107a
+commit: 3af90831f7beab5ef80878c8ac3586d7ef6733b3 [12/20] net: dsa: Plug in PHYLINK support
+config: x86_64-randconfig-x018-201827 (attached as .config)
+compiler: gcc-7 (Debian 7.3.0-16) 7.3.0
+reproduce:
+        git checkout 3af90831f7beab5ef80878c8ac3586d7ef6733b3
+        # save the attached .config to linux build tree
+        make ARCH=x86_64 
 
-Yes, please. I'd like to get this queued asap to give it some time in next.
-I've run native and compat LTP on this version and not seen any issues.
+All errors (new ones prefixed by >>):
 
-Will
+   net/dsa/slave.c: In function 'dsa_slave_get_module_info':
+   net/dsa/slave.c:550:9: error: implicit declaration of function 'phylink_ethtool_get_module_info'; did you mean 'phylink_ethtool_get_pauseparam'? [-Werror=implicit-function-declaration]
+     return phylink_ethtool_get_module_info(dp->pl, modinfo);
+            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            phylink_ethtool_get_pauseparam
+   net/dsa/slave.c: In function 'dsa_slave_get_module_eeprom':
+   net/dsa/slave.c:558:9: error: implicit declaration of function 'phylink_ethtool_get_module_eeprom'; did you mean 'phylink_ethtool_get_pauseparam'? [-Werror=implicit-function-declaration]
+     return phylink_ethtool_get_module_eeprom(dp->pl, ee, buf);
+            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            phylink_ethtool_get_pauseparam
+   net/dsa/slave.c: At top level:
+>> net/dsa/slave.c:1169:19: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
+     .mac_link_down = dsa_slave_phylink_mac_link_down,
+                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   net/dsa/slave.c:1169:19: note: (near initialization for 'dsa_slave_phylink_mac_ops.mac_link_down')
+   net/dsa/slave.c:1170:17: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
+     .mac_link_up = dsa_slave_phylink_mac_link_up,
+                    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   net/dsa/slave.c:1170:17: note: (near initialization for 'dsa_slave_phylink_mac_ops.mac_link_up')
+   cc1: some warnings being treated as errors
+
+vim +1169 net/dsa/slave.c
+
+  1163	
+  1164	static const struct phylink_mac_ops dsa_slave_phylink_mac_ops = {
+  1165		.validate = dsa_slave_phylink_validate,
+  1166		.mac_link_state = dsa_slave_phylink_mac_link_state,
+  1167		.mac_config = dsa_slave_phylink_mac_config,
+  1168		.mac_an_restart = dsa_slave_phylink_mac_an_restart,
+> 1169		.mac_link_down = dsa_slave_phylink_mac_link_down,
+  1170		.mac_link_up = dsa_slave_phylink_mac_link_up,
+  1171	};
+  1172	
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 26008 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180711/c763af70/attachment-0001.gz>
