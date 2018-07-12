@@ -1,39 +1,39 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Thu, 12 Jul 2018 09:43:39 +0200
-Subject: [PATCH] ARM: dts: sunxi: libretech-all-h3-cc: Enable eMMC module
-In-Reply-To: <20180712030417.15881-1-wens@csie.org>
-References: <20180712030417.15881-1-wens@csie.org>
-Message-ID: <20180712074339.qizqbfyhsug2pe4g@flea>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 12 Jul 2018 08:53:25 +0100
+Subject: [PATCH v3] Add DT support for Octavo Systems OSD3358-SM-RED
+ based on TI AM335x
+In-Reply-To: <20180712053155.GP99251@atomide.com>
+References: <20180711145822.1090-1-neeraj.dantu@octavosystems.com>
+ <20180712053155.GP99251@atomide.com>
+Message-ID: <20180712075325.GH6920@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 12, 2018 at 11:04:17AM +0800, Chen-Yu Tsai wrote:
-> The Libretech ALL-H3-CC has a high density connector for attaching
-> an eMMC module. The module form factor and connection is specific
-> to Libretech, and has provisions for split vmmc/vqmmc (core and I/O)
-> voltage supplies, but this board does not wire the vqmmc side. The
-> H2+/H3/H5 SoCs do not support alternate I/O voltages for eMMC either.
-> Only 3.3V is supported. A specific module that ties vqmmc to vmmc,
-> with both at 3.3V, must be used.
+On Wed, Jul 11, 2018 at 10:31:55PM -0700, Tony Lindgren wrote:
+> Hi,
 > 
-> Given that a) eMMC is not designed to be hotplugged, b) power is
-> always provided on the pins, and c) MMC controllers can deal with
-> missing cards, we can enable this by default. If a module is attached
-> it will be picked up by the system.
+> * Neeraj Dantu <dantuguf14105@gmail.com> [180711 15:13]:
+> > OSD3358-SM-RED is a dev board for OSD335x System-in-Package(SiP) devices from
+> > Octavo Systems.
+> ...
+> > - Fix HDMI encoder node name
 > 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> I think you got this the wrong way around :) See below.
+> 
+> > +&i2c0 {
+> > +	hdmiencoder: tda19988 {
+> > +		compatible = "nxp,tda998x";
+> 
+> 	tda19988: hdmiencoder {
+> 		...
+> 	};
+> 
+> So the generic type for the node. Please check the
+> other devices for that too.
 
-Applied, thanks!
-Maxime
+In the binding doc, we use "hdmi-encoder" for the node name.
 
 -- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180712/c4ca575a/attachment-0001.sig>
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
+According to speedtest.net: 13Mbps down 490kbps up
