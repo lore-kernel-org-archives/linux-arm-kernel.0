@@ -1,47 +1,78 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 12 Jul 2018 18:47:27 +0200
-Subject: [PATCH 1/9] CHROMIUM: v4l: Add H264 low-level decoder API
- compound controls.
-In-Reply-To: <20180712163821.np57u46m7akpubht@flea>
-References: <20180613140714.1686-1-maxime.ripard@bootlin.com>
- <20180613140714.1686-2-maxime.ripard@bootlin.com>
- <9c80de4e-c070-1051-2089-2d53826c6fc7@xs4all.nl>
- <20180712163821.np57u46m7akpubht@flea>
-Message-ID: <20180712164727.GB10740@lunn.ch>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 12 Jul 2018 17:54:57 +0100
+Subject: [PATCH v8 2/2] regulator: add QCOM RPMh regulator driver
+In-Reply-To: <9bbfb628-018d-2d89-257b-9cc4e716cb46@codeaurora.org>
+References: <cover.1529712888.git.collinsd@codeaurora.org>
+ <35c4ea70cdf5caba560fb6f40e866ee8bc456d93.1529712888.git.collinsd@codeaurora.org>
+ <20180702102853.GI18211@sirena.org.uk>
+ <9bbfb628-018d-2d89-257b-9cc4e716cb46@codeaurora.org>
+Message-ID: <20180712165457.GI10369@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 12, 2018 at 06:38:21PM +0200, Maxime Ripard wrote:
-> Hi Hans,
-> 
-> Thanks for your feedback, I have a few things I'm not really sure
-> about though.
-> 
-> On Fri, Jun 15, 2018 at 01:59:58PM +0200, Hans Verkuil wrote:
-> > > +struct v4l2_ctrl_h264_sps {
-> > > +	__u8 profile_idc;
-> > > +	__u8 constraint_set_flags;
-> > > +	__u8 level_idc;
-> > > +	__u8 seq_parameter_set_id;
-> > > +	__u8 chroma_format_idc;
-> > > +	__u8 bit_depth_luma_minus8;
-> > > +	__u8 bit_depth_chroma_minus8;
-> > > +	__u8 log2_max_frame_num_minus4;
-> > > +	__u8 pic_order_cnt_type;
-> > > +	__u8 log2_max_pic_order_cnt_lsb_minus4;
-> > 
-> > There is a hole in the struct here. Is that OK? Are there alignment
-> > requirements?
-> 
-> This structure represents an equivalent structure in the H264
-> bitstream, but it's not a 1:1 mapping, so I don't think there's any
-> alignment issues.
-> 
-> As of the padding, is it an issue? Isn't it defined by the ABI, and
-> therefore the userspace will have the same padding rules?
+On Mon, Jul 09, 2018 at 04:44:14PM -0700, David Collins wrote:
+> On 07/02/2018 03:28 AM, Mark Brown wrote:
+> > On Fri, Jun 22, 2018 at 05:46:14PM -0700, David Collins wrote:
 
-Hi Maxime
+> >> +static const int pmic_mode_map_pmic4_ldo[REGULATOR_MODE_STANDBY + 1] = {
+> >> +	[REGULATOR_MODE_INVALID] = -EINVAL,
+> >> +	[REGULATOR_MODE_STANDBY] = PMIC4_LDO_MODE_RETENTION,
+> >> +	[REGULATOR_MODE_IDLE]    = PMIC4_LDO_MODE_LPM,
+> >> +	[REGULATOR_MODE_NORMAL]  = -EINVAL,
+> >> +	[REGULATOR_MODE_FAST]    = PMIC4_LDO_MODE_HPM,
+> >> +};
 
-It gets interesting when you have a 64 bit kernel and a 32 bit userspace.
+> > This mapping is really weird, I'd expect one of the modes to correspond
+> > to the normal operating mode of the regulator.  
 
-   Andrew
+> My thinking here was to have a consistent mapping for consumers to use
+> between REGULATOR_MODE_* and physical regulator modes for both LDO and
+> SMPS type regulators:
+
+No, that's not useful or helpful - if there's any modes I'd *really*
+expect to see one of them be _NORMAL.
+
+> This allows a consumer to request NORMAL in typical use cases and FAST in
+> use cases that require low voltage ripple.  If NORMAL is not supported,
+> then it automatically gets upgraded to FAST by the regulator framework.
+
+> I could change it so that REGULATOR_MODE_NORMAL maps to LDO HPM mode.
+> However, doing so would make it so that REGULATOR_MODE_FAST requests would
+> fail for LDOs.  Thus, consumers would need to know if their supply is an
+> LDO or an SMPS (which seems undesirable).
+
+You've just discovered why it's a bad idea for consumers to do anything
+with modes directly!  The mappings are just never going to be consistent
+given the massive variation in what regulators can support, the
+retention mode of one regulator might be able to deliver more power than
+the normal mode of another.
+
+> Would it be acceptable to have both NORMAL and FAST map to LDO HPM?
+
+Having something other than a 1:1 mapping is going to lead to pain at
+some point.
+
+> >> +static unsigned int rpmh_regulator_pmic4_ldo_of_map_mode(unsigned int mode)
+> >> +{
+> >> +	static const unsigned int of_mode_map[RPMH_REGULATOR_MODE_COUNT] = {
+> >> +		[RPMH_REGULATOR_MODE_RET]  = REGULATOR_MODE_STANDBY,
+> >> +		[RPMH_REGULATOR_MODE_LPM]  = REGULATOR_MODE_IDLE,
+> >> +		[RPMH_REGULATOR_MODE_AUTO] = REGULATOR_MODE_INVALID,
+> >> +		[RPMH_REGULATOR_MODE_HPM]  = REGULATOR_MODE_FAST,
+> >> +	};
+
+> > Same here, based on that it looks like auto mode is a good map for
+> > normal.
+
+> LDO type regulators physically do not support AUTO mode.  That is why I
+> specified REGULATOR_MODE_INVALID in the mapping.
+
+The other question here is why this is even in the table if it's not
+valid (I'm not seeing a need for the MODE_COUNT define)?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180712/aa913186/attachment.sig>
