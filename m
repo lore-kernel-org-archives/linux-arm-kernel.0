@@ -1,78 +1,172 @@
-From: liu.song.a23@gmail.com (Song Liu)
-Date: Thu, 12 Jul 2018 12:53:11 -0700
-Subject: [PATCH v5 06/10] Uprobes: Support SDT markers having reference
- count (semaphore)
-In-Reply-To: <20180712145849.GB15265@redhat.com>
-References: <20180628052209.13056-7-ravi.bangoria@linux.ibm.com>
- <20180701210935.GA14404@redhat.com>
- <0c543791-f3b7-5a4b-f002-e1c76bb430c0@linux.ibm.com>
- <20180702180156.GA31400@redhat.com>
- <f19e3801-d56a-4e34-0acc-1040a071cf91@linux.ibm.com>
- <20180703163645.GA23144@redhat.com> <20180703172543.GC23144@redhat.com>
- <f5a39a88-c21e-4606-a04d-11b5f32016b8@linux.ibm.com>
- <20180710152527.GA3616@redhat.com>
- <6e3ff60b-267a-d49d-4ebb-c4264f9c034b@linux.ibm.com>
- <20180712145849.GB15265@redhat.com>
-Message-ID: <CAPhsuW6kCtn-tWSj5eKf+kGt8ZEjVwJKLxj9C6zdaqMZByRytg@mail.gmail.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Thu, 12 Jul 2018 14:58:02 -0500
+Subject: [PATCH 1/3] PCI: Introduce PCI software bridge common logic
+In-Reply-To: <20180629092231.32207-2-thomas.petazzoni@bootlin.com>
+References: <20180629092231.32207-1-thomas.petazzoni@bootlin.com>
+ <20180629092231.32207-2-thomas.petazzoni@bootlin.com>
+Message-ID: <20180712195802.GC28466@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I guess I got to the party late. I found this thread after I started developing
-the same feature...
+[+cc Ray since he's doing something similar for iProc,
+     Ley Foon & Simon for a possible Altera & R-Car bug]
 
-On Thu, Jul 12, 2018 at 7:58 AM, Oleg Nesterov <oleg@redhat.com> wrote:
-> On 07/11, Ravi Bangoria wrote:
->>
->> > However, I still think it would be better to avoid uprobe exporting and modifying
->> > set_swbp/set_orig_insn. May be we can simply kill both set_swbp() and set_orig_insn(),
->> > I'll re-check...
->>
->> Good that you bring this up. Actually, we can implement same logic
->> without exporting uprobe. We can do "uprobe = container_of(arch_uprobe)"
->> in uprobe_write_opcode(). No need to export struct uprobe outside,
->> no need to change set_swbp() / set_orig_insn() syntax. Just that we
->> need to pass arch_uprobe object to uprobe_write_opcode().
->
-> Yes, but you still need to modify set_swbp/set_orig_insn to pass the new
-> arg to uprobe_write_opcode(). OK, this is fine.
->
->
->> But, I wanted to discuss about making ref_ctr_offset a uprobe property
->> or a consumer property, before posting v6:
->>
->> If we make it a consumer property, the design becomes flexible for
->> user. User will have an option to either depend on kernel to handle
->> reference counter or he can create normal uprobe and manipulate
->> reference counter on his own. This will not require any changes to
->> existing tools. With this approach we need to increment / decrement
->> reference counter for each consumer. But, because of the fact that our
->> install_breakpoint() / remove_breakpoint() are not balanced, we have
->> to keep track of which reference counter have been updated in which
->> mm, for which uprobe and for which consumer. I.e. Maintain a list of
->> {uprobe, consumer, mm}.
+On Fri, Jun 29, 2018 at 11:22:29AM +0200, Thomas Petazzoni wrote:
+> Some PCI host controllers do not expose at the hardware level a root
+> port PCI bridge. Due to this, the Marvell Armada 370/38x/XP PCI
+> controller driver (pci-mvebu) emulates a root port PCI bridge, and
+> uses that to (among other things?) dynamically create the memory
+> windows that correspond to the PCI MEM and I/O regions.
+> 
+> Since we now need to add a very similar logic for the Marvell Armada
+> 37xx PCI controller driver (pci-aardvark), instead of duplicating the
+> code, we create in this commit a common logic called pci-sw-bridge.
+> 
+> The idea of this logic is to emulate a root port PCI bridge by
+> providing configuration space read/write operations, and faking behind
+> the scenes the configuration space of a PCI bridge. A PCI host
+> controller driver simply has to call pci_sw_bridge_read() and
+> pci_sw_bridge_write() to read/write the configuration space of the
+> bridge.
 
-Is it possible to maintain balanced refcount by modifying callers of
-install_breakpoint() and remove_breakpoint()? I am actually working
-toward this direction. And I found some imbalance between
-     register_for_each_vma(uprobe, uc)
-and
-     register_for_each_vma(uprobe, NULL)
+These systems must actually have a Root Port (there's obviously a Port
+that originates the link), but it's not visible in a spec-compliant
+way.  So this is basically a wrapper that translates accesses to
+standard config space into the vendor-specific registers.
 
->From reading the thread, I think there are other sources of imbalance.
-But I think it is still possible to fix it? Please let me know if this is not
-realistic...
+Since there really *is* a hardware bridge but it just doesn't have the
+interface we expect, "sw_bridge" doesn't feel like quite the right
+name for it.  Maybe something related to adapter/emulation/interface/...?
 
+There are several drivers that do this, and it would be really cool to
+have them all do it in a similar way.  I found at least these:
 
-About race conditions, I think both install_breakpoint() and remove_breakpoint()
-are called with
+  hv_pcifront_read_config()
+  mvebu_pcie_rd_conf()
+  thunder_ecam_config_read()
+  thunder_pem_config_read()
+  xgene_pcie_config_read32()
+  iproc_pcie_config_read32()
+  rcar_pcie_read_conf()
 
-   down_write(&mm->mmap_sem);
+I *really* like the fact that your accessors use the normal register
+names, e.g., PCI_EXP_DEVCAP instead of PCISWCAP_EXP_DEVCAP.  That's
+huge for greppability.
 
+> By default, the PCI bridge configuration space is simply emulated by a
+> chunk of memory, but the PCI host controller can override the behavior
+> of the read and write operations on a per-register basis to do
+> additional actions if needed.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
+> ---
+>  drivers/pci/Kconfig           |   3 +
+>  drivers/pci/Makefile          |   1 +
+>  drivers/pci/pci-sw-bridge.c   | 149 ++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/pci-sw-bridge.h | 125 +++++++++++++++++++++++++++++++++++
 
-As long as we do the same when modifying the reference counter,
-it should be fine, right?
+Could this go in drivers/pci instead of include/linux?  I'd prefer to
+hide it inside the PCI core if that's possible.
 
-Wait... sometimes we only down_read(). Is this by design?
+> + * Should be called by the PCI controller driver when reading the PCI
+> + * configuration space of the fake bridge. It will call back the
+> + * ->ops->read_base or ->ops->read_pcie operations.
+> + */
+> +int pci_sw_bridge_read(struct pci_sw_bridge *bridge, int where,
+> +		       int size, u32 *value)
 
-Thanks,
-Song
+We don't really have a strong convention about the names of config
+accessors: *_rd_conf(), *_read_config(), *config_read() are all used.
+Maybe we could at least include "conf" to connect this with config
+space as opposed to MMIO space.
+
+> +{
+> +	int ret;
+> +	int reg = where & ~3;
+> +
+> +	if (bridge->has_pcie && reg >= PCI_CAP_PCIE_END) {
+> +		*value = 0;
+> +		return PCIBIOS_SUCCESSFUL;
+> +	}
+> +
+> +	if (!bridge->has_pcie && reg >= PCI_BRIDGE_CONF_END) {
+> +		*value = 0;
+> +		return PCIBIOS_SUCCESSFUL;
+> +	}
+> +
+> +	if (bridge->has_pcie && reg >= PCI_CAP_PCIE_START) {
+> +		reg -= PCI_CAP_PCIE_START;
+> +
+> +		if (bridge->ops->read_pcie)
+> +			ret = bridge->ops->read_pcie(bridge, reg, value);
+> +		else
+> +			ret = PCI_SW_BRIDGE_NOT_HANDLED;
+> +
+> +		if (ret == PCI_SW_BRIDGE_NOT_HANDLED)
+> +			*value = *((u32*) &bridge->pcie_conf + reg / 4);
+> +	} else {
+> +		if (bridge->ops->read_base)
+> +			ret = bridge->ops->read_base(bridge, reg, value);
+> +		else
+> +			ret = PCI_SW_BRIDGE_NOT_HANDLED;
+> +
+> +		if (ret == PCI_SW_BRIDGE_NOT_HANDLED)
+> +			*value = *((u32*) &bridge->conf + reg / 4);
+
+I'm not sure about this part, where the config space that's not
+handled by the bridge's ops ends up just being RAM that's readable and
+writable with no effect on the hardware.  That seems a little
+counter-intuitive.  I think dropping writes and reading zeroes would
+simplify my mental model.
+
+> +	}
+> +
+> +	if (size == 1)
+> +		*value = (*value >> (8 * (where & 3))) & 0xff;
+> +	else if (size == 2)
+> +		*value = (*value >> (8 * (where & 3))) & 0xffff;
+> +	else if (size != 4)
+> +		return PCIBIOS_BAD_REGISTER_NUMBER;
+
+This isn't directly related to your patches, but this is a common
+pattern with some variations between drivers, which makes me wonder
+whether there are bugs lurking.  These use "where & 3" for size 2:
+
+  advk_pcie_rd_conf()
+  mtk_pcie_hw_rd_cfg()
+  pci_generic_config_read32()
+
+But these use "where & 2":
+
+  _altera_pcie_cfg_read()
+  rcar_pcie_read_conf()
+
+I *think* this means that unaligned 2-byte config reads on Altera and
+R-Car will return incorrect data.  In both cases, the actual read seen
+by the hardware is a 32-bit read, but I think we extract the wrong 16
+bits from that result.
+
+I wonder if there's a way to use a common helper function to do this.
+
+> +	return PCIBIOS_SUCCESSFUL;
+> +}
+
+> +	/*
+> +	 * Called when writing to the regular PCI bridge configuration
+> +	 * space. old is the current value, new is the new value being
+> +	 * written, and mask indicates which parts of the value are
+> +	 * being changed.
+> +	 */
+> +	void (*write_base)(struct pci_sw_bridge *bridge, int reg,
+> +			   u32 old, u32 new, u32 mask);
+> +
+> +	/*
+> +	 * Same as ->read_base(), except it is for reading from the
+> +	 * PCIe capability configuration space.
+
+I think you mean "->write_base(), except it is for writing to"
+
+> +	 */
+> +	void (*write_pcie)(struct pci_sw_bridge *bridge, int reg,
+> +			   u32 old, u32 new, u32 mask);
+> +};
