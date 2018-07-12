@@ -1,191 +1,92 @@
-From: ludovic.barre@st.com (Ludovic BARRE)
-Date: Thu, 12 Jul 2018 11:09:32 +0200
-Subject: [PATCH 01/19] mmc: mmci: regroup and define dma operations
-In-Reply-To: <CAPDyKFo0q5Yps1whPmaUQJAV3tXx91WPmxtMF_ov43qP=djQfg@mail.gmail.com>
-References: <1528809280-31116-1-git-send-email-ludovic.Barre@st.com>
- <1528809280-31116-2-git-send-email-ludovic.Barre@st.com>
- <CAPDyKFpt5HUeUqaoS9icDodM+r64jB9vQ=zTecO0tuBv=TtOXg@mail.gmail.com>
- <d93e6886-1dee-7915-459f-466a54d0c242@st.com>
- <CAPDyKFo0q5Yps1whPmaUQJAV3tXx91WPmxtMF_ov43qP=djQfg@mail.gmail.com>
-Message-ID: <f407426c-766c-c46f-85cd-7bf76bcab554@st.com>
+From: liviu.dudau@arm.com (Liviu Dudau)
+Date: Thu, 12 Jul 2018 10:18:15 +0100
+Subject: [PATCH -next] misc: vexpress: Fix potential NULL dereference in
+ vexpress_syscfg_probe()
+In-Reply-To: <20180711154110.GB10578@e107155-lin>
+References: <1531315058-183762-1-git-send-email-weiyongjun1@huawei.com>
+ <20180711154110.GB10578@e107155-lin>
+Message-ID: <20180712091815.GT15340@e110455-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Jul 11, 2018 at 04:41:10PM +0100, Sudeep Holla wrote:
+> On Wed, Jul 11, 2018 at 01:17:38PM +0000, Wei Yongjun wrote:
+> > platform_get_resource() may fail and return NULL, so we should
+> > better check it's return value to avoid a NULL pointer dereference
+> > a bit later in the code.
+> > 
+> > This is detected by Coccinelle semantic patch.
+> > 
+> > @@
+> > expression pdev, res, n, t, e, e1, e2;
+> > @@
+> > 
+> > res = platform_get_resource(pdev, t, n);
+> > + if (!res)
+> > +   return -EINVAL;
+> > ... when != res == NULL
+> > e = devm_ioremap(e1, res->start, e2);
+> 
+> Instead of adding unnecessary check here, I would go with replacing it
+> with devm_ioremap_resource as it's designed to deal with that (patch inline)
+> 
+> Regards,
+> Sudeep
+> 
+> -->8
+> From a6de466984e657dad24dcbe87e5dde2d21cb8d35 Mon Sep 17 00:00:00 2001
+> From: Sudeep Holla <sudeep.holla@arm.com>
+> Date: Wed, 11 Jul 2018 16:17:39 +0100
+> Subject: [PATCH] misc: vexpress/syscfg: Use devm_ioremap_resource() to map
+>  memory
+> 
+> Instead of checking the return value of platform_get_resource(), we can
+> use devm_ioremap_resource() which has the NULL pointer check and the
+> memory region requesting. devm_ioremap_resource is designed to replace
+> calls to devm_request_mem_region followed by devm_ioremap, so let's use
+> the same.
+> 
+> Cc: Liviu Dudau <liviu.dudau@arm.com>
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 
+Acked-by: Liviu Dudau <liviu.dudau@arm.com>
 
-On 07/11/2018 02:16 PM, Ulf Hansson wrote:
-> On 11 July 2018 at 11:41, Ludovic BARRE <ludovic.barre@st.com> wrote:
->>
->>
->> On 07/05/2018 05:17 PM, Ulf Hansson wrote:
->>>
->>> On 12 June 2018 at 15:14, Ludovic Barre <ludovic.Barre@st.com> wrote:
->>>>
->>>> From: Ludovic Barre <ludovic.barre@st.com>
->>>>
->>>> Prepare mmci driver to manage dma interface by new property.
->>>> This patch defines and regroups dma operations for mmci drivers.
->>>> mmci_dma_XX prototypes are added to call member of mmci_dma_ops
->>>> if not null. Based on legacy need, a mmci dma interface has been
->>>> defined with:
->>>> -mmci_dma_setup
->>>> -mmci_dma_release
->>>> -mmci_dma_pre_req
->>>> -mmci_dma_start
->>>> -mmci_dma_finalize
->>>> -mmci_dma_post_req
->>>> -mmci_dma_error
->>>> -mmci_dma_get_next_data
->>>
->>>
->>> As I suggested for one of the other patches, I would rather turn core
->>> mmci functions into library functions, which can be either invoked
->>> from variant callbacks or assigned directly to them.
->>>
->>> In other words, I would leave the functions that you move in this
->>> patch to stay in mmci.c. Although some needs to be re-factored and we
->>> also needs to make some of them available to be called from another
->>> file, hence the functions needs to be shared via mmci.h rather than
->>> being declared static.
->>
->>
->> In previous exchange mail "STM32MP1 SDMMC driver review"
->> we are said:
->>
->>>>> -dma variant ? should fit in Qualcomm implementation, reuse (rename)
->>>>> mmci_qcom_dml.c file and integrate ST dma in.
+> ---
+>  drivers/misc/vexpress-syscfg.c | 10 +++-------
+>  1 file changed, 3 insertions(+), 7 deletions(-)
 > 
-> Apologize if I may have lead you in a wrong direction, that was not my intent.
+> diff --git a/drivers/misc/vexpress-syscfg.c b/drivers/misc/vexpress-syscfg.c
+> index 80a6f199077c..6c3591cdf855 100644
+> --- a/drivers/misc/vexpress-syscfg.c
+> +++ b/drivers/misc/vexpress-syscfg.c
+> @@ -258,13 +258,9 @@ static int vexpress_syscfg_probe(struct platform_device *pdev)
+>  	INIT_LIST_HEAD(&syscfg->funcs);
+>  
+>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> -	if (!devm_request_mem_region(&pdev->dev, res->start,
+> -			resource_size(res), pdev->name))
+> -		return -EBUSY;
+> -
+> -	syscfg->base = devm_ioremap(&pdev->dev, res->start, resource_size(res));
+> -	if (!syscfg->base)
+> -		return -EFAULT;
+> +	syscfg->base = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(syscfg->base))
+> +		return PTR_ERR(syscfg->base);
+>  
+>  	/* Must use dev.parent (MFD), as that's where DT phandle points at... */
+>  	bridge = vexpress_config_bridge_register(pdev->dev.parent,
+> -- 
+> 2.7.4
 > 
-> However, by looking at $subject patch, your seems to be unnecessarily
-> shuffling code around. I would like to avoid that.
-> 
->>>>
->>>> stm32 sdmmc has an internal dma, no need to use dmaengine API;
->>>> So some modifications in mmci (pre/post request, mmci_dma_xx). perhaps
->>>> should be done with an ops or not.
->>>
->>> Yes.
->>>
->>> The Qualcomm variant is also using an internal DMA, hence I thought
->>> there may be something we could re-use, or at least have some new
->>> common ops for.
->>
->> It's not crystal clear for me.
->> Do you always agree with a dma ops which allow to address different
->> DMA transfer:
->> -with dmaengine API
->> -sdmmc idma, without dmaengine API
->> -...
-> 
-> If we can use a mmci ops callback to manage the variant differences,
-> that would be perfect. That combined with making the existing DMA
-> functions in mmci.c converted to "library" functions, which the mmci
-> ops callbacks can call, in order to re-use code.
-> 
-> When that isn't really suitable, we may need to add a "quirk" instead,
-> which would be specific for that particular variant. Along the lines
-> of what we already do for variant specifics inside mmci.c.
-> 
-> I think we have to decide on case by case basis, what fits best.
-> 
-> Hope this makes a better explanation. If not, please tell, and I can
-> take an initial stab and post a patch to show you with code how I mean
-> to move forward.
-> 
->>
->>
->>>
->>> Let me take a concrete example on how I would move forward, hopefully
->>> that explains it a bit better. Please see below.
->>>
->>> [...]
->>>
->>>> -/*
->>>> - * All the DMA operation mode stuff goes inside this ifdef.
->>>> - * This assumes that you have a generic DMA device interface,
->>>> - * no custom DMA interfaces are supported.
->>>> - */
->>>> -#ifdef CONFIG_DMA_ENGINE
->>>> -static void mmci_dma_setup(struct mmci_host *host)
->>>> -{
->>>> -       const char *rxname, *txname;
->>>> -       struct variant_data *variant = host->variant;
->>>> -
->>>> -       host->dma_rx_channel =
->>>> dma_request_slave_channel(mmc_dev(host->mmc), "rx");
->>>> -       host->dma_tx_channel =
->>>> dma_request_slave_channel(mmc_dev(host->mmc), "tx");
->>>> -
->>>> -       /* initialize pre request cookie */
->>>> -       host->next_data.cookie = 1;
->>>> -
->>>> -       /*
->>>> -        * If only an RX channel is specified, the driver will
->>>> -        * attempt to use it bidirectionally, however if it is
->>>> -        * is specified but cannot be located, DMA will be disabled.
->>>> -        */
->>>> -       if (host->dma_rx_channel && !host->dma_tx_channel)
->>>> -               host->dma_tx_channel = host->dma_rx_channel;
->>>> -
->>>> -       if (host->dma_rx_channel)
->>>> -               rxname = dma_chan_name(host->dma_rx_channel);
->>>> -       else
->>>> -               rxname = "none";
->>>> -
->>>> -       if (host->dma_tx_channel)
->>>> -               txname = dma_chan_name(host->dma_tx_channel);
->>>> -       else
->>>> -               txname = "none";
->>>> -
->>>> -       dev_info(mmc_dev(host->mmc), "DMA channels RX %s, TX %s\n",
->>>> -                rxname, txname);
->>>> -
->>>> -       /*
->>>> -        * Limit the maximum segment size in any SG entry according to
->>>> -        * the parameters of the DMA engine device.
->>>> -        */
->>>> -       if (host->dma_tx_channel) {
->>>> -               struct device *dev = host->dma_tx_channel->device->dev;
->>>> -               unsigned int max_seg_size = dma_get_max_seg_size(dev);
->>>> -
->>>> -               if (max_seg_size < host->mmc->max_seg_size)
->>>> -                       host->mmc->max_seg_size = max_seg_size;
->>>> -       }
->>>> -       if (host->dma_rx_channel) {
->>>> -               struct device *dev = host->dma_rx_channel->device->dev;
->>>> -               unsigned int max_seg_size = dma_get_max_seg_size(dev);
->>>> -
->>>> -               if (max_seg_size < host->mmc->max_seg_size)
->>>> -                       host->mmc->max_seg_size = max_seg_size;
->>>> -       }
->>>
->>>
->>> Everything above shall be left as generic library function,
->>> mmci_dma_setup() and I would share it via mmci.h and thus change it
->>> from being static.
->>>
->>
->> each interfaces mmci_dma_XXX have very different needs depending
->> dma_ops (legacy, sdmmc idma)
-> 
-> Right. This was just one example.
-> 
-> If I understand, what you are suggesting is to make all of them being
-> variant specific callbacks, so I assume that would solve the problems.
-> Just to be clear, I have no problem with that.
-> 
-> Although, that doesn't mean we can't re-use existing dma functions in
-> mmci.c, when that makes sense.
 
-Yes, when examine dmaengine_XX ops and sdmmc_idma_XX ops (in patch 01
-and 17) there are few common piece of code. So I think we will have same
-dma functions pointer in mmci_ops. However, the cookie management may be
-shared
-
-> 
-> [...]
-> 
-> Kind regards
-> Uffe
-> 
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
