@@ -1,33 +1,36 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 12 Jul 2018 13:30:38 +0100
-Subject: [PATCH v2 3/5] mfd: axp20x: Support AXP806 in I2C mode
-In-Reply-To: <20180705031106.344-4-wens@csie.org>
-References: <20180705031106.344-1-wens@csie.org>
- <20180705031106.344-4-wens@csie.org>
-Message-ID: <20180712123038.GH4641@dell>
+From: fabio.estevam@nxp.com (Fabio Estevam)
+Date: Thu, 12 Jul 2018 10:02:36 -0300
+Subject: [PATCH 1/3] ARM: dts: imx53-ppd: Enable secure-reg-access
+Message-ID: <1531400558-20700-1-git-send-email-fabio.estevam@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 05 Jul 2018, Chen-Yu Tsai wrote:
+From: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
 
-> The Pine64 H64 board uses an AXP806 PMIC in I2C and self-working mode.
-> The H64 SoC does not have the usual RSB controller.
-> 
-> This patch adds AXP806 to the list of devices supported in I2C mode.
-> In theory, all RSB-based PMICs can also be used in I2C mode.
-> 
-> Reviewed-by: Icenowy Zheng <icenowy@aosc.io>
-> Tested-by: Icenowy Zheng <icenowy@aosc.io>
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->  drivers/mfd/axp20x-i2c.c | 2 ++
->  1 file changed, 2 insertions(+)
+Add 'secure-reg-access' property to enable PMU and hardware counters
+so that they can be properly used with the 'perf' tool.
 
-For my own reference:
-  Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
+Signed-off-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
+[fabio: kept the change only in imx53-ppd context]
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+---
+ arch/arm/boot/dts/imx53-ppd.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
 
+diff --git a/arch/arm/boot/dts/imx53-ppd.dts b/arch/arm/boot/dts/imx53-ppd.dts
+index 444ec84..cdb90be 100644
+--- a/arch/arm/boot/dts/imx53-ppd.dts
++++ b/arch/arm/boot/dts/imx53-ppd.dts
+@@ -594,6 +594,10 @@
+ 	};
+ };
+ 
++&pmu {
++	secure-reg-access;
++};
++
+ &pwm1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_pwm1>;
 -- 
-Lee Jones [???]
-Linaro Services Technical Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+2.7.4
