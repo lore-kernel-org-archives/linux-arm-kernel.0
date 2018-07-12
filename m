@@ -1,25 +1,40 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 12 Jul 2018 10:18:30 -0700
-Subject: [PATCH v7 7/7] arm64: dts: sdm845: Add tsens nodes
-In-Reply-To: <0dfdbfa82edced85ea5be02e1d74d73d232c7a08.1531384019.git.amit.kucheria@linaro.org>
-References: <cover.1531384019.git.amit.kucheria@linaro.org>
- <0dfdbfa82edced85ea5be02e1d74d73d232c7a08.1531384019.git.amit.kucheria@linaro.org>
-Message-ID: <CAD=FV=UHQ2SDC9WbS2=D_ka3OxnxPPrQt6tLx5Yy6Lf_bnVqrg@mail.gmail.com>
+From: drivshin@awxrd.com (David Rivshin)
+Date: Thu, 12 Jul 2018 13:28:53 -0400
+Subject: [PATCH] pwm: pwm-omap-dmtimer: return -EPROBE_DEFER if no dmtimer
+ platform data
+Message-ID: <20180712172853.22293-1-drivshin@awxrd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: David Rivshin <DRivshin@allworx.com>
 
-On Thu, Jul 12, 2018 at 1:39 AM, Amit Kucheria <amit.kucheria@linaro.org> wrote:
-> SDM845 has two tsens blocks, one with 13 sensors and the other with 8
-> sensors. It uses version 2 of the TSENS IP, so use the fallback property to
-> allow more common code.
->
-> Signed-off-by: Amit Kucheria <amit.kucheria@linaro.org>
-> Reviewed-by: Bjorn Andersson <bjorn.andersson@linaro.org>
-> Tested-by: Matthias Kaehlcke <mka@chromium.org>
-> ---
->  arch/arm64/boot/dts/qcom/sdm845.dtsi | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
+If a pwm-omap-dmtimer is probed before the dmtimer it uses, the platform
+data won't be set yet.
 
-Reviewed-by: Douglas Anderson <dianders@chromium.org>
+Fixes: ac30751df953 ("ARM: OMAP: pdata-quirks: Remove unused timer pdata")
+Cc: <stable@vger.kernel.org> # 4.17+
+Signed-off-by: David Rivshin <drivshin@allworx.com>
+---
+ drivers/pwm/pwm-omap-dmtimer.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/pwm/pwm-omap-dmtimer.c b/drivers/pwm/pwm-omap-dmtimer.c
+index 665da3c8fbceb..d3d7ea7a53146 100644
+--- a/drivers/pwm/pwm-omap-dmtimer.c
++++ b/drivers/pwm/pwm-omap-dmtimer.c
+@@ -264,8 +264,9 @@ static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
+ 
+ 	timer_pdata = dev_get_platdata(&timer_pdev->dev);
+ 	if (!timer_pdata) {
+-		dev_err(&pdev->dev, "dmtimer pdata structure NULL\n");
+-		ret = -EINVAL;
++		dev_info(&pdev->dev,
++			 "dmtimer pdata structure NULL, deferring probe\n");
++		ret = -EPROBE_DEFER;
+ 		goto put;
+ 	}
+ 
+
+base-commit: 1e4b044d22517cae7047c99038abb444423243ca
+-- 
+2.17.1
