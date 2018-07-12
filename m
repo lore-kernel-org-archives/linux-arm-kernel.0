@@ -1,48 +1,80 @@
-From: brendanhiggins@google.com (Brendan Higgins)
-Date: Thu, 12 Jul 2018 01:38:00 -0700
-Subject: [PATCH] i2c: aspeed: Add newline characters into message
- printings.
-In-Reply-To: <c13fc12e859f7bdb300f08ad805cdf6d7ec09f52.camel@perches.com>
-References: <20180702211359.30585-1-jae.hyun.yoo@linux.intel.com>
- <CAFd5g443wTQJ+0hrprOV949Sr_nRnBGpNo3Wd01xFN4GW4K2Ng@mail.gmail.com>
- <2d2f2b2b-394a-506f-c870-33520335250b@linux.intel.com>
- <c13fc12e859f7bdb300f08ad805cdf6d7ec09f52.camel@perches.com>
-Message-ID: <CAFd5g47-Bq_wUkL4vP93si+urDs-A0j26ukZ+Riy24HWi5AuuA@mail.gmail.com>
+From: amit.kucheria@linaro.org (Amit Kucheria)
+Date: Thu, 12 Jul 2018 14:09:01 +0530
+Subject: [PATCH v7 0/7] thermal: tsens: Refactoring for TSENSv2 IP
+Message-ID: <cover.1531384019.git.amit.kucheria@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 11, 2018 at 10:10 AM Joe Perches <joe@perches.com> wrote:
->
-> On Wed, 2018-07-11 at 09:53 -0700, Jae Hyun Yoo wrote:
-> > On 7/10/2018 10:42 PM, Brendan Higgins wrote:
-> > > On Mon, Jul 2, 2018 at 2:14 PM Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com> wrote:
-> > > > There are some log printing without a newline character. This
-> > > > patch adds the missing newline characters.
-> []
-> > > > diff --git a/drivers/i2c/busses/i2c-aspeed.c b/drivers/i2c/busses/i2c-aspeed.c
-> []
-> > > > @@ -431,7 +431,7 @@ static bool aspeed_i2c_master_irq(struct aspeed_i2c_bus *bus)
-> > > >           */
-> > > >          if (bus->master_state == ASPEED_I2C_MASTER_START) {
-> > > >                  if (unlikely(!(irq_status & ASPEED_I2CD_INTR_TX_ACK))) {
-> > > > -                       pr_devel("no slave present at %02x", msg->addr);
-> > > > +                       pr_devel("no slave present at %02x\n", msg->addr);
-> > >
-> > > Unless something changed in the last couple versions of the kernel, this is the
-> > > only line that actually changes anything. dev_* inserts a newline for every
-> > > call.
->
-> Not true.
->
-> Any printk without KERN_CONT inserts a newline
-> if the last character
-> emitted is not a newline.
->
-> dev_<level> uses can also be followed by pr_cont.
->
-> So this patch does reduce the possibility of
-> interleaved messages from multiple processes.
+This series is a mixed bag:
+- Some code moves to allow code sharing between different SoCs with v2 of
+  the TSENS IP,
+- a generic qcom,tsens-v2 property as a fallback compatible for all v2.x.y
+  platforms,
+- new platform support (sdm845)
+- a cleanup patch and
+- a DT change to have a common way to deal with the SROT and TM registers
+  despite slightly different features across the IP family and different
+  register offsets.
 
-My mistake. Thanks for pointing that out.
+Changes since v6:
+- Fix comments and patch descriptions as per Doug's review
+- Rename tsens to thermal-sensor in DT
+- Add various review tags
 
-Jae, forget what I said earlier. This looks good to me.
+Changes since v5:
+- Actually fix unit addressses for the two tsens blocks as per Stephen's comment.
+
+Changes since v4:
+- Revert back to a single fallback bindind qcom,tsens-v2 as per Rob's
+  suggestion.
+- Rework how old (unsplit SROT and TM address space) DTs are handled by
+  needing a 0x1000 offset but still sharing common code in tsens-v2.c
+- Remove the patch to added TRDY checks while we investigate Matthias'
+  reports
+- Fix unit addressses for the two tsens blocks as per Stephen's comment.
+
+Changes since v3:
+- Introduce qcom,tsens-v2.4.0 property and make qcom,tsens-v2 a
+  fallback, compatible property.
+- Rename ops_v2 to ops_generic_v2
+
+Changes since v2:
+
+- Based on review, moved tsens-8996.c to tsens-v2.c and changed
+  corresponding function names, struct names to allow for generic tsensv2
+  platforms
+- All v2 platforms will now only need to use the qcom,tsen-v2
+  property
+- Added a DT patch to initialize tsens driver on sdm845, now that
+  4.18-rc1 will contain an sdm845.dtsi
+
+Changes since v1:
+- Move get_temp() from tsens-8996 to tsens-common and rename
+- Change 8996 DT entry to allow init_common() to work across
+  sdm845 and 8996 due to different offsets
+
+Amit Kucheria (7):
+  thermal: tsens: Get rid of unused fields in structure
+  thermal: tsens: Add support to split up register address space into
+    two
+  arm64: dts: msm8996: thermal: Initialise via DT and add second
+    controller
+  thermal: tsens: Rename tsens-8996 to tsens-v2 for reuse
+  dt: thermal: tsens: Document the fallback DT property for v2 of TSENS
+    IP
+  thermal: tsens: Add generic support for TSENS v2 IP
+  arm64: dts: sdm845: Add tsens nodes
+
+ .../devicetree/bindings/thermal/qcom-tsens.txt     | 31 +++++++++++++++++----
+ arch/arm64/boot/dts/qcom/msm8996.dtsi              | 14 ++++++++--
+ arch/arm64/boot/dts/qcom/sdm845.dtsi               | 16 +++++++++++
+ drivers/thermal/qcom/Makefile                      |  2 +-
+ drivers/thermal/qcom/tsens-common.c                | 12 ++++++++
+ drivers/thermal/qcom/{tsens-8996.c => tsens-v2.c}  | 32 ++++++++++------------
+ drivers/thermal/qcom/tsens.c                       |  3 ++
+ drivers/thermal/qcom/tsens.h                       |  8 ++++--
+ 8 files changed, 88 insertions(+), 30 deletions(-)
+ rename drivers/thermal/qcom/{tsens-8996.c => tsens-v2.c} (64%)
+
+-- 
+2.7.4
