@@ -1,61 +1,61 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu, 12 Jul 2018 17:01:33 +0900
-Subject: [PATCH 3/6] kbuild: remove redundant LDFLAGS clearing in
- arch/*/Makefile
-In-Reply-To: <1531382496-3719-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1531382496-3719-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1531382496-3719-4-git-send-email-yamada.masahiro@socionext.com>
+Date: Thu, 12 Jul 2018 17:01:30 +0900
+Subject: [PATCH 0/6] kbuild: clean-up and rename LDFLAGS to KBUILD_LDFLAGS
+Message-ID: <1531382496-3719-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since commit ce99d0bf312d ("kbuild: clear LDFLAGS in the top Makefile"),
-the top-level Makefile caters to this.
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
+This series renames LDFLAGS to KBUILD_LDFLAGS
+after some Makefile cleanups.
 
- arch/arm/Makefile      | 3 ---
- arch/openrisc/Makefile | 1 -
- arch/riscv/Makefile    | 1 -
- 3 files changed, 5 deletions(-)
+Currently, the last patch does not apply to Linus' tree
+due to missing pre-requisite patches.
 
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 62ebeae..e7d703d 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -10,9 +10,6 @@
- #
- # Copyright (C) 1995-2001 by Russell King
- 
--# Ensure linker flags are correct
--LDFLAGS		:=
--
- LDFLAGS_vmlinux	:=-p --no-undefined -X --pic-veneer
- ifeq ($(CONFIG_CPU_ENDIAN_BE8),y)
- LDFLAGS_vmlinux	+= --be8
-diff --git a/arch/openrisc/Makefile b/arch/openrisc/Makefile
-index 89076a6..70e06d3 100644
---- a/arch/openrisc/Makefile
-+++ b/arch/openrisc/Makefile
-@@ -19,7 +19,6 @@
- 
- KBUILD_DEFCONFIG := or1ksim_defconfig
- 
--LDFLAGS         :=
- OBJCOPYFLAGS    := -O binary -R .note -R .comment -S
- LDFLAGS_vmlinux :=
- LIBGCC 		:= $(shell $(CC) $(KBUILD_CFLAGS) -print-libgcc-file-name)
-diff --git a/arch/riscv/Makefile b/arch/riscv/Makefile
-index 6d4a5f6c..2627e48 100644
---- a/arch/riscv/Makefile
-+++ b/arch/riscv/Makefile
-@@ -8,7 +8,6 @@
- # for more details.
- #
- 
--LDFLAGS         :=
- OBJCOPYFLAGS    := -O binary
- LDFLAGS_vmlinux :=
- ifeq ($(CONFIG_DYNAMIC_FTRACE),y)
+I will resolve conflicts as needed.
+
+
+
+Masahiro Yamada (6):
+  um: remove redundant 'export LDFLAGS' in arch/x86/Makefile.um
+  ARM: vfp: clean-up arch/arm/vfp/Makefile
+  kbuild: remove redundant LDFLAGS clearing in arch/*/Makefile
+  kbuild: replace $(LDFLAGS) $(ldflags-y) with $(ld_flags)
+  kbuild: change ld_flags to contain LDFLAGS_$(@F)
+  kbuild: rename LDFLAGS to KBUILD_LDFLAGS
+
+ Makefile                           | 6 +++---
+ arch/arc/Makefile                  | 2 +-
+ arch/arm/Makefile                  | 7 ++-----
+ arch/arm/vfp/Makefile              | 5 +----
+ arch/arm64/Makefile                | 4 ++--
+ arch/c6x/Makefile                  | 3 +--
+ arch/h8300/Makefile                | 2 +-
+ arch/hexagon/Makefile              | 4 +---
+ arch/m68k/Makefile                 | 2 +-
+ arch/microblaze/Makefile           | 4 ++--
+ arch/mips/Makefile                 | 2 +-
+ arch/mips/boot/compressed/Makefile | 2 +-
+ arch/mips/lasat/image/Makefile     | 2 +-
+ arch/nds32/Makefile                | 4 ++--
+ arch/openrisc/Makefile             | 1 -
+ arch/powerpc/Makefile              | 6 +++---
+ arch/riscv/Makefile                | 5 ++---
+ arch/s390/Makefile                 | 2 +-
+ arch/sh/Makefile                   | 4 ++--
+ arch/sparc/Makefile                | 4 ++--
+ arch/um/Makefile                   | 2 +-
+ arch/um/drivers/Makefile           | 4 ++--
+ arch/x86/Makefile                  | 4 ++--
+ arch/x86/Makefile.um               | 4 +---
+ arch/x86/boot/compressed/Makefile  | 6 +++---
+ arch/xtensa/Makefile               | 2 +-
+ arch/xtensa/boot/boot-elf/Makefile | 2 +-
+ scripts/Kbuild.include             | 4 ++--
+ scripts/Makefile.build             | 4 ++--
+ scripts/Makefile.lib               | 5 ++---
+ scripts/Makefile.modpost           | 2 +-
+ 31 files changed, 48 insertions(+), 62 deletions(-)
+
 -- 
 2.7.4
