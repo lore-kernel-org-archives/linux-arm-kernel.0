@@ -1,64 +1,59 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 13 Jul 2018 00:04:47 +0800
-Subject: [PATCH v3 0/5] arm64: allwinner: h6: Enable AXP805 PMIC on Pine H64
-Message-ID: <20180712160452.5516-1-wens@csie.org>
+Date: Fri, 13 Jul 2018 00:04:51 +0800
+Subject: [PATCH v3 4/5] arm64: dts: allwinner: h6: Use macros for R_CCU clock
+ and reset indices
+In-Reply-To: <20180712160452.5516-1-wens@csie.org>
+References: <20180712160452.5516-1-wens@csie.org>
+Message-ID: <20180712160452.5516-5-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+Now that the device tree binding headers for the R_CCU have been merged,
+we can use the macros, instead of raw numbers.
 
-This series enables the AXP805 PMIC found on the Pine64 Pine H64 board.
-The AXP805 seems to be identical to the AXP806 when comparing datasheets.
-The Pine H64 uses the PMIC in stand-alone or "self-working" mode, using
-the I2C interface. Neither features are currently supported. This series
-adds support for them, and then adds the PMIC to the device tree.
+Switch to R_CCU macros for clock and reset indices.
 
-Unfortunately, v2 was actually an accidental resend of v1. Apologies to
-Lee having to review the same stuff twice.
+Reviewed-by: Icenowy Zheng <icenowy@aosc.io>
+Tested-by: Icenowy Zheng <icenowy@aosc.io>
+Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
 
-Changes since v1:
-
-  - Mentioned "self-working mode" in device tree commit message
-  - Shortened one line mfd cell into just one line
-  - Dropped unrelated pinctrl change
-  - Collected tags from Rob, Icenowy, Lee, and Maxime
-
-Patch 1 adds a new device tree property to describe the self-working mode
-for the AXP806.
-
-Patch 2 adds support for the newly added property to the driver.
-
-Patch 3 adds support for the using AXP806 with I2C.
-
-Patch 4 converts raw clock/reset indices for the H6 R_CCU currently found
-in the device tree to macros defined as part of the device tree bindings.
-
-Patch 5 adds the PMIC and its regulators to the Pine H64 device tree.
-
-First three patches should go in through Lee's mfd tree. We'll take the
-other two through the sunxi tree.
-
-Please have a look.
-
-Regards
-ChenYu
-
-Chen-Yu Tsai (4):
-  dt-bindings: mfd: axp20x: Add "self-working" mode for AXP806
-  mfd: axp20x: Add self-working mode support for AXP806
-  mfd: axp20x: Support AXP806 in I2C mode
-  arm64: dts: allwinner: h6: Use macros for R_CCU clock and reset
-    indices
-
-Icenowy Zheng (1):
-  arm64: dts: allwinner: h6: enable AXP805 PMIC on Pine H64
-
- .../devicetree/bindings/mfd/axp20x.txt        |   7 +-
- .../boot/dts/allwinner/sun50i-h6-pine-h64.dts | 109 ++++++++++++++++++
- arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi  |   8 +-
- drivers/mfd/axp20x-i2c.c                      |   2 +
- drivers/mfd/axp20x.c                          |  28 ++++-
- 5 files changed, 146 insertions(+), 8 deletions(-)
-
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
+index c72da8cd9ef5..37c2e11fca2e 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
+@@ -5,7 +5,9 @@
+ 
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+ #include <dt-bindings/clock/sun50i-h6-ccu.h>
++#include <dt-bindings/clock/sun50i-h6-r-ccu.h>
+ #include <dt-bindings/reset/sun50i-h6-ccu.h>
++#include <dt-bindings/reset/sun50i-h6-r-ccu.h>
+ 
+ / {
+ 	interrupt-parent = <&gic>;
+@@ -198,7 +200,7 @@
+ 			reg = <0x07022000 0x400>;
+ 			interrupts = <GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH>,
+ 				     <GIC_SPI 111 IRQ_TYPE_LEVEL_HIGH>;
+-			clocks = <&r_ccu 2>, <&osc24M>, <&osc32k>;
++			clocks = <&r_ccu CLK_R_APB1>, <&osc24M>, <&osc32k>;
+ 			clock-names = "apb", "hosc", "losc";
+ 			gpio-controller;
+ 			#gpio-cells = <3>;
+@@ -215,8 +217,8 @@
+ 			compatible = "allwinner,sun6i-a31-i2c";
+ 			reg = <0x07081400 0x400>;
+ 			interrupts = <GIC_SPI 107 IRQ_TYPE_LEVEL_HIGH>;
+-			clocks = <&r_ccu 8>;
+-			resets = <&r_ccu 4>;
++			clocks = <&r_ccu CLK_R_APB2_I2C>;
++			resets = <&r_ccu RST_R_APB2_I2C>;
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&r_i2c_pins>;
+ 			status = "disabled";
 -- 
 2.18.0
