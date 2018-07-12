@@ -1,68 +1,63 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 12 Jul 2018 09:01:29 +0200
-Subject: [RFC PATCH v6 2/2] mailbox: imx-mailbox: add scu protocol support
-In-Reply-To: <1531326759-20556-3-git-send-email-aisheng.dong@nxp.com>
-References: <1531326759-20556-1-git-send-email-aisheng.dong@nxp.com>
- <1531326759-20556-3-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <20180712070129.tyetqm2yesouiatf@pengutronix.de>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Thu, 12 Jul 2018 15:09:55 +0800
+Subject: [linux-sunxi] Re: [PATCH 1/2] ARM: sun8i: h3: enable HDMI output
+ on Banana Pi M2 Zero
+In-Reply-To: <20180712064601.m3bdd46wzac5fpgh@flea>
+References: <20180711132233.42301-1-icenowy@aosc.io>
+ <20180711132233.42301-2-icenowy@aosc.io>
+ <20180711150532.6gzm7krouriddreh@flea>
+ <8F6CDF5C-2AC1-43EC-858A-5C6345CF279A@aosc.io>
+ <20180712064601.m3bdd46wzac5fpgh@flea>
+Message-ID: <A7CA2831-7117-415C-BC59-3FB4AE425598@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 12, 2018 at 12:32:39AM +0800, Dong Aisheng wrote:
-> Add SCU protocol support in the generic mailbox driver.
-> 
-> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> ---
->  drivers/mailbox/Kconfig       |   6 +-
->  drivers/mailbox/imx-mailbox.c | 252 ++++++++++++++++++++++++++++++++++++------
->  2 files changed, 223 insertions(+), 35 deletions(-)
-> 
-> +static bool imx_mu_scu_peek_data(struct mbox_chan *chan)
-> +{
-> +	struct imx_mu_priv *priv = chan->con_priv;
-> +	u8 *raw_data;
-> +	int i, size;
-> +	int ret;
-> +
-> +	ret = imx_mu_scu_receive_msg(chan, 0, priv->msg);
-> +	if (ret)
-> +		return false;
-> +
-> +	raw_data = (u8 *)priv->msg;
-> +	size = raw_data[1];
-> +
-> +	dev_dbg(chan->mbox->dev, "receive data: hdr 0x%x size %d\n",
-> +		*priv->msg, size);
-> +
-> +	for (i = 1; i < size; i++) {
-> +		ret = imx_mu_scu_receive_msg(chan, i % 4, priv->msg + i);
-> +		if (ret)
-> +			return false;
-> +	}
-> +
-> +	mbox_chan_received_data(chan, (void *)priv->msg);
-> +
-> +	return true;
-> +}
 
-Receiving data now works by calling mbox_client_peek_data(). I think
-your plan is not to use rx_callback as triggered by mbox_chan_received_data,
-but instead exploiting the fact that you have put the receive data into
-the same buffer that you previously used to send a message. That way the
-client knows where to find the answer.
 
-While that should work I don't think this is very clean. That is the
-point where I mentioned I think that the mailbox framework would need a
-way to receive messages synchronously.
+? 2018?7?12? GMT+08:00 ??2:46:01, Maxime Ripard <maxime.ripard@bootlin.com> ??:
+>On Wed, Jul 11, 2018 at 11:15:50PM +0800, Icenowy Zheng wrote:
+>> 
+>> 
+>> ? 2018?7?11? GMT+08:00 ??11:05:32, Maxime Ripard
+><maxime.ripard@bootlin.com> ??:
+>> >Hi,
+>> >
+>> >On Wed, Jul 11, 2018 at 09:22:32PM +0800, Icenowy Zheng wrote:
+>> >> Banana Pi M2 Zero board has a miniHDMI port connected to the HDMI
+>> >> controller of Allwinner H3 SoC.
+>> >> 
+>> >> Enable the HDMI output in Banana Pi M2 Zero device tree.
+>> >> 
+>> >> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+>> >> ---
+>> >>  .../dts/sun8i-h2-plus-bananapi-m2-zero.dts    | 25
+>> >+++++++++++++++++++
+>> >>  1 file changed, 25 insertions(+)
+>> >> 
+>> >> diff --git a/arch/arm/boot/dts/sun8i-h2-plus-bananapi-m2-zero.dts
+>> >b/arch/arm/boot/dts/sun8i-h2-plus-bananapi-m2-zero.dts
+>> >> index 7d01f9322658..eb61dcf32797 100644
+>> >> --- a/arch/arm/boot/dts/sun8i-h2-plus-bananapi-m2-zero.dts
+>> >> +++ b/arch/arm/boot/dts/sun8i-h2-plus-bananapi-m2-zero.dts
+>> >> @@ -26,6 +26,17 @@
+>> >>  		stdout-path = "serial0:115200n8";
+>> >>  	};
+>> >>  
+>> >> +	hdmi-connector {
+>> >> +		compatible = "hdmi-connector";
+>> >> +		type = "c";
+>> >
+>> >This is not one of the connector type declared in DRM, how is it
+>> >exposed to the userspace?
+>> 
+>> So just use "A" here (because of single link)?
+>
+>If the connector type is C, it should be C, and DRM / driver adjusted
+>to handle it.
 
-Jassi, this is for you probably. Do you have an idea how synchronous
-receive could be implemented? We'll need some mbox_client_receive_data
-function.
+Okay I won't change this property, if there's any further revisions.
 
-Sascha
+For DRM driver, I think it can be an independent patchset.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+>
+>Maxime
