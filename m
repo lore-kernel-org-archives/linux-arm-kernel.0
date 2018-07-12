@@ -1,92 +1,121 @@
-From: liviu.dudau@arm.com (Liviu Dudau)
-Date: Thu, 12 Jul 2018 10:18:15 +0100
-Subject: [PATCH -next] misc: vexpress: Fix potential NULL dereference in
- vexpress_syscfg_probe()
-In-Reply-To: <20180711154110.GB10578@e107155-lin>
-References: <1531315058-183762-1-git-send-email-weiyongjun1@huawei.com>
- <20180711154110.GB10578@e107155-lin>
-Message-ID: <20180712091815.GT15340@e110455-lin.cambridge.arm.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Thu, 12 Jul 2018 11:21:57 +0200
+Subject: [PATCH 1/3] drm: mxsfb: Change driver.name to mxsfb-drm
+In-Reply-To: <6fdba55b-0be6-9e28-d87a-43d876a1fd09@denx.de>
+References: <cover.1529091248.git.leonard.crestez@nxp.com>
+ <47ea7572011735b68a8a70f0e11bdf00cb2fd86a.1529091248.git.leonard.crestez@nxp.com>
+ <CAOMZO5B8i0gN+rCq-yPrd112NkwJWTxYCtsLVeLhD1JLRuX6EQ@mail.gmail.com>
+ <07be6d9a85b6be655fc2b084be81d8bf9715b57a.camel@nxp.com>
+ <638457fd-85da-8fec-d146-517c43f71813@denx.de>
+ <b3fa74c5110b45e5992920485749869ab1f7ebce.camel@nxp.com>
+ <6995fa4b-47a9-887b-5e4f-4284ca6a2c79@gmail.com>
+ <fd22085f646d97f66cff5b7f22785500@agner.ch>
+ <6fdba55b-0be6-9e28-d87a-43d876a1fd09@denx.de>
+Message-ID: <617c0a7e9132b929877b8cbcf116b1ea@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 11, 2018 at 04:41:10PM +0100, Sudeep Holla wrote:
-> On Wed, Jul 11, 2018 at 01:17:38PM +0000, Wei Yongjun wrote:
-> > platform_get_resource() may fail and return NULL, so we should
-> > better check it's return value to avoid a NULL pointer dereference
-> > a bit later in the code.
-> > 
-> > This is detected by Coccinelle semantic patch.
-> > 
-> > @@
-> > expression pdev, res, n, t, e, e1, e2;
-> > @@
-> > 
-> > res = platform_get_resource(pdev, t, n);
-> > + if (!res)
-> > +   return -EINVAL;
-> > ... when != res == NULL
-> > e = devm_ioremap(e1, res->start, e2);
+On 10.07.2018 11:11, Marek Vasut wrote:
+> On 07/10/2018 11:06 AM, Stefan Agner wrote:
+>> On 16.06.2018 01:32, Marek Vasut wrote:
+>>> On 06/16/2018 12:42 AM, Leonard Crestez wrote:
+>>>> On Fri, 2018-06-15 at 23:36 +0200, Marek Vasut wrote:
+>>>>> On 06/15/2018 10:58 PM, Leonard Crestez wrote:
+>>>>>> On Fri, 2018-06-15 at 16:47 -0300, Fabio Estevam wrote:
+>>>>>>> On Fri, Jun 15, 2018 at 4:43 PM, Leonard Crestez
+>>>>>>> <leonard.crestez@nxp.com> wrote:
+>>>>
+>>>>>>>> The FBDEV driver uses the same name and both can't be registered at the
+>>>>>>>> same time. Fix this by renaming the drm driver to mxsfb-drm
+>>>>>>>
+>>>>>>> Stefan sent the same patch a few days ago:
+>>>>>>
+>>>>>> In that thread there is a proposal for removing the old fbdev/mxsfb
+>>>>>> driver entirely.
+>>>>>>
+>>>>>> That would break old DTBs, isn't this generally considered bad? Also,
+>>>>>> are we sure the removal of fbdev/mxsfb wouldn't lose any features?
+>>>>>>
+>>>>>> What my series does is make both drivers work with the same kernel
+>>>>>> image and turns the choice into a board-level dtb decision. Supporting
+>>>>>> everything at once seems desirable to me and it allows for a very
+>>>>>> smooth upgrade path.
+>>>>>
+>>>>> Having two drivers in the kernel with different set of bugs is always bad.
+>>>>>
+>>>>>> The old driver could be removed later, after all users are converted.
+>>>>>
+>>>>> Both drivers were in for long enough already. And let's be realistic,
+>>>>> how many MX23/MX28 users of old DTs with new kernels are there who
+>>>>> cannot update the DT as well ?
+>>>>
+>>>> Grepping for "display =" in arch/arm/boot/dts/imx* I see that old
+>>>> bindings are also used by 3rd-party boards for imx6/7:
+>>>>  * imx6sx-nitrogen6sx
+>>>>  * imx6ul-geam
+>>>>  * imx6ul-isiot
+>>>>  * imx6ul-opos6uldev
+>>>>  * imx6ul-pico-hobbit
+>>>>  * imx6ul-tx6ul
+>>>>  * imx7d-nitrogen7
+>>>
+>>> Er, yes, a handful of boards which could be updated :)
+>>>
+>>>> Converting everything might be quite a bit of work, and explicitly
+>>>> supporting old bindings is also work.
+>>>
+>>> Does adding support for old bindings justify the effort invested ? I
+>>> doubt so, it only adds more code to maintain.
+>>>
+>>>> It is very confusing that there is a whole set of displays for imx6/7
+>>>> which are supported by upstream but only with a non-default config.
+>>>> While it is extremely common in the embedded field to have custom
+>>>> configs the default one in the kernel should try to "just work".
+>>>>
+>>>> Couldn't this patch series be considered a bugfix? It was also
+>>>> surprisingly small.
+>>>
+>>> I think it's just a workaround which allows you to postpone the real
+>>> fix, and I don't like that.
+>>
+>> This is one of the situation where states quo is kinda the worst
+>> situation.
+>>
+>> Currently imx_v6_v7_defconfig and mxs_defconfig actually still uses
+>> CONFIG_FB_MXS.
+>>
+>> I understand that you'd rather prefer to move forward. I suggest we do
+>> it in steps.
+>>
+>> In 4.19:
+>>
+>> - Change DRM driver.name to mxsfb-drm so we avoid conflicts for now
 > 
-> Instead of adding unnecessary check here, I would go with replacing it
-> with devm_ioremap_resource as it's designed to deal with that (patch inline)
+> But this will break mesa if it depends on mxsfb name for ie. etnaviv
+> binding.
 > 
-> Regards,
-> Sudeep
-> 
-> -->8
-> From a6de466984e657dad24dcbe87e5dde2d21cb8d35 Mon Sep 17 00:00:00 2001
-> From: Sudeep Holla <sudeep.holla@arm.com>
-> Date: Wed, 11 Jul 2018 16:17:39 +0100
-> Subject: [PATCH] misc: vexpress/syscfg: Use devm_ioremap_resource() to map
->  memory
-> 
-> Instead of checking the return value of platform_get_resource(), we can
-> use devm_ioremap_resource() which has the NULL pointer check and the
-> memory region requesting. devm_ioremap_resource is designed to replace
-> calls to devm_request_mem_region followed by devm_ioremap, so let's use
-> the same.
-> 
-> Cc: Liviu Dudau <liviu.dudau@arm.com>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 
-Acked-by: Liviu Dudau <liviu.dudau@arm.com>
+Does it? grep -r -e mxsfb in libdrm and mesa master returns nothing.
 
-> ---
->  drivers/misc/vexpress-syscfg.c | 10 +++-------
->  1 file changed, 3 insertions(+), 7 deletions(-)
-> 
-> diff --git a/drivers/misc/vexpress-syscfg.c b/drivers/misc/vexpress-syscfg.c
-> index 80a6f199077c..6c3591cdf855 100644
-> --- a/drivers/misc/vexpress-syscfg.c
-> +++ b/drivers/misc/vexpress-syscfg.c
-> @@ -258,13 +258,9 @@ static int vexpress_syscfg_probe(struct platform_device *pdev)
->  	INIT_LIST_HEAD(&syscfg->funcs);
->  
->  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> -	if (!devm_request_mem_region(&pdev->dev, res->start,
-> -			resource_size(res), pdev->name))
-> -		return -EBUSY;
-> -
-> -	syscfg->base = devm_ioremap(&pdev->dev, res->start, resource_size(res));
-> -	if (!syscfg->base)
-> -		return -EFAULT;
-> +	syscfg->base = devm_ioremap_resource(&pdev->dev, res);
-> +	if (IS_ERR(syscfg->base))
-> +		return PTR_ERR(syscfg->base);
->  
->  	/* Must use dev.parent (MFD), as that's where DT phandle points at... */
->  	bridge = vexpress_config_bridge_register(pdev->dev.parent,
-> -- 
-> 2.7.4
-> 
+There is also .name in struct drm_driver, which is already set to
+mxsfb-drm... Is that the one exposed to user space?
 
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+>> - Remove CONFIG_FB_MXS from imx_v6_v7_defconfig/mxs_defconfig now, and
+>> only enable CONFIG_DRM_MXSFB=y
+>> - Add (deprecated) to CONFIG_FB_MXS
+>>
+>> In 4.19/4.20:
+>> - Fix the above device trees
+>>
+>> In 4.20/4.21:
+>> - Remove FB_MXS
+>>
+>> Does that sound reasonable? If yes, I can send the patch set to do step
+>> 1.
+> 
+> Can you fix the DTs for 4.19 too ?
+
+Getting tight, but will try.
+
+--
+Stefan
