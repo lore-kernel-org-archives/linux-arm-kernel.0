@@ -1,24 +1,35 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 12 Jul 2018 10:52:04 +0800
-Subject: [PATCH 2/2] ARM: dts: imx6sll: add gpio clocks
-In-Reply-To: <1529649154-5724-2-git-send-email-Anson.Huang@nxp.com>
-References: <1529649154-5724-1-git-send-email-Anson.Huang@nxp.com>
- <1529649154-5724-2-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <20180712025203.GQ6959@dragon>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 12 Jul 2018 11:02:25 +0800
+Subject: [PATCH] mmc: sunxi: Use new timing mode for A64 eMMC controller
+Message-ID: <20180712030225.15681-1-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 22, 2018 at 02:32:34PM +0800, Anson Huang wrote:
-> i.MX6SLL has GPIO clock gates in CCM CCGR, add
-> clock property for GPIO driver to make sure all
-> GPIO banks work as expected.
-> 
-> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+The eMMC controller is also a new timing mode controller, but it doesn't
+have the timing mode switch. It does however have signal delay and
+calibration controls, typical of Allwinner MMC controllers that support
+the new timing mode.
 
-I tried to create a topic branch for this patch with dependent clk
-branch merged in.  But it turns out to be difficult and not worth the
-effort, because too many imx6sll patches need to be moved out from
-imx/dt branch, and some imx6sll changes are mixed with other SoCs.
-Let's apply this in next cycle.  Ping me when 4.19-rc1 is available.
+Enable the new timing mode setting for the A64 eMMC controller. This
+also enables MMC HS-DDR modes, which gives higher throughput for eMMC
+chips that support it, and can deliver such throughput.
 
-Shawn
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ drivers/mmc/host/sunxi-mmc.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+index 8e7f3e35ee3d..13201bddfcc3 100644
+--- a/drivers/mmc/host/sunxi-mmc.c
++++ b/drivers/mmc/host/sunxi-mmc.c
+@@ -1166,6 +1166,7 @@ static const struct sunxi_mmc_cfg sun50i_a64_emmc_cfg = {
+ 	.idma_des_size_bits = 13,
+ 	.clk_delays = NULL,
+ 	.can_calibrate = true,
++	.needs_new_timings = true,
+ };
+ 
+ static const struct of_device_id sunxi_mmc_of_match[] = {
+-- 
+2.18.0
