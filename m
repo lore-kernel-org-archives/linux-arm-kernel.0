@@ -1,117 +1,48 @@
 From: thunder.leizhen@huawei.com (Zhen Lei)
-Date: Thu, 12 Jul 2018 14:18:30 +0800
-Subject: [PATCH v3 4/6] iommu/io-pgtable-arm: add support for non-strict mode
+Date: Thu, 12 Jul 2018 14:18:27 +0800
+Subject: [PATCH v3 1/6] iommu/arm-smmu-v3: fix the implementation of
+ flush_iotlb_all hook
 In-Reply-To: <1531376312-2192-1-git-send-email-thunder.leizhen@huawei.com>
 References: <1531376312-2192-1-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <1531376312-2192-5-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <1531376312-2192-2-git-send-email-thunder.leizhen@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To support the non-strict mode, now we only tlbi and sync for the strict
-mode. But for the non-leaf case, always follow strict mode.
-
-Use the lowest bit of the iova parameter to pass the strict mode:
-0, IOMMU_STRICT;
-1, IOMMU_NON_STRICT;
-Treat 0 as IOMMU_STRICT, so that the unmap operation can compatible with
-other IOMMUs which still use strict mode.
+.flush_iotlb_all can not just wait for previous tlbi operations to be
+completed, but should also invalid all TLBs of the related domain.
 
 Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
 ---
- drivers/iommu/io-pgtable-arm.c | 23 ++++++++++++++---------
- 1 file changed, 14 insertions(+), 9 deletions(-)
+ drivers/iommu/arm-smmu-v3.c | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
-index 010a254..9234db3 100644
---- a/drivers/iommu/io-pgtable-arm.c
-+++ b/drivers/iommu/io-pgtable-arm.c
-@@ -292,7 +292,7 @@ static void __arm_lpae_set_pte(arm_lpae_iopte *ptep, arm_lpae_iopte pte,
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index 1d64710..4402187 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -1770,6 +1770,14 @@ static int arm_smmu_map(struct iommu_domain *domain, unsigned long iova,
+ 	return ops->unmap(ops, iova, size);
+ }
  
- static size_t __arm_lpae_unmap(struct arm_lpae_io_pgtable *data,
- 			       unsigned long iova, size_t size, int lvl,
--			       arm_lpae_iopte *ptep);
-+			       arm_lpae_iopte *ptep, int strict);
- 
- static void __arm_lpae_init_pte(struct arm_lpae_io_pgtable *data,
- 				phys_addr_t paddr, arm_lpae_iopte prot,
-@@ -334,7 +334,7 @@ static int arm_lpae_init_pte(struct arm_lpae_io_pgtable *data,
- 		size_t sz = ARM_LPAE_BLOCK_SIZE(lvl, data);
- 
- 		tblp = ptep - ARM_LPAE_LVL_IDX(iova, lvl, data);
--		if (WARN_ON(__arm_lpae_unmap(data, iova, sz, lvl, tblp) != sz))
-+		if (WARN_ON(__arm_lpae_unmap(data, iova, sz, lvl, tblp, IOMMU_STRICT) != sz))
- 			return -EINVAL;
- 	}
- 
-@@ -531,7 +531,7 @@ static void arm_lpae_free_pgtable(struct io_pgtable *iop)
- static size_t arm_lpae_split_blk_unmap(struct arm_lpae_io_pgtable *data,
- 				       unsigned long iova, size_t size,
- 				       arm_lpae_iopte blk_pte, int lvl,
--				       arm_lpae_iopte *ptep)
-+				       arm_lpae_iopte *ptep, int strict)
- {
- 	struct io_pgtable_cfg *cfg = &data->iop.cfg;
- 	arm_lpae_iopte pte, *tablep;
-@@ -576,15 +576,18 @@ static size_t arm_lpae_split_blk_unmap(struct arm_lpae_io_pgtable *data,
- 	}
- 
- 	if (unmap_idx < 0)
--		return __arm_lpae_unmap(data, iova, size, lvl, tablep);
-+		return __arm_lpae_unmap(data, iova, size, lvl, tablep, strict);
- 
- 	io_pgtable_tlb_add_flush(&data->iop, iova, size, size, true);
-+	if (!strict)
-+		io_pgtable_tlb_sync(&data->iop);
++static void arm_smmu_flush_iotlb_all(struct iommu_domain *domain)
++{
++	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
 +
- 	return size;
- }
- 
- static size_t __arm_lpae_unmap(struct arm_lpae_io_pgtable *data,
- 			       unsigned long iova, size_t size, int lvl,
--			       arm_lpae_iopte *ptep)
-+			       arm_lpae_iopte *ptep, int strict)
++	if (smmu_domain->smmu)
++		arm_smmu_tlb_inv_context(smmu_domain);
++}
++
+ static void arm_smmu_iotlb_sync(struct iommu_domain *domain)
  {
- 	arm_lpae_iopte pte;
- 	struct io_pgtable *iop = &data->iop;
-@@ -609,7 +612,7 @@ static size_t __arm_lpae_unmap(struct arm_lpae_io_pgtable *data,
- 			io_pgtable_tlb_sync(iop);
- 			ptep = iopte_deref(pte, data);
- 			__arm_lpae_free_pgtable(data, lvl + 1, ptep);
--		} else {
-+		} else if (strict) {
- 			io_pgtable_tlb_add_flush(iop, iova, size, size, true);
- 		}
- 
-@@ -620,25 +623,27 @@ static size_t __arm_lpae_unmap(struct arm_lpae_io_pgtable *data,
- 		 * minus the part we want to unmap
- 		 */
- 		return arm_lpae_split_blk_unmap(data, iova, size, pte,
--						lvl + 1, ptep);
-+						lvl + 1, ptep, strict);
- 	}
- 
- 	/* Keep on walkin' */
- 	ptep = iopte_deref(pte, data);
--	return __arm_lpae_unmap(data, iova, size, lvl + 1, ptep);
-+	return __arm_lpae_unmap(data, iova, size, lvl + 1, ptep, strict);
- }
- 
- static size_t arm_lpae_unmap(struct io_pgtable_ops *ops, unsigned long iova,
- 			     size_t size)
- {
-+	int strict = ((iova & IOMMU_STRICT_MODE_MASK) == IOMMU_STRICT);
- 	struct arm_lpae_io_pgtable *data = io_pgtable_ops_to_data(ops);
- 	arm_lpae_iopte *ptep = data->pgd;
- 	int lvl = ARM_LPAE_START_LVL(data);
- 
-+	iova &= ~IOMMU_STRICT_MODE_MASK;
- 	if (WARN_ON(iova >= (1ULL << data->iop.cfg.ias)))
- 		return 0;
- 
--	return __arm_lpae_unmap(data, iova, size, lvl, ptep);
-+	return __arm_lpae_unmap(data, iova, size, lvl, ptep, strict);
- }
- 
- static phys_addr_t arm_lpae_iova_to_phys(struct io_pgtable_ops *ops,
+ 	struct arm_smmu_device *smmu = to_smmu_domain(domain)->smmu;
+@@ -1998,7 +2006,7 @@ static void arm_smmu_put_resv_regions(struct device *dev,
+ 	.map			= arm_smmu_map,
+ 	.unmap			= arm_smmu_unmap,
+ 	.map_sg			= default_iommu_map_sg,
+-	.flush_iotlb_all	= arm_smmu_iotlb_sync,
++	.flush_iotlb_all	= arm_smmu_flush_iotlb_all,
+ 	.iotlb_sync		= arm_smmu_iotlb_sync,
+ 	.iova_to_phys		= arm_smmu_iova_to_phys,
+ 	.add_device		= arm_smmu_add_device,
 -- 
 1.8.3
