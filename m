@@ -1,49 +1,89 @@
-From: amit.kucheria@linaro.org (Amit Kucheria)
-Date: Thu, 12 Jul 2018 14:09:08 +0530
-Subject: [PATCH v7 7/7] arm64: dts: sdm845: Add tsens nodes
-In-Reply-To: <cover.1531384019.git.amit.kucheria@linaro.org>
-References: <cover.1531384019.git.amit.kucheria@linaro.org>
-Message-ID: <0dfdbfa82edced85ea5be02e1d74d73d232c7a08.1531384019.git.amit.kucheria@linaro.org>
+From: brendanhiggins@google.com (Brendan Higgins)
+Date: Thu, 12 Jul 2018 01:41:28 -0700
+Subject: [PATCH] i2c: aspeed: Adjust spinlock scope in the irq handler
+In-Reply-To: <20180702214011.16071-1-jae.hyun.yoo@linux.intel.com>
+References: <20180702214011.16071-1-jae.hyun.yoo@linux.intel.com>
+Message-ID: <CAFd5g47nBCbF0mcYqEnQkDpz0Dhh0F0S1-wEL_yBHgs1b3yE5w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SDM845 has two tsens blocks, one with 13 sensors and the other with 8
-sensors. It uses version 2 of the TSENS IP, so use the fallback property to
-allow more common code.
+On Mon, Jul 2, 2018 at 2:40 PM Jae Hyun Yoo
+<jae.hyun.yoo@linux.intel.com> wrote:
+>
+> This patch adjusts spinlock scope to make it wrap the whole irq
+> handler using a single lock/unlock which covers both master and
+> slave handlers.
+>
+> Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
+> ---
+>  drivers/i2c/busses/i2c-aspeed.c | 16 ++++++++++------
+>  1 file changed, 10 insertions(+), 6 deletions(-)
+>
+> diff --git a/drivers/i2c/busses/i2c-aspeed.c b/drivers/i2c/busses/i2c-aspeed.c
+> index 60e4d0e939a3..9f02aa959a3e 100644
+> --- a/drivers/i2c/busses/i2c-aspeed.c
+> +++ b/drivers/i2c/busses/i2c-aspeed.c
+> @@ -234,7 +234,6 @@ static bool aspeed_i2c_slave_irq(struct aspeed_i2c_bus *bus)
+>         bool irq_handled = true;
+>         u8 value;
+>
+> -       spin_lock(&bus->lock);
+>         if (!slave) {
+>                 irq_handled = false;
+>                 goto out;
+> @@ -325,7 +324,6 @@ static bool aspeed_i2c_slave_irq(struct aspeed_i2c_bus *bus)
+>         writel(status_ack, bus->base + ASPEED_I2C_INTR_STS_REG);
+>
+>  out:
+> -       spin_unlock(&bus->lock);
+>         return irq_handled;
+>  }
+>  #endif /* CONFIG_I2C_SLAVE */
+> @@ -389,7 +387,6 @@ static bool aspeed_i2c_master_irq(struct aspeed_i2c_bus *bus)
+>         u8 recv_byte;
+>         int ret;
+>
+> -       spin_lock(&bus->lock);
+>         irq_status = readl(bus->base + ASPEED_I2C_INTR_STS_REG);
+>         /* Ack all interrupt bits. */
+>         writel(irq_status, bus->base + ASPEED_I2C_INTR_STS_REG);
+> @@ -547,22 +544,29 @@ static bool aspeed_i2c_master_irq(struct aspeed_i2c_bus *bus)
+>                 dev_err(bus->dev,
+>                         "irq handled != irq. expected 0x%08x, but was 0x%08x\n",
+>                         irq_status, status_ack);
+> -       spin_unlock(&bus->lock);
+>         return !!irq_status;
+>  }
+>
+>  static irqreturn_t aspeed_i2c_bus_irq(int irq, void *dev_id)
+>  {
+>         struct aspeed_i2c_bus *bus = dev_id;
+> +       bool ret;
+> +
+> +       spin_lock(&bus->lock);
+>
+>  #if IS_ENABLED(CONFIG_I2C_SLAVE)
+>         if (aspeed_i2c_slave_irq(bus)) {
+>                 dev_dbg(bus->dev, "irq handled by slave.\n");
+> -               return IRQ_HANDLED;
+> +               ret = true;
+> +               goto out;
+>         }
+>  #endif /* CONFIG_I2C_SLAVE */
+>
+> -       return aspeed_i2c_master_irq(bus) ? IRQ_HANDLED : IRQ_NONE;
+> +       ret = aspeed_i2c_master_irq(bus);
+> +
+> +out:
+> +       spin_unlock(&bus->lock);
+> +       return ret ? IRQ_HANDLED : IRQ_NONE;
+>  }
+>
+>  static int aspeed_i2c_master_xfer(struct i2c_adapter *adap,
+> --
+> 2.17.1
+>
 
-Signed-off-by: Amit Kucheria <amit.kucheria@linaro.org>
-Reviewed-by: Bjorn Andersson <bjorn.andersson@linaro.org>
-Tested-by: Matthias Kaehlcke <mka@chromium.org>
----
- arch/arm64/boot/dts/qcom/sdm845.dtsi | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+Reviewed-by: Brendan Higgins <brendanhiggins@google.com>
 
-diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-index cdaabeb..01ff146 100644
---- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
-+++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-@@ -221,6 +221,22 @@
- 			#interrupt-cells = <2>;
- 		};
- 
-+		tsens0: thermal-sensor at c263000 {
-+			compatible = "qcom,sdm845-tsens", "qcom,tsens-v2";
-+			reg = <0xc263000 0x1ff>, /* TM */
-+			      <0xc222000 0x1ff>; /* SROT */
-+			#qcom,sensors = <13>;
-+			#thermal-sensor-cells = <1>;
-+		};
-+
-+		tsens1: thermal-sensor at c265000 {
-+			compatible = "qcom,sdm845-tsens", "qcom,tsens-v2";
-+			reg = <0xc265000 0x1ff>, /* TM */
-+			      <0xc223000 0x1ff>; /* SROT */
-+			#qcom,sensors = <8>;
-+			#thermal-sensor-cells = <1>;
-+		};
-+
- 		spmi_bus: spmi at c440000 {
- 			compatible = "qcom,spmi-pmic-arb";
- 			reg = <0xc440000 0x1100>,
--- 
-2.7.4
+Thanks!
