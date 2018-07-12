@@ -1,69 +1,46 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 12 Jul 2018 15:14:57 +0200
-Subject: [PATCH 1/3] drm: mxsfb: Change driver.name to mxsfb-drm
-In-Reply-To: <7f40f34a401ced78703b1a151d9f5fe4ed8c209f.camel@nxp.com>
-References: <cover.1529091248.git.leonard.crestez@nxp.com>
- <47ea7572011735b68a8a70f0e11bdf00cb2fd86a.1529091248.git.leonard.crestez@nxp.com>
- <CAOMZO5B8i0gN+rCq-yPrd112NkwJWTxYCtsLVeLhD1JLRuX6EQ@mail.gmail.com>
- <07be6d9a85b6be655fc2b084be81d8bf9715b57a.camel@nxp.com>
- <638457fd-85da-8fec-d146-517c43f71813@denx.de>
- <b3fa74c5110b45e5992920485749869ab1f7ebce.camel@nxp.com>
- <6995fa4b-47a9-887b-5e4f-4284ca6a2c79@gmail.com>
- <fd22085f646d97f66cff5b7f22785500@agner.ch>
- <6fdba55b-0be6-9e28-d87a-43d876a1fd09@denx.de>
- <617c0a7e9132b929877b8cbcf116b1ea@agner.ch>
- <7f40f34a401ced78703b1a151d9f5fe4ed8c209f.camel@nxp.com>
-Message-ID: <039b2914-3393-5e81-82a6-7d517c5818a9@denx.de>
+From: yixun.lan@amlogic.com (Yixun Lan)
+Date: Thu, 12 Jul 2018 21:12:42 +0000
+Subject: [PATCH v3 0/2] clk: meson: add a sub EMMC clock controller support
+Message-ID: <20180712211244.11428-1-yixun.lan@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/12/2018 03:03 PM, Leonard Crestez wrote:
-> On Thu, 2018-07-12 at 11:21 +0200, Stefan Agner wrote:
->> On 10.07.2018 11:11, Marek Vasut wrote:
->>> On 07/10/2018 11:06 AM, Stefan Agner wrote:
->>>> This is one of the situation where states quo is kinda the worst
->>>> situation.
->>>>
->>>> Currently imx_v6_v7_defconfig and mxs_defconfig actually still uses
->>>> CONFIG_FB_MXS.
->>>>
->>>> I understand that you'd rather prefer to move forward. I suggest we do
->>>> it in steps.
->>>>
->>>> In 4.19:
->>>>
->>>> - Change DRM driver.name to mxsfb-drm so we avoid conflicts for now
->>>
->>> But this will break mesa if it depends on mxsfb name for ie. etnaviv
->>> binding.
->>
->> Does it? grep -r -e mxsfb in libdrm and mesa master returns nothing.
->>
->> There is also .name in struct drm_driver, which is already set to
->> mxsfb-drm... Is that the one exposed to user space?
-> 
-> Running etnaviv+x11 with a renamed mxsfb driver works fine on imx6sx-
-> sdb.
-> 
-> Tools like modetest already need -M mxsfb-drm, the drm_driver.name
-> seems to be what matters.
-> 
->> - Remove CONFIG_FB_MXS from imx_v6_v7_defconfig/mxs_defconfig now, and
->> only enable CONFIG_DRM_MXSFB=y
-> 
-> If one of the drivers is renamed then they can coexist: since the
-> bindings are distinct one driver will return a probe error and the
-> other will bind successfully. This can even be adjusted so that it
-> doesn't even print ugly scary errors.
-> 
-> This can last until somebody implements support for old bindings in the
-> drm driver and then FB_MXS can just be deleted.
+This driver will add a MMC clock controller driver support.
+The original idea about adding a clock controller is during the
+discussion in the NAND driver mainline effort[1].
 
-So why don't we just convert the DT bindings on boards supported
-upstream and zap the old driver ? What is the problem with that?
+I've tested this in the S400 board (AXG platform) by using NAND driver.
 
-Realistically, how many MXS boards in the field use old DT and new kernel ?
+Changes since v2 [3]:
+ - squash dt-binding clock-id patch
+ - update license
+ - fix alignment
+ - construct a clk register helper() function
+
+Changes since v1 [2]:
+ - implement phase clock
+ - update compatible name
+ - adjust file name
+ - divider probe() into small functions, and re-use them
+
+[1] https://lkml.kernel.org/r/20180628090034.0637a062 at xps13
+[2] https://lkml.kernel.org/r/20180703145716.31860-1-yixun.lan at amlogic.com
+[3] https://lkml.kernel.org/r/20180710163658.6175-1-yixun.lan at amlogic.com
+
+
+Yixun Lan (2):
+  clk: meson: add DT documentation for emmc clock controller
+  clk: meson: add sub MMC clock controller driver
+
+ .../bindings/clock/amlogic,mmc-clkc.txt       |  31 ++
+ drivers/clk/meson/Kconfig                     |   9 +
+ drivers/clk/meson/Makefile                    |   1 +
+ drivers/clk/meson/mmc-clkc.c                  | 367 ++++++++++++++++++
+ .../clock/amlogic,meson-mmc-clkc.h            |  16 +
+ 5 files changed, 424 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/amlogic,mmc-clkc.txt
+ create mode 100644 drivers/clk/meson/mmc-clkc.c
+ create mode 100644 include/dt-bindings/clock/amlogic,meson-mmc-clkc.h
 
 -- 
-Best regards,
-Marek Vasut
+2.18.0
