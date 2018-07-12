@@ -1,65 +1,62 @@
-From: yandong77520@gmail.com (Yandong.Zhao)
-Date: Thu, 12 Jul 2018 11:29:38 +0800
-Subject: [PATCH] arm64: neon: Fix function may_use_simd() return error status
-Message-ID: <1531366178-17630-1-git-send-email-yandong77520@gmail.com>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Thu, 12 Jul 2018 03:46:46 +0000
+Subject: [PATCH V4 0/5] soc: imx: add scu firmware api support
+In-Reply-To: <24505e51-3a5d-4f34-7ba6-262e118d070e@arm.com>
+References: <1531061817-1980-1-git-send-email-aisheng.dong@nxp.com>
+ <24505e51-3a5d-4f34-7ba6-262e118d070e@arm.com>
+Message-ID: <AM0PR04MB42113AC1D31A193E40F259CC80590@AM0PR04MB4211.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yandong Zhao <yandong77520@gmail.com>
+Hi Sudeep,
 
-It does not matter if the caller of may_use_simd() migrates to
-another cpu after the call, but it is still important that the
-kernel_neon_busy percpu instance that is read matches the cpu the
-task is running on at the time of the read.
+> -----Original Message-----
+> From: Sudeep Holla [mailto:sudeep.holla at arm.com]
+> Sent: Thursday, July 12, 2018 12:49 AM
+> To: A.s. Dong <aisheng.dong@nxp.com>; linux-arm-
+> kernel at lists.infradead.org
+> Cc: Sudeep Holla <sudeep.holla@arm.com>; dongas86 at gmail.com; dl-linux-
+> imx <linux-imx@nxp.com>; kernel at pengutronix.de; Fabio Estevam
+> <fabio.estevam@nxp.com>; shawnguo at kernel.org; Cl?ment Faure
+> <clement.faure@nxp.com>
+> Subject: Re: [PATCH V4 0/5] soc: imx: add scu firmware api support
+> 
+> On 08/07/18 15:56, Dong Aisheng wrote:
+> > Unlike the former i.MX Architectures, the new generation i.MX8 SoCs
+> > (e.g. MX8QXP and MX8QM) contain a system controller which runs on a
+> > dedicated Cortex-M core to provide power, clock, Pad, and resource
+> > management. Communication between the host processor running an OS
+> and
+> > the system controller happens through a SCU protocol.
+> > This patchset adds the SCU APIs which is implemented based on MU and
+> > will be used by different system components.
+> >
+> > It mainly consists of below parts:
+> > 1) MU mailbox driver
+> > 1) Implementation of the IPC functions based on MUs (client side).
+> >
+> >
+> 
+> I do understand the firmware might be already released for the current
+> generation of platforms, but instead of adding to the fragmentation, it would
+> be good to migrated to ARM SCMI for future platforms.
+> 
+> This system controller communication protocol is already so fragmented (we
+> have TI SCI, QCOM RPM, Nvidia Tegra BPMP, ARM SCPI and so on..
+> and now this i.MX specific one added to that), the main intention of ARM
+> SCMI is to stop that. The idea is for any Power Control System
+> Architecture(PCSA) compliant systems or any similar systems, SCMI should
+> be the standard communication protocol.
 
-This means that raw_cpu_read() is not sufficient. kernel_neon_busy
-may appear true if the caller migrates during the execution of
-raw_cpu_read() and the next task to be scheduled in on the initial
-cpu calls kernel_neon_begin().
+That sounds good and worth a look.
+Copy SCU firmware guys if more comments.
+BTW, i.MX SCU provides more services than just power related. 
+Not sure if ARM SCMI can cover it.
 
-This patch replaces raw_cpu_read() with this_cpu_read() to protect
-against this race.
+Regards
+Dong Aisheng
 
-Fixes: cb84d11e1625 ("arm64: neon: Remove support for nested or hardirq kernel-mode NEON")
-Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Reviewed-by: Dave Martin <Dave.Martin@arm.com>
-Reviewed-by: Mark Rutland <mark.rutland@arm..com>
-Signed-off-by: Yandong Zhao <yandong77520@gmail.com>
----
- arch/arm64/include/asm/simd.h | 19 +++++++------------
- 1 file changed, 7 insertions(+), 12 deletions(-)
-
-diff --git a/arch/arm64/include/asm/simd.h b/arch/arm64/include/asm/simd.h
-index fa8b3fe..6495cc5 100644
---- a/arch/arm64/include/asm/simd.h
-+++ b/arch/arm64/include/asm/simd.h
-@@ -29,20 +29,15 @@
- static __must_check inline bool may_use_simd(void)
- {
- 	/*
--	 * The raw_cpu_read() is racy if called with preemption enabled.
--	 * This is not a bug: kernel_neon_busy is only set when
--	 * preemption is disabled, so we cannot migrate to another CPU
--	 * while it is set, nor can we migrate to a CPU where it is set.
--	 * So, if we find it clear on some CPU then we're guaranteed to
--	 * find it clear on any CPU we could migrate to.
--	 *
--	 * If we are in between kernel_neon_begin()...kernel_neon_end(),
--	 * the flag will be set, but preemption is also disabled, so we
--	 * can't migrate to another CPU and spuriously see it become
--	 * false.
-+	 * kernel_neon_busy is only set while preemption is disabled,
-+	 * and is clear whenever preemption is enabled. Since
-+	 * this_cpu_read() is atomic w.r.t. preemption, kernel_neon_busy
-+	 * cannot change under our feet -- if it's set we cannot be
-+	 * migrated, and if it's clear we cannot be migrated to a CPU
-+	 * where it is set.
- 	 */
- 	return !in_irq() && !irqs_disabled() && !in_nmi() &&
--		!raw_cpu_read(kernel_neon_busy);
-+		!this_cpu_read(kernel_neon_busy);
- }
- 
- #else /* ! CONFIG_KERNEL_MODE_NEON */
--- 
-1.9.1
+> 
+> --
+> Regards,
+> Sudeep
