@@ -1,34 +1,65 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 11 Jul 2018 17:05:32 -0700
-Subject: [PATCH] arm64: Clear the stack
-In-Reply-To: <20180629190553.7282-1-labbott@redhat.com>
-References: <20180629190553.7282-1-labbott@redhat.com>
-Message-ID: <CAGXu5jLwhdKy6rfSKOeN2hajP5aCnYeT3yMka5ZbJ_o02z=WTA@mail.gmail.com>
+From: mars.cheng@mediatek.com (Mars Cheng)
+Date: Thu, 12 Jul 2018 08:06:17 +0800
+Subject: [PATCH v4 1/1] arm64: dts: mediatek: add mt6765 support
+In-Reply-To: <7a3becb3-510b-5763-5b66-5e14ebf7c974@gmail.com>
+References: <1531116302-29921-1-git-send-email-mars.cheng@mediatek.com>
+ <1531116302-29921-2-git-send-email-mars.cheng@mediatek.com>
+ <7fb13f45-4e33-6efc-467b-c7256a40cbc9@gmail.com>
+ <d439eb7d-6365-7a0a-2969-1ddecc51defc@arm.com>
+ <1531177443.7777.18.camel@mtkswgap22>
+ <7a3becb3-510b-5763-5b66-5e14ebf7c974@gmail.com>
+Message-ID: <1531353977.25499.9.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 29, 2018 at 12:05 PM, Laura Abbott <labbott@redhat.com> wrote:
->  include/linux/stackleak.h             |  1 +
-> [...]
-> diff --git a/include/linux/stackleak.h b/include/linux/stackleak.h
-> index e2da99b3a191..00d62b302efb 100644
-> --- a/include/linux/stackleak.h
-> +++ b/include/linux/stackleak.h
-> @@ -5,6 +5,7 @@
->  #include <linux/sched.h>
->  #include <linux/sched/task_stack.h>
->
-> +#include <asm/stacktrace.h>
->  /*
->   * Check that the poison value points to the unused hole in the
->   * virtual memory map for your platform.
+Hi Matthias
 
-FYI, I squashed this change into my copy of the stackleak v14 series.
-(And I just sent this arm64 patch with the adjustments for it to be
-stand-alone.)
+On Tue, 2018-07-10 at 12:52 +0200, Matthias Brugger wrote:
+> 
+> On 10/07/18 01:04, Mars Cheng wrote:
+[...]
 
--Kees
+> > pmic/pwrap/i2c/rtc/kpd/spi/wdt/cqdma/auxadc/pwm/cmdq/disp. We have
+> > dedicated owners to handle them and will cowork tightly with members to
+> > make sure things happen in the following weeks.
+> > 
+> 
+> Ok, so let's wait until pinctrl driver is submitted. I'd prefer if you could add
+> the clk driver to this series. This way we can get rid of the dummy clocks in
+> the device tree.
+> 
 
--- 
-Kees Cook
-Pixel Security
+Got it, I will submit this series with clk support in v5. and pinctrl
+after that.
+
+> > For previous chips, we did have no enough support after shell. It is due
+> > to fast pace of smartphone SoC and other resource issues. We also know
+> > that is no excuse so that we already confirmed owners and their
+> > schedules for mt6765.
+> > 
+> > If there is any suggestion, please let us know.
+> > 
+> 
+> I know that smartphone SoC is a fast paced business. Never the less I'm
+> convinced that the basic building blocks won't change much from one version to
+> another. And that mainline support for the previous version of your SoC will
+> help you to get your new drivers faster upstream.
+> 
+> For me the best example is the mt7622 which got to a reasonable upstream support
+> quite fast, thanks to a good foundation of mt7623 in mainline. I'd love to see
+> that happen on the smartphone SoCs as well.
+> 
+> Not to mention that upstream support will help you internally when you have to
+> rebase your BSP code-base to a new kernel version.
+> 
+> That said I think it is good news that you have already defined owner for the
+> different devices and hope to see submissions for them in the near future :)
+> As a suggestion I would say that upstream submission takes time and effort and
+> it will help your engineers if they can allocate some time to do so. But that's
+> most probably a management decision and all engineers know that management bases
+> it's decision on some hard-to-understandable abbreviations like EBITDA etc. ;)
+> 
+> Best regards,
+> Matthias
+
+Thanks for your suggestions. We will try to catch up on this mission :-)
