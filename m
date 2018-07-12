@@ -1,57 +1,62 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 12 Jul 2018 22:35:47 +0100
-Subject: [PATCH 00/14] ARM BPF jit compiler improvements
-In-Reply-To: <fbfa3684-b5a0-670d-c8f7-8c14829565cb@iogearbox.net>
-References: <20180711093033.GP17271@n2100.armlinux.org.uk>
- <bf534d05-8f75-20bc-e25e-4536c1123585@iogearbox.net>
- <20180712210236.GV17271@n2100.armlinux.org.uk>
- <fbfa3684-b5a0-670d-c8f7-8c14829565cb@iogearbox.net>
-Message-ID: <20180712213547.GW17271@n2100.armlinux.org.uk>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu, 12 Jul 2018 23:45:29 +0200
+Subject: [PATCH] arm64: dts: rockchip: add USB 2.0 and 3.0 support on
+ Ficus board
+In-Reply-To: <20180712160008.30972-1-ezequiel@collabora.com>
+References: <20180712160008.30972-1-ezequiel@collabora.com>
+Message-ID: <1807608.jKivtyaJVm@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 12, 2018 at 11:12:45PM +0200, Daniel Borkmann wrote:
-> On 07/12/2018 11:02 PM, Russell King - ARM Linux wrote:
-> > On Thu, Jul 12, 2018 at 09:02:41PM +0200, Daniel Borkmann wrote:
-> >> Applied to bpf-next, thanks a lot Russell!
-> > 
-> > Thanks, I've just sent four more patches, which is the sum total of
-> > what I'm intending to send for BPF improvements for the next merge
-> > window.
+Hi,
+
+Am Donnerstag, 12. Juli 2018, 18:00:08 CEST schrieb Ezequiel Garcia:
+> From: Enric Balletbo i Serra <enric.balletbo@collabora.com>
 > 
-> Great, thanks a lot for the batch of improvements, Russell!
+> The board exposes two types A ports, one is USB 3.0, up to 5.0Gbps and
+> another one is USB 2.0 up to 480Mbps. Enable the USB PHYs and the USB
+> controllers to enable theses devices.
 > 
-> Did you manage to get the BPF kselftest suite working on arm32 under
-> tools/testing/selftests/bpf/? In particular the test_verfier with
-> bpf_jit_enabled set to 1 and test_kmod.sh has a bigger number of
-> runtime tests that would stress it.
+> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+> Signed-off-by: Ezequiel Garcia <ezequiel@collabora.com>
+> ---
+> Heiko,
+> 
+> Enric finally had some time to take a look at the schematics,
+> and help with the USB stuff. Thanks to him, USB host
+> is working now! \o/
 
-I have a big issue with almost all of the tools/ subdirectory, and
-that is that it isn't "portable".
+great to hear that
+One issue below though.
 
-It seems that cross-build environments just weren't considered when
-the tools subdirectory was created - it appears to require the entire
-kernel tree and build tree to be accessible on the target in order
-to build almost everything there.  (I also exclusively do split-object
-builds, I never do an in-source-tree build.)
 
-At least perf has the ability to ask Kbuild to package it up as a
-tar.* file.  That can be easily transported to the target as a
-self-contained buildable tree, and then be able to built from that.
+> USB Type-C will have to wait until we have some spare time
+> to debug the fusb302 driver.
+>
+>  arch/arm64/boot/dts/rockchip/rk3399-ficus.dts | 85 +++++++++++++++++++
+>  1 file changed, 85 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3399-ficus.dts b/arch/arm64/boot/dts/rockchip/rk3399-ficus.dts
+> index 0d14183dd4a9..d0631c02749c 100644
+> --- a/arch/arm64/boot/dts/rockchip/rk3399-ficus.dts
+> +++ b/arch/arm64/boot/dts/rockchip/rk3399-ficus.dts
+> @@ -61,6 +61,16 @@
+>  		vin-supply = <&vcc3v3_sys>;
+>  	};
+>  
+> +	vcc5v0_host: vcc5v0-host-regulator {
+> +		compatible = "regulator-fixed";
+> +		enable-active-high;
+> +		gpio = <&gpio4 27 GPIO_ACTIVE_HIGH>;
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&host_vbus_drv>;
+> +		regulator-name = "vcc5v0_host";
+> +		regulator-always-on;
 
-My cross-build environment for the kernel is just for building
-kernels, it does not have the facilities to build for userspace - I
-have a wide range of userspaces across targets, with a multitude of
-different glibc versions, and even when they're compatible versions,
-they're built differently.
+missing voltages and also a vin-supply.
+These 5V don't come from thin air ;-) and I really like
+seeing sane regulator trees.
 
-As far as I can see, basically, most tools/ stuff requires too much
-effort to work around this to be of any use to me.  Even if I did
-unpick it from the kernel source tree by hand, that would be wasted
-effort, because I'd need to repeat that same process whenever
-anything there gets updated.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
-According to speedtest.net: 13Mbps down 490kbps up
+Thanks
+Heiko
