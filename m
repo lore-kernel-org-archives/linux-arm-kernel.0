@@ -1,17 +1,15 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 12 Jul 2018 09:46:43 +0800
-Subject: [PATCH v2 1/3] dt-bindings: freescale: Add bindings for the M4IF
- module
-In-Reply-To: <1531160355-12384-1-git-send-email-festevam@gmail.com>
-References: <1531160355-12384-1-git-send-email-festevam@gmail.com>
-Message-ID: <20180712014642.GN6959@dragon>
+Date: Thu, 12 Jul 2018 09:52:44 +0800
+Subject: [PATCH v4 1/6] dt-bindings: freescale: Add bindings for the
+ tigerp module
+In-Reply-To: <1531240308-24798-1-git-send-email-fabio.estevam@nxp.com>
+References: <1531240308-24798-1-git-send-email-fabio.estevam@nxp.com>
+Message-ID: <20180712015243.GO6959@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 09, 2018 at 03:19:13PM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@nxp.com>
-> 
-> Add bindings for the M4IF module present on i.MX51.
+On Tue, Jul 10, 2018 at 01:31:43PM -0300, Fabio Estevam wrote:
+> Add bindings for the tigerp module present on i.MX51.
 > 
 > Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 
