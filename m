@@ -1,39 +1,40 @@
-From: hofrat@osadl.org (Nicholas Mc Guire)
-Date: Thu, 12 Jul 2018 17:48:50 +0200
-Subject: [PATCH] ARM: STi: at least warn if of_iomap fails
-Message-ID: <1531410530-24163-1-git-send-email-hofrat@osadl.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 12 Jul 2018 09:56:52 -0600
+Subject: RFC: tegra2/tegra3 automotive part changes
+In-Reply-To: <3916c0ea-964e-42ab-8bfd-8e8edc5110ee@codethink.co.uk>
+References: <3916c0ea-964e-42ab-8bfd-8e8edc5110ee@codethink.co.uk>
+Message-ID: <fecd5597-1b04-6409-b87c-5cda54d43ce0@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The call to of_iomap() is unchecked but scu_enable(), which the returned
-address is passed on to, assumes a valid mapping. If the mapping is
-invalid this could probably lead to undefined system state so at least
-a warning should be issued.
+On 07/12/2018 07:36 AM, Ben Dooks wrote:
+> Hello, we are looking at up-streaming some of the work we have
+> done on the tegra2 and tegra3 automotive devices. The automotive
+> grade devices are close the commercial parts so we would like to
+> discuss the core changes before submitting.
+> 
+> The changes are mostly with things like the clock setup and a
+> few peripheral quirks (IIRC these are mostly MMC).
+> 
+> We are proposing to change the device-tree properties for the root
+> node and any other affected devices from "nvidia,tegraXX" to a new
+> "nvidia,tegraXXa". We would welcome discussion on whether to update
+> all the devices at the start
+> 
+> An example of tegra30a.dtsi:
+> 
+> #include "tegra30.dtsi"
+> 
+> / {
+>  ??????? compatible = "nvidia,tegra30a";
+> 
+>  ??????? clock at 60006000 {
+>  ??????????????? compatible = "nvidia,tegra30a-car";
+>  ??????? };
+> }
 
-Signed-off-by: Nicholas Mc Guire <hofrat@osadl.org>
-Fixes: commit 65ebcc115889 ("ARM: sti: Add STiH415 SOC support")
----
-Problem was found by an experimental coccinelle script
-
-Patch was compile tested with: multi_v7_defconfig (implies
-CONFIG_ARCH_STI=y, CONFIG_SMP=y)
-
-Patch is against 4.18-rc3 (localversion-next is next-20180712)
-
- arch/arm/mach-sti/platsmp.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/mach-sti/platsmp.c b/arch/arm/mach-sti/platsmp.c
-index 231f19e..89ae76f 100644
---- a/arch/arm/mach-sti/platsmp.c
-+++ b/arch/arm/mach-sti/platsmp.c
-@@ -109,6 +109,7 @@ static void __init sti_smp_prepare_cpus(unsigned int max_cpus)
- 
- 	if (np) {
- 		scu_base = of_iomap(np, 0);
-+		WARN_ON(!scu_base);
- 		scu_enable(scu_base);
- 		of_node_put(np);
- 	}
--- 
-2.1.4
+This doesn't sound right. Auto and commercial parts are identical AFAIK; 
+it's just qualification differences. Hence at most you'd add an extra 
+compatible value and not remove the old one. Better might be to detect 
+this at run-time from the fuses. I think we already do some of that 
+already; search for speedo related code in arch/arm/mach-tegra/.
