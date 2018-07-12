@@ -1,105 +1,29 @@
-From: andrew@aj.id.au (Andrew Jeffery)
-Date: Thu, 12 Jul 2018 10:23:50 +0930
-Subject: [RFC PATCH v2 1/4] dt-bindings: misc: Add bindings for misc. BMC
- control fields
-In-Reply-To: <20180711200450.GB17291@rob-hp-laptop>
-References: <20180711053122.30773-1-andrew@aj.id.au>
- <20180711053122.30773-2-andrew@aj.id.au>
- <20180711200450.GB17291@rob-hp-laptop>
-Message-ID: <1531356830.3551458.1437853280.551CA8C5@webmail.messagingengine.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 12 Jul 2018 09:07:47 +0800
+Subject: [PATCH 2/3] ARM: dts: imx31: add device tree description of
+ basic controllers
+In-Reply-To: <CAOMZO5BTNu4HeSvy953arpfBe_0yUe0XChiPwK+42VaMB9AwCg@mail.gmail.com>
+References: <20180703192934.6080-1-vz@mleia.com>
+ <20180703192934.6080-3-vz@mleia.com>
+ <CAOMZO5AW6QryKAjcG_kE011G1anLD=-EaJFhAaWzaqbf3aKNUQ@mail.gmail.com>
+ <430434fe-da1d-ffd9-0b54-a0c7d63c6284@mleia.com>
+ <CAOMZO5BTNu4HeSvy953arpfBe_0yUe0XChiPwK+42VaMB9AwCg@mail.gmail.com>
+Message-ID: <20180712010746.GM6959@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
-
-Thanks for the response.
-
-On Thu, 12 Jul 2018, at 05:34, Rob Herring wrote:
-> On Wed, Jul 11, 2018 at 03:01:19PM +0930, Andrew Jeffery wrote:
-> > Baseboard Management Controllers (BMCs) are embedded SoCs that exist to
-> > provide remote management of (primarily) server platforms. BMCs are
-> > often tightly coupled to the platform in terms of behaviour and provide
-> > many hardware features integral to booting and running the host system.
-> > 
-> > Some of these hardware features are simple, for example scratch
-> > registers provided by the BMC that are exposed to both the host and the
-> > BMC. In other cases there's a single bit switch to enable or disable
-> > some of the provided functionality.
-> > 
-> > The documentation defines bindings for fields in registers that do not
-> > integrate well into other driver models yet must be described to allow
-> > the BMC kernel to assume control of these features.
+On Wed, Jul 11, 2018 at 01:21:09PM -0300, Fabio Estevam wrote:
+> Hi Vladimir,
 > 
-> So we'll get a new binding when that happens? That will break 
-> compatibility.
-
-Can you please expand on this? I'm not following.
-
+> On Thu, Jul 5, 2018 at 4:09 PM, Vladimir Zapolskiy <vz@mleia.com> wrote:
 > 
-> > 
-> > Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
-> > ---
-> > 
-> > Since RFC v1:
-> > 
-> > * Add a commit message
-> > * Minor changes to documented labels
-> > 
-> >  .../bindings/misc/bmc-misc-ctrl.txt           | 252 ++++++++++++++++++
-> >  MAINTAINERS                                   |   6 +
-> >  2 files changed, 258 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/misc/bmc-misc-ctrl.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/misc/bmc-misc-ctrl.txt b/Documentation/devicetree/bindings/misc/bmc-misc-ctrl.txt
-> > new file mode 100644
-> > index 000000000000..2c869fcc7ef2
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/misc/bmc-misc-ctrl.txt
-> > @@ -0,0 +1,252 @@
-> > +BMC Miscellaneous Control Interfaces
-> > +====================================
-> > +
-> > +Baseboard Management Controllers (BMCs) often have an array of hardware
-> > +features that need to be described but are awkward to sensibly expose.
-> > +
-> > +This bindings document provides a generic mechanism for describing such
-> > +features, covering read-only (RO), read-modify-write (RMW) and
-> > +write-1-set/write-1-clear (W1SC) semantics.
+> > thank you for review, please note that I've just sent v2 with a couple
+> > of minor fixes as a reply to v1 2/3, I hope that I didn't introduce
+> > a mess to the series.
 > 
-> If we wanted a generic mechanism for single register bits/fields in DT, 
-> we'd have one already.
+> It seems that Shawn has already applied the first version of your
+> series, so please send any changes as incremental patches.
 
-I feel like this is an argument of tradition. Maybe people have been dissuaded from doing so when they don't have a reasonable use-case? I'm not saying that what I'm proposing is unquestionably reasonable, but I don't want to dismiss it out of hand.
+No.  I picked up the v2 of this patch.
 
-> A node per register bit doesn't scale.
-
-It isn't meant to scale in terms of a single system. Using it extensively is very likely wrong. Separately, register-bit-led does pretty much the same thing. Doesn't the scale argument apply there? Who is to stop me from attaching an insane number of LEDs to a system?
-
-Obviously if there are lots of systems using it sparingly and legitimately then maybe there's a scale issue, but isn't that just a reality of different hardware designs? Whoever is implementing support for the system is going to have to describe the hardware one way or another.
-
-> 
-> Maybe this should be modelled using GPIO binding? There's a line there 
-> too as whether the signals are "general purpose" or not.
-
-I don't think so, mainly because some of the things it is intended to be used for are not GPIOs. For instance, take the DAC mux I've described in the patch. It doesn't directly influence anything external to the SoC (i.e. it's certainly not a traditional GPIO in any sense). However, it does *indirectly* influence the SoC's behaviour by muxing the DAC internally between:
-
-0. VGA device exposed on the host PCIe bus
-1. The "Graphics CRT" controller 
-2. VGA port A
-3. VGA port B
-
-Maybe this could be modelled by pinmux, but then we still need some way to expose the mux functions to userspace for selection (userspace needs to transition arbitrarily between at least options 0 and 1 at runtime), at which point we haven't achieved much beyond adding a whole heap of infrastructure in the chain.
-
-Given 0 and 1, maybe exposing attributes in relevant drivers would be reasonable, except 0 isn't exposed on the SoC's internal bus so there is no driver on the BMC-side to do so. Taking into account 2 and 3 are also purely hardware paths further dashes the idea, as the configuration doesn't really "belong" to the Graphics CRT device more than it belongs anywhere else, except for the fact that there isn't anywhere else to expose it.
-
-Further, the BMC's kernel can't make the decision as to when to switch the mux as it knows nothing of the host's state. The BMC userspace is controlling the host's boot state and so *does* know when to flip the switch. Finally, the mux is in separate IP to the CRT or VGA blocks: It lives in the System Control Unit.
-
-My current point of view is the DAC mux field is effectively its own device, and we need to control it from userspace, so we need some way to describe it (i.e. not ignore it) in order for its capability to be exposed.
-
-I'm fully aware what I'm proposing isn't awesome as it's not providing any real abstraction, but the problem(s) at hand also seem to defy abstraction, and in order to avoid a plethora of bespoke bindings I thought it was reasonable to define something generic.
-
-All-in-all I appreciate the suggestion, but assuming you agree with my reasoning above do you have thoughts on other alternatives?
-
-Cheers,
-
-Andrew
+Shawn
