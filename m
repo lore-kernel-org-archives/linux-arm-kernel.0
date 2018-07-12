@@ -1,20 +1,23 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Thu, 12 Jul 2018 09:34:09 +0200
-Subject: [PATCH -next] drm/sun4i: DW HDMI: Make symbol
- sun8i_dw_hdmi_pltfm_driver static
-In-Reply-To: <1531315367-190647-1-git-send-email-weiyongjun1@huawei.com>
-References: <1531315367-190647-1-git-send-email-weiyongjun1@huawei.com>
-Message-ID: <20180712073409.onkrxth7niearorq@flea>
+Date: Thu, 12 Jul 2018 09:35:10 +0200
+Subject: [PATCH v3] drm/sun4i: mixer: Read id from DT
+In-Reply-To: <20180711112706.30222-1-jernej.skrabec@siol.net>
+References: <20180711112706.30222-1-jernej.skrabec@siol.net>
+Message-ID: <20180712073510.ssl43bjgv5n5mrwb@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 11, 2018 at 01:22:47PM +0000, Wei Yongjun wrote:
-> Fixes the following sparse warning:
+On Wed, Jul 11, 2018 at 01:27:06PM +0200, Jernej Skrabec wrote:
+> Currently, TCON supports 2 ways to match TCON with engine (mixer in this
+> case). Old way is to just traverse of graph backwards and compare node
+> pointer. New way is to match TCON and engine by their respective ids.
+> All SoCs with DE2 enabled till now used the old way, which means mixer
+> id was never used and thus never implemented.
 > 
-> drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c:228:24: warning:
->  symbol 'sun8i_dw_hdmi_pltfm_driver' was not declared. Should it be static?
+> However, for R40, only the new way will be used. To prepare for that,
+> implement mixer id fetching from DT.
 > 
-> Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
+> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 
 Applied, thanks!
 Maxime
@@ -29,4 +32,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180712/f53f2cb9/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180712/c7f270c9/attachment.sig>
