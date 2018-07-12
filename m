@@ -1,53 +1,57 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Thu, 12 Jul 2018 19:06:25 +0200
-Subject: [PATCH v2] drm/sun4i: Implement zpos for DE2
-In-Reply-To: <20180706164732.24166-1-jernej.skrabec@siol.net>
-References: <20180706164732.24166-1-jernej.skrabec@siol.net>
-Message-ID: <20180712170625.4w7zwmhkzbb4h5hc@flea.home>
+From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
+Date: Thu, 12 Jul 2018 10:10:29 -0700
+Subject: [PATCH] i2c: aspeed: Add newline characters into message
+ printings.
+In-Reply-To: <CAFd5g47-Bq_wUkL4vP93si+urDs-A0j26ukZ+Riy24HWi5AuuA@mail.gmail.com>
+References: <20180702211359.30585-1-jae.hyun.yoo@linux.intel.com>
+ <CAFd5g443wTQJ+0hrprOV949Sr_nRnBGpNo3Wd01xFN4GW4K2Ng@mail.gmail.com>
+ <2d2f2b2b-394a-506f-c870-33520335250b@linux.intel.com>
+ <c13fc12e859f7bdb300f08ad805cdf6d7ec09f52.camel@perches.com>
+ <CAFd5g47-Bq_wUkL4vP93si+urDs-A0j26ukZ+Riy24HWi5AuuA@mail.gmail.com>
+Message-ID: <41770e0f-c0ab-5fb7-6c8f-6cf4f80f01f0@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 06, 2018 at 06:47:32PM +0200, Jernej Skrabec wrote:
-> Initial implementation of DE2 planes only supported fixed zpos.
+On 7/12/2018 1:38 AM, Brendan Higgins wrote:
+> On Wed, Jul 11, 2018 at 10:10 AM Joe Perches <joe@perches.com> wrote:
+>>
+>> On Wed, 2018-07-11 at 09:53 -0700, Jae Hyun Yoo wrote:
+>>> On 7/10/2018 10:42 PM, Brendan Higgins wrote:
+>>>> On Mon, Jul 2, 2018 at 2:14 PM Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com> wrote:
+>>>>> There are some log printing without a newline character. This
+>>>>> patch adds the missing newline characters.
+>> []
+>>>>> diff --git a/drivers/i2c/busses/i2c-aspeed.c b/drivers/i2c/busses/i2c-aspeed.c
+>> []
+>>>>> @@ -431,7 +431,7 @@ static bool aspeed_i2c_master_irq(struct aspeed_i2c_bus *bus)
+>>>>>            */
+>>>>>           if (bus->master_state == ASPEED_I2C_MASTER_START) {
+>>>>>                   if (unlikely(!(irq_status & ASPEED_I2CD_INTR_TX_ACK))) {
+>>>>> -                       pr_devel("no slave present at %02x", msg->addr);
+>>>>> +                       pr_devel("no slave present at %02x\n", msg->addr);
+>>>>
+>>>> Unless something changed in the last couple versions of the kernel, this is the
+>>>> only line that actually changes anything. dev_* inserts a newline for every
+>>>> call.
+>>
+>> Not true.
+>>
+>> Any printk without KERN_CONT inserts a newline
+>> if the last character
+>> emitted is not a newline.
+>>
+>> dev_<level> uses can also be followed by pr_cont.
+>>
+>> So this patch does reduce the possibility of
+>> interleaved messages from multiple processes.
 > 
-> Expand implementation with configurable zpos property.
+> My mistake. Thanks for pointing that out.
 > 
-> Implementation background:
-> Channel in DE2 driver represents one DRM plane, whereas pipe is just
-> mapped channel to known Z position. Pipe 0 will always be at the bottom,
-> pipe 1 just above pipe 0 and so on. If, for example, channel 1 is mapped
-> at pipe 0 and channel 0 at pipe 1, whatever is on channel 0 will appear
-> on top.
+> Jae, forget what I said earlier. This looks good to me.
 > 
-> Before this commit, channel id was used for addressing channel related
-> registers (prefixed with SUN8I_MIXER_CHAN_UI_ or SUN8I_MIXER_CHAN_VI_)
-> and pipe registers (prefixed with SUN8I_MIXER_BLEND_). Additionally,
-> register SUN8I_MIXER_BLEND_ROUTE, which takes care for mapping channels
-> to pipes had fixed value. It mapped channel 0 to pipe 0, 1 to 1 and so
-> on. Consequence of all that was fixed Z order of planes.
-> 
-> With this commit, pipe registers are using zpos property as index and
-> channel related registers still use channel id as index. Pipe mapping
-> register is now set dynamically too and pipe enable register is rebuild
-> every time to make sure only active pipes are enabled.
-> 
-> Testing was done to confirm that there is no issues if bottom plane
-> contains pixels with alpha value < 0xff and if it doesn't whole screen.
-> 
-> Tested-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 
-Applied, thanks!
-Maxime
+Okay. I'll keep this patch as is.
+Thanks Joe for your clarification!
+Thanks Brendan for your 'Reviewed-by' tag!
 
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180712/c3b4d348/attachment-0001.sig>
+Jae
