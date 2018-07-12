@@ -1,157 +1,115 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Thu, 12 Jul 2018 08:10:08 +0800
-Subject: [PATCH 1/3] tty/serial_core: add ISO7816 infrastructure
-In-Reply-To: <20180711131638.12622-2-ludovic.desroches@microchip.com>
-References: <20180711131638.12622-2-ludovic.desroches@microchip.com>
-Message-ID: <201807120843.kosywnkG%fengguang.wu@intel.com>
+From: collinsd@codeaurora.org (David Collins)
+Date: Wed, 11 Jul 2018 17:10:50 -0700
+Subject: [PATCH 3/3] arm64: dts: qcom: pm8998: Add thermal zone
+In-Reply-To: <CAD=FV=XbnuNg_B_Uoj8j9hz0t7=ORdcVB16oDmVk1q2iZYGs9A@mail.gmail.com>
+References: <20180628210915.160893-1-mka@chromium.org>
+ <20180628210915.160893-3-mka@chromium.org>
+ <CAD=FV=Wo4wc_QZYr0a2_Ge=B6T4RNJDnOyxAd8r6sT4iZJjCKg@mail.gmail.com>
+ <20180629185102.GV129942@google.com>
+ <3b5054bb-76e4-a06f-54bb-e6ea7bbbcc69@codeaurora.org>
+ <20180629235417.GY129942@google.com>
+ <8144dd3c-6138-7f16-ec17-d75e84fcfb34@codeaurora.org>
+ <CAD=FV=XqoRajjNcW8RyJfrcXQVDihfjAnAsN+O9g+6qDrLHfJw@mail.gmail.com>
+ <03904a71-c6be-4f93-ad43-7d25631f9a04@codeaurora.org>
+ <CAD=FV=XbnuNg_B_Uoj8j9hz0t7=ORdcVB16oDmVk1q2iZYGs9A@mail.gmail.com>
+Message-ID: <aff517d2-df92-da86-fc1e-5f8f8c42f736@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
+Hello Doug,
 
-I love your patch! Yet something to improve:
+On 07/11/2018 03:43 PM, Doug Anderson wrote:
+> On Wed, Jul 11, 2018 at 3:36 PM, David Collins <collinsd@codeaurora.org> wrote:
+>>> On Tue, Jul 10, 2018 at 10:45 AM, David Collins <collinsd@codeaurora.org> wrote:
+>>>> On 06/29/2018 04:54 PM, Matthias Kaehlcke wrote:
+>>>>> On Fri, Jun 29, 2018 at 02:29:55PM -0700, David Collins wrote:
+>>>> ...
+>>>>>> The PMIC TEMP_ALARM hardware peripheral will perform an automatic partial
+>>>>>> PMIC shutdown upon hitting over-temperature stage 2 (125 C).  This turns
+>>>>>> off peripherals within the PMIC that are expected to draw significant
+>>>>>> current.  The set of peripherals included varies between PMICs.  This
+>>>>>> partial shutdown will occur simultaneously with the triggering of an
+>>>>>> interrupt to the APPS processor that informs the qcom-spmi-temp-alarm
+>>>>>> driver that an over-temperature threshold has been crossed.
+>>>>>>
+>>>>>> The TEMP_ALARM peripheral will perform an automatic full PMIC shutdown
+>>>>>> upon hitting over-temperature stage 3 (145 C).  Software won't receive an
+>>>>>> interrupt in this case because all power is cut.
+>>>>>
+>>>>> This information is very useful, thanks David!
+>>>>>
+>>>>> The (partial) hardware shutdown seems like a good measure of last
+>>>>> resort, however I suppose we prefer Linux to initiate a shutdown
+>>>>> before losing part of the peripherals (drivers might not be happy
+>>>>> about this and probably not revover even when the temperature goes
+>>>>> down again) or reach a full PMIC shutdown.
+>>>>>
+>>>>> Please let me know if there are reasons to prefer to go the hardware
+>>>>> limits, it's also an option for device makers to overwrite these
+>>>>> settings if they want different behavior.
+>>>>
+>>>> Disabling stage 3 automatic full PMIC shutdown at 145 C is definitely a
+>>>> bad idea.  This exists as a last resort in order to save the hardware and
+>>>> ensure end user safety in case of excessive temperature even if software
+>>>> is locked up.
+>>>>
+>>>> Disabling stage 2 automatic partial PMIC shutdown at 125 C is not
+>>>> recommended as the PMIC is already outside of reasonable operating
+>>>> conditions and needs to take corrective action quickly.  However, doing so
+>>>> may be acceptable if software is taking action to shut down the system
+>>>> immediately upon receiving the stage 2 over-temperature interrupt.
+>>>> Just to confirm: is it expected that at stage 2 the CPU's on the SoC
+>>> should continue running even with partial PMIC shutdown enabled?
+>>
+>> This is not guaranteed.
+>>
+>>
+>>> It sounded to me like partial PMIC shutdown was supposed to shut down
+>>> high-power rails that were not essential to the task of performing an
+>>> orderly shutdown.
+>>
+>> Shutting down high-power peripherals is accurate; however, special care is
+>> not taken to ensure that an orderly shutdown is possible.  At the very
+>> least, the HW and SW state will be out of sync for the peripherals that
+>> are shut down.
+> 
+> OK, I guess I'm confused now.  Why does partial PMIC shutdown even
+> exist then?  What is the point of leaving some rails alive if software
+> could stop running?  It seems like it would be better to just shut
+> everything down.
+> 
+> Said another way: can you describe what benefit you see for only
+> partially shutting down the PMIC at stage 2 compared to just fully
+> shutting it down at stage 2?
 
-[auto build test ERROR on tty/tty-testing]
-[also build test ERROR on v4.18-rc4 next-20180711]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+Stage 2 partial shutdown is present on PM8998 for legacy reasons.  It is
+being phased out on future PMICs.  My understanding is that it was
+originally intended to be a less aggressive mitigation option than a full
+shutdown and that it allows for more post-mitigation analysis (e.g.
+preserved RAM contents).
 
-url:    https://github.com/0day-ci/linux/commits/Ludovic-Desroches/add-ISO7816-support/20180712-052207
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/gregkh/tty.git tty-testing
-config: xtensa-allmodconfig (attached as .config)
-compiler: xtensa-linux-gcc (GCC) 8.1.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        GCC_VERSION=8.1.0 make.cross ARCH=xtensa 
+The set of peripherals which are disabled during stage 2 partial shutdown
+is not well defined which leads to the kind of uncertainty and ill-defined
+behavior being discussed in this thread.
 
-All errors (new ones prefixed by >>):
 
-   drivers/tty/serial/serial_core.c: In function 'uart_ioctl':
-   drivers/tty/serial/serial_core.c:1430:7: error: 'TIOCSISO7816' undeclared (first use in this function); did you mean 'TIOCSRS485'?
-     case TIOCSISO7816:
-          ^~~~~~~~~~~~
-          TIOCSRS485
-   drivers/tty/serial/serial_core.c:1430:7: note: each undeclared identifier is reported only once for each function it appears in
->> drivers/tty/serial/serial_core.c:1434:7: error: 'TIOCGISO7816' undeclared (first use in this function); did you mean 'TIOCGRS485'?
-     case TIOCGISO7816:
-          ^~~~~~~~~~~~
-          TIOCGRS485
+>> Disabling stage 2 partial shutdown and then using software to
+>> perform a controlled shutdown at 125 C is probably the best option for you
+>> at this point.
+> 
+> This seems OK to me given that I don't understand the original purpose
+> of the partial PMIC shutdown.  Would you expect that all upstream PMIC
+> users would want stage 2 partial shutdown disabled, so we should just
+> do this for all users of the PMIC?
 
-vim +1434 drivers/tty/serial/serial_core.c
+I'd think that we only want to override stage 2 partial shutdown if
+thermal nodes are defined which cause a graceful software controlled
+shutdown in place of the PMIC partial shutdown.  Therefore, management of
+the feature should probably be tied to a boolean DT property.
 
-  1344	
-  1345	/*
-  1346	 * Called via sys_ioctl.  We can use spin_lock_irq() here.
-  1347	 */
-  1348	static int
-  1349	uart_ioctl(struct tty_struct *tty, unsigned int cmd, unsigned long arg)
-  1350	{
-  1351		struct uart_state *state = tty->driver_data;
-  1352		struct tty_port *port = &state->port;
-  1353		struct uart_port *uport;
-  1354		void __user *uarg = (void __user *)arg;
-  1355		int ret = -ENOIOCTLCMD;
-  1356	
-  1357	
-  1358		/*
-  1359		 * These ioctls don't rely on the hardware to be present.
-  1360		 */
-  1361		switch (cmd) {
-  1362		case TIOCGSERIAL:
-  1363			ret = uart_get_info_user(port, uarg);
-  1364			break;
-  1365	
-  1366		case TIOCSSERIAL:
-  1367			down_write(&tty->termios_rwsem);
-  1368			ret = uart_set_info_user(tty, state, uarg);
-  1369			up_write(&tty->termios_rwsem);
-  1370			break;
-  1371	
-  1372		case TIOCSERCONFIG:
-  1373			down_write(&tty->termios_rwsem);
-  1374			ret = uart_do_autoconfig(tty, state);
-  1375			up_write(&tty->termios_rwsem);
-  1376			break;
-  1377	
-  1378		case TIOCSERGWILD: /* obsolete */
-  1379		case TIOCSERSWILD: /* obsolete */
-  1380			ret = 0;
-  1381			break;
-  1382		}
-  1383	
-  1384		if (ret != -ENOIOCTLCMD)
-  1385			goto out;
-  1386	
-  1387		if (tty_io_error(tty)) {
-  1388			ret = -EIO;
-  1389			goto out;
-  1390		}
-  1391	
-  1392		/*
-  1393		 * The following should only be used when hardware is present.
-  1394		 */
-  1395		switch (cmd) {
-  1396		case TIOCMIWAIT:
-  1397			ret = uart_wait_modem_status(state, arg);
-  1398			break;
-  1399		}
-  1400	
-  1401		if (ret != -ENOIOCTLCMD)
-  1402			goto out;
-  1403	
-  1404		mutex_lock(&port->mutex);
-  1405		uport = uart_port_check(state);
-  1406	
-  1407		if (!uport || tty_io_error(tty)) {
-  1408			ret = -EIO;
-  1409			goto out_up;
-  1410		}
-  1411	
-  1412		/*
-  1413		 * All these rely on hardware being present and need to be
-  1414		 * protected against the tty being hung up.
-  1415		 */
-  1416	
-  1417		switch (cmd) {
-  1418		case TIOCSERGETLSR: /* Get line status register */
-  1419			ret = uart_get_lsr_info(tty, state, uarg);
-  1420			break;
-  1421	
-  1422		case TIOCGRS485:
-  1423			ret = uart_get_rs485_config(uport, uarg);
-  1424			break;
-  1425	
-  1426		case TIOCSRS485:
-  1427			ret = uart_set_rs485_config(uport, uarg);
-  1428			break;
-  1429	
-> 1430		case TIOCSISO7816:
-  1431			ret = uart_set_iso7816_config(state->uart_port, uarg);
-  1432			break;
-  1433	
-> 1434		case TIOCGISO7816:
-  1435			ret = uart_get_iso7816_config(state->uart_port, uarg);
-  1436			break;
-  1437		default:
-  1438			if (uport->ops->ioctl)
-  1439				ret = uport->ops->ioctl(uport, cmd, arg);
-  1440			break;
-  1441		}
-  1442	out_up:
-  1443		mutex_unlock(&port->mutex);
-  1444	out:
-  1445		return ret;
-  1446	}
-  1447	
+Take care,
+David
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 54028 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180712/79d87dd5/attachment-0001.gz>
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
