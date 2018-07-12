@@ -1,71 +1,55 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Thu, 12 Jul 2018 18:38:21 +0200
-Subject: [PATCH 1/9] CHROMIUM: v4l: Add H264 low-level decoder API
- compound controls.
-In-Reply-To: <9c80de4e-c070-1051-2089-2d53826c6fc7@xs4all.nl>
-References: <20180613140714.1686-1-maxime.ripard@bootlin.com>
- <20180613140714.1686-2-maxime.ripard@bootlin.com>
- <9c80de4e-c070-1051-2089-2d53826c6fc7@xs4all.nl>
-Message-ID: <20180712163821.np57u46m7akpubht@flea>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 12 Jul 2018 18:39:53 +0200
+Subject: [GIT PULL] ARM: mvebu: arm for v4.19 (#1)
+Message-ID: <87y3egbe7a.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
+Hi,
 
-Thanks for your feedback, I have a few things I'm not really sure
-about though.
+Here is the first pull request for arm for mvebu for v4.19.
 
-On Fri, Jun 15, 2018 at 01:59:58PM +0200, Hans Verkuil wrote:
-> > +struct v4l2_ctrl_h264_sps {
-> > +	__u8 profile_idc;
-> > +	__u8 constraint_set_flags;
-> > +	__u8 level_idc;
-> > +	__u8 seq_parameter_set_id;
-> > +	__u8 chroma_format_idc;
-> > +	__u8 bit_depth_luma_minus8;
-> > +	__u8 bit_depth_chroma_minus8;
-> > +	__u8 log2_max_frame_num_minus4;
-> > +	__u8 pic_order_cnt_type;
-> > +	__u8 log2_max_pic_order_cnt_lsb_minus4;
-> 
-> There is a hole in the struct here. Is that OK? Are there alignment
-> requirements?
+Gregory
 
-This structure represents an equivalent structure in the H264
-bitstream, but it's not a 1:1 mapping, so I don't think there's any
-alignment issues.
+The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
 
-As of the padding, is it an issue? Isn't it defined by the ABI, and
-therefore the userspace will have the same padding rules?
+  Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
 
-> 
-> > +	__s32 offset_for_non_ref_pic;
-> > +	__s32 offset_for_top_to_bottom_field;
-> > +	__u8 num_ref_frames_in_pic_order_cnt_cycle;
-> > +	__s32 offset_for_ref_frame[255];
-> 
-> Perhaps use a define instead of hardcoding 255? Not sure if that makes sense.
-> Same for other arrays below.
-> 
-> > +	__u8 max_num_ref_frames;
-> > +	__u16 pic_width_in_mbs_minus1;
-> > +	__u16 pic_height_in_map_units_minus1;
-> > +	__u8 flags;
-> > +};
-> 
-> You have to test the struct layout for 32 bit and 64 bit systems
-> (the latter for both 64 bit arm and Intel). The layout should be the
-> same for all of them since the control framework does not support
-> compat32 conversions for compound controls.
+are available in the Git repository at:
 
-I'm not really sure how to test that though? Should I write a program
-doing a bunch of offset_of calls to make sure it matches by hand, or
-is there anything smarter?
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-arm-4.19-1
 
-Thanks!
-Maxime
+for you to fetch changes up to 432c0254106a373bcc23b1bd3e0b7eb56929c0d9:
 
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+  ARM: mvebu_v7_defconfig: enable SFP support (2018-06-28 16:53:08 +0200)
+
+----------------------------------------------------------------
+mvebu arm for 4.19 (part 1)
+
+defconfig update:
+ - add NAND controller on multi_v7
+ - add SFP support on mvebu_v7
+code improvement:
+ - remove potential call from invalid context in boot_secondary
+ - allow using CONFIG_FORTIFY_SOURCE in pmsu.c
+
+----------------------------------------------------------------
+Baruch Siach (2):
+      ARM: mvebu_v7_defconfig: sync defconfig
+      ARM: mvebu_v7_defconfig: enable SFP support
+
+Ethan Tuttle (1):
+      ARM: mvebu: declare asm symbols as character arrays in pmsu.c
+
+Gregory CLEMENT (1):
+      ARM: multi_v7_defconfig: Add Marvell NAND controller support
+
+Lucas Stach (1):
+      ARM: mvebu: convert secondary CPU clock sync to hotplug state
+
+ arch/arm/configs/multi_v7_defconfig |  1 +
+ arch/arm/configs/mvebu_v7_defconfig | 13 +++-------
+ arch/arm/mach-mvebu/platsmp.c       | 49 +++++++++++++++++--------------------
+ arch/arm/mach-mvebu/pmsu.c          |  6 ++---
+ include/linux/cpuhotplug.h          |  1 +
+ 5 files changed, 31 insertions(+), 39 deletions(-)
