@@ -1,27 +1,27 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Thu, 12 Jul 2018 09:35:38 +0200
-Subject: [PATCH] [v3] drm/sun4i: fix build failure with
- CONFIG_DRM_SUN8I_MIXER=m
-In-Reply-To: <20180711144403.1022829-1-arnd@arndb.de>
-References: <20180711144403.1022829-1-arnd@arndb.de>
-Message-ID: <20180712073538.drmn75bp6xe5cniz@flea>
+Date: Thu, 12 Jul 2018 09:43:39 +0200
+Subject: [PATCH] ARM: dts: sunxi: libretech-all-h3-cc: Enable eMMC module
+In-Reply-To: <20180712030417.15881-1-wens@csie.org>
+References: <20180712030417.15881-1-wens@csie.org>
+Message-ID: <20180712074339.qizqbfyhsug2pe4g@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 11, 2018 at 04:43:10PM +0200, Arnd Bergmann wrote:
-> Having DRM_SUN4I built-in but DRM_SUN8I_MIXER as a loadable module results in
-> a link error, as we try to access a symbol from the sun8i_tcon_top.ko module:
+On Thu, Jul 12, 2018 at 11:04:17AM +0800, Chen-Yu Tsai wrote:
+> The Libretech ALL-H3-CC has a high density connector for attaching
+> an eMMC module. The module form factor and connection is specific
+> to Libretech, and has provisions for split vmmc/vqmmc (core and I/O)
+> voltage supplies, but this board does not wire the vqmmc side. The
+> H2+/H3/H5 SoCs do not support alternate I/O voltages for eMMC either.
+> Only 3.3V is supported. A specific module that ties vqmmc to vmmc,
+> with both at 3.3V, must be used.
 > 
-> ERROR: "sun8i_tcon_top_of_table" [drivers/gpu/drm/sun4i/sun8i-drm-hdmi.ko] undefined!
-> ERROR: "sun8i_tcon_top_of_table" [drivers/gpu/drm/sun4i/sun4i-drm.ko] undefined!
+> Given that a) eMMC is not designed to be hotplugged, b) power is
+> always provided on the pins, and c) MMC controllers can deal with
+> missing cards, we can enable this by default. If a module is attached
+> it will be picked up by the system.
 > 
-> This solves the problem by adding a silent symbol for the tcon_top module,
-> building it as a separate module in exactly the cases that we need it,
-> but in a way that it is reachable by the other modules.
-> 
-> Fixes: 57e23de02f48 ("drm/sun4i: DW HDMI: Expand algorithm for possible crtcs")
-> Fixes: ef0cf6441fbb ("drm/sun4i: Add support for traversing graph with TCON TOP")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
 Applied, thanks!
 Maxime
@@ -36,4 +36,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180712/58c9be1d/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180712/c4ca575a/attachment-0001.sig>
