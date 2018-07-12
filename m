@@ -1,52 +1,66 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 12 Jul 2018 18:17:23 +0800
-Subject: [PATCH] mmc: sunxi: Use new timing mode for A64 eMMC controller
-In-Reply-To: <20180712071959.fi4rhgwv2iuoelbl@flea>
-References: <20180712030225.15681-1-wens@csie.org>
- <20180712071959.fi4rhgwv2iuoelbl@flea>
-Message-ID: <CAGb2v65rE2nQbyeiSPAyTzw-n-EQsUwQABx3nrvXTu4JogFPBQ@mail.gmail.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 12 Jul 2018 11:32:05 +0100
+Subject: [PATCH V4 0/5] soc: imx: add scu firmware api support
+In-Reply-To: <AM0PR04MB42113AC1D31A193E40F259CC80590@AM0PR04MB4211.eurprd04.prod.outlook.com>
+References: <1531061817-1980-1-git-send-email-aisheng.dong@nxp.com>
+ <24505e51-3a5d-4f34-7ba6-262e118d070e@arm.com>
+ <AM0PR04MB42113AC1D31A193E40F259CC80590@AM0PR04MB4211.eurprd04.prod.outlook.com>
+Message-ID: <73f7f126-6497-7ae9-49b2-082fbc18508d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 12, 2018 at 3:19 PM, Maxime Ripard
-<maxime.ripard@bootlin.com> wrote:
-> Hi,
->
-> On Thu, Jul 12, 2018 at 11:02:25AM +0800, Chen-Yu Tsai wrote:
->> The eMMC controller is also a new timing mode controller, but it doesn't
->> have the timing mode switch. It does however have signal delay and
->> calibration controls, typical of Allwinner MMC controllers that support
->> the new timing mode.
+
+
+On 12/07/18 04:46, A.s. Dong wrote:
+> Hi Sudeep,
+> 
+>> -----Original Message-----
+>> From: Sudeep Holla [mailto:sudeep.holla at arm.com]
+>> Sent: Thursday, July 12, 2018 12:49 AM
+>> To: A.s. Dong <aisheng.dong@nxp.com>; linux-arm-
+>> kernel at lists.infradead.org
+>> Cc: Sudeep Holla <sudeep.holla@arm.com>; dongas86 at gmail.com; dl-linux-
+>> imx <linux-imx@nxp.com>; kernel at pengutronix.de; Fabio Estevam
+>> <fabio.estevam@nxp.com>; shawnguo at kernel.org; Cl?ment Faure
+>> <clement.faure@nxp.com>
+>> Subject: Re: [PATCH V4 0/5] soc: imx: add scu firmware api support
 >>
->> Enable the new timing mode setting for the A64 eMMC controller. This
->> also enables MMC HS-DDR modes, which gives higher throughput for eMMC
->> chips that support it, and can deliver such throughput.
+>> On 08/07/18 15:56, Dong Aisheng wrote:
+>>> Unlike the former i.MX Architectures, the new generation i.MX8 SoCs
+>>> (e.g. MX8QXP and MX8QM) contain a system controller which runs on a
+>>> dedicated Cortex-M core to provide power, clock, Pad, and resource
+>>> management. Communication between the host processor running an OS
+>> and
+>>> the system controller happens through a SCU protocol.
+>>> This patchset adds the SCU APIs which is implemented based on MU and
+>>> will be used by different system components.
+>>>
+>>> It mainly consists of below parts:
+>>> 1) MU mailbox driver
+>>> 1) Implementation of the IPC functions based on MUs (client side).
+>>>
+>>>
 >>
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->
-> That doesn't look right. The datasheet explicitly mentions that this
-> bit doesn't apply to the eMMC controller, and the BSP is doing the same:
-> https://github.com/longsleep/linux-pine64/blob/lichee-dev-v3.10.65/drivers/mmc/host/sunxi-mmc-sun50iw1p1-1.c
->
-> vs
-> https://github.com/longsleep/linux-pine64/blob/lichee-dev-v3.10.65/drivers/mmc/host/sunxi-mmc-sun50iw1p1-2.c
+>> I do understand the firmware might be already released for the current
+>> generation of platforms, but instead of adding to the fragmentation, it would
+>> be good to migrated to ARM SCMI for future platforms.
+>>
+>> This system controller communication protocol is already so fragmented (we
+>> have TI SCI, QCOM RPM, Nvidia Tegra BPMP, ARM SCPI and so on..
+>> and now this i.MX specific one added to that), the main intention of ARM
+>> SCMI is to stop that. The idea is for any Power Control System
+>> Architecture(PCSA) compliant systems or any similar systems, SCMI should
+>> be the standard communication protocol.
+> 
+> That sounds good and worth a look.
+> Copy SCU firmware guys if more comments.
+> BTW, i.MX SCU provides more services than just power related. 
+> Not sure if ARM SCMI can cover it.
+> 
 
-You mean the bit in SDXC_REG_SD_NTSR? Yes I know that doesn't exist for
-the eMMC controller. I mentioned this in the commit message. It doesn't
-exist, and writes to it become a no-op.
-
-Would a comment, or comments, help with making this clear?
-
-> And I definitely remember having HS-DDR working back when I added the
-> a64 eMMC support.
-
-Well it doesn't at the moment. My BPI-M64 reports:
-
-    [    1.634276] mmc2: new high speed MMC card at address 0001
-
-And with the patch:
-
-    [    1.632552] mmc2: new DDR MMC card at address 0001
-
-Regards
-ChenYu
+Sure, we can extend the specification to cover those as generic
+protocols. If they are too NXP specific, then SCMI has options to
+use vendor specific protocols. I am interested to know the requirements.
+-- 
+Regards,
+Sudeep
