@@ -1,21 +1,46 @@
-From: hch@lst.de (Christoph Hellwig)
-Date: Thu, 12 Jul 2018 09:20:51 +0200
-Subject: [RFC PATCH 1/4] dma-mapping: Generalise dma_32bit_limit flag
-In-Reply-To: <868cead9-88a7-e58d-3452-a78e19be5f47@arm.com>
-References: <cover.1531239284.git.robin.murphy@arm.com>
- <a85a5fe22fced65b2960251fc6e8d8f1e68f828a.1531239284.git.robin.murphy@arm.com>
- <20180710180433.GB26285@lst.de>
- <868cead9-88a7-e58d-3452-a78e19be5f47@arm.com>
-Message-ID: <20180712072051.GC15624@lst.de>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Thu, 12 Jul 2018 09:19:59 +0200
+Subject: [PATCH] mmc: sunxi: Use new timing mode for A64 eMMC controller
+In-Reply-To: <20180712030225.15681-1-wens@csie.org>
+References: <20180712030225.15681-1-wens@csie.org>
+Message-ID: <20180712071959.fi4rhgwv2iuoelbl@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 11, 2018 at 05:56:40PM +0100, Robin Murphy wrote:
-> Indeed, once we've found an approach that everyone's happy with we can have 
-> a more thorough audit of exactly where else it needs to be applied. FWIW 
-> I'm not aware of any 32-bit Arm systems affected by this*, but if they do 
-> exist then at least there's no risk of regression since they've always been 
-> busted.
+Hi,
 
-Ok, great.  I just assumed arm might be affected due to the fact that
-it currently parses dma-ranges DT properties.
+On Thu, Jul 12, 2018 at 11:02:25AM +0800, Chen-Yu Tsai wrote:
+> The eMMC controller is also a new timing mode controller, but it doesn't
+> have the timing mode switch. It does however have signal delay and
+> calibration controls, typical of Allwinner MMC controllers that support
+> the new timing mode.
+> 
+> Enable the new timing mode setting for the A64 eMMC controller. This
+> also enables MMC HS-DDR modes, which gives higher throughput for eMMC
+> chips that support it, and can deliver such throughput.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+
+That doesn't look right. The datasheet explicitly mentions that this
+bit doesn't apply to the eMMC controller, and the BSP is doing the same:
+https://github.com/longsleep/linux-pine64/blob/lichee-dev-v3.10.65/drivers/mmc/host/sunxi-mmc-sun50iw1p1-1.c
+
+vs
+https://github.com/longsleep/linux-pine64/blob/lichee-dev-v3.10.65/drivers/mmc/host/sunxi-mmc-sun50iw1p1-2.c
+
+And I definitely remember having HS-DDR working back when I added the
+a64 eMMC support.
+
+Maxime
+
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180712/438c9ea8/attachment.sig>
