@@ -1,7 +1,7 @@
-From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Thu, 12 Jul 2018 13:03:14 +0000
+From: marex@denx.de (Marek Vasut)
+Date: Thu, 12 Jul 2018 15:14:57 +0200
 Subject: [PATCH 1/3] drm: mxsfb: Change driver.name to mxsfb-drm
-In-Reply-To: <617c0a7e9132b929877b8cbcf116b1ea@agner.ch>
+In-Reply-To: <7f40f34a401ced78703b1a151d9f5fe4ed8c209f.camel@nxp.com>
 References: <cover.1529091248.git.leonard.crestez@nxp.com>
  <47ea7572011735b68a8a70f0e11bdf00cb2fd86a.1529091248.git.leonard.crestez@nxp.com>
  <CAOMZO5B8i0gN+rCq-yPrd112NkwJWTxYCtsLVeLhD1JLRuX6EQ@mail.gmail.com>
@@ -12,47 +12,58 @@ References: <cover.1529091248.git.leonard.crestez@nxp.com>
  <fd22085f646d97f66cff5b7f22785500@agner.ch>
  <6fdba55b-0be6-9e28-d87a-43d876a1fd09@denx.de>
  <617c0a7e9132b929877b8cbcf116b1ea@agner.ch>
-Message-ID: <7f40f34a401ced78703b1a151d9f5fe4ed8c209f.camel@nxp.com>
+ <7f40f34a401ced78703b1a151d9f5fe4ed8c209f.camel@nxp.com>
+Message-ID: <039b2914-3393-5e81-82a6-7d517c5818a9@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2018-07-12 at 11:21 +0200, Stefan Agner wrote:
-> On 10.07.2018 11:11, Marek Vasut wrote:
-> > On 07/10/2018 11:06 AM, Stefan Agner wrote:
-> > > This is one of the situation where states quo is kinda the worst
-> > > situation.
-> > > 
-> > > Currently imx_v6_v7_defconfig and mxs_defconfig actually still uses
-> > > CONFIG_FB_MXS.
-> > > 
-> > > I understand that you'd rather prefer to move forward. I suggest we do
-> > > it in steps.
-> > > 
-> > > In 4.19:
-> > > 
-> > > - Change DRM driver.name to mxsfb-drm so we avoid conflicts for now
-> > 
-> > But this will break mesa if it depends on mxsfb name for ie. etnaviv
-> > binding.
+On 07/12/2018 03:03 PM, Leonard Crestez wrote:
+> On Thu, 2018-07-12 at 11:21 +0200, Stefan Agner wrote:
+>> On 10.07.2018 11:11, Marek Vasut wrote:
+>>> On 07/10/2018 11:06 AM, Stefan Agner wrote:
+>>>> This is one of the situation where states quo is kinda the worst
+>>>> situation.
+>>>>
+>>>> Currently imx_v6_v7_defconfig and mxs_defconfig actually still uses
+>>>> CONFIG_FB_MXS.
+>>>>
+>>>> I understand that you'd rather prefer to move forward. I suggest we do
+>>>> it in steps.
+>>>>
+>>>> In 4.19:
+>>>>
+>>>> - Change DRM driver.name to mxsfb-drm so we avoid conflicts for now
+>>>
+>>> But this will break mesa if it depends on mxsfb name for ie. etnaviv
+>>> binding.
+>>
+>> Does it? grep -r -e mxsfb in libdrm and mesa master returns nothing.
+>>
+>> There is also .name in struct drm_driver, which is already set to
+>> mxsfb-drm... Is that the one exposed to user space?
 > 
-> Does it? grep -r -e mxsfb in libdrm and mesa master returns nothing.
+> Running etnaviv+x11 with a renamed mxsfb driver works fine on imx6sx-
+> sdb.
 > 
-> There is also .name in struct drm_driver, which is already set to
-> mxsfb-drm... Is that the one exposed to user space?
+> Tools like modetest already need -M mxsfb-drm, the drm_driver.name
+> seems to be what matters.
+> 
+>> - Remove CONFIG_FB_MXS from imx_v6_v7_defconfig/mxs_defconfig now, and
+>> only enable CONFIG_DRM_MXSFB=y
+> 
+> If one of the drivers is renamed then they can coexist: since the
+> bindings are distinct one driver will return a probe error and the
+> other will bind successfully. This can even be adjusted so that it
+> doesn't even print ugly scary errors.
+> 
+> This can last until somebody implements support for old bindings in the
+> drm driver and then FB_MXS can just be deleted.
 
-Running etnaviv+x11 with a renamed mxsfb driver works fine on imx6sx-
-sdb.
+So why don't we just convert the DT bindings on boards supported
+upstream and zap the old driver ? What is the problem with that?
 
-Tools like modetest already need -M mxsfb-drm, the drm_driver.name
-seems to be what matters.
+Realistically, how many MXS boards in the field use old DT and new kernel ?
 
-> - Remove CONFIG_FB_MXS from imx_v6_v7_defconfig/mxs_defconfig now, and
-> only enable CONFIG_DRM_MXSFB=y
-
-If one of the drivers is renamed then they can coexist: since the
-bindings are distinct one driver will return a probe error and the
-other will bind successfully. This can even be adjusted so that it
-doesn't even print ugly scary errors.
-
-This can last until somebody implements support for old bindings in the
-drm driver and then FB_MXS can just be deleted.
+-- 
+Best regards,
+Marek Vasut
