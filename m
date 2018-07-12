@@ -1,32 +1,40 @@
-From: thunder.leizhen@huawei.com (Zhen Lei)
-Date: Thu, 12 Jul 2018 17:28:43 +0800
-Subject: [PATCH 1/1] iommu/arm-smmu-v3: prevent any devices access to memory
- without registration
-Message-ID: <1531387723-3592-1-git-send-email-thunder.leizhen@huawei.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 12 Jul 2018 11:31:06 +0200
+Subject: [PATCH v4 0/2] arm64: rockchip: support RK3399 Ficus board
+In-Reply-To: <20180706150818.5631-1-ezequiel@collabora.com>
+References: <20180706150818.5631-1-ezequiel@collabora.com>
+Message-ID: <31262174.ngUfOPmpOk@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stream bypass is not security. A malicious device can be hot plugged
-without match any drivers, but it can access to any memory. So change to
-disable bypass by default.
+Am Freitag, 6. Juli 2018, 17:08:16 CEST schrieb Ezequiel Garcia:
+> Fourth round for the RK3399 Ficus support.
+> 
+> Changes from v3:
+>  * Fixed a regulator node name, as noted by Rob.
+>  * Fixed wrong alphabetical order in vendors prefix patch, also noted by
+> Rob.
+> 
+> Changes from v2:
+>  * Dropped rk3399.dtsi changes and rebased on top of Randy's patch.
+>  * Removed double empty line.
+>  * Coalesced schematics comment
+> 
+> Changes from v1:
+>  * Dropoed USB support as it's not working.
+>  * Added schematics.
+>  * Splitted rk3399.dtsi from new ficus.dts file.
+>  * Added new vendor.
+>  * Cleaned regulators syntax and stlye.
+> 
+> Series based on: 600b359d2b98 ("arm64: dts: rockchip: add some common
+> pin-settings to rk3399").
+> 
+> Ezequiel Garcia (2):
+>   dt-bindings: Add vendor prefix for Vamrs Ltd.
+>   arm64: dts: rockchip: add 96boards RK3399 Ficus board
 
-Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
----
- drivers/iommu/arm-smmu-v3.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+applied both for 4.19
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 1d64710..b0ec28d 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -366,7 +366,7 @@
- #define MSI_IOVA_BASE			0x8000000
- #define MSI_IOVA_LENGTH			0x100000
-
--static bool disable_bypass;
-+static bool disable_bypass = 1;
- module_param_named(disable_bypass, disable_bypass, bool, S_IRUGO);
- MODULE_PARM_DESC(disable_bypass,
- 	"Disable bypass streams such that incoming transactions from devices that are not attached to an iommu domain will report an abort back to the device and will not be allowed to pass through the SMMU.");
---
-1.8.3
+Thanks
+Heiko
