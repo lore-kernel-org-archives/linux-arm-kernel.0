@@ -1,27 +1,69 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 12 Jul 2018 10:37:47 -0300
-Subject: [PATCH 1/2] ARM: dts: imx51-zii-scu3-esb: Add switch IRQ line
- pinumx config
-In-Reply-To: <20180712023337.30112-2-andrew.smirnov@gmail.com>
-References: <20180712023337.30112-1-andrew.smirnov@gmail.com>
- <20180712023337.30112-2-andrew.smirnov@gmail.com>
-Message-ID: <CAOMZO5DfHqKjF6xykJtoC-aA-ATWM6mCZR0VzPVpSDOt-Fs6bQ@mail.gmail.com>
+From: leonard.crestez@nxp.com (Leonard Crestez)
+Date: Thu, 12 Jul 2018 16:37:59 +0300
+Subject: [PATCH] ARM: dts: imx6sl: Add vivante gpu nodes
+Message-ID: <e056c4b8a850a81a15bf090fa6a88d9a50fae3c3.1531402278.git.leonard.crestez@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrey,
+The imx6sl soc has gpu_2d and gpu_vg, no 3d support:
 
-On Wed, Jul 11, 2018 at 11:33 PM, Andrey Smirnov
-<andrew.smirnov@gmail.com> wrote:
+etnaviv-gpu 2200000.gpu: model: GC320, revision: 5007
+etnaviv-gpu 2204000.gpu: model: GC355, revision: 1215
 
-> +       pinctrl_switch: switchgrp {
-> +               fsl,pins = <
-> +                       MX51_PAD_AUD3_BB_CK__GPIO4_20           0xc5
+The IP blocks are close enough to supported hardware that they "just
+work" with etnaviv and x11.
 
-The i.MX51 Reference Manual states that 0xa5 is the default reset
-value for the register IOMUXC_SW_PAD_CTL_PAD_AUD3_BB_CK.
+Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
 
-By reading your commit log I had the impression you wanted to provide
-the default value explicitly.
+---
+ arch/arm/boot/dts/imx6sl.dtsi | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-Please clarify.
+Tested by using yocto fsl community bsp built in "mainline" mode. This
+patch makes x11 start up and turning on drm.debug shows that the etnaviv
+driver is being used.
+
+I don't know if such a patch requires much more testing: all it really
+does is "describe the hardware".
+
+Patch is against shawguo/imx/dt, it depends on newly accepted
+commit 13211eec7b0e ("ARM: dts: imx6sl: Convert gpc to new bindings")
+This is only because of the way it references the PU power domain.
+
+diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
+index a6bc21433839..49a56b4fd393 100644
+--- a/arch/arm/boot/dts/imx6sl.dtsi
++++ b/arch/arm/boot/dts/imx6sl.dtsi
+@@ -130,10 +130,30 @@
+ 			cache-level = <2>;
+ 			arm,tag-latency = <4 2 3>;
+ 			arm,data-latency = <4 2 3>;
+ 		};
+ 
++		gpu_2d: gpu at 2200000 {
++			compatible = "vivante,gc";
++			reg = <0x02200000 0x4000>;
++			interrupts = <0 10 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&clks IMX6SL_CLK_MMDC_ROOT>,
++				 <&clks IMX6SL_CLK_GPU2D_OVG>;
++			clock-names = "bus", "core";
++			power-domains = <&pd_pu>;
++		};
++
++		gpu_vg: gpu at 2204000 {
++			compatible = "vivante,gc";
++			reg = <0x02204000 0x4000>;
++			interrupts = <0 11 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&clks IMX6SL_CLK_MMDC_ROOT>,
++				 <&clks IMX6SL_CLK_GPU2D_OVG>;
++			clock-names = "bus", "core";
++			power-domains = <&pd_pu>;
++		};
++
+ 		aips1: aips-bus at 2000000 {
+ 			compatible = "fsl,aips-bus", "simple-bus";
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
+ 			reg = <0x02000000 0x100000>;
+-- 
+2.17.1
