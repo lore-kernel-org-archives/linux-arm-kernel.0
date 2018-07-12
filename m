@@ -1,247 +1,48 @@
-From: alex.gonzalez@digi.com (Alex Gonzalez)
-Date: Thu, 12 Jul 2018 10:20:36 +0200
-Subject: [PATCH v2 2/2] ARM: dts: imx6ul: Add DTS for ConnectCore 6UL SBC
- Express
-In-Reply-To: <1531383636-3406-1-git-send-email-alex.gonzalez@digi.com>
-References: <1531383636-3406-1-git-send-email-alex.gonzalez@digi.com>
-Message-ID: <1531383636-3406-3-git-send-email-alex.gonzalez@digi.com>
+From: brendanhiggins@google.com (Brendan Higgins)
+Date: Thu, 12 Jul 2018 01:38:00 -0700
+Subject: [PATCH] i2c: aspeed: Add newline characters into message
+ printings.
+In-Reply-To: <c13fc12e859f7bdb300f08ad805cdf6d7ec09f52.camel@perches.com>
+References: <20180702211359.30585-1-jae.hyun.yoo@linux.intel.com>
+ <CAFd5g443wTQJ+0hrprOV949Sr_nRnBGpNo3Wd01xFN4GW4K2Ng@mail.gmail.com>
+ <2d2f2b2b-394a-506f-c870-33520335250b@linux.intel.com>
+ <c13fc12e859f7bdb300f08ad805cdf6d7ec09f52.camel@perches.com>
+Message-ID: <CAFd5g47-Bq_wUkL4vP93si+urDs-A0j26ukZ+Riy24HWi5AuuA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ConnectCore 6UL Single Board Computer (SBC) Express contains the
-ConnectCore 6UL System-On-Module.
+On Wed, Jul 11, 2018 at 10:10 AM Joe Perches <joe@perches.com> wrote:
+>
+> On Wed, 2018-07-11 at 09:53 -0700, Jae Hyun Yoo wrote:
+> > On 7/10/2018 10:42 PM, Brendan Higgins wrote:
+> > > On Mon, Jul 2, 2018 at 2:14 PM Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com> wrote:
+> > > > There are some log printing without a newline character. This
+> > > > patch adds the missing newline characters.
+> []
+> > > > diff --git a/drivers/i2c/busses/i2c-aspeed.c b/drivers/i2c/busses/i2c-aspeed.c
+> []
+> > > > @@ -431,7 +431,7 @@ static bool aspeed_i2c_master_irq(struct aspeed_i2c_bus *bus)
+> > > >           */
+> > > >          if (bus->master_state == ASPEED_I2C_MASTER_START) {
+> > > >                  if (unlikely(!(irq_status & ASPEED_I2CD_INTR_TX_ACK))) {
+> > > > -                       pr_devel("no slave present at %02x", msg->addr);
+> > > > +                       pr_devel("no slave present at %02x\n", msg->addr);
+> > >
+> > > Unless something changed in the last couple versions of the kernel, this is the
+> > > only line that actually changes anything. dev_* inserts a newline for every
+> > > call.
+>
+> Not true.
+>
+> Any printk without KERN_CONT inserts a newline
+> if the last character
+> emitted is not a newline.
+>
+> dev_<level> uses can also be followed by pr_cont.
+>
+> So this patch does reduce the possibility of
+> interleaved messages from multiple processes.
 
-Its hardware specifications are:
+My mistake. Thanks for pointing that out.
 
-* 256MB DDR3 memory
-* 256MB NAND flash
-* Single Ethernet
-* USB Host and USB-OTG
-* MicroSD external storage
-* Groove connectors and Raspberry Pi Hat compatible expansion header
-
-Signed-off-by: Alex Gonzalez <alex.gonzalez@digi.com>
----
- arch/arm/boot/dts/Makefile                      |   1 +
- arch/arm/boot/dts/imx6ul-ccimx6ulsbcexpress.dts | 200 ++++++++++++++++++++++++
- 2 files changed, 201 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6ul-ccimx6ulsbcexpress.dts
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 37a3de760d40..6135d3dc381c 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -533,6 +533,7 @@ dtb-$(CONFIG_SOC_IMX6SX) += \
- 	imx6sx-udoo-neo-full.dtb
- dtb-$(CONFIG_SOC_IMX6UL) += \
- 	imx6ul-14x14-evk.dtb \
-+	imx6ul-ccimx6ulsbcexpress.dtb \
- 	imx6ul-geam.dtb \
- 	imx6ul-isiot-emmc.dtb \
- 	imx6ul-isiot-nand.dtb \
-diff --git a/arch/arm/boot/dts/imx6ul-ccimx6ulsbcexpress.dts b/arch/arm/boot/dts/imx6ul-ccimx6ulsbcexpress.dts
-new file mode 100644
-index 000000000000..3792679c0c90
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6ul-ccimx6ulsbcexpress.dts
-@@ -0,0 +1,200 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * Digi International's ConnectCore6UL SBC Express board device tree source
-+ *
-+ * Copyright 2018 Digi International, Inc.
-+ *
-+ */
-+
-+/dts-v1/;
-+#include <dt-bindings/input/input.h>
-+#include <dt-bindings/interrupt-controller/irq.h>
-+#include "imx6ul.dtsi"
-+#include "imx6ul-ccimx6ulsom.dtsi"
-+
-+/ {
-+	model = "Digi International ConnectCore 6UL SBC Express.";
-+	compatible = "digi,ccimx6ulsbcexpress", "digi,ccimx6ulsom",
-+		     "fsl,imx6ul";
-+};
-+
-+&adc1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_adc1>;
-+	status = "okay";
-+};
-+
-+&can1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_flexcan1>;
-+	xceiver-supply = <&ext_3v3>;
-+	status = "okay";
-+};
-+
-+&ecspi3 {
-+	cs-gpios = <&gpio1 20 GPIO_ACTIVE_LOW>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_ecspi3_master>;
-+	status = "okay";
-+};
-+
-+&fec1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_enet1>;
-+	phy-mode = "rmii";
-+	phy-handle = <&ethphy0>;
-+	status = "okay";
-+
-+	mdio {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		ethphy0: ethernet-phy at 0 {
-+			compatible = "ethernet-phy-ieee802.3-c22";
-+			smsc,disable-energy-detect;
-+			reg = <0>;
-+		};
-+	};
-+};
-+
-+&i2c2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c2>;
-+	status = "okay";
-+};
-+
-+&pwm1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_pwm1>;
-+	status = "okay";
-+};
-+
-+&uart4 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart4>;
-+	status = "okay";
-+};
-+
-+&uart5 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart5>;
-+	status = "okay";
-+};
-+
-+&usbotg1 {
-+	dr_mode = "host";
-+	disable-over-current;
-+	status = "okay";
-+};
-+
-+&usbotg2 {
-+	dr_mode = "host";
-+	disable-over-current;
-+	status = "okay";
-+};
-+
-+&usdhc2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usdhc2>;
-+	broken-cd;      /* no carrier detect line (use polling) */
-+	no-1-8-v;
-+	status = "okay";
-+};
-+
-+&iomuxc {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_hog>;
-+
-+	pinctrl_adc1: adc1grp {
-+		fsl,pins = <
-+			/* GPIO1_4/ADC1_IN4 (pin 7 of the expansion header) */
-+			MX6UL_PAD_GPIO1_IO04__GPIO1_IO04        0xb0
-+		>;
-+	};
-+
-+	pinctrl_ecspi3_master: ecspi3grp1 {
-+		fsl,pins = <
-+			MX6UL_PAD_UART2_RX_DATA__ECSPI3_SCLK	0x10b0
-+			MX6UL_PAD_UART2_CTS_B__ECSPI3_MOSI	0x10b0
-+			MX6UL_PAD_UART2_RTS_B__ECSPI3_MISO	0x10b0
-+			MX6UL_PAD_UART2_TX_DATA__GPIO1_IO20	0x10b0 /* Chip Select */
-+		>;
-+	};
-+
-+	pinctrl_ecspi3_slave: ecspi3grp2 {
-+		fsl,pins = <
-+			MX6UL_PAD_UART2_RX_DATA__ECSPI3_SCLK	0x10b0
-+			MX6UL_PAD_UART2_CTS_B__ECSPI3_MOSI	0x10b0
-+			MX6UL_PAD_UART2_RTS_B__ECSPI3_MISO	0x10b0
-+			MX6UL_PAD_UART2_TX_DATA__ECSPI3_SS0	0x10b0 /* Chip Select */
-+		>;
-+	};
-+
-+	pinctrl_enet1: enet1grp {
-+		fsl,pins = <
-+			MX6UL_PAD_GPIO1_IO07__ENET1_MDC		0x1b0b0
-+			MX6UL_PAD_GPIO1_IO06__ENET1_MDIO	0x1b0b0
-+			MX6UL_PAD_ENET1_RX_EN__ENET1_RX_EN	0x1b0b0
-+			MX6UL_PAD_ENET1_RX_ER__ENET1_RX_ER	0x1b0b0
-+			MX6UL_PAD_ENET1_RX_DATA0__ENET1_RDATA00	0x1b0b0
-+			MX6UL_PAD_ENET1_RX_DATA1__ENET1_RDATA01	0x1b0b0
-+			MX6UL_PAD_ENET1_TX_EN__ENET1_TX_EN	0x1b0b0
-+			MX6UL_PAD_ENET1_TX_DATA0__ENET1_TDATA00	0x1b0b0
-+			MX6UL_PAD_ENET1_TX_DATA1__ENET1_TDATA01	0x1b0b0
-+			MX6UL_PAD_ENET1_TX_CLK__ENET1_REF_CLK1	0x40017051
-+		>;
-+	};
-+
-+	pinctrl_flexcan1: flexcan1grp{
-+		fsl,pins = <
-+			MX6UL_PAD_LCD_DATA08__FLEXCAN1_TX	0x1b020
-+			MX6UL_PAD_LCD_DATA09__FLEXCAN1_RX	0x1b020
-+		>;
-+	};
-+
-+	pinctrl_i2c2: i2c2grp {
-+		fsl,pins = <
-+			MX6UL_PAD_GPIO1_IO00__I2C2_SCL 0x4001b8b0
-+			MX6UL_PAD_GPIO1_IO01__I2C2_SDA 0x4001b8b0
-+		>;
-+	};
-+
-+	pinctrl_pwm1: pwm1grp {
-+		fsl,pins = <
-+			MX6UL_PAD_LCD_DATA00__PWM1_OUT		0x10b0
-+		>;
-+	};
-+
-+	pinctrl_uart4: uart4grp {
-+		fsl,pins = <
-+			MX6UL_PAD_LCD_CLK__UART4_DCE_TX		0x1b0b1
-+			MX6UL_PAD_LCD_ENABLE__UART4_DCE_RX	0x1b0b1
-+		>;
-+	};
-+
-+	pinctrl_uart5: uart5grp {
-+		fsl,pins = <
-+			MX6UL_PAD_UART5_TX_DATA__UART5_DCE_TX	0x1b0b1
-+			MX6UL_PAD_UART5_RX_DATA__UART5_DCE_RX	0x1b0b1
-+		>;
-+	};
-+
-+	pinctrl_usdhc2: usdhc2grp {
-+		fsl,pins = <
-+			MX6UL_PAD_CSI_HSYNC__USDHC2_CMD		0x17059
-+			MX6UL_PAD_CSI_VSYNC__USDHC2_CLK		0x10071
-+			MX6UL_PAD_CSI_DATA00__USDHC2_DATA0	0x17059
-+			MX6UL_PAD_CSI_DATA01__USDHC2_DATA1	0x17059
-+			MX6UL_PAD_CSI_DATA02__USDHC2_DATA2	0x17059
-+			MX6UL_PAD_CSI_DATA03__USDHC2_DATA3	0x17059
-+		>;
-+	};
-+
-+	/* General purpose pinctrl */
-+	pinctrl_hog: hoggrp {
-+		fsl,pins = <
-+			/* GPIOs BANK 3 */
-+			MX6UL_PAD_LCD_RESET__GPIO3_IO04		0xf030
-+		>;
-+	};
-+};
+Jae, forget what I said earlier. This looks good to me.
