@@ -1,49 +1,48 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 12 Jul 2018 12:06:28 +0100
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 12 Jul 2018 12:20:15 +0100
 Subject: [RFC PATCH] arm64: topology: Map PPTT node offset to logic
  physical package id
-In-Reply-To: <1530177508-15298-1-git-send-email-shunyong.yang@hxt-semitech.com>
+In-Reply-To: <20180712110628.GA16043@arm.com>
 References: <1530177508-15298-1-git-send-email-shunyong.yang@hxt-semitech.com>
-Message-ID: <20180712110628.GA16043@arm.com>
+ <20180712110628.GA16043@arm.com>
+Message-ID: <bf1406d7-66db-c854-2f3e-b0b47c533bad@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 28, 2018 at 05:18:28PM +0800, Shunyong Yang wrote:
-> As PPTT spec doesn't define the physical package id,
-> find_acpi_cpu_topology_package() will return offset of the node with
-> Physical package field set when querying physical package id. So, it
-> returns 162(0xA2) in following example.
-> 
-> [0A2h 0162   1]                Subtable Type : 00 [Processor Hierarchy
-> Node]
-> [0A3h 0163   1]                       Length : 1C
-> [0A4h 0164   2]                     Reserved : 0000
-> [0A6h 0166   4]        Flags (decoded below) : 00000003
->                             Physical package : 1
->                      ACPI Processor ID valid : 1
-> [0AAh 0170   4]                       Parent : 00000000
-> [0AEh 0174   4]            ACPI Processor ID : 00001000
-> [0B2h 0178   4]      Private Resource Number : 00000002
-> [0B6h 0182   4]             Private Resource : 0000006C
-> [0BAh 0186   4]             Private Resource : 00000084
-> 
-> So, when "cat physical_package" in /sys/devices/system/cpu/cpu0/topology/,
-> it will output 162(0xA2). And if some items are added before the node
-> above, the output will change to other value.
-> 
-> This patch maps the node offset to a logic package id. It maps the first
-> node offset to 0, the second to 1, and so on.
-> 
-> Then, it will not output a big value, such as 162 above. And it will
-> not change when some nodes(Physical package not set) are added.
-> 
-> And as long as the nodes with Physical package field set in PPTT keeps
-> the real hardware order, the logic id can map to hardware package id to
-> some extent.
-> 
-> Hope to get feedback from you.
+Hi Will,
 
-I'm assuming this is no longer needed now that we have queued the series
-from Sudeep?
+On 12/07/18 12:06, Will Deacon wrote:
+> On Thu, Jun 28, 2018 at 05:18:28PM +0800, Shunyong Yang wrote:
 
-Will
+[..]
+
+>>
+>> And as long as the nodes with Physical package field set in PPTT keeps
+>> the real hardware order, the logic id can map to hardware package id to
+>> some extent.
+>>
+>> Hope to get feedback from you.
+> 
+> I'm assuming this is no longer needed now that we have queued the series
+> from Sudeep?
+> 
+
+The series relating to topology/numa that you have queued helps us to
+re-introduces numa mask check that was reverted partial in v4.18 and is
+not related to the issue reported or addressed by this patch.
+
+However, there's no proper solution to the issue reported in this thread
+and the one from Andrew Jones[1]. The only solution is to rely on ACPI
+firmware for that instead of trying to fix in OS and we have already
+merged the patch to fix that in acpi/pptt.c (Commit 30998033f62a ("ACPI
+/ PPTT: use ACPI ID whenever ACPI_PPTT_ACPI_PROCESSOR_ID_VALID is set"))
+
+In short, all the know issues are addressed so far and nothing else
+needs to be queued for now.
+
+-- 
+Regards,
+Sudeep
+
+[1]
+https://lore.kernel.org/lkml/20180629180308.zdl4taihzv2zwarc at kamzik.brq.redhat.com/T/#t
