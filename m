@@ -1,16 +1,58 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 12 Jul 2018 09:52:44 +0800
-Subject: [PATCH v4 1/6] dt-bindings: freescale: Add bindings for the
- tigerp module
-In-Reply-To: <1531240308-24798-1-git-send-email-fabio.estevam@nxp.com>
-References: <1531240308-24798-1-git-send-email-fabio.estevam@nxp.com>
-Message-ID: <20180712015243.GO6959@dragon>
+From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
+Date: Thu, 12 Jul 2018 09:55:04 +0800
+Subject: [PATCH v6 0/3] serial: 8250_dw: add fractional divisor support
+Message-ID: <20180712095504.4d9583ce@xhacker.debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 10, 2018 at 01:31:43PM -0300, Fabio Estevam wrote:
-> Add bindings for the tigerp module present on i.MX51.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+For Synopsys DesignWare 8250 uart which version >= 4.00a, there's a
+valid divisor latch fraction register. The fractional divisor width is
+4bits ~ 6bits.
 
-Applied all, thanks.
+patch1 introduces necessary hooks to 8250 core.
+patch2 exports serial8250_do_set_divisor()
+patch3 implements the fractional divisor support for Synopsys DW 8250.
+
+Since v5:
+ - Add Andy's Reviewed-by tag to all patches.
+
+Since v4:
+ - use tmp to save baud * 16 rather than calculate every time in
+   dw8250_get_divisor()
+
+Since v3:
+ - simplify the dw8250_get_divisor() implementation again.
+
+Since v2:
+ - rebase to tty-next branch, since I need one patch from Andy which
+   is in tty-next
+ - drop the patch "serial: 8250: let serial8250_get_divisor() get
+   uart_port * as param" since it's in tty-next now.
+ - add a new patch to export serial8250_do_set_divisor(), and reuse it
+   to complete dw8250_set_divisor().
+ - remove DW 8250 version check, since the DLF register always exists
+   and if fractional divisor isn't supported, the register read as 0
+ - add comments to explain how dw8250_get_divisor() get quot and frac.
+ - the frac calcuation is simplified with well implemented GENMASK
+ - Add Andy's Reviewed-by tag to patch1.
+
+Since v1:
+ - add an extra patch to let serial8250_get_divisor() get uart_port *
+   as param
+ - take Andy's suggestions to "integrates hooks in the same way like
+   it's done for the rest of 8250 ones". Many thanks to Andy.
+
+Jisheng Zhang (3):
+  serial: 8250: introduce get_divisor() and set_divisor() hook
+  serial: 8250: export serial8250_do_set_divisor()
+  serial: 8250_dw: add fractional divisor support
+
+ drivers/tty/serial/8250/8250_core.c |  4 +++
+ drivers/tty/serial/8250/8250_dw.c   | 45 +++++++++++++++++++++++++++++
+ drivers/tty/serial/8250/8250_port.c | 30 +++++++++++++++----
+ include/linux/serial_8250.h         |  3 ++
+ include/linux/serial_core.h         |  7 +++++
+ 5 files changed, 84 insertions(+), 5 deletions(-)
+
+-- 
+2.18.0
