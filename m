@@ -1,115 +1,107 @@
-From: collinsd@codeaurora.org (David Collins)
-Date: Wed, 11 Jul 2018 17:10:50 -0700
-Subject: [PATCH 3/3] arm64: dts: qcom: pm8998: Add thermal zone
-In-Reply-To: <CAD=FV=XbnuNg_B_Uoj8j9hz0t7=ORdcVB16oDmVk1q2iZYGs9A@mail.gmail.com>
-References: <20180628210915.160893-1-mka@chromium.org>
- <20180628210915.160893-3-mka@chromium.org>
- <CAD=FV=Wo4wc_QZYr0a2_Ge=B6T4RNJDnOyxAd8r6sT4iZJjCKg@mail.gmail.com>
- <20180629185102.GV129942@google.com>
- <3b5054bb-76e4-a06f-54bb-e6ea7bbbcc69@codeaurora.org>
- <20180629235417.GY129942@google.com>
- <8144dd3c-6138-7f16-ec17-d75e84fcfb34@codeaurora.org>
- <CAD=FV=XqoRajjNcW8RyJfrcXQVDihfjAnAsN+O9g+6qDrLHfJw@mail.gmail.com>
- <03904a71-c6be-4f93-ad43-7d25631f9a04@codeaurora.org>
- <CAD=FV=XbnuNg_B_Uoj8j9hz0t7=ORdcVB16oDmVk1q2iZYGs9A@mail.gmail.com>
-Message-ID: <aff517d2-df92-da86-fc1e-5f8f8c42f736@codeaurora.org>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Thu, 12 Jul 2018 10:14:09 +1000
+Subject: [RFC PATCH v2 1/4] dt-bindings: misc: Add bindings for misc.
+ BMC control fields
+In-Reply-To: <20180711200450.GB17291@rob-hp-laptop>
+References: <20180711053122.30773-1-andrew@aj.id.au>
+ <20180711053122.30773-2-andrew@aj.id.au>
+ <20180711200450.GB17291@rob-hp-laptop>
+Message-ID: <2f479f747daa5cee15d250e3a6a4853e3dc1c4a0.camel@kernel.crashing.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Doug,
-
-On 07/11/2018 03:43 PM, Doug Anderson wrote:
-> On Wed, Jul 11, 2018 at 3:36 PM, David Collins <collinsd@codeaurora.org> wrote:
->>> On Tue, Jul 10, 2018 at 10:45 AM, David Collins <collinsd@codeaurora.org> wrote:
->>>> On 06/29/2018 04:54 PM, Matthias Kaehlcke wrote:
->>>>> On Fri, Jun 29, 2018 at 02:29:55PM -0700, David Collins wrote:
->>>> ...
->>>>>> The PMIC TEMP_ALARM hardware peripheral will perform an automatic partial
->>>>>> PMIC shutdown upon hitting over-temperature stage 2 (125 C).  This turns
->>>>>> off peripherals within the PMIC that are expected to draw significant
->>>>>> current.  The set of peripherals included varies between PMICs.  This
->>>>>> partial shutdown will occur simultaneously with the triggering of an
->>>>>> interrupt to the APPS processor that informs the qcom-spmi-temp-alarm
->>>>>> driver that an over-temperature threshold has been crossed.
->>>>>>
->>>>>> The TEMP_ALARM peripheral will perform an automatic full PMIC shutdown
->>>>>> upon hitting over-temperature stage 3 (145 C).  Software won't receive an
->>>>>> interrupt in this case because all power is cut.
->>>>>
->>>>> This information is very useful, thanks David!
->>>>>
->>>>> The (partial) hardware shutdown seems like a good measure of last
->>>>> resort, however I suppose we prefer Linux to initiate a shutdown
->>>>> before losing part of the peripherals (drivers might not be happy
->>>>> about this and probably not revover even when the temperature goes
->>>>> down again) or reach a full PMIC shutdown.
->>>>>
->>>>> Please let me know if there are reasons to prefer to go the hardware
->>>>> limits, it's also an option for device makers to overwrite these
->>>>> settings if they want different behavior.
->>>>
->>>> Disabling stage 3 automatic full PMIC shutdown at 145 C is definitely a
->>>> bad idea.  This exists as a last resort in order to save the hardware and
->>>> ensure end user safety in case of excessive temperature even if software
->>>> is locked up.
->>>>
->>>> Disabling stage 2 automatic partial PMIC shutdown at 125 C is not
->>>> recommended as the PMIC is already outside of reasonable operating
->>>> conditions and needs to take corrective action quickly.  However, doing so
->>>> may be acceptable if software is taking action to shut down the system
->>>> immediately upon receiving the stage 2 over-temperature interrupt.
->>>> Just to confirm: is it expected that at stage 2 the CPU's on the SoC
->>> should continue running even with partial PMIC shutdown enabled?
->>
->> This is not guaranteed.
->>
->>
->>> It sounded to me like partial PMIC shutdown was supposed to shut down
->>> high-power rails that were not essential to the task of performing an
->>> orderly shutdown.
->>
->> Shutting down high-power peripherals is accurate; however, special care is
->> not taken to ensure that an orderly shutdown is possible.  At the very
->> least, the HW and SW state will be out of sync for the peripherals that
->> are shut down.
+On Wed, 2018-07-11 at 14:04 -0600, Rob Herring wrote:
+> On Wed, Jul 11, 2018 at 03:01:19PM +0930, Andrew Jeffery wrote:
+> > Baseboard Management Controllers (BMCs) are embedded SoCs that exist to
+> > provide remote management of (primarily) server platforms. BMCs are
+> > often tightly coupled to the platform in terms of behaviour and provide
+> > many hardware features integral to booting and running the host system.
+> > 
+> > Some of these hardware features are simple, for example scratch
+> > registers provided by the BMC that are exposed to both the host and the
+> > BMC. In other cases there's a single bit switch to enable or disable
+> > some of the provided functionality.
+> > 
+> > The documentation defines bindings for fields in registers that do not
+> > integrate well into other driver models yet must be described to allow
+> > the BMC kernel to assume control of these features.
 > 
-> OK, I guess I'm confused now.  Why does partial PMIC shutdown even
-> exist then?  What is the point of leaving some rails alive if software
-> could stop running?  It seems like it would be better to just shut
-> everything down.
+> So we'll get a new binding when that happens? That will break 
+> compatibility.
+
+What do you mean ? The binding provides a way to describe arbitrary
+register fields and expose them to userspace. I'm not sure what you
+mean by backward compatibility.
+
+There is simply no way these things can be "abstracted" via some kind
+of nice layered Linux subsystem of some sort. It's just a whole bunch
+of knobs that control various things integral to the operation of the
+host system. Andrew can provide a more precise list if you need to.
+
 > 
-> Said another way: can you describe what benefit you see for only
-> partially shutting down the PMIC at stage 2 compared to just fully
-> shutting it down at stage 2?
-
-Stage 2 partial shutdown is present on PM8998 for legacy reasons.  It is
-being phased out on future PMICs.  My understanding is that it was
-originally intended to be a less aggressive mitigation option than a full
-shutdown and that it allows for more post-mitigation analysis (e.g.
-preserved RAM contents).
-
-The set of peripherals which are disabled during stage 2 partial shutdown
-is not well defined which leads to the kind of uncertainty and ill-defined
-behavior being discussed in this thread.
-
-
->> Disabling stage 2 partial shutdown and then using software to
->> perform a controlled shutdown at 125 C is probably the best option for you
->> at this point.
+> > 
+> > Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
+> > ---
+> > 
+> > Since RFC v1:
+> > 
+> > * Add a commit message
+> > * Minor changes to documented labels
+> > 
+> >  .../bindings/misc/bmc-misc-ctrl.txt           | 252 ++++++++++++++++++
+> >  MAINTAINERS                                   |   6 +
+> >  2 files changed, 258 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/misc/bmc-misc-ctrl.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/misc/bmc-misc-ctrl.txt b/Documentation/devicetree/bindings/misc/bmc-misc-ctrl.txt
+> > new file mode 100644
+> > index 000000000000..2c869fcc7ef2
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/misc/bmc-misc-ctrl.txt
+> > @@ -0,0 +1,252 @@
+> > +BMC Miscellaneous Control Interfaces
+> > +====================================
+> > +
+> > +Baseboard Management Controllers (BMCs) often have an array of hardware
+> > +features that need to be described but are awkward to sensibly expose.
+> > +
+> > +This bindings document provides a generic mechanism for describing such
+> > +features, covering read-only (RO), read-modify-write (RMW) and
+> > +write-1-set/write-1-clear (W1SC) semantics.
 > 
-> This seems OK to me given that I don't understand the original purpose
-> of the partial PMIC shutdown.  Would you expect that all upstream PMIC
-> users would want stage 2 partial shutdown disabled, so we should just
-> do this for all users of the PMIC?
+> If we wanted a generic mechanism for single register bits/fields in DT, 
+> we'd have one already. A node per register bit doesn't scale.
 
-I'd think that we only want to override stage 2 partial shutdown if
-thermal nodes are defined which cause a graceful software controlled
-shutdown in place of the PMIC partial shutdown.  Therefore, management of
-the feature should probably be tied to a boolean DT property.
+Register *field*. I think you are looking at this from the wrong angle.
+This isn't about exposing 236821643 SoC registers in an embedded
+product. This is about exposing a dozen or so tunables that don't
+control the SoC from the perspective of the OS running on it, but
+controls how various features of the SoC are exposed to the *host*
+system. Examples could be which of the SoC internal PCIe devices
+exposed to the host is enabled (the SoC can appear as a GPU, a BMC misc
+device or both or neither, it can have a DMA controller or not,
+etc...). Other examples are scratch registers that need to be set to
+system specific values by userspace, which the BIOS of the host will
+read to determine some configuration information. That sort of thing.
 
-Take care,
-David
+There isn't that many, scalability isn't a problem. Both the list of
+registers of interest and what needs to go in them is very much
+system/vendor specific. This is a way for the kernel to act as a
+"conduit" that doesn't need to know the specifics of a given
+system/vendor/BIOS combination.
 
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Your response smells like yet another case of trying to apply one of
+those general "blanket" rules to something where it's completely
+unapplicable.
+
+> Maybe this should be modelled using GPIO binding? There's a line there 
+> too as whether the signals are "general purpose" or not.
+
+GPIOs are binary values right ? These are arbitrary fields. We want
+arbitrary fields. This is really needed Rob, otherwise we'll NEVER have
+BMC support upstream. 
+
+The other option will be a dozen random ad-hoc char-devs that would
+have to be updated every time a new bit needs to be added or changed.
+
+Ben.
