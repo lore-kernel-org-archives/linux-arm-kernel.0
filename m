@@ -1,52 +1,25 @@
-From: cphealy@gmail.com (Chris Healy)
-Date: Thu, 12 Jul 2018 10:15:16 -0700
-Subject: [PATCH 2/2] ARM: dts: imx51-zii-scu3-esb: Fix RAVE SP watchdog
- compatible string
-In-Reply-To: <20180712023337.30112-3-andrew.smirnov@gmail.com>
-References: <20180712023337.30112-1-andrew.smirnov@gmail.com>
- <20180712023337.30112-3-andrew.smirnov@gmail.com>
-Message-ID: <CAFXsbZqo6LCbx1gb0vYqwa6hUj5ex8PcYb6=4j0dwmOSmjnxKw@mail.gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Thu, 12 Jul 2018 10:18:30 -0700
+Subject: [PATCH v7 7/7] arm64: dts: sdm845: Add tsens nodes
+In-Reply-To: <0dfdbfa82edced85ea5be02e1d74d73d232c7a08.1531384019.git.amit.kucheria@linaro.org>
+References: <cover.1531384019.git.amit.kucheria@linaro.org>
+ <0dfdbfa82edced85ea5be02e1d74d73d232c7a08.1531384019.git.amit.kucheria@linaro.org>
+Message-ID: <CAD=FV=UHQ2SDC9WbS2=D_ka3OxnxPPrQt6tLx5Yy6Lf_bnVqrg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tested-by: Chris Healy <cphealy@gmail.com>
+Hi,
 
-watchdog driver loads and works now.
-
-On Wed, Jul 11, 2018 at 7:33 PM, Andrey Smirnov
-<andrew.smirnov@gmail.com> wrote:
-> It looks like I made a nasty typo in the original patch which resulted
-> in missing watchdog device. Fix it.
+On Thu, Jul 12, 2018 at 1:39 AM, Amit Kucheria <amit.kucheria@linaro.org> wrote:
+> SDM845 has two tsens blocks, one with 13 sensors and the other with 8
+> sensors. It uses version 2 of the TSENS IP, so use the fallback property to
+> allow more common code.
 >
-> Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> Cc: Nikita Yushchenko <nikita.yoush@cogentembedded.com>
-> Cc: Lucas Stach <l.stach@pengutronix.de>
-> Cc: cphealy at gmail.com
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: devicetree at vger.kernel.org
-> Cc: linux-kernel at vger.kernel.org
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+> Signed-off-by: Amit Kucheria <amit.kucheria@linaro.org>
+> Reviewed-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+> Tested-by: Matthias Kaehlcke <mka@chromium.org>
 > ---
->  arch/arm/boot/dts/imx51-zii-scu3-esb.dts | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/boot/dts/imx51-zii-scu3-esb.dts b/arch/arm/boot/dts/imx51-zii-scu3-esb.dts
-> index 0bb42c00d72b..dffb761a1cc8 100644
-> --- a/arch/arm/boot/dts/imx51-zii-scu3-esb.dts
-> +++ b/arch/arm/boot/dts/imx51-zii-scu3-esb.dts
-> @@ -325,7 +325,7 @@
->                 #size-cells = <1>;
->
->                 watchdog {
-> -                       compatible = "zii,rave-sp-watchodg-legacy";
-> +                       compatible = "zii,rave-sp-watchdog-legacy";
->                 };
->
->                 eeprom at a4 {
-> --
-> 2.17.1
->
+>  arch/arm64/boot/dts/qcom/sdm845.dtsi | 16 ++++++++++++++++
+>  1 file changed, 16 insertions(+)
+
+Reviewed-by: Douglas Anderson <dianders@chromium.org>
