@@ -1,16 +1,20 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Thu, 12 Jul 2018 10:14:09 +1000
-Subject: [RFC PATCH v2 1/4] dt-bindings: misc: Add bindings for misc.
- BMC control fields
+From: andrew@aj.id.au (Andrew Jeffery)
+Date: Thu, 12 Jul 2018 10:23:50 +0930
+Subject: [RFC PATCH v2 1/4] dt-bindings: misc: Add bindings for misc. BMC
+ control fields
 In-Reply-To: <20180711200450.GB17291@rob-hp-laptop>
 References: <20180711053122.30773-1-andrew@aj.id.au>
  <20180711053122.30773-2-andrew@aj.id.au>
  <20180711200450.GB17291@rob-hp-laptop>
-Message-ID: <2f479f747daa5cee15d250e3a6a4853e3dc1c4a0.camel@kernel.crashing.org>
+Message-ID: <1531356830.3551458.1437853280.551CA8C5@webmail.messagingengine.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2018-07-11 at 14:04 -0600, Rob Herring wrote:
+Hi Rob,
+
+Thanks for the response.
+
+On Thu, 12 Jul 2018, at 05:34, Rob Herring wrote:
 > On Wed, Jul 11, 2018 at 03:01:19PM +0930, Andrew Jeffery wrote:
 > > Baseboard Management Controllers (BMCs) are embedded SoCs that exist to
 > > provide remote management of (primarily) server platforms. BMCs are
@@ -29,14 +33,7 @@ On Wed, 2018-07-11 at 14:04 -0600, Rob Herring wrote:
 > So we'll get a new binding when that happens? That will break 
 > compatibility.
 
-What do you mean ? The binding provides a way to describe arbitrary
-register fields and expose them to userspace. I'm not sure what you
-mean by backward compatibility.
-
-There is simply no way these things can be "abstracted" via some kind
-of nice layered Linux subsystem of some sort. It's just a whole bunch
-of knobs that control various things integral to the operation of the
-host system. Andrew can provide a more precise list if you need to.
+Can you please expand on this? I'm not following.
 
 > 
 > > 
@@ -70,38 +67,39 @@ host system. Andrew can provide a more precise list if you need to.
 > > +write-1-set/write-1-clear (W1SC) semantics.
 > 
 > If we wanted a generic mechanism for single register bits/fields in DT, 
-> we'd have one already. A node per register bit doesn't scale.
+> we'd have one already.
 
-Register *field*. I think you are looking at this from the wrong angle.
-This isn't about exposing 236821643 SoC registers in an embedded
-product. This is about exposing a dozen or so tunables that don't
-control the SoC from the perspective of the OS running on it, but
-controls how various features of the SoC are exposed to the *host*
-system. Examples could be which of the SoC internal PCIe devices
-exposed to the host is enabled (the SoC can appear as a GPU, a BMC misc
-device or both or neither, it can have a DMA controller or not,
-etc...). Other examples are scratch registers that need to be set to
-system specific values by userspace, which the BIOS of the host will
-read to determine some configuration information. That sort of thing.
+I feel like this is an argument of tradition. Maybe people have been dissuaded from doing so when they don't have a reasonable use-case? I'm not saying that what I'm proposing is unquestionably reasonable, but I don't want to dismiss it out of hand.
 
-There isn't that many, scalability isn't a problem. Both the list of
-registers of interest and what needs to go in them is very much
-system/vendor specific. This is a way for the kernel to act as a
-"conduit" that doesn't need to know the specifics of a given
-system/vendor/BIOS combination.
+> A node per register bit doesn't scale.
 
-Your response smells like yet another case of trying to apply one of
-those general "blanket" rules to something where it's completely
-unapplicable.
+It isn't meant to scale in terms of a single system. Using it extensively is very likely wrong. Separately, register-bit-led does pretty much the same thing. Doesn't the scale argument apply there? Who is to stop me from attaching an insane number of LEDs to a system?
 
+Obviously if there are lots of systems using it sparingly and legitimately then maybe there's a scale issue, but isn't that just a reality of different hardware designs? Whoever is implementing support for the system is going to have to describe the hardware one way or another.
+
+> 
 > Maybe this should be modelled using GPIO binding? There's a line there 
 > too as whether the signals are "general purpose" or not.
 
-GPIOs are binary values right ? These are arbitrary fields. We want
-arbitrary fields. This is really needed Rob, otherwise we'll NEVER have
-BMC support upstream. 
+I don't think so, mainly because some of the things it is intended to be used for are not GPIOs. For instance, take the DAC mux I've described in the patch. It doesn't directly influence anything external to the SoC (i.e. it's certainly not a traditional GPIO in any sense). However, it does *indirectly* influence the SoC's behaviour by muxing the DAC internally between:
 
-The other option will be a dozen random ad-hoc char-devs that would
-have to be updated every time a new bit needs to be added or changed.
+0. VGA device exposed on the host PCIe bus
+1. The "Graphics CRT" controller 
+2. VGA port A
+3. VGA port B
 
-Ben.
+Maybe this could be modelled by pinmux, but then we still need some way to expose the mux functions to userspace for selection (userspace needs to transition arbitrarily between at least options 0 and 1 at runtime), at which point we haven't achieved much beyond adding a whole heap of infrastructure in the chain.
+
+Given 0 and 1, maybe exposing attributes in relevant drivers would be reasonable, except 0 isn't exposed on the SoC's internal bus so there is no driver on the BMC-side to do so. Taking into account 2 and 3 are also purely hardware paths further dashes the idea, as the configuration doesn't really "belong" to the Graphics CRT device more than it belongs anywhere else, except for the fact that there isn't anywhere else to expose it.
+
+Further, the BMC's kernel can't make the decision as to when to switch the mux as it knows nothing of the host's state. The BMC userspace is controlling the host's boot state and so *does* know when to flip the switch. Finally, the mux is in separate IP to the CRT or VGA blocks: It lives in the System Control Unit.
+
+My current point of view is the DAC mux field is effectively its own device, and we need to control it from userspace, so we need some way to describe it (i.e. not ignore it) in order for its capability to be exposed.
+
+I'm fully aware what I'm proposing isn't awesome as it's not providing any real abstraction, but the problem(s) at hand also seem to defy abstraction, and in order to avoid a plethora of bespoke bindings I thought it was reasonable to define something generic.
+
+All-in-all I appreciate the suggestion, but assuming you agree with my reasoning above do you have thoughts on other alternatives?
+
+Cheers,
+
+Andrew
