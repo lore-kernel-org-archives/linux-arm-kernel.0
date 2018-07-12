@@ -1,41 +1,32 @@
-From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
-Date: Thu, 12 Jul 2018 11:24:46 +0200
-Subject: [PATCH 0/3] PCI: emulated PCI bridge common logic
-In-Reply-To: <20180629092231.32207-1-thomas.petazzoni@bootlin.com>
-References: <20180629092231.32207-1-thomas.petazzoni@bootlin.com>
-Message-ID: <20180712112446.74998bd9@windsurf>
+From: thunder.leizhen@huawei.com (Zhen Lei)
+Date: Thu, 12 Jul 2018 17:28:43 +0800
+Subject: [PATCH 1/1] iommu/arm-smmu-v3: prevent any devices access to memory
+ without registration
+Message-ID: <1531387723-3592-1-git-send-email-thunder.leizhen@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bjorn, Lorenzo,
+Stream bypass is not security. A malicious device can be hot plugged
+without match any drivers, but it can access to any memory. So change to
+disable bypass by default.
 
-On Fri, 29 Jun 2018 11:22:28 +0200, Thomas Petazzoni wrote:
+Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+---
+ drivers/iommu/arm-smmu-v3.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> The pci-mvebu driver already contains some logic to emulate a root
-> port PCI bridge. It turns out that we have a similar need for the
-> pci-aardvark driver. Instead of duplicating the same logic in two
-> drivers, this patch series starts by adding a small common
-> infrastructure that helps emulate a root port PCI bridge, converts
-> pci-mvebu to use it, and finally extends pci-aardvark to use it as
-> well.
-> 
-> Thanks to this, Marvell Armada 3720 based systems, which use the
-> Aarkvark PCI controller, will have better PCI support, by having a
-> root port PCI bridge exposed.
-> 
-> The emulated PCI bridge common logic is a proposal, I very much
-> welcome comments and suggestions. Also, if you feel that adding a
-> common logic for only two drivers is too early, I'm fine with
-> duplicating a bit of code betwen pci-mvebu and pci-aardvark.
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index 1d64710..b0ec28d 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -366,7 +366,7 @@
+ #define MSI_IOVA_BASE			0x8000000
+ #define MSI_IOVA_LENGTH			0x100000
 
-I was wondering if you had any feedback on this patch series. Not
-necessarily a detailed review, but at least some general
-feeling/feedback on the overall approach would be very nice.
-
-Thanks a lot,
-
-Thomas Petazzoni
--- 
-Thomas Petazzoni, CTO, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+-static bool disable_bypass;
++static bool disable_bypass = 1;
+ module_param_named(disable_bypass, disable_bypass, bool, S_IRUGO);
+ MODULE_PARM_DESC(disable_bypass,
+ 	"Disable bypass streams such that incoming transactions from devices that are not attached to an iommu domain will report an abort back to the device and will not be allowed to pass through the SMMU.");
+--
+1.8.3
