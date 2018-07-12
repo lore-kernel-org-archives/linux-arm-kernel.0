@@ -1,148 +1,118 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 13 Jul 2018 00:04:52 +0800
-Subject: [PATCH v3 5/5] arm64: dts: allwinner: h6: enable AXP805 PMIC on Pine
- H64
-In-Reply-To: <20180712160452.5516-1-wens@csie.org>
-References: <20180712160452.5516-1-wens@csie.org>
-Message-ID: <20180712160452.5516-6-wens@csie.org>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Thu, 12 Jul 2018 18:08:57 +0200
+Subject: [PATCH/RFC] ARM: shmobile: Always enable ARCH_TIMER on SoCs with A7
+ and/or A15
+Message-ID: <20180712160857.31471-1-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Icenowy Zheng <icenowy@aosc.io>
+R-Mobile APE6, R-Car Gen2, and RZ/G1 SoCs have Cortex-A7 and/or
+Cortex-A15 CPU cores, all of which have ARM architectured timers.
 
-Pine H64 board has an AXP805 PMIC on it, wired up in standalone, or
-self-working, mode.
+Force use of the ARM architectured timer on these SoCs.
+This allows to:
+  - Remove the calls to shmobile_init_delay() from the corresponding
+    machine vectors,
+  - Remove a check in timer setup specific to R-Car Gen2,
+  - Remove a check in shmobile_init_delay().
 
-Enable it in the device tree.
-
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-Reviewed-by: Icenowy Zheng <icenowy@aosc.io>
-Tested-by: Icenowy Zheng <icenowy@aosc.io>
-Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- .../boot/dts/allwinner/sun50i-h6-pine-h64.dts | 109 ++++++++++++++++++
- 1 file changed, 109 insertions(+)
+We still need shmobile_init_delay to setup loops-per-jiffies for the
+other SoCs.  But perhaps we can use the Cortex-A9 global timer on those?
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts b/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
-index 2e97173c9204..1673636358ef 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
-@@ -44,6 +44,115 @@
- &r_i2c {
- 	status = "okay";
+ arch/arm/mach-shmobile/Kconfig           | 2 ++
+ arch/arm/mach-shmobile/setup-r8a73a4.c   | 1 -
+ arch/arm/mach-shmobile/setup-rcar-gen2.c | 4 ----
+ arch/arm/mach-shmobile/timer.c           | 8 --------
+ 4 files changed, 2 insertions(+), 13 deletions(-)
+
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index 0b67254eabb2c4e8..aeb2eed085988bb8 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -15,6 +15,7 @@ config ARCH_RCAR_GEN1
  
-+	axp805: pmic at 36 {
-+		compatible = "x-powers,axp805", "x-powers,axp806";
-+		reg = <0x36>;
-+		interrupt-parent = <&r_intc>;
-+		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-+		interrupt-controller;
-+		#interrupt-cells = <1>;
-+		x-powers,self-working-mode;
-+
-+		regulators {
-+			reg_aldo1: aldo1 {
-+				regulator-always-on;
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-name = "vcc-pl";
-+			};
-+
-+			reg_aldo2: aldo2 {
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-name = "vcc-ac200";
-+			};
-+
-+			reg_aldo3: aldo3 {
-+				/* This regulator is connected with CLDO1 */
-+				regulator-always-on;
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-name = "vcc-3v3-1";
-+			};
-+
-+			reg_bldo1: bldo1 {
-+				regulator-always-on;
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-name = "vcc-bias-pll";
-+			};
-+
-+			reg_bldo2: bldo2 {
-+				regulator-always-on;
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-name = "vcc-efuse-pcie-hdmi-io";
-+			};
-+
-+			reg_bldo3: bldo3 {
-+				regulator-always-on;
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-name = "vcc-dcxoio";
-+			};
-+
-+			bldo4 {
-+				/* unused */
-+			};
-+
-+			reg_cldo1: cldo1 {
-+				/* This regulator is connected with ALDO3 */
-+				regulator-always-on;
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-name = "vcc-3v3-2";
-+			};
-+
-+			reg_cldo2: cldo2 {
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-name = "vcc-wifi-1";
-+			};
-+
-+			reg_cldo3: cldo3 {
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-name = "vcc-wifi-2";
-+			};
-+
-+			reg_dcdca: dcdca {
-+				regulator-always-on;
-+				regulator-min-microvolt = <810000>;
-+				regulator-max-microvolt = <1080000>;
-+				regulator-name = "vdd-cpu";
-+			};
-+
-+			reg_dcdcc: dcdcc {
-+				regulator-min-microvolt = <810000>;
-+				regulator-max-microvolt = <1080000>;
-+				regulator-name = "vdd-gpu";
-+			};
-+
-+			reg_dcdcd: dcdcd {
-+				regulator-always-on;
-+				regulator-min-microvolt = <960000>;
-+				regulator-max-microvolt = <960000>;
-+				regulator-name = "vdd-sys";
-+			};
-+
-+			reg_dcdce: dcdce {
-+				regulator-always-on;
-+				regulator-min-microvolt = <1200000>;
-+				regulator-max-microvolt = <1200000>;
-+				regulator-name = "vcc-dram";
-+			};
-+
-+			sw {
-+				/* unused */
-+			};
-+		};
-+	};
-+
- 	pcf8563: rtc at 51 {
- 		compatible = "nxp,pcf8563";
- 		reg = <0x51>;
+ config ARCH_RCAR_GEN2
+ 	bool
++	select HAVE_ARM_ARCH_TIMER
+ 	select PM
+ 	select PM_GENERIC_DOMAINS
+ 	select RENESAS_IRQC
+@@ -58,6 +59,7 @@ config ARCH_R8A73A4
+ 	bool "R-Mobile APE6 (R8A73A40)"
+ 	select ARCH_RMOBILE
+ 	select ARM_ERRATA_798181 if SMP
++	select HAVE_ARM_ARCH_TIMER
+ 	select RENESAS_IRQC
+ 
+ config ARCH_R8A7740
+diff --git a/arch/arm/mach-shmobile/setup-r8a73a4.c b/arch/arm/mach-shmobile/setup-r8a73a4.c
+index ef391fa368e9ad00..23a29a0ea9c96c35 100644
+--- a/arch/arm/mach-shmobile/setup-r8a73a4.c
++++ b/arch/arm/mach-shmobile/setup-r8a73a4.c
+@@ -18,7 +18,6 @@ static const char *const r8a73a4_boards_compat_dt[] __initconst = {
+ };
+ 
+ DT_MACHINE_START(R8A73A4_DT, "Generic R8A73A4 (Flattened Device Tree)")
+-	.init_early	= shmobile_init_delay,
+ 	.init_late	= shmobile_init_late,
+ 	.dt_compat	= r8a73a4_boards_compat_dt,
+ MACHINE_END
+diff --git a/arch/arm/mach-shmobile/setup-rcar-gen2.c b/arch/arm/mach-shmobile/setup-rcar-gen2.c
+index 117531367f1779c6..013acc97795cbfc4 100644
+--- a/arch/arm/mach-shmobile/setup-rcar-gen2.c
++++ b/arch/arm/mach-shmobile/setup-rcar-gen2.c
+@@ -59,7 +59,6 @@ static unsigned int __init get_extal_freq(void)
+ 
+ void __init rcar_gen2_timer_init(void)
+ {
+-#ifdef CONFIG_ARM_ARCH_TIMER
+ 	void __iomem *base;
+ 	u32 freq;
+ 
+@@ -101,7 +100,6 @@ void __init rcar_gen2_timer_init(void)
+ 	}
+ 
+ 	iounmap(base);
+-#endif /* CONFIG_ARM_ARCH_TIMER */
+ 
+ 	of_clk_init(NULL);
+ 	timer_probe();
+@@ -187,7 +185,6 @@ static const char * const rcar_gen2_boards_compat_dt[] __initconst = {
+ };
+ 
+ DT_MACHINE_START(RCAR_GEN2_DT, "Generic R-Car Gen2 (Flattened Device Tree)")
+-	.init_early	= shmobile_init_delay,
+ 	.init_late	= shmobile_init_late,
+ 	.init_time	= rcar_gen2_timer_init,
+ 	.reserve	= rcar_gen2_reserve,
+@@ -202,7 +199,6 @@ static const char * const rz_g1_boards_compat_dt[] __initconst = {
+ };
+ 
+ DT_MACHINE_START(RZ_G1_DT, "Generic RZ/G1 (Flattened Device Tree)")
+-	.init_early	= shmobile_init_delay,
+ 	.init_late	= shmobile_init_late,
+ 	.init_time	= rcar_gen2_timer_init,
+ 	.reserve	= rcar_gen2_reserve,
+diff --git a/arch/arm/mach-shmobile/timer.c b/arch/arm/mach-shmobile/timer.c
+index 6196a63803853048..828e8aea037e7d5e 100644
+--- a/arch/arm/mach-shmobile/timer.c
++++ b/arch/arm/mach-shmobile/timer.c
+@@ -32,14 +32,6 @@ void __init shmobile_init_delay(void)
+ 	for_each_child_of_node(cpus, np) {
+ 		u32 freq;
+ 
+-		if (IS_ENABLED(CONFIG_ARM_ARCH_TIMER) &&
+-		    (of_device_is_compatible(np, "arm,cortex-a7") ||
+-		     of_device_is_compatible(np, "arm,cortex-a15"))) {
+-			of_node_put(np);
+-			of_node_put(cpus);
+-			return;
+-		}
+-
+ 		if (!of_property_read_u32(np, "clock-frequency", &freq))
+ 			max_freq = max(max_freq, freq);
+ 	}
 -- 
-2.18.0
+2.17.1
