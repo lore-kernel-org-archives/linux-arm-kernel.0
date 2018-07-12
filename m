@@ -1,62 +1,47 @@
 From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Thu, 12 Jul 2018 03:46:46 +0000
-Subject: [PATCH V4 0/5] soc: imx: add scu firmware api support
-In-Reply-To: <24505e51-3a5d-4f34-7ba6-262e118d070e@arm.com>
+Date: Thu, 12 Jul 2018 04:06:49 +0000
+Subject: [PATCH V4 3/5] mailbox: imx: add imx mu support
+In-Reply-To: <CABb+yY0XQwXjVUMiXcqFVVCTR2jRWA343d220LqBYmTp+s6J1Q@mail.gmail.com>
 References: <1531061817-1980-1-git-send-email-aisheng.dong@nxp.com>
- <24505e51-3a5d-4f34-7ba6-262e118d070e@arm.com>
-Message-ID: <AM0PR04MB42113AC1D31A193E40F259CC80590@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <1531061817-1980-4-git-send-email-aisheng.dong@nxp.com>
+ <20180710141940.oed3kwhbplnykl36@pengutronix.de>
+ <AM0PR04MB42113391A6EA741E2767C74B805A0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <20180711075456.npwfpm6mtpkx7k76@pengutronix.de>
+ <AM0PR04MB42119DAE987CDF871CA8CFC6805A0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <CABb+yY1kH8mr3=nazsLXrLaNWT0x6j9MizVaE+bZaHmrsKn-Wg@mail.gmail.com>
+ <AM0PR04MB4211AD523CFB8DA99AB05EFC805A0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <CABb+yY0SqUFfS0ts9QHnKbqH0YW5-dLw7PxcjVa3eK_c3zrNpA@mail.gmail.com>
+ <AM0PR04MB4211F30775A0C806F44626C8805A0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <CABb+yY0XQwXjVUMiXcqFVVCTR2jRWA343d220LqBYmTp+s6J1Q@mail.gmail.com>
+Message-ID: <AM0PR04MB42112EEF9BC36AD54C1B90CC80590@AM0PR04MB4211.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sudeep,
+Hi Jassi,
 
 > -----Original Message-----
-> From: Sudeep Holla [mailto:sudeep.holla at arm.com]
-> Sent: Thursday, July 12, 2018 12:49 AM
-> To: A.s. Dong <aisheng.dong@nxp.com>; linux-arm-
-> kernel at lists.infradead.org
-> Cc: Sudeep Holla <sudeep.holla@arm.com>; dongas86 at gmail.com; dl-linux-
-> imx <linux-imx@nxp.com>; kernel at pengutronix.de; Fabio Estevam
-> <fabio.estevam@nxp.com>; shawnguo at kernel.org; Cl?ment Faure
-> <clement.faure@nxp.com>
-> Subject: Re: [PATCH V4 0/5] soc: imx: add scu firmware api support
-> 
-> On 08/07/18 15:56, Dong Aisheng wrote:
-> > Unlike the former i.MX Architectures, the new generation i.MX8 SoCs
-> > (e.g. MX8QXP and MX8QM) contain a system controller which runs on a
-> > dedicated Cortex-M core to provide power, clock, Pad, and resource
-> > management. Communication between the host processor running an OS
-> and
-> > the system controller happens through a SCU protocol.
-> > This patchset adds the SCU APIs which is implemented based on MU and
-> > will be used by different system components.
-> >
-> > It mainly consists of below parts:
-> > 1) MU mailbox driver
-> > 1) Implementation of the IPC functions based on MUs (client side).
-> >
-> >
-> 
-> I do understand the firmware might be already released for the current
-> generation of platforms, but instead of adding to the fragmentation, it would
-> be good to migrated to ARM SCMI for future platforms.
-> 
-> This system controller communication protocol is already so fragmented (we
-> have TI SCI, QCOM RPM, Nvidia Tegra BPMP, ARM SCPI and so on..
-> and now this i.MX specific one added to that), the main intention of ARM
-> SCMI is to stop that. The idea is for any Power Control System
-> Architecture(PCSA) compliant systems or any similar systems, SCMI should
-> be the standard communication protocol.
+> From: Jassi Brar [mailto:jassisinghbrar at gmail.com]
+> Sent: Thursday, July 12, 2018 1:01 AM
+> To: A.s. Dong <aisheng.dong@nxp.com>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>; linux-arm-
+> kernel at lists.infradead.org; dongas86 at gmail.com; linux-
+> kernel at vger.kernel.org; Oleksij Rempel <o.rempel@pengutronix.de>; dl-
+> linux-imx <linux-imx@nxp.com>; kernel at pengutronix.de; Fabio Estevam
+> <fabio.estevam@nxp.com>; shawnguo at kernel.org
+> Subject: Re: [PATCH V4 3/5] mailbox: imx: add imx mu support
 
-That sounds good and worth a look.
-Copy SCU firmware guys if more comments.
-BTW, i.MX SCU provides more services than just power related. 
-Not sure if ARM SCMI can cover it.
+....
+
+> >
+> > bcm seems is using peek to receive data, not only checking the data
+> > availability, right?
+> > drivers/mailbox/bcm-flexrm-mailbox.c
+> >
+> As I said, if fetching data from remote don't need to sleep, you can call
+> mbox_chan_received_data() from peek(). Otherwise not.
+
+Got it. So it seems work for i.MX.
+Thanks.
 
 Regards
 Dong Aisheng
-
-> 
-> --
-> Regards,
-> Sudeep
