@@ -1,63 +1,28 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Thu, 12 Jul 2018 15:09:55 +0800
-Subject: [linux-sunxi] Re: [PATCH 1/2] ARM: sun8i: h3: enable HDMI output
- on Banana Pi M2 Zero
-In-Reply-To: <20180712064601.m3bdd46wzac5fpgh@flea>
-References: <20180711132233.42301-1-icenowy@aosc.io>
- <20180711132233.42301-2-icenowy@aosc.io>
- <20180711150532.6gzm7krouriddreh@flea>
- <8F6CDF5C-2AC1-43EC-858A-5C6345CF279A@aosc.io>
- <20180712064601.m3bdd46wzac5fpgh@flea>
-Message-ID: <A7CA2831-7117-415C-BC59-3FB4AE425598@aosc.io>
+From: hch@lst.de (Christoph Hellwig)
+Date: Thu, 12 Jul 2018 09:15:36 +0200
+Subject: [PATCH 1/2] mm/cma: remove unsupported gfp_mask parameter from
+ cma_alloc()
+In-Reply-To: <CAAmzW4M3KADCZD9+B2h7=WsYksGtg-GzYRCJjbqK5Scceynrrg@mail.gmail.com>
+References: <CGME20180709122019eucas1p2340da484acfcc932537e6014f4fd2c29@eucas1p2.samsung.com>
+ <20180709121956.20200-1-m.szyprowski@samsung.com>
+ <20180709122019eucas1p2340da484acfcc932537e6014f4fd2c29~-sqTPJKij2939229392eucas1p2j@eucas1p2.samsung.com>
+ <CAAmzW4PPNYhUj_MeZox+ddq8MjXqnJs_AJ3xkayf710udD1pSg@mail.gmail.com>
+ <20180710095056.GE14284@dhcp22.suse.cz>
+ <CAAmzW4P1m_T77DfQzDD6ysGaOF46++-0gwRaOajmo6ef=VYp=A@mail.gmail.com>
+ <20180711085407.GB20050@dhcp22.suse.cz>
+ <CAAmzW4M3KADCZD9+B2h7=WsYksGtg-GzYRCJjbqK5Scceynrrg@mail.gmail.com>
+Message-ID: <20180712071536.GA15506@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Jul 12, 2018 at 11:48:47AM +0900, Joonsoo Kim wrote:
+> One of existing user is general DMA layer and it takes gfp flags that is
+> provided by user. I don't check all the DMA allocation sites but how do
+> you convince that none of them try to use anything other
+> than GFP_KERNEL [|__GFP_NOWARN]?
 
-
-? 2018?7?12? GMT+08:00 ??2:46:01, Maxime Ripard <maxime.ripard@bootlin.com> ??:
->On Wed, Jul 11, 2018 at 11:15:50PM +0800, Icenowy Zheng wrote:
->> 
->> 
->> ? 2018?7?11? GMT+08:00 ??11:05:32, Maxime Ripard
-><maxime.ripard@bootlin.com> ??:
->> >Hi,
->> >
->> >On Wed, Jul 11, 2018 at 09:22:32PM +0800, Icenowy Zheng wrote:
->> >> Banana Pi M2 Zero board has a miniHDMI port connected to the HDMI
->> >> controller of Allwinner H3 SoC.
->> >> 
->> >> Enable the HDMI output in Banana Pi M2 Zero device tree.
->> >> 
->> >> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
->> >> ---
->> >>  .../dts/sun8i-h2-plus-bananapi-m2-zero.dts    | 25
->> >+++++++++++++++++++
->> >>  1 file changed, 25 insertions(+)
->> >> 
->> >> diff --git a/arch/arm/boot/dts/sun8i-h2-plus-bananapi-m2-zero.dts
->> >b/arch/arm/boot/dts/sun8i-h2-plus-bananapi-m2-zero.dts
->> >> index 7d01f9322658..eb61dcf32797 100644
->> >> --- a/arch/arm/boot/dts/sun8i-h2-plus-bananapi-m2-zero.dts
->> >> +++ b/arch/arm/boot/dts/sun8i-h2-plus-bananapi-m2-zero.dts
->> >> @@ -26,6 +26,17 @@
->> >>  		stdout-path = "serial0:115200n8";
->> >>  	};
->> >>  
->> >> +	hdmi-connector {
->> >> +		compatible = "hdmi-connector";
->> >> +		type = "c";
->> >
->> >This is not one of the connector type declared in DRM, how is it
->> >exposed to the userspace?
->> 
->> So just use "A" here (because of single link)?
->
->If the connector type is C, it should be C, and DRM / driver adjusted
->to handle it.
-
-Okay I won't change this property, if there's any further revisions.
-
-For DRM driver, I think it can be an independent patchset.
-
->
->Maxime
+They use a few others things still like __GFP_COMP, __GPF_DMA or
+GFP_HUGEPAGE.  But all these are bogus as we have various implementations
+that can't respect them.  I plan to get rid of the gfp_t argument
+in the dma_map_ops alloc method in a few merge windows because of that,
+but it needs further implementation consolidation first.
