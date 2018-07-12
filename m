@@ -1,116 +1,65 @@
-From: thunder.leizhen@huawei.com (Zhen Lei)
-Date: Thu, 12 Jul 2018 14:18:32 +0800
-Subject: [PATCH v3 6/6] iommu/arm-smmu-v3: add bootup option
- "iommu_strict_mode"
-In-Reply-To: <1531376312-2192-1-git-send-email-thunder.leizhen@huawei.com>
-References: <1531376312-2192-1-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <1531376312-2192-7-git-send-email-thunder.leizhen@huawei.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Thu, 12 Jul 2018 08:46:01 +0200
+Subject: [linux-sunxi] Re: [PATCH 1/2] ARM: sun8i: h3: enable HDMI output
+ on Banana Pi M2 Zero
+In-Reply-To: <8F6CDF5C-2AC1-43EC-858A-5C6345CF279A@aosc.io>
+References: <20180711132233.42301-1-icenowy@aosc.io>
+ <20180711132233.42301-2-icenowy@aosc.io>
+ <20180711150532.6gzm7krouriddreh@flea>
+ <8F6CDF5C-2AC1-43EC-858A-5C6345CF279A@aosc.io>
+Message-ID: <20180712064601.m3bdd46wzac5fpgh@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Because the non-strict mode introduces a vulnerability window, so add a
-bootup option to make the manager can choose which mode to be used. The
-default mode is IOMMU_STRICT.
+On Wed, Jul 11, 2018 at 11:15:50PM +0800, Icenowy Zheng wrote:
+> 
+> 
+> ? 2018?7?11? GMT+08:00 ??11:05:32, Maxime Ripard <maxime.ripard@bootlin.com> ??:
+> >Hi,
+> >
+> >On Wed, Jul 11, 2018 at 09:22:32PM +0800, Icenowy Zheng wrote:
+> >> Banana Pi M2 Zero board has a miniHDMI port connected to the HDMI
+> >> controller of Allwinner H3 SoC.
+> >> 
+> >> Enable the HDMI output in Banana Pi M2 Zero device tree.
+> >> 
+> >> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> >> ---
+> >>  .../dts/sun8i-h2-plus-bananapi-m2-zero.dts    | 25
+> >+++++++++++++++++++
+> >>  1 file changed, 25 insertions(+)
+> >> 
+> >> diff --git a/arch/arm/boot/dts/sun8i-h2-plus-bananapi-m2-zero.dts
+> >b/arch/arm/boot/dts/sun8i-h2-plus-bananapi-m2-zero.dts
+> >> index 7d01f9322658..eb61dcf32797 100644
+> >> --- a/arch/arm/boot/dts/sun8i-h2-plus-bananapi-m2-zero.dts
+> >> +++ b/arch/arm/boot/dts/sun8i-h2-plus-bananapi-m2-zero.dts
+> >> @@ -26,6 +26,17 @@
+> >>  		stdout-path = "serial0:115200n8";
+> >>  	};
+> >>  
+> >> +	hdmi-connector {
+> >> +		compatible = "hdmi-connector";
+> >> +		type = "c";
+> >
+> >This is not one of the connector type declared in DRM, how is it
+> >exposed to the userspace?
+> 
+> So just use "A" here (because of single link)?
 
-Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
----
- Documentation/admin-guide/kernel-parameters.txt | 12 ++++++++++
- drivers/iommu/arm-smmu-v3.c                     | 32 ++++++++++++++++++++++---
- 2 files changed, 41 insertions(+), 3 deletions(-)
+If the connector type is C, it should be C, and DRM / driver adjusted
+to handle it.
 
-diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
-index efc7aa7..0cc80bc 100644
---- a/Documentation/admin-guide/kernel-parameters.txt
-+++ b/Documentation/admin-guide/kernel-parameters.txt
-@@ -1720,6 +1720,18 @@
- 		nobypass	[PPC/POWERNV]
- 			Disable IOMMU bypass, using IOMMU for PCI devices.
- 
-+	iommu_strict_mode=	[arm-smmu-v3]
-+		0 - strict mode
-+		    Make sure all related TLBs to be invalidated before the
-+		    memory released.
-+		1 - non-strict mode
-+		    Put off TLBs invalidation and release memory first. This mode
-+		    introduces a vlunerability window, an untrusted device can
-+		    access the reused memory because the TLBs may still valid.
-+		    Please take full consideration before choosing this mode.
-+		    Note that, VFIO is always use strict mode.
-+		others - strict mode
-+
- 	iommu.passthrough=
- 			[ARM64] Configure DMA to bypass the IOMMU by default.
- 			Format: { "0" | "1" }
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 4a198a0..9b72fc4 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -631,6 +631,24 @@ struct arm_smmu_option_prop {
- 	{ 0, NULL},
- };
- 
-+static u32 iommu_strict_mode __read_mostly = IOMMU_STRICT;
-+
-+static int __init setup_iommu_strict_mode(char *str)
-+{
-+	u32 strict_mode = IOMMU_STRICT;
-+
-+	get_option(&str, &strict_mode);
-+	if (strict_mode == IOMMU_NON_STRICT) {
-+		iommu_strict_mode = strict_mode;
-+		pr_warn("WARNING: iommu non-strict mode is chose.\n"
-+			"It's good for scatter-gather performance but lacks full isolation\n");
-+		add_taint(TAINT_WARN, LOCKDEP_STILL_OK);
-+	}
-+
-+	return 0;
-+}
-+early_param("iommu_strict_mode", setup_iommu_strict_mode);
-+
- static inline void __iomem *arm_smmu_page1_fixup(unsigned long offset,
- 						 struct arm_smmu_device *smmu)
- {
-@@ -1441,7 +1459,7 @@ static bool arm_smmu_capable(enum iommu_cap cap)
- 	case IOMMU_CAP_NOEXEC:
- 		return true;
- 	case IOMMU_CAP_NON_STRICT:
--		return true;
-+		return (iommu_strict_mode == IOMMU_NON_STRICT) ? true : false;
- 	default:
- 		return false;
- 	}
-@@ -1750,6 +1768,14 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
- 	return ret;
- }
- 
-+static u32 arm_smmu_strict_mode(struct iommu_domain *domain)
-+{
-+	if (iommu_strict_mode == IOMMU_NON_STRICT)
-+		return IOMMU_DOMAIN_STRICT_MODE(domain);
-+
-+	return IOMMU_STRICT;
-+}
-+
- static int arm_smmu_map(struct iommu_domain *domain, unsigned long iova,
- 			phys_addr_t paddr, size_t size, int prot)
- {
-@@ -1769,7 +1795,7 @@ static int arm_smmu_map(struct iommu_domain *domain, unsigned long iova,
- 	if (!ops)
- 		return 0;
- 
--	return ops->unmap(ops, iova | IOMMU_DOMAIN_STRICT_MODE(domain), size);
-+	return ops->unmap(ops, iova | arm_smmu_strict_mode(domain), size);
- }
- 
- static void arm_smmu_flush_iotlb_all(struct iommu_domain *domain)
-@@ -1784,7 +1810,7 @@ static void arm_smmu_iotlb_sync(struct iommu_domain *domain)
- {
- 	struct arm_smmu_device *smmu = to_smmu_domain(domain)->smmu;
- 
--	if (smmu && (IOMMU_DOMAIN_STRICT_MODE(domain) == IOMMU_STRICT))
-+	if (smmu && (arm_smmu_strict_mode(domain) == IOMMU_STRICT))
- 		__arm_smmu_tlb_sync(smmu);
- }
- 
+Maxime
+
 -- 
-1.8.3
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180712/c463380a/attachment-0001.sig>
