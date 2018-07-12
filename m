@@ -1,71 +1,69 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 12 Jul 2018 13:29:06 +0100
-Subject: [PATCH v2 2/5] mfd: axp20x: Add self-working mode support for
- AXP806
-In-Reply-To: <20180705031106.344-3-wens@csie.org>
-References: <20180705031106.344-1-wens@csie.org>
- <20180705031106.344-3-wens@csie.org>
-Message-ID: <20180712122906.GG4641@dell>
+From: leonard.crestez@nxp.com (Leonard Crestez)
+Date: Thu, 12 Jul 2018 15:29:49 +0300
+Subject: [PATCH V4 0/5] soc: imx: add scu firmware api support
+In-Reply-To: <73f7f126-6497-7ae9-49b2-082fbc18508d@arm.com>
+References: <1531061817-1980-1-git-send-email-aisheng.dong@nxp.com>
+ <24505e51-3a5d-4f34-7ba6-262e118d070e@arm.com>
+ <AM0PR04MB42113AC1D31A193E40F259CC80590@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <73f7f126-6497-7ae9-49b2-082fbc18508d@arm.com>
+Message-ID: <c12939870af73a9a8d590a558a3ca7d070fd0b69.camel@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 05 Jul 2018, Chen-Yu Tsai wrote:
-
-> The AXP806 can operate in a standalone "self-working" mode, in which it
-> is also responsible for power control of the overall system. This mode
-> is similar to the master mode, but the EN/PWRON pin functions as a power
-> button, instead of a level-triggered enable switch.
+On Thu, 2018-07-12 at 11:32 +0100, Sudeep Holla wrote:
+> On 12/07/18 04:46, A.s. Dong wrote:
+> > Hi Sudeep,
+> > > On 08/07/18 15:56, Dong Aisheng wrote:
+> > > > Unlike the former i.MX Architectures, the new generation i.MX8 SoCs
+> > > > (e.g. MX8QXP and MX8QM) contain a system controller which runs on a
+> > > > dedicated Cortex-M core to provide power, clock, Pad, and resource
+> > > > management. Communication between the host processor running an OS and
+> > > > the system controller happens through a SCU protocol.
+> > > > This patchset adds the SCU APIs which is implemented based on MU and
+> > > > will be used by different system components.
+> > > > 
+> > > > It mainly consists of below parts:
+> > > > 1) MU mailbox driver
+> > > > 1) Implementation of the IPC functions based on MUs (client side).
+> > > 
+> > > I do understand the firmware might be already released for the current
+> > > generation of platforms, but instead of adding to the fragmentation, it would
+> > > be good to migrated to ARM SCMI for future platforms.
+> > > 
+> > > This system controller communication protocol is already so fragmented (we
+> > > have TI SCI, QCOM RPM, Nvidia Tegra BPMP, ARM SCPI and so on..
+> > > and now this i.MX specific one added to that), the main intention of ARM
+> > > SCMI is to stop that. The idea is for any Power Control System
+> > > Architecture(PCSA) compliant systems or any similar systems, SCMI should
+> > > be the standard communication protocol.
+> > 
+> > That sounds good and worth a look.
+> > Copy SCU firmware guys if more comments.
+> > BTW, i.MX SCU provides more services than just power related. 
+> > Not sure if ARM SCMI can cover it.
 > 
-> This patch adds code checking for the new "x-powers,self-working-mode"
-> property, and a separate mfd_cell list that includes the power button
-> (PEK) sub-device.
-> 
-> Reviewed-by: Icenowy Zheng <icenowy@aosc.io>
-> Tested-by: Icenowy Zheng <icenowy@aosc.io>
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->  drivers/mfd/axp20x.c | 30 +++++++++++++++++++++++++++---
->  1 file changed, 27 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
-> index 9a2ef3d9b8f8..1988881529a9 100644
-> --- a/drivers/mfd/axp20x.c
-> +++ b/drivers/mfd/axp20x.c
-> @@ -221,6 +221,11 @@ static const struct resource axp803_pek_resources[] = {
->  	DEFINE_RES_IRQ_NAMED(AXP803_IRQ_PEK_FAL_EDGE, "PEK_DBF"),
->  };
->  
-> +static const struct resource axp806_pek_resources[] = {
-> +	DEFINE_RES_IRQ_NAMED(AXP806_IRQ_POK_RISE, "PEK_DBR"),
-> +	DEFINE_RES_IRQ_NAMED(AXP806_IRQ_POK_FALL, "PEK_DBF"),
-> +};
-> +
->  static const struct resource axp809_pek_resources[] = {
->  	DEFINE_RES_IRQ_NAMED(AXP809_IRQ_PEK_RIS_EDGE, "PEK_DBR"),
->  	DEFINE_RES_IRQ_NAMED(AXP809_IRQ_PEK_FAL_EDGE, "PEK_DBF"),
-> @@ -730,6 +735,17 @@ static const struct mfd_cell axp803_cells[] = {
->  	{	.name			= "axp20x-regulator" },
->  };
->  
-> +static const struct mfd_cell axp806_self_working_cells[] = {
-> +	{
-> +		.name			= "axp221-pek",
-> +		.num_resources		= ARRAY_SIZE(axp806_pek_resources),
-> +		.resources		= axp806_pek_resources,
-> +	},
-> +	{
-> +		.name			= "axp20x-regulator",
-> +	},
+> Sure, we can extend the specification to cover those as generic
+> protocols. If they are too NXP specific, then SCMI has options to
+> use vendor specific protocols. I am interested to know the requirements.
 
-Nit: this should be on a single line, like it is above.
+On major thing that is missing is pin control: on 8qm/8qx this is done
+through the SCU but SCMI doesn't define a protocol for this. It would
+be a big thing to implement as a vendor extension and is required for
+basic functionality. Maybe SCMI will handle this in the future? If SCMI
+eventually includes this imx might be asked to rewrite the vendor-
+specific stuff anyway.
 
-Once fixed, please re-submit with my:
+Another issue is that there doesn't seem to be any way to implement
+clk_set_parent through SCMI (SC API does have this). This might be
+intentional ("protocol does not cover discovery of clock dependencies,
+which must be described through firmware tables instead"). But how
+would the "assigned-clock-parents" DT property be implemented through
+SCMI?
 
-For my own reference:
-  Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
+Even if SCMI doesn't define a clock tree it might be still have
+something for explicit clk mux control?
 
--- 
-Lee Jones [???]
-Linaro Services Technical Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+One possible path to eventually using SCMI would be to define a SMC
+"transport" and implement SCMI calls inside ATF on top of SC API. This
+way ATF would hide clk implementation details in the same way that it
+hides hotplug and suspend details. Does this make sense?
