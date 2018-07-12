@@ -1,158 +1,60 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Thu, 12 Jul 2018 17:02:29 +0200
-Subject: [PATCH 1/3] tty/serial_core: add ISO7816 infrastructure
-In-Reply-To: <20180711131638.12622-2-ludovic.desroches@microchip.com>
-References: <20180711131638.12622-1-ludovic.desroches@microchip.com>
- <20180711131638.12622-2-ludovic.desroches@microchip.com>
-Message-ID: <20180712150229.GE22502@kroah.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Thu, 12 Jul 2018 16:07:15 +0100
+Subject: RFC: tegra2/tegra3 automotive part changes
+In-Reply-To: <62581f70-4f55-05b4-5210-221698d501c7@kapsi.fi>
+References: <3916c0ea-964e-42ab-8bfd-8e8edc5110ee@codethink.co.uk>
+ <62581f70-4f55-05b4-5210-221698d501c7@kapsi.fi>
+Message-ID: <23296983-7620-617c-50a0-e3f0c971b14b@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 11, 2018 at 03:16:36PM +0200, Ludovic Desroches wrote:
-> From: Nicolas Ferre <nicolas.ferre@microchip.com>
+On 12/07/18 14:50, Mikko Perttunen wrote:
+> On 07/12/2018 04:36 PM, Ben Dooks wrote:
+>> Hello, we are looking at up-streaming some of the work we have
+>> done on the tegra2 and tegra3 automotive devices. The automotive
+>> grade devices are close the commercial parts so we would like to
+>> discuss the core changes before submitting.
+>>
+>> The changes are mostly with things like the clock setup and a
+>> few peripheral quirks (IIRC these are mostly MMC).
+>>
+>> We are proposing to change the device-tree properties for the root
+>> node and any other affected devices from "nvidia,tegraXX" to a new
+>> "nvidia,tegraXXa". We would welcome discussion on whether to update
+>> all the devices at the start
+>>
+>> An example of tegra30a.dtsi:
+>>
+>> #include "tegra30.dtsi"
+>>
+>> / {
+>> ???????? compatible = "nvidia,tegra30a";
+>>
+>> ???????? clock at 60006000 {
+>> ???????????????? compatible = "nvidia,tegra30a-car";
+>> ???????? };
+>> }
+>>
+>> We don't think the changes are big enough to warrant their own
+>> Kconfig/defconfig updates.
+>>
 > 
-> Add the ISO7816 ioctl and associated accessors and data structure.
-> Drivers can then use this common implementation to handle ISO7816.
-> 
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
-> [ludovic.desroches at microchip.com: squash and rebase, removal of gpios, checkpatch fixes]
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
-> ---
->  drivers/tty/serial/serial_core.c  | 49 +++++++++++++++++++++++++++++++++++++++
->  include/linux/serial_core.h       |  3 +++
->  include/uapi/asm-generic/ioctls.h |  2 ++
->  include/uapi/linux/serial.h       | 17 ++++++++++++++
->  4 files changed, 71 insertions(+)
-> 
-> diff --git a/drivers/tty/serial/serial_core.c b/drivers/tty/serial/serial_core.c
-> index 9c14a453f73c..c89ac59f6f8c 100644
-> --- a/drivers/tty/serial/serial_core.c
-> +++ b/drivers/tty/serial/serial_core.c
-> @@ -1301,6 +1301,47 @@ static int uart_set_rs485_config(struct uart_port *port,
->  	return 0;
->  }
->  
-> +static int uart_get_iso7816_config(struct uart_port *port,
-> +				   struct serial_iso7816 __user *iso7816)
-> +{
-> +	unsigned long flags;
-> +	struct serial_iso7816 aux;
-> +
-> +	spin_lock_irqsave(&port->lock, flags);
-> +	aux = port->iso7816;
-> +	spin_unlock_irqrestore(&port->lock, flags);
-> +
-> +	if (copy_to_user(iso7816, &aux, sizeof(aux)))
-> +		return -EFAULT;
-> +
-> +	return 0;
-> +}
-> +
-> +static int uart_set_iso7816_config(struct uart_port *port,
-> +				   struct serial_iso7816 __user *iso7816_user)
-> +{
-> +	struct serial_iso7816 iso7816;
-> +	int ret;
-> +	unsigned long flags;
-> +
-> +	if (!port->iso7816_config)
-> +		return -ENOIOCTLCMD;
-> +
-> +	if (copy_from_user(&iso7816, iso7816_user, sizeof(*iso7816_user)))
-> +		return -EFAULT;
-> +
-> +	spin_lock_irqsave(&port->lock, flags);
-> +	ret = port->iso7816_config(port, &iso7816);
-> +	spin_unlock_irqrestore(&port->lock, flags);
-> +	if (ret)
-> +		return ret;
-> +
-> +	if (copy_to_user(iso7816_user, &port->iso7816, sizeof(port->iso7816)))
-> +		return -EFAULT;
-> +
-> +	return 0;
-> +}
-> +
->  /*
->   * Called via sys_ioctl.  We can use spin_lock_irq() here.
->   */
-> @@ -1385,6 +1426,14 @@ uart_ioctl(struct tty_struct *tty, unsigned int cmd, unsigned long arg)
->  	case TIOCSRS485:
->  		ret = uart_set_rs485_config(uport, uarg);
->  		break;
-> +
-> +	case TIOCSISO7816:
-> +		ret = uart_set_iso7816_config(state->uart_port, uarg);
-> +		break;
-> +
-> +	case TIOCGISO7816:
-> +		ret = uart_get_iso7816_config(state->uart_port, uarg);
-> +		break;
->  	default:
->  		if (uport->ops->ioctl)
->  			ret = uport->ops->ioctl(uport, cmd, arg);
-> diff --git a/include/linux/serial_core.h b/include/linux/serial_core.h
-> index 06ea4eeb09ab..d6e7747ffd46 100644
-> --- a/include/linux/serial_core.h
-> +++ b/include/linux/serial_core.h
-> @@ -137,6 +137,8 @@ struct uart_port {
->  	void			(*handle_break)(struct uart_port *);
->  	int			(*rs485_config)(struct uart_port *,
->  						struct serial_rs485 *rs485);
-> +	int			(*iso7816_config)(struct uart_port *,
-> +						  struct serial_iso7816 *iso7816);
->  	unsigned int		irq;			/* irq number */
->  	unsigned long		irqflags;		/* irq flags  */
->  	unsigned int		uartclk;		/* base uart clock */
-> @@ -253,6 +255,7 @@ struct uart_port {
->  	struct attribute_group	*attr_group;		/* port specific attributes */
->  	const struct attribute_group **tty_groups;	/* all attributes (serial core use only) */
->  	struct serial_rs485     rs485;
-> +	struct serial_iso7816   iso7816;
->  	void			*private_data;		/* generic platform data pointer */
->  };
->  
-> diff --git a/include/uapi/asm-generic/ioctls.h b/include/uapi/asm-generic/ioctls.h
-> index 040651735662..0e5c79726c2d 100644
-> --- a/include/uapi/asm-generic/ioctls.h
-> +++ b/include/uapi/asm-generic/ioctls.h
-> @@ -66,6 +66,8 @@
->  #ifndef TIOCSRS485
->  #define TIOCSRS485	0x542F
->  #endif
-> +#define TIOCGISO7816	0x5430
-> +#define TIOCSISO7816	0x5431
->  #define TIOCGPTN	_IOR('T', 0x30, unsigned int) /* Get Pty Number (of pty-mux device) */
->  #define TIOCSPTLCK	_IOW('T', 0x31, int)  /* Lock/unlock Pty */
->  #define TIOCGDEV	_IOR('T', 0x32, unsigned int) /* Get primary device node of /dev/console */
-> diff --git a/include/uapi/linux/serial.h b/include/uapi/linux/serial.h
-> index 3fdd0dee8b41..93eb3c496ff1 100644
-> --- a/include/uapi/linux/serial.h
-> +++ b/include/uapi/linux/serial.h
-> @@ -132,4 +132,21 @@ struct serial_rs485 {
->  					   are a royal PITA .. */
->  };
->  
-> +/*
-> + * Serial interface for controlling ISO7816 settings on chips with suitable
-> + * support. Set with TIOCSISO7816 and get with TIOCGISO7816 if supported by
-> + * your platform.
-> + */
-> +struct serial_iso7816 {
-> +	__u32	flags;			/* ISO7816 feature flags */
-> +#define SER_ISO7816_ENABLED		(1 << 0)
-> +#define SER_ISO7816_T_PARAM		(0x0f << 4)
-> +#define SER_ISO7816_T(t)		(((t) & 0x0f) << 4)
-> +	__u32	tg;
-> +	__u32	sc_fi;
-> +	__u32	sc_di;
-> +	__u32	clk;
-> +	__u32	reserved[5];
+> What kind of changes do you have? Tegra30a would point to a separate SoC 
+> revision of Tegra3 the existence of which I'm not aware of. If you can 
+> show some of the changes it would be easier to say how the system should 
+> be specified.
 
-You need to verify that reserved[] is all set to 0, otherwise people
-will put crud in there and you can never use it for anything in the
-future.
+I'm just working on the core clock initialisation patches as our
+original work was just patching the tegra20 and tegra30 clock init
+tables.
 
-thanks,
+As far as we can see the tegra30 automotive grade silicon is mostly
+compatible with the tegra30 but has some clock restrictions and
+initialisation changes.
 
-greg k-h
+
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
+
+https://www.codethink.co.uk/privacy.html
