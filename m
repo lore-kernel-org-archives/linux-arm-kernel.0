@@ -1,60 +1,236 @@
-From: niklas.soderlund@ragnatech.se (Niklas =?iso-8859-1?Q?S=F6derlund?=)
-Date: Thu, 12 Jul 2018 10:14:19 +0200
-Subject: [PATCH v5 1/6] dt-bindings: media: rcar-vin: Align Gen2 and Gen3
-In-Reply-To: <1531145962-1540-2-git-send-email-jacopo+renesas@jmondi.org>
-References: <1531145962-1540-1-git-send-email-jacopo+renesas@jmondi.org>
- <1531145962-1540-2-git-send-email-jacopo+renesas@jmondi.org>
-Message-ID: <20180712081419.GU5237@bigcity.dyn.berto.se>
+From: alex.gonzalez@digi.com (Alex Gonzalez)
+Date: Thu, 12 Jul 2018 10:20:35 +0200
+Subject: [PATCH v2 1/2] ARM: dts: imx6ul: Add DTS for ConnectCore 6UL
+ System-On-Module (SOM)
+In-Reply-To: <1531383636-3406-1-git-send-email-alex.gonzalez@digi.com>
+References: <1531383636-3406-1-git-send-email-alex.gonzalez@digi.com>
+Message-ID: <1531383636-3406-2-git-send-email-alex.gonzalez@digi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jacopo,
+The ConnectCore 6UL System-On-Module has the following hardware
+specification:
 
-On 2018-07-09 16:19:16 +0200, Jacopo Mondi wrote:
-> Align description of the Gen2 and Gen3 bindings for parallel input.
-> This commit prepares for description of optional endpoint properties in ports
-> subnodes accepting parallel video connections.
-> 
-> Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+* Based on a NXP i.MX6UL SoC
+* Industrial temperature ranges (-40?C to +85?C)
+* Up to 1GB DDR3 memory
+* Up to 2GB NAND flash
+* Dual Ethernet
+* On module 802.11 WiFi and Bluetooth 4.2 (QCA6564)
+* On module NXP Kinetis KL03
+* On module Microchip ATECC508A crypto element
 
-Acked-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
+Signed-off-by: Alex Gonzalez <alex.gonzalez@digi.com>
+---
+ arch/arm/boot/dts/imx6ul-ccimx6ulsom.dtsi | 202 ++++++++++++++++++++++++++++++
+ 1 file changed, 202 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6ul-ccimx6ulsom.dtsi
 
-> ---
->  Documentation/devicetree/bindings/media/rcar_vin.txt | 10 ++++++----
->  1 file changed, 6 insertions(+), 4 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/media/rcar_vin.txt b/Documentation/devicetree/bindings/media/rcar_vin.txt
-> index e25ab07..39c4e6a 100644
-> --- a/Documentation/devicetree/bindings/media/rcar_vin.txt
-> +++ b/Documentation/devicetree/bindings/media/rcar_vin.txt
-> @@ -39,9 +39,11 @@ Additionally, an alias named vinX will need to be created to specify
->  which video input device this is.
->  
->  The per-board settings Gen2 platforms:
-> - - port sub-node describing a single endpoint connected to the vin
-> -   as described in video-interfaces.txt[1]. Only the first one will
-> -   be considered as each vin interface has one input port.
-> +
-> +- port - sub-node describing a single endpoint connected to the VIN
-> +  from external SoC pins as described in video-interfaces.txt[1].
-> +  Only the first one will be considered as each vin interface has one
-> +  input port.
->  
->  The per-board settings Gen3 platforms:
->  
-> @@ -52,7 +54,7 @@ from local SoC CSI-2 receivers (port at 1) depending on SoC.
->  - renesas,id - ID number of the VIN, VINx in the documentation.
->  - ports
->      - port at 0 - sub-node describing a single endpoint connected to the VIN
-> -      from external SoC pins described in video-interfaces.txt[1].
-> +      from external SoC pins as described in video-interfaces.txt[1].
->        Describing more than one endpoint in port at 0 is invalid. Only VIN
->        instances that are connected to external pins should have port at 0.
->      - port at 1 - sub-nodes describing one or more endpoints connected to
-> -- 
-> 2.7.4
-> 
-
--- 
-Regards,
-Niklas S?derlund
+diff --git a/arch/arm/boot/dts/imx6ul-ccimx6ulsom.dtsi b/arch/arm/boot/dts/imx6ul-ccimx6ulsom.dtsi
+new file mode 100644
+index 000000000000..255c482ce56f
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6ul-ccimx6ulsom.dtsi
+@@ -0,0 +1,202 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Digi International's ConnectCore 6UL System-On-Module device tree source
++ *
++ * Copyright 2018 Digi International, Inc.
++ *
++ */
++
++/ {
++	reserved-memory {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		linux,cma {
++			compatible = "shared-dma-pool";
++			reusable;
++			size = <0x4000000>;
++			linux,cma-default;
++		};
++	};
++};
++
++&adc1 {
++	vref-supply = <&vdda_adc_3v3>;
++};
++
++&gpmi {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_gpmi_nand>;
++	status = "okay";
++};
++
++&i2c1 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c1>;
++	status = "okay";
++
++	pfuze3000: pmic at 8 {
++		compatible = "fsl,pfuze3000";
++		reg = <0x08>;
++
++		regulators {
++			int_3v3: sw1a {
++				regulator-min-microvolt = <700000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-ramp-delay = <6250>;
++				regulator-boot-on;
++				regulator-always-on;
++
++				regulator-state-mem {
++					regulator-off-in-suspend;
++				};
++			};
++
++			vdd_arm_soc_in: sw1b {
++				regulator-min-microvolt = <700000>;
++				regulator-max-microvolt = <1475000>;
++				regulator-ramp-delay = <6250>;
++				regulator-boot-on;
++				regulator-always-on;
++
++				regulator-state-mem {
++					regulator-on-in-suspend;
++					regulator-suspend-microvolt = <925000>;
++				};
++			};
++
++			ext_3v3: sw2 {
++				regulator-min-microvolt = <2500000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-ramp-delay = <6250>;
++				regulator-always-on;
++				regulator-boot-on;
++
++				regulator-state-mem {
++					regulator-off-in-suspend;
++				};
++			};
++
++			vcc_ddr3: sw3 {
++				regulator-min-microvolt = <900000>;
++				regulator-max-microvolt = <1650000>;
++				regulator-always-on;
++				regulator-boot-on;
++
++				regulator-state-mem {
++					regulator-on-in-suspend;
++					regulator-suspend-microvolt = <1300000>;
++				};
++			};
++
++			swbst_reg: swbst {
++				regulator-min-microvolt = <5000000>;
++				regulator-max-microvolt = <5150000>;
++			};
++
++			vdd_snvs_3v3: vsnvs {
++				regulator-min-microvolt = <1000000>;
++				regulator-max-microvolt = <3000000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			vrefddr: vrefddr {
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			vdda_adc_3v3: vldo1 {
++				compatible = "regulator-fixed";
++				regulator-name = "vref-adc-3v3";
++				regulator-min-microvolt = <3300000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++
++				regulator-state-mem {
++					regulator-off-in-suspend;
++				};
++			};
++
++			ldo2_ext: vldo2 {
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <1550000>;
++			};
++
++			vdda_wlan: vccsd {
++				regulator-min-microvolt = <2850000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++				regulator-boot-on;
++
++				regulator-state-mem {
++					regulator-off-in-suspend;
++				};
++			};
++
++			vdd_high_in: v33 {
++				regulator-min-microvolt = <2850000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			ldo3_int: vldo3 {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++			};
++
++			ldo4_ext: vldo4 {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++			};
++
++			vcoin_chg: vcoin {
++				regulator-min-microvolt = <2500000>;
++				regulator-max-microvolt = <3300000>;
++			};
++		};
++	};
++};
++
++&iomuxc {
++	pinctrl_gpmi_nand: gpmigrp {
++		fsl,pins = <
++			MX6UL_PAD_NAND_CE0_B__RAWNAND_CE0_B	0xb0b1
++			MX6UL_PAD_NAND_RE_B__RAWNAND_RE_B	0xb0b1
++			MX6UL_PAD_NAND_WE_B__RAWNAND_WE_B	0xb0b1
++			MX6UL_PAD_NAND_WP_B__RAWNAND_WP_B	0xb0b1
++			MX6UL_PAD_NAND_ALE__RAWNAND_ALE		0xb0b1
++			MX6UL_PAD_NAND_CLE__RAWNAND_CLE		0xb0b1
++			MX6UL_PAD_NAND_DATA00__RAWNAND_DATA00	0xb0b1
++			MX6UL_PAD_NAND_DATA01__RAWNAND_DATA01	0xb0b1
++			MX6UL_PAD_NAND_DATA02__RAWNAND_DATA02	0xb0b1
++			MX6UL_PAD_NAND_DATA03__RAWNAND_DATA03	0xb0b1
++			MX6UL_PAD_NAND_DATA04__RAWNAND_DATA04	0xb0b1
++			MX6UL_PAD_NAND_DATA05__RAWNAND_DATA05	0xb0b1
++			MX6UL_PAD_NAND_DATA06__RAWNAND_DATA06	0xb0b1
++			MX6UL_PAD_NAND_DATA07__RAWNAND_DATA07	0xb0b1
++			MX6UL_PAD_NAND_READY_B__RAWNAND_READY_B	0xb0b1
++			>;
++		};
++
++	pinctrl_i2c1: i2c1grp {
++		fsl,pins = <
++			MX6UL_PAD_UART4_TX_DATA__I2C1_SCL 0x4001b8b0
++			MX6UL_PAD_UART4_RX_DATA__I2C1_SDA 0x4001b8b0
++			>;
++		};
++};
++
++&reg_arm {
++	vin-supply = <&vdd_arm_soc_in>;
++	regulator-allow-bypass;
++};
++
++&reg_soc {
++	vin-supply = <&vdd_arm_soc_in>;
++	regulator-allow-bypass;
++};
++
