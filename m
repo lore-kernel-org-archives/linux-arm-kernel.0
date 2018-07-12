@@ -1,68 +1,52 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 12 Jul 2018 10:56:05 +0100
-Subject: [PATCH] arm64: neon: Fix function may_use_simd() return error
- status
-In-Reply-To: <1531366178-17630-1-git-send-email-yandong77520@gmail.com>
-References: <1531366178-17630-1-git-send-email-yandong77520@gmail.com>
-Message-ID: <20180712095602.GN9486@e103592.cambridge.arm.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 12 Jul 2018 18:17:23 +0800
+Subject: [PATCH] mmc: sunxi: Use new timing mode for A64 eMMC controller
+In-Reply-To: <20180712071959.fi4rhgwv2iuoelbl@flea>
+References: <20180712030225.15681-1-wens@csie.org>
+ <20180712071959.fi4rhgwv2iuoelbl@flea>
+Message-ID: <CAGb2v65rE2nQbyeiSPAyTzw-n-EQsUwQABx3nrvXTu4JogFPBQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 12, 2018 at 11:29:38AM +0800, Yandong.Zhao wrote:
-> From: Yandong Zhao <yandong77520@gmail.com>
-> 
-> It does not matter if the caller of may_use_simd() migrates to
-> another cpu after the call, but it is still important that the
-> kernel_neon_busy percpu instance that is read matches the cpu the
-> task is running on at the time of the read.
-> 
-> This means that raw_cpu_read() is not sufficient. kernel_neon_busy
-> may appear true if the caller migrates during the execution of
-> raw_cpu_read() and the next task to be scheduled in on the initial
-> cpu calls kernel_neon_begin().
-> 
-> This patch replaces raw_cpu_read() with this_cpu_read() to protect
-> against this race.
-> 
-> Fixes: cb84d11e1625 ("arm64: neon: Remove support for nested or hardirq kernel-mode NEON")
-> Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Reviewed-by: Dave Martin <Dave.Martin@arm.com>
-> Reviewed-by: Mark Rutland <mark.rutland@arm..com>
-> Signed-off-by: Yandong Zhao <yandong77520@gmail.com>
-> ---
->  arch/arm64/include/asm/simd.h | 19 +++++++------------
->  1 file changed, 7 insertions(+), 12 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/simd.h b/arch/arm64/include/asm/simd.h
-> index fa8b3fe..6495cc5 100644
-> --- a/arch/arm64/include/asm/simd.h
-> +++ b/arch/arm64/include/asm/simd.h
-> @@ -29,20 +29,15 @@
->  static __must_check inline bool may_use_simd(void)
->  {
->  	/*
-> -	 * The raw_cpu_read() is racy if called with preemption enabled.
-> -	 * This is not a bug: kernel_neon_busy is only set when
-> -	 * preemption is disabled, so we cannot migrate to another CPU
-> -	 * while it is set, nor can we migrate to a CPU where it is set.
-> -	 * So, if we find it clear on some CPU then we're guaranteed to
-> -	 * find it clear on any CPU we could migrate to.
-> -	 *
-> -	 * If we are in between kernel_neon_begin()...kernel_neon_end(),
-> -	 * the flag will be set, but preemption is also disabled, so we
-> -	 * can't migrate to another CPU and spuriously see it become
-> -	 * false.
-> +	 * kernel_neon_busy is only set while preemption is disabled,
-> +	 * and is clear whenever preemption is enabled. Since
-> +	 * this_cpu_read() is atomic w.r.t. preemption, kernel_neon_busy
-> +	 * cannot change under our feet -- if it's set we cannot be
-> +	 * migrated, and if it's clear we cannot be migrated to a CPU
-> +	 * where it is set.
->  	 */
+On Thu, Jul 12, 2018 at 3:19 PM, Maxime Ripard
+<maxime.ripard@bootlin.com> wrote:
+> Hi,
+>
+> On Thu, Jul 12, 2018 at 11:02:25AM +0800, Chen-Yu Tsai wrote:
+>> The eMMC controller is also a new timing mode controller, but it doesn't
+>> have the timing mode switch. It does however have signal delay and
+>> calibration controls, typical of Allwinner MMC controllers that support
+>> the new timing mode.
+>>
+>> Enable the new timing mode setting for the A64 eMMC controller. This
+>> also enables MMC HS-DDR modes, which gives higher throughput for eMMC
+>> chips that support it, and can deliver such throughput.
+>>
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>
+> That doesn't look right. The datasheet explicitly mentions that this
+> bit doesn't apply to the eMMC controller, and the BSP is doing the same:
+> https://github.com/longsleep/linux-pine64/blob/lichee-dev-v3.10.65/drivers/mmc/host/sunxi-mmc-sun50iw1p1-1.c
+>
+> vs
+> https://github.com/longsleep/linux-pine64/blob/lichee-dev-v3.10.65/drivers/mmc/host/sunxi-mmc-sun50iw1p1-2.c
 
-This new explanation looks fine to me.
+You mean the bit in SDXC_REG_SD_NTSR? Yes I know that doesn't exist for
+the eMMC controller. I mentioned this in the commit message. It doesn't
+exist, and writes to it become a no-op.
 
-[...]
+Would a comment, or comments, help with making this clear?
 
-Cheers
----Dave
+> And I definitely remember having HS-DDR working back when I added the
+> a64 eMMC support.
+
+Well it doesn't at the moment. My BPI-M64 reports:
+
+    [    1.634276] mmc2: new high speed MMC card at address 0001
+
+And with the patch:
+
+    [    1.632552] mmc2: new DDR MMC card at address 0001
+
+Regards
+ChenYu
