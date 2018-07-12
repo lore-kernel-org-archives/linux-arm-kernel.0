@@ -1,41 +1,28 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Thu, 12 Jul 2018 23:08:06 +0200
-Subject: [GIT PULL] pxa-dt for v4.19
-Message-ID: <87r2k89n7t.fsf@belgarion.home>
+From: daniel@iogearbox.net (Daniel Borkmann)
+Date: Thu, 12 Jul 2018 23:12:45 +0200
+Subject: [PATCH 00/14] ARM BPF jit compiler improvements
+In-Reply-To: <20180712210236.GV17271@n2100.armlinux.org.uk>
+References: <20180711093033.GP17271@n2100.armlinux.org.uk>
+ <bf534d05-8f75-20bc-e25e-4536c1123585@iogearbox.net>
+ <20180712210236.GV17271@n2100.armlinux.org.uk>
+Message-ID: <fbfa3684-b5a0-670d-c8f7-8c14829565cb@iogearbox.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Kevin, and Olof,
+On 07/12/2018 11:02 PM, Russell King - ARM Linux wrote:
+> On Thu, Jul 12, 2018 at 09:02:41PM +0200, Daniel Borkmann wrote:
+>> Applied to bpf-next, thanks a lot Russell!
+> 
+> Thanks, I've just sent four more patches, which is the sum total of
+> what I'm intending to send for BPF improvements for the next merge
+> window.
 
-This is the pxa pull request for 4.19 device-tree, with a couple fixes from
-Daniel for pxa3xx.
+Great, thanks a lot for the batch of improvements, Russell!
 
-The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
+Did you manage to get the BPF kselftest suite working on arm32 under
+tools/testing/selftests/bpf/? In particular the test_verfier with
+bpf_jit_enabled set to 1 and test_kmod.sh has a bigger number of
+runtime tests that would stress it.
 
-  Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
-
-are available in the git repository at:
-
-  https://github.com/rjarzmik/linux.git tags/pxa-dt-4.19
-
-for you to fetch changes up to 49e414c32053554736c421b1ac5b645f5c73e879:
-
-  arm: dts: pxa3xx: Add ssp ports to pxa3xx device tree (2018-06-29 22:23:44 +0200)
-
-----------------------------------------------------------------
-This device-tree pxa update brings :
- - pxa3xx fixes and updates
-
-----------------------------------------------------------------
-Daniel Mack (3):
-      ARM: dts: pxa: add label to lcd controller node
-      arm: dts: pxa3xx: provide correct clk-names property for nand controller node
-      arm: dts: pxa3xx: Add ssp ports to pxa3xx device tree
-
- .../devicetree/bindings/sound/mrvl,pxa-ssp.txt     |  8 ++----
- arch/arm/boot/dts/pxa2xx.dtsi                      |  2 +-
- arch/arm/boot/dts/pxa3xx.dtsi                      | 33 ++++++++++++++++++++++
- 3 files changed, 37 insertions(+), 6 deletions(-)
-
--- 
-Robert
+Thanks,
+Daniel
