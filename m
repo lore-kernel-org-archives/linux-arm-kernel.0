@@ -1,23 +1,27 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Thu, 12 Jul 2018 09:35:10 +0200
-Subject: [PATCH v3] drm/sun4i: mixer: Read id from DT
-In-Reply-To: <20180711112706.30222-1-jernej.skrabec@siol.net>
-References: <20180711112706.30222-1-jernej.skrabec@siol.net>
-Message-ID: <20180712073510.ssl43bjgv5n5mrwb@flea>
+Date: Thu, 12 Jul 2018 09:35:38 +0200
+Subject: [PATCH] [v3] drm/sun4i: fix build failure with
+ CONFIG_DRM_SUN8I_MIXER=m
+In-Reply-To: <20180711144403.1022829-1-arnd@arndb.de>
+References: <20180711144403.1022829-1-arnd@arndb.de>
+Message-ID: <20180712073538.drmn75bp6xe5cniz@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 11, 2018 at 01:27:06PM +0200, Jernej Skrabec wrote:
-> Currently, TCON supports 2 ways to match TCON with engine (mixer in this
-> case). Old way is to just traverse of graph backwards and compare node
-> pointer. New way is to match TCON and engine by their respective ids.
-> All SoCs with DE2 enabled till now used the old way, which means mixer
-> id was never used and thus never implemented.
+On Wed, Jul 11, 2018 at 04:43:10PM +0200, Arnd Bergmann wrote:
+> Having DRM_SUN4I built-in but DRM_SUN8I_MIXER as a loadable module results in
+> a link error, as we try to access a symbol from the sun8i_tcon_top.ko module:
 > 
-> However, for R40, only the new way will be used. To prepare for that,
-> implement mixer id fetching from DT.
+> ERROR: "sun8i_tcon_top_of_table" [drivers/gpu/drm/sun4i/sun8i-drm-hdmi.ko] undefined!
+> ERROR: "sun8i_tcon_top_of_table" [drivers/gpu/drm/sun4i/sun4i-drm.ko] undefined!
 > 
-> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+> This solves the problem by adding a silent symbol for the tcon_top module,
+> building it as a separate module in exactly the cases that we need it,
+> but in a way that it is reachable by the other modules.
+> 
+> Fixes: 57e23de02f48 ("drm/sun4i: DW HDMI: Expand algorithm for possible crtcs")
+> Fixes: ef0cf6441fbb ("drm/sun4i: Add support for traversing graph with TCON TOP")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
 Applied, thanks!
 Maxime
@@ -32,4 +36,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180712/c7f270c9/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180712/58c9be1d/attachment.sig>
