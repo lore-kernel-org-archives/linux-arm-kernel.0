@@ -1,40 +1,117 @@
 From: thunder.leizhen@huawei.com (Zhen Lei)
-Date: Thu, 12 Jul 2018 14:18:29 +0800
-Subject: [PATCH v3 3/6] iommu/amd: use default branch to deal with all
- non-supported capabilities
+Date: Thu, 12 Jul 2018 14:18:30 +0800
+Subject: [PATCH v3 4/6] iommu/io-pgtable-arm: add support for non-strict mode
 In-Reply-To: <1531376312-2192-1-git-send-email-thunder.leizhen@huawei.com>
 References: <1531376312-2192-1-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <1531376312-2192-4-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <1531376312-2192-5-git-send-email-thunder.leizhen@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Avoid below warning when new capabilities added:
+To support the non-strict mode, now we only tlbi and sync for the strict
+mode. But for the non-leaf case, always follow strict mode.
 
-drivers/iommu/amd_iommu.c: In function 'amd_iommu_capable':
-drivers/iommu/amd_iommu.c:3053:2: warning: enumeration value 'IOMMU_CAP_NON_STRICT' not handled in switch [-Wswitch]
-     switch (cap) {
+Use the lowest bit of the iova parameter to pass the strict mode:
+0, IOMMU_STRICT;
+1, IOMMU_NON_STRICT;
+Treat 0 as IOMMU_STRICT, so that the unmap operation can compatible with
+other IOMMUs which still use strict mode.
 
 Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
 ---
- drivers/iommu/amd_iommu.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+ drivers/iommu/io-pgtable-arm.c | 23 ++++++++++++++---------
+ 1 file changed, 14 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/iommu/amd_iommu.c b/drivers/iommu/amd_iommu.c
-index 596b95c..b619e5c 100644
---- a/drivers/iommu/amd_iommu.c
-+++ b/drivers/iommu/amd_iommu.c
-@@ -3085,11 +3085,9 @@ static bool amd_iommu_capable(enum iommu_cap cap)
- 		return true;
- 	case IOMMU_CAP_INTR_REMAP:
- 		return (irq_remapping_enabled == 1);
--	case IOMMU_CAP_NOEXEC:
-+	default:
- 		return false;
+diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
+index 010a254..9234db3 100644
+--- a/drivers/iommu/io-pgtable-arm.c
++++ b/drivers/iommu/io-pgtable-arm.c
+@@ -292,7 +292,7 @@ static void __arm_lpae_set_pte(arm_lpae_iopte *ptep, arm_lpae_iopte pte,
+ 
+ static size_t __arm_lpae_unmap(struct arm_lpae_io_pgtable *data,
+ 			       unsigned long iova, size_t size, int lvl,
+-			       arm_lpae_iopte *ptep);
++			       arm_lpae_iopte *ptep, int strict);
+ 
+ static void __arm_lpae_init_pte(struct arm_lpae_io_pgtable *data,
+ 				phys_addr_t paddr, arm_lpae_iopte prot,
+@@ -334,7 +334,7 @@ static int arm_lpae_init_pte(struct arm_lpae_io_pgtable *data,
+ 		size_t sz = ARM_LPAE_BLOCK_SIZE(lvl, data);
+ 
+ 		tblp = ptep - ARM_LPAE_LVL_IDX(iova, lvl, data);
+-		if (WARN_ON(__arm_lpae_unmap(data, iova, sz, lvl, tblp) != sz))
++		if (WARN_ON(__arm_lpae_unmap(data, iova, sz, lvl, tblp, IOMMU_STRICT) != sz))
+ 			return -EINVAL;
  	}
--
--	return false;
+ 
+@@ -531,7 +531,7 @@ static void arm_lpae_free_pgtable(struct io_pgtable *iop)
+ static size_t arm_lpae_split_blk_unmap(struct arm_lpae_io_pgtable *data,
+ 				       unsigned long iova, size_t size,
+ 				       arm_lpae_iopte blk_pte, int lvl,
+-				       arm_lpae_iopte *ptep)
++				       arm_lpae_iopte *ptep, int strict)
+ {
+ 	struct io_pgtable_cfg *cfg = &data->iop.cfg;
+ 	arm_lpae_iopte pte, *tablep;
+@@ -576,15 +576,18 @@ static size_t arm_lpae_split_blk_unmap(struct arm_lpae_io_pgtable *data,
+ 	}
+ 
+ 	if (unmap_idx < 0)
+-		return __arm_lpae_unmap(data, iova, size, lvl, tablep);
++		return __arm_lpae_unmap(data, iova, size, lvl, tablep, strict);
+ 
+ 	io_pgtable_tlb_add_flush(&data->iop, iova, size, size, true);
++	if (!strict)
++		io_pgtable_tlb_sync(&data->iop);
++
+ 	return size;
  }
  
- static void amd_iommu_get_resv_regions(struct device *dev,
+ static size_t __arm_lpae_unmap(struct arm_lpae_io_pgtable *data,
+ 			       unsigned long iova, size_t size, int lvl,
+-			       arm_lpae_iopte *ptep)
++			       arm_lpae_iopte *ptep, int strict)
+ {
+ 	arm_lpae_iopte pte;
+ 	struct io_pgtable *iop = &data->iop;
+@@ -609,7 +612,7 @@ static size_t __arm_lpae_unmap(struct arm_lpae_io_pgtable *data,
+ 			io_pgtable_tlb_sync(iop);
+ 			ptep = iopte_deref(pte, data);
+ 			__arm_lpae_free_pgtable(data, lvl + 1, ptep);
+-		} else {
++		} else if (strict) {
+ 			io_pgtable_tlb_add_flush(iop, iova, size, size, true);
+ 		}
+ 
+@@ -620,25 +623,27 @@ static size_t __arm_lpae_unmap(struct arm_lpae_io_pgtable *data,
+ 		 * minus the part we want to unmap
+ 		 */
+ 		return arm_lpae_split_blk_unmap(data, iova, size, pte,
+-						lvl + 1, ptep);
++						lvl + 1, ptep, strict);
+ 	}
+ 
+ 	/* Keep on walkin' */
+ 	ptep = iopte_deref(pte, data);
+-	return __arm_lpae_unmap(data, iova, size, lvl + 1, ptep);
++	return __arm_lpae_unmap(data, iova, size, lvl + 1, ptep, strict);
+ }
+ 
+ static size_t arm_lpae_unmap(struct io_pgtable_ops *ops, unsigned long iova,
+ 			     size_t size)
+ {
++	int strict = ((iova & IOMMU_STRICT_MODE_MASK) == IOMMU_STRICT);
+ 	struct arm_lpae_io_pgtable *data = io_pgtable_ops_to_data(ops);
+ 	arm_lpae_iopte *ptep = data->pgd;
+ 	int lvl = ARM_LPAE_START_LVL(data);
+ 
++	iova &= ~IOMMU_STRICT_MODE_MASK;
+ 	if (WARN_ON(iova >= (1ULL << data->iop.cfg.ias)))
+ 		return 0;
+ 
+-	return __arm_lpae_unmap(data, iova, size, lvl, ptep);
++	return __arm_lpae_unmap(data, iova, size, lvl, ptep, strict);
+ }
+ 
+ static phys_addr_t arm_lpae_iova_to_phys(struct io_pgtable_ops *ops,
 -- 
 1.8.3
