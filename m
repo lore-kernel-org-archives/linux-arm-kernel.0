@@ -1,236 +1,46 @@
 From: alex.gonzalez@digi.com (Alex Gonzalez)
-Date: Thu, 12 Jul 2018 10:20:35 +0200
-Subject: [PATCH v2 1/2] ARM: dts: imx6ul: Add DTS for ConnectCore 6UL
- System-On-Module (SOM)
-In-Reply-To: <1531383636-3406-1-git-send-email-alex.gonzalez@digi.com>
-References: <1531383636-3406-1-git-send-email-alex.gonzalez@digi.com>
-Message-ID: <1531383636-3406-2-git-send-email-alex.gonzalez@digi.com>
+Date: Thu, 12 Jul 2018 10:20:34 +0200
+Subject: [PATCH v2 0/2] Add support for the ConnectCore 6UL SOM and SBC Express
+Message-ID: <1531383636-3406-1-git-send-email-alex.gonzalez@digi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ConnectCore 6UL System-On-Module has the following hardware
-specification:
+This patchset adds a device tree include for the ConnectCore 6UL
+System-On-Module and a device tree for the ConnectCore 6UL SBC Express board
+that includes it.
 
-* Based on a NXP i.MX6UL SoC
-* Industrial temperature ranges (-40?C to +85?C)
-* Up to 1GB DDR3 memory
-* Up to 2GB NAND flash
-* Dual Ethernet
-* On module 802.11 WiFi and Bluetooth 4.2 (QCA6564)
-* On module NXP Kinetis KL03
-* On module Microchip ATECC508A crypto element
+Not all the SOM hardware is supported in this initial patchset, specifically
+the 802.11 WiFi and BT chipset and the extended functionality provided by
+the on module NXP Kinetis KL03 are not supported.
 
-Signed-off-by: Alex Gonzalez <alex.gonzalez@digi.com>
----
- arch/arm/boot/dts/imx6ul-ccimx6ulsom.dtsi | 202 ++++++++++++++++++++++++++++++
- 1 file changed, 202 insertions(+)
+The SOM is based on NXP's i.MX6UL SoC, and the patchset is tested against
+v4.18-rc4.
+
+More information about the hardware can be found at:
+
+ConnectCore 6UL SOM:
+https://www.digi.com/products/embedded-systems/system-on-modules/connectcore-for-i-mx6ul
+
+ConnectCore 6UL SBC Express board:
+https://www.digi.com/products/embedded-systems/single-board-computers/connectcore-for-i-mx6ul-sbc-express
+
+Changes since v1 [1]:
+
+* Remove not needed DT properties
+* Formatting changes:
+        * Re-order nodes alphabetically
+        * Add empty lines between properties and child nodes
+        * Use generic node names
+
+[1] https://lore.kernel.org/lkml/1529393534-7827-1-git-send-email-alex.gonzalez at digi.com/
+
+Alex Gonzalez (2):
+  ARM: dts: imx6ul: Add DTS for ConnectCore 6UL System-On-Module (SOM)
+  ARM: dts: imx6ul: Add DTS for ConnectCore 6UL SBC Express
+
+ arch/arm/boot/dts/Makefile                      |   1 +
+ arch/arm/boot/dts/imx6ul-ccimx6ulsbcexpress.dts | 200 +++++++++++++++++++++++
+ arch/arm/boot/dts/imx6ul-ccimx6ulsom.dtsi       | 202 ++++++++++++++++++++++++
+ 3 files changed, 403 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6ul-ccimx6ulsbcexpress.dts
  create mode 100644 arch/arm/boot/dts/imx6ul-ccimx6ulsom.dtsi
-
-diff --git a/arch/arm/boot/dts/imx6ul-ccimx6ulsom.dtsi b/arch/arm/boot/dts/imx6ul-ccimx6ulsom.dtsi
-new file mode 100644
-index 000000000000..255c482ce56f
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6ul-ccimx6ulsom.dtsi
-@@ -0,0 +1,202 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * Digi International's ConnectCore 6UL System-On-Module device tree source
-+ *
-+ * Copyright 2018 Digi International, Inc.
-+ *
-+ */
-+
-+/ {
-+	reserved-memory {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+
-+		linux,cma {
-+			compatible = "shared-dma-pool";
-+			reusable;
-+			size = <0x4000000>;
-+			linux,cma-default;
-+		};
-+	};
-+};
-+
-+&adc1 {
-+	vref-supply = <&vdda_adc_3v3>;
-+};
-+
-+&gpmi {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_gpmi_nand>;
-+	status = "okay";
-+};
-+
-+&i2c1 {
-+	clock-frequency = <100000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c1>;
-+	status = "okay";
-+
-+	pfuze3000: pmic at 8 {
-+		compatible = "fsl,pfuze3000";
-+		reg = <0x08>;
-+
-+		regulators {
-+			int_3v3: sw1a {
-+				regulator-min-microvolt = <700000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-ramp-delay = <6250>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
-+			};
-+
-+			vdd_arm_soc_in: sw1b {
-+				regulator-min-microvolt = <700000>;
-+				regulator-max-microvolt = <1475000>;
-+				regulator-ramp-delay = <6250>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <925000>;
-+				};
-+			};
-+
-+			ext_3v3: sw2 {
-+				regulator-min-microvolt = <2500000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-ramp-delay = <6250>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
-+			};
-+
-+			vcc_ddr3: sw3 {
-+				regulator-min-microvolt = <900000>;
-+				regulator-max-microvolt = <1650000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <1300000>;
-+				};
-+			};
-+
-+			swbst_reg: swbst {
-+				regulator-min-microvolt = <5000000>;
-+				regulator-max-microvolt = <5150000>;
-+			};
-+
-+			vdd_snvs_3v3: vsnvs {
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <3000000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			vrefddr: vrefddr {
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			vdda_adc_3v3: vldo1 {
-+				compatible = "regulator-fixed";
-+				regulator-name = "vref-adc-3v3";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
-+			};
-+
-+			ldo2_ext: vldo2 {
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <1550000>;
-+			};
-+
-+			vdda_wlan: vccsd {
-+				regulator-min-microvolt = <2850000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
-+			};
-+
-+			vdd_high_in: v33 {
-+				regulator-min-microvolt = <2850000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			ldo3_int: vldo3 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+			};
-+
-+			ldo4_ext: vldo4 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+			};
-+
-+			vcoin_chg: vcoin {
-+				regulator-min-microvolt = <2500000>;
-+				regulator-max-microvolt = <3300000>;
-+			};
-+		};
-+	};
-+};
-+
-+&iomuxc {
-+	pinctrl_gpmi_nand: gpmigrp {
-+		fsl,pins = <
-+			MX6UL_PAD_NAND_CE0_B__RAWNAND_CE0_B	0xb0b1
-+			MX6UL_PAD_NAND_RE_B__RAWNAND_RE_B	0xb0b1
-+			MX6UL_PAD_NAND_WE_B__RAWNAND_WE_B	0xb0b1
-+			MX6UL_PAD_NAND_WP_B__RAWNAND_WP_B	0xb0b1
-+			MX6UL_PAD_NAND_ALE__RAWNAND_ALE		0xb0b1
-+			MX6UL_PAD_NAND_CLE__RAWNAND_CLE		0xb0b1
-+			MX6UL_PAD_NAND_DATA00__RAWNAND_DATA00	0xb0b1
-+			MX6UL_PAD_NAND_DATA01__RAWNAND_DATA01	0xb0b1
-+			MX6UL_PAD_NAND_DATA02__RAWNAND_DATA02	0xb0b1
-+			MX6UL_PAD_NAND_DATA03__RAWNAND_DATA03	0xb0b1
-+			MX6UL_PAD_NAND_DATA04__RAWNAND_DATA04	0xb0b1
-+			MX6UL_PAD_NAND_DATA05__RAWNAND_DATA05	0xb0b1
-+			MX6UL_PAD_NAND_DATA06__RAWNAND_DATA06	0xb0b1
-+			MX6UL_PAD_NAND_DATA07__RAWNAND_DATA07	0xb0b1
-+			MX6UL_PAD_NAND_READY_B__RAWNAND_READY_B	0xb0b1
-+			>;
-+		};
-+
-+	pinctrl_i2c1: i2c1grp {
-+		fsl,pins = <
-+			MX6UL_PAD_UART4_TX_DATA__I2C1_SCL 0x4001b8b0
-+			MX6UL_PAD_UART4_RX_DATA__I2C1_SDA 0x4001b8b0
-+			>;
-+		};
-+};
-+
-+&reg_arm {
-+	vin-supply = <&vdd_arm_soc_in>;
-+	regulator-allow-bypass;
-+};
-+
-+&reg_soc {
-+	vin-supply = <&vdd_arm_soc_in>;
-+	regulator-allow-bypass;
-+};
-+
