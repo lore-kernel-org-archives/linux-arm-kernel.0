@@ -1,102 +1,38 @@
-From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
-Date: Thu, 12 Jul 2018 09:59:40 +0800
-Subject: [PATCH v6 3/3] serial: 8250_dw: add fractional divisor support
-In-Reply-To: <20180712095504.4d9583ce@xhacker.debian>
-References: <20180712095504.4d9583ce@xhacker.debian>
-Message-ID: <20180712095940.20859423@xhacker.debian>
+From: keescook@chromium.org (Kees Cook)
+Date: Wed, 11 Jul 2018 19:06:25 -0700
+Subject: [PATCH] arm64: Add support for STACKLEAK gcc plugin
+In-Reply-To: <08f1c1d4-52a8-6d42-fe56-241c255ba934@redhat.com>
+References: <20180712000337.GA4022@beast>
+ <08f1c1d4-52a8-6d42-fe56-241c255ba934@redhat.com>
+Message-ID: <CAGXu5jJtuut1E4DKB=AVs-pq8H9Jvwr3Ve6eskraBL3ekfUzqA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For Synopsys DesignWare 8250 uart which version >= 4.00a, there's a
-valid divisor latch fraction register. The fractional divisor width is
-4bits ~ 6bits.
+On Wed, Jul 11, 2018 at 6:45 PM, Laura Abbott <labbott@redhat.com> wrote:
+>> +#ifdef CONFIG_GCC_PLUGIN_STACKLEAK
+>> +#define MIN_STACK_LEFT 256
+>> +
+>> +void __used stackleak_check_alloca(unsigned long size)
+>> +{
+>> +       unsigned long sp, stack_left;
+>> +
+>> +       sp = current_stack_pointer;
+>> +
+>> +       stack_left = sp & (THREAD_SIZE - 1);
+>> +       BUG_ON(stack_left < MIN_STACK_LEFT ||
+>> +               size >= stack_left - MIN_STACK_LEFT);
+>> +}
+>> +EXPORT_SYMBOL(stackleak_check_alloca);
+>> +#endif
+>
+>
+> I think the conclusion was this needs to be re-written to account
+> for the different stack sizes in the same way as x86.
 
-Now the preparation is done, it's easy to add the feature support.
-This patch firstly tries to get the fractional divisor width during
-probe, then setups dw specific get_divisor() and set_divisor() hook.
+Oh, whoops! Sorry, I missed that fork of the thread. :)
 
-Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
-Reviewed-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
----
- drivers/tty/serial/8250/8250_dw.c | 45 +++++++++++++++++++++++++++++++
- 1 file changed, 45 insertions(+)
+-Kees
 
-diff --git a/drivers/tty/serial/8250/8250_dw.c b/drivers/tty/serial/8250/8250_dw.c
-index fa8a00e8c9c6..5a60c4814d62 100644
---- a/drivers/tty/serial/8250/8250_dw.c
-+++ b/drivers/tty/serial/8250/8250_dw.c
-@@ -31,6 +31,7 @@
- 
- /* Offsets for the DesignWare specific registers */
- #define DW_UART_USR	0x1f /* UART Status Register */
-+#define DW_UART_DLF	0xc0 /* Divisor Latch Fraction Register */
- #define DW_UART_CPR	0xf4 /* Component Parameter Register */
- #define DW_UART_UCV	0xf8 /* UART Component Version */
- 
-@@ -55,6 +56,7 @@
- 
- struct dw8250_data {
- 	u8			usr_reg;
-+	u8			dlf_size;
- 	int			line;
- 	int			msr_mask_on;
- 	int			msr_mask_off;
-@@ -366,6 +368,37 @@ static bool dw8250_idma_filter(struct dma_chan *chan, void *param)
- 	return param == chan->device->dev->parent;
- }
- 
-+/*
-+ * divisor = div(I) + div(F)
-+ * "I" means integer, "F" means fractional
-+ * quot = div(I) = clk / (16 * baud)
-+ * frac = div(F) * 2^dlf_size
-+ *
-+ * let rem = clk % (16 * baud)
-+ * we have: div(F) * (16 * baud) = rem
-+ * so frac = 2^dlf_size * rem / (16 * baud) = (rem << dlf_size) / (16 * baud)
-+ */
-+static unsigned int dw8250_get_divisor(struct uart_port *p,
-+				       unsigned int baud,
-+				       unsigned int *frac)
-+{
-+	unsigned int quot, rem, base_baud = baud * 16;
-+	struct dw8250_data *d = p->private_data;
-+
-+	quot = p->uartclk / base_baud;
-+	rem = p->uartclk % base_baud;
-+	*frac = DIV_ROUND_CLOSEST(rem << d->dlf_size, base_baud);
-+
-+	return quot;
-+}
-+
-+static void dw8250_set_divisor(struct uart_port *p, unsigned int baud,
-+			       unsigned int quot, unsigned int quot_frac)
-+{
-+	dw8250_writel_ext(p, DW_UART_DLF, quot_frac);
-+	serial8250_do_set_divisor(p, baud, quot, quot_frac);
-+}
-+
- static void dw8250_quirks(struct uart_port *p, struct dw8250_data *data)
- {
- 	if (p->dev->of_node) {
-@@ -426,6 +459,18 @@ static void dw8250_setup_port(struct uart_port *p)
- 	dev_dbg(p->dev, "Designware UART version %c.%c%c\n",
- 		(reg >> 24) & 0xff, (reg >> 16) & 0xff, (reg >> 8) & 0xff);
- 
-+	dw8250_writel_ext(p, DW_UART_DLF, ~0U);
-+	reg = dw8250_readl_ext(p, DW_UART_DLF);
-+	dw8250_writel_ext(p, DW_UART_DLF, 0);
-+
-+	if (reg) {
-+		struct dw8250_data *d = p->private_data;
-+
-+		d->dlf_size = fls(reg);
-+		p->get_divisor = dw8250_get_divisor;
-+		p->set_divisor = dw8250_set_divisor;
-+	}
-+
- 	reg = dw8250_readl_ext(p, DW_UART_CPR);
- 	if (!reg)
- 		return;
 -- 
-2.18.0
+Kees Cook
+Pixel Security
