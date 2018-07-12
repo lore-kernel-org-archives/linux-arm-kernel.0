@@ -1,47 +1,37 @@
 From: luaraneda@gmail.com (Luis Araneda)
-Date: Thu, 12 Jul 2018 00:10:19 -0400
-Subject: [PATCH v3 1/6] arm: dts: zynq: Set correct manufacturer for ZedBoard
- and MicroZed boards
+Date: Thu, 12 Jul 2018 00:10:21 -0400
+Subject: [PATCH v3 3/6] dt-bindings: xilinx: zynq: Improve boards description
 In-Reply-To: <20180712041024.20583-1-luaraneda@gmail.com>
 References: <20180712041024.20583-1-luaraneda@gmail.com>
-Message-ID: <20180712041024.20583-2-luaraneda@gmail.com>
+Message-ID: <20180712041024.20583-4-luaraneda@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Both boards are made by Avnet, Inc. So add an additional
-value to the compatible property
+Change the description of some boards to make it similar
+to the value of the model property from their respective
+device-tree, using the format "<manufacturer> <model>"
 
 Signed-off-by: Luis Araneda <luaraneda@gmail.com>
 ---
- arch/arm/boot/dts/zynq-microzed.dts | 2 +-
- arch/arm/boot/dts/zynq-zed.dts      | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ Documentation/devicetree/bindings/arm/xilinx.txt | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/zynq-microzed.dts b/arch/arm/boot/dts/zynq-microzed.dts
-index aa4a0b6defb8..574ef2276182 100644
---- a/arch/arm/boot/dts/zynq-microzed.dts
-+++ b/arch/arm/boot/dts/zynq-microzed.dts
-@@ -8,7 +8,7 @@
+diff --git a/Documentation/devicetree/bindings/arm/xilinx.txt b/Documentation/devicetree/bindings/arm/xilinx.txt
+index b9043bc35c14..4f1759b2bea7 100644
+--- a/Documentation/devicetree/bindings/arm/xilinx.txt
++++ b/Documentation/devicetree/bindings/arm/xilinx.txt
+@@ -8,10 +8,10 @@ Required root node properties:
  
- / {
- 	model = "Zynq MicroZED Development Board";
--	compatible = "xlnx,zynq-microzed", "xlnx,zynq-7000";
-+	compatible = "avnet,zynq-microzed", "xlnx,zynq-microzed", "xlnx,zynq-7000";
+ Additional compatible strings:
  
- 	aliases {
- 		ethernet0 = &gem0;
-diff --git a/arch/arm/boot/dts/zynq-zed.dts b/arch/arm/boot/dts/zynq-zed.dts
-index 53c6883ce1f6..595022487965 100644
---- a/arch/arm/boot/dts/zynq-zed.dts
-+++ b/arch/arm/boot/dts/zynq-zed.dts
-@@ -8,7 +8,7 @@
+-- Xilinx internal board cc108
++- Xilinx CC108 internal board
+   "xlnx,zynq-cc108"
  
- / {
- 	model = "Zynq Zed Development Board";
--	compatible = "xlnx,zynq-zed", "xlnx,zynq-7000";
-+	compatible = "avnet,zynq-zed", "xlnx,zynq-zed", "xlnx,zynq-7000";
- 
- 	aliases {
- 		ethernet0 = &gem0;
+-- Xilinx internal board zc770 with different FMC cards
++- Xilinx ZC770 internal board, with different FMC cards
+   "xlnx,zynq-zc770-xm010"
+   "xlnx,zynq-zc770-xm011"
+   "xlnx,zynq-zc770-xm012"
 -- 
 2.18.0
