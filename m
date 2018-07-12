@@ -1,44 +1,91 @@
-From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Wed, 11 Jul 2018 19:33:37 -0700
-Subject: [PATCH 2/2] ARM: dts: imx51-zii-scu3-esb: Fix RAVE SP watchdog
- compatible string
-In-Reply-To: <20180712023337.30112-1-andrew.smirnov@gmail.com>
-References: <20180712023337.30112-1-andrew.smirnov@gmail.com>
-Message-ID: <20180712023337.30112-3-andrew.smirnov@gmail.com>
+From: yixun.lan@amlogic.com (Yixun Lan)
+Date: Thu, 12 Jul 2018 10:47:12 +0800
+Subject: [PATCH v2 1/3] clk: meson: add DT documentation for emmc clock
+ controller
+In-Reply-To: <20180711194346.GA32414@rob-hp-laptop>
+References: <20180710163658.6175-1-yixun.lan@amlogic.com>
+ <20180710163658.6175-2-yixun.lan@amlogic.com>
+ <20180711194346.GA32414@rob-hp-laptop>
+Message-ID: <f2eb8632-1113-3bb8-506f-ac0d4e838fd4@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It looks like I made a nasty typo in the original patch which resulted
-in missing watchdog device. Fix it.
+Hi Rob
 
-Cc: Fabio Estevam <fabio.estevam@nxp.com>
-Cc: Nikita Yushchenko <nikita.yoush@cogentembedded.com>
-Cc: Lucas Stach <l.stach@pengutronix.de>
-Cc: cphealy at gmail.com
-Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: devicetree at vger.kernel.org
-Cc: linux-kernel at vger.kernel.org
-Cc: Andrew Lunn <andrew@lunn.ch>
-Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
----
- arch/arm/boot/dts/imx51-zii-scu3-esb.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+see my comments
 
-diff --git a/arch/arm/boot/dts/imx51-zii-scu3-esb.dts b/arch/arm/boot/dts/imx51-zii-scu3-esb.dts
-index 0bb42c00d72b..dffb761a1cc8 100644
---- a/arch/arm/boot/dts/imx51-zii-scu3-esb.dts
-+++ b/arch/arm/boot/dts/imx51-zii-scu3-esb.dts
-@@ -325,7 +325,7 @@
- 		#size-cells = <1>;		
- 
- 		watchdog {
--			compatible = "zii,rave-sp-watchodg-legacy";
-+			compatible = "zii,rave-sp-watchdog-legacy";
- 		};
- 
- 		eeprom at a4 {
--- 
-2.17.1
+On 07/12/18 03:43, Rob Herring wrote:
+> On Tue, Jul 10, 2018 at 04:36:56PM +0000, Yixun Lan wrote:
+>> Document the MMC sub clock controller driver, the potential consumer
+>> of this driver is MMC or NAND.
+> 
+> So you all have decided to properly model this now?
+> 
+Yes, ;-)
+
+>>
+>> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+>> ---
+>>  .../bindings/clock/amlogic,mmc-clkc.txt       | 31 +++++++++++++++++++
+>>  1 file changed, 31 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/clock/amlogic,mmc-clkc.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/clock/amlogic,mmc-clkc.txt b/Documentation/devicetree/bindings/clock/amlogic,mmc-clkc.txt
+>> new file mode 100644
+>> index 000000000000..ff6b4bf3ecf9
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/clock/amlogic,mmc-clkc.txt
+>> @@ -0,0 +1,31 @@
+>> +* Amlogic MMC Sub Clock Controller Driver
+>> +
+>> +The Amlogic MMC clock controller generates and supplies clock to support
+>> +MMC and NAND controller
+>> +
+>> +Required Properties:
+>> +
+>> +- compatible: should be:
+>> +		"amlogic,meson-gx-mmc-clkc"
+>> +		"amlogic,meson-axg-mmc-clkc"
+>> +
+>> +- #clock-cells: should be 1.
+>> +- clocks: phandles to clocks corresponding to the clock-names property
+>> +- clock-names: list of parent clock names
+>> +	- "clkin0", "clkin1"
+>> +
+>> +Parent node should have the following properties :
+>> +- compatible: "syscon", "simple-mfd, and "amlogic,meson-axg-mmc-clkc"
+> 
+> You don't need "simple-mfd" and probably not syscon either. The order is 
+> wrong too. Most specific first.
+> 
+Ok, I will drop "simple-mfd"..
+
+but the syscon is a must, since this mmc clock model access registers
+via the regmap interface
+
+I will fix the order, thanks for pointing this out
+
+>> +- reg: base address and size of the MMC control register space.
+>> +
+>> +Example: Clock controller node:
+>> +
+>> +sd_mmc_c_clkc: clock-controller at 7000 {
+>> +	compatible = "amlogic,mmc-clkc", "syscon", "simple-mfd";
+> 
+> Doesn't match the binding...
+> 
+oops, I will update this
+
+>> +	reg = <0x0 0x7000 0x0 0x4>;
+>> +	#clock-cells = <1>;
+>> +
+>> +	clock-names = "clkin0", "clkin1";
+>> +	clocks = <&clkc CLKID_SD_MMC_C_CLK0>,
+>> +			<&clkc CLKID_FCLK_DIV2>;
+>> +};
+>> -- 
+>> 2.18.0
+>>
+> 
+> .
+> 
