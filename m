@@ -1,148 +1,43 @@
-From: ezequiel@collabora.com (Ezequiel Garcia)
-Date: Thu, 12 Jul 2018 13:00:08 -0300
-Subject: [PATCH] arm64: dts: rockchip: add USB 2.0 and 3.0 support on Ficus
- board
-Message-ID: <20180712160008.30972-1-ezequiel@collabora.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 12 Jul 2018 09:01:57 -0700
+Subject: NVIDIA Tegra changes for v4.19-rc1
+In-Reply-To: <20180712154128.22705-1-thierry.reding@gmail.com>
+References: <20180712154128.22705-1-thierry.reding@gmail.com>
+Message-ID: <CAOesGMiJ9Mt6nCfZ5SrkKQHPcb1tO4O+xNmKwgWdeF1AQn8FTQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+Hi,
 
-The board exposes two types A ports, one is USB 3.0, up to 5.0Gbps and
-another one is USB 2.0 up to 480Mbps. Enable the USB PHYs and the USB
-controllers to enable theses devices.
+On Thu, Jul 12, 2018 at 8:41 AM, Thierry Reding
+<thierry.reding@gmail.com> wrote:
+> Hi ARM SoC maintainers,
+>
+> Here's the set of Tegra-related pull requests for v4.19-rc1. I'm sending
+> these a week earlier than usual because I will be on vacation for the
+> next two weeks. During my absence, Jon Hunter will be taking the helm.
+> Unfortunately he doesn't have access to the kernel.org repository, so if
+> anything comes up he may have to send patches to you directly. That said
+> I don't expect any issues with these pull requests. They've all soaked
+> in linux-next for a little while and I've done my regular sanity builds
+> and didn't see any issues.
 
-Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
-Signed-off-by: Ezequiel Garcia <ezequiel@collabora.com>
----
-Heiko,
+Sounds good. Jon, we're OK with merging from a github repo or similar
+as well, if you have more than a few patches. Please re-send them to
+arm at kernel.org with your sign-off when you have something (it's a lot
+easier than if you just cc us on an acked-by, since gmail+imap doesn't
+pop the whole thread over into my arm@ folder. :)
 
-Enric finally had some time to take a look at the schematics,
-and help with the USB stuff. Thanks to him, USB host
-is working now! \o/
+We can even host a rebasing/staging/temporary branch for you in case
+you want something to be in -next but might not be 100% that it should
+go in, if needed -- just let us know.
 
-USB Type-C will have to wait until we have some spare time
-to debug the fusb302 driver.
+> In the unlikely case that everything falls apart, I'll be back shortly
+> after v4.18-rc7, which should give us a little time to clean things up
+> before the merge window.
 
- arch/arm64/boot/dts/rockchip/rk3399-ficus.dts | 85 +++++++++++++++++++
- 1 file changed, 85 insertions(+)
+Yeah, hopefully not much. And thanks a lot for communicating your
+vacation schedules, it's useful for us to know!
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-ficus.dts b/arch/arm64/boot/dts/rockchip/rk3399-ficus.dts
-index 0d14183dd4a9..d0631c02749c 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399-ficus.dts
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-ficus.dts
-@@ -61,6 +61,16 @@
- 		vin-supply = <&vcc3v3_sys>;
- 	};
- 
-+	vcc5v0_host: vcc5v0-host-regulator {
-+		compatible = "regulator-fixed";
-+		enable-active-high;
-+		gpio = <&gpio4 27 GPIO_ACTIVE_HIGH>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&host_vbus_drv>;
-+		regulator-name = "vcc5v0_host";
-+		regulator-always-on;
-+	};
-+
- 	vdd_log: vdd-log {
- 		compatible = "pwm-regulator";
- 		pwms = <&pwm2 0 25000 0>;
-@@ -454,6 +464,13 @@
- 				<1 14 RK_FUNC_GPIO &pcfg_pull_down>;
- 		};
- 	};
-+
-+	usb2 {
-+		host_vbus_drv: host-vbus-drv {
-+			rockchip,pins =
-+				<4 27 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+	};
- };
- 
- &pwm2 {
-@@ -487,6 +504,40 @@
- 	status = "okay";
- };
- 
-+&tcphy0 {
-+	status = "okay";
-+};
-+
-+&tcphy1 {
-+	status = "okay";
-+};
-+
-+&u2phy0 {
-+	status = "okay";
-+};
-+
-+&u2phy1 {
-+	status = "okay";
-+};
-+
-+&u2phy0_host {
-+	phy-supply = <&vcc5v0_host>;
-+	status = "okay";
-+};
-+
-+&u2phy1_host {
-+	phy-supply = <&vcc5v0_host>;
-+	status = "okay";
-+};
-+
-+&u2phy0_otg {
-+	status = "okay";
-+};
-+
-+&u2phy1_otg {
-+	status = "okay";
-+};
-+
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_xfer &uart0_cts>;
-@@ -497,6 +548,40 @@
- 	status = "okay";
- };
- 
-+&usb_host0_ehci {
-+	status = "okay";
-+};
-+
-+&usb_host0_ohci {
-+	status = "okay";
-+};
-+
-+&usb_host1_ehci {
-+	status = "okay";
-+};
-+
-+&usb_host1_ohci {
-+	status = "okay";
-+};
-+
-+&usbdrd3_0 {
-+	status = "okay";
-+};
-+
-+&usbdrd_dwc3_0 {
-+	status = "okay";
-+	dr_mode = "host";
-+};
-+
-+&usbdrd3_1 {
-+	status = "okay";
-+};
-+
-+&usbdrd_dwc3_1 {
-+	status = "okay";
-+	dr_mode = "host";
-+};
-+
- &vopb {
- 	status = "okay";
- };
--- 
-2.18.0.rc2
+
+-Olof
