@@ -1,15 +1,15 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Wed, 11 Jul 2018 19:33:36 -0700
-Subject: [PATCH 1/2] ARM: dts: imx51-zii-scu3-esb: Add switch IRQ line pinumx
- config
+Date: Wed, 11 Jul 2018 19:33:37 -0700
+Subject: [PATCH 2/2] ARM: dts: imx51-zii-scu3-esb: Fix RAVE SP watchdog
+ compatible string
 In-Reply-To: <20180712023337.30112-1-andrew.smirnov@gmail.com>
 References: <20180712023337.30112-1-andrew.smirnov@gmail.com>
-Message-ID: <20180712023337.30112-2-andrew.smirnov@gmail.com>
+Message-ID: <20180712023337.30112-3-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT code to explicitly configure PAD_AUD3_BB_CK and avoid relying
-on defaults.
+It looks like I made a nasty typo in the original patch which resulted
+in missing watchdog device. Fix it.
 
 Cc: Fabio Estevam <fabio.estevam@nxp.com>
 Cc: Nikita Yushchenko <nikita.yoush@cogentembedded.com>
@@ -24,34 +24,21 @@ Cc: linux-kernel at vger.kernel.org
 Cc: Andrew Lunn <andrew@lunn.ch>
 Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 ---
- arch/arm/boot/dts/imx51-zii-scu3-esb.dts | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/boot/dts/imx51-zii-scu3-esb.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/arch/arm/boot/dts/imx51-zii-scu3-esb.dts b/arch/arm/boot/dts/imx51-zii-scu3-esb.dts
-index 2941a92d40f1..0bb42c00d72b 100644
+index 0bb42c00d72b..dffb761a1cc8 100644
 --- a/arch/arm/boot/dts/imx51-zii-scu3-esb.dts
 +++ b/arch/arm/boot/dts/imx51-zii-scu3-esb.dts
-@@ -221,6 +221,8 @@
- 			interrupts = <20 IRQ_TYPE_LEVEL_HIGH>;
- 			interrupt-controller;
- 			#interrupt-cells = <2>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_switch>;
+@@ -325,7 +325,7 @@
+ 		#size-cells = <1>;		
  
- 			ports {
- 				#address-cells = <1>;
-@@ -426,6 +428,12 @@
- 		>;
- 	};
+ 		watchdog {
+-			compatible = "zii,rave-sp-watchodg-legacy";
++			compatible = "zii,rave-sp-watchdog-legacy";
+ 		};
  
-+	pinctrl_switch: switchgrp {
-+		fsl,pins = <
-+			MX51_PAD_AUD3_BB_CK__GPIO4_20		0xc5
-+		>;
-+	};
-+
- 	pinctrl_uart1: uart1grp {
- 		fsl,pins = <
- 			MX51_PAD_UART1_RXD__UART1_RXD		0x1c5
+ 		eeprom at a4 {
 -- 
 2.17.1
