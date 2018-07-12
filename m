@@ -1,70 +1,70 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Thu, 12 Jul 2018 16:53:06 +0200
-Subject: [linux-sunxi] Re: [PATCH 1/2] ARM: sun8i: h3: enable HDMI output
- on Banana Pi M2 Zero
-In-Reply-To: <A7CA2831-7117-415C-BC59-3FB4AE425598@aosc.io>
-References: <20180711132233.42301-1-icenowy@aosc.io>
- <20180711132233.42301-2-icenowy@aosc.io>
- <20180711150532.6gzm7krouriddreh@flea>
- <8F6CDF5C-2AC1-43EC-858A-5C6345CF279A@aosc.io>
- <20180712064601.m3bdd46wzac5fpgh@flea>
- <A7CA2831-7117-415C-BC59-3FB4AE425598@aosc.io>
-Message-ID: <20180712145306.ootqt7dfh3nxsamy@flea>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Thu, 12 Jul 2018 16:58:08 +0200
+Subject: [PATCH 1/3] tty/serial_core: add ISO7816 infrastructure
+In-Reply-To: <20180711131638.12622-2-ludovic.desroches@microchip.com>
+References: <20180711131638.12622-1-ludovic.desroches@microchip.com>
+ <20180711131638.12622-2-ludovic.desroches@microchip.com>
+Message-ID: <20180712145808.GA22502@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 12, 2018 at 03:09:55PM +0800, Icenowy Zheng wrote:
-> ? 2018?7?12? GMT+08:00 ??2:46:01, Maxime Ripard <maxime.ripard@bootlin.com> ??:
-> >On Wed, Jul 11, 2018 at 11:15:50PM +0800, Icenowy Zheng wrote:
-> >> 
-> >> 
-> >> ? 2018?7?11? GMT+08:00 ??11:05:32, Maxime Ripard
-> ><maxime.ripard@bootlin.com> ??:
-> >> >Hi,
-> >> >
-> >> >On Wed, Jul 11, 2018 at 09:22:32PM +0800, Icenowy Zheng wrote:
-> >> >> Banana Pi M2 Zero board has a miniHDMI port connected to the HDMI
-> >> >> controller of Allwinner H3 SoC.
-> >> >> 
-> >> >> Enable the HDMI output in Banana Pi M2 Zero device tree.
-> >> >> 
-> >> >> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> >> >> ---
-> >> >>  .../dts/sun8i-h2-plus-bananapi-m2-zero.dts    | 25
-> >> >+++++++++++++++++++
-> >> >>  1 file changed, 25 insertions(+)
-> >> >> 
-> >> >> diff --git a/arch/arm/boot/dts/sun8i-h2-plus-bananapi-m2-zero.dts
-> >> >b/arch/arm/boot/dts/sun8i-h2-plus-bananapi-m2-zero.dts
-> >> >> index 7d01f9322658..eb61dcf32797 100644
-> >> >> --- a/arch/arm/boot/dts/sun8i-h2-plus-bananapi-m2-zero.dts
-> >> >> +++ b/arch/arm/boot/dts/sun8i-h2-plus-bananapi-m2-zero.dts
-> >> >> @@ -26,6 +26,17 @@
-> >> >>  		stdout-path = "serial0:115200n8";
-> >> >>  	};
-> >> >>  
-> >> >> +	hdmi-connector {
-> >> >> +		compatible = "hdmi-connector";
-> >> >> +		type = "c";
-> >> >
-> >> >This is not one of the connector type declared in DRM, how is it
-> >> >exposed to the userspace?
-> >> 
-> >> So just use "A" here (because of single link)?
-> >
-> >If the connector type is C, it should be C, and DRM / driver adjusted
-> >to handle it.
+On Wed, Jul 11, 2018 at 03:16:36PM +0200, Ludovic Desroches wrote:
+> From: Nicolas Ferre <nicolas.ferre@microchip.com>
 > 
-> Okay I won't change this property, if there's any further revisions.
+> Add the ISO7816 ioctl and associated accessors and data structure.
+> Drivers can then use this common implementation to handle ISO7816.
 > 
-> For DRM driver, I think it can be an independent patchset.
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+> [ludovic.desroches at microchip.com: squash and rebase, removal of gpios, checkpatch fixes]
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
+> ---
+>  drivers/tty/serial/serial_core.c  | 49 +++++++++++++++++++++++++++++++++++++++
+>  include/linux/serial_core.h       |  3 +++
+>  include/uapi/asm-generic/ioctls.h |  2 ++
+>  include/uapi/linux/serial.h       | 17 ++++++++++++++
+>  4 files changed, 71 insertions(+)
 
-Not really, since it's going to break userspace as soon as you merge
-that other patchset.
+Note, kbuild found build issues with this, please fix up.
 
-Maxime
+Also, here's some comments:
 
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+> 
+> diff --git a/drivers/tty/serial/serial_core.c b/drivers/tty/serial/serial_core.c
+> index 9c14a453f73c..c89ac59f6f8c 100644
+> --- a/drivers/tty/serial/serial_core.c
+> +++ b/drivers/tty/serial/serial_core.c
+> @@ -1301,6 +1301,47 @@ static int uart_set_rs485_config(struct uart_port *port,
+>  	return 0;
+>  }
+>  
+> +static int uart_get_iso7816_config(struct uart_port *port,
+> +				   struct serial_iso7816 __user *iso7816)
+> +{
+> +	unsigned long flags;
+> +	struct serial_iso7816 aux;
+> +
+> +	spin_lock_irqsave(&port->lock, flags);
+> +	aux = port->iso7816;
+
+Don't you want to check to see if there is a function for iso7816 before
+copying it?  Otherwise it's just empty, right?
+
+> +	if (!port->iso7816_config)
+> +		return -ENOIOCTLCMD;
+
+Why this error value?
+
+> --- a/include/uapi/asm-generic/ioctls.h
+> +++ b/include/uapi/asm-generic/ioctls.h
+> @@ -66,6 +66,8 @@
+>  #ifndef TIOCSRS485
+>  #define TIOCSRS485	0x542F
+>  #endif
+> +#define TIOCGISO7816	0x5430
+> +#define TIOCSISO7816	0x5431
+
+Where did you get these numbers from?
+
+thanks,
+
+greg k-h
