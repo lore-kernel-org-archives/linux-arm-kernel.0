@@ -1,32 +1,52 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 12 Jul 2018 10:14:32 -0700
-Subject: [PATCH v7 3/7] arm64: dts: msm8996: thermal: Initialise via DT
- and add second controller
-In-Reply-To: <f6cb99e6b805b0850b039e4f5d469e761d84f6d0.1531384019.git.amit.kucheria@linaro.org>
-References: <cover.1531384019.git.amit.kucheria@linaro.org>
- <f6cb99e6b805b0850b039e4f5d469e761d84f6d0.1531384019.git.amit.kucheria@linaro.org>
-Message-ID: <CAD=FV=W-7CfChV0wn29uR-OH7mH65kmO=0yQUWUbksmb6qL=GQ@mail.gmail.com>
+From: cphealy@gmail.com (Chris Healy)
+Date: Thu, 12 Jul 2018 10:15:16 -0700
+Subject: [PATCH 2/2] ARM: dts: imx51-zii-scu3-esb: Fix RAVE SP watchdog
+ compatible string
+In-Reply-To: <20180712023337.30112-3-andrew.smirnov@gmail.com>
+References: <20180712023337.30112-1-andrew.smirnov@gmail.com>
+ <20180712023337.30112-3-andrew.smirnov@gmail.com>
+Message-ID: <CAFXsbZqo6LCbx1gb0vYqwa6hUj5ex8PcYb6=4j0dwmOSmjnxKw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Tested-by: Chris Healy <cphealy@gmail.com>
 
-On Thu, Jul 12, 2018 at 1:39 AM, Amit Kucheria <amit.kucheria@linaro.org> wrote:
-> We also split up the regmap address space into two, for the TM and SROT
-> registers. This was required to deal with different address offsets for the
-> TM and SROT registers across different SoC families.
+watchdog driver loads and works now.
+
+On Wed, Jul 11, 2018 at 7:33 PM, Andrey Smirnov
+<andrew.smirnov@gmail.com> wrote:
+> It looks like I made a nasty typo in the original patch which resulted
+> in missing watchdog device. Fix it.
 >
-> 8996 has two TSENS IP blocks, initialise the second one too.
->
-> Since tsens-common.c/init_common() currently only registers one address
-> space, the order is important (TM before SROT). This is OK since the code
-> doesn't really use the SROT functionality yet.
->
-> Signed-off-by: Amit Kucheria <amit.kucheria@linaro.org>
-> Reviewed-by: Bjorn Andersson <bjorn.andersson@linaro.org>
-> Tested-by: Matthias Kaehlcke <mka@chromium.org>
+> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> Cc: Nikita Yushchenko <nikita.yoush@cogentembedded.com>
+> Cc: Lucas Stach <l.stach@pengutronix.de>
+> Cc: cphealy at gmail.com
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: devicetree at vger.kernel.org
+> Cc: linux-kernel at vger.kernel.org
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 > ---
->  arch/arm64/boot/dts/qcom/msm8996.dtsi | 14 ++++++++++++--
->  1 file changed, 12 insertions(+), 2 deletions(-)
-
-Reviewed-by: Douglas Anderson <dianders@chromium.org>
+>  arch/arm/boot/dts/imx51-zii-scu3-esb.dts | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/boot/dts/imx51-zii-scu3-esb.dts b/arch/arm/boot/dts/imx51-zii-scu3-esb.dts
+> index 0bb42c00d72b..dffb761a1cc8 100644
+> --- a/arch/arm/boot/dts/imx51-zii-scu3-esb.dts
+> +++ b/arch/arm/boot/dts/imx51-zii-scu3-esb.dts
+> @@ -325,7 +325,7 @@
+>                 #size-cells = <1>;
+>
+>                 watchdog {
+> -                       compatible = "zii,rave-sp-watchodg-legacy";
+> +                       compatible = "zii,rave-sp-watchdog-legacy";
+>                 };
+>
+>                 eeprom at a4 {
+> --
+> 2.17.1
+>
