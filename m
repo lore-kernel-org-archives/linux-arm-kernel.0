@@ -1,81 +1,70 @@
-From: ryan@edited.us (Ryan Grachek)
-Date: Thu, 12 Jul 2018 09:39:37 -0500
-Subject: [GIT PULL] arm64: hisilicon fixes for 4.18
-In-Reply-To: <5B39C0CC.1070503@hisilicon.com>
-References: <5B354942.1060306@hisilicon.com>
- <20180629210808.qeftfbyf2rcrocda@localhost>
- <5B39C0CC.1070503@hisilicon.com>
-Message-ID: <CAGoBSJoh0SKMBm=Hgh9rX8G+VcN93C3PxYiA56232OW76AWk-w@mail.gmail.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Thu, 12 Jul 2018 16:53:06 +0200
+Subject: [linux-sunxi] Re: [PATCH 1/2] ARM: sun8i: h3: enable HDMI output
+ on Banana Pi M2 Zero
+In-Reply-To: <A7CA2831-7117-415C-BC59-3FB4AE425598@aosc.io>
+References: <20180711132233.42301-1-icenowy@aosc.io>
+ <20180711132233.42301-2-icenowy@aosc.io>
+ <20180711150532.6gzm7krouriddreh@flea>
+ <8F6CDF5C-2AC1-43EC-858A-5C6345CF279A@aosc.io>
+ <20180712064601.m3bdd46wzac5fpgh@flea>
+ <A7CA2831-7117-415C-BC59-3FB4AE425598@aosc.io>
+Message-ID: <20180712145306.ootqt7dfh3nxsamy@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+On Thu, Jul 12, 2018 at 03:09:55PM +0800, Icenowy Zheng wrote:
+> ? 2018?7?12? GMT+08:00 ??2:46:01, Maxime Ripard <maxime.ripard@bootlin.com> ??:
+> >On Wed, Jul 11, 2018 at 11:15:50PM +0800, Icenowy Zheng wrote:
+> >> 
+> >> 
+> >> ? 2018?7?11? GMT+08:00 ??11:05:32, Maxime Ripard
+> ><maxime.ripard@bootlin.com> ??:
+> >> >Hi,
+> >> >
+> >> >On Wed, Jul 11, 2018 at 09:22:32PM +0800, Icenowy Zheng wrote:
+> >> >> Banana Pi M2 Zero board has a miniHDMI port connected to the HDMI
+> >> >> controller of Allwinner H3 SoC.
+> >> >> 
+> >> >> Enable the HDMI output in Banana Pi M2 Zero device tree.
+> >> >> 
+> >> >> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> >> >> ---
+> >> >>  .../dts/sun8i-h2-plus-bananapi-m2-zero.dts    | 25
+> >> >+++++++++++++++++++
+> >> >>  1 file changed, 25 insertions(+)
+> >> >> 
+> >> >> diff --git a/arch/arm/boot/dts/sun8i-h2-plus-bananapi-m2-zero.dts
+> >> >b/arch/arm/boot/dts/sun8i-h2-plus-bananapi-m2-zero.dts
+> >> >> index 7d01f9322658..eb61dcf32797 100644
+> >> >> --- a/arch/arm/boot/dts/sun8i-h2-plus-bananapi-m2-zero.dts
+> >> >> +++ b/arch/arm/boot/dts/sun8i-h2-plus-bananapi-m2-zero.dts
+> >> >> @@ -26,6 +26,17 @@
+> >> >>  		stdout-path = "serial0:115200n8";
+> >> >>  	};
+> >> >>  
+> >> >> +	hdmi-connector {
+> >> >> +		compatible = "hdmi-connector";
+> >> >> +		type = "c";
+> >> >
+> >> >This is not one of the connector type declared in DRM, how is it
+> >> >exposed to the userspace?
+> >> 
+> >> So just use "A" here (because of single link)?
+> >
+> >If the connector type is C, it should be C, and DRM / driver adjusted
+> >to handle it.
+> 
+> Okay I won't change this property, if there's any further revisions.
+> 
+> For DRM driver, I think it can be an independent patchset.
 
-On Mon, Jul 2, 2018 at 1:06 AM, Wei Xu <xuwei5@hisilicon.com> wrote:
-> Hi Olof,
->
-> On 2018/6/30 5:08, Olof Johansson wrote:
->>
->> On Thu, Jun 28, 2018 at 09:46:58PM +0100, Wei Xu wrote:
->>>
->>> Hi Olof, Hi Arnd,
->>>
->>> Please help to pull the following fix.
->>> Thanks!
->>>
->>> Best Regards,
->>> Wei
->>>
->>> ---
->>>
->>> The following changes since commit
->>> ce397d215ccd07b8ae3f71db689aedb85d56ab40:
->>>
->>>    Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
->>>
->>> are available in the git repository at:
->>>
->>>    git://github.com/hisilicon/linux-hisi.git tags/hisi-fixes-for-4.18
->>>
->>> for you to fetch changes up to a30449eb3ac908f26b4bc963a58039a5f2725ffa:
->>>
->>>    arm64: dts: hikey960: Define wl1837 power capabilities (2018-06-28
->>> 17:07:44 +0100)
->>>
->>> ----------------------------------------------------------------
->>> ARM64: hisi fixes for 4.18
->>>
->>> - Added power capabilities for the mmc host controller on the
->>>    hikey and hikey960 boards to avoid broken wifi.
->>
->> Thanks, merged. However, this seems to keep wifi power on during suspend?
->> That
->> seems suboptimal for suspend power consumption. Any work going on to fix
->> root
->> cause?
->
->
-> Thanks!
-> I will sync with my colleagues about that issue and hope we can get a fix
-> soon.
->
-> Best Regards,
-> Wei
->
->>
->> -Olof
->>
->> .
->>
->
->
+Not really, since it's going to break userspace as soon as you merge
+that other patchset.
 
-According to Eyal Reizer from TI, "keep-power-in-suspend" is needed in
-case of planning to use "WoWLAN".
-In hindsight, I see this property was already enabled in the SoC file
-(hi3660.dtsi), so that issue had
-already existed prior to my patch. Should I submit patch to remove the
-property from both the SoC
-and board file?
+Maxime
 
--Ryan
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
