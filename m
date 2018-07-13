@@ -1,30 +1,38 @@
-From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Fri, 13 Jul 2018 11:22:06 +0100
-Subject: [PATCH] ARM: tcm: ensure inline stub functions are marked static
-Message-ID: <E1fdvDC-0004xH-Vj@rmk-PC.armlinux.org.uk>
+From: gregory.clement@bootlin.com (Gregory CLEMENT)
+Date: Fri, 13 Jul 2018 12:27:26 +0200
+Subject: [PATCH] clk: mvebu: armada-37xx-periph: Fix wrong return value in
+ get_parent
+Message-ID: <20180713102726.1950-1-gregory.clement@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ensure that the stubbed out tcm_init() is marked static, so we don't
-end up emitting the stub each time the header is included.
+The return value of the get_parent operation is a u8, whereas a -EINVAL
+was returned. This wrong value was return if the value was bigger that
+the number of parent but this case was already handled by the core.
 
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+So we can just remove this chunk of code to fix the issue.
+
+Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
+Fixes: 9818a7a4fd10 ("clk: mvebu: armada-37xx-periph: prepare cpu clk to
+be used with DVFS")
+Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
 ---
- arch/arm/mm/tcm.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/clk/mvebu/armada-37xx-periph.c | 3 ---
+ 1 file changed, 3 deletions(-)
 
-diff --git a/arch/arm/mm/tcm.h b/arch/arm/mm/tcm.h
-index 8015ad434a40..24101925fe64 100644
---- a/arch/arm/mm/tcm.h
-+++ b/arch/arm/mm/tcm.h
-@@ -11,7 +11,7 @@
- void __init tcm_init(void);
- #else
- /* No TCM support, just blank inlines to be optimized out */
--inline void tcm_init(void)
-+static inline void tcm_init(void)
- {
+diff --git a/drivers/clk/mvebu/armada-37xx-periph.c b/drivers/clk/mvebu/armada-37xx-periph.c
+index a51edaab0c5c..287e98a7cff4 100644
+--- a/drivers/clk/mvebu/armada-37xx-periph.c
++++ b/drivers/clk/mvebu/armada-37xx-periph.c
+@@ -426,9 +426,6 @@ static u8 clk_pm_cpu_get_parent(struct clk_hw *hw)
+ 		val &= pm_cpu->mask_mux;
+ 	}
+ 
+-	if (val >= num_parents)
+-		return -EINVAL;
+-
+ 	return val;
  }
- #endif
+ 
 -- 
-2.7.4
+2.18.0
