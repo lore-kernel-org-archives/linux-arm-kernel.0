@@ -1,7 +1,9 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 13 Jul 2018 07:38:16 -0700
-Subject: [GIT PULL 1/6 v2] Broadcom defconfig changes for 4.19
-Message-ID: <20180713143821.1514-1-f.fainelli@gmail.com>
+Date: Fri, 13 Jul 2018 07:38:17 -0700
+Subject: [GIT PULL 2/6 v2] Broadcom defconfig-arm64 changes for 4.19
+In-Reply-To: <20180713143821.1514-1-f.fainelli@gmail.com>
+References: <20180713143821.1514-1-f.fainelli@gmail.com>
+Message-ID: <20180713143821.1514-2-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,27 +13,30 @@ The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
 
 are available in the git repository at:
 
-  https://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.19/defconfig
+  https://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.19/defconfig-arm64
 
-for you to fetch changes up to b0ba9fad81e419f85829c2a6925110d9714dd708:
+for you to fetch changes up to 163efb68d110d392b54e078ca041f24a4ea7d022:
 
-  Merge tag 'bcm2835-defconfig-next-2018-07-03' into defconfig/next (2018-07-09 05:23:16 -0700)
+  arm64: defconfig: add CONFIG_ARM_SP805_WATCHDOG (2018-07-09 10:40:23 -0700)
 
 ----------------------------------------------------------------
-This pull request contains Broadcom ARM-based SoCs defconfig updates
-for 4.19, please pull the following:
+This pull request contains Broadcom ARM64-based SoCs defconfig changes
+for 4.19, please pull the following changes:
 
-- Stefan enables the Raspberry Pi voltage sensor driver (HWMON) in both
-  multi_v7_defconfig and bcm2835_defconfig
+- Stefan enables the Raspberry Pi voltage sensor driver (HWMON) in the
+  arm64 defconfig file
+
+- Ray enables the ARM SP805 watchdog driver in the arm64 defconfig file
 
 ----------------------------------------------------------------
 Florian Fainelli (1):
-      Merge tag 'bcm2835-defconfig-next-2018-07-03' into defconfig/next
+      Merge tag 'bcm2835-defconfig-64-next-2018-07-03' into defconfig-arm64/next
 
-Stefan Wahren (2):
-      ARM: bcm2835_defconfig: Enable RPi voltage sensor
-      ARM: multi_v7_defconfig: Enable RPi voltage sensor
+Ray Jui (1):
+      arm64: defconfig: add CONFIG_ARM_SP805_WATCHDOG
 
- arch/arm/configs/bcm2835_defconfig  | 2 +-
- arch/arm/configs/multi_v7_defconfig | 1 +
- 2 files changed, 2 insertions(+), 1 deletion(-)
+Stefan Wahren (1):
+      arm64: defconfig: Enable RPi voltage sensor
+
+ arch/arm64/configs/defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
