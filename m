@@ -1,41 +1,47 @@
-From: hofrat@osadl.org (Nicholas Mc Guire)
-Date: Fri, 13 Jul 2018 18:40:04 +0200
-Subject: [PATCH] clk: imx6sll: fix missing of_node_put()
-Message-ID: <1531500004-23175-1-git-send-email-hofrat@osadl.org>
+From: radu.pirea@microchip.com (Radu Pirea)
+Date: Fri, 13 Jul 2018 19:47:31 +0300
+Subject: [PATCH v11 1/6] MAINTAINERS: add at91 usart mfd driver
+In-Reply-To: <20180713164736.26028-1-radu.pirea@microchip.com>
+References: <20180713164736.26028-1-radu.pirea@microchip.com>
+Message-ID: <20180713164736.26028-2-radu.pirea@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-of_find_compatible_node() is returning a device node with refcount
-incremented and must be explicitly decremented after the last use
-which is right after the us in of_iomap() here.
+Added entry for at91 usart mfd driver.
 
-Signed-off-by: Nicholas Mc Guire <hofrat@osadl.org>
-Fixes: commit 4a5f720b6542 ("clk: imx: add clock driver for imx6sll")
+Signed-off-by: Radu Pirea <radu.pirea@microchip.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
 ---
+ MAINTAINERS | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-Problem located with experimental coccinelle script
-
-looks like cut&past error from imx6ul (or vice versa)
-
-Patch was compile tested with: imx_v6_v7_defconfig (implies
-CONFIG_SOC_IMX6SLL=y)
-
-Patch is against 4.18-rc4 (localversion-next is next-20180713)
-
- drivers/clk/imx/clk-imx6sll.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/drivers/clk/imx/clk-imx6sll.c b/drivers/clk/imx/clk-imx6sll.c
-index 6270645..52379ee 100644
---- a/drivers/clk/imx/clk-imx6sll.c
-+++ b/drivers/clk/imx/clk-imx6sll.c
-@@ -92,6 +92,7 @@ static void __init imx6sll_clocks_init(struct device_node *ccm_node)
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 9d5eeff51b5f..7ac6e6af5292 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -9321,6 +9321,7 @@ M:	Richard Genoud <richard.genoud@gmail.com>
+ S:	Maintained
+ F:	drivers/tty/serial/atmel_serial.c
+ F:	drivers/tty/serial/atmel_serial.h
++F:	Documentation/devicetree/bindings/mfd/atmel-usart.txt
  
- 	np = of_find_compatible_node(NULL, NULL, "fsl,imx6sll-anatop");
- 	base = of_iomap(np, 0);
-+	of_node_put(np);
- 	WARN_ON(!base);
+ MICROCHIP / ATMEL DMA DRIVER
+ M:	Ludovic Desroches <ludovic.desroches@microchip.com>
+@@ -9353,6 +9354,14 @@ S:	Supported
+ F:	drivers/mtd/nand/raw/atmel/*
+ F:	Documentation/devicetree/bindings/mtd/atmel-nand.txt
  
- 	/* Do not bypass PLLs initially */
++MICROCHIP AT91 USART MFD DRIVER
++M:	Radu Pirea <radu.pirea@microchip.com>
++L:	linux-kernel at vger.kernel.org
++S:	Supported
++F:	drivers/mfd/at91-usart.c
++F:	include/dt-bindings/mfd/at91-usart.h
++F:	Documentation/devicetree/bindings/mfd/atmel-usart.txt
++
+ MICROCHIP KSZ SERIES ETHERNET SWITCH DRIVER
+ M:	Woojung Huh <Woojung.Huh@microchip.com>
+ M:	Microchip Linux Driver Support <UNGLinuxDriver@microchip.com>
 -- 
-2.1.4
+2.18.0
