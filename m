@@ -1,37 +1,46 @@
 From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Fri, 13 Jul 2018 11:29:30 +0200
-Subject: [PATCH] ARM: multi_v7_defconfig: enable STM32 DCMI media support
-In-Reply-To: <1530781532-7125-1-git-send-email-hugues.fruchet@st.com>
-References: <1530781532-7125-1-git-send-email-hugues.fruchet@st.com>
-Message-ID: <605b6b51-a17a-eda3-4767-67c175ddcde2@st.com>
+Date: Fri, 13 Jul 2018 11:30:28 +0200
+Subject: [PATCH V5 0/5] add iwdg2 support for stm32mp157c
+In-Reply-To: <1529941383-8653-1-git-send-email-ludovic.Barre@st.com>
+References: <1529941383-8653-1-git-send-email-ludovic.Barre@st.com>
+Message-ID: <f9a5836b-f740-6fb2-85c6-f77608283cf5@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hugues,
+Hi Ludovic
 
-On 07/05/2018 11:05 AM, Hugues Fruchet wrote:
-> Enables support of STM32 DCMI V4L2 media driver.
+On 06/25/2018 05:42 PM, Ludovic Barre wrote:
+> From: Ludovic Barre <ludovic.barre@st.com>
 > 
-> Signed-off-by: Hugues Fruchet <hugues.fruchet@st.com>
-> ---
->   arch/arm/configs/multi_v7_defconfig | 1 +
->   1 file changed, 1 insertion(+)
+> This patch series updates stm32_iwdg driver to manage pclk
+> clock by compatible. stm32mp1 requires a pclk clock.
 > 
-> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-> index 8f6be19..42ad73f76 100644
-> --- a/arch/arm/configs/multi_v7_defconfig
-> +++ b/arch/arm/configs/multi_v7_defconfig
-> @@ -578,6 +578,7 @@ CONFIG_VIDEO_SAMSUNG_EXYNOS_GSC=m
->   CONFIG_VIDEO_STI_BDISP=m
->   CONFIG_VIDEO_STI_HVA=m
->   CONFIG_VIDEO_STI_DELTA=m
-> +CONFIG_VIDEO_STM32_DCMI=m
->   CONFIG_VIDEO_RENESAS_JPU=m
->   CONFIG_VIDEO_RENESAS_VSP1=m
->   CONFIG_V4L_TEST_DRIVERS=y
+> v5:
+> -update stm32f429.dtsi
+> 
+> v4:
+> -dt-bindings: split and review
+> 
+> v3:
+> -remove stm32_iwdg_config structure, just assign the
+>   boolean directly to .dat
+> 
+> Ludovic Barre (5):
+>    dt-bindings: watchdog: add stm32mp1 support
+>    watchdog: stm32: add pclk feature for stm32mp1
+>    ARM: dts: stm32: add iwdg2 support for stm32mp157c
+>    ARM: dts: stm32: add iwdg2 support for stm32mp157c-ed1
+>    ARM: dts: stm32: update iwdg with lsi clock name for stm32f429
+> 
+>   .../devicetree/bindings/watchdog/st,stm32-iwdg.txt |  13 ++-
+>   arch/arm/boot/dts/stm32f429.dtsi                   |   1 +
+>   arch/arm/boot/dts/stm32mp157c-ed1.dts              |   5 +
+>   arch/arm/boot/dts/stm32mp157c.dtsi                 |   8 ++
+>   drivers/watchdog/stm32_iwdg.c                      | 116 +++++++++++++--------
+>   5 files changed, 98 insertions(+), 45 deletions(-)
 > 
 
-Applied on stm32-next.
+STM32 DT patches applied on stm32-next.
 
-Thanks.
+Regards
 Alex
