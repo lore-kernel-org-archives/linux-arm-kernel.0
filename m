@@ -1,181 +1,113 @@
-From: radu.pirea@microchip.com (Radu Pirea)
-Date: Fri, 13 Jul 2018 19:47:36 +0300
-Subject: [PATCH v11 6/6] tty/serial: atmel: change the driver to work under
- at91-usart mfd
-In-Reply-To: <20180713164736.26028-1-radu.pirea@microchip.com>
-References: <20180713164736.26028-1-radu.pirea@microchip.com>
-Message-ID: <20180713164736.26028-7-radu.pirea@microchip.com>
+From: mka@chromium.org (Matthias Kaehlcke)
+Date: Fri, 13 Jul 2018 09:49:03 -0700
+Subject: [PATCH 3/3] arm64: dts: qcom: pm8998: Add thermal zone
+In-Reply-To: <aff517d2-df92-da86-fc1e-5f8f8c42f736@codeaurora.org>
+References: <20180628210915.160893-3-mka@chromium.org>
+ <CAD=FV=Wo4wc_QZYr0a2_Ge=B6T4RNJDnOyxAd8r6sT4iZJjCKg@mail.gmail.com>
+ <20180629185102.GV129942@google.com>
+ <3b5054bb-76e4-a06f-54bb-e6ea7bbbcc69@codeaurora.org>
+ <20180629235417.GY129942@google.com>
+ <8144dd3c-6138-7f16-ec17-d75e84fcfb34@codeaurora.org>
+ <CAD=FV=XqoRajjNcW8RyJfrcXQVDihfjAnAsN+O9g+6qDrLHfJw@mail.gmail.com>
+ <03904a71-c6be-4f93-ad43-7d25631f9a04@codeaurora.org>
+ <CAD=FV=XbnuNg_B_Uoj8j9hz0t7=ORdcVB16oDmVk1q2iZYGs9A@mail.gmail.com>
+ <aff517d2-df92-da86-fc1e-5f8f8c42f736@codeaurora.org>
+Message-ID: <20180713164903.GX129942@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch modifies the place where resources and device tree properties
-are searched.
+On Wed, Jul 11, 2018 at 05:10:50PM -0700, David Collins wrote:
+> Hello Doug,
+> 
+> On 07/11/2018 03:43 PM, Doug Anderson wrote:
+> > On Wed, Jul 11, 2018 at 3:36 PM, David Collins <collinsd@codeaurora.org> wrote:
+> >>> On Tue, Jul 10, 2018 at 10:45 AM, David Collins <collinsd@codeaurora.org> wrote:
+> >>>> On 06/29/2018 04:54 PM, Matthias Kaehlcke wrote:
+> >>>>> On Fri, Jun 29, 2018 at 02:29:55PM -0700, David Collins wrote:
+> >>>> ...
+> >>>>>> The PMIC TEMP_ALARM hardware peripheral will perform an automatic partial
+> >>>>>> PMIC shutdown upon hitting over-temperature stage 2 (125 C).  This turns
+> >>>>>> off peripherals within the PMIC that are expected to draw significant
+> >>>>>> current.  The set of peripherals included varies between PMICs.  This
+> >>>>>> partial shutdown will occur simultaneously with the triggering of an
+> >>>>>> interrupt to the APPS processor that informs the qcom-spmi-temp-alarm
+> >>>>>> driver that an over-temperature threshold has been crossed.
+> >>>>>>
+> >>>>>> The TEMP_ALARM peripheral will perform an automatic full PMIC shutdown
+> >>>>>> upon hitting over-temperature stage 3 (145 C).  Software won't receive an
+> >>>>>> interrupt in this case because all power is cut.
+> >>>>>
+> >>>>> This information is very useful, thanks David!
+> >>>>>
+> >>>>> The (partial) hardware shutdown seems like a good measure of last
+> >>>>> resort, however I suppose we prefer Linux to initiate a shutdown
+> >>>>> before losing part of the peripherals (drivers might not be happy
+> >>>>> about this and probably not revover even when the temperature goes
+> >>>>> down again) or reach a full PMIC shutdown.
+> >>>>>
+> >>>>> Please let me know if there are reasons to prefer to go the hardware
+> >>>>> limits, it's also an option for device makers to overwrite these
+> >>>>> settings if they want different behavior.
+> >>>>
+> >>>> Disabling stage 3 automatic full PMIC shutdown at 145 C is definitely a
+> >>>> bad idea.  This exists as a last resort in order to save the hardware and
+> >>>> ensure end user safety in case of excessive temperature even if software
+> >>>> is locked up.
+> >>>>
+> >>>> Disabling stage 2 automatic partial PMIC shutdown at 125 C is not
+> >>>> recommended as the PMIC is already outside of reasonable operating
+> >>>> conditions and needs to take corrective action quickly.  However, doing so
+> >>>> may be acceptable if software is taking action to shut down the system
+> >>>> immediately upon receiving the stage 2 over-temperature interrupt.
+> >>>> Just to confirm: is it expected that at stage 2 the CPU's on the SoC
+> >>> should continue running even with partial PMIC shutdown enabled?
+> >>
+> >> This is not guaranteed.
+> >>
+> >>
+> >>> It sounded to me like partial PMIC shutdown was supposed to shut down
+> >>> high-power rails that were not essential to the task of performing an
+> >>> orderly shutdown.
+> >>
+> >> Shutting down high-power peripherals is accurate; however, special care is
+> >> not taken to ensure that an orderly shutdown is possible.  At the very
+> >> least, the HW and SW state will be out of sync for the peripherals that
+> >> are shut down.
+> > 
+> > OK, I guess I'm confused now.  Why does partial PMIC shutdown even
+> > exist then?  What is the point of leaving some rails alive if software
+> > could stop running?  It seems like it would be better to just shut
+> > everything down.
+> > 
+> > Said another way: can you describe what benefit you see for only
+> > partially shutting down the PMIC at stage 2 compared to just fully
+> > shutting it down at stage 2?
+> 
+> Stage 2 partial shutdown is present on PM8998 for legacy reasons.  It is
+> being phased out on future PMICs.  My understanding is that it was
+> originally intended to be a less aggressive mitigation option than a full
+> shutdown and that it allows for more post-mitigation analysis (e.g.
+> preserved RAM contents).
+> 
+> The set of peripherals which are disabled during stage 2 partial shutdown
+> is not well defined which leads to the kind of uncertainty and ill-defined
+> behavior being discussed in this thread.
 
-Signed-off-by: Radu Pirea <radu.pirea@microchip.com>
-Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
-Acked-by: Richard Genoud <richard.genoud@gmail.com>
-Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
----
- drivers/tty/serial/Kconfig        |  1 +
- drivers/tty/serial/atmel_serial.c | 42 ++++++++++++++++++++-----------
- 2 files changed, 28 insertions(+), 15 deletions(-)
+Thanks for the information!
 
-diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
-index df8bd0c7b97d..32886c304641 100644
---- a/drivers/tty/serial/Kconfig
-+++ b/drivers/tty/serial/Kconfig
-@@ -118,6 +118,7 @@ config SERIAL_ATMEL
- 	depends on ARCH_AT91 || COMPILE_TEST
- 	select SERIAL_CORE
- 	select SERIAL_MCTRL_GPIO if GPIOLIB
-+	select MFD_AT91_USART
- 	help
- 	  This enables the driver for the on-chip UARTs of the Atmel
- 	  AT91 processors.
-diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-index 8e4428725848..267d4d1de3f8 100644
---- a/drivers/tty/serial/atmel_serial.c
-+++ b/drivers/tty/serial/atmel_serial.c
-@@ -193,8 +193,7 @@ static struct console atmel_console;
- 
- #if defined(CONFIG_OF)
- static const struct of_device_id atmel_serial_dt_ids[] = {
--	{ .compatible = "atmel,at91rm9200-usart" },
--	{ .compatible = "atmel,at91sam9260-usart" },
-+	{ .compatible = "atmel,at91rm9200-usart-serial" },
- 	{ /* sentinel */ }
- };
- #endif
-@@ -915,6 +914,7 @@ static void atmel_tx_dma(struct uart_port *port)
- static int atmel_prepare_tx_dma(struct uart_port *port)
- {
- 	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
-+	struct device *mfd_dev = port->dev->parent;
- 	dma_cap_mask_t		mask;
- 	struct dma_slave_config config;
- 	int ret, nent;
-@@ -922,7 +922,7 @@ static int atmel_prepare_tx_dma(struct uart_port *port)
- 	dma_cap_zero(mask);
- 	dma_cap_set(DMA_SLAVE, mask);
- 
--	atmel_port->chan_tx = dma_request_slave_channel(port->dev, "tx");
-+	atmel_port->chan_tx = dma_request_slave_channel(mfd_dev, "tx");
- 	if (atmel_port->chan_tx == NULL)
- 		goto chan_err;
- 	dev_info(port->dev, "using %s for tx DMA transfers\n",
-@@ -1093,6 +1093,7 @@ static void atmel_rx_from_dma(struct uart_port *port)
- static int atmel_prepare_rx_dma(struct uart_port *port)
- {
- 	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
-+	struct device *mfd_dev = port->dev->parent;
- 	struct dma_async_tx_descriptor *desc;
- 	dma_cap_mask_t		mask;
- 	struct dma_slave_config config;
-@@ -1104,7 +1105,7 @@ static int atmel_prepare_rx_dma(struct uart_port *port)
- 	dma_cap_zero(mask);
- 	dma_cap_set(DMA_CYCLIC, mask);
- 
--	atmel_port->chan_rx = dma_request_slave_channel(port->dev, "rx");
-+	atmel_port->chan_rx = dma_request_slave_channel(mfd_dev, "rx");
- 	if (atmel_port->chan_rx == NULL)
- 		goto chan_err;
- 	dev_info(port->dev, "using %s for rx DMA transfers\n",
-@@ -2222,8 +2223,8 @@ static const char *atmel_type(struct uart_port *port)
-  */
- static void atmel_release_port(struct uart_port *port)
- {
--	struct platform_device *pdev = to_platform_device(port->dev);
--	int size = pdev->resource[0].end - pdev->resource[0].start + 1;
-+	struct platform_device *mpdev = to_platform_device(port->dev->parent);
-+	int size = resource_size(mpdev->resource);
- 
- 	release_mem_region(port->mapbase, size);
- 
-@@ -2238,8 +2239,8 @@ static void atmel_release_port(struct uart_port *port)
-  */
- static int atmel_request_port(struct uart_port *port)
- {
--	struct platform_device *pdev = to_platform_device(port->dev);
--	int size = pdev->resource[0].end - pdev->resource[0].start + 1;
-+	struct platform_device *mpdev = to_platform_device(port->dev->parent);
-+	int size = resource_size(mpdev->resource);
- 
- 	if (!request_mem_region(port->mapbase, size, "atmel_serial"))
- 		return -EBUSY;
-@@ -2341,27 +2342,28 @@ static int atmel_init_port(struct atmel_uart_port *atmel_port,
- {
- 	int ret;
- 	struct uart_port *port = &atmel_port->uart;
-+	struct platform_device *mpdev = to_platform_device(pdev->dev.parent);
- 
- 	atmel_init_property(atmel_port, pdev);
- 	atmel_set_ops(port);
- 
--	uart_get_rs485_mode(&pdev->dev, &port->rs485);
-+	uart_get_rs485_mode(&mpdev->dev, &port->rs485);
- 
- 	port->iotype		= UPIO_MEM;
- 	port->flags		= UPF_BOOT_AUTOCONF | UPF_IOREMAP;
- 	port->ops		= &atmel_pops;
- 	port->fifosize		= 1;
- 	port->dev		= &pdev->dev;
--	port->mapbase	= pdev->resource[0].start;
--	port->irq	= pdev->resource[1].start;
-+	port->mapbase		= mpdev->resource[0].start;
-+	port->irq		= mpdev->resource[1].start;
- 	port->rs485_config	= atmel_config_rs485;
--	port->membase	= NULL;
-+	port->membase		= NULL;
- 
- 	memset(&atmel_port->rx_ring, 0, sizeof(atmel_port->rx_ring));
- 
- 	/* for console, the clock could already be configured */
- 	if (!atmel_port->clk) {
--		atmel_port->clk = clk_get(&pdev->dev, "usart");
-+		atmel_port->clk = clk_get(&mpdev->dev, "usart");
- 		if (IS_ERR(atmel_port->clk)) {
- 			ret = PTR_ERR(atmel_port->clk);
- 			atmel_port->clk = NULL;
-@@ -2694,13 +2696,22 @@ static void atmel_serial_probe_fifos(struct atmel_uart_port *atmel_port,
- static int atmel_serial_probe(struct platform_device *pdev)
- {
- 	struct atmel_uart_port *atmel_port;
--	struct device_node *np = pdev->dev.of_node;
-+	struct device_node *np = pdev->dev.parent->of_node;
- 	void *data;
- 	int ret = -ENODEV;
- 	bool rs485_enabled;
- 
- 	BUILD_BUG_ON(ATMEL_SERIAL_RINGSIZE & (ATMEL_SERIAL_RINGSIZE - 1));
- 
-+	/*
-+	 * In device tree there is no node with "atmel,at91rm9200-usart-serial"
-+	 * as compatible string. This driver is probed by at91-usart mfd driver
-+	 * which is just a wrapper over the atmel_serial driver and
-+	 * spi-at91-usart driver. All attributes needed by this driver are
-+	 * found in of_node of parent.
-+	 */
-+	pdev->dev.of_node = np;
-+
- 	ret = of_alias_get_id(np, "serial");
- 	if (ret < 0)
- 		/* port id not found in platform data nor device-tree aliases:
-@@ -2836,6 +2847,7 @@ static int atmel_serial_remove(struct platform_device *pdev)
- 
- 	clk_put(atmel_port->clk);
- 	atmel_port->clk = NULL;
-+	pdev->dev.of_node = NULL;
- 
- 	return ret;
- }
-@@ -2846,7 +2858,7 @@ static struct platform_driver atmel_serial_driver = {
- 	.suspend	= atmel_serial_suspend,
- 	.resume		= atmel_serial_resume,
- 	.driver		= {
--		.name			= "atmel_usart",
-+		.name			= "atmel_usart_serial",
- 		.of_match_table		= of_match_ptr(atmel_serial_dt_ids),
- 	},
- };
--- 
-2.18.0
+> >> Disabling stage 2 partial shutdown and then using software to
+> >> perform a controlled shutdown at 125 C is probably the best option for you
+> >> at this point.
+> > 
+> > This seems OK to me given that I don't understand the original purpose
+> > of the partial PMIC shutdown.  Would you expect that all upstream PMIC
+> > users would want stage 2 partial shutdown disabled, so we should just
+> > do this for all users of the PMIC?
+> 
+> I'd think that we only want to override stage 2 partial shutdown if
+> thermal nodes are defined which cause a graceful software controlled
+> shutdown in place of the PMIC partial shutdown.  Therefore, management of
+> the feature should probably be tied to a boolean DT property.
+
+Sounds good, I'll send a patch to disable the partial shutdown through
+a DT property soon.
