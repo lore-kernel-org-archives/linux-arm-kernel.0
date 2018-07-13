@@ -1,43 +1,30 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Fri, 13 Jul 2018 12:11:05 +0900
-Subject: [PATCH/RFC] ARM: shmobile: Always enable ARCH_TIMER on SoCs with
- A7 and/or A15
-In-Reply-To: <20180712160857.31471-1-geert+renesas@glider.be>
-References: <20180712160857.31471-1-geert+renesas@glider.be>
-Message-ID: <CANqRtoTuofutGtWycNcHq+rPzHqAsjy8ZY0W0k9m_SNWnOajVg@mail.gmail.com>
+From: yibin.gong@nxp.com (Robin Gong)
+Date: Fri, 13 Jul 2018 21:08:44 +0800
+Subject: [PATCH v2 0/3] add memcpy support for sdma
+Message-ID: <1531487327-21879-1-git-send-email-yibin.gong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 13, 2018 at 1:08 AM, Geert Uytterhoeven
-<geert+renesas@glider.be> wrote:
-> R-Mobile APE6, R-Car Gen2, and RZ/G1 SoCs have Cortex-A7 and/or
-> Cortex-A15 CPU cores, all of which have ARM architectured timers.
->
-> Force use of the ARM architectured timer on these SoCs.
-> This allows to:
->   - Remove the calls to shmobile_init_delay() from the corresponding
->     machine vectors,
->   - Remove a check in timer setup specific to R-Car Gen2,
->   - Remove a check in shmobile_init_delay().
->
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> ---
+This patchset is to add memcpy interface for imx-sdma, besides,to
+support dmatest and enable config by default, so that could test dma
+easily without any other device support such as uart/audio/spi...
 
-Hi Geert,
+Change from v1:
+  1. remove bus_width check for memcpy since only max bus width needed for
+     memcpy case to speedup copy.
+  2. remove DMATEST support patch, since DMATEST is a common memcpy case.
+  3. split to single patch for SDMA_BD_MAX_CNT instead of '0xffff'
+  4. move sdma_config_ownership() from alloc_chan into sdma_prep_memcpy.
+  5. address some minor review comments.
 
-Thanks for cleaning up stuff.
+Robin Gong (3):
+  dmaengine: imx-sdma: add SDMA_BD_MAX_CNT to replace '0xffff'
+  dmaengine: imx-sdma: add memcpy interface
+  ARM: configs: imx_v6_v7_defconfig: add DMATEST support
 
-> We still need shmobile_init_delay to setup loops-per-jiffies for the
-> other SoCs.  But perhaps we can use the Cortex-A9 global timer on those?
+ arch/arm/configs/imx_v6_v7_defconfig |   3 +-
+ drivers/dma/imx-sdma.c               | 106 ++++++++++++++++++++++++++++++++---
+ 2 files changed, 99 insertions(+), 10 deletions(-)
 
-Perhaps unrelated, but on older kernels with Cortex-A9 the TWD timer
-was only available when using SMP. So historically on our single-core
-systems (with CA8 or CA9 or when using CA9 multi core with maxcpus=1)
-we had no timer available unless we also used a CMT/TMU or similar.
-
-Exactly what the level of software support is available for the ARM
-timers at this point I'm not so sure about.
-
-Cheers,
-
-/ magnus
+-- 
+2.7.4
