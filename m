@@ -1,24 +1,20 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 13 Jul 2018 08:53:06 +0100
-Subject: [PATCH v3 2/5] mfd: axp20x: Add self-working mode support for
- AXP806
-In-Reply-To: <20180712160452.5516-3-wens@csie.org>
+Date: Fri, 13 Jul 2018 08:53:19 +0100
+Subject: [PATCH v3 3/5] mfd: axp20x: Support AXP806 in I2C mode
+In-Reply-To: <20180712160452.5516-4-wens@csie.org>
 References: <20180712160452.5516-1-wens@csie.org>
- <20180712160452.5516-3-wens@csie.org>
-Message-ID: <20180713075306.GY4641@dell>
+ <20180712160452.5516-4-wens@csie.org>
+Message-ID: <20180713075319.GZ4641@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Fri, 13 Jul 2018, Chen-Yu Tsai wrote:
 
-> The AXP806 can operate in a standalone "self-working" mode, in which it
-> is also responsible for power control of the overall system. This mode
-> is similar to the master mode, but the EN/PWRON pin functions as a power
-> button, instead of a level-triggered enable switch.
+> The Pine64 H64 board uses an AXP806 PMIC in I2C and self-working mode.
+> The H64 SoC does not have the usual RSB controller.
 > 
-> This patch adds code checking for the new "x-powers,self-working-mode"
-> property, and a separate mfd_cell list that includes the power button
-> (PEK) sub-device.
+> This patch adds AXP806 to the list of devices supported in I2C mode.
+> In theory, all RSB-based PMICs can also be used in I2C mode.
 > 
 > Reviewed-by: Icenowy Zheng <icenowy@aosc.io>
 > Tested-by: Icenowy Zheng <icenowy@aosc.io>
@@ -26,8 +22,8 @@ On Fri, 13 Jul 2018, Chen-Yu Tsai wrote:
 > Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
 > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 > ---
->  drivers/mfd/axp20x.c | 28 +++++++++++++++++++++++++---
->  1 file changed, 25 insertions(+), 3 deletions(-)
+>  drivers/mfd/axp20x-i2c.c | 2 ++
+>  1 file changed, 2 insertions(+)
 
 Applied, thanks.
 
