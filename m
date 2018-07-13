@@ -1,23 +1,58 @@
-From: Eugene.Cho@dell.com (Eugene.Cho at dell.com)
-Date: Fri, 13 Jul 2018 19:06:53 +0000
-Subject: [RFC PATCH v2 1/4] dt-bindings: misc: Add bindings for misc. BMC
- control fields
-In-Reply-To: <20180713190320.GB30539@kroah.com>
-References: <20180711053122.30773-1-andrew@aj.id.au>
- <20180711053122.30773-2-andrew@aj.id.au>
- <20180711200450.GB17291@rob-hp-laptop>
- <1531356830.3551458.1437853280.551CA8C5@webmail.messagingengine.com>
- <CAL_JsqKpXxR4t_-3BOy-0mFePXkaSck_4PfHRD=OZQ-_-T5P=w@mail.gmail.com>
- <b6ced4cad4d7ff78330181b2c893855c23103953.camel@kernel.crashing.org>
- <1531463489.747186.1439263128.075AECE1@webmail.messagingengine.com>
- <a521b9fc-4c10-06c1-fd73-5c64379538f6@yadro.com>
- <bc2d6bd30ce243768d07b2aa5ed9cee4@AUSX13MPC105.AMER.DELL.COM>
- <20180713190320.GB30539@kroah.com>
-Message-ID: <8dfaea969aeb4b0fbd049b4e48389b43@AUSX13MPC105.AMER.DELL.COM>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 13 Jul 2018 20:17:20 +0100
+Subject: [PATCH net-next v2 3/7] net: mvneta: increase number of buffers
+ in RX and TX queue
+In-Reply-To: <20180713161841.11202-4-gregory.clement@bootlin.com>
+References: <20180713161841.11202-1-gregory.clement@bootlin.com>
+ <20180713161841.11202-4-gregory.clement@bootlin.com>
+Message-ID: <20180713191720.GA17271@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> Dell - Internal Use - Confidential  
->Really?  To a public mailing list?  odd...
+On Fri, Jul 13, 2018 at 06:18:37PM +0200, Gregory CLEMENT wrote:
+> From: Yelena Krivosheev <yelena@marvell.com>
+> 
+> The initial values were too small leading to poor performance when using
+> the software buffer management.
 
-Ha yea sorry - I was so excited to show my support, that I jumped the gun :)
+What does this do to latency when a large transfer is also ongoing
+(iow, the classic bufferbloat issue) ?
+
+> 
+> Signed-off-by: Yelena Krivosheev <yelena@marvell.com>
+> [gregory: extract from a larger patch]
+> Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
+> ---
+>  drivers/net/ethernet/marvell/mvneta.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
+> index f4e3943a745d..c22df28b07c8 100644
+> --- a/drivers/net/ethernet/marvell/mvneta.c
+> +++ b/drivers/net/ethernet/marvell/mvneta.c
+> @@ -295,10 +295,10 @@
+>  #define MVNETA_RSS_LU_TABLE_SIZE	1
+>  
+>  /* Max number of Rx descriptors */
+> -#define MVNETA_MAX_RXD 128
+> +#define MVNETA_MAX_RXD 512
+>  
+>  /* Max number of Tx descriptors */
+> -#define MVNETA_MAX_TXD 532
+> +#define MVNETA_MAX_TXD 1024
+>  
+>  /* Max number of allowed TCP segments for software TSO */
+>  #define MVNETA_MAX_TSO_SEGS 100
+> -- 
+> 2.18.0
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
+According to speedtest.net: 13Mbps down 490kbps up
