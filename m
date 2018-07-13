@@ -1,70 +1,84 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Fri, 13 Jul 2018 09:34:36 +0900
-Subject: [PATCH v3.1 0/4] arm64: kexec,kdump: fix boot failures on
- acpi-only system
-In-Reply-To: <20180712164918.GA26935@arm.com>
-References: <20180709234229.20181-1-takahiro.akashi@linaro.org>
- <20180712164918.GA26935@arm.com>
-Message-ID: <20180713003434.GZ28220@linaro.org>
+From: mst@redhat.com (Michael S. Tsirkin)
+Date: Fri, 13 Jul 2018 03:36:12 +0300
+Subject: [PATCH v2 02/17] virtio: pci-legacy: Validate queue pfn
+In-Reply-To: <20180327170823-mutt-send-email-mst@kernel.org>
+References: <1522156531-28348-1-git-send-email-suzuki.poulose@arm.com>
+ <1522156531-28348-3-git-send-email-suzuki.poulose@arm.com>
+ <20180327170823-mutt-send-email-mst@kernel.org>
+Message-ID: <20180713004545-mutt-send-email-mst@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 12, 2018 at 05:49:19PM +0100, Will Deacon wrote:
-> Hi Akashi,
+On Tue, Mar 27, 2018 at 05:11:04PM +0300, Michael S. Tsirkin wrote:
+> On Tue, Mar 27, 2018 at 02:15:12PM +0100, Suzuki K Poulose wrote:
+> > Legacy PCI over virtio uses a 32bit PFN for the queue. If the
+> > queue pfn is too large to fit in 32bits, which we could hit on
+> > arm64 systems with 52bit physical addresses (even with 64K page
+> > size), we simply miss out a proper link to the other side of
+> > the queue.
+> > 
+> > Add a check to validate the PFN, rather than silently breaking
+> > the devices.
+> > 
+> > Cc: "Michael S. Tsirkin" <mst@redhat.com>
+> > Cc: Jason Wang <jasowang@redhat.com>
+> > Cc: Marc Zyngier <marc.zyngier@arm.com>
+> > Cc: Christoffer Dall <cdall@kernel.org>
+> > Cc: Peter Maydel <peter.maydell@linaro.org>
+> > Cc: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
+> > Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> > ---
+> >  drivers/virtio/virtio_pci_legacy.c | 12 ++++++++++--
+> >  1 file changed, 10 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/drivers/virtio/virtio_pci_legacy.c b/drivers/virtio/virtio_pci_legacy.c
+> > index 2780886..4b84a75 100644
+> > --- a/drivers/virtio/virtio_pci_legacy.c
+> > +++ b/drivers/virtio/virtio_pci_legacy.c
+> > @@ -122,6 +122,7 @@ static struct virtqueue *setup_vq(struct virtio_pci_device *vp_dev,
+> >  	struct virtqueue *vq;
+> >  	u16 num;
+> >  	int err;
+> > +	u64 q_pfn;
+> >  
+> >  	/* Select the queue we're interested in */
+> >  	iowrite16(index, vp_dev->ioaddr + VIRTIO_PCI_QUEUE_SEL);
+> > @@ -141,9 +142,15 @@ static struct virtqueue *setup_vq(struct virtio_pci_device *vp_dev,
+> >  	if (!vq)
+> >  		return ERR_PTR(-ENOMEM);
+> >  
+> > +	q_pfn = virtqueue_get_desc_addr(vq) >> VIRTIO_PCI_QUEUE_ADDR_SHIFT;
+> > +	if (q_pfn >> 32) {
+> > +		dev_err(&vp_dev->pci_dev->dev, "virtio-pci queue PFN too large\n");
+> > +		err = -ENOMEM;
 > 
-> On Tue, Jul 10, 2018 at 08:42:25AM +0900, AKASHI Takahiro wrote:
-> > This patch series is a set of bug fixes to address kexec/kdump
-> > failures which are sometimes observed on ACPI-only system and reported
-> > in LAK-ML before.
+> ENOMEM seems wrong here. E2BIG?
 > 
-> I tried picking this up, along with Ard's fixup, but I'm seeing a build
-> failure for allmodconfig:
+> > +		goto out_del_vq;
+> > +	}
+> > +
+> >  	/* activate the queue */
+> > -	iowrite32(virtqueue_get_desc_addr(vq) >> VIRTIO_PCI_QUEUE_ADDR_SHIFT,
+> > -		  vp_dev->ioaddr + VIRTIO_PCI_QUEUE_PFN);
+> > +	iowrite32((u32)q_pfn, vp_dev->ioaddr + VIRTIO_PCI_QUEUE_PFN);
 > 
-> arch/arm64/kernel/acpi.o: In function `__acpi_get_mem_attribute':
-> acpi.c:(.text+0x60): undefined reference to `efi_mem_attributes'
+> Is the cast really necessary here?
 > 
-> I didn't investigate further. Please can you fix this?
+> >  
+> >  	vq->priv = (void __force *)vp_dev->ioaddr + VIRTIO_PCI_QUEUE_NOTIFY;
+> >  
+> > @@ -160,6 +167,7 @@ static struct virtqueue *setup_vq(struct virtio_pci_device *vp_dev,
+> >  
+> >  out_deactivate:
+> >  	iowrite32(0, vp_dev->ioaddr + VIRTIO_PCI_QUEUE_PFN);
+> > +out_del_vq:
+> >  	vring_del_virtqueue(vq);
+> >  	return ERR_PTR(err);
+> >  }
+> > -- 
+> > 2.7.4
 
-Because CONFIG_ACPI is on and CONFIG_EFI is off.
+Ping are you going to address and repost, or should I drop this?
 
-This can happen in allmodconfig as CONFIG_EFI depends on
-!CONFIG_CPU_BIG_ENDIAN, which is actually on in this case.
-
-Looking at __acpi_get_mem_attributes(), since there is no information
-available on memory attributes, what we can do at best is
-  * return PAGE_KERNEL (= cacheable) for mapped memory,
-  * return DEVICE_nGnRnE (= non-cacheable) otherwise
-(See a hunk to be applied on top of my patch#4.)
-
-I think that, after applying, acpi_os_ioremap() would work almost
-in the same way as the original before my patchset given that
-MAP memblock attribute is used only under CONFIG_EFI for now.
-
-Make sense?
-
--Takahiro AKASHI
-
-> Will
----8<---
-diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-index ed46dc188b22..cad3ed2666ef 100644
---- a/arch/arm64/kernel/acpi.c
-+++ b/arch/arm64/kernel/acpi.c
-@@ -238,6 +238,7 @@ void __init acpi_boot_table_init(void)
- 
- pgprot_t __acpi_get_mem_attribute(phys_addr_t addr)
- {
-+#ifdef CONFIG_EFI
- 	/*
- 	 * According to "Table 8 Map: EFI memory types to AArch64 memory
- 	 * types" of UEFI 2.5 section 2.3.6.1, each EFI memory type is
-@@ -255,5 +256,9 @@ pgprot_t __acpi_get_mem_attribute(phys_addr_t addr)
- 		return __pgprot(PROT_NORMAL_WT);
- 	if (attr & EFI_MEMORY_WC)
- 		return __pgprot(PROT_NORMAL_NC);
-+#else
-+	if (memblock_is_map_memory(addr))
-+		return PAGE_KERNEL;
-+#endif
- 	return __pgprot(PROT_DEVICE_nGnRnE);
- }
+-- 
+MST
