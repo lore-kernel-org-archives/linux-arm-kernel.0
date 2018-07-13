@@ -1,27 +1,27 @@
-From: mka@chromium.org (Matthias Kaehlcke)
-Date: Fri, 13 Jul 2018 09:38:28 -0700
-Subject: [PATCH v3 1/2] arm64: dts: qcom: pm8998: Add spmi-temp-alarm node
-In-Reply-To: <153149761947.48062.16210609862063613310@swboyd.mtv.corp.google.com>
-References: <20180709212522.187257-1-mka@chromium.org>
- <153149761947.48062.16210609862063613310@swboyd.mtv.corp.google.com>
-Message-ID: <20180713163828.GW129942@google.com>
+From: der.herr@hofr.at (Nicholas Mc Guire)
+Date: Fri, 13 Jul 2018 16:41:10 +0000
+Subject: [PATCH] clk: imx6ul: fix missing of_node_put()
+In-Reply-To: <153149925072.48062.9395649003513930129@swboyd.mtv.corp.google.com>
+References: <1531480400-7664-1-git-send-email-hofrat@osadl.org>
+ <153149925072.48062.9395649003513930129@swboyd.mtv.corp.google.com>
+Message-ID: <20180713164110.GA27943@osadl.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 13, 2018 at 09:00:19AM -0700, Stephen Boyd wrote:
-> Quoting Matthias Kaehlcke (2018-07-09 14:25:21)
-> > diff --git a/arch/arm64/boot/dts/qcom/pm8998.dtsi b/arch/arm64/boot/dts/qcom/pm8998.dtsi
-> > index 92bed1e7d4bb..7eea94701b23 100644
-> > --- a/arch/arm64/boot/dts/qcom/pm8998.dtsi
-> > +++ b/arch/arm64/boot/dts/qcom/pm8998.dtsi
-> > @@ -11,6 +11,13 @@
-> >                 #address-cells = <1>;
-> >                 #size-cells = <0>;
-> >  
-> > +               pm8998_temp: temp-alarm at 2400 {
+On Fri, Jul 13, 2018 at 09:27:30AM -0700, Stephen Boyd wrote:
+> Quoting Nicholas Mc Guire (2018-07-13 04:13:20)
+> > of_find_compatible_node() is returning a device node with refcount
+> > incremented and must be explicitly decremented after the last use
+> > which is right after the us in of_iomap() here.
+> > 
+> > Signed-off-by: Nicholas Mc Guire <hofrat@osadl.org>
+> > Fixes: commit 787b4271a6a0 ("clk: imx: add imx6ul clk tree support")
 > 
-> Are we sorting this file based on node name or unit address? Otherwise
-> patch looks good.
+> This is not how a Fixes line works. It doesn't have 'commit'. I'll
+> remove it when applying so no need to resend.
+>
+sorry - guess I got that wrong on a whole set of patches - fill fix that
+for future patches and thanks for fixing it here 
 
-The idea was to sort by address, following the 'convention' of
-sdm845.dtsi (https://patchwork.kernel.org/patch/10381745/).
+thx!
+hofrat 
