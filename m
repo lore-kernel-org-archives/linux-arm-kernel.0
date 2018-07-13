@@ -1,50 +1,39 @@
-From: yibin.gong@nxp.com (Robin Gong)
-Date: Fri, 13 Jul 2018 21:08:47 +0800
-Subject: [PATCH v2 3/3] ARM: configs: imx_v6_v7_defconfig: add DMATEST support
-In-Reply-To: <1531487327-21879-1-git-send-email-yibin.gong@nxp.com>
-References: <1531487327-21879-1-git-send-email-yibin.gong@nxp.com>
-Message-ID: <1531487327-21879-4-git-send-email-yibin.gong@nxp.com>
+From: andrew.smirnov@gmail.com (Andrey Smirnov)
+Date: Thu, 12 Jul 2018 22:15:28 -0700
+Subject: [PATCH 1/2] ARM: dts: imx51-zii-scu3-esb: Add switch IRQ line
+ pinumx config
+In-Reply-To: <CAOMZO5DfHqKjF6xykJtoC-aA-ATWM6mCZR0VzPVpSDOt-Fs6bQ@mail.gmail.com>
+References: <20180712023337.30112-1-andrew.smirnov@gmail.com>
+ <20180712023337.30112-2-andrew.smirnov@gmail.com>
+ <CAOMZO5DfHqKjF6xykJtoC-aA-ATWM6mCZR0VzPVpSDOt-Fs6bQ@mail.gmail.com>
+Message-ID: <CAHQ1cqEXBfs1B6Jr1NvUY6WoyX9oG=0haJpiTLVH7t-37ht10Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DMATEST support and remove invalid options, such as
-CONFIG_BT_HCIUART_H4 is default enabled and CONFIG_SND_SOC_IMX_WM8962
-is out of date and not appear in any config file. Please refer to
-Documentation/driver-api/dmaengine/dmatest.rst to test MEMCPY feature
-of imx-sdma.
+On Thu, Jul 12, 2018 at 6:37 AM Fabio Estevam <festevam@gmail.com> wrote:
+>
+> Hi Andrey,
+>
+> On Wed, Jul 11, 2018 at 11:33 PM, Andrey Smirnov
+> <andrew.smirnov@gmail.com> wrote:
+>
+> > +       pinctrl_switch: switchgrp {
+> > +               fsl,pins = <
+> > +                       MX51_PAD_AUD3_BB_CK__GPIO4_20           0xc5
+>
+> The i.MX51 Reference Manual states that 0xa5 is the default reset
+> value for the register IOMUXC_SW_PAD_CTL_PAD_AUD3_BB_CK.
+>
+> By reading your commit log I had the impression you wanted to provide
+> the default value explicitly.
+>
+> Please clarify.
 
-Signed-off-by: Robin Gong <yibin.gong@nxp.com>
----
- arch/arm/configs/imx_v6_v7_defconfig | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+I wanted to avoid relying on defaults be it register reset values or
+settings that bootloader left us with. Default value of 0xa5 works,
+but, given how the pin is IRQ_TYPE_LEVEL_HIGH, I though it would be
+better to configure it to have a pulldown. Do you want me to add that
+to commit log?
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index e381d05..f28d4d9 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -81,7 +81,6 @@ CONFIG_CAN=y
- CONFIG_CAN_FLEXCAN=y
- CONFIG_BT=y
- CONFIG_BT_HCIUART=y
--CONFIG_BT_HCIUART_H4=y
- CONFIG_BT_HCIUART_LL=y
- CONFIG_CFG80211=y
- CONFIG_CFG80211_WEXT=y
-@@ -282,7 +281,6 @@ CONFIG_SND_SOC_FSL_ASRC=y
- CONFIG_SND_IMX_SOC=y
- CONFIG_SND_SOC_PHYCORE_AC97=y
- CONFIG_SND_SOC_EUKREA_TLV320=y
--CONFIG_SND_SOC_IMX_WM8962=y
- CONFIG_SND_SOC_IMX_ES8328=y
- CONFIG_SND_SOC_IMX_SGTL5000=y
- CONFIG_SND_SOC_IMX_SPDIF=y
-@@ -371,6 +369,7 @@ CONFIG_DMADEVICES=y
- CONFIG_FSL_EDMA=y
- CONFIG_IMX_SDMA=y
- CONFIG_MXS_DMA=y
-+CONFIG_DMATEST=m
- CONFIG_STAGING=y
- CONFIG_STAGING_MEDIA=y
- CONFIG_VIDEO_IMX_MEDIA=y
--- 
-2.7.4
+Thanks,
+Andrey Smirnov
