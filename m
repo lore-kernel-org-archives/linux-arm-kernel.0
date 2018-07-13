@@ -1,86 +1,43 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Fri, 13 Jul 2018 10:28:08 +0800
-Subject: [linux-sunxi] Re: [PATCH 1/2] ARM: sun8i: h3: enable HDMI output
- on Banana Pi M2 Zero
-In-Reply-To: <20180712145306.ootqt7dfh3nxsamy@flea>
-References: <20180711132233.42301-1-icenowy@aosc.io>
- <20180711132233.42301-2-icenowy@aosc.io>
- <20180711150532.6gzm7krouriddreh@flea>
- <8F6CDF5C-2AC1-43EC-858A-5C6345CF279A@aosc.io>
- <20180712064601.m3bdd46wzac5fpgh@flea>
- <A7CA2831-7117-415C-BC59-3FB4AE425598@aosc.io>
- <20180712145306.ootqt7dfh3nxsamy@flea>
-Message-ID: <82CD0BCE-9DE4-45D7-8DF4-FCCFBC70BECF@aosc.io>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Fri, 13 Jul 2018 12:11:05 +0900
+Subject: [PATCH/RFC] ARM: shmobile: Always enable ARCH_TIMER on SoCs with
+ A7 and/or A15
+In-Reply-To: <20180712160857.31471-1-geert+renesas@glider.be>
+References: <20180712160857.31471-1-geert+renesas@glider.be>
+Message-ID: <CANqRtoTuofutGtWycNcHq+rPzHqAsjy8ZY0W0k9m_SNWnOajVg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-? 2018?7?12? GMT+08:00 ??10:53:06, Maxime Ripard <maxime.ripard@bootlin.com> ??:
->On Thu, Jul 12, 2018 at 03:09:55PM +0800, Icenowy Zheng wrote:
->> ? 2018?7?12? GMT+08:00 ??2:46:01, Maxime Ripard
-><maxime.ripard@bootlin.com> ??:
->> >On Wed, Jul 11, 2018 at 11:15:50PM +0800, Icenowy Zheng wrote:
->> >> 
->> >> 
->> >> ? 2018?7?11? GMT+08:00 ??11:05:32, Maxime Ripard
->> ><maxime.ripard@bootlin.com> ??:
->> >> >Hi,
->> >> >
->> >> >On Wed, Jul 11, 2018 at 09:22:32PM +0800, Icenowy Zheng wrote:
->> >> >> Banana Pi M2 Zero board has a miniHDMI port connected to the
->HDMI
->> >> >> controller of Allwinner H3 SoC.
->> >> >> 
->> >> >> Enable the HDMI output in Banana Pi M2 Zero device tree.
->> >> >> 
->> >> >> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
->> >> >> ---
->> >> >>  .../dts/sun8i-h2-plus-bananapi-m2-zero.dts    | 25
->> >> >+++++++++++++++++++
->> >> >>  1 file changed, 25 insertions(+)
->> >> >> 
->> >> >> diff --git
->a/arch/arm/boot/dts/sun8i-h2-plus-bananapi-m2-zero.dts
->> >> >b/arch/arm/boot/dts/sun8i-h2-plus-bananapi-m2-zero.dts
->> >> >> index 7d01f9322658..eb61dcf32797 100644
->> >> >> --- a/arch/arm/boot/dts/sun8i-h2-plus-bananapi-m2-zero.dts
->> >> >> +++ b/arch/arm/boot/dts/sun8i-h2-plus-bananapi-m2-zero.dts
->> >> >> @@ -26,6 +26,17 @@
->> >> >>  		stdout-path = "serial0:115200n8";
->> >> >>  	};
->> >> >>  
->> >> >> +	hdmi-connector {
->> >> >> +		compatible = "hdmi-connector";
->> >> >> +		type = "c";
->> >> >
->> >> >This is not one of the connector type declared in DRM, how is it
->> >> >exposed to the userspace?
->> >> 
->> >> So just use "A" here (because of single link)?
->> >
->> >If the connector type is C, it should be C, and DRM / driver
->adjusted
->> >to handle it.
->> 
->> Okay I won't change this property, if there's any further revisions.
->> 
->> For DRM driver, I think it can be an independent patchset.
+On Fri, Jul 13, 2018 at 1:08 AM, Geert Uytterhoeven
+<geert+renesas@glider.be> wrote:
+> R-Mobile APE6, R-Car Gen2, and RZ/G1 SoCs have Cortex-A7 and/or
+> Cortex-A15 CPU cores, all of which have ARM architectured timers.
 >
->Not really, since it's going to break userspace as soon as you merge
->that other patchset.
+> Force use of the ARM architectured timer on these SoCs.
+> This allows to:
+>   - Remove the calls to shmobile_init_delay() from the corresponding
+>     machine vectors,
+>   - Remove a check in timer setup specific to R-Car Gen2,
+>   - Remove a check in shmobile_init_delay().
+>
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> ---
 
-Should we bother the DRM maintainer to ask for any advice?
+Hi Geert,
 
->
->Maxime
->
->-- 
->Maxime Ripard, Bootlin (formerly Free Electrons)
->Embedded Linux and Kernel engineering
->https://bootlin.com
->
->_______________________________________________
->linux-arm-kernel mailing list
->linux-arm-kernel at lists.infradead.org
->http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Thanks for cleaning up stuff.
+
+> We still need shmobile_init_delay to setup loops-per-jiffies for the
+> other SoCs.  But perhaps we can use the Cortex-A9 global timer on those?
+
+Perhaps unrelated, but on older kernels with Cortex-A9 the TWD timer
+was only available when using SMP. So historically on our single-core
+systems (with CA8 or CA9 or when using CA9 multi core with maxcpus=1)
+we had no timer available unless we also used a CMT/TMU or similar.
+
+Exactly what the level of software support is available for the ARM
+timers at this point I'm not so sure about.
+
+Cheers,
+
+/ magnus
