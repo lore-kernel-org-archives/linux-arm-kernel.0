@@ -1,40 +1,44 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 13 Jul 2018 15:05:10 +0100
-Subject: [GIT PULL] drivers: vexpress: update/cleanup for v4.19
-Message-ID: <20180713140510.GA25344@e107155-lin>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Fri, 13 Jul 2018 15:09:32 +0100
+Subject: NVIDIA Tegra changes for v4.19-rc1
+In-Reply-To: <CAOesGMiJ9Mt6nCfZ5SrkKQHPcb1tO4O+xNmKwgWdeF1AQn8FTQ@mail.gmail.com>
+References: <20180712154128.22705-1-thierry.reding@gmail.com>
+ <CAOesGMiJ9Mt6nCfZ5SrkKQHPcb1tO4O+xNmKwgWdeF1AQn8FTQ@mail.gmail.com>
+Message-ID: <97fada59-feb7-e102-6a7f-9d6b871aec86@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM-SoC team,
 
-Please pull !
+On 12/07/18 17:01, Olof Johansson wrote:
+> Hi,
+> 
+> On Thu, Jul 12, 2018 at 8:41 AM, Thierry Reding
+> <thierry.reding@gmail.com> wrote:
+>> Hi ARM SoC maintainers,
+>>
+>> Here's the set of Tegra-related pull requests for v4.19-rc1. I'm sending
+>> these a week earlier than usual because I will be on vacation for the
+>> next two weeks. During my absence, Jon Hunter will be taking the helm.
+>> Unfortunately he doesn't have access to the kernel.org repository, so if
+>> anything comes up he may have to send patches to you directly. That said
+>> I don't expect any issues with these pull requests. They've all soaked
+>> in linux-next for a little while and I've done my regular sanity builds
+>> and didn't see any issues.
+> 
+> Sounds good. Jon, we're OK with merging from a github repo or similar
+> as well, if you have more than a few patches. Please re-send them to
+> arm at kernel.org with your sign-off when you have something (it's a lot
+> easier than if you just cc us on an acked-by, since gmail+imap doesn't
+> pop the whole thread over into my arm@ folder. :)
+> 
+> We can even host a rebasing/staging/temporary branch for you in case
+> you want something to be in -next but might not be 100% that it should
+> go in, if needed -- just let us know.
 
-Regards,
-Sudeep
+Great. Thanks. Probably unlikely but you never know.
 
---
+Cheers!
+Jon
 
-The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
-
-  Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git tags/vexpress-update-4.19
-
-for you to fetch changes up to cc4aecc5b724b47df65ef3e218ac7d73d2ee4e09:
-
-  misc: vexpress/syscfg: Use devm_ioremap_resource() to map memory (2018-07-12 18:06:01 +0100)
-
-----------------------------------------------------------------
-ARMv7 Vexpress update/cleanup for v4.19
-
-Just single cleanup patch to use devm_ioremap_resource in place of
-devm_request_mem_region and devm_ioremap.
-
-----------------------------------------------------------------
-Sudeep Holla (1):
-      misc: vexpress/syscfg: Use devm_ioremap_resource() to map memory
-
- drivers/misc/vexpress-syscfg.c | 10 +++-------
- 1 file changed, 3 insertions(+), 7 deletions(-)
+-- 
+nvpublic
