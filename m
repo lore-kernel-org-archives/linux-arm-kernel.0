@@ -1,71 +1,86 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 13 Jul 2018 13:17:49 +0200
-Subject: [PATCH 02/19] mmc: mmci: merge qcom dml feature into mmci dma
-In-Reply-To: <c09e8f7a-3bf7-abb3-b49c-011ae29f8d67@st.com>
-References: <1528809280-31116-1-git-send-email-ludovic.Barre@st.com>
- <1528809280-31116-3-git-send-email-ludovic.Barre@st.com>
- <CAPDyKFqOOvbNc79hdWhdS4pxkYrh48At-BLuGmX0jDMER3Akdw@mail.gmail.com>
- <c09e8f7a-3bf7-abb3-b49c-011ae29f8d67@st.com>
-Message-ID: <CAPDyKFrN3GMez1vyc6xQUH_Qp7UrDj88rG9pAP_oTLHOB6k91g@mail.gmail.com>
+Date: Fri, 13 Jul 2018 13:21:55 +0200
+Subject: [PATCH] soc: imx6qp: Use GENPD_FLAG_ALWAYS_ON for PU errata
+In-Reply-To: <c00ad2ebf94d105544b328c77fa1edbfe6bbc193.1531475786.git.leonard.crestez@nxp.com>
+References: <c00ad2ebf94d105544b328c77fa1edbfe6bbc193.1531475786.git.leonard.crestez@nxp.com>
+Message-ID: <CAPDyKFrcn9oK2vDiZaf+d0t=dx0GsO-hv9_MkV2d+PPRHAQEWA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 July 2018 at 17:19, Ludovic BARRE <ludovic.barre@st.com> wrote:
+On 13 July 2018 at 12:01, Leonard Crestez <leonard.crestez@nxp.com> wrote:
+> This is functionally identical but simpler and slightly faster.
 >
+> The PU domain is turned on at boot time and never turned off. In the
+> current implementation the pm core will repeatedly call power_off when
+> the domain is unused and get -EBUSY back. If the domain is marked as
+> "always on" instead the pm core won't even attempt to turn it off.
 >
-> On 07/05/2018 05:26 PM, Ulf Hansson wrote:
->>
->> On 12 June 2018 at 15:14, Ludovic Barre <ludovic.Barre@st.com> wrote:
->>>
->>> From: Ludovic Barre <ludovic.barre@st.com>
->>>
->>> This patch integrates qcom dml feature into mmci_dma file.
->>> Qualcomm Data Mover lite/local is already a variant of mmci dmaengine.
->>>
->>> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
->>> ---
->>>   drivers/mmc/host/Makefile        |   1 -
->>>   drivers/mmc/host/mmci.c          |   1 -
->>>   drivers/mmc/host/mmci.h          |  35 ++++++++
->>>   drivers/mmc/host/mmci_dma.c      | 135 ++++++++++++++++++++++++++++-
->>>   drivers/mmc/host/mmci_qcom_dml.c | 177
->>> ---------------------------------------
->>>   drivers/mmc/host/mmci_qcom_dml.h |  31 -------
->>>   6 files changed, 169 insertions(+), 211 deletions(-)
->>>   delete mode 100644 drivers/mmc/host/mmci_qcom_dml.c
->>>   delete mode 100644 drivers/mmc/host/mmci_qcom_dml.h
->>
->>
->> No, this is not the way to go. Instead I I think there are two options.
->>
->> 1) Keep mmci_qcom_dml.c|h and thus add new files for the stm32 dma
->> variant.
->>
->> 2) Start by renaming mmci_qcom_dml.* to mmc_dma.* and then in the next
->> step add the code for stm32 dma into the renamed files.
->>
->> I guess if there is some overlap in functionality, 2) may be best as
->> it could easier avoid open coding. However, I am fine with whatever
->> option and I expect that you knows what is best.
+> In theory on 6qp it is safe to turn PU off in suspend, however that is
+> best accomplished with a new core flag.
 >
->
-> After patch 01 & 05 comments:
-> I will try to define a mmci_ops which contain some functions pointer
-> called by mmci.c (core).
-> A variant defines its mmci_ops.
-> where do you define the specific function:
-> -in a single file, mmci-ops.c or other (for the name, I'm not inspirated)
-> -or in specific file for each variant mmci-qcom.c or mmci-stm32.c
->
-> following the comment (above), I think we define a single file?
+> Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
 
-If I understand the question, the problem is how we should assign the
-mmc host ops, which corresponds to the probed variant data!?
-
-I took a stub at it and posted two patches which I think you should be
-able to build upon. Please have a look.
-
-[...]
+Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
 
 Kind regards
 Uffe
+
+> ---
+>  drivers/soc/imx/gpc.c | 8 ++------
+>  1 file changed, 2 insertions(+), 6 deletions(-)
+>
+> Previous discussion:
+> * https://lkml.org/lkml/2018/7/11/431
+> * https://lkml.org/lkml/2018/7/10/103
+>
+> Attempt at turning PU off in suspend:
+> * https://lkml.org/lkml/2018/7/6/698
+>
+> diff --git a/drivers/soc/imx/gpc.c b/drivers/soc/imx/gpc.c
+> index faf13a0b85d6..f31978e5af20 100644
+> --- a/drivers/soc/imx/gpc.c
+> +++ b/drivers/soc/imx/gpc.c
+> @@ -45,11 +45,10 @@ struct imx_pm_domain {
+>         struct clk *clk[GPC_CLK_MAX];
+>         int num_clks;
+>         unsigned int reg_offs;
+>         signed char cntr_pdn_bit;
+>         unsigned int ipg_rate_mhz;
+> -       unsigned int flags;
+>  };
+>
+>  static inline struct imx_pm_domain *
+>  to_imx_pm_domain(struct generic_pm_domain *genpd)
+>  {
+> @@ -60,13 +59,10 @@ static int imx6_pm_domain_power_off(struct generic_pm_domain *genpd)
+>  {
+>         struct imx_pm_domain *pd = to_imx_pm_domain(genpd);
+>         int iso, iso2sw;
+>         u32 val;
+>
+> -       if (pd->flags & PGC_DOMAIN_FLAG_NO_PD)
+> -               return -EBUSY;
+> -
+>         /* Read ISO and ISO2SW power down delays */
+>         regmap_read(pd->regmap, pd->reg_offs + GPC_PGC_PUPSCR_OFFS, &val);
+>         iso = val & 0x3f;
+>         iso2sw = (val >> 8) & 0x3f;
+>
+> @@ -419,12 +415,12 @@ static int imx_gpc_probe(struct platform_device *pdev)
+>                 return ret;
+>         }
+>
+>         /* Disable PU power down in normal operation if ERR009619 is present */
+>         if (of_id_data->err009619_present)
+> -               imx_gpc_domains[GPC_PGC_DOMAIN_PU].flags |=
+> -                               PGC_DOMAIN_FLAG_NO_PD;
+> +               imx_gpc_domains[GPC_PGC_DOMAIN_PU].base.flags |=
+> +                               GENPD_FLAG_ALWAYS_ON;
+>
+>         /* Keep DISP always on if ERR006287 is present */
+>         if (of_id_data->err006287_present)
+>                 imx_gpc_domains[GPC_PGC_DOMAIN_DISPLAY].base.flags |=
+>                                 GENPD_FLAG_ALWAYS_ON;
+> --
+> 2.17.1
+>
