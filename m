@@ -1,40 +1,48 @@
-From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
-Date: Fri, 13 Jul 2018 17:24:57 +0800
-Subject: [PATCH 2/3] dt-bindings: arm: syna: add support for the AS370 SoC
-In-Reply-To: <20180713171712.05f58a74@xhacker.debian>
-References: <20180713171712.05f58a74@xhacker.debian>
-Message-ID: <20180713172457.6193a92f@xhacker.debian>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 13 Jul 2018 11:28:29 +0200
+Subject: [GIT PULL] ARM: mvebu: dt for v4.19 (#1)
+Message-ID: <87wotzbi2q.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AS370 SoC is a new derivative of the berlin family. The only
-difference is the SoC isn't named as berlin*.
+Hi,
 
-Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
----
- Documentation/devicetree/bindings/arm/syna.txt | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+Here is the first pull request for dt for mvebu for v4.19.
 
-diff --git a/Documentation/devicetree/bindings/arm/syna.txt b/Documentation/devicetree/bindings/arm/syna.txt
-index 3bab18409b7a..3ba1d7b5ee74 100644
---- a/Documentation/devicetree/bindings/arm/syna.txt
-+++ b/Documentation/devicetree/bindings/arm/syna.txt
-@@ -1,4 +1,4 @@
--Marvell Berlin SoC Family Device Tree Bindings
-+Synaptics SoC Device Tree Bindings
- ---------------------------------------------------------------
- 
- Work in progress statement:
-@@ -13,6 +13,10 @@ stable binding/ABI.
- 
- ---------------------------------------------------------------
- 
-+Boards with the Synaptics AS370 SoC shall have the following properties:
-+  Required root node property:
-+    compatible: "syna,as370"
-+
- Boards with a SoC of the Marvell Berlin family, e.g. Armada 1500
- shall have the following properties:
- 
--- 
-2.18.0
+Gregory
+
+The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
+
+  Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+
+are available in the Git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-4.19-1
+
+for you to fetch changes up to 96487173aaf69216fe4d7f8241ef42a539969789:
+
+  ARM: dts: armada388-clearfog: drop future changes disclaimer (2018-06-28 17:04:15 +0200)
+
+----------------------------------------------------------------
+mvebu dt for 4.19 (part 1)
+
+ - Add a new Armada 388 based board: helios4
+ - Enable SPI flash by default on SolidRun Armada 38x Microsom
+
+----------------------------------------------------------------
+Baruch Siach (2):
+      ARM: dts: armada388-clearfog: enable spi flash
+      ARM: dts: armada388-clearfog: drop future changes disclaimer
+
+Dennis Gilmore (1):
+      ARM: dts: armada388-helios4
+
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/armada-388-clearfog-base.dts     |   5 -
+ arch/arm/boot/dts/armada-388-clearfog-pro.dts      |   5 -
+ arch/arm/boot/dts/armada-388-clearfog.dts          |   7 +-
+ arch/arm/boot/dts/armada-388-clearfog.dtsi         |   7 +-
+ arch/arm/boot/dts/armada-388-helios4.dts           | 313 +++++++++++++++++++++
+ .../arm/boot/dts/armada-38x-solidrun-microsom.dtsi |   6 -
+ 7 files changed, 316 insertions(+), 28 deletions(-)
+ create mode 100644 arch/arm/boot/dts/armada-388-helios4.dts
