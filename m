@@ -1,36 +1,135 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 13 Jul 2018 23:19:35 +0200
-Subject: [PATCH 2/3 v4] ARM: dts: Att Vitesse G5e switch to the Gemini SQ201
+Date: Fri, 13 Jul 2018 23:19:36 +0200
+Subject: [PATCH 3/3 v4] ARM: dts: Add devicetree for Storlink/Storm SL93512R
 In-Reply-To: <20180713211936.31820-1-linus.walleij@linaro.org>
 References: <20180713211936.31820-1-linus.walleij@linaro.org>
-Message-ID: <20180713211936.31820-2-linus.walleij@linaro.org>
+Message-ID: <20180713211936.31820-3-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the Vitesse G5e ethernet switch to the Square
-One Itian SQ201 router device tree.
+The Storlink Gemini324 EV-Board also known as Storm
+Semiconductor SL93512R_BRD is ground zero for the Gemini
+devices. We add a device tree so we can support it, it
+turns out to be pretty trivial.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
 ChangeLog v3->v4:
-- Restore a lost comment change from v1 (sorry for the mess)
+- Restore lost changes from v1 (sorry about the mess)
 ChangeLog v2->v3:
 - Use a fixed link for the ethernet port to the Vitesse
   DSA router chip.
 ChangeLog v1->v2:
-- Drop unrelated roofs mount point change.
+- Rename wrongly named "ethernet-phy" to "mdio"
+- Drop device_type from the ethernet phy
 ---
- arch/arm/boot/dts/gemini-sq201.dts | 77 +++++++++++++++++++++++++++++-
- 1 file changed, 76 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/Makefile            |   1 +
+ arch/arm/boot/dts/gemini-sl93512r.dts | 328 ++++++++++++++++++++++++++
+ 2 files changed, 329 insertions(+)
+ create mode 100644 arch/arm/boot/dts/gemini-sl93512r.dts
 
-diff --git a/arch/arm/boot/dts/gemini-sq201.dts b/arch/arm/boot/dts/gemini-sq201.dts
-index a57a03e2953b..3787cf3763c4 100644
---- a/arch/arm/boot/dts/gemini-sq201.dts
-+++ b/arch/arm/boot/dts/gemini-sq201.dts
-@@ -69,6 +69,61 @@
- 		};
- 	};
- 
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 37a3de760d40..a10ef98c6d75 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -200,6 +200,7 @@ dtb-$(CONFIG_ARCH_GEMINI) += \
+ 	gemini-dlink-dns-313.dtb \
+ 	gemini-nas4220b.dtb \
+ 	gemini-rut1xx.dtb \
++	gemini-sl93512r.dtb \
+ 	gemini-sq201.dtb \
+ 	gemini-wbd111.dtb \
+ 	gemini-wbd222.dtb
+diff --git a/arch/arm/boot/dts/gemini-sl93512r.dts b/arch/arm/boot/dts/gemini-sl93512r.dts
+new file mode 100644
+index 000000000000..ebefb7297379
+--- /dev/null
++++ b/arch/arm/boot/dts/gemini-sl93512r.dts
+@@ -0,0 +1,328 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Device Tree file for the Storm Semiconductor SL93512R_BRD
++ * Gemini reference design, also initially called
++ * "Gemini324 EV-Board" before Storm acquired Storlink Semiconductor.
++ * The series were later acquired by Cortina Systems.
++ */
++
++/dts-v1/;
++
++#include "gemini.dtsi"
++#include <dt-bindings/input/input.h>
++
++/ {
++	model = "Storlink Semiconductor Gemini324 EV-Board / Storm Semiconductor SL93512R_BRD";
++	compatible = "storlink,gemini324", "storm,sl93512r", "cortina,gemini";
++	#address-cells = <1>;
++	#size-cells = <1>;
++
++	memory at 0 {
++		/* 64 MB Samsung K4H511638B */
++		device_type = "memory";
++		reg = <0x00000000 0x4000000>;
++	};
++
++	chosen {
++		bootargs = "console=ttyS0,19200n8 root=/dev/sda1 rw rootwait";
++		stdout-path = &uart0;
++	};
++
++	gpio_keys {
++		compatible = "gpio-keys";
++
++		button-wps {
++			debounce-interval = <50>;
++			wakeup-source;
++			linux,code = <KEY_WPS_BUTTON>;
++			label = "WPS";
++			/* Conflict with NAND flash */
++			gpios = <&gpio0 17 GPIO_ACTIVE_LOW>;
++		};
++
++		button-setup {
++			debounce-interval = <50>;
++			wakeup-source;
++			linux,code = <KEY_SETUP>;
++			label = "factory reset";
++			/* Conflict with NAND flash */
++			gpios = <&gpio0 18 GPIO_ACTIVE_LOW>;
++		};
++	};
++
++	leds {
++		compatible = "gpio-leds";
++		led-green-harddisk {
++			label = "sq201:green:harddisk";
++			/* Conflict with LCD (no problem) */
++			gpios = <&gpio0 16 GPIO_ACTIVE_LOW>;
++			default-state = "off";
++			linux,default-trigger = "disk-activity";
++		};
++		led-green-wireless {
++			label = "sq201:green:wireless";
++			/* Conflict with NAND flash CE0 (no problem) */
++			gpios = <&gpio0 17 GPIO_ACTIVE_LOW>;
++			default-state = "on";
++			linux,default-trigger = "heartbeat";
++		};
++	};
++
++	mdio0: mdio {
++		compatible = "virtual,mdio-gpio";
++		/* Uses MDC and MDIO */
++		gpios = <&gpio0 22 GPIO_ACTIVE_HIGH>, /* MDC */
++			<&gpio0 21 GPIO_ACTIVE_HIGH>; /* MDIO */
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		/* This is a Marvell 88E1111 ethernet transciever */
++		phy0: ethernet-phy at 1 {
++			reg = <1>;
++		};
++	};
++
 +	spi {
 +		compatible = "spi-gpio";
 +		#address-cells = <1>;
@@ -43,7 +142,7 @@ index a57a03e2953b..3787cf3763c4 100644
 +		num-chipselects = <1>;
 +
 +		switch at 0 {
-+			compatible = "vitesse,vsc7395";
++			compatible = "vitesse,vsc7385";
 +			reg = <0>;
 +			/* Specified for 2.5 MHz or below */
 +			spi-max-frequency = <2500000>;
@@ -86,16 +185,65 @@ index a57a03e2953b..3787cf3763c4 100644
 +	};
 +
 +
- 	soc {
- 		flash at 30000000 {
- 			/*
-@@ -134,6 +189,16 @@
- 						"gpio0kgrp";
- 					};
- 				};
++	soc {
++		flash at 30000000 {
++			status = "okay";
++			/* 16MB of flash */
++			reg = <0x30000000 0x01000000>;
++
++			partition at 0 {
++				label = "BOOT";
++				reg = <0x00000000 0x00020000>;
++				read-only;
++			};
++			partition at 120000 {
++				label = "Kern";
++				reg = <0x00020000 0x00300000>;
++			};
++			partition at 320000 {
++				label = "Ramdisk";
++				reg = <0x00320000 0x00600000>;
++			};
++			partition at 920000 {
++				label = "Application";
++				reg = <0x00920000 0x00600000>;
++			};
++			partition at f20000 {
++				label = "VCTL";
++				reg = <0x00f20000 0x00020000>;
++				read-only;
++			};
++			partition at f40000 {
++				label = "CurConf";
++				reg = <0x00f40000 0x000a0000>;
++				read-only;
++			};
++			partition at fe0000 {
++				label = "FIS directory";
++				reg = <0x00fe0000 0x00020000>;
++				read-only;
++			};
++		};
++
++		syscon: syscon at 40000000 {
++			pinctrl {
 +				/*
-+				 * gpio0dgrp cover lines used by the SPI
-+				 * to the Vitesse G5x chip.
++				 * gpio0egrp cover line 16 used by HD LED
++				 * gpio0fgrp cover line 17, 18 used by wireless LED and reset button
++				 * gpio0hgrp cover line 21, 22 used by MDIO for Marvell PHY
++				 * gpio0kgrp cover line 31 used by USB LED
++				 */
++				gpio0_default_pins: pinctrl-gpio0 {
++					mux {
++						function = "gpio0";
++						groups = "gpio0egrp",
++						"gpio0fgrp",
++						"gpio0hgrp";
++					};
++				};
++				/*
++				 * gpio1dgrp cover lines used by SPI for
++				 * the Vitesse chip (28-31)
 +				 */
 +				gpio1_default_pins: pinctrl-gpio1 {
 +					mux {
@@ -103,34 +251,128 @@ index a57a03e2953b..3787cf3763c4 100644
 +						groups = "gpio1dgrp";
 +					};
 +				};
- 				pinctrl-gmii {
- 					mux {
- 						function = "gmii";
-@@ -204,6 +269,11 @@
- 			pinctrl-0 = <&gpio0_default_pins>;
- 		};
- 
++				pinctrl-gmii {
++					mux {
++						function = "gmii";
++						groups = "gmii_gmac0_grp", "gmii_gmac1_grp";
++					};
++					/* Control pad skew comes from sl_switch.c in the vendor code */
++					conf0 {
++						pins = "P10 GMAC1 TXC";
++						skew-delay = <5>;
++					};
++					conf1 {
++						pins = "V11 GMAC1 TXEN";
++						skew-delay = <7>;
++					};
++					conf2 {
++						pins = "T11 GMAC1 RXC";
++						skew-delay = <8>;
++					};
++					conf3 {
++						pins = "U11 GMAC1 RXDV";
++						skew-delay = <7>;
++					};
++					conf4 {
++						pins = "V7 GMAC0 TXC";
++						skew-delay = <10>;
++					};
++					conf5 {
++						pins = "P8 GMAC0 TXEN";
++						skew-delay = <7>; /* 5 at another place? */
++					};
++					conf6 {
++						pins = "T8 GMAC0 RXC";
++						skew-delay = <15>;
++					};
++					conf7 {
++						pins = "R8 GMAC0 RXDV";
++						skew-delay = <0>;
++					};
++					conf8 {
++						/* The data lines all have default skew */
++						pins = "U8 GMAC0 RXD0", "V8 GMAC0 RXD1",
++						       "P9 GMAC0 RXD2", "R9 GMAC0 RXD3",
++						       "R11 GMAC1 RXD0", "P11 GMAC1 RXD1",
++						       "V12 GMAC1 RXD2", "U12 GMAC1 RXD3",
++						       "R10 GMAC1 TXD0", "T10 GMAC1 TXD1",
++						       "U10 GMAC1 TXD2", "V10 GMAC1 TXD3";
++						skew-delay = <7>;
++					};
++					/* Appears in sl351x_gmac.c in the vendor code */
++					conf9 {
++						pins = "U7 GMAC0 TXD0", "T7 GMAC0 TXD1",
++						       "R7 GMAC0 TXD2", "P7 GMAC0 TXD3";
++						skew-delay = <5>;
++					};
++				};
++			};
++		};
++
++		/* Both interfaces brought out on SATA connectors */
++		sata: sata at 46000000 {
++			cortina,gemini-ata-muxmode = <0>;
++			cortina,gemini-enable-sata-bridge;
++			status = "okay";
++		};
++
++		gpio0: gpio at 4d000000 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&gpio0_default_pins>;
++		};
++
 +		gpio1: gpio at 4e000000 {
 +			pinctrl-names = "default";
 +			pinctrl-0 = <&gpio1_default_pins>;
 +		};
 +
- 		pci at 50000000 {
- 			status = "okay";
- 			interrupt-map-mask = <0xf800 0 0 7>;
-@@ -234,7 +304,12 @@
- 				phy-handle = <&phy0>;
- 			};
- 			ethernet-port at 1 {
--				/* Used for the Vitesse G5 chip, add later */
++		pci at 50000000 {
++			status = "okay";
++			interrupt-map-mask = <0xf800 0 0 7>;
++			interrupt-map =
++				<0x4800 0 0 1 &pci_intc 0>, /* Slot 9 */
++				<0x4800 0 0 2 &pci_intc 1>,
++				<0x4800 0 0 3 &pci_intc 2>,
++				<0x4800 0 0 4 &pci_intc 3>,
++				<0x5000 0 0 1 &pci_intc 1>, /* Slot 10 */
++				<0x5000 0 0 2 &pci_intc 2>,
++				<0x5000 0 0 3 &pci_intc 3>,
++				<0x5000 0 0 4 &pci_intc 0>,
++				<0x5800 0 0 1 &pci_intc 2>, /* Slot 11 */
++				<0x5800 0 0 2 &pci_intc 3>,
++				<0x5800 0 0 3 &pci_intc 0>,
++				<0x5800 0 0 4 &pci_intc 1>,
++				<0x6000 0 0 1 &pci_intc 3>, /* Slot 12 */
++				<0x6000 0 0 2 &pci_intc 0>,
++				<0x6000 0 0 3 &pci_intc 1>,
++				<0x6000 0 0 4 &pci_intc 2>;
++		};
++
++		ethernet at 60000000 {
++			status = "okay";
++
++			ethernet-port at 0 {
++				phy-mode = "rgmii";
++				phy-handle = <&phy0>;
++			};
++			ethernet-port at 1 {
 +				phy-mode = "rgmii";
 +				fixed-link {
 +					speed = <1000>;
 +					full-duplex;
 +					pause;
 +				};
- 			};
- 		};
- 
++			};
++		};
++
++		ata at 63000000 {
++			status = "okay";
++		};
++
++		ata at 63400000 {
++			status = "okay";
++		};
++	};
++};
 -- 
 2.17.1
