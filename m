@@ -1,43 +1,42 @@
-From: ryan@edited.us (Ryan Grachek)
-Date: Fri, 13 Jul 2018 10:53:48 -0500
-Subject: [PATCH] arm64: dts: hikey960: Remove keep-power-in-suspend property
-Message-ID: <20180713155348.24343-1-ryan@edited.us>
+From: geoff@infradead.org (Geoff Levand)
+Date: Fri, 13 Jul 2018 08:59:27 -0700
+Subject: [RFC PATCH 0/2] efi: add contents of LinuxExtraArgs EFI var to
+ command line
+In-Reply-To: <20180713095604.GD32020@arm.com>
+References: <20180704154919.18564-1-ard.biesheuvel@linaro.org>
+ <4bd9bee6-f2b9-3197-c205-fec104fd1090@infradead.org>
+ <CAKv+Gu9+RYbtD8Ce_AW_1jvTei6dC5LwiiMgSUWDKLs8f7S+eA@mail.gmail.com>
+ <20180713095604.GD32020@arm.com>
+Message-ID: <2d7a3b39-e8f1-1238-b29f-06ea3160ee4a@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the keep-power-in-suspend property because it keeps wifi power
-on during suspend. This property is only required when enabling WoWLAN
-and should only be enabled based on need. Also remove dupplicate property
+Hi Will,
 
-Signed-off-by: Ryan Grachek <ryan@edited.us>
----
- arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts | 1 -
- arch/arm64/boot/dts/hisilicon/hi3660.dtsi         | 1 -
- 2 files changed, 2 deletions(-)
+On 07/13/2018 02:56 AM, Will Deacon wrote:
+> On Fri, Jul 13, 2018 at 08:15:26AM +0200, Ard Biesheuvel wrote:
+> 
+>> This is not my call to make, but I would be much less averse to this
+>> being merged if we could agree upfront on an expiration time of, say,
+>> 2 years (or more?), after which it will be removed (unless anyone
+>> makes a very good case for why it needs to be retained). This should
+>> be mentioned in the kernel log as well when the quirk is triggered.
+> 
+> The problem with that is it all falls apart when somebody who wasn't
+> involved in the initial discussion crops up after we remove the quirk to
+> complain that their machine broke. In such a situation, we don't have a
+> leg to stand on in my opinion.
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
-index 68c5a6c819ae..a927ce4ec40b 100644
---- a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
-+++ b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
-@@ -586,7 +586,6 @@
- 	ti,non-removable;
- 	non-removable;
- 	cap-power-off-card;
--	keep-power-in-suspend;
- 	#address-cells = <0x1>;
- 	#size-cells = <0x0>;
- 	status = "ok";
-diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-index 8d477dcbfa58..4588fe4e00a8 100644
---- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-@@ -1050,7 +1050,6 @@
- 			reset-names = "reset";
- 			card-detect-delay = <200>;
- 			supports-highspeed;
--			keep-power-in-suspend;
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&sdio_pmx_func
- 				     &sdio_clk_cfg_func
--- 
-2.11.0
+That's the purpose of the announcement in advance.  It should be
+several release cycles before hand to give plenty of time for feedback
+and consensus.
+
+I think it is generally accepted that if a kernel feature has no known
+users and no dedicated maintainer then that code should be removed.
+The powerpc celleb platform was in a similar situation.  Not so many
+available, no real dedicated mainliner, etc. Support was removed [1],
+and I don't know of any problems that came of it.
+
+[1] https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=bf4981a00636347ddcef3fc008e4dd979380a851
+
+-Geoff
