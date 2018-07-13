@@ -1,86 +1,77 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 13 Jul 2018 13:21:55 +0200
-Subject: [PATCH] soc: imx6qp: Use GENPD_FLAG_ALWAYS_ON for PU errata
-In-Reply-To: <c00ad2ebf94d105544b328c77fa1edbfe6bbc193.1531475786.git.leonard.crestez@nxp.com>
-References: <c00ad2ebf94d105544b328c77fa1edbfe6bbc193.1531475786.git.leonard.crestez@nxp.com>
-Message-ID: <CAPDyKFrcn9oK2vDiZaf+d0t=dx0GsO-hv9_MkV2d+PPRHAQEWA@mail.gmail.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Fri, 13 Jul 2018 12:23:02 +0100
+Subject: [PATCH 6/6] coresight: etm-perf: Add support for ETR backend
+In-Reply-To: <20180712205740.GA22128@xps15>
+References: <1531318599-8840-1-git-send-email-suzuki.poulose@arm.com>
+ <1531318599-8840-7-git-send-email-suzuki.poulose@arm.com>
+ <20180712205740.GA22128@xps15>
+Message-ID: <cf11b93e-6e57-7309-5364-6c1d00ff8381@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 July 2018 at 12:01, Leonard Crestez <leonard.crestez@nxp.com> wrote:
-> This is functionally identical but simpler and slightly faster.
->
-> The PU domain is turned on at boot time and never turned off. In the
-> current implementation the pm core will repeatedly call power_off when
-> the domain is unused and get -EBUSY back. If the domain is marked as
-> "always on" instead the pm core won't even attempt to turn it off.
->
-> In theory on 6qp it is safe to turn PU off in suspend, however that is
-> best accomplished with a new core flag.
->
-> Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
+On 12/07/18 21:57, Mathieu Poirier wrote:
+> Hi Suzuki,
+> 
+> On Wed, Jul 11, 2018 at 03:16:39PM +0100, Suzuki K Poulose wrote:
+>> Add support for using TMC-ETR as backend for ETM perf tracing.
+>> We use software double buffering at the moment. i.e, the TMC-ETR
+>> uses a separate buffer than the perf ring buffer. The data is
+>> copied to the perf ring buffer once a session completes.
+>>
+>> The TMC-ETR would try to match the larger of perf ring buffer
+>> or the ETR buffer size configured via sysfs, scaling down to
+>> a minimum limit of 1MB.
+>>
+>> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>> ---
+>>   drivers/hwtracing/coresight/coresight-tmc-etr.c | 265 +++++++++++++++++++++++-
+>>   drivers/hwtracing/coresight/coresight-tmc.h     |   2 +
+>>   2 files changed, 265 insertions(+), 2 deletions(-)
 
-Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+>> +/*
+>> + * tmc_etr_sync_perf_buffer: Copy the actual trace data from the hardware
+>> + * buffer to the perf ring buffer.
+>> + */
+>> +static void tmc_etr_sync_perf_buffer(struct etr_perf_buffer *etr_perf)
+>> +{
+>> +	long bytes, to_copy;
+>> +	long pg_idx, pg_offset, src_offset;
+>> +	unsigned long head = etr_perf->head;
+>> +	char **dst_pages, *src_buf;
+>> +	struct etr_buf *etr_buf = etr_perf->etr_buf;
+>> +
+>> +	head = PERF_IDX2OFF(etr_perf->head, etr_perf);
+> 
+> I'm puzzled here.  Since etr_perf->head is set in tmc_etr_set_perf_buffer() to
+> the value of handle->head, its value is always within the range of the perf ring
 
-Kind regards
-Uffe
+IIUC, the handle->head is not necessarily guaranteed to be within the aux-ring buffer.
 
-> ---
->  drivers/soc/imx/gpc.c | 8 ++------
->  1 file changed, 2 insertions(+), 6 deletions(-)
->
-> Previous discussion:
-> * https://lkml.org/lkml/2018/7/11/431
-> * https://lkml.org/lkml/2018/7/10/103
->
-> Attempt at turning PU off in suspend:
-> * https://lkml.org/lkml/2018/7/6/698
->
-> diff --git a/drivers/soc/imx/gpc.c b/drivers/soc/imx/gpc.c
-> index faf13a0b85d6..f31978e5af20 100644
-> --- a/drivers/soc/imx/gpc.c
-> +++ b/drivers/soc/imx/gpc.c
-> @@ -45,11 +45,10 @@ struct imx_pm_domain {
->         struct clk *clk[GPC_CLK_MAX];
->         int num_clks;
->         unsigned int reg_offs;
->         signed char cntr_pdn_bit;
->         unsigned int ipg_rate_mhz;
-> -       unsigned int flags;
->  };
->
->  static inline struct imx_pm_domain *
->  to_imx_pm_domain(struct generic_pm_domain *genpd)
->  {
-> @@ -60,13 +59,10 @@ static int imx6_pm_domain_power_off(struct generic_pm_domain *genpd)
->  {
->         struct imx_pm_domain *pd = to_imx_pm_domain(genpd);
->         int iso, iso2sw;
->         u32 val;
->
-> -       if (pd->flags & PGC_DOMAIN_FLAG_NO_PD)
-> -               return -EBUSY;
-> -
->         /* Read ISO and ISO2SW power down delays */
->         regmap_read(pd->regmap, pd->reg_offs + GPC_PGC_PUPSCR_OFFS, &val);
->         iso = val & 0x3f;
->         iso2sw = (val >> 8) & 0x3f;
->
-> @@ -419,12 +415,12 @@ static int imx_gpc_probe(struct platform_device *pdev)
->                 return ret;
->         }
->
->         /* Disable PU power down in normal operation if ERR009619 is present */
->         if (of_id_data->err009619_present)
-> -               imx_gpc_domains[GPC_PGC_DOMAIN_PU].flags |=
-> -                               PGC_DOMAIN_FLAG_NO_PD;
-> +               imx_gpc_domains[GPC_PGC_DOMAIN_PU].base.flags |=
-> +                               GENPD_FLAG_ALWAYS_ON;
->
->         /* Keep DISP always on if ERR006287 is present */
->         if (of_id_data->err006287_present)
->                 imx_gpc_domains[GPC_PGC_DOMAIN_DISPLAY].base.flags |=
->                                 GENPD_FLAG_ALWAYS_ON;
-> --
-> 2.17.1
->
+> buffer.  In tmc_etr_alloc_perf_buffer() etr_perf->nr_pages is set to the number
+> of pages present in that ring buffer.  As such I'm not sure as to why we need
+> the PERF_IDX2OFF() macro.
+> 
+> It seems to me that "head = etr_perf->head;" above is sufficient.
+> 
+
+We need to do the step at some point, which could be moved to set_perf_buffer.
+
+>> +	pg_idx = head >> PAGE_SHIFT;
+>> +	pg_offset = head & (PAGE_SIZE - 1);
+>> +	dst_pages = (char **)etr_perf->pages;
+>> +	src_offset = etr_buf->offset;
+>> +	to_copy = etr_buf->len;
+>> +
+>> +	while (to_copy > 0) {
+>> +		/*
+>> +		 * We can copy minimum of :
+> 
+> s/We can copy minimum of :/In one iteration we can copy a minimum of:/
+> 
+> If I'm wrong about the PERF_IDX2OFF(), don't bother respinning just for that.
+
+I have some more fixes for handling the different modes (sysfs vs perf),
+which I can include in the v2.
+
+Suzuki
