@@ -1,51 +1,57 @@
-From: james.morse@arm.com (James Morse)
-Date: Fri, 13 Jul 2018 16:27:37 +0100
-Subject: [PATCH v7 3/4] KVM: arm64: Share the parts of get/set events
- useful to 32bit
-In-Reply-To: <b392c9e1-d0e4-9674-a223-351b381db76c@huawei.com>
-References: <20180710164952.23736-1-james.morse@arm.com>
- <20180710164952.23736-4-james.morse@arm.com>
- <b392c9e1-d0e4-9674-a223-351b381db76c@huawei.com>
-Message-ID: <77fa3cb5-ef9c-962a-0d0c-b7cac19c1ce7@arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 13 Jul 2018 09:27:42 -0600
+Subject: [PATCH] pinctrl: at91: fix deferred probing support
+In-Reply-To: <20180713094717.GQ16084@piout.net>
+References: <20180712192222.32481-1-robh@kernel.org>
+ <20180713094717.GQ16084@piout.net>
+Message-ID: <CAL_Jsq+aT3kSLwcm+g0MHV6Gy+4mde17fUDa9HwiexQ1dHn5Bg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi gengdongjiu,
+On Fri, Jul 13, 2018 at 3:47 AM Alexandre Belloni
+<alexandre.belloni@bootlin.com> wrote:
+>
+> Hi Rob,
+>
+> On 12/07/2018 13:22:22-0600, Rob Herring wrote:
+> > AT91 pinctrl deferred probing support is broken if the GPIO devices
+> > haven't probed first and set gpio_banks to non-zero. The later condition
+> > that only some GPIO devices haven't probed can't actually happen as
+> > either all the GPIO devices have probed first or none of them have. Plus
+> > the pinctrl driver has already returned -EINVAL, so it's not on the
+> > deferred list to retry probing.
+> >
+> > Fix this by consolidating the checking that all GPIO devices are probed.
+> >
+> > Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+> > Cc: Linus Walleij <linus.walleij@linaro.org>
+> > Cc: Nicolas Ferre <nicolas.ferre@microchip.com>
+> > Cc: Alexandre Belloni <alexandre.belloni@bootlin.com>
+> > Cc: linux-arm-kernel at lists.infradead.org
+> > Cc: linux-gpio at vger.kernel.org
+> > Signed-off-by: Rob Herring <robh@kernel.org>
+> > ---
+> > This is a result of trying to remove of_platform_default_populate from
+> > at91 code and relying on the DT core handling populating devices. That
+> > changed the probe order and broke booting.
+> >
+>
+> This solves part of the issue but when tested with the
+> of_platform_default_populate removal, many drivers will fail with
+> gpiod_set_value: invalid GPIO (errorpointer)
+>
+> or
+>
+> gpiod_get_value: invalid GPIO (errorpointer)
+>
+> This happens both before and after the pinctrl driver probed.
+>
+> I didn't investigate much yet.
 
-On 11/07/18 08:16, gengdongjiu wrote:
-> On 2018/7/11 0:49, James Morse wrote:
->> The get/set events helpers to do some work to check reserved
->> and padding fields are zero. This is useful on 32bit too.
->>
->> Move this code into virt/kvm/arm/arm.c, and give the arch
->> code some underscores.
->>
->> This is temporarily hidden behind __KVM_HAVE_VCPU_EVENTS until
->> 32bit is wired up.
+Looks to me like it may be a circular dependency. The GPIO request
+functions depend on the pinctrl driver which depends on the gpio
+driver. Maybe returning EPROBE_DEFER in at91_gpio_request_enable and
+removing the requirement that the GPIO driver probe first would fix
+it...
 
->> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
->> index a94eab71e5c7..f70d24e1751d 100644
->> --- a/virt/kvm/arm/arm.c
->> +++ b/virt/kvm/arm/arm.c
->> @@ -1044,6 +1044,34 @@ static int kvm_arm_vcpu_has_attr(struct kvm_vcpu *vcpu,
-
->> +#ifdef __KVM_HAVE_VCPU_EVENTS	/* temporary: until 32bit is wired up */
-
-[..]
-
->> +#endif /* __KVM_HAVE_VCPU_EVENTS */
-
-> In [PATCH v7 4/4] KVM: arm: Add 32bit get/set events support, I see you> remove "__KVM_HAVE_VCPU_EVENTS" in kvm_arch_vcpu_ioctl()
-> but here it adds, it looks like strange.
-> so maybe it is better keep it in both place, or remove them both.
-> 
-> From the comments /* temporary: until 32bit is wired up */, do you forget
-> to remove the __KVM_HAVE_VCPU_EVENTS	after wiring up the 32bit?
-
-Indeed I did, the 'temporary' note was meant to remind me!
-(and I forgot about the documentation too)
-
-
-Thanks!
-
-James
+Rob
