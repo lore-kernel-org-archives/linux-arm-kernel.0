@@ -1,22 +1,37 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 13 Jul 2018 07:25:50 -0700
-Subject: [PATCH 0/2] Stingray Smart NIC DT support
-In-Reply-To: <1531257931-11591-1-git-send-email-ray.jui@broadcom.com>
-References: <1531257931-11591-1-git-send-email-ray.jui@broadcom.com>
-Message-ID: <bbc882af-10e3-a077-cd36-bb5553a8aefe@gmail.com>
+Date: Fri, 13 Jul 2018 07:38:16 -0700
+Subject: [GIT PULL 1/6 v2] Broadcom defconfig changes for 4.19
+Message-ID: <20180713143821.1514-1-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
 
+  Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
 
-On 07/10/2018 02:25 PM, Ray Jui wrote:
-> This patch series adds DT support for Stingray smart NIC boards
-> 
-> This patch series is based off v4.18-rc3 and is available on GIHUB:
-> repo: https://github.com/Broadcom/arm64-linux.git
-> branch: sr-smartnic-dt-v1
+are available in the git repository at:
 
-Series applied to devicetree-arm64/next, thanks. I will be sending an
-update set of 4.19 pull requests with those included.
--- 
-Florian
+  https://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.19/defconfig
+
+for you to fetch changes up to b0ba9fad81e419f85829c2a6925110d9714dd708:
+
+  Merge tag 'bcm2835-defconfig-next-2018-07-03' into defconfig/next (2018-07-09 05:23:16 -0700)
+
+----------------------------------------------------------------
+This pull request contains Broadcom ARM-based SoCs defconfig updates
+for 4.19, please pull the following:
+
+- Stefan enables the Raspberry Pi voltage sensor driver (HWMON) in both
+  multi_v7_defconfig and bcm2835_defconfig
+
+----------------------------------------------------------------
+Florian Fainelli (1):
+      Merge tag 'bcm2835-defconfig-next-2018-07-03' into defconfig/next
+
+Stefan Wahren (2):
+      ARM: bcm2835_defconfig: Enable RPi voltage sensor
+      ARM: multi_v7_defconfig: Enable RPi voltage sensor
+
+ arch/arm/configs/bcm2835_defconfig  | 2 +-
+ arch/arm/configs/multi_v7_defconfig | 1 +
+ 2 files changed, 2 insertions(+), 1 deletion(-)
