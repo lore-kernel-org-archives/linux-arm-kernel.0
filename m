@@ -1,41 +1,86 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Fri, 13 Jul 2018 10:22:51 +0800
-Subject: [PATCH 1/1] iommu/arm-smmu-v3: prevent any devices access to
- memory without registration
-In-Reply-To: <5B4804D6.4050508@huawei.com>
-References: <1531387723-3592-1-git-send-email-thunder.leizhen@huawei.com>
- <20180712170120.GC26935@arm.com> <5B4804D6.4050508@huawei.com>
-Message-ID: <8067f5d2-b241-d5f2-42f6-466913f04e04@huawei.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Fri, 13 Jul 2018 10:28:08 +0800
+Subject: [linux-sunxi] Re: [PATCH 1/2] ARM: sun8i: h3: enable HDMI output
+ on Banana Pi M2 Zero
+In-Reply-To: <20180712145306.ootqt7dfh3nxsamy@flea>
+References: <20180711132233.42301-1-icenowy@aosc.io>
+ <20180711132233.42301-2-icenowy@aosc.io>
+ <20180711150532.6gzm7krouriddreh@flea>
+ <8F6CDF5C-2AC1-43EC-858A-5C6345CF279A@aosc.io>
+ <20180712064601.m3bdd46wzac5fpgh@flea>
+ <A7CA2831-7117-415C-BC59-3FB4AE425598@aosc.io>
+ <20180712145306.ootqt7dfh3nxsamy@flea>
+Message-ID: <82CD0BCE-9DE4-45D7-8DF4-FCCFBC70BECF@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018/7/13 9:48, Leizhen (ThunderTown) wrote:
-> 
-> 
-> On 2018/7/13 1:01, Will Deacon wrote:
->> On Thu, Jul 12, 2018 at 05:28:43PM +0800, Zhen Lei wrote:
->>> Stream bypass is not security. A malicious device can be hot plugged
->>> without match any drivers, but it can access to any memory. So change to
->>> disable bypass by default.
->>>
->>> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
->>> ---
->>>  drivers/iommu/arm-smmu-v3.c | 2 +-
->>>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> Whilst this sounds nice, I *bet* you it will break some systems. In
->> particular, those where the SMMU is described but the toplogical information
->> is either incorrect or incomplete.
-> 
-> Suppose this scene exists, maybe we should consider updating IORT specification,
-> to indicate whether a smmu treats all unregistered devices as stream bypass or not, --- global control
-> to indicate whether a single device default use stream bypass or not, --- local control
-> that will be more flexible. But we still disable bypass by default.
 
-IORT (or dts) is about the hardware feature, if it's only
-about the wrong topological information of devices and
-SMMU, I think IORT is not the right place to describe such
-information, we need correct that information instead.
 
-Thanks
-Hanjun
+? 2018?7?12? GMT+08:00 ??10:53:06, Maxime Ripard <maxime.ripard@bootlin.com> ??:
+>On Thu, Jul 12, 2018 at 03:09:55PM +0800, Icenowy Zheng wrote:
+>> ? 2018?7?12? GMT+08:00 ??2:46:01, Maxime Ripard
+><maxime.ripard@bootlin.com> ??:
+>> >On Wed, Jul 11, 2018 at 11:15:50PM +0800, Icenowy Zheng wrote:
+>> >> 
+>> >> 
+>> >> ? 2018?7?11? GMT+08:00 ??11:05:32, Maxime Ripard
+>> ><maxime.ripard@bootlin.com> ??:
+>> >> >Hi,
+>> >> >
+>> >> >On Wed, Jul 11, 2018 at 09:22:32PM +0800, Icenowy Zheng wrote:
+>> >> >> Banana Pi M2 Zero board has a miniHDMI port connected to the
+>HDMI
+>> >> >> controller of Allwinner H3 SoC.
+>> >> >> 
+>> >> >> Enable the HDMI output in Banana Pi M2 Zero device tree.
+>> >> >> 
+>> >> >> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+>> >> >> ---
+>> >> >>  .../dts/sun8i-h2-plus-bananapi-m2-zero.dts    | 25
+>> >> >+++++++++++++++++++
+>> >> >>  1 file changed, 25 insertions(+)
+>> >> >> 
+>> >> >> diff --git
+>a/arch/arm/boot/dts/sun8i-h2-plus-bananapi-m2-zero.dts
+>> >> >b/arch/arm/boot/dts/sun8i-h2-plus-bananapi-m2-zero.dts
+>> >> >> index 7d01f9322658..eb61dcf32797 100644
+>> >> >> --- a/arch/arm/boot/dts/sun8i-h2-plus-bananapi-m2-zero.dts
+>> >> >> +++ b/arch/arm/boot/dts/sun8i-h2-plus-bananapi-m2-zero.dts
+>> >> >> @@ -26,6 +26,17 @@
+>> >> >>  		stdout-path = "serial0:115200n8";
+>> >> >>  	};
+>> >> >>  
+>> >> >> +	hdmi-connector {
+>> >> >> +		compatible = "hdmi-connector";
+>> >> >> +		type = "c";
+>> >> >
+>> >> >This is not one of the connector type declared in DRM, how is it
+>> >> >exposed to the userspace?
+>> >> 
+>> >> So just use "A" here (because of single link)?
+>> >
+>> >If the connector type is C, it should be C, and DRM / driver
+>adjusted
+>> >to handle it.
+>> 
+>> Okay I won't change this property, if there's any further revisions.
+>> 
+>> For DRM driver, I think it can be an independent patchset.
+>
+>Not really, since it's going to break userspace as soon as you merge
+>that other patchset.
+
+Should we bother the DRM maintainer to ask for any advice?
+
+>
+>Maxime
+>
+>-- 
+>Maxime Ripard, Bootlin (formerly Free Electrons)
+>Embedded Linux and Kernel engineering
+>https://bootlin.com
+>
+>_______________________________________________
+>linux-arm-kernel mailing list
+>linux-arm-kernel at lists.infradead.org
+>http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
