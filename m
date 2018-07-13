@@ -1,7 +1,7 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 13 Jul 2018 14:52:15 +0100
-Subject: [GIT PULL] firmware: scmi: update/cleanup for v4.19
-Message-ID: <20180713135215.GA21499@e107155-lin>
+Date: Fri, 13 Jul 2018 14:55:23 +0100
+Subject: drivers: vexpress: update/cleanup for v4.19
+Message-ID: <20180713135523.GB21499@e107155-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -20,20 +20,21 @@ The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git tags/scmi-update-4.19
+  git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git tags/vexpress-update-4.19
 
-for you to fetch changes up to 23cae492b4ed8cb2eb741f21a48bfd712960e87f:
+for you to fetch changes up to cc4aecc5b724b47df65ef3e218ac7d73d2ee4e09:
 
-  firmware: arm_scmi: remove some unnecessary checks (2018-07-09 10:50:20 +0100)
-
-----------------------------------------------------------------
-SCMI cleanup for v4.19
-
-Single patch removing some unnecessary NULL pointer checks.
+  misc: vexpress/syscfg: Use devm_ioremap_resource() to map memory (2018-07-12 18:06:01 +0100)
 
 ----------------------------------------------------------------
-Dan Carpenter (1):
-      firmware: arm_scmi: remove some unnecessary checks
+ARMv7 Vexpress update/cleanup for v4.19
 
- drivers/firmware/arm_scmi/perf.c | 5 -----
- 1 file changed, 5 deletions(-)
+Just single cleanup patch to use devm_ioremap_resource in place of
+devm_request_mem_region and devm_ioremap.
+
+----------------------------------------------------------------
+Sudeep Holla (1):
+      misc: vexpress/syscfg: Use devm_ioremap_resource() to map memory
+
+ drivers/misc/vexpress-syscfg.c | 10 +++-------
+ 1 file changed, 3 insertions(+), 7 deletions(-)
