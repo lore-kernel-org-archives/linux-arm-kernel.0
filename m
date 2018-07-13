@@ -1,66 +1,50 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Fri, 13 Jul 2018 10:41:58 +0100
-Subject: RFC: tegra2/tegra3 automotive part changes
-In-Reply-To: <fecd5597-1b04-6409-b87c-5cda54d43ce0@wwwdotorg.org>
-References: <3916c0ea-964e-42ab-8bfd-8e8edc5110ee@codethink.co.uk>
- <fecd5597-1b04-6409-b87c-5cda54d43ce0@wwwdotorg.org>
-Message-ID: <4f215c76-6539-1130-6c1f-75f0a3df068a@codethink.co.uk>
+From: alexandre.belloni@bootlin.com (Alexandre Belloni)
+Date: Fri, 13 Jul 2018 11:47:17 +0200
+Subject: [PATCH] pinctrl: at91: fix deferred probing support
+In-Reply-To: <20180712192222.32481-1-robh@kernel.org>
+References: <20180712192222.32481-1-robh@kernel.org>
+Message-ID: <20180713094717.GQ16084@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/07/18 16:56, Stephen Warren wrote:
-> On 07/12/2018 07:36 AM, Ben Dooks wrote:
->> Hello, we are looking at up-streaming some of the work we have
->> done on the tegra2 and tegra3 automotive devices. The automotive
->> grade devices are close the commercial parts so we would like to
->> discuss the core changes before submitting.
->>
->> The changes are mostly with things like the clock setup and a
->> few peripheral quirks (IIRC these are mostly MMC).
->>
->> We are proposing to change the device-tree properties for the root
->> node and any other affected devices from "nvidia,tegraXX" to a new
->> "nvidia,tegraXXa". We would welcome discussion on whether to update
->> all the devices at the start
->>
->> An example of tegra30a.dtsi:
->>
->> #include "tegra30.dtsi"
->>
->> / {
->> ???????? compatible = "nvidia,tegra30a";
->>
->> ???????? clock at 60006000 {
->> ???????????????? compatible = "nvidia,tegra30a-car";
->> ???????? };
->> }
+Hi Rob,
+
+On 12/07/2018 13:22:22-0600, Rob Herring wrote:
+> AT91 pinctrl deferred probing support is broken if the GPIO devices
+> haven't probed first and set gpio_banks to non-zero. The later condition
+> that only some GPIO devices haven't probed can't actually happen as
+> either all the GPIO devices have probed first or none of them have. Plus
+> the pinctrl driver has already returned -EINVAL, so it's not on the
+> deferred list to retry probing.
 > 
-> This doesn't sound right. Auto and commercial parts are identical AFAIK; 
-> it's just qualification differences. Hence at most you'd add an extra 
-> compatible value and not remove the old one. Better might be to detect 
-> this at run-time from the fuses. I think we already do some of that 
-> already; search for speedo related code in arch/arm/mach-tegra/.
+> Fix this by consolidating the checking that all GPIO devices are probed.
+> 
+> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Nicolas Ferre <nicolas.ferre@microchip.com>
+> Cc: Alexandre Belloni <alexandre.belloni@bootlin.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-gpio at vger.kernel.org
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> ---
+> This is a result of trying to remove of_platform_default_populate from 
+> at91 code and relying on the DT core handling populating devices. That 
+> changed the probe order and broke booting.
+> 
 
-The nvidia pdk for the automotive didn't set the clocks up in the
-same way and we where told that there are certain clock restrictions
-for the automotive parts that the commercial ones do not have. Some of
-this came from internal discussions with nvidia and NDA'd datasheets
-so I don't know how much actual data I can share.
+This solves part of the issue but when tested with the
+of_platform_default_populate removal, many drivers will fail with
+gpiod_set_value: invalid GPIO (errorpointer)
 
-To get the 4.4 kernel to be similar enough to work with the tegra30a
-we had to do some changes to the clock initialisation. For things
-like the clock I am not sure if leaving a tegra30-car in there would
-be a good idea, it may boot but probably won't be stable.
+or 
 
-For the fuses, is the fuse driver up early enough to allow the clock
-driver could use this? otherwise I think the device-tree change would
-be the only way. I'm not sure if I have the information to hand on
-how to differentiate the tegra30 and tegra20.
+gpiod_get_value: invalid GPIO (errorpointer)
 
-PS, we'll want to do the same for the tegra20.
+This happens both before and after the pinctrl driver probed.
+
+I didn't investigate much yet.
 
 -- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
-
-https://www.codethink.co.uk/privacy.html
+Alexandre Belloni, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
