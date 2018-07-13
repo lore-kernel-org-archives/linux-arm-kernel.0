@@ -1,39 +1,92 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 13 Jul 2018 16:06:07 +0100
-Subject: [PATCHv3 00/12] atomics: generate atomic headers / instrument
- arm64
-In-Reply-To: <20180706132124.GN2494@hirez.programming.kicks-ass.net>
-References: <20180705164053.10073-1-mark.rutland@arm.com>
- <20180706131603.GA11172@arm.com>
- <20180706132124.GN2494@hirez.programming.kicks-ass.net>
-Message-ID: <20180713150607.rf6hkwsxpe4gsxqt@lakrids.cambridge.arm.com>
+From: contact@paulk.fr (Paul Kocialkowski)
+Date: Fri, 13 Jul 2018 17:08:09 +0200
+Subject: [PATCH] Revert "arm64: Use aarch64elf and aarch64elfb emulation
+ mode variants"
+In-Reply-To: <CAOesGMguQk_buucvNyKD6NmtdE0Re5_98Af+PME-HzZGHmeQGQ@mail.gmail.com>
+References: <20180709200956.31158-1-labbott@redhat.com>
+ <20180710090125.GA28924@arm.com>
+ <fcd8d97b6714d787297f1b362558e7a68855a1da.camel@paulk.fr>
+ <20180710093615.GA30095@arm.com>
+ <20180713145910.2mlzip5ssk72cleo@localhost>
+ <CAOesGMguQk_buucvNyKD6NmtdE0Re5_98Af+PME-HzZGHmeQGQ@mail.gmail.com>
+Message-ID: <dcf5d2e506b77e835e6175311054f3be9754fa47.camel@paulk.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 06, 2018 at 03:21:24PM +0200, Peter Zijlstra wrote:
-> On Fri, Jul 06, 2018 at 02:16:04PM +0100, Will Deacon wrote:
-> > On Thu, Jul 05, 2018 at 05:40:41PM +0100, Mark Rutland wrote:
-> > > This series scripts the generation of the various atomic headers, to ensure
-> > > that the various atomic APIs remain consistent, reducing the risk of human
-> > > error, and simplifying future rework. This fleshes out the instrumented atomics
-> > > such that arm64 can be migrated over to them.
+Hi,
+
+On Fri, 2018-07-13 at 08:01 -0700, Olof Johansson wrote:
+> On Fri, Jul 13, 2018 at 7:59 AM, Olof Johansson <olof@lixom.net> wrote:
+> > On Tue, Jul 10, 2018 at 10:36:16AM +0100, Will Deacon wrote:
+> > > On Tue, Jul 10, 2018 at 11:30:39AM +0200, Paul Kocialkowski wrote:
+> > > > On Tue, 2018-07-10 at 10:01 +0100, Will Deacon wrote:
+> > > > > Thanks, Laura.
+> > > > > 
+> > > > > I'll take this as a fix, and add a comment to the Makefile to justify
+> > > > > why we need the linux target.
+> > > > 
+> > > > So this comes down to either breaking fedora/debian toolchains (that
+> > > > don't support elf emulation mode) or breaking bare-metal toolchains
+> > > > (that don't support linux emulation mode).
+> > > > 
+> > > > Since Linux is a bare-metal project that does not technically require
+> > > > the linux target (who said using "Linux" for all things is confusing?),
+> > > > I think it should aim for the elf target in the long term.
+> > > > 
+> > > > But well, breaking Linux build in common distros isn't good either, so I
+> > > > guess it makes sense to revert this while distros toolchains are being
+> > > > fixed. Hopefully, it won't take too long.
+> > > > 
+> > > > What do you think?
+> > > 
+> > > Yes, we need to revert the change since it's a regression otherwise. I think
+> > > the best course of action here would be to find a way that we can either
+> > > tell the linker that it doesn't need the missing linker scripts because
+> > > we're providing our own, or find a way to pass different LD flags depending
+> > > on whether or not we have a linux toolchain.
+> > > 
+> > > For now, I've pushed the revert to for-next/fixes.
 > > 
-> > Thanks! For the series apart from the shell scripts:
+> > Hi Will,
 > > 
-> > Acked-by: Will Deacon <will.deacon@arm.com>
+> > This is regressed in mainline as well. But I think we can just use a (slightly
+> > improved) ld-option here? I checked it for x86 regression since it uses the
+> > one-argument version. Patch is here, can you pick that up instead and get it in
+> > for 4.18-rc?
+> > 
+> > Thanks,
+> > 
+> > 
+> > -Olof
+> > 
+> > From 0d73b2d1774d5edce20aac919ba356b61d098646 Mon Sep 17 00:00:00 2001
+> > From: Olof Johansson <olof@lixom.net>
+> > Date: Fri, 13 Jul 2018 07:56:11 -0700
+> > Subject: [PATCH] arm64: Fix build on some toolchains
+> > 
+> > Not all toolchains have the baremetal elf targets, RedHat/Fedora ones in
+> > particular. So, probe for whether it's available and use the previous
+> > (linux) targets if it isn't.
+> > 
+> > Fixes: 38fc42486775 ("arm64: Use aarch64elf and aarch64elfb emulation mode variants")
+> > Signed-off-by: Olof Johansson <olof@lixom.net>
 > 
-> Awesome, Ingo can you stuff these here patches into locking/core
-> someplace?
+> Of course, please add:
+> Reported-by: Laura Abbott <labbott@redhat.com>
+> 
+> or other suitable tag. Sloppy of me to miss.
 
-Looks like Ingo was only Cc'd for the above.
+Thanks for taking care of this patch!
 
-Ingo, are you happy to pick these up?
+I will definitely try it when I get the chance.
 
-I've pushed out a branch [1] with Will's acks and a trivial commit
-message change for patches 8-10 which I don't think is too important. I
-can post that as v4 if you'd prefer to pick that.
+Cheers,
 
-Thanks,
-Mark.
+Paul
 
-[1] git://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git atomics/generated 
+-- 
+Developer of free digital technology and hardware support.
+
+Website: https://www.paulk.fr/
+Coding blog: https://code.paulk.fr/
+Git repositories: https://git.paulk.fr/ https://git.code.paulk.fr/
