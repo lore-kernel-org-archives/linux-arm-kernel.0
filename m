@@ -1,53 +1,53 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 13 Jul 2018 10:50:21 +0100
-Subject: [PATCH 1/3 v4] ARM: dts: Modernize the Vexpress PL111 integration
-In-Reply-To: <b00c3b85-1368-f62b-efda-d23ce27e6f9c@arm.com>
-References: <20180709075232.30678-1-linus.walleij@linaro.org>
- <b00c3b85-1368-f62b-efda-d23ce27e6f9c@arm.com>
-Message-ID: <0bcade58-26d5-8c2f-bcba-765aebd343bb@arm.com>
+From: radu.pirea@microchip.com (Radu Pirea)
+Date: Fri, 13 Jul 2018 12:56:22 +0300
+Subject: [PATCH v10 5/6] spi: at91-usart: add driver for at91-usart as spi
+In-Reply-To: <20180710181559.GG8104@sirena.org.uk>
+References: <20180625172230.29686-1-radu.pirea@microchip.com>
+ <20180625172230.29686-6-radu.pirea@microchip.com>
+ <20180710181559.GG8104@sirena.org.uk>
+Message-ID: <dc410321-5dfd-7c26-2a3e-d2b2840da214@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 10/07/18 10:46, Sudeep Holla wrote:
->  
-> On 09/07/18 08:52, Linus Walleij wrote:
-
-[...]
-
+On 07/10/2018 09:15 PM, Mark Brown wrote:
+> On Mon, Jun 25, 2018 at 08:22:29PM +0300, Radu Pirea wrote:
 > 
-> Still get below warnings, not sure if I need to upgrade my DTC ?
+> This is mostly good, just a couple of small things:
 > 
-> vexpress-v2f-1xv7-ca53x2.dtb: Warning (graph_child_address):
-> /smb at 8000000/motherboard/iofpga at 3,00000000/i2c at 160000/dvi-transmitter at 39/ports:
-> graph node has single child node 'port at 0', #address-cells/#size-cells
-> are not necessary
-> rtsm_ve-aemv8a.dtb: Warning (graph_child_address):
-> /smb at 8000000/motherboard/iofpga at 3,00000000/i2c at 160000/dvi-transmitter at 39/ports:
-> graph node has single child node 'port at 0', #address-cells/#size-cells
-> are not necessary
+>> +config SPI_AT91_USART
+>> +	tristate "Atmel USART Controller SPI driver"
+>> +	depends on HAS_DMA
+>> +	depends on (ARCH_AT91 || COMPILE_TEST)
+>> +	select MFD_AT91_USART
+> 
+> Why is this selecting rather than depending on the MFD like we normally
+> do?
 > 
 
-Ignore this as it's hard to fix. If you fix this you will get 10 other
-warnings elsewhere, not sure why.
+Hi Mark,
 
-[...]
-
->> - Fixed up the Real-Time Systems Models Virtual Executive
->>   RTSMv8 AEM VE:
->>   - Added the I2C interface (whether implemented in the
->>     emulator or not)
+If I add depends instead of select, current defconfigs will be broken 
+and the proper driver will not be selected. Like this, there is no 
+required change in any defconfig. Selecting the serial or spi driver 
+from menuconfig makes the MFD completely transparent.
+>> @@ -0,0 +1,432 @@
+>> +// SPDX-License-Identifier: GPL-2.0
+>> +/*
+>> + * Driver for AT91 USART Controllers as SPI
+>> + *
+>> + * Copyright (C) 2018 Microchip Technology Inc.
+>> + * Author: Radu Pirea <radu.pirea@microchip.com>
+>> + */
 > 
-> It doesn't work. This change is breaking the working CLCD on the models.
-> I just tested and CLCD driver returns
+> Please use C++ comments for the whole block so it looks a bit more
+> intentional.
+
+Ok. I will change it.
+
 > 
-
-It even fails to initialize CLCD on my TC2.
-
-clcd-pl11x 1c1f0000.clcd: PL111 designer 41 rev1 at 0x1c1f0000
-clcd-pl11x: probe of 1c1f0000.clcd failed with error -2
-
--- 
-Regards,
-Sudeep
+> Otherwise
+> 
+> Reviwed-by: Mark Brown <broonie@kernel.org>
+> 
