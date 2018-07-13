@@ -1,204 +1,46 @@
-From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
-Date: Fri, 13 Jul 2018 17:26:26 +0800
-Subject: [PATCH 3/3] arm64: dts: synaptics: add dtsi file for Synaptics
- AS370 SoC
-In-Reply-To: <20180713171712.05f58a74@xhacker.debian>
-References: <20180713171712.05f58a74@xhacker.debian>
-Message-ID: <20180713172626.5ca0e30f@xhacker.debian>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 13 Jul 2018 11:28:50 +0200
+Subject: [GIT PULL] ARM: mvebu: dt64 for v4.19 (#1)
+Message-ID: <87va9jbi25.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add initial dtsi file to support Synaptics AS370 SoC with quad
-Cortex-A53 CPUs.
+Hi,
 
-Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
----
- arch/arm64/boot/dts/synaptics/as370.dtsi | 177 +++++++++++++++++++++++
- 1 file changed, 177 insertions(+)
- create mode 100644 arch/arm64/boot/dts/synaptics/as370.dtsi
+Here is the first pull request for dt64 for mvebu for v4.19.
 
-diff --git a/arch/arm64/boot/dts/synaptics/as370.dtsi b/arch/arm64/boot/dts/synaptics/as370.dtsi
-new file mode 100644
-index 000000000000..20f3d658c566
---- /dev/null
-+++ b/arch/arm64/boot/dts/synaptics/as370.dtsi
-@@ -0,0 +1,177 @@
-+// SPDX-License-Identifier: (GPL-2.0 OR MIT)
-+/*
-+ * Copyright (C) 2018 Synaptics Incorporated
-+ *
-+ * Author: Jisheng Zhang <jszhang@kernel.org>
-+ */
-+
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+
-+/ {
-+	compatible = "syna,as370";
-+	interrupt-parent = <&gic>;
-+	#address-cells = <2>;
-+	#size-cells = <2>;
-+
-+	aliases {
-+		serial0 = &uart0;
-+	};
-+
-+	psci {
-+		compatible = "arm,psci-1.0";
-+		method = "smc";
-+	};
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu0: cpu at 0 {
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			device_type = "cpu";
-+			reg = <0x0>;
-+			enable-method = "psci";
-+			next-level-cache = <&l2>;
-+			cpu-idle-states = <&CPU_SLEEP_0>;
-+		};
-+
-+		cpu1: cpu at 1 {
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			device_type = "cpu";
-+			reg = <0x1>;
-+			enable-method = "psci";
-+			next-level-cache = <&l2>;
-+			cpu-idle-states = <&CPU_SLEEP_0>;
-+		};
-+
-+		cpu2: cpu at 2 {
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			device_type = "cpu";
-+			reg = <0x2>;
-+			enable-method = "psci";
-+			next-level-cache = <&l2>;
-+			cpu-idle-states = <&CPU_SLEEP_0>;
-+		};
-+
-+		cpu3: cpu at 3 {
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			device_type = "cpu";
-+			reg = <0x3>;
-+			enable-method = "psci";
-+			next-level-cache = <&l2>;
-+			cpu-idle-states = <&CPU_SLEEP_0>;
-+		};
-+
-+		l2: cache {
-+			compatible = "cache";
-+		};
-+
-+		idle-states {
-+			entry-method = "psci";
-+			CPU_SLEEP_0: cpu-sleep-0 {
-+				compatible = "arm,idle-state";
-+				local-timer-stop;
-+				arm,psci-suspend-param = <0x0010000>;
-+				entry-latency-us = <75>;
-+				exit-latency-us = <155>;
-+				min-residency-us = <1000>;
-+			};
-+		};
-+	};
-+
-+	osc: osc {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <25000000>;
-+	};
-+
-+	pmu {
-+		compatible = "arm,cortex-a53-pmu";
-+		interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-affinity = <&cpu0>,
-+				     <&cpu1>,
-+				     <&cpu2>,
-+				     <&cpu3>;
-+	};
-+
-+	timer {
-+		compatible = "arm,armv8-timer";
-+		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
-+	};
-+
-+	soc at f7000000 {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges = <0 0 0xf7000000 0x1000000>;
-+
-+		gic: interrupt-controller at 901000 {
-+			compatible = "arm,gic-400";
-+			#interrupt-cells = <3>;
-+			interrupt-controller;
-+			reg = <0x901000 0x1000>,
-+			      <0x902000 0x2000>,
-+			      <0x904000 0x2000>,
-+			      <0x906000 0x2000>;
-+			interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
-+		};
-+
-+		apb at e80000 {
-+			compatible = "simple-bus";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges = <0 0xe80000 0x10000>;
-+
-+			uart0: uart at 0c00 {
-+				compatible = "snps,dw-apb-uart";
-+				reg = <0x0c00 0x100>;
-+				interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&osc>;
-+				reg-shift = <2>;
-+				status = "disabled";
-+			};
-+
-+			gpio0: gpio at 1800 {
-+				compatible = "snps,dw-apb-gpio";
-+				reg = <0x1800 0x400>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				porta: gpio-port at 0 {
-+					compatible = "snps,dw-apb-gpio-port";
-+					gpio-controller;
-+					#gpio-cells = <2>;
-+					snps,nr-gpios = <32>;
-+					reg = <0>;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+					interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>;
-+				};
-+			};
-+
-+			gpio1: gpio at 2000 {
-+				compatible = "snps,dw-apb-gpio";
-+				reg = <0x2000 0x400>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				portb: gpio-port at 1 {
-+					compatible = "snps,dw-apb-gpio-port";
-+					gpio-controller;
-+					#gpio-cells = <2>;
-+					snps,nr-gpios = <32>;
-+					reg = <0>;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+					interrupts = <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
-+				};
-+			};
-+		};
-+	};
-+};
--- 
-2.18.0
+Gregory
+
+The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
+
+  Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+
+are available in the Git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt64-4.19-1
+
+for you to fetch changes up to 4436a3711e3249840e0679e92d3c951bcaf25515:
+
+  arm64: dts: marvell: armada-37xx: reserve memory for ATF (2018-06-29 16:39:03 +0200)
+
+----------------------------------------------------------------
+mvebu dt64 for 4.19 (part 1)
+
+Armada 3700
+ - Add default memory reservation for ATF
+ - Add a node for AVS support
+Fix eth3 connector name on the Macchiatobin
+
+----------------------------------------------------------------
+Baruch Siach (1):
+      arm64: dts: marvell: mcbin: fix eth3 connector name
+
+Gregory CLEMENT (1):
+      arm64: dts: marvell: armada-37xx: add the node allowing AVS support
+
+Victor Gu (1):
+      arm64: dts: marvell: armada-37xx: reserve memory for ATF
+
+ arch/arm64/boot/dts/marvell/armada-37xx.dtsi      | 21 +++++++++++++++++++++
+ arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts |  2 +-
+ 2 files changed, 22 insertions(+), 1 deletion(-)
