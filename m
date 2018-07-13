@@ -1,29 +1,26 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 13 Jul 2018 12:58:44 -0700
-Subject: [PATCH] arm64: build with baremetal linker target instead of
- Linux when available
-In-Reply-To: <33f65453-5b6d-0684-8a91-7e9940846143@redhat.com>
-References: <20180713150701.GA3049@arm.com>
- <20180713153033.20540-1-olof@lixom.net>
- <33f65453-5b6d-0684-8a91-7e9940846143@redhat.com>
-Message-ID: <CAOesGMj6m8q1aRz0k3qPTo2-Fur66nSsBaVNxcDnrrmWbUxe-Q@mail.gmail.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 13 Jul 2018 22:33:27 +0200
+Subject: [PATCH] i2c: aspeed: Adjust spinlock scope in the irq handler
+In-Reply-To: <59538d26-f025-28da-63df-f675e80fd68b@linux.intel.com>
+References: <20180702214011.16071-1-jae.hyun.yoo@linux.intel.com>
+ <CAFd5g47nBCbF0mcYqEnQkDpz0Dhh0F0S1-wEL_yBHgs1b3yE5w@mail.gmail.com>
+ <59538d26-f025-28da-63df-f675e80fd68b@linux.intel.com>
+Message-ID: <20180713203327.47yq4gucidbzn2hd@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 13, 2018 at 12:21 PM, Laura Abbott <labbott@redhat.com> wrote:
-> On 07/13/2018 08:30 AM, Olof Johansson wrote:
->>
->> Not all toolchains have the baremetal elf targets, RedHat/Fedora ones
->> in particular. So, probe for whether it's available and use the previous
->> (linux) targets if it isn't.
->>
->
->
-> For the Fedora toolchains:
->
-> Tested-by: Laura Abbott <labbott@redhat.com>
 
-Thanks!
+> BTW, to whom should I ask applying this patch? Should I send v2 after
+> adding your reviewed-by tag?
 
+Not needed, thanks. I use 'patchwork' and this tool collects all the
+tags for me. If I see a patch reviewed by a driver maintainer, I'll pick
+it up in the next queue.
 
--Olof
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180713/d761c31d/attachment.sig>
