@@ -1,23 +1,38 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 13 Jul 2018 08:02:10 -0300
-Subject: [PATCH 1/2] ARM: dts: imx51-zii-scu3-esb: Add switch IRQ line
- pinumx config
-In-Reply-To: <CAHQ1cqEXBfs1B6Jr1NvUY6WoyX9oG=0haJpiTLVH7t-37ht10Q@mail.gmail.com>
-References: <20180712023337.30112-1-andrew.smirnov@gmail.com>
- <20180712023337.30112-2-andrew.smirnov@gmail.com>
- <CAOMZO5DfHqKjF6xykJtoC-aA-ATWM6mCZR0VzPVpSDOt-Fs6bQ@mail.gmail.com>
- <CAHQ1cqEXBfs1B6Jr1NvUY6WoyX9oG=0haJpiTLVH7t-37ht10Q@mail.gmail.com>
-Message-ID: <CAOMZO5BGuu7VEHNn61W+33PfJ3eQqLTCy8PrAmCtXvLeC-DhLA@mail.gmail.com>
+From: clabbe@baylibre.com (Corentin Labbe)
+Date: Fri, 13 Jul 2018 11:03:04 +0000
+Subject: [PATCH v3 7/9] dt-bindings: ata: ahci-platform: document port-supply
+In-Reply-To: <1531479786-4911-1-git-send-email-clabbe@baylibre.com>
+References: <1531479786-4911-1-git-send-email-clabbe@baylibre.com>
+Message-ID: <1531479786-4911-8-git-send-email-clabbe@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 13, 2018 at 2:15 AM, Andrey Smirnov
-<andrew.smirnov@gmail.com> wrote:
+This patch document the new optional port-supply
 
-> I wanted to avoid relying on defaults be it register reset values or
-> settings that bootloader left us with. Default value of 0xa5 works,
-> but, given how the pin is IRQ_TYPE_LEVEL_HIGH, I though it would be
-> better to configure it to have a pulldown. Do you want me to add that
-> to commit log?
+Signed-off-by: Corentin Labbe <clabbe@baylibre.com>
+---
+ Documentation/devicetree/bindings/ata/ahci-platform.txt | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Yes, that would be nice. Thanks
+diff --git a/Documentation/devicetree/bindings/ata/ahci-platform.txt b/Documentation/devicetree/bindings/ata/ahci-platform.txt
+index 47652521a6ed..40a636b9851e 100644
+--- a/Documentation/devicetree/bindings/ata/ahci-platform.txt
++++ b/Documentation/devicetree/bindings/ata/ahci-platform.txt
+@@ -31,6 +31,7 @@ Optional properties:
+ - dma-coherent      : Present if dma operations are coherent
+ - clocks            : a list of phandle + clock specifier pairs
+ - target-supply     : regulator for SATA target power
++- port-supply       : regulator for SATA port
+ - phys              : reference to the SATA PHY node
+ - phy-names         : must be "sata-phy"
+ - ahci-supply       : regulator for AHCI controller
+@@ -51,6 +52,7 @@ Sub-nodes required properties:
+ And at least one of the following properties:
+ - phys		    : reference to the SATA PHY node
+ - target-supply     : regulator for SATA target power
++- port-supply       : regulator for SATA port
+ 
+ Examples:
+         sata at ffe08000 {
+-- 
+2.16.4
