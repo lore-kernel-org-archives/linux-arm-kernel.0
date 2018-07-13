@@ -1,39 +1,71 @@
-From: hofrat@osadl.org (Nicholas Mc Guire)
-Date: Fri, 13 Jul 2018 13:13:20 +0200
-Subject: [PATCH] clk: imx6ul: fix missing of_node_put()
-Message-ID: <1531480400-7664-1-git-send-email-hofrat@osadl.org>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 13 Jul 2018 13:17:49 +0200
+Subject: [PATCH 02/19] mmc: mmci: merge qcom dml feature into mmci dma
+In-Reply-To: <c09e8f7a-3bf7-abb3-b49c-011ae29f8d67@st.com>
+References: <1528809280-31116-1-git-send-email-ludovic.Barre@st.com>
+ <1528809280-31116-3-git-send-email-ludovic.Barre@st.com>
+ <CAPDyKFqOOvbNc79hdWhdS4pxkYrh48At-BLuGmX0jDMER3Akdw@mail.gmail.com>
+ <c09e8f7a-3bf7-abb3-b49c-011ae29f8d67@st.com>
+Message-ID: <CAPDyKFrN3GMez1vyc6xQUH_Qp7UrDj88rG9pAP_oTLHOB6k91g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-of_find_compatible_node() is returning a device node with refcount
-incremented and must be explicitly decremented after the last use
-which is right after the us in of_iomap() here.
+On 11 July 2018 at 17:19, Ludovic BARRE <ludovic.barre@st.com> wrote:
+>
+>
+> On 07/05/2018 05:26 PM, Ulf Hansson wrote:
+>>
+>> On 12 June 2018 at 15:14, Ludovic Barre <ludovic.Barre@st.com> wrote:
+>>>
+>>> From: Ludovic Barre <ludovic.barre@st.com>
+>>>
+>>> This patch integrates qcom dml feature into mmci_dma file.
+>>> Qualcomm Data Mover lite/local is already a variant of mmci dmaengine.
+>>>
+>>> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+>>> ---
+>>>   drivers/mmc/host/Makefile        |   1 -
+>>>   drivers/mmc/host/mmci.c          |   1 -
+>>>   drivers/mmc/host/mmci.h          |  35 ++++++++
+>>>   drivers/mmc/host/mmci_dma.c      | 135 ++++++++++++++++++++++++++++-
+>>>   drivers/mmc/host/mmci_qcom_dml.c | 177
+>>> ---------------------------------------
+>>>   drivers/mmc/host/mmci_qcom_dml.h |  31 -------
+>>>   6 files changed, 169 insertions(+), 211 deletions(-)
+>>>   delete mode 100644 drivers/mmc/host/mmci_qcom_dml.c
+>>>   delete mode 100644 drivers/mmc/host/mmci_qcom_dml.h
+>>
+>>
+>> No, this is not the way to go. Instead I I think there are two options.
+>>
+>> 1) Keep mmci_qcom_dml.c|h and thus add new files for the stm32 dma
+>> variant.
+>>
+>> 2) Start by renaming mmci_qcom_dml.* to mmc_dma.* and then in the next
+>> step add the code for stm32 dma into the renamed files.
+>>
+>> I guess if there is some overlap in functionality, 2) may be best as
+>> it could easier avoid open coding. However, I am fine with whatever
+>> option and I expect that you knows what is best.
+>
+>
+> After patch 01 & 05 comments:
+> I will try to define a mmci_ops which contain some functions pointer
+> called by mmci.c (core).
+> A variant defines its mmci_ops.
+> where do you define the specific function:
+> -in a single file, mmci-ops.c or other (for the name, I'm not inspirated)
+> -or in specific file for each variant mmci-qcom.c or mmci-stm32.c
+>
+> following the comment (above), I think we define a single file?
 
-Signed-off-by: Nicholas Mc Guire <hofrat@osadl.org>
-Fixes: commit 787b4271a6a0 ("clk: imx: add imx6ul clk tree support")
----
+If I understand the question, the problem is how we should assign the
+mmc host ops, which corresponds to the probed variant data!?
 
-Problem located with experimental coccinelle script
+I took a stub at it and posted two patches which I think you should be
+able to build upon. Please have a look.
 
-Patch was compile tested with: imx_v6_v7_defconfig (implies
-CONFIG_SOC_IMX6UL=y)
+[...]
 
-Patch is against 4.18-rc4 (localversion-next is next-20180713)
-
- drivers/clk/imx/clk-imx6ul.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/drivers/clk/imx/clk-imx6ul.c b/drivers/clk/imx/clk-imx6ul.c
-index d3f7f4d..361b43f 100644
---- a/drivers/clk/imx/clk-imx6ul.c
-+++ b/drivers/clk/imx/clk-imx6ul.c
-@@ -135,6 +135,7 @@ static void __init imx6ul_clocks_init(struct device_node *ccm_node)
- 
- 	np = of_find_compatible_node(NULL, NULL, "fsl,imx6ul-anatop");
- 	base = of_iomap(np, 0);
-+	of_node_put(np);
- 	WARN_ON(!base);
- 
- 	clks[IMX6UL_PLL1_BYPASS_SRC] = imx_clk_mux("pll1_bypass_src", base + 0x00, 14, 1, pll_bypass_src_sels, ARRAY_SIZE(pll_bypass_src_sels));
--- 
-2.1.4
+Kind regards
+Uffe
