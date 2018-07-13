@@ -1,9 +1,9 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 13 Jul 2018 07:38:19 -0700
-Subject: [GIT PULL 4/6 v2] Broadcom devicetree-arm64 changes for 4.19
+Date: Fri, 13 Jul 2018 07:38:20 -0700
+Subject: [GIT PULL 5/6 v2] Broadcom drivers changes for 4.19
 In-Reply-To: <20180713143821.1514-1-f.fainelli@gmail.com>
 References: <20180713143821.1514-1-f.fainelli@gmail.com>
-Message-ID: <20180713143821.1514-4-f.fainelli@gmail.com>
+Message-ID: <20180713143821.1514-5-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,52 +13,54 @@ The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
 
 are available in the git repository at:
 
-  https://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.19/devicetree-arm64
+  https://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.19/drivers
 
-for you to fetch changes up to e28e681630079204d6d2cb3da1e2c067d21eff64:
+for you to fetch changes up to 5773898b3b32f0e66059031afca5406702e89f9d:
 
-  arm64: dts: stingray: add bcm958802a802x dts (2018-07-13 07:24:26 -0700)
+  Merge tag 'bcm2835-drivers-next-2018-07-03' into drivers/next (2018-07-09 10:47:30 -0700)
 
 ----------------------------------------------------------------
-This pull request contains Broadcom ARM64-based SoCs Device Tree changes
+This pull request contains Broadcom ARM/ARM64/MIPS SoCs drivers changes
 for 4.19, please pull the following:
 
-- Scott does a bunch of updates to the Stingray DTS and DTS include
-  files to better support the addition of new boards. Scott also adds
-  the Stingray OTP Device Tree node
+- Doug updates the low-level suspend/resume code for ARM SoCs to support
+  the latest rev B3.0 memory controllers found on newer chips with an
+  appropriate match structure to perform the correct entry sequencing
 
-- Pramod updates the Stingray clocks such that they match the latest
-  revision of the ASIC and datasheets
+- Florian updates the Device Tree binding document for these memory
+  controllers to list all possible compatible strings that exist given
+   the supported memory controllers.
 
-- Ray sets the Stingray initial watchdog timeout to 60 seconds to give
-  sufficient time for the kernel to boot and then adds PAXC (internal
-  PCIe) support to the Stingray base DTS files
-
-- Vladimir adds support for the Stingray smart NIC PS225 boards variants
+- Stefan adds the GET_THROTTLED firmware property value that is required
+  for the Rasperry Pi voltage monitoring driver and updates the
+  Raspberry Pi firmware driver accordingly to register such a device
+  using the HWMON subsystem. Finally he adds support for reporting under
+  voltage conditions using a specialized HWMON driver.
 
 ----------------------------------------------------------------
-Pramod Kumar (1):
-      arm64: dts: Update Stingray clock DT nodes
+Doug Berger (1):
+      soc: bcm: brcmstb: pm: Add support for newer rev B3.0 controllers
 
-Ray Jui (2):
-      arm64: dts: set initial SR watchdog timeout to 60 seconds
-      arm64: dts: stingray: add PAXC support
+Florian Fainelli (2):
+      soc: bcm: brcmstb: Add missing DDR MEMC compatible strings
+      Merge tag 'bcm2835-drivers-next-2018-07-03' into drivers/next
 
-Scott Branden (2):
-      arm64: dts: stingray: move common board components to stingray-board-base
-      arm64: dts: stingray: Add OTP device node
+Kees Cook (1):
+      firmware: raspberrypi: Remove VLA usage
 
-Vladimir Olovyannikov (1):
-      arm64: dts: stingray: add bcm958802a802x dts
+Stefan Wahren (3):
+      ARM: bcm2835: Add GET_THROTTLED firmware property
+      hwmon: Add support for RPi voltage sensor
+      firmware: raspberrypi: Register hwmon driver
 
- arch/arm64/boot/dts/broadcom/stingray/Makefile     |  2 +
- .../boot/dts/broadcom/stingray/bcm958742-base.dtsi | 35 +-------------
- .../boot/dts/broadcom/stingray/bcm958802a802x.dts  | 26 +++++++++++
- .../dts/broadcom/stingray/stingray-board-base.dtsi | 51 ++++++++++++++++++++
- .../boot/dts/broadcom/stingray/stingray-clock.dtsi | 26 ++++++++---
- .../boot/dts/broadcom/stingray/stingray-pcie.dtsi  | 54 ++++++++++++++++++++++
- .../arm64/boot/dts/broadcom/stingray/stingray.dtsi | 19 ++++++++
- 7 files changed, 172 insertions(+), 41 deletions(-)
- create mode 100644 arch/arm64/boot/dts/broadcom/stingray/bcm958802a802x.dts
- create mode 100644 arch/arm64/boot/dts/broadcom/stingray/stingray-board-base.dtsi
- create mode 100644 arch/arm64/boot/dts/broadcom/stingray/stingray-pcie.dtsi
+ .../devicetree/bindings/arm/bcm/brcm,brcmstb.txt   |   4 +
+ Documentation/hwmon/raspberrypi-hwmon              |  22 +++
+ drivers/firmware/raspberrypi.c                     |  29 +++-
+ drivers/hwmon/Kconfig                              |  10 ++
+ drivers/hwmon/Makefile                             |   1 +
+ drivers/hwmon/raspberrypi-hwmon.c                  | 166 +++++++++++++++++++++
+ drivers/soc/bcm/brcmstb/pm/pm-arm.c                |  16 ++
+ include/soc/bcm2835/raspberrypi-firmware.h         |   1 +
+ 8 files changed, 247 insertions(+), 2 deletions(-)
+ create mode 100644 Documentation/hwmon/raspberrypi-hwmon
+ create mode 100644 drivers/hwmon/raspberrypi-hwmon.c
