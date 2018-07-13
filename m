@@ -1,44 +1,41 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 13 Jul 2018 10:19:46 +0200
-Subject: [PATCH/RFC] ARM: shmobile: Always enable ARCH_TIMER on SoCs with
- A7 and/or A15
-In-Reply-To: <20180713080823.l4tng6oclhr6nxrh@verge.net.au>
-References: <20180712160857.31471-1-geert+renesas@glider.be>
- <20180713080823.l4tng6oclhr6nxrh@verge.net.au>
-Message-ID: <CAMuHMdUrgP=YOrgeEnpQ0XVOoC_8Dz9Lt2FJ4P5GKb53KRNpNw@mail.gmail.com>
+From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
+Date: Fri, 13 Jul 2018 10:28:17 +0200
+Subject: [PATCH v5 20/22] ARM: dts: sun7i-a20: Add Video Engine and
+ reserved memory nodes
+In-Reply-To: <20180710092310.2hzoc7shmfykr3n5@flea>
+References: <20180710080114.31469-1-paul.kocialkowski@bootlin.com>
+ <20180710080114.31469-21-paul.kocialkowski@bootlin.com>
+ <20180710092310.2hzoc7shmfykr3n5@flea>
+Message-ID: <d9cc498c058b34b46eaf910de2f6ba4dd4ca4838.camel@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Hi,
 
-On Fri, Jul 13, 2018 at 10:08 AM Simon Horman <horms@verge.net.au> wrote:
-> On Thu, Jul 12, 2018 at 06:08:57PM +0200, Geert Uytterhoeven wrote:
-> > R-Mobile APE6, R-Car Gen2, and RZ/G1 SoCs have Cortex-A7 and/or
-> > Cortex-A15 CPU cores, all of which have ARM architectured timers.
-> >
-> > Force use of the ARM architectured timer on these SoCs.
-> > This allows to:
-> >   - Remove the calls to shmobile_init_delay() from the corresponding
-> >     machine vectors,
-> >   - Remove a check in timer setup specific to R-Car Gen2,
-> >   - Remove a check in shmobile_init_delay().
-> >
-> > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
->
-> Hi Geert,
->
-> on which boards did you test this?
+On Tue, 2018-07-10 at 11:23 +0200, Maxime Ripard wrote:
+> On Tue, Jul 10, 2018 at 10:01:12AM +0200, Paul Kocialkowski wrote:
+> > +		vpu: video-codec at 1c0e000 {
+> > +			compatible = "allwinner,sun7i-a20-video-engine";
+> > +			reg = <0x01c0e000 0x1000>;
+> > +
+> 
+> The issue is here with all your patches, but you should drop the node
+> label and the extra new line.
 
-On APE6EVM and Koelsch (R-Car M2-W).
-I can give it a spin on a few more remote R-Car Gen2 boards if you want.
+Noted, this will be fixed in the next revision.
 
-Gr{oetje,eeting}s,
+Cheers,
 
-                        Geert
+Paul
 
 -- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Paul Kocialkowski, Bootlin (formerly Free Electrons)
+Embedded Linux and kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180713/fd3f168d/attachment.sig>
