@@ -1,71 +1,101 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Fri, 13 Jul 2018 12:21:37 -0700
-Subject: [PATCH] arm64: build with baremetal linker target instead of
- Linux when available
-In-Reply-To: <20180713153033.20540-1-olof@lixom.net>
-References: <20180713150701.GA3049@arm.com>
- <20180713153033.20540-1-olof@lixom.net>
-Message-ID: <33f65453-5b6d-0684-8a91-7e9940846143@redhat.com>
+From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
+Date: Fri, 13 Jul 2018 12:21:35 -0700
+Subject: [PATCH] i2c: aspeed: Adjust spinlock scope in the irq handler
+In-Reply-To: <CAFd5g47nBCbF0mcYqEnQkDpz0Dhh0F0S1-wEL_yBHgs1b3yE5w@mail.gmail.com>
+References: <20180702214011.16071-1-jae.hyun.yoo@linux.intel.com>
+ <CAFd5g47nBCbF0mcYqEnQkDpz0Dhh0F0S1-wEL_yBHgs1b3yE5w@mail.gmail.com>
+Message-ID: <59538d26-f025-28da-63df-f675e80fd68b@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/13/2018 08:30 AM, Olof Johansson wrote:
-> Not all toolchains have the baremetal elf targets, RedHat/Fedora ones
-> in particular. So, probe for whether it's available and use the previous
-> (linux) targets if it isn't.
+On 7/12/2018 1:41 AM, Brendan Higgins wrote:
+> On Mon, Jul 2, 2018 at 2:40 PM Jae Hyun Yoo
+> <jae.hyun.yoo@linux.intel.com> wrote:
+>>
+>> This patch adjusts spinlock scope to make it wrap the whole irq
+>> handler using a single lock/unlock which covers both master and
+>> slave handlers.
+>>
+>> Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
+>> ---
+>>   drivers/i2c/busses/i2c-aspeed.c | 16 ++++++++++------
+>>   1 file changed, 10 insertions(+), 6 deletions(-)
+>>
+>> diff --git a/drivers/i2c/busses/i2c-aspeed.c b/drivers/i2c/busses/i2c-aspeed.c
+>> index 60e4d0e939a3..9f02aa959a3e 100644
+>> --- a/drivers/i2c/busses/i2c-aspeed.c
+>> +++ b/drivers/i2c/busses/i2c-aspeed.c
+>> @@ -234,7 +234,6 @@ static bool aspeed_i2c_slave_irq(struct aspeed_i2c_bus *bus)
+>>          bool irq_handled = true;
+>>          u8 value;
+>>
+>> -       spin_lock(&bus->lock);
+>>          if (!slave) {
+>>                  irq_handled = false;
+>>                  goto out;
+>> @@ -325,7 +324,6 @@ static bool aspeed_i2c_slave_irq(struct aspeed_i2c_bus *bus)
+>>          writel(status_ack, bus->base + ASPEED_I2C_INTR_STS_REG);
+>>
+>>   out:
+>> -       spin_unlock(&bus->lock);
+>>          return irq_handled;
+>>   }
+>>   #endif /* CONFIG_I2C_SLAVE */
+>> @@ -389,7 +387,6 @@ static bool aspeed_i2c_master_irq(struct aspeed_i2c_bus *bus)
+>>          u8 recv_byte;
+>>          int ret;
+>>
+>> -       spin_lock(&bus->lock);
+>>          irq_status = readl(bus->base + ASPEED_I2C_INTR_STS_REG);
+>>          /* Ack all interrupt bits. */
+>>          writel(irq_status, bus->base + ASPEED_I2C_INTR_STS_REG);
+>> @@ -547,22 +544,29 @@ static bool aspeed_i2c_master_irq(struct aspeed_i2c_bus *bus)
+>>                  dev_err(bus->dev,
+>>                          "irq handled != irq. expected 0x%08x, but was 0x%08x\n",
+>>                          irq_status, status_ack);
+>> -       spin_unlock(&bus->lock);
+>>          return !!irq_status;
+>>   }
+>>
+>>   static irqreturn_t aspeed_i2c_bus_irq(int irq, void *dev_id)
+>>   {
+>>          struct aspeed_i2c_bus *bus = dev_id;
+>> +       bool ret;
+>> +
+>> +       spin_lock(&bus->lock);
+>>
+>>   #if IS_ENABLED(CONFIG_I2C_SLAVE)
+>>          if (aspeed_i2c_slave_irq(bus)) {
+>>                  dev_dbg(bus->dev, "irq handled by slave.\n");
+>> -               return IRQ_HANDLED;
+>> +               ret = true;
+>> +               goto out;
+>>          }
+>>   #endif /* CONFIG_I2C_SLAVE */
+>>
+>> -       return aspeed_i2c_master_irq(bus) ? IRQ_HANDLED : IRQ_NONE;
+>> +       ret = aspeed_i2c_master_irq(bus);
+>> +
+>> +out:
+>> +       spin_unlock(&bus->lock);
+>> +       return ret ? IRQ_HANDLED : IRQ_NONE;
+>>   }
+>>
+>>   static int aspeed_i2c_master_xfer(struct i2c_adapter *adap,
+>> --
+>> 2.17.1
+>>
+> 
+> Reviewed-by: Brendan Higgins <brendanhiggins@google.com>
+> 
+> Thanks!
 > 
 
+Thanks Brendan!
 
-For the Fedora toolchains:
+BTW, to whom should I ask applying this patch? Should I send v2 after
+adding your reviewed-by tag?
 
-Tested-by: Laura Abbott <labbott@redhat.com>
+Thanks,
 
-> Reported-by: Laura Abbott <labbott@redhat.com>
-> Cc: Paul Kocialkowski <contact@paulk.fr>
-> Signed-off-by: Olof Johansson <olof@lixom.net>
-> ---
->   arch/arm64/Makefile    | 9 +++++----
->   scripts/Kbuild.include | 4 ++--
->   2 files changed, 7 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-> index e7101b19d590..efe61a2e4b5e 100644
-> --- a/arch/arm64/Makefile
-> +++ b/arch/arm64/Makefile
-> @@ -60,15 +60,16 @@ ifeq ($(CONFIG_CPU_BIG_ENDIAN), y)
->   KBUILD_CPPFLAGS	+= -mbig-endian
->   CHECKFLAGS	+= -D__AARCH64EB__
->   AS		+= -EB
-> -# We must use the linux target here, since distributions don't tend to package
-> -# the ELF linker scripts with binutils, and this results in a build failure.
-> -LDFLAGS		+= -EB -maarch64linuxb
-> +# Prefer the baremetal ELF build target, but not all toolchains include
-> +# it so fall back to the standard linux version if needed.
-> +LDFLAGS		+= -EB $(call ld-option, -maarch64elfb, -maarch64linuxb)
->   UTS_MACHINE	:= aarch64_be
->   else
->   KBUILD_CPPFLAGS	+= -mlittle-endian
->   CHECKFLAGS	+= -D__AARCH64EL__
->   AS		+= -EL
-> -LDFLAGS		+= -EL -maarch64linux # See comment above
-> +# Same as above, prefer ELF but fall back to linux target if needed.
-> +LDFLAGS		+= -EL $(call ld-option, -maarch64elf, -maarch64linux)
->   UTS_MACHINE	:= aarch64
->   endif
->   
-> diff --git a/scripts/Kbuild.include b/scripts/Kbuild.include
-> index c8156d61678c..1e13f502b42f 100644
-> --- a/scripts/Kbuild.include
-> +++ b/scripts/Kbuild.include
-> @@ -163,8 +163,8 @@ cc-ldoption = $(call try-run,\
->   	$(CC) $(1) $(KBUILD_CPPFLAGS) $(CC_OPTION_CFLAGS) -nostdlib -x c /dev/null -o "$$TMP",$(1),$(2))
->   
->   # ld-option
-> -# Usage: LDFLAGS += $(call ld-option, -X)
-> -ld-option = $(call try-run, $(LD) $(LDFLAGS) $(1) -v,$(1),$(2))
-> +# Usage: LDFLAGS += $(call ld-option, -X, -Y)
-> +ld-option = $(call try-run, $(LD) $(LDFLAGS) $(1) -v,$(1),$(2),$(3))
->   
->   # ar-option
->   # Usage: KBUILD_ARFLAGS := $(call ar-option,D)
-> 
+Jae
