@@ -1,45 +1,23 @@
-From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Fri, 13 Jul 2018 12:06:33 +0200
-Subject: [PATCH v10 5/6] spi: at91-usart: add driver for at91-usart as spi
-In-Reply-To: <dc410321-5dfd-7c26-2a3e-d2b2840da214@microchip.com>
-References: <20180625172230.29686-1-radu.pirea@microchip.com>
- <20180625172230.29686-6-radu.pirea@microchip.com>
- <20180710181559.GG8104@sirena.org.uk>
- <dc410321-5dfd-7c26-2a3e-d2b2840da214@microchip.com>
-Message-ID: <20180713100633.GR16084@piout.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 13 Jul 2018 12:16:09 +0200
+Subject: [PATCH 2/3] mtd: atmel nand: fix build warning on 64-bit
+In-Reply-To: <0b4ee469-8c37-9002-9067-f37f8dde869e@microchip.com>
+References: <20180709155730.2422841-1-arnd@arndb.de>
+ <20180709155730.2422841-2-arnd@arndb.de>
+ <0b4ee469-8c37-9002-9067-f37f8dde869e@microchip.com>
+Message-ID: <CAK8P3a3NbrRVC-7HW8NiNQw+E3n_-r746AFTc2dftagTYLYDtw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/07/2018 12:56:22+0300, Radu Pirea wrote:
-> 
-> 
-> On 07/10/2018 09:15 PM, Mark Brown wrote:
-> > On Mon, Jun 25, 2018 at 08:22:29PM +0300, Radu Pirea wrote:
-> > 
-> > This is mostly good, just a couple of small things:
-> > 
-> > > +config SPI_AT91_USART
-> > > +	tristate "Atmel USART Controller SPI driver"
-> > > +	depends on HAS_DMA
-> > > +	depends on (ARCH_AT91 || COMPILE_TEST)
-> > > +	select MFD_AT91_USART
-> > 
-> > Why is this selecting rather than depending on the MFD like we normally
-> > do?
-> > 
-> 
-> Hi Mark,
-> 
-> If I add depends instead of select, current defconfigs will be broken and
-> the proper driver will not be selected. Like this, there is no required
-> change in any defconfig. Selecting the serial or spi driver from menuconfig
-> makes the MFD completely transparent.
+On Fri, Jul 13, 2018 at 11:56 AM, Tudor Ambarus
+<tudor.ambarus@microchip.com> wrote:
+> Hi, Arnd,
+>
+> On 07/09/2018 06:57 PM, Arnd Bergmann wrote:
+>> +     nc->ebi_csa_offs = (uintptr_t)match->data;
+>
+> I guess we should declare ebi_csa_offs as size_t, right?
 
-I would say that this is true for the USART part but the SPI part can
-use a depends on as it didn't exist before.
+Yes, that would make sense, though it doesn't change the behavior.
 
-
--- 
-Alexandre Belloni, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+      Arnd
