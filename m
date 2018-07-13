@@ -1,49 +1,19 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 13 Jul 2018 10:56:04 +0100
-Subject: [RFC PATCH 0/2] efi: add contents of LinuxExtraArgs EFI var to
- command line
-In-Reply-To: <CAKv+Gu9+RYbtD8Ce_AW_1jvTei6dC5LwiiMgSUWDKLs8f7S+eA@mail.gmail.com>
-References: <20180704154919.18564-1-ard.biesheuvel@linaro.org>
- <4bd9bee6-f2b9-3197-c205-fec104fd1090@infradead.org>
- <CAKv+Gu9+RYbtD8Ce_AW_1jvTei6dC5LwiiMgSUWDKLs8f7S+eA@mail.gmail.com>
-Message-ID: <20180713095604.GD32020@arm.com>
+From: tudor.ambarus@microchip.com (Tudor Ambarus)
+Date: Fri, 13 Jul 2018 12:56:01 +0300
+Subject: [PATCH 2/3] mtd: atmel nand: fix build warning on 64-bit
+In-Reply-To: <20180709155730.2422841-2-arnd@arndb.de>
+References: <20180709155730.2422841-1-arnd@arndb.de>
+ <20180709155730.2422841-2-arnd@arndb.de>
+Message-ID: <0b4ee469-8c37-9002-9067-f37f8dde869e@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 13, 2018 at 08:15:26AM +0200, Ard Biesheuvel wrote:
-> On 13 July 2018 at 00:22, Geoff Levand <geoff@infradead.org> wrote:
-> > Hi Ard,
-> >
-> > On 07/04/2018 08:49 AM, Ard Biesheuvel wrote:
-> >>   efi/libstub: taken contents of LinuxExtraArgs UEFI variable into
-> >>     account
-> >
-> > To me this seems an overly complicated interface to the kernel, and
-> > still doesn't in itself solve the problem at hand -- make the
-> > generic distro kernel with APEI support run on m400 systems.
-> >
-> > As for me, I'd prefer something like my original patch.  It fixes
-> > that problem, it is simple and self contained, and is very clear
-> > in what it does.  Also, there is a limited life.  When the time
-> > comes an announcement is made to the mailing lists 'Linux-XYZ will
-> > no longer support the m400 Moonshot'.  Then, when the Linux-XYZ-rc1
-> > merge window opens a patch goes in that removes the
-> > acpi_fixup_m400_quirks() routine.
-> >
-> 
-> Actually, that is a very good point. One of the issues I have with
-> these quirks is that the burden is on the maintainers to keep them
-> around forever, unless they can prove that it is no longer needed.
-> 
-> This is not my call to make, but I would be much less averse to this
-> being merged if we could agree upfront on an expiration time of, say,
-> 2 years (or more?), after which it will be removed (unless anyone
-> makes a very good case for why it needs to be retained). This should
-> be mentioned in the kernel log as well when the quirk is triggered.
+Hi, Arnd,
 
-The problem with that is it all falls apart when somebody who wasn't
-involved in the initial discussion crops up after we remove the quirk to
-complain that their machine broke. In such a situation, we don't have a
-leg to stand on in my opinion.
+On 07/09/2018 06:57 PM, Arnd Bergmann wrote:
+> +	nc->ebi_csa_offs = (uintptr_t)match->data;
 
-Will
+I guess we should declare ebi_csa_offs as size_t, right?
+
+Best,
+ta
