@@ -1,56 +1,42 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 13 Jul 2018 07:49:45 +0200
-Subject: [PATCH v3.1 0/4] arm64: kexec,kdump: fix boot failures on
- acpi-only system
-In-Reply-To: <20180713003434.GZ28220@linaro.org>
-References: <20180709234229.20181-1-takahiro.akashi@linaro.org>
- <20180712164918.GA26935@arm.com> <20180713003434.GZ28220@linaro.org>
-Message-ID: <CAKv+Gu9PT75XTXGsh1jc5roRO_d2QYKEamq42mfbsXzmerAUzA@mail.gmail.com>
+Date: Fri, 13 Jul 2018 08:15:26 +0200
+Subject: [RFC PATCH 0/2] efi: add contents of LinuxExtraArgs EFI var to
+ command line
+In-Reply-To: <4bd9bee6-f2b9-3197-c205-fec104fd1090@infradead.org>
+References: <20180704154919.18564-1-ard.biesheuvel@linaro.org>
+ <4bd9bee6-f2b9-3197-c205-fec104fd1090@infradead.org>
+Message-ID: <CAKv+Gu9+RYbtD8Ce_AW_1jvTei6dC5LwiiMgSUWDKLs8f7S+eA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 July 2018 at 02:34, AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
-> On Thu, Jul 12, 2018 at 05:49:19PM +0100, Will Deacon wrote:
->> Hi Akashi,
->>
->> On Tue, Jul 10, 2018 at 08:42:25AM +0900, AKASHI Takahiro wrote:
->> > This patch series is a set of bug fixes to address kexec/kdump
->> > failures which are sometimes observed on ACPI-only system and reported
->> > in LAK-ML before.
->>
->> I tried picking this up, along with Ard's fixup, but I'm seeing a build
->> failure for allmodconfig:
->>
->> arch/arm64/kernel/acpi.o: In function `__acpi_get_mem_attribute':
->> acpi.c:(.text+0x60): undefined reference to `efi_mem_attributes'
->>
->> I didn't investigate further. Please can you fix this?
+On 13 July 2018 at 00:22, Geoff Levand <geoff@infradead.org> wrote:
+> Hi Ard,
 >
-> Because CONFIG_ACPI is on and CONFIG_EFI is off.
+> On 07/04/2018 08:49 AM, Ard Biesheuvel wrote:
+>>   efi/libstub: taken contents of LinuxExtraArgs UEFI variable into
+>>     account
 >
-> This can happen in allmodconfig as CONFIG_EFI depends on
-> !CONFIG_CPU_BIG_ENDIAN, which is actually on in this case.
+> To me this seems an overly complicated interface to the kernel, and
+> still doesn't in itself solve the problem at hand -- make the
+> generic distro kernel with APEI support run on m400 systems.
+>
+> As for me, I'd prefer something like my original patch.  It fixes
+> that problem, it is simple and self contained, and is very clear
+> in what it does.  Also, there is a limited life.  When the time
+> comes an announcement is made to the mailing lists 'Linux-XYZ will
+> no longer support the m400 Moonshot'.  Then, when the Linux-XYZ-rc1
+> merge window opens a patch goes in that removes the
+> acpi_fixup_m400_quirks() routine.
 >
 
-Allowing both CONFIG_ACPI and CONFIG_CPU_BIG_ENDIAN to be configured
-makes no sense at all. Things will surely break if you start using BE
-memory accesses while parsing ACPI tables.
+Actually, that is a very good point. One of the issues I have with
+these quirks is that the burden is on the maintainers to keep them
+around forever, unless they can prove that it is no longer needed.
 
-Allowing CONFIG_ACPI without CONFIG_EFI makes no sense either, since
-on arm64, the only way to find the ACPI tables is through a UEFI
-configuration table.
+This is not my call to make, but I would be much less averse to this
+being merged if we could agree upfront on an expiration time of, say,
+2 years (or more?), after which it will be removed (unless anyone
+makes a very good case for why it needs to be retained). This should
+be mentioned in the kernel log as well when the quirk is triggered.
 
-> Looking at __acpi_get_mem_attributes(), since there is no information
-> available on memory attributes, what we can do at best is
->   * return PAGE_KERNEL (= cacheable) for mapped memory,
->   * return DEVICE_nGnRnE (= non-cacheable) otherwise
-> (See a hunk to be applied on top of my patch#4.)
->
-> I think that, after applying, acpi_os_ioremap() would work almost
-> in the same way as the original before my patchset given that
-> MAP memblock attribute is used only under CONFIG_EFI for now.
->
-> Make sense?
->
-
-Let's keep your code as is but fix the Kconfig dependencies instead.
+I still think we should not be using DMI, though.
