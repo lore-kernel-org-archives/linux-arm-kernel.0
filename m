@@ -1,27 +1,152 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 13 Jul 2018 15:08:14 -0300
-Subject: [PATCH] ARM: dts: imx6sx-udoo-neo: enable i2c-2 and i2c-4 for
- onboard sensors
-In-Reply-To: <20180713171151.24699-1-pbrobinson@gmail.com>
-References: <20180713171151.24699-1-pbrobinson@gmail.com>
-Message-ID: <CAOMZO5B+1atjr3Ur7EGMJSEbqT8zqWdKZWNHrkyCGvgGM4nJFg@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 13 Jul 2018 19:09:08 +0100
+Subject: [PATCH 3/3] arm64: dts: stratix10: Add SMMU Node
+In-Reply-To: <1531499278-32132-4-git-send-email-thor.thayer@linux.intel.com>
+References: <1531499278-32132-1-git-send-email-thor.thayer@linux.intel.com>
+ <1531499278-32132-4-git-send-email-thor.thayer@linux.intel.com>
+Message-ID: <2d17b3b1-96a1-8a0a-521e-134de9df72d0@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+On 13/07/18 17:27, thor.thayer at linux.intel.com wrote:
+> From: Thor Thayer <thor.thayer@linux.intel.com>
+> 
+> Add the SMMU node and IOMMU parameters to the
+> Stratix10 Device Tree.
+> 
+> Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
+> ---
+>   arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi | 44 +++++++++++++++++++++++
+>   1 file changed, 44 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
+> index ca67ecb5866e..9b6ead87ae70 100644
+> --- a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
+> +++ b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
+> @@ -162,6 +162,8 @@
+>   			reset-names = "stmmaceth", "stmmaceth-ocp";
+>   			clocks = <&clkmgr STRATIX10_EMAC0_CLK>;
+>   			clock-names = "stmmaceth";
+> +			#stream-id-cells = <1>;
 
-On Fri, Jul 13, 2018 at 2:11 PM, Peter Robinson <pbrobinson@gmail.com> wrote:
+The #stream-id-cells property is part of the deprecated mmu-masters 
+binding, so you don't need to add these.
 
-> +&i2c4 { /* Onboard Motion sensors */
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_i2c4>;
-> +       clock-frequency = <100000>;
-> +       status = "okay";
-> +};
+> +			iommus = <&smmu 1>;
+>   			status = "disabled";
+>   		};
+>   
+> @@ -175,6 +177,8 @@
+>   			reset-names = "stmmaceth", "stmmaceth-ocp";
+>   			clocks = <&clkmgr STRATIX10_EMAC1_CLK>;
+>   			clock-names = "stmmaceth";
+> +			#stream-id-cells = <1>;
+> +			iommus = <&smmu 2>;
+>   			status = "disabled";
+>   		};
+>   
+> @@ -188,6 +192,8 @@
+>   			reset-names = "stmmaceth", "stmmaceth-ocp";
+>   			clocks = <&clkmgr STRATIX10_EMAC2_CLK>;
+>   			clock-names = "stmmaceth";
+> +			#stream-id-cells = <1>;
+> +			iommus = <&smmu 3>;
+>   			status = "disabled";
+>   		};
+>   
+> @@ -298,6 +304,8 @@
+>   			clocks = <&clkmgr STRATIX10_L4_MP_CLK>,
+>   				 <&clkmgr STRATIX10_SDMMC_CLK>;
+>   			clock-names = "biu", "ciu";
+> +			#stream-id-cells = <1>;
+> +			iommus = <&smmu 5>;
+>   			status = "disabled";
+>   		};
+>   
+> @@ -323,6 +331,8 @@
+>   			#dma-requests = <32>;
+>   			clocks = <&clkmgr STRATIX10_L4_MAIN_CLK>;
+>   			clock-names = "apb_pclk";
+> +			#stream-id-cells = <1>;
+> +			iommus = <&smmu 8>;
 
-Would it be possible to add i2c4 to the common dtsi file instead?
+Just to double-check, all the channel threads and the manager thread 
+share the one stream ID? (I'm accustomed to seeing DMA-330 integrated 
+with an SMMU by tapping the AxID outputs off to the stream ID input.)
 
-I haven't checked the schematics, but if it is only the
-imx6sx-udoo-neo-basic.dts that does not have the i2c4 node, then
-maybe you could add i2c4 to the dtsi and disable it inside
-imx6sx-udoo-neo-basic.dts?
+>   		};
+>   
+>   		rst: rstmgr at ffd11000 {
+> @@ -332,6 +342,36 @@
+>   			altr,modrst-offset = <0x20>;
+>   		};
+>   
+> +		smmu: iommu at fa000000 {
+> +			compatible = "arm,mmu-500", "arm,smmu-v2";
+> +			reg = <0xfa000000 0x40000>;
+> +			#global-interrupts = <9>;
+> +			#iommu-cells = <1>;
+> +			clocks = <&clkmgr STRATIX10_L4_MAIN_CLK>;
+> +			clock-names = "smmu_clk";
+> +			interrupt-parent = <&intc>;
+> +			interrupts = <0 128 4>,	/* Global Secure Fault */
+> +				<0 129 4>, /* Global Non-secure Fault */
+> +				<0 130 4>, /* FPGA Performance Counter */
+> +				<0 131 4>, /* DMA Performance Counter */
+> +				<0 132 4>, /* EMAC Performance Counter */
+> +				<0 133 4>, /* IO Performance Counter */
+> +				<0 134 4>, /* SDM Performance Counter */
+
+Note that there isn't much benefit to adding the secure or PMU 
+interrupts here other than to document the hardware - FWIW I have 
+actually been working on a PMU driver, and needless to say it turns out 
+not to be sufficient just having those munged into the SMMU global fault 
+handler.
+
+> +				<0 136 4>, /* Non-secure Combined Interrupt */
+> +				<0 137 4>, /* Secure Combined Interrupt */
+
+Similarly the combined interrupt; that's literally just all these other 
+interrupt lines ORed together at the SMMU end, and would generally only 
+be useful if you *didn't* have the individual lines wired up. As it 
+stands with everything listed, any event will also generate a spurious 
+global fault IRQ, which isn't ideal (not that you should get many 
+interrupts during normal operation, but still...)
+
+Robin.
+
+> +				/* Non-secure Context Interrupts (32) */
+> +				<0 138 4>, <0 139 4>, <0 140 4>, <0 141 4>,
+> +				<0 142 4>, <0 143 4>, <0 144 4>, <0 145 4>,
+> +				<0 146 4>, <0 147 4>, <0 148 4>, <0 149 4>,
+> +				<0 150 4>, <0 151 4>, <0 152 4>, <0 153 4>,
+> +				<0 154 4>, <0 155 4>, <0 156 4>, <0 157 4>,
+> +				<0 158 4>, <0 159 4>, <0 160 4>, <0 161 4>,
+> +				<0 162 4>, <0 163 4>, <0 164 4>, <0 165 4>,
+> +				<0 166 4>, <0 167 4>, <0 168 4>, <0 169 4>;
+> +			stream-match-mask = <0x7ff0>;
+> +			status = "disabled";
+> +		};
+> +
+>   		spi0: spi at ffda4000 {
+>   			compatible = "snps,dw-apb-ssi";
+>   			#address-cells = <1>;
+> @@ -439,6 +479,8 @@
+>   			resets = <&rst USB0_RESET>, <&rst USB0_OCP_RESET>;
+>   			reset-names = "dwc2", "dwc2-ecc";
+>   			clocks = <&clkmgr STRATIX10_USB_CLK>;
+> +			#stream-id-cells = <1>;
+> +			iommus = <&smmu 6>;
+>   			status = "disabled";
+>   		};
+>   
+> @@ -451,6 +493,8 @@
+>   			resets = <&rst USB1_RESET>, <&rst USB1_OCP_RESET>;
+>   			reset-names = "dwc2", "dwc2-ecc";
+>   			clocks = <&clkmgr STRATIX10_USB_CLK>;
+> +			#stream-id-cells = <1>;
+> +			iommus = <&smmu 7>;
+>   			status = "disabled";
+>   		};
+>   
+> 
