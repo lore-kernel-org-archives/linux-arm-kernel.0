@@ -1,121 +1,91 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 13 Jul 2018 12:45:06 +0530
-Subject: [PATCH 2/4] phy: socionext: add USB3 PHY driver for UniPhier SoC
-In-Reply-To: <20180711210514.BB32.4A936039@socionext.com>
-References: <4b436a46-9046-25ad-ee6d-ad2cdb16e2ca@ti.com>
- <20180709202319.1091.4A936039@socionext.com>
- <20180711210514.BB32.4A936039@socionext.com>
-Message-ID: <52b96200-2234-9017-a317-f929eac9b266@ti.com>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Fri, 13 Jul 2018 09:25:36 +0200
+Subject: [PATCH 1/3] drm: mxsfb: Change driver.name to mxsfb-drm
+In-Reply-To: <039b2914-3393-5e81-82a6-7d517c5818a9@denx.de>
+References: <CAOMZO5B8i0gN+rCq-yPrd112NkwJWTxYCtsLVeLhD1JLRuX6EQ@mail.gmail.com>
+ <07be6d9a85b6be655fc2b084be81d8bf9715b57a.camel@nxp.com>
+ <638457fd-85da-8fec-d146-517c43f71813@denx.de>
+ <b3fa74c5110b45e5992920485749869ab1f7ebce.camel@nxp.com>
+ <6995fa4b-47a9-887b-5e4f-4284ca6a2c79@gmail.com>
+ <fd22085f646d97f66cff5b7f22785500@agner.ch>
+ <6fdba55b-0be6-9e28-d87a-43d876a1fd09@denx.de>
+ <617c0a7e9132b929877b8cbcf116b1ea@agner.ch>
+ <7f40f34a401ced78703b1a151d9f5fe4ed8c209f.camel@nxp.com>
+ <039b2914-3393-5e81-82a6-7d517c5818a9@denx.de>
+Message-ID: <20180713072536.GX3008@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Jul 12, 2018 at 03:14:57PM +0200, Marek Vasut wrote:
+> On 07/12/2018 03:03 PM, Leonard Crestez wrote:
+> > On Thu, 2018-07-12 at 11:21 +0200, Stefan Agner wrote:
+> >> On 10.07.2018 11:11, Marek Vasut wrote:
+> >>> On 07/10/2018 11:06 AM, Stefan Agner wrote:
+> >>>> This is one of the situation where states quo is kinda the worst
+> >>>> situation.
+> >>>>
+> >>>> Currently imx_v6_v7_defconfig and mxs_defconfig actually still uses
+> >>>> CONFIG_FB_MXS.
+> >>>>
+> >>>> I understand that you'd rather prefer to move forward. I suggest we do
+> >>>> it in steps.
+> >>>>
+> >>>> In 4.19:
+> >>>>
+> >>>> - Change DRM driver.name to mxsfb-drm so we avoid conflicts for now
+> >>>
+> >>> But this will break mesa if it depends on mxsfb name for ie. etnaviv
+> >>> binding.
+> >>
+> >> Does it? grep -r -e mxsfb in libdrm and mesa master returns nothing.
+> >>
+> >> There is also .name in struct drm_driver, which is already set to
+> >> mxsfb-drm... Is that the one exposed to user space?
+> > 
+> > Running etnaviv+x11 with a renamed mxsfb driver works fine on imx6sx-
+> > sdb.
+> > 
+> > Tools like modetest already need -M mxsfb-drm, the drm_driver.name
+> > seems to be what matters.
+> > 
+> >> - Remove CONFIG_FB_MXS from imx_v6_v7_defconfig/mxs_defconfig now, and
+> >> only enable CONFIG_DRM_MXSFB=y
+> > 
+> > If one of the drivers is renamed then they can coexist: since the
+> > bindings are distinct one driver will return a probe error and the
+> > other will bind successfully. This can even be adjusted so that it
+> > doesn't even print ugly scary errors.
+> > 
+> > This can last until somebody implements support for old bindings in the
+> > drm driver and then FB_MXS can just be deleted.
+> 
+> So why don't we just convert the DT bindings on boards supported
+> upstream and zap the old driver ? What is the problem with that?
 
-On Wednesday 11 July 2018 05:35 PM, Kunihiko Hayashi wrote:
-> On Mon, 9 Jul 2018 20:23:19 +0900 <hayashi.kunihiko@socionext.com> wrote:
-> 
->> Hi Kishon,
->> Thank you for your comments.
->>
->> On Mon, 9 Jul 2018 10:49:50 +0530 <kishon@ti.com> wrote:
->>
->>> Hi,
->>>
->>> On Friday 29 June 2018 02:08 PM, Kunihiko Hayashi wrote:
->>>> Add a driver for PHY interface built into USB3 controller
->>>> implemented in UniPhier SoCs.
->>>> This driver supports High-Speed PHY and Super-Speed PHY.
->>>>
->>>> Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
->>>> Signed-off-by: Motoya Tanigawa <tanigawa.motoya@socionext.com>
->>>> Signed-off-by: Masami Hiramatsu <masami.hiramatsu@linaro.org>
->>>> ---
->>>>  drivers/phy/Kconfig                         |   1 +
->>>>  drivers/phy/Makefile                        |   1 +
->>>>  drivers/phy/socionext/Kconfig               |  12 +
->>>>  drivers/phy/socionext/Makefile              |   6 +
->>>>  drivers/phy/socionext/phy-uniphier-usb3hs.c | 422 ++++++++++++++++++++++++++++
->>>>  drivers/phy/socionext/phy-uniphier-usb3ss.c | 369 ++++++++++++++++++++++++
->>>>  6 files changed, 811 insertions(+)
->>>>  create mode 100644 drivers/phy/socionext/Kconfig
->>>>  create mode 100644 drivers/phy/socionext/Makefile
->>>>  create mode 100644 drivers/phy/socionext/phy-uniphier-usb3hs.c
->>>>  create mode 100644 drivers/phy/socionext/phy-uniphier-usb3ss.c
->>
->> (snip...)
->>
->>>> --- /dev/null
->>>> +++ b/drivers/phy/socionext/phy-uniphier-usb3hs.c
->>>> @@ -0,0 +1,422 @@
->>>> +// SPDX-License-Identifier: GPL-2.0
->>>> +/*
->>>> + * phy-uniphier-usb3hs.c - HS-PHY driver for Socionext UniPhier USB3 controller
->>>> + * Copyright 2015-2018 Socionext Inc.
->>>> + * Author:
->>>> + *	Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
->>>> + * Contributors:
->>>> + *      Motoya Tanigawa <tanigawa.motoya@socionext.com>
->>>> + *      Masami Hiramatsu <masami.hiramatsu@linaro.org>
->>>> + */
->>>> +
->>>> +#include <linux/bitfield.h>
->>>> +#include <linux/bitops.h>
->>>> +#include <linux/clk.h>
->>>> +#include <linux/io.h>
->>>> +#include <linux/mfd/syscon.h>
->>>> +#include <linux/module.h>
->>>> +#include <linux/nvmem-consumer.h>
->>>> +#include <linux/of.h>
->>>> +#include <linux/of_platform.h>
->>>> +#include <linux/phy/phy.h>
->>>> +#include <linux/platform_device.h>
->>>> +#include <linux/reset.h>
->>>> +#include <linux/slab.h>
->>>> +
->>>> +#define HSPHY_CFG0		0x0
->>>> +#define HSPHY_CFG0_HS_I_MASK	GENMASK(31, 28)
->>>> +#define HSPHY_CFG0_HSDISC_MASK	GENMASK(27, 26)
->>>> +#define HSPHY_CFG0_SWING_MASK	GENMASK(17, 16)
->>>> +#define HSPHY_CFG0_SEL_T_MASK	GENMASK(15, 12)
->>>> +#define HSPHY_CFG0_RTERM_MASK	GENMASK(7, 6)
->>>> +#define HSPHY_CFG0_TRIMMASK	(HSPHY_CFG0_HS_I_MASK \
->>>> +				 | HSPHY_CFG0_SEL_T_MASK \
->>>> +				 | HSPHY_CFG0_RTERM_MASK)
->>>> +
->>>> +#define HSPHY_CFG1		0x4
->>>> +#define HSPHY_CFG1_DAT_EN	BIT(29)
->>>> +#define HSPHY_CFG1_ADR_EN	BIT(28)
->>>> +#define HSPHY_CFG1_ADR_MASK	GENMASK(27, 16)
->>>> +#define HSPHY_CFG1_DAT_MASK	GENMASK(23, 16)
->>>> +
->>>> +#define MAX_CLKS	3
->>>> +#define MAX_RSTS	2
->>>> +#define MAX_PHY_PARAMS	1
->>>> +
->>>> +struct uniphier_u3hsphy_param {
->>>> +	u32 addr;
->>>> +	u32 mask;
->>>> +	u32 val;
->>>> +};
->>>
->>> I'd like to avoid configure the PHY this way, since it's impossible to know
->>> which register is being configured.
->>
-> 
-> This way might be misunderstood.
-> These HS-PHY and SS-PHY have "internal" registers, which are not memory-mapped.
-> 
-> And to access these internal registers, we need to specify the number
-> corresponding to the register.
-> 
-> The "addr" in "uniphier_u3hsphy_param" is just the number of the register.
-> The "mask" shows a bitfield of the register, that means one of PHY parameters.
-> The "value" shows a parameter value to set to the bitfield.
++1 on zapping drivers :-)
 
-What does each of these bitfields represent? Which PHY parameter does it
-configure. Are they really PHY parameters or they also configure clocks/mux
-etc? I would like the configurations to be more descriptive so that we get to
-know at least what's getting configured here.
+> Realistically, how many MXS boards in the field use old DT and new kernel ?
 
-Thanks
-Kishon
+Yeah I think occasionally that entire "DT is API, can't ever change it"
+song is overblown. The rule with regressions isn't that you're never
+allowed to break anything, but that you're only allowed to break stuff no
+one will notice and report.
+
+If there's realistically no users, go ahead and break (instead of huge and
+drawn-out compat plan).
+
+If there's a solid (and automatic enough) fallback like the drm driver,
+go ahead and break.
+
+We're doing this all the time in graphics with userspace ABI, I don't
+think DT is any different. Every once in a while there's a bit of regrets
+and a revert because we missed something, but overal it's much less effort
+than always trying to do a perfect job with backwards compat.
+
+Is it really a regression if no one reports it? No.
+
+Cheers, Daniel
+-- 
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
