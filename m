@@ -1,53 +1,49 @@
-From: radu.pirea@microchip.com (Radu Pirea)
-Date: Fri, 13 Jul 2018 12:56:22 +0300
-Subject: [PATCH v10 5/6] spi: at91-usart: add driver for at91-usart as spi
-In-Reply-To: <20180710181559.GG8104@sirena.org.uk>
-References: <20180625172230.29686-1-radu.pirea@microchip.com>
- <20180625172230.29686-6-radu.pirea@microchip.com>
- <20180710181559.GG8104@sirena.org.uk>
-Message-ID: <dc410321-5dfd-7c26-2a3e-d2b2840da214@microchip.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 13 Jul 2018 10:56:04 +0100
+Subject: [RFC PATCH 0/2] efi: add contents of LinuxExtraArgs EFI var to
+ command line
+In-Reply-To: <CAKv+Gu9+RYbtD8Ce_AW_1jvTei6dC5LwiiMgSUWDKLs8f7S+eA@mail.gmail.com>
+References: <20180704154919.18564-1-ard.biesheuvel@linaro.org>
+ <4bd9bee6-f2b9-3197-c205-fec104fd1090@infradead.org>
+ <CAKv+Gu9+RYbtD8Ce_AW_1jvTei6dC5LwiiMgSUWDKLs8f7S+eA@mail.gmail.com>
+Message-ID: <20180713095604.GD32020@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Jul 13, 2018 at 08:15:26AM +0200, Ard Biesheuvel wrote:
+> On 13 July 2018 at 00:22, Geoff Levand <geoff@infradead.org> wrote:
+> > Hi Ard,
+> >
+> > On 07/04/2018 08:49 AM, Ard Biesheuvel wrote:
+> >>   efi/libstub: taken contents of LinuxExtraArgs UEFI variable into
+> >>     account
+> >
+> > To me this seems an overly complicated interface to the kernel, and
+> > still doesn't in itself solve the problem at hand -- make the
+> > generic distro kernel with APEI support run on m400 systems.
+> >
+> > As for me, I'd prefer something like my original patch.  It fixes
+> > that problem, it is simple and self contained, and is very clear
+> > in what it does.  Also, there is a limited life.  When the time
+> > comes an announcement is made to the mailing lists 'Linux-XYZ will
+> > no longer support the m400 Moonshot'.  Then, when the Linux-XYZ-rc1
+> > merge window opens a patch goes in that removes the
+> > acpi_fixup_m400_quirks() routine.
+> >
+> 
+> Actually, that is a very good point. One of the issues I have with
+> these quirks is that the burden is on the maintainers to keep them
+> around forever, unless they can prove that it is no longer needed.
+> 
+> This is not my call to make, but I would be much less averse to this
+> being merged if we could agree upfront on an expiration time of, say,
+> 2 years (or more?), after which it will be removed (unless anyone
+> makes a very good case for why it needs to be retained). This should
+> be mentioned in the kernel log as well when the quirk is triggered.
 
+The problem with that is it all falls apart when somebody who wasn't
+involved in the initial discussion crops up after we remove the quirk to
+complain that their machine broke. In such a situation, we don't have a
+leg to stand on in my opinion.
 
-On 07/10/2018 09:15 PM, Mark Brown wrote:
-> On Mon, Jun 25, 2018 at 08:22:29PM +0300, Radu Pirea wrote:
-> 
-> This is mostly good, just a couple of small things:
-> 
->> +config SPI_AT91_USART
->> +	tristate "Atmel USART Controller SPI driver"
->> +	depends on HAS_DMA
->> +	depends on (ARCH_AT91 || COMPILE_TEST)
->> +	select MFD_AT91_USART
-> 
-> Why is this selecting rather than depending on the MFD like we normally
-> do?
-> 
-
-Hi Mark,
-
-If I add depends instead of select, current defconfigs will be broken 
-and the proper driver will not be selected. Like this, there is no 
-required change in any defconfig. Selecting the serial or spi driver 
-from menuconfig makes the MFD completely transparent.
->> @@ -0,0 +1,432 @@
->> +// SPDX-License-Identifier: GPL-2.0
->> +/*
->> + * Driver for AT91 USART Controllers as SPI
->> + *
->> + * Copyright (C) 2018 Microchip Technology Inc.
->> + * Author: Radu Pirea <radu.pirea@microchip.com>
->> + */
-> 
-> Please use C++ comments for the whole block so it looks a bit more
-> intentional.
-
-Ok. I will change it.
-
-> 
-> Otherwise
-> 
-> Reviwed-by: Mark Brown <broonie@kernel.org>
-> 
+Will
