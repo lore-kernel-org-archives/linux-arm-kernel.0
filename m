@@ -1,42 +1,51 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+From: james.morse@arm.com (James Morse)
 Date: Fri, 13 Jul 2018 16:27:37 +0100
-Subject: [PATCH 0/3] PCI: mvebu: cleanup and improvements
-In-Reply-To: <20180629091007.31069-1-thomas.petazzoni@bootlin.com>
-References: <20180629091007.31069-1-thomas.petazzoni@bootlin.com>
-Message-ID: <20180713152737.GB18555@red-moon>
+Subject: [PATCH v7 3/4] KVM: arm64: Share the parts of get/set events
+ useful to 32bit
+In-Reply-To: <b392c9e1-d0e4-9674-a223-351b381db76c@huawei.com>
+References: <20180710164952.23736-1-james.morse@arm.com>
+ <20180710164952.23736-4-james.morse@arm.com>
+ <b392c9e1-d0e4-9674-a223-351b381db76c@huawei.com>
+Message-ID: <77fa3cb5-ef9c-962a-0d0c-b7cac19c1ce7@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 29, 2018 at 11:10:04AM +0200, Thomas Petazzoni wrote:
-> Hello,
-> 
-> The main goal of this series is to convert the pci-mvebu driver to use
-> the pci_host_bridge API directly instead of using the ARM-specific
-> pci_common_init_dev() API. After this series, the last remaining user
-> of pci_common_init_dev() is pci-rcar-gen2.
-> 
-> I would appreciate some careful review of the MEM and IO resource
-> related changes (i.e the new mvebu_pcie_parse_request_resources()
-> function), since the mvebu driver is a bit special in that respect,
-> and cannot use the standard devm_of_pci_get_host_bridge_resources()
-> API.
-> 
-> Thanks,
-> 
-> Thomas
-> 
-> Thomas Petazzoni (3):
->   PCI: mvebu: Remove redundant platform_set_drvdata() call
->   PCI: mvebu: Convert to use pci_host_bridge directly
->   PCI: mvebu: Drop bogus comment above mvebu_pcie_map_registers()
-> 
->  drivers/pci/controller/pci-mvebu.c | 152 +++++++++++++++++--------------------
->  1 file changed, 71 insertions(+), 81 deletions(-)
+Hi gengdongjiu,
 
-Hi Thomas,
+On 11/07/18 08:16, gengdongjiu wrote:
+> On 2018/7/11 0:49, James Morse wrote:
+>> The get/set events helpers to do some work to check reserved
+>> and padding fields are zero. This is useful on 32bit too.
+>>
+>> Move this code into virt/kvm/arm/arm.c, and give the arch
+>> code some underscores.
+>>
+>> This is temporarily hidden behind __KVM_HAVE_VCPU_EVENTS until
+>> 32bit is wired up.
 
-it does not apply cleanly to v4.18-rc1, can you please rebase it
-and send it again so that I can apply it ?
+>> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+>> index a94eab71e5c7..f70d24e1751d 100644
+>> --- a/virt/kvm/arm/arm.c
+>> +++ b/virt/kvm/arm/arm.c
+>> @@ -1044,6 +1044,34 @@ static int kvm_arm_vcpu_has_attr(struct kvm_vcpu *vcpu,
 
-Thanks,
-Lorenzo
+>> +#ifdef __KVM_HAVE_VCPU_EVENTS	/* temporary: until 32bit is wired up */
+
+[..]
+
+>> +#endif /* __KVM_HAVE_VCPU_EVENTS */
+
+> In [PATCH v7 4/4] KVM: arm: Add 32bit get/set events support, I see you> remove "__KVM_HAVE_VCPU_EVENTS" in kvm_arch_vcpu_ioctl()
+> but here it adds, it looks like strange.
+> so maybe it is better keep it in both place, or remove them both.
+> 
+> From the comments /* temporary: until 32bit is wired up */, do you forget
+> to remove the __KVM_HAVE_VCPU_EVENTS	after wiring up the 32bit?
+
+Indeed I did, the 'temporary' note was meant to remind me!
+(and I forgot about the documentation too)
+
+
+Thanks!
+
+James
