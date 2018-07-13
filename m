@@ -1,58 +1,71 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 13 Jul 2018 20:17:20 +0100
-Subject: [PATCH net-next v2 3/7] net: mvneta: increase number of buffers
- in RX and TX queue
-In-Reply-To: <20180713161841.11202-4-gregory.clement@bootlin.com>
-References: <20180713161841.11202-1-gregory.clement@bootlin.com>
- <20180713161841.11202-4-gregory.clement@bootlin.com>
-Message-ID: <20180713191720.GA17271@n2100.armlinux.org.uk>
+From: labbott@redhat.com (Laura Abbott)
+Date: Fri, 13 Jul 2018 12:21:37 -0700
+Subject: [PATCH] arm64: build with baremetal linker target instead of
+ Linux when available
+In-Reply-To: <20180713153033.20540-1-olof@lixom.net>
+References: <20180713150701.GA3049@arm.com>
+ <20180713153033.20540-1-olof@lixom.net>
+Message-ID: <33f65453-5b6d-0684-8a91-7e9940846143@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 13, 2018 at 06:18:37PM +0200, Gregory CLEMENT wrote:
-> From: Yelena Krivosheev <yelena@marvell.com>
+On 07/13/2018 08:30 AM, Olof Johansson wrote:
+> Not all toolchains have the baremetal elf targets, RedHat/Fedora ones
+> in particular. So, probe for whether it's available and use the previous
+> (linux) targets if it isn't.
 > 
-> The initial values were too small leading to poor performance when using
-> the software buffer management.
 
-What does this do to latency when a large transfer is also ongoing
-(iow, the classic bufferbloat issue) ?
 
-> 
-> Signed-off-by: Yelena Krivosheev <yelena@marvell.com>
-> [gregory: extract from a larger patch]
-> Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
+For the Fedora toolchains:
+
+Tested-by: Laura Abbott <labbott@redhat.com>
+
+> Reported-by: Laura Abbott <labbott@redhat.com>
+> Cc: Paul Kocialkowski <contact@paulk.fr>
+> Signed-off-by: Olof Johansson <olof@lixom.net>
 > ---
->  drivers/net/ethernet/marvell/mvneta.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+>   arch/arm64/Makefile    | 9 +++++----
+>   scripts/Kbuild.include | 4 ++--
+>   2 files changed, 7 insertions(+), 6 deletions(-)
 > 
-> diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-> index f4e3943a745d..c22df28b07c8 100644
-> --- a/drivers/net/ethernet/marvell/mvneta.c
-> +++ b/drivers/net/ethernet/marvell/mvneta.c
-> @@ -295,10 +295,10 @@
->  #define MVNETA_RSS_LU_TABLE_SIZE	1
->  
->  /* Max number of Rx descriptors */
-> -#define MVNETA_MAX_RXD 128
-> +#define MVNETA_MAX_RXD 512
->  
->  /* Max number of Tx descriptors */
-> -#define MVNETA_MAX_TXD 532
-> +#define MVNETA_MAX_TXD 1024
->  
->  /* Max number of allowed TCP segments for software TSO */
->  #define MVNETA_MAX_TSO_SEGS 100
-> -- 
-> 2.18.0
+> diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+> index e7101b19d590..efe61a2e4b5e 100644
+> --- a/arch/arm64/Makefile
+> +++ b/arch/arm64/Makefile
+> @@ -60,15 +60,16 @@ ifeq ($(CONFIG_CPU_BIG_ENDIAN), y)
+>   KBUILD_CPPFLAGS	+= -mbig-endian
+>   CHECKFLAGS	+= -D__AARCH64EB__
+>   AS		+= -EB
+> -# We must use the linux target here, since distributions don't tend to package
+> -# the ELF linker scripts with binutils, and this results in a build failure.
+> -LDFLAGS		+= -EB -maarch64linuxb
+> +# Prefer the baremetal ELF build target, but not all toolchains include
+> +# it so fall back to the standard linux version if needed.
+> +LDFLAGS		+= -EB $(call ld-option, -maarch64elfb, -maarch64linuxb)
+>   UTS_MACHINE	:= aarch64_be
+>   else
+>   KBUILD_CPPFLAGS	+= -mlittle-endian
+>   CHECKFLAGS	+= -D__AARCH64EL__
+>   AS		+= -EL
+> -LDFLAGS		+= -EL -maarch64linux # See comment above
+> +# Same as above, prefer ELF but fall back to linux target if needed.
+> +LDFLAGS		+= -EL $(call ld-option, -maarch64elf, -maarch64linux)
+>   UTS_MACHINE	:= aarch64
+>   endif
+>   
+> diff --git a/scripts/Kbuild.include b/scripts/Kbuild.include
+> index c8156d61678c..1e13f502b42f 100644
+> --- a/scripts/Kbuild.include
+> +++ b/scripts/Kbuild.include
+> @@ -163,8 +163,8 @@ cc-ldoption = $(call try-run,\
+>   	$(CC) $(1) $(KBUILD_CPPFLAGS) $(CC_OPTION_CFLAGS) -nostdlib -x c /dev/null -o "$$TMP",$(1),$(2))
+>   
+>   # ld-option
+> -# Usage: LDFLAGS += $(call ld-option, -X)
+> -ld-option = $(call try-run, $(LD) $(LDFLAGS) $(1) -v,$(1),$(2))
+> +# Usage: LDFLAGS += $(call ld-option, -X, -Y)
+> +ld-option = $(call try-run, $(LD) $(LDFLAGS) $(1) -v,$(1),$(2),$(3))
+>   
+>   # ar-option
+>   # Usage: KBUILD_ARFLAGS := $(call ar-option,D)
 > 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
-According to speedtest.net: 13Mbps down 490kbps up
