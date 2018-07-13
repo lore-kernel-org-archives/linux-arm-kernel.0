@@ -1,50 +1,76 @@
 From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Fri, 13 Jul 2018 13:49:57 +0200
-Subject: [PATCH] ARM64: dts: meson-axg: remove vddio_ao18 from SoC dtsi
-Message-ID: <20180713114957.32361-1-jbrunet@baylibre.com>
+Date: Fri, 13 Jul 2018 13:54:47 +0200
+Subject: [PATCH] ARM64: dts: meson-axg: add adc buttons the S400
+Message-ID: <20180713115447.2868-1-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Regulator should not be defined inside the SoC dtsi file.
-vddio_ao18 is already defined in the S400 board dts anyway.
+Add the 6 adc buttons of the amlogic S400
 
 Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
 ---
+ arch/arm64/boot/dts/amlogic/meson-axg-s400.dts | 44 ++++++++++++++++++++++++++
+ 1 file changed, 44 insertions(+)
 
-Kevin,
-
-This patch fixes a problem in a patch [0] you have applied recently.
-I did not put a Fixes tag because the branch on which you've applied it
-is not public yet (unknown sha1)
-
-If you decide to pick this patch, could you please add the Fixes tag?
-You could also squash the two patches together, if you prefer.
-
-Cheers
-Jerome
-
-[0] https://lkml.kernel.org/r/7hmuv0nkss.fsf at baylibre.com
-
- arch/arm64/boot/dts/amlogic/meson-axg.dtsi | 7 -------
- 1 file changed, 7 deletions(-)
-
-diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-index a936d6535ce7..d4dc87ae72a4 100644
---- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-@@ -92,13 +92,6 @@
- 		method = "smc";
- 	};
+diff --git a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
+index f389f84be2e2..fd90fa4a282c 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
+@@ -6,11 +6,55 @@
+ /dts-v1/;
  
--	vddio_ao18: regulator-vddio_ao18 {
--		compatible = "regulator-fixed";
--		regulator-name = "VDDIO_AO18";
--		regulator-min-microvolt = <1800000>;
--		regulator-max-microvolt = <1800000>;
--	};
--
- 	timer {
- 		compatible = "arm,armv8-timer";
- 		interrupts = <GIC_PPI 13
+ #include "meson-axg.dtsi"
++#include <dt-bindings/input/input.h>
+ 
+ / {
+ 	compatible = "amlogic,s400", "amlogic,a113d", "amlogic,meson-axg";
+ 	model = "Amlogic Meson AXG S400 Development Board";
+ 
++	adc_keys {
++		compatible = "adc-keys";
++		io-channels = <&saradc 0>;
++		io-channel-names = "buttons";
++		keyup-threshold-microvolt = <1800000>;
++
++		button-next {
++			label = "Next";
++			linux,code = <KEY_NEXT>;
++			press-threshold-microvolt = <1116000>; /* 62% */
++		};
++
++		button-prev {
++			label = "Previous";
++			linux,code = <KEY_PREVIOUS>;
++			press-threshold-microvolt = <900000>; /* 50% */
++		};
++
++		button-wifi {
++			label = "Wifi";
++			linux,code = <KEY_WLAN>;
++			press-threshold-microvolt = <684000>; /* 38% */
++		};
++
++		button-up {
++			label = "Volume Up";
++			linux,code = <KEY_VOLUMEUP>;
++			press-threshold-microvolt = <468000>; /* 26% */
++		};
++
++		button-down {
++			label = "Volume Down";
++			linux,code = <KEY_VOLUMEDOWN>;
++			press-threshold-microvolt = <252000>; /* 14% */
++		};
++
++		button-voice {
++			label = "Voice";
++			linux,code = <KEY_VOICECOMMAND>;
++			press-threshold-microvolt = <0>; /* 0% */
++		};
++	};
++
+ 	aliases {
+ 		serial0 = &uart_AO;
+ 		serial1 = &uart_A;
 -- 
 2.14.4
