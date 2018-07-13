@@ -1,91 +1,23 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Fri, 13 Jul 2018 09:25:36 +0200
-Subject: [PATCH 1/3] drm: mxsfb: Change driver.name to mxsfb-drm
-In-Reply-To: <039b2914-3393-5e81-82a6-7d517c5818a9@denx.de>
-References: <CAOMZO5B8i0gN+rCq-yPrd112NkwJWTxYCtsLVeLhD1JLRuX6EQ@mail.gmail.com>
- <07be6d9a85b6be655fc2b084be81d8bf9715b57a.camel@nxp.com>
- <638457fd-85da-8fec-d146-517c43f71813@denx.de>
- <b3fa74c5110b45e5992920485749869ab1f7ebce.camel@nxp.com>
- <6995fa4b-47a9-887b-5e4f-4284ca6a2c79@gmail.com>
- <fd22085f646d97f66cff5b7f22785500@agner.ch>
- <6fdba55b-0be6-9e28-d87a-43d876a1fd09@denx.de>
- <617c0a7e9132b929877b8cbcf116b1ea@agner.ch>
- <7f40f34a401ced78703b1a151d9f5fe4ed8c209f.camel@nxp.com>
- <039b2914-3393-5e81-82a6-7d517c5818a9@denx.de>
-Message-ID: <20180713072536.GX3008@phenom.ffwll.local>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 13 Jul 2018 09:26:11 +0200
+Subject: [PATCH 1/2] gpio: mt7621: add OF_GPIO dependency
+In-Reply-To: <20180710151915.2282622-1-arnd@arndb.de>
+References: <20180710151915.2282622-1-arnd@arndb.de>
+Message-ID: <CACRpkdbD6D3xtR6n3oOj4wWv5AZGar71Gwiyiv8Fu89UvX_9RA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 12, 2018 at 03:14:57PM +0200, Marek Vasut wrote:
-> On 07/12/2018 03:03 PM, Leonard Crestez wrote:
-> > On Thu, 2018-07-12 at 11:21 +0200, Stefan Agner wrote:
-> >> On 10.07.2018 11:11, Marek Vasut wrote:
-> >>> On 07/10/2018 11:06 AM, Stefan Agner wrote:
-> >>>> This is one of the situation where states quo is kinda the worst
-> >>>> situation.
-> >>>>
-> >>>> Currently imx_v6_v7_defconfig and mxs_defconfig actually still uses
-> >>>> CONFIG_FB_MXS.
-> >>>>
-> >>>> I understand that you'd rather prefer to move forward. I suggest we do
-> >>>> it in steps.
-> >>>>
-> >>>> In 4.19:
-> >>>>
-> >>>> - Change DRM driver.name to mxsfb-drm so we avoid conflicts for now
-> >>>
-> >>> But this will break mesa if it depends on mxsfb name for ie. etnaviv
-> >>> binding.
-> >>
-> >> Does it? grep -r -e mxsfb in libdrm and mesa master returns nothing.
-> >>
-> >> There is also .name in struct drm_driver, which is already set to
-> >> mxsfb-drm... Is that the one exposed to user space?
-> > 
-> > Running etnaviv+x11 with a renamed mxsfb driver works fine on imx6sx-
-> > sdb.
-> > 
-> > Tools like modetest already need -M mxsfb-drm, the drm_driver.name
-> > seems to be what matters.
-> > 
-> >> - Remove CONFIG_FB_MXS from imx_v6_v7_defconfig/mxs_defconfig now, and
-> >> only enable CONFIG_DRM_MXSFB=y
-> > 
-> > If one of the drivers is renamed then they can coexist: since the
-> > bindings are distinct one driver will return a probe error and the
-> > other will bind successfully. This can even be adjusted so that it
-> > doesn't even print ugly scary errors.
-> > 
-> > This can last until somebody implements support for old bindings in the
-> > drm driver and then FB_MXS can just be deleted.
-> 
-> So why don't we just convert the DT bindings on boards supported
-> upstream and zap the old driver ? What is the problem with that?
+On Tue, Jul 10, 2018 at 5:19 PM Arnd Bergmann <arnd@arndb.de> wrote:
 
-+1 on zapping drivers :-)
+> Compile-testing the driver fails unless OF_GPIO is enabled:
+>
+> drivers/gpio/gpio-mt7621.c: In function 'mediatek_gpio_bank_probe':
+> drivers/gpio/gpio-mt7621.c:228:10: error: 'struct gpio_chip' has no member named 'of_node'
+>
+> Fixes: 4ba9c3afda41 ("gpio: mt7621: Add a driver for MT7621")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-> Realistically, how many MXS boards in the field use old DT and new kernel ?
+Patch applied. Sorry for taking some days.
 
-Yeah I think occasionally that entire "DT is API, can't ever change it"
-song is overblown. The rule with regressions isn't that you're never
-allowed to break anything, but that you're only allowed to break stuff no
-one will notice and report.
-
-If there's realistically no users, go ahead and break (instead of huge and
-drawn-out compat plan).
-
-If there's a solid (and automatic enough) fallback like the drm driver,
-go ahead and break.
-
-We're doing this all the time in graphics with userspace ABI, I don't
-think DT is any different. Every once in a while there's a bit of regrets
-and a revert because we missed something, but overal it's much less effort
-than always trying to do a perfect job with backwards compat.
-
-Is it really a regression if no one reports it? No.
-
-Cheers, Daniel
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+Yours,
+Linus Walleij
