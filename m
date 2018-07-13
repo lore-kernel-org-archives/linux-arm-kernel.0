@@ -1,58 +1,46 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 13 Jul 2018 14:32:46 +0200
-Subject: [PATCH/RFC] ARM: shmobile: Always enable ARCH_TIMER on SoCs with
- A7 and/or A15
-In-Reply-To: <TY1PR01MB1562D500B559B159DA971B998A580@TY1PR01MB1562.jpnprd01.prod.outlook.com>
-References: <20180712160857.31471-1-geert+renesas@glider.be>
- <CANqRtoTuofutGtWycNcHq+rPzHqAsjy8ZY0W0k9m_SNWnOajVg@mail.gmail.com>
- <CAMuHMdVsASDbnk-8CtgZu6g5JYCVpj2eF4qFCy7q6bzBr1OEoA@mail.gmail.com>
- <TY1PR01MB1562D500B559B159DA971B998A580@TY1PR01MB1562.jpnprd01.prod.outlook.com>
-Message-ID: <CAMuHMdVNvOP7NymwuiJ0fZdzCF9ijKzhm2sfgptOOiHBj2SCWA@mail.gmail.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Fri, 13 Jul 2018 14:44:51 +0200
+Subject: [PATCH v3 4/9] dt-bindings: ata: ahci-platform: document AHCI
+ reset
+In-Reply-To: <1531479786-4911-5-git-send-email-clabbe@baylibre.com>
+References: <1531479786-4911-1-git-send-email-clabbe@baylibre.com>
+ <1531479786-4911-5-git-send-email-clabbe@baylibre.com>
+Message-ID: <20180713124451.pwdp6lf6ql2s4hyz@flea.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chris,
+On Fri, Jul 13, 2018 at 11:03:01AM +0000, Corentin Labbe wrote:
+> This patch document the new optional resets for ahci node.
+> 
+> Signed-off-by: Corentin Labbe <clabbe@baylibre.com>
+> ---
+>  Documentation/devicetree/bindings/ata/ahci-platform.txt | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/ata/ahci-platform.txt b/Documentation/devicetree/bindings/ata/ahci-platform.txt
+> index 5f362af2724c..a5281d7557e3 100644
+> --- a/Documentation/devicetree/bindings/ata/ahci-platform.txt
+> +++ b/Documentation/devicetree/bindings/ata/ahci-platform.txt
+> @@ -34,6 +34,8 @@ Optional properties:
+>  - phys              : reference to the SATA PHY node
+>  - phy-names         : must be "sata-phy"
+>  - ahci-supply       : regulator for AHCI controller
+> +- resets            : phandle to the reset line of AHCI controller
+> +                      If set, must have a reset-names set as "ahci"
 
-On Fri, Jul 13, 2018 at 2:22 PM Chris Brandt <Chris.Brandt@renesas.com> wrote:
-> On Friday, July 13, 2018, linux-renesas-soc-owner at vger.kernel.org wrote:
-> > > Exactly what the level of software support is available for the ARM
-> > > timers at this point I'm not so sure about.
-> >
-> > Using the TWD timer indeed has two issues:
-> >   - It's available on multi-core Cortex-A9 SoCs only,
-> >   - Its driver does not call register_current_timer_delay(), so it doesn't
-> > set
-> >     up lpj_fine for skipping loop calibration.
-> >
-> > The global timer driver does call register_current_timer_delay(), but so
-> > far no
-> > Renesas SoCs describe its presence in DT.
-> >
-> > At least SH-Mobile AG5 and R-Car M1A and H1 seem to have it.
-> > RZ/A1 (and A2) and R-Mobile A1 don't seem to have it, though.
-> > Perhaps the call to register_current_timer_delay() could be added to
-> > the RZ/A OSTM driver?
->
-> For RZ/A1, technically you could use MTU2 or OSTM as your system timer.
-> However, no one would every use MTU2 because OSTM is way more accurate.
->
-> Regardless, would we always call register_current_timer_delay() from the
-> OSTM driver?
-> Note that there are 2 OSTM channels on RZ/A1. The first one is loaded as
-> a clocksource, the second is used as an event counter. Would we call
-> register_current_timer_delay() for both instances?
+This isn't optional, it's required for the R40, and the other don't
+need it.
 
-For the clocksource only.
-Note that register_current_timer_delay() has some protection against
-multiple callers, and picks up the best timer found.
-
-Gr{oetje,eeting}s,
-
-                        Geert
+Maxime
 
 -- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180713/5154f9ce/attachment.sig>
