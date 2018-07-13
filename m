@@ -1,42 +1,32 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Fri, 13 Jul 2018 08:59:27 -0700
-Subject: [RFC PATCH 0/2] efi: add contents of LinuxExtraArgs EFI var to
- command line
-In-Reply-To: <20180713095604.GD32020@arm.com>
-References: <20180704154919.18564-1-ard.biesheuvel@linaro.org>
- <4bd9bee6-f2b9-3197-c205-fec104fd1090@infradead.org>
- <CAKv+Gu9+RYbtD8Ce_AW_1jvTei6dC5LwiiMgSUWDKLs8f7S+eA@mail.gmail.com>
- <20180713095604.GD32020@arm.com>
-Message-ID: <2d7a3b39-e8f1-1238-b29f-06ea3160ee4a@infradead.org>
+From: swboyd@chromium.org (Stephen Boyd)
+Date: Fri, 13 Jul 2018 09:00:19 -0700
+Subject: [PATCH v3 1/2] arm64: dts: qcom: pm8998: Add spmi-temp-alarm node
+In-Reply-To: <20180709212522.187257-1-mka@chromium.org>
+References: <20180709212522.187257-1-mka@chromium.org>
+Message-ID: <153149761947.48062.16210609862063613310@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+Quoting Matthias Kaehlcke (2018-07-09 14:25:21)
+> diff --git a/arch/arm64/boot/dts/qcom/pm8998.dtsi b/arch/arm64/boot/dts/qcom/pm8998.dtsi
+> index 92bed1e7d4bb..7eea94701b23 100644
+> --- a/arch/arm64/boot/dts/qcom/pm8998.dtsi
+> +++ b/arch/arm64/boot/dts/qcom/pm8998.dtsi
+> @@ -11,6 +11,13 @@
+>                 #address-cells = <1>;
+>                 #size-cells = <0>;
+>  
+> +               pm8998_temp: temp-alarm at 2400 {
 
-On 07/13/2018 02:56 AM, Will Deacon wrote:
-> On Fri, Jul 13, 2018 at 08:15:26AM +0200, Ard Biesheuvel wrote:
-> 
->> This is not my call to make, but I would be much less averse to this
->> being merged if we could agree upfront on an expiration time of, say,
->> 2 years (or more?), after which it will be removed (unless anyone
->> makes a very good case for why it needs to be retained). This should
->> be mentioned in the kernel log as well when the quirk is triggered.
-> 
-> The problem with that is it all falls apart when somebody who wasn't
-> involved in the initial discussion crops up after we remove the quirk to
-> complain that their machine broke. In such a situation, we don't have a
-> leg to stand on in my opinion.
+Are we sorting this file based on node name or unit address? Otherwise
+patch looks good.
 
-That's the purpose of the announcement in advance.  It should be
-several release cycles before hand to give plenty of time for feedback
-and consensus.
-
-I think it is generally accepted that if a kernel feature has no known
-users and no dedicated maintainer then that code should be removed.
-The powerpc celleb platform was in a similar situation.  Not so many
-available, no real dedicated mainliner, etc. Support was removed [1],
-and I don't know of any problems that came of it.
-
-[1] https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=bf4981a00636347ddcef3fc008e4dd979380a851
-
--Geoff
+> +                       compatible = "qcom,spmi-temp-alarm";
+> +                       reg = <0x2400>;
+> +                       interrupts = <0x0 0x24 0x0 IRQ_TYPE_EDGE_RISING>;
+> +                       #thermal-sensor-cells = <0>;
+> +               };
+> +
+>                 pm8998_gpio: gpios at c000 {
+>                         compatible = "qcom,pm8998-gpio", "qcom,spmi-gpio";
+>                         reg = <0xc000>;
