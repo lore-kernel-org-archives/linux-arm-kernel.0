@@ -1,42 +1,90 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 13 Jul 2018 08:15:26 +0200
-Subject: [RFC PATCH 0/2] efi: add contents of LinuxExtraArgs EFI var to
- command line
-In-Reply-To: <4bd9bee6-f2b9-3197-c205-fec104fd1090@infradead.org>
-References: <20180704154919.18564-1-ard.biesheuvel@linaro.org>
- <4bd9bee6-f2b9-3197-c205-fec104fd1090@infradead.org>
-Message-ID: <CAKv+Gu9+RYbtD8Ce_AW_1jvTei6dC5LwiiMgSUWDKLs8f7S+eA@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 13 Jul 2018 08:16:04 +0200
+Subject: [PATCH v2 2/3] dmaengine: imx-sdma: add memcpy interface
+In-Reply-To: <1531487327-21879-3-git-send-email-yibin.gong@nxp.com>
+References: <1531487327-21879-1-git-send-email-yibin.gong@nxp.com>
+ <1531487327-21879-3-git-send-email-yibin.gong@nxp.com>
+Message-ID: <20180713061604.tza3udckmyaoq5wh@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 July 2018 at 00:22, Geoff Levand <geoff@infradead.org> wrote:
-> Hi Ard,
->
-> On 07/04/2018 08:49 AM, Ard Biesheuvel wrote:
->>   efi/libstub: taken contents of LinuxExtraArgs UEFI variable into
->>     account
->
-> To me this seems an overly complicated interface to the kernel, and
-> still doesn't in itself solve the problem at hand -- make the
-> generic distro kernel with APEI support run on m400 systems.
->
-> As for me, I'd prefer something like my original patch.  It fixes
-> that problem, it is simple and self contained, and is very clear
-> in what it does.  Also, there is a limited life.  When the time
-> comes an announcement is made to the mailing lists 'Linux-XYZ will
-> no longer support the m400 Moonshot'.  Then, when the Linux-XYZ-rc1
-> merge window opens a patch goes in that removes the
-> acpi_fixup_m400_quirks() routine.
->
+On Fri, Jul 13, 2018 at 09:08:46PM +0800, Robin Gong wrote:
+> Add MEMCPY capability for imx-sdma driver.
+> 
+> Signed-off-by: Robin Gong <yibin.gong@nxp.com>
+> ---
+>  drivers/dma/imx-sdma.c | 95 ++++++++++++++++++++++++++++++++++++++++++++++++--
+>  1 file changed, 92 insertions(+), 3 deletions(-)
+> 
+> @@ -1318,6 +1347,63 @@ static struct sdma_desc *sdma_transfer_init(struct sdma_channel *sdmac,
+>  	return NULL;
+>  }
+>  
+> +static struct dma_async_tx_descriptor *sdma_prep_memcpy(
+> +		struct dma_chan *chan, dma_addr_t dma_dst,
+> +		dma_addr_t dma_src, size_t len, unsigned long flags)
+> +{
+> +	struct sdma_channel *sdmac = to_sdma_chan(chan);
+> +	struct sdma_engine *sdma = sdmac->sdma;
+> +	int channel = sdmac->channel;
+> +	size_t count;
+> +	int i = 0, param;
+> +	struct sdma_buffer_descriptor *bd;
+> +	struct sdma_desc *desc;
+> +
+> +	if (!chan || !len)
+> +		return NULL;
+> +
+> +	dev_dbg(sdma->dev, "memcpy: %pad->%pad, len=%zu, channel=%d.\n",
+> +		&dma_src, &dma_dst, len, channel);
+> +
+> +	desc = sdma_transfer_init(sdmac, DMA_MEM_TO_MEM,
+> +					len / SDMA_BD_MAX_CNT + 1);
+> +	if (!desc)
+> +		return NULL;
+> +
+> +	do {
+> +		count = min_t(size_t, len, SDMA_BD_MAX_CNT);
+> +		bd = &desc->bd[i];
+> +		bd->buffer_addr = dma_src;
+> +		bd->ext_buffer_addr = dma_dst;
+> +		bd->mode.count = count;
+> +		desc->chn_count += count;
+> +		/* align with sdma->dma_device.copy_align: 4bytes */
+> +		bd->mode.command = 0;
+> +
+> +		dma_src += count;
+> +		dma_dst += count;
+> +		len -= count;
+> +		i++;
 
-Actually, that is a very good point. One of the issues I have with
-these quirks is that the burden is on the maintainers to keep them
-around forever, unless they can prove that it is no longer needed.
+NACK.
 
-This is not my call to make, but I would be much less averse to this
-being merged if we could agree upfront on an expiration time of, say,
-2 years (or more?), after which it will be removed (unless anyone
-makes a very good case for why it needs to be retained). This should
-be mentioned in the kernel log as well when the quirk is triggered.
+Please actually look at your code and find out where you do unaligned DMA
+accesses. Hint: What happens when this loop body is executed more than once?
 
-I still think we should not be using DMI, though.
+Sascha
+
+> +
+> +		param = BD_DONE | BD_EXTD | BD_CONT;
+> +		/* last bd */
+> +		if (!len) {
+> +			param |= BD_INTR;
+> +			param |= BD_LAST;
+> +			param &= ~BD_CONT;
+> +		}
+> +
+> +		dev_dbg(sdma->dev, "entry %d: count: %zd dma: 0x%x %s%s\n",
+> +				i, count, bd->buffer_addr,
+> +				param & BD_WRAP ? "wrap" : "",
+> +				param & BD_INTR ? " intr" : "");
+> +
+> +		bd->mode.status = param;
+> +	} while (len);
+> +
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
