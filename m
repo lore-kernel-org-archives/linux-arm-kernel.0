@@ -1,23 +1,27 @@
-From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
-Date: Fri, 13 Jul 2018 13:37:17 -0700
-Subject: [PATCH] i2c: aspeed: Adjust spinlock scope in the irq handler
-In-Reply-To: <20180713203327.47yq4gucidbzn2hd@katana>
-References: <20180702214011.16071-1-jae.hyun.yoo@linux.intel.com>
- <CAFd5g47nBCbF0mcYqEnQkDpz0Dhh0F0S1-wEL_yBHgs1b3yE5w@mail.gmail.com>
- <59538d26-f025-28da-63df-f675e80fd68b@linux.intel.com>
- <20180713203327.47yq4gucidbzn2hd@katana>
-Message-ID: <0840cfe8-e18a-ae7c-5593-fc43b9b47291@linux.intel.com>
+From: harald@skogtun.org (Harald Arnesen)
+Date: Fri, 13 Jul 2018 23:09:15 +0200
+Subject: [GIT PULL] arm64 fixes for 4.18-rc5
+In-Reply-To: <CA+55aFwR2S4a=Ytb=Rk46GBBCTX=ejVyYZ6YKO63j2MrW7+Vaw@mail.gmail.com>
+References: <20180713131344.GH32020@arm.com>
+ <CA+55aFwR2S4a=Ytb=Rk46GBBCTX=ejVyYZ6YKO63j2MrW7+Vaw@mail.gmail.com>
+Message-ID: <c779d859-6dc4-b11b-0a8d-cf3439c0ea95@skogtun.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/13/2018 1:33 PM, Wolfram Sang wrote:
-> 
->> BTW, to whom should I ask applying this patch? Should I send v2 after
->> adding your reviewed-by tag?
-> 
-> Not needed, thanks. I use 'patchwork' and this tool collects all the
-> tags for me. If I see a patch reviewed by a driver maintainer, I'll pick
-> it up in the next queue.
-> 
+Linus Torvalds [2018-07-13 20:51]:
 
-Oh, I see. Thanks a lot Wolfram!
+> On Fri, Jul 13, 2018 at 6:13 AM Will Deacon <will.deacon@arm.com> wrote:
+>>
+>> Catalin's out enjoying the sunshine, so I'm sending the fixes for a couple
+>> of weeks (although there hopefully won't be any more!).
+> 
+> Never fear, I'm sure there won't be more than a couple of weeks of
+> sunshine in the UK this summer.
+> 
+> That's what you were trying to say, right?
+> 
+>             Linus
+
+FYI: Northern Europe has been exceptionally warm this summer.
+-- 
+Hilsen Harald
