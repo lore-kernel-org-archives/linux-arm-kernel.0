@@ -1,25 +1,28 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 13 Jul 2018 12:44:44 +0100
-Subject: [PATCH 1/3 v4] ARM: dts: Modernize the Vexpress PL111 integration
-In-Reply-To: <0bcade58-26d5-8c2f-bcba-765aebd343bb@arm.com>
-References: <20180709075232.30678-1-linus.walleij@linaro.org>
- <b00c3b85-1368-f62b-efda-d23ce27e6f9c@arm.com>
- <0bcade58-26d5-8c2f-bcba-765aebd343bb@arm.com>
-Message-ID: <b76645a6-5145-14b5-4290-95ef1dfff4de@arm.com>
+From: clabbe@baylibre.com (Corentin Labbe)
+Date: Fri, 13 Jul 2018 11:48:42 +0000
+Subject: [PATCH] net: stmmac: dwmac-sun8i: fix typo descrive => describe
+Message-ID: <1531482522-10824-1-git-send-email-clabbe@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/07/18 10:50, Sudeep Holla wrote:
->> It doesn't work. This change is breaking the working CLCD on the models.
->> I just tested and CLCD driver returns
->>
-> 
-> It even fails to initialize CLCD on my TC2.
-> 
-> clcd-pl11x 1c1f0000.clcd: PL111 designer 41 rev1 at 0x1c1f0000
-> clcd-pl11x: probe of 1c1f0000.clcd failed with error -2
+This patch fix a typo in the word Describe
+Signed-off-by: Corentin Labbe <clabbe@baylibre.com>
+---
+ drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-FWIW the same happens on PB-A8; looks like converting to OF graph 
-bindings falls foul of the "panel-dpi" check in clcdfb_of_get_mode().
-
-Robin.
+diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
+index 2e6e2a96b4f2..f9a61f90cfbc 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
++++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
+@@ -37,7 +37,7 @@
+  *		is done in the "stmmac files"
+  */
+ 
+-/* struct emac_variant - Descrive dwmac-sun8i hardware variant
++/* struct emac_variant - Describe dwmac-sun8i hardware variant
+  * @default_syscon_value:	The default value of the EMAC register in syscon
+  *				This value is used for disabling properly EMAC
+  *				and used as a good starting value in case of the
+-- 
+2.16.4
