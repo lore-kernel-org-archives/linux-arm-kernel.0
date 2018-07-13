@@ -1,57 +1,64 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 13 Jul 2018 09:27:42 -0600
-Subject: [PATCH] pinctrl: at91: fix deferred probing support
-In-Reply-To: <20180713094717.GQ16084@piout.net>
-References: <20180712192222.32481-1-robh@kernel.org>
- <20180713094717.GQ16084@piout.net>
-Message-ID: <CAL_Jsq+aT3kSLwcm+g0MHV6Gy+4mde17fUDa9HwiexQ1dHn5Bg@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 13 Jul 2018 08:30:33 -0700
+Subject: [PATCH] arm64: build with baremetal linker target instead of Linux
+ when available
+In-Reply-To: <20180713150701.GA3049@arm.com>
+References: <20180713150701.GA3049@arm.com>
+Message-ID: <20180713153033.20540-1-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 13, 2018 at 3:47 AM Alexandre Belloni
-<alexandre.belloni@bootlin.com> wrote:
->
-> Hi Rob,
->
-> On 12/07/2018 13:22:22-0600, Rob Herring wrote:
-> > AT91 pinctrl deferred probing support is broken if the GPIO devices
-> > haven't probed first and set gpio_banks to non-zero. The later condition
-> > that only some GPIO devices haven't probed can't actually happen as
-> > either all the GPIO devices have probed first or none of them have. Plus
-> > the pinctrl driver has already returned -EINVAL, so it's not on the
-> > deferred list to retry probing.
-> >
-> > Fix this by consolidating the checking that all GPIO devices are probed.
-> >
-> > Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-> > Cc: Linus Walleij <linus.walleij@linaro.org>
-> > Cc: Nicolas Ferre <nicolas.ferre@microchip.com>
-> > Cc: Alexandre Belloni <alexandre.belloni@bootlin.com>
-> > Cc: linux-arm-kernel at lists.infradead.org
-> > Cc: linux-gpio at vger.kernel.org
-> > Signed-off-by: Rob Herring <robh@kernel.org>
-> > ---
-> > This is a result of trying to remove of_platform_default_populate from
-> > at91 code and relying on the DT core handling populating devices. That
-> > changed the probe order and broke booting.
-> >
->
-> This solves part of the issue but when tested with the
-> of_platform_default_populate removal, many drivers will fail with
-> gpiod_set_value: invalid GPIO (errorpointer)
->
-> or
->
-> gpiod_get_value: invalid GPIO (errorpointer)
->
-> This happens both before and after the pinctrl driver probed.
->
-> I didn't investigate much yet.
+Not all toolchains have the baremetal elf targets, RedHat/Fedora ones
+in particular. So, probe for whether it's available and use the previous
+(linux) targets if it isn't.
 
-Looks to me like it may be a circular dependency. The GPIO request
-functions depend on the pinctrl driver which depends on the gpio
-driver. Maybe returning EPROBE_DEFER in at91_gpio_request_enable and
-removing the requirement that the GPIO driver probe first would fix
-it...
+Reported-by: Laura Abbott <labbott@redhat.com>
+Cc: Paul Kocialkowski <contact@paulk.fr>
+Signed-off-by: Olof Johansson <olof@lixom.net>
+---
+ arch/arm64/Makefile    | 9 +++++----
+ scripts/Kbuild.include | 4 ++--
+ 2 files changed, 7 insertions(+), 6 deletions(-)
 
-Rob
+diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+index e7101b19d590..efe61a2e4b5e 100644
+--- a/arch/arm64/Makefile
++++ b/arch/arm64/Makefile
+@@ -60,15 +60,16 @@ ifeq ($(CONFIG_CPU_BIG_ENDIAN), y)
+ KBUILD_CPPFLAGS	+= -mbig-endian
+ CHECKFLAGS	+= -D__AARCH64EB__
+ AS		+= -EB
+-# We must use the linux target here, since distributions don't tend to package
+-# the ELF linker scripts with binutils, and this results in a build failure.
+-LDFLAGS		+= -EB -maarch64linuxb
++# Prefer the baremetal ELF build target, but not all toolchains include
++# it so fall back to the standard linux version if needed.
++LDFLAGS		+= -EB $(call ld-option, -maarch64elfb, -maarch64linuxb)
+ UTS_MACHINE	:= aarch64_be
+ else
+ KBUILD_CPPFLAGS	+= -mlittle-endian
+ CHECKFLAGS	+= -D__AARCH64EL__
+ AS		+= -EL
+-LDFLAGS		+= -EL -maarch64linux # See comment above
++# Same as above, prefer ELF but fall back to linux target if needed.
++LDFLAGS		+= -EL $(call ld-option, -maarch64elf, -maarch64linux)
+ UTS_MACHINE	:= aarch64
+ endif
+ 
+diff --git a/scripts/Kbuild.include b/scripts/Kbuild.include
+index c8156d61678c..1e13f502b42f 100644
+--- a/scripts/Kbuild.include
++++ b/scripts/Kbuild.include
+@@ -163,8 +163,8 @@ cc-ldoption = $(call try-run,\
+ 	$(CC) $(1) $(KBUILD_CPPFLAGS) $(CC_OPTION_CFLAGS) -nostdlib -x c /dev/null -o "$$TMP",$(1),$(2))
+ 
+ # ld-option
+-# Usage: LDFLAGS += $(call ld-option, -X)
+-ld-option = $(call try-run, $(LD) $(LDFLAGS) $(1) -v,$(1),$(2))
++# Usage: LDFLAGS += $(call ld-option, -X, -Y)
++ld-option = $(call try-run, $(LD) $(LDFLAGS) $(1) -v,$(1),$(2),$(3))
+ 
+ # ar-option
+ # Usage: KBUILD_ARFLAGS := $(call ar-option,D)
+-- 
+2.11.0
