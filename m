@@ -1,50 +1,53 @@
-From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Fri, 13 Jul 2018 11:47:17 +0200
-Subject: [PATCH] pinctrl: at91: fix deferred probing support
-In-Reply-To: <20180712192222.32481-1-robh@kernel.org>
-References: <20180712192222.32481-1-robh@kernel.org>
-Message-ID: <20180713094717.GQ16084@piout.net>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Fri, 13 Jul 2018 10:50:21 +0100
+Subject: [PATCH 1/3 v4] ARM: dts: Modernize the Vexpress PL111 integration
+In-Reply-To: <b00c3b85-1368-f62b-efda-d23ce27e6f9c@arm.com>
+References: <20180709075232.30678-1-linus.walleij@linaro.org>
+ <b00c3b85-1368-f62b-efda-d23ce27e6f9c@arm.com>
+Message-ID: <0bcade58-26d5-8c2f-bcba-765aebd343bb@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
 
-On 12/07/2018 13:22:22-0600, Rob Herring wrote:
-> AT91 pinctrl deferred probing support is broken if the GPIO devices
-> haven't probed first and set gpio_banks to non-zero. The later condition
-> that only some GPIO devices haven't probed can't actually happen as
-> either all the GPIO devices have probed first or none of them have. Plus
-> the pinctrl driver has already returned -EINVAL, so it's not on the
-> deferred list to retry probing.
+
+On 10/07/18 10:46, Sudeep Holla wrote:
+>  
+> On 09/07/18 08:52, Linus Walleij wrote:
+
+[...]
+
 > 
-> Fix this by consolidating the checking that all GPIO devices are probed.
+> Still get below warnings, not sure if I need to upgrade my DTC ?
 > 
-> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Nicolas Ferre <nicolas.ferre@microchip.com>
-> Cc: Alexandre Belloni <alexandre.belloni@bootlin.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-gpio at vger.kernel.org
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> ---
-> This is a result of trying to remove of_platform_default_populate from 
-> at91 code and relying on the DT core handling populating devices. That 
-> changed the probe order and broke booting.
+> vexpress-v2f-1xv7-ca53x2.dtb: Warning (graph_child_address):
+> /smb at 8000000/motherboard/iofpga at 3,00000000/i2c at 160000/dvi-transmitter at 39/ports:
+> graph node has single child node 'port at 0', #address-cells/#size-cells
+> are not necessary
+> rtsm_ve-aemv8a.dtb: Warning (graph_child_address):
+> /smb at 8000000/motherboard/iofpga at 3,00000000/i2c at 160000/dvi-transmitter at 39/ports:
+> graph node has single child node 'port at 0', #address-cells/#size-cells
+> are not necessary
 > 
 
-This solves part of the issue but when tested with the
-of_platform_default_populate removal, many drivers will fail with
-gpiod_set_value: invalid GPIO (errorpointer)
+Ignore this as it's hard to fix. If you fix this you will get 10 other
+warnings elsewhere, not sure why.
 
-or 
+[...]
 
-gpiod_get_value: invalid GPIO (errorpointer)
+>> - Fixed up the Real-Time Systems Models Virtual Executive
+>>   RTSMv8 AEM VE:
+>>   - Added the I2C interface (whether implemented in the
+>>     emulator or not)
+> 
+> It doesn't work. This change is breaking the working CLCD on the models.
+> I just tested and CLCD driver returns
+> 
 
-This happens both before and after the pinctrl driver probed.
+It even fails to initialize CLCD on my TC2.
 
-I didn't investigate much yet.
+clcd-pl11x 1c1f0000.clcd: PL111 designer 41 rev1 at 0x1c1f0000
+clcd-pl11x: probe of 1c1f0000.clcd failed with error -2
 
 -- 
-Alexandre Belloni, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+Regards,
+Sudeep
