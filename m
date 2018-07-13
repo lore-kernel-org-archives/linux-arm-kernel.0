@@ -1,38 +1,26 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Fri, 13 Jul 2018 09:01:55 +0200
-Subject: [PATCH] drm/sun41: Fix incorrect return type
-In-Reply-To: <20180712155037.211625-1-seanpaul@chromium.org>
-References: <20180712155037.211625-1-seanpaul@chromium.org>
-Message-ID: <20180713070155.3dodt43il4w6rjll@flea.home>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 13 Jul 2018 09:05:48 +0200
+Subject: [PATCH] gpio: aspeed: fix compile testing warning
+In-Reply-To: <20180709145612.4166409-1-arnd@arndb.de>
+References: <20180709145612.4166409-1-arnd@arndb.de>
+Message-ID: <CACRpkdaMdcAnA9GWx2vJtfGtDEUzpE64g6v+tJM8NVtY=Bc_Mg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sean,
+On Mon, Jul 9, 2018 at 4:56 PM Arnd Bergmann <arnd@arndb.de> wrote:
 
-On Thu, Jul 12, 2018 at 11:50:28AM -0400, Sean Paul wrote:
-> We're returning -errno instead of ERR_PTR(-errno).
-> 
-> Fixes: af11942ee44e ("drm/sun4i: tcon-top: Cleanup clock handling")
-> Cc: Chen-Yu Tsai <wens@csie.org>
-> Cc: Jernej Skrabec <jernej.skrabec@siol.net>
-> Cc: Maxime Ripard <maxime.ripard@bootlin.com>
-> Cc: dri-devel at lists.freedesktop.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Sean Paul <seanpaul@chromium.org>
+> Gcc cannot always see that BUG_ON(1) is guaranteed to not
+> return, so we get a warning message in some configurations:
+>
+> drivers/gpio/gpio-aspeed.c: In function 'bank_reg':
+> drivers/gpio/gpio-aspeed.c:244:1: error: control reaches end of non-void function [-Werror=return-type]
+>
+> Using a plain BUG() is easier here and avoids the problem.
+>
+> Fixes: 44ddf559d579 ("gpio: aspeed: Rework register type accessors")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-I merged a similar patch yesterday, the warning should be gone now.
+Patch applied with Benjamin's ACK.
 
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180713/f8cd09f4/attachment.sig>
+Yours,
+Linus Walleij
