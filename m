@@ -1,264 +1,122 @@
-From: jens.wiklander@linaro.org (Jens Wiklander)
-Date: Fri, 13 Jul 2018 11:24:50 +0200
-Subject: [RESEND PATCH] tee: add kernel internal client interface
-In-Reply-To: <20180709061549.24382-1-jens.wiklander@linaro.org>
-References: <20180709061549.24382-1-jens.wiklander@linaro.org>
-Message-ID: <20180713092449.GA17766@jax.urgonet>
+From: ludovic.desroches@microchip.com (Ludovic Desroches)
+Date: Fri, 13 Jul 2018 11:24:39 +0200
+Subject: [PATCH] pinctrl: at91: fix deferred probing support
+In-Reply-To: <20180712192222.32481-1-robh@kernel.org>
+References: <20180712192222.32481-1-robh@kernel.org>
+Message-ID: <20180713092439.3f6q6et4si2x3dle@M43218.corp.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+Sumit]
+On Thu, Jul 12, 2018 at 01:22:22PM -0600, Rob Herring wrote:
+> AT91 pinctrl deferred probing support is broken if the GPIO devices
+> haven't probed first and set gpio_banks to non-zero. The later condition
+> that only some GPIO devices haven't probed can't actually happen as
+> either all the GPIO devices have probed first or none of them have. Plus
+> the pinctrl driver has already returned -EINVAL, so it's not on the
+> deferred list to retry probing.
+> 
+> Fix this by consolidating the checking that all GPIO devices are probed.
+> 
+> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Nicolas Ferre <nicolas.ferre@microchip.com>
+> Cc: Alexandre Belloni <alexandre.belloni@bootlin.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-gpio at vger.kernel.org
+> Signed-off-by: Rob Herring <robh@kernel.org>
+Acked-by: Ludovic Desroches <ludovic.desroches@microchip.com> 
 
-On Mon, Jul 09, 2018 at 08:15:49AM +0200, Jens Wiklander wrote:
-> Adds a kernel internal TEE client interface to be used by other drivers.
-> 
-> Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
 > ---
->  drivers/tee/tee_core.c  | 113 +++++++++++++++++++++++++++++++++++++---
->  include/linux/tee_drv.h |  73 ++++++++++++++++++++++++++
->  2 files changed, 179 insertions(+), 7 deletions(-)
+> This is a result of trying to remove of_platform_default_populate from 
+> at91 code and relying on the DT core handling populating devices. That 
+> changed the probe order and broke booting.
 > 
-> diff --git a/drivers/tee/tee_core.c b/drivers/tee/tee_core.c
-> index dd46b758852a..7b2bb4c50058 100644
-> --- a/drivers/tee/tee_core.c
-> +++ b/drivers/tee/tee_core.c
-> @@ -38,15 +38,13 @@ static DEFINE_SPINLOCK(driver_lock);
->  static struct class *tee_class;
->  static dev_t tee_devt;
->  
-> -static int tee_open(struct inode *inode, struct file *filp)
-> +static struct tee_context *teedev_open(struct tee_device *teedev)
+> Compile tested only.
+
+Tested on an at91-sama5d4_xplained board, it still boots.
+
+Regards
+
+Ludovic
+
+> 
+> Rob
+> 
+>  drivers/pinctrl/pinctrl-at91.c | 36 ++++++++++++----------------------
+>  1 file changed, 13 insertions(+), 23 deletions(-)
+> 
+> diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
+> index 50f0ec42c637..167838901b75 100644
+> --- a/drivers/pinctrl/pinctrl-at91.c
+> +++ b/drivers/pinctrl/pinctrl-at91.c
+> @@ -1162,7 +1162,7 @@ static int at91_pinctrl_probe_dt(struct platform_device *pdev,
+>  				 struct at91_pinctrl *info)
 >  {
->  	int rc;
-> -	struct tee_device *teedev;
->  	struct tee_context *ctx;
+>  	int ret = 0;
+> -	int i, j;
+> +	int i, j, ngpio_chips_enabled = 0;
+>  	uint32_t *tmp;
+>  	struct device_node *np = pdev->dev.of_node;
+>  	struct device_node *child;
+> @@ -1175,10 +1175,17 @@ static int at91_pinctrl_probe_dt(struct platform_device *pdev,
+>  		of_match_device(at91_pinctrl_of_match, &pdev->dev)->data;
+>  	at91_pinctrl_child_count(info, np);
 >  
-> -	teedev = container_of(inode->i_cdev, struct tee_device, cdev);
->  	if (!tee_device_get(teedev))
+> -	if (gpio_banks < 1) {
+> -		dev_err(&pdev->dev, "you need to specify at least one gpio-controller\n");
 > -		return -EINVAL;
-> +		return ERR_PTR(-EINVAL);
->  
->  	ctx = kzalloc(sizeof(*ctx), GFP_KERNEL);
->  	if (!ctx) {
-> @@ -57,16 +55,16 @@ static int tee_open(struct inode *inode, struct file *filp)
->  	kref_init(&ctx->refcount);
->  	ctx->teedev = teedev;
->  	INIT_LIST_HEAD(&ctx->list_shm);
-> -	filp->private_data = ctx;
->  	rc = teedev->desc->ops->open(ctx);
->  	if (rc)
->  		goto err;
->  
-> -	return 0;
-> +	return ctx;
->  err:
->  	kfree(ctx);
->  	tee_device_put(teedev);
-> -	return rc;
-> +	return ERR_PTR(rc);
+> -	}
+> +	/*
+> +	 * We need all the GPIO drivers to probe FIRST, or we will not be able
+> +	 * to obtain references to the struct gpio_chip * for them, and we
+> +	 * need this to proceed.
+> +	 */
+> +	for (i = 0; i < MAX_GPIO_BANKS; i++)
+> +		if (gpio_chips[i])
+> +			ngpio_chips_enabled++;
 > +
->  }
+> +	if (ngpio_chips_enabled < info->nactive_banks)
+> +		return -EPROBE_DEFER;
 >  
->  void teedev_ctx_get(struct tee_context *ctx)
-> @@ -100,6 +98,18 @@ static void teedev_close_context(struct tee_context *ctx)
->  	teedev_ctx_put(ctx);
->  }
->  
-> +static int tee_open(struct inode *inode, struct file *filp)
-> +{
-> +	struct tee_context *ctx;
-> +
-> +	ctx = teedev_open(container_of(inode->i_cdev, struct tee_device, cdev));
-> +	if (IS_ERR(ctx))
-> +		return PTR_ERR(ctx);
-> +
-> +	filp->private_data = ctx;
-> +	return 0;
-> +}
-> +
->  static int tee_release(struct inode *inode, struct file *filp)
+>  	ret = at91_pinctrl_mux_mask(info, np);
+>  	if (ret)
+> @@ -1234,7 +1241,7 @@ static int at91_pinctrl_probe(struct platform_device *pdev)
 >  {
->  	teedev_close_context(filp->private_data);
-> @@ -928,6 +938,95 @@ void *tee_get_drvdata(struct tee_device *teedev)
->  }
->  EXPORT_SYMBOL_GPL(tee_get_drvdata);
+>  	struct at91_pinctrl *info;
+>  	struct pinctrl_pin_desc *pdesc;
+> -	int ret, i, j, k, ngpio_chips_enabled = 0;
+> +	int ret, i, j, k;
 >  
-> +struct match_dev_data {
-> +	struct tee_ioctl_version_data *vers;
-> +	const void *data;
-> +	int (*match)(struct tee_ioctl_version_data *, const void *);
-> +};
-> +
-> +static int match_dev(struct device *dev, const void *data)
-> +{
-> +	const struct match_dev_data *match_data = data;
-> +	struct tee_device *teedev = container_of(dev, struct tee_device, dev);
-> +
-> +	teedev->desc->ops->get_version(teedev, match_data->vers);
-> +	return match_data->match(match_data->vers, match_data->data);
-> +}
-> +
-> +struct tee_context *
-> +tee_client_open_context(struct tee_context *start,
-> +			int (*match)(struct tee_ioctl_version_data *,
-> +				     const void *),
-> +			const void *data, struct tee_ioctl_version_data *vers)
-> +{
-> +	struct device *dev = NULL;
-> +	struct device *put_dev = NULL;
-> +	struct tee_context *ctx = NULL;
-> +	struct tee_ioctl_version_data v;
-> +	struct match_dev_data match_data = { vers ? vers : &v, data, match };
-> +
-> +	if (start)
-> +		dev = &start->teedev->dev;
-> +
-> +	do {
-> +		dev = class_find_device(tee_class, dev, &match_data, match_dev);
-> +		if (!dev) {
-> +			ctx = ERR_PTR(-ENOENT);
-> +			break;
-> +		}
-> +
-> +		put_device(put_dev);
-> +		put_dev = dev;
-> +
-> +		ctx = teedev_open(container_of(dev, struct tee_device, dev));
-> +	} while (IS_ERR(ctx) && PTR_ERR(ctx) != -ENOMEM);
-> +
-> +	put_device(put_dev);
-> +	return ctx;
-> +}
-> +EXPORT_SYMBOL_GPL(tee_client_open_context);
-> +
-> +void tee_client_close_context(struct tee_context *ctx)
-> +{
-> +	teedev_close_context(ctx);
-> +}
-> +EXPORT_SYMBOL_GPL(tee_client_close_context);
-> +
-> +void tee_client_get_version(struct tee_context *ctx,
-> +			    struct tee_ioctl_version_data *vers)
-> +{
-> +	ctx->teedev->desc->ops->get_version(ctx->teedev, vers);
-> +}
-> +EXPORT_SYMBOL_GPL(tee_client_get_version);
-> +
-> +int tee_client_open_session(struct tee_context *ctx,
-> +			    struct tee_ioctl_open_session_arg *arg,
-> +			    struct tee_param *param)
-> +{
-> +	if (!ctx->teedev->desc->ops->open_session)
-> +		return -EINVAL;
-> +	return ctx->teedev->desc->ops->open_session(ctx, arg, param);
-> +}
-> +EXPORT_SYMBOL_GPL(tee_client_open_session);
-> +
-> +int tee_client_close_session(struct tee_context *ctx, u32 session)
-> +{
-> +	if (!ctx->teedev->desc->ops->close_session)
-> +		return -EINVAL;
-> +	return ctx->teedev->desc->ops->close_session(ctx, session);
-> +}
-> +EXPORT_SYMBOL_GPL(tee_client_close_session);
-> +
-> +int tee_client_invoke_func(struct tee_context *ctx,
-> +			   struct tee_ioctl_invoke_arg *arg,
-> +			   struct tee_param *param)
-> +{
-> +	if (!ctx->teedev->desc->ops->invoke_func)
-> +		return -EINVAL;
-> +	return ctx->teedev->desc->ops->invoke_func(ctx, arg, param);
-> +}
-> +EXPORT_SYMBOL_GPL(tee_client_invoke_func);
-> +
->  static int __init tee_init(void)
->  {
->  	int rc;
-> diff --git a/include/linux/tee_drv.h b/include/linux/tee_drv.h
-> index a2b3dfcee0b5..6cfe05893a76 100644
-> --- a/include/linux/tee_drv.h
-> +++ b/include/linux/tee_drv.h
-> @@ -453,6 +453,79 @@ static inline int tee_shm_get_id(struct tee_shm *shm)
->   */
->  struct tee_shm *tee_shm_get_from_id(struct tee_context *ctx, int id);
+>  	info = devm_kzalloc(&pdev->dev, sizeof(*info), GFP_KERNEL);
+>  	if (!info)
+> @@ -1244,23 +1251,6 @@ static int at91_pinctrl_probe(struct platform_device *pdev)
+>  	if (ret)
+>  		return ret;
 >  
-> +/**
-> + * tee_client_open_context() - Open a TEE context
-> + * @start:	if not NULL, continue search after this context
-> + * @match:	function to check TEE device
-> + * @data:	data for match function
-> + * @vers:	if not NULL, version data of TEE device of the context returned
-> + *
-> + * This function does an operation similar to open("/dev/teeX") in user space.
-> + * A returned context must be released with tee_client_close_context().
-> + *
-> + * Returns a TEE context of the first TEE device matched by the match()
-> + * callback or an ERR_PTR.
-> + */
-> +struct tee_context *
-> +tee_client_open_context(struct tee_context *start,
-> +			int (*match)(struct tee_ioctl_version_data *,
-> +				     const void *),
-> +			const void *data, struct tee_ioctl_version_data *vers);
-> +
-> +/**
-> + * tee_client_close_context() - Close a TEE context
-> + * @ctx:	TEE context to close
-> + *
-> + * Note that all sessions previously opened with this context will be
-> + * closed when this function is called.
-> + */
-> +void tee_client_close_context(struct tee_context *ctx);
-> +
-> +/**
-> + * tee_client_get_version() - Query version of TEE
-> + * @ctx:	TEE context to TEE to query
-> + * @vers:	Pointer to version data
-> + */
-> +void tee_client_get_version(struct tee_context *ctx,
-> +			    struct tee_ioctl_version_data *vers);
-> +
-> +/**
-> + * tee_client_open_session() - Open a session to a Trusted Application
-> + * @ctx:	TEE context
-> + * @arg:	Open session arguments, see description of
-> + *		struct tee_ioctl_open_session_arg
-> + * @param:	Parameters passed to the Trusted Application
-> + *
-> + * Returns < 0 on error else see @arg->ret for result. If @arg->ret
-> + * is TEEC_SUCCESS the session identifier is available in @arg->session.
-> + */
-> +int tee_client_open_session(struct tee_context *ctx,
-> +			    struct tee_ioctl_open_session_arg *arg,
-> +			    struct tee_param *param);
-> +
-> +/**
-> + * tee_client_close_session() - Close a session to a Trusted Application
-> + * @ctx:	TEE Context
-> + * @session:	Session id
-> + *
-> + * Return < 0 on error else 0, regardless the session will not be
-> + * valid after this function has returned.
-> + */
-> +int tee_client_close_session(struct tee_context *ctx, u32 session);
-> +
-> +/**
-> + * tee_client_invoke_func() - Invoke a function in a Trusted Application
-> + * @ctx:	TEE Context
-> + * @arg:	Invoke arguments, see description of
-> + *		struct tee_ioctl_invoke_arg
-> + * @param:	Parameters passed to the Trusted Application
-> + *
-> + * Returns < 0 on error else see @arg->ret for result.
-> + */
-> +int tee_client_invoke_func(struct tee_context *ctx,
-> +			   struct tee_ioctl_invoke_arg *arg,
-> +			   struct tee_param *param);
-> +
->  static inline bool tee_param_is_memref(struct tee_param *param)
->  {
->  	switch (param->attr & TEE_IOCTL_PARAM_ATTR_TYPE_MASK) {
+> -	/*
+> -	 * We need all the GPIO drivers to probe FIRST, or we will not be able
+> -	 * to obtain references to the struct gpio_chip * for them, and we
+> -	 * need this to proceed.
+> -	 */
+> -	for (i = 0; i < gpio_banks; i++)
+> -		if (gpio_chips[i])
+> -			ngpio_chips_enabled++;
+> -
+> -	if (ngpio_chips_enabled < info->nactive_banks) {
+> -		dev_warn(&pdev->dev,
+> -			 "All GPIO chips are not registered yet (%d/%d)\n",
+> -			 ngpio_chips_enabled, info->nactive_banks);
+> -		devm_kfree(&pdev->dev, info);
+> -		return -EPROBE_DEFER;
+> -	}
+> -
+>  	at91_pinctrl_desc.name = dev_name(&pdev->dev);
+>  	at91_pinctrl_desc.npins = gpio_banks * MAX_NB_GPIO_PER_BANK;
+>  	at91_pinctrl_desc.pins = pdesc =
 > -- 
 > 2.17.1
 > 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-gpio" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
