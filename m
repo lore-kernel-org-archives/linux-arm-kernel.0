@@ -1,53 +1,65 @@
 From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Sat, 14 Jul 2018 21:37:23 +0200
-Subject: [PATCH v2 3/5] dt-bindings: arm: amlogic: Add support for the Oranth
- Tanix TX3 Mini
+Date: Sat, 14 Jul 2018 21:37:24 +0200
+Subject: [PATCH v2 4/5] ARM64: dts: meson-gxl: add support for the S905W SoC
+ and the P281 board
 In-Reply-To: <20180714193725.17837-1-martin.blumenstingl@googlemail.com>
 References: <20180714193725.17837-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20180714193725.17837-4-martin.blumenstingl@googlemail.com>
+Message-ID: <20180714193725.17837-5-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Tanix TX3 Mini is a TV box based on the Amlogic S905W chipset. It
-comes with:
-- 1 GiB or 2 GiB of DDR3 memory depending on the model
-- 8 GB or 16 GB eMMC flash depending on the model
-- 802.11 b/g/n wifi (Silicon Valley Microelectronics SSV6051, does not
-  support Bluetooth, not supported by any mailine driver)
-- an LED 7 segment display with an FD628 controller (not supported by
-  any mainline driver)
-- HDMI and AV (CVBS) output
-- 2x USB (utilizing both USB ports provided by the SoC)
-- micro SD card slot
-
-The board seems to be very similar to the P23x and Q20x reference
-boards:
-- eMMC reset routed to BOOT_9
-- the SDIO wifi chip's reset line is routed to GPIOX_6 and the reference
-  clock is 32.768KHz on PWM_E
-- SD card detection is routed to CARD_6
-- vqmmc of all MMC controllers is hard-wired to 1.8V (VDDIO_BOOT)
-- uart_AO can be accessed after opening the case and soldering RX, TX
-  and GND lines onto the exposed solder points (marked with RX, TX and
-  GND)
+S905W is a new SoC from the GXL series. It is a cost-reduced version of
+the S905X.
+The P281 development board from Amlogic uses the same layout as the P231
+(S905D development board). Thus the new P281 board inherits
+meson-gx-p23x-q20x.dtsi to avoid code-duplication.
 
 Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
 ---
- Documentation/devicetree/bindings/arm/amlogic.txt | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm64/boot/dts/amlogic/Makefile          |  1 +
+ .../boot/dts/amlogic/meson-gxl-s905w-p281.dts | 22 +++++++++++++++++++
+ 2 files changed, 23 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl-s905w-p281.dts
 
-diff --git a/Documentation/devicetree/bindings/arm/amlogic.txt b/Documentation/devicetree/bindings/arm/amlogic.txt
-index 8178da8742c3..b5c2b5c35766 100644
---- a/Documentation/devicetree/bindings/arm/amlogic.txt
-+++ b/Documentation/devicetree/bindings/arm/amlogic.txt
-@@ -90,6 +90,7 @@ Board compatible values (alphabetically, grouped by SoC):
-   - "amlogic,p241" (Meson gxl s805x)
- 
-   - "amlogic,p281" (Meson gxl s905w)
-+  - "oranth,tx3-mini" (Meson gxl s905w)
- 
-   - "amlogic,q200" (Meson gxm s912)
-   - "amlogic,q201" (Meson gxm s912)
+diff --git a/arch/arm64/boot/dts/amlogic/Makefile b/arch/arm64/boot/dts/amlogic/Makefile
+index 4dcffb0e3536..e55156dec237 100644
+--- a/arch/arm64/boot/dts/amlogic/Makefile
++++ b/arch/arm64/boot/dts/amlogic/Makefile
+@@ -18,6 +18,7 @@ dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905x-p212.dtb
+ dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905d-p230.dtb
+ dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905d-p231.dtb
+ dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s805x-p241.dtb
++dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905w-p281.dtb
+ dtb-$(CONFIG_ARCH_MESON) += meson-gxm-khadas-vim2.dtb
+ dtb-$(CONFIG_ARCH_MESON) += meson-gxm-nexbox-a1.dtb
+ dtb-$(CONFIG_ARCH_MESON) += meson-gxm-q200.dtb
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905w-p281.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905w-p281.dts
+new file mode 100644
+index 000000000000..6509c4950950
+--- /dev/null
++++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905w-p281.dts
+@@ -0,0 +1,22 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++/*
++ * Copyright (c) 2018 Martin Blumenstingl <martin.blumenstingl@googlemail.com>.
++ * Based on meson-gxl-s905d-p231.dts:
++ * - Copyright (c) 2016 Endless Computers, Inc.
++ *   Author: Carlo Caione <carlo@endlessm.com>
++ */
++
++/dts-v1/;
++
++#include "meson-gxl-s905x.dtsi"
++#include "meson-gx-p23x-q20x.dtsi"
++
++/ {
++	compatible = "amlogic,p281", "amlogic,s905w", "amlogic,meson-gxl";
++	model = "Amlogic Meson GXL (S905W) P281 Development Board";
++
++	memory at 0 {
++		device_type = "memory";
++		reg = <0x0 0x0 0x0 0x40000000>;
++	};
++};
 -- 
 2.18.0
