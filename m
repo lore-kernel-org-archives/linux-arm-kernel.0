@@ -1,57 +1,34 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 14 Jul 2018 14:28:01 -0700
-Subject: [GIT PULL] STM32 DT changes for v4.19 #1
-In-Reply-To: <2560c5e6-d749-244c-4ae3-4b04a3d62c36@st.com>
-References: <2560c5e6-d749-244c-4ae3-4b04a3d62c36@st.com>
-Message-ID: <20180714212801.eo7lbzs47ofdrxcg@localhost>
+Date: Sat, 14 Jul 2018 14:29:55 -0700
+Subject: [GIT PULL 3/3] DaVinci defconfig updates for v4.19
+In-Reply-To: <20180711062906.22865-3-nsekhar@ti.com>
+References: <20180711062906.22865-1-nsekhar@ti.com>
+ <20180711062906.22865-3-nsekhar@ti.com>
+Message-ID: <20180714212955.rfa5s7cudbtkqjxm@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 13, 2018 at 03:57:40PM +0200, Alexandre Torgue wrote:
-> Hi Arnd, Olof and Kevin,
-> 
-> Please consider this first round of STM32 DT updates for v4.19:
-> 
-> Thanks.
-> Alex
-> 
+On Wed, Jul 11, 2018 at 11:59:06AM +0530, Sekhar Nori wrote:
 > The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
 > 
 >   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
 > 
-> are available in the git repository at:
+> are available in the Git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/atorgue/stm32.git
-> tags/stm32-dt-for-v4.19-1
+>   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.19/defconfig
 > 
-> for you to fetch changes up to c2888cc2e2b8fc16164de0cca806763831a36f6f:
+> for you to fetch changes up to 17b98aadcedc823312bdc3641deae873027063bf:
 > 
->   ARM: dts: stm32: update iwdg with lsi clock name for stm32f429 (2018-07-13
-> 13:57:05 +0200)
+>   ARM: davinci_all_defconfig: Enable Bluetooth (2018-06-29 19:26:10 +0530)
 > 
 > ----------------------------------------------------------------
-> STM32 DT updates for v4.19, round 1
+> DaVinci defconfig updates for v4.19
+> -----------------------------------
 > 
-> Highlights:
-> ----------
-> 
-> -MCU platforms update:
->  -Update RTC syscfg bindings on stm32f746 and stm32f429
->  -Update IWDG node with LSI clock name on stm32f429
-> 
-> -MPU STM32MP157 platform update:
->  -Add HASH support
->  -Add m_can support and enable it on EV1 board
->  -Add RTC suppoort and enable it on ED1 board
->  -Add USB OTG HS support and enable it on EV1 board
->  -Enable USB Host EHCI on EV1 board
->  -Add DFSDM support
->  -Add SPI support
->  -Add ETH support and enable it on EV1 board
->  -Add IWDG support and enable it on ED1 board
->  -Fix useless GPIO aliases and reorder nodes
+> * Enable support for PWM backight and bluetooth
+> * Remove some vestiges of mach-davinci private clock implementation.
 
-Merged, thanks!
+Merged, thanks.
 
 
 -Olof
