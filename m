@@ -1,15 +1,18 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 14 Jul 2018 14:39:40 -0700
-Subject: [GIT PULL 3/5] ti-sysc driver changes for omaps for v4.19
-In-Reply-To: <pull-1531314878-371161@atomide.com-3>
-References: <pull-1531314878-371161@atomide.com>
- <pull-1531314878-371161@atomide.com-3>
-Message-ID: <20180714213940.i5mjxlteew4budni@localhost>
+Date: Sat, 14 Jul 2018 14:42:08 -0700
+Subject: [GIT PULL] ARM: mvebu: arm for v4.19 (#1)
+In-Reply-To: <87y3egbe7a.fsf@bootlin.com>
+References: <87y3egbe7a.fsf@bootlin.com>
+Message-ID: <20180714214208.lns2fszqzm6m3q4g@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 11, 2018 at 06:19:06AM -0700, Tony Lindgren wrote:
-> From: "Tony Lindgren" <tony@atomide.com>
+On Thu, Jul 12, 2018 at 06:39:53PM +0200, Gregory CLEMENT wrote:
+> Hi,
+> 
+> Here is the first pull request for arm for mvebu for v4.19.
+> 
+> Gregory
 > 
 > The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
 > 
@@ -17,13 +20,30 @@ On Wed, Jul 11, 2018 at 06:19:06AM -0700, Tony Lindgren wrote:
 > 
 > are available in the Git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.19/ti-sysc-v2-signed
+>   git://git.infradead.org/linux-mvebu.git tags/mvebu-arm-4.19-1
 > 
-> for you to fetch changes up to 596e7955692b5d8b042fca500b7a83c25dfcf936:
+> for you to fetch changes up to 432c0254106a373bcc23b1bd3e0b7eb56929c0d9:
 > 
->   bus: ti-sysc: Add support for software reset (2018-07-09 22:31:38 -0700)
+>   ARM: mvebu_v7_defconfig: enable SFP support (2018-06-28 16:53:08 +0200)
+> 
+> ----------------------------------------------------------------
+> mvebu arm for 4.19 (part 1)
+> 
+> defconfig update:
+>  - add NAND controller on multi_v7
+>  - add SFP support on mvebu_v7
+> code improvement:
+>  - remove potential call from invalid context in boot_secondary
+>  - allow using CONFIG_FORTIFY_SOURCE in pmsu.c
 
-Merged, thanks!
+Please separate out soc and defconfig changes to separate branches/pull
+requests. If you look at our tree, you'll see that we queue them in
+separate branches.
 
+Also, note that we renoramlized the configs in 4.18-rc3, so you want to base
+the DT contents on top of that when you send the new pull requests.
+
+
+Thanks,
 
 -Olof
