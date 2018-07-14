@@ -1,69 +1,35 @@
 From: marcel@holtmann.org (Marcel Holtmann)
-Date: Sat, 14 Jul 2018 18:26:24 +0200
-Subject: [PATCH v5 1/7] dt-bindings: net: bluetooth: Add mediatek-bluetooth
-In-Reply-To: <d8a5b34513cf2187a2b23a513feaa358d719bc14.1531150733.git.sean.wang@mediatek.com>
+Date: Sat, 14 Jul 2018 18:27:33 +0200
+Subject: [PATCH v5 2/7] serdev: add dev_pm_domain_attach|detach()
+In-Reply-To: <d5904115ff1da38fe79b45fa3d59ef0688cea124.1531150733.git.sean.wang@mediatek.com>
 References: <cover.1531150733.git.sean.wang@mediatek.com>
- <d8a5b34513cf2187a2b23a513feaa358d719bc14.1531150733.git.sean.wang@mediatek.com>
-Message-ID: <7E55939D-7F8A-4832-9DD5-EFB3B19ACF0B@holtmann.org>
+ <d5904115ff1da38fe79b45fa3d59ef0688cea124.1531150733.git.sean.wang@mediatek.com>
+Message-ID: <ED7E5A98-81DC-41B9-9B9A-3EF4EBBED854@holtmann.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Sean,
 
-> Add binding document for a SoC built-in device using MediaTek protocol.
-> Which could be found on MT7622 SoC or other similar MediaTek SoCs.
+> In order to open up the required power gate before any operation can be
+> effectively performed over the serial bus between CPU and serdev, it's
+> clearly essential to add common attach functions for PM domains to serdev
+> at the probe phase.
+> 
+> Similarly, the relevant dettach function for the PM domains should be
+> properly and reversely added at the remove phase.
 > 
 > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> Reviewed-by: Rob Herring <robh@kernel.org>
+> Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+> Cc: Rob Herring <robh@kernel.org>
+> Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Jiri Slaby <jslaby@suse.com>
+> Cc: linux-serial at vger.kernel.org
 > ---
-> .../devicetree/bindings/net/mediatek-bluetooth.txt | 35 ++++++++++++++++++++++
-> 1 file changed, 35 insertions(+)
-> create mode 100644 Documentation/devicetree/bindings/net/mediatek-bluetooth.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/net/mediatek-bluetooth.txt b/Documentation/devicetree/bindings/net/mediatek-bluetooth.txt
-> new file mode 100644
-> index 0000000..1335429
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/net/mediatek-bluetooth.txt
-> @@ -0,0 +1,35 @@
-> +MediaTek SoC built-in Bluetooth Devices
-> +==================================
-> +
-> +This device is a serial attached device to BTIF device and thus it must be a
-> +child node of the serial node with BTIF. The dt-bindings details for BTIF
-> +device can be known via Documentation/devicetree/bindings/serial/8250.txt.
-> +
-> +Required properties:
-> +
-> +- compatible:	Must be one of
-> +		  "mediatek,mt7622-bluetooth"": for MT7622 SoC
+> drivers/tty/serdev/core.c | 15 ++++++++++++++-
+> 1 file changed, 14 insertions(+), 1 deletion(-)
 
-this does not match with the example below. And one of, should be normally be a list.
-
-> +- clocks:	Should be the clock specifiers corresponding to the entry in
-> +		clock-names property.
-> +- clock-names:	Should contain "ref" entries.
-> +- power-domains: Phandle to the power domain that the device is part of
-> +
-> +Example:
-> +
-> +	btif: serial at 1100c000 {
-> +		compatible = "mediatek,mt7622-btif",
-> +			     "mediatek,mtk-btif";
-> +		reg = <0 0x1100c000 0 0x1000>;
-> +		interrupts = <GIC_SPI 90 IRQ_TYPE_LEVEL_LOW>;
-> +		clocks = <&pericfg CLK_PERI_BTIF_PD>;
-> +		clock-names = "main";
-> +		reg-shift = <2>;
-> +		reg-io-width = <4>;
-> +
-> +		bluetooth {
-> +			compatible = "mediatek,mt7622-bluetooth";
-> +			power-domains = <&scpsys MT7622_POWER_DOMAIN_WB>;
-> +			clocks = <&clk25m>;
-> +			clock-names = "ref";
-> +		};
-> +	};
+can we take this through the serial subsystem? Or should I just take it when the driver is ready to be included?
 
 Regards
 
