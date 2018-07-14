@@ -1,98 +1,83 @@
 From: christoffer.dall@arm.com (Christoffer Dall)
-Date: Sat, 14 Jul 2018 19:05:32 +0200
-Subject: [PATCH v3 1/9] KVM: arm/arm64: vgic: Define GICD_IIDR fields for
- GICv2 and GIv3
+Date: Sat, 14 Jul 2018 19:05:39 +0200
+Subject: [PATCH v3 8/9] KVM: arm/arm64: vgic: Let userspace opt-in to writable
+ v2 IGROUPR
 In-Reply-To: <1531587940-2490-1-git-send-email-christoffer.dall@arm.com>
 References: <1531587940-2490-1-git-send-email-christoffer.dall@arm.com>
-Message-ID: <1531587940-2490-2-git-send-email-christoffer.dall@arm.com>
+Message-ID: <1531587940-2490-9-git-send-email-christoffer.dall@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of hardcoding the shifts and masks in the GICD_IIDR register
-emulation, let's add the definition of these fields to the GIC header
-files and use them.
+Simply letting IGROUPR be writable from userspace would break
+migration from old kernels to newer kernels, because old kernels
+incorrectly report interrupt groups as group 1.  This would not be a big
+problem if userspace wrote GICD_IIDR as read from the kernel, because we
+could detect the incompatibility and return an error to userspace.
+Unfortunately, this is not the case with current userspace
+implementations and simply letting IGROUPR be writable from userspace for
+an emulated GICv2 silently breaks migration and causes the destination
+VM to no longer run after migration.
 
-This will make things more obvious when we're going to bump the revision
-in the IIDR when we'll make guest-visible changes to the implementation.
+We now encourage userspace to write the read and expected value of
+GICD_IIDR as the first part of a GIC register restore, and if we observe
+a write to GICD_IIDR we know that userspace has been updated and has had
+a chance to cope with older kernels (VGICv2 IIDR.Revision == 0)
+incorrectly reporting interrupts as group 1, and therefore we now allow
+groups to be user writable.
 
 Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
 ---
- include/linux/irqchip/arm-gic-v3.h | 10 ++++++++++
- include/linux/irqchip/arm-gic.h    | 10 ++++++++++
- virt/kvm/arm/vgic/vgic-mmio-v2.c   |  3 ++-
- virt/kvm/arm/vgic/vgic-mmio-v3.c   |  3 ++-
- 4 files changed, 24 insertions(+), 2 deletions(-)
+ include/kvm/arm_vgic.h           |  3 +++
+ virt/kvm/arm/vgic/vgic-mmio-v2.c | 15 ++++++++++++++-
+ 2 files changed, 17 insertions(+), 1 deletion(-)
 
-diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-index cbb872c..b22f9df 100644
---- a/include/linux/irqchip/arm-gic-v3.h
-+++ b/include/linux/irqchip/arm-gic-v3.h
-@@ -61,6 +61,16 @@
- #define GICD_CTLR_ENABLE_G1A           (1U << 1)
- #define GICD_CTLR_ENABLE_G1            (1U << 0)
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index c661d0e..c134790 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -221,6 +221,9 @@ struct vgic_dist {
+        /* Implementation revision as reported in the GICD_IIDR */
+        u32                     implementation_rev;
 
-+#define GICD_IIDR_IMPLEMENTER_SHIFT    0
-+#define GICD_IIDR_IMPLEMENTER_MASK     (0xfff << GICD_IIDR_IMPLEMENTER_SHIFT)
-+#define GICD_IIDR_REVISION_SHIFT       12
-+#define GICD_IIDR_REVISION_MASK                (0xf << GICD_IIDR_REVISION_SHIFT)
-+#define GICD_IIDR_VARIANT_SHIFT                16
-+#define GICD_IIDR_VARIANT_MASK         (0xf << GICD_IIDR_VARIANT_SHIFT)
-+#define GICD_IIDR_PRODUCT_ID_SHIFT     24
-+#define GICD_IIDR_PRODUCT_ID_MASK      (0xff << GICD_IIDR_PRODUCT_ID_SHIFT)
++       /* Userspace can write to GICv2 IGROUPR */
++       bool                    v2_groups_user_writable;
 +
-+
- /*
-  * In systems with a single security state (what we emulate in KVM)
-  * the meaning of the interrupt group enable bits is slightly different
-diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
-index 68d8b1f..484f5bf 100644
---- a/include/linux/irqchip/arm-gic.h
-+++ b/include/linux/irqchip/arm-gic.h
-@@ -71,6 +71,16 @@
-                                        (GICD_INT_DEF_PRI << 8) |\
-                                        GICD_INT_DEF_PRI)
+        /* Do injected MSIs require an additional device ID? */
+        bool                    msis_require_devid;
 
-+#define GICD_IIDR_IMPLEMENTER_SHIFT    0
-+#define GICD_IIDR_IMPLEMENTER_MASK     (0xfff << GICD_IIDR_IMPLEMENTER_SHIFT)
-+#define GICD_IIDR_REVISION_SHIFT       12
-+#define GICD_IIDR_REVISION_MASK                (0xf << GICD_IIDR_REVISION_SHIFT)
-+#define GICD_IIDR_VARIANT_SHIFT                16
-+#define GICD_IIDR_VARIANT_MASK         (0xf << GICD_IIDR_VARIANT_SHIFT)
-+#define GICD_IIDR_PRODUCT_ID_SHIFT     24
-+#define GICD_IIDR_PRODUCT_ID_MASK      (0xff << GICD_IIDR_PRODUCT_ID_SHIFT)
-+
-+
- #define GICH_HCR                       0x0
- #define GICH_VTR                       0x4
- #define GICH_VMCR                      0x8
 diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-index ffc587b..af44e569 100644
+index b79de42..9b6b758 100644
 --- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
 +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-@@ -37,7 +37,8 @@ static unsigned long vgic_mmio_read_v2_misc(struct kvm_vcpu *vcpu,
-                value |= (atomic_read(&vcpu->kvm->online_vcpus) - 1) << 5;
-                break;
+@@ -85,6 +85,17 @@ static int vgic_mmio_uaccess_write_v2_misc(struct kvm_vcpu *vcpu,
         case GIC_DIST_IIDR:
--               value = (PRODUCT_ID_KVM << 24) | (IMPLEMENTER_ARM << 0);
-+               value = (PRODUCT_ID_KVM << GICD_IIDR_PRODUCT_ID_SHIFT) |
-+                       (IMPLEMENTER_ARM << GICD_IIDR_IMPLEMENTER_SHIFT);
-                break;
-        default:
-                return 0;
-diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-index 2877840..c03f424 100644
---- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-@@ -81,7 +81,8 @@ static unsigned long vgic_mmio_read_v3_misc(struct kvm_vcpu *vcpu,
-                }
-                break;
-        case GICD_IIDR:
--               value = (PRODUCT_ID_KVM << 24) | (IMPLEMENTER_ARM << 0);
-+               value = (PRODUCT_ID_KVM << GICD_IIDR_PRODUCT_ID_SHIFT) |
-+                       (IMPLEMENTER_ARM << GICD_IIDR_IMPLEMENTER_SHIFT);
-                break;
-        default:
-                return 0;
+                if (val != vgic_mmio_read_v2_misc(vcpu, addr, len))
+                        return -EINVAL;
++
++               /*
++                * If we observe a write to GICD_IIDR we know that userspace
++                * has been updated and has had a chance to cope with older
++                * kernels (VGICv2 IIDR.Revision == 0) incorrectly reporting
++                * interrupts as group 1, and therefore we now allow gruops to
++                * be user writable.  Doing this by default would break
++                * migration from old kernels to new kernels with legacy
++                * userspace.
++                */
++               vcpu->kvm->arch.vgic.v2_groups_user_writable = true;
+        }
+
+        vgic_mmio_write_v2_misc(vcpu, addr, len, val);
+@@ -95,7 +106,9 @@ static int vgic_mmio_uaccess_write_v2_group(struct kvm_vcpu *vcpu,
+                                            gpa_t addr, unsigned int len,
+                                            unsigned long val)
+ {
+-       /* Ignore writes from userspace */
++       if (vcpu->kvm->arch.vgic.v2_groups_user_writable)
++               vgic_mmio_write_group(vcpu, addr, len, val);
++
+        return 0;
+ }
+
 --
 2.7.4
 
