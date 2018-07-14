@@ -1,42 +1,29 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 14 Jul 2018 14:31:48 -0700
-Subject: [GIT PULL] STM32 defconfig changes for v4.19 #1
-In-Reply-To: <016b1449-4ede-9302-e6f9-c52b63e0330e@st.com>
-References: <016b1449-4ede-9302-e6f9-c52b63e0330e@st.com>
-Message-ID: <20180714213148.h2f3ipw6bja36x4p@localhost>
+Date: Sat, 14 Jul 2018 14:39:40 -0700
+Subject: [GIT PULL 3/5] ti-sysc driver changes for omaps for v4.19
+In-Reply-To: <pull-1531314878-371161@atomide.com-3>
+References: <pull-1531314878-371161@atomide.com>
+ <pull-1531314878-371161@atomide.com-3>
+Message-ID: <20180714213940.i5mjxlteew4budni@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 13, 2018 at 04:01:40PM +0200, Alexandre Torgue wrote:
-> Hi Arnd, Olof and Kevin,
-> 
-> Please consider this first round of STM32 defconfig updates for v4.19.
-> This time it concerns only multi_v7_defconfig.
-> 
-> Thanks.
-> Alex
+On Wed, Jul 11, 2018 at 06:19:06AM -0700, Tony Lindgren wrote:
+> From: "Tony Lindgren" <tony@atomide.com>
 > 
 > The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
 > 
 >   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
 > 
-> are available in the git repository at:
+> are available in the Git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/atorgue/stm32.git
-> tags/stm32-defconfig-for-v4.19-1
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.19/ti-sysc-v2-signed
 > 
-> for you to fetch changes up to 1b8a8589a3e10997fa8f43e7da874c4903f33ac7:
+> for you to fetch changes up to 596e7955692b5d8b042fca500b7a83c25dfcf936:
 > 
->   ARM: multi_v7_defconfig: enable STM32 DCMI media support (2018-07-13
-> 14:54:24 +0200)
+>   bus: ti-sysc: Add support for software reset (2018-07-09 22:31:38 -0700)
 
-Hi,
-
-We renormalized the multi_v7_defconfig file in 4.18-rc3, so this pull request
-has quite a few conflicts due to that. I've fixed it up though, make sure it's
-behaving like you would expect.
-
-Thanks,
+Merged, thanks!
 
 
 -Olof
