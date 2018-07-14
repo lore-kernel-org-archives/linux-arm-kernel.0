@@ -1,35 +1,36 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 14 Jul 2018 14:15:14 -0700
-Subject: [GIT PULL 5/6] Broadcom drivers changes for 4.19
-In-Reply-To: <c3cc71d0-a2eb-da1d-1016-bde249936aaa@gmail.com>
-References: <20180709153035.6376-1-f.fainelli@gmail.com>
- <20180709153035.6376-5-f.fainelli@gmail.com>
- <c3cc71d0-a2eb-da1d-1016-bde249936aaa@gmail.com>
-Message-ID: <20180714211514.exjadd55xz2qfm4p@localhost>
+Date: Sat, 14 Jul 2018 14:17:11 -0700
+Subject: [GIT PULL 2/3] DaVinci DT updates for v4.19
+In-Reply-To: <20180711062906.22865-2-nsekhar@ti.com>
+References: <20180711062906.22865-1-nsekhar@ti.com>
+ <20180711062906.22865-2-nsekhar@ti.com>
+Message-ID: <20180714211711.jwb4fkgx2hopfi4f@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 09, 2018 at 10:49:48AM -0700, Florian Fainelli wrote:
-> Hi Arnd, Olof Kevin,
+On Wed, Jul 11, 2018 at 11:59:05AM +0530, Sekhar Nori wrote:
+> The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
 > 
-> On 07/09/2018 08:30 AM, Florian Fainelli wrote:
-> > The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
-> > 
-> >   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
-> > 
-> > are available in the git repository at:
-> > 
-> >   https://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.19/drivers
-> > 
-> > for you to fetch changes up to 25ee284c21a8d950af463d4235995eeecc5fc70b:
-> > 
-> >   Merge tag 'bcm2835-drivers-next-2018-07-03' into drivers/next (2018-07-09 05:22:16 -0700)
+>   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
 > 
-> I will be re-doing this one to squash this patch in:
+> are available in the Git repository at:
 > 
-> https://patchwork.kernel.org/patch/10514987/
+>   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.19/dt
+> 
+> for you to fetch changes up to 3117c17301edce7583843bdee513e201bb69c37c:
+> 
+>   ARM: dts: da850: Add power-domains to CPPI 4.1 node (2018-07-10 15:32:41 +0530)
+> 
+> ----------------------------------------------------------------
+> DaVinci Device-Tree updates for v4.19
+> -------------------------------------
+> 
+> * DA850 now uses clocks from device-tree
+> * DA850 EVM gains LCD (with backlight) and SATA support
+> * Lego Mindstorms gains bluetooth support
+> * DSP reset control support on DA850
 
-Ok, merged now.
+Thanks, merged!
 
 
 -Olof
