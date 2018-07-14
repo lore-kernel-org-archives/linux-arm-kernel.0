@@ -1,151 +1,70 @@
-From: ezequiel@collabora.com (Ezequiel Garcia)
-Date: Sat, 14 Jul 2018 14:09:22 -0300
-Subject: [PATCH v2] arm64: dts: rockchip: add USB 2.0 and 3.0 support on Ficus
- board
-Message-ID: <20180714170922.4433-1-ezequiel@collabora.com>
+From: christoffer.dall@arm.com (Christoffer Dall)
+Date: Sat, 14 Jul 2018 19:05:34 +0200
+Subject: [PATCH v3 3/9] KVM: arm/arm64: vgic: GICv2 IGROUPR should read as zero
+In-Reply-To: <1531587940-2490-1-git-send-email-christoffer.dall@arm.com>
+References: <1531587940-2490-1-git-send-email-christoffer.dall@arm.com>
+Message-ID: <1531587940-2490-4-git-send-email-christoffer.dall@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+We currently don't support grouping in the emulated VGIC, which is a
+known defect on KVM (not hurting any currently used guests as far as
+we're aware). This is currently handled by treating all interrupts as
+group 0 interrupts for an emulated GICv2 and always signaling interrupts
+as group 0 to the virtual CPU interface.
 
-The board exposes two types A ports, one is USB 3.0, up to 5.0Gbps and
-another one is USB 2.0 up to 480Mbps. Enable the USB PHYs and the USB
-controllers to enable theses devices.
+However, when reading which group interrupts belongs to in the guest
+from the emulated VGIC, the VGIC currently reports group 1 instead of
+group 0, which is misleading.  Fix this temporarily before introducing
+full group support by changing the hander to _raz instead of _rao.
 
-Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
-Signed-off-by: Ezequiel Garcia <ezequiel@collabora.com>
+Fixes: fb848db39661a "KVM: arm/arm64: vgic-new: Add GICv2 MMIO handling framework"
+Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
 ---
-Changes from v1:
- * Provide voltage for vcc5v0_host and vcc3v3_pcie regulators
- * Provide vin_supply for vcc5v0_host.
+ virt/kvm/arm/vgic/vgic-init.c    | 2 +-
+ virt/kvm/arm/vgic/vgic-mmio-v2.c | 8 +++++++-
+ 2 files changed, 8 insertions(+), 2 deletions(-)
 
- arch/arm64/boot/dts/rockchip/rk3399-ficus.dts | 90 +++++++++++++++++++
- 1 file changed, 90 insertions(+)
+diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
+index 8b6fc45..230c922 100644
+--- a/virt/kvm/arm/vgic/vgic-init.c
++++ b/virt/kvm/arm/vgic/vgic-init.c
+@@ -298,7 +298,7 @@ int vgic_init(struct kvm *kvm)
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-ficus.dts b/arch/arm64/boot/dts/rockchip/rk3399-ficus.dts
-index 0d14183dd4a9..6295483b701f 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399-ficus.dts
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-ficus.dts
-@@ -58,9 +58,24 @@
- 		pinctrl-0 = <&pcie_drv>;
- 		regulator-boot-on;
- 		regulator-name = "vcc3v3_pcie";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
- 		vin-supply = <&vcc3v3_sys>;
- 	};
- 
-+	vcc5v0_host: vcc5v0-host-regulator {
-+		compatible = "regulator-fixed";
-+		enable-active-high;
-+		gpio = <&gpio4 27 GPIO_ACTIVE_HIGH>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&host_vbus_drv>;
-+		regulator-name = "vcc5v0_host";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-always-on;
-+		vin-supply = <&vcc_sys>;
-+	};
+        vgic_debug_init(kvm);
+
+-       dist->implementation_rev = 0;
++       dist->implementation_rev = 1;
+        dist->initialized = true;
+
+ out:
+diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+index f0c5351..db646f1 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
++++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+@@ -22,6 +22,12 @@
+ #include "vgic.h"
+ #include "vgic-mmio.h"
+
++/*
++ * The Revision field in the IIDR have the following meanings:
++ *
++ * Revision 1: Report GICv2 interrupts as group 0 instead of group 1
++ */
 +
- 	vdd_log: vdd-log {
- 		compatible = "pwm-regulator";
- 		pwms = <&pwm2 0 25000 0>;
-@@ -454,6 +469,13 @@
- 				<1 14 RK_FUNC_GPIO &pcfg_pull_down>;
- 		};
- 	};
-+
-+	usb2 {
-+		host_vbus_drv: host-vbus-drv {
-+			rockchip,pins =
-+				<4 27 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+	};
- };
- 
- &pwm2 {
-@@ -487,6 +509,40 @@
- 	status = "okay";
- };
- 
-+&tcphy0 {
-+	status = "okay";
-+};
-+
-+&tcphy1 {
-+	status = "okay";
-+};
-+
-+&u2phy0 {
-+	status = "okay";
-+};
-+
-+&u2phy1 {
-+	status = "okay";
-+};
-+
-+&u2phy0_host {
-+	phy-supply = <&vcc5v0_host>;
-+	status = "okay";
-+};
-+
-+&u2phy1_host {
-+	phy-supply = <&vcc5v0_host>;
-+	status = "okay";
-+};
-+
-+&u2phy0_otg {
-+	status = "okay";
-+};
-+
-+&u2phy1_otg {
-+	status = "okay";
-+};
-+
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_xfer &uart0_cts>;
-@@ -497,6 +553,40 @@
- 	status = "okay";
- };
- 
-+&usb_host0_ehci {
-+	status = "okay";
-+};
-+
-+&usb_host0_ohci {
-+	status = "okay";
-+};
-+
-+&usb_host1_ehci {
-+	status = "okay";
-+};
-+
-+&usb_host1_ohci {
-+	status = "okay";
-+};
-+
-+&usbdrd3_0 {
-+	status = "okay";
-+};
-+
-+&usbdrd_dwc3_0 {
-+	status = "okay";
-+	dr_mode = "host";
-+};
-+
-+&usbdrd3_1 {
-+	status = "okay";
-+};
-+
-+&usbdrd_dwc3_1 {
-+	status = "okay";
-+	dr_mode = "host";
-+};
-+
- &vopb {
- 	status = "okay";
- };
--- 
-2.18.0
+ static unsigned long vgic_mmio_read_v2_misc(struct kvm_vcpu *vcpu,
+                                            gpa_t addr, unsigned int len)
+ {
+@@ -365,7 +371,7 @@ static const struct vgic_register_region vgic_v2_dist_registers[] = {
+                vgic_mmio_read_v2_misc, vgic_mmio_write_v2_misc, 12,
+                VGIC_ACCESS_32bit),
+        REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_IGROUP,
+-               vgic_mmio_read_rao, vgic_mmio_write_wi, NULL, NULL, 1,
++               vgic_mmio_read_raz, vgic_mmio_write_wi, NULL, NULL, 1,
+                VGIC_ACCESS_32bit),
+        REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ENABLE_SET,
+                vgic_mmio_read_enable, vgic_mmio_write_senable, NULL, NULL, 1,
+--
+2.7.4
+
+IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
