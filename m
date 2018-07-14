@@ -1,34 +1,41 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 14 Jul 2018 14:29:55 -0700
-Subject: [GIT PULL 3/3] DaVinci defconfig updates for v4.19
-In-Reply-To: <20180711062906.22865-3-nsekhar@ti.com>
-References: <20180711062906.22865-1-nsekhar@ti.com>
- <20180711062906.22865-3-nsekhar@ti.com>
-Message-ID: <20180714212955.rfa5s7cudbtkqjxm@localhost>
+Date: Sat, 14 Jul 2018 14:30:30 -0700
+Subject: [GIT PULL 3/3] ARM: defconfig: Pull for v4.19
+In-Reply-To: <20180712164641.19925-2-krzk@kernel.org>
+References: <20180712164641.19925-1-krzk@kernel.org>
+ <20180712164641.19925-2-krzk@kernel.org>
+Message-ID: <20180714213030.uxe2wwwulk6cvyop@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 11, 2018 at 11:59:06AM +0530, Sekhar Nori wrote:
-> The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
+On Thu, Jul 12, 2018 at 06:46:39PM +0200, Krzysztof Kozlowski wrote:
+> Hi,
 > 
->   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+> Rebased on v4.18-rc2.
 > 
-> are available in the Git repository at:
+> Best regards,
+> Krzysztof
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.19/defconfig
 > 
-> for you to fetch changes up to 17b98aadcedc823312bdc3641deae873027063bf:
+> The following changes since commit 7daf201d7fe8334e2d2364d4e8ed3394ec9af819:
 > 
->   ARM: davinci_all_defconfig: Enable Bluetooth (2018-06-29 19:26:10 +0530)
+>   Linux 4.18-rc2 (2018-06-24 20:54:29 +0800)
+> 
+> are available in the git repository at:
+> 
+>   https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-defconfig-4.19
+> 
+> for you to fetch changes up to 24ede29d026a9f00aa3f4e7a5531803af4810734:
+> 
+>   ARM: s5pv210_defconfig: Enable options needed to boot typical Linux distro (2018-07-07 10:49:16 +0200)
 > 
 > ----------------------------------------------------------------
-> DaVinci defconfig updates for v4.19
-> -----------------------------------
+> Samsung defconfig changes for v4.19
 > 
-> * Enable support for PWM backight and bluetooth
-> * Remove some vestiges of mach-davinci private clock implementation.
+> Enable options needed for booting full system on S5Pv210-based Samsung
+> Galaxy S mobile phones.
 
-Merged, thanks.
+Thanks!
 
 
 -Olof
