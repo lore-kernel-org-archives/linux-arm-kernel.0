@@ -1,35 +1,38 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 14 Jul 2018 14:23:03 -0700
-Subject: [GIT PULL 1/3] ARM: dts: exynos: Pull for v4.19
-In-Reply-To: <20180712164641.19925-3-krzk@kernel.org>
-References: <20180712164641.19925-1-krzk@kernel.org>
- <20180712164641.19925-3-krzk@kernel.org>
-Message-ID: <20180714212303.nddjnfhis4vwn4zc@localhost>
+Date: Sat, 14 Jul 2018 14:20:35 -0700
+Subject: [GIT PULL 1/5] dt-bindings: tegra: Changes for v4.19-rc1
+In-Reply-To: <20180712154128.22705-2-thierry.reding@gmail.com>
+References: <20180712154128.22705-1-thierry.reding@gmail.com>
+ <20180712154128.22705-2-thierry.reding@gmail.com>
+Message-ID: <20180714212035.rhcvushvcbvfyzxx@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 12, 2018 at 06:46:40PM +0200, Krzysztof Kozlowski wrote:
-> Hi,
+On Thu, Jul 12, 2018 at 05:41:24PM +0200, Thierry Reding wrote:
+> Hi ARM SoC maintainers,
 > 
-> Rebased on v4.18-rc2.
+> The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
 > 
-> Best regards,
-> Krzysztof
+>   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
 > 
+> are available in the Git repository at:
 > 
-> The following changes since commit 7daf201d7fe8334e2d2364d4e8ed3394ec9af819:
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.19-dt-bindings
 > 
->   Linux 4.18-rc2 (2018-06-24 20:54:29 +0800)
+> for you to fetch changes up to 29aa59efc6bf91cfa5bfba8375fd730150a19d3f:
 > 
-> are available in the git repository at:
+>   dt-bindings: arm: Add compatible string for NVIDIA Carmel (2018-07-02 15:58:25 +0200)
 > 
->   https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-dt-4.19
+> Thanks,
+> Thierry
 > 
-> for you to fetch changes up to 57f4e8bc1c3ebbd06a278107edeb6af95b53e5bf:
+> ----------------------------------------------------------------
+> dt-bindings: tegra: Changes for v4.19-rc1
 > 
->   dt-bindings: samsung: Document bindings for SGH-T959P board (2018-07-07 12:28:07 +0200)
+> This contains a single update that adds the Carmel CPU found in Tegra194
+> SoCs to the arm/cpus.txt device tree bindings.
 
-Merged, thanks!
+Merged, thanks.
 
 
 -Olof
