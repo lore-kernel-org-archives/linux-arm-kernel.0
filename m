@@ -1,45 +1,35 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 14 Jul 2018 14:19:25 -0700
-Subject: [GIT PULL 5/5] dts changes for omap mcan for v4.19
-In-Reply-To: <pull-1531314878-371161@atomide.com-5>
-References: <pull-1531314878-371161@atomide.com>
- <pull-1531314878-371161@atomide.com-5>
-Message-ID: <20180714211925.btxeb3ewlohndsiz@localhost>
+Date: Sat, 14 Jul 2018 14:23:03 -0700
+Subject: [GIT PULL 1/3] ARM: dts: exynos: Pull for v4.19
+In-Reply-To: <20180712164641.19925-3-krzk@kernel.org>
+References: <20180712164641.19925-1-krzk@kernel.org>
+ <20180712164641.19925-3-krzk@kernel.org>
+Message-ID: <20180714212303.nddjnfhis4vwn4zc@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 11, 2018 at 06:19:08AM -0700, Tony Lindgren wrote:
-> From: "Tony Lindgren" <tony@atomide.com>
+On Thu, Jul 12, 2018 at 06:46:40PM +0200, Krzysztof Kozlowski wrote:
+> Hi,
 > 
-> The following changes since commit 596e7955692b5d8b042fca500b7a83c25dfcf936:
+> Rebased on v4.18-rc2.
 > 
->   bus: ti-sysc: Add support for software reset (2018-07-09 22:31:38 -0700)
+> Best regards,
+> Krzysztof
 > 
-> are available in the Git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.19/dt-mcan-v2-signed-v2
+> The following changes since commit 7daf201d7fe8334e2d2364d4e8ed3394ec9af819:
 > 
-> for you to fetch changes up to 0adbe832f21ac8478f33aa64627c92fd3225b944:
+>   Linux 4.18-rc2 (2018-06-24 20:54:29 +0800)
 > 
->   ARM: dts: dra76x: Add MCAN node (2018-07-10 04:05:30 -0700)
+> are available in the git repository at:
 > 
-> ----------------------------------------------------------------
-> dts changes for mcan for omaps for v4.19 merge window
+>   https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-dt-4.19
 > 
-> These changes configure the mcan clock, interconnect target
-> module and mcan device. These changes depend on the ti-sysc
-> related driver changes and are based on those.
+> for you to fetch changes up to 57f4e8bc1c3ebbd06a278107edeb6af95b53e5bf:
 > 
-> Notably this is the first new driver that probes with ti-sysc
-> driver with no legacy hwmod platform data for the interconnect
-> target module.
+>   dt-bindings: samsung: Document bindings for SGH-T959P board (2018-07-07 12:28:07 +0200)
 
-Hi Tony,
-
-I'm not entirely sure why you sent this as a separate pull request, but it also
-conflicts with your first DT branch (add/add conflict at the end of the file).
-
-Fixed up by keeping both sides, merged.
+Merged, thanks!
 
 
 -Olof
