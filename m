@@ -1,41 +1,42 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 14 Jul 2018 14:30:30 -0700
-Subject: [GIT PULL 3/3] ARM: defconfig: Pull for v4.19
-In-Reply-To: <20180712164641.19925-2-krzk@kernel.org>
-References: <20180712164641.19925-1-krzk@kernel.org>
- <20180712164641.19925-2-krzk@kernel.org>
-Message-ID: <20180714213030.uxe2wwwulk6cvyop@localhost>
+Date: Sat, 14 Jul 2018 14:31:48 -0700
+Subject: [GIT PULL] STM32 defconfig changes for v4.19 #1
+In-Reply-To: <016b1449-4ede-9302-e6f9-c52b63e0330e@st.com>
+References: <016b1449-4ede-9302-e6f9-c52b63e0330e@st.com>
+Message-ID: <20180714213148.h2f3ipw6bja36x4p@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 12, 2018 at 06:46:39PM +0200, Krzysztof Kozlowski wrote:
-> Hi,
+On Fri, Jul 13, 2018 at 04:01:40PM +0200, Alexandre Torgue wrote:
+> Hi Arnd, Olof and Kevin,
 > 
-> Rebased on v4.18-rc2.
+> Please consider this first round of STM32 defconfig updates for v4.19.
+> This time it concerns only multi_v7_defconfig.
 > 
-> Best regards,
-> Krzysztof
+> Thanks.
+> Alex
 > 
+> The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
 > 
-> The following changes since commit 7daf201d7fe8334e2d2364d4e8ed3394ec9af819:
-> 
->   Linux 4.18-rc2 (2018-06-24 20:54:29 +0800)
+>   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
 > 
 > are available in the git repository at:
 > 
->   https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-defconfig-4.19
+>   git://git.kernel.org/pub/scm/linux/kernel/git/atorgue/stm32.git
+> tags/stm32-defconfig-for-v4.19-1
 > 
-> for you to fetch changes up to 24ede29d026a9f00aa3f4e7a5531803af4810734:
+> for you to fetch changes up to 1b8a8589a3e10997fa8f43e7da874c4903f33ac7:
 > 
->   ARM: s5pv210_defconfig: Enable options needed to boot typical Linux distro (2018-07-07 10:49:16 +0200)
-> 
-> ----------------------------------------------------------------
-> Samsung defconfig changes for v4.19
-> 
-> Enable options needed for booting full system on S5Pv210-based Samsung
-> Galaxy S mobile phones.
+>   ARM: multi_v7_defconfig: enable STM32 DCMI media support (2018-07-13
+> 14:54:24 +0200)
 
-Thanks!
+Hi,
+
+We renormalized the multi_v7_defconfig file in 4.18-rc3, so this pull request
+has quite a few conflicts due to that. I've fixed it up though, make sure it's
+behaving like you would expect.
+
+Thanks,
 
 
 -Olof
