@@ -1,129 +1,135 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sat, 14 Jul 2018 22:15:45 +0200
-Subject: [PATCH 2/2] ARM: dts: pxa: add mioa701 board description
-In-Reply-To: <CAL_JsqJU2jyfN3PyvXRCTO4xXQmUbU3tJ0uLok10KONULpJwXg@mail.gmail.com>
- (Rob Herring's message of "Mon, 9 Jul 2018 12:00:26 -0600")
-References: <20180702055733.18578-1-robert.jarzmik@free.fr>
- <20180702055733.18578-2-robert.jarzmik@free.fr>
- <CAL_JsqJU2jyfN3PyvXRCTO4xXQmUbU3tJ0uLok10KONULpJwXg@mail.gmail.com>
-Message-ID: <87lgada80e.fsf@belgarion.home>
+From: christoffer.dall@arm.com (Christoffer Dall)
+Date: Sat, 14 Jul 2018 19:05:35 +0200
+Subject: [PATCH v3 4/9] KVM: arm/arm64: vgic: Add group field to struct irq
+In-Reply-To: <1531587940-2490-1-git-send-email-christoffer.dall@arm.com>
+References: <1531587940-2490-1-git-send-email-christoffer.dall@arm.com>
+Message-ID: <1531587940-2490-5-git-send-email-christoffer.dall@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rob Herring <robh+dt@kernel.org> writes:
+In preparation for proper group 0 and group 1 support in the vgic, we
+add a field in the struct irq to store the group of all interrupts.
 
-Hi Rob,
+We initialize the group to group 0 when emulating GICv2 and to group 1
+when emulating GICv3, just like we treat them today.  LPIs are always
+group 1.  We also continue to ignore writes from the guest, preserving
+existing functionality, for now.
 
->> +       /* compatible = "mitac,mioa701"; */
->> +       compatible = "marvell,pxa270";
->
-> Why the comment?
-Leftover, I'll remove it.
+Finally, we also add this field to the vgic debug logic to show the
+group for all interrupts.
 
->> +                       pstore_region:region at 0xa2000000 {
->
-> Drop the 0x
-Done.
+Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
+---
+ include/kvm/arm_vgic.h         |  1 +
+ virt/kvm/arm/vgic/vgic-debug.c |  8 +++++---
+ virt/kvm/arm/vgic/vgic-init.c  | 19 +++++++++++++++++--
+ virt/kvm/arm/vgic/vgic-its.c   |  1 +
+ 4 files changed, 24 insertions(+), 5 deletions(-)
 
->> +                               compatible = "linux,contiguous-memory-region";
->> +                               reg = <0xa2000000 1048576>;
->
-> Use hex for the size.
-Ok.
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index 7e64c46..c661d0e 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -133,6 +133,7 @@ struct vgic_irq {
+        u8 source;                      /* GICv2 SGIs only */
+        u8 active_source;               /* GICv2 SGIs only */
+        u8 priority;
++       u8 group;                       /* 0 == group 0, 1 == group 1 */
+        enum vgic_irq_config config;    /* Level or edge */
 
->> +               ffuart: uart at 40100000 {
->
-> Should be "serial at ...". You'll have to fix in the base dtsi.
-Ok for all of these.
->> +               pxai2c1: i2c at 40301680 {
->> +                       mrvl,i2c-fast-mode;
->> +                       pinctrl-names = "default";
->> +                       pinctrl-0 = <&pinctrl_i2c_default>;
->> +                       status = "okay";
->> +
->> +                       mt9m111: camera at 5d {
->> +                               compatible = "micron,mt9m111";
->> +                               reg = <0x5d>;
->> +                               gpios = <&gpio 56 GPIO_ACTIVE_HIGH>;
->> +
->> +                               remote = <&pxa_camera>;
->
-> Not needed with the graph:
-I don't understand that, do you mean the port node is not needed ?
+        /*
+diff --git a/virt/kvm/arm/vgic/vgic-debug.c b/virt/kvm/arm/vgic/vgic-debug.c
+index c589d4c..d3a403f 100644
+--- a/virt/kvm/arm/vgic/vgic-debug.c
++++ b/virt/kvm/arm/vgic/vgic-debug.c
+@@ -148,6 +148,7 @@ static void print_dist_state(struct seq_file *s, struct vgic_dist *dist)
 
->
->> +                               port {
->> +                                       mt9m111_1: endpoint {
->> +                                               bus-width = <8>;
->> +                                               remote-endpoint = <&pxa_camera>;
->> +                                       };
->> +                               };
->> +                       };
->> +               };
->> +               gpio-keys {
->> +                       compatible = "gpio-keys";
->> +                       #address-cells = <1>;
->> +                       #size-cells = <0>;
->> +                       autorepeat;
->> +                       pinctrl-names = "default";
->> +                       pinctrl-0 = <&pinctrl_gpiokeys_default>;
->> +                       status = "okay";
->
-> Don't need status here? It shouldn't be defined in the base dtsi.
-Heuh what ? The status is just above, and gpio-keys is not defined in any dtsi.
+        seq_printf(s, "P=pending_latch, L=line_level, A=active\n");
+        seq_printf(s, "E=enabled, H=hw, C=config (level=1, edge=0)\n");
++       seq_printf(s, "G=group\n");
+ }
 
->> +
->> +                       button at 0 {
->
-> If you have unit-address there should also be a reg property. Just
-> drop and name the node 'power' or 'power-button'. And similarly for
-> the rest.
-Ok.
+ static void print_header(struct seq_file *s, struct vgic_irq *irq,
+@@ -162,8 +163,8 @@ static void print_header(struct seq_file *s, struct vgic_irq *irq,
+        }
 
->> +
->> +       regulators {
->> +               compatible = "simple-bus";
->
-> Drop this and move children to the top level. This is not an mmio bus.
-Ok.
+        seq_printf(s, "\n");
+-       seq_printf(s, "%s%2d TYP   ID TGT_ID PLAEHC     HWID   TARGET SRC PRI VCPU_ID\n", hdr, id);
+-       seq_printf(s, "---------------------------------------------------------------\n");
++       seq_printf(s, "%s%2d TYP   ID TGT_ID PLAEHCG     HWID   TARGET SRC PRI VCPU_ID\n", hdr, id);
++       seq_printf(s, "----------------------------------------------------------------\n");
+ }
 
->> +       docg3: flash at 0 {
->
-> This probably should be a child of the bus controller.
-Most certainly yes.
+ static void print_irq_state(struct seq_file *s, struct vgic_irq *irq,
+@@ -182,7 +183,7 @@ static void print_irq_state(struct seq_file *s, struct vgic_irq *irq,
 
->
->> +               compatible = "m-systems,diskonchip-g3";
->> +               reg = <0x0 0x2000>;
->> +       };
->> +
->> +       panel {
->> +               compatible = "toshiba,ltm0305a776";
->> +               lcd-type = "color-tft";
->
-> This should be implied by the compatible.
-Mmm no. Actually, this is used by the framebuffer controller, ie. pxafb to set
-it up. And I don't think adding a list of panel compatibles in pxafb is a good
-idea.
-The corresponding code is in : drivers/video/fbdev/pxafb.c, see
-"static const char * const lcd_types[]".
+        seq_printf(s, "       %s %4d "
+                      "    %2d "
+-                     "%d%d%d%d%d%d "
++                     "%d%d%d%d%d%d%d "
+                      "%8d "
+                      "%8x "
+                      " %2x "
+@@ -197,6 +198,7 @@ static void print_irq_state(struct seq_file *s, struct vgic_irq *irq,
+                        irq->enabled,
+                        irq->hw,
+                        irq->config == VGIC_CONFIG_LEVEL,
++                       irq->group,
+                        irq->hwintid,
+                        irq->mpidr,
+                        irq->source,
+diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
+index 230c922..a7c19cd 100644
+--- a/virt/kvm/arm/vgic/vgic-init.c
++++ b/virt/kvm/arm/vgic/vgic-init.c
+@@ -175,10 +175,13 @@ static int kvm_vgic_dist_init(struct kvm *kvm, unsigned int nr_spis)
+                irq->vcpu = NULL;
+                irq->target_vcpu = vcpu0;
+                kref_init(&irq->refcount);
+-               if (dist->vgic_model == KVM_DEV_TYPE_ARM_VGIC_V2)
++               if (dist->vgic_model == KVM_DEV_TYPE_ARM_VGIC_V2) {
+                        irq->targets = 0;
+-               else
++                       irq->group = 0;
++               } else {
+                        irq->mpidr = 0;
++                       irq->group = 1;
++               }
+        }
+        return 0;
+ }
+@@ -227,6 +230,18 @@ int kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
+                        /* PPIs */
+                        irq->config = VGIC_CONFIG_LEVEL;
+                }
++
++               /*
++                * GICv3 can only be created via the KVM_DEVICE_CREATE API and
++                * so we always know the emulation type at this point as it's
++                * either explicitly configured as GICv3, or explicitly
++                * configured as GICv2, or not configured yet which also
++                * implies GICv2.
++                */
++               if (dist->vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3)
++                       irq->group = 1;
++               else
++                       irq->group = 0;
+        }
 
->> +               display-timings {
->> +                       native-mode = <&timing0>;
->
-> We generally imply this from the compatible (i.e. use simple-panel).
-But you suppose there is an actual driver for the panel, right ? But there is
-none.
+        if (!irqchip_in_kernel(vcpu->kvm))
+diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+index 4ed79c9..92840c0 100644
+--- a/virt/kvm/arm/vgic/vgic-its.c
++++ b/virt/kvm/arm/vgic/vgic-its.c
+@@ -71,6 +71,7 @@ static struct vgic_irq *vgic_add_lpi(struct kvm *kvm, u32 intid,
+        kref_init(&irq->refcount);
+        irq->intid = intid;
+        irq->target_vcpu = vcpu;
++       irq->group = 1;
 
-> Could use another level of indentation.
-Sure.
+        spin_lock_irqsave(&dist->lpi_list_lock, flags);
 
->> +       ac_charger: charger at 1 {
->
-> Drop the unit-address.
-Ok.
+--
+2.7.4
 
-Thanks for the review.
-
--- 
-Robert
+IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
