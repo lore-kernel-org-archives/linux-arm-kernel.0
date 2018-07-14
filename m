@@ -1,17 +1,22 @@
-From: deepa.kernel@gmail.com (Deepa Dinamani)
-Date: Sat, 14 Jul 2018 08:54:17 -0700
-Subject: [PATCH] [RFC] y2038: globally rename compat_time to old_time32
-In-Reply-To: <20180713133204.3123939-1-arnd@arndb.de>
-References: <20180713133204.3123939-1-arnd@arndb.de>
-Message-ID: <CABeXuvphoYM+KOGPgtsuxzS1_XDSOO0Ta5hr3sA7gYtt-78wtQ@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sat, 14 Jul 2018 13:09:59 -0300
+Subject: [PATCH V2] ARM: dts: imx6sl-evk: add missing GPIO iomux setting
+In-Reply-To: <1531533238-8816-1-git-send-email-Anson.Huang@nxp.com>
+References: <1531533238-8816-1-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <CAOMZO5AcJSMyh3Y51K+4P2Ha-aX9kbeZCT6gFN9tV90p-6F2hg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Right now we only have compat syscalls and native syscalls.
-Until we transition all the architectures to use the new syscalls,
-wouldn't it be the same sort of confusion as exists today?
-These structures today are still used by compat entry points.
-I'm trying to understand why such a cleanup would make sense today
-rather than at the end of the transition.
+Hi Anson,
 
--Deepa
+On Fri, Jul 13, 2018 at 10:53 PM, Anson Huang <Anson.Huang@nxp.com> wrote:
+> On i.MX6SL EVK board, the MX6SL_PAD_KEY_ROW5 pin is
+> used as lcd 3v3 regulator control pin, need to make
+> sure MX6SL_PAD_KEY_ROW5 is muxed as GPIO function
+> for controlling lcd 3v3 regulator.
+>
+> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+
+Looks good now, thanks:
+
+Reviewed-by; Fabio Estevam <fabio.estevam@nxp.com>
