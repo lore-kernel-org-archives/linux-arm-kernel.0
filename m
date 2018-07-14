@@ -1,34 +1,61 @@
 From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Sat, 14 Jul 2018 16:30:40 +0200
-Subject: [PATCH 1/3] dt-bindings: clk: g12a: New binding for Meson-G12A SoC
-In-Reply-To: <f6f387ff-271b-9b4b-5b6e-072b4e56d840@amlogic.com>
-References: <1531134767-29927-1-git-send-email-jian.hu@amlogic.com>
- <1531134767-29927-2-git-send-email-jian.hu@amlogic.com>
- <1531214976.2708.52.camel@baylibre.com>
- <f6f387ff-271b-9b4b-5b6e-072b4e56d840@amlogic.com>
-Message-ID: <CAFBinCDW_Z-Ku+x8YsaM0CuTP6KD4PQ2uf94m3DZn5kCmvK9GA@mail.gmail.com>
+Date: Sat, 14 Jul 2018 16:36:15 +0200
+Subject: [PATCH 0/3] pinctrl: meson-g12a: add pinctrl driver support
+In-Reply-To: <CAFBinCAVSGTWFzW6nikbnC+K9n5KRYjun9bnEp7YsKbGRHJorg@mail.gmail.com>
+References: <20180704224511.29350-1-yixun.lan@amlogic.com>
+ <CACRpkdauMRnLpfiARG-BWkuJfArri68e9BYx56SCUxJaYWsYYA@mail.gmail.com>
+ <CAFBinCAVSGTWFzW6nikbnC+K9n5KRYjun9bnEp7YsKbGRHJorg@mail.gmail.com>
+Message-ID: <CAFBinCDqHEh_9Gt65FHgt-4e8o1T-YZqp9_kqS1ajqqxJ1qfuw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 11, 2018 at 3:06 PM Jian Hu <jian.hu@amlogic.com> wrote:
+On Tue, Jul 10, 2018 at 12:07 AM Martin Blumenstingl
+<martin.blumenstingl@googlemail.com> wrote:
 >
+> Hi Linus,
 >
->
-> On 2018/7/10 17:29, Jerome Brunet wrote:
-> > On Mon, 2018-07-09 at 19:12 +0800, Jian Hu wrote:
-> >> Add new binding for Meson-G12A SoC Everything-Else part
+> On Mon, Jul 9, 2018 at 3:35 PM Linus Walleij <linus.walleij@linaro.org> wrote:
 > >
-> > nitpick: I would prefer if the words 'clock' and 'controller' was somewhere in
-> > the description.
+> > On Wed, Jul 4, 2018 at 4:48 PM Yixun Lan <yixun.lan@amlogic.com> wrote:
+> > >
+> > > This patch series try to add pinctrl driver support for
+> > > the Meson-G12A SoC.
+> > >
+> > >
+> > > Yixun Lan (3):
+> > >   documentation: Add compatibles for Amlogic Meson G12A pin controllers
+> > >   dt-bindings: pinctrl: meson-g12a: document pin name
+> > >   pinctrl: meson-g12a: add pinctrl driver support
 > >
-> > Maybe "add new clock controller compatible for the EE domain of the g12a SoC" ?
->
-> Patch 1 and 2 have squashed, the commit message focuse which one?
-I would use the information from both commit messages (for example you
-could use the what Jerome already suggested and extend it with "and
-add a header file which contains preprocessor macros to identify the
-clocks provided by this clock controller")
+> > Overall this looks good to me, could we get some review or ACKs
+> > from Beniamino, Martin and/or Carlo as an indication that everything
+> > seems all right before I apply the series?
+> I do not have any documentation for this hardware (I'm not even sure
+> if this is the successor to AXG/"the Audio SoCs" or rather a successor
+> of GXL or GXM/"the OTT/STB SoCs"
+for those who are interested: according to [0] the marketing name of
+this SoC will be "A311D" - specs from the linked PDF:
+- CPU: Quad Cortex-A73 + Dual Cortex-A53 (max frequency: TBD)
+- GPU: ARM G52 MP4 (4ppc)
+- Memory: DDR3/4 LPDDR3/4
+- Video decoding: 4K H265&VP9&AVS2
+- Video Encoding: 1080P H264 H265
+- HDMI-Tx: 4K2K
+- Ethernet: 10/100M/1000M
+- AV output: CVBS
+- IP License: Dolby, DTS
+
+W400 is the reference board for this SoC, it comes with:
+- EMMC
+- WIFI AP6398S
+- DDR 2GB
+
+if I had to guess then I would say it's the successor of the GXL (or
+GXM?) family
 
 
 Regards
 Martin
+
+
+[0] http://openlinux.amlogic.com:8000/download/doc/Amlogic_A311D_Buildroot_Preview_Release_Notes_V20180706.pdf
