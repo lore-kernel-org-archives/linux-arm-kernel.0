@@ -1,38 +1,45 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sat, 14 Jul 2018 15:11:05 -0700
-Subject: [GIT PULL] Rockchip dts32 fix for 4.18
-In-Reply-To: <1776596.Q4iCTXTKyP@phil>
-References: <1776596.Q4iCTXTKyP@phil>
-Message-ID: <20180714221105.u7gbyetcpjhlylfl@localhost>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun, 15 Jul 2018 01:15:02 +0200
+Subject: [GIT PULL] Gemini DTS updates for v4.19
+Message-ID: <CACRpkdbGQ2Pzb4q32Pg_gOrpxWfuUzbB-wEdqwd0X766FBydNw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 11, 2018 at 04:18:55PM +0200, Heiko Stuebner wrote:
-> Hi Arnd, Kevin, Olof,
-> 
-> please find below a one-patch pull fixing a new warning the updated dtc
-> in 4.18 found. So far no other regressions have been found in Rockchip
-> parts it seems. So please pull!
-> 
-> Thanks
-> Heiko
-> 
-> The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
-> 
->   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
-> 
-> are available in the Git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.18-rockchip-dts32fixes-1
-> 
-> for you to fetch changes up to cddb86833615d9550d7b3a1b65b71071784dae70:
-> 
->   ARM: dts: rockchip: fix graph node unit address error from dtc (2018-06-17 09:31:34 +0200)
+Hi ARM SoC folks,
 
-I took the liberty to declare this non-urgent and queued it up with next/dt
-instead for 4.19. It's just a warning and we're past rc4 so it seemed like
-a reasonable call. Let me know if it has actual functional impact/regression
-though.
+please pull these three DTS updates for v4.19!
+Details in the signed tag.
 
+Yours,
+Linus Walleij
 
--Olof
+The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
+
+  Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+
+are available in the Git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git
+tags/gemini-dts-v4.19
+
+for you to fetch changes up to 41043ec45bdea5970e7c2d6766caf0793aeeb159:
+
+  ARM: dts: Add devicetree for Storlink/Storm SL93512R (2018-07-15
+01:09:26 +0200)
+
+----------------------------------------------------------------
+Gemini DTS updates for v4.19:
+- Add Vitesse switch chips
+- Add a new DT for a reference design
+
+----------------------------------------------------------------
+Linus Walleij (3):
+      ARM: dts: Add WAN ethernet port to the SQ201
+      ARM: dts: Add Vitesse G5e switch to the Gemini SQ201
+      ARM: dts: Add devicetree for Storlink/Storm SL93512R
+
+ arch/arm/boot/dts/Makefile            |   1 +
+ arch/arm/boot/dts/gemini-sl93512r.dts | 328 ++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/gemini-sq201.dts    | 159 ++++++++++++++++
+ 3 files changed, 488 insertions(+)
+ create mode 100644 arch/arm/boot/dts/gemini-sl93512r.dts
