@@ -1,52 +1,81 @@
 From: christoffer.dall@arm.com (Christoffer Dall)
-Date: Sat, 14 Jul 2018 19:05:40 +0200
-Subject: [PATCH v3 9/9] KVM: arm/arm64: vgic: Update documentation of the
- GICv2 device
-In-Reply-To: <1531587940-2490-1-git-send-email-christoffer.dall@arm.com>
-References: <1531587940-2490-1-git-send-email-christoffer.dall@arm.com>
-Message-ID: <1531587940-2490-10-git-send-email-christoffer.dall@arm.com>
+Date: Sat, 14 Jul 2018 19:05:31 +0200
+Subject: [PATCH v3 0/9] KVM: arm/arm64: vgic: Virtual interrupt grouping
+ support
+Message-ID: <1531587940-2490-1-git-send-email-christoffer.dall@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update the documentation to reflect the ordering requirements of
-restoring GICv2 distributor registers and remove outdated limitations in
-the documentation while we're at it.
+This series addresses a peculiarity of the current VGIC
+implementation, namely that we don't support interrupt grouping.
 
-Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
----
- Documentation/virtual/kvm/devices/arm-vgic.txt | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+KVM either implements a GICv2 without support for the security
+extensions, or a GICv3 with DS=1.  For GICv2, on systems without the
+security extensions, group 0 interrupts can be configured to be either
+signalled as FIQs or as IRQs by the VM, whereas group 1 interrupts are
+always IRQs.  For GICv3, with DS=1, group 1 interrupts are always IRQs
+and group 0 interrupts are always FIQs, and there is no concept of
+secure vs. non-secure group 1 interrupts when DS=1.
 
-diff --git a/Documentation/virtual/kvm/devices/arm-vgic.txt b/Documentation/virtual/kvm/devices/arm-vgic.txt
-index b3ce126..c9a6393 100644
---- a/Documentation/virtual/kvm/devices/arm-vgic.txt
-+++ b/Documentation/virtual/kvm/devices/arm-vgic.txt
-@@ -49,9 +49,12 @@ Groups:
-     index is specified with the vcpu_index field.  Note that most distributor
-     fields are not banked, but return the same value regardless of the
-     vcpu_index used to access the register.
--  Limitations:
--    - Priorities are not implemented, and registers are RAZ/WI
--    - Currently only implemented for KVM_DEV_TYPE_ARM_VGIC_V2.
-+
-+    GICD_IIDR.Revision is updated when the KVM implementation of an emulated
-+    GICv2 is changed.  Userspace should read GICD_IIDR from KVM and write back
-+    the read value to confirm its expected behavior is aligned with the KVM
-+    implementation.  To properly restore the interrupt group configuration,
-+    GICD_IIDR should be written before any other registers.
-   Errors:
-     -ENXIO: Getting or setting this register is not yet supported
-     -EBUSY: One or more VCPUs are running
-@@ -94,9 +97,6 @@ Groups:
-     use the lower 5 bits to communicate with the KVM device and must shift the
-     value left by 3 places to obtain the actual priority mask level.
+We were treating all interrupts on GICv2 as group 0, but yet telling the
+guest that they were group 1.  The first patch changes this behavior,
+which seems to have no effect on no known guests, but still.
 
--  Limitations:
--    - Priorities are not implemented, and registers are RAZ/WI
--    - Currently only implemented for KVM_DEV_TYPE_ARM_VGIC_V2.
-   Errors:
-     -ENXIO: Getting or setting this register is not yet supported
-     -EBUSY: One or more VCPUs are running
+The remaining patches introduce proper interrupt grouping support, along
+with MMIO accessors for the VM and userspace to retrieve and set the
+which group SGIs, PPIs, and SPIs belong to.  LPIs are always group 1
+interrupts as per the architecture, and there is no way to modify this
+configuration (no IGROUPR registers for LPIs or equivalent ITS
+commands).
+
+Tested on Seattle, TX1, and the foundation model.  I've run a
+GICv2 guest on a GICv3 host on the foundation model.  I've tested
+migration on Seattle, and migration from an old kernel to a newer kernel
+with an unmodified QEMU binary continues to work.  I also tested a
+modified userspace that sets some interrupts to group 1, and that is
+reflected in the vgic debug output.
+
+Applies to v4.18-rc3.
+
+Changes since v2:
+ - Patch 6 doesn't allow configuraiton of groups from userspace for
+   GICv2.
+ - Patches 7 through 9 are new in v3 of this series, and prevents
+   userspace from restoring an incompatible IIDR without seeing an error
+   in the future, and supports legacy userspace migration from old to
+   new kernels.
+
+Changes since v1:
+ - Bumped implementation revision field in GICD_IIDR along with changes
+ - Changed logic in init code to correctly detect vgic emulation type
+ - Rebased to v4.18-rc3
+
+Christoffer Dall (9):
+  KVM: arm/arm64: vgic: Define GICD_IIDR fields for GICv2 and GIv3
+  KVM: arm/arm64: vgic: Keep track of implementation revision
+  KVM: arm/arm64: vgic: GICv2 IGROUPR should read as zero
+  KVM: arm/arm64: vgic: Add group field to struct irq
+  KVM: arm/arm64: vgic: Signal IRQs using their configured group
+  KVM: arm/arm64: vgic: Allow configuration of interrupt groups
+  KVM: arm/arm64: vgic: Permit uaccess writes to return errors
+  KVM: arm/arm64: vgic: Let userspace opt-in to writable v2 IGROUPR
+  KVM: arm/arm64: vgic: Update documentation of the GICv2 device
+
+ Documentation/virtual/kvm/devices/arm-vgic.txt | 12 +++---
+ include/kvm/arm_vgic.h                         |  7 +++
+ include/linux/irqchip/arm-gic-v3.h             | 10 +++++
+ include/linux/irqchip/arm-gic.h                | 11 +++++
+ virt/kvm/arm/vgic/vgic-debug.c                 |  8 ++--
+ virt/kvm/arm/vgic/vgic-init.c                  | 20 ++++++++-
+ virt/kvm/arm/vgic/vgic-its.c                   |  1 +
+ virt/kvm/arm/vgic/vgic-mmio-v2.c               | 60 +++++++++++++++++++++++---
+ virt/kvm/arm/vgic/vgic-mmio-v3.c               | 51 ++++++++++++++++------
+ virt/kvm/arm/vgic/vgic-mmio.c                  | 56 +++++++++++++++++++++---
+ virt/kvm/arm/vgic/vgic-mmio.h                  | 25 +++++++----
+ virt/kvm/arm/vgic/vgic-v2.c                    |  3 ++
+ virt/kvm/arm/vgic/vgic-v3.c                    |  6 +--
+ 13 files changed, 223 insertions(+), 47 deletions(-)
+
 --
 2.7.4
 
