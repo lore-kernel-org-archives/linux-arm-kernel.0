@@ -1,36 +1,45 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 14 Jul 2018 14:17:11 -0700
-Subject: [GIT PULL 2/3] DaVinci DT updates for v4.19
-In-Reply-To: <20180711062906.22865-2-nsekhar@ti.com>
-References: <20180711062906.22865-1-nsekhar@ti.com>
- <20180711062906.22865-2-nsekhar@ti.com>
-Message-ID: <20180714211711.jwb4fkgx2hopfi4f@localhost>
+Date: Sat, 14 Jul 2018 14:19:25 -0700
+Subject: [GIT PULL 5/5] dts changes for omap mcan for v4.19
+In-Reply-To: <pull-1531314878-371161@atomide.com-5>
+References: <pull-1531314878-371161@atomide.com>
+ <pull-1531314878-371161@atomide.com-5>
+Message-ID: <20180714211925.btxeb3ewlohndsiz@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 11, 2018 at 11:59:05AM +0530, Sekhar Nori wrote:
-> The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
+On Wed, Jul 11, 2018 at 06:19:08AM -0700, Tony Lindgren wrote:
+> From: "Tony Lindgren" <tony@atomide.com>
 > 
->   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+> The following changes since commit 596e7955692b5d8b042fca500b7a83c25dfcf936:
+> 
+>   bus: ti-sysc: Add support for software reset (2018-07-09 22:31:38 -0700)
 > 
 > are available in the Git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.19/dt
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.19/dt-mcan-v2-signed-v2
 > 
-> for you to fetch changes up to 3117c17301edce7583843bdee513e201bb69c37c:
+> for you to fetch changes up to 0adbe832f21ac8478f33aa64627c92fd3225b944:
 > 
->   ARM: dts: da850: Add power-domains to CPPI 4.1 node (2018-07-10 15:32:41 +0530)
+>   ARM: dts: dra76x: Add MCAN node (2018-07-10 04:05:30 -0700)
 > 
 > ----------------------------------------------------------------
-> DaVinci Device-Tree updates for v4.19
-> -------------------------------------
+> dts changes for mcan for omaps for v4.19 merge window
 > 
-> * DA850 now uses clocks from device-tree
-> * DA850 EVM gains LCD (with backlight) and SATA support
-> * Lego Mindstorms gains bluetooth support
-> * DSP reset control support on DA850
+> These changes configure the mcan clock, interconnect target
+> module and mcan device. These changes depend on the ti-sysc
+> related driver changes and are based on those.
+> 
+> Notably this is the first new driver that probes with ti-sysc
+> driver with no legacy hwmod platform data for the interconnect
+> target module.
 
-Thanks, merged!
+Hi Tony,
+
+I'm not entirely sure why you sent this as a separate pull request, but it also
+conflicts with your first DT branch (add/add conflict at the end of the file).
+
+Fixed up by keeping both sides, merged.
 
 
 -Olof
