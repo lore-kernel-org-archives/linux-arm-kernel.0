@@ -1,22 +1,70 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 14 Jul 2018 13:09:59 -0300
-Subject: [PATCH V2] ARM: dts: imx6sl-evk: add missing GPIO iomux setting
-In-Reply-To: <1531533238-8816-1-git-send-email-Anson.Huang@nxp.com>
-References: <1531533238-8816-1-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <CAOMZO5AcJSMyh3Y51K+4P2Ha-aX9kbeZCT6gFN9tV90p-6F2hg@mail.gmail.com>
+From: marcel@holtmann.org (Marcel Holtmann)
+Date: Sat, 14 Jul 2018 18:26:24 +0200
+Subject: [PATCH v5 1/7] dt-bindings: net: bluetooth: Add mediatek-bluetooth
+In-Reply-To: <d8a5b34513cf2187a2b23a513feaa358d719bc14.1531150733.git.sean.wang@mediatek.com>
+References: <cover.1531150733.git.sean.wang@mediatek.com>
+ <d8a5b34513cf2187a2b23a513feaa358d719bc14.1531150733.git.sean.wang@mediatek.com>
+Message-ID: <7E55939D-7F8A-4832-9DD5-EFB3B19ACF0B@holtmann.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Anson,
+Hi Sean,
 
-On Fri, Jul 13, 2018 at 10:53 PM, Anson Huang <Anson.Huang@nxp.com> wrote:
-> On i.MX6SL EVK board, the MX6SL_PAD_KEY_ROW5 pin is
-> used as lcd 3v3 regulator control pin, need to make
-> sure MX6SL_PAD_KEY_ROW5 is muxed as GPIO function
-> for controlling lcd 3v3 regulator.
->
-> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+> Add binding document for a SoC built-in device using MediaTek protocol.
+> Which could be found on MT7622 SoC or other similar MediaTek SoCs.
+> 
+> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> Reviewed-by: Rob Herring <robh@kernel.org>
+> ---
+> .../devicetree/bindings/net/mediatek-bluetooth.txt | 35 ++++++++++++++++++++++
+> 1 file changed, 35 insertions(+)
+> create mode 100644 Documentation/devicetree/bindings/net/mediatek-bluetooth.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/net/mediatek-bluetooth.txt b/Documentation/devicetree/bindings/net/mediatek-bluetooth.txt
+> new file mode 100644
+> index 0000000..1335429
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/net/mediatek-bluetooth.txt
+> @@ -0,0 +1,35 @@
+> +MediaTek SoC built-in Bluetooth Devices
+> +==================================
+> +
+> +This device is a serial attached device to BTIF device and thus it must be a
+> +child node of the serial node with BTIF. The dt-bindings details for BTIF
+> +device can be known via Documentation/devicetree/bindings/serial/8250.txt.
+> +
+> +Required properties:
+> +
+> +- compatible:	Must be one of
+> +		  "mediatek,mt7622-bluetooth"": for MT7622 SoC
 
-Looks good now, thanks:
+this does not match with the example below. And one of, should be normally be a list.
 
-Reviewed-by; Fabio Estevam <fabio.estevam@nxp.com>
+> +- clocks:	Should be the clock specifiers corresponding to the entry in
+> +		clock-names property.
+> +- clock-names:	Should contain "ref" entries.
+> +- power-domains: Phandle to the power domain that the device is part of
+> +
+> +Example:
+> +
+> +	btif: serial at 1100c000 {
+> +		compatible = "mediatek,mt7622-btif",
+> +			     "mediatek,mtk-btif";
+> +		reg = <0 0x1100c000 0 0x1000>;
+> +		interrupts = <GIC_SPI 90 IRQ_TYPE_LEVEL_LOW>;
+> +		clocks = <&pericfg CLK_PERI_BTIF_PD>;
+> +		clock-names = "main";
+> +		reg-shift = <2>;
+> +		reg-io-width = <4>;
+> +
+> +		bluetooth {
+> +			compatible = "mediatek,mt7622-bluetooth";
+> +			power-domains = <&scpsys MT7622_POWER_DOMAIN_WB>;
+> +			clocks = <&clk25m>;
+> +			clock-names = "ref";
+> +		};
+> +	};
+
+Regards
+
+Marcel
