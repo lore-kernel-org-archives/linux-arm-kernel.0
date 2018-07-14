@@ -1,36 +1,42 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 14 Jul 2018 15:11:42 -0700
-Subject: [GIT PULL] pxa fixes for v4.18
-In-Reply-To: <871sc9ed1h.fsf@belgarion.home>
-References: <871sc9ed1h.fsf@belgarion.home>
-Message-ID: <20180714221142.wupbudvvailk7tmd@localhost>
+Date: Sat, 14 Jul 2018 15:13:29 -0700
+Subject: [GIT PULL] ARM: mvebu: fixes for v4.18 (#1)
+In-Reply-To: <87zhywbem1.fsf@bootlin.com>
+References: <87zhywbem1.fsf@bootlin.com>
+Message-ID: <20180714221329.cyxoaxvmbrfgewsv@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 11, 2018 at 10:24:26PM +0200, Robert Jarzmik wrote:
-> Hello Arnd, Kevin, Olof,
+On Thu, Jul 12, 2018 at 06:31:02PM +0200, Gregory CLEMENT wrote:
+> Hi,
 > 
-> Please consider this pull request for pxa fixes for 4.18.
+> Here is the first pull request for fixes for mvebu for v4.18.
 > 
-> The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
+> Gregory
 > 
->   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+> The following changes since commit 021c91791a5e7e85c567452f1be3e4c2c6cb6063:
 > 
-> are available in the git repository at:
+>   Linux 4.18-rc3 (2018-07-01 16:04:53 -0700)
 > 
->   https://github.com/rjarzmik/linux.git tags/pxa-fixes-4.18
+> are available in the Git repository at:
 > 
-> for you to fetch changes up to 0c1049dcb4ceec640d8bd797335bcbebdcab44d2:
+>   git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-4.18-1
 > 
->   ARM: pxa: irq: fix handling of ICMR registers in suspend/resume (2018-07-07 13:25:15 +0200)
+> for you to fetch changes up to 568cc2f07c8ea5f71a0486464bd9703e4671045f:
+> 
+>   ARM: dts: armada-38x: use the new thermal binding (2018-07-06 16:50:48 +0200)
 > 
 > ----------------------------------------------------------------
-> This is the fixes set for v4.18 cycle.
+> mvebu fixes for 4.18 (part 1)
 > 
-> This is a fix for suspending all pxa3xx platforms, where high
-> number interrupts are not reenabled.
+> Use the new thermal binding on Armada 38x allowing to use a driver fix
+> which is already part of the kernel.
 
-Thanks, merged.
+It would have been nice to mention why this is needed (the patch description is
+nice and clear but it's worth bringign up to fixes tag decriptions in a shorter
+format).
+
+Merged into fixes now, thanks!
 
 
 -Olof
