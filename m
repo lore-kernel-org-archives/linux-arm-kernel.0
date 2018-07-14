@@ -1,21 +1,25 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 14 Jul 2018 12:28:47 +0200
-Subject: [PATCH] ARM: tcm: ensure inline stub functions are marked static
-In-Reply-To: <E1fdvDC-0004xH-Vj@rmk-PC.armlinux.org.uk>
-References: <E1fdvDC-0004xH-Vj@rmk-PC.armlinux.org.uk>
-Message-ID: <CACRpkdZRunyRmuH9QfJfBKCmd2m4=nQirg5RD0BKrBz4agWX_g@mail.gmail.com>
+Date: Sat, 14 Jul 2018 12:49:07 +0200
+Subject: [PATCH -next] pinctrl: nsp: fix potential NULL dereference in
+ nsp_pinmux_probe()
+In-Reply-To: <14329d52-72bb-3594-dec3-00ab0f7ccd40@broadcom.com>
+References: <1531312461-134547-1-git-send-email-weiyongjun1@huawei.com>
+ <CACRpkdbwAJOaFay3x45gyf7rBpkPOAMbxW6FLQUvCekUKatLYA@mail.gmail.com>
+ <14329d52-72bb-3594-dec3-00ab0f7ccd40@broadcom.com>
+Message-ID: <CACRpkdaSgwLhwwHEKHJfrWSHcQ+SAZPtkOreP88wtDKuMgTVcg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 13, 2018 at 12:22 PM Russell King
-<rmk+kernel@armlinux.org.uk> wrote:
+On Fri, Jul 13, 2018 at 6:53 PM Ray Jui <ray.jui@broadcom.com> wrote:
 
-> Ensure that the stubbed out tcm_init() is marked static, so we don't
-> end up emitting the stub each time the header is included.
+> > Patch applied with Ray's ACK.
 >
-> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> Would be nice to add the following Fixes tag:
+>
+> Fixes: cc4fa83f66e9 ("pinctrl: nsp: add pinmux driver support for
+> Broadcom NSP SoC")
 
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+OK fixed it!
 
 Yours,
 Linus Walleij
