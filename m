@@ -1,136 +1,196 @@
-From: collinsd@codeaurora.org (David Collins)
-Date: Fri, 13 Jul 2018 18:50:57 -0700
-Subject: [PATCH v9 0/2] regulator: add QCOM RPMh regulator driver
-Message-ID: <cover.1531531808.git.collinsd@codeaurora.org>
+From: dyoung@redhat.com (Dave Young)
+Date: Sat, 14 Jul 2018 09:52:23 +0800
+Subject: [PATCH v11 03/15] powerpc, kexec_file: factor out memblock-based
+ arch_kexec_walk_mem()
+In-Reply-To: <20180711074203.3019-4-takahiro.akashi@linaro.org>
+References: <20180711074203.3019-1-takahiro.akashi@linaro.org>
+ <20180711074203.3019-4-takahiro.akashi@linaro.org>
+Message-ID: <20180714015223.GA2745@dhcp-128-65.nay.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series adds a driver and device tree binding documentation for
-PMIC regulator control via Resource Power Manager-hardened (RPMh) on some
-Qualcomm Technologies, Inc. SoCs such as SDM845.  RPMh is a hardware block
-which contains several accelerators which are used to manage various
-hardware resources that are shared between the processors of the SoC.  The
-final hardware state of a regulator is determined within RPMh by performing
-max aggregation of the requests made by all of the processors.
+On 07/11/18 at 04:41pm, AKASHI Takahiro wrote:
+> Memblock list is another source for usable system memory layout.
+> So powerpc's arch_kexec_walk_mem() is moved to kexec_file.c so that
+> other memblock-based architectures, particularly arm64, can also utilise
+> it. A moved function is now renamed to kexec_walk_memblock() and merged
+> into the existing arch_kexec_walk_mem() for general use, either resource
+> list or memblock list.
+> 
+> A consequent function will not work for kdump with memblock list, but
+> this will be fixed in the next patch.
+> 
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> Cc: "Eric W. Biederman" <ebiederm@xmission.com>
+> Cc: Dave Young <dyoung@redhat.com>
+> Cc: Vivek Goyal <vgoyal@redhat.com>
+> Cc: Baoquan He <bhe@redhat.com>
+> Acked-by: James Morse <james.morse@arm.com>
+> ---
+>  arch/powerpc/kernel/machine_kexec_file_64.c | 54 ---------------------
+>  kernel/kexec_file.c                         | 54 +++++++++++++++++++++
+>  2 files changed, 54 insertions(+), 54 deletions(-)
+> 
+> diff --git a/arch/powerpc/kernel/machine_kexec_file_64.c b/arch/powerpc/kernel/machine_kexec_file_64.c
+> index 0bd23dc789a4..5357b09902c5 100644
+> --- a/arch/powerpc/kernel/machine_kexec_file_64.c
+> +++ b/arch/powerpc/kernel/machine_kexec_file_64.c
+> @@ -24,7 +24,6 @@
+>  
+>  #include <linux/slab.h>
+>  #include <linux/kexec.h>
+> -#include <linux/memblock.h>
+>  #include <linux/of_fdt.h>
+>  #include <linux/libfdt.h>
+>  #include <asm/ima.h>
+> @@ -46,59 +45,6 @@ int arch_kexec_kernel_image_probe(struct kimage *image, void *buf,
+>  	return kexec_image_probe_default(image, buf, buf_len);
+>  }
+>  
+> -/**
+> - * arch_kexec_walk_mem - call func(data) for each unreserved memory block
+> - * @kbuf:	Context info for the search. Also passed to @func.
+> - * @func:	Function to call for each memory block.
+> - *
+> - * This function is used by kexec_add_buffer and kexec_locate_mem_hole
+> - * to find unreserved memory to load kexec segments into.
+> - *
+> - * Return: The memory walk will stop when func returns a non-zero value
+> - * and that value will be returned. If all free regions are visited without
+> - * func returning non-zero, then zero will be returned.
+> - */
+> -int arch_kexec_walk_mem(struct kexec_buf *kbuf,
+> -			int (*func)(struct resource *, void *))
+> -{
+> -	int ret = 0;
+> -	u64 i;
+> -	phys_addr_t mstart, mend;
+> -	struct resource res = { };
+> -
+> -	if (kbuf->top_down) {
+> -		for_each_free_mem_range_reverse(i, NUMA_NO_NODE, 0,
+> -						&mstart, &mend, NULL) {
+> -			/*
+> -			 * In memblock, end points to the first byte after the
+> -			 * range while in kexec, end points to the last byte
+> -			 * in the range.
+> -			 */
+> -			res.start = mstart;
+> -			res.end = mend - 1;
+> -			ret = func(&res, kbuf);
+> -			if (ret)
+> -				break;
+> -		}
+> -	} else {
+> -		for_each_free_mem_range(i, NUMA_NO_NODE, 0, &mstart, &mend,
+> -					NULL) {
+> -			/*
+> -			 * In memblock, end points to the first byte after the
+> -			 * range while in kexec, end points to the last byte
+> -			 * in the range.
+> -			 */
+> -			res.start = mstart;
+> -			res.end = mend - 1;
+> -			ret = func(&res, kbuf);
+> -			if (ret)
+> -				break;
+> -		}
+> -	}
+> -
+> -	return ret;
+> -}
+> -
+>  /**
+>   * setup_purgatory - initialize the purgatory's global variables
+>   * @image:		kexec image.
+> diff --git a/kernel/kexec_file.c b/kernel/kexec_file.c
+> index 63c7ce1c0c3e..b088324fb3ad 100644
+> --- a/kernel/kexec_file.c
+> +++ b/kernel/kexec_file.c
+> @@ -16,6 +16,7 @@
+>  #include <linux/file.h>
+>  #include <linux/slab.h>
+>  #include <linux/kexec.h>
+> +#include <linux/memblock.h>
+>  #include <linux/mutex.h>
+>  #include <linux/list.h>
+>  #include <linux/fs.h>
+> @@ -501,6 +502,55 @@ static int locate_mem_hole_callback(struct resource *res, void *arg)
+>  	return locate_mem_hole_bottom_up(start, end, kbuf);
+>  }
+>  
+> +#if defined(CONFIG_HAVE_MEMBLOCK) && !defined(CONFIG_ARCH_DISCARD_MEMBLOCK)
+> +static int kexec_walk_memblock(struct kexec_buf *kbuf,
+> +			       int (*func)(struct resource *, void *))
+> +{
+> +	int ret = 0;
+> +	u64 i;
+> +	phys_addr_t mstart, mend;
+> +	struct resource res = { };
+> +
+> +	if (kbuf->top_down) {
+> +		for_each_free_mem_range_reverse(i, NUMA_NO_NODE, 0,
+> +						&mstart, &mend, NULL) {
+> +			/*
+> +			 * In memblock, end points to the first byte after the
+> +			 * range while in kexec, end points to the last byte
+> +			 * in the range.
+> +			 */
+> +			res.start = mstart;
+> +			res.end = mend - 1;
+> +			ret = func(&res, kbuf);
+> +			if (ret)
+> +				break;
+> +		}
+> +	} else {
+> +		for_each_free_mem_range(i, NUMA_NO_NODE, 0, &mstart, &mend,
+> +					NULL) {
+> +			/*
+> +			 * In memblock, end points to the first byte after the
+> +			 * range while in kexec, end points to the last byte
+> +			 * in the range.
+> +			 */
+> +			res.start = mstart;
+> +			res.end = mend - 1;
+> +			ret = func(&res, kbuf);
+> +			if (ret)
+> +				break;
+> +		}
+> +	}
+> +
+> +	return ret;
+> +}
+> +#else
+> +static int kexec_walk_memblock(struct kexec_buf *kbuf,
+> +			       int (*func)(struct resource *, void *))
+> +{
+> +	return 0;
+> +}
+> +#endif
+> +
+>  /**
+>   * arch_kexec_walk_mem - call func(data) on free memory regions
+>   * @kbuf:	Context info for the search. Also passed to @func.
+> @@ -513,6 +563,10 @@ static int locate_mem_hole_callback(struct resource *res, void *arg)
+>  int __weak arch_kexec_walk_mem(struct kexec_buf *kbuf,
+>  			       int (*func)(struct resource *, void *))
+>  {
+> +	if (IS_ENABLED(CONFIG_HAVE_MEMBLOCK) &&
+> +			!IS_ENABLED(CONFIG_ARCH_DISCARD_MEMBLOCK))
+> +		return kexec_walk_memblock(kbuf, func);
 
-The RPMh regulator driver depends upon the RPMh driver [1] and command DB
-driver [2] which are both still undergoing review.  It also depends upon
-three recent regulator patches: [3], [4], and [5] as well as an RPMh
-helper patch [6].
+AKASHI, I'm not sure if this works on all arches, for example I chekced
+the .config on my Nokia N900 kernel tree, there is HAVE_MEMBLOCK=y and
+no CONFIG_ARCH_DISCARD_MEMBLOCK,  in 32bit arm code no
+arch_kexec_walk_mem() 
 
-Changes since v8 [7]:
- - Used C++ style comment for qcom-rpmh-regulator.c copyright
- - Removed RPMH_REGULATOR_MODE_COUNT
- - Changed ternary operator to if else statement in
-   rpmh_regulator_vrm_set_mode_bypass()
- - Changed LDO mode mappings to use REGULATOR_MODE_NORMAL for HPM
-   instead of REGULATOR_MODE_FAST
- - Replaced mapping arrays with switch case statements in of_map_mode
-   callback functions
+> +
+>  	if (kbuf->image->type == KEXEC_TYPE_CRASH)
+>  		return walk_iomem_res_desc(crashk_res.desc,
+>  					   IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY,
+> -- 
+> 2.17.0
+> 
 
-Changes since v7 [8]:
- - Removed the cmd_db_ready() call from the driver probe function as it
-   is now handled by the RPMh driver itself [6]
- - Added Reviewed-by tag for driver patch 2/2
-
-Changes since v6 [9]:
- - Removed 'count' parameter from rpmh_regulator_send_request() since
-   it is always 1
- - Fixed _rpmh_regulator_vrm_set_voltage_sel() return value
- - Added a helper function to capture common code between
-   rpmh_regulator_enable() and rpmh_regulator_disable()
- - Added an iterator for pmic_rpmh_data in rpmh_regulator_init_vreg()
- - Added Reviewed-by tag for both patches
-
-Changes since v5 [10]:
- - Removed unused constants
- - Added Reviewed-by tag for DT patch 1/2
-
-Changes since v4 [11]:
- - Removed support for DT properties qcom,regulator-drms-modes and
-   qcom,drms-mode-max-microamps
- - Specified fixed DRMS high power mode minimum limits for LDO type
-   regulators
- - Removed DRMS support for SMPS and BOB type regulators
- - Simplified voltage caching logic
-
-Changes since v3 [12]:
- - Removed support for DT properties qcom,regulator-initial-microvolt
-   and qcom,headroom-microvolt
- - Renamed DT property qcom,allowed-drms-modes to be
-   qcom,regulator-drms-modes
- - Updated DT binding documentation to mention which common regulator
-   bindings can be used for qcom-rpmh-regulator devices
- - Added voltage caching so that voltage requests are only sent to RPMh
-   after the regulator has been enabled at least once
- - Changed 'voltage_selector' default value to be -ENOTRECOVERABLE to
-   interact with [5]
- - Initialized 'enabled' to -EINVAL so that unused regulators are
-   disabled by regulator_late_cleanup()
- - Removed rpmh_regulator_load_default_parameters() as it is no longer
-   needed
- - Updated the mode usage description in qcom,rpmh-regulator.h
-
-Changes since v2 [13]:
- - Replaced '_' with '-' in device tree supply property names
- - Renamed qcom_rpmh-regulator.c to be qcom-rpmh-regulator.c
- - Updated various DT property names to use "microvolt" and "microamp"
- - Moved allowed modes constraint specification out of the driver [4]
- - Replaced rpmh_client with device pointer to match new RPMh API [1]
- - Corrected drms mode threshold checking
- - Initialized voltage_selector to -EINVAL when not specified in DT
- - Added constants for PMIC regulator hardware modes
- - Corrected type sign of mode mapping tables
- - Made variable names for mode arrays plural
- - Simplified Kconfig depends on
- - Removed unnecessary constants and struct fields
- - Added some descriptive comments
-
-Changes since v1 [14]:
- - Addressed review feedback from Doug, Mark, and Stephen
- - Replaced set_voltage()/get_voltage() callbacks with set_voltage_sel()/
-   get_voltage_sel()
- - Added set_bypass()/get_bypass() callbacks for BOB pass-through mode
-   control
- - Removed top-level PMIC data structures
- - Removed initialization variables from structs and passed them as
-   function parameters
- - Removed various comments and error messages
- - Simplified mode handling
- - Refactored per-PMIC rpmh-regulator data specification
- - Simplified probe function
- - Moved header into DT patch
- - Removed redundant property listings from DT binding documentation
-
-[1]: https://lkml.org/lkml/2018/6/20/519
-[2]: https://lkml.org/lkml/2018/4/10/714
-[3]: https://lkml.org/lkml/2018/4/18/556
-[4]: https://lkml.org/lkml/2018/5/11/696
-[5]: https://lkml.org/lkml/2018/5/15/1005
-[6]: https://lkml.org/lkml/2018/6/18/1188
-[7]: https://lkml.org/lkml/2018/6/22/935
-[8]: https://lkml.org/lkml/2018/6/8/573
-[9]: https://lkml.org/lkml/2018/6/4/879
-[10]: https://lkml.org/lkml/2018/6/1/895
-[11]: https://lkml.org/lkml/2018/5/22/1168
-[12]: https://lkml.org/lkml/2018/5/11/701
-[13]: https://lkml.org/lkml/2018/4/13/687
-[14]: https://lkml.org/lkml/2018/3/16/1431
-
-David Collins (2):
-  regulator: dt-bindings: add QCOM RPMh regulator bindings
-  regulator: add QCOM RPMh regulator driver
-
- .../bindings/regulator/qcom,rpmh-regulator.txt     | 160 +++++
- drivers/regulator/Kconfig                          |   9 +
- drivers/regulator/Makefile                         |   1 +
- drivers/regulator/qcom-rpmh-regulator.c            | 769 +++++++++++++++++++++
- .../dt-bindings/regulator/qcom,rpmh-regulator.h    |  36 +
- 5 files changed, 975 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/regulator/qcom,rpmh-regulator.txt
- create mode 100644 drivers/regulator/qcom-rpmh-regulator.c
- create mode 100644 include/dt-bindings/regulator/qcom,rpmh-regulator.h
-
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Thanks
+Dave
