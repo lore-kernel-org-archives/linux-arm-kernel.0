@@ -1,69 +1,98 @@
 From: christoffer.dall@arm.com (Christoffer Dall)
-Date: Sat, 14 Jul 2018 19:05:34 +0200
-Subject: [PATCH v3 3/9] KVM: arm/arm64: vgic: GICv2 IGROUPR should read as zero
+Date: Sat, 14 Jul 2018 19:05:32 +0200
+Subject: [PATCH v3 1/9] KVM: arm/arm64: vgic: Define GICD_IIDR fields for
+ GICv2 and GIv3
 In-Reply-To: <1531587940-2490-1-git-send-email-christoffer.dall@arm.com>
 References: <1531587940-2490-1-git-send-email-christoffer.dall@arm.com>
-Message-ID: <1531587940-2490-4-git-send-email-christoffer.dall@arm.com>
+Message-ID: <1531587940-2490-2-git-send-email-christoffer.dall@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We currently don't support grouping in the emulated VGIC, which is a
-known defect on KVM (not hurting any currently used guests as far as
-we're aware). This is currently handled by treating all interrupts as
-group 0 interrupts for an emulated GICv2 and always signaling interrupts
-as group 0 to the virtual CPU interface.
+Instead of hardcoding the shifts and masks in the GICD_IIDR register
+emulation, let's add the definition of these fields to the GIC header
+files and use them.
 
-However, when reading which group interrupts belongs to in the guest
-from the emulated VGIC, the VGIC currently reports group 1 instead of
-group 0, which is misleading.  Fix this temporarily before introducing
-full group support by changing the hander to _raz instead of _rao.
+This will make things more obvious when we're going to bump the revision
+in the IIDR when we'll make guest-visible changes to the implementation.
 
-Fixes: fb848db39661a "KVM: arm/arm64: vgic-new: Add GICv2 MMIO handling framework"
 Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
 ---
- virt/kvm/arm/vgic/vgic-init.c    | 2 +-
- virt/kvm/arm/vgic/vgic-mmio-v2.c | 8 +++++++-
- 2 files changed, 8 insertions(+), 2 deletions(-)
+ include/linux/irqchip/arm-gic-v3.h | 10 ++++++++++
+ include/linux/irqchip/arm-gic.h    | 10 ++++++++++
+ virt/kvm/arm/vgic/vgic-mmio-v2.c   |  3 ++-
+ virt/kvm/arm/vgic/vgic-mmio-v3.c   |  3 ++-
+ 4 files changed, 24 insertions(+), 2 deletions(-)
 
-diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
-index 8b6fc45..230c922 100644
---- a/virt/kvm/arm/vgic/vgic-init.c
-+++ b/virt/kvm/arm/vgic/vgic-init.c
-@@ -298,7 +298,7 @@ int vgic_init(struct kvm *kvm)
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index cbb872c..b22f9df 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -61,6 +61,16 @@
+ #define GICD_CTLR_ENABLE_G1A           (1U << 1)
+ #define GICD_CTLR_ENABLE_G1            (1U << 0)
 
-        vgic_debug_init(kvm);
++#define GICD_IIDR_IMPLEMENTER_SHIFT    0
++#define GICD_IIDR_IMPLEMENTER_MASK     (0xfff << GICD_IIDR_IMPLEMENTER_SHIFT)
++#define GICD_IIDR_REVISION_SHIFT       12
++#define GICD_IIDR_REVISION_MASK                (0xf << GICD_IIDR_REVISION_SHIFT)
++#define GICD_IIDR_VARIANT_SHIFT                16
++#define GICD_IIDR_VARIANT_MASK         (0xf << GICD_IIDR_VARIANT_SHIFT)
++#define GICD_IIDR_PRODUCT_ID_SHIFT     24
++#define GICD_IIDR_PRODUCT_ID_MASK      (0xff << GICD_IIDR_PRODUCT_ID_SHIFT)
++
++
+ /*
+  * In systems with a single security state (what we emulate in KVM)
+  * the meaning of the interrupt group enable bits is slightly different
+diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
+index 68d8b1f..484f5bf 100644
+--- a/include/linux/irqchip/arm-gic.h
++++ b/include/linux/irqchip/arm-gic.h
+@@ -71,6 +71,16 @@
+                                        (GICD_INT_DEF_PRI << 8) |\
+                                        GICD_INT_DEF_PRI)
 
--       dist->implementation_rev = 0;
-+       dist->implementation_rev = 1;
-        dist->initialized = true;
-
- out:
++#define GICD_IIDR_IMPLEMENTER_SHIFT    0
++#define GICD_IIDR_IMPLEMENTER_MASK     (0xfff << GICD_IIDR_IMPLEMENTER_SHIFT)
++#define GICD_IIDR_REVISION_SHIFT       12
++#define GICD_IIDR_REVISION_MASK                (0xf << GICD_IIDR_REVISION_SHIFT)
++#define GICD_IIDR_VARIANT_SHIFT                16
++#define GICD_IIDR_VARIANT_MASK         (0xf << GICD_IIDR_VARIANT_SHIFT)
++#define GICD_IIDR_PRODUCT_ID_SHIFT     24
++#define GICD_IIDR_PRODUCT_ID_MASK      (0xff << GICD_IIDR_PRODUCT_ID_SHIFT)
++
++
+ #define GICH_HCR                       0x0
+ #define GICH_VTR                       0x4
+ #define GICH_VMCR                      0x8
 diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-index f0c5351..db646f1 100644
+index ffc587b..af44e569 100644
 --- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
 +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-@@ -22,6 +22,12 @@
- #include "vgic.h"
- #include "vgic-mmio.h"
-
-+/*
-+ * The Revision field in the IIDR have the following meanings:
-+ *
-+ * Revision 1: Report GICv2 interrupts as group 0 instead of group 1
-+ */
-+
- static unsigned long vgic_mmio_read_v2_misc(struct kvm_vcpu *vcpu,
-                                            gpa_t addr, unsigned int len)
- {
-@@ -365,7 +371,7 @@ static const struct vgic_register_region vgic_v2_dist_registers[] = {
-                vgic_mmio_read_v2_misc, vgic_mmio_write_v2_misc, 12,
-                VGIC_ACCESS_32bit),
-        REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_IGROUP,
--               vgic_mmio_read_rao, vgic_mmio_write_wi, NULL, NULL, 1,
-+               vgic_mmio_read_raz, vgic_mmio_write_wi, NULL, NULL, 1,
-                VGIC_ACCESS_32bit),
-        REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ENABLE_SET,
-                vgic_mmio_read_enable, vgic_mmio_write_senable, NULL, NULL, 1,
+@@ -37,7 +37,8 @@ static unsigned long vgic_mmio_read_v2_misc(struct kvm_vcpu *vcpu,
+                value |= (atomic_read(&vcpu->kvm->online_vcpus) - 1) << 5;
+                break;
+        case GIC_DIST_IIDR:
+-               value = (PRODUCT_ID_KVM << 24) | (IMPLEMENTER_ARM << 0);
++               value = (PRODUCT_ID_KVM << GICD_IIDR_PRODUCT_ID_SHIFT) |
++                       (IMPLEMENTER_ARM << GICD_IIDR_IMPLEMENTER_SHIFT);
+                break;
+        default:
+                return 0;
+diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+index 2877840..c03f424 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
++++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+@@ -81,7 +81,8 @@ static unsigned long vgic_mmio_read_v3_misc(struct kvm_vcpu *vcpu,
+                }
+                break;
+        case GICD_IIDR:
+-               value = (PRODUCT_ID_KVM << 24) | (IMPLEMENTER_ARM << 0);
++               value = (PRODUCT_ID_KVM << GICD_IIDR_PRODUCT_ID_SHIFT) |
++                       (IMPLEMENTER_ARM << GICD_IIDR_IMPLEMENTER_SHIFT);
+                break;
+        default:
+                return 0;
 --
 2.7.4
 
