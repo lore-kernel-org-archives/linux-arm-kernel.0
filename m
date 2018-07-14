@@ -1,69 +1,112 @@
 From: christoffer.dall@arm.com (Christoffer Dall)
-Date: Sat, 14 Jul 2018 19:05:36 +0200
-Subject: [PATCH v3 5/9] KVM: arm/arm64: vgic: Signal IRQs using their
- configured group
+Date: Sat, 14 Jul 2018 19:05:33 +0200
+Subject: [PATCH v3 2/9] KVM: arm/arm64: vgic: Keep track of implementation
+ revision
 In-Reply-To: <1531587940-2490-1-git-send-email-christoffer.dall@arm.com>
 References: <1531587940-2490-1-git-send-email-christoffer.dall@arm.com>
-Message-ID: <1531587940-2490-6-git-send-email-christoffer.dall@arm.com>
+Message-ID: <1531587940-2490-3-git-send-email-christoffer.dall@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now when we have a group configuration on the struct IRQ, use this state
-when populating the LR and signaling interrupts as either group 0 or
-group 1 to the VM.  Depending on the model of the emulated GIC, and the
-guest's configuration of the VMCR, interrupts may be signaled as IRQs or
-FIQs to the VM.
+As we are about to tweak implementation aspects of the VGIC emulation,
+while still preserving some level of backwards compatibility support,
+add a field to keep track of the implementation revision field which is
+reported to the VM and to userspace.
 
 Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
 ---
- include/linux/irqchip/arm-gic.h | 1 +
- virt/kvm/arm/vgic/vgic-v2.c     | 3 +++
- virt/kvm/arm/vgic/vgic-v3.c     | 6 +-----
- 3 files changed, 5 insertions(+), 5 deletions(-)
+ include/kvm/arm_vgic.h           | 3 +++
+ virt/kvm/arm/vgic/vgic-init.c    | 1 +
+ virt/kvm/arm/vgic/vgic-mmio-v2.c | 6 ++++--
+ virt/kvm/arm/vgic/vgic-mmio-v3.c | 6 ++++--
+ 4 files changed, 12 insertions(+), 4 deletions(-)
 
-diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
-index 484f5bf..6c4aaf0 100644
---- a/include/linux/irqchip/arm-gic.h
-+++ b/include/linux/irqchip/arm-gic.h
-@@ -104,6 +104,7 @@
- #define GICH_LR_PENDING_BIT            (1 << 28)
- #define GICH_LR_ACTIVE_BIT             (1 << 29)
- #define GICH_LR_EOI                    (1 << 19)
-+#define GICH_LR_GROUP1                 (1 << 30)
- #define GICH_LR_HW                     (1 << 31)
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index cfdd248..7e64c46 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -217,6 +217,9 @@ struct vgic_dist {
+        /* vGIC model the kernel emulates for the guest (GICv2 or GICv3) */
+        u32                     vgic_model;
 
- #define GICH_VMCR_ENABLE_GRP0_SHIFT    0
-diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
-index a5f2e44..df5e6a6 100644
---- a/virt/kvm/arm/vgic/vgic-v2.c
-+++ b/virt/kvm/arm/vgic/vgic-v2.c
-@@ -159,6 +159,9 @@ void vgic_v2_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr)
-                }
-        }
-
-+       if (irq->group)
-+               val |= GICH_LR_GROUP1;
++       /* Implementation revision as reported in the GICD_IIDR */
++       u32                     implementation_rev;
 +
-        if (irq->hw) {
-                val |= GICH_LR_HW;
-                val |= irq->hwintid << GICH_LR_PHYSID_CPUID_SHIFT;
-diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-index cdce653..530b849 100644
---- a/virt/kvm/arm/vgic/vgic-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-v3.c
-@@ -197,11 +197,7 @@ void vgic_v3_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr)
-        if (vgic_irq_is_mapped_level(irq) && (val & ICH_LR_PENDING_BIT))
-                irq->line_level = false;
+        /* Do injected MSIs require an additional device ID? */
+        bool                    msis_require_devid;
 
--       /*
--        * We currently only support Group1 interrupts, which is a
--        * known defect. This needs to be addressed at some point.
--        */
--       if (model == KVM_DEV_TYPE_ARM_VGIC_V3)
-+       if (irq->group)
-                val |= ICH_LR_GROUP;
+diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
+index b714179..8b6fc45 100644
+--- a/virt/kvm/arm/vgic/vgic-init.c
++++ b/virt/kvm/arm/vgic/vgic-init.c
+@@ -298,6 +298,7 @@ int vgic_init(struct kvm *kvm)
 
-        val |= (u64)irq->priority << ICH_LR_PRIORITY_SHIFT;
+        vgic_debug_init(kvm);
+
++       dist->implementation_rev = 0;
+        dist->initialized = true;
+
+ out:
+diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+index af44e569..f0c5351 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
++++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+@@ -25,19 +25,21 @@
+ static unsigned long vgic_mmio_read_v2_misc(struct kvm_vcpu *vcpu,
+                                            gpa_t addr, unsigned int len)
+ {
++       struct vgic_dist *vgic = &vcpu->kvm->arch.vgic;
+        u32 value;
+
+        switch (addr & 0x0c) {
+        case GIC_DIST_CTRL:
+-               value = vcpu->kvm->arch.vgic.enabled ? GICD_ENABLE : 0;
++               value = vgic->enabled ? GICD_ENABLE : 0;
+                break;
+        case GIC_DIST_CTR:
+-               value = vcpu->kvm->arch.vgic.nr_spis + VGIC_NR_PRIVATE_IRQS;
++               value = vgic->nr_spis + VGIC_NR_PRIVATE_IRQS;
+                value = (value >> 5) - 1;
+                value |= (atomic_read(&vcpu->kvm->online_vcpus) - 1) << 5;
+                break;
+        case GIC_DIST_IIDR:
+                value = (PRODUCT_ID_KVM << GICD_IIDR_PRODUCT_ID_SHIFT) |
++                       (vgic->implementation_rev << GICD_IIDR_REVISION_SHIFT) |
+                        (IMPLEMENTER_ARM << GICD_IIDR_IMPLEMENTER_SHIFT);
+                break;
+        default:
+diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+index c03f424..ebe10a0 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
++++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+@@ -62,16 +62,17 @@ bool vgic_supports_direct_msis(struct kvm *kvm)
+ static unsigned long vgic_mmio_read_v3_misc(struct kvm_vcpu *vcpu,
+                                            gpa_t addr, unsigned int len)
+ {
++       struct vgic_dist *vgic = &vcpu->kvm->arch.vgic;
+        u32 value = 0;
+
+        switch (addr & 0x0c) {
+        case GICD_CTLR:
+-               if (vcpu->kvm->arch.vgic.enabled)
++               if (vgic->enabled)
+                        value |= GICD_CTLR_ENABLE_SS_G1;
+                value |= GICD_CTLR_ARE_NS | GICD_CTLR_DS;
+                break;
+        case GICD_TYPER:
+-               value = vcpu->kvm->arch.vgic.nr_spis + VGIC_NR_PRIVATE_IRQS;
++               value = vgic->nr_spis + VGIC_NR_PRIVATE_IRQS;
+                value = (value >> 5) - 1;
+                if (vgic_has_its(vcpu->kvm)) {
+                        value |= (INTERRUPT_ID_BITS_ITS - 1) << 19;
+@@ -82,6 +83,7 @@ static unsigned long vgic_mmio_read_v3_misc(struct kvm_vcpu *vcpu,
+                break;
+        case GICD_IIDR:
+                value = (PRODUCT_ID_KVM << GICD_IIDR_PRODUCT_ID_SHIFT) |
++                       (vgic->implementation_rev << GICD_IIDR_REVISION_SHIFT) |
+                        (IMPLEMENTER_ARM << GICD_IIDR_IMPLEMENTER_SHIFT);
+                break;
+        default:
 --
 2.7.4
 
