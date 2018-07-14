@@ -1,26 +1,16 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 14 Jul 2018 14:52:25 -0700
-Subject: [GIT PULL] pxa for v4.19
-In-Reply-To: <87va9kb3xs.fsf@belgarion.home>
-References: <87va9kb3xs.fsf@belgarion.home>
-Message-ID: <20180714215225.vtclgbczy4c6znxy@localhost>
+Date: Sat, 14 Jul 2018 15:11:42 -0700
+Subject: [GIT PULL] pxa fixes for v4.18
+In-Reply-To: <871sc9ed1h.fsf@belgarion.home>
+References: <871sc9ed1h.fsf@belgarion.home>
+Message-ID: <20180714221142.wupbudvvailk7tmd@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 12, 2018 at 10:21:35PM +0200, Robert Jarzmik wrote:
-> Hi Arnd, Kevin, and Olof,
+On Wed, Jul 11, 2018 at 10:24:26PM +0200, Robert Jarzmik wrote:
+> Hello Arnd, Kevin, Olof,
 > 
-> This is the pxa pull request for 4.19. This time it touches a lot of subsystems
-> because of the dma slave map conversion of the pxa architecture.
-> 
-> And there is one catch : the build of pxa defconfigs will probably fail in your
-> arm-soc tree, while it will succeed in -next tree. The reason of the failure is
-> that one patch, namely "dmaengine: pxa: make the filter function internal",
-> depends on one patch queued in Mark Brown's tree.
-> If that is a problem for you, I'll postpone this patch, and resend a new pull
-> request if you ask it.
-> 
-> Can you please consider pulling ?
+> Please consider this pull request for pxa fixes for 4.18.
 > 
 > The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
 > 
@@ -28,39 +18,19 @@ On Thu, Jul 12, 2018 at 10:21:35PM +0200, Robert Jarzmik wrote:
 > 
 > are available in the git repository at:
 > 
->   https://github.com/rjarzmik/linux.git tags/pxa-for-4.19
+>   https://github.com/rjarzmik/linux.git tags/pxa-fixes-4.18
 > 
-> for you to fetch changes up to 0d0b16b8e008825834684163799ab944920aabce:
+> for you to fetch changes up to 0c1049dcb4ceec640d8bd797335bcbebdcab44d2:
 > 
->   dmaengine: pxa: make the filter function internal (2018-06-29 22:30:14 +0200)
-> 
-> ----------------------------------------------------------------
-> This is the pxa changes for 4.19 cycle :
->  - the pxa architecture is ported to dma slavemap
->  - some minor AC97 fixes
->  - some minor board fixes
+>   ARM: pxa: irq: fix handling of ICMR registers in suspend/resume (2018-07-07 13:25:15 +0200)
 > 
 > ----------------------------------------------------------------
-> Robert Jarzmik (17):
->       dmaengine: pxa: use a dma slave map
->       ARM: pxa: add dma slave map
->       dmaengine: pxa: add a default requestor policy
->       mmc: pxamci: remove the dmaengine compat need
->       media: pxa_camera: remove the dmaengine compat need
->       mtd: rawnand: marvell: remove the dmaengine compat need
->       ata: pata_pxa: remove the dmaengine compat need
->       dmaengine: pxa: document pxad_param
->       ARM: pxa: remove the DMA IO resources
->       ARM: pxa: change SSP DMA channels allocation
->       ARM: pxa: hx4700: fix the usb client
->       ARM: pxa: mioa701 convert to the new AC97 bus
->       ARM: pxa: add the missing AC97 clocks
->       ARM: pxa: zylonite: use the new ac97 bus support
->       net: smc911x: remove the dmaengine compat need
->       net: smc91x: remove the dmaengine compat need
->       dmaengine: pxa: make the filter function internal
+> This is the fixes set for v4.18 cycle.
+> 
+> This is a fix for suspending all pxa3xx platforms, where high
+> number interrupts are not reenabled.
 
-Looks like the external patches all have acks, so I've merged this. Thanks.
+Thanks, merged.
 
 
 -Olof
