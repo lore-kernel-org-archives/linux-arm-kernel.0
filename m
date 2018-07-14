@@ -1,84 +1,27 @@
-From: christoffer.dall@arm.com (Christoffer Dall)
-Date: Sat, 14 Jul 2018 19:05:39 +0200
-Subject: [PATCH v3 8/9] KVM: arm/arm64: vgic: Let userspace opt-in to writable
- v2 IGROUPR
-In-Reply-To: <1531587940-2490-1-git-send-email-christoffer.dall@arm.com>
-References: <1531587940-2490-1-git-send-email-christoffer.dall@arm.com>
-Message-ID: <1531587940-2490-9-git-send-email-christoffer.dall@arm.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 14 Jul 2018 14:06:55 -0700
+Subject: [GIT PULL 2/2] Rockchip dts64 updates for 4.19 round 1
+In-Reply-To: <3426970.u8yLmZCROa@phil>
+References: <2000491.bLgWuj0xar@phil> <1895379.zdtPBogyMs@phil>
+ <3426970.u8yLmZCROa@phil>
+Message-ID: <20180714210655.d2pqlp2i74pn7imp@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Simply letting IGROUPR be writable from userspace would break
-migration from old kernels to newer kernels, because old kernels
-incorrectly report interrupt groups as group 1.  This would not be a big
-problem if userspace wrote GICD_IIDR as read from the kernel, because we
-could detect the incompatibility and return an error to userspace.
-Unfortunately, this is not the case with current userspace
-implementations and simply letting IGROUPR be writable from userspace for
-an emulated GICv2 silently breaks migration and causes the destination
-VM to no longer run after migration.
+On Wed, Jul 11, 2018 at 04:29:29PM +0200, Heiko Stuebner wrote:
+> The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
+> 
+>   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+> 
+> are available in the Git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.19-rockchip-dts64-1
+> 
+> for you to fetch changes up to d0414fdd58eb51ffd6528280fd66705123663964:
+> 
+>   arm64: dts: rockchip: corrected uart1 clock-names for rk3328 (2018-07-07 13:02:27 +0200)
 
-We now encourage userspace to write the read and expected value of
-GICD_IIDR as the first part of a GIC register restore, and if we observe
-a write to GICD_IIDR we know that userspace has been updated and has had
-a chance to cope with older kernels (VGICv2 IIDR.Revision == 0)
-incorrectly reporting interrupts as group 1, and therefore we now allow
-groups to be user writable.
+Merged, thanks!
 
-Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
----
- include/kvm/arm_vgic.h           |  3 +++
- virt/kvm/arm/vgic/vgic-mmio-v2.c | 15 ++++++++++++++-
- 2 files changed, 17 insertions(+), 1 deletion(-)
 
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index c661d0e..c134790 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -221,6 +221,9 @@ struct vgic_dist {
-        /* Implementation revision as reported in the GICD_IIDR */
-        u32                     implementation_rev;
-
-+       /* Userspace can write to GICv2 IGROUPR */
-+       bool                    v2_groups_user_writable;
-+
-        /* Do injected MSIs require an additional device ID? */
-        bool                    msis_require_devid;
-
-diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-index b79de42..9b6b758 100644
---- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-@@ -85,6 +85,17 @@ static int vgic_mmio_uaccess_write_v2_misc(struct kvm_vcpu *vcpu,
-        case GIC_DIST_IIDR:
-                if (val != vgic_mmio_read_v2_misc(vcpu, addr, len))
-                        return -EINVAL;
-+
-+               /*
-+                * If we observe a write to GICD_IIDR we know that userspace
-+                * has been updated and has had a chance to cope with older
-+                * kernels (VGICv2 IIDR.Revision == 0) incorrectly reporting
-+                * interrupts as group 1, and therefore we now allow gruops to
-+                * be user writable.  Doing this by default would break
-+                * migration from old kernels to new kernels with legacy
-+                * userspace.
-+                */
-+               vcpu->kvm->arch.vgic.v2_groups_user_writable = true;
-        }
-
-        vgic_mmio_write_v2_misc(vcpu, addr, len, val);
-@@ -95,7 +106,9 @@ static int vgic_mmio_uaccess_write_v2_group(struct kvm_vcpu *vcpu,
-                                            gpa_t addr, unsigned int len,
-                                            unsigned long val)
- {
--       /* Ignore writes from userspace */
-+       if (vcpu->kvm->arch.vgic.v2_groups_user_writable)
-+               vgic_mmio_write_group(vcpu, addr, len, val);
-+
-        return 0;
- }
-
---
-2.7.4
-
-IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+-Olof
