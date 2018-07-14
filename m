@@ -1,135 +1,132 @@
-From: christoffer.dall@arm.com (Christoffer Dall)
-Date: Sat, 14 Jul 2018 19:05:35 +0200
-Subject: [PATCH v3 4/9] KVM: arm/arm64: vgic: Add group field to struct irq
-In-Reply-To: <1531587940-2490-1-git-send-email-christoffer.dall@arm.com>
-References: <1531587940-2490-1-git-send-email-christoffer.dall@arm.com>
-Message-ID: <1531587940-2490-5-git-send-email-christoffer.dall@arm.com>
+From: sam@ravnborg.org (Sam Ravnborg)
+Date: Sat, 14 Jul 2018 22:56:15 +0200
+Subject: [PATCH 1/1] atmel_lcdfb: support native-mode display-timings
+Message-ID: <20180714205615.GA21579@ravnborg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation for proper group 0 and group 1 support in the vgic, we
-add a field in the struct irq to store the group of all interrupts.
+>From 8aded81852666b591624001ec02aa4dc0d8f4cfb Mon Sep 17 00:00:00 2001
+From: Sam Ravnborg <sam@ravnborg.org>
+Date: Sat, 14 Jul 2018 22:17:18 +0200
+Subject: [PATCH 1/1] atmel_lcdfb: support native-mode display-timings
 
-We initialize the group to group 0 when emulating GICv2 and to group 1
-when emulating GICv3, just like we treat them today.  LPIs are always
-group 1.  We also continue to ignore writes from the guest, preserving
-existing functionality, for now.
+When a device tree set a display-timing using native-mode
+then according to the bindings doc this should:
 
-Finally, we also add this field to the vgic debug logic to show the
-group for all interrupts.
+    native-mode:
+    The native mode for the display, in case multiple
+    modes are provided.
+    When omitted, assume the first node is the native.
 
-Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
+The atmel_lcdfb used the last timing subnode and did not
+respect the timing mode specified with native-mode.
+
+Introduce use of of_get_videomode() which allowed
+a nice simplification of the code while also
+added support for native-mode.
+
+As a nice side-effect this fixes a memory leak where the
+data used for timings and the display_np was not freed.
+
+Signed-off-by: Sam Ravnborg <sam@ravnborg.org>
+Cc: Nicolas Ferre <nicolas.ferre@microchip.com>
+Cc: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+Cc: Alexandre Belloni <alexandre.belloni@bootlin.com>
 ---
- include/kvm/arm_vgic.h         |  1 +
- virt/kvm/arm/vgic/vgic-debug.c |  8 +++++---
- virt/kvm/arm/vgic/vgic-init.c  | 19 +++++++++++++++++--
- virt/kvm/arm/vgic/vgic-its.c   |  1 +
- 4 files changed, 24 insertions(+), 5 deletions(-)
 
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 7e64c46..c661d0e 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -133,6 +133,7 @@ struct vgic_irq {
-        u8 source;                      /* GICv2 SGIs only */
-        u8 active_source;               /* GICv2 SGIs only */
-        u8 priority;
-+       u8 group;                       /* 0 == group 0, 1 == group 1 */
-        enum vgic_irq_config config;    /* Level or edge */
+Tested on a proprietary board utilizing an at91sam9263.
+Problem was found because I uses the bootloader to
+set the native-mode depending on the mounted display.
 
-        /*
-diff --git a/virt/kvm/arm/vgic/vgic-debug.c b/virt/kvm/arm/vgic/vgic-debug.c
-index c589d4c..d3a403f 100644
---- a/virt/kvm/arm/vgic/vgic-debug.c
-+++ b/virt/kvm/arm/vgic/vgic-debug.c
-@@ -148,6 +148,7 @@ static void print_dist_state(struct seq_file *s, struct vgic_dist *dist)
+Please note - I may have missed some magic around selecting
+the correct videomode.
+The patch was to some extend based on what was done in
+the mxsfb driver.
 
-        seq_printf(s, "P=pending_latch, L=line_level, A=active\n");
-        seq_printf(s, "E=enabled, H=hw, C=config (level=1, edge=0)\n");
-+       seq_printf(s, "G=group\n");
- }
+I am away a few days after sunday, but decided to send
+out the patch in order to collect potential review feedback.
 
- static void print_header(struct seq_file *s, struct vgic_irq *irq,
-@@ -162,8 +163,8 @@ static void print_header(struct seq_file *s, struct vgic_irq *irq,
-        }
+        Sam
 
-        seq_printf(s, "\n");
--       seq_printf(s, "%s%2d TYP   ID TGT_ID PLAEHC     HWID   TARGET SRC PRI VCPU_ID\n", hdr, id);
--       seq_printf(s, "---------------------------------------------------------------\n");
-+       seq_printf(s, "%s%2d TYP   ID TGT_ID PLAEHCG     HWID   TARGET SRC PRI VCPU_ID\n", hdr, id);
-+       seq_printf(s, "----------------------------------------------------------------\n");
- }
+ drivers/video/fbdev/atmel_lcdfb.c | 43 ++++++++-------------------------------
+ 1 file changed, 9 insertions(+), 34 deletions(-)
 
- static void print_irq_state(struct seq_file *s, struct vgic_irq *irq,
-@@ -182,7 +183,7 @@ static void print_irq_state(struct seq_file *s, struct vgic_irq *irq,
-
-        seq_printf(s, "       %s %4d "
-                      "    %2d "
--                     "%d%d%d%d%d%d "
-+                     "%d%d%d%d%d%d%d "
-                      "%8d "
-                      "%8x "
-                      " %2x "
-@@ -197,6 +198,7 @@ static void print_irq_state(struct seq_file *s, struct vgic_irq *irq,
-                        irq->enabled,
-                        irq->hw,
-                        irq->config == VGIC_CONFIG_LEVEL,
-+                       irq->group,
-                        irq->hwintid,
-                        irq->mpidr,
-                        irq->source,
-diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
-index 230c922..a7c19cd 100644
---- a/virt/kvm/arm/vgic/vgic-init.c
-+++ b/virt/kvm/arm/vgic/vgic-init.c
-@@ -175,10 +175,13 @@ static int kvm_vgic_dist_init(struct kvm *kvm, unsigned int nr_spis)
-                irq->vcpu = NULL;
-                irq->target_vcpu = vcpu0;
-                kref_init(&irq->refcount);
--               if (dist->vgic_model == KVM_DEV_TYPE_ARM_VGIC_V2)
-+               if (dist->vgic_model == KVM_DEV_TYPE_ARM_VGIC_V2) {
-                        irq->targets = 0;
--               else
-+                       irq->group = 0;
-+               } else {
-                        irq->mpidr = 0;
-+                       irq->group = 1;
-+               }
-        }
-        return 0;
- }
-@@ -227,6 +230,18 @@ int kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
-                        /* PPIs */
-                        irq->config = VGIC_CONFIG_LEVEL;
-                }
-+
-+               /*
-+                * GICv3 can only be created via the KVM_DEVICE_CREATE API and
-+                * so we always know the emulation type at this point as it's
-+                * either explicitly configured as GICv3, or explicitly
-+                * configured as GICv2, or not configured yet which also
-+                * implies GICv2.
-+                */
-+               if (dist->vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3)
-+                       irq->group = 1;
-+               else
-+                       irq->group = 0;
-        }
-
-        if (!irqchip_in_kernel(vcpu->kvm))
-diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index 4ed79c9..92840c0 100644
---- a/virt/kvm/arm/vgic/vgic-its.c
-+++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -71,6 +71,7 @@ static struct vgic_irq *vgic_add_lpi(struct kvm *kvm, u32 intid,
-        kref_init(&irq->refcount);
-        irq->intid = intid;
-        irq->target_vcpu = vcpu;
-+       irq->group = 1;
-
-        spin_lock_irqsave(&dist->lpi_list_lock, flags);
-
---
-2.7.4
-
-IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+diff --git a/drivers/video/fbdev/atmel_lcdfb.c b/drivers/video/fbdev/atmel_lcdfb.c
+index 076d24afbd72..4ed55e6bbb84 100644
+--- a/drivers/video/fbdev/atmel_lcdfb.c
++++ b/drivers/video/fbdev/atmel_lcdfb.c
+@@ -22,6 +22,7 @@
+ #include <linux/module.h>
+ #include <linux/of.h>
+ #include <linux/of_device.h>
++#include <video/of_videomode.h>
+ #include <video/of_display_timing.h>
+ #include <linux/regulator/consumer.h>
+ #include <video/videomode.h>
+@@ -1028,11 +1029,11 @@ static int atmel_lcdfb_of_init(struct atmel_lcdfb_info *sinfo)
+ 	struct device *dev = &sinfo->pdev->dev;
+ 	struct device_node *np =dev->of_node;
+ 	struct device_node *display_np;
+-	struct device_node *timings_np;
+-	struct display_timings *timings;
+ 	struct atmel_lcdfb_power_ctrl_gpio *og;
+ 	bool is_gpio_power = false;
++	struct fb_videomode fb_vm;
+ 	struct gpio_desc *gpiod;
++	struct videomode vm;
+ 	int ret = -ENOENT;
+ 	int i;
+ 
+@@ -1105,44 +1106,18 @@ static int atmel_lcdfb_of_init(struct atmel_lcdfb_info *sinfo)
+ 	pdata->lcdcon_is_backlight = of_property_read_bool(display_np, "atmel,lcdcon-backlight");
+ 	pdata->lcdcon_pol_negative = of_property_read_bool(display_np, "atmel,lcdcon-backlight-inverted");
+ 
+-	timings = of_get_display_timings(display_np);
+-	if (!timings) {
+-		dev_err(dev, "failed to get display timings\n");
+-		ret = -EINVAL;
++	ret = of_get_videomode(display_np, &vm, OF_USE_NATIVE_MODE);
++	if (ret) {
++		dev_err(dev, "failed to get videomode from DT\n");
+ 		goto put_display_node;
+ 	}
+ 
+-	timings_np = of_get_child_by_name(display_np, "display-timings");
+-	if (!timings_np) {
+-		dev_err(dev, "failed to find display-timings node\n");
+-		ret = -ENODEV;
++	ret = fb_videomode_from_videomode(&vm, &fb_vm);
++	if (ret < 0)
+ 		goto put_display_node;
+-	}
+ 
+-	for (i = 0; i < of_get_child_count(timings_np); i++) {
+-		struct videomode vm;
+-		struct fb_videomode fb_vm;
+-
+-		ret = videomode_from_timings(timings, &vm, i);
+-		if (ret < 0)
+-			goto put_timings_node;
+-		ret = fb_videomode_from_videomode(&vm, &fb_vm);
+-		if (ret < 0)
+-			goto put_timings_node;
+-
+-		fb_add_videomode(&fb_vm, &info->modelist);
+-	}
+-
+-	/*
+-	 * FIXME: Make sure we are not referencing any fields in display_np
+-	 * and timings_np and drop our references to them before returning to
+-	 * avoid leaking the nodes on probe deferral and driver unbind.
+-	 */
+-
+-	return 0;
++	fb_add_videomode(&fb_vm, &info->modelist);
+ 
+-put_timings_node:
+-	of_node_put(timings_np);
+ put_display_node:
+ 	of_node_put(display_np);
+ 	return ret;
+-- 
+2.12.0
