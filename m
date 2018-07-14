@@ -1,82 +1,61 @@
-From: christoffer.dall@arm.com (Christoffer Dall)
-Date: Sat, 14 Jul 2018 19:05:31 +0200
-Subject: [PATCH v3 0/9] KVM: arm/arm64: vgic: Virtual interrupt grouping
- support
-Message-ID: <1531587940-2490-1-git-send-email-christoffer.dall@arm.com>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Sat, 14 Jul 2018 21:37:20 +0200
+Subject: [PATCH v2 0/5] ARM64: amlogic: add support for the S905W and two
+ boards
+Message-ID: <20180714193725.17837-1-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series addresses a peculiarity of the current VGIC
-implementation, namely that we don't support interrupt grouping.
+The goal of this series is to to add support for the Amlogic S905W SoC
+along with Amlogic's P281 development board and the Tanix TX3 Mini (which
+both use the S905W SoC).
 
-KVM either implements a GICv2 without support for the security
-extensions, or a GICv3 with DS=1.  For GICv2, on systems without the
-security extensions, group 0 interrupts can be configured to be either
-signalled as FIQs or as IRQs by the VM, whereas group 1 interrupts are
-always IRQs.  For GICv3, with DS=1, group 1 interrupts are always IRQs
-and group 0 interrupts are always FIQs, and there is no concept of
-secure vs. non-secure group 1 interrupts when DS=1.
+I am sending this as request-for-comments because I would like to get
+feedback specifically on:
+- the naming of the new vendor "Oranth" and their brand "Tanix". more
+  information regarding their relation can be found in patch #1
+- I do not have access to the P281 development board (nor any
+  documentation apart from what is available in Amlogic's GPL kernel
+  sources). thus it would be great if someone from Amlogic could confirm
+  that my .dts is working
+- the S905W SoC is a cost-reduced version of the S905X SoC. I have
+  documented the differences that I am aware of in patch #2. none of
+  these changes require adjustments to any existing driver/binding
+  because these changes are either handled in the SCPI firmware (CPU
+  frequency and DDR interface) or there is no Linux support for them
+  yet (4k HDMI resolutions and the HW video decoder)
 
-We were treating all interrupts on GICv2 as group 0, but yet telling the
-guest that they were group 1.  The first patch changes this behavior,
-which seems to have no effect on no known guests, but still.
 
-The remaining patches introduce proper interrupt grouping support, along
-with MMIO accessors for the VM and userspace to retrieve and set the
-which group SGIs, PPIs, and SPIs belong to.  LPIs are always group 1
-interrupts as per the architecture, and there is no way to modify this
-configuration (no IGROUPR registers for LPIs or equivalent ITS
-commands).
+changes since RfC v1 at [0]:
+- dropped RfC prefix
+- collected Rob's Reviewed-by on patches 1-3
+- dropped meson-gxl-s905w.dtsi and include meson-gxl-s905x.dtsi instead
+  as suggested by Kevin and as already done with the new P241 board
+  (which uses the GXL S805X SoC instead of S905W though)
+- rebased on top of Kevin's v4.19/dt64 branch to apply cleanly on top
+  of f51b3da8f18d50 ("ARM64: dts: add S805X based P241 board")
 
-Tested on Seattle, TX1, and the foundation model.  I've run a
-GICv2 guest on a GICv3 host on the foundation model.  I've tested
-migration on Seattle, and migration from an old kernel to a newer kernel
-with an unmodified QEMU binary continues to work.  I also tested a
-modified userspace that sets some interrupts to group 1, and that is
-reflected in the vgic debug output.
+[0] http://lists.infradead.org/pipermail/linux-amlogic/2018-June/007517.html
 
-Applies to v4.18-rc3.
 
-Changes since v2:
- - Patch 6 doesn't allow configuraiton of groups from userspace for
-   GICv2.
- - Patches 7 through 9 are new in v3 of this series, and prevents
-   userspace from restoring an incompatible IIDR without seeing an error
-   in the future, and supports legacy userspace migration from old to
-   new kernels.
+Martin Blumenstingl (5):
+  dt-bindings: add vendor prefix for Shenzhen Oranth Technology Co.,
+    Ltd.
+  dt-bindings: arm: amlogic: Add support for GXL S905W and the P281
+    board
+  dt-bindings: arm: amlogic: Add support for the Oranth Tanix TX3 Mini
+  ARM64: dts: meson-gxl: add support for the S905W SoC and the P281
+    board
+  ARM64: dts: meson-gxl: add support for the Oranth Tanix TX3 Mini
 
-Changes since v1:
- - Bumped implementation revision field in GICD_IIDR along with changes
- - Changed logic in init code to correctly detect vgic emulation type
- - Rebased to v4.18-rc3
+ .../devicetree/bindings/arm/amlogic.txt       |  7 ++++++
+ .../devicetree/bindings/vendor-prefixes.txt   |  1 +
+ arch/arm64/boot/dts/amlogic/Makefile          |  2 ++
+ .../boot/dts/amlogic/meson-gxl-s905w-p281.dts | 22 +++++++++++++++++++
+ .../dts/amlogic/meson-gxl-s905w-tx3-mini.dts  | 22 +++++++++++++++++++
+ 5 files changed, 54 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl-s905w-p281.dts
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl-s905w-tx3-mini.dts
 
-Christoffer Dall (9):
-  KVM: arm/arm64: vgic: Define GICD_IIDR fields for GICv2 and GIv3
-  KVM: arm/arm64: vgic: Keep track of implementation revision
-  KVM: arm/arm64: vgic: GICv2 IGROUPR should read as zero
-  KVM: arm/arm64: vgic: Add group field to struct irq
-  KVM: arm/arm64: vgic: Signal IRQs using their configured group
-  KVM: arm/arm64: vgic: Allow configuration of interrupt groups
-  KVM: arm/arm64: vgic: Permit uaccess writes to return errors
-  KVM: arm/arm64: vgic: Let userspace opt-in to writable v2 IGROUPR
-  KVM: arm/arm64: vgic: Update documentation of the GICv2 device
-
- Documentation/virtual/kvm/devices/arm-vgic.txt | 12 +++---
- include/kvm/arm_vgic.h                         |  7 +++
- include/linux/irqchip/arm-gic-v3.h             | 10 +++++
- include/linux/irqchip/arm-gic.h                | 11 +++++
- virt/kvm/arm/vgic/vgic-debug.c                 |  8 ++--
- virt/kvm/arm/vgic/vgic-init.c                  | 20 ++++++++-
- virt/kvm/arm/vgic/vgic-its.c                   |  1 +
- virt/kvm/arm/vgic/vgic-mmio-v2.c               | 60 +++++++++++++++++++++++---
- virt/kvm/arm/vgic/vgic-mmio-v3.c               | 51 ++++++++++++++++------
- virt/kvm/arm/vgic/vgic-mmio.c                  | 56 +++++++++++++++++++++---
- virt/kvm/arm/vgic/vgic-mmio.h                  | 25 +++++++----
- virt/kvm/arm/vgic/vgic-v2.c                    |  3 ++
- virt/kvm/arm/vgic/vgic-v3.c                    |  6 +--
- 13 files changed, 223 insertions(+), 47 deletions(-)
-
---
-2.7.4
-
-IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+-- 
+2.18.0
