@@ -1,45 +1,38 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 14 Jul 2018 14:10:12 -0700
-Subject: [GIT PULL 2/6] Broadcom defconfig-arm64 changes for 4.19
-In-Reply-To: <20180709153035.6376-2-f.fainelli@gmail.com>
-References: <20180709153035.6376-1-f.fainelli@gmail.com>
- <20180709153035.6376-2-f.fainelli@gmail.com>
-Message-ID: <20180714211012.mh3j7v7bdnlpnenw@localhost>
+Date: Sat, 14 Jul 2018 14:16:47 -0700
+Subject: [GIT PULL 1/3] DaVinci SoC updates for v4.19
+In-Reply-To: <20180711062906.22865-1-nsekhar@ti.com>
+References: <20180711062906.22865-1-nsekhar@ti.com>
+Message-ID: <20180714211647.xzgxoadeckdfd3yf@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 09, 2018 at 08:30:31AM -0700, Florian Fainelli wrote:
+On Wed, Jul 11, 2018 at 11:59:04AM +0530, Sekhar Nori wrote:
 > The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
 > 
 >   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
 > 
-> are available in the git repository at:
+> are available in the Git repository at:
 > 
->   https://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.19/defconfig-arm64
+>   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.19/soc
 > 
-> for you to fetch changes up to ec93d5a25f9f959e6c20351e74182ad4bfa85716:
+> for you to fetch changes up to 7f69ae7fadd9dbebe563bfc28b993a2bc9c8acf9:
 > 
->   Merge tag 'bcm2835-defconfig-64-next-2018-07-03' into defconfig-arm64/next (2018-07-09 05:23:47 -0700)
-> 
-> ----------------------------------------------------------------
-> This pull request contains Broadcom ARM64-based SoCs defconfig changes
-> for 4.19, please pull the following changes:
-> 
-> - Stefan enables the Raspberry Pi voltage sensor driver (HWMON) in the
->   arm64 defconfig file
+>   ARM: davinci: unduplicate aemif support (2018-07-10 15:39:27 +0530)
 > 
 > ----------------------------------------------------------------
-> Florian Fainelli (1):
->       Merge tag 'bcm2835-defconfig-64-next-2018-07-03' into defconfig-arm64/next
+> DaVinci SoC updates for v4.19
+> -----------------------------
 > 
-> Stefan Wahren (1):
->       arm64: defconfig: Enable RPi voltage sensor
+> * mach-davinci updates needed to finally move over to common clock framework
+> * update to use the aemif driver from drivers/memory rather than the
+>   private implementation available in mach-davinci
+> 
+> For the later item, I have included a branch from David Lechner which
+> should also get merged through the clk tree. The clk dependencies are
+> needed for aemif conversion.
 
-It looks like you revisited this tag and branch after you sent the pull
-request. It's usually better to do a new tag instead (and remove the
-old one in case you don't want me to merge it), to avoid confusion.
-
-New contents looks reasonable so I merged anyway.
+Thanks, merged.
 
 
 -Olof
