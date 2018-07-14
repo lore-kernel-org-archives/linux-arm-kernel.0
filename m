@@ -1,132 +1,151 @@
-From: sam@ravnborg.org (Sam Ravnborg)
-Date: Sat, 14 Jul 2018 22:56:15 +0200
-Subject: [PATCH 1/1] atmel_lcdfb: support native-mode display-timings
-Message-ID: <20180714205615.GA21579@ravnborg.org>
+From: ezequiel@collabora.com (Ezequiel Garcia)
+Date: Sat, 14 Jul 2018 14:09:22 -0300
+Subject: [PATCH v2] arm64: dts: rockchip: add USB 2.0 and 3.0 support on Ficus
+ board
+Message-ID: <20180714170922.4433-1-ezequiel@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From 8aded81852666b591624001ec02aa4dc0d8f4cfb Mon Sep 17 00:00:00 2001
-From: Sam Ravnborg <sam@ravnborg.org>
-Date: Sat, 14 Jul 2018 22:17:18 +0200
-Subject: [PATCH 1/1] atmel_lcdfb: support native-mode display-timings
+From: Enric Balletbo i Serra <enric.balletbo@collabora.com>
 
-When a device tree set a display-timing using native-mode
-then according to the bindings doc this should:
+The board exposes two types A ports, one is USB 3.0, up to 5.0Gbps and
+another one is USB 2.0 up to 480Mbps. Enable the USB PHYs and the USB
+controllers to enable theses devices.
 
-    native-mode:
-    The native mode for the display, in case multiple
-    modes are provided.
-    When omitted, assume the first node is the native.
-
-The atmel_lcdfb used the last timing subnode and did not
-respect the timing mode specified with native-mode.
-
-Introduce use of of_get_videomode() which allowed
-a nice simplification of the code while also
-added support for native-mode.
-
-As a nice side-effect this fixes a memory leak where the
-data used for timings and the display_np was not freed.
-
-Signed-off-by: Sam Ravnborg <sam@ravnborg.org>
-Cc: Nicolas Ferre <nicolas.ferre@microchip.com>
-Cc: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-Cc: Alexandre Belloni <alexandre.belloni@bootlin.com>
+Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+Signed-off-by: Ezequiel Garcia <ezequiel@collabora.com>
 ---
+Changes from v1:
+ * Provide voltage for vcc5v0_host and vcc3v3_pcie regulators
+ * Provide vin_supply for vcc5v0_host.
 
-Tested on a proprietary board utilizing an at91sam9263.
-Problem was found because I uses the bootloader to
-set the native-mode depending on the mounted display.
+ arch/arm64/boot/dts/rockchip/rk3399-ficus.dts | 90 +++++++++++++++++++
+ 1 file changed, 90 insertions(+)
 
-Please note - I may have missed some magic around selecting
-the correct videomode.
-The patch was to some extend based on what was done in
-the mxsfb driver.
-
-I am away a few days after sunday, but decided to send
-out the patch in order to collect potential review feedback.
-
-        Sam
-
- drivers/video/fbdev/atmel_lcdfb.c | 43 ++++++++-------------------------------
- 1 file changed, 9 insertions(+), 34 deletions(-)
-
-diff --git a/drivers/video/fbdev/atmel_lcdfb.c b/drivers/video/fbdev/atmel_lcdfb.c
-index 076d24afbd72..4ed55e6bbb84 100644
---- a/drivers/video/fbdev/atmel_lcdfb.c
-+++ b/drivers/video/fbdev/atmel_lcdfb.c
-@@ -22,6 +22,7 @@
- #include <linux/module.h>
- #include <linux/of.h>
- #include <linux/of_device.h>
-+#include <video/of_videomode.h>
- #include <video/of_display_timing.h>
- #include <linux/regulator/consumer.h>
- #include <video/videomode.h>
-@@ -1028,11 +1029,11 @@ static int atmel_lcdfb_of_init(struct atmel_lcdfb_info *sinfo)
- 	struct device *dev = &sinfo->pdev->dev;
- 	struct device_node *np =dev->of_node;
- 	struct device_node *display_np;
--	struct device_node *timings_np;
--	struct display_timings *timings;
- 	struct atmel_lcdfb_power_ctrl_gpio *og;
- 	bool is_gpio_power = false;
-+	struct fb_videomode fb_vm;
- 	struct gpio_desc *gpiod;
-+	struct videomode vm;
- 	int ret = -ENOENT;
- 	int i;
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399-ficus.dts b/arch/arm64/boot/dts/rockchip/rk3399-ficus.dts
+index 0d14183dd4a9..6295483b701f 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399-ficus.dts
++++ b/arch/arm64/boot/dts/rockchip/rk3399-ficus.dts
+@@ -58,9 +58,24 @@
+ 		pinctrl-0 = <&pcie_drv>;
+ 		regulator-boot-on;
+ 		regulator-name = "vcc3v3_pcie";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
+ 		vin-supply = <&vcc3v3_sys>;
+ 	};
  
-@@ -1105,44 +1106,18 @@ static int atmel_lcdfb_of_init(struct atmel_lcdfb_info *sinfo)
- 	pdata->lcdcon_is_backlight = of_property_read_bool(display_np, "atmel,lcdcon-backlight");
- 	pdata->lcdcon_pol_negative = of_property_read_bool(display_np, "atmel,lcdcon-backlight-inverted");
++	vcc5v0_host: vcc5v0-host-regulator {
++		compatible = "regulator-fixed";
++		enable-active-high;
++		gpio = <&gpio4 27 GPIO_ACTIVE_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&host_vbus_drv>;
++		regulator-name = "vcc5v0_host";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		regulator-always-on;
++		vin-supply = <&vcc_sys>;
++	};
++
+ 	vdd_log: vdd-log {
+ 		compatible = "pwm-regulator";
+ 		pwms = <&pwm2 0 25000 0>;
+@@ -454,6 +469,13 @@
+ 				<1 14 RK_FUNC_GPIO &pcfg_pull_down>;
+ 		};
+ 	};
++
++	usb2 {
++		host_vbus_drv: host-vbus-drv {
++			rockchip,pins =
++				<4 27 RK_FUNC_GPIO &pcfg_pull_none>;
++		};
++	};
+ };
  
--	timings = of_get_display_timings(display_np);
--	if (!timings) {
--		dev_err(dev, "failed to get display timings\n");
--		ret = -EINVAL;
-+	ret = of_get_videomode(display_np, &vm, OF_USE_NATIVE_MODE);
-+	if (ret) {
-+		dev_err(dev, "failed to get videomode from DT\n");
- 		goto put_display_node;
- 	}
+ &pwm2 {
+@@ -487,6 +509,40 @@
+ 	status = "okay";
+ };
  
--	timings_np = of_get_child_by_name(display_np, "display-timings");
--	if (!timings_np) {
--		dev_err(dev, "failed to find display-timings node\n");
--		ret = -ENODEV;
-+	ret = fb_videomode_from_videomode(&vm, &fb_vm);
-+	if (ret < 0)
- 		goto put_display_node;
--	}
++&tcphy0 {
++	status = "okay";
++};
++
++&tcphy1 {
++	status = "okay";
++};
++
++&u2phy0 {
++	status = "okay";
++};
++
++&u2phy1 {
++	status = "okay";
++};
++
++&u2phy0_host {
++	phy-supply = <&vcc5v0_host>;
++	status = "okay";
++};
++
++&u2phy1_host {
++	phy-supply = <&vcc5v0_host>;
++	status = "okay";
++};
++
++&u2phy0_otg {
++	status = "okay";
++};
++
++&u2phy1_otg {
++	status = "okay";
++};
++
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_xfer &uart0_cts>;
+@@ -497,6 +553,40 @@
+ 	status = "okay";
+ };
  
--	for (i = 0; i < of_get_child_count(timings_np); i++) {
--		struct videomode vm;
--		struct fb_videomode fb_vm;
--
--		ret = videomode_from_timings(timings, &vm, i);
--		if (ret < 0)
--			goto put_timings_node;
--		ret = fb_videomode_from_videomode(&vm, &fb_vm);
--		if (ret < 0)
--			goto put_timings_node;
--
--		fb_add_videomode(&fb_vm, &info->modelist);
--	}
--
--	/*
--	 * FIXME: Make sure we are not referencing any fields in display_np
--	 * and timings_np and drop our references to them before returning to
--	 * avoid leaking the nodes on probe deferral and driver unbind.
--	 */
--
--	return 0;
-+	fb_add_videomode(&fb_vm, &info->modelist);
- 
--put_timings_node:
--	of_node_put(timings_np);
- put_display_node:
- 	of_node_put(display_np);
- 	return ret;
++&usb_host0_ehci {
++	status = "okay";
++};
++
++&usb_host0_ohci {
++	status = "okay";
++};
++
++&usb_host1_ehci {
++	status = "okay";
++};
++
++&usb_host1_ohci {
++	status = "okay";
++};
++
++&usbdrd3_0 {
++	status = "okay";
++};
++
++&usbdrd_dwc3_0 {
++	status = "okay";
++	dr_mode = "host";
++};
++
++&usbdrd3_1 {
++	status = "okay";
++};
++
++&usbdrd_dwc3_1 {
++	status = "okay";
++	dr_mode = "host";
++};
++
+ &vopb {
+ 	status = "okay";
+ };
 -- 
-2.12.0
+2.18.0
