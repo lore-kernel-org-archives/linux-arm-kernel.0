@@ -1,45 +1,199 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 15 Jul 2018 01:15:02 +0200
-Subject: [GIT PULL] Gemini DTS updates for v4.19
-Message-ID: <CACRpkdbGQ2Pzb4q32Pg_gOrpxWfuUzbB-wEdqwd0X766FBydNw@mail.gmail.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Sat, 14 Jul 2018 18:37:18 -0700
+Subject: [PATCH v2] arm64/mm: unmap the linear alias of module allocations
+In-Reply-To: <20180711170426.11133-1-ard.biesheuvel@linaro.org>
+References: <20180711170426.11133-1-ard.biesheuvel@linaro.org>
+Message-ID: <CAGXu5jKwd3GFUJBhu4ZDBiz_ATypU0dF7rJEHQdeqV=d-aWJSQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC folks,
+On Wed, Jul 11, 2018 at 10:04 AM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+> When CONFIG_STRICT_KERNEL_RWX=y [which is the default on arm64], we
+> take great care to ensure that the mappings of modules in the vmalloc
+> space are locked down as much as possible, i.e., executable code is
+> mapped read-only, read-only data is mapped read-only and non-executable,
+> and read-write data is mapped non-executable as well.
+>
+> However, due to the way we map the linear region [aka the kernel direct
+> mapping], those module regions are aliased by read-write mappings, and
+> it is possible for an attacker to modify code or data that was assumed
+> to be immutable in this configuration.
+>
+> So let's ensure that the linear alias of module memory is remapped
+> read-only upon allocation and remapped read-write when it is freed. The
+> latter requires some special handling involving a workqueue due to the
+> fact that it may be called in softirq context at which time calling
+> find_vm_area() is unsafe.
+>
+> Note that this requires the entire linear region to be mapped down to
+> pages, which may result in a performance regression in some hardware
+> configurations.
 
-please pull these three DTS updates for v4.19!
-Details in the signed tag.
+So this is only module allocations, not all vmap allocations? This
+should cover modules and eBPF, though any future stuff that uses
+vmalloc and wants to go read-only made need tweaking.
 
-Yours,
-Linus Walleij
+>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+> Changes since RFC/v1:
+> - remap linear alias read-only rather than invalid
+> - honour rodata_enabled, i.e., 'rodata=off' will disable this functionality
+> - use VMA nr_pages field rather than size to obtain the number of pages to
+>   remap
+>
+>  arch/arm64/include/asm/module.h |  6 +++
+>  arch/arm64/kernel/module.c      | 42 ++++++++++++++++++++
+>  arch/arm64/mm/mmu.c             |  2 +-
+>  arch/arm64/mm/pageattr.c        | 19 +++++++++
+>  4 files changed, 68 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm64/include/asm/module.h b/arch/arm64/include/asm/module.h
+> index 97d0ef12e2ff..f16f0073642b 100644
+> --- a/arch/arm64/include/asm/module.h
+> +++ b/arch/arm64/include/asm/module.h
+> @@ -91,4 +91,10 @@ static inline bool plt_entries_equal(const struct plt_entry *a,
+>                a->mov2 == b->mov2;
+>  }
+>
+> +#ifdef CONFIG_STRICT_KERNEL_RWX
+> +void remap_linear_module_alias(void *module_region, bool ro);
+> +#else
+> +static inline void remap_linear_module_alias(void *module_region, bool ro) {}
+> +#endif
+> +
+>  #endif /* __ASM_MODULE_H */
+> diff --git a/arch/arm64/kernel/module.c b/arch/arm64/kernel/module.c
+> index f0f27aeefb73..2b61ca0285eb 100644
+> --- a/arch/arm64/kernel/module.c
+> +++ b/arch/arm64/kernel/module.c
+> @@ -26,10 +26,51 @@
+>  #include <linux/mm.h>
+>  #include <linux/moduleloader.h>
+>  #include <linux/vmalloc.h>
+> +#include <linux/workqueue.h>
+>  #include <asm/alternative.h>
+>  #include <asm/insn.h>
+>  #include <asm/sections.h>
+>
+> +#ifdef CONFIG_STRICT_KERNEL_RWX
+> +
+> +static struct workqueue_struct *module_free_wq;
+> +
+> +static int init_workqueue(void)
+> +{
+> +       module_free_wq = alloc_ordered_workqueue("module_free_wq", 0);
+> +       WARN_ON(!module_free_wq);
+> +
+> +       return 0;
+> +}
+> +pure_initcall(init_workqueue);
+> +
+> +static void module_free_wq_worker(struct work_struct *work)
+> +{
+> +       remap_linear_module_alias(work, false);
+> +       vfree(work);
+> +}
+> +
+> +void module_memfree(void *module_region)
+> +{
+> +       struct work_struct *work;
+> +
+> +       if (!module_region)
+> +               return;
+> +
+> +       /*
+> +        * At this point, module_region is a pointer to an allocation of at
+> +        * least PAGE_SIZE bytes that is mapped read-write. So instead of
+> +        * allocating memory for a data structure containing a work_struct
+> +        * instance and a copy of the value of module_region, just reuse the
+> +        * allocation directly.
+> +        */
 
-The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
+This took me a few reads to realize this is the virtual memory
+address, not the linear address -- duh. I was thinking "but it's not
+read-write yet!" :)
 
-  Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+> +       work = module_region;
+> +       INIT_WORK(work, module_free_wq_worker);
+> +       queue_work(module_free_wq, work);
+> +}
+> +
+> +#endif
+> +
+>  void *module_alloc(unsigned long size)
+>  {
+>         gfp_t gfp_mask = GFP_KERNEL;
+> @@ -65,6 +106,7 @@ void *module_alloc(unsigned long size)
+>                 return NULL;
+>         }
+>
+> +       remap_linear_module_alias(p, true);
+>         return p;
+>  }
+>
+> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> index 493ff75670ff..5492b691aafd 100644
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -432,7 +432,7 @@ static void __init map_mem(pgd_t *pgdp)
+>         struct memblock_region *reg;
+>         int flags = 0;
+>
+> -       if (debug_pagealloc_enabled())
+> +       if (rodata_enabled || debug_pagealloc_enabled())
+>                 flags = NO_BLOCK_MAPPINGS | NO_CONT_MAPPINGS;
 
-are available in the Git repository at:
+Is it worth adding a comment above this to describe what the
+conditions are that are triggering the page-level granularity here?
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git
-tags/gemini-dts-v4.19
+>
+>         /*
+> diff --git a/arch/arm64/mm/pageattr.c b/arch/arm64/mm/pageattr.c
+> index a56359373d8b..cc04be572660 100644
+> --- a/arch/arm64/mm/pageattr.c
+> +++ b/arch/arm64/mm/pageattr.c
+> @@ -138,6 +138,25 @@ int set_memory_valid(unsigned long addr, int numpages, int enable)
+>                                         __pgprot(PTE_VALID));
+>  }
+>
+> +#ifdef CONFIG_STRICT_KERNEL_RWX
+> +void remap_linear_module_alias(void *module_region, bool ro)
+> +{
+> +       struct vm_struct *vm;
+> +       int i;
+> +
+> +       if (!rodata_enabled)
+> +               return;
+> +
+> +       vm = find_vm_area(module_region);
+> +       WARN_ON(!vm || !vm->pages);
+> +
+> +       for (i = 0; i < vm->nr_pages; i++)
+> +               __change_memory_common((u64)page_address(vm->pages[i]), PAGE_SIZE,
+> +                               ro ? __pgprot(PTE_RDONLY) : __pgprot(PTE_WRITE),
+> +                               ro ? __pgprot(PTE_WRITE) : __pgprot(PTE_RDONLY));
+> +}
+> +#endif
+> +
+>  #ifdef CONFIG_DEBUG_PAGEALLOC
+>  void __kernel_map_pages(struct page *page, int numpages, int enable)
+>  {
+> --
+> 2.17.1
+>
 
-for you to fetch changes up to 41043ec45bdea5970e7c2d6766caf0793aeeb159:
+If this doesn't get another version, probably just skip my comment
+suggestion above. :) Regardless:
 
-  ARM: dts: Add devicetree for Storlink/Storm SL93512R (2018-07-15
-01:09:26 +0200)
+Reviewed-by: Kees Cook <keescook@chromium.org>
 
-----------------------------------------------------------------
-Gemini DTS updates for v4.19:
-- Add Vitesse switch chips
-- Add a new DT for a reference design
+So glad to have the linear mapping handled now. :) I should probably
+add tests for this to lkdtm, since it's a per-architecture thing...
 
-----------------------------------------------------------------
-Linus Walleij (3):
-      ARM: dts: Add WAN ethernet port to the SQ201
-      ARM: dts: Add Vitesse G5e switch to the Gemini SQ201
-      ARM: dts: Add devicetree for Storlink/Storm SL93512R
+-Kees
 
- arch/arm/boot/dts/Makefile            |   1 +
- arch/arm/boot/dts/gemini-sl93512r.dts | 328 ++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/gemini-sq201.dts    | 159 ++++++++++++++++
- 3 files changed, 488 insertions(+)
- create mode 100644 arch/arm/boot/dts/gemini-sl93512r.dts
+-- 
+Kees Cook
+Pixel Security
