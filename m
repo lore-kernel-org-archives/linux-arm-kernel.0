@@ -1,56 +1,30 @@
 From: sravanhome@gmail.com (Saravanan Sekar)
-Date: Sun, 15 Jul 2018 14:31:40 +0200
-Subject: [PATCH v4 0/5] Add clock driver for Actions S700 SoC
-Message-ID: <20180715123145.16975-1-sravanhome@gmail.com>
+Date: Sun, 15 Jul 2018 14:31:41 +0200
+Subject: [PATCH v4 1/5] clk: actions: Add REGMAP as dependency
+In-Reply-To: <20180715123145.16975-1-sravanhome@gmail.com>
+References: <20180715123145.16975-1-sravanhome@gmail.com>
+Message-ID: <20180715123145.16975-2-sravanhome@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changelog v4:
-- dt-bindings use absolute numbering for clocks
-- Patch re-oredering
+Add REGMAP as dependency to avoid undefined reference to regmap symbol
 
-Changelog v3:
-- Splitted uart clock DTS changes into separate patch
-- Splitted REGMAP Kconfig selection into separate patch
-- General naming convention as "Actions Semi" in dt-binding documentation
-- Patch re-oredering
-- Cleanup and fixed review findings
+Signed-off-by: Saravanan Sekar <sravanhome@gmail.com>
+---
+ drivers/clk/actions/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Changelog v2:
-Fixed 0 day compilation warning
-Modified existing dts Actions S900 clock bindings common to Actions
-Soc family
-
-This patchset adds clock support for Actions Semi OWL series S700 SoC
-with relevant clock bindings and device tree info. 
-
-Changed the UART clock using CMU instance and changes are tested in
-cubieboard7
-
-Thanks and regards,
-Saravanan,
-Parthiban
-
-*** BLURB HERE ***
-
-Saravanan Sekar (5):
-  clk: actions: Add REGMAP as dependency
-  dt-bindings: clock: Add S700 support for Actions Semi Soc's
-  clk: actions: Add S700 SoC clock support
-  arm64: dts: actions: Enable clock controller for S700
-  arm64: dts: actions: Set UART clock reference from CMU
-
- ...tions,s900-cmu.txt => actions,owl-cmu.txt} |  20 +-
- .../boot/dts/actions/s700-cubieboard7.dts     |   8 +-
- arch/arm64/boot/dts/actions/s700.dtsi         |  14 +
- drivers/clk/actions/Kconfig                   |  14 +
- drivers/clk/actions/Makefile                  |   1 +
- drivers/clk/actions/owl-s700.c                | 610 ++++++++++++++++++
- include/dt-bindings/clock/actions,s700-cmu.h  | 118 ++++
- 7 files changed, 769 insertions(+), 16 deletions(-)
- rename Documentation/devicetree/bindings/clock/{actions,s900-cmu.txt => actions,owl-cmu.txt} (67%)
- create mode 100644 drivers/clk/actions/owl-s700.c
- create mode 100644 include/dt-bindings/clock/actions,s700-cmu.h
-
+diff --git a/drivers/clk/actions/Kconfig b/drivers/clk/actions/Kconfig
+index 8854adb37847..39491154abbf 100644
+--- a/drivers/clk/actions/Kconfig
++++ b/drivers/clk/actions/Kconfig
+@@ -1,6 +1,7 @@
+ config CLK_ACTIONS
+ 	bool "Clock driver for Actions Semi SoCs"
+ 	depends on ARCH_ACTIONS || COMPILE_TEST
++	select REGMAP_MMIO
+ 	default ARCH_ACTIONS
+ 
+ if CLK_ACTIONS
 -- 
 2.18.0
