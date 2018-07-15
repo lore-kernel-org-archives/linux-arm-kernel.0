@@ -1,77 +1,90 @@
 From: vilhelm.gray@gmail.com (William Breathitt Gray)
-Date: Sun, 15 Jul 2018 16:46:14 -0400
-Subject: [PATCH v8 06/11] counter: 104-quad-8: Documentation: Add Generic
- Counter sysfs documentation
+Date: Sun, 15 Jul 2018 16:46:43 -0400
+Subject: [PATCH v8 08/11] dt-bindings: counter: Document stm32 quadrature
+ encoder
 In-Reply-To: <cover.1531685024.git.vilhelm.gray@gmail.com>
 References: <cover.1531685024.git.vilhelm.gray@gmail.com>
-Message-ID: <0fe263bc6bb36208eaa2fbcd83fa04fd22fb597e.1531685025.git.vilhelm.gray@gmail.com>
+Message-ID: <9724df348c488ed5c1b92738c3ef2ee12665bd05.1531685025.git.vilhelm.gray@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds standard documentation for the Generic Counter interface
-userspace sysfs attributes of the 104-QUAD-8 driver.
+From: Benjamin Gaignard <benjamin.gaignard@st.com>
 
-Acked-by: Jonathan Cameron <Jonathan.Cameron@huawei.com>
+Add bindings for STM32 Timer quadrature encoder.
+It is a sub-node of STM32 Timer which implement the
+quadratic encoder part of the hardware.
+
+Cc: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: William Breathitt Gray <vilhelm.gray@gmail.com>
 ---
- .../ABI/testing/sysfs-bus-counter-104-quad-8  | 36 +++++++++++++++++++
- MAINTAINERS                                   |  1 +
- 2 files changed, 37 insertions(+)
- create mode 100644 Documentation/ABI/testing/sysfs-bus-counter-104-quad-8
+ .../bindings/counter/stm32-timer-cnt.txt      | 31 +++++++++++++++++++
+ .../devicetree/bindings/mfd/stm32-timers.txt  |  7 +++++
+ 2 files changed, 38 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/counter/stm32-timer-cnt.txt
 
-diff --git a/Documentation/ABI/testing/sysfs-bus-counter-104-quad-8 b/Documentation/ABI/testing/sysfs-bus-counter-104-quad-8
+diff --git a/Documentation/devicetree/bindings/counter/stm32-timer-cnt.txt b/Documentation/devicetree/bindings/counter/stm32-timer-cnt.txt
 new file mode 100644
-index 000000000000..2d9fa57af101
+index 000000000000..c52fcdd4bf6c
 --- /dev/null
-+++ b/Documentation/ABI/testing/sysfs-bus-counter-104-quad-8
-@@ -0,0 +1,36 @@
-+What:		/sys/bus/counter/devices/counterX/signalY/index_polarity
-+KernelVersion:	4.19
-+Contact:	linux-iio at vger.kernel.org
-+Description:
-+		Active level of index input Signal Y; irrelevant in
-+		non-synchronous load mode.
++++ b/Documentation/devicetree/bindings/counter/stm32-timer-cnt.txt
+@@ -0,0 +1,31 @@
++STMicroelectronics STM32 Timer quadrature encoder
 +
-+What:		/sys/bus/counter/devices/counterX/signalY/index_polarity_available
-+What:		/sys/bus/counter/devices/counterX/signalY/synchronous_mode_available
-+KernelVersion:	4.19
-+Contact:	linux-iio at vger.kernel.org
-+Description:
-+		Discrete set of available values for the respective Signal Y
-+		configuration are listed in this file.
++STM32 Timer provides quadrature encoder to detect
++angular position and direction of rotary elements,
++from IN1 and IN2 input signals.
 +
-+What:		/sys/bus/counter/devices/counterX/signalY/synchronous_mode
-+KernelVersion:	4.19
-+Contact:	linux-iio at vger.kernel.org
-+Description:
-+		Configure the counter associated with Signal Y for
-+		non-synchronous or synchronous load mode. Synchronous load mode
-+		cannot be selected in non-quadrature (Pulse-Direction) clock
-+		mode.
++Must be a sub-node of an STM32 Timer device tree node.
++See ../mfd/stm32-timers.txt for details about the parent node.
 +
-+		non-synchronous:
-+			A logic low level is the active level at this index
-+			input. The index function (as enabled via preset_enable)
-+			is performed directly on the active level of the index
-+			input.
++Required properties:
++- compatible:		Must be "st,stm32-timer-counter".
++- pinctrl-names: 	Set to "default".
++- pinctrl-0: 		List of phandles pointing to pin configuration nodes,
++			to set CH1/CH2 pins in mode of operation for STM32
++			Timer input on external pin.
 +
-+		synchronous:
-+			Intended for interfacing with encoder Index output in
-+			quadrature clock mode. The active level is configured
-+			via index_polarity. The index function (as enabled via
-+			preset_enable) is performed synchronously with the
-+			quadrature clock on the active level of the index input.
-diff --git a/MAINTAINERS b/MAINTAINERS
-index f41c45246e2b..865c47a3feae 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -270,6 +270,7 @@ ACCES 104-QUAD-8 DRIVER
- M:	William Breathitt Gray <vilhelm.gray@gmail.com>
- L:	linux-iio at vger.kernel.org
- S:	Maintained
-+F:	Documentation/ABI/testing/sysfs-bus-counter-104-quad-8
- F:	Documentation/ABI/testing/sysfs-bus-iio-counter-104-quad-8
- F:	drivers/counter/104-quad-8.c
++Example:
++	timers at 40010000 {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		compatible = "st,stm32-timers";
++		reg = <0x40010000 0x400>;
++		clocks = <&rcc 0 160>;
++		clock-names = "int";
++
++		counter {
++			compatible = "st,stm32-timer-counter";
++			pinctrl-names = "default";
++			pinctrl-0 = <&tim1_in_pins>;
++		};
++	};
+diff --git a/Documentation/devicetree/bindings/mfd/stm32-timers.txt b/Documentation/devicetree/bindings/mfd/stm32-timers.txt
+index 0e900b52e895..15c3b87f51d9 100644
+--- a/Documentation/devicetree/bindings/mfd/stm32-timers.txt
++++ b/Documentation/devicetree/bindings/mfd/stm32-timers.txt
+@@ -28,6 +28,7 @@ Optional parameters:
+ Optional subnodes:
+ - pwm:			See ../pwm/pwm-stm32.txt
+ - timer:		See ../iio/timer/stm32-timer-trigger.txt
++- counter:		See ../counter/stm32-timer-cnt.txt
  
+ Example:
+ 	timers at 40010000 {
+@@ -48,6 +49,12 @@ Example:
+ 			compatible = "st,stm32-timer-trigger";
+ 			reg = <0>;
+ 		};
++
++		counter {
++			compatible = "st,stm32-timer-counter";
++			pinctrl-names = "default";
++			pinctrl-0 = <&tim1_in_pins>;
++		};
+ 	};
+ 
+ Example with all dmas:
 -- 
 2.18.0
