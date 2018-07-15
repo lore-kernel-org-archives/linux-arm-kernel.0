@@ -1,26 +1,29 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Sun, 15 Jul 2018 23:39:41 +0200
-Subject: [PATCH v6 1/5] clk: actions: Add missing REGMAP_MMIO dependency
-In-Reply-To: <20180715203524.11948-2-sravanhome@gmail.com>
-References: <20180715203524.11948-1-sravanhome@gmail.com>
- <20180715203524.11948-2-sravanhome@gmail.com>
-Message-ID: <9b580b0c-3cbe-a608-fb21-e8950e259c2f@suse.de>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Mon, 16 Jul 2018 07:57:18 +1000
+Subject: linux-next: Signed-off-by missing for commits in the arm-soc tree
+Message-ID: <20180716075718.4e5ef491@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 15.07.2018 um 22:35 schrieb Saravanan Sekar:
-> Add REGMAP_MMIO as dependency to avoid undefined
-> reference to regmap symbols.
-> 
-> Fixes: d85d20053e19 ("clk: actions: Add S900 SoC clock support")
-> Signed-off-by: Saravanan Sekar <sravanhome@gmail.com>
+Hi all,
 
-Reviewed-by: Andreas F?rber <afaerber@suse.de>
+Commits
 
-Thanks,
-Andreas
+  b8ccf02a5014 ("ARM: dts: bcm283x: Add the PMU to the devicetree.")
+  b7dd29b401f5 ("ARM: dts: bcm283x: Add Transposer block")
+  74d1e007915f ("hwmon: Add support for RPi voltage sensor")
+  70eea1bbb556 ("firmware: raspberrypi: Register hwmon driver")
+  a1547e0bca51 ("firmware: raspberrypi: Remove VLA usage")
+
+are missing a Signed-off-by from their committer.
 
 -- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+Cheers,
+Stephen Rothwell
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180716/752046b0/attachment.sig>
