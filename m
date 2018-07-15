@@ -1,50 +1,107 @@
-From: agustin.vega.frias@gmail.com (=?UTF-8?B?Si4gQWd1c3TDrW4gVmVnYS1GcsOtYXM=?=)
-Date: Sun, 15 Jul 2018 15:35:45 -0500
-Subject: [RFC V4 0/3] arm_pmu: acpi: variant support and QCOM Falkor
- extensions
-In-Reply-To: <20180713153318.GB3049@arm.com>
-References: <1530822201-5890-1-git-send-email-agustinv@codeaurora.org>
- <20180713153318.GB3049@arm.com>
-Message-ID: <CAGbRU0QLSpNEtcryuPPZE98zAo7peEmcDqcQiLi1zO6cfKML2A@mail.gmail.com>
+From: vilhelm.gray@gmail.com (William Breathitt Gray)
+Date: Sun, 15 Jul 2018 16:44:24 -0400
+Subject: [PATCH v8 00/11] Introduce the Counter subsystem
+Message-ID: <cover.1531685024.git.vilhelm.gray@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+Changes in v8:
+ - Add counter_enum.h file
+ - Simplify COUNTER Kconfig option help text
+ - Rename generic-counter.c to the more straightforward counter.c
+ - Update copyright and license boilerplate (use recommended SPDX line)
+ - Replace EXPORT_SYMBOL lines with respective EXPORT_SYMBOL_GPL lines
+ - Replace scnprintf lines with sprintf since we're dealing with sysfs files
+ - Add struct counter_attr_parm to simplify counter_attribute_create parameters
+ - Rename *_comp_t suffixes to *_unit in order to avoid *_t suffix implications
+ - List sysfs attribute values verbatim in sysfs documentation files
+ - Reorganize 104-QUAD-8 driver license boilerplate update to dedicated patch
 
-On Fri, Jul 13, 2018 at 10:33 AM, Will Deacon <will.deacon@arm.com> wrote:
+This revision is functionally identical to the last; changes in this version
+were made to improve clarity, formatting and whitespace, and organization. I
+also took this opportunity to record some of the new ACKs from the last
+submission.
 
-[snip]
+The counter_enum.h file was created to hold the Generic Counter enum helper
+functions required by the Generic Counter enum macros (i.e. COUNTER_SIGNAL_ENUM,
+COUNTER_COUNT_ENUM, etc.). These helper functions are not intended to be used
+directly by driver authors, so I thought it best to keep them separated. Now the
+counter.h file contains only macro, functions, and data structures that are
+expected to possibly appear in a counter device driver.
 
-> I'm mostly ok with this approach, but I have a concern with the way in which
-> the sysfs interface for carving up the config fields is implemented. If this
-> is intended to be a strict extension to the armv8 pmu architecture, then I
-> don't think you should be overriding the attr_groups entirely. Rather, you
-> should be taking the attr_groups from pmuv3 and then extending them in a way
-> which avoids overlapping field allocations by construction.
->
-> As it stands, you already have an overlap between the pcc bit and the
-> chained counter bit which Suzuki has implemented and it will be very easy to
-> introduce API breakage if we don't enforce this as part of the design.
->
-> Will
+The counter_attribute_create function parameter list was large so I reorganized
+the parameters into the counter_attr_parm structure, which may be set and passed
+by reference to the counter_attribute_create function. Since the show and store
+function pointers match with the struct device_attribute show and store function
+pointers, I decided to keep them declared as there are here without a typedef --
+however, I can typedef them in a future revision if it will improve clarity to
+do so.
 
-FYI, I left Qualcomm on July 6, one of my former colleagues will submit
-new iterations of this series. I will continue to comment on this and future
-patchsets as a courtesy to my former colleagues and the community.
+Heads-up for Jonathan Cameron: you may pick-up the "iio: 104-quad-8: Update
+license boilerplate" patch independent of this series; it's the SPDX license
+boilerplate update for the 104-QUAD-8 IIO driver.
 
-Thanks for pointing out the sysfs issue. My suggestion on how to address it is:
+Sincerely,
 
-1. Reserve config and config1 for architectural format attributes and
-   config2 for extension format attributes.
-2. Add a struct attribute ** parameter to the extension init function so
-   extensions can return the new attributes.
-3. The extension framework code in arm_pmu_acpi.c can then allocate a new
-   attribute array to contain the base and extension attributes and ensure
-   all the new attributes are on config2.
+William Breathitt Gray
 
-Though a more elaborate approach can be implemented to find conflicts in
-bit usage within config fields, it would require much more code for a
-relatively simple problem. Thoughts?
+Benjamin Gaignard (2):
+  counter: Add STM32 Timer quadrature encoder
+  dt-bindings: counter: Document stm32 quadrature encoder
 
-Thanks,
-Agust?n
+Fabrice Gasnier (2):
+  counter: stm32-lptimer: add counter device
+  dt-bindings: counter: Adjust dt-bindings for STM32 lptimer move
+
+William Breathitt Gray (7):
+  counter: Introduce the Generic Counter interface
+  counter: Documentation: Add Generic Counter sysfs documentation
+  docs: Add Generic Counter interface documentation
+  iio: 104-quad-8: Update license boilerplate
+  counter: 104-quad-8: Add Generic Counter interface support
+  counter: 104-quad-8: Documentation: Add Generic Counter sysfs
+    documentation
+  iio: counter: Add deprecation markings for IIO Counter attributes
+
+ Documentation/ABI/testing/sysfs-bus-counter   |  230 +++
+ .../ABI/testing/sysfs-bus-counter-104-quad-8  |   36 +
+ Documentation/ABI/testing/sysfs-bus-iio       |    8 +
+ .../testing/sysfs-bus-iio-counter-104-quad-8  |   16 +
+ .../{iio => }/counter/stm32-lptimer-cnt.txt   |    0
+ .../bindings/counter/stm32-timer-cnt.txt      |   31 +
+ .../devicetree/bindings/mfd/stm32-lptimer.txt |    2 +-
+ .../devicetree/bindings/mfd/stm32-timers.txt  |    7 +
+ Documentation/driver-api/generic-counter.rst  |  342 ++++
+ Documentation/driver-api/index.rst            |    1 +
+ MAINTAINERS                                   |   15 +-
+ drivers/Kconfig                               |    2 +
+ drivers/Makefile                              |    1 +
+ drivers/{iio => }/counter/104-quad-8.c        |  782 ++++++++-
+ drivers/counter/Kconfig                       |   51 +
+ drivers/{iio => }/counter/Makefile            |    5 +-
+ drivers/counter/counter.c                     | 1561 +++++++++++++++++
+ drivers/{iio => }/counter/stm32-lptimer-cnt.c |  361 +++-
+ drivers/counter/stm32-timer-cnt.c             |  390 ++++
+ drivers/iio/Kconfig                           |    1 -
+ drivers/iio/Makefile                          |    1 -
+ drivers/iio/counter/Kconfig                   |   34 -
+ include/linux/counter.h                       |  505 ++++++
+ include/linux/counter_enum.h                  |   45 +
+ 24 files changed, 4341 insertions(+), 86 deletions(-)
+ create mode 100644 Documentation/ABI/testing/sysfs-bus-counter
+ create mode 100644 Documentation/ABI/testing/sysfs-bus-counter-104-quad-8
+ rename Documentation/devicetree/bindings/{iio => }/counter/stm32-lptimer-cnt.txt (100%)
+ create mode 100644 Documentation/devicetree/bindings/counter/stm32-timer-cnt.txt
+ create mode 100644 Documentation/driver-api/generic-counter.rst
+ rename drivers/{iio => }/counter/104-quad-8.c (44%)
+ create mode 100644 drivers/counter/Kconfig
+ rename drivers/{iio => }/counter/Makefile (46%)
+ create mode 100644 drivers/counter/counter.c
+ rename drivers/{iio => }/counter/stm32-lptimer-cnt.c (48%)
+ create mode 100644 drivers/counter/stm32-timer-cnt.c
+ delete mode 100644 drivers/iio/counter/Kconfig
+ create mode 100644 include/linux/counter.h
+ create mode 100644 include/linux/counter_enum.h
+
+-- 
+2.18.0
