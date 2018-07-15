@@ -1,41 +1,77 @@
 From: vilhelm.gray@gmail.com (William Breathitt Gray)
-Date: Sun, 15 Jul 2018 16:45:44 -0400
-Subject: [PATCH v8 04/11] iio: 104-quad-8: Update license boilerplate
+Date: Sun, 15 Jul 2018 16:46:14 -0400
+Subject: [PATCH v8 06/11] counter: 104-quad-8: Documentation: Add Generic
+ Counter sysfs documentation
 In-Reply-To: <cover.1531685024.git.vilhelm.gray@gmail.com>
 References: <cover.1531685024.git.vilhelm.gray@gmail.com>
-Message-ID: <bd80be65f742fdedfafcd708033ffd0d9ddae0f7.1531685025.git.vilhelm.gray@gmail.com>
+Message-ID: <0fe263bc6bb36208eaa2fbcd83fa04fd22fb597e.1531685025.git.vilhelm.gray@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch simplifies the boilerplate license text by making use of a
-SPDX license identifier line.
+This patch adds standard documentation for the Generic Counter interface
+userspace sysfs attributes of the 104-QUAD-8 driver.
 
+Acked-by: Jonathan Cameron <Jonathan.Cameron@huawei.com>
 Signed-off-by: William Breathitt Gray <vilhelm.gray@gmail.com>
 ---
- drivers/iio/counter/104-quad-8.c | 10 +---------
- 1 file changed, 1 insertion(+), 9 deletions(-)
+ .../ABI/testing/sysfs-bus-counter-104-quad-8  | 36 +++++++++++++++++++
+ MAINTAINERS                                   |  1 +
+ 2 files changed, 37 insertions(+)
+ create mode 100644 Documentation/ABI/testing/sysfs-bus-counter-104-quad-8
 
-diff --git a/drivers/iio/counter/104-quad-8.c b/drivers/iio/counter/104-quad-8.c
-index 92be8d0f7735..72b6352e09f0 100644
---- a/drivers/iio/counter/104-quad-8.c
-+++ b/drivers/iio/counter/104-quad-8.c
-@@ -1,16 +1,8 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * IIO driver for the ACCES 104-QUAD-8
-  * Copyright (C) 2016 William Breathitt Gray
-  *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License, version 2, as
-- * published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful, but
-- * WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-- * General Public License for more details.
-- *
-  * This driver supports the ACCES 104-QUAD-8 and ACCES 104-QUAD-4.
-  */
- #include <linux/bitops.h>
+diff --git a/Documentation/ABI/testing/sysfs-bus-counter-104-quad-8 b/Documentation/ABI/testing/sysfs-bus-counter-104-quad-8
+new file mode 100644
+index 000000000000..2d9fa57af101
+--- /dev/null
++++ b/Documentation/ABI/testing/sysfs-bus-counter-104-quad-8
+@@ -0,0 +1,36 @@
++What:		/sys/bus/counter/devices/counterX/signalY/index_polarity
++KernelVersion:	4.19
++Contact:	linux-iio at vger.kernel.org
++Description:
++		Active level of index input Signal Y; irrelevant in
++		non-synchronous load mode.
++
++What:		/sys/bus/counter/devices/counterX/signalY/index_polarity_available
++What:		/sys/bus/counter/devices/counterX/signalY/synchronous_mode_available
++KernelVersion:	4.19
++Contact:	linux-iio at vger.kernel.org
++Description:
++		Discrete set of available values for the respective Signal Y
++		configuration are listed in this file.
++
++What:		/sys/bus/counter/devices/counterX/signalY/synchronous_mode
++KernelVersion:	4.19
++Contact:	linux-iio at vger.kernel.org
++Description:
++		Configure the counter associated with Signal Y for
++		non-synchronous or synchronous load mode. Synchronous load mode
++		cannot be selected in non-quadrature (Pulse-Direction) clock
++		mode.
++
++		non-synchronous:
++			A logic low level is the active level at this index
++			input. The index function (as enabled via preset_enable)
++			is performed directly on the active level of the index
++			input.
++
++		synchronous:
++			Intended for interfacing with encoder Index output in
++			quadrature clock mode. The active level is configured
++			via index_polarity. The index function (as enabled via
++			preset_enable) is performed synchronously with the
++			quadrature clock on the active level of the index input.
+diff --git a/MAINTAINERS b/MAINTAINERS
+index f41c45246e2b..865c47a3feae 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -270,6 +270,7 @@ ACCES 104-QUAD-8 DRIVER
+ M:	William Breathitt Gray <vilhelm.gray@gmail.com>
+ L:	linux-iio at vger.kernel.org
+ S:	Maintained
++F:	Documentation/ABI/testing/sysfs-bus-counter-104-quad-8
+ F:	Documentation/ABI/testing/sysfs-bus-iio-counter-104-quad-8
+ F:	drivers/counter/104-quad-8.c
+ 
 -- 
 2.18.0
