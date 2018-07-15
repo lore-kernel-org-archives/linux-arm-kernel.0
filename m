@@ -1,37 +1,56 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Sun, 15 Jul 2018 14:15:07 +0200
-Subject: [PATCH v6 3/8] interconnect: Add debugfs support
-In-Reply-To: <20180709155104.25528-4-georgi.djakov@linaro.org>
-References: <20180709155104.25528-1-georgi.djakov@linaro.org>
- <20180709155104.25528-4-georgi.djakov@linaro.org>
-Message-ID: <20180715121507.GA17794@kroah.com>
+From: sravanhome@gmail.com (Saravanan Sekar)
+Date: Sun, 15 Jul 2018 14:31:40 +0200
+Subject: [PATCH v4 0/5] Add clock driver for Actions S700 SoC
+Message-ID: <20180715123145.16975-1-sravanhome@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 09, 2018 at 06:50:59PM +0300, Georgi Djakov wrote:
-> +static int __init icc_debugfs_init(void)
-> +{
-> +	struct dentry *file;
-> +
-> +	icc_debugfs_dir = debugfs_create_dir("interconnect", NULL);
-> +	if (!icc_debugfs_dir) {
-> +		pr_err("interconnect: error creating debugfs directory\n");
-> +		return -ENODEV;
-> +	}
+Changelog v4:
+- dt-bindings use absolute numbering for clocks
+- Patch re-oredering
 
-You should never care about the return value of a debugfs call.  Just
-ignore it and move on.
+Changelog v3:
+- Splitted uart clock DTS changes into separate patch
+- Splitted REGMAP Kconfig selection into separate patch
+- General naming convention as "Actions Semi" in dt-binding documentation
+- Patch re-oredering
+- Cleanup and fixed review findings
 
-> +	file = debugfs_create_file("interconnect_summary", 0444,
-> +				   icc_debugfs_dir, NULL, &icc_summary_fops);
-> +	if (!file)
-> +		return -ENODEV;
+Changelog v2:
+Fixed 0 day compilation warning
+Modified existing dts Actions S900 clock bindings common to Actions
+Soc family
 
-Again, do not check this.
+This patchset adds clock support for Actions Semi OWL series S700 SoC
+with relevant clock bindings and device tree info. 
 
-Where do you remove this directory and file from the system when the
-code shuts down?
+Changed the UART clock using CMU instance and changes are tested in
+cubieboard7
 
-thanks,
+Thanks and regards,
+Saravanan,
+Parthiban
 
-greg k-h
+*** BLURB HERE ***
+
+Saravanan Sekar (5):
+  clk: actions: Add REGMAP as dependency
+  dt-bindings: clock: Add S700 support for Actions Semi Soc's
+  clk: actions: Add S700 SoC clock support
+  arm64: dts: actions: Enable clock controller for S700
+  arm64: dts: actions: Set UART clock reference from CMU
+
+ ...tions,s900-cmu.txt => actions,owl-cmu.txt} |  20 +-
+ .../boot/dts/actions/s700-cubieboard7.dts     |   8 +-
+ arch/arm64/boot/dts/actions/s700.dtsi         |  14 +
+ drivers/clk/actions/Kconfig                   |  14 +
+ drivers/clk/actions/Makefile                  |   1 +
+ drivers/clk/actions/owl-s700.c                | 610 ++++++++++++++++++
+ include/dt-bindings/clock/actions,s700-cmu.h  | 118 ++++
+ 7 files changed, 769 insertions(+), 16 deletions(-)
+ rename Documentation/devicetree/bindings/clock/{actions,s900-cmu.txt => actions,owl-cmu.txt} (67%)
+ create mode 100644 drivers/clk/actions/owl-s700.c
+ create mode 100644 include/dt-bindings/clock/actions,s700-cmu.h
+
+-- 
+2.18.0
