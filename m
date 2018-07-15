@@ -1,98 +1,39 @@
-From: embed3d@gmail.com (Philipp Rossak)
-Date: Sun, 15 Jul 2018 16:08:04 +0200
-Subject: [RESEND PATCH v5 0/6] IR support for A83T
-In-Reply-To: <20180710083637.6s36rfbi2old5uxo@gofer.mess.org>
-References: <20180213122952.8420-1-embed3d@gmail.com>
- <85ddc129-d0f8-6299-dca0-81f79f3d04a9@gmail.com>
- <20180710083637.6s36rfbi2old5uxo@gofer.mess.org>
-Message-ID: <aa2d50b1-9ff5-01e7-8202-e35dc6e039ea@gmail.com>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Sun, 15 Jul 2018 19:45:51 +0530
+Subject: [PATCH v4 1/5] clk: actions: Add REGMAP as dependency
+In-Reply-To: <b0e29fe8-c16a-e783-8877-d01f052ba963@suse.de>
+References: <20180715123145.16975-1-sravanhome@gmail.com>
+ <20180715123145.16975-2-sravanhome@gmail.com>
+ <b0e29fe8-c16a-e783-8877-d01f052ba963@suse.de>
+Message-ID: <20180715141551.GA9980@Mani-XPS-13-9360>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry, that got lost...
+Hi,
 
-I will resubmit / update the patches next week.
+On Sun, Jul 15, 2018 at 02:35:53PM +0200, Andreas F?rber wrote:
+> Hi,
+> 
+> Am 15.07.2018 um 14:31 schrieb Saravanan Sekar:
+> > Add REGMAP as dependency to avoid undefined reference to regmap symbol
+> 
+> Is this a bugfix for S900? Then please add a Fixes: line. If not, why is
+> it a separate patch and not in 3/5?
+> 
 
-Philipp
+Yes, this is a bug fix for S900 clk and should have Fixes tag.
 
-On 10.07.2018 10:36, Sean Young wrote:
-> On Fri, Mar 02, 2018 at 01:11:34PM +0100, Philipp Rossak wrote:
->>
->>
->> On 13.02.2018 13:29, Philipp Rossak wrote:
->>> This patch series adds support for the sunxi A83T ir module and enhances
->>> the sunxi-ir driver. Right now the base clock frequency for the ir driver
->>> is a hard coded define and is set to 8 MHz.
->>> This works for the most common ir receivers. On the Sinovoip Bananapi M3
->>> the ir receiver needs, a 3 MHz base clock frequency to work without
->>> problems with this driver.
->>>
->>> This patch series adds support for an optinal property that makes it able
->>> to override the default base clock frequency and enables the ir interface
->>> on the a83t and the Bananapi M3.
->>>
->>> changes since v4:
->>> * rename cir pin from cir_pins to r_cir_pin
->>> * drop unit-adress from r_cir_pin
->>> * add a83t compatible to the cir node
->>> * move muxing options to dtsi
->>> * rename cir label and reorder it in the bananpim3.dts file
->>>
->>> changes since v3:
->>> * collecting all acks & reviewd by
->>> * fixed typos
->>>
->>> changes since v2:
->>> * reorder cir pin (alphabetical)
->>> * fix typo in documentation
->>>
->>> changes since v1:
->>> * fix typos, reword Documentation
->>> * initialize 'b_clk_freq' to 'SUNXI_IR_BASE_CLK' & remove if statement
->>> * change dev_info() to dev_dbg()
->>> * change naming to cir* in dts/dtsi
->>> * Added acked Ackedi-by to related patch
->>> * use whole memory block instead of registers needed + fix for h3/h5
->>>
->>> changes since rfc:
->>> * The property is now optinal. If the property is not available in
->>>     the dtb the driver uses the default base clock frequency.
->>> * the driver prints out the the selected base clock frequency.
->>> * changed devicetree property from base-clk-frequency to clock-frequency
->>>
->>> Regards,
->>> Philipp
->>>
->>> Philipp Rossak (6):
->>>     media: rc: update sunxi-ir driver to get base clock frequency from
->>>       devicetree
->>>     media: dt: bindings: Update binding documentation for sunxi IR
->>>       controller
->>>     arm: dts: sun8i: a83t: Add the cir pin for the A83T
->>>     arm: dts: sun8i: a83t: Add support for the cir interface
->>>     arm: dts: sun8i: a83t: bananapi-m3: Enable IR controller
->>>     arm: dts: sun8i: h3-h5: ir register size should be the whole memory
->>>       block
->>>
->>>    Documentation/devicetree/bindings/media/sunxi-ir.txt |  3 +++
->>>    arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts         |  5 +++++
->>>    arch/arm/boot/dts/sun8i-a83t.dtsi                    | 18 ++++++++++++++++++
->>>    arch/arm/boot/dts/sunxi-h3-h5.dtsi                   |  2 +-
->>>    drivers/media/rc/sunxi-cir.c                         | 19 +++++++++++--------
->>>    5 files changed, 38 insertions(+), 9 deletions(-)
->>>
->>
->> I talked yesterday with Maxime about this patch series. And he told me if
->> the first to patches got merged, he will apply the dts patches to the sunxi
->> tree.
->>
->> Sean, can you merge the first two patches through the rc-core?
+Thanks,
+Mani
+
+> Also, the subject is fine as is, but please add a full stop at the end
+> of the sentence in the commit message.
 > 
-> So I merged the first two patches, but the rest never made it upstream.
+> Regards,
+> Andreas
 > 
-> Should they be resubmitted?
 > 
-> Thanks,
-> 
-> Sean
-> 
+> -- 
+> SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+> GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+> HRB 21284 (AG N?rnberg)
