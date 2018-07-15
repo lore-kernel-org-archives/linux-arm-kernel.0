@@ -1,106 +1,30 @@
 From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Sun, 15 Jul 2018 20:13:57 +0200
-Subject: [RFC net-next 00/15] net: A socket API for LoRa
-In-Reply-To: <BY1PR02MB11147C7443AB9623D6B65798E75A0@BY1PR02MB1114.namprd02.prod.outlook.com>
-References: <20180701110804.32415-1-afaerber@suse.de>
- <BY1PR02MB11147C7443AB9623D6B65798E75A0@BY1PR02MB1114.namprd02.prod.outlook.com>
-Message-ID: <e08cdcfb-207f-bd73-2afd-f775810b72b7@suse.de>
+Date: Sun, 15 Jul 2018 20:36:46 +0200
+Subject: [PATCH v4 2/5] dt-bindings: clock: Add S700 support for Actions
+ Semi Soc's
+In-Reply-To: <20180715143849.GC9980@Mani-XPS-13-9360>
+References: <20180715123145.16975-1-sravanhome@gmail.com>
+ <20180715123145.16975-3-sravanhome@gmail.com>
+ <20180715143849.GC9980@Mani-XPS-13-9360>
+Message-ID: <0d52c569-bd9a-2a17-c1ef-13e0d1fe4495@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ linux-wireless + Stefan + Seth
+Hi,
 
-Am 11.07.2018 um 17:21 schrieb Ben Whitten:
->> This patchset is clearly not ready for merging, but is being
->> submitted for
->> discussion, as requested by Jiri, in particular of the design
->> choices:
->>
->> 1) PF_LORA/AF_LORA and associated identifiers are
->> proposed to represent
->>    this technology. While for an SX1276 - case a) above - it
->> might work to
->>    layer LoRaWAN as a protocol option for PF_LORA and add
->> LoRaWAN address
->>    fields to the union in my sockaddr_lora, how would that
->> work for devices
->>    that only support LoRaWAN but not pure LoRa? Do we
->> need both AF_LORA and
->>    AF_LORAWAN, or just a separate ETH_P_LORAWAN or
->> ARPHRD_LORAWAN?
->>
->> 2) PF_LORA is used with SOCK_DGRAM here. The
->> assumption is that RAW mode
->>    would be DGRAM plus preamble plus optional checksum.
->>
->> 3) Only the transmit path is partially implemented already.
->> The assumption
->>    is that the devices should go into receive mode by default
->> and only
->>    interrupt that when asked to transmit.
->>
->> 4) Some hardware settings need to be supplied externally,
->> such as the radio
->>    frequency for some modules, but many others can be
->> runtime-configured,
->>    such as Spreading Factor, Bandwidth, Sync Word, or which
->> antenna to use.
->>    What settings should be implemented as socket option vs.
->> netlink layer
->>    vs. ioctl vs. sysfs? What are the criteria to apply?
->>
->> 5) Many of the modules support multiple modes, such as
->> LoRa, LoRaWAN and FSK.
->>    Lacking a LoRaWAN implementation, I am currently
->> switching them into LoRa
->>    mode at probe time wherever possible. How do we deal
->> with that properly?
->>
->>   a) Is there any precedence from the Wifi world for
->> dynamically selecting
->>      between our own trusted Open Source implementation
->> vs. hardware/firmware
->>      accelerated and/or certified implementations?
->>
->>   b) Would a proof of concept for FSK (non-LoRa) modes be
->> required for
->>      merging any LoRa driver for chipsets that support both?
->> Or is there any
->>      facility or design guidelines that would allow us to focus
->> on LoRa and
->>      LoRaWAN and leave non-LoRa radio modes to later
->> contributors?
-> 
-> Down the line I think we should also plan for a CRDA style regdb somewhere in the path for raw LoRa transceivers operating as softMAC, much like with WiFi.
+Am 15.07.2018 um 16:38 schrieb Manivannan Sadhasivam:
+> On Sun, Jul 15, 2018 at 02:31:42PM +0200, Saravanan Sekar wrote:
+>> diff --git a/include/dt-bindings/clock/actions,s700-cmu.h b/include/dt-bindings/clock/actions,s700-cmu.h
+>> new file mode 100644
+>> index 000000000000..905808bf335b
+>> --- /dev/null
+>> +++ b/include/dt-bindings/clock/actions,s700-cmu.h
+>> @@ -0,0 +1,118 @@
+>> +/* SPDX-License-Identifier: GPL-2.0+
 
-Yes, I had raised the topic of wireless-regdb for Stefan's conference -
-currently it seems to only cover 2.4 GHz, 5 GHz and 60 GHz. Not sure if
-we can easily extend that to cover 433 MHz, 868 MHz, 915 MHz and 923 MHz
-bands or whether we'd just need something similar... Is 802.15.4 able to
-share this database with Wifi?
+"GPL-2.0-or-later OR MIT" please for bindings and DT.
 
-An argument to share with Wifi might be that Semtech's SX1280 and SX1281
-2.4 GHz transceivers claim to support LoRa modulation, too. Having two
-different regulatory DBs interact with LoRa drivers seems a bad idea,
-and duplicating 2.4 GHz into a new DB doesn't sound appealing either.
-
-https://www.semtech.com/products/wireless-rf/24-ghz-transceivers
-
-Meanwhile my attempt to play with netlink during SUSE Hackweek has been
-going slow and I could use some guidance or a volunteer to contribute: I
-have a bare skeleton of registration, commands, attributes and multicast
-groups, but no plan yet how to connect that to the actual drivers to
-query or apply the settings...
-
-https://git.kernel.org/pub/scm/linux/kernel/git/afaerber/linux-lora.git/tree/net/lora/netlink.c?h=lora-next
-
-> LoRa radios used in Gateway devices are typically relatively high power (capable of 27dBm) and operate in bands with certain restrictions, eg the EU has keep out areas within 868MHz for alarms and SRD devices must abide by certain duty cycle restrictions, there are also maximum powers to consider for sub-bands. (ETSI EN 300 220-2 V3.2.1, Bands K, L, M, N, P, Q)
-
-> The certified AT style modules will (should) already have this regulatory data baked in so it only applied to situations where we drive the transceivers directly, but it wouldn't hurt to check that the frequency being asked to transmit on doesn't spill into a restricted band.
-
-Some do have configuration options that will need to be set or checked.
-
-Regards,
+Thanks,
 Andreas
 
 -- 
