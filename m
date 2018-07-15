@@ -1,453 +1,990 @@
 From: vilhelm.gray@gmail.com (William Breathitt Gray)
-Date: Sun, 15 Jul 2018 16:46:32 -0400
-Subject: [PATCH v8 07/11] counter: Add STM32 Timer quadrature encoder
+Date: Sun, 15 Jul 2018 16:45:55 -0400
+Subject: [PATCH v8 05/11] counter: 104-quad-8: Add Generic Counter interface
+ support
 In-Reply-To: <cover.1531685024.git.vilhelm.gray@gmail.com>
 References: <cover.1531685024.git.vilhelm.gray@gmail.com>
-Message-ID: <14b517e863f6af60353e06d7c5db5571f75f6f86.1531685025.git.vilhelm.gray@gmail.com>
+Message-ID: <357b55d607360a4e6a51aeab33f46f614bbada29.1531685025.git.vilhelm.gray@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Benjamin Gaignard <benjamin.gaignard@st.com>
+This patch adds support for the Generic Counter interface to the
+104-QUAD-8 driver. The existing 104-QUAD-8 device interface should not
+be affected by this patch; all changes are intended as supplemental
+additions as perceived by the user.
 
-Implement counter part of the STM32 timer hardware block by using
-counter API. Hardware only supports X2 and X4 quadrature modes. A
-ceiling value can be set to define the maximum value reachable by the
-counter.
+Generic Counter Counts are created for the eight quadrature channel
+counts, as well as their respective quadrature A and B Signals (which
+are associated via respective Synapse structures) and respective index
+Signals.
 
-Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
-Co-authored-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+The new Generic Counter interface sysfs attributes are intended to
+expose the same functionality and data available via the existing
+104-QUAD-8 IIO device interface; the Generic Counter interface serves
+to provide the respective functionality and data in a standard way
+expected of counter devices.
+
 Reviewed-by: Jonathan Cameron <Jonathan.Cameron@huawei.com>
 Signed-off-by: William Breathitt Gray <vilhelm.gray@gmail.com>
 ---
- drivers/counter/Kconfig           |  10 +
- drivers/counter/Makefile          |   1 +
- drivers/counter/stm32-timer-cnt.c | 390 ++++++++++++++++++++++++++++++
- 3 files changed, 401 insertions(+)
- create mode 100644 drivers/counter/stm32-timer-cnt.c
+ MAINTAINERS                            |   4 +-
+ drivers/{iio => }/counter/104-quad-8.c | 772 ++++++++++++++++++++++++-
+ drivers/counter/Kconfig                |  21 +
+ drivers/counter/Makefile               |   2 +
+ drivers/iio/counter/Kconfig            |  17 -
+ drivers/iio/counter/Makefile           |   1 -
+ 6 files changed, 783 insertions(+), 34 deletions(-)
+ rename drivers/{iio => }/counter/104-quad-8.c (44%)
 
-diff --git a/drivers/counter/Kconfig b/drivers/counter/Kconfig
-index dd3add729529..0bb2340d6087 100644
---- a/drivers/counter/Kconfig
-+++ b/drivers/counter/Kconfig
-@@ -28,4 +28,14 @@ config 104_QUAD_8
- 	  The base port addresses for the devices may be configured via the base
- 	  array module parameter.
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 08339129d342..f41c45246e2b 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -266,12 +266,12 @@ L:	linux-gpio at vger.kernel.org
+ S:	Maintained
+ F:	drivers/gpio/gpio-104-idio-16.c
  
-+config STM32_TIMER_CNT
-+	tristate "STM32 Timer encoder counter driver"
-+	depends on MFD_STM32_TIMERS || COMPILE_TEST
-+	help
-+	  Select this option to enable STM32 Timer quadrature encoder
-+	  and counter driver.
-+
-+	  To compile this driver as a module, choose M here: the
-+	  module will be called stm32-timer-cnt.
-+
- endif # COUNTER
-diff --git a/drivers/counter/Makefile b/drivers/counter/Makefile
-index aee0d2ddcf2c..6b4a5be21b00 100644
---- a/drivers/counter/Makefile
-+++ b/drivers/counter/Makefile
-@@ -5,3 +5,4 @@
- obj-$(CONFIG_COUNTER) += counter.o
+-ACCES 104-QUAD-8 IIO DRIVER
++ACCES 104-QUAD-8 DRIVER
+ M:	William Breathitt Gray <vilhelm.gray@gmail.com>
+ L:	linux-iio at vger.kernel.org
+ S:	Maintained
+ F:	Documentation/ABI/testing/sysfs-bus-iio-counter-104-quad-8
+-F:	drivers/iio/counter/104-quad-8.c
++F:	drivers/counter/104-quad-8.c
  
- obj-$(CONFIG_104_QUAD_8)	+= 104-quad-8.o
-+obj-$(CONFIG_STM32_TIMER_CNT)	+= stm32-timer-cnt.o
-diff --git a/drivers/counter/stm32-timer-cnt.c b/drivers/counter/stm32-timer-cnt.c
-new file mode 100644
-index 000000000000..0b15e729798b
---- /dev/null
-+++ b/drivers/counter/stm32-timer-cnt.c
-@@ -0,0 +1,390 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * STM32 Timer Encoder and Counter driver
-+ *
-+ * Copyright (C) STMicroelectronics 2018
-+ *
-+ * Author: Benjamin Gaignard <benjamin.gaignard@st.com>
-+ *
-+ */
+ ACCES PCI-IDIO-16 GPIO DRIVER
+ M:	William Breathitt Gray <vilhelm.gray@gmail.com>
+diff --git a/drivers/iio/counter/104-quad-8.c b/drivers/counter/104-quad-8.c
+similarity index 44%
+rename from drivers/iio/counter/104-quad-8.c
+rename to drivers/counter/104-quad-8.c
+index 72b6352e09f0..c5679347736d 100644
+--- a/drivers/iio/counter/104-quad-8.c
++++ b/drivers/counter/104-quad-8.c
+@@ -1,11 +1,12 @@
+ // SPDX-License-Identifier: GPL-2.0
+ /*
+- * IIO driver for the ACCES 104-QUAD-8
++ * Counter driver for the ACCES 104-QUAD-8
+  * Copyright (C) 2016 William Breathitt Gray
+  *
+  * This driver supports the ACCES 104-QUAD-8 and ACCES 104-QUAD-4.
+  */
+ #include <linux/bitops.h>
 +#include <linux/counter.h>
-+#include <linux/iio/iio.h>
-+#include <linux/iio/types.h>
-+#include <linux/mfd/stm32-timers.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+
-+#define TIM_CCMR_CCXS	(BIT(8) | BIT(0))
-+#define TIM_CCMR_MASK	(TIM_CCMR_CC1S | TIM_CCMR_CC2S | \
-+			 TIM_CCMR_IC1F | TIM_CCMR_IC2F)
-+#define TIM_CCER_MASK	(TIM_CCER_CC1P | TIM_CCER_CC1NP | \
-+			 TIM_CCER_CC2P | TIM_CCER_CC2NP)
-+
-+struct stm32_timer_cnt {
+ #include <linux/device.h>
+ #include <linux/errno.h>
+ #include <linux/iio/iio.h>
+@@ -29,6 +30,7 @@ MODULE_PARM_DESC(base, "ACCES 104-QUAD-8 base addresses");
+ 
+ /**
+  * struct quad8_iio - IIO device private data structure
++ * @counter:		instance of the counter_device
+  * @preset:		array of preset values
+  * @count_mode:		array of count mode configurations
+  * @quadrature_mode:	array of quadrature mode configurations
+@@ -40,6 +42,7 @@ MODULE_PARM_DESC(base, "ACCES 104-QUAD-8 base addresses");
+  * @base:		base port address of the IIO device
+  */
+ struct quad8_iio {
 +	struct counter_device counter;
-+	struct regmap *regmap;
-+	struct clk *clk;
-+	u32 ceiling;
-+};
+ 	unsigned int preset[QUAD8_NUM_COUNTERS];
+ 	unsigned int count_mode[QUAD8_NUM_COUNTERS];
+ 	unsigned int quadrature_mode[QUAD8_NUM_COUNTERS];
+@@ -83,6 +86,10 @@ struct quad8_iio {
+ #define QUAD8_RLD_CNTR_OUT 0x10
+ #define QUAD8_CHAN_OP_ENABLE_COUNTERS 0x00
+ #define QUAD8_CHAN_OP_RESET_COUNTERS 0x01
++#define QUAD8_CMR_QUADRATURE_X1 0x08
++#define QUAD8_CMR_QUADRATURE_X2 0x10
++#define QUAD8_CMR_QUADRATURE_X4 0x18
 +
-+/**
-+ * stm32_count_function - enumerates stm32 timer counter encoder modes
-+ * @STM32_COUNT_SLAVE_MODE_DISABLED: counts on internal clock when CEN=1
-+ * @STM32_COUNT_ENCODER_MODE_1: counts TI1FP1 edges, depending on TI2FP2 level
-+ * @STM32_COUNT_ENCODER_MODE_2: counts TI2FP2 edges, depending on TI1FP1 level
-+ * @STM32_COUNT_ENCODER_MODE_3: counts on both TI1FP1 and TI2FP2 edges
-+ */
-+enum stm32_count_function {
-+	STM32_COUNT_SLAVE_MODE_DISABLED = -1,
-+	STM32_COUNT_ENCODER_MODE_1,
-+	STM32_COUNT_ENCODER_MODE_2,
-+	STM32_COUNT_ENCODER_MODE_3,
-+};
-+
-+static enum count_function stm32_count_functions[] = {
-+	[STM32_COUNT_ENCODER_MODE_1] = COUNT_FUNCTION_QUADRATURE_X2_A,
-+	[STM32_COUNT_ENCODER_MODE_2] = COUNT_FUNCTION_QUADRATURE_X2_B,
-+	[STM32_COUNT_ENCODER_MODE_3] = COUNT_FUNCTION_QUADRATURE_X4,
-+};
-+
-+static int stm32_count_read(struct counter_device *counter,
-+			    struct counter_count *count,
-+			    struct count_read_value *val)
+ 
+ static int quad8_read_raw(struct iio_dev *indio_dev,
+ 	struct iio_chan_spec const *chan, int *val, int *val2, long mask)
+@@ -338,13 +345,13 @@ static const char *const quad8_count_modes[] = {
+ };
+ 
+ static int quad8_set_count_mode(struct iio_dev *indio_dev,
+-	const struct iio_chan_spec *chan, unsigned int count_mode)
++	const struct iio_chan_spec *chan, unsigned int cnt_mode)
+ {
+ 	struct quad8_iio *const priv = iio_priv(indio_dev);
+-	unsigned int mode_cfg = count_mode << 1;
++	unsigned int mode_cfg = cnt_mode << 1;
+ 	const int base_offset = priv->base + 2 * chan->channel + 1;
+ 
+-	priv->count_mode[chan->channel] = count_mode;
++	priv->count_mode[chan->channel] = cnt_mode;
+ 
+ 	/* Add quadrature mode configuration */
+ 	if (priv->quadrature_mode[chan->channel])
+@@ -554,24 +561,746 @@ static const struct iio_chan_spec quad8_channels[] = {
+ 	QUAD8_COUNT_CHAN(7), QUAD8_INDEX_CHAN(7)
+ };
+ 
++static int quad8_signal_read(struct counter_device *counter,
++	struct counter_signal *signal, struct signal_read_value *val)
 +{
-+	struct stm32_timer_cnt *const priv = counter->priv;
-+	u32 cnt;
++	const struct quad8_iio *const priv = counter->priv;
++	unsigned int state;
++	enum signal_level level;
 +
-+	regmap_read(priv->regmap, TIM_CNT, &cnt);
-+	count_read_value_set(val, COUNT_POSITION, &cnt);
++	/* Only Index signal levels can be read */
++	if (signal->id < 16)
++		return -EINVAL;
++
++	state = inb(priv->base + QUAD8_REG_INDEX_INPUT_LEVELS)
++		& BIT(signal->id - 16);
++
++	level = (state) ? SIGNAL_LEVEL_HIGH : SIGNAL_LEVEL_LOW;
++
++	signal_read_value_set(val, SIGNAL_LEVEL, &level);
 +
 +	return 0;
 +}
 +
-+static int stm32_count_write(struct counter_device *counter,
-+			     struct counter_count *count,
-+			     struct count_write_value *val)
++static int quad8_count_read(struct counter_device *counter,
++	struct counter_count *count, struct count_read_value *val)
 +{
-+	struct stm32_timer_cnt *const priv = counter->priv;
-+	u32 cnt;
-+	int err;
++	const struct quad8_iio *const priv = counter->priv;
++	const int base_offset = priv->base + 2 * count->id;
++	unsigned int flags;
++	unsigned int borrow;
++	unsigned int carry;
++	unsigned long position;
++	int i;
 +
-+	err = count_write_value_get(&cnt, COUNT_POSITION, val);
++	flags = inb(base_offset + 1);
++	borrow = flags & QUAD8_FLAG_BT;
++	carry = !!(flags & QUAD8_FLAG_CT);
++
++	/* Borrow XOR Carry effectively doubles count range */
++	position = (unsigned long)(borrow ^ carry) << 24;
++
++	/* Reset Byte Pointer; transfer Counter to Output Latch */
++	outb(QUAD8_CTR_RLD | QUAD8_RLD_RESET_BP | QUAD8_RLD_CNTR_OUT,
++	     base_offset + 1);
++
++	for (i = 0; i < 3; i++)
++		position |= (unsigned long)inb(base_offset) << (8 * i);
++
++	count_read_value_set(val, COUNT_POSITION, &position);
++
++	return 0;
++}
++
++static int quad8_count_write(struct counter_device *counter,
++	struct counter_count *count, struct count_write_value *val)
++{
++	const struct quad8_iio *const priv = counter->priv;
++	const int base_offset = priv->base + 2 * count->id;
++	int err;
++	unsigned long position;
++	int i;
++
++	err = count_write_value_get(&position, COUNT_POSITION, val);
 +	if (err)
 +		return err;
 +
-+	if (cnt > priv->ceiling)
++	/* Only 24-bit values are supported */
++	if (position > 0xFFFFFF)
 +		return -EINVAL;
 +
-+	return regmap_write(priv->regmap, TIM_CNT, cnt);
-+}
++	/* Reset Byte Pointer */
++	outb(QUAD8_CTR_RLD | QUAD8_RLD_RESET_BP, base_offset + 1);
 +
-+static int stm32_count_function_get(struct counter_device *counter,
-+				    struct counter_count *count,
-+				    size_t *function)
-+{
-+	struct stm32_timer_cnt *const priv = counter->priv;
-+	u32 smcr;
++	/* Counter can only be set via Preset Register */
++	for (i = 0; i < 3; i++)
++		outb(position >> (8 * i), base_offset);
 +
-+	regmap_read(priv->regmap, TIM_SMCR, &smcr);
++	/* Transfer Preset Register to Counter */
++	outb(QUAD8_CTR_RLD | QUAD8_RLD_PRESET_CNTR, base_offset + 1);
 +
-+	switch (smcr & TIM_SMCR_SMS) {
-+	case 1:
-+		*function = STM32_COUNT_ENCODER_MODE_1;
-+		return 0;
-+	case 2:
-+		*function = STM32_COUNT_ENCODER_MODE_2;
-+		return 0;
-+	case 3:
-+		*function = STM32_COUNT_ENCODER_MODE_3;
-+		return 0;
-+	}
++	/* Reset Byte Pointer */
++	outb(QUAD8_CTR_RLD | QUAD8_RLD_RESET_BP, base_offset + 1);
 +
-+	return -EINVAL;
-+}
++	/* Set Preset Register back to original value */
++	position = priv->preset[count->id];
++	for (i = 0; i < 3; i++)
++		outb(position >> (8 * i), base_offset);
 +
-+static int stm32_count_function_set(struct counter_device *counter,
-+				    struct counter_count *count,
-+				    size_t function)
-+{
-+	struct stm32_timer_cnt *const priv = counter->priv;
-+	u32 cr1, sms;
-+
-+	switch (function) {
-+	case STM32_COUNT_ENCODER_MODE_1:
-+		sms = 1;
-+		break;
-+	case STM32_COUNT_ENCODER_MODE_2:
-+		sms = 2;
-+		break;
-+	case STM32_COUNT_ENCODER_MODE_3:
-+		sms = 3;
-+		break;
-+	default:
-+		sms = 0;
-+		break;
-+	}
-+
-+	/* Store enable status */
-+	regmap_read(priv->regmap, TIM_CR1, &cr1);
-+
-+	regmap_update_bits(priv->regmap, TIM_CR1, TIM_CR1_CEN, 0);
-+
-+	/* TIMx_ARR register shouldn't be buffered (ARPE=0) */
-+	regmap_update_bits(priv->regmap, TIM_CR1, TIM_CR1_ARPE, 0);
-+	regmap_write(priv->regmap, TIM_ARR, priv->ceiling);
-+
-+	regmap_update_bits(priv->regmap, TIM_SMCR, TIM_SMCR_SMS, sms);
-+
-+	/* Make sure that registers are updated */
-+	regmap_update_bits(priv->regmap, TIM_EGR, TIM_EGR_UG, TIM_EGR_UG);
-+
-+	/* Restore the enable status */
-+	regmap_update_bits(priv->regmap, TIM_CR1, TIM_CR1_CEN, cr1);
++	/* Reset Borrow, Carry, Compare, and Sign flags */
++	outb(QUAD8_CTR_RLD | QUAD8_RLD_RESET_FLAGS, base_offset + 1);
++	/* Reset Error flag */
++	outb(QUAD8_CTR_RLD | QUAD8_RLD_RESET_E, base_offset + 1);
 +
 +	return 0;
 +}
 +
-+static ssize_t stm32_count_direction_read(struct counter_device *counter,
-+				      struct counter_count *count,
-+				      void *private, char *buf)
++enum quad8_count_function {
++	QUAD8_COUNT_FUNCTION_PULSE_DIRECTION = 0,
++	QUAD8_COUNT_FUNCTION_QUADRATURE_X1,
++	QUAD8_COUNT_FUNCTION_QUADRATURE_X2,
++	QUAD8_COUNT_FUNCTION_QUADRATURE_X4
++};
++
++static enum count_function quad8_count_functions_list[] = {
++	[QUAD8_COUNT_FUNCTION_PULSE_DIRECTION] = COUNT_FUNCTION_PULSE_DIRECTION,
++	[QUAD8_COUNT_FUNCTION_QUADRATURE_X1] = COUNT_FUNCTION_QUADRATURE_X1_A,
++	[QUAD8_COUNT_FUNCTION_QUADRATURE_X2] = COUNT_FUNCTION_QUADRATURE_X2_A,
++	[QUAD8_COUNT_FUNCTION_QUADRATURE_X4] = COUNT_FUNCTION_QUADRATURE_X4
++};
++
++static int quad8_function_get(struct counter_device *counter,
++	struct counter_count *count, size_t *function)
 +{
-+	struct stm32_timer_cnt *const priv = counter->priv;
-+	const char *direction;
-+	u32 cr1;
++	const struct quad8_iio *const priv = counter->priv;
++	const int id = count->id;
++	const unsigned int quadrature_mode = priv->quadrature_mode[id];
++	const unsigned int scale = priv->quadrature_scale[id];
 +
-+	regmap_read(priv->regmap, TIM_CR1, &cr1);
-+	direction = (cr1 & TIM_CR1_DIR) ? "backward" : "forward";
++	if (quadrature_mode)
++		switch (scale) {
++		case 0:
++			*function = QUAD8_COUNT_FUNCTION_QUADRATURE_X1;
++			break;
++		case 1:
++			*function = QUAD8_COUNT_FUNCTION_QUADRATURE_X2;
++			break;
++		case 2:
++			*function = QUAD8_COUNT_FUNCTION_QUADRATURE_X4;
++			break;
++		}
++	else
++		*function = QUAD8_COUNT_FUNCTION_PULSE_DIRECTION;
 +
-+	return scnprintf(buf, PAGE_SIZE, "%s\n", direction);
++	return 0;
 +}
 +
-+static ssize_t stm32_count_ceiling_read(struct counter_device *counter,
-+					struct counter_count *count,
-+					void *private, char *buf)
++static int quad8_function_set(struct counter_device *counter,
++	struct counter_count *count, size_t function)
 +{
-+	struct stm32_timer_cnt *const priv = counter->priv;
-+	u32 arr;
++	struct quad8_iio *const priv = counter->priv;
++	const int id = count->id;
++	unsigned int *const quadrature_mode = priv->quadrature_mode + id;
++	unsigned int *const scale = priv->quadrature_scale + id;
++	unsigned int mode_cfg = priv->count_mode[id] << 1;
++	unsigned int *const synchronous_mode = priv->synchronous_mode + id;
++	const unsigned int idr_cfg = priv->index_polarity[id] << 1;
++	const int base_offset = priv->base + 2 * id + 1;
 +
-+	regmap_read(priv->regmap, TIM_ARR, &arr);
++	if (function == QUAD8_COUNT_FUNCTION_PULSE_DIRECTION) {
++		*quadrature_mode = 0;
 +
-+	return snprintf(buf, PAGE_SIZE, "%u\n", arr);
++		/* Quadrature scaling only available in quadrature mode */
++		*scale = 0;
++
++		/* Synchronous function not supported in non-quadrature mode */
++		if (*synchronous_mode) {
++			*synchronous_mode = 0;
++			/* Disable synchronous function mode */
++			outb(QUAD8_CTR_IDR | idr_cfg, base_offset);
++		}
++	} else {
++		*quadrature_mode = 1;
++
++		switch (function) {
++		case QUAD8_COUNT_FUNCTION_QUADRATURE_X1:
++			*scale = 0;
++			mode_cfg |= QUAD8_CMR_QUADRATURE_X1;
++			break;
++		case QUAD8_COUNT_FUNCTION_QUADRATURE_X2:
++			*scale = 1;
++			mode_cfg |= QUAD8_CMR_QUADRATURE_X2;
++			break;
++		case QUAD8_COUNT_FUNCTION_QUADRATURE_X4:
++			*scale = 2;
++			mode_cfg |= QUAD8_CMR_QUADRATURE_X4;
++			break;
++		}
++	}
++
++	/* Load mode configuration to Counter Mode Register */
++	outb(QUAD8_CTR_CMR | mode_cfg, base_offset);
++
++	return 0;
 +}
 +
-+static ssize_t stm32_count_ceiling_write(struct counter_device *counter,
-+					 struct counter_count *count,
-+					 void *private,
-+					 const char *buf, size_t len)
++static void quad8_direction_get(struct counter_device *counter,
++	struct counter_count *count, enum count_direction *direction)
 +{
-+	struct stm32_timer_cnt *const priv = counter->priv;
-+	unsigned int ceiling;
++	const struct quad8_iio *const priv = counter->priv;
++	unsigned int ud_flag;
++	const unsigned int flag_addr = priv->base + 2 * count->id + 1;
++
++	/* U/D flag: nonzero = up, zero = down */
++	ud_flag = inb(flag_addr) & QUAD8_FLAG_UD;
++
++	*direction = (ud_flag) ? COUNT_DIRECTION_FORWARD :
++		COUNT_DIRECTION_BACKWARD;
++}
++
++enum quad8_synapse_action {
++	QUAD8_SYNAPSE_ACTION_NONE = 0,
++	QUAD8_SYNAPSE_ACTION_RISING_EDGE,
++	QUAD8_SYNAPSE_ACTION_FALLING_EDGE,
++	QUAD8_SYNAPSE_ACTION_BOTH_EDGES
++};
++
++static enum synapse_action quad8_index_actions_list[] = {
++	[QUAD8_SYNAPSE_ACTION_NONE] = SYNAPSE_ACTION_NONE,
++	[QUAD8_SYNAPSE_ACTION_RISING_EDGE] = SYNAPSE_ACTION_RISING_EDGE
++};
++
++static enum synapse_action quad8_synapse_actions_list[] = {
++	[QUAD8_SYNAPSE_ACTION_NONE] = SYNAPSE_ACTION_NONE,
++	[QUAD8_SYNAPSE_ACTION_RISING_EDGE] = SYNAPSE_ACTION_RISING_EDGE,
++	[QUAD8_SYNAPSE_ACTION_FALLING_EDGE] = SYNAPSE_ACTION_FALLING_EDGE,
++	[QUAD8_SYNAPSE_ACTION_BOTH_EDGES] = SYNAPSE_ACTION_BOTH_EDGES
++};
++
++static int quad8_action_get(struct counter_device *counter,
++	struct counter_count *count, struct counter_synapse *synapse,
++	size_t *action)
++{
++	struct quad8_iio *const priv = counter->priv;
++	int err;
++	size_t function = 0;
++	const size_t signal_a_id = count->synapses[0].signal->id;
++	enum count_direction direction;
++
++	/* Handle Index signals */
++	if (synapse->signal->id >= 16) {
++		if (priv->preset_enable[count->id])
++			*action = QUAD8_SYNAPSE_ACTION_RISING_EDGE;
++		else
++			*action = QUAD8_SYNAPSE_ACTION_NONE;
++
++		return 0;
++	}
++
++	err = quad8_function_get(counter, count, &function);
++	if (err)
++		return err;
++
++	/* Default action mode */
++	*action = QUAD8_SYNAPSE_ACTION_NONE;
++
++	/* Determine action mode based on current count function mode */
++	switch (function) {
++	case QUAD8_COUNT_FUNCTION_PULSE_DIRECTION:
++		if (synapse->signal->id == signal_a_id)
++			*action = QUAD8_SYNAPSE_ACTION_RISING_EDGE;
++		break;
++	case QUAD8_COUNT_FUNCTION_QUADRATURE_X1:
++		if (synapse->signal->id == signal_a_id) {
++			quad8_direction_get(counter, count, &direction);
++
++			if (direction == COUNT_DIRECTION_FORWARD)
++				*action = QUAD8_SYNAPSE_ACTION_RISING_EDGE;
++			else
++				*action = QUAD8_SYNAPSE_ACTION_FALLING_EDGE;
++		}
++		break;
++	case QUAD8_COUNT_FUNCTION_QUADRATURE_X2:
++		if (synapse->signal->id == signal_a_id)
++			*action = QUAD8_SYNAPSE_ACTION_BOTH_EDGES;
++		break;
++	case QUAD8_COUNT_FUNCTION_QUADRATURE_X4:
++		*action = QUAD8_SYNAPSE_ACTION_BOTH_EDGES;
++		break;
++	}
++
++	return 0;
++}
++
++const struct counter_ops quad8_ops = {
++	.signal_read = quad8_signal_read,
++	.count_read = quad8_count_read,
++	.count_write = quad8_count_write,
++	.function_get = quad8_function_get,
++	.function_set = quad8_function_set,
++	.action_get = quad8_action_get
++};
++
++static int quad8_index_polarity_get(struct counter_device *counter,
++	struct counter_signal *signal, size_t *index_polarity)
++{
++	const struct quad8_iio *const priv = counter->priv;
++	const size_t channel_id = signal->id - 16;
++
++	*index_polarity = priv->index_polarity[channel_id];
++
++	return 0;
++}
++
++static int quad8_index_polarity_set(struct counter_device *counter,
++	struct counter_signal *signal, size_t index_polarity)
++{
++	struct quad8_iio *const priv = counter->priv;
++	const size_t channel_id = signal->id - 16;
++	const unsigned int idr_cfg = priv->synchronous_mode[channel_id] |
++		index_polarity << 1;
++	const int base_offset = priv->base + 2 * channel_id + 1;
++
++	priv->index_polarity[channel_id] = index_polarity;
++
++	/* Load Index Control configuration to Index Control Register */
++	outb(QUAD8_CTR_IDR | idr_cfg, base_offset);
++
++	return 0;
++}
++
++static struct counter_signal_enum_ext quad8_index_pol_enum = {
++	.items = quad8_index_polarity_modes,
++	.num_items = ARRAY_SIZE(quad8_index_polarity_modes),
++	.get = quad8_index_polarity_get,
++	.set = quad8_index_polarity_set
++};
++
++static int quad8_synchronous_mode_get(struct counter_device *counter,
++	struct counter_signal *signal, size_t *synchronous_mode)
++{
++	const struct quad8_iio *const priv = counter->priv;
++	const size_t channel_id = signal->id - 16;
++
++	*synchronous_mode = priv->synchronous_mode[channel_id];
++
++	return 0;
++}
++
++static int quad8_synchronous_mode_set(struct counter_device *counter,
++	struct counter_signal *signal, size_t synchronous_mode)
++{
++	struct quad8_iio *const priv = counter->priv;
++	const size_t channel_id = signal->id - 16;
++	const unsigned int idr_cfg = synchronous_mode |
++		priv->index_polarity[channel_id] << 1;
++	const int base_offset = priv->base + 2 * channel_id + 1;
++
++	/* Index function must be non-synchronous in non-quadrature mode */
++	if (synchronous_mode && !priv->quadrature_mode[channel_id])
++		return -EINVAL;
++
++	priv->synchronous_mode[channel_id] = synchronous_mode;
++
++	/* Load Index Control configuration to Index Control Register */
++	outb(QUAD8_CTR_IDR | idr_cfg, base_offset);
++
++	return 0;
++}
++
++static struct counter_signal_enum_ext quad8_syn_mode_enum = {
++	.items = quad8_synchronous_modes,
++	.num_items = ARRAY_SIZE(quad8_synchronous_modes),
++	.get = quad8_synchronous_mode_get,
++	.set = quad8_synchronous_mode_set
++};
++
++static ssize_t quad8_count_floor_read(struct counter_device *counter,
++	struct counter_count *count, void *private, char *buf)
++{
++	/* Only a floor of 0 is supported */
++	return snprintf(buf, PAGE_SIZE, "0\n");
++}
++
++static int quad8_count_mode_get(struct counter_device *counter,
++	struct counter_count *count, size_t *cnt_mode)
++{
++	const struct quad8_iio *const priv = counter->priv;
++
++	/* Map 104-QUAD-8 count mode to Generic Counter count mode */
++	switch (priv->count_mode[count->id]) {
++	case 0:
++		*cnt_mode = COUNT_MODE_NORMAL;
++		break;
++	case 1:
++		*cnt_mode = COUNT_MODE_RANGE_LIMIT;
++		break;
++	case 2:
++		*cnt_mode = COUNT_MODE_NON_RECYCLE;
++		break;
++	case 3:
++		*cnt_mode = COUNT_MODE_MODULO_N;
++		break;
++	}
++
++	return 0;
++}
++
++static int quad8_count_mode_set(struct counter_device *counter,
++	struct counter_count *count, size_t cnt_mode)
++{
++	struct quad8_iio *const priv = counter->priv;
++	unsigned int mode_cfg;
++	const int base_offset = priv->base + 2 * count->id + 1;
++
++	/* Map Generic Counter count mode to 104-QUAD-8 count mode */
++	switch (cnt_mode) {
++	case COUNT_MODE_NORMAL:
++		cnt_mode = 0;
++		break;
++	case COUNT_MODE_RANGE_LIMIT:
++		cnt_mode = 1;
++		break;
++	case COUNT_MODE_NON_RECYCLE:
++		cnt_mode = 2;
++		break;
++	case COUNT_MODE_MODULO_N:
++		cnt_mode = 3;
++		break;
++	}
++
++	priv->count_mode[count->id] = cnt_mode;
++
++	/* Set count mode configuration value */
++	mode_cfg = cnt_mode << 1;
++
++	/* Add quadrature mode configuration */
++	if (priv->quadrature_mode[count->id])
++		mode_cfg |= (priv->quadrature_scale[count->id] + 1) << 3;
++
++	/* Load mode configuration to Counter Mode Register */
++	outb(QUAD8_CTR_CMR | mode_cfg, base_offset);
++
++	return 0;
++}
++
++static struct counter_count_enum_ext quad8_cnt_mode_enum = {
++	.items = count_mode_str,
++	.num_items = ARRAY_SIZE(count_mode_str),
++	.get = quad8_count_mode_get,
++	.set = quad8_count_mode_set
++};
++
++static ssize_t quad8_count_direction_read(struct counter_device *counter,
++	struct counter_count *count, void *priv, char *buf)
++{
++	enum count_direction dir;
++
++	quad8_direction_get(counter, count, &dir);
++
++	return scnprintf(buf, PAGE_SIZE, "%s\n", count_direction_str[dir]);
++}
++
++static ssize_t quad8_count_enable_read(struct counter_device *counter,
++	struct counter_count *count, void *private, char *buf)
++{
++	const struct quad8_iio *const priv = counter->priv;
++
++	return scnprintf(buf, PAGE_SIZE, "%u\n", priv->ab_enable[count->id]);
++}
++
++static ssize_t quad8_count_enable_write(struct counter_device *counter,
++	struct counter_count *count, void *private, const char *buf, size_t len)
++{
++	struct quad8_iio *const priv = counter->priv;
++	const int base_offset = priv->base + 2 * count->id;
++	int err;
++	bool ab_enable;
++	unsigned int ior_cfg;
++
++	err = kstrtobool(buf, &ab_enable);
++	if (err)
++		return err;
++
++	priv->ab_enable[count->id] = ab_enable;
++
++	ior_cfg = ab_enable | priv->preset_enable[count->id] << 1;
++
++	/* Load I/O control configuration */
++	outb(QUAD8_CTR_IOR | ior_cfg, base_offset + 1);
++
++	return len;
++}
++
++static int quad8_error_noise_get(struct counter_device *counter,
++	struct counter_count *count, size_t *noise_error)
++{
++	const struct quad8_iio *const priv = counter->priv;
++	const int base_offset = priv->base + 2 * count->id + 1;
++
++	*noise_error = !!(inb(base_offset) & QUAD8_FLAG_E);
++
++	return 0;
++}
++
++static struct counter_count_enum_ext quad8_error_noise_enum = {
++	.items = quad8_noise_error_states,
++	.num_items = ARRAY_SIZE(quad8_noise_error_states),
++	.get = quad8_error_noise_get
++};
++
++static ssize_t quad8_count_preset_read(struct counter_device *counter,
++	struct counter_count *count, void *private, char *buf)
++{
++	const struct quad8_iio *const priv = counter->priv;
++
++	return snprintf(buf, PAGE_SIZE, "%u\n", priv->preset[count->id]);
++}
++
++static ssize_t quad8_count_preset_write(struct counter_device *counter,
++	struct counter_count *count, void *private, const char *buf, size_t len)
++{
++	struct quad8_iio *const priv = counter->priv;
++	const int base_offset = priv->base + 2 * count->id;
++	unsigned int preset;
 +	int ret;
++	int i;
 +
-+	ret = kstrtouint(buf, 0, &ceiling);
++	ret = kstrtouint(buf, 0, &preset);
 +	if (ret)
 +		return ret;
 +
-+	/* TIMx_ARR register shouldn't be buffered (ARPE=0) */
-+	regmap_update_bits(priv->regmap, TIM_CR1, TIM_CR1_ARPE, 0);
-+	regmap_write(priv->regmap, TIM_ARR, ceiling);
++	/* Only 24-bit values are supported */
++	if (preset > 0xFFFFFF)
++		return -EINVAL;
 +
-+	priv->ceiling = ceiling;
++	priv->preset[count->id] = preset;
++
++	/* Reset Byte Pointer */
++	outb(QUAD8_CTR_RLD | QUAD8_RLD_RESET_BP, base_offset + 1);
++
++	/* Set Preset Register */
++	for (i = 0; i < 3; i++)
++		outb(preset >> (8 * i), base_offset);
++
 +	return len;
 +}
 +
-+static ssize_t stm32_count_enable_read(struct counter_device *counter,
-+				       struct counter_count *count,
-+				       void *private, char *buf)
++static ssize_t quad8_count_ceiling_read(struct counter_device *counter,
++	struct counter_count *count, void *private, char *buf)
 +{
-+	struct stm32_timer_cnt *const priv = counter->priv;
-+	u32 cr1;
++	const struct quad8_iio *const priv = counter->priv;
 +
-+	regmap_read(priv->regmap, TIM_CR1, &cr1);
++	/* Range Limit and Modulo-N count modes use preset value as ceiling */
++	switch (priv->count_mode[count->id]) {
++	case 1:
++	case 3:
++		return quad8_count_preset_read(counter, count, private, buf);
++	}
 +
-+	return scnprintf(buf, PAGE_SIZE, "%d\n", (bool)(cr1 & TIM_CR1_CEN));
++	/* By default 0x1FFFFFF (25 bits unsigned) is maximum count */
++	return snprintf(buf, PAGE_SIZE, "33554431\n");
 +}
 +
-+static ssize_t stm32_count_enable_write(struct counter_device *counter,
-+					struct counter_count *count,
-+					void *private,
-+					const char *buf, size_t len)
++static ssize_t quad8_count_ceiling_write(struct counter_device *counter,
++	struct counter_count *count, void *private, const char *buf, size_t len)
 +{
-+	struct stm32_timer_cnt *const priv = counter->priv;
-+	int err;
-+	u32 cr1;
-+	bool enable;
++	struct quad8_iio *const priv = counter->priv;
 +
-+	err = kstrtobool(buf, &enable);
-+	if (err)
-+		return err;
-+
-+	if (enable) {
-+		regmap_read(priv->regmap, TIM_CR1, &cr1);
-+			if (!(cr1 & TIM_CR1_CEN))
-+				clk_enable(priv->clk);
-+
-+		regmap_update_bits(priv->regmap, TIM_CR1, TIM_CR1_CEN,
-+				   TIM_CR1_CEN);
-+	} else {
-+		regmap_read(priv->regmap, TIM_CR1, &cr1);
-+		regmap_update_bits(priv->regmap, TIM_CR1, TIM_CR1_CEN, 0);
-+		if (cr1 & TIM_CR1_CEN)
-+			clk_disable(priv->clk);
++	/* Range Limit and Modulo-N count modes use preset value as ceiling */
++	switch (priv->count_mode[count->id]) {
++	case 1:
++	case 3:
++		return quad8_count_preset_write(counter, count, private, buf,
++						len);
 +	}
 +
 +	return len;
 +}
 +
-+static const struct counter_count_ext stm32_count_ext[] = {
++static ssize_t quad8_count_preset_enable_read(struct counter_device *counter,
++	struct counter_count *count, void *private, char *buf)
++{
++	const struct quad8_iio *const priv = counter->priv;
++
++	return snprintf(buf, PAGE_SIZE, "%u\n",
++		!priv->preset_enable[count->id]);
++}
++
++static ssize_t quad8_count_preset_enable_write(struct counter_device *counter,
++	struct counter_count *count, void *private, const char *buf, size_t len)
++{
++	struct quad8_iio *const priv = counter->priv;
++	const int base_offset = priv->base + 2 * count->id + 1;
++	bool preset_enable;
++	int ret;
++	unsigned int ior_cfg;
++
++	ret = kstrtobool(buf, &preset_enable);
++	if (ret)
++		return ret;
++
++	/* Preset enable is active low in Input/Output Control register */
++	preset_enable = !preset_enable;
++
++	priv->preset_enable[count->id] = preset_enable;
++
++	ior_cfg = priv->ab_enable[count->id] | (unsigned int)preset_enable << 1;
++
++	/* Load I/O control configuration to Input / Output Control Register */
++	outb(QUAD8_CTR_IOR | ior_cfg, base_offset);
++
++	return len;
++}
++
++static const struct counter_signal_ext quad8_index_ext[] = {
++	COUNTER_SIGNAL_ENUM("index_polarity", &quad8_index_pol_enum),
++	COUNTER_SIGNAL_ENUM_AVAILABLE("index_polarity",	&quad8_index_pol_enum),
++	COUNTER_SIGNAL_ENUM("synchronous_mode", &quad8_syn_mode_enum),
++	COUNTER_SIGNAL_ENUM_AVAILABLE("synchronous_mode", &quad8_syn_mode_enum)
++};
++
++#define	QUAD8_QUAD_SIGNAL(_id, _name) {	\
++	.id = (_id),			\
++	.name = (_name)			\
++}
++
++#define	QUAD8_INDEX_SIGNAL(_id, _name) {	\
++	.id = (_id),				\
++	.name = (_name),			\
++	.ext = quad8_index_ext,			\
++	.num_ext = ARRAY_SIZE(quad8_index_ext)	\
++}
++
++static struct counter_signal quad8_signals[] = {
++	QUAD8_QUAD_SIGNAL(0, "Channel 1 Quadrature A"),
++	QUAD8_QUAD_SIGNAL(1, "Channel 1 Quadrature B"),
++	QUAD8_QUAD_SIGNAL(2, "Channel 2 Quadrature A"),
++	QUAD8_QUAD_SIGNAL(3, "Channel 2 Quadrature B"),
++	QUAD8_QUAD_SIGNAL(4, "Channel 3 Quadrature A"),
++	QUAD8_QUAD_SIGNAL(5, "Channel 3 Quadrature B"),
++	QUAD8_QUAD_SIGNAL(6, "Channel 4 Quadrature A"),
++	QUAD8_QUAD_SIGNAL(7, "Channel 4 Quadrature B"),
++	QUAD8_QUAD_SIGNAL(8, "Channel 5 Quadrature A"),
++	QUAD8_QUAD_SIGNAL(9, "Channel 5 Quadrature B"),
++	QUAD8_QUAD_SIGNAL(10, "Channel 6 Quadrature A"),
++	QUAD8_QUAD_SIGNAL(11, "Channel 6 Quadrature B"),
++	QUAD8_QUAD_SIGNAL(12, "Channel 7 Quadrature A"),
++	QUAD8_QUAD_SIGNAL(13, "Channel 7 Quadrature B"),
++	QUAD8_QUAD_SIGNAL(14, "Channel 8 Quadrature A"),
++	QUAD8_QUAD_SIGNAL(15, "Channel 8 Quadrature B"),
++	QUAD8_INDEX_SIGNAL(16, "Channel 1 Index"),
++	QUAD8_INDEX_SIGNAL(17, "Channel 2 Index"),
++	QUAD8_INDEX_SIGNAL(18, "Channel 3 Index"),
++	QUAD8_INDEX_SIGNAL(19, "Channel 4 Index"),
++	QUAD8_INDEX_SIGNAL(20, "Channel 5 Index"),
++	QUAD8_INDEX_SIGNAL(21, "Channel 6 Index"),
++	QUAD8_INDEX_SIGNAL(22, "Channel 7 Index"),
++	QUAD8_INDEX_SIGNAL(23, "Channel 8 Index")
++};
++
++#define QUAD8_COUNT_SYNAPSES(_id) {					\
++	{								\
++		.actions_list = quad8_synapse_actions_list,		\
++		.num_actions = ARRAY_SIZE(quad8_synapse_actions_list),	\
++		.signal = quad8_signals + 2 * (_id)			\
++	},								\
++	{								\
++		.actions_list = quad8_synapse_actions_list,		\
++		.num_actions = ARRAY_SIZE(quad8_synapse_actions_list),	\
++		.signal = quad8_signals + 2 * (_id) + 1			\
++	},								\
++	{								\
++		.actions_list = quad8_index_actions_list,		\
++		.num_actions = ARRAY_SIZE(quad8_index_actions_list),	\
++		.signal = quad8_signals + 2 * (_id) + 16		\
++	}								\
++}
++
++static struct counter_synapse quad8_count_synapses[][3] = {
++	QUAD8_COUNT_SYNAPSES(0), QUAD8_COUNT_SYNAPSES(1),
++	QUAD8_COUNT_SYNAPSES(2), QUAD8_COUNT_SYNAPSES(3),
++	QUAD8_COUNT_SYNAPSES(4), QUAD8_COUNT_SYNAPSES(5),
++	QUAD8_COUNT_SYNAPSES(6), QUAD8_COUNT_SYNAPSES(7)
++};
++
++static const struct counter_count_ext quad8_count_ext[] = {
++	{
++		.name = "ceiling",
++		.read = quad8_count_ceiling_read,
++		.write = quad8_count_ceiling_write
++	},
++	{
++		.name = "floor",
++		.read = quad8_count_floor_read
++	},
++	COUNTER_COUNT_ENUM("count_mode", &quad8_cnt_mode_enum),
++	COUNTER_COUNT_ENUM_AVAILABLE("count_mode", &quad8_cnt_mode_enum),
 +	{
 +		.name = "direction",
-+		.read = stm32_count_direction_read,
++		.read = quad8_count_direction_read
 +	},
 +	{
 +		.name = "enable",
-+		.read = stm32_count_enable_read,
-+		.write = stm32_count_enable_write
++		.read = quad8_count_enable_read,
++		.write = quad8_count_enable_write
++	},
++	COUNTER_COUNT_ENUM("error_noise", &quad8_error_noise_enum),
++	COUNTER_COUNT_ENUM_AVAILABLE("error_noise", &quad8_error_noise_enum),
++	{
++		.name = "preset",
++		.read = quad8_count_preset_read,
++		.write = quad8_count_preset_write
 +	},
 +	{
-+		.name = "ceiling",
-+		.read = stm32_count_ceiling_read,
-+		.write = stm32_count_ceiling_write
-+	},
-+};
-+
-+enum stm32_synapse_action {
-+	STM32_SYNAPSE_ACTION_NONE,
-+	STM32_SYNAPSE_ACTION_BOTH_EDGES
-+};
-+
-+static enum synapse_action stm32_synapse_actions[] = {
-+	[STM32_SYNAPSE_ACTION_NONE] = SYNAPSE_ACTION_NONE,
-+	[STM32_SYNAPSE_ACTION_BOTH_EDGES] = SYNAPSE_ACTION_BOTH_EDGES
-+};
-+
-+static int stm32_action_get(struct counter_device *counter,
-+			    struct counter_count *count,
-+			    struct counter_synapse *synapse,
-+			    size_t *action)
-+{
-+	size_t function;
-+	int err;
-+
-+	/* Default action mode (e.g. STM32_COUNT_SLAVE_MODE_DISABLED) */
-+	*action = STM32_SYNAPSE_ACTION_NONE;
-+
-+	err = stm32_count_function_get(counter, count, &function);
-+	if (err)
-+		return 0;
-+
-+	switch (function) {
-+	case STM32_COUNT_ENCODER_MODE_1:
-+		/* counts up/down on TI1FP1 edge depending on TI2FP2 level */
-+		if (synapse->signal->id == count->synapses[0].signal->id)
-+			*action = STM32_SYNAPSE_ACTION_BOTH_EDGES;
-+		break;
-+	case STM32_COUNT_ENCODER_MODE_2:
-+		/* counts up/down on TI2FP2 edge depending on TI1FP1 level */
-+		if (synapse->signal->id == count->synapses[1].signal->id)
-+			*action = STM32_SYNAPSE_ACTION_BOTH_EDGES;
-+		break;
-+	case STM32_COUNT_ENCODER_MODE_3:
-+		/* counts up/down on both TI1FP1 and TI2FP2 edges */
-+		*action = STM32_SYNAPSE_ACTION_BOTH_EDGES;
-+		break;
++		.name = "preset_enable",
++		.read = quad8_count_preset_enable_read,
++		.write = quad8_count_preset_enable_write
 +	}
++};
 +
-+	return 0;
++#define QUAD8_COUNT(_id, _cntname) {					\
++	.id = (_id),							\
++	.name = (_cntname),						\
++	.functions_list = quad8_count_functions_list,			\
++	.num_functions = ARRAY_SIZE(quad8_count_functions_list),	\
++	.synapses = quad8_count_synapses[(_id)],			\
++	.num_synapses =	2,						\
++	.ext = quad8_count_ext,						\
++	.num_ext = ARRAY_SIZE(quad8_count_ext)				\
 +}
 +
-+static const struct counter_ops stm32_timer_cnt_ops = {
-+	.count_read = stm32_count_read,
-+	.count_write = stm32_count_write,
-+	.function_get = stm32_count_function_get,
-+	.function_set = stm32_count_function_set,
-+	.action_get = stm32_action_get,
++static struct counter_count quad8_counts[] = {
++	QUAD8_COUNT(0, "Channel 1 Count"),
++	QUAD8_COUNT(1, "Channel 2 Count"),
++	QUAD8_COUNT(2, "Channel 3 Count"),
++	QUAD8_COUNT(3, "Channel 4 Count"),
++	QUAD8_COUNT(4, "Channel 5 Count"),
++	QUAD8_COUNT(5, "Channel 6 Count"),
++	QUAD8_COUNT(6, "Channel 7 Count"),
++	QUAD8_COUNT(7, "Channel 8 Count")
 +};
 +
-+static struct counter_signal stm32_signals[] = {
-+	{
-+		.id = 0,
-+		.name = "Channel 1 Quadrature A"
-+	},
-+	{
-+		.id = 1,
-+		.name = "Channel 1 Quadrature B"
-+	}
-+};
-+
-+static struct counter_synapse stm32_count_synapses[] = {
-+	{
-+		.actions_list = stm32_synapse_actions,
-+		.num_actions = ARRAY_SIZE(stm32_synapse_actions),
-+		.signal = &stm32_signals[0]
-+	},
-+	{
-+		.actions_list = stm32_synapse_actions,
-+		.num_actions = ARRAY_SIZE(stm32_synapse_actions),
-+		.signal = &stm32_signals[1]
-+	}
-+};
-+
-+static struct counter_count stm32_counts = {
-+	.id = 0,
-+	.name = "Channel 1 Count",
-+	.functions_list = stm32_count_functions,
-+	.num_functions = ARRAY_SIZE(stm32_count_functions),
-+	.synapses = stm32_count_synapses,
-+	.num_synapses = ARRAY_SIZE(stm32_count_synapses),
-+	.ext = stm32_count_ext,
-+	.num_ext = ARRAY_SIZE(stm32_count_ext)
-+};
-+
-+static int stm32_timer_cnt_probe(struct platform_device *pdev)
-+{
-+	struct stm32_timers *ddata = dev_get_drvdata(pdev->dev.parent);
-+	struct device *dev = &pdev->dev;
-+	struct stm32_timer_cnt *priv;
-+
-+	if (IS_ERR_OR_NULL(ddata))
-+		return -EINVAL;
-+
-+	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
-+	if (!priv)
+ static int quad8_probe(struct device *dev, unsigned int id)
+ {
+ 	struct iio_dev *indio_dev;
+-	struct quad8_iio *priv;
++	struct quad8_iio *quad8iio;
+ 	int i, j;
+ 	unsigned int base_offset;
++	int err;
+ 
+-	indio_dev = devm_iio_device_alloc(dev, sizeof(*priv));
+-	if (!indio_dev)
+-		return -ENOMEM;
+-
+-	if (!devm_request_region(dev, base[id], QUAD8_EXTENT,
+-		dev_name(dev))) {
++	if (!devm_request_region(dev, base[id], QUAD8_EXTENT, dev_name(dev))) {
+ 		dev_err(dev, "Unable to lock port addresses (0x%X-0x%X)\n",
+ 			base[id], base[id] + QUAD8_EXTENT);
+ 		return -EBUSY;
+ 	}
+ 
++	/* Allocate IIO device; this also allocates driver data structure */
++	indio_dev = devm_iio_device_alloc(dev, sizeof(*quad8iio));
++	if (!indio_dev)
 +		return -ENOMEM;
 +
-+	priv->regmap = ddata->regmap;
-+	priv->clk = ddata->clk;
-+	priv->ceiling = ddata->max_arr;
-+
-+	priv->counter.name = dev_name(dev);
-+	priv->counter.parent = dev;
-+	priv->counter.ops = &stm32_timer_cnt_ops;
-+	priv->counter.counts = &stm32_counts;
-+	priv->counter.num_counts = 1;
-+	priv->counter.signals = stm32_signals;
-+	priv->counter.num_signals = ARRAY_SIZE(stm32_signals);
-+	priv->counter.priv = priv;
++	/* Initialize IIO device */
+ 	indio_dev->info = &quad8_info;
+ 	indio_dev->modes = INDIO_DIRECT_MODE;
+ 	indio_dev->num_channels = ARRAY_SIZE(quad8_channels);
+@@ -579,8 +1308,17 @@ static int quad8_probe(struct device *dev, unsigned int id)
+ 	indio_dev->name = dev_name(dev);
+ 	indio_dev->dev.parent = dev;
+ 
+-	priv = iio_priv(indio_dev);
+-	priv->base = base[id];
++	/* Initialize Counter device and driver data */
++	quad8iio = iio_priv(indio_dev);
++	quad8iio->counter.name = dev_name(dev);
++	quad8iio->counter.parent = dev;
++	quad8iio->counter.ops = &quad8_ops;
++	quad8iio->counter.counts = quad8_counts;
++	quad8iio->counter.num_counts = ARRAY_SIZE(quad8_counts);
++	quad8iio->counter.signals = quad8_signals;
++	quad8iio->counter.num_signals = ARRAY_SIZE(quad8_signals);
++	quad8iio->counter.priv = quad8iio;
++	quad8iio->base = base[id];
+ 
+ 	/* Reset all counters and disable interrupt function */
+ 	outb(QUAD8_CHAN_OP_RESET_COUNTERS, base[id] + QUAD8_REG_CHAN_OP);
+@@ -606,7 +1344,13 @@ static int quad8_probe(struct device *dev, unsigned int id)
+ 	/* Enable all counters */
+ 	outb(QUAD8_CHAN_OP_ENABLE_COUNTERS, base[id] + QUAD8_REG_CHAN_OP);
+ 
+-	return devm_iio_device_register(dev, indio_dev);
++	/* Register IIO device */
++	err = devm_iio_device_register(dev, indio_dev);
++	if (err)
++		return err;
 +
 +	/* Register Counter device */
-+	return devm_counter_register(dev, &priv->counter);
-+}
++	return devm_counter_register(dev, &quad8iio->counter);
+ }
+ 
+ static struct isa_driver quad8_driver = {
+diff --git a/drivers/counter/Kconfig b/drivers/counter/Kconfig
+index a74998400282..dd3add729529 100644
+--- a/drivers/counter/Kconfig
++++ b/drivers/counter/Kconfig
+@@ -8,3 +8,24 @@ menuconfig COUNTER
+ 	  This enables counter device support through the Generic Counter
+ 	  interface. You only need to enable this, if you also want to enable
+ 	  one or more of the counter device drivers below.
 +
-+static const struct of_device_id stm32_timer_cnt_of_match[] = {
-+	{ .compatible = "st,stm32-timer-counter", },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, stm32_timer_cnt_of_match);
++if COUNTER
 +
-+static struct platform_driver stm32_timer_cnt_driver = {
-+	.probe = stm32_timer_cnt_probe,
-+	.driver = {
-+		.name = "stm32-timer-counter",
-+		.of_match_table = stm32_timer_cnt_of_match,
-+	},
-+};
-+module_platform_driver(stm32_timer_cnt_driver);
++config 104_QUAD_8
++	tristate "ACCES 104-QUAD-8 driver"
++	depends on PC104 && X86 && IIO
++	select ISA_BUS_API
++	help
++	  Say yes here to build support for the ACCES 104-QUAD-8 quadrature
++	  encoder counter/interface device family (104-QUAD-8, 104-QUAD-4).
 +
-+MODULE_AUTHOR("Benjamin Gaignard <benjamin.gaignard@st.com>");
-+MODULE_ALIAS("platform:stm32-timer-counter");
-+MODULE_DESCRIPTION("STMicroelectronics STM32 TIMER counter driver");
-+MODULE_LICENSE("GPL v2");
++	  A counter's respective error flag may be cleared by performing a write
++	  operation on the respective count value attribute. Although the
++	  104-QUAD-8 counters have a 25-bit range, only the lower 24 bits may be
++	  set, either directly or via the counter's preset attribute. Interrupts
++	  are not supported by this driver.
++
++	  The base port addresses for the devices may be configured via the base
++	  array module parameter.
++
++endif # COUNTER
+diff --git a/drivers/counter/Makefile b/drivers/counter/Makefile
+index b1464604bdbe..aee0d2ddcf2c 100644
+--- a/drivers/counter/Makefile
++++ b/drivers/counter/Makefile
+@@ -3,3 +3,5 @@
+ #
+ 
+ obj-$(CONFIG_COUNTER) += counter.o
++
++obj-$(CONFIG_104_QUAD_8)	+= 104-quad-8.o
+diff --git a/drivers/iio/counter/Kconfig b/drivers/iio/counter/Kconfig
+index bf1e559ad7cd..eeb358122cbe 100644
+--- a/drivers/iio/counter/Kconfig
++++ b/drivers/iio/counter/Kconfig
+@@ -5,23 +5,6 @@
+ 
+ menu "Counters"
+ 
+-config 104_QUAD_8
+-	tristate "ACCES 104-QUAD-8 driver"
+-	depends on PC104 && X86
+-	select ISA_BUS_API
+-	help
+-	  Say yes here to build support for the ACCES 104-QUAD-8 quadrature
+-	  encoder counter/interface device family (104-QUAD-8, 104-QUAD-4).
+-
+-	  Performing a write to a counter's IIO_CHAN_INFO_RAW sets the counter and
+-	  also clears the counter's respective error flag. Although the counters
+-	  have a 25-bit range, only the lower 24 bits may be set, either directly
+-	  or via a counter's preset attribute. Interrupts are not supported by
+-	  this driver.
+-
+-	  The base port addresses for the devices may be configured via the base
+-	  array module parameter.
+-
+ config STM32_LPTIMER_CNT
+ 	tristate "STM32 LP Timer encoder counter driver"
+ 	depends on MFD_STM32_LPTIMER || COMPILE_TEST
+diff --git a/drivers/iio/counter/Makefile b/drivers/iio/counter/Makefile
+index 1b9a896eb488..93933ba49280 100644
+--- a/drivers/iio/counter/Makefile
++++ b/drivers/iio/counter/Makefile
+@@ -4,5 +4,4 @@
+ 
+ # When adding new entries keep the list in alphabetical order
+ 
+-obj-$(CONFIG_104_QUAD_8)	+= 104-quad-8.o
+ obj-$(CONFIG_STM32_LPTIMER_CNT)	+= stm32-lptimer-cnt.o
 -- 
 2.18.0
