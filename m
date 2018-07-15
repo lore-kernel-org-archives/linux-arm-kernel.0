@@ -1,30 +1,48 @@
-From: johan@kernel.org (Johan Hovold)
-Date: Sun, 15 Jul 2018 10:56:28 +0200
-Subject: [PATCH v5 2/7] serdev: add dev_pm_domain_attach|detach()
-In-Reply-To: <d5904115ff1da38fe79b45fa3d59ef0688cea124.1531150733.git.sean.wang@mediatek.com>
-References: <cover.1531150733.git.sean.wang@mediatek.com>
- <d5904115ff1da38fe79b45fa3d59ef0688cea124.1531150733.git.sean.wang@mediatek.com>
-Message-ID: <20180715085628.GI10204@localhost>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun, 15 Jul 2018 12:03:33 +0200
+Subject: [GIT PULL] Ux500 DTS changes for v4.19
+Message-ID: <CACRpkdboWGC5Q1WXQt6u4E3tW+kObCFqtL6eBDoQR=PNz_S91g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 09, 2018 at 11:56:58PM +0800, sean.wang at mediatek.com wrote:
-> From: Sean Wang <sean.wang@mediatek.com>
-> 
-> In order to open up the required power gate before any operation can be
-> effectively performed over the serial bus between CPU and serdev, it's
-> clearly essential to add common attach functions for PM domains to serdev
-> at the probe phase.
-> 
-> Similarly, the relevant dettach function for the PM domains should be
-> properly and reversely added at the remove phase.
-> 
-> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
-> Cc: Rob Herring <robh@kernel.org>
-> Cc: Ulf Hansson <ulf.hansson@linaro.org>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: Jiri Slaby <jslaby@suse.com>
-> Cc: linux-serial at vger.kernel.org
+Hi ARM SoC folks,
 
-Reviewed-by: Johan Hovold <johan@kernel.org>
+here are some Ux500 DTS changes that have stacked up.
+Please pull them in for v4.19!
+
+Yours,
+Linus Walleij
+
+The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
+
+  Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+
+are available in the Git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
+tags/ux500-dts-v4.19
+
+for you to fetch changes up to 97ac567429605c931223a40cae7f2c24f5ae809f:
+
+  ARM: dts: ux500: Get rid of DTC warnings (2018-07-15 11:57:30 +0200)
+
+----------------------------------------------------------------
+Ux500 DTS changes for the v4.19 series.
+Mostly cleanups and fixes, got rid of the DTC warnings.
+
+----------------------------------------------------------------
+Geert Uytterhoeven (2):
+      ARM: dts: ux500: Correct SCU unit address
+      dt-bindings: arm: scu: Correct example SCU unit addresses
+
+Linus Walleij (2):
+      ARM: dts: ux500: Fix LCDA clock line muxing
+      ARM: dts: ux500: Get rid of DTC warnings
+
+ Documentation/devicetree/bindings/arm/scu.txt          | 2 +-
+ Documentation/devicetree/bindings/arm/ux500/boards.txt | 2 +-
+ arch/arm/boot/dts/ste-dbx5x0.dtsi                      | 9 +++++++--
+ arch/arm/boot/dts/ste-href-family-pinctrl.dtsi         | 8 ++++++--
+ arch/arm/boot/dts/ste-href.dtsi                        | 1 +
+ arch/arm/boot/dts/ste-snowball.dts                     | 1 +
+ 6 files changed, 17 insertions(+), 6 deletions(-)
