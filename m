@@ -1,86 +1,52 @@
-From: sean.wang@mediatek.com (Sean Wang)
-Date: Sun, 15 Jul 2018 15:52:14 +0800
-Subject: [PATCH v5 5/7] Bluetooth: Extend btuart driver for join more
- vendor devices
-In-Reply-To: <70616B99-5A2D-417A-8815-246700EEF4E2@holtmann.org>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Sun, 15 Jul 2018 10:12:10 +0200
+Subject: [SPAM]Re: [PATCH v5 2/7] serdev: add dev_pm_domain_attach|detach()
+In-Reply-To: <1531632595.26214.31.camel@mtkswgap22>
 References: <cover.1531150733.git.sean.wang@mediatek.com>
- <85d449cdd34bf47d72935a821915e825c64a2145.1531150733.git.sean.wang@mediatek.com>
- <70616B99-5A2D-417A-8815-246700EEF4E2@holtmann.org>
-Message-ID: <1531641134.3955.19.camel@mtkswgap22>
+ <d5904115ff1da38fe79b45fa3d59ef0688cea124.1531150733.git.sean.wang@mediatek.com>
+ <ED7E5A98-81DC-41B9-9B9A-3EF4EBBED854@holtmann.org>
+ <1531632595.26214.31.camel@mtkswgap22>
+Message-ID: <20180715081210.GB20758@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2018-07-14 at 18:44 +0200, Marcel Holtmann wrote:
-> Hi Sean,
-> 
-> > Adding an independent btuart.h header allows these essential definitions
-> > can be reused in vendor driver. Also, struct btuart_vnd is extended with
-> > additional callbacks such as .init initializing vendor data, .shtudown,
-> > .recv and .send supporting SoC specific framing for that btuart can
-> > simply adapt to various Bluetooth uart-based devices.
+On Sun, Jul 15, 2018 at 01:29:55PM +0800, Sean Wang wrote:
+> On Sat, 2018-07-14 at 18:27 +0200, Marcel Holtmann wrote:
+> > Hi Sean,
 > > 
-> > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> > ---
-> > drivers/bluetooth/btuart.c | 73 ++++++++++++++++++++++++----------------------
-> > drivers/bluetooth/btuart.h | 30 +++++++++++++++++++
-> > 2 files changed, 68 insertions(+), 35 deletions(-)
-> > create mode 100644 drivers/bluetooth/btuart.h
+> > > In order to open up the required power gate before any operation can be
+> > > effectively performed over the serial bus between CPU and serdev, it's
+> > > clearly essential to add common attach functions for PM domains to serdev
+> > > at the probe phase.
+> > > 
+> > > Similarly, the relevant dettach function for the PM domains should be
+> > > properly and reversely added at the remove phase.
+> > > 
+> > > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> > > Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+> > > Cc: Rob Herring <robh@kernel.org>
+> > > Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> > > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> > > Cc: Jiri Slaby <jslaby@suse.com>
+> > > Cc: linux-serial at vger.kernel.org
+> > > ---
+> > > drivers/tty/serdev/core.c | 15 ++++++++++++++-
+> > > 1 file changed, 14 insertions(+), 1 deletion(-)
 > > 
-> > diff --git a/drivers/bluetooth/btuart.c b/drivers/bluetooth/btuart.c
-> > index a900aac..65d0086 100644
-> > --- a/drivers/bluetooth/btuart.c
-> > +++ b/drivers/bluetooth/btuart.c
-> > @@ -33,35 +33,11 @@
-> > #include <net/bluetooth/hci_core.h>
+> > can we take this through the serial subsystem? Or should I just take it when the driver is ready to be included?
 > > 
-> > #include "h4_recv.h"
-> > +#include "btuart.h"
-> > #include "btbcm.h"
+> > Regards
 > > 
-> > #define VERSION "1.0"
+> > Marcel
 > > 
-> > -struct btuart_vnd {
-> > -	const struct h4_recv_pkt *recv_pkts;
-> > -	int recv_pkts_cnt;
-> > -	unsigned int manufacturer;
-> > -	int (*open)(struct hci_dev *hdev);
-> > -	int (*close)(struct hci_dev *hdev);
-> > -	int (*setup)(struct hci_dev *hdev);
-> > -};
-> > -
-> > -struct btuart_dev {
-> > -	struct hci_dev *hdev;
-> > -	struct serdev_device *serdev;
-> > -
-> > -	struct work_struct tx_work;
-> > -	unsigned long tx_state;
-> > -	struct sk_buff_head txq;
-> > -
-> > -	struct sk_buff *rx_skb;
-> > -
-> > -	const struct btuart_vnd *vnd;
-> > -};
 > 
-> I really like to avoid this since it is not clean. Frankly I prefer to keep the btuart.c driver for drivers that really just use H:4 as transport protocol. If the protocol is only H:4 alike and has extra headers, then it should be a separate driver.
+> I think it's better if the change is taken through serial subsystem
+> first.
 > 
-
-thanks for letting me know your concern. I think I'm a little over in reusing these existing methods and break something generic and its beauty.
-
-I'll make the driver be a separate one based on btuart in the next version.
-
-
-> The common H:4 handling is abstracted in h4_recv.h already anyway and we can add more pieces if needed. However I also wonder since you have extra framing that the complex H:4 state keeping might be not needed at all. So it could be simplified.
+> Hi, Rob
 > 
+> do you have any comment? 
 
-okay, I will get rid of h4_recv.h and consider to use more simplified logic to handle the extra framing and its payload.
+Yeah, I've been ignoring it to wait to get an ack from someone...
 
-> Regards
-> 
-> Marcel
-
-
-> 
-> _______________________________________________
-> Linux-mediatek mailing list
-> Linux-mediatek at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-mediatek
+greg k-h
