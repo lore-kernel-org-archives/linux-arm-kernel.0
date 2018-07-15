@@ -1,13 +1,13 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sun, 15 Jul 2018 19:03:51 +0300
-Subject: [PATCH 1/8] PCI: xgene: Fix I/O space page leak
+Date: Sun, 15 Jul 2018 19:08:14 +0300
+Subject: [PATCH 3/8] PCI: versatile: Fix I/O space page leak
 In-Reply-To: <3e862a05-084a-d732-3060-6e2b234e9718@cogentembedded.com>
 References: <3e862a05-084a-d732-3060-6e2b234e9718@cogentembedded.com>
-Message-ID: <e217754c-6488-4d2e-510c-6984cc5fc375@cogentembedded.com>
+Message-ID: <6e75e0be-eee4-9a92-4d33-994ae393d2db@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When testing the R-Car PCIe driver on the Condor board,  I noticed that if
+When testing the R-Car PCIe driver on the Condor board, I noticed that iff
 I left  the PCIe PHY driver disabled, the kernel crashed with this BUG:
 
 [    1.225819] kernel BUG at lib/ioremap.c:72!
@@ -60,96 +60,29 @@ probe failed, and since devm_phy_optional_get() returned -EPROBE_DEFER,
 the probe was retried,  finally causing the BUG due to trying to remap
 already remapped pages.
 
-The most feasible solution seemed to introduce devm_pci_remap_iospace()
-and call it instead of pci_remap_iospace(), so that the pages get unmapped
-automagically on any probe failure.
+The Versatile PCIe driver has the same issue. The most feasible solution
+seemed to introduce devm_pci_remap_iospace() -- which was done in the XGene
+PCIe driver patch posted earlier...
 
-Looking at the PCI drivers having the same issue, the XGene driver turned
-out  to be the earliest broken, so I'll have to start with fixing it...
-
-Fixes: 5f6b6ccdbe1c ("PCI: xgene: Add APM X-Gene PCIe driver")
+Fixes: b7e78170efd4 ("PCI: versatile: Add DT-based ARM Versatile PB PCIe host driver")
 Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 Acked-by: Bjorn Helgaas <bhelgaas@google.com>
 
 ---
- drivers/pci/controller/pci-xgene.c |    2 -
- drivers/pci/pci.c                  |   38 +++++++++++++++++++++++++++++++++++++
- include/linux/pci.h                |    2 +
- 3 files changed, 41 insertions(+), 1 deletion(-)
+ drivers/pci/controller/pci-versatile.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Index: pci/drivers/pci/controller/pci-xgene.c
+Index: pci/drivers/pci/controller/pci-versatile.c
 ===================================================================
---- pci.orig/drivers/pci/controller/pci-xgene.c
-+++ pci/drivers/pci/controller/pci-xgene.c
-@@ -423,7 +423,7 @@ static int xgene_pcie_map_ranges(struct
- 		case IORESOURCE_IO:
- 			xgene_pcie_setup_ob_reg(port, res, OMR3BARL, io_base,
- 						res->start - window->offset);
--			ret = pci_remap_iospace(res, io_base);
-+			ret = devm_pci_remap_iospace(dev, res, io_base);
- 			if (ret < 0)
- 				return ret;
- 			break;
-Index: pci/drivers/pci/pci.c
-===================================================================
---- pci.orig/drivers/pci/pci.c
-+++ pci/drivers/pci/pci.c
-@@ -3579,6 +3579,44 @@ void pci_unmap_iospace(struct resource *
- }
- EXPORT_SYMBOL(pci_unmap_iospace);
+--- pci.orig/drivers/pci/controller/pci-versatile.c
++++ pci/drivers/pci/controller/pci-versatile.c
+@@ -82,7 +82,7 @@ static int versatile_pci_parse_request_o
  
-+static void devm_pci_unmap_iospace(struct device *dev, void *ptr)
-+{
-+	struct resource **res = ptr;
-+
-+	pci_unmap_iospace(*res);
-+}
-+
-+/**
-+ * devm_pci_remap_iospace - Managed pci_remap_iospace()
-+ * @dev: Generic device to remap IO address for
-+ * @res: Resource describing the I/O space
-+ * @phys_addr: physical address of range to be mapped
-+ *
-+ * Managed pci_remap_iospace().  Map is automatically unmapped on driver
-+ * detach.
-+ */
-+int devm_pci_remap_iospace(struct device *dev, const struct resource *res,
-+			   phys_addr_t phys_addr)
-+{
-+	const struct resource **ptr;
-+	int error;
-+
-+	ptr = devres_alloc(devm_pci_unmap_iospace, sizeof(*ptr), GFP_KERNEL);
-+	if (!ptr)
-+		return -ENOMEM;
-+
-+	error = pci_remap_iospace(res, phys_addr);
-+	if (error) {
-+		devres_free(ptr);
-+	} else	{
-+		*ptr = res;
-+		devres_add(dev, ptr);
-+	}
-+
-+	return error;
-+}
-+EXPORT_SYMBOL(devm_pci_remap_iospace);
-+
- /**
-  * devm_pci_remap_cfgspace - Managed pci_remap_cfgspace()
-  * @dev: Generic device to remap IO address for
-Index: pci/include/linux/pci.h
-===================================================================
---- pci.orig/include/linux/pci.h
-+++ pci/include/linux/pci.h
-@@ -1240,6 +1240,8 @@ int pci_register_io_range(struct fwnode_
- unsigned long pci_address_to_pio(phys_addr_t addr);
- phys_addr_t pci_pio_to_address(unsigned long pio);
- int pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr);
-+int devm_pci_remap_iospace(struct device *dev, const struct resource *res,
-+			   phys_addr_t phys_addr);
- void pci_unmap_iospace(struct resource *res);
- void __iomem *devm_pci_remap_cfgspace(struct device *dev,
- 				      resource_size_t offset,
+ 		switch (resource_type(res)) {
+ 		case IORESOURCE_IO:
+-			err = pci_remap_iospace(res, iobase);
++			err = devm_pci_remap_iospace(dev, res, iobase);
+ 			if (err) {
+ 				dev_warn(dev, "error %d: failed to map resource %pR\n",
+ 					 err, res);
