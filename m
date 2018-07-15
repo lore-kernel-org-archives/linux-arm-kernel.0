@@ -1,9 +1,9 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sun, 15 Jul 2018 19:23:15 +0300
-Subject: [PATCH 5/8] PCI: aardvark: Fix I/O space page leak
+Date: Sun, 15 Jul 2018 19:31:22 +0300
+Subject: [PATCH 7/8] PCI: mediatek: Fix I/O space page leak
 In-Reply-To: <3e862a05-084a-d732-3060-6e2b234e9718@cogentembedded.com>
 References: <3e862a05-084a-d732-3060-6e2b234e9718@cogentembedded.com>
-Message-ID: <cda39cfb-59e5-d19e-9564-ab765f3e88c8@cogentembedded.com>
+Message-ID: <176630c8-6b02-75a5-6d9e-eedc89ee9763@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -60,30 +60,29 @@ probe failed, and since devm_phy_optional_get() returned -EPROBE_DEFER,
 the probe was retried,  finally causing the BUG due to trying to remap
 already remapped pages.
 
-The Aardvark PCI driver has the same issue.  The most feasible solution
+The MediatTek PCIe driver has the same issue.  The most feasible solution
 seemed to introduce devm_pci_remap_iospace() -- which was done in the XGene
 PCIe driver patch posted earlier...
 
-Fixes: 8c39d710363c ("PCI: aardvark: Add Aardvark PCI host controller driver")
+Fixes: 637cfacae96f ("PCI: mediatek: Add MediaTek PCIe host controller support")
 Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Reviewed-by: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
 Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 Acked-by: Bjorn Helgaas <bhelgaas@google.com>
 
 ---
- drivers/pci/controller/pci-aardvark.c |    2 +-
+ drivers/pci/controller/pcie-mediatek.c |    2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-Index: pci/drivers/pci/controller/pci-aardvark.c
+Index: pci/drivers/pci/controller/pcie-mediatek.c
 ===================================================================
---- pci.orig/drivers/pci/controller/pci-aardvark.c
-+++ pci/drivers/pci/controller/pci-aardvark.c
-@@ -849,7 +849,7 @@ static int advk_pcie_parse_request_of_pc
- 					     0,	0xF8000000, 0,
- 					     lower_32_bits(res->start),
- 					     OB_PCIE_IO);
--			err = pci_remap_iospace(res, iobase);
-+			err = devm_pci_remap_iospace(dev, res, iobase);
- 			if (err) {
- 				dev_warn(dev, "error %d: failed to map resource %pR\n",
- 					 err, res);
+--- pci.orig/drivers/pci/controller/pcie-mediatek.c
++++ pci/drivers/pci/controller/pcie-mediatek.c
+@@ -1109,7 +1109,7 @@ static int mtk_pcie_request_resources(st
+ 	if (err < 0)
+ 		return err;
+ 
+-	pci_remap_iospace(&pcie->pio, pcie->io.start);
++	devm_pci_remap_iospace(dev, &pcie->pio, pcie->io.start);
+ 
+ 	return 0;
+ }
