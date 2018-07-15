@@ -1,136 +1,88 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sat, 14 Jul 2018 20:53:42 -0700
-Subject: [PATCH] arm64: cpuinfo: Include cleartext implementer and part strings
-Message-ID: <20180715035342.11371-1-olof@lixom.net>
+From: sean.wang@mediatek.com (Sean Wang)
+Date: Sun, 15 Jul 2018 13:10:49 +0800
+Subject: [PATCH v5 1/7] dt-bindings: net: bluetooth: Add mediatek-bluetooth
+In-Reply-To: <7E55939D-7F8A-4832-9DD5-EFB3B19ACF0B@holtmann.org>
+References: <cover.1531150733.git.sean.wang@mediatek.com>
+ <d8a5b34513cf2187a2b23a513feaa358d719bc14.1531150733.git.sean.wang@mediatek.com>
+ <7E55939D-7F8A-4832-9DD5-EFB3B19ACF0B@holtmann.org>
+Message-ID: <1531631449.26214.28.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There's some use in printing out what the implementer and part numbers
-decode to for cases where they're known.
+On Sat, 2018-07-14 at 18:26 +0200, Marcel Holtmann wrote:
+> Hi Sean,
+> 
+> > Add binding document for a SoC built-in device using MediaTek protocol.
+> > Which could be found on MT7622 SoC or other similar MediaTek SoCs.
+> > 
+> > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> > Reviewed-by: Rob Herring <robh@kernel.org>
+> > ---
+> > .../devicetree/bindings/net/mediatek-bluetooth.txt | 35 ++++++++++++++++++++++
+> > 1 file changed, 35 insertions(+)
+> > create mode 100644 Documentation/devicetree/bindings/net/mediatek-bluetooth.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/net/mediatek-bluetooth.txt b/Documentation/devicetree/bindings/net/mediatek-bluetooth.txt
+> > new file mode 100644
+> > index 0000000..1335429
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/net/mediatek-bluetooth.txt
+> > @@ -0,0 +1,35 @@
+> > +MediaTek SoC built-in Bluetooth Devices
+> > +==================================
+> > +
+> > +This device is a serial attached device to BTIF device and thus it must be a
+> > +child node of the serial node with BTIF. The dt-bindings details for BTIF
+> > +device can be known via Documentation/devicetree/bindings/serial/8250.txt.
+> > +
+> > +Required properties:
+> > +
+> > +- compatible:	Must be one of
+> > +		  "mediatek,mt7622-bluetooth"": for MT7622 SoC
+> 
+> this does not match with the example below. And one of, should be normally be a list.
+> 
 
-I filled in the table based on public information; mostly from ARM TRMs
-and other tools (and some of the SSBD tables in the kernel, etc).
+Thanks! I'll remove the words "one of" from the compatible description,
+and the extra " being added accidentally.
 
-Apple IDs came from
-https://github.com/apple/darwin-xnu/blob/master/osfmk/arm/cpuid.h
+And the below example fully shows the bluetooth device and its attached
+bus (mediatek,mt7622-btif) to let people know clearly how to enable the
+bluetooth device.
 
-Signed-off-by: Olof Johansson <olof@lixom.net>
----
- arch/arm64/kernel/cpuinfo.c | 79 +++++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 76 insertions(+), 3 deletions(-)
+The current document just describes the bluetooth device and as for the
+attached bus, it is already present at
+Documentation/devicetree/bindings/serial/8250.txt.
 
-diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
-index e9ab7b3..9a7c25d 100644
---- a/arch/arm64/kernel/cpuinfo.c
-+++ b/arch/arm64/kernel/cpuinfo.c
-@@ -121,6 +121,67 @@ static const char *const compat_hwcap2_str[] = {
- };
- #endif /* CONFIG_COMPAT */
- 
-+struct midr_info {
-+	unsigned int mask;
-+	unsigned int val;
-+	char *id;
-+};
-+
-+static const struct midr_info midr_part[] = {
-+	// ARM
-+	{ .mask = 0xff00fff0, .val = 0x4100d030, .id = "Cortex-A53" },
-+	{ .mask = 0xff00fff0, .val = 0x4100d040, .id = "Cortex-A35" },
-+	{ .mask = 0xff00fff0, .val = 0x4100d070, .id = "Cortex-A57" },
-+	{ .mask = 0xff00fff0, .val = 0x4100d080, .id = "Cortex-A72" },
-+	{ .mask = 0xff00fff0, .val = 0x4100d090, .id = "Cortex-A73" },
-+	{ .mask = 0xff00fff0, .val = 0x4100d0a0, .id = "Cortex-A75" },
-+	{ .mask = 0xff00fff0, .val = 0x4100d0f0, .id = "Cortex-A55" },
-+	// Broadcom
-+	{ .mask = 0xff00fff0, .val = 0x42001000, .id = "Brahma-B53" },
-+	{ .mask = 0xff00fff0, .val = 0x42005160, .id = "ThunderX2" },
-+	// Cavium
-+	{ .mask = 0xff00fff0, .val = 0x43000a00, .id = "ThunderX" },
-+	{ .mask = 0xff00fff0, .val = 0x43000a10, .id = "ThunderX 88xx" },
-+	{ .mask = 0xff00fff0, .val = 0x43000a20, .id = "ThunderX 81xx" },
-+	{ .mask = 0xff00fff0, .val = 0x43000a30, .id = "ThunderX 83xx" },
-+	{ .mask = 0xff00fff0, .val = 0x43000af0, .id = "ThunderX2 99xx" },
-+	// Nvidia
-+	{ .mask = 0xff00fff0, .val = 0x4e000000, .id = "Denver" },
-+	{ .mask = 0xff00fff0, .val = 0x4e000030, .id = "Denver 2" },
-+	// Applied Micro
-+	{ .mask = 0xff00fff0, .val = 0x50000000, .id = "X-Gene" },
-+	// Qualcomm
-+	{ .mask = 0xff00fff0, .val = 0x51002010, .id = "Kryo" },
-+	{ .mask = 0xff00fff0, .val = 0x51002050, .id = "Kryo" },
-+	{ .mask = 0xff00fff0, .val = 0x51002110, .id = "Kryo" },
-+	{ .mask = 0xff00fff0, .val = 0x51008000, .id = "Falkor V1/Kryo" },
-+	{ .mask = 0xff00fff0, .val = 0x51008010, .id = "Kryo V2" },
-+	{ .mask = 0xff00fff0, .val = 0x5100c000, .id = "Falkor" },
-+	{ .mask = 0xff00fff0, .val = 0x5100c010, .id = "Saphira" },
-+	// Samsung
-+	{ .mask = 0xff00fff0, .val = 0x53000010, .id = "M1" },
-+	// Apple
-+	{ .mask = 0xff00fff0, .val = 0x61000010, .id = "Cyclone" },
-+	{ .mask = 0xff00fff0, .val = 0x61000020, .id = "Typhoon" },
-+	{ .mask = 0xff00fff0, .val = 0x61000030, .id = "Typhoon/Capri" },
-+	{ .mask = 0xff00fff0, .val = 0x61000040, .id = "Twister" },
-+	{ .mask = 0xff00fff0, .val = 0x61000050, .id = "Twister/Elba/Malta" },
-+	{ .mask = 0xff00fff0, .val = 0x61000060, .id = "Hurricane" },
-+	{ .mask = 0xff00fff0, .val = 0x61000070, .id = "Hurricane/Myst" },
-+};
-+
-+static const struct midr_info midr_impl[] = {
-+	{ .mask = 0xff000000, .val = 0x41000000, .id = "ARM" },
-+	{ .mask = 0xff000000, .val = 0x42000000, .id = "Broadcom" },
-+	{ .mask = 0xff000000, .val = 0x43000000, .id = "Cavium" },
-+	{ .mask = 0xff000000, .val = 0x4d000000, .id = "Motorola" },
-+	{ .mask = 0xff000000, .val = 0x4e000000, .id = "Nvidia" },
-+	{ .mask = 0xff000000, .val = 0x50000000, .id = "Applied Micro" },
-+	{ .mask = 0xff000000, .val = 0x51000000, .id = "Qualcomm" },
-+	{ .mask = 0xff000000, .val = 0x53000000, .id = "Samsung" },
-+	{ .mask = 0xff000000, .val = 0x61000000, .id = "Apple" },
-+};
-+
- static int c_show(struct seq_file *m, void *v)
- {
- 	int i, j;
-@@ -129,6 +190,16 @@ static int c_show(struct seq_file *m, void *v)
- 	for_each_online_cpu(i) {
- 		struct cpuinfo_arm64 *cpuinfo = &per_cpu(cpu_data, i);
- 		u32 midr = cpuinfo->reg_midr;
-+		char *impl = NULL;
-+		char *part = NULL;
-+
-+		for (j = 0; !impl && j < ARRAY_SIZE(midr_impl); j++)
-+			if ((midr & midr_impl[j].mask) == midr_impl[j].val)
-+				impl = midr_impl[j].id;
-+
-+		for (j = 0; !part && j < ARRAY_SIZE(midr_part); j++)
-+			if ((midr & midr_part[j].mask) == midr_part[j].val)
-+				part = midr_part[j].id;
- 
- 		/*
- 		 * glibc reads /proc/cpuinfo to determine the number of
-@@ -168,11 +239,12 @@ static int c_show(struct seq_file *m, void *v)
- 		}
- 		seq_puts(m, "\n");
- 
--		seq_printf(m, "CPU implementer\t: 0x%02x\n",
--			   MIDR_IMPLEMENTOR(midr));
-+		seq_printf(m, "CPU implementer\t: 0x%02x (%s)\n",
-+			   MIDR_IMPLEMENTOR(midr), impl ? : "unknown");
- 		seq_printf(m, "CPU architecture: 8\n");
- 		seq_printf(m, "CPU variant\t: 0x%x\n", MIDR_VARIANT(midr));
--		seq_printf(m, "CPU part\t: 0x%03x\n", MIDR_PARTNUM(midr));
-+		seq_printf(m, "CPU part\t: 0x%03x (%s)\n", MIDR_PARTNUM(midr),
-+			   part ? : "unknown");
- 		seq_printf(m, "CPU revision\t: %d\n\n", MIDR_REVISION(midr));
- 	}
- 
-@@ -300,6 +372,7 @@ static int __init cpuinfo_regs_init(void)
- 	}
- 	return 0;
- }
-+
- static void cpuinfo_detect_icache_policy(struct cpuinfo_arm64 *info)
- {
- 	unsigned int cpu = smp_processor_id();
--- 
-2.8.6
+	Sean
+
+
+> > +- clocks:	Should be the clock specifiers corresponding to the entry in
+> > +		clock-names property.
+> > +- clock-names:	Should contain "ref" entries.
+> > +- power-domains: Phandle to the power domain that the device is part of
+> > +
+> > +Example:
+> > +
+> > +	btif: serial at 1100c000 {
+> > +		compatible = "mediatek,mt7622-btif",
+> > +			     "mediatek,mtk-btif";
+> > +		reg = <0 0x1100c000 0 0x1000>;
+> > +		interrupts = <GIC_SPI 90 IRQ_TYPE_LEVEL_LOW>;
+> > +		clocks = <&pericfg CLK_PERI_BTIF_PD>;
+> > +		clock-names = "main";
+> > +		reg-shift = <2>;
+> > +		reg-io-width = <4>;
+> > +
+> > +		bluetooth {
+> > +			compatible = "mediatek,mt7622-bluetooth";
+> > +			power-domains = <&scpsys MT7622_POWER_DOMAIN_WB>;
+> > +			clocks = <&clk25m>;
+> > +			clock-names = "ref";
+> > +		};
+> > +	};
+> 
+> Regards
+> 
+> Marcel
+> 
