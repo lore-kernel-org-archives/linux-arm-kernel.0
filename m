@@ -1,26 +1,57 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Sun, 15 Jul 2018 22:19:12 +0200
-Subject: [PATCH v5 1/5] clk: actions: Fix the missing REGMAP_MMIO
- dependency
-In-Reply-To: <20180715200151.10416-2-sravanhome@gmail.com>
-References: <20180715200151.10416-1-sravanhome@gmail.com>
- <20180715200151.10416-2-sravanhome@gmail.com>
-Message-ID: <4255c9c7-fffb-5b35-dbb7-ec91c6424c34@suse.de>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sun, 15 Jul 2018 22:21:53 +0200
+Subject: [PATCH] ARM: dts: pxa: change serial node names
+Message-ID: <20180715202153.7233-1-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 15.07.2018 um 22:01 schrieb Saravanan Sekar:
-> Add REGMAP_MMIO as dependency to avoid undefined
-> reference to regmap symbols.
-> 
-> Signed-off-by: Saravanan Sekar <sravanhome@gmail.com>
+Change from xxuart to serial to normalize the devicetree pxa serial
+support.
 
-Still no Fixes: header. Please read SubmittingPatches.
+Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+---
+ arch/arm/boot/dts/pxa2xx.dtsi | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-Regards,
-Andreas
-
+diff --git a/arch/arm/boot/dts/pxa2xx.dtsi b/arch/arm/boot/dts/pxa2xx.dtsi
+index f609dbb86abf..a5f9efdd2361 100644
+--- a/arch/arm/boot/dts/pxa2xx.dtsi
++++ b/arch/arm/boot/dts/pxa2xx.dtsi
+@@ -95,7 +95,7 @@
+ 			};
+ 		};
+ 
+-		ffuart: uart at 40100000 {
++		ffuart: serial at 40100000 {
+ 			compatible = "mrvl,pxa-uart";
+ 			reg = <0x40100000 0x30>;
+ 			interrupts = <22>;
+@@ -103,7 +103,7 @@
+ 			status = "disabled";
+ 		};
+ 
+-		btuart: uart at 40200000 {
++		btuart: serial at 40200000 {
+ 			compatible = "mrvl,pxa-uart";
+ 			reg = <0x40200000 0x30>;
+ 			interrupts = <21>;
+@@ -111,7 +111,7 @@
+ 			status = "disabled";
+ 		};
+ 
+-		stuart: uart at 40700000 {
++		stuart: serial at 40700000 {
+ 			compatible = "mrvl,pxa-uart";
+ 			reg = <0x40700000 0x30>;
+ 			interrupts = <20>;
+@@ -119,7 +119,7 @@
+ 			status = "disabled";
+ 		};
+ 
+-		hwuart: uart at 41100000 {
++		hwuart: serial at 41100000 {
+ 			compatible = "mrvl,pxa-uart";
+ 			reg = <0x41100000 0x30>;
+ 			interrupts = <7>;
 -- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+2.11.0
