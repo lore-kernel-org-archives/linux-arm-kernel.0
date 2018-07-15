@@ -1,57 +1,62 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sun, 15 Jul 2018 22:21:53 +0200
-Subject: [PATCH] ARM: dts: pxa: change serial node names
-Message-ID: <20180715202153.7233-1-robert.jarzmik@free.fr>
+From: sravanhome@gmail.com (Saravanan Sekar)
+Date: Sun, 15 Jul 2018 22:35:19 +0200
+Subject: [PATCH v6 0/5] Add clock driver for Actions S700 SoC
+Message-ID: <20180715203524.11948-1-sravanhome@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change from xxuart to serial to normalize the devicetree pxa serial
-support.
+This patchset adds clock support for Actions Semi Owl series S700 SoC
+with relevant clock bindings and device tree info. 
 
-Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
----
- arch/arm/boot/dts/pxa2xx.dtsi | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+Changed the UART clock using CMU instance and changes are tested in
+cubieboard7
 
-diff --git a/arch/arm/boot/dts/pxa2xx.dtsi b/arch/arm/boot/dts/pxa2xx.dtsi
-index f609dbb86abf..a5f9efdd2361 100644
---- a/arch/arm/boot/dts/pxa2xx.dtsi
-+++ b/arch/arm/boot/dts/pxa2xx.dtsi
-@@ -95,7 +95,7 @@
- 			};
- 		};
- 
--		ffuart: uart at 40100000 {
-+		ffuart: serial at 40100000 {
- 			compatible = "mrvl,pxa-uart";
- 			reg = <0x40100000 0x30>;
- 			interrupts = <22>;
-@@ -103,7 +103,7 @@
- 			status = "disabled";
- 		};
- 
--		btuart: uart at 40200000 {
-+		btuart: serial at 40200000 {
- 			compatible = "mrvl,pxa-uart";
- 			reg = <0x40200000 0x30>;
- 			interrupts = <21>;
-@@ -111,7 +111,7 @@
- 			status = "disabled";
- 		};
- 
--		stuart: uart at 40700000 {
-+		stuart: serial at 40700000 {
- 			compatible = "mrvl,pxa-uart";
- 			reg = <0x40700000 0x30>;
- 			interrupts = <20>;
-@@ -119,7 +119,7 @@
- 			status = "disabled";
- 		};
- 
--		hwuart: uart at 41100000 {
-+		hwuart: serial at 41100000 {
- 			compatible = "mrvl,pxa-uart";
- 			reg = <0x41100000 0x30>;
- 			interrupts = <7>;
+Changelog v6:
+- Adding Fixes tag for adding REGMAP dependency addition
+
+Changelog v5:
+- Commit message corrections
+- Removed MMC_OWL_CLK_NANDPLL option, as no active consumer
+- Device tree clock label name correction
+
+Changelog v4:
+- dt-bindings use absolute numbering for clocks
+- Patch re-oredering
+
+Changelog v3:
+- Splitted uart clock DTS changes into separate patch
+- Splitted REGMAP Kconfig selection into separate patch
+- General naming convention as "Actions Semi" in dt-binding documentation
+- Patch re-oredering
+- Cleanup and fixed review findings
+
+Changelog v2:
+Fixed 0 day compilation warning
+Modified existing dts Actions S900 clock bindings common to Actions
+Soc family
+
+Thanks and regards,
+Saravanan,
+Parthiban
+
+Saravanan Sekar (5):
+  clk: actions: Add missing REGMAP_MMIO dependency
+  dt-bindings: clock: Add S700 support for Actions Semi Soc's
+  clk: actions: Add S700 SoC clock support
+  arm64: dts: actions: Add Clock Management Unit for S700
+  arm64: dts: actions: Set UART clock reference from CMU
+
+ ...tions,s900-cmu.txt => actions,owl-cmu.txt} |  20 +-
+ .../boot/dts/actions/s700-cubieboard7.dts     |   8 +-
+ arch/arm64/boot/dts/actions/s700.dtsi         |  14 +
+ drivers/clk/actions/Kconfig                   |   7 +
+ drivers/clk/actions/Makefile                  |   1 +
+ drivers/clk/actions/owl-s700.c                | 606 ++++++++++++++++++
+ include/dt-bindings/clock/actions,s700-cmu.h  | 118 ++++
+ 7 files changed, 758 insertions(+), 16 deletions(-)
+ rename Documentation/devicetree/bindings/clock/{actions,s900-cmu.txt => actions,owl-cmu.txt} (68%)
+ create mode 100644 drivers/clk/actions/owl-s700.c
+ create mode 100644 include/dt-bindings/clock/actions,s700-cmu.h
+
 -- 
-2.11.0
+2.18.0
