@@ -1,88 +1,109 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sun, 15 Jul 2018 19:31:22 +0300
-Subject: [PATCH 7/8] PCI: mediatek: Fix I/O space page leak
-In-Reply-To: <3e862a05-084a-d732-3060-6e2b234e9718@cogentembedded.com>
-References: <3e862a05-084a-d732-3060-6e2b234e9718@cogentembedded.com>
-Message-ID: <176630c8-6b02-75a5-6d9e-eedc89ee9763@cogentembedded.com>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Sun, 15 Jul 2018 20:13:57 +0200
+Subject: [RFC net-next 00/15] net: A socket API for LoRa
+In-Reply-To: <BY1PR02MB11147C7443AB9623D6B65798E75A0@BY1PR02MB1114.namprd02.prod.outlook.com>
+References: <20180701110804.32415-1-afaerber@suse.de>
+ <BY1PR02MB11147C7443AB9623D6B65798E75A0@BY1PR02MB1114.namprd02.prod.outlook.com>
+Message-ID: <e08cdcfb-207f-bd73-2afd-f775810b72b7@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When testing the R-Car PCIe driver on the Condor board,  I noticed that if
-I left  the PCIe PHY driver disabled, the kernel crashed with this BUG:
++ linux-wireless + Stefan + Seth
 
-[    1.225819] kernel BUG at lib/ioremap.c:72!
-[    1.230007] Internal error: Oops - BUG: 0 [#1] PREEMPT SMP
-[    1.235496] Modules linked in:
-[    1.238561] CPU: 0 PID: 39 Comm: kworker/0:1 Not tainted 4.17.0-dirty #1092
-[    1.245526] Hardware name: Renesas Condor board based on r8a77980 (DT)
-[    1.252075] Workqueue: events deferred_probe_work_func
-[    1.257220] pstate: 80000005 (Nzcv daif -PAN -UAO)
-[    1.262024] pc : ioremap_page_range+0x370/0x3c8
-[    1.266558] lr : ioremap_page_range+0x40/0x3c8
-[    1.271002] sp : ffff000008da39e0
-[    1.274317] x29: ffff000008da39e0 x28: 00e8000000000f07
-[    1.279636] x27: ffff7dfffee00000 x26: 0140000000000000
-[    1.284954] x25: ffff7dfffef00000 x24: 00000000000fe100
-[    1.290272] x23: ffff80007b906000 x22: ffff000008ab8000
-[    1.295590] x21: ffff000008bb1d58 x20: ffff7dfffef00000
-[    1.300909] x19: ffff800009c30fb8 x18: 0000000000000001
-[    1.306226] x17: 00000000000152d0 x16: 00000000014012d0
-[    1.311544] x15: 0000000000000000 x14: 0720072007200720
-[    1.316862] x13: 0720072007200720 x12: 0720072007200720
-[    1.322180] x11: 0720072007300730 x10: 00000000000000ae
-[    1.327498] x9 : 0000000000000000 x8 : ffff7dffff000000                      
-[    1.332816] x7 : 0000000000000000 x6 : 0000000000000100
-[    1.338134] x5 : 0000000000000000 x4 : 000000007b906000
-[    1.343452] x3 : ffff80007c61a880 x2 : ffff7dfffeefffff
-[    1.348770] x1 : 0000000040000000 x0 : 00e80000fe100f07
-[    1.354090] Process kworker/0:1 (pid: 39, stack limit = 0x        (ptrval))  
-[    1.361056] Call trace:
-[    1.363504]  ioremap_page_range+0x370/0x3c8
-[    1.367695]  pci_remap_iospace+0x7c/0xac
-[    1.371624]  pci_parse_request_of_pci_ranges+0x13c/0x190
-[    1.376945]  rcar_pcie_probe+0x4c/0xb04
-[    1.380786]  platform_drv_probe+0x50/0xbc
-[    1.384799]  driver_probe_device+0x21c/0x308
-[    1.389072]  __device_attach_driver+0x98/0xc8
-[    1.393431]  bus_for_each_drv+0x54/0x94
-[    1.397269]  __device_attach+0xc4/0x12c
-[    1.401107]  device_initial_probe+0x10/0x18
-[    1.405292]  bus_probe_device+0x90/0x98
-[    1.409130]  deferred_probe_work_func+0xb0/0x150
-[    1.413756]  process_one_work+0x12c/0x29c
-[    1.417768]  worker_thread+0x200/0x3fc
-[    1.421522]  kthread+0x108/0x134
-[    1.424755]  ret_from_fork+0x10/0x18
-[    1.428334] Code: f9004ba2 54000080 aa0003fb 17ffff48 (d4210000)
+Am 11.07.2018 um 17:21 schrieb Ben Whitten:
+>> This patchset is clearly not ready for merging, but is being
+>> submitted for
+>> discussion, as requested by Jiri, in particular of the design
+>> choices:
+>>
+>> 1) PF_LORA/AF_LORA and associated identifiers are
+>> proposed to represent
+>>    this technology. While for an SX1276 - case a) above - it
+>> might work to
+>>    layer LoRaWAN as a protocol option for PF_LORA and add
+>> LoRaWAN address
+>>    fields to the union in my sockaddr_lora, how would that
+>> work for devices
+>>    that only support LoRaWAN but not pure LoRa? Do we
+>> need both AF_LORA and
+>>    AF_LORAWAN, or just a separate ETH_P_LORAWAN or
+>> ARPHRD_LORAWAN?
+>>
+>> 2) PF_LORA is used with SOCK_DGRAM here. The
+>> assumption is that RAW mode
+>>    would be DGRAM plus preamble plus optional checksum.
+>>
+>> 3) Only the transmit path is partially implemented already.
+>> The assumption
+>>    is that the devices should go into receive mode by default
+>> and only
+>>    interrupt that when asked to transmit.
+>>
+>> 4) Some hardware settings need to be supplied externally,
+>> such as the radio
+>>    frequency for some modules, but many others can be
+>> runtime-configured,
+>>    such as Spreading Factor, Bandwidth, Sync Word, or which
+>> antenna to use.
+>>    What settings should be implemented as socket option vs.
+>> netlink layer
+>>    vs. ioctl vs. sysfs? What are the criteria to apply?
+>>
+>> 5) Many of the modules support multiple modes, such as
+>> LoRa, LoRaWAN and FSK.
+>>    Lacking a LoRaWAN implementation, I am currently
+>> switching them into LoRa
+>>    mode at probe time wherever possible. How do we deal
+>> with that properly?
+>>
+>>   a) Is there any precedence from the Wifi world for
+>> dynamically selecting
+>>      between our own trusted Open Source implementation
+>> vs. hardware/firmware
+>>      accelerated and/or certified implementations?
+>>
+>>   b) Would a proof of concept for FSK (non-LoRa) modes be
+>> required for
+>>      merging any LoRa driver for chipsets that support both?
+>> Or is there any
+>>      facility or design guidelines that would allow us to focus
+>> on LoRa and
+>>      LoRaWAN and leave non-LoRa radio modes to later
+>> contributors?
+> 
+> Down the line I think we should also plan for a CRDA style regdb somewhere in the path for raw LoRa transceivers operating as softMAC, much like with WiFi.
 
-It turned out that pci_remap_iospace() wasn't undone when the driver's
-probe failed, and since devm_phy_optional_get() returned -EPROBE_DEFER,
-the probe was retried,  finally causing the BUG due to trying to remap
-already remapped pages.
+Yes, I had raised the topic of wireless-regdb for Stefan's conference -
+currently it seems to only cover 2.4 GHz, 5 GHz and 60 GHz. Not sure if
+we can easily extend that to cover 433 MHz, 868 MHz, 915 MHz and 923 MHz
+bands or whether we'd just need something similar... Is 802.15.4 able to
+share this database with Wifi?
 
-The MediatTek PCIe driver has the same issue.  The most feasible solution
-seemed to introduce devm_pci_remap_iospace() -- which was done in the XGene
-PCIe driver patch posted earlier...
+An argument to share with Wifi might be that Semtech's SX1280 and SX1281
+2.4 GHz transceivers claim to support LoRa modulation, too. Having two
+different regulatory DBs interact with LoRa drivers seems a bad idea,
+and duplicating 2.4 GHz into a new DB doesn't sound appealing either.
 
-Fixes: 637cfacae96f ("PCI: mediatek: Add MediaTek PCIe host controller support")
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
-Acked-by: Bjorn Helgaas <bhelgaas@google.com>
+https://www.semtech.com/products/wireless-rf/24-ghz-transceivers
 
----
- drivers/pci/controller/pcie-mediatek.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Meanwhile my attempt to play with netlink during SUSE Hackweek has been
+going slow and I could use some guidance or a volunteer to contribute: I
+have a bare skeleton of registration, commands, attributes and multicast
+groups, but no plan yet how to connect that to the actual drivers to
+query or apply the settings...
 
-Index: pci/drivers/pci/controller/pcie-mediatek.c
-===================================================================
---- pci.orig/drivers/pci/controller/pcie-mediatek.c
-+++ pci/drivers/pci/controller/pcie-mediatek.c
-@@ -1109,7 +1109,7 @@ static int mtk_pcie_request_resources(st
- 	if (err < 0)
- 		return err;
- 
--	pci_remap_iospace(&pcie->pio, pcie->io.start);
-+	devm_pci_remap_iospace(dev, &pcie->pio, pcie->io.start);
- 
- 	return 0;
- }
+https://git.kernel.org/pub/scm/linux/kernel/git/afaerber/linux-lora.git/tree/net/lora/netlink.c?h=lora-next
+
+> LoRa radios used in Gateway devices are typically relatively high power (capable of 27dBm) and operate in bands with certain restrictions, eg the EU has keep out areas within 868MHz for alarms and SRD devices must abide by certain duty cycle restrictions, there are also maximum powers to consider for sub-bands. (ETSI EN 300 220-2 V3.2.1, Bands K, L, M, N, P, Q)
+
+> The certified AT style modules will (should) already have this regulatory data baked in so it only applied to situations where we drive the transceivers directly, but it wouldn't hurt to check that the frequency being asked to transmit on doesn't spill into a restricted band.
+
+Some do have configuration options that will need to be set or checked.
+
+Regards,
+Andreas
+
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
