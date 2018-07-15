@@ -1,137 +1,453 @@
 From: vilhelm.gray@gmail.com (William Breathitt Gray)
-Date: Sun, 15 Jul 2018 16:47:30 -0400
-Subject: [PATCH v8 11/11] iio: counter: Add deprecation markings for IIO
- Counter attributes
+Date: Sun, 15 Jul 2018 16:46:32 -0400
+Subject: [PATCH v8 07/11] counter: Add STM32 Timer quadrature encoder
 In-Reply-To: <cover.1531685024.git.vilhelm.gray@gmail.com>
 References: <cover.1531685024.git.vilhelm.gray@gmail.com>
-Message-ID: <8815656bba012cc91b8cd0802d744c54917b6f3d.1531685025.git.vilhelm.gray@gmail.com>
+Message-ID: <14b517e863f6af60353e06d7c5db5571f75f6f86.1531685025.git.vilhelm.gray@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The IIO counter subdirectory is now superceded by the Counter subsystem.
-This patch adds deprecation warnings to the documentation of the
-relevant IIO Counter sysfs attributes.
+From: Benjamin Gaignard <benjamin.gaignard@st.com>
 
-Acked-by: Jonathan Cameron <Jonathan.Cameron@huawei.com>
+Implement counter part of the STM32 timer hardware block by using
+counter API. Hardware only supports X2 and X4 quadrature modes. A
+ceiling value can be set to define the maximum value reachable by the
+counter.
+
+Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+Co-authored-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+Reviewed-by: Jonathan Cameron <Jonathan.Cameron@huawei.com>
 Signed-off-by: William Breathitt Gray <vilhelm.gray@gmail.com>
 ---
- Documentation/ABI/testing/sysfs-bus-iio          |  8 ++++++++
- .../ABI/testing/sysfs-bus-iio-counter-104-quad-8 | 16 ++++++++++++++++
- 2 files changed, 24 insertions(+)
+ drivers/counter/Kconfig           |  10 +
+ drivers/counter/Makefile          |   1 +
+ drivers/counter/stm32-timer-cnt.c | 390 ++++++++++++++++++++++++++++++
+ 3 files changed, 401 insertions(+)
+ create mode 100644 drivers/counter/stm32-timer-cnt.c
 
-diff --git a/Documentation/ABI/testing/sysfs-bus-iio b/Documentation/ABI/testing/sysfs-bus-iio
-index c7353030670a..fc50adf08e47 100644
---- a/Documentation/ABI/testing/sysfs-bus-iio
-+++ b/Documentation/ABI/testing/sysfs-bus-iio
-@@ -1649,6 +1649,8 @@ What:		/sys/bus/iio/devices/iio:deviceX/in_countY_raw
- KernelVersion:	4.10
- Contact:	linux-iio at vger.kernel.org
- Description:
-+		This interface is deprecated; please use the Counter subsystem.
-+
- 		Raw counter device counts from channel Y. For quadrature
- 		counters, multiplication by an available [Y]_scale results in
- 		the counts of a single quadrature signal phase from channel Y.
-@@ -1657,6 +1659,8 @@ What:		/sys/bus/iio/devices/iio:deviceX/in_indexY_raw
- KernelVersion:	4.10
- Contact:	linux-iio at vger.kernel.org
- Description:
-+		This interface is deprecated; please use the Counter subsystem.
-+
- 		Raw counter device index value from channel Y. This attribute
- 		provides an absolute positional reference (e.g. a pulse once per
- 		revolution) which may be used to home positional systems as
-@@ -1666,6 +1670,8 @@ What:		/sys/bus/iio/devices/iio:deviceX/in_count_count_direction_available
- KernelVersion:	4.12
- Contact:	linux-iio at vger.kernel.org
- Description:
-+		This interface is deprecated; please use the Counter subsystem.
-+
- 		A list of possible counting directions which are:
- 		- "up"	: counter device is increasing.
- 		- "down": counter device is decreasing.
-@@ -1674,4 +1680,6 @@ What:		/sys/bus/iio/devices/iio:deviceX/in_countY_count_direction
- KernelVersion:	4.12
- Contact:	linux-iio at vger.kernel.org
- Description:
-+		This interface is deprecated; please use the Counter subsystem.
-+
- 		Raw counter device counters direction for channel Y.
-diff --git a/Documentation/ABI/testing/sysfs-bus-iio-counter-104-quad-8 b/Documentation/ABI/testing/sysfs-bus-iio-counter-104-quad-8
-index 7fac2c268d9a..bac3d0d48b7b 100644
---- a/Documentation/ABI/testing/sysfs-bus-iio-counter-104-quad-8
-+++ b/Documentation/ABI/testing/sysfs-bus-iio-counter-104-quad-8
-@@ -6,6 +6,8 @@ What:		/sys/bus/iio/devices/iio:deviceX/in_index_synchronous_mode_available
- KernelVersion:	4.10
- Contact:	linux-iio at vger.kernel.org
- Description:
-+		This interface is deprecated; please use the Counter subsystem.
-+
- 		Discrete set of available values for the respective counter
- 		configuration are listed in this file.
+diff --git a/drivers/counter/Kconfig b/drivers/counter/Kconfig
+index dd3add729529..0bb2340d6087 100644
+--- a/drivers/counter/Kconfig
++++ b/drivers/counter/Kconfig
+@@ -28,4 +28,14 @@ config 104_QUAD_8
+ 	  The base port addresses for the devices may be configured via the base
+ 	  array module parameter.
  
-@@ -13,6 +15,8 @@ What:		/sys/bus/iio/devices/iio:deviceX/in_countY_count_mode
- KernelVersion:	4.10
- Contact:	linux-iio at vger.kernel.org
- Description:
-+		This interface is deprecated; please use the Counter subsystem.
++config STM32_TIMER_CNT
++	tristate "STM32 Timer encoder counter driver"
++	depends on MFD_STM32_TIMERS || COMPILE_TEST
++	help
++	  Select this option to enable STM32 Timer quadrature encoder
++	  and counter driver.
 +
- 		Count mode for channel Y. Four count modes are available:
- 		normal, range limit, non-recycle, and modulo-n. The preset value
- 		for channel Y is used by the count mode where required.
-@@ -47,6 +51,8 @@ What:		/sys/bus/iio/devices/iio:deviceX/in_countY_noise_error
- KernelVersion:	4.10
- Contact:	linux-iio at vger.kernel.org
- Description:
-+		This interface is deprecated; please use the Counter subsystem.
++	  To compile this driver as a module, choose M here: the
++	  module will be called stm32-timer-cnt.
 +
- 		Read-only attribute that indicates whether excessive noise is
- 		present at the channel Y count inputs in quadrature clock mode;
- 		irrelevant in non-quadrature clock mode.
-@@ -55,6 +61,8 @@ What:		/sys/bus/iio/devices/iio:deviceX/in_countY_preset
- KernelVersion:	4.10
- Contact:	linux-iio at vger.kernel.org
- Description:
-+		This interface is deprecated; please use the Counter subsystem.
-+
- 		If the counter device supports preset registers, the preset
- 		count for channel Y is provided by this attribute.
+ endif # COUNTER
+diff --git a/drivers/counter/Makefile b/drivers/counter/Makefile
+index aee0d2ddcf2c..6b4a5be21b00 100644
+--- a/drivers/counter/Makefile
++++ b/drivers/counter/Makefile
+@@ -5,3 +5,4 @@
+ obj-$(CONFIG_COUNTER) += counter.o
  
-@@ -62,6 +70,8 @@ What:		/sys/bus/iio/devices/iio:deviceX/in_countY_quadrature_mode
- KernelVersion:	4.10
- Contact:	linux-iio at vger.kernel.org
- Description:
-+		This interface is deprecated; please use the Counter subsystem.
+ obj-$(CONFIG_104_QUAD_8)	+= 104-quad-8.o
++obj-$(CONFIG_STM32_TIMER_CNT)	+= stm32-timer-cnt.o
+diff --git a/drivers/counter/stm32-timer-cnt.c b/drivers/counter/stm32-timer-cnt.c
+new file mode 100644
+index 000000000000..0b15e729798b
+--- /dev/null
++++ b/drivers/counter/stm32-timer-cnt.c
+@@ -0,0 +1,390 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * STM32 Timer Encoder and Counter driver
++ *
++ * Copyright (C) STMicroelectronics 2018
++ *
++ * Author: Benjamin Gaignard <benjamin.gaignard@st.com>
++ *
++ */
++#include <linux/counter.h>
++#include <linux/iio/iio.h>
++#include <linux/iio/types.h>
++#include <linux/mfd/stm32-timers.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
 +
- 		Configure channel Y counter for non-quadrature or quadrature
- 		clock mode. Selecting non-quadrature clock mode will disable
- 		synchronous load mode. In quadrature clock mode, the channel Y
-@@ -83,6 +93,8 @@ What:		/sys/bus/iio/devices/iio:deviceX/in_countY_set_to_preset_on_index
- KernelVersion:	4.10
- Contact:	linux-iio at vger.kernel.org
- Description:
-+		This interface is deprecated; please use the Counter subsystem.
++#define TIM_CCMR_CCXS	(BIT(8) | BIT(0))
++#define TIM_CCMR_MASK	(TIM_CCMR_CC1S | TIM_CCMR_CC2S | \
++			 TIM_CCMR_IC1F | TIM_CCMR_IC2F)
++#define TIM_CCER_MASK	(TIM_CCER_CC1P | TIM_CCER_CC1NP | \
++			 TIM_CCER_CC2P | TIM_CCER_CC2NP)
 +
- 		Whether to set channel Y counter with channel Y preset value
- 		when channel Y index input is active, or continuously count.
- 		Valid attribute values are boolean.
-@@ -91,6 +103,8 @@ What:		/sys/bus/iio/devices/iio:deviceX/in_indexY_index_polarity
- KernelVersion:	4.10
- Contact:	linux-iio at vger.kernel.org
- Description:
-+		This interface is deprecated; please use the Counter subsystem.
++struct stm32_timer_cnt {
++	struct counter_device counter;
++	struct regmap *regmap;
++	struct clk *clk;
++	u32 ceiling;
++};
 +
- 		Active level of channel Y index input; irrelevant in
- 		non-synchronous load mode.
- 
-@@ -98,6 +112,8 @@ What:		/sys/bus/iio/devices/iio:deviceX/in_indexY_synchronous_mode
- KernelVersion:	4.10
- Contact:	linux-iio at vger.kernel.org
- Description:
-+		This interface is deprecated; please use the Counter subsystem.
++/**
++ * stm32_count_function - enumerates stm32 timer counter encoder modes
++ * @STM32_COUNT_SLAVE_MODE_DISABLED: counts on internal clock when CEN=1
++ * @STM32_COUNT_ENCODER_MODE_1: counts TI1FP1 edges, depending on TI2FP2 level
++ * @STM32_COUNT_ENCODER_MODE_2: counts TI2FP2 edges, depending on TI1FP1 level
++ * @STM32_COUNT_ENCODER_MODE_3: counts on both TI1FP1 and TI2FP2 edges
++ */
++enum stm32_count_function {
++	STM32_COUNT_SLAVE_MODE_DISABLED = -1,
++	STM32_COUNT_ENCODER_MODE_1,
++	STM32_COUNT_ENCODER_MODE_2,
++	STM32_COUNT_ENCODER_MODE_3,
++};
 +
- 		Configure channel Y counter for non-synchronous or synchronous
- 		load mode. Synchronous load mode cannot be selected in
- 		non-quadrature clock mode.
++static enum count_function stm32_count_functions[] = {
++	[STM32_COUNT_ENCODER_MODE_1] = COUNT_FUNCTION_QUADRATURE_X2_A,
++	[STM32_COUNT_ENCODER_MODE_2] = COUNT_FUNCTION_QUADRATURE_X2_B,
++	[STM32_COUNT_ENCODER_MODE_3] = COUNT_FUNCTION_QUADRATURE_X4,
++};
++
++static int stm32_count_read(struct counter_device *counter,
++			    struct counter_count *count,
++			    struct count_read_value *val)
++{
++	struct stm32_timer_cnt *const priv = counter->priv;
++	u32 cnt;
++
++	regmap_read(priv->regmap, TIM_CNT, &cnt);
++	count_read_value_set(val, COUNT_POSITION, &cnt);
++
++	return 0;
++}
++
++static int stm32_count_write(struct counter_device *counter,
++			     struct counter_count *count,
++			     struct count_write_value *val)
++{
++	struct stm32_timer_cnt *const priv = counter->priv;
++	u32 cnt;
++	int err;
++
++	err = count_write_value_get(&cnt, COUNT_POSITION, val);
++	if (err)
++		return err;
++
++	if (cnt > priv->ceiling)
++		return -EINVAL;
++
++	return regmap_write(priv->regmap, TIM_CNT, cnt);
++}
++
++static int stm32_count_function_get(struct counter_device *counter,
++				    struct counter_count *count,
++				    size_t *function)
++{
++	struct stm32_timer_cnt *const priv = counter->priv;
++	u32 smcr;
++
++	regmap_read(priv->regmap, TIM_SMCR, &smcr);
++
++	switch (smcr & TIM_SMCR_SMS) {
++	case 1:
++		*function = STM32_COUNT_ENCODER_MODE_1;
++		return 0;
++	case 2:
++		*function = STM32_COUNT_ENCODER_MODE_2;
++		return 0;
++	case 3:
++		*function = STM32_COUNT_ENCODER_MODE_3;
++		return 0;
++	}
++
++	return -EINVAL;
++}
++
++static int stm32_count_function_set(struct counter_device *counter,
++				    struct counter_count *count,
++				    size_t function)
++{
++	struct stm32_timer_cnt *const priv = counter->priv;
++	u32 cr1, sms;
++
++	switch (function) {
++	case STM32_COUNT_ENCODER_MODE_1:
++		sms = 1;
++		break;
++	case STM32_COUNT_ENCODER_MODE_2:
++		sms = 2;
++		break;
++	case STM32_COUNT_ENCODER_MODE_3:
++		sms = 3;
++		break;
++	default:
++		sms = 0;
++		break;
++	}
++
++	/* Store enable status */
++	regmap_read(priv->regmap, TIM_CR1, &cr1);
++
++	regmap_update_bits(priv->regmap, TIM_CR1, TIM_CR1_CEN, 0);
++
++	/* TIMx_ARR register shouldn't be buffered (ARPE=0) */
++	regmap_update_bits(priv->regmap, TIM_CR1, TIM_CR1_ARPE, 0);
++	regmap_write(priv->regmap, TIM_ARR, priv->ceiling);
++
++	regmap_update_bits(priv->regmap, TIM_SMCR, TIM_SMCR_SMS, sms);
++
++	/* Make sure that registers are updated */
++	regmap_update_bits(priv->regmap, TIM_EGR, TIM_EGR_UG, TIM_EGR_UG);
++
++	/* Restore the enable status */
++	regmap_update_bits(priv->regmap, TIM_CR1, TIM_CR1_CEN, cr1);
++
++	return 0;
++}
++
++static ssize_t stm32_count_direction_read(struct counter_device *counter,
++				      struct counter_count *count,
++				      void *private, char *buf)
++{
++	struct stm32_timer_cnt *const priv = counter->priv;
++	const char *direction;
++	u32 cr1;
++
++	regmap_read(priv->regmap, TIM_CR1, &cr1);
++	direction = (cr1 & TIM_CR1_DIR) ? "backward" : "forward";
++
++	return scnprintf(buf, PAGE_SIZE, "%s\n", direction);
++}
++
++static ssize_t stm32_count_ceiling_read(struct counter_device *counter,
++					struct counter_count *count,
++					void *private, char *buf)
++{
++	struct stm32_timer_cnt *const priv = counter->priv;
++	u32 arr;
++
++	regmap_read(priv->regmap, TIM_ARR, &arr);
++
++	return snprintf(buf, PAGE_SIZE, "%u\n", arr);
++}
++
++static ssize_t stm32_count_ceiling_write(struct counter_device *counter,
++					 struct counter_count *count,
++					 void *private,
++					 const char *buf, size_t len)
++{
++	struct stm32_timer_cnt *const priv = counter->priv;
++	unsigned int ceiling;
++	int ret;
++
++	ret = kstrtouint(buf, 0, &ceiling);
++	if (ret)
++		return ret;
++
++	/* TIMx_ARR register shouldn't be buffered (ARPE=0) */
++	regmap_update_bits(priv->regmap, TIM_CR1, TIM_CR1_ARPE, 0);
++	regmap_write(priv->regmap, TIM_ARR, ceiling);
++
++	priv->ceiling = ceiling;
++	return len;
++}
++
++static ssize_t stm32_count_enable_read(struct counter_device *counter,
++				       struct counter_count *count,
++				       void *private, char *buf)
++{
++	struct stm32_timer_cnt *const priv = counter->priv;
++	u32 cr1;
++
++	regmap_read(priv->regmap, TIM_CR1, &cr1);
++
++	return scnprintf(buf, PAGE_SIZE, "%d\n", (bool)(cr1 & TIM_CR1_CEN));
++}
++
++static ssize_t stm32_count_enable_write(struct counter_device *counter,
++					struct counter_count *count,
++					void *private,
++					const char *buf, size_t len)
++{
++	struct stm32_timer_cnt *const priv = counter->priv;
++	int err;
++	u32 cr1;
++	bool enable;
++
++	err = kstrtobool(buf, &enable);
++	if (err)
++		return err;
++
++	if (enable) {
++		regmap_read(priv->regmap, TIM_CR1, &cr1);
++			if (!(cr1 & TIM_CR1_CEN))
++				clk_enable(priv->clk);
++
++		regmap_update_bits(priv->regmap, TIM_CR1, TIM_CR1_CEN,
++				   TIM_CR1_CEN);
++	} else {
++		regmap_read(priv->regmap, TIM_CR1, &cr1);
++		regmap_update_bits(priv->regmap, TIM_CR1, TIM_CR1_CEN, 0);
++		if (cr1 & TIM_CR1_CEN)
++			clk_disable(priv->clk);
++	}
++
++	return len;
++}
++
++static const struct counter_count_ext stm32_count_ext[] = {
++	{
++		.name = "direction",
++		.read = stm32_count_direction_read,
++	},
++	{
++		.name = "enable",
++		.read = stm32_count_enable_read,
++		.write = stm32_count_enable_write
++	},
++	{
++		.name = "ceiling",
++		.read = stm32_count_ceiling_read,
++		.write = stm32_count_ceiling_write
++	},
++};
++
++enum stm32_synapse_action {
++	STM32_SYNAPSE_ACTION_NONE,
++	STM32_SYNAPSE_ACTION_BOTH_EDGES
++};
++
++static enum synapse_action stm32_synapse_actions[] = {
++	[STM32_SYNAPSE_ACTION_NONE] = SYNAPSE_ACTION_NONE,
++	[STM32_SYNAPSE_ACTION_BOTH_EDGES] = SYNAPSE_ACTION_BOTH_EDGES
++};
++
++static int stm32_action_get(struct counter_device *counter,
++			    struct counter_count *count,
++			    struct counter_synapse *synapse,
++			    size_t *action)
++{
++	size_t function;
++	int err;
++
++	/* Default action mode (e.g. STM32_COUNT_SLAVE_MODE_DISABLED) */
++	*action = STM32_SYNAPSE_ACTION_NONE;
++
++	err = stm32_count_function_get(counter, count, &function);
++	if (err)
++		return 0;
++
++	switch (function) {
++	case STM32_COUNT_ENCODER_MODE_1:
++		/* counts up/down on TI1FP1 edge depending on TI2FP2 level */
++		if (synapse->signal->id == count->synapses[0].signal->id)
++			*action = STM32_SYNAPSE_ACTION_BOTH_EDGES;
++		break;
++	case STM32_COUNT_ENCODER_MODE_2:
++		/* counts up/down on TI2FP2 edge depending on TI1FP1 level */
++		if (synapse->signal->id == count->synapses[1].signal->id)
++			*action = STM32_SYNAPSE_ACTION_BOTH_EDGES;
++		break;
++	case STM32_COUNT_ENCODER_MODE_3:
++		/* counts up/down on both TI1FP1 and TI2FP2 edges */
++		*action = STM32_SYNAPSE_ACTION_BOTH_EDGES;
++		break;
++	}
++
++	return 0;
++}
++
++static const struct counter_ops stm32_timer_cnt_ops = {
++	.count_read = stm32_count_read,
++	.count_write = stm32_count_write,
++	.function_get = stm32_count_function_get,
++	.function_set = stm32_count_function_set,
++	.action_get = stm32_action_get,
++};
++
++static struct counter_signal stm32_signals[] = {
++	{
++		.id = 0,
++		.name = "Channel 1 Quadrature A"
++	},
++	{
++		.id = 1,
++		.name = "Channel 1 Quadrature B"
++	}
++};
++
++static struct counter_synapse stm32_count_synapses[] = {
++	{
++		.actions_list = stm32_synapse_actions,
++		.num_actions = ARRAY_SIZE(stm32_synapse_actions),
++		.signal = &stm32_signals[0]
++	},
++	{
++		.actions_list = stm32_synapse_actions,
++		.num_actions = ARRAY_SIZE(stm32_synapse_actions),
++		.signal = &stm32_signals[1]
++	}
++};
++
++static struct counter_count stm32_counts = {
++	.id = 0,
++	.name = "Channel 1 Count",
++	.functions_list = stm32_count_functions,
++	.num_functions = ARRAY_SIZE(stm32_count_functions),
++	.synapses = stm32_count_synapses,
++	.num_synapses = ARRAY_SIZE(stm32_count_synapses),
++	.ext = stm32_count_ext,
++	.num_ext = ARRAY_SIZE(stm32_count_ext)
++};
++
++static int stm32_timer_cnt_probe(struct platform_device *pdev)
++{
++	struct stm32_timers *ddata = dev_get_drvdata(pdev->dev.parent);
++	struct device *dev = &pdev->dev;
++	struct stm32_timer_cnt *priv;
++
++	if (IS_ERR_OR_NULL(ddata))
++		return -EINVAL;
++
++	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
++	if (!priv)
++		return -ENOMEM;
++
++	priv->regmap = ddata->regmap;
++	priv->clk = ddata->clk;
++	priv->ceiling = ddata->max_arr;
++
++	priv->counter.name = dev_name(dev);
++	priv->counter.parent = dev;
++	priv->counter.ops = &stm32_timer_cnt_ops;
++	priv->counter.counts = &stm32_counts;
++	priv->counter.num_counts = 1;
++	priv->counter.signals = stm32_signals;
++	priv->counter.num_signals = ARRAY_SIZE(stm32_signals);
++	priv->counter.priv = priv;
++
++	/* Register Counter device */
++	return devm_counter_register(dev, &priv->counter);
++}
++
++static const struct of_device_id stm32_timer_cnt_of_match[] = {
++	{ .compatible = "st,stm32-timer-counter", },
++	{},
++};
++MODULE_DEVICE_TABLE(of, stm32_timer_cnt_of_match);
++
++static struct platform_driver stm32_timer_cnt_driver = {
++	.probe = stm32_timer_cnt_probe,
++	.driver = {
++		.name = "stm32-timer-counter",
++		.of_match_table = stm32_timer_cnt_of_match,
++	},
++};
++module_platform_driver(stm32_timer_cnt_driver);
++
++MODULE_AUTHOR("Benjamin Gaignard <benjamin.gaignard@st.com>");
++MODULE_ALIAS("platform:stm32-timer-counter");
++MODULE_DESCRIPTION("STMicroelectronics STM32 TIMER counter driver");
++MODULE_LICENSE("GPL v2");
 -- 
 2.18.0
