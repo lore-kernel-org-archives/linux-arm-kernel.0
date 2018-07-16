@@ -1,89 +1,80 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 16 Jul 2018 09:05:43 -0600
-Subject: [PATCH 6/6] coresight: etm-perf: Add support for ETR backend
-In-Reply-To: <cf11b93e-6e57-7309-5364-6c1d00ff8381@arm.com>
-References: <1531318599-8840-1-git-send-email-suzuki.poulose@arm.com>
- <1531318599-8840-7-git-send-email-suzuki.poulose@arm.com>
- <20180712205740.GA22128@xps15>
- <cf11b93e-6e57-7309-5364-6c1d00ff8381@arm.com>
-Message-ID: <CANLsYkzMoU=9JibeuK6dUrK+umxPEuFaYyEStY5h2p=V5ujBUA@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 16 Jul 2018 16:10:51 +0100
+Subject: [PATCH] ACPI/IORT: Support address size limit for root complexes
+In-Reply-To: <b52cdefb7a3f631340b98dcd38a274ae277bd561.1531239023.git.robin.murphy@arm.com>
+References: <b52cdefb7a3f631340b98dcd38a274ae277bd561.1531239023.git.robin.murphy@arm.com>
+Message-ID: <20180716151051.GB19945@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 13 Jul 2018 at 05:23, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
->
-> On 12/07/18 21:57, Mathieu Poirier wrote:
-> > Hi Suzuki,
-> >
-> > On Wed, Jul 11, 2018 at 03:16:39PM +0100, Suzuki K Poulose wrote:
-> >> Add support for using TMC-ETR as backend for ETM perf tracing.
-> >> We use software double buffering at the moment. i.e, the TMC-ETR
-> >> uses a separate buffer than the perf ring buffer. The data is
-> >> copied to the perf ring buffer once a session completes.
-> >>
-> >> The TMC-ETR would try to match the larger of perf ring buffer
-> >> or the ETR buffer size configured via sysfs, scaling down to
-> >> a minimum limit of 1MB.
-> >>
-> >> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-> >> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> >> ---
-> >>   drivers/hwtracing/coresight/coresight-tmc-etr.c | 265 +++++++++++++++++++++++-
-> >>   drivers/hwtracing/coresight/coresight-tmc.h     |   2 +
-> >>   2 files changed, 265 insertions(+), 2 deletions(-)
->
-> >> +/*
-> >> + * tmc_etr_sync_perf_buffer: Copy the actual trace data from the hardware
-> >> + * buffer to the perf ring buffer.
-> >> + */
-> >> +static void tmc_etr_sync_perf_buffer(struct etr_perf_buffer *etr_perf)
-> >> +{
-> >> +    long bytes, to_copy;
-> >> +    long pg_idx, pg_offset, src_offset;
-> >> +    unsigned long head = etr_perf->head;
-> >> +    char **dst_pages, *src_buf;
-> >> +    struct etr_buf *etr_buf = etr_perf->etr_buf;
-> >> +
-> >> +    head = PERF_IDX2OFF(etr_perf->head, etr_perf);
-> >
-> > I'm puzzled here.  Since etr_perf->head is set in tmc_etr_set_perf_buffer() to
-> > the value of handle->head, its value is always within the range of the perf ring
->
-> IIUC, the handle->head is not necessarily guaranteed to be within the aux-ring buffer.
+On Tue, Jul 10, 2018 at 05:13:45PM +0100, Robin Murphy wrote:
+> IORT revision D allows PCI root complex nodes to specify a memory
+> address size limit equivalently to named components, to help describe
+> straightforward integrations which don't really warrant a full-blown
+> _DMA method. Now that our headers are up-to-date, plumb it in.
+> 
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> ---
+>  drivers/acpi/arm64/iort.c | 25 +++++++++++++++++++++++--
+>  1 file changed, 23 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+> index 7a3a541046ed..4a66896e2aa3 100644
+> --- a/drivers/acpi/arm64/iort.c
+> +++ b/drivers/acpi/arm64/iort.c
+> @@ -947,6 +947,24 @@ static int nc_dma_get_range(struct device *dev, u64 *size)
+>  	return 0;
+>  }
+>  
+> +static int rc_dma_get_range(struct device *dev, u64 *size)
+> +{
+> +	struct acpi_iort_node *node;
+> +	struct acpi_iort_root_complex *rc;
+> +
+> +	node = iort_scan_node(ACPI_IORT_NODE_PCI_ROOT_COMPLEX,
+> +			      iort_match_node_callback, dev);
+> +	if (!node || node->revision < 1)
+> +		return -ENODEV;
+> +
+> +	rc = (struct acpi_iort_root_complex *)node->node_data;
+> +
+> +	*size = rc->memory_address_limit >= 64 ? U64_MAX :
+> +			1ULL<<rc->memory_address_limit;
+> +
+> +	return 0;
+> +}
+> +
+>  /**
+>   * iort_dma_setup() - Set-up device DMA parameters.
+>   *
+> @@ -975,10 +993,13 @@ void iort_dma_setup(struct device *dev, u64 *dma_addr, u64 *dma_size)
+>  
+>  	size = max(dev->coherent_dma_mask, dev->coherent_dma_mask + 1);
+>  
+> -	if (dev_is_pci(dev))
+> +	if (dev_is_pci(dev)) {
+>  		ret = acpi_dma_get_range(dev, &dmaaddr, &offset, &size);
+> -	else
+> +		if (ret == -ENODEV)
+> +			ret = rc_dma_get_range(dev, &size);
 
-I just looked at the ETB code and you are correct.
+Thank you for putting together the patch.
 
->
-> > buffer.  In tmc_etr_alloc_perf_buffer() etr_perf->nr_pages is set to the number
-> > of pages present in that ring buffer.  As such I'm not sure as to why we need
-> > the PERF_IDX2OFF() macro.
-> >
-> > It seems to me that "head = etr_perf->head;" above is sufficient.
-> >
->
-> We need to do the step at some point, which could be moved to set_perf_buffer.
+The question is whether it is OK to ignore the IORT address limits
+when _DMA is actually specified. It is a sort of grey area that
+has to be clarified, maybe we can add a check to detect a size
+mismatch, I do not know if something should be added at IORT spec
+level to clarify its relation to the _DMA object, if present.
 
-That's a good idea.
+Thanks,
+Lorenzo
 
->
-> >> +    pg_idx = head >> PAGE_SHIFT;
-> >> +    pg_offset = head & (PAGE_SIZE - 1);
-> >> +    dst_pages = (char **)etr_perf->pages;
-> >> +    src_offset = etr_buf->offset;
-> >> +    to_copy = etr_buf->len;
-> >> +
-> >> +    while (to_copy > 0) {
-> >> +            /*
-> >> +             * We can copy minimum of :
-> >
-> > s/We can copy minimum of :/In one iteration we can copy a minimum of:/
-> >
-> > If I'm wrong about the PERF_IDX2OFF(), don't bother respinning just for that.
->
-> I have some more fixes for handling the different modes (sysfs vs perf),
-> which I can include in the v2.
-
-Very well.
-
->
-> Suzuki
+> +	} else {
+>  		ret = nc_dma_get_range(dev, &size);
+> +	}
+>  
+>  	if (!ret) {
+>  		msb = fls64(dmaaddr + size - 1);
+> -- 
+> 2.17.1.dirty
+> 
