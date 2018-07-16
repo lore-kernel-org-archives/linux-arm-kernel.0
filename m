@@ -1,84 +1,52 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 16 Jul 2018 18:23:57 +0100
-Subject: [PATCH] kvm: arm/arm64: Fix emulated physical timer IRQ injection
-Message-ID: <20180716172357.6121-1-andre.przywara@arm.com>
+From: tbaicar@codeaurora.org (Tyler Baicar)
+Date: Mon, 16 Jul 2018 13:26:49 -0400
+Subject: [RFC PATCH] EDAC, ghes: Enable per-layer error reporting for ARM
+Message-ID: <1531762009-15112-1-git-send-email-tbaicar@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When KVM emulates a physical timer, we keep track of the interrupt
-condition and try to inject an IRQ to the guest when needed.
-This works if the timer expires when either the guest is running or KVM
-does work on behalf of it, since it calls kvm_timer_update_state().
-However when the guest's VCPU is not scheduled (for instance because
-the guest issued a WFI instruction before), we miss injecting the interrupt
-when the VCPU's state gets restored back in kvm_timer_vcpu_load().
+Enable per-layer error reporting for ARM systems so that the error
+counters are incremented per-DIMM.
 
-Fix this by moving the interrupt injection check into the
-phys_timer_emulate() function, so that all possible paths of execution
-are covered.
+On ARM systems that use firmware first error handling it is understood
+that card=channel and module=DIMM on that channel. Populate that
+information and enable per layer error reporting for ARM systems so that
+the EDAC error counters are incremented based on DIMM number as per the
+SMBIOS table rather than just incrementing the noinfo counters on the
+memory controller.
 
-This fixes the physical timer emulation, which broke when it got changed
-in the 4.15 merge window.
-The respective kvm-unit-test check has been posted already.
-
-Cc: Stable <stable@vger.kernel.org> # 4.15+
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
 ---
- virt/kvm/arm/arch_timer.c | 21 +++++++++++++--------
- 1 file changed, 13 insertions(+), 8 deletions(-)
+ drivers/edac/ghes_edac.c | 15 ++++++++++++---
+ 1 file changed, 12 insertions(+), 3 deletions(-)
 
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index bd3d57f40f1b..1949fb0b80a4 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -294,17 +294,26 @@ static void phys_timer_emulate(struct kvm_vcpu *vcpu)
- 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
- 	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
- 
-+	/* If the timer cannot fire at all, then we don't need a soft timer. */
-+	if (!kvm_timer_irq_can_fire(ptimer)) {
-+		soft_timer_cancel(&timer->phys_timer, NULL);
-+		kvm_timer_update_irq(vcpu, false, ptimer);
-+		return;
+diff --git a/drivers/edac/ghes_edac.c b/drivers/edac/ghes_edac.c
+index 473aeec..e4c8b6e 100644
+--- a/drivers/edac/ghes_edac.c
++++ b/drivers/edac/ghes_edac.c
+@@ -213,9 +213,18 @@ void ghes_edac_report_mem_error(int sev, struct cper_sec_mem_err *mem_err)
+ 	strcpy(e->label, "unknown label");
+ 	e->msg = pvt->msg;
+ 	e->other_detail = pvt->other_detail;
+-	e->top_layer = -1;
+-	e->mid_layer = -1;
+-	e->low_layer = -1;
++	if ((IS_ENABLED(CONFIG_ARM) || IS_ENABLED(CONFIG_ARM64))
++	    && (mem_err->validation_bits & CPER_MEM_VALID_CARD)
++	    && (mem_err->validation_bits & CPER_MEM_VALID_MODULE)) {
++		e->top_layer = mem_err->card;
++		e->mid_layer = mem_err->module;
++		e->low_layer = -1;
++		e->enable_per_layer_report = true;
++	} else {
++		e->top_layer = -1;
++		e->mid_layer = -1;
++		e->low_layer = -1;
 +	}
-+
- 	/*
--	 * If the timer can fire now we have just raised the IRQ line and we
--	 * don't need to have a soft timer scheduled for the future.  If the
--	 * timer cannot fire at all, then we also don't need a soft timer.
-+	 * If the timer can fire now, we don't need to have a soft timer
-+	 * scheduled for the future, as we also raise the IRQ line.
- 	 */
--	if (kvm_timer_should_fire(ptimer) || !kvm_timer_irq_can_fire(ptimer)) {
-+	if (kvm_timer_should_fire(ptimer)) {
- 		soft_timer_cancel(&timer->phys_timer, NULL);
-+		kvm_timer_update_irq(vcpu, true, ptimer);
-+
- 		return;
- 	}
- 
- 	soft_timer_start(&timer->phys_timer, kvm_timer_compute_delta(ptimer));
-+	kvm_timer_update_irq(vcpu, false, ptimer);
- }
- 
- /*
-@@ -316,7 +325,6 @@ static void kvm_timer_update_state(struct kvm_vcpu *vcpu)
- {
- 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
- 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
--	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
- 	bool level;
- 
- 	if (unlikely(!timer->enabled))
-@@ -332,9 +340,6 @@ static void kvm_timer_update_state(struct kvm_vcpu *vcpu)
- 	level = kvm_timer_should_fire(vtimer);
- 	kvm_timer_update_irq(vcpu, level, vtimer);
- 
--	if (kvm_timer_should_fire(ptimer) != ptimer->irq.level)
--		kvm_timer_update_irq(vcpu, !ptimer->irq.level, ptimer);
--
- 	phys_timer_emulate(vcpu);
- }
+ 	*pvt->other_detail = '\0';
+ 	*pvt->msg = '\0';
  
 -- 
-2.14.4
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
