@@ -1,98 +1,81 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 16 Jul 2018 18:35:15 +0100
-Subject: [PATCH] kvm: arm/arm64: Fix emulated physical timer IRQ injection
-In-Reply-To: <20180716172357.6121-1-andre.przywara@arm.com>
-References: <20180716172357.6121-1-andre.przywara@arm.com>
-Message-ID: <d2f5aa19-9107-7e6b-e0f0-8064e2eab2bf@arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 16 Jul 2018 11:44:02 -0600
+Subject: [PATCH v4 10/14] dt-bindings/interrupt-controller: update
+ Marvell ICU bindings
+In-Reply-To: <20180716183935.36f48f76@xps13>
+References: <20180705124011.7661-1-miquel.raynal@bootlin.com>
+ <20180705124011.7661-11-miquel.raynal@bootlin.com>
+ <20180716152734.GA4581@rob-hp-laptop>
+ <20180716183935.36f48f76@xps13>
+Message-ID: <20180716174402.GA28988@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/07/18 18:23, Andre Przywara wrote:
-> When KVM emulates a physical timer, we keep track of the interrupt
-> condition and try to inject an IRQ to the guest when needed.
-> This works if the timer expires when either the guest is running or KVM
-> does work on behalf of it, since it calls kvm_timer_update_state().
-> However when the guest's VCPU is not scheduled (for instance because
-> the guest issued a WFI instruction before), we miss injecting the interrupt
-> when the VCPU's state gets restored back in kvm_timer_vcpu_load().
+On Mon, Jul 16, 2018 at 06:39:35PM +0200, Miquel Raynal wrote:
+> Hi Rob,
 > 
-> Fix this by moving the interrupt injection check into the
-> phys_timer_emulate() function, so that all possible paths of execution
-> are covered.
+> Rob Herring <robh@kernel.org> wrote on Mon, 16 Jul 2018 09:27:34 -0600:
 > 
-> This fixes the physical timer emulation, which broke when it got changed
-> in the 4.15 merge window.
-> The respective kvm-unit-test check has been posted already.
+> > On Thu, Jul 05, 2018 at 02:40:07PM +0200, Miquel Raynal wrote:
+> > > Change the documentation to reflect the new bindings used for Marvell
+> > > ICU. This involves describing each interrupt group as a subnode of the
+> > > ICU node. Each of them having their own compatible.
+> > > 
+> > > The DT binding documentation still documents the legacy binding, where
+> > > there was a single node with no subnode.
+> > > 
+> > > Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+> > > ---
+> > >  .../bindings/interrupt-controller/marvell,icu.txt  | 83 ++++++++++++++++++----
+> > >  1 file changed, 71 insertions(+), 12 deletions(-)
+> > > 
+> > > diff --git a/Documentation/devicetree/bindings/interrupt-controller/marvell,icu.txt b/Documentation/devicetree/bindings/interrupt-controller/marvell,icu.txt
+> > > index 649b7ec9d9b1..83b4fbf8af65 100644
+> > > --- a/Documentation/devicetree/bindings/interrupt-controller/marvell,icu.txt
+> > > +++ b/Documentation/devicetree/bindings/interrupt-controller/marvell,icu.txt
+> > > @@ -5,6 +5,8 @@ The Marvell ICU (Interrupt Consolidation Unit) controller is
+> > >  responsible for collecting all wired-interrupt sources in the CP and
+> > >  communicating them to the GIC in the AP, the unit translates interrupt
+> > >  requests on input wires to MSG memory mapped transactions to the GIC.
+> > > +These messages will access a different GIC memory area depending on
+> > > +their type (NSR, SR, SEI, REI, etc).
+> > >  
+> > >  Required properties:
+> > >  
+> > > @@ -12,20 +14,19 @@ Required properties:
+> > >  
+> > >  - reg: Should contain ICU registers location and length.
+> > >  
+> > > +Subnodes: Each group of interrupt is declared as a subnode of the ICU,
+> > > +with their own compatible.
+> > > +
+> > > +Required properties for the icu_nsr/icu_sei subnodes:
+> > > +
+> > > +- compatible: Should be "marvell,cp110-icu-nsr" or "marvell,cp110-icu-sei".
+> > > +  
+> > 
+> > I raised this before and still don't understand. You had 4 types before 
+> > and now you only have 2 types? How do you handle SR and REI with the new 
+> > binding?
 > 
-> Cc: Stable <stable@vger.kernel.org> # 4.15+
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
->  virt/kvm/arm/arch_timer.c | 21 +++++++++++++--------
->  1 file changed, 13 insertions(+), 8 deletions(-)
+> Indeed there are 4 types: NSR, SR, SEI, REI.
 > 
-> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-> index bd3d57f40f1b..1949fb0b80a4 100644
-> --- a/virt/kvm/arm/arch_timer.c
-> +++ b/virt/kvm/arm/arch_timer.c
-> @@ -294,17 +294,26 @@ static void phys_timer_emulate(struct kvm_vcpu *vcpu)
->  	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
->  	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
->  
-> +	/* If the timer cannot fire at all, then we don't need a soft timer. */
-> +	if (!kvm_timer_irq_can_fire(ptimer)) {
-> +		soft_timer_cancel(&timer->phys_timer, NULL);
-> +		kvm_timer_update_irq(vcpu, false, ptimer);
-> +		return;
-> +	}
-> +
->  	/*
-> -	 * If the timer can fire now we have just raised the IRQ line and we
-> -	 * don't need to have a soft timer scheduled for the future.  If the
-> -	 * timer cannot fire at all, then we also don't need a soft timer.
-> +	 * If the timer can fire now, we don't need to have a soft timer
-> +	 * scheduled for the future, as we also raise the IRQ line.
->  	 */
-> -	if (kvm_timer_should_fire(ptimer) || !kvm_timer_irq_can_fire(ptimer)) {
-> +	if (kvm_timer_should_fire(ptimer)) {
->  		soft_timer_cancel(&timer->phys_timer, NULL);
-> +		kvm_timer_update_irq(vcpu, true, ptimer);
-> +
->  		return;
->  	}
->  
->  	soft_timer_start(&timer->phys_timer, kvm_timer_compute_delta(ptimer));
-> +	kvm_timer_update_irq(vcpu, false, ptimer);
+> Until now only NSR were supported.
 
-I think this bit is wrong. The soft timer could have expired by the time
-you get to lower the line, and you would just loose that interrupt.
-Lowering the line *before* starting the soft timer would make a lot more
-sense to me.
+All 4 were supported by the binding and now only 2 though.
 
->  }
->  
->  /*
-> @@ -316,7 +325,6 @@ static void kvm_timer_update_state(struct kvm_vcpu *vcpu)
->  {
->  	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
->  	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
-> -	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
->  	bool level;
->  
->  	if (unlikely(!timer->enabled))
-> @@ -332,9 +340,6 @@ static void kvm_timer_update_state(struct kvm_vcpu *vcpu)
->  	level = kvm_timer_should_fire(vtimer);
->  	kvm_timer_update_irq(vcpu, level, vtimer);
->  
-> -	if (kvm_timer_should_fire(ptimer) != ptimer->irq.level)
-> -		kvm_timer_update_irq(vcpu, !ptimer->irq.level, ptimer);
-> -
->  	phys_timer_emulate(vcpu);
->  }
->  
+> I'm adding SEI support.
 > 
+> In the future, people might want to add support for SR/REI as well but
+> they have never been supported in mainline. When support for these
+> interrupts will have been contributed, I suppose it will easy to add
+> two other compatibles with the same formatting "marvell,cp110-icu-xxx"?
 
-Thanks,
+Perhaps, but I have know way to tell.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> I hope the changes in the driver will make such contribution almost
+> trivial.
+
+You can add bindings without adding driver.
+
+Rob
