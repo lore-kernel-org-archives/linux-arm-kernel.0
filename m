@@ -1,53 +1,98 @@
-From: ezequiel@collabora.com (Ezequiel Garcia)
-Date: Mon, 16 Jul 2018 14:29:40 -0300
-Subject: [PATCH v2] arm64: dts: rockchip: add USB 2.0 and 3.0 support on
- Ficus board
-In-Reply-To: <2487041.HPaZN1uVBU@phil>
-References: <20180714170922.4433-1-ezequiel@collabora.com>
- <2487041.HPaZN1uVBU@phil>
-Message-ID: <68cdc26d1e58797080ce9939c173148eb9f15a52.camel@collabora.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 16 Jul 2018 18:35:15 +0100
+Subject: [PATCH] kvm: arm/arm64: Fix emulated physical timer IRQ injection
+In-Reply-To: <20180716172357.6121-1-andre.przywara@arm.com>
+References: <20180716172357.6121-1-andre.przywara@arm.com>
+Message-ID: <d2f5aa19-9107-7e6b-e0f0-8064e2eab2bf@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2018-07-16 at 19:02 +0200, Heiko Stuebner wrote:
-> Hi Enric, Ezequiel,
+On 16/07/18 18:23, Andre Przywara wrote:
+> When KVM emulates a physical timer, we keep track of the interrupt
+> condition and try to inject an IRQ to the guest when needed.
+> This works if the timer expires when either the guest is running or KVM
+> does work on behalf of it, since it calls kvm_timer_update_state().
+> However when the guest's VCPU is not scheduled (for instance because
+> the guest issued a WFI instruction before), we miss injecting the interrupt
+> when the VCPU's state gets restored back in kvm_timer_vcpu_load().
 > 
-> Am Samstag, 14. Juli 2018, 19:09:22 CEST schrieb Ezequiel Garcia:
-> > From: Enric Balletbo i Serra <enric.balletbo@collabora.com>
-> > 
-> > The board exposes two types A ports, one is USB 3.0, up to 5.0Gbps and
-> > another one is USB 2.0 up to 480Mbps. Enable the USB PHYs and the USB
-> > controllers to enable theses devices.
-> > 
-> > Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
-> > Signed-off-by: Ezequiel Garcia <ezequiel@collabora.com>
-> > ---
-> > Changes from v1:
-> >  * Provide voltage for vcc5v0_host and vcc3v3_pcie regulators
-> >  * Provide vin_supply for vcc5v0_host.
-> > 
-> >  arch/arm64/boot/dts/rockchip/rk3399-ficus.dts | 90 +++++++++++++++++++
-> >  1 file changed, 90 insertions(+)
-> > 
-> > diff --git a/arch/arm64/boot/dts/rockchip/rk3399-ficus.dts b/arch/arm64/boot/dts/rockchip/rk3399-ficus.dts
-> > index 0d14183dd4a9..6295483b701f 100644
-> > --- a/arch/arm64/boot/dts/rockchip/rk3399-ficus.dts
-> > +++ b/arch/arm64/boot/dts/rockchip/rk3399-ficus.dts
-> > @@ -58,9 +58,24 @@
-> >  		pinctrl-0 = <&pcie_drv>;
-> >  		regulator-boot-on;
-> >  		regulator-name = "vcc3v3_pcie";
-> > +		regulator-min-microvolt = <3300000>;
-> > +		regulator-max-microvolt = <3300000>;
-> >  		vin-supply = <&vcc3v3_sys>;
-> >  	};
+> Fix this by moving the interrupt injection check into the
+> phys_timer_emulate() function, so that all possible paths of execution
+> are covered.
 > 
-> I've split this out into a separate patch, as it isn't part of what
-> the commit message describes and thus should be separate
-> and applied both resulting patches for 4.19.
+> This fixes the physical timer emulation, which broke when it got changed
+> in the 4.15 merge window.
+> The respective kvm-unit-test check has been posted already.
 > 
-> And also cleaned up a vendor-property that shouldn't be
-> part of mainline.
+> Cc: Stable <stable@vger.kernel.org> # 4.15+
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+>  virt/kvm/arm/arch_timer.c | 21 +++++++++++++--------
+>  1 file changed, 13 insertions(+), 8 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+> index bd3d57f40f1b..1949fb0b80a4 100644
+> --- a/virt/kvm/arm/arch_timer.c
+> +++ b/virt/kvm/arm/arch_timer.c
+> @@ -294,17 +294,26 @@ static void phys_timer_emulate(struct kvm_vcpu *vcpu)
+>  	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+>  	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
+>  
+> +	/* If the timer cannot fire at all, then we don't need a soft timer. */
+> +	if (!kvm_timer_irq_can_fire(ptimer)) {
+> +		soft_timer_cancel(&timer->phys_timer, NULL);
+> +		kvm_timer_update_irq(vcpu, false, ptimer);
+> +		return;
+> +	}
+> +
+>  	/*
+> -	 * If the timer can fire now we have just raised the IRQ line and we
+> -	 * don't need to have a soft timer scheduled for the future.  If the
+> -	 * timer cannot fire at all, then we also don't need a soft timer.
+> +	 * If the timer can fire now, we don't need to have a soft timer
+> +	 * scheduled for the future, as we also raise the IRQ line.
+>  	 */
+> -	if (kvm_timer_should_fire(ptimer) || !kvm_timer_irq_can_fire(ptimer)) {
+> +	if (kvm_timer_should_fire(ptimer)) {
+>  		soft_timer_cancel(&timer->phys_timer, NULL);
+> +		kvm_timer_update_irq(vcpu, true, ptimer);
+> +
+>  		return;
+>  	}
+>  
+>  	soft_timer_start(&timer->phys_timer, kvm_timer_compute_delta(ptimer));
+> +	kvm_timer_update_irq(vcpu, false, ptimer);
+
+I think this bit is wrong. The soft timer could have expired by the time
+you get to lower the line, and you would just loose that interrupt.
+Lowering the line *before* starting the soft timer would make a lot more
+sense to me.
+
+>  }
+>  
+>  /*
+> @@ -316,7 +325,6 @@ static void kvm_timer_update_state(struct kvm_vcpu *vcpu)
+>  {
+>  	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+>  	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+> -	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
+>  	bool level;
+>  
+>  	if (unlikely(!timer->enabled))
+> @@ -332,9 +340,6 @@ static void kvm_timer_update_state(struct kvm_vcpu *vcpu)
+>  	level = kvm_timer_should_fire(vtimer);
+>  	kvm_timer_update_irq(vcpu, level, vtimer);
+>  
+> -	if (kvm_timer_should_fire(ptimer) != ptimer->irq.level)
+> -		kvm_timer_update_irq(vcpu, !ptimer->irq.level, ptimer);
+> -
+>  	phys_timer_emulate(vcpu);
+>  }
+>  
 > 
 
-Thanks a lot!
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
