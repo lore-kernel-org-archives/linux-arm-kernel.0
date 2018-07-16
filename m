@@ -1,96 +1,142 @@
 From: ravi.bangoria@linux.ibm.com (Ravi Bangoria)
-Date: Mon, 16 Jul 2018 14:17:02 +0530
-Subject: [PATCH v6 2/6] Uprobe: Additional argument arch_uprobe to
- uprobe_write_opcode()
+Date: Mon, 16 Jul 2018 14:17:01 +0530
+Subject: [PATCH v6 1/6] Uprobes: Simplify uprobe_register() body
 In-Reply-To: <20180716084706.28244-1-ravi.bangoria@linux.ibm.com>
 References: <20180716084706.28244-1-ravi.bangoria@linux.ibm.com>
-Message-ID: <20180716084706.28244-3-ravi.bangoria@linux.ibm.com>
+Message-ID: <20180716084706.28244-2-ravi.bangoria@linux.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add addition argument 'arch_uprobe' to uprobe_write_opcode().
-We need this in later set of patches.
+Simplify uprobe_register() function body and let __uprobe_register()
+handle everything. Also move dependency functions around to fix build
+failures.
 
 Signed-off-by: Ravi Bangoria <ravi.bangoria@linux.ibm.com>
 ---
- arch/arm/probes/uprobes/core.c | 2 +-
- arch/mips/kernel/uprobes.c     | 2 +-
- include/linux/uprobes.h        | 2 +-
- kernel/events/uprobes.c        | 9 +++++----
- 4 files changed, 8 insertions(+), 7 deletions(-)
+ kernel/events/uprobes.c | 69 ++++++++++++++++++++++++++-----------------------
+ 1 file changed, 36 insertions(+), 33 deletions(-)
 
-diff --git a/arch/arm/probes/uprobes/core.c b/arch/arm/probes/uprobes/core.c
-index d1329f1ba4e4..bf992264060e 100644
---- a/arch/arm/probes/uprobes/core.c
-+++ b/arch/arm/probes/uprobes/core.c
-@@ -32,7 +32,7 @@ bool is_swbp_insn(uprobe_opcode_t *insn)
- int set_swbp(struct arch_uprobe *auprobe, struct mm_struct *mm,
- 	     unsigned long vaddr)
- {
--	return uprobe_write_opcode(mm, vaddr,
-+	return uprobe_write_opcode(auprobe, mm, vaddr,
- 		   __opcode_to_mem_arm(auprobe->bpinsn));
- }
- 
-diff --git a/arch/mips/kernel/uprobes.c b/arch/mips/kernel/uprobes.c
-index f7a0645ccb82..4aaff3b3175c 100644
---- a/arch/mips/kernel/uprobes.c
-+++ b/arch/mips/kernel/uprobes.c
-@@ -224,7 +224,7 @@ unsigned long arch_uretprobe_hijack_return_addr(
- int __weak set_swbp(struct arch_uprobe *auprobe, struct mm_struct *mm,
- 	unsigned long vaddr)
- {
--	return uprobe_write_opcode(mm, vaddr, UPROBE_SWBP_INSN);
-+	return uprobe_write_opcode(auprobe, mm, vaddr, UPROBE_SWBP_INSN);
- }
- 
- void arch_uprobe_copy_ixol(struct page *page, unsigned long vaddr,
-diff --git a/include/linux/uprobes.h b/include/linux/uprobes.h
-index 0a294e950df8..bb9d2084af03 100644
---- a/include/linux/uprobes.h
-+++ b/include/linux/uprobes.h
-@@ -121,7 +121,7 @@ extern bool is_swbp_insn(uprobe_opcode_t *insn);
- extern bool is_trap_insn(uprobe_opcode_t *insn);
- extern unsigned long uprobe_get_swbp_addr(struct pt_regs *regs);
- extern unsigned long uprobe_get_trap_addr(struct pt_regs *regs);
--extern int uprobe_write_opcode(struct mm_struct *mm, unsigned long vaddr, uprobe_opcode_t);
-+extern int uprobe_write_opcode(struct arch_uprobe *auprobe, struct mm_struct *mm, unsigned long vaddr, uprobe_opcode_t);
- extern int uprobe_register(struct inode *inode, loff_t offset, struct uprobe_consumer *uc);
- extern int uprobe_apply(struct inode *inode, loff_t offset, struct uprobe_consumer *uc, bool);
- extern void uprobe_unregister(struct inode *inode, loff_t offset, struct uprobe_consumer *uc);
 diff --git a/kernel/events/uprobes.c b/kernel/events/uprobes.c
-index 471eac896635..c0418ba52ba8 100644
+index ccc579a7d32e..471eac896635 100644
 --- a/kernel/events/uprobes.c
 +++ b/kernel/events/uprobes.c
-@@ -299,8 +299,8 @@ static int verify_opcode(struct page *page, unsigned long vaddr, uprobe_opcode_t
-  * Called with mm->mmap_sem held for write.
-  * Return 0 (success) or a negative errno.
-  */
--int uprobe_write_opcode(struct mm_struct *mm, unsigned long vaddr,
--			uprobe_opcode_t opcode)
-+int uprobe_write_opcode(struct arch_uprobe *auprobe, struct mm_struct *mm,
-+			unsigned long vaddr, uprobe_opcode_t opcode)
+@@ -840,13 +840,8 @@ register_for_each_vma(struct uprobe *uprobe, struct uprobe_consumer *new)
+ 	return err;
+ }
+ 
+-static int __uprobe_register(struct uprobe *uprobe, struct uprobe_consumer *uc)
+-{
+-	consumer_add(uprobe, uc);
+-	return register_for_each_vma(uprobe, uc);
+-}
+-
+-static void __uprobe_unregister(struct uprobe *uprobe, struct uprobe_consumer *uc)
++static void
++__uprobe_unregister(struct uprobe *uprobe, struct uprobe_consumer *uc)
  {
- 	struct page *old_page, *new_page;
+ 	int err;
+ 
+@@ -860,24 +855,46 @@ static void __uprobe_unregister(struct uprobe *uprobe, struct uprobe_consumer *u
+ }
+ 
+ /*
+- * uprobe_register - register a probe
++ * uprobe_unregister - unregister a already registered probe.
++ * @inode: the file in which the probe has to be removed.
++ * @offset: offset from the start of the file.
++ * @uc: identify which probe if multiple probes are colocated.
++ */
++void uprobe_unregister(struct inode *inode, loff_t offset, struct uprobe_consumer *uc)
++{
++	struct uprobe *uprobe;
++
++	uprobe = find_uprobe(inode, offset);
++	if (WARN_ON(!uprobe))
++		return;
++
++	down_write(&uprobe->register_rwsem);
++	__uprobe_unregister(uprobe, uc);
++	up_write(&uprobe->register_rwsem);
++	put_uprobe(uprobe);
++}
++EXPORT_SYMBOL_GPL(uprobe_unregister);
++
++/*
++ * __uprobe_register - register a probe
+  * @inode: the file in which the probe has to be placed.
+  * @offset: offset from the start of the file.
+  * @uc: information on howto handle the probe..
+  *
+- * Apart from the access refcount, uprobe_register() takes a creation
++ * Apart from the access refcount, __uprobe_register() takes a creation
+  * refcount (thro alloc_uprobe) if and only if this @uprobe is getting
+  * inserted into the rbtree (i.e first consumer for a @inode:@offset
+  * tuple).  Creation refcount stops uprobe_unregister from freeing the
+  * @uprobe even before the register operation is complete. Creation
+  * refcount is released when the last @uc for the @uprobe
+- * unregisters. Caller of uprobe_register() is required to keep @inode
++ * unregisters. Caller of __uprobe_register() is required to keep @inode
+  * (and the containing mount) referenced.
+  *
+  * Return errno if it cannot successully install probes
+  * else return 0 (success)
+  */
+-int uprobe_register(struct inode *inode, loff_t offset, struct uprobe_consumer *uc)
++static int __uprobe_register(struct inode *inode, loff_t offset,
++			     struct uprobe_consumer *uc)
+ {
+ 	struct uprobe *uprobe;
+ 	int ret;
+@@ -904,7 +921,8 @@ int uprobe_register(struct inode *inode, loff_t offset, struct uprobe_consumer *
+ 	down_write(&uprobe->register_rwsem);
+ 	ret = -EAGAIN;
+ 	if (likely(uprobe_is_active(uprobe))) {
+-		ret = __uprobe_register(uprobe, uc);
++		consumer_add(uprobe, uc);
++		ret = register_for_each_vma(uprobe, uc);
+ 		if (ret)
+ 			__uprobe_unregister(uprobe, uc);
+ 	}
+@@ -915,6 +933,12 @@ int uprobe_register(struct inode *inode, loff_t offset, struct uprobe_consumer *
+ 		goto retry;
+ 	return ret;
+ }
++
++int uprobe_register(struct inode *inode, loff_t offset,
++		    struct uprobe_consumer *uc)
++{
++	return __uprobe_register(inode, offset, uc);
++}
+ EXPORT_SYMBOL_GPL(uprobe_register);
+ 
+ /*
+@@ -946,27 +970,6 @@ int uprobe_apply(struct inode *inode, loff_t offset,
+ 	return ret;
+ }
+ 
+-/*
+- * uprobe_unregister - unregister a already registered probe.
+- * @inode: the file in which the probe has to be removed.
+- * @offset: offset from the start of the file.
+- * @uc: identify which probe if multiple probes are colocated.
+- */
+-void uprobe_unregister(struct inode *inode, loff_t offset, struct uprobe_consumer *uc)
+-{
+-	struct uprobe *uprobe;
+-
+-	uprobe = find_uprobe(inode, offset);
+-	if (WARN_ON(!uprobe))
+-		return;
+-
+-	down_write(&uprobe->register_rwsem);
+-	__uprobe_unregister(uprobe, uc);
+-	up_write(&uprobe->register_rwsem);
+-	put_uprobe(uprobe);
+-}
+-EXPORT_SYMBOL_GPL(uprobe_unregister);
+-
+ static int unapply_uprobe(struct uprobe *uprobe, struct mm_struct *mm)
+ {
  	struct vm_area_struct *vma;
-@@ -351,7 +351,7 @@ int uprobe_write_opcode(struct mm_struct *mm, unsigned long vaddr,
-  */
- int __weak set_swbp(struct arch_uprobe *auprobe, struct mm_struct *mm, unsigned long vaddr)
- {
--	return uprobe_write_opcode(mm, vaddr, UPROBE_SWBP_INSN);
-+	return uprobe_write_opcode(auprobe, mm, vaddr, UPROBE_SWBP_INSN);
- }
- 
- /**
-@@ -366,7 +366,8 @@ int __weak set_swbp(struct arch_uprobe *auprobe, struct mm_struct *mm, unsigned
- int __weak
- set_orig_insn(struct arch_uprobe *auprobe, struct mm_struct *mm, unsigned long vaddr)
- {
--	return uprobe_write_opcode(mm, vaddr, *(uprobe_opcode_t *)&auprobe->insn);
-+	return uprobe_write_opcode(auprobe, mm, vaddr,
-+			*(uprobe_opcode_t *)&auprobe->insn);
- }
- 
- static struct uprobe *get_uprobe(struct uprobe *uprobe)
 -- 
 2.14.4
