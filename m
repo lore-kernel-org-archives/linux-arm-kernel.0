@@ -1,58 +1,44 @@
-From: patrice.chotard@st.com (Patrice CHOTARD)
-Date: Mon, 16 Jul 2018 07:55:08 +0000
-Subject: [PATCH] ARM: STi: at least warn if of_iomap fails
-In-Reply-To: <1531410530-24163-1-git-send-email-hofrat@osadl.org>
-References: <1531410530-24163-1-git-send-email-hofrat@osadl.org>
-Message-ID: <50a1ccc1-e64a-a35e-a7b5-eeb7082478e9@st.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 16 Jul 2018 00:57:40 -0700
+Subject: [PATCH] pwm-omap: handle timers not ready in probe
+In-Reply-To: <20180716071323.GB23110@amd>
+References: <20180709081534.GA6799@amd>
+ <20180709214910.tes6u4ivxomd3aja@earth.universe>
+ <20180709220211.GA7760@amd>
+ <20180710101147.lyu65ro4czvrs2da@earth.universe>
+ <20180710133040.GA4391@amd>
+ <20180710161123.azym6sbboriuj4yc@earth.universe>
+ <20180711080218.GA21225@amd> <20180711132739.GL99251@atomide.com>
+ <20180711142526.dto6iost57zx5t5l@earth.universe>
+ <20180716071323.GB23110@amd>
+Message-ID: <20180716075740.GT99251@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicholas
-
-On 07/12/2018 05:48 PM, Nicholas Mc Guire wrote:
-> The call to of_iomap() is unchecked but scu_enable(), which the returned
-> address is passed on to, assumes a valid mapping. If the mapping is
-> invalid this could probably lead to undefined system state so at least
-> a warning should be issued.
+* Pavel Machek <pavel@ucw.cz> [180716 07:16]:
 > 
-> Signed-off-by: Nicholas Mc Guire <hofrat@osadl.org>
-> Fixes: commit 65ebcc115889 ("ARM: sti: Add STiH415 SOC support")
-> ---
-> Problem was found by an experimental coccinelle script
+> When all the drivers are built-in, timers are not ready and probing
+> fails. Fix that with -EPROBE_DEFFER.
 > 
-> Patch was compile tested with: multi_v7_defconfig (implies
-> CONFIG_ARCH_STI=y, CONFIG_SMP=y)
+> Signed-off-by: Pavel Machek <pavel@ucw.cz>
 > 
-> Patch is against 4.18-rc3 (localversion-next is next-20180712)
-> 
->   arch/arm/mach-sti/platsmp.c | 1 +
->   1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/mach-sti/platsmp.c b/arch/arm/mach-sti/platsmp.c
-> index 231f19e..89ae76f 100644
-> --- a/arch/arm/mach-sti/platsmp.c
-> +++ b/arch/arm/mach-sti/platsmp.c
-> @@ -109,6 +109,7 @@ static void __init sti_smp_prepare_cpus(unsigned int max_cpus)
->   
->   	if (np) {
->   		scu_base = of_iomap(np, 0);
-> +		WARN_ON(!scu_base);
->   		scu_enable(scu_base);
->   		of_node_put(np);
->   	}
-> 
+> diff --git a/drivers/pwm/pwm-omap-dmtimer.c b/drivers/pwm/pwm-omap-dmtimer.c
+> index 665da3c..debeb70 100644
+> --- a/drivers/pwm/pwm-omap-dmtimer.c
+> +++ b/drivers/pwm/pwm-omap-dmtimer.c
+> @@ -265,7 +271,7 @@ static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
+>  	timer_pdata = dev_get_platdata(&timer_pdev->dev);
+>  	if (!timer_pdata) {
+>  		dev_err(&pdev->dev, "dmtimer pdata structure NULL\n");
+> -		ret = -EINVAL;
+> +		ret = -EPROBE_DEFER;
+>  		goto put;
+>  	}
 
-I should prefer to exit with an error to avoid unpredictable behavior,
-something like this is better :
+There seems to be an earlier similar patch, care to take a look
+at "[PATCH] pwm: pwm-omap-dmtimer: return -EPROBE_DEFER if no
+dmtimer platform data"?
 
-scu_base = of_iomap(np, 0);
-of_node_put(np);
-if (!scu_base) {
-	pr_err("No SCU remap\n");
-	return;
-}
+Regards,
 
-scu_enable(scu_base);
-
-
-Thanks
+Tony
