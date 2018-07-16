@@ -1,55 +1,34 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 16 Jul 2018 15:59:13 -0600
-Subject: [PATCH v2 1/2] dt: bindings: Add bindings for SDHCI Synopsys DWC
- MSHC
-In-Reply-To: <20180712100611.5887a195@xhacker.debian>
-References: <20180706151930.78b3024b@xhacker.debian>
- <20180706152047.0b0a4944@xhacker.debian>
- <20180711161206.GA1558@rob-hp-laptop>
- <20180712100611.5887a195@xhacker.debian>
-Message-ID: <20180716215913.GA4269@rob-hp-laptop>
+Date: Mon, 16 Jul 2018 16:04:35 -0600
+Subject: [PATCH 1/2] dt-bindings: amlogic: Add support for GXL S805X and
+ the P241 board
+In-Reply-To: <1530784243-20823-2-git-send-email-narmstrong@baylibre.com>
+References: <1530784243-20823-1-git-send-email-narmstrong@baylibre.com>
+ <1530784243-20823-2-git-send-email-narmstrong@baylibre.com>
+Message-ID: <20180716220435.GA22633@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 12, 2018 at 10:06:11AM +0800, Jisheng Zhang wrote:
-> Hi Rob,
+On Thu, Jul 05, 2018 at 11:50:42AM +0200, Neil Armstrong wrote:
+> The S805X is a variant of the Amlogic Meson GXL SoC family with the
+> following physical limitations :
+> - No SDCard interface
+> - No GPIOCLK pins
+> - No USB OTG ID pin (but Gadget feature can stil be forced)
+> - No 5V regulator
+> - Reduced ADC inputs (only ADC0 and ADC1)
+> - GPIODV_26, GPIOAO_3, GPIOAO_4, GPIOAO_5, GPIOAO_6, GPIOX_14,
+>   GPIOX_15, GPIOH_3 are no more exposed on the package
 > 
-> On Wed, 11 Jul 2018 10:12:06 -0600 Rob Herring wrote:
+> Amlogic exposes the following SW limitations :
+> - HDMI max resolution should be 1080p60, VPU clock should be downgraded
+> - Video Decoding should be limited to 1080p60, VDEC clock should be downgraded
+> - CPU speed should be limited by SCPI OPP table to 1.2GHz
+> - DRAM interface is limited to DDR4 16bit up to 1GiB
 > 
-> > On Fri, Jul 06, 2018 at 03:20:47PM +0800, Jisheng Zhang wrote:
-> > > Synopsys SDHCI compatible DesignWare Cores Mobile Storage Host
-> > > Controller can support eMMC/SD/SDIO. Add the bindings.
-> > > 
-> > > Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
-> > > ---
-> > >  .../bindings/mmc/sdhci-of-dwcmshc.txt         | 20 +++++++++++++++++++
-> > >  1 file changed, 20 insertions(+)
-> > >  create mode 100644 Documentation/devicetree/bindings/mmc/sdhci-of-dwcmshc.txt
-> > > 
-> > > diff --git a/Documentation/devicetree/bindings/mmc/sdhci-of-dwcmshc.txt b/Documentation/devicetree/bindings/mmc/sdhci-of-dwcmshc.txt
-> > > new file mode 100644
-> > > index 000000000000..ee4253b33be2
-> > > --- /dev/null
-> > > +++ b/Documentation/devicetree/bindings/mmc/sdhci-of-dwcmshc.txt
-> > > @@ -0,0 +1,20 @@
-> > > +* Synopsys DesignWare Cores Mobile Storage Host Controller
-> > > +
-> > > +Required properties:
-> > > +- compatible: should be one of the following:
-> > > +    "snps,dwcmshc-sdhci"  
-> > 
-> > Needs to note that there must also be an SoC specific compatible.
-> 
-> Currently, there's no SoC specific code in this driver, so the binding could
-> be extended to SoC compatible if necessary. What do you think?
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> ---
+>  Documentation/devicetree/bindings/arm/amlogic.txt | 6 ++++++
+>  1 file changed, 6 insertions(+)
 
-Doesn't matter what's in the driver, it can use this compatible.
-
-But experience has shown that a compatible for a licensed IP is never 
-sufficient. There are versions of the blocks, configuration options, and 
-integration differences.
-
-I'm not asking you to add any SoC specific compatible now unless you 
-are working on a particular SoC, but just state one is needed. 
-
-Rob
+Reviewed-by: Rob Herring <robh@kernel.org>
