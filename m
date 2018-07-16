@@ -1,46 +1,28 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 16 Jul 2018 11:28:52 +0200
-Subject: [PATCH v3 0/4] Add basic support for Mediatek MT8183 SoC
-In-Reply-To: <1526538126-51497-1-git-send-email-erin.lo@mediatek.com>
-References: <1526538126-51497-1-git-send-email-erin.lo@mediatek.com>
-Message-ID: <9ba45353-a6e1-9a6e-f05b-4b1679ae9e52@gmail.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Mon, 16 Jul 2018 10:34:12 +0100
+Subject: [PATCH 0/2] Support ARMv8R
+In-Reply-To: <1531129858-8341-1-git-send-email-vladimir.murzin@arm.com>
+References: <1531129858-8341-1-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <ad460509-5fb2-badf-32d2-4fda07244e65@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Erin,
-
-On 17/05/18 08:22, Erin Lo wrote:
-> MT8183 is a SoC based on 64bit ARMv8 architecture.
-> It contains 4 CA53 and 4 CA73 cores.
-> MT8183 share many HW IP with MT65xx series.
-> This patchset was tested on MT8183 evaluation board, and boot to shell ok.
-> 
-> This series contains document bindings, device tree including interrupt, uart.
-> 
-> Change in v3:
-> 1. Fill out GICC, GICH, GICV regions
-> 2. Update Copyright to 2018
-> 
-> Change in v2:
-> 1. Split dt-bindings into different patches
-> 2. Correct bindings for supported SoCs (mtk-uart.txt)
-> 
-> Ben Ho (1):
->   arm64: dts: Add Mediatek SoC MT8183 and evaluation board dts and
->     Makefile
-> 
-> Erin Lo (3):
->   dt-bindings: arm: Add bindings for Mediatek MT8183 SoC Platform
->   dt-bindings: mtk-sysirq: Add compatible for Mediatek MT8183
->   dt-bindings: serial: Add compatible for Mediatek MT8183
+On 09/07/18 10:50, Vladimir Murzin wrote:
+> ARMv8R brings set of new features. Some of them, like PMSAv8, have
+> already been merged, so these patches add missing features for bare
+> minimimum support of ARMv8R.
 > 
 
-I'm a bit reluctant to take this series, as it will only enable the EVB board to
-boot into a serial console. Are you planning to add support for other devices of
-this SoC?
+Ok for patch tracker?
 
-Apart please take into account that there is an issue with the dts file, as you
-were told by the kbuild test robot.
-
-Regards,
-Matthias
+> Thanks!
+> 
+> Vladimir Murzin (2):
+>   ARM: NOMMU: Extend check for VBAR support
+>   ARM: NOMMU: Allow enter in Hyp mode
+> 
+>  arch/arm/kernel/head-nommu.S | 12 ++++++++++--
+>  arch/arm/mm/Kconfig          |  1 -
+>  arch/arm/mm/nommu.c          |  3 ++-
+>  3 files changed, 12 insertions(+), 4 deletions(-)
+> 
