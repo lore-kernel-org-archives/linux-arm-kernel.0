@@ -1,46 +1,139 @@
-From: andrew@aj.id.au (Andrew Jeffery)
-Date: Mon, 16 Jul 2018 10:27:30 +0930
-Subject: [RFC PATCH v2 1/4] dt-bindings: misc: Add bindings for misc. BMC
- control fields
-In-Reply-To: <a521b9fc-4c10-06c1-fd73-5c64379538f6@yadro.com>
-References: <20180711053122.30773-1-andrew@aj.id.au>
- <20180711053122.30773-2-andrew@aj.id.au>
- <20180711200450.GB17291@rob-hp-laptop>
- <1531356830.3551458.1437853280.551CA8C5@webmail.messagingengine.com>
- <CAL_JsqKpXxR4t_-3BOy-0mFePXkaSck_4PfHRD=OZQ-_-T5P=w@mail.gmail.com>
- <b6ced4cad4d7ff78330181b2c893855c23103953.camel@kernel.crashing.org>
- <1531463489.747186.1439263128.075AECE1@webmail.messagingengine.com>
- <a521b9fc-4c10-06c1-fd73-5c64379538f6@yadro.com>
-Message-ID: <1531702650.981120.1441646240.2E63DD09@webmail.messagingengine.com>
+From: gengdongjiu@huawei.com (gengdongjiu)
+Date: Mon, 16 Jul 2018 10:50:44 +0800
+Subject: [PATCH v8 3/4] KVM: arm64: Share the parts of get/set events
+ useful to 32bit
+In-Reply-To: <20180713154751.18131-4-james.morse@arm.com>
+References: <20180713154751.18131-1-james.morse@arm.com>
+ <20180713154751.18131-4-james.morse@arm.com>
+Message-ID: <35192343-38d1-c672-9e20-f5b295f264a3@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexander,
-
-I've rearranged your reply slightly :)
-
-On Sat, 14 Jul 2018, at 00:44, Alexander Amelkin wrote:
-
+On 2018/7/13 23:47, James Morse wrote:
+> The get/set events helpers do some work to check reserved
+> and padding fields are zero. This is useful on 32bit too.
 > 
-> So I'm writing this to support your position in this discussion and to
-> let Rob and other reviewers know that this feature is actually needed.
-
-Thanks.
-
-So to summarise some other replies so far, YADRO (Alexander) and Dell (Eugene) - platform vendors integrating BMCs - are interested in a solution, and the patches are seen useful for ASPEED and Nuvoton (Avi) BMCs.
-
+> Move this code into virt/kvm/arm/arm.c, and give the arch
+> code some underscores.
 > 
-> From the discussion it looks to me like Rob is not familiar with
-> specifics of BMC-managed servers and tries to apply to them the rules
-> that have proven to be good for workstations and laptops.
+> This is temporarily hidden behind __KVM_HAVE_VCPU_EVENTS until
+> 32bit is wired up.
 > 
+> Signed-off-by: James Morse <james.morse@arm.com>
+> CC: Dongjiu Geng <gengdongjiu@huawei.com>
 
-Whatever Rob's familiarity with BMCs or other systems, I'm keen to listen to, explore and gain from his experience. I was certainly expecting push back on these patches and in different circumstances I'd probably say no to them as well. The argument for them needs to stand up to scrutiny, and if that scrutiny leads to alternative solutions (that, ideally, are not /dev/mem) then that's fine.
+thanks!
+Reviewed-by: Dongjiu Geng <gengdongjiu@huawei.com>
 
-Currently I think we need what I've proposed despite it looking like a violation of abstractions, because the hardware itself doesn't have a neat, abstract design. But we could be thinking about it wrong, e.g. maybe what we need instead are no devicetree bindings and simply some in-kernel helpers that allow arbitrary drivers to instantiate the sysfs interface I've proposed for these fields under their control. That removes the need for explicit description in the devicetree, though may lead to the creation of a number of unique drivers (and bindings) that each cover only the functions we're trying to generalise over here.
+> ---
+>  arch/arm64/include/asm/kvm_host.h |  8 ++++----
+>  arch/arm64/kvm/guest.c            | 21 ++++-----------------
+>  virt/kvm/arm/arm.c                | 28 ++++++++++++++++++++++++++++
+>  3 files changed, 36 insertions(+), 21 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index 45a384b0a78a..66d09b44ebd8 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -350,11 +350,11 @@ unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu);
+>  int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *indices);
+>  int kvm_arm_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg);
+>  int kvm_arm_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg);
+> -int kvm_arm_vcpu_get_events(struct kvm_vcpu *vcpu,
+> -			    struct kvm_vcpu_events *events);
+> +int __kvm_arm_vcpu_get_events(struct kvm_vcpu *vcpu,
+> +			      struct kvm_vcpu_events *events);
+>  
+> -int kvm_arm_vcpu_set_events(struct kvm_vcpu *vcpu,
+> -			    struct kvm_vcpu_events *events);
+> +int __kvm_arm_vcpu_set_events(struct kvm_vcpu *vcpu,
+> +			      struct kvm_vcpu_events *events);
+>  
+>  #define KVM_ARCH_WANT_MMU_NOTIFIER
+>  int kvm_unmap_hva(struct kvm *kvm, unsigned long hva);
+> diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
+> index dd05be96d981..725c7545e91a 100644
+> --- a/arch/arm64/kvm/guest.c
+> +++ b/arch/arm64/kvm/guest.c
+> @@ -289,11 +289,9 @@ int kvm_arch_vcpu_ioctl_set_sregs(struct kvm_vcpu *vcpu,
+>  	return -EINVAL;
+>  }
+>  
+> -int kvm_arm_vcpu_get_events(struct kvm_vcpu *vcpu,
+> -			struct kvm_vcpu_events *events)
+> +int __kvm_arm_vcpu_get_events(struct kvm_vcpu *vcpu,
+> +			      struct kvm_vcpu_events *events)
+>  {
+> -	memset(events, 0, sizeof(*events));
+> -
+>  	events->exception.serror_pending = !!(vcpu->arch.hcr_el2 & HCR_VSE);
+>  	events->exception.serror_has_esr = cpus_have_const_cap(ARM64_HAS_RAS_EXTN);
+>  
+> @@ -303,23 +301,12 @@ int kvm_arm_vcpu_get_events(struct kvm_vcpu *vcpu,
+>  	return 0;
+>  }
+>  
+> -int kvm_arm_vcpu_set_events(struct kvm_vcpu *vcpu,
+> -			struct kvm_vcpu_events *events)
+> +int __kvm_arm_vcpu_set_events(struct kvm_vcpu *vcpu,
+> +			      struct kvm_vcpu_events *events)
+>  {
+> -	int i;
+>  	bool serror_pending = events->exception.serror_pending;
+>  	bool has_esr = events->exception.serror_has_esr;
+>  
+> -	/* check whether the reserved field is zero */
+> -	for (i = 0; i < ARRAY_SIZE(events->reserved); i++)
+> -		if (events->reserved[i])
+> -			return -EINVAL;
+> -
+> -	/* check whether the pad field is zero */
+> -	for (i = 0; i < ARRAY_SIZE(events->exception.pad); i++)
+> -		if (events->exception.pad[i])
+> -			return -EINVAL;
+> -
+>  	if (serror_pending && has_esr) {
+>  		if (!cpus_have_const_cap(ARM64_HAS_RAS_EXTN))
+>  			return -EINVAL;
+> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+> index a94eab71e5c7..f70d24e1751d 100644
+> --- a/virt/kvm/arm/arm.c
+> +++ b/virt/kvm/arm/arm.c
+> @@ -1044,6 +1044,34 @@ static int kvm_arm_vcpu_has_attr(struct kvm_vcpu *vcpu,
+>  	return ret;
+>  }
+>  
+> +#ifdef __KVM_HAVE_VCPU_EVENTS	/* temporary: until 32bit is wired up */
+> +static int kvm_arm_vcpu_get_events(struct kvm_vcpu *vcpu,
+> +				   struct kvm_vcpu_events *events)
+> +{
+> +	memset(events, 0, sizeof(*events));
+> +
+> +	return __kvm_arm_vcpu_get_events(vcpu, events);
+> +}
+> +
+> +static int kvm_arm_vcpu_set_events(struct kvm_vcpu *vcpu,
+> +				   struct kvm_vcpu_events *events)
+> +{
+> +	int i;
+> +
+> +	/* check whether the reserved field is zero */
+> +	for (i = 0; i < ARRAY_SIZE(events->reserved); i++)
+> +		if (events->reserved[i])
+> +			return -EINVAL;
+> +
+> +	/* check whether the pad field is zero */
+> +	for (i = 0; i < ARRAY_SIZE(events->exception.pad); i++)
+> +		if (events->exception.pad[i])
+> +			return -EINVAL;
+> +
+> +	return __kvm_arm_vcpu_set_events(vcpu, events);
+> +}
+> +#endif /* __KVM_HAVE_VCPU_EVENTS */
 
-It would be good to have some feedback on the proposed sysfs interface as well - as explored above we could feasibly live without the bindings in their current form but taking away the sysfs interface would nuke the series.
 
-Cheers,
-
-Andrew
+> +
+>  long kvm_arch_vcpu_ioctl(struct file *filp,
+>  			 unsigned int ioctl, unsigned long arg)
+>  {
+> 
