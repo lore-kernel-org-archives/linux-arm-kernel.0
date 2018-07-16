@@ -1,63 +1,80 @@
-From: hofrat@osadl.org (Nicholas Mc Guire)
-Date: Mon, 16 Jul 2018 15:46:49 +0200
-Subject: [PATCH V2] ARM: STi: warn if scu mapping fails
-Message-ID: <1531748809-12540-1-git-send-email-hofrat@osadl.org>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Mon, 16 Jul 2018 08:52:36 -0500
+Subject: [PATCH v2] ARM64: dts: meson-axg: add saradc support
+In-Reply-To: <1531326349.2708.136.camel@baylibre.com> (Jerome Brunet's message
+ of "Wed, 11 Jul 2018 18:25:49 +0200")
+References: <20180702222515.13924-1-yixun.lan@amlogic.com>
+ <1531326349.2708.136.camel@baylibre.com>
+Message-ID: <7h7elvmgnv.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- If the device node is not found or the of_iomap() failed, calling
-scu_enable would not be safe and could lead to an undefined system
-state. So warn in both failure paths before returning.
+Jerome Brunet <jbrunet@baylibre.com> writes:
 
-Signed-off-by: Nicholas Mc Guire <hofrat@osadl.org>
-Link: http://lkml.org/lkml/2018/7/16/219
-Fixes: commit 65ebcc115889 ("ARM: sti: Add STiH415 SOC support")
----
+> On Mon, 2018-07-02 at 22:25 +0000, Yixun Lan wrote:
+>> From: Xingyu Chen <xingyu.chen@amlogic.com>
+>> 
+>> Add the DT info for SAR ADC of the Amlogic's Meson-AXG SoC.
+>> 
+>> Signed-off-by: Xingyu Chen <xingyu.chen@amlogic.com>
+>> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+>> ---
+>> Hi kevin
+>>   I just re-send this patch which rebased to your khilman/v4.18/integ branch
+>>   Thanks
+>> Yixun
+>> 
+>> nothing changed since patch v1 [1]:
+>>  -
+>> 
+>> [1] https://lkml.kernel.org/r/20180326092117.208416-1-yixun.lan at amlogic.com
+>> 
+>> ---
+>>  .../arm64/boot/dts/amlogic/meson-axg-s400.dts |  5 +++++
+>>  arch/arm64/boot/dts/amlogic/meson-axg.dtsi    | 21 +++++++++++++++++++
+>>  2 files changed, 26 insertions(+)
+>> 
+>> diff --git a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
+>> index 4b3331fbfe39..6041f68b32ae 100644
+>> --- a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
+>> +++ b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
+>> @@ -153,3 +153,8 @@
+>>  		compatible = "brcm,bcm4329-fmac";
+>>  	};
+>>  };
+>> +
+>> +&saradc {
+>> +	status = "okay";
+>> +	vref-supply = <&vddio_ao18>;
+>> +};
+>> diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+>> index 67d7115e4eff..52678a69dbf8 100644
+>> --- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+>> +++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+>> @@ -91,6 +91,13 @@
+>>  		method = "smc";
+>>  	};
+>>  
+>> +	vddio_ao18: regulator-vddio_ao18 {
+>> +		compatible = "regulator-fixed";
+>> +		regulator-name = "VDDIO_AO18";
+>> +		regulator-min-microvolt = <1800000>;
+>> +		regulator-max-microvolt = <1800000>;
+>> +	};
+>
+> Kevin, Yixun,
+>
+> I find odd that we are adding a regulator to SoC device tree file.
+> Those regulator are usually part of board file
+>
+> Unless the regulator is actually inside the SoC, this is not the place for it.
+>
+> Sorry for not catching this earlier.
 
-V2: replacement of WARN_ON() by a meaningful pr_err as suggested by
-    Patrice CHOTARD <patrice.chotard@st.com>.
+You're right, I should've noticed this earlier also.
 
-Problem was found by an experimental coccinelle script
+Yixun, can you resend this with the regulators in the board file please?
 
-Patch was compile tested with: multi_v7_defconfig (implies
-CONFIG_ARCH_STI=y, CONFIG_SMP=y)
-(with one sparse warning unrelated to the proposed change)
+In the mean time, I've dropped this from v4.19/dt64 branch,
 
-Patch is against 4.18-rc4 (localversion-next is next-20180716)
-
- arch/arm/mach-sti/platsmp.c | 18 ++++++++++++++----
- 1 file changed, 14 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/mach-sti/platsmp.c b/arch/arm/mach-sti/platsmp.c
-index 231f19e..530e9a5 100644
---- a/arch/arm/mach-sti/platsmp.c
-+++ b/arch/arm/mach-sti/platsmp.c
-@@ -107,12 +107,22 @@ static void __init sti_smp_prepare_cpus(unsigned int max_cpus)
- 
- 	np = of_find_compatible_node(NULL, NULL, "arm,cortex-a9-scu");
- 
--	if (np) {
--		scu_base = of_iomap(np, 0);
--		scu_enable(scu_base);
--		of_node_put(np);
-+	if (!np) {
-+		pr_err("SCU not found at %s:%s():%d\n",
-+		       __FILE__, __func__, __LINE__);
-+		return;
- 	}
- 
-+	scu_base = of_iomap(np, 0);
-+	of_node_put(np);
-+	if (!scu_base) {
-+		pr_err("SCU remap failed at %s:%s():%d\n",
-+		       __FILE__, __func__, __LINE__);
-+		return;
-+	}
-+
-+	scu_enable(scu_base);
-+
- 	if (max_cpus <= 1)
- 		return;
- 
--- 
-2.1.4
+Kevin
