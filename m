@@ -1,49 +1,81 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 16 Jul 2018 10:57:00 +0100
-Subject: linux-next: Signed-off-by missing for commits in the arm-soc tree
-In-Reply-To: <CAGb2v667K4Z6o-KEQROWuCbgJbKLNX_OCpCBOWaECb_qfRMBpw@mail.gmail.com>
-References: <20180716075718.4e5ef491@canb.auug.org.au>
- <CAOesGMhVeo6Wc=nMcEnusa+FfwQBWJnxs0LY-zXm4HMau+SMhg@mail.gmail.com>
- <6a9fa6f3-7aef-a83b-72a6-dc9492964b5e@gmail.com>
- <CAGb2v667K4Z6o-KEQROWuCbgJbKLNX_OCpCBOWaECb_qfRMBpw@mail.gmail.com>
-Message-ID: <20180716095700.GC17271@n2100.armlinux.org.uk>
+From: christoffer.dall@arm.com (Christoffer Dall)
+Date: Mon, 16 Jul 2018 11:59:37 +0200
+Subject: [PATCH v3 7/9] KVM: arm/arm64: vgic: Permit uaccess writes to
+ return errors
+In-Reply-To: <08e71965-e39e-430f-3db5-765283ba3a0f@arm.com>
+References: <1531587940-2490-1-git-send-email-christoffer.dall@arm.com>
+ <1531587940-2490-8-git-send-email-christoffer.dall@arm.com>
+ <08e71965-e39e-430f-3db5-765283ba3a0f@arm.com>
+Message-ID: <20180716095937.GC30822@e113682-lin.lund.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 16, 2018 at 05:24:08PM +0800, Chen-Yu Tsai wrote:
-> On Mon, Jul 16, 2018 at 5:13 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+On Mon, Jul 16, 2018 at 09:28:00AM +0100, Marc Zyngier wrote:
+> On 14/07/18 18:05, Christoffer Dall wrote:
+> > Currently we do not allow any vgic mmio write operations to fail, which
+> > makes sense from mmio traps from the guest.  However, we should be able
+> > to report failures to userspace, if userspace writes incompatible values
+> > to read-only registers.  Rework the internal interface to allow errors
+> > to be returned on the write side for userspace writes.
 > >
+> > Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
+> > ---
+> >  virt/kvm/arm/vgic/vgic-mmio-v2.c | 26 +++++++++++++++++++++-----
+> >  virt/kvm/arm/vgic/vgic-mmio-v3.c | 31 ++++++++++++++++++++++++-------
+> >  virt/kvm/arm/vgic/vgic-mmio.c    | 18 +++++++++++++-----
+> >  virt/kvm/arm/vgic/vgic-mmio.h    | 19 +++++++++++--------
+> >  4 files changed, 69 insertions(+), 25 deletions(-)
 > >
-> > On 07/15/2018 03:50 PM, Olof Johansson wrote:
-> >> Thanks Stephen, I keep saying every time you catch these that I need
-> >> to run the same script. :(
-> >>
-> >> Florian, I wonder if this happened when you rebased to squash in the fix?
+> > diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> > index 34e36fc..b79de42 100644
+> > --- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> > +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> > @@ -77,11 +77,26 @@ static void vgic_mmio_write_v2_misc(struct kvm_vcpu *vcpu,
+> >     }
+> >  }
 > >
-> > Humm, could be, all I did (and it was not the first time) was to do an
-> > interactive rebase with --preserve-merges. AFAICT, all of these commits
-> > came from Eric's pull request, so what I typically do is just sign off
-> > on the merge commit, but do not apply my SoB to all commits coming from
-> > that pull request if that makes sense?
-> 
-> When you rebase, if the commit is re-applied, the committer changes to
-> you, so you need to add your SoB to all commits you rebased.
-> 
-> I suppose you could override it with GIT_COMMITTER_NAME and
-> GIT_COMMITTER_EMAIL environment variables, but that sort of distorts
-> the SoB if any changes were added due to rebasing, such as resolution
-> of merge conflicts.
+> > -static void vgic_mmio_uaccess_write_v2_group(struct kvm_vcpu *vcpu,
+> > -                                        gpa_t addr, unsigned int len,
+> > -                                        unsigned long val)
+> > +static int vgic_mmio_uaccess_write_v2_misc(struct kvm_vcpu *vcpu,
+> > +                                      gpa_t addr, unsigned int len,
+> > +                                      unsigned long val)
+> > +{
+> > +   switch (addr & 0x0c) {
+> > +   case GIC_DIST_IIDR:
+> > +           if (val != vgic_mmio_read_v2_misc(vcpu, addr, len))
+> > +                   return -EINVAL;
+> > +   }
+> > +
+> > +   vgic_mmio_write_v2_misc(vcpu, addr, len, val);
+> > +   return 0;
+> > +}
+> > +
+> > +static int vgic_mmio_uaccess_write_v2_group(struct kvm_vcpu *vcpu,
+> > +                                       gpa_t addr, unsigned int len,
+> > +                                       unsigned long val)
+> >  {
+> >     /* Ignore writes from userspace */
+> > +   return 0;
+> >  }
+>
+> I think it'd make more sense if this patch came before the previous one
+> (change the prototype of the userspace accessor, and only then add a new
+> accessor that can return an error). It would avoid churn in the above
+> function, and you could move vgic_mmio_uaccess_write_v2_misc into patch 6.
 
-A different point: should *anyone* be rebasing commits that they did not
-themselves commit.  Discuss.
+The intention was that the first six patches dealt with the basic
+interrupt grouping support, pretending that we don't have this
+save/restore issue with GICv2, and then let the following patches deal
+with the GICv2 problem.
 
-IMHO no - the commits were made public, and anyone could pull the tree
-from which they came in order to do further work before submitting that.
-Rebasing changes the commit IDs, which can lead to duplicate commits
-ending up in mainline.  With other changes on top, this causes totally
-unnecessary conflicts.
+>
+> Not a big deal though, as the code is otherwise perfectly fine.
+>
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
-According to speedtest.net: 13Mbps down 490kbps up
+That said, I'm happy to try to rework this if you think the git history
+will be easier to carry as a result.
+
+Thanks,
+-Christoffer
+IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
