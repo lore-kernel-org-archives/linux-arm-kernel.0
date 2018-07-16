@@ -1,74 +1,58 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 16 Jul 2018 07:34:05 -0700
-Subject: [PATCH] arm64: cpuinfo: Include cleartext implementer and part
- strings
-In-Reply-To: <f619f0e9-b8b4-29fb-5ad6-7f5ebc3a4da8@arm.com>
-References: <20180715035342.11371-1-olof@lixom.net>
- <f619f0e9-b8b4-29fb-5ad6-7f5ebc3a4da8@arm.com>
-Message-ID: <CAOesGMjq=d3ZPLTq5qudx+EE+XC2-zSsA1ViheTwM7fnTtJh2Q@mail.gmail.com>
+From: miquel.raynal@bootlin.com (Miquel Raynal)
+Date: Mon, 16 Jul 2018 16:41:45 +0200
+Subject: [PATCH v3 02/23] thermal: armada: remove useless register accesses
+In-Reply-To: <20180716144206.30985-1-miquel.raynal@bootlin.com>
+References: <20180716144206.30985-1-miquel.raynal@bootlin.com>
+Message-ID: <20180716144206.30985-3-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 16, 2018 at 2:17 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> Hi Olof,
->
-> On 15/07/18 04:53, Olof Johansson wrote:
->> There's some use in printing out what the implementer and part numbers
->> decode to for cases where they're known.
->>
->> I filled in the table based on public information; mostly from ARM TRMs
->> and other tools (and some of the SSBD tables in the kernel, etc).
->>
->> Apple IDs came from
->> https://github.com/apple/darwin-xnu/blob/master/osfmk/arm/cpuid.h
->>
->> Signed-off-by: Olof Johansson <olof@lixom.net>
->> ---
->>  arch/arm64/kernel/cpuinfo.c | 79 +++++++++++++++++++++++++++++++++++++++++++--
->>  1 file changed, 76 insertions(+), 3 deletions(-)
->
-> [...]
->
-> The same thing pops up every so often. And the answer is the same each time:
+Prepare the migration to use regmaps by first simplifying the
+initialization functions: avoid unnecessary write/read cycles on
+configuration registers.
 
-Ever thought about why it pops up?
+Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+---
+ drivers/thermal/armada_thermal.c | 8 ++------
+ 1 file changed, 2 insertions(+), 6 deletions(-)
 
-> - it breaks an existing userspace ABI by changing the format of cpuinfo
-
-Most tools likely rely on a per-line format, and in this case they're
-likely interpreting the contents after the ':' as an integer. Adding
-something to the line might or might not break them, agreed.
-
-How about introducing a "CPU model" line similar to x86's cleartext one?
-
-> - it is unmaintainable in the long run
-
-False. Chances are you already need details more fine-grained than
-this for errata and quirks, we already do for SSBD. And if it lacks an
-entry it's not the end of the world.
-
-> - userspace already has this information by simply running "lscpu"
->
-> What has changed?
-
-What has changed is that ARM(64) is moving from a
-custom-kernel-custom-userspace world to one where you might be
-upreving kernels and userspace separately, and you might be using an
-older userspace with a newer machine and a newer kernel. Having to
-update lscpu is an extra step and extra friction to making it behave
-nicely.
-
-There's also a growing expectation of the system to behave more like
-x86, especially when it comes to trivial ways of detecting what kind
-of machine you are running on. On x86 it's been trivial to look at
-/proc/cpuinfo since it is provided by the platform there. Nobody wants
-to change their implementation from having to read a file to exec a
-program, dealing with errors, and parsing its output (sure, easier
-from scripts, but more awkward from real source).
-
-Having the information exported from the kernel is a reasonable way to
-do it. The other extreme is that the kernel should just ever have
-exported the raw MIDR value.
-
-
--Olof
+diff --git a/drivers/thermal/armada_thermal.c b/drivers/thermal/armada_thermal.c
+index 077e8e562306..6fdb90b3c001 100644
+--- a/drivers/thermal/armada_thermal.c
++++ b/drivers/thermal/armada_thermal.c
+@@ -103,16 +103,13 @@ static void armadaxp_init_sensor(struct platform_device *pdev,
+ 
+ 	reg = readl_relaxed(priv->control1);
+ 	reg |= PMU_TDC0_OTF_CAL_MASK;
+-	writel(reg, priv->control1);
+ 
+ 	/* Reference calibration value */
+ 	reg &= ~PMU_TDC0_REF_CAL_CNT_MASK;
+ 	reg |= (0xf1 << PMU_TDC0_REF_CAL_CNT_OFFS);
+-	writel(reg, priv->control1);
+ 
+ 	/* Reset the sensor */
+-	reg = readl_relaxed(priv->control1);
+-	writel((reg | PMU_TDC0_SW_RST_MASK), priv->control1);
++	reg |= PMU_TDC0_SW_RST_MASK;
+ 
+ 	writel(reg, priv->control1);
+ 
+@@ -129,14 +126,13 @@ static void armada370_init_sensor(struct platform_device *pdev,
+ 
+ 	reg = readl_relaxed(priv->control1);
+ 	reg |= PMU_TDC0_OTF_CAL_MASK;
+-	writel(reg, priv->control1);
+ 
+ 	/* Reference calibration value */
+ 	reg &= ~PMU_TDC0_REF_CAL_CNT_MASK;
+ 	reg |= (0xf1 << PMU_TDC0_REF_CAL_CNT_OFFS);
+-	writel(reg, priv->control1);
+ 
+ 	reg &= ~PMU_TDC0_START_CAL_MASK;
++
+ 	writel(reg, priv->control1);
+ 
+ 	msleep(10);
+-- 
+2.14.1
