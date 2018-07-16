@@ -1,123 +1,96 @@
 From: ravi.bangoria@linux.ibm.com (Ravi Bangoria)
-Date: Mon, 16 Jul 2018 14:17:00 +0530
-Subject: [PATCH v6 0/6] Uprobes: Support SDT markers having reference count
- (semaphore)
-Message-ID: <20180716084706.28244-1-ravi.bangoria@linux.ibm.com>
+Date: Mon, 16 Jul 2018 14:17:02 +0530
+Subject: [PATCH v6 2/6] Uprobe: Additional argument arch_uprobe to
+ uprobe_write_opcode()
+In-Reply-To: <20180716084706.28244-1-ravi.bangoria@linux.ibm.com>
+References: <20180716084706.28244-1-ravi.bangoria@linux.ibm.com>
+Message-ID: <20180716084706.28244-3-ravi.bangoria@linux.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Userspace Statically Defined Tracepoints[1] are dtrace style markers
-inside userspace applications. Applications like PostgreSQL, MySQL,
-Pthread, Perl, Python, Java, Ruby, Node.js, libvirt, QEMU, glib etc
-have these markers embedded in them. These markers are added by developer
-at important places in the code. Each marker source expands to a single
-nop instruction in the compiled code but there may be additional
-overhead for computing the marker arguments which expands to couple of
-instructions. In case the overhead is more, execution of it can be
-omitted by runtime if() condition when no one is tracing on the marker:
+Add addition argument 'arch_uprobe' to uprobe_write_opcode().
+We need this in later set of patches.
 
-    if (reference_counter > 0) {
-        Execute marker instructions;
-    }
+Signed-off-by: Ravi Bangoria <ravi.bangoria@linux.ibm.com>
+---
+ arch/arm/probes/uprobes/core.c | 2 +-
+ arch/mips/kernel/uprobes.c     | 2 +-
+ include/linux/uprobes.h        | 2 +-
+ kernel/events/uprobes.c        | 9 +++++----
+ 4 files changed, 8 insertions(+), 7 deletions(-)
 
-Default value of reference counter is 0. Tracer has to increment the 
-reference counter before tracing on a marker and decrement it when
-done with the tracing.
-
-Currently, perf tool has limited supports for SDT markers. I.e. it
-can not trace markers surrounded by reference counter. Also, it's
-not easy to add reference counter logic in userspace tool like perf,
-so basic idea for this patchset is to add reference counter logic in
-the a uprobe infrastructure. Ex,[2]
-
-  # cat tick.c
-    ... 
-    for (i = 0; i < 100; i++) {
-	DTRACE_PROBE1(tick, loop1, i);
-        if (TICK_LOOP2_ENABLED()) {
-            DTRACE_PROBE1(tick, loop2, i); 
-        }
-        printf("hi: %d\n", i); 
-        sleep(1);
-    }   
-    ... 
-
-Here tick:loop1 is marker without reference counter where as tick:loop2
-is surrounded by reference counter condition.
-
-  # perf buildid-cache --add /tmp/tick
-  # perf probe sdt_tick:loop1
-  # perf probe sdt_tick:loop2
-
-  # perf stat -e sdt_tick:loop1,sdt_tick:loop2 -- /tmp/tick
-  hi: 0
-  hi: 1
-  hi: 2
-  ^C
-  Performance counter stats for '/tmp/tick':
-             3      sdt_tick:loop1
-             0      sdt_tick:loop2
-     2.747086086 seconds time elapsed
-
-Perf failed to record data for tick:loop2. Same experiment with this
-patch series:
-
-  # ./perf buildid-cache --add /tmp/tick
-  # ./perf probe sdt_tick:loop2
-  # ./perf stat -e sdt_tick:loop2 /tmp/tick
-    hi: 0
-    hi: 1
-    hi: 2
-    ^C  
-     Performance counter stats for '/tmp/tick':
-                 3      sdt_tick:loop2
-       2.561851452 seconds time elapsed
-
-
-v6 changes:
- - Do not export struct uprobe outside of uprobe.c. Instead, use
-   container_of(arch_uprobe) to regain uprobe in uprobe_write_opcode().
- - Allow 0 as a special value for reference counter _offset_. I.e.
-   two uprobes, one having ref_ctr_offset=0 and the other having
-   non-zero ref_ctr_offset can coexists.
- - If vma holding reference counter is not present while patching an
-   instruction, we add that uprobe in delayed_uprobe_list. When
-   appropriate mapping is created, we increment the reference counter
-   and remove uprobe from delayed_uprobe_list. While doing all this,
-   v5 was searching for all such uprobes in uprobe_tree which is not 
-   require. Also, uprobes are stored in rbtree with inode+offset as
-   the key and v5 was searching uprobe based on inode+ref_ctr_offset
-   which is wrong too. Fix this by directly looing on delayed_uprobe_list.
- - Consider VM_SHARED vma as invalid for reference counter. Return
-   false from valid_ref_ctr_vma() if vma->vm_flags has VM_SHARED set.
- - No need to use FOLL_FORCE in get_user_pages_remote() while getting
-   a page to update reference counter. Remove it.
- - Do not mention usage of reference counter in Documentation/.
-
-
-v5 can be found at: https://lkml.org/lkml/2018/6/28/51
-
-Ravi Bangoria (6):
-  Uprobes: Simplify uprobe_register() body
-  Uprobe: Additional argument arch_uprobe to uprobe_write_opcode()
-  Uprobes: Support SDT markers having reference count (semaphore)
-  trace_uprobe/sdt: Prevent multiple reference counter for same uprobe
-  Uprobes/sdt: Prevent multiple reference counter for same uprobe
-  perf probe: Support SDT markers having reference counter (semaphore)
-
- arch/arm/probes/uprobes/core.c |   2 +-
- arch/mips/kernel/uprobes.c     |   2 +-
- include/linux/uprobes.h        |   7 +-
- kernel/events/uprobes.c        | 358 ++++++++++++++++++++++++++++++++++++-----
- kernel/trace/trace.c           |   2 +-
- kernel/trace/trace_uprobe.c    |  78 ++++++++-
- tools/perf/util/probe-event.c  |  39 ++++-
- tools/perf/util/probe-event.h  |   1 +
- tools/perf/util/probe-file.c   |  34 +++-
- tools/perf/util/probe-file.h   |   1 +
- tools/perf/util/symbol-elf.c   |  46 ++++--
- tools/perf/util/symbol.h       |   7 +
- 12 files changed, 503 insertions(+), 74 deletions(-)
-
+diff --git a/arch/arm/probes/uprobes/core.c b/arch/arm/probes/uprobes/core.c
+index d1329f1ba4e4..bf992264060e 100644
+--- a/arch/arm/probes/uprobes/core.c
++++ b/arch/arm/probes/uprobes/core.c
+@@ -32,7 +32,7 @@ bool is_swbp_insn(uprobe_opcode_t *insn)
+ int set_swbp(struct arch_uprobe *auprobe, struct mm_struct *mm,
+ 	     unsigned long vaddr)
+ {
+-	return uprobe_write_opcode(mm, vaddr,
++	return uprobe_write_opcode(auprobe, mm, vaddr,
+ 		   __opcode_to_mem_arm(auprobe->bpinsn));
+ }
+ 
+diff --git a/arch/mips/kernel/uprobes.c b/arch/mips/kernel/uprobes.c
+index f7a0645ccb82..4aaff3b3175c 100644
+--- a/arch/mips/kernel/uprobes.c
++++ b/arch/mips/kernel/uprobes.c
+@@ -224,7 +224,7 @@ unsigned long arch_uretprobe_hijack_return_addr(
+ int __weak set_swbp(struct arch_uprobe *auprobe, struct mm_struct *mm,
+ 	unsigned long vaddr)
+ {
+-	return uprobe_write_opcode(mm, vaddr, UPROBE_SWBP_INSN);
++	return uprobe_write_opcode(auprobe, mm, vaddr, UPROBE_SWBP_INSN);
+ }
+ 
+ void arch_uprobe_copy_ixol(struct page *page, unsigned long vaddr,
+diff --git a/include/linux/uprobes.h b/include/linux/uprobes.h
+index 0a294e950df8..bb9d2084af03 100644
+--- a/include/linux/uprobes.h
++++ b/include/linux/uprobes.h
+@@ -121,7 +121,7 @@ extern bool is_swbp_insn(uprobe_opcode_t *insn);
+ extern bool is_trap_insn(uprobe_opcode_t *insn);
+ extern unsigned long uprobe_get_swbp_addr(struct pt_regs *regs);
+ extern unsigned long uprobe_get_trap_addr(struct pt_regs *regs);
+-extern int uprobe_write_opcode(struct mm_struct *mm, unsigned long vaddr, uprobe_opcode_t);
++extern int uprobe_write_opcode(struct arch_uprobe *auprobe, struct mm_struct *mm, unsigned long vaddr, uprobe_opcode_t);
+ extern int uprobe_register(struct inode *inode, loff_t offset, struct uprobe_consumer *uc);
+ extern int uprobe_apply(struct inode *inode, loff_t offset, struct uprobe_consumer *uc, bool);
+ extern void uprobe_unregister(struct inode *inode, loff_t offset, struct uprobe_consumer *uc);
+diff --git a/kernel/events/uprobes.c b/kernel/events/uprobes.c
+index 471eac896635..c0418ba52ba8 100644
+--- a/kernel/events/uprobes.c
++++ b/kernel/events/uprobes.c
+@@ -299,8 +299,8 @@ static int verify_opcode(struct page *page, unsigned long vaddr, uprobe_opcode_t
+  * Called with mm->mmap_sem held for write.
+  * Return 0 (success) or a negative errno.
+  */
+-int uprobe_write_opcode(struct mm_struct *mm, unsigned long vaddr,
+-			uprobe_opcode_t opcode)
++int uprobe_write_opcode(struct arch_uprobe *auprobe, struct mm_struct *mm,
++			unsigned long vaddr, uprobe_opcode_t opcode)
+ {
+ 	struct page *old_page, *new_page;
+ 	struct vm_area_struct *vma;
+@@ -351,7 +351,7 @@ int uprobe_write_opcode(struct mm_struct *mm, unsigned long vaddr,
+  */
+ int __weak set_swbp(struct arch_uprobe *auprobe, struct mm_struct *mm, unsigned long vaddr)
+ {
+-	return uprobe_write_opcode(mm, vaddr, UPROBE_SWBP_INSN);
++	return uprobe_write_opcode(auprobe, mm, vaddr, UPROBE_SWBP_INSN);
+ }
+ 
+ /**
+@@ -366,7 +366,8 @@ int __weak set_swbp(struct arch_uprobe *auprobe, struct mm_struct *mm, unsigned
+ int __weak
+ set_orig_insn(struct arch_uprobe *auprobe, struct mm_struct *mm, unsigned long vaddr)
+ {
+-	return uprobe_write_opcode(mm, vaddr, *(uprobe_opcode_t *)&auprobe->insn);
++	return uprobe_write_opcode(auprobe, mm, vaddr,
++			*(uprobe_opcode_t *)&auprobe->insn);
+ }
+ 
+ static struct uprobe *get_uprobe(struct uprobe *uprobe)
 -- 
 2.14.4
