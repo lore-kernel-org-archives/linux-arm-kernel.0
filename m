@@ -1,26 +1,52 @@
-From: christoffer.dall@arm.com (Christoffer Dall)
-Date: Mon, 16 Jul 2018 13:39:01 +0200
-Subject: [PATCH v3 8/9] KVM: arm/arm64: vgic: Let userspace opt-in to
- writable v2 IGROUPR
-In-Reply-To: <20180716094656.GA30822@e113682-lin.lund.arm.com>
-References: <1531587940-2490-1-git-send-email-christoffer.dall@arm.com>
- <1531587940-2490-9-git-send-email-christoffer.dall@arm.com>
- <16b6ec62-4548-3980-073c-2b593d7d4dcb@arm.com>
- <20180716094656.GA30822@e113682-lin.lund.arm.com>
-Message-ID: <20180716113901.GC29193@e113682-lin.lund.arm.com>
+From: o.rempel@pengutronix.de (Oleksij Rempel)
+Date: Mon, 16 Jul 2018 13:42:06 +0200
+Subject: [PATCH v3 0/3] add mailbox support for i.MX7D
+Message-ID: <20180716114209.25242-1-o.rempel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 16, 2018 at 11:46:57AM +0200, Christoffer Dall wrote:
-> 
-> Thanks,
-> -Christoffer
-> IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+20180615 changes v3:
+- DT: remove prosaic part of documentation. It describes software
+  or firmware specific usage and not relevant for HW description.
+- DT: use <soc>-mu instead of <soc>-mu-<mu side> and add fsl,mu-side-a
+  parameter.
+- DT: add most of know i.MX variants with MU
+- imx-mailbox: use macros instead of precalculated bit index.
+- imx-mailbox: remove warning message for clk.
+- imx-mailbox: use imx_mu_chan[%idx] for devm_request_irq.
+- imx-mailbox: depend on ARCH_MXS instead of SOX_IMX7
 
-Apologies on the disclaimer, mutt configuration snafu.
+20180615 changes v2:
+- DT: use mailbox@ instead of mu@
+- DT: change interrupts description
+- clk: use imx_clk_gate4 instead of imx_clk_gate2
+- imx-mailbox: remove last_tx_done support
+- imx-mailbox: fix module description 
 
-Please disregard the disclaimer as it clearly doesn't apply here on a
-public mailing list.
+This patches are providing support for mailbox (Messaging Unit)
+for i.MX7D.
+Functionality was tested on PHYTEC phyBOARD-Zeta i.MX7D with
+Linux running on all cores: ARM Cortex-A7 and ARM Cortex-M4.
 
-Thanks,
--Christoffer
+Both parts of i.MX messaging Unit are visible for all CPUs available
+on i.MX7D. Communication worked independent of MU side in combination
+with CPU. For example MU-A used on ARM Cortex-A7 and MU-B used on ARM Cortex-M4
+or other ways around.
+
+
+Oleksij Rempel (3):
+  dt-bindings: arm: fsl: add mu binding doc
+  ARM: dts: imx7s: add i.MX7 messaging unit support
+  mailbox: Add support for i.MX7D messaging unit
+
+ .../devicetree/bindings/mailbox/fsl,mu.txt    |  32 ++
+ arch/arm/boot/dts/imx7s.dtsi                  |  19 ++
+ drivers/mailbox/Kconfig                       |   6 +
+ drivers/mailbox/Makefile                      |   2 +
+ drivers/mailbox/imx-mailbox.c                 | 294 ++++++++++++++++++
+ 5 files changed, 353 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mailbox/fsl,mu.txt
+ create mode 100644 drivers/mailbox/imx-mailbox.c
+
+-- 
+2.18.0
