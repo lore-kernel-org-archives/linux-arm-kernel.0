@@ -1,32 +1,41 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 16 Jul 2018 00:59:26 -0700
-Subject: Vibrations on Droid 4?
-In-Reply-To: <20180715201729.GB19675@amd>
-References: <20180709081534.GA6799@amd>
- <20180709214910.tes6u4ivxomd3aja@earth.universe>
- <20180709220211.GA7760@amd>
- <20180710101147.lyu65ro4czvrs2da@earth.universe>
- <20180710133040.GA4391@amd>
- <20180710161123.azym6sbboriuj4yc@earth.universe>
- <20180711080218.GA21225@amd> <20180711132739.GL99251@atomide.com>
- <20180715201729.GB19675@amd>
-Message-ID: <20180716075926.GU99251@atomide.com>
+From: jian.hu@amlogic.com (Jian Hu)
+Date: Mon, 16 Jul 2018 16:11:45 +0800
+Subject: [RESEND PATCH v2 0/2] clk: meson-g12a: Add EE clock controller driver
+Message-ID: <1531728707-192230-1-git-send-email-jian.hu@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Pavel Machek <pavel@ucw.cz> [180715 20:20]:
-> Yep, so I have two patches that make the device appear, but vibrations
-> still do not work for me.
-> 
-> a) any ideas how to debug that / get them to work?
+Add a Clock driver for the Everything-Else part of
+the Amlogic Meson-G12A SoC.
 
-Hmm no new ideas except I wonder if there is also some other
-regression with the timer pdata not being passed properly now.
+Changes since v1 at[1]
+-fix typo of 'Everything'.
+-change the word ?AmLogic? to 'Amlogic'
+-squash patch 1 and 2.
+-delete usless message of "Trying obsolete regs".
+-delete the empty line in include/dt-bindings/clock/g12a-clkc.h.
+-rebase on top of the "next/drivers" branch, and add g12a clock patch.
+-add CLK_MUX_ROUND_CLOSEST for g12a_sd_emmc_b_clk0_sel and
+ g12a_sd_emmc_c_clk0_sel.
 
-> b) do you want the patches anyway?
+I have forgetten adding the PATCH version tag, so resend it 
 
-Yes for things that are obviously broken it makes sense.
+[1]https://lkml.kernel.org/r/1531133549-25806-2-git-send-email-jian.hu at amlogic.com
 
-Thanks,
+Jian Hu (2):
+  dt-bindings: clk: meson-g12a: Add G12A EE Clock Bindings
+  clk: meson-g12a: Add EE Clock controller driver
 
-Tony
+ .../bindings/clock/amlogic,gxbb-clkc.txt           |   1 +
+ drivers/clk/meson/Kconfig                          |  10 +
+ drivers/clk/meson/Makefile                         |   1 +
+ drivers/clk/meson/g12a.c                           | 994 +++++++++++++++++++++
+ drivers/clk/meson/g12a.h                           | 122 +++
+ include/dt-bindings/clock/g12a-clkc.h              |  92 ++
+ 6 files changed, 1220 insertions(+)
+ create mode 100644 drivers/clk/meson/g12a.c
+ create mode 100644 drivers/clk/meson/g12a.h
+ create mode 100644 include/dt-bindings/clock/g12a-clkc.h
+
+-- 
+1.9.1
