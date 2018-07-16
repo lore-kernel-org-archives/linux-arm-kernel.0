@@ -1,63 +1,55 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 16 Jul 2018 17:27:00 +0530
-Subject: [PATCH v4 08/18] net: davinci_emac: potentially get the MAC
- address from MTD
-In-Reply-To: <a70aebb0-408c-c61f-897a-227114888585@linaro.org>
-References: <20180629094039.7543-1-brgl@bgdev.pl>
- <20180629094039.7543-9-brgl@bgdev.pl>
- <03b77e24-9ab9-fa01-2387-9de0408a9942@gmail.com>
- <20180704070919.GA14051@lenoch>
- <CAMRc=McOYG9=naT2=4c4hnhJwxcqBCATEZOGXXv9u9zuvXyDXw@mail.gmail.com>
- <c0ffc590-8064-3b02-9b5c-fcc24628d390@ti.com>
- <CAMRc=McO8H9Aw8a7h318a=hJjKBOgeC+9_hreBnOY3Tc3Fh7sg@mail.gmail.com>
- <d7f03763-982f-5e3e-d0ad-54e024b10f97@ti.com>
- <a70aebb0-408c-c61f-897a-227114888585@linaro.org>
-Message-ID: <3b53a8a7-3f3a-4341-35b0-e7b52854fa9b@ti.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 16 Jul 2018 04:55:50 -0700
+Subject: linux-next: Signed-off-by missing for commits in the arm-soc tree
+In-Reply-To: <20180716095700.GC17271@n2100.armlinux.org.uk>
+References: <20180716075718.4e5ef491@canb.auug.org.au>
+ <CAOesGMhVeo6Wc=nMcEnusa+FfwQBWJnxs0LY-zXm4HMau+SMhg@mail.gmail.com>
+ <6a9fa6f3-7aef-a83b-72a6-dc9492964b5e@gmail.com>
+ <CAGb2v667K4Z6o-KEQROWuCbgJbKLNX_OCpCBOWaECb_qfRMBpw@mail.gmail.com>
+ <20180716095700.GC17271@n2100.armlinux.org.uk>
+Message-ID: <6a6d47fa-cc7f-b977-339e-ea215bc40541@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 16 July 2018 02:26 PM, Srinivas Kandagatla wrote:
-> 
-> 
-> On 16/07/18 09:50, Sekhar Nori wrote:
->> On Friday 13 July 2018 11:30 PM, Bartosz Golaszewski wrote:
+
+
+On 07/16/2018 02:57 AM, Russell King - ARM Linux wrote:
+> On Mon, Jul 16, 2018 at 05:24:08PM +0800, Chen-Yu Tsai wrote:
+>> On Mon, Jul 16, 2018 at 5:13 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+>>>
+>>>
+>>> On 07/15/2018 03:50 PM, Olof Johansson wrote:
+>>>> Thanks Stephen, I keep saying every time you catch these that I need
+>>>> to run the same script. :(
+>>>>
+>>>> Florian, I wonder if this happened when you rebased to squash in the fix?
+>>>
+>>> Humm, could be, all I did (and it was not the first time) was to do an
+>>> interactive rebase with --preserve-merges. AFAICT, all of these commits
+>>> came from Eric's pull request, so what I typically do is just sign off
+>>> on the merge commit, but do not apply my SoB to all commits coming from
+>>> that pull request if that makes sense?
 >>
->>> We're getting close to rc5 so I'd like to make a case for this series
->>> again.
->>>
->>> I understand that there's more to do than just the changes introduced
->>> here, but we shouldn't try to fix several problems in many different
->>> places at once. There's just too many moving pieces. I'd rather start
->>> merging small improvements right away.
->>>
->>> The idea behind this series is to remove (almost) all users of
->>> at24_platform_data. The davinci_emac patches are there only because we
->>> need to remove some MAC adress reading stuff from the board files.
->>> Having this code there and calling it back from EEPROM/MTD drivers is
->>> already wrong and we should work towards using nvmem for that anyway.
->>>
->>> Currently for MTD the nvmem support series seems to be dead and it's
->>> going to take some time before anything gets upstream.
->>>
->>> So I'd like to again ask you to consider picking up the patches from
->>> this series to your respective trees or at the very least: I'd like to
->>> ask Srinivas to pick up the nvmem patches and Sekhar to take the
->>> first, non-controversial batch of davinci platform changes so that
->>> we'll have less code to carry for the next release.
+>> When you rebase, if the commit is re-applied, the committer changes to
+>> you, so you need to add your SoB to all commits you rebased.
 >>
->> I think those are patches 3-7. I can take those if I get an immutable
->> commit over v4.18-rc1 from Srinivas with patches 1 & 2 applied.
-
-> nvmem patches go via Greg KH char-misc tree, if it makes things easy I
-> can provide Ack on nvmem patches, so that you can take these patches via
-> your tree?
+>> I suppose you could override it with GIT_COMMITTER_NAME and
+>> GIT_COMMITTER_EMAIL environment variables, but that sort of distorts
+>> the SoB if any changes were added due to rebasing, such as resolution
+>> of merge conflicts.
 > 
-> Let me know.
+> A different point: should *anyone* be rebasing commits that they did not
+> themselves commit.  Discuss.
+> 
+> IMHO no - the commits were made public, and anyone could pull the tree
+> from which they came in order to do further work before submitting that.
+> Rebasing changes the commit IDs, which can lead to duplicate commits
+> ending up in mainline.  With other changes on top, this causes totally
+> unnecessary conflicts.
+> 
 
-I can do that.
-
-Greg, are you fine with this? It will be great to have your ack for
-patches 1/8 and 2/18.
-
-Thanks,
-Sekhar
+Well in that case, I thought it would be cleaner to just squash Arnd's
+build fix since the commit had not been merged into arm-soc, but I will
+keep in mind not to do that anymore.
+-- 
+Florian
