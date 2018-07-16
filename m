@@ -1,83 +1,69 @@
-From: marcel@holtmann.org (Marcel Holtmann)
-Date: Mon, 16 Jul 2018 14:59:58 +0200
-Subject: [PATCH v5 5/7] Bluetooth: Extend btuart driver for join more
- vendor devices
-In-Reply-To: <1531641134.3955.19.camel@mtkswgap22>
-References: <cover.1531150733.git.sean.wang@mediatek.com>
- <85d449cdd34bf47d72935a821915e825c64a2145.1531150733.git.sean.wang@mediatek.com>
- <70616B99-5A2D-417A-8815-246700EEF4E2@holtmann.org>
- <1531641134.3955.19.camel@mtkswgap22>
-Message-ID: <6476BE78-3FE5-465F-8060-2215387323AA@holtmann.org>
+From: christoffer.dall@arm.com (Christoffer Dall)
+Date: Mon, 16 Jul 2018 15:06:20 +0200
+Subject: [PATCH v4 03/10] KVM: arm/arm64: vgic: GICv2 IGROUPR should read as
+ zero
+In-Reply-To: <1531746387-7033-1-git-send-email-christoffer.dall@arm.com>
+References: <1531746387-7033-1-git-send-email-christoffer.dall@arm.com>
+Message-ID: <1531746387-7033-4-git-send-email-christoffer.dall@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sean,
+We currently don't support grouping in the emulated VGIC, which is a
+known defect on KVM (not hurting any currently used guests as far as
+we're aware). This is currently handled by treating all interrupts as
+group 0 interrupts for an emulated GICv2 and always signaling interrupts
+as group 0 to the virtual CPU interface.
 
->>> Adding an independent btuart.h header allows these essential definitions
->>> can be reused in vendor driver. Also, struct btuart_vnd is extended with
->>> additional callbacks such as .init initializing vendor data, .shtudown,
->>> .recv and .send supporting SoC specific framing for that btuart can
->>> simply adapt to various Bluetooth uart-based devices.
->>> 
->>> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
->>> ---
->>> drivers/bluetooth/btuart.c | 73 ++++++++++++++++++++++++----------------------
->>> drivers/bluetooth/btuart.h | 30 +++++++++++++++++++
->>> 2 files changed, 68 insertions(+), 35 deletions(-)
->>> create mode 100644 drivers/bluetooth/btuart.h
->>> 
->>> diff --git a/drivers/bluetooth/btuart.c b/drivers/bluetooth/btuart.c
->>> index a900aac..65d0086 100644
->>> --- a/drivers/bluetooth/btuart.c
->>> +++ b/drivers/bluetooth/btuart.c
->>> @@ -33,35 +33,11 @@
->>> #include <net/bluetooth/hci_core.h>
->>> 
->>> #include "h4_recv.h"
->>> +#include "btuart.h"
->>> #include "btbcm.h"
->>> 
->>> #define VERSION "1.0"
->>> 
->>> -struct btuart_vnd {
->>> -	const struct h4_recv_pkt *recv_pkts;
->>> -	int recv_pkts_cnt;
->>> -	unsigned int manufacturer;
->>> -	int (*open)(struct hci_dev *hdev);
->>> -	int (*close)(struct hci_dev *hdev);
->>> -	int (*setup)(struct hci_dev *hdev);
->>> -};
->>> -
->>> -struct btuart_dev {
->>> -	struct hci_dev *hdev;
->>> -	struct serdev_device *serdev;
->>> -
->>> -	struct work_struct tx_work;
->>> -	unsigned long tx_state;
->>> -	struct sk_buff_head txq;
->>> -
->>> -	struct sk_buff *rx_skb;
->>> -
->>> -	const struct btuart_vnd *vnd;
->>> -};
->> 
->> I really like to avoid this since it is not clean. Frankly I prefer to keep the btuart.c driver for drivers that really just use H:4 as transport protocol. If the protocol is only H:4 alike and has extra headers, then it should be a separate driver.
->> 
-> 
-> thanks for letting me know your concern. I think I'm a little over in reusing these existing methods and break something generic and its beauty.
-> 
-> I'll make the driver be a separate one based on btuart in the next version.
-> 
-> 
->> The common H:4 handling is abstracted in h4_recv.h already anyway and we can add more pieces if needed. However I also wonder since you have extra framing that the complex H:4 state keeping might be not needed at all. So it could be simplified.
->> 
-> 
-> okay, I will get rid of h4_recv.h and consider to use more simplified logic to handle the extra framing and its payload.
+However, when reading which group interrupts belongs to in the guest
+from the emulated VGIC, the VGIC currently reports group 1 instead of
+group 0, which is misleading.  Fix this temporarily before introducing
+full group support by changing the hander to _raz instead of _rao.
 
-only if it is already framed by your extra header, but I seem to recall that it will frame it. For example the bfusb.c old driver does frame H:4 as well and then no extra state keeping for H:4 is needed. Just pass the frames up into the core via hci_recv_frame (or hci_recv_diag for vendor diagnostic) and move on with it.
+Fixes: fb848db39661a "KVM: arm/arm64: vgic-new: Add GICv2 MMIO handling framework"
+Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
+---
+ virt/kvm/arm/vgic/vgic-init.c    | 2 +-
+ virt/kvm/arm/vgic/vgic-mmio-v2.c | 8 +++++++-
+ 2 files changed, 8 insertions(+), 2 deletions(-)
 
-You can of course use h4_recv.h if you need to, but only do that if you are true H:4 stream and have no idea where a frame ends and starts.
-
-Regards
-
-Marcel
+diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
+index 8b6fc45..230c922 100644
+--- a/virt/kvm/arm/vgic/vgic-init.c
++++ b/virt/kvm/arm/vgic/vgic-init.c
+@@ -298,7 +298,7 @@ int vgic_init(struct kvm *kvm)
+ 
+ 	vgic_debug_init(kvm);
+ 
+-	dist->implementation_rev = 0;
++	dist->implementation_rev = 1;
+ 	dist->initialized = true;
+ 
+ out:
+diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+index f0c5351..db646f1 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
++++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+@@ -22,6 +22,12 @@
+ #include "vgic.h"
+ #include "vgic-mmio.h"
+ 
++/*
++ * The Revision field in the IIDR have the following meanings:
++ *
++ * Revision 1: Report GICv2 interrupts as group 0 instead of group 1
++ */
++
+ static unsigned long vgic_mmio_read_v2_misc(struct kvm_vcpu *vcpu,
+ 					    gpa_t addr, unsigned int len)
+ {
+@@ -365,7 +371,7 @@ static const struct vgic_register_region vgic_v2_dist_registers[] = {
+ 		vgic_mmio_read_v2_misc, vgic_mmio_write_v2_misc, 12,
+ 		VGIC_ACCESS_32bit),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_IGROUP,
+-		vgic_mmio_read_rao, vgic_mmio_write_wi, NULL, NULL, 1,
++		vgic_mmio_read_raz, vgic_mmio_write_wi, NULL, NULL, 1,
+ 		VGIC_ACCESS_32bit),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ENABLE_SET,
+ 		vgic_mmio_read_enable, vgic_mmio_write_senable, NULL, NULL, 1,
+-- 
+2.7.4
