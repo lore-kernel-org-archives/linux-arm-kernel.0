@@ -1,78 +1,83 @@
 From: christoffer.dall@arm.com (Christoffer Dall)
-Date: Mon, 16 Jul 2018 15:06:27 +0200
-Subject: [PATCH v4 10/10] KVM: arm/arm64: vgic: Update documentation of the
- GIC devices wrt IIDR
+Date: Mon, 16 Jul 2018 15:06:26 +0200
+Subject: [PATCH v4 09/10] KVM: arm/arm64: vgic: Let userspace opt-in to
+ writable v2 IGROUPR
 In-Reply-To: <1531746387-7033-1-git-send-email-christoffer.dall@arm.com>
 References: <1531746387-7033-1-git-send-email-christoffer.dall@arm.com>
-Message-ID: <1531746387-7033-11-git-send-email-christoffer.dall@arm.com>
+Message-ID: <1531746387-7033-10-git-send-email-christoffer.dall@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update the documentation to reflect the ordering requirements of
-restoring the GICD_IIDR register before any other registers and the
-effects this has on restoring the interrupt groups for an emulated GICv2
-insttance.
+Simply letting IGROUPR be writable from userspace would break
+migration from old kernels to newer kernels, because old kernels
+incorrectly report interrupt groups as group 1.  This would not be a big
+problem if userspace wrote GICD_IIDR as read from the kernel, because we
+could detect the incompatibility and return an error to userspace.
+Unfortunately, this is not the case with current userspace
+implementations and simply letting IGROUPR be writable from userspace for
+an emulated GICv2 silently breaks migration and causes the destination
+VM to no longer run after migration.
 
-Also remove some outdated limitations in the documentation while we're
-at it.
+We now encourage userspace to write the read and expected value of
+GICD_IIDR as the first part of a GIC register restore, and if we observe
+a write to GICD_IIDR we know that userspace has been updated and has had
+a chance to cope with older kernels (VGICv2 IIDR.Revision == 0)
+incorrectly reporting interrupts as group 1, and therefore we now allow
+groups to be user writable.
 
 Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
 ---
- Documentation/virtual/kvm/devices/arm-vgic-v3.txt |  8 ++++++++
- Documentation/virtual/kvm/devices/arm-vgic.txt    | 15 +++++++++------
- 2 files changed, 17 insertions(+), 6 deletions(-)
+ include/kvm/arm_vgic.h           |  3 +++
+ virt/kvm/arm/vgic/vgic-mmio-v2.c | 16 +++++++++++++++-
+ 2 files changed, 18 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/virtual/kvm/devices/arm-vgic-v3.txt b/Documentation/virtual/kvm/devices/arm-vgic-v3.txt
-index 2408ab7..eba20ae 100644
---- a/Documentation/virtual/kvm/devices/arm-vgic-v3.txt
-+++ b/Documentation/virtual/kvm/devices/arm-vgic-v3.txt
-@@ -100,6 +100,14 @@ Groups:
-     Note that distributor fields are not banked, but return the same value
-     regardless of the mpidr used to access the register.
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index c661d0e..c134790 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -221,6 +221,9 @@ struct vgic_dist {
+ 	/* Implementation revision as reported in the GICD_IIDR */
+ 	u32			implementation_rev;
  
-+    GICD_IIDR.Revision is updated when the KVM implementation is changed in a
-+    way directly observable by the guest or userspace.  Userspace should read
-+    GICD_IIDR from KVM and write back the read value to confirm its expected
-+    behavior is aligned with the KVM implementation.  Userspace should set
-+    GICD_IIDR before setting any other registers.  to ensure the expected
-+    behavior.
++	/* Userspace can write to GICv2 IGROUPR */
++	bool			v2_groups_user_writable;
 +
-+
-     The GICD_STATUSR and GICR_STATUSR registers are architecturally defined such
-     that a write of a clear bit has no effect, whereas a write with a set bit
-     clears that value.  To allow userspace to freely set the values of these two
-diff --git a/Documentation/virtual/kvm/devices/arm-vgic.txt b/Documentation/virtual/kvm/devices/arm-vgic.txt
-index b3ce126..4ff7635 100644
---- a/Documentation/virtual/kvm/devices/arm-vgic.txt
-+++ b/Documentation/virtual/kvm/devices/arm-vgic.txt
-@@ -49,9 +49,15 @@ Groups:
-     index is specified with the vcpu_index field.  Note that most distributor
-     fields are not banked, but return the same value regardless of the
-     vcpu_index used to access the register.
--  Limitations:
--    - Priorities are not implemented, and registers are RAZ/WI
--    - Currently only implemented for KVM_DEV_TYPE_ARM_VGIC_V2.
-+
-+    GICD_IIDR.Revision is updated when the KVM implementation of an emulated
-+    GICv2 is changed in a way directly observable by the guest or userspace.
-+    Userspace should read GICD_IIDR from KVM and write back the read value to
-+    confirm its expected behavior is aligned with the KVM implementation.
-+    Userspace should set GICD_IIDR before setting any other registers (both
-+    KVM_DEV_ARM_VGIC_GRP_DIST_REGS and KVM_DEV_ARM_VGIC_GRP_CPU_REGS) to ensure
-+    the expected behavior.  Unless GICD_IIDR has been set from userspace, writes
-+    to the interrupt group registers (GICD_IGROUPR) are ignored.
-   Errors:
-     -ENXIO: Getting or setting this register is not yet supported
-     -EBUSY: One or more VCPUs are running
-@@ -94,9 +100,6 @@ Groups:
-     use the lower 5 bits to communicate with the KVM device and must shift the
-     value left by 3 places to obtain the actual priority mask level.
+ 	/* Do injected MSIs require an additional device ID? */
+ 	bool			msis_require_devid;
  
--  Limitations:
--    - Priorities are not implemented, and registers are RAZ/WI
--    - Currently only implemented for KVM_DEV_TYPE_ARM_VGIC_V2.
-   Errors:
-     -ENXIO: Getting or setting this register is not yet supported
-     -EBUSY: One or more VCPUs are running
+diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+index ee164f8..26654f4 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
++++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+@@ -85,6 +85,18 @@ static int vgic_mmio_uaccess_write_v2_misc(struct kvm_vcpu *vcpu,
+ 	case GIC_DIST_IIDR:
+ 		if (val != vgic_mmio_read_v2_misc(vcpu, addr, len))
+ 			return -EINVAL;
++
++		/*
++		 * If we observe a write to GICD_IIDR we know that userspace
++		 * has been updated and has had a chance to cope with older
++		 * kernels (VGICv2 IIDR.Revision == 0) incorrectly reporting
++		 * interrupts as group 1, and therefore we now allow groups to
++		 * be user writable.  Doing this by default would break
++		 * migration from old kernels to new kernels with legacy
++		 * userspace.
++		 */
++		vcpu->kvm->arch.vgic.v2_groups_user_writable = true;
++		return 0;
+ 	}
+ 
+ 	vgic_mmio_write_v2_misc(vcpu, addr, len, val);
+@@ -95,7 +107,9 @@ static int vgic_mmio_uaccess_write_v2_group(struct kvm_vcpu *vcpu,
+ 					    gpa_t addr, unsigned int len,
+ 					    unsigned long val)
+ {
+-	/* Ignore writes from userspace */
++	if (vcpu->kvm->arch.vgic.v2_groups_user_writable)
++		vgic_mmio_write_group(vcpu, addr, len, val);
++
+ 	return 0;
+ }
+ 
 -- 
 2.7.4
