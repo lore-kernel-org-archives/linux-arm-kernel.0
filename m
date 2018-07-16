@@ -1,84 +1,43 @@
 From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 16 Jul 2018 15:33:30 +0200
-Subject: [PATCH v2 1/6] dt-bindings: gpu: mali-utgard: add
- mediatek,mt7623-mali compatible
-In-Reply-To: <1530089565.29697.35.camel@mtkswgap22>
-References: <cover.1524816502.git.sean.wang@mediatek.com>
- <7ab060c2e9ef2b220fc62913b8936b706dfaf202.1524816502.git.sean.wang@mediatek.com>
- <3bd6e509-f99a-1f2d-1b66-65c414bacdbd@gmail.com>
- <1530089565.29697.35.camel@mtkswgap22>
-Message-ID: <434aae44-d289-6683-9395-cb5711cd4b71@gmail.com>
+Date: Mon, 16 Jul 2018 15:36:50 +0200
+Subject: [PATCH 6/7] arm64: dts: mt7622: use gpio-ranges to pinctrl device
+In-Reply-To: <e0483accc1e82280492a2f68a90959232ba868f6.1529639050.git.sean.wang@mediatek.com>
+References: <f222c9f488490bd86d35346e725491e1de306ace.1529639050.git.sean.wang@mediatek.com>
+ <e0483accc1e82280492a2f68a90959232ba868f6.1529639050.git.sean.wang@mediatek.com>
+Message-ID: <76cde153-74db-101d-84a1-a0a7da679daf@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 27/06/18 10:52, Sean Wang wrote:
-> On Mon, 2018-06-25 at 17:14 +0200, Matthias Brugger wrote:
->>
->> On 27/04/18 10:14, sean.wang at mediatek.com wrote:
->>> From: Sean Wang <sean.wang@mediatek.com>
->>>
->>> The MediaTek MT7623 SoC contains a Mali-450, so add a compatible for it
->>> and define its own vendor-specific properties.
->>>
->>> Reviewed-by: Rob Herring <robh@kernel.org>
->>> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
->>> ---
->>
->> Hi Rob,
->>
->> Any comments regarding this patch?
->>
->> Regards,
->> Matthias
->>
+On 22/06/18 05:49, sean.wang at mediatek.com wrote:
+> From: Sean Wang <sean.wang@mediatek.com>
 > 
-> Hi, Matthias
+> Using gpio-ranges property represent which GPIOs correspond to which pins
+> on MT7622 pin controllers. For details, we can see section 2.1 of
+> Documentation/devicetree/bindings/gpio/gpio.txt to know how to bind pinctrl
+> and gpio drivers via the "gpio-ranges" property.
 > 
-> I've already got a Reviewed-by tag from Rob.
-> 
-> Is it possible that this patch go through your tree ?
-> 
+> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
 
-Basically yes, I just want to get the mmsys problem fixed first.
-Sorry I know it is on my plate. I'll try to send a new version this week.
+pushed now to v4.18-next/dts64
 
-Regards,
-Matthias
+Thanks
 
-> 	Sean
+> ---
+>  arch/arm64/boot/dts/mediatek/mt7622.dtsi | 1 +
+>  1 file changed, 1 insertion(+)
 > 
->>>  Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt | 9 +++++++++
->>>  1 file changed, 9 insertions(+)
->>>
->>> diff --git a/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt b/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
->>> index 99d1c0a..656068f 100644
->>> --- a/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
->>> +++ b/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
->>> @@ -19,6 +19,7 @@ Required properties:
->>>        + rockchip,rk3228-mali
->>>        + rockchip,rk3328-mali
->>>        + stericsson,db8500-mali
->>> +      + mediatek,mt7623-mali
->>>  
->>>    - reg: Physical base address and length of the GPU registers
->>>  
->>> @@ -89,6 +90,14 @@ to specify one more vendor-specific compatible, among:
->>>        * interrupt-names and interrupts:
->>>          + combined: combined interrupt of all of the above lines
->>>  
->>> +  - mediatek,mt7623-mali
->>> +     Required properties:
->>> +      * resets: phandle to the reset line for the GPU
->>> +      * mediatek,larb: phandle pointed to the local arbiter used to control the
->>> +	access to external memory on the SoC.
->>> +	see Documentation/devicetree/bindings/memory-controllers/mediatek,smi-larb.txt
->>> +	for details
->>> +
->>>  Example:
->>>  
->>>  mali: gpu at 1c40000 {
->>>
-> 
+> diff --git a/arch/arm64/boot/dts/mediatek/mt7622.dtsi b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
+> index e2c5450..50cb56c 100644
+> --- a/arch/arm64/boot/dts/mediatek/mt7622.dtsi
+> +++ b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
+> @@ -291,6 +291,7 @@
+>  		reg-names = "base", "eint";
+>  		gpio-controller;
+>  		#gpio-cells = <2>;
+> +		gpio-ranges = <&pio 0 0 103>;
+>  		interrupt-controller;
+>  		interrupts = <GIC_SPI 153 IRQ_TYPE_LEVEL_HIGH>;
+>  		interrupt-parent = <&gic>;
 > 
