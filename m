@@ -1,85 +1,63 @@
-From: Anson.Huang@nxp.com (Anson Huang)
-Date: Mon, 16 Jul 2018 12:46:35 +0800
-Subject: [PATCH] soc: imx: gpc: restrict register range for regmap access
-Message-ID: <1531716395-21549-1-git-send-email-Anson.Huang@nxp.com>
+From: andrew@aj.id.au (Andrew Jeffery)
+Date: Mon, 16 Jul 2018 14:47:12 +0930
+Subject: [PATCH 1/7] arm: dts: aspeed: Add aspeed G4 USB pinmux
+In-Reply-To: <20180629035106.27181-2-benh@kernel.crashing.org>
+References: <20180629035106.27181-1-benh@kernel.crashing.org>
+ <20180629035106.27181-2-benh@kernel.crashing.org>
+Message-ID: <1531718232.1112143.1441811576.1A98A0F8@webmail.messagingengine.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-GPC registers are NOT continuous, some registers are
-reserved and accessing them from userspace will trigger
-external abort, add regmap register access table to
-avoid below abort:
+On Fri, 29 Jun 2018, at 13:21, Benjamin Herrenschmidt wrote:
+> Set the default pinmux for EHCI so boards don't have to do
+> it an document why it is not set for UHCI.
+> 
+> Signed-off-by: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+> ---
+>  arch/arm/boot/dts/aspeed-g4.dtsi | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
+> index 75df1573380e..1d7ffa9fdb11 100644
+> --- a/arch/arm/boot/dts/aspeed-g4.dtsi
+> +++ b/arch/arm/boot/dts/aspeed-g4.dtsi
+> @@ -113,6 +113,8 @@
+>  			reg = <0x1e6a1000 0x100>;
+>  			interrupts = <5>;
+>  			clocks = <&syscon ASPEED_CLK_GATE_USBPORT1CLK>;
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&pinctrl_usb2h_default>;
+>  			status = "disabled";
+>  		};
+>  
+> @@ -123,6 +125,10 @@
+>  			#ports = <3>;
+>  			clocks = <&syscon ASPEED_CLK_GATE_USBUHCICLK>;
+>  			status = "disabled";
+> +			/*
+> +			 * No default pinmux, it will follow EHCI, use an explicit pinmux
+> +			 * override if you don't enable EHCI
+> +			 */
 
-root at imx6slevk:~# cat /sys/kernel/debug/regmap/20dc000.gpc/registers
-[  108.480477] Unhandled fault: imprecise external abort (0x1406) at 0xb6db5004
-[  108.487985] pgd = 42b54bfd
-[  108.490741] [b6db5004] *pgd=ba1b7831
-[  108.494386] Internal error: : 1406 [#1] SMP ARM
-[  108.498943] Modules linked in:
-[  108.502043] CPU: 0 PID: 389 Comm: cat Not tainted 4.18.0-rc1-00074-gc9f1f60-dirty #482
-[  108.509982] Hardware name: Freescale i.MX6 SoloLite (Device Tree)
-[  108.516123] PC is at regmap_mmio_read32le+0x20/0x24
-[  108.521031] LR is at regmap_mmio_read+0x40/0x60
-[  108.525586] pc : [<c059cf74>]    lr : [<c059d1ac>]    psr: 20060093
-[  108.531875] sp : eccf1d98  ip : eccf1da8  fp : eccf1da4
-[  108.537122] r10: ec2d3800  r9 : eccf1f60  r8 : ecfc0000
-[  108.542370] r7 : eccf1e2c  r6 : eccf1e2c  r5 : 00000028  r4 : ec338e00
-[  108.548920] r3 : 00000000  r2 : eccf1e2c  r1 : f0980028  r0 : 00000000
-[  108.555474] Flags: nzCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment none
-[  108.562720] Control: 10c5387d  Table: acf4004a  DAC: 00000051
-[  108.568491] Process cat (pid: 389, stack limit = 0xd4318a65)
-[  108.574174] Stack: (0xeccf1d98 to 0xeccf2000)
+This is only part of the story on the AST2400 which has 3 USB ports:
 
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
----
- drivers/soc/imx/gpc.c | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+* Port 1 is fixed-function UHCI
+* Port 2 can be muxed to the UHCI (host) or HID (device) controllers
+* Port 3 can be muxed to the EHCI or vHub controllers
 
-diff --git a/drivers/soc/imx/gpc.c b/drivers/soc/imx/gpc.c
-index 32f0748..0097a93 100644
---- a/drivers/soc/imx/gpc.c
-+++ b/drivers/soc/imx/gpc.c
-@@ -27,9 +27,16 @@
- #define GPC_PGC_SW2ISO_SHIFT	0x8
- #define GPC_PGC_SW_SHIFT	0x0
- 
-+#define GPC_PGC_PCI_PDN		0x200
-+#define GPC_PGC_PCI_SR		0x20c
-+
- #define GPC_PGC_GPU_PDN		0x260
- #define GPC_PGC_GPU_PUPSCR	0x264
- #define GPC_PGC_GPU_PDNSCR	0x268
-+#define GPC_PGC_GPU_SR		0x26c
-+
-+#define GPC_PGC_DISP_PDN	0x240
-+#define GPC_PGC_DISP_SR		0x24c
- 
- #define GPU_VPU_PUP_REQ		BIT(1)
- #define GPU_VPU_PDN_REQ		BIT(0)
-@@ -318,10 +325,24 @@ static const struct of_device_id imx_gpc_dt_ids[] = {
- 	{ }
- };
- 
-+static const struct regmap_range yes_ranges[] = {
-+	regmap_reg_range(GPC_CNTR, GPC_CNTR),
-+	regmap_reg_range(GPC_PGC_PCI_PDN, GPC_PGC_PCI_SR),
-+	regmap_reg_range(GPC_PGC_GPU_PDN, GPC_PGC_GPU_SR),
-+	regmap_reg_range(GPC_PGC_DISP_PDN, GPC_PGC_DISP_SR),
-+};
-+
-+static const struct regmap_access_table access_table = {
-+	.yes_ranges	= yes_ranges,
-+	.n_yes_ranges	= ARRAY_SIZE(yes_ranges),
-+};
-+
- static const struct regmap_config imx_gpc_regmap_config = {
- 	.reg_bits = 32,
- 	.val_bits = 32,
- 	.reg_stride = 4,
-+	.rd_table = &access_table,
-+	.wr_table = &access_table,
- 	.max_register = 0x2ac,
- };
- 
--- 
-2.7.4
+I assume if we plug a USB 1.1 device into port 3 it gets rate matched and dealt with (therefore UHCI follows EHCI as suggested in your comment). But given port 2, which *may* route to UHCI *specifically* (not EHCI), UHCI *doesn't* always follow EHCI.
+
+However, port 2 has its other function, HID, and HID is only available on port 2. So, if we had a HID devicetree node, we would put the pinmux for port 2 in there and leave it to the board to configure the HID controller as enabled or not. However, given this conflict, the UHCI node still shouldn't have any pinmux properties as your comment suggests, as it's up to the board whether HID or UHCI mode should be selected for port 2, but we'll need to enable the UHCI controller for port 1 (or 3) and we don't want to force the mux state of port 2 (or 3).
+
+So whilst partially correct, the comment is a bit misleading in that it suggests muxing EHCI is enough in general, which isn't really true. Maybe say instead that due to flexible configuration, UHCI pinmux should be overridden in the platform dts explicitly?
+
+Cheers,
+
+Andrew
+
+>  		};
+>  
+>  		apb {
+> -- 
+> 2.17.1
+> 
