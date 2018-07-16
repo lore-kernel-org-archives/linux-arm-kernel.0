@@ -1,58 +1,55 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 16 Jul 2018 15:45:16 -0600
-Subject: [PATCH 2/3] dt-bindings: amlogic: Add Internal Clock Measurer
- bindings
-In-Reply-To: <1530624110-4687-3-git-send-email-narmstrong@baylibre.com>
-References: <1530624110-4687-1-git-send-email-narmstrong@baylibre.com>
- <1530624110-4687-3-git-send-email-narmstrong@baylibre.com>
-Message-ID: <20180716214516.GA31738@rob-hp-laptop>
+Date: Mon, 16 Jul 2018 15:59:13 -0600
+Subject: [PATCH v2 1/2] dt: bindings: Add bindings for SDHCI Synopsys DWC
+ MSHC
+In-Reply-To: <20180712100611.5887a195@xhacker.debian>
+References: <20180706151930.78b3024b@xhacker.debian>
+ <20180706152047.0b0a4944@xhacker.debian>
+ <20180711161206.GA1558@rob-hp-laptop>
+ <20180712100611.5887a195@xhacker.debian>
+Message-ID: <20180716215913.GA4269@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 03, 2018 at 03:21:49PM +0200, Neil Armstrong wrote:
-> The Amlogic Meson GX SoCs embeds a clock measurer IP to measure the internal
-> clock paths frequencies.
+On Thu, Jul 12, 2018 at 10:06:11AM +0800, Jisheng Zhang wrote:
+> Hi Rob,
 > 
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> ---
->  .../devicetree/bindings/soc/amlogic/clk-measure.txt       | 15 +++++++++++++++
->  1 file changed, 15 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/soc/amlogic/clk-measure.txt
+> On Wed, 11 Jul 2018 10:12:06 -0600 Rob Herring wrote:
 > 
-> diff --git a/Documentation/devicetree/bindings/soc/amlogic/clk-measure.txt b/Documentation/devicetree/bindings/soc/amlogic/clk-measure.txt
-> new file mode 100644
-> index 0000000..ba9183a
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/soc/amlogic/clk-measure.txt
-> @@ -0,0 +1,15 @@
-> +Amlogic Internal Clock Measurer
-> +===============================
-> +
-> +The Amlogic SoCs contains an IP to measure the internal clocks.
-> +The precision is multiple of MHz, useful to debug the clock states.
-
-What a simple yet useful debug tool.
-
-> +
-> +Required properties:
-> +- compatible: Shall contain "amlogic,meson-gx-clk-measure"
-> +- reg: base address and size of the Clock Measurer register space.
-> +
-> +Example:
-> +	clock-measure at 8758 {
-> +		compatible = "amlogic,meson-gx-clk-measure";
-> +		reg = <0x0 0x8758 0x0 0x10>;
-
-This doesn't really look like its own block though. Can't the parent 
-device instantiate the driver for this?
-
-
-> +	};
-> -- 
-> 2.7.4
+> > On Fri, Jul 06, 2018 at 03:20:47PM +0800, Jisheng Zhang wrote:
+> > > Synopsys SDHCI compatible DesignWare Cores Mobile Storage Host
+> > > Controller can support eMMC/SD/SDIO. Add the bindings.
+> > > 
+> > > Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
+> > > ---
+> > >  .../bindings/mmc/sdhci-of-dwcmshc.txt         | 20 +++++++++++++++++++
+> > >  1 file changed, 20 insertions(+)
+> > >  create mode 100644 Documentation/devicetree/bindings/mmc/sdhci-of-dwcmshc.txt
+> > > 
+> > > diff --git a/Documentation/devicetree/bindings/mmc/sdhci-of-dwcmshc.txt b/Documentation/devicetree/bindings/mmc/sdhci-of-dwcmshc.txt
+> > > new file mode 100644
+> > > index 000000000000..ee4253b33be2
+> > > --- /dev/null
+> > > +++ b/Documentation/devicetree/bindings/mmc/sdhci-of-dwcmshc.txt
+> > > @@ -0,0 +1,20 @@
+> > > +* Synopsys DesignWare Cores Mobile Storage Host Controller
+> > > +
+> > > +Required properties:
+> > > +- compatible: should be one of the following:
+> > > +    "snps,dwcmshc-sdhci"  
+> > 
+> > Needs to note that there must also be an SoC specific compatible.
 > 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Currently, there's no SoC specific code in this driver, so the binding could
+> be extended to SoC compatible if necessary. What do you think?
+
+Doesn't matter what's in the driver, it can use this compatible.
+
+But experience has shown that a compatible for a licensed IP is never 
+sufficient. There are versions of the blocks, configuration options, and 
+integration differences.
+
+I'm not asking you to add any SoC specific compatible now unless you 
+are working on a particular SoC, but just state one is needed. 
+
+Rob
