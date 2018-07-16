@@ -1,89 +1,169 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 16 Jul 2018 12:30:09 +0100
-Subject: [PATCHv4 04/12] atomics/treewide: instrument xchg()
-In-Reply-To: <20180716113017.3909-1-mark.rutland@arm.com>
-References: <20180716113017.3909-1-mark.rutland@arm.com>
-Message-ID: <20180716113017.3909-5-mark.rutland@arm.com>
+Date: Mon, 16 Jul 2018 12:30:05 +0100
+Subject: [PATCHv4 00/12] atomics: generate atomic headers / instrument arm64
+Message-ID: <20180716113017.3909-1-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While we instrument all of the (non-relaxed) atomic_*() functions and
-cmpxchg(), we missed xchg().
+Hi Ingo,
 
-Let's add instrumentation for xchg(), fixing up x86 to implement
-arch_xchg().
+Are you happy to pick this series? Both Will and Peter are happy with v3, and
+since then I've only made a minor cleanup to the commit messages for patches
+8-10 (as requested by Peter), and added Will's Acked-by tags.
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Peter Zijlstra (Intel) <peterz@infradead.org>
-Acked-by: Will Deacon <will.deacon@arm.com>
-Cc: Boqun Feng <boqun.feng@gmail.com>
-Cc: Dmitry Vyukov <dvyukov@google.com>
-Cc: H. Peter Anvin <hpa@zytor.com>
-Cc: Ingo Molnar <mingo@redhat.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
----
- arch/x86/include/asm/atomic.h             | 2 +-
- arch/x86/include/asm/atomic64_64.h        | 2 +-
- arch/x86/include/asm/cmpxchg.h            | 2 +-
- include/asm-generic/atomic-instrumented.h | 7 +++++++
- 4 files changed, 10 insertions(+), 3 deletions(-)
+This series scripts the generation of the various atomic headers, to ensure
+that the various atomic APIs remain consistent, reducing the risk of human
+error, and simplifying future rework. This fleshes out the instrumented atomics
+such that arm64 can be migrated over to them.
 
-diff --git a/arch/x86/include/asm/atomic.h b/arch/x86/include/asm/atomic.h
-index 823fd2f320cf..b143717b92b3 100644
---- a/arch/x86/include/asm/atomic.h
-+++ b/arch/x86/include/asm/atomic.h
-@@ -202,7 +202,7 @@ static __always_inline bool arch_atomic_try_cmpxchg(atomic_t *v, int *old, int n
- 
- static inline int arch_atomic_xchg(atomic_t *v, int new)
- {
--	return xchg(&v->counter, new);
-+	return arch_xchg(&v->counter, new);
- }
- 
- static inline void arch_atomic_and(int i, atomic_t *v)
-diff --git a/arch/x86/include/asm/atomic64_64.h b/arch/x86/include/asm/atomic64_64.h
-index 849f1c566a11..4343d9b4f30e 100644
---- a/arch/x86/include/asm/atomic64_64.h
-+++ b/arch/x86/include/asm/atomic64_64.h
-@@ -188,7 +188,7 @@ static __always_inline bool arch_atomic64_try_cmpxchg(atomic64_t *v, s64 *old, l
- 
- static inline long arch_atomic64_xchg(atomic64_t *v, long new)
- {
--	return xchg(&v->counter, new);
-+	return arch_xchg(&v->counter, new);
- }
- 
- static inline void arch_atomic64_and(long i, atomic64_t *v)
-diff --git a/arch/x86/include/asm/cmpxchg.h b/arch/x86/include/asm/cmpxchg.h
-index e3efd8a06066..a55d79b233d3 100644
---- a/arch/x86/include/asm/cmpxchg.h
-+++ b/arch/x86/include/asm/cmpxchg.h
-@@ -75,7 +75,7 @@ extern void __add_wrong_size(void)
-  * use "asm volatile" and "memory" clobbers to prevent gcc from moving
-  * information around.
-  */
--#define xchg(ptr, v)	__xchg_op((ptr), (v), xchg, "")
-+#define arch_xchg(ptr, v)	__xchg_op((ptr), (v), xchg, "")
- 
- /*
-  * Atomic compare and exchange.  Compare OLD with MEM, if identical,
-diff --git a/include/asm-generic/atomic-instrumented.h b/include/asm-generic/atomic-instrumented.h
-index c7c3e4cdd942..53481b6eacdf 100644
---- a/include/asm-generic/atomic-instrumented.h
-+++ b/include/asm-generic/atomic-instrumented.h
-@@ -408,6 +408,13 @@ static __always_inline bool atomic64_add_negative(s64 i, atomic64_t *v)
- }
- #endif
- 
-+#define xchg(ptr, new)							\
-+({									\
-+	typeof(ptr) __ai_ptr = (ptr);					\
-+	kasan_check_write(__ai_ptr, sizeof(*__ai_ptr));			\
-+	arch_xchg(__ai_ptr, (new));					\
-+})
-+
- #define cmpxchg(ptr, old, new)						\
- ({									\
- 	typeof(ptr) __ai_ptr = (ptr);					\
+Since v1 [1]:
+* Use 'p' instead of 'I' for pointer to base int type
+* Use Peter's patch for ldsem
+* Rename atomic acquire/release barriers
+* Handle xchg/cmpxchg variants
+* Typo fixes
+* Migrate arm64 to instrumented atomics
+
+Since v2 [2]:
+* Drop undefs for __atomic_*_fence()
+* Rename __atomic_{pre,post}_fence => __atomic_{pre,post}_full_fence()
+* Restore atomic_long_cond_read_relaxed()
+* Add Kbuild step to verify atomic headers are up-to-date
+* Rework arm64 atomic naming
+* Commit message cleanups
+* Accumulate acks
+
+Since v3 [3]:
+* Add Will's Acked-by tags
+* Clean up rationale for patches 8-10 given we check at kbuild time
+
+The series is based on my atomic API cleanup patches [4], which have been
+queued in the tip locking/core branch.
+
+The first six patches clean up some issues with the existing atomic
+instrumentation, with patch six introducing the header generation
+infrastructure. The subsequent three patches migrate to each generated header
+in turn, with the final patch moving arm64 over to the instrumented atomics.
+
+The scripts themselves are mostly POSIX sh (modulo local), without bashisms,
+and work in dash and bash.
+
+Per Linus request that it is possible to use git grep to inspect the atomic
+headers [3], the headers are committed (and not generated by kbuild). Since we
+now expand the fallback definitions inline, each *should* be easier to find
+with grep. Each header also has a comment at the top with a path to the script
+used to generate it. 
+
+That scripting comes to ~900 lines, and replaces ~1700 lines of hand-written
+boilerplate with ~4700 lines of generated code. Some of that increase in line
+count is due to filling in missing portions of the API (e.g. adding all the
+ordering variants to the instrumented atomics), while some of that is due to
+expanding fallbacks in place, and consistently spreading these across multiple
+lines.
+
+I've build-tested this for x86_64 and arm64 (with and without LSE), and given
+this some basic boot testing on an Arm Juno platform.
+
+I've pushed the series out to my atomics/generated branch [5], based atop of
+tip locking/core.
+
+Thanks,
+Mark.
+
+[1] https://lkml.kernel.org/r/20180529180746.29684-1-mark.rutland at arm.com
+[2] https://lkml.kernel.org/r/20180625105952.3756-1-mark.rutland at arm.com 
+[3] https://lkml.kernel.org/r/20180705164053.10073-1-mark.rutland at arm.com
+[4] https://lkml.kernel.org/r/20180621121321.4761-1-mark.rutland at arm.com
+[5] git://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git atomics/generated
+
+Mark Rutland (11):
+  atomics/x86: reduce arch_cmpxchg64*() instrumentation
+  atomics: simplify cmpxchg() instrumentation
+  atomics/treewide: instrument xchg()
+  atomics: instrument cmpxchg_double*()
+  atomics/treewide: rework ordering barriers
+  atomics: add common header generation files
+  atomics: switch to generated fallbacks
+  atomics: switch to generated atomic-long
+  atomics: switch to generated instrumentation
+  atomics: check generated headers are up-to-date
+  arm64: use instrumented atomics
+
+Peter Zijlstra (1):
+  atomic/tty: Fix up atomic abuse in ldsem
+
+ Kbuild                                       |   18 +-
+ MAINTAINERS                                  |    1 +
+ arch/alpha/include/asm/atomic.h              |    8 +-
+ arch/arm64/include/asm/atomic.h              |  237 +--
+ arch/arm64/include/asm/atomic_ll_sc.h        |   28 +-
+ arch/arm64/include/asm/atomic_lse.h          |   38 +-
+ arch/arm64/include/asm/cmpxchg.h             |   60 +-
+ arch/arm64/include/asm/sync_bitops.h         |   16 +-
+ arch/powerpc/include/asm/atomic.h            |   17 +-
+ arch/riscv/include/asm/atomic.h              |   17 +-
+ arch/x86/include/asm/atomic.h                |    2 +-
+ arch/x86/include/asm/atomic64_64.h           |    2 +-
+ arch/x86/include/asm/cmpxchg.h               |    2 +-
+ arch/x86/include/asm/cmpxchg_64.h            |    4 +-
+ drivers/tty/tty_ldsem.c                      |   82 +-
+ include/asm-generic/atomic-instrumented.h    | 1770 +++++++++++++++++---
+ include/asm-generic/atomic-long.h            | 1173 ++++++++++---
+ include/linux/atomic-fallback.h              | 2294 ++++++++++++++++++++++++++
+ include/linux/atomic.h                       | 1279 +-------------
+ include/linux/tty_ldisc.h                    |    4 +-
+ scripts/atomic/atomic-tbl.sh                 |  186 +++
+ scripts/atomic/atomics.tbl                   |   41 +
+ scripts/atomic/check-atomics.sh              |   19 +
+ scripts/atomic/fallbacks/acquire             |    9 +
+ scripts/atomic/fallbacks/add_negative        |   16 +
+ scripts/atomic/fallbacks/add_unless          |   16 +
+ scripts/atomic/fallbacks/andnot              |    7 +
+ scripts/atomic/fallbacks/dec                 |    7 +
+ scripts/atomic/fallbacks/dec_and_test        |   15 +
+ scripts/atomic/fallbacks/dec_if_positive     |   15 +
+ scripts/atomic/fallbacks/dec_unless_positive |   14 +
+ scripts/atomic/fallbacks/fence               |   11 +
+ scripts/atomic/fallbacks/fetch_add_unless    |   23 +
+ scripts/atomic/fallbacks/inc                 |    7 +
+ scripts/atomic/fallbacks/inc_and_test        |   15 +
+ scripts/atomic/fallbacks/inc_not_zero        |   14 +
+ scripts/atomic/fallbacks/inc_unless_negative |   14 +
+ scripts/atomic/fallbacks/read_acquire        |    7 +
+ scripts/atomic/fallbacks/release             |    8 +
+ scripts/atomic/fallbacks/set_release         |    7 +
+ scripts/atomic/fallbacks/sub_and_test        |   16 +
+ scripts/atomic/fallbacks/try_cmpxchg         |   11 +
+ scripts/atomic/gen-atomic-fallback.sh        |  181 ++
+ scripts/atomic/gen-atomic-instrumented.sh    |  182 ++
+ scripts/atomic/gen-atomic-long.sh            |  101 ++
+ 45 files changed, 5994 insertions(+), 2000 deletions(-)
+ create mode 100644 include/linux/atomic-fallback.h
+ create mode 100755 scripts/atomic/atomic-tbl.sh
+ create mode 100644 scripts/atomic/atomics.tbl
+ create mode 100755 scripts/atomic/check-atomics.sh
+ create mode 100644 scripts/atomic/fallbacks/acquire
+ create mode 100644 scripts/atomic/fallbacks/add_negative
+ create mode 100644 scripts/atomic/fallbacks/add_unless
+ create mode 100644 scripts/atomic/fallbacks/andnot
+ create mode 100644 scripts/atomic/fallbacks/dec
+ create mode 100644 scripts/atomic/fallbacks/dec_and_test
+ create mode 100644 scripts/atomic/fallbacks/dec_if_positive
+ create mode 100644 scripts/atomic/fallbacks/dec_unless_positive
+ create mode 100644 scripts/atomic/fallbacks/fence
+ create mode 100644 scripts/atomic/fallbacks/fetch_add_unless
+ create mode 100644 scripts/atomic/fallbacks/inc
+ create mode 100644 scripts/atomic/fallbacks/inc_and_test
+ create mode 100644 scripts/atomic/fallbacks/inc_not_zero
+ create mode 100644 scripts/atomic/fallbacks/inc_unless_negative
+ create mode 100644 scripts/atomic/fallbacks/read_acquire
+ create mode 100644 scripts/atomic/fallbacks/release
+ create mode 100644 scripts/atomic/fallbacks/set_release
+ create mode 100644 scripts/atomic/fallbacks/sub_and_test
+ create mode 100644 scripts/atomic/fallbacks/try_cmpxchg
+ create mode 100755 scripts/atomic/gen-atomic-fallback.sh
+ create mode 100755 scripts/atomic/gen-atomic-instrumented.sh
+ create mode 100755 scripts/atomic/gen-atomic-long.sh
+
 -- 
 2.11.0
