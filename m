@@ -1,133 +1,173 @@
 From: christoffer.dall@arm.com (Christoffer Dall)
-Date: Mon, 16 Jul 2018 15:06:21 +0200
-Subject: [PATCH v4 04/10] KVM: arm/arm64: vgic: Add group field to struct irq
+Date: Mon, 16 Jul 2018 15:06:23 +0200
+Subject: [PATCH v4 06/10] KVM: arm/arm64: vgic: Permit uaccess writes to
+ return errors
 In-Reply-To: <1531746387-7033-1-git-send-email-christoffer.dall@arm.com>
 References: <1531746387-7033-1-git-send-email-christoffer.dall@arm.com>
-Message-ID: <1531746387-7033-5-git-send-email-christoffer.dall@arm.com>
+Message-ID: <1531746387-7033-7-git-send-email-christoffer.dall@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation for proper group 0 and group 1 support in the vgic, we
-add a field in the struct irq to store the group of all interrupts.
-
-We initialize the group to group 0 when emulating GICv2 and to group 1
-when emulating GICv3, just like we treat them today.  LPIs are always
-group 1.  We also continue to ignore writes from the guest, preserving
-existing functionality, for now.
-
-Finally, we also add this field to the vgic debug logic to show the
-group for all interrupts.
+Currently we do not allow any vgic mmio write operations to fail, which
+makes sense from mmio traps from the guest.  However, we should be able
+to report failures to userspace, if userspace writes incompatible values
+to read-only registers.  Rework the internal interface to allow errors
+to be returned on the write side for userspace writes.
 
 Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
 ---
- include/kvm/arm_vgic.h         |  1 +
- virt/kvm/arm/vgic/vgic-debug.c |  8 +++++---
- virt/kvm/arm/vgic/vgic-init.c  | 19 +++++++++++++++++--
- virt/kvm/arm/vgic/vgic-its.c   |  1 +
- 4 files changed, 24 insertions(+), 5 deletions(-)
+ virt/kvm/arm/vgic/vgic-mmio-v3.c | 12 +++++++-----
+ virt/kvm/arm/vgic/vgic-mmio.c    | 18 +++++++++++++-----
+ virt/kvm/arm/vgic/vgic-mmio.h    | 19 +++++++++++--------
+ 3 files changed, 31 insertions(+), 18 deletions(-)
 
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 7e64c46..c661d0e 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -133,6 +133,7 @@ struct vgic_irq {
- 	u8 source;			/* GICv2 SGIs only */
- 	u8 active_source;		/* GICv2 SGIs only */
- 	u8 priority;
-+	u8 group;			/* 0 == group 0, 1 == group 1 */
- 	enum vgic_irq_config config;	/* Level or edge */
- 
- 	/*
-diff --git a/virt/kvm/arm/vgic/vgic-debug.c b/virt/kvm/arm/vgic/vgic-debug.c
-index c589d4c..d3a403f 100644
---- a/virt/kvm/arm/vgic/vgic-debug.c
-+++ b/virt/kvm/arm/vgic/vgic-debug.c
-@@ -148,6 +148,7 @@ static void print_dist_state(struct seq_file *s, struct vgic_dist *dist)
- 
- 	seq_printf(s, "P=pending_latch, L=line_level, A=active\n");
- 	seq_printf(s, "E=enabled, H=hw, C=config (level=1, edge=0)\n");
-+	seq_printf(s, "G=group\n");
+diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+index ebe10a0..ef57a1a 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
++++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+@@ -249,9 +249,9 @@ static unsigned long vgic_v3_uaccess_read_pending(struct kvm_vcpu *vcpu,
+ 	return value;
  }
  
- static void print_header(struct seq_file *s, struct vgic_irq *irq,
-@@ -162,8 +163,8 @@ static void print_header(struct seq_file *s, struct vgic_irq *irq,
- 	}
+-static void vgic_v3_uaccess_write_pending(struct kvm_vcpu *vcpu,
+-					  gpa_t addr, unsigned int len,
+-					  unsigned long val)
++static int vgic_v3_uaccess_write_pending(struct kvm_vcpu *vcpu,
++					 gpa_t addr, unsigned int len,
++					 unsigned long val)
+ {
+ 	u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
+ 	int i;
+@@ -276,6 +276,8 @@ static void vgic_v3_uaccess_write_pending(struct kvm_vcpu *vcpu,
  
- 	seq_printf(s, "\n");
--	seq_printf(s, "%s%2d TYP   ID TGT_ID PLAEHC     HWID   TARGET SRC PRI VCPU_ID\n", hdr, id);
--	seq_printf(s, "---------------------------------------------------------------\n");
-+	seq_printf(s, "%s%2d TYP   ID TGT_ID PLAEHCG     HWID   TARGET SRC PRI VCPU_ID\n", hdr, id);
-+	seq_printf(s, "----------------------------------------------------------------\n");
+ 		vgic_put_irq(vcpu->kvm, irq);
+ 	}
++
++	return 0;
  }
  
- static void print_irq_state(struct seq_file *s, struct vgic_irq *irq,
-@@ -182,7 +183,7 @@ static void print_irq_state(struct seq_file *s, struct vgic_irq *irq,
+ /* We want to avoid outer shareable. */
+@@ -468,7 +470,7 @@ static const struct vgic_register_region vgic_v3_dist_registers[] = {
+ 		VGIC_ACCESS_32bit),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_ICPENDR,
+ 		vgic_mmio_read_pending, vgic_mmio_write_cpending,
+-		vgic_mmio_read_raz, vgic_mmio_write_wi, 1,
++		vgic_mmio_read_raz, vgic_mmio_uaccess_write_wi, 1,
+ 		VGIC_ACCESS_32bit),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_ISACTIVER,
+ 		vgic_mmio_read_active, vgic_mmio_write_sactive,
+@@ -541,7 +543,7 @@ static const struct vgic_register_region vgic_v3_sgibase_registers[] = {
+ 		VGIC_ACCESS_32bit),
+ 	REGISTER_DESC_WITH_LENGTH_UACCESS(GICR_ICPENDR0,
+ 		vgic_mmio_read_pending, vgic_mmio_write_cpending,
+-		vgic_mmio_read_raz, vgic_mmio_write_wi, 4,
++		vgic_mmio_read_raz, vgic_mmio_uaccess_write_wi, 4,
+ 		VGIC_ACCESS_32bit),
+ 	REGISTER_DESC_WITH_LENGTH_UACCESS(GICR_ISACTIVER0,
+ 		vgic_mmio_read_active, vgic_mmio_write_sactive,
+diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
+index ff9655c..e1e7998 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio.c
++++ b/virt/kvm/arm/vgic/vgic-mmio.c
+@@ -40,6 +40,13 @@ void vgic_mmio_write_wi(struct kvm_vcpu *vcpu, gpa_t addr,
+ 	/* Ignore */
+ }
  
- 	seq_printf(s, "       %s %4d "
- 		      "    %2d "
--		      "%d%d%d%d%d%d "
-+		      "%d%d%d%d%d%d%d "
- 		      "%8d "
- 		      "%8x "
- 		      " %2x "
-@@ -197,6 +198,7 @@ static void print_irq_state(struct seq_file *s, struct vgic_irq *irq,
- 			irq->enabled,
- 			irq->hw,
- 			irq->config == VGIC_CONFIG_LEVEL,
-+			irq->group,
- 			irq->hwintid,
- 			irq->mpidr,
- 			irq->source,
-diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
-index 230c922..a7c19cd 100644
---- a/virt/kvm/arm/vgic/vgic-init.c
-+++ b/virt/kvm/arm/vgic/vgic-init.c
-@@ -175,10 +175,13 @@ static int kvm_vgic_dist_init(struct kvm *kvm, unsigned int nr_spis)
- 		irq->vcpu = NULL;
- 		irq->target_vcpu = vcpu0;
- 		kref_init(&irq->refcount);
--		if (dist->vgic_model == KVM_DEV_TYPE_ARM_VGIC_V2)
-+		if (dist->vgic_model == KVM_DEV_TYPE_ARM_VGIC_V2) {
- 			irq->targets = 0;
--		else
-+			irq->group = 0;
-+		} else {
- 			irq->mpidr = 0;
-+			irq->group = 1;
-+		}
- 	}
++int vgic_mmio_uaccess_write_wi(struct kvm_vcpu *vcpu, gpa_t addr,
++			       unsigned int len, unsigned long val)
++{
++	/* Ignore */
++	return 0;
++}
++
+ /*
+  * Read accesses to both GICD_ICENABLER and GICD_ISENABLER return the value
+  * of the enabled bit, so there is only one function for both here.
+@@ -363,11 +370,12 @@ void vgic_mmio_write_cactive(struct kvm_vcpu *vcpu,
+ 	mutex_unlock(&vcpu->kvm->lock);
+ }
+ 
+-void vgic_mmio_uaccess_write_cactive(struct kvm_vcpu *vcpu,
++int vgic_mmio_uaccess_write_cactive(struct kvm_vcpu *vcpu,
+ 				     gpa_t addr, unsigned int len,
+ 				     unsigned long val)
+ {
+ 	__vgic_mmio_write_cactive(vcpu, addr, len, val);
++	return 0;
+ }
+ 
+ static void __vgic_mmio_write_sactive(struct kvm_vcpu *vcpu,
+@@ -399,11 +407,12 @@ void vgic_mmio_write_sactive(struct kvm_vcpu *vcpu,
+ 	mutex_unlock(&vcpu->kvm->lock);
+ }
+ 
+-void vgic_mmio_uaccess_write_sactive(struct kvm_vcpu *vcpu,
++int vgic_mmio_uaccess_write_sactive(struct kvm_vcpu *vcpu,
+ 				     gpa_t addr, unsigned int len,
+ 				     unsigned long val)
+ {
+ 	__vgic_mmio_write_sactive(vcpu, addr, len, val);
++	return 0;
+ }
+ 
+ unsigned long vgic_mmio_read_priority(struct kvm_vcpu *vcpu,
+@@ -735,10 +744,9 @@ static int vgic_uaccess_write(struct kvm_vcpu *vcpu, struct kvm_io_device *dev,
+ 
+ 	r_vcpu = iodev->redist_vcpu ? iodev->redist_vcpu : vcpu;
+ 	if (region->uaccess_write)
+-		region->uaccess_write(r_vcpu, addr, sizeof(u32), *val);
+-	else
+-		region->write(r_vcpu, addr, sizeof(u32), *val);
++		return region->uaccess_write(r_vcpu, addr, sizeof(u32), *val);
+ 
++	region->write(r_vcpu, addr, sizeof(u32), *val);
  	return 0;
  }
-@@ -227,6 +230,18 @@ int kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
- 			/* PPIs */
- 			irq->config = VGIC_CONFIG_LEVEL;
- 		}
+ 
+diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
+index 5693f6df..9c3d6d3 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio.h
++++ b/virt/kvm/arm/vgic/vgic-mmio.h
+@@ -37,8 +37,8 @@ struct vgic_register_region {
+ 	unsigned long (*uaccess_read)(struct kvm_vcpu *vcpu, gpa_t addr,
+ 				      unsigned int len);
+ 	union {
+-		void (*uaccess_write)(struct kvm_vcpu *vcpu, gpa_t addr,
+-				      unsigned int len, unsigned long val);
++		int (*uaccess_write)(struct kvm_vcpu *vcpu, gpa_t addr,
++				     unsigned int len, unsigned long val);
+ 		int (*uaccess_its_write)(struct kvm *kvm, struct vgic_its *its,
+ 					 gpa_t addr, unsigned int len,
+ 					 unsigned long val);
+@@ -134,6 +134,9 @@ unsigned long vgic_mmio_read_rao(struct kvm_vcpu *vcpu,
+ void vgic_mmio_write_wi(struct kvm_vcpu *vcpu, gpa_t addr,
+ 			unsigned int len, unsigned long val);
+ 
++int vgic_mmio_uaccess_write_wi(struct kvm_vcpu *vcpu, gpa_t addr,
++			       unsigned int len, unsigned long val);
 +
-+		/*
-+		 * GICv3 can only be created via the KVM_DEVICE_CREATE API and
-+		 * so we always know the emulation type at this point as it's
-+		 * either explicitly configured as GICv3, or explicitly
-+		 * configured as GICv2, or not configured yet which also
-+		 * implies GICv2.
-+		 */
-+		if (dist->vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3)
-+			irq->group = 1;
-+		else
-+			irq->group = 0;
- 	}
+ unsigned long vgic_mmio_read_enable(struct kvm_vcpu *vcpu,
+ 				    gpa_t addr, unsigned int len);
  
- 	if (!irqchip_in_kernel(vcpu->kvm))
-diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index 4ed79c9..92840c0 100644
---- a/virt/kvm/arm/vgic/vgic-its.c
-+++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -71,6 +71,7 @@ static struct vgic_irq *vgic_add_lpi(struct kvm *kvm, u32 intid,
- 	kref_init(&irq->refcount);
- 	irq->intid = intid;
- 	irq->target_vcpu = vcpu;
-+	irq->group = 1;
+@@ -167,13 +170,13 @@ void vgic_mmio_write_sactive(struct kvm_vcpu *vcpu,
+ 			     gpa_t addr, unsigned int len,
+ 			     unsigned long val);
  
- 	spin_lock_irqsave(&dist->lpi_list_lock, flags);
+-void vgic_mmio_uaccess_write_cactive(struct kvm_vcpu *vcpu,
+-				     gpa_t addr, unsigned int len,
+-				     unsigned long val);
++int vgic_mmio_uaccess_write_cactive(struct kvm_vcpu *vcpu,
++				    gpa_t addr, unsigned int len,
++				    unsigned long val);
  
+-void vgic_mmio_uaccess_write_sactive(struct kvm_vcpu *vcpu,
+-				     gpa_t addr, unsigned int len,
+-				     unsigned long val);
++int vgic_mmio_uaccess_write_sactive(struct kvm_vcpu *vcpu,
++				    gpa_t addr, unsigned int len,
++				    unsigned long val);
+ 
+ unsigned long vgic_mmio_read_priority(struct kvm_vcpu *vcpu,
+ 				      gpa_t addr, unsigned int len);
 -- 
 2.7.4
