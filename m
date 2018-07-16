@@ -1,55 +1,68 @@
-From: james.morse@arm.com (James Morse)
-Date: Mon, 16 Jul 2018 12:04:09 +0100
-Subject: [PATCH v11 03/15] powerpc, kexec_file: factor out memblock-based
- arch_kexec_walk_mem()
-In-Reply-To: <20180714015223.GA2745@dhcp-128-65.nay.redhat.com>
-References: <20180711074203.3019-1-takahiro.akashi@linaro.org>
- <20180711074203.3019-4-takahiro.akashi@linaro.org>
- <20180714015223.GA2745@dhcp-128-65.nay.redhat.com>
-Message-ID: <2a4ec965-5258-5835-3022-8f403a2f6bdd@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 16 Jul 2018 12:07:04 +0100
+Subject: [PATCH v3 9/9] KVM: arm/arm64: vgic: Update documentation of the
+ GICv2 device
+In-Reply-To: <20180716103442.GD30822@e113682-lin.lund.arm.com>
+References: <1531587940-2490-1-git-send-email-christoffer.dall@arm.com>
+ <1531587940-2490-10-git-send-email-christoffer.dall@arm.com>
+ <a5324e35-53b4-b5b4-84a2-1e0a89b244e7@arm.com>
+ <20180716103442.GD30822@e113682-lin.lund.arm.com>
+Message-ID: <5c91b926-58d6-5830-87b9-2170bb700ef6@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dave,
-
-On 14/07/18 02:52, Dave Young wrote:
-> On 07/11/18 at 04:41pm, AKASHI Takahiro wrote:
->> Memblock list is another source for usable system memory layout.
->> So powerpc's arch_kexec_walk_mem() is moved to kexec_file.c so that
->> other memblock-based architectures, particularly arm64, can also utilise
->> it. A moved function is now renamed to kexec_walk_memblock() and merged
->> into the existing arch_kexec_walk_mem() for general use, either resource
->> list or memblock list.
+On 16/07/18 11:34, Christoffer Dall wrote:
+> On Mon, Jul 16, 2018 at 09:52:04AM +0100, Marc Zyngier wrote:
+>> On 14/07/18 18:05, Christoffer Dall wrote:
+>>> Update the documentation to reflect the ordering requirements of
+>>> restoring GICv2 distributor registers and remove outdated limitations in
+>>> the documentation while we're at it.
+>>>
+>>> Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
+>>> ---
+>>>  Documentation/virtual/kvm/devices/arm-vgic.txt | 12 ++++++------
+>>>  1 file changed, 6 insertions(+), 6 deletions(-)
+>>>
+>>> diff --git a/Documentation/virtual/kvm/devices/arm-vgic.txt b/Documentation/virtual/kvm/devices/arm-vgic.txt
+>>> index b3ce126..c9a6393 100644
+>>> --- a/Documentation/virtual/kvm/devices/arm-vgic.txt
+>>> +++ b/Documentation/virtual/kvm/devices/arm-vgic.txt
+>>> @@ -49,9 +49,12 @@ Groups:
+>>>      index is specified with the vcpu_index field.  Note that most distributor
+>>>      fields are not banked, but return the same value regardless of the
+>>>      vcpu_index used to access the register.
+>>> -  Limitations:
+>>> -    - Priorities are not implemented, and registers are RAZ/WI
+>>> -    - Currently only implemented for KVM_DEV_TYPE_ARM_VGIC_V2.
+>>> +
+>>> +    GICD_IIDR.Revision is updated when the KVM implementation of an emulated
+>>> +    GICv2 is changed.  Userspace should read GICD_IIDR from KVM and write back
+>>> +    the read value to confirm its expected behavior is aligned with the KVM
+>>> +    implementation.  To properly restore the interrupt group configuration,
+>>> +    GICD_IIDR should be written before any other registers.
 >>
->> A consequent function will not work for kdump with memblock list, but
->> this will be fixed in the next patch.
-
->> diff --git a/kernel/kexec_file.c b/kernel/kexec_file.c
-
->> @@ -513,6 +563,10 @@ static int locate_mem_hole_callback(struct resource *res, void *arg)
->>  int __weak arch_kexec_walk_mem(struct kexec_buf *kbuf,
->>  			       int (*func)(struct resource *, void *))
->>  {
->> +	if (IS_ENABLED(CONFIG_HAVE_MEMBLOCK) &&
->> +			!IS_ENABLED(CONFIG_ARCH_DISCARD_MEMBLOCK))
->> +		return kexec_walk_memblock(kbuf, func);
+>> I'd like to make it crystal clear that writing to IIDR doesn't allow to
+>> select a behaviour, and is merely a confirmation that host and guest do
+>> agree on either revision 0 (no write) or revision n (n being read and
+>> written back).
+>>
 > 
-> AKASHI, I'm not sure if this works on all arches, for example I chekced
-> the .config on my Nokia N900 kernel tree, there is HAVE_MEMBLOCK=y and
-> no CONFIG_ARCH_DISCARD_MEMBLOCK, in 32bit arm code no arch_kexec_walk_mem()
-By doesn't work you mean it's a change in behaviour?
-I think this is fine because 32bit arm doesn't support KEXEC_FILE, (this file is
-kexec_file specific right?).
+> But that's not really true though, because userspace can read rev 0, and
+> still have "no write", or read and write n for n >= 1 and have "write".
+> 
+> I guess I'm not completely sure which wording you'd like me to add?
+I'm not sure either, because I find the behaviour of this register a bit
+odd. We always default to rev 0, and allow the behaviour to be switched
+to rev 2 if we write 2 to it. But we can't select rev 1.
 
-It only affects architectures with MEMBLOCK and KEXEC_FILE: powerpc, s390 and
-soon arm64. s390 keeps its behaviour because it provides arch_kexec_walk_mem(),
-and powerpc's is copied in here as its generic 'memblock describes my memory'
-stuff. The implementation would be the same on arm64, so we're doing this to
-avoid duplicating otherwise generic arch code. I think 32bit arm should be able
-to use this too if it gets KEXEC_FILE support. (32bit arms' KEXEC already
-depends on MEMBLOCK).
+So in a way, it is not a revision selection API (like we have with the
+ITS), but a "I don't want rev 0" API. It works for what we have now, but
+I'm not sure how future proof it is (I guess we can cross that bridge
+when we get there).
 
+Another thing is that the guest will always see rev 2, even when it runs
+with the rev 0 behaviour, which is quite bizarre.
 
-Thanks,
-
-James
+	M.
+-- 
+Jazz is not dead. It just smells funny...
