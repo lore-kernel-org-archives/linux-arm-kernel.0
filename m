@@ -1,26 +1,54 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 16 Jul 2018 09:20:27 -0600
-Subject: [PATCH v6 2/5] dt-bindings: clock: Add S700 support for Actions
- Semi Soc's
-In-Reply-To: <20180715203524.11948-3-sravanhome@gmail.com>
-References: <20180715203524.11948-1-sravanhome@gmail.com>
- <20180715203524.11948-3-sravanhome@gmail.com>
-Message-ID: <20180716152027.GA28696@rob-hp-laptop>
+Date: Mon, 16 Jul 2018 09:27:34 -0600
+Subject: [PATCH v4 10/14] dt-bindings/interrupt-controller: update
+ Marvell ICU bindings
+In-Reply-To: <20180705124011.7661-11-miquel.raynal@bootlin.com>
+References: <20180705124011.7661-1-miquel.raynal@bootlin.com>
+ <20180705124011.7661-11-miquel.raynal@bootlin.com>
+Message-ID: <20180716152734.GA4581@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 15, 2018 at 10:35:21PM +0200, Saravanan Sekar wrote:
-> Add clock bindings constants for action S700
-> Maintain common clock dt-bindings for Actions Semi SoC's
-> S700 and S900.
+On Thu, Jul 05, 2018 at 02:40:07PM +0200, Miquel Raynal wrote:
+> Change the documentation to reflect the new bindings used for Marvell
+> ICU. This involves describing each interrupt group as a subnode of the
+> ICU node. Each of them having their own compatible.
 > 
-> Signed-off-by: Parthiban Nallathambi <pn@denx.de>
-> Signed-off-by: Saravanan Sekar <sravanhome@gmail.com>
+> The DT binding documentation still documents the legacy binding, where
+> there was a single node with no subnode.
+> 
+> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 > ---
->  ...tions,s900-cmu.txt => actions,owl-cmu.txt} |  20 +--
->  include/dt-bindings/clock/actions,s700-cmu.h  | 118 ++++++++++++++++++
->  2 files changed, 129 insertions(+), 9 deletions(-)
->  rename Documentation/devicetree/bindings/clock/{actions,s900-cmu.txt => actions,owl-cmu.txt} (68%)
->  create mode 100644 include/dt-bindings/clock/actions,s700-cmu.h
+>  .../bindings/interrupt-controller/marvell,icu.txt  | 83 ++++++++++++++++++----
+>  1 file changed, 71 insertions(+), 12 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/interrupt-controller/marvell,icu.txt b/Documentation/devicetree/bindings/interrupt-controller/marvell,icu.txt
+> index 649b7ec9d9b1..83b4fbf8af65 100644
+> --- a/Documentation/devicetree/bindings/interrupt-controller/marvell,icu.txt
+> +++ b/Documentation/devicetree/bindings/interrupt-controller/marvell,icu.txt
+> @@ -5,6 +5,8 @@ The Marvell ICU (Interrupt Consolidation Unit) controller is
+>  responsible for collecting all wired-interrupt sources in the CP and
+>  communicating them to the GIC in the AP, the unit translates interrupt
+>  requests on input wires to MSG memory mapped transactions to the GIC.
+> +These messages will access a different GIC memory area depending on
+> +their type (NSR, SR, SEI, REI, etc).
+>  
+>  Required properties:
+>  
+> @@ -12,20 +14,19 @@ Required properties:
+>  
+>  - reg: Should contain ICU registers location and length.
+>  
+> +Subnodes: Each group of interrupt is declared as a subnode of the ICU,
+> +with their own compatible.
+> +
+> +Required properties for the icu_nsr/icu_sei subnodes:
+> +
+> +- compatible: Should be "marvell,cp110-icu-nsr" or "marvell,cp110-icu-sei".
+> +
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+I raised this before and still don't understand. You had 4 types before 
+and now you only have 2 types? How do you handle SR and REI with the new 
+binding?
+
+Rob
