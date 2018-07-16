@@ -1,52 +1,59 @@
 From: o.rempel@pengutronix.de (Oleksij Rempel)
-Date: Mon, 16 Jul 2018 13:42:06 +0200
-Subject: [PATCH v3 0/3] add mailbox support for i.MX7D
-Message-ID: <20180716114209.25242-1-o.rempel@pengutronix.de>
+Date: Mon, 16 Jul 2018 13:42:07 +0200
+Subject: [PATCH v3 1/3] dt-bindings: arm: fsl: add mu binding doc
+In-Reply-To: <20180716114209.25242-1-o.rempel@pengutronix.de>
+References: <20180716114209.25242-1-o.rempel@pengutronix.de>
+Message-ID: <20180716114209.25242-2-o.rempel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-20180615 changes v3:
-- DT: remove prosaic part of documentation. It describes software
-  or firmware specific usage and not relevant for HW description.
-- DT: use <soc>-mu instead of <soc>-mu-<mu side> and add fsl,mu-side-a
-  parameter.
-- DT: add most of know i.MX variants with MU
-- imx-mailbox: use macros instead of precalculated bit index.
-- imx-mailbox: remove warning message for clk.
-- imx-mailbox: use imx_mu_chan[%idx] for devm_request_irq.
-- imx-mailbox: depend on ARCH_MXS instead of SOX_IMX7
+The Messaging Unit module enables two processors within
+the SoC to communicate and coordinate by passing messages
+(e.g. data, status and control) through the MU interface.
 
-20180615 changes v2:
-- DT: use mailbox@ instead of mu@
-- DT: change interrupts description
-- clk: use imx_clk_gate4 instead of imx_clk_gate2
-- imx-mailbox: remove last_tx_done support
-- imx-mailbox: fix module description 
-
-This patches are providing support for mailbox (Messaging Unit)
-for i.MX7D.
-Functionality was tested on PHYTEC phyBOARD-Zeta i.MX7D with
-Linux running on all cores: ARM Cortex-A7 and ARM Cortex-M4.
-
-Both parts of i.MX messaging Unit are visible for all CPUs available
-on i.MX7D. Communication worked independent of MU side in combination
-with CPU. For example MU-A used on ARM Cortex-A7 and MU-B used on ARM Cortex-M4
-or other ways around.
-
-
-Oleksij Rempel (3):
-  dt-bindings: arm: fsl: add mu binding doc
-  ARM: dts: imx7s: add i.MX7 messaging unit support
-  mailbox: Add support for i.MX7D messaging unit
-
- .../devicetree/bindings/mailbox/fsl,mu.txt    |  32 ++
- arch/arm/boot/dts/imx7s.dtsi                  |  19 ++
- drivers/mailbox/Kconfig                       |   6 +
- drivers/mailbox/Makefile                      |   2 +
- drivers/mailbox/imx-mailbox.c                 | 294 ++++++++++++++++++
- 5 files changed, 353 insertions(+)
+Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
+---
+ .../devicetree/bindings/mailbox/fsl,mu.txt    | 32 +++++++++++++++++++
+ 1 file changed, 32 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/mailbox/fsl,mu.txt
- create mode 100644 drivers/mailbox/imx-mailbox.c
 
+diff --git a/Documentation/devicetree/bindings/mailbox/fsl,mu.txt b/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
+new file mode 100644
+index 000000000000..5d48dd75b98d
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
+@@ -0,0 +1,32 @@
++NXP i.MX Messaging Unit (MU)
++--------------------------------------------------------------------
++
++Required properties:
++-------------------
++- compatible :	should be "fsl,<chip>-mu", the supported chips include:
++		imx6sx	- i.MX 6SoloX
++		imx7d	- i.MX 7Dual
++		imx7s	- i.MX 7Solo
++		imx7ulp	- i.MX 7ULP
++		imx8qm	- i.MX 8QM
++		imx8qxp	- i.MX 8QXP
++- reg :		Should contain the registers location and length
++- interrupts :	Interrupt number. The interrupt specifier format depends
++		on the interrupt controller parent.
++- #mbox-cells:  Must be:
++		0 - for single channel mode. i.MX8* SCU protocol specific.
++		1 - for multichannel (generic) mode.
++
++Optional properties:
++-------------------
++- clocks :	phandle to the input clock.
++- fsl,mu-side-a : Should be set for side A MU.
++
++Examples:
++--------
++lsio_mu0: mailbox at 5d1b0000 {
++	compatible = "fsl,imx8qxp-mu";
++	reg = <0x0 0x5d1b0000 0x0 0x10000>;
++	interrupts = <GIC_SPI 176 IRQ_TYPE_LEVEL_HIGH>;
++	#mbox-cells = <0>;
++};
 -- 
 2.18.0
