@@ -1,29 +1,26 @@
-From: dyoung@redhat.com (Dave Young)
-Date: Mon, 16 Jul 2018 20:26:23 +0800
-Subject: [PATCH v11 03/15] powerpc, kexec_file: factor out memblock-based
- arch_kexec_walk_mem()
-In-Reply-To: <20180711074203.3019-4-takahiro.akashi@linaro.org>
-References: <20180711074203.3019-1-takahiro.akashi@linaro.org>
- <20180711074203.3019-4-takahiro.akashi@linaro.org>
-Message-ID: <20180716122623.GB7160@dhcp-128-65.nay.redhat.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Mon, 16 Jul 2018 13:45:05 +0100
+Subject: [PATCH v6 1/8] KVM: arm/arm64: Share common code in
+ user_mem_abort()
+In-Reply-To: <20180716110857.19310-2-punit.agrawal@arm.com>
+References: <20180716110857.19310-1-punit.agrawal@arm.com>
+ <20180716110857.19310-2-punit.agrawal@arm.com>
+Message-ID: <c28e1aa4-c0f1-8010-6a11-005e7f1db01c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Akashi,
-
-On 07/11/18 at 04:41pm, AKASHI Takahiro wrote:
-> Memblock list is another source for usable system memory layout.
-> So powerpc's arch_kexec_walk_mem() is moved to kexec_file.c so that
-> other memblock-based architectures, particularly arm64, can also utilise
-> it. A moved function is now renamed to kexec_walk_memblock() and merged
-> into the existing arch_kexec_walk_mem() for general use, either resource
-> list or memblock list.
+On 16/07/18 12:08, Punit Agrawal wrote:
+> The code for operations such as marking the pfn as dirty, and
+> dcache/icache maintenance during stage 2 fault handling is duplicated
+> between normal pages and PMD hugepages.
 > 
-> A consequent function will not work for kdump with memblock list, but
-> this will be fixed in the next patch.
+> Instead of creating another copy of the operations when we introduce
+> PUD hugepages, let's share them across the different pagesizes.
+> 
+> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+> Cc: Christoffer Dall <christoffer.dall@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
 
-If this breaks something, then it would be good to fold the following
-patch in this patch so that bisect can still work?
+Thanks for splitting the patch. It looks much simpler this way.
 
-Thanks
-Dave
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
