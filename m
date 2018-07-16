@@ -1,50 +1,134 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Mon, 16 Jul 2018 21:50:52 +0300
-Subject: [PATCH 0/8] Fix PCI I/O space page leaks
-In-Reply-To: <20180716150606.GA19945@red-moon>
-References: <3e862a05-084a-d732-3060-6e2b234e9718@cogentembedded.com>
- <20180716150606.GA19945@red-moon>
-Message-ID: <db85a353-2d90-2aa5-2f45-13d8a0b36424@cogentembedded.com>
+From: thor.thayer@linux.intel.com (Thor Thayer)
+Date: Mon, 16 Jul 2018 13:56:23 -0500
+Subject: [PATCH 3/3] arm64: dts: stratix10: Add SMMU Node
+In-Reply-To: <2d17b3b1-96a1-8a0a-521e-134de9df72d0@arm.com>
+References: <1531499278-32132-1-git-send-email-thor.thayer@linux.intel.com>
+ <1531499278-32132-4-git-send-email-thor.thayer@linux.intel.com>
+ <2d17b3b1-96a1-8a0a-521e-134de9df72d0@arm.com>
+Message-ID: <847f8f94-5108-47a3-bb08-c5f50b64e6e6@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/16/2018 06:06 PM, Lorenzo Pieralisi wrote:
+Hi Robin,
 
->> Here's a set of 8 patches against the 'pci/controller-fixes' branch of Lorenzo
->> Pieralisi's 'pci.git' repo. They are the fixes for the PCI I/O space page leaks
->> (and the kernel BUG caused by them on deferred probe); those were 1st found
->> testing the R-Car PCIe driver. The patches are in the chronological order
->> (considering the date/time of the commits specified in the Fixes: tag), patches
->> #2..#8 depend on the patch #1 in order to build/work as it introduces the managed
->> device API that they all use...
+On 07/13/2018 01:09 PM, Robin Murphy wrote:
+> On 13/07/18 17:27, thor.thayer at linux.intel.com wrote:
+>> From: Thor Thayer <thor.thayer@linux.intel.com>
 >>
->> [1/8] PCI: xgene: Fix I/O space page leak
->> [2/8] PCI: of: Fix I/O space page leak
->> [3/8] PCI: versatile: Fix I/O space page leak
->> [4/8] PCI: designware: Fix I/O space page leak
->> [5/8] PCI: aardvark: Fix I/O space page leak
->> [6/8] PCI: faraday: Fix I/O space page leak
->> [7/8] PCI: mediatek: Fix I/O space page leak
->> [8/8] PCI: v3-semi: Fix I/O space page leak
+>> Add the SMMU node and IOMMU parameters to the
+>> Stratix10 Device Tree.
 >>
->> MBR, Sergei
+>> Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
+>> ---
+>> ? arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi | 44 
+>> +++++++++++++++++++++++
+>> ? 1 file changed, 44 insertions(+)
+>>
+>> diff --git a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi 
+>> b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
+>> index ca67ecb5866e..9b6ead87ae70 100644
+>> --- a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
+>> +++ b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
+>> @@ -162,6 +162,8 @@
+>> ????????????? reset-names = "stmmaceth", "stmmaceth-ocp";
+>> ????????????? clocks = <&clkmgr STRATIX10_EMAC0_CLK>;
+>> ????????????? clock-names = "stmmaceth";
+>> +??????????? #stream-id-cells = <1>;
 > 
-> Hi Sergei,
+> The #stream-id-cells property is part of the deprecated mmu-masters 
+> binding, so you don't need to add these.
 > 
-> I reshuffled the series, rewrote commit logs and move the devm_
-> API to commit 2 which is the one you tested AFAIK.
+OK. Thank you.
 
-   Well, that means the XGene fix wouldn't propagate "deep enough", if that's your
-choice, OK...
+>> +??????????? iommus = <&smmu 1>;
+>> ????????????? status = "disabled";
+>> ????????? };
 
-> I pushed them out to my pci/controller-fixes branch which I hope
-> we can still aim for an -rc, please do have a look and let me know
-> what you think, I have not asked Bjorn to pull it yet.
+<SNIP>
 
-   Your edits generally look fine, except you forgot the usual "X has the same issue"
-phrase in the XGene's commit log.
+>> ????????????? status = "disabled";
+>> ????????? };
+>> @@ -323,6 +331,8 @@
+>> ????????????? #dma-requests = <32>;
+>> ????????????? clocks = <&clkmgr STRATIX10_L4_MAIN_CLK>;
+>> ????????????? clock-names = "apb_pclk";
+>> +??????????? #stream-id-cells = <1>;
+>> +??????????? iommus = <&smmu 8>;
+> 
+> Just to double-check, all the channel threads and the manager thread 
+> share the one stream ID? (I'm accustomed to seeing DMA-330 integrated 
+> with an SMMU by tapping the AxID outputs off to the stream ID input.)
+> 
+Yes, we have only one stream ID for the DMA. I'll forward the 
+differences you noted to our architecture team as something to consider 
+for future chips.
 
-> Thanks,
-> Lorenzo
+>> ????????? };
+>> ????????? rst: rstmgr at ffd11000 {
+>> @@ -332,6 +342,36 @@
+>> ????????????? altr,modrst-offset = <0x20>;
+>> ????????? };
+>> +??????? smmu: iommu at fa000000 {
+>> +??????????? compatible = "arm,mmu-500", "arm,smmu-v2";
+>> +??????????? reg = <0xfa000000 0x40000>;
+>> +??????????? #global-interrupts = <9>;
+>> +??????????? #iommu-cells = <1>;
+>> +??????????? clocks = <&clkmgr STRATIX10_L4_MAIN_CLK>;
+>> +??????????? clock-names = "smmu_clk";
+>> +??????????? interrupt-parent = <&intc>;
+>> +??????????? interrupts = <0 128 4>,??? /* Global Secure Fault */
+>> +??????????????? <0 129 4>, /* Global Non-secure Fault */
+>> +??????????????? <0 130 4>, /* FPGA Performance Counter */
+>> +??????????????? <0 131 4>, /* DMA Performance Counter */
+>> +??????????????? <0 132 4>, /* EMAC Performance Counter */
+>> +??????????????? <0 133 4>, /* IO Performance Counter */
+>> +??????????????? <0 134 4>, /* SDM Performance Counter */
+> 
+> Note that there isn't much benefit to adding the secure or PMU 
+> interrupts here other than to document the hardware - FWIW I have 
+> actually been working on a PMU driver, and needless to say it turns out 
+> not to be sufficient just having those munged into the SMMU global fault 
+> handler.
+> 
+Thanks for pointing this out. I was following other SMMU-500 device 
+trees. Just to clarify, how should I simplify this? Should I replace all 
+the above with the following?
 
-MBR, Sergei
+	<0 129 4>, /* Global Non-secure Fault */
+
+Or will your upcoming PMU driver need the PMU units? It sounded like 
+using the just Global fault was not sufficient.
+
+>> +??????????????? <0 136 4>, /* Non-secure Combined Interrupt */
+>> +??????????????? <0 137 4>, /* Secure Combined Interrupt */
+> 
+> Similarly the combined interrupt; that's literally just all these other 
+> interrupt lines ORed together at the SMMU end, and would generally only 
+> be useful if you *didn't* have the individual lines wired up. As it 
+> stands with everything listed, any event will also generate a spurious 
+> global fault IRQ, which isn't ideal (not that you should get many 
+> interrupts during normal operation, but still...)
+> 
+And I'd remove both of these then, right?
+
+Thanks for the review and helpful comments (and also pointing out the 
+existing clock patch in my patch series summary)!
+
+Thor
+
+> Robin.
+> 
+>> +??????????????? /* Non-secure Context Interrupts (32) */
+>> +??????????????? <0 138 4>, <0 139 4>, <0 140 4>, <0 141 4>,
+>> +??????????????? <0 142 4>, <0 143 4>, <0 144 4>, <0 145 4>,
+>> +??????????????? <0 146 4>, <0 147 4>, <0 148 4>, <0 149 4>,
+>> +??????????????? <0 150 4>, <0 151 4>, <0 152 4>, <0 153 4>,
+>> +??????????????? <0 154 4>, <0 155 4>, <0 156 4>, <0 157 4>,
+>> +??????????????? <0 158 4>, <0 159 4>, <0 160 4>, <0 161 4>,
+>> +??????????????? <0 162 4>, <0 163 4>, <0 164 4>, <0 165 4>,
+>> +??????????????? <0 166 4>, <0 167 4>, <0 168 4>, <0 169 4>;
+>> +??????????? stream-match-mask = <0x7ff0>;
+>> +??????????? status = "disabled";
+>> +??????? };
+>> +
+<snip>
