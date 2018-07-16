@@ -1,68 +1,55 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 16 Jul 2018 10:19:47 +0200
-Subject: [PATCH 1/3 v4] ARM: dts: Modernize the Vexpress PL111 integration
-In-Reply-To: <b00c3b85-1368-f62b-efda-d23ce27e6f9c@arm.com>
-References: <20180709075232.30678-1-linus.walleij@linaro.org>
- <b00c3b85-1368-f62b-efda-d23ce27e6f9c@arm.com>
-Message-ID: <CACRpkdYpQkY9yfnsKV5=nbbh5f3mpU2u6xQ1r33-cNO7YHtcUA@mail.gmail.com>
+From: ravi.bangoria@linux.ibm.com (Ravi Bangoria)
+Date: Mon, 16 Jul 2018 13:50:10 +0530
+Subject: [PATCH v5 06/10] Uprobes: Support SDT markers having reference
+ count (semaphore)
+In-Reply-To: <CAPhsuW5njYcYXxYYEUsdVWem3qwk2z_bra_eRpwHwEy9TA-LHQ@mail.gmail.com>
+References: <20180628052209.13056-7-ravi.bangoria@linux.ibm.com>
+ <20180701210935.GA14404@redhat.com>
+ <0c543791-f3b7-5a4b-f002-e1c76bb430c0@linux.ibm.com>
+ <20180702180156.GA31400@redhat.com>
+ <f19e3801-d56a-4e34-0acc-1040a071cf91@linux.ibm.com>
+ <20180703163645.GA23144@redhat.com> <20180703172543.GC23144@redhat.com>
+ <f5a39a88-c21e-4606-a04d-11b5f32016b8@linux.ibm.com>
+ <20180710152527.GA3616@redhat.com>
+ <6e3ff60b-267a-d49d-4ebb-c4264f9c034b@linux.ibm.com>
+ <20180712145849.GB15265@redhat.com>
+ <CAPhsuW6kCtn-tWSj5eKf+kGt8ZEjVwJKLxj9C6zdaqMZByRytg@mail.gmail.com>
+ <9b062a19-d9a7-b360-26b1-d28b8dfc35a3@linux.ibm.com>
+ <CAPhsuW5njYcYXxYYEUsdVWem3qwk2z_bra_eRpwHwEy9TA-LHQ@mail.gmail.com>
+Message-ID: <a37cc94b-5940-643c-3e81-fc375c6aada0@linux.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 10, 2018 at 11:46 AM Sudeep Holla <sudeep.holla@arm.com> wrote:
-> On 09/07/18 08:52, Linus Walleij wrote:
+Hi Song,
 
-> Still get below warnings, not sure if I need to upgrade my DTC ?
->
-> vexpress-v2f-1xv7-ca53x2.dtb: Warning (graph_child_address):
-> /smb at 8000000/motherboard/iofpga at 3,00000000/i2c at 160000/dvi-transmitter at 39/ports:
-> graph node has single child node 'port at 0', #address-cells/#size-cells
-> are not necessary
-> rtsm_ve-aemv8a.dtb: Warning (graph_child_address):
-> /smb at 8000000/motherboard/iofpga at 3,00000000/i2c at 160000/dvi-transmitter at 39/ports:
-> graph node has single child node 'port at 0', #address-cells/#size-cells
-> are not necessary
+On 07/14/2018 05:20 AM, Song Liu wrote:
+> 
+> Hmm... what happens when we have multiple uprobes sharing the same
+> reference counter? It feels equally complicate to me. Or did I miss any
+> cases here?
 
-Yeah I looked at it as you said I decided to drop the amendments and I'm
-just ever more confused.
 
-> > - Fixed up the CA53 DTS: use the right chip select base
-> >   at 0x18000000.
->
-> I really hate this as it make maintenance difficult, but I don't have
-> good alternative, so I am fine as it is for now :)
+As far as I can think of, it should be handled by default. No special
+treatment needed for this.
 
-Yeah :/
+...
 
-I wish I could fix this but the changes are already daunting and scary
-as they are without going in and trying to fix how the CMA DMA
-allocator does its job as well (I admit I am scared of that code).
+> 
+> This patch tries to resolve this imbalance by passing extra flag
+> "restore_insn" to probe_event_disable().
+> 
+> Signed-off-by: Song Liu <songliubraving@fb.com>
 
-> > - Fixed up the Real-Time Systems Models Virtual Executive
-> >   RTSMv8 AEM VE:
-> >   - Added the I2C interface (whether implemented in the
-> >     emulator or not)
->
-> It doesn't work. This change is breaking the working CLCD on the models.
-> I just tested and CLCD driver returns
 
-Yeah not surprised... with QEMU I had to go in and add the I2C
-bridge as it was not modeled.
+Ah cool. Seems this will make them balanced. But is it fine to change
+uprobe_unregister()? It's already an ABI. No other way around?
 
-I think the solution is to add a "simple" panel without bridge
-for this as it is properly modeling what the hardware in the
-RTSM looks like. Looking into it.
+Also, one more source of imbalance is this condition:
 
-> >   - Fixed the chip select of the memory node to the right
-> >     memory base 0x18000000.
->
-> See, this keeps happening.
+          if (is_register)
+                  flags |= VM_WRITE;
 
-Yeah, I looked them over again and again, it gets wrong because
-I put a human to do a machine's job... The chipselect setting is
-in a non-obvious place in one file and the base that corresponds
-to in a different file and it gets a bit confused.
+in valid_vma(). You need to take care of that as well.
 
-I hope I have them all right now.
-
-Yours,
-Linus Walleij
+Thanks,
+Ravi
