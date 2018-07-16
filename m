@@ -1,70 +1,42 @@
-From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Mon, 16 Jul 2018 22:59:08 +0800
-Subject: [PATCH v1 1/2] arm64: dts: mt7622: add some misc device nodes
-Message-ID: <2ff39c40ef6bc3054667e63c785a1d28527b5ddf.1531753039.git.ryder.lee@mediatek.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 16 Jul 2018 16:06:06 +0100
+Subject: [PATCH 0/8] Fix PCI I/O space page leaks
+In-Reply-To: <3e862a05-084a-d732-3060-6e2b234e9718@cogentembedded.com>
+References: <3e862a05-084a-d732-3060-6e2b234e9718@cogentembedded.com>
+Message-ID: <20180716150606.GA19945@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add some misc nodes support - timer and ARM CCI-400.
+On Sun, Jul 15, 2018 at 07:00:21PM +0300, Sergei Shtylyov wrote:
+> Hello!
+> 
+> Here's a set of 8 patches against the 'pci/controller-fixes' branch of Lorenzo
+> Pieralisi's 'pci.git' repo. They are the fixes for the PCI I/O space page leaks
+> (and the kernel BUG caused by them on deferred probe); those were 1st found
+> testing the R-Car PCIe driver. The patches are in the chronological order
+> (considering the date/time of the commits specified in the Fixes: tag), patches
+> #2..#8 depend on the patch #1 in order to build/work as it introduces the managed
+> device API that they all use...
+> 
+> [1/8] PCI: xgene: Fix I/O space page leak
+> [2/8] PCI: of: Fix I/O space page leak
+> [3/8] PCI: versatile: Fix I/O space page leak
+> [4/8] PCI: designware: Fix I/O space page leak
+> [5/8] PCI: aardvark: Fix I/O space page leak
+> [6/8] PCI: faraday: Fix I/O space page leak
+> [7/8] PCI: mediatek: Fix I/O space page leak
+> [8/8] PCI: v3-semi: Fix I/O space page leak
+> 
+> MBR, Sergei
 
-Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
----
- arch/arm64/boot/dts/mediatek/mt7622.dtsi | 36 ++++++++++++++++++++++++++++++++
- 1 file changed, 36 insertions(+)
+Hi Sergei,
 
-diff --git a/arch/arm64/boot/dts/mediatek/mt7622.dtsi b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
-index 9213c96..8cdec52 100644
---- a/arch/arm64/boot/dts/mediatek/mt7622.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
-@@ -217,6 +217,16 @@
- 		#reset-cells = <1>;
- 	};
- 
-+	timer: timer at 10004000 {
-+		compatible = "mediatek,mt7622-timer",
-+			     "mediatek,mt6577-timer";
-+		reg = <0 0x10004000 0 0x80>;
-+		interrupts = <GIC_SPI 152 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&infracfg CLK_INFRA_APXGPT_PD>,
-+			 <&topckgen CLK_TOP_RTC>;
-+		clock-names = "system-clk", "rtc-clk";
-+	};
-+
- 	scpsys: scpsys at 10006000 {
- 		compatible = "mediatek,mt7622-scpsys",
- 			     "syscon";
-@@ -317,6 +327,32 @@
- 		      <0 0x10360000 0 0x2000>;
- 	};
- 
-+	cci: cci at 10390000 {
-+		compatible = "arm,cci-400";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		reg = <0 0x10390000 0 0x1000>;
-+		ranges = <0 0 0x10390000 0x10000>;
-+
-+		cci_control0: slave-if at 1000 {
-+			compatible = "arm,cci-400-ctrl-if";
-+			interface-type = "ace-lite";
-+			reg = <0x1000 0x1000>;
-+		};
-+
-+		cci_control1: slave-if at 4000 {
-+			compatible = "arm,cci-400-ctrl-if";
-+			interface-type = "ace";
-+			reg = <0x4000 0x1000>;
-+		};
-+
-+		cci_control2: slave-if at 5000 {
-+			compatible = "arm,cci-400-ctrl-if";
-+			interface-type = "ace";
-+			reg = <0x5000 0x1000>;
-+		};
-+	};
-+
- 	auxadc: adc at 11001000 {
- 		compatible = "mediatek,mt7622-auxadc";
- 		reg = <0 0x11001000 0 0x1000>;
--- 
-1.9.1
+I reshuffled the series, rewrote commit logs and move the devm_
+API to commit 2 which is the one you tested AFAIK.
+
+I pushed them out to my pci/controller-fixes branch which I hope
+we can still aim for an -rc, please do have a look and let me know
+what you think, I have not asked Bjorn to pull it yet.
+
+Thanks,
+Lorenzo
