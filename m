@@ -1,51 +1,32 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon, 16 Jul 2018 19:02:24 +0200
-Subject: [PATCH v2] arm64: dts: rockchip: add USB 2.0 and 3.0 support on
- Ficus board
-In-Reply-To: <20180714170922.4433-1-ezequiel@collabora.com>
-References: <20180714170922.4433-1-ezequiel@collabora.com>
-Message-ID: <2487041.HPaZN1uVBU@phil>
+From: nm@ti.com (Nishanth Menon)
+Date: Mon, 16 Jul 2018 12:13:26 -0500
+Subject: [PATCH V2 0/2] firmware: ti_sci: Add host-id as an optional parameter
+Message-ID: <20180716171328.11674-1-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Enric, Ezequiel,
+Please find attached series to enable host-id as an optional dt property.
 
-Am Samstag, 14. Juli 2018, 19:09:22 CEST schrieb Ezequiel Garcia:
-> From: Enric Balletbo i Serra <enric.balletbo@collabora.com>
-> 
-> The board exposes two types A ports, one is USB 3.0, up to 5.0Gbps and
-> another one is USB 2.0 up to 480Mbps. Enable the USB PHYs and the USB
-> controllers to enable theses devices.
-> 
-> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
-> Signed-off-by: Ezequiel Garcia <ezequiel@collabora.com>
-> ---
-> Changes from v1:
->  * Provide voltage for vcc5v0_host and vcc3v3_pcie regulators
->  * Provide vin_supply for vcc5v0_host.
-> 
->  arch/arm64/boot/dts/rockchip/rk3399-ficus.dts | 90 +++++++++++++++++++
->  1 file changed, 90 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/rockchip/rk3399-ficus.dts b/arch/arm64/boot/dts/rockchip/rk3399-ficus.dts
-> index 0d14183dd4a9..6295483b701f 100644
-> --- a/arch/arm64/boot/dts/rockchip/rk3399-ficus.dts
-> +++ b/arch/arm64/boot/dts/rockchip/rk3399-ficus.dts
-> @@ -58,9 +58,24 @@
->  		pinctrl-0 = <&pcie_drv>;
->  		regulator-boot-on;
->  		regulator-name = "vcc3v3_pcie";
-> +		regulator-min-microvolt = <3300000>;
-> +		regulator-max-microvolt = <3300000>;
->  		vin-supply = <&vcc3v3_sys>;
->  	};
+This is a minor update to V1 -> Mostly to pick up Greet's feedback and Rob's Ack.
 
-I've split this out into a separate patch, as it isn't part of what
-the commit message describes and thus should be separate
-and applied both resulting patches for 4.19.
+V1: https://patchwork.ozlabs.org/cover/931822/
 
-And also cleaned up a vendor-property that shouldn't be
-part of mainline.
+The series is based on v4.18-rc1 and is available here:
+https://github.com/nmenon/linux-2.6-playground/commits/upstream/v4.18-rc1/k3-1-am6-tisci
 
+Consolidated all patches (including all series) are available here:
+https://github.com/nmenon/linux-2.6-playground/commits/upstream/v4.18-rc1/k3-am6-integ
 
-Heiko
+Full Boot log (integrated of all series for AM654) is available here:
+   https://pastebin.ubuntu.com/p/bBFmnzYtCd/
+
+Nishanth Menon (2):
+  Documentation: dt: keystone: ti-sci: Add optional host-id parameter
+  firmware: ti_sci: Provide host-id as an optional dt parameter
+
+ .../devicetree/bindings/arm/keystone/ti,sci.txt    |  4 ++++
+ drivers/firmware/ti_sci.c                          | 24 ++++++++++++++++++----
+ 2 files changed, 24 insertions(+), 4 deletions(-)
+
+-- 
+2.15.1
