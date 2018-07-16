@@ -1,26 +1,34 @@
-From: vbabka@suse.cz (Vlastimil Babka)
-Date: Mon, 16 Jul 2018 09:45:31 +0200
-Subject: [PATCH 2/2] dma: remove unsupported gfp_mask parameter from
- dma_alloc_from_contiguous()
-In-Reply-To: <20180709122020eucas1p21a71b092975cb4a3b9954ffc63f699d1~-sqUFoa-h2939329393eucas1p2Y@eucas1p2.samsung.com>
-References: <20180709121956.20200-1-m.szyprowski@samsung.com>
- <CGME20180709122020eucas1p21a71b092975cb4a3b9954ffc63f699d1@eucas1p2.samsung.com>
- <20180709122020eucas1p21a71b092975cb4a3b9954ffc63f699d1~-sqUFoa-h2939329393eucas1p2Y@eucas1p2.samsung.com>
-Message-ID: <c4380664-e9c2-f366-f776-f24af8a42f27@suse.cz>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 16 Jul 2018 09:53:25 +0200
+Subject: [PATCH v3 2/2] arm64: dts: renesas: condor/v3hsk: add
+ DU/LVDS/HDMI support
+In-Reply-To: <20180614072426.vq42mmb3gsmv6z5k@verge.net.au>
+References: <95d0db34-713d-8206-00c2-ee9a42aab823@cogentembedded.com>
+ <c78f1228-afb0-54cf-5d9e-5c812b678de3@cogentembedded.com>
+ <20180614072426.vq42mmb3gsmv6z5k@verge.net.au>
+Message-ID: <20180716075325.y7jtwyqxwerdmfy3@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/09/2018 02:19 PM, Marek Szyprowski wrote:
-> The CMA memory allocator doesn't support standard gfp flags for memory
-> allocation, so there is no point having it as a parameter for
-> dma_alloc_from_contiguous() function. Replace it by a boolean no_warn
-> argument, which covers all the underlaying cma_alloc() function supports.
+On Thu, Jun 14, 2018 at 09:24:27AM +0200, Simon Horman wrote:
+> On Wed, Jun 13, 2018 at 11:12:40PM +0300, Sergei Shtylyov wrote:
+> > Define the Condor/V3HSK board dependent parts of the DU and  LVDS device
+> > nodes. Also add the device nodes for Thine THC63LVD1024 LVDS decoder and
+> > Analog Devices ADV7511W HDMI transmitter...
+> > 
+> > Based on the original (and large) patch by Vladimir Barinov.
+> > 
+> > Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+> > Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> > 
+> > ---
+> > Changes in version 2:
+> > - added the V3HSK DT update, reworded the description, renamed the patch;
+> > - added a space between the HDMI node name and a brace.
+> > 
+> >  arch/arm64/boot/dts/renesas/r8a77980-condor.dts |  106 +++++++++++++++++++++
+> >  arch/arm64/boot/dts/renesas/r8a77980-v3hsk.dts  |  120 ++++++++++++++++++++++++
 > 
-> This will help to avoid giving false feeling that this function supports
-> standard gfp flags and callers can pass __GFP_ZERO to get zeroed buffer,
-> what has already been an issue: see commit dd65a941f6ba ("arm64:
-> dma-mapping: clear buffers allocated with FORCE_CONTIGUOUS flag").
-> 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Laurent, could you review this?
 
-Acked-by: Vlastimil Babka <vbabka@suse.cz>
+Ping
