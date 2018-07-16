@@ -1,18 +1,20 @@
 From: vbabka@suse.cz (Vlastimil Babka)
-Date: Mon, 16 Jul 2018 09:45:02 +0200
-Subject: [PATCH 1/2] mm/cma: remove unsupported gfp_mask parameter from
- cma_alloc()
-In-Reply-To: <20180709122019eucas1p2340da484acfcc932537e6014f4fd2c29~-sqTPJKij2939229392eucas1p2j@eucas1p2.samsung.com>
+Date: Mon, 16 Jul 2018 09:45:31 +0200
+Subject: [PATCH 2/2] dma: remove unsupported gfp_mask parameter from
+ dma_alloc_from_contiguous()
+In-Reply-To: <20180709122020eucas1p21a71b092975cb4a3b9954ffc63f699d1~-sqUFoa-h2939329393eucas1p2Y@eucas1p2.samsung.com>
 References: <20180709121956.20200-1-m.szyprowski@samsung.com>
- <CGME20180709122019eucas1p2340da484acfcc932537e6014f4fd2c29@eucas1p2.samsung.com>
- <20180709122019eucas1p2340da484acfcc932537e6014f4fd2c29~-sqTPJKij2939229392eucas1p2j@eucas1p2.samsung.com>
-Message-ID: <7a7a88e5-e620-914c-3265-1a6383ae1974@suse.cz>
+ <CGME20180709122020eucas1p21a71b092975cb4a3b9954ffc63f699d1@eucas1p2.samsung.com>
+ <20180709122020eucas1p21a71b092975cb4a3b9954ffc63f699d1~-sqUFoa-h2939329393eucas1p2Y@eucas1p2.samsung.com>
+Message-ID: <c4380664-e9c2-f366-f776-f24af8a42f27@suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 07/09/2018 02:19 PM, Marek Szyprowski wrote:
-> cma_alloc() function doesn't really support gfp flags other than
-> __GFP_NOWARN, so convert gfp_mask parameter to boolean no_warn parameter.
+> The CMA memory allocator doesn't support standard gfp flags for memory
+> allocation, so there is no point having it as a parameter for
+> dma_alloc_from_contiguous() function. Replace it by a boolean no_warn
+> argument, which covers all the underlaying cma_alloc() function supports.
 > 
 > This will help to avoid giving false feeling that this function supports
 > standard gfp flags and callers can pass __GFP_ZERO to get zeroed buffer,
