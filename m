@@ -1,25 +1,47 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 16 Jul 2018 12:02:38 -0600
-Subject: [PATCH v2 1/2] documentation: pinctrl: Add compatibles for
- Amlogic Meson G12A pin controllers
-In-Reply-To: <20180714232754.5402-2-yixun.lan@amlogic.com>
-References: <20180714232754.5402-1-yixun.lan@amlogic.com>
- <20180714232754.5402-2-yixun.lan@amlogic.com>
-Message-ID: <20180716180238.GA19285@rob-hp-laptop>
+From: nm@ti.com (Nishanth Menon)
+Date: Mon, 16 Jul 2018 13:06:01 -0500
+Subject: [PATCH V2 0/6] mailbox: ti-msgmgr: Add support for AM654 Secure Proxy
+Message-ID: <20180716180607.16526-1-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 14, 2018 at 11:27:53PM +0000, Yixun Lan wrote:
-> Add new compatible name for Amlogic's Meson-G12A pin controllers,
-> add a dt-binding header file which document the detail pin names.
-> 
-> Acked-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-> Signed-off-by: Xingyu Chen <xingyu.chen@amlogic.com>
-> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
-> ---
->  .../bindings/pinctrl/meson,pinctrl.txt        |   2 +
->  include/dt-bindings/gpio/meson-g12a-gpio.h    | 114 ++++++++++++++++++
->  2 files changed, 116 insertions(+)
->  create mode 100644 include/dt-bindings/gpio/meson-g12a-gpio.h
+The V2 of the series updates a minor comment in binding and picks up Rob's Reviewed-by
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+Since I have'nt seen additional comments, I am assuming things are fine for v4.19.
+
+The following series enables support for Secure Proxy in newest addition in TI's SoC
+portfolio - AM654 SoC (posted previously as RFC).
+
+The series is based on v4.18-rc1 and is available here:
+https://github.com/nmenon/linux-2.6-playground/commits/upstream/v4.18-rc1/k3-1-am6-sproxy
+
+There are a couple of follow on patches to be posted as well (Kconfig changes
+for K3_ARCH and actual dts node changes).
+
+Changes since RFC are highlighted in each of the patches, but overall:
+* The K3 dependency has been broken out into a seperate series independent of
+  this.
+* Binding has been seperated out as it's own file (even though the driver is
+  reused).
+
+Consolidated all patches (including all series) are available here:
+https://github.com/nmenon/linux-2.6-playground/commits/upstream/v4.18-rc1/k3-am6-integ
+
+Full Boot log  on AM654 (integrated with all patch series) is available here:
+   https://pastebin.ubuntu.com/p/bBFmnzYtCd/
+
+Nishanth Menon (6):
+  mailbox: ti-msgmgr: Get rid of unused structure members
+  mailbox: ti-msgmgr: Allocate Rx channel resources only on request
+  mailbox: ti-msgmgr: Change message count mask to be descriptor based
+  mailbox: ti-msgmgr: Move the memory region name to descriptor
+  dt-bindings: mailbox: Add support for secure proxy threads
+  mailbox: ti-msgmgr: Add support for Secure Proxy
+
+ .../bindings/mailbox/ti,secure-proxy.txt           |  50 +++
+ drivers/mailbox/ti-msgmgr.c                        | 353 +++++++++++++++++----
+ 2 files changed, 336 insertions(+), 67 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mailbox/ti,secure-proxy.txt
+
+-- 
+2.15.1
