@@ -1,168 +1,73 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Mon, 16 Jul 2018 13:06:03 -0500
-Subject: [PATCH V2 2/6] mailbox: ti-msgmgr: Allocate Rx channel resources only
- on request
+Date: Mon, 16 Jul 2018 13:06:05 -0500
+Subject: [PATCH V2 4/6] mailbox: ti-msgmgr: Move the memory region name to
+ descriptor
 In-Reply-To: <20180716180607.16526-1-nm@ti.com>
 References: <20180716180607.16526-1-nm@ti.com>
-Message-ID: <20180716180607.16526-3-nm@ti.com>
+Message-ID: <20180716180607.16526-5-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In a much bigger system SoCs, the number of Rx channels can be
-many and mostly unused based on the system of choice, and not all
-Rx channels need IRQs and allocating all memory at probe will be
-inefficient. Some SoCs could have total threads in the 100s and usage
-would be just 1 Rx thread.
-
-Thus, request and map the IRQs and allocate memory only when needed.
-
-Since these channels are requested by client drivers on need, our
-utilization will be optimal.
+For newer generation of the hardware, the naming of the region is
+decided at integration level and there could be additional regions
+as well. Hence move the region naming to be described from compatible
+descriptor.
 
 Signed-off-by: Nishanth Menon <nm@ti.com>
 ---
 Changes since V1: None
-V1: https://patchwork.kernel.org/patch/10475301/
-RFC: https://patchwork.kernel.org/patch/10447701/
+V1: https://patchwork.kernel.org/patch/10475331/
+RFC: https://patchwork.kernel.org/patch/10447653/
 
- drivers/mailbox/ti-msgmgr.c | 91 ++++++++++++++++++++++++++++++---------------
- 1 file changed, 61 insertions(+), 30 deletions(-)
+ drivers/mailbox/ti-msgmgr.c | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/mailbox/ti-msgmgr.c b/drivers/mailbox/ti-msgmgr.c
-index 5fe6ce200264..91c955979008 100644
+index 7d2eb4b359ba..7167cc708f44 100644
 --- a/drivers/mailbox/ti-msgmgr.c
 +++ b/drivers/mailbox/ti-msgmgr.c
-@@ -310,6 +310,51 @@ static int ti_msgmgr_send_data(struct mbox_chan *chan, void *data)
- 	return 0;
- }
+@@ -48,6 +48,8 @@ struct ti_msgmgr_valid_queue_desc {
+  * @tx_polled:		Do I need to use polled mechanism for tx
+  * @tx_poll_timeout_ms: Timeout in ms if polled
+  * @valid_queues:	List of Valid queues that the processor can access
++ * @data_region_name:	Name of the proxy data region
++ * @status_region_name:	Name of the proxy status region
+  * @num_valid_queues:	Number of valid queues
+  *
+  * This structure is used in of match data to describe how integration
+@@ -63,6 +65,8 @@ struct ti_msgmgr_desc {
+ 	bool tx_polled;
+ 	int tx_poll_timeout_ms;
+ 	const struct ti_msgmgr_valid_queue_desc *valid_queues;
++	const char *data_region_name;
++	const char *status_region_name;
+ 	int num_valid_queues;
+ };
  
-+/**
-+ *  ti_msgmgr_queue_rx_irq_req() - RX IRQ request
-+ *  @dev:	device pointer
-+ *  @qinst:	Queue instance
-+ *  @chan:	Channel pointer
-+ */
-+static int ti_msgmgr_queue_rx_irq_req(struct device *dev,
-+				      struct ti_queue_inst *qinst,
-+				      struct mbox_chan *chan)
-+{
-+	int ret = 0;
-+	char of_rx_irq_name[7];
-+	struct device_node *np;
-+
-+	snprintf(of_rx_irq_name, sizeof(of_rx_irq_name),
-+		 "rx_%03d", qinst->queue_id);
-+
-+	/* Get the IRQ if not found */
-+	if (qinst->irq < 0) {
-+		np = of_node_get(dev->of_node);
-+		if (!np)
-+			return -ENODATA;
-+		qinst->irq = of_irq_get_byname(np, of_rx_irq_name);
-+		of_node_put(np);
-+
-+		if (qinst->irq < 0) {
-+			dev_err(dev,
-+				"QID %d PID %d:No IRQ[%s]: %d\n",
-+				qinst->queue_id, qinst->proxy_id,
-+				of_rx_irq_name, qinst->irq);
-+			return qinst->irq;
-+		}
-+	}
-+
-+	/* With the expectation that the IRQ might be shared in SoC */
-+	ret = request_irq(qinst->irq, ti_msgmgr_queue_rx_interrupt,
-+			  IRQF_SHARED, qinst->name, chan);
-+	if (ret) {
-+		dev_err(dev, "Unable to get IRQ %d on %s(res=%d)\n",
-+			qinst->irq, qinst->name, ret);
-+	}
-+
-+	return ret;
-+}
-+
- /**
-  * ti_msgmgr_queue_startup() - Startup queue
-  * @chan:	Channel pointer
-@@ -318,19 +363,21 @@ static int ti_msgmgr_send_data(struct mbox_chan *chan, void *data)
-  */
- static int ti_msgmgr_queue_startup(struct mbox_chan *chan)
- {
--	struct ti_queue_inst *qinst = chan->con_priv;
- 	struct device *dev = chan->mbox->dev;
-+	struct ti_msgmgr_inst *inst = dev_get_drvdata(dev);
-+	struct ti_queue_inst *qinst = chan->con_priv;
-+	const struct ti_msgmgr_desc *d = inst->desc;
- 	int ret;
+@@ -531,6 +535,8 @@ static const struct ti_msgmgr_desc k2g_desc = {
+ 	.queue_count = 64,
+ 	.max_message_size = 64,
+ 	.max_messages = 128,
++	.data_region_name = "queue_proxy_region",
++	.status_region_name = "queue_state_debug_region",
+ 	.data_first_reg = 16,
+ 	.data_last_reg = 31,
+ 	.status_cnt_mask = Q_STATE_ENTRY_COUNT_MASK,
+@@ -582,13 +588,13 @@ static int ti_msgmgr_probe(struct platform_device *pdev)
+ 	inst->desc = desc;
  
- 	if (!qinst->is_tx) {
--		/*
--		 * With the expectation that the IRQ might be shared in SoC
--		 */
--		ret = request_irq(qinst->irq, ti_msgmgr_queue_rx_interrupt,
--				  IRQF_SHARED, qinst->name, chan);
-+		/* Allocate usage buffer for rx */
-+		qinst->rx_buff = kzalloc(d->max_message_size, GFP_KERNEL);
-+		if (!qinst->rx_buff)
-+			return -ENOMEM;
-+		/* Request IRQ */
-+		ret = ti_msgmgr_queue_rx_irq_req(dev, qinst, chan);
- 		if (ret) {
--			dev_err(dev, "Unable to get IRQ %d on %s(res=%d)\n",
--				qinst->irq, qinst->name, ret);
-+			kfree(qinst->rx_buff);
- 			return ret;
- 		}
- 	}
-@@ -346,8 +393,10 @@ static void ti_msgmgr_queue_shutdown(struct mbox_chan *chan)
- {
- 	struct ti_queue_inst *qinst = chan->con_priv;
+ 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
+-					   "queue_proxy_region");
++					   desc->data_region_name);
+ 	inst->queue_proxy_region = devm_ioremap_resource(dev, res);
+ 	if (IS_ERR(inst->queue_proxy_region))
+ 		return PTR_ERR(inst->queue_proxy_region);
  
--	if (!qinst->is_tx)
-+	if (!qinst->is_tx) {
- 		free_irq(qinst->irq, chan);
-+		kfree(qinst->rx_buff);
-+	}
- }
- 
- /**
-@@ -425,27 +474,6 @@ static int ti_msgmgr_queue_setup(int idx, struct device *dev,
- 		 dev_name(dev), qinst->is_tx ? "tx" : "rx", qinst->queue_id,
- 		 qinst->proxy_id);
- 
--	if (!qinst->is_tx) {
--		char of_rx_irq_name[7];
--
--		snprintf(of_rx_irq_name, sizeof(of_rx_irq_name),
--			 "rx_%03d", qinst->queue_id);
--
--		qinst->irq = of_irq_get_byname(np, of_rx_irq_name);
--		if (qinst->irq < 0) {
--			dev_crit(dev,
--				 "[%d]QID %d PID %d:No IRQ[%s]: %d\n",
--				 idx, qinst->queue_id, qinst->proxy_id,
--				 of_rx_irq_name, qinst->irq);
--			return qinst->irq;
--		}
--		/* Allocate usage buffer for rx */
--		qinst->rx_buff = devm_kzalloc(dev,
--					      d->max_message_size, GFP_KERNEL);
--		if (!qinst->rx_buff)
--			return -ENOMEM;
--	}
--
- 	qinst->queue_buff_start = inst->queue_proxy_region +
- 	    Q_DATA_OFFSET(qinst->proxy_id, qinst->queue_id, d->data_first_reg);
- 	qinst->queue_buff_end = inst->queue_proxy_region +
-@@ -454,6 +482,9 @@ static int ti_msgmgr_queue_setup(int idx, struct device *dev,
- 	    Q_STATE_OFFSET(qinst->queue_id);
- 	qinst->chan = chan;
- 
-+	/* Setup an error value for IRQ - Lazy allocation */
-+	qinst->irq = -EINVAL;
-+
- 	chan->con_priv = qinst;
- 
- 	dev_dbg(dev, "[%d] qidx=%d pidx=%d irq=%d q_s=%p q_e = %p\n",
+ 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
+-					   "queue_state_debug_region");
++					   desc->status_region_name);
+ 	inst->queue_state_debug_region = devm_ioremap_resource(dev, res);
+ 	if (IS_ERR(inst->queue_state_debug_region))
+ 		return PTR_ERR(inst->queue_state_debug_region);
 -- 
 2.15.1
