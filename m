@@ -1,86 +1,46 @@
 From: andrew@aj.id.au (Andrew Jeffery)
-Date: Mon, 16 Jul 2018 14:53:20 +0930
-Subject: [PATCH 2/7] arm: dts: aspeed: Add aspeed G5 USB host pinmux
-In-Reply-To: <20180629035106.27181-3-benh@kernel.crashing.org>
+Date: Mon, 16 Jul 2018 15:04:13 +0930
+Subject: [PATCH 3/7] arm: dts: aspeed: Add Aspeed G4 USB Virtual Hub
+In-Reply-To: <20180629035106.27181-4-benh@kernel.crashing.org>
 References: <20180629035106.27181-1-benh@kernel.crashing.org>
- <20180629035106.27181-3-benh@kernel.crashing.org>
-Message-ID: <1531718600.1114140.1441828880.06F3B897@webmail.messagingengine.com>
+ <20180629035106.27181-4-benh@kernel.crashing.org>
+Message-ID: <1531719253.1117720.1441834824.43621FCB@webmail.messagingengine.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Fri, 29 Jun 2018, at 13:21, Benjamin Herrenschmidt wrote:
-> Set the default pinmux for EHCIs so boards don't have to do
-> it an document why it is not set for UHCI.
-> 
-> Remove the properties from the AST2500 EVB board which are
-> now redundant
+> This adds the (disabled by default) device node for the
+> Aspeed virtual hub,a long with clocks and pinmux.
 > 
 > Signed-off-by: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-
-Reviewed-by: Andrew Jeffery <andrew@aj.id.au>
-
 > ---
->  arch/arm/boot/dts/aspeed-ast2500-evb.dts | 6 ------
->  arch/arm/boot/dts/aspeed-g5.dtsi         | 8 ++++++++
->  2 files changed, 8 insertions(+), 6 deletions(-)
+>  arch/arm/boot/dts/aspeed-g4.dtsi | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
 > 
-> diff --git a/arch/arm/boot/dts/aspeed-ast2500-evb.dts b/arch/arm/boot/
-> dts/aspeed-ast2500-evb.dts
-> index ede11c597673..2bff1b253842 100644
-> --- a/arch/arm/boot/dts/aspeed-ast2500-evb.dts
-> +++ b/arch/arm/boot/dts/aspeed-ast2500-evb.dts
-> @@ -82,18 +82,12 @@
+> diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
+> index 1d7ffa9fdb11..54524564037c 100644
+> --- a/arch/arm/boot/dts/aspeed-g4.dtsi
+> +++ b/arch/arm/boot/dts/aspeed-g4.dtsi
+> @@ -131,6 +131,16 @@
+>  			 */
+>  		};
 >  
->  &ehci0 {
->  	status = "okay";
-> -	pinctrl-names = "default";
-> -	pinctrl-0 = <&pinctrl_usb2ah_default>;
->  };
->  
->  &ehci1 {
->  	status = "okay";
-> -	pinctrl-names = "default";
-> -	pinctrl-0 = <&pinctrl_usb2bh_default>;
->  };
->  
->  &uhci {
->  	status = "okay";
-> -
-> -	/* No pinctrl, this follows the above EHCI settings */
->  };
-> diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
-> index 17f2714d18a7..dfdc239b86f6 100644
-> --- a/arch/arm/boot/dts/aspeed-g5.dtsi
-> +++ b/arch/arm/boot/dts/aspeed-g5.dtsi
-> @@ -148,6 +148,8 @@
->  			reg = <0x1e6a1000 0x100>;
->  			interrupts = <5>;
->  			clocks = <&syscon ASPEED_CLK_GATE_USBPORT1CLK>;
+> +		vhub: usb-vhub at 1e6a0000 {
+> +			compatible = "aspeed,ast2400-usb-vhub";
+> +			reg = <0x1e6a0000 0x300>;
+> +			interrupts = <5>;
+> +			clocks = <&syscon ASPEED_CLK_GATE_USBPORT1CLK>;
 > +			pinctrl-names = "default";
-> +			pinctrl-0 = <&pinctrl_usb2ah_default>;
->  			status = "disabled";
->  		};
->  
-> @@ -156,6 +158,8 @@
->  			reg = <0x1e6a3000 0x100>;
->  			interrupts = <13>;
->  			clocks = <&syscon ASPEED_CLK_GATE_USBPORT2CLK>;
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&pinctrl_usb2bh_default>;
->  			status = "disabled";
->  		};
->  
-> @@ -166,6 +170,10 @@
->  			#ports = <2>;
->  			clocks = <&syscon ASPEED_CLK_GATE_USBUHCICLK>;
->  			status = "disabled";
-> +			/*
-> +			 * No default pinmux, it will follow EHCI, use an explicit pinmux
-> +			 * override if you don't enable EHCI
-> +			 */
->  		};
->  
+> +			pinctrl-0 = <&pinctrl_usb2d_default>;
+> +			status = "disabled";
+> +		};
+> +
+
+These are all generic properties, so it's pretty clear what's going on, but it seems there's no bindings document capturing the compatible string? Not wanting to be a pain, but shouldn't we have documented it?
+
 >  		apb {
+>  			compatible = "simple-bus";
+>  			#address-cells = <1>;
 > -- 
 > 2.17.1
 > 
