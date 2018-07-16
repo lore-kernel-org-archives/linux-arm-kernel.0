@@ -1,14 +1,62 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Mon, 16 Jul 2018 10:35:07 +0200
-Subject: [PATCH 3/4] staging: mt7621: Add braces around macro argument
-In-Reply-To: <1531489266-20410-3-git-send-email-oliver.huebers@web.de>
-References: <1531489266-20410-1-git-send-email-oliver.huebers@web.de>
- <1531489266-20410-3-git-send-email-oliver.huebers@web.de>
-Message-ID: <20180716083507.GB7903@kroah.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 16 Jul 2018 10:37:20 +0200
+Subject: [PATCH] pwm-omap: handle timers not ready in probe
+In-Reply-To: <20180716075740.GT99251@atomide.com>
+References: <20180709214910.tes6u4ivxomd3aja@earth.universe>
+ <20180709220211.GA7760@amd>
+ <20180710101147.lyu65ro4czvrs2da@earth.universe>
+ <20180710133040.GA4391@amd>
+ <20180710161123.azym6sbboriuj4yc@earth.universe>
+ <20180711080218.GA21225@amd> <20180711132739.GL99251@atomide.com>
+ <20180711142526.dto6iost57zx5t5l@earth.universe>
+ <20180716071323.GB23110@amd> <20180716075740.GT99251@atomide.com>
+Message-ID: <20180716083720.GA3047@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 13, 2018 at 03:41:05PM +0200, Oliver H?bers wrote:
-> Add braces around macro argument to avoid precedence problems.
+On Mon 2018-07-16 00:57:40, Tony Lindgren wrote:
+> * Pavel Machek <pavel@ucw.cz> [180716 07:16]:
+> > 
+> > When all the drivers are built-in, timers are not ready and probing
+> > fails. Fix that with -EPROBE_DEFFER.
+> > 
+> > Signed-off-by: Pavel Machek <pavel@ucw.cz>
+> > 
+> > diff --git a/drivers/pwm/pwm-omap-dmtimer.c b/drivers/pwm/pwm-omap-dmtimer.c
+> > index 665da3c..debeb70 100644
+> > --- a/drivers/pwm/pwm-omap-dmtimer.c
+> > +++ b/drivers/pwm/pwm-omap-dmtimer.c
+> > @@ -265,7 +271,7 @@ static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
+> >  	timer_pdata = dev_get_platdata(&timer_pdev->dev);
+> >  	if (!timer_pdata) {
+> >  		dev_err(&pdev->dev, "dmtimer pdata structure NULL\n");
+> > -		ret = -EINVAL;
+> > +		ret = -EPROBE_DEFER;
+> >  		goto put;
+> >  	}
+> 
+> There seems to be an earlier similar patch, care to take a look
+> at "[PATCH] pwm: pwm-omap-dmtimer: return -EPROBE_DEFER if no
+> dmtimer platform data"?
 
-That is not what this patch does :(
+Yes, that one is equivalent.
+
+You can add
+
+Acked-by: Pavel Machek <pavel@ucw.cz>
+Tested-by: Pavel Machek <pavel@ucw.cz>
+
+on it.
+
+Thanks,
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180716/b09ecb28/attachment-0001.sig>
