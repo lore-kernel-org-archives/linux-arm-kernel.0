@@ -1,53 +1,71 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 16 Jul 2018 09:26:31 +0200
-Subject: [GIT PULL] Rockchip dts32 fix for 4.18
-In-Reply-To: <1884349.WTgIHKSUBb@phil>
-References: <1776596.Q4iCTXTKyP@phil>
- <20180714221105.u7gbyetcpjhlylfl@localhost>
- <1884349.WTgIHKSUBb@phil>
-Message-ID: <CAK8P3a2Rxh2L2FyZ_dVx1ruLAcUni3WGwQP39M3mLCCvTxkM3g@mail.gmail.com>
+From: patrice.chotard@st.com (Patrice CHOTARD)
+Date: Mon, 16 Jul 2018 07:42:26 +0000
+Subject: [PATCH 1/3] arm: Convert arm boot_lock to raw
+In-Reply-To: <20180711110037.12928-2-bigeasy@linutronix.de>
+References: <20180711110037.12928-1-bigeasy@linutronix.de>
+ <20180711110037.12928-2-bigeasy@linutronix.de>
+Message-ID: <768ab9bd-40f7-b031-2dd5-1629ddafd3ac@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 15, 2018 at 5:46 PM, Heiko Stuebner <heiko@sntech.de> wrote:
-> Am Sonntag, 15. Juli 2018, 00:11:05 CEST schrieb Olof Johansson:
->> On Wed, Jul 11, 2018 at 04:18:55PM +0200, Heiko Stuebner wrote:
->> > Hi Arnd, Kevin, Olof,
->> >
->> > please find below a one-patch pull fixing a new warning the updated dtc
->> > in 4.18 found. So far no other regressions have been found in Rockchip
->> > parts it seems. So please pull!
->> >
->> > Thanks
->> > Heiko
->> >
->> > The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
->> >
->> >   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
->> >
->> > are available in the Git repository at:
->> >
->> >   git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.18-rockchip-dts32fixes-1
->> >
->> > for you to fetch changes up to cddb86833615d9550d7b3a1b65b71071784dae70:
->> >
->> >   ARM: dts: rockchip: fix graph node unit address error from dtc (2018-06-17 09:31:34 +0200)
->>
->> I took the liberty to declare this non-urgent and queued it up with next/dt
->> instead for 4.19. It's just a warning and we're past rc4 so it seemed like
->> a reasonable call. Let me know if it has actual functional impact/regression
->> though.
->
-> no problem from my side, it's just dtc emiting the warning :-)
->
-> I just saw this the first time with 4.18-rc1, so it seems to stem from
-> a newer dtc and remembered that previous dtc fixes from Arnd or so
-> went in as fixes.
+Hi Sebastian
 
-Right, I usually tried to get all warnings merged in the kernel release
-that contains the dtc change so that we would remain warning free in an
-allmodconfig build. If dtc gets changed for -next, then queuing the warning
-fix for -next instead of as a fix is fine, but if dtc is already changed in
-mainline, I would appreciate having the warning fixed before the release.
+On 07/11/2018 01:00 PM, Sebastian Andrzej Siewior wrote:
+> From: Frank Rowand <frank.rowand@am.sony.com>
+> 
+> The arm boot_lock is used by the secondary processor startup code.  The locking
+> task is the idle thread, which has idle->sched_class == &idle_sched_class.
+> idle_sched_class->enqueue_task == NULL, so if the idle task blocks on the
+> lock, the attempt to wake it when the lock becomes available will fail:
+> 
+> try_to_wake_up()
+>     ...
+>        activate_task()
+>           enqueue_task()
+>              p->sched_class->enqueue_task(rq, p, flags)
+> 
+> Fix by converting boot_lock to a raw spin lock.
+> 
+> Cc: "Andreas F?rber" <afaerber@suse.de>
+> Cc: Kukjin Kim <kgene@kernel.org>
+> Cc: Krzysztof Kozlowski <krzk@kernel.org>
+> Cc: Wei Xu <xuwei5@hisilicon.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Barry Song <baohua@kernel.org>
+> Cc: Andy Gross <andy.gross@linaro.org>
+> Cc: David Brown <david.brown@linaro.org>
+> Cc: Viresh Kumar <vireshk@kernel.org>
+> Cc: Shiraz Hashim <shiraz.linux.kernel@gmail.com>
+> Cc: Patrice Chotard <patrice.chotard@st.com>
+> Cc: Maxime Ripard <maxime.ripard@bootlin.com>
+> Cc: Chen-Yu Tsai <wens@csie.org>
+> Cc: linux-samsung-soc at vger.kernel.org
+> Cc: linux-omap at vger.kernel.org
+> Cc: linux-arm-msm at vger.kernel.org
+> Cc: linux-soc at vger.kernel.org
+> Signed-off-by: Frank Rowand <frank.rowand@am.sony.com>
+> Link: http://lkml.kernel.org/r/4E77B952.3010606 at am.sony.com
+> Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+> Tested-by: Tony Lindgren <tony@atomide.com>
+> Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
+> Tested-by: Krzysztof Kozlowski <krzk@kernel.org> [Exynos5422 Linaro PM-QA]
+> Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+> ---
+>   arch/arm/mach-actions/platsmp.c   |  6 +++---
+>   arch/arm/mach-exynos/platsmp.c    | 12 ++++++------
+>   arch/arm/mach-hisi/platmcpm.c     | 22 +++++++++++-----------
+>   arch/arm/mach-omap2/omap-smp.c    | 10 +++++-----
+>   arch/arm/mach-prima2/platsmp.c    | 10 +++++-----
+>   arch/arm/mach-qcom/platsmp.c      | 10 +++++-----
+>   arch/arm/mach-spear/platsmp.c     | 10 +++++-----
+>   arch/arm/mach-sti/platsmp.c       | 10 +++++-----
+>   arch/arm/mach-sunxi/mc_smp.c      | 20 ++++++++++----------
+>   arch/arm/plat-versatile/platsmp.c | 10 +++++-----
+>   10 files changed, 60 insertions(+), 60 deletions(-)
+> 
 
-       Arnd
+For mach-sti:
+
+Acked-by: Patrice Chotard <patrice.chotard@st.com>
+
+Thanks
