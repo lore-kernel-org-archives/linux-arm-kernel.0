@@ -1,35 +1,85 @@
-From: logang@deltatee.com (Logan Gunthorpe)
-Date: Sun, 15 Jul 2018 22:48:37 -0600
-Subject: next/master boot: 184 boots: 13 failed, 171 passed (next-20180711)
-In-Reply-To: <20180716083144.499eb2c6@canb.auug.org.au>
-References: <5b45f6df.1c69fb81.86409.6375@mx.google.com>
- <20180711145253.GA9651@sirena.org.uk>
- <CAOMZO5B+LBwAEewEoCn=TojQuZ=qMt+4a8n+tiG9cfnzAta_9w@mail.gmail.com>
- <20180712100809.10ac3e1d@canb.auug.org.au>
- <20180714121046.7a9cdf20@canb.auug.org.au>
- <1bdd19e5-036d-0979-f360-14a43e3e986d@deltatee.com>
- <20180716083144.499eb2c6@canb.auug.org.au>
-Message-ID: <1484e486-1c19-a803-2967-7dec9e84d351@deltatee.com>
+From: Anson.Huang@nxp.com (Anson Huang)
+Date: Mon, 16 Jul 2018 12:46:35 +0800
+Subject: [PATCH] soc: imx: gpc: restrict register range for regmap access
+Message-ID: <1531716395-21549-1-git-send-email-Anson.Huang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+GPC registers are NOT continuous, some registers are
+reserved and accessing them from userspace will trigger
+external abort, add regmap register access table to
+avoid below abort:
 
+root at imx6slevk:~# cat /sys/kernel/debug/regmap/20dc000.gpc/registers
+[  108.480477] Unhandled fault: imprecise external abort (0x1406) at 0xb6db5004
+[  108.487985] pgd = 42b54bfd
+[  108.490741] [b6db5004] *pgd=ba1b7831
+[  108.494386] Internal error: : 1406 [#1] SMP ARM
+[  108.498943] Modules linked in:
+[  108.502043] CPU: 0 PID: 389 Comm: cat Not tainted 4.18.0-rc1-00074-gc9f1f60-dirty #482
+[  108.509982] Hardware name: Freescale i.MX6 SoloLite (Device Tree)
+[  108.516123] PC is at regmap_mmio_read32le+0x20/0x24
+[  108.521031] LR is at regmap_mmio_read+0x40/0x60
+[  108.525586] pc : [<c059cf74>]    lr : [<c059d1ac>]    psr: 20060093
+[  108.531875] sp : eccf1d98  ip : eccf1da8  fp : eccf1da4
+[  108.537122] r10: ec2d3800  r9 : eccf1f60  r8 : ecfc0000
+[  108.542370] r7 : eccf1e2c  r6 : eccf1e2c  r5 : 00000028  r4 : ec338e00
+[  108.548920] r3 : 00000000  r2 : eccf1e2c  r1 : f0980028  r0 : 00000000
+[  108.555474] Flags: nzCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment none
+[  108.562720] Control: 10c5387d  Table: acf4004a  DAC: 00000051
+[  108.568491] Process cat (pid: 389, stack limit = 0xd4318a65)
+[  108.574174] Stack: (0xeccf1d98 to 0xeccf2000)
 
-On 15/07/18 04:31 PM, Stephen Rothwell wrote:
-> OK, so I have removed the following from linux-next today:
-> 
-> 0b845db3ac65 ntb: ntb_hw_switchtec: cleanup 64bit IO defines to use the common header
-> 6d997075ea14 crypto: caam: cleanup CONFIG_64BIT ifdefs when using io{read|write}64
-> 9d235749060f ntb: ntb_hw_intel: use io-64-nonatomic instead of in-driver hacks
-> 1a516b53c12d io-64-nonatomic: add io{read|write}64[be]{_lo_hi|_hi_lo} macros
-> ddc62940244b iomap: introduce io{read|write}64_{lo_hi|hi_lo}
-> 6f595ae8ed85 parisc: iomap: introduce io{read|write}64
-> b68c7928b65d iomap: use non-raw io functions for io{read|write}XXbe
-> 
-> Let me know if that is correct or otherwise.
+Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+---
+ drivers/soc/imx/gpc.c | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
-That's correct.
-
-Thanks,
-
-Logan
+diff --git a/drivers/soc/imx/gpc.c b/drivers/soc/imx/gpc.c
+index 32f0748..0097a93 100644
+--- a/drivers/soc/imx/gpc.c
++++ b/drivers/soc/imx/gpc.c
+@@ -27,9 +27,16 @@
+ #define GPC_PGC_SW2ISO_SHIFT	0x8
+ #define GPC_PGC_SW_SHIFT	0x0
+ 
++#define GPC_PGC_PCI_PDN		0x200
++#define GPC_PGC_PCI_SR		0x20c
++
+ #define GPC_PGC_GPU_PDN		0x260
+ #define GPC_PGC_GPU_PUPSCR	0x264
+ #define GPC_PGC_GPU_PDNSCR	0x268
++#define GPC_PGC_GPU_SR		0x26c
++
++#define GPC_PGC_DISP_PDN	0x240
++#define GPC_PGC_DISP_SR		0x24c
+ 
+ #define GPU_VPU_PUP_REQ		BIT(1)
+ #define GPU_VPU_PDN_REQ		BIT(0)
+@@ -318,10 +325,24 @@ static const struct of_device_id imx_gpc_dt_ids[] = {
+ 	{ }
+ };
+ 
++static const struct regmap_range yes_ranges[] = {
++	regmap_reg_range(GPC_CNTR, GPC_CNTR),
++	regmap_reg_range(GPC_PGC_PCI_PDN, GPC_PGC_PCI_SR),
++	regmap_reg_range(GPC_PGC_GPU_PDN, GPC_PGC_GPU_SR),
++	regmap_reg_range(GPC_PGC_DISP_PDN, GPC_PGC_DISP_SR),
++};
++
++static const struct regmap_access_table access_table = {
++	.yes_ranges	= yes_ranges,
++	.n_yes_ranges	= ARRAY_SIZE(yes_ranges),
++};
++
+ static const struct regmap_config imx_gpc_regmap_config = {
+ 	.reg_bits = 32,
+ 	.val_bits = 32,
+ 	.reg_stride = 4,
++	.rd_table = &access_table,
++	.wr_table = &access_table,
+ 	.max_register = 0x2ac,
+ };
+ 
+-- 
+2.7.4
