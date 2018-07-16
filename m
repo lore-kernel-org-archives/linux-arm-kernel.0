@@ -1,71 +1,78 @@
 From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Mon, 16 Jul 2018 12:11:50 +0200
-Subject: [PATCH 5/6] ARM64: dts: meson-axg: add pdm pins
+Date: Mon, 16 Jul 2018 12:11:47 +0200
+Subject: [PATCH 2/6] ARM64: dts: meson-axg: add adc buttons the S400
 In-Reply-To: <20180716101151.31109-1-jbrunet@baylibre.com>
 References: <20180716101151.31109-1-jbrunet@baylibre.com>
-Message-ID: <20180716101151.31109-6-jbrunet@baylibre.com>
+Message-ID: <20180716101151.31109-3-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add pdm input pin definitions to meson AXG
+Add the 6 adc buttons of the amlogic S400
 
 Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
 ---
- arch/arm64/boot/dts/amlogic/meson-axg.dtsi | 42 ++++++++++++++++++++++++++++++
- 1 file changed, 42 insertions(+)
+ arch/arm64/boot/dts/amlogic/meson-axg-s400.dts | 44 ++++++++++++++++++++++++++
+ 1 file changed, 44 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-index 277958ff516a..461be4a35f92 100644
---- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-@@ -477,6 +477,48 @@
- 					};
- 				};
+diff --git a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
+index f389f84be2e2..fd90fa4a282c 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
+@@ -6,11 +6,55 @@
+ /dts-v1/;
  
-+				pdm_dclk_a14_pins: pdm_dclk_a14 {
-+					mux {
-+						groups = "pdm_dclk_a14";
-+						function = "pdm";
-+					};
-+				};
+ #include "meson-axg.dtsi"
++#include <dt-bindings/input/input.h>
+ 
+ / {
+ 	compatible = "amlogic,s400", "amlogic,a113d", "amlogic,meson-axg";
+ 	model = "Amlogic Meson AXG S400 Development Board";
+ 
++	adc_keys {
++		compatible = "adc-keys";
++		io-channels = <&saradc 0>;
++		io-channel-names = "buttons";
++		keyup-threshold-microvolt = <1800000>;
 +
-+				pdm_dclk_a19_pins: pdm_dclk_a19 {
-+					mux {
-+						groups = "pdm_dclk_a19";
-+						function = "pdm";
-+					};
-+				};
++		button-next {
++			label = "Next";
++			linux,code = <KEY_NEXT>;
++			press-threshold-microvolt = <1116000>; /* 62% */
++		};
 +
-+				pdm_din0_pins: pdm_din0 {
-+					mux {
-+						groups = "pdm_din0";
-+						function = "pdm";
-+					};
-+				};
++		button-prev {
++			label = "Previous";
++			linux,code = <KEY_PREVIOUS>;
++			press-threshold-microvolt = <900000>; /* 50% */
++		};
 +
-+				pdm_din1_pins: pdm_din1 {
-+					mux {
-+						groups = "pdm_din1";
-+						function = "pdm";
-+					};
-+				};
++		button-wifi {
++			label = "Wifi";
++			linux,code = <KEY_WLAN>;
++			press-threshold-microvolt = <684000>; /* 38% */
++		};
 +
-+				pdm_din2_pins: pdm_din2 {
-+					mux {
-+						groups = "pdm_din2";
-+						function = "pdm";
-+					};
-+				};
++		button-up {
++			label = "Volume Up";
++			linux,code = <KEY_VOLUMEUP>;
++			press-threshold-microvolt = <468000>; /* 26% */
++		};
 +
-+				pdm_din3_pins: pdm_din3 {
-+					mux {
-+						groups = "pdm_din3";
-+						function = "pdm";
-+					};
-+				};
++		button-down {
++			label = "Volume Down";
++			linux,code = <KEY_VOLUMEDOWN>;
++			press-threshold-microvolt = <252000>; /* 14% */
++		};
 +
- 				pwm_a_a_pins: pwm_a_a {
- 					mux {
- 						groups = "pwm_a_a";
++		button-voice {
++			label = "Voice";
++			linux,code = <KEY_VOICECOMMAND>;
++			press-threshold-microvolt = <0>; /* 0% */
++		};
++	};
++
+ 	aliases {
+ 		serial0 = &uart_AO;
+ 		serial1 = &uart_A;
 -- 
 2.14.4
