@@ -1,66 +1,54 @@
 From: andrew@aj.id.au (Andrew Jeffery)
-Date: Mon, 16 Jul 2018 15:06:29 +0930
-Subject: [PATCH 4/7] arm: dts: aspeed: Add Aspeed 54 USB Virtual Hub
-In-Reply-To: <20180629035106.27181-5-benh@kernel.crashing.org>
+Date: Mon, 16 Jul 2018 15:07:36 +0930
+Subject: [PATCH 5/7] arm: configs: Add USB gadget to Aspeed G4 defconfig
+In-Reply-To: <20180629035106.27181-6-benh@kernel.crashing.org>
 References: <20180629035106.27181-1-benh@kernel.crashing.org>
- <20180629035106.27181-5-benh@kernel.crashing.org>
-Message-ID: <1531719389.1118131.1441835376.01278A09@webmail.messagingengine.com>
+ <20180629035106.27181-6-benh@kernel.crashing.org>
+Message-ID: <1531719456.1118986.1441836232.3393D280@webmail.messagingengine.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Typo: '54' in the subject should be 'G5'
-
 On Fri, 29 Jun 2018, at 13:21, Benjamin Herrenschmidt wrote:
-> This adds the (disabled by default) device node for the
-> Aspeed virtual hub,a long with clocks and pinmux.
-> 
-> This also adds the missing pinmux definition for it
-> (the kernel driver already knows about it).
-
-Whoops! Thanks for catching that.
-
+> Now that the vhub driver is upstream and the device-trees
+> updated, let's enable this by default.
 > 
 > Signed-off-by: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+
+Acked-by: Andrew Jeffery <andrew@aj.id.au>
+
 > ---
->  arch/arm/boot/dts/aspeed-g5.dtsi | 15 +++++++++++++++
->  1 file changed, 15 insertions(+)
+>  arch/arm/configs/aspeed_g4_defconfig | 17 +++++++++++++++++
+>  1 file changed, 17 insertions(+)
 > 
-> diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
-> index dfdc239b86f6..6274d3eaf374 100644
-> --- a/arch/arm/boot/dts/aspeed-g5.dtsi
-> +++ b/arch/arm/boot/dts/aspeed-g5.dtsi
-> @@ -176,6 +176,16 @@
->  			 */
->  		};
->  
-> +		vhub: usb-vhub at 1e6a0000 {
-> +			compatible = "aspeed,ast2500-usb-vhub";
-> +			reg = <0x1e6a0000 0x300>;
-> +			interrupts = <5>;
-> +			clocks = <&syscon ASPEED_CLK_GATE_USBPORT1CLK>;
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&pinctrl_usb2ad_default>;
-> +			status = "disabled";
-> +		};
-> +
-
-Same query about the compatible before.
-
->  		apb {
->  			compatible = "simple-bus";
->  			#address-cells = <1>;
-> @@ -1425,6 +1435,11 @@
->  		groups = "USB2AH";
->  	};
->  
-> +	pinctrl_usb2ad_default: usb2ad_default {
-> +		function = "USB2AD";
-> +		groups = "USB2AD";
-> +	};
-> +
->  	pinctrl_usb11bhid_default: usb11bhid_default {
->  		function = "USB11BHID";
->  		groups = "USB11BHID";
+> diff --git a/arch/arm/configs/aspeed_g4_defconfig b/arch/arm/configs/
+> aspeed_g4_defconfig
+> index 95946dee9c77..be714ea088ed 100644
+> --- a/arch/arm/configs/aspeed_g4_defconfig
+> +++ b/arch/arm/configs/aspeed_g4_defconfig
+> @@ -138,6 +138,23 @@ CONFIG_USB_DYNAMIC_MINORS=y
+>  CONFIG_USB_EHCI_HCD=y
+>  CONFIG_USB_EHCI_ROOT_HUB_TT=y
+>  CONFIG_USB_EHCI_HCD_PLATFORM=y
+> +CONFIG_USB_GADGET=y
+> +CONFIG_U_SERIAL_CONSOLE=y
+> +CONFIG_USB_ASPEED_VHUB=y
+> +CONFIG_USB_CONFIGFS=y
+> +CONFIG_USB_CONFIGFS_SERIAL=y
+> +CONFIG_USB_CONFIGFS_ACM=y
+> +CONFIG_USB_CONFIGFS_OBEX=y
+> +CONFIG_USB_CONFIGFS_NCM=y
+> +CONFIG_USB_CONFIGFS_ECM=y
+> +CONFIG_USB_CONFIGFS_ECM_SUBSET=y
+> +CONFIG_USB_CONFIGFS_RNDIS=y
+> +CONFIG_USB_CONFIGFS_EEM=y
+> +CONFIG_USB_CONFIGFS_MASS_STORAGE=y
+> +CONFIG_USB_CONFIGFS_F_LB_SS=y
+> +CONFIG_USB_CONFIGFS_F_FS=y
+> +CONFIG_USB_CONFIGFS_F_HID=y
+> +CONFIG_USB_CONFIGFS_F_PRINTER=y
+>  CONFIG_NEW_LEDS=y
+>  CONFIG_LEDS_CLASS=y
+>  CONFIG_LEDS_CLASS_FLASH=y
 > -- 
 > 2.17.1
 > 
