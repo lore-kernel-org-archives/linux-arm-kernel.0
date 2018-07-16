@@ -1,133 +1,168 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Mon, 16 Jul 2018 13:06:04 -0500
-Subject: [PATCH V2 3/6] mailbox: ti-msgmgr: Change message count mask to be
- descriptor based
+Date: Mon, 16 Jul 2018 13:06:03 -0500
+Subject: [PATCH V2 2/6] mailbox: ti-msgmgr: Allocate Rx channel resources only
+ on request
 In-Reply-To: <20180716180607.16526-1-nm@ti.com>
 References: <20180716180607.16526-1-nm@ti.com>
-Message-ID: <20180716180607.16526-4-nm@ti.com>
+Message-ID: <20180716180607.16526-3-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change mask used to extract the message count to be descriptor based.
+In a much bigger system SoCs, the number of Rx channels can be
+many and mostly unused based on the system of choice, and not all
+Rx channels need IRQs and allocating all memory at probe will be
+inefficient. Some SoCs could have total threads in the 100s and usage
+would be just 1 Rx thread.
 
-This is to support changes for count location for various SoC
-solutions.
+Thus, request and map the IRQs and allocate memory only when needed.
+
+Since these channels are requested by client drivers on need, our
+utilization will be optimal.
 
 Signed-off-by: Nishanth Menon <nm@ti.com>
 ---
 Changes since V1: None
-V1: https://patchwork.kernel.org/patch/10475341/
-RFC:  https://patchwork.kernel.org/patch/10447671/
+V1: https://patchwork.kernel.org/patch/10475301/
+RFC: https://patchwork.kernel.org/patch/10447701/
 
- drivers/mailbox/ti-msgmgr.c | 25 ++++++++++++++++++-------
- 1 file changed, 18 insertions(+), 7 deletions(-)
+ drivers/mailbox/ti-msgmgr.c | 91 ++++++++++++++++++++++++++++++---------------
+ 1 file changed, 61 insertions(+), 30 deletions(-)
 
 diff --git a/drivers/mailbox/ti-msgmgr.c b/drivers/mailbox/ti-msgmgr.c
-index 91c955979008..7d2eb4b359ba 100644
+index 5fe6ce200264..91c955979008 100644
 --- a/drivers/mailbox/ti-msgmgr.c
 +++ b/drivers/mailbox/ti-msgmgr.c
-@@ -44,6 +44,7 @@ struct ti_msgmgr_valid_queue_desc {
-  * @max_messages:	Number of messages
-  * @data_first_reg:	First data register for proxy data region
-  * @data_last_reg:	Last data register for proxy data region
-+ * @status_cnt_mask:	Mask for getting the status value
-  * @tx_polled:		Do I need to use polled mechanism for tx
-  * @tx_poll_timeout_ms: Timeout in ms if polled
-  * @valid_queues:	List of Valid queues that the processor can access
-@@ -58,6 +59,7 @@ struct ti_msgmgr_desc {
- 	u8 max_messages;
- 	u8 data_first_reg;
- 	u8 data_last_reg;
-+	u32 status_cnt_mask;
- 	bool tx_polled;
- 	int tx_poll_timeout_ms;
- 	const struct ti_msgmgr_valid_queue_desc *valid_queues;
-@@ -116,20 +118,24 @@ struct ti_msgmgr_inst {
+@@ -310,6 +310,51 @@ static int ti_msgmgr_send_data(struct mbox_chan *chan, void *data)
+ 	return 0;
+ }
+ 
++/**
++ *  ti_msgmgr_queue_rx_irq_req() - RX IRQ request
++ *  @dev:	device pointer
++ *  @qinst:	Queue instance
++ *  @chan:	Channel pointer
++ */
++static int ti_msgmgr_queue_rx_irq_req(struct device *dev,
++				      struct ti_queue_inst *qinst,
++				      struct mbox_chan *chan)
++{
++	int ret = 0;
++	char of_rx_irq_name[7];
++	struct device_node *np;
++
++	snprintf(of_rx_irq_name, sizeof(of_rx_irq_name),
++		 "rx_%03d", qinst->queue_id);
++
++	/* Get the IRQ if not found */
++	if (qinst->irq < 0) {
++		np = of_node_get(dev->of_node);
++		if (!np)
++			return -ENODATA;
++		qinst->irq = of_irq_get_byname(np, of_rx_irq_name);
++		of_node_put(np);
++
++		if (qinst->irq < 0) {
++			dev_err(dev,
++				"QID %d PID %d:No IRQ[%s]: %d\n",
++				qinst->queue_id, qinst->proxy_id,
++				of_rx_irq_name, qinst->irq);
++			return qinst->irq;
++		}
++	}
++
++	/* With the expectation that the IRQ might be shared in SoC */
++	ret = request_irq(qinst->irq, ti_msgmgr_queue_rx_interrupt,
++			  IRQF_SHARED, qinst->name, chan);
++	if (ret) {
++		dev_err(dev, "Unable to get IRQ %d on %s(res=%d)\n",
++			qinst->irq, qinst->name, ret);
++	}
++
++	return ret;
++}
++
+ /**
+  * ti_msgmgr_queue_startup() - Startup queue
+  * @chan:	Channel pointer
+@@ -318,19 +363,21 @@ static int ti_msgmgr_send_data(struct mbox_chan *chan, void *data)
+  */
+ static int ti_msgmgr_queue_startup(struct mbox_chan *chan)
+ {
+-	struct ti_queue_inst *qinst = chan->con_priv;
+ 	struct device *dev = chan->mbox->dev;
++	struct ti_msgmgr_inst *inst = dev_get_drvdata(dev);
++	struct ti_queue_inst *qinst = chan->con_priv;
++	const struct ti_msgmgr_desc *d = inst->desc;
+ 	int ret;
+ 
+ 	if (!qinst->is_tx) {
+-		/*
+-		 * With the expectation that the IRQ might be shared in SoC
+-		 */
+-		ret = request_irq(qinst->irq, ti_msgmgr_queue_rx_interrupt,
+-				  IRQF_SHARED, qinst->name, chan);
++		/* Allocate usage buffer for rx */
++		qinst->rx_buff = kzalloc(d->max_message_size, GFP_KERNEL);
++		if (!qinst->rx_buff)
++			return -ENOMEM;
++		/* Request IRQ */
++		ret = ti_msgmgr_queue_rx_irq_req(dev, qinst, chan);
+ 		if (ret) {
+-			dev_err(dev, "Unable to get IRQ %d on %s(res=%d)\n",
+-				qinst->irq, qinst->name, ret);
++			kfree(qinst->rx_buff);
+ 			return ret;
+ 		}
+ 	}
+@@ -346,8 +393,10 @@ static void ti_msgmgr_queue_shutdown(struct mbox_chan *chan)
+ {
+ 	struct ti_queue_inst *qinst = chan->con_priv;
+ 
+-	if (!qinst->is_tx)
++	if (!qinst->is_tx) {
+ 		free_irq(qinst->irq, chan);
++		kfree(qinst->rx_buff);
++	}
+ }
  
  /**
-  * ti_msgmgr_queue_get_num_messages() - Get the number of pending messages
-+ * @d:		Description of message manager
-  * @qinst:	Queue instance for which we check the number of pending messages
-  *
-  * Return: number of messages pending in the queue (0 == no pending messages)
-  */
--static inline int ti_msgmgr_queue_get_num_messages(struct ti_queue_inst *qinst)
-+static inline int
-+ti_msgmgr_queue_get_num_messages(const struct ti_msgmgr_desc *d,
-+				 struct ti_queue_inst *qinst)
- {
- 	u32 val;
-+	u32 status_cnt_mask = d->status_cnt_mask;
+@@ -425,27 +474,6 @@ static int ti_msgmgr_queue_setup(int idx, struct device *dev,
+ 		 dev_name(dev), qinst->is_tx ? "tx" : "rx", qinst->queue_id,
+ 		 qinst->proxy_id);
  
- 	/*
- 	 * We cannot use relaxed operation here - update may happen
- 	 * real-time.
- 	 */
--	val = readl(qinst->queue_state) & Q_STATE_ENTRY_COUNT_MASK;
--	val >>= __ffs(Q_STATE_ENTRY_COUNT_MASK);
-+	val = readl(qinst->queue_state) & status_cnt_mask;
-+	val >>= __ffs(status_cnt_mask);
+-	if (!qinst->is_tx) {
+-		char of_rx_irq_name[7];
+-
+-		snprintf(of_rx_irq_name, sizeof(of_rx_irq_name),
+-			 "rx_%03d", qinst->queue_id);
+-
+-		qinst->irq = of_irq_get_byname(np, of_rx_irq_name);
+-		if (qinst->irq < 0) {
+-			dev_crit(dev,
+-				 "[%d]QID %d PID %d:No IRQ[%s]: %d\n",
+-				 idx, qinst->queue_id, qinst->proxy_id,
+-				 of_rx_irq_name, qinst->irq);
+-			return qinst->irq;
+-		}
+-		/* Allocate usage buffer for rx */
+-		qinst->rx_buff = devm_kzalloc(dev,
+-					      d->max_message_size, GFP_KERNEL);
+-		if (!qinst->rx_buff)
+-			return -ENOMEM;
+-	}
+-
+ 	qinst->queue_buff_start = inst->queue_proxy_region +
+ 	    Q_DATA_OFFSET(qinst->proxy_id, qinst->queue_id, d->data_first_reg);
+ 	qinst->queue_buff_end = inst->queue_proxy_region +
+@@ -454,6 +482,9 @@ static int ti_msgmgr_queue_setup(int idx, struct device *dev,
+ 	    Q_STATE_OFFSET(qinst->queue_id);
+ 	qinst->chan = chan;
  
- 	return val;
- }
-@@ -167,8 +173,9 @@ static irqreturn_t ti_msgmgr_queue_rx_interrupt(int irq, void *p)
- 		return IRQ_NONE;
- 	}
++	/* Setup an error value for IRQ - Lazy allocation */
++	qinst->irq = -EINVAL;
++
+ 	chan->con_priv = qinst;
  
-+	desc = inst->desc;
- 	/* Do I actually have messages to read? */
--	msg_count = ti_msgmgr_queue_get_num_messages(qinst);
-+	msg_count = ti_msgmgr_queue_get_num_messages(desc, qinst);
- 	if (!msg_count) {
- 		/* Shared IRQ? */
- 		dev_dbg(dev, "Spurious event - 0 pending data!\n");
-@@ -181,7 +188,6 @@ static irqreturn_t ti_msgmgr_queue_rx_interrupt(int irq, void *p)
- 	 * of how many bytes I should be reading. Let the client figure this
- 	 * out.. I just read the full message and pass it on..
- 	 */
--	desc = inst->desc;
- 	message.len = desc->max_message_size;
- 	message.buf = (u8 *)qinst->rx_buff;
- 
-@@ -224,12 +230,14 @@ static irqreturn_t ti_msgmgr_queue_rx_interrupt(int irq, void *p)
- static bool ti_msgmgr_queue_peek_data(struct mbox_chan *chan)
- {
- 	struct ti_queue_inst *qinst = chan->con_priv;
-+	struct device *dev = chan->mbox->dev;
-+	struct ti_msgmgr_inst *inst = dev_get_drvdata(dev);
- 	int msg_count;
- 
- 	if (qinst->is_tx)
- 		return false;
- 
--	msg_count = ti_msgmgr_queue_get_num_messages(qinst);
-+	msg_count = ti_msgmgr_queue_get_num_messages(inst->desc, qinst);
- 
- 	return msg_count ? true : false;
- }
-@@ -243,12 +251,14 @@ static bool ti_msgmgr_queue_peek_data(struct mbox_chan *chan)
- static bool ti_msgmgr_last_tx_done(struct mbox_chan *chan)
- {
- 	struct ti_queue_inst *qinst = chan->con_priv;
-+	struct device *dev = chan->mbox->dev;
-+	struct ti_msgmgr_inst *inst = dev_get_drvdata(dev);
- 	int msg_count;
- 
- 	if (!qinst->is_tx)
- 		return false;
- 
--	msg_count = ti_msgmgr_queue_get_num_messages(qinst);
-+	msg_count = ti_msgmgr_queue_get_num_messages(inst->desc, qinst);
- 
- 	/* if we have any messages pending.. */
- 	return msg_count ? false : true;
-@@ -523,6 +533,7 @@ static const struct ti_msgmgr_desc k2g_desc = {
- 	.max_messages = 128,
- 	.data_first_reg = 16,
- 	.data_last_reg = 31,
-+	.status_cnt_mask = Q_STATE_ENTRY_COUNT_MASK,
- 	.tx_polled = false,
- 	.valid_queues = k2g_valid_queues,
- 	.num_valid_queues = ARRAY_SIZE(k2g_valid_queues),
+ 	dev_dbg(dev, "[%d] qidx=%d pidx=%d irq=%d q_s=%p q_e = %p\n",
 -- 
 2.15.1
