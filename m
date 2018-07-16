@@ -1,83 +1,92 @@
-From: christoffer.dall@arm.com (Christoffer Dall)
-Date: Mon, 16 Jul 2018 15:06:26 +0200
-Subject: [PATCH v4 09/10] KVM: arm/arm64: vgic: Let userspace opt-in to
- writable v2 IGROUPR
-In-Reply-To: <1531746387-7033-1-git-send-email-christoffer.dall@arm.com>
-References: <1531746387-7033-1-git-send-email-christoffer.dall@arm.com>
-Message-ID: <1531746387-7033-10-git-send-email-christoffer.dall@arm.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Mon, 16 Jul 2018 15:24:44 +0200
+Subject: [PATCH v2 2/2] arm64: dts: Add Mediatek X20 Development Board
+ support
+In-Reply-To: <20180605163442.4812-3-manivannan.sadhasivam@linaro.org>
+References: <20180605163442.4812-1-manivannan.sadhasivam@linaro.org>
+ <20180605163442.4812-3-manivannan.sadhasivam@linaro.org>
+Message-ID: <d88504b4-409c-c42b-f816-bedefce2a819@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Simply letting IGROUPR be writable from userspace would break
-migration from old kernels to newer kernels, because old kernels
-incorrectly report interrupt groups as group 1.  This would not be a big
-problem if userspace wrote GICD_IIDR as read from the kernel, because we
-could detect the incompatibility and return an error to userspace.
-Unfortunately, this is not the case with current userspace
-implementations and simply letting IGROUPR be writable from userspace for
-an emulated GICv2 silently breaks migration and causes the destination
-VM to no longer run after migration.
+Hi Manivanna,
 
-We now encourage userspace to write the read and expected value of
-GICD_IIDR as the first part of a GIC register restore, and if we observe
-a write to GICD_IIDR we know that userspace has been updated and has had
-a chance to cope with older kernels (VGICv2 IIDR.Revision == 0)
-incorrectly reporting interrupts as group 1, and therefore we now allow
-groups to be user writable.
+On 05/06/18 18:34, Manivannan Sadhasivam wrote:
+> Add initial device tree support for Mediatek X20 Development Board
+> based on MT6797 Deca core SoC. This board is one of the 96Boards
+> Consumer Edition platform.
+> 
+> Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+> ---
+>  arch/arm64/boot/dts/mediatek/Makefile         |  1 +
+>  .../boot/dts/mediatek/mt6797-x20-dev.dts      | 33 +++++++++++++++++++
+>  2 files changed, 34 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/mediatek/mt6797-x20-dev.dts
+> 
+> diff --git a/arch/arm64/boot/dts/mediatek/Makefile b/arch/arm64/boot/dts/mediatek/Makefile
+> index ac17f60f998c..5b7fd6ad96e4 100644
+> --- a/arch/arm64/boot/dts/mediatek/Makefile
+> +++ b/arch/arm64/boot/dts/mediatek/Makefile
+> @@ -3,5 +3,6 @@ dtb-$(CONFIG_ARCH_MEDIATEK) += mt2712-evb.dtb
+>  dtb-$(CONFIG_ARCH_MEDIATEK) += mt6755-evb.dtb
+>  dtb-$(CONFIG_ARCH_MEDIATEK) += mt6795-evb.dtb
+>  dtb-$(CONFIG_ARCH_MEDIATEK) += mt6797-evb.dtb
+> +dtb-$(CONFIG_ARCH_MEDIATEK) += mt6797-x20-dev.dtb
+>  dtb-$(CONFIG_ARCH_MEDIATEK) += mt7622-rfb1.dtb
+>  dtb-$(CONFIG_ARCH_MEDIATEK) += mt8173-evb.dtb
+> diff --git a/arch/arm64/boot/dts/mediatek/mt6797-x20-dev.dts b/arch/arm64/boot/dts/mediatek/mt6797-x20-dev.dts
+> new file mode 100644
+> index 000000000000..2c09ca95d9e2
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/mediatek/mt6797-x20-dev.dts
+> @@ -0,0 +1,33 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * Device Tree Source for MediaTek X20 Development Board
+> + *
+> + * Copyright (C) 2018, Linaro Ltd.
+> + *
+> + */
+> +
+> +/dts-v1/;
+> +
+> +#include "mt6797.dtsi"
+> +
+> +/ {
+> +	model = "Mediatek X20 Development Board";
+> +	compatible = "archermind,mt6797-x20-dev", "mediatek,mt6797";
+> +
+> +	aliases {
+> +		serial0 = &uart1;
+> +	};
 
-Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
----
- include/kvm/arm_vgic.h           |  3 +++
- virt/kvm/arm/vgic/vgic-mmio-v2.c | 16 +++++++++++++++-
- 2 files changed, 18 insertions(+), 1 deletion(-)
+Sorry for the late answer.
+Why did you use uart1 instead of uart0?
+I know that uart0 is used by the bootloader, but because of their exotic flash
+procedure I find it quite useful to see this messages in my serial connection.
+Of course you can only use 921600 baudrate then.
 
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index c661d0e..c134790 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -221,6 +221,9 @@ struct vgic_dist {
- 	/* Implementation revision as reported in the GICD_IIDR */
- 	u32			implementation_rev;
- 
-+	/* Userspace can write to GICv2 IGROUPR */
-+	bool			v2_groups_user_writable;
-+
- 	/* Do injected MSIs require an additional device ID? */
- 	bool			msis_require_devid;
- 
-diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-index ee164f8..26654f4 100644
---- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-@@ -85,6 +85,18 @@ static int vgic_mmio_uaccess_write_v2_misc(struct kvm_vcpu *vcpu,
- 	case GIC_DIST_IIDR:
- 		if (val != vgic_mmio_read_v2_misc(vcpu, addr, len))
- 			return -EINVAL;
-+
-+		/*
-+		 * If we observe a write to GICD_IIDR we know that userspace
-+		 * has been updated and has had a chance to cope with older
-+		 * kernels (VGICv2 IIDR.Revision == 0) incorrectly reporting
-+		 * interrupts as group 1, and therefore we now allow groups to
-+		 * be user writable.  Doing this by default would break
-+		 * migration from old kernels to new kernels with legacy
-+		 * userspace.
-+		 */
-+		vcpu->kvm->arch.vgic.v2_groups_user_writable = true;
-+		return 0;
- 	}
- 
- 	vgic_mmio_write_v2_misc(vcpu, addr, len, val);
-@@ -95,7 +107,9 @@ static int vgic_mmio_uaccess_write_v2_group(struct kvm_vcpu *vcpu,
- 					    gpa_t addr, unsigned int len,
- 					    unsigned long val)
- {
--	/* Ignore writes from userspace */
-+	if (vcpu->kvm->arch.vgic.v2_groups_user_writable)
-+		vgic_mmio_write_group(vcpu, addr, len, val);
-+
- 	return 0;
- }
- 
--- 
-2.7.4
+> +
+> +	memory at 40000000 {
+> +		device_type = "memory";
+> +		reg = <0 0x40000000 0 0x1e605000>;
+
+How comes this strange number for the memory size?
+
+BTW do you know the differences between the EVB board and the x20 one?
+I used the evb dts for booting up to now.
+
+Best regards,
+Matthias
+
+> +	};
+> +
+> +	chosen {
+> +		stdout-path = "serial0:115200n8";
+> +	};
+> +};
+> +
+> +&uart1 {
+> +	status = "okay";
+> +};
+> 
