@@ -1,32 +1,75 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 16 Jul 2018 12:11:53 +0200
-Subject: [PATCH] [RFC] y2038: globally rename compat_time to old_time32
-In-Reply-To: <CABeXuvphoYM+KOGPgtsuxzS1_XDSOO0Ta5hr3sA7gYtt-78wtQ@mail.gmail.com>
-References: <20180713133204.3123939-1-arnd@arndb.de>
- <CABeXuvphoYM+KOGPgtsuxzS1_XDSOO0Ta5hr3sA7gYtt-78wtQ@mail.gmail.com>
-Message-ID: <CAK8P3a2xu4KGVM1BvTjtXKHfXpBQ2PMynAPybW4cRt7FB8ktwg@mail.gmail.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Mon, 16 Jul 2018 12:11:51 +0200
+Subject: [PATCH 6/6] ARM64: dts: meson-axg: add the audio clock controller
+In-Reply-To: <20180716101151.31109-1-jbrunet@baylibre.com>
+References: <20180716101151.31109-1-jbrunet@baylibre.com>
+Message-ID: <20180716101151.31109-7-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 14, 2018 at 5:54 PM, Deepa Dinamani <deepa.kernel@gmail.com> wrote:
-> Right now we only have compat syscalls and native syscalls.
-> Until we transition all the architectures to use the new syscalls,
-> wouldn't it be the same sort of confusion as exists today?
-> These structures today are still used by compat entry points.
-> I'm trying to understand why such a cleanup would make sense today
-> rather than at the end of the transition.
+Add the audio clock controller which is part of the audio bus
+This controller takes 8 input plls, and the usual clock gate, from the
+main clock controller. It provides the clocs for the all the devices of
+the audio subsystem, such as tdms, spdif, pdm, etc.
 
-I don't think it makes a big difference whether we change it now or later,
-but if Christoph feels that it addresses his concern about the compat_
-namespace being reused during the transition, doing it earlier would
-enable us to finish the remaining syscalls.
+Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+---
+ arch/arm64/boot/dts/amlogic/meson-axg.dtsi | 36 ++++++++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
 
-We are running a little late with the remaining syscalls for 4.19 as we
-now have an rc5. At this point we probably won't have time to finish
-the discussion about all of clock_adjtime, getrusage/waitid and getitimer(),
-but I'd really like to get utimensat, futex, sched_rr_get_interval,
-recvmmsg, sys_io_getevents, rt_sigtimedwait, ppoll and pselect6
-done for 4.19 so we can finalize the ABI for 4.20 along with doing
-the actual conversion.
-
-      Arnd
+diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+index 461be4a35f92..6adc8d3dbf0a 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+@@ -6,6 +6,7 @@
+ #include <dt-bindings/gpio/gpio.h>
+ #include <dt-bindings/interrupt-controller/irq.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
++#include <dt-bindings/clock/axg-audio-clkc.h>
+ #include <dt-bindings/clock/axg-clkc.h>
+ #include <dt-bindings/clock/axg-aoclkc.h>
+ #include <dt-bindings/gpio/meson-axg-gpio.h>
+@@ -155,6 +156,41 @@
+ 			};
+ 		};
+ 
++		audio: bus at ff642000 {
++			compatible = "simple-bus";
++			reg = <0x0 0xff642000 0x0 0x2000>;
++			#address-cells = <2>;
++			#size-cells = <2>;
++			ranges = <0x0 0x0 0x0 0xff642000 0x0 0x2000>;
++
++			clkc_audio: clock-controller at 0 {
++				compatible = "amlogic,axg-audio-clkc";
++				reg = <0x0 0x0 0x0 0xb4>;
++				#clock-cells = <1>;
++
++				clocks = <&clkc CLKID_AUDIO>,
++					 <&clkc CLKID_MPLL0>,
++					 <&clkc CLKID_MPLL1>,
++					 <&clkc CLKID_MPLL2>,
++					 <&clkc CLKID_MPLL3>,
++					 <&clkc CLKID_HIFI_PLL>,
++					 <&clkc CLKID_FCLK_DIV3>,
++					 <&clkc CLKID_FCLK_DIV4>,
++					 <&clkc CLKID_GP0_PLL>;
++				clock-names = "pclk",
++					      "mst_in0",
++					      "mst_in1",
++					      "mst_in2",
++					      "mst_in3",
++					      "mst_in4",
++					      "mst_in5",
++					      "mst_in6",
++					      "mst_in7";
++
++				resets = <&reset RESET_AUDIO>;
++			};
++		};
++
+ 		cbus: bus at ffd00000 {
+ 			compatible = "simple-bus";
+ 			reg = <0x0 0xffd00000 0x0 0x25000>;
+-- 
+2.14.4
