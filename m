@@ -1,40 +1,55 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 16 Jul 2018 10:17:18 +0100
-Subject: [PATCH] arm64: cpuinfo: Include cleartext implementer and part
- strings
-In-Reply-To: <20180715035342.11371-1-olof@lixom.net>
-References: <20180715035342.11371-1-olof@lixom.net>
-Message-ID: <f619f0e9-b8b4-29fb-5ad6-7f5ebc3a4da8@arm.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 16 Jul 2018 02:24:12 -0700
+Subject: [GIT PULL 2/6] Broadcom defconfig-arm64 changes for 4.19
+In-Reply-To: <20180714211012.mh3j7v7bdnlpnenw@localhost>
+References: <20180709153035.6376-1-f.fainelli@gmail.com>
+ <20180709153035.6376-2-f.fainelli@gmail.com>
+ <20180714211012.mh3j7v7bdnlpnenw@localhost>
+Message-ID: <efe27b1c-2710-2591-eab3-a3f6af8be1cd@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
 
-On 15/07/18 04:53, Olof Johansson wrote:
-> There's some use in printing out what the implementer and part numbers
-> decode to for cases where they're known.
+
+On 07/14/2018 02:10 PM, Olof Johansson wrote:
+> On Mon, Jul 09, 2018 at 08:30:31AM -0700, Florian Fainelli wrote:
+>> The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
+>>
+>>   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+>>
+>> are available in the git repository at:
+>>
+>>   https://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.19/defconfig-arm64
+>>
+>> for you to fetch changes up to ec93d5a25f9f959e6c20351e74182ad4bfa85716:
+>>
+>>   Merge tag 'bcm2835-defconfig-64-next-2018-07-03' into defconfig-arm64/next (2018-07-09 05:23:47 -0700)
+>>
+>> ----------------------------------------------------------------
+>> This pull request contains Broadcom ARM64-based SoCs defconfig changes
+>> for 4.19, please pull the following changes:
+>>
+>> - Stefan enables the Raspberry Pi voltage sensor driver (HWMON) in the
+>>   arm64 defconfig file
+>>
+>> ----------------------------------------------------------------
+>> Florian Fainelli (1):
+>>       Merge tag 'bcm2835-defconfig-64-next-2018-07-03' into defconfig-arm64/next
+>>
+>> Stefan Wahren (1):
+>>       arm64: defconfig: Enable RPi voltage sensor
 > 
-> I filled in the table based on public information; mostly from ARM TRMs
-> and other tools (and some of the SSBD tables in the kernel, etc).
+> It looks like you revisited this tag and branch after you sent the pull
+> request. It's usually better to do a new tag instead (and remove the
+> old one in case you don't want me to merge it), to avoid confusion.
+
+Good point, I did send out new emails with [GIT PULL v2] in the subject,
+but depending on your mail client (e.g: Gmail) this can be easy to
+conflate with the original one.
+
 > 
-> Apple IDs came from
-> https://github.com/apple/darwin-xnu/blob/master/osfmk/arm/cpuid.h
-> 
-> Signed-off-by: Olof Johansson <olof@lixom.net>
-> ---
->  arch/arm64/kernel/cpuinfo.c | 79 +++++++++++++++++++++++++++++++++++++++++++--
->  1 file changed, 76 insertions(+), 3 deletions(-)
+> New contents looks reasonable so I merged anyway.
 
-[...]
-
-The same thing pops up every so often. And the answer is the same each time:
-
-- it breaks an existing userspace ABI by changing the format of cpuinfo
-- it is unmaintainable in the long run
-- userspace already has this information by simply running "lscpu"
-
-What has changed?
-
-	M.
+Thanks!
 -- 
-Jazz is not dead. It just smells funny...
+Florian
