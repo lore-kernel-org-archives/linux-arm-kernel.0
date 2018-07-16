@@ -1,36 +1,123 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Mon, 16 Jul 2018 10:41:45 +0200
-Subject: [PATCH 1/3] soc: amlogic: Add Meson GX Clock Measure driver
-In-Reply-To: <CAFBinCDCbOrX8BaJcDpeiR=r6eSxj=OQ1voj-Lug=P7hyvu=hA@mail.gmail.com>
-References: <1530624110-4687-1-git-send-email-narmstrong@baylibre.com>
- <1530624110-4687-2-git-send-email-narmstrong@baylibre.com>
- <CAFBinCDBEbVSEzhM2WOhxNX1DZLiSrkeo7GWdxGzBpOUH3PKQw@mail.gmail.com>
- <7d83a0a4-5cde-7e4f-78a8-372ae8cb03d0@baylibre.com>
- <CAFBinCA5B87TkfOtQd==PxDK74kJ+XWMgY-36QK2TT9p-vAEUA@mail.gmail.com>
- <7hy3eknl3l.fsf@baylibre.com>
- <fb73556d-cf18-266c-e638-9dd92224b939@baylibre.com>
- <CAFBinCDCbOrX8BaJcDpeiR=r6eSxj=OQ1voj-Lug=P7hyvu=hA@mail.gmail.com>
-Message-ID: <1531730505.12853.16.camel@baylibre.com>
+From: ravi.bangoria@linux.ibm.com (Ravi Bangoria)
+Date: Mon, 16 Jul 2018 14:17:00 +0530
+Subject: [PATCH v6 0/6] Uprobes: Support SDT markers having reference count
+ (semaphore)
+Message-ID: <20180716084706.28244-1-ravi.bangoria@linux.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2018-07-14 at 16:41 +0200, Martin Blumenstingl wrote:
-> > > 
-> > > Even futther, Couldn't this measure IP be used by the current CCF code
-> > > (as an additonal, optional property) such the the debugfs clk_summary
-> > > uses it directly?
-> > 
-> > It will need hacking the CCF core, but as Jerome and I said, this can be done later on !
-> > We can push a debugfs version and migrate it to CCF when we figure out how to integrate it
-> > correctly.
-> 
-> Jerome already raised concerns (on IRC) that measuring the clock takes
-> too much time and using a CCF clock provider would mean that "cat
-> /sys/kernel/debug/clk/clk_summary" would be slow
-> if that's the case then I'm happy with a debugfs solution which can be
-> migrated wo whatever framework suits best in the future
+Userspace Statically Defined Tracepoints[1] are dtrace style markers
+inside userspace applications. Applications like PostgreSQL, MySQL,
+Pthread, Perl, Python, Java, Ruby, Node.js, libvirt, QEMU, glib etc
+have these markers embedded in them. These markers are added by developer
+at important places in the code. Each marker source expands to a single
+nop instruction in the compiled code but there may be additional
+overhead for computing the marker arguments which expands to couple of
+instructions. In case the overhead is more, execution of it can be
+omitted by runtime if() condition when no one is tracing on the marker:
 
-Actually I'm not concerned by clk_summary much, it is debug. Slow is not
-desirable but not critical either. I'm more concerned by tree recalc while
-changing the tree topology and rate change if clock measure implement
-get_rate(). It is worth trying ... just keep an eye ton this.
+    if (reference_counter > 0) {
+        Execute marker instructions;
+    }
+
+Default value of reference counter is 0. Tracer has to increment the 
+reference counter before tracing on a marker and decrement it when
+done with the tracing.
+
+Currently, perf tool has limited supports for SDT markers. I.e. it
+can not trace markers surrounded by reference counter. Also, it's
+not easy to add reference counter logic in userspace tool like perf,
+so basic idea for this patchset is to add reference counter logic in
+the a uprobe infrastructure. Ex,[2]
+
+  # cat tick.c
+    ... 
+    for (i = 0; i < 100; i++) {
+	DTRACE_PROBE1(tick, loop1, i);
+        if (TICK_LOOP2_ENABLED()) {
+            DTRACE_PROBE1(tick, loop2, i); 
+        }
+        printf("hi: %d\n", i); 
+        sleep(1);
+    }   
+    ... 
+
+Here tick:loop1 is marker without reference counter where as tick:loop2
+is surrounded by reference counter condition.
+
+  # perf buildid-cache --add /tmp/tick
+  # perf probe sdt_tick:loop1
+  # perf probe sdt_tick:loop2
+
+  # perf stat -e sdt_tick:loop1,sdt_tick:loop2 -- /tmp/tick
+  hi: 0
+  hi: 1
+  hi: 2
+  ^C
+  Performance counter stats for '/tmp/tick':
+             3      sdt_tick:loop1
+             0      sdt_tick:loop2
+     2.747086086 seconds time elapsed
+
+Perf failed to record data for tick:loop2. Same experiment with this
+patch series:
+
+  # ./perf buildid-cache --add /tmp/tick
+  # ./perf probe sdt_tick:loop2
+  # ./perf stat -e sdt_tick:loop2 /tmp/tick
+    hi: 0
+    hi: 1
+    hi: 2
+    ^C  
+     Performance counter stats for '/tmp/tick':
+                 3      sdt_tick:loop2
+       2.561851452 seconds time elapsed
+
+
+v6 changes:
+ - Do not export struct uprobe outside of uprobe.c. Instead, use
+   container_of(arch_uprobe) to regain uprobe in uprobe_write_opcode().
+ - Allow 0 as a special value for reference counter _offset_. I.e.
+   two uprobes, one having ref_ctr_offset=0 and the other having
+   non-zero ref_ctr_offset can coexists.
+ - If vma holding reference counter is not present while patching an
+   instruction, we add that uprobe in delayed_uprobe_list. When
+   appropriate mapping is created, we increment the reference counter
+   and remove uprobe from delayed_uprobe_list. While doing all this,
+   v5 was searching for all such uprobes in uprobe_tree which is not 
+   require. Also, uprobes are stored in rbtree with inode+offset as
+   the key and v5 was searching uprobe based on inode+ref_ctr_offset
+   which is wrong too. Fix this by directly looing on delayed_uprobe_list.
+ - Consider VM_SHARED vma as invalid for reference counter. Return
+   false from valid_ref_ctr_vma() if vma->vm_flags has VM_SHARED set.
+ - No need to use FOLL_FORCE in get_user_pages_remote() while getting
+   a page to update reference counter. Remove it.
+ - Do not mention usage of reference counter in Documentation/.
+
+
+v5 can be found at: https://lkml.org/lkml/2018/6/28/51
+
+Ravi Bangoria (6):
+  Uprobes: Simplify uprobe_register() body
+  Uprobe: Additional argument arch_uprobe to uprobe_write_opcode()
+  Uprobes: Support SDT markers having reference count (semaphore)
+  trace_uprobe/sdt: Prevent multiple reference counter for same uprobe
+  Uprobes/sdt: Prevent multiple reference counter for same uprobe
+  perf probe: Support SDT markers having reference counter (semaphore)
+
+ arch/arm/probes/uprobes/core.c |   2 +-
+ arch/mips/kernel/uprobes.c     |   2 +-
+ include/linux/uprobes.h        |   7 +-
+ kernel/events/uprobes.c        | 358 ++++++++++++++++++++++++++++++++++++-----
+ kernel/trace/trace.c           |   2 +-
+ kernel/trace/trace_uprobe.c    |  78 ++++++++-
+ tools/perf/util/probe-event.c  |  39 ++++-
+ tools/perf/util/probe-event.h  |   1 +
+ tools/perf/util/probe-file.c   |  34 +++-
+ tools/perf/util/probe-file.h   |   1 +
+ tools/perf/util/symbol-elf.c   |  46 ++++--
+ tools/perf/util/symbol.h       |   7 +
+ 12 files changed, 503 insertions(+), 74 deletions(-)
+
+-- 
+2.14.4
