@@ -1,81 +1,84 @@
-From: megous@megous.com (=?utf-8?Q?Ond=C5=99ej?= Jirman)
-Date: Mon, 16 Jul 2018 19:14:28 +0200
-Subject: [PATCH v3 0/7] mmc: sunxi: Add runtime PM support
-In-Reply-To: <cover.e9b9c0ab5bc9ffcc52a15e1c2f41462729da5b61.1523888566.git-series.maxime.ripard@bootlin.com>
-References: <cover.e9b9c0ab5bc9ffcc52a15e1c2f41462729da5b61.1523888566.git-series.maxime.ripard@bootlin.com>
-Message-ID: <20180716171428.ud3zsmeccds545si@core>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Mon, 16 Jul 2018 18:23:57 +0100
+Subject: [PATCH] kvm: arm/arm64: Fix emulated physical timer IRQ injection
+Message-ID: <20180716172357.6121-1-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Maxime,
+When KVM emulates a physical timer, we keep track of the interrupt
+condition and try to inject an IRQ to the guest when needed.
+This works if the timer expires when either the guest is running or KVM
+does work on behalf of it, since it calls kvm_timer_update_state().
+However when the guest's VCPU is not scheduled (for instance because
+the guest issued a WFI instruction before), we miss injecting the interrupt
+when the VCPU's state gets restored back in kvm_timer_vcpu_load().
 
-On Mon, Apr 16, 2018 at 04:22:58PM +0200, Maxime Ripard wrote:
-> Hi,
-> 
-> Since it's introduction, our MMC controller has had its external clocks
-> running all the time.
-> 
-> While that was working great, the power usage and most importantly the EMI
-> that it generated was pretty bad.
-> 
-> Let's implement some runtime_pm hooks with an autosuspend to shut down the
-> whole block when the MMC is not active.
-> 
-> However, some SDIO devices will not probe properly if we keep shutting down
-> the controller, so the autosuspend is disabled for the SDIO devices.
+Fix this by moving the interrupt injection check into the
+phys_timer_emulate() function, so that all possible paths of execution
+are covered.
 
-I've tested your patches on TBS A711 tablet (A83T). I get this in the log:
+This fixes the physical timer emulation, which broke when it got changed
+in the 4.15 merge window.
+The respective kvm-unit-test check has been posted already.
 
-  sunxi-mmc 1c10000.mmc: fatal err update clk timeout
+Cc: Stable <stable@vger.kernel.org> # 4.15+
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+---
+ virt/kvm/arm/arch_timer.c | 21 +++++++++++++--------
+ 1 file changed, 13 insertions(+), 8 deletions(-)
 
-Interestingly, this only happens after the first boot. If I hard power cycle the
-tablet (removing/reinserting the battery) the first boot after that, there's no
-timeout, and WiFi chip connected to the mmc controller works.
-
-Any other reboot (even power cycling via PMIC), it fails with the above error.
-Maybe there's some unforeseen interaction of runtime PM with mmc-powerseq used
-for the wifi chip power seuencing? Do you know what's the above error about?
-I don't know anything about mmc subsystem.
-
-Reverting "mmc: sunxi: Add runtime_pm support" (+ various cleanup patches
-afterwards) helps.
-
-thank you and regards,
-  o.
-
-> Let me know what you think,
-> Maxime
-> 
-> Changes from v2:
->   - Dropped the patches already applied
->   - Do not power up or down the card during a runtime_resume or
->     runtime_suspend, but only take care of the controller
->   - In order to do the above, split the set_ios function into smaller
->     chunks that can be called from set_ios and our runtime_resume hook
-> 
-> Changes from v1:
->   - Disable entirely the controller
->   - Made sure the driver would work with CONFIG_PM off
->   - Fixed an issue with the SDIO devices
->   - Rebased on top of 4.16
-> 
-> Maxime Ripard (7):
->   mmc: sunxi: Reorder the headers
->   mmc: sunxi: Change sunxi_mmc_init_host argument type
->   mmc: sunxi: Move bus width configuration to a function
->   mmc: sunxi: Move clock configuration to a function
->   mmc: sunxi: Move the card power configuration to a function
->   mmc: sunxi: Add runtime_pm support
->   mmc: sunxi: Drop the init / reset of the controller from set_ios
-> 
->  drivers/mmc/host/sunxi-mmc.c | 185 +++++++++++++++++++++++-------------
->  1 file changed, 122 insertions(+), 63 deletions(-)
-> 
-> base-commit: 60cc43fc888428bb2f18f08997432d426a243338
-> -- 
-> git-series 0.9.1
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+index bd3d57f40f1b..1949fb0b80a4 100644
+--- a/virt/kvm/arm/arch_timer.c
++++ b/virt/kvm/arm/arch_timer.c
+@@ -294,17 +294,26 @@ static void phys_timer_emulate(struct kvm_vcpu *vcpu)
+ 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+ 	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
+ 
++	/* If the timer cannot fire at all, then we don't need a soft timer. */
++	if (!kvm_timer_irq_can_fire(ptimer)) {
++		soft_timer_cancel(&timer->phys_timer, NULL);
++		kvm_timer_update_irq(vcpu, false, ptimer);
++		return;
++	}
++
+ 	/*
+-	 * If the timer can fire now we have just raised the IRQ line and we
+-	 * don't need to have a soft timer scheduled for the future.  If the
+-	 * timer cannot fire at all, then we also don't need a soft timer.
++	 * If the timer can fire now, we don't need to have a soft timer
++	 * scheduled for the future, as we also raise the IRQ line.
+ 	 */
+-	if (kvm_timer_should_fire(ptimer) || !kvm_timer_irq_can_fire(ptimer)) {
++	if (kvm_timer_should_fire(ptimer)) {
+ 		soft_timer_cancel(&timer->phys_timer, NULL);
++		kvm_timer_update_irq(vcpu, true, ptimer);
++
+ 		return;
+ 	}
+ 
+ 	soft_timer_start(&timer->phys_timer, kvm_timer_compute_delta(ptimer));
++	kvm_timer_update_irq(vcpu, false, ptimer);
+ }
+ 
+ /*
+@@ -316,7 +325,6 @@ static void kvm_timer_update_state(struct kvm_vcpu *vcpu)
+ {
+ 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+ 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+-	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
+ 	bool level;
+ 
+ 	if (unlikely(!timer->enabled))
+@@ -332,9 +340,6 @@ static void kvm_timer_update_state(struct kvm_vcpu *vcpu)
+ 	level = kvm_timer_should_fire(vtimer);
+ 	kvm_timer_update_irq(vcpu, level, vtimer);
+ 
+-	if (kvm_timer_should_fire(ptimer) != ptimer->irq.level)
+-		kvm_timer_update_irq(vcpu, !ptimer->irq.level, ptimer);
+-
+ 	phys_timer_emulate(vcpu);
+ }
+ 
+-- 
+2.14.4
