@@ -1,59 +1,49 @@
 From: o.rempel@pengutronix.de (Oleksij Rempel)
-Date: Mon, 16 Jul 2018 13:42:07 +0200
-Subject: [PATCH v3 1/3] dt-bindings: arm: fsl: add mu binding doc
+Date: Mon, 16 Jul 2018 13:42:08 +0200
+Subject: [PATCH v3 2/3] ARM: dts: imx7s: add i.MX7 messaging unit support
 In-Reply-To: <20180716114209.25242-1-o.rempel@pengutronix.de>
 References: <20180716114209.25242-1-o.rempel@pengutronix.de>
-Message-ID: <20180716114209.25242-2-o.rempel@pengutronix.de>
+Message-ID: <20180716114209.25242-3-o.rempel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Messaging Unit module enables two processors within
-the SoC to communicate and coordinate by passing messages
-(e.g. data, status and control) through the MU interface.
+Define the Messaging Unit (MU) for i.MX7 in the processor's dtsi.
+The respective driver is added in the next commit.
 
 Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
 ---
- .../devicetree/bindings/mailbox/fsl,mu.txt    | 32 +++++++++++++++++++
- 1 file changed, 32 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mailbox/fsl,mu.txt
+ arch/arm/boot/dts/imx7s.dtsi | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/mailbox/fsl,mu.txt b/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
-new file mode 100644
-index 000000000000..5d48dd75b98d
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
-@@ -0,0 +1,32 @@
-+NXP i.MX Messaging Unit (MU)
-+--------------------------------------------------------------------
+diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
+index ce85b3ca1a55..5bc0d4109da1 100644
+--- a/arch/arm/boot/dts/imx7s.dtsi
++++ b/arch/arm/boot/dts/imx7s.dtsi
+@@ -1001,6 +1001,25 @@
+ 				status = "disabled";
+ 			};
+ 
++			mu0a: mailbox at 30aa0000 {
++				compatible = "fsl,imx7s-mu";
++				reg = <0x30aa0000 0x10000>;
++				interrupts = <GIC_SPI 88 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX7D_MU_ROOT_CLK>;
++				#mbox-cells = <1>;
++				fsl,mu-side-a;
++				status = "disabled";
++			};
 +
-+Required properties:
-+-------------------
-+- compatible :	should be "fsl,<chip>-mu", the supported chips include:
-+		imx6sx	- i.MX 6SoloX
-+		imx7d	- i.MX 7Dual
-+		imx7s	- i.MX 7Solo
-+		imx7ulp	- i.MX 7ULP
-+		imx8qm	- i.MX 8QM
-+		imx8qxp	- i.MX 8QXP
-+- reg :		Should contain the registers location and length
-+- interrupts :	Interrupt number. The interrupt specifier format depends
-+		on the interrupt controller parent.
-+- #mbox-cells:  Must be:
-+		0 - for single channel mode. i.MX8* SCU protocol specific.
-+		1 - for multichannel (generic) mode.
++			mu0b: mailbox at 30ab0000 {
++				compatible = "fsl,imx7s-mu";
++				reg = <0x30ab0000 0x10000>;
++				interrupts = <GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX7D_MU_ROOT_CLK>;
++				#mbox-cells = <1>;
++				status = "disabled";
++			};
 +
-+Optional properties:
-+-------------------
-+- clocks :	phandle to the input clock.
-+- fsl,mu-side-a : Should be set for side A MU.
-+
-+Examples:
-+--------
-+lsio_mu0: mailbox at 5d1b0000 {
-+	compatible = "fsl,imx8qxp-mu";
-+	reg = <0x0 0x5d1b0000 0x0 0x10000>;
-+	interrupts = <GIC_SPI 176 IRQ_TYPE_LEVEL_HIGH>;
-+	#mbox-cells = <0>;
-+};
+ 			usbotg1: usb at 30b10000 {
+ 				compatible = "fsl,imx7d-usb", "fsl,imx27-usb";
+ 				reg = <0x30b10000 0x200>;
 -- 
 2.18.0
