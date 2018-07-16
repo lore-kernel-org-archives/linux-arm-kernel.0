@@ -1,81 +1,118 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 16 Jul 2018 11:44:02 -0600
-Subject: [PATCH v4 10/14] dt-bindings/interrupt-controller: update
- Marvell ICU bindings
-In-Reply-To: <20180716183935.36f48f76@xps13>
-References: <20180705124011.7661-1-miquel.raynal@bootlin.com>
- <20180705124011.7661-11-miquel.raynal@bootlin.com>
- <20180716152734.GA4581@rob-hp-laptop>
- <20180716183935.36f48f76@xps13>
-Message-ID: <20180716174402.GA28988@rob-hp-laptop>
+From: nm@ti.com (Nishanth Menon)
+Date: Mon, 16 Jul 2018 12:13:28 -0500
+Subject: [PATCH V2 2/2] firmware: ti_sci: Provide host-id as an optional dt
+ parameter
+In-Reply-To: <20180716171328.11674-1-nm@ti.com>
+References: <20180716171328.11674-1-nm@ti.com>
+Message-ID: <20180716171328.11674-3-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 16, 2018 at 06:39:35PM +0200, Miquel Raynal wrote:
-> Hi Rob,
-> 
-> Rob Herring <robh@kernel.org> wrote on Mon, 16 Jul 2018 09:27:34 -0600:
-> 
-> > On Thu, Jul 05, 2018 at 02:40:07PM +0200, Miquel Raynal wrote:
-> > > Change the documentation to reflect the new bindings used for Marvell
-> > > ICU. This involves describing each interrupt group as a subnode of the
-> > > ICU node. Each of them having their own compatible.
-> > > 
-> > > The DT binding documentation still documents the legacy binding, where
-> > > there was a single node with no subnode.
-> > > 
-> > > Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
-> > > ---
-> > >  .../bindings/interrupt-controller/marvell,icu.txt  | 83 ++++++++++++++++++----
-> > >  1 file changed, 71 insertions(+), 12 deletions(-)
-> > > 
-> > > diff --git a/Documentation/devicetree/bindings/interrupt-controller/marvell,icu.txt b/Documentation/devicetree/bindings/interrupt-controller/marvell,icu.txt
-> > > index 649b7ec9d9b1..83b4fbf8af65 100644
-> > > --- a/Documentation/devicetree/bindings/interrupt-controller/marvell,icu.txt
-> > > +++ b/Documentation/devicetree/bindings/interrupt-controller/marvell,icu.txt
-> > > @@ -5,6 +5,8 @@ The Marvell ICU (Interrupt Consolidation Unit) controller is
-> > >  responsible for collecting all wired-interrupt sources in the CP and
-> > >  communicating them to the GIC in the AP, the unit translates interrupt
-> > >  requests on input wires to MSG memory mapped transactions to the GIC.
-> > > +These messages will access a different GIC memory area depending on
-> > > +their type (NSR, SR, SEI, REI, etc).
-> > >  
-> > >  Required properties:
-> > >  
-> > > @@ -12,20 +14,19 @@ Required properties:
-> > >  
-> > >  - reg: Should contain ICU registers location and length.
-> > >  
-> > > +Subnodes: Each group of interrupt is declared as a subnode of the ICU,
-> > > +with their own compatible.
-> > > +
-> > > +Required properties for the icu_nsr/icu_sei subnodes:
-> > > +
-> > > +- compatible: Should be "marvell,cp110-icu-nsr" or "marvell,cp110-icu-sei".
-> > > +  
-> > 
-> > I raised this before and still don't understand. You had 4 types before 
-> > and now you only have 2 types? How do you handle SR and REI with the new 
-> > binding?
-> 
-> Indeed there are 4 types: NSR, SR, SEI, REI.
-> 
-> Until now only NSR were supported.
+Texas Instrument's System Control Interface (TISCI) permits the
+ability for Operating Systems to running in virtual machines to be
+able to independently communicate with the firmware without the need
+going through an hypervisor.
 
-All 4 were supported by the binding and now only 2 though.
+The "host-id" in effect is the hardware representation of the
+host (example: VMs locked to a core) as identified to the System
+Controller.
 
-> I'm adding SEI support.
-> 
-> In the future, people might want to add support for SR/REI as well but
-> they have never been supported in mainline. When support for these
-> interrupts will have been contributed, I suppose it will easy to add
-> two other compatibles with the same formatting "marvell,cp110-icu-xxx"?
+Provide support as an optional parameter implementation and use the
+compatible data as default if one is not provided by device tree.
 
-Perhaps, but I have know way to tell.
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+Changes since V1:
+* None
 
-> I hope the changes in the driver will make such contribution almost
-> trivial.
+V1: https://patchwork.kernel.org/patch/10475309/
+RFC: https://patchwork.kernel.org/patch/10447715/
 
-You can add bindings without adding driver.
+ drivers/firmware/ti_sci.c | 24 ++++++++++++++++++++----
+ 1 file changed, 20 insertions(+), 4 deletions(-)
 
-Rob
+diff --git a/drivers/firmware/ti_sci.c b/drivers/firmware/ti_sci.c
+index 7fa744793bc5..69ed1464175c 100644
+--- a/drivers/firmware/ti_sci.c
++++ b/drivers/firmware/ti_sci.c
+@@ -66,14 +66,14 @@ struct ti_sci_xfers_info {
+ 
+ /**
+  * struct ti_sci_desc - Description of SoC integration
+- * @host_id:		Host identifier representing the compute entity
++ * @default_host_id:	Host identifier representing the compute entity
+  * @max_rx_timeout_ms:	Timeout for communication with SoC (in Milliseconds)
+  * @max_msgs: Maximum number of messages that can be pending
+  *		  simultaneously in the system
+  * @max_msg_size: Maximum size of data per message that can be handled.
+  */
+ struct ti_sci_desc {
+-	u8 host_id;
++	u8 default_host_id;
+ 	int max_rx_timeout_ms;
+ 	int max_msgs;
+ 	int max_msg_size;
+@@ -94,6 +94,7 @@ struct ti_sci_desc {
+  * @chan_rx:	Receive mailbox channel
+  * @minfo:	Message info
+  * @node:	list head
++ * @host_id:	Host ID
+  * @users:	Number of users of this instance
+  */
+ struct ti_sci_info {
+@@ -110,6 +111,7 @@ struct ti_sci_info {
+ 	struct mbox_chan *chan_rx;
+ 	struct ti_sci_xfers_info minfo;
+ 	struct list_head node;
++	u8 host_id;
+ 	/* protected by ti_sci_list_mutex */
+ 	int users;
+ 
+@@ -370,7 +372,7 @@ static struct ti_sci_xfer *ti_sci_get_one_xfer(struct ti_sci_info *info,
+ 
+ 	hdr->seq = xfer_id;
+ 	hdr->type = msg_type;
+-	hdr->host = info->desc->host_id;
++	hdr->host = info->host_id;
+ 	hdr->flags = msg_flags;
+ 
+ 	return xfer;
+@@ -1793,7 +1795,7 @@ static int tisci_reboot_handler(struct notifier_block *nb, unsigned long mode,
+ 
+ /* Description for K2G */
+ static const struct ti_sci_desc ti_sci_pmmc_k2g_desc = {
+-	.host_id = 2,
++	.default_host_id = 2,
+ 	/* Conservative duration */
+ 	.max_rx_timeout_ms = 1000,
+ 	/* Limited by MBOX_TX_QUEUE_LEN. K2G can handle upto 128 messages! */
+@@ -1819,6 +1821,7 @@ static int ti_sci_probe(struct platform_device *pdev)
+ 	int ret = -EINVAL;
+ 	int i;
+ 	int reboot = 0;
++	u32 h_id;
+ 
+ 	of_id = of_match_device(ti_sci_of_match, dev);
+ 	if (!of_id) {
+@@ -1833,6 +1836,19 @@ static int ti_sci_probe(struct platform_device *pdev)
+ 
+ 	info->dev = dev;
+ 	info->desc = desc;
++	ret = of_property_read_u32(dev->of_node, "ti,host-id", &h_id);
++	/* if the property is not present in DT, use a default from desc */
++	if (ret < 0) {
++		info->host_id = info->desc->default_host_id;
++	} else {
++		if (!h_id) {
++			dev_warn(dev, "Host ID 0 is reserved for firmware\n");
++			info->host_id = info->desc->default_host_id;
++		} else {
++			info->host_id = h_id;
++		}
++	}
++
+ 	reboot = of_property_read_bool(dev->of_node,
+ 				       "ti,system-reboot-controller");
+ 	INIT_LIST_HEAD(&info->node);
+-- 
+2.15.1
