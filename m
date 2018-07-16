@@ -1,33 +1,71 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 16 Jul 2018 10:25:20 +0200
-Subject: [PATCH 1/3 v4] ARM: dts: Modernize the Vexpress PL111 integration
-In-Reply-To: <b76645a6-5145-14b5-4290-95ef1dfff4de@arm.com>
-References: <20180709075232.30678-1-linus.walleij@linaro.org>
- <b00c3b85-1368-f62b-efda-d23ce27e6f9c@arm.com>
- <0bcade58-26d5-8c2f-bcba-765aebd343bb@arm.com>
- <b76645a6-5145-14b5-4290-95ef1dfff4de@arm.com>
-Message-ID: <CACRpkdZEV5kDBzL1baq_MO+EMjj43bA-T_pK0PrJ=vPxdmNDLQ@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 16 Jul 2018 09:28:00 +0100
+Subject: [PATCH v3 7/9] KVM: arm/arm64: vgic: Permit uaccess writes to
+ return errors
+In-Reply-To: <1531587940-2490-8-git-send-email-christoffer.dall@arm.com>
+References: <1531587940-2490-1-git-send-email-christoffer.dall@arm.com>
+ <1531587940-2490-8-git-send-email-christoffer.dall@arm.com>
+Message-ID: <08e71965-e39e-430f-3db5-765283ba3a0f@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 13, 2018 at 1:44 PM Robin Murphy <robin.murphy@arm.com> wrote:
-> On 13/07/18 10:50, Sudeep Holla wrote:
-> >> It doesn't work. This change is breaking the working CLCD on the models.
-> >> I just tested and CLCD driver returns
-> >>
-> >
-> > It even fails to initialize CLCD on my TC2.
-> >
-> > clcd-pl11x 1c1f0000.clcd: PL111 designer 41 rev1 at 0x1c1f0000
-> > clcd-pl11x: probe of 1c1f0000.clcd failed with error -2
->
-> FWIW the same happens on PB-A8; looks like converting to OF graph
-> bindings falls foul of the "panel-dpi" check in clcdfb_of_get_mode().
+On 14/07/18 18:05, Christoffer Dall wrote:
+> Currently we do not allow any vgic mmio write operations to fail, which
+> makes sense from mmio traps from the guest.  However, we should be able
+> to report failures to userspace, if userspace writes incompatible values
+> to read-only registers.  Rework the internal interface to allow errors
+> to be returned on the write side for userspace writes.
+> 
+> Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
+> ---
+>  virt/kvm/arm/vgic/vgic-mmio-v2.c | 26 +++++++++++++++++++++-----
+>  virt/kvm/arm/vgic/vgic-mmio-v3.c | 31 ++++++++++++++++++++++++-------
+>  virt/kvm/arm/vgic/vgic-mmio.c    | 18 +++++++++++++-----
+>  virt/kvm/arm/vgic/vgic-mmio.h    | 19 +++++++++++--------
+>  4 files changed, 69 insertions(+), 25 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> index 34e36fc..b79de42 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> @@ -77,11 +77,26 @@ static void vgic_mmio_write_v2_misc(struct kvm_vcpu *vcpu,
+>  	}
+>  }
+>  
+> -static void vgic_mmio_uaccess_write_v2_group(struct kvm_vcpu *vcpu,
+> -					     gpa_t addr, unsigned int len,
+> -					     unsigned long val)
+> +static int vgic_mmio_uaccess_write_v2_misc(struct kvm_vcpu *vcpu,
+> +					   gpa_t addr, unsigned int len,
+> +					   unsigned long val)
+> +{
+> +	switch (addr & 0x0c) {
+> +	case GIC_DIST_IIDR:
+> +		if (val != vgic_mmio_read_v2_misc(vcpu, addr, len))
+> +			return -EINVAL;
+> +	}
+> +
+> +	vgic_mmio_write_v2_misc(vcpu, addr, len, val);
+> +	return 0;
+> +}
+> +
+> +static int vgic_mmio_uaccess_write_v2_group(struct kvm_vcpu *vcpu,
+> +					    gpa_t addr, unsigned int len,
+> +					    unsigned long val)
+>  {
+>  	/* Ignore writes from userspace */
+> +	return 0;
+>  }
 
-That is from the old FB drivers, the defconfig changes in patch 2,3
-need to be applied in lockstep with this patch. Then it "should work"
-(alas I only tested PB-A8 on QEMU, which I modified to hopefully
-properly model the DVI bridge).
+I think it'd make more sense if this patch came before the previous one
+(change the prototype of the userspace accessor, and only then add a new
+accessor that can return an error). It would avoid churn in the above
+function, and you could move vgic_mmio_uaccess_write_v2_misc into patch 6.
 
-Yours,
-Linus Walleij
+Not a big deal though, as the code is otherwise perfectly fine.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
