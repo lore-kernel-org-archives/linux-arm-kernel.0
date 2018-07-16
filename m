@@ -1,110 +1,90 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Mon, 16 Jul 2018 12:08:53 +0100
-Subject: [PATCH v6 4/8] KVM: arm64: Support dirty page tracking for PUD
- hugepages
-In-Reply-To: <20180716110857.19310-1-punit.agrawal@arm.com>
-References: <20180716110857.19310-1-punit.agrawal@arm.com>
-Message-ID: <20180716110857.19310-5-punit.agrawal@arm.com>
+From: andreyknvl@google.com (Andrey Konovalov)
+Date: Mon, 16 Jul 2018 13:25:59 +0200
+Subject: [PATCH v4 0/7] arm64: untag user pointers passed to the kernel
+In-Reply-To: <CAAeHK+wJbbCZd+-X=9oeJgsqQJiq8h+Aagz3SQMPaAzCD+pvFw@mail.gmail.com>
+References: <cover.1529507994.git.andreyknvl@google.com>
+ <CAAeHK+zqtyGzd_CZ7qKZKU-uZjZ1Pkmod5h8zzbN0xCV26nSfg@mail.gmail.com>
+ <20180626172900.ufclp2pfrhwkxjco@armageddon.cambridge.arm.com>
+ <CAAeHK+yqWKTdTG+ymZ2-5XKiDANV+fmUjnQkRy-5tpgphuLJRA@mail.gmail.com>
+ <CAAeHK+wJbbCZd+-X=9oeJgsqQJiq8h+Aagz3SQMPaAzCD+pvFw@mail.gmail.com>
+Message-ID: <CAAeHK+yWF05XoU+0iuJoXAL3cWgdtxbeLoBz169yP12W4LkcQw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation for creating PUD hugepages at stage 2, add support for
-write protecting PUD hugepages when they are encountered. Write
-protecting guest tables is used to track dirty pages when migrating
-VMs.
+On Thu, Jun 28, 2018 at 9:30 PM, Andrey Konovalov <andreyknvl@google.com> wrote:
+> On Wed, Jun 27, 2018 at 5:05 PM, Andrey Konovalov <andreyknvl@google.com> wrote:
+>> On Tue, Jun 26, 2018 at 7:29 PM, Catalin Marinas
+>> <catalin.marinas@arm.com> wrote:
+>>> While I support this work, as a maintainer I'd like to understand
+>>> whether we'd be in a continuous chase of ABI breaks with every kernel
+>>> release or we have a better way to identify potential issues. Is there
+>>> any way to statically analyse conversions from __user ptr to long for
+>>> example? Or, could we get the compiler to do this for us?
+>>
+>>
+>> OK, got it, I'll try to figure out a way to find these conversions.
+>
+> I've prototyped a checker on top of clang static analyzer (initially
+> looked at sparse, but couldn't find any documentation or examples).
+> The results are here [1], search for "warning: user pointer cast".
+> Sharing in case anybody wants to take a look, will look at them myself
+> tomorrow.
+>
+> [1] https://gist.github.com/xairy/433edd5c86456a64026247cb2fef2115
 
-Also, provide trivial implementations of required kvm_s2pud_* helpers
-to allow sharing of code with arm32.
+So the checker reports ~100 different places where a __user pointer
+being casted. I've looked through them and found 3 places where we
+need to add untagging. Source code lines below come from 4.18-rc2+
+(6f0d349d).
 
-Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Russell King <linux@armlinux.org.uk>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm/include/asm/kvm_mmu.h   | 16 ++++++++++++++++
- arch/arm64/include/asm/kvm_mmu.h | 10 ++++++++++
- virt/kvm/arm/mmu.c               | 11 +++++++----
- 3 files changed, 33 insertions(+), 4 deletions(-)
+Place 1:
 
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index d095c2d0b284..c3ac7a76fb69 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -80,6 +80,22 @@ void kvm_clear_hyp_idmap(void);
- 
- #define kvm_pmd_mkhuge(pmd)	pmd_mkhuge(pmd)
- 
-+/*
-+ * The following kvm_*pud*() functions are provided strictly to allow
-+ * sharing code with arm64. They should never be called in practice.
-+ */
-+static inline void kvm_set_s2pud_readonly(pud_t *pud)
-+{
-+	BUG();
-+}
-+
-+static inline bool kvm_s2pud_readonly(pud_t *pud)
-+{
-+	BUG();
-+	return false;
-+}
-+
-+
- static inline void kvm_set_pmd(pmd_t *pmd, pmd_t new_pmd)
- {
- 	*pmd = new_pmd;
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index 689def9bb9d5..84051930ddfe 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -239,6 +239,16 @@ static inline bool kvm_s2pmd_exec(pmd_t *pmdp)
- 	return !(READ_ONCE(pmd_val(*pmdp)) & PMD_S2_XN);
- }
- 
-+static inline void kvm_set_s2pud_readonly(pud_t *pudp)
-+{
-+	kvm_set_s2pte_readonly((pte_t *)pudp);
-+}
-+
-+static inline bool kvm_s2pud_readonly(pud_t *pudp)
-+{
-+	return kvm_s2pte_readonly((pte_t *)pudp);
-+}
-+
- static inline bool kvm_page_empty(void *ptr)
- {
- 	struct page *ptr_page = virt_to_page(ptr);
-diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-index e131b7f9b7d7..ed8f8271c389 100644
---- a/virt/kvm/arm/mmu.c
-+++ b/virt/kvm/arm/mmu.c
-@@ -1288,9 +1288,12 @@ static void  stage2_wp_puds(pgd_t *pgd, phys_addr_t addr, phys_addr_t end)
- 	do {
- 		next = stage2_pud_addr_end(addr, end);
- 		if (!stage2_pud_none(*pud)) {
--			/* TODO:PUD not supported, revisit later if supported */
--			BUG_ON(stage2_pud_huge(*pud));
--			stage2_wp_pmds(pud, addr, next);
-+			if (stage2_pud_huge(*pud)) {
-+				if (!kvm_s2pud_readonly(pud))
-+					kvm_set_s2pud_readonly(pud);
-+			} else {
-+				stage2_wp_pmds(pud, addr, next);
-+			}
- 		}
- 	} while (pud++, addr = next, addr != end);
- }
-@@ -1333,7 +1336,7 @@ static void stage2_wp_range(struct kvm *kvm, phys_addr_t addr, phys_addr_t end)
-  *
-  * Called to start logging dirty pages after memory region
-  * KVM_MEM_LOG_DIRTY_PAGES operation is called. After this function returns
-- * all present PMD and PTEs are write protected in the memory region.
-+ * all present PUD, PMD and PTEs are write protected in the memory region.
-  * Afterwards read of dirty page log can be called.
-  *
-  * Acquires kvm_mmu_lock. Called with kvm->slots_lock mutex acquired,
--- 
-2.17.1
+arch/arm64/mm/fault.c:302:34: warning: user pointer cast
+current->thread.fault_address = (unsigned long)info->si_addr;
+
+Compare a pointer with TASK_SIZE (1 << 48) to check whether it lies in
+the kernel or in user space. Need to untag the address before
+performing a comparison.
+
+Place 2:
+
+fs/namespace.c:2736:21: warning: user pointer cast
+size = TASK_SIZE - (unsigned long)data;
+
+A similar check performed by subtracting a pointer from TASK_SIZE.
+Need to untag before subtracting.
+
+Place 3:
+
+drivers/usb/core/devio.c:1407:29: warning: user pointer cast
+unsigned long uurb_start = (unsigned long)uurb->buffer;
+drivers/usb/core/devio.c:1636:31: warning: user pointer cast
+unsigned long uurb_start = (unsigned long)uurb->buffer;
+drivers/usb/core/devio.c:1715:30: warning: user pointer cast
+unsigned long uurb_start = (unsigned long)uurb->buffer;
+
+The device keeps list of mmapped areas and searches them for provided
+__user pointer. Need to untag before searching.
+
+There are also a few cases of memory syscalls operating on __user
+pointers instead of unsigned longs like mmap:
+
+ipc/shm.c:1355:23: warning: user pointer cast
+unsigned long addr = (unsigned long)shmaddr;
+ipc/shm.c:1566:23: warning: user pointer cast
+unsigned long addr = (unsigned long)shmaddr;
+mm/migrate.c:1586:10: warning: user pointer cast
+addr = (unsigned long)p;
+mm/migrate.c:1660:24: warning: user pointer cast
+unsigned long addr = (unsigned long)(*pages);
+
+If we don't add untagging to mmap, we probably don't need it here.
+
+The rest of reported places look fine as is. Full annotated results of
+running the checker are here [2].
+
+I'll add the 3 patches with fixes to v5 of this patchset.
+
+Catalin, WDYT?
+
+[2] https://gist.github.com/xairy/aabda57741919df67d79895356ba9b58
