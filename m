@@ -1,74 +1,171 @@
-From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Mon, 16 Jul 2018 18:39:35 +0200
-Subject: [PATCH v4 10/14] dt-bindings/interrupt-controller: update
- Marvell ICU bindings
-In-Reply-To: <20180716152734.GA4581@rob-hp-laptop>
-References: <20180705124011.7661-1-miquel.raynal@bootlin.com>
- <20180705124011.7661-11-miquel.raynal@bootlin.com>
- <20180716152734.GA4581@rob-hp-laptop>
-Message-ID: <20180716183935.36f48f76@xps13>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 16 Jul 2018 17:52:52 +0100
+Subject: [PATCH] arm64: cpuinfo: Include cleartext implementer and part
+ strings
+In-Reply-To: <CAOesGMjq=d3ZPLTq5qudx+EE+XC2-zSsA1ViheTwM7fnTtJh2Q@mail.gmail.com>
+References: <20180715035342.11371-1-olof@lixom.net>
+ <f619f0e9-b8b4-29fb-5ad6-7f5ebc3a4da8@arm.com>
+ <CAOesGMjq=d3ZPLTq5qudx+EE+XC2-zSsA1ViheTwM7fnTtJh2Q@mail.gmail.com>
+Message-ID: <20180716165251.6ka5wvvmebxphpme@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Hi Olof,
 
-Rob Herring <robh@kernel.org> wrote on Mon, 16 Jul 2018 09:27:34 -0600:
+On Mon, Jul 16, 2018 at 07:34:05AM -0700, Olof Johansson wrote:
+> On Mon, Jul 16, 2018 at 2:17 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> > On 15/07/18 04:53, Olof Johansson wrote:
+> >> There's some use in printing out what the implementer and part numbers
+> >> decode to for cases where they're known.
+> >>
+> >> I filled in the table based on public information; mostly from ARM TRMs
+> >> and other tools (and some of the SSBD tables in the kernel, etc).
+> >>
+> >> Apple IDs came from
+> >> https://github.com/apple/darwin-xnu/blob/master/osfmk/arm/cpuid.h
 
-> On Thu, Jul 05, 2018 at 02:40:07PM +0200, Miquel Raynal wrote:
-> > Change the documentation to reflect the new bindings used for Marvell
-> > ICU. This involves describing each interrupt group as a subnode of the
-> > ICU node. Each of them having their own compatible.
-> > 
-> > The DT binding documentation still documents the legacy binding, where
-> > there was a single node with no subnode.
-> > 
-> > Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
-> > ---
-> >  .../bindings/interrupt-controller/marvell,icu.txt  | 83 ++++++++++++++++++----
-> >  1 file changed, 71 insertions(+), 12 deletions(-)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/interrupt-controller/marvell,icu.txt b/Documentation/devicetree/bindings/interrupt-controller/marvell,icu.txt
-> > index 649b7ec9d9b1..83b4fbf8af65 100644
-> > --- a/Documentation/devicetree/bindings/interrupt-controller/marvell,icu.txt
-> > +++ b/Documentation/devicetree/bindings/interrupt-controller/marvell,icu.txt
-> > @@ -5,6 +5,8 @@ The Marvell ICU (Interrupt Consolidation Unit) controller is
-> >  responsible for collecting all wired-interrupt sources in the CP and
-> >  communicating them to the GIC in the AP, the unit translates interrupt
-> >  requests on input wires to MSG memory mapped transactions to the GIC.
-> > +These messages will access a different GIC memory area depending on
-> > +their type (NSR, SR, SEI, REI, etc).
-> >  
-> >  Required properties:
-> >  
-> > @@ -12,20 +14,19 @@ Required properties:
-> >  
-> >  - reg: Should contain ICU registers location and length.
-> >  
-> > +Subnodes: Each group of interrupt is declared as a subnode of the ICU,
-> > +with their own compatible.
-> > +
-> > +Required properties for the icu_nsr/icu_sei subnodes:
-> > +
-> > +- compatible: Should be "marvell,cp110-icu-nsr" or "marvell,cp110-icu-sei".
-> > +  
+I appreciate that the format of /proc/cpuinfo isn't as nice as one might
+like as a human reader.
+
+For better or worse, the vast majority of readers of /proc/cpuinfo are
+applications (be they scripts or binaries), and we must treat the format
+and contents of /proc/cpuinfo as ABI. We've been burned by /proc/cpuinfo
+format changes in the past, so we want to minimize the potential for ABI
+issues.
+
+This change is only useful to human readers of /proc/cpuinfo, mandates
+perpetual maintenance work, and comes with a very strong risk of subtle
+ABI breakage (both for this patch and future patches it implies will be
+necessary).
+
+So sorry, but I must NAK this patch, as with prior patches changing the
+format of /proc/cpuinfo.
+
+> > The same thing pops up every so often. And the answer is the same each time:
 > 
-> I raised this before and still don't understand. You had 4 types before 
-> and now you only have 2 types? How do you handle SR and REI with the new 
-> binding?
+> Ever thought about why it pops up?
 
-Indeed there are 4 types: NSR, SR, SEI, REI.
+In some cases because the person in question isn't sure what hardware
+they're on. In most cases because people are used to x86, and haven't
+considered what exactly they're trying to achieve.
 
-Until now only NSR were supported.
+We've repeatedly been asked for strings *by application developers*,
+despite the MIDR being sufficient and already available. Generally,
+developers are happy to use MIDRs once they realise this.
 
-I'm adding SEI support.
+Having the string leads people to try to parse it, even though it cannot
+be reliable.
 
-In the future, people might want to add support for SR/REI as well but
-they have never been supported in mainline. When support for these
-interrupts will have been contributed, I suppose it will easy to add
-two other compatibles with the same formatting "marvell,cp110-icu-xxx"?
+> > - it breaks an existing userspace ABI by changing the format of cpuinfo
+> 
+> Most tools likely rely on a per-line format, and in this case they're
+> likely interpreting the contents after the ':' as an integer. Adding
+> something to the line might or might not break them, agreed.
+> 
+> How about introducing a "CPU model" line similar to x86's cleartext one?
+> 
+> > - it is unmaintainable in the long run
+> 
+> False. Chances are you already need details more fine-grained than
+> this for errata and quirks, we already do for SSBD.
 
-I hope the changes in the driver will make such contribution almost
-trivial.
+For SSBD, we don't look at the MIDR, and rely solely on the FW to
+identify the presence of a workaround. Going forwards, we'll do likewise
+as this is the only way to be future-proof and generic.
+
+> And if it lacks an entry it's not the end of the world.
+
+I don't think we can be that relaxed about this; it's quite easy to see
+that people *will* write software that relies on the string (or
+properties thereof) in ways that we cannot manage.
+
+People will do silly things like try to read the string into a
+fixed-size buffer. That works when the string is "Unknown", but falls
+apart on the next kernel release when it's "awesome super CPU
+2000xx-super-mega-long-name-edition". We don't discover this problem for
+months, whereupon other applications are reliant upon the new string,
+and now we're stuck with a horrible ABI bug that we can't fix.
+
+> > - userspace already has this information by simply running "lscpu"
+> >
+> > What has changed?
+> 
+> What has changed is that ARM(64) is moving from a
+> custom-kernel-custom-userspace world to one where you might be
+> upreving kernels and userspace separately, and you might be using an
+> older userspace with a newer machine and a newer kernel.
+
+Sure, and this is exactly why we're trying to ensure that the behaviour
+is *guaranteed* to be consistent across kernels -- so whichever kernel
+is used, userspace should behave the same.
+
+If userspace *needs* to know about a CPU, it can identify the CPU based
+on the MIDR (and REVIDR), and this will work regardless of kernel
+version. GCC does this today.
+
+If userspace *wants* to know about a CPU (e.g. to expose a
+human-friendly name), then a userspace database is fine. In the majority
+of cases it's *vastly* easier to update a userspace application than it
+is to update the kernel, and it's always possible to build the latest
+binary yourself.
+
+There are a number of cases where using strings is going to be
+problematic in practice, e.g.
+
+* Every out-of-tree SoC port is going to invent values that may not
+  match the values mainline settles on. Then people will complain that
+  their software only works on one or the other, because it makes some
+  decision base on the model name.
+
+* Every distro is going to differ in the set of IDs they backport, if
+  any.  If your software relies on the MIDR, it will work everywhere. If
+  it tries to parse the string, it will behave erratically across
+  distros.
+
+* We may get the matching logic for wrong, and be overly permissive when
+  matching MIDR -> string. e.g. we ignore the low 4 bits for some range
+  of MIDRs, but the vendor only uses 0x0-0xc, and assigns 0xd-0xf a
+  different name.
+
+* Parts (and vendors) don't always have a fix name. What happens when a
+  vendor renames their product (or themselves)? Remember Cortex-A12?
+
+> There's also a growing expectation of the system to behave more like
+> x86, especially when it comes to trivial ways of detecting what kind
+> of machine you are running on. On x86 it's been trivial to look at
+> /proc/cpuinfo since it is provided by the platform there.
+
+It's trivial because *the CPU provides this*, via CPUID. See
+get_model_name() in arch/x86/kernel/cpu/common.c. That is how x86 can
+expose a model name in a future-proof manner, and without a maintenance
+nightmare.
+
+On arm, we have the MIDR_EL1 and REVIDR_EL1. We simply do not have the
+same information, and trying to guess at it is a losing game.
+
+> Nobody wants to change their implementation from having to read a file
+> to exec a program, dealing with errors, and parsing its output (sure,
+> easier from scripts, but more awkward from real source).
+
+Unfortunately, this ship has long sailed. The format of /proc/cpuinfo
+differs across architectures, and it is not something that can be relied
+upon by portable applications.
+
+> Having the information exported from the kernel is a reasonable way to
+> do it.
+
+While I can appreciate this may seem simple, it comes with far more
+problems than it solves.
+
+> The other extreme is that the kernel should just ever have exported
+> the raw MIDR value.
+
+We expose the raw MIDR and REVIDR values under sysfs. We expose the
+decomposed value (in the format defined by the architecture) because we
+have to for compatibility with existing software.
+
+To be honest, my personal preference would be to delete /proc/cpuinfo if
+we could.
 
 Thanks,
-Miqu?l
+Mark.
