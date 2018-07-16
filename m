@@ -1,45 +1,68 @@
-From: ulrich.hecht@gmail.com (Ulrich Hecht)
-Date: Mon, 16 Jul 2018 11:16:53 +0200
-Subject: [PATCH v3 2/2] arm64: dts: renesas: condor/v3hsk: add
- DU/LVDS/HDMI support
-In-Reply-To: <20180716075325.y7jtwyqxwerdmfy3@verge.net.au>
-References: <95d0db34-713d-8206-00c2-ee9a42aab823@cogentembedded.com>
- <c78f1228-afb0-54cf-5d9e-5c812b678de3@cogentembedded.com>
- <20180614072426.vq42mmb3gsmv6z5k@verge.net.au>
- <20180716075325.y7jtwyqxwerdmfy3@verge.net.au>
-Message-ID: <CAO3366wzXc+KY2uMVp5FGS9RyGyaFgktWS__kSTdu3AAWVxZKQ@mail.gmail.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Mon, 16 Jul 2018 11:16:56 +0200
+Subject: [dts] [v2] fix green/blue pio-led on bananapi-r2
+In-Reply-To: <trinity-28694d63-092a-48be-aade-ba680b5c4e70-1529921159405@3c-app-gmx-bs16>
+References: <trinity-ae29ad25-a4fb-47f3-8d68-f6e58c875a0e-1529682447976@3c-app-gmx-bs42>
+ <trinity-0d48bc23-f754-4da3-af01-c3a7abe1d34b-1529682783853@3c-app-gmx-bs42>
+ <1529918263.29697.31.camel@mtkswgap22>
+ <trinity-28694d63-092a-48be-aade-ba680b5c4e70-1529921159405@3c-app-gmx-bs16>
+Message-ID: <13bab02e-0dc7-0ad9-3dde-fa4eef9e4411@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 16, 2018 at 9:53 AM, Simon Horman <horms@verge.net.au> wrote:
-> On Thu, Jun 14, 2018 at 09:24:27AM +0200, Simon Horman wrote:
->> On Wed, Jun 13, 2018 at 11:12:40PM +0300, Sergei Shtylyov wrote:
->> > Define the Condor/V3HSK board dependent parts of the DU and  LVDS device
->> > nodes. Also add the device nodes for Thine THC63LVD1024 LVDS decoder and
->> > Analog Devices ADV7511W HDMI transmitter...
->> >
->> > Based on the original (and large) patch by Vladimir Barinov.
->> >
->> > Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
->> > Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->> >
->> > ---
->> > Changes in version 2:
->> > - added the V3HSK DT update, reworded the description, renamed the patch;
->> > - added a space between the HDMI node name and a brace.
->> >
->> >  arch/arm64/boot/dts/renesas/r8a77980-condor.dts |  106 +++++++++++++++++++++
->> >  arch/arm64/boot/dts/renesas/r8a77980-v3hsk.dts  |  120 ++++++++++++++++++++++++
->>
->> Laurent, could you review this?
->
-> Ping
 
-For the Condor part:
 
-Reviewed-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+On 25/06/18 12:05, Frank Wunderlich wrote:
+> 
+> From: Frank Wunderlich <frank-w@public-files.de>
+> Date: Mon, 25 Jun 2018 11:57:13 +0200
+> Subject: [PATCH] [dts] [v2] fix green/blue pio-led
+>  pio-leds (near GPIO-Header) are swapped and LOW-active 
+>  patch restore this expected behaviour
+>  red cannot be switched afaik
+> 
+> v2: alphabetic order
+> 
 
-Unfortunately, I do not have documentation for the other board.
+I fixed the commit message and pushed it to v4.18-next/dts32
 
-CU
-Uli
+> Signed-off-by: Frank Wunderlich <frank-w@public-files.de>
+> ---
+>  arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
+> index 531d905d924ff..2b760f90f38c8 100644
+> --- a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
+> +++ b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
+> @@ -91,19 +91,19 @@
+>  
+>  		blue {
+>  			label = "bpi-r2:pio:blue";
+> -			gpios = <&pio 241 GPIO_ACTIVE_HIGH>;
+> +			gpios = <&pio 240 GPIO_ACTIVE_LOW>;
+>  			default-state = "off";
+>  		};
+>  
+>  		green {
+>  			label = "bpi-r2:pio:green";
+> -			gpios = <&pio 240 GPIO_ACTIVE_HIGH>;
+> +			gpios = <&pio 241 GPIO_ACTIVE_LOW>;
+>  			default-state = "off";
+>  		};
+>  
+>  		red {
+>  			label = "bpi-r2:pio:red";
+> -			gpios = <&pio 239 GPIO_ACTIVE_HIGH>;
+> +			gpios = <&pio 239 GPIO_ACTIVE_LOW>;
+>  			default-state = "off";
+>  		};
+>  	};
+> 
+> ?
+> 
+> _______________________________________________
+> Linux-mediatek mailing list
+> Linux-mediatek at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-mediatek
+> 
