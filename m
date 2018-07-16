@@ -1,138 +1,55 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Mon, 16 Jul 2018 12:30:45 +0200
-Subject: [RESEND PATCH v2 1/2] dt-bindings: clk: meson-g12a: Add G12A EE
- Clock Bindings
-In-Reply-To: <1531728707-192230-2-git-send-email-jian.hu@amlogic.com>
-References: <1531728707-192230-1-git-send-email-jian.hu@amlogic.com>
- <1531728707-192230-2-git-send-email-jian.hu@amlogic.com>
-Message-ID: <1531737045.12853.47.camel@baylibre.com>
+From: christoffer.dall@arm.com (Christoffer Dall)
+Date: Mon, 16 Jul 2018 12:34:42 +0200
+Subject: [PATCH v3 9/9] KVM: arm/arm64: vgic: Update documentation of the
+ GICv2 device
+In-Reply-To: <a5324e35-53b4-b5b4-84a2-1e0a89b244e7@arm.com>
+References: <1531587940-2490-1-git-send-email-christoffer.dall@arm.com>
+ <1531587940-2490-10-git-send-email-christoffer.dall@arm.com>
+ <a5324e35-53b4-b5b4-84a2-1e0a89b244e7@arm.com>
+Message-ID: <20180716103442.GD30822@e113682-lin.lund.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2018-07-16 at 16:11 +0800, Jian Hu wrote:
-> Add new clock controller compatible and dt-bingdings headers
-> for the Everything-Else domain of the g12a SoC
-> 
-> 
-> Signed-off-by: Jian Hu <jian.hu@amlogic.com>
-> ---
+On Mon, Jul 16, 2018 at 09:52:04AM +0100, Marc Zyngier wrote:
+> On 14/07/18 18:05, Christoffer Dall wrote:
+> > Update the documentation to reflect the ordering requirements of
+> > restoring GICv2 distributor registers and remove outdated limitations in
+> > the documentation while we're at it.
+> >
+> > Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
+> > ---
+> >  Documentation/virtual/kvm/devices/arm-vgic.txt | 12 ++++++------
+> >  1 file changed, 6 insertions(+), 6 deletions(-)
+> >
+> > diff --git a/Documentation/virtual/kvm/devices/arm-vgic.txt b/Documentation/virtual/kvm/devices/arm-vgic.txt
+> > index b3ce126..c9a6393 100644
+> > --- a/Documentation/virtual/kvm/devices/arm-vgic.txt
+> > +++ b/Documentation/virtual/kvm/devices/arm-vgic.txt
+> > @@ -49,9 +49,12 @@ Groups:
+> >      index is specified with the vcpu_index field.  Note that most distributor
+> >      fields are not banked, but return the same value regardless of the
+> >      vcpu_index used to access the register.
+> > -  Limitations:
+> > -    - Priorities are not implemented, and registers are RAZ/WI
+> > -    - Currently only implemented for KVM_DEV_TYPE_ARM_VGIC_V2.
+> > +
+> > +    GICD_IIDR.Revision is updated when the KVM implementation of an emulated
+> > +    GICv2 is changed.  Userspace should read GICD_IIDR from KVM and write back
+> > +    the read value to confirm its expected behavior is aligned with the KVM
+> > +    implementation.  To properly restore the interrupt group configuration,
+> > +    GICD_IIDR should be written before any other registers.
+>
+> I'd like to make it crystal clear that writing to IIDR doesn't allow to
+> select a behaviour, and is merely a confirmation that host and guest do
+> agree on either revision 0 (no write) or revision n (n being read and
+> written back).
+>
 
-Extra new line above - please fix next time
-Below, comment on alignement on v1 remains un-answered.
-Some goes for patch 2.
+But that's not really true though, because userspace can read rev 0, and
+still have "no write", or read and write n for n >= 1 and have "write".
 
->  .../bindings/clock/amlogic,gxbb-clkc.txt           |  1 +
->  include/dt-bindings/clock/g12a-clkc.h              | 92 ++++++++++++++++++++++
->  2 files changed, 93 insertions(+)
->  create mode 100644 include/dt-bindings/clock/g12a-clkc.h
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/amlogic,gxbb-clkc.txt b/Documentation/devicetree/bindings/clock/amlogic,gxbb-clkc.txt
-> index e950599..0833006 100644
-> --- a/Documentation/devicetree/bindings/clock/amlogic,gxbb-clkc.txt
-> +++ b/Documentation/devicetree/bindings/clock/amlogic,gxbb-clkc.txt
-> @@ -9,6 +9,7 @@ Required Properties:
->  		"amlogic,gxbb-clkc" for GXBB SoC,
->  		"amlogic,gxl-clkc" for GXL and GXM SoC,
->  		"amlogic,axg-clkc" for AXG SoC.
-> +		"amlogic,g12a-clkc" for G12A SoC.
->  
->  - #clock-cells: should be 1.
->  
-> diff --git a/include/dt-bindings/clock/g12a-clkc.h b/include/dt-bindings/clock/g12a-clkc.h
-> new file mode 100644
-> index 0000000..9796720
-> --- /dev/null
-> +++ b/include/dt-bindings/clock/g12a-clkc.h
-> @@ -0,0 +1,92 @@
-> +/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
-> +/*
-> + * Meson-G12A clock tree IDs
-> + *
-> + * Copyright (c) 2018 Amlogic, Inc. All rights reserved.
-> + */
-> +
-> +#ifndef __G12A_CLKC_H
-> +#define __G12A_CLKC_H
-> +
-> +#define CLKID_SYS_PLL				0
-> +#define CLKID_FIXED_PLL				1
-> +#define CLKID_FCLK_DIV2				2
-> +#define CLKID_FCLK_DIV3				3
-> +#define CLKID_FCLK_DIV4				4
-> +#define CLKID_FCLK_DIV5				5
-> +#define CLKID_FCLK_DIV7				6
-> +#define CLKID_GP0_PLL				7
-> +#define CLKID_CLK81					10
-> +#define CLKID_MPLL0					11
-> +#define CLKID_MPLL1					12
-> +#define CLKID_MPLL2					13
-> +#define CLKID_MPLL3					14
-> +#define CLKID_DDR					15
-> +#define CLKID_DOS					16
-> +#define CLKID_AUDIO_LOCKER			17
-> +#define CLKID_MIPI_DSI_HOST			18
-> +#define CLKID_ETH_PHY				19
-> +#define CLKID_ISA					20
-> +#define CLKID_PL301					21
-> +#define CLKID_PERIPHS				22
-> +#define CLKID_SPICC0				23
-> +#define CLKID_I2C					24
-> +#define CLKID_SANA					25
-> +#define CLKID_SD					26
-> +#define CLKID_RNG0					27
-> +#define CLKID_UART0					28
-> +#define CLKID_SPICC1				29
-> +#define CLKID_HIU_IFACE				30
-> +#define CLKID_MIPI_DSI_PHY			31
-> +#define CLKID_ASSIST_MISC			32
-> +#define CLKID_SD_EMMC_A				33
-> +#define CLKID_SD_EMMC_B				34
-> +#define CLKID_SD_EMMC_C				35
-> +#define CLKID_AUDIO_CODEC			36
-> +#define CLKID_AUDIO					37
-> +#define CLKID_ETH					38
-> +#define CLKID_DEMUX					39
-> +#define CLKID_AUDIO_IFIFO			40
-> +#define CLKID_ADC					41
-> +#define CLKID_UART1					42
-> +#define CLKID_G2D					43
-> +#define CLKID_RESET					44
-> +#define CLKID_PCIE_COMB				45
-> +#define CLKID_PARSER				46
-> +#define CLKID_USB					47
-> +#define CLKID_PCIE_PHY				48
-> +#define CLKID_AHB_ARB0				49
-> +#define CLKID_AHB_DATA_BUS			50
-> +#define CLKID_AHB_CTRL_BUS			51
-> +#define CLKID_HTX_HDCP22			52
-> +#define CLKID_HTX_PCLK				53
-> +#define CLKID_BT656					54
-> +#define CLKID_USB1_DDR_BRIDGE		55
-> +#define CLKID_MMC_PCLK				56
-> +#define CLKID_UART2					57
-> +#define CLKID_VPU_INTR				58
-> +#define CLKID_GIC					59
-> +#define CLKID_SD_EMMC_B_CLK0		60
-> +#define CLKID_SD_EMMC_C_CLK0		61
-> +#define CLKID_HIFI_PLL				71
-> +#define CLKID_VCLK2_VENCI0			77
-> +#define CLKID_VCLK2_VENCI1			78
-> +#define CLKID_VCLK2_VENCP0			79
-> +#define CLKID_VCLK2_VENCP1			80
-> +#define CLKID_VCLK2_VENCT0			81
-> +#define CLKID_VCLK2_VENCT1			82
-> +#define CLKID_VCLK2_OTHER			83
-> +#define CLKID_VCLK2_ENCI			84
-> +#define CLKID_VCLK2_ENCP			85
-> +#define CLKID_DAC_CLK				86
-> +#define CLKID_AOCLK					87
-> +#define CLKID_IEC958				88
-> +#define CLKID_ENC480P				89
-> +#define CLKID_RNG1					90
-> +#define CLKID_VCLK2_ENCT			91
-> +#define CLKID_VCLK2_ENCL			92
-> +#define CLKID_VCLK2_VENCLMMC		93
-> +#define CLKID_VCLK2_VENCL			94
-> +#define CLKID_VCLK2_OTHER1			95
-> +
-> +#endif /* __G12A_CLKC_H */
+I guess I'm not completely sure which wording you'd like me to add?
+
+Thanks,
+-Christoffer
+IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
