@@ -1,52 +1,53 @@
-From: tbaicar@codeaurora.org (Tyler Baicar)
-Date: Mon, 16 Jul 2018 13:26:49 -0400
-Subject: [RFC PATCH] EDAC, ghes: Enable per-layer error reporting for ARM
-Message-ID: <1531762009-15112-1-git-send-email-tbaicar@codeaurora.org>
+From: ezequiel@collabora.com (Ezequiel Garcia)
+Date: Mon, 16 Jul 2018 14:29:40 -0300
+Subject: [PATCH v2] arm64: dts: rockchip: add USB 2.0 and 3.0 support on
+ Ficus board
+In-Reply-To: <2487041.HPaZN1uVBU@phil>
+References: <20180714170922.4433-1-ezequiel@collabora.com>
+ <2487041.HPaZN1uVBU@phil>
+Message-ID: <68cdc26d1e58797080ce9939c173148eb9f15a52.camel@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable per-layer error reporting for ARM systems so that the error
-counters are incremented per-DIMM.
+On Mon, 2018-07-16 at 19:02 +0200, Heiko Stuebner wrote:
+> Hi Enric, Ezequiel,
+> 
+> Am Samstag, 14. Juli 2018, 19:09:22 CEST schrieb Ezequiel Garcia:
+> > From: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+> > 
+> > The board exposes two types A ports, one is USB 3.0, up to 5.0Gbps and
+> > another one is USB 2.0 up to 480Mbps. Enable the USB PHYs and the USB
+> > controllers to enable theses devices.
+> > 
+> > Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+> > Signed-off-by: Ezequiel Garcia <ezequiel@collabora.com>
+> > ---
+> > Changes from v1:
+> >  * Provide voltage for vcc5v0_host and vcc3v3_pcie regulators
+> >  * Provide vin_supply for vcc5v0_host.
+> > 
+> >  arch/arm64/boot/dts/rockchip/rk3399-ficus.dts | 90 +++++++++++++++++++
+> >  1 file changed, 90 insertions(+)
+> > 
+> > diff --git a/arch/arm64/boot/dts/rockchip/rk3399-ficus.dts b/arch/arm64/boot/dts/rockchip/rk3399-ficus.dts
+> > index 0d14183dd4a9..6295483b701f 100644
+> > --- a/arch/arm64/boot/dts/rockchip/rk3399-ficus.dts
+> > +++ b/arch/arm64/boot/dts/rockchip/rk3399-ficus.dts
+> > @@ -58,9 +58,24 @@
+> >  		pinctrl-0 = <&pcie_drv>;
+> >  		regulator-boot-on;
+> >  		regulator-name = "vcc3v3_pcie";
+> > +		regulator-min-microvolt = <3300000>;
+> > +		regulator-max-microvolt = <3300000>;
+> >  		vin-supply = <&vcc3v3_sys>;
+> >  	};
+> 
+> I've split this out into a separate patch, as it isn't part of what
+> the commit message describes and thus should be separate
+> and applied both resulting patches for 4.19.
+> 
+> And also cleaned up a vendor-property that shouldn't be
+> part of mainline.
+> 
 
-On ARM systems that use firmware first error handling it is understood
-that card=channel and module=DIMM on that channel. Populate that
-information and enable per layer error reporting for ARM systems so that
-the EDAC error counters are incremented based on DIMM number as per the
-SMBIOS table rather than just incrementing the noinfo counters on the
-memory controller.
-
-Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
----
- drivers/edac/ghes_edac.c | 15 ++++++++++++---
- 1 file changed, 12 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/edac/ghes_edac.c b/drivers/edac/ghes_edac.c
-index 473aeec..e4c8b6e 100644
---- a/drivers/edac/ghes_edac.c
-+++ b/drivers/edac/ghes_edac.c
-@@ -213,9 +213,18 @@ void ghes_edac_report_mem_error(int sev, struct cper_sec_mem_err *mem_err)
- 	strcpy(e->label, "unknown label");
- 	e->msg = pvt->msg;
- 	e->other_detail = pvt->other_detail;
--	e->top_layer = -1;
--	e->mid_layer = -1;
--	e->low_layer = -1;
-+	if ((IS_ENABLED(CONFIG_ARM) || IS_ENABLED(CONFIG_ARM64))
-+	    && (mem_err->validation_bits & CPER_MEM_VALID_CARD)
-+	    && (mem_err->validation_bits & CPER_MEM_VALID_MODULE)) {
-+		e->top_layer = mem_err->card;
-+		e->mid_layer = mem_err->module;
-+		e->low_layer = -1;
-+		e->enable_per_layer_report = true;
-+	} else {
-+		e->top_layer = -1;
-+		e->mid_layer = -1;
-+		e->low_layer = -1;
-+	}
- 	*pvt->other_detail = '\0';
- 	*pvt->msg = '\0';
- 
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+Thanks a lot!
