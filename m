@@ -1,108 +1,108 @@
-From: ludovic.desroches@microchip.com (Ludovic Desroches)
-Date: Mon, 16 Jul 2018 11:40:34 +0200
-Subject: [PATCH v3 0/3] i2c: at91: slave mode support
-Message-ID: <20180716094037.1843-1-ludovic.desroches@microchip.com>
+From: christoffer.dall@arm.com (Christoffer Dall)
+Date: Mon, 16 Jul 2018 11:46:57 +0200
+Subject: [PATCH v3 8/9] KVM: arm/arm64: vgic: Let userspace opt-in to
+ writable v2 IGROUPR
+In-Reply-To: <16b6ec62-4548-3980-073c-2b593d7d4dcb@arm.com>
+References: <1531587940-2490-1-git-send-email-christoffer.dall@arm.com>
+ <1531587940-2490-9-git-send-email-christoffer.dall@arm.com>
+ <16b6ec62-4548-3980-073c-2b593d7d4dcb@arm.com>
+Message-ID: <20180716094656.GA30822@e113682-lin.lund.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Ludovic Desroches: see 'Changes in v3' section]
+On Mon, Jul 16, 2018 at 09:38:36AM +0100, Marc Zyngier wrote:
+> On 14/07/18 18:05, Christoffer Dall wrote:
+> > Simply letting IGROUPR be writable from userspace would break
+> > migration from old kernels to newer kernels, because old kernels
+> > incorrectly report interrupt groups as group 1.  This would not be a big
+> > problem if userspace wrote GICD_IIDR as read from the kernel, because we
+> > could detect the incompatibility and return an error to userspace.
+> > Unfortunately, this is not the case with current userspace
+> > implementations and simply letting IGROUPR be writable from userspace for
+> > an emulated GICv2 silently breaks migration and causes the destination
+> > VM to no longer run after migration.
+> >
+> > We now encourage userspace to write the read and expected value of
+> > GICD_IIDR as the first part of a GIC register restore, and if we observe
+> > a write to GICD_IIDR we know that userspace has been updated and has had
+> > a chance to cope with older kernels (VGICv2 IIDR.Revision == 0)
+> > incorrectly reporting interrupts as group 1, and therefore we now allow
+> > groups to be user writable.
+> >
+> > Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
+> > ---
+> >  include/kvm/arm_vgic.h           |  3 +++
+> >  virt/kvm/arm/vgic/vgic-mmio-v2.c | 15 ++++++++++++++-
+> >  2 files changed, 17 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+> > index c661d0e..c134790 100644
+> > --- a/include/kvm/arm_vgic.h
+> > +++ b/include/kvm/arm_vgic.h
+> > @@ -221,6 +221,9 @@ struct vgic_dist {
+> >     /* Implementation revision as reported in the GICD_IIDR */
+> >     u32                     implementation_rev;
+> >
+> > +   /* Userspace can write to GICv2 IGROUPR */
+> > +   bool                    v2_groups_user_writable;
+> > +
+> >     /* Do injected MSIs require an additional device ID? */
+> >     bool                    msis_require_devid;
+> >
+> > diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> > index b79de42..9b6b758 100644
+> > --- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> > +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> > @@ -85,6 +85,17 @@ static int vgic_mmio_uaccess_write_v2_misc(struct kvm_vcpu *vcpu,
+> >     case GIC_DIST_IIDR:
+> >             if (val != vgic_mmio_read_v2_misc(vcpu, addr, len))
+> >                     return -EINVAL;
+> > +
+> > +           /*
+> > +            * If we observe a write to GICD_IIDR we know that userspace
+> > +            * has been updated and has had a chance to cope with older
+> > +            * kernels (VGICv2 IIDR.Revision == 0) incorrectly reporting
+> > +            * interrupts as group 1, and therefore we now allow gruops to
+>
+> groups
+>
+> > +            * be user writable.  Doing this by default would break
+> > +            * migration from old kernels to new kernels with legacy
+> > +            * userspace.
+> > +            */
+> > +           vcpu->kvm->arch.vgic.v2_groups_user_writable = true;
+>
+>               return 0; ?
+>
+> I think it'd be safer, just in case we decide to do something bizarre in
+> vgic_mmio_write_v2_misc...
+>
 
-Based on the discussion we had on the i2c-linux list [1], I wrote a patch for
-AT91 hardware and tried to fulfill the Linux I2C slave interface description
-[2] as good as possible. This enables aforementioned hardware to act as an I2C
-slave that can be accessed by a remote I2C master.
+That one was on purpose, as I figured we handle setting values from
+userspace and the guest for the other regs in the other function, and it
+would be a bit strange that one the one register was special-cased, but
+I can see it from the other point of view as well, so I don't mind
+changing it.
 
-I have tested this patchset successfully on an ATSAMA5D27.
+> >     }
+> >
+> >     vgic_mmio_write_v2_misc(vcpu, addr, len, val);
+> > @@ -95,7 +106,9 @@ static int vgic_mmio_uaccess_write_v2_group(struct kvm_vcpu *vcpu,
+> >                                         gpa_t addr, unsigned int len,
+> >                                         unsigned long val)
+> >  {
+> > -   /* Ignore writes from userspace */
+> > +   if (vcpu->kvm->arch.vgic.v2_groups_user_writable)
+> > +           vgic_mmio_write_group(vcpu, addr, len, val);
+> > +
+> >     return 0;
+> >  }
+> >
+> >
+>
+> Otherwise looks good..
+>
 
-                                 ^  3.3V   ^  3.3V
-    +-----------------------+    |         |         +-----------------------+
-    | Slave: ATSAMA5D27     |   +-+       +-+        | Master: ATSAMA5D35    |
-    | with i2c-slave-eeprom |   | | 100k  | | 100k   | with i2cset           |
-    +-------------------+-+-+   +-+       +-+        +-+-+-------------------+
-                        | |      |         |           | |
-                        | +------+---------|---(SDA)---+ |
-                        +------------------+---(SCL)-----+
-
-    Schematic: Connection of slave and master with 100kOhm pullup resistors.
-
-On the master the following BASH script has been used to stress the slave.
-
-	root at emblinux:~# cat ./stress.sh
-	#!/bin/bash
-	I=0
-	while true
-	do
-		if i2cset -y -r 1 0x64 0 $I w | grep mismatch
-		then
-			echo "$(date): Error in transmission ${I}"
-		fi
-		((I++))
-		if [ $I -eq 65536 ]
-		then
-			I=0
-			echo "$(date): Sent 65536 transmissions"
-		fi
-	done
-
-After running the script for some time I had the following output. To me this
-looks promising :)
-
-	root at emblinux:~# ./stress.sh
-	Thu Nov  9 13:58:45 CTE 2017: Sent 65536 transmissions
-	Thu Nov  9 14:35:20 CTE 2017: Sent 65536 transmissions
-	Thu Nov  9 15:12:11 CTE 2017: Sent 65536 transmissions
-	Thu Nov  9 15:49:04 CTE 2017: Sent 65536 transmissions
-	Thu Nov  9 16:26:00 CTE 2017: Sent 65536 transmissions
-	Thu Nov  9 17:03:07 UTC 2017: Sent 65536 transmissions
-	Thu Nov  9 17:40:15 UTC 2017: Sent 65536 transmissions
-
-	If you have some hardware with an at91-i2c interface included at hand, I really
-	would appreciate if you can run the test script on your hardware and test this
-	driver.
-
-Best regards
-  Juergen
-
-
-[Ludovic Desroches]
-Changes in v3:
- - rebase (cherry-pick was enough)
- - fix checkpatch errors
- - tests:
-   - hangs with a SAMA5D4 (master and slave on different busses) after about
-   100 transfers. It's the firs time I do this test.
-   - some mismatches with a SAMA5D4 as slave and a SAMA5D2 as master
-   I don't know if it's a regression. I don't remember having seen this
-   behavior previously.
-   I think it's worth taking those patches even if there are some possible
-   bugs. It'll allow to get more people using it and so to consolidate the
-   slave mode support.
-
-Changes in v2:
- - Implemented all suggestions made by Ludovic. (Thank you!)
- - Reworked the IRQ handler completely. Have a look in patch 3 fort further
-   details.
-
-[1] https://marc.info/?t=150824004800001&r=1&w=1
-[2] https://www.kernel.org/doc/Documentation/i2c/slave-interface
-
-Juergen Fitschen (3):
-  i2c: at91: segregate master mode specific code from probe and init
-    func
-  i2c: at91: split driver into core and master file
-  i2c: at91: added slave mode support
-
- MAINTAINERS                                        |   3 +-
- drivers/i2c/busses/Makefile                        |   4 +
- drivers/i2c/busses/i2c-at91-core.c                 | 380 +++++++++++++++++
- .../i2c/busses/{i2c-at91.c => i2c-at91-master.c}   | 453 +--------------------
- drivers/i2c/busses/i2c-at91-slave.c                | 147 +++++++
- drivers/i2c/busses/i2c-at91.h                      | 179 ++++++++
- 6 files changed, 719 insertions(+), 447 deletions(-)
- create mode 100644 drivers/i2c/busses/i2c-at91-core.c
- rename drivers/i2c/busses/{i2c-at91.c => i2c-at91-master.c} (67%)
- create mode 100644 drivers/i2c/busses/i2c-at91-slave.c
- create mode 100644 drivers/i2c/busses/i2c-at91.h
-
--- 
-2.12.2
+Thanks,
+-Christoffer
+IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
