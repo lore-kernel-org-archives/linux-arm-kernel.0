@@ -1,74 +1,74 @@
-From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Mon, 16 Jul 2018 16:32:26 +0200
-Subject: [PATCH v2 18/23] dt-bindings: thermal: armada: add reference to
- new bindings
-In-Reply-To: <CAL_JsqLG6vDmyH3X7aHUUMRC+BN3orC5T8iHYUHHZVsQ6rM0Tg@mail.gmail.com>
-References: <20180625151239.20976-1-miquel.raynal@bootlin.com>
- <20180625151239.20976-19-miquel.raynal@bootlin.com>
- <20180703213011.GA13190@rob-hp-laptop>
- <20180705120528.4b923e16@xps13>
- <CAL_JsqL9h4RExZtm5cER-5kNvMpDzH-4MwcmY7VOLXB9-uEYYA@mail.gmail.com>
- <20180706094904.22275b10@xps13>
- <CAL_JsqLG6vDmyH3X7aHUUMRC+BN3orC5T8iHYUHHZVsQ6rM0Tg@mail.gmail.com>
-Message-ID: <20180716163226.6f532579@xps13>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 16 Jul 2018 07:34:05 -0700
+Subject: [PATCH] arm64: cpuinfo: Include cleartext implementer and part
+ strings
+In-Reply-To: <f619f0e9-b8b4-29fb-5ad6-7f5ebc3a4da8@arm.com>
+References: <20180715035342.11371-1-olof@lixom.net>
+ <f619f0e9-b8b4-29fb-5ad6-7f5ebc3a4da8@arm.com>
+Message-ID: <CAOesGMjq=d3ZPLTq5qudx+EE+XC2-zSsA1ViheTwM7fnTtJh2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On Mon, Jul 16, 2018 at 2:17 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> Hi Olof,
+>
+> On 15/07/18 04:53, Olof Johansson wrote:
+>> There's some use in printing out what the implementer and part numbers
+>> decode to for cases where they're known.
+>>
+>> I filled in the table based on public information; mostly from ARM TRMs
+>> and other tools (and some of the SSBD tables in the kernel, etc).
+>>
+>> Apple IDs came from
+>> https://github.com/apple/darwin-xnu/blob/master/osfmk/arm/cpuid.h
+>>
+>> Signed-off-by: Olof Johansson <olof@lixom.net>
+>> ---
+>>  arch/arm64/kernel/cpuinfo.c | 79 +++++++++++++++++++++++++++++++++++++++++++--
+>>  1 file changed, 76 insertions(+), 3 deletions(-)
+>
+> [...]
+>
+> The same thing pops up every so often. And the answer is the same each time:
 
-> > > > > > for AP806 and CP110 compatibles. Add a reference to these files from the
-> > > > > > original documentation.
-> > > > > >
-> > > > > > Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
-> > > > > > ---
-> > > > > >  Documentation/devicetree/bindings/thermal/armada-thermal.txt | 5 +++++
-> > > > > >  1 file changed, 5 insertions(+)
-> > > > > >
-> > > > > > diff --git a/Documentation/devicetree/bindings/thermal/armada-thermal.txt b/Documentation/devicetree/bindings/thermal/armada-thermal.txt
-> > > > > > index e0d013a2e66d..f3b441100890 100644
-> > > > > > --- a/Documentation/devicetree/bindings/thermal/armada-thermal.txt
-> > > > > > +++ b/Documentation/devicetree/bindings/thermal/armada-thermal.txt
-> > > > > > @@ -10,6 +10,11 @@ Required properties:
-> > > > > >      * marvell,armada-ap806-thermal
-> > > > > >      * marvell,armada-cp110-thermal  
-> > > > >
-> > > > > Really you should not be using the same compatible for both. Now you
-> > > > > have 2 drivers matching to same compatibles.
-> > > > >
-> > > > > Can't you make this a child of the syscon without breaking the binding?  
-> > > >
-> > > > We are talking about only 1 driver here, so I'm not sure how I should
-> > > > understand your last sentence. Do you want me to add a second
-> > > > compatible (for the same piece of hardware) for thermal node declared
-> > > > as a child of the syscon?  
-> > >
-> > > I don't know what I'm suggesting. Your changes look like they break
-> > > compatibility to me.  
-> >
-> > There is code in the driver to handle the legacy non-syscon-ish thermal
-> > node ("armada_thermal_probe_legacy()"). An old DT with a new kernel
-> > would work fine.  
-> 
-> Okay, that's good.
-> 
-> > > What happens if you use this new binding without any kernel change?  
-> >
-> > I suppose you mean "during the merge window"? In this case the driver
-> > of the thermal IP will not probe (and spawn an error in the dmesg) with
-> > ap806/cp110 IPs. As the support is pretty new for them, this is maybe
-> > not a huge issue. Also, before the DT changes adding thermal zones,
-> > just retrieving the temperature might be pretty useless. However, it
-> > is always possible to merge the driver changes in 4.19 and the DT
-> > changes in 4.20.  
-> 
-> Not the merge window, but distros (SUSE at least) want to be able to
-> boot with current DTs and their distro (old) kernel. Maybe for this
-> platform you don't care.
+Ever thought about why it pops up?
 
-Indeed, I think we don't care that much for this platform.
+> - it breaks an existing userspace ABI by changing the format of cpuinfo
 
-Let me resend the series with the 'interrupt' reference removed as I
-think it was the last thing to address.
+Most tools likely rely on a per-line format, and in this case they're
+likely interpreting the contents after the ':' as an integer. Adding
+something to the line might or might not break them, agreed.
 
-Thanks,
-Miqu?l
+How about introducing a "CPU model" line similar to x86's cleartext one?
+
+> - it is unmaintainable in the long run
+
+False. Chances are you already need details more fine-grained than
+this for errata and quirks, we already do for SSBD. And if it lacks an
+entry it's not the end of the world.
+
+> - userspace already has this information by simply running "lscpu"
+>
+> What has changed?
+
+What has changed is that ARM(64) is moving from a
+custom-kernel-custom-userspace world to one where you might be
+upreving kernels and userspace separately, and you might be using an
+older userspace with a newer machine and a newer kernel. Having to
+update lscpu is an extra step and extra friction to making it behave
+nicely.
+
+There's also a growing expectation of the system to behave more like
+x86, especially when it comes to trivial ways of detecting what kind
+of machine you are running on. On x86 it's been trivial to look at
+/proc/cpuinfo since it is provided by the platform there. Nobody wants
+to change their implementation from having to read a file to exec a
+program, dealing with errors, and parsing its output (sure, easier
+from scripts, but more awkward from real source).
+
+Having the information exported from the kernel is a reasonable way to
+do it. The other extreme is that the kernel should just ever have
+exported the raw MIDR value.
+
+
+-Olof
