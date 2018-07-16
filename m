@@ -1,36 +1,46 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Mon, 16 Jul 2018 11:50:18 +0200
-Subject: [PATCH v5 2/7] serdev: add dev_pm_domain_attach|detach()
-In-Reply-To: <20180715085628.GI10204@localhost>
-References: <cover.1531150733.git.sean.wang@mediatek.com>
- <d5904115ff1da38fe79b45fa3d59ef0688cea124.1531150733.git.sean.wang@mediatek.com>
- <20180715085628.GI10204@localhost>
-Message-ID: <20180716095018.GA11078@kroah.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 16 Jul 2018 02:54:01 -0700
+Subject: linux-next: Signed-off-by missing for commits in the arm-soc tree
+In-Reply-To: <CAGb2v667K4Z6o-KEQROWuCbgJbKLNX_OCpCBOWaECb_qfRMBpw@mail.gmail.com>
+References: <20180716075718.4e5ef491@canb.auug.org.au>
+ <CAOesGMhVeo6Wc=nMcEnusa+FfwQBWJnxs0LY-zXm4HMau+SMhg@mail.gmail.com>
+ <6a9fa6f3-7aef-a83b-72a6-dc9492964b5e@gmail.com>
+ <CAGb2v667K4Z6o-KEQROWuCbgJbKLNX_OCpCBOWaECb_qfRMBpw@mail.gmail.com>
+Message-ID: <311493fa-18de-cfe2-30b1-6e018e434b44@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 15, 2018 at 10:56:28AM +0200, Johan Hovold wrote:
-> On Mon, Jul 09, 2018 at 11:56:58PM +0800, sean.wang at mediatek.com wrote:
-> > From: Sean Wang <sean.wang@mediatek.com>
-> > 
-> > In order to open up the required power gate before any operation can be
-> > effectively performed over the serial bus between CPU and serdev, it's
-> > clearly essential to add common attach functions for PM domains to serdev
-> > at the probe phase.
-> > 
-> > Similarly, the relevant dettach function for the PM domains should be
-> > properly and reversely added at the remove phase.
-> > 
-> > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> > Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
-> > Cc: Rob Herring <robh@kernel.org>
-> > Cc: Ulf Hansson <ulf.hansson@linaro.org>
-> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> > Cc: Jiri Slaby <jslaby@suse.com>
-> > Cc: linux-serial at vger.kernel.org
+
+
+On 07/16/2018 02:24 AM, Chen-Yu Tsai wrote:
+> On Mon, Jul 16, 2018 at 5:13 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+>>
+>>
+>> On 07/15/2018 03:50 PM, Olof Johansson wrote:
+>>> Thanks Stephen, I keep saying every time you catch these that I need
+>>> to run the same script. :(
+>>>
+>>> Florian, I wonder if this happened when you rebased to squash in the fix?
+>>
+>> Humm, could be, all I did (and it was not the first time) was to do an
+>> interactive rebase with --preserve-merges. AFAICT, all of these commits
+>> came from Eric's pull request, so what I typically do is just sign off
+>> on the merge commit, but do not apply my SoB to all commits coming from
+>> that pull request if that makes sense?
 > 
-> Reviewed-by: Johan Hovold <johan@kernel.org>
+> When you rebase, if the commit is re-applied, the committer changes to
+> you, so you need to add your SoB to all commits you rebased.
 
-Thanks, now applied.
+Indeed, thanks for bringing that up Chen-Yu.
 
-greg k-h
+> 
+> I suppose you could override it with GIT_COMMITTER_NAME and
+> GIT_COMMITTER_EMAIL environment variables, but that sort of distorts
+> the SoB if any changes were added due to rebasing, such as resolution
+> of merge conflicts.
+> 
+> ChenYu
+> 
+
+-- 
+Florian
