@@ -1,44 +1,85 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 16 Jul 2018 10:59:19 -0300
-Subject: [PATCH] soc: imx: gpc: restrict register range for regmap access
-In-Reply-To: <1531716395-21549-1-git-send-email-Anson.Huang@nxp.com>
-References: <1531716395-21549-1-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <CAOMZO5Bo0_+cbC0ikd0OuVV42-z7cz+J2_EET-Rk1xpTxZCTpA@mail.gmail.com>
+From: alexandre.belloni@bootlin.com (Alexandre Belloni)
+Date: Mon, 16 Jul 2018 16:15:04 +0200
+Subject: [PATCH v5 4/5] ARM: dts: at91: sama5d2: add nodes for I2S
+ controllers
+In-Reply-To: <e056ed7d-521d-54ab-2e5d-0f5259a09ec6@microchip.com>
+References: <20180618141239.10892-1-codrin.ciubotariu@microchip.com>
+ <20180618141239.10892-5-codrin.ciubotariu@microchip.com>
+ <20180706193923.GC16084@piout.net>
+ <e056ed7d-521d-54ab-2e5d-0f5259a09ec6@microchip.com>
+Message-ID: <20180716141504.GB3180@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Anson,
+Hello,
 
-On Mon, Jul 16, 2018 at 1:46 AM, Anson Huang <Anson.Huang@nxp.com> wrote:
-> GPC registers are NOT continuous, some registers are
-> reserved and accessing them from userspace will trigger
-> external abort, add regmap register access table to
-> avoid below abort:
->
-> root at imx6slevk:~# cat /sys/kernel/debug/regmap/20dc000.gpc/registers
-> [  108.480477] Unhandled fault: imprecise external abort (0x1406) at 0xb6db5004
-> [  108.487985] pgd = 42b54bfd
-> [  108.490741] [b6db5004] *pgd=ba1b7831
-> [  108.494386] Internal error: : 1406 [#1] SMP ARM
-> [  108.498943] Modules linked in:
-> [  108.502043] CPU: 0 PID: 389 Comm: cat Not tainted 4.18.0-rc1-00074-gc9f1f60-dirty #482
-> [  108.509982] Hardware name: Freescale i.MX6 SoloLite (Device Tree)
-> [  108.516123] PC is at regmap_mmio_read32le+0x20/0x24
-> [  108.521031] LR is at regmap_mmio_read+0x40/0x60
-> [  108.525586] pc : [<c059cf74>]    lr : [<c059d1ac>]    psr: 20060093
-> [  108.531875] sp : eccf1d98  ip : eccf1da8  fp : eccf1da4
-> [  108.537122] r10: ec2d3800  r9 : eccf1f60  r8 : ecfc0000
-> [  108.542370] r7 : eccf1e2c  r6 : eccf1e2c  r5 : 00000028  r4 : ec338e00
-> [  108.548920] r3 : 00000000  r2 : eccf1e2c  r1 : f0980028  r0 : 00000000
-> [  108.555474] Flags: nzCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment none
-> [  108.562720] Control: 10c5387d  Table: acf4004a  DAC: 00000051
-> [  108.568491] Process cat (pid: 389, stack limit = 0xd4318a65)
-> [  108.574174] Stack: (0xeccf1d98 to 0xeccf2000)
->
-> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+On 09/07/2018 16:29:43+0300, Codrin Ciubotariu wrote:
+> On 06.07.2018 22:39, Alexandre Belloni wrote:
+> > Hi Codrin,
+> > 
+> > On 18/06/2018 17:12:38+0300, Codrin Ciubotariu wrote:
+> > > From: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+> > > 
+> > > This patch adds DT nodes for I2S0 and I2S1. It also adds an alias for
+> > > each I2S node.
+> > > 
+> > > Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+> > > [codrin.ciubotariu at microchip.com: added phandle to new mux clock]
+> > > Signed-off-by: Codrin Ciubotariu <codrin.ciubotariu@microchip.com>
+> > > ---
+> > > 
+> > > The bindings for the I2S node are applied to broonie/sound.git .
+> > > 
+> > > Changes in v5:
+> > > 	- the previous name was:
+> > > 	  [PATCH v4 6/7] ARM: dts: at91: sama5d2: add nodes for I2S controllers
+> > > 
+> > >   arch/arm/boot/dts/sama5d2.dtsi | 34 ++++++++++++++++++++++++++++++++++
+> > >   1 file changed, 34 insertions(+)
+> > > 
+> > > diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
+> > > index eeb6afa1cda7..eca73ce40bc5 100644
+> > > --- a/arch/arm/boot/dts/sama5d2.dtsi
+> > > +++ b/arch/arm/boot/dts/sama5d2.dtsi
+> > > @@ -58,6 +58,8 @@
+> > >   		serial1 = &uart3;
+> > >   		tcb0 = &tcb0;
+> > >   		tcb1 = &tcb1;
+> > > +		i2s0 = &i2s0;
+> > > +		i2s1 = &i2s1;
+> > >   	};
+> > >   	cpus {
+> > > @@ -1313,6 +1315,22 @@
+> > >   				clocks = <&clk32k>;
+> > >   			};
+> > > +			i2s0: i2s at f8050000 {
+> > > +				compatible = "atmel,sama5d2-i2s";
+> > > +				reg = <0xf8050000 0x100>;
+> > > +				interrupts = <54 IRQ_TYPE_LEVEL_HIGH 7>;
+> > > +				dmas = <&dma0
+> > > +					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
+> > > +					 AT91_XDMAC_DT_PERID(31))>,
+> > > +				       <&dma0
+> > > +					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
+> > > +					 AT91_XDMAC_DT_PERID(32))>;
+> > > +				dma-names = "tx", "rx";
+> > > +				clocks = <&i2s0_clk>, <&i2s0_gclk>, <&audio_pll_pmc>, <&i2s0muxck>;
+> > > +				clock-names = "pclk", "gclk", "aclk", "muxclk";
+> > > +				status = "disabled";
+> > > +			};
+> > > +
+> > 
+> > Can you resend the DTS patches after removing the unnecessary clocks?
+> 
+> I will. Should I also make the "muxclk" clock an assigned clock to assign
+> its parent ?
+> 
 
-Thanks for this fix.
+It would be better if that allows to remove the corresponding code in
+the driver.
 
-Maybe you could add a Fixes tag, so that it can be applied to stable?
 
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+-- 
+Alexandre Belloni, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
