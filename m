@@ -1,27 +1,37 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Mon, 16 Jul 2018 12:17:57 -0700
-Subject: [PATCH] ata: ftide010: Add a quirk for SQ201
-In-Reply-To: <20180715200929.10116-1-linus.walleij@linaro.org>
-References: <20180715200929.10116-1-linus.walleij@linaro.org>
-Message-ID: <20180716191757.GO72677@devbig577.frc2.facebook.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Mon, 16 Jul 2018 21:23:57 +0200 (CEST)
+Subject: [PATCHv4 02/12] atomics/x86: reduce arch_cmpxchg64*()
+ instrumentation
+In-Reply-To: <20180716113017.3909-3-mark.rutland@arm.com>
+References: <20180716113017.3909-1-mark.rutland@arm.com>
+ <20180716113017.3909-3-mark.rutland@arm.com>
+Message-ID: <alpine.DEB.2.21.1807162123380.1693@nanos.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 15, 2018 at 10:09:29PM +0200, Linus Walleij wrote:
-> The DMA is broken on this specific device for some unknown
-> reason (probably badly designed or plain broken interface
-> electronics) and will only work with PIO. Other users of
-> the same hardware does not have this problem.
+On Mon, 16 Jul 2018, Mark Rutland wrote:
+> Currently x86's arch_cmpxchg64() and arch_cmpxchg64_local() are
+> instrumented twice, as they call into instrumented atomics rather than
+> their arch_ equivalents.
 > 
-> Add a specific quirk so that this Gemini device gets
-> DMA turned off. Also fix up some code around passing the
-> port information around in probe while we're at it.
+> A call to cmpxchg64() results in:
 > 
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>   cmpxchg64()
+>     kasan_check_write()
+>     arch_cmpxchg64()
+>       cmpxchg()
+>         kasan_check_write()
+>         arch_cmpxchg()
+> 
+> Let's fix this up and call the arch_ equivalents, resulting in:
+> 
+>   cmpxchg64()
+>     kasan_check_write()
+>     arch_cmpxchg64()
+>       arch_cmpxchg()
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Acked-by: Peter Zijlstra (Intel) <peterz@infradead.org>
+> Acked-by: Will Deacon <will.deacon@arm.com>
 
-Applied to libata/for-4.18-fixes.
-
-Thanks.
-
--- 
-tejun
+Acked-by: Thomas Gleixner <tglx@linutronix.de>
