@@ -1,32 +1,27 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 16 Jul 2018 08:18:00 +0200
-Subject: linux-next: build failure after merge of the arm-soc tree
-In-Reply-To: <CAOesGMgicOOi0Nr+m_UHEGYL+ryRW65YAPwVsN+CZpo6kc2FLA@mail.gmail.com>
- (Olof Johansson's message of "Sun, 15 Jul 2018 16:50:25 -0700")
-References: <20180716091337.6c1b2a4d@canb.auug.org.au>
- <CAOesGMgicOOi0Nr+m_UHEGYL+ryRW65YAPwVsN+CZpo6kc2FLA@mail.gmail.com>
-Message-ID: <87601faelj.fsf@belgarion.home>
+From: jian.hu@amlogic.com (Jian Hu)
+Date: Mon, 16 Jul 2018 14:37:18 +0800
+Subject: [PATCH 0/2] clk: meson-g12a: Add EE clock controller driver
+Message-ID: <1531723038-134012-1-git-send-email-jian.hu@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof Johansson <olof@lixom.net> writes:
+Add a Clock driver for the Everyting-Else part of
+the Amlogic Meson-G12A SoC.
 
-> It's a known issue due to dependencies with a driver tree. :(
->
-> Robert, this is unfortunate. What's the dependent patches? We can pick
-> them up in our tree as duplicates if needed.
-I'd rather postpone one of the patches, as I explained in the pull request.
-As Stephen noticed, this will be :
-0d0b16b8e008 ("dmaengine: pxa: make the filter function internal")
+Jian Hu (2):
+  dt-bindings: clk: meson-g12a: Add G12A EE Clock Bindings
+  clk: meson-g12a: Add EE Clock controller driver
 
-I'll queue this one for the 4.20 cycle. By the way, all of this cames from the
-fact that I didn't take this very patch in my imutable branch for this change
-...
-
-I'll also resend a pull request, without this patch if that's good for you,
-which will solve the breakage.
-
-Cheers.
+ .../bindings/clock/amlogic,gxbb-clkc.txt           |   1 +
+ drivers/clk/meson/Kconfig                          |  10 +
+ drivers/clk/meson/Makefile                         |   1 +
+ drivers/clk/meson/g12a.c                           | 994 +++++++++++++++++++++
+ drivers/clk/meson/g12a.h                           | 122 +++
+ include/dt-bindings/clock/g12a-clkc.h              |  92 ++
+ 6 files changed, 1220 insertions(+)
+ create mode 100644 drivers/clk/meson/g12a.c
+ create mode 100644 drivers/clk/meson/g12a.h
+ create mode 100644 include/dt-bindings/clock/g12a-clkc.h
 
 -- 
-Robert
+1.9.1
