@@ -1,54 +1,63 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Mon, 16 Jul 2018 13:55:06 +0200
-Subject: [GIT PULL] STM32 defconfig changes for v4.19 #1
-In-Reply-To: <20180714213148.h2f3ipw6bja36x4p@localhost>
-References: <016b1449-4ede-9302-e6f9-c52b63e0330e@st.com>
- <20180714213148.h2f3ipw6bja36x4p@localhost>
-Message-ID: <9c9d4951-eccb-5285-d98a-a9172d2b1eab@st.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 16 Jul 2018 17:27:00 +0530
+Subject: [PATCH v4 08/18] net: davinci_emac: potentially get the MAC
+ address from MTD
+In-Reply-To: <a70aebb0-408c-c61f-897a-227114888585@linaro.org>
+References: <20180629094039.7543-1-brgl@bgdev.pl>
+ <20180629094039.7543-9-brgl@bgdev.pl>
+ <03b77e24-9ab9-fa01-2387-9de0408a9942@gmail.com>
+ <20180704070919.GA14051@lenoch>
+ <CAMRc=McOYG9=naT2=4c4hnhJwxcqBCATEZOGXXv9u9zuvXyDXw@mail.gmail.com>
+ <c0ffc590-8064-3b02-9b5c-fcc24628d390@ti.com>
+ <CAMRc=McO8H9Aw8a7h318a=hJjKBOgeC+9_hreBnOY3Tc3Fh7sg@mail.gmail.com>
+ <d7f03763-982f-5e3e-d0ad-54e024b10f97@ti.com>
+ <a70aebb0-408c-c61f-897a-227114888585@linaro.org>
+Message-ID: <3b53a8a7-3f3a-4341-35b0-e7b52854fa9b@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof
+On Monday 16 July 2018 02:26 PM, Srinivas Kandagatla wrote:
+> 
+> 
+> On 16/07/18 09:50, Sekhar Nori wrote:
+>> On Friday 13 July 2018 11:30 PM, Bartosz Golaszewski wrote:
+>>
+>>> We're getting close to rc5 so I'd like to make a case for this series
+>>> again.
+>>>
+>>> I understand that there's more to do than just the changes introduced
+>>> here, but we shouldn't try to fix several problems in many different
+>>> places at once. There's just too many moving pieces. I'd rather start
+>>> merging small improvements right away.
+>>>
+>>> The idea behind this series is to remove (almost) all users of
+>>> at24_platform_data. The davinci_emac patches are there only because we
+>>> need to remove some MAC adress reading stuff from the board files.
+>>> Having this code there and calling it back from EEPROM/MTD drivers is
+>>> already wrong and we should work towards using nvmem for that anyway.
+>>>
+>>> Currently for MTD the nvmem support series seems to be dead and it's
+>>> going to take some time before anything gets upstream.
+>>>
+>>> So I'd like to again ask you to consider picking up the patches from
+>>> this series to your respective trees or at the very least: I'd like to
+>>> ask Srinivas to pick up the nvmem patches and Sekhar to take the
+>>> first, non-controversial batch of davinci platform changes so that
+>>> we'll have less code to carry for the next release.
+>>
+>> I think those are patches 3-7. I can take those if I get an immutable
+>> commit over v4.18-rc1 from Srinivas with patches 1 & 2 applied.
 
-On 07/14/2018 11:31 PM, Olof Johansson wrote:
-> On Fri, Jul 13, 2018 at 04:01:40PM +0200, Alexandre Torgue wrote:
->> Hi Arnd, Olof and Kevin,
->>
->> Please consider this first round of STM32 defconfig updates for v4.19.
->> This time it concerns only multi_v7_defconfig.
->>
->> Thanks.
->> Alex
->>
->> The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
->>
->>    Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
->>
->> are available in the git repository at:
->>
->>    git://git.kernel.org/pub/scm/linux/kernel/git/atorgue/stm32.git
->> tags/stm32-defconfig-for-v4.19-1
->>
->> for you to fetch changes up to 1b8a8589a3e10997fa8f43e7da874c4903f33ac7:
->>
->>    ARM: multi_v7_defconfig: enable STM32 DCMI media support (2018-07-13
->> 14:54:24 +0200)
+> nvmem patches go via Greg KH char-misc tree, if it makes things easy I
+> can provide Ack on nvmem patches, so that you can take these patches via
+> your tree?
 > 
-> Hi,
-> 
-> We renormalized the multi_v7_defconfig file in 4.18-rc3, so this pull request
-> has quite a few conflicts due to that. I've fixed it up though, make sure it's
-> behaving like you would expect.
+> Let me know.
 
-I checked merge point on arm-soc tree and for me it's correct.
+I can do that.
 
-Thanks
-Alex
+Greg, are you fine with this? It will be great to have your ack for
+patches 1/8 and 2/18.
 
-
-> 
-> Thanks,
-> 
-> 
-> -Olof
-> 
+Thanks,
+Sekhar
