@@ -1,36 +1,63 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Mon, 16 Jul 2018 08:41:35 -0500
-Subject: [PATCH 3/3] clk: meson-g12a: Add EE Clock controller driver
-In-Reply-To: <be3c7332-3a7d-f8b0-efe4-e2a319273c42@amlogic.com> (Jian Hu's
- message of "Wed, 11 Jul 2018 16:05:54 +0800")
-References: <1531134767-29927-1-git-send-email-jian.hu@amlogic.com>
- <1531134767-29927-4-git-send-email-jian.hu@amlogic.com>
- <CAFBinCBB9N_p6S_-dfiV=zDCf-RYnA3C-ir6oNLC7JAfdOqqiw@mail.gmail.com>
- <be3c7332-3a7d-f8b0-efe4-e2a319273c42@amlogic.com>
-Message-ID: <7hbmb7mh68.fsf@baylibre.com>
+From: hofrat@osadl.org (Nicholas Mc Guire)
+Date: Mon, 16 Jul 2018 15:46:49 +0200
+Subject: [PATCH V2] ARM: STi: warn if scu mapping fails
+Message-ID: <1531748809-12540-1-git-send-email-hofrat@osadl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jian Hu <jian.hu@amlogic.com> writes:
+ If the device node is not found or the of_iomap() failed, calling
+scu_enable would not be safe and could lead to an undefined system
+state. So warn in both failure paths before returning.
 
-> On 2018/7/10 5:53, Martin Blumenstingl wrote:
->> On Mon, Jul 9, 2018 at 1:14 PM Jian Hu <jian.hu@amlogic.com> wrote:
+Signed-off-by: Nicholas Mc Guire <hofrat@osadl.org>
+Link: http://lkml.org/lkml/2018/7/16/219
+Fixes: commit 65ebcc115889 ("ARM: sti: Add STiH415 SOC support")
+---
 
-[...]
+V2: replacement of WARN_ON() by a meaningful pr_err as suggested by
+    Patrice CHOTARD <patrice.chotard@st.com>.
 
->>> +static const struct of_device_id clkc_match_table[] = {
->>> +       { .compatible = "amlogic,g12a-clkc" },
->> I wonder if that should be "amlogic,meson-g12a-clkc" (I know that AXG
->> and GXBB/GXL/GXM omit the "meson-" prefix, but I am not sure if that's
->> correct - I'll CC Rob Herring on the dt-bindings patch)
->>
-> For clock drivers,they omit the "meson-" prefix, But for common
-> amlogic drivers use "amlogic.meson-<chip>-<ip>".
-> So which type should we choose? .compatible = "amlogic,g12a-clkc or
->
-> .compatible = "amlogic,meson-g12a-clkc
+Problem was found by an experimental coccinelle script
 
-Please follow the existing pattern for clock drivers, omitting the
-"meson-" prefix.
+Patch was compile tested with: multi_v7_defconfig (implies
+CONFIG_ARCH_STI=y, CONFIG_SMP=y)
+(with one sparse warning unrelated to the proposed change)
 
-Kevin
+Patch is against 4.18-rc4 (localversion-next is next-20180716)
+
+ arch/arm/mach-sti/platsmp.c | 18 ++++++++++++++----
+ 1 file changed, 14 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/mach-sti/platsmp.c b/arch/arm/mach-sti/platsmp.c
+index 231f19e..530e9a5 100644
+--- a/arch/arm/mach-sti/platsmp.c
++++ b/arch/arm/mach-sti/platsmp.c
+@@ -107,12 +107,22 @@ static void __init sti_smp_prepare_cpus(unsigned int max_cpus)
+ 
+ 	np = of_find_compatible_node(NULL, NULL, "arm,cortex-a9-scu");
+ 
+-	if (np) {
+-		scu_base = of_iomap(np, 0);
+-		scu_enable(scu_base);
+-		of_node_put(np);
++	if (!np) {
++		pr_err("SCU not found at %s:%s():%d\n",
++		       __FILE__, __func__, __LINE__);
++		return;
+ 	}
+ 
++	scu_base = of_iomap(np, 0);
++	of_node_put(np);
++	if (!scu_base) {
++		pr_err("SCU remap failed at %s:%s():%d\n",
++		       __FILE__, __func__, __LINE__);
++		return;
++	}
++
++	scu_enable(scu_base);
++
+ 	if (max_cpus <= 1)
+ 		return;
+ 
+-- 
+2.1.4
