@@ -1,55 +1,33 @@
-From: ravi.bangoria@linux.ibm.com (Ravi Bangoria)
-Date: Mon, 16 Jul 2018 13:50:10 +0530
-Subject: [PATCH v5 06/10] Uprobes: Support SDT markers having reference
- count (semaphore)
-In-Reply-To: <CAPhsuW5njYcYXxYYEUsdVWem3qwk2z_bra_eRpwHwEy9TA-LHQ@mail.gmail.com>
-References: <20180628052209.13056-7-ravi.bangoria@linux.ibm.com>
- <20180701210935.GA14404@redhat.com>
- <0c543791-f3b7-5a4b-f002-e1c76bb430c0@linux.ibm.com>
- <20180702180156.GA31400@redhat.com>
- <f19e3801-d56a-4e34-0acc-1040a071cf91@linux.ibm.com>
- <20180703163645.GA23144@redhat.com> <20180703172543.GC23144@redhat.com>
- <f5a39a88-c21e-4606-a04d-11b5f32016b8@linux.ibm.com>
- <20180710152527.GA3616@redhat.com>
- <6e3ff60b-267a-d49d-4ebb-c4264f9c034b@linux.ibm.com>
- <20180712145849.GB15265@redhat.com>
- <CAPhsuW6kCtn-tWSj5eKf+kGt8ZEjVwJKLxj9C6zdaqMZByRytg@mail.gmail.com>
- <9b062a19-d9a7-b360-26b1-d28b8dfc35a3@linux.ibm.com>
- <CAPhsuW5njYcYXxYYEUsdVWem3qwk2z_bra_eRpwHwEy9TA-LHQ@mail.gmail.com>
-Message-ID: <a37cc94b-5940-643c-3e81-fc375c6aada0@linux.ibm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 16 Jul 2018 10:25:20 +0200
+Subject: [PATCH 1/3 v4] ARM: dts: Modernize the Vexpress PL111 integration
+In-Reply-To: <b76645a6-5145-14b5-4290-95ef1dfff4de@arm.com>
+References: <20180709075232.30678-1-linus.walleij@linaro.org>
+ <b00c3b85-1368-f62b-efda-d23ce27e6f9c@arm.com>
+ <0bcade58-26d5-8c2f-bcba-765aebd343bb@arm.com>
+ <b76645a6-5145-14b5-4290-95ef1dfff4de@arm.com>
+Message-ID: <CACRpkdZEV5kDBzL1baq_MO+EMjj43bA-T_pK0PrJ=vPxdmNDLQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Song,
+On Fri, Jul 13, 2018 at 1:44 PM Robin Murphy <robin.murphy@arm.com> wrote:
+> On 13/07/18 10:50, Sudeep Holla wrote:
+> >> It doesn't work. This change is breaking the working CLCD on the models.
+> >> I just tested and CLCD driver returns
+> >>
+> >
+> > It even fails to initialize CLCD on my TC2.
+> >
+> > clcd-pl11x 1c1f0000.clcd: PL111 designer 41 rev1 at 0x1c1f0000
+> > clcd-pl11x: probe of 1c1f0000.clcd failed with error -2
+>
+> FWIW the same happens on PB-A8; looks like converting to OF graph
+> bindings falls foul of the "panel-dpi" check in clcdfb_of_get_mode().
 
-On 07/14/2018 05:20 AM, Song Liu wrote:
-> 
-> Hmm... what happens when we have multiple uprobes sharing the same
-> reference counter? It feels equally complicate to me. Or did I miss any
-> cases here?
+That is from the old FB drivers, the defconfig changes in patch 2,3
+need to be applied in lockstep with this patch. Then it "should work"
+(alas I only tested PB-A8 on QEMU, which I modified to hopefully
+properly model the DVI bridge).
 
-
-As far as I can think of, it should be handled by default. No special
-treatment needed for this.
-
-...
-
-> 
-> This patch tries to resolve this imbalance by passing extra flag
-> "restore_insn" to probe_event_disable().
-> 
-> Signed-off-by: Song Liu <songliubraving@fb.com>
-
-
-Ah cool. Seems this will make them balanced. But is it fine to change
-uprobe_unregister()? It's already an ABI. No other way around?
-
-Also, one more source of imbalance is this condition:
-
-          if (is_register)
-                  flags |= VM_WRITE;
-
-in valid_vma(). You need to take care of that as well.
-
-Thanks,
-Ravi
+Yours,
+Linus Walleij
