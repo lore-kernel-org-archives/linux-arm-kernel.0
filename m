@@ -1,96 +1,221 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 16 Jul 2018 15:58:29 +0200
-Subject: [PATCH] pinctrl: at91: fix deferred probing support
-In-Reply-To: <CAL_Jsq+aT3kSLwcm+g0MHV6Gy+4mde17fUDa9HwiexQ1dHn5Bg@mail.gmail.com>
-References: <20180712192222.32481-1-robh@kernel.org>
- <20180713094717.GQ16084@piout.net>
- <CAL_Jsq+aT3kSLwcm+g0MHV6Gy+4mde17fUDa9HwiexQ1dHn5Bg@mail.gmail.com>
-Message-ID: <CACRpkdaSdFZOi+swmuFa8JdSTuVeE8j0W+2b+W3rfMD+ve999Q@mail.gmail.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Mon, 16 Jul 2018 15:59:09 +0200
+Subject: [PATCH 1/2] arm: dts: mt7623: cleanup MT7623N NAND dts file
+In-Reply-To: <34e4c13bd1deeb8e090a74b4e7e9192512b3eff0.1531199139.git.ryder.lee@mediatek.com>
+References: <34e4c13bd1deeb8e090a74b4e7e9192512b3eff0.1531199139.git.ryder.lee@mediatek.com>
+Message-ID: <53d30dd0-d805-1ff9-c0f0-4029e7ee453f@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 13, 2018 at 5:27 PM Rob Herring <robh@kernel.org> wrote:
-> On Fri, Jul 13, 2018 at 3:47 AM Alexandre Belloni
-> <alexandre.belloni@bootlin.com> wrote:
-> >
-> > Hi Rob,
-> >
-> > On 12/07/2018 13:22:22-0600, Rob Herring wrote:
-> > > AT91 pinctrl deferred probing support is broken if the GPIO devices
-> > > haven't probed first and set gpio_banks to non-zero. The later condition
-> > > that only some GPIO devices haven't probed can't actually happen as
-> > > either all the GPIO devices have probed first or none of them have. Plus
-> > > the pinctrl driver has already returned -EINVAL, so it's not on the
-> > > deferred list to retry probing.
-> > >
-> > > Fix this by consolidating the checking that all GPIO devices are probed.
-> > >
-> > > Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-> > > Cc: Linus Walleij <linus.walleij@linaro.org>
-> > > Cc: Nicolas Ferre <nicolas.ferre@microchip.com>
-> > > Cc: Alexandre Belloni <alexandre.belloni@bootlin.com>
-> > > Cc: linux-arm-kernel at lists.infradead.org
-> > > Cc: linux-gpio at vger.kernel.org
-> > > Signed-off-by: Rob Herring <robh@kernel.org>
-> > > ---
-> > > This is a result of trying to remove of_platform_default_populate from
-> > > at91 code and relying on the DT core handling populating devices. That
-> > > changed the probe order and broke booting.
-> > >
-> >
-> > This solves part of the issue but when tested with the
-> > of_platform_default_populate removal, many drivers will fail with
-> > gpiod_set_value: invalid GPIO (errorpointer)
-> >
-> > or
-> >
-> > gpiod_get_value: invalid GPIO (errorpointer)
-> >
-> > This happens both before and after the pinctrl driver probed.
-> >
-> > I didn't investigate much yet.
->
-> Looks to me like it may be a circular dependency. The GPIO request
-> functions depend on the pinctrl driver which depends on the gpio
-> driver. Maybe returning EPROBE_DEFER in at91_gpio_request_enable and
-> removing the requirement that the GPIO driver probe first would fix
-> it...
 
-I think you're spot in.
 
-This kind of problem has cropped up in these subsystems since day
-one and we probably just have different lame attempts to paper
-over it all over.
+On 10/07/18 07:09, Ryder Lee wrote:
+> Normally, we didn't release this kind of baord to user. This specific
+> board exists only in the early stage of development inside MediaTek -
+> and that may confuse peoples.
+> 
+> Hence this patch removes related files accordingly.
+> 
+> Cc: John Crispin <john@phrozen.org>
+> Cc: Sean Wang <sean.wang@mediatek.com>
+> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
 
-I suspect that what we need to do is more akin to the DRM model
-which I recently learned about (drivers/gpu/drm/vc4/vc4_drv.c is a very
-clean and good example) using the core kernel component
-infrastructure:
+Whole series pushed to v4.18-next/dts32
 
-1. Drivers probe() independently, doing intiialization of state
-  container struct and retreiveing resources like I/O memory,
-  regulators, IRQ, DMA... but no registering interfaces to
-  the subsystems yet.
+Thanks a lot to everybody who provided feedback.
 
-2. The probe of the main component (master) matches the
-  subcomponents on the platform bus. In this case, whatever
-  needs to come first is the master. I guess pin control.
-  return component_master_add_with_match(dev, &vc4_drm_ops, match);
+Regards,
+Matthias
 
-3. Subcomponents:
-   return component_add(&pdev->dev, &vc4_dsi_ops);
-
-4. Later on we take control over the binding order.
-   the .bind callback of the main component issues
-   component_bind_all(dev, drm) and there the subdevices
-   are bound.
-
-The process is perfectly reversible. The idea here is to break the
-neck of the problem by doing enough set-up in probe() so that
-bind() can commence with all its resources. My Nomadik driver
-already makes a half-assed attempt at this (not using the component
-framework) but I could refactor it to provide an example if
-there is interest.
-
-Yours,
-Linus Walleij
+> ---
+>  arch/arm/boot/dts/Makefile             |  1 -
+>  arch/arm/boot/dts/mt7623n-rfb-nand.dts | 73 -----------------------------
+>  arch/arm/boot/dts/mt7623n-rfb.dtsi     | 86 ----------------------------------
+>  3 files changed, 160 deletions(-)
+>  delete mode 100644 arch/arm/boot/dts/mt7623n-rfb-nand.dts
+>  delete mode 100644 arch/arm/boot/dts/mt7623n-rfb.dtsi
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 37a3de7..dde494e 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -1168,7 +1168,6 @@ dtb-$(CONFIG_ARCH_MEDIATEK) += \
+>  	mt7623a-rfb-emmc.dtb \
+>  	mt7623a-rfb-nand.dtb \
+>  	mt7623n-rfb-emmc.dtb \
+> -	mt7623n-rfb-nand.dtb \
+>  	mt7623n-bananapi-bpi-r2.dtb \
+>  	mt8127-moose.dtb \
+>  	mt8135-evbp1.dtb
+> diff --git a/arch/arm/boot/dts/mt7623n-rfb-nand.dts b/arch/arm/boot/dts/mt7623n-rfb-nand.dts
+> deleted file mode 100644
+> index 96ff3c9..0000000
+> --- a/arch/arm/boot/dts/mt7623n-rfb-nand.dts
+> +++ /dev/null
+> @@ -1,73 +0,0 @@
+> -// SPDX-License-Identifier: GPL-2.0
+> -/*
+> - * Copyright (c) 2017 MediaTek Inc.
+> - * Author: John Crispin <john@phrozen.org>
+> - *
+> - */
+> -
+> -/dts-v1/;
+> -#include "mt7623n-rfb.dtsi"
+> -
+> -/ {
+> -	model = "MediaTek MT7623N NAND reference board";
+> -	compatible = "mediatek,mt7623n-rfb-nand", "mediatek,mt7623";
+> -};
+> -
+> -&bch {
+> -	status = "okay";
+> -};
+> -
+> -&nandc {
+> -	status = "okay";
+> -	pinctrl-names = "default";
+> -	pinctrl-0 = <&nand_pins_default>;
+> -
+> -	nand at 0 {
+> -		reg = <0>;
+> -		spare_per_sector = <64>;
+> -		nand-ecc-mode = "hw";
+> -		nand-ecc-strength = <12>;
+> -		nand-ecc-step-size = <1024>;
+> -
+> -		partitions {
+> -			compatible = "fixed-partitions";
+> -			#address-cells = <1>;
+> -			#size-cells = <1>;
+> -
+> -			partition at 0 {
+> -				label = "preloader";
+> -				reg = <0x0 0x40000>;
+> -			};
+> -
+> -			partition at 40000 {
+> -				label = "uboot";
+> -				reg = <0x40000 0x80000>;
+> -			};
+> -
+> -			partition at c0000 {
+> -				label = "uboot-env";
+> -				reg = <0xC0000 0x40000>;
+> -			};
+> -
+> -			partition at 140000 {
+> -				label = "bootimg";
+> -				reg = <0x140000 0x2000000>;
+> -			};
+> -
+> -			partition at 2140000 {
+> -				label = "recovery";
+> -				reg = <0x2140000 0x2000000>;
+> -			};
+> -
+> -			partition at 4140000 {
+> -				label = "rootfs";
+> -				reg = <0x4140000 0x1000000>;
+> -			};
+> -
+> -			partition at 5140000 {
+> -				label = "usrdata";
+> -				reg = <0x5140000 0x1000000>;
+> -			};
+> -		};
+> -	};
+> -};
+> diff --git a/arch/arm/boot/dts/mt7623n-rfb.dtsi b/arch/arm/boot/dts/mt7623n-rfb.dtsi
+> deleted file mode 100644
+> index 5c5cc7d..0000000
+> --- a/arch/arm/boot/dts/mt7623n-rfb.dtsi
+> +++ /dev/null
+> @@ -1,86 +0,0 @@
+> -// SPDX-License-Identifier: GPL-2.0
+> -/*
+> - * Copyright (c) 2017 MediaTek Inc.
+> - * Author: John Crispin <john@phrozen.org>
+> - *	   Sean Wang <sean.wang@mediatek.com>
+> - *
+> - */
+> -
+> -/dts-v1/;
+> -#include "mt7623.dtsi"
+> -#include "mt6323.dtsi"
+> -
+> -/ {
+> -	aliases {
+> -		serial0 = &uart0;
+> -		serial1 = &uart1;
+> -		serial2 = &uart2;
+> -	};
+> -
+> -	chosen {
+> -		stdout-path = "serial2:115200n8";
+> -	};
+> -
+> -	cpus {
+> -		cpu0 {
+> -			proc-supply = <&mt6323_vproc_reg>;
+> -		};
+> -
+> -		cpu1 {
+> -			proc-supply = <&mt6323_vproc_reg>;
+> -		};
+> -
+> -		cpu2 {
+> -			proc-supply = <&mt6323_vproc_reg>;
+> -		};
+> -
+> -		cpu3 {
+> -			proc-supply = <&mt6323_vproc_reg>;
+> -		};
+> -	};
+> -
+> -	memory at 80000000 {
+> -		device_type = "memory";
+> -		reg = <0 0x80000000 0 0x40000000>;
+> -	};
+> -
+> -	usb_p1_vbus: regulator-5v {
+> -		compatible = "regulator-fixed";
+> -		regulator-name = "usb_vbus";
+> -		regulator-min-microvolt = <5000000>;
+> -		regulator-max-microvolt = <5000000>;
+> -		gpio = <&pio 135 GPIO_ACTIVE_HIGH>;
+> -		enable-active-high;
+> -	};
+> -};
+> -
+> -&mmc0 {
+> -	vmmc-supply = <&mt6323_vemc3v3_reg>;
+> -	vqmmc-supply = <&mt6323_vio18_reg>;
+> -};
+> -
+> -&mmc1 {
+> -	vmmc-supply = <&mt6323_vmch_reg>;
+> -	vqmmc-supply = <&mt6323_vmc_reg>;
+> -};
+> -
+> -&uart0 {
+> -	status = "okay";
+> -};
+> -
+> -&uart1 {
+> -	status = "okay";
+> -};
+> -
+> -&uart2 {
+> -	status = "okay";
+> -};
+> -
+> -&usb1 {
+> -	vbus-supply = <&usb_p1_vbus>;
+> -	status = "okay";
+> -};
+> -
+> -&u3phy1 {
+> -	status = "okay";
+> -};
+> 
