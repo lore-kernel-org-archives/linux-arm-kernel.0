@@ -1,98 +1,36 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 16 Jul 2018 09:38:36 +0100
-Subject: [PATCH v3 8/9] KVM: arm/arm64: vgic: Let userspace opt-in to
- writable v2 IGROUPR
-In-Reply-To: <1531587940-2490-9-git-send-email-christoffer.dall@arm.com>
-References: <1531587940-2490-1-git-send-email-christoffer.dall@arm.com>
- <1531587940-2490-9-git-send-email-christoffer.dall@arm.com>
-Message-ID: <16b6ec62-4548-3980-073c-2b593d7d4dcb@arm.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Mon, 16 Jul 2018 10:41:45 +0200
+Subject: [PATCH 1/3] soc: amlogic: Add Meson GX Clock Measure driver
+In-Reply-To: <CAFBinCDCbOrX8BaJcDpeiR=r6eSxj=OQ1voj-Lug=P7hyvu=hA@mail.gmail.com>
+References: <1530624110-4687-1-git-send-email-narmstrong@baylibre.com>
+ <1530624110-4687-2-git-send-email-narmstrong@baylibre.com>
+ <CAFBinCDBEbVSEzhM2WOhxNX1DZLiSrkeo7GWdxGzBpOUH3PKQw@mail.gmail.com>
+ <7d83a0a4-5cde-7e4f-78a8-372ae8cb03d0@baylibre.com>
+ <CAFBinCA5B87TkfOtQd==PxDK74kJ+XWMgY-36QK2TT9p-vAEUA@mail.gmail.com>
+ <7hy3eknl3l.fsf@baylibre.com>
+ <fb73556d-cf18-266c-e638-9dd92224b939@baylibre.com>
+ <CAFBinCDCbOrX8BaJcDpeiR=r6eSxj=OQ1voj-Lug=P7hyvu=hA@mail.gmail.com>
+Message-ID: <1531730505.12853.16.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/07/18 18:05, Christoffer Dall wrote:
-> Simply letting IGROUPR be writable from userspace would break
-> migration from old kernels to newer kernels, because old kernels
-> incorrectly report interrupt groups as group 1.  This would not be a big
-> problem if userspace wrote GICD_IIDR as read from the kernel, because we
-> could detect the incompatibility and return an error to userspace.
-> Unfortunately, this is not the case with current userspace
-> implementations and simply letting IGROUPR be writable from userspace for
-> an emulated GICv2 silently breaks migration and causes the destination
-> VM to no longer run after migration.
+On Sat, 2018-07-14 at 16:41 +0200, Martin Blumenstingl wrote:
+> > > 
+> > > Even futther, Couldn't this measure IP be used by the current CCF code
+> > > (as an additonal, optional property) such the the debugfs clk_summary
+> > > uses it directly?
+> > 
+> > It will need hacking the CCF core, but as Jerome and I said, this can be done later on !
+> > We can push a debugfs version and migrate it to CCF when we figure out how to integrate it
+> > correctly.
 > 
-> We now encourage userspace to write the read and expected value of
-> GICD_IIDR as the first part of a GIC register restore, and if we observe
-> a write to GICD_IIDR we know that userspace has been updated and has had
-> a chance to cope with older kernels (VGICv2 IIDR.Revision == 0)
-> incorrectly reporting interrupts as group 1, and therefore we now allow
-> groups to be user writable.
-> 
-> Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
-> ---
->  include/kvm/arm_vgic.h           |  3 +++
->  virt/kvm/arm/vgic/vgic-mmio-v2.c | 15 ++++++++++++++-
->  2 files changed, 17 insertions(+), 1 deletion(-)
-> 
-> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-> index c661d0e..c134790 100644
-> --- a/include/kvm/arm_vgic.h
-> +++ b/include/kvm/arm_vgic.h
-> @@ -221,6 +221,9 @@ struct vgic_dist {
->  	/* Implementation revision as reported in the GICD_IIDR */
->  	u32			implementation_rev;
->  
-> +	/* Userspace can write to GICv2 IGROUPR */
-> +	bool			v2_groups_user_writable;
-> +
->  	/* Do injected MSIs require an additional device ID? */
->  	bool			msis_require_devid;
->  
-> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-> index b79de42..9b6b758 100644
-> --- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
-> +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-> @@ -85,6 +85,17 @@ static int vgic_mmio_uaccess_write_v2_misc(struct kvm_vcpu *vcpu,
->  	case GIC_DIST_IIDR:
->  		if (val != vgic_mmio_read_v2_misc(vcpu, addr, len))
->  			return -EINVAL;
-> +
-> +		/*
-> +		 * If we observe a write to GICD_IIDR we know that userspace
-> +		 * has been updated and has had a chance to cope with older
-> +		 * kernels (VGICv2 IIDR.Revision == 0) incorrectly reporting
-> +		 * interrupts as group 1, and therefore we now allow gruops to
+> Jerome already raised concerns (on IRC) that measuring the clock takes
+> too much time and using a CCF clock provider would mean that "cat
+> /sys/kernel/debug/clk/clk_summary" would be slow
+> if that's the case then I'm happy with a debugfs solution which can be
+> migrated wo whatever framework suits best in the future
 
-groups
-
-> +		 * be user writable.  Doing this by default would break
-> +		 * migration from old kernels to new kernels with legacy
-> +		 * userspace.
-> +		 */
-> +		vcpu->kvm->arch.vgic.v2_groups_user_writable = true;
-
-		return 0; ?
-
-I think it'd be safer, just in case we decide to do something bizarre in
-vgic_mmio_write_v2_misc...
-
->  	}
->  
->  	vgic_mmio_write_v2_misc(vcpu, addr, len, val);
-> @@ -95,7 +106,9 @@ static int vgic_mmio_uaccess_write_v2_group(struct kvm_vcpu *vcpu,
->  					    gpa_t addr, unsigned int len,
->  					    unsigned long val)
->  {
-> -	/* Ignore writes from userspace */
-> +	if (vcpu->kvm->arch.vgic.v2_groups_user_writable)
-> +		vgic_mmio_write_group(vcpu, addr, len, val);
-> +
->  	return 0;
->  }
->  
-> 
-
-Otherwise looks good..
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Actually I'm not concerned by clk_summary much, it is debug. Slow is not
+desirable but not critical either. I'm more concerned by tree recalc while
+changing the tree topology and rate change if clock measure implement
+get_rate(). It is worth trying ... just keep an eye ton this.
