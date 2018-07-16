@@ -1,54 +1,50 @@
 From: andrew@aj.id.au (Andrew Jeffery)
-Date: Mon, 16 Jul 2018 15:08:08 +0930
-Subject: [PATCH 6/7] arm: configs: Add USB gadget to Aspeed G5 defconfig
-In-Reply-To: <20180629035106.27181-7-benh@kernel.crashing.org>
+Date: Mon, 16 Jul 2018 15:09:58 +0930
+Subject: [PATCH 7/7] arm: dts: aspeed: Enable vhub on port A of AST2500 EVB
+In-Reply-To: <20180629035106.27181-8-benh@kernel.crashing.org>
 References: <20180629035106.27181-1-benh@kernel.crashing.org>
- <20180629035106.27181-7-benh@kernel.crashing.org>
-Message-ID: <1531719488.1119218.1441836344.2211276E@webmail.messagingengine.com>
+ <20180629035106.27181-8-benh@kernel.crashing.org>
+Message-ID: <1531719598.1119558.1441836648.51F03355@webmail.messagingengine.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Fri, 29 Jun 2018, at 13:21, Benjamin Herrenschmidt wrote:
-> Now that the vhub driver is upstream and the device-trees
-> updated, let's enable this by default.
+> This is an eval board, it makes sense to enable many
+> functions by default. This changes the device-tree to
+> set port A to be a USB device and leave port B as a
+> host, along with a little comment explaining how to
+> change it.
+> 
+> (the vhub device can only exist on port A on this SoC)
 > 
 > Signed-off-by: Benjamin Herrenschmidt <benh@kernel.crashing.org>
 
 Acked-by: Andrew Jeffery <andrew@aj.id.au>
 
 > ---
->  arch/arm/configs/aspeed_g5_defconfig | 17 +++++++++++++++++
->  1 file changed, 17 insertions(+)
+>  arch/arm/boot/dts/aspeed-ast2500-evb.dts | 8 +++++++-
+>  1 file changed, 7 insertions(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm/configs/aspeed_g5_defconfig b/arch/arm/configs/
-> aspeed_g5_defconfig
-> index 8c7ea033cdc2..38e9b2d43df3 100644
-> --- a/arch/arm/configs/aspeed_g5_defconfig
-> +++ b/arch/arm/configs/aspeed_g5_defconfig
-> @@ -140,6 +140,23 @@ CONFIG_USB_DYNAMIC_MINORS=y
->  CONFIG_USB_EHCI_HCD=y
->  CONFIG_USB_EHCI_ROOT_HUB_TT=y
->  CONFIG_USB_EHCI_HCD_PLATFORM=y
-> +CONFIG_USB_GADGET=y
-> +CONFIG_U_SERIAL_CONSOLE=y
-> +CONFIG_USB_ASPEED_VHUB=y
-> +CONFIG_USB_CONFIGFS=y
-> +CONFIG_USB_CONFIGFS_SERIAL=y
-> +CONFIG_USB_CONFIGFS_ACM=y
-> +CONFIG_USB_CONFIGFS_OBEX=y
-> +CONFIG_USB_CONFIGFS_NCM=y
-> +CONFIG_USB_CONFIGFS_ECM=y
-> +CONFIG_USB_CONFIGFS_ECM_SUBSET=y
-> +CONFIG_USB_CONFIGFS_RNDIS=y
-> +CONFIG_USB_CONFIGFS_EEM=y
-> +CONFIG_USB_CONFIGFS_MASS_STORAGE=y
-> +CONFIG_USB_CONFIGFS_F_LB_SS=y
-> +CONFIG_USB_CONFIGFS_F_FS=y
-> +CONFIG_USB_CONFIGFS_F_HID=y
-> +CONFIG_USB_CONFIGFS_F_PRINTER=y
->  CONFIG_NEW_LEDS=y
->  CONFIG_LEDS_CLASS=y
->  CONFIG_LEDS_CLASS_FLASH=y
+> diff --git a/arch/arm/boot/dts/aspeed-ast2500-evb.dts b/arch/arm/boot/
+> dts/aspeed-ast2500-evb.dts
+> index 2bff1b253842..2375449c02d0 100644
+> --- a/arch/arm/boot/dts/aspeed-ast2500-evb.dts
+> +++ b/arch/arm/boot/dts/aspeed-ast2500-evb.dts
+> @@ -80,7 +80,13 @@
+>  	};
+>  };
+>  
+> -&ehci0 {
+> +/*
+> + * Enable port A as device (via the virtual hub) and port B as
+> + * host by default on the eval board. This can be easily changed
+> + * by replacing the override below with &ehci0 { ... } to enable
+> + * host on both ports.
+> + */
+> +&vhub {
+>  	status = "okay";
+>  };
+>  
 > -- 
 > 2.17.1
 > 
