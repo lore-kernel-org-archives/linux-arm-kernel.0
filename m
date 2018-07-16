@@ -1,40 +1,58 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 16 Jul 2018 00:53:46 -0700
-Subject: [GIT PULL 5/5] dts changes for omap mcan for v4.19
-In-Reply-To: <20180714211925.btxeb3ewlohndsiz@localhost>
-References: <pull-1531314878-371161@atomide.com>
- <pull-1531314878-371161@atomide.com-5>
- <20180714211925.btxeb3ewlohndsiz@localhost>
-Message-ID: <20180716075346.GS99251@atomide.com>
+From: patrice.chotard@st.com (Patrice CHOTARD)
+Date: Mon, 16 Jul 2018 07:55:08 +0000
+Subject: [PATCH] ARM: STi: at least warn if of_iomap fails
+In-Reply-To: <1531410530-24163-1-git-send-email-hofrat@osadl.org>
+References: <1531410530-24163-1-git-send-email-hofrat@osadl.org>
+Message-ID: <50a1ccc1-e64a-a35e-a7b5-eeb7082478e9@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Olof Johansson <olof@lixom.net> [180714 22:21]:
-> On Wed, Jul 11, 2018 at 06:19:08AM -0700, Tony Lindgren wrote:
-> > dts changes for mcan for omaps for v4.19 merge window
-> > 
-> > These changes configure the mcan clock, interconnect target
-> > module and mcan device. These changes depend on the ti-sysc
-> > related driver changes and are based on those.
-> > 
-> > Notably this is the first new driver that probes with ti-sysc
-> > driver with no legacy hwmod platform data for the interconnect
-> > target module.
+Hi Nicholas
+
+On 07/12/2018 05:48 PM, Nicholas Mc Guire wrote:
+> The call to of_iomap() is unchecked but scu_enable(), which the returned
+> address is passed on to, assumes a valid mapping. If the mapping is
+> invalid this could probably lead to undefined system state so at least
+> a warning should be issued.
 > 
-> Hi Tony,
+> Signed-off-by: Nicholas Mc Guire <hofrat@osadl.org>
+> Fixes: commit 65ebcc115889 ("ARM: sti: Add STiH415 SOC support")
+> ---
+> Problem was found by an experimental coccinelle script
 > 
-> I'm not entirely sure why you sent this as a separate pull request, but it also
-> conflicts with your first DT branch (add/add conflict at the end of the file).
+> Patch was compile tested with: multi_v7_defconfig (implies
+> CONFIG_ARCH_STI=y, CONFIG_SMP=y)
+> 
+> Patch is against 4.18-rc3 (localversion-next is next-20180712)
+> 
+>   arch/arm/mach-sti/platsmp.c | 1 +
+>   1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/mach-sti/platsmp.c b/arch/arm/mach-sti/platsmp.c
+> index 231f19e..89ae76f 100644
+> --- a/arch/arm/mach-sti/platsmp.c
+> +++ b/arch/arm/mach-sti/platsmp.c
+> @@ -109,6 +109,7 @@ static void __init sti_smp_prepare_cpus(unsigned int max_cpus)
+>   
+>   	if (np) {
+>   		scu_base = of_iomap(np, 0);
+> +		WARN_ON(!scu_base);
+>   		scu_enable(scu_base);
+>   		of_node_put(np);
+>   	}
+> 
 
-I put them into a separate branch because they were based on
-the pending ti-sysc driver changes so you could merge them to
-a branch you prefer. But I forgot the merge conflict again..
-The resolution is almost always in Linux next for the branches
-I send pull requests for for. But I added some notes to check
-those next time.
+I should prefer to exit with an error to avoid unpredictable behavior,
+something like this is better :
 
-> Fixed up by keeping both sides, merged.
+scu_base = of_iomap(np, 0);
+of_node_put(np);
+if (!scu_base) {
+	pr_err("No SCU remap\n");
+	return;
+}
 
-OK thanks!
+scu_enable(scu_base);
 
-Tony
+
+Thanks
