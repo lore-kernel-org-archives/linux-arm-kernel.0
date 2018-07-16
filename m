@@ -1,67 +1,46 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 16 Jul 2018 11:25:58 +0200
-Subject: [PATCH 3/3 v5] ARM: defconfig: Enable the PL111 DRM driver on vexpress
-In-Reply-To: <20180716092558.10358-1-linus.walleij@linaro.org>
-References: <20180716092558.10358-1-linus.walleij@linaro.org>
-Message-ID: <20180716092558.10358-3-linus.walleij@linaro.org>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Mon, 16 Jul 2018 11:28:52 +0200
+Subject: [PATCH v3 0/4] Add basic support for Mediatek MT8183 SoC
+In-Reply-To: <1526538126-51497-1-git-send-email-erin.lo@mediatek.com>
+References: <1526538126-51497-1-git-send-email-erin.lo@mediatek.com>
+Message-ID: <9ba45353-a6e1-9a6e-f05b-4b1679ae9e52@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This updates the Versatile defconfig to use the new P111 DRM
-driver that is merged in the DRM subsystem.
+Hi Erin,
 
-We deactivate the old CLCD driver and activate the Pl111 DRM
-driver and the SiI9022 HDMI bridge.
+On 17/05/18 08:22, Erin Lo wrote:
+> MT8183 is a SoC based on 64bit ARMv8 architecture.
+> It contains 4 CA53 and 4 CA73 cores.
+> MT8183 share many HW IP with MT65xx series.
+> This patchset was tested on MT8183 evaluation board, and boot to shell ok.
+> 
+> This series contains document bindings, device tree including interrupt, uart.
+> 
+> Change in v3:
+> 1. Fill out GICC, GICH, GICV regions
+> 2. Update Copyright to 2018
+> 
+> Change in v2:
+> 1. Split dt-bindings into different patches
+> 2. Correct bindings for supported SoCs (mtk-uart.txt)
+> 
+> Ben Ho (1):
+>   arm64: dts: Add Mediatek SoC MT8183 and evaluation board dts and
+>     Makefile
+> 
+> Erin Lo (3):
+>   dt-bindings: arm: Add bindings for Mediatek MT8183 SoC Platform
+>   dt-bindings: mtk-sysirq: Add compatible for Mediatek MT8183
+>   dt-bindings: serial: Add compatible for Mediatek MT8183
+> 
 
-We activate DMA memory allocation using CMA so that the special
-graphics memory for the on-board CLCD can be used.
+I'm a bit reluctant to take this series, as it will only enable the EVB board to
+boot into a serial console. Are you planning to add support for other devices of
+this SoC?
 
-Cc: Sudeep Holla <sudeep.holla@arm.com>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ChangeLog v4->v5:
-- Resending.
-ChangeLog v3->v4:
-- Resending.
-ChangeLog v1->v3:
-- Rebased
----
- arch/arm/configs/vexpress_defconfig | 12 ++++++++----
- 1 file changed, 8 insertions(+), 4 deletions(-)
+Apart please take into account that there is an issue with the dts file, as you
+were told by the kbuild test robot.
 
-diff --git a/arch/arm/configs/vexpress_defconfig b/arch/arm/configs/vexpress_defconfig
-index 226fe4bfb487..392ed3b3613c 100644
---- a/arch/arm/configs/vexpress_defconfig
-+++ b/arch/arm/configs/vexpress_defconfig
-@@ -48,6 +48,7 @@ CONFIG_NET_9P=y
- CONFIG_NET_9P_VIRTIO=y
- CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
- CONFIG_DEVTMPFS=y
-+CONFIG_DMA_CMA=y
- CONFIG_MTD=y
- CONFIG_MTD_CMDLINE_PARTS=y
- CONFIG_MTD_BLOCK=y
-@@ -78,13 +79,16 @@ CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
- CONFIG_VIRTIO_CONSOLE=y
- CONFIG_HW_RANDOM=y
- CONFIG_HW_RANDOM_VIRTIO=y
--CONFIG_I2C=y
- CONFIG_I2C_VERSATILE=y
- CONFIG_SENSORS_VEXPRESS=y
- CONFIG_REGULATOR_VEXPRESS=y
--CONFIG_FB=y
--CONFIG_FB_ARMCLCD=y
--CONFIG_FRAMEBUFFER_CONSOLE=y
-+CONFIG_DRM=y
-+CONFIG_DRM_PANEL_SIMPLE=y
-+CONFIG_DRM_SII902X=y
-+CONFIG_DRM_PL111=y
-+CONFIG_FB_MODE_HELPERS=y
-+CONFIG_BACKLIGHT_LCD_SUPPORT=y
-+CONFIG_BACKLIGHT_CLASS_DEVICE=y
- CONFIG_LOGO=y
- # CONFIG_LOGO_LINUX_MONO is not set
- # CONFIG_LOGO_LINUX_VGA16 is not set
--- 
-2.17.0
+Regards,
+Matthias
