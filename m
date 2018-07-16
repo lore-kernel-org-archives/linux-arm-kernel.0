@@ -1,68 +1,102 @@
 From: christoffer.dall@arm.com (Christoffer Dall)
-Date: Mon, 16 Jul 2018 15:06:22 +0200
-Subject: [PATCH v4 05/10] KVM: arm/arm64: vgic: Signal IRQs using their
- configured group
+Date: Mon, 16 Jul 2018 15:06:24 +0200
+Subject: [PATCH v4 07/10] KVM: arm/arm64: vgic: Return error on incompatible
+ uaccess GICD_IIDR writes
 In-Reply-To: <1531746387-7033-1-git-send-email-christoffer.dall@arm.com>
 References: <1531746387-7033-1-git-send-email-christoffer.dall@arm.com>
-Message-ID: <1531746387-7033-6-git-send-email-christoffer.dall@arm.com>
+Message-ID: <1531746387-7033-8-git-send-email-christoffer.dall@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now when we have a group configuration on the struct IRQ, use this state
-when populating the LR and signaling interrupts as either group 0 or
-group 1 to the VM.  Depending on the model of the emulated GIC, and the
-guest's configuration of the VMCR, interrupts may be signaled as IRQs or
-FIQs to the VM.
+If userspace attempts to write a GICD_IIDR that does not match the
+kernel version, return an error to userspace.  The intention is to allow
+implementation changes inside KVM while avoiding silently breaking
+migration resulting in guests not running without any clear indication
+of what went wrong.
 
 Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
 ---
- include/linux/irqchip/arm-gic.h | 1 +
- virt/kvm/arm/vgic/vgic-v2.c     | 3 +++
- virt/kvm/arm/vgic/vgic-v3.c     | 6 +-----
- 3 files changed, 5 insertions(+), 5 deletions(-)
+ virt/kvm/arm/vgic/vgic-mmio-v2.c | 21 ++++++++++++++++++---
+ virt/kvm/arm/vgic/vgic-mmio-v3.c | 21 ++++++++++++++++++---
+ 2 files changed, 36 insertions(+), 6 deletions(-)
 
-diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
-index 484f5bf..6c4aaf0 100644
---- a/include/linux/irqchip/arm-gic.h
-+++ b/include/linux/irqchip/arm-gic.h
-@@ -104,6 +104,7 @@
- #define GICH_LR_PENDING_BIT		(1 << 28)
- #define GICH_LR_ACTIVE_BIT		(1 << 29)
- #define GICH_LR_EOI			(1 << 19)
-+#define GICH_LR_GROUP1			(1 << 30)
- #define GICH_LR_HW			(1 << 31)
+diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+index db646f1..4f0f2c4 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
++++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+@@ -75,6 +75,20 @@ static void vgic_mmio_write_v2_misc(struct kvm_vcpu *vcpu,
+ 	}
+ }
  
- #define GICH_VMCR_ENABLE_GRP0_SHIFT	0
-diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
-index a5f2e44..df5e6a6 100644
---- a/virt/kvm/arm/vgic/vgic-v2.c
-+++ b/virt/kvm/arm/vgic/vgic-v2.c
-@@ -159,6 +159,9 @@ void vgic_v2_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr)
- 		}
++static int vgic_mmio_uaccess_write_v2_misc(struct kvm_vcpu *vcpu,
++					   gpa_t addr, unsigned int len,
++					   unsigned long val)
++{
++	switch (addr & 0x0c) {
++	case GIC_DIST_IIDR:
++		if (val != vgic_mmio_read_v2_misc(vcpu, addr, len))
++			return -EINVAL;
++	}
++
++	vgic_mmio_write_v2_misc(vcpu, addr, len, val);
++	return 0;
++}
++
+ static void vgic_mmio_write_sgir(struct kvm_vcpu *source_vcpu,
+ 				 gpa_t addr, unsigned int len,
+ 				 unsigned long val)
+@@ -367,9 +381,10 @@ static void vgic_mmio_write_apr(struct kvm_vcpu *vcpu,
+ }
+ 
+ static const struct vgic_register_region vgic_v2_dist_registers[] = {
+-	REGISTER_DESC_WITH_LENGTH(GIC_DIST_CTRL,
+-		vgic_mmio_read_v2_misc, vgic_mmio_write_v2_misc, 12,
+-		VGIC_ACCESS_32bit),
++	REGISTER_DESC_WITH_LENGTH_UACCESS(GIC_DIST_CTRL,
++		vgic_mmio_read_v2_misc, vgic_mmio_write_v2_misc,
++		NULL, vgic_mmio_uaccess_write_v2_misc,
++		12, VGIC_ACCESS_32bit),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_IGROUP,
+ 		vgic_mmio_read_raz, vgic_mmio_write_wi, NULL, NULL, 1,
+ 		VGIC_ACCESS_32bit),
+diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+index ef57a1a..abdb0ec 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
++++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+@@ -113,6 +113,20 @@ static void vgic_mmio_write_v3_misc(struct kvm_vcpu *vcpu,
+ 	}
+ }
+ 
++static int vgic_mmio_uaccess_write_v3_misc(struct kvm_vcpu *vcpu,
++					   gpa_t addr, unsigned int len,
++					   unsigned long val)
++{
++	switch (addr & 0x0c) {
++	case GICD_IIDR:
++		if (val != vgic_mmio_read_v3_misc(vcpu, addr, len))
++			return -EINVAL;
++	}
++
++	vgic_mmio_write_v3_misc(vcpu, addr, len, val);
++	return 0;
++}
++
+ static unsigned long vgic_mmio_read_irouter(struct kvm_vcpu *vcpu,
+ 					    gpa_t addr, unsigned int len)
+ {
+@@ -449,9 +463,10 @@ static void vgic_mmio_write_pendbase(struct kvm_vcpu *vcpu,
  	}
  
-+	if (irq->group)
-+		val |= GICH_LR_GROUP1;
-+
- 	if (irq->hw) {
- 		val |= GICH_LR_HW;
- 		val |= irq->hwintid << GICH_LR_PHYSID_CPUID_SHIFT;
-diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-index cdce653..530b849 100644
---- a/virt/kvm/arm/vgic/vgic-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-v3.c
-@@ -197,11 +197,7 @@ void vgic_v3_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr)
- 	if (vgic_irq_is_mapped_level(irq) && (val & ICH_LR_PENDING_BIT))
- 		irq->line_level = false;
- 
--	/*
--	 * We currently only support Group1 interrupts, which is a
--	 * known defect. This needs to be addressed at some point.
--	 */
--	if (model == KVM_DEV_TYPE_ARM_VGIC_V3)
-+	if (irq->group)
- 		val |= ICH_LR_GROUP;
- 
- 	val |= (u64)irq->priority << ICH_LR_PRIORITY_SHIFT;
+ static const struct vgic_register_region vgic_v3_dist_registers[] = {
+-	REGISTER_DESC_WITH_LENGTH(GICD_CTLR,
+-		vgic_mmio_read_v3_misc, vgic_mmio_write_v3_misc, 16,
+-		VGIC_ACCESS_32bit),
++	REGISTER_DESC_WITH_LENGTH_UACCESS(GICD_CTLR,
++		vgic_mmio_read_v3_misc, vgic_mmio_write_v3_misc,
++		NULL, vgic_mmio_uaccess_write_v3_misc,
++		16, VGIC_ACCESS_32bit),
+ 	REGISTER_DESC_WITH_LENGTH(GICD_STATUSR,
+ 		vgic_mmio_read_rao, vgic_mmio_write_wi, 4,
+ 		VGIC_ACCESS_32bit),
 -- 
 2.7.4
