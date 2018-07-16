@@ -1,57 +1,69 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Mon, 16 Jul 2018 09:56:46 +0100
-Subject: [PATCH v4 08/18] net: davinci_emac: potentially get the MAC
- address from MTD
-In-Reply-To: <d7f03763-982f-5e3e-d0ad-54e024b10f97@ti.com>
-References: <20180629094039.7543-1-brgl@bgdev.pl>
- <20180629094039.7543-9-brgl@bgdev.pl>
- <03b77e24-9ab9-fa01-2387-9de0408a9942@gmail.com>
- <20180704070919.GA14051@lenoch>
- <CAMRc=McOYG9=naT2=4c4hnhJwxcqBCATEZOGXXv9u9zuvXyDXw@mail.gmail.com>
- <c0ffc590-8064-3b02-9b5c-fcc24628d390@ti.com>
- <CAMRc=McO8H9Aw8a7h318a=hJjKBOgeC+9_hreBnOY3Tc3Fh7sg@mail.gmail.com>
- <d7f03763-982f-5e3e-d0ad-54e024b10f97@ti.com>
-Message-ID: <a70aebb0-408c-c61f-897a-227114888585@linaro.org>
+From: der.herr@hofr.at (Nicholas Mc Guire)
+Date: Mon, 16 Jul 2018 08:46:26 +0000
+Subject: [PATCH] ARM: STi: at least warn if of_iomap fails
+In-Reply-To: <50a1ccc1-e64a-a35e-a7b5-eeb7082478e9@st.com>
+References: <1531410530-24163-1-git-send-email-hofrat@osadl.org>
+ <50a1ccc1-e64a-a35e-a7b5-eeb7082478e9@st.com>
+Message-ID: <20180716084626.GA28893@osadl.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 16/07/18 09:50, Sekhar Nori wrote:
-> On Friday 13 July 2018 11:30 PM, Bartosz Golaszewski wrote:
+On Mon, Jul 16, 2018 at 07:55:08AM +0000, Patrice CHOTARD wrote:
+> Hi Nicholas
 > 
->> We're getting close to rc5 so I'd like to make a case for this series again.
->>
->> I understand that there's more to do than just the changes introduced
->> here, but we shouldn't try to fix several problems in many different
->> places at once. There's just too many moving pieces. I'd rather start
->> merging small improvements right away.
->>
->> The idea behind this series is to remove (almost) all users of
->> at24_platform_data. The davinci_emac patches are there only because we
->> need to remove some MAC adress reading stuff from the board files.
->> Having this code there and calling it back from EEPROM/MTD drivers is
->> already wrong and we should work towards using nvmem for that anyway.
->>
->> Currently for MTD the nvmem support series seems to be dead and it's
->> going to take some time before anything gets upstream.
->>
->> So I'd like to again ask you to consider picking up the patches from
->> this series to your respective trees or at the very least: I'd like to
->> ask Srinivas to pick up the nvmem patches and Sekhar to take the
->> first, non-controversial batch of davinci platform changes so that
->> we'll have less code to carry for the next release.
+> On 07/12/2018 05:48 PM, Nicholas Mc Guire wrote:
+> > The call to of_iomap() is unchecked but scu_enable(), which the returned
+> > address is passed on to, assumes a valid mapping. If the mapping is
+> > invalid this could probably lead to undefined system state so at least
+> > a warning should be issued.
+> > 
+> > Signed-off-by: Nicholas Mc Guire <hofrat@osadl.org>
+> > Fixes: commit 65ebcc115889 ("ARM: sti: Add STiH415 SOC support")
+> > ---
+> > Problem was found by an experimental coccinelle script
+> > 
+> > Patch was compile tested with: multi_v7_defconfig (implies
+> > CONFIG_ARCH_STI=y, CONFIG_SMP=y)
+> > 
+> > Patch is against 4.18-rc3 (localversion-next is next-20180712)
+> > 
+> >   arch/arm/mach-sti/platsmp.c | 1 +
+> >   1 file changed, 1 insertion(+)
+> > 
+> > diff --git a/arch/arm/mach-sti/platsmp.c b/arch/arm/mach-sti/platsmp.c
+> > index 231f19e..89ae76f 100644
+> > --- a/arch/arm/mach-sti/platsmp.c
+> > +++ b/arch/arm/mach-sti/platsmp.c
+> > @@ -109,6 +109,7 @@ static void __init sti_smp_prepare_cpus(unsigned int max_cpus)
+> >   
+> >   	if (np) {
+> >   		scu_base = of_iomap(np, 0);
+> > +		WARN_ON(!scu_base);
+> >   		scu_enable(scu_base);
+> >   		of_node_put(np);
+> >   	}
+> > 
 > 
-> I think those are patches 3-7. I can take those if I get an immutable
-> commit over v4.18-rc1 from Srinivas with patches 1 & 2 applied.
-nvmem patches go via Greg KH char-misc tree, if it makes things easy I 
-can provide Ack on nvmem patches, so that you can take these patches via 
-your tree?
+> I should prefer to exit with an error to avoid unpredictable behavior,
+> something like this is better :
+> 
+> scu_base = of_iomap(np, 0);
+> of_node_put(np);
+> if (!scu_base) {
+> 	pr_err("No SCU remap\n");
+> 	return;
+> }
+> 
+> scu_enable(scu_base);
+>
+even though it would be possible to locate that then from that message
+would it not be prefereable to provide the infos upfront like:
 
-Let me know.
+	pr_err("SCU remap failed at %s:%s():%d\n",
+               __FILE__, __func__, __LINE__);
 
---srini
-> 
-> Thanks,
-> Sekhar
-> 
+if that makes sense I?ll resend - or is that considered too verbouse ?
+
+thx!
+hofrat
+ 
