@@ -1,50 +1,45 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 16 Jul 2018 02:13:55 -0700
-Subject: linux-next: Signed-off-by missing for commits in the arm-soc tree
-In-Reply-To: <CAOesGMhVeo6Wc=nMcEnusa+FfwQBWJnxs0LY-zXm4HMau+SMhg@mail.gmail.com>
-References: <20180716075718.4e5ef491@canb.auug.org.au>
- <CAOesGMhVeo6Wc=nMcEnusa+FfwQBWJnxs0LY-zXm4HMau+SMhg@mail.gmail.com>
-Message-ID: <6a9fa6f3-7aef-a83b-72a6-dc9492964b5e@gmail.com>
+From: ulrich.hecht@gmail.com (Ulrich Hecht)
+Date: Mon, 16 Jul 2018 11:16:53 +0200
+Subject: [PATCH v3 2/2] arm64: dts: renesas: condor/v3hsk: add
+ DU/LVDS/HDMI support
+In-Reply-To: <20180716075325.y7jtwyqxwerdmfy3@verge.net.au>
+References: <95d0db34-713d-8206-00c2-ee9a42aab823@cogentembedded.com>
+ <c78f1228-afb0-54cf-5d9e-5c812b678de3@cogentembedded.com>
+ <20180614072426.vq42mmb3gsmv6z5k@verge.net.au>
+ <20180716075325.y7jtwyqxwerdmfy3@verge.net.au>
+Message-ID: <CAO3366wzXc+KY2uMVp5FGS9RyGyaFgktWS__kSTdu3AAWVxZKQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 07/15/2018 03:50 PM, Olof Johansson wrote:
-> Thanks Stephen, I keep saying every time you catch these that I need
-> to run the same script. :(
-> 
-> Florian, I wonder if this happened when you rebased to squash in the fix?
-
-Humm, could be, all I did (and it was not the first time) was to do an
-interactive rebase with --preserve-merges. AFAICT, all of these commits
-came from Eric's pull request, so what I typically do is just sign off
-on the merge commit, but do not apply my SoB to all commits coming from
-that pull request if that makes sense?
-
-> 
-> I'll figure out where to get this into my workflow so we catch it
-> before I merge from now on.
-> 
-> 
-> -Olof
-> 
-> On Sun, Jul 15, 2018 at 2:57 PM, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
->> Hi all,
+On Mon, Jul 16, 2018 at 9:53 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Thu, Jun 14, 2018 at 09:24:27AM +0200, Simon Horman wrote:
+>> On Wed, Jun 13, 2018 at 11:12:40PM +0300, Sergei Shtylyov wrote:
+>> > Define the Condor/V3HSK board dependent parts of the DU and  LVDS device
+>> > nodes. Also add the device nodes for Thine THC63LVD1024 LVDS decoder and
+>> > Analog Devices ADV7511W HDMI transmitter...
+>> >
+>> > Based on the original (and large) patch by Vladimir Barinov.
+>> >
+>> > Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+>> > Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>> >
+>> > ---
+>> > Changes in version 2:
+>> > - added the V3HSK DT update, reworded the description, renamed the patch;
+>> > - added a space between the HDMI node name and a brace.
+>> >
+>> >  arch/arm64/boot/dts/renesas/r8a77980-condor.dts |  106 +++++++++++++++++++++
+>> >  arch/arm64/boot/dts/renesas/r8a77980-v3hsk.dts  |  120 ++++++++++++++++++++++++
 >>
->> Commits
->>
->>   b8ccf02a5014 ("ARM: dts: bcm283x: Add the PMU to the devicetree.")
->>   b7dd29b401f5 ("ARM: dts: bcm283x: Add Transposer block")
->>   74d1e007915f ("hwmon: Add support for RPi voltage sensor")
->>   70eea1bbb556 ("firmware: raspberrypi: Register hwmon driver")
->>   a1547e0bca51 ("firmware: raspberrypi: Remove VLA usage")
->>
->> are missing a Signed-off-by from their committer.
->>
->> --
->> Cheers,
->> Stephen Rothwell
+>> Laurent, could you review this?
+>
+> Ping
 
--- 
-Florian
+For the Condor part:
+
+Reviewed-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+
+Unfortunately, I do not have documentation for the other board.
+
+CU
+Uli
