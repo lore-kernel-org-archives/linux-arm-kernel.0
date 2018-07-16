@@ -1,46 +1,50 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Mon, 16 Jul 2018 16:41:57 +0200
-Subject: [PATCH v3 14/23] dt-bindings: ap806: prepare the syscon file to list
- other syscons nodes
+Date: Mon, 16 Jul 2018 16:41:48 +0200
+Subject: [PATCH v3 05/23] thermal: armada: dissociate a380 and cp110 ->init()
+ hooks
 In-Reply-To: <20180716144206.30985-1-miquel.raynal@bootlin.com>
 References: <20180716144206.30985-1-miquel.raynal@bootlin.com>
-Message-ID: <20180716144206.30985-15-miquel.raynal@bootlin.com>
+Message-ID: <20180716144206.30985-6-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are multiple system controllers in AP806. Because all syscon nodes
-use the same compatible, it is pertinent to use this same file to list
-IPs inside it. Thus, change the header to be more generic.
+Until now, Armada 380 and CP110 could share the same ->init() function
+because their use was identical.
+
+Prepare the support of multi-sensors support and overheat interrupt
+feature by separating the initialization paths before they actually
+diverge.
 
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
 ---
- .../bindings/arm/marvell/ap806-system-controller.txt           | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ drivers/thermal/armada_thermal.c | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt b/Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt
-index 0b887440e08a..a856eb9a4e05 100644
---- a/Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt
-+++ b/Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt
-@@ -2,14 +2,14 @@ Marvell Armada AP806 System Controller
- ======================================
+diff --git a/drivers/thermal/armada_thermal.c b/drivers/thermal/armada_thermal.c
+index 3d22a6016b04..9291ea3ad2f7 100644
+--- a/drivers/thermal/armada_thermal.c
++++ b/drivers/thermal/armada_thermal.c
+@@ -200,6 +200,12 @@ static void armada_ap806_init(struct platform_device *pdev,
+ 	armada_wait_sensor_validity(priv);
+ }
  
- The AP806 is one of the two core HW blocks of the Marvell Armada 7K/8K
--SoCs. It contains a system controller, which provides a number
--registers giving access to numerous features: clocks, pin-muxing and
--many other SoC configuration items. This DT binding allows to describe
--this system controller.
-+SoCs. It contains system controllers, which provide several registers
-+giving access to numerous features: clocks, pin-muxing and many other
-+SoC configuration items. This DT binding allows to describe these
-+system controllers.
++static void armada_cp110_init(struct platform_device *pdev,
++			      struct armada_thermal_priv *priv)
++{
++	armada380_init(pdev, priv);
++}
++
+ static bool armada_is_valid(struct armada_thermal_priv *priv)
+ {
+ 	u32 reg = readl_relaxed(priv->status);
+@@ -306,7 +312,7 @@ static const struct armada_thermal_data armada_ap806_data = {
  
- For the top level node:
-  - compatible: must be: "syscon", "simple-mfd";
--  - reg: register area of the AP806 system controller
-+ - reg: register area of the AP806 system controller
- 
- Clocks:
- -------
+ static const struct armada_thermal_data armada_cp110_data = {
+ 	.is_valid = armada_is_valid,
+-	.init = armada380_init,
++	.init = armada_cp110_init,
+ 	.is_valid_bit = BIT(10),
+ 	.temp_shift = 0,
+ 	.temp_mask = 0x3ff,
 -- 
 2.14.1
