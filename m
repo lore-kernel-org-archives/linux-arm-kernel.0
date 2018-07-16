@@ -1,62 +1,98 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 16 Jul 2018 10:37:20 +0200
-Subject: [PATCH] pwm-omap: handle timers not ready in probe
-In-Reply-To: <20180716075740.GT99251@atomide.com>
-References: <20180709214910.tes6u4ivxomd3aja@earth.universe>
- <20180709220211.GA7760@amd>
- <20180710101147.lyu65ro4czvrs2da@earth.universe>
- <20180710133040.GA4391@amd>
- <20180710161123.azym6sbboriuj4yc@earth.universe>
- <20180711080218.GA21225@amd> <20180711132739.GL99251@atomide.com>
- <20180711142526.dto6iost57zx5t5l@earth.universe>
- <20180716071323.GB23110@amd> <20180716075740.GT99251@atomide.com>
-Message-ID: <20180716083720.GA3047@amd>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 16 Jul 2018 09:38:36 +0100
+Subject: [PATCH v3 8/9] KVM: arm/arm64: vgic: Let userspace opt-in to
+ writable v2 IGROUPR
+In-Reply-To: <1531587940-2490-9-git-send-email-christoffer.dall@arm.com>
+References: <1531587940-2490-1-git-send-email-christoffer.dall@arm.com>
+ <1531587940-2490-9-git-send-email-christoffer.dall@arm.com>
+Message-ID: <16b6ec62-4548-3980-073c-2b593d7d4dcb@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 2018-07-16 00:57:40, Tony Lindgren wrote:
-> * Pavel Machek <pavel@ucw.cz> [180716 07:16]:
-> > 
-> > When all the drivers are built-in, timers are not ready and probing
-> > fails. Fix that with -EPROBE_DEFFER.
-> > 
-> > Signed-off-by: Pavel Machek <pavel@ucw.cz>
-> > 
-> > diff --git a/drivers/pwm/pwm-omap-dmtimer.c b/drivers/pwm/pwm-omap-dmtimer.c
-> > index 665da3c..debeb70 100644
-> > --- a/drivers/pwm/pwm-omap-dmtimer.c
-> > +++ b/drivers/pwm/pwm-omap-dmtimer.c
-> > @@ -265,7 +271,7 @@ static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
-> >  	timer_pdata = dev_get_platdata(&timer_pdev->dev);
-> >  	if (!timer_pdata) {
-> >  		dev_err(&pdev->dev, "dmtimer pdata structure NULL\n");
-> > -		ret = -EINVAL;
-> > +		ret = -EPROBE_DEFER;
-> >  		goto put;
-> >  	}
+On 14/07/18 18:05, Christoffer Dall wrote:
+> Simply letting IGROUPR be writable from userspace would break
+> migration from old kernels to newer kernels, because old kernels
+> incorrectly report interrupt groups as group 1.  This would not be a big
+> problem if userspace wrote GICD_IIDR as read from the kernel, because we
+> could detect the incompatibility and return an error to userspace.
+> Unfortunately, this is not the case with current userspace
+> implementations and simply letting IGROUPR be writable from userspace for
+> an emulated GICv2 silently breaks migration and causes the destination
+> VM to no longer run after migration.
 > 
-> There seems to be an earlier similar patch, care to take a look
-> at "[PATCH] pwm: pwm-omap-dmtimer: return -EPROBE_DEFER if no
-> dmtimer platform data"?
+> We now encourage userspace to write the read and expected value of
+> GICD_IIDR as the first part of a GIC register restore, and if we observe
+> a write to GICD_IIDR we know that userspace has been updated and has had
+> a chance to cope with older kernels (VGICv2 IIDR.Revision == 0)
+> incorrectly reporting interrupts as group 1, and therefore we now allow
+> groups to be user writable.
+> 
+> Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
+> ---
+>  include/kvm/arm_vgic.h           |  3 +++
+>  virt/kvm/arm/vgic/vgic-mmio-v2.c | 15 ++++++++++++++-
+>  2 files changed, 17 insertions(+), 1 deletion(-)
+> 
+> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+> index c661d0e..c134790 100644
+> --- a/include/kvm/arm_vgic.h
+> +++ b/include/kvm/arm_vgic.h
+> @@ -221,6 +221,9 @@ struct vgic_dist {
+>  	/* Implementation revision as reported in the GICD_IIDR */
+>  	u32			implementation_rev;
+>  
+> +	/* Userspace can write to GICv2 IGROUPR */
+> +	bool			v2_groups_user_writable;
+> +
+>  	/* Do injected MSIs require an additional device ID? */
+>  	bool			msis_require_devid;
+>  
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> index b79de42..9b6b758 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> @@ -85,6 +85,17 @@ static int vgic_mmio_uaccess_write_v2_misc(struct kvm_vcpu *vcpu,
+>  	case GIC_DIST_IIDR:
+>  		if (val != vgic_mmio_read_v2_misc(vcpu, addr, len))
+>  			return -EINVAL;
+> +
+> +		/*
+> +		 * If we observe a write to GICD_IIDR we know that userspace
+> +		 * has been updated and has had a chance to cope with older
+> +		 * kernels (VGICv2 IIDR.Revision == 0) incorrectly reporting
+> +		 * interrupts as group 1, and therefore we now allow gruops to
 
-Yes, that one is equivalent.
+groups
 
-You can add
+> +		 * be user writable.  Doing this by default would break
+> +		 * migration from old kernels to new kernels with legacy
+> +		 * userspace.
+> +		 */
+> +		vcpu->kvm->arch.vgic.v2_groups_user_writable = true;
 
-Acked-by: Pavel Machek <pavel@ucw.cz>
-Tested-by: Pavel Machek <pavel@ucw.cz>
+		return 0; ?
 
-on it.
+I think it'd be safer, just in case we decide to do something bizarre in
+vgic_mmio_write_v2_misc...
 
-Thanks,
-									Pavel
+>  	}
+>  
+>  	vgic_mmio_write_v2_misc(vcpu, addr, len, val);
+> @@ -95,7 +106,9 @@ static int vgic_mmio_uaccess_write_v2_group(struct kvm_vcpu *vcpu,
+>  					    gpa_t addr, unsigned int len,
+>  					    unsigned long val)
+>  {
+> -	/* Ignore writes from userspace */
+> +	if (vcpu->kvm->arch.vgic.v2_groups_user_writable)
+> +		vgic_mmio_write_group(vcpu, addr, len, val);
+> +
+>  	return 0;
+>  }
+>  
+> 
+
+Otherwise looks good..
+
+	M.
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180716/b09ecb28/attachment-0001.sig>
+Jazz is not dead. It just smells funny...
