@@ -1,137 +1,60 @@
-From: bharat.bhushan@nxp.com (Bharat Bhushan)
-Date: Mon, 16 Jul 2018 15:43:28 +0000
-Subject: [PATCH v4 07/10] KVM: arm/arm64: vgic: Return error on
- incompatible uaccess GICD_IIDR writes
-In-Reply-To: <1531746387-7033-8-git-send-email-christoffer.dall@arm.com>
-References: <1531746387-7033-1-git-send-email-christoffer.dall@arm.com>
- <1531746387-7033-8-git-send-email-christoffer.dall@arm.com>
-Message-ID: <AM5PR0401MB25455D849AB57AF98A3C91F49A5D0@AM5PR0401MB2545.eurprd04.prod.outlook.com>
+From: drivshin@awxrd.com (David Rivshin)
+Date: Mon, 16 Jul 2018 11:47:58 -0400
+Subject: [PATCH] pwm-omap: handle timers not ready in probe
+In-Reply-To: <20180716083720.GA3047@amd>
+References: <20180709214910.tes6u4ivxomd3aja@earth.universe>
+ <20180709220211.GA7760@amd>
+ <20180710101147.lyu65ro4czvrs2da@earth.universe>
+ <20180710133040.GA4391@amd>
+ <20180710161123.azym6sbboriuj4yc@earth.universe>
+ <20180711080218.GA21225@amd> <20180711132739.GL99251@atomide.com>
+ <20180711142526.dto6iost57zx5t5l@earth.universe>
+ <20180716071323.GB23110@amd> <20180716075740.GT99251@atomide.com>
+ <20180716083720.GA3047@amd>
+Message-ID: <20180716114758.60a6a6cb.drivshin@awxrd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
+On Mon, 16 Jul 2018 10:37:20 +0200
+Pavel Machek <pavel@ucw.cz> wrote:
 
-> -----Original Message-----
-> From: kvmarm-bounces at lists.cs.columbia.edu [mailto:kvmarm-
-> bounces at lists.cs.columbia.edu] On Behalf Of Christoffer Dall
-> Sent: Monday, July 16, 2018 6:36 PM
-> To: kvmarm at lists.cs.columbia.edu; linux-arm-kernel at lists.infradead.org
-> Cc: kvm at vger.kernel.org; Marc Zyngier <marc.zyngier@arm.com>; Andre
-> Przywara <andre.przywara@arm.com>
-> Subject: [PATCH v4 07/10] KVM: arm/arm64: vgic: Return error on
-> incompatible uaccess GICD_IIDR writes
+> On Mon 2018-07-16 00:57:40, Tony Lindgren wrote:
+> > * Pavel Machek <pavel@ucw.cz> [180716 07:16]:  
+> > > 
+> > > When all the drivers are built-in, timers are not ready and probing
+> > > fails. Fix that with -EPROBE_DEFFER.
+> > > 
+> > > Signed-off-by: Pavel Machek <pavel@ucw.cz>
+> > > 
+> > > diff --git a/drivers/pwm/pwm-omap-dmtimer.c b/drivers/pwm/pwm-omap-dmtimer.c
+> > > index 665da3c..debeb70 100644
+> > > --- a/drivers/pwm/pwm-omap-dmtimer.c
+> > > +++ b/drivers/pwm/pwm-omap-dmtimer.c
+> > > @@ -265,7 +271,7 @@ static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
+> > >  	timer_pdata = dev_get_platdata(&timer_pdev->dev);
+> > >  	if (!timer_pdata) {
+> > >  		dev_err(&pdev->dev, "dmtimer pdata structure NULL\n");
+> > > -		ret = -EINVAL;
+> > > +		ret = -EPROBE_DEFER;
+> > >  		goto put;
+> > >  	}  
+> > 
+> > There seems to be an earlier similar patch, care to take a look
+> > at "[PATCH] pwm: pwm-omap-dmtimer: return -EPROBE_DEFER if no
+> > dmtimer platform data"?  
 > 
-> If userspace attempts to write a GICD_IIDR that does not match the
-> kernel version, return an error to userspace.  The intention is to allow
-> implementation changes inside KVM while avoiding silently breaking
-> migration resulting in guests not running without any clear indication
-> of what went wrong.
+> Yes, that one is equivalent.
 > 
-> Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
-> ---
->  virt/kvm/arm/vgic/vgic-mmio-v2.c | 21 ++++++++++++++++++---
->  virt/kvm/arm/vgic/vgic-mmio-v3.c | 21 ++++++++++++++++++---
->  2 files changed, 36 insertions(+), 6 deletions(-)
+> You can add
 > 
-> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-
-> mmio-v2.c
-> index db646f1..4f0f2c4 100644
-> --- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
-> +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-> @@ -75,6 +75,20 @@ static void vgic_mmio_write_v2_misc(struct kvm_vcpu
-> *vcpu,
->  	}
->  }
+> Acked-by: Pavel Machek <pavel@ucw.cz>
+> Tested-by: Pavel Machek <pavel@ucw.cz>
 > 
-> +static int vgic_mmio_uaccess_write_v2_misc(struct kvm_vcpu *vcpu,
-> +					   gpa_t addr, unsigned int len,
-> +					   unsigned long val)
-> +{
-> +	switch (addr & 0x0c) {
+> on it.
+> 
+> Thanks,
+> 									Pavel
 
-I am just understanding the code, not sure if it make sense to replace hardcoded "0x0c".
-
-Thanks
--Bharat
-
-> +	case GIC_DIST_IIDR:
-> +		if (val != vgic_mmio_read_v2_misc(vcpu, addr, len))
-> +			return -EINVAL;
-> +	}
-> +
-> +	vgic_mmio_write_v2_misc(vcpu, addr, len, val);
-> +	return 0;
-> +}
-> +
->  static void vgic_mmio_write_sgir(struct kvm_vcpu *source_vcpu,
->  				 gpa_t addr, unsigned int len,
->  				 unsigned long val)
-> @@ -367,9 +381,10 @@ static void vgic_mmio_write_apr(struct kvm_vcpu
-> *vcpu,
->  }
-> 
->  static const struct vgic_register_region vgic_v2_dist_registers[] = {
-> -	REGISTER_DESC_WITH_LENGTH(GIC_DIST_CTRL,
-> -		vgic_mmio_read_v2_misc, vgic_mmio_write_v2_misc, 12,
-> -		VGIC_ACCESS_32bit),
-> +	REGISTER_DESC_WITH_LENGTH_UACCESS(GIC_DIST_CTRL,
-> +		vgic_mmio_read_v2_misc, vgic_mmio_write_v2_misc,
-> +		NULL, vgic_mmio_uaccess_write_v2_misc,
-> +		12, VGIC_ACCESS_32bit),
->  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_IGROUP,
->  		vgic_mmio_read_raz, vgic_mmio_write_wi, NULL, NULL, 1,
->  		VGIC_ACCESS_32bit),
-> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-
-> mmio-v3.c
-> index ef57a1a..abdb0ec 100644
-> --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> @@ -113,6 +113,20 @@ static void vgic_mmio_write_v3_misc(struct
-> kvm_vcpu *vcpu,
->  	}
->  }
-> 
-> +static int vgic_mmio_uaccess_write_v3_misc(struct kvm_vcpu *vcpu,
-> +					   gpa_t addr, unsigned int len,
-> +					   unsigned long val)
-> +{
-> +	switch (addr & 0x0c) {
-> +	case GICD_IIDR:
-> +		if (val != vgic_mmio_read_v3_misc(vcpu, addr, len))
-> +			return -EINVAL;
-> +	}
-> +
-> +	vgic_mmio_write_v3_misc(vcpu, addr, len, val);
-> +	return 0;
-> +}
-> +
->  static unsigned long vgic_mmio_read_irouter(struct kvm_vcpu *vcpu,
->  					    gpa_t addr, unsigned int len)
->  {
-> @@ -449,9 +463,10 @@ static void vgic_mmio_write_pendbase(struct
-> kvm_vcpu *vcpu,
->  	}
-> 
->  static const struct vgic_register_region vgic_v3_dist_registers[] = {
-> -	REGISTER_DESC_WITH_LENGTH(GICD_CTLR,
-> -		vgic_mmio_read_v3_misc, vgic_mmio_write_v3_misc, 16,
-> -		VGIC_ACCESS_32bit),
-> +	REGISTER_DESC_WITH_LENGTH_UACCESS(GICD_CTLR,
-> +		vgic_mmio_read_v3_misc, vgic_mmio_write_v3_misc,
-> +		NULL, vgic_mmio_uaccess_write_v3_misc,
-> +		16, VGIC_ACCESS_32bit),
->  	REGISTER_DESC_WITH_LENGTH(GICD_STATUSR,
->  		vgic_mmio_read_rao, vgic_mmio_write_wi, 4,
->  		VGIC_ACCESS_32bit),
-> --
-> 2.7.4
-> 
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://emea01.safelinks.protection.outlook.com/?url=https%3A%2F%2Flist
-> s.cs.columbia.edu%2Fmailman%2Flistinfo%2Fkvmarm&amp;data=02%7C01%
-> 7Cbharat.bhushan%40nxp.com%7Cf2d3e98a8d1a48166ce108d5eb1d06f4%7C
-> 686ea1d3bc2b4c6fa92cd99c5c301635%7C0%7C0%7C636673432268886197&am
-> p;sdata=DitjaxtCqfVUge823Qw9IpT%2Fg9EoN2xI%2FIlj6mCdZ9k%3D&amp;r
-> eserved=0
+Thanks Pavel. I hadn't been watching the Droid 4 threads, so I didn't 
+see you were hitting the same problem. I'm assuming the patch will go
+through the PWM tree, so copying in Thierry.
