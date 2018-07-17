@@ -1,54 +1,151 @@
-From: ykaneko0929@gmail.com (Yoshihiro Kaneko)
-Date: Wed, 18 Jul 2018 04:48:03 +0900
-Subject: [PATCH/RFT 7/7] arm64: dts: renesas: r8a77965: Add Sound MIX support
-In-Reply-To: <1531856883-19645-1-git-send-email-ykaneko0929@gmail.com>
-References: <1531856883-19645-1-git-send-email-ykaneko0929@gmail.com>
-Message-ID: <1531856883-19645-8-git-send-email-ykaneko0929@gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 17 Jul 2018 15:55:37 -0400 (EDT)
+Subject: [RFC PATCH] ARM: Debug kernel copy by printing
+In-Reply-To: <TY1PR01MB177010920A6FC7FC1B61358BC0580@TY1PR01MB1770.jpnprd01.prod.outlook.com>
+References: <1530022595-6806-1-git-send-email-fabrizio.castro@bp.renesas.com>
+ <TY1PR01MB177010920A6FC7FC1B61358BC0580@TY1PR01MB1770.jpnprd01.prod.outlook.com>
+Message-ID: <nycvar.YSQ.7.76.1807171552380.20892@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+On Fri, 13 Jul 2018, Fabrizio Castro wrote:
 
-Based on a similar patch of the R8A7796 device tree
-by Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>.
+> Dear All,
+> 
+> Has anybody had the chance to look into this? Does it make sense? Any feedback at all?
+> Thanks!
 
-Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
----
- arch/arm64/boot/dts/renesas/r8a77965.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+Looks fine to me.
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77965.dtsi b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
-index 2188ad2..56303ac 100644
---- a/arch/arm64/boot/dts/renesas/r8a77965.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
-@@ -1356,6 +1356,7 @@
- 				 <&cpg CPG_MOD 1028>, <&cpg CPG_MOD 1029>,
- 				 <&cpg CPG_MOD 1030>, <&cpg CPG_MOD 1031>,
- 				 <&cpg CPG_MOD 1020>, <&cpg CPG_MOD 1021>,
-+				 <&cpg CPG_MOD 1020>, <&cpg CPG_MOD 1021>,
- 				 <&cpg CPG_MOD 1019>, <&cpg CPG_MOD 1018>,
- 				 <&audio_clk_a>, <&audio_clk_b>,
- 				 <&audio_clk_c>,
-@@ -1367,6 +1368,7 @@
- 				      "src.9", "src.8", "src.7", "src.6",
- 				      "src.5", "src.4", "src.3", "src.2",
- 				      "src.1", "src.0",
-+				      "mix.1", "mix.0",
- 				      "ctu.1", "ctu.0",
- 				      "dvc.0", "dvc.1",
- 				      "clk_a", "clk_b", "clk_c", "clk_i";
-@@ -1394,6 +1396,11 @@
- 				};
- 			};
- 
-+			rcar_sound,mix {
-+				mix0: mix-0 { };
-+				mix1: mix-1 { };
-+			};
-+
- 			rcar_sound,ctu {
- 				ctu00: ctu-0 { };
- 				ctu01: ctu-1 { };
--- 
-1.9.1
+
+
+> 
+> Fab
+> 
+> > Subject: [RFC PATCH] ARM: Debug kernel copy by printing
+> >
+> > It may happen that when we relocate the kernel we corrupt other
+> > sensible memory (e.g. the memory needed by U-Boot for dealing
+> > with bootm command) while copying the kernel. If we overwrite
+> > the content of the memory area used by U-Boot's command bootm
+> > (described by U-Boot's parameters bootm_low and bootm_size),
+> > the kernel won't be able to boot. Troubleshooting the problem
+> > then is not straightforward.
+> >
+> > This commit allows the user to easily print information on
+> > where the kernel gets copied from/to in order to help with the
+> > design of the system memory map (e.g. bootm_low and bootm_size)
+> > at boot up.
+> >
+> > Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+> > Reviewed-by: Chris Paterson <Chris.Paterson2@renesas.com>
+> > Acked-by: Biju Das <biju.das@bp.renesas.com>
+> > ---
+> > Dear All,
+> >
+> > shmobile_defconfig doesn't use kernel modules, everything gets
+> > built-in. iwg20d and iwg22d platforms from iWave use uImage
+> > to boot, DRAM starts at address 0x40000000, the kernel gets
+> > loaded up in memory at address 0x40007fc0, bootm_low is
+> > 0x40e00000, and bootm_size is 0x100000.
+> >
+> > The kernel is getting larger and larger, so much so that during
+> > the relocation the kernel is copying itself right where the
+> > bootm memory area lives, preventing Linux from booting.
+> > Here is what this patch prints when applied on top of tag
+> > next-20180625 and running on the iwg22d:
+> >
+> > C:0x400080C0-0x404922A0->0x40E90800-0x4131A9E0
+> >
+> > The designer then has to pick up a suitable memory range for
+> > bootm memory area to fix this, but the only way to successfully
+> > achieve this is by knowing where the kernel is going to copy
+> > itself in memory, so that he can stay clear of it.
+> >
+> > Other platforms that use the same defconfig suffer from the same
+> > issue (e.g. Koelsch et al.) as they have been designed some time
+> > ago or the original BSP was based on an LTS kernel.
+> >
+> > Debugging this basically requires a JTAG debugger at this stage.
+> >
+> > Do you think this patch could be considered acceptable? If not,
+> > what would be the best way to get useful/sensible/debug
+> > information out of the kernel when the problem occours?
+> >
+> > Comments welcome!
+> >
+> > Thanks,
+> > Fab
+> >
+> >  arch/arm/boot/compressed/head.S | 43 +++++++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 43 insertions(+)
+> >
+> > diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+> > index 517e0e1..6c7ccb4 100644
+> > --- a/arch/arm/boot/compressed/head.S
+> > +++ b/arch/arm/boot/compressed/head.S
+> > @@ -114,6 +114,35 @@
+> >  #endif
+> >  .endm
+> >
+> > +/*
+> > + * Debug kernel copy by printing the memory addresses involved
+> > + */
+> > +.macro dbgkc, begin, end, cbegin, cend
+> > +#ifdef DEBUG
+> > +kputc   #'\n'
+> > +kputc   #'C'
+> > +kputc   #':'
+> > +kputc   #'0'
+> > +kputc   #'x'
+> > +kphex   \begin, 8/* Start of compressed kernel */
+> > +kputc#'-'
+> > +kputc#'0'
+> > +kputc#'x'
+> > +kphex\end, 8/* End of compressed kernel */
+> > +kputc#'-'
+> > +kputc#'>'
+> > +kputc   #'0'
+> > +kputc   #'x'
+> > +kphex   \cbegin, 8/* Start of kernel copy */
+> > +kputc#'-'
+> > +kputc#'0'
+> > +kputc#'x'
+> > +kphex\cend, 8/* End of kernel copy */
+> > +kputc#'\n'
+> > +kputc#'\r'
+> > +#endif
+> > +.endm
+> > +
+> >  .section ".start", #alloc, #execinstr
+> >  /*
+> >   * sort out different calling conventions
+> > @@ -450,6 +479,20 @@ dtb_check_done:
+> >  addr6, r9, r5
+> >  addr9, r9, r10
+> >
+> > +#ifdef DEBUG
+> > +sub     r10, r6, r5
+> > +sub     r10, r9, r10
+> > +/*
+> > + * We are about to copy the kernel to a new memory area.
+> > + * The boundaries of the new memory area can be found in
+> > + * r10 and r9, whilst r5 and r6 contain the boundaries
+> > + * of the memory we are going to copy.
+> > + * Calling dbgkc will help with the printing of this
+> > + * information.
+> > + */
+> > +dbgkcr5, r6, r10, r9
+> > +#endif
+> > +
+> >  1:ldmdbr6!, {r0 - r3, r10 - r12, lr}
+> >  cmpr6, r5
+> >  stmdbr9!, {r0 - r3, r10 - r12, lr}
+> > --
+> > 2.7.4
+> 
+> 
+> 
+> 
+> Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
+> 
