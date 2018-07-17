@@ -1,130 +1,123 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 17 Jul 2018 18:01:21 +0100
-Subject: [PATCH v3 5/7] arm64: smp: remove cpu and numa topology
- information when hotplugging out CPU
-In-Reply-To: <5a23f1c8-27cb-b09c-90fc-edab3eec99f9@arm.com>
-References: <1530874968-5960-1-git-send-email-sudeep.holla@arm.com>
- <1530874968-5960-6-git-send-email-sudeep.holla@arm.com>
- <CAMuHMdXw9My+P1UCJ19Qdjq4O9gY_0QVFZaw6C5Ytmpyac59Vw@mail.gmail.com>
- <20180717140536.GA27323@e107155-lin>
- <CAMuHMdUnL=XyoSfRU+ebVUjsiP89V4vcoN=O4xc0VwHmLP72HA@mail.gmail.com>
- <1c47b3fd-59ba-aba4-43b2-ed98e750887b@arm.com>
- <5a23f1c8-27cb-b09c-90fc-edab3eec99f9@arm.com>
-Message-ID: <20180717170121.GA14049@e107155-lin>
+From: edgar.righi@lsitec.org.br (Edgar Bernardi Righi)
+Date: Tue, 17 Jul 2018 14:02:00 -0300
+Subject: [PATCH] clk: actions: Add custom delay option to Actions Semi OWL pll
+ clock driver
+Message-ID: <CADHB5bAztBFgWe-1v5vFfsxJgW1S3OOpV1Jkjrgk2h+pJBFw9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 17, 2018 at 04:55:22PM +0100, Sudeep Holla wrote:
+This patch adds custom delay support to Actions Semi OWL pll clock driver.
+It is required for future Actions Semi Owl series S500 SoC clock support
 
-[..]
+Currently, the driver waits a fixed amount of time defined by the
+macro PLL_STABILITY_WAIT_US.
+The default delay (50us) is not enough for Actions Semi Owl S500 SoC.
+It needs up to 150us.
+A new field called "delay" was added to "struct owl_pll_hw". The rest
+of the code was updated accordingly.
+Old macros "OWL_PLL_HW", "OWL_PLL" and "OWL_PLL_NO_PARENT" were kept
+(same usage), but updated to set "delay" value to
+PLL_STABILITY_WAIT_US (50us).
+New macros "OWL_PLL_HW_DELAY", "OWL_PLL_DELAY" and
+"OWL_PLL_NO_PARENT_DELAY" were created with an extra argument to set a
+custom "delay".
+This does not break S700 and S900 code and was tested on S500 based
+Lemaker Guitar Board.
 
-> Going through the code again, I think I understand the problem here.
-> We use the topology_core_mask pointers which are stashed in cpu_groups[]
-> But, the cpumask themselves will be getting modified as the cpus go up
-> and down, so we need to make a copy instead of just using the pointer.
-> I will see what we can do to fix that.
+Signed-off-by: Edgar Bernardi Righi <edgar.righi@lsitec.org.br>
 
-This is what I could come up with. I haven't tested this but just compiled
-it. Let me know if this resolves the issue.
+diff -uprN -X vanilla/Documentation/dontdiff
+vanilla/drivers/clk/actions/owl-pll.c
+linux/drivers/clk/actions/owl-pll.c
+--- vanilla/drivers/clk/actions/owl-pll.c    2018-07-17 13:07:16.667704000 -0300
++++ linux/drivers/clk/actions/owl-pll.c    2018-07-17 13:42:07.396785603 -0300
+@@ -179,7 +179,7 @@ static int owl_pll_set_rate(struct clk_h
 
--->8
+     regmap_write(common->regmap, pll_hw->reg, reg);
 
-From: Sudeep Holla <sudeep.holla@arm.com>
-Date: Tue, 17 Jul 2018 17:45:20 +0100
-Subject: [PATCH] drivers/firmware: psci_checker: stash and use topology_core_cpumask for hotplug tests
+-    udelay(PLL_STABILITY_WAIT_US);
++    udelay(pll_hw->delay);
 
-Commit 7f9545aa1a91 ("arm64: smp: remove cpu and numa topology information
-when hotplugging out CPU") updates the cpu topology when the CPU is
-hotplugged out. However the PSCI checker code uses the topology_core_cpumask
-pointers for some of the cpu hotplug testing. Since the pointer to the
-core_cpumask of the first CPU in the group is used, which when that CPU
-itself is hotpugged out is just set to itself, the testing terminates
-after that particular CPU is tested out. But the intention of this tests
-is to cover all the CPU in the group.
-
-In order to support that, we need to stash the topology_core_cpumask
-before the start of the test and use that value instead of pointer to a
-cpumask which will be updated on CPU hotplug.
-
-Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
----
- drivers/firmware/psci_checker.c | 21 +++++++++++++--------
- 1 file changed, 13 insertions(+), 8 deletions(-)
-
-diff --git a/drivers/firmware/psci_checker.c b/drivers/firmware/psci_checker.c
-index bb1c068bff19..dcace6fa17b6 100644
---- a/drivers/firmware/psci_checker.c
-+++ b/drivers/firmware/psci_checker.c
-@@ -77,21 +77,20 @@ static int psci_ops_check(void)
- 	return 0;
+     return 0;
  }
- 
--static int find_cpu_groups(const struct cpumask *cpus,
--			   const struct cpumask **cpu_groups)
-+static int find_cpu_groups(cpumask_var_t *cpu_groups)
- {
- 	unsigned int nb = 0;
- 	cpumask_var_t tmp;
- 
- 	if (!alloc_cpumask_var(&tmp, GFP_KERNEL))
- 		return -ENOMEM;
--	cpumask_copy(tmp, cpus);
-+	cpumask_copy(tmp, cpu_online_mask);
- 
- 	while (!cpumask_empty(tmp)) {
- 		const struct cpumask *cpu_group =
- 			topology_core_cpumask(cpumask_any(tmp));
- 
--		cpu_groups[nb++] = cpu_group;
-+		cpumask_copy(cpu_groups[nb++], cpu_group);
- 		cpumask_andnot(tmp, tmp, cpu_group);
- 	}
- 
-@@ -169,16 +168,15 @@ static unsigned int down_and_up_cpus(const struct cpumask *cpus,
- static int hotplug_tests(void)
- {
- 	int err;
--	cpumask_var_t offlined_cpus;
-+	cpumask_var_t offlined_cpus, *cpu_groups;
- 	int i, nb_cpu_group;
--	const struct cpumask **cpu_groups;
- 	char *page_buf;
- 
- 	err = -ENOMEM;
- 	if (!alloc_cpumask_var(&offlined_cpus, GFP_KERNEL))
- 		return err;
- 	/* We may have up to nb_available_cpus cpu_groups. */
--	cpu_groups = kmalloc_array(nb_available_cpus, sizeof(*cpu_groups),
-+	cpu_groups = kmalloc_array(nb_available_cpus, sizeof(cpu_groups),
- 				   GFP_KERNEL);
- 	if (!cpu_groups)
- 		goto out_free_cpus;
-@@ -186,8 +184,12 @@ static int hotplug_tests(void)
- 	if (!page_buf)
- 		goto out_free_cpu_groups;
- 
-+	for (i = 0; i < nb_available_cpus; ++i)
-+		if (!alloc_cpumask_var(&cpu_groups[i], GFP_KERNEL))
-+			goto out_free_cpu_groups_var;
+diff -uprN -X vanilla/Documentation/dontdiff
+vanilla/drivers/clk/actions/owl-pll.h
+linux/drivers/clk/actions/owl-pll.h
+--- vanilla/drivers/clk/actions/owl-pll.h    2018-07-17 13:07:16.667704000 -0300
++++ linux/drivers/clk/actions/owl-pll.h    2018-07-17 13:42:11.116765089 -0300
+@@ -27,6 +27,7 @@ struct owl_pll_hw {
+     u8            width;
+     u8            min_mul;
+     u8            max_mul;
++    u32            delay;
+     const struct clk_pll_table *table;
+ };
+
+@@ -35,6 +36,51 @@ struct owl_pll {
+     struct owl_clk_common    common;
+ };
+
++#define PLL_STABILITY_WAIT_US    (50)
 +
- 	err = 0;
--	nb_cpu_group = find_cpu_groups(cpu_online_mask, cpu_groups);
-+	nb_cpu_group = find_cpu_groups(cpu_groups);
- 
- 	/*
- 	 * Of course the last CPU cannot be powered down and cpu_down() should
-@@ -211,6 +213,9 @@ static int hotplug_tests(void)
- 	}
- 
- 	free_page((unsigned long)page_buf);
-+out_free_cpu_groups_var:
-+	for (i = 0; i < nb_available_cpus; ++i)
-+		free_cpumask_var(cpu_groups[i]);
- out_free_cpu_groups:
- 	kfree(cpu_groups);
- out_free_cpus:
--- 
-2.7.4
++#define OWL_PLL_HW_DELAY(_reg, _bfreq, _bit_idx, _shift,            \
++           _width, _min_mul, _max_mul, _table, _delay)            \
++    {                                \
++        .reg        = _reg,                    \
++        .bfreq        = _bfreq,                \
++        .bit_idx    = _bit_idx,                \
++        .shift        = _shift,                \
++        .width        = _width,                \
++        .min_mul    = _min_mul,                \
++        .max_mul    = _max_mul,                \
++        .table        = _table,                \
++        .delay        = _delay,                \
++    }
++
++#define OWL_PLL_DELAY(_struct, _name, _parent, _reg, _bfreq, _bit_idx,    \
++        _shift, _width, _min_mul, _max_mul, _table, _flags, _delay)    \
++    struct owl_pll _struct = {                    \
++        .pll_hw    = OWL_PLL_HW_DELAY(_reg, _bfreq, _bit_idx, _shift,    \
++                     _width, _min_mul,            \
++                     _max_mul, _table, _delay),            \
++        .common = {                        \
++            .regmap = NULL,                    \
++            .hw.init = CLK_HW_INIT(_name,            \
++                           _parent,            \
++                           &owl_pll_ops,        \
++                           _flags),            \
++        },                            \
++    }
++
++#define OWL_PLL_NO_PARENT_DELAY(_struct, _name, _reg, _bfreq, _bit_idx,    \
++        _shift, _width, _min_mul, _max_mul, _table, _flags, _delay)    \
++    struct owl_pll _struct = {                    \
++        .pll_hw    = OWL_PLL_HW_DELAY(_reg, _bfreq, _bit_idx, _shift,    \
++                     _width, _min_mul,            \
++                     _max_mul, _table, _delay),            \
++        .common = {                        \
++            .regmap = NULL,                    \
++            .hw.init = CLK_HW_INIT_NO_PARENT(_name,        \
++                           &owl_pll_ops,        \
++                           _flags),            \
++        },                            \
++    }
++
+ #define OWL_PLL_HW(_reg, _bfreq, _bit_idx, _shift,            \
+            _width, _min_mul, _max_mul, _table)            \
+     {                                \
+@@ -46,6 +92,7 @@ struct owl_pll {
+         .min_mul    = _min_mul,                \
+         .max_mul    = _max_mul,                \
+         .table        = _table,                \
++        .delay        = PLL_STABILITY_WAIT_US,\
+     }
+
+ #define OWL_PLL(_struct, _name, _parent, _reg, _bfreq, _bit_idx,    \
+@@ -78,7 +125,6 @@ struct owl_pll {
+     }
+
+ #define mul_mask(m)        ((1 << ((m)->width)) - 1)
+-#define PLL_STABILITY_WAIT_US    (50)
+
+ static inline struct owl_pll *hw_to_owl_pll(const struct clk_hw *hw)
+ {
