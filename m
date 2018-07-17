@@ -1,108 +1,26 @@
-From: ayan.halder@arm.com (Ayan Kumar Halder)
-Date: Tue, 17 Jul 2018 18:13:43 +0100
-Subject: [PATCH 2/5] drm/i915: Substitute intel_format_is_yuv() with
- format->is_yuv
-In-Reply-To: <1531847626-22248-1-git-send-email-ayan.halder@arm.com>
-References: <1531847626-22248-1-git-send-email-ayan.halder@arm.com>
-Message-ID: <1531847626-22248-2-git-send-email-ayan.halder@arm.com>
+From: pawel.mikolaj.chmiel@gmail.com (=?UTF-8?q?Pawe=C5=82=20Chmiel?=)
+Date: Tue, 17 Jul 2018 20:16:24 +0200
+Subject: [PATCH v2 0/2] Input: atmel_mxt_ts: Add support for optional
+ regulators
+Message-ID: <1531851386-17840-1-git-send-email-pawel.mikolaj.chmiel@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-drm_format_info table has a field 'is_yuv' to denote if the format
-is yuv or not. The driver is expected to use this instead of
-having a function for the same purpose.
+This two patches add optional regulator support to atmel_mxt_ts.
+First patch adds regulators to driver.
+Second patch updates documentation.
 
-Signed-off-by: Ayan Kumar halder <ayan.halder@arm.com>
----
- drivers/gpu/drm/i915/intel_display.c |  2 +-
- drivers/gpu/drm/i915/intel_drv.h     |  2 --
- drivers/gpu/drm/i915/intel_sprite.c  | 20 +++-----------------
- 3 files changed, 4 insertions(+), 20 deletions(-)
+Changes from v1:
+  - Enable regulators only if reset_gpio is present.
+  - Switch from devm_regulator_get_optional to devm_regulator_get.
 
-diff --git a/drivers/gpu/drm/i915/intel_display.c b/drivers/gpu/drm/i915/intel_display.c
-index fbe5a65..cf09012 100644
---- a/drivers/gpu/drm/i915/intel_display.c
-+++ b/drivers/gpu/drm/i915/intel_display.c
-@@ -3657,7 +3657,7 @@ u32 glk_plane_color_ctl(const struct intel_crtc_state *crtc_state,
- 	plane_color_ctl |= PLANE_COLOR_PLANE_GAMMA_DISABLE;
- 	plane_color_ctl |= glk_plane_color_ctl_alpha(fb->format->format);
- 
--	if (intel_format_is_yuv(fb->format->format)) {
-+	if (fb->format->is_yuv) {
- 		if (plane_state->base.color_encoding == DRM_COLOR_YCBCR_BT709)
- 			plane_color_ctl |= PLANE_COLOR_CSC_MODE_YUV709_TO_RGB709;
- 		else
-diff --git a/drivers/gpu/drm/i915/intel_drv.h b/drivers/gpu/drm/i915/intel_drv.h
-index 0c3ac0e..64111ea 100644
---- a/drivers/gpu/drm/i915/intel_drv.h
-+++ b/drivers/gpu/drm/i915/intel_drv.h
-@@ -2069,7 +2069,6 @@ bool intel_sdvo_init(struct drm_i915_private *dev_priv,
- 
- 
- /* intel_sprite.c */
--bool intel_format_is_yuv(u32 format);
- int intel_usecs_to_scanlines(const struct drm_display_mode *adjusted_mode,
- 			     int usecs);
- struct intel_plane *intel_sprite_plane_create(struct drm_i915_private *dev_priv,
-@@ -2085,7 +2084,6 @@ void skl_disable_plane(struct intel_plane *plane, struct intel_crtc *crtc);
- bool skl_plane_get_hw_state(struct intel_plane *plane, enum pipe *pipe);
- bool skl_plane_has_ccs(struct drm_i915_private *dev_priv,
- 		       enum pipe pipe, enum plane_id plane_id);
--bool intel_format_is_yuv(uint32_t format);
- bool skl_plane_has_planar(struct drm_i915_private *dev_priv,
- 			  enum pipe pipe, enum plane_id plane_id);
- 
-diff --git a/drivers/gpu/drm/i915/intel_sprite.c b/drivers/gpu/drm/i915/intel_sprite.c
-index 344c0e7..1bb7bc3 100644
---- a/drivers/gpu/drm/i915/intel_sprite.c
-+++ b/drivers/gpu/drm/i915/intel_sprite.c
-@@ -41,20 +41,6 @@
- #include <drm/i915_drm.h>
- #include "i915_drv.h"
- 
--bool intel_format_is_yuv(u32 format)
--{
--	switch (format) {
--	case DRM_FORMAT_YUYV:
--	case DRM_FORMAT_UYVY:
--	case DRM_FORMAT_VYUY:
--	case DRM_FORMAT_YVYU:
--	case DRM_FORMAT_NV12:
--		return true;
--	default:
--		return false;
--	}
--}
--
- int intel_usecs_to_scanlines(const struct drm_display_mode *adjusted_mode,
- 			     int usecs)
- {
-@@ -404,7 +390,7 @@ chv_update_csc(const struct intel_plane_state *plane_state)
- 	const s16 *csc = csc_matrix[plane_state->base.color_encoding];
- 
- 	/* Seems RGB data bypasses the CSC always */
--	if (!intel_format_is_yuv(fb->format->format))
-+	if (!fb->format->is_yuv)
- 		return;
- 
- 	I915_WRITE_FW(SPCSCYGOFF(plane_id), SPCSC_OOFF(0) | SPCSC_IOFF(0));
-@@ -439,7 +425,7 @@ vlv_update_clrc(const struct intel_plane_state *plane_state)
- 	enum plane_id plane_id = plane->id;
- 	int contrast, brightness, sh_scale, sh_sin, sh_cos;
- 
--	if (intel_format_is_yuv(fb->format->format) &&
-+	if (fb->format->is_yuv &&
- 	    plane_state->base.color_range == DRM_COLOR_YCBCR_LIMITED_RANGE) {
- 		/*
- 		 * Expand limited range to full range:
-@@ -1040,7 +1026,7 @@ intel_check_sprite_plane(struct intel_plane *plane,
- 		src->y1 = src_y << 16;
- 		src->y2 = (src_y + src_h) << 16;
- 
--		if (intel_format_is_yuv(fb->format->format) &&
-+		if (fb->format->is_yuv &&
-     		    fb->format->format != DRM_FORMAT_NV12 &&
- 		    (src_x % 2 || src_w % 2)) {
- 			DRM_DEBUG_KMS("src x/w (%u, %u) must be a multiple of 2 for YUV planes\n",
+Pawe? Chmiel (2):
+  Input: atmel_mxt_ts: Add support for  optional regulators.
+  Input: atmel_mxt_ts: Document optional voltage regulators
+
+ .../devicetree/bindings/input/atmel,maxtouch.txt   |  8 ++++
+ drivers/input/touchscreen/atmel_mxt_ts.c           | 46 +++++++++++++++++++++-
+ 2 files changed, 52 insertions(+), 2 deletions(-)
+
 -- 
 2.7.4
