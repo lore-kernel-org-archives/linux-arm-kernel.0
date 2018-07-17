@@ -1,49 +1,34 @@
-From: ebiggers3@gmail.com (Eric Biggers)
-Date: Tue, 17 Jul 2018 10:09:26 -0700
-Subject: [PATCH] crypto: arm64/sha256 - increase cra_priority of scalar
- implementations
-Message-ID: <20180717170926.90689-1-ebiggers3@gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 17 Jul 2018 10:20:17 -0700
+Subject: [GIT PULL] Amlogic 64-bit DT updates for v4.19
+In-Reply-To: <7hva9dn9nf.fsf@baylibre.com>
+References: <7hva9dn9nf.fsf@baylibre.com>
+Message-ID: <CAOesGMgA774T_ov7Ya7ixyR8jVukQpziAWoNMErOVY-qOw8o8Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Eric Biggers <ebiggers@google.com>
+On Tue, Jul 17, 2018 at 8:51 AM, Kevin Hilman <khilman@baylibre.com> wrote:
+> The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
+>
+>   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+>
+> are available in the git repository at:
+>
+>   https://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt64
+>
+> for you to fetch changes up to 6a4c2246a2ecb84ce578d23752fa9f8fc7f832fd:
+>
+>   ARM64: dts: meson-axg: add pdm pins (2018-07-17 08:32:12 -0700)
+>
+> ----------------------------------------------------------------
+> Amlogic 64-bit DT updates for v4.19
+> - new SoC: S805x
+> - new board: S805x-based P241 board from Amlogic
+> - AXG: add ADC support w/buttons, add pins for PDM, SPDIF
+> - AXG: s400 board: preliminary support for audio
+> - GX: nanopi-k2: add HDMI, CEC, CVBS support
 
-Commit b73b7ac0a774 ("crypto: sha256_generic - add cra_priority") gave
-sha256-generic and sha224-generic a cra_priority of 100, to match the
-convention for generic implementations.  But sha256-arm64 and
-sha224-arm64 also have priority 100, so their order relative to the
-generic implementations became ambiguous.
+Merged, thanks!
 
-Therefore, increase their priority to 125 so that they have higher
-priority than the generic implementations but lower priority than the
-NEON implementations which have priority 150.
 
-Signed-off-by: Eric Biggers <ebiggers@google.com>
----
- arch/arm64/crypto/sha256-glue.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/crypto/sha256-glue.c b/arch/arm64/crypto/sha256-glue.c
-index f1b4f4420ca1..4aedeaefd61f 100644
---- a/arch/arm64/crypto/sha256-glue.c
-+++ b/arch/arm64/crypto/sha256-glue.c
-@@ -67,7 +67,7 @@ static struct shash_alg algs[] = { {
- 	.descsize		= sizeof(struct sha256_state),
- 	.base.cra_name		= "sha256",
- 	.base.cra_driver_name	= "sha256-arm64",
--	.base.cra_priority	= 100,
-+	.base.cra_priority	= 125,
- 	.base.cra_blocksize	= SHA256_BLOCK_SIZE,
- 	.base.cra_module	= THIS_MODULE,
- }, {
-@@ -79,7 +79,7 @@ static struct shash_alg algs[] = { {
- 	.descsize		= sizeof(struct sha256_state),
- 	.base.cra_name		= "sha224",
- 	.base.cra_driver_name	= "sha224-arm64",
--	.base.cra_priority	= 100,
-+	.base.cra_priority	= 125,
- 	.base.cra_blocksize	= SHA224_BLOCK_SIZE,
- 	.base.cra_module	= THIS_MODULE,
- } };
--- 
-2.18.0.203.gfac676dfb9-goog
+-Olof
