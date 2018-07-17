@@ -1,95 +1,53 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 17 Jul 2018 22:11:21 +0200
-Subject: [PATCH 2/5] thermal: exynos: cleanup of clk err check for
- exynos_tmu_work
-In-Reply-To: <CANAwSgTrsOv_cg470tze2vLLNAPEV1oApTEKep6gK8mPzWMiQg@mail.gmail.com>
-References: <1531822342-4293-1-git-send-email-linux.amoon@gmail.com>
- <1531822342-4293-2-git-send-email-linux.amoon@gmail.com>
- <CAJKOXPdtEbaOaqU1uzPLq6-MUANJq+2GCviy47b3zkjmRMcc8A@mail.gmail.com>
- <CANAwSgTrsOv_cg470tze2vLLNAPEV1oApTEKep6gK8mPzWMiQg@mail.gmail.com>
-Message-ID: <CAJKOXPdMEp1r_K3Qa_iztfvKg61BEn4TejtoDwpq_Yf1CnyRAg@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 17 Jul 2018 16:16:44 -0400 (EDT)
+Subject: [PATCH] ARM: early_printk: respect keep parameter
+In-Reply-To: <20180711183239.21023-1-alexandre.belloni@bootlin.com>
+References: <20180711183239.21023-1-alexandre.belloni@bootlin.com>
+Message-ID: <nycvar.YSQ.7.76.1807171603240.20892@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 July 2018 at 22:08, Anand Moon <linux.amoon@gmail.com> wrote:
-> Hi Krzysztof,
->
-> On 17 July 2018 at 17:54, Krzysztof Kozlowski <krzk@kernel.org> wrote:
->> On 17 July 2018 at 12:12, Anand Moon <linux.amoon@gmail.com> wrote:
->>> cleanup err check in exynos_tmu_work as clk internal
->>> framework will perform if clk is enable/disable
->>> so drop the double check of IS_ERR and other such references.
->>
->> I do not understand the statement. Clock framework will perform if clk
->> is enable/disable? How clock can be "enable" or "disable"? You mean
->> gate clock? you mean clock pointer is an ERR pointer?
->>
->
-> if (!IS_ERR(data->clk_sec))
-> check if the pointer is valid or not
-> this check is again performed in
-> clk_enable.
+On Wed, 11 Jul 2018, Alexandre Belloni wrote:
 
-This should be then written in commit msg.
+> Parse and use the keep parameter of earlyprintk to avoid having the kernel
+> output stop with:
+> 
+> Console: colour dummy device 80x30
+> console [tty0] enabled
+> bootconsole [earlycon0] disabled
+> 
+> This happens because once tty0, the virtual terminal console is registered,
+> it is selected as the default console, disregarding an existing stdout-path
+> DT property and the early console is shutdown before the console driver is
+> probed.
+> 
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
 
->>> CC: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
->>> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
->>> ---
->>>  drivers/thermal/samsung/exynos_tmu.c | 19 ++++++-------------
->>>  1 file changed, 6 insertions(+), 13 deletions(-)
->>>
->>> diff --git a/drivers/thermal/samsung/exynos_tmu.c b/drivers/thermal/samsung/exynos_tmu.c
->>> index 0164c9e..2dbde97 100644
->>> --- a/drivers/thermal/samsung/exynos_tmu.c
->>> +++ b/drivers/thermal/samsung/exynos_tmu.c
->>> @@ -300,8 +300,7 @@ static int exynos_tmu_initialize(struct platform_device *pdev)
->>>
->>>         mutex_lock(&data->lock);
->>>         clk_enable(data->clk);
->>> -       if (!IS_ERR(data->clk_sec))
->>> -               clk_enable(data->clk_sec);
->>> +       clk_enable(data->clk_sec);
->>>
->>>         status = readb(data->base + EXYNOS_TMU_REG_STATUS);
->>>         if (!status) {
->>> @@ -334,8 +333,7 @@ static int exynos_tmu_initialize(struct platform_device *pdev)
->>>  err:
->>>         clk_disable(data->clk);
->>>         mutex_unlock(&data->lock);
->>> -       if (!IS_ERR(data->clk_sec))
->>> -               clk_disable(data->clk_sec);
->>> +       clk_disable(data->clk_sec);
->>>  out:
->>>         return ret;
->>>  }
->>> @@ -789,19 +787,16 @@ static void exynos_tmu_work(struct work_struct *work)
->>>         struct exynos_tmu_data *data = container_of(work,
->>>                         struct exynos_tmu_data, irq_work);
->>>
->>> -       if (!IS_ERR(data->clk_sec))
->>> -               clk_enable(data->clk_sec);
->>> -       if (!IS_ERR(data->clk_sec))
->>> -               clk_disable(data->clk_sec);
->>> -
->>>         thermal_zone_device_update(data->tzd, THERMAL_EVENT_UNSPECIFIED);
->>>
->>>         mutex_lock(&data->lock);
->>>         clk_enable(data->clk);
->>> +       clk_enable(data->clk_sec);
->>
->> You are changing here the logic completely. Before the "enable" was
->> followed immediately by "disable". Now you are moving disable
->> somewhere else... All this looks suspicious...
->
-> I chose to move enable/disable of clk_sec this under the mutex lock for safe
-> which dose the same sequence with different order.
->
-> Second approach:
-> We should get rid of clk_enable/disable in exynos_tmu_work
-> as this looks unnecessary for toggle clk's on every update.
+Why can't you have a real console driver that takes over at that point 
+which respects whatever DT property you give it?
 
-I already sent a cleanup for this:
-https://patchwork.kernel.org/patch/10529971/
+The early_printk code is very raw and inefficient, and it shouldn't be 
+used for anything but the debugging of early boot hangs.
 
-Best regards,
-Krzysztof
+> ---
+>  arch/arm/kernel/early_printk.c | 3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> diff --git a/arch/arm/kernel/early_printk.c b/arch/arm/kernel/early_printk.c
+> index 9257736ec9fa..bbb10150b11a 100644
+> --- a/arch/arm/kernel/early_printk.c
+> +++ b/arch/arm/kernel/early_printk.c
+> @@ -42,6 +42,9 @@ static struct console early_console_dev = {
+>  
+>  static int __init setup_early_printk(char *buf)
+>  {
+> +	if (buf && strstr(buf, "keep"))
+> +		early_console_dev.flags &= ~CON_BOOT;
+> +
+>  	early_console = &early_console_dev;
+>  	register_console(&early_console_dev);
+>  	return 0;
+> -- 
+> 2.18.0
+> 
+> 
