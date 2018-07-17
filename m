@@ -1,51 +1,28 @@
-From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Tue, 17 Jul 2018 19:47:57 +0530
-Subject: [PATCH v6 5/5] arm64: dts: actions: Set UART clock reference
- from CMU
-In-Reply-To: <20180715203524.11948-6-sravanhome@gmail.com>
-References: <20180715203524.11948-1-sravanhome@gmail.com>
- <20180715203524.11948-6-sravanhome@gmail.com>
-Message-ID: <20180717141757.GE19076@mani>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 17 Jul 2018 11:20:21 -0300
+Subject: [PATCH] ARM: dts: imx6sx-udoo-neo: enable i2c-2 and i2c-4 for
+ onboard sensors
+In-Reply-To: <CALeDE9N5AnQba5LirHegWgz2_3Rr6cCT_ttTUtg38OdvdegpFA@mail.gmail.com>
+References: <20180713171151.24699-1-pbrobinson@gmail.com>
+ <CAOMZO5B+1atjr3Ur7EGMJSEbqT8zqWdKZWNHrkyCGvgGM4nJFg@mail.gmail.com>
+ <CALeDE9N5AnQba5LirHegWgz2_3Rr6cCT_ttTUtg38OdvdegpFA@mail.gmail.com>
+Message-ID: <CAOMZO5BDEnFU__1iSuVpmRKx4SK5F+WFNho-ujTSCobQy-vzSw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 15, 2018 at 10:35:24PM +0200, Saravanan Sekar wrote:
-> Signed-off-by: Parthiban Nallathambi <pn@denx.de>
-> Signed-off-by: Saravanan Sekar <sravanhome@gmail.com>
+Hi Peter,
 
-Reviewed-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+On Mon, Jul 16, 2018 at 11:43 AM, Peter Robinson <pbrobinson@gmail.com> wrote:
 
-Thanks,
-Mani
+> Enabling it to turn around and then disable it again seemed counter
 
-> ---
->  arch/arm64/boot/dts/actions/s700-cubieboard7.dts | 8 +-------
->  1 file changed, 1 insertion(+), 7 deletions(-)
-> 
-> diff --git a/arch/arm64/boot/dts/actions/s700-cubieboard7.dts b/arch/arm64/boot/dts/actions/s700-cubieboard7.dts
-> index ef79d7905f44..c08808ca3346 100644
-> --- a/arch/arm64/boot/dts/actions/s700-cubieboard7.dts
-> +++ b/arch/arm64/boot/dts/actions/s700-cubieboard7.dts
-> @@ -28,12 +28,6 @@
->  		device_type = "memory";
->  		reg = <0x1 0xe0000000 0x0 0x0>;
->  	};
-> -
-> -	uart3_clk: uart3-clk {
-> -		compatible = "fixed-clock";
-> -		clock-frequency = <921600>;
-> -		#clock-cells = <0>;
-> -	};
->  };
->  
->  &timer {
-> @@ -42,5 +36,5 @@
->  
->  &uart3 {
->  	status = "okay";
-> -	clocks = <&uart3_clk>;
-> +	clocks = <&cmu CLK_UART3>;
->  };
-> -- 
-> 2.18.0
-> 
+Other option would be to put i2c4 with status = "disabled" in the common file
+and enable i2c4 on the two dts files that suport it.
+
+> intuitive to me hence the way I did, the WiFi in done that way even
+> though it's not on all boards and I would imagine it would cause
+> errors on the devices where there isn't wifi although I don't have
+> those model(s) to verify.
+
+If the Wifi is not present, then it will not be probed, so it would
+not cause problems.
