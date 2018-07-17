@@ -1,96 +1,93 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Tue, 17 Jul 2018 14:31:05 +0900
-Subject: [PATCH v11 03/15] powerpc, kexec_file: factor out memblock-based
- arch_kexec_walk_mem()
-In-Reply-To: <20180716122412.GA7160@dhcp-128-65.nay.redhat.com>
-References: <20180711074203.3019-1-takahiro.akashi@linaro.org>
- <20180711074203.3019-4-takahiro.akashi@linaro.org>
- <20180714015223.GA2745@dhcp-128-65.nay.redhat.com>
- <2a4ec965-5258-5835-3022-8f403a2f6bdd@arm.com>
- <20180716122412.GA7160@dhcp-128-65.nay.redhat.com>
-Message-ID: <20180717053104.GB11258@linaro.org>
+From: o.rempel@pengutronix.de (Oleksij Rempel)
+Date: Tue, 17 Jul 2018 07:45:22 +0200
+Subject: [PATCH v3 1/3] dt-bindings: arm: fsl: add mu binding doc
+In-Reply-To: <AM0PR04MB4211E30E85E830AA31F998A1805C0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+References: <20180716114209.25242-1-o.rempel@pengutronix.de>
+ <20180716114209.25242-2-o.rempel@pengutronix.de>
+ <AM0PR04MB4211E30E85E830AA31F998A1805C0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+Message-ID: <7f96a775-661b-86e5-95eb-07017dcec3c5@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dave,
 
-On Mon, Jul 16, 2018 at 08:24:12PM +0800, Dave Young wrote:
-> On 07/16/18 at 12:04pm, James Morse wrote:
-> > Hi Dave,
-> > 
-> > On 14/07/18 02:52, Dave Young wrote:
-> > > On 07/11/18 at 04:41pm, AKASHI Takahiro wrote:
-> > >> Memblock list is another source for usable system memory layout.
-> > >> So powerpc's arch_kexec_walk_mem() is moved to kexec_file.c so that
-> > >> other memblock-based architectures, particularly arm64, can also utilise
-> > >> it. A moved function is now renamed to kexec_walk_memblock() and merged
-> > >> into the existing arch_kexec_walk_mem() for general use, either resource
-> > >> list or memblock list.
-> > >>
-> > >> A consequent function will not work for kdump with memblock list, but
-> > >> this will be fixed in the next patch.
-> > 
-> > >> diff --git a/kernel/kexec_file.c b/kernel/kexec_file.c
-> > 
-> > >> @@ -513,6 +563,10 @@ static int locate_mem_hole_callback(struct resource *res, void *arg)
-> > >>  int __weak arch_kexec_walk_mem(struct kexec_buf *kbuf,
-> > >>  			       int (*func)(struct resource *, void *))
-> > >>  {
-> > >> +	if (IS_ENABLED(CONFIG_HAVE_MEMBLOCK) &&
-> > >> +			!IS_ENABLED(CONFIG_ARCH_DISCARD_MEMBLOCK))
-> > >> +		return kexec_walk_memblock(kbuf, func);
-> > > 
-> > > AKASHI, I'm not sure if this works on all arches, for example I chekced
-> > > the .config on my Nokia N900 kernel tree, there is HAVE_MEMBLOCK=y and
-> > > no CONFIG_ARCH_DISCARD_MEMBLOCK, in 32bit arm code no arch_kexec_walk_mem()
-> > By doesn't work you mean it's a change in behaviour?
-> > I think this is fine because 32bit arm doesn't support KEXEC_FILE, (this file is
-> > kexec_file specific right?).
+
+On 17.07.2018 07:00, A.s. Dong wrote:
+>> -----Original Message-----
+>> From: Oleksij Rempel [mailto:o.rempel at pengutronix.de]
+>> Sent: Monday, July 16, 2018 7:42 PM
+>> To: Shawn Guo <shawnguo@kernel.org>; Fabio Estevam
+>> <fabio.estevam@nxp.com>; Rob Herring <robh+dt@kernel.org>; Mark
+>> Rutland <mark.rutland@arm.com>; A.s. Dong <aisheng.dong@nxp.com>
+>> Cc: Oleksij Rempel <o.rempel@pengutronix.de>; kernel at pengutronix.de;
+>> linux-arm-kernel at lists.infradead.org; devicetree at vger.kernel.org; dl-linux-
+>> imx <linux-imx@nxp.com>
+>> Subject: [PATCH v3 1/3] dt-bindings: arm: fsl: add mu binding doc
+>>
+>> The Messaging Unit module enables two processors within the SoC to
+>> communicate and coordinate by passing messages (e.g. data, status and
+>> control) through the MU interface.
+>>
+>> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
+>> ---
+>>  .../devicetree/bindings/mailbox/fsl,mu.txt    | 32 +++++++++++++++++++
+>>  1 file changed, 32 insertions(+)
+>>  create mode 100644
+>> Documentation/devicetree/bindings/mailbox/fsl,mu.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
+>> b/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
+>> new file mode 100644
+>> index 000000000000..5d48dd75b98d
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
+>> @@ -0,0 +1,32 @@
+>> +NXP i.MX Messaging Unit (MU)
+>> +--------------------------------------------------------------------
+>> +
+>> +Required properties:
+>> +-------------------
+>> +- compatible :	should be "fsl,<chip>-mu", the supported chips include:
+>> +		imx6sx	- i.MX 6SoloX
+>> +		imx7d	- i.MX 7Dual
+>> +		imx7s	- i.MX 7Solo
+>> +		imx7ulp	- i.MX 7ULP
+>> +		imx8qm	- i.MX 8QM
+>> +		imx8qxp	- i.MX 8QXP
+>> +- reg :		Should contain the registers location and length
+>> +- interrupts :	Interrupt number. The interrupt specifier format depends
+>> +		on the interrupt controller parent.
+>> +- #mbox-cells:  Must be:
+>> +		0 - for single channel mode. i.MX8* SCU protocol specific.
+>> +		1 - for multichannel (generic) mode.
+>> +
+>> +Optional properties:
+>> +-------------------
+>> +- clocks :	phandle to the input clock.
+>> +- fsl,mu-side-a : Should be set for side A MU.
 > 
-> Ah, replied on a train, I forgot this is only for kexec_file, sorry
-> about that.  Please ignore the comment.
-> 
-> But since we have a weak function arch_kexec_walk_mem, adding another
-> condition branch within this weak function looks not good.
-> Something like below would be better:
+> For this property, how about doing like:
+> fsl,mu-side: An Integer represents the MU side.
 
-I see your concern here, but
+All this SoCs have MUs with only two sides. Why do we need explicit
+annotation for both parts?
+
+> If missing this property, it's default to Side A
+
+So, why do we need optional integer, which is set by default as side A?
+This is why I made it bool.
+
+> 	       which is mostly used by A core.
+
+And you will need to explicit set side=B for SCU. Correct?
+
+> 	       0: MU Side A
+> 	       1: MU Side B
 
 
-> int kexec_locate_mem_hole(struct kexec_buf *kbuf)
-> {
->         int ret;
-> 
-> 	+ if use memblock
-> 	+	ret = kexec_walk_memblock()
-> 	+ else
->         	ret = arch_kexec_walk_mem(kbuf, locate_mem_hole_callback);
-> 
->         return ret == 1 ? 0 : -EADDRNOTAVAIL;
-> }
-
-what if yet another architecture comes to kexec_file and wanna
-take a third approach? How can it override those functions?
-Depending on kernel configuration, it might re-define either
-kexec_walk_memblock() or arch_kexec_walk_mem(). It sounds weird to me.
-
-Thanks,
--Takahiro AKASHI
-
-> 
-> > 
-> > It only affects architectures with MEMBLOCK and KEXEC_FILE: powerpc, s390 and
-> > soon arm64. s390 keeps its behaviour because it provides arch_kexec_walk_mem(),
-> > and powerpc's is copied in here as its generic 'memblock describes my memory'
-> > stuff. The implementation would be the same on arm64, so we're doing this to
-> > avoid duplicating otherwise generic arch code. I think 32bit arm should be able
-> > to use this too if it gets KEXEC_FILE support. (32bit arms' KEXEC already
-> > depends on MEMBLOCK).
-> > 
-> > 
-> > Thanks,
-> > 
-> > James
-> 
-> Thanks
-> Dave
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180717/37429afd/attachment.sig>
