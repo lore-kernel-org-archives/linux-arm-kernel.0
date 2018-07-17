@@ -1,56 +1,30 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Tue, 17 Jul 2018 14:16:45 +0200
-Subject: [PATCH/RFC] ARM: shmobile: Always enable ARCH_TIMER on SoCs with
- A7 and/or A15
-In-Reply-To: <CAMuHMdVsvkydFmx_1pKab+ov9c3tt_j=_yWgVdEOkwryAkAwqA@mail.gmail.com>
-References: <20180712160857.31471-1-geert+renesas@glider.be>
- <20180713080823.l4tng6oclhr6nxrh@verge.net.au>
- <CAMuHMdUrgP=YOrgeEnpQ0XVOoC_8Dz9Lt2FJ4P5GKb53KRNpNw@mail.gmail.com>
- <CAMuHMdUsHHDo_2unzUZN9W0kY2p5YW+yGkfsdXE-8ZHuBAuxnA@mail.gmail.com>
- <20180717095904.eik3sko64zqymzts@verge.net.au>
- <CAMuHMdVsvkydFmx_1pKab+ov9c3tt_j=_yWgVdEOkwryAkAwqA@mail.gmail.com>
-Message-ID: <20180717121644.gai63ewyv5cw2uge@verge.net.au>
+Date: Tue, 17 Jul 2018 14:19:25 +0200
+Subject: [PATCH v4] arm64: dts: r8a77995: Add SCIF {0,1,3,4,5} and all
+ HSCIF device nodes
+In-Reply-To: <CAMuHMdXZ_pQaF7BZs_F6MdYsacRDHmNLnUS14n5yhy9+r6Z5Mw@mail.gmail.com>
+References: <20180717113832.26413-1-horms+renesas@verge.net.au>
+ <CAMuHMdXZ_pQaF7BZs_F6MdYsacRDHmNLnUS14n5yhy9+r6Z5Mw@mail.gmail.com>
+Message-ID: <20180717121924.42ilbf4l6ryksmap@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 17, 2018 at 12:12:14PM +0200, Geert Uytterhoeven wrote:
-> Hi Simon,
-> 
-> On Tue, Jul 17, 2018 at 11:59 AM Simon Horman <horms@verge.net.au> wrote:
-> > On Fri, Jul 13, 2018 at 10:33:17AM +0200, Geert Uytterhoeven wrote:
-> > > On Fri, Jul 13, 2018 at 10:19 AM Geert Uytterhoeven
-> > > <geert@linux-m68k.org> wrote:
-> > > > On Fri, Jul 13, 2018 at 10:08 AM Simon Horman <horms@verge.net.au> wrote:
-> > > > > On Thu, Jul 12, 2018 at 06:08:57PM +0200, Geert Uytterhoeven wrote:
-> > > > > > R-Mobile APE6, R-Car Gen2, and RZ/G1 SoCs have Cortex-A7 and/or
-> > > > > > Cortex-A15 CPU cores, all of which have ARM architectured timers.
-> > > > > >
-> > > > > > Force use of the ARM architectured timer on these SoCs.
-> > > > > > This allows to:
-> > > > > >   - Remove the calls to shmobile_init_delay() from the corresponding
-> > > > > >     machine vectors,
-> > > > > >   - Remove a check in timer setup specific to R-Car Gen2,
-> > > > > >   - Remove a check in shmobile_init_delay().
-> > > > > >
-> > > > > > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> > > > >
-> > > > > on which boards did you test this?
-> > > >
-> > > > On APE6EVM and Koelsch (R-Car M2-W).
-> > > > I can give it a spin on a few more remote R-Car Gen2 boards if you want.
-> > >
-> > > I don't expect any issues, as shmobile_defconfig already enables
-> > > CONFIG_HAVE_ARM_ARCH_TIMER, and shmobile_init_delay() was already
-> > > a no-op in that case.
+On Tue, Jul 17, 2018 at 01:45:26PM +0200, Geert Uytterhoeven wrote:
+> On Tue, Jul 17, 2018 at 1:38 PM Simon Horman <horms+renesas@verge.net.au> wrote:
+> > From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
 > >
-> > I am happy if you are happy.
-> > Shall I go ahead and apply this?
+> > This patch adds the device nodes for SCIF {0,1,3,4,5} and all HSCIF serial
+> > ports, incl. clocks, power domain and DMAs.
+> >
+> > Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+> > Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> > --
+> > v3 [Simon Horman]
+> > * Add DMAs
 > 
-> Yes, selecting HAVE_ARM_ARCH_TIMER is consistent with what several
-> other SoCs are already doing, and it leads to less code.
-> 
-> > Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
-> 
-> Thanks!
+> For the newly added SCIF dmas:
+> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
 Thanks, applied.
