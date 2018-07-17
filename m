@@ -1,53 +1,50 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 17 Jul 2018 15:26:45 +0100
-Subject: [PATCH] arm64: fix kernel panic on serror exception caused by
- user process
-In-Reply-To: <CAM5rFu8avWLrUhEsCHBTKv=sM6dE3Sh_0=5M3Eh0WcT9EdmtSg@mail.gmail.com>
-References: <1531819881-2931-1-git-send-email-hari.vyas@broadcom.com>
- <1531819881-2931-2-git-send-email-hari.vyas@broadcom.com>
- <20180717100628.s5emikyc6orira2q@lakrids.cambridge.arm.com>
- <CAM5rFu_trZpt20H2GAUq8GYTOuJMSmEknsQaEkPkDwFHPVDPeA@mail.gmail.com>
- <20180717114815.5a3rbcznfzvi2xh6@lakrids.cambridge.arm.com>
- <CAM5rFu8avWLrUhEsCHBTKv=sM6dE3Sh_0=5M3Eh0WcT9EdmtSg@mail.gmail.com>
-Message-ID: <9b9c4cd5-4428-c08d-d4a3-7352c6c80583@arm.com>
+From: maxime.chevallier@bootlin.com (Maxime Chevallier)
+Date: Tue, 17 Jul 2018 16:31:49 +0200
+Subject: [PATCH RESEND 0/5] spi: imx: Improve non 8-bit aligned words and
+ dynamic bursts
+Message-ID: <20180717143154.28241-1-maxime.chevallier@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/07/18 14:40, Hari Vyas wrote:
-[...]
->> Sorry, but this is simply a risk of exposing /dev/mem to userspace.
->>
->> The user could also use devmem to poke devices in ways which could
->> permanently damage them. If you cannot trust the user to not do such
->> things, you must not give them access to /dev/mem.
->>
-> Okay. Don't think it is a question of trust. If access happens from
-> kernel mode, I understand but If user mode initiated
-> access(from devmem(which is just an example) or any other application)
-> into outside or invalid region of system
-> address brings complete kernel down, at least I will be surprised.
+[Resend with i.MX platform maintainers and reviewers in Cc: ]
 
-If you have an Arm Juno board, why not try this fun little demonstration 
-I once wrote for a colleague:
+This series aims to improve PIO transfers on the SPI imx driver for several
+use-cases, where bits_per_words isn't a multiple of 8, or when using
+dynamic_burst mode.
 
+The first patch is just a cosmetic cleanup of extra variable assignments
 
-#include <fcntl.h>
-#include <sys/mman.h>
+The second patch enforces the use of the dynamic_burst mode only when we
+can pack words into the 32 bits FIFO entries. This avoid having to mask out the
+remaining parts of the words, and avoid shifting extra clock ticks.
 
-int main(void) {
-	int *dmc, fd = open("/dev/mem", O_RDWR|O_SYNC);
-	
-	dmc = mmap(0, 4096, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0x2b0a0000);
-	dmc[2] = 1;
-}
+The 3rd and 4th patches fixes the way we compute the number of bytes per words,
+by using 4 bytes to transfer 24 bits words as expected by the core.
 
+Finally, the 5th patch reworks the way dynamic bursts are emitted, by shifting
+out the non 4-bytes aligned parts first as expected by the imx SPI controller.
 
-The simple fact is that anyone with access to /dev/mem *can* take down 
-the system any number of ways. It's foolish to think there's any way of 
-protecting against that other than by not giving them access at all.
+This avoid splitting out transfer when not necessary.
 
-Robin.
+This was tested on imx6s and imx6q, with and without DMA, in single and full
+duplex with a wide range of transfer sizes and bit_per_words values.
 
+I however couldn't test the slave mode with these patches, so some review is
+very welcomed, especially on the last patch.
 
-[ For anyone interested, it puts the DRAM controller into sleep mode. 
-The kernel can't even panic if all the memory suddenly disappears :D ]
+Thanks,
+
+Maxime
+
+Maxime Chevallier (5):
+  spi: imx: Remove duplicate variable assignments
+  spi: imx: Use dynamic bursts only when bits_per_word is 8, 16 or 32
+  spi: imx: Use correct number of bytes per words
+  spi: imx: remove unnecessary check in spi_imx_can_dma
+  spi: imx: Use the longuest possible burst size when in dynamic_burst
+
+ drivers/spi/spi-imx.c | 162 +++++++++++++++++++++++++++++++-------------------
+ 1 file changed, 101 insertions(+), 61 deletions(-)
+
+-- 
+2.11.0
