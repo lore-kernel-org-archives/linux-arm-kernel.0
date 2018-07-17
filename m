@@ -1,102 +1,100 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Tue, 17 Jul 2018 17:36:24 +0100
-Subject: [PATCH v8 2/4] arm64: KVM: export the capability to set guest
- SError syndrome
-In-Reply-To: <20180713154751.18131-3-james.morse@arm.com>
-References: <20180713154751.18131-1-james.morse@arm.com>
- <20180713154751.18131-3-james.morse@arm.com>
-Message-ID: <CAFEAcA9pK7W=gSZXTOTxFEFDmc6kJ8GDYO4a6r_P1FHp+KuT9A@mail.gmail.com>
+From: james.morse@arm.com (James Morse)
+Date: Tue, 17 Jul 2018 17:57:06 +0100
+Subject: [PATCH v11 09/15] arm64: kexec_file: load initrd and device-tree
+In-Reply-To: <20180711074203.3019-10-takahiro.akashi@linaro.org>
+References: <20180711074203.3019-1-takahiro.akashi@linaro.org>
+ <20180711074203.3019-10-takahiro.akashi@linaro.org>
+Message-ID: <c5199d62-16f3-a0f2-fdf5-7dcbf6a02cd6@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 July 2018 at 16:47, James Morse <james.morse@arm.com> wrote:
-> From: Dongjiu Geng <gengdongjiu@huawei.com>
->
-> For the arm64 RAS Extension, user space can inject a virtual-SError
-> with specified ESR. So user space needs to know whether KVM support
-> to inject such SError, this interface adds this query for this capability.
->
-> KVM will check whether system support RAS Extension, if supported, KVM
-> returns true to user space, otherwise returns false.
->
-> Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
-> Reviewed-by: James Morse <james.morse@arm.com>
-> Signed-off-by: James Morse <james.morse@arm.com>
-> ---
->  Documentation/virtual/kvm/api.txt | 11 +++++++++++
->  arch/arm64/kvm/reset.c            |  3 +++
->  include/uapi/linux/kvm.h          |  1 +
->  3 files changed, 15 insertions(+)
->
-> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-> index e3940f8715a5..480fa64eb52a 100644
-> --- a/Documentation/virtual/kvm/api.txt
-> +++ b/Documentation/virtual/kvm/api.txt
-> @@ -4643,3 +4643,14 @@ This capability indicates that KVM supports paravirtualized Hyper-V TLB Flush
->  hypercalls:
->  HvFlushVirtualAddressSpace, HvFlushVirtualAddressSpaceEx,
->  HvFlushVirtualAddressList, HvFlushVirtualAddressListEx.
+Hi Akashi,
+
+On 11/07/18 08:41, AKASHI Takahiro wrote:
+> load_other_segments() is expected to allocate and place all the necessary
+> memory segments other than kernel, including initrd and device-tree
+> blob (and elf core header for crash).
+> While most of the code was borrowed from kexec-tools' counterpart,
+> users may not be allowed to specify dtb explicitly, instead, the dtb
+> presented by the original boot loader is reused.
+> 
+> arch_kimage_kernel_post_load_cleanup() is responsible for freeing arm64-
+> specific data allocated in load_other_segments().
+
+> diff --git a/arch/arm64/kernel/machine_kexec_file.c b/arch/arm64/kernel/machine_kexec_file.c
+> index c38a8048ed00..ca00681c25c6 100644
+> --- a/arch/arm64/kernel/machine_kexec_file.c
+> +++ b/arch/arm64/kernel/machine_kexec_file.c
+
+> +int arch_kimage_file_post_load_cleanup(struct kimage *image)
+> +{
+> +	vfree(image->arch.dtb_buf);
+> +	image->arch.dtb_buf = NULL;
 > +
-> +8.19 KVM_CAP_ARM_SET_SERROR_ESR
-> +
-> +Architectures: arm, arm64
-> +
-> +This capability indicates that userspace can specify the syndrome value reported
-> +to the guest OS when guest takes a virtual SError interrupt exception.
+> +	return kexec_image_post_load_cleanup_default(image);
+> +}
 
-"the guest"
+A nit from sparse:
+| warning: symbol 'arch_kimage_file_post_load_cleanup' was not declared
 
-> +If KVM has this capability, userspace can only specify the ISS field for the ESR
-> +syndrome, it can not specify the EC field which is not under control by KVM.
+Can we add a definition for this to a header file somewhere. asm/kexec.h is
+probably the best bet.
 
-Full stop or semicolon, not comma.
-Not sure what the "which is not under control by KVM" part means.
 
-> +If this virtual SError is taken to EL1 using AArch64, this value will be reported
-> +in ISS filed of ESR_EL1.
+> +static int setup_dtb(struct kimage *image,
+> +		unsigned long initrd_load_addr, unsigned long initrd_len,
+> +		char *cmdline, unsigned long cmdline_len,
+> +		char **dtb_buf, size_t *dtb_buf_len)
+> +{
 
-"the ISS field".
+> +	/* add initrd-* */
+> +	if (initrd_load_addr) {
+> +		value = cpu_to_fdt64(initrd_load_addr);
+> +		ret = fdt_setprop_u64(buf, nodeoffset, "linux,initrd-start",
+> +							value);
 
-How does this capability interact with the KVM_CAP_VCPU_EVENTS
-API in patch 1? Is it saying "you can specify the ESR via
-that API", or talking about something else?
+fdt_setprop_u64() already does the endian conversion.
 
-What happens if userspace does try to specify the EC field value ?
-Is this an error, or is it ignored ?
+>From scripts/dtc/libfdt/libfdt.h, its implemented as:
+| 	fdt64_t tmp = cpu_to_fdt64(val);
+| 	return fdt_setprop(fdt, nodeoffset, name, &tmp, sizeof(tmp));
 
-> diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
-> index a3db01a28062..067c6ba969bd 100644
-> --- a/arch/arm64/kvm/reset.c
-> +++ b/arch/arm64/kvm/reset.c
-> @@ -77,6 +77,9 @@ int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
->         case KVM_CAP_ARM_PMU_V3:
->                 r = kvm_arm_support_pmu_v3();
->                 break;
-> +       case KVM_CAP_ARM_INJECT_SERROR_ESR:
-> +               r = cpus_have_const_cap(ARM64_HAS_RAS_EXTN);
-> +               break;
->         case KVM_CAP_SET_GUEST_DEBUG:
->         case KVM_CAP_VCPU_ATTRIBUTES:
->         case KVM_CAP_VCPU_EVENTS:
-> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
-> index b6270a3b38e9..a7d9bc4e4068 100644
-> --- a/include/uapi/linux/kvm.h
-> +++ b/include/uapi/linux/kvm.h
-> @@ -949,6 +949,7 @@ struct kvm_ppc_resize_hpt {
->  #define KVM_CAP_GET_MSR_FEATURES 153
->  #define KVM_CAP_HYPERV_EVENTFD 154
->  #define KVM_CAP_HYPERV_TLBFLUSH 155
-> +#define KVM_CAP_ARM_INJECT_SERROR_ESR 156
->
->  #ifdef KVM_CAP_IRQ_ROUTING
->
-> --
-> 2.18.0
->
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
+(I think you were using setprop directly in an older version)
 
-thanks
--- PMM
+
+This leads to:
+| ------------[ cut here ]------------
+| initrd not fully accessible via the linear mapping -- please check your
+| bootloader ...
+| WARNING: CPU: 0 PID: 0 at ../arch/arm64/mm/init.c:429
+| arm64_memblock_init+0x150/0x3d8
+| Modules linked in:
+| CPU: 0 PID: 0 Comm: swapper Not tainted 4.18.0-rc5-00015-g95b5c843d0da #10150
+| Hardware name: AMD Seattle (Rev.B0) Development Board (Overdrive) (DT)
+| pstate: 60000085 (nZCv daIf -PAN -UAO)
+| pc : arm64_memblock_init+0x150/0x3d8
+| lr : arm64_memblock_init+0x150/0x3d8
+
+| Call trace:
+| arm64_memblock_init+0x150/0x3d8
+| setup_arch+0x1c0/0x510
+| start_kernel+0x80/0x418
+| random: get_random_bytes called from print_oops_end_marker+0x4c/0x68 with
+| crng_init=0
+| ---[ end trace 0000000000000000 ]---
+
+
+Which is caused by the values being miles outside ram due to the extra byte
+swapping:
+| morse at frikadeller:~$ sudo dtc -I dtb -O dts /sys/firmware/fdt  | grep initrd
+|                 linux,initrd-end = <0x900b6c05 0x80000000>;
+|                 linux,initrd-start = <0x906a04 0x80000000>;
+
+
+With the two extra cpu_to_fdt64() calls removed:
+Reviewed-by: James Morse <james.morse@arm.com>
+
+
+Thanks,
+
+James
