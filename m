@@ -1,47 +1,51 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 17 Jul 2018 08:16:23 -0600
-Subject: [PATCH 1/4] dt-bindings: phy: add DT bindings for UniPhier USB3
- PHY driver
-In-Reply-To: <20180717195531.8587.4A936039@socionext.com>
-References: <1530261541-23104-2-git-send-email-hayashi.kunihiko@socionext.com>
- <20180716205049.GA3663@rob-hp-laptop>
- <20180717195531.8587.4A936039@socionext.com>
-Message-ID: <CAL_JsqKjC3J16uk2GTQyTquMbvO5Aw6kr4BfdNLAfZHD3MuBgQ@mail.gmail.com>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Tue, 17 Jul 2018 19:47:57 +0530
+Subject: [PATCH v6 5/5] arm64: dts: actions: Set UART clock reference
+ from CMU
+In-Reply-To: <20180715203524.11948-6-sravanhome@gmail.com>
+References: <20180715203524.11948-1-sravanhome@gmail.com>
+ <20180715203524.11948-6-sravanhome@gmail.com>
+Message-ID: <20180717141757.GE19076@mani>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 17, 2018 at 4:55 AM Kunihiko Hayashi
-<hayashi.kunihiko@socionext.com> wrote:
->
-> Hi Rob,
-> Thank you for your comments.
->
-> On Mon, 16 Jul 2018 14:50:49 -0600 <robh@kernel.org> wrote:
->
-> > On Fri, Jun 29, 2018 at 05:38:58PM +0900, Kunihiko Hayashi wrote:
-> > > Add DT bindings for PHY interface built into USB3 controller
-> > > implemented in UniPhier SoCs.
-> > >
-> > > Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
-> > > ---
-> > >  .../devicetree/bindings/phy/uniphier-usb3-phy.txt  | 118 +++++++++++++++++++++
+On Sun, Jul 15, 2018 at 10:35:24PM +0200, Saravanan Sekar wrote:
+> Signed-off-by: Parthiban Nallathambi <pn@denx.de>
+> Signed-off-by: Saravanan Sekar <sravanhome@gmail.com>
 
-[...]
+Reviewed-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 
-> > > +Optional properties:
-> > > +- phy-supply: A phandle to the regulator for USB VBUS.
-> >
-> > The phy actually needs Vbus or you just want to control Vbus from the
-> > phy driver?
->
-> To enable each USB port correspond with phy, we must enable Vbus for each port.
-> However, the host driver doesn't have the way to control regulators directly,
-> then I think it is reasonable to control Vbus by using phy regulator.
+Thanks,
+Mani
 
-DT should reflect the h/w. If Vbus rail is powering the phy then it
-should be in the phy node. If you just happen to want to put Vbus
-control in the phy driver, that's an OS problem and doesn't belong in
-DT. In that case, Vbus should be described as part of a USB connector
-node and any driver can walk the tree or graph and get Vbus regulator.
-
-Rob
+> ---
+>  arch/arm64/boot/dts/actions/s700-cubieboard7.dts | 8 +-------
+>  1 file changed, 1 insertion(+), 7 deletions(-)
+> 
+> diff --git a/arch/arm64/boot/dts/actions/s700-cubieboard7.dts b/arch/arm64/boot/dts/actions/s700-cubieboard7.dts
+> index ef79d7905f44..c08808ca3346 100644
+> --- a/arch/arm64/boot/dts/actions/s700-cubieboard7.dts
+> +++ b/arch/arm64/boot/dts/actions/s700-cubieboard7.dts
+> @@ -28,12 +28,6 @@
+>  		device_type = "memory";
+>  		reg = <0x1 0xe0000000 0x0 0x0>;
+>  	};
+> -
+> -	uart3_clk: uart3-clk {
+> -		compatible = "fixed-clock";
+> -		clock-frequency = <921600>;
+> -		#clock-cells = <0>;
+> -	};
+>  };
+>  
+>  &timer {
+> @@ -42,5 +36,5 @@
+>  
+>  &uart3 {
+>  	status = "okay";
+> -	clocks = <&uart3_clk>;
+> +	clocks = <&cmu CLK_UART3>;
+>  };
+> -- 
+> 2.18.0
+> 
