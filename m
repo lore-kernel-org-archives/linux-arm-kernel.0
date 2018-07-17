@@ -1,57 +1,132 @@
-From: julian.calaby@gmail.com (Julian Calaby)
-Date: Tue, 17 Jul 2018 22:41:20 +1000
-Subject: [linux-sunxi] [PATCH 2/2] drm/sun4i: sun4i: Introduce a quirk for
- lowest plane alpha support
-In-Reply-To: <20180717085230.17472-2-paul.kocialkowski@bootlin.com>
-References: <20180717085230.17472-1-paul.kocialkowski@bootlin.com>
- <20180717085230.17472-2-paul.kocialkowski@bootlin.com>
-Message-ID: <CAGRGNgX27bbJz2qe3FOb4eP5WKgDYFUNxoz7SkUbN_QDF25pAg@mail.gmail.com>
+From: christoffer.dall@arm.com (Christoffer Dall)
+Date: Tue, 17 Jul 2018 14:46:29 +0200
+Subject: [PATCH v2] kvm: arm/arm64: Fix emulated physical timer IRQ
+ injection
+In-Reply-To: <20180717095137.9620-1-andre.przywara@arm.com>
+References: <20180717095137.9620-1-andre.przywara@arm.com>
+Message-ID: <20180717124629.GB30790@e113682-lin.lund.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
-
-On Tue, Jul 17, 2018 at 6:53 PM Paul Kocialkowski
-<paul.kocialkowski@bootlin.com> wrote:
->
-> Not all sunxi platforms with the first version of the Display Engine
-> support an alpha component on the plane with the lowest z position
-> (as in: lowest z-pos), that gets blended with the background color.
->
-> In particular, the A13 is known to have this limitation. However, it was
-> recently discovered that the A20 and A33 are capable of having alpha on
-> their lowest plane.
->
-> Thus, this introduces a specific quirk to indicate such support,
-> per-platform. Since this was not tested on sun4i and sun6i platforms, a
-> conservative approach is kept and this feature is not supported.
->
-> Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+On Tue, Jul 17, 2018 at 10:51:37AM +0100, Andre Przywara wrote:
+> When KVM emulates a physical timer, we keep track of the interrupt
+> condition and try to inject an IRQ to the guest when needed.
+> This works if the timer expires when either the guest is running or KVM
+> does work on behalf of it (like handling a trap).
+> However when the guest's VCPU is not scheduled (for instance because
+> the guest issued a WFI instruction before), we miss injecting the interrupt
+> when the VCPU's state gets restored back in kvm_timer_vcpu_load().
+> 
+> Fix this by moving the interrupt injection check into the
+> phys_timer_emulate() function, so that all possible paths of execution
+> are covered.
+> 
+> Cc: Stable <stable@vger.kernel.org> # 4.15+
+> Fixes: bbdd52cfcba29 ("KVM: arm/arm64: Avoid phys timer emulation in vcpu entry/exit")
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 > ---
->  drivers/gpu/drm/sun4i/sun4i_backend.c | 10 ++++++++--
->  1 file changed, 8 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
-> index a3cc398d4d80..cdc4a8a91ea2 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_backend.c
-> +++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
-> @@ -584,8 +587,9 @@ static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
->         }
->
->         /* We can't have an alpha plane at the lowest position */
-> -       if (plane_states[0]->fb->format->has_alpha ||
-> -           (plane_states[0]->alpha != DRM_BLEND_ALPHA_OPAQUE))
-> +       if ((plane_states[0]->fb->format->has_alpha ||
-> +           (plane_states[0]->alpha != DRM_BLEND_ALPHA_OPAQUE)) &&
-> +           !backend->quirks->supports_lowest_plane_alpha)
+> Changelog v1...v2:
+> - clear IRQ line *before* starting the soft timer
+> 
+>  virt/kvm/arm/arch_timer.c | 21 +++++++++++++--------
+>  1 file changed, 13 insertions(+), 8 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+> index bd3d57f40f1b..03a4ea776b85 100644
+> --- a/virt/kvm/arm/arch_timer.c
+> +++ b/virt/kvm/arm/arch_timer.c
+> @@ -294,16 +294,25 @@ static void phys_timer_emulate(struct kvm_vcpu *vcpu)
 
->From a readability perspective, it'd be fractionally nicer if the
-quirk check was before the alpha checks.
+Please update the comment on this function as well.
+
+>  	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+>  	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
+>  
+> +	/* If the timer cannot fire at all, then we don't need a soft timer. */
+> +	if (!kvm_timer_irq_can_fire(ptimer)) {
+> +		soft_timer_cancel(&timer->phys_timer, NULL);
+> +		kvm_timer_update_irq(vcpu, false, ptimer);
+> +		return;
+> +	}
+> +
+>  	/*
+> -	 * If the timer can fire now we have just raised the IRQ line and we
+> -	 * don't need to have a soft timer scheduled for the future.  If the
+> -	 * timer cannot fire at all, then we also don't need a soft timer.
+> +	 * If the timer can fire now, we don't need to have a soft timer
+> +	 * scheduled for the future, as we also raise the IRQ line.
+>  	 */
+> -	if (kvm_timer_should_fire(ptimer) || !kvm_timer_irq_can_fire(ptimer)) {
+> +	if (kvm_timer_should_fire(ptimer)) {
+>  		soft_timer_cancel(&timer->phys_timer, NULL);
+> +		kvm_timer_update_irq(vcpu, true, ptimer);
+> +
+>  		return;
+>  	}
+>  
+> +	kvm_timer_update_irq(vcpu, false, ptimer);
+>  	soft_timer_start(&timer->phys_timer, kvm_timer_compute_delta(ptimer));
+
+I find this overly complex.
+
+How about:
+
+diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+index bd3d57f..b5dcfca 100644
+--- a/virt/kvm/arm/arch_timer.c
++++ b/virt/kvm/arm/arch_timer.c
+@@ -288,7 +288,7 @@ static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level,
+ 	}
+ }
+ 
+-/* Schedule the background timer for the emulated timer. */
++/* Emulate the physical timer in software and update IRQ signal if needed */
+ static void phys_timer_emulate(struct kvm_vcpu *vcpu)
+ {
+ 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+@@ -299,12 +299,13 @@ static void phys_timer_emulate(struct kvm_vcpu *vcpu)
+ 	 * don't need to have a soft timer scheduled for the future.  If the
+ 	 * timer cannot fire at all, then we also don't need a soft timer.
+ 	 */
+-	if (kvm_timer_should_fire(ptimer) || !kvm_timer_irq_can_fire(ptimer)) {
++	if (kvm_timer_should_fire(ptimer) || !kvm_timer_irq_can_fire(ptimer))
+ 		soft_timer_cancel(&timer->phys_timer, NULL);
+-		return;
+-	}
++	else
++		soft_timer_start(&timer->phys_timer, kvm_timer_compute_delta(ptimer));
+ 
+-	soft_timer_start(&timer->phys_timer, kvm_timer_compute_delta(ptimer));
++	if (kvm_timer_should_fire(ptimer) != ptimer->irq.level)
++		kvm_timer_update_irq(vcpu, !ptimer->irq.level, ptimer);
+ }
+ 
+ /*
+ 
+
+>  }
+>  
+> @@ -316,7 +325,6 @@ static void kvm_timer_update_state(struct kvm_vcpu *vcpu)
+>  {
+>  	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+>  	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+> -	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
+>  	bool level;
+>  
+>  	if (unlikely(!timer->enabled))
+> @@ -332,9 +340,6 @@ static void kvm_timer_update_state(struct kvm_vcpu *vcpu)
+>  	level = kvm_timer_should_fire(vtimer);
+>  	kvm_timer_update_irq(vcpu, level, vtimer);
+>  
+> -	if (kvm_timer_should_fire(ptimer) != ptimer->irq.level)
+> -		kvm_timer_update_irq(vcpu, !ptimer->irq.level, ptimer);
+> -
+>  	phys_timer_emulate(vcpu);
+>  }
+>  
+Please also remove the comment in kvm_timer_vcpu_load() which indicates
+that the call to the function will only ever schedule a background
+timer.
 
 Thanks,
-
--- 
-Julian Calaby
-
-Email: julian.calaby at gmail.com
-Profile: http://www.google.com/profiles/julian.calaby/
+-Christoffer
