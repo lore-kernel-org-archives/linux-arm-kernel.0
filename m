@@ -1,142 +1,60 @@
-From: pawel.mikolaj.chmiel@gmail.com (=?utf-8?B?UGF3ZcWC?= Chmiel)
-Date: Tue, 17 Jul 2018 18:08:09 +0200
-Subject: [PATCH 1/2] Input: atmel_mxt_ts: Add support for optional
- regulators.
-In-Reply-To: <20180715102547.afu57hbjcbizn3kc@penguin>
-References: <1531506608-24479-1-git-send-email-pawel.mikolaj.chmiel@gmail.com>
- <1531506608-24479-2-git-send-email-pawel.mikolaj.chmiel@gmail.com>
- <20180715102547.afu57hbjcbizn3kc@penguin>
-Message-ID: <2367651.5rnNy4vni7@acerlaptop>
+From: tudor.ambarus@microchip.com (Tudor Ambarus)
+Date: Tue, 17 Jul 2018 19:28:31 +0300
+Subject: [PATCH 3/3] mtd: spi-nor: add support for Microchip SST26 QSPI flash
+ memories
+In-Reply-To: <20180717162831.17947-1-tudor.ambarus@microchip.com>
+References: <20180717162831.17947-1-tudor.ambarus@microchip.com>
+Message-ID: <20180717162831.17947-3-tudor.ambarus@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday, July 15, 2018 10:25:47 AM CEST Dmitry Torokhov wrote:
-> Hi Pawe?,
-> 
-> On Fri, Jul 13, 2018 at 08:30:07PM +0200, Pawe? Chmiel wrote:
-> > This patch adds optional regulators, which can be used to power
-> > up touchscreen. After enabling regulators, we need to wait 150msec.
-> > This value is taken from official driver.
-> > 
-> > It was tested on Samsung Galaxy i9000 (based on Samsung S5PV210 SOC).
-> > 
-> > Signed-off-by: Pawe? Chmiel <pawel.mikolaj.chmiel@gmail.com>
-> > ---
-> >  drivers/input/touchscreen/atmel_mxt_ts.c | 45 ++++++++++++++++++++++++++++++++
-> >  1 file changed, 45 insertions(+)
-> > 
-> > diff --git a/drivers/input/touchscreen/atmel_mxt_ts.c b/drivers/input/touchscreen/atmel_mxt_ts.c
-> > index 54fe190fd4bc..a7625ec8fb9f 100644
-> > --- a/drivers/input/touchscreen/atmel_mxt_ts.c
-> > +++ b/drivers/input/touchscreen/atmel_mxt_ts.c
-> > @@ -27,6 +27,7 @@
-> >  #include <linux/interrupt.h>
-> >  #include <linux/of.h>
-> >  #include <linux/property.h>
-> > +#include <linux/regulator/consumer.h>
-> >  #include <linux/slab.h>
-> >  #include <linux/gpio/consumer.h>
-> >  #include <linux/property.h>
-> > @@ -198,6 +199,7 @@ enum t100_type {
-> >  #define MXT_RESET_INVALID_CHG	100	/* msec */
-> >  #define MXT_RESET_TIME		200	/* msec */
-> >  #define MXT_RESET_TIMEOUT	3000	/* msec */
-> > +#define MXT_REGULATOR_DELAY	150	/* msec */
-> >  #define MXT_CRC_TIMEOUT		1000	/* msec */
-> >  #define MXT_FW_RESET_TIME	3000	/* msec */
-> >  #define MXT_FW_CHG_TIMEOUT	300	/* msec */
-> > @@ -310,6 +312,8 @@ struct mxt_data {
-> >  	struct t7_config t7_cfg;
-> >  	struct mxt_dbg dbg;
-> >  	struct gpio_desc *reset_gpio;
-> > +	struct regulator *vdd_reg;
-> > +	struct regulator *avdd_reg;
-> >  
-> >  	/* Cached parameters from object table */
-> >  	u16 T5_address;
-> > @@ -3076,6 +3080,40 @@ static int mxt_probe(struct i2c_client *client, const struct i2c_device_id *id)
-> >  		return error;
-> >  	}
-> >  
-> > +	data->vdd_reg = devm_regulator_get_optional(&client->dev, "vdd");
-> > +	if (IS_ERR(data->vdd_reg)) {
-> > +		error = PTR_ERR(data->vdd_reg);
-> > +		dev_err(&client->dev, "Failed to get vdd regulator: %d\n",
-> > +			error);
-> > +		return error;
-> > +	}
-> > +
-> > +	if (data->vdd_reg) {
-> > +		error = regulator_enable(data->vdd_reg);
-> > +		if (error) {
-> > +			dev_err(&client->dev, "Failed to enable vdd regulator: %d\n",
-> > +				error);
-> > +			return error;
-> > +		}
-> > +	}
-> > +
-> > +	data->avdd_reg = devm_regulator_get_optional(&client->dev, "avdd");
-> > +	if (IS_ERR(data->avdd_reg)) {
-> > +		error = PTR_ERR(data->avdd_reg);
-> > +		dev_err(&client->dev, "Failed to get avdd regulator: %d\n",
-> > +			error);
-> > +		return error;
-> > +	}
-> > +
-> > +	if (data->avdd_reg) {
-> 
-> devm_regulator_get_optional() does not return NULL for regulators
-> not present in device tree, but rather -ENOENT, so this code is not
-> correct; neither is the simple IS_ERR() check above.
-> 
-> Moreover, the optional regulators should be used when there is a part of
-> IP block that can be optionally powered up, but the device can work
-> (with limited functionality) even when it is powered down. They should
-> not be used in cases when supplies are mandatory (such as vdd/avdd) but
-> may not be exposed to the kernel by the firmware.
-> 
-> Simply use devm_regulator_get() and rely on the fact that on fully
-> constrained system you will get a dummy regulator.
-> 
-> > +		error = regulator_enable(data->avdd_reg);
-> > +		if (error) {
-> > +			dev_err(&client->dev, "Failed to enable avdd regulator: %d\n",
-> > +				error);
-> > +			return error;
-> > +		}
-> > +	}
-> > +
-> >  	error = devm_request_threaded_irq(&client->dev, client->irq,
-> >  					  NULL, mxt_interrupt, IRQF_ONESHOT,
-> >  					  client->name, data);
-> > @@ -3086,6 +3124,9 @@ static int mxt_probe(struct i2c_client *client, const struct i2c_device_id *id)
-> >  
-> >  	disable_irq(client->irq);
-> >  
-> > +	if (!IS_ERR(data->vdd_reg) || !IS_ERR(data->avdd_reg))
-> > +		msleep(MXT_REGULATOR_DELAY);
-> > +
-> >  	if (data->reset_gpio) {
-> 
-> I think you should require that if regulators are exposed then reset
-> gpio should also be present to ensure proper power up timings.
+The flash memories are write-protected by default at power-on and
+must be unlocked first, before being erased, then programmed.
 
-Thanks for comments. I'll prepare v2 version with those changes applied.
-> 
-> >  		msleep(MXT_RESET_GPIO_TIME);
-> >  		gpiod_set_value(data->reset_gpio, 1);
-> > @@ -3116,6 +3157,10 @@ static int mxt_remove(struct i2c_client *client)
-> >  	struct mxt_data *data = i2c_get_clientdata(client);
-> >  
-> >  	disable_irq(data->irq);
-> > +	if (!IS_ERR(data->avdd_reg))
-> > +		regulator_disable(data->avdd_reg);
-> > +	if (!IS_ERR(data->vdd_reg))
-> > +		regulator_disable(data->vdd_reg);
-> >  	sysfs_remove_group(&client->dev.kobj, &mxt_attr_group);
-> >  	mxt_free_input_device(data);
-> >  	mxt_free_object_table(data);
-> 
-> Thanks.
-> 
-> 
+The erase block sizes are not uniform. The memory layout is uniform
+just for the 4K sector blocks.
+
+Based on initial work done by Cyrille Pitchen.
+
+Signed-off-by: Tudor Ambarus <tudor.ambarus@microchip.com>
+---
+ drivers/mtd/spi-nor/spi-nor.c | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
+
+diff --git a/drivers/mtd/spi-nor/spi-nor.c b/drivers/mtd/spi-nor/spi-nor.c
+index eddf09f..06d7023 100644
+--- a/drivers/mtd/spi-nor/spi-nor.c
++++ b/drivers/mtd/spi-nor/spi-nor.c
+@@ -1164,10 +1164,30 @@ static const struct flash_info spi_nor_ids[] = {
+ 	{ "sst25wf040",  INFO(0xbf2504, 0, 64 * 1024,  8, SECT_4K | SST_WRITE) },
+ 	{ "sst25wf080",  INFO(0xbf2505, 0, 64 * 1024, 16, SECT_4K | SST_WRITE) },
+ 	{
++		"sst26vf016b", INFO(0xbf2641, 0, 64 * 1024, 32,
++			SECT_4K | SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ |
++			UNLOCK_GLOBAL_BLOCK)
++	},
++	{
++		"sst26vf032b", INFO(0xbf2642, 0, 64 * 1024, 64,
++			SECT_4K | SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ |
++			UNLOCK_GLOBAL_BLOCK)
++	},
++	{
+ 		"sst26vf064b", INFO(0xbf2643, 0, 64 * 1024, 128,
+ 			SECT_4K | SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ |
+ 			UNLOCK_GLOBAL_BLOCK)
+ 	},
++	{
++		"sst26vf040b", INFO(0xbf2654, 0, 64 * 1024, 8,
++			SECT_4K | SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ |
++			UNLOCK_GLOBAL_BLOCK)
++	},
++	{
++		"sst26vf080b", INFO(0xbf2658, 0, 64 * 1024, 16,
++			SECT_4K | SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ |
++			UNLOCK_GLOBAL_BLOCK)
++	},
+ 
+ 	/* ST Microelectronics -- newer production may have feature updates */
+ 	{ "m25p05",  INFO(0x202010,  0,  32 * 1024,   2, 0) },
+-- 
+2.9.4
