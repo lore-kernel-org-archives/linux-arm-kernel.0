@@ -1,8 +1,8 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 17 Jul 2018 13:38:32 +0200
-Subject: [PATCH v4] arm64: dts: r8a77995: Add SCIF {0, 1, 3, 4,
+Date: Tue, 17 Jul 2018 13:42:09 +0200
+Subject: [PATCH v3] arm64: dts: r8a77995: Add SCIF {0, 1, 3, 4,
  5} and all HSCIF device nodes
-Message-ID: <20180717113832.26413-1-horms+renesas@verge.net.au>
+Message-ID: <20180717114209.26788-1-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
