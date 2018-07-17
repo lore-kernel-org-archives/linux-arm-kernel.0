@@ -1,32 +1,54 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Tue, 17 Jul 2018 15:58:19 -0700
-Subject: [PATCH] arm64: Clear the stack
-In-Reply-To: <20180703121440.v4olvwqb3ykgt5fm@lakrids.cambridge.arm.com>
-References: <20180629190553.7282-1-labbott@redhat.com>
- <9733d929-3c6a-40e1-6110-8f79975323d3@linux.com>
- <1b97aa7d-2b6c-a5df-0caa-1cd16e18a816@redhat.com>
- <20180703121440.v4olvwqb3ykgt5fm@lakrids.cambridge.arm.com>
-Message-ID: <06dd55e6-d39e-7617-b644-bdd04fa3c030@redhat.com>
+From: jmkrzyszt@gmail.com (Janusz Krzysztofik)
+Date: Wed, 18 Jul 2018 01:14:45 +0200
+Subject: [PATCH v2 0/3] ARM: OMAP1: ams-delta: Complete driver gpiod migration
+In-Reply-To: <20180518210954.29044-1-jmkrzyszt@gmail.com>
+References: <20180518210954.29044-1-jmkrzyszt@gmail.com>
+Message-ID: <20180717231448.14958-1-jmkrzyszt@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/03/2018 05:14 AM, Mark Rutland wrote:
->> It might be cleaner just to use on_accessible_stack and then another
->> function to get the top of stack. This also might just be
->> reimplementing what x86 already has? (Mark, Ard?)
-> It looks like we could build a get_stack_info() as they have.
-> 
-> We could probably clean up our stack traced atop of that, too.
 
-So I spent some time looking at this and I'm not 100% clear
-if there would actually be much benefit to re-writing with
-get_stack_info. Most of that design seems to come from x86
-needing to handle multiple unwind options which arm64 doesn't
-need to worry about. Any rework ended up with roughly
-the same code without any notable benefit that I could see.
-It's possible I'm missing what kind of cleanup you're suggesting
-but I think just going with a tweaked version of on_accessible_stack
-would be fine.
+This is a follow up of initial submission of a series consisted of 
+6 changes, 3 of which have been already applied or reworkeed.
+
+V2 changelog:
+[PATCH 1/6] ARM: OMAP1: ams-delta: add GPIO lookup tables
+	- already in mainline, commit 68e62a15a914
+[PATCH 2/6] Input: ams_delta_serio: use GPIO lookup table
+	- reworked and submitted as a series, already in linux-omap,
+	  commit 68e62a15a914 ("ARM: OMAP1: ams-delta: drop GPIO lookup
+	  table for serio device") followed by 9 more
+[PATCH 3/6] ASoC: ams_delta: use GPIO lookup table
+	- already in mainline, commit d65777d1a2cd
+[PATCH 4/6] fbdev: omapfb: lcd_ams_delta: use GPIO lookup table
+	- resubmitting as [PATCH v2 1/3 v2]
+	v2: Remove problematic error code conversion no longer
+	    needed if used on top of commit d08605a64e67 ("ARM: OMAP1:
+	    ams-delta: move late devices back to init_machine")
+	    and commit 8853daf3b4ac ("gpiolib: Defer on non-DT
+	    find_chip_by_name() failure") already in linux-next
+[PATCH 5/6] mtd: rawnand: ams-delta: use GPIO lookup table
+	- resubmitting as [PATCH v2 2/3 v4]
+	v2: Fix handling of devm_gpiod_get_optional() return values -
+	    thanks to Andy Shevchenko.
+	v3: Remove problematic error code conversion no longer needed
+	    if used on top of commit d08605a64e67 ("ARM: OMAP1:
+	    ams-delta: move late devices back to init_machine") and
+	    commit 8853daf3b4ac ("gpiolib: Defer on non-DT
+	    find_chip_by_name() failure") already in linux-next - thanks
+	    to Boris Brezillon
+	v4: fix style issue - thanks to Boris Brezillon
+[PATCH 6/6] ARM: OMAP1: ams-delta: make board header file local to
+	mach-omap1
+	- resending as [PATCH v2 3/3]
+
+Dependency on commit 8853daf3b4ac ("gpiolib: Defer on non-DT
+find_chip_by_name() failure") is not critical - it is not needed for
+clean build or run, it only prevents from potential future changes to
+driver initializaton order during device_initcall.
+
+I'm submitting the three patches in series because the last one depends
+on the other two.
 
 Thanks,
-Laura
+Janusz
