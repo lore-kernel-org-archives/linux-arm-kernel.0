@@ -1,65 +1,52 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 17 Jul 2018 18:11:31 +0100
-Subject: [PATCH v2 00/10] coresight: perf: Support for tmc-etr backed buffers
-Message-ID: <1531847501-22226-1-git-send-email-suzuki.poulose@arm.com>
+Date: Tue, 17 Jul 2018 18:11:36 +0100
+Subject: [PATCH v2 05/10] coresight: tmc-etr: Relax collection of trace from
+ sysfs mode
+In-Reply-To: <1531847501-22226-1-git-send-email-suzuki.poulose@arm.com>
+References: <1531847501-22226-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1531847501-22226-6-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds the support for using the tmc-etr in perf mode for
-storing the trace to system RAM. The ETR uses a separate buffer (double
-buffering) for storing the trace. This is copied back to the ring buffer
-when the event is stopped. We try to match the ETR buffer to the larger
-of perf ring buffer or the size configured for the ETR via sysfs. This
-allows tuning the buffer size to prevent overflows and loosing trace
-data, as we don't have overflow interrupt support (yet).
+Since the ETR now uses mode specific buffers, we can reliably
+provide the trace data captured in sysfs mode, even when the ETR
+is operating in PERF mode.
 
-Applies on coresight/next
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+---
+ drivers/hwtracing/coresight/coresight-tmc-etr.c | 14 ++++++--------
+ 1 file changed, 6 insertions(+), 8 deletions(-)
 
-Changes since v1 :
- - Fix path for each CPU where the event might be recorded.
- - Handle errors in enabling source
- - Remove set_buffer callback to avoid complicating the error handling.
- - Fix a bug in handling sysfs mode specific buffers
-
-Changes since [0] :
- - Drop buffer rotation logic for etr-buf
- - Do not use perf ring buffer. (Add support later)
- - Fix handling of sink, preventing mixed modes of operation.
-
-[0] - TMC ETR perf support
- - http://lists.infradead.org/pipermail/linux-arm-kernel/2018-May/574875.html
-
-
-Suzuki K Poulose (10):
-  coresight: Fix handling of sinks
-  coresight: perf: Fix per cpu path management
-  coresight: perf: Disable trace path upon source error
-  coresight: tmc-etr: Handle driver mode specific ETR buffers
-  coresight: tmc-etr: Relax collection of trace from sysfs mode
-  coresight: Convert driver messages to dev_dbg
-  coresight: perf: Remove reset_buffer call back for sinks
-  coresight: perf: Add helper to retrieve sink configuration
-  coresight: perf: Remove set_buffer call back
-  coresight: etm-perf: Add support for ETR backend
-
- .../coresight/coresight-dynamic-replicator.c       |   4 +-
- drivers/hwtracing/coresight/coresight-etb10.c      |  84 ++----
- drivers/hwtracing/coresight/coresight-etm-perf.c   |  91 +++---
- drivers/hwtracing/coresight/coresight-etm-perf.h   |  26 ++
- drivers/hwtracing/coresight/coresight-etm3x.c      |   4 +-
- drivers/hwtracing/coresight/coresight-etm4x.c      |   4 +-
- drivers/hwtracing/coresight/coresight-funnel.c     |   4 +-
- drivers/hwtracing/coresight/coresight-priv.h       |   2 +-
- drivers/hwtracing/coresight/coresight-replicator.c |   4 +-
- drivers/hwtracing/coresight/coresight-stm.c        |   4 +-
- drivers/hwtracing/coresight/coresight-tmc-etf.c    |  94 +++---
- drivers/hwtracing/coresight/coresight-tmc-etr.c    | 327 ++++++++++++++++++---
- drivers/hwtracing/coresight/coresight-tmc.c        |   4 +-
- drivers/hwtracing/coresight/coresight-tmc.h        |   4 +
- drivers/hwtracing/coresight/coresight-tpiu.c       |   6 +-
- drivers/hwtracing/coresight/coresight.c            |  31 +-
- include/linux/coresight.h                          |  12 +-
- 17 files changed, 473 insertions(+), 232 deletions(-)
-
+diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+index 58c7935..671a2ba 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
++++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+@@ -1168,19 +1168,17 @@ int tmc_read_prepare_etr(struct tmc_drvdata *drvdata)
+ 		goto out;
+ 	}
+ 
+-	/* Don't interfere if operated from Perf */
+-	if (drvdata->mode == CS_MODE_PERF) {
+-		ret = -EINVAL;
+-		goto out;
+-	}
+-
+-	/* If sysfs_buf is NULL the trace data has been read already */
++	/*
++	 * We can safely allow reads even if the ETR is operating in PERF mode,
++	 * since the sysfs session is captured in mode specific data.
++	 * If drvdata::sysfs_data is NULL the trace data has been read already.
++	 */
+ 	if (!drvdata->sysfs_buf) {
+ 		ret = -EINVAL;
+ 		goto out;
+ 	}
+ 
+-	/* Disable the TMC if we are trying to read from a running session */
++	/* Disable the TMC if we are trying to read from a running session. */
+ 	if (drvdata->mode == CS_MODE_SYSFS)
+ 		tmc_etr_disable_hw(drvdata);
+ 
 -- 
 2.7.4
