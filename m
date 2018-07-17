@@ -1,85 +1,54 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 17 Jul 2018 18:05:40 +0200
-Subject: [PATCH 5/6] staging: rtl: Use existing define with polynomial
-In-Reply-To: <20180717160541.3843-1-krzk@kernel.org>
-References: <20180717160541.3843-1-krzk@kernel.org>
-Message-ID: <20180717160541.3843-6-krzk@kernel.org>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 18 Jul 2018 00:09:48 +0800
+Subject: [PATCH v5 10/11] clk: mediatek: Add MT6765 clock support
+In-Reply-To: <1531817552-17221-11-git-send-email-mars.cheng@mediatek.com>
+References: <1531817552-17221-11-git-send-email-mars.cheng@mediatek.com>
+Message-ID: <201807180025.FNytrCxn%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Do not define again the polynomial but use header with existing define.
+Hi Owen,
 
-Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+Thank you for the patch! Yet something to improve:
+
+[auto build test ERROR on robh/for-next]
+[also build test ERROR on v4.18-rc5 next-20180717]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+
+url:    https://github.com/0day-ci/linux/commits/Mars-Cheng/Add-basic-SoC-support-for-mt6765/20180717-205540
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
+config: i386-allmodconfig (attached as .config)
+compiler: gcc-7 (Debian 7.3.0-16) 7.3.0
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=i386 
+
+All errors (new ones prefixed by >>):
+
+>> drivers/clk/mediatek/clk-mt6765-vcodec.c:75:21: error: 'of_match_clk_mt6765_vcodec' undeclared here (not in a function); did you mean 'of_match_clk_mt6765_venc'?
+      .of_match_table = of_match_clk_mt6765_vcodec,
+                        ^~~~~~~~~~~~~~~~~~~~~~~~~~
+                        of_match_clk_mt6765_venc
+
+vim +75 drivers/clk/mediatek/clk-mt6765-vcodec.c
+
+    70	
+    71	static struct platform_driver clk_mt6765_vcodec_drv = {
+    72		.probe = clk_mt6765_vcodec_probe,
+    73		.driver = {
+    74			.name = "clk-mt6765-vcodec",
+  > 75			.of_match_table = of_match_clk_mt6765_vcodec,
+    76		},
+    77	};
+    78	
+
 ---
-Not tested
-
-It would be nice to get some testing. Only generic lib/crc, bunzip, xz_crc32
-and Freescale's Ethernet driver were tested on HW.  Rest got just different
-builds.
-
- drivers/staging/rtl8712/rtl871x_security.c    | 5 ++---
- drivers/staging/rtl8723bs/core/rtw_security.c | 5 ++---
- 2 files changed, 4 insertions(+), 6 deletions(-)
-
-diff --git a/drivers/staging/rtl8712/rtl871x_security.c b/drivers/staging/rtl8712/rtl871x_security.c
-index 7bc74d7d8a3a..1075eacdb441 100644
---- a/drivers/staging/rtl8712/rtl871x_security.c
-+++ b/drivers/staging/rtl8712/rtl871x_security.c
-@@ -40,6 +40,7 @@
- #include <linux/uaccess.h>
- #include <asm/byteorder.h>
- #include <linux/atomic.h>
-+#include <linux/crc32poly.h>
- #include <linux/semaphore.h>
- 
- #include "osdep_service.h"
-@@ -49,8 +50,6 @@
- 
- /* =====WEP related===== */
- 
--#define CRC32_POLY 0x04c11db7
--
- struct arc4context {
- 	u32 x;
- 	u32 y;
-@@ -135,7 +134,7 @@ static void crc32_init(void)
- 	for (i = 0; i < 256; ++i) {
- 		k = crc32_reverseBit((u8)i);
- 		for (c = ((u32)k) << 24, j = 8; j > 0; --j)
--			c = c & 0x80000000 ? (c << 1) ^ CRC32_POLY : (c << 1);
-+			c = c & 0x80000000 ? (c << 1) ^ CRC32_POLY_BE : (c << 1);
- 		p1 = (u8 *)&crc32_table[i];
- 		p1[0] = crc32_reverseBit(p[3]);
- 		p1[1] = crc32_reverseBit(p[2]);
-diff --git a/drivers/staging/rtl8723bs/core/rtw_security.c b/drivers/staging/rtl8723bs/core/rtw_security.c
-index 612277a555d2..6c8ac9e86c9f 100644
---- a/drivers/staging/rtl8723bs/core/rtw_security.c
-+++ b/drivers/staging/rtl8723bs/core/rtw_security.c
-@@ -6,6 +6,7 @@
-  ******************************************************************************/
- #define  _RTW_SECURITY_C_
- 
-+#include <linux/crc32poly.h>
- #include <drv_types.h>
- #include <rtw_debug.h>
- 
-@@ -87,8 +88,6 @@ const char *security_type_str(u8 value)
- 
- /* WEP related ===== */
- 
--#define CRC32_POLY 0x04c11db7
--
- struct arc4context {
- 	u32 x;
- 	u32 y;
-@@ -178,7 +177,7 @@ static void crc32_init(void)
- 		for (i = 0; i < 256; ++i) {
- 			k = crc32_reverseBit((u8)i);
- 			for (c = ((u32)k) << 24, j = 8; j > 0; --j) {
--				c = c & 0x80000000 ? (c << 1) ^ CRC32_POLY : (c << 1);
-+				c = c & 0x80000000 ? (c << 1) ^ CRC32_POLY_BE : (c << 1);
- 			}
- 			p1 = (u8 *)&crc32_table[i];
- 
--- 
-2.14.1
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 64183 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180718/3c2eee28/attachment-0001.gz>
