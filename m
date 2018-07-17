@@ -1,55 +1,46 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 17 Jul 2018 14:28:09 +0200
-Subject: [PATCH 4/5] thermal: exynos: fixed the efuse min/max value for
- exynos5422
-In-Reply-To: <1531822342-4293-4-git-send-email-linux.amoon@gmail.com>
-References: <1531822342-4293-1-git-send-email-linux.amoon@gmail.com>
- <1531822342-4293-4-git-send-email-linux.amoon@gmail.com>
-Message-ID: <CAJKOXPfOiTARmtkcJeC49RicWOt8q98GKPJOQkYmqG_nJtY=aQ@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 17 Jul 2018 09:28:31 -0300
+Subject: [PATCH 1/2] drm/panel: Add support for Armadeus ST0700 Adapt
+In-Reply-To: <20180717072318.18730-1-sebastien.szymanski@armadeus.com>
+References: <20180717072318.18730-1-sebastien.szymanski@armadeus.com>
+Message-ID: <CAOMZO5Dr0zqy4Sf3s=L4qoqePRhZAXWpDk1oTOUidy4_TUQ=QA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 July 2018 at 12:12, Anand Moon <linux.amoon@gmail.com> wrote:
-> e-fuse range min~max range is 16~76. if e-fuse value is out of
+Hi S?bastien,
 
-s/e-fuse/Fuse/
-s/if/If/
-
-Can you share the sources confirming that fuse values are between 16 and 76?
-
-Best regards,
-Krzysztof
-
-> this range, then thermal sensor may not sense thermal data properly.
+On Tue, Jul 17, 2018 at 4:23 AM, S?bastien Szymanski
+<sebastien.szymanski@armadeus.com> wrote:
+> This patch adds support for the Armadeus ST0700 Adapt. It comes with a
+> Santek ST0700I5Y-RBSLW 7.0" WVGA (800x480) TFT and an adapter board so
+> that it can be connected on the TFT header of Armadeus Dev boards.
 >
-> CC: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+> Signed-off-by: S?bastien Szymanski <sebastien.szymanski@armadeus.com>
 > ---
->  drivers/thermal/samsung/exynos_tmu.c | 10 ++++++----
->  1 file changed, 6 insertions(+), 4 deletions(-)
+>  .../display/panel/armadeus,st0700-adapt.txt        |  9 +++++++
+>  drivers/gpu/drm/panel/panel-simple.c               | 29 ++++++++++++++++++++++
+>  2 files changed, 38 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/display/panel/armadeus,st0700-adapt.txt
 >
-> diff --git a/drivers/thermal/samsung/exynos_tmu.c b/drivers/thermal/samsung/exynos_tmu.c
-> index 4a2733c..6481d91 100644
-> --- a/drivers/thermal/samsung/exynos_tmu.c
-> +++ b/drivers/thermal/samsung/exynos_tmu.c
-> @@ -940,11 +940,13 @@ static int exynos_map_dt_data(struct platform_device *pdev)
->                 data->reference_voltage = 16;
->                 data->efuse_value = 55;
->                 if (data->soc != SOC_ARCH_EXYNOS5420 &&
-> -                   data->soc != SOC_ARCH_EXYNOS5420_TRIMINFO)
-> +                   data->soc != SOC_ARCH_EXYNOS5420_TRIMINFO) {
-> +                       data->min_efuse_value = 16;
-> +                       data->max_efuse_value = 76;
-> +               } else {
->                         data->min_efuse_value = 40;
-> -               else
-> -                       data->min_efuse_value = 0;
-> -               data->max_efuse_value = 100;
-> +                       data->max_efuse_value = 100;
-> +               }
->                 break;
->         case SOC_ARCH_EXYNOS5433:
->                 data->tmu_set_trip_temp = exynos5433_tmu_set_trip_temp;
-> --
-> 2.7.4
->
+> diff --git a/Documentation/devicetree/bindings/display/panel/armadeus,st0700-adapt.txt b/Documentation/devicetree/bindings/display/panel/armadeus,st0700-adapt.txt
+> new file mode 100644
+> index 000000000000..a30d63db3c8f
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/display/panel/armadeus,st0700-adapt.txt
+> @@ -0,0 +1,9 @@
+> +Armadeus ST0700 Adapt. A Santek ST0700I5Y-RBSLW 7.0" WVGA (800x480) TFT with
+> +an adapter board.
+> +
+> +Required properties:
+> +- compatible: "armadeus,st0700-adapt"
+
+Shouldn't this be named "santek,st0700i5y" instead?
+
+Santek is the vendor of the panel and st0700i5y is the model.
+
+Then you could add a "santek" entry in
+Documentation/devicetree/bindings/vendor-prefixes.txt.
+
+Regards,
+
+Fabio Estevam
