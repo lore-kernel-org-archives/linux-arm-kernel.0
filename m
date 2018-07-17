@@ -1,37 +1,97 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Tue, 17 Jul 2018 09:31:59 +0800
-Subject: [nomadik:gemini-dir-685-rtl8366rb-rtk-tag 14/14] make[3]: *** No
- rule to make target 'net/dsa/tag_rtk.o', needed by 'net/dsa/built-in.a'.
-Message-ID: <20180717013159.GR10593@intel.com>
+From: yixun.lan@amlogic.com (Yixun Lan)
+Date: Tue, 17 Jul 2018 09:24:02 +0800
+Subject: [PATCH 3/3] clk: meson-g12a: Add EE Clock controller driver
+In-Reply-To: <7hfu0jmhbe.fsf@baylibre.com>
+References: <1531134767-29927-1-git-send-email-jian.hu@amlogic.com>
+ <1531134767-29927-4-git-send-email-jian.hu@amlogic.com>
+ <CAFBinCBB9N_p6S_-dfiV=zDCf-RYnA3C-ir6oNLC7JAfdOqqiw@mail.gmail.com>
+ <ec49c089-bccf-9aac-5d0f-43bc27770ad9@amlogic.com>
+ <1531216472.2708.71.camel@baylibre.com> <7hfu0jmhbe.fsf@baylibre.com>
+Message-ID: <7e1cce0b-fc86-b900-2019-a85c5e5ba2ae@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git gemini-dir-685-rtl8366rb-rtk-tag
-head:   17c7eb1fa8546c38fe844166efb2ece4d1503e7d
-commit: 17c7eb1fa8546c38fe844166efb2ece4d1503e7d [14/14] dsa: tagging stab
-config: openrisc-allyesconfig (attached as .config)
-compiler: or1k-linux-gcc (GCC) 6.0.0 20160327 (experimental)
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout 17c7eb1fa8546c38fe844166efb2ece4d1503e7d
-        # save the attached .config to linux build tree
-        make.cross ARCH=openrisc 
-:::::: branch date: 16 hours ago
-:::::: commit date: 16 hours ago
+HI Kevin
 
-All errors (new ones prefixed by >>):
+just want to clarify..
 
->> make[3]: *** No rule to make target 'net/dsa/tag_rtk.o', needed by 'net/dsa/built-in.a'.
-   make[3]: Target '__build' not remade because of errors.
+On 07/16/18 21:38, Kevin Hilman wrote:
+> Jerome Brunet <jbrunet@baylibre.com> writes:
+> 
+>> On Tue, 2018-07-10 at 09:21 +0800, Yixun Lan wrote:
+>>>
+>>> On 07/10/18 05:53, Martin Blumenstingl wrote:
+>>>> On Mon, Jul 9, 2018 at 1:14 PM Jian Hu <jian.hu@amlogic.com> wrote:
+> 
+> [...]
+> 
+>>>>> +
+>>>>> +static const struct of_device_id clkc_match_table[] = {
+>>>>> +       { .compatible = "amlogic,g12a-clkc" },
+>>>>
+>>>> I wonder if that should be "amlogic,meson-g12a-clkc" (I know that AXG
+>>>> and GXBB/GXL/GXM omit the "meson-" prefix, but I am not sure if that's
+>>>> correct - I'll CC Rob Herring on the dt-bindings patch)
+>>>>
+>>>
+>>> we're fine with either way, since the g12a is recently new added SoC.
+>>>
+>>> but I guess those old compatibles which already exist won't be changed,
+>>> as it will break the DT
+>>
+>> Yes, I doubt we are going to change the compatibles. With or without the meson
+>> prefix, I suppose it going to stay that way.
+> 
+> Correct, we will not change existing compatibles.  Adding new ones for
+> clarity is fine though.
+> 
+fine
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 45600 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180717/03f32fac/attachment-0001.gz>
+>> It is worth thinking about it for new drivers though.
+>> We already have the "amlogic,", so do we really to prefix even more with "meson-
+>> "
+>>
+>> Also, if we were really strict about that scheme, should meson8b compatible be
+>>
+>> "amlogic,meson-meson8b-foo-bar" ... the SoC is meson8b, not just 8b after all ?
+>>
+>> For the particular case of the clock controller, I don't care very much, as long
+>> as the compatible is coherent with documentation.
+>>
+>> I might have a preference for the current compatible ... just for consistency
+>> with the other clock controllers.
+> 
+> In hindsight, I think using the "meson" prefix was a mistake.  It's
+> redunant, IMO, but it's how we've been doing things for all the drivers,
+> except for drivers/clk, which, honestly, I hadn't even noticed until
+> now.
+> 
+> As Jerome said, I think consistency is an important goal, so leaving off
+> the "meson-" for drivers/clk is fine with me.
+> 
+ok
+
+> Also for consistency, for the rest of the drivers, keeping "meson-" is
+> probably the right thing to do.
+> 
+ok, for the above, you are talking about the already exist compatible
+names? or the patches we will push in the future?
+
+> However, patches would be welcome to add compatibles without the "meson"
+> for the rest of the drivers & documentation as well, but please do not
+> remove any compatibles.
+> 
+I assume you are talking about the patches in the future we will push?
+to drop the "meson".
+
+I'm confused here, as the above two paragraphs conflict with each other
+
+> Kevin
+> 
+> _______________________________________________
+> linux-amlogic mailing list
+> linux-amlogic at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-amlogic
+> 
+> .
+> 
