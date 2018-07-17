@@ -1,31 +1,56 @@
-From: ludovic.Barre@st.com (Ludovic Barre)
-Date: Tue, 17 Jul 2018 14:14:27 +0200
-Subject: [PATCH 1/1] irqchip/stm32: add exti0 translation for stm32mp1
-Message-ID: <1531829667-22928-1-git-send-email-ludovic.Barre@st.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 17 Jul 2018 14:16:45 +0200
+Subject: [PATCH/RFC] ARM: shmobile: Always enable ARCH_TIMER on SoCs with
+ A7 and/or A15
+In-Reply-To: <CAMuHMdVsvkydFmx_1pKab+ov9c3tt_j=_yWgVdEOkwryAkAwqA@mail.gmail.com>
+References: <20180712160857.31471-1-geert+renesas@glider.be>
+ <20180713080823.l4tng6oclhr6nxrh@verge.net.au>
+ <CAMuHMdUrgP=YOrgeEnpQ0XVOoC_8Dz9Lt2FJ4P5GKb53KRNpNw@mail.gmail.com>
+ <CAMuHMdUsHHDo_2unzUZN9W0kY2p5YW+yGkfsdXE-8ZHuBAuxnA@mail.gmail.com>
+ <20180717095904.eik3sko64zqymzts@verge.net.au>
+ <CAMuHMdVsvkydFmx_1pKab+ov9c3tt_j=_yWgVdEOkwryAkAwqA@mail.gmail.com>
+Message-ID: <20180717121644.gai63ewyv5cw2uge@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ludovic Barre <ludovic.barre@st.com>
+On Tue, Jul 17, 2018 at 12:12:14PM +0200, Geert Uytterhoeven wrote:
+> Hi Simon,
+> 
+> On Tue, Jul 17, 2018 at 11:59 AM Simon Horman <horms@verge.net.au> wrote:
+> > On Fri, Jul 13, 2018 at 10:33:17AM +0200, Geert Uytterhoeven wrote:
+> > > On Fri, Jul 13, 2018 at 10:19 AM Geert Uytterhoeven
+> > > <geert@linux-m68k.org> wrote:
+> > > > On Fri, Jul 13, 2018 at 10:08 AM Simon Horman <horms@verge.net.au> wrote:
+> > > > > On Thu, Jul 12, 2018 at 06:08:57PM +0200, Geert Uytterhoeven wrote:
+> > > > > > R-Mobile APE6, R-Car Gen2, and RZ/G1 SoCs have Cortex-A7 and/or
+> > > > > > Cortex-A15 CPU cores, all of which have ARM architectured timers.
+> > > > > >
+> > > > > > Force use of the ARM architectured timer on these SoCs.
+> > > > > > This allows to:
+> > > > > >   - Remove the calls to shmobile_init_delay() from the corresponding
+> > > > > >     machine vectors,
+> > > > > >   - Remove a check in timer setup specific to R-Car Gen2,
+> > > > > >   - Remove a check in shmobile_init_delay().
+> > > > > >
+> > > > > > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> > > > >
+> > > > > on which boards did you test this?
+> > > >
+> > > > On APE6EVM and Koelsch (R-Car M2-W).
+> > > > I can give it a spin on a few more remote R-Car Gen2 boards if you want.
+> > >
+> > > I don't expect any issues, as shmobile_defconfig already enables
+> > > CONFIG_HAVE_ARM_ARCH_TIMER, and shmobile_init_delay() was already
+> > > a no-op in that case.
+> >
+> > I am happy if you are happy.
+> > Shall I go ahead and apply this?
+> 
+> Yes, selecting HAVE_ARM_ARCH_TIMER is consistent with what several
+> other SoCs are already doing, and it leads to less code.
+> 
+> > Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
+> 
+> Thanks!
 
-This patch fixes a datasheet issue, in the draft version the "exti0"
-was not connected whereas is it.
-
-Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
----
- drivers/irqchip/irq-stm32-exti.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/drivers/irqchip/irq-stm32-exti.c b/drivers/irqchip/irq-stm32-exti.c
-index 3a7e890..3df527f 100644
---- a/drivers/irqchip/irq-stm32-exti.c
-+++ b/drivers/irqchip/irq-stm32-exti.c
-@@ -159,6 +159,7 @@ static const struct stm32_exti_bank *stm32mp1_exti_banks[] = {
- };
- 
- static const struct stm32_desc_irq stm32mp1_desc_irq[] = {
-+	{ .exti = 0, .irq_parent = 6 },
- 	{ .exti = 1, .irq_parent = 7 },
- 	{ .exti = 2, .irq_parent = 8 },
- 	{ .exti = 3, .irq_parent = 9 },
--- 
-2.7.4
+Thanks, applied.
