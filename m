@@ -1,40 +1,83 @@
-From: tudor.ambarus@microchip.com (Tudor Ambarus)
-Date: Tue, 17 Jul 2018 19:28:30 +0300
-Subject: [PATCH 2/3] mtd: spi-nor: unlock global block protection on
- sst26vf064b
-In-Reply-To: <20180717162831.17947-1-tudor.ambarus@microchip.com>
-References: <20180717162831.17947-1-tudor.ambarus@microchip.com>
-Message-ID: <20180717162831.17947-2-tudor.ambarus@microchip.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Tue, 17 Jul 2018 17:33:01 +0100
+Subject: [PATCH v8 1/4] arm/arm64: KVM: Add KVM_GET/SET_VCPU_EVENTS
+In-Reply-To: <20180713154751.18131-2-james.morse@arm.com>
+References: <20180713154751.18131-1-james.morse@arm.com>
+ <20180713154751.18131-2-james.morse@arm.com>
+Message-ID: <CAFEAcA-t8U-GmkCtAcAN8tj4UAaynCZhgTi1Cg1RhaarGUOJfg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To avoid inadvertent writes during power-up, sst26vf064b is
-write-protected by default after a power-on reset cycle.
-Unlock the serial flash memory by using the Global Block Protection
-Unlock command - it offers a single command cycle that unlocks
-the entire memory array.
+On 13 July 2018 at 16:47, James Morse <james.morse@arm.com> wrote:
+> From: Dongjiu Geng <gengdongjiu@huawei.com>
+>
+> For the migrating VMs, user space may need to know the exception
+> state. For example, in the machine A, KVM make an SError pending,
+> when migrate to B, KVM also needs to pend an SError.
+>
+> This new IOCTL exports user-invisible states related to SError.
+> Together with appropriate user space changes, user space can get/set
+> the SError exception state to do migrate/snapshot/suspend.
+>
+> Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
+> Reviewed-by: James Morse <james.morse@arm.com>
+> Signed-off-by: James Morse <james.morse@arm.com>
+> ---
+>  Documentation/virtual/kvm/api.txt    | 33 +++++++++++++++++---
+>  arch/arm64/include/asm/kvm_emulate.h |  5 +++
+>  arch/arm64/include/asm/kvm_host.h    |  7 +++++
+>  arch/arm64/include/uapi/asm/kvm.h    | 13 ++++++++
+>  arch/arm64/kvm/guest.c               | 46 ++++++++++++++++++++++++++++
+>  arch/arm64/kvm/inject_fault.c        |  6 ++--
+>  arch/arm64/kvm/reset.c               |  1 +
+>  virt/kvm/arm/arm.c                   | 21 +++++++++++++
+>  8 files changed, 125 insertions(+), 7 deletions(-)
+>
+> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+> index d10944e619d3..e3940f8715a5 100644
+> --- a/Documentation/virtual/kvm/api.txt
+> +++ b/Documentation/virtual/kvm/api.txt
+> @@ -835,11 +835,13 @@ struct kvm_clock_data {
+>
+>  Capability: KVM_CAP_VCPU_EVENTS
+>  Extended by: KVM_CAP_INTR_SHADOW
+> -Architectures: x86
+> -Type: vm ioctl
+> +Architectures: x86, arm64
+> +Type: vcpu ioctl
+>  Parameters: struct kvm_vcpu_event (out)
+>  Returns: 0 on success, -1 on error
+>
+> +X86:
+> +
+>  Gets currently pending exceptions, interrupts, and NMIs as well as related
+>  states of the vcpu.
+>
+> @@ -881,15 +883,32 @@ Only two fields are defined in the flags field:
+>  - KVM_VCPUEVENT_VALID_SMM may be set in the flags field to signal that
+>    smi contains a valid state.
+>
+> +ARM64:
+> +
+> +Gets currently pending SError exceptions as well as related states of the vcpu.
 
-Signed-off-by: Tudor Ambarus <tudor.ambarus@microchip.com>
----
- drivers/mtd/spi-nor/spi-nor.c | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+Any chance of expanding this to explain what this state actually is?
+(ie something you could use to implement or review the userspace
+code which has to manipulate it).
 
-diff --git a/drivers/mtd/spi-nor/spi-nor.c b/drivers/mtd/spi-nor/spi-nor.c
-index 6648251..eddf09f 100644
---- a/drivers/mtd/spi-nor/spi-nor.c
-+++ b/drivers/mtd/spi-nor/spi-nor.c
-@@ -1163,7 +1163,11 @@ static const struct flash_info spi_nor_ids[] = {
- 	{ "sst25wf040b", INFO(0x621613, 0, 64 * 1024,  8, SECT_4K) },
- 	{ "sst25wf040",  INFO(0xbf2504, 0, 64 * 1024,  8, SECT_4K | SST_WRITE) },
- 	{ "sst25wf080",  INFO(0xbf2505, 0, 64 * 1024, 16, SECT_4K | SST_WRITE) },
--	{ "sst26vf064b", INFO(0xbf2643, 0, 64 * 1024, 128, SECT_4K | SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ) },
-+	{
-+		"sst26vf064b", INFO(0xbf2643, 0, 64 * 1024, 128,
-+			SECT_4K | SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ |
-+			UNLOCK_GLOBAL_BLOCK)
-+	},
- 
- 	/* ST Microelectronics -- newer production may have feature updates */
- 	{ "m25p05",  INFO(0x202010,  0,  32 * 1024,   2, 0) },
--- 
-2.9.4
+> +
+> +struct kvm_vcpu_events {
+> +       struct {
+> +               __u8 serror_pending;
+> +               __u8 serror_has_esr;
+> +               /* Align it to 8 bytes */
+> +               __u8 pad[6];
+> +               __u64 serror_esr;
+> +       } exception;
+> +       __u32 reserved[12];
+> +};
+> +
+>  4.32 KVM_SET_VCPU_EVENTS
+
+thanks
+-- PMM
