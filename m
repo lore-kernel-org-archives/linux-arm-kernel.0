@@ -1,49 +1,49 @@
-From: hari.vyas@broadcom.com (Hari Vyas)
-Date: Tue, 17 Jul 2018 15:01:21 +0530
-Subject: [PATCH] arm64: fix kernel panic on serror exception caused by user
- process
-In-Reply-To: <1531819881-2931-1-git-send-email-hari.vyas@broadcom.com>
-References: <1531819881-2931-1-git-send-email-hari.vyas@broadcom.com>
-Message-ID: <1531819881-2931-2-git-send-email-hari.vyas@broadcom.com>
+From: liwei213@huawei.com (Li Wei)
+Date: Tue, 17 Jul 2018 17:36:58 +0800
+Subject: [PATCH v11 3/4] [RESEND] arm64: dts: add ufs dts node
+In-Reply-To: <20180717093659.103263-1-liwei213@huawei.com>
+References: <20180717093659.103263-1-liwei213@huawei.com>
+Message-ID: <20180717093659.103263-4-liwei213@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On executing simple user level "devmem 0x0" command, kernel panics.
-As 0x0 address is mostly not matched to any valid memory so exception
-is expected and raised which results in unconditional kernel panic
-by serror handler.
+arm64: dts: add ufs node for Hisilicon.
 
-This is happening after newly introduced serror handling framework
-change which panics kernel on any any serror without checking
-processor mode.`
-
-Kernel panic is fixed by checking processor mode in serror handler.
-On kernel mode, normal kernel panic action is taken and system halts.
-On user mode, only user process is killed and further panic action is
-not initiated.
-
-Signed-off-by: Hari Vyas <hari.vyas@broadcom.com>
+Signed-off-by: Li Wei <liwei213@huawei.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
+Tested-by: John Stultz <john.stultz@linaro.org>
 ---
- arch/arm64/kernel/traps.c | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm64/boot/dts/hisilicon/hi3660.dtsi | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index d399d45..c7cbad7 100644
---- a/arch/arm64/kernel/traps.c
-+++ b/arch/arm64/kernel/traps.c
-@@ -729,6 +729,13 @@ bool arm64_is_fatal_ras_serror(struct pt_regs *regs, unsigned int esr)
+diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+index 8d477dcbfa58..851190a719ea 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
++++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+@@ -1000,6 +1000,24 @@
+ 			reset-gpios = <&gpio11 1 0 >;
+ 		};
  
- asmlinkage void do_serror(struct pt_regs *regs, unsigned int esr)
- {
-+	if (user_mode(regs)) {
-+		pr_crit("UserMode SError Exception on CPU%d, code 0x%08x %s\n",
-+			smp_processor_id(), esr, esr_get_class_string(esr));
-+		die("Oops - user mode ", regs, 0);
-+		return;
-+        }
++		/* UFS */
++		ufs: ufs at ff3b0000 {
++			compatible = "hisilicon,hi3660-ufs", "jedec,ufs-1.1";
++			/* 0: HCI standard */
++			/* 1: UFS SYS CTRL */
++			reg = <0x0 0xff3b0000 0x0 0x1000>,
++				<0x0 0xff3b1000 0x0 0x1000>;
++			interrupt-parent = <&gic>;
++			interrupts = <GIC_SPI 278 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&crg_ctrl HI3660_CLK_GATE_UFSIO_REF>,
++				<&crg_ctrl HI3660_CLK_GATE_UFSPHY_CFG>;
++			clock-names = "ref_clk", "phy_clk";
++			freq-table-hz = <0 0>, <0 0>;
++			/* offset: 0x84; bit: 12 */
++			resets = <&crg_rst 0x84 12>;
++			reset-names = "rst";
++		};
 +
- 	nmi_enter();
- 
- 	/* non-RAS errors are not containable */
+ 		/* SD */
+ 		dwmmc1: dwmmc1 at ff37f000 {
+ 			#address-cells = <1>;
 -- 
-1.9.1
+2.15.0
