@@ -1,39 +1,33 @@
 From: matthias.bgg@kernel.org (matthias.bgg at kernel.org)
-Date: Tue, 17 Jul 2018 23:59:51 +0200
-Subject: [PATCH v4--to=ulrich.hecht+renesas@gmail.com 5/5] drm: mediatek: Omit
- warning on probe defers
-In-Reply-To: <20180717215951.378-1-matthias.bgg@kernel.org>
-References: <20180717215951.378-1-matthias.bgg@kernel.org>
-Message-ID: <20180717215951.378-6-matthias.bgg@kernel.org>
+Date: Wed, 18 Jul 2018 00:03:23 +0200
+Subject: [resend PATCH v4 0/5] arm/arm64: mediatek: Fix mmsys device probing
+Message-ID: <20180717220328.792-1-matthias.bgg@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Matthias Brugger <mbrugger@suse.com>
+Changes since v3:
+- use platform device to probe clock driver
+- add Acked-by CK Hu for the probe deferred patch
 
-It can happen that the clock drivers wasn't probed before the
-ddp driver gets invoked. The driver used to omit a warning
-that the driver failed to get the clocks. Omit this error on
-the defered probe path.
-
-Signed-off-by: Matthias Brugger <mbrugger@suse.com>
-Acked-by: CK Hu <ck.hu@mediatek.com>
----
- drivers/gpu/drm/mediatek/mtk_drm_ddp.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-index bafc5c77c4fb..6b399348a2dc 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-@@ -374,7 +374,8 @@ static int mtk_ddp_probe(struct platform_device *pdev)
+Changes since v2:
+- fix kconfig typo (shame on me)
+- delete __initconst from mm_clocks as converted to a platform driver
+  
+Changes since v1:
+- add binding documentation
+- ddp: use regmap_update_bits
+- ddp: ignore EPROBE_DEFER on clock probing
+- mfd: delete mmsys_private
+- add Reviewed-by and Acked-by tags
  
- 	ddp->clk = devm_clk_get(dev, NULL);
- 	if (IS_ERR(ddp->clk)) {
--		dev_err(dev, "Failed to get clock\n");
-+		if (PTR_ERR(ddp->clk) != -EPROBE_DEFER)
-+			dev_err(dev, "Failed to get clock\n");
- 		return PTR_ERR(ddp->clk);
- 	}
- 
--- 
-2.17.1
+MMSYS in Mediatek SoCs has some registers to control clock gates (which is 
+used in the clk driver) and some registers to set the routing and enable
+the differnet blocks of the display subsystem.
+
+Up to now both drivers, clock and drm are probed with the same device tree
+compatible. But only the first driver get probed, which in effect breaks
+graphics on mt8173 and mt2701.
+
+This patch uses a platform device registration in the DRM driver, which
+will trigger the probe of the corresponding clock driver. It was tested on the
+bananapi-r2 and the Acer R13 Chromebook.
