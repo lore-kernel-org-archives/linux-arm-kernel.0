@@ -1,89 +1,52 @@
-From: Anson.Huang@nxp.com (Anson Huang)
-Date: Tue, 17 Jul 2018 11:28:46 +0800
-Subject: [PATCH V2] soc: imx: gpc: restrict register range for regmap access
-Message-ID: <1531798126-24360-1-git-send-email-Anson.Huang@nxp.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Tue, 17 Jul 2018 06:38:02 +0300
+Subject: [PATCH 1/2] ARM: dts: hummingboard2: describe optional rs485
+Message-ID: <8c90900a5d7538d26ec93287ca4787c1dd97fbce.1531798683.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-GPC registers are NOT continuous, some registers are
-reserved and accessing them from userspace will trigger
-external abort, add regmap register access table to
-avoid below abort:
+A Hummingboard assembly option provides RS-485 transceiver on UART2
+(/dev/ttymxc1). Add DT node for that. Keep it disabled, since RS-485 is
+not assembled by default.
 
-root at imx6slevk:~# cat /sys/kernel/debug/regmap/20dc000.gpc/registers
-[  108.480477] Unhandled fault: imprecise external abort (0x1406) at 0xb6db5004
-[  108.487985] pgd = 42b54bfd
-[  108.490741] [b6db5004] *pgd=ba1b7831
-[  108.494386] Internal error: : 1406 [#1] SMP ARM
-[  108.498943] Modules linked in:
-[  108.502043] CPU: 0 PID: 389 Comm: cat Not tainted 4.18.0-rc1-00074-gc9f1f60-dirty #482
-[  108.509982] Hardware name: Freescale i.MX6 SoloLite (Device Tree)
-[  108.516123] PC is at regmap_mmio_read32le+0x20/0x24
-[  108.521031] LR is at regmap_mmio_read+0x40/0x60
-[  108.525586] pc : [<c059cf74>]    lr : [<c059d1ac>]    psr: 20060093
-[  108.531875] sp : eccf1d98  ip : eccf1da8  fp : eccf1da4
-[  108.537122] r10: ec2d3800  r9 : eccf1f60  r8 : ecfc0000
-[  108.542370] r7 : eccf1e2c  r6 : eccf1e2c  r5 : 00000028  r4 : ec338e00
-[  108.548920] r3 : 00000000  r2 : eccf1e2c  r1 : f0980028  r0 : 00000000
-[  108.555474] Flags: nzCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment none
-[  108.562720] Control: 10c5387d  Table: acf4004a  DAC: 00000051
-[  108.568491] Process cat (pid: 389, stack limit = 0xd4318a65)
-[  108.574174] Stack: (0xeccf1d98 to 0xeccf2000)
-
-Fixes: 721cabf6c660 ("soc: imx: move PGC handling to a new GPC driver")
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+Signed-off-by: Baruch Siach <baruch@tkos.co.il>
 ---
-change since V1:
-	add fix tag.
- drivers/soc/imx/gpc.c | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+ arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-diff --git a/drivers/soc/imx/gpc.c b/drivers/soc/imx/gpc.c
-index 32f0748..0097a93 100644
---- a/drivers/soc/imx/gpc.c
-+++ b/drivers/soc/imx/gpc.c
-@@ -27,9 +27,16 @@
- #define GPC_PGC_SW2ISO_SHIFT	0x8
- #define GPC_PGC_SW_SHIFT	0x0
+diff --git a/arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi b/arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi
+index c413f9c3540f..576437936a60 100644
+--- a/arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi
+@@ -501,6 +501,14 @@
+ 			>;
+ 		};
  
-+#define GPC_PGC_PCI_PDN		0x200
-+#define GPC_PGC_PCI_SR		0x20c
++		pinctrl_hummingboard2_uart2: hummingboard2-uart2 {
++			fsl,pins = <
++				MX6QDL_PAD_SD4_DAT4__UART2_RX_DATA	0x1b0b1
++				MX6QDL_PAD_SD4_DAT7__UART2_TX_DATA	0x1b0b1
++				MX6QDL_PAD_SD4_DAT6__UART2_CTS_B	0x1b0b1
++			>;
++		};
 +
- #define GPC_PGC_GPU_PDN		0x260
- #define GPC_PGC_GPU_PUPSCR	0x264
- #define GPC_PGC_GPU_PDNSCR	0x268
-+#define GPC_PGC_GPU_SR		0x26c
-+
-+#define GPC_PGC_DISP_PDN	0x240
-+#define GPC_PGC_DISP_SR		0x24c
- 
- #define GPU_VPU_PUP_REQ		BIT(1)
- #define GPU_VPU_PDN_REQ		BIT(0)
-@@ -318,10 +325,24 @@ static const struct of_device_id imx_gpc_dt_ids[] = {
- 	{ }
+ 		pinctrl_hummingboard2_uart3: hummingboard2-uart3 {
+ 			fsl,pins = <
+ 				MX6QDL_PAD_EIM_D25__UART3_TX_DATA	0x1b0b1
+@@ -565,6 +573,14 @@
+ 	status = "okay";
  };
  
-+static const struct regmap_range yes_ranges[] = {
-+	regmap_reg_range(GPC_CNTR, GPC_CNTR),
-+	regmap_reg_range(GPC_PGC_PCI_PDN, GPC_PGC_PCI_SR),
-+	regmap_reg_range(GPC_PGC_GPU_PDN, GPC_PGC_GPU_SR),
-+	regmap_reg_range(GPC_PGC_DISP_PDN, GPC_PGC_DISP_SR),
++/* Optional RS-485 transceiver */
++&uart2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_hummingboard2_uart2>;
++	uart-has-rtscts;
++	status = "disabled";
 +};
 +
-+static const struct regmap_access_table access_table = {
-+	.yes_ranges	= yes_ranges,
-+	.n_yes_ranges	= ARRAY_SIZE(yes_ranges),
-+};
-+
- static const struct regmap_config imx_gpc_regmap_config = {
- 	.reg_bits = 32,
- 	.val_bits = 32,
- 	.reg_stride = 4,
-+	.rd_table = &access_table,
-+	.wr_table = &access_table,
- 	.max_register = 0x2ac,
- };
- 
+ &uart3 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_hummingboard2_uart3>;
 -- 
-2.7.4
+2.18.0
