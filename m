@@ -1,122 +1,47 @@
-From: pawel.mikolaj.chmiel@gmail.com (=?UTF-8?q?Pawe=C5=82=20Chmiel?=)
-Date: Tue, 17 Jul 2018 20:16:25 +0200
-Subject: [PATCH v2 1/2] Input: atmel_mxt_ts: Add support for optional
- regulators.
-In-Reply-To: <1531851386-17840-1-git-send-email-pawel.mikolaj.chmiel@gmail.com>
-References: <1531851386-17840-1-git-send-email-pawel.mikolaj.chmiel@gmail.com>
-Message-ID: <1531851386-17840-2-git-send-email-pawel.mikolaj.chmiel@gmail.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 18 Jul 2018 02:19:29 +0800
+Subject: [PATCH v5 06/11] soc: mediatek: add new flow for mtcmos power.
+In-Reply-To: <1531817552-17221-7-git-send-email-mars.cheng@mediatek.com>
+References: <1531817552-17221-7-git-send-email-mars.cheng@mediatek.com>
+Message-ID: <201807180244.Xwu9lTTR%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds optional regulators, which can be used to power
-up touchscreen. After enabling regulators, we need to wait 150msec.
-This value is taken from official driver.
+Hi Owen,
 
-It was tested on Samsung Galaxy i9000 (based on Samsung S5PV210 SOC).
+Thank you for the patch! Perhaps something to improve:
 
-Signed-off-by: Pawe? Chmiel <pawel.mikolaj.chmiel@gmail.com>
+[auto build test WARNING on robh/for-next]
+[also build test WARNING on v4.18-rc5 next-20180717]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+
+url:    https://github.com/0day-ci/linux/commits/Mars-Cheng/Add-basic-SoC-support-for-mt6765/20180717-205540
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
+reproduce:
+        # apt-get install sparse
+        make ARCH=x86_64 allmodconfig
+        make C=1 CF=-D__CHECK_ENDIAN__
+
+
+sparse warnings: (new ones prefixed by >>)
+
+>> drivers/soc/mediatek/mtk-scpsys-ext.c:83:5: sparse: symbol 'bus_ctrl_set_release' was not declared. Should it be static?
+>> drivers/soc/mediatek/mtk-scpsys-ext.c:114:5: sparse: symbol 'bus_ctrl_set' was not declared. Should it be static?
+>> drivers/soc/mediatek/mtk-scpsys-ext.c:119:5: sparse: symbol 'bus_ctrl_release' was not declared. Should it be static?
+>> drivers/soc/mediatek/mtk-scpsys-ext.c:124:5: sparse: symbol 'bus_clk_enable_disable' was not declared. Should it be static?
+>> drivers/soc/mediatek/mtk-scpsys-ext.c:161:5: sparse: symbol 'bus_clk_enable' was not declared. Should it be static?
+>> drivers/soc/mediatek/mtk-scpsys-ext.c:192:27: sparse: symbol 'bus_mask_set_clr_ctrl' was not declared. Should it be static?
+>> drivers/soc/mediatek/mtk-scpsys-ext.c:197:26: sparse: symbol 'ext_bus_ctrl' was not declared. Should it be static?
+>> drivers/soc/mediatek/mtk-scpsys-ext.c:202:26: sparse: symbol 'ext_cg_ctrl' was not declared. Should it be static?
+>> drivers/soc/mediatek/mtk-scpsys-ext.c:210:15: sparse: symbol 'syscon_regmap_lookup_by_phandle_idx' was not declared. Should it be static?
+>> drivers/soc/mediatek/mtk-scpsys-ext.c:231:5: sparse: symbol 'scpsys_ext_regmap_init' was not declared. Should it be static?
+   include/linux/slab.h:631:13: sparse: undefined identifier '__builtin_mul_overflow'
+>> drivers/soc/mediatek/mtk-scpsys-ext.c:324:5: sparse: symbol 'scpsys_ext_clk_init' was not declared. Should it be static?
+>> drivers/soc/mediatek/mtk-scpsys-ext.c:336:5: sparse: symbol 'scpsys_ext_attr_init' was not declared. Should it be static?
+   include/linux/slab.h:631:13: sparse: call with no type!
+
+Please review and possibly fold the followup patch.
+
 ---
-Changes from v1:
-  - Enable regulators only if reset_gpio is present.
-  - Switch from devm_regulator_get_optional to devm_regulator_get
----
- drivers/input/touchscreen/atmel_mxt_ts.c | 46 ++++++++++++++++++++++++++++++--
- 1 file changed, 44 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/input/touchscreen/atmel_mxt_ts.c b/drivers/input/touchscreen/atmel_mxt_ts.c
-index 54fe190fd4bc..005f0fee9fc8 100644
---- a/drivers/input/touchscreen/atmel_mxt_ts.c
-+++ b/drivers/input/touchscreen/atmel_mxt_ts.c
-@@ -27,6 +27,7 @@
- #include <linux/interrupt.h>
- #include <linux/of.h>
- #include <linux/property.h>
-+#include <linux/regulator/consumer.h>
- #include <linux/slab.h>
- #include <linux/gpio/consumer.h>
- #include <linux/property.h>
-@@ -194,10 +195,10 @@ enum t100_type {
- 
- /* Delay times */
- #define MXT_BACKUP_TIME		50	/* msec */
--#define MXT_RESET_GPIO_TIME	20	/* msec */
- #define MXT_RESET_INVALID_CHG	100	/* msec */
- #define MXT_RESET_TIME		200	/* msec */
- #define MXT_RESET_TIMEOUT	3000	/* msec */
-+#define MXT_REGULATOR_DELAY	150	/* msec */
- #define MXT_CRC_TIMEOUT		1000	/* msec */
- #define MXT_FW_RESET_TIME	3000	/* msec */
- #define MXT_FW_CHG_TIMEOUT	300	/* msec */
-@@ -310,6 +311,8 @@ struct mxt_data {
- 	struct t7_config t7_cfg;
- 	struct mxt_dbg dbg;
- 	struct gpio_desc *reset_gpio;
-+	struct regulator *vdd_reg;
-+	struct regulator *avdd_reg;
- 
- 	/* Cached parameters from object table */
- 	u16 T5_address;
-@@ -3076,6 +3079,22 @@ static int mxt_probe(struct i2c_client *client, const struct i2c_device_id *id)
- 		return error;
- 	}
- 
-+	data->vdd_reg = devm_regulator_get(&client->dev, "vdd");
-+	if (IS_ERR(data->vdd_reg)) {
-+		error = PTR_ERR(data->vdd_reg);
-+		dev_err(&client->dev, "Failed to get vdd regulator: %d\n",
-+			error);
-+		return error;
-+	}
-+
-+	data->avdd_reg = devm_regulator_get(&client->dev, "avdd");
-+	if (IS_ERR(data->avdd_reg)) {
-+		error = PTR_ERR(data->avdd_reg);
-+		dev_err(&client->dev, "Failed to get avdd regulator: %d\n",
-+			error);
-+		return error;
-+	}
-+
- 	error = devm_request_threaded_irq(&client->dev, client->irq,
- 					  NULL, mxt_interrupt, IRQF_ONESHOT,
- 					  client->name, data);
-@@ -3087,7 +3106,26 @@ static int mxt_probe(struct i2c_client *client, const struct i2c_device_id *id)
- 	disable_irq(client->irq);
- 
- 	if (data->reset_gpio) {
--		msleep(MXT_RESET_GPIO_TIME);
-+		error = regulator_enable(data->vdd_reg);
-+		if (error) {
-+			dev_err(&client->dev, "Failed to enable vdd regulator: %d\n",
-+				error);
-+			return error;
-+		}
-+
-+		error = regulator_enable(data->avdd_reg);
-+		if (error) {
-+			dev_err(&client->dev, "Failed to enable avdd regulator: %d\n",
-+				error);
-+			return error;
-+		}
-+
-+		/*
-+		 * According to maXTouch power sequencing specification, RESET line
-+		 * must be kept low until some time after regulators come up to
-+		 * voltage
-+		 */
-+		msleep(MXT_REGULATOR_DELAY);
- 		gpiod_set_value(data->reset_gpio, 1);
- 		msleep(MXT_RESET_INVALID_CHG);
- 	}
-@@ -3116,6 +3154,10 @@ static int mxt_remove(struct i2c_client *client)
- 	struct mxt_data *data = i2c_get_clientdata(client);
- 
- 	disable_irq(data->irq);
-+	if (data->reset_gpio) {
-+		regulator_disable(data->avdd_reg);
-+		regulator_disable(data->vdd_reg);
-+	}
- 	sysfs_remove_group(&client->dev.kobj, &mxt_attr_group);
- 	mxt_free_input_device(data);
- 	mxt_free_object_table(data);
--- 
-2.7.4
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
