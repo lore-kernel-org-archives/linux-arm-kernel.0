@@ -1,94 +1,104 @@
 From: yaojun8558363@gmail.com (Jun Yao)
-Date: Tue, 17 Jul 2018 17:56:04 +0800
-Subject: [PATCH v4 2/6] arm64/mm: Make __enable_mmu() take the ttbr1 page as
- an argument
+Date: Tue, 17 Jul 2018 17:56:05 +0800
+Subject: [PATCH v4 3/6] arm64/mm: Create initial page tables in init_pg_dir
 In-Reply-To: <20180717095608.11008-1-yaojun8558363@gmail.com>
 References: <20180717095608.11008-1-yaojun8558363@gmail.com>
-Message-ID: <20180717095608.11008-3-yaojun8558363@gmail.com>
+Message-ID: <20180717095608.11008-4-yaojun8558363@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make __enable_mmu() take the physical address of the ttbr1 page as
-an argument.
+Create initial page tables in init_pg_dir and then create final
+page tables in swapper_pg_dir directly.
 
 Signed-off-by: Jun Yao <yaojun8558363@gmail.com>
 ---
- arch/arm64/kernel/head.S  | 21 ++++++++++++---------
- arch/arm64/kernel/sleep.S |  1 +
- 2 files changed, 13 insertions(+), 9 deletions(-)
+ arch/arm64/include/asm/pgtable.h |  2 ++
+ arch/arm64/kernel/head.S         |  4 ++--
+ arch/arm64/kernel/setup.c        |  1 +
+ arch/arm64/mm/mmu.c              | 24 ++++--------------------
+ 4 files changed, 9 insertions(+), 22 deletions(-)
 
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+index 1bdeca8918a6..46ef21ebfe47 100644
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -712,6 +712,8 @@ static inline pmd_t pmdp_establish(struct vm_area_struct *vma,
+ }
+ #endif
+ 
++extern pgd_t init_pg_dir[PTRS_PER_PGD];
++extern pgd_t init_pg_end[];
+ extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
+ extern pgd_t swapper_pg_end[];
+ extern pgd_t idmap_pg_dir[PTRS_PER_PGD];
 diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 2c83a8c47e3f..c3e4b1886cde 100644
+index c3e4b1886cde..a5fc47ccf7f8 100644
 --- a/arch/arm64/kernel/head.S
 +++ b/arch/arm64/kernel/head.S
-@@ -714,6 +714,7 @@ secondary_startup:
- 	 * Common entry point for secondary CPUs.
+@@ -376,7 +376,7 @@ __create_page_tables:
+ 	/*
+ 	 * Map the kernel image (starting with PHYS_OFFSET).
  	 */
- 	bl	__cpu_setup			// initialise processor
-+	adrp	x1, swapper_pg_dir
- 	bl	__enable_mmu
- 	ldr	x8, =__secondary_switched
- 	br	x8
-@@ -756,6 +757,7 @@ ENDPROC(__secondary_switched)
-  * Enable the MMU.
-  *
-  *  x0  = SCTLR_EL1 value for turning on the MMU.
-+ *  x1  = TTBR1_EL1 value for turning on the MMU.
-  *
-  * Returns to the caller via x30/lr. This requires the caller to be covered
-  * by the .idmap.text section.
-@@ -764,15 +766,15 @@ ENDPROC(__secondary_switched)
-  * If it isn't, park the CPU
-  */
- ENTRY(__enable_mmu)
--	mrs	x1, ID_AA64MMFR0_EL1
--	ubfx	x2, x1, #ID_AA64MMFR0_TGRAN_SHIFT, 4
--	cmp	x2, #ID_AA64MMFR0_TGRAN_SUPPORTED
-+	mrs	x5, ID_AA64MMFR0_EL1
-+	ubfx	x6, x5, #ID_AA64MMFR0_TGRAN_SHIFT, 4
-+	cmp	x6, #ID_AA64MMFR0_TGRAN_SUPPORTED
- 	b.ne	__no_granule_support
--	update_early_cpu_boot_status 0, x1, x2
--	adrp	x1, idmap_pg_dir
--	adrp	x2, swapper_pg_dir
--	phys_to_ttbr x3, x1
--	phys_to_ttbr x4, x2
-+	update_early_cpu_boot_status 0, x5, x6
-+	adrp	x5, idmap_pg_dir
-+	mov	x6, x1
-+	phys_to_ttbr x3, x5
-+	phys_to_ttbr x4, x6
- 	msr	ttbr0_el1, x3			// load TTBR0
- 	msr	ttbr1_el1, x4			// load TTBR1
- 	isb
-@@ -791,7 +793,7 @@ ENDPROC(__enable_mmu)
- 
- __no_granule_support:
- 	/* Indicate that this CPU can't boot and is stuck in the kernel */
--	update_early_cpu_boot_status CPU_STUCK_IN_KERNEL, x1, x2
-+	update_early_cpu_boot_status CPU_STUCK_IN_KERNEL, x5, x6
- 1:
- 	wfe
- 	wfi
-@@ -831,6 +833,7 @@ __primary_switch:
+-	adrp	x0, swapper_pg_dir
++	adrp	x0, init_pg_dir
+ 	mov_q	x5, KIMAGE_VADDR + TEXT_OFFSET	// compile time __va(_text)
+ 	add	x5, x5, x23			// add KASLR displacement
+ 	mov	x4, PTRS_PER_PGD
+@@ -833,7 +833,7 @@ __primary_switch:
  	mrs	x20, sctlr_el1			// preserve old SCTLR_EL1 value
  #endif
  
-+	adrp	x1, swapper_pg_dir
+-	adrp	x1, swapper_pg_dir
++	adrp	x1, init_pg_dir
  	bl	__enable_mmu
  #ifdef CONFIG_RELOCATABLE
  	bl	__relocate_kernel
-diff --git a/arch/arm64/kernel/sleep.S b/arch/arm64/kernel/sleep.S
-index bebec8ef9372..3e53ffa07994 100644
---- a/arch/arm64/kernel/sleep.S
-+++ b/arch/arm64/kernel/sleep.S
-@@ -101,6 +101,7 @@ ENTRY(cpu_resume)
- 	bl	el2_setup		// if in EL2 drop to EL1 cleanly
- 	bl	__cpu_setup
- 	/* enable the MMU early - so we can access sleep_save_stash by va */
-+	adrp	x1, swapper_pg_dir
- 	bl	__enable_mmu
- 	ldr	x8, =_cpu_resume
- 	br	x8
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 30ad2f085d1f..b065c08d4008 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -249,6 +249,7 @@ void __init setup_arch(char **cmdline_p)
+ 	init_mm.end_code   = (unsigned long) _etext;
+ 	init_mm.end_data   = (unsigned long) _edata;
+ 	init_mm.brk	   = (unsigned long) _end;
++	init_mm.pgd	   = init_pg_dir;
+ 
+ 	*cmdline_p = boot_command_line;
+ 
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 65f86271f02b..cdce3ec4c7bb 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -629,26 +629,10 @@ static void __init map_kernel(pgd_t *pgdp)
+  */
+ void __init paging_init(void)
+ {
+-	phys_addr_t pgd_phys = early_pgtable_alloc();
+-	pgd_t *pgdp = pgd_set_fixmap(pgd_phys);
+-
+-	map_kernel(pgdp);
+-	map_mem(pgdp);
+-
+-	/*
+-	 * We want to reuse the original swapper_pg_dir so we don't have to
+-	 * communicate the new address to non-coherent secondaries in
+-	 * secondary_entry, and so cpu_switch_mm can generate the address with
+-	 * adrp+add rather than a load from some global variable.
+-	 *
+-	 * To do this we need to go via a temporary pgd.
+-	 */
+-	cpu_replace_ttbr1(__va(pgd_phys));
+-	memcpy(swapper_pg_dir, pgdp, PGD_SIZE);
+-	cpu_replace_ttbr1(lm_alias(swapper_pg_dir));
+-
+-	pgd_clear_fixmap();
+-	memblock_free(pgd_phys, PAGE_SIZE);
++	map_kernel(swapper_pg_dir);
++	map_mem(swapper_pg_dir);
++	cpu_replace_ttbr1(swapper_pg_dir);
++	init_mm.pgd = swapper_pg_dir;
+ 
+ 	/*
+ 	 * We only reuse the PGD from the swapper_pg_dir, not the pud + pmd
 -- 
 2.17.1
