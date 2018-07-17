@@ -1,287 +1,187 @@
-From: Claudiu.Beznea@microchip.com (Claudiu Beznea)
-Date: Tue, 17 Jul 2018 13:49:31 +0300
-Subject: [PATCH 4/4] ARM: at91: pm: configure wakeup sources for ULP1 mode
-In-Reply-To: <20180717104508.GC3100@piout.net>
-References: <1531816017-31986-1-git-send-email-claudiu.beznea@microchip.com>
- <1531816017-31986-5-git-send-email-claudiu.beznea@microchip.com>
- <20180717104508.GC3100@piout.net>
-Message-ID: <45288ce9-a590-04c1-7601-8306bb29bba4@microchip.com>
+From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
+Date: Tue, 17 Jul 2018 19:55:32 +0900
+Subject: [PATCH 1/4] dt-bindings: phy: add DT bindings for UniPhier USB3
+ PHY driver
+In-Reply-To: <20180716205049.GA3663@rob-hp-laptop>
+References: <1530261541-23104-2-git-send-email-hayashi.kunihiko@socionext.com>
+ <20180716205049.GA3663@rob-hp-laptop>
+Message-ID: <20180717195531.8587.4A936039@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Rob,
+Thank you for your comments.
+
+On Mon, 16 Jul 2018 14:50:49 -0600 <robh@kernel.org> wrote:
+
+> On Fri, Jun 29, 2018 at 05:38:58PM +0900, Kunihiko Hayashi wrote:
+> > Add DT bindings for PHY interface built into USB3 controller
+> > implemented in UniPhier SoCs.
+> > 
+> > Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+> > ---
+> >  .../devicetree/bindings/phy/uniphier-usb3-phy.txt  | 118 +++++++++++++++++++++
+> >  1 file changed, 118 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/phy/uniphier-usb3-phy.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/phy/uniphier-usb3-phy.txt b/Documentation/devicetree/bindings/phy/uniphier-usb3-phy.txt
+> > new file mode 100644
+> > index 0000000..3df4a486
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/phy/uniphier-usb3-phy.txt
+> > @@ -0,0 +1,118 @@
+> > +Socionext UniPhier USB3 PHY
+> > +
+> > +This describes the devicetree bindings for PHY interfaces built into
+> > +USB3 controller implemented on Socionext UniPhier SoCs.
+> > +The controller includes High-Speed PHY and Super-Speed PHY.
+> > +
+> > +USB3 High-Speed (HS) PHY
+> > +------------------------
+> > +
+> > +Required properties:
+> > +- compatible: Should contain one of the following:
+> > +    "socionext,uniphier-pro4-usb3-hsphy" - for Pro4 SoC
+> > +    "socionext,uniphier-pxs2-usb3-hsphy" - for PXs2 SoC
+> > +    "socionext,uniphier-ld20-usb3-hsphy" - for LD20 SoC
+> > +    "socionext,uniphier-pxs3-usb3-hsphy" - for PXs3 SoC
+> > +- reg: Specifies offset and length of the register set for the device.
+> > +- #phy-cells: Should be 0.
+> > +- clocks: A list of phandles to the clock gate for USB3 glue layer.
+> > +	According to the clock-names, appropriate clocks are required.
+> > +- clock-names: Should contain the following:
+> > +    "gio", "link" - for Pro4 SoC
+> > +    "link", "phy", "phy-ext" - for PXs3 SoC, "phy-ext" is optional.
+> > +    "link", "phy" - for others
+> 
+> Can't you make 'link' always first.
+
+I see. I'll change the order.
+
+> > +- resets: A list of phandles to the reset control for USB3 glue layer.
+> > +	According to the reset-names, appropriate resets are required.
+> > +- reset-names: Should contain the following:
+> > +    "gio", "link" - for Pro4 SoC
+> > +    "link", "phy" - for others
+> > +
+> > +Optional properties:
+> > +- phy-supply: A phandle to the regulator for USB VBUS.
+> 
+> The phy actually needs Vbus or you just want to control Vbus from the 
+> phy driver?
+
+To enable each USB port correspond with phy, we must enable Vbus for each port.
+However, the host driver doesn't have the way to control regulators directly,
+then I think it is reasonable to control Vbus by using phy regulator.
 
 
-On 17.07.2018 13:45, Alexandre Belloni wrote:
-> Hi,
+> > +- nvmem-cells: Phandles to nvmem cell that contains the trimming data.
+> > +	Available only for HS-PHY implemented on LD20 and PXs3, and
+> > +	if unspecified, default value is used.
+> > +- nvmem-cell-names: Should be the following names, which correspond to
+> > +	each nvmem-cells.
+> > +	All of the 3 parameters associated with the following names are
+> > +	required for each port, if any one is omitted, the trimming data
+> > +	of the port will not be set at all.
+> > +    "rterm", "sel_t", "hs_i" - Each cell name for phy parameters
+> > +
+> > +Refer to phy/phy-bindings.txt for the generic PHY binding properties.
+> > +
+> > +Example:
+> > +
+> > +	usb-glue at 65b00000 {
+> > +		compatible = "socionext,uniphier-ld20-dwc3-glue",
+> > +			     "simple-mfd";
+> > +		#address-cells = <1>;
+> > +		#size-cells = <1>;
+> > +		ranges = <0 0x65b00000 0x400>;
+> > +
+> > +		usb_hsphy0: hs-phy at 200 {
+> > +			compatible = "socionext,uniphier-ld20-usb3-hsphy";
+> > +			reg = <0x200 0x10>;
+> > +			#phy-cells = <0>;
+> > +			clock-names = "link", "phy";
+> > +			clocks = <&sys_clk 14>, <&sys_clk 16>;
+> > +			reset-names = "link", "phy";
+> > +			resets = <&sys_rst 14>, <&sys_rst 16>;
+> > +			phy-supply = <&usb_vbus0>;
+> > +			nvmem-cell-names = "rterm", "sel_t", "hs_i";
+> > +			nvmem-cells = <&usb_rterm0>, <&usb_sel_t0>,
+> > +				      <&usb_hs_i0>;
+> > +		};
+> > +	};
+> > +
+> > +
+> > +USB3 Super-Speed (SS) PHY
+> > +-------------------------
 > 
-> On 17/07/2018 11:26:57+0300, Claudiu Beznea wrote:
->> Since for ULP1 PM mode of SAMA5D2 the wakeup sources are limited and
->> well known add a method to check if these wakeup sources are defined by
->> user (either via DT or filesystem). In case there are no wakeup sources
->> defined for ULP1 the PM suspend will fail, otherwise these will be
->> configured in fast startup registers of PMC. Since wakeup sources of
->> ULP1 need also to be configured in SHDWC registers the code was a bit
->> changed to map the SHDWC also in case ULP1 is requested by user (this
->> was done in the initialization phase). In case the ULP1 initialization
->> fails the ULP0 mode is used (this mode was also used in case backup mode
->> initialization failed).
->>
->> Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
->> ---
->>  arch/arm/mach-at91/pm.c | 165 +++++++++++++++++++++++++++++++++++++++++-------
->>  1 file changed, 143 insertions(+), 22 deletions(-)
->>
->> diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
->> index 099d8094018c..c8ef696b83b6 100644
->> --- a/arch/arm/mach-at91/pm.c
->> +++ b/arch/arm/mach-at91/pm.c
->> @@ -80,6 +80,87 @@ static struct at91_pm_bu {
->>  	phys_addr_t resume;
->>  } *pm_bu;
->>  
->> +struct wakeup_source_info {
->> +	unsigned int pmc_fsmr_bit;
->> +	unsigned int shdwc_mr_bit;
->> +	bool set_polarity;
->> +};
->> +
->> +static const struct wakeup_source_info ws_info[] = {
->> +	{ .pmc_fsmr_bit = AT91_PMC_FSTT(10),	.set_polarity = true },
->> +	{ .pmc_fsmr_bit = AT91_PMC_RTCAL,	.shdwc_mr_bit = BIT(17) },
->> +	{ .pmc_fsmr_bit = AT91_PMC_USBAL },
->> +	{ .pmc_fsmr_bit = AT91_PMC_SDMMC_CD },
->> +};
->> +
->> +static const struct of_device_id sama5d2_ws_ids[] = {
->> +	{ .compatible = "atmel,sama5d2-gem",		.data = &ws_info[0] },
->> +	{ .compatible = "atmel,at91rm9200-rtc",		.data = &ws_info[1] },
->> +	{ .compatible = "atmel,sama5d3-udc",		.data = &ws_info[2] },
->> +	{ .compatible = "atmel,at91rm9200-ohci",	.data = &ws_info[2] },
->> +	{ .compatible = "usb-ohci",			.data = &ws_info[2] },
->> +	{ .compatible = "atmel,at91sam9g45-ehci",	.data = &ws_info[2] },
->> +	{ .compatible = "usb-ehci",			.data = &ws_info[2] },
->> +	{ .compatible = "atmel,sama5d2-sdhci",		.data = &ws_info[3] },
->> +	{ /* sentinel */ }
->> +};
->> +
->> +static int at91_pm_config_ws(unsigned int pm_mode, bool set)
->> +{
->> +	const struct wakeup_source_info *wsi;
->> +	const struct of_device_id *match;
->> +	struct platform_device *pdev;
->> +	struct device_node *np;
->> +	unsigned int mode = 0, polarity = 0, val = 0;
->> +
->> +	if (pm_mode != AT91_PM_ULP1)
->> +		return 0;
->> +
->> +	if (!pm_data.pmc || !pm_data.shdwc)
->> +		return -EPERM;
->> +
->> +	if (!set) {
->> +		writel(mode, pm_data.pmc + AT91_PMC_FSMR);
->> +		return 0;
->> +	}
->> +
->> +	/* SHDWC.WUIR */
->> +	val = readl(pm_data.shdwc + 0x0c);
->> +	mode |= (val & 0x3ff);
->> +	polarity |= ((val >> 16) & 0x3ff);
->> +
->> +	/* SHDWC.MR */
->> +	val = readl(pm_data.shdwc + 0x04);
->> +
->> +	/* Loop through defined wakeup sources. */
->> +	for_each_matching_node_and_match(np, sama5d2_ws_ids, &match) {
->> +		pdev = of_find_device_by_node(np);
-> 
-> of_find_device_by_node takes a reference to the embedded struct
-> device...
-> 
+> Nothing seems to be shared here. Make this 2 docs.
 
-Yes, thank you!
+I see. I'll split it.
 
->> +		if (!pdev)
->> +			continue;
->> +
->> +		if (device_may_wakeup(&pdev->dev)) {
->> +			wsi = match->data;
->> +
->> +			/* Check if enabled on SHDWC. */
->> +			if (wsi->shdwc_mr_bit && !(val & wsi->shdwc_mr_bit))
->> +				continue;
->> +
->> +			mode |= wsi->pmc_fsmr_bit;
->> +			if (wsi->set_polarity)
->> +				polarity |= wsi->pmc_fsmr_bit;
->> +		}
 > 
-> So you need to drop it here.
+> > +
+> > +Required properties:
+> > +- compatible: Should contain one of the following:
+> > +    "socionext,uniphier-pro4-usb3-ssphy" - for Pro4 SoC
+> > +    "socionext,uniphier-pxs2-usb3-ssphy" - for PXs2 SoC
+> > +    "socionext,uniphier-ld20-usb3-ssphy" - for LD20 SoC
+> > +    "socionext,uniphier-pxs3-usb3-ssphy" - for PXs3 SoC
+> > +- reg: Specifies offset and length of the register set for the device.
+> > +- #phy-cells: Should be 0.
+> > +- clocks: A list of phandles to the clock gate for USB3 glue layer.
+> > +	According to the clock-names, appropriate clocks are required.
+> > +- clock-names:
+> > +    "gio", "link" - for Pro4 SoC
+> > +    "link", "phy", "phy-ext" - for PXs3 SoC, "phy-ext" is optional.
+> > +    "link", "phy" - for others
 > 
-> Can you do that and resend, just that patch? thanks.
+> Can't you make 'link' always first.
+
+ditto.
+
+> > +- resets: A list of phandles to the reset control for USB3 glue layer.
+> > +	According to the reset-names, appropriate resets are required.
+> > +- reset-names:
+> > +    "gio", "link" - for Pro4 SoC
+> > +    "link", "phy" - for others
 > 
->> +	}
->> +
->> +	if (mode) {
->> +		writel(mode, pm_data.pmc + AT91_PMC_FSMR);
->> +		writel(polarity, pm_data.pmc + AT91_PMC_FSPR);
->> +	} else {
->> +		pr_err("AT91: PM: no ULP1 wakeup sources found!");
->> +	}
->> +
->> +	return mode ? 0 : -EPERM;
->> +}
->> +
->>  /*
->>   * Called after processes are frozen, but before we shutdown devices.
->>   */
->> @@ -98,7 +179,7 @@ static int at91_pm_begin(suspend_state_t state)
->>  		pm_data.mode = -1;
->>  	}
->>  
->> -	return 0;
->> +	return at91_pm_config_ws(pm_data.mode, true);
->>  }
->>  
->>  /*
->> @@ -234,6 +315,7 @@ static int at91_pm_enter(suspend_state_t state)
->>   */
->>  static void at91_pm_end(void)
->>  {
->> +	at91_pm_config_ws(pm_data.mode, false);
->>  }
->>  
->>  
->> @@ -479,31 +561,28 @@ static void __init at91_pm_sram_init(void)
->>  			&at91_pm_suspend_in_sram, at91_pm_suspend_in_sram_sz);
->>  }
->>  
->> -static void __init at91_pm_backup_init(void)
->> +static bool __init at91_is_pm_mode_active(int pm_mode)
->> +{
->> +	return (pm_data.standby_mode == pm_mode ||
->> +		pm_data.suspend_mode == pm_mode);
->> +}
->> +
->> +static int __init at91_pm_backup_init(void)
->>  {
->>  	struct gen_pool *sram_pool;
->>  	struct device_node *np;
->>  	struct platform_device *pdev = NULL;
->> +	int ret = -ENODEV;
->>  
->> -	if ((pm_data.standby_mode != AT91_PM_BACKUP) &&
->> -	    (pm_data.suspend_mode != AT91_PM_BACKUP))
->> -		return;
->> +	if (!at91_is_pm_mode_active(AT91_PM_BACKUP))
->> +		return 0;
->>  
->>  	pm_bu = NULL;
->>  
->> -	np = of_find_compatible_node(NULL, NULL, "atmel,sama5d2-shdwc");
->> -	if (!np) {
->> -		pr_warn("%s: failed to find shdwc!\n", __func__);
->> -		return;
->> -	}
->> -
->> -	pm_data.shdwc = of_iomap(np, 0);
->> -	of_node_put(np);
->> -
->>  	np = of_find_compatible_node(NULL, NULL, "atmel,sama5d2-sfrbu");
->>  	if (!np) {
->>  		pr_warn("%s: failed to find sfrbu!\n", __func__);
->> -		goto sfrbu_fail;
->> +		return ret;
->>  	}
->>  
->>  	pm_data.sfrbu = of_iomap(np, 0);
->> @@ -530,6 +609,7 @@ static void __init at91_pm_backup_init(void)
->>  	pm_bu = (void *)gen_pool_alloc(sram_pool, sizeof(struct at91_pm_bu));
->>  	if (!pm_bu) {
->>  		pr_warn("%s: unable to alloc securam!\n", __func__);
->> +		ret = -ENOMEM;
->>  		goto securam_fail;
->>  	}
->>  
->> @@ -537,21 +617,62 @@ static void __init at91_pm_backup_init(void)
->>  	pm_bu->canary = __pa_symbol(&canary);
->>  	pm_bu->resume = __pa_symbol(cpu_resume);
->>  
->> -	return;
->> +	return 0;
->>  
->> -sfrbu_fail:
->> -	iounmap(pm_data.shdwc);
->> -	pm_data.shdwc = NULL;
->>  securam_fail:
->>  	iounmap(pm_data.sfrbu);
->>  	pm_data.sfrbu = NULL;
->> +	return ret;
->> +}
->>  
->> -	if (pm_data.standby_mode == AT91_PM_BACKUP)
->> +static void __init at91_pm_use_default_mode(int pm_mode)
->> +{
->> +	if (pm_mode != AT91_PM_ULP1 && pm_mode != AT91_PM_BACKUP)
->> +		return;
->> +
->> +	if (pm_data.standby_mode == pm_mode)
->>  		pm_data.standby_mode = AT91_PM_ULP0;
->> -	if (pm_data.suspend_mode == AT91_PM_BACKUP)
->> +	if (pm_data.suspend_mode == pm_mode)
->>  		pm_data.suspend_mode = AT91_PM_ULP0;
->>  }
->>  
->> +static void __init at91_pm_modes_init(void)
->> +{
->> +	struct device_node *np;
->> +	int ret;
->> +
->> +	if (!at91_is_pm_mode_active(AT91_PM_BACKUP) &&
->> +	    !at91_is_pm_mode_active(AT91_PM_ULP1))
->> +		return;
->> +
->> +	np = of_find_compatible_node(NULL, NULL, "atmel,sama5d2-shdwc");
->> +	if (!np) {
->> +		pr_warn("%s: failed to find shdwc!\n", __func__);
->> +		goto ulp1_default;
->> +	}
->> +
->> +	pm_data.shdwc = of_iomap(np, 0);
->> +	of_node_put(np);
->> +
->> +	ret = at91_pm_backup_init();
->> +	if (ret) {
->> +		if (!at91_is_pm_mode_active(AT91_PM_ULP1))
->> +			goto unmap;
->> +		else
->> +			goto backup_default;
->> +	}
->> +
->> +	return;
->> +
->> +unmap:
->> +	iounmap(pm_data.shdwc);
->> +	pm_data.shdwc = NULL;
->> +ulp1_default:
->> +	at91_pm_use_default_mode(AT91_PM_ULP1);
->> +backup_default:
->> +	at91_pm_use_default_mode(AT91_PM_BACKUP);
->> +}
->> +
->>  struct pmc_info {
->>  	unsigned long uhp_udp_mask;
->>  };
->> @@ -645,7 +766,7 @@ void __init sama5d2_pm_init(void)
->>  	if (!IS_ENABLED(CONFIG_SOC_SAMA5D2))
->>  		return;
->>  
->> -	at91_pm_backup_init();
->> +	at91_pm_modes_init();
->>  	sama5_pm_init();
->>  }
->>  
->> -- 
->> 2.7.4
->>
+> And here.
 > 
+> > +
+> > +Optional properties:
+> > +- phy-supply: A phandle to the regulator for USB VBUS.
+> > +
+> > +Refer to phy/phy-bindings.txt for the generic PHY binding properties.
+> > +
+> > +Example:
+> > +
+> > +	usb-glue at 65b00000 {
+> > +		compatible = "socionext,uniphier-ld20-dwc3-glue",
+> > +			     "simple-mfd";
+> > +		#address-cells = <1>;
+> > +		#size-cells = <1>;
+> > +		ranges = <0 0x65b00000 0x400>;
+> > +
+> > +		usb_ssphy0: ss-phy at 300 {
+> > +			compatible = "socionext,uniphier-ld20-usb3-ssphy";
+> > +			reg = <0x300 0x10>;
+> > +			#phy-cells = <0>;
+> > +			clock-names = "link", "phy";
+> > +			clocks = <&sys_clk 14>, <&sys_clk 16>;
+> > +			reset-names = "link", "phy";
+> > +			resets = <&sys_rst 14>, <&sys_rst 16>;
+> > +			phy-supply = <&usb_vbus0>;
+> > +		};
+> > +
+> > +		other nodes ...
+> > +	};
+> > -- 
+> > 2.7.4
+> > 
+
+Thank you,
+
+---
+Best Regards,
+Kunihiko Hayashi
