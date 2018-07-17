@@ -1,219 +1,336 @@
 From: jolly.shah@xilinx.com (Jolly Shah)
-Date: Tue, 17 Jul 2018 12:59:06 -0700
-Subject: [PATCH v10 09/10] dt-bindings: clock: Add bindings for ZynqMP clock
- driver
+Date: Tue, 17 Jul 2018 12:59:03 -0700
+Subject: [PATCH v10 06/10] firmware: xilinx: Add debugfs interface
 In-Reply-To: <1531857547-16652-1-git-send-email-jollys@xilinx.com>
 References: <1531857547-16652-1-git-send-email-jollys@xilinx.com>
-Message-ID: <1531857547-16652-10-git-send-email-jollys@xilinx.com>
+Message-ID: <1531857547-16652-7-git-send-email-jollys@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rajan Vaja <rajanv@xilinx.com>
 
-Add documentation to describe Xilinx ZynqMP clock driver
-bindings.
+Firmware-debug provides debugfs interface to all APIs.
+Debugfs can be used to call firmware APIs with required
+parameters.
+
+Usage:
+* Calling firmware API through debugfs:
+  # echo "<api-name> <arg1> .. <argn>" > /sys/.../zynqmp-firmware/pm
+
+* Read output of last called firmware API:
+  # cat /sys/.../zynqmp-firmware/pm
+
+Refer ug1200 for more information on these APIs:
+  * https://www.xilinx.com/support/documentation/user_guides/ug1200-eemi-api.pdf
+
+Add basic debugfs file to get API version.
 
 Signed-off-by: Rajan Vaja <rajanv@xilinx.com>
 Signed-off-by: Jolly Shah <jollys@xilinx.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
-Reviewed-by: Stephen Boyd <sboyd@kernel.org>
 ---
- .../firmware/xilinx/xlnx,zynqmp-firmware.txt       |  53 ++++++++++
- include/dt-bindings/clock/xlnx,zynqmp-clk.h        | 116 +++++++++++++++++++++
- 2 files changed, 169 insertions(+)
- create mode 100644 include/dt-bindings/clock/xlnx,zynqmp-clk.h
+ drivers/firmware/xilinx/Kconfig        |   7 ++
+ drivers/firmware/xilinx/Makefile       |   1 +
+ drivers/firmware/xilinx/zynqmp-debug.c | 212 +++++++++++++++++++++++++++++++++
+ drivers/firmware/xilinx/zynqmp-debug.h |  22 ++++
+ drivers/firmware/xilinx/zynqmp.c       |   9 ++
+ 5 files changed, 251 insertions(+)
+ create mode 100644 drivers/firmware/xilinx/zynqmp-debug.c
+ create mode 100644 drivers/firmware/xilinx/zynqmp-debug.h
 
-diff --git a/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt b/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt
-index 1b431d9..d215d15 100644
---- a/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt
-+++ b/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt
-@@ -17,6 +17,53 @@ Required properties:
- 		  - "smc" : SMC #0, following the SMCCC
- 		  - "hvc" : HVC #0, following the SMCCC
+diff --git a/drivers/firmware/xilinx/Kconfig b/drivers/firmware/xilinx/Kconfig
+index 64d976e..8f44b9c 100644
+--- a/drivers/firmware/xilinx/Kconfig
++++ b/drivers/firmware/xilinx/Kconfig
+@@ -13,4 +13,11 @@ config ZYNQMP_FIRMWARE
+ 	  Say yes to enable ZynqMP firmware interface driver.
+ 	  If in doubt, say N.
  
-+--------------------------------------------------------------------------
-+Device Tree Clock bindings for the Zynq Ultrascale+ MPSoC controlled using
-+Zynq MPSoC firmware interface
-+--------------------------------------------------------------------------
-+The clock controller is a h/w block of Zynq Ultrascale+ MPSoC clock
-+tree. It reads required input clock frequencies from the devicetree and acts
-+as clock provider for all clock consumers of PS clocks.
++config ZYNQMP_FIRMWARE_DEBUG
++	bool "Enable Xilinx Zynq MPSoC firmware debug APIs"
++	depends on ZYNQMP_FIRMWARE && DEBUG_FS
++	help
++	  Say yes to enable ZynqMP firmware interface debug APIs.
++	  If in doubt, say N.
 +
-+See clock_bindings.txt for more information on the generic clock bindings.
-+
-+Required properties:
-+ - #clock-cells:	Must be 1
-+ - compatible:		Must contain:	"xlnx,zynqmp-clk"
-+ - clocks:		List of clock specifiers which are external input
-+			clocks to the given clock controller. Please refer
-+			the next section to find the input clocks for a
-+			given controller.
-+ - clock-names:		List of clock names which are exteral input clocks
-+			to the given clock controller. Please refer to the
-+			clock bindings for more details.
-+
-+Input clocks for zynqmp Ultrascale+ clock controller:
-+
-+The Zynq UltraScale+ MPSoC has one primary and four alternative reference clock
-+inputs. These required clock inputs are:
-+ - pss_ref_clk (PS reference clock)
-+ - video_clk (reference clock for video system )
-+ - pss_alt_ref_clk (alternative PS reference clock)
-+ - aux_ref_clk
-+ - gt_crx_ref_clk (transceiver reference clock)
-+
-+The following strings are optional parameters to the 'clock-names' property in
-+order to provide an optional (E)MIO clock source:
-+ - swdt0_ext_clk
-+ - swdt1_ext_clk
-+ - gem0_emio_clk
-+ - gem1_emio_clk
-+ - gem2_emio_clk
-+ - gem3_emio_clk
-+ - mio_clk_XX		# with XX = 00..77
-+ - mio_clk_50_or_51	#for the mux clock to gem tsu from 50 or 51
-+
-+
-+Output clocks are registered based on clock information received
-+from firmware. Output clocks indexes are mentioned in
-+include/dt-bindings/clock/xlnx,zynqmp-clk.h.
-+
- -------
- Example
- -------
-@@ -25,5 +72,11 @@ firmware {
- 	zynqmp_firmware: zynqmp-firmware {
- 		compatible = "xlnx,zynqmp-firmware";
- 		method = "smc";
-+		zynqmp_clk : clock-controller {
-+			#clock-cells = <1>;
-+			compatible = "xlnx,zynqmp-clk";
-+			clocks = <&pss_ref_clk>, <&video_clk>, <&pss_alt_ref_clk>, <&aux_ref_clk>, <&gt_crx_ref_clk>;
-+			clock-names = "pss_ref_clk", "video_clk", "pss_alt_ref_clk","aux_ref_clk", "gt_crx_ref_clk";
-+		};
- 	};
- };
-diff --git a/include/dt-bindings/clock/xlnx,zynqmp-clk.h b/include/dt-bindings/clock/xlnx,zynqmp-clk.h
+ endmenu
+diff --git a/drivers/firmware/xilinx/Makefile b/drivers/firmware/xilinx/Makefile
+index 29f7bf2..875a537 100644
+--- a/drivers/firmware/xilinx/Makefile
++++ b/drivers/firmware/xilinx/Makefile
+@@ -2,3 +2,4 @@
+ # Makefile for Xilinx firmwares
+ 
+ obj-$(CONFIG_ZYNQMP_FIRMWARE) += zynqmp.o
++obj-$(CONFIG_ZYNQMP_FIRMWARE_DEBUG) += zynqmp-debug.o
+diff --git a/drivers/firmware/xilinx/zynqmp-debug.c b/drivers/firmware/xilinx/zynqmp-debug.c
 new file mode 100644
-index 0000000..4aebe6e
+index 0000000..fcbdd6e
 --- /dev/null
-+++ b/include/dt-bindings/clock/xlnx,zynqmp-clk.h
-@@ -0,0 +1,116 @@
++++ b/drivers/firmware/xilinx/zynqmp-debug.c
+@@ -0,0 +1,212 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Xilinx Zynq MPSoC Firmware layer for debugfs APIs
++ *
++ *  Copyright (C) 2014-2018 Xilinx, Inc.
++ *
++ *  Michal Simek <michal.simek@xilinx.com>
++ *  Davorin Mista <davorin.mista@aggios.com>
++ *  Jolly Shah <jollys@xilinx.com>
++ *  Rajan Vaja <rajanv@xilinx.com>
++ */
++
++#include <linux/compiler.h>
++#include <linux/module.h>
++#include <linux/slab.h>
++#include <linux/debugfs.h>
++#include <linux/uaccess.h>
++
++#include <linux/firmware/xlnx-zynqmp.h>
++#include "zynqmp-debug.h"
++
++#define PM_API_NAME_LEN			50
++
++struct pm_api_info {
++	u32 api_id;
++	char api_name[PM_API_NAME_LEN];
++	char api_name_len;
++};
++
++static char debugfs_buf[PAGE_SIZE];
++
++#define PM_API(id)		 {id, #id, strlen(#id)}
++static struct pm_api_info pm_api_list[] = {
++	PM_API(PM_GET_API_VERSION),
++};
++
++/**
++ * zynqmp_pm_argument_value() - Extract argument value from a PM-API request
++ * @arg:	Entered PM-API argument in string format
++ *
++ * Return: Argument value in unsigned integer format on success
++ *	   0 otherwise
++ */
++static u64 zynqmp_pm_argument_value(char *arg)
++{
++	u64 value;
++
++	if (!arg)
++		return 0;
++
++	if (!kstrtou64(arg, 0, &value))
++		return value;
++
++	return 0;
++}
++
++/**
++ * get_pm_api_id() - Extract API-ID from a PM-API request
++ * @pm_api_req:		Entered PM-API argument in string format
++ * @pm_id:		API-ID
++ *
++ * Return: 0 on success else error code
++ */
++static int get_pm_api_id(char *pm_api_req, u32 *pm_id)
++{
++	int i;
++
++	for (i = 0; i < ARRAY_SIZE(pm_api_list) ; i++) {
++		if (!strncasecmp(pm_api_req, pm_api_list[i].api_name,
++				 pm_api_list[i].api_name_len)) {
++			*pm_id = pm_api_list[i].api_id;
++			break;
++		}
++	}
++
++	/* If no name was entered look for PM-API ID instead */
++	if (i == ARRAY_SIZE(pm_api_list) && kstrtouint(pm_api_req, 10, pm_id))
++		return -EINVAL;
++
++	return 0;
++}
++
++static int process_api_request(u32 pm_id, u64 *pm_api_arg, u32 *pm_api_ret)
++{
++	const struct zynqmp_eemi_ops *eemi_ops = zynqmp_pm_get_eemi_ops();
++	u32 pm_api_version;
++	int ret;
++
++	if (!eemi_ops)
++		return -ENXIO;
++
++	switch (pm_id) {
++	case PM_GET_API_VERSION:
++		ret = eemi_ops->get_api_version(&pm_api_version);
++		sprintf(debugfs_buf, "PM-API Version = %d.%d\n",
++			pm_api_version >> 16, pm_api_version & 0xffff);
++		break;
++	default:
++		sprintf(debugfs_buf, "Unsupported PM-API request\n");
++		ret = -EINVAL;
++	}
++
++	return ret;
++}
++
++/**
++ * zynqmp_pm_debugfs_api_write() - debugfs write function
++ * @file:	User file
++ * @ptr:	User entered PM-API string
++ * @len:	Length of the userspace buffer
++ * @off:	Offset within the file
++ *
++ * Used for triggering pm api functions by writing
++ * echo <pm_api_id>	> /sys/kernel/debug/zynqmp_pm/power or
++ * echo <pm_api_name>	> /sys/kernel/debug/zynqmp_pm/power
++ *
++ * Return: Number of bytes copied if PM-API request succeeds,
++ *	   the corresponding error code otherwise
++ */
++static ssize_t zynqmp_pm_debugfs_api_write(struct file *file,
++					   const char __user *ptr, size_t len,
++					   loff_t *off)
++{
++	char *kern_buff, *tmp_buff;
++	char *pm_api_req;
++	u32 pm_id = 0;
++	u64 pm_api_arg[4] = {0, 0, 0, 0};
++	/* Return values from PM APIs calls */
++	u32 pm_api_ret[4] = {0, 0, 0, 0};
++
++	int ret;
++	int i = 0;
++
++	strcpy(debugfs_buf, "");
++
++	if (*off != 0 || len == 0)
++		return -EINVAL;
++
++	kern_buff = kzalloc(len, GFP_KERNEL);
++	if (!kern_buff)
++		return -ENOMEM;
++
++	tmp_buff = kern_buff;
++
++	ret = strncpy_from_user(kern_buff, ptr, len);
++	if (ret < 0) {
++		ret = -EFAULT;
++		goto err;
++	}
++
++	/* Read the API name from a user request */
++	pm_api_req = strsep(&kern_buff, " ");
++
++	ret = get_pm_api_id(pm_api_req, &pm_id);
++	if (ret < 0)
++		goto err;
++
++	/* Read node_id and arguments from the PM-API request */
++	pm_api_req = strsep(&kern_buff, " ");
++	while ((i < ARRAY_SIZE(pm_api_arg)) && pm_api_req) {
++		pm_api_arg[i++] = zynqmp_pm_argument_value(pm_api_req);
++		pm_api_req = strsep(&kern_buff, " ");
++	}
++
++	ret = process_api_request(pm_id, pm_api_arg, pm_api_ret);
++
++err:
++	kfree(tmp_buff);
++	if (ret)
++		return ret;
++
++	return len;
++}
++
++/**
++ * zynqmp_pm_debugfs_api_read() - debugfs read function
++ * @file:	User file
++ * @ptr:	Requested pm_api_version string
++ * @len:	Length of the userspace buffer
++ * @off:	Offset within the file
++ *
++ * Return: Length of the version string on success
++ *	   else error code
++ */
++static ssize_t zynqmp_pm_debugfs_api_read(struct file *file, char __user *ptr,
++					  size_t len, loff_t *off)
++{
++	return simple_read_from_buffer(ptr, len, off, debugfs_buf,
++				       strlen(debugfs_buf));
++}
++
++/* Setup debugfs fops */
++static const struct file_operations fops_zynqmp_pm_dbgfs = {
++	.owner = THIS_MODULE,
++	.write = zynqmp_pm_debugfs_api_write,
++	.read = zynqmp_pm_debugfs_api_read,
++};
++
++/**
++ * zynqmp_pm_api_debugfs_init - Initialize debugfs interface
++ *
++ * Return:	None
++ */
++void zynqmp_pm_api_debugfs_init(void)
++{
++	struct dentry *root_dir;
++
++	/* Initialize debugfs interface */
++	root_dir = debugfs_create_dir("zynqmp-firmware", NULL);
++	debugfs_create_file("pm", 0660, root_dir, NULL,
++			    &fops_zynqmp_pm_dbgfs);
++}
+diff --git a/drivers/firmware/xilinx/zynqmp-debug.h b/drivers/firmware/xilinx/zynqmp-debug.h
+new file mode 100644
+index 0000000..3303b37
+--- /dev/null
++++ b/drivers/firmware/xilinx/zynqmp-debug.h
+@@ -0,0 +1,22 @@
 +/* SPDX-License-Identifier: GPL-2.0 */
 +/*
 + * Xilinx Zynq MPSoC Firmware layer
 + *
-+ *  Copyright (C) 2014-2018 Xilinx, Inc.
++ *  Copyright (C) 2014-2018 Xilinx
 + *
++ *  Michal Simek <michal.simek@xilinx.com>
++ *  Davorin Mista <davorin.mista@aggios.com>
++ *  Jolly Shah <jollys@xilinx.com>
++ *  Rajan Vaja <rajanv@xilinx.com>
 + */
 +
-+#ifndef _DT_BINDINGS_CLK_ZYNQMP_H
-+#define _DT_BINDINGS_CLK_ZYNQMP_H
++#ifndef __FIRMWARE_ZYNQMP_DEBUG_H__
++#define __FIRMWARE_ZYNQMP_DEBUG_H__
 +
-+#define IOPLL			0
-+#define RPLL			1
-+#define APLL			2
-+#define DPLL			3
-+#define VPLL			4
-+#define IOPLL_TO_FPD		5
-+#define RPLL_TO_FPD		6
-+#define APLL_TO_LPD		7
-+#define DPLL_TO_LPD		8
-+#define VPLL_TO_LPD		9
-+#define ACPU			10
-+#define ACPU_HALF		11
-+#define DBF_FPD			12
-+#define DBF_LPD			13
-+#define DBG_TRACE		14
-+#define DBG_TSTMP		15
-+#define DP_VIDEO_REF		16
-+#define DP_AUDIO_REF		17
-+#define DP_STC_REF		18
-+#define GDMA_REF		19
-+#define DPDMA_REF		20
-+#define DDR_REF			21
-+#define SATA_REF		22
-+#define PCIE_REF		23
-+#define GPU_REF			24
-+#define GPU_PP0_REF		25
-+#define GPU_PP1_REF		26
-+#define TOPSW_MAIN		27
-+#define TOPSW_LSBUS		28
-+#define GTGREF0_REF		29
-+#define LPD_SWITCH		30
-+#define LPD_LSBUS		31
-+#define USB0_BUS_REF		32
-+#define USB1_BUS_REF		33
-+#define USB3_DUAL_REF		34
-+#define USB0			35
-+#define USB1			36
-+#define CPU_R5			37
-+#define CPU_R5_CORE		38
-+#define CSU_SPB			39
-+#define CSU_PLL			40
-+#define PCAP			41
-+#define IOU_SWITCH		42
-+#define GEM_TSU_REF		43
-+#define GEM_TSU			44
-+#define GEM0_REF		45
-+#define GEM1_REF		46
-+#define GEM2_REF		47
-+#define GEM3_REF		48
-+#define GEM0_TX			49
-+#define GEM1_TX			50
-+#define GEM2_TX			51
-+#define GEM3_TX			52
-+#define QSPI_REF		53
-+#define SDIO0_REF		54
-+#define SDIO1_REF		55
-+#define UART0_REF		56
-+#define UART1_REF		57
-+#define SPI0_REF		58
-+#define SPI1_REF		59
-+#define NAND_REF		60
-+#define I2C0_REF		61
-+#define I2C1_REF		62
-+#define CAN0_REF		63
-+#define CAN1_REF		64
-+#define CAN0			65
-+#define CAN1			66
-+#define DLL_REF			67
-+#define ADMA_REF		68
-+#define TIMESTAMP_REF		69
-+#define AMS_REF			70
-+#define PL0_REF			71
-+#define PL1_REF			72
-+#define PL2_REF			73
-+#define PL3_REF			74
-+#define WDT			75
-+#define IOPLL_INT		76
-+#define IOPLL_PRE_SRC		77
-+#define IOPLL_HALF		78
-+#define IOPLL_INT_MUX		79
-+#define IOPLL_POST_SRC		80
-+#define RPLL_INT		81
-+#define RPLL_PRE_SRC		82
-+#define RPLL_HALF		83
-+#define RPLL_INT_MUX		84
-+#define RPLL_POST_SRC		85
-+#define APLL_INT		86
-+#define APLL_PRE_SRC		87
-+#define APLL_HALF		88
-+#define APLL_INT_MUX		89
-+#define APLL_POST_SRC		90
-+#define DPLL_INT		91
-+#define DPLL_PRE_SRC		92
-+#define DPLL_HALF		93
-+#define DPLL_INT_MUX		94
-+#define DPLL_POST_SRC		95
-+#define VPLL_INT		96
-+#define VPLL_PRE_SRC		97
-+#define VPLL_HALF		98
-+#define VPLL_INT_MUX		99
-+#define VPLL_POST_SRC		100
-+#define CAN0_MIO		101
-+#define CAN1_MIO		102
-+
++#if IS_REACHABLE(CONFIG_ZYNQMP_FIRMWARE_DEBUG)
++void zynqmp_pm_api_debugfs_init(void);
++#else
++static inline void zynqmp_pm_api_debugfs_init(void) { }
 +#endif
++
++#endif /* __FIRMWARE_ZYNQMP_DEBUG_H__ */
+diff --git a/drivers/firmware/xilinx/zynqmp.c b/drivers/firmware/xilinx/zynqmp.c
+index 41ed800..7ccedf0 100644
+--- a/drivers/firmware/xilinx/zynqmp.c
++++ b/drivers/firmware/xilinx/zynqmp.c
+@@ -21,6 +21,7 @@
+ #include <linux/uaccess.h>
+ 
+ #include <linux/firmware/xlnx-zynqmp.h>
++#include "zynqmp-debug.h"
+ 
+ /**
+  * zynqmp_pm_ret_code() - Convert PMU-FW error codes to Linux error codes
+@@ -551,3 +552,11 @@ static int __init zynqmp_plat_init(void)
+ 	return ret;
+ }
+ early_initcall(zynqmp_plat_init);
++
++static int zynqmp_firmware_init(void)
++{
++	zynqmp_pm_api_debugfs_init();
++
++	return 0;
++}
++device_initcall(zynqmp_firmware_init);
 -- 
 2.7.4
