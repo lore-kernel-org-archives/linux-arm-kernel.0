@@ -1,34 +1,44 @@
 From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
-Date: Tue, 17 Jul 2018 18:06:07 +0200
-Subject: [PATCH 2/5] arm64: defconfig: Enable Infineon TPM security chip.
-In-Reply-To: <20180717160610.26501-1-enric.balletbo@collabora.com>
-References: <20180717160610.26501-1-enric.balletbo@collabora.com>
-Message-ID: <20180717160610.26501-2-enric.balletbo@collabora.com>
+Date: Tue, 17 Jul 2018 18:06:06 +0200
+Subject: [PATCH 1/5] arm64: defconfig: Enable sound support for Samsung
+ Chromebook Plus.
+Message-ID: <20180717160610.26501-1-enric.balletbo@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some Chromebooks (like the Samsung Chromebook Plus) have a TPM security
-chip that is compliant with the TCG TIS 1.2 TPM specification and
-Infineon's I2C Protocol Stack. So, add support in the defconfig.
+Enable the Rockchip sound driver with MAX98357A/RT5514/DA7219 codecs
+needed for the Samsung Chromebook Plus.
 
 Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
 ---
 
- arch/arm64/configs/defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm64/configs/defconfig | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
 diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 4917641060b1..e530d6fc34b2 100644
+index f9a186f6af8a..4917641060b1 100644
 --- a/arch/arm64/configs/defconfig
 +++ b/arch/arm64/configs/defconfig
-@@ -294,6 +294,8 @@ CONFIG_SERIAL_XILINX_PS_UART_CONSOLE=y
- CONFIG_SERIAL_MVEBU_UART=y
- CONFIG_SERIAL_DEV_BUS=y
- CONFIG_VIRTIO_CONSOLE=y
-+CONFIG_TCG_TPM=y
-+CONFIG_TCG_TIS_I2C_INFINEON=y
- CONFIG_I2C_CHARDEV=y
- CONFIG_I2C_MUX=y
- CONFIG_I2C_MUX_PCA954x=y
+@@ -447,9 +447,20 @@ CONFIG_SOUND=y
+ CONFIG_SND=y
+ CONFIG_SND_SOC=y
+ CONFIG_SND_BCM2835_SOC_I2S=m
++CONFIG_SND_SOC_ROCKCHIP=m
++CONFIG_SND_SOC_ROCKCHIP_I2S=m
++CONFIG_SND_SOC_ROCKCHIP_SPDIF=m
++CONFIG_SND_SOC_ROCKCHIP_RT5645=m
++CONFIG_SND_SOC_RK3399_GRU_SOUND=m
+ CONFIG_SND_SOC_SAMSUNG=y
+ CONFIG_SND_SOC_RCAR=m
+ CONFIG_SND_SOC_AK4613=m
++CONFIG_SND_SOC_DA7219=m
++CONFIG_SND_SOC_MAX98357A=m
++CONFIG_SND_SOC_RL6231=m
++CONFIG_SND_SOC_RT5514=m
++CONFIG_SND_SOC_RT5514_SPI=m
++CONFIG_SND_SOC_RT5645=m
+ CONFIG_SND_SIMPLE_CARD=m
+ CONFIG_SND_AUDIO_GRAPH_CARD=m
+ CONFIG_I2C_HID=m
 -- 
 2.18.0
