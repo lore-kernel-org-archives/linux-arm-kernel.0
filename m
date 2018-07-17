@@ -1,65 +1,89 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue, 17 Jul 2018 13:30:38 +0200
-Subject: [PATCH 2/3] dt-bindings: amlogic: Add Internal Clock Measurer
- bindings
-In-Reply-To: <20180716214516.GA31738@rob-hp-laptop>
-References: <1530624110-4687-1-git-send-email-narmstrong@baylibre.com>
- <1530624110-4687-3-git-send-email-narmstrong@baylibre.com>
- <20180716214516.GA31738@rob-hp-laptop>
-Message-ID: <964512dd-fddb-4919-446a-96db7cc22a8b@baylibre.com>
+From: hari.vyas@broadcom.com (Hari Vyas)
+Date: Tue, 17 Jul 2018 17:02:04 +0530
+Subject: [PATCH] arm64: fix kernel panic on serror exception caused by
+ user process
+In-Reply-To: <20180717100628.s5emikyc6orira2q@lakrids.cambridge.arm.com>
+References: <1531819881-2931-1-git-send-email-hari.vyas@broadcom.com>
+ <1531819881-2931-2-git-send-email-hari.vyas@broadcom.com>
+ <20180717100628.s5emikyc6orira2q@lakrids.cambridge.arm.com>
+Message-ID: <CAM5rFu_trZpt20H2GAUq8GYTOuJMSmEknsQaEkPkDwFHPVDPeA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On Tue, Jul 17, 2018 at 3:36 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Tue, Jul 17, 2018 at 03:01:21PM +0530, Hari Vyas wrote:
+>> On executing simple user level "devmem 0x0" command, kernel panics.
+>> As 0x0 address is mostly not matched to any valid memory so exception
+>> is expected and raised which results in unconditional kernel panic
+>> by serror handler.
+>
+> Having access to /dev/mem means that userspace can bring down the system
+> in any number of ways.
+>
+> Why did userspace do this, and why do you think this shouldn't be fatal?
+>
+I understand,  here /dev/mem is accessible but access is issued by
+user application devmem (which user can even do by mistake or
+deliberately) and
+don't think system/kernel should be  penalized for such type of minor mistake.
+>> This is happening after newly introduced serror handling framework
+>> change which panics kernel on any any serror without checking
+>> processor mode.`
+>
+> This is the expected behaviour. The processor mode is not relevant,
+> because Serror is asynchronous -- so we cannot attribute it to userspace
+> instructions.
+>
+We recently moved to 4.17 version but if my understanding is correct
+till  Kernel 4.14, same access was resulting in bad mode and due to
+user process initiation,
+kernel was throwing exception and devmem was killed but  not
+resulting in kernel panic.
 
-On 16/07/2018 23:45, Rob Herring wrote:
-> On Tue, Jul 03, 2018 at 03:21:49PM +0200, Neil Armstrong wrote:
->> The Amlogic Meson GX SoCs embeds a clock measurer IP to measure the internal
->> clock paths frequencies.
+>> Kernel panic is fixed by checking processor mode in serror handler.
+>> On kernel mode, normal kernel panic action is taken and system halts.
+>> On user mode, only user process is killed and further panic action is
+>> not initiated.
+>
+> This is not safe.
+>
+> For example, an Serror could result from the kernel page tables being
+> programmed to point at device memory. A TLB walk for TTBR1 made while
+> userspace was executing could result in an SError, and killing userspace
+> alone is insufficient to contain the error.
+>
+Yes. Serror exception just gives indication and needs to be further
+analyzed but here case is direct and known and can be handled.
+
+> Thanks,
+> Mark.
+>
 >>
->> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+>> Signed-off-by: Hari Vyas <hari.vyas@broadcom.com>
 >> ---
->>  .../devicetree/bindings/soc/amlogic/clk-measure.txt       | 15 +++++++++++++++
->>  1 file changed, 15 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/soc/amlogic/clk-measure.txt
+>>  arch/arm64/kernel/traps.c | 7 +++++++
+>>  1 file changed, 7 insertions(+)
 >>
->> diff --git a/Documentation/devicetree/bindings/soc/amlogic/clk-measure.txt b/Documentation/devicetree/bindings/soc/amlogic/clk-measure.txt
->> new file mode 100644
->> index 0000000..ba9183a
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/soc/amlogic/clk-measure.txt
->> @@ -0,0 +1,15 @@
->> +Amlogic Internal Clock Measurer
->> +===============================
+>> diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+>> index d399d45..c7cbad7 100644
+>> --- a/arch/arm64/kernel/traps.c
+>> +++ b/arch/arm64/kernel/traps.c
+>> @@ -729,6 +729,13 @@ bool arm64_is_fatal_ras_serror(struct pt_regs *regs, unsigned int esr)
+>>
+>>  asmlinkage void do_serror(struct pt_regs *regs, unsigned int esr)
+>>  {
+>> +     if (user_mode(regs)) {
+>> +             pr_crit("UserMode SError Exception on CPU%d, code 0x%08x %s\n",
+>> +                     smp_processor_id(), esr, esr_get_class_string(esr));
+>> +             die("Oops - user mode ", regs, 0);
+>> +             return;
+>> +        }
 >> +
->> +The Amlogic SoCs contains an IP to measure the internal clocks.
->> +The precision is multiple of MHz, useful to debug the clock states.
-> 
-> What a simple yet useful debug tool.
-> 
->> +
->> +Required properties:
->> +- compatible: Shall contain "amlogic,meson-gx-clk-measure"
->> +- reg: base address and size of the Clock Measurer register space.
->> +
->> +Example:
->> +	clock-measure at 8758 {
->> +		compatible = "amlogic,meson-gx-clk-measure";
->> +		reg = <0x0 0x8758 0x0 0x10>;
-> 
-> This doesn't really look like its own block though. Can't the parent 
-> device instantiate the driver for this?
-
-As weird as it seems, on the GX family the registers are not on a aligned boundary, but yes it's its own block.
-On newer SoCs, they have a more aligned register address, with the exact same register set.
-
-Neil
-
-> 
-> 
->> +	};
->> -- 
->> 2.7.4
+>>       nmi_enter();
+>>
+>>       /* non-RAS errors are not containable */
+>> --
+>> 1.9.1
 >>
 >>
 >> _______________________________________________
