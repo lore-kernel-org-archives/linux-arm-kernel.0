@@ -1,76 +1,40 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 17 Jul 2018 18:11:32 +0100
-Subject: [PATCH v2 01/10] coresight: Fix handling of sinks
+Date: Tue, 17 Jul 2018 18:11:34 +0100
+Subject: [PATCH v2 03/10] coresight: perf: Disable trace path upon source error
 In-Reply-To: <1531847501-22226-1-git-send-email-suzuki.poulose@arm.com>
 References: <1531847501-22226-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1531847501-22226-2-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1531847501-22226-4-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The coresight components could be operated either in sysfs mode or in perf
-mode. For some of the components, the mode of operation doesn't matter as
-they simply relay the data to the next component in the trace path. But for
-sinks, they need to be able to provide the trace data back to the user.
-Thus we need to make sure that "mode" is handled appropriately. e.g,
-the sysfs mode could have multiple sources driving the trace data, while
-perf mode doesn't allow sharing the sink.
-
-The coresight_enable_sink() however doesn't really allow this check to
-trigger as it skips the "enable_sink" callback if the component is
-already enabled, irrespective of the mode. This could cause mixing
-of data from different modes or even same mode (in perf), if the
-sources are different. Also, if we fail to enable the sink while
-enabling a path (where sink is the first component enabled),
-we could end up in disabling the components in the "entire"
-path which were not enabled in this trial, causing disruptions
-in the existing trace paths.
+We enable the trace path, before activating the source.
+If we fail to enable the source, we must disable the path
+to make sure it is available for another session.
 
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- drivers/hwtracing/coresight/coresight.c | 22 +++++++++++++++-------
- 1 file changed, 15 insertions(+), 7 deletions(-)
+ drivers/hwtracing/coresight/coresight-etm-perf.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
-index 3e07fd3..c0dabbd 100644
---- a/drivers/hwtracing/coresight/coresight.c
-+++ b/drivers/hwtracing/coresight/coresight.c
-@@ -132,12 +132,14 @@ static int coresight_enable_sink(struct coresight_device *csdev, u32 mode)
- {
- 	int ret;
+diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
+index ab2a6e8..48b7d65b 100644
+--- a/drivers/hwtracing/coresight/coresight-etm-perf.c
++++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
+@@ -300,11 +300,13 @@ static void etm_event_start(struct perf_event *event, int flags)
  
--	if (!csdev->enable) {
--		if (sink_ops(csdev)->enable) {
--			ret = sink_ops(csdev)->enable(csdev, mode);
--			if (ret)
--				return ret;
--		}
-+	/*
-+	 * We need to make sure the "new" session is compatible with the
-+	 * existing "mode" of operation.
-+	 */
-+	if (sink_ops(csdev)->enable) {
-+		ret = sink_ops(csdev)->enable(csdev, mode);
-+		if (ret)
-+			return ret;
- 		csdev->enable = true;
- 	}
+ 	/* Finally enable the tracer */
+ 	if (source_ops(csdev)->enable(csdev, event, CS_MODE_PERF))
+-		goto fail_end_stop;
++		goto fail_disable_path;
  
-@@ -339,8 +341,14 @@ int coresight_enable_path(struct list_head *path, u32 mode)
- 		switch (type) {
- 		case CORESIGHT_DEV_TYPE_SINK:
- 			ret = coresight_enable_sink(csdev, mode);
-+			/*
-+			 * Sink is the first component turned on. If we
-+			 * failed to enable the sink, there are no components
-+			 * that need disabling. Disabling the path here
-+			 * would mean we could disrupt an existing session.
-+			 */
- 			if (ret)
--				goto err;
-+				goto out;
- 			break;
- 		case CORESIGHT_DEV_TYPE_SOURCE:
- 			/* sources are enabled from either sysFS or Perf */
+ out:
+ 	return;
+ 
++fail_disable_path:
++	coresight_disable_path(path);
+ fail_end_stop:
+ 	perf_aux_output_flag(handle, PERF_AUX_FLAG_TRUNCATED);
+ 	perf_aux_output_end(handle, 0);
 -- 
 2.7.4
