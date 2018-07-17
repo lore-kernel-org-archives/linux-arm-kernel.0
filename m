@@ -1,68 +1,93 @@
-From: ludovic.Barre@st.com (Ludovic Barre)
-Date: Tue, 17 Jul 2018 11:56:27 +0200
-Subject: [PATCH 2/2] pinctrl: stm32: add syscfg mask parameter
-In-Reply-To: <1531821387-29845-1-git-send-email-ludovic.Barre@st.com>
-References: <1531821387-29845-1-git-send-email-ludovic.Barre@st.com>
-Message-ID: <1531821387-29845-3-git-send-email-ludovic.Barre@st.com>
+From: yaojun8558363@gmail.com (Jun Yao)
+Date: Tue, 17 Jul 2018 17:56:08 +0800
+Subject: [PATCH v4 6/6] arm64/mm: Move {idmap_pg_dir,
+ swapper_pg_dir} to .rodata section
+In-Reply-To: <20180717095608.11008-1-yaojun8558363@gmail.com>
+References: <20180717095608.11008-1-yaojun8558363@gmail.com>
+Message-ID: <20180717095608.11008-7-yaojun8558363@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ludovic Barre <ludovic.barre@st.com>
+Move {idmap_pg_dir, tramp_pg_dir, reserved_ttbr0, swapper_pg_dir}
+to .rodata section.
 
-This patch adds mask parameter to define IRQ mux field.
-This field could vary depend of IRQ mux selection register.
-To avoid backward compatibility, the drivers set
-the legacy value by default.
-
-Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+Signed-off-by: Jun Yao <yaojun8558363@gmail.com>
 ---
- drivers/pinctrl/stm32/pinctrl-stm32.c | 16 ++++++++++++++--
- 1 file changed, 14 insertions(+), 2 deletions(-)
+ arch/arm64/kernel/vmlinux.lds.S | 39 ++++++++++++++++++++-------------
+ 1 file changed, 24 insertions(+), 15 deletions(-)
 
-diff --git a/drivers/pinctrl/stm32/pinctrl-stm32.c b/drivers/pinctrl/stm32/pinctrl-stm32.c
-index dfed609..f756232 100644
---- a/drivers/pinctrl/stm32/pinctrl-stm32.c
-+++ b/drivers/pinctrl/stm32/pinctrl-stm32.c
-@@ -46,6 +46,8 @@
- #define STM32_GPIO_PINS_PER_BANK 16
- #define STM32_GPIO_IRQ_LINE	 16
- 
-+#define SYSCFG_IRQMUX_MASK GENMASK(3, 0)
+diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+index 2446911f4262..142528a23b44 100644
+--- a/arch/arm64/kernel/vmlinux.lds.S
++++ b/arch/arm64/kernel/vmlinux.lds.S
+@@ -64,8 +64,13 @@ jiffies = jiffies_64;
+ 	*(.entry.tramp.text)				\
+ 	. = ALIGN(PAGE_SIZE);				\
+ 	__entry_tramp_text_end = .;
 +
- #define gpio_range_to_bank(chip) \
- 		container_of(chip, struct stm32_gpio_bank, range)
++#define TRAMP_PG_TABLE					\
++	tramp_pg_dir = .;				\
++	. += PAGE_SIZE;
+ #else
+ #define TRAMP_TEXT
++#define TRAMP_PG_TABLE
+ #endif
  
-@@ -1033,6 +1035,7 @@ static int stm32_pctrl_dt_setup_irq(struct platform_device *pdev,
- 	struct device *dev = &pdev->dev;
- 	struct regmap *rm;
- 	int offset, ret, i;
-+	int mask, mask_width;
+ #define INIT_PG_TABLES					\
+@@ -74,6 +79,24 @@ jiffies = jiffies_64;
+ 	. += SWAPPER_DIR_SIZE;                          \
+ 	init_pg_end = .;
  
- 	parent = of_irq_find_parent(np);
- 	if (!parent)
-@@ -1052,12 +1055,21 @@ static int stm32_pctrl_dt_setup_irq(struct platform_device *pdev,
- 	if (ret)
- 		return ret;
- 
-+	ret = of_property_read_u32_index(np, "st,syscfg", 2, &mask);
-+	if (ret)
-+		mask = SYSCFG_IRQMUX_MASK;
++#ifdef CONFIG_ARM64_SW_TTBR0_PAN
++#define RESERVED_PG_TABLE				\
++	reserved_ttbr0 = .;				\
++	. += RESERVED_TTBR0_SIZE;
++#else
++#define RESERVED_PG_TABLE
++#endif
 +
-+	mask_width = fls(mask);
++#define KERNEL_PG_TABLES				\
++	. = ALIGN(PAGE_SIZE);                           \
++	idmap_pg_dir = .;				\
++	. += IDMAP_DIR_SIZE;				\
++	TRAMP_PG_TABLE					\
++	RESERVED_PG_TABLE				\
++	swapper_pg_dir = .;				\
++	. += PAGE_SIZE;					\
++	swapper_pg_end = .;
 +
- 	for (i = 0; i < STM32_GPIO_PINS_PER_BANK; i++) {
- 		struct reg_field mux;
+ /*
+  * The size of the PE/COFF section that covers the kernel image, which
+  * runs from stext to _edata, must be a round multiple of the PE/COFF
+@@ -143,6 +166,7 @@ SECTIONS
+ 	RO_DATA(PAGE_SIZE)		/* everything from this point to     */
+ 	EXCEPTION_TABLE(8)		/* __init_begin will be marked RO NX */
+ 	NOTES
++	KERNEL_PG_TABLES
  
- 		mux.reg = offset + (i / 4) * 4;
--		mux.lsb = (i % 4) * 4;
--		mux.msb = mux.lsb + 3;
-+		mux.lsb = (i % 4) * mask_width;
-+		mux.msb = mux.lsb + mask_width - 1;
-+
-+		dev_dbg(dev, "irqmux%d: reg:%#x, lsb:%d, msb:%d\n",
-+			i, mux.reg, mux.lsb, mux.msb);
+ 	. = ALIGN(SEGMENT_ALIGN);
+ 	__init_begin = .;
+@@ -224,21 +248,6 @@ SECTIONS
+ 	BSS_SECTION(0, 0, 0)
  
- 		pctl->irqmux[i] = devm_regmap_field_alloc(dev, rm, mux);
- 		if (IS_ERR(pctl->irqmux[i]))
+ 	. = ALIGN(PAGE_SIZE);
+-	idmap_pg_dir = .;
+-	. += IDMAP_DIR_SIZE;
+-
+-#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
+-	tramp_pg_dir = .;
+-	. += PAGE_SIZE;
+-#endif
+-
+-#ifdef CONFIG_ARM64_SW_TTBR0_PAN
+-	reserved_ttbr0 = .;
+-	. += RESERVED_TTBR0_SIZE;
+-#endif
+-	swapper_pg_dir = .;
+-	. += PAGE_SIZE;
+-	swapper_pg_end = .;
+ 
+ 	__pecoff_data_size = ABSOLUTE(. - __initdata_begin);
+ 	_end = .;
 -- 
-2.7.4
+2.17.1
