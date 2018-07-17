@@ -1,135 +1,142 @@
-From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
-Date: Tue, 17 Jul 2018 09:18:14 -0700
-Subject: [PATCH] i2c: aspeed: Improve driver to support multi-master use
- cases stably
-In-Reply-To: <a84da5d076924f40b1c836fe8b9d0844@TWMBX01.aspeed.com>
-References: <20180626165812.4141-1-jae.hyun.yoo@linux.intel.com>
- <CAFd5g45z--ucXf-So517tgrayZT6x2TGvaUvaDF7zeRNn7CPXw@mail.gmail.com>
- <e51471e6-0f8a-bffc-34c8-1e74239fdbcf@linux.intel.com>
- <CAFd5g47j_h4ZrT8Eg1FZ8sAj5ekCUH20jUVub75ozdkg8_YW7Q@mail.gmail.com>
- <921b1ab7-9c9f-0aeb-da89-5a1a27d009f0@linux.intel.com>
- <d3f10fc1-635b-3a5d-a967-2816eac005fc@linux.intel.com>
- <CAFd5g47zdPdqqjVJtNHtFk+jKgciKbMcEH9M-W9rL4DgLM5hkg@mail.gmail.com>
- <b8232faa-58f5-f3a5-d12a-3f326cf1d03d@linux.intel.com>
- <a84da5d076924f40b1c836fe8b9d0844@TWMBX01.aspeed.com>
-Message-ID: <26400cb7-972e-7be9-81ba-8e08d42abd4e@linux.intel.com>
+From: pawel.mikolaj.chmiel@gmail.com (=?utf-8?B?UGF3ZcWC?= Chmiel)
+Date: Tue, 17 Jul 2018 18:08:09 +0200
+Subject: [PATCH 1/2] Input: atmel_mxt_ts: Add support for optional
+ regulators.
+In-Reply-To: <20180715102547.afu57hbjcbizn3kc@penguin>
+References: <1531506608-24479-1-git-send-email-pawel.mikolaj.chmiel@gmail.com>
+ <1531506608-24479-2-git-send-email-pawel.mikolaj.chmiel@gmail.com>
+ <20180715102547.afu57hbjcbizn3kc@penguin>
+Message-ID: <2367651.5rnNy4vni7@acerlaptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sunday, July 15, 2018 10:25:47 AM CEST Dmitry Torokhov wrote:
+> Hi Pawe?,
+> 
+> On Fri, Jul 13, 2018 at 08:30:07PM +0200, Pawe? Chmiel wrote:
+> > This patch adds optional regulators, which can be used to power
+> > up touchscreen. After enabling regulators, we need to wait 150msec.
+> > This value is taken from official driver.
+> > 
+> > It was tested on Samsung Galaxy i9000 (based on Samsung S5PV210 SOC).
+> > 
+> > Signed-off-by: Pawe? Chmiel <pawel.mikolaj.chmiel@gmail.com>
+> > ---
+> >  drivers/input/touchscreen/atmel_mxt_ts.c | 45 ++++++++++++++++++++++++++++++++
+> >  1 file changed, 45 insertions(+)
+> > 
+> > diff --git a/drivers/input/touchscreen/atmel_mxt_ts.c b/drivers/input/touchscreen/atmel_mxt_ts.c
+> > index 54fe190fd4bc..a7625ec8fb9f 100644
+> > --- a/drivers/input/touchscreen/atmel_mxt_ts.c
+> > +++ b/drivers/input/touchscreen/atmel_mxt_ts.c
+> > @@ -27,6 +27,7 @@
+> >  #include <linux/interrupt.h>
+> >  #include <linux/of.h>
+> >  #include <linux/property.h>
+> > +#include <linux/regulator/consumer.h>
+> >  #include <linux/slab.h>
+> >  #include <linux/gpio/consumer.h>
+> >  #include <linux/property.h>
+> > @@ -198,6 +199,7 @@ enum t100_type {
+> >  #define MXT_RESET_INVALID_CHG	100	/* msec */
+> >  #define MXT_RESET_TIME		200	/* msec */
+> >  #define MXT_RESET_TIMEOUT	3000	/* msec */
+> > +#define MXT_REGULATOR_DELAY	150	/* msec */
+> >  #define MXT_CRC_TIMEOUT		1000	/* msec */
+> >  #define MXT_FW_RESET_TIME	3000	/* msec */
+> >  #define MXT_FW_CHG_TIMEOUT	300	/* msec */
+> > @@ -310,6 +312,8 @@ struct mxt_data {
+> >  	struct t7_config t7_cfg;
+> >  	struct mxt_dbg dbg;
+> >  	struct gpio_desc *reset_gpio;
+> > +	struct regulator *vdd_reg;
+> > +	struct regulator *avdd_reg;
+> >  
+> >  	/* Cached parameters from object table */
+> >  	u16 T5_address;
+> > @@ -3076,6 +3080,40 @@ static int mxt_probe(struct i2c_client *client, const struct i2c_device_id *id)
+> >  		return error;
+> >  	}
+> >  
+> > +	data->vdd_reg = devm_regulator_get_optional(&client->dev, "vdd");
+> > +	if (IS_ERR(data->vdd_reg)) {
+> > +		error = PTR_ERR(data->vdd_reg);
+> > +		dev_err(&client->dev, "Failed to get vdd regulator: %d\n",
+> > +			error);
+> > +		return error;
+> > +	}
+> > +
+> > +	if (data->vdd_reg) {
+> > +		error = regulator_enable(data->vdd_reg);
+> > +		if (error) {
+> > +			dev_err(&client->dev, "Failed to enable vdd regulator: %d\n",
+> > +				error);
+> > +			return error;
+> > +		}
+> > +	}
+> > +
+> > +	data->avdd_reg = devm_regulator_get_optional(&client->dev, "avdd");
+> > +	if (IS_ERR(data->avdd_reg)) {
+> > +		error = PTR_ERR(data->avdd_reg);
+> > +		dev_err(&client->dev, "Failed to get avdd regulator: %d\n",
+> > +			error);
+> > +		return error;
+> > +	}
+> > +
+> > +	if (data->avdd_reg) {
+> 
+> devm_regulator_get_optional() does not return NULL for regulators
+> not present in device tree, but rather -ENOENT, so this code is not
+> correct; neither is the simple IS_ERR() check above.
+> 
+> Moreover, the optional regulators should be used when there is a part of
+> IP block that can be optionally powered up, but the device can work
+> (with limited functionality) even when it is powered down. They should
+> not be used in cases when supplies are mandatory (such as vdd/avdd) but
+> may not be exposed to the kernel by the firmware.
+> 
+> Simply use devm_regulator_get() and rely on the fact that on fully
+> constrained system you will get a dummy regulator.
+> 
+> > +		error = regulator_enable(data->avdd_reg);
+> > +		if (error) {
+> > +			dev_err(&client->dev, "Failed to enable avdd regulator: %d\n",
+> > +				error);
+> > +			return error;
+> > +		}
+> > +	}
+> > +
+> >  	error = devm_request_threaded_irq(&client->dev, client->irq,
+> >  					  NULL, mxt_interrupt, IRQF_ONESHOT,
+> >  					  client->name, data);
+> > @@ -3086,6 +3124,9 @@ static int mxt_probe(struct i2c_client *client, const struct i2c_device_id *id)
+> >  
+> >  	disable_irq(client->irq);
+> >  
+> > +	if (!IS_ERR(data->vdd_reg) || !IS_ERR(data->avdd_reg))
+> > +		msleep(MXT_REGULATOR_DELAY);
+> > +
+> >  	if (data->reset_gpio) {
+> 
+> I think you should require that if regulators are exposed then reset
+> gpio should also be present to ensure proper power up timings.
 
-On 7/15/2018 8:05 PM, Gary Hsu wrote:
-> Hi Jae,
+Thanks for comments. I'll prepare v2 version with those changes applied.
 > 
-> In originally, we reserved these register bits for debug purpose. But for some error handling case, we found it is also useful to help to clarify some error conditions. So driver also can use these fields information to check something.
-> As for how driver use these information in their code, I have no comment. I don?t understand the driver. But these information is the real controller state, it had no problem to use information.
+> >  		msleep(MXT_RESET_GPIO_TIME);
+> >  		gpiod_set_value(data->reset_gpio, 1);
+> > @@ -3116,6 +3157,10 @@ static int mxt_remove(struct i2c_client *client)
+> >  	struct mxt_data *data = i2c_get_clientdata(client);
+> >  
+> >  	disable_irq(data->irq);
+> > +	if (!IS_ERR(data->avdd_reg))
+> > +		regulator_disable(data->avdd_reg);
+> > +	if (!IS_ERR(data->vdd_reg))
+> > +		regulator_disable(data->vdd_reg);
+> >  	sysfs_remove_group(&client->dev.kobj, &mxt_attr_group);
+> >  	mxt_free_input_device(data);
+> >  	mxt_free_object_table(data);
 > 
-
-Thanks Gary!
-
-Hi Brendan,
-Is it acceptable now if I add this as a comment like below?
-
-Thanks,
-Jae
-
-> Best Regards,
+> Thanks.
 > 
-> ??? Gary Hsu
 > 
-> ??????????
-> ASPEED Technology Inc.
-> 
-> 2F,No.15,Industry East Road 4.,Hsinchu Science Park, Hsinchu City 30077, Taiwan
-> ??????????? 15 ? 2F
-> 
-> Tel : 886-3-5789568 ext:807
-> Fax : 886-3-5789586
-> Web : http://www.aspeedtech.com
-> 
-> ************* Email Confidentiality Notice ********************
-> ????:
-> ???????????,???(????)????????????????? ???????????????????????????, ??????????????????????????????!
-> 
-> DISCLAIMER:
-> This message (and any attachments) may contain legally privileged and/or other confidential information. If you have received it in error, please notify the sender by reply e-mail and immediately delete the e-mail and any attachments without copying or disclosing the contents. Thank you.
-> 
-> -----Original Message-----
-> From: Jae Hyun Yoo [mailto:jae.hyun.yoo at linux.intel.com]
-> Sent: Saturday, July 14, 2018 2:54 AM
-> To: Brendan Higgins <brendanhiggins@google.com>
-> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>; Joel Stanley <joel@jms.id.au>; Andrew Jeffery <andrew@aj.id.au>; linux-i2c at vger.kernel.org; OpenBMC Maillist <openbmc@lists.ozlabs.org>; Linux ARM <linux-arm-kernel@lists.infradead.org>; linux-aspeed at lists.ozlabs.org; Linux Kernel Mailing List <linux-kernel@vger.kernel.org>; james.feist at linux.intel.com; vernon.mauery at linux.intel.com; Benjamin Fair <benjaminfair@google.com>; Patrick Venture <venture@google.com>; Gary Hsu <gary_hsu@aspeedtech.com>; Ryan Chen <ryan_chen@aspeedtech.com>
-> Subject: Re: [PATCH] i2c: aspeed: Improve driver to support multi-master use cases stably
-> 
-> On 7/13/2018 11:12 AM, Brendan Higgins wrote:
->> On Fri, Jul 13, 2018 at 10:22 AM Jae Hyun Yoo
->> <jae.hyun.yoo@linux.intel.com> wrote:
->>>
->>> On 7/12/2018 11:21 AM, Jae Hyun Yoo wrote:
->>>> On 7/12/2018 2:33 AM, Brendan Higgins wrote:
->>>>> On Wed, Jun 27, 2018 at 10:55 AM Jae Hyun Yoo
->>>>> <jae.hyun.yoo@linux.intel.com> wrote:
->> <snip>
->>>>> <snip>
->>>>>>>> +       for (;;) {
->>>>>>>> +               if (!(readl(bus->base + ASPEED_I2C_CMD_REG) &
->>>>>>>> +                     (ASPEED_I2CD_BUS_BUSY_STS |
->>>>>>>> +                      ASPEED_I2CD_XFER_MODE_STS_MASK)))
->>>>>>>
->>>>>>> Is using the Transfer Mode State Machine bits necessary? The
->>>>>>> documentation marks it as "for debugging purpose only," so
->>>>>>> relying on it makes me nervous.
->>>>>>>
->>>>>>
->>>>>> As you said, the documentation marks it as "for debugging purpose only."
->>>>>> but ASPEED also uses this way in their SDK code because it's the
->>>>>> best way for checking bus busy status which can cover both single
->>>>>> and multi-master use cases.
->>>>>>
->>>>>
->>>>> Well, it would also be really nice to have access to this bit if
->>>>> someone wants to implement MCTP. Could we maybe check with Aspeed
->>>>> what them meant by "for debugging purposes only" and document it
->>>>> here? It makes me nervous to rely on debugging functionality for
->>>>> normal usage.
->>>>>
->>>>
->>>> Okay, I'll check it with Aspeed. Will let you know their response.
->>>>
->>>
->>> I've checked it with Gary Hsu <gary_hsu@aspeedtech.com> and he
->>> confirmed that the bits reflect real information and good to be used
->>> in practical code.
->>
->> Huh. For my own edification, could you ask them why they said "for
->> debugging purpose only" in the documentation? I am just really curious
->> what they meant by that. I would be satisfied if you just CC'ed me on
->> your email thread with Gary, and I can ask him myself.
->>
-> 
-> I've already CC'ed Gary and Ryan in this thread.
-> 
-> Hi Gary,
-> 
-> Can you explain why the documentation says that the bit field is 'for debugging purpose only'? Any plan to change the description?
-> 
-> Thanks,
-> 
-> Jae
-> 
->>>
->>> I'll add a comment like below:
->>>
->>> /*
->>>     * This is marked as 'for debugging purpose only' in datasheet but
->>>     * ASPEED confirmed that this reflects real information and good
->>>     * to be used in practical code.
->>>     */
->>>
->>> Is it acceptable then?
->>
->> Yeah, that's fine.
->>
->> <snip>
->>
->> Cheers
->>
