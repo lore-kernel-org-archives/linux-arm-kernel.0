@@ -1,48 +1,87 @@
-From: cphealy@gmail.com (Chris Healy)
-Date: Tue, 17 Jul 2018 08:22:14 -0700
-Subject: [PATCH] ARM: dts: vf610: Add ZII SSMB SPU3 board
-In-Reply-To: <20180717152035.GD16320@lunn.ch>
-References: <20180717040651.641-1-andrew.smirnov@gmail.com>
- <20180717144638.GB16320@lunn.ch>
- <CAFXsbZpKyLjp0bO7MVR5StKf=3UkXUANydhM+8_13G3itRmE+Q@mail.gmail.com>
- <20180717152035.GD16320@lunn.ch>
-Message-ID: <CAFXsbZpS0zs3nihDuaMZaNEwYDyhQQeo_5gz5W-frv0QJFZKPQ@mail.gmail.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Tue, 17 Jul 2018 10:28:11 -0500
+Subject: [PATCH v2] ARM64: dts: meson-axg: add saradc support
+In-Reply-To: <7h7elvmgnv.fsf@baylibre.com> (Kevin Hilman's message of "Mon, 16
+ Jul 2018 08:52:36 -0500")
+References: <20180702222515.13924-1-yixun.lan@amlogic.com>
+ <1531326349.2708.136.camel@baylibre.com> <7h7elvmgnv.fsf@baylibre.com>
+Message-ID: <7h4lgxop9w.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 17, 2018 at 8:20 AM, Andrew Lunn <andrew@lunn.ch> wrote:
->> >> +++ b/arch/arm/boot/dts/vf610-zii-ssmb-spu3.dts
->> >> @@ -0,0 +1,343 @@
->> >> +// SPDX-License-Identifier: (GPL-2.0 OR MIT)
->> >> +
->> >> +/*
->> >> + * Device tree file for ZII's SSMB SPU3 board
->> >> + *
->> >> + * SSMB - SPU3 Switch Management Board
->> >> + * SPU - Seat Power Unit
->> >
->> > I think this is the first Zodiac board with mutually recursive
->> > acronyms.
->> >
->> > Probably a question for Chris: Does SSMB specifically refer to version
->> > 3 of the SPU?
->> >
->> >    Andrew
+Kevin Hilman <khilman@baylibre.com> writes:
+
+> Jerome Brunet <jbrunet@baylibre.com> writes:
+>
+>> On Mon, 2018-07-02 at 22:25 +0000, Yixun Lan wrote:
+>>> From: Xingyu Chen <xingyu.chen@amlogic.com>
+>>> 
+>>> Add the DT info for SAR ADC of the Amlogic's Meson-AXG SoC.
+>>> 
+>>> Signed-off-by: Xingyu Chen <xingyu.chen@amlogic.com>
+>>> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+>>> ---
+>>> Hi kevin
+>>>   I just re-send this patch which rebased to your khilman/v4.18/integ branch
+>>>   Thanks
+>>> Yixun
+>>> 
+>>> nothing changed since patch v1 [1]:
+>>>  -
+>>> 
+>>> [1] https://lkml.kernel.org/r/20180326092117.208416-1-yixun.lan at amlogic.com
+>>> 
+>>> ---
+>>>  .../arm64/boot/dts/amlogic/meson-axg-s400.dts |  5 +++++
+>>>  arch/arm64/boot/dts/amlogic/meson-axg.dtsi    | 21 +++++++++++++++++++
+>>>  2 files changed, 26 insertions(+)
+>>> 
+>>> diff --git a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
+>>> index 4b3331fbfe39..6041f68b32ae 100644
+>>> --- a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
+>>> +++ b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
+>>> @@ -153,3 +153,8 @@
+>>>  		compatible = "brcm,bcm4329-fmac";
+>>>  	};
+>>>  };
+>>> +
+>>> +&saradc {
+>>> +	status = "okay";
+>>> +	vref-supply = <&vddio_ao18>;
+>>> +};
+>>> diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+>>> index 67d7115e4eff..52678a69dbf8 100644
+>>> --- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+>>> +++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+>>> @@ -91,6 +91,13 @@
+>>>  		method = "smc";
+>>>  	};
+>>>  
+>>> +	vddio_ao18: regulator-vddio_ao18 {
+>>> +		compatible = "regulator-fixed";
+>>> +		regulator-name = "VDDIO_AO18";
+>>> +		regulator-min-microvolt = <1800000>;
+>>> +		regulator-max-microvolt = <1800000>;
+>>> +	};
 >>
->> SPU3 is the third generation of seat power unit.
->> SSMB is the SPU3 Switch Management Board.
+>> Kevin, Yixun,
 >>
->> So, SSMB is a backronym.  This naming scheme breaks down a bit though
->> when follow on designs (that are not the SPU3) also use the SSMB, but
->> that's what it is... ;-)
+>> I find odd that we are adding a regulator to SoC device tree file.
+>> Those regulator are usually part of board file
+>>
+>> Unless the regulator is actually inside the SoC, this is not the place for it.
+>>
+>> Sorry for not catching this earlier.
 >
-> O.K, i was just wondering if the 3 was in the wrong place. More
-> logically, it would be
+> You're right, I should've noticed this earlier also.
 >
-> * SSMB - SPU Switch Management Board
-> * SPU 3 - Seat Power Unit, version 3.
+> Yixun, can you resend this with the regulators in the board file please?
 >
-> But you are saying the Marketing guys messed up the naming and
-> engineering is now stuck with it.
->
-Yep
+> In the mean time, I've dropped this from v4.19/dt64 branch,
+
+Nevermind, Jerome fixed this up already in a series of DT updates for
+AXG, so I'll keep it as is.
+
+Thanks Jerome!
+
+Kevin
