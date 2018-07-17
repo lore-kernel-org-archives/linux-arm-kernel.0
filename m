@@ -1,89 +1,43 @@
-From: christoffer.dall@arm.com (Christoffer Dall)
-Date: Tue, 17 Jul 2018 14:29:35 +0200
-Subject: [PATCH] kvm: arm/arm64: Fix emulated physical timer IRQ injection
-In-Reply-To: <0acb919d-04d2-66f9-5281-ddcae5342578@arm.com>
-References: <20180716172357.6121-1-andre.przywara@arm.com>
- <20180717101040.GE30570@e113682-lin.lund.arm.com>
- <0acb919d-04d2-66f9-5281-ddcae5342578@arm.com>
-Message-ID: <20180717122935.GA30790@e113682-lin.lund.arm.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Tue, 17 Jul 2018 14:29:45 +0200
+Subject: [PATCH 5/5] ARM: dts: exynos: add tmu aliases nodes
+In-Reply-To: <1531822342-4293-5-git-send-email-linux.amoon@gmail.com>
+References: <1531822342-4293-1-git-send-email-linux.amoon@gmail.com>
+ <1531822342-4293-5-git-send-email-linux.amoon@gmail.com>
+Message-ID: <CAJKOXPc256dCWWWaoJBOB9NUc=CUYtqgfeKh=LBOoFAfh_T8Ng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 17, 2018 at 12:34:58PM +0100, Andre Przywara wrote:
-> Hi,
-> 
-> On 17/07/18 11:10, Christoffer Dall wrote:
-> > On Mon, Jul 16, 2018 at 06:23:57PM +0100, Andre Przywara wrote:
-> >> When KVM emulates a physical timer, we keep track of the interrupt
-> >> condition and try to inject an IRQ to the guest when needed.
-> >> This works if the timer expires when either the guest is running or KVM
-> >> does work on behalf of it, since it calls kvm_timer_update_state().
-> >> However when the guest's VCPU is not scheduled (for instance because
-> >> the guest issued a WFI instruction before), we miss injecting the interrupt
-> >> when the VCPU's state gets restored back in kvm_timer_vcpu_load().
-> >>
-> >> Fix this by moving the interrupt injection check into the
-> >> phys_timer_emulate() function, so that all possible paths of execution
-> >> are covered.
-> >>
-> >> This fixes the physical timer emulation, which broke when it got changed
-> >> in the 4.15 merge window.
-> >> The respective kvm-unit-test check has been posted already.
-> >>
-> >> Cc: Stable <stable@vger.kernel.org> # 4.15+
-> >> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> >> ---
-> >>  virt/kvm/arm/arch_timer.c | 21 +++++++++++++--------
-> >>  1 file changed, 13 insertions(+), 8 deletions(-)
-> >>
-> >> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-> >> index bd3d57f40f1b..1949fb0b80a4 100644
-> >> --- a/virt/kvm/arm/arch_timer.c
-> >> +++ b/virt/kvm/arm/arch_timer.c
-> >> @@ -294,17 +294,26 @@ static void phys_timer_emulate(struct kvm_vcpu *vcpu)
-> >>  	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
-> >>  	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
-> >>  
-> >> +	/* If the timer cannot fire at all, then we don't need a soft timer. */
-> >> +	if (!kvm_timer_irq_can_fire(ptimer)) {
-> >> +		soft_timer_cancel(&timer->phys_timer, NULL);
-> >> +		kvm_timer_update_irq(vcpu, false, ptimer);
-> >> +		return;
-> >> +	}
-> > 
-> > This stuff is breaking what the intention is with the
-> > phys_timer_emulate() function.  See the comment above the function,
-> > which says that this is about scheduling the background soft timer, and
-> > not about managing the rest of the state.
-> > 
-> > At least that function needs updating.
-> 
-> Well, my naive understanding of "phys_timer_emulate()" was that it takes
-> care of the whole task, and injecting the IRQ is an integral part of the
-> package. 
+On 17 July 2018 at 12:12, Anand Moon <linux.amoon@gmail.com> wrote:
+> add tmuctrl aliases node for exynos542x
 
-I don't understand how you could come to that conclusion given that the
-comment says otherwise and the function doesn't do anything with IRQs,
-but ok...
+Please use full sentence, starting with capital letter and ending with
+a dot. Also please explain why you need tmuctrl aliases.
 
-> As it stands with your patches now, the caller of
-> phys_timer_emulate() has to take care of the IRQ injection, which smells
-> a bit fragile.  So since we have this "phys_timer_emulate(); if()
-> kvm_timer_update_irq() ...;" sequence now exactly twice, I found it more
-> logical to move that into the function.
-> But I don't really care (or we wrap this once more as Marc suggested).
-> And as your version also works (tested with both kvm-unit-tests and by
-> running a hacked Linux guest which always uses the physical timer), feel
-> free to send your patches. You might want to declare ptimer in
-> kvm_timer_vcpu_load() though ;-) and also amend this comment in
-> phys_timer_emulate().
-> I think having this separate bites me a bit in the nested virt rework
-> (because it's more than one timer to emulate), but I can fix this there.
-> 
+>
+> CC: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+> ---
+>  arch/arm/boot/dts/exynos5420-peach-pit.dts         |  8 ++++----
+>  arch/arm/boot/dts/exynos5420.dtsi                  | 20 ++++++++++++--------
+>  arch/arm/boot/dts/exynos5422-odroid-core.dtsi      |  8 ++++----
+>  arch/arm/boot/dts/exynos5422-odroidhc1.dts         |  8 ++++----
+>  arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi |  8 ++++----
+>  arch/arm/boot/dts/exynos5800-peach-pi.dts          |  8 ++++----
+>  6 files changed, 32 insertions(+), 28 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+> index 57c2332..ff79f0b 100644
+> --- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
+> +++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+> @@ -1061,19 +1061,19 @@
+>         status = "okay";
+>  };
+>
+> -&tmu_cpu0 {
+> +&tmu_cpu_0 {
 
-That's a resonable argument for having it embedded in a single function.
+This looks irrelevant to the topic of adding aliases.
 
-I'll send another version of my patches then.
-
-Thanks,
--Christoffer
+Best regards,
+Krzysztof
