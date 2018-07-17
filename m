@@ -1,40 +1,45 @@
-From: ludovic.Barre@st.com (Ludovic Barre)
-Date: Tue, 17 Jul 2018 11:56:26 +0200
-Subject: [PATCH 1/2] dt-bindings: pinctrl: add syscfg mask parameter
-In-Reply-To: <1531821387-29845-1-git-send-email-ludovic.Barre@st.com>
-References: <1531821387-29845-1-git-send-email-ludovic.Barre@st.com>
-Message-ID: <1531821387-29845-2-git-send-email-ludovic.Barre@st.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 17 Jul 2018 11:59:05 +0200
+Subject: [PATCH/RFC] ARM: shmobile: Always enable ARCH_TIMER on SoCs with
+ A7 and/or A15
+In-Reply-To: <CAMuHMdUsHHDo_2unzUZN9W0kY2p5YW+yGkfsdXE-8ZHuBAuxnA@mail.gmail.com>
+References: <20180712160857.31471-1-geert+renesas@glider.be>
+ <20180713080823.l4tng6oclhr6nxrh@verge.net.au>
+ <CAMuHMdUrgP=YOrgeEnpQ0XVOoC_8Dz9Lt2FJ4P5GKb53KRNpNw@mail.gmail.com>
+ <CAMuHMdUsHHDo_2unzUZN9W0kY2p5YW+yGkfsdXE-8ZHuBAuxnA@mail.gmail.com>
+Message-ID: <20180717095904.eik3sko64zqymzts@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ludovic Barre <ludovic.barre@st.com>
+On Fri, Jul 13, 2018 at 10:33:17AM +0200, Geert Uytterhoeven wrote:
+> Hi Simon,
+> 
+> On Fri, Jul 13, 2018 at 10:19 AM Geert Uytterhoeven
+> <geert@linux-m68k.org> wrote:
+> > On Fri, Jul 13, 2018 at 10:08 AM Simon Horman <horms@verge.net.au> wrote:
+> > > On Thu, Jul 12, 2018 at 06:08:57PM +0200, Geert Uytterhoeven wrote:
+> > > > R-Mobile APE6, R-Car Gen2, and RZ/G1 SoCs have Cortex-A7 and/or
+> > > > Cortex-A15 CPU cores, all of which have ARM architectured timers.
+> > > >
+> > > > Force use of the ARM architectured timer on these SoCs.
+> > > > This allows to:
+> > > >   - Remove the calls to shmobile_init_delay() from the corresponding
+> > > >     machine vectors,
+> > > >   - Remove a check in timer setup specific to R-Car Gen2,
+> > > >   - Remove a check in shmobile_init_delay().
+> > > >
+> > > > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> > >
+> > > on which boards did you test this?
+> >
+> > On APE6EVM and Koelsch (R-Car M2-W).
+> > I can give it a spin on a few more remote R-Car Gen2 boards if you want.
+> 
+> I don't expect any issues, as shmobile_defconfig already enables
+> CONFIG_HAVE_ARM_ARCH_TIMER, and shmobile_init_delay() was already
+> a no-op in that case.
 
-This patch adds mask parameter to define IRQ mux field.
-This field could vary depend of IRQ mux selection register.
-This parameter is needed if the mask is different of 0xf.
+I am happy if you are happy.
+Shall I go ahead and apply this?
 
-Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
----
- Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
-index 9a06e1f..4d60119 100644
---- a/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
-@@ -39,9 +39,10 @@ Optional properties:
-  - reset:	  : Reference to the reset controller
-  - interrupt-parent: phandle of the interrupt parent to which the external
-    GPIO interrupts are forwarded to.
-- - st,syscfg: Should be phandle/offset pair. The phandle to the syscon node
--   which includes IRQ mux selection register, and the offset of the IRQ mux
--   selection register.
-+ - st,syscfg: Should be phandle/offset/mask.
-+	-The phandle to the syscon node which includes IRQ mux selection register.
-+	-The offset of the IRQ mux selection register
-+	-The field mask of IRQ mux, needed if different of 0xf.
-  - gpio-ranges: Define a dedicated mapping between a pin-controller and
-    a gpio controller. Format is <&phandle a b c> with:
- 	-(phandle): phandle of pin-controller.
--- 
-2.7.4
+Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
