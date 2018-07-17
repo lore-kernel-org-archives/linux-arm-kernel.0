@@ -1,93 +1,59 @@
-From: jmkrzyszt@gmail.com (Janusz Krzysztofik)
-Date: Wed, 18 Jul 2018 01:14:48 +0200
-Subject: [PATCH v2 3/3] ARM: OMAP1: ams-delta: make board header file local to
- mach-omap1
-In-Reply-To: <20180717231448.14958-1-jmkrzyszt@gmail.com>
-References: <20180518210954.29044-1-jmkrzyszt@gmail.com>
- <20180717231448.14958-1-jmkrzyszt@gmail.com>
-Message-ID: <20180717231448.14958-4-jmkrzyszt@gmail.com>
+From: andrew@aj.id.au (Andrew Jeffery)
+Date: Wed, 18 Jul 2018 08:58:18 +0930
+Subject: [RFC PATCH v2 1/4] dt-bindings: misc: Add bindings for misc. BMC
+ control fields
+In-Reply-To: <ece91112ecfdc7218184c4c4519e455cf9397e11.camel@kernel.crashing.org>
+References: <20180711053122.30773-1-andrew@aj.id.au>
+ <20180711053122.30773-2-andrew@aj.id.au>
+ <20180711200450.GB17291@rob-hp-laptop>
+ <1531356830.3551458.1437853280.551CA8C5@webmail.messagingengine.com>
+ <CAL_JsqKpXxR4t_-3BOy-0mFePXkaSck_4PfHRD=OZQ-_-T5P=w@mail.gmail.com>
+ <b6ced4cad4d7ff78330181b2c893855c23103953.camel@kernel.crashing.org>
+ <1531463489.747186.1439263128.075AECE1@webmail.messagingengine.com>
+ <CAL_JsqLZo-=7UkuvvUFYdCR4asBBiWyC=Q1ryH=-HLU6vzf9tA@mail.gmail.com>
+ <ece91112ecfdc7218184c4c4519e455cf9397e11.camel@kernel.crashing.org>
+Message-ID: <1531870098.3337969.1444201888.2476205D@webmail.messagingengine.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now as board header file is no longer included by drivers, move it to
-the root directory of mach-omap1.
+On Tue, 17 Jul 2018, at 14:26, Benjamin Herrenschmidt wrote:
+> On Mon, 2018-07-16 at 07:55 -0600, Rob Herring wrote:
+> > If that data is one set per SoC, then i'm not that concerned having
+> > platform-specific data in the driver. That doesn't mean the driver is
+> > not "generic". It's still not clear to me in this thread, how much of
+> > this is board specific, but given that you've placed all the data in
+> > an SoC dtsi file it seems to be all per SoC.
+> 
+> So Rob, I think that's precisely where the disconnect is.
+> 
+> I think we all (well hopefully) agree that those few tunables don't fit
+> in any existing subystem and aren't likely to ever do (famous last
+> words...).
+> 
+> Where we disagree is we want to make this parametrized via the DT, and
+> you want us to hard wire the list in some kind of SoC driver for a
+> given SoC family/version.
+> 
+> The reason I think hard wiring the list in the driver is not a great
+> solution is that that list in itself is prone to variations, possibly
+> fairly often, between boards, vendors, versions of boards, etc...
+> 
+> We can't know for sure every SoC tunable (out of the gazillions in
+> those chips) are going to be needed for a given system. We know which
+> ones we do use for ours, and that's a couple of handfuls, but it could
+> be that Dell need a slightly different set, and so might Yadro, or so
+> might our next board revision for that matter.
+> 
+> Now, updating the device-tree in the board flash with whatever vendor
+> specific information is needed is a LOT easier than getting the kernel
+> driver constantly updated. The device-tree after all is there to
+> reflect among other things system specific ways in which the SoC is
+> wired and configured. This is rather close...
 
-Signed-off-by: Janusz Krzysztofik <jmkrzyszt@gmail.com>
----
-Depends on patches 1/3 and 2/3 of the series.
+Not sure this helps, but I feel that the proposal pretty closely matches what's described in Documentation/devicetree/bindings/mfd/mfd.txt. It's intended that nodes using the bindings I'm proposing are children of a 'compatible = "syscon", "simple-mfd"' node (this is the case with the features we're hoping to describe for our SoC). I should explicitly call that out.
 
- arch/arm/mach-omap1/ams-delta-fiq-handler.S              | 2 +-
- arch/arm/mach-omap1/ams-delta-fiq.c                      | 3 +--
- arch/arm/mach-omap1/board-ams-delta.c                    | 2 +-
- arch/arm/mach-omap1/{include/mach => }/board-ams-delta.h | 2 +-
- 4 files changed, 4 insertions(+), 5 deletions(-)
- rename arch/arm/mach-omap1/{include/mach => }/board-ams-delta.h (98%)
+But to go on, "simple-mfd" is effectively an alias of "simple-bus", which means its intended to match child node compatibles to drivers provided by the kernel. If we shouldn't be describing minor features of a SoC in the devicetree, doesn't this invalidate the case for simple-mfd? What is the *correct* use of simple-mfd? When is it not used to expose minor features in set of "miscellaneous system registers"? Why doesn't this proposed case fit?
 
-diff --git a/arch/arm/mach-omap1/ams-delta-fiq-handler.S b/arch/arm/mach-omap1/ams-delta-fiq-handler.S
-index ddc27638ba2a..2e2a17364dc9 100644
---- a/arch/arm/mach-omap1/ams-delta-fiq-handler.S
-+++ b/arch/arm/mach-omap1/ams-delta-fiq-handler.S
-@@ -17,9 +17,9 @@
- #include <linux/platform_data/ams-delta-fiq.h>
- 
- #include <asm/assembler.h>
--#include <mach/board-ams-delta.h>
- 
- #include "ams-delta-fiq.h"
-+#include "board-ams-delta.h"
- #include "iomap.h"
- #include "soc.h"
- 
-diff --git a/arch/arm/mach-omap1/ams-delta-fiq.c b/arch/arm/mach-omap1/ams-delta-fiq.c
-index b0dc7ddf5877..14c3d3f5255e 100644
---- a/arch/arm/mach-omap1/ams-delta-fiq.c
-+++ b/arch/arm/mach-omap1/ams-delta-fiq.c
-@@ -22,11 +22,10 @@
- #include <linux/platform_data/ams-delta-fiq.h>
- #include <linux/platform_device.h>
- 
--#include <mach/board-ams-delta.h>
--
- #include <asm/fiq.h>
- 
- #include "ams-delta-fiq.h"
-+#include "board-ams-delta.h"
- 
- static struct fiq_handler fh = {
- 	.name	= "ams-delta-fiq"
-diff --git a/arch/arm/mach-omap1/board-ams-delta.c b/arch/arm/mach-omap1/board-ams-delta.c
-index dd28d2614d7f..34cb63ff45b3 100644
---- a/arch/arm/mach-omap1/board-ams-delta.c
-+++ b/arch/arm/mach-omap1/board-ams-delta.c
-@@ -36,7 +36,6 @@
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
- 
--#include <mach/board-ams-delta.h>
- #include <linux/platform_data/keypad-omap.h>
- #include <mach/mux.h>
- 
-@@ -45,6 +44,7 @@
- #include <mach/usb.h>
- 
- #include "ams-delta-fiq.h"
-+#include "board-ams-delta.h"
- #include "iomap.h"
- #include "common.h"
- 
-diff --git a/arch/arm/mach-omap1/include/mach/board-ams-delta.h b/arch/arm/mach-omap1/board-ams-delta.h
-similarity index 98%
-rename from arch/arm/mach-omap1/include/mach/board-ams-delta.h
-rename to arch/arm/mach-omap1/board-ams-delta.h
-index ad6f865d1f16..1fbada29431a 100644
---- a/arch/arm/mach-omap1/include/mach/board-ams-delta.h
-+++ b/arch/arm/mach-omap1/board-ams-delta.h
-@@ -1,5 +1,5 @@
- /*
-- * arch/arm/plat-omap/include/mach/board-ams-delta.h
-+ * arch/arm/mach-omap1/board-ams-delta.h
-  *
-  * Copyright (C) 2006 Jonathan McDowell <noodles@earth.li>
-  *
--- 
-2.16.4
+Cheers,
+
+Andrew
