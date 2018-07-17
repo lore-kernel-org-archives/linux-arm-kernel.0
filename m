@@ -1,47 +1,35 @@
 From: michal.simek@xilinx.com (Michal Simek)
-Date: Tue, 17 Jul 2018 16:57:23 +0200
-Subject: [PATCH] arm: zynq: Remove #address/#size-cells from gpio-keys
-Message-ID: <af809c1d98451a14b981f8d2cc123b2e1016021c.1531839440.git.michal.simek@xilinx.com>
+Date: Tue, 17 Jul 2018 16:59:53 +0200
+Subject: [PATCH 0/3] arm: dts: zynq: Improvements to Zybo z7 board
+In-Reply-To: <20180712055049.5098-1-luaraneda@gmail.com>
+References: <20180712055049.5098-1-luaraneda@gmail.com>
+Message-ID: <6586da49-6171-b8b0-b6d7-0290b5470930@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-dts reports incorrect usage of these properties in gpio-keys node.
-Warning (avoid_unnecessary_addr_size): /gpio-keys: unnecessary
+On 12.7.2018 07:50, Luis Araneda wrote:
+> This patchset corrects and improves the device-tree
+> of the Zybo Z7 board
+> 
+> The first patch correct the RAM size
+> ( supersedes https://lkml.org/lkml/2018/6/26/965 )
+> 
+> The second patch introduce the use of GPIO constants
+> to replace a literal
+> 
+> Finally, the third patch adds a gpio-leds node with
+> one LED
+> 
+> Luis Araneda (3):
+>   arm: dts: zynq: Fix memory size on the Zybo Z7 board
+>   arm: dts: zynq: Use gpio constants for the Zybo Z7 board
+>   arm: dts: zynq: Add LEDs to the Zybo Z7 board
+> 
+>  arch/arm/boot/dts/zynq-zybo-z7.dts | 14 ++++++++++++--
+>  1 file changed, 12 insertions(+), 2 deletions(-)
+> 
 
-The patch is removing these useless properties.
+Applied all.
 
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
----
-
- arch/arm/boot/dts/zynq-zc702.dts | 2 --
- arch/arm/boot/dts/zynq-zturn.dts | 2 --
- 2 files changed, 4 deletions(-)
-
-diff --git a/arch/arm/boot/dts/zynq-zc702.dts b/arch/arm/boot/dts/zynq-zc702.dts
-index 6653e34409cd..cc5a3dc2b4a0 100644
---- a/arch/arm/boot/dts/zynq-zc702.dts
-+++ b/arch/arm/boot/dts/zynq-zc702.dts
-@@ -29,8 +29,6 @@
- 
- 	gpio-keys {
- 		compatible = "gpio-keys";
--		#address-cells = <1>;
--		#size-cells = <0>;
- 		autorepeat;
- 		sw14 {
- 			label = "sw14";
-diff --git a/arch/arm/boot/dts/zynq-zturn.dts b/arch/arm/boot/dts/zynq-zturn.dts
-index b25beaed874d..b38704657960 100644
---- a/arch/arm/boot/dts/zynq-zturn.dts
-+++ b/arch/arm/boot/dts/zynq-zturn.dts
-@@ -49,8 +49,6 @@
- 
- 	gpio-keys {
- 		compatible = "gpio-keys";
--		#address-cells = <1>;
--		#size-cells = <0>;
- 		autorepeat;
- 		K1 {
- 			label = "K1";
--- 
-1.9.1
+Thanks,
+Michal
