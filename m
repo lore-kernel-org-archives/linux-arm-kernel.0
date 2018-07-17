@@ -1,46 +1,56 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 17 Jul 2018 09:28:31 -0300
-Subject: [PATCH 1/2] drm/panel: Add support for Armadeus ST0700 Adapt
-In-Reply-To: <20180717072318.18730-1-sebastien.szymanski@armadeus.com>
-References: <20180717072318.18730-1-sebastien.szymanski@armadeus.com>
-Message-ID: <CAOMZO5Dr0zqy4Sf3s=L4qoqePRhZAXWpDk1oTOUidy4_TUQ=QA@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 17 Jul 2018 13:27:51 +0100
+Subject: [PATCH] arm64: cpuinfo: Include cleartext implementer and part
+ strings
+In-Reply-To: <CAOesGMjq=d3ZPLTq5qudx+EE+XC2-zSsA1ViheTwM7fnTtJh2Q@mail.gmail.com>
+References: <20180715035342.11371-1-olof@lixom.net>
+ <f619f0e9-b8b4-29fb-5ad6-7f5ebc3a4da8@arm.com>
+ <CAOesGMjq=d3ZPLTq5qudx+EE+XC2-zSsA1ViheTwM7fnTtJh2Q@mail.gmail.com>
+Message-ID: <e7e272e0-a7ad-1a97-a081-acf3bfa42b6f@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi S?bastien,
+On 16/07/18 15:34, Olof Johansson wrote:
+[...]
+> There's also a growing expectation of the system to behave more like
+> x86, especially when it comes to trivial ways of detecting what kind
+> of machine you are running on. On x86 it's been trivial to look at
+> /proc/cpuinfo since it is provided by the platform there. Nobody wants
+> to change their implementation from having to read a file to exec a
+> program, dealing with errors, and parsing its output (sure, easier
+> from scripts, but more awkward from real source).
 
-On Tue, Jul 17, 2018 at 4:23 AM, S?bastien Szymanski
-<sebastien.szymanski@armadeus.com> wrote:
-> This patch adds support for the Armadeus ST0700 Adapt. It comes with a
-> Santek ST0700I5Y-RBSLW 7.0" WVGA (800x480) TFT and an adapter board so
-> that it can be connected on the TFT header of Armadeus Dev boards.
->
-> Signed-off-by: S?bastien Szymanski <sebastien.szymanski@armadeus.com>
-> ---
->  .../display/panel/armadeus,st0700-adapt.txt        |  9 +++++++
->  drivers/gpu/drm/panel/panel-simple.c               | 29 ++++++++++++++++++++++
->  2 files changed, 38 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/display/panel/armadeus,st0700-adapt.txt
->
-> diff --git a/Documentation/devicetree/bindings/display/panel/armadeus,st0700-adapt.txt b/Documentation/devicetree/bindings/display/panel/armadeus,st0700-adapt.txt
-> new file mode 100644
-> index 000000000000..a30d63db3c8f
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/display/panel/armadeus,st0700-adapt.txt
-> @@ -0,0 +1,9 @@
-> +Armadeus ST0700 Adapt. A Santek ST0700I5Y-RBSLW 7.0" WVGA (800x480) TFT with
-> +an adapter board.
-> +
-> +Required properties:
-> +- compatible: "armadeus,st0700-adapt"
+The thing with the "be more like x86" argument is that it never actually 
+stands up to scrutiny. What is proposed here (again) is for the kernel 
+to decode the raw MIDR description of the *CPU core microarchitecture* 
+to a human-readable string. What does the nearest Intel box say about 
+its microarchitecture name?
 
-Shouldn't this be named "santek,st0700i5y" instead?
+cpu family	: 6
+model		: 79
 
-Santek is the vendor of the panel and st0700i5y is the model.
+OK, I had to go and look up that that apparently implies "Broadwell", so 
+the x86 kernel is in fact no more helpful in that regard than arm64.
 
-Then you could add a "santek" entry in
-Documentation/devicetree/bindings/vendor-prefixes.txt.
+Furthermore, telling the user that they have have 4 "Cortex-A53" cores 
+vs. 4 "part: 0xd03" cores doesn't actually give them any more meaningful 
+information about their *system*, because that example reflects about 
+half the low-to-mid-range SoCs on the market today. What the "model 
+name" on x86 describes is a specific processor SKU, of which Arm has no 
+*architectural* equivalent, for reasons which should hopefully be 
+obvious from the fundamental differences in the business models driving 
+the respective architectures.
 
-Regards,
+And yet whenever /proc/cpuinfo/ comes up, nobody ever seems to ask for 
+some kind of SoC identifier in there; it's always just decoding MIDR 
+into a microarchitecture name, which implies that all these people want 
+is to see a string for the sake of seeing a string, regardless of how 
+meaningful it actually might be (and yes, I do realise that in *some* 
+cases a CPU core is essentially unique to a particular SoC, but we have 
+to look at the big picture here).
 
-Fabio Estevam
+In summary; when a small minority of users are complaining that oranges 
+aren't apples, the sensible response is not to start debating whether to 
+paint the oranges green or red.
+
+Robin.
