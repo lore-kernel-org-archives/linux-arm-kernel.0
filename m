@@ -1,178 +1,207 @@
 From: mars.cheng@mediatek.com (Mars Cheng)
-Date: Tue, 17 Jul 2018 16:52:28 +0800
-Subject: [PATCH v5 07/11] soc: mediatek: add MT6765 subdomain support
+Date: Tue, 17 Jul 2018 16:52:22 +0800
+Subject: [PATCH v5 01/11] dt-bindings: clock: mediatek: document clk bindings
+ for Mediatek MT6765 SoC
 In-Reply-To: <1531817552-17221-1-git-send-email-mars.cheng@mediatek.com>
 References: <1531817552-17221-1-git-send-email-mars.cheng@mediatek.com>
-Message-ID: <1531817552-17221-8-git-send-email-mars.cheng@mediatek.com>
+Message-ID: <1531817552-17221-2-git-send-email-mars.cheng@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add extend data, parent_n for domain-subdomain corresponse.
+This patch adds the binding documentation for apmixedsys, audsys, camsys,
+imgsys, infracfg, mipi0a, topckgen, vcodecsys
 
 Signed-off-by: Mars Cheng <mars.cheng@mediatek.com>
 Signed-off-by: Owen Chen <owen.chen@mediatek.com>
 ---
- drivers/soc/mediatek/mtk-scpsys-ext.c |  132 ++++++++++++++++++++++++++++++++-
- 1 file changed, 131 insertions(+), 1 deletion(-)
+ .../bindings/arm/mediatek/mediatek,apmixedsys.txt  |    1 +
+ .../bindings/arm/mediatek/mediatek,audsys.txt      |    1 +
+ .../bindings/arm/mediatek/mediatek,camsys.txt      |   27 ++++++++++++++++++++
+ .../bindings/arm/mediatek/mediatek,imgsys.txt      |    1 +
+ .../bindings/arm/mediatek/mediatek,infracfg.txt    |    1 +
+ .../bindings/arm/mediatek/mediatek,mipi0a.txt      |   23 +++++++++++++++++
+ .../bindings/arm/mediatek/mediatek,mmsys.txt       |    1 +
+ .../bindings/arm/mediatek/mediatek,pericfg.txt     |    1 +
+ .../bindings/arm/mediatek/mediatek,topckgen.txt    |    1 +
+ .../bindings/arm/mediatek/mediatek,vcodecsys.txt   |   22 ++++++++++++++++
+ 10 files changed, 79 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,camsys.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,mipi0a.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,vcodecsys.txt
 
-diff --git a/drivers/soc/mediatek/mtk-scpsys-ext.c b/drivers/soc/mediatek/mtk-scpsys-ext.c
-index 965e64d..e649a06 100644
---- a/drivers/soc/mediatek/mtk-scpsys-ext.c
-+++ b/drivers/soc/mediatek/mtk-scpsys-ext.c
-@@ -13,7 +13,7 @@
- #include <linux/regmap.h>
- #include <linux/soc/mediatek/infracfg.h>
- #include <linux/soc/mediatek/scpsys-ext.h>
--
-+#include <dt-bindings/power/mt6765-power.h>
+diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,apmixedsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,apmixedsys.txt
+index b404d59..44eaeac 100644
+--- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,apmixedsys.txt
++++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,apmixedsys.txt
+@@ -8,6 +8,7 @@ Required Properties:
+ - compatible: Should be one of:
+ 	- "mediatek,mt2701-apmixedsys"
+ 	- "mediatek,mt2712-apmixedsys", "syscon"
++	- "mediatek,mt6765-apmixedsys", "syscon"
+ 	- "mediatek,mt6797-apmixedsys"
+ 	- "mediatek,mt7622-apmixedsys"
+ 	- "mediatek,mt8135-apmixedsys"
+diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,audsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,audsys.txt
+index 34a69ba..9a8672a 100644
+--- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,audsys.txt
++++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,audsys.txt
+@@ -7,6 +7,7 @@ Required Properties:
  
- #define MAX_CLKS		10
- #define INFRA			"infracfg"
-@@ -65,6 +65,21 @@ struct bus_mask_ops {
- 			   u32 sta_ofs, u32 mask);
- };
+ - compatible: Should be one of:
+ 	- "mediatek,mt2701-audsys", "syscon"
++	- "mediatek,mt6765-audsys", "syscon"
+ 	- "mediatek,mt7622-audsys", "syscon"
+ - #clock-cells: Must be 1
  
-+static struct scpsys_ext_attr *__get_attr_node(const char *scpd_n)
-+{
-+	struct scpsys_ext_attr *attr;
+diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,camsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,camsys.txt
+new file mode 100644
+index 0000000..dc75783
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,camsys.txt
+@@ -0,0 +1,27 @@
++MediaTek CAMSYS controller
++============================
 +
-+	if (!scpd_n)
-+		return ERR_PTR(-EINVAL);
++The MediaTek CAMSYS controller provides various clocks to the system.
 +
-+	list_for_each_entry(attr, &ext_attr_map_list, attr_list) {
-+		if (attr->scpd_n && !strcmp(scpd_n, attr->scpd_n))
-+			return attr;
-+	}
++Required Properties:
 +
-+	return ERR_PTR(-EINVAL);
-+}
++- compatible: Should be one of:
++	- "mediatek,mt6765-camsys", "syscon"
++- #clock-cells: Must be 1
 +
- static struct scpsys_ext_attr *__get_attr_parent(const char *parent_n)
- {
- 	struct scpsys_ext_attr *attr;
-@@ -353,8 +368,123 @@ int scpsys_ext_attr_init(const struct scpsys_ext_data *data)
- 	return 0;
- }
- 
-+/*
-+ * MT6765 extend power domain support
-+ */
++The AUDSYS controller uses the common clk binding from
++Documentation/devicetree/bindings/clock/clock-bindings.txt
++The available clocks are defined in dt-bindings/clock/mt*-clk.h.
 +
-+#define INFRA_TOPAXI_PROTECTEN_SET_MT6765	0x02A0
-+#define INFRA_TOPAXI_PROTECTEN_STA1_MT6765	0x0228
-+#define INFRA_TOPAXI_PROTECTEN_CLR_MT6765	0x02A4
++Required sub-nodes:
++-------
++For common binding part and usage, refer to
++../sonud/mt2701-afe-pcm.txt.
 +
-+#define INFRA_TOPAXI_PROTECTEN_1_SET_MT6765	0x02A8
-+#define INFRA_TOPAXI_PROTECTEN_STA1_1_MT6765	0x0258
-+#define INFRA_TOPAXI_PROTECTEN_1_CLR_MT6765	0x02AC
++Example:
 +
-+#define SMI_COMMON_SMI_CLAMP_MT6765		0x03C0
-+#define SMI_COMMON_SMI_CLAMP_SET_MT6765	0x03C4
-+#define SMI_COMMON_SMI_CLAMP_CLR_MT6765	0x03C8
-+
-+static struct ext_reg_ctrl infra_bus_regs_0_mt6765 = {
-+	.type = IFR_TYPE,
-+	.set_ofs = INFRA_TOPAXI_PROTECTEN_SET_MT6765,
-+	.clr_ofs = INFRA_TOPAXI_PROTECTEN_CLR_MT6765,
-+	.sta_ofs = INFRA_TOPAXI_PROTECTEN_STA1_MT6765,
++camsys: camsys at 1a000000  {
++	compatible = "mediatek,mt6765-camsys", "syscon";
++	reg = <0 0x1a000000  0 0x1000>;
++	#clock-cells = <1>;
 +};
+diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,imgsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,imgsys.txt
+index 868bd51..c7057d0 100644
+--- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,imgsys.txt
++++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,imgsys.txt
+@@ -8,6 +8,7 @@ Required Properties:
+ - compatible: Should be one of:
+ 	- "mediatek,mt2701-imgsys", "syscon"
+ 	- "mediatek,mt2712-imgsys", "syscon"
++	- "mediatek,mt6765-imgsys", "syscon"
+ 	- "mediatek,mt6797-imgsys", "syscon"
+ 	- "mediatek,mt8173-imgsys", "syscon"
+ - #clock-cells: Must be 1
+diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,infracfg.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,infracfg.txt
+index 566f153..ac6aae5 100644
+--- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,infracfg.txt
++++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,infracfg.txt
+@@ -9,6 +9,7 @@ Required Properties:
+ - compatible: Should be one of:
+ 	- "mediatek,mt2701-infracfg", "syscon"
+ 	- "mediatek,mt2712-infracfg", "syscon"
++	- "mediatek,mt6765-infracfg", "syscon"
+ 	- "mediatek,mt6797-infracfg", "syscon"
+ 	- "mediatek,mt7622-infracfg", "syscon"
+ 	- "mediatek,mt8135-infracfg", "syscon"
+diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,mipi0a.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,mipi0a.txt
+new file mode 100644
+index 0000000..ba5ee7a
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,mipi0a.txt
+@@ -0,0 +1,23 @@
++Mediatek mipi_rx_ana_csi0a controller
++============================
 +
-+#define BUS_IFR0_MT6765(_mask) {				\
-+		.regs = &infra_bus_regs_0_mt6765,		\
-+		.mask = _mask,				\
-+		.ops = &bus_mask_set_clr_ctrl,		\
-+	}
++The Mediatek mipi_rx_ana_csi0a controller provides various clocks
++to the system.
 +
-+static struct ext_reg_ctrl infra_bus_regs_1_mt6765 = {
-+	.type = IFR_TYPE,
-+	.set_ofs = INFRA_TOPAXI_PROTECTEN_1_SET_MT6765,
-+	.clr_ofs = INFRA_TOPAXI_PROTECTEN_1_CLR_MT6765,
-+	.sta_ofs = INFRA_TOPAXI_PROTECTEN_STA1_1_MT6765,
++Required Properties:
++
++- compatible: Should be one of:
++	- "mediatek,mt6765-mipi_rx_ana_csi0a", "syscon"
++- #clock-cells: Must be 1
++
++The vencsys controller uses the common clk binding from
++Documentation/devicetree/bindings/clock/clock-bindings.txt
++The available clocks are defined in dt-bindings/clock/mt*-clk.h.
++
++Example:
++
++mipi_rx_ana_csi0a: mipi_rx_ana_csi0a at 11c10000 {
++	compatible = "mediatek,mt6765-mipi_rx_ana_csi0a", "syscon";
++	reg = <0 0x11c10000 0 0x1000>;
++	#clock-cells = <1>;
 +};
+diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt
+index 4eb8bbe..184f159 100644
+--- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt
++++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt
+@@ -8,6 +8,7 @@ Required Properties:
+ - compatible: Should be one of:
+ 	- "mediatek,mt2701-mmsys", "syscon"
+ 	- "mediatek,mt2712-mmsys", "syscon"
++	- "mediatek,mt6765-mmsys", "syscon"
+ 	- "mediatek,mt6797-mmsys", "syscon"
+ 	- "mediatek,mt8173-mmsys", "syscon"
+ - #clock-cells: Must be 1
+diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,pericfg.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,pericfg.txt
+index fb58ca8..8eeb84b 100644
+--- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,pericfg.txt
++++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,pericfg.txt
+@@ -9,6 +9,7 @@ Required Properties:
+ - compatible: Should be one of:
+ 	- "mediatek,mt2701-pericfg", "syscon"
+ 	- "mediatek,mt2712-pericfg", "syscon"
++	- "mediatek,mt6765-pericfg", "syscon"
+ 	- "mediatek,mt7622-pericfg", "syscon"
+ 	- "mediatek,mt8135-pericfg", "syscon"
+ 	- "mediatek,mt8173-pericfg", "syscon"
+diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,topckgen.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,topckgen.txt
+index 24014a7..3a5cad6 100644
+--- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,topckgen.txt
++++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,topckgen.txt
+@@ -8,6 +8,7 @@ Required Properties:
+ - compatible: Should be one of:
+ 	- "mediatek,mt2701-topckgen"
+ 	- "mediatek,mt2712-topckgen", "syscon"
++	- "mediatek,mt6765-topckgen", "syscon"
+ 	- "mediatek,mt6797-topckgen"
+ 	- "mediatek,mt7622-topckgen"
+ 	- "mediatek,mt8135-topckgen"
+diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,vcodecsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,vcodecsys.txt
+new file mode 100644
+index 0000000..462889b
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,vcodecsys.txt
+@@ -0,0 +1,22 @@
++Mediatek vcodecsys controller
++============================
 +
-+#define BUS_IFR1_MT6765(_mask) {				\
-+		.regs = &infra_bus_regs_1_mt6765,		\
-+		.mask = _mask,				\
-+		.ops = &bus_mask_set_clr_ctrl,		\
-+	}
++The Mediatek vcodecsys controller provides various clocks to the system.
 +
-+static struct ext_reg_ctrl smi_bus_regs_0_mt6765 = {
-+	.type = SMI_TYPE,
-+	.set_ofs = SMI_COMMON_SMI_CLAMP_SET_MT6765,
-+	.clr_ofs = SMI_COMMON_SMI_CLAMP_CLR_MT6765,
-+	.sta_ofs = SMI_COMMON_SMI_CLAMP_MT6765,
++Required Properties:
++
++- compatible: Should be one of:
++	- "mediatek,mt6765-vcodecsys", "syscon"
++- #clock-cells: Must be 1
++
++The vencsys controller uses the common clk binding from
++Documentation/devicetree/bindings/clock/clock-bindings.txt
++The available clocks are defined in dt-bindings/clock/mt*-clk.h.
++
++Example:
++
++venc_gcon: venc_gcon at 17000000 {
++	compatible = "mediatek,mt6765-vcodecsys", "syscon";
++	reg = <0 0x17000000 0 0x10000>;
++	#clock-cells = <1>;
 +};
-+
-+#define BUS_SMI0_MT6765(_mask) {				\
-+		.regs = &smi_bus_regs_0_mt6765,		\
-+		.mask = _mask,				\
-+		.ops = &bus_mask_set_clr_ctrl,		\
-+	}
-+
-+static struct scpsys_ext_attr scp_ext_attr_mt6765[] = {
-+	[MT6765_POWER_DOMAIN_ISP] = {
-+		.scpd_n = "isp",
-+		.mask =  {
-+			BUS_IFR1_MT6765(BIT(20)),
-+			BUS_SMI0_MT6765(BIT(2)),
-+		},
-+		.parent_n = "mm",
-+		.bus_ops = &ext_bus_ctrl,
-+		.cg_ops = &ext_cg_ctrl,
-+	},
-+	[MT6765_POWER_DOMAIN_MM] = {
-+		.scpd_n = "mm",
-+		.mask = {
-+			BUS_IFR1_MT6765(BIT(16) | BIT(17)),
-+			BUS_IFR0_MT6765(BIT(10) | BIT(11)),
-+			BUS_IFR0_MT6765(BIT(1) | BIT(2)),
-+		},
-+		.bus_ops = &ext_bus_ctrl,
-+		.cg_ops = &ext_cg_ctrl,
-+	},
-+	[MT6765_POWER_DOMAIN_CONN] = {
-+		.scpd_n = "conn",
-+		.mask = {
-+			BUS_IFR0_MT6765(BIT(13)),
-+			BUS_IFR1_MT6765(BIT(18)),
-+			BUS_IFR0_MT6765(BIT(14) | BIT(16)),
-+		},
-+		.bus_ops = &ext_bus_ctrl,
-+	},
-+	[MT6765_POWER_DOMAIN_MFG] = {
-+		.scpd_n = "mfg",
-+		.mask = {
-+			BUS_IFR0_MT6765(BIT(25)),
-+			BUS_IFR0_MT6765(BIT(21) | BIT(22)),
-+		},
-+		.bus_ops = &ext_bus_ctrl,
-+	},
-+	[MT6765_POWER_DOMAIN_CAM] = {
-+		.scpd_n = "cam",
-+		.mask = {
-+			BUS_IFR1_MT6765(BIT(19) | BIT(21)),
-+			BUS_IFR0_MT6765(BIT(20)),
-+			BUS_SMI0_MT6765(BIT(3)),
-+		},
-+		.parent_n = "mm",
-+		.bus_ops = &ext_bus_ctrl,
-+		.cg_ops = &ext_cg_ctrl,
-+	},
-+};
-+
-+static const struct scpsys_ext_data scp_ext_data_mt6765 = {
-+	.attr = scp_ext_attr_mt6765,
-+	.num_attr = ARRAY_SIZE(scp_ext_attr_mt6765),
-+	.get_attr = __get_attr_node,
-+};
-+
- static const struct of_device_id of_scpsys_ext_match_tbl[] = {
- 	{
-+		.compatible = "mediatek,mt6765-scpsys",
-+		.data = &scp_ext_data_mt6765,
-+	}, {
- 		/* sentinel */
- 	}
- };
 -- 
 1.7.9.5
