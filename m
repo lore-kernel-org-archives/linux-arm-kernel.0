@@ -1,26 +1,44 @@
 From: pawel.mikolaj.chmiel@gmail.com (=?UTF-8?q?Pawe=C5=82=20Chmiel?=)
-Date: Tue, 17 Jul 2018 20:16:24 +0200
-Subject: [PATCH v2 0/2] Input: atmel_mxt_ts: Add support for optional
+Date: Tue, 17 Jul 2018 20:16:26 +0200
+Subject: [PATCH v2 2/2] Input: atmel_mxt_ts: Document optional voltage
  regulators
-Message-ID: <1531851386-17840-1-git-send-email-pawel.mikolaj.chmiel@gmail.com>
+In-Reply-To: <1531851386-17840-1-git-send-email-pawel.mikolaj.chmiel@gmail.com>
+References: <1531851386-17840-1-git-send-email-pawel.mikolaj.chmiel@gmail.com>
+Message-ID: <1531851386-17840-3-git-send-email-pawel.mikolaj.chmiel@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This two patches add optional regulator support to atmel_mxt_ts.
-First patch adds regulators to driver.
-Second patch updates documentation.
+Document new optional voltage regulators, which can be used
+to power down/up touchscreen.
 
-Changes from v1:
-  - Enable regulators only if reset_gpio is present.
-  - Switch from devm_regulator_get_optional to devm_regulator_get.
+Signed-off-by: Pawe? Chmiel <pawel.mikolaj.chmiel@gmail.com>
+---
+ Documentation/devicetree/bindings/input/atmel,maxtouch.txt | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-Pawe? Chmiel (2):
-  Input: atmel_mxt_ts: Add support for  optional regulators.
-  Input: atmel_mxt_ts: Document optional voltage regulators
-
- .../devicetree/bindings/input/atmel,maxtouch.txt   |  8 ++++
- drivers/input/touchscreen/atmel_mxt_ts.c           | 46 +++++++++++++++++++++-
- 2 files changed, 52 insertions(+), 2 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/input/atmel,maxtouch.txt b/Documentation/devicetree/bindings/input/atmel,maxtouch.txt
+index c88919480d37..17930ecadad3 100644
+--- a/Documentation/devicetree/bindings/input/atmel,maxtouch.txt
++++ b/Documentation/devicetree/bindings/input/atmel,maxtouch.txt
+@@ -31,6 +31,12 @@ Optional properties for main touchpad device:
+ 
+ - reset-gpios: GPIO specifier for the touchscreen's reset pin (active low)
+ 
++- avdd-supply: Analog power supply. It powers up the analog channel block
++    of the controller to detect the touches.
++
++- vdd-supply: Digital power supply. It powers up the digital block
++    of the controller to enable i2c communication.
++
+ Example:
+ 
+ 	touch at 4b {
+@@ -38,4 +44,6 @@ Example:
+ 		reg = <0x4b>;
+ 		interrupt-parent = <&gpio>;
+ 		interrupts = <TEGRA_GPIO(W, 3) IRQ_TYPE_LEVEL_LOW>;
++		avdd-supply = <&atsp_reg>;
++		vdd-supply = <&tsp_reg>;
+ 	};
 -- 
 2.7.4
