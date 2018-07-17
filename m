@@ -1,572 +1,531 @@
 From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Wed, 18 Jul 2018 00:27:49 +0200
-Subject: [PATCH 08/16] dt-bindings: clk: at91: Document new PMC binding
+Date: Wed, 18 Jul 2018 00:27:47 +0200
+Subject: [PATCH 06/16] clk: at91: allow clock registration from C code
 In-Reply-To: <20180717222757.10253-1-alexandre.belloni@bootlin.com>
 References: <20180717222757.10253-1-alexandre.belloni@bootlin.com>
-Message-ID: <20180717222757.10253-9-alexandre.belloni@bootlin.com>
+Message-ID: <20180717222757.10253-7-alexandre.belloni@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document the new PMC binding with only one PMC node for all the PMC clocks
-instead of one node per clock as this proved to be problematic.
+Remove static keyword to allow functions to be used from other units. Also
+move some struct and function declarations to pmc.h
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
 ---
- .../devicetree/bindings/clock/at91-clock.txt  | 523 +-----------------
- 1 file changed, 21 insertions(+), 502 deletions(-)
+ drivers/clk/at91/clk-generated.c    |   2 +-
+ drivers/clk/at91/clk-i2s-mux.c      |   2 +-
+ drivers/clk/at91/clk-main.c         |   8 +-
+ drivers/clk/at91/clk-master.c       |  17 +---
+ drivers/clk/at91/clk-peripheral.c   |   4 +-
+ drivers/clk/at91/clk-pll.c          |  24 +----
+ drivers/clk/at91/clk-plldiv.c       |   2 +-
+ drivers/clk/at91/clk-programmable.c |  14 +--
+ drivers/clk/at91/clk-slow.c         |   2 +-
+ drivers/clk/at91/clk-smd.c          |   2 +-
+ drivers/clk/at91/clk-system.c       |   2 +-
+ drivers/clk/at91/clk-usb.c          |   6 +-
+ drivers/clk/at91/clk-utmi.c         |   2 +-
+ drivers/clk/at91/pmc.h              | 142 ++++++++++++++++++++++++++++
+ 14 files changed, 170 insertions(+), 59 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/clock/at91-clock.txt b/Documentation/devicetree/bindings/clock/at91-clock.txt
-index 64fcbea10e12..e9f70fcdfe80 100644
---- a/Documentation/devicetree/bindings/clock/at91-clock.txt
-+++ b/Documentation/devicetree/bindings/clock/at91-clock.txt
-@@ -4,6 +4,8 @@ This binding uses the common clock binding[1].
+diff --git a/drivers/clk/at91/clk-generated.c b/drivers/clk/at91/clk-generated.c
+index 6dfee6e588c4..0fe4d7f04225 100644
+--- a/drivers/clk/at91/clk-generated.c
++++ b/drivers/clk/at91/clk-generated.c
+@@ -277,7 +277,7 @@ static void clk_generated_startup(struct clk_generated *gck)
+ 					>> AT91_PMC_PCR_GCKDIV_OFFSET;
+ }
  
- [1] Documentation/devicetree/bindings/clock/clock-bindings.txt
+-static struct clk_hw * __init
++struct clk_hw * __init
+ at91_clk_register_generated(struct regmap *regmap, spinlock_t *lock,
+ 			    const char *name, const char **parent_names,
+ 			    u8 num_parents, u8 id, bool pll_audio,
+diff --git a/drivers/clk/at91/clk-i2s-mux.c b/drivers/clk/at91/clk-i2s-mux.c
+index f0c3c3079f04..ed9e96938589 100644
+--- a/drivers/clk/at91/clk-i2s-mux.c
++++ b/drivers/clk/at91/clk-i2s-mux.c
+@@ -48,7 +48,7 @@ static const struct clk_ops clk_i2s_mux_ops = {
+ 	.determine_rate = __clk_mux_determine_rate,
+ };
  
-+Slow Clock controller:
+-static struct clk_hw * __init
++struct clk_hw * __init
+ at91_clk_i2s_mux_register(struct regmap *regmap, const char *name,
+ 			  const char * const *parent_names,
+ 			  unsigned int num_parents, u8 bus_id)
+diff --git a/drivers/clk/at91/clk-main.c b/drivers/clk/at91/clk-main.c
+index c813c27f2e58..82184009137d 100644
+--- a/drivers/clk/at91/clk-main.c
++++ b/drivers/clk/at91/clk-main.c
+@@ -128,7 +128,7 @@ static const struct clk_ops main_osc_ops = {
+ 	.is_prepared = clk_main_osc_is_prepared,
+ };
+ 
+-static struct clk_hw * __init
++struct clk_hw * __init
+ at91_clk_register_main_osc(struct regmap *regmap,
+ 			   const char *name,
+ 			   const char *parent_name,
+@@ -275,7 +275,7 @@ static const struct clk_ops main_rc_osc_ops = {
+ 	.recalc_accuracy = clk_main_rc_osc_recalc_accuracy,
+ };
+ 
+-static struct clk_hw * __init
++struct clk_hw * __init
+ at91_clk_register_main_rc_osc(struct regmap *regmap,
+ 			      const char *name,
+ 			      u32 frequency, u32 accuracy)
+@@ -403,7 +403,7 @@ static const struct clk_ops rm9200_main_ops = {
+ 	.recalc_rate = clk_rm9200_main_recalc_rate,
+ };
+ 
+-static struct clk_hw * __init
++struct clk_hw * __init
+ at91_clk_register_rm9200_main(struct regmap *regmap,
+ 			      const char *name,
+ 			      const char *parent_name)
+@@ -541,7 +541,7 @@ static const struct clk_ops sam9x5_main_ops = {
+ 	.get_parent = clk_sam9x5_main_get_parent,
+ };
+ 
+-static struct clk_hw * __init
++struct clk_hw * __init
+ at91_clk_register_sam9x5_main(struct regmap *regmap,
+ 			      const char *name,
+ 			      const char **parent_names,
+diff --git a/drivers/clk/at91/clk-master.c b/drivers/clk/at91/clk-master.c
+index e9cba9fc26d7..088044bb6ea2 100644
+--- a/drivers/clk/at91/clk-master.c
++++ b/drivers/clk/at91/clk-master.c
+@@ -24,17 +24,6 @@
+ #define MASTER_DIV_SHIFT	8
+ #define MASTER_DIV_MASK		0x3
+ 
+-struct clk_master_characteristics {
+-	struct clk_range output;
+-	u32 divisors[4];
+-	u8 have_div3_pres;
+-};
+-
+-struct clk_master_layout {
+-	u32 mask;
+-	u8 pres_shift;
+-};
+-
+ #define to_clk_master(hw) container_of(hw, struct clk_master, hw)
+ 
+ struct clk_master {
+@@ -120,7 +109,7 @@ static const struct clk_ops master_ops = {
+ 	.get_parent = clk_master_get_parent,
+ };
+ 
+-static struct clk_hw * __init
++struct clk_hw * __init
+ at91_clk_register_master(struct regmap *regmap,
+ 		const char *name, int num_parents,
+ 		const char **parent_names,
+@@ -161,12 +150,12 @@ at91_clk_register_master(struct regmap *regmap,
+ }
+ 
+ 
+-static const struct clk_master_layout at91rm9200_master_layout = {
++const struct clk_master_layout at91rm9200_master_layout = {
+ 	.mask = 0x31F,
+ 	.pres_shift = 2,
+ };
+ 
+-static const struct clk_master_layout at91sam9x5_master_layout = {
++const struct clk_master_layout at91sam9x5_master_layout = {
+ 	.mask = 0x373,
+ 	.pres_shift = 4,
+ };
+diff --git a/drivers/clk/at91/clk-peripheral.c b/drivers/clk/at91/clk-peripheral.c
+index 770118369230..cb41d06a2481 100644
+--- a/drivers/clk/at91/clk-peripheral.c
++++ b/drivers/clk/at91/clk-peripheral.c
+@@ -104,7 +104,7 @@ static const struct clk_ops peripheral_ops = {
+ 	.is_enabled = clk_peripheral_is_enabled,
+ };
+ 
+-static struct clk_hw * __init
++struct clk_hw * __init
+ at91_clk_register_peripheral(struct regmap *regmap, const char *name,
+ 			     const char *parent_name, u32 id)
+ {
+@@ -331,7 +331,7 @@ static const struct clk_ops sam9x5_peripheral_ops = {
+ 	.set_rate = clk_sam9x5_peripheral_set_rate,
+ };
+ 
+-static struct clk_hw * __init
++struct clk_hw * __init
+ at91_clk_register_sam9x5_peripheral(struct regmap *regmap, spinlock_t *lock,
+ 				    const char *name, const char *parent_name,
+ 				    u32 id, const struct clk_range *range)
+diff --git a/drivers/clk/at91/clk-pll.c b/drivers/clk/at91/clk-pll.c
+index 72b6091eb7b9..31fff0b9d5c2 100644
+--- a/drivers/clk/at91/clk-pll.c
++++ b/drivers/clk/at91/clk-pll.c
+@@ -34,20 +34,6 @@
+ #define PLL_OUT_SHIFT		14
+ #define PLL_MAX_ID		1
+ 
+-struct clk_pll_characteristics {
+-	struct clk_range input;
+-	int num_output;
+-	struct clk_range *output;
+-	u16 *icpll;
+-	u8 *out;
+-};
+-
+-struct clk_pll_layout {
+-	u32 pllr_mask;
+-	u16 mul_mask;
+-	u8 mul_shift;
+-};
+-
+ #define to_clk_pll(hw) container_of(hw, struct clk_pll, hw)
+ 
+ struct clk_pll {
+@@ -285,7 +271,7 @@ static const struct clk_ops pll_ops = {
+ 	.set_rate = clk_pll_set_rate,
+ };
+ 
+-static struct clk_hw * __init
++struct clk_hw * __init
+ at91_clk_register_pll(struct regmap *regmap, const char *name,
+ 		      const char *parent_name, u8 id,
+ 		      const struct clk_pll_layout *layout,
+@@ -331,25 +317,25 @@ at91_clk_register_pll(struct regmap *regmap, const char *name,
+ }
+ 
+ 
+-static const struct clk_pll_layout at91rm9200_pll_layout = {
++const struct clk_pll_layout at91rm9200_pll_layout = {
+ 	.pllr_mask = 0x7FFFFFF,
+ 	.mul_shift = 16,
+ 	.mul_mask = 0x7FF,
+ };
+ 
+-static const struct clk_pll_layout at91sam9g45_pll_layout = {
++const struct clk_pll_layout at91sam9g45_pll_layout = {
+ 	.pllr_mask = 0xFFFFFF,
+ 	.mul_shift = 16,
+ 	.mul_mask = 0xFF,
+ };
+ 
+-static const struct clk_pll_layout at91sam9g20_pllb_layout = {
++const struct clk_pll_layout at91sam9g20_pllb_layout = {
+ 	.pllr_mask = 0x3FFFFF,
+ 	.mul_shift = 16,
+ 	.mul_mask = 0x3F,
+ };
+ 
+-static const struct clk_pll_layout sama5d3_pll_layout = {
++const struct clk_pll_layout sama5d3_pll_layout = {
+ 	.pllr_mask = 0x1FFFFFF,
+ 	.mul_shift = 18,
+ 	.mul_mask = 0x7F,
+diff --git a/drivers/clk/at91/clk-plldiv.c b/drivers/clk/at91/clk-plldiv.c
+index b4afaf22f3fd..de803a2b27d3 100644
+--- a/drivers/clk/at91/clk-plldiv.c
++++ b/drivers/clk/at91/clk-plldiv.c
+@@ -75,7 +75,7 @@ static const struct clk_ops plldiv_ops = {
+ 	.set_rate = clk_plldiv_set_rate,
+ };
+ 
+-static struct clk_hw * __init
++struct clk_hw * __init
+ at91_clk_register_plldiv(struct regmap *regmap, const char *name,
+ 			 const char *parent_name)
+ {
+diff --git a/drivers/clk/at91/clk-programmable.c b/drivers/clk/at91/clk-programmable.c
+index 0e6aab1252fc..df302bfa8259 100644
+--- a/drivers/clk/at91/clk-programmable.c
++++ b/drivers/clk/at91/clk-programmable.c
+@@ -25,12 +25,6 @@
+ #define PROG_PRES(layout, pckr)	((pckr >> layout->pres_shift) & PROG_PRES_MASK)
+ #define PROG_MAX_RM9200_CSS	3
+ 
+-struct clk_programmable_layout {
+-	u8 pres_shift;
+-	u8 css_mask;
+-	u8 have_slck_mck;
+-};
+-
+ struct clk_programmable {
+ 	struct clk_hw hw;
+ 	struct regmap *regmap;
+@@ -170,7 +164,7 @@ static const struct clk_ops programmable_ops = {
+ 	.set_rate = clk_programmable_set_rate,
+ };
+ 
+-static struct clk_hw * __init
++struct clk_hw * __init
+ at91_clk_register_programmable(struct regmap *regmap,
+ 			       const char *name, const char **parent_names,
+ 			       u8 num_parents, u8 id,
+@@ -211,19 +205,19 @@ at91_clk_register_programmable(struct regmap *regmap,
+ 	return hw;
+ }
+ 
+-static const struct clk_programmable_layout at91rm9200_programmable_layout = {
++const struct clk_programmable_layout at91rm9200_programmable_layout = {
+ 	.pres_shift = 2,
+ 	.css_mask = 0x3,
+ 	.have_slck_mck = 0,
+ };
+ 
+-static const struct clk_programmable_layout at91sam9g45_programmable_layout = {
++const struct clk_programmable_layout at91sam9g45_programmable_layout = {
+ 	.pres_shift = 2,
+ 	.css_mask = 0x3,
+ 	.have_slck_mck = 1,
+ };
+ 
+-static const struct clk_programmable_layout at91sam9x5_programmable_layout = {
++const struct clk_programmable_layout at91sam9x5_programmable_layout = {
+ 	.pres_shift = 4,
+ 	.css_mask = 0x7,
+ 	.have_slck_mck = 0,
+diff --git a/drivers/clk/at91/clk-slow.c b/drivers/clk/at91/clk-slow.c
+index 560a8b9abf93..a890132db68f 100644
+--- a/drivers/clk/at91/clk-slow.c
++++ b/drivers/clk/at91/clk-slow.c
+@@ -40,7 +40,7 @@ static const struct clk_ops sam9260_slow_ops = {
+ 	.get_parent = clk_sam9260_slow_get_parent,
+ };
+ 
+-static struct clk_hw * __init
++struct clk_hw * __init
+ at91_clk_register_sam9260_slow(struct regmap *regmap,
+ 			       const char *name,
+ 			       const char **parent_names,
+diff --git a/drivers/clk/at91/clk-smd.c b/drivers/clk/at91/clk-smd.c
+index 965c662b90a5..bbf5dc91777f 100644
+--- a/drivers/clk/at91/clk-smd.c
++++ b/drivers/clk/at91/clk-smd.c
+@@ -111,7 +111,7 @@ static const struct clk_ops at91sam9x5_smd_ops = {
+ 	.set_rate = at91sam9x5_clk_smd_set_rate,
+ };
+ 
+-static struct clk_hw * __init
++struct clk_hw * __init
+ at91sam9x5_clk_register_smd(struct regmap *regmap, const char *name,
+ 			    const char **parent_names, u8 num_parents)
+ {
+diff --git a/drivers/clk/at91/clk-system.c b/drivers/clk/at91/clk-system.c
+index 86a36809765d..1ac0144a38c0 100644
+--- a/drivers/clk/at91/clk-system.c
++++ b/drivers/clk/at91/clk-system.c
+@@ -88,7 +88,7 @@ static const struct clk_ops system_ops = {
+ 	.is_prepared = clk_system_is_prepared,
+ };
+ 
+-static struct clk_hw * __init
++struct clk_hw * __init
+ at91_clk_register_system(struct regmap *regmap, const char *name,
+ 			 const char *parent_name, u8 id)
+ {
+diff --git a/drivers/clk/at91/clk-usb.c b/drivers/clk/at91/clk-usb.c
+index 791770a563fc..a728320877dd 100644
+--- a/drivers/clk/at91/clk-usb.c
++++ b/drivers/clk/at91/clk-usb.c
+@@ -192,7 +192,7 @@ static const struct clk_ops at91sam9n12_usb_ops = {
+ 	.set_rate = at91sam9x5_clk_usb_set_rate,
+ };
+ 
+-static struct clk_hw * __init
++struct clk_hw * __init
+ at91sam9x5_clk_register_usb(struct regmap *regmap, const char *name,
+ 			    const char **parent_names, u8 num_parents)
+ {
+@@ -225,7 +225,7 @@ at91sam9x5_clk_register_usb(struct regmap *regmap, const char *name,
+ 	return hw;
+ }
+ 
+-static struct clk_hw * __init
++struct clk_hw * __init
+ at91sam9n12_clk_register_usb(struct regmap *regmap, const char *name,
+ 			     const char *parent_name)
+ {
+@@ -342,7 +342,7 @@ static const struct clk_ops at91rm9200_usb_ops = {
+ 	.set_rate = at91rm9200_clk_usb_set_rate,
+ };
+ 
+-static struct clk_hw * __init
++struct clk_hw * __init
+ at91rm9200_clk_register_usb(struct regmap *regmap, const char *name,
+ 			    const char *parent_name, const u32 *divisors)
+ {
+diff --git a/drivers/clk/at91/clk-utmi.c b/drivers/clk/at91/clk-utmi.c
+index cd8d689138ff..6c69b6ac71e1 100644
+--- a/drivers/clk/at91/clk-utmi.c
++++ b/drivers/clk/at91/clk-utmi.c
+@@ -125,7 +125,7 @@ static const struct clk_ops utmi_ops = {
+ 	.recalc_rate = clk_utmi_recalc_rate,
+ };
+ 
+-static struct clk_hw * __init
++struct clk_hw * __init
+ at91_clk_register_utmi(struct regmap *regmap_pmc, struct regmap *regmap_sfr,
+ 		       const char *name, const char *parent_name)
+ {
+diff --git a/drivers/clk/at91/pmc.h b/drivers/clk/at91/pmc.h
+index d22b1fa9ecdc..3dc50267a458 100644
+--- a/drivers/clk/at91/pmc.h
++++ b/drivers/clk/at91/pmc.h
+@@ -26,9 +26,151 @@ struct clk_range {
+ 
+ #define CLK_RANGE(MIN, MAX) {.min = MIN, .max = MAX,}
+ 
++struct clk_master_layout {
++	u32 mask;
++	u8 pres_shift;
++};
 +
- Required properties:
- - compatible : shall be one of the following:
- 	"atmel,at91sam9x5-sckc" or
-@@ -16,84 +18,6 @@ Required properties:
++extern const struct clk_master_layout at91rm9200_master_layout;
++extern const struct clk_master_layout at91sam9x5_master_layout;
++
++struct clk_master_characteristics {
++	struct clk_range output;
++	u32 divisors[4];
++	u8 have_div3_pres;
++};
++
++struct clk_pll_layout {
++	u32 pllr_mask;
++	u16 mul_mask;
++	u8 mul_shift;
++};
++
++extern const struct clk_pll_layout at91rm9200_pll_layout;
++extern const struct clk_pll_layout at91sam9g45_pll_layout;
++extern const struct clk_pll_layout at91sam9g20_pllb_layout;
++extern const struct clk_pll_layout sama5d3_pll_layout;
++
++struct clk_pll_characteristics {
++	struct clk_range input;
++	int num_output;
++	struct clk_range *output;
++	u16 *icpll;
++	u8 *out;
++};
++
++struct clk_programmable_layout {
++	u8 pres_shift;
++	u8 css_mask;
++	u8 have_slck_mck;
++};
++
++extern const struct clk_programmable_layout at91rm9200_programmable_layout;
++extern const struct clk_programmable_layout at91sam9g45_programmable_layout;
++extern const struct clk_programmable_layout at91sam9x5_programmable_layout;
++
+ int of_at91_get_clk_range(struct device_node *np, const char *propname,
+ 			  struct clk_range *range);
  
- 	"atmel,at91sam9x5-clk-slow-rc-osc":
- 		at91 internal slow RC oscillator
--
--	"atmel,<chip>-pmc":
--		at91 PMC (Power Management Controller)
--		All at91 specific clocks (clocks defined below) must be child
--		node of the PMC node.
--		<chip> can be: at91rm9200, at91sam9260, at91sam9261,
--		at91sam9263, at91sam9g45, at91sam9n12, at91sam9rl, at91sam9x5,
--		sama5d2, sama5d3 or sama5d4.
--
--	"atmel,at91sam9x5-clk-slow" (under sckc node)
--	or
--	"atmel,at91sam9260-clk-slow" (under pmc node):
--		at91 slow clk
--
--	"atmel,at91rm9200-clk-main-osc"
--	"atmel,at91sam9x5-clk-main-rc-osc"
--		at91 main clk sources
--
--	"atmel,at91sam9x5-clk-main"
--	"atmel,at91rm9200-clk-main":
--		at91 main clock
--
--	"atmel,at91rm9200-clk-master" or
--	"atmel,at91sam9x5-clk-master":
--		at91 master clock
--
--	"atmel,at91sam9x5-clk-peripheral" or
--	"atmel,at91rm9200-clk-peripheral":
--		at91 peripheral clocks
--
--	"atmel,at91rm9200-clk-pll" or
--	"atmel,at91sam9g45-clk-pll" or
--	"atmel,at91sam9g20-clk-pllb" or
--	"atmel,sama5d3-clk-pll":
--		at91 pll clocks
--
--	"atmel,at91sam9x5-clk-plldiv":
--		at91 plla divisor
--
--	"atmel,at91rm9200-clk-programmable" or
--	"atmel,at91sam9g45-clk-programmable" or
--	"atmel,at91sam9x5-clk-programmable":
--		at91 programmable clocks
--
--	"atmel,at91sam9x5-clk-smd":
--		at91 SMD (Soft Modem) clock
--
--	"atmel,at91rm9200-clk-system":
--		at91 system clocks
--
--	"atmel,at91rm9200-clk-usb" or
--	"atmel,at91sam9x5-clk-usb" or
--	"atmel,at91sam9n12-clk-usb":
--		at91 usb clock
--
--	"atmel,at91sam9x5-clk-utmi":
--		at91 utmi clock
--
--	"atmel,sama5d4-clk-h32mx":
--		at91 h32mx clock
--
--	"atmel,sama5d2-clk-generated":
--		at91 generated clock
--
--	"atmel,sama5d2-clk-audio-pll-frac":
--		at91 audio fractional pll
--
--	"atmel,sama5d2-clk-audio-pll-pad":
--		at91 audio pll CLK_AUDIO output pin
--
--	"atmel,sama5d2-clk-audio-pll-pmc"
--		at91 audio pll output on AUDIOPLLCLK that feeds the PMC
--		and can be used by peripheral clock or generic clock
--
--	"atmel,sama5d2-clk-i2s-mux" (under pmc node):
--		at91 I2S clock source selection
--
--Required properties for SCKC node:
- - reg : defines the IO memory reserved for the SCKC.
- - #size-cells : shall be 0 (reg is used to encode clk id).
- - #address-cells : shall be 1 (reg is used to encode clk id).
-@@ -109,435 +33,30 @@ For example:
- 		/* put at91 slow clocks here */
- 	};
- 
-+Power Management Controller (PMC):
- 
--Required properties for internal slow RC oscillator:
--- #clock-cells : from common clock binding; shall be set to 0.
--- clock-frequency : define the internal RC oscillator frequency.
--
--Optional properties:
--- clock-accuracy : define the internal RC oscillator accuracy.
--
--For example:
--	slow_rc_osc: slow_rc_osc {
--		compatible = "atmel,at91sam9x5-clk-slow-rc-osc";
--		clock-frequency = <32768>;
--		clock-accuracy = <50000000>;
--	};
--
--Required properties for slow oscillator:
--- #clock-cells : from common clock binding; shall be set to 0.
--- clocks : shall encode the main osc source clk sources (see atmel datasheet).
-+Required properties:
-+- compatible : shall be "atmel,<chip>-pmc", "syscon":
-+	<chip> can be: at91rm9200, at91sam9260, at91sam9261,
-+	at91sam9263, at91sam9g45, at91sam9n12, at91sam9rl, at91sam9g15,
-+	at91sam9g25, at91sam9g35, at91sam9x25, at91sam9x35, at91sam9x5,
-+	sama5d2, sama5d3 or sama5d4.
-+- #clock-cells : from common clock binding; shall be set to 2. The first entry
-+  is the type of the clock (core, system, peripheral or generated) and the
-+  second entry its index as provided by the datasheet
-+- clocks : Must contain an entry for each entry in clock-names.
-+- clock-names: Must include the following entries: "slow_clk", "main_xtal"
- 
- Optional properties:
- - atmel,osc-bypass : boolean property. Set this when a clock signal is directly
-   provided on XIN.
- 
- For example:
--	slow_osc: slow_osc {
--		compatible = "atmel,at91rm9200-clk-slow-osc";
--		#clock-cells = <0>;
--		clocks = <&slow_xtal>;
--	};
--
--Required properties for slow clock:
--- #clock-cells : from common clock binding; shall be set to 0.
--- clocks : shall encode the slow clk sources (see atmel datasheet).
--
--For example:
--	clk32k: slck {
--		compatible = "atmel,at91sam9x5-clk-slow";
--		#clock-cells = <0>;
--		clocks = <&slow_rc_osc &slow_osc>;
--	};
--
--Required properties for PMC node:
--- reg : defines the IO memory reserved for the PMC.
--- #size-cells : shall be 0 (reg is used to encode clk id).
--- #address-cells : shall be 1 (reg is used to encode clk id).
--- interrupts : shall be set to PMC interrupt line.
--- interrupt-controller : tell that the PMC is an interrupt controller.
--- #interrupt-cells : must be set to 1. The first cell encodes the interrupt id,
--	and reflect the bit position in the PMC_ER/DR/SR registers.
--	You can use the dt macros defined in dt-bindings/clock/at91.h.
--	0 (AT91_PMC_MOSCS) -> main oscillator ready
--	1 (AT91_PMC_LOCKA) -> PLL A ready
--	2 (AT91_PMC_LOCKB) -> PLL B ready
--	3 (AT91_PMC_MCKRDY) -> master clock ready
--	6 (AT91_PMC_LOCKU) -> UTMI PLL clock ready
--	8 .. 15 (AT91_PMC_PCKRDY(id)) -> programmable clock ready
--	16 (AT91_PMC_MOSCSELS) -> main oscillator selected
--	17 (AT91_PMC_MOSCRCS) -> RC main oscillator stabilized
--	18 (AT91_PMC_CFDEV) -> clock failure detected
--
--For example:
--	pmc: pmc at fffffc00 {
--		compatible = "atmel,sama5d3-pmc";
--		interrupts = <1 4 7>;
--		interrupt-controller;
--		#interrupt-cells = <2>;
--		#size-cells = <0>;
--		#address-cells = <1>;
--
--		/* put at91 clocks here */
--	};
--
--Required properties for main clock internal RC oscillator:
--- interrupt-parent : must reference the PMC node.
--- interrupts : shall be set to "<0>".
--- clock-frequency : define the internal RC oscillator frequency.
--
--Optional properties:
--- clock-accuracy : define the internal RC oscillator accuracy.
--
--For example:
--	main_rc_osc: main_rc_osc {
--		compatible = "atmel,at91sam9x5-clk-main-rc-osc";
--		interrupt-parent = <&pmc>;
--		interrupts = <0>;
--		clock-frequency = <12000000>;
--		clock-accuracy = <50000000>;
--	};
--
--Required properties for main clock oscillator:
--- interrupt-parent : must reference the PMC node.
--- interrupts : shall be set to "<0>".
--- #clock-cells : from common clock binding; shall be set to 0.
--- clocks : shall encode the main osc source clk sources (see atmel datasheet).
--
--Optional properties:
--- atmel,osc-bypass : boolean property. Specified if a clock signal is provided
--  on XIN.
--
--  clock signal is directly provided on XIN pin.
--
--For example:
--	main_osc: main_osc {
--		compatible = "atmel,at91rm9200-clk-main-osc";
--		interrupt-parent = <&pmc>;
--		interrupts = <0>;
--		#clock-cells = <0>;
--		clocks = <&main_xtal>;
--	};
--
--Required properties for main clock:
--- interrupt-parent : must reference the PMC node.
--- interrupts : shall be set to "<0>".
--- #clock-cells : from common clock binding; shall be set to 0.
--- clocks : shall encode the main clk sources (see atmel datasheet).
--
--For example:
--	main: mainck {
--		compatible = "atmel,at91sam9x5-clk-main";
--		interrupt-parent = <&pmc>;
--		interrupts = <0>;
--		#clock-cells = <0>;
--		clocks = <&main_rc_osc &main_osc>;
--	};
--
--Required properties for master clock:
--- interrupt-parent : must reference the PMC node.
--- interrupts : shall be set to "<3>".
--- #clock-cells : from common clock binding; shall be set to 0.
--- clocks : shall be the master clock sources (see atmel datasheet) phandles.
--	e.g. "<&ck32k>, <&main>, <&plla>, <&pllb>".
--- atmel,clk-output-range : minimum and maximum clock frequency (two u32
--			   fields).
--	   e.g. output = <0 133000000>; <=> 0 to 133MHz.
--- atmel,clk-divisors : master clock divisors table (four u32 fields).
--		0 <=> reserved value.
--		e.g. divisors = <1 2 4 6>;
--- atmel,master-clk-have-div3-pres : some SoC use the reserved value 7 in the
--				    PRES field as CLOCK_DIV3 (e.g sam9x5).
--
--For example:
--	mck: mck {
--		compatible = "atmel,at91rm9200-clk-master";
--		interrupt-parent = <&pmc>;
--		interrupts = <3>;
--		#clock-cells = <0>;
--		atmel,clk-output-range = <0 133000000>;
--		atmel,clk-divisors = <1 2 4 0>;
--	};
--
--Required properties for peripheral clocks:
--- #size-cells : shall be 0 (reg is used to encode clk id).
--- #address-cells : shall be 1 (reg is used to encode clk id).
--- clocks : shall be the master clock phandle.
--	e.g. clocks = <&mck>;
--- name: device tree node describing a specific peripheral clock.
--	* #clock-cells : from common clock binding; shall be set to 0.
--	* reg: peripheral id. See Atmel's datasheets to get a full
--	  list of peripheral ids.
--	* atmel,clk-output-range : minimum and maximum clock frequency
--	  (two u32 fields). Only valid on at91sam9x5-clk-peripheral
--	  compatible IPs.
--
--For example:
--	periph: periphck {
--		compatible = "atmel,at91sam9x5-clk-peripheral";
--		#size-cells = <0>;
--		#address-cells = <1>;
--		clocks = <&mck>;
--
--		ssc0_clk {
--			#clock-cells = <0>;
--			reg = <2>;
--			atmel,clk-output-range = <0 133000000>;
--		};
--
--		usart0_clk {
--			#clock-cells = <0>;
--			reg = <3>;
--			atmel,clk-output-range = <0 66000000>;
--		};
--	};
--
--
--Required properties for pll clocks:
--- interrupt-parent : must reference the PMC node.
--- interrupts : shall be set to "<1>".
--- #clock-cells : from common clock binding; shall be set to 0.
--- clocks : shall be the main clock phandle.
--- reg : pll id.
--	0 -> PLL A
--	1 -> PLL B
--- atmel,clk-input-range : minimum and maximum source clock frequency (two u32
--			  fields).
--	  e.g. input = <1 32000000>; <=> 1 to 32MHz.
--- #atmel,pll-clk-output-range-cells : number of cells reserved for pll output
--				      range description. Sould be set to 2, 3
--				      or 4.
--	* 1st and 2nd cells represent the frequency range (min-max).
--	* 3rd cell is optional and represents the OUT field value for the given
--	  range.
--	* 4th cell is optional and represents the ICPLL field (PLLICPR
--	  register)
--- atmel,pll-clk-output-ranges : pll output frequency ranges + optional parameter
--				depending on #atmel,pll-output-range-cells
--				property value.
--
--For example:
--	plla: pllack {
--		compatible = "atmel,at91sam9g45-clk-pll";
--		interrupt-parent = <&pmc>;
--		interrupts = <1>;
--		#clock-cells = <0>;
--		clocks = <&main>;
--		reg = <0>;
--		atmel,clk-input-range = <2000000 32000000>;
--		#atmel,pll-clk-output-range-cells = <4>;
--		atmel,pll-clk-output-ranges = <74500000 800000000 0 0
--					       69500000 750000000 1 0
--					       64500000 700000000 2 0
--					       59500000 650000000 3 0
--					       54500000 600000000 0 1
--					       49500000 550000000 1 1
--					       44500000 500000000 2 1
--					       40000000 450000000 3 1>;
--	};
--
--Required properties for plldiv clocks (plldiv = pll / 2):
--- #clock-cells : from common clock binding; shall be set to 0.
--- clocks : shall be the plla clock phandle.
--
--The pll divisor is equal to 2 and cannot be changed.
--
--For example:
--	plladiv: plladivck {
--		compatible = "atmel,at91sam9x5-clk-plldiv";
--		#clock-cells = <0>;
--		clocks = <&plla>;
--	};
--
--Required properties for programmable clocks:
--- interrupt-parent : must reference the PMC node.
--- #size-cells : shall be 0 (reg is used to encode clk id).
--- #address-cells : shall be 1 (reg is used to encode clk id).
--- clocks : shall be the programmable clock source phandles.
--	e.g. clocks = <&clk32k>, <&main>, <&plla>, <&pllb>;
--- name: device tree node describing a specific prog clock.
--	* #clock-cells : from common clock binding; shall be set to 0.
--	* reg : programmable clock id (register offset from  PCKx
--			 register).
--	* interrupts : shall be set to "<(8 + id)>".
--
--For example:
--	prog: progck {
--		compatible = "atmel,at91sam9g45-clk-programmable";
--		#size-cells = <0>;
--		#address-cells = <1>;
--		interrupt-parent = <&pmc>;
--		clocks = <&clk32k>, <&main>, <&plladiv>, <&utmi>, <&mck>;
--
--		prog0 {
--			#clock-cells = <0>;
--			reg = <0>;
--			interrupts = <8>;
--		};
--
--		prog1 {
--			#clock-cells = <0>;
--			reg = <1>;
--			interrupts = <9>;
--		};
--	};
--
--
--Required properties for smd clock:
--- #clock-cells : from common clock binding; shall be set to 0.
--- clocks : shall be the smd clock source phandles.
--	e.g. clocks = <&plladiv>, <&utmi>;
--
--For example:
--	smd: smdck {
--		compatible = "atmel,at91sam9x5-clk-smd";
--		#clock-cells = <0>;
--		clocks = <&plladiv>, <&utmi>;
--	};
--
--Required properties for system clocks:
--- #size-cells : shall be 0 (reg is used to encode clk id).
--- #address-cells : shall be 1 (reg is used to encode clk id).
--- name: device tree node describing a specific system clock.
--	* #clock-cells : from common clock binding; shall be set to 0.
--	* reg: system clock id (bit position in SCER/SCDR/SCSR registers).
--	      See Atmel's datasheet to get a full list of system clock ids.
--
--For example:
--	system: systemck {
--		compatible = "atmel,at91rm9200-clk-system";
--		#address-cells = <1>;
--		#size-cells = <0>;
--
--		ddrck {
--			#clock-cells = <0>;
--			reg = <2>;
--			clocks = <&mck>;
--		};
--
--		uhpck {
--			#clock-cells = <0>;
--			reg = <6>;
--			clocks = <&usb>;
--		};
--
--		udpck {
--			#clock-cells = <0>;
--			reg = <7>;
--			clocks = <&usb>;
--		};
--	};
--
--
--Required properties for usb clock:
--- #clock-cells : from common clock binding; shall be set to 0.
--- clocks : shall be the smd clock source phandles.
--	e.g. clocks = <&pllb>;
--- atmel,clk-divisors (only available for "atmel,at91rm9200-clk-usb"):
--	usb clock divisor table.
--	e.g. divisors = <1 2 4 0>;
--
--For example:
--	usb: usbck {
--		compatible = "atmel,at91sam9x5-clk-usb";
--		#clock-cells = <0>;
--		clocks = <&plladiv>, <&utmi>;
--	};
--
--	usb: usbck {
--		compatible = "atmel,at91rm9200-clk-usb";
--		#clock-cells = <0>;
--		clocks = <&pllb>;
--		atmel,clk-divisors = <1 2 4 0>;
--	};
--
--
--Required properties for utmi clock:
--- interrupt-parent : must reference the PMC node.
--- interrupts : shall be set to "<AT91_PMC_LOCKU IRQ_TYPE_LEVEL_HIGH>".
--- #clock-cells : from common clock binding; shall be set to 0.
--- clocks : shall be the main clock source phandle.
--
--For example:
--	utmi: utmick {
--		compatible = "atmel,at91sam9x5-clk-utmi";
--		interrupt-parent = <&pmc>;
--		interrupts = <AT91_PMC_LOCKU IRQ_TYPE_LEVEL_HIGH>;
--		#clock-cells = <0>;
--		clocks = <&main>;
--	};
--
--Required properties for 32 bits bus Matrix clock (h32mx clock):
--- #clock-cells : from common clock binding; shall be set to 0.
--- clocks : shall be the master clock source phandle.
--
--For example:
--	h32ck: h32mxck {
--		#clock-cells = <0>;
--		compatible = "atmel,sama5d4-clk-h32mx";
--		clocks = <&mck>;
--	};
--
--Required properties for generated clocks:
--- #size-cells : shall be 0 (reg is used to encode clk id).
--- #address-cells : shall be 1 (reg is used to encode clk id).
--- clocks : shall be the generated clock source phandles.
--	e.g. clocks = <&clk32k>, <&main>, <&plladiv>, <&utmi>, <&mck>, <&audio_pll_pmc>;
--- name: device tree node describing a specific generated clock.
--	* #clock-cells : from common clock binding; shall be set to 0.
--	* reg: peripheral id. See Atmel's datasheets to get a full
--	  list of peripheral ids.
--	* atmel,clk-output-range : minimum and maximum clock frequency
--	  (two u32 fields).
--
--For example:
--	gck {
--		compatible = "atmel,sama5d2-clk-generated";
--		#address-cells = <1>;
--		#size-cells = <0>;
--		clocks = <&clk32k>, <&main>, <&plladiv>, <&utmi>, <&mck>, <&audio_pll_pmc>;
--
--		tcb0_gclk: tcb0_gclk {
--			#clock-cells = <0>;
--			reg = <35>;
--			atmel,clk-output-range = <0 83000000>;
--		};
--
--		pwm_gclk: pwm_gclk {
--			#clock-cells = <0>;
--			reg = <38>;
--			atmel,clk-output-range = <0 83000000>;
--		};
--	};
--
--Required properties for I2S mux clocks:
--- #size-cells : shall be 0 (reg is used to encode I2S bus id).
--- #address-cells : shall be 1 (reg is used to encode I2S bus id).
--- name: device tree node describing a specific mux clock.
--	* #clock-cells : from common clock binding; shall be set to 0.
--	* clocks : shall be the mux clock parent phandles; shall be 2 phandles:
--	  peripheral and generated clock; the first phandle shall belong to the
--	  peripheral clock and the second one shall belong to the generated
--	  clock; "clock-indices" property can be user to specify
--	  the correct order.
--	* reg: I2S bus id of the corresponding mux clock.
--	  e.g. reg = <0>; for i2s0, reg = <1>; for i2s1
--
--For example:
--	i2s_clkmux {
--		compatible = "atmel,sama5d2-clk-i2s-mux";
--		#address-cells = <1>;
--		#size-cells = <0>;
--
--		i2s0muxck: i2s0_muxclk {
--			clocks = <&i2s0_clk>, <&i2s0_gclk>;
--			#clock-cells = <0>;
--			reg = <0>;
--		};
--
--		i2s1muxck: i2s1_muxclk {
--			clocks = <&i2s1_clk>, <&i2s1_gclk>;
--			#clock-cells = <0>;
--			reg = <1>;
--		};
-+	pmc: pmc at f0018000 {
-+		compatible = "atmel,sama5d4-pmc", "syscon";
-+		reg = <0xf0018000 0x120>;
-+		interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
-+		#clock-cells = <2>;
-+		clocks = <&clk32k>, <&main_xtal>;
-+		clock-names = "slow_clk", "main_xtal";
- 	};
++struct clk_hw *of_clk_hw_pmc_get(struct of_phandle_args *clkspec, void *data);
++
++struct clk_hw * __init
++at91_clk_register_audio_pll_frac(struct regmap *regmap, const char *name,
++				 const char *parent_name);
++
++struct clk_hw * __init
++at91_clk_register_audio_pll_pad(struct regmap *regmap, const char *name,
++				const char *parent_name);
++
++struct clk_hw * __init
++at91_clk_register_audio_pll_pmc(struct regmap *regmap, const char *name,
++				const char *parent_name);
++
++struct clk_hw * __init
++at91_clk_register_generated(struct regmap *regmap, spinlock_t *lock,
++			    const char *name, const char **parent_names,
++			    u8 num_parents, u8 id, bool pll_audio,
++			    const struct clk_range *range);
++
++struct clk_hw * __init
++at91_clk_register_h32mx(struct regmap *regmap, const char *name,
++			const char *parent_name);
++
++struct clk_hw * __init
++at91_clk_i2s_mux_register(struct regmap *regmap, const char *name,
++			  const char * const *parent_names,
++			  unsigned int num_parents, u8 bus_id);
++
++struct clk_hw * __init
++at91_clk_register_main_rc_osc(struct regmap *regmap, const char *name,
++			      u32 frequency, u32 accuracy);
++struct clk_hw * __init
++at91_clk_register_main_osc(struct regmap *regmap, const char *name,
++			   const char *parent_name, bool bypass);
++struct clk_hw * __init
++at91_clk_register_rm9200_main(struct regmap *regmap,
++			      const char *name,
++			      const char *parent_name);
++struct clk_hw * __init
++at91_clk_register_sam9x5_main(struct regmap *regmap, const char *name,
++			      const char **parent_names, int num_parents);
++
++struct clk_hw * __init
++at91_clk_register_master(struct regmap *regmap, const char *name,
++			 int num_parents, const char **parent_names,
++			 const struct clk_master_layout *layout,
++			 const struct clk_master_characteristics *characteristics);
++
++struct clk_hw * __init
++at91_clk_register_peripheral(struct regmap *regmap, const char *name,
++			     const char *parent_name, u32 id);
++struct clk_hw * __init
++at91_clk_register_sam9x5_peripheral(struct regmap *regmap, spinlock_t *lock,
++				    const char *name, const char *parent_name,
++				    u32 id, const struct clk_range *range);
++
++struct clk_hw * __init
++at91_clk_register_pll(struct regmap *regmap, const char *name,
++		      const char *parent_name, u8 id,
++		      const struct clk_pll_layout *layout,
++		      const struct clk_pll_characteristics *characteristics);
++struct clk_hw * __init
++at91_clk_register_plldiv(struct regmap *regmap, const char *name,
++			 const char *parent_name);
++
++struct clk_hw * __init
++at91_clk_register_programmable(struct regmap *regmap, const char *name,
++			       const char **parent_names, u8 num_parents, u8 id,
++			       const struct clk_programmable_layout *layout);
++
++struct clk_hw * __init
++at91_clk_register_sam9260_slow(struct regmap *regmap,
++			       const char *name,
++			       const char **parent_names,
++			       int num_parents);
++
++struct clk_hw * __init
++at91sam9x5_clk_register_smd(struct regmap *regmap, const char *name,
++			    const char **parent_names, u8 num_parents);
++
++struct clk_hw * __init
++at91_clk_register_system(struct regmap *regmap, const char *name,
++			 const char *parent_name, u8 id);
++
++struct clk_hw * __init
++at91sam9x5_clk_register_usb(struct regmap *regmap, const char *name,
++			    const char **parent_names, u8 num_parents);
++struct clk_hw * __init
++at91sam9n12_clk_register_usb(struct regmap *regmap, const char *name,
++			     const char *parent_name);
++struct clk_hw * __init
++at91rm9200_clk_register_usb(struct regmap *regmap, const char *name,
++			    const char *parent_name, const u32 *divisors);
++
++struct clk_hw * __init
++at91_clk_register_utmi(struct regmap *regmap_pmc, struct regmap *regmap_sfr,
++		       const char *name, const char *parent_name);
++
+ #ifdef CONFIG_PM
+ void pmc_register_id(u8 id);
+ void pmc_register_pck(u8 pck);
 -- 
 2.18.0
