@@ -1,52 +1,33 @@
-From: mka@chromium.org (Matthias Kaehlcke)
-Date: Tue, 17 Jul 2018 14:11:28 -0700
-Subject: [PATCH v4 2/3] arm64: dts: qcom: pm8998: Add spmi-temp-alarm node
-In-Reply-To: <20180717210815.245639-2-mka@chromium.org>
-References: <20180717210815.245639-1-mka@chromium.org>
- <20180717210815.245639-2-mka@chromium.org>
-Message-ID: <20180717211128.GB129942@google.com>
+From: matthias.bgg@kernel.org (matthias.bgg at kernel.org)
+Date: Tue, 17 Jul 2018 23:59:46 +0200
+Subject: arm/arm64: mediatek: Fix mmsys device probing
+Message-ID: <20180717215951.378-1-matthias.bgg@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 17, 2018 at 02:08:14PM -0700, Matthias Kaehlcke wrote:
-> This adds the spmi-temp-alarm node to pm8998 based on the examples in the
-> bindings.
-> 
-> Signed-off-by: Matthias Kaehlcke <mka@chromium.org>
+Changes since v3:
+- use platform device to probe clock driver
+- add Acked-by CK Hu for the probe deferred patch
 
-I should have added:
+Changes since v2:
+- fix kconfig typo (shame on me)
+- delete __initconst from mm_clocks as converted to a platform driver
+  
+Changes since v1:
+- add binding documentation
+- ddp: use regmap_update_bits
+- ddp: ignore EPROBE_DEFER on clock probing
+- mfd: delete mmsys_private
+- add Reviewed-by and Acked-by tags
+ 
+MMSYS in Mediatek SoCs has some registers to control clock gates (which is 
+used in the clk driver) and some registers to set the routing and enable
+the differnet blocks of the display subsystem.
 
-Reviewed-by: Douglas Anderson <dianders@chromium.org>
+Up to now both drivers, clock and drm are probed with the same device tree
+compatible. But only the first driver get probed, which in effect breaks
+graphics on mt8173 and mt2701.
 
-> ---
-> Changes in v4:
-> - none
-> 
-> Changes in v3:
-> - changed node name from 'qcom,temp-alarm at 2400' to 'temp-alarm at 2400'
-> - removed controller register length value from 'reg'
-> 
-> Changes in v2:
-> - none
-> ---
->  arch/arm64/boot/dts/qcom/pm8998.dtsi | 7 +++++++
->  1 file changed, 7 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/qcom/pm8998.dtsi b/arch/arm64/boot/dts/qcom/pm8998.dtsi
-> index 92bed1e7d4bb..7eea94701b23 100644
-> --- a/arch/arm64/boot/dts/qcom/pm8998.dtsi
-> +++ b/arch/arm64/boot/dts/qcom/pm8998.dtsi
-> @@ -11,6 +11,13 @@
->  		#address-cells = <1>;
->  		#size-cells = <0>;
->  
-> +		pm8998_temp: temp-alarm at 2400 {
-> +			compatible = "qcom,spmi-temp-alarm";
-> +			reg = <0x2400>;
-> +			interrupts = <0x0 0x24 0x0 IRQ_TYPE_EDGE_RISING>;
-> +			#thermal-sensor-cells = <0>;
-> +		};
-> +
->  		pm8998_gpio: gpios at c000 {
->  			compatible = "qcom,pm8998-gpio", "qcom,spmi-gpio";
->  			reg = <0xc000>;
+This patch uses a platform device registration in the DRM driver, which
+will trigger the probe of the corresponding clock driver. It was tested on
+the bananapi-r2 and the Acer R13 Chromebook.
