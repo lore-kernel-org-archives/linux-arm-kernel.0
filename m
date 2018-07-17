@@ -1,52 +1,83 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Tue, 17 Jul 2018 14:56:21 +1000
-Subject: [RFC PATCH v2 1/4] dt-bindings: misc: Add bindings for misc.
- BMC control fields
-In-Reply-To: <CAL_JsqLZo-=7UkuvvUFYdCR4asBBiWyC=Q1ryH=-HLU6vzf9tA@mail.gmail.com>
-References: <20180711053122.30773-1-andrew@aj.id.au>
- <20180711053122.30773-2-andrew@aj.id.au>
- <20180711200450.GB17291@rob-hp-laptop>
- <1531356830.3551458.1437853280.551CA8C5@webmail.messagingengine.com>
- <CAL_JsqKpXxR4t_-3BOy-0mFePXkaSck_4PfHRD=OZQ-_-T5P=w@mail.gmail.com>
- <b6ced4cad4d7ff78330181b2c893855c23103953.camel@kernel.crashing.org>
- <1531463489.747186.1439263128.075AECE1@webmail.messagingengine.com>
- <CAL_JsqLZo-=7UkuvvUFYdCR4asBBiWyC=Q1ryH=-HLU6vzf9tA@mail.gmail.com>
-Message-ID: <ece91112ecfdc7218184c4c4519e455cf9397e11.camel@kernel.crashing.org>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Tue, 17 Jul 2018 05:00:38 +0000
+Subject: [PATCH v3 1/3] dt-bindings: arm: fsl: add mu binding doc
+In-Reply-To: <20180716114209.25242-2-o.rempel@pengutronix.de>
+References: <20180716114209.25242-1-o.rempel@pengutronix.de>
+ <20180716114209.25242-2-o.rempel@pengutronix.de>
+Message-ID: <AM0PR04MB4211E30E85E830AA31F998A1805C0@AM0PR04MB4211.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2018-07-16 at 07:55 -0600, Rob Herring wrote:
-> If that data is one set per SoC, then i'm not that concerned having
-> platform-specific data in the driver. That doesn't mean the driver is
-> not "generic". It's still not clear to me in this thread, how much of
-> this is board specific, but given that you've placed all the data in
-> an SoC dtsi file it seems to be all per SoC.
+> -----Original Message-----
+> From: Oleksij Rempel [mailto:o.rempel at pengutronix.de]
+> Sent: Monday, July 16, 2018 7:42 PM
+> To: Shawn Guo <shawnguo@kernel.org>; Fabio Estevam
+> <fabio.estevam@nxp.com>; Rob Herring <robh+dt@kernel.org>; Mark
+> Rutland <mark.rutland@arm.com>; A.s. Dong <aisheng.dong@nxp.com>
+> Cc: Oleksij Rempel <o.rempel@pengutronix.de>; kernel at pengutronix.de;
+> linux-arm-kernel at lists.infradead.org; devicetree at vger.kernel.org; dl-linux-
+> imx <linux-imx@nxp.com>
+> Subject: [PATCH v3 1/3] dt-bindings: arm: fsl: add mu binding doc
+> 
+> The Messaging Unit module enables two processors within the SoC to
+> communicate and coordinate by passing messages (e.g. data, status and
+> control) through the MU interface.
+> 
+> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
+> ---
+>  .../devicetree/bindings/mailbox/fsl,mu.txt    | 32 +++++++++++++++++++
+>  1 file changed, 32 insertions(+)
+>  create mode 100644
+> Documentation/devicetree/bindings/mailbox/fsl,mu.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
+> b/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
+> new file mode 100644
+> index 000000000000..5d48dd75b98d
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
+> @@ -0,0 +1,32 @@
+> +NXP i.MX Messaging Unit (MU)
+> +--------------------------------------------------------------------
+> +
+> +Required properties:
+> +-------------------
+> +- compatible :	should be "fsl,<chip>-mu", the supported chips include:
+> +		imx6sx	- i.MX 6SoloX
+> +		imx7d	- i.MX 7Dual
+> +		imx7s	- i.MX 7Solo
+> +		imx7ulp	- i.MX 7ULP
+> +		imx8qm	- i.MX 8QM
+> +		imx8qxp	- i.MX 8QXP
+> +- reg :		Should contain the registers location and length
+> +- interrupts :	Interrupt number. The interrupt specifier format depends
+> +		on the interrupt controller parent.
+> +- #mbox-cells:  Must be:
+> +		0 - for single channel mode. i.MX8* SCU protocol specific.
+> +		1 - for multichannel (generic) mode.
+> +
+> +Optional properties:
+> +-------------------
+> +- clocks :	phandle to the input clock.
+> +- fsl,mu-side-a : Should be set for side A MU.
 
-So Rob, I think that's precisely where the disconnect is.
+For this property, how about doing like:
+fsl,mu-side: An Integer represents the MU side. If missing this property, it's default to Side A
+	       which is mostly used by A core.
+	       0: MU Side A
+	       1: MU Side B
 
-I think we all (well hopefully) agree that those few tunables don't fit
-in any existing subystem and aren't likely to ever do (famous last
-words...).
-
-Where we disagree is we want to make this parametrized via the DT, and
-you want us to hard wire the list in some kind of SoC driver for a
-given SoC family/version.
-
-The reason I think hard wiring the list in the driver is not a great
-solution is that that list in itself is prone to variations, possibly
-fairly often, between boards, vendors, versions of boards, etc...
-
-We can't know for sure every SoC tunable (out of the gazillions in
-those chips) are going to be needed for a given system. We know which
-ones we do use for ours, and that's a couple of handfuls, but it could
-be that Dell need a slightly different set, and so might Yadro, or so
-might our next board revision for that matter.
-
-Now, updating the device-tree in the board flash with whatever vendor
-specific information is needed is a LOT easier than getting the kernel
-driver constantly updated. The device-tree after all is there to
-reflect among other things system specific ways in which the SoC is
-wired and configured. This is rather close...
-
-Cheers,
-Ben.
+Regards
+Dong Aisheng
+		
+> +
+> +Examples:
+> +--------
+> +lsio_mu0: mailbox at 5d1b0000 {
+> +	compatible = "fsl,imx8qxp-mu";
+> +	reg = <0x0 0x5d1b0000 0x0 0x10000>;
+> +	interrupts = <GIC_SPI 176 IRQ_TYPE_LEVEL_HIGH>;
+> +	#mbox-cells = <0>;
+> +};
+> --
+> 2.18.0
