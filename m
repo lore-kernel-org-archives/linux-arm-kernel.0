@@ -1,44 +1,33 @@
 From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
-Date: Tue, 17 Jul 2018 18:06:06 +0200
-Subject: [PATCH 1/5] arm64: defconfig: Enable sound support for Samsung
- Chromebook Plus.
-Message-ID: <20180717160610.26501-1-enric.balletbo@collabora.com>
+Date: Tue, 17 Jul 2018 18:06:10 +0200
+Subject: [PATCH 5/5] arm64: defconfig: Enable support for SBS battery driver.
+In-Reply-To: <20180717160610.26501-1-enric.balletbo@collabora.com>
+References: <20180717160610.26501-1-enric.balletbo@collabora.com>
+Message-ID: <20180717160610.26501-5-enric.balletbo@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the Rockchip sound driver with MAX98357A/RT5514/DA7219 codecs
-needed for the Samsung Chromebook Plus.
+Some Chromebooks, like the Samsung Chromebook Plus, come with a
+SBS-compliant gas gauges, so enable the support in the default kernel
+configuration.
 
 Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
 ---
 
- arch/arm64/configs/defconfig | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index f9a186f6af8a..4917641060b1 100644
+index a36e80cce868..e2aaa47c4999 100644
 --- a/arch/arm64/configs/defconfig
 +++ b/arch/arm64/configs/defconfig
-@@ -447,9 +447,20 @@ CONFIG_SOUND=y
- CONFIG_SND=y
- CONFIG_SND_SOC=y
- CONFIG_SND_BCM2835_SOC_I2S=m
-+CONFIG_SND_SOC_ROCKCHIP=m
-+CONFIG_SND_SOC_ROCKCHIP_I2S=m
-+CONFIG_SND_SOC_ROCKCHIP_SPDIF=m
-+CONFIG_SND_SOC_ROCKCHIP_RT5645=m
-+CONFIG_SND_SOC_RK3399_GRU_SOUND=m
- CONFIG_SND_SOC_SAMSUNG=y
- CONFIG_SND_SOC_RCAR=m
- CONFIG_SND_SOC_AK4613=m
-+CONFIG_SND_SOC_DA7219=m
-+CONFIG_SND_SOC_MAX98357A=m
-+CONFIG_SND_SOC_RL6231=m
-+CONFIG_SND_SOC_RT5514=m
-+CONFIG_SND_SOC_RT5514_SPI=m
-+CONFIG_SND_SOC_RT5645=m
- CONFIG_SND_SIMPLE_CARD=m
- CONFIG_SND_AUDIO_GRAPH_CARD=m
- CONFIG_I2C_HID=m
+@@ -350,6 +350,7 @@ CONFIG_POWER_RESET_MSM=y
+ CONFIG_POWER_RESET_XGENE=y
+ CONFIG_POWER_RESET_SYSCON=y
+ CONFIG_SYSCON_REBOOT_MODE=y
++CONFIG_BATTERY_SBS=m
+ CONFIG_BATTERY_BQ27XXX=y
+ CONFIG_SENSORS_ARM_SCPI=y
+ CONFIG_SENSORS_LM90=m
 -- 
 2.18.0
