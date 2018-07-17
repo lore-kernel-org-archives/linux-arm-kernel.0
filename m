@@ -1,10 +1,9 @@
 From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Tue, 17 Jul 2018 05:03:54 +0000
-Subject: [PATCH v3 2/3] ARM: dts: imx7s: add i.MX7 messaging unit support
-In-Reply-To: <20180716114209.25242-3-o.rempel@pengutronix.de>
+Date: Tue, 17 Jul 2018 05:05:30 +0000
+Subject: [PATCH v3 0/3] add mailbox support for i.MX7D
+In-Reply-To: <20180716114209.25242-1-o.rempel@pengutronix.de>
 References: <20180716114209.25242-1-o.rempel@pengutronix.de>
- <20180716114209.25242-3-o.rempel@pengutronix.de>
-Message-ID: <AM0PR04MB421178D1CE16778CF9CEACA0805C0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+Message-ID: <AM0PR04MB42111345DF174BF8016DC071805C0@AM0PR04MB4211.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,54 +16,56 @@ List-Id: linux-arm-kernel.lists.infradead.org
 > Cc: Oleksij Rempel <o.rempel@pengutronix.de>; kernel at pengutronix.de;
 > linux-arm-kernel at lists.infradead.org; devicetree at vger.kernel.org; dl-linux-
 > imx <linux-imx@nxp.com>
-> Subject: [PATCH v3 2/3] ARM: dts: imx7s: add i.MX7 messaging unit support
+> Subject: [PATCH v3 0/3] add mailbox support for i.MX7D
 > 
-> Define the Messaging Unit (MU) for i.MX7 in the processor's dtsi.
-> The respective driver is added in the next commit.
-> 
-> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
-> ---
->  arch/arm/boot/dts/imx7s.dtsi | 19 +++++++++++++++++++
->  1 file changed, 19 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
-> index ce85b3ca1a55..5bc0d4109da1 100644
-> --- a/arch/arm/boot/dts/imx7s.dtsi
-> +++ b/arch/arm/boot/dts/imx7s.dtsi
-> @@ -1001,6 +1001,25 @@
->  				status = "disabled";
->  			};
-> 
-> +			mu0a: mailbox at 30aa0000 {
-> +				compatible = "fsl,imx7s-mu";
-> +				reg = <0x30aa0000 0x10000>;
-> +				interrupts = <GIC_SPI 88
-> IRQ_TYPE_LEVEL_HIGH>;
-> +				clocks = <&clks IMX7D_MU_ROOT_CLK>;
-> +				#mbox-cells = <1>;
-> +				fsl,mu-side-a;
+> 20180615 changes v3:
+> - DT: remove prosaic part of documentation. It describes software
+>   or firmware specific usage and not relevant for HW description.
+> - DT: use <soc>-mu instead of <soc>-mu-<mu side> and add fsl,mu-side-a
+>   parameter.
+> - DT: add most of know i.MX variants with MU
+> - imx-mailbox: use macros instead of precalculated bit index.
+> - imx-mailbox: remove warning message for clk.
+> - imx-mailbox: use imx_mu_chan[%idx] for devm_request_irq.
+> - imx-mailbox: depend on ARCH_MXS instead of SOX_IMX7
 
-Excpet this property which I commented in patch 1, otherwise, this path
-Is okay to me.
+It's ARCH_MXC, but no affection on real patches.
 
 Regards
 Dong Aisheng
 
-> +				status = "disabled";
-> +			};
-> +
-> +			mu0b: mailbox at 30ab0000 {
-> +				compatible = "fsl,imx7s-mu";
-> +				reg = <0x30ab0000 0x10000>;
-> +				interrupts = <GIC_SPI 97
-> IRQ_TYPE_LEVEL_HIGH>;
-> +				clocks = <&clks IMX7D_MU_ROOT_CLK>;
-> +				#mbox-cells = <1>;
-> +				status = "disabled";
-> +			};
-> +
->  			usbotg1: usb at 30b10000 {
->  				compatible = "fsl,imx7d-usb", "fsl,imx27-usb";
->  				reg = <0x30b10000 0x200>;
+> 
+> 20180615 changes v2:
+> - DT: use mailbox@ instead of mu@
+> - DT: change interrupts description
+> - clk: use imx_clk_gate4 instead of imx_clk_gate2
+> - imx-mailbox: remove last_tx_done support
+> - imx-mailbox: fix module description
+> 
+> This patches are providing support for mailbox (Messaging Unit) for i.MX7D.
+> Functionality was tested on PHYTEC phyBOARD-Zeta i.MX7D with Linux
+> running on all cores: ARM Cortex-A7 and ARM Cortex-M4.
+> 
+> Both parts of i.MX messaging Unit are visible for all CPUs available on i.MX7D.
+> Communication worked independent of MU side in combination with CPU.
+> For example MU-A used on ARM Cortex-A7 and MU-B used on ARM Cortex-
+> M4 or other ways around.
+> 
+> 
+> Oleksij Rempel (3):
+>   dt-bindings: arm: fsl: add mu binding doc
+>   ARM: dts: imx7s: add i.MX7 messaging unit support
+>   mailbox: Add support for i.MX7D messaging unit
+> 
+>  .../devicetree/bindings/mailbox/fsl,mu.txt    |  32 ++
+>  arch/arm/boot/dts/imx7s.dtsi                  |  19 ++
+>  drivers/mailbox/Kconfig                       |   6 +
+>  drivers/mailbox/Makefile                      |   2 +
+>  drivers/mailbox/imx-mailbox.c                 | 294 ++++++++++++++++++
+>  5 files changed, 353 insertions(+)
+>  create mode 100644
+> Documentation/devicetree/bindings/mailbox/fsl,mu.txt
+>  create mode 100644 drivers/mailbox/imx-mailbox.c
+> 
 > --
 > 2.18.0
