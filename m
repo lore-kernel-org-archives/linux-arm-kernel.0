@@ -1,80 +1,60 @@
-From: jcrouse@codeaurora.org (Jordan Crouse)
-Date: Tue, 17 Jul 2018 14:19:49 -0600
-Subject: [PATCH 04/16] iommu: sva: Add support for private PASIDs
-In-Reply-To: <c87ae21f-ac02-17fe-6d11-48d2840911e1@arm.com>
-References: <20180518213500.31595-1-jcrouse@codeaurora.org>
- <20180518213500.31595-5-jcrouse@codeaurora.org>
- <c87ae21f-ac02-17fe-6d11-48d2840911e1@arm.com>
-Message-ID: <20180717201949.GA7632@jcrouse-lnx.qualcomm.com>
+From: linux.amoon@gmail.com (Anand Moon)
+Date: Wed, 18 Jul 2018 01:53:59 +0530
+Subject: [PATCH 1/5] thermal: exynos: enable core tmu clk on exynos
+ platform
+In-Reply-To: <CAJKOXPdP78VFQgSQ9z9WsgYY_YhEKPUt=0MOra6Pz6smQeiNGg@mail.gmail.com>
+References: <1531822342-4293-1-git-send-email-linux.amoon@gmail.com>
+ <CAJKOXPdP78VFQgSQ9z9WsgYY_YhEKPUt=0MOra6Pz6smQeiNGg@mail.gmail.com>
+Message-ID: <CANAwSgS=08fVsqn95WHzSF71WTTyD2-=K2C6-BEz0tY0t6A1-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 17, 2018 at 12:21:03PM +0100, Jean-Philippe Brucker wrote:
-> Hi Jordan,
-> 
-> Thanks for the patches, I finally got around testing them with SMMUv3.
-> It's an important feature, arguably more than SVA itself. I could pick
-> this one as part of the SVA series, what do you think?
+Hi Krzysztof
 
-I'm good with whatever is the easiest.
+On 17 July 2018 at 17:50, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+> Hi Anand,
+>
+> Thanks for patch.
+>
+> On 17 July 2018 at 12:12, Anand Moon <linux.amoon@gmail.com> wrote:
+>> clk_summary do not show tmu_apbif clk enable, so replace
+>> the clk_prepare with clk_prepare_enables to enable tmu clk.
+>
+> This is not valid reason to do a change. What is clk_summary does not
+> really matter. Your change has negative impact on power consumption as
+> the clock stays enabled all the time. This is not what we want... so
+> please explain it more - why you need the clock to be enabled all the
+> time? What is broken (clk_summary is not broken in this case)?
+>
 
-> Although I probably would have done the same, I dislike the interface
-> because it forces us to duplicate functions and IOMMU ops. The list is
-> small but growing:
-> 
-> iommu_map
-> iommu_map_sg
-> iommu_unmap
-> iommu_unmap_fast
-> iommu_iova_to_phys
-> iommu_tlb_range_add
-> iommu_flush_tlb_all
-> 
-> Each of these and their associated IOMMU op will have an iommu_sva_X
-> counterpart that takes one different argument. Modifying these functions
-> to take both a domain and a PASID argument would be more elegant. Or as
-> an intermediate solution, perhaps we could only change the IOMMU ops to
-> take an additional argument, like you did for map_sg?
-> 
-> In any case it requires invasive changes in lots of drivers and we can
-> always tidy up later, so unless Joerg has a preference I'd keep the
-> duplicates for now.
+Opps I could not explain some more in my commit message.
 
-I agree.
+Actually TMU sensor for Exynos process are controlled by so external clk
 
-> However, having to lookup pasid-to-io_mm on every map/unmap call is
-> cumbersome, especially since map/unmap are supposed to be as fast as
-> possible. iommu_sva_alloc_pasid should return a structure representing
-> the PASID instead of the value alone. The io_mm structure seems like a
-> good fit, and the device driver can access io_mm->pasid directly or via
-> an io_mm_get_pasid() function.
-> 
-> The new functions would then be:
-> 
-> struct io_mm *iommu_sva_alloc_pasid(domain, dev)
-> void iommu_sva_free_pasid(domain, io_mm)
-> 
-> int iommu_sva_map(io_mm, iova, paddr, size, prot)
-> size_t iommu_map_sg(io_mm, iova, sg, nents, prot)
-> size_t iommu_sva_unmap(io_mm, iova, size)
-> size_t iommu_sva_unmap_fast(io_mm, iova, size)
-> phys_addr_t iommu_sva_iova_to_phys(io_mm, iova)
-> void iommu_sva_flush_tlb_all(io_mm)
-> void iommu_sva_tlb_range_add(io_mm, iova, size)
+Exynos4412 have VDD18_TS sensor which controls the CLK_SENSE tmu.
+Exynos5422 have VDD18_TS01 / VDD18_TS23 / VDD18_TS4 sensor which
+control the CLK_SENSE tmu.
 
-Okay - this sounds reasonable - a simplification like that could
-even lead to making all the new functions static inlines which
-would cut down on the exported symbols.
+So as per my understanding tmu is clk driver which control the flow  PMIC.
 
-> A few more comments inline
+clk_prepare_enable combine clk_prepare and clk_enable
+and clk_disable_unprepare combine clk_disable and clk_unprepare.
 
-All those sound like good ideas to me. I'll take a bit of time to bash on this
-and send out an updated revision soonish.
+most of the driver prefer clk_prepare_enable and clk_disable_unprepare.
 
-Jordan
+clk_summary is just a reference looking point where we could check the
+clk is enable/disable.
 
-<snip>
+what is broken ?
+I still few more parameter need to tuned to configure the tmu driver.
 
--- 
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+>> simplify the enable of tmu_triminfo_apbif clk, also fixed
+>> the order of goto error for failed cases.
+>
+> This has to be split into separate change.
+>
+> Best regards,
+> Krzysztof
+
+Best Regards
+-Anand
