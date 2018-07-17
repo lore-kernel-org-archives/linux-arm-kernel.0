@@ -1,119 +1,45 @@
-From: jolly.shah@xilinx.com (Jolly Shah)
-Date: Tue, 17 Jul 2018 12:58:57 -0700
-Subject: [PATCH v10 00/10] drivers: Introduce firmware dnd clock river for
- ZynqMP core
-Message-ID: <1531857547-16652-1-git-send-email-jollys@xilinx.com>
+From: linux.amoon@gmail.com (Anand Moon)
+Date: Wed, 18 Jul 2018 01:29:53 +0530
+Subject: [PATCH 3/5] thermal: exynos: increase the number of trips for
+ exynos542x
+In-Reply-To: <CAJKOXPe_omjhLMfMScTeXG2k908WT4MesMK5obpA0ejBs=vrfg@mail.gmail.com>
+References: <1531822342-4293-1-git-send-email-linux.amoon@gmail.com>
+ <1531822342-4293-3-git-send-email-linux.amoon@gmail.com>
+ <CAJKOXPe_omjhLMfMScTeXG2k908WT4MesMK5obpA0ejBs=vrfg@mail.gmail.com>
+Message-ID: <CANAwSgTx=vYcQ4zrcBQ=GpQ9gXJ+26T7zCF-_zLAh8SxVmcv=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset is adding communication layer with firmware and clock driver who uses 
-those APIs to communicate with PMU.
-Firmware driver provides an interface to firmware APIs.Interface APIs can be used by any driver to communicate to
-PMUFW(Platform Management Unit). All requests go through ATF.
-This patchset adds CCF compliant clock driver for ZynqMP.Clock driver queries supported clock information from 
-firmware and regiters pll and output clocks with CCF.
-v10:
- - Incorporated code review comments from v9 patch series. Discussed below:
-	https://patchwork.kernel.org/patch/10478575/
-	https://patchwork.kernel.org/patch/10478457/
-	https://patchwork.kernel.org/patch/10478461/
-	https://patchwork.kernel.org/patch/10478463/
-	
-v9:
- - Fixed minor typo comments
+Hi Krzysztof,
 
-v8:
- - Corrected typo in clk Kconfig
- 
-v7:
- - Removed xilinx specific clock debugfs API support
- - Added reviewed-by tags for FW and clock bindings
- - Updated clock node name to clock-controller
+On 17 July 2018 at 17:55, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+> On 17 July 2018 at 12:12, Anand Moon <linux.amoon@gmail.com> wrote:
+>> increase the number of trips to support more polling modes,
+>> changes help supress following warning.
+>>
+>> [    4.231731] thermal thermal_zone0: failed to read out thermal zone (-22)
+>> [    4.237190] exynos-tmu 10060000.tmu: More trip points than supported by this TMU.
+>> [    4.244661] exynos-tmu 10060000.tmu: 2 trip points should be configured in polling mode.
+>> [    4.254821] thermal thermal_zone1: failed to read out thermal zone (-22)
+>> [    4.260370] exynos-tmu 10064000.tmu: More trip points than supported by this TMU.
+>> [    4.267631] exynos-tmu 10064000.tmu: 2 trip points should be configured in polling mode.
+>> [    4.277551] thermal thermal_zone2: failed to read out thermal zone (-22)
+>> [    4.283090] exynos-tmu 10068000.tmu: More trip points than supported by this TMU.
+>> [    4.290438] exynos-tmu 10068000.tmu: 2 trip points should be configured in polling mode.
+>> [    4.300280] thermal thermal_zone3: failed to read out thermal zone (-22)
+>> [    4.305711] exynos-tmu 1006c000.tmu: More trip points than supported by this TMU.
+>> [    4.313171] exynos-tmu 1006c000.tmu: 2 trip points should be configured in polling mode.
+>> [    4.323002] thermal thermal_zone4: failed to read out thermal zone (-22)
+>>
+>> CC: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+>> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+>
+> NAK
+>
+> Exynos5420/5422/5800 has 4 trip points (understood as in current driver design).
+>
 
-v6:
- - Broke patch series to have base FW driver and Clock driver user
- - Incorporated code review comments from last FW and Clock driver patch series. Discussed below:
-	https://patchwork.kernel.org/patch/10230759/
-	https://patchwork.kernel.org/patch/10250047/
+Ok no issue.
 
-v5:
- - Added ATF version check support
- - Updated some functions to be static 
- - Minor function name corrections
-
-v4:
- - Changed clock setrate/getrate API prototype to support 64 bit rate
- - Defined macros for get_node_status return values
- - Moved DT node as a child of firmware
- - Changed debugfs APIs to return data to debugfs buffer instead of dumping to kernel log
- - Minor changes to incorporate other review comments from v3 patch series
-
-v3:
- - added some fixes to firmware-ggs.c
- - updated pinmux get/set function argument names to specify function id instead of node id
- - added new pinctrl query macros
- - incorporated review comments from v2 patch series
-
-v2:
- - change SPDX-License-Identifier license text style
- - split patch into multiple patches
- - Updated copyrights
- - Added ABI documentation
- - incorporated logical review comments from previuos patch. Discussed below:
-	https://patchwork.kernel.org/patch/10150665/
-	
-Jolly Shah (1):
-  drivers: clk: Add ZynqMP clock driver
-
-Rajan Vaja (9):
-  dt-bindings: firmware: Add bindings for ZynqMP firmware
-  firmware: xilinx: Add Zynqmp firmware driver
-  firmware: xilinx: Add zynqmp IOCTL API for device control
-  firmware: xilinx: Add query data API
-  firmware: xilinx: Add clock APIs
-  firmware: xilinx: Add debugfs interface
-  firmware: xilinx: Add debugfs for IOCTL API
-  firmware: xilinx: Add debugfs for query data API
-  dt-bindings: clock: Add bindings for ZynqMP clock driver
-
- .../firmware/xilinx/xlnx,zynqmp-firmware.txt       |  82 +++
- arch/arm64/Kconfig.platforms                       |   1 +
- drivers/clk/Kconfig                                |   1 +
- drivers/clk/Makefile                               |   1 +
- drivers/clk/zynqmp/Kconfig                         |  10 +
- drivers/clk/zynqmp/Makefile                        |   4 +
- drivers/clk/zynqmp/clk-gate-zynqmp.c               | 144 +++++
- drivers/clk/zynqmp/clk-mux-zynqmp.c                | 141 ++++
- drivers/clk/zynqmp/clk-zynqmp.h                    |  68 ++
- drivers/clk/zynqmp/clkc.c                          | 719 +++++++++++++++++++++
- drivers/clk/zynqmp/divider.c                       | 217 +++++++
- drivers/clk/zynqmp/pll.c                           | 335 ++++++++++
- drivers/firmware/Kconfig                           |   1 +
- drivers/firmware/Makefile                          |   1 +
- drivers/firmware/xilinx/Kconfig                    |  23 +
- drivers/firmware/xilinx/Makefile                   |   5 +
- drivers/firmware/xilinx/zynqmp-debug.c             | 249 +++++++
- drivers/firmware/xilinx/zynqmp-debug.h             |  22 +
- drivers/firmware/xilinx/zynqmp.c                   | 562 ++++++++++++++++
- include/dt-bindings/clock/xlnx,zynqmp-clk.h        | 116 ++++
- include/linux/firmware/xlnx-zynqmp.h               | 116 ++++
- 21 files changed, 2818 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt
- create mode 100644 drivers/clk/zynqmp/Kconfig
- create mode 100644 drivers/clk/zynqmp/Makefile
- create mode 100644 drivers/clk/zynqmp/clk-gate-zynqmp.c
- create mode 100644 drivers/clk/zynqmp/clk-mux-zynqmp.c
- create mode 100644 drivers/clk/zynqmp/clk-zynqmp.h
- create mode 100644 drivers/clk/zynqmp/clkc.c
- create mode 100644 drivers/clk/zynqmp/divider.c
- create mode 100644 drivers/clk/zynqmp/pll.c
- create mode 100644 drivers/firmware/xilinx/Kconfig
- create mode 100644 drivers/firmware/xilinx/Makefile
- create mode 100644 drivers/firmware/xilinx/zynqmp-debug.c
- create mode 100644 drivers/firmware/xilinx/zynqmp-debug.h
- create mode 100644 drivers/firmware/xilinx/zynqmp.c
- create mode 100644 include/dt-bindings/clock/xlnx,zynqmp-clk.h
- create mode 100644 include/linux/firmware/xlnx-zynqmp.h
-
--- 
-2.7.4
+Best Regards
+-Anand
