@@ -1,68 +1,64 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Tue, 17 Jul 2018 10:51:00 -0500
-Subject: [GIT PULL] Amlogic 64-bit DT updates for v4.19
-Message-ID: <7hva9dn9nf.fsf@baylibre.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 17 Jul 2018 16:55:22 +0100
+Subject: [PATCH v3 5/7] arm64: smp: remove cpu and numa topology
+ information when hotplugging out CPU
+In-Reply-To: <1c47b3fd-59ba-aba4-43b2-ed98e750887b@arm.com>
+References: <1530874968-5960-1-git-send-email-sudeep.holla@arm.com>
+ <1530874968-5960-6-git-send-email-sudeep.holla@arm.com>
+ <CAMuHMdXw9My+P1UCJ19Qdjq4O9gY_0QVFZaw6C5Ytmpyac59Vw@mail.gmail.com>
+ <20180717140536.GA27323@e107155-lin>
+ <CAMuHMdUnL=XyoSfRU+ebVUjsiP89V4vcoN=O4xc0VwHmLP72HA@mail.gmail.com>
+ <1c47b3fd-59ba-aba4-43b2-ed98e750887b@arm.com>
+Message-ID: <5a23f1c8-27cb-b09c-90fc-edab3eec99f9@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
 
-  Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
 
-are available in the git repository at:
+On 17/07/18 16:34, Sudeep Holla wrote:
+> 
+> 
+> On 17/07/18 16:06, Geert Uytterhoeven wrote:
+>> Hi Sudeep,
+>>
+>> On Tue, Jul 17, 2018 at 4:05 PM Sudeep Holla <sudeep.holla@arm.com> wrote:
+>>> On Tue, Jul 17, 2018 at 02:58:14PM +0200, Geert Uytterhoeven wrote:
+>>>> On Fri, Jul 6, 2018 at 1:04 PM Sudeep Holla <sudeep.holla@arm.com> wrote:
+> 
+> [...]
+> 
+>>>> All but CPU0 tested, as expected.
+>>>
+>>> OK, does the firmware on this system not allow CPU0 to be hotplugged out ?
+>>
+>> Correct. But that's not the issue.
+>>
+> 
+> Yes,  was just trying to understand the behavior.
+> 
+> [..]
+> 
+>>>> Woops, CPU5-7 are not tested.
+>>>
+>>> I don't understand what you mean by that. From the logs, it looks fine.
+>>> What do you mean by "CPU5-7 are not tested" ?
+>>> Sorry, but I am finding it hard to understand the issue from the log.
+>>
+>> The above is not the log, but the diff between the log before and after the bad
+>> commit. So lines prefixed with "-" are no longer printed.
+>> Before, CPU4-7 were tested for hotplug in group 1.
+>> After, only CPU4 is tested for hotplug in group 1.
+>>
+> 
+> Ah OK, I think I now understand what is the issue, will try to replicate
+> at my end and get back to you.
+> 
+Going through the code again, I think I understand the problem here.
+We use the topology_core_mask pointers which are stashed in cpu_groups[]
+But, the cpumask themselves will be getting modified as the cpus go up
+and down, so we need to make a copy instead of just using the pointer.
+I will see what we can do to fix that.
 
-  https://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt64
-
-for you to fetch changes up to 6a4c2246a2ecb84ce578d23752fa9f8fc7f832fd:
-
-  ARM64: dts: meson-axg: add pdm pins (2018-07-17 08:32:12 -0700)
-
-----------------------------------------------------------------
-Amlogic 64-bit DT updates for v4.19
-- new SoC: S805x
-- new board: S805x-based P241 board from Amlogic
-- AXG: add ADC support w/buttons, add pins for PDM, SPDIF
-- AXG: s400 board: preliminary support for audio
-- GX: nanopi-k2: add HDMI, CEC, CVBS support
-
-----------------------------------------------------------------
-Jerome Brunet (9):
-      ARM64: dts: meson-axg: add s400 microphone card leds
-      ARM64: dts: meson-axg: add s400 main 12v supply
-      ARM64: dts: meson-axg: add s400 speaker amplifier
-      ARM64: dts: meson-axg: add spdif output pins
-      ARM64: dts: meson-axg: remove vddio_ao18 from SoC dtsi
-      ARM64: dts: meson-axg: add adc buttons the S400
-      ARM64: dts: meson-axg: remove spdif out from gpio a7
-      ARM64: dts: meson-axg: add spdif input pins
-      ARM64: dts: meson-axg: add pdm pins
-
-Martin Blumenstingl (2):
-      ARM64: dts: meson: enable the saradc node in meson-gx-p23x-q20x.dtsi
-      ARM64: dts: meson-gx-p23x-q20x: move the wifi node to each board's .dts
-
-Neil Armstrong (3):
-      ARM64: dts: meson-gxbb-nanopi-k2: Add HDMI, CEC and CVBS nodes
-      dt-bindings: amlogic: Add support for GXL S805X and the P241 board
-      ARM64: dts: add S805X based P241 board
-
-Viresh Kumar (1):
-      ARM64: dts: amlogic: Add missing cooling device properties for CPUs
-
-Xingyu Chen (1):
-      ARM64: dts: meson-axg: add saradc support
-
- Documentation/devicetree/bindings/arm/amlogic.txt     |   6 ++++
- arch/arm64/boot/dts/amlogic/Makefile                  |   1 +
- arch/arm64/boot/dts/amlogic/meson-axg-s400.dts        | 111 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- arch/arm64/boot/dts/amlogic/meson-axg.dtsi            | 126 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi   |  17 ++++++---
- arch/arm64/boot/dts/amlogic/meson-gxbb-nanopi-k2.dts  |  48 ++++++++++++++++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gxl-s805x-p241.dts  | 218 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p230.dts  |  15 +++-----
- arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p231.dts  |   7 ++++
- arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts |  24 +++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gxm-q200.dts        |  15 +++-----
- arch/arm64/boot/dts/amlogic/meson-gxm-q201.dts        |   7 ++++
- 12 files changed, 570 insertions(+), 25 deletions(-)
- create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl-s805x-p241.dts
+-- 
+Regards,
+Sudeep
