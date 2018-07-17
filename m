@@ -1,126 +1,178 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Tue, 17 Jul 2018 12:34:58 +0100
-Subject: [PATCH] kvm: arm/arm64: Fix emulated physical timer IRQ injection
-In-Reply-To: <20180717101040.GE30570@e113682-lin.lund.arm.com>
-References: <20180716172357.6121-1-andre.przywara@arm.com>
- <20180717101040.GE30570@e113682-lin.lund.arm.com>
-Message-ID: <0acb919d-04d2-66f9-5281-ddcae5342578@arm.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Tue, 17 Jul 2018 13:38:32 +0200
+Subject: [PATCH v4] arm64: dts: r8a77995: Add SCIF {0, 1, 3, 4,
+ 5} and all HSCIF device nodes
+Message-ID: <20180717113832.26413-1-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
 
-On 17/07/18 11:10, Christoffer Dall wrote:
-> On Mon, Jul 16, 2018 at 06:23:57PM +0100, Andre Przywara wrote:
->> When KVM emulates a physical timer, we keep track of the interrupt
->> condition and try to inject an IRQ to the guest when needed.
->> This works if the timer expires when either the guest is running or KVM
->> does work on behalf of it, since it calls kvm_timer_update_state().
->> However when the guest's VCPU is not scheduled (for instance because
->> the guest issued a WFI instruction before), we miss injecting the interrupt
->> when the VCPU's state gets restored back in kvm_timer_vcpu_load().
->>
->> Fix this by moving the interrupt injection check into the
->> phys_timer_emulate() function, so that all possible paths of execution
->> are covered.
->>
->> This fixes the physical timer emulation, which broke when it got changed
->> in the 4.15 merge window.
->> The respective kvm-unit-test check has been posted already.
->>
->> Cc: Stable <stable@vger.kernel.org> # 4.15+
->> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->> ---
->>  virt/kvm/arm/arch_timer.c | 21 +++++++++++++--------
->>  1 file changed, 13 insertions(+), 8 deletions(-)
->>
->> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
->> index bd3d57f40f1b..1949fb0b80a4 100644
->> --- a/virt/kvm/arm/arch_timer.c
->> +++ b/virt/kvm/arm/arch_timer.c
->> @@ -294,17 +294,26 @@ static void phys_timer_emulate(struct kvm_vcpu *vcpu)
->>  	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
->>  	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
->>  
->> +	/* If the timer cannot fire at all, then we don't need a soft timer. */
->> +	if (!kvm_timer_irq_can_fire(ptimer)) {
->> +		soft_timer_cancel(&timer->phys_timer, NULL);
->> +		kvm_timer_update_irq(vcpu, false, ptimer);
->> +		return;
->> +	}
-> 
-> This stuff is breaking what the intention is with the
-> phys_timer_emulate() function.  See the comment above the function,
-> which says that this is about scheduling the background soft timer, and
-> not about managing the rest of the state.
-> 
-> At least that function needs updating.
+This patch adds the device nodes for SCIF {0,1,3,4,5} and all HSCIF serial
+ports, incl. clocks, power domain and DMAs.
 
-Well, my naive understanding of "phys_timer_emulate()" was that it takes
-care of the whole task, and injecting the IRQ is an integral part of the
-package. As it stands with your patches now, the caller of
-phys_timer_emulate() has to take care of the IRQ injection, which smells
-a bit fragile. So since we have this "phys_timer_emulate(); if()
-kvm_timer_update_irq() ...;" sequence now exactly twice, I found it more
-logical to move that into the function.
-But I don't really care (or we wrap this once more as Marc suggested).
-And as your version also works (tested with both kvm-unit-tests and by
-running a hacked Linux guest which always uses the physical timer), feel
-free to send your patches. You might want to declare ptimer in
-kvm_timer_vcpu_load() though ;-) and also amend this comment in
-phys_timer_emulate().
-I think having this separate bites me a bit in the nested virt rework
-(because it's more than one timer to emulate), but I can fix this there.
+Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+--
+v3 [Simon Horman]
+* Add DMAs
+* group SCIF nodes together
+* squash SCIF and HSCIF patches
 
->> +
->>  	/*
->> -	 * If the timer can fire now we have just raised the IRQ line and we
->> -	 * don't need to have a soft timer scheduled for the future.  If the
->> -	 * timer cannot fire at all, then we also don't need a soft timer.
->> +	 * If the timer can fire now, we don't need to have a soft timer
->> +	 * scheduled for the future, as we also raise the IRQ line.
->>  	 */
->> -	if (kvm_timer_should_fire(ptimer) || !kvm_timer_irq_can_fire(ptimer)) {
->> +	if (kvm_timer_should_fire(ptimer)) {
->>  		soft_timer_cancel(&timer->phys_timer, NULL);
->> +		kvm_timer_update_irq(vcpu, true, ptimer);
->> +
->>  		return;
->>  	}
->>  
->>  	soft_timer_start(&timer->phys_timer, kvm_timer_compute_delta(ptimer));
->> +	kvm_timer_update_irq(vcpu, false, ptimer);
-> 
-> This is clearly racy as you'll lower the interrupt that may have just
-> fired between these two lines.
+v2 [Simon Horman]
+* updated internal clock from S3D1 to S3D1C to match documentation
 
-True, Marc pointed that out already and I fixed in in v2.
+v1 [Ulrich Hecht]
 
-Cheers,
-Andre.
+v0 [Takeshi Kihara]
+---
+ arch/arm64/boot/dts/renesas/r8a77995.dtsi | 118 ++++++++++++++++++++++++++++++
+ 1 file changed, 118 insertions(+)
 
->>  }
->>  
->>  /*
->> @@ -316,7 +325,6 @@ static void kvm_timer_update_state(struct kvm_vcpu *vcpu)
->>  {
->>  	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
->>  	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
->> -	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
->>  	bool level;
->>  
->>  	if (unlikely(!timer->enabled))
->> @@ -332,9 +340,6 @@ static void kvm_timer_update_state(struct kvm_vcpu *vcpu)
->>  	level = kvm_timer_should_fire(vtimer);
->>  	kvm_timer_update_irq(vcpu, level, vtimer);
->>  
->> -	if (kvm_timer_should_fire(ptimer) != ptimer->irq.level)
->> -		kvm_timer_update_irq(vcpu, !ptimer->irq.level, ptimer);
->> -
->>  	phys_timer_emulate(vcpu);
->>  }
->>  
->> -- 
->> 2.14.4
->>
-> 
+diff --git a/arch/arm64/boot/dts/renesas/r8a77995.dtsi b/arch/arm64/boot/dts/renesas/r8a77995.dtsi
+index 6c0a8217d40f..fe77bc43c447 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77995.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a77995.dtsi
+@@ -242,6 +242,41 @@
+ 			resets = <&cpg 407>;
+ 		};
+ 
++		hscif0: serial at e6540000 {
++			compatible = "renesas,hscif-r8a77995",
++				     "renesas,rcar-gen3-hscif",
++				     "renesas,hscif";
++			reg = <0 0xe6540000 0 0x60>;
++			interrupts = <GIC_SPI 154 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 520>,
++				 <&cpg CPG_CORE R8A77995_CLK_S3D1C>,
++				 <&scif_clk>;
++			clock-names = "fck", "brg_int", "scif_clk";
++			dmas = <&dmac1 0x31>, <&dmac1 0x30>,
++			       <&dmac2 0x31>, <&dmac2 0x30>;
++			dma-names = "tx", "rx", "tx", "rx";
++			power-domains = <&sysc R8A77995_PD_ALWAYS_ON>;
++			resets = <&cpg 520>;
++			status = "disabled";
++		};
++
++		hscif3: serial at e66a0000 {
++			compatible = "renesas,hscif-r8a77995",
++				     "renesas,rcar-gen3-hscif",
++				     "renesas,hscif";
++			reg = <0 0xe66a0000 0 0x60>;
++			interrupts = <GIC_SPI 145 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 517>,
++				 <&cpg CPG_CORE R8A77995_CLK_S3D1C>,
++				 <&scif_clk>;
++			clock-names = "fck", "brg_int", "scif_clk";
++			dmas = <&dmac0 0x37>, <&dmac0 0x36>;
++			dma-names = "tx", "rx";
++			power-domains = <&sysc R8A77995_PD_ALWAYS_ON>;
++			resets = <&cpg 517>;
++			status = "disabled";
++		};
++
+ 		i2c0: i2c at e6500000 {
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+@@ -605,6 +640,40 @@
+ 			status = "disabled";
+ 		};
+ 
++		scif0: serial at e6e60000 {
++			compatible = "renesas,scif-r8a77995",
++				     "renesas,rcar-gen3-scif", "renesas,scif";
++			reg = <0 0xe6e60000 0 64>;
++			interrupts = <GIC_SPI 152 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 207>,
++				 <&cpg CPG_CORE R8A77995_CLK_S3D1C>,
++				 <&scif_clk>;
++			clock-names = "fck", "brg_int", "scif_clk";
++			dmas = <&dmac1 0x51>, <&dmac1 0x50>,
++			       <&dmac2 0x51>, <&dmac2 0x50>;
++			dma-names = "tx", "rx", "tx", "rx";
++			power-domains = <&sysc R8A77995_PD_ALWAYS_ON>;
++			resets = <&cpg 207>;
++			status = "disabled";
++		};
++
++		scif1: serial at e6e68000 {
++			compatible = "renesas,scif-r8a77995",
++				     "renesas,rcar-gen3-scif", "renesas,scif";
++			reg = <0 0xe6e68000 0 64>;
++			interrupts = <GIC_SPI 153 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 206>,
++				 <&cpg CPG_CORE R8A77995_CLK_S3D1C>,
++				 <&scif_clk>;
++			clock-names = "fck", "brg_int", "scif_clk";
++			dmas = <&dmac1 0x53>, <&dmac1 0x52>,
++			       <&dmac2 0x53>, <&dmac2 0x52>;
++			dma-names = "tx", "rx", "tx", "rx";
++			power-domains = <&sysc R8A77995_PD_ALWAYS_ON>;
++			resets = <&cpg 206>;
++			status = "disabled";
++		};
++
+ 		scif2: serial at e6e88000 {
+ 			compatible = "renesas,scif-r8a77995",
+ 				     "renesas,rcar-gen3-scif", "renesas,scif";
+@@ -622,6 +691,55 @@
+ 			status = "disabled";
+ 		};
+ 
++		scif3: serial at e6c50000 {
++			compatible = "renesas,scif-r8a77995",
++				     "renesas,rcar-gen3-scif", "renesas,scif";
++			reg = <0 0xe6c50000 0 64>;
++			interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 204>,
++				 <&cpg CPG_CORE R8A77995_CLK_S3D1C>,
++				 <&scif_clk>;
++			clock-names = "fck", "brg_int", "scif_clk";
++			dmas = <&dmac0 0x57>, <&dmac0 0x56>;
++			dma-names = "tx", "rx";
++			power-domains = <&sysc R8A77995_PD_ALWAYS_ON>;
++			resets = <&cpg 204>;
++			status = "disabled";
++		};
++
++		scif4: serial at e6c40000 {
++			compatible = "renesas,scif-r8a77995",
++				     "renesas,rcar-gen3-scif", "renesas,scif";
++			reg = <0 0xe6c40000 0 64>;
++			interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 203>,
++				 <&cpg CPG_CORE R8A77995_CLK_S3D1C>,
++				 <&scif_clk>;
++			clock-names = "fck", "brg_int", "scif_clk";
++			dmas = <&dmac0 0x59>, <&dmac0 0x58>;
++			dma-names = "tx", "rx";
++			power-domains = <&sysc R8A77995_PD_ALWAYS_ON>;
++			resets = <&cpg 203>;
++			status = "disabled";
++		};
++
++		scif5: serial at e6f30000 {
++			compatible = "renesas,scif-r8a77995",
++				     "renesas,rcar-gen3-scif", "renesas,scif";
++			reg = <0 0xe6f30000 0 64>;
++			interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 202>,
++				 <&cpg CPG_CORE R8A77995_CLK_S3D1C>,
++				 <&scif_clk>;
++			clock-names = "fck", "brg_int", "scif_clk";
++			dmas = <&dmac1 0x5b>, <&dmac1 0x5a>,
++			       <&dmac2 0x5b>, <&dmac2 0x5a>;
++			dma-names = "tx", "rx", "tx", "rx";
++			power-domains = <&sysc R8A77995_PD_ALWAYS_ON>;
++			resets = <&cpg 202>;
++			status = "disabled";
++		};
++
+ 		msiof0: spi at e6e90000 {
+ 			compatible = "renesas,msiof-r8a77995",
+ 				     "renesas,rcar-gen3-msiof";
+-- 
+2.11.0
