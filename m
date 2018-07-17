@@ -1,28 +1,50 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 17 Jul 2018 11:20:21 -0300
-Subject: [PATCH] ARM: dts: imx6sx-udoo-neo: enable i2c-2 and i2c-4 for
- onboard sensors
-In-Reply-To: <CALeDE9N5AnQba5LirHegWgz2_3Rr6cCT_ttTUtg38OdvdegpFA@mail.gmail.com>
-References: <20180713171151.24699-1-pbrobinson@gmail.com>
- <CAOMZO5B+1atjr3Ur7EGMJSEbqT8zqWdKZWNHrkyCGvgGM4nJFg@mail.gmail.com>
- <CALeDE9N5AnQba5LirHegWgz2_3Rr6cCT_ttTUtg38OdvdegpFA@mail.gmail.com>
-Message-ID: <CAOMZO5BDEnFU__1iSuVpmRKx4SK5F+WFNho-ujTSCobQy-vzSw@mail.gmail.com>
+From: james.morse@arm.com (James Morse)
+Date: Tue, 17 Jul 2018 15:20:47 +0100
+Subject: [PATCH] arm64: fix kernel panic on serror exception caused by
+ user process
+In-Reply-To: <CAM5rFu8avWLrUhEsCHBTKv=sM6dE3Sh_0=5M3Eh0WcT9EdmtSg@mail.gmail.com>
+References: <1531819881-2931-1-git-send-email-hari.vyas@broadcom.com>
+ <1531819881-2931-2-git-send-email-hari.vyas@broadcom.com>
+ <20180717100628.s5emikyc6orira2q@lakrids.cambridge.arm.com>
+ <CAM5rFu_trZpt20H2GAUq8GYTOuJMSmEknsQaEkPkDwFHPVDPeA@mail.gmail.com>
+ <20180717114815.5a3rbcznfzvi2xh6@lakrids.cambridge.arm.com>
+ <CAM5rFu8avWLrUhEsCHBTKv=sM6dE3Sh_0=5M3Eh0WcT9EdmtSg@mail.gmail.com>
+Message-ID: <6ac1a5b0-6767-bb76-012e-b8270a580ca2@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+Hi hari,
 
-On Mon, Jul 16, 2018 at 11:43 AM, Peter Robinson <pbrobinson@gmail.com> wrote:
+On 17/07/18 14:40, Hari Vyas wrote:
+> On Tue, Jul 17, 2018 at 5:18 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+>> ... indeed, and this was a bug, which was addressed by ensuring that
+>> an uncontainable SError was always fatal.
+>>
+> If I check commit message for do_serror(), it says some hooks can be
+> added to avoid panic.
+> ---
+> commit a92d4d1454ab8b43b80b89fa31fcedb8821f8164
+> Author: Xie XiuQi <xiexiuqi@huawei.com>
+> 
+> Future patches may change do_serror() to return if the SError
+> Interrupt was notification of a
+> corrected error
+>  --
 
-> Enabling it to turn around and then disable it again seemed counter
+This is referring to the v8.2 RAS Extensions, which add architect-ed ESR values
+to SError. In this example the CPU would use the ESR_ELx.AET bits to describe
+the error as something hardware has corrected. e.g. using ecc. (details in
+D10.2.39 of the ARM-ARM and [0])
+commit 6bf0dcfd7135 ("arm64: kernel: Survive corrected RAS errors notified by
+SError") adds these hooks based on the ESR information.
 
-Other option would be to put i2c4 with status = "disabled" in the common file
-and enable i2c4 on the two dts files that suport it.
+Without the information in the ESR (and a few other registers), we can't know
+what the SError means, it has to be fatal.
 
-> intuitive to me hence the way I did, the WiFi in done that way even
-> though it's not on all boards and I would imagine it would cause
-> errors on the devices where there isn't wifi although I don't have
-> those model(s) to verify.
 
-If the Wifi is not present, then it will not be probed, so it would
-not cause problems.
+Thanks,
+
+James
+
+[0]
+https://static.docs.arm.com/ddi0587/a/RAS%20Extension-release%20candidate_march_29.pdf
