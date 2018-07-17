@@ -1,50 +1,132 @@
 From: yaojun8558363@gmail.com (Jun Yao)
-Date: Tue, 17 Jul 2018 17:56:02 +0800
-Subject: [PATCH v4 0/6] arm64/mm: Move {idmap_pg_dir,swapper_pg_dir} to
-Message-ID: <20180717095608.11008-1-yaojun8558363@gmail.com>
+Date: Tue, 17 Jul 2018 17:56:03 +0800
+Subject: [PATCH v4 1/6] arm64/mm: Introduce init_pg_dir
+In-Reply-To: <20180717095608.11008-1-yaojun8558363@gmail.com>
+References: <20180717095608.11008-1-yaojun8558363@gmail.com>
+Message-ID: <20180717095608.11008-2-yaojun8558363@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Version 4 changes:
-	1. Rename INIT_DIR to INIT_PG_TABLES and move it outside the
-	   '.init.data' section[1].
-	2. Move the 'count' calculation to clear_pages()[1].
-	3. Rearrange register in __enable_mmu() and pass ttbr1 through
-	   the x1 register[2].
-	4. Add commit message to explain why we can make swapper_pg_dir
-	   smaller[3].
-	5. Rewrite in_swapper_pgdir() and use pgd_set_fixmap() to
-	   populate swapper_pg_dir. At the same time, add a spin lock to
-	   avoid race conditions[4].
-	6. Move {idmap_pg_dir,tramp_pg_dir,reserved_ttbr0,swapper_pg_dir}
-	   to the KERNEL_PG_TABLES macro. And put this macro after
-	   NOTES[4].
+Add init_pg_dir to vmlinux.lds.S and boiler-plate
+clearing/cleaning/invalidating it in head.S.
 
-v3: https://www.spinics.net/lists/arm-kernel/msg662537.html
-v2: https://patchwork.kernel.org/patch/10485641/
-v1: https://patchwork.kernel.org/patch/10476595/
+Signed-off-by: Jun Yao <yaojun8558363@gmail.com>
+---
+ arch/arm64/include/asm/assembler.h | 29 +++++++++++++++++++++++++++++
+ arch/arm64/kernel/head.S           | 22 +++++++++++++++-------
+ arch/arm64/kernel/vmlinux.lds.S    |  8 ++++++++
+ 3 files changed, 52 insertions(+), 7 deletions(-)
 
-[1] https://lkml.org/lkml/2018/7/6/238
-[2] https://lkml.org/lkml/2018/7/6/239
-[3] https://lkml.org/lkml/2018/7/6/243
-[4] https://lkml.org/lkml/2018/7/11/782
-
-Jun Yao (6):
-  arm64/mm: Introduce init_pg_dir
-  arm64/mm: Make __enable_mmu() take the ttbr1 page as an argument
-  arm64/mm: Create initial page tables in init_pg_dir
-  arm64/mm: Make swapper_pg_dir smaller
-  arm64/mm: Populate swapper_pg_dir by fixmap
-  arm64/mm: Move {idmap_pg_dir, swapper_pg_dir} to .rodata section
-
- arch/arm64/include/asm/assembler.h | 29 +++++++++++++
- arch/arm64/include/asm/pgtable.h   | 66 ++++++++++++++++++++++++++----
- arch/arm64/kernel/head.S           | 45 ++++++++++++--------
- arch/arm64/kernel/setup.c          |  1 +
- arch/arm64/kernel/sleep.S          |  1 +
- arch/arm64/kernel/vmlinux.lds.S    | 47 ++++++++++++++-------
- arch/arm64/mm/mmu.c                | 34 +++------------
- 7 files changed, 154 insertions(+), 69 deletions(-)
-
+diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+index 0bcc98dbba56..eb363a915c0e 100644
+--- a/arch/arm64/include/asm/assembler.h
++++ b/arch/arm64/include/asm/assembler.h
+@@ -456,6 +456,35 @@ USER(\label, ic	ivau, \tmp2)			// invalidate I line PoU
+ 	b.ne	9998b
+ 	.endm
+ 
++/*
++ * clear_page - clear one page
++ *
++ *	start:	page aligned virtual address
++ */
++	.macro clear_page, start:req
++9996:	stp	xzr, xzr, [\start], #16
++	stp	xzr, xzr, [\start], #16
++	stp	xzr, xzr, [\start], #16
++	stp	xzr, xzr, [\start], #16
++	tst	\start, #(PAGE_SIZE - 1)
++	b.ne	9996b
++	.endm
++
++/*
++ * clear_pages - clear contiguous pages
++ *
++ *	start, end: page aligend virtual addresses
++ */
++	.macro clear_pages, start:req, end:req
++	sub	\end, \end, \start
++	lsr	\end, \end, #(PAGE_SHIFT)
++9997:	cbz	\end, 9998f
++	clear_page \start
++	sub	\end, \end, #1
++	b	9997b
++9998:
++	.endm
++
+ /*
+  * Annotate a function as position independent, i.e., safe to be called before
+  * the kernel virtual mapping is activated.
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index b0853069702f..2c83a8c47e3f 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -295,18 +295,21 @@ __create_page_tables:
+ 	sub	x1, x1, x0
+ 	bl	__inval_dcache_area
+ 
++	adrp	x0, init_pg_dir
++	adrp	x1, init_pg_end
++	sub	x1, x1, x0
++	bl	__inval_dcache_area
++
+ 	/*
+ 	 * Clear the idmap and swapper page tables.
+ 	 */
+ 	adrp	x0, idmap_pg_dir
+ 	adrp	x1, swapper_pg_end
+-	sub	x1, x1, x0
+-1:	stp	xzr, xzr, [x0], #16
+-	stp	xzr, xzr, [x0], #16
+-	stp	xzr, xzr, [x0], #16
+-	stp	xzr, xzr, [x0], #16
+-	subs	x1, x1, #64
+-	b.ne	1b
++	clear_pages x0, x1
++
++	adrp	x0, init_pg_dir
++	adrp	x1, init_pg_end
++	clear_pages x0, x1
+ 
+ 	mov	x7, SWAPPER_MM_MMUFLAGS
+ 
+@@ -395,6 +398,11 @@ __create_page_tables:
+ 	dmb	sy
+ 	bl	__inval_dcache_area
+ 
++	adrp	x0, init_pg_dir
++	adrp	x1, init_pg_end
++	sub	x1, x1, x0
++	bl	__inval_dcache_area
++
+ 	ret	x28
+ ENDPROC(__create_page_tables)
+ 	.ltorg
+diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+index 605d1b60469c..61d7cee3eaa6 100644
+--- a/arch/arm64/kernel/vmlinux.lds.S
++++ b/arch/arm64/kernel/vmlinux.lds.S
+@@ -68,6 +68,12 @@ jiffies = jiffies_64;
+ #define TRAMP_TEXT
+ #endif
+ 
++#define INIT_PG_TABLES					\
++	. = ALIGN(PAGE_SIZE);                           \
++	init_pg_dir = .;                                \
++	. += SWAPPER_DIR_SIZE;                          \
++	init_pg_end = .;
++
+ /*
+  * The size of the PE/COFF section that covers the kernel image, which
+  * runs from stext to _edata, must be a round multiple of the PE/COFF
+@@ -161,6 +167,8 @@ SECTIONS
+ 	__inittext_end = .;
+ 	__initdata_begin = .;
+ 
++	INIT_PG_TABLES
++
+ 	.init.data : {
+ 		INIT_DATA
+ 		INIT_SETUP(16)
 -- 
 2.17.1
