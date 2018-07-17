@@ -1,48 +1,133 @@
-From: mazziesaccount@gmail.com (Matti Vaittinen)
-Date: Tue, 17 Jul 2018 10:42:12 +0300
-Subject: [PATCH] clk: clkdev - add managed versions of lookup registrations
-In-Reply-To: <CANhJrGN9UkmAAp7-O1dgcviP21uYrAT3-BPLinKuAozR2uQvhQ@mail.gmail.com>
-References: <20180628075453.GA7793@localhost.localdomain>
- <153111802456.143105.16373079820431081414@swboyd.mtv.corp.google.com>
- <CANhJrGN9UkmAAp7-O1dgcviP21uYrAT3-BPLinKuAozR2uQvhQ@mail.gmail.com>
-Message-ID: <CANhJrGM0pF1ZmJBSE0f=tKa3jtV-tmdsgGdNhS0G1f-ij5PiVQ@mail.gmail.com>
+From: dyoung@redhat.com (Dave Young)
+Date: Tue, 17 Jul 2018 15:49:23 +0800
+Subject: [PATCH v11 03/15] powerpc, kexec_file: factor out memblock-based
+ arch_kexec_walk_mem()
+In-Reply-To: <20180717053104.GB11258@linaro.org>
+References: <20180711074203.3019-1-takahiro.akashi@linaro.org>
+ <20180711074203.3019-4-takahiro.akashi@linaro.org>
+ <20180714015223.GA2745@dhcp-128-65.nay.redhat.com>
+ <2a4ec965-5258-5835-3022-8f403a2f6bdd@arm.com>
+ <20180716122412.GA7160@dhcp-128-65.nay.redhat.com>
+ <20180717053104.GB11258@linaro.org>
+Message-ID: <20180717074923.GA8591@dhcp-128-65.nay.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello all,
+Hi AKASHI,
+On 07/17/18 at 02:31pm, AKASHI Takahiro wrote:
+> Hi Dave,
+> 
+> On Mon, Jul 16, 2018 at 08:24:12PM +0800, Dave Young wrote:
+> > On 07/16/18 at 12:04pm, James Morse wrote:
+> > > Hi Dave,
+> > > 
+> > > On 14/07/18 02:52, Dave Young wrote:
+> > > > On 07/11/18 at 04:41pm, AKASHI Takahiro wrote:
+> > > >> Memblock list is another source for usable system memory layout.
+> > > >> So powerpc's arch_kexec_walk_mem() is moved to kexec_file.c so that
+> > > >> other memblock-based architectures, particularly arm64, can also utilise
+> > > >> it. A moved function is now renamed to kexec_walk_memblock() and merged
+> > > >> into the existing arch_kexec_walk_mem() for general use, either resource
+> > > >> list or memblock list.
+> > > >>
+> > > >> A consequent function will not work for kdump with memblock list, but
+> > > >> this will be fixed in the next patch.
+> > > 
+> > > >> diff --git a/kernel/kexec_file.c b/kernel/kexec_file.c
+> > > 
+> > > >> @@ -513,6 +563,10 @@ static int locate_mem_hole_callback(struct resource *res, void *arg)
+> > > >>  int __weak arch_kexec_walk_mem(struct kexec_buf *kbuf,
+> > > >>  			       int (*func)(struct resource *, void *))
+> > > >>  {
+> > > >> +	if (IS_ENABLED(CONFIG_HAVE_MEMBLOCK) &&
+> > > >> +			!IS_ENABLED(CONFIG_ARCH_DISCARD_MEMBLOCK))
+> > > >> +		return kexec_walk_memblock(kbuf, func);
+> > > > 
+> > > > AKASHI, I'm not sure if this works on all arches, for example I chekced
+> > > > the .config on my Nokia N900 kernel tree, there is HAVE_MEMBLOCK=y and
+> > > > no CONFIG_ARCH_DISCARD_MEMBLOCK, in 32bit arm code no arch_kexec_walk_mem()
+> > > By doesn't work you mean it's a change in behaviour?
+> > > I think this is fine because 32bit arm doesn't support KEXEC_FILE, (this file is
+> > > kexec_file specific right?).
+> > 
+> > Ah, replied on a train, I forgot this is only for kexec_file, sorry
+> > about that.  Please ignore the comment.
+> > 
+> > But since we have a weak function arch_kexec_walk_mem, adding another
+> > condition branch within this weak function looks not good.
+> > Something like below would be better:
+> 
+> I see your concern here, but
+> 
+> 
+> > int kexec_locate_mem_hole(struct kexec_buf *kbuf)
+> > {
+> >         int ret;
+> > 
+> > 	+ if use memblock
+> > 	+	ret = kexec_walk_memblock()
+> > 	+ else
+> >         	ret = arch_kexec_walk_mem(kbuf, locate_mem_hole_callback);
+> > 
+> >         return ret == 1 ? 0 : -EADDRNOTAVAIL;
+> > }
+> 
+> what if yet another architecture comes to kexec_file and wanna
+> take a third approach? How can it override those functions?
+> Depending on kernel configuration, it might re-define either
+> kexec_walk_memblock() or arch_kexec_walk_mem(). It sounds weird to me.
 
-Sorry for html email. I'm not used to send mails using gmail app.
-Trying to resend as plain text now...
+I also feel this weird, but it is slightly better because currently no
+user need another overriding requirement, and I feel it is not expected to have in
+the future for the memblock use.
 
-On 7/17/18, Matti Vaittinen <mazziesaccount@gmail.com> wrote:
-> ma 9. hein?k. 2018 klo 9.33 Stephen Boyd <sboyd@kernel.org> kirjoitti:
->
->> Quoting Matti Vaittinen (2018-06-28 00:54:53)
->> > Add devm_clk_hw_register_clkdev, devm_clk_register_clkdev and
->> > devm_clk_release_clkdev as a first styep to clean up drivers which are
->>
->> s/styep/step/
->>
->
-> Snip...
->
-> I'll respond to these comments when I am back from my summer vacation trip
-> after a week or two.
->
-> Best regards
-> Matti Vaittinen
->
->
->>
->
+Rethinking about this issue, we can just remove the weak function and
+just use general function.
 
+Currently with your patch applied only s390 use arch_kexec_walk_mem like
+below:
+/*
+ * The kernel is loaded to a fixed location. Turn off kexec_locate_mem_hole
+ * and provide kbuf->mem by hand.
+ */
+int arch_kexec_walk_mem(struct kexec_buf *kbuf,
+                        int (*func)(struct resource *, void *))
+{
+        return 1;
+}
 
--- 
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
--Matti "Maz" Vaittinen
+AFAIK, all other users initialize kbuf->mem as NULL, so we can check
+kbuf->mem in int kexec_locate_mem_hole:
 
-When you feel blue, no one sees your tears...
-When your down, no one understands your struggle...
-When you feel happy, no one notices your smile...
-But fart just once...
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+if (kbuf->mem)
+	return 0;
+
+if use memblock
+	kexec_walk_memblock
+else
+	kexec_walk_mem
+
+> 
+> Thanks,
+> -Takahiro AKASHI
+> 
+> > 
+> > > 
+> > > It only affects architectures with MEMBLOCK and KEXEC_FILE: powerpc, s390 and
+> > > soon arm64. s390 keeps its behaviour because it provides arch_kexec_walk_mem(),
+> > > and powerpc's is copied in here as its generic 'memblock describes my memory'
+> > > stuff. The implementation would be the same on arm64, so we're doing this to
+> > > avoid duplicating otherwise generic arch code. I think 32bit arm should be able
+> > > to use this too if it gets KEXEC_FILE support. (32bit arms' KEXEC already
+> > > depends on MEMBLOCK).
+> > > 
+> > > 
+> > > Thanks,
+> > > 
+> > > James
+> > 
+> > Thanks
+> > Dave
+
+Thanks
+Dave
