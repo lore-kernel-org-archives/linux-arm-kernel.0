@@ -1,85 +1,62 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Tue, 17 Jul 2018 16:42:42 +0200
-Subject: [PATCH] arm64: zynqmp: Add support for Avnet Ultra96 rev1 board
-In-Reply-To: <80d21c84d427cb6b4122efd3dea7f1c4ab4cf2be.1525261987.git.michal.simek@xilinx.com>
-References: <80d21c84d427cb6b4122efd3dea7f1c4ab4cf2be.1525261987.git.michal.simek@xilinx.com>
-Message-ID: <c94812e7-b213-2a3a-30c9-c0f88ecbefb1@monstr.eu>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 17 Jul 2018 16:46:38 +0200
+Subject: [PATCH] ARM: dts: vf610: Add ZII SSMB SPU3 board
+In-Reply-To: <20180717040651.641-1-andrew.smirnov@gmail.com>
+References: <20180717040651.641-1-andrew.smirnov@gmail.com>
+Message-ID: <20180717144638.GB16320@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2.5.2018 13:53, Michal Simek wrote:
-> Avnet Ultra96 rev1 board is commercialized Xilinx zcu100 revC/D
-> internal board. The patch is reusing zcu100 revC files but changing
-> model description and compatible strings which are used for example by
-> libmraa.
+On Mon, Jul 16, 2018 at 09:06:51PM -0700, Andrey Smirnov wrote:
+> Add support for Zodiac Inflight Innovations SSMB SPU3
+> board (VF610-based).
 > 
-> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> Cc: cphealy at gmail.com
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: devicetree at vger.kernel.org
+> Cc: linux-kernel at vger.kernel.org
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 > ---
+>  arch/arm/boot/dts/Makefile                |   3 +-
+>  arch/arm/boot/dts/vf610-zii-ssmb-spu3.dts | 343 ++++++++++++++++++++++
+>  2 files changed, 345 insertions(+), 1 deletion(-)
+>  create mode 100644 arch/arm/boot/dts/vf610-zii-ssmb-spu3.dts
 > 
-> I choose this option because there are houndreds of zcu100 boards
-> created and this will enable support both versions.
-> 
-> Record avnet prefix was sent by separate patch.
-> ---
->  arch/arm64/boot/dts/xilinx/Makefile           |  1 +
->  .../boot/dts/xilinx/avnet-ultra96-rev1.dts    | 19 +++++++++++++++++++
->  2 files changed, 20 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/xilinx/avnet-ultra96-rev1.dts
-> 
-> diff --git a/arch/arm64/boot/dts/xilinx/Makefile b/arch/arm64/boot/dts/xilinx/Makefile
-> index d452f80e7601..60f5443f3ef4 100644
-> --- a/arch/arm64/boot/dts/xilinx/Makefile
-> +++ b/arch/arm64/boot/dts/xilinx/Makefile
-> @@ -1,4 +1,5 @@
->  # SPDX-License-Identifier: GPL-2.0
-> +dtb-$(CONFIG_ARCH_ZYNQMP) += avnet-ultra96-rev1.dtb
->  dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-zc1232-revA.dtb
->  dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-zc1254-revA.dtb
->  dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-zc1275-revA.dtb
-> diff --git a/arch/arm64/boot/dts/xilinx/avnet-ultra96-rev1.dts b/arch/arm64/boot/dts/xilinx/avnet-ultra96-rev1.dts
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index bea41b129493..e331b2c16539 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -570,7 +570,8 @@ dtb-$(CONFIG_SOC_VF610) += \
+>  	vf610m4-cosmic.dtb \
+>  	vf610-twr.dtb \
+>  	vf610-zii-dev-rev-b.dtb \
+> -	vf610-zii-dev-rev-c.dtb
+> +	vf610-zii-dev-rev-c.dtb \
+> +	vf610-zii-ssmb-spu3.dtb
+>  dtb-$(CONFIG_ARCH_MXS) += \
+>  	imx23-evk.dtb \
+>  	imx23-olinuxino.dtb \
+> diff --git a/arch/arm/boot/dts/vf610-zii-ssmb-spu3.dts b/arch/arm/boot/dts/vf610-zii-ssmb-spu3.dts
 > new file mode 100644
-> index 000000000000..88aa06fa78a8
+> index 000000000000..b692117d7839
 > --- /dev/null
-> +++ b/arch/arm64/boot/dts/xilinx/avnet-ultra96-rev1.dts
-> @@ -0,0 +1,19 @@
-> +// SPDX-License-Identifier: GPL-2.0+
+> +++ b/arch/arm/boot/dts/vf610-zii-ssmb-spu3.dts
+> @@ -0,0 +1,343 @@
+> +// SPDX-License-Identifier: (GPL-2.0 OR MIT)
+> +
 > +/*
-> + * dts file for Avnet Ultra96 rev1
+> + * Device tree file for ZII's SSMB SPU3 board
 > + *
-> + * (C) Copyright 2018, Xilinx, Inc.
-> + *
-> + * Michal Simek <michal.simek@xilinx.com>
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include "zynqmp-zcu100-revC.dts"
-> +
-> +/ {
-> +	model = "Avnet Ultra96 Rev1";
-> +	compatible = "avnet,ultra96-rev1", "avnet,ultra96",
-> +		     "xlnx,zynqmp-zcu100-revC", "xlnx,zynqmp-zcu100",
-> +		     "xlnx,zynqmp";
-> +};
-> 
+> + * SSMB - SPU3 Switch Management Board
+> + * SPU - Seat Power Unit
 
-Applied.
+I think this is the first Zodiac board with mutually recursive
+acronyms.
 
-Thanks,
-Michal
+Probably a question for Chris: Does SSMB specifically refer to version
+3 of the SPU?
 
--- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Xilinx Microblaze
-Maintainer of Linux kernel - Xilinx Zynq ARM and ZynqMP ARM64 SoCs
-U-Boot custodian - Xilinx Microblaze/Zynq/ZynqMP SoCs
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180717/b71a8fca/attachment.sig>
+   Andrew
