@@ -1,56 +1,31 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 17 Jul 2018 17:27:51 +0530
-Subject: [PATCH] i2c: davinci: Avoid zero value of CLKH
-In-Reply-To: <20180713152017.2207-1-alexander.sverdlin@nokia.com>
-References: <20180713152017.2207-1-alexander.sverdlin@nokia.com>
-Message-ID: <ab965f1d-de6c-75f7-9ebd-35d31ed3de18@ti.com>
+From: ludovic.Barre@st.com (Ludovic Barre)
+Date: Tue, 17 Jul 2018 14:14:27 +0200
+Subject: [PATCH 1/1] irqchip/stm32: add exti0 translation for stm32mp1
+Message-ID: <1531829667-22928-1-git-send-email-ludovic.Barre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 13 July 2018 08:50 PM, Alexander Sverdlin wrote:
-> If CLKH is set to 0 I2C clock is not generated at all, so avoid this value
-> and stretch the clock in this case.
+From: Ludovic Barre <ludovic.barre@st.com>
 
-This must be by observation since specification does not seem to state
-this.
+This patch fixes a datasheet issue, in the draft version the "exti0"
+was not connected whereas is it.
 
-> 
-> Signed-off-by: Alexander Sverdlin <alexander.sverdlin@nokia.com>
+Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+---
+ drivers/irqchip/irq-stm32-exti.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-In any case, the patch is fine.
-
-Acked-by: Sekhar Nori <nsekhar@ti.com>
-
-Thanks,
-Sekhar
-
-> ---
->  drivers/i2c/busses/i2c-davinci.c | 8 ++++++--
->  1 file changed, 6 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/i2c/busses/i2c-davinci.c b/drivers/i2c/busses/i2c-davinci.c
-> index 75d6ab177055..7379043711df 100644
-> --- a/drivers/i2c/busses/i2c-davinci.c
-> +++ b/drivers/i2c/busses/i2c-davinci.c
-> @@ -237,12 +237,16 @@ static void i2c_davinci_calc_clk_dividers(struct davinci_i2c_dev *dev)
->  	/*
->  	 * It's not always possible to have 1 to 2 ratio when d=7, so fall back
->  	 * to minimal possible clkh in this case.
-> +	 *
-> +	 * Note:
-> +	 * CLKH is not allowed to be 0, in this case I2C clock is not generated
-> +	 * at all
->  	 */
-> -	if (clk >= clkl + d) {
-> +	if (clk > clkl + d) {
->  		clkh = clk - clkl - d;
->  		clkl -= d;
->  	} else {
-> -		clkh = 0;
-> +		clkh = 1;
->  		clkl = clk - (d << 1);
->  	}
->  
-> -- 
-> 2.18.0
-> 
+diff --git a/drivers/irqchip/irq-stm32-exti.c b/drivers/irqchip/irq-stm32-exti.c
+index 3a7e890..3df527f 100644
+--- a/drivers/irqchip/irq-stm32-exti.c
++++ b/drivers/irqchip/irq-stm32-exti.c
+@@ -159,6 +159,7 @@ static const struct stm32_exti_bank *stm32mp1_exti_banks[] = {
+ };
+ 
+ static const struct stm32_desc_irq stm32mp1_desc_irq[] = {
++	{ .exti = 0, .irq_parent = 6 },
+ 	{ .exti = 1, .irq_parent = 7 },
+ 	{ .exti = 2, .irq_parent = 8 },
+ 	{ .exti = 3, .irq_parent = 9 },
+-- 
+2.7.4
