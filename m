@@ -1,34 +1,50 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 17 Jul 2018 22:07:23 +0200
-Subject: [PATCH 4/5] thermal: exynos: fixed the efuse min/max value for
- exynos5422
-In-Reply-To: <CANAwSgSwKBFDSWAF2dox9c7DAKKbHShXBNtSUcea2FdoR=80yg@mail.gmail.com>
-References: <1531822342-4293-1-git-send-email-linux.amoon@gmail.com>
- <1531822342-4293-4-git-send-email-linux.amoon@gmail.com>
- <CAJKOXPfOiTARmtkcJeC49RicWOt8q98GKPJOQkYmqG_nJtY=aQ@mail.gmail.com>
- <CANAwSgSwKBFDSWAF2dox9c7DAKKbHShXBNtSUcea2FdoR=80yg@mail.gmail.com>
-Message-ID: <CAJKOXPc74_5XT_nscxWLmbqRMNdBQaN-0=qV+C4uoBcwBMy0xw@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 17 Jul 2018 23:08:27 +0300
+Subject: [PATCH] arm64: dts: renesas: r8a77980: add INTC-EX support
+In-Reply-To: <2368353.xfo5beGC5E@wasted.cogentembedded.com>
+References: <2368353.xfo5beGC5E@wasted.cogentembedded.com>
+Message-ID: <c1e25728-8b86-b896-c097-e9ce2b891951@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 July 2018 at 21:58, Anand Moon <linux.amoon@gmail.com> wrote:
-> Hi Krzysztof,
->
-> On 17 July 2018 at 17:58, Krzysztof Kozlowski <krzk@kernel.org> wrote:
->> On 17 July 2018 at 12:12, Anand Moon <linux.amoon@gmail.com> wrote:
->>> e-fuse range min~max range is 16~76. if e-fuse value is out of
->>
->> s/e-fuse/Fuse/
->> s/if/If/
->>
->> Can you share the sources confirming that fuse values are between 16 and 76?
->>
-> Below is my patch :
-> https://github.com/hardkernel/linux/commit/52c4c9b295930bc53b215d38e274aeb0780917f1
->
-> e-Fuse range min/max values are from exynos5422 user manual.
+Describe the INTC-EX interrupt controller in the R8A77980 device tree.
 
-Indeed. Can you mention in commit msg, User Manual as the reference of this?
+Based on the original (and large) patch by Vladimir Barinov.
 
-Best regards,
-Krzysztof
+Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+
+---
+This patch is against the 'renesas-devel-20180717-v4.18-rc5' tag of Simon
+Horman's 'renesas.git' repo.
+
+ arch/arm64/boot/dts/renesas/r8a77980.dtsi |   16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
+
+Index: renesas/arch/arm64/boot/dts/renesas/r8a77980.dtsi
+===================================================================
+--- renesas.orig/arch/arm64/boot/dts/renesas/r8a77980.dtsi
++++ renesas/arch/arm64/boot/dts/renesas/r8a77980.dtsi
+@@ -234,6 +234,22 @@
+ 			#power-domain-cells = <1>;
+ 		};
+ 
++		intc_ex: interrupt-controller at e61c0000 {
++			compatible = "renesas,intc-ex-r8a77980", "renesas,irqc";
++			#interrupt-cells = <2>;
++			interrupt-controller;
++			reg = <0 0xe61c0000 0 0x200>;
++			interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 161 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 407>;
++			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
++			resets = <&cpg 407>;
++		};
++
+ 		i2c0: i2c at e6500000 {
+ 			compatible = "renesas,i2c-r8a77980",
+ 				     "renesas,rcar-gen3-i2c";
