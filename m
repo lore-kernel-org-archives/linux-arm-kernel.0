@@ -1,44 +1,41 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Tue, 17 Jul 2018 09:56:34 +0200
-Subject: [PATCH v1 2/2] arm64: dts: mt7622: update a clock property for
- UART0
-In-Reply-To: <87527531b135f4eb7fb51d4e7ee82723cd162a6c.1531753039.git.ryder.lee@mediatek.com>
-References: <2ff39c40ef6bc3054667e63c785a1d28527b5ddf.1531753039.git.ryder.lee@mediatek.com>
- <87527531b135f4eb7fb51d4e7ee82723cd162a6c.1531753039.git.ryder.lee@mediatek.com>
-Message-ID: <070b9fec-a66a-9f2e-bef4-22eaa6d6ddf3@gmail.com>
+From: cl@rock-chips.com (cl at rock-chips.com)
+Date: Tue, 17 Jul 2018 15:56:01 +0800
+Subject: [PATCH v1 5/7] Documentation: rockchip: grf: add grf and pmugrf
+ description for px30
+In-Reply-To: <1531813747-8804-1-git-send-email-cl@rock-chips.com>
+References: <1531813747-8804-1-git-send-email-cl@rock-chips.com>
+Message-ID: <1531814161-8940-1-git-send-email-cl@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Liang Chen <cl@rock-chips.com>
 
+This patch adds the compatible of GRF and PMUGRF for PX30 SoCs.
 
-On 16/07/18 16:59, Ryder Lee wrote:
-> The input clock of UART0 should be CLK_PERI_UART0_PD.
-> 
-> Fixes: 13f36c326cef ("arm64: dts: mt7622: turn uart0 clock to real ones")
-> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
-> ---
+Signed-off-by: Liang Chen <cl@rock-chips.com>
+---
+ Documentation/devicetree/bindings/soc/rockchip/grf.txt | 2 ++
+ 1 file changed, 2 insertions(+)
 
-pused to v4.18-next/dts64
-
-Thanks a lot!
-
-> change since v1:
-> - add Fixes tag.
-> ---
->  arch/arm64/boot/dts/mediatek/mt7622.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/boot/dts/mediatek/mt7622.dtsi b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
-> index 8cdec52..4caa9b4 100644
-> --- a/arch/arm64/boot/dts/mediatek/mt7622.dtsi
-> +++ b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
-> @@ -367,7 +367,7 @@
->  		reg = <0 0x11002000 0 0x400>;
->  		interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_LOW>;
->  		clocks = <&topckgen CLK_TOP_UART_SEL>,
-> -			 <&pericfg CLK_PERI_UART1_PD>;
-> +			 <&pericfg CLK_PERI_UART0_PD>;
->  		clock-names = "baud", "bus";
->  		status = "disabled";
->  	};
-> 
+diff --git a/Documentation/devicetree/bindings/soc/rockchip/grf.txt b/Documentation/devicetree/bindings/soc/rockchip/grf.txt
+index 7dc5ce8..46e27cd 100644
+--- a/Documentation/devicetree/bindings/soc/rockchip/grf.txt
++++ b/Documentation/devicetree/bindings/soc/rockchip/grf.txt
+@@ -13,6 +13,7 @@ On RK3328 SoCs, the GRF adds a section for USB2PHYGRF,
+ Required Properties:
+ 
+ - compatible: GRF should be one of the following:
++   - "rockchip,px30-grf", "syscon": for px30
+    - "rockchip,rk3036-grf", "syscon": for rk3036
+    - "rockchip,rk3066-grf", "syscon": for rk3066
+    - "rockchip,rk3188-grf", "syscon": for rk3188
+@@ -23,6 +24,7 @@ Required Properties:
+    - "rockchip,rk3399-grf", "syscon": for rk3399
+    - "rockchip,rv1108-grf", "syscon": for rv1108
+ - compatible: PMUGRF should be one of the following:
++   - "rockchip,px30-pmugrf", "syscon": for px30
+    - "rockchip,rk3368-pmugrf", "syscon": for rk3368
+    - "rockchip,rk3399-pmugrf", "syscon": for rk3399
+ - compatible: SGRF should be one of the following
+-- 
+1.9.1
