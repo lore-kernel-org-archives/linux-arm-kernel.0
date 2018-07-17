@@ -1,93 +1,34 @@
-From: matthias.bgg@kernel.org (matthias.bgg at kernel.org)
-Date: Wed, 18 Jul 2018 00:03:27 +0200
-Subject: [resend PATCH v4 4/5] drm/mediatek: Add support for mmsys through a
- pdev
-In-Reply-To: <20180717220328.792-1-matthias.bgg@kernel.org>
-References: <20180717220328.792-1-matthias.bgg@kernel.org>
-Message-ID: <20180717220328.792-5-matthias.bgg@kernel.org>
+From: alexandre.belloni@bootlin.com (Alexandre Belloni)
+Date: Wed, 18 Jul 2018 00:27:42 +0200
+Subject: [PATCH 01/16] clk: at91: audio-pll: fix audio pmc type
+In-Reply-To: <20180717222757.10253-1-alexandre.belloni@bootlin.com>
+References: <20180717222757.10253-1-alexandre.belloni@bootlin.com>
+Message-ID: <20180717222757.10253-2-alexandre.belloni@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Matthias Brugger <mbrugger@suse.com>
+The allocation for the audio pmc is using the size of struct clk_audio_pad
+instead of struct clk_audio_pmc. This works fine because the former is
+larger than the latter but it is safer to be correct.
 
-The MMSYS subsystem includes clocks and drm components.
-This patch adds an initailization path through a platform device
-for the clock part, so that both drivers get probed from the same
-device tree compatible.
-
-Signed-off-by: Matthias Brugger <mbrugger@suse.com>
+Fixes: ("0865805d82d4 clk: at91: add audio pll clock drivers")
+Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
 ---
- drivers/gpu/drm/mediatek/mtk_drm_drv.c | 18 ++++++++++++++++++
- drivers/gpu/drm/mediatek/mtk_drm_drv.h |  2 ++
- 2 files changed, 20 insertions(+)
+ drivers/clk/at91/clk-audio-pll.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-index dd249cf5121e..c946aea722e5 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-@@ -173,6 +173,7 @@ static const struct mtk_mmsys_driver_data mt2701_mmsys_driver_data = {
- 	.ext_path = mt2701_mtk_ddp_ext,
- 	.ext_len = ARRAY_SIZE(mt2701_mtk_ddp_ext),
- 	.shadow_register = true,
-+	.clk_drv_name = "clk-mt2701-mm",
- };
+diff --git a/drivers/clk/at91/clk-audio-pll.c b/drivers/clk/at91/clk-audio-pll.c
+index da7bafcfbe70..b3eaf654fac9 100644
+--- a/drivers/clk/at91/clk-audio-pll.c
++++ b/drivers/clk/at91/clk-audio-pll.c
+@@ -509,7 +509,7 @@ static void __init of_sama5d2_clk_audio_pll_pad_setup(struct device_node *np)
  
- static const struct mtk_mmsys_driver_data mt8173_mmsys_driver_data = {
-@@ -180,6 +181,7 @@ static const struct mtk_mmsys_driver_data mt8173_mmsys_driver_data = {
- 	.main_len = ARRAY_SIZE(mt8173_mtk_ddp_main),
- 	.ext_path = mt8173_mtk_ddp_ext,
- 	.ext_len = ARRAY_SIZE(mt8173_mtk_ddp_ext),
-+	.clk_drv_name = "clk-mt8173-mm",
- };
+ static void __init of_sama5d2_clk_audio_pll_pmc_setup(struct device_node *np)
+ {
+-	struct clk_audio_pad *apmc_ck;
++	struct clk_audio_pmc *apmc_ck;
+ 	struct clk_init_data init = {};
  
- static int mtk_drm_kms_init(struct drm_device *drm)
-@@ -411,6 +413,19 @@ static int mtk_drm_probe(struct platform_device *pdev)
- 	if (IS_ERR(private->config_regs))
- 		return PTR_ERR(private->config_regs);
- 
-+	if (private->data->clk_drv_name) {
-+		private->clk_dev = platform_device_register_data(dev,
-+						private->data->clk_drv_name, -1,
-+						NULL, 0);
-+
-+		if (IS_ERR(private->clk_dev)) {
-+			pr_err("failed to register %s platform device\n",
-+						private->data->clk_drv_name);
-+
-+			return PTR_ERR(private->clk_dev);
-+		}
-+	}
-+
- 	/* Iterate over sibling DISP function blocks */
- 	for_each_child_of_node(dev->of_node->parent, node) {
- 		const struct of_device_id *of_id;
-@@ -515,6 +530,9 @@ static int mtk_drm_remove(struct platform_device *pdev)
- 	for (i = 0; i < DDP_COMPONENT_ID_MAX; i++)
- 		of_node_put(private->comp_node[i]);
- 
-+	if (private->clk_dev)
-+		platform_device_unregister(private->clk_dev);
-+
- 	return 0;
- }
- 
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.h b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
-index 86cec19193c4..200eee5de419 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_drv.h
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
-@@ -34,11 +34,13 @@ struct mtk_mmsys_driver_data {
- 	const enum mtk_ddp_comp_id *ext_path;
- 	unsigned int ext_len;
- 	bool shadow_register;
-+	const char *clk_drv_name;
- };
- 
- struct mtk_drm_private {
- 	struct drm_device *drm;
- 	struct device *dma_dev;
-+	struct platform_device *clk_dev;
- 
- 	unsigned int num_pipes;
- 
+ 	apmc_ck = kzalloc(sizeof(*apmc_ck), GFP_KERNEL);
 -- 
-2.17.1
+2.18.0
