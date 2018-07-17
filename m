@@ -1,32 +1,18 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 16 Jul 2018 23:48:11 -0700
-Subject: [PATCH] dts/droid4: fix dts w.r.t. pwm
-In-Reply-To: <20180716101106.vgmjz3ic7gqy2u2q@earth.universe>
-References: <20180709214910.tes6u4ivxomd3aja@earth.universe>
- <20180709220211.GA7760@amd>
- <20180710101147.lyu65ro4czvrs2da@earth.universe>
- <20180710133040.GA4391@amd>
- <20180710161123.azym6sbboriuj4yc@earth.universe>
- <20180711080218.GA21225@amd> <20180711132739.GL99251@atomide.com>
- <20180711142526.dto6iost57zx5t5l@earth.universe>
- <20180716071048.GA23110@amd>
- <20180716101106.vgmjz3ic7gqy2u2q@earth.universe>
-Message-ID: <20180717064811.GA99251@atomide.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 17 Jul 2018 14:48:16 +0800
+Subject: [PATCH V2] ARM: dts: imx6sl-evk: add missing GPIO iomux setting
+In-Reply-To: <1531533238-8816-1-git-send-email-Anson.Huang@nxp.com>
+References: <1531533238-8816-1-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <20180717064815.GL4576@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Sebastian Reichel <sre@kernel.org> [180716 10:14]:
-> Hi,
+On Sat, Jul 14, 2018 at 09:53:58AM +0800, Anson Huang wrote:
+> On i.MX6SL EVK board, the MX6SL_PAD_KEY_ROW5 pin is
+> used as lcd 3v3 regulator control pin, need to make
+> sure MX6SL_PAD_KEY_ROW5 is muxed as GPIO function
+> for controlling lcd 3v3 regulator.
 > 
-> On Mon, Jul 16, 2018 at 09:10:48AM +0200, Pavel Machek wrote:
-> > pwm node should not be under gpio6 node in the device tree.
-> >    
-> > This fixes detection of the pwm on Droid 4.
-> >     
-> > Signed-off-by: Pavel Machek <pavel@ucw.cz>
-> 
-> Reviewed-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
+> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
 
-Applying into omap-for-v4.18/fixes thanks.
-
-Tony
+Applied, thanks.
