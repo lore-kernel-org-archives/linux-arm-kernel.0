@@ -1,261 +1,186 @@
-From: maxime.chevallier@bootlin.com (Maxime Chevallier)
-Date: Tue, 17 Jul 2018 16:31:54 +0200
-Subject: [PATCH RESEND 5/5] spi: imx: Use the longuest possible burst size
- when in dynamic_burst
-In-Reply-To: <20180717143154.28241-1-maxime.chevallier@bootlin.com>
-References: <20180717143154.28241-1-maxime.chevallier@bootlin.com>
-Message-ID: <20180717143154.28241-6-maxime.chevallier@bootlin.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Tue, 17 Jul 2018 22:34:44 +0800
+Subject: [stericsson:ux500-mcde 5/5] drivers/gpu/drm/mcde/mcde_dsi.c:494:2:
+ note: in expansion of macro 'dev_dbg'
+Message-ID: <201807172242.qpUGR2mk%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dynamic burst mode allows to group together multiple words and send them
-in one continuous burst. When the number of bytes to be sent is not a
-strict multiple of the FIFO entry size (32 bits), the controller expects
-the non aligned bits to be sent first.
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git ux500-mcde
+head:   1c2cef2895c1f98796d3f43b4fe8b40efe9ae694
+commit: 1c2cef2895c1f98796d3f43b4fe8b40efe9ae694 [5/5] MCDE hack
+config: sparc64-allyesconfig (attached as .config)
+compiler: sparc64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 1c2cef2895c1f98796d3f43b4fe8b40efe9ae694
+        # save the attached .config to linux build tree
+        GCC_VERSION=7.2.0 make.cross ARCH=sparc64 
 
-This commit adds support for this particular constraint, avoiding the
-need to send the non-aligned bytes one by one at the end of the
-transfer, speeding-up transfer speed in that case.
+All warnings (new ones prefixed by >>):
 
-With this method, a transfer is divided into multiple bursts, limited in
-size by the maximum amount of data that the controller can transfer in
-one continuous burst (which is 512 bytes).
+   In file included from include/linux/printk.h:332:0,
+                    from include/linux/kernel.h:14,
+                    from include/linux/list.h:9,
+                    from include/linux/kobject.h:19,
+                    from include/linux/device.h:16,
+                    from include/linux/platform_device.h:14,
+                    from drivers/gpu/drm/mcde/mcde_dsi.c:2:
+   drivers/gpu/drm/mcde/mcde_dsi.c: In function 'mcde_dsi_host_transfer':
+   drivers/gpu/drm/mcde/mcde_dsi.c:495:3: warning: format '%d' expects argument of type 'int', but argument 5 has type 'size_t {aka long unsigned int}' [-Wformat=]
+      "message to channel %d, %d bytes: ",
+      ^
+   include/linux/dynamic_debug.h:135:39: note: in definition of macro 'dynamic_dev_dbg'
+      __dynamic_dev_dbg(&descriptor, dev, fmt, \
+                                          ^~~
+>> drivers/gpu/drm/mcde/mcde_dsi.c:494:2: note: in expansion of macro 'dev_dbg'
+     dev_dbg(d->dev,
+     ^~~~~~~
+   At top level:
+   drivers/gpu/drm/mcde/mcde_dsi.c:604:13: warning: 'mcde_dsi_te_request' defined but not used [-Wunused-function]
+    static void mcde_dsi_te_request(struct mcde_dsi *d)
+                ^~~~~~~~~~~~~~~~~~~
 
-The non-512 byte part of the transfer is sent first. The remaining bytes
-to be transferred in the current burst is stored in the 'remainder'
-field.
+vim +/dev_dbg +494 drivers/gpu/drm/mcde/mcde_dsi.c
 
-With this method, the read_u32 field is no longer necessary, and is
-removed.
+   468	
+   469	#define MCDE_DSI_HOST_IS_READ(type)			    \
+   470	        ((type == MIPI_DSI_GENERIC_READ_REQUEST_0_PARAM) || \
+   471		 (type == MIPI_DSI_GENERIC_READ_REQUEST_1_PARAM) || \
+   472		 (type == MIPI_DSI_GENERIC_READ_REQUEST_2_PARAM) || \
+   473		 (type == MIPI_DSI_DCS_READ))
+   474	
+   475	static ssize_t mcde_dsi_host_transfer(struct mipi_dsi_host *host,
+   476					      const struct mipi_dsi_msg *msg)
+   477	{
+   478		struct mcde_dsi *d = host_to_mcde_dsi(host);
+   479		const u32 loop_delay_us = 10; /* us */
+   480		const u8 *tx = msg->tx_buf;
+   481		u32 loop_counter;
+   482		size_t txlen;
+   483		u32 val;
+   484		int ret;
+   485		int i;
+   486	
+   487		txlen = msg->tx_len;
+   488		if (txlen > 12) {
+   489			dev_err(d->dev,
+   490				"dunno how to write more than 12 bytes yet\n");
+   491			return -EIO;
+   492		}
+   493	
+ > 494		dev_dbg(d->dev,
+   495			"message to channel %d, %d bytes: ",
+   496			msg->channel,
+   497			txlen);
+   498	
+   499		/* Command "nature" */
+   500		if (MCDE_DSI_HOST_IS_READ(msg->type))
+   501			/* MCTL_MAIN_DATA_CTL already set up */
+   502			val = DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_NAT_READ;
+   503		else
+   504			val = DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_NAT_WRITE;
+   505		/*
+   506		 * More than 2 bytes will not fit in a single packet, so it's
+   507		 * time to set the "long not short" bit. One byte is used by
+   508		 * the MIPI DCS command leaving just one byte for the payload
+   509		 * in a short package.
+   510		 */
+   511		if (mipi_dsi_packet_format_is_long(msg->type))
+   512			val |= DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_LONGNOTSHORT;
+   513		val |= 0 << DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_ID_SHIFT;
+   514		/* Add one to the length for the MIPI DCS command */
+   515		val |= txlen
+   516			<< DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_SIZE_SHIFT;
+   517		val |= DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_LP_EN;
+   518	        val |= msg->type << DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_HEAD_SHIFT;
+   519		writel(val, d->regs + DSI_DIRECT_CMD_MAIN_SETTINGS);
+   520	
+   521		/* MIPI DCS command is part of the data */
+   522		if (txlen > 0) {
+   523			val = 0;
+   524			for (i = 0; i < 4 && i < txlen; i++)
+   525				val |= tx[i] << (i & 3) * 8;
+   526		}
+   527		writel(val, d->regs + DSI_DIRECT_CMD_WRDAT0);
+   528		if (txlen > 4) {
+   529			val = 0;
+   530			for (i = 0; i < 4 && (i + 4) < txlen; i++)
+   531				val |= tx[i + 4] << (i & 3) * 8;
+   532			writel(val, d->regs + DSI_DIRECT_CMD_WRDAT1);
+   533		}
+   534		if (txlen > 8) {
+   535			val = 0;
+   536			for (i = 0; i < 4 && (i + 8) < txlen; i++)
+   537				val |= tx[i + 8] << (i & 3) * 8;
+   538			writel(val, d->regs + DSI_DIRECT_CMD_WRDAT2);
+   539		}
+   540		if (txlen > 12) {
+   541			val = 0;
+   542			for (i = 0; i < 4 && (i + 12) < txlen; i++)
+   543				val |= tx[i + 12] << (i & 3) * 8;
+   544			writel(val, d->regs + DSI_DIRECT_CMD_WRDAT3);
+   545		}
+   546	
+   547		writel(~0, d->regs + DSI_DIRECT_CMD_STS_CLR);
+   548		writel(~0, d->regs + DSI_CMD_MODE_STS_CLR);
+   549		/* Send command */
+   550		writel(1, d->regs + DSI_DIRECT_CMD_SEND);
+   551	
+   552		loop_counter = 1000 * 1000 / loop_delay_us;
+   553		while (!(readl(d->regs + DSI_DIRECT_CMD_STS) &
+   554			 DSI_DIRECT_CMD_STS_WRITE_COMPLETED)
+   555		       && --loop_counter)
+   556			usleep_range(loop_delay_us, (loop_delay_us * 3) / 2);
+   557	
+   558		if (!loop_counter) {
+   559	                dev_err(d->dev, "DSI write timeout!\n");
+   560	                return -ETIME;
+   561	        }
+   562	
+   563		val = readl(d->regs + DSI_DIRECT_CMD_STS);
+   564		if (val & DSI_DIRECT_CMD_STS_ACKNOWLEDGE_WITH_ERR_RECEIVED) {
+   565			val >>= DSI_DIRECT_CMD_STS_ACK_VAL_SHIFT;
+   566			dev_err(d->dev, "error during transmission: %04x\n",
+   567				val);
+   568			return -EIO;
+   569		}
+   570	
+   571		if (!MCDE_DSI_HOST_IS_READ(msg->type)) {
+   572			/* Return number of bytes written */
+   573			if (mipi_dsi_packet_format_is_long(msg->type))
+   574				ret = 4 + txlen;
+   575			else
+   576				ret = 4;
+   577		} else {
+   578			/* OK this is a read command, get the response */
+   579			u32 rdsz;
+   580			u32 rddat;
+   581			u8 *rx = msg->rx_buf;
+   582	
+   583			rdsz = readl(d->regs + DSI_DIRECT_CMD_RD_PROPERTY);
+   584			rdsz &= DSI_DIRECT_CMD_RD_PROPERTY_RD_SIZE_MASK;
+   585			rddat = readl(d->regs + DSI_DIRECT_CMD_RDDAT);
+   586			for (i = 0; i < 4 && i < rdsz; i++)
+   587				rx[i] = (rddat >> (i * 8)) & 0xff;
+   588			ret = rdsz;
+   589		}
+   590	
+   591		writel(~0, d->regs + DSI_DIRECT_CMD_STS_CLR);
+   592		writel(~0, d->regs + DSI_CMD_MODE_STS_CLR);
+   593	
+   594		return ret;
+   595	}
+   596	
 
-This was tested on imx6 solo and imx6 quad.
-
-Signed-off-by: Maxime Chevallier <maxime.chevallier@bootlin.com>
 ---
- drivers/spi/spi-imx.c | 122 +++++++++++++++++++++++++++++++++++---------------
- 1 file changed, 85 insertions(+), 37 deletions(-)
-
-diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
-index ef6d3648396a..08dd3a31a3e5 100644
---- a/drivers/spi/spi-imx.c
-+++ b/drivers/spi/spi-imx.c
-@@ -94,7 +94,7 @@ struct spi_imx_data {
- 	void *rx_buf;
- 	const void *tx_buf;
- 	unsigned int txfifo; /* number of words pushed in tx FIFO */
--	unsigned int dynamic_burst, read_u32;
-+	unsigned int dynamic_burst;
- 
- 	/* Slave mode */
- 	bool slave_mode;
-@@ -139,6 +139,8 @@ static void spi_imx_buf_rx_##type(struct spi_imx_data *spi_imx)		\
- 		*(type *)spi_imx->rx_buf = val;				\
- 		spi_imx->rx_buf += sizeof(type);			\
- 	}								\
-+									\
-+	spi_imx->remainder -= sizeof(type);				\
- }
- 
- #define MXC_SPI_BUF_TX(type)						\
-@@ -292,22 +294,36 @@ static void spi_imx_buf_rx_swap_u32(struct spi_imx_data *spi_imx)
- 		*(u32 *)spi_imx->rx_buf = val;
- 		spi_imx->rx_buf += sizeof(u32);
- 	}
-+
-+	spi_imx->remainder -= sizeof(u32);
- }
- 
- static void spi_imx_buf_rx_swap(struct spi_imx_data *spi_imx)
- {
--	unsigned int bytes_per_word;
-+	int unaligned;
-+	u32 val;
- 
--	bytes_per_word = spi_imx_bytes_per_word(spi_imx->bits_per_word);
--	if (spi_imx->read_u32) {
-+	unaligned = spi_imx->remainder % 4;
-+
-+	if (!unaligned) {
- 		spi_imx_buf_rx_swap_u32(spi_imx);
- 		return;
- 	}
- 
--	if (bytes_per_word == 1)
--		spi_imx_buf_rx_u8(spi_imx);
--	else if (bytes_per_word == 2)
-+	if (spi_imx_bytes_per_word(spi_imx->bits_per_word) == 2) {
- 		spi_imx_buf_rx_u16(spi_imx);
-+		return;
-+	}
-+
-+	val = readl(spi_imx->base + MXC_CSPIRXDATA);
-+
-+	while (unaligned--) {
-+		if (spi_imx->rx_buf) {
-+			*(u8 *)spi_imx->rx_buf = (val >> (8 * unaligned)) & 0xff;
-+			spi_imx->rx_buf++;
-+		}
-+		spi_imx->remainder--;
-+	}
- }
- 
- static void spi_imx_buf_tx_swap_u32(struct spi_imx_data *spi_imx)
-@@ -336,40 +352,30 @@ static void spi_imx_buf_tx_swap_u32(struct spi_imx_data *spi_imx)
- 
- static void spi_imx_buf_tx_swap(struct spi_imx_data *spi_imx)
- {
--	u32 ctrl, val;
--	unsigned int bytes_per_word;
-+	int unaligned;
-+	u32 val = 0;
- 
--	if (spi_imx->count == spi_imx->remainder) {
--		ctrl = readl(spi_imx->base + MX51_ECSPI_CTRL);
--		ctrl &= ~MX51_ECSPI_CTRL_BL_MASK;
--		if (spi_imx->count > MX51_ECSPI_CTRL_MAX_BURST) {
--			spi_imx->remainder = spi_imx->count %
--					     MX51_ECSPI_CTRL_MAX_BURST;
--			val = MX51_ECSPI_CTRL_MAX_BURST * 8 - 1;
--		} else if (spi_imx->count >= sizeof(u32)) {
--			spi_imx->remainder = spi_imx->count % sizeof(u32);
--			val = (spi_imx->count - spi_imx->remainder) * 8 - 1;
--		} else {
--			spi_imx->remainder = 0;
--			val = spi_imx->bits_per_word - 1;
--			spi_imx->read_u32 = 0;
--		}
-+	unaligned = spi_imx->count % 4;
- 
--		ctrl |= (val << MX51_ECSPI_CTRL_BL_OFFSET);
--		writel(ctrl, spi_imx->base + MX51_ECSPI_CTRL);
-+	if (!unaligned) {
-+		spi_imx_buf_tx_swap_u32(spi_imx);
-+		return;
- 	}
- 
--	if (spi_imx->count >= sizeof(u32)) {
--		spi_imx_buf_tx_swap_u32(spi_imx);
-+	if (spi_imx_bytes_per_word(spi_imx->bits_per_word) == 2) {
-+		spi_imx_buf_tx_u16(spi_imx);
- 		return;
- 	}
- 
--	bytes_per_word = spi_imx_bytes_per_word(spi_imx->bits_per_word);
-+	while (unaligned--) {
-+		if (spi_imx->tx_buf) {
-+			val |= *(u8 *)spi_imx->tx_buf << (8 * unaligned);
-+			spi_imx->tx_buf++;
-+		}
-+		spi_imx->count--;
-+	}
- 
--	if (bytes_per_word == 1)
--		spi_imx_buf_tx_u8(spi_imx);
--	else if (bytes_per_word == 2)
--		spi_imx_buf_tx_u16(spi_imx);
-+	writel(val, spi_imx->base + MXC_CSPITXDATA);
- }
- 
- static void mx53_ecspi_rx_slave(struct spi_imx_data *spi_imx)
-@@ -388,6 +394,8 @@ static void mx53_ecspi_rx_slave(struct spi_imx_data *spi_imx)
- 		spi_imx->rx_buf += n_bytes;
- 		spi_imx->slave_burst -= n_bytes;
- 	}
-+
-+	spi_imx->remainder -= sizeof(u32);
- }
- 
- static void mx53_ecspi_tx_slave(struct spi_imx_data *spi_imx)
-@@ -997,12 +1005,52 @@ static void spi_imx_chipselect(struct spi_device *spi, int is_active)
- 	gpio_set_value(spi->cs_gpio, dev_is_lowactive ^ active);
- }
- 
-+static void spi_imx_set_burst_len(struct spi_imx_data *spi_imx, int n_bits)
-+{
-+	u32 ctrl;
-+
-+	ctrl = readl(spi_imx->base + MX51_ECSPI_CTRL);
-+	ctrl &= ~MX51_ECSPI_CTRL_BL_MASK;
-+	ctrl |= ((n_bits - 1) << MX51_ECSPI_CTRL_BL_OFFSET);
-+	writel(ctrl, spi_imx->base + MX51_ECSPI_CTRL);
-+}
-+
- static void spi_imx_push(struct spi_imx_data *spi_imx)
- {
-+	unsigned int burst_len, fifo_words;
-+
-+	if (spi_imx->dynamic_burst)
-+		fifo_words = 4;
-+	else
-+		fifo_words = spi_imx_bytes_per_word(spi_imx->bits_per_word);
-+	/*
-+	 * Reload the FIFO when the remaining bytes to be transferred in the
-+	 * current burst is 0. This only applies when bits_per_word is a
-+	 * multiple of 8.
-+	 */
-+	if (!spi_imx->remainder) {
-+		if (spi_imx->dynamic_burst) {
-+
-+			/* We need to deal unaligned data first */
-+			burst_len = spi_imx->count % MX51_ECSPI_CTRL_MAX_BURST;
-+
-+			if (!burst_len)
-+				burst_len = MX51_ECSPI_CTRL_MAX_BURST;
-+
-+			spi_imx_set_burst_len(spi_imx, burst_len * 8);
-+
-+			spi_imx->remainder = burst_len;
-+		} else {
-+			spi_imx->remainder = fifo_words;
-+		}
-+	}
-+
- 	while (spi_imx->txfifo < spi_imx->devtype_data->fifo_size) {
- 		if (!spi_imx->count)
- 			break;
--		if (spi_imx->txfifo && (spi_imx->count == spi_imx->remainder))
-+		if (spi_imx->dynamic_burst &&
-+		    spi_imx->txfifo >=  DIV_ROUND_UP(spi_imx->remainder,
-+						     fifo_words))
- 			break;
- 		spi_imx->tx(spi_imx);
- 		spi_imx->txfifo++;
-@@ -1108,12 +1156,9 @@ static int spi_imx_setupxfer(struct spi_device *spi,
- 	    spi_imx->bits_per_word == 16 ||
- 	    spi_imx->bits_per_word == 32)) {
- 
--		spi_imx->read_u32  = 1;
--
- 		spi_imx->rx = spi_imx_buf_rx_swap;
- 		spi_imx->tx = spi_imx_buf_tx_swap;
- 		spi_imx->dynamic_burst = 1;
--		spi_imx->remainder = t->len;
- 
- 	} else {
- 		if (spi_imx->bits_per_word <= 8) {
-@@ -1126,6 +1171,7 @@ static int spi_imx_setupxfer(struct spi_device *spi,
- 			spi_imx->rx = spi_imx_buf_rx_u32;
- 			spi_imx->tx = spi_imx_buf_tx_u32;
- 		}
-+		spi_imx->dynamic_burst = 0;
- 	}
- 
- 	if (spi_imx_can_dma(spi_imx->bitbang.master, spi, t))
-@@ -1309,6 +1355,7 @@ static int spi_imx_pio_transfer(struct spi_device *spi,
- 	spi_imx->rx_buf = transfer->rx_buf;
- 	spi_imx->count = transfer->len;
- 	spi_imx->txfifo = 0;
-+	spi_imx->remainder = 0;
- 
- 	reinit_completion(&spi_imx->xfer_done);
- 
-@@ -1346,6 +1393,7 @@ static int spi_imx_pio_transfer_slave(struct spi_device *spi,
- 	spi_imx->rx_buf = transfer->rx_buf;
- 	spi_imx->count = transfer->len;
- 	spi_imx->txfifo = 0;
-+	spi_imx->remainder = 0;
- 
- 	reinit_completion(&spi_imx->xfer_done);
- 	spi_imx->slave_aborted = false;
--- 
-2.11.0
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 54403 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180717/0afc045b/attachment-0001.gz>
