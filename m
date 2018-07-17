@@ -1,83 +1,53 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Tue, 17 Jul 2018 10:51:37 +0100
-Subject: [PATCH v2] kvm: arm/arm64: Fix emulated physical timer IRQ injection
-Message-ID: <20180717095137.9620-1-andre.przywara@arm.com>
+From: yaojun8558363@gmail.com (Jun Yao)
+Date: Tue, 17 Jul 2018 17:56:06 +0800
+Subject: [PATCH v4 4/6] arm64/mm: Make swapper_pg_dir smaller
+In-Reply-To: <20180717095608.11008-1-yaojun8558363@gmail.com>
+References: <20180717095608.11008-1-yaojun8558363@gmail.com>
+Message-ID: <20180717095608.11008-5-yaojun8558363@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When KVM emulates a physical timer, we keep track of the interrupt
-condition and try to inject an IRQ to the guest when needed.
-This works if the timer expires when either the guest is running or KVM
-does work on behalf of it (like handling a trap).
-However when the guest's VCPU is not scheduled (for instance because
-the guest issued a WFI instruction before), we miss injecting the interrupt
-when the VCPU's state gets restored back in kvm_timer_vcpu_load().
+We setup final page tables in swapper_pg_dir, which just contains
+PGD. And the PUD/PMD are allocated dynamically. So we can make it
+smaller.
 
-Fix this by moving the interrupt injection check into the
-phys_timer_emulate() function, so that all possible paths of execution
-are covered.
-
-Cc: Stable <stable@vger.kernel.org> # 4.15+
-Fixes: bbdd52cfcba29 ("KVM: arm/arm64: Avoid phys timer emulation in vcpu entry/exit")
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+Signed-off-by: Jun Yao <yaojun8558363@gmail.com>
 ---
-Changelog v1...v2:
-- clear IRQ line *before* starting the soft timer
+ arch/arm64/kernel/vmlinux.lds.S | 2 +-
+ arch/arm64/mm/mmu.c             | 8 --------
+ 2 files changed, 1 insertion(+), 9 deletions(-)
 
- virt/kvm/arm/arch_timer.c | 21 +++++++++++++--------
- 1 file changed, 13 insertions(+), 8 deletions(-)
-
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index bd3d57f40f1b..03a4ea776b85 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -294,16 +294,25 @@ static void phys_timer_emulate(struct kvm_vcpu *vcpu)
- 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
- 	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
+diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+index 61d7cee3eaa6..2446911f4262 100644
+--- a/arch/arm64/kernel/vmlinux.lds.S
++++ b/arch/arm64/kernel/vmlinux.lds.S
+@@ -237,7 +237,7 @@ SECTIONS
+ 	. += RESERVED_TTBR0_SIZE;
+ #endif
+ 	swapper_pg_dir = .;
+-	. += SWAPPER_DIR_SIZE;
++	. += PAGE_SIZE;
+ 	swapper_pg_end = .;
  
-+	/* If the timer cannot fire at all, then we don't need a soft timer. */
-+	if (!kvm_timer_irq_can_fire(ptimer)) {
-+		soft_timer_cancel(&timer->phys_timer, NULL);
-+		kvm_timer_update_irq(vcpu, false, ptimer);
-+		return;
-+	}
-+
- 	/*
--	 * If the timer can fire now we have just raised the IRQ line and we
--	 * don't need to have a soft timer scheduled for the future.  If the
--	 * timer cannot fire at all, then we also don't need a soft timer.
-+	 * If the timer can fire now, we don't need to have a soft timer
-+	 * scheduled for the future, as we also raise the IRQ line.
- 	 */
--	if (kvm_timer_should_fire(ptimer) || !kvm_timer_irq_can_fire(ptimer)) {
-+	if (kvm_timer_should_fire(ptimer)) {
- 		soft_timer_cancel(&timer->phys_timer, NULL);
-+		kvm_timer_update_irq(vcpu, true, ptimer);
-+
- 		return;
- 	}
- 
-+	kvm_timer_update_irq(vcpu, false, ptimer);
- 	soft_timer_start(&timer->phys_timer, kvm_timer_compute_delta(ptimer));
- }
- 
-@@ -316,7 +325,6 @@ static void kvm_timer_update_state(struct kvm_vcpu *vcpu)
- {
- 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
- 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
--	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
- 	bool level;
- 
- 	if (unlikely(!timer->enabled))
-@@ -332,9 +340,6 @@ static void kvm_timer_update_state(struct kvm_vcpu *vcpu)
- 	level = kvm_timer_should_fire(vtimer);
- 	kvm_timer_update_irq(vcpu, level, vtimer);
- 
--	if (kvm_timer_should_fire(ptimer) != ptimer->irq.level)
--		kvm_timer_update_irq(vcpu, !ptimer->irq.level, ptimer);
+ 	__pecoff_data_size = ABSOLUTE(. - __initdata_begin);
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index cdce3ec4c7bb..d24be05ec1d4 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -633,14 +633,6 @@ void __init paging_init(void)
+ 	map_mem(swapper_pg_dir);
+ 	cpu_replace_ttbr1(swapper_pg_dir);
+ 	init_mm.pgd = swapper_pg_dir;
 -
- 	phys_timer_emulate(vcpu);
+-	/*
+-	 * We only reuse the PGD from the swapper_pg_dir, not the pud + pmd
+-	 * allocated with it.
+-	 */
+-	memblock_free(__pa_symbol(swapper_pg_dir) + PAGE_SIZE,
+-		      __pa_symbol(swapper_pg_end) - __pa_symbol(swapper_pg_dir)
+-		      - PAGE_SIZE);
  }
  
+ /*
 -- 
-2.14.4
+2.17.1
