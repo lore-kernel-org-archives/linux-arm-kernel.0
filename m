@@ -1,32 +1,33 @@
 From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
-Date: Tue, 17 Jul 2018 18:06:08 +0200
-Subject: [PATCH 3/5] arm64: defconfig: Enable vctrl regulators for Gru/Kevin.
+Date: Tue, 17 Jul 2018 18:06:09 +0200
+Subject: [PATCH 4/5] arm64: defconfig: Enable Camera (uvcvideo) support.
 In-Reply-To: <20180717160610.26501-1-enric.balletbo@collabora.com>
 References: <20180717160610.26501-1-enric.balletbo@collabora.com>
-Message-ID: <20180717160610.26501-3-enric.balletbo@collabora.com>
+Message-ID: <20180717160610.26501-4-enric.balletbo@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Gru/Kevin uses vctrl regulators for dynamic CPU voltages, so enable in
-the default defconfig in order to have support for cpufreq.
+Some Chromebooks have a UVC camera device, so enable in the default
+defconfig to support it.
 
 Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
 ---
 
- arch/arm64/configs/defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm64/configs/defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
 diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index e530d6fc34b2..3fae8ada69e1 100644
+index 3fae8ada69e1..a36e80cce868 100644
 --- a/arch/arm64/configs/defconfig
 +++ b/arch/arm64/configs/defconfig
-@@ -396,6 +396,7 @@ CONFIG_REGULATOR_QCOM_SMD_RPM=y
- CONFIG_REGULATOR_QCOM_SPMI=y
- CONFIG_REGULATOR_RK808=y
- CONFIG_REGULATOR_S2MPS11=y
-+CONFIG_REGULATOR_VCTRL=m
- CONFIG_RC_CORE=m
- CONFIG_RC_DECODERS=y
- CONFIG_RC_DEVICES=y
+@@ -409,6 +409,8 @@ CONFIG_MEDIA_CONTROLLER=y
+ CONFIG_VIDEO_V4L2_SUBDEV_API=y
+ # CONFIG_DVB_NET is not set
+ CONFIG_V4L_MEM2MEM_DRIVERS=y
++CONFIG_MEDIA_USB_SUPPORT=y
++CONFIG_USB_VIDEO_CLASS=m
+ CONFIG_VIDEO_SAMSUNG_S5P_JPEG=m
+ CONFIG_VIDEO_SAMSUNG_S5P_MFC=m
+ CONFIG_VIDEO_SAMSUNG_EXYNOS_GSC=m
 -- 
 2.18.0
