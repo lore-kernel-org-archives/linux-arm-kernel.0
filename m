@@ -1,33 +1,32 @@
 From: cl@rock-chips.com (cl at rock-chips.com)
-Date: Tue, 17 Jul 2018 15:49:00 +0800
-Subject: [PATCH v1 0/7] arm64: dts: rockchip: add basic dts file for PX30 SoCs
-Message-ID: <1531813747-8804-1-git-send-email-cl@rock-chips.com>
+Date: Tue, 17 Jul 2018 15:49:01 +0800
+Subject: [PATCH v1 1/7] Documentation: usb: dwc2: add description for px30
+In-Reply-To: <1531813747-8804-1-git-send-email-cl@rock-chips.com>
+References: <1531813747-8804-1-git-send-email-cl@rock-chips.com>
+Message-ID: <1531813747-8804-2-git-send-email-cl@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Liang Chen <cl@rock-chips.com>
 
-Liang Chen (7):
-  Documentation: usb: dwc2: add description for px30
-  Documentation: rockchip-dw-mshc: add description for px30
-  Documentation: spi-rockchip: add description for px30
-  Documentation: rockchip-i2s: add description for px30
-  Documentation: rockchip: grf: add grf and pmugrf description for px30
-  arm64: dts: rockchip: add core dtsi file for PX30 SoCs
-  arm64: dts: rockchip: add PX30 eavluation board devicetree
+This patch adds the compatible of dwc2 for PX30 SoCs.
 
- Documentation/devicetree/bindings/arm/rockchip.txt |    4 +
- .../devicetree/bindings/mmc/rockchip-dw-mshc.txt   |    1 +
- .../devicetree/bindings/soc/rockchip/grf.txt       |    2 +
- .../devicetree/bindings/sound/rockchip-i2s.txt     |    1 +
- .../devicetree/bindings/spi/spi-rockchip.txt       |    1 +
- Documentation/devicetree/bindings/usb/dwc2.txt     |    1 +
- arch/arm64/boot/dts/rockchip/Makefile              |    1 +
- arch/arm64/boot/dts/rockchip/px30-evb.dts          |  539 ++++++
- arch/arm64/boot/dts/rockchip/px30.dtsi             | 2044 ++++++++++++++++++++
- 9 files changed, 2594 insertions(+)
- create mode 100644 arch/arm64/boot/dts/rockchip/px30-evb.dts
- create mode 100644 arch/arm64/boot/dts/rockchip/px30.dtsi
+Signed-off-by: Liang Chen <cl@rock-chips.com>
+---
+ Documentation/devicetree/bindings/usb/dwc2.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
+diff --git a/Documentation/devicetree/bindings/usb/dwc2.txt b/Documentation/devicetree/bindings/usb/dwc2.txt
+index 46da5f1..6dc3c4a 100644
+--- a/Documentation/devicetree/bindings/usb/dwc2.txt
++++ b/Documentation/devicetree/bindings/usb/dwc2.txt
+@@ -6,6 +6,7 @@ Required properties:
+   - brcm,bcm2835-usb: The DWC2 USB controller instance in the BCM2835 SoC.
+   - hisilicon,hi6220-usb: The DWC2 USB controller instance in the hi6220 SoC.
+   - rockchip,rk3066-usb: The DWC2 USB controller instance in the rk3066 Soc;
++  - "rockchip,px30-usb", "rockchip,rk3066-usb", "snps,dwc2": for px30 Soc;
+   - "rockchip,rk3188-usb", "rockchip,rk3066-usb", "snps,dwc2": for rk3188 Soc;
+   - "rockchip,rk3288-usb", "rockchip,rk3066-usb", "snps,dwc2": for rk3288 Soc;
+   - "lantiq,arx100-usb": The DWC2 USB controller instance in Lantiq ARX SoCs;
 -- 
 1.9.1
