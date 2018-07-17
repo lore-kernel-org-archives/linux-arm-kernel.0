@@ -1,119 +1,43 @@
 From: linux.amoon@gmail.com (Anand Moon)
-Date: Tue, 17 Jul 2018 10:12:18 +0000
-Subject: [PATCH 1/5] thermal: exynos: enable core tmu clk on exynos platform
-Message-ID: <1531822342-4293-1-git-send-email-linux.amoon@gmail.com>
+Date: Tue, 17 Jul 2018 10:12:21 +0000
+Subject: [PATCH 4/5] thermal: exynos: fixed the efuse min/max value for
+ exynos5422
+In-Reply-To: <1531822342-4293-1-git-send-email-linux.amoon@gmail.com>
+References: <1531822342-4293-1-git-send-email-linux.amoon@gmail.com>
+Message-ID: <1531822342-4293-4-git-send-email-linux.amoon@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-clk_summary do not show tmu_apbif clk enable, so replace
-the clk_prepare with clk_prepare_enables to enable tmu clk.
-simplify the enable of tmu_triminfo_apbif clk, also fixed
-the order of goto error for failed cases.
+e-fuse range min~max range is 16~76. if e-fuse value is out of
+this range, then thermal sensor may not sense thermal data properly.
 
 CC: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 Signed-off-by: Anand Moon <linux.amoon@gmail.com>
 ---
-before:
-cat /sys/kernel/debug/clk/clk_summary | grep tmu
-                         tmu_gpu           0            2    66600000          0 0
-                         tmu              0            6    66600000          0 0
-after:
-cat /sys/kernel/debug/clk/clk_summary | grep tmu
-                         tmu_gpu       2        2        0    66600000          0 0
-                         tmu          6        6        0    66600000          0 0
----
- drivers/thermal/samsung/exynos_tmu.c | 45 ++++++++++++++++++------------------
- 1 file changed, 22 insertions(+), 23 deletions(-)
+ drivers/thermal/samsung/exynos_tmu.c | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/thermal/samsung/exynos_tmu.c b/drivers/thermal/samsung/exynos_tmu.c
-index a992e51..0164c9e 100644
+index 4a2733c..6481d91 100644
 --- a/drivers/thermal/samsung/exynos_tmu.c
 +++ b/drivers/thermal/samsung/exynos_tmu.c
-@@ -1060,41 +1060,40 @@ static int exynos_tmu_probe(struct platform_device *pdev)
- 		dev_err(&pdev->dev, "Failed to get clock\n");
- 		ret = PTR_ERR(data->clk);
- 		goto err_sensor;
--	}
--
--	data->clk_sec = devm_clk_get(&pdev->dev, "tmu_triminfo_apbif");
--	if (IS_ERR(data->clk_sec)) {
--		if (data->soc == SOC_ARCH_EXYNOS5420_TRIMINFO) {
--			dev_err(&pdev->dev, "Failed to get triminfo clock\n");
--			ret = PTR_ERR(data->clk_sec);
--			goto err_sensor;
--		}
- 	} else {
--		ret = clk_prepare(data->clk_sec);
-+		ret = clk_prepare_enable(data->clk);
- 		if (ret) {
- 			dev_err(&pdev->dev, "Failed to get clock\n");
- 			goto err_sensor;
- 		}
- 	}
- 
--	ret = clk_prepare(data->clk);
--	if (ret) {
--		dev_err(&pdev->dev, "Failed to get clock\n");
--		goto err_clk_sec;
--	}
--
- 	switch (data->soc) {
-+	case SOC_ARCH_EXYNOS5420_TRIMINFO:
-+		data->clk_sec = devm_clk_get(&pdev->dev, "tmu_triminfo_apbif");
-+		if (IS_ERR(data->clk_sec)) {
-+			dev_err(&pdev->dev, "Failed to get triminfo clock\n");
-+			ret = PTR_ERR(data->clk_sec);
-+			goto err_clk;
+@@ -940,11 +940,13 @@ static int exynos_map_dt_data(struct platform_device *pdev)
+ 		data->reference_voltage = 16;
+ 		data->efuse_value = 55;
+ 		if (data->soc != SOC_ARCH_EXYNOS5420 &&
+-		    data->soc != SOC_ARCH_EXYNOS5420_TRIMINFO)
++		    data->soc != SOC_ARCH_EXYNOS5420_TRIMINFO) {
++			data->min_efuse_value = 16;
++			data->max_efuse_value = 76;
 +		} else {
-+			ret = clk_prepare_enable(data->clk_sec);
-+			if (ret) {
-+				dev_err(&pdev->dev, "Failed to get clock\n");
-+				goto err_clk;
-+			}
+ 			data->min_efuse_value = 40;
+-		else
+-			data->min_efuse_value = 0;
+-		data->max_efuse_value = 100;
++			data->max_efuse_value = 100;
 +		}
-+		break;
- 	case SOC_ARCH_EXYNOS5433:
- 	case SOC_ARCH_EXYNOS7:
- 		data->sclk = devm_clk_get(&pdev->dev, "tmu_sclk");
- 		if (IS_ERR(data->sclk)) {
- 			dev_err(&pdev->dev, "Failed to get sclk\n");
--			goto err_clk;
-+			goto err_clk_sec;
- 		} else {
- 			ret = clk_prepare_enable(data->sclk);
- 			if (ret) {
- 				dev_err(&pdev->dev, "Failed to enable sclk\n");
--				goto err_clk;
-+				goto err_clk_sec;
- 			}
- 		}
  		break;
-@@ -1134,11 +1133,11 @@ static int exynos_tmu_probe(struct platform_device *pdev)
- 	thermal_zone_of_sensor_unregister(&pdev->dev, data->tzd);
- err_sclk:
- 	clk_disable_unprepare(data->sclk);
--err_clk:
--	clk_unprepare(data->clk);
- err_clk_sec:
- 	if (!IS_ERR(data->clk_sec))
--		clk_unprepare(data->clk_sec);
-+		clk_disable_unprepare(data->clk_sec);
-+err_clk:
-+	clk_disable_unprepare(data->clk);
- err_sensor:
- 	if (!IS_ERR(data->regulator))
- 		regulator_disable(data->regulator);
-@@ -1155,9 +1154,9 @@ static int exynos_tmu_remove(struct platform_device *pdev)
- 	exynos_tmu_control(pdev, false);
- 
- 	clk_disable_unprepare(data->sclk);
--	clk_unprepare(data->clk);
-+	clk_disable_unprepare(data->clk);
- 	if (!IS_ERR(data->clk_sec))
--		clk_unprepare(data->clk_sec);
-+		clk_disable_unprepare(data->clk_sec);
- 
- 	if (!IS_ERR(data->regulator))
- 		regulator_disable(data->regulator);
+ 	case SOC_ARCH_EXYNOS5433:
+ 		data->tmu_set_trip_temp = exynos5433_tmu_set_trip_temp;
 -- 
 2.7.4
