@@ -1,39 +1,55 @@
 From: maxime.chevallier@bootlin.com (Maxime Chevallier)
-Date: Tue, 17 Jul 2018 16:31:53 +0200
-Subject: [PATCH RESEND 4/5] spi: imx: remove unnecessary check in
- spi_imx_can_dma
+Date: Tue, 17 Jul 2018 16:31:52 +0200
+Subject: [PATCH RESEND 3/5] spi: imx: Use correct number of bytes per words
 In-Reply-To: <20180717143154.28241-1-maxime.chevallier@bootlin.com>
 References: <20180717143154.28241-1-maxime.chevallier@bootlin.com>
-Message-ID: <20180717143154.28241-5-maxime.chevallier@bootlin.com>
+Message-ID: <20180717143154.28241-4-maxime.chevallier@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The spi_imx_can_dma function computes the watermark level so that
-the transfer will fit in exactly N bursts (without a remainder).
+The SPI core enforces that we always use the next power-of-two number of
+bytes to store words. As a result, a 24 bits word will be stored in 4
+bytes.
 
-The smallest watermark level possible being one FIFO entry per burst, we
-can't never have a case where the transfer size isn't divsiible by 1.
+This commit fixes the spi_imx_bytes_per_word function to return the
+correct number of bytes.
 
-Remove the extra check for the wml being different than 0.
+This also allows to get rid of unnecessary checks in the can_dma
+function, since the SPI core validates that we always have a transfer
+length that is a multiple of the number of bytes per word.
 
 Signed-off-by: Maxime Chevallier <maxime.chevallier@bootlin.com>
 ---
- drivers/spi/spi-imx.c | 3 ---
- 1 file changed, 3 deletions(-)
+ drivers/spi/spi-imx.c | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
-index 3ae706dac660..ef6d3648396a 100644
+index ecafbda5ec94..3ae706dac660 100644
 --- a/drivers/spi/spi-imx.c
 +++ b/drivers/spi/spi-imx.c
-@@ -229,9 +229,6 @@ static bool spi_imx_can_dma(struct spi_master *master, struct spi_device *spi,
- 			break;
- 	}
+@@ -202,7 +202,12 @@ static unsigned int spi_imx_clkdiv_2(unsigned int fin,
  
--	if (i == 0)
+ static int spi_imx_bytes_per_word(const int bits_per_word)
+ {
+-	return DIV_ROUND_UP(bits_per_word, BITS_PER_BYTE);
++	if (bits_per_word <= 8)
++		return 1;
++	else if (bits_per_word <= 16)
++		return 2;
++	else
++		return 4;
+ }
+ 
+ static bool spi_imx_can_dma(struct spi_master *master, struct spi_device *spi,
+@@ -219,9 +224,6 @@ static bool spi_imx_can_dma(struct spi_master *master, struct spi_device *spi,
+ 
+ 	bytes_per_word = spi_imx_bytes_per_word(transfer->bits_per_word);
+ 
+-	if (bytes_per_word != 1 && bytes_per_word != 2 && bytes_per_word != 4)
 -		return false;
 -
- 	spi_imx->wml = i;
- 	spi_imx->dynamic_burst = 0;
- 
+ 	for (i = spi_imx->devtype_data->fifo_size / 2; i > 0; i--) {
+ 		if (!(transfer->len % (i * bytes_per_word)))
+ 			break;
 -- 
 2.11.0
