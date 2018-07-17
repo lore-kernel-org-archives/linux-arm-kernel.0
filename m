@@ -1,97 +1,152 @@
-From: ayan.halder@arm.com (Ayan Kumar Halder)
-Date: Tue, 17 Jul 2018 18:13:45 +0100
-Subject: [PATCH 4/5] drm/omapdrm: Substitute format_is_yuv() with
- format->is_yuv
-In-Reply-To: <1531847626-22248-1-git-send-email-ayan.halder@arm.com>
-References: <1531847626-22248-1-git-send-email-ayan.halder@arm.com>
-Message-ID: <1531847626-22248-4-git-send-email-ayan.halder@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 17 Jul 2018 18:15:43 +0100
+Subject: [PATCH v3 3/4] PCI: mediatek: Add system pm support for MT2712
+ and MT7622
+In-Reply-To: <1530518264-6125-4-git-send-email-honghui.zhang@mediatek.com>
+References: <1530518264-6125-1-git-send-email-honghui.zhang@mediatek.com>
+ <1530518264-6125-4-git-send-email-honghui.zhang@mediatek.com>
+Message-ID: <20180717171543.GA20991@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-drm_format_info table has a field 'is_yuv' to denote if the format
-is yuv or not. The driver is expected to use this instead of
-having a function for the same purpose.
+[+Rafael, Kevin, Ulf]
 
-Signed-off-by: Ayan Kumar halder <ayan.halder@arm.com>
----
- drivers/gpu/drm/omapdrm/dss/dispc.c | 26 ++++++++++----------------
- 1 file changed, 10 insertions(+), 16 deletions(-)
+On Mon, Jul 02, 2018 at 03:57:43PM +0800, honghui.zhang at mediatek.com wrote:
+> From: Honghui Zhang <honghui.zhang@mediatek.com>
+> 
+> The MTCMOS of PCIe Host for MT2712 and MT7622 will be off when system
+> suspend, and all the internal control register will be reset after system
+> resume. The PCIe link should be re-established and the related control
+> register values should be re-set after system resume.
+> 
+> Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
+> Acked-by: Ryder Lee <ryder.lee@mediatek.com>
+> ---
+>  drivers/pci/controller/pcie-mediatek.c | 67 ++++++++++++++++++++++++++++++++++
+>  1 file changed, 67 insertions(+)
+> 
+> diff --git a/drivers/pci/controller/pcie-mediatek.c b/drivers/pci/controller/pcie-mediatek.c
+> index 86918d4..175d7b6 100644
+> --- a/drivers/pci/controller/pcie-mediatek.c
+> +++ b/drivers/pci/controller/pcie-mediatek.c
+> @@ -134,12 +134,14 @@ struct mtk_pcie_port;
+>  /**
+>   * struct mtk_pcie_soc - differentiate between host generations
+>   * @need_fix_class_id: whether this host's class ID needed to be fixed or not
+> + * @pm_support: whether the host's MTCMOS will be off when suspend
+>   * @ops: pointer to configuration access functions
+>   * @startup: pointer to controller setting functions
+>   * @setup_irq: pointer to initialize IRQ functions
+>   */
+>  struct mtk_pcie_soc {
+>  	bool need_fix_class_id;
+> +	bool pm_support;
+>  	struct pci_ops *ops;
+>  	int (*startup)(struct mtk_pcie_port *port);
+>  	int (*setup_irq)(struct mtk_pcie_port *port, struct device_node *node);
+> @@ -1197,12 +1199,75 @@ static int mtk_pcie_probe(struct platform_device *pdev)
+>  	return err;
+>  }
+>  
+> +static int __maybe_unused mtk_pcie_suspend_noirq(struct device *dev)
+> +{
+> +	struct mtk_pcie *pcie = dev_get_drvdata(dev);
+> +	const struct mtk_pcie_soc *soc = pcie->soc;
+> +	struct mtk_pcie_port *port;
+> +
+> +	if (!soc->pm_support)
+> +		return 0;
+> +
+> +	if (list_empty(&pcie->ports))
+> +		return 0;
+> +
+> +	list_for_each_entry(port, &pcie->ports, list) {
+> +		clk_disable_unprepare(port->pipe_ck);
+> +		clk_disable_unprepare(port->obff_ck);
+> +		clk_disable_unprepare(port->axi_ck);
+> +		clk_disable_unprepare(port->aux_ck);
+> +		clk_disable_unprepare(port->ahb_ck);
+> +		clk_disable_unprepare(port->sys_ck);
+> +		phy_power_off(port->phy);
+> +		phy_exit(port->phy);
+> +	}
+> +
+> +	mtk_pcie_subsys_powerdown(pcie);
+> +
+> +	return 0;
+> +}
+> +
+> +static int __maybe_unused mtk_pcie_resume_noirq(struct device *dev)
+> +{
+> +	struct mtk_pcie *pcie = dev_get_drvdata(dev);
+> +	const struct mtk_pcie_soc *soc = pcie->soc;
+> +	struct mtk_pcie_port *port, *tmp;
+> +
+> +	if (!soc->pm_support)
+> +		return 0;
+> +
+> +	if (list_empty(&pcie->ports))
+> +		return 0;
+> +
+> +	if (dev->pm_domain) {
+> +		pm_runtime_enable(dev);
+> +		pm_runtime_get_sync(dev);
+> +	}
 
-diff --git a/drivers/gpu/drm/omapdrm/dss/dispc.c b/drivers/gpu/drm/omapdrm/dss/dispc.c
-index 84f274c..8d2d7a4 100644
---- a/drivers/gpu/drm/omapdrm/dss/dispc.c
-+++ b/drivers/gpu/drm/omapdrm/dss/dispc.c
-@@ -1140,18 +1140,6 @@ static void dispc_ovl_set_color_mode(struct dispc_device *dispc,
- 	REG_FLD_MOD(dispc, DISPC_OVL_ATTRIBUTES(plane), m, 4, 1);
- }
- 
--static bool format_is_yuv(u32 fourcc)
--{
--	switch (fourcc) {
--	case DRM_FORMAT_YUYV:
--	case DRM_FORMAT_UYVY:
--	case DRM_FORMAT_NV12:
--		return true;
--	default:
--		return false;
--	}
--}
--
- static void dispc_ovl_configure_burst_type(struct dispc_device *dispc,
- 					   enum omap_plane_id plane,
- 					   enum omap_dss_rotation_type rotation)
-@@ -1910,11 +1898,14 @@ static void dispc_ovl_set_scaling_uv(struct dispc_device *dispc,
- 	int scale_x = out_width != orig_width;
- 	int scale_y = out_height != orig_height;
- 	bool chroma_upscale = plane != OMAP_DSS_WB;
-+	const struct drm_format_info *info;
-+
-+	info = drm_format_info(fourcc);
- 
- 	if (!dispc_has_feature(dispc, FEAT_HANDLE_UV_SEPARATE))
- 		return;
- 
--	if (!format_is_yuv(fourcc)) {
-+	if (!info->is_yuv) {
- 		/* reset chroma resampling for RGB formats  */
- 		if (plane != OMAP_DSS_WB)
- 			REG_FLD_MOD(dispc, DISPC_OVL_ATTRIBUTES2(plane),
-@@ -2632,6 +2623,9 @@ static int dispc_ovl_setup_common(struct dispc_device *dispc,
- 	bool ilace = !!(vm->flags & DISPLAY_FLAGS_INTERLACED);
- 	unsigned long pclk = dispc_plane_pclk_rate(dispc, plane);
- 	unsigned long lclk = dispc_plane_lclk_rate(dispc, plane);
-+	const struct drm_format_info *info;
-+
-+	info = drm_format_info(fourcc);
- 
- 	/* when setting up WB, dispc_plane_pclk_rate() returns 0 */
- 	if (plane == OMAP_DSS_WB)
-@@ -2640,7 +2634,7 @@ static int dispc_ovl_setup_common(struct dispc_device *dispc,
- 	if (paddr == 0 && rotation_type != OMAP_DSS_ROT_TILER)
- 		return -EINVAL;
- 
--	if (format_is_yuv(fourcc) && (in_width & 1)) {
-+	if (info->is_yuv && (in_width & 1)) {
- 		DSSERR("input width %d is not even for YUV format\n", in_width);
- 		return -EINVAL;
- 	}
-@@ -2680,7 +2674,7 @@ static int dispc_ovl_setup_common(struct dispc_device *dispc,
- 		DSSDBG("predecimation %d x %x, new input size %d x %d\n",
- 			x_predecim, y_predecim, in_width, in_height);
- 
--	if (format_is_yuv(fourcc) && (in_width & 1)) {
-+	if (info->is_yuv && (in_width & 1)) {
- 		DSSDBG("predecimated input width is not even for YUV format\n");
- 		DSSDBG("adjusting input width %d -> %d\n",
- 			in_width, in_width & ~1);
-@@ -2688,7 +2682,7 @@ static int dispc_ovl_setup_common(struct dispc_device *dispc,
- 		in_width &= ~1;
- 	}
- 
--	if (format_is_yuv(fourcc))
-+	if (info->is_yuv)
- 		cconv = 1;
- 
- 	if (ilace && !fieldmode) {
--- 
-2.7.4
+Are these runtime PM calls needed/abused here ?
+
+Mind explaining the logic ?
+
+There is certainly an asymmetry with the suspend callback which made me
+suspicious, I am pretty certain Rafael/Kevin/Ulf can help me clarify so
+that we can make progress with this patch.
+
+Lorenzo
+
+> +
+> +	clk_prepare_enable(pcie->free_ck);
+> +
+> +	list_for_each_entry_safe(port, tmp, &pcie->ports, list)
+> +		mtk_pcie_enable_port(port);
+> +
+> +	/* In case of EP was removed while system suspend. */
+> +	if (list_empty(&pcie->ports))
+> +		mtk_pcie_subsys_powerdown(pcie);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct dev_pm_ops mtk_pcie_pm_ops = {
+> +	SET_NOIRQ_SYSTEM_SLEEP_PM_OPS(mtk_pcie_suspend_noirq,
+> +				      mtk_pcie_resume_noirq)
+> +};
+> +
+>  static const struct mtk_pcie_soc mtk_pcie_soc_v1 = {
+>  	.ops = &mtk_pcie_ops,
+>  	.startup = mtk_pcie_startup_port,
+>  };
+>  
+>  static const struct mtk_pcie_soc mtk_pcie_soc_mt2712 = {
+> +	.pm_support = true,
+>  	.ops = &mtk_pcie_ops_v2,
+>  	.startup = mtk_pcie_startup_port_v2,
+>  	.setup_irq = mtk_pcie_setup_irq,
+> @@ -1210,6 +1275,7 @@ static const struct mtk_pcie_soc mtk_pcie_soc_mt2712 = {
+>  
+>  static const struct mtk_pcie_soc mtk_pcie_soc_mt7622 = {
+>  	.need_fix_class_id = true,
+> +	.pm_support = true,
+>  	.ops = &mtk_pcie_ops_v2,
+>  	.startup = mtk_pcie_startup_port_v2,
+>  	.setup_irq = mtk_pcie_setup_irq,
+> @@ -1229,6 +1295,7 @@ static struct platform_driver mtk_pcie_driver = {
+>  		.name = "mtk-pcie",
+>  		.of_match_table = mtk_pcie_ids,
+>  		.suppress_bind_attrs = true,
+> +		.pm = &mtk_pcie_pm_ops,
+>  	},
+>  };
+>  builtin_platform_driver(mtk_pcie_driver);
+> -- 
+> 2.6.4
+> 
