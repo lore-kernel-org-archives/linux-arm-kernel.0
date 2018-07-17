@@ -1,55 +1,36 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 17 Jul 2018 23:43:03 +0800
-Subject: [PATCH] mmc: sunxi: Use new timing mode for A64 eMMC controller
-In-Reply-To: <20180717151558.wn7v33whtljqt53w@flea>
-References: <20180712030225.15681-1-wens@csie.org>
- <20180712071959.fi4rhgwv2iuoelbl@flea>
- <CAGb2v65rE2nQbyeiSPAyTzw-n-EQsUwQABx3nrvXTu4JogFPBQ@mail.gmail.com>
- <20180717151558.wn7v33whtljqt53w@flea>
-Message-ID: <CAGb2v64NRVaWpbDqiX0JX7_6uvypUpNEecPUj-sSjaK5X-hdQA@mail.gmail.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Tue, 17 Jul 2018 17:46:17 +0200
+Subject: [PATCH] thermal: samsung: Remove Exynos5440 clock handling left-overs
+Message-ID: <20180717154617.29913-1-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 17, 2018 at 11:15 PM, Maxime Ripard
-<maxime.ripard@bootlin.com> wrote:
-> On Thu, Jul 12, 2018 at 06:17:23PM +0800, Chen-Yu Tsai wrote:
->> On Thu, Jul 12, 2018 at 3:19 PM, Maxime Ripard
->> <maxime.ripard@bootlin.com> wrote:
->> > Hi,
->> >
->> > On Thu, Jul 12, 2018 at 11:02:25AM +0800, Chen-Yu Tsai wrote:
->> >> The eMMC controller is also a new timing mode controller, but it doesn't
->> >> have the timing mode switch. It does however have signal delay and
->> >> calibration controls, typical of Allwinner MMC controllers that support
->> >> the new timing mode.
->> >>
->> >> Enable the new timing mode setting for the A64 eMMC controller. This
->> >> also enables MMC HS-DDR modes, which gives higher throughput for eMMC
->> >> chips that support it, and can deliver such throughput.
->> >>
->> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->> >
->> > That doesn't look right. The datasheet explicitly mentions that this
->> > bit doesn't apply to the eMMC controller, and the BSP is doing the same:
->> > https://github.com/longsleep/linux-pine64/blob/lichee-dev-v3.10.65/drivers/mmc/host/sunxi-mmc-sun50iw1p1-1.c
->> >
->> > vs
->> > https://github.com/longsleep/linux-pine64/blob/lichee-dev-v3.10.65/drivers/mmc/host/sunxi-mmc-sun50iw1p1-2.c
->>
->> You mean the bit in SDXC_REG_SD_NTSR? Yes I know that doesn't exist
->> for the eMMC controller. I mentioned this in the commit message. It
->> doesn't exist, and writes to it become a no-op.
->>
->> Would a comment, or comments, help with making this clear?
->
-> Ah right. Maybe we should move the calibration under can_calibrate
-> though, or create another boolean for this?
->
-> Putting it under has_new_timings while the SoC doesn't use it looks
-> very confusing.
+Commit 8014220d48e7 ("thermal: samsung: Remove support for Exynos5440")
+removed the Exynos5440 specific part of code for accessing TMU interrupt
+registers but the surrounding clock handling was left.
 
-IIRC we don't support calibration anyway. This boolean simply signals
-the usage of the new timing mode, whether by choice, or because it is
-the only mode the controller supports.
+Clean it up.
 
-ChenYu
+Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+---
+ drivers/thermal/samsung/exynos_tmu.c | 5 -----
+ 1 file changed, 5 deletions(-)
+
+diff --git a/drivers/thermal/samsung/exynos_tmu.c b/drivers/thermal/samsung/exynos_tmu.c
+index a992e51ef065..48eef552cba4 100644
+--- a/drivers/thermal/samsung/exynos_tmu.c
++++ b/drivers/thermal/samsung/exynos_tmu.c
+@@ -789,11 +789,6 @@ static void exynos_tmu_work(struct work_struct *work)
+ 	struct exynos_tmu_data *data = container_of(work,
+ 			struct exynos_tmu_data, irq_work);
+ 
+-	if (!IS_ERR(data->clk_sec))
+-		clk_enable(data->clk_sec);
+-	if (!IS_ERR(data->clk_sec))
+-		clk_disable(data->clk_sec);
+-
+ 	thermal_zone_device_update(data->tzd, THERMAL_EVENT_UNSPECIFIED);
+ 
+ 	mutex_lock(&data->lock);
+-- 
+2.14.1
