@@ -1,53 +1,50 @@
 From: yaojun8558363@gmail.com (Jun Yao)
-Date: Tue, 17 Jul 2018 17:56:06 +0800
-Subject: [PATCH v4 4/6] arm64/mm: Make swapper_pg_dir smaller
-In-Reply-To: <20180717095608.11008-1-yaojun8558363@gmail.com>
-References: <20180717095608.11008-1-yaojun8558363@gmail.com>
-Message-ID: <20180717095608.11008-5-yaojun8558363@gmail.com>
+Date: Tue, 17 Jul 2018 17:56:02 +0800
+Subject: [PATCH v4 0/6] arm64/mm: Move {idmap_pg_dir,swapper_pg_dir} to
+Message-ID: <20180717095608.11008-1-yaojun8558363@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We setup final page tables in swapper_pg_dir, which just contains
-PGD. And the PUD/PMD are allocated dynamically. So we can make it
-smaller.
+Version 4 changes:
+	1. Rename INIT_DIR to INIT_PG_TABLES and move it outside the
+	   '.init.data' section[1].
+	2. Move the 'count' calculation to clear_pages()[1].
+	3. Rearrange register in __enable_mmu() and pass ttbr1 through
+	   the x1 register[2].
+	4. Add commit message to explain why we can make swapper_pg_dir
+	   smaller[3].
+	5. Rewrite in_swapper_pgdir() and use pgd_set_fixmap() to
+	   populate swapper_pg_dir. At the same time, add a spin lock to
+	   avoid race conditions[4].
+	6. Move {idmap_pg_dir,tramp_pg_dir,reserved_ttbr0,swapper_pg_dir}
+	   to the KERNEL_PG_TABLES macro. And put this macro after
+	   NOTES[4].
 
-Signed-off-by: Jun Yao <yaojun8558363@gmail.com>
----
- arch/arm64/kernel/vmlinux.lds.S | 2 +-
- arch/arm64/mm/mmu.c             | 8 --------
- 2 files changed, 1 insertion(+), 9 deletions(-)
+v3: https://www.spinics.net/lists/arm-kernel/msg662537.html
+v2: https://patchwork.kernel.org/patch/10485641/
+v1: https://patchwork.kernel.org/patch/10476595/
 
-diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-index 61d7cee3eaa6..2446911f4262 100644
---- a/arch/arm64/kernel/vmlinux.lds.S
-+++ b/arch/arm64/kernel/vmlinux.lds.S
-@@ -237,7 +237,7 @@ SECTIONS
- 	. += RESERVED_TTBR0_SIZE;
- #endif
- 	swapper_pg_dir = .;
--	. += SWAPPER_DIR_SIZE;
-+	. += PAGE_SIZE;
- 	swapper_pg_end = .;
- 
- 	__pecoff_data_size = ABSOLUTE(. - __initdata_begin);
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index cdce3ec4c7bb..d24be05ec1d4 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -633,14 +633,6 @@ void __init paging_init(void)
- 	map_mem(swapper_pg_dir);
- 	cpu_replace_ttbr1(swapper_pg_dir);
- 	init_mm.pgd = swapper_pg_dir;
--
--	/*
--	 * We only reuse the PGD from the swapper_pg_dir, not the pud + pmd
--	 * allocated with it.
--	 */
--	memblock_free(__pa_symbol(swapper_pg_dir) + PAGE_SIZE,
--		      __pa_symbol(swapper_pg_end) - __pa_symbol(swapper_pg_dir)
--		      - PAGE_SIZE);
- }
- 
- /*
+[1] https://lkml.org/lkml/2018/7/6/238
+[2] https://lkml.org/lkml/2018/7/6/239
+[3] https://lkml.org/lkml/2018/7/6/243
+[4] https://lkml.org/lkml/2018/7/11/782
+
+Jun Yao (6):
+  arm64/mm: Introduce init_pg_dir
+  arm64/mm: Make __enable_mmu() take the ttbr1 page as an argument
+  arm64/mm: Create initial page tables in init_pg_dir
+  arm64/mm: Make swapper_pg_dir smaller
+  arm64/mm: Populate swapper_pg_dir by fixmap
+  arm64/mm: Move {idmap_pg_dir, swapper_pg_dir} to .rodata section
+
+ arch/arm64/include/asm/assembler.h | 29 +++++++++++++
+ arch/arm64/include/asm/pgtable.h   | 66 ++++++++++++++++++++++++++----
+ arch/arm64/kernel/head.S           | 45 ++++++++++++--------
+ arch/arm64/kernel/setup.c          |  1 +
+ arch/arm64/kernel/sleep.S          |  1 +
+ arch/arm64/kernel/vmlinux.lds.S    | 47 ++++++++++++++-------
+ arch/arm64/mm/mmu.c                | 34 +++------------
+ 7 files changed, 154 insertions(+), 69 deletions(-)
+
 -- 
 2.17.1
