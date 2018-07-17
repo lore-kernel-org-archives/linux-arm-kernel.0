@@ -1,186 +1,358 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Tue, 17 Jul 2018 22:34:44 +0800
-Subject: [stericsson:ux500-mcde 5/5] drivers/gpu/drm/mcde/mcde_dsi.c:494:2:
- note: in expansion of macro 'dev_dbg'
-Message-ID: <201807172242.qpUGR2mk%fengguang.wu@intel.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Tue, 17 Jul 2018 16:39:52 +0200
+Subject: [PATCH] arm64: zynqmp: Remove ep108 board
+In-Reply-To: <052cdf7d45bb94e106ae33c972a050089ef75803.1523452618.git.michal.simek@xilinx.com>
+References: <052cdf7d45bb94e106ae33c972a050089ef75803.1523452618.git.michal.simek@xilinx.com>
+Message-ID: <42b604af-b9e0-058a-c3eb-e9a5b6c5e5ca@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git ux500-mcde
-head:   1c2cef2895c1f98796d3f43b4fe8b40efe9ae694
-commit: 1c2cef2895c1f98796d3f43b4fe8b40efe9ae694 [5/5] MCDE hack
-config: sparc64-allyesconfig (attached as .config)
-compiler: sparc64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout 1c2cef2895c1f98796d3f43b4fe8b40efe9ae694
-        # save the attached .config to linux build tree
-        GCC_VERSION=7.2.0 make.cross ARCH=sparc64 
+On 11.4.2018 15:17, Michal Simek wrote:
+> ZynqMP Emulation board is no longer tested and there is no reason to
+> keep maintaining it.
+> 
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> ---
+> 
+>  arch/arm64/boot/dts/xilinx/Makefile           |   1 -
+>  .../boot/dts/xilinx/zynqmp-ep108-clk.dtsi     | 137 ----------------
+>  arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts   | 154 ------------------
+>  3 files changed, 292 deletions(-)
+>  delete mode 100644 arch/arm64/boot/dts/xilinx/zynqmp-ep108-clk.dtsi
+>  delete mode 100644 arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
+> 
+> diff --git a/arch/arm64/boot/dts/xilinx/Makefile b/arch/arm64/boot/dts/xilinx/Makefile
+> index c2a0c00272e2..d452f80e7601 100644
+> --- a/arch/arm64/boot/dts/xilinx/Makefile
+> +++ b/arch/arm64/boot/dts/xilinx/Makefile
+> @@ -1,5 +1,4 @@
+>  # SPDX-License-Identifier: GPL-2.0
+> -dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-ep108.dtb
+>  dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-zc1232-revA.dtb
+>  dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-zc1254-revA.dtb
+>  dtb-$(CONFIG_ARCH_ZYNQMP) += zynqmp-zc1275-revA.dtb
+> diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-ep108-clk.dtsi b/arch/arm64/boot/dts/xilinx/zynqmp-ep108-clk.dtsi
+> deleted file mode 100644
+> index 9f5eedbc2139..000000000000
+> --- a/arch/arm64/boot/dts/xilinx/zynqmp-ep108-clk.dtsi
+> +++ /dev/null
+> @@ -1,137 +0,0 @@
+> -// SPDX-License-Identifier: GPL-2.0+
+> -/*
+> - * clock specification for Xilinx ZynqMP ep108 development board
+> - *
+> - * (C) Copyright 2015, Xilinx, Inc.
+> - *
+> - * Michal Simek <michal.simek@xilinx.com>
+> - *
+> - * This program is free software; you can redistribute it and/or
+> - * modify it under the terms of the GNU General Public License as
+> - * published by the Free Software Foundation; either version 2 of
+> - * the License, or (at your option) any later version.
+> - */
+> -
+> -/ {
+> -	misc_clk: misc_clk {
+> -		compatible = "fixed-clock";
+> -		#clock-cells = <0>;
+> -		clock-frequency = <25000000>;
+> -	};
+> -
+> -	i2c_clk: i2c_clk {
+> -		compatible = "fixed-clock";
+> -		#clock-cells = <0x0>;
+> -		clock-frequency = <111111111>;
+> -	};
+> -
+> -	sata_clk: sata_clk {
+> -		compatible = "fixed-clock";
+> -		#clock-cells = <0>;
+> -		clock-frequency = <75000000>;
+> -	};
+> -
+> -	clk100: clk100 {
+> -		compatible = "fixed-clock";
+> -		#clock-cells = <0>;
+> -		clock-frequency = <100000000>;
+> -	};
+> -
+> -	clk600: clk600 {
+> -		compatible = "fixed-clock";
+> -		#clock-cells = <0>;
+> -		clock-frequency = <600000000>;
+> -	};
+> -};
+> -
+> -&can0 {
+> -	clocks = <&misc_clk &misc_clk>;
+> -};
+> -
+> -&can1 {
+> -	clocks = <&misc_clk &misc_clk>;
+> -};
+> -
+> -&fpd_dma_chan1 {
+> -	clocks = <&clk600>, <&clk100>;
+> -};
+> -
+> -&fpd_dma_chan2 {
+> -	clocks = <&clk600>, <&clk100>;
+> -};
+> -
+> -&fpd_dma_chan3 {
+> -	clocks = <&clk600>, <&clk100>;
+> -};
+> -
+> -&fpd_dma_chan4 {
+> -	clocks = <&clk600>, <&clk100>;
+> -};
+> -
+> -&fpd_dma_chan5 {
+> -	clocks = <&clk600>, <&clk100>;
+> -};
+> -
+> -&fpd_dma_chan6 {
+> -	clocks = <&clk600>, <&clk100>;
+> -};
+> -
+> -&fpd_dma_chan7 {
+> -	clocks = <&clk600>, <&clk100>;
+> -};
+> -
+> -&fpd_dma_chan8 {
+> -	clocks = <&clk600>, <&clk100>;
+> -};
+> -
+> -&gem0 {
+> -	clocks = <&misc_clk>, <&misc_clk>, <&misc_clk>;
+> -};
+> -
+> -&gpio {
+> -	clocks = <&misc_clk>;
+> -};
+> -
+> -&i2c0 {
+> -	clocks = <&i2c_clk>;
+> -};
+> -
+> -&i2c1 {
+> -	clocks = <&i2c_clk>;
+> -};
+> -
+> -&sata {
+> -	clocks = <&sata_clk>;
+> -};
+> -
+> -&sdhci0 {
+> -	clocks = <&misc_clk>, <&misc_clk>;
+> -};
+> -
+> -&sdhci1 {
+> -	clocks = <&misc_clk>, <&misc_clk>;
+> -};
+> -
+> -&spi0 {
+> -	clocks = <&misc_clk &misc_clk>;
+> -};
+> -
+> -&spi1 {
+> -	clocks = <&misc_clk &misc_clk>;
+> -};
+> -
+> -&uart0 {
+> -	clocks = <&misc_clk &misc_clk>;
+> -};
+> -
+> -&usb0 {
+> -	clocks = <&misc_clk>, <&misc_clk>;
+> -};
+> -
+> -&usb1 {
+> -	clocks = <&misc_clk>, <&misc_clk>;
+> -};
+> -
+> -&watchdog0 {
+> -	clocks= <&misc_clk>;
+> -};
+> diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts b/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
+> deleted file mode 100644
+> index 4b0684911626..000000000000
+> --- a/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
+> +++ /dev/null
+> @@ -1,154 +0,0 @@
+> -// SPDX-License-Identifier: GPL-2.0+
+> -/*
+> - * dts file for Xilinx ZynqMP ep108 development board
+> - *
+> - * (C) Copyright 2014 - 2015, Xilinx, Inc.
+> - *
+> - * Michal Simek <michal.simek@xilinx.com>
+> - *
+> - * This program is free software; you can redistribute it and/or
+> - * modify it under the terms of the GNU General Public License as
+> - * published by the Free Software Foundation; either version 2 of
+> - * the License, or (at your option) any later version.
+> - */
+> -
+> -/dts-v1/;
+> -
+> -#include "zynqmp.dtsi"
+> -#include "zynqmp-ep108-clk.dtsi"
+> -
+> -/ {
+> -	model = "ZynqMP EP108";
+> -
+> -	aliases {
+> -		mmc0 = &sdhci0;
+> -		mmc1 = &sdhci1;
+> -		serial0 = &uart0;
+> -	};
+> -
+> -	chosen {
+> -		stdout-path = "serial0:115200n8";
+> -	};
+> -
+> -	memory at 0 {
+> -		device_type = "memory";
+> -		reg = <0x0 0x0 0x0 0x40000000>;
+> -	};
+> -};
+> -
+> -&can0 {
+> -	status = "okay";
+> -};
+> -
+> -&can1 {
+> -	status = "okay";
+> -};
+> -
+> -&gem0 {
+> -	status = "okay";
+> -	phy-handle = <&phy0>;
+> -	phy-mode = "rgmii-id";
+> -	phy0: phy at 0 {
+> -		reg = <0>;
+> -		max-speed = <100>;
+> -	};
+> -};
+> -
+> -&gpio {
+> -	status = "okay";
+> -};
+> -
+> -&i2c0 {
+> -	status = "okay";
+> -	clock-frequency = <400000>;
+> -	eeprom at 54 {
+> -		compatible = "atmel,24c64";
+> -		reg = <0x54>;
+> -	};
+> -};
+> -
+> -&i2c1 {
+> -	status = "okay";
+> -	clock-frequency = <400000>;
+> -	eeprom at 55 {
+> -		compatible = "atmel,24c64";
+> -		reg = <0x55>;
+> -	};
+> -};
+> -
+> -&sata {
+> -	status = "okay";
+> -	ceva,broken-gen2;
+> -	/* SATA Phy OOB timing settings */
+> -	ceva,p0-cominit-params = /bits/ 8 <0x0F 0x25 0x18 0x29>;
+> -	ceva,p0-comwake-params = /bits/ 8 <0x04 0x0B 0x08 0x0F>;
+> -	ceva,p0-burst-params = /bits/ 8 <0x0A 0x08 0x4A 0x06>;
+> -	ceva,p0-retry-params = /bits/ 16 <0x0216 0x7F06>;
+> -	ceva,p1-cominit-params = /bits/ 8 <0x0F 0x25 0x18 0x29>;
+> -	ceva,p1-comwake-params = /bits/ 8 <0x04 0x0B 0x08 0x0F>;
+> -	ceva,p1-burst-params = /bits/ 8 <0x0A 0x08 0x4A 0x06>;
+> -	ceva,p1-retry-params = /bits/ 16 <0x0216 0x7F06>;
+> -};
+> -
+> -&sdhci0 {
+> -	status = "okay";
+> -	bus-width = <8>;
+> -};
+> -
+> -&sdhci1 {
+> -	status = "okay";
+> -};
+> -
+> -&spi0 {
+> -	status = "okay";
+> -	num-cs = <1>;
+> -	spi0_flash0: spi0_flash0 at 0 {
+> -		compatible = "m25p80";
+> -		#address-cells = <1>;
+> -		#size-cells = <1>;
+> -		spi-max-frequency = <50000000>;
+> -		reg = <0>;
+> -
+> -		spi0_flash0 at 0 {
+> -			label = "spi0_flash0";
+> -			reg = <0x0 0x100000>;
+> -		};
+> -	};
+> -};
+> -
+> -&spi1 {
+> -	status = "okay";
+> -	num-cs = <1>;
+> -	spi1_flash0: spi1_flash0 at 0 {
+> -		compatible = "m25p80";
+> -		#address-cells = <1>;
+> -		#size-cells = <1>;
+> -		spi-max-frequency = <50000000>;
+> -		reg = <0>;
+> -
+> -		spi1_flash0 at 0 {
+> -			label = "spi1_flash0";
+> -			reg = <0x0 0x100000>;
+> -		};
+> -	};
+> -};
+> -
+> -&uart0 {
+> -	status = "okay";
+> -};
+> -
+> -&usb0 {
+> -	status = "okay";
+> -	dr_mode = "peripheral";
+> -	maximum-speed = "high-speed";
+> -};
+> -
+> -&usb1 {
+> -	status = "okay";
+> -	dr_mode = "host";
+> -	maximum-speed = "high-speed";
+> -};
+> -
+> -&watchdog0 {
+> -	status = "okay";
+> -};
+> 
 
-All warnings (new ones prefixed by >>):
+Applied.
 
-   In file included from include/linux/printk.h:332:0,
-                    from include/linux/kernel.h:14,
-                    from include/linux/list.h:9,
-                    from include/linux/kobject.h:19,
-                    from include/linux/device.h:16,
-                    from include/linux/platform_device.h:14,
-                    from drivers/gpu/drm/mcde/mcde_dsi.c:2:
-   drivers/gpu/drm/mcde/mcde_dsi.c: In function 'mcde_dsi_host_transfer':
-   drivers/gpu/drm/mcde/mcde_dsi.c:495:3: warning: format '%d' expects argument of type 'int', but argument 5 has type 'size_t {aka long unsigned int}' [-Wformat=]
-      "message to channel %d, %d bytes: ",
-      ^
-   include/linux/dynamic_debug.h:135:39: note: in definition of macro 'dynamic_dev_dbg'
-      __dynamic_dev_dbg(&descriptor, dev, fmt, \
-                                          ^~~
->> drivers/gpu/drm/mcde/mcde_dsi.c:494:2: note: in expansion of macro 'dev_dbg'
-     dev_dbg(d->dev,
-     ^~~~~~~
-   At top level:
-   drivers/gpu/drm/mcde/mcde_dsi.c:604:13: warning: 'mcde_dsi_te_request' defined but not used [-Wunused-function]
-    static void mcde_dsi_te_request(struct mcde_dsi *d)
-                ^~~~~~~~~~~~~~~~~~~
+Thanks,
+Michal
 
-vim +/dev_dbg +494 drivers/gpu/drm/mcde/mcde_dsi.c
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Xilinx Microblaze
+Maintainer of Linux kernel - Xilinx Zynq ARM and ZynqMP ARM64 SoCs
+U-Boot custodian - Xilinx Microblaze/Zynq/ZynqMP SoCs
 
-   468	
-   469	#define MCDE_DSI_HOST_IS_READ(type)			    \
-   470	        ((type == MIPI_DSI_GENERIC_READ_REQUEST_0_PARAM) || \
-   471		 (type == MIPI_DSI_GENERIC_READ_REQUEST_1_PARAM) || \
-   472		 (type == MIPI_DSI_GENERIC_READ_REQUEST_2_PARAM) || \
-   473		 (type == MIPI_DSI_DCS_READ))
-   474	
-   475	static ssize_t mcde_dsi_host_transfer(struct mipi_dsi_host *host,
-   476					      const struct mipi_dsi_msg *msg)
-   477	{
-   478		struct mcde_dsi *d = host_to_mcde_dsi(host);
-   479		const u32 loop_delay_us = 10; /* us */
-   480		const u8 *tx = msg->tx_buf;
-   481		u32 loop_counter;
-   482		size_t txlen;
-   483		u32 val;
-   484		int ret;
-   485		int i;
-   486	
-   487		txlen = msg->tx_len;
-   488		if (txlen > 12) {
-   489			dev_err(d->dev,
-   490				"dunno how to write more than 12 bytes yet\n");
-   491			return -EIO;
-   492		}
-   493	
- > 494		dev_dbg(d->dev,
-   495			"message to channel %d, %d bytes: ",
-   496			msg->channel,
-   497			txlen);
-   498	
-   499		/* Command "nature" */
-   500		if (MCDE_DSI_HOST_IS_READ(msg->type))
-   501			/* MCTL_MAIN_DATA_CTL already set up */
-   502			val = DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_NAT_READ;
-   503		else
-   504			val = DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_NAT_WRITE;
-   505		/*
-   506		 * More than 2 bytes will not fit in a single packet, so it's
-   507		 * time to set the "long not short" bit. One byte is used by
-   508		 * the MIPI DCS command leaving just one byte for the payload
-   509		 * in a short package.
-   510		 */
-   511		if (mipi_dsi_packet_format_is_long(msg->type))
-   512			val |= DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_LONGNOTSHORT;
-   513		val |= 0 << DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_ID_SHIFT;
-   514		/* Add one to the length for the MIPI DCS command */
-   515		val |= txlen
-   516			<< DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_SIZE_SHIFT;
-   517		val |= DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_LP_EN;
-   518	        val |= msg->type << DSI_DIRECT_CMD_MAIN_SETTINGS_CMD_HEAD_SHIFT;
-   519		writel(val, d->regs + DSI_DIRECT_CMD_MAIN_SETTINGS);
-   520	
-   521		/* MIPI DCS command is part of the data */
-   522		if (txlen > 0) {
-   523			val = 0;
-   524			for (i = 0; i < 4 && i < txlen; i++)
-   525				val |= tx[i] << (i & 3) * 8;
-   526		}
-   527		writel(val, d->regs + DSI_DIRECT_CMD_WRDAT0);
-   528		if (txlen > 4) {
-   529			val = 0;
-   530			for (i = 0; i < 4 && (i + 4) < txlen; i++)
-   531				val |= tx[i + 4] << (i & 3) * 8;
-   532			writel(val, d->regs + DSI_DIRECT_CMD_WRDAT1);
-   533		}
-   534		if (txlen > 8) {
-   535			val = 0;
-   536			for (i = 0; i < 4 && (i + 8) < txlen; i++)
-   537				val |= tx[i + 8] << (i & 3) * 8;
-   538			writel(val, d->regs + DSI_DIRECT_CMD_WRDAT2);
-   539		}
-   540		if (txlen > 12) {
-   541			val = 0;
-   542			for (i = 0; i < 4 && (i + 12) < txlen; i++)
-   543				val |= tx[i + 12] << (i & 3) * 8;
-   544			writel(val, d->regs + DSI_DIRECT_CMD_WRDAT3);
-   545		}
-   546	
-   547		writel(~0, d->regs + DSI_DIRECT_CMD_STS_CLR);
-   548		writel(~0, d->regs + DSI_CMD_MODE_STS_CLR);
-   549		/* Send command */
-   550		writel(1, d->regs + DSI_DIRECT_CMD_SEND);
-   551	
-   552		loop_counter = 1000 * 1000 / loop_delay_us;
-   553		while (!(readl(d->regs + DSI_DIRECT_CMD_STS) &
-   554			 DSI_DIRECT_CMD_STS_WRITE_COMPLETED)
-   555		       && --loop_counter)
-   556			usleep_range(loop_delay_us, (loop_delay_us * 3) / 2);
-   557	
-   558		if (!loop_counter) {
-   559	                dev_err(d->dev, "DSI write timeout!\n");
-   560	                return -ETIME;
-   561	        }
-   562	
-   563		val = readl(d->regs + DSI_DIRECT_CMD_STS);
-   564		if (val & DSI_DIRECT_CMD_STS_ACKNOWLEDGE_WITH_ERR_RECEIVED) {
-   565			val >>= DSI_DIRECT_CMD_STS_ACK_VAL_SHIFT;
-   566			dev_err(d->dev, "error during transmission: %04x\n",
-   567				val);
-   568			return -EIO;
-   569		}
-   570	
-   571		if (!MCDE_DSI_HOST_IS_READ(msg->type)) {
-   572			/* Return number of bytes written */
-   573			if (mipi_dsi_packet_format_is_long(msg->type))
-   574				ret = 4 + txlen;
-   575			else
-   576				ret = 4;
-   577		} else {
-   578			/* OK this is a read command, get the response */
-   579			u32 rdsz;
-   580			u32 rddat;
-   581			u8 *rx = msg->rx_buf;
-   582	
-   583			rdsz = readl(d->regs + DSI_DIRECT_CMD_RD_PROPERTY);
-   584			rdsz &= DSI_DIRECT_CMD_RD_PROPERTY_RD_SIZE_MASK;
-   585			rddat = readl(d->regs + DSI_DIRECT_CMD_RDDAT);
-   586			for (i = 0; i < 4 && i < rdsz; i++)
-   587				rx[i] = (rddat >> (i * 8)) & 0xff;
-   588			ret = rdsz;
-   589		}
-   590	
-   591		writel(~0, d->regs + DSI_DIRECT_CMD_STS_CLR);
-   592		writel(~0, d->regs + DSI_CMD_MODE_STS_CLR);
-   593	
-   594		return ret;
-   595	}
-   596	
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 54403 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180717/0afc045b/attachment-0001.gz>
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180717/d6dd4bc3/attachment.sig>
