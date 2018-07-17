@@ -1,30 +1,31 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 17 Jul 2018 14:19:25 +0200
-Subject: [PATCH v4] arm64: dts: r8a77995: Add SCIF {0,1,3,4,5} and all
- HSCIF device nodes
-In-Reply-To: <CAMuHMdXZ_pQaF7BZs_F6MdYsacRDHmNLnUS14n5yhy9+r6Z5Mw@mail.gmail.com>
-References: <20180717113832.26413-1-horms+renesas@verge.net.au>
- <CAMuHMdXZ_pQaF7BZs_F6MdYsacRDHmNLnUS14n5yhy9+r6Z5Mw@mail.gmail.com>
-Message-ID: <20180717121924.42ilbf4l6ryksmap@verge.net.au>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Tue, 17 Jul 2018 14:20:56 +0200
+Subject: [PATCH 1/5] thermal: exynos: enable core tmu clk on exynos
+ platform
+In-Reply-To: <1531822342-4293-1-git-send-email-linux.amoon@gmail.com>
+References: <1531822342-4293-1-git-send-email-linux.amoon@gmail.com>
+Message-ID: <CAJKOXPdP78VFQgSQ9z9WsgYY_YhEKPUt=0MOra6Pz6smQeiNGg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 17, 2018 at 01:45:26PM +0200, Geert Uytterhoeven wrote:
-> On Tue, Jul 17, 2018 at 1:38 PM Simon Horman <horms+renesas@verge.net.au> wrote:
-> > From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> >
-> > This patch adds the device nodes for SCIF {0,1,3,4,5} and all HSCIF serial
-> > ports, incl. clocks, power domain and DMAs.
-> >
-> > Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> > Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> > --
-> > v3 [Simon Horman]
-> > * Add DMAs
-> 
-> For the newly added SCIF dmas:
-> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Hi Anand,
 
-Thanks, applied.
+Thanks for patch.
+
+On 17 July 2018 at 12:12, Anand Moon <linux.amoon@gmail.com> wrote:
+> clk_summary do not show tmu_apbif clk enable, so replace
+> the clk_prepare with clk_prepare_enables to enable tmu clk.
+
+This is not valid reason to do a change. What is clk_summary does not
+really matter. Your change has negative impact on power consumption as
+the clock stays enabled all the time. This is not what we want... so
+please explain it more - why you need the clock to be enabled all the
+time? What is broken (clk_summary is not broken in this case)?
+
+> simplify the enable of tmu_triminfo_apbif clk, also fixed
+> the order of goto error for failed cases.
+
+This has to be split into separate change.
+
+Best regards,
+Krzysztof
