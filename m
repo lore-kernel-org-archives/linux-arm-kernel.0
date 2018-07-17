@@ -1,74 +1,61 @@
-From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Tue, 17 Jul 2018 10:52:30 +0200
-Subject: [PATCH 2/2] drm/sun4i: sun4i: Introduce a quirk for lowest plane
- alpha support
-In-Reply-To: <20180717085230.17472-1-paul.kocialkowski@bootlin.com>
-References: <20180717085230.17472-1-paul.kocialkowski@bootlin.com>
-Message-ID: <20180717085230.17472-2-paul.kocialkowski@bootlin.com>
+From: christoffer.dall@arm.com (Christoffer Dall)
+Date: Tue, 17 Jul 2018 11:10:50 +0200
+Subject: [PATCH v4 07/10] KVM: arm/arm64: vgic: Return error on
+ incompatible uaccess GICD_IIDR writes
+In-Reply-To: <AM5PR0401MB25455D849AB57AF98A3C91F49A5D0@AM5PR0401MB2545.eurprd04.prod.outlook.com>
+References: <1531746387-7033-1-git-send-email-christoffer.dall@arm.com>
+ <1531746387-7033-8-git-send-email-christoffer.dall@arm.com>
+ <AM5PR0401MB25455D849AB57AF98A3C91F49A5D0@AM5PR0401MB2545.eurprd04.prod.outlook.com>
+Message-ID: <20180717091050.GB30570@e113682-lin.lund.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Not all sunxi platforms with the first version of the Display Engine
-support an alpha component on the plane with the lowest z position
-(as in: lowest z-pos), that gets blended with the background color.
+On Mon, Jul 16, 2018 at 03:43:28PM +0000, Bharat Bhushan wrote:
+> Hi Christoffer,
+> 
+> > -----Original Message-----
+> > From: kvmarm-bounces at lists.cs.columbia.edu [mailto:kvmarm-
+> > bounces at lists.cs.columbia.edu] On Behalf Of Christoffer Dall
+> > Sent: Monday, July 16, 2018 6:36 PM
+> > To: kvmarm at lists.cs.columbia.edu; linux-arm-kernel at lists.infradead.org
+> > Cc: kvm at vger.kernel.org; Marc Zyngier <marc.zyngier@arm.com>; Andre
+> > Przywara <andre.przywara@arm.com>
+> > Subject: [PATCH v4 07/10] KVM: arm/arm64: vgic: Return error on
+> > incompatible uaccess GICD_IIDR writes
+> > 
+> > If userspace attempts to write a GICD_IIDR that does not match the
+> > kernel version, return an error to userspace.  The intention is to allow
+> > implementation changes inside KVM while avoiding silently breaking
+> > migration resulting in guests not running without any clear indication
+> > of what went wrong.
+> > 
+> > Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
+> > ---
+> >  virt/kvm/arm/vgic/vgic-mmio-v2.c | 21 ++++++++++++++++++---
+> >  virt/kvm/arm/vgic/vgic-mmio-v3.c | 21 ++++++++++++++++++---
+> >  2 files changed, 36 insertions(+), 6 deletions(-)
+> > 
+> > diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-
+> > mmio-v2.c
+> > index db646f1..4f0f2c4 100644
+> > --- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> > +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> > @@ -75,6 +75,20 @@ static void vgic_mmio_write_v2_misc(struct kvm_vcpu
+> > *vcpu,
+> >  	}
+> >  }
+> > 
+> > +static int vgic_mmio_uaccess_write_v2_misc(struct kvm_vcpu *vcpu,
+> > +					   gpa_t addr, unsigned int len,
+> > +					   unsigned long val)
+> > +{
+> > +	switch (addr & 0x0c) {
+> 
+> I am just understanding the code, not sure if it make sense to replace hardcoded "0x0c".
+> 
 
-In particular, the A13 is known to have this limitation. However, it was
-recently discovered that the A20 and A33 are capable of having alpha on
-their lowest plane.
+We could encode it, but we use the hardcoded value elsewhere so I just
+followed the current pattern.
 
-Thus, this introduces a specific quirk to indicate such support,
-per-platform. Since this was not tested on sun4i and sun6i platforms, a
-conservative approach is kept and this feature is not supported.
-
-Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
----
- drivers/gpu/drm/sun4i/sun4i_backend.c | 10 ++++++++--
- 1 file changed, 8 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
-index a3cc398d4d80..cdc4a8a91ea2 100644
---- a/drivers/gpu/drm/sun4i/sun4i_backend.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
-@@ -35,6 +35,8 @@
- struct sun4i_backend_quirks {
- 	/* backend <-> TCON muxing selection done in backend */
- 	bool needs_output_muxing;
-+	/* alpha at the lowest z position is not always supported */
-+	bool supports_lowest_plane_alpha;
- };
- 
- static void sun4i_backend_apply_color_correction(struct sunxi_engine *engine)
-@@ -484,6 +486,7 @@ static void sun4i_backend_atomic_begin(struct sunxi_engine *engine,
- static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
- 				      struct drm_crtc_state *crtc_state)
- {
-+	struct sun4i_backend *backend = engine_to_sun4i_backend(engine);
- 	struct drm_plane_state *plane_states[SUN4I_BACKEND_NUM_LAYERS] = { 0 };
- 	struct drm_atomic_state *state = crtc_state->state;
- 	struct drm_device *drm = state->dev;
-@@ -584,8 +587,9 @@ static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
- 	}
- 
- 	/* We can't have an alpha plane at the lowest position */
--	if (plane_states[0]->fb->format->has_alpha ||
--	    (plane_states[0]->alpha != DRM_BLEND_ALPHA_OPAQUE))
-+	if ((plane_states[0]->fb->format->has_alpha ||
-+	    (plane_states[0]->alpha != DRM_BLEND_ALPHA_OPAQUE)) &&
-+	    !backend->quirks->supports_lowest_plane_alpha)
- 		return -EINVAL;
- 
- 	for (i = 1; i < num_planes; i++) {
-@@ -970,9 +974,11 @@ static const struct sun4i_backend_quirks sun6i_backend_quirks = {
- 
- static const struct sun4i_backend_quirks sun7i_backend_quirks = {
- 	.needs_output_muxing = true,
-+	.supports_lowest_plane_alpha = true,
- };
- 
- static const struct sun4i_backend_quirks sun8i_a33_backend_quirks = {
-+	.supports_lowest_plane_alpha = true,
- };
- 
- static const struct sun4i_backend_quirks sun9i_backend_quirks = {
--- 
-2.17.1
+Thanks,
+-Christoffer
