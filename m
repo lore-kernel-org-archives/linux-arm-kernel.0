@@ -1,28 +1,28 @@
 From: lkp@intel.com (kbuild test robot)
-Date: Tue, 17 Jul 2018 09:31:32 +0800
+Date: Tue, 17 Jul 2018 09:31:59 +0800
 Subject: [nomadik:gemini-dir-685-rtl8366rb-rtk-tag 14/14] make[3]: *** No
- rule to make target 'net/dsa/tag_rtk.o', needed by 'net/dsa/dsa_core.o'.
-Message-ID: <20180717013132.GQ10593@intel.com>
+ rule to make target 'net/dsa/tag_rtk.o', needed by 'net/dsa/built-in.a'.
+Message-ID: <20180717013159.GR10593@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 tree:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git gemini-dir-685-rtl8366rb-rtk-tag
 head:   17c7eb1fa8546c38fe844166efb2ece4d1503e7d
 commit: 17c7eb1fa8546c38fe844166efb2ece4d1503e7d [14/14] dsa: tagging stab
-config: arm-allmodconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
+config: openrisc-allyesconfig (attached as .config)
+compiler: or1k-linux-gcc (GCC) 6.0.0 20160327 (experimental)
 reproduce:
         wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
         chmod +x ~/bin/make.cross
         git checkout 17c7eb1fa8546c38fe844166efb2ece4d1503e7d
         # save the attached .config to linux build tree
-        GCC_VERSION=7.2.0 make.cross ARCH=arm 
+        make.cross ARCH=openrisc 
 :::::: branch date: 16 hours ago
 :::::: commit date: 16 hours ago
 
 All errors (new ones prefixed by >>):
 
->> make[3]: *** No rule to make target 'net/dsa/tag_rtk.o', needed by 'net/dsa/dsa_core.o'.
+>> make[3]: *** No rule to make target 'net/dsa/tag_rtk.o', needed by 'net/dsa/built-in.a'.
    make[3]: Target '__build' not remade because of errors.
 
 ---
@@ -32,6 +32,6 @@ https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 A non-text attachment was scrubbed...
 Name: .config.gz
 Type: application/gzip
-Size: 66187 bytes
+Size: 45600 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180717/e5da1b6f/attachment-0001.gz>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180717/03f32fac/attachment-0001.gz>
