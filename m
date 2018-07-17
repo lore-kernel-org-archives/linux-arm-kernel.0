@@ -1,110 +1,38 @@
 From: matthias.bgg@kernel.org (matthias.bgg at kernel.org)
-Date: Wed, 18 Jul 2018 00:03:26 +0200
-Subject: [resend PATCH v4 3/5] clk: mediatek: mt8173: switch mmsys to platform
- device probing
+Date: Wed, 18 Jul 2018 00:03:28 +0200
+Subject: [resend PATCH v4 5/5] drm: mediatek: Omit warning on probe defers
 In-Reply-To: <20180717220328.792-1-matthias.bgg@kernel.org>
 References: <20180717220328.792-1-matthias.bgg@kernel.org>
-Message-ID: <20180717220328.792-4-matthias.bgg@kernel.org>
+Message-ID: <20180717220328.792-6-matthias.bgg@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Matthias Brugger <mbrugger@suse.com>
 
-Switch probing for the MMSYS to support invocation to a
-plain paltform device. The driver will be probed by the DRM subsystem.
+It can happen that the clock drivers wasn't probed before the
+ddp driver gets invoked. The driver used to omit a warning
+that the driver failed to get the clocks. Omit this error on
+the defered probe path.
 
 Signed-off-by: Matthias Brugger <mbrugger@suse.com>
+Acked-by: CK Hu <ck.hu@mediatek.com>
 ---
- drivers/clk/mediatek/clk-mt8173.c | 51 ++++++++++++++++++++++++++-----
- 1 file changed, 44 insertions(+), 7 deletions(-)
+ drivers/gpu/drm/mediatek/mtk_drm_ddp.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/clk/mediatek/clk-mt8173.c b/drivers/clk/mediatek/clk-mt8173.c
-index 96c292c3e440..10b6a0251123 100644
---- a/drivers/clk/mediatek/clk-mt8173.c
-+++ b/drivers/clk/mediatek/clk-mt8173.c
-@@ -13,8 +13,11 @@
-  */
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+index bafc5c77c4fb..6b399348a2dc 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
++++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+@@ -374,7 +374,8 @@ static int mtk_ddp_probe(struct platform_device *pdev)
  
- #include <linux/clk.h>
-+#include <linux/module.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
-+#include <linux/platform_device.h>
-+#include <linux/slab.h>
- 
- #include "clk-mtk.h"
- #include "clk-gate.h"
-@@ -791,7 +794,7 @@ static const struct mtk_gate_regs mm1_cg_regs __initconst = {
- 		.ops = &mtk_clk_gate_ops_setclr,		\
+ 	ddp->clk = devm_clk_get(dev, NULL);
+ 	if (IS_ERR(ddp->clk)) {
+-		dev_err(dev, "Failed to get clock\n");
++		if (PTR_ERR(ddp->clk) != -EPROBE_DEFER)
++			dev_err(dev, "Failed to get clock\n");
+ 		return PTR_ERR(ddp->clk);
  	}
  
--static const struct mtk_gate mm_clks[] __initconst = {
-+static const struct mtk_gate mm_clks[] = {
- 	/* MM0 */
- 	GATE_MM0(CLK_MM_SMI_COMMON, "mm_smi_common", "mm_sel", 0),
- 	GATE_MM0(CLK_MM_SMI_LARB0, "mm_smi_larb0", "mm_sel", 1),
-@@ -1152,22 +1155,56 @@ static void __init mtk_imgsys_init(struct device_node *node)
- }
- CLK_OF_DECLARE(mtk_imgsys, "mediatek,mt8173-imgsys", mtk_imgsys_init);
- 
--static void __init mtk_mmsys_init(struct device_node *node)
--{
-+struct mtk_mmsys_priv {
- 	struct clk_onecell_data *clk_data;
-+};
-+
-+static int mtk_mmsys_probe(struct platform_device *pdev)
-+{
- 	int r;
-+	struct device_node *node;
-+	struct mtk_mmsys_priv *private;
-+
-+	node = pdev->dev.parent->of_node;
- 
--	clk_data = mtk_alloc_clk_data(CLK_MM_NR_CLK);
-+	private = devm_kzalloc(&pdev->dev, sizeof(*private), GFP_KERNEL);
-+	if (!private)
-+		return -ENOMEM;
-+
-+	private->clk_data = mtk_alloc_clk_data(CLK_MM_NR_CLK);
-+
-+	platform_set_drvdata(pdev, private);
- 
- 	mtk_clk_register_gates(node, mm_clks, ARRAY_SIZE(mm_clks),
--						clk_data);
-+					private->clk_data);
- 
--	r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
-+	r = of_clk_add_provider(node, of_clk_src_onecell_get,
-+					private->clk_data);
- 	if (r)
- 		pr_err("%s(): could not register clock provider: %d\n",
- 			__func__, r);
-+
-+	return r;
-+}
-+
-+static int mtk_mmsys_remove(struct platform_device *pdev)
-+{
-+	struct mtk_mmsys_priv *private = platform_get_drvdata(pdev);
-+
-+	kfree(private->clk_data);
-+	kfree(private);
-+
-+	return 0;
- }
--CLK_OF_DECLARE(mtk_mmsys, "mediatek,mt8173-mmsys", mtk_mmsys_init);
-+
-+static struct platform_driver clk_mt8173_mm_drv = {
-+	.probe = mtk_mmsys_probe,
-+	.probe = mtk_mmsys_remove,
-+	.driver = {
-+		.name = "clk-mt8173-mm",
-+	},
-+};
-+module_platform_driver(clk_mt8173_mm_drv);
- 
- static void __init mtk_vdecsys_init(struct device_node *node)
- {
 -- 
 2.17.1
