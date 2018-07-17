@@ -1,123 +1,76 @@
-From: edgar.righi@lsitec.org.br (Edgar Bernardi Righi)
-Date: Tue, 17 Jul 2018 14:02:00 -0300
-Subject: [PATCH] clk: actions: Add custom delay option to Actions Semi OWL pll
- clock driver
-Message-ID: <CADHB5bAztBFgWe-1v5vFfsxJgW1S3OOpV1Jkjrgk2h+pJBFw9w@mail.gmail.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Tue, 17 Jul 2018 18:11:32 +0100
+Subject: [PATCH v2 01/10] coresight: Fix handling of sinks
+In-Reply-To: <1531847501-22226-1-git-send-email-suzuki.poulose@arm.com>
+References: <1531847501-22226-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1531847501-22226-2-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds custom delay support to Actions Semi OWL pll clock driver.
-It is required for future Actions Semi Owl series S500 SoC clock support
+The coresight components could be operated either in sysfs mode or in perf
+mode. For some of the components, the mode of operation doesn't matter as
+they simply relay the data to the next component in the trace path. But for
+sinks, they need to be able to provide the trace data back to the user.
+Thus we need to make sure that "mode" is handled appropriately. e.g,
+the sysfs mode could have multiple sources driving the trace data, while
+perf mode doesn't allow sharing the sink.
 
-Currently, the driver waits a fixed amount of time defined by the
-macro PLL_STABILITY_WAIT_US.
-The default delay (50us) is not enough for Actions Semi Owl S500 SoC.
-It needs up to 150us.
-A new field called "delay" was added to "struct owl_pll_hw". The rest
-of the code was updated accordingly.
-Old macros "OWL_PLL_HW", "OWL_PLL" and "OWL_PLL_NO_PARENT" were kept
-(same usage), but updated to set "delay" value to
-PLL_STABILITY_WAIT_US (50us).
-New macros "OWL_PLL_HW_DELAY", "OWL_PLL_DELAY" and
-"OWL_PLL_NO_PARENT_DELAY" were created with an extra argument to set a
-custom "delay".
-This does not break S700 and S900 code and was tested on S500 based
-Lemaker Guitar Board.
+The coresight_enable_sink() however doesn't really allow this check to
+trigger as it skips the "enable_sink" callback if the component is
+already enabled, irrespective of the mode. This could cause mixing
+of data from different modes or even same mode (in perf), if the
+sources are different. Also, if we fail to enable the sink while
+enabling a path (where sink is the first component enabled),
+we could end up in disabling the components in the "entire"
+path which were not enabled in this trial, causing disruptions
+in the existing trace paths.
 
-Signed-off-by: Edgar Bernardi Righi <edgar.righi@lsitec.org.br>
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+---
+ drivers/hwtracing/coresight/coresight.c | 22 +++++++++++++++-------
+ 1 file changed, 15 insertions(+), 7 deletions(-)
 
-diff -uprN -X vanilla/Documentation/dontdiff
-vanilla/drivers/clk/actions/owl-pll.c
-linux/drivers/clk/actions/owl-pll.c
---- vanilla/drivers/clk/actions/owl-pll.c    2018-07-17 13:07:16.667704000 -0300
-+++ linux/drivers/clk/actions/owl-pll.c    2018-07-17 13:42:07.396785603 -0300
-@@ -179,7 +179,7 @@ static int owl_pll_set_rate(struct clk_h
-
-     regmap_write(common->regmap, pll_hw->reg, reg);
-
--    udelay(PLL_STABILITY_WAIT_US);
-+    udelay(pll_hw->delay);
-
-     return 0;
- }
-diff -uprN -X vanilla/Documentation/dontdiff
-vanilla/drivers/clk/actions/owl-pll.h
-linux/drivers/clk/actions/owl-pll.h
---- vanilla/drivers/clk/actions/owl-pll.h    2018-07-17 13:07:16.667704000 -0300
-+++ linux/drivers/clk/actions/owl-pll.h    2018-07-17 13:42:11.116765089 -0300
-@@ -27,6 +27,7 @@ struct owl_pll_hw {
-     u8            width;
-     u8            min_mul;
-     u8            max_mul;
-+    u32            delay;
-     const struct clk_pll_table *table;
- };
-
-@@ -35,6 +36,51 @@ struct owl_pll {
-     struct owl_clk_common    common;
- };
-
-+#define PLL_STABILITY_WAIT_US    (50)
-+
-+#define OWL_PLL_HW_DELAY(_reg, _bfreq, _bit_idx, _shift,            \
-+           _width, _min_mul, _max_mul, _table, _delay)            \
-+    {                                \
-+        .reg        = _reg,                    \
-+        .bfreq        = _bfreq,                \
-+        .bit_idx    = _bit_idx,                \
-+        .shift        = _shift,                \
-+        .width        = _width,                \
-+        .min_mul    = _min_mul,                \
-+        .max_mul    = _max_mul,                \
-+        .table        = _table,                \
-+        .delay        = _delay,                \
-+    }
-+
-+#define OWL_PLL_DELAY(_struct, _name, _parent, _reg, _bfreq, _bit_idx,    \
-+        _shift, _width, _min_mul, _max_mul, _table, _flags, _delay)    \
-+    struct owl_pll _struct = {                    \
-+        .pll_hw    = OWL_PLL_HW_DELAY(_reg, _bfreq, _bit_idx, _shift,    \
-+                     _width, _min_mul,            \
-+                     _max_mul, _table, _delay),            \
-+        .common = {                        \
-+            .regmap = NULL,                    \
-+            .hw.init = CLK_HW_INIT(_name,            \
-+                           _parent,            \
-+                           &owl_pll_ops,        \
-+                           _flags),            \
-+        },                            \
-+    }
-+
-+#define OWL_PLL_NO_PARENT_DELAY(_struct, _name, _reg, _bfreq, _bit_idx,    \
-+        _shift, _width, _min_mul, _max_mul, _table, _flags, _delay)    \
-+    struct owl_pll _struct = {                    \
-+        .pll_hw    = OWL_PLL_HW_DELAY(_reg, _bfreq, _bit_idx, _shift,    \
-+                     _width, _min_mul,            \
-+                     _max_mul, _table, _delay),            \
-+        .common = {                        \
-+            .regmap = NULL,                    \
-+            .hw.init = CLK_HW_INIT_NO_PARENT(_name,        \
-+                           &owl_pll_ops,        \
-+                           _flags),            \
-+        },                            \
-+    }
-+
- #define OWL_PLL_HW(_reg, _bfreq, _bit_idx, _shift,            \
-            _width, _min_mul, _max_mul, _table)            \
-     {                                \
-@@ -46,6 +92,7 @@ struct owl_pll {
-         .min_mul    = _min_mul,                \
-         .max_mul    = _max_mul,                \
-         .table        = _table,                \
-+        .delay        = PLL_STABILITY_WAIT_US,\
-     }
-
- #define OWL_PLL(_struct, _name, _parent, _reg, _bfreq, _bit_idx,    \
-@@ -78,7 +125,6 @@ struct owl_pll {
-     }
-
- #define mul_mask(m)        ((1 << ((m)->width)) - 1)
--#define PLL_STABILITY_WAIT_US    (50)
-
- static inline struct owl_pll *hw_to_owl_pll(const struct clk_hw *hw)
+diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
+index 3e07fd3..c0dabbd 100644
+--- a/drivers/hwtracing/coresight/coresight.c
++++ b/drivers/hwtracing/coresight/coresight.c
+@@ -132,12 +132,14 @@ static int coresight_enable_sink(struct coresight_device *csdev, u32 mode)
  {
+ 	int ret;
+ 
+-	if (!csdev->enable) {
+-		if (sink_ops(csdev)->enable) {
+-			ret = sink_ops(csdev)->enable(csdev, mode);
+-			if (ret)
+-				return ret;
+-		}
++	/*
++	 * We need to make sure the "new" session is compatible with the
++	 * existing "mode" of operation.
++	 */
++	if (sink_ops(csdev)->enable) {
++		ret = sink_ops(csdev)->enable(csdev, mode);
++		if (ret)
++			return ret;
+ 		csdev->enable = true;
+ 	}
+ 
+@@ -339,8 +341,14 @@ int coresight_enable_path(struct list_head *path, u32 mode)
+ 		switch (type) {
+ 		case CORESIGHT_DEV_TYPE_SINK:
+ 			ret = coresight_enable_sink(csdev, mode);
++			/*
++			 * Sink is the first component turned on. If we
++			 * failed to enable the sink, there are no components
++			 * that need disabling. Disabling the path here
++			 * would mean we could disrupt an existing session.
++			 */
+ 			if (ret)
+-				goto err;
++				goto out;
+ 			break;
+ 		case CORESIGHT_DEV_TYPE_SOURCE:
+ 			/* sources are enabled from either sysFS or Perf */
+-- 
+2.7.4
