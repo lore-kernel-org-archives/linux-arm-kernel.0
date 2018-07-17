@@ -1,132 +1,34 @@
-From: christoffer.dall@arm.com (Christoffer Dall)
-Date: Tue, 17 Jul 2018 14:46:29 +0200
-Subject: [PATCH v2] kvm: arm/arm64: Fix emulated physical timer IRQ
- injection
-In-Reply-To: <20180717095137.9620-1-andre.przywara@arm.com>
-References: <20180717095137.9620-1-andre.przywara@arm.com>
-Message-ID: <20180717124629.GB30790@e113682-lin.lund.arm.com>
+From: tali.perry1@gmail.com (Tali Perry)
+Date: Tue, 17 Jul 2018 15:47:41 +0300
+Subject: [PATCH v1 0/1] clk: npcm7xx: fix base address and of_clk_get_by_name
+Message-ID: <20180717124742.31099-1-tali.perry1@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 17, 2018 at 10:51:37AM +0100, Andre Przywara wrote:
-> When KVM emulates a physical timer, we keep track of the interrupt
-> condition and try to inject an IRQ to the guest when needed.
-> This works if the timer expires when either the guest is running or KVM
-> does work on behalf of it (like handling a trap).
-> However when the guest's VCPU is not scheduled (for instance because
-> the guest issued a WFI instruction before), we miss injecting the interrupt
-> when the VCPU's state gets restored back in kvm_timer_vcpu_load().
-> 
-> Fix this by moving the interrupt injection check into the
-> phys_timer_emulate() function, so that all possible paths of execution
-> are covered.
-> 
-> Cc: Stable <stable@vger.kernel.org> # 4.15+
-> Fixes: bbdd52cfcba29 ("KVM: arm/arm64: Avoid phys timer emulation in vcpu entry/exit")
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
-> Changelog v1...v2:
-> - clear IRQ line *before* starting the soft timer
-> 
->  virt/kvm/arm/arch_timer.c | 21 +++++++++++++--------
->  1 file changed, 13 insertions(+), 8 deletions(-)
-> 
-> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-> index bd3d57f40f1b..03a4ea776b85 100644
-> --- a/virt/kvm/arm/arch_timer.c
-> +++ b/virt/kvm/arm/arch_timer.c
-> @@ -294,16 +294,25 @@ static void phys_timer_emulate(struct kvm_vcpu *vcpu)
+Nuvoton NPCM7XX Clock Controller
+fix base address and of_clk_get_by_name error handling.
+    Also update error messages to be more informative.
+    
+    In case clk_base allocation is erronoeous the return value is null.
+    Also fix handling of of_clk_get_by_name returns an error. 
+    Print a better error message pointing to the dt-binding documention.
 
-Please update the comment on this function as well.
+This patch is re-submitted since it was already pushed to main 
+(just the diff, without the full driver which is already in 
+master branch.)
 
->  	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
->  	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
->  
-> +	/* If the timer cannot fire at all, then we don't need a soft timer. */
-> +	if (!kvm_timer_irq_can_fire(ptimer)) {
-> +		soft_timer_cancel(&timer->phys_timer, NULL);
-> +		kvm_timer_update_irq(vcpu, false, ptimer);
-> +		return;
-> +	}
-> +
->  	/*
-> -	 * If the timer can fire now we have just raised the IRQ line and we
-> -	 * don't need to have a soft timer scheduled for the future.  If the
-> -	 * timer cannot fire at all, then we also don't need a soft timer.
-> +	 * If the timer can fire now, we don't need to have a soft timer
-> +	 * scheduled for the future, as we also raise the IRQ line.
->  	 */
-> -	if (kvm_timer_should_fire(ptimer) || !kvm_timer_irq_can_fire(ptimer)) {
-> +	if (kvm_timer_should_fire(ptimer)) {
->  		soft_timer_cancel(&timer->phys_timer, NULL);
-> +		kvm_timer_update_irq(vcpu, true, ptimer);
-> +
->  		return;
->  	}
->  
-> +	kvm_timer_update_irq(vcpu, false, ptimer);
->  	soft_timer_start(&timer->phys_timer, kvm_timer_compute_delta(ptimer));
 
-I find this overly complex.
+Signed-off-by: Tali Perry <tali.perry1@gmail.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
 
-How about:
+---
 
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index bd3d57f..b5dcfca 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -288,7 +288,7 @@ static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level,
- 	}
- }
- 
--/* Schedule the background timer for the emulated timer. */
-+/* Emulate the physical timer in software and update IRQ signal if needed */
- static void phys_timer_emulate(struct kvm_vcpu *vcpu)
- {
- 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
-@@ -299,12 +299,13 @@ static void phys_timer_emulate(struct kvm_vcpu *vcpu)
- 	 * don't need to have a soft timer scheduled for the future.  If the
- 	 * timer cannot fire at all, then we also don't need a soft timer.
- 	 */
--	if (kvm_timer_should_fire(ptimer) || !kvm_timer_irq_can_fire(ptimer)) {
-+	if (kvm_timer_should_fire(ptimer) || !kvm_timer_irq_can_fire(ptimer))
- 		soft_timer_cancel(&timer->phys_timer, NULL);
--		return;
--	}
-+	else
-+		soft_timer_start(&timer->phys_timer, kvm_timer_compute_delta(ptimer));
- 
--	soft_timer_start(&timer->phys_timer, kvm_timer_compute_delta(ptimer));
-+	if (kvm_timer_should_fire(ptimer) != ptimer->irq.level)
-+		kvm_timer_update_irq(vcpu, !ptimer->irq.level, ptimer);
- }
- 
- /*
- 
+Tali Perry (1):
+  clk: npcm7xx: get fixed clocks from DT
 
->  }
->  
-> @@ -316,7 +325,6 @@ static void kvm_timer_update_state(struct kvm_vcpu *vcpu)
->  {
->  	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
->  	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
-> -	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
->  	bool level;
->  
->  	if (unlikely(!timer->enabled))
-> @@ -332,9 +340,6 @@ static void kvm_timer_update_state(struct kvm_vcpu *vcpu)
->  	level = kvm_timer_should_fire(vtimer);
->  	kvm_timer_update_irq(vcpu, level, vtimer);
->  
-> -	if (kvm_timer_should_fire(ptimer) != ptimer->irq.level)
-> -		kvm_timer_update_irq(vcpu, !ptimer->irq.level, ptimer);
-> -
->  	phys_timer_emulate(vcpu);
->  }
->  
-Please also remove the comment in kvm_timer_vcpu_load() which indicates
-that the call to the function will only ever schedule a background
-timer.
+ drivers/clk/clk-npcm7xx.c | 99 +++++++++++++++++++++++++++++++++++------------
+ 1 file changed, 75 insertions(+), 24 deletions(-)
 
-Thanks,
--Christoffer
+-- 
+2.14.1
