@@ -1,151 +1,334 @@
 From: mars.cheng@mediatek.com (Mars Cheng)
-Date: Tue, 17 Jul 2018 16:52:29 +0800
-Subject: [PATCH v5 08/11] clk: mediatek: fix pll setting
+Date: Tue, 17 Jul 2018 16:52:32 +0800
+Subject: [PATCH v5 11/11] arm64: dts: mediatek: add mt6765 support
 In-Reply-To: <1531817552-17221-1-git-send-email-mars.cheng@mediatek.com>
 References: <1531817552-17221-1-git-send-email-mars.cheng@mediatek.com>
-Message-ID: <1531817552-17221-9-git-send-email-mars.cheng@mediatek.com>
+Message-ID: <1531817552-17221-12-git-send-email-mars.cheng@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Owen Chen <owen.chen@mediatek.com>
+This adds basic chip support for MT6765 SoC.
 
-1. pcwibits: The integer bits of pcw for plls is extend to 8 bits,
-   add a variable to indicate this change and
-   backward-compatible.
-2. fmin: The pll freqency lower-bound is vary from 1GMhz to
-   1.5Ghz, add a variable to indicate platform-dependent.
-
+Signed-off-by: Mars Cheng <mars.cheng@mediatek.com>
 Signed-off-by: Owen Chen <owen.chen@mediatek.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/clk/mediatek/clk-mtk.h |    2 ++
- drivers/clk/mediatek/clk-pll.c |   45 ++++++++++++++++++++++++++++++++++------
- 2 files changed, 41 insertions(+), 6 deletions(-)
+ arch/arm64/boot/dts/mediatek/Makefile       |    1 +
+ arch/arm64/boot/dts/mediatek/mt6765-evb.dts |   33 ++++
+ arch/arm64/boot/dts/mediatek/mt6765.dtsi    |  253 +++++++++++++++++++++++++++
+ 3 files changed, 287 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/mediatek/mt6765-evb.dts
+ create mode 100644 arch/arm64/boot/dts/mediatek/mt6765.dtsi
 
-diff --git a/drivers/clk/mediatek/clk-mtk.h b/drivers/clk/mediatek/clk-mtk.h
-index f83c2bb..1882221 100644
---- a/drivers/clk/mediatek/clk-mtk.h
-+++ b/drivers/clk/mediatek/clk-mtk.h
-@@ -215,7 +215,9 @@ struct mtk_pll_data {
- 	const struct clk_ops *ops;
- 	u32 rst_bar_mask;
- 	unsigned long fmax;
-+	unsigned long fmin;
- 	int pcwbits;
-+	int pcwibits;
- 	uint32_t pcw_reg;
- 	int pcw_shift;
- 	const struct mtk_pll_div_table *div_table;
-diff --git a/drivers/clk/mediatek/clk-pll.c b/drivers/clk/mediatek/clk-pll.c
-index f54e401..df571e5 100644
---- a/drivers/clk/mediatek/clk-pll.c
-+++ b/drivers/clk/mediatek/clk-pll.c
-@@ -27,7 +27,7 @@
- #define CON0_BASE_EN		BIT(0)
- #define CON0_PWR_ON		BIT(0)
- #define CON0_ISO_EN		BIT(1)
--#define CON0_PCW_CHG		BIT(31)
-+#define CON1_PCW_CHG		BIT(31)
- 
- #define AUDPLL_TUNER_EN		BIT(31)
- 
-@@ -69,11 +69,13 @@ static unsigned long __mtk_pll_recalc_rate(struct mtk_clk_pll *pll, u32 fin,
- {
- 	int pcwbits = pll->data->pcwbits;
- 	int pcwfbits;
-+	int ibits;
- 	u64 vco;
- 	u8 c = 0;
- 
- 	/* The fractional part of the PLL divider. */
--	pcwfbits = pcwbits > INTEGER_BITS ? pcwbits - INTEGER_BITS : 0;
-+	ibits = pll->data->pcwibits ? pll->data->pcwibits : INTEGER_BITS;
-+	pcwfbits = pcwbits > ibits ? pcwbits - ibits : 0;
- 
- 	vco = (u64)fin * pcw;
- 
-@@ -93,9 +95,31 @@ static void mtk_pll_set_rate_regs(struct mtk_clk_pll *pll, u32 pcw,
- {
- 	u32 con1, val;
- 	int pll_en;
-+	u32 tuner_en = 0;
-+	u32 tuner_en_mask;
-+	void __iomem *tuner_en_addr = NULL;
- 
- 	pll_en = readl(pll->base_addr + REG_CON0) & CON0_BASE_EN;
- 
-+	/* disable tuner */
-+	if (pll->tuner_en_addr) {
-+		tuner_en_addr = pll->tuner_en_addr;
-+		tuner_en_mask = BIT(pll->data->tuner_en_bit);
-+	} else if (pll->tuner_addr) {
-+		tuner_en_addr = pll->tuner_addr;
-+		tuner_en_mask = AUDPLL_TUNER_EN;
-+	}
+diff --git a/arch/arm64/boot/dts/mediatek/Makefile b/arch/arm64/boot/dts/mediatek/Makefile
+index ac17f60..7506b0d 100644
+--- a/arch/arm64/boot/dts/mediatek/Makefile
++++ b/arch/arm64/boot/dts/mediatek/Makefile
+@@ -1,6 +1,7 @@
+ # SPDX-License-Identifier: GPL-2.0
+ dtb-$(CONFIG_ARCH_MEDIATEK) += mt2712-evb.dtb
+ dtb-$(CONFIG_ARCH_MEDIATEK) += mt6755-evb.dtb
++dtb-$(CONFIG_ARCH_MEDIATEK) += mt6765-evb.dtb
+ dtb-$(CONFIG_ARCH_MEDIATEK) += mt6795-evb.dtb
+ dtb-$(CONFIG_ARCH_MEDIATEK) += mt6797-evb.dtb
+ dtb-$(CONFIG_ARCH_MEDIATEK) += mt7622-rfb1.dtb
+diff --git a/arch/arm64/boot/dts/mediatek/mt6765-evb.dts b/arch/arm64/boot/dts/mediatek/mt6765-evb.dts
+new file mode 100644
+index 0000000..36dddff2
+--- /dev/null
++++ b/arch/arm64/boot/dts/mediatek/mt6765-evb.dts
+@@ -0,0 +1,33 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * dts file for Mediatek MT6765
++ *
++ * (C) Copyright 2018. Mediatek, Inc.
++ *
++ * Mars Cheng <mars.cheng@mediatek.com>
++ */
 +
-+	if (tuner_en_addr) {
-+		val = readl(tuner_en_addr);
-+		tuner_en = val & tuner_en_mask;
++/dts-v1/;
++#include "mt6765.dtsi"
 +
-+		if (tuner_en) {
-+			val &= ~tuner_en_mask;
-+			writel(val, tuner_en_addr);
-+		}
-+	}
++/ {
++	model = "MediaTek MT6765 EVB";
++	compatible = "mediatek,mt6765-evb", "mediatek,mt6765";
 +
- 	/* set postdiv */
- 	val = readl(pll->pd_addr);
- 	val &= ~(POSTDIV_MASK << pll->data->pd_shift);
-@@ -116,12 +140,20 @@ static void mtk_pll_set_rate_regs(struct mtk_clk_pll *pll, u32 pcw,
- 	con1 = readl(pll->base_addr + REG_CON1);
- 
- 	if (pll_en)
--		con1 |= CON0_PCW_CHG;
-+		con1 |= CON1_PCW_CHG;
- 
- 	writel(con1, pll->base_addr + REG_CON1);
++	aliases {
++		serial0 = &uart0;
++	};
 +
- 	if (pll->tuner_addr)
- 		writel(con1 + 1, pll->tuner_addr);
- 
-+	/* restore tuner_en */
-+	if (tuner_en_addr && tuner_en) {
-+		val = readl(tuner_en_addr);
-+		val |= tuner_en_mask;
-+		writel(val, tuner_en_addr);
-+	}
++	memory at 40000000 {
++		device_type = "memory";
++		reg = <0 0x40000000 0 0x1e800000>;
++	};
 +
- 	if (pll_en)
- 		udelay(20);
- }
-@@ -138,9 +170,10 @@ static void mtk_pll_set_rate_regs(struct mtk_clk_pll *pll, u32 pcw,
- static void mtk_pll_calc_values(struct mtk_clk_pll *pll, u32 *pcw, u32 *postdiv,
- 		u32 freq, u32 fin)
- {
--	unsigned long fmin = 1000 * MHZ;
-+	unsigned long fmin = pll->data->fmin ? pll->data->fmin : 1000 * MHZ;
- 	const struct mtk_pll_div_table *div_table = pll->data->div_table;
- 	u64 _pcw;
-+	int ibits;
- 	u32 val;
- 
- 	if (freq > pll->data->fmax)
-@@ -164,7 +197,8 @@ static void mtk_pll_calc_values(struct mtk_clk_pll *pll, u32 *pcw, u32 *postdiv,
- 	}
- 
- 	/* _pcw = freq * postdiv / fin * 2^pcwfbits */
--	_pcw = ((u64)freq << val) << (pll->data->pcwbits - INTEGER_BITS);
-+	ibits = pll->data->pcwibits ? pll->data->pcwibits : INTEGER_BITS;
-+	_pcw = ((u64)freq << val) << (pll->data->pcwbits - ibits);
- 	do_div(_pcw, fin);
- 
- 	*pcw = (u32)_pcw;
-@@ -192,7 +226,6 @@ static unsigned long mtk_pll_recalc_rate(struct clk_hw *hw,
- 
- 	postdiv = (readl(pll->pd_addr) >> pll->data->pd_shift) & POSTDIV_MASK;
- 	postdiv = 1 << postdiv;
--
- 	pcw = readl(pll->pcw_addr) >> pll->data->pcw_shift;
- 	pcw &= GENMASK(pll->data->pcwbits - 1, 0);
- 
++	chosen {
++		stdout-path = "serial0:921600n8";
++	};
++};
++
++&uart0 {
++	status = "okay";
++};
+diff --git a/arch/arm64/boot/dts/mediatek/mt6765.dtsi b/arch/arm64/boot/dts/mediatek/mt6765.dtsi
+new file mode 100644
+index 0000000..37f9f3a
+--- /dev/null
++++ b/arch/arm64/boot/dts/mediatek/mt6765.dtsi
+@@ -0,0 +1,253 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * dts file for Mediatek MT6765
++ *
++ * (C) Copyright 2018. Mediatek, Inc.
++ *
++ * Mars Cheng <mars.cheng@mediatek.com>
++ */
++
++#include <dt-bindings/interrupt-controller/irq.h>
++#include <dt-bindings/interrupt-controller/arm-gic.h>
++#include <dt-bindings/clock/mt6765-clk.h>
++
++/ {
++	compatible = "mediatek,mt6765";
++	interrupt-parent = <&sysirq>;
++	#address-cells = <2>;
++	#size-cells = <2>;
++
++	psci {
++		compatible = "arm,psci-0.2";
++		method = "smc";
++	};
++
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a53";
++			enable-method = "psci";
++			reg = <0x000>;
++		};
++
++		cpu at 1 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a53";
++			enable-method = "psci";
++			reg = <0x001>;
++		};
++
++		cpu at 2 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a53";
++			enable-method = "psci";
++			reg = <0x002>;
++		};
++
++		cpu at 3 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a53";
++			enable-method = "psci";
++			reg = <0x003>;
++		};
++
++		cpu at 100 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a53";
++			enable-method = "psci";
++			reg = <0x100>;
++		};
++
++		cpu at 101 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a53";
++			enable-method = "psci";
++			reg = <0x101>;
++		};
++
++		cpu at 102 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a53";
++			enable-method = "psci";
++			reg = <0x102>;
++		};
++
++		cpu at 103 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a53";
++			enable-method = "psci";
++			reg = <0x103>;
++		};
++	};
++
++	clocks {
++		clk26m: clk26m {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <26000000>;
++		};
++
++		clk32k: clk32k {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <32000>;
++		};
++	};
++
++	timer {
++		compatible = "arm,armv8-timer";
++		interrupt-parent = <&gic>;
++		interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_LOW>,
++			     <GIC_PPI 14 IRQ_TYPE_LEVEL_LOW>,
++			     <GIC_PPI 11 IRQ_TYPE_LEVEL_LOW>,
++			     <GIC_PPI 10 IRQ_TYPE_LEVEL_LOW>;
++	};
++
++	soc {
++		#address-cells = <2>;
++		#size-cells = <2>;
++		compatible = "simple-bus";
++		ranges;
++
++		gic: interrupt-controller at c000000 {
++			compatible = "arm,gic-v3";
++			#interrupt-cells = <3>;
++			#address-cells = <2>;
++			#size-cells = <2>;
++			interrupt-parent = <&gic>;
++			interrupt-controller;
++			reg = <0 0x0c000000 0 0x40000>,  /* GICD */
++			      <0 0x0c100000 0 0x200000>, /* GICR */
++			      <0 0x0c400000 0 0x2000>,   /* GICC */
++			      <0 0x0c410000 0 0x2000>,   /* GICH */
++			      <0 0x0c420000 0 0x20000>;  /* GICV */
++			interrupts = <GIC_PPI 9 IRQ_TYPE_LEVEL_HIGH>;
++		};
++
++		topckgen: topckgen at 10000000 {
++			compatible = "mediatek,mt6765-topckgen", "syscon";
++			reg = <0 0x10000000 0 0x1000>;
++			#clock-cells = <1>;
++		};
++
++		infracfg: infracfg at 10001000 {
++			compatible = "mediatek,mt6765-infracfg", "syscon";
++			reg = <0 0x10001000 0 0x1000>;
++			interrupts = <GIC_SPI 147 IRQ_TYPE_EDGE_RISING>;
++			#clock-cells = <1>;
++		};
++
++		pericfg: pericfg at 10003000 {
++			compatible = "mediatek,mt6765-pericfg", "syscon";
++			reg = <0 0x10003000 0 0x1000>;
++		};
++
++		scpsys: scpsys at 10006000 {
++			compatible = "mediatek,mt6765-scpsys";
++			reg =	<0 0x10006000 0 0x1000>; /* spm */
++			#power-domain-cells = <1>;
++			clocks = <&topckgen CLK_TOP_MFG_SEL>,
++				 <&topckgen CLK_TOP_MM_SEL>,
++				 <&mmsys_config CLK_MM_SMI_COMMON>,
++				 <&mmsys_config CLK_MM_SMI_COMM0>,
++				 <&mmsys_config CLK_MM_SMI_COMM1>,
++				 <&mmsys_config CLK_MM_SMI_LARB0>,
++				 <&imgsys CLK_IMG_LARB2>,
++				 <&mmsys_config CLK_MM_SMI_IMG>,
++				 <&camsys CLK_CAM_LARB3>,
++				 <&camsys CLK_CAM_DFP_VAD>,
++				 <&camsys CLK_CAM>,
++				 <&camsys CLK_CAM_CCU>,
++				 <&mmsys_config CLK_MM_SMI_CAM>;
++			clock-names = "mfg", "mm",
++				      "mm-0", "mm-1", "mm-2", "mm-3",
++				      "isp-0", "isp-1", "cam-0", "cam-1",
++				      "cam-2", "cam-3", "cam-4";
++			infracfg = <&infracfg>;
++			smi_comm = <&smi_common>;
++		};
++
++		apmixed: apmixed at 1000c000 {
++			compatible = "mediatek,mt6765-apmixedsys", "syscon";
++			reg = <0 0x1000c000 0 0x1000>;
++			#clock-cells = <1>;
++		};
++
++		sysirq: interrupt-controller at 10200a80 {
++			compatible = "mediatek,mt6765-sysirq",
++				     "mediatek,mt6577-sysirq";
++			interrupt-controller;
++			#interrupt-cells = <3>;
++			interrupt-parent = <&gic>;
++			reg = <0 0x10200a80 0 0x50>;
++		};
++
++		uart0: serial at 11002000 {
++			compatible = "mediatek,mt6765-uart",
++				     "mediatek,mt6577-uart";
++			reg = <0 0x11002000 0 0x400>;
++			interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_LOW>;
++			clocks = <&infracfg CLK_IFR_UART0>,
++				 <&infracfg CLK_IFR_AP_DMA>;
++			clock-names = "baud", "bus";
++			status = "disabled";
++		};
++
++		uart1: serial at 11003000 {
++			compatible = "mediatek,mt6765-uart",
++				     "mediatek,mt6577-uart";
++			reg = <0 0x11003000 0 0x400>;
++			interrupts = <GIC_SPI 92 IRQ_TYPE_LEVEL_LOW>;
++			clocks = <&infracfg CLK_IFR_UART1>,
++				 <&infracfg CLK_IFR_AP_DMA>;
++			clock-names = "baud", "bus";
++			status = "disabled";
++		};
++
++		audio: audio at 11220000 {
++			compatible = "mediatek,mt6765-audsys", "syscon";
++			reg = <0 0x11220000 0 0x1000>;
++			#clock-cells = <1>;
++		};
++
++		mipi_rx_ana_csi0a: mipi_rx_ana_csi0a at 11c10000 {
++			compatible = "mediatek,mt6765-mipi_rx_ana_csi0a",
++				     "syscon";
++			reg = <0 0x11c10000 0 0x1000>;
++			#clock-cells = <1>;
++		};
++
++		mmsys_config: mmsys_config at 14000000 {
++			compatible = "mediatek,mt6765-mmsys", "syscon";
++			reg = <0 0x14000000 0 0x1000>;
++			interrupts = <GIC_SPI 227 IRQ_TYPE_LEVEL_LOW>;
++			#clock-cells = <1>;
++		};
++
++		smi_common: smi_common at 14002000 {
++			compatible = "mediatek,mt6765-smi-common", "syscon";
++			reg = <0 0x14002000 0 0x1000>;
++		};
++
++		imgsys: imgsys at 15020000 {
++			compatible = "mediatek,mt6765-imgsys", "syscon";
++			reg = <0 0x15020000 0 0x1000>;
++			#clock-cells = <1>;
++		};
++
++		venc_gcon: venc_gcon at 17000000 {
++			compatible = "mediatek,mt6765-vcodecsys", "syscon";
++			reg = <0 0x17000000 0 0x10000>;
++			#clock-cells = <1>;
++		};
++
++		camsys: camsys at 1a000000  {
++			compatible = "mediatek,mt6765-camsys", "syscon";
++			reg = <0 0x1a000000 0 0x1000>;
++			#clock-cells = <1>;
++		};
++	}; /* end of soc */
++};
 -- 
 1.7.9.5
