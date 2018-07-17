@@ -1,114 +1,162 @@
-From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Tue, 17 Jul 2018 19:34:53 +0530
-Subject: [PATCH v2 2/2] arm64: dts: Add Mediatek X20 Development Board
- support
-In-Reply-To: <d88504b4-409c-c42b-f816-bedefce2a819@gmail.com>
-References: <20180605163442.4812-1-manivannan.sadhasivam@linaro.org>
- <20180605163442.4812-3-manivannan.sadhasivam@linaro.org>
- <d88504b4-409c-c42b-f816-bedefce2a819@gmail.com>
-Message-ID: <20180717140453.GA19076@mani>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 17 Jul 2018 15:05:36 +0100
+Subject: [PATCH v3 5/7] arm64: smp: remove cpu and numa topology
+ information when hotplugging out CPU
+In-Reply-To: <CAMuHMdXw9My+P1UCJ19Qdjq4O9gY_0QVFZaw6C5Ytmpyac59Vw@mail.gmail.com>
+References: <1530874968-5960-1-git-send-email-sudeep.holla@arm.com>
+ <1530874968-5960-6-git-send-email-sudeep.holla@arm.com>
+ <CAMuHMdXw9My+P1UCJ19Qdjq4O9gY_0QVFZaw6C5Ytmpyac59Vw@mail.gmail.com>
+Message-ID: <20180717140536.GA27323@e107155-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matthias,
+On Tue, Jul 17, 2018 at 02:58:14PM +0200, Geert Uytterhoeven wrote:
+> Hi Sudeep,
+>
+> On Fri, Jul 6, 2018 at 1:04 PM Sudeep Holla <sudeep.holla@arm.com> wrote:
+> > We already repopulate the information on CPU hotplug-in, so we can safely
+> > remove the CPU topology and NUMA cpumap information during CPU hotplug
+> > out operation. This will help to provide the correct cpumask for
+> > scheduler domains.
+> >
+> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > Tested-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+> > Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
+> > Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+>
+> This is now commit 7f9545aa1a91a9a4 ("arm64: smp: remove cpu and numa
+> topology information when hotplugging out CPU") in arm64/for-next/core, to
+> which I bisected a PSCI checker regression on systems with two CPU clusters.
+>
+> Dmesg on R-Car H3 (4xCA57+4xCA53) before/after:
+>
+>      psci_checker: PSCI checker started using 8 CPUs
+>
+> 8 CPU cores detected.
+>
+>      psci_checker: Starting hotplug tests
+>      psci_checker: Trying to turn off and on again all CPUs
+>      CPU1: shutdown
+>      psci: CPU1 killed.
+>      CPU2: shutdown
+>      psci: CPU2 killed.
+>     -NOHZ: local_softirq_pending 55
+>      CPU3: shutdown
+>      psci: CPU3 killed.
+>     -NOHZ: local_softirq_pending 51
+>      CPU4: shutdown
+>      psci: CPU4 killed.
+>      NOHZ: local_softirq_pending 55
+>      CPU5: shutdown
+>      psci: CPU5 killed.
+>      NOHZ: local_softirq_pending 55
+>      CPU6: shutdown
+>      psci: CPU6 killed.
+>      NOHZ: local_softirq_pending 55
+>      CPU7: shutdown
+>      psci: CPU7 killed.
+>      Detected PIPT I-cache on CPU1
+>      CPU1: Booted secondary processor 0x0000000001 [0x411fd073]
+>      Detected PIPT I-cache on CPU2
+>      CPU2: Booted secondary processor 0x0000000002 [0x411fd073]
+>      Detected PIPT I-cache on CPU3
+>      CPU3: Booted secondary processor 0x0000000003 [0x411fd073]
+>      Detected VIPT I-cache on CPU4
+>      CPU4: Booted secondary processor 0x0000000100 [0x410fd034]
+>      cpufreq: cpufreq_online: CPU4: Running at unlisted freq: 1198080 KHz
+>      cpufreq: cpufreq_online: CPU4: Unlisted initial frequency changed to: 1200000 KHz
+>      Detected VIPT I-cache on CPU5
+>      CPU5: Booted secondary processor 0x0000000101 [0x410fd034]
+>      Detected VIPT I-cache on CPU6
+>      CPU6: Booted secondary processor 0x0000000102 [0x410fd034]
+>      Detected VIPT I-cache on CPU7
+>      CPU7: Booted secondary processor 0x0000000103 [0x410fd034]
+>
+> All but CPU0 tested, as expected.
+>
 
-On Mon, Jul 16, 2018 at 03:24:44PM +0200, Matthias Brugger wrote:
-> Hi Manivanna,
-> 
-> On 05/06/18 18:34, Manivannan Sadhasivam wrote:
-> > Add initial device tree support for Mediatek X20 Development Board
-> > based on MT6797 Deca core SoC. This board is one of the 96Boards
-> > Consumer Edition platform.
-> > 
-> > Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-> > ---
-> >  arch/arm64/boot/dts/mediatek/Makefile         |  1 +
-> >  .../boot/dts/mediatek/mt6797-x20-dev.dts      | 33 +++++++++++++++++++
-> >  2 files changed, 34 insertions(+)
-> >  create mode 100644 arch/arm64/boot/dts/mediatek/mt6797-x20-dev.dts
-> > 
-> > diff --git a/arch/arm64/boot/dts/mediatek/Makefile b/arch/arm64/boot/dts/mediatek/Makefile
-> > index ac17f60f998c..5b7fd6ad96e4 100644
-> > --- a/arch/arm64/boot/dts/mediatek/Makefile
-> > +++ b/arch/arm64/boot/dts/mediatek/Makefile
-> > @@ -3,5 +3,6 @@ dtb-$(CONFIG_ARCH_MEDIATEK) += mt2712-evb.dtb
-> >  dtb-$(CONFIG_ARCH_MEDIATEK) += mt6755-evb.dtb
-> >  dtb-$(CONFIG_ARCH_MEDIATEK) += mt6795-evb.dtb
-> >  dtb-$(CONFIG_ARCH_MEDIATEK) += mt6797-evb.dtb
-> > +dtb-$(CONFIG_ARCH_MEDIATEK) += mt6797-x20-dev.dtb
-> >  dtb-$(CONFIG_ARCH_MEDIATEK) += mt7622-rfb1.dtb
-> >  dtb-$(CONFIG_ARCH_MEDIATEK) += mt8173-evb.dtb
-> > diff --git a/arch/arm64/boot/dts/mediatek/mt6797-x20-dev.dts b/arch/arm64/boot/dts/mediatek/mt6797-x20-dev.dts
-> > new file mode 100644
-> > index 000000000000..2c09ca95d9e2
-> > --- /dev/null
-> > +++ b/arch/arm64/boot/dts/mediatek/mt6797-x20-dev.dts
-> > @@ -0,0 +1,33 @@
-> > +// SPDX-License-Identifier: GPL-2.0
-> > +/*
-> > + * Device Tree Source for MediaTek X20 Development Board
-> > + *
-> > + * Copyright (C) 2018, Linaro Ltd.
-> > + *
-> > + */
+OK, does the firmware on this system not allow CPU0 to be hotplugged out ?
+
+>     psci_checker: Trying to turn off and on again group 0 (CPUs 0-3)
+>
+> 4 big CPU cores detected.
+>
+>      CPU1: shutdown
+>      psci: CPU1 killed.
+>     -NOHZ: local_softirq_pending 55
+>     +NOHZ: local_softirq_pending 51
+>      CPU2: shutdown
+>      psci: CPU2 killed.
+>      NOHZ: local_softirq_pending 51
+>      CPU3: shutdown
+>      psci: CPU3 killed.
+>      Detected PIPT I-cache on CPU1
+>      CPU1: Booted secondary processor 0x0000000001 [0x411fd073]
+>      Detected PIPT I-cache on CPU2
+>      CPU2: Booted secondary processor 0x0000000002 [0x411fd073]
+>      Detected PIPT I-cache on CPU3
+>      CPU3: Booted secondary processor 0x0000000003 [0x411fd073]
+>
+> All but CPU0 tested, as expected.
+>
+>     psci_checker: Trying to turn off and on again group 1 (CPUs 4-7)
+>
+> 4 LITTLE CPU cores detected.
+>
+>      CPU4: shutdown
+>      psci: CPU4 killed.
+>      NOHZ: local_softirq_pending 55
+>     -CPU5: shutdown
+>     -psci: CPU5 killed.
+>     -NOHZ: local_softirq_pending 55
+>     -CPU6: shutdown
+>     -psci: CPU6 killed.
+>     -NOHZ: local_softirq_pending 55
+>     -CPU7: shutdown
+>     -psci: CPU7 killed.
+>      Detected VIPT I-cache on CPU4
+>      CPU4: Booted secondary processor 0x0000000100 [0x410fd034]
+>     -cpufreq: cpufreq_online: CPU4: Running at unlisted freq: 1198080 KHz
+>     -cpufreq: cpufreq_online: CPU4: Unlisted initial frequency changed to: 1200000 KHz
+>     -Detected VIPT I-cache on CPU5
+>     -CPU5: Booted secondary processor 0x0000000101 [0x410fd034]
+>     -Detected VIPT I-cache on CPU6
+>     -CPU6: Booted secondary processor 0x0000000102 [0x410fd034]
+>     -Detected VIPT I-cache on CPU7
+>     -CPU7: Booted secondary processor 0x0000000103 [0x410fd034]
+>
+> Woops, CPU5-7 are not tested.
+>
+
+I don't understand what you mean by that. From the logs, it looks fine.
+What do you mean by "CPU5-7 are not tested" ?
+
+>     psci_checker: Hotplug tests passed OK
+>
+>
+> > --- a/arch/arm64/kernel/smp.c
+> > +++ b/arch/arm64/kernel/smp.c
+> > @@ -279,6 +279,9 @@ int __cpu_disable(void)
+> >         if (ret)
+> >                 return ret;
+> >
+> > +       remove_cpu_topology(cpu);
+> > +       numa_remove_cpu(cpu);
 > > +
-> > +/dts-v1/;
-> > +
-> > +#include "mt6797.dtsi"
-> > +
-> > +/ {
-> > +	model = "Mediatek X20 Development Board";
-> > +	compatible = "archermind,mt6797-x20-dev", "mediatek,mt6797";
-> > +
-> > +	aliases {
-> > +		serial0 = &uart1;
-> > +	};
-> 
-> Sorry for the late answer.
-> Why did you use uart1 instead of uart0?
-> I know that uart0 is used by the bootloader, but because of their exotic flash
-> procedure I find it quite useful to see this messages in my serial connection.
-> Of course you can only use 921600 baudrate then.
-> 
+> >         /*
+> >          * Take this CPU offline.  Once we clear this, we can't return,
+> >          * and we must not schedule until we're ready to give up the cpu.
+>
+> A simple revert is not sufficient, as that causes
+>
+>     watchdog: BUG: soft lockup - CPU#2 stuck for 22s! [cpuhp/2:21]
+>
+> Do you have an idea how to fix this?
 
-The reason is, most of the Mezzanine boards use USB to UART bridge on the
-UART1 port available on the Low Speed Expansion header. Additionally, the
-convention followed by most of the Consumer Edition 96Boards is to use UART1
-as the debug serial port. That's why eventhough the bootloader is using UART0,
-I forced the kernel to use UART1.
+Sorry, but I am finding it hard to understand the issue from the log.
+Also, it would be good to know your config. Is it defconfig - NUMA as before ?
 
-> > +
-> > +	memory at 40000000 {
-> > +		device_type = "memory";
-> > +		reg = <0 0x40000000 0 0x1e605000>;
-> 
-> How comes this strange number for the memory size?
-> 
-
-Actually, the memory size is extracted from the downstream kernel [1].
-
-> BTW do you know the differences between the EVB board and the x20 one?
-> I used the evb dts for booting up to now.
-> 
-
-Sorry, I don't know the difference between both boards!
-
-Thanks,
-Mani
-
-[1] https://github.com/helio-x20/linux/blob/helio-x20/arch/arm64/boot/dts/amt6797_64_open.dts#L8
-
-> Best regards,
-> Matthias
-> 
-> > +	};
-> > +
-> > +	chosen {
-> > +		stdout-path = "serial0:115200n8";
-> > +	};
-> > +};
-> > +
-> > +&uart1 {
-> > +	status = "okay";
-> > +};
-> > 
+--
+Regards,
+Sudeep
