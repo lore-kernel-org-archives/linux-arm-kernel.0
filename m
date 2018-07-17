@@ -1,9 +1,9 @@
 From: ykaneko0929@gmail.com (Yoshihiro Kaneko)
-Date: Wed, 18 Jul 2018 04:48:02 +0900
-Subject: [PATCH/RFT 6/7] arm64: dts: renesas: r8a77965: Add Sound CTU support
+Date: Wed, 18 Jul 2018 04:48:03 +0900
+Subject: [PATCH/RFT 7/7] arm64: dts: renesas: r8a77965: Add Sound MIX support
 In-Reply-To: <1531856883-19645-1-git-send-email-ykaneko0929@gmail.com>
 References: <1531856883-19645-1-git-send-email-ykaneko0929@gmail.com>
-Message-ID: <1531856883-19645-7-git-send-email-ykaneko0929@gmail.com>
+Message-ID: <1531856883-19645-8-git-send-email-ykaneko0929@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,46 +15,40 @@ by Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>.
 Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
 Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
 ---
- arch/arm64/boot/dts/renesas/r8a77965.dtsi | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a77965.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/renesas/r8a77965.dtsi b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
-index 61140e1..2188ad2 100644
+index 2188ad2..56303ac 100644
 --- a/arch/arm64/boot/dts/renesas/r8a77965.dtsi
 +++ b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
-@@ -1355,6 +1355,7 @@
- 				 <&cpg CPG_MOD 1026>, <&cpg CPG_MOD 1027>,
+@@ -1356,6 +1356,7 @@
  				 <&cpg CPG_MOD 1028>, <&cpg CPG_MOD 1029>,
  				 <&cpg CPG_MOD 1030>, <&cpg CPG_MOD 1031>,
+ 				 <&cpg CPG_MOD 1020>, <&cpg CPG_MOD 1021>,
 +				 <&cpg CPG_MOD 1020>, <&cpg CPG_MOD 1021>,
  				 <&cpg CPG_MOD 1019>, <&cpg CPG_MOD 1018>,
  				 <&audio_clk_a>, <&audio_clk_b>,
  				 <&audio_clk_c>,
-@@ -1366,6 +1367,7 @@
+@@ -1367,6 +1368,7 @@
  				      "src.9", "src.8", "src.7", "src.6",
  				      "src.5", "src.4", "src.3", "src.2",
  				      "src.1", "src.0",
-+				      "ctu.1", "ctu.0",
++				      "mix.1", "mix.0",
+ 				      "ctu.1", "ctu.0",
  				      "dvc.0", "dvc.1",
  				      "clk_a", "clk_b", "clk_c", "clk_i";
- 			power-domains = <&sysc R8A77965_PD_ALWAYS_ON>;
-@@ -1392,6 +1394,17 @@
+@@ -1394,6 +1396,11 @@
  				};
  			};
  
-+			rcar_sound,ctu {
-+				ctu00: ctu-0 { };
-+				ctu01: ctu-1 { };
-+				ctu02: ctu-2 { };
-+				ctu03: ctu-3 { };
-+				ctu10: ctu-4 { };
-+				ctu11: ctu-5 { };
-+				ctu12: ctu-6 { };
-+				ctu13: ctu-7 { };
++			rcar_sound,mix {
++				mix0: mix-0 { };
++				mix1: mix-1 { };
 +			};
 +
- 			rcar_sound,src {
- 				src0: src-0 {
- 					interrupts = <GIC_SPI 352 IRQ_TYPE_LEVEL_HIGH>;
+ 			rcar_sound,ctu {
+ 				ctu00: ctu-0 { };
+ 				ctu01: ctu-1 { };
 -- 
 1.9.1
