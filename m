@@ -1,60 +1,73 @@
-From: linux.amoon@gmail.com (Anand Moon)
-Date: Wed, 18 Jul 2018 01:53:59 +0530
-Subject: [PATCH 1/5] thermal: exynos: enable core tmu clk on exynos
- platform
-In-Reply-To: <CAJKOXPdP78VFQgSQ9z9WsgYY_YhEKPUt=0MOra6Pz6smQeiNGg@mail.gmail.com>
-References: <1531822342-4293-1-git-send-email-linux.amoon@gmail.com>
- <CAJKOXPdP78VFQgSQ9z9WsgYY_YhEKPUt=0MOra6Pz6smQeiNGg@mail.gmail.com>
-Message-ID: <CANAwSgS=08fVsqn95WHzSF71WTTyD2-=K2C6-BEz0tY0t6A1-g@mail.gmail.com>
+From: alexandre.belloni@bootlin.com (Alexandre Belloni)
+Date: Tue, 17 Jul 2018 22:31:53 +0200
+Subject: [PATCH] ARM: early_printk: respect keep parameter
+In-Reply-To: <nycvar.YSQ.7.76.1807171603240.20892@knanqh.ubzr>
+References: <20180711183239.21023-1-alexandre.belloni@bootlin.com>
+ <nycvar.YSQ.7.76.1807171603240.20892@knanqh.ubzr>
+Message-ID: <20180717203153.GC3211@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof
+On 17/07/2018 16:16:44-0400, Nicolas Pitre wrote:
+> On Wed, 11 Jul 2018, Alexandre Belloni wrote:
+> 
+> > Parse and use the keep parameter of earlyprintk to avoid having the kernel
+> > output stop with:
+> > 
+> > Console: colour dummy device 80x30
+> > console [tty0] enabled
+> > bootconsole [earlycon0] disabled
+> > 
+> > This happens because once tty0, the virtual terminal console is registered,
+> > it is selected as the default console, disregarding an existing stdout-path
+> > DT property and the early console is shutdown before the console driver is
+> > probed.
+> > 
+> > Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
+> 
+> Why can't you have a real console driver that takes over at that point 
+> which respects whatever DT property you give it?
+> 
 
-On 17 July 2018 at 17:50, Krzysztof Kozlowski <krzk@kernel.org> wrote:
-> Hi Anand,
->
-> Thanks for patch.
->
-> On 17 July 2018 at 12:12, Anand Moon <linux.amoon@gmail.com> wrote:
->> clk_summary do not show tmu_apbif clk enable, so replace
->> the clk_prepare with clk_prepare_enables to enable tmu clk.
->
-> This is not valid reason to do a change. What is clk_summary does not
-> really matter. Your change has negative impact on power consumption as
-> the clock stays enabled all the time. This is not what we want... so
-> please explain it more - why you need the clock to be enabled all the
-> time? What is broken (clk_summary is not broken in this case)?
->
+See Russell's analysis here:
 
-Opps I could not explain some more in my commit message.
+https://www.spinics.net/lists/linux-serial/msg25363.html
 
-Actually TMU sensor for Exynos process are controlled by so external clk
 
-Exynos4412 have VDD18_TS sensor which controls the CLK_SENSE tmu.
-Exynos5422 have VDD18_TS01 / VDD18_TS23 / VDD18_TS4 sensor which
-control the CLK_SENSE tmu.
+> The early_printk code is very raw and inefficient, and it shouldn't be 
+> used for anything but the debugging of early boot hangs.
+> 
 
-So as per my understanding tmu is clk driver which control the flow  PMIC.
+The issue I had is that he pinctrl driver wasn't probing so the real
+console driver could never probe. I think this fits the use case.
 
-clk_prepare_enable combine clk_prepare and clk_enable
-and clk_disable_unprepare combine clk_disable and clk_unprepare.
+Also, atmel_serial doesn't yet have earlycon support.
 
-most of the driver prefer clk_prepare_enable and clk_disable_unprepare.
+> > ---
+> >  arch/arm/kernel/early_printk.c | 3 +++
+> >  1 file changed, 3 insertions(+)
+> > 
+> > diff --git a/arch/arm/kernel/early_printk.c b/arch/arm/kernel/early_printk.c
+> > index 9257736ec9fa..bbb10150b11a 100644
+> > --- a/arch/arm/kernel/early_printk.c
+> > +++ b/arch/arm/kernel/early_printk.c
+> > @@ -42,6 +42,9 @@ static struct console early_console_dev = {
+> >  
+> >  static int __init setup_early_printk(char *buf)
+> >  {
+> > +	if (buf && strstr(buf, "keep"))
+> > +		early_console_dev.flags &= ~CON_BOOT;
+> > +
+> >  	early_console = &early_console_dev;
+> >  	register_console(&early_console_dev);
+> >  	return 0;
+> > -- 
+> > 2.18.0
+> > 
+> > 
+> 
 
-clk_summary is just a reference looking point where we could check the
-clk is enable/disable.
-
-what is broken ?
-I still few more parameter need to tuned to configure the tmu driver.
-
->> simplify the enable of tmu_triminfo_apbif clk, also fixed
->> the order of goto error for failed cases.
->
-> This has to be split into separate change.
->
-> Best regards,
-> Krzysztof
-
-Best Regards
--Anand
+-- 
+Alexandre Belloni, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
