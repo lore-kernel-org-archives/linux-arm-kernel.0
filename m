@@ -1,41 +1,131 @@
-From: tjakobi@math.uni-bielefeld.de (Tobias Jakobi)
-Date: Wed, 18 Jul 2018 22:33:07 +0200
-Subject: [PATCH] clk: samsung: Remove unused
- mout_user_aclk400_mcuisp_p4x12 variable
-In-Reply-To: <20180718195620.5331-1-krzk@kernel.org>
-References: <20180718195620.5331-1-krzk@kernel.org>
-Message-ID: <c5e83bb8-840a-9e91-648c-4472b956c111@math.uni-bielefeld.de>
+From: jrdr.linux@gmail.com (Souptick Joarder)
+Date: Thu, 19 Jul 2018 02:19:57 +0530
+Subject: [PATCH] gpu/drm/exynos: Convert drm_atomic_helper_suspend/resume()
+Message-ID: <20180718204957.GA14132@jordon-HP-15-Notebook-PC>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Speaking of the ISP clocks driver, I wonder why this one was never merged?
-https://patches.linaro.org/patch/115531/
+convert drm_atomic_helper_suspend/resume() to use
+drm_mode_config_helper_suspend/resume().
 
-- Tobias
+exynos_drm_fbdev_suspend/resume can be removed
+as drm_mode_config_helper_suspend/resume has
+implement the same in generic way.
 
+Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
+Signed-off-by: Ajit Negi <ajitn.linux@gmail.com>
+---
+ drivers/gpu/drm/exynos/exynos_drm_drv.c   | 32 ++++++++++---------------------
+ drivers/gpu/drm/exynos/exynos_drm_fbdev.c | 17 ----------------
+ drivers/gpu/drm/exynos/exynos_drm_fbdev.h | 10 ----------
+ 3 files changed, 10 insertions(+), 49 deletions(-)
 
-Krzysztof Kozlowski wrote:
-> Remove unused 'mout_user_aclk400_mcuisp_p4x12' variable to fix GCC warning:
-> 
->     drivers/clk/samsung/clk-exynos4412-isp.c:40:27: warning:
->         'mout_user_aclk400_mcuisp_p4x12' defined but not used [-Wunused-const-variable=]
-> 
-> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
-> ---
->  drivers/clk/samsung/clk-exynos4412-isp.c | 2 --
->  1 file changed, 2 deletions(-)
-> 
-> diff --git a/drivers/clk/samsung/clk-exynos4412-isp.c b/drivers/clk/samsung/clk-exynos4412-isp.c
-> index d5f1ccb36300..cfaa057035ad 100644
-> --- a/drivers/clk/samsung/clk-exynos4412-isp.c
-> +++ b/drivers/clk/samsung/clk-exynos4412-isp.c
-> @@ -37,8 +37,6 @@ static const unsigned long exynos4x12_clk_isp_save[] __initconst = {
->  	E4X12_GATE_ISP1,
->  };
->  
-> -PNAME(mout_user_aclk400_mcuisp_p4x12) = { "fin_pll", "div_aclk400_mcuisp", };
-> -
->  static struct samsung_div_clock exynos4x12_isp_div_clks[] = {
->  	DIV(CLK_ISP_DIV_ISP0, "div_isp0", "aclk200", E4X12_DIV_ISP0, 0, 3),
->  	DIV(CLK_ISP_DIV_ISP1, "div_isp1", "aclk200", E4X12_DIV_ISP0, 4, 3),
-> 
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_drv.c b/drivers/gpu/drm/exynos/exynos_drm_drv.c
+index a81b4a5..1996ff7 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_drv.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_drv.c
+@@ -151,39 +151,27 @@ static void exynos_drm_postclose(struct drm_device *dev, struct drm_file *file)
+ static int exynos_drm_suspend(struct device *dev)
+ {
+ 	struct drm_device *drm_dev = dev_get_drvdata(dev);
+-	struct exynos_drm_private *private;
++	int ret = 0;
+ 
+-	if (pm_runtime_suspended(dev) || !drm_dev)
+-		return 0;
++	if (pm_runtime_suspended(dev))
++		return ret;
+ 
+-	private = drm_dev->dev_private;
++	ret = drm_mode_config_helper_suspend(drm_dev);
+ 
+-	drm_kms_helper_poll_disable(drm_dev);
+-	exynos_drm_fbdev_suspend(drm_dev);
+-	private->suspend_state = drm_atomic_helper_suspend(drm_dev);
+-	if (IS_ERR(private->suspend_state)) {
+-		exynos_drm_fbdev_resume(drm_dev);
+-		drm_kms_helper_poll_enable(drm_dev);
+-		return PTR_ERR(private->suspend_state);
+-	}
+-
+-	return 0;
++	return ret;
+ }
+ 
+ static int exynos_drm_resume(struct device *dev)
+ {
+ 	struct drm_device *drm_dev = dev_get_drvdata(dev);
+-	struct exynos_drm_private *private;
++	int ret = 0;
+ 
+-	if (pm_runtime_suspended(dev) || !drm_dev)
+-		return 0;
++	if (pm_runtime_suspended(dev))
++		return ret;
+ 
+-	private = drm_dev->dev_private;
+-	drm_atomic_helper_resume(drm_dev, private->suspend_state);
+-	exynos_drm_fbdev_resume(drm_dev);
+-	drm_kms_helper_poll_enable(drm_dev);
++	ret = drm_mode_config_helper_resume(drm_dev);
+ 
+-	return 0;
++	return ret;
+ }
+ #endif
+ 
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
+index 132dd52..918dd2c 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
+@@ -270,20 +270,3 @@ void exynos_drm_fbdev_fini(struct drm_device *dev)
+ 	private->fb_helper = NULL;
+ }
+ 
+-void exynos_drm_fbdev_suspend(struct drm_device *dev)
+-{
+-	struct exynos_drm_private *private = dev->dev_private;
+-
+-	console_lock();
+-	drm_fb_helper_set_suspend(private->fb_helper, 1);
+-	console_unlock();
+-}
+-
+-void exynos_drm_fbdev_resume(struct drm_device *dev)
+-{
+-	struct exynos_drm_private *private = dev->dev_private;
+-
+-	console_lock();
+-	drm_fb_helper_set_suspend(private->fb_helper, 0);
+-	console_unlock();
+-}
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_fbdev.h b/drivers/gpu/drm/exynos/exynos_drm_fbdev.h
+index b338472..6840b6a 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_fbdev.h
++++ b/drivers/gpu/drm/exynos/exynos_drm_fbdev.h
+@@ -19,8 +19,6 @@
+ 
+ int exynos_drm_fbdev_init(struct drm_device *dev);
+ void exynos_drm_fbdev_fini(struct drm_device *dev);
+-void exynos_drm_fbdev_suspend(struct drm_device *drm);
+-void exynos_drm_fbdev_resume(struct drm_device *drm);
+ 
+ #else
+ 
+@@ -39,14 +37,6 @@ static inline void exynos_drm_fbdev_restore_mode(struct drm_device *dev)
+ 
+ #define exynos_drm_output_poll_changed (NULL)
+ 
+-static inline void exynos_drm_fbdev_suspend(struct drm_device *drm)
+-{
+-}
+-
+-static inline void exynos_drm_fbdev_resume(struct drm_device *drm)
+-{
+-}
+-
+ #endif
+ 
+ #endif
+-- 
+1.9.1
