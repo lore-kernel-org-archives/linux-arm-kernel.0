@@ -1,94 +1,169 @@
-From: giulio.benetti@micronovasrl.com (Giulio Benetti)
-Date: Wed, 18 Jul 2018 16:42:25 +0200
-Subject: [PATCH] drm/sun4i: Handle DRM_BUS_FLAG_PIXDATA_*EDGE checking if
- panel is used.
-In-Reply-To: <20180718142357.120998-1-giulio.benetti@micronovasrl.com>
-References: <20180613081647.31183-1-paul.kocialkowski@bootlin.com>
- <20180718142357.120998-1-giulio.benetti@micronovasrl.com>
-Message-ID: <e1fcedb1-64d5-24fb-ffc1-d418620ec795@micronovasrl.com>
+From: pintu.ping@gmail.com (Pintu Kumar)
+Date: Wed, 18 Jul 2018 20:19:15 +0530
+Subject: [PREEMPT_RT]: Using printk-rt-aware.patch in non-rt kernel
+In-Reply-To: <CAOuPNLiK9tdHF6k+mNSqEQG92hA9oo4C+obhiwpjVOi_zaBZXw@mail.gmail.com>
+References: <CAOuPNLiK9tdHF6k+mNSqEQG92hA9oo4C+obhiwpjVOi_zaBZXw@mail.gmail.com>
+Message-ID: <CAOuPNLhTBdzj8B_u9f7FLXHwaA5KYVwPoy87LaZNhzLxbuifaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+Hi All,
 
-can you give a try to this patch on A13 with VGA DAC?
-Unfortunately I don't have an A13 board to test it.
+I have a question about PREEMPT_RT patch for 3.10 kernel.
+I am trying to port this rt patch: 0224-printk-rt-aware.patch.patch
+(see the patch below), in non-rt kernel.
+I could able to successfully apply this patch after replacing:
+migrate_enable/disable with preempt_enable/disable.
+Things were working fine so far.
 
-Thanks in advance.
+Then, I noticed that "printk" from interrupt context is not appearing
+on console (minicom), if console shell is active.
+However, it appears on the dmesg output.
 
-Giulio
+So, I am wondering, what could be the cause of this patch for this
+behavior in non-rt kernel?
+Is this the expected behavior, even on PREEMPT_RT kernel?
+Is there a way we can fix this issue on non-rt kernel?
 
-Il 18/07/2018 16:23, Giulio Benetti ha scritto:
-> Handle both positive and negative dclk polarity,
-> according to bus_flags, taking care of this:
-> 
-> On A20 and similar SoCs, the only way to achieve Positive Edge
-> (Rising Edge), is setting dclk clock phase to 2/3(240?).
-> By default TCON works in Negative Edge(Falling Edge), this is why phase
-> is set to 0 in that case.
-> Unfortunately there's no way to logically invert dclk through IO_POL
-> register.
-> The only acceptable way to work, triple checked with scope,
-> is using clock phase set to 0? for Negative Edge and set to 240? for
-> Positive Edge.
-> On A33 and similar SoCs there would be a 90? phase option, but it divides
-> also dclk by 2.
-> This patch is a way to avoid quirks all around TCON and DOTCLOCK drivers
-> for using A33 90? phase divided by 2 and consequently increase code
-> complexity.
-> 
-> Check if panel is used. TCON can also handle VGA DAC, then panel could
-> be empty.
-> 
-> Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
+Please help us with your suggestions.
+
+Thanks,
+Pintu
+
+On Wed, Jun 13, 2018 at 8:02 PM Pintu Kumar <pintu.ping@gmail.com> wrote:
+>
+> Dear Thomas,
+>
+> I was looking into this RT patches for 3.10 kernel:
+> https://mirrors.edge.kernel.org/pub/linux/kernel/projects/rt/3.10/patches-3.10.108-rt123.tar.gz
+>
+> And I came across your patch: 0224-printk-rt-aware.patch.patch
+> I guess, this patch is related to improving irq latency during printk.
+> And this patch can work only if PREEMPT_RT_FULL is enabled.
+>
+> But, I have 3.10 non-RT kernel, and still I want to use this feature
+> for non-RT case and achieve the same functionality.
+> Can you give me some idea, how to convert this RT patch to non-RT
+> kernel and still achieve the same behavior.
+> I know this is weird but it is our internal requirement.
+>
+
+> So, if you have any suggestions, it will be really helpful.
+>
+> Thank You!
+>
+> Regards,
+> Pintu
+>
+> This is the patch details:
+> -----------------------------------
+> rt-patches/patches$ cat 0224-printk-rt-aware.patch.patch
+> From ec944721d45454681485906615affa9368e0dfae Mon Sep 17 00:00:00 2001
+> From: Thomas Gleixner <tglx@linutronix.de>
+> Date: Wed, 19 Sep 2012 14:50:37 +0200
+> Subject: [PATCH 224/405] printk-rt-aware.patch
+>
+> Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
 > ---
->   drivers/gpu/drm/sun4i/sun4i_tcon.c | 28 ++++++++++++++++++++++++++++
->   1 file changed, 28 insertions(+)
-> 
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> index 8232b39e16ca..5c7d6ae53111 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> @@ -17,6 +17,7 @@
->   #include <drm/drm_encoder.h>
->   #include <drm/drm_modes.h>
->   #include <drm/drm_of.h>
-> +#include <drm/drm_panel.h>
->   
->   #include <uapi/drm/drm_mode.h>
->   
-> @@ -474,6 +475,33 @@ static void sun4i_tcon0_mode_set_rgb(struct sun4i_tcon *tcon,
->   	if (mode->flags & DRM_MODE_FLAG_PVSYNC)
->   		val |= SUN4I_TCON0_IO_POL_VSYNC_POSITIVE;
->   
-> +	/*
-> +	 * On A20 and similar SoCs, the only way to achieve Positive Edge
-> +	 * (Rising Edge), is setting dclk clock phase to 2/3(240?).
-> +	 * By default TCON works in Negative Edge(Falling Edge),
-> +	 * this is why phase is set to 0 in that case.
-> +	 * Unfortunately there's no way to logically invert dclk through
-> +	 * IO_POL register.
-> +	 * The only acceptable way to work, triple checked with scope,
-> +	 * is using clock phase set to 0? for Negative Edge and set to 240?
-> +	 * for Positive Edge.
-> +	 * On A33 and similar SoCs there would be a 90? phase option,
-> +	 * but it divides also dclk by 2.
-> +	 * Following code is a way to avoid quirks all around TCON
-> +	 * and DOTCLOCK drivers.
-> +	 */
-> +	if (!IS_ERR(tcon->panel)) {
-> +		struct drm_panel *panel = tcon->panel;
-> +		struct drm_connector *connector = panel->connector;
-> +		struct drm_display_info display_info = connector->display_info;
-> +
-> +		if (display_info.bus_flags & DRM_BUS_FLAG_PIXDATA_POSEDGE)
-> +			clk_set_phase(tcon->dclk, 240);
-> +
-> +		if (display_info.bus_flags & DRM_BUS_FLAG_PIXDATA_NEGEDGE)
-> +			clk_set_phase(tcon->dclk, 0);
-> +	}
-> +
->   	regmap_update_bits(tcon->regs, SUN4I_TCON0_IO_POL_REG,
->   			   SUN4I_TCON0_IO_POL_HSYNC_POSITIVE | SUN4I_TCON0_IO_POL_VSYNC_POSITIVE,
->   			   val);
-> 
+>  kernel/printk.c | 34 +++++++++++++++++++++++++++++-----
+>  1 file changed, 29 insertions(+), 5 deletions(-)
+>
+> diff --git a/kernel/printk.c b/kernel/printk.c
+> index e879b8615a0f..07d32a2c8a5f 100644
+> --- a/kernel/printk.c
+> +++ b/kernel/printk.c
+> @@ -1277,6 +1277,7 @@ static void call_console_drivers(int level,
+> const char *text, size_t len)
+>         if (!console_drivers)
+>                 return;
+>
+> +       migrate_disable();
+>         for_each_console(con) {
+>                 if (exclusive_console && con != exclusive_console)
+>                         continue;
+> @@ -1289,6 +1290,7 @@ static void call_console_drivers(int level,
+> const char *text, size_t len)
+>                         continue;
+>                 con->write(con, text, len);
+>         }
+> +       migrate_enable();
+>  }
+>
+>  /*
+> @@ -1348,12 +1350,18 @@ static inline int can_use_console(unsigned int cpu)
+>   * interrupts disabled. It should return with 'lockbuf_lock'
+>   * released but interrupts still disabled.
+>   */
+> -static int console_trylock_for_printk(unsigned int cpu)
+> +static int console_trylock_for_printk(unsigned int cpu, unsigned long flags)
+>         __releases(&logbuf_lock)
+>  {
+>         int retval = 0, wake = 0;
+> +#ifdef CONFIG_PREEMPT_RT_FULL
+> +       int lock = !early_boot_irqs_disabled && !irqs_disabled_flags(flags) &&
+> +               (preempt_count() <= 1);
+> +#else
+> +       int lock = 1;
+> +#endif
+>
+> -       if (console_trylock()) {
+> +       if (lock && console_trylock()) {
+>                 retval = 1;
+>
+>                 /*
+> @@ -1688,8 +1696,15 @@ asmlinkage int vprintk_emit(int facility, int level,
+>          * The console_trylock_for_printk() function will release 'logbuf_lock'
+>          * regardless of whether it actually gets the console semaphore or not.
+>          */
+> -       if (console_trylock_for_printk(this_cpu))
+> +       if (console_trylock_for_printk(this_cpu, flags)) {
+> +#ifndef CONFIG_PREEMPT_RT_FULL
+>                 console_unlock();
+> +#else
+> +               raw_local_irq_restore(flags);
+> +               console_unlock();
+> +               raw_local_irq_save(flags);
+> +#endif
+> +       }
+>
+>         lockdep_on();
+>  out_restore_irqs:
+> @@ -2043,11 +2058,16 @@ static void console_cont_flush(char *text, size_t size)
+>                 goto out;
+>
+>         len = cont_print_text(text, size);
+> +#ifndef CONFIG_PREEMPT_RT_FULL
+>         raw_spin_unlock(&logbuf_lock);
+>         stop_critical_timings();
+>         call_console_drivers(cont.level, text, len);
+>         start_critical_timings();
+>         local_irq_restore(flags);
+> +#else
+> +       raw_spin_unlock_irqrestore(&logbuf_lock, flags);
+> +       call_console_drivers(cont.level, text, len);
+> +#endif
+>         return;
+>  out:
+>         raw_spin_unlock_irqrestore(&logbuf_lock, flags);
+> @@ -2141,13 +2161,17 @@ skip:
+>                 console_idx = log_next(console_idx);
+>                 console_seq++;
+>                 console_prev = msg->flags;
+> -               raw_spin_unlock(&logbuf_lock);
+>
+> +#ifndef CONFIG_PREEMPT_RT_FULL
+> +               raw_spin_unlock(&logbuf_lock);
+>                 stop_critical_timings();        /* don't trace print latency */
+>                 call_console_drivers(level, text, len);
+>                 start_critical_timings();
+>                 local_irq_restore(flags);
+> -
+> +#else
+> +               raw_spin_unlock_irqrestore(&logbuf_lock, flags);
+> +               call_console_drivers(level, text, len);
+> +#endif
+>                 if (do_cond_resched)
+>                         cond_resched();
+>         }
+> --
+> 2.13.2
