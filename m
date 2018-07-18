@@ -1,92 +1,90 @@
 From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Wed, 18 Jul 2018 16:24:40 +0530
-Subject: [PATCH v3 00/18] arm64: allwinner: Add A64 DE2 HDMI support
-Message-ID: <20180718105458.22304-1-jagan@amarulasolutions.com>
+Date: Wed, 18 Jul 2018 16:24:41 +0530
+Subject: [PATCH v3 01/18] clk: sunxi-ng: a64: Add minimal rate for video PLLs
+In-Reply-To: <20180718105458.22304-1-jagan@amarulasolutions.com>
+References: <20180718105458.22304-1-jagan@amarulasolutions.com>
+Message-ID: <20180718105458.22304-2-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner A64 has display engine pipeline like other Allwinner SOC's A83T/H3/H5.
+According to documentation and experience with other similar SoCs, video
+PLLs don't work stable if their output frequency is set below 192 MHz.
 
-A64 behaviour similar to Allwinner A83T where
-Mixer0 => TCON0 => LVDS/RGB/MIPI-DSI
-Mixer1 => TCON1 => HDMI
-as per Display System Block Diagram from Allwinner_A64_User_Manual_V1.1.pdf
+Because of that, set minimal rate to both A64 video PLLs to 192 MHz.
 
-This is third patch-set followed with previous RFC[1], first and second
-series[2][3] and merely concentrated on HDMI pipeline through TCON1 and
-rest will add eventually.
+Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+---
+Changes for v3:
+- none 
+Changes for v2:
+- New patch
 
-This series fixed previous version comments
-- Rebasing on linux-next
-- sqash all pipeline components in one patch
-- Enable all pipeline components in board dts
-- about documenting fallback compatibles
-- adding new compatible for mixer1
+ drivers/clk/sunxi-ng/ccu-sun50i-a64.c | 46 ++++++++++++++-------------
+ 1 file changed, 24 insertions(+), 22 deletions(-)
 
-Log:
-[    1.450984] Jagan: sun8i_mixer_probe
-[    1.464981] sun4i-drm display-engine: bound 1200000.mixer (ops sun8i_mixer_ops)
-[    1.472572] sun4i-drm display-engine: bound 1c0d000.lcd-controller (ops sun4i_tcon_ops)
-[    1.480676] sun8i-dw-hdmi 1ee0000.hdmi: Linked as a consumer to regulator.10
-[    1.488738] sun8i-dw-hdmi 1ee0000.hdmi: Detected HDMI TX controller v1.32a with HDCP (sun8i_dw_hdmi_phy)
-[    1.498879] sun8i-dw-hdmi 1ee0000.hdmi: registered DesignWare HDMI I2C bus driver
-[    1.507372] sun4i-drm display-engine: bound 1ee0000.hdmi (ops sun8i_dw_hdmi_ops)
-[    1.514778] [drm] Supports vblank timestamp caching Rev 2 (21.10.2013).
-[    1.521398] [drm] No driver support for vblank timestamp query.
-[    1.684611] random: fast init done
-[    2.011575] Console: switching to colour frame buffer device 180x56
-[    2.049858] sun4i-drm display-engine: fb0: DRM emulated frame buffer device
-[    2.057268] [drm] Initialized sun4i-drm 1.0.0 20150629 for display-engine on minor 0
-
-Note:
-Pine64 boards are unable to get edid by default like other A64 boards,
-but forcing 'video=HDMI-A-1:1920x1080 at 60D' kernel command line can
-create edid with display on penel
-
-[3] https://lkml.org/lkml/2018/5/18/461
-[2] https://lkml.org/lkml/2018/4/30/288
-[1] https://lkml.org/lkml/2018/4/24/547
-
-Icenowy Zheng (1):
-  drm: sun4i: add support for HVCC regulator for DWC HDMI glue
-
-Jagan Teki (17):
-  clk: sunxi-ng: a64: Add minimal rate for video PLLs
-  drm/sun4i: Add support for A64 mixer1
-  dt-bindings: display: Add compatible for A64 DE2 tcon1 blocks
-  drm/sun4i: Add support for A64 display engine
-  dt-bindings: display: Add compatible for A64 HDMI
-  dt-bindings: clock: sun50i-a64-ccu: Add PLL_VIDEO[0-1] macros
-  arm64: dts: allwinner: a64: Add tcon1 HDMI pipeline
-  clk: sunxi-ng: Enable DE2_CCU for SUN8I and SUN50I
-  arm64: defconfig: Enable CONFIG_DRM_SUN4I
-  drm/sun4i: Enable DE2 Mixer for SUN8I and SUN50I
-  drm/sun4i: Enable DesignWare HDMI for SUN50I
-  arm64: dts: allwinner: a64: bananapi-m64: Enable HDMI output
-  arm64: dts: allwinner: a64: nanopi-a64: Enable HDMI output
-  arm64: dts: allwinner: a64: orangepi-win: Enable HDMI output
-  arm64: dts: allwinner: a64: a64-olinuxino: Enable HDMI output
-  arm64: dts: allwinner: a64: pine64: Enable HDMI output
-  arm64: dts: allwinner: a64: sopine: Enable HDMI output
-
- .../bindings/display/sunxi/sun4i-drm.txt      |   4 +
- .../dts/allwinner/sun50i-a64-bananapi-m64.dts |  34 ++++++
- .../dts/allwinner/sun50i-a64-nanopi-a64.dts   |  34 ++++++
- .../dts/allwinner/sun50i-a64-olinuxino.dts    |  34 ++++++
- .../dts/allwinner/sun50i-a64-orangepi-win.dts |  34 ++++++
- .../boot/dts/allwinner/sun50i-a64-pine64.dts  |  34 ++++++
- .../allwinner/sun50i-a64-sopine-baseboard.dts |  34 ++++++
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 110 ++++++++++++++++++
- arch/arm64/configs/defconfig                  |   1 +
- drivers/clk/sunxi-ng/Kconfig                  |   2 +
- drivers/clk/sunxi-ng/ccu-sun50i-a64.c         |  46 ++++----
- drivers/gpu/drm/sun4i/Kconfig                 |   3 +-
- drivers/gpu/drm/sun4i/sun4i_drv.c             |   1 +
- drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c         |  14 +++
- drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h         |   2 +
- drivers/gpu/drm/sun4i/sun8i_mixer.c           |  12 ++
- include/dt-bindings/clock/sun50i-a64-ccu.h    |   2 +
- 17 files changed, 378 insertions(+), 23 deletions(-)
-
+diff --git a/drivers/clk/sunxi-ng/ccu-sun50i-a64.c b/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
+index ee9c12cf3f08..d0e30192f0cf 100644
+--- a/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
++++ b/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
+@@ -64,17 +64,18 @@ static SUNXI_CCU_NM_WITH_GATE_LOCK(pll_audio_base_clk, "pll-audio-base",
+ 				   BIT(28),	/* lock */
+ 				   CLK_SET_RATE_UNGATE);
+ 
+-static SUNXI_CCU_NM_WITH_FRAC_GATE_LOCK(pll_video0_clk, "pll-video0",
+-					"osc24M", 0x010,
+-					8, 7,		/* N */
+-					0, 4,		/* M */
+-					BIT(24),	/* frac enable */
+-					BIT(25),	/* frac select */
+-					270000000,	/* frac rate 0 */
+-					297000000,	/* frac rate 1 */
+-					BIT(31),	/* gate */
+-					BIT(28),	/* lock */
+-					CLK_SET_RATE_UNGATE);
++static SUNXI_CCU_NM_WITH_FRAC_GATE_LOCK_MIN(pll_video0_clk, "pll-video0",
++					    "osc24M", 0x010,
++					    192000000,	/* Minimum rate */
++					    8, 7,		/* N */
++					    0, 4,		/* M */
++					    BIT(24),	/* frac enable */
++					    BIT(25),	/* frac select */
++					    270000000,	/* frac rate 0 */
++					    297000000,	/* frac rate 1 */
++					    BIT(31),	/* gate */
++					    BIT(28),	/* lock */
++					    CLK_SET_RATE_UNGATE);
+ 
+ static SUNXI_CCU_NM_WITH_FRAC_GATE_LOCK(pll_ve_clk, "pll-ve",
+ 					"osc24M", 0x018,
+@@ -125,17 +126,18 @@ static struct ccu_nk pll_periph1_clk = {
+ 	},
+ };
+ 
+-static SUNXI_CCU_NM_WITH_FRAC_GATE_LOCK(pll_video1_clk, "pll-video1",
+-					"osc24M", 0x030,
+-					8, 7,		/* N */
+-					0, 4,		/* M */
+-					BIT(24),	/* frac enable */
+-					BIT(25),	/* frac select */
+-					270000000,	/* frac rate 0 */
+-					297000000,	/* frac rate 1 */
+-					BIT(31),	/* gate */
+-					BIT(28),	/* lock */
+-					CLK_SET_RATE_UNGATE);
++static SUNXI_CCU_NM_WITH_FRAC_GATE_LOCK_MIN(pll_video1_clk, "pll-video1",
++					    "osc24M", 0x030,
++					    192000000,	/* Minimum rate */
++					    8, 7,		/* N */
++					    0, 4,		/* M */
++					    BIT(24),	/* frac enable */
++					    BIT(25),	/* frac select */
++					    270000000,	/* frac rate 0 */
++					    297000000,	/* frac rate 1 */
++					    BIT(31),	/* gate */
++					    BIT(28),	/* lock */
++					    CLK_SET_RATE_UNGATE);
+ 
+ static SUNXI_CCU_NM_WITH_FRAC_GATE_LOCK(pll_gpu_clk, "pll-gpu",
+ 					"osc24M", 0x038,
 -- 
 2.17.1
