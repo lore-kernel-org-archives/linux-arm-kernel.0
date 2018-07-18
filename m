@@ -1,121 +1,83 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 18 Jul 2018 10:18:50 +0100
-Subject: [PATCH v4 07/20] kvm: arm64: Clean up VTCR_EL2 initialisation
+Date: Wed, 18 Jul 2018 10:18:48 +0100
+Subject: [PATCH v4 05/20] kvm: arm64: Add helper for loading the stage2
+ setting for a VM
 In-Reply-To: <1531905547-25478-1-git-send-email-suzuki.poulose@arm.com>
 References: <1531905547-25478-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1531905547-25478-8-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1531905547-25478-6-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the new helper for converting the parange to the physical shift.
-Also, add the missing definitions for the VTCR_EL2 register fields
-and use them instead of hard coding numbers.
+We load the stage2 context of a guest for different operations,
+including running the guest and tlb maintenance on behalf of the
+guest. As of now only the vttbr is private to the guest, but this
+is about to change with IPA per VM. Add a helper to load the stage2
+configuration for a VM, which could do the right thing with the
+future changes.
 
-Cc: Marc Zyngier <marc.zyngier@arm.com>
 Cc: Christoffer Dall <cdall@kernel.org>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
 Reviewed-by: Eric Auger <eric.auger@redhat.com>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
-Changs sinec v3
- - Update comment about reserved bits
- - Added Reviewed-by from Eric
+Changes since v2:
+ - New patch
 ---
- arch/arm64/include/asm/kvm_arm.h |  3 +++
- arch/arm64/kvm/hyp/s2-setup.c    | 34 ++++++++--------------------------
- 2 files changed, 11 insertions(+), 26 deletions(-)
+ arch/arm64/include/asm/kvm_hyp.h | 6 ++++++
+ arch/arm64/kvm/hyp/switch.c      | 2 +-
+ arch/arm64/kvm/hyp/tlb.c         | 4 ++--
+ 3 files changed, 9 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-index 6dd285e..3dffd38 100644
---- a/arch/arm64/include/asm/kvm_arm.h
-+++ b/arch/arm64/include/asm/kvm_arm.h
-@@ -106,6 +106,7 @@
- #define VTCR_EL2_RES1		(1 << 31)
- #define VTCR_EL2_HD		(1 << 22)
- #define VTCR_EL2_HA		(1 << 21)
-+#define VTCR_EL2_PS_SHIFT	TCR_EL2_PS_SHIFT
- #define VTCR_EL2_PS_MASK	TCR_EL2_PS_MASK
- #define VTCR_EL2_TG0_MASK	TCR_TG0_MASK
- #define VTCR_EL2_TG0_4K		TCR_TG0_4K
-@@ -126,6 +127,8 @@
- #define VTCR_EL2_VS_8BIT	(0 << VTCR_EL2_VS_SHIFT)
- #define VTCR_EL2_VS_16BIT	(1 << VTCR_EL2_VS_SHIFT)
+diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
+index 384c343..82f9994 100644
+--- a/arch/arm64/include/asm/kvm_hyp.h
++++ b/arch/arm64/include/asm/kvm_hyp.h
+@@ -155,5 +155,11 @@ void deactivate_traps_vhe_put(void);
+ u64 __guest_enter(struct kvm_vcpu *vcpu, struct kvm_cpu_context *host_ctxt);
+ void __noreturn __hyp_do_panic(unsigned long, ...);
  
-+#define VTCR_EL2_T0SZ(x)	TCR_T0SZ(x)
++/* Must be called from hyp code running at EL2 */
++static __always_inline void __hyp_text __load_guest_stage2(struct kvm *kvm)
++{
++	write_sysreg(kvm->arch.vttbr, vttbr_el2);
++}
 +
- /*
-  * We configure the Stage-2 page tables to always restrict the IPA space to be
-  * 40 bits wide (T0SZ = 24).  Systems with a PARange smaller than 40 bits are
-diff --git a/arch/arm64/kvm/hyp/s2-setup.c b/arch/arm64/kvm/hyp/s2-setup.c
-index 603e1ee..e1ca672 100644
---- a/arch/arm64/kvm/hyp/s2-setup.c
-+++ b/arch/arm64/kvm/hyp/s2-setup.c
-@@ -19,45 +19,27 @@
- #include <asm/kvm_arm.h>
- #include <asm/kvm_asm.h>
- #include <asm/kvm_hyp.h>
-+#include <asm/cpufeature.h>
+ #endif /* __ARM64_KVM_HYP_H__ */
  
- u32 __hyp_text __init_stage2_translation(void)
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index d496ef5..355fb25 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -195,7 +195,7 @@ void deactivate_traps_vhe_put(void)
+ 
+ static void __hyp_text __activate_vm(struct kvm *kvm)
  {
- 	u64 val = VTCR_EL2_FLAGS;
- 	u64 parange;
-+	u32 phys_shift;
- 	u64 tmp;
- 
- 	/*
- 	 * Read the PARange bits from ID_AA64MMFR0_EL1 and set the PS
--	 * bits in VTCR_EL2. Amusingly, the PARange is 4 bits, while
--	 * PS is only 3. Fortunately, bit 19 is RES0 in VTCR_EL2...
-+	 * bits in VTCR_EL2. Amusingly, the PARange is 4 bits, but the
-+	 * allocated values are limited to 3bits.
- 	 */
- 	parange = read_sysreg(id_aa64mmfr0_el1) & 7;
- 	if (parange > ID_AA64MMFR0_PARANGE_MAX)
- 		parange = ID_AA64MMFR0_PARANGE_MAX;
--	val |= parange << 16;
-+	val |= parange << VTCR_EL2_PS_SHIFT;
- 
- 	/* Compute the actual PARange... */
--	switch (parange) {
--	case 0:
--		parange = 32;
--		break;
--	case 1:
--		parange = 36;
--		break;
--	case 2:
--		parange = 40;
--		break;
--	case 3:
--		parange = 42;
--		break;
--	case 4:
--		parange = 44;
--		break;
--	case 5:
--	default:
--		parange = 48;
--		break;
--	}
-+	phys_shift = id_aa64mmfr0_parange_to_phys_shift(parange);
- 
- 	/*
- 	 * ... and clamp it to 40 bits, unless we have some braindead
-@@ -65,7 +47,7 @@ u32 __hyp_text __init_stage2_translation(void)
- 	 * return that value for the rest of the kernel to decide what
- 	 * to do.
- 	 */
--	val |= 64 - (parange > 40 ? 40 : parange);
-+	val |= VTCR_EL2_T0SZ(phys_shift > 40 ? 40 : phys_shift);
- 
- 	/*
- 	 * Check the availability of Hardware Access Flag / Dirty Bit
-@@ -86,5 +68,5 @@ u32 __hyp_text __init_stage2_translation(void)
- 
- 	write_sysreg(val, vtcr_el2);
- 
--	return parange;
-+	return phys_shift;
+-	write_sysreg(kvm->arch.vttbr, vttbr_el2);
++	__load_guest_stage2(kvm);
  }
+ 
+ static void __hyp_text __deactivate_vm(struct kvm_vcpu *vcpu)
+diff --git a/arch/arm64/kvm/hyp/tlb.c b/arch/arm64/kvm/hyp/tlb.c
+index 131c777..4dbd9c6 100644
+--- a/arch/arm64/kvm/hyp/tlb.c
++++ b/arch/arm64/kvm/hyp/tlb.c
+@@ -30,7 +30,7 @@ static void __hyp_text __tlb_switch_to_guest_vhe(struct kvm *kvm)
+ 	 * bits. Changing E2H is impossible (goodbye TTBR1_EL2), so
+ 	 * let's flip TGE before executing the TLB operation.
+ 	 */
+-	write_sysreg(kvm->arch.vttbr, vttbr_el2);
++	__load_guest_stage2(kvm);
+ 	val = read_sysreg(hcr_el2);
+ 	val &= ~HCR_TGE;
+ 	write_sysreg(val, hcr_el2);
+@@ -39,7 +39,7 @@ static void __hyp_text __tlb_switch_to_guest_vhe(struct kvm *kvm)
+ 
+ static void __hyp_text __tlb_switch_to_guest_nvhe(struct kvm *kvm)
+ {
+-	write_sysreg(kvm->arch.vttbr, vttbr_el2);
++	__load_guest_stage2(kvm);
+ 	isb();
+ }
+ 
 -- 
 2.7.4
