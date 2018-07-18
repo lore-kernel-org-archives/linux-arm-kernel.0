@@ -1,144 +1,124 @@
-From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Wed, 18 Jul 2018 22:13:04 +0530
-Subject: [PATCH v2 2/2] arm64: dts: Add Mediatek X20 Development Board
- support
-In-Reply-To: <a48b0735-ff75-6228-22ba-c8e868240f0c@gmail.com>
-References: <20180605163442.4812-1-manivannan.sadhasivam@linaro.org>
- <20180605163442.4812-3-manivannan.sadhasivam@linaro.org>
- <d88504b4-409c-c42b-f816-bedefce2a819@gmail.com>
- <20180717140453.GA19076@mani>
- <a48b0735-ff75-6228-22ba-c8e868240f0c@gmail.com>
-Message-ID: <20180718164304.GA4902@Mani-XPS-13-9360>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 18 Jul 2018 17:49:30 +0100
+Subject: [PATCH] drivers/firmware: psci_checker: stash and use
+ topology_core_cpumask for hotplug tests
+In-Reply-To: <1531913132-21022-1-git-send-email-sudeep.holla@arm.com>
+References: <1531913132-21022-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <20180718164930.GB21924@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matthias,
+On Wed, Jul 18, 2018 at 12:25:32PM +0100, Sudeep Holla wrote:
+> Commit 7f9545aa1a91 ("arm64: smp: remove cpu and numa topology
+> information when hotplugging out CPU") updates the cpu topology when
+> the CPU is hotplugged out. However the PSCI checker code uses the
+> topology_core_cpumask pointers for some of the cpu hotplug testing.
+> Since the pointer to the core_cpumask of the first CPU in the group
+> is used, which when that CPU itself is hotpugged out is just set to
+> itself, the testing terminates after that particular CPU is tested out.
+> But the intention of this tests is to cover all the CPU in the group.
+> 
+> In order to support that, we need to stash the topology_core_cpumask
+> before the start of the test and use that value instead of pointer to
+> a cpumask which will be updated on CPU hotplug.
+> 
+> Fixes: 7f9545aa1a91a9a4 ("arm64: smp: remove cpu and numa topology
+> 	information when hotplugging out CPU")
+> Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
+> Tested-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> ---
+>  drivers/firmware/psci_checker.c | 30 ++++++++++++++++++++----------
+>  1 file changed, 20 insertions(+), 10 deletions(-)
+> 
+> diff --git a/drivers/firmware/psci_checker.c b/drivers/firmware/psci_checker.c
+> index bb1c068bff19..e330c6cb45f5 100644
+> --- a/drivers/firmware/psci_checker.c
+> +++ b/drivers/firmware/psci_checker.c
+> @@ -77,21 +77,23 @@ static int psci_ops_check(void)
+>  	return 0;
+>  }
+>  
+> -static int find_cpu_groups(const struct cpumask *cpus,
+> -			   const struct cpumask **cpu_groups)
+> +static int find_cpu_groups(cpumask_var_t *cpu_groups)
+>  {
+>  	unsigned int nb = 0;
+>  	cpumask_var_t tmp;
+>  
+>  	if (!alloc_cpumask_var(&tmp, GFP_KERNEL))
+>  		return -ENOMEM;
+> -	cpumask_copy(tmp, cpus);
+> +	cpumask_copy(tmp, cpu_online_mask);
+>  
+>  	while (!cpumask_empty(tmp)) {
+>  		const struct cpumask *cpu_group =
+>  			topology_core_cpumask(cpumask_any(tmp));
+>  
+> -		cpu_groups[nb++] = cpu_group;
+> +		if (cpu_groups && cpu_groups[nb])
+> +			cpumask_copy(cpu_groups[nb], cpu_group);
+> +
+> +		nb++;
+>  		cpumask_andnot(tmp, tmp, cpu_group);
+>  	}
+>  
+> @@ -169,25 +171,31 @@ static unsigned int down_and_up_cpus(const struct cpumask *cpus,
+>  static int hotplug_tests(void)
+>  {
+>  	int err;
+> -	cpumask_var_t offlined_cpus;
+> +	cpumask_var_t offlined_cpus, *cpu_groups;
+>  	int i, nb_cpu_group;
+> -	const struct cpumask **cpu_groups;
+>  	char *page_buf;
+>  
+> +	/* first run to just get the number of cpu groups */
+> +	nb_cpu_group = find_cpu_groups(NULL);
+> +
+>  	err = -ENOMEM;
+>  	if (!alloc_cpumask_var(&offlined_cpus, GFP_KERNEL))
+>  		return err;
+> -	/* We may have up to nb_available_cpus cpu_groups. */
+> -	cpu_groups = kmalloc_array(nb_available_cpus, sizeof(*cpu_groups),
+> -				   GFP_KERNEL);
+> +	cpu_groups = kcalloc(nb_cpu_group, sizeof(cpu_groups), GFP_KERNEL);
+>  	if (!cpu_groups)
+>  		goto out_free_cpus;
+> +
+> +	for (i = 0; i < nb_cpu_group; ++i)
+> +		if (!alloc_cpumask_var(&cpu_groups[i], GFP_KERNEL))
+> +			goto out_free_cpu_groups;
+> +
+>  	page_buf = (char *)__get_free_page(GFP_KERNEL);
+>  	if (!page_buf)
+>  		goto out_free_cpu_groups;
+>  
+>  	err = 0;
+> -	nb_cpu_group = find_cpu_groups(cpu_online_mask, cpu_groups);
+> +	/* second run to populate/copy the cpumask */
+> +	nb_cpu_group = find_cpu_groups(cpu_groups);
+>  
+>  	/*
+>  	 * Of course the last CPU cannot be powered down and cpu_down() should
+> @@ -212,6 +220,8 @@ static int hotplug_tests(void)
+>  
+>  	free_page((unsigned long)page_buf);
+>  out_free_cpu_groups:
+> +	for (i = 0; i < nb_cpu_group; ++i)
+> +		free_cpumask_var(cpu_groups[i]);
+>  	kfree(cpu_groups);
+>  out_free_cpus:
+>  	free_cpumask_var(offlined_cpus);
 
-On Wed, Jul 18, 2018 at 05:07:38PM +0200, Matthias Brugger wrote:
-> 
-> 
-> On 17/07/18 16:04, Manivannan Sadhasivam wrote:
-> > Hi Matthias,
-> > 
-> > On Mon, Jul 16, 2018 at 03:24:44PM +0200, Matthias Brugger wrote:
-> >> Hi Manivanna,
-> >>
-> >> On 05/06/18 18:34, Manivannan Sadhasivam wrote:
-> >>> Add initial device tree support for Mediatek X20 Development Board
-> >>> based on MT6797 Deca core SoC. This board is one of the 96Boards
-> >>> Consumer Edition platform.
-> >>>
-> >>> Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-> >>> ---
-> >>>  arch/arm64/boot/dts/mediatek/Makefile         |  1 +
-> >>>  .../boot/dts/mediatek/mt6797-x20-dev.dts      | 33 +++++++++++++++++++
-> >>>  2 files changed, 34 insertions(+)
-> >>>  create mode 100644 arch/arm64/boot/dts/mediatek/mt6797-x20-dev.dts
-> >>>
-> >>> diff --git a/arch/arm64/boot/dts/mediatek/Makefile b/arch/arm64/boot/dts/mediatek/Makefile
-> >>> index ac17f60f998c..5b7fd6ad96e4 100644
-> >>> --- a/arch/arm64/boot/dts/mediatek/Makefile
-> >>> +++ b/arch/arm64/boot/dts/mediatek/Makefile
-> >>> @@ -3,5 +3,6 @@ dtb-$(CONFIG_ARCH_MEDIATEK) += mt2712-evb.dtb
-> >>>  dtb-$(CONFIG_ARCH_MEDIATEK) += mt6755-evb.dtb
-> >>>  dtb-$(CONFIG_ARCH_MEDIATEK) += mt6795-evb.dtb
-> >>>  dtb-$(CONFIG_ARCH_MEDIATEK) += mt6797-evb.dtb
-> >>> +dtb-$(CONFIG_ARCH_MEDIATEK) += mt6797-x20-dev.dtb
-> >>>  dtb-$(CONFIG_ARCH_MEDIATEK) += mt7622-rfb1.dtb
-> >>>  dtb-$(CONFIG_ARCH_MEDIATEK) += mt8173-evb.dtb
-> >>> diff --git a/arch/arm64/boot/dts/mediatek/mt6797-x20-dev.dts b/arch/arm64/boot/dts/mediatek/mt6797-x20-dev.dts
-> >>> new file mode 100644
-> >>> index 000000000000..2c09ca95d9e2
-> >>> --- /dev/null
-> >>> +++ b/arch/arm64/boot/dts/mediatek/mt6797-x20-dev.dts
-> >>> @@ -0,0 +1,33 @@
-> >>> +// SPDX-License-Identifier: GPL-2.0
-> >>> +/*
-> >>> + * Device Tree Source for MediaTek X20 Development Board
-> >>> + *
-> >>> + * Copyright (C) 2018, Linaro Ltd.
-> >>> + *
-> >>> + */
-> >>> +
-> >>> +/dts-v1/;
-> >>> +
-> >>> +#include "mt6797.dtsi"
-> >>> +
-> >>> +/ {
-> >>> +	model = "Mediatek X20 Development Board";
-> >>> +	compatible = "archermind,mt6797-x20-dev", "mediatek,mt6797";
-> >>> +
-> >>> +	aliases {
-> >>> +		serial0 = &uart1;
-> >>> +	};
-> >>
-> >> Sorry for the late answer.
-> >> Why did you use uart1 instead of uart0?
-> >> I know that uart0 is used by the bootloader, but because of their exotic flash
-> >> procedure I find it quite useful to see this messages in my serial connection.
-> >> Of course you can only use 921600 baudrate then.
-> >>
-> > 
-> > The reason is, most of the Mezzanine boards use USB to UART bridge on the
-> > UART1 port available on the Low Speed Expansion header. Additionally, the
-> > convention followed by most of the Consumer Edition 96Boards is to use UART1
-> > as the debug serial port. That's why eventhough the bootloader is using UART0,
-> > I forced the kernel to use UART1.
-> > 
-> 
-> Sounds reasonable, I don't have this 96 boards adapter and I forgot about it.
-> 
+Hi Sudeep,
 
-That's fine :)
-
-> >>> +
-> >>> +	memory at 40000000 {
-> >>> +		device_type = "memory";
-> >>> +		reg = <0 0x40000000 0 0x1e605000>;
-> >>
-> >> How comes this strange number for the memory size?
-> >>
-> > 
-> > Actually, the memory size is extracted from the downstream kernel [1].
-> > 
-> 
-> Hm, Archermind "Helio X20 Development Board Hardware Manual" talks about 2GB
-> LPDDR3-SDRAM. Would you mind to check if that is actually true?
-> 
-
-Yes, it is 2GB. Shall I change the size to 0x80000000?
+thanks for the patch. I reckon that adding two functions, say,
+alloc_cpu_groups() and free_cpu_groups() would make the code
+more readable instead of relying on find_cpu_groups() to first
+count then copy; it is for readability rather than correctness.
 
 Thanks,
-Mani
-
-> >> BTW do you know the differences between the EVB board and the x20 one?
-> >> I used the evb dts for booting up to now.
-> >>
-> > 
-> > Sorry, I don't know the difference between both boards!
-> 
-> Sure, no problem :)
-> 
-> Regards,
-> Matthias
-> 
-> > 
-> > Thanks,
-> > Mani
-> > 
-> > [1] https://github.com/helio-x20/linux/blob/helio-x20/arch/arm64/boot/dts/amt6797_64_open.dts#L8
-> > 
-> >> Best regards,
-> >> Matthias
-> >>
-> >>> +	};
-> >>> +
-> >>> +	chosen {
-> >>> +		stdout-path = "serial0:115200n8";
-> >>> +	};
-> >>> +};
-> >>> +
-> >>> +&uart1 {
-> >>> +	status = "okay";
-> >>> +};
-> >>>
+Lorenzo
