@@ -1,59 +1,70 @@
-From: cheat.sc.linux@outlook.com (Maruyama Shohei)
-Date: Wed, 18 Jul 2018 14:58:21 +0000
-Subject: [PATCH 2/3] arm64: dts: rockchip: add power button support for
- Firefly-RK3399
-In-Reply-To: <20180718145727.30217-1-cheat.sc.linux@outlook.com>
-References: <20180718145727.30217-1-cheat.sc.linux@outlook.com>
-Message-ID: <PS2P216MB0532C24EED873485C60D8367D1530@PS2P216MB0532.KORP216.PROD.OUTLOOK.COM>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Wed, 18 Jul 2018 16:58:32 +0200
+Subject: [resend PATCH v4 2/5] clk: mediatek: mt2701-mmsys: switch to
+ platform device probing (fwd)
+In-Reply-To: <alpine.DEB.2.20.1807181654200.3113@hadrien>
+References: <alpine.DEB.2.20.1807181654200.3113@hadrien>
+Message-ID: <11ba8df2-21f3-71e5-8467-813eda93f8ec@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shohei Maruyama <cheat.sc.linux@outlook.com>
 
-This commit adds power button support for the Firefly-RK3399.
 
-Signed-off-by: Shohei Maruyama <cheat.sc.linux@outlook.com>
----
- .../boot/dts/rockchip/rk3399-firefly.dts      | 20 +++++++++++++++++++
- 1 file changed, 20 insertions(+)
+On 18/07/18 16:54, Julia Lawall wrote:
+> Please check on whether the kfree is still needed.
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-firefly.dts b/arch/arm64/boot/dts/rockchip/rk3399-firefly.dts
-index 8ac29824923c..2fe443511d21 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399-firefly.dts
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-firefly.dts
-@@ -42,6 +42,7 @@
- 
- /dts-v1/;
- #include <dt-bindings/pwm/pwm.h>
-+#include <dt-bindings/input/linux-event-codes.h>
- #include "rk3399.dtsi"
- #include "rk3399-opp.dtsi"
- 
-@@ -132,6 +133,25 @@
- 		};
- 	};
- 
-+	gpio-keys {
-+		compatible = "gpio-keys";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		autorepeat;
-+
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pwrbtn>;
-+
-+		button at 0 {
-+			gpios = <&gpio0 RK_PA5 GPIO_ACTIVE_LOW>;
-+			linux,code = <KEY_POWER>;
-+			label = "GPIO Key Power";
-+			linux,input-type = <1>;
-+			gpio-key,wakeup = <1>;
-+			debounce-interval = <100>;
-+		};
-+	};
-+
- 	sdio_pwrseq: sdio-pwrseq {
- 		compatible = "mmc-pwrseq-simple";
- 		clocks = <&rk808 1>;
--- 
-2.18.0
+No it is not needed, thanks for noting.
+Matthias
+
+> 
+> julia
+> 
+> ---------- Forwarded message ----------
+> Date: Wed, 18 Jul 2018 22:03:48 +0800
+> From: kbuild test robot <lkp@intel.com>
+> To: kbuild at 01.org
+> Cc: Julia Lawall <julia.lawall@lip6.fr>
+> Subject: Re: [resend PATCH v4 2/5] clk: mediatek: mt2701-mmsys: switch to
+>     platform device probing
+> 
+> In-Reply-To: <20180717220328.792-3-matthias.bgg@kernel.org>
+> References: <20180717220328.792-3-matthias.bgg@kernel.org>
+> TO: matthias.bgg at kernel.org
+> 
+> Hi Matthias,
+> 
+> I love your patch! Perhaps something to improve:
+> 
+> [auto build test WARNING on sof-driver-fuweitax/master]
+> [also build test WARNING on v4.18-rc5 next-20180718]
+> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+> 
+> url:    https://github.com/0day-ci/linux/commits/matthias-bgg-kernel-org/arm-arm64-mediatek-Fix-mmsys-device-probing/20180718-191916
+> base:   https://github.com/fuweitax/linux master
+> :::::: branch date: 3 hours ago
+> :::::: commit date: 3 hours ago
+> 
+>>> drivers/clk/mediatek/clk-mt2701-mm.c:128:1-6: WARNING: invalid free of devm_ allocated data
+> 
+> # https://github.com/0day-ci/linux/commit/555e11caac5f7729e8927939046adbfa2264f9f5
+> git remote add linux-review https://github.com/0day-ci/linux
+> git remote update linux-review
+> git checkout 555e11caac5f7729e8927939046adbfa2264f9f5
+> vim +128 drivers/clk/mediatek/clk-mt2701-mm.c
+> 
+> e98621182 Shunli Wang      2016-11-04  122
+> 555e11caa Matthias Brugger 2018-07-18  123  static int clk_mt2701_mm_remove(struct platform_device *pdev)
+> 555e11caa Matthias Brugger 2018-07-18  124  {
+> 555e11caa Matthias Brugger 2018-07-18  125  	struct clk_mt2701_mm_priv *private = platform_get_drvdata(pdev);
+> 555e11caa Matthias Brugger 2018-07-18  126
+> 555e11caa Matthias Brugger 2018-07-18  127  	kfree(private->clk_data);
+> 555e11caa Matthias Brugger 2018-07-18 @128  	kfree(private);
+> 555e11caa Matthias Brugger 2018-07-18  129
+> 555e11caa Matthias Brugger 2018-07-18  130  	return 0;
+> 555e11caa Matthias Brugger 2018-07-18  131  }
+> 555e11caa Matthias Brugger 2018-07-18  132
+> 
+> ---
+> 0-DAY kernel test infrastructure                Open Source Technology Center
+> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+> 
