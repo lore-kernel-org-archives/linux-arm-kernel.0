@@ -1,69 +1,51 @@
-From: ebiggers3@gmail.com (Eric Biggers)
-Date: Tue, 17 Jul 2018 17:12:58 -0700
-Subject: [PATCH 0/6] lib/crc32: treewide: Use existing define with
- polynomial
-In-Reply-To: <20180717160541.3843-1-krzk@kernel.org>
-References: <20180717160541.3843-1-krzk@kernel.org>
-Message-ID: <20180718001258.GA210746@gmail.com>
+From: mka@chromium.org (Matthias Kaehlcke)
+Date: Tue, 17 Jul 2018 17:15:54 -0700
+Subject: [PATCH v7 7/7] arm64: dts: sdm845: Add tsens nodes
+In-Reply-To: <0dfdbfa82edced85ea5be02e1d74d73d232c7a08.1531384019.git.amit.kucheria@linaro.org>
+References: <cover.1531384019.git.amit.kucheria@linaro.org>
+ <0dfdbfa82edced85ea5be02e1d74d73d232c7a08.1531384019.git.amit.kucheria@linaro.org>
+Message-ID: <20180718001554.GH129942@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+On Thu, Jul 12, 2018 at 02:09:08PM +0530, Amit Kucheria wrote:
+> SDM845 has two tsens blocks, one with 13 sensors and the other with 8
+> sensors. It uses version 2 of the TSENS IP, so use the fallback property to
+> allow more common code.
+> 
+> Signed-off-by: Amit Kucheria <amit.kucheria@linaro.org>
+> Reviewed-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+> Tested-by: Matthias Kaehlcke <mka@chromium.org>
+> ---
+>  arch/arm64/boot/dts/qcom/sdm845.dtsi | 16 ++++++++++++++++
+>  1 file changed, 16 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+> index cdaabeb..01ff146 100644
+> --- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
+> +++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+> @@ -221,6 +221,22 @@
+>  			#interrupt-cells = <2>;
+>  		};
+>  
+> +		tsens0: thermal-sensor at c263000 {
+> +			compatible = "qcom,sdm845-tsens", "qcom,tsens-v2";
+> +			reg = <0xc263000 0x1ff>, /* TM */
+> +			      <0xc222000 0x1ff>; /* SROT */
+> +			#qcom,sensors = <13>;
+> +			#thermal-sensor-cells = <1>;
+> +		};
+> +
+> +		tsens1: thermal-sensor at c265000 {
+> +			compatible = "qcom,sdm845-tsens", "qcom,tsens-v2";
+> +			reg = <0xc265000 0x1ff>, /* TM */
+> +			      <0xc223000 0x1ff>; /* SROT */
+> +			#qcom,sensors = <8>;
+> +			#thermal-sensor-cells = <1>;
+> +		};
+> +
+>  		spmi_bus: spmi at c440000 {
+>  			compatible = "qcom,spmi-pmic-arb";
+>  			reg = <0xc440000 0x1100>,
 
-On Tue, Jul 17, 2018 at 06:05:35PM +0200, Krzysztof Kozlowski wrote:
-> Hi,
-> 
-> Kernel defines same polynomial for CRC-32 in few places.
-> This is unnecessary duplication of the same value. Also this might
-> be error-prone for future code - every driver will define the
-> polynomial again.
-> 
-> This is an attempt to unify definition of polynomial.  Few obvious
-> hard-coded locations are fixed with define.
-> 
-> All series depend on each 1/6 and 2/6.
-> 
-> This could be merged in two different merge windows (1st lib/crc and then
-> the rest) or taken through one tree.
-> 
-> It would be nice to get some testing. Only generic lib/crc, bunzip, xz_crc32
-> and Freescale's Ethernet driver were tested on HW.  Rest got just different
-> builds.
-> 
-> Best regards,
-> Krzysztof
-> 
-> Krzysztof Kozlowski (6):
->   lib/crc: Move polynomial definition to separate header
->   lib/crc: Use consistent naming for CRC-32 polynomials
->   crypto: stm32_crc32 - Use existing define with polynomial
->   net: ethernet: Use existing define with polynomial
->   staging: rtl: Use existing define with polynomial
->   lib: Use existing define with polynomial
-> 
->  drivers/crypto/stm32/stm32_crc32.c               | 11 ++++-------
->  drivers/net/ethernet/amd/xgbe/xgbe-dev.c         |  4 ++--
->  drivers/net/ethernet/apple/bmac.c                |  8 ++------
->  drivers/net/ethernet/broadcom/tg3.c              |  3 ++-
->  drivers/net/ethernet/freescale/fec_main.c        |  4 ++--
->  drivers/net/ethernet/freescale/fs_enet/fec.h     |  3 ---
->  drivers/net/ethernet/freescale/fs_enet/mac-fec.c |  3 ++-
->  drivers/net/ethernet/micrel/ks8851_mll.c         |  3 ++-
->  drivers/net/ethernet/synopsys/dwc-xlgmac-hw.c    |  4 ++--
->  drivers/staging/rtl8712/rtl871x_security.c       |  5 ++---
->  drivers/staging/rtl8723bs/core/rtw_security.c    |  5 ++---
->  include/linux/crc32poly.h                        | 20 ++++++++++++++++++++
->  lib/crc32.c                                      | 11 ++++++-----
->  lib/crc32defs.h                                  | 14 --------------
->  lib/decompress_bunzip2.c                         |  3 ++-
->  lib/gen_crc32table.c                             |  5 +++--
->  lib/xz/xz_crc32.c                                |  3 ++-
->  17 files changed, 55 insertions(+), 54 deletions(-)
->  create mode 100644 include/linux/crc32poly.h
-> 
-
-Did you check whether any of these users can be converted to use the CRC
-implementations in lib/, so they wouldn't need the polynomial definition
-themselves?
-
-- Eric
+Reviewed-by: Matthias Kaehlcke <mka@chromium.org>
