@@ -1,137 +1,76 @@
-From: bharat.bhushan@nxp.com (Bharat Bhushan)
-Date: Wed, 18 Jul 2018 10:45:56 +0000
-Subject: [PATCH v4 10/10] KVM: arm/arm64: vgic: Update documentation of
- the GIC devices wrt IIDR
-In-Reply-To: <20180717091355.GC30570@e113682-lin.lund.arm.com>
-References: <1531746387-7033-1-git-send-email-christoffer.dall@arm.com>
- <1531746387-7033-11-git-send-email-christoffer.dall@arm.com>
- <AM5PR0401MB25454B501D430C2EB6BF1C069A5D0@AM5PR0401MB2545.eurprd04.prod.outlook.com>
- <20180717091355.GC30570@e113682-lin.lund.arm.com>
-Message-ID: <AM5PR0401MB2545844E923E158215C3E6049A530@AM5PR0401MB2545.eurprd04.prod.outlook.com>
+From: linux.amoon@gmail.com (Anand Moon)
+Date: Wed, 18 Jul 2018 16:20:28 +0530
+Subject: [PATCH] ARM: dts: exynos5: add missing interrupts for pwm node
+In-Reply-To: <CAJKOXPez6cuLyrxBkAKtyx2xiqG7VLWFCBYXkBX_537A=bDpsg@mail.gmail.com>
+References: <1531906490-1739-1-git-send-email-linux.amoon@gmail.com>
+ <CAJKOXPdeRvt4YG9Doziq-_oQ9DeUffvTB53OOaq-q2UpkBGpgQ@mail.gmail.com>
+ <CANAwSgS8z-TQ=nK7dy5YeA8QJV+7cCctZKJT7qn8macQQkyKqg@mail.gmail.com>
+ <CAJKOXPez6cuLyrxBkAKtyx2xiqG7VLWFCBYXkBX_537A=bDpsg@mail.gmail.com>
+Message-ID: <CANAwSgSaU1kTW3j0OZGwmOWo=p2uHFP8toLUe9FHYEkCJsuLFg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Krzysztof,
 
-> -----Original Message-----
-> From: Christoffer Dall [mailto:christoffer.dall at arm.com]
-> Sent: Tuesday, July 17, 2018 2:44 PM
-> To: Bharat Bhushan <bharat.bhushan@nxp.com>
-> Cc: kvmarm at lists.cs.columbia.edu; linux-arm-kernel at lists.infradead.org;
-> kvm at vger.kernel.org; Marc Zyngier <marc.zyngier@arm.com>; Andre
-> Przywara <andre.przywara@arm.com>
-> Subject: Re: [PATCH v4 10/10] KVM: arm/arm64: vgic: Update documentation
-> of the GIC devices wrt IIDR
-> 
-> On Mon, Jul 16, 2018 at 03:59:42PM +0000, Bharat Bhushan wrote:
-> > Hi Christoffer,
-> >
-> > > -----Original Message-----
-> > > From: kvmarm-bounces at lists.cs.columbia.edu [mailto:kvmarm-
-> > > bounces at lists.cs.columbia.edu] On Behalf Of Christoffer Dall
-> > > Sent: Monday, July 16, 2018 6:36 PM
-> > > To: kvmarm at lists.cs.columbia.edu;
-> > > linux-arm-kernel at lists.infradead.org
-> > > Cc: kvm at vger.kernel.org; Marc Zyngier <marc.zyngier@arm.com>;
-> Andre
-> > > Przywara <andre.przywara@arm.com>
-> > > Subject: [PATCH v4 10/10] KVM: arm/arm64: vgic: Update documentation
-> > > of the GIC devices wrt IIDR
-> > >
-> > > Update the documentation to reflect the ordering requirements of
-> > > restoring the GICD_IIDR register before any other registers and the
-> > > effects this has on restoring the interrupt groups for an emulated
-> > > GICv2 insttance.
-> > >
-> > > Also remove some outdated limitations in the documentation while
-> > > we're at it.
-> > >
-> > > Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
-> > > ---
-> > >  Documentation/virtual/kvm/devices/arm-vgic-v3.txt |  8 ++++++++
-> > >  Documentation/virtual/kvm/devices/arm-vgic.txt    | 15 +++++++++------
-> > >  2 files changed, 17 insertions(+), 6 deletions(-)
-> > >
-> > > diff --git a/Documentation/virtual/kvm/devices/arm-vgic-v3.txt
-> > > b/Documentation/virtual/kvm/devices/arm-vgic-v3.txt
-> > > index 2408ab7..eba20ae 100644
-> > > --- a/Documentation/virtual/kvm/devices/arm-vgic-v3.txt
-> > > +++ b/Documentation/virtual/kvm/devices/arm-vgic-v3.txt
-> > > @@ -100,6 +100,14 @@ Groups:
-> > >      Note that distributor fields are not banked, but return the same value
-> > >      regardless of the mpidr used to access the register.
-> > >
-> > > +    GICD_IIDR.Revision is updated when the KVM implementation is
-> > > + changed
-> > > in a
-> > > +    way directly observable by the guest or userspace.  Userspace
-> > > + should
-> > > read
-> > > +    GICD_IIDR from KVM and write back the read value to confirm its
-> > > expected
-> > > +    behavior is aligned with the KVM implementation.  Userspace should
-> set
-> > > +    GICD_IIDR before setting any other registers.  to ensure the expected
-> > > +    behavior.
-> > > +
-> > > +
-> > >      The GICD_STATUSR and GICR_STATUSR registers are architecturally
-> > > defined such
-> > >      that a write of a clear bit has no effect, whereas a write with a set bit
-> > >      clears that value.  To allow userspace to freely set the values
-> > > of these two diff --git
-> > > a/Documentation/virtual/kvm/devices/arm-vgic.txt
-> > > b/Documentation/virtual/kvm/devices/arm-vgic.txt
-> > > index b3ce126..4ff7635 100644
-> > > --- a/Documentation/virtual/kvm/devices/arm-vgic.txt
-> > > +++ b/Documentation/virtual/kvm/devices/arm-vgic.txt
-> > > @@ -49,9 +49,15 @@ Groups:
-> > >      index is specified with the vcpu_index field.  Note that most distributor
-> > >      fields are not banked, but return the same value regardless of the
-> > >      vcpu_index used to access the register.
-> > > -  Limitations:
-> > > -    - Priorities are not implemented, and registers are RAZ/WI
-> > > -    - Currently only implemented for KVM_DEV_TYPE_ARM_VGIC_V2.
-> > > +
-> > > +    GICD_IIDR.Revision is updated when the KVM implementation of an
-> > > emulated
-> > > +    GICv2 is changed in a way directly observable by the guest or
-> userspace.
-> > > +    Userspace should read GICD_IIDR from KVM and write back the
-> > > + read
-> > > value to
-> > > +    confirm its expected behavior is aligned with the KVM
-> implementation.
-> > > +    Userspace should set GICD_IIDR before setting any other registers
-> (both
-> > > +    KVM_DEV_ARM_VGIC_GRP_DIST_REGS and
-> > > KVM_DEV_ARM_VGIC_GRP_CPU_REGS) to ensure
-> > > +    the expected behavior.  Unless GICD_IIDR has been set from
-> > > + userspace,
-> > > writes
-> > > +    to the interrupt group registers (GICD_IGROUPR) are ignored.
-> >
-> > Newer user-space will write to GICD_IIDR, that mean interrupt-groups are
-> supported otherwise not.
-> 
-> It only means that userspace can write interrupt groups, interrupt groups will
-> always be supported (and writable) from the guest's point of view with
-> newer kernels.
-> 
-> An updated userspace (which writes IIDR) must know to either raise an error
-> if it sees a migration stream from an older QEMU or translate the interrupt
-> groups from 1 to 0 before writing them.
-> 
-> > And when interrupt-groups are not supported then writes to
-> > GICD_IGROUPR are ignored (backward compatibility)
-> 
-> Legacy userspace which doesn't write IIDR will not have the above logic so to
-> preserve migration support between an old kernel and a new kernel, both
-> with legacy userspace, we ignore userspace writes to the IGROUPRs in the
-> KVM interface for userspace which hasn't written IIDR.
+On 18 July 2018 at 16:03, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+> On 18 July 2018 at 12:30, Anand Moon <linux.amoon@gmail.com> wrote:
+>> Hi
+>>
+>> On 18 July 2018 at 15:27, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+>>> On 18 July 2018 at 11:34, Anand Moon <linux.amoon@gmail.com> wrote:
+>>>> Add missing GIC interrupts property for pwm nodes.
+>>>>
+>>>> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+>>>> ---
+>>>>  arch/arm/boot/dts/exynos5.dtsi | 5 +++++
+>>>>  1 file changed, 5 insertions(+)
+>>>>
+>>>> diff --git a/arch/arm/boot/dts/exynos5.dtsi b/arch/arm/boot/dts/exynos5.dtsi
+>>>> index 5d2f0a0..9406108 100644
+>>>> --- a/arch/arm/boot/dts/exynos5.dtsi
+>>>> +++ b/arch/arm/boot/dts/exynos5.dtsi
+>>>> @@ -169,6 +169,11 @@
+>>>>                 pwm: pwm at 12dd0000 {
+>>>>                         compatible = "samsung,exynos4210-pwm";
+>>>>                         reg = <0x12DD0000 0x100>;
+>>>> +                       interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>,
+>>>> +                                  <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>,
+>>>
+>>> Indentation here looks weird - spaces used after tabs but not aligned
+>>> with first entry. Please indent it properly and align it.
+>>>
+>>> Best regards,
+>>> Krzysztof
+>>
+>> I ram checkpatch before I submit this patch it shown no error.
+>>
+>> # scripts/checkpatch.pl --no-signoff -q
+>> 0001-ARM-dts-exynos5-add-missing-interrupts-for-pwm-node.patch
+>
+> That's good, thank you. Still when I look at it in patchwork the
+> indentation is wrong:
+> https://patchwork.kernel.org/patch/10531753/
+> However it can be patchwork's fault, so are you sure that this is
+> properly indented and aligned?
+>
+> BR,
+> Krzysztof
 
-Thanks Christoffer,
+I prefer vim and I use following plugin
 
+https://github.com/vivien/vim-linux-coding-style
 
-> 
-> Hope this helps,
-> -Christoffer
+root at odroidxu4:/usr/src/odroidxu4-4kr-devel# wget -nv
+https://patchwork.kernel.org/patch/10531753/mbox/ -O pwm.patch
+2018-07-18 10:48:09
+URL:https://patchwork.kernel.org/patch/10531753/mbox/ [1460] ->
+"pwm.patch" [1]
+root at odroidxu4:/usr/src/odroidxu4-4kr-devel#
+root at odroidxu4:/usr/src/odroidxu4-4kr-devel# scripts/checkpatch.pl
+--no-signoff -q pwm.patch
+root at odroidxu4:/usr/src/odroidxu4-4kr-devel#
+
+Is their any other way to test checkpatch please let me know.
+
+Best Regards
+-Anand
