@@ -1,133 +1,163 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 18 Jul 2018 10:18:56 +0100
-Subject: [PATCH v4 13/20] kvm: arm64: Configure VTCR_EL2.SL0 per VM
+Date: Wed, 18 Jul 2018 10:18:55 +0100
+Subject: [PATCH v4 12/20] kvm: arm64: Dynamic configuration of VTTBR mask
 In-Reply-To: <1531905547-25478-1-git-send-email-suzuki.poulose@arm.com>
 References: <1531905547-25478-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1531905547-25478-14-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1531905547-25478-13-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-VTCR_EL2 holds the following key stage2 translation table
-parameters:
-  SL0  - Entry level in the page table lookup.
-  T0SZ - Denotes the size of the memory addressed by the table.
-
-We have been using fixed values for the SL0 depending on the
-page size as we have a fixed IPA size. But since we are about
-to make it dynamic, we need to calculate the SL0 at runtime
-per VM. This patch adds a helper to compute the value of SL0
-for a VM based on the IPA size.
+On arm64 VTTBR_EL2:BADDR holds the base address for the stage2
+translation table. The Arm ARM mandates that the bits BADDR[x-1:0]
+should be 0, where 'x' is defined for a given IPA Size and the
+number of levels for a translation granule size. It is defined
+using some magical constants. This patch is a reverse engineered
+implementation to calculate the 'x' at runtime for a given ipa and
+number of page table levels. See patch for more details.
 
 Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Christoffer Dall <cdall@arm.com>
-Cc: Eric Auger <eric.auger@redhat.com>
+Cc: Christoffer Dall <cdall@kernel.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
-Changes since v3:
- - Update reference to latest ARM ARM.
- - Update per-vm VTCR value of SL0.
- - Add helpers to decode levels from SL0.
- - Didn't pick up Reviewed-by tag from Eric, as there
-   are some new changes in this version
+Changes since V3:
+ - Update reference to latest ARM ARM and improve commentary
 ---
- arch/arm64/include/asm/kvm_arm.h | 51 +++++++++++++++++++++++++++++++---------
- arch/arm64/kvm/guest.c           |  2 ++
- 2 files changed, 42 insertions(+), 11 deletions(-)
+ arch/arm64/include/asm/kvm_arm.h | 63 ++++++++++++++++++++++++++++++++++++----
+ arch/arm64/include/asm/kvm_mmu.h | 25 +++++++++++++++-
+ 2 files changed, 81 insertions(+), 7 deletions(-)
 
 diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-index 66cf1df..abc7107 100644
+index 87d2db6..66cf1df 100644
 --- a/arch/arm64/include/asm/kvm_arm.h
 +++ b/arch/arm64/include/asm/kvm_arm.h
-@@ -120,7 +120,6 @@
- #define VTCR_EL2_IRGN0_WBWA	TCR_IRGN0_WBWA
- #define VTCR_EL2_SL0_SHIFT	6
+@@ -122,7 +122,6 @@
  #define VTCR_EL2_SL0_MASK	(3 << VTCR_EL2_SL0_SHIFT)
--#define VTCR_EL2_SL0_LVL1	(1 << VTCR_EL2_SL0_SHIFT)
+ #define VTCR_EL2_SL0_LVL1	(1 << VTCR_EL2_SL0_SHIFT)
  #define VTCR_EL2_T0SZ_MASK	0x3f
+-#define VTCR_EL2_T0SZ_40B	24
  #define VTCR_EL2_VS_SHIFT	19
  #define VTCR_EL2_VS_8BIT	(0 << VTCR_EL2_VS_SHIFT)
-@@ -147,29 +146,59 @@
- /*
-  * Stage2 translation configuration:
-  * 64kB pages (TG0 = 1)
-- * 2 level page tables (SL = 1)
+ #define VTCR_EL2_VS_16BIT	(1 << VTCR_EL2_VS_SHIFT)
+@@ -139,11 +138,8 @@
+  * Note that when using 4K pages, we concatenate two first level page tables
+  * together. With 16K pages, we concatenate 16 first level page tables.
+  *
+- * The magic numbers used for VTTBR_X in this patch can be found in Tables
+- * D4-23 and D4-25 in ARM DDI 0487A.b.
   */
--#define VTCR_EL2_TGRAN_FLAGS		(VTCR_EL2_TG0_64K | VTCR_EL2_SL0_LVL1)
--#define VTTBR_X_TGRAN_MAGIC		38
-+#define VTCR_EL2_TGRAN			VTCR_EL2_TG0_64K
-+#define VTCR_EL2_TGRAN_SL0_BASE		3UL
-+
- #elif defined(CONFIG_ARM64_16K_PAGES)
- /*
-  * Stage2 translation configuration:
-  * 16kB pages (TG0 = 2)
-- * 2 level page tables (SL = 1)
-  */
--#define VTCR_EL2_TGRAN_FLAGS		(VTCR_EL2_TG0_16K | VTCR_EL2_SL0_LVL1)
--#define VTTBR_X_TGRAN_MAGIC		42
-+#define VTCR_EL2_TGRAN			VTCR_EL2_TG0_16K
-+#define VTCR_EL2_TGRAN_SL0_BASE		3UL
- #else	/* 4K */
- /*
-  * Stage2 translation configuration:
-  * 4kB pages (TG0 = 0)
-- * 3 level page tables (SL = 1)
-  */
--#define VTCR_EL2_TGRAN_FLAGS		(VTCR_EL2_TG0_4K | VTCR_EL2_SL0_LVL1)
--#define VTTBR_X_TGRAN_MAGIC		37
-+#define VTCR_EL2_TGRAN			VTCR_EL2_TG0_4K
-+#define VTCR_EL2_TGRAN_SL0_BASE		2UL
+ 
+-#define VTCR_EL2_T0SZ_IPA	VTCR_EL2_T0SZ_40B
+ #define VTCR_EL2_COMMON_BITS	(VTCR_EL2_SH0_INNER | VTCR_EL2_ORGN0_WBWA | \
+ 				 VTCR_EL2_IRGN0_WBWA | VTCR_EL2_RES1)
+ 
+@@ -174,9 +170,64 @@
  #endif
  
--#define VTCR_EL2_FLAGS			(VTCR_EL2_COMMON_BITS | VTCR_EL2_TGRAN_FLAGS)
-+#define VTCR_EL2_FLAGS			(VTCR_EL2_COMMON_BITS | VTCR_EL2_TGRAN)
+ #define VTCR_EL2_FLAGS			(VTCR_EL2_COMMON_BITS | VTCR_EL2_TGRAN_FLAGS)
+-#define VTTBR_X				(VTTBR_X_TGRAN_MAGIC - VTCR_EL2_T0SZ_IPA)
 +/*
-+ * VTCR_EL2:SL0 indicates the entry level for Stage2 translation.
-+ * Interestingly, it depends on the page size.
-+ * See D.10.2.121, VTCR_EL2, in ARM DDI 0487C.a
++ * ARM VMSAv8-64 defines an algorithm for finding the translation table
++ * descriptors in section D4.2.8 in ARM DDI 0487C.a.
 + *
-+ *	-----------------------------------------
-+ *	| Entry level		|  4K  | 16K/64K |
-+ *	------------------------------------------
-+ *	| Level: 0		|  2   |   -     |
-+ *	------------------------------------------
-+ *	| Level: 1		|  1   |   2     |
-+ *	------------------------------------------
-+ *	| Level: 2		|  0   |   1     |
-+ *	------------------------------------------
-+ *	| Level: 3		|  -   |   0     |
-+ *	------------------------------------------
++ * The algorithm defines the expectations on the BaseAddress (for the page
++ * table) bits resolved at each level based on the page size, entry level
++ * and T0SZ. The variable "x" in the algorithm also affects the VTTBR:BADDR
++ * for stage2 page table.
 + *
-+ * That table roughly translates to :
++ * The value of "x" is calculated as :
++ *	x = Magic_N - T0SZ
 + *
-+ *	SL0(PAGE_SIZE, Entry_level) = SL0_BASE(PAGE_SIZE) - Entry_Level
++ * where Magic_N is an integer depending on the page size and the entry
++ * level of the page table as below:
 + *
-+ * Where SL0_BASE(4K) = 2 and SL0_BASE(16K) = 3, SL0_BASE(64K) = 3, provided
-+ * we take care of ruling out the unsupported cases and
-+ * Entry_Level = 4 - Number_of_levels.
++ *	--------------------------------------------
++ *	| Entry level		|  4K    16K   64K |
++ *	--------------------------------------------
++ *	| Level: 0 (4 levels)	| 28   |  -  |  -  |
++ *	--------------------------------------------
++ *	| Level: 1 (3 levels)	| 37   | 31  | 25  |
++ *	--------------------------------------------
++ *	| Level: 2 (2 levels)	| 46   | 42  | 38  |
++ *	--------------------------------------------
++ *	| Level: 3 (1 level)	| -    | 53  | 51  |
++ *	--------------------------------------------
 + *
++ * We have a magic formula for the Magic_N below:
++ *
++ *  Magic_N(PAGE_SIZE, Level) = 64 - ((PAGE_SHIFT - 3) * Number_of_levels)
++ *
++ * where Number_of_levels = (4 - Level). We are only interested in the
++ * value for Entry_Level for the stage2 page table.
++ *
++ * So, given that T0SZ = (64 - IPA_SHIFT), we can compute 'x' as follows:
++ *
++ *	x = (64 - ((PAGE_SHIFT - 3) * Number_of_levels)) - (64 - IPA_SHIFT)
++ *	  = IPA_SHIFT - ((PAGE_SHIFT - 3) * Number of levels)
++ *
++ * Here is one way to explain the Magic Formula:
++ *
++ *  x = log2(Size_of_Entry_Level_Table)
++ *
++ * Since, we can resolve (PAGE_SHIFT - 3) bits@each level, and another
++ * PAGE_SHIFT bits in the PTE, we have :
++ *
++ *  Bits_Entry_level = IPA_SHIFT - ((PAGE_SHIFT - 3) * (n - 1) + PAGE_SHIFT)
++ *		     = IPA_SHIFT - (PAGE_SHIFT - 3) * n - 3
++ *  where n = number of levels, and since each pointer is 8bytes, we have:
++ *
++ *  x = Bits_Entry_Level + 3
++ *    = IPA_SHIFT - (PAGE_SHIFT - 3) * n
++ *
++ * The only constraint here is that, we have to find the number of page table
++ * levels for a given IPA size (which we do, see stage2_pt_levels())
 + */
-+#define VTCR_EL2_LVLS_TO_SL0(levels)	\
-+	((VTCR_EL2_TGRAN_SL0_BASE - (4 - (levels))) << VTCR_EL2_SL0_SHIFT)
-+#define VTCR_EL2_SL0_TO_LVLS(sl0)	\
-+	((sl0) + 4 - VTCR_EL2_TGRAN_SL0_BASE)
-+#define VTCR_EL2_LVLS(vtcr)		\
-+	VTCR_EL2_SL0_TO_LVLS(((vtcr) & VTCR_EL2_SL0_MASK) >> VTCR_EL2_SL0_SHIFT)
- /*
-  * ARM VMSAv8-64 defines an algorithm for finding the translation table
-  * descriptors in section D4.2.8 in ARM DDI 0487C.a.
-diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
-index d24ee23..f7e1ece 100644
---- a/arch/arm64/kvm/guest.c
-+++ b/arch/arm64/kvm/guest.c
-@@ -491,6 +491,8 @@ int kvm_arm_config_vm(struct kvm *kvm)
- 	vtcr |= (kvm_get_vmid_bits() == 16) ?
- 		VTCR_EL2_VS_16BIT :
- 		VTCR_EL2_VS_8BIT;
++#define ARM64_VTTBR_X(ipa, levels)	((ipa) - ((levels) * (PAGE_SHIFT - 3)))
+ 
+-#define VTTBR_BADDR_MASK  (((UL(1) << (PHYS_MASK_SHIFT - VTTBR_X)) - 1) << VTTBR_X)
+ #define VTTBR_VMID_SHIFT  (UL(48))
+ #define VTTBR_VMID_MASK(size) (_AT(u64, (1 << size) - 1) << VTTBR_VMID_SHIFT)
+ 
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index 6b36fc3..4f22772 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -145,7 +145,6 @@ static inline unsigned long __kern_hyp_va(unsigned long v)
+ #define kvm_phys_shift(kvm)		KVM_PHYS_SHIFT
+ #define kvm_phys_size(kvm)		(_AC(1, ULL) << kvm_phys_shift(kvm))
+ #define kvm_phys_mask(kvm)		(kvm_phys_size(kvm) - _AC(1, ULL))
+-#define kvm_vttbr_baddr_mask(kvm)	VTTBR_BADDR_MASK
+ 
+ static inline bool kvm_page_empty(void *ptr)
+ {
+@@ -501,5 +500,29 @@ static inline int hyp_map_aux_data(void)
+ 
+ #define kvm_phys_to_vttbr(addr)		phys_to_ttbr(addr)
+ 
++/*
++ * Get the magic number 'x' for VTTBR:BADDR of this KVM instance.
++ * With v8.2 LVA extensions, 'x' should be a minimum of 6 with
++ * 52bit IPS.
++ */
++static inline int arm64_vttbr_x(u32 ipa_shift, u32 levels)
++{
++	int x = ARM64_VTTBR_X(ipa_shift, levels);
 +
-+	vtcr |= VTCR_EL2_LVLS_TO_SL0(kvm_stage2_levels(kvm));
- 	kvm->arch.vtcr = vtcr;
- 	return 0;
- }
++	return (IS_ENABLED(CONFIG_ARM64_PA_BITS_52) && x < 6) ? 6 : x;
++}
++
++static inline u64 vttbr_baddr_mask(u32 ipa_shift, u32 levels)
++{
++	unsigned int x = arm64_vttbr_x(ipa_shift, levels);
++
++	return GENMASK_ULL(PHYS_MASK_SHIFT - 1, x);
++}
++
++static inline u64 kvm_vttbr_baddr_mask(struct kvm *kvm)
++{
++	return vttbr_baddr_mask(kvm_phys_shift(kvm), kvm_stage2_levels(kvm));
++}
++
+ #endif /* __ASSEMBLY__ */
+ #endif /* __ARM64_KVM_MMU_H__ */
 -- 
 2.7.4
