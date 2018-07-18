@@ -1,38 +1,79 @@
-From: phil.edworthy@renesas.com (Phil Edworthy)
-Date: Wed, 18 Jul 2018 13:56:26 +0000
-Subject: [PATCH] clk: Add functions to get optional clocks
-In-Reply-To: <CAMuHMdUjzVBXn-goAwbTBULfo=HrJEY6eBae4w7Z6qA-gScUUw@mail.gmail.com>
-References: <1531918658-32278-1-git-send-email-phil.edworthy@renesas.com>
- <20180718130228.GG17271@n2100.armlinux.org.uk>
- <CAMuHMdUjzVBXn-goAwbTBULfo=HrJEY6eBae4w7Z6qA-gScUUw@mail.gmail.com>
-Message-ID: <OSBPR01MB1766E6AFE37986B2E2B5E35DF5530@OSBPR01MB1766.jpnprd01.prod.outlook.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Wed, 18 Jul 2018 16:10:14 +0200
+Subject: [GIT PULL] arm: zynq: Xilinx DT changes for v4.19
+Message-ID: <50ac449c-2196-0352-0352-1f761d321e61@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Hi,
 
-On 18 July 2018 14:19, Geert Uytterhoeven wrote:
-> On Wed, Jul 18, 2018 at 3:02 PM Russell King - ARM Linux  wrote:
-> > On Wed, Jul 18, 2018 at 01:57:38PM +0100, Phil Edworthy wrote:
-> > > Behaves the same as (devm_)clk_get except where there is no clock
-> > > producer. In this case, instead of returning -ENOENT, the function
-> > > returns NULL. This makes error checking simpler and allows
-> > > clk_prepare_enable, etc to be called on the returned reference
-> > > without additional checks.
-> >
-> > How does this work with non-DT systems, where looking a clock up which
-> > isn't yet registered with clkdev returns -ENOENT ?
-> >
-> > (clkdev doesn't know when all clocks are registered with it.)
-> 
-> Good question.
-> 
-> I guess all drivers trying to handle optional clocks this way are already broken
-> on non-DT systems where clocks may be registered late...
+please pull the following patches.
 
-So how do non-DT systems that look a clock up which isn't yet
-registered with clkdev, determine that an optional clock is there
-or not?
+Thanks,
+Michal
 
-Thanks
-Phil
+
+The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
+
+  Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+
+are available in the git repository at:
+
+  https://github.com/Xilinx/linux-xlnx.git tags/zynq-dt-for-v4.19
+
+for you to fetch changes up to 7df89642f143d67a80605ea3fb7e53bcb95f6b39:
+
+  arm: zynq: Remove #address/#size-cells from gpio-keys (2018-07-17
+16:57:29 +0200)
+
+----------------------------------------------------------------
+arm: zynq: DT changes for v4.19
+
+- Add Z-turn board
+- Add mmc aliases
+- Fix model information
+- Sort out documentatio
+- Update Zybo Z7
+- Fix gpio-keys
+
+----------------------------------------------------------------
+Anton Gerasimov (1):
+      arm: dts: zynq: Add support for Z-turn board
+
+Luis Araneda (9):
+      arm: dts: zynq: Set correct manufacturer for ZedBoard and MicroZed
+boards
+      arm: dts: zynq: correct and improve the model property of dt files
+      dt-bindings: xilinx: zynq: Improve boards description
+      dt-bindings: xilinx: zynq: Sort entries alphabetically
+      dt-bindings: Move Paralella board to Xilinx
+      dt-bindings: xilinx: zynq: Add missing boards
+      arm: dts: zynq: Fix memory size on the Zybo Z7 board
+      arm: dts: zynq: Use gpio constants for the Zybo Z7 board
+      arm: dts: zynq: Add LEDs to the Zybo Z7 board
+
+Michal Simek (2):
+      arm: zynq: Add mmc alias for zc702/zc706/zed/zybo
+      arm: zynq: Remove #address/#size-cells from gpio-keys
+
+ Documentation/devicetree/bindings/arm/adapteva.txt |   7 -------
+ Documentation/devicetree/bindings/arm/xilinx.txt   |  30
++++++++++++++++++++++++++-----
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/zynq-cc108.dts                   |   2 +-
+ arch/arm/boot/dts/zynq-microzed.dts                |   4 ++--
+ arch/arm/boot/dts/zynq-parallella.dts              |   2 +-
+ arch/arm/boot/dts/zynq-zc702.dts                   |   5 ++---
+ arch/arm/boot/dts/zynq-zc706.dts                   |   3 ++-
+ arch/arm/boot/dts/zynq-zc770-xm010.dts             |   2 +-
+ arch/arm/boot/dts/zynq-zc770-xm011.dts             |   2 +-
+ arch/arm/boot/dts/zynq-zc770-xm012.dts             |   2 +-
+ arch/arm/boot/dts/zynq-zc770-xm013.dts             |   2 +-
+ arch/arm/boot/dts/zynq-zed.dts                     |   5 +++--
+ arch/arm/boot/dts/zynq-zturn.dts                   | 114
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/zynq-zybo-z7.dts                 |  16 +++++++++++++---
+ arch/arm/boot/dts/zynq-zybo.dts                    |   3 ++-
+ 16 files changed, 170 insertions(+), 30 deletions(-)
+ delete mode 100644 Documentation/devicetree/bindings/arm/adapteva.txt
+ create mode 100644 arch/arm/boot/dts/zynq-zturn.dts
