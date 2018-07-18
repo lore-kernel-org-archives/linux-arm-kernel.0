@@ -1,43 +1,57 @@
 From: xuwei5@hisilicon.com (Wei Xu)
-Date: Wed, 18 Jul 2018 17:03:59 +0100
-Subject: [GIT PULL] ARM: hisi: soc changes for v4.19
-Message-ID: <5B4F64EF.6070406@hisilicon.com>
+Date: Wed, 18 Jul 2018 17:07:07 +0100
+Subject: [GIT PULL] arm64: defconfig: hisilicon config updates for v4.19
+In-Reply-To: <CAOesGMgaqFeqqpcFxGvs-r3g-2WRYyhk=JLhWgp4gO41gXKTcg@mail.gmail.com>
+References: <5B4F60ED.2070106@hisilicon.com>
+ <CAOesGMgaqFeqqpcFxGvs-r3g-2WRYyhk=JLhWgp4gO41gXKTcg@mail.gmail.com>
+Message-ID: <5B4F65AB.6030603@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Arnd,
+Hi Olof,
 
-Please consider to pull the following changes.
+On 2018/7/18 16:53, Olof Johansson wrote:
+> On Wed, Jul 18, 2018 at 8:46 AM, Wei Xu <xuwei5@hisilicon.com> wrote:
+>> Hi Olof, Hi Arnd,
+>>
+>> Please consider to pull the following changes.
+>> Thanks!
+>>
+>> Best Regards,
+>> Wei
+>>
+>> ---
+>>
+>> The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
+>>
+>>   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+>>
+>> are available in the Git repository at:
+>>
+>>   git://github.com/hisilicon/linux-hisi.git tags/hisi-defconfig-for-4.19
+>>
+>> for you to fetch changes up to cc4493faf494bb8af2324b1b7cabd1f1457a76ca:
+>>
+>>   arm64: defconfig: enable HiSilicon PMU driver (2018-07-17 14:06:16 +0100)
+>>
+>> ----------------------------------------------------------------
+>> ARM64: hisilicon: defconfig updates for 4.18
+>>
+>> - Enable uncore pmu for some hisilicon SoCs
+> 
+> Thanks, merged! Btw, for single patches like these, you can just git
+> send-email the patch to us too -- it's about the same amount of work
+> and fewer merge commits. But it's up to you.
+
 Thanks!
+I will do like that next time.
 
 Best Regards,
 Wei
 
----
-
-The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
-
-  Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
-
-are available in the Git repository at:
-
-  git://github.com/hisilicon/linux-hisi.git tags/hisi-armv7-soc-for-4.19
-
-for you to fetch changes up to d396cb185c0337aae5664b250cdd9a73f6eb1503:
-
-  ARM: hisi: handle of_iomap and fix missing of_node_put (2018-07-16 17:36:50 +0100)
-
-----------------------------------------------------------------
-ARM: mach-hisi: Hisilicon SoC updates for 4.19
-
-- check of_iomap and add missing of_node_put since of_find_compatible_node
-  is invoked on hisilicon SoCs like hip01, hix5hd2 and hi3xxx.
-
-----------------------------------------------------------------
-Nicholas Mc Guire (3):
-      ARM: hisi: fix error handling and missing of_node_put
-      ARM: hisi: check of_iomap and fix missing of_node_put
-      ARM: hisi: handle of_iomap and fix missing of_node_put
-
- arch/arm/mach-hisi/hotplug.c | 41 ++++++++++++++++++++++++++---------------
- 1 file changed, 26 insertions(+), 15 deletions(-)
+> 
+> 
+> -Olof
+> 
+> .
+> 
