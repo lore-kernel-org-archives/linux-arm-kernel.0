@@ -1,98 +1,27 @@
-From: joel@jms.id.au (Joel Stanley)
-Date: Wed, 18 Jul 2018 23:23:01 +0930
-Subject: [PATCH 2/3] ARM: config: multi_v5: Refresh configuration
-In-Reply-To: <20180718135302.4927-1-joel@jms.id.au>
-References: <20180718135302.4927-1-joel@jms.id.au>
-Message-ID: <20180718135302.4927-3-joel@jms.id.au>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Wed, 18 Jul 2018 15:54:46 +0200
+Subject: [PATCH v4] dt-bindings: mediatek: Add binding for mt2712 IOMMU
+ and SMI
+In-Reply-To: <d3d34d21-1a38-d3b7-1448-bd9e4c6afc6e@gmail.com>
+References: <1527165331-22261-1-git-send-email-yong.wu@mediatek.com>
+ <1529562433.22229.2.camel@mhfsdcap03>
+ <d3d34d21-1a38-d3b7-1448-bd9e4c6afc6e@gmail.com>
+Message-ID: <20180718135446.GB18541@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the result of a make mutli_v5_defconfig && make savedefconfig.
+On Mon, Jul 16, 2018 at 03:28:14PM +0200, Matthias Brugger wrote:
+> >>  .../devicetree/bindings/iommu/mediatek,iommu.txt   |  6 +-
+> >>  .../memory-controllers/mediatek,smi-common.txt     |  6 +-
+> >>  .../memory-controllers/mediatek,smi-larb.txt       |  5 +-
+> >>  include/dt-bindings/memory/mt2712-larb-port.h      | 95 ++++++++++++++++++++++
+> >>  4 files changed, 106 insertions(+), 6 deletions(-)
+> >>  create mode 100644 include/dt-bindings/memory/mt2712-larb-port.h
+> >>
+> 
+> Joerg, will you take this through your tree, or would you mind to provide a
+> Acked-By?
 
-Signed-off-by: Joel Stanley <joel@jms.id.au>
----
- arch/arm/configs/multi_v5_defconfig | 16 +++++-----------
- 1 file changed, 5 insertions(+), 11 deletions(-)
+Sure,
 
-diff --git a/arch/arm/configs/multi_v5_defconfig b/arch/arm/configs/multi_v5_defconfig
-index 7c41bee28463..b647e249908e 100644
---- a/arch/arm/configs/multi_v5_defconfig
-+++ b/arch/arm/configs/multi_v5_defconfig
-@@ -1,5 +1,4 @@
- CONFIG_SYSVIPC=y
--CONFIG_FHANDLE=y
- CONFIG_NO_HZ=y
- CONFIG_HIGH_RES_TIMERS=y
- CONFIG_LOG_BUF_SHIFT=19
-@@ -11,12 +10,10 @@ CONFIG_KPROBES=y
- CONFIG_MODULES=y
- CONFIG_MODULE_UNLOAD=y
- # CONFIG_ARCH_MULTI_V7 is not set
--CONFIG_ARCH_MVEBU=y
--CONFIG_MACH_KIRKWOOD=y
--CONFIG_ARCH_AT91=y
--CONFIG_SOC_AT91SAM9=y
- CONFIG_ARCH_ASPEED=y
- CONFIG_MACH_ASPEED_G4=y
-+CONFIG_ARCH_AT91=y
-+CONFIG_SOC_AT91SAM9=y
- CONFIG_ARCH_MXC=y
- CONFIG_MACH_MX21ADS=y
- CONFIG_MACH_MX27ADS=y
-@@ -25,6 +22,8 @@ CONFIG_MACH_IMX27_VISSTRIM_M10=y
- CONFIG_MACH_PCA100=y
- CONFIG_MACH_IMX27_DT=y
- CONFIG_SOC_IMX25=y
-+CONFIG_ARCH_MVEBU=y
-+CONFIG_MACH_KIRKWOOD=y
- CONFIG_ARCH_ORION5X=y
- CONFIG_MACH_DB88F5281=y
- CONFIG_MACH_RD88F5182=y
-@@ -34,7 +33,6 @@ CONFIG_MACH_DNS323=y
- CONFIG_MACH_TS209=y
- CONFIG_MACH_TERASTATION_PRO2=y
- CONFIG_MACH_LINKSTATION_PRO=y
--CONFIG_MACH_LINKSTATION_LSCHL=y
- CONFIG_MACH_LINKSTATION_MINI=y
- CONFIG_MACH_LINKSTATION_LS_HGL=y
- CONFIG_MACH_TS409=y
-@@ -71,7 +69,6 @@ CONFIG_IP_PNP=y
- CONFIG_IP_PNP_DHCP=y
- CONFIG_IP_PNP_BOOTP=y
- CONFIG_NET_DSA=y
--CONFIG_NET_SWITCHDEV=y
- CONFIG_NET_PKTGEN=m
- CONFIG_CFG80211=y
- CONFIG_MAC80211=y
-@@ -112,8 +109,8 @@ CONFIG_MACB=y
- CONFIG_DM9000=y
- CONFIG_MV643XX_ETH=y
- CONFIG_R8169=y
--CONFIG_MARVELL_PHY=y
- CONFIG_DAVICOM_PHY=y
-+CONFIG_MARVELL_PHY=y
- CONFIG_MICREL_PHY=y
- CONFIG_LIBERTAS=y
- CONFIG_LIBERTAS_SDIO=y
-@@ -125,7 +122,6 @@ CONFIG_KEYBOARD_GPIO=y
- CONFIG_INPUT_TOUCHSCREEN=y
- CONFIG_TOUCHSCREEN_ADS7846=m
- CONFIG_LEGACY_PTY_COUNT=16
--# CONFIG_DEVKMEM is not set
- CONFIG_SERIAL_8250=y
- CONFIG_SERIAL_8250_CONSOLE=y
- CONFIG_SERIAL_8250_NR_UARTS=6
-@@ -172,11 +168,9 @@ CONFIG_MEDIA_CAMERA_SUPPORT=y
- CONFIG_V4L_PLATFORM_DRIVERS=y
- CONFIG_SOC_CAMERA=y
- CONFIG_VIDEO_ATMEL_ISI=m
--CONFIG_SOC_CAMERA_OV2640=m
- CONFIG_DRM=y
- CONFIG_DRM_ATMEL_HLCDC=m
- CONFIG_DRM_PANEL_SIMPLE=y
--CONFIG_FB=y
- CONFIG_FB_IMX=y
- CONFIG_FB_ATMEL=y
- CONFIG_BACKLIGHT_ATMEL_LCDC=y
--- 
-2.17.1
+	Acked-by: Joerg Roedel <jroedel@suse.de>
