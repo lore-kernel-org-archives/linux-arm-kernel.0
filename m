@@ -1,66 +1,54 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 18 Jul 2018 07:59:25 -0700
-Subject: [GIT PULL] pxa for v4.19-v2
-In-Reply-To: <59475364-3050-d5c3-e3df-a750c3cb6bc0@zonque.org>
-References: <871sc37xrs.fsf@belgarion.home>
- <CAOesGMizEXbF5VUCshamVuVSkLQd7274m3zGWwZ3E3ULxoomEw@mail.gmail.com>
- <59475364-3050-d5c3-e3df-a750c3cb6bc0@zonque.org>
-Message-ID: <CAOesGMgnwn5bzGY2y3-xiJitamBf=V8jmbTuq7uAFTSE_oEnkw@mail.gmail.com>
+Date: Wed, 18 Jul 2018 08:00:24 -0700
+Subject: [GIT PULL] arm64: zynqmp: Xilinx DT changes for v4.19
+In-Reply-To: <a0dc4c86-7fe6-b9f6-2d57-b418061dbb3c@monstr.eu>
+References: <a0dc4c86-7fe6-b9f6-2d57-b418061dbb3c@monstr.eu>
+Message-ID: <CAOesGMhaVNmmsJStL8RXv_RP_yd7TSDdfTRUvnz+jx+7OY_O3A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 18, 2018 at 7:56 AM, Daniel Mack <daniel@zonque.org> wrote:
-> On Wednesday, July 18, 2018 04:55 PM, Olof Johansson wrote:
->>
->> On Mon, Jul 16, 2018 at 1:04 PM, Robert Jarzmik <robert.jarzmik@free.fr>
->> wrote:
->>>
->>> Hi Arnd, Kevin, and Olof,
->>>
->>> This is the pxa pull request for 4.19 v2. It is the same pull request as
->>> v1,
->>> with one patch removed and postponed for 4.20 to fix cross trees
->>> dependencies
->>> breakage.
->>>
->>> As before, this time it touches a lot of subsystems because of the dma
->>> slave map
->>> conversion of the pxa architecture.
->>>
->>> Can you please consider pulling ?
->>>
->>> The following changes since commit
->>> ce397d215ccd07b8ae3f71db689aedb85d56ab40:
->>>
->>>    Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
->>>
->>> are available in the git repository at:
->>>
->>>    https://github.com/rjarzmik/linux.git tags/pxa-for-4.19-v2
->>>
->>> for you to fetch changes up to cbc654c88178b7dc3b63f57278cb917ffdb629cc:
->>>
->>>    net: smc91x: remove the dmaengine compat need (2018-06-21 10:45:47
->>> +0200)
->>>
->>> ----------------------------------------------------------------
->>> This is the pxa changes for 4.19 cycle :
->>>   - the pxa architecture is ported to dma slavemap
->>>   - some minor AC97 fixes
->>>   - some minor board fixes
->>
->>
->> Thanks -- I merged just into our for-next yesterday to get one run
->> through linux-next overnight, and that looked good. So I now merged it
->> into next/soc as well.
+On Wed, Jul 18, 2018 at 7:14 AM, Michal Simek <monstr@monstr.eu> wrote:
+> Hi,
 >
+> please pull the following arm64 DT patches.
 >
-> Thanks! Can we get that missing patch merged in 4.19-rc2 maybe? I'd much
-> like to finally get this transition off the table for the 4.19 release :)
+> Thanks,
+> Michal
+>
+> The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
+>
+>   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+>
+> are available in the git repository at:
+>
+>   https://github.com/Xilinx/linux-xlnx.git tags/zynqmp-dt-for-v4.19
+>
+> for you to fetch changes up to d287de28641beb953f7ab2bd6966b166ea5c6e99:
+>
+>   arm64: zynqmp: Add support for Avnet Ultra96 rev1 board (2018-07-17
+> 16:41:09 +0200)
+>
+> ----------------------------------------------------------------
+> arm: zynqmp: DT changes for v4.19
+>
+> - Use serdev for BT in zcu100
+> - Remove ep108
+> - Fix gpio-keys binding
+> - Add suport for Ultra96
+>
+> ----------------------------------------------------------------
+> Michal Simek (4):
+>       arm64: zynqmp: Use serdev for zcu100 BT
+>       arm64: zynqmp: Remove ep108 board
+>       arm64: zynqmp: Remove #address/#size-cells from gpio-keys
+>       arm64: zynqmp: Add support for Avnet Ultra96 rev1 board
 
-Probably, but let's see what fallout is like during the merge window
-and decide then, send it right after -rc1 if that's the case (a patch
-is fine, no need to do a pull request).
+Common style here is:
+
+arm64: dts: zyncmp: <...>
+
+Again, please respin and fix. We've been pretty lenient on this but
+it's turning into the wild west. :)
 
 
 -Olof
