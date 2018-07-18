@@ -1,195 +1,261 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 18 Jul 2018 13:06:50 +0300
-Subject: [RFC] dmaengine: Add metadat_ops for dma_async_tx_descriptor
-In-Reply-To: <20180710055230.GB3219@vkoul-mobl>
-References: <32208a9c-2b15-d345-1432-f1e387531f9b@ti.com>
- <20180601102429.16429-1-peter.ujfalusi@ti.com>
- <20180710055230.GB3219@vkoul-mobl>
-Message-ID: <052ebdd9-7e68-5b78-52c3-304376f48777@ti.com>
+From: sean.wang@mediatek.com (Sean Wang)
+Date: Wed, 18 Jul 2018 18:06:27 +0800
+Subject: [resend PATCH v4 4/5] drm/mediatek: Add support for mmsys
+ through a pdev
+In-Reply-To: <51066716.k5MkZnrqCl@avalon>
+References: <20180717220328.792-1-matthias.bgg@kernel.org>
+ <20180717220328.792-5-matthias.bgg@kernel.org>
+ <1531882655.8953.83.camel@mtkswgap22> <51066716.k5MkZnrqCl@avalon>
+Message-ID: <1531908387.8953.147.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
-
-On 2018-07-10 08:52, Vinod wrote:
+On Wed, 2018-07-18 at 11:05 +0300, Laurent Pinchart wrote:
+> Hi Sean,
 > 
-> Hey Peter,
+> On Wednesday, 18 July 2018 05:57:35 EEST Sean Wang wrote:
+> > On Wed, 2018-07-18 at 00:03 +0200, matthias.bgg at kernel.org wrote:
+> > > From: Matthias Brugger <mbrugger@suse.com>
+> > > 
+> > > The MMSYS subsystem includes clocks and drm components.
+> > > This patch adds an initailization path through a platform device
+> > > for the clock part, so that both drivers get probed from the same
+> > > device tree compatible.
+> > 
+> > Sorry for that I should have a response earlier for the series.
+> > 
+> > Some points I felt they're not exactly right and should be fixed up
+> > before we're moving on
+> > 
+> > Currently, drm driver have a wrong reference to the dt-binding,
+> > "mediatek,mt2701-mmsys" or "mediatek,mt8173-mmsys", they should be all
+> > for the subsystem exporting clock and reset line such common resource to
+> > its sub-devices. Every subsystem has a similar shape. I hope mmsys
+> > shouldn't be an exception.
+> > 
+> > DRM device needs to have its own dt-binding show how connections between
+> > DRM components being made and its node should be put under mmsys node.
+> > 
+> > In this way, it becomes easy to see how the topology of the subsystem is
+> > and grows, like a tree "device tree", instead of hiding the details in
+> > the implementation.
+> > 
+> > The similar example we already did for audsys on mt2701 and mt7623 as
+> > below
+> > 
+> > 	audsys: clock-controller at 11220000 {
+> > 		
+> compatible = "mediatek,mt7623-audsys",
+> > 		
+> 	     "mediatek,mt2701-audsys",
+> > 		
+> 	     "syscon";
+> > 		
+> 	...
+> > 
+> > 		
+> afe: audio-controller {
+> > 		
+> 	compatible = "mediatek,mt7623-audio",
+> > 		
+> 		
+>      "mediatek,mt2701-audio";
+> > 
+> > 		
+> 	...
+> > 		
+> };
+> > 	};
 > 
-> Sorry for late response on this..
+> This looks very strange to me. I'm not familiar with the hardware 
+> architecture, but a clock controller that includes an audio controller seems 
+> like a very weird design. It's usually the other way around, you have an audio
 
-No problem, I was away myself also...
+yes, naming audsys as clock controller is really not good. it should be
+worth a better naming.
 
-> On 01-06-18, 13:24, Peter Ujfalusi wrote:
->> If the DMA supports per descriptor metadata it can implement the attach,
->> get_ptr/set_len callbacks.
->>
->> Client drivers must only use either attach or get_ptr/set_len to avoid
->> miss configuration.
->>
->> Wrappers are also added for the metadata_ops:
->> dmaengine_desc_attach_metadata()
->> dmaengine_desc_get_metadata_ptr()
->> dmaengine_desc_set_metadata_len()
->>
->> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
->> ---
->> Hi,
->>
->> since attachments are bouncing back, I send the patch separately
->>
->> Regards,
->> Peter
->>
->>  include/linux/dmaengine.h | 50 +++++++++++++++++++++++++++++++++++++++
->>  1 file changed, 50 insertions(+)
->>
->> diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
->> index 51fbb861e84b..ac42ace36aa3 100644
->> --- a/include/linux/dmaengine.h
->> +++ b/include/linux/dmaengine.h
->> @@ -491,6 +491,18 @@ struct dmaengine_unmap_data {
->>  	dma_addr_t addr[0];
->>  };
->>  
->> +struct dma_async_tx_descriptor;
->> +
->> +struct dma_descriptor_metadata_ops {
->> +	int (*attach)(struct dma_async_tx_descriptor *desc, void *data,
->> +		      size_t len);
+mtk subsystem AFAIK works as a container, at least provides clocks,
+reset, syscon access, these common resource to these devices running on
+the subsystem. It also has a power gate independent from other
+subsystem, that can be controlled when these devices all powered down
+or once up.
+
+And it should be better that we don't assume what exact devices are
+running on since it is possible that there're different devices running
+on the same subsystem per SoC. mtk has many subsystem working in this
+way. mmsys is just a case. we can see in [1]
+
+
+[1]
+https://elixir.bootlin.com/linux/v4.18-rc5/source/Documentation/devicetree/bindings/arm/mediatek
+ 
+> controller, and it also contains hardware that produces clocks, and possibly 
+> handles miscellaneous audio-related routing tasks. I would thus expect the 
+> reverse in the device tree:
 > 
-> How does one detach?
-
-I have not thought about detach, but clients can just attach NULL I guess.
-
-> When should the client free up the memory, IOW when
-> does dma driver drop ref to data.
-
-The metadata is for the descriptor so the DMA driver might want to
-access to it while the descriptor is valid.
-
-Typically clients can free up their metadata storage after the dma
-completion callback. On DEV_TO_MEM the metadata is going to be placed in
-the provided buffer when the transfer is completed.
-
+> 	afe: audio-controller at 11220000 {
+> 		
+> compatible = "mediatek,mt7623-audio",
+> 		
+> 	     "mediatek,mt2701-audio";
+> 		
+> ..
 > 
->> +
->> +	void *(*get_ptr)(struct dma_async_tx_descriptor *desc,
->> +			 size_t *payload_len, size_t *max_len);
+> 		
+> audsys: clock-controller {
+> 		
+> 	compatible = "mediatek,mt7623-audsys",
+> 		
+> 		
+>      "mediatek,mt2701-audsys",
+> 		
+> 		
+>      "syscon";
+> 		
+> 	...
+> 		
+> };
+> 	};
 > 
-> so what is this supposed to do..?
-
-My issue with the attach in general is that it will need additional
-memcpy to move the metadata from/to the client buffer to it's place.
-
-With get_ptr the client can get the pointer to the actual place where
-the metadata resides and modify/read it in place w/o memcpy.
-
-I know, I know... We need to trust the clients, but with high throughput
-peripherals the memcpy is taxing.
-
+> And if audsys only exposes clocks, you don't even need a subnode to represent 
+> it, the audio controller itself can be a clock provider.
 > 
->> +	int (*set_len)(struct dma_async_tx_descriptor *desc,
->> +		       size_t payload_len);
+> 	afe: audio-controller at 11220000 {
+> 		
+> compatible = "mediatek,mt7623-audio",
+> 		
+> 	     "mediatek,mt2701-audio";
+> 		
+> #clock-cells = <1>;
+> 		
+> ..
+> 	};
 > 
-> attach already has length, so how does this help?
-
-So, DMA drivers can implement either or both:
-1. attach()
-2. get_ptr() / set_len()
-
-Clients must not mix the two way of handling the metadata.
-The set_len() is intended to tell the DMA driver the client provided
-metadata size (in MEM_TO_DEV case mostly).
-
-MEM_TO_DEV flow on client side:
-get_ptr()
-fill in the metadata to the pointer (not exceeding max_len)
-set_len() to tell the DMA driver the amount of valid bytes written
-
-DEV_TO_MEM flow on client side:
-In the completion callback, get_ptr()
-the metadata is payload_len bytes and can be accessed in the return pointer.
-
-
-BTW: The driver which is going to need this is now accessible in public:
-https://git.ti.com/ti-linux-kernel/ti-linux-kernel/trees/ti-linux-4.14.y/drivers/dma/ti
-
-or in my wip tree:
-https://github.com/omap-audio/linux-audio/tree/peter/ti-linux-4.14.y/wip/drivers/dma/ti
-
-prefixed with k3-*
-
+> > > Signed-off-by: Matthias Brugger <mbrugger@suse.com>
+> > > ---
+> > > 
+> > >  drivers/gpu/drm/mediatek/mtk_drm_drv.c | 18 ++++++++++++++++++
+> > >  drivers/gpu/drm/mediatek/mtk_drm_drv.h |  2 ++
+> > >  2 files changed, 20 insertions(+)
+> > > 
+> > > diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+> > > b/drivers/gpu/drm/mediatek/mtk_drm_drv.c index dd249cf5121e..c946aea722e5
+> > > 100644
+> > > --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+> > > +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+> > > @@ -173,6 +173,7 @@ static const struct mtk_mmsys_driver_data
+> > > mt2701_mmsys_driver_data = {> 
+> > >  	.ext_path = mt2701_mtk_ddp_ext,
+> > >  	.ext_len = 
+> ARRAY_SIZE(mt2701_mtk_ddp_ext),
+> > >  	.shadow_register = true,
+> > > 
+> > > +	.clk_drv_name = "clk-mt2701-mm",
+> > > 
+> > >  };
+> > >  
+> > >  static const struct mtk_mmsys_driver_data mt8173_mmsys_driver_data = {
+> > > 
+> > > @@ -180,6 +181,7 @@ static const struct mtk_mmsys_driver_data
+> > > mt8173_mmsys_driver_data = {> 
+> > >  	.main_len = 
+> ARRAY_SIZE(mt8173_mtk_ddp_main),
+> > >  	.ext_path = mt8173_mtk_ddp_ext,
+> > >  	.ext_len = 
+> ARRAY_SIZE(mt8173_mtk_ddp_ext),
+> > > 
+> > > +	.clk_drv_name = "clk-mt8173-mm",
+> > > 
+> > >  };
+> > >  
+> > >  static int mtk_drm_kms_init(struct drm_device *drm)
+> > > 
+> > > @@ -411,6 +413,19 @@ static int mtk_drm_probe(struct platform_device
+> > > *pdev)
+> > > 
+> > >  	if (IS_ERR(private->config_regs))
+> > >  	
+> > >  		
+> return PTR_ERR(private->config_regs);
+> > > 
+> > > +	if (private->data->clk_drv_name) {
+> > > +		
+> private->clk_dev = platform_device_register_data(dev,
+> > > +		
+> 		
+> 		
+> private->data->clk_drv_name, -1,
+> > > +		
+> 		
+> 		
+> NULL, 0);
+> > > +
+> > > +		
+> if (IS_ERR(private->clk_dev)) {
+> > > +		
+> 	pr_err("failed to register %s platform 
+> device\n",
+> > > +		
+> 		
+> 		
+> private->data->clk_drv_name);
+> > > +
+> > > +		
+> 	return PTR_ERR(private->clk_dev);
+> > > +		
+> }
+> > > +	}
+> > > +
+> > > 
+> > >  	/* Iterate over sibling DISP 
+> function blocks */
+> > >  	for_each_child_of_node(dev->of_node-
+> >parent, node) {
+> > >  	
+> > >  		
+> const struct of_device_id *of_id;
+> > > 
+> > > @@ -515,6 +530,9 @@ static int mtk_drm_remove(struct platform_device
+> > > *pdev)
+> > > 
+> > >  	for (i = 0; i < 
+> DDP_COMPONENT_ID_MAX; i++)
+> > >  	
+> > >  		
+> of_node_put(private->comp_node[i]);
+> > > 
+> > > +	if (private->clk_dev)
+> > > +		
+> platform_device_unregister(private->clk_dev);
+> > > +
+> > > 
+> > >  	return 0;
+> > >  
+> > >  }
+> > > 
+> > > diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.h
+> > > b/drivers/gpu/drm/mediatek/mtk_drm_drv.h index 86cec19193c4..200eee5de419
+> > > 100644
+> > > --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.h
+> > > +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
+> > > @@ -34,11 +34,13 @@ struct mtk_mmsys_driver_data {
+> > > 
+> > >  	const enum mtk_ddp_comp_id 
+> *ext_path;
+> > >  	unsigned int ext_len;
+> > >  	bool shadow_register;
+> > > 
+> > > +	const char *clk_drv_name;
+> > > 
+> > >  };
+> > >  
+> > >  struct mtk_drm_private {
+> > >  
+> > >  	struct drm_device *drm;
+> > >  	struct device *dma_dev;
+> > > 
+> > > +	struct platform_device *clk_dev;
+> > > 
+> > >  	unsigned int num_pipes;
 > 
->> +};
->> +
->>  /**
->>   * struct dma_async_tx_descriptor - async transaction descriptor
->>   * ---dma generic offload fields---
->> @@ -520,6 +532,7 @@ struct dma_async_tx_descriptor {
->>  	dma_async_tx_callback_result callback_result;
->>  	void *callback_param;
->>  	struct dmaengine_unmap_data *unmap;
->> +	struct dma_descriptor_metadata_ops *metadata_ops;
->>  #ifdef CONFIG_ASYNC_TX_ENABLE_CHANNEL_SWITCH
->>  	struct dma_async_tx_descriptor *next;
->>  	struct dma_async_tx_descriptor *parent;
->> @@ -932,6 +945,43 @@ static inline struct dma_async_tx_descriptor *dmaengine_prep_dma_memcpy(
->>  						    len, flags);
->>  }
->>  
->> +static inline int dmaengine_desc_attach_metadata(
->> +		struct dma_async_tx_descriptor *desc, void *data, size_t len)
->> +{
->> +	if (!desc)
->> +		return 0;
->> +
->> +	if (!desc->metadata_ops || !desc->metadata_ops->attach)
->> +		return -ENOTSUPP;
->> +
->> +	return desc->metadata_ops->attach(desc, data, len);
->> +}
->> +
->> +static inline void *dmaengine_desc_get_metadata_ptr(
->> +		struct dma_async_tx_descriptor *desc, size_t *payload_len,
->> +		size_t *max_len)
->> +{
->> +	if (!desc)
->> +		return NULL;
->> +
->> +	if (!desc->metadata_ops || !desc->metadata_ops->get_ptr)
->> +		return ERR_PTR(-ENOTSUPP);
->> +
->> +	return desc->metadata_ops->get_ptr(desc, payload_len, max_len);
->> +}
->> +
->> +static inline int dmaengine_desc_set_metadata_len(
->> +		struct dma_async_tx_descriptor *desc, size_t payload_len)
->> +{
->> +	if (!desc)
->> +		return 0;
->> +
->> +	if (!desc->metadata_ops || !desc->metadata_ops->set_len)
->> +		return -ENOTSUPP;
->> +
->> +	return desc->metadata_ops->set_len(desc, payload_len);
->> +}
->> +
->>  /**
->>   * dmaengine_terminate_all() - Terminate all active DMA transfers
->>   * @chan: The channel for which to terminate the transfers
->> -- 
->> Peter
->>
->> Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
->> Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe dmaengine" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
-
-- P?ter
-
-Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
-Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
