@@ -1,71 +1,46 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Thu, 19 Jul 2018 06:18:58 +0800
-Subject: [PATCH v4] media: dvb-frontends: add Socionext SC1501A ISDB-S/T
- demodulator driver
-In-Reply-To: <20180718010614.18585-1-suzuki.katsuhiro@socionext.com>
-References: <20180718010614.18585-1-suzuki.katsuhiro@socionext.com>
-Message-ID: <201807190505.kWqmZxPb%fengguang.wu@intel.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Wed, 18 Jul 2018 17:30:27 -0500
+Subject: [PATCH V5 5/6] PCI: Deprecate pci_reset_bus() and
+ pci_reset_slot() functions
+In-Reply-To: <1530572336-20296-6-git-send-email-okaya@codeaurora.org>
+References: <1530572336-20296-1-git-send-email-okaya@codeaurora.org>
+ <1530572336-20296-6-git-send-email-okaya@codeaurora.org>
+Message-ID: <20180718223027.GI128988@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Katsuhiro,
+On Mon, Jul 02, 2018 at 06:58:54PM -0400, Sinan Kaya wrote:
+> pci_reset_bus() and pci_reset_slot() functions are not being used by
+> any code. Remove them from the kernel in favor of pci_try_reset_bus()
+> and pci_try_reset_slot() functions.
+> 
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> ---
+>  drivers/pci/pci.c   | 55 ++---------------------------------------------------
+>  include/linux/pci.h |  2 --
+>  2 files changed, 2 insertions(+), 55 deletions(-)
+> 
+> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+> index a31e6db..7e3f2e9 100644
+> --- a/drivers/pci/pci.c
+> +++ b/drivers/pci/pci.c
+> @@ -4784,9 +4784,9 @@ int pci_probe_reset_slot(struct pci_slot *slot)
+>  EXPORT_SYMBOL_GPL(pci_probe_reset_slot);
+>  
+>  /**
+> - * pci_reset_slot - reset a PCI slot
+> + * __pci_try_reset_slot - Try to reset a PCI slot
+>   * @slot: PCI slot to reset
+> - *
+> + *`
 
-I love your patch! Yet something to improve:
+Is this "*`" intentional or a typo?  I can't find it in kernel-doc.rst
+(but it's full of ` and maybe I missed it).
 
-[auto build test ERROR on linuxtv-media/master]
-[also build test ERROR on v4.18-rc5 next-20180718]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+I do see a few other occurrences in the code, although they look like
+typos to me:
 
-url:    https://github.com/0day-ci/linux/commits/Katsuhiro-Suzuki/media-dvb-frontends-add-Socionext-SC1501A-ISDB-S-T-demodulator-driver/20180719-045753
-base:   git://linuxtv.org/media_tree.git master
-config: x86_64-randconfig-u0-07190437 (attached as .config)
-compiler: gcc-5 (Debian 5.5.0-3) 5.4.1 20171010
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=x86_64 
-
-All errors (new ones prefixed by >>):
-
->> drivers/media/dvb-frontends/sc1501a.c:646:3: error: unknown field 'frequency_min_hz' specified in initializer
-      .frequency_min_hz =  470 * MHz,
-      ^
->> drivers/media/dvb-frontends/sc1501a.c:646:30: error: 'MHz' undeclared here (not in a function)
-      .frequency_min_hz =  470 * MHz,
-                                 ^
->> drivers/media/dvb-frontends/sc1501a.c:647:3: error: unknown field 'frequency_max_hz' specified in initializer
-      .frequency_max_hz = 2071 * MHz,
-      ^
-
-vim +/frequency_min_hz +646 drivers/media/dvb-frontends/sc1501a.c
-
-   641	
-   642	static const struct dvb_frontend_ops sc1501a_ops = {
-   643		.delsys = { SYS_ISDBS, SYS_ISDBT },
-   644		.info = {
-   645			.name = "Socionext SC1501A",
- > 646			.frequency_min_hz =  470 * MHz,
- > 647			.frequency_max_hz = 2071 * MHz,
-   648			.symbol_rate_min  = 28860000,
-   649			.symbol_rate_max  = 28860000,
-   650			.caps = FE_CAN_INVERSION_AUTO | FE_CAN_FEC_AUTO |
-   651				FE_CAN_QAM_AUTO | FE_CAN_TRANSMISSION_MODE_AUTO |
-   652				FE_CAN_GUARD_INTERVAL_AUTO | FE_CAN_HIERARCHY_AUTO,
-   653		},
-   654	
-   655		.sleep                   = sc1501a_sleep,
-   656		.set_frontend            = sc1501a_set_frontend,
-   657		.get_tune_settings       = sc1501a_get_tune_settings,
-   658		.read_status             = sc1501a_read_status,
-   659	};
-   660	
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 30459 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180719/7c7347ab/attachment-0001.gz>
+  $ git grep "\*\`" | grep -v Documentation
+  arch/mips/cavium-octeon/octeon-usb.c:	 *`	0x1 = Big endian
+  arch/mips/cavium-octeon/octeon-usb.c:	 *`	0x1 = Big endian
+  drivers/gpu/drm/amd/display/amdgpu_dm/amdgpu_dm.c:/*`
