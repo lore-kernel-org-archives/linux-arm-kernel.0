@@ -1,42 +1,63 @@
-From: sean.wang@mediatek.com (Sean Wang)
-Date: Wed, 18 Jul 2018 11:04:17 +0800
-Subject: [resend PATCH v4 5/5] drm: mediatek: Omit warning on probe defers
-In-Reply-To: <20180717220328.792-6-matthias.bgg@kernel.org>
-References: <20180717220328.792-1-matthias.bgg@kernel.org>
- <20180717220328.792-6-matthias.bgg@kernel.org>
-Message-ID: <1531883057.8953.87.camel@mtkswgap22>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Wed, 18 Jul 2018 03:16:50 +0000
+Subject: [PATCH v3 1/3] dt-bindings: arm: fsl: add mu binding doc
+In-Reply-To: <15215da0-2de9-a6a9-0a08-1877e27e0fd7@pengutronix.de>
+References: <20180716114209.25242-1-o.rempel@pengutronix.de>
+ <20180716114209.25242-2-o.rempel@pengutronix.de>
+ <20180716151654.GA21819@rob-hp-laptop>
+ <AM0PR04MB42115331D2201A6A07D82CEA805C0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <15215da0-2de9-a6a9-0a08-1877e27e0fd7@pengutronix.de>
+Message-ID: <AM0PR04MB4211F5F21B6E562E36F7123680530@AM0PR04MB4211.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2018-07-18 at 00:03 +0200, matthias.bgg at kernel.org wrote:
-> From: Matthias Brugger <mbrugger@suse.com>
+> -----Original Message-----
+> From: Oleksij Rempel [mailto:o.rempel at pengutronix.de]
+> Sent: Tuesday, July 17, 2018 12:56 PM
+> To: A.s. Dong <aisheng.dong@nxp.com>; Rob Herring <robh@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>; devicetree at vger.kernel.org;
+> dl-linux-imx <linux-imx@nxp.com>; kernel at pengutronix.de; Fabio Estevam
+> <fabio.estevam@nxp.com>; Shawn Guo <shawnguo@kernel.org>; linux-
+> arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH v3 1/3] dt-bindings: arm: fsl: add mu binding doc
 > 
-> It can happen that the clock drivers wasn't probed before the
-> ddp driver gets invoked. The driver used to omit a warning
-> that the driver failed to get the clocks. Omit this error on
-> the defered probe path.
+> Hi,
 > 
+> On 17.07.2018 06:51, A.s. Dong wrote:
+> >> -----Original Message-----
+> >> From: Rob Herring [mailto:robh at kernel.org]
+> >> Sent: Monday, July 16, 2018 11:17 PM
+> >> To: Oleksij Rempel <o.rempel@pengutronix.de>
+> >> Cc: Shawn Guo <shawnguo@kernel.org>; Fabio Estevam
+> >> <fabio.estevam@nxp.com>; Mark Rutland <mark.rutland@arm.com>; A.s.
+> >> Dong <aisheng.dong@nxp.com>; kernel at pengutronix.de; linux-arm-
+> >> kernel at lists.infradead.org; devicetree at vger.kernel.org; dl-linux-imx
+> >> <linux- imx@nxp.com>
+> >> Subject: Re: [PATCH v3 1/3] dt-bindings: arm: fsl: add mu binding doc
+> >>
+> >> On Mon, Jul 16, 2018 at 01:42:07PM +0200, Oleksij Rempel wrote:
+> >>> The Messaging Unit module enables two processors within the SoC to
+> >>> communicate and coordinate by passing messages (e.g. data, status
+> >>> and
+> >>> control) through the MU interface.
+> >>
+> >> v3? I already gave my R-by on v4 from Dong. Please coordinate your
+> >> work on this.
+> >
+> > Okay.
+> >
+> > Oleksij,
+> > could you re-add the M4 support part in a separate patch based on the
+> > already acked SCU one?
+> > I guess you can re-send with the acked one.
+> 
+> Rob, what do you prefer: two patches for one new file or one squashed
+> patch?
 
-so if we list drm device as a child device of mmsys we don't need the
-patch, and that make more sense.
+I guess Rob's meaning is two separate patches as they're two features.
+We probably can send and test in case Rob is missing this mail.
+If any issue, we can simply change later. Anyway, that allow us to
+review a new version of other part instead of pending here.
 
-> Signed-off-by: Matthias Brugger <mbrugger@suse.com>
-> Acked-by: CK Hu <ck.hu@mediatek.com>
-> ---
->  drivers/gpu/drm/mediatek/mtk_drm_ddp.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-> index bafc5c77c4fb..6b399348a2dc 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-> @@ -374,7 +374,8 @@ static int mtk_ddp_probe(struct platform_device *pdev)
->  
->  	ddp->clk = devm_clk_get(dev, NULL);
->  	if (IS_ERR(ddp->clk)) {
-> -		dev_err(dev, "Failed to get clock\n");
-> +		if (PTR_ERR(ddp->clk) != -EPROBE_DEFER)
-> +			dev_err(dev, "Failed to get clock\n");
->  		return PTR_ERR(ddp->clk);
->  	}
->  
+Regards
+Dong Aisheng
