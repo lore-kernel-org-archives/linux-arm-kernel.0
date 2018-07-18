@@ -1,79 +1,69 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Wed, 18 Jul 2018 16:10:14 +0200
-Subject: [GIT PULL] arm: zynq: Xilinx DT changes for v4.19
-Message-ID: <50ac449c-2196-0352-0352-1f761d321e61@xilinx.com>
+From: gregory.clement@bootlin.com (Gregory CLEMENT)
+Date: Wed, 18 Jul 2018 16:13:29 +0200
+Subject: [PATCH 1/5] arm64: defconfig: Enable sound support for Samsung
+ Chromebook Plus.
+In-Reply-To: <20180717160610.26501-1-enric.balletbo@collabora.com> (Enric
+ Balletbo i. Serra's message of "Tue, 17 Jul 2018 18:06:06 +0200")
+References: <20180717160610.26501-1-enric.balletbo@collabora.com>
+Message-ID: <87efg0aaye.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Enric Balletbo,
+ 
+ On mar., juil. 17 2018, Enric Balletbo i Serra <enric.balletbo@collabora.com> wrote:
 
-please pull the following patches.
+> Enable the Rockchip sound driver with MAX98357A/RT5514/DA7219 codecs
+> needed for the Samsung Chromebook Plus.
+>
+> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+
+Could you remove me from your destination list for your next version?
+
+I guess you got my name by the get_maintainer script, but for the
+defconfig the result is very inaccurate. Indeed, the fact that I update
+the defconfig for the SoC I care doesn't mean that I have an expertise
+on the other SoC :)
 
 Thanks,
-Michal
 
+Gregory
 
-The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
+> ---
+>
+>  arch/arm64/configs/defconfig | 11 +++++++++++
+>  1 file changed, 11 insertions(+)
+>
+> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+> index f9a186f6af8a..4917641060b1 100644
+> --- a/arch/arm64/configs/defconfig
+> +++ b/arch/arm64/configs/defconfig
+> @@ -447,9 +447,20 @@ CONFIG_SOUND=y
+>  CONFIG_SND=y
+>  CONFIG_SND_SOC=y
+>  CONFIG_SND_BCM2835_SOC_I2S=m
+> +CONFIG_SND_SOC_ROCKCHIP=m
+> +CONFIG_SND_SOC_ROCKCHIP_I2S=m
+> +CONFIG_SND_SOC_ROCKCHIP_SPDIF=m
+> +CONFIG_SND_SOC_ROCKCHIP_RT5645=m
+> +CONFIG_SND_SOC_RK3399_GRU_SOUND=m
+>  CONFIG_SND_SOC_SAMSUNG=y
+>  CONFIG_SND_SOC_RCAR=m
+>  CONFIG_SND_SOC_AK4613=m
+> +CONFIG_SND_SOC_DA7219=m
+> +CONFIG_SND_SOC_MAX98357A=m
+> +CONFIG_SND_SOC_RL6231=m
+> +CONFIG_SND_SOC_RT5514=m
+> +CONFIG_SND_SOC_RT5514_SPI=m
+> +CONFIG_SND_SOC_RT5645=m
+>  CONFIG_SND_SIMPLE_CARD=m
+>  CONFIG_SND_AUDIO_GRAPH_CARD=m
+>  CONFIG_I2C_HID=m
+> -- 
+> 2.18.0
+>
 
-  Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
-
-are available in the git repository at:
-
-  https://github.com/Xilinx/linux-xlnx.git tags/zynq-dt-for-v4.19
-
-for you to fetch changes up to 7df89642f143d67a80605ea3fb7e53bcb95f6b39:
-
-  arm: zynq: Remove #address/#size-cells from gpio-keys (2018-07-17
-16:57:29 +0200)
-
-----------------------------------------------------------------
-arm: zynq: DT changes for v4.19
-
-- Add Z-turn board
-- Add mmc aliases
-- Fix model information
-- Sort out documentatio
-- Update Zybo Z7
-- Fix gpio-keys
-
-----------------------------------------------------------------
-Anton Gerasimov (1):
-      arm: dts: zynq: Add support for Z-turn board
-
-Luis Araneda (9):
-      arm: dts: zynq: Set correct manufacturer for ZedBoard and MicroZed
-boards
-      arm: dts: zynq: correct and improve the model property of dt files
-      dt-bindings: xilinx: zynq: Improve boards description
-      dt-bindings: xilinx: zynq: Sort entries alphabetically
-      dt-bindings: Move Paralella board to Xilinx
-      dt-bindings: xilinx: zynq: Add missing boards
-      arm: dts: zynq: Fix memory size on the Zybo Z7 board
-      arm: dts: zynq: Use gpio constants for the Zybo Z7 board
-      arm: dts: zynq: Add LEDs to the Zybo Z7 board
-
-Michal Simek (2):
-      arm: zynq: Add mmc alias for zc702/zc706/zed/zybo
-      arm: zynq: Remove #address/#size-cells from gpio-keys
-
- Documentation/devicetree/bindings/arm/adapteva.txt |   7 -------
- Documentation/devicetree/bindings/arm/xilinx.txt   |  30
-+++++++++++++++++++++++++-----
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/zynq-cc108.dts                   |   2 +-
- arch/arm/boot/dts/zynq-microzed.dts                |   4 ++--
- arch/arm/boot/dts/zynq-parallella.dts              |   2 +-
- arch/arm/boot/dts/zynq-zc702.dts                   |   5 ++---
- arch/arm/boot/dts/zynq-zc706.dts                   |   3 ++-
- arch/arm/boot/dts/zynq-zc770-xm010.dts             |   2 +-
- arch/arm/boot/dts/zynq-zc770-xm011.dts             |   2 +-
- arch/arm/boot/dts/zynq-zc770-xm012.dts             |   2 +-
- arch/arm/boot/dts/zynq-zc770-xm013.dts             |   2 +-
- arch/arm/boot/dts/zynq-zed.dts                     |   5 +++--
- arch/arm/boot/dts/zynq-zturn.dts                   | 114
-++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/zynq-zybo-z7.dts                 |  16 +++++++++++++---
- arch/arm/boot/dts/zynq-zybo.dts                    |   3 ++-
- 16 files changed, 170 insertions(+), 30 deletions(-)
- delete mode 100644 Documentation/devicetree/bindings/arm/adapteva.txt
- create mode 100644 arch/arm/boot/dts/zynq-zturn.dts
+-- 
+Gregory Clement, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+http://bootlin.com
