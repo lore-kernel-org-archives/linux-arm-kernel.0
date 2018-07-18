@@ -1,124 +1,52 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 18 Jul 2018 17:49:30 +0100
-Subject: [PATCH] drivers/firmware: psci_checker: stash and use
- topology_core_cpumask for hotplug tests
-In-Reply-To: <1531913132-21022-1-git-send-email-sudeep.holla@arm.com>
-References: <1531913132-21022-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <20180718164930.GB21924@red-moon>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 18 Jul 2018 18:47:37 +0200
+Subject: [PATCH 5/5] net: add MTD support to eth_platform_get_mac_address()
+In-Reply-To: <20180718161035.7005-6-brgl@bgdev.pl>
+References: <20180718161035.7005-1-brgl@bgdev.pl>
+ <20180718161035.7005-6-brgl@bgdev.pl>
+Message-ID: <20180718164737.GE12477@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 18, 2018 at 12:25:32PM +0100, Sudeep Holla wrote:
-> Commit 7f9545aa1a91 ("arm64: smp: remove cpu and numa topology
-> information when hotplugging out CPU") updates the cpu topology when
-> the CPU is hotplugged out. However the PSCI checker code uses the
-> topology_core_cpumask pointers for some of the cpu hotplug testing.
-> Since the pointer to the core_cpumask of the first CPU in the group
-> is used, which when that CPU itself is hotpugged out is just set to
-> itself, the testing terminates after that particular CPU is tested out.
-> But the intention of this tests is to cover all the CPU in the group.
+On Wed, Jul 18, 2018 at 06:10:35PM +0200, Bartosz Golaszewski wrote:
+> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 > 
-> In order to support that, we need to stash the topology_core_cpumask
-> before the start of the test and use that value instead of pointer to
-> a cpumask which will be updated on CPU hotplug.
+> MTD doesn't support nvmem yet. Some platforms use MTD to read the MAC
+> address from SPI flash. If we want this function to generalize reading
+> the MAC address, we need to separately try to use MTD.
 > 
-> Fixes: 7f9545aa1a91a9a4 ("arm64: smp: remove cpu and numa topology
-> 	information when hotplugging out CPU")
-> Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
-> Tested-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 > ---
->  drivers/firmware/psci_checker.c | 30 ++++++++++++++++++++----------
->  1 file changed, 20 insertions(+), 10 deletions(-)
+>  net/ethernet/eth.c | 20 ++++++++++++++++++++
+>  1 file changed, 20 insertions(+)
 > 
-> diff --git a/drivers/firmware/psci_checker.c b/drivers/firmware/psci_checker.c
-> index bb1c068bff19..e330c6cb45f5 100644
-> --- a/drivers/firmware/psci_checker.c
-> +++ b/drivers/firmware/psci_checker.c
-> @@ -77,21 +77,23 @@ static int psci_ops_check(void)
->  	return 0;
->  }
->  
-> -static int find_cpu_groups(const struct cpumask *cpus,
-> -			   const struct cpumask **cpu_groups)
-> +static int find_cpu_groups(cpumask_var_t *cpu_groups)
->  {
->  	unsigned int nb = 0;
->  	cpumask_var_t tmp;
->  
->  	if (!alloc_cpumask_var(&tmp, GFP_KERNEL))
->  		return -ENOMEM;
-> -	cpumask_copy(tmp, cpus);
-> +	cpumask_copy(tmp, cpu_online_mask);
->  
->  	while (!cpumask_empty(tmp)) {
->  		const struct cpumask *cpu_group =
->  			topology_core_cpumask(cpumask_any(tmp));
->  
-> -		cpu_groups[nb++] = cpu_group;
-> +		if (cpu_groups && cpu_groups[nb])
-> +			cpumask_copy(cpu_groups[nb], cpu_group);
-> +
-> +		nb++;
->  		cpumask_andnot(tmp, tmp, cpu_group);
+> diff --git a/net/ethernet/eth.c b/net/ethernet/eth.c
+> index adf5bd03851f..f7dbd2cff7f9 100644
+> --- a/net/ethernet/eth.c
+> +++ b/net/ethernet/eth.c
+> @@ -55,6 +55,7 @@
+>  #include <linux/of_net.h>
+>  #include <linux/pci.h>
+>  #include <linux/nvmem-consumer.h>
+> +#include <linux/mtd/mtd.h>
+>  #include <net/dst.h>
+>  #include <net/arp.h>
+>  #include <net/sock.h>
+> @@ -573,6 +574,25 @@ int eth_platform_get_mac_address(struct device *dev, u8 *mac_addr)
+>  		}
 >  	}
 >  
-> @@ -169,25 +171,31 @@ static unsigned int down_and_up_cpus(const struct cpumask *cpus,
->  static int hotplug_tests(void)
->  {
->  	int err;
-> -	cpumask_var_t offlined_cpus;
-> +	cpumask_var_t offlined_cpus, *cpu_groups;
->  	int i, nb_cpu_group;
-> -	const struct cpumask **cpu_groups;
->  	char *page_buf;
->  
-> +	/* first run to just get the number of cpu groups */
-> +	nb_cpu_group = find_cpu_groups(NULL);
+> +#ifdef CONFIG_MTD
+> +	/* NOTE: this should go away as soon as MTD gets nvmem support. */
+> +	if (!addr) {
+> +		struct mtd_info *mtd;
+> +		int rv;
 > +
->  	err = -ENOMEM;
->  	if (!alloc_cpumask_var(&offlined_cpus, GFP_KERNEL))
->  		return err;
-> -	/* We may have up to nb_available_cpus cpu_groups. */
-> -	cpu_groups = kmalloc_array(nb_available_cpus, sizeof(*cpu_groups),
-> -				   GFP_KERNEL);
-> +	cpu_groups = kcalloc(nb_cpu_group, sizeof(cpu_groups), GFP_KERNEL);
->  	if (!cpu_groups)
->  		goto out_free_cpus;
-> +
-> +	for (i = 0; i < nb_cpu_group; ++i)
-> +		if (!alloc_cpumask_var(&cpu_groups[i], GFP_KERNEL))
-> +			goto out_free_cpu_groups;
-> +
->  	page_buf = (char *)__get_free_page(GFP_KERNEL);
->  	if (!page_buf)
->  		goto out_free_cpu_groups;
->  
->  	err = 0;
-> -	nb_cpu_group = find_cpu_groups(cpu_online_mask, cpu_groups);
-> +	/* second run to populate/copy the cpumask */
-> +	nb_cpu_group = find_cpu_groups(cpu_groups);
->  
->  	/*
->  	 * Of course the last CPU cannot be powered down and cpu_down() should
-> @@ -212,6 +220,8 @@ static int hotplug_tests(void)
->  
->  	free_page((unsigned long)page_buf);
->  out_free_cpu_groups:
-> +	for (i = 0; i < nb_cpu_group; ++i)
-> +		free_cpumask_var(cpu_groups[i]);
->  	kfree(cpu_groups);
->  out_free_cpus:
->  	free_cpumask_var(offlined_cpus);
+> +		mtd = get_mtd_device_nm("MAC-Address");
 
-Hi Sudeep,
+In order for this to go away, you need to keep backwards
+compatibility. When using nvmem, you look for a cell called
+"mac-address". Here you are looking for "MAC-Address". That is going
+to make backwards compatibility harder. How do you plan to do it?
 
-thanks for the patch. I reckon that adding two functions, say,
-alloc_cpu_groups() and free_cpu_groups() would make the code
-more readable instead of relying on find_cpu_groups() to first
-count then copy; it is for readability rather than correctness.
-
-Thanks,
-Lorenzo
+   Andrew
