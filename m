@@ -1,74 +1,258 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 18 Jul 2018 13:07:37 -0600
-Subject: [RFC PATCH v2 1/4] dt-bindings: misc: Add bindings for misc. BMC
- control fields
-In-Reply-To: <1531870098.3337969.1444201888.2476205D@webmail.messagingengine.com>
-References: <20180711053122.30773-1-andrew@aj.id.au>
- <20180711053122.30773-2-andrew@aj.id.au>
- <20180711200450.GB17291@rob-hp-laptop>
- <1531356830.3551458.1437853280.551CA8C5@webmail.messagingengine.com>
- <CAL_JsqKpXxR4t_-3BOy-0mFePXkaSck_4PfHRD=OZQ-_-T5P=w@mail.gmail.com>
- <b6ced4cad4d7ff78330181b2c893855c23103953.camel@kernel.crashing.org>
- <1531463489.747186.1439263128.075AECE1@webmail.messagingengine.com>
- <CAL_JsqLZo-=7UkuvvUFYdCR4asBBiWyC=Q1ryH=-HLU6vzf9tA@mail.gmail.com>
- <ece91112ecfdc7218184c4c4519e455cf9397e11.camel@kernel.crashing.org>
- <1531870098.3337969.1444201888.2476205D@webmail.messagingengine.com>
-Message-ID: <CAL_Jsq+YdcBe+VYBAZPvK-X9gwJyhzP4m6hAx59+2Nz0JzsKug@mail.gmail.com>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Wed, 18 Jul 2018 21:08:49 +0200
+Subject: [PATCH 2/2] mtd: rawnand: meson: add support for Amlogic NAND
+ flash controller
+In-Reply-To: <76d428ff-376a-dce3-cb51-d238564b7c3e@amlogic.com>
+References: <20180613161314.14894-1-yixun.lan@amlogic.com>
+ <20180613161314.14894-3-yixun.lan@amlogic.com>
+ <20180624213844.2207ca6f@bbrezillon>
+ <76d428ff-376a-dce3-cb51-d238564b7c3e@amlogic.com>
+Message-ID: <20180718210849.493f0087@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 17, 2018 at 5:28 PM Andrew Jeffery <andrew@aj.id.au> wrote:
->
-> On Tue, 17 Jul 2018, at 14:26, Benjamin Herrenschmidt wrote:
-> > On Mon, 2018-07-16 at 07:55 -0600, Rob Herring wrote:
-> > > If that data is one set per SoC, then i'm not that concerned having
-> > > platform-specific data in the driver. That doesn't mean the driver is
-> > > not "generic". It's still not clear to me in this thread, how much of
-> > > this is board specific, but given that you've placed all the data in
-> > > an SoC dtsi file it seems to be all per SoC.
-> >
-> > So Rob, I think that's precisely where the disconnect is.
-> >
-> > I think we all (well hopefully) agree that those few tunables don't fit
-> > in any existing subystem and aren't likely to ever do (famous last
-> > words...).
-> >
-> > Where we disagree is we want to make this parametrized via the DT, and
-> > you want us to hard wire the list in some kind of SoC driver for a
-> > given SoC family/version.
-> >
-> > The reason I think hard wiring the list in the driver is not a great
-> > solution is that that list in itself is prone to variations, possibly
-> > fairly often, between boards, vendors, versions of boards, etc...
-> >
-> > We can't know for sure every SoC tunable (out of the gazillions in
-> > those chips) are going to be needed for a given system. We know which
-> > ones we do use for ours, and that's a couple of handfuls, but it could
-> > be that Dell need a slightly different set, and so might Yadro, or so
-> > might our next board revision for that matter.
-> >
-> > Now, updating the device-tree in the board flash with whatever vendor
-> > specific information is needed is a LOT easier than getting the kernel
-> > driver constantly updated. The device-tree after all is there to
-> > reflect among other things system specific ways in which the SoC is
-> > wired and configured. This is rather close...
->
-> Not sure this helps, but I feel that the proposal pretty closely matches what's described in Documentation/devicetree/bindings/mfd/mfd.txt. It's intended that nodes using the bindings I'm proposing are children of a 'compatible = "syscon", "simple-mfd"' node (this is the case with the features we're hoping to describe for our SoC). I should explicitly call that out.
+Hi Yixun,
 
-IMO, any binding that has only those compatibles is not correct and a
-specific compatible is needed. We should be able identify a specific
-h/w block.
+On Wed, 18 Jul 2018 17:38:56 +0800
+Yixun Lan <yixun.lan@amlogic.com> wrote:
 
-> But to go on, "simple-mfd" is effectively an alias of "simple-bus", which means its intended to match child node compatibles to drivers provided by the kernel. If we shouldn't be describing minor features of a SoC in the devicetree, doesn't this invalidate the case for simple-mfd? What is the *correct* use of simple-mfd? When is it not used to expose minor features in set of "miscellaneous system registers"? Why doesn't this proposed case fit?
+> >> +
+> >> +#define NFC_REG_CMD		0x00
+> >> +#define NFC_REG_CFG		0x04
+> >> +#define NFC_REG_DADR		0x08
+> >> +#define NFC_REG_IADR		0x0c
+> >> +#define NFC_REG_BUF		0x10
+> >> +#define NFC_REG_INFO		0x14
+> >> +#define NFC_REG_DC		0x18
+> >> +#define NFC_REG_ADR		0x1c
+> >> +#define NFC_REG_DL		0x20
+> >> +#define NFC_REG_DH		0x24
+> >> +#define NFC_REG_CADR		0x28
+> >> +#define NFC_REG_SADR		0x2c
+> >> +#define NFC_REG_PINS		0x30
+> >> +#define NFC_REG_VER		0x38
+> >> +  
+> > 
+> > Can you put the reg offsets next to their field definitions?
+> >   
+> actually, we would prefer to put all the CMD definition below the reg
+> offset, so it will better reflect what's it belong to.
 
-I'm no fan of simple-mfd either. I think it is abused and often a sign
-of bad binding design. The general problem with MFD bindings is people
-define child nodes based on what drivers they happen to have for some
-OS. DT is not the only way to instantiate drivers. Child nodes are
-really only needed when you have resources per child that need to be
-defined. For example, if the MFD has an interrupt controller and
-interrupts to sub-blocks or sub-blocks have their own clocks.
-"simple-mfd" was for when the parent node has no driver or the child
-nodes have no dependency on the parent.
+Just to be clear, I meant something like:
 
-Rob
+#define NFC_CMD				0x00
+#define NFC_CMD_DRD			(0x8 << 14)
+#define NFC_CMD_IDLE			(0xc << 14)
+...
+
+#define NFC_CFG				0x04
+#define NFC_CFG_XXX			xxx
+...
+
+I find it easier to guess which register the fields are attached to when
+it's defined like that, but I won't block the driver for such a tiny
+detail. 
+
+> >> +static void meson_nfc_cmd_ctrl(struct mtd_info *mtd,
+> >> +					int cmd, unsigned int ctrl)  
+> >   
+> > ->cmd_ctrl() has recently been deprecated in favor of ->exec_op(). You  
+> > can have a look at the marvell, v610 or fsmc drivers if you want to
+> > have an idea of how ->exec_op() should be implemented. Miquel and I are
+> > also here to help if you have any questions.
+> >   
+> 
+> follow your suggestion, we have implemented the exec_op() interface,
+> we'd really appreciate if you can help to review this ..
+
+Sure, just send a v2 and we'll review it.
+
+
+> >> +
+> >> +static void meson_nfc_cmd_m2n(struct meson_nfc *nfc, int raw)  
+> > 
+> > n2m -> nand2mem ?
+> >   
+> yes, it is
+
+Then please use nand2mem, it's clearer.
+
+> >> +static int meson_nfc_wait_dma_finish(struct meson_nfc *nfc)
+> >> +{
+> >> +	meson_nfc_cmd_idle(nfc, 0);
+> >> +	meson_nfc_cmd_idle(nfc, 0);  
+> > 
+> > Two calls to cmd_idle(), is this expected or a copy&paste error? If
+> > that's expected it definitely deserves a comment explaining why?
+> >   
+> 
+> yes, it is intentional
+> 
+> we will put these comments into the function.
+> 	/*
+>          * The Nand flash controller is designed as two stages pipleline -
+>          *  a) fetch and b) excute.
+>          * So, there might be cases when the driver see command queue is
+> empty,
+>          * but the Nand flash controller still has two commands buffered,
+>          * one is fetched into NFC request queue (ready to run), and another
+>          * is actively executing.
+>          */
+> 
+
+So pushing 2 "IDLE" commands guarantees that the pipeline is emptied,
+right? The comment looks incomplete, you should explain what those
+meson_nfc_cmd_idle() are for.
+
+> >> +static int meson_nfc_ecc_init(struct device *dev, struct mtd_info *mtd)
+> >> +{
+> >> +	struct nand_chip *nand = mtd_to_nand(mtd);
+> >> +	struct meson_nfc_nand_chip *meson_chip = to_meson_nand(nand);
+> >> +	struct meson_nfc *nfc = nand_get_controller_data(nand);
+> >> +	struct meson_nand_ecc *meson_ecc = nfc->data->ecc;
+> >> +	int num = nfc->data->ecc_num;
+> >> +	int nsectors, i, bytes;
+> >> +
+> >> +	/* support only ecc hw mode */
+> >> +	if (nand->ecc.mode != NAND_ECC_HW) {  
+> > 
+> > Given that you support raw accesses, I'm pretty sure you can support
+> > ECC_NONE, ECC_SOFT and ECC_ON_DIE with zero effort.
+> >   
+> 
+> is this a block for this driver to be accepted by upstream?
+
+Nope.
+
+> otherwise we'd like to implement this feature later in separate patch.
+> 
+
+That's fine.
+
+> >> +	nsectors = mtd->writesize / nand->ecc.size;
+> >> +	bytes =(meson_chip->user_mode == NFC_USER2_OOB_BYTES) ? nsectors * 2 : 16;
+> >> +	if (mtd->oobsize < (nand->ecc.bytes * nsectors + bytes))
+> >> +		return -EINVAL;  
+> > 
+> > It's probably worth looking at what is being proposed here [2] for the
+> > ECC config selection logic.
+> >   
+> 
+> sure, we'd happy to adopt the ECC config helper function, and seems it
+> is possible ;-)
+> 
+> sounds the proposed ECC config patch is still under review, and we
+> would like to adjust our code once it's ready (probably we will still
+> keep this version in patch v2, then address it in v3 later)
+
+It's been merged, and should be available in the nand/next branch [1].
+
+> >> +static int meson_nfc_buffer_init(struct mtd_info *mtd)
+> >> +{
+> >> +	struct nand_chip *nand = mtd_to_nand(mtd);
+> >> +	struct meson_nfc_nand_chip *meson_chip = to_meson_nand(nand);
+> >> +	struct meson_nfc *nfc = nand_get_controller_data(nand);
+> >> +	struct device *dev = nfc->dev;
+> >> +	int info_bytes, page_bytes;
+> >> +	int nsectors;
+> >> +
+> >> +	nsectors = mtd->writesize / nand->ecc.size;
+> >> +	info_bytes = nsectors * PER_INFO_BYTE;
+> >> +	page_bytes = mtd->writesize + mtd->oobsize;
+> >> +
+> >> +	if ((meson_chip->data_buf) && (meson_chip->info_buf))
+> >> +		return 0;
+> >> +
+> >> +	meson_chip->data_buf = devm_kzalloc(dev, page_bytes, GFP_KERNEL);
+> >> +	if (!meson_chip->data_buf)
+> >> +		return  -ENOMEM;
+> >> +
+> >> +	meson_chip->info_buf = devm_kzalloc(dev, info_bytes, GFP_KERNEL);
+> >> +	if (!meson_chip->info_buf)
+> >> +		return  -ENOMEM;  
+> > 
+> > You're doing DMA on those buffers, and devm_kzalloc() is not
+> > DMA-friendly (returned buffers are not aligned on a cache line). Also,
+> > you don't have to allocate your own buffers because the core already
+> > allocate them (chip->data_buf, chip->oob_poi). All you need to do is
+> > set the NAND_USE_BOUNCE_BUFFER flag in chip->options to make sure
+> > you're always passed a DMA-able buffer.
+> >   
+> 
+> thanks for the suggestion, we've migrated to use the
+> dmam_alloc_coherent() API
+
+kzalloc() should be just fine, no need to alloc a DMA coherent region. 
+
+
+> 
+> >> +	nand->setup_data_interface = meson_nfc_setup_data_interface;
+> >> +
+> >> +	nand->chip_delay = 200;  
+> > 
+> > This should not be needed if you implement ->exec_op() and  
+> > ->setup_data_interface().  
+> >   
+> will drop this
+> 
+> >> +	nand->ecc.mode = NAND_ECC_HW;
+> >> +
+> >> +	nand->ecc.write_page_raw = meson_nfc_write_page_raw;
+> >> +	nand->ecc.write_page = meson_nfc_write_page_hwecc;
+> >> +	nand->ecc.write_oob_raw = nand_write_oob_std;
+> >> +	nand->ecc.write_oob = nand_write_oob_std;
+> >> +
+> >> +	nand->ecc.read_page_raw = meson_nfc_read_page_raw;
+> >> +	nand->ecc.read_page = meson_nfc_read_page_hwecc;
+> >> +	nand->ecc.read_oob_raw = meson_nfc_read_oob_raw;
+> >> +	nand->ecc.read_oob = meson_nfc_read_oob;
+> >> +
+> >> +	mtd = nand_to_mtd(nand);
+> >> +	mtd->owner = THIS_MODULE;
+> >> +	mtd->dev.parent = dev;
+> >> +	mtd->name = devm_kasprintf(nfc->dev, GFP_KERNEL,
+> >> +				   "%s:nand", dev_name(dev));
+> >> +	if (!mtd->name) {
+> >> +		dev_err(nfc->dev, "Failed to allocate mtd->name\n");
+> >> +		return -ENOMEM;
+> >> +	}  
+> > 
+> > You set the name after nand_scan_ident() and make it conditional (only
+> > if ->name == NULL) so that the label property defined in the DT takes
+> > precedence over the default name.  
+> 
+> we can do this, but as second consideration, we'd prefer simply to drop
+> this customization of mtd->name here (we didn't understand your next cs
+> id suggestion).
+
+No, you really should set a well-known name, so that people can pass
+mtdparts on the kernel command line.
+
+> 
+> > Also, I recommend suffixing this name
+> > with the CS id, just in case you ever need to support connecting several
+> > chips to the same controller. 
+> >   
+> 
+> we actually didn't get the point here, cs is about chip selection with
+> multiple nand chip? and how to get this information?
+
+Well, you currently seem to only support one chip per controller, but I
+guess the IP can handle several CS lines. So my recommendation is about
+choosing a name so that you can later easily add support for multiple
+chips without breaking setups where mtdparts is used.
+
+To sum-up, assuming your NAND chip is always connected to CS0 (on the
+controller side), I'd suggest doing:
+
+	mtd->name = devm_kasprintf(nfc->dev, GFP_KERNEL,
+				   "%s:nand.%d", dev_name(dev), cs_id);
+
+where cs_id is the value you extracted from the reg property of the
+NAND node.
+
+Regards,
+
+Boris
+
+[1]http://git.infradead.org/linux-mtd.git/shortlog/refs/heads/nand/next
