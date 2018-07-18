@@ -1,161 +1,197 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Wed, 18 Jul 2018 09:28:25 +0200
-Subject: [resend PATCH v4 4/5] drm/mediatek: Add support for mmsys through
- a pdev
-In-Reply-To: <50c93f6d-c546-1479-62c1-adc0b40d5dab@gmail.com>
-References: <20180717220328.792-1-matthias.bgg@kernel.org>
- <20180717220328.792-5-matthias.bgg@kernel.org>
- <1531882655.8953.83.camel@mtkswgap22>
- <50c93f6d-c546-1479-62c1-adc0b40d5dab@gmail.com>
-Message-ID: <660471a0-480b-241f-8880-8b56aed3e64b@gmail.com>
+From: amit.kucheria@linaro.org (Amit Kucheria)
+Date: Wed, 18 Jul 2018 13:19:17 +0530
+Subject: [PATCH v1] arm64: dts: sdm845: enable tsens thermal zones
+In-Reply-To: <cover.1531899325.git.amit.kucheria@linaro.org>
+References: <cover.1531899325.git.amit.kucheria@linaro.org>
+Message-ID: <b3c25cedfa3a9b8a4b481e714992afe62b84ca3b.1531899325.git.amit.kucheria@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+One thermal zone per cpu is defined
 
+Signed-off-by: Amit Kucheria <amit.kucheria@linaro.org>
+---
+ arch/arm64/boot/dts/qcom/sdm845.dtsi | 170 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 170 insertions(+)
 
-On 18/07/18 09:27, Matthias Brugger wrote:
-> Hi Sean,
-> 
-> On 18/07/18 04:57, Sean Wang wrote:
->> On Wed, 2018-07-18 at 00:03 +0200, matthias.bgg at kernel.org wrote:
->>> From: Matthias Brugger <mbrugger@suse.com>
->>>
->>> The MMSYS subsystem includes clocks and drm components.
->>> This patch adds an initailization path through a platform device
->>> for the clock part, so that both drivers get probed from the same
->>> device tree compatible.
->>>
->>
->> Sorry for that I should have a response earlier for the series.
->>
->> Some points I felt they're not exactly right and should be fixed up
->> before we're moving on
->>
->> Currently, drm driver have a wrong reference to the dt-binding,
->> "mediatek,mt2701-mmsys" or "mediatek,mt8173-mmsys", they should be all
->> for the subsystem exporting clock and reset line such common resource to
->> its sub-devices. Every subsystem has a similar shape. I hope mmsys
->> shouldn't be an exception.
-> 
-> I'm not sure if I understand what you mean. You proposed to use a platform
-> device [1] and now you say we should change the DTS?
-> 
-> What do you mean by "drm driver has a wrong reference to the dt-binding"? How
-> would you want to name it and most important, what would be your approach to
-> have backwards compatibility to older device tree bindings?
-> 
-
-I forgot the reference:
-[1] https://patchwork.kernel.org/patch/10367797/
-
->>
->> DRM device needs to have its own dt-binding show how connections between
->> DRM components being made and its node should be put under mmsys node.
->>> In this way, it becomes easy to see how the topology of the subsystem is
->> and grows, like a tree "device tree", instead of hiding the details in
->> the implementation.
->>
->> The similar example we already did for audsys on mt2701 and mt7623 as
->> below
->>
->> 	audsys: clock-controller at 11220000 {
->> 		compatible = "mediatek,mt7623-audsys",
->> 			     "mediatek,mt2701-audsys",
->> 			     "syscon";
->> 			...
->>
->> 		afe: audio-controller {
->> 			compatible = "mediatek,mt7623-audio",
->> 				     "mediatek,mt2701-audio";
->> 			
->> 			...
->> 		};
->> 	};
->>
-> 
-> I think this approach is not working as, due to backwards compatibility, we have
-> to make sure that the DRM driver gets probed with the mmsys binding.
-> 
-> Regards,
-> Matthias
-> 
->> 	
->> 	Sean
->>
->>
->>> Signed-off-by: Matthias Brugger <mbrugger@suse.com>
->>> ---
->>>  drivers/gpu/drm/mediatek/mtk_drm_drv.c | 18 ++++++++++++++++++
->>>  drivers/gpu/drm/mediatek/mtk_drm_drv.h |  2 ++
->>>  2 files changed, 20 insertions(+)
->>>
->>> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
->>> index dd249cf5121e..c946aea722e5 100644
->>> --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
->>> +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
->>> @@ -173,6 +173,7 @@ static const struct mtk_mmsys_driver_data mt2701_mmsys_driver_data = {
->>>  	.ext_path = mt2701_mtk_ddp_ext,
->>>  	.ext_len = ARRAY_SIZE(mt2701_mtk_ddp_ext),
->>>  	.shadow_register = true,
->>> +	.clk_drv_name = "clk-mt2701-mm",
->>>  };
->>>  
->>>  static const struct mtk_mmsys_driver_data mt8173_mmsys_driver_data = {
->>> @@ -180,6 +181,7 @@ static const struct mtk_mmsys_driver_data mt8173_mmsys_driver_data = {
->>>  	.main_len = ARRAY_SIZE(mt8173_mtk_ddp_main),
->>>  	.ext_path = mt8173_mtk_ddp_ext,
->>>  	.ext_len = ARRAY_SIZE(mt8173_mtk_ddp_ext),
->>> +	.clk_drv_name = "clk-mt8173-mm",
->>>  };
->>>  
->>>  static int mtk_drm_kms_init(struct drm_device *drm)
->>> @@ -411,6 +413,19 @@ static int mtk_drm_probe(struct platform_device *pdev)
->>>  	if (IS_ERR(private->config_regs))
->>>  		return PTR_ERR(private->config_regs);
->>>  
->>> +	if (private->data->clk_drv_name) {
->>> +		private->clk_dev = platform_device_register_data(dev,
->>> +						private->data->clk_drv_name, -1,
->>> +						NULL, 0);
->>> +
->>> +		if (IS_ERR(private->clk_dev)) {
->>> +			pr_err("failed to register %s platform device\n",
->>> +						private->data->clk_drv_name);
->>> +
->>> +			return PTR_ERR(private->clk_dev);
->>> +		}
->>> +	}
->>> +
->>>  	/* Iterate over sibling DISP function blocks */
->>>  	for_each_child_of_node(dev->of_node->parent, node) {
->>>  		const struct of_device_id *of_id;
->>> @@ -515,6 +530,9 @@ static int mtk_drm_remove(struct platform_device *pdev)
->>>  	for (i = 0; i < DDP_COMPONENT_ID_MAX; i++)
->>>  		of_node_put(private->comp_node[i]);
->>>  
->>> +	if (private->clk_dev)
->>> +		platform_device_unregister(private->clk_dev);
->>> +
->>>  	return 0;
->>>  }
->>>  
->>> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.h b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
->>> index 86cec19193c4..200eee5de419 100644
->>> --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.h
->>> +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
->>> @@ -34,11 +34,13 @@ struct mtk_mmsys_driver_data {
->>>  	const enum mtk_ddp_comp_id *ext_path;
->>>  	unsigned int ext_len;
->>>  	bool shadow_register;
->>> +	const char *clk_drv_name;
->>>  };
->>>  
->>>  struct mtk_drm_private {
->>>  	struct drm_device *drm;
->>>  	struct device *dma_dev;
->>> +	struct platform_device *clk_dev;
->>>  
->>>  	unsigned int num_pipes;
->>>  
->>
->>
+diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+index 01ff146..a75be7c 100644
+--- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
++++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+@@ -340,4 +340,174 @@
+ 			};
+ 		};
+ 	};
++
++	thermal-zones {
++		cpu0-thermal {
++			polling-delay-passive = <250>;
++			polling-delay = <1000>;
++
++			thermal-sensors = <&tsens0 1>;
++
++			trips {
++				cpu_alert0: trip0 {
++					temperature = <75000>;
++					hysteresis = <2000>;
++					type = "passive";
++				};
++
++				cpu_crit0: trip1 {
++					temperature = <110000>;
++					hysteresis = <1000>;
++					type = "critical";
++				};
++			};
++		};
++
++		cpu1-thermal {
++			polling-delay-passive = <250>;
++			polling-delay = <1000>;
++
++			thermal-sensors = <&tsens0 2>;
++
++			trips {
++				cpu_alert1: trip0 {
++					temperature = <75000>;
++					hysteresis = <2000>;
++					type = "passive";
++				};
++
++				cpu_crit1: trip1 {
++					temperature = <110000>;
++					hysteresis = <1000>;
++					type = "critical";
++				};
++			};
++		};
++
++		cpu2-thermal {
++			polling-delay-passive = <250>;
++			polling-delay = <1000>;
++
++			thermal-sensors = <&tsens0 3>;
++
++			trips {
++				cpu_alert2: trip0 {
++					temperature = <75000>;
++					hysteresis = <2000>;
++					type = "passive";
++				};
++
++				cpu_crit2: trip1 {
++					temperature = <110000>;
++					hysteresis = <1000>;
++					type = "critical";
++				};
++			};
++		};
++
++		cpu3-thermal {
++			polling-delay-passive = <250>;
++			polling-delay = <1000>;
++
++			thermal-sensors = <&tsens0 4>;
++
++			trips {
++				cpu_alert3: trip0 {
++					temperature = <75000>;
++					hysteresis = <2000>;
++					type = "passive";
++				};
++
++				cpu_crit3: trip1 {
++					temperature = <110000>;
++					hysteresis = <1000>;
++					type = "critical";
++				};
++			};
++		};
++
++		cpu4-thermal {
++			polling-delay-passive = <250>;
++			polling-delay = <1000>;
++
++			thermal-sensors = <&tsens0 7>;
++
++			trips {
++				cpu_alert4: trip0 {
++					temperature = <75000>;
++					hysteresis = <2000>;
++					type = "passive";
++				};
++
++				cpu_crit4: trip1 {
++					temperature = <110000>;
++					hysteresis = <1000>;
++					type = "critical";
++				};
++			};
++		};
++
++		cpu5-thermal {
++			polling-delay-passive = <250>;
++			polling-delay = <1000>;
++
++			thermal-sensors = <&tsens0 8>;
++
++			trips {
++				cpu_alert5: trip0 {
++					temperature = <75000>;
++					hysteresis = <2000>;
++					type = "passive";
++				};
++
++				cpu_crit5: trip1 {
++					temperature = <110000>;
++					hysteresis = <1000>;
++					type = "critical";
++				};
++			};
++		};
++
++		cpu6-thermal {
++			polling-delay-passive = <250>;
++			polling-delay = <1000>;
++
++			thermal-sensors = <&tsens0 9>;
++
++			trips {
++				cpu_alert6: trip0 {
++					temperature = <75000>;
++					hysteresis = <2000>;
++					type = "passive";
++				};
++
++				cpu_crit6: trip1 {
++					temperature = <110000>;
++					hysteresis = <1000>;
++					type = "critical";
++				};
++			};
++		};
++
++		cpu7-thermal {
++			polling-delay-passive = <250>;
++			polling-delay = <1000>;
++
++			thermal-sensors = <&tsens0 10>;
++
++			trips {
++				cpu_alert7: trip0 {
++					temperature = <75000>;
++					hysteresis = <2000>;
++					type = "passive";
++				};
++
++				cpu_crit7: trip1 {
++					temperature = <110000>;
++					hysteresis = <1000>;
++					type = "critical";
++				};
++			};
++		};
++	};
+ };
+-- 
+2.7.4
