@@ -1,102 +1,40 @@
-From: edgar.righi@lsitec.org.br (Edgar Bernardi Righi)
-Date: Wed, 18 Jul 2018 12:43:31 -0300
-Subject: [PATCH v1 02/04] dt-bindings: clock: Add Clock Management Unit for
- Actions Semi S500 SoC
-Message-ID: <CADHB5bAD6A6U1Gk0kzVse1n-g2ONQtoMoOYxpMwGZuExvqsYKA@mail.gmail.com>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Wed, 18 Jul 2018 16:46:53 +0100
+Subject: [GIT PULL] arm64: defconfig: hisilicon config updates for v4.19
+Message-ID: <5B4F60ED.2070106@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Clock Management Unit for Actions Semi S500 SoC. Dt-Bindings
-constants added.
-Tested on a Lemaker Guitar board.
+Hi Olof, Hi Arnd,
 
-File(s) created: "/include/dt-bindings/clock/actions,s500-cmu.h"
+Please consider to pull the following changes.
+Thanks!
 
-Signed-off-by: Edgar Bernardi Righi <edgar.righi@lsitec.org.br>
+Best Regards,
+Wei
 
-diff -uprN -X vanilla/Documentation/dontdiff
-vanilla/include/dt-bindings/clock/actions,s500-cmu.h
-linux/include/dt-bindings/clock/actions,s500-cmu.h
---- vanilla/include/dt-bindings/clock/actions,s500-cmu.h    1969-12-31
-21:00:00.000000000 -0300
-+++ linux/include/dt-bindings/clock/actions,s500-cmu.h    2018-07-18
-12:42:13.002448774 -0300
-@@ -0,0 +1,78 @@
-+// SPDX-License-Identifier: GPL-2.0+
-+//
-+// Device Tree binding constants for Actions Semi S500 Clock Management Unit
-+//
-+// Copyright (c) 2014 Actions Semi Inc.
-+// Copyright (c) 2018 Linaro Ltd.
-+// Copyright (c) 2018 LSI-TEC - Caninos Loucos
-+
-+#ifndef __DT_BINDINGS_CLOCK_S500_CMU_H
-+#define __DT_BINDINGS_CLOCK_S500_CMU_H
-+
-+#define CLK_NONE            0
-+
-+/* fixed rate clocks */
-+#define CLK_LOSC            1
-+#define CLK_HOSC            2
-+
-+/* pll clocks */
-+#define CLK_CORE_PLL        3
-+#define CLK_DEV_PLL            4
-+#define CLK_DDR_PLL            5
-+#define CLK_NAND_PLL        6
-+#define CLK_DISPLAY_PLL        7
-+#define CLK_ETHERNET_PLL    8
-+#define CLK_AUDIO_PLL        9
-+
-+/* system clock */
-+#define CLK_DEV                10
-+#define CLK_H                11
-+#define CLK_AHBPREDIV        12
-+#define CLK_AHB                13
-+#define CLK_DE                14
-+#define CLK_BISP            15
-+#define CLK_VCE                16
-+#define CLK_VDE                17
-+
-+/* peripheral device clock */
-+#define CLK_TIMER            18
-+#define CLK_I2C0            19
-+#define CLK_I2C1            20
-+#define CLK_I2C2            21
-+#define CLK_I2C3            22
-+#define CLK_PWM0            23
-+#define CLK_PWM1            24
-+#define CLK_PWM2            25
-+#define CLK_PWM3            26
-+#define CLK_PWM4            27
-+#define CLK_PWM5            28
-+#define CLK_SD0                29
-+#define CLK_SD1                30
-+#define CLK_SD2                31
-+#define CLK_SENSOR0            32
-+#define CLK_SENSOR1            33
-+#define CLK_SPI0            34
-+#define CLK_SPI1            35
-+#define CLK_SPI2            36
-+#define CLK_SPI3            37
-+#define CLK_UART0            38
-+#define CLK_UART1            39
-+#define CLK_UART2            40
-+#define CLK_UART3            41
-+#define CLK_UART4            42
-+#define CLK_UART5            43
-+#define CLK_UART6            44
-+#define CLK_DE1                45
-+#define CLK_DE2                46
-+#define CLK_I2SRX            47
-+#define CLK_I2STX            48
-+#define CLK_HDMI_AUDIO        49
-+#define CLK_HDMI            50
-+#define CLK_SPDIF            51
-+#define CLK_NAND            52
-+#define CLK_ECC                53
-+#define CLK_RMII_REF        54
-+
-+#define CLK_NR_CLKS            (CLK_RMII_REF + 1)
-+
-+#endif /* __DT_BINDINGS_CLOCK_S500_CMU_H */
+---
+
+The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
+
+  Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+
+are available in the Git repository at:
+
+  git://github.com/hisilicon/linux-hisi.git tags/hisi-defconfig-for-4.19
+
+for you to fetch changes up to cc4493faf494bb8af2324b1b7cabd1f1457a76ca:
+
+  arm64: defconfig: enable HiSilicon PMU driver (2018-07-17 14:06:16 +0100)
+
+----------------------------------------------------------------
+ARM64: hisilicon: defconfig updates for 4.18
+
+- Enable uncore pmu for some hisilicon SoCs
+
+----------------------------------------------------------------
+Zhou Wang (1):
+      arm64: defconfig: enable HiSilicon PMU driver
+
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
