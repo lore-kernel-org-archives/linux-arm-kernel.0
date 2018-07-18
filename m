@@ -1,261 +1,115 @@
-From: sean.wang@mediatek.com (Sean Wang)
-Date: Wed, 18 Jul 2018 18:06:27 +0800
-Subject: [resend PATCH v4 4/5] drm/mediatek: Add support for mmsys
- through a pdev
-In-Reply-To: <51066716.k5MkZnrqCl@avalon>
-References: <20180717220328.792-1-matthias.bgg@kernel.org>
- <20180717220328.792-5-matthias.bgg@kernel.org>
- <1531882655.8953.83.camel@mtkswgap22> <51066716.k5MkZnrqCl@avalon>
-Message-ID: <1531908387.8953.147.camel@mtkswgap22>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Wed, 18 Jul 2018 12:06:55 +0200
+Subject: [PATCH 1/5] thermal: exynos: enable core tmu clk on exynos
+ platform
+In-Reply-To: <CANAwSgRFehdmYZvPL3yD1=Ng_w1Yhtij=nvZEOqkof7zj8fcwA@mail.gmail.com>
+References: <1531822342-4293-1-git-send-email-linux.amoon@gmail.com>
+ <CAJKOXPdP78VFQgSQ9z9WsgYY_YhEKPUt=0MOra6Pz6smQeiNGg@mail.gmail.com>
+ <CANAwSgS=08fVsqn95WHzSF71WTTyD2-=K2C6-BEz0tY0t6A1-g@mail.gmail.com>
+ <CAJKOXPdXYz77Bqyjr3HK+EA0HpEABPqmPOD0f5ew-yq2SFVpVQ@mail.gmail.com>
+ <CANAwSgRFehdmYZvPL3yD1=Ng_w1Yhtij=nvZEOqkof7zj8fcwA@mail.gmail.com>
+Message-ID: <CAJKOXPfRBPgmGc17XEzW5+MK80JcudCbhBfLeMFTQYjWLJ3JeA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2018-07-18 at 11:05 +0300, Laurent Pinchart wrote:
-> Hi Sean,
-> 
-> On Wednesday, 18 July 2018 05:57:35 EEST Sean Wang wrote:
-> > On Wed, 2018-07-18 at 00:03 +0200, matthias.bgg at kernel.org wrote:
-> > > From: Matthias Brugger <mbrugger@suse.com>
-> > > 
-> > > The MMSYS subsystem includes clocks and drm components.
-> > > This patch adds an initailization path through a platform device
-> > > for the clock part, so that both drivers get probed from the same
-> > > device tree compatible.
-> > 
-> > Sorry for that I should have a response earlier for the series.
-> > 
-> > Some points I felt they're not exactly right and should be fixed up
-> > before we're moving on
-> > 
-> > Currently, drm driver have a wrong reference to the dt-binding,
-> > "mediatek,mt2701-mmsys" or "mediatek,mt8173-mmsys", they should be all
-> > for the subsystem exporting clock and reset line such common resource to
-> > its sub-devices. Every subsystem has a similar shape. I hope mmsys
-> > shouldn't be an exception.
-> > 
-> > DRM device needs to have its own dt-binding show how connections between
-> > DRM components being made and its node should be put under mmsys node.
-> > 
-> > In this way, it becomes easy to see how the topology of the subsystem is
-> > and grows, like a tree "device tree", instead of hiding the details in
-> > the implementation.
-> > 
-> > The similar example we already did for audsys on mt2701 and mt7623 as
-> > below
-> > 
-> > 	audsys: clock-controller at 11220000 {
-> > 		
-> compatible = "mediatek,mt7623-audsys",
-> > 		
-> 	     "mediatek,mt2701-audsys",
-> > 		
-> 	     "syscon";
-> > 		
-> 	...
-> > 
-> > 		
-> afe: audio-controller {
-> > 		
-> 	compatible = "mediatek,mt7623-audio",
-> > 		
-> 		
->      "mediatek,mt2701-audio";
-> > 
-> > 		
-> 	...
-> > 		
-> };
-> > 	};
-> 
-> This looks very strange to me. I'm not familiar with the hardware 
-> architecture, but a clock controller that includes an audio controller seems 
-> like a very weird design. It's usually the other way around, you have an audio
+On 18 July 2018 at 11:24, Anand Moon <linux.amoon@gmail.com> wrote:
+> Hi Krzysztof
+>
+> On 18 July 2018 at 11:47, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+>> On 17 July 2018 at 22:23, Anand Moon <linux.amoon@gmail.com> wrote:
+>>> Hi Krzysztof
+>>>
+>>> On 17 July 2018 at 17:50, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+>>>> Hi Anand,
+>>>>
+>>>> Thanks for patch.
+>>>>
+>>>> On 17 July 2018 at 12:12, Anand Moon <linux.amoon@gmail.com> wrote:
+>>>>> clk_summary do not show tmu_apbif clk enable, so replace
+>>>>> the clk_prepare with clk_prepare_enables to enable tmu clk.
+>>>>
+>>>> This is not valid reason to do a change. What is clk_summary does not
+>>>> really matter. Your change has negative impact on power consumption as
+>>>> the clock stays enabled all the time. This is not what we want... so
+>>>> please explain it more - why you need the clock to be enabled all the
+>>>> time? What is broken (clk_summary is not broken in this case)?
+>>>>
+>>>
+>>> Opps I could not explain some more in my commit message.
+>>>
+>>> Actually TMU sensor for Exynos process are controlled by so external clk
+>>>
+>>> Exynos4412 have VDD18_TS sensor which controls the CLK_SENSE tmu.
+>>> Exynos5422 have VDD18_TS01 / VDD18_TS23 / VDD18_TS4 sensor which
+>>> control the CLK_SENSE tmu.
+>>>
+>>> So as per my understanding tmu is clk driver which control the flow  PMIC.
+>>>
+>>> clk_prepare_enable combine clk_prepare and clk_enable
+>>> and clk_disable_unprepare combine clk_disable and clk_unprepare.
+>>>
+>>> most of the driver prefer clk_prepare_enable and clk_disable_unprepare.
+>>>
+>>> clk_summary is just a reference looking point where we could check the
+>>> clk is enable/disable.
+>>>
+>>> what is broken ?
+>>> I still few more parameter need to tuned to configure the tmu driver.
+>>
+>> I am sorry but I am still unable to see what is broken and what are
+>> you trying to fix. I asked what is broken and you replied that there
+>> is a sensor, there is a clock, drivers use clk_prepare_enable and some
+>> more parameter need to be tuned... None of these are answers to
+>> question - what is broken. How can I reproduce the problem?
+>>
+>> Best regards,
+>> Krzysztof
+>
+> Basically I use thermal testing.
+>
+> # git clone https://git.linaro.org/power/pm-qa.git
+> # cd pm-qa
+> # make -C thermal check
+>
+> most of the testcase failed on Exynos5422 but some pass on Exynos4412.
+>
+> Attach is the software overview from Exynos5422 user manual.
+>
+> I am not able to explain in deep technically, but I have studied other thermal
+> driver to draw into conclusion that tmu clk's need to be enabled.
 
-yes, naming audsys as clock controller is really not good. it should be
-worth a better naming.
+That is true in general - the clk has to be enabled in certain cases.
+However you did not say at all when you want this clock to be
+enabled... and the your patch enables it for entire lifetime of
+device.
 
-mtk subsystem AFAIK works as a container, at least provides clocks,
-reset, syscon access, these common resource to these devices running on
-the subsystem. It also has a power gate independent from other
-subsystem, that can be controlled when these devices all powered down
-or once up.
+> If you feel the we should not enable these clk, them I will drop the
+> clk_prepare_enable check
+> and resubmit the changes with better commit message.
 
-And it should be better that we don't assume what exact devices are
-running on since it is possible that there're different devices running
-on the same subsystem per SoC. mtk has many subsystem working in this
-way. mmsys is just a case. we can see in [1]
+I don't know. This was fifth email in this thread and it is the first
+time some real problem is mentioned. Still the issue is not described
+entirely so I really do not have a clue whether this patch fixes
+something or not.
+What is more, you mentioned falling pm-qa tests here (not in commit
+msg) but did not say whether this patch fixes anything or not.
 
+So let me summarize it:
+1. You did not describe the problem you want to fix.
+2. The patch looks incorrect because it enables the clock for entire
+lifetime of device which we do not want.
+3. The patch might or not might fix some problem. We even do not know what...
+4. The clock not being enabled when not needed... is obviously not a problem.
 
-[1]
-https://elixir.bootlin.com/linux/v4.18-rc5/source/Documentation/devicetree/bindings/arm/mediatek
- 
-> controller, and it also contains hardware that produces clocks, and possibly 
-> handles miscellaneous audio-related routing tasks. I would thus expect the 
-> reverse in the device tree:
-> 
-> 	afe: audio-controller at 11220000 {
-> 		
-> compatible = "mediatek,mt7623-audio",
-> 		
-> 	     "mediatek,mt2701-audio";
-> 		
-> ..
-> 
-> 		
-> audsys: clock-controller {
-> 		
-> 	compatible = "mediatek,mt7623-audsys",
-> 		
-> 		
->      "mediatek,mt2701-audsys",
-> 		
-> 		
->      "syscon";
-> 		
-> 	...
-> 		
-> };
-> 	};
-> 
-> And if audsys only exposes clocks, you don't even need a subnode to represent 
-> it, the audio controller itself can be a clock provider.
-> 
-> 	afe: audio-controller at 11220000 {
-> 		
-> compatible = "mediatek,mt7623-audio",
-> 		
-> 	     "mediatek,mt2701-audio";
-> 		
-> #clock-cells = <1>;
-> 		
-> ..
-> 	};
-> 
-> > > Signed-off-by: Matthias Brugger <mbrugger@suse.com>
-> > > ---
-> > > 
-> > >  drivers/gpu/drm/mediatek/mtk_drm_drv.c | 18 ++++++++++++++++++
-> > >  drivers/gpu/drm/mediatek/mtk_drm_drv.h |  2 ++
-> > >  2 files changed, 20 insertions(+)
-> > > 
-> > > diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-> > > b/drivers/gpu/drm/mediatek/mtk_drm_drv.c index dd249cf5121e..c946aea722e5
-> > > 100644
-> > > --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-> > > +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-> > > @@ -173,6 +173,7 @@ static const struct mtk_mmsys_driver_data
-> > > mt2701_mmsys_driver_data = {> 
-> > >  	.ext_path = mt2701_mtk_ddp_ext,
-> > >  	.ext_len = 
-> ARRAY_SIZE(mt2701_mtk_ddp_ext),
-> > >  	.shadow_register = true,
-> > > 
-> > > +	.clk_drv_name = "clk-mt2701-mm",
-> > > 
-> > >  };
-> > >  
-> > >  static const struct mtk_mmsys_driver_data mt8173_mmsys_driver_data = {
-> > > 
-> > > @@ -180,6 +181,7 @@ static const struct mtk_mmsys_driver_data
-> > > mt8173_mmsys_driver_data = {> 
-> > >  	.main_len = 
-> ARRAY_SIZE(mt8173_mtk_ddp_main),
-> > >  	.ext_path = mt8173_mtk_ddp_ext,
-> > >  	.ext_len = 
-> ARRAY_SIZE(mt8173_mtk_ddp_ext),
-> > > 
-> > > +	.clk_drv_name = "clk-mt8173-mm",
-> > > 
-> > >  };
-> > >  
-> > >  static int mtk_drm_kms_init(struct drm_device *drm)
-> > > 
-> > > @@ -411,6 +413,19 @@ static int mtk_drm_probe(struct platform_device
-> > > *pdev)
-> > > 
-> > >  	if (IS_ERR(private->config_regs))
-> > >  	
-> > >  		
-> return PTR_ERR(private->config_regs);
-> > > 
-> > > +	if (private->data->clk_drv_name) {
-> > > +		
-> private->clk_dev = platform_device_register_data(dev,
-> > > +		
-> 		
-> 		
-> private->data->clk_drv_name, -1,
-> > > +		
-> 		
-> 		
-> NULL, 0);
-> > > +
-> > > +		
-> if (IS_ERR(private->clk_dev)) {
-> > > +		
-> 	pr_err("failed to register %s platform 
-> device\n",
-> > > +		
-> 		
-> 		
-> private->data->clk_drv_name);
-> > > +
-> > > +		
-> 	return PTR_ERR(private->clk_dev);
-> > > +		
-> }
-> > > +	}
-> > > +
-> > > 
-> > >  	/* Iterate over sibling DISP 
-> function blocks */
-> > >  	for_each_child_of_node(dev->of_node-
-> >parent, node) {
-> > >  	
-> > >  		
-> const struct of_device_id *of_id;
-> > > 
-> > > @@ -515,6 +530,9 @@ static int mtk_drm_remove(struct platform_device
-> > > *pdev)
-> > > 
-> > >  	for (i = 0; i < 
-> DDP_COMPONENT_ID_MAX; i++)
-> > >  	
-> > >  		
-> of_node_put(private->comp_node[i]);
-> > > 
-> > > +	if (private->clk_dev)
-> > > +		
-> platform_device_unregister(private->clk_dev);
-> > > +
-> > > 
-> > >  	return 0;
-> > >  
-> > >  }
-> > > 
-> > > diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.h
-> > > b/drivers/gpu/drm/mediatek/mtk_drm_drv.h index 86cec19193c4..200eee5de419
-> > > 100644
-> > > --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.h
-> > > +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
-> > > @@ -34,11 +34,13 @@ struct mtk_mmsys_driver_data {
-> > > 
-> > >  	const enum mtk_ddp_comp_id 
-> *ext_path;
-> > >  	unsigned int ext_len;
-> > >  	bool shadow_register;
-> > > 
-> > > +	const char *clk_drv_name;
-> > > 
-> > >  };
-> > >  
-> > >  struct mtk_drm_private {
-> > >  
-> > >  	struct drm_device *drm;
-> > >  	struct device *dma_dev;
-> > > 
-> > > +	struct platform_device *clk_dev;
-> > > 
-> > >  	unsigned int num_pipes;
-> 
-> 
+Please start from beginning. Find the problem, tell us how it can be
+reproduced and deliver a single patch which fixes the problem.
+
+This pattern of your code - fixing something without describing the
+problem - happened many time before. I repeated this some times before
+as well. I would prefer not to repeat to many times. Therefore I would
+be happy if you follow the path mentioned in paragraph before always:
+find the problem, tell how it can be reproduced, deliver single patch
+which fixes the problem.
+
+Best regards,
+Krzysztof
