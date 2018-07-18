@@ -1,15 +1,17 @@
 From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Wed, 18 Jul 2018 16:24:45 +0530
-Subject: [PATCH v3 05/18] dt-bindings: display: Add compatible for A64 HDMI
+Date: Wed, 18 Jul 2018 16:24:46 +0530
+Subject: [PATCH v3 06/18] dt-bindings: clock: sun50i-a64-ccu: Add
+ PLL_VIDEO[0-1] macros
 In-Reply-To: <20180718105458.22304-1-jagan@amarulasolutions.com>
 References: <20180718105458.22304-1-jagan@amarulasolutions.com>
-Message-ID: <20180718105458.22304-6-jagan@amarulasolutions.com>
+Message-ID: <20180718105458.22304-7-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HDMI on Allwinner A64 has similar like H3/H5/A83T.
+Allwinner A64 has two clock parents PLL_VIDEO0 and PLL_VIDEO1.
 
-Add compatible a64 and update A83T compatible as fallback.
+Include these macros on dt-bindings so-that the same can be
+used while defining CCU clock phadles.
 
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 Reviewed-by: Rob Herring <robh@kernel.org>
@@ -17,22 +19,24 @@ Reviewed-by: Rob Herring <robh@kernel.org>
 Changes for v3:
 - collect Rob r-w-b tag
 Changes for v2:
-- Add fallback compatible
+- new patch
 
- Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 1 +
- 1 file changed, 1 insertion(+)
+ include/dt-bindings/clock/sun50i-a64-ccu.h | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-index 3594378fbe72..10b3c77833c2 100644
---- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-+++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-@@ -78,6 +78,7 @@ Required properties:
+diff --git a/include/dt-bindings/clock/sun50i-a64-ccu.h b/include/dt-bindings/clock/sun50i-a64-ccu.h
+index d66432c6e675..d1d7d5b7d06a 100644
+--- a/include/dt-bindings/clock/sun50i-a64-ccu.h
++++ b/include/dt-bindings/clock/sun50i-a64-ccu.h
+@@ -43,7 +43,9 @@
+ #ifndef _DT_BINDINGS_CLK_SUN50I_A64_H_
+ #define _DT_BINDINGS_CLK_SUN50I_A64_H_
  
-   - compatible: value must be one of:
-     * "allwinner,sun8i-a83t-dw-hdmi"
-+    * "allwinner,sun50i-a64-dw-hdmi", "allwinner,sun8i-a83t-dw-hdmi"
-   - reg: base address and size of memory-mapped region
-   - reg-io-width: See dw_hdmi.txt. Shall be 1.
-   - interrupts: HDMI interrupt number
++#define CLK_PLL_VIDEO0		7
+ #define CLK_PLL_PERIPH0		11
++#define CLK_PLL_VIDEO1		15
+ 
+ #define CLK_BUS_MIPI_DSI	28
+ #define CLK_BUS_CE		29
 -- 
 2.17.1
