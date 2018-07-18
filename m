@@ -1,141 +1,78 @@
-From: tpiepho@impinj.com (Trent Piepho)
-Date: Wed, 18 Jul 2018 12:44:24 -0700
-Subject: [PATCH 2/2] PCI: imx: Add workaround for e10728,
- IMX7d PCIe PLL failure
-In-Reply-To: <20180718194424.8844-1-tpiepho@impinj.com>
-References: <20180718194424.8844-1-tpiepho@impinj.com>
-Message-ID: <20180718194424.8844-3-tpiepho@impinj.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 18 Jul 2018 13:50:56 -0600
+Subject: [RFC PATCH v2 1/4] dt-bindings: misc: Add bindings for misc. BMC
+ control fields
+In-Reply-To: <ece91112ecfdc7218184c4c4519e455cf9397e11.camel@kernel.crashing.org>
+References: <20180711053122.30773-1-andrew@aj.id.au>
+ <20180711053122.30773-2-andrew@aj.id.au>
+ <20180711200450.GB17291@rob-hp-laptop>
+ <1531356830.3551458.1437853280.551CA8C5@webmail.messagingengine.com>
+ <CAL_JsqKpXxR4t_-3BOy-0mFePXkaSck_4PfHRD=OZQ-_-T5P=w@mail.gmail.com>
+ <b6ced4cad4d7ff78330181b2c893855c23103953.camel@kernel.crashing.org>
+ <1531463489.747186.1439263128.075AECE1@webmail.messagingengine.com>
+ <CAL_JsqLZo-=7UkuvvUFYdCR4asBBiWyC=Q1ryH=-HLU6vzf9tA@mail.gmail.com>
+ <ece91112ecfdc7218184c4c4519e455cf9397e11.camel@kernel.crashing.org>
+Message-ID: <CAL_JsqL_bMXLAA0091-g8PmhXR5g5Pf2y2=ey7Ss5ofHm46sWw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This implements the workound described in the NXP IMX7d erratum e10728.
+On Mon, Jul 16, 2018 at 10:56 PM Benjamin Herrenschmidt
+<benh@kernel.crashing.org> wrote:
+>
+> On Mon, 2018-07-16 at 07:55 -0600, Rob Herring wrote:
+> > If that data is one set per SoC, then i'm not that concerned having
+> > platform-specific data in the driver. That doesn't mean the driver is
+> > not "generic". It's still not clear to me in this thread, how much of
+> > this is board specific, but given that you've placed all the data in
+> > an SoC dtsi file it seems to be all per SoC.
+>
+> So Rob, I think that's precisely where the disconnect is.
+>
+> I think we all (well hopefully) agree that those few tunables don't fit
+> in any existing subystem and aren't likely to ever do (famous last
+> words...).
+>
+> Where we disagree is we want to make this parametrized via the DT, and
+> you want us to hard wire the list in some kind of SoC driver for a
+> given SoC family/version.
+>
+> The reason I think hard wiring the list in the driver is not a great
+> solution is that that list in itself is prone to variations, possibly
+> fairly often, between boards, vendors, versions of boards, etc...
 
-Initial VCO oscillation may fail under corner conditions such as cold
-temperature.  It causes PCIe PLL to fail to lock in the initialization
-phase, which results in the PCIe link failing to come up.
+Can we separate the list of what's enabled from the details of the
+registers?  Even if we put all this into DT, we may still want to have
+some separation for dts file structure. Some portion of this has to be
+SoC specific because you are simply exposing SoC registers.
 
-The workaround is to disable Duty-cycle Corrector (DCC) calibration
-after G_RST.
+> We can't know for sure every SoC tunable (out of the gazillions in
+> those chips) are going to be needed for a given system. We know which
+> ones we do use for ours, and that's a couple of handfuls, but it could
+> be that Dell need a slightly different set, and so might Yadro, or so
+> might our next board revision for that matter.
 
-To do this it is necessary to gain access to the undocumented and
-currently unused PCIe PHY register bank.  A new device tree node of type
-"fsl,imx-pcie-phy" is created for the PHY block and the existing PCIe
-device uses a phandle named "fsl,pcie-phy" to point to it.
+That's very hand wavy. Do you have some concrete examples (i.e. dts
+files) showing the differences.
 
-Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: Fabio Estevam <fabio.estevam@nxp.com>
-Cc: Richard Zhu <hongxing.zhu@nxp.com>
-Cc: Lucas Stach <l.stach@pengutronix.de>
-Signed-off-by: Trent Piepho <tpiepho@impinj.com>
----
- drivers/pci/dwc/pci-imx6.c | 59 ++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 59 insertions(+)
+One problem I'm having with this is you are still going to need per
+board specifics in userspace. You may be moving some of details out,
+but moving to DT is not going to completely eliminate that. I agree
+that not using /dev/mem is a good thing, but there are several ways
+you could do that independent of any DT binding.
 
-diff --git a/drivers/pci/dwc/pci-imx6.c b/drivers/pci/dwc/pci-imx6.c
-index dcf389b62944..32429afc9380 100644
---- a/drivers/pci/dwc/pci-imx6.c
-+++ b/drivers/pci/dwc/pci-imx6.c
-@@ -18,6 +18,7 @@
- #include <linux/module.h>
- #include <linux/of_gpio.h>
- #include <linux/of_device.h>
-+#include <linux/of_address.h>
- #include <linux/pci.h>
- #include <linux/platform_device.h>
- #include <linux/regmap.h>
-@@ -58,6 +59,7 @@ struct imx6_pcie {
- 	u32			tx_swing_low;
- 	int			link_gen;
- 	struct regulator	*vpcie;
-+	void __iomem		*phy_base;
- };
- 
- /* Parameters for the waiting for PCIe PHY PLL to lock on i.MX7 */
-@@ -98,6 +100,23 @@ struct imx6_pcie {
- #define PCIE_PHY_RX_ASIC_OUT 0x100D
- #define PCIE_PHY_RX_ASIC_OUT_VALID	(1 << 0)
- 
-+/* iMX7 PCIe PHY registers */
-+#define PCIE_PHY_CMN_REG4		0x14
-+/* These are probably the bits that *aren't* DCC_FB_EN */
-+#define PCIE_PHY_CMN_REG4_DCC_FB_EN	0x29
-+
-+#define PCIE_PHY_CMN_REG15	        0x54
-+#define PCIE_PHY_CMN_REG15_DLY_4	BIT(2)
-+#define PCIE_PHY_CMN_REG15_PLL_PD	BIT(5)
-+#define PCIE_PHY_CMN_REG15_OVRD_PLL_PD	BIT(7)
-+
-+#define PCIE_PHY_CMN_REG24		0x90
-+#define PCIE_PHY_CMN_REG24_RX_EQ	BIT(6)
-+#define PCIE_PHY_CMN_REG24_RX_EQ_SEL	BIT(3)
-+
-+#define PCIE_PHY_CMN_REG26		0x98
-+#define PCIE_PHY_CMN_REG26_ATT_MODE	0xBC
-+
- #define PHY_RX_OVRD_IN_LO 0x1005
- #define PHY_RX_OVRD_IN_LO_RX_DATA_EN (1 << 5)
- #define PHY_RX_OVRD_IN_LO_RX_PLL_EN (1 << 3)
-@@ -431,6 +450,26 @@ static void imx6_pcie_deassert_core_reset(struct imx6_pcie *imx6_pcie)
- 	switch (imx6_pcie->variant) {
- 	case IMX7D:
- 		reset_control_deassert(imx6_pcie->pciephy_reset);
-+
-+		/* Workaround for ERR010728, failure of PCI-e PLL VCO to
-+		 * oscillate, especially when cold.  This turns off "Duty-cycle
-+		 * Corrector" and other mysterious undocumented things.
-+		 */
-+		if (likely(imx6_pcie->phy_base)) {
-+			/* De-assert DCC_FB_EN */
-+			writel(PCIE_PHY_CMN_REG4_DCC_FB_EN,
-+			       imx6_pcie->phy_base + PCIE_PHY_CMN_REG4);
-+			/* Assert RX_EQS and RX_EQS_SEL */
-+			writel(PCIE_PHY_CMN_REG24_RX_EQ_SEL
-+				| PCIE_PHY_CMN_REG24_RX_EQ,
-+			       imx6_pcie->phy_base + PCIE_PHY_CMN_REG24);
-+			/* Assert ATT_MODE */
-+			writel(PCIE_PHY_CMN_REG26_ATT_MODE,
-+			       imx6_pcie->phy_base + PCIE_PHY_CMN_REG26);
-+		} else {
-+			dev_err(dev, "PHY base address not set\n");
-+		}
-+
- 		imx7d_pcie_wait_for_phy_pll_lock(imx6_pcie);
- 		break;
- 	case IMX6SX:
-@@ -698,6 +737,7 @@ static int imx6_pcie_probe(struct platform_device *pdev)
- 	struct device *dev = &pdev->dev;
- 	struct dw_pcie *pci;
- 	struct imx6_pcie *imx6_pcie;
-+	struct device_node *np;
- 	struct resource *dbi_base;
- 	struct device_node *node = dev->of_node;
- 	int ret;
-@@ -717,6 +757,25 @@ static int imx6_pcie_probe(struct platform_device *pdev)
- 	imx6_pcie->variant =
- 		(enum imx6_pcie_variants)of_device_get_match_data(dev);
- 
-+	/* Find the PHY if one is defined, only imx7d uses it */
-+	np = of_parse_phandle(node, "fsl,pcie-phy", 0);
-+	if (np) {
-+		struct resource res;
-+
-+		ret = of_address_to_resource(np, 0, &res);
-+		if (ret) {
-+			dev_err(dev, "Unable to map PCIe PHY\n");
-+			return ret;
-+		}
-+		imx6_pcie->phy_base = devm_ioremap_resource(dev, &res);
-+		if (IS_ERR(imx6_pcie->phy_base)) {
-+			dev_err(dev, "Unable to map PCIe PHY\n");
-+			return PTR_ERR(imx6_pcie->phy_base);
-+		}
-+	} else {
-+		imx6_pcie->phy_base = NULL;
-+	}
-+
- 	dbi_base = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	pci->dbi_base = devm_ioremap_resource(dev, dbi_base);
- 	if (IS_ERR(pci->dbi_base))
--- 
-2.14.4
+> Now, updating the device-tree in the board flash with whatever vendor
+> specific information is needed is a LOT easier than getting the kernel
+> driver constantly updated. The device-tree after all is there to
+> reflect among other things system specific ways in which the SoC is
+> wired and configured. This is rather close...
+
+Sadly, updating my kernel is easier than updating my PC firmware
+(though packaged firmware on my current laptop changes that). I can
+assure you that ARM boards are generally much worse in that regard.
+BTW, you may want to pay attention to EBBR[1][2]. Not sure how much
+you care for BMCs, but there may be some interest.
+
+Rob
+
+[1] https://github.com/ARM-software/ebbr
+[2] https://lists.linaro.org/pipermail/boot-architecture/
