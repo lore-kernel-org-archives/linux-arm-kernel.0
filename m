@@ -1,58 +1,33 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 18 Jul 2018 10:18:49 +0100
-Subject: [PATCH v4 06/20] arm64: Add a helper for PARange to physical shift
- conversion
-In-Reply-To: <1531905547-25478-1-git-send-email-suzuki.poulose@arm.com>
-References: <1531905547-25478-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1531905547-25478-7-git-send-email-suzuki.poulose@arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 18 Jul 2018 11:19:27 +0200
+Subject: [PATCH/RFT 2/7] ASoC: rsnd: Document R-Car M3-N support
+In-Reply-To: <1531856883-19645-3-git-send-email-ykaneko0929@gmail.com>
+References: <1531856883-19645-1-git-send-email-ykaneko0929@gmail.com>
+ <1531856883-19645-3-git-send-email-ykaneko0929@gmail.com>
+Message-ID: <CAMuHMdXE1YBU3KO1uF97VVQ4cyEfrcnxr2vyb3GEgQvKJ_YG6w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On arm64, ID_AA64MMFR0_EL1.PARange encodes the maximum Physical
-Address range supported by the CPU. Add a helper to decode this
-to actual physical shift. If we hit an unallocated value, return
-the maximum range supported by the kernel.
-This will be used by KVM to set the VTCR_EL2.T0SZ, as it
-is about to move its place. Having this helper keeps the code
-movement cleaner.
+On Tue, Jul 17, 2018 at 9:48 PM Yoshihiro Kaneko <ykaneko0929@gmail.com> wrote:
+> From: Hiroyuki Yokoyama <hiroyuki.yokoyama.vx@renesas.com>
+>
+> Document support for the sound modules in the Renesas M3-N (r8a77965)
+> SoC.
+>
+> No driver update is needed.
+>
+> Signed-off-by: Hiroyuki Yokoyama <hiroyuki.yokoyama.vx@renesas.com>
+> Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
 
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: James Morse <james.morse@arm.com>
-Cc: Christoffer Dall <cdall@kernel.org>
-Reviewed-by: Eric Auger <eric.auger@redhat.com>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
-Changes since V2:
- - Split the patch
- - Limit the physical shift only for values unrecognized.
----
- arch/arm64/include/asm/cpufeature.h | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index 1717ba1..855cf0e 100644
---- a/arch/arm64/include/asm/cpufeature.h
-+++ b/arch/arm64/include/asm/cpufeature.h
-@@ -530,6 +530,19 @@ void arm64_set_ssbd_mitigation(bool state);
- static inline void arm64_set_ssbd_mitigation(bool state) {}
- #endif
- 
-+static inline u32 id_aa64mmfr0_parange_to_phys_shift(int parange)
-+{
-+	switch (parange) {
-+	case 0: return 32;
-+	case 1: return 36;
-+	case 2: return 40;
-+	case 3: return 42;
-+	case 4: return 44;
-+	case 5: return 48;
-+	case 6: return 52;
-+	default: return CONFIG_ARM64_PA_BITS;
-+	}
-+}
- #endif /* __ASSEMBLY__ */
- 
- #endif
+Gr{oetje,eeting}s,
+
+                        Geert
+
 -- 
-2.7.4
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
