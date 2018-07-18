@@ -1,82 +1,55 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Wed, 18 Jul 2018 18:10:34 +0200
-Subject: [PATCH 4/5] net: add support for nvmem to
- eth_platform_get_mac_address()
+Date: Wed, 18 Jul 2018 18:10:32 +0200
+Subject: [PATCH 2/5] net: add an info message to eth_platform_get_mac_address()
 In-Reply-To: <20180718161035.7005-1-brgl@bgdev.pl>
 References: <20180718161035.7005-1-brgl@bgdev.pl>
-Message-ID: <20180718161035.7005-5-brgl@bgdev.pl>
+Message-ID: <20180718161035.7005-3-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-Many non-DT platforms read the MAC address from EEPROM. Usually it's
-either done with callbacks defined in board files or from SoC-specific
-ethernet drivers.
-
-In order to generalize this, try to read the MAC from nvmem in
-eth_platform_get_mac_address() using a standard lookup name:
-"mac-address".
+Many drivers that read the MAC address from EEPROM or MTD emit a log
+message when they succeed. Since this function is meant to be reused
+in those drivers instead of reimplementing the same operation
+everywhere, add an info message when we successfully read the MAC
+address.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- net/ethernet/eth.c | 29 +++++++++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
+ net/ethernet/eth.c | 13 +++++++++++--
+ 1 file changed, 11 insertions(+), 2 deletions(-)
 
 diff --git a/net/ethernet/eth.c b/net/ethernet/eth.c
-index 6b64586fd2af..adf5bd03851f 100644
+index da8530879e1e..2a2173324d9e 100644
 --- a/net/ethernet/eth.c
 +++ b/net/ethernet/eth.c
-@@ -54,6 +54,7 @@
- #include <linux/if_ether.h>
- #include <linux/of_net.h>
- #include <linux/pci.h>
-+#include <linux/nvmem-consumer.h>
- #include <net/dst.h>
- #include <net/arp.h>
- #include <net/sock.h>
-@@ -530,7 +531,10 @@ int eth_platform_get_mac_address(struct device *dev, u8 *mac_addr)
+@@ -530,15 +530,24 @@ int eth_platform_get_mac_address(struct device *dev, u8 *mac_addr)
  	struct device_node *dp = dev_is_pci(dev) ?
  			pci_device_to_OF_node(to_pci_dev(dev)) : dev->of_node;
  	const unsigned char *addr = NULL;
-+	unsigned char addrbuf[ETH_ALEN];
-+	struct nvmem_cell *nvmem;
- 	const char *from = NULL;
-+	size_t alen;
++	const char *from = NULL;
  
- 	if (dp) {
+-	if (dp)
++	if (dp) {
  		addr = of_get_mac_address(dp);
-@@ -544,6 +548,31 @@ int eth_platform_get_mac_address(struct device *dev, u8 *mac_addr)
- 			from = "arch callback";
- 	}
- 
-+	if (!addr) {
-+		nvmem = nvmem_cell_get(dev, "mac-address");
-+		if (IS_ERR(nvmem) && PTR_ERR(nvmem) == -EPROBE_DEFER)
-+			/* We may have a lookup registered for MAC address but
-+			 * the corresponding nvmem provider hasn't been
-+			 * registered yet.
-+			 */
-+			return -EPROBE_DEFER;
-+
-+		if (!IS_ERR(nvmem)) {
-+			addr = nvmem_cell_read(nvmem, &alen);
-+			if (!IS_ERR(addr)) {
-+				from = "nvmem";
-+				/* Don't use ether_addr_copy() in case we
-+				 * didn't get the right size.
-+				 */
-+				memcpy(addrbuf, addr, alen);
-+				kfree(addr);
-+				addr = addrbuf;
-+			}
-+
-+			nvmem_cell_put(nvmem);
-+		}
+-	if (!addr)
++		if (addr)
++			from = "device tree";
 +	}
 +
- 	if (!addr || !is_valid_ether_addr(addr))
++	if (!addr) {
+ 		addr = arch_get_platform_mac_address();
++		if (addr)
++			from = "arch callback";
++	}
+ 
+ 	if (!addr)
  		return -ENODEV;
  
++	dev_info(dev, "read MAC address from %s\n", from);
+ 	ether_addr_copy(mac_addr, addr);
+ 	return 0;
+ }
 -- 
 2.17.1
