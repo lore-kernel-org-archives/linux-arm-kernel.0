@@ -1,65 +1,38 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Wed, 18 Jul 2018 17:22:03 +0200
-Subject: [PATCH] mmc: sunxi: Use new timing mode for A64 eMMC controller
-In-Reply-To: <CAGb2v64NRVaWpbDqiX0JX7_6uvypUpNEecPUj-sSjaK5X-hdQA@mail.gmail.com>
-References: <20180712030225.15681-1-wens@csie.org>
- <20180712071959.fi4rhgwv2iuoelbl@flea>
- <CAGb2v65rE2nQbyeiSPAyTzw-n-EQsUwQABx3nrvXTu4JogFPBQ@mail.gmail.com>
- <20180717151558.wn7v33whtljqt53w@flea>
- <CAGb2v64NRVaWpbDqiX0JX7_6uvypUpNEecPUj-sSjaK5X-hdQA@mail.gmail.com>
-Message-ID: <20180718152203.svrt6wmr2vwh4rb5@flea>
+Date: Wed, 18 Jul 2018 17:23:41 +0200
+Subject: [PATCH v2] drm/sun4i: sun4i: Introduce a quirk for lowest plane
+ alpha support
+In-Reply-To: <76279f0a265bfbe509074fcff3156a437e7091dd.camel@bootlin.com>
+References: <20180718092948.15334-1-paul.kocialkowski@bootlin.com>
+ <76279f0a265bfbe509074fcff3156a437e7091dd.camel@bootlin.com>
+Message-ID: <20180718152341.zr32w5cjtpfec4xe@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 17, 2018 at 11:43:03PM +0800, Chen-Yu Tsai wrote:
-> On Tue, Jul 17, 2018 at 11:15 PM, Maxime Ripard
-> <maxime.ripard@bootlin.com> wrote:
-> > On Thu, Jul 12, 2018 at 06:17:23PM +0800, Chen-Yu Tsai wrote:
-> >> On Thu, Jul 12, 2018 at 3:19 PM, Maxime Ripard
-> >> <maxime.ripard@bootlin.com> wrote:
-> >> > Hi,
-> >> >
-> >> > On Thu, Jul 12, 2018 at 11:02:25AM +0800, Chen-Yu Tsai wrote:
-> >> >> The eMMC controller is also a new timing mode controller, but it doesn't
-> >> >> have the timing mode switch. It does however have signal delay and
-> >> >> calibration controls, typical of Allwinner MMC controllers that support
-> >> >> the new timing mode.
-> >> >>
-> >> >> Enable the new timing mode setting for the A64 eMMC controller. This
-> >> >> also enables MMC HS-DDR modes, which gives higher throughput for eMMC
-> >> >> chips that support it, and can deliver such throughput.
-> >> >>
-> >> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> >> >
-> >> > That doesn't look right. The datasheet explicitly mentions that this
-> >> > bit doesn't apply to the eMMC controller, and the BSP is doing the same:
-> >> > https://github.com/longsleep/linux-pine64/blob/lichee-dev-v3.10.65/drivers/mmc/host/sunxi-mmc-sun50iw1p1-1.c
-> >> >
-> >> > vs
-> >> > https://github.com/longsleep/linux-pine64/blob/lichee-dev-v3.10.65/drivers/mmc/host/sunxi-mmc-sun50iw1p1-2.c
-> >>
-> >> You mean the bit in SDXC_REG_SD_NTSR? Yes I know that doesn't exist
-> >> for the eMMC controller. I mentioned this in the commit message. It
-> >> doesn't exist, and writes to it become a no-op.
-> >>
-> >> Would a comment, or comments, help with making this clear?
-> >
-> > Ah right. Maybe we should move the calibration under can_calibrate
-> > though, or create another boolean for this?
-> >
-> > Putting it under has_new_timings while the SoC doesn't use it looks
-> > very confusing.
+On Wed, Jul 18, 2018 at 11:35:23AM +0200, Paul Kocialkowski wrote:
+> On Wed, 2018-07-18 at 11:29 +0200, Paul Kocialkowski wrote:
+> > Not all sunxi platforms with the first version of the Display Engine
+> > support an alpha component on the plane with the lowest z position
+> > (as in: lowest z-pos), that gets blended with the background color.
+> > 
+> > In particular, the A13 is known to have this limitation. However, it was
+> > recently discovered that the A20 and A33 are capable of having alpha on
+> > their lowest plane.
+> > 
+> > Thus, this introduces a specific quirk to indicate such support,
+> > per-platform. Since this was not tested on sun4i and sun6i platforms, a
+> > conservative approach is kept and this feature is not supported.
 > 
-> IIRC we don't support calibration anyway. This boolean simply signals
-> the usage of the new timing mode, whether by choice, or because it is
-> the only mode the controller supports.
+> Woops, I forgot to include PATCH 1/2 from v1, which did not change.
+> 
+> Would it be preferable for me to send v2 again (and maybe call it v3)
+> for convenience?
 
-This is not the semantic I had in mind when I introduced it. The
-original intent was to set the new timing bit all the time for
-SoCs. If we want to change that semantic, then we also need to make
-sure what this bit means is documented properly.
+Yeah, resend it, and call it v2 resend (explaining why a resend was
+needed).
 
 Maxime
+
 
 -- 
 Maxime Ripard, Bootlin (formerly Free Electrons)
@@ -71,4 +44,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180718/a0d51ed7/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180718/bfd9b33d/attachment.sig>
