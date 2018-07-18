@@ -1,55 +1,163 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 18 Jul 2018 10:18:59 +0100
-Subject: [PATCH v4 16/20] kvm: arm64: Add 52bit support for PAR to HPFAR
- conversoin
-In-Reply-To: <1531905547-25478-1-git-send-email-suzuki.poulose@arm.com>
-References: <1531905547-25478-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1531905547-25478-17-git-send-email-suzuki.poulose@arm.com>
+From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
+Date: Wed, 18 Jul 2018 11:35:23 +0200
+Subject: [PATCH v2] drm/sun4i: sun4i: Introduce a quirk for lowest plane
+ alpha support
+In-Reply-To: <20180718092948.15334-1-paul.kocialkowski@bootlin.com>
+References: <20180718092948.15334-1-paul.kocialkowski@bootlin.com>
+Message-ID: <76279f0a265bfbe509074fcff3156a437e7091dd.camel@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for handling 52bit addresses in PAR to HPFAR
-conversion. Instead of hardcoding the address limits, we
-now use PHYS_MASK_SHIFT.
+On Wed, 2018-07-18 at 11:29 +0200, Paul Kocialkowski wrote:
+> Not all sunxi platforms with the first version of the Display Engine
+> support an alpha component on the plane with the lowest z position
+> (as in: lowest z-pos), that gets blended with the background color.
+> 
+> In particular, the A13 is known to have this limitation. However, it was
+> recently discovered that the A20 and A33 are capable of having alpha on
+> their lowest plane.
+> 
+> Thus, this introduces a specific quirk to indicate such support,
+> per-platform. Since this was not tested on sun4i and sun6i platforms, a
+> conservative approach is kept and this feature is not supported.
 
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Christoffer Dall <cdall@kernel.org>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
- arch/arm64/include/asm/kvm_arm.h | 7 +++++++
- arch/arm64/kvm/hyp/switch.c      | 2 +-
- 2 files changed, 8 insertions(+), 1 deletion(-)
+Woops, I forgot to include PATCH 1/2 from v1, which did not change.
 
-diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-index d7b6226..c18c3b2 100644
---- a/arch/arm64/include/asm/kvm_arm.h
-+++ b/arch/arm64/include/asm/kvm_arm.h
-@@ -307,6 +307,13 @@
- 
- /* Hyp Prefetch Fault Address Register (HPFAR/HDFAR) */
- #define HPFAR_MASK	(~UL(0xf))
-+/*
-+ * We have
-+ *	PAR	[PA_Shift - 1	: 12] = PA	[PA_Shift - 1 : 12]
-+ *	HPFAR	[PA_Shift - 9	: 4]  = FIPA	[PA_Shift - 1 : 12]
-+ */
-+#define PAR_TO_HPFAR(par)		\
-+	(((par) & GENMASK_ULL(PHYS_MASK_SHIFT - 1, 12)) >> 8)
- 
- #define kvm_arm_exception_type	\
- 	{0, "IRQ" }, 		\
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index 355fb25..fb66320 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -260,7 +260,7 @@ static bool __hyp_text __translate_far_to_hpfar(u64 far, u64 *hpfar)
- 		return false; /* Translation failed, back to guest */
- 
- 	/* Convert PAR to HPFAR format */
--	*hpfar = ((tmp >> 12) & ((1UL << 36) - 1)) << 4;
-+	*hpfar = PAR_TO_HPFAR(tmp);
- 	return true;
- }
- 
+Would it be preferable for me to send v2 again (and maybe call it v3)
+for convenience?
+
+Sorry about that,
+
+Paul
+
+> Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+> ---
+> 
+> Changes since v1:
+> * reordered backend declaration;
+> * updated comment to reflect that not all platforms are affected;
+> * used num_alpha_planes_max variable instead of define, since it is now
+>   dynamic;
+> * reordered check to have quirk first in associated conditional.
+> 
+>  drivers/gpu/drm/sun4i/sun4i_backend.c | 40 +++++++++++++++++----------
+>  drivers/gpu/drm/sun4i/sun4i_backend.h |  1 -
+>  2 files changed, 26 insertions(+), 15 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
+> index de0a76dfa1a2..eda9466b793b 100644
+> --- a/drivers/gpu/drm/sun4i/sun4i_backend.c
+> +++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
+> @@ -34,6 +34,8 @@
+>  struct sun4i_backend_quirks {
+>  	/* backend <-> TCON muxing selection done in backend */
+>  	bool needs_output_muxing;
+> +	/* alpha at the lowest z position is not always supported */
+> +	bool supports_lowest_plane_alpha;
+>  };
+>  
+>  static const u32 sunxi_rgb2yuv_coef[12] = {
+> @@ -463,12 +465,14 @@ static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
+>  				      struct drm_crtc_state *crtc_state)
+>  {
+>  	struct drm_plane_state *plane_states[SUN4I_BACKEND_NUM_LAYERS] = { 0 };
+> +	struct sun4i_backend *backend = engine_to_sun4i_backend(engine);
+>  	struct drm_atomic_state *state = crtc_state->state;
+>  	struct drm_device *drm = state->dev;
+>  	struct drm_plane *plane;
+>  	unsigned int num_planes = 0;
+>  	unsigned int num_alpha_planes = 0;
+>  	unsigned int num_frontend_planes = 0;
+> +	unsigned int num_alpha_planes_max = 1;
+>  	unsigned int num_yuv_planes = 0;
+>  	unsigned int current_pipe = 0;
+>  	unsigned int i;
+> @@ -532,33 +536,39 @@ static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
+>  	 * the layer with the highest priority.
+>  	 *
+>  	 * The second step is the actual alpha blending, that takes
+> -	 * the two pipes as input, and uses the eventual alpha
+> +	 * the two pipes as input, and uses the potential alpha
+>  	 * component to do the transparency between the two.
+>  	 *
+> -	 * This two steps scenario makes us unable to guarantee a
+> +	 * This two-step scenario makes us unable to guarantee a
+>  	 * robust alpha blending between the 4 layers in all
+>  	 * situations, since this means that we need to have one layer
+>  	 * with alpha at the lowest position of our two pipes.
+>  	 *
+> -	 * However, we cannot even do that, since the hardware has a
+> -	 * bug where the lowest plane of the lowest pipe (pipe 0,
+> -	 * priority 0), if it has any alpha, will discard the pixel
+> -	 * entirely and just display the pixels in the background
+> -	 * color (black by default).
+> +	 * However, we cannot even do that on every platform, since the
+> +	 * hardware has a bug where the lowest plane of the lowest pipe
+> +	 * (pipe 0, priority 0), if it has any alpha, will discard the
+> +	 * pixel data entirely and just display the pixels in the
+> +	 * background color (black by default).
+>  	 *
+> -	 * This means that we effectively have only three valid
+> -	 * configurations with alpha, all of them with the alpha being
+> -	 * on pipe1 with the lowest position, which can be 1, 2 or 3
+> -	 * depending on the number of planes and their zpos.
+> +	 * This means that on the affected platforms, we effectively
+> +	 * have only three valid configurations with alpha, all of them
+> +	 * with the alpha being on pipe1 with the lowest position, which
+> +	 * can be 1, 2 or 3 depending on the number of planes and their zpos.
+>  	 */
+> -	if (num_alpha_planes > SUN4I_BACKEND_NUM_ALPHA_LAYERS) {
+> +
+> +	/* For platforms that are not affected by the issue described above. */
+> +	if (backend->quirks->supports_lowest_plane_alpha)
+> +		num_alpha_planes_max++;
+> +
+> +	if (num_alpha_planes > num_alpha_planes_max) {
+>  		DRM_DEBUG_DRIVER("Too many planes with alpha, rejecting...\n");
+>  		return -EINVAL;
+>  	}
+>  
+>  	/* We can't have an alpha plane at the lowest position */
+> -	if (plane_states[0]->fb->format->has_alpha ||
+> -	    (plane_states[0]->alpha != DRM_BLEND_ALPHA_OPAQUE))
+> +	if (!backend->quirks->supports_lowest_plane_alpha &&
+> +	    (plane_states[0]->fb->format->has_alpha ||
+> +	    (plane_states[0]->alpha != DRM_BLEND_ALPHA_OPAQUE)))
+>  		return -EINVAL;
+>  
+>  	for (i = 1; i < num_planes; i++) {
+> @@ -941,9 +951,11 @@ static const struct sun4i_backend_quirks sun6i_backend_quirks = {
+>  
+>  static const struct sun4i_backend_quirks sun7i_backend_quirks = {
+>  	.needs_output_muxing = true,
+> +	.supports_lowest_plane_alpha = true,
+>  };
+>  
+>  static const struct sun4i_backend_quirks sun8i_a33_backend_quirks = {
+> +	.supports_lowest_plane_alpha = true,
+>  };
+>  
+>  static const struct sun4i_backend_quirks sun9i_backend_quirks = {
+> diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.h b/drivers/gpu/drm/sun4i/sun4i_backend.h
+> index 4caee0392fa4..c428952f3661 100644
+> --- a/drivers/gpu/drm/sun4i/sun4i_backend.h
+> +++ b/drivers/gpu/drm/sun4i/sun4i_backend.h
+> @@ -167,7 +167,6 @@
+>  #define SUN4I_BACKEND_PIPE_OFF(p)		(0x5000 + (0x400 * (p)))
+>  
+>  #define SUN4I_BACKEND_NUM_LAYERS		4
+> -#define SUN4I_BACKEND_NUM_ALPHA_LAYERS		1
+>  #define SUN4I_BACKEND_NUM_FRONTEND_LAYERS	1
+>  #define SUN4I_BACKEND_NUM_YUV_PLANES		1
+>  
 -- 
-2.7.4
+Paul Kocialkowski, Bootlin (formerly Free Electrons)
+Embedded Linux and kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180718/c540a412/attachment.sig>
