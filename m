@@ -1,145 +1,157 @@
 From: jmkrzyszt@gmail.com (Janusz Krzysztofik)
-Date: Thu, 19 Jul 2018 01:57:09 +0200
-Subject: [RFC PATCH 7/8] mtd: rawnand: ams-delta: Check sanity of data GPIO
- resource
+Date: Thu, 19 Jul 2018 01:57:08 +0200
+Subject: [RFC PATCH 6/8] gpio: omap: Add get/set_multiple() callbacks
 In-Reply-To: <20180718235710.18242-1-jmkrzyszt@gmail.com>
 References: <20180718235710.18242-1-jmkrzyszt@gmail.com>
-Message-ID: <20180718235710.18242-8-jmkrzyszt@gmail.com>
+Message-ID: <20180718235710.18242-7-jmkrzyszt@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The plan is to replace data port readw()/writew() operations with GPIO
-callbacks provided by gpio-omap driver.  For acceptable performance the
-GPIO chip must support get/set_multiple() GPIO callbacks.
-
-In order to avoid data corruption, we require the array of data GPIO
-descriptors obtained with gpiod_get_array() to meet some strict
-requirements:
-- all pins must belong to the same single GPIO chip,
-- array index of each pin descriptor must match its hardware number,
-- pin polarity must not be inverted,
-- pin hardware configuration must not be open drain nor open source.
-
-Let's implement the above described sanity checks before replacing the
-readw()/writew() operations witn GPIO callbacks.  If a check fails,
-return -EINVAL to indicate the board provided GPIO setup is invalid.
+This should make applications utilizing whole banks work faster.
 
 Signed-off-by: Janusz Krzysztofik <jmkrzyszt@gmail.com>
 ---
- drivers/mtd/nand/raw/ams-delta.c | 87 +++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 86 insertions(+), 1 deletion(-)
+ drivers/gpio/gpio-omap.c | 88 ++++++++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 86 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/mtd/nand/raw/ams-delta.c b/drivers/mtd/nand/raw/ams-delta.c
-index ad62c0245458..bd501f385e78 100644
---- a/drivers/mtd/nand/raw/ams-delta.c
-+++ b/drivers/mtd/nand/raw/ams-delta.c
-@@ -21,6 +21,7 @@
- #include <linux/module.h>
- #include <linux/delay.h>
- #include <linux/gpio/consumer.h>
-+#include <linux/gpio/driver.h>
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/rawnand.h>
- #include <linux/mtd/partitions.h>
-@@ -190,7 +191,9 @@ static int ams_delta_init(struct platform_device *pdev)
- 	struct resource *res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	void __iomem *io_base;
- 	struct gpio_descs *data_gpiods;
--	int err = 0;
-+	struct gpio_chip *data_gpioc;
-+	unsigned long mask, bits;
-+	int i, err = 0;
+diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+index d1afedf4dcbf..e81008678a38 100644
+--- a/drivers/gpio/gpio-omap.c
++++ b/drivers/gpio/gpio-omap.c
+@@ -77,6 +77,8 @@ struct gpio_bank {
+ 	bool workaround_enabled;
  
- 	if (!res)
- 		return -ENXIO;
-@@ -298,6 +301,88 @@ static int ams_delta_init(struct platform_device *pdev)
- 		goto out_mtd;
+ 	void (*set_dataout)(struct gpio_bank *bank, unsigned gpio, int enable);
++	void (*set_dataout_multiple)(struct gpio_bank *bank,
++				     unsigned long *mask, unsigned long *bits);
+ 	int (*get_context_loss_count)(struct device *dev);
+ 
+ 	struct omap_gpio_reg_offs *regs;
+@@ -161,6 +163,51 @@ static int omap_get_gpio_dataout(struct gpio_bank *bank, int offset)
+ 	return (readl_relaxed(reg) & (BIT(offset))) != 0;
+ }
+ 
++/* set multiple data out values using dedicate set/clear register */
++static void omap_set_gpio_dataout_reg_multiple(struct gpio_bank *bank,
++					       unsigned long *mask,
++					       unsigned long *bits)
++{
++	void __iomem *reg = bank->base;
++	u32 l;
++
++	l = *bits & *mask;
++	writel_relaxed(l, reg + bank->regs->set_dataout);
++	bank->context.dataout |= l;
++
++	l = ~*bits & *mask;
++	writel_relaxed(l, reg + bank->regs->clr_dataout);
++	bank->context.dataout &= ~l;
++}
++
++/* set multiple data out values using mask register */
++static void omap_set_gpio_dataout_mask_multiple(struct gpio_bank *bank,
++						unsigned long *mask,
++						unsigned long *bits)
++{
++	void __iomem *reg = bank->base + bank->regs->dataout;
++	u32 l = (readl_relaxed(reg) & ~*mask) | (*bits & *mask);
++
++	writel_relaxed(l, reg);
++	bank->context.dataout = l;
++}
++
++static unsigned long omap_get_gpio_datain_multiple(struct gpio_bank *bank,
++					      unsigned long *mask)
++{
++	void __iomem *reg = bank->base + bank->regs->datain;
++
++	return readl_relaxed(reg) & *mask;
++}
++
++static unsigned long omap_get_gpio_dataout_multiple(struct gpio_bank *bank,
++					       unsigned long *mask)
++{
++	void __iomem *reg = bank->base + bank->regs->dataout;
++
++	return readl_relaxed(reg) & *mask;
++}
++
+ static inline void omap_gpio_rmw(void __iomem *base, u32 reg, u32 mask, bool set)
+ {
+ 	int l = readl_relaxed(base + reg);
+@@ -968,6 +1015,26 @@ static int omap_gpio_output(struct gpio_chip *chip, unsigned offset, int value)
+ 	return 0;
+ }
+ 
++static int omap_gpio_get_multiple(struct gpio_chip *chip, unsigned long *mask,
++				  unsigned long *bits)
++{
++	struct gpio_bank *bank = gpiochip_get_data(chip);
++	void __iomem *reg = bank->base + bank->regs->direction;
++	unsigned long in = readl_relaxed(reg), l;
++
++	*bits = 0;
++
++	l = in & *mask;
++	if (l)
++		*bits |= omap_get_gpio_datain_multiple(bank, &l);
++
++	l = ~in & *mask;
++	if (l)
++		*bits |= omap_get_gpio_dataout_multiple(bank, &l);
++
++	return 0;
++}
++
+ static int omap_gpio_debounce(struct gpio_chip *chip, unsigned offset,
+ 			      unsigned debounce)
+ {
+@@ -1012,6 +1079,17 @@ static void omap_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
+ 	raw_spin_unlock_irqrestore(&bank->lock, flags);
+ }
+ 
++static void omap_gpio_set_multiple(struct gpio_chip *chip, unsigned long *mask,
++				   unsigned long *bits)
++{
++	struct gpio_bank *bank = gpiochip_get_data(chip);
++	unsigned long flags;
++
++	raw_spin_lock_irqsave(&bank->lock, flags);
++	bank->set_dataout_multiple(bank, mask, bits);
++	raw_spin_unlock_irqrestore(&bank->lock, flags);
++}
++
+ /*---------------------------------------------------------------------*/
+ 
+ static void omap_gpio_show_rev(struct gpio_bank *bank)
+@@ -1073,9 +1151,11 @@ static int omap_gpio_chip_init(struct gpio_bank *bank, struct irq_chip *irqc)
+ 	bank->chip.get_direction = omap_gpio_get_direction;
+ 	bank->chip.direction_input = omap_gpio_input;
+ 	bank->chip.get = omap_gpio_get;
++	bank->chip.get_multiple = omap_gpio_get_multiple;
+ 	bank->chip.direction_output = omap_gpio_output;
+ 	bank->chip.set_config = omap_gpio_set_config;
+ 	bank->chip.set = omap_gpio_set;
++	bank->chip.set_multiple = omap_gpio_set_multiple;
+ 	if (bank->is_mpuio) {
+ 		bank->chip.label = "mpuio";
+ 		if (bank->regs->wkup_en)
+@@ -1209,10 +1289,14 @@ static int omap_gpio_probe(struct platform_device *pdev)
+ 				pdata->get_context_loss_count;
  	}
  
-+	/* Use GPIO chip of first data GPIO pin descriptor */
-+	data_gpioc = gpiod_to_chip(data_gpiods->desc[0]);
-+
-+	/*
-+	 * For acceptable performance require the data GPIO
-+	 * chip to support get/set_multiple() callbacks.
-+	 */
-+	if (!data_gpioc->get_multiple || !data_gpioc->set_multiple) {
-+		err = -EINVAL;
-+		dev_err(&pdev->dev,
-+			"data GPIO chip does not support get/set_multiple()\n");
-+		goto out_mtd;
+-	if (bank->regs->set_dataout && bank->regs->clr_dataout)
++	if (bank->regs->set_dataout && bank->regs->clr_dataout) {
+ 		bank->set_dataout = omap_set_gpio_dataout_reg;
+-	else
++		bank->set_dataout_multiple = omap_set_gpio_dataout_reg_multiple;
++	} else {
+ 		bank->set_dataout = omap_set_gpio_dataout_mask;
++		bank->set_dataout_multiple =
++				omap_set_gpio_dataout_mask_multiple;
 +	}
-+
-+	/* Verify if get_multiple() returns all pins low as initialized above */
-+	mask = (1 << data_gpiods->ndescs) - 1;
-+	err = data_gpioc->get_multiple(data_gpioc, &mask, &bits);
-+	if (err) {
-+		dev_err(&pdev->dev,
-+			"data GPIO chip get_multiple() failed: %d\n", err);
-+		goto out_mtd;
-+	}
-+	if (bits) {
-+		err = -EINVAL;
-+		dev_err(&pdev->dev,
-+			"mismmatch of data GPIO initial value: %lu\n", bits);
-+		goto out_mtd;
-+	}
-+
-+	/* Verify each data GPIO pin */
-+	for (i = 0; i < data_gpiods->ndescs; i++) {
-+		/* Require all pins belong to the same GPIO chip */
-+		if (gpiod_to_chip(data_gpiods->desc[i]) != data_gpioc) {
-+			err = -EINVAL;
-+			dev_err(&pdev->dev, "GPIO chip mismatch of data bit %d\n",
-+				i);
-+			goto out_mtd;
-+		}
-+
-+		/* Require all pins active high (not inverted) */
-+		if (gpiod_is_active_low(data_gpiods->desc[i])) {
-+			err = -EINVAL;
-+			dev_err(&pdev->dev,
-+				"unsupported polarity of data GPIO bit %d\n",
-+				i);
-+			goto out_mtd;
-+		}
-+
-+		/*
-+		 * Require pin gpiod array index to match hardware pin number.
-+		 * Verified by setting the pin high with gpiod_set_raw_value()
-+		 * then reading it back with gpiochip->get() for comparison.
-+		 */
-+		gpiod_set_raw_value(data_gpiods->desc[i], 1);
-+		err = data_gpioc->get(data_gpioc, i);
-+		if (err < 0) {
-+			dev_err(&pdev->dev,
-+				"data bit %d GPIO chip get() failed: %d\n", i,
-+				err);
-+			goto out_mtd;
-+		}
-+		if (!err) {
-+			err = -EINVAL;
-+			dev_err(&pdev->dev, "mismatch of data GPIO bit %d value\n",
-+				i);
-+			goto out_mtd;
-+		}
-+
-+		/*
-+		 * Check for unsupported pin hardware configuration.  Use
-+		 * just verified gpiod array index as hardware pin number.
-+		 */
-+		if (gpiochip_line_is_open_drain(data_gpioc, i) ||
-+		    gpiochip_line_is_open_source(data_gpioc, i)) {
-+			err = -EINVAL;
-+			dev_err(&pdev->dev,
-+				"unsupported mode of data GPIO bit %d\n",
-+				i);
-+			goto out_mtd;
-+		}
-+	}
-+
- 	/* Scan to find existence of the device */
- 	err = nand_scan(mtd, 1);
- 	if (err)
+ 
+ 	raw_spin_lock_init(&bank->lock);
+ 	raw_spin_lock_init(&bank->wa_lock);
 -- 
 2.16.4
