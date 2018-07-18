@@ -1,44 +1,42 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu, 19 Jul 2018 08:41:04 +0900
-Subject: [PATCH 0/6] kbuild: clean-up and rename LDFLAGS to KBUILD_LDFLAGS
-In-Reply-To: <20180712140539.4b5xdraq34i5dbii@kshutemo-mobl1>
-References: <1531382496-3719-1-git-send-email-yamada.masahiro@socionext.com>
- <20180712140539.4b5xdraq34i5dbii@kshutemo-mobl1>
-Message-ID: <CAK7LNAThEpLsFgD_pv4ZgLWfbXcNPBiPEU7qZ5ah_R=x8LQA0w@mail.gmail.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Thu, 19 Jul 2018 08:45:38 +0900
+Subject: [PATCH] dt-bindings: clock: samsung: Add SPDX license identifiers
+In-Reply-To: <20180718200216.6389-1-krzk@kernel.org>
+References: <CGME20180718200247epcas1p33ff6e502031498802741a0dc37400ca9@epcas1p3.samsung.com>
+ <20180718200216.6389-1-krzk@kernel.org>
+Message-ID: <5B4FD122.3070403@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-07-12 23:05 GMT+09:00 Kirill A. Shutemov <kirill@shutemov.name>:
-> On Thu, Jul 12, 2018 at 05:01:30PM +0900, Masahiro Yamada wrote:
->>
->> This series renames LDFLAGS to KBUILD_LDFLAGS
->> after some Makefile cleanups.
->>
->> Currently, the last patch does not apply to Linus' tree
->> due to missing pre-requisite patches.
->>
->> I will resolve conflicts as needed.
->>
->>
->>
->> Masahiro Yamada (6):
->>   um: remove redundant 'export LDFLAGS' in arch/x86/Makefile.um
->>   ARM: vfp: clean-up arch/arm/vfp/Makefile
->>   kbuild: remove redundant LDFLAGS clearing in arch/*/Makefile
->>   kbuild: replace $(LDFLAGS) $(ldflags-y) with $(ld_flags)
->>   kbuild: change ld_flags to contain LDFLAGS_$(@F)
->>   kbuild: rename LDFLAGS to KBUILD_LDFLAGS
->
-> Thanks! Looks sane to me
->
-> Acked-by: Kirill A. Shutemov <kirill.shutemov@linux.intel.com>
->
+Hi Krzysztof,
 
+On 2018? 07? 19? 05:02, Krzysztof Kozlowski wrote:
+> Replace GPL license statements with SPDX license identifiers (GPL-2.0).
+> 
+> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+> ---
+>  include/dt-bindings/clock/exynos3250.h            | 5 +----
+>  include/dt-bindings/clock/exynos4.h               | 7 ++-----
+>  include/dt-bindings/clock/exynos5250.h            | 7 ++-----
+>  include/dt-bindings/clock/exynos5260-clk.h        | 7 ++-----
+>  include/dt-bindings/clock/exynos5410.h            | 7 ++-----
+>  include/dt-bindings/clock/exynos5420.h            | 7 ++-----
+>  include/dt-bindings/clock/exynos5433.h            | 5 +----
+>  include/dt-bindings/clock/exynos7-clk.h           | 7 ++-----
+>  include/dt-bindings/clock/s3c2410.h               | 5 +----
+>  include/dt-bindings/clock/s3c2412.h               | 5 +----
+>  include/dt-bindings/clock/s3c2443.h               | 5 +----
+>  include/dt-bindings/clock/samsung,s2mps11.h       | 5 +----
+>  include/dt-bindings/clock/samsung,s3c64xx-clock.h | 7 ++-----
+>  13 files changed, 20 insertions(+), 59 deletions(-)
+> 
 
-Patch 1, 3, 4, 5 applied to linux-kbuild.
+Looks good to me.
+Acked-by: Chanwoo Choi <cw00.choi@samsung.com>
 
-
+(snip)
 
 -- 
-Best Regards
-Masahiro Yamada
+Best Regards,
+Chanwoo Choi
+Samsung Electronics
