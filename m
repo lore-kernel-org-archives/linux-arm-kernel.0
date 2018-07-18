@@ -1,38 +1,38 @@
 From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Wed, 18 Jul 2018 16:24:44 +0530
-Subject: [PATCH v3 04/18] drm/sun4i: Add support for A64 display engine
+Date: Wed, 18 Jul 2018 16:24:45 +0530
+Subject: [PATCH v3 05/18] dt-bindings: display: Add compatible for A64 HDMI
 In-Reply-To: <20180718105458.22304-1-jagan@amarulasolutions.com>
 References: <20180718105458.22304-1-jagan@amarulasolutions.com>
-Message-ID: <20180718105458.22304-5-jagan@amarulasolutions.com>
+Message-ID: <20180718105458.22304-6-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Display Engine(DE2) in Allwinner A64 has two mixers and tcons.
+HDMI on Allwinner A64 has similar like H3/H5/A83T.
 
-The routing for mixer0 is through tcon0 and connected to
-LVDS/RGB/MIPI-DSI controller.
-
-The routing for mixer1 is through tcon1 and connected to HDMI.
+Add compatible a64 and update A83T compatible as fallback.
 
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
 ---
-Changes for v3, v2:
-- none
+Changes for v3:
+- collect Rob r-w-b tag
+Changes for v2:
+- Add fallback compatible
 
- drivers/gpu/drm/sun4i/sun4i_drv.c | 1 +
+ Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
-index 03ffbcc98dd0..30a39946f747 100644
---- a/drivers/gpu/drm/sun4i/sun4i_drv.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
-@@ -421,6 +421,7 @@ static const struct of_device_id sun4i_drv_of_table[] = {
- 	{ .compatible = "allwinner,sun8i-r40-display-engine" },
- 	{ .compatible = "allwinner,sun8i-v3s-display-engine" },
- 	{ .compatible = "allwinner,sun9i-a80-display-engine" },
-+	{ .compatible = "allwinner,sun50i-a64-display-engine" },
- 	{ }
- };
- MODULE_DEVICE_TABLE(of, sun4i_drv_of_table);
+diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+index 3594378fbe72..10b3c77833c2 100644
+--- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
++++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+@@ -78,6 +78,7 @@ Required properties:
+ 
+   - compatible: value must be one of:
+     * "allwinner,sun8i-a83t-dw-hdmi"
++    * "allwinner,sun50i-a64-dw-hdmi", "allwinner,sun8i-a83t-dw-hdmi"
+   - reg: base address and size of memory-mapped region
+   - reg-io-width: See dw_hdmi.txt. Shall be 1.
+   - interrupts: HDMI interrupt number
 -- 
 2.17.1
