@@ -1,149 +1,194 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 18 Jul 2018 10:18:57 +0100
-Subject: [PATCH v4 14/20] kvm: arm64: Switch to per VM IPA limit
+Date: Wed, 18 Jul 2018 10:18:58 +0100
+Subject: [PATCH v4 15/20] vgic: Add support for 52bit guest physical address
 In-Reply-To: <1531905547-25478-1-git-send-email-suzuki.poulose@arm.com>
 References: <1531905547-25478-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1531905547-25478-15-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1531905547-25478-16-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we can manage the stage2 page table per VM, switch the
-configuration details to per VM instance. The VTCR is updated
-with the values specific to the VM based on the configuration.
+From: Kristina Martsenko <kristina.martsenko@arm.com>
+
+Add support for handling 52bit guest physical address to the
+VGIC layer. So far we have limited the guest physical address
+to 48bits, by explicitly masking the upper bits. This patch
+removes the restriction. We do not have to check if the host
+supports 52bit as the gpa is always validated during an access.
+(e.g, kvm_{read/write}_guest, kvm_is_visible_gfn()).
+Also, the ITS table save-restore is also not affected with
+the enhancement. The DTE entries already store the bits[51:8]
+of the ITT_addr (with a 256byte alignment).
 
 Cc: Marc Zyngier <marc.zyngier@arm.com>
 Cc: Christoffer Dall <cdall@kernel.org>
+Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
+[ Macro clean ups, fix PROPBASER and PENDBASER accesses ]
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm/include/asm/kvm_host.h         | 6 ++++--
- arch/arm64/include/asm/kvm_arm.h        | 3 +++
- arch/arm64/include/asm/kvm_host.h       | 2 +-
- arch/arm64/include/asm/kvm_mmu.h        | 2 +-
- arch/arm64/include/asm/stage2_pgtable.h | 2 +-
- arch/arm64/kvm/guest.c                  | 8 ++++++--
- virt/kvm/arm/arm.c                      | 3 +--
- 7 files changed, 17 insertions(+), 9 deletions(-)
+ include/linux/irqchip/arm-gic-v3.h |  5 +++++
+ virt/kvm/arm/vgic/vgic-its.c       | 36 ++++++++++--------------------------
+ virt/kvm/arm/vgic/vgic-mmio-v3.c   |  2 --
+ 3 files changed, 15 insertions(+), 28 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index 86f43ab..0ccfbc1 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -350,9 +350,11 @@ static inline void kvm_vcpu_put_sysregs(struct kvm_vcpu *vcpu) {}
- struct kvm *kvm_arch_alloc_vm(void);
- void kvm_arch_free_vm(struct kvm *kvm);
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index cbb872c..bc4b95b 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -346,6 +346,8 @@
+ #define GITS_CBASER_RaWaWt	GIC_BASER_CACHEABILITY(GITS_CBASER, INNER, RaWaWt)
+ #define GITS_CBASER_RaWaWb	GIC_BASER_CACHEABILITY(GITS_CBASER, INNER, RaWaWb)
  
--static inline int kvm_arm_config_vm(struct kvm *kvm)
-+static inline int kvm_arm_config_vm(struct kvm *kvm, u32 ipa_shift)
- {
--	return 0;
-+	if (ipa_shift == KVM_PHYS_SHIFT)
-+		return 0;
-+	return -EINVAL;
- }
- 
- #endif /* __ARM_KVM_HOST_H__ */
-diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-index abc7107..d7b6226 100644
---- a/arch/arm64/include/asm/kvm_arm.h
-+++ b/arch/arm64/include/asm/kvm_arm.h
-@@ -199,6 +199,9 @@
- 	((sl0) + 4 - VTCR_EL2_TGRAN_SL0_BASE)
- #define VTCR_EL2_LVLS(vtcr)		\
- 	VTCR_EL2_SL0_TO_LVLS(((vtcr) & VTCR_EL2_SL0_MASK) >> VTCR_EL2_SL0_SHIFT)
++#define GITS_CBASER_ADDRESS(cbaser)	((cbaser) & GENMASK_ULL(52, 12))
 +
-+#define VTCR_EL2_IPA(vtcr)	(64 - ((vtcr) & VTCR_EL2_T0SZ_MASK))
+ #define GITS_BASER_NR_REGS		8
+ 
+ #define GITS_BASER_VALID			(1ULL << 63)
+@@ -377,6 +379,9 @@
+ #define GITS_BASER_ENTRY_SIZE_MASK	GENMASK_ULL(52, 48)
+ #define GITS_BASER_PHYS_52_to_48(phys)					\
+ 	(((phys) & GENMASK_ULL(47, 16)) | (((phys) >> 48) & 0xf) << 12)
++#define GITS_BASER_ADDR_48_to_52(baser)					\
++	(((baser) & GENMASK_ULL(47, 16)) | (((baser) >> 12) & 0xf) << 48)
 +
- /*
-  * ARM VMSAv8-64 defines an algorithm for finding the translation table
-  * descriptors in section D4.2.8 in ARM DDI 0487C.a.
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index b1ffaf3..e64587c 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -516,6 +516,6 @@ void kvm_vcpu_put_sysregs(struct kvm_vcpu *vcpu);
- struct kvm *kvm_arch_alloc_vm(void);
- void kvm_arch_free_vm(struct kvm *kvm);
+ #define GITS_BASER_SHAREABILITY_SHIFT	(10)
+ #define GITS_BASER_InnerShareable					\
+ 	GIC_BASER_SHAREABILITY(GITS_BASER, InnerShareable)
+diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+index 4ed79c9..c6eb390 100644
+--- a/virt/kvm/arm/vgic/vgic-its.c
++++ b/virt/kvm/arm/vgic/vgic-its.c
+@@ -234,13 +234,6 @@ static struct its_ite *find_ite(struct vgic_its *its, u32 device_id,
+ 	list_for_each_entry(dev, &(its)->device_list, dev_list) \
+ 		list_for_each_entry(ite, &(dev)->itt_head, ite_list)
  
--int kvm_arm_config_vm(struct kvm *kvm);
-+int kvm_arm_config_vm(struct kvm *kvm, u32 ipa_shift);
- 
- #endif /* __ARM64_KVM_HOST_H__ */
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index 4f22772..4d1219b 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -142,7 +142,7 @@ static inline unsigned long __kern_hyp_va(unsigned long v)
-  */
- #define KVM_PHYS_SHIFT	(40)
- 
--#define kvm_phys_shift(kvm)		KVM_PHYS_SHIFT
-+#define kvm_phys_shift(kvm)		VTCR_EL2_IPA(kvm->arch.vtcr)
- #define kvm_phys_size(kvm)		(_AC(1, ULL) << kvm_phys_shift(kvm))
- #define kvm_phys_mask(kvm)		(kvm_phys_size(kvm) - _AC(1, ULL))
- 
-diff --git a/arch/arm64/include/asm/stage2_pgtable.h b/arch/arm64/include/asm/stage2_pgtable.h
-index a4fbb1a..1d7d3d7 100644
---- a/arch/arm64/include/asm/stage2_pgtable.h
-+++ b/arch/arm64/include/asm/stage2_pgtable.h
-@@ -43,7 +43,7 @@
-  */
- #define stage2_pgtable_levels(ipa)	ARM64_HW_PGTABLE_LEVELS((ipa) - 4)
- #define STAGE2_PGTABLE_LEVELS		stage2_pgtable_levels(KVM_PHYS_SHIFT)
--#define kvm_stage2_levels(kvm)		stage2_pgtable_levels(kvm_phys_shift(kvm))
-+#define kvm_stage2_levels(kvm)		VTCR_EL2_LVLS(kvm->arch.vtcr)
- 
- /*
-  * With all the supported VA_BITs and 40bit guest IPA, the following condition
-diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
-index f7e1ece..af5520d 100644
---- a/arch/arm64/kvm/guest.c
-+++ b/arch/arm64/kvm/guest.c
-@@ -469,11 +469,13 @@ int kvm_arm_vcpu_arch_has_attr(struct kvm_vcpu *vcpu,
-  * all CPUs, as it is safe to run with or without the feature and
-  * the bit is RES0 on CPUs that don't support it.
-  */
--int kvm_arm_config_vm(struct kvm *kvm)
-+int kvm_arm_config_vm(struct kvm *kvm, u32 ipa_shift)
- {
- 	u64 vtcr = VTCR_EL2_FLAGS;
- 	u64 parange;
- 
-+	if (ipa_shift != KVM_PHYS_SHIFT)
-+		return -EINVAL;
- 
- 	parange = read_sanitised_ftr_reg(SYS_ID_AA64MMFR0_EL1) & 7;
- 	if (parange > ID_AA64MMFR0_PARANGE_MAX)
-@@ -492,7 +494,9 @@ int kvm_arm_config_vm(struct kvm *kvm)
- 		VTCR_EL2_VS_16BIT :
- 		VTCR_EL2_VS_8BIT;
- 
--	vtcr |= VTCR_EL2_LVLS_TO_SL0(kvm_stage2_levels(kvm));
-+	vtcr |= VTCR_EL2_LVLS_TO_SL0(stage2_pgtable_levels(ipa_shift));
-+	vtcr |= VTCR_EL2_T0SZ(ipa_shift);
-+
- 	kvm->arch.vtcr = vtcr;
- 	return 0;
- }
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index 2291487..21272dc 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -110,7 +110,6 @@ void kvm_arch_check_processor_compat(void *rtn)
- 	*(int *)rtn = 0;
- }
- 
+-/*
+- * We only implement 48 bits of PA at the moment, although the ITS
+- * supports more. Let's be restrictive here.
+- */
+-#define BASER_ADDRESS(x)	((x) & GENMASK_ULL(47, 16))
+-#define CBASER_ADDRESS(x)	((x) & GENMASK_ULL(47, 12))
 -
- /**
-  * kvm_arch_init_vm - initializes a VM data structure
-  * @kvm:	pointer to the KVM struct
-@@ -122,7 +121,7 @@ int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
- 	if (type)
- 		return -EINVAL;
+ #define GIC_LPI_OFFSET 8192
  
--	ret = kvm_arm_config_vm(kvm);
-+	ret = kvm_arm_config_vm(kvm, KVM_PHYS_SHIFT);
- 	if (ret)
- 		return ret;
+ #define VITS_TYPER_IDBITS 16
+@@ -752,6 +745,7 @@ static bool vgic_its_check_id(struct vgic_its *its, u64 baser, u32 id,
+ {
+ 	int l1_tbl_size = GITS_BASER_NR_PAGES(baser) * SZ_64K;
+ 	u64 indirect_ptr, type = GITS_BASER_TYPE(baser);
++	phys_addr_t base = GITS_BASER_ADDR_48_to_52(baser);
+ 	int esz = GITS_BASER_ENTRY_SIZE(baser);
+ 	int index;
+ 	gfn_t gfn;
+@@ -776,7 +770,7 @@ static bool vgic_its_check_id(struct vgic_its *its, u64 baser, u32 id,
+ 		if (id >= (l1_tbl_size / esz))
+ 			return false;
+ 
+-		addr = BASER_ADDRESS(baser) + id * esz;
++		addr = base + id * esz;
+ 		gfn = addr >> PAGE_SHIFT;
+ 
+ 		if (eaddr)
+@@ -791,7 +785,7 @@ static bool vgic_its_check_id(struct vgic_its *its, u64 baser, u32 id,
+ 
+ 	/* Each 1st level entry is represented by a 64-bit value. */
+ 	if (kvm_read_guest_lock(its->dev->kvm,
+-			   BASER_ADDRESS(baser) + index * sizeof(indirect_ptr),
++			   base + index * sizeof(indirect_ptr),
+ 			   &indirect_ptr, sizeof(indirect_ptr)))
+ 		return false;
+ 
+@@ -801,11 +795,7 @@ static bool vgic_its_check_id(struct vgic_its *its, u64 baser, u32 id,
+ 	if (!(indirect_ptr & BIT_ULL(63)))
+ 		return false;
+ 
+-	/*
+-	 * Mask the guest physical address and calculate the frame number.
+-	 * Any address beyond our supported 48 bits of PA will be caught
+-	 * by the actual check in the final step.
+-	 */
++	/* Mask the guest physical address and calculate the frame number. */
+ 	indirect_ptr &= GENMASK_ULL(51, 16);
+ 
+ 	/* Find the address of the actual entry */
+@@ -1297,9 +1287,6 @@ static u64 vgic_sanitise_its_baser(u64 reg)
+ 				  GITS_BASER_OUTER_CACHEABILITY_SHIFT,
+ 				  vgic_sanitise_outer_cacheability);
+ 
+-	/* Bits 15:12 contain bits 51:48 of the PA, which we don't support. */
+-	reg &= ~GENMASK_ULL(15, 12);
+-
+ 	/* We support only one (ITS) page size: 64K */
+ 	reg = (reg & ~GITS_BASER_PAGE_SIZE_MASK) | GITS_BASER_PAGE_SIZE_64K;
+ 
+@@ -1318,11 +1305,8 @@ static u64 vgic_sanitise_its_cbaser(u64 reg)
+ 				  GITS_CBASER_OUTER_CACHEABILITY_SHIFT,
+ 				  vgic_sanitise_outer_cacheability);
+ 
+-	/*
+-	 * Sanitise the physical address to be 64k aligned.
+-	 * Also limit the physical addresses to 48 bits.
+-	 */
+-	reg &= ~(GENMASK_ULL(51, 48) | GENMASK_ULL(15, 12));
++	/* Sanitise the physical address to be 64k aligned. */
++	reg &= ~GENMASK_ULL(15, 12);
+ 
+ 	return reg;
+ }
+@@ -1368,7 +1352,7 @@ static void vgic_its_process_commands(struct kvm *kvm, struct vgic_its *its)
+ 	if (!its->enabled)
+ 		return;
+ 
+-	cbaser = CBASER_ADDRESS(its->cbaser);
++	cbaser = GITS_CBASER_ADDRESS(its->cbaser);
+ 
+ 	while (its->cwriter != its->creadr) {
+ 		int ret = kvm_read_guest_lock(kvm, cbaser + its->creadr,
+@@ -2226,7 +2210,7 @@ static int vgic_its_restore_device_tables(struct vgic_its *its)
+ 	if (!(baser & GITS_BASER_VALID))
+ 		return 0;
+ 
+-	l1_gpa = BASER_ADDRESS(baser);
++	l1_gpa = GITS_BASER_ADDR_48_to_52(baser);
+ 
+ 	if (baser & GITS_BASER_INDIRECT) {
+ 		l1_esz = GITS_LVL1_ENTRY_SIZE;
+@@ -2298,7 +2282,7 @@ static int vgic_its_save_collection_table(struct vgic_its *its)
+ {
+ 	const struct vgic_its_abi *abi = vgic_its_get_abi(its);
+ 	u64 baser = its->baser_coll_table;
+-	gpa_t gpa = BASER_ADDRESS(baser);
++	gpa_t gpa = GITS_BASER_ADDR_48_to_52(baser);
+ 	struct its_collection *collection;
+ 	u64 val;
+ 	size_t max_size, filled = 0;
+@@ -2347,7 +2331,7 @@ static int vgic_its_restore_collection_table(struct vgic_its *its)
+ 	if (!(baser & GITS_BASER_VALID))
+ 		return 0;
+ 
+-	gpa = BASER_ADDRESS(baser);
++	gpa = GITS_BASER_ADDR_48_to_52(baser);
+ 
+ 	max_size = GITS_BASER_NR_PAGES(baser) * SZ_64K;
+ 
+diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+index 2877840..64647be 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
++++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+@@ -338,7 +338,6 @@ static u64 vgic_sanitise_pendbaser(u64 reg)
+ 				  vgic_sanitise_outer_cacheability);
+ 
+ 	reg &= ~PENDBASER_RES0_MASK;
+-	reg &= ~GENMASK_ULL(51, 48);
+ 
+ 	return reg;
+ }
+@@ -356,7 +355,6 @@ static u64 vgic_sanitise_propbaser(u64 reg)
+ 				  vgic_sanitise_outer_cacheability);
+ 
+ 	reg &= ~PROPBASER_RES0_MASK;
+-	reg &= ~GENMASK_ULL(51, 48);
+ 	return reg;
+ }
  
 -- 
 2.7.4
