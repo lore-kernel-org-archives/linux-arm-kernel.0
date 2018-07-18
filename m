@@ -1,91 +1,37 @@
 From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Wed, 18 Jul 2018 16:24:54 +0530
-Subject: [PATCH v3 14/18] arm64: dts: allwinner: a64: nanopi-a64: Enable HDMI
- output
+Date: Wed, 18 Jul 2018 16:24:50 +0530
+Subject: [PATCH v3 10/18] drm/sun4i: Enable DE2 Mixer for SUN8I and SUN50I
 In-Reply-To: <20180718105458.22304-1-jagan@amarulasolutions.com>
 References: <20180718105458.22304-1-jagan@amarulasolutions.com>
-Message-ID: <20180718105458.22304-15-jagan@amarulasolutions.com>
+Message-ID: <20180718105458.22304-11-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable all necessary HDMI pipeline nodes with HDMI out
-connector on nanopi-a64 board.
+Allwinner SoC like SUN8I and SUN50I are now using DE2 Mixer
+so enable them as default.
 
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
 Changes for v3:
-- Enable all pipeline components
-Changes for v2:
 - none
+Changes for v2:
+- Enable for SUN8I
 
- .../dts/allwinner/sun50i-a64-nanopi-a64.dts   | 34 +++++++++++++++++++
- 1 file changed, 34 insertions(+)
+ drivers/gpu/drm/sun4i/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
-index 98dbff19f5cc..5395069bf541 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
-@@ -57,6 +57,21 @@
- 	chosen {
- 		stdout-path = "serial0:115200n8";
- 	};
-+
-+	connector {
-+		compatible = "hdmi-connector";
-+		type = "a";
-+
-+		port {
-+			hdmi_con_in: endpoint {
-+				remote-endpoint = <&hdmi_out_con>;
-+			};
-+		};
-+	};
-+};
-+
-+&de {
-+	status = "okay";
- };
+diff --git a/drivers/gpu/drm/sun4i/Kconfig b/drivers/gpu/drm/sun4i/Kconfig
+index c2c042287c19..cfa8b96273fb 100644
+--- a/drivers/gpu/drm/sun4i/Kconfig
++++ b/drivers/gpu/drm/sun4i/Kconfig
+@@ -61,7 +61,7 @@ config DRM_SUN8I_DW_HDMI
  
- &ehci0 {
-@@ -67,6 +82,17 @@
- 	status = "okay";
- };
- 
-+&hdmi {
-+	hvcc-supply = <&reg_dldo1>;
-+	status = "okay";
-+};
-+
-+&hdmi_out {
-+	hdmi_out_con: endpoint {
-+		remote-endpoint = <&hdmi_con_in>;
-+	};
-+};
-+
- /* i2c1 connected with gpio headers like pine64, bananapi */
- &i2c1 {
- 	pinctrl-names = "default";
-@@ -78,6 +104,10 @@
- 	bias-pull-up;
- };
- 
-+&mixer1 {
-+	status = "okay";
-+};
-+
- &mmc0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc0_pins>;
-@@ -199,6 +229,10 @@
- 	vcc-hdmi-supply = <&reg_dldo1>;
- };
- 
-+&tcon1 {
-+	status = "okay";
-+};
-+
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_pins_a>;
+ config DRM_SUN8I_MIXER
+ 	tristate "Support for Allwinner Display Engine 2.0 Mixer"
+-	default MACH_SUN8I
++	default MACH_SUN8I || (ARM64 && ARCH_SUNXI)
+ 	help
+ 	  Choose this option if you have an Allwinner SoC with the
+ 	  Allwinner Display Engine 2.0, which has a mixer to do some
 -- 
 2.17.1
