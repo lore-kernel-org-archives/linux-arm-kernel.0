@@ -1,69 +1,71 @@
-From: cheat.sc.linux@outlook.com (Maruyama Shohei)
-Date: Wed, 18 Jul 2018 14:58:23 +0000
-Subject: [PATCH 3/3] arm64: dts: rockchip: add led support for Firefly-RK3399
-In-Reply-To: <20180718145727.30217-1-cheat.sc.linux@outlook.com>
-References: <20180718145727.30217-1-cheat.sc.linux@outlook.com>
-Message-ID: <PS2P216MB0532F58A6ABDA3FD941EF8F2D1530@PS2P216MB0532.KORP216.PROD.OUTLOOK.COM>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Wed, 18 Jul 2018 17:18:16 +0200
+Subject: [GIT PULL] arm: zynq: Xilinx DT changes for v4.19
+In-Reply-To: <CAOesGMhvbj6cde2N+fG-ZBSF=gBNPa56x0M0GnKu8sk-yyRV-Q@mail.gmail.com>
+References: <50ac449c-2196-0352-0352-1f761d321e61@xilinx.com>
+ <CAOesGMhvbj6cde2N+fG-ZBSF=gBNPa56x0M0GnKu8sk-yyRV-Q@mail.gmail.com>
+Message-ID: <ba4cfef3-c782-61f3-33eb-a6ec3eea183e@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shohei Maruyama <cheat.sc.linux@outlook.com>
+On 18.7.2018 16:58, Olof Johansson wrote:
+> Hi,
+> 
+> On Wed, Jul 18, 2018 at 7:10 AM, Michal Simek <michal.simek@xilinx.com> wrote:
+>> Hi,
+>>
+>> please pull the following patches.
+>>
+>> Thanks,
+>> Michal
+>>
+>>
+>> The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
+>>
+>>   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+>>
+>> are available in the git repository at:
+>>
+>>   https://github.com/Xilinx/linux-xlnx.git tags/zynq-dt-for-v4.19
+>>
+>> for you to fetch changes up to 7df89642f143d67a80605ea3fb7e53bcb95f6b39:
+>>
+>>   arm: zynq: Remove #address/#size-cells from gpio-keys (2018-07-17
+>> 16:57:29 +0200)
+>>
+>> ----------------------------------------------------------------
+>> arm: zynq: DT changes for v4.19
+>>
+>> - Add Z-turn board
+>> - Add mmc aliases
+>> - Fix model information
+>> - Sort out documentatio
+>> - Update Zybo Z7
+>> - Fix gpio-keys
+>>
+>> ----------------------------------------------------------------
+>> Anton Gerasimov (1):
+>>       arm: dts: zynq: Add support for Z-turn board
+>>
+>> Luis Araneda (9):
+>>       arm: dts: zynq: Set correct manufacturer for ZedBoard and MicroZed
+>> boards
+>>       arm: dts: zynq: correct and improve the model property of dt files
+>>       dt-bindings: xilinx: zynq: Improve boards description
+>>       dt-bindings: xilinx: zynq: Sort entries alphabetically
+>>       dt-bindings: Move Paralella board to Xilinx
+>>       dt-bindings: xilinx: zynq: Add missing boards
+>>       arm: dts: zynq: Fix memory size on the Zybo Z7 board
+>>       arm: dts: zynq: Use gpio constants for the Zybo Z7 board
+>>       arm: dts: zynq: Add LEDs to the Zybo Z7 board
+>>
+>> Michal Simek (2):
+>>       arm: zynq: Add mmc alias for zc702/zc706/zed/zybo
+>>       arm: zynq: Remove #address/#size-cells from gpio-keys
+> 
+> We use "ARM: dts: <...>" as prefix on ARM. Please fix up and resubmit.
 
-This commit adds led support for the Firefly-RK3399. The board has two
-leds, this commit enables them.
+ok. Not a problem. Is the same rule also for ARM64?
 
-Signed-off-by: Shohei Maruyama <cheat.sc.linux@outlook.com>
----
- .../boot/dts/rockchip/rk3399-firefly.dts      | 30 +++++++++++++++++++
- 1 file changed, 30 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-firefly.dts b/arch/arm64/boot/dts/rockchip/rk3399-firefly.dts
-index 2fe443511d21..69851757584d 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399-firefly.dts
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-firefly.dts
-@@ -233,6 +233,26 @@
- 		regulator-max-microvolt = <1400000>;
- 		vin-supply = <&vcc_sys>;
- 	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+
-+		work-led {
-+			label = "work";
-+			default-state = "on";
-+			gpios = <&gpio2 RK_PD3 GPIO_ACTIVE_HIGH>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&work_led_gpio>;
-+		};
-+
-+		diy-led {
-+			label = "diy";
-+			default-state = "off";
-+			gpios = <&gpio0 RK_PB5 GPIO_ACTIVE_HIGH>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&diy_led_gpio>;
-+		};
-+	};
- };
- 
- &cpu_l0 {
-@@ -647,6 +667,16 @@
- 			rockchip,pins = <1 RK_PA0 RK_FUNC_GPIO &pcfg_pull_none>;
- 		};
- 	};
-+
-+	leds {
-+		work_led_gpio: work_led-gpio {
-+			rockchip,pins = <2 RK_PD3 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+
-+		diy_led_gpio: diy_led-gpio {
-+			rockchip,pins = <0 RK_PB5 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+	};
- };
- 
- &pwm0 {
--- 
-2.18.0
+Thanks,
+Michal
