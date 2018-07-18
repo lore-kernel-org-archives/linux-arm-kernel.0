@@ -1,95 +1,138 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed, 18 Jul 2018 15:48:07 -0600
-Subject: [PATCH v3 7/7] perf tools: Use ioctl function to send sink
- configuration to kernel
+Date: Wed, 18 Jul 2018 15:48:06 -0600
+Subject: [PATCH v3 6/7] perf tools: Make perf_evsel accessible to PMU driver
+ configuration code
 In-Reply-To: <1531950487-24554-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1531950487-24554-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1531950487-24554-8-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1531950487-24554-7-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Using sysFS to communicate sink information for a trace session doesn't
-work when more than one CPU is involved in the scenario.  As such
-communicate the sink information to each event by using the SET_DRV_CONFIG
-ioctl command.
+Make structure perf_evsel available to the PMU driver configuration code.
+That way function perf_evsel__apply_drv_config() can be used from within
+that code and information pertaining to the 'perf_evsel_config_term' is
+still available.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- tools/perf/arch/arm/util/cs-etm.c | 54 ++++-----------------------------------
- 1 file changed, 5 insertions(+), 49 deletions(-)
+ tools/perf/arch/arm/util/cs-etm.c | 22 +++++++++++++++++++++-
+ tools/perf/arch/arm/util/cs-etm.h |  3 ++-
+ tools/perf/util/drv_configs.c     | 30 +++++++-----------------------
+ tools/perf/util/pmu.h             |  3 ++-
+ 4 files changed, 32 insertions(+), 26 deletions(-)
 
 diff --git a/tools/perf/arch/arm/util/cs-etm.c b/tools/perf/arch/arm/util/cs-etm.c
-index d8081c2e6d44..cb0978eb7181 100644
+index 2f595cd73da6..d8081c2e6d44 100644
 --- a/tools/perf/arch/arm/util/cs-etm.c
 +++ b/tools/perf/arch/arm/util/cs-etm.c
-@@ -599,55 +599,10 @@ struct auxtrace_record *cs_etm_record_init(int *err)
- 	return NULL;
+@@ -635,7 +635,7 @@ static int __printf(2, 3) cs_device__print_file(const char *name, const char *fm
+ 	return ret;
  }
  
--static FILE *cs_device__open_file(const char *name)
-+static int cs_etm_set_drv_config_term(struct perf_evsel *evsel,
-+				      const char *term)
+-int cs_etm_set_drv_config(struct perf_evsel_config_term *term)
++static int cs_etm_set_drv_config_term(struct perf_evsel_config_term *term)
  {
--	struct stat st;
--	char path[PATH_MAX];
--	const char *sysfs;
+ 	int ret;
+ 	char enable_sink[ENABLE_SINK_MAX];
+@@ -649,3 +649,23 @@ int cs_etm_set_drv_config(struct perf_evsel_config_term *term)
+ 
+ 	return 0;
+ }
++
++int cs_etm_set_drv_config(struct perf_evsel *evsel,
++			  struct perf_evsel_config_term **err_term)
++{
++	int err = 0;
++	struct perf_evsel_config_term *term;
++
++	list_for_each_entry(term, &evsel->config_terms, list) {
++		if (term->type != PERF_EVSEL__CONFIG_TERM_DRV_CFG)
++			continue;
++
++		err = cs_etm_set_drv_config_term(term);
++		if (err) {
++			*err_term = term;
++			break;
++		}
++	}
++
++	return err;
++}
+diff --git a/tools/perf/arch/arm/util/cs-etm.h b/tools/perf/arch/arm/util/cs-etm.h
+index 1a12e64f5127..a3f8dde6ccef 100644
+--- a/tools/perf/arch/arm/util/cs-etm.h
++++ b/tools/perf/arch/arm/util/cs-etm.h
+@@ -10,6 +10,7 @@
+ #include "../../util/evsel.h"
+ 
+ struct auxtrace_record *cs_etm_record_init(int *err);
+-int cs_etm_set_drv_config(struct perf_evsel_config_term *term);
++int cs_etm_set_drv_config(struct perf_evsel *evsel,
++			  struct perf_evsel_config_term **err_term);
+ 
+ #endif
+diff --git a/tools/perf/util/drv_configs.c b/tools/perf/util/drv_configs.c
+index eec754243f4d..f7c1bcf08549 100644
+--- a/tools/perf/util/drv_configs.c
++++ b/tools/perf/util/drv_configs.c
+@@ -25,7 +25,6 @@ perf_evsel__apply_drv_configs(struct perf_evsel *evsel,
+ {
+ 	bool found = false;
+ 	int err = 0;
+-	struct perf_evsel_config_term *term;
+ 	struct perf_pmu *pmu = NULL;
+ 
+ 	while ((pmu = perf_pmu__scan(pmu)) != NULL)
+@@ -34,29 +33,14 @@ perf_evsel__apply_drv_configs(struct perf_evsel *evsel,
+ 			break;
+ 		}
+ 
+-	list_for_each_entry(term, &evsel->config_terms, list) {
+-		if (term->type != PERF_EVSEL__CONFIG_TERM_DRV_CFG)
+-			continue;
++	/*
++	 * No need to continue if we didn't get a match or if there is no
++	 * driver configuration function for this PMU.
++	 */
++	if (!found || !pmu->set_drv_config)
++		return err;
+ 
+-		/*
+-		 * We have a configuration term, report an error if we
+-		 * can't find the PMU or if the PMU driver doesn't support
+-		 * cmd line driver configuration.
+-		 */
+-		if (!found || !pmu->set_drv_config) {
+-			err = -EINVAL;
+-			*err_term = term;
+-			break;
+-		}
 -
--	sysfs = sysfs__mountpoint();
--	if (!sysfs)
--		return NULL;
--
--	snprintf(path, PATH_MAX,
--		 "%s" CS_BUS_DEVICE_PATH "%s", sysfs, name);
--
--	if (stat(path, &st) < 0)
--		return NULL;
--
--	return fopen(path, "w");
--
--}
--
--static int __printf(2, 3) cs_device__print_file(const char *name, const char *fmt, ...)
--{
--	va_list args;
--	FILE *file;
--	int ret = -EINVAL;
--
--	va_start(args, fmt);
--	file = cs_device__open_file(name);
--	if (file) {
--		ret = vfprintf(file, fmt, args);
--		fclose(file);
+-		err = pmu->set_drv_config(term);
+-		if (err) {
+-			*err_term = term;
+-			break;
+-		}
 -	}
--	va_end(args);
--	return ret;
--}
 -
--static int cs_etm_set_drv_config_term(struct perf_evsel_config_term *term)
--{
--	int ret;
--	char enable_sink[ENABLE_SINK_MAX];
--
--	snprintf(enable_sink, ENABLE_SINK_MAX, "%s/%s",
--		 term->val.drv_cfg, "enable_sink");
--
--	ret = cs_device__print_file(enable_sink, "%d", 1);
--	if (ret < 0)
--		return ret;
--
--	return 0;
-+	return perf_evsel__apply_drv_config(evsel, term);
+-	return err;
++	return pmu->set_drv_config(evsel, err_term);
  }
  
- int cs_etm_set_drv_config(struct perf_evsel *evsel,
-@@ -660,7 +615,8 @@ int cs_etm_set_drv_config(struct perf_evsel *evsel,
- 		if (term->type != PERF_EVSEL__CONFIG_TERM_DRV_CFG)
- 			continue;
+ int perf_evlist__apply_drv_configs(struct perf_evlist *evlist,
+diff --git a/tools/perf/util/pmu.h b/tools/perf/util/pmu.h
+index 76fecec7b3f9..47f44394042b 100644
+--- a/tools/perf/util/pmu.h
++++ b/tools/perf/util/pmu.h
+@@ -29,7 +29,8 @@ struct perf_pmu {
+ 	struct list_head format;  /* HEAD struct perf_pmu_format -> list */
+ 	struct list_head aliases; /* HEAD struct perf_pmu_alias -> list */
+ 	struct list_head list;    /* ELEM */
+-	int (*set_drv_config)	(struct perf_evsel_config_term *term);
++	int (*set_drv_config)	(struct perf_evsel *evsel,
++				 struct perf_evsel_config_term **err_term);
+ };
  
--		err = cs_etm_set_drv_config_term(term);
-+		err = cs_etm_set_drv_config_term(evsel,
-+						 term->val.drv_cfg);
- 		if (err) {
- 			*err_term = term;
- 			break;
+ struct perf_pmu_info {
 -- 
 2.7.4
