@@ -1,131 +1,115 @@
-From: jrdr.linux@gmail.com (Souptick Joarder)
-Date: Thu, 19 Jul 2018 02:19:57 +0530
-Subject: [PATCH] gpu/drm/exynos: Convert drm_atomic_helper_suspend/resume()
-Message-ID: <20180718204957.GA14132@jordon-HP-15-Notebook-PC>
+From: dave.taht@gmail.com (Dave Taht)
+Date: Wed, 18 Jul 2018 13:55:50 -0700
+Subject: [PATCH net-next v2 3/7] net: mvneta: increase number of buffers
+ in RX and TX queue
+In-Reply-To: <87tvow8sho.fsf@bootlin.com>
+References: <20180713161841.11202-1-gregory.clement@bootlin.com>
+ <20180713161841.11202-4-gregory.clement@bootlin.com>
+ <20180713191720.GA17271@n2100.armlinux.org.uk>
+ <87tvow8sho.fsf@bootlin.com>
+Message-ID: <CAA93jw4ygBN9dLVL_rRr23+ZEFabEHiHBpDExQLj9V4E2LtekA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-convert drm_atomic_helper_suspend/resume() to use
-drm_mode_config_helper_suspend/resume().
+On Wed, Jul 18, 2018 at 8:39 AM Gregory CLEMENT
+<gregory.clement@bootlin.com> wrote:
+>
+> Hi Russell King,
+>
+>  On ven., juil. 13 2018, Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
+>
+> > On Fri, Jul 13, 2018 at 06:18:37PM +0200, Gregory CLEMENT wrote:
+> >> From: Yelena Krivosheev <yelena@marvell.com>
+> >>
+> >> The initial values were too small leading to poor performance when using
+> >> the software buffer management.
+> >
+> > What does this do to latency when a large transfer is also ongoing
+> > (iow, the classic bufferbloat issue) ?
+>
+> IXIA latency test had been done without seeing any differences for long
+> traffic (routing).
 
-exynos_drm_fbdev_suspend/resume can be removed
-as drm_mode_config_helper_suspend/resume has
-implement the same in generic way.
+IXIA's tests in the latency under load area are pure rubbish. try
+irtt, netperf, + flent (which wraps those)
 
-Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
-Signed-off-by: Ajit Negi <ajitn.linux@gmail.com>
----
- drivers/gpu/drm/exynos/exynos_drm_drv.c   | 32 ++++++++++---------------------
- drivers/gpu/drm/exynos/exynos_drm_fbdev.c | 17 ----------------
- drivers/gpu/drm/exynos/exynos_drm_fbdev.h | 10 ----------
- 3 files changed, 10 insertions(+), 49 deletions(-)
+https://github.com/heistp/irtt - with good one way delay measurements,
+has been coming along nicely of late.
 
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_drv.c b/drivers/gpu/drm/exynos/exynos_drm_drv.c
-index a81b4a5..1996ff7 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_drv.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_drv.c
-@@ -151,39 +151,27 @@ static void exynos_drm_postclose(struct drm_device *dev, struct drm_file *file)
- static int exynos_drm_suspend(struct device *dev)
- {
- 	struct drm_device *drm_dev = dev_get_drvdata(dev);
--	struct exynos_drm_private *private;
-+	int ret = 0;
- 
--	if (pm_runtime_suspended(dev) || !drm_dev)
--		return 0;
-+	if (pm_runtime_suspended(dev))
-+		return ret;
- 
--	private = drm_dev->dev_private;
-+	ret = drm_mode_config_helper_suspend(drm_dev);
- 
--	drm_kms_helper_poll_disable(drm_dev);
--	exynos_drm_fbdev_suspend(drm_dev);
--	private->suspend_state = drm_atomic_helper_suspend(drm_dev);
--	if (IS_ERR(private->suspend_state)) {
--		exynos_drm_fbdev_resume(drm_dev);
--		drm_kms_helper_poll_enable(drm_dev);
--		return PTR_ERR(private->suspend_state);
--	}
--
--	return 0;
-+	return ret;
- }
- 
- static int exynos_drm_resume(struct device *dev)
- {
- 	struct drm_device *drm_dev = dev_get_drvdata(dev);
--	struct exynos_drm_private *private;
-+	int ret = 0;
- 
--	if (pm_runtime_suspended(dev) || !drm_dev)
--		return 0;
-+	if (pm_runtime_suspended(dev))
-+		return ret;
- 
--	private = drm_dev->dev_private;
--	drm_atomic_helper_resume(drm_dev, private->suspend_state);
--	exynos_drm_fbdev_resume(drm_dev);
--	drm_kms_helper_poll_enable(drm_dev);
-+	ret = drm_mode_config_helper_resume(drm_dev);
- 
--	return 0;
-+	return ret;
- }
- #endif
- 
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
-index 132dd52..918dd2c 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
-@@ -270,20 +270,3 @@ void exynos_drm_fbdev_fini(struct drm_device *dev)
- 	private->fb_helper = NULL;
- }
- 
--void exynos_drm_fbdev_suspend(struct drm_device *dev)
--{
--	struct exynos_drm_private *private = dev->dev_private;
--
--	console_lock();
--	drm_fb_helper_set_suspend(private->fb_helper, 1);
--	console_unlock();
--}
--
--void exynos_drm_fbdev_resume(struct drm_device *dev)
--{
--	struct exynos_drm_private *private = dev->dev_private;
--
--	console_lock();
--	drm_fb_helper_set_suspend(private->fb_helper, 0);
--	console_unlock();
--}
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_fbdev.h b/drivers/gpu/drm/exynos/exynos_drm_fbdev.h
-index b338472..6840b6a 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_fbdev.h
-+++ b/drivers/gpu/drm/exynos/exynos_drm_fbdev.h
-@@ -19,8 +19,6 @@
- 
- int exynos_drm_fbdev_init(struct drm_device *dev);
- void exynos_drm_fbdev_fini(struct drm_device *dev);
--void exynos_drm_fbdev_suspend(struct drm_device *drm);
--void exynos_drm_fbdev_resume(struct drm_device *drm);
- 
- #else
- 
-@@ -39,14 +37,6 @@ static inline void exynos_drm_fbdev_restore_mode(struct drm_device *dev)
- 
- #define exynos_drm_output_poll_changed (NULL)
- 
--static inline void exynos_drm_fbdev_suspend(struct drm_device *drm)
--{
--}
--
--static inline void exynos_drm_fbdev_resume(struct drm_device *drm)
--{
--}
--
- #endif
- 
- #endif
+> These new values offer better performance for the main usage of this SoC
+> (NAS applications), however both Rx and TX queues size can be change by
+> ethtool.
+
+BQL was added to this driver as of commit
+a29b6235560a1ed10c8e1a73bfc616a66b802b90, with typical latencies below
+2ms range. Is that not still the case? at a gbit, 1500 byte packets,
+non-gso, that's a ring buffer size of ~155. So I can imagine that your
+proposed larger ring buffer size for smaller packets might help, (was
+your test using smaller packets?) and the usage of BQL should obscure
+any change of latency seen by increasing the limit.
+
+(in other words, assuming bql is working, go right ahead, increase tx
+descriptors)
+
+bqlmon can be used to monitor the state of bql.
+
+as for rx, are you seeing drops under load due to overflowing it? When
+I last looked at this
+driver (in the pre-bql era), it did a lot of bulky processing in rx.
+
+>
+> Gregory
+>
+> >
+> >>
+> >> Signed-off-by: Yelena Krivosheev <yelena@marvell.com>
+> >> [gregory: extract from a larger patch]
+> >> Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
+> >> ---
+> >>  drivers/net/ethernet/marvell/mvneta.c | 4 ++--
+> >>  1 file changed, 2 insertions(+), 2 deletions(-)
+> >>
+> >> diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
+> >> index f4e3943a745d..c22df28b07c8 100644
+> >> --- a/drivers/net/ethernet/marvell/mvneta.c
+> >> +++ b/drivers/net/ethernet/marvell/mvneta.c
+> >> @@ -295,10 +295,10 @@
+> >>  #define MVNETA_RSS_LU_TABLE_SIZE    1
+> >>
+> >>  /* Max number of Rx descriptors */
+> >> -#define MVNETA_MAX_RXD 128
+> >> +#define MVNETA_MAX_RXD 512
+> >>
+> >>  /* Max number of Tx descriptors */
+> >> -#define MVNETA_MAX_TXD 532
+> >> +#define MVNETA_MAX_TXD 1024
+> >>
+> >>  /* Max number of allowed TCP segments for software TSO */
+> >>  #define MVNETA_MAX_TSO_SEGS 100
+> >> --
+> >> 2.18.0
+> >>
+> >>
+> >> _______________________________________________
+> >> linux-arm-kernel mailing list
+> >> linux-arm-kernel at lists.infradead.org
+> >> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> >
+> > --
+> > RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+> > FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
+> > According to speedtest.net: 13Mbps down 490kbps up
+>
+> --
+> Gregory Clement, Bootlin (formerly Free Electrons)
+> Embedded Linux and Kernel engineering
+> http://bootlin.com
+
+
+
 -- 
-1.9.1
+
+Dave T?ht
+CEO, TekLibre, LLC
+http://www.teklibre.com
+Tel: 1-669-226-2619
