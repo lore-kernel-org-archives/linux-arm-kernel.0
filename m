@@ -1,83 +1,54 @@
 From: tpiepho@impinj.com (Trent Piepho)
-Date: Wed, 18 Jul 2018 12:44:23 -0700
-Subject: [PATCH 1/2] ARM: dts: imx7d: Add node for PCIe PHY
-In-Reply-To: <20180718194424.8844-1-tpiepho@impinj.com>
-References: <20180718194424.8844-1-tpiepho@impinj.com>
-Message-ID: <20180718194424.8844-2-tpiepho@impinj.com>
+Date: Wed, 18 Jul 2018 12:44:22 -0700
+Subject: [PATCH 0/2] Workaround for IMX7d PCI-e PLL lock failure
+Message-ID: <20180718194424.8844-1-tpiepho@impinj.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There isn't yet any code in the kernel that uses this device's register,
-but there will be some for a PCIe PLL erratum wortkaround.
+This is the workaround for the IMX7d Erratum e10728, failure of
+initialize PCIe PLL VCO oscillation resulting in PLL lock failure and
+failure of the PCI-e link to come up.
 
-This adds the PHY as a new node.  The PCI-e controller node gains a
-phandle property that points to it.  There is no driver for the PHY at
-this point and all the existing code that relates to the PHY is part of
-the PCI-e controller driver (and does not need register access, yet).
+The registers used in the workaround are based on the latest patch in
+the NXP kernel, but many things around that have been changed.
+
+This uses a new node of type fsl,imx-pcie-phy to get the PHY's
+registers.  The node is found via a phandle added to the PCI-e
+controller's node, rather than the incorrect way done in the NXP kernel.
+
+There is no error if the phandle is not preset (since it's needed except
+for the imx7d workaround and no existing dtses have it), but if preset
+it is an error if something relating to it does not work.
+
+** Should the node be fsl,imx7d-pcie-phy?  snps,dw-pcie-phy?  
+
+There is little to no documenation from NXP and Synopsis about this, so I'm
+unsure of the PHY's lineage.
+
+The imx6 PCI-e driver does not use the generic phy layer to interact
+with the PHY.  It appears PHY related hardware, like clocks, regulators,
+and resets, are part of the fsl,imx6q-pcie node.  But again, the
+topology of this hardware is not documented very well.
+
+Another approach would be to add the PHY registers as another bank in
+the PCI-e node.  This would match how the PHY reset, clock, etc.  are
+done.  However, the PHY is attached to a different AXI master than the
+PCI-e controller, so the register range really does not belong there.
+
+Trent Piepho (2):
+  ARM: dts: imx7d: Add node for PCIe PHY
+  PCI: imx: Add workaround for e10728, IMX7d PCIe PLL failure
+
+ .../devicetree/bindings/pci/fsl,imx6q-pcie.txt     | 11 ++++
+ arch/arm/boot/dts/imx7d.dtsi                       |  9 ++++
+ drivers/pci/dwc/pci-imx6.c                         | 59 ++++++++++++++++++++++
+ 3 files changed, 79 insertions(+)
 
 Cc: Shawn Guo <shawnguo@kernel.org>
 Cc: Sascha Hauer <kernel@pengutronix.de>
 Cc: Fabio Estevam <fabio.estevam@nxp.com>
 Cc: Richard Zhu <hongxing.zhu@nxp.com>
 Cc: Lucas Stach <l.stach@pengutronix.de>
-Signed-off-by: Trent Piepho <tpiepho@impinj.com>
----
- Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt | 11 +++++++++++
- arch/arm/boot/dts/imx7d.dtsi                             |  9 +++++++++
- 2 files changed, 20 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
-index cb33421184a0..c7aeda6878ff 100644
---- a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
-+++ b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
-@@ -50,6 +50,7 @@ Additional required properties for imx7d-pcie:
- - reset-names: Must contain the following entires:
- 	       - "pciephy"
- 	       - "apps"
-+- fsl,pcie-phy: A phandle to an fsl,imx-pcie-phy node.
- 
- Example:
- 
-@@ -76,3 +77,13 @@ Example:
- 		clocks = <&clks 144>, <&clks 206>, <&clks 189>;
- 		clock-names = "pcie", "pcie_bus", "pcie_phy";
- 	};
-+
-+* Freescale i.MX7d PCIe PHY
-+
-+This is the PHY associated with the IMX7d PCIe controller.  It's used by the
-+PCI-e controller via the fsl,pcie-phy phandle.
-+
-+Required properties:
-+- compatible:
-+	- "fsl,imx-pcie-phy"
-+- reg: base address and length of the PCIe PHY controller
-diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
-index 200714e3feea..31f5c8576251 100644
---- a/arch/arm/boot/dts/imx7d.dtsi
-+++ b/arch/arm/boot/dts/imx7d.dtsi
-@@ -94,6 +94,14 @@
- 	};
- };
- 
-+&aips2 {
-+	pcie_phy: pcie-phy at 306d0000 {
-+		  compatible = "fsl,imx-pcie-phy";
-+		  reg = <0x306d0000 0x10000>;
-+		  status = "disabled";
-+	};
-+};
-+
- &aips3 {
- 	usbotg2: usb at 30b20000 {
- 		compatible = "fsl,imx7d-usb", "fsl,imx27-usb";
-@@ -167,6 +175,7 @@
- 			 <&src IMX7_RESET_PCIE_CTRL_APPS_EN>;
- 		reset-names = "pciephy", "apps";
- 		status = "disabled";
-+		fsl,pcie-phy = <&pcie_phy>;
- 	};
- };
- 
 -- 
 2.14.4
