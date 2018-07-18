@@ -1,72 +1,84 @@
-From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Wed, 18 Jul 2018 16:18:04 +0200
-Subject: [PATCH v2 0/3] ARM: OMAP1: ams-delta: Complete driver gpiod
- migration
-In-Reply-To: <20180717231448.14958-1-jmkrzyszt@gmail.com> (Janusz
- Krzysztofik's message of "Wed, 18 Jul 2018 01:14:45 +0200")
-References: <20180518210954.29044-1-jmkrzyszt@gmail.com>
- <20180717231448.14958-1-jmkrzyszt@gmail.com>
-Message-ID: <87a7qoaaqr.fsf@bootlin.com>
+From: giulio.benetti@micronovasrl.com (Giulio Benetti)
+Date: Wed, 18 Jul 2018 16:23:57 +0200
+Subject: [PATCH] drm/sun4i: Handle DRM_BUS_FLAG_PIXDATA_*EDGE checking if
+ panel is used.
+In-Reply-To: <20180613081647.31183-1-paul.kocialkowski@bootlin.com>
+References: <20180613081647.31183-1-paul.kocialkowski@bootlin.com>
+Message-ID: <20180718142357.120998-1-giulio.benetti@micronovasrl.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Janusz,
+Handle both positive and negative dclk polarity,
+according to bus_flags, taking care of this:
+
+On A20 and similar SoCs, the only way to achieve Positive Edge
+(Rising Edge), is setting dclk clock phase to 2/3(240?).
+By default TCON works in Negative Edge(Falling Edge), this is why phase
+is set to 0 in that case.
+Unfortunately there's no way to logically invert dclk through IO_POL
+register.
+The only acceptable way to work, triple checked with scope,
+is using clock phase set to 0? for Negative Edge and set to 240? for
+Positive Edge.
+On A33 and similar SoCs there would be a 90? phase option, but it divides
+also dclk by 2.
+This patch is a way to avoid quirks all around TCON and DOTCLOCK drivers
+for using A33 90? phase divided by 2 and consequently increase code
+complexity.
+
+Check if panel is used. TCON can also handle VGA DAC, then panel could
+be empty.
+
+Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
+---
+ drivers/gpu/drm/sun4i/sun4i_tcon.c | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
+
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+index 8232b39e16ca..5c7d6ae53111 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+@@ -17,6 +17,7 @@
+ #include <drm/drm_encoder.h>
+ #include <drm/drm_modes.h>
+ #include <drm/drm_of.h>
++#include <drm/drm_panel.h>
  
- On mer., juil. 18 2018, Janusz Krzysztofik <jmkrzyszt@gmail.com> wrote:
-
-> This is a follow up of initial submission of a series consisted of 
-> 6 changes, 3 of which have been already applied or reworkeed.
->
-> V2 changelog:
-> [PATCH 1/6] ARM: OMAP1: ams-delta: add GPIO lookup tables
-> 	- already in mainline, commit 68e62a15a914
-> [PATCH 2/6] Input: ams_delta_serio: use GPIO lookup table
-> 	- reworked and submitted as a series, already in linux-omap,
-> 	  commit 68e62a15a914 ("ARM: OMAP1: ams-delta: drop GPIO lookup
-> 	  table for serio device") followed by 9 more
-> [PATCH 3/6] ASoC: ams_delta: use GPIO lookup table
-> 	- already in mainline, commit d65777d1a2cd
-> [PATCH 4/6] fbdev: omapfb: lcd_ams_delta: use GPIO lookup table
-> 	- resubmitting as [PATCH v2 1/3 v2]
-> 	v2: Remove problematic error code conversion no longer
-> 	    needed if used on top of commit d08605a64e67 ("ARM: OMAP1:
-> 	    ams-delta: move late devices back to init_machine")
-> 	    and commit 8853daf3b4ac ("gpiolib: Defer on non-DT
-> 	    find_chip_by_name() failure") already in linux-next
-> [PATCH 5/6] mtd: rawnand: ams-delta: use GPIO lookup table
-> 	- resubmitting as [PATCH v2 2/3 v4]
-> 	v2: Fix handling of devm_gpiod_get_optional() return values -
-> 	    thanks to Andy Shevchenko.
-> 	v3: Remove problematic error code conversion no longer needed
-> 	    if used on top of commit d08605a64e67 ("ARM: OMAP1:
-> 	    ams-delta: move late devices back to init_machine") and
-> 	    commit 8853daf3b4ac ("gpiolib: Defer on non-DT
-> 	    find_chip_by_name() failure") already in linux-next - thanks
-> 	    to Boris Brezillon
-> 	v4: fix style issue - thanks to Boris Brezillon
-> [PATCH 6/6] ARM: OMAP1: ams-delta: make board header file local to
-> 	mach-omap1
-> 	- resending as [PATCH v2 3/3]
->
-> Dependency on commit 8853daf3b4ac ("gpiolib: Defer on non-DT
-> find_chip_by_name() failure") is not critical - it is not needed for
-> clean build or run, it only prevents from potential future changes to
-> driver initializaton order during device_initcall.
->
-> I'm submitting the three patches in series because the last one depends
-> on the other two.
-
-I think that being in CC in this series is a mistake as I don't see
-anything related what I have done in this series.
-
-Gregory
-
->
-> Thanks,
-> Janusz
->
-
+ #include <uapi/drm/drm_mode.h>
+ 
+@@ -474,6 +475,33 @@ static void sun4i_tcon0_mode_set_rgb(struct sun4i_tcon *tcon,
+ 	if (mode->flags & DRM_MODE_FLAG_PVSYNC)
+ 		val |= SUN4I_TCON0_IO_POL_VSYNC_POSITIVE;
+ 
++	/*
++	 * On A20 and similar SoCs, the only way to achieve Positive Edge
++	 * (Rising Edge), is setting dclk clock phase to 2/3(240?).
++	 * By default TCON works in Negative Edge(Falling Edge),
++	 * this is why phase is set to 0 in that case.
++	 * Unfortunately there's no way to logically invert dclk through
++	 * IO_POL register.
++	 * The only acceptable way to work, triple checked with scope,
++	 * is using clock phase set to 0? for Negative Edge and set to 240?
++	 * for Positive Edge.
++	 * On A33 and similar SoCs there would be a 90? phase option,
++	 * but it divides also dclk by 2.
++	 * Following code is a way to avoid quirks all around TCON
++	 * and DOTCLOCK drivers.
++	 */
++	if (!IS_ERR(tcon->panel)) {
++		struct drm_panel *panel = tcon->panel;
++		struct drm_connector *connector = panel->connector;
++		struct drm_display_info display_info = connector->display_info;
++
++		if (display_info.bus_flags & DRM_BUS_FLAG_PIXDATA_POSEDGE)
++			clk_set_phase(tcon->dclk, 240);
++
++		if (display_info.bus_flags & DRM_BUS_FLAG_PIXDATA_NEGEDGE)
++			clk_set_phase(tcon->dclk, 0);
++	}
++
+ 	regmap_update_bits(tcon->regs, SUN4I_TCON0_IO_POL_REG,
+ 			   SUN4I_TCON0_IO_POL_HSYNC_POSITIVE | SUN4I_TCON0_IO_POL_VSYNC_POSITIVE,
+ 			   val);
 -- 
-Gregory Clement, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-http://bootlin.com
+2.17.1
