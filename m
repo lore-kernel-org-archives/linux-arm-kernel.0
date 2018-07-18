@@ -1,17 +1,87 @@
 From: jmkrzyszt@gmail.com (Janusz Krzysztofik)
-Date: Thu, 19 Jul 2018 01:57:02 +0200
-Subject: [RFC PATCH 0/8] mtd: rawnand: ams-delta: Use gpio-omap accessors for
- data I/O
-Message-ID: <20180718235710.18242-1-jmkrzyszt@gmail.com>
+Date: Thu, 19 Jul 2018 01:57:07 +0200
+Subject: [RFC PATCH 5/8] mtd: rawnand: ams-delta: Request data port GPIO
+ resource
+In-Reply-To: <20180718235710.18242-1-jmkrzyszt@gmail.com>
+References: <20180718235710.18242-1-jmkrzyszt@gmail.com>
+Message-ID: <20180718235710.18242-6-jmkrzyszt@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Data port used by the driver is actually an OMAP MPUIO device, already
+under control of gpio-omap driver.  For that reason we used to not
+request the memory region of the port as that would fail because the
+region is already busy.  Despite that, we are still accessing the port
+by just ioremapping it and performing read/write operations.  Moreover,
+we are doing that without any proteciton from other users legally
+manipulating the port pins over GPIO API.
 
-Implement the idea suggested by Artem Bityutskiy and Tony Lindgren
-described in commit b027274d2e3a ("mtd: ams-delta: fix
-request_mem_region() failure").
+The plan is to convert the driver to access the port over functions
+exposed by the gpio-omap driver.  Before that happens, we can already
+obtain exclusive access to the port by requesting an array of its GPIO
+descriptors.  For that to work on Amstrad Delta, respective GPIO lookup
+table entries are added to the board init file.
 
- arch/arm/mach-omap1/board-ams-delta.c |   22 -
- drivers/gpio/gpio-omap.c              |   88 ++++++
- drivers/mtd/nand/raw/ams-delta.c      |  436 +++++++++++++++++++++-------------
- 3 files changed, 376 insertions(+), 170 deletions(-)
+Signed-off-by: Janusz Krzysztofik <jmkrzyszt@gmail.com>
+---
+ arch/arm/mach-omap1/board-ams-delta.c | 11 ++++++++++-
+ drivers/mtd/nand/raw/ams-delta.c      |  8 ++++++++
+ 2 files changed, 18 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-omap1/board-ams-delta.c b/arch/arm/mach-omap1/board-ams-delta.c
+index eedacdfe9725..16f7bbe47607 100644
+--- a/arch/arm/mach-omap1/board-ams-delta.c
++++ b/arch/arm/mach-omap1/board-ams-delta.c
+@@ -337,7 +337,8 @@ static struct platform_device ams_delta_nand_device = {
+ 	.resource	= ams_delta_nand_resources,
+ };
+ 
+-#define OMAP_GPIO_LABEL	"gpio-0-15"
++#define OMAP_GPIO_LABEL		"gpio-0-15"
++#define OMAP_MPUIO_LABEL	"mpuio"
+ 
+ static struct gpiod_lookup_table ams_delta_nand_gpio_table = {
+ 	.table = {
+@@ -349,6 +350,14 @@ static struct gpiod_lookup_table ams_delta_nand_gpio_table = {
+ 		GPIO_LOOKUP(LATCH2_LABEL, LATCH2_PIN_NAND_NWE, "nwe", 0),
+ 		GPIO_LOOKUP(LATCH2_LABEL, LATCH2_PIN_NAND_ALE, "ale", 0),
+ 		GPIO_LOOKUP(LATCH2_LABEL, LATCH2_PIN_NAND_CLE, "cle", 0),
++		GPIO_LOOKUP_IDX(OMAP_MPUIO_LABEL, 0, "data", 0, 0),
++		GPIO_LOOKUP_IDX(OMAP_MPUIO_LABEL, 1, "data", 1, 0),
++		GPIO_LOOKUP_IDX(OMAP_MPUIO_LABEL, 2, "data", 2, 0),
++		GPIO_LOOKUP_IDX(OMAP_MPUIO_LABEL, 3, "data", 3, 0),
++		GPIO_LOOKUP_IDX(OMAP_MPUIO_LABEL, 4, "data", 4, 0),
++		GPIO_LOOKUP_IDX(OMAP_MPUIO_LABEL, 5, "data", 5, 0),
++		GPIO_LOOKUP_IDX(OMAP_MPUIO_LABEL, 6, "data", 6, 0),
++		GPIO_LOOKUP_IDX(OMAP_MPUIO_LABEL, 7, "data", 7, 0),
+ 		{ },
+ 	},
+ };
+diff --git a/drivers/mtd/nand/raw/ams-delta.c b/drivers/mtd/nand/raw/ams-delta.c
+index d7e4c9dbef67..ad62c0245458 100644
+--- a/drivers/mtd/nand/raw/ams-delta.c
++++ b/drivers/mtd/nand/raw/ams-delta.c
+@@ -189,6 +189,7 @@ static int ams_delta_init(struct platform_device *pdev)
+ 	struct mtd_info *mtd;
+ 	struct resource *res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	void __iomem *io_base;
++	struct gpio_descs *data_gpiods;
+ 	int err = 0;
+ 
+ 	if (!res)
+@@ -289,6 +290,13 @@ static int ams_delta_init(struct platform_device *pdev)
+ 		dev_err(&pdev->dev, "CLE GPIO request failed (%d)\n", err);
+ 		goto out_mtd;
+ 	}
++	/* Request array of data pins, initialize them as output and set low */
++	data_gpiods = devm_gpiod_get_array(&pdev->dev, "data", GPIOD_OUT_LOW);
++	if (IS_ERR(data_gpiods)) {
++		err = PTR_ERR(data_gpiods);
++		dev_err(&pdev->dev, "data GPIO request failed: %d\n", err);
++		goto out_mtd;
++	}
+ 
+ 	/* Scan to find existence of the device */
+ 	err = nand_scan(mtd, 1);
+-- 
+2.16.4
