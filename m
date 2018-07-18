@@ -1,34 +1,39 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Wed, 18 Jul 2018 18:10:33 +0200
-Subject: [PATCH 3/5] net: fortify eth_platform_get_mac_address()
-In-Reply-To: <20180718161035.7005-1-brgl@bgdev.pl>
-References: <20180718161035.7005-1-brgl@bgdev.pl>
-Message-ID: <20180718161035.7005-4-brgl@bgdev.pl>
+From: gregory.clement@bootlin.com (Gregory CLEMENT)
+Date: Wed, 18 Jul 2018 18:10:51 +0200
+Subject: [PATCH net-next v3 2/8] net: mvneta: fix mtu change on port without
+ link
+In-Reply-To: <20180718161057.28704-1-gregory.clement@bootlin.com>
+References: <20180718161057.28704-1-gregory.clement@bootlin.com>
+Message-ID: <20180718161057.28704-3-gregory.clement@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+From: Yelena Krivosheev <yelena@marvell.com>
 
-We'll soon have more sources from which to read the MAC address in this
-routine. Make sure the address is correct before returning it.
+It is incorrect to enable TX/RX queues (call by mvneta_port_up()) for
+port without link. Indeed MTU change for interface without link causes TX
+queues to stuck.
 
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+Fixes: c5aff18204da ("net: mvneta: driver for Marvell Armada 370/XP
+network unit")
+Signed-off-by: Yelena Krivosheev <yelena@marvell.com>
+[gregory.clement: adding Fixes tags and rewording commit log]
+Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
 ---
- net/ethernet/eth.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/net/ethernet/marvell/mvneta.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/net/ethernet/eth.c b/net/ethernet/eth.c
-index 2a2173324d9e..6b64586fd2af 100644
---- a/net/ethernet/eth.c
-+++ b/net/ethernet/eth.c
-@@ -544,7 +544,7 @@ int eth_platform_get_mac_address(struct device *dev, u8 *mac_addr)
- 			from = "arch callback";
- 	}
+diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
+index ec84db47d82d..3d1f4335b0d3 100644
+--- a/drivers/net/ethernet/marvell/mvneta.c
++++ b/drivers/net/ethernet/marvell/mvneta.c
+@@ -3196,7 +3196,6 @@ static int mvneta_change_mtu(struct net_device *dev, int mtu)
  
--	if (!addr)
-+	if (!addr || !is_valid_ether_addr(addr))
- 		return -ENODEV;
+ 	on_each_cpu(mvneta_percpu_enable, pp, true);
+ 	mvneta_start_dev(pp);
+-	mvneta_port_up(pp);
  
- 	dev_info(dev, "read MAC address from %s\n", from);
+ 	netdev_update_features(dev);
+ 
 -- 
-2.17.1
+2.18.0
