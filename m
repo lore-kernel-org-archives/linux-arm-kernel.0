@@ -1,53 +1,69 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Wed, 18 Jul 2018 12:33:13 +0200
-Subject: [PATCH] ARM: dts: exynos5: add missing interrupts for pwm node
-In-Reply-To: <CANAwSgS8z-TQ=nK7dy5YeA8QJV+7cCctZKJT7qn8macQQkyKqg@mail.gmail.com>
-References: <1531906490-1739-1-git-send-email-linux.amoon@gmail.com>
- <CAJKOXPdeRvt4YG9Doziq-_oQ9DeUffvTB53OOaq-q2UpkBGpgQ@mail.gmail.com>
- <CANAwSgS8z-TQ=nK7dy5YeA8QJV+7cCctZKJT7qn8macQQkyKqg@mail.gmail.com>
-Message-ID: <CAJKOXPez6cuLyrxBkAKtyx2xiqG7VLWFCBYXkBX_537A=bDpsg@mail.gmail.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 18 Jul 2018 11:33:16 +0100
+Subject: [PATCH v3 5/7] arm64: smp: remove cpu and numa topology
+ information when hotplugging out CPU
+In-Reply-To: <CAMuHMdWv4BjXshBbqacebjbOz2eQM=1cBSjit8c2p7dmQP4ZxA@mail.gmail.com>
+References: <1530874968-5960-1-git-send-email-sudeep.holla@arm.com>
+ <1530874968-5960-6-git-send-email-sudeep.holla@arm.com>
+ <CAMuHMdXw9My+P1UCJ19Qdjq4O9gY_0QVFZaw6C5Ytmpyac59Vw@mail.gmail.com>
+ <20180717140536.GA27323@e107155-lin>
+ <CAMuHMdUnL=XyoSfRU+ebVUjsiP89V4vcoN=O4xc0VwHmLP72HA@mail.gmail.com>
+ <1c47b3fd-59ba-aba4-43b2-ed98e750887b@arm.com>
+ <5a23f1c8-27cb-b09c-90fc-edab3eec99f9@arm.com>
+ <20180717170121.GA14049@e107155-lin>
+ <CAMuHMdWv4BjXshBbqacebjbOz2eQM=1cBSjit8c2p7dmQP4ZxA@mail.gmail.com>
+Message-ID: <7cdb1d9b-cd2f-4dd7-25bf-450a7afa83d9@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 July 2018 at 12:30, Anand Moon <linux.amoon@gmail.com> wrote:
-> Hi
->
-> On 18 July 2018 at 15:27, Krzysztof Kozlowski <krzk@kernel.org> wrote:
->> On 18 July 2018 at 11:34, Anand Moon <linux.amoon@gmail.com> wrote:
->>> Add missing GIC interrupts property for pwm nodes.
->>>
->>> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
->>> ---
->>>  arch/arm/boot/dts/exynos5.dtsi | 5 +++++
->>>  1 file changed, 5 insertions(+)
->>>
->>> diff --git a/arch/arm/boot/dts/exynos5.dtsi b/arch/arm/boot/dts/exynos5.dtsi
->>> index 5d2f0a0..9406108 100644
->>> --- a/arch/arm/boot/dts/exynos5.dtsi
->>> +++ b/arch/arm/boot/dts/exynos5.dtsi
->>> @@ -169,6 +169,11 @@
->>>                 pwm: pwm at 12dd0000 {
->>>                         compatible = "samsung,exynos4210-pwm";
->>>                         reg = <0x12DD0000 0x100>;
->>> +                       interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>,
->>> +                                  <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>,
->>
->> Indentation here looks weird - spaces used after tabs but not aligned
->> with first entry. Please indent it properly and align it.
->>
->> Best regards,
->> Krzysztof
->
-> I ram checkpatch before I submit this patch it shown no error.
->
-> # scripts/checkpatch.pl --no-signoff -q
-> 0001-ARM-dts-exynos5-add-missing-interrupts-for-pwm-node.patch
 
-That's good, thank you. Still when I look at it in patchwork the
-indentation is wrong:
-https://patchwork.kernel.org/patch/10531753/
-However it can be patchwork's fault, so are you sure that this is
-properly indented and aligned?
 
-BR,
-Krzysztof
+On 18/07/18 08:15, Geert Uytterhoeven wrote:
+> Hi Sudeep,
+> 
+> On Tue, Jul 17, 2018 at 7:02 PM Sudeep Holla <sudeep.holla@arm.com> wrote:
+>> On Tue, Jul 17, 2018 at 04:55:22PM +0100, Sudeep Holla wrote:
+>>> Going through the code again, I think I understand the problem here.
+>>> We use the topology_core_mask pointers which are stashed in cpu_groups[]
+>>> But, the cpumask themselves will be getting modified as the cpus go up
+>>> and down, so we need to make a copy instead of just using the pointer.
+>>> I will see what we can do to fix that.
+>>
+>> This is what I could come up with. I haven't tested this but just compiled
+>> it. Let me know if this resolves the issue.
+> 
+> Thanks, it did!
+> 
+>> From: Sudeep Holla <sudeep.holla@arm.com>
+>> Date: Tue, 17 Jul 2018 17:45:20 +0100
+>> Subject: [PATCH] drivers/firmware: psci_checker: stash and use topology_core_cpumask for hotplug tests
+>>
+>> Commit 7f9545aa1a91 ("arm64: smp: remove cpu and numa topology information
+>> when hotplugging out CPU") updates the cpu topology when the CPU is
+>> hotplugged out. However the PSCI checker code uses the topology_core_cpumask
+>> pointers for some of the cpu hotplug testing. Since the pointer to the
+>> core_cpumask of the first CPU in the group is used, which when that CPU
+>> itself is hotpugged out is just set to itself, the testing terminates
+>> after that particular CPU is tested out. But the intention of this tests
+>> is to cover all the CPU in the group.
+>>
+>> In order to support that, we need to stash the topology_core_cpumask
+>> before the start of the test and use that value instead of pointer to a
+>> cpumask which will be updated on CPU hotplug.
+>>
+>> Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
+>> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> 
+> Fixes: 7f9545aa1a91a9a4 ("arm64: smp: remove cpu and numa topology
+> information when hotplugging out CPU")
+> Tested-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> 
+
+Thanks, I will post the patch independently with small clean up to
+reduce allocation of cpumask
+
+-- 
+Regards,
+Sudeep
