@@ -1,42 +1,38 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Wed, 18 Jul 2018 15:55:57 +0200
-Subject: [PATCHv2] ARM: dts: exynos5: add missing interrupts for pwm node
-In-Reply-To: <1531918767-7177-1-git-send-email-linux.amoon@gmail.com>
-References: <1531918767-7177-1-git-send-email-linux.amoon@gmail.com>
-Message-ID: <CAJKOXPdAEp-7jw-AqPfmqq+ygY_p4BGt92voCNRc3z57KU_-ZA@mail.gmail.com>
+From: phil.edworthy@renesas.com (Phil Edworthy)
+Date: Wed, 18 Jul 2018 13:56:26 +0000
+Subject: [PATCH] clk: Add functions to get optional clocks
+In-Reply-To: <CAMuHMdUjzVBXn-goAwbTBULfo=HrJEY6eBae4w7Z6qA-gScUUw@mail.gmail.com>
+References: <1531918658-32278-1-git-send-email-phil.edworthy@renesas.com>
+ <20180718130228.GG17271@n2100.armlinux.org.uk>
+ <CAMuHMdUjzVBXn-goAwbTBULfo=HrJEY6eBae4w7Z6qA-gScUUw@mail.gmail.com>
+Message-ID: <OSBPR01MB1766E6AFE37986B2E2B5E35DF5530@OSBPR01MB1766.jpnprd01.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 July 2018 at 14:59, Anand Moon <linux.amoon@gmail.com> wrote:
-> Add missing GIC interrupts property for pwm nodes.
->
-> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
-> ---
-> Fixed the patch indentation issue with all tabs.
-> sorry checkpatch could not figure out the error.
-> ---
->  arch/arm/boot/dts/exynos5.dtsi | 5 +++++
->  1 file changed, 5 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/exynos5.dtsi b/arch/arm/boot/dts/exynos5.dtsi
-> index 5d2f0a0..f48fb9b 100644
-> --- a/arch/arm/boot/dts/exynos5.dtsi
-> +++ b/arch/arm/boot/dts/exynos5.dtsi
-> @@ -169,6 +169,11 @@
->                 pwm: pwm at 12dd0000 {
->                         compatible = "samsung,exynos4210-pwm";
->                         reg = <0x12DD0000 0x100>;
-> +                       interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>,
-> +                                       <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>,
-> +                                       <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>,
-> +                                       <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>,
-> +                                       <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>;
+Hi Russell,
 
-OK, thanks for v2. Now only tabs are used but in previous mail I
-mentioned which example to use - the rtc node which nicely aligns
-continued lines. Why you did not follow this alignment?
+On 18 July 2018 14:19, Geert Uytterhoeven wrote:
+> On Wed, Jul 18, 2018 at 3:02 PM Russell King - ARM Linux  wrote:
+> > On Wed, Jul 18, 2018 at 01:57:38PM +0100, Phil Edworthy wrote:
+> > > Behaves the same as (devm_)clk_get except where there is no clock
+> > > producer. In this case, instead of returning -ENOENT, the function
+> > > returns NULL. This makes error checking simpler and allows
+> > > clk_prepare_enable, etc to be called on the returned reference
+> > > without additional checks.
+> >
+> > How does this work with non-DT systems, where looking a clock up which
+> > isn't yet registered with clkdev returns -ENOENT ?
+> >
+> > (clkdev doesn't know when all clocks are registered with it.)
+> 
+> Good question.
+> 
+> I guess all drivers trying to handle optional clocks this way are already broken
+> on non-DT systems where clocks may be registered late...
 
-I'll fix it when applying, no need to resend.
+So how do non-DT systems that look a clock up which isn't yet
+registered with clkdev, determine that an optional clock is there
+or not?
 
-Best regards,
-Krzysztof
+Thanks
+Phil
