@@ -1,15 +1,15 @@
 From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Wed, 18 Jul 2018 16:24:53 +0530
-Subject: [PATCH v3 13/18] arm64: dts: allwinner: a64: bananapi-m64: Enable
- HDMI output
+Date: Wed, 18 Jul 2018 16:24:57 +0530
+Subject: [PATCH v3 17/18] arm64: dts: allwinner: a64: pine64: Enable HDMI
+ output
 In-Reply-To: <20180718105458.22304-1-jagan@amarulasolutions.com>
 References: <20180718105458.22304-1-jagan@amarulasolutions.com>
-Message-ID: <20180718105458.22304-14-jagan@amarulasolutions.com>
+Message-ID: <20180718105458.22304-18-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Enable all necessary HDMI pipeline nodes with HDMI out
-connector on Bananpi-m64 board.
+connector on pine64 board.
 
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
@@ -18,17 +18,18 @@ Changes for v3:
 Changes for v2:
 - none
 
- .../dts/allwinner/sun50i-a64-bananapi-m64.dts | 34 +++++++++++++++++++
+ .../boot/dts/allwinner/sun50i-a64-pine64.dts  | 34 +++++++++++++++++++
  1 file changed, 34 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
-index 094cfed13df9..7adba2c8f6e5 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
-@@ -60,6 +60,17 @@
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+index 1b9b92e541d2..4d1553f7d2a9 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+@@ -62,6 +62,21 @@
+ 	chosen {
  		stdout-path = "serial0:115200n8";
  	};
- 
++
 +	connector {
 +		compatible = "hdmi-connector";
 +		type = "a";
@@ -39,23 +40,15 @@ index 094cfed13df9..7adba2c8f6e5 100644
 +			};
 +		};
 +	};
-+
- 	leds {
- 		compatible = "gpio-leds";
- 
-@@ -86,6 +97,10 @@
- 	};
- };
- 
-+&de {
-+	status = "okay";
 +};
 +
- &ehci0 {
- 	status = "okay";
++&de {
++	status = "okay";
  };
-@@ -103,6 +118,17 @@
- 	status = "okay";
+ 
+ &ehci0 {
+@@ -82,6 +97,17 @@
+ 
  };
  
 +&hdmi {
@@ -72,7 +65,7 @@ index 094cfed13df9..7adba2c8f6e5 100644
  &i2c1 {
  	pinctrl-names = "default";
  	pinctrl-0 = <&i2c1_pins>;
-@@ -120,6 +146,10 @@
+@@ -99,6 +125,10 @@
  	};
  };
  
@@ -83,16 +76,16 @@ index 094cfed13df9..7adba2c8f6e5 100644
  &mmc0 {
  	pinctrl-names = "default";
  	pinctrl-0 = <&mmc0_pins>;
-@@ -300,6 +330,10 @@
- 	vcc-hdmi-supply = <&reg_dldo1>;
+@@ -238,6 +268,10 @@
+ 	status = "disabled";
  };
  
 +&tcon1 {
 +	status = "okay";
 +};
 +
+ /* On Exp and Euler connectors */
  &uart0 {
  	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_pins_a>;
 -- 
 2.17.1
