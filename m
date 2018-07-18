@@ -1,104 +1,180 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Wed, 18 Jul 2018 09:14:08 +0000
-Subject: [PATCH v4 2/4] dt-bindings: arm: fsl: rework mu doc
-In-Reply-To: <20180718071251.8857-3-o.rempel@pengutronix.de>
-References: <20180718071251.8857-1-o.rempel@pengutronix.de>
- <20180718071251.8857-3-o.rempel@pengutronix.de>
-Message-ID: <AM0PR04MB4211E48ACD3B832236FA228180530@AM0PR04MB4211.eurprd04.prod.outlook.com>
+From: sean.wang@mediatek.com (Sean Wang)
+Date: Wed, 18 Jul 2018 17:16:22 +0800
+Subject: [resend PATCH v4 4/5] drm/mediatek: Add support for mmsys
+ through a pdev
+In-Reply-To: <50c93f6d-c546-1479-62c1-adc0b40d5dab@gmail.com>
+References: <20180717220328.792-1-matthias.bgg@kernel.org>
+ <20180717220328.792-5-matthias.bgg@kernel.org>
+ <1531882655.8953.83.camel@mtkswgap22>
+ <50c93f6d-c546-1479-62c1-adc0b40d5dab@gmail.com>
+Message-ID: <1531905382.8953.113.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Oleksij Rempel [mailto:o.rempel at pengutronix.de]
-> Sent: Wednesday, July 18, 2018 3:13 PM
-> To: Shawn Guo <shawnguo@kernel.org>; Fabio Estevam
-> <fabio.estevam@nxp.com>; Rob Herring <robh+dt@kernel.org>; Mark
-> Rutland <mark.rutland@arm.com>; A.s. Dong <aisheng.dong@nxp.com>
-> Cc: Oleksij Rempel <o.rempel@pengutronix.de>; kernel at pengutronix.de;
-> linux-arm-kernel at lists.infradead.org; devicetree at vger.kernel.org; dl-linux-
-> imx <linux-imx@nxp.com>
-> Subject: [PATCH v4 2/4] dt-bindings: arm: fsl: rework mu doc
+On Wed, 2018-07-18 at 09:27 +0200, Matthias Brugger wrote:
+> Hi Sean,
+> 
+> On 18/07/18 04:57, Sean Wang wrote:
+> > On Wed, 2018-07-18 at 00:03 +0200, matthias.bgg at kernel.org wrote:
+> >> From: Matthias Brugger <mbrugger@suse.com>
+> >>
+> >> The MMSYS subsystem includes clocks and drm components.
+> >> This patch adds an initailization path through a platform device
+> >> for the clock part, so that both drivers get probed from the same
+> >> device tree compatible.
+> >>
+> > 
+> > Sorry for that I should have a response earlier for the series.
+> > 
+> > Some points I felt they're not exactly right and should be fixed up
+> > before we're moving on
+> > 
+> > Currently, drm driver have a wrong reference to the dt-binding,
+> > "mediatek,mt2701-mmsys" or "mediatek,mt8173-mmsys", they should be all
+> > for the subsystem exporting clock and reset line such common resource to
+> > its sub-devices. Every subsystem has a similar shape. I hope mmsys
+> > shouldn't be an exception.
+> 
+> I'm not sure if I understand what you mean. You proposed to use a platform
+> device [1] and now you say we should change the DTS?
 > 
 
-The patch title may be improved like:
-dt-bindings: mailbox: imx-mu: add generic MU channel support
+Yes, my initial thought is that I would like to embed drm platform
+device into mmsys. It is the easiest way to solve problems caused by
+compatible string conflict we met here in short term.
 
-And explain in commit message:
-Each MU has four pairs of rx/tx data register with four rx/tx interrupts which can also
-be used as a separate channel. This patch intends to .....
 
-> - Remove software specific description. MU has many use cases limited only
-> by imagination. So remove this confusing part.
-> - Add all currently known SoCs with MU
-> - Make sure this documentation covers not only Firmware specific use case.
-> Parameters for generic configurations should be described as well.
+> What do you mean by "drm driver has a wrong reference to the dt-binding"? How
+
+But for long-term goal, device has to define its own dt-binding before
+the driver is being implemented. Currently, drm driver uses wrong
+compatible string,  "mediatek,mt2701-mmsys" or "mediatek,mt8173-mmsys",
+that are owned by mmsys device [1], not by drm device.
+
+[1]
+https://elixir.bootlin.com/linux/v4.18-rc5/source/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt
+
+
+> would you want to name it and most important, what would be your approach to
+> have backwards compatibility to older device tree bindings?
 > 
-> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
-> ---
->  .../devicetree/bindings/mailbox/fsl,mu.txt    | 32 +++++++++----------
->  1 file changed, 15 insertions(+), 17 deletions(-)
+
+We can use embed a platform device into mmsys for solving issue caused
+by the older device tree binding.
+
+But for long-term, it's neccessary to have a drm device dt-binding
+document allowing drm driver and its components driver to follow. 
+
+
+
+> > 
+> > DRM device needs to have its own dt-binding show how connections between
+> > DRM components being made and its node should be put under mmsys node.
+> > > In this way, it becomes easy to see how the topology of the subsystem is
+> > and grows, like a tree "device tree", instead of hiding the details in
+> > the implementation.
+> > 
+> > The similar example we already did for audsys on mt2701 and mt7623 as
+> > below
+> > 
+> > 	audsys: clock-controller at 11220000 {
+> > 		compatible = "mediatek,mt7623-audsys",
+> > 			     "mediatek,mt2701-audsys",
+> > 			     "syscon";
+> > 			...
+> > 
+> > 		afe: audio-controller {
+> > 			compatible = "mediatek,mt7623-audio",
+> > 				     "mediatek,mt2701-audio";
+> > 			
+> > 			...
+> > 		};
+> > 	};
+> > 
 > 
-> diff --git a/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
-> b/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
-> index 90e4905dfc69..9d5e6ee61e22 100644
-> --- a/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
-> +++ b/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
-> @@ -1,28 +1,26 @@
->  NXP i.MX Messaging Unit (MU)
->  --------------------------------------------------------------------
+> I think this approach is not working as, due to backwards compatibility, we have
+> to make sure that the DRM driver gets probed with the mmsys binding.
 > 
-> -The Messaging Unit module enables two processors within the SoC to -
-> communicate and coordinate by passing messages (e.g. data, status -and
-> control) through the MU interface. The MU also provides the ability -for one
-> processor to signal the other processor using interrupts.
-> -
-> -Because the MU manages the messaging between processors, the MU uses
-> -different clocks (from each side of the different peripheral buses).
-> -Therefore, the MU must synchronize the accesses from one side to the -
-> other. The MU accomplishes synchronization using two sets of matching -
-> registers (Processor A-facing, Processor B-facing).
-> -
-> -Messaging Unit Device Node:
-> -=============================
-> -
-
-Here you removed all the HW description of MU from the reference manual
-which is a bit strange to me.
-
-The reason you given is "remove software specific description. MU has many use
-cases limited only by imagination. So remove this confusing part" looks not quit
-convince. What confusing did you mean?
-Is it " passing messages (e.g. data, status -and control)"?
-Those are HW capabilities and I'm not sure it's quite necessary to remove them.
-
-Regards
-Dong Aisheng
-
->  Required properties:
->  -------------------
-> -- compatible :	should be "fsl,<chip>-mu", the supported chips include
-> -		imx8qxp, imx8qm.
-> +- compatible :	should be "fsl,<chip>-mu", the supported chips include:
-> +		fsl,imx6sx-mu	- i.MX 6SoloX
-> +		fsl,imx7d-mu	- i.MX 7Dual
-> +		fsl,imx7s-mu	- i.MX 7Solo
-> +		fsl,imx7ulp-mu	- i.MX 7ULP
-> +		fsl,imx8qm-mu	- i.MX 8QM
-> +		fsl,imx8qxp-mu	- i.MX 8QXP
->  - reg :		Should contain the registers location and length
->  - interrupts :	Interrupt number. The interrupt specifier format depends
->  		on the interrupt controller parent.
-> -- #mbox-cells:  Must be 0. Number of cells in a mailbox
-> +- #mbox-cells:  Must be:
-> +		0 - for single channel mode. i.MX8* SCU protocol specific.
-> +		1 - for multichannel (generic) mode.
-> +
-> +Optional properties:
-> +-------------------
-> +- clocks :	phandle to the input clock.
-> +- fsl,mu-side-b : Should be set for side B MU.
+> Regards,
+> Matthias
 > 
->  Examples:
->  --------
-> --
-> 2.18.0
+> > 	
+> > 	Sean
+> > 
+> > 
+> >> Signed-off-by: Matthias Brugger <mbrugger@suse.com>
+> >> ---
+> >>  drivers/gpu/drm/mediatek/mtk_drm_drv.c | 18 ++++++++++++++++++
+> >>  drivers/gpu/drm/mediatek/mtk_drm_drv.h |  2 ++
+> >>  2 files changed, 20 insertions(+)
+> >>
+> >> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+> >> index dd249cf5121e..c946aea722e5 100644
+> >> --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+> >> +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+> >> @@ -173,6 +173,7 @@ static const struct mtk_mmsys_driver_data mt2701_mmsys_driver_data = {
+> >>  	.ext_path = mt2701_mtk_ddp_ext,
+> >>  	.ext_len = ARRAY_SIZE(mt2701_mtk_ddp_ext),
+> >>  	.shadow_register = true,
+> >> +	.clk_drv_name = "clk-mt2701-mm",
+> >>  };
+> >>  
+> >>  static const struct mtk_mmsys_driver_data mt8173_mmsys_driver_data = {
+> >> @@ -180,6 +181,7 @@ static const struct mtk_mmsys_driver_data mt8173_mmsys_driver_data = {
+> >>  	.main_len = ARRAY_SIZE(mt8173_mtk_ddp_main),
+> >>  	.ext_path = mt8173_mtk_ddp_ext,
+> >>  	.ext_len = ARRAY_SIZE(mt8173_mtk_ddp_ext),
+> >> +	.clk_drv_name = "clk-mt8173-mm",
+> >>  };
+> >>  
+> >>  static int mtk_drm_kms_init(struct drm_device *drm)
+> >> @@ -411,6 +413,19 @@ static int mtk_drm_probe(struct platform_device *pdev)
+> >>  	if (IS_ERR(private->config_regs))
+> >>  		return PTR_ERR(private->config_regs);
+> >>  
+> >> +	if (private->data->clk_drv_name) {
+> >> +		private->clk_dev = platform_device_register_data(dev,
+> >> +						private->data->clk_drv_name, -1,
+> >> +						NULL, 0);
+> >> +
+> >> +		if (IS_ERR(private->clk_dev)) {
+> >> +			pr_err("failed to register %s platform device\n",
+> >> +						private->data->clk_drv_name);
+> >> +
+> >> +			return PTR_ERR(private->clk_dev);
+> >> +		}
+> >> +	}
+> >> +
+> >>  	/* Iterate over sibling DISP function blocks */
+> >>  	for_each_child_of_node(dev->of_node->parent, node) {
+> >>  		const struct of_device_id *of_id;
+> >> @@ -515,6 +530,9 @@ static int mtk_drm_remove(struct platform_device *pdev)
+> >>  	for (i = 0; i < DDP_COMPONENT_ID_MAX; i++)
+> >>  		of_node_put(private->comp_node[i]);
+> >>  
+> >> +	if (private->clk_dev)
+> >> +		platform_device_unregister(private->clk_dev);
+> >> +
+> >>  	return 0;
+> >>  }
+> >>  
+> >> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.h b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
+> >> index 86cec19193c4..200eee5de419 100644
+> >> --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.h
+> >> +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
+> >> @@ -34,11 +34,13 @@ struct mtk_mmsys_driver_data {
+> >>  	const enum mtk_ddp_comp_id *ext_path;
+> >>  	unsigned int ext_len;
+> >>  	bool shadow_register;
+> >> +	const char *clk_drv_name;
+> >>  };
+> >>  
+> >>  struct mtk_drm_private {
+> >>  	struct drm_device *drm;
+> >>  	struct device *dma_dev;
+> >> +	struct platform_device *clk_dev;
+> >>  
+> >>  	unsigned int num_pipes;
+> >>  
+> > 
+> > 
