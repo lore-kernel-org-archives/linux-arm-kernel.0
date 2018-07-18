@@ -1,99 +1,183 @@
-From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Wed, 18 Jul 2018 10:19:33 +0200
-Subject: [PATCH 2/2] drm/sun4i: sun4i: Introduce a quirk for lowest
- plane alpha support
-In-Reply-To: <20180717122547.d5tkizuuj6676ilc@flea.home>
-References: <20180717085230.17472-1-paul.kocialkowski@bootlin.com>
- <20180717085230.17472-2-paul.kocialkowski@bootlin.com>
- <20180717122547.d5tkizuuj6676ilc@flea.home>
-Message-ID: <fa741d96804aec4c2caa40b14eb01081b8b1c954.camel@bootlin.com>
+From: mars.cheng@mediatek.com (Mars Cheng)
+Date: Wed, 18 Jul 2018 16:54:15 +0800
+Subject: [PATCH v5 04/11] soc: mediatek: add MT6765 scpsys support
+In-Reply-To: <1531832413.8953.30.camel@mtkswgap22>
+References: <1531817552-17221-1-git-send-email-mars.cheng@mediatek.com>
+ <1531817552-17221-5-git-send-email-mars.cheng@mediatek.com>
+ <1531832413.8953.30.camel@mtkswgap22>
+Message-ID: <1531904055.4416.2.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Sean
 
-On Tue, 2018-07-17 at 14:25 +0200, Maxime Ripard wrote:
-> On Tue, Jul 17, 2018 at 10:52:30AM +0200, Paul Kocialkowski wrote:
-> > Not all sunxi platforms with the first version of the Display Engine
-> > support an alpha component on the plane with the lowest z position
-> > (as in: lowest z-pos), that gets blended with the background color.
+On Tue, 2018-07-17 at 21:00 +0800, Sean Wang wrote:
+> On Tue, 2018-07-17 at 16:52 +0800, Mars Cheng wrote:
+> > This adds scpsys support for MT6765
 > > 
-> > In particular, the A13 is known to have this limitation. However, it was
-> > recently discovered that the A20 and A33 are capable of having alpha on
-> > their lowest plane.
-> > 
-> > Thus, this introduces a specific quirk to indicate such support,
-> > per-platform. Since this was not tested on sun4i and sun6i platforms, a
-> > conservative approach is kept and this feature is not supported.
-> > 
-> > Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+> 
+> it looks like 4/11 have to depend on 6/11 and 7/11 to get a full function on scpsys for MT6765.
+> 
+> you should keep dependency in order to submit these patches
+> 
+
+Got it, will reorder the sequence.
+
+> > Signed-off-by: Mars Cheng <mars.cheng@mediatek.com>
+> > Signed-off-by: Owen Chen <owen.chen@mediatek.com>
 > > ---
-> >  drivers/gpu/drm/sun4i/sun4i_backend.c | 10 ++++++++--
-> >  1 file changed, 8 insertions(+), 2 deletions(-)
+> >  drivers/soc/mediatek/mtk-scpsys.c        |   88 ++++++++++++++++++++++++++++++
+> >  include/dt-bindings/power/mt6765-power.h |   14 +++++
+> >  2 files changed, 102 insertions(+)
+> >  create mode 100644 include/dt-bindings/power/mt6765-power.h
 > > 
-> > diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
-> > index a3cc398d4d80..cdc4a8a91ea2 100644
-> > --- a/drivers/gpu/drm/sun4i/sun4i_backend.c
-> > +++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
-> > @@ -35,6 +35,8 @@
-> >  struct sun4i_backend_quirks {
-> >  	/* backend <-> TCON muxing selection done in backend */
-> >  	bool needs_output_muxing;
-> > +	/* alpha at the lowest z position is not always supported */
-> > +	bool supports_lowest_plane_alpha;
+> > diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
+> > index 5b24bb4..4bb6c7a 100644
+> > --- a/drivers/soc/mediatek/mtk-scpsys.c
+> > +++ b/drivers/soc/mediatek/mtk-scpsys.c
+> > @@ -23,6 +23,7 @@
+> >  
+> >  #include <dt-bindings/power/mt2701-power.h>
+> >  #include <dt-bindings/power/mt2712-power.h>
+> > +#include <dt-bindings/power/mt6765-power.h>
+> >  #include <dt-bindings/power/mt6797-power.h>
+> >  #include <dt-bindings/power/mt7622-power.h>
+> >  #include <dt-bindings/power/mt7623a-power.h>
+> > @@ -680,6 +681,79 @@ static void mtk_register_power_domains(struct platform_device *pdev,
 > >  };
 > >  
-> >  static void sun4i_backend_apply_color_correction(struct sunxi_engine *engine)
-> > @@ -484,6 +486,7 @@ static void sun4i_backend_atomic_begin(struct sunxi_engine *engine,
-> >  static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
-> >  				      struct drm_crtc_state *crtc_state)
-> >  {
-> > +	struct sun4i_backend *backend = engine_to_sun4i_backend(engine);
-> >  	struct drm_plane_state *plane_states[SUN4I_BACKEND_NUM_LAYERS] = { 0 };
+> >  /*
+> > + * MT6765 power domain support
+> > + */
+> > +#define SPM_PWR_STATUS_MT6765			0x0180
+> > +#define SPM_PWR_STATUS_2ND_MT6765		0x0184
+> > +
+> > +static const struct scp_domain_data scp_domain_data_mt6765[] = {
+> > +	[MT6765_POWER_DOMAIN_VCODEC] = {
+> > +		.name = "vcodec",
+> > +		.sta_mask = BIT(26),
+> > +		.ctl_offs = 0x300,
+> > +		.sram_pdn_bits = GENMASK(8, 8),
+> > +		.sram_pdn_ack_bits = GENMASK(12, 12),
+> > +	},
+> > +	[MT6765_POWER_DOMAIN_ISP] = {
+> > +		.name = "isp",
+> > +		.sta_mask = BIT(5),
+> > +		.ctl_offs = 0x308,
+> > +		.sram_pdn_bits = GENMASK(8, 8),
+> > +		.sram_pdn_ack_bits = GENMASK(12, 12),
+> > +	},
+> > +	[MT6765_POWER_DOMAIN_MM] = {
+> > +		.name = "mm",
+> > +		.sta_mask = BIT(3),
+> > +		.ctl_offs = 0x30C,
+> > +		.sram_pdn_bits = GENMASK(8, 8),
+> > +		.sram_pdn_ack_bits = GENMASK(12, 12),
+> > +	},
+> > +	[MT6765_POWER_DOMAIN_CONN] = {
+> > +		.name = "conn",
+> > +		.sta_mask = BIT(1),
+> > +		.ctl_offs = 0x32C,
+> > +		.sram_pdn_bits = 0,
+> > +		.sram_pdn_ack_bits = 0,
+> > +	},
+> > +	[MT6765_POWER_DOMAIN_MFG_ASYNC] = {
+> > +		.name = "mfg_async",
+> > +		.sta_mask = BIT(23),
+> > +		.ctl_offs = 0x334,
+> > +		.sram_pdn_bits = 0,
+> > +		.sram_pdn_ack_bits = 0,
+> > +	},
+> > +	[MT6765_POWER_DOMAIN_MFG] = {
+> > +		.name = "mfg",
+> > +		.sta_mask = BIT(4),
+> > +		.ctl_offs = 0x338,
+> > +		.sram_pdn_bits = GENMASK(8, 8),
+> > +		.sram_pdn_ack_bits = GENMASK(12, 12),
+> > +	},
+> > +	[MT6765_POWER_DOMAIN_CAM] = {
+> > +		.name = "cam",
+> > +		.sta_mask = BIT(25),
+> > +		.ctl_offs = 0x344,
+> > +		.sram_pdn_bits = GENMASK(8, 9),
+> > +		.sram_pdn_ack_bits = GENMASK(12, 13),
+> > +	},
+> > +	[MT6765_POWER_DOMAIN_MFG_CORE0] = {
+> > +		.name = "mfg_core0",
+> > +		.sta_mask = BIT(7),
+> > +		.ctl_offs = 0x34C,
+> > +		.sram_pdn_bits = GENMASK(8, 8),
+> > +		.sram_pdn_ack_bits = GENMASK(12, 12),
+> > +	},
 > 
-> Your new variable should be here.
+> Above power domains really don't require any clock controlled with
+> clk_id before any access on them?
+> 
 
-Ok, will do in v2.
+Yes, already sync with Owen, they are lost. will add them.
 
-> >  	struct drm_atomic_state *state = crtc_state->state;
-> >  	struct drm_device *drm = state->dev;
-> > @@ -584,8 +587,9 @@ static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
-> >  	}
+Thanks.
+> > +};
+> > +
+> > +static const struct scp_subdomain scp_subdomain_mt6765[] = {
+> > +	{MT6765_POWER_DOMAIN_MM, MT6765_POWER_DOMAIN_CAM},
+> > +	{MT6765_POWER_DOMAIN_MM, MT6765_POWER_DOMAIN_ISP},
+> > +	{MT6765_POWER_DOMAIN_MM, MT6765_POWER_DOMAIN_VCODEC},
+> > +	{MT6765_POWER_DOMAIN_MFG_ASYNC, MT6765_POWER_DOMAIN_MFG},
+> > +	{MT6765_POWER_DOMAIN_MFG, MT6765_POWER_DOMAIN_MFG_CORE0},
+> > +};
+> > +
+> > +/*
+> >   * MT6797 power domain support
+> >   */
 > >  
-> >  	/* We can't have an alpha plane at the lowest position */
-> > -	if (plane_states[0]->fb->format->has_alpha ||
-> > -	    (plane_states[0]->alpha != DRM_BLEND_ALPHA_OPAQUE))
-> > +	if ((plane_states[0]->fb->format->has_alpha ||
-> > +	    (plane_states[0]->alpha != DRM_BLEND_ALPHA_OPAQUE)) &&
-> > +	    !backend->quirks->supports_lowest_plane_alpha)
-> >  		return -EINVAL;
+> > @@ -962,6 +1036,17 @@ static void mtk_register_power_domains(struct platform_device *pdev,
+> >  	.bus_prot_reg_update = false,
+> >  };
+> >  
+> > +static const struct scp_soc_data mt6765_data = {
+> > +	.domains = scp_domain_data_mt6765,
+> > +	.num_domains = ARRAY_SIZE(scp_domain_data_mt6765),
+> > +	.subdomains = scp_subdomain_mt6765,
+> > +	.num_subdomains = ARRAY_SIZE(scp_subdomain_mt6765),
+> > +	.regs = {
+> > +		.pwr_sta_offs = SPM_PWR_STATUS_MT6765,
+> > +		.pwr_sta2nd_offs = SPM_PWR_STATUS_2ND_MT6765,
+> > +	},
+> > +};
+> > +
+> >  static const struct scp_soc_data mt6797_data = {
+> >  	.domains = scp_domain_data_mt6797,
+> >  	.num_domains = ARRAY_SIZE(scp_domain_data_mt6797),
+> > @@ -1018,6 +1103,9 @@ static void mtk_register_power_domains(struct platform_device *pdev,
+> >  		.compatible = "mediatek,mt2712-scpsys",
+> >  		.data = &mt2712_data,
+> >  	}, {
+> > +		.compatible = "mediatek,mt6765-scpsys",
+> > +		.data = &mt6765_data,
+> > +	}, {
+> >  		.compatible = "mediatek,mt6797-scpsys",
+> >  		.data = &mt6797_data,
+> >  	}, {
+> > diff --git a/include/dt-bindings/power/mt6765-power.h b/include/dt-bindings/power/mt6765-power.h
+> > new file mode 100644
+> > index 0000000..d347b4e
+> > --- /dev/null
+> > +++ b/include/dt-bindings/power/mt6765-power.h
+> > @@ -0,0 +1,14 @@
+> > +/* SPDX-License-Identifier: GPL-2.0 */
+> > +#ifndef _DT_BINDINGS_POWER_MT6765_POWER_H
+> > +#define _DT_BINDINGS_POWER_MT6765_POWER_H
+> > +
+> > +#define MT6765_POWER_DOMAIN_CONN		0
+> > +#define MT6765_POWER_DOMAIN_MM			1
+> > +#define MT6765_POWER_DOMAIN_MFG_ASYNC		2
+> > +#define MT6765_POWER_DOMAIN_ISP			3
+> > +#define MT6765_POWER_DOMAIN_MFG			4
+> > +#define MT6765_POWER_DOMAIN_MFG_CORE0		5
+> > +#define MT6765_POWER_DOMAIN_CAM			6
+> > +#define MT6765_POWER_DOMAIN_VCODEC		7
+> > +
+> > +#endif /* _DT_BINDINGS_POWER_MT6765_POWER_H */
 > 
-> This only partially does the job. This only allows to have an alpha
-> plane at the lowest position, but the fact that the alpha works at the
-> lowest position also means you can have two alpha planes now, and you
-> didn't change that check.
-
-You're right, the number of available planes with alpha has to be
-changed accordingly. Will do in v2.
-
-> The pipe allocation algorithm would also need to be checked.
-
->From my understanding, the limitation on the number of alpha planes only
-takes effect after pipe allocation, so this change doesn't require
-modifying the allocation algorithm.
-
-Cheers and thanks for the review,
-
-Paul
-
--- 
-Paul Kocialkowski, Bootlin (formerly Free Electrons)
-Embedded Linux and kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180718/a6fc0085/attachment.sig>
+> 
