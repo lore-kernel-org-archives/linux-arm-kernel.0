@@ -1,42 +1,48 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 18 Jul 2018 11:57:15 -0700
-Subject: [PATCH V2 0/5] arm64: Initial support Texas Instrument's AM654
- Platform
-In-Reply-To: <20180718180455.gaej4fgf47zytdxk@kahuna>
-References: <20180626162615.19194-1-nm@ti.com>
- <20180718180455.gaej4fgf47zytdxk@kahuna>
-Message-ID: <20180718185715.GG99251@atomide.com>
+From: john.stultz@linaro.org (John Stultz)
+Date: Wed, 18 Jul 2018 11:58:06 -0700
+Subject: [PATCH v11 0/4] [RESEND] scsi: ufs: add ufs driver code for
+ Hisilicon Hi3660 SoC
+In-Reply-To: <20180717093659.103263-1-liwei213@huawei.com>
+References: <20180717093659.103263-1-liwei213@huawei.com>
+Message-ID: <CALAqxLVgRCCPJhjdpqG9TejtdNzHbyasxBytObgrS5_LrQnTtw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nishanth Menon <nm@ti.com> [180718 18:08]:
-> On 16:26-20180626, Nishanth Menon wrote:
-> > Hi,
-> > 
-> > This is an minor update from V1 posted earlier:
-> > 	https://marc.info/?l=linux-kernel&m=152943745424138&w=2
-> > 
-> > The following series enables support for newest addition in TI's SoC
-> > portfolio - AM654 SoC.
-> > 
-> > The series is based off v4.18-rc1, also available here:
-> > https://github.com/nmenon/linux-2.6-playground/tree/upstream/v4.18-rc1/k3-1-am6-base
-> > 
-> > Key changes since RFC are indicated in respective patches:
-> > * Pickedup Tony's Reviewed by
-> > * Modified cbass nodes to indicate interconnect (patch #3 in the series)
-> 
-> Hi Tony,
-> 
-> Apologies on the off-request. Looks like Tero might be on vacation
-> and might not be able to send the Pull request to arm-soc folks on time.
-> 
-> Requesting you to pick them up on our behalf for v4.19 if it that is
-> fine with you. We do have Rob's ack on the bindings themselves, and
-> the patches also have been reviewed as well.
+On Tue, Jul 17, 2018 at 2:36 AM, Li Wei <liwei213@huawei.com> wrote:
+> This patchset adds driver support for UFS for Hi3660 SoC. It is verified on HiKey960 board.
+>
+> Li Wei (4):
+>   scsi: ufs: add Hisilicon ufs driver code
+>   dt-bindings: scsi: ufs: add document for hisi-ufs
+>   arm64: dts: add ufs dts node
+>   arm64: defconfig: enable configs for Hisilicon ufs
+>
+>  Documentation/devicetree/bindings/ufs/ufs-hisi.txt |  41 ++
+>  .../devicetree/bindings/ufs/ufshcd-pltfrm.txt      |  10 +-
+>  arch/arm64/boot/dts/hisilicon/hi3660.dtsi          |  18 +
+>  arch/arm64/configs/defconfig                       |   1 +
+>  drivers/scsi/ufs/Kconfig                           |   9 +
+>  drivers/scsi/ufs/Makefile                          |   1 +
+>  drivers/scsi/ufs/ufs-hisi.c                        | 619 +++++++++++++++++++++
+>  drivers/scsi/ufs/ufs-hisi.h                        | 115 ++++
+>  8 files changed, 811 insertions(+), 3 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/ufs/ufs-hisi.txt
+>  create mode 100644 drivers/scsi/ufs/ufs-hisi.c
+>  create mode 100644 drivers/scsi/ufs/ufs-hisi.h
 
-Sure applying the whole series into am654-for-v4.19 branch.
 
-Regards,
+Martin/Vinayak: Wanted to nudge either of you to see if you had any
+further feedback or objections on this patchset? Its been a long slow
+slog for this patch-set and getting it upstream will make the HiKey960
+board much more useful for testing mainline kernels.
 
-Tony
+If you don't have objections, would you consider merging the scsi
+driver and Acked dt-bindings via the scsi tree?   Including the dts
+changes too if Wei Xu (now cc'ed) acks it, would be helpful as well
+(but that can go separately later if necessary).
+
+The defconfig change isn't as important, so I suspect can be re-pushed
+through the ARM maintainers later.
+
+thanks
+-john
