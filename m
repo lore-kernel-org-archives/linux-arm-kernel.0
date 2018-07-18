@@ -1,71 +1,74 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Wed, 18 Jul 2018 17:18:16 +0200
-Subject: [GIT PULL] arm: zynq: Xilinx DT changes for v4.19
-In-Reply-To: <CAOesGMhvbj6cde2N+fG-ZBSF=gBNPa56x0M0GnKu8sk-yyRV-Q@mail.gmail.com>
-References: <50ac449c-2196-0352-0352-1f761d321e61@xilinx.com>
- <CAOesGMhvbj6cde2N+fG-ZBSF=gBNPa56x0M0GnKu8sk-yyRV-Q@mail.gmail.com>
-Message-ID: <ba4cfef3-c782-61f3-33eb-a6ec3eea183e@xilinx.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Wed, 18 Jul 2018 17:22:03 +0200
+Subject: [PATCH] mmc: sunxi: Use new timing mode for A64 eMMC controller
+In-Reply-To: <CAGb2v64NRVaWpbDqiX0JX7_6uvypUpNEecPUj-sSjaK5X-hdQA@mail.gmail.com>
+References: <20180712030225.15681-1-wens@csie.org>
+ <20180712071959.fi4rhgwv2iuoelbl@flea>
+ <CAGb2v65rE2nQbyeiSPAyTzw-n-EQsUwQABx3nrvXTu4JogFPBQ@mail.gmail.com>
+ <20180717151558.wn7v33whtljqt53w@flea>
+ <CAGb2v64NRVaWpbDqiX0JX7_6uvypUpNEecPUj-sSjaK5X-hdQA@mail.gmail.com>
+Message-ID: <20180718152203.svrt6wmr2vwh4rb5@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18.7.2018 16:58, Olof Johansson wrote:
-> Hi,
+On Tue, Jul 17, 2018 at 11:43:03PM +0800, Chen-Yu Tsai wrote:
+> On Tue, Jul 17, 2018 at 11:15 PM, Maxime Ripard
+> <maxime.ripard@bootlin.com> wrote:
+> > On Thu, Jul 12, 2018 at 06:17:23PM +0800, Chen-Yu Tsai wrote:
+> >> On Thu, Jul 12, 2018 at 3:19 PM, Maxime Ripard
+> >> <maxime.ripard@bootlin.com> wrote:
+> >> > Hi,
+> >> >
+> >> > On Thu, Jul 12, 2018 at 11:02:25AM +0800, Chen-Yu Tsai wrote:
+> >> >> The eMMC controller is also a new timing mode controller, but it doesn't
+> >> >> have the timing mode switch. It does however have signal delay and
+> >> >> calibration controls, typical of Allwinner MMC controllers that support
+> >> >> the new timing mode.
+> >> >>
+> >> >> Enable the new timing mode setting for the A64 eMMC controller. This
+> >> >> also enables MMC HS-DDR modes, which gives higher throughput for eMMC
+> >> >> chips that support it, and can deliver such throughput.
+> >> >>
+> >> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> >> >
+> >> > That doesn't look right. The datasheet explicitly mentions that this
+> >> > bit doesn't apply to the eMMC controller, and the BSP is doing the same:
+> >> > https://github.com/longsleep/linux-pine64/blob/lichee-dev-v3.10.65/drivers/mmc/host/sunxi-mmc-sun50iw1p1-1.c
+> >> >
+> >> > vs
+> >> > https://github.com/longsleep/linux-pine64/blob/lichee-dev-v3.10.65/drivers/mmc/host/sunxi-mmc-sun50iw1p1-2.c
+> >>
+> >> You mean the bit in SDXC_REG_SD_NTSR? Yes I know that doesn't exist
+> >> for the eMMC controller. I mentioned this in the commit message. It
+> >> doesn't exist, and writes to it become a no-op.
+> >>
+> >> Would a comment, or comments, help with making this clear?
+> >
+> > Ah right. Maybe we should move the calibration under can_calibrate
+> > though, or create another boolean for this?
+> >
+> > Putting it under has_new_timings while the SoC doesn't use it looks
+> > very confusing.
 > 
-> On Wed, Jul 18, 2018 at 7:10 AM, Michal Simek <michal.simek@xilinx.com> wrote:
->> Hi,
->>
->> please pull the following patches.
->>
->> Thanks,
->> Michal
->>
->>
->> The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
->>
->>   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
->>
->> are available in the git repository at:
->>
->>   https://github.com/Xilinx/linux-xlnx.git tags/zynq-dt-for-v4.19
->>
->> for you to fetch changes up to 7df89642f143d67a80605ea3fb7e53bcb95f6b39:
->>
->>   arm: zynq: Remove #address/#size-cells from gpio-keys (2018-07-17
->> 16:57:29 +0200)
->>
->> ----------------------------------------------------------------
->> arm: zynq: DT changes for v4.19
->>
->> - Add Z-turn board
->> - Add mmc aliases
->> - Fix model information
->> - Sort out documentatio
->> - Update Zybo Z7
->> - Fix gpio-keys
->>
->> ----------------------------------------------------------------
->> Anton Gerasimov (1):
->>       arm: dts: zynq: Add support for Z-turn board
->>
->> Luis Araneda (9):
->>       arm: dts: zynq: Set correct manufacturer for ZedBoard and MicroZed
->> boards
->>       arm: dts: zynq: correct and improve the model property of dt files
->>       dt-bindings: xilinx: zynq: Improve boards description
->>       dt-bindings: xilinx: zynq: Sort entries alphabetically
->>       dt-bindings: Move Paralella board to Xilinx
->>       dt-bindings: xilinx: zynq: Add missing boards
->>       arm: dts: zynq: Fix memory size on the Zybo Z7 board
->>       arm: dts: zynq: Use gpio constants for the Zybo Z7 board
->>       arm: dts: zynq: Add LEDs to the Zybo Z7 board
->>
->> Michal Simek (2):
->>       arm: zynq: Add mmc alias for zc702/zc706/zed/zybo
->>       arm: zynq: Remove #address/#size-cells from gpio-keys
-> 
-> We use "ARM: dts: <...>" as prefix on ARM. Please fix up and resubmit.
+> IIRC we don't support calibration anyway. This boolean simply signals
+> the usage of the new timing mode, whether by choice, or because it is
+> the only mode the controller supports.
 
-ok. Not a problem. Is the same rule also for ARM64?
+This is not the semantic I had in mind when I introduced it. The
+original intent was to set the new timing bit all the time for
+SoCs. If we want to change that semantic, then we also need to make
+sure what this bit means is documented properly.
 
-Thanks,
-Michal
+Maxime
+
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180718/a0d51ed7/attachment.sig>
