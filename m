@@ -1,41 +1,37 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Wed, 18 Jul 2018 22:02:50 +0200
-Subject: [PATCH] dt-bindings: thermal: samsung: Add SPDX license identifier
-Message-ID: <20180718200250.6478-1-krzk@kernel.org>
+Date: Wed, 18 Jul 2018 22:03:50 +0200
+Subject: [PATCH] dt-bindings: pinctrl: samsung: Add SPDX license identifier
+Message-ID: <20180718200350.6590-1-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace GPL license statement with SPDX license identifier (GPL-2.0+).
+Replace GPL license statement with SPDX license identifier (GPL-2.0).
 
 Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 ---
- include/dt-bindings/thermal/thermal_exynos.h | 12 +-----------
- 1 file changed, 1 insertion(+), 11 deletions(-)
+ include/dt-bindings/pinctrl/samsung.h | 7 ++-----
+ 1 file changed, 2 insertions(+), 5 deletions(-)
 
-diff --git a/include/dt-bindings/thermal/thermal_exynos.h b/include/dt-bindings/thermal/thermal_exynos.h
-index 0646500bca69..642e4e7f4084 100644
---- a/include/dt-bindings/thermal/thermal_exynos.h
-+++ b/include/dt-bindings/thermal/thermal_exynos.h
-@@ -1,19 +1,9 @@
-+/* SPDX-License-Identifier: GPL-2.0+ */
+diff --git a/include/dt-bindings/pinctrl/samsung.h b/include/dt-bindings/pinctrl/samsung.h
+index ceb672305f59..b1832506b923 100644
+--- a/include/dt-bindings/pinctrl/samsung.h
++++ b/include/dt-bindings/pinctrl/samsung.h
+@@ -1,14 +1,11 @@
++/* SPDX-License-Identifier: GPL-2.0 */
  /*
-  * thermal_exynos.h - Samsung EXYNOS TMU device tree definitions
+  * Samsung's Exynos pinctrl bindings
   *
-  *  Copyright (C) 2014 Samsung Electronics
-  *  Lukasz Majewski <l.majewski@samsung.com>
+  * Copyright (c) 2016 Samsung Electronics Co., Ltd.
+  *		http://www.samsung.com
+  * Author: Krzysztof Kozlowski <krzk@kernel.org>
 - *
 - * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-  */
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+-*/
++ */
  
- #ifndef _EXYNOS_THERMAL_TMU_DT_H
+ #ifndef __DT_BINDINGS_PINCTRL_SAMSUNG_H__
+ #define __DT_BINDINGS_PINCTRL_SAMSUNG_H__
 -- 
 2.14.1
