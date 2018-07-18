@@ -1,37 +1,104 @@
-From: clabbe@baylibre.com (Corentin Labbe)
-Date: Wed, 18 Jul 2018 11:40:39 +0000
-Subject: [PATCH v2 3/5] ARM: dts: sun8i: a83t: Remove unused
- address-cells/size-cells of dwmac-sun8i
-In-Reply-To: <1531914041-14751-1-git-send-email-clabbe@baylibre.com>
-References: <1531914041-14751-1-git-send-email-clabbe@baylibre.com>
-Message-ID: <1531914041-14751-4-git-send-email-clabbe@baylibre.com>
+From: MNARANI@xilinx.com (Manish Narani)
+Date: Wed, 18 Jul 2018 11:52:39 +0000
+Subject: [PATCH 1/4] iio: adc: xilinx: Rename 'channels' variable name to
+ 'iio_xadc_channels'
+In-Reply-To: <d2c3ddfd-91da-e500-7b58-917d2da1d540@metafoo.de>
+References: <1531912331-26431-1-git-send-email-manish.narani@xilinx.com>
+ <1531912331-26431-2-git-send-email-manish.narani@xilinx.com>
+ <d2c3ddfd-91da-e500-7b58-917d2da1d540@metafoo.de>
+Message-ID: <SN6PR02MB4959267C97370CCE2052A9E4C1530@SN6PR02MB4959.namprd02.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ddress-cells/size-cells is unnecessary for dwmac-sun8i node.
-It was in early days, but since a mdio node is used, it could be
-removed.
+Hi Lars,
 
-This patch fix the following DT warning:
-Warning (avoid_unnecessary_addr_size): /soc/ethernet at 1c50000: unnecessary #address-cells/#size-cells without "ranges" or child "reg" property
+> -----Original Message-----
+> From: Lars-Peter Clausen [mailto:lars at metafoo.de]
+> Sent: Wednesday, July 18, 2018 4:49 PM
+> To: Manish Narani <MNARANI@xilinx.com>; jic23 at kernel.org;
+> knaack.h at gmx.de; pmeerw at pmeerw.net; Michal Simek
+> <michals@xilinx.com>; linux-iio at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; linux-kernel at vger.kernel.org
+> Cc: Anirudha Sarangi <anirudh@xilinx.com>; Srinivas Goud
+> <sgoud@xilinx.com>; Joe Perches <joe@perches.com>
+> Subject: Re: [PATCH 1/4] iio: adc: xilinx: Rename 'channels' variable name to
+> 'iio_xadc_channels'
+> 
+> On 07/18/2018 01:12 PM, Manish Narani wrote:
+> > This patch fix the following checkpatch warning in xadc driver.
+> > - Reusing the krealloc arg is almost always a bug.
+> >
+> > Renamed the 'channels' variable as 'iio_xadc_channels' to fix the
+> > above warning.
+> >
+> 
+> This is a bug in checkpatch and should be fixed in checkpatch. The code is not
+> actually re-using the parameter. channels and xadc_channels are independent
+> variables, just checkpatch somehow does not realize this.
+I agree with you on this. Initially I presumed the checkpatch to be giving genuine
+warning but now I am sure that this is certainly the checkpatch script issue.
+In that case should we keep this code change?
+Please suggest.
 
-Signed-off-by: Corentin Labbe <clabbe@baylibre.com>
----
- arch/arm/boot/dts/sun8i-a83t.dtsi | 2 --
- 1 file changed, 2 deletions(-)
+Thanks,
+Manish
 
-diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
-index b047f05e690d..276c99fcfcc8 100644
---- a/arch/arm/boot/dts/sun8i-a83t.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
-@@ -913,8 +913,6 @@
- 			reset-names = "stmmaceth";
- 			clocks = <&ccu 27>;
- 			clock-names = "stmmaceth";
--			#address-cells = <1>;
--			#size-cells = <0>;
- 			status = "disabled";
- 
- 			mdio: mdio {
--- 
-2.16.4
+> 
+> > Signed-off-by: Manish Narani <manish.narani@xilinx.com>
+> > ---
+> >  drivers/iio/adc/xilinx-xadc-core.c | 16 +++++++++-------
+> >  1 file changed, 9 insertions(+), 7 deletions(-)
+> >
+> > diff --git a/drivers/iio/adc/xilinx-xadc-core.c
+> > b/drivers/iio/adc/xilinx-xadc-core.c
+> > index d4f21d1..27b45df 100644
+> > --- a/drivers/iio/adc/xilinx-xadc-core.c
+> > +++ b/drivers/iio/adc/xilinx-xadc-core.c
+> > @@ -1040,7 +1040,7 @@ static int xadc_parse_dt(struct iio_dev *indio_dev,
+> struct device_node *np,
+> >  	unsigned int *conf)
+> >  {
+> >  	struct xadc *xadc = iio_priv(indio_dev);
+> > -	struct iio_chan_spec *channels, *chan;
+> > +	struct iio_chan_spec *iio_xadc_channels, *chan;
+> >  	struct device_node *chan_node, *child;
+> >  	unsigned int num_channels;
+> >  	const char *external_mux;
+> > @@ -1083,12 +1083,13 @@ static int xadc_parse_dt(struct iio_dev
+> *indio_dev, struct device_node *np,
+> >  		*conf |= XADC_CONF0_MUX |
+> XADC_CONF0_CHAN(ext_mux_chan);
+> >  	}
+> >
+> > -	channels = kmemdup(xadc_channels, sizeof(xadc_channels),
+> GFP_KERNEL);
+> > -	if (!channels)
+> > +	iio_xadc_channels = kmemdup(xadc_channels, sizeof(xadc_channels),
+> > +				    GFP_KERNEL);
+> > +	if (!iio_xadc_channels)
+> >  		return -ENOMEM;
+> >
+> >  	num_channels = 9;
+> > -	chan = &channels[9];
+> > +	chan = &iio_xadc_channels[9];
+> >
+> >  	chan_node = of_get_child_by_name(np, "xlnx,channels");
+> >  	if (chan_node) {
+> > @@ -1119,11 +1120,12 @@ static int xadc_parse_dt(struct iio_dev
+> *indio_dev, struct device_node *np,
+> >  	of_node_put(chan_node);
+> >
+> >  	indio_dev->num_channels = num_channels;
+> > -	indio_dev->channels = krealloc(channels, sizeof(*channels) *
+> > -					num_channels, GFP_KERNEL);
+> > +	indio_dev->channels = krealloc(iio_xadc_channels,
+> > +				       sizeof(*iio_xadc_channels) *
+> > +				       num_channels, GFP_KERNEL);
+> >  	/* If we can't resize the channels array, just use the original */
+> >  	if (!indio_dev->channels)
+> > -		indio_dev->channels = channels;
+> > +		indio_dev->channels = iio_xadc_channels;
+> >
+> >  	return 0;
+> >  }
+> >
