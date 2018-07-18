@@ -1,110 +1,82 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 18 Jul 2018 12:11:06 +0200
-Subject: [PATCH v8 09/26] kernel/cpu_pm: Manage runtime PM in the idle
- path for CPUs
-In-Reply-To: <20180620172226.15012-10-ulf.hansson@linaro.org>
-References: <20180620172226.15012-1-ulf.hansson@linaro.org>
- <20180620172226.15012-10-ulf.hansson@linaro.org>
-Message-ID: <2056372.NMt4aPaF4h@aspire.rjw.lan>
+From: ville.syrjala@linux.intel.com (Ville =?iso-8859-1?Q?Syrj=E4l=E4?=)
+Date: Wed, 18 Jul 2018 13:15:40 +0300
+Subject: [Intel-gfx] [PATCH 5/5] drm/sun4i: Substitute
+ sun4i_backend_format_is_yuv() with format->is_yuv
+In-Reply-To: <1531847626-22248-5-git-send-email-ayan.halder@arm.com>
+References: <1531847626-22248-1-git-send-email-ayan.halder@arm.com>
+ <1531847626-22248-5-git-send-email-ayan.halder@arm.com>
+Message-ID: <20180718101540.GT5565@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, June 20, 2018 7:22:09 PM CEST Ulf Hansson wrote:
-> To allow CPUs being power managed by PM domains, let's deploy support for
-> runtime PM for the CPU's corresponding struct device.
+On Tue, Jul 17, 2018 at 06:13:46PM +0100, Ayan Kumar Halder wrote:
+> drm_format_info table has a field 'is_yuv' to denote if the format
+> is yuv or not. The driver is expected to use this instead of
+> having a function for the same purpose.
 > 
-> More precisely, at the point when the CPU is about to enter an idle state,
-> decrease the runtime PM usage count for its corresponding struct device,
-> via calling pm_runtime_put_sync_suspend(). Then, at the point when the CPU
-> resumes from idle, let's increase the runtime PM usage count, via calling
-> pm_runtime_get_sync().
-> 
-> Cc: Lina Iyer <ilina@codeaurora.org>
-> Co-developed-by: Lina Iyer <lina.iyer@linaro.org>
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-
-I finally got to this one, sorry for the huge delay.
-
-Let me confirm that I understand the code flow correctly.
-
+> Signed-off-by: Ayan Kumar halder <ayan.halder@arm.com>
 > ---
->  kernel/cpu_pm.c | 11 +++++++++++
->  1 file changed, 11 insertions(+)
+>  drivers/gpu/drm/sun4i/sun4i_backend.c | 12 +++---------
+>  1 file changed, 3 insertions(+), 9 deletions(-)
 > 
-> diff --git a/kernel/cpu_pm.c b/kernel/cpu_pm.c
-> index 67b02e138a47..492d4a83dca0 100644
-> --- a/kernel/cpu_pm.c
-> +++ b/kernel/cpu_pm.c
-> @@ -16,9 +16,11 @@
->   */
->  
->  #include <linux/kernel.h>
-> +#include <linux/cpu.h>
->  #include <linux/cpu_pm.h>
->  #include <linux/module.h>
->  #include <linux/notifier.h>
-> +#include <linux/pm_runtime.h>
->  #include <linux/spinlock.h>
->  #include <linux/syscore_ops.h>
->  
-> @@ -91,6 +93,7 @@ int cpu_pm_enter(void)
-
-This is called from a cpuidle driver's ->enter callback for the target state
-selected by the idle governor ->
-
->  {
->  	int nr_calls;
->  	int ret = 0;
-> +	struct device *dev = get_cpu_device(smp_processor_id());
->  
->  	ret = cpu_pm_notify(CPU_PM_ENTER, -1, &nr_calls);
->  	if (ret)
-> @@ -100,6 +103,9 @@ int cpu_pm_enter(void)
->  		 */
->  		cpu_pm_notify(CPU_PM_ENTER_FAILED, nr_calls - 1, NULL);
->  
-> +	if (!ret && dev && dev->pm_domain)
-> +		pm_runtime_put_sync_suspend(dev);
-
--> so this is going to invoke genpd_runtime_suspend() if the usage
-counter of dev is 0.
-
-That will cause cpu_power_down_ok() to be called (because this is
-a CPU domain) and that will walk the domain cpumask and compute the
-estimated idle duration as the minimum of tick_nohz_get_next_wakeup()
-values over the CPUs in that cpumask.  [Note that the weight of the
-cpumask must be seriously limited for that to actually work, as this
-happens in the idle path.]  Next, it will return "true" if it can
-find a domain state with residency within the estimated idle
-duration.  [Note that this sort of overlaps with the idle governor's
-job.]
-
-Next, __genpd_runtime_suspend() will be invoked to run the device-specific
-callback if any [Note that this has to be suitable for the idle path if
-present.] and genpd_stop_dev() runs (which, again, may invoke a callback)
-and genpd_power_off() runs under the domain lock (which must be a spinlock
-then).
-
-> +
->  	return ret;
+> diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
+> index de0a76d..d7950b5 100644
+> --- a/drivers/gpu/drm/sun4i/sun4i_backend.c
+> +++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
+> @@ -86,12 +86,6 @@ static inline bool sun4i_backend_format_is_packed_yuv422(uint32_t format)
+>  	}
 >  }
->  EXPORT_SYMBOL_GPL(cpu_pm_enter);
-> @@ -118,6 +124,11 @@ EXPORT_SYMBOL_GPL(cpu_pm_enter);
->   */
->  int cpu_pm_exit(void)
+>  
+> -static inline bool sun4i_backend_format_is_yuv(uint32_t format)
+> -{
+> -	return sun4i_backend_format_is_planar_yuv(format) ||
+> -		sun4i_backend_format_is_packed_yuv422(format);
+> -}
+
+sun4i_backend_format_is_planar_yuv() is now unused so could be nuked.
+Also the one remaining use of sun4i_backend_format_is_packed_yuv422()
+could be replaced with 'is_yuv && num_planes == 1', so that one could
+be easily killed off ass well.
+
+> -
+>  static void sun4i_backend_apply_color_correction(struct sunxi_engine *engine)
 >  {
-> +	struct device *dev = get_cpu_device(smp_processor_id());
-> +
-> +	if (dev && dev->pm_domain)
-> +		pm_runtime_get_sync(dev);
-> +
->  	return cpu_pm_notify(CPU_PM_EXIT, -1, NULL);
->  }
->  EXPORT_SYMBOL_GPL(cpu_pm_exit);
+>  	int i;
+> @@ -304,7 +298,7 @@ int sun4i_backend_update_layer_formats(struct sun4i_backend *backend,
+>  			   SUN4I_BACKEND_ATTCTL_REG0_LAY_GLBALPHA_EN,
+>  			   val);
+>  
+> -	if (sun4i_backend_format_is_yuv(fb->format->format))
+> +	if (fb->format->is_yuv)
+>  		return sun4i_backend_update_yuv_format(backend, layer, plane);
+>  
+>  	ret = sun4i_backend_drm_format_to_layer(fb->format->format, &val);
+> @@ -384,7 +378,7 @@ int sun4i_backend_update_layer_buffer(struct sun4i_backend *backend,
+>  	 */
+>  	paddr -= PHYS_OFFSET;
+>  
+> -	if (sun4i_backend_format_is_yuv(fb->format->format))
+> +	if (fb->format->is_yuv)
+>  		return sun4i_backend_update_yuv_buffer(backend, fb, paddr);
+>  
+>  	/* Write the 32 lower bits of the address (in bits) */
+> @@ -502,7 +496,7 @@ static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
+>  		if (fb->format->has_alpha || (plane_state->alpha != DRM_BLEND_ALPHA_OPAQUE))
+>  			num_alpha_planes++;
+>  
+> -		if (sun4i_backend_format_is_yuv(fb->format->format)) {
+> +		if (fb->format->is_yuv) {
+>  			DRM_DEBUG_DRIVER("Plane FB format is YUV\n");
+>  			num_yuv_planes++;
+>  		}
+> -- 
+> 2.7.4
 > 
+> _______________________________________________
+> Intel-gfx mailing list
+> Intel-gfx at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/intel-gfx
 
-And this is called on wakeup when the cpuidle driver's ->enter callback
-is about to return and it reverses the suspend flow (except that the
-governor doesn't need to be called now).
-
-Have I got that right?
+-- 
+Ville Syrj?l?
+Intel
