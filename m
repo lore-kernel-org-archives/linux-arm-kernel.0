@@ -1,65 +1,43 @@
 From: xuwei5@hisilicon.com (Wei Xu)
-Date: Wed, 18 Jul 2018 16:58:16 +0100
-Subject: [GIT PULL] arm64: dts: hisilicon dts updates for v4.19
-Message-ID: <5B4F6398.2070608@hisilicon.com>
+Date: Wed, 18 Jul 2018 17:03:59 +0100
+Subject: [GIT PULL] ARM: hisi: soc changes for v4.19
+Message-ID: <5B4F64EF.6070406@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Olof, Hi Arnd,
 
 Please consider to pull the following changes.
-I rebased the pull on hisi-fixes-for-4.18 since there are
-some fixes for v4.18 have been merged.
-
 Thanks!
 
 Best Regards,
 Wei
 
 ---
-The following changes since commit a30449eb3ac908f26b4bc963a58039a5f2725ffa:
 
-  arm64: dts: hikey960: Define wl1837 power capabilities (2018-06-28 17:07:44 +0100)
+The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
+
+  Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
 
 are available in the Git repository at:
 
-  git://github.com/hisilicon/linux-hisi.git tags/hisi-arm64-dt-for-4.19
+  git://github.com/hisilicon/linux-hisi.git tags/hisi-armv7-soc-for-4.19
 
-for you to fetch changes up to 168124aa0b430dce963d9a9e3dba44cb81a8159e:
+for you to fetch changes up to d396cb185c0337aae5664b250cdd9a73f6eb1503:
 
-  arm64: dts: hi6220: Add all CPUs in cooling maps (2018-07-17 13:58:17 +0100)
-
-----------------------------------------------------------------
-ARM64: DT: Hisilicon SoC DT updates for 4.19
-
-- Tidy up MMC properties for hi3660
-- Remove keep-power-in-suspend on hikey and hikey960 to
-  avoid keeping wifi power during suspend and let the
-  user enable it if required
-- Update idle states for hikey960
-- Add missing cooling device properties for cpus on hi6220
-- Update thermal dt binding to allow multiple devices
-  to share cooling map
-- Add all cpus in the cooling maps for hi6220
+  ARM: hisi: handle of_iomap and fix missing of_node_put (2018-07-16 17:36:50 +0100)
 
 ----------------------------------------------------------------
-Vincent Guittot (1):
-      arm64: hikey960: update idle-states
+ARM: mach-hisi: Hisilicon SoC updates for 4.19
 
-Viresh Kumar (3):
-      arm64: dts: hisilicon: Add missing cooling device properties for CPUs
-      dt-bindings: thermal: Allow multiple devices to share cooling map
-      arm64: dts: hi6220: Add all CPUs in cooling maps
+- check of_iomap and add missing of_node_put since of_find_compatible_node
+  is invoked on hisilicon SoCs like hip01, hix5hd2 and hi3xxx.
 
-oscardagrach (4):
-      arm64: dts: hikey960: Remove deprecated MMC properties
-      arm64: dts: hikey960: Clean up MMC properties and move to proper file
-      arm64: dts: hikey960: Remove keep-power-in-suspend property
-      arm64: dts: hikey: Remove keep-power-in-suspend property
+----------------------------------------------------------------
+Nicholas Mc Guire (3):
+      ARM: hisi: fix error handling and missing of_node_put
+      ARM: hisi: check of_iomap and fix missing of_node_put
+      ARM: hisi: handle of_iomap and fix missing of_node_put
 
- .../devicetree/bindings/thermal/thermal.txt        | 11 +--
- arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts  | 26 +++++--
- arch/arm64/boot/dts/hisilicon/hi3660.dtsi          | 79 +++++++++-------------
- arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts     |  1 -
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi          | 25 ++++++-
- 5 files changed, 78 insertions(+), 64 deletions(-)
+ arch/arm/mach-hisi/hotplug.c | 41 ++++++++++++++++++++++++++---------------
+ 1 file changed, 26 insertions(+), 15 deletions(-)
