@@ -1,189 +1,108 @@
-From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Wed, 18 Jul 2018 21:37:02 +0800
-Subject: [PATCH V4 8/9] clk: imx: implement new clk_hw based APIs
-In-Reply-To: <1531921023-18497-1-git-send-email-aisheng.dong@nxp.com>
-References: <1531921023-18497-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1531921023-18497-9-git-send-email-aisheng.dong@nxp.com>
+From: gregory.clement@bootlin.com (Gregory CLEMENT)
+Date: Wed, 18 Jul 2018 16:53:04 +0200
+Subject: [PATCH 3/3] ARM: dts: cubox: add LCD controller and TDA998x
+ configuration
+In-Reply-To: <E1fcpom-0003ZI-FL@rmk-PC.armlinux.org.uk> (Russell King's
+ message of "Tue, 10 Jul 2018 11:24:24 +0100")
+References: <20180710102344.GH17271@n2100.armlinux.org.uk>
+ <E1fcpom-0003ZI-FL@rmk-PC.armlinux.org.uk>
+Message-ID: <87601ca94f.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Clock providers are recommended to use the new struct clk_hw based API,
-so implement IMX clk_hw based provider helpers functions to the new
-approach.
+Hi Russell,
+ 
+ On mar., juil. 10 2018, Russell King <rmk+kernel@arm.linux.org.uk> wrote:
 
-Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> Add DT configuration for the HDMI display output on the Dove Cubox.
+> This adds support for the LCD0 controller which is connected to a
+> TDA19988 HDMI encoder.
+>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  arch/arm/boot/dts/dove-cubox.dts | 43 ++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 43 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/dove-cubox.dts b/arch/arm/boot/dts/dove-cubox.dts
+> index 580e3cbcfbf7..f6dd56f63d09 100644
+> --- a/arch/arm/boot/dts/dove-cubox.dts
+> +++ b/arch/arm/boot/dts/dove-cubox.dts
+> @@ -67,6 +67,25 @@
+>  	gpu-subsystem {
+>  		status = "okay";
+>  	};
+> +
+> +	reserved-memory {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges;
+> +
+> +		display_reserved: framebuffer {
+> +			compatible = "marvell,dove-framebuffer";
 
----
-ChangeLog:
-v2->v4:
- * no changes
-v1->v2:  new patches
----
- drivers/clk/imx/clk.c | 22 ++++++++++++++++++
- drivers/clk/imx/clk.h | 62 +++++++++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 84 insertions(+)
+I didn't find the binding documentation associated to
+"marvell,dove-framebuffer".
 
-diff --git a/drivers/clk/imx/clk.c b/drivers/clk/imx/clk.c
-index 9074e69..1efed86 100644
---- a/drivers/clk/imx/clk.c
-+++ b/drivers/clk/imx/clk.c
-@@ -18,6 +18,16 @@ void __init imx_check_clocks(struct clk *clks[], unsigned int count)
- 			       i, PTR_ERR(clks[i]));
- }
- 
-+void imx_check_clk_hws(struct clk_hw *clks[], unsigned int count)
-+{
-+	unsigned int i;
-+
-+	for (i = 0; i < count; i++)
-+		if (IS_ERR(clks[i]))
-+			pr_err("i.MX clk %u: register failed with %ld\n",
-+			       i, PTR_ERR(clks[i]));
-+}
-+
- static struct clk * __init imx_obtain_fixed_clock_from_dt(const char *name)
- {
- 	struct of_phandle_args phandle;
-@@ -49,6 +59,18 @@ struct clk * __init imx_obtain_fixed_clock(
- 	return clk;
- }
- 
-+struct clk_hw * __init imx_obtain_fixed_clk_hw(struct device_node *np,
-+					       const char *name)
-+{
-+	struct clk *clk;
-+
-+	clk = of_clk_get_by_name(np, name);
-+	if (IS_ERR(clk))
-+		return ERR_PTR(-ENOENT);
-+
-+	return __clk_get_hw(clk);
-+}
-+
- /*
-  * This fixups the register CCM_CSCMR1 write value.
-  * The write/read/divider values of the aclk_podf field
-diff --git a/drivers/clk/imx/clk.h b/drivers/clk/imx/clk.h
-index 7fca912..d3fcaa5 100644
---- a/drivers/clk/imx/clk.h
-+++ b/drivers/clk/imx/clk.h
-@@ -8,6 +8,7 @@
- extern spinlock_t imx_ccm_lock;
- 
- void imx_check_clocks(struct clk *clks[], unsigned int count);
-+void imx_check_clk_hws(struct clk_hw *clks[], unsigned int count);
- void imx_register_uart_clocks(struct clk ** const clks[]);
- 
- extern void imx_cscmr1_fixup(u32 *val);
-@@ -54,6 +55,9 @@ struct clk *clk_register_gate2(struct device *dev, const char *name,
- struct clk * imx_obtain_fixed_clock(
- 			const char *name, unsigned long rate);
- 
-+struct clk_hw *imx_obtain_fixed_clk_hw(struct device_node *np,
-+				       const char *name);
-+
- struct clk *imx_clk_gate_exclusive(const char *name, const char *parent,
- 	 void __iomem *reg, u8 shift, u32 exclusive_mask);
- 
-@@ -90,6 +94,16 @@ static inline struct clk *imx_clk_fixed(const char *name, int rate)
- 	return clk_register_fixed_rate(NULL, name, NULL, 0, rate);
- }
- 
-+static inline struct clk_hw *imx_clk_hw_fixed(const char *name, int rate)
-+{
-+	return clk_hw_register_fixed_rate(NULL, name, NULL, 0, rate);
-+}
-+
-+static inline struct clk_hw *imx_get_clk_hw_fixed(const char *name, int rate)
-+{
-+	return clk_hw_register_fixed_rate(NULL, name, NULL, 0, rate);
-+}
-+
- static inline struct clk *imx_clk_mux_ldb(const char *name, void __iomem *reg,
- 			u8 shift, u8 width, const char * const *parents,
- 			int num_parents)
-@@ -113,6 +127,15 @@ static inline struct clk *imx_clk_divider(const char *name, const char *parent,
- 			reg, shift, width, 0, &imx_ccm_lock);
- }
- 
-+static inline struct clk_hw *imx_clk_hw_divider(const char *name,
-+						const char *parent,
-+						void __iomem *reg, u8 shift,
-+						u8 width)
-+{
-+	return clk_hw_register_divider(NULL, name, parent, CLK_SET_RATE_PARENT,
-+				       reg, shift, width, 0, &imx_ccm_lock);
-+}
-+
- static inline struct clk *imx_clk_divider_flags(const char *name,
- 		const char *parent, void __iomem *reg, u8 shift, u8 width,
- 		unsigned long flags)
-@@ -121,6 +144,15 @@ static inline struct clk *imx_clk_divider_flags(const char *name,
- 			reg, shift, width, 0, &imx_ccm_lock);
- }
- 
-+static inline struct clk_hw *imx_clk_hw_divider_flags(const char *name,
-+						   const char *parent,
-+						   void __iomem *reg, u8 shift,
-+						   u8 width, unsigned long flags)
-+{
-+	return clk_hw_register_divider(NULL, name, parent, flags,
-+				       reg, shift, width, 0, &imx_ccm_lock);
-+}
-+
- static inline struct clk *imx_clk_divider2(const char *name, const char *parent,
- 		void __iomem *reg, u8 shift, u8 width)
- {
-@@ -143,6 +175,13 @@ static inline struct clk *imx_clk_gate_flags(const char *name, const char *paren
- 			shift, 0, &imx_ccm_lock);
- }
- 
-+static inline struct clk_hw *imx_clk_hw_gate(const char *name, const char *parent,
-+					     void __iomem *reg, u8 shift)
-+{
-+	return clk_hw_register_gate(NULL, name, parent, CLK_SET_RATE_PARENT, reg,
-+				    shift, 0, &imx_ccm_lock);
-+}
-+
- static inline struct clk *imx_clk_gate_dis(const char *name, const char *parent,
- 		void __iomem *reg, u8 shift)
- {
-@@ -222,6 +261,17 @@ static inline struct clk *imx_clk_mux2(const char *name, void __iomem *reg,
- 			reg, shift, width, 0, &imx_ccm_lock);
- }
- 
-+static inline struct clk_hw *imx_clk_hw_mux2(const char *name, void __iomem *reg,
-+					     u8 shift, u8 width,
-+					     const char * const *parents,
-+					     int num_parents)
-+{
-+	return clk_hw_register_mux(NULL, name, parents, num_parents,
-+				   CLK_SET_RATE_NO_REPARENT |
-+				   CLK_OPS_PARENT_ENABLE,
-+				   reg, shift, width, 0, &imx_ccm_lock);
-+}
-+
- static inline struct clk *imx_clk_mux_flags(const char *name,
- 			void __iomem *reg, u8 shift, u8 width,
- 			const char * const *parents, int num_parents,
-@@ -232,6 +282,18 @@ static inline struct clk *imx_clk_mux_flags(const char *name,
- 			&imx_ccm_lock);
- }
- 
-+static inline struct clk_hw *imx_clk_hw_mux_flags(const char *name,
-+						  void __iomem *reg, u8 shift,
-+						  u8 width,
-+						  const char * const *parents,
-+						  int num_parents,
-+						  unsigned long flags)
-+{
-+	return clk_hw_register_mux(NULL, name, parents, num_parents,
-+				   flags | CLK_SET_RATE_NO_REPARENT,
-+				   reg, shift, width, 0, &imx_ccm_lock);
-+}
-+
- struct clk *imx_clk_cpu(const char *name, const char *parent_name,
- 		struct clk *div, struct clk *mux, struct clk *pll,
- 		struct clk *step);
+Could you point me on the accurate file?
+
+
+> +			size = <0x02000000>;
+> +			alignment = <0x02000000>;
+> +			no-map;
+> +		};
+> +	};
+> +
+> +	display-subsystem {
+> +		compatible = "marvell,dove-display-subsystem";
+
+Same for this one.
+
+Thanks,
+
+Gregory
+
+> +		memory-region = <&display_reserved>;
+> +		ports = <&lcd0_port>;
+> +	};
+>  };
+>  
+>  &uart0 { status = "okay"; };
+> @@ -117,6 +136,30 @@
+>  			silabs,pll-master;
+>  		};
+>  	};
+> +
+> +	tda998x: hdmi-encoder {
+> +		compatible = "nxp,tda998x";
+> +		reg = <0x70>;
+> +		video-ports = <0x234501>;
+> +		interrupts-extended = <&gpio0 27 IRQ_TYPE_LEVEL_LOW>;
+> +
+> +		port {
+> +			tda998x_video: endpoint {
+> +				remote-endpoint = <&lcd0_rgb>;
+> +			};
+> +		};
+> +	};
+> +};
+> +
+> +&lcd0 {
+> +	status = "okay";
+> +	clocks = <&si5351 0>;
+> +	clock-names = "ext_ref_clk1";
+> +	lcd0_port: port {
+> +		lcd0_rgb: endpoint {
+> +			remote-endpoint = <&tda998x_video>;
+> +		};
+> +	};
+>  };
+>  
+>  &sdio0 {
+> -- 
+> 2.7.4
+>
+
 -- 
-2.7.4
+Gregory Clement, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+http://bootlin.com
