@@ -1,96 +1,114 @@
 From: marcel@holtmann.org (Marcel Holtmann)
-Date: Wed, 18 Jul 2018 14:14:49 +0200
-Subject: [PATCH v5 4/7] Bluetooth: Add new quirk for non-persistent setup
- settings
-In-Reply-To: <1531757114.8953.12.camel@mtkswgap22>
+Date: Wed, 18 Jul 2018 14:23:35 +0200
+Subject: [PATCH v5 5/7] Bluetooth: Extend btuart driver for join more
+ vendor devices
+In-Reply-To: <1531754965.8953.3.camel@mtkswgap22>
 References: <cover.1531150733.git.sean.wang@mediatek.com>
- <4b188c8a508340598dda233f6d49a16c9ac8784e.1531150733.git.sean.wang@mediatek.com>
- <2825B722-E75C-4A3C-8110-879205E46C0E@holtmann.org>
- <1531638169.3955.5.camel@mtkswgap22>
- <6571C864-B2EC-4806-BC5D-F531792737F6@holtmann.org>
- <1531757114.8953.12.camel@mtkswgap22>
-Message-ID: <E05CD0A8-B820-4900-970D-57F71E8E5583@holtmann.org>
+ <85d449cdd34bf47d72935a821915e825c64a2145.1531150733.git.sean.wang@mediatek.com>
+ <70616B99-5A2D-417A-8815-246700EEF4E2@holtmann.org>
+ <1531641134.3955.19.camel@mtkswgap22>
+ <6476BE78-3FE5-465F-8060-2215387323AA@holtmann.org>
+ <1531754965.8953.3.camel@mtkswgap22>
+Message-ID: <BB53539F-C053-4DCD-A748-B75B995E1179@holtmann.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Sean,
 
->>>>> Add a new quirk HCI_QUIRK_NON_PERSISTENT_SETUP allowing that a quirk that
->>>>> runs setup() after every open() and not just after the first open().
+>>>>> Adding an independent btuart.h header allows these essential definitions
+>>>>> can be reused in vendor driver. Also, struct btuart_vnd is extended with
+>>>>> additional callbacks such as .init initializing vendor data, .shtudown,
+>>>>> .recv and .send supporting SoC specific framing for that btuart can
+>>>>> simply adapt to various Bluetooth uart-based devices.
 >>>>> 
 >>>>> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
 >>>>> ---
->>>>> include/net/bluetooth/hci.h | 9 +++++++++
->>>>> net/bluetooth/hci_core.c    | 3 ++-
->>>>> 2 files changed, 11 insertions(+), 1 deletion(-)
+>>>>> drivers/bluetooth/btuart.c | 73 ++++++++++++++++++++++++----------------------
+>>>>> drivers/bluetooth/btuart.h | 30 +++++++++++++++++++
+>>>>> 2 files changed, 68 insertions(+), 35 deletions(-)
+>>>>> create mode 100644 drivers/bluetooth/btuart.h
 >>>>> 
->>>>> diff --git a/include/net/bluetooth/hci.h b/include/net/bluetooth/hci.h
->>>>> index 73e48be..d3ec5b2a8 100644
->>>>> --- a/include/net/bluetooth/hci.h
->>>>> +++ b/include/net/bluetooth/hci.h
->>>>> @@ -183,6 +183,15 @@ enum {
->>>>> 	 * during the hdev->setup vendor callback.
->>>>> 	 */
->>>>> 	HCI_QUIRK_NON_PERSISTENT_DIAG,
->>>>> +
->>>>> +	/* When this quirk is set, setup() would be run after every
->>>>> +	 * open() and not just after the first open().
->>>>> +	 *
->>>>> +	 * This quirk can be set before hci_register_dev is called or
->>>>> +	 * during the hdev->setup vendor callback.
->>>>> +	 *
->>>>> +	 */
->>>>> +	HCI_QUIRK_NON_PERSISTENT_SETUP,
->>>>> };
+>>>>> diff --git a/drivers/bluetooth/btuart.c b/drivers/bluetooth/btuart.c
+>>>>> index a900aac..65d0086 100644
+>>>>> --- a/drivers/bluetooth/btuart.c
+>>>>> +++ b/drivers/bluetooth/btuart.c
+>>>>> @@ -33,35 +33,11 @@
+>>>>> #include <net/bluetooth/hci_core.h>
 >>>>> 
->>>>> /* HCI device flags */
->>>>> diff --git a/net/bluetooth/hci_core.c b/net/bluetooth/hci_core.c
->>>>> index f5c21004..0111280 100644
->>>>> --- a/net/bluetooth/hci_core.c
->>>>> +++ b/net/bluetooth/hci_core.c
->>>>> @@ -1396,7 +1396,8 @@ static int hci_dev_do_open(struct hci_dev *hdev)
->>>>> 	atomic_set(&hdev->cmd_cnt, 1);
->>>>> 	set_bit(HCI_INIT, &hdev->flags);
+>>>>> #include "h4_recv.h"
+>>>>> +#include "btuart.h"
+>>>>> #include "btbcm.h"
 >>>>> 
->>>>> -	if (hci_dev_test_flag(hdev, HCI_SETUP)) {
->>>>> +	if (hci_dev_test_flag(hdev, HCI_SETUP) ||
->>>>> +	    test_bit(HCI_QUIRK_NON_PERSISTENT_SETUP, &hdev->quirks)) {
->>>>> 		hci_sock_dev_event(hdev, HCI_DEV_SETUP);
+>>>>> #define VERSION "1.0"
+>>>>> 
+>>>>> -struct btuart_vnd {
+>>>>> -	const struct h4_recv_pkt *recv_pkts;
+>>>>> -	int recv_pkts_cnt;
+>>>>> -	unsigned int manufacturer;
+>>>>> -	int (*open)(struct hci_dev *hdev);
+>>>>> -	int (*close)(struct hci_dev *hdev);
+>>>>> -	int (*setup)(struct hci_dev *hdev);
+>>>>> -};
+>>>>> -
+>>>>> -struct btuart_dev {
+>>>>> -	struct hci_dev *hdev;
+>>>>> -	struct serdev_device *serdev;
+>>>>> -
+>>>>> -	struct work_struct tx_work;
+>>>>> -	unsigned long tx_state;
+>>>>> -	struct sk_buff_head txq;
+>>>>> -
+>>>>> -	struct sk_buff *rx_skb;
+>>>>> -
+>>>>> -	const struct btuart_vnd *vnd;
+>>>>> -};
 >>>> 
->>>> can you include the extract of btmon on how the HCI_DEV_SETUP event shows up in the traces? I remember that I asked about something like that.
->>>> 
->>>> Regards
->>>> 
->>>> Marcel
+>>>> I really like to avoid this since it is not clean. Frankly I prefer to keep the btuart.c driver for drivers that really just use H:4 as transport protocol. If the protocol is only H:4 alike and has extra headers, then it should be a separate driver.
 >>>> 
 >>> 
->>> No, I cannot see any event about HCI_DEV_SETUP in btmon trace, the trace I posted as below is doing some rounds of power off and then on
+>>> thanks for letting me know your concern. I think I'm a little over in reusing these existing methods and break something generic and its beauty.
+>>> 
+>>> I'll make the driver be a separate one based on btuart in the next version.
+>>> 
+>>> 
+>>>> The common H:4 handling is abstracted in h4_recv.h already anyway and we can add more pieces if needed. However I also wonder since you have extra framing that the complex H:4 state keeping might be not needed at all. So it could be simplified.
+>>>> 
+>>> 
+>>> okay, I will get rid of h4_recv.h and consider to use more simplified logic to handle the extra framing and its payload.
 >> 
->> it will result in this:
+>> only if it is already framed by your extra header, but I seem to recall that it will frame it. For example the bfusb.c old driver does frame H:4 as well and then no extra state keeping for H:4 is needed. Just pass the frames up into the core via hci_recv_frame (or hci_recv_diag for vendor diagnostic) and move on with it.
 >> 
->>        case HCI_DEV_SETUP:
->>                if (hdev->manufacturer == 0xffff)
->>                        return NULL;
->> 
->>        case HCI_DEV_UP:
->>                skb = bt_skb_alloc(HCI_MON_INDEX_INFO_SIZE, GFP_ATOMIC);
->> 
->> So we will see extra index info events, but I assume that is just fine this we also see them on DEV_UP. They also do not hurt as long as not magically the manufacturer information changes.
->> 
->> I do wonder though if this quirk is set, then hdev->manufacturer needs to be reset and allow hdev->setup() to reset it. This goes with a log of other information as well. Maybe just a look if there are no races here.
+>> You can of course use h4_recv.h if you need to, but only do that if you are true H:4 stream and have no idea where a frame ends and starts.
 >> 
 >> Regards
 >> 
 >> Marcel
 >> 
 > 
-> I didn't set a value to hdev->manufacture.
+> Thanks for the explanation, I didn't show what the extra header is, that causes some misunderstanding.
 > 
-> Should I set it in hdev->setup() ? MediaTek is 0x46 according to [1].
+> The mtk extra header doesn't provide any idea where a frame ends and starts in the bluetooth stream. 
+> 
+> It is just totally a legacy stuff used by mtk combo devices sharing a serial transport, such as BT/GPS/FM running via a shared UART, to
+> let the host know what type of radio the following bytes is for and how long it's. 
 
-it is generally useful so that it gets reported out in btmon and thus it can assign the correct vendor specific decoder. However you better set hdev->manufacturer = 70 in the probe() routine before calling hci_register_dev. You have a dedicated driver and thus will always know it.
+but that means it is framed. You know ahead of time how long the H:4 packet will be. That is the important part. Unless you tell me that it can fragment a H:4 frame over multiple MTK specific frames.
 
-The core tries to figure this out at some point, but then you are missing btmon decoding for the earlier messages. See btusb.c and how other drivers set it early on.
+> The extra header is really useful for a combo device, splitting flow and fitting in a single serial transport, but for a single device such as
+> mt7622 Bluetooth I made here, it seems to be useless.
+
+Useless or not depends on what you are going to do with the device. In theory you could write a serdev driver that just handles the multiplexing (since that is what you have) and then hands down the frames to individual drivers. Frankly something like btqcomsmd.c seems to be what you really want here. However first you would needed this multiplex driver that takes the serial stream and breaks it up.
+
+> Because the extra header doesn't provide any details about this stream and each radio stack still needs to be in charge of their stream
+> parsing. That is why I still want to use recv_h4.h instead of coding my own parser.
+
+As I said above, if the header + length always indicates a full H:4 frame, then you do not need h4_recv.h since you know the packet size. If it doesn't (and it means things can fragment), then you do.
+
+However I have to note that a serial stream from your multiplexer protocol also needs some state handling since it can be interrupted at any point. If you want this clean, then you actually do that anyway. Essentially you have two protocols layered and want to process the independently.
+
+If you post details about the multiplexing protocol for your serial stream, then I can help you design a driver for it. With serdev that is actually simple. And then you could hook up GPS etc. at some point once you want to run this on hardware that has the combo chip.
+
+Having a Linux Bluetooth driver is useful for Android as well btw. We have HCI_CHANNEL_USER and a generic Android driver for using it. So enabling the chip in Linux upstream will enable it for Android as well.
 
 Regards
 
