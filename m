@@ -1,39 +1,41 @@
 From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Wed, 18 Jul 2018 18:10:51 +0200
-Subject: [PATCH net-next v3 2/8] net: mvneta: fix mtu change on port without
- link
+Date: Wed, 18 Jul 2018 18:10:53 +0200
+Subject: [PATCH net-next v3 4/8] net: mvneta: increase number of buffers in RX
+ and TX queue
 In-Reply-To: <20180718161057.28704-1-gregory.clement@bootlin.com>
 References: <20180718161057.28704-1-gregory.clement@bootlin.com>
-Message-ID: <20180718161057.28704-3-gregory.clement@bootlin.com>
+Message-ID: <20180718161057.28704-5-gregory.clement@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Yelena Krivosheev <yelena@marvell.com>
 
-It is incorrect to enable TX/RX queues (call by mvneta_port_up()) for
-port without link. Indeed MTU change for interface without link causes TX
-queues to stuck.
+The initial values were too small leading to poor performance when using
+the software buffer management.
 
-Fixes: c5aff18204da ("net: mvneta: driver for Marvell Armada 370/XP
-network unit")
 Signed-off-by: Yelena Krivosheev <yelena@marvell.com>
-[gregory.clement: adding Fixes tags and rewording commit log]
+[gregory: extract from a larger patch]
 Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
 ---
- drivers/net/ethernet/marvell/mvneta.c | 1 -
- 1 file changed, 1 deletion(-)
+ drivers/net/ethernet/marvell/mvneta.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-index ec84db47d82d..3d1f4335b0d3 100644
+index 011794148ec8..e519439bac97 100644
 --- a/drivers/net/ethernet/marvell/mvneta.c
 +++ b/drivers/net/ethernet/marvell/mvneta.c
-@@ -3196,7 +3196,6 @@ static int mvneta_change_mtu(struct net_device *dev, int mtu)
+@@ -295,10 +295,10 @@
+ #define MVNETA_RSS_LU_TABLE_SIZE	1
  
- 	on_each_cpu(mvneta_percpu_enable, pp, true);
- 	mvneta_start_dev(pp);
--	mvneta_port_up(pp);
+ /* Max number of Rx descriptors */
+-#define MVNETA_MAX_RXD 128
++#define MVNETA_MAX_RXD 512
  
- 	netdev_update_features(dev);
+ /* Max number of Tx descriptors */
+-#define MVNETA_MAX_TXD 532
++#define MVNETA_MAX_TXD 1024
  
+ /* Max number of allowed TCP segments for software TSO */
+ #define MVNETA_MAX_TSO_SEGS 100
 -- 
 2.18.0
