@@ -1,39 +1,62 @@
-From: james.morse@arm.com (James Morse)
-Date: Wed, 18 Jul 2018 17:52:03 +0100
-Subject: [PATCH v11 03/15] powerpc, kexec_file: factor out memblock-based
- arch_kexec_walk_mem()
-In-Reply-To: <20180716122623.GB7160@dhcp-128-65.nay.redhat.com>
-References: <20180711074203.3019-1-takahiro.akashi@linaro.org>
- <20180711074203.3019-4-takahiro.akashi@linaro.org>
- <20180716122623.GB7160@dhcp-128-65.nay.redhat.com>
-Message-ID: <c8c09929-165a-b710-6993-0b149a0c3b99@arm.com>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Wed, 18 Jul 2018 18:54:12 +0200
+Subject: [PATCH 5/5] net: add MTD support to eth_platform_get_mac_address()
+In-Reply-To: <20180718164737.GE12477@lunn.ch>
+References: <20180718161035.7005-1-brgl@bgdev.pl>
+ <20180718161035.7005-6-brgl@bgdev.pl>
+ <20180718164737.GE12477@lunn.ch>
+Message-ID: <CAMRc=MeRv3_C8_R-Awfr1zjLa3G_CVAACc-2t_ihB+1v+BCTGw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dave, Akashi,
-
-On 16/07/18 13:26, Dave Young wrote:
-> On 07/11/18 at 04:41pm, AKASHI Takahiro wrote:
->> Memblock list is another source for usable system memory layout.
->> So powerpc's arch_kexec_walk_mem() is moved to kexec_file.c so that
->> other memblock-based architectures, particularly arm64, can also utilise
->> it. A moved function is now renamed to kexec_walk_memblock() and merged
->> into the existing arch_kexec_walk_mem() for general use, either resource
->> list or memblock list.
+2018-07-18 18:47 GMT+02:00 Andrew Lunn <andrew@lunn.ch>:
+> On Wed, Jul 18, 2018 at 06:10:35PM +0200, Bartosz Golaszewski wrote:
+>> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 >>
->> A consequent function will not work for kdump with memblock list, but
->> this will be fixed in the next patch.
-> 
-> If this breaks something, then it would be good to fold the following
-> patch in this patch so that bisect can still work?
+>> MTD doesn't support nvmem yet. Some platforms use MTD to read the MAC
+>> address from SPI flash. If we want this function to generalize reading
+>> the MAC address, we need to separately try to use MTD.
+>>
+>> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>> ---
+>>  net/ethernet/eth.c | 20 ++++++++++++++++++++
+>>  1 file changed, 20 insertions(+)
+>>
+>> diff --git a/net/ethernet/eth.c b/net/ethernet/eth.c
+>> index adf5bd03851f..f7dbd2cff7f9 100644
+>> --- a/net/ethernet/eth.c
+>> +++ b/net/ethernet/eth.c
+>> @@ -55,6 +55,7 @@
+>>  #include <linux/of_net.h>
+>>  #include <linux/pci.h>
+>>  #include <linux/nvmem-consumer.h>
+>> +#include <linux/mtd/mtd.h>
+>>  #include <net/dst.h>
+>>  #include <net/arp.h>
+>>  #include <net/sock.h>
+>> @@ -573,6 +574,25 @@ int eth_platform_get_mac_address(struct device *dev, u8 *mac_addr)
+>>               }
+>>       }
+>>
+>> +#ifdef CONFIG_MTD
+>> +     /* NOTE: this should go away as soon as MTD gets nvmem support. */
+>> +     if (!addr) {
+>> +             struct mtd_info *mtd;
+>> +             int rv;
+>> +
+>> +             mtd = get_mtd_device_nm("MAC-Address");
+>
+> In order for this to go away, you need to keep backwards
+> compatibility. When using nvmem, you look for a cell called
+> "mac-address". Here you are looking for "MAC-Address". That is going
+> to make backwards compatibility harder. How do you plan to do it?
+>
+>    Andrew
 
-This patch is just moving code from arch/powerpc that is generic.
-powerpc doesn't support kdump via kexec_file, so nothing is damaged by adding
-this new code in the next patch.
+I'm trying to adjust to already existing users. The only user of
+get_mtd_device_nm() who calls it to read the MAC address registers a
+partition called "MAC-Address". We can't change it since it's visible
+from user space. In the future we'd just have to have a list of
+supported string that we'd use to do the nvmem lookup.
 
-arm64 would need this kdump support, but it doesn't use it until patch 11.
-
-
-Thanks,
-
-James
+Bart
