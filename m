@@ -1,64 +1,125 @@
-From: jagannadh.teki@gmail.com (Jagan Teki)
-Date: Wed, 18 Jul 2018 18:26:43 +0530
-Subject: [PATCH v3 00/18] arm64: allwinner: Add A64 DE2 HDMI support
-In-Reply-To: <20180718124448.2s2b3jxbsqt46cgu@flea>
-References: <20180718105458.22304-1-jagan@amarulasolutions.com>
- <20180718124448.2s2b3jxbsqt46cgu@flea>
-Message-ID: <CAD6G_RQQyS=zeqvhBP8vVf5sHZgLwqX1SP0SKLHea_L4Od3woQ@mail.gmail.com>
+From: phil.edworthy@renesas.com (Phil Edworthy)
+Date: Wed, 18 Jul 2018 13:57:38 +0100
+Subject: [PATCH] clk: Add functions to get optional clocks
+Message-ID: <1531918658-32278-1-git-send-email-phil.edworthy@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 18, 2018 at 6:14 PM, Maxime Ripard
-<maxime.ripard@bootlin.com> wrote:
-> On Wed, Jul 18, 2018 at 04:24:40PM +0530, Jagan Teki wrote:
->> Allwinner A64 has display engine pipeline like other Allwinner SOC's A83T/H3/H5.
->>
->> A64 behaviour similar to Allwinner A83T where
->> Mixer0 => TCON0 => LVDS/RGB/MIPI-DSI
->> Mixer1 => TCON1 => HDMI
->> as per Display System Block Diagram from Allwinner_A64_User_Manual_V1.1.pdf
->>
->> This is third patch-set followed with previous RFC[1], first and second
->> series[2][3] and merely concentrated on HDMI pipeline through TCON1 and
->> rest will add eventually.
->>
->> This series fixed previous version comments
->> - Rebasing on linux-next
->> - sqash all pipeline components in one patch
->> - Enable all pipeline components in board dts
->> - about documenting fallback compatibles
->> - adding new compatible for mixer1
->
-> You still haven't figured out the SRAM parts. We asked you to fix this
-> in the v1 and the v2 already, and we're not going to merge this
-> without those bits figured out properly.
+Behaves the same as (devm_)clk_get except where there is no clock
+producer. In this case, instead of returning -ENOENT, the function
+returns NULL. This makes error checking simpler and allows
+clk_prepare_enable, etc to be called on the returned reference
+without additional checks.
 
-Sorry I'm not sure what I'm trying to do on SRAM here because the last
-mail, I have waited for Icenowy changes about simple_fb with sram_c on
-ccu node and those are merged. can you elaborate please.
+Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
+---
+ drivers/clk/clk-devres.c | 11 +++++++++++
+ drivers/clk/clkdev.c     | 11 +++++++++++
+ include/linux/clk.h      | 27 +++++++++++++++++++++++++++
+ 3 files changed, 49 insertions(+)
 
->
->> Log:
->> [    1.450984] Jagan: sun8i_mixer_probe
->> [    1.464981] sun4i-drm display-engine: bound 1200000.mixer (ops sun8i_mixer_ops)
->> [    1.472572] sun4i-drm display-engine: bound 1c0d000.lcd-controller (ops sun4i_tcon_ops)
->> [    1.480676] sun8i-dw-hdmi 1ee0000.hdmi: Linked as a consumer to regulator.10
->> [    1.488738] sun8i-dw-hdmi 1ee0000.hdmi: Detected HDMI TX controller v1.32a with HDCP (sun8i_dw_hdmi_phy)
->> [    1.498879] sun8i-dw-hdmi 1ee0000.hdmi: registered DesignWare HDMI I2C bus driver
->> [    1.507372] sun4i-drm display-engine: bound 1ee0000.hdmi (ops sun8i_dw_hdmi_ops)
->> [    1.514778] [drm] Supports vblank timestamp caching Rev 2 (21.10.2013).
->> [    1.521398] [drm] No driver support for vblank timestamp query.
->> [    1.684611] random: fast init done
->> [    2.011575] Console: switching to colour frame buffer device 180x56
->> [    2.049858] sun4i-drm display-engine: fb0: DRM emulated frame buffer device
->> [    2.057268] [drm] Initialized sun4i-drm 1.0.0 20150629 for display-engine on minor 0
->>
->> Note:
->> Pine64 boards are unable to get edid by default like other A64 boards,
->> but forcing 'video=HDMI-A-1:1920x1080 at 60D' kernel command line can
->> create edid with display on penel
->
-> Then that needs to be figured out before it's enabled, instead of
-> having a hack that barely works.
-
-Any suggestion to work.
+diff --git a/drivers/clk/clk-devres.c b/drivers/clk/clk-devres.c
+index d854e26..63295d9 100644
+--- a/drivers/clk/clk-devres.c
++++ b/drivers/clk/clk-devres.c
+@@ -34,6 +34,17 @@ struct clk *devm_clk_get(struct device *dev, const char *id)
+ }
+ EXPORT_SYMBOL(devm_clk_get);
+ 
++struct clk *devm_clk_get_optional(struct device *dev, const char *id)
++{
++	struct clk *c = devm_clk_get(dev, id);
++
++	if (PTR_ERR(c) == -ENOENT)
++		return NULL;
++
++	return c;
++}
++EXPORT_SYMBOL(devm_clk_get_optional);
++
+ struct clk_bulk_devres {
+ 	struct clk_bulk_data *clks;
+ 	int num_clks;
+diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
+index 7513411..7f2cd1e 100644
+--- a/drivers/clk/clkdev.c
++++ b/drivers/clk/clkdev.c
+@@ -209,6 +209,17 @@ struct clk *clk_get(struct device *dev, const char *con_id)
+ }
+ EXPORT_SYMBOL(clk_get);
+ 
++struct clk *clk_get_optional(struct device *dev, const char *id)
++{
++	struct clk *c = clk_get(dev, id);
++
++	if (PTR_ERR(c) == -ENOENT)
++		return NULL;
++
++	return c;
++}
++EXPORT_SYMBOL(clk_get_optional);
++
+ void clk_put(struct clk *clk)
+ {
+ 	__clk_put(clk);
+diff --git a/include/linux/clk.h b/include/linux/clk.h
+index 0dbd088..907202b 100644
+--- a/include/linux/clk.h
++++ b/include/linux/clk.h
+@@ -258,6 +258,14 @@ static inline void clk_bulk_unprepare(int num_clks, struct clk_bulk_data *clks)
+ struct clk *clk_get(struct device *dev, const char *id);
+ 
+ /**
++ * clk_get_optional - lookup and obtain a reference to optional clock producer.
++ *
++ * Behaves the same as clk_get except where there is no clock producer. In this
++ * case, instead of returning -ENOENT, the function returns NULL.
++ */
++struct clk *clk_get_optional(struct device *dev, const char *id);
++
++/**
+  * clk_bulk_get - lookup and obtain a number of references to clock producer.
+  * @dev: device for clock "consumer"
+  * @num_clks: the number of clk_bulk_data
+@@ -316,6 +324,14 @@ int __must_check devm_clk_bulk_get(struct device *dev, int num_clks,
+ struct clk *devm_clk_get(struct device *dev, const char *id);
+ 
+ /**
++ * devm_clk_get_optional - lookup and obtain a managed reference to an optional
++ *			   clock producer.
++ * Behaves the same as devm_clk_get except where there is no clock producer. In
++ * this case, instead of returning -ENOENT, the function returns NULL.
++ */
++struct clk *devm_clk_get_optional(struct device *dev, const char *id);
++
++/**
+  * devm_get_clk_from_child - lookup and obtain a managed reference to a
+  *			     clock producer from child node.
+  * @dev: device for clock "consumer"
+@@ -603,6 +619,11 @@ static inline struct clk *clk_get(struct device *dev, const char *id)
+ 	return NULL;
+ }
+ 
++static inline struct clk *clk_get_optional(struct device *dev, const char *id)
++{
++	return NULL;
++}
++
+ static inline int __must_check clk_bulk_get(struct device *dev, int num_clks,
+ 					    struct clk_bulk_data *clks)
+ {
+@@ -614,6 +635,12 @@ static inline struct clk *devm_clk_get(struct device *dev, const char *id)
+ 	return NULL;
+ }
+ 
++static inline struct clk *devm_clk_get_optional(struct device *dev,
++						const char *id)
++{
++	return NULL;
++}
++
+ static inline int __must_check devm_clk_bulk_get(struct device *dev, int num_clks,
+ 						 struct clk_bulk_data *clks)
+ {
+-- 
+2.7.4
