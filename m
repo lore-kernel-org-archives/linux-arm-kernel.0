@@ -1,68 +1,99 @@
-From: sebastien.szymanski@armadeus.com (=?UTF-8?Q?S=c3=a9bastien_Szymanski?=)
-Date: Wed, 18 Jul 2018 10:19:15 +0200
-Subject: [PATCH 1/2] drm/panel: Add support for Armadeus ST0700 Adapt
-In-Reply-To: <CAOMZO5Dr0zqy4Sf3s=L4qoqePRhZAXWpDk1oTOUidy4_TUQ=QA@mail.gmail.com>
-References: <20180717072318.18730-1-sebastien.szymanski@armadeus.com>
- <CAOMZO5Dr0zqy4Sf3s=L4qoqePRhZAXWpDk1oTOUidy4_TUQ=QA@mail.gmail.com>
-Message-ID: <3bfd3bde-55e2-9b68-a8ab-c69dc98097da@armadeus.com>
+From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
+Date: Wed, 18 Jul 2018 10:19:33 +0200
+Subject: [PATCH 2/2] drm/sun4i: sun4i: Introduce a quirk for lowest
+ plane alpha support
+In-Reply-To: <20180717122547.d5tkizuuj6676ilc@flea.home>
+References: <20180717085230.17472-1-paul.kocialkowski@bootlin.com>
+ <20180717085230.17472-2-paul.kocialkowski@bootlin.com>
+ <20180717122547.d5tkizuuj6676ilc@flea.home>
+Message-ID: <fa741d96804aec4c2caa40b14eb01081b8b1c954.camel@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+Hi,
 
-On 07/17/2018 02:28 PM, Fabio Estevam wrote:
-> Hi S?bastien,
+On Tue, 2018-07-17 at 14:25 +0200, Maxime Ripard wrote:
+> On Tue, Jul 17, 2018 at 10:52:30AM +0200, Paul Kocialkowski wrote:
+> > Not all sunxi platforms with the first version of the Display Engine
+> > support an alpha component on the plane with the lowest z position
+> > (as in: lowest z-pos), that gets blended with the background color.
+> > 
+> > In particular, the A13 is known to have this limitation. However, it was
+> > recently discovered that the A20 and A33 are capable of having alpha on
+> > their lowest plane.
+> > 
+> > Thus, this introduces a specific quirk to indicate such support,
+> > per-platform. Since this was not tested on sun4i and sun6i platforms, a
+> > conservative approach is kept and this feature is not supported.
+> > 
+> > Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+> > ---
+> >  drivers/gpu/drm/sun4i/sun4i_backend.c | 10 ++++++++--
+> >  1 file changed, 8 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
+> > index a3cc398d4d80..cdc4a8a91ea2 100644
+> > --- a/drivers/gpu/drm/sun4i/sun4i_backend.c
+> > +++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
+> > @@ -35,6 +35,8 @@
+> >  struct sun4i_backend_quirks {
+> >  	/* backend <-> TCON muxing selection done in backend */
+> >  	bool needs_output_muxing;
+> > +	/* alpha at the lowest z position is not always supported */
+> > +	bool supports_lowest_plane_alpha;
+> >  };
+> >  
+> >  static void sun4i_backend_apply_color_correction(struct sunxi_engine *engine)
+> > @@ -484,6 +486,7 @@ static void sun4i_backend_atomic_begin(struct sunxi_engine *engine,
+> >  static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
+> >  				      struct drm_crtc_state *crtc_state)
+> >  {
+> > +	struct sun4i_backend *backend = engine_to_sun4i_backend(engine);
+> >  	struct drm_plane_state *plane_states[SUN4I_BACKEND_NUM_LAYERS] = { 0 };
 > 
-> On Tue, Jul 17, 2018 at 4:23 AM, S?bastien Szymanski
-> <sebastien.szymanski@armadeus.com> wrote:
->> This patch adds support for the Armadeus ST0700 Adapt. It comes with a
->> Santek ST0700I5Y-RBSLW 7.0" WVGA (800x480) TFT and an adapter board so
->> that it can be connected on the TFT header of Armadeus Dev boards.
->>
->> Signed-off-by: S?bastien Szymanski <sebastien.szymanski@armadeus.com>
->> ---
->>  .../display/panel/armadeus,st0700-adapt.txt        |  9 +++++++
->>  drivers/gpu/drm/panel/panel-simple.c               | 29 ++++++++++++++++++++++
->>  2 files changed, 38 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/display/panel/armadeus,st0700-adapt.txt
->>
->> diff --git a/Documentation/devicetree/bindings/display/panel/armadeus,st0700-adapt.txt b/Documentation/devicetree/bindings/display/panel/armadeus,st0700-adapt.txt
->> new file mode 100644
->> index 000000000000..a30d63db3c8f
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/display/panel/armadeus,st0700-adapt.txt
->> @@ -0,0 +1,9 @@
->> +Armadeus ST0700 Adapt. A Santek ST0700I5Y-RBSLW 7.0" WVGA (800x480) TFT with
->> +an adapter board.
->> +
->> +Required properties:
->> +- compatible: "armadeus,st0700-adapt"
-> 
-> Shouldn't this be named "santek,st0700i5y" instead?
-> 
-> Santek is the vendor of the panel and st0700i5y is the model.
+> Your new variable should be here.
 
-You're right but Armadeus doesn't provide the panel as-is. Armadeus adds
-an adapter board so it can be connected on the development boards. [1]
-Even though the panel supports MEDIA_BUS_FMT_RGB888_1X24, with the
-adapter board the bus format has to be MEDIA_BUS_FMT_RGB666_1X18.
+Ok, will do in v2.
 
-[1] http://www.opossom.com/english/products-peripherals-st0700_adapt.html
+> >  	struct drm_atomic_state *state = crtc_state->state;
+> >  	struct drm_device *drm = state->dev;
+> > @@ -584,8 +587,9 @@ static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
+> >  	}
+> >  
+> >  	/* We can't have an alpha plane at the lowest position */
+> > -	if (plane_states[0]->fb->format->has_alpha ||
+> > -	    (plane_states[0]->alpha != DRM_BLEND_ALPHA_OPAQUE))
+> > +	if ((plane_states[0]->fb->format->has_alpha ||
+> > +	    (plane_states[0]->alpha != DRM_BLEND_ALPHA_OPAQUE)) &&
+> > +	    !backend->quirks->supports_lowest_plane_alpha)
+> >  		return -EINVAL;
+> 
+> This only partially does the job. This only allows to have an alpha
+> plane at the lowest position, but the fact that the alpha works at the
+> lowest position also means you can have two alpha planes now, and you
+> didn't change that check.
 
-Regards,
+You're right, the number of available planes with alpha has to be
+changed accordingly. Will do in v2.
 
-> 
-> Then you could add a "santek" entry in
-> Documentation/devicetree/bindings/vendor-prefixes.txt.
-> 
-> Regards,
-> 
-> Fabio Estevam
-> 
+> The pipe allocation algorithm would also need to be checked.
 
+>From my understanding, the limitation on the number of alpha planes only
+takes effect after pipe allocation, so this change doesn't require
+modifying the allocation algorithm.
+
+Cheers and thanks for the review,
+
+Paul
 
 -- 
-S?bastien Szymanski
-Software engineer, Armadeus Systems
-Tel: +33 (0)9 72 29 41 44
-Fax: +33 (0)9 72 28 79 26
+Paul Kocialkowski, Bootlin (formerly Free Electrons)
+Embedded Linux and kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180718/a6fc0085/attachment.sig>
