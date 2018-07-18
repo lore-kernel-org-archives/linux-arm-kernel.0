@@ -1,16 +1,15 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu, 19 Jul 2018 08:01:44 +0900
-Subject: [GIT PULL 2/3] arm64: dts: uniphier: UniPhier DT updates for v4.19
-Message-ID: <CAK7LNAStvWBsimKG2uBe9ROAU8dAV2Zi6F=6VrOS4pFnQgNhAg@mail.gmail.com>
+Date: Thu, 19 Jul 2018 08:05:03 +0900
+Subject: [GIT PULL 3/3] ARM: uniphier: UniPhier SoC updates for v4.19
+Message-ID: <CAK7LNAShLhWqCRR8RfuJ0xBJAFoj-S6WLcSdh9QShg8dGfq9RA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Arnd, Olof,
 
-Please pull UniPhier DT (64bit) updates for the v4.19 MW.
+Please pull UniPhier SoC changes for the v4.19 MW.
 
 Thanks!
-
 
 
 The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
@@ -20,32 +19,37 @@ The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
 are available in the git repository at:
 
   git://git.kernel.org/pub/scm/linux/kernel/git/masahiroy/linux-uniphier.git
-tags/uniphier-dt64-v4.19
+tags/uniphier-soc-v4.19
 
-for you to fetch changes up to 1470075d5e354da8f46f5aa2e6956de794eb406a:
+for you to fetch changes up to ae93e694440a454609fa40725e16619c5a781768:
 
-  arm64: dts: uniphier: add headphone detect gpio for LD11 global
-board (2018-07-19 06:43:12 +0900)
-
-----------------------------------------------------------------
-UniPhier ARM64 SoC DT updates for v4.19
-
-- Add missing #cooling-cells properties
-
-- Add hp-det-gpio property to detect headphone via GPIO
+  ARM: uniphier: remove empty Makefile (2018-07-19 06:53:16 +0900)
 
 ----------------------------------------------------------------
-Katsuhiro Suzuki (2):
-      arm64: dts: uniphier: add headphone detect gpio for LD20 global board
-      arm64: dts: uniphier: add headphone detect gpio for LD11 global board
+UniPhier ARM SoC updates for v4.19
 
-Viresh Kumar (1):
-      arm64: dts: uniphier: Add missing cooling device properties for CPUs
+- enable ethernet and thermal drivers from multi_v7_defconfig
 
- arch/arm64/boot/dts/socionext/uniphier-ld11-global.dts | 1 +
- arch/arm64/boot/dts/socionext/uniphier-ld20-global.dts | 1 +
- arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi       | 2 ++
- 3 files changed, 4 insertions(+)
+- select RESET_CONTROLLER
+
+- remove empty arch/arm/mach-uniphier/Makefile
+
+----------------------------------------------------------------
+Kunihiko Hayashi (1):
+      ARM: multi_v7_defconfig: add CONFIG_UNIPHIER_THERMAL and CONFIG_SNI_AVE
+
+Masahiro Yamada (3):
+      ARM: uniphier: select RESET_CONTROLLER
+      arm64: uniphier: select RESET_CONTROLLER
+      ARM: uniphier: remove empty Makefile
+
+ arch/arm/Makefile                   | 1 -
+ arch/arm/configs/multi_v7_defconfig | 2 ++
+ arch/arm/mach-uniphier/Kconfig      | 1 +
+ arch/arm/mach-uniphier/Makefile     | 0
+ arch/arm64/Kconfig.platforms        | 1 +
+ 5 files changed, 4 insertions(+), 1 deletion(-)
+ delete mode 100644 arch/arm/mach-uniphier/Makefile
 
 
 -- 
