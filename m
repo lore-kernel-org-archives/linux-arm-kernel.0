@@ -1,63 +1,65 @@
-From: edgar.righi@lsitec.org.br (Edgar Bernardi Righi)
-Date: Wed, 18 Jul 2018 12:54:44 -0300
-Subject: [PATCH v1 03/04] arm: dts: actions: Enable clock controller for
- Actions Semi S500 SoC
-Message-ID: <CADHB5bDhdXonoSUahgxqV8_rcUwYxvh3t9WDNN4YO8g7KSt07Q@mail.gmail.com>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Wed, 18 Jul 2018 16:58:16 +0100
+Subject: [GIT PULL] arm64: dts: hisilicon dts updates for v4.19
+Message-ID: <5B4F6398.2070608@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable clock controller for Actions Semi S500 SoC on owl-s500 device tree.
-Tested on a Lemaker Guitar board.
+Hi Olof, Hi Arnd,
 
-File(s) updated: "/arch/arm/boot/dts/owl-s500.dtsi"
+Please consider to pull the following changes.
+I rebased the pull on hisi-fixes-for-4.18 since there are
+some fixes for v4.18 have been merged.
 
-Signed-off-by: Edgar Bernardi Righi <edgar.righi@lsitec.org.br>
+Thanks!
 
-diff -uprN -X vanilla/Documentation/dontdiff
-vanilla/arch/arm/boot/dts/owl-s500.dtsi
-linux/arch/arm/boot/dts/owl-s500.dtsi
---- vanilla/arch/arm/boot/dts/owl-s500.dtsi    2018-07-17
-13:07:15.675710000 -0300
-+++ linux/arch/arm/boot/dts/owl-s500.dtsi    2018-07-18 12:51:07.875364441 -0300
-@@ -2,12 +2,14 @@
-  * Actions Semi S500 SoC
-  *
-  * Copyright (c) 2016-2017 Andreas F?rber
-+ * Copyright (c) 2018-2018 Edgar Bernardi Righi
-  *
-  * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-  */
+Best Regards,
+Wei
 
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- #include <dt-bindings/power/owl-s500-powergate.h>
-+#include <dt-bindings/clock/actions,s500-cmu.h>
+---
+The following changes since commit a30449eb3ac908f26b4bc963a58039a5f2725ffa:
 
- / {
-     compatible = "actions,s500";
-@@ -71,6 +73,12 @@
-         #clock-cells = <0>;
-     };
+  arm64: dts: hikey960: Define wl1837 power capabilities (2018-06-28 17:07:44 +0100)
 
-+    losc: losc {
-+        compatible = "fixed-clock";
-+        clock-frequency = <32678>;
-+        #clock-cells = <0>;
-+    };
-+
-     soc {
-         compatible = "simple-bus";
-         #address-cells = <1>;
-@@ -170,6 +178,13 @@
-             status = "disabled";
-         };
+are available in the Git repository at:
 
-+        cmu: clock-controller at b0160000 {
-+            compatible = "actions,s500-cmu";
-+            reg = <0xb0160000 0x8000>;
-+            clocks = <&hosc>, <&losc>;
-+            #clock-cells = <1>;
-+        };
-+
-         timer: timer at b0168000 {
-             compatible = "actions,s500-timer";
-             reg = <0xb0168000 0x8000>;
+  git://github.com/hisilicon/linux-hisi.git tags/hisi-arm64-dt-for-4.19
+
+for you to fetch changes up to 168124aa0b430dce963d9a9e3dba44cb81a8159e:
+
+  arm64: dts: hi6220: Add all CPUs in cooling maps (2018-07-17 13:58:17 +0100)
+
+----------------------------------------------------------------
+ARM64: DT: Hisilicon SoC DT updates for 4.19
+
+- Tidy up MMC properties for hi3660
+- Remove keep-power-in-suspend on hikey and hikey960 to
+  avoid keeping wifi power during suspend and let the
+  user enable it if required
+- Update idle states for hikey960
+- Add missing cooling device properties for cpus on hi6220
+- Update thermal dt binding to allow multiple devices
+  to share cooling map
+- Add all cpus in the cooling maps for hi6220
+
+----------------------------------------------------------------
+Vincent Guittot (1):
+      arm64: hikey960: update idle-states
+
+Viresh Kumar (3):
+      arm64: dts: hisilicon: Add missing cooling device properties for CPUs
+      dt-bindings: thermal: Allow multiple devices to share cooling map
+      arm64: dts: hi6220: Add all CPUs in cooling maps
+
+oscardagrach (4):
+      arm64: dts: hikey960: Remove deprecated MMC properties
+      arm64: dts: hikey960: Clean up MMC properties and move to proper file
+      arm64: dts: hikey960: Remove keep-power-in-suspend property
+      arm64: dts: hikey: Remove keep-power-in-suspend property
+
+ .../devicetree/bindings/thermal/thermal.txt        | 11 +--
+ arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts  | 26 +++++--
+ arch/arm64/boot/dts/hisilicon/hi3660.dtsi          | 79 +++++++++-------------
+ arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts     |  1 -
+ arch/arm64/boot/dts/hisilicon/hi6220.dtsi          | 25 ++++++-
+ 5 files changed, 78 insertions(+), 64 deletions(-)
