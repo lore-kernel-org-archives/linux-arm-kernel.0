@@ -1,48 +1,35 @@
-From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Wed, 18 Jul 2018 08:56:25 +0200
-Subject: [PATCH 2/3] mtd: atmel nand: fix build warning on 64-bit
-In-Reply-To: <20180717230839.3fc2264e@bbrezillon>
-References: <20180709155730.2422841-1-arnd@arndb.de>
- <20180709155730.2422841-2-arnd@arndb.de>
- <0b4ee469-8c37-9002-9067-f37f8dde869e@microchip.com>
- <CAK8P3a3NbrRVC-7HW8NiNQw+E3n_-r746AFTc2dftagTYLYDtw@mail.gmail.com>
- <20180717230523.7005ca91@xps13>
- <20180717230839.3fc2264e@bbrezillon>
-Message-ID: <20180718085625.436958fc@xps13>
+From: Anson.Huang@nxp.com (Anson Huang)
+Date: Wed, 18 Jul 2018 14:54:49 +0800
+Subject: [PATCH] ARM: dts: imx7d: add missing OPP property for cpu0
+Message-ID: <1531896889-21377-1-git-send-email-Anson.Huang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+Commit b97872d4eb22 ("ARM: dts: imx: Add missing OPP properties for CPUs")
+added "operating-points" property for all CPUs, but missed i.MX7D's cpu0,
+this patch adds it.
 
-Boris Brezillon <boris.brezillon@bootlin.com> wrote on Tue, 17 Jul 2018
-23:08:39 +0200:
+Fixes: b97872d4eb22 ("ARM: dts: imx: Add missing OPP properties for CPUs")
+Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+---
+ arch/arm/boot/dts/imx7d.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-> On Tue, 17 Jul 2018 23:05:23 +0200
-> Miquel Raynal <miquel.raynal@bootlin.com> wrote:
-> 
-> > Hi Arnd,
-> > 
-> > Arnd Bergmann <arnd@arndb.de> wrote on Fri, 13 Jul 2018 12:16:09 +0200:
-> >   
-> > > On Fri, Jul 13, 2018 at 11:56 AM, Tudor Ambarus
-> > > <tudor.ambarus@microchip.com> wrote:    
-> > > > Hi, Arnd,
-> > > >
-> > > > On 07/09/2018 06:57 PM, Arnd Bergmann wrote:      
-> > > >> +     nc->ebi_csa_offs = (uintptr_t)match->data;      
-> > > >
-> > > > I guess we should declare ebi_csa_offs as size_t, right?      
-> > > 
-> > > Yes, that would make sense, though it doesn't change the behavior.
-> > >     
-> > 
-> > Do you plan to send a new version? I don't want to mess with
-> > improvised casts :)  
-> 
-> This fix is already part of my COMPILE_TEST series (v2), and I don't
-> thing declaring ->ebi_csa_offs as a size_t is useful.
-
-I missed that, ok.
-
-Thanks,
-Miqu?l
+diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
+index 9a772fc..30a1a73 100644
+--- a/arch/arm/boot/dts/imx7d.dtsi
++++ b/arch/arm/boot/dts/imx7d.dtsi
+@@ -9,6 +9,11 @@
+ / {
+ 	cpus {
+ 		cpu0: cpu at 0 {
++			operating-points = <
++				/* KHz	uV */
++				996000	1075000
++				792000	975000
++			>;
+ 			clock-frequency = <996000000>;
+ 			operating-points-v2 = <&cpu0_opp_table>;
+ 			#cooling-cells = <2>;
+-- 
+2.7.4
