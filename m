@@ -1,251 +1,110 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Wed, 18 Jul 2018 14:10:12 -0700
-Subject: [PATCH 1/2] arm64: Introduce current_stack_type
-In-Reply-To: <20180718211013.14512-1-labbott@redhat.com>
-References: <20180718211013.14512-1-labbott@redhat.com>
-Message-ID: <20180718211013.14512-2-labbott@redhat.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Wed, 18 Jul 2018 22:31:46 +0100
+Subject: [PATCH] coresight: etm_perf: Rework alloc/free methods to avoid
+ lockep warning
+In-Reply-To: <1531942988-20901-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1531942988-20901-1-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <d648155e-0486-7d7c-5e29-2bda6c536dba@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Mathieu,
 
-In preparation for enabling the stackleak plugin on arm64,
-we need a way to get the bounds of the current stack.
-Introduce a new primitive current_stack_type which is similar
-to x86's get_stack_info. Utilize that to rework
-on_accessible_stack slightly as well.
+On 07/18/2018 08:43 PM, Mathieu Poirier wrote:
+> When enabling the lockdep mechanic and working with CPU-wide scenarios we
+> get the following console output:
+> 
 
-Signed-off-by: Laura Abbott <labbott@redhat.com>
----
-So this did end up looking quite a bit like get_stack_info but I didn't
-really see the need to integrate this more than this. I do think
-actually enumerating the types makes things a bit cleaner.
----
- arch/arm64/include/asm/sdei.h       |  8 ++-
- arch/arm64/include/asm/stacktrace.h | 94 ++++++++++++++++++++++++-----
- arch/arm64/kernel/ptrace.c          |  2 +-
- arch/arm64/kernel/sdei.c            | 21 ++++++-
- 4 files changed, 103 insertions(+), 22 deletions(-)
+> This is fixed by working with the cpu_present_mask, avoinding at the same
+> the need to use get/put_online_cpus() that triggers lockdep.
 
-diff --git a/arch/arm64/include/asm/sdei.h b/arch/arm64/include/asm/sdei.h
-index e073e6886685..34f7b203845b 100644
---- a/arch/arm64/include/asm/sdei.h
-+++ b/arch/arm64/include/asm/sdei.h
-@@ -40,15 +40,17 @@ asmlinkage unsigned long __sdei_handler(struct pt_regs *regs,
- unsigned long sdei_arch_get_entry_point(int conduit);
- #define sdei_arch_get_entry_point(x)	sdei_arch_get_entry_point(x)
- 
--bool _on_sdei_stack(unsigned long sp);
--static inline bool on_sdei_stack(unsigned long sp)
-+bool _on_sdei_stack(unsigned long sp, unsigned long *, unsigned long *);
-+static inline bool on_sdei_stack(unsigned long sp,
-+				unsigned long *stack_low,
-+				unsigned long *stack_high)
- {
- 	if (!IS_ENABLED(CONFIG_VMAP_STACK))
- 		return false;
- 	if (!IS_ENABLED(CONFIG_ARM_SDE_INTERFACE))
- 		return false;
- 	if (in_nmi())
--		return _on_sdei_stack(sp);
-+		return _on_sdei_stack(sp, stack_low, stack_high);
- 
- 	return false;
- }
-diff --git a/arch/arm64/include/asm/stacktrace.h b/arch/arm64/include/asm/stacktrace.h
-index 902f9edacbea..9855a0425e64 100644
---- a/arch/arm64/include/asm/stacktrace.h
-+++ b/arch/arm64/include/asm/stacktrace.h
-@@ -39,7 +39,9 @@ extern void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk);
- 
- DECLARE_PER_CPU(unsigned long *, irq_stack_ptr);
- 
--static inline bool on_irq_stack(unsigned long sp)
-+static inline bool on_irq_stack(unsigned long sp,
-+				unsigned long *stack_low,
-+				unsigned long *stack_high)
- {
- 	unsigned long low = (unsigned long)raw_cpu_read(irq_stack_ptr);
- 	unsigned long high = low + IRQ_STACK_SIZE;
-@@ -47,47 +49,109 @@ static inline bool on_irq_stack(unsigned long sp)
- 	if (!low)
- 		return false;
- 
--	return (low <= sp && sp < high);
-+	if (sp < low || sp >= high)
-+		return false;
-+
-+	if (stack_low && stack_high) {
-+		*stack_low = low;
-+		*stack_high = high;
-+	}
-+
-+	return true;
- }
- 
--static inline bool on_task_stack(struct task_struct *tsk, unsigned long sp)
-+static inline bool on_task_stack(struct task_struct *tsk, unsigned long sp,
-+				unsigned long *stack_low,
-+				unsigned long *stack_high)
- {
- 	unsigned long low = (unsigned long)task_stack_page(tsk);
- 	unsigned long high = low + THREAD_SIZE;
- 
--	return (low <= sp && sp < high);
-+	if (sp < low || sp >= high)
-+		return false;
-+
-+	if (stack_low && stack_high) {
-+		*stack_low = low;
-+		*stack_high = high;
-+	}
-+
-+	return true;
- }
- 
- #ifdef CONFIG_VMAP_STACK
- DECLARE_PER_CPU(unsigned long [OVERFLOW_STACK_SIZE/sizeof(long)], overflow_stack);
- 
--static inline bool on_overflow_stack(unsigned long sp)
-+static inline bool on_overflow_stack(unsigned long sp,
-+				unsigned long *stack_low,
-+				unsigned long *stack_high)
- {
- 	unsigned long low = (unsigned long)raw_cpu_ptr(overflow_stack);
- 	unsigned long high = low + OVERFLOW_STACK_SIZE;
- 
--	return (low <= sp && sp < high);
-+	if (sp < low || sp >= high)
-+		return false;
-+
-+	if (stack_low && stack_high) {
-+		*stack_low = low;
-+		*stack_high = high;
-+	}
-+
-+	return true;
- }
- #else
--static inline bool on_overflow_stack(unsigned long sp) { return false; }
-+static inline bool on_overflow_stack(unsigned long sp,
-+			unsigned long *stack_low,
-+			unsigned long *stack_high) { return false; }
- #endif
- 
-+enum stack_type {
-+	STACK_TYPE_UNKNOWN,
-+	STACK_TYPE_TASK,
-+	STACK_TYPE_IRQ,
-+	STACK_TYPE_OVERFLOW,
-+	STACK_TYPE_SDEI,
-+};
-+
-+static inline enum stack_type current_stack_type(struct task_struct *tsk,
-+						unsigned long sp,
-+						unsigned long *stack_low,
-+						unsigned long *stack_high)
-+{
-+	if (on_task_stack(tsk, sp, stack_low, stack_high))
-+		return STACK_TYPE_TASK;
-+	if (on_irq_stack(sp, stack_low, stack_high))
-+		return STACK_TYPE_IRQ;
-+	if (on_overflow_stack(sp, stack_low, stack_high))
-+		return STACK_TYPE_OVERFLOW;
-+	if (on_sdei_stack(sp, stack_low, stack_high))
-+		return STACK_TYPE_SDEI;
-+	return STACK_TYPE_UNKNOWN;
-+}
-+
- /*
-  * We can only safely access per-cpu stacks from current in a non-preemptible
-  * context.
-  */
- static inline bool on_accessible_stack(struct task_struct *tsk, unsigned long sp)
- {
--	if (on_task_stack(tsk, sp))
-+	enum stack_type type;
-+	unsigned long low, high;
-+
-+	type = current_stack_type(tsk, sp, &low, &high);
-+
-+	switch (type) {
-+	case STACK_TYPE_TASK:
- 		return true;
--	if (tsk != current || preemptible())
-+	case STACK_TYPE_IRQ:
-+	case STACK_TYPE_OVERFLOW:
-+	case STACK_TYPE_SDEI:
-+		if (tsk != current || preemptible())
-+			return false;
-+		else
-+			return true;
-+	case STACK_TYPE_UNKNOWN:
- 		return false;
--	if (on_irq_stack(sp))
--		return true;
--	if (on_overflow_stack(sp))
--		return true;
--	if (on_sdei_stack(sp))
--		return true;
-+	}
- 
- 	return false;
- }
-diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-index 5c338ce5a7fa..a6b3a2be7561 100644
---- a/arch/arm64/kernel/ptrace.c
-+++ b/arch/arm64/kernel/ptrace.c
-@@ -132,7 +132,7 @@ static bool regs_within_kernel_stack(struct pt_regs *regs, unsigned long addr)
- {
- 	return ((addr & ~(THREAD_SIZE - 1))  ==
- 		(kernel_stack_pointer(regs) & ~(THREAD_SIZE - 1))) ||
--		on_irq_stack(addr);
-+		on_irq_stack(addr, NULL, NULL);
- }
- 
- /**
-diff --git a/arch/arm64/kernel/sdei.c b/arch/arm64/kernel/sdei.c
-index 6b8d90d5ceae..8e18913a53fd 100644
---- a/arch/arm64/kernel/sdei.c
-+++ b/arch/arm64/kernel/sdei.c
-@@ -88,7 +88,9 @@ static int init_sdei_stacks(void)
- 	return err;
- }
- 
--bool _on_sdei_stack(unsigned long sp)
-+bool _on_sdei_stack(unsigned long sp,
-+		unsigned long *stack_low,
-+		unsigned long *stack_high)
- {
- 	unsigned long low, high;
- 
-@@ -98,13 +100,26 @@ bool _on_sdei_stack(unsigned long sp)
- 	low = (unsigned long)raw_cpu_read(sdei_stack_critical_ptr);
- 	high = low + SDEI_STACK_SIZE;
- 
--	if (low <= sp && sp < high)
-+	if (low <= sp && sp < high) {
-+		if (stack_low && stack_high) {
-+			*stack_low = low;
-+			*stack_high = high;
-+		}
- 		return true;
-+	}
- 
- 	low = (unsigned long)raw_cpu_read(sdei_stack_normal_ptr);
- 	high = low + SDEI_STACK_SIZE;
- 
--	return (low <= sp && sp < high);
-+	if (low <= sp && sp < high) {
-+		if (stack_low && stack_high) {
-+			*stack_low = low;
-+			*stack_high = high;
-+		}
-+		return true;
-+	}
-+
-+	return false;
- }
- 
- unsigned long sdei_arch_get_entry_point(int conduit)
--- 
-2.17.1
+The patch looks correct to me. In fact I have a patch [1], which
+does the same thing and switches to using per-cpu variable for the
+paths.
+
+> 
+> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+> ---
+>   drivers/hwtracing/coresight/coresight-etm-perf.c | 39 +++++++++++++-----------
+>   1 file changed, 21 insertions(+), 18 deletions(-)
+> 
+> diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
+> index 677695635211..16b9c87d9d00 100644
+> --- a/drivers/hwtracing/coresight/coresight-etm-perf.c
+> +++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
+> @@ -108,26 +108,32 @@ static int etm_event_init(struct perf_event *event)
+>   static void free_event_data(struct work_struct *work)
+>   {
+>   	int cpu;
+> +	void *snk_config;
+>   	cpumask_t *mask;
+>   	struct etm_event_data *event_data;
+>   	struct coresight_device *sink;
+>   
+>   	event_data = container_of(work, struct etm_event_data, work);
+>   	mask = &event_data->mask;
+> -	/*
+> -	 * First deal with the sink configuration.  See comment in
+> -	 * etm_setup_aux() about why we take the first available path.
+> -	 */
+> -	if (event_data->snk_config) {
+> -		cpu = cpumask_first(mask);
+> -		sink = coresight_get_sink(event_data->path[cpu]);
+> -		if (sink_ops(sink)->free_buffer)
+> -			sink_ops(sink)->free_buffer(event_data->snk_config);
+> -	}
+> +	snk_config = event_data->snk_config;
+>   
+>   	for_each_cpu(cpu, mask) {
+> -		if (!(IS_ERR_OR_NULL(event_data->path[cpu])))
+> -			coresight_release_path(event_data->path[cpu]);
+> +		if (IS_ERR_OR_NULL(event_data->path[cpu]))
+> +			continue;
+> +
+> +		/*
+> +		 * Free sink configuration - there can only be one sink
+> +		 * per event.
+> +		 */
+> +		if (snk_config) {
+> +			sink = coresight_get_sink(event_data->path[cpu]);
+> +			if (sink_ops(sink)->free_buffer) {
+> +				sink_ops(sink)->free_buffer(snk_config);
+> +				snk_config = NULL;
+> +			}
+> +		}
+> +
+> +		coresight_release_path(event_data->path[cpu]);
+>   	}
+
+>   
+>   	kfree(event_data->path);
+> @@ -145,16 +151,13 @@ static void *alloc_event_data(int cpu)
+>   	if (!event_data)
+>   		return NULL;
+>   
+> -	/* Make sure nothing disappears under us */
+> -	get_online_cpus();
+> -	size = num_online_cpus();
+> -
+>   	mask = &event_data->mask;
+> +	size = num_present_cpus();
+> +
+>   	if (cpu != -1)
+>   		cpumask_set_cpu(cpu, mask);
+>   	else
+> -		cpumask_copy(mask, cpu_online_mask);
+> -	put_online_cpus();
+> +		cpumask_copy(mask, cpu_present_mask);
+
+I think it is safe to use cpu_online_mask outside the
+get/put_online_cpus(). Using present_mask may fail as
+we could fail to create a path for a CPU that is not online.
+
+
+Please could you check if [1] fixes the problem for you ?
+
+[1] 
+http://lists.infradead.org/pipermail/linux-arm-kernel/2018-July/591606.html
+
+Cheers
+Suzuki
