@@ -1,195 +1,180 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Thu, 19 Jul 2018 05:02:19 +0800
-Subject: [PATCH v2] drm/sun4i: sun4i: Introduce a quirk for lowest plane
- alpha support
-In-Reply-To: <20180718092948.15334-1-paul.kocialkowski@bootlin.com>
-References: <20180718092948.15334-1-paul.kocialkowski@bootlin.com>
-Message-ID: <201807190447.oi0SxKqP%fengguang.wu@intel.com>
+From: labbott@redhat.com (Laura Abbott)
+Date: Wed, 18 Jul 2018 14:10:13 -0700
+Subject: [PATCH 2/2] arm64: Clear the stack
+In-Reply-To: <20180718211013.14512-1-labbott@redhat.com>
+References: <20180718211013.14512-1-labbott@redhat.com>
+Message-ID: <20180718211013.14512-3-labbott@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
 
-Thank you for the patch! Yet something to improve:
+Implementation of stackleak based heavily on the x86 version
 
-[auto build test ERROR on sunxi/sunxi/for-next]
-[also build test ERROR on v4.18-rc5 next-20180718]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-
-url:    https://github.com/0day-ci/linux/commits/Paul-Kocialkowski/drm-sun4i-sun4i-Introduce-a-quirk-for-lowest-plane-alpha-support/20180719-030611
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git sunxi/for-next
-config: arm-allmodconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        GCC_VERSION=7.2.0 make.cross ARCH=arm 
-
-All errors (new ones prefixed by >>):
-
-   drivers/gpu/drm/sun4i/sun4i_backend.c: In function 'sun4i_backend_atomic_check':
->> drivers/gpu/drm/sun4i/sun4i_backend.c:560:13: error: 'struct sun4i_backend' has no member named 'quirks'
-     if (backend->quirks->supports_lowest_plane_alpha)
-                ^~
-   drivers/gpu/drm/sun4i/sun4i_backend.c:569:14: error: 'struct sun4i_backend' has no member named 'quirks'
-     if (!backend->quirks->supports_lowest_plane_alpha &&
-                 ^~
-
-vim +560 drivers/gpu/drm/sun4i/sun4i_backend.c
-
-   463	
-   464	static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
-   465					      struct drm_crtc_state *crtc_state)
-   466	{
-   467		struct drm_plane_state *plane_states[SUN4I_BACKEND_NUM_LAYERS] = { 0 };
-   468		struct sun4i_backend *backend = engine_to_sun4i_backend(engine);
-   469		struct drm_atomic_state *state = crtc_state->state;
-   470		struct drm_device *drm = state->dev;
-   471		struct drm_plane *plane;
-   472		unsigned int num_planes = 0;
-   473		unsigned int num_alpha_planes = 0;
-   474		unsigned int num_frontend_planes = 0;
-   475		unsigned int num_alpha_planes_max = 1;
-   476		unsigned int num_yuv_planes = 0;
-   477		unsigned int current_pipe = 0;
-   478		unsigned int i;
-   479	
-   480		DRM_DEBUG_DRIVER("Starting checking our planes\n");
-   481	
-   482		if (!crtc_state->planes_changed)
-   483			return 0;
-   484	
-   485		drm_for_each_plane_mask(plane, drm, crtc_state->plane_mask) {
-   486			struct drm_plane_state *plane_state =
-   487				drm_atomic_get_plane_state(state, plane);
-   488			struct sun4i_layer_state *layer_state =
-   489				state_to_sun4i_layer_state(plane_state);
-   490			struct drm_framebuffer *fb = plane_state->fb;
-   491			struct drm_format_name_buf format_name;
-   492	
-   493			if (sun4i_backend_plane_uses_frontend(plane_state)) {
-   494				DRM_DEBUG_DRIVER("Using the frontend for plane %d\n",
-   495						 plane->index);
-   496	
-   497				layer_state->uses_frontend = true;
-   498				num_frontend_planes++;
-   499			} else {
-   500				layer_state->uses_frontend = false;
-   501			}
-   502	
-   503			DRM_DEBUG_DRIVER("Plane FB format is %s\n",
-   504					 drm_get_format_name(fb->format->format,
-   505							     &format_name));
-   506			if (fb->format->has_alpha || (plane_state->alpha != DRM_BLEND_ALPHA_OPAQUE))
-   507				num_alpha_planes++;
-   508	
-   509			if (sun4i_backend_format_is_yuv(fb->format->format)) {
-   510				DRM_DEBUG_DRIVER("Plane FB format is YUV\n");
-   511				num_yuv_planes++;
-   512			}
-   513	
-   514			DRM_DEBUG_DRIVER("Plane zpos is %d\n",
-   515					 plane_state->normalized_zpos);
-   516	
-   517			/* Sort our planes by Zpos */
-   518			plane_states[plane_state->normalized_zpos] = plane_state;
-   519	
-   520			num_planes++;
-   521		}
-   522	
-   523		/* All our planes were disabled, bail out */
-   524		if (!num_planes)
-   525			return 0;
-   526	
-   527		/*
-   528		 * The hardware is a bit unusual here.
-   529		 *
-   530		 * Even though it supports 4 layers, it does the composition
-   531		 * in two separate steps.
-   532		 *
-   533		 * The first one is assigning a layer to one of its two
-   534		 * pipes. If more that 1 layer is assigned to the same pipe,
-   535		 * and if pixels overlaps, the pipe will take the pixel from
-   536		 * the layer with the highest priority.
-   537		 *
-   538		 * The second step is the actual alpha blending, that takes
-   539		 * the two pipes as input, and uses the potential alpha
-   540		 * component to do the transparency between the two.
-   541		 *
-   542		 * This two-step scenario makes us unable to guarantee a
-   543		 * robust alpha blending between the 4 layers in all
-   544		 * situations, since this means that we need to have one layer
-   545		 * with alpha at the lowest position of our two pipes.
-   546		 *
-   547		 * However, we cannot even do that on every platform, since the
-   548		 * hardware has a bug where the lowest plane of the lowest pipe
-   549		 * (pipe 0, priority 0), if it has any alpha, will discard the
-   550		 * pixel data entirely and just display the pixels in the
-   551		 * background color (black by default).
-   552		 *
-   553		 * This means that on the affected platforms, we effectively
-   554		 * have only three valid configurations with alpha, all of them
-   555		 * with the alpha being on pipe1 with the lowest position, which
-   556		 * can be 1, 2 or 3 depending on the number of planes and their zpos.
-   557		 */
-   558	
-   559		/* For platforms that are not affected by the issue described above. */
- > 560		if (backend->quirks->supports_lowest_plane_alpha)
-   561			num_alpha_planes_max++;
-   562	
-   563		if (num_alpha_planes > num_alpha_planes_max) {
-   564			DRM_DEBUG_DRIVER("Too many planes with alpha, rejecting...\n");
-   565			return -EINVAL;
-   566		}
-   567	
-   568		/* We can't have an alpha plane at the lowest position */
-   569		if (!backend->quirks->supports_lowest_plane_alpha &&
-   570		    (plane_states[0]->fb->format->has_alpha ||
-   571		    (plane_states[0]->alpha != DRM_BLEND_ALPHA_OPAQUE)))
-   572			return -EINVAL;
-   573	
-   574		for (i = 1; i < num_planes; i++) {
-   575			struct drm_plane_state *p_state = plane_states[i];
-   576			struct drm_framebuffer *fb = p_state->fb;
-   577			struct sun4i_layer_state *s_state = state_to_sun4i_layer_state(p_state);
-   578	
-   579			/*
-   580			 * The only alpha position is the lowest plane of the
-   581			 * second pipe.
-   582			 */
-   583			if (fb->format->has_alpha || (p_state->alpha != DRM_BLEND_ALPHA_OPAQUE))
-   584				current_pipe++;
-   585	
-   586			s_state->pipe = current_pipe;
-   587		}
-   588	
-   589		/* We can only have a single YUV plane at a time */
-   590		if (num_yuv_planes > SUN4I_BACKEND_NUM_YUV_PLANES) {
-   591			DRM_DEBUG_DRIVER("Too many planes with YUV, rejecting...\n");
-   592			return -EINVAL;
-   593		}
-   594	
-   595		if (num_frontend_planes > SUN4I_BACKEND_NUM_FRONTEND_LAYERS) {
-   596			DRM_DEBUG_DRIVER("Too many planes going through the frontend, rejecting\n");
-   597			return -EINVAL;
-   598		}
-   599	
-   600		DRM_DEBUG_DRIVER("State valid with %u planes, %u alpha, %u video, %u YUV\n",
-   601				 num_planes, num_alpha_planes, num_frontend_planes,
-   602				 num_yuv_planes);
-   603	
-   604		return 0;
-   605	}
-   606	
-
+Signed-off-by: Laura Abbott <labbott@redhat.com>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 66067 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180719/81deaa7e/attachment-0001.gz>
+Since last time: Minor style cleanups. Re-wrote check_alloca to
+correctly handle all stack types. While doing that, I also realized
+current_top_of_stack was incorrect so I fixed that as well.
+---
+ arch/arm64/Kconfig                    |  1 +
+ arch/arm64/include/asm/processor.h    | 17 ++++++++++++++
+ arch/arm64/kernel/entry.S             |  7 ++++++
+ arch/arm64/kernel/process.c           | 32 +++++++++++++++++++++++++++
+ arch/arm64/kvm/hyp/Makefile           |  3 ++-
+ drivers/firmware/efi/libstub/Makefile |  3 ++-
+ include/linux/stackleak.h             |  1 +
+ 7 files changed, 62 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 42c090cf0292..216d36a49ab5 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -96,6 +96,7 @@ config ARM64
+ 	select HAVE_ARCH_MMAP_RND_BITS
+ 	select HAVE_ARCH_MMAP_RND_COMPAT_BITS if COMPAT
+ 	select HAVE_ARCH_SECCOMP_FILTER
++	select HAVE_ARCH_STACKLEAK
+ 	select HAVE_ARCH_THREAD_STRUCT_WHITELIST
+ 	select HAVE_ARCH_TRACEHOOK
+ 	select HAVE_ARCH_TRANSPARENT_HUGEPAGE
+diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+index a73ae1e49200..4f3062ee22c6 100644
+--- a/arch/arm64/include/asm/processor.h
++++ b/arch/arm64/include/asm/processor.h
+@@ -266,5 +266,22 @@ extern void __init minsigstksz_setup(void);
+ #define SVE_SET_VL(arg)	sve_set_current_vl(arg)
+ #define SVE_GET_VL()	sve_get_current_vl()
+ 
++/*
++ * For CONFIG_STACKLEAK
++ *
++ * These need to be macros because otherwise we get stuck in a nightmare
++ * of header definitions for the use of task_stack_page.
++ */
++
++#define current_top_of_stack()		\
++({					\
++	unsigned long _low = 0;		\
++	unsigned long _high = 0;	\
++					\
++	current_stack_type(current, current_stack_pointer, &_low, &_high); \
++	_high;	\
++})
++#define on_thread_stack()	(on_task_stack(current, current_stack_pointer, NULL, NULL))
++
+ #endif /* __ASSEMBLY__ */
+ #endif /* __ASM_PROCESSOR_H */
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index 28ad8799406f..67d12016063d 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -431,6 +431,11 @@ tsk	.req	x28		// current thread_info
+ 
+ 	.text
+ 
++	.macro	stackleak_erase
++#ifdef CONFIG_GCC_PLUGIN_STACKLEAK
++	bl	stackleak_erase
++#endif
++	.endm
+ /*
+  * Exception vectors.
+  */
+@@ -910,6 +915,7 @@ ret_fast_syscall:
+ 	and	x2, x1, #_TIF_WORK_MASK
+ 	cbnz	x2, work_pending
+ 	enable_step_tsk x1, x2
++	stackleak_erase
+ 	kernel_exit 0
+ ret_fast_syscall_trace:
+ 	enable_daif
+@@ -936,6 +942,7 @@ ret_to_user:
+ 	cbnz	x2, work_pending
+ finish_ret_to_user:
+ 	enable_step_tsk x1, x2
++	stackleak_erase
+ 	kernel_exit 0
+ ENDPROC(ret_to_user)
+ 
+diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+index e10bc363f533..904defa36689 100644
+--- a/arch/arm64/kernel/process.c
++++ b/arch/arm64/kernel/process.c
+@@ -493,3 +493,35 @@ void arch_setup_new_exec(void)
+ {
+ 	current->mm->context.flags = is_compat_task() ? MMCF_AARCH32 : 0;
+ }
++
++#ifdef CONFIG_GCC_PLUGIN_STACKLEAK
++void __used stackleak_check_alloca(unsigned long size)
++{
++	unsigned long stack_left;
++	enum stack_type type;
++	unsigned long current_sp = current_stack_pointer;
++	unsigned long low, high;
++
++	type = current_stack_type(current, current_sp, &low, &high);
++	BUG_ON(type == STACK_TYPE_UNKNOWN);
++
++	stack_left = current_sp - low;
++
++	if (size >= stack_left) {
++		/*
++		 * Kernel stack depth overflow is detected, let's report that.
++		 * If CONFIG_VMAP_STACK is enabled, we can safely use BUG().
++		 * If CONFIG_VMAP_STACK is disabled, BUG() handling can corrupt
++		 * the neighbour memory. CONFIG_SCHED_STACK_END_CHECK calls
++		 * panic() in a similar situation, so let's do the same if that
++		 * option is on. Otherwise just use BUG() and hope for the best.
++		 */
++#if !defined(CONFIG_VMAP_STACK) && defined(CONFIG_SCHED_STACK_END_CHECK)
++		panic("alloca() over the kernel stack boundary\n");
++#else
++		BUG();
++#endif
++	}
++}
++EXPORT_SYMBOL(stackleak_check_alloca);
++#endif
+diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
+index 4313f7475333..2fabc2dc1966 100644
+--- a/arch/arm64/kvm/hyp/Makefile
++++ b/arch/arm64/kvm/hyp/Makefile
+@@ -3,7 +3,8 @@
+ # Makefile for Kernel-based Virtual Machine module, HYP part
+ #
+ 
+-ccflags-y += -fno-stack-protector -DDISABLE_BRANCH_PROFILING
++ccflags-y += -fno-stack-protector -DDISABLE_BRANCH_PROFILING \
++		$(DISABLE_STACKLEAK_PLUGIN)
+ 
+ KVM=../../../../virt/kvm
+ 
+diff --git a/drivers/firmware/efi/libstub/Makefile b/drivers/firmware/efi/libstub/Makefile
+index a34e9290a699..25dd2a14560d 100644
+--- a/drivers/firmware/efi/libstub/Makefile
++++ b/drivers/firmware/efi/libstub/Makefile
+@@ -20,7 +20,8 @@ cflags-$(CONFIG_EFI_ARMSTUB)	+= -I$(srctree)/scripts/dtc/libfdt
+ KBUILD_CFLAGS			:= $(cflags-y) -DDISABLE_BRANCH_PROFILING \
+ 				   -D__NO_FORTIFY \
+ 				   $(call cc-option,-ffreestanding) \
+-				   $(call cc-option,-fno-stack-protector)
++				   $(call cc-option,-fno-stack-protector) \
++				   $(DISABLE_STACKLEAK_PLUGIN)
+ 
+ GCOV_PROFILE			:= n
+ KASAN_SANITIZE			:= n
+diff --git a/include/linux/stackleak.h b/include/linux/stackleak.h
+index b911b973d328..08420ec6b7c3 100644
+--- a/include/linux/stackleak.h
++++ b/include/linux/stackleak.h
+@@ -5,6 +5,7 @@
+ #include <linux/sched.h>
+ #include <linux/sched/task_stack.h>
+ 
++#include <asm/stacktrace.h>
+ /*
+  * Check that the poison value points to the unused hole in the
+  * virtual memory map for your platform.
+-- 
+2.17.1
