@@ -1,15 +1,15 @@
 From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Wed, 18 Jul 2018 16:24:57 +0530
-Subject: [PATCH v3 17/18] arm64: dts: allwinner: a64: pine64: Enable HDMI
+Date: Wed, 18 Jul 2018 16:24:58 +0530
+Subject: [PATCH v3 18/18] arm64: dts: allwinner: a64: sopine: Enable HDMI
  output
 In-Reply-To: <20180718105458.22304-1-jagan@amarulasolutions.com>
 References: <20180718105458.22304-1-jagan@amarulasolutions.com>
-Message-ID: <20180718105458.22304-18-jagan@amarulasolutions.com>
+Message-ID: <20180718105458.22304-19-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Enable all necessary HDMI pipeline nodes with HDMI out
-connector on pine64 board.
+connector on sopine board.
 
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
@@ -18,18 +18,17 @@ Changes for v3:
 Changes for v2:
 - none
 
- .../boot/dts/allwinner/sun50i-a64-pine64.dts  | 34 +++++++++++++++++++
+ .../allwinner/sun50i-a64-sopine-baseboard.dts | 34 +++++++++++++++++++
  1 file changed, 34 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-index 1b9b92e541d2..4d1553f7d2a9 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-@@ -62,6 +62,21 @@
- 	chosen {
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
+index c21f2331add6..050e0ff92145 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
+@@ -61,6 +61,17 @@
  		stdout-path = "serial0:115200n8";
  	};
-+
+ 
 +	connector {
 +		compatible = "hdmi-connector";
 +		type = "a";
@@ -40,15 +39,23 @@ index 1b9b92e541d2..4d1553f7d2a9 100644
 +			};
 +		};
 +	};
-+};
 +
-+&de {
-+	status = "okay";
+ 	reg_vcc1v8: vcc1v8 {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "vcc1v8";
+@@ -69,6 +80,10 @@
+ 	};
  };
  
++&de {
++	status = "okay";
++};
++
  &ehci0 {
-@@ -82,6 +97,17 @@
- 
+ 	status = "okay";
+ };
+@@ -86,6 +101,17 @@
+ 	status = "okay";
  };
  
 +&hdmi {
@@ -62,10 +69,10 @@ index 1b9b92e541d2..4d1553f7d2a9 100644
 +	};
 +};
 +
- &i2c1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&i2c1_pins>;
-@@ -99,6 +125,10 @@
+ &mdio {
+ 	ext_rgmii_phy: ethernet-phy at 1 {
+ 		compatible = "ethernet-phy-ieee802.3-c22";
+@@ -93,6 +119,10 @@
  	};
  };
  
@@ -73,19 +80,19 @@ index 1b9b92e541d2..4d1553f7d2a9 100644
 +	status = "okay";
 +};
 +
- &mmc0 {
+ &mmc2 {
  	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc0_pins>;
-@@ -238,6 +268,10 @@
- 	status = "disabled";
+ 	pinctrl-0 = <&mmc2_pins>;
+@@ -138,6 +168,10 @@
+ 	vcc-hdmi-supply = <&reg_dldo1>;
  };
  
 +&tcon1 {
 +	status = "okay";
 +};
 +
- /* On Exp and Euler connectors */
  &uart0 {
  	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_pins_a>;
 -- 
 2.17.1
