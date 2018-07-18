@@ -1,96 +1,104 @@
-From: hari.vyas@broadcom.com (Hari Vyas)
-Date: Wed, 18 Jul 2018 14:44:04 +0530
-Subject: [PATCH] arm64: fix kernel panic on serror exception caused by
- user process
-In-Reply-To: <20180717144547.GE17271@n2100.armlinux.org.uk>
-References: <1531819881-2931-1-git-send-email-hari.vyas@broadcom.com>
- <1531819881-2931-2-git-send-email-hari.vyas@broadcom.com>
- <20180717100628.s5emikyc6orira2q@lakrids.cambridge.arm.com>
- <CAM5rFu_trZpt20H2GAUq8GYTOuJMSmEknsQaEkPkDwFHPVDPeA@mail.gmail.com>
- <20180717114815.5a3rbcznfzvi2xh6@lakrids.cambridge.arm.com>
- <CAM5rFu8avWLrUhEsCHBTKv=sM6dE3Sh_0=5M3Eh0WcT9EdmtSg@mail.gmail.com>
- <20180717144547.GE17271@n2100.armlinux.org.uk>
-Message-ID: <CAM5rFu_NXGwcKh_2_eAzz5dbKL8-mU6xgf56AM9wimjtueRaBA@mail.gmail.com>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Wed, 18 Jul 2018 09:14:08 +0000
+Subject: [PATCH v4 2/4] dt-bindings: arm: fsl: rework mu doc
+In-Reply-To: <20180718071251.8857-3-o.rempel@pengutronix.de>
+References: <20180718071251.8857-1-o.rempel@pengutronix.de>
+ <20180718071251.8857-3-o.rempel@pengutronix.de>
+Message-ID: <AM0PR04MB4211E48ACD3B832236FA228180530@AM0PR04MB4211.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell and all,
+> -----Original Message-----
+> From: Oleksij Rempel [mailto:o.rempel at pengutronix.de]
+> Sent: Wednesday, July 18, 2018 3:13 PM
+> To: Shawn Guo <shawnguo@kernel.org>; Fabio Estevam
+> <fabio.estevam@nxp.com>; Rob Herring <robh+dt@kernel.org>; Mark
+> Rutland <mark.rutland@arm.com>; A.s. Dong <aisheng.dong@nxp.com>
+> Cc: Oleksij Rempel <o.rempel@pengutronix.de>; kernel at pengutronix.de;
+> linux-arm-kernel at lists.infradead.org; devicetree at vger.kernel.org; dl-linux-
+> imx <linux-imx@nxp.com>
+> Subject: [PATCH v4 2/4] dt-bindings: arm: fsl: rework mu doc
+> 
 
-On Tue, Jul 17, 2018 at 8:15 PM, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
-> On Tue, Jul 17, 2018 at 07:10:25PM +0530, Hari Vyas wrote:
->> Okay. Don't think it is a question of trust. If access happens from
->> kernel mode, I understand but If user mode initiated
->> access(from devmem(which is just an example) or any other application)
->> into outside or invalid region of system
->> address brings complete kernel down, at least I will be surprised.
->> If all other also think kernel panic okay in this case, then no
->> further action is required from my side.
->
-> There are many, many ways that someone with privileged access can take
-> the system down.
->
-> It's _well_ known that accesses through /dev/mem (which gives _direct_
-> access to the hardware in the system) has the capability to take the
-> system down.
->
-> Your example may be through an exception, but another way could be to
-> find the clock controller and disable system clocks, or find the RAM
-> controller in physical memory and disable that.  Or the L2 cache in
-> older ARMs and tell it to invalidate all its contents, leading to
-> system data corruption and probably a kernel panic.
->
-> Other ways (on x86) that have been known for years include configuring
-> an 8250 serial port at an address or interrupt (this doesn't involve
-> /dev/mem, but merely the setserial program.)
->
-> Another, non-hardware way is the killall program used from a privileged
-> context.  On some flavours of Unix, it terminates programs that match
-> the argument.  On others, it terminates _all_ programs without warning,
-> effectively taking the system down.
->
-> There are 32-bit ARM SoCs that hard-lock if you try to access a device
-> and the clocks for that device are disabled - irrespective of whether
-> that is a kernel or user mode access.
->
-> Whoever has privileged system access (iow, the ability to directly
-> talk to hardware or configure drivers) has a responsibility to know
-> what to do and, more importantly, what not to do.  Poking around in
-> /dev/mem definitely comes under the heading of "don't do that unless
-> you know *exactly* what you are doing".
->
-> In normal circumstances, _nothing_ in userspace should have /dev/mem
-> open - indeed, the kernel build system provides an option to disable
-> this special device file via the CONFIG_DEVMEM.
->
-> It has to be said that /dev/mem should _never_ be exposed to non-
-> privileged users on the system - it's way too dangerous to do so,
-> since as soon as you do that, you have *no* system security what so
-> ever.  Your average user is then at liberty to manually read *and*
-> *write* the hardware *including* the kernel code _and_ page tables,
-> which means they can bypass *all* software protections and some
-> hardware ones as well.
->
-> TBH, I'd say that for people who don't know what they're doing, poking
-> about in /dev/mem is like pointing a gun at your foot while squeezing
-> the trigger.  It won't end well.
->
-Thanks for clarifying concern. My idea was to keep kernel running no
-matter what user does
-and due to that I proposed simple fix to avoid panic with some
-notification(which worked in our
-environment) and was as per little bit old kernel 4.14 version.
+The patch title may be improved like:
+dt-bindings: mailbox: imx-mu: add generic MU channel support
 
-All suggested example modifies system/device memory
-i.e.clock,dram,uart so user knows very well
-what is being done and so may expect weird behavior but here I was
-just (read)accessing i.e.
- not modifying. I understand (read) access could also result in
-security violation and it will be difficult to
-distinguish case and  if all are thinking that it is expected behavior
-and best to panic kernel, I am also Okay.
+And explain in commit message:
+Each MU has four pairs of rx/tx data register with four rx/tx interrupts which can also
+be used as a separate channel. This patch intends to .....
 
+> - Remove software specific description. MU has many use cases limited only
+> by imagination. So remove this confusing part.
+> - Add all currently known SoCs with MU
+> - Make sure this documentation covers not only Firmware specific use case.
+> Parameters for generic configurations should be described as well.
+> 
+> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
+> ---
+>  .../devicetree/bindings/mailbox/fsl,mu.txt    | 32 +++++++++----------
+>  1 file changed, 15 insertions(+), 17 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
+> b/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
+> index 90e4905dfc69..9d5e6ee61e22 100644
+> --- a/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
+> +++ b/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
+> @@ -1,28 +1,26 @@
+>  NXP i.MX Messaging Unit (MU)
+>  --------------------------------------------------------------------
+> 
+> -The Messaging Unit module enables two processors within the SoC to -
+> communicate and coordinate by passing messages (e.g. data, status -and
+> control) through the MU interface. The MU also provides the ability -for one
+> processor to signal the other processor using interrupts.
+> -
+> -Because the MU manages the messaging between processors, the MU uses
+> -different clocks (from each side of the different peripheral buses).
+> -Therefore, the MU must synchronize the accesses from one side to the -
+> other. The MU accomplishes synchronization using two sets of matching -
+> registers (Processor A-facing, Processor B-facing).
+> -
+> -Messaging Unit Device Node:
+> -=============================
+> -
+
+Here you removed all the HW description of MU from the reference manual
+which is a bit strange to me.
+
+The reason you given is "remove software specific description. MU has many use
+cases limited only by imagination. So remove this confusing part" looks not quit
+convince. What confusing did you mean?
+Is it " passing messages (e.g. data, status -and control)"?
+Those are HW capabilities and I'm not sure it's quite necessary to remove them.
+
+Regards
+Dong Aisheng
+
+>  Required properties:
+>  -------------------
+> -- compatible :	should be "fsl,<chip>-mu", the supported chips include
+> -		imx8qxp, imx8qm.
+> +- compatible :	should be "fsl,<chip>-mu", the supported chips include:
+> +		fsl,imx6sx-mu	- i.MX 6SoloX
+> +		fsl,imx7d-mu	- i.MX 7Dual
+> +		fsl,imx7s-mu	- i.MX 7Solo
+> +		fsl,imx7ulp-mu	- i.MX 7ULP
+> +		fsl,imx8qm-mu	- i.MX 8QM
+> +		fsl,imx8qxp-mu	- i.MX 8QXP
+>  - reg :		Should contain the registers location and length
+>  - interrupts :	Interrupt number. The interrupt specifier format depends
+>  		on the interrupt controller parent.
+> -- #mbox-cells:  Must be 0. Number of cells in a mailbox
+> +- #mbox-cells:  Must be:
+> +		0 - for single channel mode. i.MX8* SCU protocol specific.
+> +		1 - for multichannel (generic) mode.
+> +
+> +Optional properties:
+> +-------------------
+> +- clocks :	phandle to the input clock.
+> +- fsl,mu-side-b : Should be set for side B MU.
+> 
+>  Examples:
+>  --------
 > --
-> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
-> According to speedtest.net: 13Mbps down 490kbps up
+> 2.18.0
