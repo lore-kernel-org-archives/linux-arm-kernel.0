@@ -1,21 +1,57 @@
 From: xuwei5@hisilicon.com (Wei Xu)
-Date: Wed, 18 Jul 2018 16:33:25 +0100
-Subject: [PATCH] arm64: dts: hikey960: Remove keep-power-in-suspend
- property
-In-Reply-To: <20180713155348.24343-1-ryan@edited.us>
-References: <20180713155348.24343-1-ryan@edited.us>
-Message-ID: <5B4F5DC4.5010500@hisilicon.com>
+Date: Wed, 18 Jul 2018 16:33:48 +0100
+Subject: [PATCH v2] arm64: hikey960: update idle-states
+In-Reply-To: <1531298086-8375-1-git-send-email-vincent.guittot@linaro.org>
+References: <1531298086-8375-1-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <5B4F5DDC.1060802@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ryan,
+Hi Vincent,
 
-On 2018/7/13 16:53, Ryan Grachek wrote:
-> Remove the keep-power-in-suspend property because it keeps wifi power
-> on during suspend. This property is only required when enabling WoWLAN
-> and should only be enabled based on need. Also remove dupplicate property
+On 2018/7/11 9:34, Vincent Guittot wrote:
+> Update entry/exit latency and residency time of hikey960 to use more
+> realistic figures based on unitary tests done on the platform.
 > 
-> Signed-off-by: Ryan Grachek <ryan@edited.us>
+> The complete results (in us) :
+>                   big cluster
+>                   cluster  CPU
+> max entry latency     800  400
+> max exit latency     2900  550
+> residency  903Mhz    5000 1500
+> residency 2363Mhz       0 1500
+> 
+>                   little cluster
+>                   cluster  CPU
+> max entry latency     500  400
+> max exit latency     1600  650
+> residency  533Mhz    8000 4500
+> residency 1844Mhz       0 1500
+> 
+> We can see that the residency time depends of the running OPP which is not
+> handled for now. Then we also have to take into account the constraint of
+> a residency time shorter than the tick to get full advantage of idle loop
+> reordering(tick is stopped if idle duration is higher than tick period).
+> Finally the selected residency value are :
+>                  big cluster
+>                   cluster  CPU
+> residency            3700 1500
+> 
+>                   little cluster
+>                   cluster  CPU
+> residency            3500 1500
+> 
+> A simple test with a task waking up every 11.111ms shows improvement:
+> - 5% a lowest OPP
+> - 22% at highest OPP
+> 
+> The period has been chosen:
+> - to be shorter than old cluster residency time and longer than new
+> residency time of cluster off C-state
+> - to prevent any sync with tick (4ms) when running tests that can add
+> some variances between tests
+> 
+> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
 
 Thanks!
 Applied to the hisilicon dt tree.
@@ -24,32 +60,134 @@ Best Regards,
 Wei
 
 > ---
->  arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts | 1 -
->  arch/arm64/boot/dts/hisilicon/hi3660.dtsi         | 1 -
->  2 files changed, 2 deletions(-)
+>  arch/arm64/boot/dts/hisilicon/hi3660.dtsi | 45 ++++++++++++++++++-------------
+>  1 file changed, 27 insertions(+), 18 deletions(-)
 > 
-> diff --git a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
-> index 68c5a6c819ae..a927ce4ec40b 100644
-> --- a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
-> +++ b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
-> @@ -586,7 +586,6 @@
->  	ti,non-removable;
->  	non-removable;
->  	cap-power-off-card;
-> -	keep-power-in-suspend;
->  	#address-cells = <0x1>;
->  	#size-cells = <0x0>;
->  	status = "ok";
 > diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-> index 8d477dcbfa58..4588fe4e00a8 100644
+> index 421d454..890d23e 100644
 > --- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
 > +++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-> @@ -1050,7 +1050,6 @@
->  			reset-names = "reset";
->  			card-detect-delay = <200>;
->  			supports-highspeed;
-> -			keep-power-in-suspend;
->  			pinctrl-names = "default";
->  			pinctrl-0 = <&sdio_pmx_func
->  				     &sdio_clk_cfg_func
+> @@ -61,7 +61,7 @@
+>  			reg = <0x0 0x0>;
+>  			enable-method = "psci";
+>  			next-level-cache = <&A53_L2>;
+> -			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP_0>;
+> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+>  			capacity-dmips-mhz = <592>;
+>  			clocks = <&stub_clock HI3660_CLK_STUB_CLUSTER0>;
+>  			operating-points-v2 = <&cluster0_opp>;
+> @@ -75,7 +75,7 @@
+>  			reg = <0x0 0x1>;
+>  			enable-method = "psci";
+>  			next-level-cache = <&A53_L2>;
+> -			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP_0>;
+> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+>  			capacity-dmips-mhz = <592>;
+>  			clocks = <&stub_clock HI3660_CLK_STUB_CLUSTER0>;
+>  			operating-points-v2 = <&cluster0_opp>;
+> @@ -87,7 +87,7 @@
+>  			reg = <0x0 0x2>;
+>  			enable-method = "psci";
+>  			next-level-cache = <&A53_L2>;
+> -			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP_0>;
+> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+>  			capacity-dmips-mhz = <592>;
+>  			clocks = <&stub_clock HI3660_CLK_STUB_CLUSTER0>;
+>  			operating-points-v2 = <&cluster0_opp>;
+> @@ -99,7 +99,7 @@
+>  			reg = <0x0 0x3>;
+>  			enable-method = "psci";
+>  			next-level-cache = <&A53_L2>;
+> -			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP_0>;
+> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+>  			capacity-dmips-mhz = <592>;
+>  			clocks = <&stub_clock HI3660_CLK_STUB_CLUSTER0>;
+>  			operating-points-v2 = <&cluster0_opp>;
+> @@ -111,7 +111,7 @@
+>  			reg = <0x0 0x100>;
+>  			enable-method = "psci";
+>  			next-level-cache = <&A73_L2>;
+> -			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP_1>;
+> +			cpu-idle-states = <&CPU_SLEEP_1 &CLUSTER_SLEEP_1>;
+>  			capacity-dmips-mhz = <1024>;
+>  			clocks = <&stub_clock HI3660_CLK_STUB_CLUSTER1>;
+>  			operating-points-v2 = <&cluster1_opp>;
+> @@ -125,7 +125,7 @@
+>  			reg = <0x0 0x101>;
+>  			enable-method = "psci";
+>  			next-level-cache = <&A73_L2>;
+> -			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP_1>;
+> +			cpu-idle-states = <&CPU_SLEEP_1 &CLUSTER_SLEEP_1>;
+>  			capacity-dmips-mhz = <1024>;
+>  			clocks = <&stub_clock HI3660_CLK_STUB_CLUSTER1>;
+>  			operating-points-v2 = <&cluster1_opp>;
+> @@ -137,7 +137,7 @@
+>  			reg = <0x0 0x102>;
+>  			enable-method = "psci";
+>  			next-level-cache = <&A73_L2>;
+> -			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP_1>;
+> +			cpu-idle-states = <&CPU_SLEEP_1 &CLUSTER_SLEEP_1>;
+>  			capacity-dmips-mhz = <1024>;
+>  			clocks = <&stub_clock HI3660_CLK_STUB_CLUSTER1>;
+>  			operating-points-v2 = <&cluster1_opp>;
+> @@ -149,7 +149,7 @@
+>  			reg = <0x0 0x103>;
+>  			enable-method = "psci";
+>  			next-level-cache = <&A73_L2>;
+> -			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP_1>;
+> +			cpu-idle-states = <&CPU_SLEEP_1 &CLUSTER_SLEEP_1>;
+>  			capacity-dmips-mhz = <1024>;
+>  			clocks = <&stub_clock HI3660_CLK_STUB_CLUSTER1>;
+>  			operating-points-v2 = <&cluster1_opp>;
+> @@ -158,31 +158,40 @@
+>  		idle-states {
+>  			entry-method = "psci";
+>  
+> -			CPU_SLEEP: cpu-sleep {
+> +			CPU_SLEEP_0: cpu-sleep-0 {
+>  				compatible = "arm,idle-state";
+>  				local-timer-stop;
+>  				arm,psci-suspend-param = <0x0010000>;
+> -				entry-latency-us = <40>;
+> -				exit-latency-us = <70>;
+> -				min-residency-us = <3000>;
+> +				entry-latency-us = <400>;
+> +				exit-latency-us = <650>;
+> +				min-residency-us = <1500>;
+>  			};
+> -
+>  			CLUSTER_SLEEP_0: cluster-sleep-0 {
+>  				compatible = "arm,idle-state";
+>  				local-timer-stop;
+>  				arm,psci-suspend-param = <0x1010000>;
+>  				entry-latency-us = <500>;
+> -				exit-latency-us = <5000>;
+> -				min-residency-us = <20000>;
+> +				exit-latency-us = <1600>;
+> +				min-residency-us = <3500>;
+> +			};
+> +
+> +
+> +			CPU_SLEEP_1: cpu-sleep-1 {
+> +				compatible = "arm,idle-state";
+> +				local-timer-stop;
+> +				arm,psci-suspend-param = <0x0010000>;
+> +				entry-latency-us = <400>;
+> +				exit-latency-us = <550>;
+> +				min-residency-us = <1500>;
+>  			};
+>  
+>  			CLUSTER_SLEEP_1: cluster-sleep-1 {
+>  				compatible = "arm,idle-state";
+>  				local-timer-stop;
+>  				arm,psci-suspend-param = <0x1010000>;
+> -				entry-latency-us = <1000>;
+> -				exit-latency-us = <5000>;
+> -				min-residency-us = <20000>;
+> +				entry-latency-us = <800>;
+> +				exit-latency-us = <2900>;
+> +				min-residency-us = <3500>;
+>  			};
+>  		};
+>  
 > 
