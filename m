@@ -1,146 +1,87 @@
-From: sean.wang@mediatek.com (Sean Wang)
-Date: Wed, 18 Jul 2018 22:26:08 +0800
-Subject: [PATCH v5 5/7] Bluetooth: Extend btuart driver for join more
- vendor devices
-In-Reply-To: <BB53539F-C053-4DCD-A748-B75B995E1179@holtmann.org>
-References: <cover.1531150733.git.sean.wang@mediatek.com>
- <85d449cdd34bf47d72935a821915e825c64a2145.1531150733.git.sean.wang@mediatek.com>
- <70616B99-5A2D-417A-8815-246700EEF4E2@holtmann.org>
- <1531641134.3955.19.camel@mtkswgap22>
- <6476BE78-3FE5-465F-8060-2215387323AA@holtmann.org>
- <1531754965.8953.3.camel@mtkswgap22>
- <BB53539F-C053-4DCD-A748-B75B995E1179@holtmann.org>
-Message-ID: <1531923968.8953.197.camel@mtkswgap22>
+From: ayan.halder@arm.com (Ayan Halder)
+Date: Wed, 18 Jul 2018 15:40:51 +0100
+Subject: [Intel-gfx] [PATCH 5/5] drm/sun4i: Substitute
+ sun4i_backend_format_is_yuv() with format->is_yuv
+In-Reply-To: <20180718101540.GT5565@intel.com>
+References: <1531847626-22248-1-git-send-email-ayan.halder@arm.com>
+ <1531847626-22248-5-git-send-email-ayan.halder@arm.com>
+ <20180718101540.GT5565@intel.com>
+Message-ID: <20180718144050.GA2056@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2018-07-18 at 14:23 +0200, Marcel Holtmann wrote:
-> Hi Sean,
-> 
-> >>>>> Adding an independent btuart.h header allows these essential definitions
-> >>>>> can be reused in vendor driver. Also, struct btuart_vnd is extended with
-> >>>>> additional callbacks such as .init initializing vendor data, .shtudown,
-> >>>>> .recv and .send supporting SoC specific framing for that btuart can
-> >>>>> simply adapt to various Bluetooth uart-based devices.
-> >>>>> 
-> >>>>> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> >>>>> ---
-> >>>>> drivers/bluetooth/btuart.c | 73 ++++++++++++++++++++++++----------------------
-> >>>>> drivers/bluetooth/btuart.h | 30 +++++++++++++++++++
-> >>>>> 2 files changed, 68 insertions(+), 35 deletions(-)
-> >>>>> create mode 100644 drivers/bluetooth/btuart.h
-> >>>>> 
-> >>>>> diff --git a/drivers/bluetooth/btuart.c b/drivers/bluetooth/btuart.c
-> >>>>> index a900aac..65d0086 100644
-> >>>>> --- a/drivers/bluetooth/btuart.c
-> >>>>> +++ b/drivers/bluetooth/btuart.c
-> >>>>> @@ -33,35 +33,11 @@
-> >>>>> #include <net/bluetooth/hci_core.h>
-> >>>>> 
-> >>>>> #include "h4_recv.h"
-> >>>>> +#include "btuart.h"
-> >>>>> #include "btbcm.h"
-> >>>>> 
-> >>>>> #define VERSION "1.0"
-> >>>>> 
-> >>>>> -struct btuart_vnd {
-> >>>>> -	const struct h4_recv_pkt *recv_pkts;
-> >>>>> -	int recv_pkts_cnt;
-> >>>>> -	unsigned int manufacturer;
-> >>>>> -	int (*open)(struct hci_dev *hdev);
-> >>>>> -	int (*close)(struct hci_dev *hdev);
-> >>>>> -	int (*setup)(struct hci_dev *hdev);
-> >>>>> -};
-> >>>>> -
-> >>>>> -struct btuart_dev {
-> >>>>> -	struct hci_dev *hdev;
-> >>>>> -	struct serdev_device *serdev;
-> >>>>> -
-> >>>>> -	struct work_struct tx_work;
-> >>>>> -	unsigned long tx_state;
-> >>>>> -	struct sk_buff_head txq;
-> >>>>> -
-> >>>>> -	struct sk_buff *rx_skb;
-> >>>>> -
-> >>>>> -	const struct btuart_vnd *vnd;
-> >>>>> -};
-> >>>> 
-> >>>> I really like to avoid this since it is not clean. Frankly I prefer to keep the btuart.c driver for drivers that really just use H:4 as transport protocol. If the protocol is only H:4 alike and has extra headers, then it should be a separate driver.
-> >>>> 
-> >>> 
-> >>> thanks for letting me know your concern. I think I'm a little over in reusing these existing methods and break something generic and its beauty.
-> >>> 
-> >>> I'll make the driver be a separate one based on btuart in the next version.
-> >>> 
-> >>> 
-> >>>> The common H:4 handling is abstracted in h4_recv.h already anyway and we can add more pieces if needed. However I also wonder since you have extra framing that the complex H:4 state keeping might be not needed at all. So it could be simplified.
-> >>>> 
-> >>> 
-> >>> okay, I will get rid of h4_recv.h and consider to use more simplified logic to handle the extra framing and its payload.
-> >> 
-> >> only if it is already framed by your extra header, but I seem to recall that it will frame it. For example the bfusb.c old driver does frame H:4 as well and then no extra state keeping for H:4 is needed. Just pass the frames up into the core via hci_recv_frame (or hci_recv_diag for vendor diagnostic) and move on with it.
-> >> 
-> >> You can of course use h4_recv.h if you need to, but only do that if you are true H:4 stream and have no idea where a frame ends and starts.
-> >> 
-> >> Regards
-> >> 
-> >> Marcel
-> >> 
+On Wed, Jul 18, 2018 at 01:15:40PM +0300, Ville Syrj?l? wrote:
+
+Hi Ville,
+> On Tue, Jul 17, 2018 at 06:13:46PM +0100, Ayan Kumar Halder wrote:
+> > drm_format_info table has a field 'is_yuv' to denote if the format
+> > is yuv or not. The driver is expected to use this instead of
+> > having a function for the same purpose.
 > > 
-> > Thanks for the explanation, I didn't show what the extra header is, that causes some misunderstanding.
+> > Signed-off-by: Ayan Kumar halder <ayan.halder@arm.com>
+> > ---
+> >  drivers/gpu/drm/sun4i/sun4i_backend.c | 12 +++---------
+> >  1 file changed, 3 insertions(+), 9 deletions(-)
 > > 
-> > The mtk extra header doesn't provide any idea where a frame ends and starts in the bluetooth stream. 
+> > diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
+> > index de0a76d..d7950b5 100644
+> > --- a/drivers/gpu/drm/sun4i/sun4i_backend.c
+> > +++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
+> > @@ -86,12 +86,6 @@ static inline bool sun4i_backend_format_is_packed_yuv422(uint32_t format)
+> >  	}
+> >  }
+> >  
+> > -static inline bool sun4i_backend_format_is_yuv(uint32_t format)
+> > -{
+> > -	return sun4i_backend_format_is_planar_yuv(format) ||
+> > -		sun4i_backend_format_is_packed_yuv422(format);
+> > -}
+> 
+> sun4i_backend_format_is_planar_yuv() is now unused so could be nuked.
+> Also the one remaining use of sun4i_backend_format_is_packed_yuv422()
+> could be replaced with 'is_yuv && num_planes == 1', so that one could
+> be easily killed off ass well.
+
+I will have this in a separate patch.
+> > -
+> >  static void sun4i_backend_apply_color_correction(struct sunxi_engine *engine)
+> >  {
+> >  	int i;
+> > @@ -304,7 +298,7 @@ int sun4i_backend_update_layer_formats(struct sun4i_backend *backend,
+> >  			   SUN4I_BACKEND_ATTCTL_REG0_LAY_GLBALPHA_EN,
+> >  			   val);
+> >  
+> > -	if (sun4i_backend_format_is_yuv(fb->format->format))
+> > +	if (fb->format->is_yuv)
+> >  		return sun4i_backend_update_yuv_format(backend, layer, plane);
+> >  
+> >  	ret = sun4i_backend_drm_format_to_layer(fb->format->format, &val);
+> > @@ -384,7 +378,7 @@ int sun4i_backend_update_layer_buffer(struct sun4i_backend *backend,
+> >  	 */
+> >  	paddr -= PHYS_OFFSET;
+> >  
+> > -	if (sun4i_backend_format_is_yuv(fb->format->format))
+> > +	if (fb->format->is_yuv)
+> >  		return sun4i_backend_update_yuv_buffer(backend, fb, paddr);
+> >  
+> >  	/* Write the 32 lower bits of the address (in bits) */
+> > @@ -502,7 +496,7 @@ static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
+> >  		if (fb->format->has_alpha || (plane_state->alpha != DRM_BLEND_ALPHA_OPAQUE))
+> >  			num_alpha_planes++;
+> >  
+> > -		if (sun4i_backend_format_is_yuv(fb->format->format)) {
+> > +		if (fb->format->is_yuv) {
+> >  			DRM_DEBUG_DRIVER("Plane FB format is YUV\n");
+> >  			num_yuv_planes++;
+> >  		}
+> > -- 
+> > 2.7.4
 > > 
-> > It is just totally a legacy stuff used by mtk combo devices sharing a serial transport, such as BT/GPS/FM running via a shared UART, to
-> > let the host know what type of radio the following bytes is for and how long it's. 
+> > _______________________________________________
+> > Intel-gfx mailing list
+> > Intel-gfx at lists.freedesktop.org
+> > https://lists.freedesktop.org/mailman/listinfo/intel-gfx
 > 
-> but that means it is framed. You know ahead of time how long the H:4 packet will be. That is the important part. Unless you tell me that it can fragment a H:4 frame over multiple MTK specific frames.
-> 
-> > The extra header is really useful for a combo device, splitting flow and fitting in a single serial transport, but for a single device such as
-> > mt7622 Bluetooth I made here, it seems to be useless.
-> 
-> Useless or not depends on what you are going to do with the device. In theory you could write a serdev driver that just handles the multiplexing (since that is what you have) and then hands down the frames to individual drivers. Frankly something like btqcomsmd.c seems to be what you really want here. However first you would needed this multiplex driver that takes the serial stream and breaks it up.
-> 
-> > Because the extra header doesn't provide any details about this stream and each radio stack still needs to be in charge of their stream
-> > parsing. That is why I still want to use recv_h4.h instead of coding my own parser.
-> 
-> As I said above, if the header + length always indicates a full H:4 frame, then you do not need h4_recv.h since you know the packet size. If it doesn't (and it means things can fragment), then you do.
-> 
-
-My case is the extra header + length doesn't indicate a full H:4 frame,
-things can fragment
-
-> However I have to note that a serial stream from your multiplexer protocol also needs some state handling since it can be interrupted at any point. If you want this clean, then you actually do that anyway. Essentially you have two protocols layered and want to process the independently.
-
-Yes, I also agree that it makes better and cleaner if there is another
-driver in charge of the multiplexer protocol and the framing.
-
-But, could you accept that I postpone the target into the next stage,
-I just like to consider BT single device, not for multiplexer protocol
-case, in the current stage.
-
-To be honest, my next step is to add mt7688 btusb and then want to have
-an integration with btmtkuart. mt7688 btusb doesn't have extra framing
-for multiplexer protocol, so it can allow me to make the concentration
-more on pure bt protocol and pushing the latest mtk bluetooth devices
-being supported on the bluez driver.
-
-> If you post details about the multiplexing protocol for your serial stream, then I can help you design a driver for it. With serdev that is actually simple. And then you could hook up GPS etc. at some point once you want to run this on hardware that has the combo chip.
-> 
-
-okay, really thanks for your help. I also have an interest on this part.
-now how does bluez receive and sent packet from/to a virtual device ( a
-serdev handling multiplexer protocol)? It seems current bluez device all
-handling packet from/to physical bus device. or I was missing something?
-
-> Having a Linux Bluetooth driver is useful for Android as well btw. We have HCI_CHANNEL_USER and a generic Android driver for using it. So enabling the chip in Linux upstream will enable it for Android as well.
-> 
-it really save more time as I knew many vendors do two driver separately
-for bluez and bluedroid. where could I find the resource for
-HCI_CHANNEL_USER and generic android driver ? Is it still the part of
-bluez or run by another project ?
-
-> Regards
-> 
-> Marcel
-> 
+> -- 
+> Ville Syrj?l?
+> Intel
