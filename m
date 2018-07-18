@@ -1,110 +1,79 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 18 Jul 2018 22:31:46 +0100
-Subject: [PATCH] coresight: etm_perf: Rework alloc/free methods to avoid
- lockep warning
-In-Reply-To: <1531942988-20901-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1531942988-20901-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <d648155e-0486-7d7c-5e29-2bda6c536dba@arm.com>
+From: bhsharma@redhat.com (Bhupesh Sharma)
+Date: Thu, 19 Jul 2018 03:07:44 +0530
+Subject: [PATCH] arm64, kaslr: export offset in VMCOREINFO ELF notes
+Message-ID: <1531949864-27447-1-git-send-email-bhsharma@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mathieu,
+Include KASLR offset in VMCOREINFO ELF notes to assist in debugging.
 
-On 07/18/2018 08:43 PM, Mathieu Poirier wrote:
-> When enabling the lockdep mechanic and working with CPU-wide scenarios we
-> get the following console output:
-> 
+makedumpfile user-space utility will need fixup to use this KASLR offset
+to work with cases where we need to find a way to translate symbol
+address from vmlinux to kernel run time address in case of KASLR boot on
+arm64.
 
-> This is fixed by working with the cpu_present_mask, avoinding at the same
-> the need to use get/put_online_cpus() that triggers lockdep.
+I already have those fixup ready, which will be sent upstream once this
+patch makes through (see [0]).
 
-The patch looks correct to me. In fact I have a patch [1], which
-does the same thing and switches to using per-cpu variable for the
-paths.
+I tested this on my qualcomm amberwing board both for KASLR and
+non-KASLR boot cases:
 
-> 
-> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-> ---
->   drivers/hwtracing/coresight/coresight-etm-perf.c | 39 +++++++++++++-----------
->   1 file changed, 21 insertions(+), 18 deletions(-)
-> 
-> diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
-> index 677695635211..16b9c87d9d00 100644
-> --- a/drivers/hwtracing/coresight/coresight-etm-perf.c
-> +++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
-> @@ -108,26 +108,32 @@ static int etm_event_init(struct perf_event *event)
->   static void free_event_data(struct work_struct *work)
->   {
->   	int cpu;
-> +	void *snk_config;
->   	cpumask_t *mask;
->   	struct etm_event_data *event_data;
->   	struct coresight_device *sink;
->   
->   	event_data = container_of(work, struct etm_event_data, work);
->   	mask = &event_data->mask;
-> -	/*
-> -	 * First deal with the sink configuration.  See comment in
-> -	 * etm_setup_aux() about why we take the first available path.
-> -	 */
-> -	if (event_data->snk_config) {
-> -		cpu = cpumask_first(mask);
-> -		sink = coresight_get_sink(event_data->path[cpu]);
-> -		if (sink_ops(sink)->free_buffer)
-> -			sink_ops(sink)->free_buffer(event_data->snk_config);
-> -	}
-> +	snk_config = event_data->snk_config;
->   
->   	for_each_cpu(cpu, mask) {
-> -		if (!(IS_ERR_OR_NULL(event_data->path[cpu])))
-> -			coresight_release_path(event_data->path[cpu]);
-> +		if (IS_ERR_OR_NULL(event_data->path[cpu]))
-> +			continue;
-> +
-> +		/*
-> +		 * Free sink configuration - there can only be one sink
-> +		 * per event.
-> +		 */
-> +		if (snk_config) {
-> +			sink = coresight_get_sink(event_data->path[cpu]);
-> +			if (sink_ops(sink)->free_buffer) {
-> +				sink_ops(sink)->free_buffer(snk_config);
-> +				snk_config = NULL;
-> +			}
-> +		}
-> +
-> +		coresight_release_path(event_data->path[cpu]);
->   	}
+Without this patch:
+   # cat > scrub.conf << EOF
+   [vmlinux]
+   erase jiffies
+   erase init_task.utime
+   for tsk in init_task.tasks.next within task_struct:tasks
+       erase tsk.utime
+   endfor
+   EOF
 
->   
->   	kfree(event_data->path);
-> @@ -145,16 +151,13 @@ static void *alloc_event_data(int cpu)
->   	if (!event_data)
->   		return NULL;
->   
-> -	/* Make sure nothing disappears under us */
-> -	get_online_cpus();
-> -	size = num_online_cpus();
-> -
->   	mask = &event_data->mask;
-> +	size = num_present_cpus();
-> +
->   	if (cpu != -1)
->   		cpumask_set_cpu(cpu, mask);
->   	else
-> -		cpumask_copy(mask, cpu_online_mask);
-> -	put_online_cpus();
-> +		cpumask_copy(mask, cpu_present_mask);
+  # makedumpfile --split -d 31 -x vmlinux --config scrub.conf vmcore dumpfile_{1,2,3}
+  readpage_elf: Attempt to read non-existent page at 0xffffa8a5bf180000.
+  readmem: type_addr: 1, addr:ffffa8a5bf180000, size:8
+  vaddr_to_paddr_arm64: Can't read pgd
+  readmem: Can't convert a virtual address(ffff0000092a542c) to physical
+  address.
+  readmem: type_addr: 0, addr:ffff0000092a542c, size:390
+  check_release: Can't get the address of system_utsname
 
-I think it is safe to use cpu_online_mask outside the
-get/put_online_cpus(). Using present_mask may fail as
-we could fail to create a path for a CPU that is not online.
+After this patch check_release() is ok, and also we are able to erase
+symbol from vmcore (I checked this with kernel 4.18.0-rc4+):
 
+  # makedumpfile --split -d 31 -x vmlinux --config scrub.conf vmcore dumpfile_{1,2,3}
+  The kernel version is not supported.
+  The makedumpfile operation may be incomplete.
+  Checking for memory holes                         : [100.0 %] \
+  Checking for memory holes                         : [100.0 %] |
+  Checking foExcluding unnecessary pages                       : [100.0 %]
+  \
+  Excluding unnecessary pages                       : [100.0 %] \
 
-Please could you check if [1] fixes the problem for you ?
+  The dumpfiles are saved to dumpfile_1, dumpfile_2, and dumpfile_3.
 
-[1] 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2018-July/591606.html
+  makedumpfile Completed.
 
-Cheers
-Suzuki
+[0] https://github.com/bhupesh-sharma/makedumpfile/commit/555e5ae0fb2b21797c450ad55950e81c470224ef
+
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: James Morse <james.morse@arm.com>
+Signed-off-by: Bhupesh Sharma <bhsharma@redhat.com>
+---
+ arch/arm64/kernel/machine_kexec.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
+index f62effc6e064..028df356a5fd 100644
+--- a/arch/arm64/kernel/machine_kexec.c
++++ b/arch/arm64/kernel/machine_kexec.c
+@@ -360,4 +360,5 @@ void arch_crash_save_vmcoreinfo(void)
+ 						kimage_voffset);
+ 	vmcoreinfo_append_str("NUMBER(PHYS_OFFSET)=0x%llx\n",
+ 						PHYS_OFFSET);
++	vmcoreinfo_append_str("KERNELOFFSET=%lx\n", kaslr_offset());
+ }
+-- 
+2.7.4
