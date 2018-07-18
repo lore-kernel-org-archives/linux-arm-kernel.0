@@ -1,92 +1,126 @@
-From: yaojun8558363@gmail.com (Jun Yao)
-Date: Wed, 18 Jul 2018 18:17:27 +0800
-Subject: [RESEND PATCH v4 6/6] arm64/mm: Move
-In-Reply-To: <20180718101727.10787-1-yaojun8558363@gmail.com>
-References: <20180718101727.10787-1-yaojun8558363@gmail.com>
-Message-ID: <20180718101727.10787-7-yaojun8558363@gmail.com>
+From: ville.syrjala@linux.intel.com (Ville =?iso-8859-1?Q?Syrj=E4l=E4?=)
+Date: Wed, 18 Jul 2018 13:21:52 +0300
+Subject: [PATCH 1/5] drm/fourcc: Add is_yuv field to drm_format_info to
+ denote if the format is yuv
+In-Reply-To: <20180718091202.GA27151@DESKTOP-E1NTVVP.localdomain>
+References: <1531847626-22248-1-git-send-email-ayan.halder@arm.com>
+ <20180718091202.GA27151@DESKTOP-E1NTVVP.localdomain>
+Message-ID: <20180718102152.GV5565@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move {idmap_pg_dir, tramp_pg_dir, reserved_ttbr0, swapper_pg_dir}
-to .rodata section.
+On Wed, Jul 18, 2018 at 10:12:02AM +0100, Brian Starkey wrote:
+> Hi Ayan,
+> 
+> On Tue, Jul 17, 2018 at 06:13:42PM +0100, Ayan Kumar Halder wrote:
+> >A lot of drivers duplicate the function to check if a format is yuv or not.
+> >If we add a field (to denote whether the format is yuv or not) in the
+> >drm_format_info table, all the drivers can use this field and it will
+> >prevent duplication of similar logic.
+> 
+> This looks like a good idea to me.
+> 
+> I wonder if the two "has_alpha" and "is_yuv" bools should be bitfields
+> to reduce the footprint (not sure what the general DRM attitude to
+> bitfields is), but either way:
 
-Signed-off-by: Jun Yao <yaojun8558363@gmail.com>
----
- arch/arm64/kernel/vmlinux.lds.S | 39 ++++++++++++++++++++-------------
- 1 file changed, 24 insertions(+), 15 deletions(-)
+There are quite a few of these so tighter packing (of the other fields
+as well perhaps) might be a decent idea.
 
-diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-index 2446911f4262..142528a23b44 100644
---- a/arch/arm64/kernel/vmlinux.lds.S
-+++ b/arch/arm64/kernel/vmlinux.lds.S
-@@ -64,8 +64,13 @@ jiffies = jiffies_64;
- 	*(.entry.tramp.text)				\
- 	. = ALIGN(PAGE_SIZE);				\
- 	__entry_tramp_text_end = .;
-+
-+#define TRAMP_PG_TABLE					\
-+	tramp_pg_dir = .;				\
-+	. += PAGE_SIZE;
- #else
- #define TRAMP_TEXT
-+#define TRAMP_PG_TABLE
- #endif
- 
- #define INIT_PG_TABLES					\
-@@ -74,6 +79,24 @@ jiffies = jiffies_64;
- 	. += SWAPPER_DIR_SIZE;                          \
- 	init_pg_end = .;
- 
-+#ifdef CONFIG_ARM64_SW_TTBR0_PAN
-+#define RESERVED_PG_TABLE				\
-+	reserved_ttbr0 = .;				\
-+	. += RESERVED_TTBR0_SIZE;
-+#else
-+#define RESERVED_PG_TABLE
-+#endif
-+
-+#define KERNEL_PG_TABLES				\
-+	. = ALIGN(PAGE_SIZE);                           \
-+	idmap_pg_dir = .;				\
-+	. += IDMAP_DIR_SIZE;				\
-+	TRAMP_PG_TABLE					\
-+	RESERVED_PG_TABLE				\
-+	swapper_pg_dir = .;				\
-+	. += PAGE_SIZE;					\
-+	swapper_pg_end = .;
-+
- /*
-  * The size of the PE/COFF section that covers the kernel image, which
-  * runs from stext to _edata, must be a round multiple of the PE/COFF
-@@ -143,6 +166,7 @@ SECTIONS
- 	RO_DATA(PAGE_SIZE)		/* everything from this point to     */
- 	EXCEPTION_TABLE(8)		/* __init_begin will be marked RO NX */
- 	NOTES
-+	KERNEL_PG_TABLES
- 
- 	. = ALIGN(SEGMENT_ALIGN);
- 	__init_begin = .;
-@@ -224,21 +248,6 @@ SECTIONS
- 	BSS_SECTION(0, 0, 0)
- 
- 	. = ALIGN(PAGE_SIZE);
--	idmap_pg_dir = .;
--	. += IDMAP_DIR_SIZE;
--
--#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
--	tramp_pg_dir = .;
--	. += PAGE_SIZE;
--#endif
--
--#ifdef CONFIG_ARM64_SW_TTBR0_PAN
--	reserved_ttbr0 = .;
--	. += RESERVED_TTBR0_SIZE;
--#endif
--	swapper_pg_dir = .;
--	. += PAGE_SIZE;
--	swapper_pg_end = .;
- 
- 	__pecoff_data_size = ABSOLUTE(. - __initdata_begin);
- 	_end = .;
+For the series (except for the omapdrm patch which I'll leave for Tomi):
+Reviewed-by: Ville Syrj?l? <ville.syrjala@linux.intel.com>
+
+> 
+> Reviewed-by: Brian Starkey <brian.starkey@arm.com>
+> 
+> >
+> >Signed-off-by: Ayan Kumar halder <ayan.halder@arm.com>
+> >---
+> > drivers/gpu/drm/drm_fourcc.c | 42 +++++++++++++++++++++---------------------
+> > include/drm/drm_fourcc.h     |  2 ++
+> > 2 files changed, 23 insertions(+), 21 deletions(-)
+> >
+> >diff --git a/drivers/gpu/drm/drm_fourcc.c b/drivers/gpu/drm/drm_fourcc.c
+> >index 5ca6395..35c1e27 100644
+> >--- a/drivers/gpu/drm/drm_fourcc.c
+> >+++ b/drivers/gpu/drm/drm_fourcc.c
+> >@@ -152,27 +152,27 @@ const struct drm_format_info *__drm_format_info(u32 format)
+> > 		{ .format = DRM_FORMAT_XBGR8888_A8,	.depth = 32, .num_planes = 2, .cpp = { 4, 1, 0 }, .hsub = 1, .vsub = 1, .has_alpha = true },
+> > 		{ .format = DRM_FORMAT_RGBX8888_A8,	.depth = 32, .num_planes = 2, .cpp = { 4, 1, 0 }, .hsub = 1, .vsub = 1, .has_alpha = true },
+> > 		{ .format = DRM_FORMAT_BGRX8888_A8,	.depth = 32, .num_planes = 2, .cpp = { 4, 1, 0 }, .hsub = 1, .vsub = 1, .has_alpha = true },
+> >-		{ .format = DRM_FORMAT_YUV410,		.depth = 0,  .num_planes = 3, .cpp = { 1, 1, 1 }, .hsub = 4, .vsub = 4 },
+> >-		{ .format = DRM_FORMAT_YVU410,		.depth = 0,  .num_planes = 3, .cpp = { 1, 1, 1 }, .hsub = 4, .vsub = 4 },
+> >-		{ .format = DRM_FORMAT_YUV411,		.depth = 0,  .num_planes = 3, .cpp = { 1, 1, 1 }, .hsub = 4, .vsub = 1 },
+> >-		{ .format = DRM_FORMAT_YVU411,		.depth = 0,  .num_planes = 3, .cpp = { 1, 1, 1 }, .hsub = 4, .vsub = 1 },
+> >-		{ .format = DRM_FORMAT_YUV420,		.depth = 0,  .num_planes = 3, .cpp = { 1, 1, 1 }, .hsub = 2, .vsub = 2 },
+> >-		{ .format = DRM_FORMAT_YVU420,		.depth = 0,  .num_planes = 3, .cpp = { 1, 1, 1 }, .hsub = 2, .vsub = 2 },
+> >-		{ .format = DRM_FORMAT_YUV422,		.depth = 0,  .num_planes = 3, .cpp = { 1, 1, 1 }, .hsub = 2, .vsub = 1 },
+> >-		{ .format = DRM_FORMAT_YVU422,		.depth = 0,  .num_planes = 3, .cpp = { 1, 1, 1 }, .hsub = 2, .vsub = 1 },
+> >-		{ .format = DRM_FORMAT_YUV444,		.depth = 0,  .num_planes = 3, .cpp = { 1, 1, 1 }, .hsub = 1, .vsub = 1 },
+> >-		{ .format = DRM_FORMAT_YVU444,		.depth = 0,  .num_planes = 3, .cpp = { 1, 1, 1 }, .hsub = 1, .vsub = 1 },
+> >-		{ .format = DRM_FORMAT_NV12,		.depth = 0,  .num_planes = 2, .cpp = { 1, 2, 0 }, .hsub = 2, .vsub = 2 },
+> >-		{ .format = DRM_FORMAT_NV21,		.depth = 0,  .num_planes = 2, .cpp = { 1, 2, 0 }, .hsub = 2, .vsub = 2 },
+> >-		{ .format = DRM_FORMAT_NV16,		.depth = 0,  .num_planes = 2, .cpp = { 1, 2, 0 }, .hsub = 2, .vsub = 1 },
+> >-		{ .format = DRM_FORMAT_NV61,		.depth = 0,  .num_planes = 2, .cpp = { 1, 2, 0 }, .hsub = 2, .vsub = 1 },
+> >-		{ .format = DRM_FORMAT_NV24,		.depth = 0,  .num_planes = 2, .cpp = { 1, 2, 0 }, .hsub = 1, .vsub = 1 },
+> >-		{ .format = DRM_FORMAT_NV42,		.depth = 0,  .num_planes = 2, .cpp = { 1, 2, 0 }, .hsub = 1, .vsub = 1 },
+> >-		{ .format = DRM_FORMAT_YUYV,		.depth = 0,  .num_planes = 1, .cpp = { 2, 0, 0 }, .hsub = 2, .vsub = 1 },
+> >-		{ .format = DRM_FORMAT_YVYU,		.depth = 0,  .num_planes = 1, .cpp = { 2, 0, 0 }, .hsub = 2, .vsub = 1 },
+> >-		{ .format = DRM_FORMAT_UYVY,		.depth = 0,  .num_planes = 1, .cpp = { 2, 0, 0 }, .hsub = 2, .vsub = 1 },
+> >-		{ .format = DRM_FORMAT_VYUY,		.depth = 0,  .num_planes = 1, .cpp = { 2, 0, 0 }, .hsub = 2, .vsub = 1 },
+> >-		{ .format = DRM_FORMAT_AYUV,		.depth = 0,  .num_planes = 1, .cpp = { 4, 0, 0 }, .hsub = 1, .vsub = 1, .has_alpha = true },
+> >+		{ .format = DRM_FORMAT_YUV410,		.depth = 0,  .num_planes = 3, .cpp = { 1, 1, 1 }, .hsub = 4, .vsub = 4, .is_yuv = true },
+> >+		{ .format = DRM_FORMAT_YVU410,		.depth = 0,  .num_planes = 3, .cpp = { 1, 1, 1 }, .hsub = 4, .vsub = 4, .is_yuv = true },
+> >+		{ .format = DRM_FORMAT_YUV411,		.depth = 0,  .num_planes = 3, .cpp = { 1, 1, 1 }, .hsub = 4, .vsub = 1, .is_yuv = true },
+> >+		{ .format = DRM_FORMAT_YVU411,		.depth = 0,  .num_planes = 3, .cpp = { 1, 1, 1 }, .hsub = 4, .vsub = 1, .is_yuv = true },
+> >+		{ .format = DRM_FORMAT_YUV420,		.depth = 0,  .num_planes = 3, .cpp = { 1, 1, 1 }, .hsub = 2, .vsub = 2, .is_yuv = true },
+> >+		{ .format = DRM_FORMAT_YVU420,		.depth = 0,  .num_planes = 3, .cpp = { 1, 1, 1 }, .hsub = 2, .vsub = 2, .is_yuv = true },
+> >+		{ .format = DRM_FORMAT_YUV422,		.depth = 0,  .num_planes = 3, .cpp = { 1, 1, 1 }, .hsub = 2, .vsub = 1, .is_yuv = true },
+> >+		{ .format = DRM_FORMAT_YVU422,		.depth = 0,  .num_planes = 3, .cpp = { 1, 1, 1 }, .hsub = 2, .vsub = 1, .is_yuv = true },
+> >+		{ .format = DRM_FORMAT_YUV444,		.depth = 0,  .num_planes = 3, .cpp = { 1, 1, 1 }, .hsub = 1, .vsub = 1, .is_yuv = true },
+> >+		{ .format = DRM_FORMAT_YVU444,		.depth = 0,  .num_planes = 3, .cpp = { 1, 1, 1 }, .hsub = 1, .vsub = 1, .is_yuv = true },
+> >+		{ .format = DRM_FORMAT_NV12,		.depth = 0,  .num_planes = 2, .cpp = { 1, 2, 0 }, .hsub = 2, .vsub = 2, .is_yuv = true },
+> >+		{ .format = DRM_FORMAT_NV21,		.depth = 0,  .num_planes = 2, .cpp = { 1, 2, 0 }, .hsub = 2, .vsub = 2, .is_yuv = true },
+> >+		{ .format = DRM_FORMAT_NV16,		.depth = 0,  .num_planes = 2, .cpp = { 1, 2, 0 }, .hsub = 2, .vsub = 1, .is_yuv = true },
+> >+		{ .format = DRM_FORMAT_NV61,		.depth = 0,  .num_planes = 2, .cpp = { 1, 2, 0 }, .hsub = 2, .vsub = 1, .is_yuv = true },
+> >+		{ .format = DRM_FORMAT_NV24,		.depth = 0,  .num_planes = 2, .cpp = { 1, 2, 0 }, .hsub = 1, .vsub = 1, .is_yuv = true },
+> >+		{ .format = DRM_FORMAT_NV42,		.depth = 0,  .num_planes = 2, .cpp = { 1, 2, 0 }, .hsub = 1, .vsub = 1, .is_yuv = true },
+> >+		{ .format = DRM_FORMAT_YUYV,		.depth = 0,  .num_planes = 1, .cpp = { 2, 0, 0 }, .hsub = 2, .vsub = 1, .is_yuv = true },
+> >+		{ .format = DRM_FORMAT_YVYU,		.depth = 0,  .num_planes = 1, .cpp = { 2, 0, 0 }, .hsub = 2, .vsub = 1, .is_yuv = true },
+> >+		{ .format = DRM_FORMAT_UYVY,		.depth = 0,  .num_planes = 1, .cpp = { 2, 0, 0 }, .hsub = 2, .vsub = 1, .is_yuv = true },
+> >+		{ .format = DRM_FORMAT_VYUY,		.depth = 0,  .num_planes = 1, .cpp = { 2, 0, 0 }, .hsub = 2, .vsub = 1, .is_yuv = true },
+> >+		{ .format = DRM_FORMAT_AYUV,		.depth = 0,  .num_planes = 1, .cpp = { 4, 0, 0 }, .hsub = 1, .vsub = 1, .has_alpha = true, .is_yuv = true },
+> > 	};
+> >
+> > 	unsigned int i;
+> >diff --git a/include/drm/drm_fourcc.h b/include/drm/drm_fourcc.h
+> >index 3e86408..f9c1584 100644
+> >--- a/include/drm/drm_fourcc.h
+> >+++ b/include/drm/drm_fourcc.h
+> >@@ -39,6 +39,7 @@ struct drm_mode_fb_cmd2;
+> >  * @hsub: Horizontal chroma subsampling factor
+> >  * @vsub: Vertical chroma subsampling factor
+> >  * @has_alpha: Does the format embeds an alpha component?
+> >+ * @is_yuv: Is it a YUV format?
+> >  */
+> > struct drm_format_info {
+> > 	u32 format;
+> >@@ -48,6 +49,7 @@ struct drm_format_info {
+> > 	u8 hsub;
+> > 	u8 vsub;
+> > 	bool has_alpha;
+> >+	bool is_yuv;
+> > };
+> >
+> > /**
+> >-- 
+> >2.7.4
+> >
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+
 -- 
-2.17.1
+Ville Syrj?l?
+Intel
