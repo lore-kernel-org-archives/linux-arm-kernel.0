@@ -1,69 +1,153 @@
-From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Wed, 18 Jul 2018 09:21:17 +0200
-Subject: [linux-sunxi] [PATCH 2/2] drm/sun4i: sun4i: Introduce a quirk
- for lowest plane alpha support
-In-Reply-To: <CAGRGNgX27bbJz2qe3FOb4eP5WKgDYFUNxoz7SkUbN_QDF25pAg@mail.gmail.com>
-References: <20180717085230.17472-1-paul.kocialkowski@bootlin.com>
- <20180717085230.17472-2-paul.kocialkowski@bootlin.com>
- <CAGRGNgX27bbJz2qe3FOb4eP5WKgDYFUNxoz7SkUbN_QDF25pAg@mail.gmail.com>
-Message-ID: <cdd9c0632d495aedb6cc709033c983ce19f59e48.camel@bootlin.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Wed, 18 Jul 2018 09:27:48 +0200
+Subject: [resend PATCH v4 4/5] drm/mediatek: Add support for mmsys through
+ a pdev
+In-Reply-To: <1531882655.8953.83.camel@mtkswgap22>
+References: <20180717220328.792-1-matthias.bgg@kernel.org>
+ <20180717220328.792-5-matthias.bgg@kernel.org>
+ <1531882655.8953.83.camel@mtkswgap22>
+Message-ID: <50c93f6d-c546-1479-62c1-adc0b40d5dab@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Sean,
 
-On Tue, 2018-07-17 at 22:41 +1000, Julian Calaby wrote:
-> Hi Paul,
+On 18/07/18 04:57, Sean Wang wrote:
+> On Wed, 2018-07-18 at 00:03 +0200, matthias.bgg at kernel.org wrote:
+>> From: Matthias Brugger <mbrugger@suse.com>
+>>
+>> The MMSYS subsystem includes clocks and drm components.
+>> This patch adds an initailization path through a platform device
+>> for the clock part, so that both drivers get probed from the same
+>> device tree compatible.
+>>
 > 
-> On Tue, Jul 17, 2018 at 6:53 PM Paul Kocialkowski
-> <paul.kocialkowski@bootlin.com> wrote:
-> > 
-> > Not all sunxi platforms with the first version of the Display Engine
-> > support an alpha component on the plane with the lowest z position
-> > (as in: lowest z-pos), that gets blended with the background color.
-> > 
-> > In particular, the A13 is known to have this limitation. However, it was
-> > recently discovered that the A20 and A33 are capable of having alpha on
-> > their lowest plane.
-> > 
-> > Thus, this introduces a specific quirk to indicate such support,
-> > per-platform. Since this was not tested on sun4i and sun6i platforms, a
-> > conservative approach is kept and this feature is not supported.
-> > 
-> > Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-> > ---
-> >  drivers/gpu/drm/sun4i/sun4i_backend.c | 10 ++++++++--
-> >  1 file changed, 8 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
-> > index a3cc398d4d80..cdc4a8a91ea2 100644
-> > --- a/drivers/gpu/drm/sun4i/sun4i_backend.c
-> > +++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
-> > @@ -584,8 +587,9 @@ static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
-> >         }
-> > 
-> >         /* We can't have an alpha plane at the lowest position */
-> > -       if (plane_states[0]->fb->format->has_alpha ||
-> > -           (plane_states[0]->alpha != DRM_BLEND_ALPHA_OPAQUE))
-> > +       if ((plane_states[0]->fb->format->has_alpha ||
-> > +           (plane_states[0]->alpha != DRM_BLEND_ALPHA_OPAQUE)) &&
-> > +           !backend->quirks->supports_lowest_plane_alpha)
+> Sorry for that I should have a response earlier for the series.
 > 
-> From a readability perspective, it'd be fractionally nicer if the
-> quirk check was before the alpha checks.
+> Some points I felt they're not exactly right and should be fixed up
+> before we're moving on
+> 
+> Currently, drm driver have a wrong reference to the dt-binding,
+> "mediatek,mt2701-mmsys" or "mediatek,mt8173-mmsys", they should be all
+> for the subsystem exporting clock and reset line such common resource to
+> its sub-devices. Every subsystem has a similar shape. I hope mmsys
+> shouldn't be an exception.
 
-Agreed, I will do that in v2.
+I'm not sure if I understand what you mean. You proposed to use a platform
+device [1] and now you say we should change the DTS?
 
-Thanks!
+What do you mean by "drm driver has a wrong reference to the dt-binding"? How
+would you want to name it and most important, what would be your approach to
+have backwards compatibility to older device tree bindings?
 
--- 
-Paul Kocialkowski, Bootlin (formerly Free Electrons)
-Embedded Linux and kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180718/a6c241df/attachment.sig>
+> 
+> DRM device needs to have its own dt-binding show how connections between
+> DRM components being made and its node should be put under mmsys node.
+> > In this way, it becomes easy to see how the topology of the subsystem is
+> and grows, like a tree "device tree", instead of hiding the details in
+> the implementation.
+> 
+> The similar example we already did for audsys on mt2701 and mt7623 as
+> below
+> 
+> 	audsys: clock-controller at 11220000 {
+> 		compatible = "mediatek,mt7623-audsys",
+> 			     "mediatek,mt2701-audsys",
+> 			     "syscon";
+> 			...
+> 
+> 		afe: audio-controller {
+> 			compatible = "mediatek,mt7623-audio",
+> 				     "mediatek,mt2701-audio";
+> 			
+> 			...
+> 		};
+> 	};
+> 
+
+I think this approach is not working as, due to backwards compatibility, we have
+to make sure that the DRM driver gets probed with the mmsys binding.
+
+Regards,
+Matthias
+
+> 	
+> 	Sean
+> 
+> 
+>> Signed-off-by: Matthias Brugger <mbrugger@suse.com>
+>> ---
+>>  drivers/gpu/drm/mediatek/mtk_drm_drv.c | 18 ++++++++++++++++++
+>>  drivers/gpu/drm/mediatek/mtk_drm_drv.h |  2 ++
+>>  2 files changed, 20 insertions(+)
+>>
+>> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+>> index dd249cf5121e..c946aea722e5 100644
+>> --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+>> +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+>> @@ -173,6 +173,7 @@ static const struct mtk_mmsys_driver_data mt2701_mmsys_driver_data = {
+>>  	.ext_path = mt2701_mtk_ddp_ext,
+>>  	.ext_len = ARRAY_SIZE(mt2701_mtk_ddp_ext),
+>>  	.shadow_register = true,
+>> +	.clk_drv_name = "clk-mt2701-mm",
+>>  };
+>>  
+>>  static const struct mtk_mmsys_driver_data mt8173_mmsys_driver_data = {
+>> @@ -180,6 +181,7 @@ static const struct mtk_mmsys_driver_data mt8173_mmsys_driver_data = {
+>>  	.main_len = ARRAY_SIZE(mt8173_mtk_ddp_main),
+>>  	.ext_path = mt8173_mtk_ddp_ext,
+>>  	.ext_len = ARRAY_SIZE(mt8173_mtk_ddp_ext),
+>> +	.clk_drv_name = "clk-mt8173-mm",
+>>  };
+>>  
+>>  static int mtk_drm_kms_init(struct drm_device *drm)
+>> @@ -411,6 +413,19 @@ static int mtk_drm_probe(struct platform_device *pdev)
+>>  	if (IS_ERR(private->config_regs))
+>>  		return PTR_ERR(private->config_regs);
+>>  
+>> +	if (private->data->clk_drv_name) {
+>> +		private->clk_dev = platform_device_register_data(dev,
+>> +						private->data->clk_drv_name, -1,
+>> +						NULL, 0);
+>> +
+>> +		if (IS_ERR(private->clk_dev)) {
+>> +			pr_err("failed to register %s platform device\n",
+>> +						private->data->clk_drv_name);
+>> +
+>> +			return PTR_ERR(private->clk_dev);
+>> +		}
+>> +	}
+>> +
+>>  	/* Iterate over sibling DISP function blocks */
+>>  	for_each_child_of_node(dev->of_node->parent, node) {
+>>  		const struct of_device_id *of_id;
+>> @@ -515,6 +530,9 @@ static int mtk_drm_remove(struct platform_device *pdev)
+>>  	for (i = 0; i < DDP_COMPONENT_ID_MAX; i++)
+>>  		of_node_put(private->comp_node[i]);
+>>  
+>> +	if (private->clk_dev)
+>> +		platform_device_unregister(private->clk_dev);
+>> +
+>>  	return 0;
+>>  }
+>>  
+>> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.h b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
+>> index 86cec19193c4..200eee5de419 100644
+>> --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.h
+>> +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
+>> @@ -34,11 +34,13 @@ struct mtk_mmsys_driver_data {
+>>  	const enum mtk_ddp_comp_id *ext_path;
+>>  	unsigned int ext_len;
+>>  	bool shadow_register;
+>> +	const char *clk_drv_name;
+>>  };
+>>  
+>>  struct mtk_drm_private {
+>>  	struct drm_device *drm;
+>>  	struct device *dma_dev;
+>> +	struct platform_device *clk_dev;
+>>  
+>>  	unsigned int num_pipes;
+>>  
+> 
+> 
