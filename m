@@ -1,69 +1,74 @@
-From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Wed, 18 Jul 2018 16:13:29 +0200
-Subject: [PATCH 1/5] arm64: defconfig: Enable sound support for Samsung
- Chromebook Plus.
-In-Reply-To: <20180717160610.26501-1-enric.balletbo@collabora.com> (Enric
- Balletbo i. Serra's message of "Tue, 17 Jul 2018 18:06:06 +0200")
-References: <20180717160610.26501-1-enric.balletbo@collabora.com>
-Message-ID: <87efg0aaye.fsf@bootlin.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Wed, 18 Jul 2018 16:14:48 +0200
+Subject: [GIT PULL] arm64: zynqmp: Xilinx DT changes for v4.19
+Message-ID: <a0dc4c86-7fe6-b9f6-2d57-b418061dbb3c@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Enric Balletbo,
- 
- On mar., juil. 17 2018, Enric Balletbo i Serra <enric.balletbo@collabora.com> wrote:
+Hi,
 
-> Enable the Rockchip sound driver with MAX98357A/RT5514/DA7219 codecs
-> needed for the Samsung Chromebook Plus.
->
-> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
-
-Could you remove me from your destination list for your next version?
-
-I guess you got my name by the get_maintainer script, but for the
-defconfig the result is very inaccurate. Indeed, the fact that I update
-the defconfig for the SoC I care doesn't mean that I have an expertise
-on the other SoC :)
+please pull the following arm64 DT patches.
 
 Thanks,
+Michal
 
-Gregory
+The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
 
-> ---
->
->  arch/arm64/configs/defconfig | 11 +++++++++++
->  1 file changed, 11 insertions(+)
->
-> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-> index f9a186f6af8a..4917641060b1 100644
-> --- a/arch/arm64/configs/defconfig
-> +++ b/arch/arm64/configs/defconfig
-> @@ -447,9 +447,20 @@ CONFIG_SOUND=y
->  CONFIG_SND=y
->  CONFIG_SND_SOC=y
->  CONFIG_SND_BCM2835_SOC_I2S=m
-> +CONFIG_SND_SOC_ROCKCHIP=m
-> +CONFIG_SND_SOC_ROCKCHIP_I2S=m
-> +CONFIG_SND_SOC_ROCKCHIP_SPDIF=m
-> +CONFIG_SND_SOC_ROCKCHIP_RT5645=m
-> +CONFIG_SND_SOC_RK3399_GRU_SOUND=m
->  CONFIG_SND_SOC_SAMSUNG=y
->  CONFIG_SND_SOC_RCAR=m
->  CONFIG_SND_SOC_AK4613=m
-> +CONFIG_SND_SOC_DA7219=m
-> +CONFIG_SND_SOC_MAX98357A=m
-> +CONFIG_SND_SOC_RL6231=m
-> +CONFIG_SND_SOC_RT5514=m
-> +CONFIG_SND_SOC_RT5514_SPI=m
-> +CONFIG_SND_SOC_RT5645=m
->  CONFIG_SND_SIMPLE_CARD=m
->  CONFIG_SND_AUDIO_GRAPH_CARD=m
->  CONFIG_I2C_HID=m
-> -- 
-> 2.18.0
->
+  Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+
+are available in the git repository at:
+
+  https://github.com/Xilinx/linux-xlnx.git tags/zynqmp-dt-for-v4.19
+
+for you to fetch changes up to d287de28641beb953f7ab2bd6966b166ea5c6e99:
+
+  arm64: zynqmp: Add support for Avnet Ultra96 rev1 board (2018-07-17
+16:41:09 +0200)
+
+----------------------------------------------------------------
+arm: zynqmp: DT changes for v4.19
+
+- Use serdev for BT in zcu100
+- Remove ep108
+- Fix gpio-keys binding
+- Add suport for Ultra96
+
+----------------------------------------------------------------
+Michal Simek (4):
+      arm64: zynqmp: Use serdev for zcu100 BT
+      arm64: zynqmp: Remove ep108 board
+      arm64: zynqmp: Remove #address/#size-cells from gpio-keys
+      arm64: zynqmp: Add support for Avnet Ultra96 rev1 board
+
+ arch/arm64/boot/dts/xilinx/Makefile               |   2 +-
+ arch/arm64/boot/dts/xilinx/avnet-ultra96-rev1.dts |  19 +++++++++++++++++++
+ arch/arm64/boot/dts/xilinx/zynqmp-ep108-clk.dtsi  | 137
+-----------------------------------------------------------------------------------------------------------------------------------------
+ arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts       | 154
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+ arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts |  12 ++++--------
+ arch/arm64/boot/dts/xilinx/zynqmp-zcu102-revA.dts |   2 --
+ arch/arm64/boot/dts/xilinx/zynqmp-zcu106-revA.dts |   2 --
+ arch/arm64/boot/dts/xilinx/zynqmp-zcu111-revA.dts |   2 --
+ 8 files changed, 24 insertions(+), 306 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/xilinx/avnet-ultra96-rev1.dts
+ delete mode 100644 arch/arm64/boot/dts/xilinx/zynqmp-ep108-clk.dtsi
+ delete mode 100644 arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
+
+
 
 -- 
-Gregory Clement, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-http://bootlin.com
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Xilinx Microblaze
+Maintainer of Linux kernel - Xilinx Zynq ARM and ZynqMP ARM64 SoCs
+U-Boot custodian - Xilinx Microblaze/Zynq/ZynqMP SoCs
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180718/a692fc3a/attachment-0001.sig>
