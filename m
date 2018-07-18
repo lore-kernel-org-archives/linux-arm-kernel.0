@@ -1,32 +1,77 @@
-From: linux.amoon@gmail.com (Anand Moon)
-Date: Wed, 18 Jul 2018 09:34:50 +0000
-Subject: [PATCH] ARM: dts: exynos5: add missing interrupts for pwm node
-Message-ID: <1531906490-1739-1-git-send-email-linux.amoon@gmail.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Wed, 18 Jul 2018 10:19:07 +0100
+Subject: [kvmtool PATCH v4 24/24] kvmtool: arm: Add support for creating VM
+ with PA size
+In-Reply-To: <1531905547-25478-1-git-send-email-suzuki.poulose@arm.com>
+References: <1531905547-25478-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1531905547-25478-25-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add missing GIC interrupts property for pwm nodes.
+Specify the physical size for the VM encoded in the vm type.
 
-Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm/boot/dts/exynos5.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+ arm/include/arm-common/kvm-arch.h |  6 +++++-
+ arm/kvm.c                         | 22 ++++++++++++++++++++++
+ 2 files changed, 27 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/exynos5.dtsi b/arch/arm/boot/dts/exynos5.dtsi
-index 5d2f0a0..9406108 100644
---- a/arch/arm/boot/dts/exynos5.dtsi
-+++ b/arch/arm/boot/dts/exynos5.dtsi
-@@ -169,6 +169,11 @@
- 		pwm: pwm at 12dd0000 {
- 			compatible = "samsung,exynos4210-pwm";
- 			reg = <0x12DD0000 0x100>;
-+			interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>,
-+				   <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>,
-+				   <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>,
-+				   <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>,
-+				   <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>;
- 			samsung,pwm-outputs = <0>, <1>, <2>, <3>;
- 			#pwm-cells = <3>;
- 		};
+diff --git a/arm/include/arm-common/kvm-arch.h b/arm/include/arm-common/kvm-arch.h
+index b29b4b1..d77f3ac 100644
+--- a/arm/include/arm-common/kvm-arch.h
++++ b/arm/include/arm-common/kvm-arch.h
+@@ -44,7 +44,11 @@
+ 
+ #define KVM_IRQ_OFFSET		GIC_SPI_IRQ_BASE
+ 
+-#define KVM_VM_TYPE		0
++extern unsigned long		kvm_arm_type;
++extern void kvm__arch_init_hyp(struct kvm *kvm);
++
++#define KVM_VM_TYPE		kvm_arm_type
++#define kvm__arch_init_hyp	kvm__arch_init_hyp
+ 
+ #define VIRTIO_DEFAULT_TRANS(kvm)	\
+ 	((kvm)->cfg.arch.virtio_trans_pci ? VIRTIO_PCI : VIRTIO_MMIO)
+diff --git a/arm/kvm.c b/arm/kvm.c
+index 5701d41..b7c3382 100644
+--- a/arm/kvm.c
++++ b/arm/kvm.c
+@@ -11,6 +11,8 @@
+ #include <linux/kvm.h>
+ #include <linux/sizes.h>
+ 
++unsigned long kvm_arm_type;
++
+ struct kvm_ext kvm_req_ext[] = {
+ 	{ DEFINE_KVM_EXT(KVM_CAP_IRQCHIP) },
+ 	{ DEFINE_KVM_EXT(KVM_CAP_ONE_REG) },
+@@ -18,6 +20,26 @@ struct kvm_ext kvm_req_ext[] = {
+ 	{ 0, 0 },
+ };
+ 
++#ifndef KVM_CAP_ARM_VM_MAX_PHYS_SHIFT
++#define KVM_CAP_ARM_VM_MAX_PHYS_SHIFT	156
++#endif
++
++void kvm__arch_init_hyp(struct kvm *kvm)
++{
++	int max_ipa;
++
++	if (!kvm->cfg.arch.phys_shift || kvm->cfg.arch.phys_shift == 40)
++		return;
++	max_ipa = ioctl(kvm->sys_fd,
++			KVM_CHECK_EXTENSION, KVM_CAP_ARM_VM_MAX_PHYS_SHIFT);
++	if (!max_ipa)
++		die("Kernel doesn't support IPA size configuration\n");
++	if (kvm->cfg.arch.phys_shift > max_ipa)
++		die("Requested PA size (%u) is not supported by the host (%ubits)\n",
++		    kvm->cfg.arch.phys_shift, max_ipa);
++	kvm_arm_type = kvm->cfg.arch.phys_shift;
++}
++
+ bool kvm__arch_cpu_supports_vm(void)
+ {
+ 	/* The KVM capability check is enough. */
 -- 
 2.7.4
