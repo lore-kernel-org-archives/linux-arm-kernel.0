@@ -1,73 +1,119 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Thu, 19 Jul 2018 06:09:45 +0800
-Subject: [PATCH v4] media: dvb-frontends: add Socionext SC1501A ISDB-S/T
- demodulator driver
-In-Reply-To: <20180718010614.18585-1-suzuki.katsuhiro@socionext.com>
-References: <20180718010614.18585-1-suzuki.katsuhiro@socionext.com>
-Message-ID: <201807190527.QGc0RswR%fengguang.wu@intel.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Wed, 18 Jul 2018 16:11:16 -0600
+Subject: [PATCH] coresight: etm_perf: Rework alloc/free methods to avoid
+ lockep warning
+In-Reply-To: <d648155e-0486-7d7c-5e29-2bda6c536dba@arm.com>
+References: <1531942988-20901-1-git-send-email-mathieu.poirier@linaro.org>
+ <d648155e-0486-7d7c-5e29-2bda6c536dba@arm.com>
+Message-ID: <CANLsYkw5eXvVg+8QGBFsQ_kawL-Okuny-e4VPY=q6w3_27Dq_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Katsuhiro,
+On Wed, 18 Jul 2018 at 15:31, Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
+>
+> Hi Mathieu,
+>
+> On 07/18/2018 08:43 PM, Mathieu Poirier wrote:
+> > When enabling the lockdep mechanic and working with CPU-wide scenarios we
+> > get the following console output:
+> >
+>
+> > This is fixed by working with the cpu_present_mask, avoinding at the same
+> > the need to use get/put_online_cpus() that triggers lockdep.
+>
+> The patch looks correct to me. In fact I have a patch [1], which
+> does the same thing and switches to using per-cpu variable for the
+> paths.
 
-I love your patch! Yet something to improve:
+Not only did you beat me to the punch but I think using a per-cpu
+variable is cleaner, so let's go with yours.
 
-[auto build test ERROR on linuxtv-media/master]
-[also build test ERROR on v4.18-rc5 next-20180718]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+Mathieu
 
-url:    https://github.com/0day-ci/linux/commits/Katsuhiro-Suzuki/media-dvb-frontends-add-Socionext-SC1501A-ISDB-S-T-demodulator-driver/20180719-045753
-base:   git://linuxtv.org/media_tree.git master
-config: i386-allmodconfig (attached as .config)
-compiler: gcc-7 (Debian 7.3.0-16) 7.3.0
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=i386 
-
-All errors (new ones prefixed by >>):
-
->> drivers/media/dvb-frontends/sc1501a.c:646:4: error: 'struct dvb_frontend_info' has no member named 'frequency_min_hz'; did you mean 'frequency_min'?
-      .frequency_min_hz =  470 * MHz,
-       ^~~~~~~~~~~~~~~~
-       frequency_min
-   drivers/media/dvb-frontends/sc1501a.c:646:30: error: 'MHz' undeclared here (not in a function)
-      .frequency_min_hz =  470 * MHz,
-                                 ^~~
->> drivers/media/dvb-frontends/sc1501a.c:647:4: error: 'struct dvb_frontend_info' has no member named 'frequency_max_hz'; did you mean 'frequency_max'?
-      .frequency_max_hz = 2071 * MHz,
-       ^~~~~~~~~~~~~~~~
-       frequency_max
-
-vim +646 drivers/media/dvb-frontends/sc1501a.c
-
-   641	
-   642	static const struct dvb_frontend_ops sc1501a_ops = {
-   643		.delsys = { SYS_ISDBS, SYS_ISDBT },
-   644		.info = {
-   645			.name = "Socionext SC1501A",
- > 646			.frequency_min_hz =  470 * MHz,
- > 647			.frequency_max_hz = 2071 * MHz,
-   648			.symbol_rate_min  = 28860000,
-   649			.symbol_rate_max  = 28860000,
-   650			.caps = FE_CAN_INVERSION_AUTO | FE_CAN_FEC_AUTO |
-   651				FE_CAN_QAM_AUTO | FE_CAN_TRANSMISSION_MODE_AUTO |
-   652				FE_CAN_GUARD_INTERVAL_AUTO | FE_CAN_HIERARCHY_AUTO,
-   653		},
-   654	
-   655		.sleep                   = sc1501a_sleep,
-   656		.set_frontend            = sc1501a_set_frontend,
-   657		.get_tune_settings       = sc1501a_get_tune_settings,
-   658		.read_status             = sc1501a_read_status,
-   659	};
-   660	
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 64148 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180719/9a8360a0/attachment-0001.gz>
+>
+> >
+> > Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+> > ---
+> >   drivers/hwtracing/coresight/coresight-etm-perf.c | 39 +++++++++++++-----------
+> >   1 file changed, 21 insertions(+), 18 deletions(-)
+> >
+> > diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
+> > index 677695635211..16b9c87d9d00 100644
+> > --- a/drivers/hwtracing/coresight/coresight-etm-perf.c
+> > +++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
+> > @@ -108,26 +108,32 @@ static int etm_event_init(struct perf_event *event)
+> >   static void free_event_data(struct work_struct *work)
+> >   {
+> >       int cpu;
+> > +     void *snk_config;
+> >       cpumask_t *mask;
+> >       struct etm_event_data *event_data;
+> >       struct coresight_device *sink;
+> >
+> >       event_data = container_of(work, struct etm_event_data, work);
+> >       mask = &event_data->mask;
+> > -     /*
+> > -      * First deal with the sink configuration.  See comment in
+> > -      * etm_setup_aux() about why we take the first available path.
+> > -      */
+> > -     if (event_data->snk_config) {
+> > -             cpu = cpumask_first(mask);
+> > -             sink = coresight_get_sink(event_data->path[cpu]);
+> > -             if (sink_ops(sink)->free_buffer)
+> > -                     sink_ops(sink)->free_buffer(event_data->snk_config);
+> > -     }
+> > +     snk_config = event_data->snk_config;
+> >
+> >       for_each_cpu(cpu, mask) {
+> > -             if (!(IS_ERR_OR_NULL(event_data->path[cpu])))
+> > -                     coresight_release_path(event_data->path[cpu]);
+> > +             if (IS_ERR_OR_NULL(event_data->path[cpu]))
+> > +                     continue;
+> > +
+> > +             /*
+> > +              * Free sink configuration - there can only be one sink
+> > +              * per event.
+> > +              */
+> > +             if (snk_config) {
+> > +                     sink = coresight_get_sink(event_data->path[cpu]);
+> > +                     if (sink_ops(sink)->free_buffer) {
+> > +                             sink_ops(sink)->free_buffer(snk_config);
+> > +                             snk_config = NULL;
+> > +                     }
+> > +             }
+> > +
+> > +             coresight_release_path(event_data->path[cpu]);
+> >       }
+>
+> >
+> >       kfree(event_data->path);
+> > @@ -145,16 +151,13 @@ static void *alloc_event_data(int cpu)
+> >       if (!event_data)
+> >               return NULL;
+> >
+> > -     /* Make sure nothing disappears under us */
+> > -     get_online_cpus();
+> > -     size = num_online_cpus();
+> > -
+> >       mask = &event_data->mask;
+> > +     size = num_present_cpus();
+> > +
+> >       if (cpu != -1)
+> >               cpumask_set_cpu(cpu, mask);
+> >       else
+> > -             cpumask_copy(mask, cpu_online_mask);
+> > -     put_online_cpus();
+> > +             cpumask_copy(mask, cpu_present_mask);
+>
+> I think it is safe to use cpu_online_mask outside the
+> get/put_online_cpus(). Using present_mask may fail as
+> we could fail to create a path for a CPU that is not online.
+>
+>
+> Please could you check if [1] fixes the problem for you ?
+>
+> [1]
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2018-July/591606.html
+>
+> Cheers
+> Suzuki
