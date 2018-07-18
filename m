@@ -1,90 +1,75 @@
-From: manish.narani@xilinx.com (Manish Narani)
-Date: Wed, 18 Jul 2018 16:42:10 +0530
-Subject: [PATCH 3/4] iio: adc: xilinx: Check for return values in clk related
- functions
-In-Reply-To: <1531912331-26431-1-git-send-email-manish.narani@xilinx.com>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Wed, 18 Jul 2018 13:18:34 +0200
+Subject: [PATCH 1/4] iio: adc: xilinx: Rename 'channels' variable name to
+ 'iio_xadc_channels'
+In-Reply-To: <1531912331-26431-2-git-send-email-manish.narani@xilinx.com>
 References: <1531912331-26431-1-git-send-email-manish.narani@xilinx.com>
-Message-ID: <1531912331-26431-4-git-send-email-manish.narani@xilinx.com>
+ <1531912331-26431-2-git-send-email-manish.narani@xilinx.com>
+Message-ID: <d2c3ddfd-91da-e500-7b58-917d2da1d540@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds check for return values from clock related functions.
-This was reported by static code analysis tool.
+On 07/18/2018 01:12 PM, Manish Narani wrote:
+> This patch fix the following checkpatch warning in xadc driver.
+> - Reusing the krealloc arg is almost always a bug.
+> 
+> Renamed the 'channels' variable as 'iio_xadc_channels' to fix the above
+> warning.
+> 
 
-Signed-off-by: Manish Narani <manish.narani@xilinx.com>
----
- drivers/iio/adc/xilinx-xadc-core.c | 24 ++++++++++++++++++++++--
- 1 file changed, 22 insertions(+), 2 deletions(-)
+This is a bug in checkpatch and should be fixed in checkpatch. The code is
+not actually re-using the parameter. channels and xadc_channels are
+independent variables, just checkpatch somehow does not realize this.
 
-diff --git a/drivers/iio/adc/xilinx-xadc-core.c b/drivers/iio/adc/xilinx-xadc-core.c
-index 248cffa..47eb364 100644
---- a/drivers/iio/adc/xilinx-xadc-core.c
-+++ b/drivers/iio/adc/xilinx-xadc-core.c
-@@ -322,6 +322,7 @@ static irqreturn_t xadc_zynq_interrupt_handler(int irq, void *devid)
- 
- #define XADC_ZYNQ_TCK_RATE_MAX 50000000
- #define XADC_ZYNQ_IGAP_DEFAULT 20
-+#define XADC_ZYNQ_PCAP_RATE_MAX 200000000
- 
- static int xadc_zynq_setup(struct platform_device *pdev,
- 	struct iio_dev *indio_dev, int irq)
-@@ -332,6 +333,7 @@ static int xadc_zynq_setup(struct platform_device *pdev,
- 	unsigned int div;
- 	unsigned int igap;
- 	unsigned int tck_rate;
-+	int ret;
- 
- 	/* TODO: Figure out how to make igap and tck_rate configurable */
- 	igap = XADC_ZYNQ_IGAP_DEFAULT;
-@@ -341,6 +343,13 @@ static int xadc_zynq_setup(struct platform_device *pdev,
- 
- 	pcap_rate = clk_get_rate(xadc->clk);
- 
-+	if (pcap_rate > XADC_ZYNQ_PCAP_RATE_MAX) {
-+		ret = clk_set_rate(xadc->clk,
-+				   (unsigned long)XADC_ZYNQ_PCAP_RATE_MAX);
-+		if (ret)
-+			return ret;
-+	}
-+
- 	if (tck_rate > pcap_rate / 2) {
- 		div = 2;
- 	} else {
-@@ -366,6 +375,12 @@ static int xadc_zynq_setup(struct platform_device *pdev,
- 			XADC_ZYNQ_CFG_REDGE | XADC_ZYNQ_CFG_WEDGE |
- 			tck_div | XADC_ZYNQ_CFG_IGAP(igap));
- 
-+	if (pcap_rate > XADC_ZYNQ_PCAP_RATE_MAX) {
-+		ret = clk_set_rate(xadc->clk, pcap_rate);
-+		if (ret)
-+			return ret;
-+	}
-+
- 	return 0;
- }
- 
-@@ -887,6 +902,9 @@ static int xadc_write_raw(struct iio_dev *indio_dev,
- 	unsigned long clk_rate = xadc_get_dclk_rate(xadc);
- 	unsigned int div;
- 
-+	if (!clk_rate)
-+		return -EINVAL;
-+
- 	if (info != IIO_CHAN_INFO_SAMP_FREQ)
- 		return -EINVAL;
- 
-@@ -1239,8 +1257,10 @@ static int xadc_probe(struct platform_device *pdev)
- 		goto err_free_irq;
- 
- 	/* Disable all alarms */
--	xadc_update_adc_reg(xadc, XADC_REG_CONF1, XADC_CONF1_ALARM_MASK,
--		XADC_CONF1_ALARM_MASK);
-+	ret = xadc_update_adc_reg(xadc, XADC_REG_CONF1, XADC_CONF1_ALARM_MASK,
-+				  XADC_CONF1_ALARM_MASK);
-+	if (ret)
-+		goto err_free_irq;
- 
- 	/* Set thresholds to min/max */
- 	for (i = 0; i < 16; i++) {
--- 
-2.1.1
+> Signed-off-by: Manish Narani <manish.narani@xilinx.com>
+> ---
+>  drivers/iio/adc/xilinx-xadc-core.c | 16 +++++++++-------
+>  1 file changed, 9 insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/iio/adc/xilinx-xadc-core.c b/drivers/iio/adc/xilinx-xadc-core.c
+> index d4f21d1..27b45df 100644
+> --- a/drivers/iio/adc/xilinx-xadc-core.c
+> +++ b/drivers/iio/adc/xilinx-xadc-core.c
+> @@ -1040,7 +1040,7 @@ static int xadc_parse_dt(struct iio_dev *indio_dev, struct device_node *np,
+>  	unsigned int *conf)
+>  {
+>  	struct xadc *xadc = iio_priv(indio_dev);
+> -	struct iio_chan_spec *channels, *chan;
+> +	struct iio_chan_spec *iio_xadc_channels, *chan;
+>  	struct device_node *chan_node, *child;
+>  	unsigned int num_channels;
+>  	const char *external_mux;
+> @@ -1083,12 +1083,13 @@ static int xadc_parse_dt(struct iio_dev *indio_dev, struct device_node *np,
+>  		*conf |= XADC_CONF0_MUX | XADC_CONF0_CHAN(ext_mux_chan);
+>  	}
+>  
+> -	channels = kmemdup(xadc_channels, sizeof(xadc_channels), GFP_KERNEL);
+> -	if (!channels)
+> +	iio_xadc_channels = kmemdup(xadc_channels, sizeof(xadc_channels),
+> +				    GFP_KERNEL);
+> +	if (!iio_xadc_channels)
+>  		return -ENOMEM;
+>  
+>  	num_channels = 9;
+> -	chan = &channels[9];
+> +	chan = &iio_xadc_channels[9];
+>  
+>  	chan_node = of_get_child_by_name(np, "xlnx,channels");
+>  	if (chan_node) {
+> @@ -1119,11 +1120,12 @@ static int xadc_parse_dt(struct iio_dev *indio_dev, struct device_node *np,
+>  	of_node_put(chan_node);
+>  
+>  	indio_dev->num_channels = num_channels;
+> -	indio_dev->channels = krealloc(channels, sizeof(*channels) *
+> -					num_channels, GFP_KERNEL);
+> +	indio_dev->channels = krealloc(iio_xadc_channels,
+> +				       sizeof(*iio_xadc_channels) *
+> +				       num_channels, GFP_KERNEL);
+>  	/* If we can't resize the channels array, just use the original */
+>  	if (!indio_dev->channels)
+> -		indio_dev->channels = channels;
+> +		indio_dev->channels = iio_xadc_channels;
+>  
+>  	return 0;
+>  }
+> 
