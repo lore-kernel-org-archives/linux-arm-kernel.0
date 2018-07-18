@@ -1,40 +1,102 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 18 Jul 2018 08:39:27 -0700
-Subject: [GIT PULL] ARM: mvebu: defconfig for v4.19 (#1)
-In-Reply-To: <87y3e88sz2.fsf@bootlin.com>
-References: <87y3e88sz2.fsf@bootlin.com>
-Message-ID: <CAOesGMjV4F6q+s2G995p0DDTZWkSSnw24ujriHgc_qqiEzgskw@mail.gmail.com>
+From: edgar.righi@lsitec.org.br (Edgar Bernardi Righi)
+Date: Wed, 18 Jul 2018 12:43:31 -0300
+Subject: [PATCH v1 02/04] dt-bindings: clock: Add Clock Management Unit for
+ Actions Semi S500 SoC
+Message-ID: <CADHB5bAD6A6U1Gk0kzVse1n-g2ONQtoMoOYxpMwGZuExvqsYKA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Add Clock Management Unit for Actions Semi S500 SoC. Dt-Bindings
+constants added.
+Tested on a Lemaker Guitar board.
 
-On Wed, Jul 18, 2018 at 8:27 AM, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
-> Hi,
->
-> Here is the first pull request for defconfig for mvebu for v4.19.
->
-> Gregory
->
-> The following changes since commit 021c91791a5e7e85c567452f1be3e4c2c6cb6063:
->
->   Linux 4.18-rc3 (2018-07-01 16:04:53 -0700)
->
-> are available in the Git repository at:
->
->   git://git.infradead.org/linux-mvebu.git tags/mvebu-defconfig-4.19-1
->
-> for you to fetch changes up to b4645695a9dca5bbdcb9d6133731d661d2a3c4fb:
->
->   ARM: mvebu_v7_defconfig: enable SFP support (2018-07-18 17:07:05 +0200)
->
-> ----------------------------------------------------------------
-> mvebu defconfig for 4.19 (part 1)
->
->  - add NAND controller on multi_v7
->  - add SFP support on mvebu_v7
+File(s) created: "/include/dt-bindings/clock/actions,s500-cmu.h"
 
-Merged, thanks!
+Signed-off-by: Edgar Bernardi Righi <edgar.righi@lsitec.org.br>
 
--Olof
+diff -uprN -X vanilla/Documentation/dontdiff
+vanilla/include/dt-bindings/clock/actions,s500-cmu.h
+linux/include/dt-bindings/clock/actions,s500-cmu.h
+--- vanilla/include/dt-bindings/clock/actions,s500-cmu.h    1969-12-31
+21:00:00.000000000 -0300
++++ linux/include/dt-bindings/clock/actions,s500-cmu.h    2018-07-18
+12:42:13.002448774 -0300
+@@ -0,0 +1,78 @@
++// SPDX-License-Identifier: GPL-2.0+
++//
++// Device Tree binding constants for Actions Semi S500 Clock Management Unit
++//
++// Copyright (c) 2014 Actions Semi Inc.
++// Copyright (c) 2018 Linaro Ltd.
++// Copyright (c) 2018 LSI-TEC - Caninos Loucos
++
++#ifndef __DT_BINDINGS_CLOCK_S500_CMU_H
++#define __DT_BINDINGS_CLOCK_S500_CMU_H
++
++#define CLK_NONE            0
++
++/* fixed rate clocks */
++#define CLK_LOSC            1
++#define CLK_HOSC            2
++
++/* pll clocks */
++#define CLK_CORE_PLL        3
++#define CLK_DEV_PLL            4
++#define CLK_DDR_PLL            5
++#define CLK_NAND_PLL        6
++#define CLK_DISPLAY_PLL        7
++#define CLK_ETHERNET_PLL    8
++#define CLK_AUDIO_PLL        9
++
++/* system clock */
++#define CLK_DEV                10
++#define CLK_H                11
++#define CLK_AHBPREDIV        12
++#define CLK_AHB                13
++#define CLK_DE                14
++#define CLK_BISP            15
++#define CLK_VCE                16
++#define CLK_VDE                17
++
++/* peripheral device clock */
++#define CLK_TIMER            18
++#define CLK_I2C0            19
++#define CLK_I2C1            20
++#define CLK_I2C2            21
++#define CLK_I2C3            22
++#define CLK_PWM0            23
++#define CLK_PWM1            24
++#define CLK_PWM2            25
++#define CLK_PWM3            26
++#define CLK_PWM4            27
++#define CLK_PWM5            28
++#define CLK_SD0                29
++#define CLK_SD1                30
++#define CLK_SD2                31
++#define CLK_SENSOR0            32
++#define CLK_SENSOR1            33
++#define CLK_SPI0            34
++#define CLK_SPI1            35
++#define CLK_SPI2            36
++#define CLK_SPI3            37
++#define CLK_UART0            38
++#define CLK_UART1            39
++#define CLK_UART2            40
++#define CLK_UART3            41
++#define CLK_UART4            42
++#define CLK_UART5            43
++#define CLK_UART6            44
++#define CLK_DE1                45
++#define CLK_DE2                46
++#define CLK_I2SRX            47
++#define CLK_I2STX            48
++#define CLK_HDMI_AUDIO        49
++#define CLK_HDMI            50
++#define CLK_SPDIF            51
++#define CLK_NAND            52
++#define CLK_ECC                53
++#define CLK_RMII_REF        54
++
++#define CLK_NR_CLKS            (CLK_RMII_REF + 1)
++
++#endif /* __DT_BINDINGS_CLOCK_S500_CMU_H */
