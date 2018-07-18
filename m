@@ -1,33 +1,22 @@
-From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Wed, 18 Jul 2018 16:24:49 +0530
-Subject: [PATCH v3 09/18] arm64: defconfig: Enable CONFIG_DRM_SUN4I
-In-Reply-To: <20180718105458.22304-1-jagan@amarulasolutions.com>
-References: <20180718105458.22304-1-jagan@amarulasolutions.com>
-Message-ID: <20180718105458.22304-10-jagan@amarulasolutions.com>
+From: manish.narani@xilinx.com (Manish Narani)
+Date: Wed, 18 Jul 2018 16:42:07 +0530
+Subject: [PATCH 0/4] iio: adc: xilinx: XADC driver enhancements and bug fixes
+Message-ID: <1531912331-26431-1-git-send-email-manish.narani@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable DRM Support for Allwinner Display Engine, built as a module.
+This patch series resolves code style problems as reported by code analysis
+tools.
 
-Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
----
-Changes for v3, v2:
-- none
+Manish Narani (4):
+  iio: adc: xilinx: Rename 'channels' variable name to
+    'iio_xadc_channels'
+  iio: adc: xilinx: Remove dead code from xadc_zynq_setup
+  iio: adc: xilinx: Check for return values in clk related functions
+  iio: adc: xilinx: Use devm_ functions while requesting irq
 
- arch/arm64/configs/defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/iio/adc/xilinx-xadc-core.c | 60 ++++++++++++++++++++++++--------------
+ 1 file changed, 38 insertions(+), 22 deletions(-)
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index c192a42c2ba3..7c362b0ea27c 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -425,6 +425,7 @@ CONFIG_DRM_EXYNOS_DSI=y
- CONFIG_DRM_EXYNOS_HDMI=y
- CONFIG_DRM_EXYNOS_MIC=y
- CONFIG_DRM_ROCKCHIP=m
-+CONFIG_DRM_SUN4I=m
- CONFIG_ROCKCHIP_ANALOGIX_DP=y
- CONFIG_ROCKCHIP_CDN_DP=y
- CONFIG_ROCKCHIP_DW_HDMI=y
 -- 
-2.17.1
+2.1.1
