@@ -1,75 +1,67 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Wed, 18 Jul 2018 13:18:34 +0200
-Subject: [PATCH 1/4] iio: adc: xilinx: Rename 'channels' variable name to
- 'iio_xadc_channels'
-In-Reply-To: <1531912331-26431-2-git-send-email-manish.narani@xilinx.com>
-References: <1531912331-26431-1-git-send-email-manish.narani@xilinx.com>
- <1531912331-26431-2-git-send-email-manish.narani@xilinx.com>
-Message-ID: <d2c3ddfd-91da-e500-7b58-917d2da1d540@metafoo.de>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Wed, 18 Jul 2018 12:19:41 +0100
+Subject: [PATCH] mmc: sunxi: remove output of virtual base address
+In-Reply-To: <20180717114348.lv2ngzrekp5zpcmk@flea.home>
+References: <20180717100958.12042-1-andre.przywara@arm.com>
+ <20180717114348.lv2ngzrekp5zpcmk@flea.home>
+Message-ID: <7cda9046-ec72-02d9-6474-0f4fbaa7e170@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/18/2018 01:12 PM, Manish Narani wrote:
-> This patch fix the following checkpatch warning in xadc driver.
-> - Reusing the krealloc arg is almost always a bug.
-> 
-> Renamed the 'channels' variable as 'iio_xadc_channels' to fix the above
-> warning.
-> 
+Hi,
 
-This is a bug in checkpatch and should be fixed in checkpatch. The code is
-not actually re-using the parameter. channels and xadc_channels are
-independent variables, just checkpatch somehow does not realize this.
+On 17/07/18 12:43, Maxime Ripard wrote:
+> 1;5202;0c
+> On Tue, Jul 17, 2018 at 11:09:58AM +0100, Andre Przywara wrote:
+>> Recent Linux versions refuse to print actual virtual kernel addresses,
+>> to not give a hint about the location of the kernel in a randomized virtual
+>> address space. This affects the output of the sunxi MMC controller
+>> driver, which now produces the rather uninformative line:
+>>
+>> [    1.482660] sunxi-mmc 1c0f000.mmc: base:0x(____ptrval____) irq:8
+>>
+>> Since the virtual base address is not really interesting in the first
+>> place, let's just drop this value. We have the physical address as part
+>> of the DT node name, which is way more useful for debugging purposes.
+>>
+>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>> ---
+>>  drivers/mmc/host/sunxi-mmc.c | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+>> index 8e7f3e35ee3d..811b08d2d0f2 100644
+>> --- a/drivers/mmc/host/sunxi-mmc.c
+>> +++ b/drivers/mmc/host/sunxi-mmc.c
+>> @@ -1407,7 +1407,7 @@ static int sunxi_mmc_probe(struct platform_device *pdev)
+>>  	if (ret)
+>>  		goto error_free_dma;
+>>  
+>> -	dev_info(&pdev->dev, "base:0x%p irq:%u\n", host->reg_base, host->irq);
+>> +	dev_info(&pdev->dev, "irq:%u\n", host->irq);
+> 
+> Can't we just remove it? It doesn't look like it brings much value anyway.
 
-> Signed-off-by: Manish Narani <manish.narani@xilinx.com>
-> ---
->  drivers/iio/adc/xilinx-xadc-core.c | 16 +++++++++-------
->  1 file changed, 9 insertions(+), 7 deletions(-)
-> 
-> diff --git a/drivers/iio/adc/xilinx-xadc-core.c b/drivers/iio/adc/xilinx-xadc-core.c
-> index d4f21d1..27b45df 100644
-> --- a/drivers/iio/adc/xilinx-xadc-core.c
-> +++ b/drivers/iio/adc/xilinx-xadc-core.c
-> @@ -1040,7 +1040,7 @@ static int xadc_parse_dt(struct iio_dev *indio_dev, struct device_node *np,
->  	unsigned int *conf)
->  {
->  	struct xadc *xadc = iio_priv(indio_dev);
-> -	struct iio_chan_spec *channels, *chan;
-> +	struct iio_chan_spec *iio_xadc_channels, *chan;
->  	struct device_node *chan_node, *child;
->  	unsigned int num_channels;
->  	const char *external_mux;
-> @@ -1083,12 +1083,13 @@ static int xadc_parse_dt(struct iio_dev *indio_dev, struct device_node *np,
->  		*conf |= XADC_CONF0_MUX | XADC_CONF0_CHAN(ext_mux_chan);
->  	}
->  
-> -	channels = kmemdup(xadc_channels, sizeof(xadc_channels), GFP_KERNEL);
-> -	if (!channels)
-> +	iio_xadc_channels = kmemdup(xadc_channels, sizeof(xadc_channels),
-> +				    GFP_KERNEL);
-> +	if (!iio_xadc_channels)
->  		return -ENOMEM;
->  
->  	num_channels = 9;
-> -	chan = &channels[9];
-> +	chan = &iio_xadc_channels[9];
->  
->  	chan_node = of_get_child_by_name(np, "xlnx,channels");
->  	if (chan_node) {
-> @@ -1119,11 +1120,12 @@ static int xadc_parse_dt(struct iio_dev *indio_dev, struct device_node *np,
->  	of_node_put(chan_node);
->  
->  	indio_dev->num_channels = num_channels;
-> -	indio_dev->channels = krealloc(channels, sizeof(*channels) *
-> -					num_channels, GFP_KERNEL);
-> +	indio_dev->channels = krealloc(iio_xadc_channels,
-> +				       sizeof(*iio_xadc_channels) *
-> +				       num_channels, GFP_KERNEL);
->  	/* If we can't resize the channels array, just use the original */
->  	if (!indio_dev->channels)
-> -		indio_dev->channels = channels;
-> +		indio_dev->channels = iio_xadc_channels;
->  
->  	return 0;
->  }
-> 
+Yes, the IRQ value is the virtual Linux number, so equally
+non-informative. But this line is the only info message left from the
+mmc driver, so since we have scary "deferring probe" messages before,
+I'd rather leave this "success!" message in, to help debugging:
+# dmesg | grep mmc
+[    1.314211] sunxi-mmc 1c0f000.mmc: could not find pctldev for node
+/soc/pinctrl at 1c20800/mmc0-pins, deferring probe
+[    1.324705] sunxi-mmc 1c11000.mmc: could not find pctldev for node
+/soc/pinctrl at 1c20800/mmc2-pins, deferring probe
+[    1.737310] sunxi-mmc 1c0f000.mmc: irq:6
+[    1.771255] sunxi-mmc 1c11000.mmc: irq:7
+[    1.787003] mmc0: new high speed SDHC card at address 1234
+[    1.796029] mmcblk0: mmc0:1234 SA08G 7.21 GiB
+[    1.809093]  mmcblk0: p1 p2 p3
+....
+
+We could just say something like: "initialized.". It would be even more
+useful if we could print the type of MMC: SD card, SDIO, eMMC, but apart
+from eMMC vs. MMC0/1 for the A64 we don't have this information (not
+even the index number) at this level, I think.
+
+Cheers,
+Andre.
