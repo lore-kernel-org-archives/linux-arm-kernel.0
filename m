@@ -1,43 +1,38 @@
-From: tjakobi@math.uni-bielefeld.de (Tobias Jakobi)
-Date: Wed, 18 Jul 2018 22:13:03 +0200
-Subject: [PATCH] drm/exynos/mixer: Remove unused local variable priv
-In-Reply-To: <20180718195520.5226-1-krzk@kernel.org>
-References: <20180718195520.5226-1-krzk@kernel.org>
-Message-ID: <6b613193-a3f6-d824-194d-004f87afacd4@math.uni-bielefeld.de>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Thu, 19 Jul 2018 01:37:09 +0530
+Subject: [PATCH 4/4] MAINTAINERS: Add entry for Actions Semi Owl SoCs DMA
+ driver
+In-Reply-To: <20180718200709.27102-1-manivannan.sadhasivam@linaro.org>
+References: <20180718200709.27102-1-manivannan.sadhasivam@linaro.org>
+Message-ID: <20180718200709.27102-5-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+Add entry for Actions Semi Owl SoCs DMA driver under ARM/ACTIONS.
 
-looks good to me!
+Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+---
+ MAINTAINERS | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Reviewed-by: Tobias Jakobi <tjakobi@math.uni-bielefeld.de>
-
-- Tobias
-
-
-Krzysztof Kozlowski wrote:
-> Remove local variable 'priv' to fix GCC warning:
-> 
->     drivers/gpu/drm/exynos/exynos_mixer.c: In function 'mixer_initialize':
->     drivers/gpu/drm/exynos/exynos_mixer.c:840:29: warning: variable 'priv' set but not used [-Wunused-but-set-variable]
-> 
-> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
-> ---
->  drivers/gpu/drm/exynos/exynos_mixer.c | 2 --
->  1 file changed, 2 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/exynos/exynos_mixer.c b/drivers/gpu/drm/exynos/exynos_mixer.c
-> index 272c79f5f5bf..b86ae2ab9590 100644
-> --- a/drivers/gpu/drm/exynos/exynos_mixer.c
-> +++ b/drivers/gpu/drm/exynos/exynos_mixer.c
-> @@ -837,8 +837,6 @@ static int mixer_initialize(struct mixer_context *mixer_ctx,
->  			struct drm_device *drm_dev)
->  {
->  	int ret;
-> -	struct exynos_drm_private *priv;
-> -	priv = drm_dev->dev_private;
->  
->  	mixer_ctx->drm_dev = drm_dev;
->  
-> 
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 09b54e9ebc6f..56d9c7715c2a 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1145,12 +1145,14 @@ F:	arch/arm/boot/dts/owl-*
+ F:	arch/arm64/boot/dts/actions/
+ F:	drivers/clk/actions/
+ F:	drivers/clocksource/owl-*
++F:	drivers/dma/owl-dma.c
+ F:	drivers/pinctrl/actions/*
+ F:	drivers/soc/actions/
+ F:	include/dt-bindings/power/owl-*
+ F:	include/linux/soc/actions/
+ F:	Documentation/devicetree/bindings/arm/actions.txt
+ F:	Documentation/devicetree/bindings/clock/actions,s900-cmu.txt
++F:	Documentation/devicetree/bindings/dma/owl-dma.txt
+ F:	Documentation/devicetree/bindings/pinctrl/actions,s900-pinctrl.txt
+ F:	Documentation/devicetree/bindings/power/actions,owl-sps.txt
+ F:	Documentation/devicetree/bindings/timer/actions,owl-timer.txt
+-- 
+2.17.1
