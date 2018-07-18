@@ -1,79 +1,68 @@
-From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Wed, 18 Jul 2018 17:37:39 +0200
-Subject: [PATCH net-next v2 3/7] net: mvneta: increase number of buffers
- in RX and TX queue
-In-Reply-To: <20180713191720.GA17271@n2100.armlinux.org.uk> (Russell King's
- message of "Fri, 13 Jul 2018 20:17:20 +0100")
-References: <20180713161841.11202-1-gregory.clement@bootlin.com>
- <20180713161841.11202-4-gregory.clement@bootlin.com>
- <20180713191720.GA17271@n2100.armlinux.org.uk>
-Message-ID: <87tvow8sho.fsf@bootlin.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 18 Jul 2018 08:38:33 -0700
+Subject: [GIT PULL] ARM: mvebu: arm for v4.19 (#1)
+In-Reply-To: <871sc0a8oo.fsf@bootlin.com>
+References: <87y3egbe7a.fsf@bootlin.com>
+ <20180714214208.lns2fszqzm6m3q4g@localhost>
+ <871sc0a8oo.fsf@bootlin.com>
+Message-ID: <CAOesGMjRpXBwHT0orPuX5Tn=LjvK2py0+PuOJDrDy+ihxhvNkw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell King,
- 
- On ven., juil. 13 2018, Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
-
-> On Fri, Jul 13, 2018 at 06:18:37PM +0200, Gregory CLEMENT wrote:
->> From: Yelena Krivosheev <yelena@marvell.com>
->> 
->> The initial values were too small leading to poor performance when using
->> the software buffer management.
+On Wed, Jul 18, 2018 at 8:02 AM, Gregory CLEMENT
+<gregory.clement@bootlin.com> wrote:
+> Hi Olof,
 >
-> What does this do to latency when a large transfer is also ongoing
-> (iow, the classic bufferbloat issue) ?
-
-IXIA latency test had been done without seeing any differences for long
-traffic (routing).
-
-These new values offer better performance for the main usage of this SoC
-(NAS applications), however both Rx and TX queues size can be change by
-ethtool.
-
-Gregory
-
+>  On sam., juil. 14 2018, Olof Johansson <olof@lixom.net> wrote:
 >
->> 
->> Signed-off-by: Yelena Krivosheev <yelena@marvell.com>
->> [gregory: extract from a larger patch]
->> Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
->> ---
->>  drivers/net/ethernet/marvell/mvneta.c | 4 ++--
->>  1 file changed, 2 insertions(+), 2 deletions(-)
->> 
->> diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
->> index f4e3943a745d..c22df28b07c8 100644
->> --- a/drivers/net/ethernet/marvell/mvneta.c
->> +++ b/drivers/net/ethernet/marvell/mvneta.c
->> @@ -295,10 +295,10 @@
->>  #define MVNETA_RSS_LU_TABLE_SIZE	1
->>  
->>  /* Max number of Rx descriptors */
->> -#define MVNETA_MAX_RXD 128
->> +#define MVNETA_MAX_RXD 512
->>  
->>  /* Max number of Tx descriptors */
->> -#define MVNETA_MAX_TXD 532
->> +#define MVNETA_MAX_TXD 1024
->>  
->>  /* Max number of allowed TCP segments for software TSO */
->>  #define MVNETA_MAX_TSO_SEGS 100
->> -- 
->> 2.18.0
->> 
->> 
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>> On Thu, Jul 12, 2018 at 06:39:53PM +0200, Gregory CLEMENT wrote:
+>>> Hi,
+>>>
+>>> Here is the first pull request for arm for mvebu for v4.19.
+>>>
+>>> Gregory
+>>>
+>>> The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
+>>>
+>>>   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+>>>
+>>> are available in the Git repository at:
+>>>
+>>>   git://git.infradead.org/linux-mvebu.git tags/mvebu-arm-4.19-1
+>>>
+>>> for you to fetch changes up to 432c0254106a373bcc23b1bd3e0b7eb56929c0d9:
+>>>
+>>>   ARM: mvebu_v7_defconfig: enable SFP support (2018-06-28 16:53:08 +0200)
+>>>
+>>> ----------------------------------------------------------------
+>>> mvebu arm for 4.19 (part 1)
+>>>
+>>> defconfig update:
+>>>  - add NAND controller on multi_v7
+>>>  - add SFP support on mvebu_v7
+>>> code improvement:
+>>>  - remove potential call from invalid context in boot_secondary
+>>>  - allow using CONFIG_FORTIFY_SOURCE in pmsu.c
+>>
+>> Please separate out soc and defconfig changes to separate branches/pull
+>> requests. If you look at our tree, you'll see that we queue them in
+>> separate branches.
 >
-> -- 
-> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
-> According to speedtest.net: 13Mbps down 490kbps up
+> I was confused by the arm64 which has patches modifying the defconfig
+> file.
 
--- 
-Gregory Clement, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-http://bootlin.com
+Yeah, we've moved around a bit how we organize the branches -- we've
+essentially stopped separating 32- and 64-bit material at our end. We
+do still ask maintainers to send them separately in case we want to
+split it up for some releases though.
+
+>> Also, note that we renoramlized the configs in 4.18-rc3, so you want to base
+>> the DT contents on top of that when you send the new pull requests.
+>
+> Thanks for the information, I am going to resend 2 new PR for arm and
+> defconfig.
+
+Cool, merging them now as well.
+
+
+-Olof
