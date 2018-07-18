@@ -1,69 +1,43 @@
 From: manish.narani@xilinx.com (Manish Narani)
-Date: Wed, 18 Jul 2018 16:42:08 +0530
-Subject: [PATCH 1/4] iio: adc: xilinx: Rename 'channels' variable name to
- 'iio_xadc_channels'
+Date: Wed, 18 Jul 2018 16:42:09 +0530
+Subject: [PATCH 2/4] iio: adc: xilinx: Remove dead code from xadc_zynq_setup
 In-Reply-To: <1531912331-26431-1-git-send-email-manish.narani@xilinx.com>
 References: <1531912331-26431-1-git-send-email-manish.narani@xilinx.com>
-Message-ID: <1531912331-26431-2-git-send-email-manish.narani@xilinx.com>
+Message-ID: <1531912331-26431-3-git-send-email-manish.narani@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fix the following checkpatch warning in xadc driver.
-- Reusing the krealloc arg is almost always a bug.
-
-Renamed the 'channels' variable as 'iio_xadc_channels' to fix the above
-warning.
+This patch removes dead code from xadc_zynq_setup. The condition
+"if (tck_rate > XADC_ZYNQ_TCK_RATE_MAX)" cannot be true at any point of
+time. There is also an incompatible parameter used in the code.
+This patch fixes the same reported by coverity.
 
 Signed-off-by: Manish Narani <manish.narani@xilinx.com>
 ---
- drivers/iio/adc/xilinx-xadc-core.c | 16 +++++++++-------
- 1 file changed, 9 insertions(+), 7 deletions(-)
+ drivers/iio/adc/xilinx-xadc-core.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
 diff --git a/drivers/iio/adc/xilinx-xadc-core.c b/drivers/iio/adc/xilinx-xadc-core.c
-index d4f21d1..27b45df 100644
+index 27b45df..248cffa 100644
 --- a/drivers/iio/adc/xilinx-xadc-core.c
 +++ b/drivers/iio/adc/xilinx-xadc-core.c
-@@ -1040,7 +1040,7 @@ static int xadc_parse_dt(struct iio_dev *indio_dev, struct device_node *np,
- 	unsigned int *conf)
- {
- 	struct xadc *xadc = iio_priv(indio_dev);
--	struct iio_chan_spec *channels, *chan;
-+	struct iio_chan_spec *iio_xadc_channels, *chan;
- 	struct device_node *chan_node, *child;
+@@ -341,8 +341,6 @@ static int xadc_zynq_setup(struct platform_device *pdev,
+ 
+ 	pcap_rate = clk_get_rate(xadc->clk);
+ 
+-	if (tck_rate > XADC_ZYNQ_TCK_RATE_MAX)
+-		tck_rate = XADC_ZYNQ_TCK_RATE_MAX;
+ 	if (tck_rate > pcap_rate / 2) {
+ 		div = 2;
+ 	} else {
+@@ -1045,7 +1043,7 @@ static int xadc_parse_dt(struct iio_dev *indio_dev, struct device_node *np,
  	unsigned int num_channels;
  	const char *external_mux;
-@@ -1083,12 +1083,13 @@ static int xadc_parse_dt(struct iio_dev *indio_dev, struct device_node *np,
- 		*conf |= XADC_CONF0_MUX | XADC_CONF0_CHAN(ext_mux_chan);
- 	}
+ 	u32 ext_mux_chan;
+-	int reg;
++	u32 reg;
+ 	int ret;
  
--	channels = kmemdup(xadc_channels, sizeof(xadc_channels), GFP_KERNEL);
--	if (!channels)
-+	iio_xadc_channels = kmemdup(xadc_channels, sizeof(xadc_channels),
-+				    GFP_KERNEL);
-+	if (!iio_xadc_channels)
- 		return -ENOMEM;
- 
- 	num_channels = 9;
--	chan = &channels[9];
-+	chan = &iio_xadc_channels[9];
- 
- 	chan_node = of_get_child_by_name(np, "xlnx,channels");
- 	if (chan_node) {
-@@ -1119,11 +1120,12 @@ static int xadc_parse_dt(struct iio_dev *indio_dev, struct device_node *np,
- 	of_node_put(chan_node);
- 
- 	indio_dev->num_channels = num_channels;
--	indio_dev->channels = krealloc(channels, sizeof(*channels) *
--					num_channels, GFP_KERNEL);
-+	indio_dev->channels = krealloc(iio_xadc_channels,
-+				       sizeof(*iio_xadc_channels) *
-+				       num_channels, GFP_KERNEL);
- 	/* If we can't resize the channels array, just use the original */
- 	if (!indio_dev->channels)
--		indio_dev->channels = channels;
-+		indio_dev->channels = iio_xadc_channels;
- 
- 	return 0;
- }
+ 	*conf = 0;
 -- 
 2.1.1
