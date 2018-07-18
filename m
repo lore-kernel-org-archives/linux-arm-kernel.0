@@ -1,74 +1,39 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 18 Jul 2018 10:18:45 +0100
-Subject: [PATCH v4 02/20] virtio: pci-legacy: Validate queue pfn
+Date: Wed, 18 Jul 2018 10:18:46 +0100
+Subject: [PATCH v4 03/20] kvm: arm/arm64: Fix stage2_flush_memslot for 4 level
+ page table
 In-Reply-To: <1531905547-25478-1-git-send-email-suzuki.poulose@arm.com>
 References: <1531905547-25478-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1531905547-25478-3-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1531905547-25478-4-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Legacy PCI over virtio uses a 32bit PFN for the queue. If the
-queue pfn is too large to fit in 32bits, which we could hit on
-arm64 systems with 52bit physical addresses (even with 64K page
-size), we simply miss out a proper link to the other side of
-the queue.
+So far we have only supported 3 level page table with fixed IPA of
+40bits, where PUD is folded. With 4 level page tables, we need
+to check if the PUD entry is valid or not. Fix stage2_flush_memslot()
+to do this check, before walking down the table.
 
-Add a check to validate the PFN, rather than silently breaking
-the devices.
-
-Cc: "Michael S. Tsirkin" <mst@redhat.com>
-Cc: Jason Wang <jasowang@redhat.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Christoffer Dall <cdall@kernel.org>
-Cc: Peter Maydel <peter.maydell@linaro.org>
-Cc: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
+Acked-by: Christoffer Dall <cdall@kernel.org>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
-Changes since v2:
- - Change errno to -E2BIG
----
- drivers/virtio/virtio_pci_legacy.c | 14 ++++++++++++--
- 1 file changed, 12 insertions(+), 2 deletions(-)
+ virt/kvm/arm/mmu.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/virtio/virtio_pci_legacy.c b/drivers/virtio/virtio_pci_legacy.c
-index 2780886..de062fb 100644
---- a/drivers/virtio/virtio_pci_legacy.c
-+++ b/drivers/virtio/virtio_pci_legacy.c
-@@ -122,6 +122,7 @@ static struct virtqueue *setup_vq(struct virtio_pci_device *vp_dev,
- 	struct virtqueue *vq;
- 	u16 num;
- 	int err;
-+	u64 q_pfn;
- 
- 	/* Select the queue we're interested in */
- 	iowrite16(index, vp_dev->ioaddr + VIRTIO_PCI_QUEUE_SEL);
-@@ -141,9 +142,17 @@ static struct virtqueue *setup_vq(struct virtio_pci_device *vp_dev,
- 	if (!vq)
- 		return ERR_PTR(-ENOMEM);
- 
-+	q_pfn = virtqueue_get_desc_addr(vq) >> VIRTIO_PCI_QUEUE_ADDR_SHIFT;
-+	if (q_pfn >> 32) {
-+		dev_err(&vp_dev->pci_dev->dev,
-+			"platform bug: legacy virtio-mmio must not be used with RAM above 0x%llxGB\n",
-+			0x1ULL << (32 + PAGE_SHIFT - 30));
-+		err = -E2BIG;
-+		goto out_del_vq;
-+	}
-+
- 	/* activate the queue */
--	iowrite32(virtqueue_get_desc_addr(vq) >> VIRTIO_PCI_QUEUE_ADDR_SHIFT,
--		  vp_dev->ioaddr + VIRTIO_PCI_QUEUE_PFN);
-+	iowrite32(q_pfn, vp_dev->ioaddr + VIRTIO_PCI_QUEUE_PFN);
- 
- 	vq->priv = (void __force *)vp_dev->ioaddr + VIRTIO_PCI_QUEUE_NOTIFY;
- 
-@@ -160,6 +169,7 @@ static struct virtqueue *setup_vq(struct virtio_pci_device *vp_dev,
- 
- out_deactivate:
- 	iowrite32(0, vp_dev->ioaddr + VIRTIO_PCI_QUEUE_PFN);
-+out_del_vq:
- 	vring_del_virtqueue(vq);
- 	return ERR_PTR(err);
+diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+index 1d90d79..061e6b3 100644
+--- a/virt/kvm/arm/mmu.c
++++ b/virt/kvm/arm/mmu.c
+@@ -379,7 +379,8 @@ static void stage2_flush_memslot(struct kvm *kvm,
+ 	pgd = kvm->arch.pgd + stage2_pgd_index(addr);
+ 	do {
+ 		next = stage2_pgd_addr_end(addr, end);
+-		stage2_flush_puds(kvm, pgd, addr, next);
++		if (!stage2_pgd_none(*pgd))
++			stage2_flush_puds(kvm, pgd, addr, next);
+ 	} while (pgd++, addr = next, addr != end);
  }
+ 
 -- 
 2.7.4
