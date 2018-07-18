@@ -1,109 +1,96 @@
-From: brian.starkey@arm.com (Brian Starkey)
-Date: Wed, 18 Jul 2018 10:12:02 +0100
-Subject: [PATCH 1/5] drm/fourcc: Add is_yuv field to drm_format_info to
- denote if the format is yuv
-In-Reply-To: <1531847626-22248-1-git-send-email-ayan.halder@arm.com>
-References: <1531847626-22248-1-git-send-email-ayan.halder@arm.com>
-Message-ID: <20180718091202.GA27151@DESKTOP-E1NTVVP.localdomain>
+From: hari.vyas@broadcom.com (Hari Vyas)
+Date: Wed, 18 Jul 2018 14:44:04 +0530
+Subject: [PATCH] arm64: fix kernel panic on serror exception caused by
+ user process
+In-Reply-To: <20180717144547.GE17271@n2100.armlinux.org.uk>
+References: <1531819881-2931-1-git-send-email-hari.vyas@broadcom.com>
+ <1531819881-2931-2-git-send-email-hari.vyas@broadcom.com>
+ <20180717100628.s5emikyc6orira2q@lakrids.cambridge.arm.com>
+ <CAM5rFu_trZpt20H2GAUq8GYTOuJMSmEknsQaEkPkDwFHPVDPeA@mail.gmail.com>
+ <20180717114815.5a3rbcznfzvi2xh6@lakrids.cambridge.arm.com>
+ <CAM5rFu8avWLrUhEsCHBTKv=sM6dE3Sh_0=5M3Eh0WcT9EdmtSg@mail.gmail.com>
+ <20180717144547.GE17271@n2100.armlinux.org.uk>
+Message-ID: <CAM5rFu_NXGwcKh_2_eAzz5dbKL8-mU6xgf56AM9wimjtueRaBA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ayan,
+Hi Russell and all,
 
-On Tue, Jul 17, 2018 at 06:13:42PM +0100, Ayan Kumar Halder wrote:
->A lot of drivers duplicate the function to check if a format is yuv or not.
->If we add a field (to denote whether the format is yuv or not) in the
->drm_format_info table, all the drivers can use this field and it will
->prevent duplication of similar logic.
+On Tue, Jul 17, 2018 at 8:15 PM, Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
+> On Tue, Jul 17, 2018 at 07:10:25PM +0530, Hari Vyas wrote:
+>> Okay. Don't think it is a question of trust. If access happens from
+>> kernel mode, I understand but If user mode initiated
+>> access(from devmem(which is just an example) or any other application)
+>> into outside or invalid region of system
+>> address brings complete kernel down, at least I will be surprised.
+>> If all other also think kernel panic okay in this case, then no
+>> further action is required from my side.
+>
+> There are many, many ways that someone with privileged access can take
+> the system down.
+>
+> It's _well_ known that accesses through /dev/mem (which gives _direct_
+> access to the hardware in the system) has the capability to take the
+> system down.
+>
+> Your example may be through an exception, but another way could be to
+> find the clock controller and disable system clocks, or find the RAM
+> controller in physical memory and disable that.  Or the L2 cache in
+> older ARMs and tell it to invalidate all its contents, leading to
+> system data corruption and probably a kernel panic.
+>
+> Other ways (on x86) that have been known for years include configuring
+> an 8250 serial port at an address or interrupt (this doesn't involve
+> /dev/mem, but merely the setserial program.)
+>
+> Another, non-hardware way is the killall program used from a privileged
+> context.  On some flavours of Unix, it terminates programs that match
+> the argument.  On others, it terminates _all_ programs without warning,
+> effectively taking the system down.
+>
+> There are 32-bit ARM SoCs that hard-lock if you try to access a device
+> and the clocks for that device are disabled - irrespective of whether
+> that is a kernel or user mode access.
+>
+> Whoever has privileged system access (iow, the ability to directly
+> talk to hardware or configure drivers) has a responsibility to know
+> what to do and, more importantly, what not to do.  Poking around in
+> /dev/mem definitely comes under the heading of "don't do that unless
+> you know *exactly* what you are doing".
+>
+> In normal circumstances, _nothing_ in userspace should have /dev/mem
+> open - indeed, the kernel build system provides an option to disable
+> this special device file via the CONFIG_DEVMEM.
+>
+> It has to be said that /dev/mem should _never_ be exposed to non-
+> privileged users on the system - it's way too dangerous to do so,
+> since as soon as you do that, you have *no* system security what so
+> ever.  Your average user is then at liberty to manually read *and*
+> *write* the hardware *including* the kernel code _and_ page tables,
+> which means they can bypass *all* software protections and some
+> hardware ones as well.
+>
+> TBH, I'd say that for people who don't know what they're doing, poking
+> about in /dev/mem is like pointing a gun at your foot while squeezing
+> the trigger.  It won't end well.
+>
+Thanks for clarifying concern. My idea was to keep kernel running no
+matter what user does
+and due to that I proposed simple fix to avoid panic with some
+notification(which worked in our
+environment) and was as per little bit old kernel 4.14 version.
 
-This looks like a good idea to me.
+All suggested example modifies system/device memory
+i.e.clock,dram,uart so user knows very well
+what is being done and so may expect weird behavior but here I was
+just (read)accessing i.e.
+ not modifying. I understand (read) access could also result in
+security violation and it will be difficult to
+distinguish case and  if all are thinking that it is expected behavior
+and best to panic kernel, I am also Okay.
 
-I wonder if the two "has_alpha" and "is_yuv" bools should be bitfields
-to reduce the footprint (not sure what the general DRM attitude to
-bitfields is), but either way:
-
-Reviewed-by: Brian Starkey <brian.starkey@arm.com>
-
->
->Signed-off-by: Ayan Kumar halder <ayan.halder@arm.com>
->---
-> drivers/gpu/drm/drm_fourcc.c | 42 +++++++++++++++++++++---------------------
-> include/drm/drm_fourcc.h     |  2 ++
-> 2 files changed, 23 insertions(+), 21 deletions(-)
->
->diff --git a/drivers/gpu/drm/drm_fourcc.c b/drivers/gpu/drm/drm_fourcc.c
->index 5ca6395..35c1e27 100644
->--- a/drivers/gpu/drm/drm_fourcc.c
->+++ b/drivers/gpu/drm/drm_fourcc.c
->@@ -152,27 +152,27 @@ const struct drm_format_info *__drm_format_info(u32 format)
-> 		{ .format = DRM_FORMAT_XBGR8888_A8,	.depth = 32, .num_planes = 2, .cpp = { 4, 1, 0 }, .hsub = 1, .vsub = 1, .has_alpha = true },
-> 		{ .format = DRM_FORMAT_RGBX8888_A8,	.depth = 32, .num_planes = 2, .cpp = { 4, 1, 0 }, .hsub = 1, .vsub = 1, .has_alpha = true },
-> 		{ .format = DRM_FORMAT_BGRX8888_A8,	.depth = 32, .num_planes = 2, .cpp = { 4, 1, 0 }, .hsub = 1, .vsub = 1, .has_alpha = true },
->-		{ .format = DRM_FORMAT_YUV410,		.depth = 0,  .num_planes = 3, .cpp = { 1, 1, 1 }, .hsub = 4, .vsub = 4 },
->-		{ .format = DRM_FORMAT_YVU410,		.depth = 0,  .num_planes = 3, .cpp = { 1, 1, 1 }, .hsub = 4, .vsub = 4 },
->-		{ .format = DRM_FORMAT_YUV411,		.depth = 0,  .num_planes = 3, .cpp = { 1, 1, 1 }, .hsub = 4, .vsub = 1 },
->-		{ .format = DRM_FORMAT_YVU411,		.depth = 0,  .num_planes = 3, .cpp = { 1, 1, 1 }, .hsub = 4, .vsub = 1 },
->-		{ .format = DRM_FORMAT_YUV420,		.depth = 0,  .num_planes = 3, .cpp = { 1, 1, 1 }, .hsub = 2, .vsub = 2 },
->-		{ .format = DRM_FORMAT_YVU420,		.depth = 0,  .num_planes = 3, .cpp = { 1, 1, 1 }, .hsub = 2, .vsub = 2 },
->-		{ .format = DRM_FORMAT_YUV422,		.depth = 0,  .num_planes = 3, .cpp = { 1, 1, 1 }, .hsub = 2, .vsub = 1 },
->-		{ .format = DRM_FORMAT_YVU422,		.depth = 0,  .num_planes = 3, .cpp = { 1, 1, 1 }, .hsub = 2, .vsub = 1 },
->-		{ .format = DRM_FORMAT_YUV444,		.depth = 0,  .num_planes = 3, .cpp = { 1, 1, 1 }, .hsub = 1, .vsub = 1 },
->-		{ .format = DRM_FORMAT_YVU444,		.depth = 0,  .num_planes = 3, .cpp = { 1, 1, 1 }, .hsub = 1, .vsub = 1 },
->-		{ .format = DRM_FORMAT_NV12,		.depth = 0,  .num_planes = 2, .cpp = { 1, 2, 0 }, .hsub = 2, .vsub = 2 },
->-		{ .format = DRM_FORMAT_NV21,		.depth = 0,  .num_planes = 2, .cpp = { 1, 2, 0 }, .hsub = 2, .vsub = 2 },
->-		{ .format = DRM_FORMAT_NV16,		.depth = 0,  .num_planes = 2, .cpp = { 1, 2, 0 }, .hsub = 2, .vsub = 1 },
->-		{ .format = DRM_FORMAT_NV61,		.depth = 0,  .num_planes = 2, .cpp = { 1, 2, 0 }, .hsub = 2, .vsub = 1 },
->-		{ .format = DRM_FORMAT_NV24,		.depth = 0,  .num_planes = 2, .cpp = { 1, 2, 0 }, .hsub = 1, .vsub = 1 },
->-		{ .format = DRM_FORMAT_NV42,		.depth = 0,  .num_planes = 2, .cpp = { 1, 2, 0 }, .hsub = 1, .vsub = 1 },
->-		{ .format = DRM_FORMAT_YUYV,		.depth = 0,  .num_planes = 1, .cpp = { 2, 0, 0 }, .hsub = 2, .vsub = 1 },
->-		{ .format = DRM_FORMAT_YVYU,		.depth = 0,  .num_planes = 1, .cpp = { 2, 0, 0 }, .hsub = 2, .vsub = 1 },
->-		{ .format = DRM_FORMAT_UYVY,		.depth = 0,  .num_planes = 1, .cpp = { 2, 0, 0 }, .hsub = 2, .vsub = 1 },
->-		{ .format = DRM_FORMAT_VYUY,		.depth = 0,  .num_planes = 1, .cpp = { 2, 0, 0 }, .hsub = 2, .vsub = 1 },
->-		{ .format = DRM_FORMAT_AYUV,		.depth = 0,  .num_planes = 1, .cpp = { 4, 0, 0 }, .hsub = 1, .vsub = 1, .has_alpha = true },
->+		{ .format = DRM_FORMAT_YUV410,		.depth = 0,  .num_planes = 3, .cpp = { 1, 1, 1 }, .hsub = 4, .vsub = 4, .is_yuv = true },
->+		{ .format = DRM_FORMAT_YVU410,		.depth = 0,  .num_planes = 3, .cpp = { 1, 1, 1 }, .hsub = 4, .vsub = 4, .is_yuv = true },
->+		{ .format = DRM_FORMAT_YUV411,		.depth = 0,  .num_planes = 3, .cpp = { 1, 1, 1 }, .hsub = 4, .vsub = 1, .is_yuv = true },
->+		{ .format = DRM_FORMAT_YVU411,		.depth = 0,  .num_planes = 3, .cpp = { 1, 1, 1 }, .hsub = 4, .vsub = 1, .is_yuv = true },
->+		{ .format = DRM_FORMAT_YUV420,		.depth = 0,  .num_planes = 3, .cpp = { 1, 1, 1 }, .hsub = 2, .vsub = 2, .is_yuv = true },
->+		{ .format = DRM_FORMAT_YVU420,		.depth = 0,  .num_planes = 3, .cpp = { 1, 1, 1 }, .hsub = 2, .vsub = 2, .is_yuv = true },
->+		{ .format = DRM_FORMAT_YUV422,		.depth = 0,  .num_planes = 3, .cpp = { 1, 1, 1 }, .hsub = 2, .vsub = 1, .is_yuv = true },
->+		{ .format = DRM_FORMAT_YVU422,		.depth = 0,  .num_planes = 3, .cpp = { 1, 1, 1 }, .hsub = 2, .vsub = 1, .is_yuv = true },
->+		{ .format = DRM_FORMAT_YUV444,		.depth = 0,  .num_planes = 3, .cpp = { 1, 1, 1 }, .hsub = 1, .vsub = 1, .is_yuv = true },
->+		{ .format = DRM_FORMAT_YVU444,		.depth = 0,  .num_planes = 3, .cpp = { 1, 1, 1 }, .hsub = 1, .vsub = 1, .is_yuv = true },
->+		{ .format = DRM_FORMAT_NV12,		.depth = 0,  .num_planes = 2, .cpp = { 1, 2, 0 }, .hsub = 2, .vsub = 2, .is_yuv = true },
->+		{ .format = DRM_FORMAT_NV21,		.depth = 0,  .num_planes = 2, .cpp = { 1, 2, 0 }, .hsub = 2, .vsub = 2, .is_yuv = true },
->+		{ .format = DRM_FORMAT_NV16,		.depth = 0,  .num_planes = 2, .cpp = { 1, 2, 0 }, .hsub = 2, .vsub = 1, .is_yuv = true },
->+		{ .format = DRM_FORMAT_NV61,		.depth = 0,  .num_planes = 2, .cpp = { 1, 2, 0 }, .hsub = 2, .vsub = 1, .is_yuv = true },
->+		{ .format = DRM_FORMAT_NV24,		.depth = 0,  .num_planes = 2, .cpp = { 1, 2, 0 }, .hsub = 1, .vsub = 1, .is_yuv = true },
->+		{ .format = DRM_FORMAT_NV42,		.depth = 0,  .num_planes = 2, .cpp = { 1, 2, 0 }, .hsub = 1, .vsub = 1, .is_yuv = true },
->+		{ .format = DRM_FORMAT_YUYV,		.depth = 0,  .num_planes = 1, .cpp = { 2, 0, 0 }, .hsub = 2, .vsub = 1, .is_yuv = true },
->+		{ .format = DRM_FORMAT_YVYU,		.depth = 0,  .num_planes = 1, .cpp = { 2, 0, 0 }, .hsub = 2, .vsub = 1, .is_yuv = true },
->+		{ .format = DRM_FORMAT_UYVY,		.depth = 0,  .num_planes = 1, .cpp = { 2, 0, 0 }, .hsub = 2, .vsub = 1, .is_yuv = true },
->+		{ .format = DRM_FORMAT_VYUY,		.depth = 0,  .num_planes = 1, .cpp = { 2, 0, 0 }, .hsub = 2, .vsub = 1, .is_yuv = true },
->+		{ .format = DRM_FORMAT_AYUV,		.depth = 0,  .num_planes = 1, .cpp = { 4, 0, 0 }, .hsub = 1, .vsub = 1, .has_alpha = true, .is_yuv = true },
-> 	};
->
-> 	unsigned int i;
->diff --git a/include/drm/drm_fourcc.h b/include/drm/drm_fourcc.h
->index 3e86408..f9c1584 100644
->--- a/include/drm/drm_fourcc.h
->+++ b/include/drm/drm_fourcc.h
->@@ -39,6 +39,7 @@ struct drm_mode_fb_cmd2;
->  * @hsub: Horizontal chroma subsampling factor
->  * @vsub: Vertical chroma subsampling factor
->  * @has_alpha: Does the format embeds an alpha component?
->+ * @is_yuv: Is it a YUV format?
->  */
-> struct drm_format_info {
-> 	u32 format;
->@@ -48,6 +49,7 @@ struct drm_format_info {
-> 	u8 hsub;
-> 	u8 vsub;
-> 	bool has_alpha;
->+	bool is_yuv;
-> };
->
-> /**
->-- 
->2.7.4
->
+> --
+> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+> FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
+> According to speedtest.net: 13Mbps down 490kbps up
