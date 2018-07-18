@@ -1,30 +1,37 @@
 From: xuwei5@hisilicon.com (Wei Xu)
-Date: Wed, 18 Jul 2018 16:36:05 +0100
-Subject: [PATCH 0/3] ARM: hisi: fix of_iomap errors
-In-Reply-To: <1531387704-13265-1-git-send-email-hofrat@osadl.org>
-References: <1531387704-13265-1-git-send-email-hofrat@osadl.org>
-Message-ID: <5B4F5E65.4050503@hisilicon.com>
+Date: Wed, 18 Jul 2018 16:36:49 +0100
+Subject: [PATCH] arm64: defconfig: enable HiSilicon PMU driver
+In-Reply-To: <1530067786-195470-1-git-send-email-wangzhou1@hisilicon.com>
+References: <1530067786-195470-1-git-send-email-wangzhou1@hisilicon.com>
+Message-ID: <5B4F5E91.3000803@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicholas,
+Hi Zhou,
 
-On 2018/7/12 10:28, Nicholas Mc Guire wrote:
-> This patch set addresses two issues in arch/arm/mach-hisi/hotplug.c
-> 
-> 1) The hisi hotplug functions were using a few unchecked 
->    of_iomap() while at the same time the system relied on
->    those mappings. Checks for !NULL were inserted.
-> 
-> 2) Further some mandatory of_node_put() were missing and have
->    been inserted.
-> 
-> 
-> .
-> 
+On 2018/6/27 3:49, Zhou Wang wrote:
+> Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
 
 Thanks!
-Applied all the 3 patches to the hisilicon SoC tree.
+Applied to the hisilicon defconfig tree.
 
 Best Regards,
 Wei
+
+> ---
+>  arch/arm64/configs/defconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+> index 3cfa8ca..be36e61 100644
+> --- a/arch/arm64/configs/defconfig
+> +++ b/arch/arm64/configs/defconfig
+> @@ -633,6 +633,7 @@ CONFIG_PHY_ROCKCHIP_PCIE=m
+>  CONFIG_PHY_ROCKCHIP_TYPEC=y
+>  CONFIG_PHY_XGENE=y
+>  CONFIG_PHY_TEGRA_XUSB=y
+> +CONFIG_HISI_PMU=y
+>  CONFIG_QCOM_L2_PMU=y
+>  CONFIG_QCOM_L3_PMU=y
+>  CONFIG_MESON_EFUSE=m
+> 
