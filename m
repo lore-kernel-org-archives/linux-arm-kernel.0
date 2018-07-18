@@ -1,45 +1,177 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 18 Jul 2018 11:28:25 +0530
-Subject: [PATCH 3/6] arm64: dts: hisilicon: Add missing cooling device
- properties for CPUs
-In-Reply-To: <5B09A5B4.4050904@hisilicon.com>
-References: <cover.1527225682.git.viresh.kumar@linaro.org>
- <0754957a2c3842cf4e36fa27231d327fd8d6d499.1527225682.git.viresh.kumar@linaro.org>
- <5B09A0B4.2080400@hisilicon.com> <5B09A5B4.4050904@hisilicon.com>
-Message-ID: <20180718055825.nrh7wk3cfuvib2ng@vireshk-i7>
+From: honghui.zhang@mediatek.com (Honghui Zhang)
+Date: Wed, 18 Jul 2018 14:02:41 +0800
+Subject: [PATCH v3 3/4] PCI: mediatek: Add system pm support for MT2712
+ and MT7622
+In-Reply-To: <20180717171543.GA20991@red-moon>
+References: <1530518264-6125-1-git-send-email-honghui.zhang@mediatek.com>
+ <1530518264-6125-4-git-send-email-honghui.zhang@mediatek.com>
+ <20180717171543.GA20991@red-moon>
+Message-ID: <1531893761.31406.15.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26-05-18, 19:21, Wei Xu wrote:
-> Hi Viresh,
+On Tue, 2018-07-17 at 18:15 +0100, Lorenzo Pieralisi wrote:
+> [+Rafael, Kevin, Ulf]
 > 
-> On 2018/5/26 19:00, Wei Xu wrote:
-> > Hi Viresh,
+> On Mon, Jul 02, 2018 at 03:57:43PM +0800, honghui.zhang at mediatek.com wrote:
+> > From: Honghui Zhang <honghui.zhang@mediatek.com>
 > > 
-> > On 2018/5/25 6:40, Viresh Kumar wrote:
-> >> The cooling device properties, like "#cooling-cells" and
-> >> "dynamic-power-coefficient", should either be present for all the CPUs
-> >> of a cluster or none. If these are present only for a subset of CPUs of
-> >> a cluster then things will start falling apart as soon as the CPUs are
-> >> brought online in a different order. For example, this will happen
-> >> because the operating system looks for such properties in the CPU node
-> >> it is trying to bring up, so that it can register a cooling device.
-> >>
-> >> Add such missing properties.
-> >>
-> >> Do minor rearrangement as well to keep ordering consistent.
-> >>
-> >> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> > The MTCMOS of PCIe Host for MT2712 and MT7622 will be off when system
+> > suspend, and all the internal control register will be reset after system
+> > resume. The PCIe link should be re-established and the related control
+> > register values should be re-set after system resume.
 > > 
-> > Thanks!
-> > Applied to the hisilicon fix tree.
+> > Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
+> > Acked-by: Ryder Lee <ryder.lee@mediatek.com>
+> > ---
+> >  drivers/pci/controller/pcie-mediatek.c | 67 ++++++++++++++++++++++++++++++++++
+> >  1 file changed, 67 insertions(+)
+> > 
+> > diff --git a/drivers/pci/controller/pcie-mediatek.c b/drivers/pci/controller/pcie-mediatek.c
+> > index 86918d4..175d7b6 100644
+> > --- a/drivers/pci/controller/pcie-mediatek.c
+> > +++ b/drivers/pci/controller/pcie-mediatek.c
+> > @@ -134,12 +134,14 @@ struct mtk_pcie_port;
+> >  /**
+> >   * struct mtk_pcie_soc - differentiate between host generations
+> >   * @need_fix_class_id: whether this host's class ID needed to be fixed or not
+> > + * @pm_support: whether the host's MTCMOS will be off when suspend
+> >   * @ops: pointer to configuration access functions
+> >   * @startup: pointer to controller setting functions
+> >   * @setup_irq: pointer to initialize IRQ functions
+> >   */
+> >  struct mtk_pcie_soc {
+> >  	bool need_fix_class_id;
+> > +	bool pm_support;
+> >  	struct pci_ops *ops;
+> >  	int (*startup)(struct mtk_pcie_port *port);
+> >  	int (*setup_irq)(struct mtk_pcie_port *port, struct device_node *node);
+> > @@ -1197,12 +1199,75 @@ static int mtk_pcie_probe(struct platform_device *pdev)
+> >  	return err;
+> >  }
+> >  
+> > +static int __maybe_unused mtk_pcie_suspend_noirq(struct device *dev)
+> > +{
+> > +	struct mtk_pcie *pcie = dev_get_drvdata(dev);
+> > +	const struct mtk_pcie_soc *soc = pcie->soc;
+> > +	struct mtk_pcie_port *port;
+> > +
+> > +	if (!soc->pm_support)
+> > +		return 0;
+> > +
+> > +	if (list_empty(&pcie->ports))
+> > +		return 0;
+> > +
+> > +	list_for_each_entry(port, &pcie->ports, list) {
+> > +		clk_disable_unprepare(port->pipe_ck);
+> > +		clk_disable_unprepare(port->obff_ck);
+> > +		clk_disable_unprepare(port->axi_ck);
+> > +		clk_disable_unprepare(port->aux_ck);
+> > +		clk_disable_unprepare(port->ahb_ck);
+> > +		clk_disable_unprepare(port->sys_ck);
+> > +		phy_power_off(port->phy);
+> > +		phy_exit(port->phy);
+> > +	}
+> > +
+> > +	mtk_pcie_subsys_powerdown(pcie);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static int __maybe_unused mtk_pcie_resume_noirq(struct device *dev)
+> > +{
+> > +	struct mtk_pcie *pcie = dev_get_drvdata(dev);
+> > +	const struct mtk_pcie_soc *soc = pcie->soc;
+> > +	struct mtk_pcie_port *port, *tmp;
+> > +
+> > +	if (!soc->pm_support)
+> > +		return 0;
+> > +
+> > +	if (list_empty(&pcie->ports))
+> > +		return 0;
+> > +
+> > +	if (dev->pm_domain) {
+> > +		pm_runtime_enable(dev);
+> > +		pm_runtime_get_sync(dev);
+> > +	}
 > 
-> Sorry for the noise!
-> It seems this patch is still under discussion.
-> I will drop it firstly.
+> Are these runtime PM calls needed/abused here ?
+> 
+> Mind explaining the logic ?
+> 
+> There is certainly an asymmetry with the suspend callback which made me
+> suspicious, I am pretty certain Rafael/Kevin/Ulf can help me clarify so
+> that we can make progress with this patch.
+> 
+> Lorenzo
+> 
+Hi Lorenzo, thanks for your comments.
+Sorry I don't get you.
+I believe that in suspend callbacks the pm_runtime_put_sync and
+pm_runtime_disable should be called to gated the CMOS for this module,
+while the pm_rumtime_enable and pm_rumtime_get_sync should be called in
+resume callback.
 
-Wei, can you please apply it again now that all the discussions are
-over ?
+That's exactly this patch doing.
+But the pm_rumtime_put_sync and pm_runtime_disable functions was wrapped
+in the mtk_pcie_subsys_powerdown.
 
--- 
-viresh
+I did not call mtk_pcie_subsys_powerup since it does not just wrapped
+pm_rumtime related functions but also do the platform_resource_get,
+devm_ioremap, and free_ck clock get which I do not needed in resume
+callback.
+
+Do you think it will be much clear if I abstract the
+platform_resource_get, devm_ioremap functions from
+mtk_pcie_subsys_powerup and put it to a new functions like
+mtk_pcie_subsys_resource_get, and then we may call the
+mtk_pcie_subsys_powerup in the resume function?
+
+thanks
+> > +
+> > +	clk_prepare_enable(pcie->free_ck);
+> > +
+> > +	list_for_each_entry_safe(port, tmp, &pcie->ports, list)
+> > +		mtk_pcie_enable_port(port);
+> > +
+> > +	/* In case of EP was removed while system suspend. */
+> > +	if (list_empty(&pcie->ports))
+> > +		mtk_pcie_subsys_powerdown(pcie);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static const struct dev_pm_ops mtk_pcie_pm_ops = {
+> > +	SET_NOIRQ_SYSTEM_SLEEP_PM_OPS(mtk_pcie_suspend_noirq,
+> > +				      mtk_pcie_resume_noirq)
+> > +};
+> > +
+> >  static const struct mtk_pcie_soc mtk_pcie_soc_v1 = {
+> >  	.ops = &mtk_pcie_ops,
+> >  	.startup = mtk_pcie_startup_port,
+> >  };
+> >  
+> >  static const struct mtk_pcie_soc mtk_pcie_soc_mt2712 = {
+> > +	.pm_support = true,
+> >  	.ops = &mtk_pcie_ops_v2,
+> >  	.startup = mtk_pcie_startup_port_v2,
+> >  	.setup_irq = mtk_pcie_setup_irq,
+> > @@ -1210,6 +1275,7 @@ static const struct mtk_pcie_soc mtk_pcie_soc_mt2712 = {
+> >  
+> >  static const struct mtk_pcie_soc mtk_pcie_soc_mt7622 = {
+> >  	.need_fix_class_id = true,
+> > +	.pm_support = true,
+> >  	.ops = &mtk_pcie_ops_v2,
+> >  	.startup = mtk_pcie_startup_port_v2,
+> >  	.setup_irq = mtk_pcie_setup_irq,
+> > @@ -1229,6 +1295,7 @@ static struct platform_driver mtk_pcie_driver = {
+> >  		.name = "mtk-pcie",
+> >  		.of_match_table = mtk_pcie_ids,
+> >  		.suppress_bind_attrs = true,
+> > +		.pm = &mtk_pcie_pm_ops,
+> >  	},
+> >  };
+> >  builtin_platform_driver(mtk_pcie_driver);
+> > -- 
+> > 2.6.4
+> > 
