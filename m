@@ -1,39 +1,50 @@
-From: suzuki.katsuhiro@socionext.com (Katsuhiro Suzuki)
-Date: Wed, 18 Jul 2018 10:07:53 +0900
-Subject: [RESEND PATCH] media: helene: fix xtal frequency setting at power on
-Message-ID: <20180718010753.18717-1-suzuki.katsuhiro@socionext.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Wed, 18 Jul 2018 10:07:47 +0900
+Subject: [PATCH] ARM: vfp: clean up arch/arm/vfp/Makefile
+Message-ID: <1531876067-4957-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes crystal frequency setting when power on this device.
+Since commit 799c43415442 ("kbuild: thin archives make default for
+all archs"), $(AR) is used instead of $(LD) to combine object files.
 
-Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
-Acked-by: Abylay Ospan <aospan@netup.ru>
+The following code in arch/arm/vfp/Makefile:
 
+  LDFLAGS         +=--no-warn-mismatch
+
+... is no longer used.
+
+Also, arch/arm/Makefile already guards arch/arm/vfp/ by a boolean
+symbol, CONFIG_VFP, like this:
+
+  core-$(CONFIG_VFP)              += arch/arm/vfp/
+
+So, $(CONFIG_VFP) is always evaluated to y in arch/arm/vfp/Makefile.
+There is no point to use pseudo object, vfp.o, which never becomes
+a module.  Add all objects to obj-y directly.
+
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
 
-Changes from before:
-  - Add Abylay's Ack
+KernelVersion: v4.18-rc5
 
----
- drivers/media/dvb-frontends/helene.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/media/dvb-frontends/helene.c b/drivers/media/dvb-frontends/helene.c
-index 0a4f312c4368..8fcf7a00782a 100644
---- a/drivers/media/dvb-frontends/helene.c
-+++ b/drivers/media/dvb-frontends/helene.c
-@@ -924,7 +924,10 @@ static int helene_x_pon(struct helene_priv *priv)
- 	helene_write_regs(priv, 0x99, cdata, sizeof(cdata));
+ arch/arm/vfp/Makefile | 5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
+
+diff --git a/arch/arm/vfp/Makefile b/arch/arm/vfp/Makefile
+index a81404c..94516c4 100644
+--- a/arch/arm/vfp/Makefile
++++ b/arch/arm/vfp/Makefile
+@@ -8,8 +8,5 @@
+ # asflags-y := -DDEBUG
  
- 	/* 0x81 - 0x94 */
--	data[0] = 0x18; /* xtal 24 MHz */
-+	if (priv->xtal == SONY_HELENE_XTAL_16000)
-+		data[0] = 0x10; /* xtal 16 MHz */
-+	else
-+		data[0] = 0x18; /* xtal 24 MHz */
- 	data[1] = (uint8_t)(0x80 | (0x04 & 0x1F)); /* 4 x 25 = 100uA */
- 	data[2] = (uint8_t)(0x80 | (0x26 & 0x7F)); /* 38 x 0.25 = 9.5pF */
- 	data[3] = 0x80; /* REFOUT signal output 500mVpp */
+ KBUILD_AFLAGS	:=$(KBUILD_AFLAGS:-msoft-float=-Wa,-mfpu=softvfp+vfp -mfloat-abi=soft)
+-LDFLAGS		+=--no-warn-mismatch
+ 
+-obj-y			+= vfp.o
+-
+-vfp-$(CONFIG_VFP)	+= vfpmodule.o entry.o vfphw.o vfpsingle.o vfpdouble.o
++obj-y		+= vfpmodule.o entry.o vfphw.o vfpsingle.o vfpdouble.o
 -- 
-2.17.0
+2.7.4
