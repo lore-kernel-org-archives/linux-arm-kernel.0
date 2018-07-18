@@ -1,70 +1,66 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Wed, 18 Jul 2018 16:58:32 +0200
-Subject: [resend PATCH v4 2/5] clk: mediatek: mt2701-mmsys: switch to
- platform device probing (fwd)
-In-Reply-To: <alpine.DEB.2.20.1807181654200.3113@hadrien>
-References: <alpine.DEB.2.20.1807181654200.3113@hadrien>
-Message-ID: <11ba8df2-21f3-71e5-8467-813eda93f8ec@gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 18 Jul 2018 07:59:25 -0700
+Subject: [GIT PULL] pxa for v4.19-v2
+In-Reply-To: <59475364-3050-d5c3-e3df-a750c3cb6bc0@zonque.org>
+References: <871sc37xrs.fsf@belgarion.home>
+ <CAOesGMizEXbF5VUCshamVuVSkLQd7274m3zGWwZ3E3ULxoomEw@mail.gmail.com>
+ <59475364-3050-d5c3-e3df-a750c3cb6bc0@zonque.org>
+Message-ID: <CAOesGMgnwn5bzGY2y3-xiJitamBf=V8jmbTuq7uAFTSE_oEnkw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Jul 18, 2018 at 7:56 AM, Daniel Mack <daniel@zonque.org> wrote:
+> On Wednesday, July 18, 2018 04:55 PM, Olof Johansson wrote:
+>>
+>> On Mon, Jul 16, 2018 at 1:04 PM, Robert Jarzmik <robert.jarzmik@free.fr>
+>> wrote:
+>>>
+>>> Hi Arnd, Kevin, and Olof,
+>>>
+>>> This is the pxa pull request for 4.19 v2. It is the same pull request as
+>>> v1,
+>>> with one patch removed and postponed for 4.20 to fix cross trees
+>>> dependencies
+>>> breakage.
+>>>
+>>> As before, this time it touches a lot of subsystems because of the dma
+>>> slave map
+>>> conversion of the pxa architecture.
+>>>
+>>> Can you please consider pulling ?
+>>>
+>>> The following changes since commit
+>>> ce397d215ccd07b8ae3f71db689aedb85d56ab40:
+>>>
+>>>    Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+>>>
+>>> are available in the git repository at:
+>>>
+>>>    https://github.com/rjarzmik/linux.git tags/pxa-for-4.19-v2
+>>>
+>>> for you to fetch changes up to cbc654c88178b7dc3b63f57278cb917ffdb629cc:
+>>>
+>>>    net: smc91x: remove the dmaengine compat need (2018-06-21 10:45:47
+>>> +0200)
+>>>
+>>> ----------------------------------------------------------------
+>>> This is the pxa changes for 4.19 cycle :
+>>>   - the pxa architecture is ported to dma slavemap
+>>>   - some minor AC97 fixes
+>>>   - some minor board fixes
+>>
+>>
+>> Thanks -- I merged just into our for-next yesterday to get one run
+>> through linux-next overnight, and that looked good. So I now merged it
+>> into next/soc as well.
+>
+>
+> Thanks! Can we get that missing patch merged in 4.19-rc2 maybe? I'd much
+> like to finally get this transition off the table for the 4.19 release :)
+
+Probably, but let's see what fallout is like during the merge window
+and decide then, send it right after -rc1 if that's the case (a patch
+is fine, no need to do a pull request).
 
 
-On 18/07/18 16:54, Julia Lawall wrote:
-> Please check on whether the kfree is still needed.
-
-No it is not needed, thanks for noting.
-Matthias
-
-> 
-> julia
-> 
-> ---------- Forwarded message ----------
-> Date: Wed, 18 Jul 2018 22:03:48 +0800
-> From: kbuild test robot <lkp@intel.com>
-> To: kbuild at 01.org
-> Cc: Julia Lawall <julia.lawall@lip6.fr>
-> Subject: Re: [resend PATCH v4 2/5] clk: mediatek: mt2701-mmsys: switch to
->     platform device probing
-> 
-> In-Reply-To: <20180717220328.792-3-matthias.bgg@kernel.org>
-> References: <20180717220328.792-3-matthias.bgg@kernel.org>
-> TO: matthias.bgg at kernel.org
-> 
-> Hi Matthias,
-> 
-> I love your patch! Perhaps something to improve:
-> 
-> [auto build test WARNING on sof-driver-fuweitax/master]
-> [also build test WARNING on v4.18-rc5 next-20180718]
-> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-> 
-> url:    https://github.com/0day-ci/linux/commits/matthias-bgg-kernel-org/arm-arm64-mediatek-Fix-mmsys-device-probing/20180718-191916
-> base:   https://github.com/fuweitax/linux master
-> :::::: branch date: 3 hours ago
-> :::::: commit date: 3 hours ago
-> 
->>> drivers/clk/mediatek/clk-mt2701-mm.c:128:1-6: WARNING: invalid free of devm_ allocated data
-> 
-> # https://github.com/0day-ci/linux/commit/555e11caac5f7729e8927939046adbfa2264f9f5
-> git remote add linux-review https://github.com/0day-ci/linux
-> git remote update linux-review
-> git checkout 555e11caac5f7729e8927939046adbfa2264f9f5
-> vim +128 drivers/clk/mediatek/clk-mt2701-mm.c
-> 
-> e98621182 Shunli Wang      2016-11-04  122
-> 555e11caa Matthias Brugger 2018-07-18  123  static int clk_mt2701_mm_remove(struct platform_device *pdev)
-> 555e11caa Matthias Brugger 2018-07-18  124  {
-> 555e11caa Matthias Brugger 2018-07-18  125  	struct clk_mt2701_mm_priv *private = platform_get_drvdata(pdev);
-> 555e11caa Matthias Brugger 2018-07-18  126
-> 555e11caa Matthias Brugger 2018-07-18  127  	kfree(private->clk_data);
-> 555e11caa Matthias Brugger 2018-07-18 @128  	kfree(private);
-> 555e11caa Matthias Brugger 2018-07-18  129
-> 555e11caa Matthias Brugger 2018-07-18  130  	return 0;
-> 555e11caa Matthias Brugger 2018-07-18  131  }
-> 555e11caa Matthias Brugger 2018-07-18  132
-> 
-> ---
-> 0-DAY kernel test infrastructure                Open Source Technology Center
-> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
-> 
+-Olof
