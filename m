@@ -1,43 +1,63 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 18 Jul 2018 08:53:55 -0700
-Subject: [GIT PULL] arm64: defconfig: hisilicon config updates for v4.19
-In-Reply-To: <5B4F60ED.2070106@hisilicon.com>
-References: <5B4F60ED.2070106@hisilicon.com>
-Message-ID: <CAOesGMgaqFeqqpcFxGvs-r3g-2WRYyhk=JLhWgp4gO41gXKTcg@mail.gmail.com>
+From: edgar.righi@lsitec.org.br (Edgar Bernardi Righi)
+Date: Wed, 18 Jul 2018 12:54:44 -0300
+Subject: [PATCH v1 03/04] arm: dts: actions: Enable clock controller for
+ Actions Semi S500 SoC
+Message-ID: <CADHB5bDhdXonoSUahgxqV8_rcUwYxvh3t9WDNN4YO8g7KSt07Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 18, 2018 at 8:46 AM, Wei Xu <xuwei5@hisilicon.com> wrote:
-> Hi Olof, Hi Arnd,
->
-> Please consider to pull the following changes.
-> Thanks!
->
-> Best Regards,
-> Wei
->
-> ---
->
-> The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
->
->   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
->
-> are available in the Git repository at:
->
->   git://github.com/hisilicon/linux-hisi.git tags/hisi-defconfig-for-4.19
->
-> for you to fetch changes up to cc4493faf494bb8af2324b1b7cabd1f1457a76ca:
->
->   arm64: defconfig: enable HiSilicon PMU driver (2018-07-17 14:06:16 +0100)
->
-> ----------------------------------------------------------------
-> ARM64: hisilicon: defconfig updates for 4.18
->
-> - Enable uncore pmu for some hisilicon SoCs
+Enable clock controller for Actions Semi S500 SoC on owl-s500 device tree.
+Tested on a Lemaker Guitar board.
 
-Thanks, merged! Btw, for single patches like these, you can just git
-send-email the patch to us too -- it's about the same amount of work
-and fewer merge commits. But it's up to you.
+File(s) updated: "/arch/arm/boot/dts/owl-s500.dtsi"
 
+Signed-off-by: Edgar Bernardi Righi <edgar.righi@lsitec.org.br>
 
--Olof
+diff -uprN -X vanilla/Documentation/dontdiff
+vanilla/arch/arm/boot/dts/owl-s500.dtsi
+linux/arch/arm/boot/dts/owl-s500.dtsi
+--- vanilla/arch/arm/boot/dts/owl-s500.dtsi    2018-07-17
+13:07:15.675710000 -0300
++++ linux/arch/arm/boot/dts/owl-s500.dtsi    2018-07-18 12:51:07.875364441 -0300
+@@ -2,12 +2,14 @@
+  * Actions Semi S500 SoC
+  *
+  * Copyright (c) 2016-2017 Andreas F?rber
++ * Copyright (c) 2018-2018 Edgar Bernardi Righi
+  *
+  * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+  */
+
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+ #include <dt-bindings/power/owl-s500-powergate.h>
++#include <dt-bindings/clock/actions,s500-cmu.h>
+
+ / {
+     compatible = "actions,s500";
+@@ -71,6 +73,12 @@
+         #clock-cells = <0>;
+     };
+
++    losc: losc {
++        compatible = "fixed-clock";
++        clock-frequency = <32678>;
++        #clock-cells = <0>;
++    };
++
+     soc {
+         compatible = "simple-bus";
+         #address-cells = <1>;
+@@ -170,6 +178,13 @@
+             status = "disabled";
+         };
+
++        cmu: clock-controller at b0160000 {
++            compatible = "actions,s500-cmu";
++            reg = <0xb0160000 0x8000>;
++            clocks = <&hosc>, <&losc>;
++            #clock-cells = <1>;
++        };
++
+         timer: timer at b0168000 {
+             compatible = "actions,s500-timer";
+             reg = <0xb0168000 0x8000>;
