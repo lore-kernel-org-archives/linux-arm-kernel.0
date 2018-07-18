@@ -1,52 +1,45 @@
-From: linux.amoon@gmail.com (Anand Moon)
-Date: Wed, 18 Jul 2018 23:18:45 +0530
-Subject: [PATCHv2] ARM: dts: exynos5: add missing interrupts for pwm node
-In-Reply-To: <CAJKOXPdAEp-7jw-AqPfmqq+ygY_p4BGt92voCNRc3z57KU_-ZA@mail.gmail.com>
-References: <1531918767-7177-1-git-send-email-linux.amoon@gmail.com>
- <CAJKOXPdAEp-7jw-AqPfmqq+ygY_p4BGt92voCNRc3z57KU_-ZA@mail.gmail.com>
-Message-ID: <CANAwSgQTJE4hRFEWhKQ3zbbnxUarxx=ieLHtn5qODUYyMj1O3A@mail.gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 18 Jul 2018 13:04:55 -0500
+Subject: [PATCH V2 0/5] arm64: Initial support Texas Instrument's AM654
+ Platform
+In-Reply-To: <20180626162615.19194-1-nm@ti.com>
+References: <20180626162615.19194-1-nm@ti.com>
+Message-ID: <20180718180455.gaej4fgf47zytdxk@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+On 16:26-20180626, Nishanth Menon wrote:
+> Hi,
+> 
+> This is an minor update from V1 posted earlier:
+> 	https://marc.info/?l=linux-kernel&m=152943745424138&w=2
+> 
+> The following series enables support for newest addition in TI's SoC
+> portfolio - AM654 SoC.
+> 
+> The series is based off v4.18-rc1, also available here:
+> https://github.com/nmenon/linux-2.6-playground/tree/upstream/v4.18-rc1/k3-1-am6-base
+> 
+> Key changes since RFC are indicated in respective patches:
+> * Pickedup Tony's Reviewed by
+> * Modified cbass nodes to indicate interconnect (patch #3 in the series)
 
-On 18 July 2018 at 19:25, Krzysztof Kozlowski <krzk@kernel.org> wrote:
-> On 18 July 2018 at 14:59, Anand Moon <linux.amoon@gmail.com> wrote:
->> Add missing GIC interrupts property for pwm nodes.
->>
->> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
->> ---
->> Fixed the patch indentation issue with all tabs.
->> sorry checkpatch could not figure out the error.
->> ---
->>  arch/arm/boot/dts/exynos5.dtsi | 5 +++++
->>  1 file changed, 5 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/exynos5.dtsi b/arch/arm/boot/dts/exynos5.dtsi
->> index 5d2f0a0..f48fb9b 100644
->> --- a/arch/arm/boot/dts/exynos5.dtsi
->> +++ b/arch/arm/boot/dts/exynos5.dtsi
->> @@ -169,6 +169,11 @@
->>                 pwm: pwm at 12dd0000 {
->>                         compatible = "samsung,exynos4210-pwm";
->>                         reg = <0x12DD0000 0x100>;
->> +                       interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>,
->> +                                       <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>,
->> +                                       <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>,
->> +                                       <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>,
->> +                                       <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>;
->
-> OK, thanks for v2. Now only tabs are used but in previous mail I
-> mentioned which example to use - the rtc node which nicely aligns
-> continued lines. Why you did not follow this alignment?
->
-> I'll fix it when applying, no need to resend.
->
-> Best regards,
-> Krzysztof
+Hi Tony,
 
-Thanks, I follow the tab protocol otherwise checkpatch would have
-complained of tab/space issue.
+Apologies on the off-request. Looks like Tero might be on vacation
+and might not be able to send the Pull request to arm-soc folks on time.
 
-Best Regards
--Anand
+Requesting you to pick them up on our behalf for v4.19 if it that is
+fine with you. We do have Rob's ack on the bindings themselves, and
+the patches also have been reviewed as well.
+
+Patchwork links:
+https://patchwork.kernel.org/patch/10527309/
+https://patchwork.kernel.org/patch/10489509/
+https://patchwork.kernel.org/patch/10489547/
+https://patchwork.kernel.org/patch/10489543/
+https://patchwork.kernel.org/patch/10489513/
+
+-- 
+Regards,
+Nishanth Menon
