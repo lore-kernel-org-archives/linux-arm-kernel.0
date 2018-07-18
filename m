@@ -1,69 +1,43 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 18 Jul 2018 11:33:16 +0100
-Subject: [PATCH v3 5/7] arm64: smp: remove cpu and numa topology
- information when hotplugging out CPU
-In-Reply-To: <CAMuHMdWv4BjXshBbqacebjbOz2eQM=1cBSjit8c2p7dmQP4ZxA@mail.gmail.com>
-References: <1530874968-5960-1-git-send-email-sudeep.holla@arm.com>
- <1530874968-5960-6-git-send-email-sudeep.holla@arm.com>
- <CAMuHMdXw9My+P1UCJ19Qdjq4O9gY_0QVFZaw6C5Ytmpyac59Vw@mail.gmail.com>
- <20180717140536.GA27323@e107155-lin>
- <CAMuHMdUnL=XyoSfRU+ebVUjsiP89V4vcoN=O4xc0VwHmLP72HA@mail.gmail.com>
- <1c47b3fd-59ba-aba4-43b2-ed98e750887b@arm.com>
- <5a23f1c8-27cb-b09c-90fc-edab3eec99f9@arm.com>
- <20180717170121.GA14049@e107155-lin>
- <CAMuHMdWv4BjXshBbqacebjbOz2eQM=1cBSjit8c2p7dmQP4ZxA@mail.gmail.com>
-Message-ID: <7cdb1d9b-cd2f-4dd7-25bf-450a7afa83d9@arm.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Wed, 18 Jul 2018 12:36:57 +0200
+Subject: [PATCH RT v2] arm64: fpsimd: use a local_lock() in addition to
+ local_bh_disable()
+In-Reply-To: <1531909728.6904.84.camel@gmx.de>
+References: <20180522172115.fpqguqlsq6bavtxy@linutronix.de>
+ <20180522132429.6f1dcf92@gandalf.local.home>
+ <20180522173333.aawadhkcekzvrswp@linutronix.de>
+ <20180711092555.268adf7f@gandalf.local.home>
+ <20180711133157.bvrza5vmthu6lwjd@linutronix.de>
+ <20180711093346.782af07a@gandalf.local.home>
+ <20180713174937.5ddaqpylalcmc3jq@linutronix.de>
+ <1531519424.23898.68.camel@gmx.de>
+ <20180718092741.pah2lubzo2a7tkmu@linutronix.de>
+ <1531909728.6904.84.camel@gmx.de>
+Message-ID: <20180718103657.zyqinxambp5n3tv6@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 2018-07-18 12:28:48 [+0200], Mike Galbraith wrote:
+> > Okay, so you did not test this because you can't compile.
+> 
+> Nope, the running kernel, the one that is doing the segfaulting etc,
+> has the patches applied.
+> 
+> It is exhibiting that symptom because those patches do not cure this
+> symptom, one which I verified to be present in virgin 4.14-rt as well. 
+> The pseudo-patch I sent, disabling preemption where it is assumed to be
+> disabled instead, does cure it.  With preemption so disabled, I can
+> beat on affected kernels (>=4.14-rt) as long as I like.
 
+ah. so gcc shows the problem instead gcc explodes with the patch
+applied. Okay. Let me stare at this a little more?
 
-On 18/07/18 08:15, Geert Uytterhoeven wrote:
-> Hi Sudeep,
+> This particular 48 core Cavium is very slow, maybe that makes it easier
+> to reproduce, dunno.  According to pipe-test, the thing is essentially
+> a dozen RPi super-glued together.  pipe-test pinned to a single core
+> can only context switch at ~40KHz with PREEMPT_RT, or ~90 with
+> NOPREEMPT, comparable to measurement done in real deal RPi.
 > 
-> On Tue, Jul 17, 2018 at 7:02 PM Sudeep Holla <sudeep.holla@arm.com> wrote:
->> On Tue, Jul 17, 2018 at 04:55:22PM +0100, Sudeep Holla wrote:
->>> Going through the code again, I think I understand the problem here.
->>> We use the topology_core_mask pointers which are stashed in cpu_groups[]
->>> But, the cpumask themselves will be getting modified as the cpus go up
->>> and down, so we need to make a copy instead of just using the pointer.
->>> I will see what we can do to fix that.
->>
->> This is what I could come up with. I haven't tested this but just compiled
->> it. Let me know if this resolves the issue.
-> 
-> Thanks, it did!
-> 
->> From: Sudeep Holla <sudeep.holla@arm.com>
->> Date: Tue, 17 Jul 2018 17:45:20 +0100
->> Subject: [PATCH] drivers/firmware: psci_checker: stash and use topology_core_cpumask for hotplug tests
->>
->> Commit 7f9545aa1a91 ("arm64: smp: remove cpu and numa topology information
->> when hotplugging out CPU") updates the cpu topology when the CPU is
->> hotplugged out. However the PSCI checker code uses the topology_core_cpumask
->> pointers for some of the cpu hotplug testing. Since the pointer to the
->> core_cpumask of the first CPU in the group is used, which when that CPU
->> itself is hotpugged out is just set to itself, the testing terminates
->> after that particular CPU is tested out. But the intention of this tests
->> is to cover all the CPU in the group.
->>
->> In order to support that, we need to stash the topology_core_cpumask
->> before the start of the test and use that value instead of pointer to a
->> cpumask which will be updated on CPU hotplug.
->>
->> Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> 
-> Fixes: 7f9545aa1a91a9a4 ("arm64: smp: remove cpu and numa topology
-> information when hotplugging out CPU")
-> Tested-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> 
+> 	-Mike
 
-Thanks, I will post the patch independently with small clean up to
-reduce allocation of cpumask
-
--- 
-Regards,
-Sudeep
+Sebastian
