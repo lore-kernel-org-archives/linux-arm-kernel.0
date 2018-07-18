@@ -1,87 +1,94 @@
-From: ayan.halder@arm.com (Ayan Halder)
-Date: Wed, 18 Jul 2018 15:40:51 +0100
-Subject: [Intel-gfx] [PATCH 5/5] drm/sun4i: Substitute
- sun4i_backend_format_is_yuv() with format->is_yuv
-In-Reply-To: <20180718101540.GT5565@intel.com>
-References: <1531847626-22248-1-git-send-email-ayan.halder@arm.com>
- <1531847626-22248-5-git-send-email-ayan.halder@arm.com>
- <20180718101540.GT5565@intel.com>
-Message-ID: <20180718144050.GA2056@arm.com>
+From: giulio.benetti@micronovasrl.com (Giulio Benetti)
+Date: Wed, 18 Jul 2018 16:42:25 +0200
+Subject: [PATCH] drm/sun4i: Handle DRM_BUS_FLAG_PIXDATA_*EDGE checking if
+ panel is used.
+In-Reply-To: <20180718142357.120998-1-giulio.benetti@micronovasrl.com>
+References: <20180613081647.31183-1-paul.kocialkowski@bootlin.com>
+ <20180718142357.120998-1-giulio.benetti@micronovasrl.com>
+Message-ID: <e1fcedb1-64d5-24fb-ffc1-d418620ec795@micronovasrl.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 18, 2018 at 01:15:40PM +0300, Ville Syrj?l? wrote:
+Hi Paul,
 
-Hi Ville,
-> On Tue, Jul 17, 2018 at 06:13:46PM +0100, Ayan Kumar Halder wrote:
-> > drm_format_info table has a field 'is_yuv' to denote if the format
-> > is yuv or not. The driver is expected to use this instead of
-> > having a function for the same purpose.
-> > 
-> > Signed-off-by: Ayan Kumar halder <ayan.halder@arm.com>
-> > ---
-> >  drivers/gpu/drm/sun4i/sun4i_backend.c | 12 +++---------
-> >  1 file changed, 3 insertions(+), 9 deletions(-)
-> > 
-> > diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
-> > index de0a76d..d7950b5 100644
-> > --- a/drivers/gpu/drm/sun4i/sun4i_backend.c
-> > +++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
-> > @@ -86,12 +86,6 @@ static inline bool sun4i_backend_format_is_packed_yuv422(uint32_t format)
-> >  	}
-> >  }
-> >  
-> > -static inline bool sun4i_backend_format_is_yuv(uint32_t format)
-> > -{
-> > -	return sun4i_backend_format_is_planar_yuv(format) ||
-> > -		sun4i_backend_format_is_packed_yuv422(format);
-> > -}
-> 
-> sun4i_backend_format_is_planar_yuv() is now unused so could be nuked.
-> Also the one remaining use of sun4i_backend_format_is_packed_yuv422()
-> could be replaced with 'is_yuv && num_planes == 1', so that one could
-> be easily killed off ass well.
+can you give a try to this patch on A13 with VGA DAC?
+Unfortunately I don't have an A13 board to test it.
 
-I will have this in a separate patch.
-> > -
-> >  static void sun4i_backend_apply_color_correction(struct sunxi_engine *engine)
-> >  {
-> >  	int i;
-> > @@ -304,7 +298,7 @@ int sun4i_backend_update_layer_formats(struct sun4i_backend *backend,
-> >  			   SUN4I_BACKEND_ATTCTL_REG0_LAY_GLBALPHA_EN,
-> >  			   val);
-> >  
-> > -	if (sun4i_backend_format_is_yuv(fb->format->format))
-> > +	if (fb->format->is_yuv)
-> >  		return sun4i_backend_update_yuv_format(backend, layer, plane);
-> >  
-> >  	ret = sun4i_backend_drm_format_to_layer(fb->format->format, &val);
-> > @@ -384,7 +378,7 @@ int sun4i_backend_update_layer_buffer(struct sun4i_backend *backend,
-> >  	 */
-> >  	paddr -= PHYS_OFFSET;
-> >  
-> > -	if (sun4i_backend_format_is_yuv(fb->format->format))
-> > +	if (fb->format->is_yuv)
-> >  		return sun4i_backend_update_yuv_buffer(backend, fb, paddr);
-> >  
-> >  	/* Write the 32 lower bits of the address (in bits) */
-> > @@ -502,7 +496,7 @@ static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
-> >  		if (fb->format->has_alpha || (plane_state->alpha != DRM_BLEND_ALPHA_OPAQUE))
-> >  			num_alpha_planes++;
-> >  
-> > -		if (sun4i_backend_format_is_yuv(fb->format->format)) {
-> > +		if (fb->format->is_yuv) {
-> >  			DRM_DEBUG_DRIVER("Plane FB format is YUV\n");
-> >  			num_yuv_planes++;
-> >  		}
-> > -- 
-> > 2.7.4
-> > 
-> > _______________________________________________
-> > Intel-gfx mailing list
-> > Intel-gfx at lists.freedesktop.org
-> > https://lists.freedesktop.org/mailman/listinfo/intel-gfx
+Thanks in advance.
+
+Giulio
+
+Il 18/07/2018 16:23, Giulio Benetti ha scritto:
+> Handle both positive and negative dclk polarity,
+> according to bus_flags, taking care of this:
 > 
-> -- 
-> Ville Syrj?l?
-> Intel
+> On A20 and similar SoCs, the only way to achieve Positive Edge
+> (Rising Edge), is setting dclk clock phase to 2/3(240?).
+> By default TCON works in Negative Edge(Falling Edge), this is why phase
+> is set to 0 in that case.
+> Unfortunately there's no way to logically invert dclk through IO_POL
+> register.
+> The only acceptable way to work, triple checked with scope,
+> is using clock phase set to 0? for Negative Edge and set to 240? for
+> Positive Edge.
+> On A33 and similar SoCs there would be a 90? phase option, but it divides
+> also dclk by 2.
+> This patch is a way to avoid quirks all around TCON and DOTCLOCK drivers
+> for using A33 90? phase divided by 2 and consequently increase code
+> complexity.
+> 
+> Check if panel is used. TCON can also handle VGA DAC, then panel could
+> be empty.
+> 
+> Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
+> ---
+>   drivers/gpu/drm/sun4i/sun4i_tcon.c | 28 ++++++++++++++++++++++++++++
+>   1 file changed, 28 insertions(+)
+> 
+> diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> index 8232b39e16ca..5c7d6ae53111 100644
+> --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> @@ -17,6 +17,7 @@
+>   #include <drm/drm_encoder.h>
+>   #include <drm/drm_modes.h>
+>   #include <drm/drm_of.h>
+> +#include <drm/drm_panel.h>
+>   
+>   #include <uapi/drm/drm_mode.h>
+>   
+> @@ -474,6 +475,33 @@ static void sun4i_tcon0_mode_set_rgb(struct sun4i_tcon *tcon,
+>   	if (mode->flags & DRM_MODE_FLAG_PVSYNC)
+>   		val |= SUN4I_TCON0_IO_POL_VSYNC_POSITIVE;
+>   
+> +	/*
+> +	 * On A20 and similar SoCs, the only way to achieve Positive Edge
+> +	 * (Rising Edge), is setting dclk clock phase to 2/3(240?).
+> +	 * By default TCON works in Negative Edge(Falling Edge),
+> +	 * this is why phase is set to 0 in that case.
+> +	 * Unfortunately there's no way to logically invert dclk through
+> +	 * IO_POL register.
+> +	 * The only acceptable way to work, triple checked with scope,
+> +	 * is using clock phase set to 0? for Negative Edge and set to 240?
+> +	 * for Positive Edge.
+> +	 * On A33 and similar SoCs there would be a 90? phase option,
+> +	 * but it divides also dclk by 2.
+> +	 * Following code is a way to avoid quirks all around TCON
+> +	 * and DOTCLOCK drivers.
+> +	 */
+> +	if (!IS_ERR(tcon->panel)) {
+> +		struct drm_panel *panel = tcon->panel;
+> +		struct drm_connector *connector = panel->connector;
+> +		struct drm_display_info display_info = connector->display_info;
+> +
+> +		if (display_info.bus_flags & DRM_BUS_FLAG_PIXDATA_POSEDGE)
+> +			clk_set_phase(tcon->dclk, 240);
+> +
+> +		if (display_info.bus_flags & DRM_BUS_FLAG_PIXDATA_NEGEDGE)
+> +			clk_set_phase(tcon->dclk, 0);
+> +	}
+> +
+>   	regmap_update_bits(tcon->regs, SUN4I_TCON0_IO_POL_REG,
+>   			   SUN4I_TCON0_IO_POL_HSYNC_POSITIVE | SUN4I_TCON0_IO_POL_VSYNC_POSITIVE,
+>   			   val);
+> 
