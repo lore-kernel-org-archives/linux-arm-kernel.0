@@ -1,103 +1,54 @@
-From: leoyang.li@nxp.com (Leo Li)
-Date: Wed, 18 Jul 2018 18:10:24 +0000
-Subject: [PATCH 1/2] staging:fsl-mc: Move DPIO from staging to
- drivers/soc/fsl
-In-Reply-To: <VI1PR04MB44942CF2B2E5BA1C6CE8D17786440@VI1PR04MB4494.eurprd04.prod.outlook.com>
-References: <20180705194113.16256-1-roy.pledge@nxp.com>
- <20180705194113.16256-2-roy.pledge@nxp.com>
- <119c6fc6-a32d-45a5-96ea-f6e9959b1e74@nxp.com>
- <VI1PR04MB44942CF2B2E5BA1C6CE8D17786440@VI1PR04MB4494.eurprd04.prod.outlook.com>
-Message-ID: <AM0PR04MB4867D7E843D3EAFB73EF939D8F530@AM0PR04MB4867.eurprd04.prod.outlook.com>
+From: mylene.josserand@bootlin.com (=?UTF-8?q?Myl=C3=A8ne=20Josserand?=)
+Date: Wed, 18 Jul 2018 20:27:16 +0200
+Subject: [PATCH v3 0/3] sun8i-a83t: Add touchscreen support on TBS A711
+Message-ID: <20180718182719.29663-1-mylene.josserand@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello everyone,
 
+This is a V3 of the patch series that adds touchscreen support
+(FocalTech EDT-FT5x06 Polytouch) for TBS A711 (Allwinner sun8i-a83t SoC).
+Based on last master of linux-input tree.
 
-> -----Original Message-----
-> From: Roy Pledge
-> Sent: Monday, July 9, 2018 10:24 AM
-> To: Laurentiu Tudor <laurentiu.tudor@nxp.com>;
-> devel at driverdev.osuosl.org; linux-arm-kernel at lists.infradead.org;
-> gregkh at linuxfoundation.org; Leo Li <leoyang.li@nxp.com>
-> Cc: Ioana Ciocoi Radulescu <ruxandra.radulescu@nxp.com>; Horia Geanta
-> <horia.geanta@nxp.com>; linux-kernel at vger.kernel.org; arnd at arndb.de;
-> catalin.marinas at arm.com; robin.murphy at arm.com
-> Subject: Re: [PATCH 1/2] staging:fsl-mc: Move DPIO from staging to
-> drivers/soc/fsl
-> 
-> On 7/9/2018 6:37 AM, Laurentiu Tudor wrote:
-> > Hi Roy,
-> >
-> > Couple of comments inline.
-> >
-> > On 05.07.2018 22:41, Roy Pledge wrote:
-> >> Move the NXP DPIO (Datapath I/O Driver) out of the drivers/staging
-> >> directory and into the drivers/soc/fsl directory.
-> >>
-> >> The DPIO driver enables access to Queue and Buffer Manager (QBMAN)
-> >> hardware on NXP DPAA2 devices. This is a prerequisite to moving the
-> >> DPAA2 Ethernet driver out of staging.
-> >>
-> >> Signed-off-by: Roy Pledge <roy.pledge@nxp.com>
-> >> ---
-> >>   MAINTAINERS                                                    |  2 +-
-> >>   drivers/crypto/caam/sg_sw_qm2.h                                |  2 +-
-> >>   drivers/crypto/caam/sg_sw_sec4.h                               |  2 +-
-> >>   drivers/soc/fsl/Kconfig                                        | 10 ++++++++++
-> >>   drivers/soc/fsl/Makefile                                       |  1 +
-> >>   drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/Makefile          |  0
-> >>   drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio-cmd.h        |  0
-> >>   drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio-driver.c     |  2 +-
-> >>   drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio-driver.txt   |  0
-> > Maybe this should be converted to .rst and go in the already existing
-> > Documentation/networking/dpaa2/?
-> 
-> I can look into converting this to RST but I'm not sure it belongs in the
-> networking documentation folder since it will be used by other non
-> networking drivers in the near future - compress/decompress for example.
-> >
-> >>   drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio-service.c    |  2 +-
-> >>   drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio.c            |  0
-> >>   drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio.h            |  0
-> >>   drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/qbman-portal.c    |  2 +-
-> >>   drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/qbman-portal.h    |  2 +-
-> >>   drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h                 |  4 ++--
-> >>   drivers/staging/fsl-mc/bus/Kconfig                             |  9 ---------
-> >>   drivers/staging/fsl-mc/bus/Makefile                            |  2 --
-> >>   {drivers/staging/fsl-mc/include => include/soc/fsl}/dpaa2-fd.h |  0
-> >>   .../staging/fsl-mc/include => include/soc/fsl}/dpaa2-global.h  |  0
-> >>   {drivers/staging/fsl-mc/include => include/soc/fsl}/dpaa2-io.h |  0
-> >>   20 files changed, 20 insertions(+), 20 deletions(-)
-> >>   rename drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/Makefile (100%)
-> >>   rename drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio-cmd.h (100%)
-> >>   rename drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio-driver.c (99%)
-> >>   rename drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio-driver.txt
-> (100%)
-> >>   rename drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio-service.c (99%)
-> >>   rename drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio.c (100%)
-> >>   rename drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio.h (100%)
-> >>   rename drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/qbman-portal.c
-> (99%)
-> >>   rename drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/qbman-portal.h
-> (99%)
-> >>   rename {drivers/staging/fsl-mc/include => include/soc/fsl}/dpaa2-fd.h
-> (100%)
-> >>   rename {drivers/staging/fsl-mc/include => include/soc/fsl}/dpaa2-
-> global.h (100%)
-> >>   rename {drivers/staging/fsl-mc/include =>
-> >> include/soc/fsl}/dpaa2-io.h (100%)
-> > I received feedback in the past on mc-bus that a driver should limit
-> > to only one public header and one private one. Would it make sense to
-> > do the same for dpio too?
-> Looking at this the dpaa-2global.h file should probably be integrated into the
-> dpaa2-io.h file.
-> The dpaaa2-fd.h can be used by devices that don't need to used DPIO - the
-> definition of a frame descriptor isn't DPIO specific so I would argue it should
-> be kept in a seperate file.
+Since I can't test the suspend/resume functions there is no updates in
+this series about factory/normal mode.
 
-Hi Roy,
+Changes since v2:
+   - Remove the check if regulator is NULL (Dmitry Torokhov's review)
+   - Add EPROBE_DEFER error not to print a error message (Lothar Wa?mann's review)
+   - Add set wake/reset on suspend/resume.
+Changes since v1:
+   - Remove patches 01 and 02 as Chen-Yu Tsai sent a similar patch:
+   https://patchwork.kernel.org/patch/10111431/
+   and it is merged on last next-20171222.
+   (See commit f066f46ce5a5 "ARM: dts: sun8i: a83t: Add I2C device nodes and pinmux settings")
+   - Update regulator according to Dmitry Torokhov's review: remove "optional"
+   suffix while retrieving the regulator, rename it into "vcc" instead of
+   "power" and add bindings documentation.
+   - Update device tree according to Maxime Ripard's review: remove the
+   label and rename the node.
+   - Squash patch 03 with patch 05 to add I2C0 and touchscreen's node
+   in one patch (see patch 02).
 
-Will there be a re-spin of the patch soon so that we can probably catch the next merge window?
+Patch 01: Add support for regulator in the FocalTech touchscreen driver
+because A711 tablet is using a regulator to power-up the touchscreen.
+Patch 02: Add a set wake/reset values on resume and suspend.
+Patch 03: Add i2c0 and touchscreen's node for A711 TBS tablet.
 
-Regards,
-Leo
+Thank you in advance for any review.
+Best regards,
+Myl?ne
+
+Myl?ne Josserand (3):
+  Input: edt-ft5x06 - Add support for regulator
+  Input: edt-ft5x06 - Set wake/reset values on resume/suspend
+  arm: dts: sun8i: a83t: a711: Add touchscreen node
+
+ .../bindings/input/touchscreen/edt-ft5x06.txt      |  1 +
+ arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts          | 16 +++++++++
+ drivers/input/touchscreen/edt-ft5x06.c             | 41 ++++++++++++++++++++++
+ 3 files changed, 58 insertions(+)
+
+-- 
+2.11.0
