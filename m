@@ -1,138 +1,73 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed, 18 Jul 2018 15:48:06 -0600
-Subject: [PATCH v3 6/7] perf tools: Make perf_evsel accessible to PMU driver
- configuration code
-In-Reply-To: <1531950487-24554-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1531950487-24554-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1531950487-24554-7-git-send-email-mathieu.poirier@linaro.org>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 19 Jul 2018 06:09:45 +0800
+Subject: [PATCH v4] media: dvb-frontends: add Socionext SC1501A ISDB-S/T
+ demodulator driver
+In-Reply-To: <20180718010614.18585-1-suzuki.katsuhiro@socionext.com>
+References: <20180718010614.18585-1-suzuki.katsuhiro@socionext.com>
+Message-ID: <201807190527.QGc0RswR%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make structure perf_evsel available to the PMU driver configuration code.
-That way function perf_evsel__apply_drv_config() can be used from within
-that code and information pertaining to the 'perf_evsel_config_term' is
-still available.
+Hi Katsuhiro,
 
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+I love your patch! Yet something to improve:
+
+[auto build test ERROR on linuxtv-media/master]
+[also build test ERROR on v4.18-rc5 next-20180718]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+
+url:    https://github.com/0day-ci/linux/commits/Katsuhiro-Suzuki/media-dvb-frontends-add-Socionext-SC1501A-ISDB-S-T-demodulator-driver/20180719-045753
+base:   git://linuxtv.org/media_tree.git master
+config: i386-allmodconfig (attached as .config)
+compiler: gcc-7 (Debian 7.3.0-16) 7.3.0
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=i386 
+
+All errors (new ones prefixed by >>):
+
+>> drivers/media/dvb-frontends/sc1501a.c:646:4: error: 'struct dvb_frontend_info' has no member named 'frequency_min_hz'; did you mean 'frequency_min'?
+      .frequency_min_hz =  470 * MHz,
+       ^~~~~~~~~~~~~~~~
+       frequency_min
+   drivers/media/dvb-frontends/sc1501a.c:646:30: error: 'MHz' undeclared here (not in a function)
+      .frequency_min_hz =  470 * MHz,
+                                 ^~~
+>> drivers/media/dvb-frontends/sc1501a.c:647:4: error: 'struct dvb_frontend_info' has no member named 'frequency_max_hz'; did you mean 'frequency_max'?
+      .frequency_max_hz = 2071 * MHz,
+       ^~~~~~~~~~~~~~~~
+       frequency_max
+
+vim +646 drivers/media/dvb-frontends/sc1501a.c
+
+   641	
+   642	static const struct dvb_frontend_ops sc1501a_ops = {
+   643		.delsys = { SYS_ISDBS, SYS_ISDBT },
+   644		.info = {
+   645			.name = "Socionext SC1501A",
+ > 646			.frequency_min_hz =  470 * MHz,
+ > 647			.frequency_max_hz = 2071 * MHz,
+   648			.symbol_rate_min  = 28860000,
+   649			.symbol_rate_max  = 28860000,
+   650			.caps = FE_CAN_INVERSION_AUTO | FE_CAN_FEC_AUTO |
+   651				FE_CAN_QAM_AUTO | FE_CAN_TRANSMISSION_MODE_AUTO |
+   652				FE_CAN_GUARD_INTERVAL_AUTO | FE_CAN_HIERARCHY_AUTO,
+   653		},
+   654	
+   655		.sleep                   = sc1501a_sleep,
+   656		.set_frontend            = sc1501a_set_frontend,
+   657		.get_tune_settings       = sc1501a_get_tune_settings,
+   658		.read_status             = sc1501a_read_status,
+   659	};
+   660	
+
 ---
- tools/perf/arch/arm/util/cs-etm.c | 22 +++++++++++++++++++++-
- tools/perf/arch/arm/util/cs-etm.h |  3 ++-
- tools/perf/util/drv_configs.c     | 30 +++++++-----------------------
- tools/perf/util/pmu.h             |  3 ++-
- 4 files changed, 32 insertions(+), 26 deletions(-)
-
-diff --git a/tools/perf/arch/arm/util/cs-etm.c b/tools/perf/arch/arm/util/cs-etm.c
-index 2f595cd73da6..d8081c2e6d44 100644
---- a/tools/perf/arch/arm/util/cs-etm.c
-+++ b/tools/perf/arch/arm/util/cs-etm.c
-@@ -635,7 +635,7 @@ static int __printf(2, 3) cs_device__print_file(const char *name, const char *fm
- 	return ret;
- }
- 
--int cs_etm_set_drv_config(struct perf_evsel_config_term *term)
-+static int cs_etm_set_drv_config_term(struct perf_evsel_config_term *term)
- {
- 	int ret;
- 	char enable_sink[ENABLE_SINK_MAX];
-@@ -649,3 +649,23 @@ int cs_etm_set_drv_config(struct perf_evsel_config_term *term)
- 
- 	return 0;
- }
-+
-+int cs_etm_set_drv_config(struct perf_evsel *evsel,
-+			  struct perf_evsel_config_term **err_term)
-+{
-+	int err = 0;
-+	struct perf_evsel_config_term *term;
-+
-+	list_for_each_entry(term, &evsel->config_terms, list) {
-+		if (term->type != PERF_EVSEL__CONFIG_TERM_DRV_CFG)
-+			continue;
-+
-+		err = cs_etm_set_drv_config_term(term);
-+		if (err) {
-+			*err_term = term;
-+			break;
-+		}
-+	}
-+
-+	return err;
-+}
-diff --git a/tools/perf/arch/arm/util/cs-etm.h b/tools/perf/arch/arm/util/cs-etm.h
-index 1a12e64f5127..a3f8dde6ccef 100644
---- a/tools/perf/arch/arm/util/cs-etm.h
-+++ b/tools/perf/arch/arm/util/cs-etm.h
-@@ -10,6 +10,7 @@
- #include "../../util/evsel.h"
- 
- struct auxtrace_record *cs_etm_record_init(int *err);
--int cs_etm_set_drv_config(struct perf_evsel_config_term *term);
-+int cs_etm_set_drv_config(struct perf_evsel *evsel,
-+			  struct perf_evsel_config_term **err_term);
- 
- #endif
-diff --git a/tools/perf/util/drv_configs.c b/tools/perf/util/drv_configs.c
-index eec754243f4d..f7c1bcf08549 100644
---- a/tools/perf/util/drv_configs.c
-+++ b/tools/perf/util/drv_configs.c
-@@ -25,7 +25,6 @@ perf_evsel__apply_drv_configs(struct perf_evsel *evsel,
- {
- 	bool found = false;
- 	int err = 0;
--	struct perf_evsel_config_term *term;
- 	struct perf_pmu *pmu = NULL;
- 
- 	while ((pmu = perf_pmu__scan(pmu)) != NULL)
-@@ -34,29 +33,14 @@ perf_evsel__apply_drv_configs(struct perf_evsel *evsel,
- 			break;
- 		}
- 
--	list_for_each_entry(term, &evsel->config_terms, list) {
--		if (term->type != PERF_EVSEL__CONFIG_TERM_DRV_CFG)
--			continue;
-+	/*
-+	 * No need to continue if we didn't get a match or if there is no
-+	 * driver configuration function for this PMU.
-+	 */
-+	if (!found || !pmu->set_drv_config)
-+		return err;
- 
--		/*
--		 * We have a configuration term, report an error if we
--		 * can't find the PMU or if the PMU driver doesn't support
--		 * cmd line driver configuration.
--		 */
--		if (!found || !pmu->set_drv_config) {
--			err = -EINVAL;
--			*err_term = term;
--			break;
--		}
--
--		err = pmu->set_drv_config(term);
--		if (err) {
--			*err_term = term;
--			break;
--		}
--	}
--
--	return err;
-+	return pmu->set_drv_config(evsel, err_term);
- }
- 
- int perf_evlist__apply_drv_configs(struct perf_evlist *evlist,
-diff --git a/tools/perf/util/pmu.h b/tools/perf/util/pmu.h
-index 76fecec7b3f9..47f44394042b 100644
---- a/tools/perf/util/pmu.h
-+++ b/tools/perf/util/pmu.h
-@@ -29,7 +29,8 @@ struct perf_pmu {
- 	struct list_head format;  /* HEAD struct perf_pmu_format -> list */
- 	struct list_head aliases; /* HEAD struct perf_pmu_alias -> list */
- 	struct list_head list;    /* ELEM */
--	int (*set_drv_config)	(struct perf_evsel_config_term *term);
-+	int (*set_drv_config)	(struct perf_evsel *evsel,
-+				 struct perf_evsel_config_term **err_term);
- };
- 
- struct perf_pmu_info {
--- 
-2.7.4
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 64148 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180719/9a8360a0/attachment-0001.gz>
