@@ -1,74 +1,104 @@
 From: ville.syrjala@linux.intel.com (Ville =?iso-8859-1?Q?Syrj=E4l=E4?=)
-Date: Wed, 18 Jul 2018 13:15:40 +0300
-Subject: [Intel-gfx] [PATCH 5/5] drm/sun4i: Substitute
- sun4i_backend_format_is_yuv() with format->is_yuv
-In-Reply-To: <1531847626-22248-5-git-send-email-ayan.halder@arm.com>
+Date: Wed, 18 Jul 2018 13:17:41 +0300
+Subject: [Intel-gfx] [PATCH 4/5] drm/omapdrm: Substitute format_is_yuv()
+ with format->is_yuv
+In-Reply-To: <1531847626-22248-4-git-send-email-ayan.halder@arm.com>
 References: <1531847626-22248-1-git-send-email-ayan.halder@arm.com>
- <1531847626-22248-5-git-send-email-ayan.halder@arm.com>
-Message-ID: <20180718101540.GT5565@intel.com>
+ <1531847626-22248-4-git-send-email-ayan.halder@arm.com>
+Message-ID: <20180718101741.GU5565@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 17, 2018 at 06:13:46PM +0100, Ayan Kumar Halder wrote:
+On Tue, Jul 17, 2018 at 06:13:45PM +0100, Ayan Kumar Halder wrote:
 > drm_format_info table has a field 'is_yuv' to denote if the format
 > is yuv or not. The driver is expected to use this instead of
 > having a function for the same purpose.
 > 
 > Signed-off-by: Ayan Kumar halder <ayan.halder@arm.com>
 > ---
->  drivers/gpu/drm/sun4i/sun4i_backend.c | 12 +++---------
->  1 file changed, 3 insertions(+), 9 deletions(-)
+>  drivers/gpu/drm/omapdrm/dss/dispc.c | 26 ++++++++++----------------
+>  1 file changed, 10 insertions(+), 16 deletions(-)
 > 
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
-> index de0a76d..d7950b5 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_backend.c
-> +++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
-> @@ -86,12 +86,6 @@ static inline bool sun4i_backend_format_is_packed_yuv422(uint32_t format)
->  	}
+> diff --git a/drivers/gpu/drm/omapdrm/dss/dispc.c b/drivers/gpu/drm/omapdrm/dss/dispc.c
+> index 84f274c..8d2d7a4 100644
+> --- a/drivers/gpu/drm/omapdrm/dss/dispc.c
+> +++ b/drivers/gpu/drm/omapdrm/dss/dispc.c
+> @@ -1140,18 +1140,6 @@ static void dispc_ovl_set_color_mode(struct dispc_device *dispc,
+>  	REG_FLD_MOD(dispc, DISPC_OVL_ATTRIBUTES(plane), m, 4, 1);
 >  }
 >  
-> -static inline bool sun4i_backend_format_is_yuv(uint32_t format)
+> -static bool format_is_yuv(u32 fourcc)
 > -{
-> -	return sun4i_backend_format_is_planar_yuv(format) ||
-> -		sun4i_backend_format_is_packed_yuv422(format);
+> -	switch (fourcc) {
+> -	case DRM_FORMAT_YUYV:
+> -	case DRM_FORMAT_UYVY:
+> -	case DRM_FORMAT_NV12:
+> -		return true;
+> -	default:
+> -		return false;
+> -	}
 > -}
-
-sun4i_backend_format_is_planar_yuv() is now unused so could be nuked.
-Also the one remaining use of sun4i_backend_format_is_packed_yuv422()
-could be replaced with 'is_yuv && num_planes == 1', so that one could
-be easily killed off ass well.
-
 > -
->  static void sun4i_backend_apply_color_correction(struct sunxi_engine *engine)
->  {
->  	int i;
-> @@ -304,7 +298,7 @@ int sun4i_backend_update_layer_formats(struct sun4i_backend *backend,
->  			   SUN4I_BACKEND_ATTCTL_REG0_LAY_GLBALPHA_EN,
->  			   val);
+>  static void dispc_ovl_configure_burst_type(struct dispc_device *dispc,
+>  					   enum omap_plane_id plane,
+>  					   enum omap_dss_rotation_type rotation)
+> @@ -1910,11 +1898,14 @@ static void dispc_ovl_set_scaling_uv(struct dispc_device *dispc,
+>  	int scale_x = out_width != orig_width;
+>  	int scale_y = out_height != orig_height;
+>  	bool chroma_upscale = plane != OMAP_DSS_WB;
+> +	const struct drm_format_info *info;
+> +
+> +	info = drm_format_info(fourcc);
+
+Not sure Tomi wants drm usage (apart from the fourccs) inside the
+dss code.
+
 >  
-> -	if (sun4i_backend_format_is_yuv(fb->format->format))
-> +	if (fb->format->is_yuv)
->  		return sun4i_backend_update_yuv_format(backend, layer, plane);
+>  	if (!dispc_has_feature(dispc, FEAT_HANDLE_UV_SEPARATE))
+>  		return;
 >  
->  	ret = sun4i_backend_drm_format_to_layer(fb->format->format, &val);
-> @@ -384,7 +378,7 @@ int sun4i_backend_update_layer_buffer(struct sun4i_backend *backend,
->  	 */
->  	paddr -= PHYS_OFFSET;
+> -	if (!format_is_yuv(fourcc)) {
+> +	if (!info->is_yuv) {
+>  		/* reset chroma resampling for RGB formats  */
+>  		if (plane != OMAP_DSS_WB)
+>  			REG_FLD_MOD(dispc, DISPC_OVL_ATTRIBUTES2(plane),
+> @@ -2632,6 +2623,9 @@ static int dispc_ovl_setup_common(struct dispc_device *dispc,
+>  	bool ilace = !!(vm->flags & DISPLAY_FLAGS_INTERLACED);
+>  	unsigned long pclk = dispc_plane_pclk_rate(dispc, plane);
+>  	unsigned long lclk = dispc_plane_lclk_rate(dispc, plane);
+> +	const struct drm_format_info *info;
+> +
+> +	info = drm_format_info(fourcc);
 >  
-> -	if (sun4i_backend_format_is_yuv(fb->format->format))
-> +	if (fb->format->is_yuv)
->  		return sun4i_backend_update_yuv_buffer(backend, fb, paddr);
+>  	/* when setting up WB, dispc_plane_pclk_rate() returns 0 */
+>  	if (plane == OMAP_DSS_WB)
+> @@ -2640,7 +2634,7 @@ static int dispc_ovl_setup_common(struct dispc_device *dispc,
+>  	if (paddr == 0 && rotation_type != OMAP_DSS_ROT_TILER)
+>  		return -EINVAL;
 >  
->  	/* Write the 32 lower bits of the address (in bits) */
-> @@ -502,7 +496,7 @@ static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
->  		if (fb->format->has_alpha || (plane_state->alpha != DRM_BLEND_ALPHA_OPAQUE))
->  			num_alpha_planes++;
+> -	if (format_is_yuv(fourcc) && (in_width & 1)) {
+> +	if (info->is_yuv && (in_width & 1)) {
+>  		DSSERR("input width %d is not even for YUV format\n", in_width);
+>  		return -EINVAL;
+>  	}
+> @@ -2680,7 +2674,7 @@ static int dispc_ovl_setup_common(struct dispc_device *dispc,
+>  		DSSDBG("predecimation %d x %x, new input size %d x %d\n",
+>  			x_predecim, y_predecim, in_width, in_height);
 >  
-> -		if (sun4i_backend_format_is_yuv(fb->format->format)) {
-> +		if (fb->format->is_yuv) {
->  			DRM_DEBUG_DRIVER("Plane FB format is YUV\n");
->  			num_yuv_planes++;
->  		}
+> -	if (format_is_yuv(fourcc) && (in_width & 1)) {
+> +	if (info->is_yuv && (in_width & 1)) {
+>  		DSSDBG("predecimated input width is not even for YUV format\n");
+>  		DSSDBG("adjusting input width %d -> %d\n",
+>  			in_width, in_width & ~1);
+> @@ -2688,7 +2682,7 @@ static int dispc_ovl_setup_common(struct dispc_device *dispc,
+>  		in_width &= ~1;
+>  	}
+>  
+> -	if (format_is_yuv(fourcc))
+> +	if (info->is_yuv)
+>  		cconv = 1;
+>  
+>  	if (ilace && !fieldmode) {
 > -- 
 > 2.7.4
 > 
