@@ -1,21 +1,43 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 18 Jul 2018 18:35:02 +0200
-Subject: [PATCH 3/5] net: fortify eth_platform_get_mac_address()
-In-Reply-To: <20180718161035.7005-4-brgl@bgdev.pl>
+Date: Wed, 18 Jul 2018 18:42:18 +0200
+Subject: [PATCH 4/5] net: add support for nvmem to
+ eth_platform_get_mac_address()
+In-Reply-To: <20180718161035.7005-5-brgl@bgdev.pl>
 References: <20180718161035.7005-1-brgl@bgdev.pl>
- <20180718161035.7005-4-brgl@bgdev.pl>
-Message-ID: <20180718163502.GC12477@lunn.ch>
+ <20180718161035.7005-5-brgl@bgdev.pl>
+Message-ID: <20180718164218.GD12477@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 18, 2018 at 06:10:33PM +0200, Bartosz Golaszewski wrote:
-> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> 
-> We'll soon have more sources from which to read the MAC address in this
-> routine. Make sure the address is correct before returning it.
-> 
-> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> +		if (!IS_ERR(nvmem)) {
+> +			addr = nvmem_cell_read(nvmem, &alen);
+> +			if (!IS_ERR(addr)) {
+> +				from = "nvmem";
+> +				/* Don't use ether_addr_copy() in case we
+> +				 * didn't get the right size.
+> +				 */
 
-Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+Please verify the size. A short read can still give a valid MAC
+address, so the is_valid_ether_addr(addr) is not sufficient.
 
-    Andrew
+> +				memcpy(addrbuf, addr, alen);
+
+Another reason to check the length is that you appear to have a buffer
+overflow here, if alen > 6.
+
+	 Andrew
+
+> +				kfree(addr);
+> +				addr = addrbuf;
+> +			}
+> +
+> +			nvmem_cell_put(nvmem);
+> +		}
+> +	}
+> +
+>  	if (!addr || !is_valid_ether_addr(addr))
+>  		return -ENODEV;
+>  
+> -- 
+> 2.17.1
+> 
