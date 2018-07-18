@@ -1,78 +1,114 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 18 Jul 2018 13:50:56 -0600
-Subject: [RFC PATCH v2 1/4] dt-bindings: misc: Add bindings for misc. BMC
- control fields
-In-Reply-To: <ece91112ecfdc7218184c4c4519e455cf9397e11.camel@kernel.crashing.org>
-References: <20180711053122.30773-1-andrew@aj.id.au>
- <20180711053122.30773-2-andrew@aj.id.au>
- <20180711200450.GB17291@rob-hp-laptop>
- <1531356830.3551458.1437853280.551CA8C5@webmail.messagingengine.com>
- <CAL_JsqKpXxR4t_-3BOy-0mFePXkaSck_4PfHRD=OZQ-_-T5P=w@mail.gmail.com>
- <b6ced4cad4d7ff78330181b2c893855c23103953.camel@kernel.crashing.org>
- <1531463489.747186.1439263128.075AECE1@webmail.messagingengine.com>
- <CAL_JsqLZo-=7UkuvvUFYdCR4asBBiWyC=Q1ryH=-HLU6vzf9tA@mail.gmail.com>
- <ece91112ecfdc7218184c4c4519e455cf9397e11.camel@kernel.crashing.org>
-Message-ID: <CAL_JsqL_bMXLAA0091-g8PmhXR5g5Pf2y2=ey7Ss5ofHm46sWw@mail.gmail.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Wed, 18 Jul 2018 21:54:04 +0200
+Subject: [PATCH] i2c: exynos5: Describe the hardware variant for readability
+Message-ID: <20180718195404.5095-1-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 16, 2018 at 10:56 PM Benjamin Herrenschmidt
-<benh@kernel.crashing.org> wrote:
->
-> On Mon, 2018-07-16 at 07:55 -0600, Rob Herring wrote:
-> > If that data is one set per SoC, then i'm not that concerned having
-> > platform-specific data in the driver. That doesn't mean the driver is
-> > not "generic". It's still not clear to me in this thread, how much of
-> > this is board specific, but given that you've placed all the data in
-> > an SoC dtsi file it seems to be all per SoC.
->
-> So Rob, I think that's precisely where the disconnect is.
->
-> I think we all (well hopefully) agree that those few tunables don't fit
-> in any existing subystem and aren't likely to ever do (famous last
-> words...).
->
-> Where we disagree is we want to make this parametrized via the DT, and
-> you want us to hard wire the list in some kind of SoC driver for a
-> given SoC family/version.
->
-> The reason I think hard wiring the list in the driver is not a great
-> solution is that that list in itself is prone to variations, possibly
-> fairly often, between boards, vendors, versions of boards, etc...
+The driver supports multiple hardware variants of Exynos I2C controller
+which differ in FIFO depth, handling of interrupts and bus recovery in
+HSI2C_MASTER_ST_LOSE state.
 
-Can we separate the list of what's enabled from the details of the
-registers?  Even if we put all this into DT, we may still want to have
-some separation for dts file structure. Some portion of this has to be
-SoC specific because you are simply exposing SoC registers.
+The difference in variant was a single bit set for Exynos7 variants and
+implicit lack of this bit for other variants.
 
-> We can't know for sure every SoC tunable (out of the gazillions in
-> those chips) are going to be needed for a given system. We know which
-> ones we do use for ours, and that's a couple of handfuls, but it could
-> be that Dell need a slightly different set, and so might Yadro, or so
-> might our next board revision for that matter.
+Make each variant explicit which also fixes the GCC warning about
+documentation:
 
-That's very hand wavy. Do you have some concrete examples (i.e. dts
-files) showing the differences.
+    drivers/i2c/busses/i2c-exynos5.c:223: warning: Function parameter or member 'hw' not described in 'exynos_hsi2c_variant'
 
-One problem I'm having with this is you are still going to need per
-board specifics in userspace. You may be moving some of details out,
-but moving to DT is not going to completely eliminate that. I agree
-that not using /dev/mem is a good thing, but there are several ways
-you could do that independent of any DT binding.
+No change in functionality.
 
-> Now, updating the device-tree in the board flash with whatever vendor
-> specific information is needed is a LOT easier than getting the kernel
-> driver constantly updated. The device-tree after all is there to
-> reflect among other things system specific ways in which the SoC is
-> wired and configured. This is rather close...
+Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+---
+ drivers/i2c/busses/i2c-exynos5.c | 22 ++++++++++++++--------
+ 1 file changed, 14 insertions(+), 8 deletions(-)
 
-Sadly, updating my kernel is easier than updating my PC firmware
-(though packaged firmware on my current laptop changes that). I can
-assure you that ARM boards are generally much worse in that regard.
-BTW, you may want to pay attention to EBBR[1][2]. Not sure how much
-you care for BMCs, but there may be some interest.
-
-Rob
-
-[1] https://github.com/ARM-software/ebbr
-[2] https://lists.linaro.org/pipermail/boot-architecture/
+diff --git a/drivers/i2c/busses/i2c-exynos5.c b/drivers/i2c/busses/i2c-exynos5.c
+index de82ad8ff534..c1ce2299a76e 100644
+--- a/drivers/i2c/busses/i2c-exynos5.c
++++ b/drivers/i2c/busses/i2c-exynos5.c
+@@ -176,7 +176,10 @@
+ 
+ #define EXYNOS5_I2C_TIMEOUT (msecs_to_jiffies(100))
+ 
+-#define HSI2C_EXYNOS7	BIT(0)
++enum i2c_type_exynos {
++	I2C_TYPE_EXYNOS5,
++	I2C_TYPE_EXYNOS7,
++};
+ 
+ struct exynos5_i2c {
+ 	struct i2c_adapter	adap;
+@@ -212,27 +215,30 @@ struct exynos5_i2c {
+ /**
+  * struct exynos_hsi2c_variant - platform specific HSI2C driver data
+  * @fifo_depth: the fifo depth supported by the HSI2C module
++ * @hw: the hardware variant of Exynos I2C controller
+  *
+  * Specifies platform specific configuration of HSI2C module.
+  * Note: A structure for driver specific platform data is used for future
+  * expansion of its usage.
+  */
+ struct exynos_hsi2c_variant {
+-	unsigned int	fifo_depth;
+-	unsigned int	hw;
++	unsigned int		fifo_depth;
++	enum i2c_type_exynos	hw;
+ };
+ 
+ static const struct exynos_hsi2c_variant exynos5250_hsi2c_data = {
+ 	.fifo_depth	= 64,
++	.hw		= I2C_TYPE_EXYNOS5,
+ };
+ 
+ static const struct exynos_hsi2c_variant exynos5260_hsi2c_data = {
+ 	.fifo_depth	= 16,
++	.hw		= I2C_TYPE_EXYNOS5,
+ };
+ 
+ static const struct exynos_hsi2c_variant exynos7_hsi2c_data = {
+ 	.fifo_depth	= 16,
+-	.hw		= HSI2C_EXYNOS7,
++	.hw		= I2C_TYPE_EXYNOS7,
+ };
+ 
+ static const struct of_device_id exynos5_i2c_match[] = {
+@@ -300,7 +306,7 @@ static int exynos5_i2c_set_timing(struct exynos5_i2c *i2c, bool hs_timings)
+ 	 */
+ 	t_ftl_cycle = (readl(i2c->regs + HSI2C_CONF) >> 16) & 0x7;
+ 	temp = clkin / op_clk - 8 - t_ftl_cycle;
+-	if (i2c->variant->hw != HSI2C_EXYNOS7)
++	if (i2c->variant->hw != I2C_TYPE_EXYNOS7)
+ 		temp -= t_ftl_cycle;
+ 	div = temp / 512;
+ 	clk_cycle = temp / (div + 1) - 2;
+@@ -424,7 +430,7 @@ static irqreturn_t exynos5_i2c_irq(int irqno, void *dev_id)
+ 	writel(int_status, i2c->regs + HSI2C_INT_STATUS);
+ 
+ 	/* handle interrupt related to the transfer status */
+-	if (i2c->variant->hw == HSI2C_EXYNOS7) {
++	if (i2c->variant->hw == I2C_TYPE_EXYNOS7) {
+ 		if (int_status & HSI2C_INT_TRANS_DONE) {
+ 			i2c->trans_done = 1;
+ 			i2c->state = 0;
+@@ -571,7 +577,7 @@ static void exynos5_i2c_bus_check(struct exynos5_i2c *i2c)
+ {
+ 	unsigned long timeout;
+ 
+-	if (i2c->variant->hw != HSI2C_EXYNOS7)
++	if (i2c->variant->hw != I2C_TYPE_EXYNOS7)
+ 		return;
+ 
+ 	/*
+@@ -612,7 +618,7 @@ static void exynos5_i2c_message_start(struct exynos5_i2c *i2c, int stop)
+ 	unsigned long flags;
+ 	unsigned short trig_lvl;
+ 
+-	if (i2c->variant->hw == HSI2C_EXYNOS7)
++	if (i2c->variant->hw == I2C_TYPE_EXYNOS7)
+ 		int_en |= HSI2C_INT_I2C_TRANS;
+ 	else
+ 		int_en |= HSI2C_INT_I2C;
+-- 
+2.14.1
