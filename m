@@ -1,47 +1,43 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Wed, 18 Jul 2018 17:23:41 +0200
-Subject: [PATCH v2] drm/sun4i: sun4i: Introduce a quirk for lowest plane
- alpha support
-In-Reply-To: <76279f0a265bfbe509074fcff3156a437e7091dd.camel@bootlin.com>
-References: <20180718092948.15334-1-paul.kocialkowski@bootlin.com>
- <76279f0a265bfbe509074fcff3156a437e7091dd.camel@bootlin.com>
-Message-ID: <20180718152341.zr32w5cjtpfec4xe@flea>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 18 Jul 2018 17:26:40 +0200
+Subject: [GIT PULL v2] ARM: mvebu: arm for v4.19 (#1)
+Message-ID: <87zhyo8szz.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 18, 2018 at 11:35:23AM +0200, Paul Kocialkowski wrote:
-> On Wed, 2018-07-18 at 11:29 +0200, Paul Kocialkowski wrote:
-> > Not all sunxi platforms with the first version of the Display Engine
-> > support an alpha component on the plane with the lowest z position
-> > (as in: lowest z-pos), that gets blended with the background color.
-> > 
-> > In particular, the A13 is known to have this limitation. However, it was
-> > recently discovered that the A20 and A33 are capable of having alpha on
-> > their lowest plane.
-> > 
-> > Thus, this introduces a specific quirk to indicate such support,
-> > per-platform. Since this was not tested on sun4i and sun6i platforms, a
-> > conservative approach is kept and this feature is not supported.
-> 
-> Woops, I forgot to include PATCH 1/2 from v1, which did not change.
-> 
-> Would it be preferable for me to send v2 again (and maybe call it v3)
-> for convenience?
+Hi,
 
-Yeah, resend it, and call it v2 resend (explaining why a resend was
-needed).
+Here is the first pull request for arm for mvebu for v4.19. It
+supersedes the previous one done one week ago.
 
-Maxime
+Gregory
 
+The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
 
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180718/bfd9b33d/attachment.sig>
+  Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+
+are available in the Git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-arm-4.19-1
+
+for you to fetch changes up to 77bc8c28ddac90287bc42c129002eb703288d550:
+
+  ARM: mvebu: convert secondary CPU clock sync to hotplug state (2018-06-27 08:40:29 +0200)
+
+----------------------------------------------------------------
+mvebu arm for 4.19 (part 1)
+
+ - remove potential call from invalid context in boot_secondary
+ - allow using CONFIG_FORTIFY_SOURCE in pmsu.c
+
+----------------------------------------------------------------
+Ethan Tuttle (1):
+      ARM: mvebu: declare asm symbols as character arrays in pmsu.c
+
+Lucas Stach (1):
+      ARM: mvebu: convert secondary CPU clock sync to hotplug state
+
+ arch/arm/mach-mvebu/platsmp.c | 49 ++++++++++++++++++++-----------------------
+ arch/arm/mach-mvebu/pmsu.c    |  6 +++---
+ include/linux/cpuhotplug.h    |  1 +
+ 3 files changed, 27 insertions(+), 29 deletions(-)
