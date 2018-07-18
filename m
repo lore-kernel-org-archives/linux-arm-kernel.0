@@ -1,68 +1,41 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 18 Jul 2018 08:38:33 -0700
-Subject: [GIT PULL] ARM: mvebu: arm for v4.19 (#1)
-In-Reply-To: <871sc0a8oo.fsf@bootlin.com>
-References: <87y3egbe7a.fsf@bootlin.com>
- <20180714214208.lns2fszqzm6m3q4g@localhost>
- <871sc0a8oo.fsf@bootlin.com>
-Message-ID: <CAOesGMjRpXBwHT0orPuX5Tn=LjvK2py0+PuOJDrDy+ihxhvNkw@mail.gmail.com>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Wed, 18 Jul 2018 16:39:10 +0100
+Subject: [PATCH] arm64: defconfig: enable Huawei Intelligent PCIe NIC
+ driver
+In-Reply-To: <1530067895-195886-1-git-send-email-wangzhou1@hisilicon.com>
+References: <1530067895-195886-1-git-send-email-wangzhou1@hisilicon.com>
+Message-ID: <5B4F5F1E.4060707@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 18, 2018 at 8:02 AM, Gregory CLEMENT
-<gregory.clement@bootlin.com> wrote:
-> Hi Olof,
->
->  On sam., juil. 14 2018, Olof Johansson <olof@lixom.net> wrote:
->
->> On Thu, Jul 12, 2018 at 06:39:53PM +0200, Gregory CLEMENT wrote:
->>> Hi,
->>>
->>> Here is the first pull request for arm for mvebu for v4.19.
->>>
->>> Gregory
->>>
->>> The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
->>>
->>>   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
->>>
->>> are available in the Git repository at:
->>>
->>>   git://git.infradead.org/linux-mvebu.git tags/mvebu-arm-4.19-1
->>>
->>> for you to fetch changes up to 432c0254106a373bcc23b1bd3e0b7eb56929c0d9:
->>>
->>>   ARM: mvebu_v7_defconfig: enable SFP support (2018-06-28 16:53:08 +0200)
->>>
->>> ----------------------------------------------------------------
->>> mvebu arm for 4.19 (part 1)
->>>
->>> defconfig update:
->>>  - add NAND controller on multi_v7
->>>  - add SFP support on mvebu_v7
->>> code improvement:
->>>  - remove potential call from invalid context in boot_secondary
->>>  - allow using CONFIG_FORTIFY_SOURCE in pmsu.c
->>
->> Please separate out soc and defconfig changes to separate branches/pull
->> requests. If you look at our tree, you'll see that we queue them in
->> separate branches.
->
-> I was confused by the arm64 which has patches modifying the defconfig
-> file.
+Hi Zhou,
 
-Yeah, we've moved around a bit how we organize the branches -- we've
-essentially stopped separating 32- and 64-bit material at our end. We
-do still ask maintainers to send them separately in case we want to
-split it up for some releases though.
+On 2018/6/27 3:51, Zhou Wang wrote:
+> Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
+> ---
+>  arch/arm64/configs/defconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+> index be36e61..fc6628f 100644
+> --- a/arch/arm64/configs/defconfig
+> +++ b/arch/arm64/configs/defconfig
+> @@ -223,6 +223,7 @@ CONFIG_THUNDER_NIC_PF=y
+>  CONFIG_HIX5HD2_GMAC=y
+>  CONFIG_HNS_DSAF=y
+>  CONFIG_HNS_ENET=y
+> +CONFIG_HINIC=y
 
->> Also, note that we renoramlized the configs in 4.18-rc3, so you want to base
->> the DT contents on top of that when you send the new pull requests.
->
-> Thanks for the information, I am going to resend 2 new PR for arm and
-> defconfig.
+Since HINIC is a PCIe card and its default value is module,
+I prefer to keep it what it was.
+How do you think about it?
+Thanks!
 
-Cool, merging them now as well.
+Best Regards,
+Wei
 
 
--Olof
+>  CONFIG_E1000E=y
+>  CONFIG_IGB=y
+>  CONFIG_IGBVF=y
+> 
