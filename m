@@ -1,126 +1,56 @@
-From: ville.syrjala@linux.intel.com (Ville =?iso-8859-1?Q?Syrj=E4l=E4?=)
-Date: Wed, 18 Jul 2018 13:21:52 +0300
-Subject: [PATCH 1/5] drm/fourcc: Add is_yuv field to drm_format_info to
- denote if the format is yuv
-In-Reply-To: <20180718091202.GA27151@DESKTOP-E1NTVVP.localdomain>
-References: <1531847626-22248-1-git-send-email-ayan.halder@arm.com>
- <20180718091202.GA27151@DESKTOP-E1NTVVP.localdomain>
-Message-ID: <20180718102152.GV5565@intel.com>
+From: efault@gmx.de (Mike Galbraith)
+Date: Wed, 18 Jul 2018 12:28:48 +0200
+Subject: [PATCH RT v2] arm64: fpsimd: use a local_lock() in addition to
+ local_bh_disable()
+In-Reply-To: <20180718092741.pah2lubzo2a7tkmu@linutronix.de>
+References: <20180517124006.ohygrrpg7z2moqqt@linutronix.de>
+ <20180522131004.3012953c@gandalf.local.home>
+ <20180522172115.fpqguqlsq6bavtxy@linutronix.de>
+ <20180522132429.6f1dcf92@gandalf.local.home>
+ <20180522173333.aawadhkcekzvrswp@linutronix.de>
+ <20180711092555.268adf7f@gandalf.local.home>
+ <20180711133157.bvrza5vmthu6lwjd@linutronix.de>
+ <20180711093346.782af07a@gandalf.local.home>
+ <20180713174937.5ddaqpylalcmc3jq@linutronix.de>
+ <1531519424.23898.68.camel@gmx.de>
+ <20180718092741.pah2lubzo2a7tkmu@linutronix.de>
+Message-ID: <1531909728.6904.84.camel@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 18, 2018 at 10:12:02AM +0100, Brian Starkey wrote:
-> Hi Ayan,
+On Wed, 2018-07-18 at 11:27 +0200, Sebastian Andrzej Siewior wrote:
+> On 2018-07-14 00:03:44 [+0200], Mike Galbraith wrote:
+> > > This seems to make work (crypto chacha20-neon + cyclictest). I have no
+> > > EFI so I have no clue if saving SIMD while calling to EFI works.
+> > 
+> > All is not well on cavium test box.  I'm seeing random errors ala...
+> > 
+> > ./include/linux/fs.h:3137:11: internal compiler error: Segmentation fault
+> > ./include/linux/bio.h:175:1: internal compiler error: in grokdeclarator, at c/c-decl.c:7023
+> > 
+> > ...during make -j96 (2*cpus) kbuild.  Turns out 4.14-rt has this issue
+> > as well, which is unsurprising if it's related to fpsimd woes.  Box
+> > does not exhibit the issue with NONRT kernels, PREEMPT or NOPREEMPT.
+> > 
+> > To file under FWIW, arm64 configured SLE15-RT, 4.12 based kernel
+> > containing virgin @stable arch/arm64/kernel/fpsimd.c, does not exhibit
+> > the problem. (relevant? dunno, it may be unrelated to fpsimd.c).
 > 
-> On Tue, Jul 17, 2018 at 06:13:42PM +0100, Ayan Kumar Halder wrote:
-> >A lot of drivers duplicate the function to check if a format is yuv or not.
-> >If we add a field (to denote whether the format is yuv or not) in the
-> >drm_format_info table, all the drivers can use this field and it will
-> >prevent duplication of similar logic.
-> 
-> This looks like a good idea to me.
-> 
-> I wonder if the two "has_alpha" and "is_yuv" bools should be bitfields
-> to reduce the footprint (not sure what the general DRM attitude to
-> bitfields is), but either way:
+> Okay, so you did not test this because you can't compile.
 
-There are quite a few of these so tighter packing (of the other fields
-as well perhaps) might be a decent idea.
+Nope, the running kernel, the one that is doing the segfaulting etc,
+has the patches applied.
 
-For the series (except for the omapdrm patch which I'll leave for Tomi):
-Reviewed-by: Ville Syrj?l? <ville.syrjala@linux.intel.com>
+It is exhibiting that symptom because those patches do not cure this
+symptom, one which I verified to be present in virgin 4.14-rt as well. 
+The pseudo-patch I sent, disabling preemption where it is assumed to be
+disabled instead, does cure it.  With preemption so disabled, I can
+beat on affected kernels (>=4.14-rt) as long as I like.
 
-> 
-> Reviewed-by: Brian Starkey <brian.starkey@arm.com>
-> 
-> >
-> >Signed-off-by: Ayan Kumar halder <ayan.halder@arm.com>
-> >---
-> > drivers/gpu/drm/drm_fourcc.c | 42 +++++++++++++++++++++---------------------
-> > include/drm/drm_fourcc.h     |  2 ++
-> > 2 files changed, 23 insertions(+), 21 deletions(-)
-> >
-> >diff --git a/drivers/gpu/drm/drm_fourcc.c b/drivers/gpu/drm/drm_fourcc.c
-> >index 5ca6395..35c1e27 100644
-> >--- a/drivers/gpu/drm/drm_fourcc.c
-> >+++ b/drivers/gpu/drm/drm_fourcc.c
-> >@@ -152,27 +152,27 @@ const struct drm_format_info *__drm_format_info(u32 format)
-> > 		{ .format = DRM_FORMAT_XBGR8888_A8,	.depth = 32, .num_planes = 2, .cpp = { 4, 1, 0 }, .hsub = 1, .vsub = 1, .has_alpha = true },
-> > 		{ .format = DRM_FORMAT_RGBX8888_A8,	.depth = 32, .num_planes = 2, .cpp = { 4, 1, 0 }, .hsub = 1, .vsub = 1, .has_alpha = true },
-> > 		{ .format = DRM_FORMAT_BGRX8888_A8,	.depth = 32, .num_planes = 2, .cpp = { 4, 1, 0 }, .hsub = 1, .vsub = 1, .has_alpha = true },
-> >-		{ .format = DRM_FORMAT_YUV410,		.depth = 0,  .num_planes = 3, .cpp = { 1, 1, 1 }, .hsub = 4, .vsub = 4 },
-> >-		{ .format = DRM_FORMAT_YVU410,		.depth = 0,  .num_planes = 3, .cpp = { 1, 1, 1 }, .hsub = 4, .vsub = 4 },
-> >-		{ .format = DRM_FORMAT_YUV411,		.depth = 0,  .num_planes = 3, .cpp = { 1, 1, 1 }, .hsub = 4, .vsub = 1 },
-> >-		{ .format = DRM_FORMAT_YVU411,		.depth = 0,  .num_planes = 3, .cpp = { 1, 1, 1 }, .hsub = 4, .vsub = 1 },
-> >-		{ .format = DRM_FORMAT_YUV420,		.depth = 0,  .num_planes = 3, .cpp = { 1, 1, 1 }, .hsub = 2, .vsub = 2 },
-> >-		{ .format = DRM_FORMAT_YVU420,		.depth = 0,  .num_planes = 3, .cpp = { 1, 1, 1 }, .hsub = 2, .vsub = 2 },
-> >-		{ .format = DRM_FORMAT_YUV422,		.depth = 0,  .num_planes = 3, .cpp = { 1, 1, 1 }, .hsub = 2, .vsub = 1 },
-> >-		{ .format = DRM_FORMAT_YVU422,		.depth = 0,  .num_planes = 3, .cpp = { 1, 1, 1 }, .hsub = 2, .vsub = 1 },
-> >-		{ .format = DRM_FORMAT_YUV444,		.depth = 0,  .num_planes = 3, .cpp = { 1, 1, 1 }, .hsub = 1, .vsub = 1 },
-> >-		{ .format = DRM_FORMAT_YVU444,		.depth = 0,  .num_planes = 3, .cpp = { 1, 1, 1 }, .hsub = 1, .vsub = 1 },
-> >-		{ .format = DRM_FORMAT_NV12,		.depth = 0,  .num_planes = 2, .cpp = { 1, 2, 0 }, .hsub = 2, .vsub = 2 },
-> >-		{ .format = DRM_FORMAT_NV21,		.depth = 0,  .num_planes = 2, .cpp = { 1, 2, 0 }, .hsub = 2, .vsub = 2 },
-> >-		{ .format = DRM_FORMAT_NV16,		.depth = 0,  .num_planes = 2, .cpp = { 1, 2, 0 }, .hsub = 2, .vsub = 1 },
-> >-		{ .format = DRM_FORMAT_NV61,		.depth = 0,  .num_planes = 2, .cpp = { 1, 2, 0 }, .hsub = 2, .vsub = 1 },
-> >-		{ .format = DRM_FORMAT_NV24,		.depth = 0,  .num_planes = 2, .cpp = { 1, 2, 0 }, .hsub = 1, .vsub = 1 },
-> >-		{ .format = DRM_FORMAT_NV42,		.depth = 0,  .num_planes = 2, .cpp = { 1, 2, 0 }, .hsub = 1, .vsub = 1 },
-> >-		{ .format = DRM_FORMAT_YUYV,		.depth = 0,  .num_planes = 1, .cpp = { 2, 0, 0 }, .hsub = 2, .vsub = 1 },
-> >-		{ .format = DRM_FORMAT_YVYU,		.depth = 0,  .num_planes = 1, .cpp = { 2, 0, 0 }, .hsub = 2, .vsub = 1 },
-> >-		{ .format = DRM_FORMAT_UYVY,		.depth = 0,  .num_planes = 1, .cpp = { 2, 0, 0 }, .hsub = 2, .vsub = 1 },
-> >-		{ .format = DRM_FORMAT_VYUY,		.depth = 0,  .num_planes = 1, .cpp = { 2, 0, 0 }, .hsub = 2, .vsub = 1 },
-> >-		{ .format = DRM_FORMAT_AYUV,		.depth = 0,  .num_planes = 1, .cpp = { 4, 0, 0 }, .hsub = 1, .vsub = 1, .has_alpha = true },
-> >+		{ .format = DRM_FORMAT_YUV410,		.depth = 0,  .num_planes = 3, .cpp = { 1, 1, 1 }, .hsub = 4, .vsub = 4, .is_yuv = true },
-> >+		{ .format = DRM_FORMAT_YVU410,		.depth = 0,  .num_planes = 3, .cpp = { 1, 1, 1 }, .hsub = 4, .vsub = 4, .is_yuv = true },
-> >+		{ .format = DRM_FORMAT_YUV411,		.depth = 0,  .num_planes = 3, .cpp = { 1, 1, 1 }, .hsub = 4, .vsub = 1, .is_yuv = true },
-> >+		{ .format = DRM_FORMAT_YVU411,		.depth = 0,  .num_planes = 3, .cpp = { 1, 1, 1 }, .hsub = 4, .vsub = 1, .is_yuv = true },
-> >+		{ .format = DRM_FORMAT_YUV420,		.depth = 0,  .num_planes = 3, .cpp = { 1, 1, 1 }, .hsub = 2, .vsub = 2, .is_yuv = true },
-> >+		{ .format = DRM_FORMAT_YVU420,		.depth = 0,  .num_planes = 3, .cpp = { 1, 1, 1 }, .hsub = 2, .vsub = 2, .is_yuv = true },
-> >+		{ .format = DRM_FORMAT_YUV422,		.depth = 0,  .num_planes = 3, .cpp = { 1, 1, 1 }, .hsub = 2, .vsub = 1, .is_yuv = true },
-> >+		{ .format = DRM_FORMAT_YVU422,		.depth = 0,  .num_planes = 3, .cpp = { 1, 1, 1 }, .hsub = 2, .vsub = 1, .is_yuv = true },
-> >+		{ .format = DRM_FORMAT_YUV444,		.depth = 0,  .num_planes = 3, .cpp = { 1, 1, 1 }, .hsub = 1, .vsub = 1, .is_yuv = true },
-> >+		{ .format = DRM_FORMAT_YVU444,		.depth = 0,  .num_planes = 3, .cpp = { 1, 1, 1 }, .hsub = 1, .vsub = 1, .is_yuv = true },
-> >+		{ .format = DRM_FORMAT_NV12,		.depth = 0,  .num_planes = 2, .cpp = { 1, 2, 0 }, .hsub = 2, .vsub = 2, .is_yuv = true },
-> >+		{ .format = DRM_FORMAT_NV21,		.depth = 0,  .num_planes = 2, .cpp = { 1, 2, 0 }, .hsub = 2, .vsub = 2, .is_yuv = true },
-> >+		{ .format = DRM_FORMAT_NV16,		.depth = 0,  .num_planes = 2, .cpp = { 1, 2, 0 }, .hsub = 2, .vsub = 1, .is_yuv = true },
-> >+		{ .format = DRM_FORMAT_NV61,		.depth = 0,  .num_planes = 2, .cpp = { 1, 2, 0 }, .hsub = 2, .vsub = 1, .is_yuv = true },
-> >+		{ .format = DRM_FORMAT_NV24,		.depth = 0,  .num_planes = 2, .cpp = { 1, 2, 0 }, .hsub = 1, .vsub = 1, .is_yuv = true },
-> >+		{ .format = DRM_FORMAT_NV42,		.depth = 0,  .num_planes = 2, .cpp = { 1, 2, 0 }, .hsub = 1, .vsub = 1, .is_yuv = true },
-> >+		{ .format = DRM_FORMAT_YUYV,		.depth = 0,  .num_planes = 1, .cpp = { 2, 0, 0 }, .hsub = 2, .vsub = 1, .is_yuv = true },
-> >+		{ .format = DRM_FORMAT_YVYU,		.depth = 0,  .num_planes = 1, .cpp = { 2, 0, 0 }, .hsub = 2, .vsub = 1, .is_yuv = true },
-> >+		{ .format = DRM_FORMAT_UYVY,		.depth = 0,  .num_planes = 1, .cpp = { 2, 0, 0 }, .hsub = 2, .vsub = 1, .is_yuv = true },
-> >+		{ .format = DRM_FORMAT_VYUY,		.depth = 0,  .num_planes = 1, .cpp = { 2, 0, 0 }, .hsub = 2, .vsub = 1, .is_yuv = true },
-> >+		{ .format = DRM_FORMAT_AYUV,		.depth = 0,  .num_planes = 1, .cpp = { 4, 0, 0 }, .hsub = 1, .vsub = 1, .has_alpha = true, .is_yuv = true },
-> > 	};
-> >
-> > 	unsigned int i;
-> >diff --git a/include/drm/drm_fourcc.h b/include/drm/drm_fourcc.h
-> >index 3e86408..f9c1584 100644
-> >--- a/include/drm/drm_fourcc.h
-> >+++ b/include/drm/drm_fourcc.h
-> >@@ -39,6 +39,7 @@ struct drm_mode_fb_cmd2;
-> >  * @hsub: Horizontal chroma subsampling factor
-> >  * @vsub: Vertical chroma subsampling factor
-> >  * @has_alpha: Does the format embeds an alpha component?
-> >+ * @is_yuv: Is it a YUV format?
-> >  */
-> > struct drm_format_info {
-> > 	u32 format;
-> >@@ -48,6 +49,7 @@ struct drm_format_info {
-> > 	u8 hsub;
-> > 	u8 vsub;
-> > 	bool has_alpha;
-> >+	bool is_yuv;
-> > };
-> >
-> > /**
-> >-- 
-> >2.7.4
-> >
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+This particular 48 core Cavium is very slow, maybe that makes it easier
+to reproduce, dunno.  According to pipe-test, the thing is essentially
+a dozen RPi super-glued together.  pipe-test pinned to a single core
+can only context switch at ~40KHz with PREEMPT_RT, or ~90 with
+NOPREEMPT, comparable to measurement done in real deal RPi.
 
--- 
-Ville Syrj?l?
-Intel
+	-Mike
