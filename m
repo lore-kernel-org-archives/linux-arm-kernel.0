@@ -1,56 +1,55 @@
-From: efault@gmx.de (Mike Galbraith)
-Date: Wed, 18 Jul 2018 12:28:48 +0200
-Subject: [PATCH RT v2] arm64: fpsimd: use a local_lock() in addition to
- local_bh_disable()
-In-Reply-To: <20180718092741.pah2lubzo2a7tkmu@linutronix.de>
-References: <20180517124006.ohygrrpg7z2moqqt@linutronix.de>
- <20180522131004.3012953c@gandalf.local.home>
- <20180522172115.fpqguqlsq6bavtxy@linutronix.de>
- <20180522132429.6f1dcf92@gandalf.local.home>
- <20180522173333.aawadhkcekzvrswp@linutronix.de>
- <20180711092555.268adf7f@gandalf.local.home>
- <20180711133157.bvrza5vmthu6lwjd@linutronix.de>
- <20180711093346.782af07a@gandalf.local.home>
- <20180713174937.5ddaqpylalcmc3jq@linutronix.de>
- <1531519424.23898.68.camel@gmx.de>
- <20180718092741.pah2lubzo2a7tkmu@linutronix.de>
-Message-ID: <1531909728.6904.84.camel@gmx.de>
+From: linux.amoon@gmail.com (Anand Moon)
+Date: Wed, 18 Jul 2018 16:00:04 +0530
+Subject: [PATCH] ARM: dts: exynos5: add missing interrupts for pwm node
+In-Reply-To: <CAJKOXPdeRvt4YG9Doziq-_oQ9DeUffvTB53OOaq-q2UpkBGpgQ@mail.gmail.com>
+References: <1531906490-1739-1-git-send-email-linux.amoon@gmail.com>
+ <CAJKOXPdeRvt4YG9Doziq-_oQ9DeUffvTB53OOaq-q2UpkBGpgQ@mail.gmail.com>
+Message-ID: <CANAwSgS8z-TQ=nK7dy5YeA8QJV+7cCctZKJT7qn8macQQkyKqg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2018-07-18 at 11:27 +0200, Sebastian Andrzej Siewior wrote:
-> On 2018-07-14 00:03:44 [+0200], Mike Galbraith wrote:
-> > > This seems to make work (crypto chacha20-neon + cyclictest). I have no
-> > > EFI so I have no clue if saving SIMD while calling to EFI works.
-> > 
-> > All is not well on cavium test box.  I'm seeing random errors ala...
-> > 
-> > ./include/linux/fs.h:3137:11: internal compiler error: Segmentation fault
-> > ./include/linux/bio.h:175:1: internal compiler error: in grokdeclarator, at c/c-decl.c:7023
-> > 
-> > ...during make -j96 (2*cpus) kbuild.  Turns out 4.14-rt has this issue
-> > as well, which is unsurprising if it's related to fpsimd woes.  Box
-> > does not exhibit the issue with NONRT kernels, PREEMPT or NOPREEMPT.
-> > 
-> > To file under FWIW, arm64 configured SLE15-RT, 4.12 based kernel
-> > containing virgin @stable arch/arm64/kernel/fpsimd.c, does not exhibit
-> > the problem. (relevant? dunno, it may be unrelated to fpsimd.c).
-> 
-> Okay, so you did not test this because you can't compile.
+Hi
 
-Nope, the running kernel, the one that is doing the segfaulting etc,
-has the patches applied.
+On 18 July 2018 at 15:27, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+> On 18 July 2018 at 11:34, Anand Moon <linux.amoon@gmail.com> wrote:
+>> Add missing GIC interrupts property for pwm nodes.
+>>
+>> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+>> ---
+>>  arch/arm/boot/dts/exynos5.dtsi | 5 +++++
+>>  1 file changed, 5 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/exynos5.dtsi b/arch/arm/boot/dts/exynos5.dtsi
+>> index 5d2f0a0..9406108 100644
+>> --- a/arch/arm/boot/dts/exynos5.dtsi
+>> +++ b/arch/arm/boot/dts/exynos5.dtsi
+>> @@ -169,6 +169,11 @@
+>>                 pwm: pwm at 12dd0000 {
+>>                         compatible = "samsung,exynos4210-pwm";
+>>                         reg = <0x12DD0000 0x100>;
+>> +                       interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>,
+>> +                                  <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>,
+>
+> Indentation here looks weird - spaces used after tabs but not aligned
+> with first entry. Please indent it properly and align it.
+>
+> Best regards,
+> Krzysztof
 
-It is exhibiting that symptom because those patches do not cure this
-symptom, one which I verified to be present in virgin 4.14-rt as well. 
-The pseudo-patch I sent, disabling preemption where it is assumed to be
-disabled instead, does cure it.  With preemption so disabled, I can
-beat on affected kernels (>=4.14-rt) as long as I like.
+I ram checkpatch before I submit this patch it shown no error.
 
-This particular 48 core Cavium is very slow, maybe that makes it easier
-to reproduce, dunno.  According to pipe-test, the thing is essentially
-a dozen RPi super-glued together.  pipe-test pinned to a single core
-can only context switch at ~40KHz with PREEMPT_RT, or ~90 with
-NOPREEMPT, comparable to measurement done in real deal RPi.
+# scripts/checkpatch.pl --no-signoff -q
+0001-ARM-dts-exynos5-add-missing-interrupts-for-pwm-node.patch
 
-	-Mike
+Best Regards
+-Anand
+>
+>> +                                  <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>,
+>> +                                  <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>,
+>> +                                  <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>;
+>>                         samsung,pwm-outputs = <0>, <1>, <2>, <3>;
+>>                         #pwm-cells = <3>;
+>>                 };
+>> --
+>> 2.7.4
+>>
