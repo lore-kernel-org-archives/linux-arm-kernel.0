@@ -1,56 +1,74 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu, 19 Jul 2018 08:05:03 +0900
-Subject: [GIT PULL 3/3] ARM: uniphier: UniPhier SoC updates for v4.19
-Message-ID: <CAK7LNAShLhWqCRR8RfuJ0xBJAFoj-S6WLcSdh9QShg8dGfq9RA@mail.gmail.com>
+Date: Thu, 19 Jul 2018 08:08:53 +0900
+Subject: [PATCH] arm64: build with baremetal linker target instead of
+ Linux when available
+In-Reply-To: <20180713153033.20540-1-olof@lixom.net>
+References: <20180713150701.GA3049@arm.com>
+ <20180713153033.20540-1-olof@lixom.net>
+Message-ID: <CAK7LNAQkL+8sFPiVsxaVF9ffyWFeezTzWFQCnJKTP1Y6-C0N8Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+2018-07-14 0:30 GMT+09:00 Olof Johansson <olof@lixom.net>:
+> Not all toolchains have the baremetal elf targets, RedHat/Fedora ones
+> in particular. So, probe for whether it's available and use the previous
+> (linux) targets if it isn't.
+>
+> Reported-by: Laura Abbott <labbott@redhat.com>
+> Cc: Paul Kocialkowski <contact@paulk.fr>
+> Signed-off-by: Olof Johansson <olof@lixom.net>
+> ---
+>  arch/arm64/Makefile    | 9 +++++----
+>  scripts/Kbuild.include | 4 ++--
+>  2 files changed, 7 insertions(+), 6 deletions(-)
+>
+> diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+> index e7101b19d590..efe61a2e4b5e 100644
+> --- a/arch/arm64/Makefile
+> +++ b/arch/arm64/Makefile
+> @@ -60,15 +60,16 @@ ifeq ($(CONFIG_CPU_BIG_ENDIAN), y)
+>  KBUILD_CPPFLAGS        += -mbig-endian
+>  CHECKFLAGS     += -D__AARCH64EB__
+>  AS             += -EB
+> -# We must use the linux target here, since distributions don't tend to package
+> -# the ELF linker scripts with binutils, and this results in a build failure.
+> -LDFLAGS                += -EB -maarch64linuxb
+> +# Prefer the baremetal ELF build target, but not all toolchains include
+> +# it so fall back to the standard linux version if needed.
+> +LDFLAGS                += -EB $(call ld-option, -maarch64elfb, -maarch64linuxb)
+>  UTS_MACHINE    := aarch64_be
+>  else
+>  KBUILD_CPPFLAGS        += -mlittle-endian
+>  CHECKFLAGS     += -D__AARCH64EL__
+>  AS             += -EL
+> -LDFLAGS                += -EL -maarch64linux # See comment above
+> +# Same as above, prefer ELF but fall back to linux target if needed.
+> +LDFLAGS                += -EL $(call ld-option, -maarch64elf, -maarch64linux)
+>  UTS_MACHINE    := aarch64
+>  endif
+>
+> diff --git a/scripts/Kbuild.include b/scripts/Kbuild.include
+> index c8156d61678c..1e13f502b42f 100644
+> --- a/scripts/Kbuild.include
+> +++ b/scripts/Kbuild.include
+> @@ -163,8 +163,8 @@ cc-ldoption = $(call try-run,\
+>         $(CC) $(1) $(KBUILD_CPPFLAGS) $(CC_OPTION_CFLAGS) -nostdlib -x c /dev/null -o "$$TMP",$(1),$(2))
+>
+>  # ld-option
+> -# Usage: LDFLAGS += $(call ld-option, -X)
+> -ld-option = $(call try-run, $(LD) $(LDFLAGS) $(1) -v,$(1),$(2))
+> +# Usage: LDFLAGS += $(call ld-option, -X, -Y)
+> +ld-option = $(call try-run, $(LD) $(LDFLAGS) $(1) -v,$(1),$(2),$(3))
+>
+>  # ar-option
+>  # Usage: KBUILD_ARFLAGS := $(call ar-option,D)
 
-Please pull UniPhier SoC changes for the v4.19 MW.
 
-Thanks!
+I guess this patch will go through the arm64 tree.
 
+I am fine with the change of scripts/Kbuild.include
 
-The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
-
-  Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/masahiroy/linux-uniphier.git
-tags/uniphier-soc-v4.19
-
-for you to fetch changes up to ae93e694440a454609fa40725e16619c5a781768:
-
-  ARM: uniphier: remove empty Makefile (2018-07-19 06:53:16 +0900)
-
-----------------------------------------------------------------
-UniPhier ARM SoC updates for v4.19
-
-- enable ethernet and thermal drivers from multi_v7_defconfig
-
-- select RESET_CONTROLLER
-
-- remove empty arch/arm/mach-uniphier/Makefile
-
-----------------------------------------------------------------
-Kunihiko Hayashi (1):
-      ARM: multi_v7_defconfig: add CONFIG_UNIPHIER_THERMAL and CONFIG_SNI_AVE
-
-Masahiro Yamada (3):
-      ARM: uniphier: select RESET_CONTROLLER
-      arm64: uniphier: select RESET_CONTROLLER
-      ARM: uniphier: remove empty Makefile
-
- arch/arm/Makefile                   | 1 -
- arch/arm/configs/multi_v7_defconfig | 2 ++
- arch/arm/mach-uniphier/Kconfig      | 1 +
- arch/arm/mach-uniphier/Makefile     | 0
- arch/arm64/Kconfig.platforms        | 1 +
- 5 files changed, 4 insertions(+), 1 deletion(-)
- delete mode 100644 arch/arm/mach-uniphier/Makefile
-
+Acked-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 
 -- 
 Best Regards
