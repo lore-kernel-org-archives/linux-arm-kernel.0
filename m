@@ -1,76 +1,92 @@
-From: linux.amoon@gmail.com (Anand Moon)
-Date: Wed, 18 Jul 2018 16:20:28 +0530
-Subject: [PATCH] ARM: dts: exynos5: add missing interrupts for pwm node
-In-Reply-To: <CAJKOXPez6cuLyrxBkAKtyx2xiqG7VLWFCBYXkBX_537A=bDpsg@mail.gmail.com>
-References: <1531906490-1739-1-git-send-email-linux.amoon@gmail.com>
- <CAJKOXPdeRvt4YG9Doziq-_oQ9DeUffvTB53OOaq-q2UpkBGpgQ@mail.gmail.com>
- <CANAwSgS8z-TQ=nK7dy5YeA8QJV+7cCctZKJT7qn8macQQkyKqg@mail.gmail.com>
- <CAJKOXPez6cuLyrxBkAKtyx2xiqG7VLWFCBYXkBX_537A=bDpsg@mail.gmail.com>
-Message-ID: <CANAwSgSaU1kTW3j0OZGwmOWo=p2uHFP8toLUe9FHYEkCJsuLFg@mail.gmail.com>
+From: jagan@amarulasolutions.com (Jagan Teki)
+Date: Wed, 18 Jul 2018 16:24:40 +0530
+Subject: [PATCH v3 00/18] arm64: allwinner: Add A64 DE2 HDMI support
+Message-ID: <20180718105458.22304-1-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+Allwinner A64 has display engine pipeline like other Allwinner SOC's A83T/H3/H5.
 
-On 18 July 2018 at 16:03, Krzysztof Kozlowski <krzk@kernel.org> wrote:
-> On 18 July 2018 at 12:30, Anand Moon <linux.amoon@gmail.com> wrote:
->> Hi
->>
->> On 18 July 2018 at 15:27, Krzysztof Kozlowski <krzk@kernel.org> wrote:
->>> On 18 July 2018 at 11:34, Anand Moon <linux.amoon@gmail.com> wrote:
->>>> Add missing GIC interrupts property for pwm nodes.
->>>>
->>>> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
->>>> ---
->>>>  arch/arm/boot/dts/exynos5.dtsi | 5 +++++
->>>>  1 file changed, 5 insertions(+)
->>>>
->>>> diff --git a/arch/arm/boot/dts/exynos5.dtsi b/arch/arm/boot/dts/exynos5.dtsi
->>>> index 5d2f0a0..9406108 100644
->>>> --- a/arch/arm/boot/dts/exynos5.dtsi
->>>> +++ b/arch/arm/boot/dts/exynos5.dtsi
->>>> @@ -169,6 +169,11 @@
->>>>                 pwm: pwm at 12dd0000 {
->>>>                         compatible = "samsung,exynos4210-pwm";
->>>>                         reg = <0x12DD0000 0x100>;
->>>> +                       interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>,
->>>> +                                  <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>,
->>>
->>> Indentation here looks weird - spaces used after tabs but not aligned
->>> with first entry. Please indent it properly and align it.
->>>
->>> Best regards,
->>> Krzysztof
->>
->> I ram checkpatch before I submit this patch it shown no error.
->>
->> # scripts/checkpatch.pl --no-signoff -q
->> 0001-ARM-dts-exynos5-add-missing-interrupts-for-pwm-node.patch
->
-> That's good, thank you. Still when I look at it in patchwork the
-> indentation is wrong:
-> https://patchwork.kernel.org/patch/10531753/
-> However it can be patchwork's fault, so are you sure that this is
-> properly indented and aligned?
->
-> BR,
-> Krzysztof
+A64 behaviour similar to Allwinner A83T where
+Mixer0 => TCON0 => LVDS/RGB/MIPI-DSI
+Mixer1 => TCON1 => HDMI
+as per Display System Block Diagram from Allwinner_A64_User_Manual_V1.1.pdf
 
-I prefer vim and I use following plugin
+This is third patch-set followed with previous RFC[1], first and second
+series[2][3] and merely concentrated on HDMI pipeline through TCON1 and
+rest will add eventually.
 
-https://github.com/vivien/vim-linux-coding-style
+This series fixed previous version comments
+- Rebasing on linux-next
+- sqash all pipeline components in one patch
+- Enable all pipeline components in board dts
+- about documenting fallback compatibles
+- adding new compatible for mixer1
 
-root at odroidxu4:/usr/src/odroidxu4-4kr-devel# wget -nv
-https://patchwork.kernel.org/patch/10531753/mbox/ -O pwm.patch
-2018-07-18 10:48:09
-URL:https://patchwork.kernel.org/patch/10531753/mbox/ [1460] ->
-"pwm.patch" [1]
-root at odroidxu4:/usr/src/odroidxu4-4kr-devel#
-root at odroidxu4:/usr/src/odroidxu4-4kr-devel# scripts/checkpatch.pl
---no-signoff -q pwm.patch
-root at odroidxu4:/usr/src/odroidxu4-4kr-devel#
+Log:
+[    1.450984] Jagan: sun8i_mixer_probe
+[    1.464981] sun4i-drm display-engine: bound 1200000.mixer (ops sun8i_mixer_ops)
+[    1.472572] sun4i-drm display-engine: bound 1c0d000.lcd-controller (ops sun4i_tcon_ops)
+[    1.480676] sun8i-dw-hdmi 1ee0000.hdmi: Linked as a consumer to regulator.10
+[    1.488738] sun8i-dw-hdmi 1ee0000.hdmi: Detected HDMI TX controller v1.32a with HDCP (sun8i_dw_hdmi_phy)
+[    1.498879] sun8i-dw-hdmi 1ee0000.hdmi: registered DesignWare HDMI I2C bus driver
+[    1.507372] sun4i-drm display-engine: bound 1ee0000.hdmi (ops sun8i_dw_hdmi_ops)
+[    1.514778] [drm] Supports vblank timestamp caching Rev 2 (21.10.2013).
+[    1.521398] [drm] No driver support for vblank timestamp query.
+[    1.684611] random: fast init done
+[    2.011575] Console: switching to colour frame buffer device 180x56
+[    2.049858] sun4i-drm display-engine: fb0: DRM emulated frame buffer device
+[    2.057268] [drm] Initialized sun4i-drm 1.0.0 20150629 for display-engine on minor 0
 
-Is their any other way to test checkpatch please let me know.
+Note:
+Pine64 boards are unable to get edid by default like other A64 boards,
+but forcing 'video=HDMI-A-1:1920x1080 at 60D' kernel command line can
+create edid with display on penel
 
-Best Regards
--Anand
+[3] https://lkml.org/lkml/2018/5/18/461
+[2] https://lkml.org/lkml/2018/4/30/288
+[1] https://lkml.org/lkml/2018/4/24/547
+
+Icenowy Zheng (1):
+  drm: sun4i: add support for HVCC regulator for DWC HDMI glue
+
+Jagan Teki (17):
+  clk: sunxi-ng: a64: Add minimal rate for video PLLs
+  drm/sun4i: Add support for A64 mixer1
+  dt-bindings: display: Add compatible for A64 DE2 tcon1 blocks
+  drm/sun4i: Add support for A64 display engine
+  dt-bindings: display: Add compatible for A64 HDMI
+  dt-bindings: clock: sun50i-a64-ccu: Add PLL_VIDEO[0-1] macros
+  arm64: dts: allwinner: a64: Add tcon1 HDMI pipeline
+  clk: sunxi-ng: Enable DE2_CCU for SUN8I and SUN50I
+  arm64: defconfig: Enable CONFIG_DRM_SUN4I
+  drm/sun4i: Enable DE2 Mixer for SUN8I and SUN50I
+  drm/sun4i: Enable DesignWare HDMI for SUN50I
+  arm64: dts: allwinner: a64: bananapi-m64: Enable HDMI output
+  arm64: dts: allwinner: a64: nanopi-a64: Enable HDMI output
+  arm64: dts: allwinner: a64: orangepi-win: Enable HDMI output
+  arm64: dts: allwinner: a64: a64-olinuxino: Enable HDMI output
+  arm64: dts: allwinner: a64: pine64: Enable HDMI output
+  arm64: dts: allwinner: a64: sopine: Enable HDMI output
+
+ .../bindings/display/sunxi/sun4i-drm.txt      |   4 +
+ .../dts/allwinner/sun50i-a64-bananapi-m64.dts |  34 ++++++
+ .../dts/allwinner/sun50i-a64-nanopi-a64.dts   |  34 ++++++
+ .../dts/allwinner/sun50i-a64-olinuxino.dts    |  34 ++++++
+ .../dts/allwinner/sun50i-a64-orangepi-win.dts |  34 ++++++
+ .../boot/dts/allwinner/sun50i-a64-pine64.dts  |  34 ++++++
+ .../allwinner/sun50i-a64-sopine-baseboard.dts |  34 ++++++
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 110 ++++++++++++++++++
+ arch/arm64/configs/defconfig                  |   1 +
+ drivers/clk/sunxi-ng/Kconfig                  |   2 +
+ drivers/clk/sunxi-ng/ccu-sun50i-a64.c         |  46 ++++----
+ drivers/gpu/drm/sun4i/Kconfig                 |   3 +-
+ drivers/gpu/drm/sun4i/sun4i_drv.c             |   1 +
+ drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c         |  14 +++
+ drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h         |   2 +
+ drivers/gpu/drm/sun4i/sun8i_mixer.c           |  12 ++
+ include/dt-bindings/clock/sun50i-a64-ccu.h    |   2 +
+ 17 files changed, 378 insertions(+), 23 deletions(-)
+
+-- 
+2.17.1
