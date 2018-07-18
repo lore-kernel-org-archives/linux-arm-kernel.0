@@ -1,45 +1,44 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Wed, 18 Jul 2018 18:29:34 -0500
-Subject: [PATCH V5 5/6] PCI: Deprecate pci_reset_bus() and
- pci_reset_slot() functions
-In-Reply-To: <3d664a22-7362-07ec-584d-b38829a22ba2@kernel.org>
-References: <1530572336-20296-1-git-send-email-okaya@codeaurora.org>
- <1530572336-20296-6-git-send-email-okaya@codeaurora.org>
- <20180718223027.GI128988@bhelgaas-glaptop.roam.corp.google.com>
- <3d664a22-7362-07ec-584d-b38829a22ba2@kernel.org>
-Message-ID: <20180718232934.GK128988@bhelgaas-glaptop.roam.corp.google.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Thu, 19 Jul 2018 08:41:04 +0900
+Subject: [PATCH 0/6] kbuild: clean-up and rename LDFLAGS to KBUILD_LDFLAGS
+In-Reply-To: <20180712140539.4b5xdraq34i5dbii@kshutemo-mobl1>
+References: <1531382496-3719-1-git-send-email-yamada.masahiro@socionext.com>
+ <20180712140539.4b5xdraq34i5dbii@kshutemo-mobl1>
+Message-ID: <CAK7LNAThEpLsFgD_pv4ZgLWfbXcNPBiPEU7qZ5ah_R=x8LQA0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 18, 2018 at 03:36:29PM -0700, Sinan Kaya wrote:
-> On 7/18/2018 3:30 PM, Bjorn Helgaas wrote:
-> > On Mon, Jul 02, 2018 at 06:58:54PM -0400, Sinan Kaya wrote:
-> > > pci_reset_bus() and pci_reset_slot() functions are not being used by
-> > > any code. Remove them from the kernel in favor of pci_try_reset_bus()
-> > > and pci_try_reset_slot() functions.
-> > > 
-> > > Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> > > ---
-> > >   drivers/pci/pci.c   | 55 ++---------------------------------------------------
-> > >   include/linux/pci.h |  2 --
-> > >   2 files changed, 2 insertions(+), 55 deletions(-)
-> > > 
-> > > diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-> > > index a31e6db..7e3f2e9 100644
-> > > --- a/drivers/pci/pci.c
-> > > +++ b/drivers/pci/pci.c
-> > > @@ -4784,9 +4784,9 @@ int pci_probe_reset_slot(struct pci_slot *slot)
-> > >   EXPORT_SYMBOL_GPL(pci_probe_reset_slot);
-> > >   /**
-> > > - * pci_reset_slot - reset a PCI slot
-> > > + * __pci_try_reset_slot - Try to reset a PCI slot
-> > >    * @slot: PCI slot to reset
-> > > - *
-> > > + *`
-> > 
-> > Is this "*`" intentional or a typo?  I can't find it in kernel-doc.rst
-> > (but it's full of ` and maybe I missed it).
-> 
-> Typo.
+2018-07-12 23:05 GMT+09:00 Kirill A. Shutemov <kirill@shutemov.name>:
+> On Thu, Jul 12, 2018 at 05:01:30PM +0900, Masahiro Yamada wrote:
+>>
+>> This series renames LDFLAGS to KBUILD_LDFLAGS
+>> after some Makefile cleanups.
+>>
+>> Currently, the last patch does not apply to Linus' tree
+>> due to missing pre-requisite patches.
+>>
+>> I will resolve conflicts as needed.
+>>
+>>
+>>
+>> Masahiro Yamada (6):
+>>   um: remove redundant 'export LDFLAGS' in arch/x86/Makefile.um
+>>   ARM: vfp: clean-up arch/arm/vfp/Makefile
+>>   kbuild: remove redundant LDFLAGS clearing in arch/*/Makefile
+>>   kbuild: replace $(LDFLAGS) $(ldflags-y) with $(ld_flags)
+>>   kbuild: change ld_flags to contain LDFLAGS_$(@F)
+>>   kbuild: rename LDFLAGS to KBUILD_LDFLAGS
+>
+> Thanks! Looks sane to me
+>
+> Acked-by: Kirill A. Shutemov <kirill.shutemov@linux.intel.com>
+>
 
-Great, I fixed it.
+
+Patch 1, 3, 4, 5 applied to linux-kbuild.
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
