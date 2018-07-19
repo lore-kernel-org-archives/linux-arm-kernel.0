@@ -1,344 +1,45 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 19 Jul 2018 13:59:49 -0600
-Subject: [PATCH v2 10/10] coresight: etm-perf: Add support for ETR backend
-In-Reply-To: <1531847501-22226-11-git-send-email-suzuki.poulose@arm.com>
-References: <1531847501-22226-1-git-send-email-suzuki.poulose@arm.com>
- <1531847501-22226-11-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20180719195949.GA9421@xps15>
+From: andrew.smirnov@gmail.com (Andrey Smirnov)
+Date: Thu, 19 Jul 2018 13:00:02 -0700
+Subject: [PATCH] ARM: dts: vf610-zii-ssmb-spu3: Fix W=1 level warnings
+Message-ID: <20180719200002.15857-1-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 17, 2018 at 06:11:41PM +0100, Suzuki K Poulose wrote:
-> Add support for using TMC-ETR as backend for ETM perf tracing.
-> We use software double buffering at the moment. i.e, the TMC-ETR
-> uses a separate buffer than the perf ring buffer. The data is
-> copied to the perf ring buffer once a session completes.
-> 
-> The TMC-ETR would try to match the larger of perf ring buffer
-> or the ETR buffer size configured via sysfs, scaling down to
-> a minimum limit of 1MB.
-> 
-> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->  drivers/hwtracing/coresight/coresight-tmc-etr.c | 248 +++++++++++++++++++++++-
->  drivers/hwtracing/coresight/coresight-tmc.h     |   2 +
->  2 files changed, 248 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-> index bc0c932..6280790 100644
-> --- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
-> +++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-> @@ -10,6 +10,7 @@
->  #include <linux/slab.h>
->  #include <linux/vmalloc.h>
->  #include "coresight-catu.h"
-> +#include "coresight-etm-perf.h"
->  #include "coresight-priv.h"
->  #include "coresight-tmc.h"
->  
-> @@ -21,6 +22,28 @@ struct etr_flat_buf {
->  };
->  
->  /*
-> + * etr_perf_buffer - Perf buffer used for ETR
-> + * @etr_buf		- Actual buffer used by the ETR
-> + * @snaphost		- Perf session mode
-> + * @head		- handle->head at the beginning of the session.
-> + * @nr_pages		- Number of pages in the ring buffer.
-> + * @pages		- Array of Pages in the ring buffer.
-> + */
-> +struct etr_perf_buffer {
-> +	struct etr_buf		*etr_buf;
-> +	bool			snapshot;
-> +	unsigned long		head;
-> +	int			nr_pages;
-> +	void			**pages;
-> +};
-> +
-> +/* Convert the perf index to an offset within the ETR buffer */
-> +#define PERF_IDX2OFF(idx, buf)	((idx) % ((buf)->nr_pages << PAGE_SHIFT))
-> +
-> +/* Lower limit for ETR hardware buffer */
-> +#define TMC_ETR_PERF_MIN_BUF_SIZE	SZ_1M
-> +
-> +/*
->   * The TMC ETR SG has a page size of 4K. The SG table contains pointers
->   * to 4KB buffers. However, the OS may use a PAGE_SIZE different from
->   * 4K (i.e, 16KB or 64KB). This implies that a single OS page could
-> @@ -1103,10 +1126,228 @@ static int tmc_enable_etr_sink_sysfs(struct coresight_device *csdev)
->  	return ret;
->  }
->  
-> +/*
-> + * tmc_etr_setup_perf_buf: Allocate ETR buffer for use by perf.
-> + * The size of the hardware buffer is dependent on the size configured
-> + * via sysfs and the perf ring buffer size. We prefer to allocate the
-> + * largest possible size, scaling down the size by half until it
-> + * reaches a minimum limit (1M), beyond which we give up.
-> + */
-> +static struct etr_perf_buffer *
-> +tmc_etr_setup_perf_buf(struct tmc_drvdata *drvdata, int node, int nr_pages,
-> +		       void **pages, bool snapshot)
-> +{
-> +	struct etr_buf *etr_buf;
-> +	struct etr_perf_buffer *etr_perf;
-> +	unsigned long size;
-> +
-> +	etr_perf = kzalloc_node(sizeof(*etr_perf), GFP_KERNEL, node);
-> +	if (!etr_perf)
-> +		return ERR_PTR(-ENOMEM);
-> +
-> +	/*
-> +	 * Try to match the perf ring buffer size if it is larger
-> +	 * than the size requested via sysfs.
-> +	 */
-> +	if ((nr_pages << PAGE_SHIFT) > drvdata->size) {
-> +		etr_buf = tmc_alloc_etr_buf(drvdata, (nr_pages << PAGE_SHIFT),
-> +					    0, node, NULL);
-> +		if (!IS_ERR(etr_buf))
-> +			goto done;
-> +	}
-> +
-> +	/*
-> +	 * Else switch to configured size for this ETR
-> +	 * and scale down until we hit the minimum limit.
-> +	 */
-> +	size = drvdata->size;
-> +	do {
-> +		etr_buf = tmc_alloc_etr_buf(drvdata, size, 0, node, NULL);
-> +		if (!IS_ERR(etr_buf))
-> +			goto done;
-> +		size /= 2;
-> +	} while (size >= TMC_ETR_PERF_MIN_BUF_SIZE);
-> +
-> +	kfree(etr_perf);
-> +	return ERR_PTR(-ENOMEM);
-> +
-> +done:
-> +	etr_perf->etr_buf = etr_buf;
-> +	return etr_perf;
-> +}
-> +
-> +
-> +static void *tmc_etr_alloc_perf_buffer(struct coresight_device *csdev,
-> +				       int cpu, void **pages, int nr_pages,
-> +				       bool snapshot)
-> +{
-> +	struct etr_perf_buffer *etr_perf;
-> +	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
-> +
-> +	if (cpu == -1)
-> +		cpu = smp_processor_id();
-> +
-> +	etr_perf = tmc_etr_setup_perf_buf(drvdata, cpu_to_node(cpu),
-> +					  nr_pages, pages, snapshot);
-> +	if (IS_ERR(etr_perf)) {
-> +		dev_dbg(drvdata->dev, "Unable to allocate ETR buffer\n");
-> +		return NULL;
-> +	}
-> +
-> +	etr_perf->snapshot = snapshot;
-> +	etr_perf->nr_pages = nr_pages;
-> +	etr_perf->pages = pages;
-> +
-> +	return etr_perf;
-> +}
-> +
-> +static void tmc_etr_free_perf_buffer(void *config)
-> +{
-> +	struct etr_perf_buffer *etr_perf = config;
-> +
-> +	if (etr_perf->etr_buf)
-> +		tmc_free_etr_buf(etr_perf->etr_buf);
-> +	kfree(etr_perf);
-> +}
-> +
-> +/*
-> + * tmc_etr_sync_perf_buffer: Copy the actual trace data from the hardware
-> + * buffer to the perf ring buffer.
-> + */
-> +static void tmc_etr_sync_perf_buffer(struct etr_perf_buffer *etr_perf)
-> +{
-> +	long bytes, to_copy;
-> +	long pg_idx, pg_offset, src_offset;
-> +	unsigned long head = etr_perf->head;
-> +	char **dst_pages, *src_buf;
-> +	struct etr_buf *etr_buf = etr_perf->etr_buf;
-> +
-> +	head = etr_perf->head;
-> +	pg_idx = head >> PAGE_SHIFT;
-> +	pg_offset = head & (PAGE_SIZE - 1);
-> +	dst_pages = (char **)etr_perf->pages;
-> +	src_offset = etr_buf->offset;
-> +	to_copy = etr_buf->len;
-> +
-> +	while (to_copy > 0) {
-> +		/*
-> +		 * In one iteration, we can copy minimum of :
-> +		 *  1) what is available in the source buffer,
-> +		 *  2) what is available in the source buffer, before it
-> +		 *     wraps around.
-> +		 *  3) what is available in the destination page.
-> +		 * in one iteration.
-> +		 */
-> +		bytes = tmc_etr_buf_get_data(etr_buf, src_offset, to_copy,
-> +					     &src_buf);
-> +		if (WARN_ON_ONCE(bytes <= 0))
-> +			break;
-> +		bytes = min(bytes, (long)(PAGE_SIZE - pg_offset));
-> +
-> +		memcpy(dst_pages[pg_idx] + pg_offset, src_buf, bytes);
-> +
-> +		to_copy -= bytes;
-> +
-> +		/* Move destination pointers */
-> +		pg_offset += bytes;
-> +		if (pg_offset == PAGE_SIZE) {
-> +			pg_offset = 0;
-> +			if (++pg_idx == etr_perf->nr_pages)
-> +				pg_idx = 0;
-> +		}
-> +
-> +		/* Move source pointers */
-> +		src_offset += bytes;
-> +		if (src_offset >= etr_buf->size)
-> +			src_offset -= etr_buf->size;
-> +	}
-> +}
-> +
-> +/*
-> + * tmc_etr_update_perf_buffer : Update the perf ring buffer with the
-> + * available trace data. We use software double buffering at the moment.
-> + *
-> + * TODO: Add support for reusing the perf ring buffer.
-> + */
-> +static unsigned long
-> +tmc_etr_update_perf_buffer(struct coresight_device *csdev,
-> +			   struct perf_output_handle *handle,
-> +			   void *config)
-> +{
-> +	bool lost = false;
-> +	unsigned long flags, size = 0;
-> +	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
-> +	struct etr_perf_buffer *etr_perf = config;
-> +	struct etr_buf *etr_buf = etr_perf->etr_buf;
-> +
-> +	spin_lock_irqsave(&drvdata->spinlock, flags);
-> +	if (WARN_ON(drvdata->perf_data != etr_perf)) {
-> +		lost = true;
-> +		spin_unlock_irqrestore(&drvdata->spinlock, flags);
-> +		goto out;
-> +	}
-> +
-> +	CS_UNLOCK(drvdata->base);
-> +
-> +	tmc_flush_and_stop(drvdata);
-> +	tmc_sync_etr_buf(drvdata);
-> +
-> +	CS_UNLOCK(drvdata->base);
+Fix a couple of things that were causing warning when building DTB
+with W=1.
 
-This is a copy/paste oversight, here you want to lock again.
+Cc: Shawn Guo <shawnguo@kernel.org>
+Cc: Fabio Estevam <fabio.estevam@nxp.com>
+Cc: cphealy at gmail.com
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: devicetree at vger.kernel.org
+Cc: linux-kernel at vger.kernel.org
+Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+---
+ arch/arm/boot/dts/vf610-zii-ssmb-spu3.dts | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-> +	/* Reset perf specific data */
-> +	drvdata->perf_data = NULL;
-> +	spin_unlock_irqrestore(&drvdata->spinlock, flags);
-> +
-> +	size = etr_buf->len;
-> +	tmc_etr_sync_perf_buffer(etr_perf);
-> +
-> +	/*
-> +	 * Update handle->head in snapshot mode. Also update the size to the
-> +	 * hardware buffer size if there was an overflow.
-> +	 */
-> +	if (etr_perf->snapshot) {
-> +		handle->head += size;
-> +		if (etr_buf->full)
-> +			size = etr_buf->size;
-> +	}
-> +
-> +	lost |= etr_buf->full;
-> +out:
-> +	if (lost)
-> +		perf_aux_output_flag(handle, PERF_AUX_FLAG_TRUNCATED);
-> +	return size;
-> +}
-> +
->  static int tmc_enable_etr_sink_perf(struct coresight_device *csdev, void *data)
->  {
-> -	/* We don't support perf mode yet ! */
-> -	return -EINVAL;
-> +	int rc = 0;
-> +	unsigned long flags;
-> +	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
-> +	struct perf_output_handle *handle = data;
-> +	struct etr_perf_buffer *etr_perf = etm_perf_sink_config(handle);
-> +
-> +	spin_lock_irqsave(&drvdata->spinlock, flags);
-> +	/*
-> +	 * There can be only one writer per sink in perf mode. If the sink
-> +	 * is already open in SYSFS mode, we can't use it.
-> +	 */
-> +	if (drvdata->mode != CS_MODE_DISABLED || drvdata->perf_data) {
-> +		rc = -EBUSY;
-> +		goto unlock_out;
-> +	}
-> +
-> +	if (WARN_ON(!etr_perf || !etr_perf->etr_buf)) {
-> +		rc = -EINVAL;
-> +		goto unlock_out;
-> +	}
-> +
-> +	etr_perf->head = PERF_IDX2OFF(handle->head, etr_perf);
-> +	drvdata->perf_data = etr_perf;
-> +	drvdata->mode = CS_MODE_PERF;
-> +	tmc_etr_enable_hw(drvdata, etr_perf->etr_buf);
-> +
-> +unlock_out:
-> +	spin_unlock_irqrestore(&drvdata->spinlock, flags);
-> +	return rc;
->  }
->  
->  static int tmc_enable_etr_sink(struct coresight_device *csdev,
-> @@ -1148,6 +1389,9 @@ static void tmc_disable_etr_sink(struct coresight_device *csdev)
->  static const struct coresight_ops_sink tmc_etr_sink_ops = {
->  	.enable		= tmc_enable_etr_sink,
->  	.disable	= tmc_disable_etr_sink,
-> +	.alloc_buffer	= tmc_etr_alloc_perf_buffer,
-> +	.update_buffer	= tmc_etr_update_perf_buffer,
-> +	.free_buffer	= tmc_etr_free_perf_buffer,
-
-
-	.alloc_buffer	= tmc_alloc_etr_buffer,
-	.update_buffer	= tmc_update_etr_buffer,
-	.free_buffer	= tmc_free_etr_buffer,
-
-To be consistant with .enable and .disable along with the naming convention on
-the ETF side.
-
->  };
->  
->  const struct coresight_ops tmc_etr_cs_ops = {
-> diff --git a/drivers/hwtracing/coresight/coresight-tmc.h b/drivers/hwtracing/coresight/coresight-tmc.h
-> index 872f63e..487c537 100644
-> --- a/drivers/hwtracing/coresight/coresight-tmc.h
-> +++ b/drivers/hwtracing/coresight/coresight-tmc.h
-> @@ -170,6 +170,7 @@ struct etr_buf {
->   * @trigger_cntr: amount of words to store after a trigger.
->   * @etr_caps:	Bitmask of capabilities of the TMC ETR, inferred from the
->   *		device configuration register (DEVID)
-> + * @perf_data:	PERF buffer for ETR.
->   * @sysfs_data:	SYSFS buffer for ETR.
->   */
->  struct tmc_drvdata {
-> @@ -191,6 +192,7 @@ struct tmc_drvdata {
->  	u32			trigger_cntr;
->  	u32			etr_caps;
->  	struct etr_buf		*sysfs_buf;
-> +	void			*perf_data;
->  };
->  
->  struct etr_buf_operations {
-> -- 
-> 2.7.4
-> 
+diff --git a/arch/arm/boot/dts/vf610-zii-ssmb-spu3.dts b/arch/arm/boot/dts/vf610-zii-ssmb-spu3.dts
+index b692117d7839..fe357668865b 100644
+--- a/arch/arm/boot/dts/vf610-zii-ssmb-spu3.dts
++++ b/arch/arm/boot/dts/vf610-zii-ssmb-spu3.dts
+@@ -23,7 +23,7 @@
+ 		stdout-path = &uart0;
+ 	};
+ 
+-	memory {
++	memory at 80000000 {
+ 		reg = <0x80000000 0x20000000>;
+ 	};
+ 
+@@ -128,8 +128,6 @@
+ 			compatible = "marvell,mv88e6190";
+ 			pinctrl-0 = <&pinctrl_gpio_switch0>;
+ 			pinctrl-names = "default";
+-			#address-cells = <1>;
+-			#size-cells = <0>;
+ 			reg = <0>;
+ 			eeprom-length = <65536>;
+ 			reset-gpios = <&gpio3 11 GPIO_ACTIVE_LOW>;
+-- 
+2.17.1
