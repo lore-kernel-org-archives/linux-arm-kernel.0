@@ -1,98 +1,85 @@
-From: james.morse@arm.com (James Morse)
-Date: Thu, 19 Jul 2018 16:24:23 +0100
-Subject: [PATCH v9 2/4] arm64: KVM: export the capability to set guest SError
- syndrome
-In-Reply-To: <20180719152425.6696-1-james.morse@arm.com>
-References: <20180719152425.6696-1-james.morse@arm.com>
-Message-ID: <20180719152425.6696-3-james.morse@arm.com>
+From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
+Date: Thu, 19 Jul 2018 17:25:02 +0200
+Subject: [PATCH 4/5] net: add support for nvmem to
+ eth_platform_get_mac_address()
+In-Reply-To: <20180719152222.GD9119@lunn.ch>
+References: <20180718161035.7005-1-brgl@bgdev.pl>
+ <20180718161035.7005-5-brgl@bgdev.pl>
+ <20180719152222.GD9119@lunn.ch>
+Message-ID: <CAMpxmJWXLi5XbhJ0a_DcLJcAQK4bjMmKjam4NAn6QW-7nJ0MFA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dongjiu Geng <gengdongjiu@huawei.com>
+2018-07-19 17:22 GMT+02:00 Andrew Lunn <andrew@lunn.ch>:
+> On Wed, Jul 18, 2018 at 06:10:34PM +0200, Bartosz Golaszewski wrote:
+>> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>>
+>> Many non-DT platforms read the MAC address from EEPROM. Usually it's
+>> either done with callbacks defined in board files or from SoC-specific
+>> ethernet drivers.
+>>
+>> In order to generalize this, try to read the MAC from nvmem in
+>> eth_platform_get_mac_address() using a standard lookup name:
+>> "mac-address".
+>>
+>> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>> ---
+>>  net/ethernet/eth.c | 29 +++++++++++++++++++++++++++++
+>>  1 file changed, 29 insertions(+)
+>>
+>> diff --git a/net/ethernet/eth.c b/net/ethernet/eth.c
+>> index 6b64586fd2af..adf5bd03851f 100644
+>> --- a/net/ethernet/eth.c
+>> +++ b/net/ethernet/eth.c
+>> @@ -54,6 +54,7 @@
+>>  #include <linux/if_ether.h>
+>>  #include <linux/of_net.h>
+>>  #include <linux/pci.h>
+>> +#include <linux/nvmem-consumer.h>
+>>  #include <net/dst.h>
+>>  #include <net/arp.h>
+>>  #include <net/sock.h>
+>> @@ -530,7 +531,10 @@ int eth_platform_get_mac_address(struct device *dev, u8 *mac_addr)
+>>       struct device_node *dp = dev_is_pci(dev) ?
+>>                       pci_device_to_OF_node(to_pci_dev(dev)) : dev->of_node;
+>>       const unsigned char *addr = NULL;
+>> +     unsigned char addrbuf[ETH_ALEN];
+>> +     struct nvmem_cell *nvmem;
+>>       const char *from = NULL;
+>> +     size_t alen;
+>>
+>>       if (dp) {
+>>               addr = of_get_mac_address(dp);
+>> @@ -544,6 +548,31 @@ int eth_platform_get_mac_address(struct device *dev, u8 *mac_addr)
+>>                       from = "arch callback";
+>>       }
+>>
+>> +     if (!addr) {
+>> +             nvmem = nvmem_cell_get(dev, "mac-address");
+>> +             if (IS_ERR(nvmem) && PTR_ERR(nvmem) == -EPROBE_DEFER)
+>
+> How does EPROBE_DEFER work here? You say the use case is
+> Non-DT. Without having DT, how do you know the cell should exist, but
+> does not yet exist? I might be looking at old code, but i only see
+> -EPROBE_DEFER inside the if (np) case.
+>
+>> +                     /* We may have a lookup registered for MAC address but
+>> +                      * the corresponding nvmem provider hasn't been
+>> +                      * registered yet.
+>> +                      */
+>> +                     return -EPROBE_DEFER;
+>
+> You really should return real errors. If i'm reading
+> __nvmem_device_get() right, it will return a NULL pointer when the
+> cell does not exist. NULL is not an error, so IS_ERR() will return
+> false. So you should return all errors from nvmem_cell_get().
+>
+>        Andrew
 
-For the arm64 RAS Extension, user space can inject a virtual-SError
-with specified ESR. So user space needs to know whether KVM support
-to inject such SError, this interface adds this query for this capability.
+We have a patch queued for nvmem for 4.19 which adds a notion of nvmem
+cell lookups similar to gpio lookups:
+https://patchwork.kernel.org/patch/10496045/
 
-KVM will check whether system support RAS Extension, if supported, KVM
-returns true to user space, otherwise returns false.
+This will work fine with probe deferral.
 
-Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
-Reviewed-by: James Morse <james.morse@arm.com>
-[expanded documentation wording]
-Signed-off-by: James Morse <james.morse@arm.com>
----
- Documentation/virtual/kvm/api.txt | 26 ++++++++++++++++++++++++++
- arch/arm64/kvm/reset.c            |  3 +++
- include/uapi/linux/kvm.h          |  1 +
- 3 files changed, 30 insertions(+)
-
-diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-index 284d36e72f28..dbbb95d5798a 100644
---- a/Documentation/virtual/kvm/api.txt
-+++ b/Documentation/virtual/kvm/api.txt
-@@ -907,6 +907,18 @@ SError is pending, the architecture's 'Multiple SError interrupts' rules should
- be followed. (2.5.3 of DDI0587.a "ARM Reliability, Availability, and
- Serviceability (RAS) Specification").
- 
-+SError exceptions always have an ESR value. Some CPUs have the ability to
-+specify what the virtual SError's ESR value should be. These systems will
-+advertise KVM_CAP_ARM_SET_SERROR_ESR. In this case exception.has_esr will
-+always have a non-zero value when read, and the agent making an SError pending
-+should specify the ISS field in the lower 24 bits of exception.serror_esr. If
-+the system supports KVM_CAP_ARM_SET_SERROR_ESR, but user-space sets the events
-+with exception.has_esr as zero, KVM will choose an ESR.
-+
-+Specifying exception.has_esr on a system that does not support it will return
-+-EINVAL. Setting anything other than the lower 24bits of exception.serror_esr
-+will return -EINVAL.
-+
- struct kvm_vcpu_events {
- 	struct {
- 		__u8 serror_pending;
-@@ -4664,3 +4676,17 @@ This capability indicates that KVM supports paravirtualized Hyper-V TLB Flush
- hypercalls:
- HvFlushVirtualAddressSpace, HvFlushVirtualAddressSpaceEx,
- HvFlushVirtualAddressList, HvFlushVirtualAddressListEx.
-+
-+8.19 KVM_CAP_ARM_SET_SERROR_ESR
-+
-+Architectures: arm, arm64
-+
-+This capability indicates that userspace can specify (via the
-+KVM_SET_VCPU_EVENTS ioctl) the syndrome value reported to the guest when it
-+takes a virtual SError interrupt exception.
-+If KVM advertises this capability, userspace can only specify the ISS field for
-+the ESR syndrome. Other parts of the ESR, such as the EC are generated by the
-+CPU when the exception is taken. If this virtual SError is taken to EL1 using
-+AArch64, this value will be reported in the ISS field of ESR_ELx.
-+
-+See KVM_CAP_VCPU_EVENTS for more details.
-diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
-index a3db01a28062..067c6ba969bd 100644
---- a/arch/arm64/kvm/reset.c
-+++ b/arch/arm64/kvm/reset.c
-@@ -77,6 +77,9 @@ int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
- 	case KVM_CAP_ARM_PMU_V3:
- 		r = kvm_arm_support_pmu_v3();
- 		break;
-+	case KVM_CAP_ARM_INJECT_SERROR_ESR:
-+		r = cpus_have_const_cap(ARM64_HAS_RAS_EXTN);
-+		break;
- 	case KVM_CAP_SET_GUEST_DEBUG:
- 	case KVM_CAP_VCPU_ATTRIBUTES:
- 	case KVM_CAP_VCPU_EVENTS:
-diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
-index b6270a3b38e9..a7d9bc4e4068 100644
---- a/include/uapi/linux/kvm.h
-+++ b/include/uapi/linux/kvm.h
-@@ -949,6 +949,7 @@ struct kvm_ppc_resize_hpt {
- #define KVM_CAP_GET_MSR_FEATURES 153
- #define KVM_CAP_HYPERV_EVENTFD 154
- #define KVM_CAP_HYPERV_TLBFLUSH 155
-+#define KVM_CAP_ARM_INJECT_SERROR_ESR 156
- 
- #ifdef KVM_CAP_IRQ_ROUTING
- 
--- 
-2.18.0
+Bart
