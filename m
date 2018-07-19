@@ -1,55 +1,60 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 19 Jul 2018 16:04:15 +0100
-Subject: [PATCH v2] drivers/firmware: psci_checker: stash and use
- topology_core_cpumask for hotplug tests
-In-Reply-To: <20180719142016.GD9213@e107981-ln.cambridge.arm.com>
-References: <1531913132-21022-1-git-send-email-sudeep.holla@arm.com>
- <1532007349-9498-1-git-send-email-sudeep.holla@arm.com>
- <20180719142016.GD9213@e107981-ln.cambridge.arm.com>
-Message-ID: <a1e03cce-4127-c959-8dc0-855636f6102c@arm.com>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Thu, 19 Jul 2018 17:07:40 +0200
+Subject: [PATCH 5/5] net: add MTD support to eth_platform_get_mac_address()
+In-Reply-To: <20180719150138.GC9119@lunn.ch>
+References: <20180718161035.7005-1-brgl@bgdev.pl>
+ <20180718161035.7005-6-brgl@bgdev.pl>
+ <20180718164737.GE12477@lunn.ch>
+ <CAMRc=MeRv3_C8_R-Awfr1zjLa3G_CVAACc-2t_ihB+1v+BCTGw@mail.gmail.com>
+ <20180718170352.GF12477@lunn.ch>
+ <CAMRc=Md3oeEktzrA9UZyNPX6pB4bG+Gv0o6cjbs0UUKb3sYTsA@mail.gmail.com>
+ <20180719150138.GC9119@lunn.ch>
+Message-ID: <CAMRc=MfKedvD2OXes02op2ErGR2HKkzJwjHtv5i4NkbJAVg3dw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+2018-07-19 17:01 GMT+02:00 Andrew Lunn <andrew@lunn.ch>:
+> On Thu, Jul 19, 2018 at 10:14:29AM +0200, Bartosz Golaszewski wrote:
+>> 2018-07-18 19:03 GMT+02:00 Andrew Lunn <andrew@lunn.ch>:
+>> >> >> +#ifdef CONFIG_MTD
+>> >> >> +     /* NOTE: this should go away as soon as MTD gets nvmem support. */
+>> >> >> +     if (!addr) {
+>> >> >> +             struct mtd_info *mtd;
+>> >> >> +             int rv;
+>> >> >> +
+>> >> >> +             mtd = get_mtd_device_nm("MAC-Address");
+>> >> >
+>> >> > In order for this to go away, you need to keep backwards
+>> >> > compatibility. When using nvmem, you look for a cell called
+>> >> > "mac-address". Here you are looking for "MAC-Address". That is going
+>> >> > to make backwards compatibility harder. How do you plan to do it?
+>> >> >
+>> >> >    Andrew
+>> >>
+>> >> I'm trying to adjust to already existing users. The only user of
+>> >> get_mtd_device_nm() who calls it to read the MAC address registers a
+>> >> partition called "MAC-Address". We can't change it since it's visible
+>> >> from user space. In the future we'd just have to have a list of
+>> >> supported string that we'd use to do the nvmem lookup.
+>> >
+>> > Why not have the nvmem cell called "MAC-Address"? When you add nvmem
+>> > support to MTD, i assume you are going to map each MTD partition to an
+>> > nvmem cell?
+>>
+>> Because all existing users of nvmem use "mac-address" as the name of
+>> this cell already. I guess we will need to live with both in this
+>> particular function.
+>
+> So i'm not convinced this last patch is making things better. I would
+> prefer if it was dropped for the moment. Wait until MTD via nvmem is
+> actually implemented and there is a concrete concept of how a MAC
+> address would be looked up without having lots of ugly code.
+>
+>         Andrew
 
+Unfortunately: this would effectively block me from improving the
+support for older davinci boards. Having a (subjectively) ugly but
+generalized way of reading the MAC address from MTD is still better
+than using the MTD notifier from board files IMO.
 
-On 19/07/18 15:20, Lorenzo Pieralisi wrote:
-> On Thu, Jul 19, 2018 at 02:35:49PM +0100, Sudeep Holla wrote:
-
-[...]
-
->> +static cpumask_var_t *alloc_cpu_groups(int num)
->> +{
->> +	int i;
->> +	cpumask_var_t *cpu_groups;
->> +
->> +	cpu_groups = kcalloc(num, sizeof(cpu_groups), GFP_KERNEL);
->> +	if (!cpu_groups)
->> +		return NULL;
->> +
->> +	for (i = 0; i < num; ++i)
->> +		if (!alloc_cpumask_var(&cpu_groups[i], GFP_KERNEL)) {
->> +			free_cpu_groups(num, cpu_groups);
->> +			return NULL;
->> +		}
->> +
->> +	return cpu_groups;
->> +}
-> 
-> Sorry for being a PITA - I meant we could remove find_cpu_groups()
-
-
-Sorry that's exactly what I understood when I read it, but ...
-got distracted with something else and when I returned back to it,
-implemented something else.
-
-> entirely and embed it in alloc_cpu_groups(), that takes a cpumask_t
-> pointer and return the number of groups, again, to make it more
-> readable but that's just my opinion.
-> 
-
-Sorry for not showing that much love to this, not paying too much
-attention as it's test code :).
-
--- 
-Regards,
-Sudeep
+Bart
