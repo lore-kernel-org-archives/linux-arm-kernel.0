@@ -1,54 +1,55 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Thu, 19 Jul 2018 17:02:44 +0200
-Subject: [RFC PATCH 10/16] KVM: arm64: Add a vcpu flag to control SVE
- visibility for the guest
-In-Reply-To: <1529593060-542-11-git-send-email-Dave.Martin@arm.com>
-References: <1529593060-542-1-git-send-email-Dave.Martin@arm.com>
- <1529593060-542-11-git-send-email-Dave.Martin@arm.com>
-Message-ID: <20180719150244.cybuq65qc6pt7hek@kamzik.brq.redhat.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 19 Jul 2018 16:04:15 +0100
+Subject: [PATCH v2] drivers/firmware: psci_checker: stash and use
+ topology_core_cpumask for hotplug tests
+In-Reply-To: <20180719142016.GD9213@e107981-ln.cambridge.arm.com>
+References: <1531913132-21022-1-git-send-email-sudeep.holla@arm.com>
+ <1532007349-9498-1-git-send-email-sudeep.holla@arm.com>
+ <20180719142016.GD9213@e107981-ln.cambridge.arm.com>
+Message-ID: <a1e03cce-4127-c959-8dc0-855636f6102c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 21, 2018 at 03:57:34PM +0100, Dave Martin wrote:
-> Since SVE will be enabled or disabled on a per-vcpu basis, a flag
-> is needed in order to track which vcpus have it enabled.
-> 
-> This patch adds a suitable flag and a helper for checking it.
-> 
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> ---
->  arch/arm64/include/asm/kvm_host.h | 8 ++++++++
->  1 file changed, 8 insertions(+)
-> 
-> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> index 9671ddd..609d08b 100644
-> --- a/arch/arm64/include/asm/kvm_host.h
-> +++ b/arch/arm64/include/asm/kvm_host.h
-> @@ -308,6 +308,14 @@ struct kvm_vcpu_arch {
->  #define KVM_ARM64_FP_HOST		(1 << 2) /* host FP regs loaded */
->  #define KVM_ARM64_HOST_SVE_IN_USE	(1 << 3) /* backup for host TIF_SVE */
->  #define KVM_ARM64_HOST_SVE_ENABLED	(1 << 4) /* SVE enabled for EL0 */
-> +#define KVM_ARM64_GUEST_HAS_SVE		(1 << 5) /* SVE exposed to guest */
-> +
-> +static inline bool vcpu_has_sve(struct kvm_vcpu_arch const *vcpu_arch)
 
-Shouldn't this vcpu function take a vcpu instead of a vcpu_arch?
 
-Thanks,
-drew
+On 19/07/18 15:20, Lorenzo Pieralisi wrote:
+> On Thu, Jul 19, 2018 at 02:35:49PM +0100, Sudeep Holla wrote:
 
-> +{
-> +	return system_supports_sve() &&
-> +		(vcpu_arch->flags & KVM_ARM64_GUEST_HAS_SVE);
-> +
-> +}
->  
->  #define vcpu_gp_regs(v)		(&(v)->arch.ctxt.gp_regs)
->  
-> -- 
-> 2.1.4
+[...]
+
+>> +static cpumask_var_t *alloc_cpu_groups(int num)
+>> +{
+>> +	int i;
+>> +	cpumask_var_t *cpu_groups;
+>> +
+>> +	cpu_groups = kcalloc(num, sizeof(cpu_groups), GFP_KERNEL);
+>> +	if (!cpu_groups)
+>> +		return NULL;
+>> +
+>> +	for (i = 0; i < num; ++i)
+>> +		if (!alloc_cpumask_var(&cpu_groups[i], GFP_KERNEL)) {
+>> +			free_cpu_groups(num, cpu_groups);
+>> +			return NULL;
+>> +		}
+>> +
+>> +	return cpu_groups;
+>> +}
 > 
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
+> Sorry for being a PITA - I meant we could remove find_cpu_groups()
+
+
+Sorry that's exactly what I understood when I read it, but ...
+got distracted with something else and when I returned back to it,
+implemented something else.
+
+> entirely and embed it in alloc_cpu_groups(), that takes a cpumask_t
+> pointer and return the number of groups, again, to make it more
+> readable but that's just my opinion.
+> 
+
+Sorry for not showing that much love to this, not paying too much
+attention as it's test code :).
+
+-- 
+Regards,
+Sudeep
