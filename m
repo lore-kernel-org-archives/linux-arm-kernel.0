@@ -1,175 +1,52 @@
-From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Fri, 20 Jul 2018 01:00:08 +0200
-Subject: [PATCH v3 15/33] mtd: rawnand: mxc: convert driver to nand_scan()
-In-Reply-To: <20180719230026.8741-1-miquel.raynal@bootlin.com>
-References: <20180719230026.8741-1-miquel.raynal@bootlin.com>
-Message-ID: <20180719230026.8741-16-miquel.raynal@bootlin.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Thu, 19 Jul 2018 17:08:31 -0600
+Subject: [PATCH 1/3] dts: arm64/sdm845: Add node for arm,mmu-500
+In-Reply-To: <20180719175356.14753-2-vivek.gautam@codeaurora.org>
+References: <20180719175356.14753-1-vivek.gautam@codeaurora.org>
+ <20180719175356.14753-2-vivek.gautam@codeaurora.org>
+Message-ID: <CAL_JsqKQgZq23F7gqNoEDzpWj3zVR7Tsok3cZZCpCL=Br_+BeA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Two helpers have been added to the core to make ECC-related
-configuration between the detection phase and the final NAND scan. Use
-these hooks and convert the driver to just use nand_scan() instead of
-both nand_scan_ident() and nand_scan_tail().
+On Thu, Jul 19, 2018 at 11:54 AM Vivek Gautam
+<vivek.gautam@codeaurora.org> wrote:
+>
+> Add device node for arm,mmu-500 available on sdm845.
+> This MMU-500 with single TCU and multiple TBU architecture
+> is shared among all the peripherals except gpu on sdm845.
+>
+> Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
+> ---
+>  arch/arm64/boot/dts/qcom/sdm845-mtp.dts |  4 ++
+>  arch/arm64/boot/dts/qcom/sdm845.dtsi    | 73 +++++++++++++++++++++++++++++++++
+>  2 files changed, 77 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/qcom/sdm845-mtp.dts b/arch/arm64/boot/dts/qcom/sdm845-mtp.dts
+> index 6d651f314193..13b50dff440f 100644
+> --- a/arch/arm64/boot/dts/qcom/sdm845-mtp.dts
+> +++ b/arch/arm64/boot/dts/qcom/sdm845-mtp.dts
+> @@ -58,3 +58,7 @@
+>                 bias-pull-up;
+>         };
+>  };
+> +
+> +&apps_smmu {
+> +       status = "okay";
+> +};
+> diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+> index 00722b533a92..70ca18ae6cb3 100644
+> --- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
+> +++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+> @@ -980,6 +980,79 @@
+>                         cell-index = <0>;
+>                 };
+>
+> +               apps_smmu: arm,smmu at 15000000 {
 
-Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
----
- drivers/mtd/nand/raw/mxc_nand.c | 136 +++++++++++++++++++++-------------------
- 1 file changed, 71 insertions(+), 65 deletions(-)
+iommu at ...
 
-diff --git a/drivers/mtd/nand/raw/mxc_nand.c b/drivers/mtd/nand/raw/mxc_nand.c
-index c6eff61e909d..62823fe30d80 100644
---- a/drivers/mtd/nand/raw/mxc_nand.c
-+++ b/drivers/mtd/nand/raw/mxc_nand.c
-@@ -1691,6 +1691,74 @@ static int mxcnd_probe_dt(struct mxc_nand_host *host)
- }
- #endif
- 
-+static int mxcnd_attach_chip(struct nand_chip *chip)
-+{
-+	struct mtd_info *mtd = nand_to_mtd(chip);
-+	struct mxc_nand_host *host = nand_get_controller_data(chip);
-+	struct device *dev = mtd->dev.parent;
-+
-+	switch (chip->ecc.mode) {
-+	case NAND_ECC_HW:
-+		chip->ecc.read_page = mxc_nand_read_page;
-+		chip->ecc.read_page_raw = mxc_nand_read_page_raw;
-+		chip->ecc.read_oob = mxc_nand_read_oob;
-+		chip->ecc.write_page = mxc_nand_write_page_ecc;
-+		chip->ecc.write_page_raw = mxc_nand_write_page_raw;
-+		chip->ecc.write_oob = mxc_nand_write_oob;
-+		break;
-+
-+	case NAND_ECC_SOFT:
-+		break;
-+
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	if (chip->bbt_options & NAND_BBT_USE_FLASH) {
-+		chip->bbt_td = &bbt_main_descr;
-+		chip->bbt_md = &bbt_mirror_descr;
-+	}
-+
-+	/* Allocate the right size buffer now */
-+	devm_kfree(dev, (void *)host->data_buf);
-+	host->data_buf = devm_kzalloc(dev, mtd->writesize + mtd->oobsize,
-+				      GFP_KERNEL);
-+	if (!host->data_buf)
-+		return -ENOMEM;
-+
-+	/* Call preset again, with correct writesize chip time */
-+	host->devtype_data->preset(mtd);
-+
-+	if (!chip->ecc.bytes) {
-+		if (host->eccsize == 8)
-+			chip->ecc.bytes = 18;
-+		else if (host->eccsize == 4)
-+			chip->ecc.bytes = 9;
-+	}
-+
-+	/*
-+	 * Experimentation shows that i.MX NFC can only handle up to 218 oob
-+	 * bytes. Limit used_oobsize to 218 so as to not confuse copy_spare()
-+	 * into copying invalid data to/from the spare IO buffer, as this
-+	 * might cause ECC data corruption when doing sub-page write to a
-+	 * partially written page.
-+	 */
-+	host->used_oobsize = min(mtd->oobsize, 218U);
-+
-+	if (chip->ecc.mode == NAND_ECC_HW) {
-+		if (is_imx21_nfc(host) || is_imx27_nfc(host))
-+			chip->ecc.strength = 1;
-+		else
-+			chip->ecc.strength = (host->eccsize == 4) ? 4 : 8;
-+	}
-+
-+	return 0;
-+}
-+
-+static struct nand_controller_ops mxcnd_controller_ops = {
-+	.attach_chip = mxcnd_attach_chip,
-+};
-+
- static int mxcnd_probe(struct platform_device *pdev)
- {
- 	struct nand_chip *this;
-@@ -1830,71 +1898,9 @@ static int mxcnd_probe(struct platform_device *pdev)
- 		host->devtype_data->irq_control(host, 1);
- 	}
- 
--	/* first scan to find the device and get the page size */
--	err = nand_scan_ident(mtd, is_imx25_nfc(host) ? 4 : 1, NULL);
--	if (err)
--		goto escan;
--
--	switch (this->ecc.mode) {
--	case NAND_ECC_HW:
--		this->ecc.read_page = mxc_nand_read_page;
--		this->ecc.read_page_raw = mxc_nand_read_page_raw;
--		this->ecc.read_oob = mxc_nand_read_oob;
--		this->ecc.write_page = mxc_nand_write_page_ecc;
--		this->ecc.write_page_raw = mxc_nand_write_page_raw;
--		this->ecc.write_oob = mxc_nand_write_oob;
--		break;
--
--	case NAND_ECC_SOFT:
--		break;
--
--	default:
--		err = -EINVAL;
--		goto escan;
--	}
--
--	if (this->bbt_options & NAND_BBT_USE_FLASH) {
--		this->bbt_td = &bbt_main_descr;
--		this->bbt_md = &bbt_mirror_descr;
--	}
--
--	/* allocate the right size buffer now */
--	devm_kfree(&pdev->dev, (void *)host->data_buf);
--	host->data_buf = devm_kzalloc(&pdev->dev, mtd->writesize + mtd->oobsize,
--					GFP_KERNEL);
--	if (!host->data_buf) {
--		err = -ENOMEM;
--		goto escan;
--	}
--
--	/* Call preset again, with correct writesize this time */
--	host->devtype_data->preset(mtd);
--
--	if (!this->ecc.bytes) {
--		if (host->eccsize == 8)
--			this->ecc.bytes = 18;
--		else if (host->eccsize == 4)
--			this->ecc.bytes = 9;
--	}
--
--	/*
--	 * Experimentation shows that i.MX NFC can only handle up to 218 oob
--	 * bytes. Limit used_oobsize to 218 so as to not confuse copy_spare()
--	 * into copying invalid data to/from the spare IO buffer, as this
--	 * might cause ECC data corruption when doing sub-page write to a
--	 * partially written page.
--	 */
--	host->used_oobsize = min(mtd->oobsize, 218U);
--
--	if (this->ecc.mode == NAND_ECC_HW) {
--		if (is_imx21_nfc(host) || is_imx27_nfc(host))
--			this->ecc.strength = 1;
--		else
--			this->ecc.strength = (host->eccsize == 4) ? 4 : 8;
--	}
--
--	/* second phase scan */
--	err = nand_scan_tail(mtd);
-+	/* Scan the NAND device */
-+	this->dummy_controller.ops = &mxcnd_controller_ops;
-+	err = nand_scan(mtd, is_imx25_nfc(host) ? 4 : 1);
- 	if (err)
- 		goto escan;
- 
--- 
-2.14.1
+> +                       compatible = "arm,mmu-500";
+
+Really unmodified by QCom? Would be better to have SoC specific compatible.
+
+Rob
