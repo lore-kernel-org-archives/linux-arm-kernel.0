@@ -1,338 +1,44 @@
-From: yixun.lan@amlogic.com (Yixun Lan)
-Date: Thu, 19 Jul 2018 16:13:47 +0800
-Subject: [PATCH 2/2] mtd: rawnand: meson: add support for Amlogic NAND
- flash controller
-In-Reply-To: <20180718210849.493f0087@bbrezillon>
-References: <20180613161314.14894-1-yixun.lan@amlogic.com>
- <20180613161314.14894-3-yixun.lan@amlogic.com>
- <20180624213844.2207ca6f@bbrezillon>
- <76d428ff-376a-dce3-cb51-d238564b7c3e@amlogic.com>
- <20180718210849.493f0087@bbrezillon>
-Message-ID: <45c1a96c-0d14-dece-37cf-ac428bb98621@amlogic.com>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Thu, 19 Jul 2018 10:14:29 +0200
+Subject: [PATCH 5/5] net: add MTD support to eth_platform_get_mac_address()
+In-Reply-To: <20180718170352.GF12477@lunn.ch>
+References: <20180718161035.7005-1-brgl@bgdev.pl>
+ <20180718161035.7005-6-brgl@bgdev.pl>
+ <20180718164737.GE12477@lunn.ch>
+ <CAMRc=MeRv3_C8_R-Awfr1zjLa3G_CVAACc-2t_ihB+1v+BCTGw@mail.gmail.com>
+ <20180718170352.GF12477@lunn.ch>
+Message-ID: <CAMRc=Md3oeEktzrA9UZyNPX6pB4bG+Gv0o6cjbs0UUKb3sYTsA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HI Boris:
-
-thanks for the quick response.
-
-On 07/19/18 03:08, Boris Brezillon wrote:
-> Hi Yixun,
-> 
-> On Wed, 18 Jul 2018 17:38:56 +0800
-> Yixun Lan <yixun.lan@amlogic.com> wrote:
-> 
->>>> +
->>>> +#define NFC_REG_CMD		0x00
->>>> +#define NFC_REG_CFG		0x04
->>>> +#define NFC_REG_DADR		0x08
->>>> +#define NFC_REG_IADR		0x0c
->>>> +#define NFC_REG_BUF		0x10
->>>> +#define NFC_REG_INFO		0x14
->>>> +#define NFC_REG_DC		0x18
->>>> +#define NFC_REG_ADR		0x1c
->>>> +#define NFC_REG_DL		0x20
->>>> +#define NFC_REG_DH		0x24
->>>> +#define NFC_REG_CADR		0x28
->>>> +#define NFC_REG_SADR		0x2c
->>>> +#define NFC_REG_PINS		0x30
->>>> +#define NFC_REG_VER		0x38
->>>> +  
->>>
->>> Can you put the reg offsets next to their field definitions?
->>>   
->> actually, we would prefer to put all the CMD definition below the reg
->> offset, so it will better reflect what's it belong to.
-> 
-> Just to be clear, I meant something like:
-> 
-> #define NFC_CMD				0x00
-> #define NFC_CMD_DRD			(0x8 << 14)
-> #define NFC_CMD_IDLE			(0xc << 14)
-> ...
-> 
-> #define NFC_CFG				0x04
-> #define NFC_CFG_XXX			xxx
-> ...
-> 
-> I find it easier to guess which register the fields are attached to when
-> it's defined like that, but I won't block the driver for such a tiny
-> detail. 
-> 
-yes, this is exactly what I mean
-
->>>> +static void meson_nfc_cmd_ctrl(struct mtd_info *mtd,
->>>> +					int cmd, unsigned int ctrl)  
->>>   
->>> ->cmd_ctrl() has recently been deprecated in favor of ->exec_op(). You  
->>> can have a look at the marvell, v610 or fsmc drivers if you want to
->>> have an idea of how ->exec_op() should be implemented. Miquel and I are
->>> also here to help if you have any questions.
->>>   
+2018-07-18 19:03 GMT+02:00 Andrew Lunn <andrew@lunn.ch>:
+>> >> +#ifdef CONFIG_MTD
+>> >> +     /* NOTE: this should go away as soon as MTD gets nvmem support. */
+>> >> +     if (!addr) {
+>> >> +             struct mtd_info *mtd;
+>> >> +             int rv;
+>> >> +
+>> >> +             mtd = get_mtd_device_nm("MAC-Address");
+>> >
+>> > In order for this to go away, you need to keep backwards
+>> > compatibility. When using nvmem, you look for a cell called
+>> > "mac-address". Here you are looking for "MAC-Address". That is going
+>> > to make backwards compatibility harder. How do you plan to do it?
+>> >
+>> >    Andrew
 >>
->> follow your suggestion, we have implemented the exec_op() interface,
->> we'd really appreciate if you can help to review this ..
-> 
-> Sure, just send a v2 and we'll review it.
-> 
-> 
->>>> +
->>>> +static void meson_nfc_cmd_m2n(struct meson_nfc *nfc, int raw)  
->>>
->>> n2m -> nand2mem ?
->>>   
->> yes, it is
-> 
-> Then please use nand2mem, it's clearer.
-we end at dropping the n2m function. by converting them into
+>> I'm trying to adjust to already existing users. The only user of
+>> get_mtd_device_nm() who calls it to read the MAC address registers a
+>> partition called "MAC-Address". We can't change it since it's visible
+>> from user space. In the future we'd just have to have a list of
+>> supported string that we'd use to do the nvmem lookup.
+>
+> Why not have the nvmem cell called "MAC-Address"? When you add nvmem
+> support to MTD, i assume you are going to map each MTD partition to an
+> nvmem cell?
 
-static void
-meson_nfc_cmd_access(
-struct meson_nfc *nfc,
-struct mtd_info *mtd, int raw, bool dir)
+Because all existing users of nvmem use "mac-address" as the name of
+this cell already. I guess we will need to live with both in this
+particular function.
 
-
-> 
->>>> +static int meson_nfc_wait_dma_finish(struct meson_nfc *nfc)
->>>> +{
->>>> +	meson_nfc_cmd_idle(nfc, 0);
->>>> +	meson_nfc_cmd_idle(nfc, 0);  
->>>
->>> Two calls to cmd_idle(), is this expected or a copy&paste error? If
->>> that's expected it definitely deserves a comment explaining why?
->>>   
->>
->> yes, it is intentional
->>
->> we will put these comments into the function.
->> 	/*
->>          * The Nand flash controller is designed as two stages pipleline -
->>          *  a) fetch and b) excute.
->>          * So, there might be cases when the driver see command queue is
->> empty,
->>          * but the Nand flash controller still has two commands buffered,
->>          * one is fetched into NFC request queue (ready to run), and another
->>          * is actively executing.
->>          */
->>
-> 
-> So pushing 2 "IDLE" commands guarantees that the pipeline is emptied,
-> right? The comment looks incomplete, you should explain what those
-> meson_nfc_cmd_idle() are for.
-> 
-thanks
-
-the meson_nfc_cmd_idle() function itself is quite straightforward, and
-we feel explain that inserting 2 "IDLE" commands to drain out the
-pipeline is enough.
-
->>>> +static int meson_nfc_ecc_init(struct device *dev, struct mtd_info *mtd)
->>>> +{
->>>> +	struct nand_chip *nand = mtd_to_nand(mtd);
->>>> +	struct meson_nfc_nand_chip *meson_chip = to_meson_nand(nand);
->>>> +	struct meson_nfc *nfc = nand_get_controller_data(nand);
->>>> +	struct meson_nand_ecc *meson_ecc = nfc->data->ecc;
->>>> +	int num = nfc->data->ecc_num;
->>>> +	int nsectors, i, bytes;
->>>> +
->>>> +	/* support only ecc hw mode */
->>>> +	if (nand->ecc.mode != NAND_ECC_HW) {  
->>>
->>> Given that you support raw accesses, I'm pretty sure you can support
->>> ECC_NONE, ECC_SOFT and ECC_ON_DIE with zero effort.
->>>   
->>
->> is this a block for this driver to be accepted by upstream?
-> 
-> Nope.
-> 
->> otherwise we'd like to implement this feature later in separate patch.
->>
-> 
-> That's fine.
-> 
->>>> +	nsectors = mtd->writesize / nand->ecc.size;
->>>> +	bytes =(meson_chip->user_mode == NFC_USER2_OOB_BYTES) ? nsectors * 2 : 16;
->>>> +	if (mtd->oobsize < (nand->ecc.bytes * nsectors + bytes))
->>>> +		return -EINVAL;  
->>>
->>> It's probably worth looking at what is being proposed here [2] for the
->>> ECC config selection logic.
->>>   
->>
->> sure, we'd happy to adopt the ECC config helper function, and seems it
->> is possible ;-)
->>
->> sounds the proposed ECC config patch is still under review, and we
->> would like to adjust our code once it's ready (probably we will still
->> keep this version in patch v2, then address it in v3 later)
-> 
-> It's been merged, and should be available in the nand/next branch [1].
-> 
-em... I'd leave this to Liang Yang to implement this, so it's not fixed
-in next PATCH v2, but will address this in v3.
-
-thanks
-
->>>> +static int meson_nfc_buffer_init(struct mtd_info *mtd)
->>>> +{
->>>> +	struct nand_chip *nand = mtd_to_nand(mtd);
->>>> +	struct meson_nfc_nand_chip *meson_chip = to_meson_nand(nand);
->>>> +	struct meson_nfc *nfc = nand_get_controller_data(nand);
->>>> +	struct device *dev = nfc->dev;
->>>> +	int info_bytes, page_bytes;
->>>> +	int nsectors;
->>>> +
->>>> +	nsectors = mtd->writesize / nand->ecc.size;
->>>> +	info_bytes = nsectors * PER_INFO_BYTE;
->>>> +	page_bytes = mtd->writesize + mtd->oobsize;
->>>> +
->>>> +	if ((meson_chip->data_buf) && (meson_chip->info_buf))
->>>> +		return 0;
->>>> +
->>>> +	meson_chip->data_buf = devm_kzalloc(dev, page_bytes, GFP_KERNEL);
->>>> +	if (!meson_chip->data_buf)
->>>> +		return  -ENOMEM;
->>>> +
->>>> +	meson_chip->info_buf = devm_kzalloc(dev, info_bytes, GFP_KERNEL);
->>>> +	if (!meson_chip->info_buf)
->>>> +		return  -ENOMEM;  
->>>
->>> You're doing DMA on those buffers, and devm_kzalloc() is not
->>> DMA-friendly (returned buffers are not aligned on a cache line). Also,
->>> you don't have to allocate your own buffers because the core already
->>> allocate them (chip->data_buf, chip->oob_poi). All you need to do is
->>> set the NAND_USE_BOUNCE_BUFFER flag in chip->options to make sure
->>> you're always passed a DMA-able buffer.
->>>   
->>
->> thanks for the suggestion, we've migrated to use the
->> dmam_alloc_coherent() API
-> 
-> kzalloc() should be just fine, no need to alloc a DMA coherent region. 
-> 
-
-we're a little bit confused here, isn't devm_kzalloc (previously we are
-using) a variant of kzalloc? and since the NAND controller is doing DMA
-here, using DMA coherent API is more proper way?
-
-> 
->>
->>>> +	nand->setup_data_interface = meson_nfc_setup_data_interface;
->>>> +
->>>> +	nand->chip_delay = 200;  
->>>
->>> This should not be needed if you implement ->exec_op() and  
->>> ->setup_data_interface().  
->>>   
->> will drop this
->>
->>>> +	nand->ecc.mode = NAND_ECC_HW;
->>>> +
->>>> +	nand->ecc.write_page_raw = meson_nfc_write_page_raw;
->>>> +	nand->ecc.write_page = meson_nfc_write_page_hwecc;
->>>> +	nand->ecc.write_oob_raw = nand_write_oob_std;
->>>> +	nand->ecc.write_oob = nand_write_oob_std;
->>>> +
->>>> +	nand->ecc.read_page_raw = meson_nfc_read_page_raw;
->>>> +	nand->ecc.read_page = meson_nfc_read_page_hwecc;
->>>> +	nand->ecc.read_oob_raw = meson_nfc_read_oob_raw;
->>>> +	nand->ecc.read_oob = meson_nfc_read_oob;
->>>> +
->>>> +	mtd = nand_to_mtd(nand);
->>>> +	mtd->owner = THIS_MODULE;
->>>> +	mtd->dev.parent = dev;
->>>> +	mtd->name = devm_kasprintf(nfc->dev, GFP_KERNEL,
->>>> +				   "%s:nand", dev_name(dev));
->>>> +	if (!mtd->name) {
->>>> +		dev_err(nfc->dev, "Failed to allocate mtd->name\n");
->>>> +		return -ENOMEM;
->>>> +	}  
->>>
->>> You set the name after nand_scan_ident() and make it conditional (only
->>> if ->name == NULL) so that the label property defined in the DT takes
->>> precedence over the default name.  
->>
-for setting mtd->name conditional, do you mean doing something like this?
-
-if (!mtd->name)
-	mtd->name = devm_kasprintf(..)
-
-but we found mtd->name = "ffe07800.nfc" after function
-nand_scan_ident(), which is same value as dev_name(dev)..
-and there is no cs information encoded there.
-
-
->> we can do this, but as second consideration, we'd prefer simply to drop
->> this customization of mtd->name here (we didn't understand your next cs
->> id suggestion).
-> 
-> No, you really should set a well-known name, so that people can pass
-> mtdparts on the kernel command line.
-> 
-ok
-
->>
->>> Also, I recommend suffixing this name
->>> with the CS id, just in case you ever need to support connecting several
->>> chips to the same controller. 
->>>   
->>
->> we actually didn't get the point here, cs is about chip selection with
->> multiple nand chip? and how to get this information?
-> 
-> Well, you currently seem to only support one chip per controller, but I
-> guess the IP can handle several CS lines. So my recommendation is about
-> choosing a name so that you can later easily add support for multiple
-> chips without breaking setups where mtdparts is used.
-> 
-> To sum-up, assuming your NAND chip is always connected to CS0 (on the
-> controller side), I'd suggest doing:
-> 
-yes, this is exactly how the hardware connected.
-> 	mtd->name = devm_kasprintf(nfc->dev, GFP_KERNEL,
-> 				   "%s:nand.%d", dev_name(dev), cs_id);
-> 
-> where cs_id is the value you extracted from the reg property of the
-> NAND node.
-> 
-Ok, you right.
-current, the NAND chip is only use one CS (which CE0) for now, what's in
-the DT is
-
-nand at 0 {
- reg = < 0 >;
- ..
-};
-
-so for the multiple chips it would something like this in DT?
-
-nand at 0 {
-  reg = < 0 >;
-};
-
-nand at 1 {
-  reg = < 1 >;
-};
-
-or even
-nand at 0 {
-  reg = < 0 2 >;
-};
-
-nand at 1 {
-  reg = < 3 4 >;
-};
-
-do we need to encode all the cs information here? not sure if we
-understand this correctly, but could send out the patch for review..
-
-
-> Regards,
-> 
-> Boris
-> 
-> [1]http://git.infradead.org/linux-mtd.git/shortlog/refs/heads/nand/next
-> 
-> .
-> 
+Bart
