@@ -1,9 +1,10 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Fri, 20 Jul 2018 00:59:59 +0200
-Subject: [PATCH v3 06/33] mtd: rawnand: fsl_ifc: convert driver to nand_scan()
+Date: Fri, 20 Jul 2018 01:00:05 +0200
+Subject: [PATCH v3 12/33] mtd: rawnand: lpc32xx_slc: convert driver to
+ nand_scan()
 In-Reply-To: <20180719230026.8741-1-miquel.raynal@bootlin.com>
 References: <20180719230026.8741-1-miquel.raynal@bootlin.com>
-Message-ID: <20180719230026.8741-7-miquel.raynal@bootlin.com>
+Message-ID: <20180719230026.8741-13-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,53 +15,103 @@ both nand_scan_ident() and nand_scan_tail().
 
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 ---
- drivers/mtd/nand/raw/fsl_ifc_nand.c | 19 ++++++++-----------
- 1 file changed, 8 insertions(+), 11 deletions(-)
+ drivers/mtd/nand/raw/lpc32xx_slc.c | 77 +++++++++++++++++++++-----------------
+ 1 file changed, 42 insertions(+), 35 deletions(-)
 
-diff --git a/drivers/mtd/nand/raw/fsl_ifc_nand.c b/drivers/mtd/nand/raw/fsl_ifc_nand.c
-index 96130d91e32c..4434a0e8ba48 100644
---- a/drivers/mtd/nand/raw/fsl_ifc_nand.c
-+++ b/drivers/mtd/nand/raw/fsl_ifc_nand.c
-@@ -714,9 +714,9 @@ static int fsl_ifc_write_page(struct mtd_info *mtd, struct nand_chip *chip,
- 	return nand_prog_page_end_op(chip);
+diff --git a/drivers/mtd/nand/raw/lpc32xx_slc.c b/drivers/mtd/nand/raw/lpc32xx_slc.c
+index 42820aa1abab..41c135567e8c 100644
+--- a/drivers/mtd/nand/raw/lpc32xx_slc.c
++++ b/drivers/mtd/nand/raw/lpc32xx_slc.c
+@@ -779,6 +779,46 @@ static struct lpc32xx_nand_cfg_slc *lpc32xx_parse_dt(struct device *dev)
+ 	return ncfg;
  }
  
--static int fsl_ifc_chip_init_tail(struct mtd_info *mtd)
-+static int fsl_ifc_attach_chip(struct nand_chip *chip)
- {
--	struct nand_chip *chip = mtd_to_nand(mtd);
++static int lpc32xx_nand_attach_chip(struct nand_chip *chip)
++{
 +	struct mtd_info *mtd = nand_to_mtd(chip);
- 	struct fsl_ifc_mtd *priv = nand_get_controller_data(chip);
- 
- 	dev_dbg(priv->dev, "%s: nand->numchips = %d\n", __func__,
-@@ -757,6 +757,10 @@ static int fsl_ifc_chip_init_tail(struct mtd_info *mtd)
- 	return 0;
- }
- 
-+static struct nand_controller_ops fsl_ifc_controller_ops = {
-+	.attach_chip = fsl_ifc_attach_chip,
++	struct lpc32xx_nand_host *host = nand_get_controller_data(chip);
++
++	/* OOB and ECC CPU and DMA work areas */
++	host->ecc_buf = (uint32_t *)(host->data_buf + LPC32XX_DMA_DATA_SIZE);
++
++	/*
++	 * Small page FLASH has a unique OOB layout, but large and huge
++	 * page FLASH use the standard layout. Small page FLASH uses a
++	 * custom BBT marker layout.
++	 */
++	if (mtd->writesize <= 512)
++		mtd_set_ooblayout(mtd, &lpc32xx_ooblayout_ops);
++
++	/* These sizes remain the same regardless of page size */
++	chip->ecc.size = 256;
++	chip->ecc.bytes = LPC32XX_SLC_DEV_ECC_BYTES;
++	chip->ecc.prepad = 0;
++	chip->ecc.postpad = 0;
++
++	/*
++	 * Use a custom BBT marker setup for small page FLASH that
++	 * won't interfere with the ECC layout. Large and huge page
++	 * FLASH use the standard layout.
++	 */
++	if ((chip->bbt_options & NAND_BBT_USE_FLASH) &&
++	    mtd->writesize <= 512) {
++		chip->bbt_td = &bbt_smallpage_main_descr;
++		chip->bbt_md = &bbt_smallpage_mirror_descr;
++	}
++
++	return 0;
++}
++
++static struct nand_controller_ops lpc32xx_nand_controller_ops = {
++	.attach_chip = lpc32xx_nand_attach_chip,
 +};
 +
- static void fsl_ifc_sram_init(struct fsl_ifc_mtd *priv)
- {
- 	struct fsl_ifc_ctrl *ctrl = priv->ctrl;
-@@ -1046,15 +1050,8 @@ static int fsl_ifc_nand_probe(struct platform_device *dev)
- 	if (ret)
- 		goto err;
+ /*
+  * Probe for NAND controller
+  */
+@@ -884,41 +924,8 @@ static int lpc32xx_nand_probe(struct platform_device *pdev)
+ 	}
  
--	ret = nand_scan_ident(mtd, 1, NULL);
--	if (ret)
--		goto err;
+ 	/* Find NAND device */
+-	res = nand_scan_ident(mtd, 1, NULL);
+-	if (res)
+-		goto release_dma;
 -
--	ret = fsl_ifc_chip_init_tail(mtd);
--	if (ret)
--		goto err;
+-	/* OOB and ECC CPU and DMA work areas */
+-	host->ecc_buf = (uint32_t *)(host->data_buf + LPC32XX_DMA_DATA_SIZE);
 -
--	ret = nand_scan_tail(mtd);
-+	priv->chip.controller->ops = &fsl_ifc_controller_ops;
-+	ret = nand_scan(mtd, 1);
- 	if (ret)
- 		goto err;
+-	/*
+-	 * Small page FLASH has a unique OOB layout, but large and huge
+-	 * page FLASH use the standard layout. Small page FLASH uses a
+-	 * custom BBT marker layout.
+-	 */
+-	if (mtd->writesize <= 512)
+-		mtd_set_ooblayout(mtd, &lpc32xx_ooblayout_ops);
+-
+-	/* These sizes remain the same regardless of page size */
+-	chip->ecc.size = 256;
+-	chip->ecc.bytes = LPC32XX_SLC_DEV_ECC_BYTES;
+-	chip->ecc.prepad = chip->ecc.postpad = 0;
+-
+-	/*
+-	 * Use a custom BBT marker setup for small page FLASH that
+-	 * won't interfere with the ECC layout. Large and huge page
+-	 * FLASH use the standard layout.
+-	 */
+-	if ((chip->bbt_options & NAND_BBT_USE_FLASH) &&
+-	    mtd->writesize <= 512) {
+-		chip->bbt_td = &bbt_smallpage_main_descr;
+-		chip->bbt_md = &bbt_smallpage_mirror_descr;
+-	}
+-
+-	/*
+-	 * Fills out all the uninitialized function pointers with the defaults
+-	 */
+-	res = nand_scan_tail(mtd);
++	chip->dummy_controller.ops = &lpc32xx_nand_controller_ops;
++	res = nand_scan(mtd, 1);
+ 	if (res)
+ 		goto release_dma;
  
 -- 
 2.14.1
