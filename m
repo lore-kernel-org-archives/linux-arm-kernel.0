@@ -1,70 +1,38 @@
-From: hari.vyas@broadcom.com (Hari Vyas)
-Date: Thu, 19 Jul 2018 15:47:46 +0530
-Subject: [PATCH] arm64: fix for restoring console loglevel after handling
- traps
-In-Reply-To: <20180719100140.GA424@jagdpanzerIV>
-References: <1531993734-1463-1-git-send-email-hari.vyas@broadcom.com>
- <1531993734-1463-2-git-send-email-hari.vyas@broadcom.com>
- <20180719100140.GA424@jagdpanzerIV>
-Message-ID: <CAM5rFu_N-=26LddRy1mO010h9yLcGuKqK6=y+h=h3-HbfEP+FQ@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 19 Jul 2018 11:19:31 +0100
+Subject: [PATCH 0/6] Further spectre variant 1 mitigations
+In-Reply-To: <20180710141322.GL17271@n2100.armlinux.org.uk>
+References: <20180710141322.GL17271@n2100.armlinux.org.uk>
+Message-ID: <20180719101931.GI17271@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 19, 2018 at 3:31 PM, Sergey Senozhatsky
-<sergey.senozhatsky.work@gmail.com> wrote:
-> On (07/19/18 15:18), Hari Vyas wrote:
-> [..]
->
-> Not so sure about the patch, sorry.
->
-Mentioned concern in cover letter and commit message. Console loglevel
-remains maximum after process die which
-needs to be restored.
->> @@ -211,6 +211,8 @@ void die(const char *str, struct pt_regs *regs, int err)
->>
->>       bust_spinlocks(0);
->>       add_taint(TAINT_DIE, LOCKDEP_NOW_UNRELIABLE);
->> +
->> +     restore_console_loglevel();
->>       oops_exit();
->
-> This is *probably* the only place where you can roll-back the
-> loglevel, but you restore console loglevel too early - a trap
-> can panic() the system, we need to preserve the console verbose
-> mode which we set at the start of the trap.
->
-console loglevel is indirectly sets to verbose in oops_enter() so
-better to restore before oops_exit().
-More from ARM maintainers.
->> @@ -624,6 +626,7 @@ asmlinkage void bad_mode(struct pt_regs *regs, int reason, unsigned int esr)
->>       die("Oops - bad mode", regs, 0);
->>       local_daif_mask();
->>       panic("bad mode");
->> +     restore_console_loglevel();
->
-> panic()
->
->> @@ -680,6 +683,7 @@ asmlinkage void handle_bad_stack(struct pt_regs *regs)
->>        * to get a better stack trace.
->>        */
->>       nmi_panic(NULL, "kernel stack overflow");
->> +     restore_console_loglevel();
->
-> panic()
->
->> @@ -694,7 +698,7 @@ void __noreturn arm64_serror_panic(struct pt_regs *regs, u32 esr)
->>               __show_regs(regs);
->>
->>       nmi_panic(regs, "Asynchronous SError Interrupt");
->> -
->> +     restore_console_loglevel();
->
-> panic()
->
-> What's the point of restore_console_loglevel() after panic()?
->
->         -ss
-Except die(), other places restore call can be avoided but just added
-for code completeness.
-Same mentioned in cover letter.
-More from ARM maintainers
+I don't have any public feedback on this series... so, I guess no one
+is really interested in this?
+
+On Tue, Jul 10, 2018 at 03:13:22PM +0100, Russell King - ARM Linux wrote:
+> Hi,
+> 
+> This series applies the mitigations for Spectre variant 1 to 32-bit
+> ARM user accessors.  This series slightly larger by the need to
+> offset the additional overhead introduced by these checks in various
+> paths, particularly the signal handling path.
+> 
+>  arch/arm/include/asm/assembler.h   |  4 +++
+>  arch/arm/include/asm/thread_info.h |  2 +-
+>  arch/arm/include/asm/uaccess.h     | 26 ++++++++++++-----
+>  arch/arm/kernel/signal.c           | 58 +++++++++++++++++++-------------------
+>  arch/arm/kernel/sys_oabi-compat.c  |  8 ++++--
+>  arch/arm/lib/copy_from_user.S      |  7 +++++
+>  arch/arm/vfp/vfpmodule.c           | 16 +++++------
+>  7 files changed, 72 insertions(+), 49 deletions(-)
+> 
+> -- 
+> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+> FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
+> According to speedtest.net: 13Mbps down 490kbps up
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
+According to speedtest.net: 13Mbps down 490kbps up
