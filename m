@@ -1,40 +1,35 @@
 From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Thu, 19 Jul 2018 16:24:48 +0530
-Subject: [PATCH v3 0/2] Add Mediatek X20 Development Board support
-Message-ID: <1531997690-6040-1-git-send-email-manivannan.sadhasivam@linaro.org>
+Date: Thu, 19 Jul 2018 16:24:49 +0530
+Subject: [PATCH v3 1/2] dt-bindings: arm: mediatek: Document Mediatek X20
+ Development Board
+In-Reply-To: <1531997690-6040-1-git-send-email-manivannan.sadhasivam@linaro.org>
+References: <1531997690-6040-1-git-send-email-manivannan.sadhasivam@linaro.org>
+Message-ID: <1531997690-6040-2-git-send-email-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add devicetree support for Mediatek X20 Development Board by Archermind.
-This board is based on the Deca-Core MT6797 SoC from Mediatek and is
-one of the 96Boards Consumer Edition platform.
+Document Mediatek X20 Development Board which is a 96Boards Consumer
+Edition platform based on MT6797 SoC.
 
-With this devicetree change, board can boot into initramfs.
+Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+Reviewed-by: Rob Herring <robh@kernel.org>
+---
+ Documentation/devicetree/bindings/arm/mediatek.txt | 3 +++
+ 1 file changed, 3 insertions(+)
 
-More information about this board can be found in 96Boards product page:
-https://www.96boards.org/product/mediatek-x20/
-
-Thanks,
-Mani
-
-Changes in v3:
-
-* Modified the memory size to 2GB (0x80000000) in board DTS
-
-Changes in v2:
-
-* Added documentation for board compatible
-* Dropped vendor documetation patch since it got applied
-
-Manivannan Sadhasivam (2):
-  dt-bindings: arm: mediatek: Document Mediatek X20 Development Board
-  arm64: dts: Add Mediatek X20 Development Board support
-
- Documentation/devicetree/bindings/arm/mediatek.txt |  3 ++
- arch/arm64/boot/dts/mediatek/Makefile              |  1 +
- arch/arm64/boot/dts/mediatek/mt6797-x20-dev.dts    | 33 ++++++++++++++++++++++
- 3 files changed, 37 insertions(+)
- create mode 100644 arch/arm64/boot/dts/mediatek/mt6797-x20-dev.dts
-
+diff --git a/Documentation/devicetree/bindings/arm/mediatek.txt b/Documentation/devicetree/bindings/arm/mediatek.txt
+index 7d21ab3..356df1e 100644
+--- a/Documentation/devicetree/bindings/arm/mediatek.txt
++++ b/Documentation/devicetree/bindings/arm/mediatek.txt
+@@ -47,6 +47,9 @@ Supported boards:
+ - Evaluation board for MT6797(Helio X20):
+     Required root node properties:
+       - compatible = "mediatek,mt6797-evb", "mediatek,mt6797";
++- Mediatek X20 Development Board:
++    Required root node properties:
++      - compatible = "archermind,mt6797-x20-dev", "mediatek,mt6797";
+ - Reference board variant 1 for MT7622:
+     Required root node properties:
+       - compatible = "mediatek,mt7622-rfb1", "mediatek,mt7622";
 -- 
 2.7.4
