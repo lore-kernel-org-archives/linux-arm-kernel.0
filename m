@@ -1,56 +1,90 @@
 From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Thu, 19 Jul 2018 23:14:01 +0530
-Subject: [PATCH v5 2/6] arm64: dts: actions: Add pinctrl definition for S900
- I2C controller
+Date: Thu, 19 Jul 2018 23:14:02 +0530
+Subject: [PATCH v5 3/6] arm64: dts: actions: Add Actions Semiconductor S900
+ I2C controller nodes
 In-Reply-To: <20180719174405.7210-1-manivannan.sadhasivam@linaro.org>
 References: <20180719174405.7210-1-manivannan.sadhasivam@linaro.org>
-Message-ID: <20180719174405.7210-3-manivannan.sadhasivam@linaro.org>
+Message-ID: <20180719174405.7210-4-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add pinctrl definition for Actions Semiconductor S900 I2C controller.
-Pinctrl definitions are only available for I2C0, I2C1, and I2C2.
+Add I2C controller nodes for Actions Semiconductor S900 SoC.
 
 Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 ---
- .../dts/actions/s900-bubblegum-96-pins.dtsi   | 29 +++++++++++++++++++
- 1 file changed, 29 insertions(+)
- create mode 100644 arch/arm64/boot/dts/actions/s900-bubblegum-96-pins.dtsi
+ arch/arm64/boot/dts/actions/s900.dtsi | 60 +++++++++++++++++++++++++++
+ 1 file changed, 60 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/actions/s900-bubblegum-96-pins.dtsi b/arch/arm64/boot/dts/actions/s900-bubblegum-96-pins.dtsi
-new file mode 100644
-index 000000000000..95e8b31071f9
---- /dev/null
-+++ b/arch/arm64/boot/dts/actions/s900-bubblegum-96-pins.dtsi
-@@ -0,0 +1,29 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+
-+&pinctrl {
-+
-+	i2c0_default: i2c0_default {
-+		pinmux {
-+			groups = "i2c0_mfp";
-+			function = "i2c0";
+diff --git a/arch/arm64/boot/dts/actions/s900.dtsi b/arch/arm64/boot/dts/actions/s900.dtsi
+index 7ae8b931f000..6f7b89edbe4d 100644
+--- a/arch/arm64/boot/dts/actions/s900.dtsi
++++ b/arch/arm64/boot/dts/actions/s900.dtsi
+@@ -174,6 +174,66 @@
+ 			#clock-cells = <1>;
+ 		};
+ 
++		i2c0: i2c at e0170000 {
++			compatible = "actions,s900-i2c";
++			reg = <0 0xe0170000 0 0x1000>;
++			interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
++			pinctrl-names = "default";
++			pinctrl-0 = <&i2c0_default>;
 +		};
-+		pinconf {
-+			pins = "i2c0_sclk", "i2c0_sdata";
-+			bias-pull-up;
-+		};
-+	};
 +
-+	i2c1_default: i2c1_default {
-+		pinconf {
-+			pins = "i2c1_sclk", "i2c1_sdata";
-+			bias-pull-up;
++		i2c1: i2c at e0172000 {
++			compatible = "actions,s900-i2c";
++			reg = <0 0xe0172000 0 0x1000>;
++			interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
++			pinctrl-names = "default";
++			pinctrl-0 = <&i2c1_default>;
 +		};
-+	};
 +
-+	i2c2_default: i2c2_default {
-+		pinconf {
-+			pins = "i2c2_sclk", "i2c2_sdata";
-+			bias-pull-up;
++		i2c2: i2c at e0174000 {
++			compatible = "actions,s900-i2c";
++			reg = <0 0xe0174000 0 0x1000>;
++			interrupts = <GIC_SPI 27 IRQ_TYPE_LEVEL_HIGH>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
++			pinctrl-names = "default";
++			pinctrl-0 = <&i2c2_default>;
 +		};
-+	};
-+};
++
++		i2c3: i2c at e0176000 {
++			compatible = "actions,s900-i2c";
++			reg = <0 0xe0176000 0 0x1000>;
++			interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
++		};
++
++		i2c4: i2c at e0178000 {
++			compatible = "actions,s900-i2c";
++			reg = <0 0xe0178000 0 0x1000>;
++			interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
++		};
++
++		i2c5: i2c at e017a000 {
++			compatible = "actions,s900-i2c";
++			reg = <0 0xe017a000 0 0x1000>;
++			interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
++		};
++
+ 		pinctrl: pinctrl at e01b0000 {
+ 			compatible = "actions,s900-pinctrl";
+ 			reg = <0x0 0xe01b0000 0x0 0x1000>;
 -- 
 2.17.1
