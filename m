@@ -1,50 +1,90 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Thu, 19 Jul 2018 17:32:40 +0200
-Subject: [PATCH v3 0/3] net: extend eth_platform_get_mac_address()
-Message-ID: <20180719153243.20944-1-brgl@bgdev.pl>
+Date: Thu, 19 Jul 2018 17:32:42 +0200
+Subject: [PATCH v3 2/3] net: add support for nvmem to
+ eth_platform_get_mac_address()
+In-Reply-To: <20180719153243.20944-1-brgl@bgdev.pl>
+References: <20180719153243.20944-1-brgl@bgdev.pl>
+Message-ID: <20180719153243.20944-3-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a follow-up to a series I posted a while ago the goal of which
-was to replace the at24 platform data with device properties. To do so
-we need to somehow remove reading the MAC address from relevant board
-files.
+From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-In my patches I used nvmem and MTD to read the MAC address from within
-the davinci emac driver. It was suggested that we generalize it further
-but since MTD doesn't support nvmem yet, the best we can do is to move
-this code over to net core code.
+Many non-DT platforms read the MAC address from EEPROM. Usually it's
+either done with callbacks defined in board files or from SoC-specific
+ethernet drivers.
 
-The following patches modify the eth_platform_get_mac_address()
-function which seems to be the best candidate for this code.
+In order to generalize this, try to read the MAC from nvmem in
+eth_platform_get_mac_address() using a standard lookup name:
+"mac-address".
 
-The first patch splits the function into two subroutines.
+Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+---
+ net/ethernet/eth.c | 38 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 38 insertions(+)
 
-The last two patches add nvmem and MTD support to the function. In
-order to stay compatible with existing users, nvmem and MTD will be
-tried last - after device tree and arch-specific callback.
-
-If this series gets accepted I will modify my previous patches to
-use it instead of handcoding the same operations in davinci_emac.
-
-v1 -> v2:
-- dropped patches 1 & 2
-- improved the MAC address verification and fixed a potential buffer
-  overflow in patch 2/3
-
-v2 -> v3:
-- in patch 1: split the function into subroutines in preparation
-  for nvmem and MTD support
-- modify patches 2 & 3 so that they have a separate function for
-  each new MAC address source
-
-Bartosz Golaszewski (3):
-  net: split eth_platform_get_mac_address() into subroutines
-  net: add support for nvmem to eth_platform_get_mac_address()
-  net: add MTD support to eth_platform_get_mac_address()
-
- net/ethernet/eth.c | 117 ++++++++++++++++++++++++++++++++++++++++-----
- 1 file changed, 106 insertions(+), 11 deletions(-)
-
+diff --git a/net/ethernet/eth.c b/net/ethernet/eth.c
+index cf54cdf042b7..98bc280b8a62 100644
+--- a/net/ethernet/eth.c
++++ b/net/ethernet/eth.c
+@@ -54,6 +54,7 @@
+ #include <linux/if_ether.h>
+ #include <linux/of_net.h>
+ #include <linux/pci.h>
++#include <linux/nvmem-consumer.h>
+ #include <net/dst.h>
+ #include <net/arp.h>
+ #include <net/sock.h>
+@@ -559,6 +560,39 @@ static int mac_address_from_arch(u8 *mac_addr)
+ 	return 0;
+ }
+ 
++static int mac_address_from_nvmem(struct device *dev, u8 *mac_addr)
++{
++	const unsigned char *addr;
++	struct nvmem_cell *cell;
++	size_t alen;
++	int rv = 0;
++
++	cell = nvmem_cell_get(dev, "mac-address");
++	if (IS_ERR(cell))
++		return PTR_ERR(cell);
++
++	addr = nvmem_cell_read(cell, &alen);
++	if (IS_ERR(addr)) {
++		rv = PTR_ERR(addr);
++		goto put_nvmem;
++	}
++
++	if (alen != ETH_ALEN || !is_valid_ether_addr(addr)) {
++		rv = -ENODEV;
++		goto free_addr;
++	}
++
++	ether_addr_copy(mac_addr, addr);
++
++free_addr:
++	kfree(addr);
++
++put_nvmem:
++	nvmem_cell_put(cell);
++
++	return rv;
++}
++
+ int eth_platform_get_mac_address(struct device *dev, u8 *mac_addr)
+ {
+ 	int rv;
+@@ -571,6 +605,10 @@ int eth_platform_get_mac_address(struct device *dev, u8 *mac_addr)
+ 	if (!rv)
+ 		return 0;
+ 
++	rv = mac_address_from_nvmem(dev, mac_addr);
++	if (!rv)
++		return 0;
++
+ 	return -ENODEV;
+ }
+ EXPORT_SYMBOL(eth_platform_get_mac_address);
 -- 
 2.17.1
