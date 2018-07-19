@@ -1,38 +1,153 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 19 Jul 2018 11:19:31 +0100
-Subject: [PATCH 0/6] Further spectre variant 1 mitigations
-In-Reply-To: <20180710141322.GL17271@n2100.armlinux.org.uk>
-References: <20180710141322.GL17271@n2100.armlinux.org.uk>
-Message-ID: <20180719101931.GI17271@n2100.armlinux.org.uk>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Thu, 19 Jul 2018 12:22:47 +0200
+Subject: [PATCH v8 05/26] PM / Domains: Add helper functions to
+ attach/detach CPUs to/from genpd
+In-Reply-To: <20180620172226.15012-6-ulf.hansson@linaro.org>
+References: <20180620172226.15012-1-ulf.hansson@linaro.org>
+ <20180620172226.15012-6-ulf.hansson@linaro.org>
+Message-ID: <3889041.sTGkQNs1Ck@aspire.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I don't have any public feedback on this series... so, I guess no one
-is really interested in this?
+On Wednesday, June 20, 2018 7:22:05 PM CEST Ulf Hansson wrote:
+> Introduce two new genpd helper functions, of_genpd_attach|detach_cpu(),
+> which takes the CPU-number as an in-parameter.
+> 
+> To attach a CPU to a genpd, of_genpd_attach_cpu() starts by fetching the
+> struct device belonging to the CPU. Then it calls genpd_dev_pm_attach(),
+> which via DT tries to hook up the CPU device to its corresponding PM
+> domain. If it succeeds, of_genpd_attach_cpu() continues to prepare/enable
+> runtime PM of the device.
+> 
+> To detach a CPU from its PM domain, of_genpd_attach_cpu() reverse the
+> operations made from of_genpd_attach_cpu(). However, first it checks that
+> the CPU device has a valid PM domain pointer assigned, as to make sure it
+> belongs to genpd.
+> 
+> Cc: Lina Iyer <ilina@codeaurora.org>
+> Co-developed-by: Lina Iyer <lina.iyer@linaro.org>
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> ---
+>  drivers/base/power/domain.c | 69 +++++++++++++++++++++++++++++++++++++
+>  include/linux/pm_domain.h   |  9 +++++
+>  2 files changed, 78 insertions(+)
+> 
+> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+> index 6149ce0bfa7b..299fa2febbec 100644
+> --- a/drivers/base/power/domain.c
+> +++ b/drivers/base/power/domain.c
+> @@ -2445,6 +2445,75 @@ struct device *genpd_dev_pm_attach_by_id(struct device *dev,
+>  }
+>  EXPORT_SYMBOL_GPL(genpd_dev_pm_attach_by_id);
+>  
+> +/*
+> + * of_genpd_attach_cpu() - Attach a CPU to its PM domain
+> + * @cpu: The CPU to be attached.
+> + *
+> + * Parses the OF node of the CPU's device, to find a PM domain specifier. If
+> + * such is found, attaches the CPU's device to the retrieved pm_domain ops and
+> + * enables runtime PM for it. This to allow the CPU to be power managed through
+> + * its PM domain.
+> + *
+> + * Returns zero when successfully attached the CPU's device to its PM domain,
+> + * else a negative error code.
+> + */
+> +int of_genpd_attach_cpu(int cpu)
+> +{
+> +	struct device *dev = get_cpu_device(cpu);
+> +	int ret;
+> +
+> +	if (!dev) {
+> +		pr_warn("genpd: no dev for cpu%d\n", cpu);
+> +		return -ENODEV;
+> +	}
 
-On Tue, Jul 10, 2018 at 03:13:22PM +0100, Russell King - ARM Linux wrote:
-> Hi,
-> 
-> This series applies the mitigations for Spectre variant 1 to 32-bit
-> ARM user accessors.  This series slightly larger by the need to
-> offset the additional overhead introduced by these checks in various
-> paths, particularly the signal handling path.
-> 
->  arch/arm/include/asm/assembler.h   |  4 +++
->  arch/arm/include/asm/thread_info.h |  2 +-
->  arch/arm/include/asm/uaccess.h     | 26 ++++++++++++-----
->  arch/arm/kernel/signal.c           | 58 +++++++++++++++++++-------------------
->  arch/arm/kernel/sys_oabi-compat.c  |  8 ++++--
->  arch/arm/lib/copy_from_user.S      |  7 +++++
->  arch/arm/vfp/vfpmodule.c           | 16 +++++------
->  7 files changed, 72 insertions(+), 49 deletions(-)
-> 
-> -- 
-> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
-> According to speedtest.net: 13Mbps down 490kbps up
+I'm not sure about the value of the above.  Is it possible even?
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
-According to speedtest.net: 13Mbps down 490kbps up
+> +
+> +	ret = genpd_dev_pm_attach(dev);
+> +	if (ret != 1) {
+> +		dev_warn(dev, "genpd: attach cpu failed %d\n", ret);
+
+This looks like a debug message.  Do you really want to print it with high prio?
+
+> +		return ret < 0 ? ret : -ENODEV;
+> +	}
+> +
+> +	pm_runtime_irq_safe(dev);
+> +	pm_runtime_get_noresume(dev);
+> +	pm_runtime_set_active(dev);
+> +	pm_runtime_enable(dev);
+> +
+> +	dev_info(dev, "genpd: attached cpu\n");
+
+This definitely is a debug message.
+
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL(of_genpd_attach_cpu);
+> +
+> +/**
+> + * of_genpd_detach_cpu() - Detach a CPU from its PM domain
+> + * @cpu: The CPU to be detached.
+> + *
+> + * Detach the CPU's device from its corresponding PM domain. If detaching is
+> + * completed successfully, disable runtime PM and restore the runtime PM usage
+> + * count for the CPU's device.
+> + */
+> +void of_genpd_detach_cpu(int cpu)
+> +{
+> +	struct device *dev = get_cpu_device(cpu);
+> +
+> +	if (!dev) {
+> +		pr_warn("genpd: no dev for cpu%d\n", cpu);
+> +		return;
+> +	}
+> +
+> +	/* Check that the device is attached to a genpd. */
+> +	if (!(dev->pm_domain && dev->pm_domain->detach == genpd_dev_pm_detach))
+> +		return;
+> +
+> +	genpd_dev_pm_detach(dev, true);
+> +
+> +	pm_runtime_disable(dev);
+> +	pm_runtime_put_noidle(dev);
+> +	pm_runtime_reinit(dev);
+> +
+> +	dev_info(dev, "genpd: detached cpu\n");
+> +}
+> +EXPORT_SYMBOL(of_genpd_detach_cpu);
+> +
+>  static const struct of_device_id idle_state_match[] = {
+>  	{ .compatible = "domain-idle-state", },
+>  	{ }
+> diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
+> index 3f67ff0c1c69..2c09cf80b285 100644
+> --- a/include/linux/pm_domain.h
+> +++ b/include/linux/pm_domain.h
+> @@ -243,6 +243,8 @@ unsigned int of_genpd_opp_to_performance_state(struct device *dev,
+>  int genpd_dev_pm_attach(struct device *dev);
+>  struct device *genpd_dev_pm_attach_by_id(struct device *dev,
+>  					 unsigned int index);
+> +int of_genpd_attach_cpu(int cpu);
+> +void of_genpd_detach_cpu(int cpu);
+>  #else /* !CONFIG_PM_GENERIC_DOMAINS_OF */
+>  static inline int of_genpd_add_provider_simple(struct device_node *np,
+>  					struct generic_pm_domain *genpd)
+> @@ -294,6 +296,13 @@ static inline struct device *genpd_dev_pm_attach_by_id(struct device *dev,
+>  	return NULL;
+>  }
+>  
+> +static inline int of_genpd_attach_cpu(int cpu)
+> +{
+> +	return -ENODEV;
+> +}
+> +
+> +static inline void of_genpd_detach_cpu(int cpu) {}
+> +
+>  static inline
+>  struct generic_pm_domain *of_genpd_remove_last(struct device_node *np)
+>  {
+> 
+
+I'd combine this with patch [04/26].  The split here is somewhat artificial IMO.
