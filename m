@@ -1,9 +1,9 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Fri, 20 Jul 2018 01:00:02 +0200
-Subject: [PATCH v3 09/33] mtd: rawnand: hisi504: convert driver to nand_scan()
+Date: Fri, 20 Jul 2018 01:00:07 +0200
+Subject: [PATCH v3 14/33] mtd: rawnand: mtk: convert driver to nand_scan()
 In-Reply-To: <20180719230026.8741-1-miquel.raynal@bootlin.com>
 References: <20180719230026.8741-1-miquel.raynal@bootlin.com>
-Message-ID: <20180719230026.8741-10-miquel.raynal@bootlin.com>
+Message-ID: <20180719230026.8741-15-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,109 +14,114 @@ both nand_scan_ident() and nand_scan_tail().
 
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 ---
- drivers/mtd/nand/raw/hisi504_nand.c | 78 +++++++++++++++++++++----------------
- 1 file changed, 44 insertions(+), 34 deletions(-)
+ drivers/mtd/nand/raw/mtk_nand.c | 75 ++++++++++++++++++++++++-----------------
+ 1 file changed, 44 insertions(+), 31 deletions(-)
 
-diff --git a/drivers/mtd/nand/raw/hisi504_nand.c b/drivers/mtd/nand/raw/hisi504_nand.c
-index a1e009c8e556..34867e91df84 100644
---- a/drivers/mtd/nand/raw/hisi504_nand.c
-+++ b/drivers/mtd/nand/raw/hisi504_nand.c
-@@ -709,9 +709,50 @@ static int hisi_nfc_ecc_probe(struct hinfc_host *host)
+diff --git a/drivers/mtd/nand/raw/mtk_nand.c b/drivers/mtd/nand/raw/mtk_nand.c
+index 7bc6be3f6ec0..4376adc433a6 100644
+--- a/drivers/mtd/nand/raw/mtk_nand.c
++++ b/drivers/mtd/nand/raw/mtk_nand.c
+@@ -1250,13 +1250,54 @@ static int mtk_nfc_ecc_init(struct device *dev, struct mtd_info *mtd)
  	return 0;
  }
  
-+static int hisi_nfc_attach_chip(struct nand_chip *chip)
++static int mtk_nfc_attach_chip(struct nand_chip *chip)
 +{
 +	struct mtd_info *mtd = nand_to_mtd(chip);
-+	struct hinfc_host *host = nand_get_controller_data(chip);
-+	int flag;
++	struct device *dev = mtd->dev.parent;
++	struct mtk_nfc *nfc = nand_get_controller_data(chip);
++	struct mtk_nfc_nand_chip *mtk_nand = to_mtk_nand(chip);
++	int len;
++	int ret;
 +
-+	host->buffer = dmam_alloc_coherent(host->dev,
-+					   mtd->writesize + mtd->oobsize,
-+					   &host->dma_buffer, GFP_KERNEL);
-+	if (!host->buffer)
-+		return -ENOMEM;
-+
-+	host->dma_oob = host->dma_buffer + mtd->writesize;
-+	memset(host->buffer, 0xff, mtd->writesize + mtd->oobsize);
-+
-+	flag = hinfc_read(host, HINFC504_CON);
-+	flag &= ~(HINFC504_CON_PAGESIZE_MASK << HINFC504_CON_PAGEISZE_SHIFT);
-+	switch (mtd->writesize) {
-+	case 2048:
-+		flag |= (0x001 << HINFC504_CON_PAGEISZE_SHIFT);
-+		break;
-+	/*
-+	 * TODO: add more pagesize support,
-+	 * default pagesize has been set in hisi_nfc_host_init
-+	 */
-+	default:
-+		dev_err(host->dev, "NON-2KB page size nand flash\n");
++	if (chip->options & NAND_BUSWIDTH_16) {
++		dev_err(dev, "16bits buswidth not supported");
 +		return -EINVAL;
 +	}
-+	hinfc_write(host, flag, HINFC504_CON);
 +
-+	if (chip->ecc.mode == NAND_ECC_HW)
-+		hisi_nfc_ecc_probe(host);
++	/* store bbt magic in page, cause OOB is not protected */
++	if (chip->bbt_options & NAND_BBT_USE_FLASH)
++		chip->bbt_options |= NAND_BBT_NO_OOB;
++
++	ret = mtk_nfc_ecc_init(dev, mtd);
++	if (ret)
++		return ret;
++
++	ret = mtk_nfc_set_spare_per_sector(&mtk_nand->spare_per_sector, mtd);
++	if (ret)
++		return ret;
++
++	mtk_nfc_set_fdm(&mtk_nand->fdm, mtd);
++	mtk_nfc_set_bad_mark_ctl(&mtk_nand->bad_mark, mtd);
++
++	len = mtd->writesize + mtd->oobsize;
++	nfc->buffer = devm_kzalloc(dev, len, GFP_KERNEL);
++	if (!nfc->buffer)
++		return  -ENOMEM;
 +
 +	return 0;
 +}
 +
-+static struct nand_controller_ops hisi_nfc_controller_ops = {
-+	.attach_chip = hisi_nfc_attach_chip,
++static struct nand_controller_ops mtk_nfc_controller_ops = {
++	.attach_chip = mtk_nfc_attach_chip,
 +};
 +
- static int hisi_nfc_probe(struct platform_device *pdev)
+ static int mtk_nfc_nand_chip_init(struct device *dev, struct mtk_nfc *nfc,
+ 				  struct device_node *np)
  {
--	int ret = 0, irq, flag, max_chips = HINFC504_MAX_CHIP;
-+	int ret = 0, irq, max_chips = HINFC504_MAX_CHIP;
- 	struct device *dev = &pdev->dev;
- 	struct hinfc_host *host;
- 	struct nand_chip  *chip;
-@@ -769,42 +810,11 @@ static int hisi_nfc_probe(struct platform_device *pdev)
- 		return ret;
- 	}
+ 	struct mtk_nfc_nand_chip *chip;
+ 	struct nand_chip *nand;
+ 	struct mtd_info *mtd;
+-	int nsels, len;
++	int nsels;
+ 	u32 tmp;
+ 	int ret;
+ 	int i;
+@@ -1287,6 +1328,7 @@ static int mtk_nfc_nand_chip_init(struct device *dev, struct mtk_nfc *nfc,
  
--	ret = nand_scan_ident(mtd, max_chips, NULL);
-+	chip->dummy_controller.ops = &hisi_nfc_controller_ops;
-+	ret = nand_scan(mtd, max_chips);
+ 	nand = &chip->nand;
+ 	nand->controller = &nfc->controller;
++	nand->controller->ops = &mtk_nfc_controller_ops;
+ 
+ 	nand_set_flash_node(nand, np);
+ 	nand_set_controller_data(nand, nfc);
+@@ -1324,36 +1366,7 @@ static int mtk_nfc_nand_chip_init(struct device *dev, struct mtk_nfc *nfc,
+ 
+ 	mtk_nfc_hw_init(nfc);
+ 
+-	ret = nand_scan_ident(mtd, nsels, NULL);
+-	if (ret)
+-		return ret;
+-
+-	/* store bbt magic in page, cause OOB is not protected */
+-	if (nand->bbt_options & NAND_BBT_USE_FLASH)
+-		nand->bbt_options |= NAND_BBT_NO_OOB;
+-
+-	ret = mtk_nfc_ecc_init(dev, mtd);
+-	if (ret)
+-		return -EINVAL;
+-
+-	if (nand->options & NAND_BUSWIDTH_16) {
+-		dev_err(dev, "16bits buswidth not supported");
+-		return -EINVAL;
+-	}
+-
+-	ret = mtk_nfc_set_spare_per_sector(&chip->spare_per_sector, mtd);
+-	if (ret)
+-		return ret;
+-
+-	mtk_nfc_set_fdm(&chip->fdm, mtd);
+-	mtk_nfc_set_bad_mark_ctl(&chip->bad_mark, mtd);
+-
+-	len = mtd->writesize + mtd->oobsize;
+-	nfc->buffer = devm_kzalloc(dev, len, GFP_KERNEL);
+-	if (!nfc->buffer)
+-		return  -ENOMEM;
+-
+-	ret = nand_scan_tail(mtd);
++	ret = nand_scan(mtd, nsels);
  	if (ret)
  		return ret;
  
--	host->buffer = dmam_alloc_coherent(dev, mtd->writesize + mtd->oobsize,
--		&host->dma_buffer, GFP_KERNEL);
--	if (!host->buffer)
--		return -ENOMEM;
--
--	host->dma_oob = host->dma_buffer + mtd->writesize;
--	memset(host->buffer, 0xff, mtd->writesize + mtd->oobsize);
--
--	flag = hinfc_read(host, HINFC504_CON);
--	flag &= ~(HINFC504_CON_PAGESIZE_MASK << HINFC504_CON_PAGEISZE_SHIFT);
--	switch (mtd->writesize) {
--	case 2048:
--		flag |= (0x001 << HINFC504_CON_PAGEISZE_SHIFT); break;
--	/*
--	 * TODO: add more pagesize support,
--	 * default pagesize has been set in hisi_nfc_host_init
--	 */
--	default:
--		dev_err(dev, "NON-2KB page size nand flash\n");
--		return -EINVAL;
--	}
--	hinfc_write(host, flag, HINFC504_CON);
--
--	if (chip->ecc.mode == NAND_ECC_HW)
--		hisi_nfc_ecc_probe(host);
--
--	ret = nand_scan_tail(mtd);
--	if (ret) {
--		dev_err(dev, "nand_scan_tail failed: %d\n", ret);
--		return ret;
--	}
--
- 	ret = mtd_device_register(mtd, NULL, 0);
- 	if (ret) {
- 		dev_err(dev, "Err MTD partition=%d\n", ret);
 -- 
 2.14.1
