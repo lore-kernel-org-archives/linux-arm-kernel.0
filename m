@@ -1,73 +1,35 @@
 From: vivek.gautam@codeaurora.org (Vivek Gautam)
-Date: Thu, 19 Jul 2018 23:23:55 +0530
-Subject: [PATCH 2/3] dts: arm64/sdm845: Add node for qcom,smmu-v2
-In-Reply-To: <20180719175356.14753-1-vivek.gautam@codeaurora.org>
-References: <20180719175356.14753-1-vivek.gautam@codeaurora.org>
-Message-ID: <20180719175356.14753-3-vivek.gautam@codeaurora.org>
+Date: Thu, 19 Jul 2018 23:23:53 +0530
+Subject: [PATCH 0/3] Enable smmu support on sdm845
+Message-ID: <20180719175356.14753-1-vivek.gautam@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device node for qcom,smmu-v2 available on sdm845.
-This smmu is available only to GPU device.
+This series enables apps-smmu (arm,mmu-500) and gpu-smmu (qcom,smmu-v2)
+on sdm845. gpu-smmu needs one power domain from gpu clock controller
+whose driver was sent by Amit [1].
 
-Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
----
-
-One power domain required for this GPU smmu - GPU_CX_GDSC,
-commented out in the node is coming from gpu clock controller [1].
+This series also contains a patch to split the check for num_context_irqs
+and num_context_banks in two. We now error out only if num_context_irqs
+is greater than num_context_banks.
+There are cases such as on sdm845, in which few of the context banks are
+reserved by the bootloader (secure software), and thus kernel view
+lesser number than the total available context banks.
+So, we shouldn't error out simply when the num_context_irqs is not equal
+to num_context_banks.
 
 [1] https://lore.kernel.org/patchwork/cover/962208/
 
- arch/arm64/boot/dts/qcom/sdm845-mtp.dts |  4 ++++
- arch/arm64/boot/dts/qcom/sdm845.dtsi    | 23 +++++++++++++++++++++++
- 2 files changed, 27 insertions(+)
+Vivek Gautam (3):
+  dts: arm64/sdm845: Add node for arm,mmu-500
+  dts: arm64/sdm845: Add node for qcom,smmu-v2
+  iommu/arm-smmu: Error out only if not enough context interrupts
 
-diff --git a/arch/arm64/boot/dts/qcom/sdm845-mtp.dts b/arch/arm64/boot/dts/qcom/sdm845-mtp.dts
-index 13b50dff440f..969aa76bdceb 100644
---- a/arch/arm64/boot/dts/qcom/sdm845-mtp.dts
-+++ b/arch/arm64/boot/dts/qcom/sdm845-mtp.dts
-@@ -62,3 +62,7 @@
- &apps_smmu {
- 	status = "okay";
- };
-+
-+&gpu_smmu {
-+	status = "okay";
-+};
-diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-index 70ca18ae6cb3..db9f9e84d162 100644
---- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
-+++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-@@ -980,6 +980,29 @@
- 			cell-index = <0>;
- 		};
- 
-+		gpu_smmu: arm,smmu at 5040000 {
-+			compatible = "qcom,sdm845-smmu-v2", "qcom,smmu-v2";
-+			reg = <0x5040000 0x10000>;
-+			#iommu-cells = <1>;
-+			#global-interrupts = <2>;
-+			interrupts = <GIC_SPI 229 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 231 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 364 IRQ_TYPE_EDGE_RISING>,
-+				     <GIC_SPI 365 IRQ_TYPE_EDGE_RISING>,
-+				     <GIC_SPI 366 IRQ_TYPE_EDGE_RISING>,
-+				     <GIC_SPI 367 IRQ_TYPE_EDGE_RISING>,
-+				     <GIC_SPI 368 IRQ_TYPE_EDGE_RISING>,
-+				     <GIC_SPI 369 IRQ_TYPE_EDGE_RISING>,
-+				     <GIC_SPI 370 IRQ_TYPE_EDGE_RISING>,
-+				     <GIC_SPI 371 IRQ_TYPE_EDGE_RISING>;
-+			clock-names = "bus", "iface";
-+			clocks = <&gcc GCC_GPU_MEMNOC_GFX_CLK>,
-+				 <&gcc GCC_GPU_CFG_AHB_CLK>;
-+
-+			/* power-domains = <&gpucc GPU_CX_GDSC>; */
-+			status = "disabled";
-+		};
-+
- 		apps_smmu: arm,smmu at 15000000 {
- 			compatible = "arm,mmu-500";
- 			reg = <0x15000000 0x80000>;
+ arch/arm64/boot/dts/qcom/sdm845-mtp.dts |  8 +++
+ arch/arm64/boot/dts/qcom/sdm845.dtsi    | 96 +++++++++++++++++++++++++++++++++
+ drivers/iommu/arm-smmu.c                | 19 ++++---
+ 3 files changed, 117 insertions(+), 6 deletions(-)
+
 -- 
 QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
 of Code Aurora Forum, hosted by The Linux Foundation
