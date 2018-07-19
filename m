@@ -1,89 +1,35 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Thu, 19 Jul 2018 15:24:05 +0800
-Subject: [PATCH] pinctrl: uniphier: add spi pin-mux settings
-In-Reply-To: <1531981249-26329-1-git-send-email-hayashibara.keiji@socionext.com>
-References: <1531981249-26329-1-git-send-email-hayashibara.keiji@socionext.com>
-Message-ID: <201807191559.Hz06N37O%fengguang.wu@intel.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 19 Jul 2018 00:37:32 -0700
+Subject: [GIT PULL] one omap fix for v4.18-rc cycle
+Message-ID: <pull-1531985748-704286@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kunihiko,
+From: "Tony Lindgren" <tony@atomide.com>
 
-Thank you for the patch! Yet something to improve:
+The following changes since commit 923847413f7316b5ced3491769b3fefa6c56a79a:
 
-[auto build test ERROR on pinctrl/devel]
-[also build test ERROR on v4.18-rc5 next-20180718]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+  ARM: dts: am3517.dtsi:  Disable reference to OMAP3 OTG controller (2018-07-12 06:57:05 -0700)
 
-url:    https://github.com/0day-ci/linux/commits/Keiji-Hayashibara/pinctrl-uniphier-add-spi-pin-mux-settings/20180719-144943
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-pinctrl.git devel
-config: xtensa-allyesconfig (attached as .config)
-compiler: xtensa-linux-gcc (GCC) 8.1.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        GCC_VERSION=8.1.0 make.cross ARCH=xtensa 
+are available in the Git repository at:
 
-All errors (new ones prefixed by >>):
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.18/fixes-rc5-signed
 
-   In file included from drivers/pinctrl/uniphier/pinctrl-uniphier-sld8.c:21:
->> drivers/pinctrl/uniphier/pinctrl-uniphier-sld8.c:629:27: error: 'spi0_groups' undeclared here (not in a function); did you mean 'spi_groups'?
-     UNIPHIER_PINMUX_FUNCTION(spi0),
-                              ^~~~
-   drivers/pinctrl/uniphier/pinctrl-uniphier.h:188:13: note: in definition of macro 'UNIPHIER_PINMUX_FUNCTION'
-      .groups = func##_groups,    \
-                ^~~~
-   In file included from include/linux/kernel.h:15,
-                    from drivers/pinctrl/uniphier/pinctrl-uniphier-sld8.c:16:
-   include/linux/build_bug.h:29:45: error: bit-field '<anonymous>' width not an integer constant
-    #define BUILD_BUG_ON_ZERO(e) (sizeof(struct { int:(-!!(e)); }))
-                                                ^
-   include/linux/compiler-gcc.h:65:28: note: in expansion of macro 'BUILD_BUG_ON_ZERO'
-    #define __must_be_array(a) BUILD_BUG_ON_ZERO(__same_type((a), &(a)[0]))
-                               ^~~~~~~~~~~~~~~~~
-   include/linux/kernel.h:72:59: note: in expansion of macro '__must_be_array'
-    #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]) + __must_be_array(arr))
-                                                              ^~~~~~~~~~~~~~~
-   drivers/pinctrl/uniphier/pinctrl-uniphier.h:189:17: note: in expansion of macro 'ARRAY_SIZE'
-      .num_groups = ARRAY_SIZE(func##_groups),  \
-                    ^~~~~~~~~~
-   drivers/pinctrl/uniphier/pinctrl-uniphier-sld8.c:629:2: note: in expansion of macro 'UNIPHIER_PINMUX_FUNCTION'
-     UNIPHIER_PINMUX_FUNCTION(spi0),
-     ^~~~~~~~~~~~~~~~~~~~~~~~
+for you to fetch changes up to d3f6daede246038cf2ea38b78d732f9dd8feb1d6:
 
-vim +629 drivers/pinctrl/uniphier/pinctrl-uniphier-sld8.c
+  ARM: dts: omap4-droid4: fix dts w.r.t. pwm (2018-07-16 23:38:52 -0700)
 
-   618	
-   619	static const struct uniphier_pinmux_function uniphier_sld8_functions[] = {
-   620		UNIPHIER_PINMUX_FUNCTION(emmc),
-   621		UNIPHIER_PINMUX_FUNCTION(ether_mii),
-   622		UNIPHIER_PINMUX_FUNCTION(ether_rmii),
-   623		UNIPHIER_PINMUX_FUNCTION(i2c0),
-   624		UNIPHIER_PINMUX_FUNCTION(i2c1),
-   625		UNIPHIER_PINMUX_FUNCTION(i2c2),
-   626		UNIPHIER_PINMUX_FUNCTION(i2c3),
-   627		UNIPHIER_PINMUX_FUNCTION(nand),
-   628		UNIPHIER_PINMUX_FUNCTION(sd),
- > 629		UNIPHIER_PINMUX_FUNCTION(spi0),
-   630		UNIPHIER_PINMUX_FUNCTION(system_bus),
-   631		UNIPHIER_PINMUX_FUNCTION(uart0),
-   632		UNIPHIER_PINMUX_FUNCTION(uart1),
-   633		UNIPHIER_PINMUX_FUNCTION(uart2),
-   634		UNIPHIER_PINMUX_FUNCTION(uart3),
-   635		UNIPHIER_PINMUX_FUNCTION(usb0),
-   636		UNIPHIER_PINMUX_FUNCTION(usb1),
-   637		UNIPHIER_PINMUX_FUNCTION(usb2),
-   638	};
-   639	
+----------------------------------------------------------------
+One omap dts mismerge fix
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 54164 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180719/4786e6bc/attachment-0001.gz>
+The dts patch for droid4 PWM vibrator has added gpio6 entries to the wrong
+node. Let's fix it with a note that there seems to be also other GPIO PWM
+issues to fix still to get the PWM vibrator working. So this can wait for
+v4.19 merge cycle if necessary.
+
+----------------------------------------------------------------
+Pavel Machek (1):
+      ARM: dts: omap4-droid4: fix dts w.r.t. pwm
+
+ arch/arm/boot/dts/omap4-droid4-xt894.dts | 9 +++------
+ 1 file changed, 3 insertions(+), 6 deletions(-)
