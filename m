@@ -1,114 +1,27 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Thu, 19 Jul 2018 08:23:18 +0200
-Subject: [RFC PATCH 3/8] mtd: rawnand: ams-delta: Set port direction
- once per transfer
-In-Reply-To: <20180718235710.18242-4-jmkrzyszt@gmail.com>
-References: <20180718235710.18242-1-jmkrzyszt@gmail.com>
- <20180718235710.18242-4-jmkrzyszt@gmail.com>
-Message-ID: <20180719082318.290abee1@bbrezillon>
+From: hayashibara.keiji@socionext.com (Keiji Hayashibara)
+Date: Thu, 19 Jul 2018 15:23:26 +0900
+Subject: [PATCH 0/3] Add SPI dts node for UniPhier SoCs
+Message-ID: <1531981409-28396-1-git-send-email-hayashibara.keiji@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 19 Jul 2018 01:57:05 +0200
-Janusz Krzysztofik <jmkrzyszt@gmail.com> wrote:
+This series adds SPI pin-mux node and SPI node for UniPhier SoCs.
 
-> In its current shape, the driver sets data port direction before each
-> byte read/write operation, even during multi-byte transfers.  Optimize
-> that by setting the port direction only on first byte of each transfer.
+Kunihiko Hayashi (3):
+  ARM: dts: uniphier: add SPI pin-mux node
+  ARM: dts: uniphier: add SPI node for UniPhier 32bit SoCs
+  arm64: dts: uniphier: add SPI node for LD20, LD11 and PXs3
 
-Sounds like premature optimization for something you'll rework when
-fully switching to the GPIO consumer API to control the DATA bus.
+ arch/arm/boot/dts/uniphier-ld4.dtsi              | 11 ++++++
+ arch/arm/boot/dts/uniphier-pinctrl.dtsi          | 20 +++++++++++
+ arch/arm/boot/dts/uniphier-pro4.dtsi             | 22 ++++++++++++
+ arch/arm/boot/dts/uniphier-pro5.dtsi             | 33 ++++++++++++++++++
+ arch/arm/boot/dts/uniphier-pxs2.dtsi             | 22 ++++++++++++
+ arch/arm/boot/dts/uniphier-sld8.dtsi             | 11 ++++++
+ arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi | 22 ++++++++++++
+ arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi | 44 ++++++++++++++++++++++++
+ arch/arm64/boot/dts/socionext/uniphier-pxs3.dtsi | 22 ++++++++++++
+ 9 files changed, 207 insertions(+)
 
-> 
-> Signed-off-by: Janusz Krzysztofik <jmkrzyszt@gmail.com>
-> ---
->  drivers/mtd/nand/raw/ams-delta.c | 42 ++++++++++++++++++++++++++++++----------
->  1 file changed, 32 insertions(+), 10 deletions(-)
-> 
-> diff --git a/drivers/mtd/nand/raw/ams-delta.c b/drivers/mtd/nand/raw/ams-delta.c
-> index 6ac38e9cfa1a..dfefcd79b420 100644
-> --- a/drivers/mtd/nand/raw/ams-delta.c
-> +++ b/drivers/mtd/nand/raw/ams-delta.c
-> @@ -72,50 +72,72 @@ static const struct mtd_partition partition_info[] = {
->  	  .size		=  3 * SZ_256K },
->  };
->  
-> -static void ams_delta_write_byte(struct mtd_info *mtd, u_char byte)
-> +static void ams_delta_write_next_byte(struct mtd_info *mtd, u_char byte)
->  {
->  	struct nand_chip *this = mtd_to_nand(mtd);
->  	struct ams_delta_nand *priv = nand_get_controller_data(this);
-> -	void __iomem *io_base = priv->io_base;
->  
-> -	writew(0, io_base + OMAP_MPUIO_IO_CNTL);
->  	writew(byte, this->IO_ADDR_W);
->  	gpiod_set_value(priv->gpiod_nwe, 0);
->  	ndelay(40);
->  	gpiod_set_value(priv->gpiod_nwe, 1);
->  }
->  
-> -static u_char ams_delta_read_byte(struct mtd_info *mtd)
-> +static void ams_delta_write_byte(struct mtd_info *mtd, u_char byte)
->  {
-> -	u_char res;
->  	struct nand_chip *this = mtd_to_nand(mtd);
->  	struct ams_delta_nand *priv = nand_get_controller_data(this);
->  	void __iomem *io_base = priv->io_base;
->  
-> +	writew(0, io_base + OMAP_MPUIO_IO_CNTL);
-> +
-> +	ams_delta_write_next_byte(mtd, byte);
-> +}
-> +
-> +static u_char ams_delta_read_next_byte(struct mtd_info *mtd)
-> +{
-> +	struct nand_chip *this = mtd_to_nand(mtd);
-> +	struct ams_delta_nand *priv = nand_get_controller_data(this);
-> +	u_char res;
-> +
->  	gpiod_set_value(priv->gpiod_nre, 0);
->  	ndelay(40);
-> -	writew(~0, io_base + OMAP_MPUIO_IO_CNTL);
->  	res = readw(this->IO_ADDR_R);
->  	gpiod_set_value(priv->gpiod_nre, 1);
->  
->  	return res;
->  }
->  
-> +static u_char ams_delta_read_byte(struct mtd_info *mtd)
-> +{
-> +	struct nand_chip *this = mtd_to_nand(mtd);
-> +	struct ams_delta_nand *priv = nand_get_controller_data(this);
-> +	void __iomem *io_base = priv->io_base;
-> +
-> +	writew(~0, io_base + OMAP_MPUIO_IO_CNTL);
-> +
-> +	return ams_delta_read_next_byte(mtd);
-> +}
-> +
->  static void ams_delta_write_buf(struct mtd_info *mtd, const u_char *buf,
->  				int len)
->  {
->  	int i;
->  
-> -	for (i=0; i<len; i++)
-> -		ams_delta_write_byte(mtd, buf[i]);
-> +	if (len > 0)
-> +		ams_delta_write_byte(mtd, buf[0]);
-> +	for (i = 1; i < len; i++)
-> +		ams_delta_write_next_byte(mtd, buf[i]);
->  }
->  
->  static void ams_delta_read_buf(struct mtd_info *mtd, u_char *buf, int len)
->  {
->  	int i;
->  
-> -	for (i=0; i<len; i++)
-> -		buf[i] = ams_delta_read_byte(mtd);
-> +	if (len > 0)
-> +		buf[0] = ams_delta_read_byte(mtd);
-> +	for (i = 1; i < len; i++)
-> +		buf[i] = ams_delta_read_next_byte(mtd);
->  }
->  
->  /*
+-- 
+2.7.4
